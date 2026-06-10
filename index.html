@@ -15,7 +15,7 @@
 /* ── RESET ── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 html{height:100%;}
-body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;}
+body{height:100%;font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;}
 
 /* ══ THEME TOKENS ══ */
 :root,[data-theme="light"]{
@@ -97,6 +97,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   display:flex;flex-direction:column;
   background:var(--bg);
   position:relative;
+  overflow:hidden;
 }
 .statusbar{flex-shrink:0;padding:14px 20px 4px;display:flex;justify-content:space-between;font-size:11px;color:var(--tm);}
 .topbar{flex-shrink:0;padding:2px 18px 8px;display:flex;align-items:center;justify-content:space-between;}
