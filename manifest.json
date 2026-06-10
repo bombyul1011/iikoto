@@ -2,7 +2,7 @@
   "name": "iikoto",
   "short_name": "iikoto",
   "description": "더 나은 나로 만드는 데일리 앱",
-  "start_url": "/",
+  "start_url": "/iikoto/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#fdf0e8",
@@ -20,5 +20,6 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
-  ]
+  ],
+  "scope": "/iikoto/"
 }

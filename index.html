@@ -7,8 +7,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="iikoto">
 <meta name="theme-color" content="#fdf0e8">
-<link rel="manifest" href="/manifest.json">
-<link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
 <title>iikoto</title>
 <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -1196,8 +1196,13 @@ async function syncHabitsDown(){
 }
 async function syncHabitsUp(){
   const h=getHabits();
-  await supaFetch('habits','DELETE');
-  if(h.length)await supaFetch('habits','POST',h.map((h,i)=>({name:h.name,color:h.color,sort_order:i})));
+  // id 없이 전체 삭제 방지 — 먼저 기존 rows 가져와서 id로 삭제
+  const existing=await supaFetch('habits?select=id');
+  if(existing&&existing.length){
+    const ids=existing.map(r=>r.id).join(',');
+    await supaFetch(`habits?id=in.(${ids})`,'DELETE');
+  }
+  if(h.length)await supaFetch('habits','POST',h.map((hh,i)=>({name:hh.name,color:hh.color,sort_order:i})));
 }
 async function syncHCDown(wk){
   const ws=wk.replace('week:','');const we=getWeekEnd(ws);
@@ -2114,7 +2119,7 @@ window.addEventListener('resize',()=>{
 // PC 초기화
 initPC();
 
-if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));}
+if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
 
 </script>
 </body>
