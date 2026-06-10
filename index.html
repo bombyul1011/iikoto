@@ -940,10 +940,19 @@ function updateDateUI(){
   const d=currentDate;
   document.getElementById('js-date').textContent=`${d.getFullYear()}. ${d.getMonth()+1}. ${d.getDate()}. ${DAYS[d.getDay()]}`;
   const nxt=document.getElementById('btn-next');
-  nxt.style.opacity=isToday(d)?'0.3':'1';nxt.style.pointerEvents=isToday(d)?'none':'auto';
+  const tmrw=new Date();tmrw.setDate(tmrw.getDate()+1);
+  const isTmrwOrLater=d>=tmrw;
+  nxt.style.opacity=isTmrwOrLater?'0.3':'1';
+  nxt.style.pointerEvents=isTmrwOrLater?'none':'auto';
   loadDaily();
 }
-function shiftDay(n){const d=new Date(currentDate);d.setDate(d.getDate()+n);if(d>new Date())return;currentDate=d;updateDateUI();}
+function shiftDay(n){
+  const d=new Date(currentDate);d.setDate(d.getDate()+n);
+  const tomorrow=new Date();tomorrow.setDate(tomorrow.getDate()+1);
+  tomorrow.setHours(23,59,59,999);
+  if(d>tomorrow)return;
+  currentDate=d;updateDateUI();
+}
 function goToday(){currentDate=new Date();updateDateUI();}
 updateDateUI();
 
