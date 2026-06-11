@@ -976,12 +976,8 @@ body{height:100%;font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antiali
           <span style="font-size:10px;color:var(--tm);display:flex;align-items:center;gap:4px;"><span style="width:9px;height:9px;border-radius:3px;background:rgba(200,240,235,.75);display:inline-block"></span>영화</span>
           <span style="font-size:10px;color:var(--tm);display:flex;align-items:center;gap:4px;"><span style="width:9px;height:9px;border-radius:3px;background:rgba(200,220,255,.75);display:inline-block"></span>음악</span>
         </div>
-        <div class="tt-scroll">
-          <div class="tt-inner">
-            <div class="tt-head" id="tt-head"></div>
-            <div id="tt-rows"></div>
-          </div>
-        </div>
+        <div id="tt-head" style="display:flex;gap:2px;margin-bottom:4px;align-items:center;"></div>
+        <div id="tt-rows"></div>
         <div class="tt-hint">← 스크롤 · 카테고리명 탭 → 추가 · 블록 탭 → 수정/삭제</div>
       </div>
       <div class="slabel">해빗 모아보기</div>
@@ -1731,31 +1727,39 @@ function renderTimetable(){
   const rowsEl=document.getElementById('tt-rows');
   if(!headEl||!rowsEl)return;
 
-  // 헤더: 고정 spacer + 날짜 스크롤
-  headEl.innerHTML='<div class="tt-head-spacer"></div>'
-    +'<div style="flex:1;overflow-x:auto;-webkit-overflow-scrolling:touch;" id="tt-head-dates">'
-    +'<div style="display:flex;gap:2px;">'
-    +Array.from({length:31},(_,i)=>`<span style="width:20px;flex-shrink:0;font-size:8.5px;color:var(--tm);text-align:center;">${i+1}</span>`).join('')
-    +'</div></div>';
-  headEl.style.cssText='display:flex;gap:2px;margin-bottom:4px;align-items:center;';
+  // 헤더
+  const headSpacer=document.createElement('div');
+  headSpacer.style.cssText='width:54px;flex-shrink:0;';
+  const headDates=document.createElement('div');
+  headDates.id='tt-head-dates';
+  headDates.style.cssText='flex:1;overflow-x:hidden;';
+  const headInner=document.createElement('div');
+  headInner.style.cssText='display:flex;gap:2px;';
+  for(let i=1;i<=31;i++){
+    const s=document.createElement('span');
+    s.style.cssText='width:20px;flex-shrink:0;font-size:8.5px;color:var(--tm);text-align:center;display:block;';
+    s.textContent=i;headInner.appendChild(s);
+  }
+  headDates.appendChild(headInner);
+  headEl.innerHTML='';
+  headEl.appendChild(headSpacer);headEl.appendChild(headDates);
 
+  // 행들
   rowsEl.innerHTML='';
   CATS.forEach(cat=>{
     const row=document.createElement('div');
-    row.style.cssText='display:flex;gap:2px;align-items:center;margin-bottom:3px;';
+    row.style.cssText='display:flex;align-items:center;margin-bottom:3px;gap:0;';
 
-    // 카테고리명 — sticky 고정
+    // 카테고리명 — 왼쪽 고정
     const catEl=document.createElement('div');
-    catEl.className='tt-cat-fixed';
+    catEl.style.cssText='width:54px;flex-shrink:0;font-size:10px;color:var(--ts);cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px;padding-right:4px;';
     catEl.textContent=CAT_LABELS[cat];
     catEl.addEventListener('click',()=>openContentModal(cat));
-    row.appendChild(catEl);
 
     // 날짜 스크롤 영역
     const scroll=document.createElement('div');
-    scroll.style.cssText='flex:1;overflow-x:auto;-webkit-overflow-scrolling:touch;';
-    scroll.setAttribute('data-tt-scroll','1');
-
+    scroll.style.cssText='flex:1;overflow-x:auto;-webkit-overflow-scrolling:touch;cursor:grab;';
+    scroll.setAttribute('data-tt','1');
     const inner=document.createElement('div');
     inner.style.cssText='display:flex;gap:2px;';
 
@@ -1767,33 +1771,32 @@ function renderTimetable(){
         const item=startMap[d];
         const startD=item.startDay||1,endD=Math.max(item.endDay||startD,startD);
         const span=endD-startD+1,w=span*20+(span-1)*2;
-        const block=document.createElement('div');block.className=`tt-block ${cat}`;
-        block.style.cssText=`width:${w}px;min-width:${w}px;flex-shrink:0;height:20px;`;
+        const block=document.createElement('div');
+        block.className=`tt-block ${cat}`;
+        block.style.cssText=`width:${w}px;min-width:${w}px;flex-shrink:0;height:20px;border-radius:5px;display:flex;align-items:center;padding:0 6px;font-size:9px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;`;
         if(item.status==='watching')block.style.opacity='0.7';
-        if(item.poster)block.style.backgroundImage=`linear-gradient(rgba(255,255,255,0.7),rgba(255,255,255,0.7)),url(${item.poster})`;
         block.textContent=item.title;block.title=item.title;
         block.addEventListener('click',()=>openContentModal(cat,item,mk));
         inner.appendChild(block);d=endD+1;
       } else {
-        const cell=document.createElement('div');cell.className='tt-cell';
-        cell.style.cssText='width:20px;height:20px;flex-shrink:0;border-radius:4px;';
+        const cell=document.createElement('div');
+        cell.style.cssText='width:20px;height:20px;flex-shrink:0;border-radius:4px;background:rgba(255,255,255,0.18);';
         inner.appendChild(cell);d++;
       }
     }
     scroll.appendChild(inner);
-    row.appendChild(scroll);
+    row.appendChild(catEl);row.appendChild(scroll);
     rowsEl.appendChild(row);
   });
 
-  // 모든 날짜 스크롤 영역 + 헤더 동기화
-  const allScrolls=rowsEl.querySelectorAll('[data-tt-scroll]');
-  const headScroll=document.getElementById('tt-head-dates');
+  // 모든 스크롤 동기화
+  const allScrolls=Array.from(rowsEl.querySelectorAll('[data-tt]'));
   function syncScroll(src){
-    if(headScroll) headScroll.scrollLeft=src.scrollLeft;
-    allScrolls.forEach(s=>{if(s!==src)s.scrollLeft=src.scrollLeft;});
+    const sl=src.scrollLeft;
+    if(headDates) headDates.scrollLeft=sl;
+    allScrolls.forEach(s=>{if(s!==src)s.scrollLeft=sl;});
   }
   allScrolls.forEach(s=>s.addEventListener('scroll',()=>syncScroll(s),{passive:true}));
-  if(headScroll) headScroll.addEventListener('scroll',()=>syncScroll(headScroll),{passive:true});
 }
 
 </script>
