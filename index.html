@@ -1799,6 +1799,93 @@ function renderTimetable(){
   allScrolls.forEach(s=>s.addEventListener('scroll',()=>syncScroll(s),{passive:true}));
 }
 
+
+// ── LOAD FUNCTIONS
+function loadDaily(){loadSleep();renderTodos();renderMemos();}
+function loadWeekly(){
+  buildWeekStrip();renderHabitGrid();
+  renderGoalNote('weekly-goal-wrap',S.key('wgoal',weekKey(new Date())));
+}
+function loadMonthly(){
+  _calYear=new Date().getFullYear();_calMonth=new Date().getMonth();
+  updateStats();renderTimetable();renderHabitMonthly();
+  renderGoalNote('monthly-goal-wrap',S.key('mgoal',monthKey(new Date())));
+  renderCalendar();
+  renderMonthlyStatBar();
+}
+
+// ── MODAL/SHEET HELPERS
+function openModal(id){document.getElementById(id).classList.add('on');}
+function closeModal(id,e){if(!e||e.target===document.getElementById(id))document.getElementById(id).classList.remove('on');}
+function openSheet(id){document.getElementById(id).classList.add('on');}
+function closeSheet(id,e){if(!e||e.target===document.getElementById(id))document.getElementById(id).classList.remove('on');}
+
+// ── SETTINGS
+function openSettings(){
+  document.getElementById('sync-status').textContent=navigator.onLine?'온라인 ✅':'오프라인';
+  const theme=S.get('theme')||'light';
+  document.getElementById('dark-tog').classList.toggle('on',theme==='dark');
+  document.querySelectorAll('.ctheme-btn').forEach(b=>b.classList.remove('on'));
+  const act=document.getElementById('ct-'+theme);if(act)act.classList.add('on');
+  document.getElementById('settings-ov').classList.add('on');
+}
+function closeSettings(){document.getElementById('settings-ov').classList.remove('on');}
+function toggleDark(tog){
+  const isDark=!tog.classList.contains('on');tog.classList.toggle('on',isDark);
+  setTheme(isDark?'dark':(S.get('color-theme')||'light'),document.getElementById('ct-'+(isDark?'dark':(S.get('color-theme')||'light'))));
+}
+function setTheme(theme,btn){
+  document.documentElement.setAttribute('data-theme',theme);S.set('theme',theme);
+  if(theme!=='dark')S.set('color-theme',theme);
+  document.querySelectorAll('.ctheme-btn').forEach(b=>b.classList.remove('on'));
+  if(btn)btn.classList.add('on');
+  document.getElementById('dark-tog').classList.toggle('on',theme==='dark');
+}
+async function manualSync(){
+  document.getElementById('sync-status').textContent='동기화 중...';
+  await syncAll();
+  document.getElementById('sync-status').textContent='완료! '+new Date().toLocaleTimeString();
+}
+(function initTheme(){const t=S.get('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();
+
+// ── SHARE
+let _shareType='weekly';
+function openShareMenu(){openSheet('share-menu-sheet');}
+function switchShareAndOpen(type){
+  _shareType=type;
+  document.querySelectorAll('.share-tab').forEach((t,i)=>t.classList.toggle('on',(type==='weekly'&&i===0)||(type==='monthly'&&i===1)));
+  document.getElementById('sc-weekly').style.display=type==='weekly'?'':'none';
+  document.getElementById('sc-monthly').style.display=type==='monthly'?'':'none';
+  if(type==='weekly')buildWeeklyCard();else buildMonthlyCard();
+  document.getElementById('share-ov').classList.add('on');
+}
+function openShare(){switchShareAndOpen('weekly');}
+function closeShare(e){if(!e||e.target===document.getElementById('share-ov'))document.getElementById('share-ov').classList.remove('on');}
+function switchShare(type,btn){
+  _shareType=type;
+  document.querySelectorAll('.share-tab').forEach(t=>t.classList.remove('on'));
+  btn.classList.add('on');
+  document.getElementById('sc-weekly').style.display=type==='weekly'?'':'none';
+  document.getElementById('sc-monthly').style.display=type==='monthly'?'':'none';
+  if(type==='weekly')buildWeeklyCard();else buildMonthlyCard();
+}
+async function saveShare(){
+  if(!window.html2canvas){await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
+  try{const canvas=await html2canvas(document.getElementById('share-card'),{scale:3,useCORS:true,backgroundColor:null,logging:false});const a=document.createElement('a');a.download=`iikoto-${_shareType}-${dateKey(new Date())}.png`;a.href=canvas.toDataURL('image/png');a.click();}
+  catch(e){alert('스크린샷으로 저장해주세요!');}
+}
+
+// ── INIT
+loadDaily();
+setTimeout(syncAll,600);
+
+// 앱이 포그라운드로 돌아올 때 자동 동기화
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);
+});
+
+if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
+
 </script>
 </body>
 </html>
