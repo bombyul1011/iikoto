@@ -1,7 +1,7 @@
 {
   "name": "iikoto",
   "short_name": "iikoto",
-  "description": "더 나은 나로 만드는 데일리 앱",
+  "description": "\ub354 \ub098\uc740 \ub098\ub85c \ub9cc\ub4dc\ub294 \ub370\uc77c\ub9ac \uc571",
   "start_url": "/iikoto/",
   "display": "standalone",
   "orientation": "portrait",
@@ -9,13 +9,13 @@
   "theme_color": "#fdf0e8",
   "icons": [
     {
-      "src": "/icon-192.png",
+      "src": "icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icon-512.png",
+      "src": "icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

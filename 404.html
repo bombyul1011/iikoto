@@ -1215,7 +1215,7 @@ window.addEventListener('online',()=>syncAll());
 setTimeout(()=>{const s=document.getElementById('splash');s.classList.add('hide');setTimeout(()=>s.remove(),650);},2200);
 
 // ── CLOCK
-function updateClock(){const n=new Date();document.getElementById('js-clock').textContent=`${pad(n.getHours())}:${pad(n.getMinutes())}`;}
+function updateClock(){const n=new Date();const el=document.getElementById('js-clock');if(el)el.textContent=`${pad(n.getHours())}:${pad(n.getMinutes())}`;}
 updateClock();setInterval(updateClock,30000);
 
 // ── DATE NAV
