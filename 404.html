@@ -1397,7 +1397,7 @@ function updateDateUI(){
   const isTmrwOrLater=d>=tmrw;
   nxt.style.opacity=isTmrwOrLater?'0.3':'1';
   nxt.style.pointerEvents=isTmrwOrLater?'none':'auto';
-  loadDaily();
+  if(typeof loadDaily==='function')loadDaily();
 }
 function shiftDay(n){
   const d=new Date(currentDate);d.setDate(d.getDate()+n);
@@ -1799,6 +1799,226 @@ function renderTimetable(){
   allScrolls.forEach(s=>s.addEventListener('scroll',()=>syncScroll(s),{passive:true}));
 }
 
+
+
+// ── STATS
+function updateStats(){
+  const now=new Date(),y=now.getFullYear(),mo=now.getMonth();
+  const dim=new Date(y,mo+1,0).getDate();
+  let memos=0,todos=0,hc=0,ht=0;
+  const habits=getHabits();
+  for(let d=1;d<=dim;d++){
+    const dk=`${y}-${pad(mo+1)}-${pad(d)}`;
+    memos+=getMemos(dk).length;todos+=getTodos(dk).filter(t=>t.done).length;
+    const date=new Date(y,mo,d);const wk=weekKey(date);const dow=(date.getDay()+6)%7;
+    const checks=getHabitChecks(wk);
+    habits.forEach(h=>{ht++;if(checks[`${h.name}-${dow}`])hc++;});
+  }
+  const mk=monthKey(now);const contents=getContents(mk).length;
+  const pct=ht>0?Math.round(hc/ht*100):0;
+  const q=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  q('st-memo',memos);q('st-todo',todos);q('st-habit',pct+'%');q('st-content',contents);
+}
+
+// ── WEEK STRIP
+function buildWeekStrip(){
+  const now=new Date(),dow=now.getDay();
+  const mon=new Date(now);mon.setDate(now.getDate()-((dow+6)%7));
+  const strip=document.getElementById('week-strip');if(!strip)return;
+  strip.innerHTML='';
+  for(let i=0;i<7;i++){
+    const d=new Date(mon);d.setDate(mon.getDate()+i);
+    const today=d.toDateString()===now.toDateString();
+    const el=document.createElement('div');el.className='day-btn'+(today?' today':'');
+    el.innerHTML=`<div class="day-name">${DAYS[d.getDay()]}</div><div class="day-num">${d.getDate()}</div>`;
+    el.addEventListener('click',()=>{
+      currentDate=new Date(d);
+      document.querySelectorAll('.vtab').forEach(t=>t.classList.toggle('on',t.dataset.v==='daily'));
+      document.querySelectorAll('.view').forEach(vw=>vw.classList.toggle('on',vw.id==='v-daily'));
+      updateDateUI();document.querySelector('.scroll').scrollTop=0;
+    });
+    strip.appendChild(el);
+  }
+}
+
+// ── HABIT MONTHLY
+function renderHabitMonthly(){
+  const habits=getHabits(),now=currentDate,y=now.getFullYear(),mo=now.getMonth();
+  const dim=new Date(y,mo+1,0).getDate();
+  const el=document.getElementById('habit-monthly');if(!el)return;
+  el.innerHTML='';
+  habits.forEach(h=>{
+    const row=document.createElement('div');row.className='hm-row';
+    const lbl=document.createElement('span');lbl.className='hm-lbl';lbl.textContent=h.name;
+    row.appendChild(lbl);
+    const dots=document.createElement('div');dots.className='hm-dots';
+    let checked_cnt=0;
+    for(let d=1;d<=dim;d++){
+      const date=new Date(y,mo,d);const wk=weekKey(date);const dow=(date.getDay()+6)%7;
+      const checked=getHabitChecks(wk)[`${h.name}-${dow}`];
+      if(checked)checked_cnt++;
+      const dot=document.createElement('div');dot.className='hm-dot'+(checked?' '+h.color:'');
+      dots.appendChild(dot);
+    }
+    const pct=Math.round(checked_cnt/dim*100);
+    const pctEl=document.createElement('div');
+    pctEl.style.cssText='font-size:10px;color:var(--tm);margin-top:5px;margin-left:2px;padding-bottom:8px;border-bottom:1px solid var(--div);width:100%;';
+    pctEl.textContent=`${checked_cnt}/${dim}일 · ${pct}%`;
+    const wrap=document.createElement('div');wrap.style.cssText='display:flex;flex-direction:column;flex:1;';
+    wrap.appendChild(dots);wrap.appendChild(pctEl);
+    row.appendChild(wrap);el.appendChild(row);
+  });
+}
+
+// ── CALENDAR
+let _calYear=new Date().getFullYear();
+let _calMonth=new Date().getMonth();
+let _calSelectedDay=null;
+
+function calShiftMonth(n){
+  _calMonth+=n;
+  if(_calMonth>11){_calMonth=0;_calYear++;}
+  if(_calMonth<0){_calMonth=11;_calYear--;}
+  _calSelectedDay=null;
+  const el=document.getElementById('cal-detail');if(el)el.innerHTML='';
+  renderCalendar();
+}
+
+function renderCalendar(){
+  const wrap=document.getElementById('monthly-cal');if(!wrap)return;
+  const y=_calYear,mo=_calMonth;
+  const firstDay=new Date(y,mo,1).getDay();
+  const daysInMonth=new Date(y,mo+1,0).getDate();
+  const today=new Date();
+  const hasData={};
+  for(let d=1;d<=daysInMonth;d++){
+    const dk=`${y}-${pad(mo+1)}-${pad(d)}`;
+    if(getMemos(dk).length>0||getTodos(dk).some(t=>t.done)||getSleep(dk).sleep)hasData[d]=true;
+  }
+  let h=`<div style="padding:4px 2px 0;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div class="nav-arr" onclick="calShiftMonth(-1)"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" style="color:var(--tm)"><polyline points="6.5,1.5 3,5 6.5,8.5"/></svg></div>
+      <span style="font-size:15px;font-weight:500;color:var(--tp);">${y}년 ${mo+1}월</span>
+      <div class="nav-arr" onclick="calShiftMonth(1)"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" style="color:var(--tm)"><polyline points="3.5,1.5 7,5 3.5,8.5"/></svg></div>
+    </div>
+    <div class="cal-grid">`;
+  ['일','월','화','수','목','금','토'].forEach(d=>h+=`<div class="cal-day-name">${d}</div>`);
+  for(let i=0;i<firstDay;i++)h+=`<div class="cal-day other-month"><div class="cal-num"></div></div>`;
+  for(let d=1;d<=daysInMonth;d++){
+    const isToday2=today.getFullYear()===y&&today.getMonth()===mo&&today.getDate()===d;
+    const isSel=_calSelectedDay===d;
+    let cls='cal-day';if(isToday2)cls+=' today';if(isSel)cls+=' selected';
+    const dot=hasData[d]?'<div class="cal-dot"></div>':'';
+    h+=`<div class="${cls}" onclick="calDayClick(${d})"><div class="cal-num">${d}</div>${dot}</div>`;
+  }
+  h+=`</div></div>`;
+  wrap.innerHTML=h;
+  const showDay=_calSelectedDay||(today.getFullYear()===y&&today.getMonth()===mo?today.getDate():null);
+  if(showDay)renderCalDetail(showDay);
+}
+
+function calDayClick(d){
+  _calSelectedDay=(_calSelectedDay===d)?null:d;
+  renderCalendar();
+  if(!_calSelectedDay){const el=document.getElementById('cal-detail');if(el)el.innerHTML='';}
+}
+
+function renderCalDetail(d){
+  const el=document.getElementById('cal-detail');if(!el)return;
+  const dk=`${_calYear}-${pad(_calMonth+1)}-${pad(d)}`;
+  const allMemos=getMemos(dk);const todos=getTodos(dk).filter(t=>t.done);const sleep=getSleep(dk);
+  const date=new Date(_calYear,_calMonth,d);
+  const dateStr=`${_calMonth+1}월 ${d}일 ${DAYS[date.getDay()]}`;
+  let items='';
+  if(sleep.sleep||sleep.wake){
+    const sv=sleep.sleep?sleep.sleep.split(':').map(Number):null;
+    const wv=sleep.wake?sleep.wake.split(':').map(Number):null;
+    let dur='';
+    if(sv&&wv){let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;dur=` · ${Math.floor(m/60)}h ${m%60}m`;}
+    items+=`<div class="cal-detail-row"><div class="cal-detail-icon"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="color:var(--tm)"><path d="M10.5 9C9 10.5 6.8 11 4.8 10C2.8 9 1.8 6.8 2.2 4.8C2.5 3.2 3.5 1.8 5 1.2C3.5 3.5 3.8 6.5 6 8.2C7.8 9.5 10 9.5 11.8 8.5C11.5 8.7 11 8.9 10.5 9Z" fill="rgba(200,176,168,0.2)"/></svg></div><span class="cal-detail-text" style="color:var(--ts);">${sleep.sleep||'--'} 취침 · ${sleep.wake||'--'} 기상${dur}</span></div>`;
+  }
+  todos.slice(0,3).forEach(t=>{items+=`<div class="cal-detail-row"><div class="cal-detail-icon"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--tm)"><polyline points="2,6 4.5,9 10,3.5"/></svg></div><span class="cal-detail-text">${t.text}</span></div>`;});
+  const MAX=5;const total=allMemos.length;const hiddenCnt=Math.max(0,total-MAX);
+  const showMemos=total>MAX?allMemos.slice(-MAX):allMemos;
+  if(hiddenCnt>0)items+=`<div class="cal-detail-more" onclick="calShowAll('${dk}')">··· ${hiddenCnt}개 더 보기</div>`;
+  showMemos.forEach(m=>{items+=`<div class="cal-detail-row"><span class="cal-detail-time">${m.time||''}</span><span class="cal-detail-text">${m.text||''}</span></div>`;});
+  if(!items){el.innerHTML=`<div class="cal-detail-wrap"><div class="cal-detail-date">${dateStr}</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:10px 0;">기록이 없어요</div></div>`;return;}
+  el.innerHTML=`<div class="cal-detail-wrap"><div class="cal-detail-date">${dateStr}</div>${items}</div>`;
+  el.style.display='block';
+  setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'nearest'}),100);
+}
+
+function calShowAll(dk){
+  const memos=getMemos(dk);const el=document.getElementById('cal-detail');if(!el)return;
+  const moreBtn=el.querySelector('.cal-detail-more');if(!moreBtn)return;
+  const MAX=5;const hiddenMemos=memos.slice(0,memos.length-MAX);
+  let extra='';
+  hiddenMemos.forEach(m=>{extra+=`<div class="cal-detail-row"><span class="cal-detail-time">${m.time||''}</span><span class="cal-detail-text">${m.text||''}</span></div>`;});
+  moreBtn.outerHTML=extra;
+}
+
+// ── MONTHLY STAT BAR
+function renderMonthlyStatBar(){
+  const el=document.getElementById('monthly-stat-bar');if(!el)return;
+  const now=new Date(),y=now.getFullYear(),mo=now.getMonth();
+  const dim=new Date(y,mo+1,0).getDate();
+  let memos=0,todos=0,hc=0,ht=0,sleepMin=0,sleepCnt=0;
+  const habits=getHabits();
+  for(let d=1;d<=dim;d++){
+    const dk=`${y}-${pad(mo+1)}-${pad(d)}`;
+    memos+=getMemos(dk).length;todos+=getTodos(dk).filter(t=>t.done).length;
+    const sl=getSleep(dk);
+    if(sl.sleep&&sl.wake){const sv=sl.sleep.split(':').map(Number),wv=sl.wake.split(':').map(Number);let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;sleepMin+=m;sleepCnt++;}
+    const date=new Date(y,mo,d);const wk=weekKey(date);const dow=(date.getDay()+6)%7;
+    const checks=getHabitChecks(wk);
+    habits.forEach(h=>{ht++;if(checks[`${h.name}-${dow}`])hc++;});
+  }
+  const pct=ht>0?Math.round(hc/ht*100):0;
+  const mk=monthKey(now);const cc=getContents(mk).length;
+  const avgSleep=sleepCnt>0?(sleepMin/sleepCnt/60).toFixed(1):'-';
+  el.innerHTML=`<div class="stat-bar-wrap">
+    <div class="sbar-item"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="color:var(--tm)"><rect x="2" y="1.5" width="10" height="11" rx="2"/><line x1="4.5" y1="5" x2="9.5" y2="5"/><line x1="4.5" y1="7.5" x2="8" y2="7.5"/></svg><span class="sbar-num">${memos}</span></div>
+    <div class="sbar-div"></div>
+    <div class="sbar-item"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--tm)"><polyline points="2.5,7 5.5,10 11.5,4"/></svg><span class="sbar-num">${todos}</span></div>
+    <div class="sbar-div"></div>
+    <div class="sbar-item"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="color:var(--tm)"><path d="M7 2C7 2 4 4 4 7C4 8.7 5.3 10 7 10C8.7 10 10 8.7 10 7C10 4 7 2 7 2Z"/><line x1="7" y1="10" x2="7" y2="12.5"/></svg><span class="sbar-num">${pct}%</span></div>
+    <div class="sbar-div"></div>
+    <div class="sbar-item"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="color:var(--tm)"><rect x="1.5" y="2" width="11" height="8" rx="1.5"/><polygon points="5.5,4.5 5.5,7.5 9,6" fill="rgba(200,176,168,0.3)" stroke="currentColor" stroke-width="1"/></svg><span class="sbar-num">${cc}</span></div>
+    <div class="sbar-div"></div>
+    <div class="sbar-item"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="color:var(--tm)"><path d="M10.5 9C9 10.5 6.8 11 4.8 10C2.8 9 1.8 6.8 2.2 4.8C2.5 3.2 3.5 1.8 5 1.2C3.5 3.5 3.8 6.5 6 8.2C7.8 9.5 10 9.5 11.8 8.5C11.5 8.7 11 8.9 10.5 9Z"/></svg><span class="sbar-num">${avgSleep}h</span></div>
+  </div>`;
+}
+
+// ── SHARE CARDS
+function buildWeeklyCard(){
+  const now=new Date(),dow=now.getDay();
+  const mon=new Date(now);mon.setDate(now.getDate()-((dow+6)%7));
+  const sun=new Date(mon);sun.setDate(mon.getDate()+6);
+  const fmt=d=>`${d.getMonth()+1}/${d.getDate()}`;
+  document.getElementById('sc-period').textContent=`weekly · ${fmt(mon)} – ${fmt(sun)}`;
+  document.getElementById('sc-date').textContent=`${now.getFullYear()}. ${now.getMonth()+1}.`;
+  let memos=0,todos=0,hc=0,ht=0;
+  const habits=getHabits(),wk=weekKey(now),checks=getHabitChecks(wk);
+  for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);const dk=dateKey(d);memos+=getMemos(dk).length;todos+=getTodos(dk).filter(t=>t.done).length;}
+  habits.forEach(h=>{for(let i=0;i<7;i++){ht++;if(checks[`${h.name}-${i}`])hc++;}});
+  const pct=ht>0?Math.round(hc/ht*100):0;
+  document.getElementById('sc-stats').innerHTML=`<div class="sc-stat"><div class="sc-stat-v">${todos}</div><div class="sc-stat-l">완료 투두</div></div><div class="sc-stat"><div class="sc-stat-v">${memos}</div><div class="sc-stat-l">메모</div></div><div class="sc-stat"><div class="sc-stat-v">${hc}</div><div class="sc-stat-l">해빗 달성</div></div><div class="sc-stat"><div class="sc-stat-v">${pct}%</div><div class="sc-stat-l">달성률</div></div>`;
+  const hEl=document.getElementById('sc-habits');hEl.innerHTML='';
+  habits.slice(0,3).forEach(h=>{const row=document.createElement('div');row.className='sc-habit-row';let dots='';for(let i=0;i<7;i++)dots+=`<div class="sc-dot ${checks[`${h.name}-${i}`]?'on':'off'}"></div>`;row.innerHTML=`<span class="sc-habit-name">${h.name}</span><div class="sc-hdots">${dots}</div>`;hEl.appendChild(row);});
+}
+
+function buildMonthlyCard(){
+  const now=new Date(),mk=monthKey(now);
+  document.getElementById('sc-period').textContent=`monthly · ${now.getFullYear()}년 ${now.getMonth()+1}월`;
+  document.getElementById('sc-date').textContent=`${now.getFullYear()}. ${now.getMonth()+1}.`;
+  const contents=getContents(mk),el=document.getElementById('sc-contents');
+  el.innerHTML='';
+  if(!contents.length){el.innerHTML='<div style="text-align:center;color:#c8b0a8;font-size:12px;padding:16px 0;">이번 달 콘텐츠가 없어요</div>';return;}
+  contents.slice(0,4).forEach(c=>{
+    const stars='★'.repeat(c.stars||0)+'☆'.repeat(5-(c.stars||0));
+    el.innerHTML+=`<div class="sc-citem"><div class="sc-cbar" style="background:${SHARE_CBAR[c.cat]||'rgba(200,200,200,.5)'}"></div><div class="sc-cinfo"><div class="sc-ccat">${CAT_LABELS[c.cat]||c.cat}</div><div class="sc-ctitle">${c.title}</div></div><div class="sc-cstars">${stars}</div></div>`;
+  });
+}
 
 // ── LOAD FUNCTIONS
 function loadDaily(){loadSleep();renderTodos();renderMemos();}
