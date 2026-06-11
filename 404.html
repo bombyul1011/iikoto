@@ -505,19 +505,21 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 
 /* ── DAILY ONE LINE ── */
-.oneline-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--div);}
+.oneline-row{display:flex;align-items:center;gap:0;padding:9px 0;border-bottom:1px solid var(--div);}
 .oneline-row:last-child{border-bottom:none;}
-.oneline-day{font-size:11px;color:var(--tm);width:28px;flex-shrink:0;text-align:center;}
-.oneline-date{font-size:10px;color:var(--tm);width:20px;flex-shrink:0;text-align:center;}
-.oneline-inp{flex:1;background:none;border:none;outline:none;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--tp);padding:2px 0;}
-.oneline-inp::placeholder{color:var(--tm);}
-.oneline-inp:focus{border-bottom:1px solid var(--inp-b);}
+.oneline-day-wrap{display:flex;align-items:center;gap:6px;width:52px;flex-shrink:0;}
+.oneline-day{font-size:11px;color:var(--ts);font-weight:500;}
+.oneline-today .oneline-day{color:var(--acc);}
+.oneline-divider{width:1px;height:18px;background:rgba(200,175,165,0.35);margin-right:12px;flex-shrink:0;}
+[data-theme="dark"] .oneline-divider{background:rgba(255,255,255,0.12);}
+.oneline-inp{flex:1;background:none;border:none;outline:none;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--tp);padding:2px 0;-webkit-appearance:none;}
+.oneline-inp::placeholder{color:var(--tm);font-size:12px;}
 [data-theme="dark"] .oneline-inp{color:var(--tp);}
 
 /* ── TODO DRAG ── */
 .todo-item.dragging{opacity:0.5;background:var(--card);border-radius:10px;}
 .todo-item.drag-over{border-top:2px solid var(--acc);}
-.drag-handle{display:flex;align-items:center;cursor:grab;padding:0 4px;color:var(--tm);flex-shrink:0;touch-action:none;}
+.drag-handle{display:flex;align-items:center;cursor:grab;padding:4px 2px 4px 8px;color:var(--tm);flex-shrink:0;touch-action:none;margin-left:auto;}
 .drag-handle:active{cursor:grabbing;}
 </style>
 </head>
@@ -651,10 +653,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
     <!-- MONTHLY -->
     <div class="view" id="v-monthly">
-      <div id="monthly-cal"></div>
-      <div id="cal-detail"></div>
       <div class="goal-section-title">✦ 이번 달 목표</div>
       <div class="goal-wrap" id="monthly-goal-wrap"></div>
+      <div id="monthly-cal"></div>
+      <div id="cal-detail"></div>
       <div class="slabel">콘텐츠 기록</div>
       <div class="card s" style="padding:14px 10px;">
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
