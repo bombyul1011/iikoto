@@ -820,6 +820,12 @@ body{height:100%;font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antiali
 .tt-dates-scroll{flex:1;overflow-x:auto;-webkit-overflow-scrolling:touch;}
 .tt-dates-scroll::-webkit-scrollbar{display:none;}
 .tt-dates-inner{display:flex;gap:2px;}
+
+/* 타임테이블 스크롤바 숨김 */
+[data-tt]::-webkit-scrollbar{display:none;}
+[data-tt]{-ms-overflow-style:none;scrollbar-width:none;}
+#tt-head-dates::-webkit-scrollbar{display:none;}
+#tt-head-dates{-ms-overflow-style:none;scrollbar-width:none;}
 </style>
 </head>
 <body>
