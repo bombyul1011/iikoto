@@ -1593,7 +1593,7 @@ function renderTimetable(){
 
 function openContentModal(cat,item=null,mk=null){
   _contentCtx={cat,item,mk:mk||monthKey(currentDate),mode:item?'edit':'add'};
-  document.getElementById('content-modal-title').textContent=item?item.title:(CAT_LABELS[cat]+' 추가');
+  const titleEl=document.getElementById('content-modal-title');if(titleEl)titleEl.textContent=item?item.title:(CAT_LABELS[cat]+' 추가');
   document.getElementById('cm-title').value=item?.title||'';
   _selectedPoster=null;
   const pp=document.getElementById('cm-poster-preview');
