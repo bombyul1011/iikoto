@@ -1012,7 +1012,11 @@ async function supaFetch(path,method='GET',body=null){
 
 // ── DATA ACCESSORS
 function getTodos(dk){return S.get(S.key('todos',dk))||[];}
-function saveTodos(dk,v){S.set(S.key('todos',dk),v);S.set(S.key('todos_modified',dk),Date.now());autoSync('todos',dk);}
+function saveTodos(dk,v){
+  S.set(S.key('todos',dk),v);
+  S.set(S.key('todos_pending',dk),true); // 업로드 필요 플래그
+  autoSync('todos',dk); // 온라인이면 즉시 업로드
+}
 function getMemos(dk){return S.get(S.key('memos',dk))||[];}
 function saveMemos(dk,v){S.set(S.key('memos',dk),v);autoSync('memos',dk);}
 function getSleep(dk){return S.get(S.key('sleep',dk))||{};}
@@ -1028,25 +1032,22 @@ function saveGoal(key,lines){S.set(key,lines);autoSync('goal',key);}
 
 // ── SUPABASE SYNC
 async function syncTodosDown(dk){
-  const rows=await supaFetch(`todos?date_key=eq.${dk}&order=created`);
-  if(!rows)return; // 네트워크 오류 시 로컬 유지
-  const localTodos=getTodos(dk);
-  if(rows.length===0){
-    // Supabase에 없음 — 로컬에 있으면 업로드, 없으면 그냥 둠
-    if(localTodos.length>0)syncTodosUp(dk);
+  // 로컬에 업로드 대기중인 변경이 있으면 먼저 업로드
+  if(S.get(S.key('todos_pending',dk))){
+    await syncTodosUp(dk);
+    S.set(S.key('todos_pending',dk),false);
     return;
   }
-  // Supabase에 있음 — 로컬 lastSync 이후 로컬 변경이 없으면 Supabase 우선
-  const localModified=S.get(S.key('todos_modified',dk))||0;
-  const supaLatest=Math.max(...rows.map(r=>r.created||0));
-  if(supaLatest>=localModified){
-    // Supabase가 최신 — 덮어씀
-    S.set(S.key('todos',dk),rows.map(r=>({text:r.text,done:r.done,created:r.created})));
-    S.set(S.key('todos_modified',dk),supaLatest);
-  } else {
-    // 로컬이 최신 — 업로드
-    syncTodosUp(dk);
+  const rows=await supaFetch(`todos?date_key=eq.${dk}&order=created`);
+  if(!rows)return;
+  if(rows.length===0){
+    if(getTodos(dk).length>0){
+      await syncTodosUp(dk);
+    }
+    return;
   }
+  // Supabase 데이터로 덮어씀 (항상 Supabase 우선)
+  S.set(S.key('todos',dk),rows.map(r=>({text:r.text,done:r.done,created:r.created})));
 }
 async function syncTodosUp(dk){
   const todos=getTodos(dk);
@@ -1132,7 +1133,7 @@ async function syncContentsUp(mk){
 }
 async function autoSync(type,key){
   if(!navigator.onLine)return;
-  if(type==='todos')syncTodosUp(key);
+  if(type==='todos'){await syncTodosUp(key);S.set(S.key('todos_pending',key),false);}
   else if(type==='memos')syncMemosUp(key);
   else if(type==='sleep')syncSleepUp(key);
   else if(type==='habits')syncHabitsUp();
@@ -1143,15 +1144,19 @@ async function autoSync(type,key){
 async function syncAll(){
   if(!navigator.onLine)return;
   const dk=dateKey(currentDate),mk=monthKey(currentDate),now=new Date(),wk=weekKey(now);
-  // 내일 날짜도 함께 동기화 (미리 입력한 투두 보존)
   const tomorrow=new Date(currentDate);tomorrow.setDate(tomorrow.getDate()+1);
   const dk_tmrw=dateKey(tomorrow);
+  // 이번 주 하루한줄 동기화
+  const weekOnelines=[];
+  const mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7));
+  for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);weekOnelines.push(syncGoalDown(S.key('oneline',dateKey(d))));}
   await Promise.all([
     syncTodosDown(dk),syncMemosDown(dk),syncSleepDown(dk),
-    syncTodosDown(dk_tmrw), // 내일 투두도 동기화
+    syncTodosDown(dk_tmrw),
     syncHabitsDown(),syncHCDown(wk),syncContentsDown(mk),
     syncGoalDown(S.key('wgoal',weekKey(now))),
-    syncGoalDown(S.key('mgoal',monthKey(now)))
+    syncGoalDown(S.key('mgoal',monthKey(now))),
+    ...weekOnelines
   ]);
   loadDaily();
 }
@@ -1855,7 +1860,11 @@ function renderMonthlyStatBar(){
 
 // ── DAILY ONE LINE
 function getDailyOneLine(dk){return S.get(S.key('oneline',dk))||'';}
-function saveDailyOneLine(dk,text){S.set(S.key('oneline',dk),text);}
+function saveDailyOneLine(dk,text){
+  S.set(S.key('oneline',dk),text);
+  // goal_notes 테이블에 동기화 (key: oneline:YYYY-MM-DD)
+  if(navigator.onLine)syncGoalUp(S.key('oneline',dk));
+}
 function renderDailyOneLineWeek(){
   const el=document.getElementById('daily-oneline-list');if(!el)return;
   const now=new Date(),dow=now.getDay();
