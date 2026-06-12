@@ -995,7 +995,7 @@ let currentDate=new Date();
 // ── SUPABASE
 async function supaFetch(path,method='GET',body=null){
   try{
-    const opts={method,headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':method==='POST'?'resolution=merge-duplicates':''}};
+    const opts={method,headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json'}};
     if(body)opts.body=JSON.stringify(body);
     const res=await fetch(SUPA_URL+'/rest/v1/'+path,opts);
     if(!res.ok){console.warn('supa err:',path,await res.text());return null;}
@@ -1012,7 +1012,11 @@ function saveTodos(dk,v){
   autoSync('todos',dk); // 온라인이면 즉시 업로드
 }
 function getMemos(dk){return S.get(S.key('memos',dk))||[];}
-function saveMemos(dk,v){S.set(S.key('memos',dk),v);autoSync('memos',dk);}
+function saveMemos(dk,v){
+  S.set(S.key('memos',dk),v);
+  S.set(S.key('memos_pending',dk),true);
+  autoSync('memos',dk);
+}
 function getSleep(dk){return S.get(S.key('sleep',dk))||{};}
 function saveSleepData(dk,v){S.set(S.key('sleep',dk),v);autoSync('sleep',dk);}
 function getHabits(){return S.get('habits')||DEFAULT_HABITS;}
@@ -1038,13 +1042,7 @@ async function syncTodosDown(dk){
   }
   const rows=await supaFetch(`todos?date_key=eq.${dk}&order=created`);
   if(!rows)return;
-  if(rows.length===0){
-    if(getTodos(dk).length>0){
-      await syncTodosUp(dk);
-    }
-    return;
-  }
-  // Supabase 데이터로 덮어씀 (항상 Supabase 우선)
+  // rows=0 포함 항상 Supabase 우선 (로컬 삭제 반영)
   S.set(S.key('todos',dk),rows.map(r=>({text:r.text,done:r.done,created:r.created})));
 }
 async function syncTodosUp(dk){
@@ -1053,9 +1051,14 @@ async function syncTodosUp(dk){
   if(todos.length)await supaFetch('todos','POST',todos.map(t=>({date_key:dk,text:t.text,done:t.done,created:t.created})));
 }
 async function syncMemosDown(dk){
+  if(S.get(S.key('memos_pending',dk))){
+    await syncMemosUp(dk);
+    S.set(S.key('memos_pending',dk),false);
+    return;
+  }
   const rows=await supaFetch(`memos?date_key=eq.${dk}&order=created`);
   if(!rows)return;
-  if(rows.length===0&&getMemos(dk).length>0){syncMemosUp(dk);return;}
+  // rows=0 포함 항상 Supabase 우선 (로컬 삭제 반영)
   S.set(S.key('memos',dk),rows.map(r=>({time:r.memo_time,text:r.text,photo:r.photo,created:r.created})));
 }
 async function syncMemosUp(dk){
@@ -1126,10 +1129,7 @@ async function syncContentsDown(mk){
   }
   const rows=await supaFetch(`contents?month_key=eq.${mk}&order=created`);
   if(!rows)return;
-  if(rows.length===0){
-    if(getContents(mk).length>0)await syncContentsUp(mk);
-    return;
-  }
+  // rows=0 포함 항상 Supabase 우선
   S.set(S.key('contents',mk),rows.map(r=>({cat:r.content_cat,title:r.title,startDay:r.start_day,endDay:r.end_day,status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,created:r.created})));
 }
 async function syncContentsUp(mk){
@@ -1140,7 +1140,7 @@ async function syncContentsUp(mk){
 async function autoSync(type,key){
   if(!navigator.onLine)return;
   if(type==='todos'){await syncTodosUp(key);S.set(S.key('todos_pending',key),false);}
-  else if(type==='memos')syncMemosUp(key);
+  else if(type==='memos'){await syncMemosUp(key);S.set(S.key('memos_pending',key),false);}
   else if(type==='sleep')syncSleepUp(key);
   else if(type==='habits')syncHabitsUp();
   else if(type==='hc')syncHCUp(key);
@@ -1152,10 +1152,18 @@ async function syncAll(){
   const dk=dateKey(currentDate),mk=monthKey(currentDate),now=new Date(),wk=weekKey(now);
   const tomorrow=new Date(currentDate);tomorrow.setDate(tomorrow.getDate()+1);
   const dk_tmrw=dateKey(tomorrow);
-  // 이번 주 하루한줄 동기화
+  // 이번 주 하루한줄
   const weekOnelines=[];
   const mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7));
   for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);weekOnelines.push(syncGoalDown(S.key('oneline',dateKey(d))));}
+  // pending인 것들 먼저 Up (삭제/수정 반영)
+  const upTasks=[];
+  if(S.get(S.key('todos_pending',dk)))upTasks.push(syncTodosUp(dk).then(()=>S.set(S.key('todos_pending',dk),false)));
+  if(S.get(S.key('todos_pending',dk_tmrw)))upTasks.push(syncTodosUp(dk_tmrw).then(()=>S.set(S.key('todos_pending',dk_tmrw),false)));
+  if(S.get(S.key('memos_pending',dk)))upTasks.push(syncMemosUp(dk).then(()=>S.set(S.key('memos_pending',dk),false)));
+  if(S.get(S.key('contents_pending',mk)))upTasks.push(syncContentsUp(mk).then(()=>S.set(S.key('contents_pending',mk),false)));
+  if(upTasks.length)await Promise.all(upTasks);
+  // 그 다음 Down (Supabase → 로컬)
   await Promise.all([
     syncTodosDown(dk),syncMemosDown(dk),syncSleepDown(dk),
     syncTodosDown(dk_tmrw),
