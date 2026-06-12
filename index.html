@@ -749,7 +749,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 <div class="modal-ov" id="todo-modal" onclick="closeModal('todo-modal',event)">
   <div class="modal">
     <div class="modal-title" id="todo-modal-title">할 일 추가</div>
-    <input type="text" class="modal-inp" id="todo-modal-inp" placeholder="할 일을 입력하세요" autocomplete="off" onkeydown="if(event.key==='Enter')confirmTodo()">
+    <input type="text" class="modal-inp" id="todo-modal-inp" placeholder="할 일을 입력하세요" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmTodo();}">
     <div class="modal-actions">
       <button class="mbtn cancel" onclick="closeModal('todo-modal')">취소</button>
       <button class="mbtn ok" onclick="confirmTodo()">저장</button>
@@ -1012,7 +1012,7 @@ async function supaFetch(path,method='GET',body=null){
 
 // ── DATA ACCESSORS
 function getTodos(dk){return S.get(S.key('todos',dk))||[];}
-function saveTodos(dk,v){S.set(S.key('todos',dk),v);autoSync('todos',dk);}
+function saveTodos(dk,v){S.set(S.key('todos',dk),v);S.set(S.key('todos_modified',dk),Date.now());autoSync('todos',dk);}
 function getMemos(dk){return S.get(S.key('memos',dk))||[];}
 function saveMemos(dk,v){S.set(S.key('memos',dk),v);autoSync('memos',dk);}
 function getSleep(dk){return S.get(S.key('sleep',dk))||{};}
@@ -1029,9 +1029,24 @@ function saveGoal(key,lines){S.set(key,lines);autoSync('goal',key);}
 // ── SUPABASE SYNC
 async function syncTodosDown(dk){
   const rows=await supaFetch(`todos?date_key=eq.${dk}&order=created`);
-  if(!rows)return;
-  if(rows.length===0&&getTodos(dk).length>0){syncTodosUp(dk);return;}
-  S.set(S.key('todos',dk),rows.map(r=>({text:r.text,done:r.done,created:r.created})));
+  if(!rows)return; // 네트워크 오류 시 로컬 유지
+  const localTodos=getTodos(dk);
+  if(rows.length===0){
+    // Supabase에 없음 — 로컬에 있으면 업로드, 없으면 그냥 둠
+    if(localTodos.length>0)syncTodosUp(dk);
+    return;
+  }
+  // Supabase에 있음 — 로컬 lastSync 이후 로컬 변경이 없으면 Supabase 우선
+  const localModified=S.get(S.key('todos_modified',dk))||0;
+  const supaLatest=Math.max(...rows.map(r=>r.created||0));
+  if(supaLatest>=localModified){
+    // Supabase가 최신 — 덮어씀
+    S.set(S.key('todos',dk),rows.map(r=>({text:r.text,done:r.done,created:r.created})));
+    S.set(S.key('todos_modified',dk),supaLatest);
+  } else {
+    // 로컬이 최신 — 업로드
+    syncTodosUp(dk);
+  }
 }
 async function syncTodosUp(dk){
   const todos=getTodos(dk);
@@ -1128,8 +1143,12 @@ async function autoSync(type,key){
 async function syncAll(){
   if(!navigator.onLine)return;
   const dk=dateKey(currentDate),mk=monthKey(currentDate),now=new Date(),wk=weekKey(now);
+  // 내일 날짜도 함께 동기화 (미리 입력한 투두 보존)
+  const tomorrow=new Date(currentDate);tomorrow.setDate(tomorrow.getDate()+1);
+  const dk_tmrw=dateKey(tomorrow);
   await Promise.all([
     syncTodosDown(dk),syncMemosDown(dk),syncSleepDown(dk),
+    syncTodosDown(dk_tmrw), // 내일 투두도 동기화
     syncHabitsDown(),syncHCDown(wk),syncContentsDown(mk),
     syncGoalDown(S.key('wgoal',weekKey(now))),
     syncGoalDown(S.key('mgoal',monthKey(now)))
@@ -1261,14 +1280,18 @@ function openTodoModal(editIdx=-1){
   document.getElementById('todo-modal-inp').value=editIdx>=0?(getTodos(dk)[editIdx]?.text||''):'';
   openModal('todo-modal');setTimeout(()=>document.getElementById('todo-modal-inp').focus(),100);
 }
+let _todoSubmitting=false;
 function confirmTodo(){
+  if(_todoSubmitting)return;
   const text=document.getElementById('todo-modal-inp').value.trim();if(!text)return;
+  _todoSubmitting=true;
   const dk=dateKey(currentDate),todos=getTodos(dk);
   const modal=document.getElementById('todo-modal');
   const editIdx=modal.dataset.editIdx!==''?parseInt(modal.dataset.editIdx):-1;
   if(editIdx>=0&&todos[editIdx])todos[editIdx].text=text;
   else todos.push({text,done:false,created:Date.now()});
   saveTodos(dk,todos);closeModal('todo-modal');renderTodos();
+  setTimeout(()=>{_todoSubmitting=false;},500);
 }
 function todoEditSwipe(i){closeSheet('todo-sheet');openTodoModal(i);}
 function todoDelSwipe(i){
@@ -1784,7 +1807,7 @@ function renderCalDetail(d){
   if(hiddenCnt>0)items+=`<div class="cal-detail-more" onclick="calShowAll('${dk}')">··· ${hiddenCnt}개 더 보기</div>`;
   showMemos.forEach(m=>{items+=`<div class="cal-detail-row"><span class="cal-detail-time">${m.time||''}</span><span class="cal-detail-text">${m.text||''}</span></div>`;});
   if(!items){el.innerHTML=`<div class="cal-detail-wrap"><div class="cal-detail-date">${dateStr}</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:10px 0;">기록이 없어요</div></div>`;return;}
-  const oneLineHtml=oneLine?`<span style="font-size:11.5px;color:var(--ts);font-style:italic;flex:1;text-align:right;padding-left:8px;">&#x275D;${oneLine}&#x275E;</span>`:'';
+  const oneLineHtml=oneLine?`<span style="font-size:11.5px;color:var(--ts);font-style:italic;flex:1;text-align:right;padding-left:8px;">&#x275D; ${oneLine} &#x275E;</span>`:'';
   el.innerHTML=`<div class="cal-detail-wrap"><div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;gap:6px;"><span class="cal-detail-date" style="margin-bottom:0;flex-shrink:0;">${dateStr}</span>${oneLineHtml}</div>${items}</div>`;
   el.style.display='block';
   setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'nearest'}),100);
@@ -2091,7 +2114,7 @@ setTimeout(syncAll,600);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
 
-</script>
+</script></script>
 
 </body>
 </html>
