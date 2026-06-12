@@ -387,7 +387,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cstatus-btn{flex:1;padding:9px 4px;border-radius:10px;border:1px solid;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;}
 .cstatus-btn.watching{background:rgba(255,235,160,.55);border-color:rgba(240,215,100,.55);color:#9a7020;}
 .cstatus-btn.done{background:rgba(200,240,235,.55);border-color:rgba(160,220,215,.55);color:#3a8878;}
-.cstatus-btn.dim{opacity:.45;}
+.cstatus-btn.dim{opacity:.38;filter:saturate(0.5);}
 .enddate-row{display:none;margin-bottom:10px;}
 .enddate-row.show{display:flex;gap:8px;align-items:center;}
 
@@ -797,7 +797,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 <!-- CONTENT MODAL -->
 <div class="modal-ov" id="content-modal" onclick="closeModal('content-modal',event)">
   <div class="modal" style="max-width:340px;">
-    <div class="modal-title" id="content-modal-title">콘텐츠 추가</div>
     <div class="api-search-wrap">
       <input type="text" class="modal-inp" id="cm-title" placeholder="제목 검색..." autocomplete="off" oninput="apiSearchDebounce(this.value)" onblur="setTimeout(()=>hideApiResults(),200)">
       <div class="api-results" id="api-results" style="display:none;"></div>
@@ -809,12 +808,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
       <span style="font-size:12px;color:var(--tm);white-space:nowrap;">시작일</span>
       <input type="date" class="modal-inp" id="cm-start" style="flex:1;margin-bottom:0;">
-    </div>
-    <div class="content-status-row" id="cm-status-row">
-      <button class="cstatus-btn watching" id="cm-watching" onclick="setCStatus('watching')">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><circle cx="7" cy="7" r="5.5"/><polygon points="5.5,4.5 5.5,9.5 10,7" fill="rgba(176,128,48,0.4)" stroke="currentColor" stroke-width="1.1"/></svg>보는 중
-      </button>
-      <button class="cstatus-btn done" id="cm-done" onclick="setCStatus('done')">
+      <button class="cstatus-btn done" id="cm-done" onclick="toggleCDone()" style="flex-shrink:0;white-space:nowrap;padding:8px 14px;margin-bottom:0;">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><circle cx="7" cy="7" r="5.5"/><polyline points="4,7 6,9.5 10,4.5"/></svg>완료
       </button>
     </div>
@@ -1026,7 +1020,11 @@ function saveHabits(v){S.set('habits',v);autoSync('habits',null);}
 function getHabitChecks(wk){return S.get(S.key('hc',wk))||{};}
 function saveHabitChecks(wk,v){S.set(S.key('hc',wk),v);autoSync('hc',wk);}
 function getContents(mk){return S.get(S.key('contents',mk))||[];}
-function saveContents(mk,v){S.set(S.key('contents',mk),v);autoSync('contents',mk);}
+function saveContents(mk,v){
+  S.set(S.key('contents',mk),v);
+  S.set(S.key('contents_pending',mk),true);
+  autoSync('contents',mk);
+}
 function getGoal(key){return S.get(key)||[''];}
 function saveGoal(key,lines){S.set(key,lines);autoSync('goal',key);}
 
@@ -1121,9 +1119,17 @@ async function syncGoalUp(key){
   await supaFetch('goal_notes','POST',[{note_key:key,lines}]);
 }
 async function syncContentsDown(mk){
+  if(S.get(S.key('contents_pending',mk))){
+    await syncContentsUp(mk);
+    S.set(S.key('contents_pending',mk),false);
+    return;
+  }
   const rows=await supaFetch(`contents?month_key=eq.${mk}&order=created`);
   if(!rows)return;
-  if(rows.length===0&&getContents(mk).length>0){syncContentsUp(mk);return;}
+  if(rows.length===0){
+    if(getContents(mk).length>0)await syncContentsUp(mk);
+    return;
+  }
   S.set(S.key('contents',mk),rows.map(r=>({cat:r.content_cat,title:r.title,startDay:r.start_day,endDay:r.end_day,status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,created:r.created})));
 }
 async function syncContentsUp(mk){
@@ -1139,7 +1145,7 @@ async function autoSync(type,key){
   else if(type==='habits')syncHabitsUp();
   else if(type==='hc')syncHCUp(key);
   else if(type==='goal')syncGoalUp(key);
-  else if(type==='contents')syncContentsUp(key);
+  else if(type==='contents'){await syncContentsUp(key);S.set(S.key('contents_pending',key),false);}
 }
 async function syncAll(){
   if(!navigator.onLine)return;
@@ -1599,8 +1605,6 @@ function openContentModal(cat,item=null,mk=null){
   document.getElementById('cm-start').value=item?(()=>{const d=new Date(monthKey(currentDate)+'-'+String(item.startDay).padStart(2,'0'));return isNaN(d)?today:dateKey(d);})():today;
   document.getElementById('cm-review').value=item?.review||'';
   document.getElementById('cm-stars').value=item?.stars||'';
-  const isMusic=cat==='music';
-  document.getElementById('cm-status-row').style.display=isMusic?'none':'flex';
   document.getElementById('cm-del-btn').style.display=item?'block':'none';
   const status=item?.status||'watching';
   setCStatus(status);
@@ -1609,19 +1613,23 @@ function openContentModal(cat,item=null,mk=null){
 }
 function setCStatus(status){
   _contentCtx.status=status;
-  const w=document.getElementById('cm-watching'),d=document.getElementById('cm-done');
-  if(w&&d){w.classList.toggle('dim',status!=='watching');d.classList.toggle('dim',status==='watching');}
+  const d=document.getElementById('cm-done');
+  if(d)d.classList.toggle('dim',status!=='done');
   const edr=document.getElementById('cm-enddate-row');
   if(edr){
     edr.classList.toggle('show',status==='done');
     if(status==='done'&&!document.getElementById('cm-end').value)document.getElementById('cm-end').value=dateKey(currentDate);
   }
 }
+function toggleCDone(){
+  const isDone=_contentCtx.status==='done';
+  setCStatus(isDone?'watching':'done');
+}
 function confirmContent(){
   const title=document.getElementById('cm-title').value.trim();if(!title)return;
   const startVal=document.getElementById('cm-start').value;
   const startDay=startVal?parseInt(startVal.split('-')[2])||1:1;
-  const status=_contentCtx.status||'watching';
+  const status=_contentCtx.status==='done'?'done':'watching';
   let endDay=startDay;
   if(status==='done'){const endVal=document.getElementById('cm-end').value;endDay=endVal?Math.max(parseInt(endVal.split('-')[2])||startDay,startDay):startDay;}
   const review=document.getElementById('cm-review').value.trim();
@@ -2131,7 +2139,7 @@ setTimeout(syncAll,600);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
 
-</script></script></script>
+</script></script></script></script>
 
 </body>
 </html>
