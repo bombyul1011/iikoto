@@ -1293,6 +1293,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           <div class="home-time-label" id="home-time-label-n"></div>
           <div class="home-greeting-main" id="home-greeting-n">오늘도 수고했어요</div>
           <div class="home-greeting-sub" id="home-today-summary-n">오늘 기록 불러오는 중...</div>
+          <div class="home-greeting-sub" id="home-weather-n" style="font-size:11px;color:var(--tm);margin-top:4px;"></div>
           <div class="home-header-divider"></div>
         </div>
         <div class="slabel">하루 마감</div>
@@ -2725,8 +2726,22 @@ function openSheet(id){document.getElementById(id).classList.add('on');}
 function closeSheet(id,e){if(!e||e.target===document.getElementById(id))document.getElementById(id).classList.remove('on');}
 
 // ── SETTINGS
+
+function saveClaudeKey(){
+  const inp=document.getElementById('claude-api-key-inp');
+  if(!inp)return;
+  const val=inp.value.trim();
+  if(val&&!val.startsWith('••')){
+    S.set('claude_api_key',val);
+    showToast('Claude API 키가 저장됐어요 ✅');
+    inp.value='••••••••••••'+val.slice(-4);
+    _weatherCache=null; // 캐시 초기화
+  }
+}
 function openSettings(){
   const el=document.getElementById('sync-status');if(el)el.textContent=navigator.onLine?'온라인 ✅':'오프라인';
+  const keyInp=document.getElementById('claude-api-key-inp');
+  if(keyInp){const k=S.get('claude_api_key');keyInp.value=k?'••••••••••••'+k.slice(-4):'';}
   const theme=S.get('theme')||'light';
   const darkTog=document.getElementById('dark-tog');if(darkTog)darkTog.classList.toggle('on',theme==='dark');
   document.querySelectorAll('.ctheme-btn').forEach(b=>b.classList.remove('on'));
@@ -3049,34 +3064,119 @@ function renderHomeIconBar(section){
   });
 }
 
-// 날씨 + 인사 (Open-Meteo)
+// 날씨 코드 → 설명
+function weatherDesc(code){
+  if(code<=1)return{emoji:'☀️',txt:'맑음'};
+  if(code<=3)return{emoji:'⛅',txt:'구름 조금'};
+  if(code<=48)return{emoji:'🌫',txt:'흐림'};
+  if(code<=67)return{emoji:'🌧',txt:'비'};
+  if(code<=77)return{emoji:'❄️',txt:'눈'};
+  return{emoji:'🌩',txt:'천둥번개'};
+}
+
+// 날씨 캐시 (앱 세션 내 재호출 방지)
+let _weatherCache=null;
+let _weatherCacheTime=0;
+
+async function fetchWeatherData(){
+  const now=Date.now();
+  if(_weatherCache&&now-_weatherCacheTime<30*60*1000)return _weatherCache;
+  return new Promise(resolve=>{
+    if(!navigator.geolocation){resolve(null);return;}
+    navigator.geolocation.getCurrentPosition(async pos=>{
+      try{
+        const {latitude:lat,longitude:lon}=pos.coords;
+        const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weathercode,uv_index,apparent_temperature&hourly=precipitation_probability&timezone=auto&forecast_days=1`;
+        const res=await fetch(url);
+        const data=await res.json();
+        const c=data.current;
+        _weatherCache={
+          temp:Math.round(c.temperature_2m),
+          feels:Math.round(c.apparent_temperature),
+          uv:Math.round(c.uv_index||0),
+          code:c.weathercode,
+          rain:data.hourly?.precipitation_probability?.[new Date().getHours()]||0
+        };
+        _weatherCacheTime=now;
+        resolve(_weatherCache);
+      }catch(e){resolve(null);}
+    },()=>resolve(null),{timeout:8000});
+  });
+}
+
+// Claude API로 날씨 인사 생성
+async function generateWeatherGreeting(weather,section){
+  const CLAUDE_KEY=S.get('claude_api_key');
+  if(!CLAUDE_KEY)return null;
+  const sectionTxt={morning:'아침',afternoon:'오후',night:'저녁'};
+  const uvTxt=weather.uv>=8?'자외선 매우 강함':weather.uv>=6?'자외선 강함':weather.uv>=3?'자외선 보통':'자외선 약함';
+  const {emoji,txt}=weatherDesc(weather.code);
+  const prompt=`지금은 ${sectionTxt[section]}이고 현재 날씨는 다음과 같아: 기온 ${weather.temp}도(체감 ${weather.feels}도), ${txt}, ${uvTxt}, 강수확률 ${weather.rain}%. 이 날씨와 시간대에 맞게 짧고 자연스러운 한국어 인사 한 문장만 만들어줘. 이모지 1개 포함. 날씨 정보를 그대로 나열하지 말고 생활 팁이나 감성적인 표현으로. 20자 내외.`;
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-haiku-4-5-20251001',
+        max_tokens:100,
+        messages:[{role:'user',content:prompt}]
+      })
+    });
+    const data=await res.json();
+    return data.content?.[0]?.text?.trim()||null;
+  }catch(e){return null;}
+}
+
+// 날씨 인사 통합
 async function fetchWeatherGreeting(section){
   const greetingIds={morning:'home-greeting-m',afternoon:'home-greeting-a',night:'home-greeting-n'};
-  const weatherIds={morning:'home-weather-m',afternoon:'home-weather-a'};
+  const weatherIds={morning:'home-weather-m',afternoon:'home-weather-a',night:'home-weather-n'};
   const greetingEl=document.getElementById(greetingIds[section]);
-  const weatherEl=document.getElementById(weatherIds[section]);
-  try{
-    if(!navigator.geolocation)return;
-    navigator.geolocation.getCurrentPosition(async pos=>{
-      const {latitude:lat,longitude:lon}=pos.coords;
-      const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weathercode,uv_index&timezone=auto`;
-      const res=await fetch(url);const data=await res.json();
-      const temp=Math.round(data.current.temperature_2m);
-      const uv=data.current.uv_index;
-      const code=data.current.weathercode;
-      const weatherEmoji=code<=1?'☀️':code<=3?'⛅':code<=48?'🌫':code<=67?'🌧':code<=77?'❄️':'🌩';
-      const uvTxt=uv>=8?'자외선 매우 높음':uv>=6?'자외선 높음':uv>=3?'자외선 보통':'자외선 낮음';
-      if(weatherEl)weatherEl.textContent=`${weatherEmoji} ${temp}°C · ${uvTxt}`;
-      // 인사말은 나중에 Claude API 연결
-      const greetings={
-        morning:['좋은 아침이에요','상쾌한 아침이에요 ✨','오늘도 좋은 하루 시작해요 🌿'],
-        afternoon:['잘 하고 있어요 ✨','오후도 화이팅이에요 🌸','거의 다 왔어요 🌿'],
-        night:['오늘도 수고했어요','잘 마무리했어요 ✨','오늘 하루도 수고했어요 🌸']
-      };
-      const arr=greetings[section];
-      if(greetingEl)greetingEl.textContent=arr[new Date().getDate()%arr.length];
-    });
-  }catch(e){console.log('weather:',e);}
+  const weatherElId=weatherIds[section];
+  const weatherEl=weatherElId?document.getElementById(weatherElId):null;
+
+  // 기본 인사 (날씨 로딩 전)
+  const defaults={
+    morning:'좋은 아침이에요',
+    afternoon:'잘 하고 있어요 ✨',
+    night:'오늘도 수고했어요'
+  };
+
+  const weather=await fetchWeatherData();
+  if(!weather){
+    if(greetingEl)greetingEl.textContent=defaults[section];
+    return;
+  }
+
+  // 날씨 pill 업데이트
+  const {emoji,txt}=weatherDesc(weather.code);
+  const uvTxt=weather.uv>=8?'자외선 매우 높음':weather.uv>=6?'자외선 높음':weather.uv>=3?'자외선 보통':'자외선 낮음';
+  if(weatherEl)weatherEl.textContent=`${emoji} ${weather.temp}°C · ${uvTxt}`;
+
+  // Claude API 키 있으면 생성, 없으면 날씨 기반 기본 문장
+  const claudeGreeting=await generateWeatherGreeting(weather,section);
+  if(claudeGreeting){
+    if(greetingEl)greetingEl.textContent=claudeGreeting;
+  } else {
+    // Claude 없을 때 날씨 기반 간단한 문장
+    const {emoji:em}=weatherDesc(weather.code);
+    const weatherGreetings={
+      morning:[
+        weather.uv>=6?`자외선 강해요, 선크림 챙겨요 ${em}`:`오늘 ${weather.temp}도, 좋은 아침이에요 ${em}`,
+        weather.rain>=50?`비 올 수 있어요, 우산 챙겨요 ${em}`:`${txt} 날씨네요, 좋은 하루 시작해요 ${em}`
+      ],
+      afternoon:[
+        `오후도 ${weather.temp}도, 잘 하고 있어요 ${em}`,
+        weather.rain>=50?`오후에 비 올 수 있어요 ${em}`:`${txt} 오후예요, 화이팅 ${em}`
+      ],
+      night:[
+        `오늘 하루도 수고했어요 ${em}`,
+        `${weather.temp}도의 밤이에요, 잘 마무리했어요 ${em}`
+      ]
+    };
+    const arr=weatherGreetings[section];
+    if(greetingEl)greetingEl.textContent=arr[new Date().getDate()%arr.length];
+  }
 }
 
 // 클로드 연동 — 오늘 데이터 취합 후 앱 열기
@@ -3143,7 +3243,7 @@ setTimeout(syncAll,600);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
 
-</script></script></script></script>
+</script></script></script></script></script>
 
 </body>
 </html>
