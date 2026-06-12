@@ -1188,6 +1188,32 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="dark"] .home-content-item{background:rgba(255,255,255,0.06);border-color:rgba(255,255,255,0.10);}
 [data-theme="dark"] .home-icon-btn{background:rgba(255,255,255,0.06);border-color:rgba(255,255,255,0.10);}
 [data-theme="dark"] .home-icon-bar{border-top-color:rgba(255,255,255,0.08);}
+
+/* ── 주간 루틴 ── */
+.routine-card{
+  background:var(--card);border:1px solid var(--card-b);
+  border-radius:14px;padding:14px 15px;cursor:pointer;
+  transition:all .15s;position:relative;
+}
+.routine-card.selected{
+  border-color:var(--acc);
+  background:var(--acc-soft);
+}
+.routine-card:active{opacity:.85;}
+.routine-card-type{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:10px;font-weight:500;letter-spacing:.06em;
+  border-radius:8px;padding:3px 9px;margin-bottom:8px;
+}
+.routine-card-type.challenge{background:rgba(255,180,100,.25);color:#b06020;}
+.routine-card-type.maintain{background:rgba(140,210,200,.25);color:#2a7868;}
+.routine-card-type.recover{background:rgba(180,165,230,.25);color:#6a50a0;}
+.routine-card-title{font-size:13.5px;font-weight:500;color:var(--tp);margin-bottom:6px;}
+.routine-card-reason{font-size:11.5px;color:var(--ts);line-height:1.6;margin-bottom:10px;}
+.routine-card-habits{display:flex;flex-wrap:wrap;gap:5px;}
+.routine-habit-tag{font-size:10.5px;color:var(--ts);background:rgba(255,255,255,.55);border:1px solid var(--card-b);border-radius:8px;padding:3px 9px;}
+.routine-check{position:absolute;top:12px;right:12px;width:20px;height:20px;border-radius:50%;border:1.5px solid rgba(200,160,160,.40);display:flex;align-items:center;justify-content:center;}
+.routine-card.selected .routine-check{background:var(--acc);border-color:var(--acc);}
 </style>
 </head>
 <body>
@@ -1445,6 +1471,29 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   </div><!-- /scroll -->
 
 </div><!-- /app -->
+
+
+<!-- 주간 루틴 모달 -->
+<div class="modal-ov" id="routine-modal" onclick="closeModal('routine-modal',event)">
+  <div class="modal" style="max-width:360px;max-height:88vh;overflow-y:auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div class="modal-title" style="margin-bottom:0;">주간 루틴 제안</div>
+      <div id="routine-loading" style="font-size:11px;color:var(--tm);display:none;">생성 중...</div>
+    </div>
+    <div id="routine-cards" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;"></div>
+    <div id="routine-selected" style="display:none;">
+      <div style="height:1px;background:var(--div);margin-bottom:14px;"></div>
+      <div style="font-size:12px;color:var(--ts);margin-bottom:10px;">선택한 루틴을 습관에 반영할까요?</div>
+      <div class="modal-actions">
+        <button class="mbtn cancel" onclick="closeModal('routine-modal')">취소</button>
+        <button class="mbtn ok" onclick="applyRoutine()">습관에 반영</button>
+      </div>
+    </div>
+    <div id="routine-empty" style="text-align:center;padding:20px 0;font-size:13px;color:var(--tm);display:none;">
+      Claude API 키를 설정해주세요 🌿
+    </div>
+  </div>
+</div>
 
 <!-- UNDO TOAST -->
 <div class="undo-toast" id="undo-toast">삭제됐어요 <span class="undo-btn" onclick="undoMemo()">되돌리기</span></div>
@@ -3262,7 +3311,156 @@ function openContentDiscuss(title,cat,stars,review){
   }
 }
 
-function openWeeklyRoutine(){showToast('주간 루틴 — 곧 추가될 기능이에요 🌿');}
+
+// ── 주간 루틴 제안
+let _selectedRoutine=null;
+
+async function openWeeklyRoutine(){
+  openModal('routine-modal');
+  const cardsEl=document.getElementById('routine-cards');
+  const loadingEl=document.getElementById('routine-loading');
+  const emptyEl=document.getElementById('routine-empty');
+  const selectedEl=document.getElementById('routine-selected');
+  if(!cardsEl)return;
+
+  const CLAUDE_KEY=S.get('claude_api_key');
+  if(!CLAUDE_KEY){
+    cardsEl.innerHTML='';
+    if(emptyEl)emptyEl.style.display='block';
+    return;
+  }
+  if(emptyEl)emptyEl.style.display='none';
+  if(selectedEl)selectedEl.style.display='none';
+  _selectedRoutine=null;
+
+  // 지난 주 데이터 취합
+  cardsEl.innerHTML='<div style="text-align:center;padding:24px 0;font-size:13px;color:var(--tm);">지난 주 데이터 분석 중...</div>';
+  if(loadingEl)loadingEl.style.display='block';
+
+  const now=new Date();
+  const dow=now.getDay();
+  const mon=new Date(now);mon.setDate(now.getDate()-((dow+6)%7)-7); // 지난 주 월요일
+
+  let weekData={habits:[],habitChecks:{},todos:{done:0,total:0},sleep:[],memos:0};
+  weekData.habits=getHabits();
+
+  for(let i=0;i<7;i++){
+    const d=new Date(mon);d.setDate(mon.getDate()+i);
+    const dk=dateKey(d);const wk=weekKey(d);
+    const checks=getHabitChecks(wk);
+    const todos=getTodos(dk);
+    const sl=getSleep(dk);
+    weekData.todos.done+=todos.filter(t=>t.done).length;
+    weekData.todos.total+=todos.length;
+    weekData.memos+=getMemos(dk).length;
+    if(sl.sleep&&sl.wake){
+      const sv=sl.sleep.split(':').map(Number),wv=sl.wake.split(':').map(Number);
+      let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;
+      weekData.sleep.push(Math.round(m/60*10)/10);
+    }
+    weekData.habits.forEach(h=>{
+      const k=`${h.name}-${i}`;
+      if(!weekData.habitChecks[h.name])weekData.habitChecks[h.name]=0;
+      if(checks[k])weekData.habitChecks[h.name]++;
+    });
+  }
+
+  const avgSleep=weekData.sleep.length?
+    (weekData.sleep.reduce((a,b)=>a+b,0)/weekData.sleep.length).toFixed(1):null;
+  const todoPct=weekData.todos.total>0?
+    Math.round(weekData.todos.done/weekData.todos.total*100):0;
+
+  // 습관별 달성률
+  const habitSummary=weekData.habits.map(h=>{
+    const cnt=weekData.habitChecks[h.name]||0;
+    return `${h.name}: ${cnt}/7일 (${Math.round(cnt/7*100)}%)`;
+  }).join(', ');
+
+  const prompt=`지난 주 iikoto 기록 분석:
+- 습관 달성: ${habitSummary||'기록 없음'}
+- 투두 완료율: ${todoPct}% (${weekData.todos.done}/${weekData.todos.total}개)
+- 평균 수면: ${avgSleep?avgSleep+'시간':'기록 없음'}
+- 메모 수: ${weekData.memos}개
+
+이 데이터를 바탕으로 다음 주 습관 루틴 3가지를 제안해줘:
+1. 도전형: 더 발전하고 싶은 사람을 위한 루틴
+2. 유지형: 현재 페이스를 유지하는 루틴  
+3. 회복형: 조금 쉬면서 재충전하는 루틴
+
+각각 JSON 형식으로만 응답해줘 (다른 텍스트 없이):
+[
+  {"type":"challenge","title":"제목","reason":"이유 1-2문장","habits":["습관1","습관2","습관3"]},
+  {"type":"maintain","title":"제목","reason":"이유 1-2문장","habits":["습관1","습관2"]},
+  {"type":"recover","title":"제목","reason":"이유 1-2문장","habits":["습관1"]}
+]`;
+
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-haiku-4-5-20251001',
+        max_tokens:600,
+        messages:[{role:'user',content:prompt}]
+      })
+    });
+    const data=await res.json();
+    const text=data.content?.[0]?.text?.trim()||'';
+    const clean=text.replace(/```json|```/g,'').trim();
+    const plans=JSON.parse(clean);
+    if(loadingEl)loadingEl.style.display='none';
+    renderRoutineCards(plans,cardsEl);
+  }catch(e){
+    if(loadingEl)loadingEl.style.display='none';
+    cardsEl.innerHTML='<div style="text-align:center;padding:20px 0;font-size:13px;color:var(--tm);">잠시 후 다시 시도해주세요 🌿</div>';
+  }
+}
+
+const ROUTINE_TYPE_LABEL={challenge:'🔥 도전형',maintain:'✦ 유지형',recover:'🌿 회복형'};
+
+function renderRoutineCards(plans,container){
+  container.innerHTML='';
+  plans.forEach(plan=>{
+    const card=document.createElement('div');
+    card.className=`routine-card`;
+    card.innerHTML=`
+      <div class="routine-check"></div>
+      <div class="routine-card-type ${plan.type}">${ROUTINE_TYPE_LABEL[plan.type]||plan.type}</div>
+      <div class="routine-card-title">${plan.title}</div>
+      <div class="routine-card-reason">${plan.reason}</div>
+      <div class="routine-card-habits">${(plan.habits||[]).map(h=>`<span class="routine-habit-tag">${h}</span>`).join('')}</div>`;
+    card.addEventListener('click',()=>{
+      document.querySelectorAll('.routine-card').forEach(c=>c.classList.remove('selected'));
+      card.classList.add('selected');
+      _selectedRoutine=plan;
+      const sel=document.getElementById('routine-selected');
+      if(sel)sel.style.display='block';
+    });
+    container.appendChild(card);
+  });
+}
+
+function applyRoutine(){
+  if(!_selectedRoutine)return;
+  const habits=_selectedRoutine.habits||[];
+  if(!habits.length){closeModal('routine-modal');return;}
+  // 기존 습관 유지하면서 루틴 제안 습관 병합
+  const existing=getHabits();
+  const existingNames=existing.map(h=>h.name);
+  const COLORS=['mint','pink','sky','yellow','rose','lavender','peach','teal'];
+  const newHabits=[...existing];
+  habits.forEach((name,i)=>{
+    if(!existingNames.includes(name)){
+      newHabits.push({name,color:COLORS[(existing.length+i)%COLORS.length]});
+    }
+  });
+  saveHabits(newHabits);
+  closeModal('routine-modal');
+  showToast(`✦ 루틴이 습관에 반영됐어요 🌿`);
+  // 홈 화면이 열려있으면 새로고침
+  if(document.getElementById('v-home')?.classList.contains('on'))renderHome();
+}
+
 function openBackup(){openPdfModal();}
 function openExternalNews(){window.open('https://news.naver.com','_blank');}
 function openCalendar(){window.location.href='calshow://';}
@@ -3274,7 +3472,7 @@ setTimeout(syncAll,600);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
 
-</script></script></script></script></script></script>
+</script></script></script></script></script></script></script>
 
 </body>
 </html>
