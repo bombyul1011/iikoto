@@ -978,7 +978,7 @@ const DEFAULT_HABITS=[{name:'운동',color:'mint'},{name:'독서',color:'pink'},
 // ── STORAGE
 const S={
   get:k=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):null;}catch(e){return null;}},
-  set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(e){console.warn('storage:',e);}},
+  set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(e){if(e.name==='QuotaExceededError'||e.code===22){console.warn('저장 공간 부족 — 오래된 사진 메모 정리를 권장합니다');}else{console.warn('storage:',e);}}},
   key:(...a)=>a.join(':')
 };
 
@@ -1306,7 +1306,7 @@ function confirmTodo(){
   _todoSubmitting=true;
   const dk=dateKey(currentDate),todos=getTodos(dk);
   const modal=document.getElementById('todo-modal');
-  const editIdx=modal.dataset.editIdx!==''?parseInt(modal.dataset.editIdx):-1;
+  const editIdx=modal.dataset.editIdx&&modal.dataset.editIdx!==''?parseInt(modal.dataset.editIdx)||(-1):-1;
   if(editIdx>=0&&todos[editIdx])todos[editIdx].text=text;
   else todos.push({text,done:false,created:Date.now()});
   saveTodos(dk,todos);closeModal('todo-modal');renderTodos();
@@ -1606,7 +1606,7 @@ function openContentModal(cat,item=null,mk=null){
   _selectedPoster=null;
   const pp=document.getElementById('cm-poster-preview');
   if(pp){
-    if(item?.poster){pp.style.display='flex';document.getElementById('cm-poster-img').src=item.poster;document.getElementById('cm-poster-title').textContent=item.title||'';}
+    if(item?.poster){pp.style.display='flex';const pimg=document.getElementById('cm-poster-img');if(pimg)pimg.src=item.poster;document.getElementById('cm-poster-title').textContent=item.title||'';}
     else pp.style.display='none';
   }
   const today=dateKey(currentDate);
@@ -1835,7 +1835,7 @@ function renderCalDetail(d){
   const showMemos=total>MAX?allMemos.slice(-MAX):allMemos;
   if(hiddenCnt>0)items+=`<div class="cal-detail-more" onclick="calShowAll('${dk}')">··· ${hiddenCnt}개 더 보기</div>`;
   showMemos.forEach(m=>{items+=`<div class="cal-detail-row"><span class="cal-detail-time">${m.time||''}</span><span class="cal-detail-text">${m.text||''}</span></div>`;});
-  if(!items){el.innerHTML=`<div class="cal-detail-wrap"><div class="cal-detail-date">${dateStr}</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:10px 0;">기록이 없어요</div></div>`;return;}
+  if(!items){const olh=oneLine?`<span style="font-size:11.5px;color:var(--ts);font-style:italic;flex:1;text-align:right;padding-left:8px;">&#x275D; ${oneLine} &#x275E;</span>`:"";el.innerHTML=`<div class="cal-detail-wrap"><div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;gap:6px;"><span class="cal-detail-date" style="margin-bottom:0;flex-shrink:0;">${dateStr}</span>${olh}</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:10px 0;">기록이 없어요</div></div>`;return;}
   const oneLineHtml=oneLine?`<span style="font-size:11.5px;color:var(--ts);font-style:italic;flex:1;text-align:right;padding-left:8px;">&#x275D; ${oneLine} &#x275E;</span>`:'';
   el.innerHTML=`<div class="cal-detail-wrap"><div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;gap:6px;"><span class="cal-detail-date" style="margin-bottom:0;flex-shrink:0;">${dateStr}</span>${oneLineHtml}</div>${items}</div>`;
   el.style.display='block';
@@ -1911,6 +1911,7 @@ function renderDailyOneLineWeek(){
     inp.placeholder=isToday?'오늘 하루 한 줄...':'';
     inp.autocomplete='off';
     inp.addEventListener('blur',()=>saveDailyOneLine(dk,inp.value.trim()));
+    inp.addEventListener('compositionend',()=>{}); // 한글 IME 안전
     inp.addEventListener('keydown',e=>{if(e.key==='Enter')inp.blur();});
     row.appendChild(dayWrap);row.appendChild(divider);row.appendChild(inp);
     el.appendChild(row);
@@ -1955,23 +1956,27 @@ function initTodoDrag(){
     list.querySelectorAll('.todo-item').forEach(el=>el.classList.remove('drag-over'));
     t.classList.add('drag-over');
   });
-  document.addEventListener('mouseup',()=>{
-    if(!_dragEl)return;
-    _dragEl.classList.remove('dragging');
-    const l=document.getElementById('todo-list');if(!l)return;
-    const over=l.querySelector('.todo-item.drag-over');
-    if(over){
-      over.classList.remove('drag-over');
-      const all=Array.from(l.querySelectorAll('.todo-item'));
-      const toIdx=all.indexOf(over);
-      if(_dragIdx!==toIdx&&toIdx>=0){
-        const dk=dateKey(currentDate),todos=getTodos(dk);
-        const[mv]=todos.splice(_dragIdx,1);todos.splice(toIdx,0,mv);
-        saveTodos(dk,todos);renderTodos();
+  // mouseup 한 번만 등록
+  if(!window._dragMouseUpAttached){
+    window._dragMouseUpAttached=true;
+    document.addEventListener('mouseup',()=>{
+      if(!_dragEl)return;
+      _dragEl.classList.remove('dragging');
+      const l=document.getElementById('todo-list');if(!l)return;
+      const over=l.querySelector('.todo-item.drag-over');
+      if(over){
+        over.classList.remove('drag-over');
+        const all=Array.from(l.querySelectorAll('.todo-item'));
+        const toIdx=all.indexOf(over);
+        if(_dragIdx!==toIdx&&toIdx>=0){
+          const dk=dateKey(currentDate),todos=getTodos(dk);
+          const[mv]=todos.splice(_dragIdx,1);todos.splice(toIdx,0,mv);
+          saveTodos(dk,todos);renderTodos();
+        }
       }
-    }
-    _dragIdx=-1;_dragEl=null;
-  });
+      _dragIdx=-1;_dragEl=null;
+    });
+  }
 }
 // ── LOAD
 function loadDaily(){loadSleep();renderTodos();renderMemos();}
@@ -2147,7 +2152,7 @@ setTimeout(syncAll,600);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
 
-</script></script></script></script>
+</script>
 
 </body>
 </html>
