@@ -3103,6 +3103,59 @@ function exportMarkdownDownload(){
   showToast('파일이 저장됐어요 ⬇️');
 }
 
+
+// ── HOME
+const DAYS_KO=['일','월','화','수','목','금','토'];
+
+function goHome(){
+  document.querySelectorAll('.vtab').forEach(t=>t.classList.remove('on'));
+  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='v-home'));
+  document.querySelector('.scroll').scrollTop=0;
+  renderHome();
+}
+
+function getTimeSection(){
+  const h=new Date().getHours();
+  if(h>=6&&h<12)return 'morning';
+  if(h>=12&&h<19)return 'afternoon';
+  return 'night';
+}
+
+function renderHome(){
+  const section=getTimeSection();
+  document.getElementById('home-morning').style.display=section==='morning'?'':'none';
+  document.getElementById('home-afternoon').style.display=section==='afternoon'?'':'none';
+  document.getElementById('home-night').style.display=section==='night'?'':'none';
+  document.querySelectorAll('.home-header').forEach(el=>{
+    el.classList.remove('morning','afternoon','night');
+    el.classList.add(section);
+  });
+  const now=new Date();
+  const h=now.getHours(),m=now.getMinutes();
+  const ampm=h<12?'오전':'오후';
+  const hh=h===0?12:h>12?h-12:h;
+  const mm=String(m).padStart(2,'0');
+  const dayStr=DAYS_KO[now.getDay()];
+  const timeStr=`${ampm} ${hh}:${mm} · ${dayStr}요일`;
+  if(section==='morning'){
+    const el=document.getElementById('home-time-label-m');if(el)el.textContent=timeStr;
+    renderHomeHabits('home-habit-morning');
+    setTimeout(()=>renderHomeRings('m'),50);
+    fetchWeatherGreeting('morning');
+  } else if(section==='afternoon'){
+    const el=document.getElementById('home-time-label-a');if(el)el.textContent=timeStr;
+    renderHomeRemain();
+    fetchWeatherGreeting('afternoon');
+  } else {
+    const el=document.getElementById('home-time-label-n');if(el)el.textContent=timeStr;
+    renderHomeNightSummary();
+    renderHomeContents();
+    setTimeout(()=>renderHomeRings(),50);
+    fetchWeatherGreeting('night');
+  }
+  renderHomeIconBar(section);
+}
+
 // ── INIT
 updateDateUI();
 loadDaily();
