@@ -625,9 +625,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div id="memo-list"></div>
         <div class="memo-input-row">
           <button class="stamp-btn" onclick="stampNow()"><svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="color:var(--ts)"><circle cx="5.5" cy="5.5" r="4.2"/><polyline points="5.5,3 5.5,5.5 7.2,6.8"/></svg>지금</button>
-          <button class="stamp-btn" onclick="document.getElementById('photo-inp').click()" style="padding:7px 9px;"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="color:var(--ts)"><rect x="1" y="3" width="12" height="9" rx="2"/><circle cx="7" cy="7.5" r="2.2"/><path d="M4.5 3L5.5 1.5H8.5L9.5 3"/></svg></button>
-          <input type="file" id="photo-inp" accept="image/*" style="display:none" onchange="handlePhoto(this)">
-          <textarea id="memo-inp" class="memo-field" rows="1" placeholder="메모 입력" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
+          <textarea id="memo-inp" class="memo-field" rows="1" placeholder="메모 입력" autocomplete="off"></textarea>
           <button class="send-btn" onclick="sendMemo()"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="white" stroke-width="1.4" stroke-linecap="round"><line x1="6.5" y1="10.5" x2="6.5" y2="2"/><polyline points="3,5.5 6.5,2 10,5.5"/></svg></button>
         </div>
       </div>
@@ -1365,7 +1363,7 @@ function attachSwipe(el,onSwipe){
 }
 
 // ── MEMO
-let _pendingPhoto=null,_deletedMemo=null,_undoTimer=null,_memoSwipeIdx=-1;
+let _deletedMemo=null,_undoTimer=null,_memoSwipeIdx=-1;
 function renderMemos(){
   const dk=dateKey(currentDate),memos=getMemos(dk);
   const list=document.getElementById('memo-list');if(!list)return;
@@ -1375,7 +1373,7 @@ function renderMemos(){
     const bub=document.createElement('div');bub.className='memo-bub';
     bub.style.cursor='pointer';
     bub.addEventListener('click',()=>{_memoSwipeIdx=i;openSheet('memo-sheet');});
-    bub.innerHTML=(m.text||'')+(m.photo?`<img src="${m.photo}" style="width:68px;height:68px;border-radius:10px;object-fit:cover;display:block;margin-top:6px;">`:'');
+    bub.innerHTML=m.text||'';
     const sw=document.createElement('div');sw.className='memo-swipe';
     sw.innerHTML=`<div class="msw-btn msw-edit" onclick="memoEditSwipe(${i})">수정</div><div class="msw-btn msw-del" onclick="memoDelSwipe(${i})">삭제</div>`;
     const time=document.createElement('span');time.className='memo-time';time.textContent=m.time||'';
@@ -1425,38 +1423,18 @@ function stampNow(){
 }
 function sendMemo(){
   const f=document.getElementById('memo-inp');
-  const text=f.value.trim();
-  if(!text&&!_pendingPhoto)return;
+  const text=f.value.trim();if(!text)return;
   const n=new Date();
   const stamp=f.dataset.stamp||`${pad(n.getHours())}:${pad(n.getMinutes())}`;
   const dk=dateKey(currentDate),memos=getMemos(dk);
-  const memo={text,time:stamp,created:Date.now()};
-  if(_pendingPhoto)memo.photo=_pendingPhoto;
-  memos.push(memo);saveMemos(dk,memos);
+  memos.push({text,time:stamp,created:Date.now()});
+  saveMemos(dk,memos);
   f.value='';delete f.dataset.stamp;f.placeholder='메모 입력';f.style.height='';
-  if(_pendingPhoto){_pendingPhoto=null;const p=document.getElementById('photo-preview');if(p)p.remove();}
   renderMemos();
 }
 document.getElementById('memo-inp').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMemo();}});
 document.getElementById('memo-inp').addEventListener('input',e=>{const el=e.target;el.style.height='auto';el.style.height=Math.min(el.scrollHeight,100)+'px';});
-function handlePhoto(inp){
-  const file=inp.files[0];if(!file)return;
-  const reader=new FileReader();
-  reader.onload=e=>{
-    const img=new Image();
-    img.onload=()=>{
-      const size=Math.min(img.width,img.height);
-      const canvas=document.createElement('canvas');canvas.width=300;canvas.height=300;
-      const ctx=canvas.getContext('2d');
-      ctx.drawImage(img,(img.width-size)/2,(img.height-size)/2,size,size,0,0,300,300);
-      _pendingPhoto=canvas.toDataURL('image/jpeg',0.8);
-      let preview=document.getElementById('photo-preview');
-      if(!preview){preview=document.createElement('div');preview.id='photo-preview';preview.style.cssText='position:relative;display:inline-block;margin:6px 0 0;';document.querySelector('.memo-input-row').parentNode.insertBefore(preview,document.querySelector('.memo-input-row'));}
-      preview.innerHTML=`<img src="${_pendingPhoto}" style="width:68px;height:68px;border-radius:10px;object-fit:cover;"><button onclick="cancelPhoto()" style="position:absolute;top:-5px;right:-5px;width:18px;height:18px;background:rgba(60,40,40,.75);border:none;border-radius:50%;color:white;font-size:9px;cursor:pointer;">✕</button>`;
-    };img.src=e.target.result;
-  };reader.readAsDataURL(file);inp.value='';
-}
-function cancelPhoto(){_pendingPhoto=null;const p=document.getElementById('photo-preview');if(p)p.remove();}
+
 function openSearch(){
   const q=prompt('메모 검색:');if(!q)return;
   const dk=dateKey(currentDate);const found=getMemos(dk).filter(m=>(m.text||'').includes(q));
@@ -2152,7 +2130,7 @@ setTimeout(syncAll,600);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
 
-</script>
+</script></script>
 
 </body>
 </html>
