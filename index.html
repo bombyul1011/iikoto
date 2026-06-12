@@ -1244,11 +1244,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div class="view" id="v-home">
       <!-- 시간대별 섹션 — JS로 렌더 -->
       <div id="home-morning" style="display:none;">
-        <div style="padding:4px 2px 0;">
+        <div class="home-header morning">
           <div class="home-time-label" id="home-time-label-m"></div>
           <div class="home-greeting-main" id="home-greeting-m">좋은 아침이에요</div>
           <div class="home-greeting-sub" id="home-weather-m">날씨 불러오는 중...</div>
-          <div style="height:1px;background:var(--div);margin:14px 0 4px;"></div>
+          <div class="home-header-divider"></div>
         </div>
         <div class="slabel">바로가기</div>
         <div class="home-btn-grid">
@@ -1268,11 +1268,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       </div>
 
       <div id="home-afternoon" style="display:none;">
-        <div style="padding:4px 2px 0;">
+        <div class="home-header afternoon">
           <div class="home-time-label" id="home-time-label-a"></div>
           <div class="home-greeting-main" id="home-greeting-a">잘 하고 있어요 ✨</div>
           <div class="home-greeting-sub" id="home-weather-a">날씨 불러오는 중...</div>
-          <div style="height:1px;background:var(--div);margin:14px 0 4px;"></div>
+          <div class="home-header-divider"></div>
         </div>
         <div class="slabel">남은 해빗 & 투두</div>
         <div class="card m" id="home-remain-afternoon"></div>
@@ -1289,11 +1289,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       </div>
 
       <div id="home-night" style="display:none;">
-        <div style="padding:4px 2px 0;">
+        <div class="home-header night">
           <div class="home-time-label" id="home-time-label-n"></div>
           <div class="home-greeting-main" id="home-greeting-n">오늘도 수고했어요</div>
           <div class="home-greeting-sub" id="home-today-summary-n">오늘 기록 불러오는 중...</div>
-          <div style="height:1px;background:var(--div);margin:14px 0 4px;"></div>
+          <div class="home-header-divider"></div>
         </div>
         <div class="slabel">하루 마감</div>
         <div class="home-action-btn" onclick="openTodayReview()">
