@@ -3655,6 +3655,7 @@ async function openWeeklyReview(){
 // ── INIT
 updateDateUI();
 loadDaily();
+initHomeEvents();
 setTimeout(syncAll,600);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
