@@ -3422,12 +3422,34 @@ async function fetchWeatherGreeting(section){
   if(subEl)subEl.textContent=arr[new Date().getDate()%arr.length];
 }
 
-function openClaudeChat(){
-  const txt=buildTodayText();
-  if(navigator.clipboard){navigator.clipboard.writeText(txt).then(()=>{showToast('클로드에 붙여넣기 해주세요 📋');setTimeout(()=>{const a=document.createElement('a');a.href='claude://';a.style.display='none';document.body.appendChild(a);a.click();document.body.removeChild(a);},600);});}
-}
+function openClaudeChat(){copyAndOpenClaude(buildTodayText());}
 function openTodayReview(){openClaudeChat();}
 
+
+
+// ── 공통: 클립보드 복사 + Claude 앱 열기
+function copyAndOpenClaude(txt){
+  const open=()=>{
+    const a=document.createElement('a');
+    a.href='claude://';a.style.display='none';
+    document.body.appendChild(a);a.click();
+    document.body.removeChild(a);
+  };
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt)
+      .then(()=>{showToast('클로드에 붙여넣기 해주세요 📋');setTimeout(open,600);})
+      .catch(()=>{fallbackCopy(txt);setTimeout(open,600);});
+  } else {
+    fallbackCopy(txt);setTimeout(open,600);
+  }
+}
+function fallbackCopy(txt){
+  const ta=document.createElement('textarea');
+  ta.value=txt;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.focus();ta.select();
+  try{document.execCommand('copy');showToast('클로드에 붙여넣기 해주세요 📋');}catch(e){}
+  document.body.removeChild(ta);
+}
 
 // ── HOME BUTTON EVENTS
 function initHomeEvents(){
@@ -3456,19 +3478,7 @@ function openContentDiscuss(title,cat,stars,review){
 
 ---
 위 콘텐츠에 대해 깊은 토론을 하고 싶어. 먼저 웹 검색으로 이 작품의 줄거리, 주요 등장인물, 평론가 반응 등을 찾아봐줘. 그리고 내가 기록한 별점과 감상을 바탕으로 자연스럽게 대화를 시작해줘. 단순히 줄거리 설명 말고, 이 작품의 핵심 테마나 인상적인 장면에 대해 질문을 던져줘. 대화가 어느 정도 마무리되면 우리가 나눈 토론 내용을 간략하게 정리해서 메모로 알려줘.`;
-  if(navigator.clipboard){
-    navigator.clipboard.writeText(txt).then(()=>{
-      showToast('클로드에 붙여넣기 해주세요 💬');
-      setTimeout(()=>{const a=document.createElement('a');a.href='claude://';a.style.display='none';document.body.appendChild(a);a.click();document.body.removeChild(a);},600);
-    }).catch(()=>{
-      // clipboard 실패시 폴백
-      const ta=document.createElement('textarea');
-      ta.value=txt;document.body.appendChild(ta);ta.select();
-      document.execCommand('copy');document.body.removeChild(ta);
-      showToast('클로드에 붙여넣기 해주세요 💬');
-      setTimeout(()=>{const a=document.createElement('a');a.href='claude://';a.style.display='none';document.body.appendChild(a);a.click();document.body.removeChild(a);},600);
-    });
-  }
+  copyAndOpenClaude(txt);
 }
 
 // ── 주간 루틴
@@ -3480,9 +3490,9 @@ async function openWeeklyRoutine(){
   const selectedEl=document.getElementById('routine-selected');
   if(!cardsEl)return;
   const CLAUDE_KEY=S.get('claude_api_key');
-  if(!CLAUDE_KEY){
+  if(!CLAUDE_KEY||String(CLAUDE_KEY).trim().length<10){
     cardsEl.innerHTML='';
-    if(emptyEl)emptyEl.style.display='block';
+    if(emptyEl){emptyEl.style.display='block';emptyEl.textContent='설정에서 Claude API 키를 저장해주세요 🌿';}
     return;
   }
   if(emptyEl)emptyEl.style.display='none';
@@ -3564,19 +3574,10 @@ function applyRoutine(){
 }
 
 // ── 뉴스 (Claude 웹검색)
-async function openExternalNews(){
-  const CLAUDE_KEY=S.get('claude_api_key');
+function openExternalNews(){
   const interests=S.get('news_interests')||'일상, 건강, 라이프스타일';
-  if(!CLAUDE_KEY){
-    window.open('https://news.naver.com','_blank');return;
-  }
   const txt=`오늘 날짜(${new Date().toLocaleDateString('ko-KR')}) 기준으로 "${interests}" 분야의 어제 주요 뉴스를 웹 검색해서 3~5개 요약해줘. 각 뉴스는 제목과 2~3줄 요약으로, 친근하고 읽기 편하게 정리해줘.`;
-  if(navigator.clipboard){
-    navigator.clipboard.writeText(txt).then(()=>{
-      showToast('클로드에 붙여넣기 해주세요 📋');
-      setTimeout(()=>{const a=document.createElement('a');a.href='claude://';a.style.display='none';document.body.appendChild(a);a.click();document.body.removeChild(a);},600);
-    });
-  }
+  copyAndOpenClaude(txt);
 }
 
 // ── 일정 요약 (투두 + 캘린더)
@@ -3660,7 +3661,7 @@ setTimeout(syncAll,600);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
 
-</script></script></script></script></script></script></script></script></script></script></script></script></script></script>
+</script></script></script></script></script></script></script></script></script></script></script></script></script></script></script>
 
 </body>
 </html>
