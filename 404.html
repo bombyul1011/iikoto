@@ -602,7 +602,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .home-content-cat{font-size:9px;color:var(--tm);letter-spacing:1px;text-transform:uppercase;margin-bottom:2px;}
 .home-content-title{font-size:13px;color:var(--tp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .home-content-meta{font-size:10px;color:var(--tm);margin-top:2px;}
-.home-discuss-btn{font-size:10px;color:var(--acc);background:rgba(192,112,128,0.10);border:1px solid rgba(192,112,128,0.22);border-radius:10px;padding:4px 10px;cursor:pointer;white-space:nowrap;flex-shrink:0;}
+.home-discuss-btn{width:32px;height:32px;background:rgba(192,112,128,0.10);border:1px solid rgba(192,112,128,0.22);border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
 
 .home-icon-bar{display:flex;justify-content:center;gap:12px;padding:18px 0 8px;border-top:1px solid var(--div);margin-top:8px;}
 .home-icon-btn{width:42px;height:42px;background:var(--card);border:1px solid var(--card-b);border-radius:14px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
@@ -1179,7 +1179,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .home-content-cat{font-size:9px;color:var(--tm);letter-spacing:1px;text-transform:uppercase;margin-bottom:2px;}
 .home-content-title{font-size:13px;color:var(--tp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .home-content-meta{font-size:10px;color:var(--tm);margin-top:2px;}
-.home-discuss-btn{font-size:10px;color:var(--acc);background:rgba(192,112,128,0.10);border:1px solid rgba(192,112,128,0.22);border-radius:10px;padding:4px 10px;cursor:pointer;white-space:nowrap;flex-shrink:0;}
+.home-discuss-btn{width:32px;height:32px;background:rgba(192,112,128,0.10);border:1px solid rgba(192,112,128,0.22);border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
 .home-icon-bar{display:flex;justify-content:center;gap:16px;padding:18px 0 8px;border-top:1px solid var(--div);margin-top:8px;}
 .home-icon-btn{width:42px;height:42px;background:var(--card);border:1px solid var(--card-b);border-radius:14px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
 .home-icon-btn:active{opacity:.7;}
@@ -1282,9 +1282,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div class="slabel">바로가기</div>
         <div class="home-btn-grid">
           <div class="home-btn-card" id="btn-news">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="color:var(--ts)"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="7" y1="4" x2="7" y2="9"/><line x1="7" y1="13" x2="10" y2="13"/><line x1="7" y1="16" x2="14" y2="16"/><text x="13" y="7.5" font-size="4" fill="currentColor" font-weight="bold">N</text></svg>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="color:var(--ts)"><path d="M4 6C4 4.9 4.9 4 6 4H18C19.1 4 20 4.9 20 6V18C20 19.1 19.1 20 18 20H6C4.9 20 4 19.1 4 18V6Z"/><line x1="4" y1="9" x2="20" y2="9"/><line x1="8" y1="4" x2="8" y2="9"/><line x1="8" y1="13" x2="12" y2="13"/><line x1="8" y1="16.5" x2="16" y2="16.5"/><text x="12.5" y="7.2" font-size="3.5" fill="currentColor" font-weight="bold" text-anchor="middle">N≡</text></svg>
             <div class="home-btn-title">오늘 뉴스</div>
-            <div class="home-btn-sub">AI 헤드라인</div>
+            <div class="home-btn-sub">Claude 요약</div>
           </div>
           <div class="home-btn-card" id="btn-calendar">
             <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="color:var(--ts)"><rect x="2" y="3" width="16" height="15" rx="2"/><line x1="2" y1="8" x2="18" y2="8"/><line x1="6" y1="3" x2="6" y2="5.5"/><line x1="14" y1="3" x2="14" y2="5.5"/></svg>
@@ -1707,6 +1707,25 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         </div>
         <div class="settings-item" style="padding-top:0;">
           <span style="font-size:11px;color:var(--tm);">날씨 인사 · 주간 루틴 제안에 사용돼요</span>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="settings-slbl">Google Calendar</div>
+      <div class="settings-card">
+        <div class="settings-item" style="flex-direction:column;align-items:flex-start;gap:8px;padding-bottom:12px;">
+          <span class="settings-item-lbl">클라이언트 ID</span>
+          <input type="password" class="modal-inp" id="gcal-client-id-inp" placeholder="xxxxx.apps.googleusercontent.com" style="margin-bottom:0;font-size:12px;width:100%;" autocomplete="off">
+        </div>
+        <div class="settings-item" style="flex-direction:column;align-items:flex-start;gap:8px;padding-bottom:12px;">
+          <span class="settings-item-lbl">API 키</span>
+          <input type="password" class="modal-inp" id="gcal-api-key-inp" placeholder="AIza..." style="margin-bottom:0;font-size:12px;width:100%;" autocomplete="off">
+        </div>
+        <div class="settings-item" style="padding-top:0;">
+          <button onclick="saveGCalKeys()" style="width:100%;padding:9px;border-radius:10px;border:none;background:var(--acc-soft);color:var(--acc);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">저장</button>
+        </div>
+        <div class="settings-item">
+          <span style="font-size:11px;color:var(--tm);">오늘 일정 요약에 사용돼요</span>
         </div>
       </div>
     </div>
@@ -2887,6 +2906,26 @@ function closeSheet(id,e){if(!e||e.target===document.getElementById(id))document
 
 // ── SETTINGS
 
+
+
+function saveGCalKeys(){
+  const clientId=document.getElementById('gcal-client-id-inp')?.value.trim();
+  const apiKey=document.getElementById('gcal-api-key-inp')?.value.trim();
+  if(clientId&&!clientId.startsWith('••')){S.set('gcal_client_id',clientId);}
+  if(apiKey&&!apiKey.startsWith('••')){S.set('gcal_api_key',apiKey);}
+  showToast('Google Calendar 키가 저장됐어요 ✅');
+  // 마스킹
+  const ci=document.getElementById('gcal-client-id-inp');
+  const ak=document.getElementById('gcal-api-key-inp');
+  if(ci&&clientId)ci.value='••••••••'+clientId.slice(-6);
+  if(ak&&apiKey)ak.value='••••••••'+apiKey.slice(-6);
+}
+function saveNewsInterests(){
+  const inp=document.getElementById('news-interests-inp');
+  if(!inp)return;
+  const val=inp.value.trim();
+  if(val){S.set('news_interests',val);showToast('관심 분야가 저장됐어요 ✅');}
+}
 function saveClaudeKey(){
   const inp=document.getElementById('claude-api-key-inp');
   if(!inp)return;
@@ -2901,7 +2940,9 @@ function saveClaudeKey(){
 function openSettings(){
   const el=document.getElementById('sync-status');if(el)el.textContent=navigator.onLine?'온라인 ✅':'오프라인';
   const keyInp=document.getElementById('claude-api-key-inp');
-  if(keyInp){const k=S.get('claude_api_key');keyInp.value=k?'••••••••••••'+k.slice(-4):'';}
+  if(keyInp){const k=S.get('claude_api_key');keyInp.value=k?'••••••••••••'+k.slice(-4):'';}  const newsInp=document.getElementById('news-interests-inp');if(newsInp)newsInp.value=S.get('news_interests')||'';
+  const gcalCi=document.getElementById('gcal-client-id-inp');if(gcalCi){const v=S.get('gcal_client_id');gcalCi.value=v?'••••••••'+v.slice(-6):'';}
+  const gcalAk=document.getElementById('gcal-api-key-inp');if(gcalAk){const v=S.get('gcal_api_key');gcalAk.value=v?'••••••••'+v.slice(-6):'';}
   const theme=S.get('theme')||'light';
   const darkTog=document.getElementById('dark-tog');if(darkTog)darkTog.classList.toggle('on',theme==='dark');
   document.querySelectorAll('.ctheme-btn').forEach(b=>b.classList.remove('on'));
@@ -3160,6 +3201,17 @@ function renderHome(){
     renderHomeContents();
     setTimeout(()=>renderHomeRings(),50);
     fetchWeatherGreeting('night');
+    // 일요일 오후~밤에만 주간 회고 버튼 표시
+    const isSunday=now.getDay()===0&&now.getHours()>=14;
+    const routineBtn=document.getElementById('btn-weekly-routine');
+    if(routineBtn){
+      if(isSunday){
+        routineBtn.querySelector('svg').innerHTML='<circle cx="12" cy="12" r="9"/><line x1="12" y1="7" x2="12" y2="12"/><polyline points="9,15 12,12 15,15"/>';
+        routineBtn.querySelector('div:last-child div:first-child').textContent='주간 회고';
+        routineBtn.querySelector('div:last-child div:last-child').textContent='이번 주 돌아보기';
+        routineBtn.onclick=openWeeklyReview;
+      }
+    }
   }
   renderHomeIconBar(section);
 }
@@ -3262,7 +3314,7 @@ function renderHomeContents(){
     item.appendChild(leftDiv);item.appendChild(infoDiv);
     if(c.status==='watching'){const badge=document.createElement('span');badge.style.cssText='font-size:9.5px;padding:3px 8px;border-radius:10px;background:rgba(255,235,160,.55);color:#9a7020;flex-shrink:0;';badge.textContent='보는 중';item.appendChild(badge);}
     else if(stars){const starEl=document.createElement('span');starEl.style.cssText='font-size:11px;color:#e8c070;flex-shrink:0;';starEl.textContent=stars;item.appendChild(starEl);}
-    const btn=document.createElement('div');btn.className='home-discuss-btn';btn.textContent='토론 💬';
+    const btn=document.createElement('div');btn.className='home-discuss-btn';btn.innerHTML='<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--acc)"><path d="M13.5 2H2.5C1.7 2 1 2.7 1 3.5V10C1 10.8 1.7 11.5 2.5 11.5H5L8 14.5L11 11.5H13.5C14.3 11.5 15 10.8 15 10V3.5C15 2.7 14.3 2 13.5 2Z"/><circle cx="5.5" cy="7" r="0.7" fill="currentColor"/><circle cx="8" cy="7" r="0.7" fill="currentColor"/><circle cx="10.5" cy="7" r="0.7" fill="currentColor"/></svg>';
     const _c=c;btn.addEventListener('click',()=>openContentDiscuss(_c.title,_c.cat,_c.stars||0,_c.review||''));
     item.appendChild(btn);el.appendChild(item);
   });
@@ -3400,6 +3452,215 @@ function initHomeEvents(){
     if(el)el.addEventListener('click',fn);
   });
 }
+
+// ── 콘텐츠 토론
+function openContentDiscuss(title,cat,stars,review){
+  const catLabel=CAT_LABELS[cat]||cat;
+  const statusMap={watching:'보는 중(시청/독서 중)',done:'완료(다 봤음/다 읽었음)'};
+  const txt=`[iikoto 콘텐츠 정보]
+제목: ${title}
+장르: ${catLabel}
+별점: ${stars}/5
+감상: ${review||'없음'}
+
+---
+위 콘텐츠에 대해 깊은 토론을 하고 싶어. 먼저 웹 검색으로 이 작품의 줄거리, 주요 등장인물, 평론가 반응 등을 찾아봐줘. 그리고 내가 기록한 별점과 감상을 바탕으로 자연스럽게 대화를 시작해줘. 단순히 줄거리 설명 말고, 이 작품의 핵심 테마나 인상적인 장면에 대해 질문을 던져줘. 대화가 어느 정도 마무리되면 우리가 나눈 토론 내용을 간략하게 정리해서 메모로 알려줘.`;
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(txt).then(()=>{
+      showToast('클로드에 붙여넣기 해주세요 💬');
+      setTimeout(()=>{window.location.href='claude://';},600);
+    }).catch(()=>{
+      // clipboard 실패시 폴백
+      const ta=document.createElement('textarea');
+      ta.value=txt;document.body.appendChild(ta);ta.select();
+      document.execCommand('copy');document.body.removeChild(ta);
+      showToast('클로드에 붙여넣기 해주세요 💬');
+      setTimeout(()=>{window.location.href='claude://';},600);
+    });
+  }
+}
+
+// ── 주간 루틴
+async function openWeeklyRoutine(){
+  openModal('routine-modal');
+  const cardsEl=document.getElementById('routine-cards');
+  const loadingEl=document.getElementById('routine-loading');
+  const emptyEl=document.getElementById('routine-empty');
+  const selectedEl=document.getElementById('routine-selected');
+  if(!cardsEl)return;
+  const CLAUDE_KEY=S.get('claude_api_key');
+  if(!CLAUDE_KEY){
+    cardsEl.innerHTML='';
+    if(emptyEl)emptyEl.style.display='block';
+    return;
+  }
+  if(emptyEl)emptyEl.style.display='none';
+  if(selectedEl)selectedEl.style.display='none';
+  _selectedRoutine=null;
+  cardsEl.innerHTML='<div style="text-align:center;padding:24px 0;font-size:13px;color:var(--tm);">지난 주 데이터 분석 중...</div>';
+  if(loadingEl)loadingEl.style.display='block';
+  const now=new Date(),dow=now.getDay();
+  const mon=new Date(now);mon.setDate(now.getDate()-((dow+6)%7)-7);
+  let weekData={habits:getHabits(),habitChecks:{},todos:{done:0,total:0},sleep:[],memos:0};
+  for(let i=0;i<7;i++){
+    const d=new Date(mon);d.setDate(mon.getDate()+i);
+    const dk=dateKey(d),wk=weekKey(d),checks=getHabitChecks(wk);
+    const todos=getTodos(dk),sl=getSleep(dk);
+    weekData.todos.done+=todos.filter(t=>t.done).length;
+    weekData.todos.total+=todos.length;
+    weekData.memos+=getMemos(dk).length;
+    if(sl.sleep&&sl.wake){const sv=sl.sleep.split(':').map(Number),wv=sl.wake.split(':').map(Number);let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;weekData.sleep.push(Math.round(m/60*10)/10);}
+    weekData.habits.forEach(h=>{if(!weekData.habitChecks[h.name])weekData.habitChecks[h.name]=0;if(getHabitChecks(wk)[`${h.name}-${i}`])weekData.habitChecks[h.name]++;});
+  }
+  const avgSleep=weekData.sleep.length?(weekData.sleep.reduce((a,b)=>a+b,0)/weekData.sleep.length).toFixed(1):null;
+  const todoPct=weekData.todos.total>0?Math.round(weekData.todos.done/weekData.todos.total*100):0;
+  const habitSummary=weekData.habits.map(h=>{const cnt=weekData.habitChecks[h.name]||0;return `${h.name}: ${cnt}/7일 (${Math.round(cnt/7*100)}%)`;}).join(', ');
+  const prompt=`지난 주 iikoto 기록:
+- 습관 달성: ${habitSummary||'기록 없음'}
+- 투두 완료율: ${todoPct}% (${weekData.todos.done}/${weekData.todos.total}개)
+- 평균 수면: ${avgSleep?avgSleep+'시간':'기록 없음'}
+- 메모 수: ${weekData.memos}개
+
+이 데이터를 분석해서 이번 주 습관 루틴 3가지를 제안해줘. 각 루틴에 왜 이 루틴을 추천하는지 근거를 꼭 포함해줘.
+JSON 형식으로만 응답해줘:
+[
+  {"type":"challenge","title":"제목","reason":"왜 이 루틴인지 근거 포함 1-2문장","habits":["습관1","습관2","습관3"]},
+  {"type":"maintain","title":"제목","reason":"왜 이 루틴인지 근거 포함 1-2문장","habits":["습관1","습관2"]},
+  {"type":"recover","title":"제목","reason":"왜 이 루틴인지 근거 포함 1-2문장","habits":["습관1"]}
+]`;
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:600,messages:[{role:'user',content:prompt}]})});
+    const data=await res.json();
+    const text=data.content?.[0]?.text?.trim()||'';
+    const clean=text.replace(/```json|```/g,'').trim();
+    const plans=JSON.parse(clean);
+    if(loadingEl)loadingEl.style.display='none';
+    renderRoutineCards(plans,cardsEl);
+  }catch(e){
+    if(loadingEl)loadingEl.style.display='none';
+    cardsEl.innerHTML='<div style="text-align:center;padding:20px 0;font-size:13px;color:var(--tm);">잠시 후 다시 시도해주세요 🌿</div>';
+  }
+}
+
+let _selectedRoutine=null;
+const ROUTINE_TYPE_LABEL={challenge:'🔥 도전형',maintain:'✦ 유지형',recover:'🌿 회복형'};
+
+function renderRoutineCards(plans,container){
+  container.innerHTML='';
+  plans.forEach(plan=>{
+    const card=document.createElement('div');card.className='routine-card';
+    card.innerHTML=`<div class="routine-check"></div><div class="routine-card-type ${plan.type}">${ROUTINE_TYPE_LABEL[plan.type]||plan.type}</div><div class="routine-card-title">${plan.title}</div><div class="routine-card-reason">${plan.reason}</div><div class="routine-card-habits">${(plan.habits||[]).map(h=>`<span class="routine-habit-tag">${h}</span>`).join('')}</div>`;
+    card.addEventListener('click',()=>{
+      document.querySelectorAll('.routine-card').forEach(c=>c.classList.remove('selected'));
+      card.classList.add('selected');_selectedRoutine=plan;
+      const sel=document.getElementById('routine-selected');if(sel)sel.style.display='block';
+    });
+    container.appendChild(card);
+  });
+}
+
+function applyRoutine(){
+  if(!_selectedRoutine)return;
+  const habits=_selectedRoutine.habits||[];
+  if(!habits.length){closeModal('routine-modal');return;}
+  const existing=getHabits(),existingNames=existing.map(h=>h.name);
+  const COLORS=['mint','pink','sky','yellow','rose','lavender','peach','teal'];
+  const newHabits=[...existing];
+  habits.forEach((name,i)=>{if(!existingNames.includes(name))newHabits.push({name,color:COLORS[(existing.length+i)%COLORS.length]});});
+  saveHabits(newHabits);closeModal('routine-modal');
+  showToast('✦ 루틴이 습관에 반영됐어요 🌿');
+  if(document.getElementById('v-home')?.classList.contains('on'))renderHome();
+}
+
+// ── 뉴스 (Claude 웹검색)
+async function openExternalNews(){
+  const CLAUDE_KEY=S.get('claude_api_key');
+  const interests=S.get('news_interests')||'일상, 건강, 라이프스타일';
+  if(!CLAUDE_KEY){
+    window.open('https://news.naver.com','_blank');return;
+  }
+  const txt=`오늘 날짜(${new Date().toLocaleDateString('ko-KR')}) 기준으로 "${interests}" 분야의 어제 주요 뉴스를 웹 검색해서 3~5개 요약해줘. 각 뉴스는 제목과 2~3줄 요약으로, 친근하고 읽기 편하게 정리해줘.`;
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(txt).then(()=>{
+      showToast('클로드에 붙여넣기 해주세요 📋');
+      setTimeout(()=>{window.location.href='claude://';},600);
+    });
+  }
+}
+
+// ── 일정 요약 (투두 + 캘린더)
+function openCalendar(){
+  const dk=dateKey(new Date());
+  const todos=getTodos(dk);
+  const txt=`오늘 ${new Date().toLocaleDateString('ko-KR')} 나의 투두리스트:
+${todos.map(t=>`${t.done?'✓':'○'} ${t.text}`).join('\n')||'등록된 할 일이 없어요'}
+
+내 구글/애플 캘린더에 오늘 일정을 확인해서 위 투두리스트와 함께 오늘 하루 일정을 자연스럽게 요약해줘. 중요한 것부터 정리해주고 시간 배분 조언도 살짝 해줘.`;
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(txt).then(()=>{
+      showToast('클로드에 붙여넣기 해주세요 📋');
+      setTimeout(()=>{window.location.href='claude://';},600);
+    });
+  }
+}
+
+
+// ── 주간 회고 (일요일 전용)
+async function openWeeklyReview(){
+  const CLAUDE_KEY=S.get('claude_api_key');
+  const now=new Date();
+  const dow=now.getDay();
+  const mon=new Date(now);mon.setDate(now.getDate()-((dow+6)%7));
+
+  let weekSummary='=== iikoto 이번 주 기록 ===\n\n';
+  let totalMemos=0,totalDone=0,totalTodo=0,sleepArr=[];
+  const habits=getHabits();const habitCounts={};
+  habits.forEach(h=>habitCounts[h.name]=0);
+
+  for(let i=0;i<7;i++){
+    const d=new Date(mon);d.setDate(mon.getDate()+i);
+    const dk=dateKey(d);const wk=weekKey(d);
+    const dayName=['월','화','수','목','금','토','일'][i];
+    const memos=getMemos(dk),todos=getTodos(dk),sl=getSleep(dk);
+    const checks=getHabitChecks(wk);
+    totalMemos+=memos.length;
+    totalDone+=todos.filter(t=>t.done).length;
+    totalTodo+=todos.length;
+    if(sl.sleep&&sl.wake){
+      const sv=sl.sleep.split(':').map(Number),wv=sl.wake.split(':').map(Number);
+      let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;
+      sleepArr.push(Math.round(m/60*10)/10);
+    }
+    habits.forEach(h=>{if(checks[`${h.name}-${i}`])habitCounts[h.name]++;});
+    if(memos.length||todos.filter(t=>t.done).length){
+      weekSummary+=`[${dayName}] `;
+      if(todos.filter(t=>t.done).length)weekSummary+=`투두 ${todos.filter(t=>t.done).length}개 완료 `;
+      if(memos.length)weekSummary+=`메모 ${memos.length}개 `;
+      const oneline=S.get(S.key('oneline',dk));
+      if(oneline)weekSummary+=`"${oneline}" `;
+      weekSummary+='\n';
+    }
+  }
+  const avgSleep=sleepArr.length?(sleepArr.reduce((a,b)=>a+b,0)/sleepArr.length).toFixed(1):'-';
+  weekSummary+=`\n[통계] 투두 ${totalDone}/${totalTodo}개 완료, 평균 수면 ${avgSleep}h, 메모 ${totalMemos}개`;
+  weekSummary+=`\n[습관] ${habits.map(h=>`${h.name} ${habitCounts[h.name]}/7`).join(', ')}`;
+  weekSummary+=`\n\n---\n위 데이터를 바탕으로 이번 주 나의 패턴을 분석해줘. 잘한 것, 반복되는 패턴, 개선할 점을 자연스럽게 말해줘. 마지막에 다음 주를 위한 한 가지 제안을 해줘. 데이터를 딱딱하게 나열하지 말고 친한 친구처럼 따뜻하게 말해줘.`;
+
+  if(CLAUDE_KEY){
+    if(navigator.clipboard){
+      await navigator.clipboard.writeText(weekSummary);
+      showToast('클로드에 붙여넣기 해주세요 💬');
+      setTimeout(()=>{window.location.href='claude://';},600);
+    }
+  } else {
+    if(navigator.clipboard){
+      await navigator.clipboard.writeText(weekSummary);
+      showToast('클로드에 붙여넣기 해주세요 💬');
+      setTimeout(()=>{window.location.href='claude://';},600);
+    }
+  }
+}
+
 // ── INIT
 updateDateUI();
 loadDaily();
@@ -3408,7 +3669,7 @@ setTimeout(syncAll,600);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
 
-</script></script></script></script></script></script></script></script></script></script></script>
+</script></script></script></script></script></script></script></script></script></script></script></script></script>
 
 </body>
 </html>
