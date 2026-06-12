@@ -144,7 +144,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .chk{width:16px;height:16px;border-radius:5px;border:1.5px solid rgba(200,160,160,0.55);flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;}
 .chk.on{background:var(--acc-soft);border-color:var(--acc);}
 .chk.on::after{content:'';width:7px;height:4px;border-left:1.5px solid white;border-bottom:1.5px solid white;transform:rotate(-45deg) translateY(-1px);}
-.todo-txt{flex:1;line-height:1.4;}
+.todo-txt{flex:1;line-height:1.4;cursor:pointer;}
 .todo-txt.done{text-decoration:line-through;color:var(--tm);}
 .todo-swipe{position:absolute;right:0;top:0;bottom:0;display:flex;align-items:stretch;overflow:hidden;transition:width .2s,opacity .2s;width:0;opacity:0;}
 .tsw-btn{display:flex;align-items:center;justify-content:center;padding:0 14px;font-size:11px;cursor:pointer;white-space:nowrap;}
@@ -1269,7 +1269,7 @@ function renderTodos(){
   todos.forEach((t,i)=>{
     if(hiding&&t.done)return;
     const el=document.createElement('div');el.className='todo-item';
-    el.innerHTML=`<div class="chk${t.done?' on':''}" onclick="toggleTodo(${i})"></div><span class="todo-txt${t.done?' done':''}">${t.text}</span><div class="drag-handle"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--tm)"><line x1="2" y1="4" x2="12" y2="4"/><line x1="2" y1="7" x2="12" y2="7"/><line x1="2" y1="10" x2="12" y2="10"/></svg></div><div class="todo-swipe"><div class="tsw-btn tsw-edit" onclick="todoEditSwipe(${i})">수정</div><div class="tsw-btn tsw-del" onclick="todoDelSwipe(${i})">삭제</div></div>`;
+    el.innerHTML=`<div class="chk${t.done?' on':''}" onclick="toggleTodo(${i})"></div><span class="todo-txt${t.done?' done':''}" onclick="openTodoSheet(${i})">${t.text}</span><div class="drag-handle"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--tm)"><line x1="2" y1="4" x2="12" y2="4"/><line x1="2" y1="7" x2="12" y2="7"/><line x1="2" y1="10" x2="12" y2="10"/></svg></div><div class="todo-swipe"><div class="tsw-btn tsw-edit" onclick="todoEditSwipe(${i})">수정</div><div class="tsw-btn tsw-del" onclick="todoDelSwipe(${i})">삭제</div></div>`;
     attachSwipe(el,()=>{_todoSwipeIdx=i;document.getElementById('todo-sheet-title').textContent=t.text;openSheet('todo-sheet');});
     list.appendChild(el);
   });
@@ -1303,6 +1303,12 @@ function todoDelSwipe(i){
   closeSheet('todo-sheet');
   const dk=dateKey(currentDate),todos=getTodos(dk);
   todos.splice(i,1);saveTodos(dk,todos);renderTodos();
+}
+function openTodoSheet(i){
+  _todoSwipeIdx=i;
+  const dk=dateKey(currentDate),todos=getTodos(dk);
+  document.getElementById('todo-sheet-title').textContent=todos[i]?.text||'';
+  openSheet('todo-sheet');
 }
 function todoSheetEdit(){_todoSwipeIdx>=0&&(closeSheet('todo-sheet'),openTodoModal(_todoSwipeIdx));}
 function todoSheetDelete(){todoDelSwipe(_todoSwipeIdx);}
@@ -1353,6 +1359,8 @@ function renderMemos(){
   memos.forEach((m,i)=>{
     const el=document.createElement('div');el.className='memo-item';
     const bub=document.createElement('div');bub.className='memo-bub';
+    bub.style.cursor='pointer';
+    bub.addEventListener('click',()=>{_memoSwipeIdx=i;openSheet('memo-sheet');});
     bub.innerHTML=(m.text||'')+(m.photo?`<img src="${m.photo}" style="width:68px;height:68px;border-radius:10px;object-fit:cover;display:block;margin-top:6px;">`:'');
     const sw=document.createElement('div');sw.className='memo-swipe';
     sw.innerHTML=`<div class="msw-btn msw-edit" onclick="memoEditSwipe(${i})">수정</div><div class="msw-btn msw-del" onclick="memoDelSwipe(${i})">삭제</div>`;
@@ -2123,7 +2131,7 @@ setTimeout(syncAll,600);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
 
-</script></script>
+</script></script></script>
 
 </body>
 </html>
