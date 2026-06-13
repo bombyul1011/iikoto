@@ -2886,10 +2886,16 @@ function saveClaudeKey(){
   if(!inp)return;
   const val=inp.value.trim();
   if(!val){showToast('키를 입력해주세요');return;}
-  if(val.startsWith('•')){showToast('이미 저장되어 있어요 ✅');return;}
+  if(val.startsWith('•')){
+    // 마스킹된 상태 — 삭제 원하면 지우고 새로 입력하라고 안내
+    showToast('새 키를 입력하려면 전체 지우고 다시 입력해주세요');
+    return;
+  }
+  // 기존 키 완전히 덮어쓰기
+  localStorage.removeItem('claude_api_key');
   S.set('claude_api_key',val);
   showToast('저장됐어요 ✅');
-  inp.value='sk-ant-••••'+val.slice(-4);
+  inp.value='••••'+val.slice(-4);
   _weatherCache=null;
 }
 function openSettings(){
