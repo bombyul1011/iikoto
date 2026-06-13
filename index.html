@@ -2182,6 +2182,7 @@ async function autoSync(type,key){
 }
 async function syncAll(){
   if(!navigator.onLine)return;
+  if(window._restoring)return; // 복구 중엔 sync 차단
   const dk=dateKey(currentDate),mk=monthKey(currentDate),now=new Date(),wk=weekKey(now);
   const tomorrow=new Date(currentDate);tomorrow.setDate(tomorrow.getDate()+1);
   const dk_tmrw=dateKey(tomorrow);
@@ -2257,7 +2258,7 @@ function shiftDay(n){
   if(d>tmrw)return;
   currentDate=d;updateDateUI();
 }
-function goToday(){currentDate=new Date();updateDateUI();}
+function goToday(){currentDate=new Date();updateDateUI();loadDaily();}
 
 // ── TABS
 document.querySelectorAll('.vtab').forEach(b=>b.addEventListener('click',()=>{
@@ -3363,12 +3364,25 @@ async function forceRestoreDate(dk){
 }
 async function forceRestoreAll(){
   showToast('복구 시작...');
-  var dates=['2026-06-11','2026-06-12','2026-06-13','2026-06-14'];
-  for(var i=0;i<dates.length;i++){
-    await forceRestoreDate(dates[i]);
+  window._restoring = true;
+  var dates = [];
+  for(var i = 13; i >= 0; i--){
+    var d = new Date(); d.setDate(d.getDate() - i);
+    dates.push(dateKey(d));
   }
+  var restored = 0;
+  for(var i = 0; i < dates.length; i++){
+    var dk = dates[i];
+    var before = getTodos(dk).length + getMemos(dk).length;
+    await forceRestoreDate(dk);
+    var after = getTodos(dk).length + getMemos(dk).length;
+    if(after > before) restored++;
+    S.set(S.key('todos_pending', dk), false);
+    S.set(S.key('memos_pending', dk), false);
+  }
+  window._restoring = false;
   loadDaily();
-  showToast('복구 완료 ✅ 날짜 이동해서 확인해주세요');
+  showToast('복구 완료 ✅ ' + restored + '일치 데이터 복원됨');
 }
 // ── INIT
 updateDateUI();
