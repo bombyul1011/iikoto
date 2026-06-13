@@ -3169,25 +3169,38 @@ function getTimeSection(){
 
 // ── 강제 복구
 async function forceRestoreDate(dk){
-  showToast('복구 중...');
+  let result='';
   try{
-    const mrows=await supaFetch(`memos?date_key=eq.${dk}&order=created`);
-    if(mrows&&mrows.length>0)S.set(S.key('memos',dk),mrows.map(r=>({time:r.memo_time,text:r.text,photo:r.photo,created:r.created})));
-    const trows=await supaFetch(`todos?date_key=eq.${dk}&order=created`);
-    if(trows&&trows.length>0)S.set(S.key('todos',dk),trows.map(r=>({text:r.text,done:r.done,created:r.created,sort_order:r.sort_order??0})));
-    const srows=await supaFetch(`sleep?date_key=eq.${dk}`);
-    if(srows&&srows.length>0)S.set(S.key('sleep',dk),{sleep:srows[0].sleep_time,wake:srows[0].wake_time});
-    loadDaily();
-    showToast(`${dk} 복구 완료 ✅`);
-  }catch(e){showToast('복구 실패: '+e.message);}
+    const mrows=await supaFetch('memos?date_key=eq.'+dk+'&order=created');
+    if(mrows&&mrows.length>0){
+      S.set(S.key('memos',dk),mrows.map(function(r){return {time:r.memo_time,text:r.text,photo:r.photo,created:r.created};}));
+      result+='메모 '+mrows.length+'개 ';
+    }
+    const trows=await supaFetch('todos?date_key=eq.'+dk+'&order=created');
+    if(trows&&trows.length>0){
+      S.set(S.key('todos',dk),trows.map(function(r){return {text:r.text,done:r.done,created:r.created,sort_order:r.sort_order||0};}));
+      result+='투두 '+trows.length+'개 ';
+    }
+    const srows=await supaFetch('sleep?date_key=eq.'+dk);
+    if(srows&&srows.length>0){
+      S.set(S.key('sleep',dk),{sleep:srows[0].sleep_time,wake:srows[0].wake_time});
+      result+='수면 ';
+    }
+    if(result)showToast(dk+' 복구: '+result+'✅');
+    else showToast(dk+' — Supabase에 데이터 없음');
+  }catch(e){
+    showToast('복구 오류: '+e.message);
+  }
 }
 async function forceRestoreAll(){
-  const dates=['2026-06-12','2026-06-13','2026-06-14'];
-  for(const dk of dates){
-    await forceRestoreDate(dk);
-    await new Promise(r=>setTimeout(r,500));
+  const dates=['2026-06-11','2026-06-12','2026-06-13','2026-06-14'];
+  showToast('복구 시작... ('+dates.length+'일치)');
+  for(let i=0;i<dates.length;i++){
+    await forceRestoreDate(dates[i]);
+    await new Promise(function(r){setTimeout(r,600);});
   }
-  showToast('전체 복구 완료 ✅');
+  loadDaily();
+  showToast('전체 복구 완료 ✅ 날짜 이동해서 확인해주세요');
 }
 
 // ── INIT
@@ -3197,7 +3210,7 @@ setTimeout(syncAll,600);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
 
-</script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script>
+</script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script>
 
 </body>
 </html>
