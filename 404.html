@@ -3693,36 +3693,67 @@ async function generateScheduleSummary(section,todos,calEvents,key){
 
 async function fetchGCalEvents(clientId,apiKey,section){
   return new Promise((resolve)=>{
+    const doFetch=async(token)=>{
+      try{
+        const now=new Date();
+        let start,end;
+        if(section==='night'){
+          start=new Date(now);start.setDate(start.getDate()+1);start.setHours(0,0,0,0);
+          end=new Date(start);end.setHours(23,59,59,999);
+        } else {
+          start=new Date(now);start.setHours(0,0,0,0);
+          end=new Date(now);end.setHours(23,59,59,999);
+        }
+        const headers={Authorization:`Bearer ${token}`};
+        const tMin=start.toISOString();
+        const tMax=end.toISOString();
+
+        // 1단계: 전체 캘린더 목록 가져오기
+        const calListRes=await fetch(
+          `https://www.googleapis.com/calendar/v3/users/me/calendarList?key=${apiKey}`,
+          {headers}
+        );
+        const calListData=await calListRes.json();
+        const calendars=(calListData.items||[]).filter(c=>c.selected!==false);
+
+        // 2단계: 각 캘린더에서 이벤트 가져오기
+        const allEvents=[];
+        await Promise.all(calendars.map(async cal=>{
+          try{
+            const evRes=await fetch(
+              `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(cal.id)}/events?key=${apiKey}&timeMin=${tMin}&timeMax=${tMax}&singleEvents=true&orderBy=startTime&maxResults=5`,
+              {headers}
+            );
+            const evData=await evRes.json();
+            (evData.items||[]).forEach(e=>{
+              if(e.status==='cancelled')return;
+              allEvents.push({
+                title:e.summary||'',
+                time:e.start?.dateTime?new Date(e.start.dateTime).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}):'',
+                calName:cal.summary||''
+              });
+            });
+          }catch(e){}
+        }));
+
+        // 시간순 정렬
+        allEvents.sort((a,b)=>a.time.localeCompare(b.time));
+        resolve(allEvents.slice(0,8));
+      }catch(e){resolve([]);}
+    };
+
     const loadGIS=()=>{
       const tokenClient=google.accounts.oauth2.initTokenClient({
         client_id:clientId,
         scope:'https://www.googleapis.com/auth/calendar.readonly',
-        callback:async(resp)=>{
+        callback:(resp)=>{
           if(resp.error){resolve([]);return;}
-          try{
-            const now=new Date();
-            let start,end;
-            if(section==='night'){
-              // 내일 일정
-              start=new Date(now);start.setDate(start.getDate()+1);start.setHours(0,0,0,0);
-              end=new Date(start);end.setHours(23,59,59,999);
-            } else {
-              start=new Date(now);start.setHours(0,0,0,0);
-              end=new Date(now);end.setHours(23,59,59,999);
-            }
-            const url=`https://www.googleapis.com/calendar/v3/calendars/primary/events?key=${apiKey}&timeMin=${start.toISOString()}&timeMax=${end.toISOString()}&singleEvents=true&orderBy=startTime&maxResults=5`;
-            const res=await fetch(url,{headers:{Authorization:`Bearer ${resp.access_token}`}});
-            const data=await res.json();
-            const events=(data.items||[]).map(e=>({
-              title:e.summary||'',
-              time:e.start?.dateTime?new Date(e.start.dateTime).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}):''
-            }));
-            resolve(events);
-          }catch(e){resolve([]);}
+          doFetch(resp.access_token);
         }
       });
       tokenClient.requestAccessToken({prompt:''});
     };
+
     if(window.google?.accounts?.oauth2){
       loadGIS();
     } else {
