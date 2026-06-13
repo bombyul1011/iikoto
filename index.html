@@ -1284,12 +1284,12 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         </div>
         <div class="slabel">바로가기</div>
         <div class="home-btn-grid">
-          <div class="home-btn-card" id="btn-news">
+          <div class="home-btn-card" id="btn-news" onclick="openExternalNews()" onclick="openExternalNews()">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="color:var(--ts)"><path d="M4 6C4 4.9 4.9 4 6 4H18C19.1 4 20 4.9 20 6V18C20 19.1 19.1 20 18 20H6C4.9 20 4 19.1 4 18V6Z"/><line x1="4" y1="9" x2="20" y2="9"/><line x1="8" y1="4" x2="8" y2="9"/><line x1="8" y1="13" x2="12" y2="13"/><line x1="8" y1="16.5" x2="16" y2="16.5"/><text x="12.5" y="7.2" font-size="3.5" fill="currentColor" font-weight="bold" text-anchor="middle">N≡</text></svg>
             <div class="home-btn-title">오늘 뉴스</div>
             <div class="home-btn-sub">Claude 요약</div>
           </div>
-          <div class="home-btn-card" id="btn-calendar">
+          <div class="home-btn-card" id="btn-calendar" onclick="openCalendar()" onclick="openCalendar()">
             <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="color:var(--ts)"><rect x="2" y="3" width="16" height="15" rx="2"/><line x1="2" y1="8" x2="18" y2="8"/><line x1="6" y1="3" x2="6" y2="5.5"/><line x1="14" y1="3" x2="14" y2="5.5"/></svg>
             <div class="home-btn-title">오늘 일정</div>
             <div class="home-btn-sub">캘린더 열기</div>
@@ -1329,7 +1329,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div class="slabel">남은 해빗 & 투두</div>
         <div class="card m" id="home-remain-afternoon"></div>
         <div class="slabel">클로드와 대화</div>
-        <div class="home-action-btn" id="btn-claude-chat">
+        <div class="home-action-btn" id="btn-claude-chat" onclick="openClaudeChat()" onclick="openClaudeChat()">
           <div>
             <div class="home-action-title">수다 떨까요? 💬</div>
             <div class="home-action-sub">오늘 기록 바탕으로 대화 시작</div>
@@ -1351,7 +1351,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           <div class="home-header-divider"></div>
         </div>
         <div class="slabel">하루 마감</div>
-        <div class="home-action-btn" id="btn-today-review">
+        <div class="home-action-btn" id="btn-today-review" onclick="openTodayReview()" onclick="openTodayReview()">
           <div>
             <div class="home-action-title">오늘 어땠어?</div>
             <div class="home-action-sub">하루 기록 → Claude에게 털어놓기</div>
@@ -1376,7 +1376,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
               <div style="font-size:10px;color:var(--tm);">습관 달성</div>
             </div>
           </div>
-          <div class="home-btn-card" id="btn-weekly-routine" style="flex:1;">
+          <div class="home-btn-card" id="btn-weekly-routine" style="flex:1;" onclick="openWeeklyRoutine()">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="color:var(--ts)"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/><polyline points="8,14.5 11,17.5 16,12"/></svg>
             <div class="home-btn-title">주간 루틴</div>
             <div class="home-btn-sub">Claude 제안</div>
@@ -2912,16 +2912,13 @@ function closeSheet(id,e){if(!e||e.target===document.getElementById(id))document
 
 
 function saveGCalKeys(){
-  const clientId=document.getElementById('gcal-client-id-inp')?.value.trim();
-  const apiKey=document.getElementById('gcal-api-key-inp')?.value.trim();
-  if(clientId&&!clientId.startsWith('••')){S.set('gcal_client_id',clientId);}
-  if(apiKey&&!apiKey.startsWith('••')){S.set('gcal_api_key',apiKey);}
-  showToast('Google Calendar 키가 저장됐어요 ✅');
-  // 마스킹
   const ci=document.getElementById('gcal-client-id-inp');
   const ak=document.getElementById('gcal-api-key-inp');
-  if(ci&&clientId)ci.value='••••••••'+clientId.slice(-6);
-  if(ak&&apiKey)ak.value='••••••••'+apiKey.slice(-6);
+  const clientId=ci?.value.trim()||'';
+  const apiKey=ak?.value.trim()||'';
+  if(clientId&&!clientId.startsWith('•')){S.set('gcal_client_id',clientId);if(ci)ci.value='••••'+clientId.slice(-6);}
+  if(apiKey&&!apiKey.startsWith('•')){S.set('gcal_api_key',apiKey);if(ak)ak.value='••••'+apiKey.slice(-6);}
+  showToast('저장됐어요 ✅');
 }
 function saveNewsInterests(){
   const inp=document.getElementById('news-interests-inp');
@@ -2933,15 +2930,11 @@ function saveClaudeKey(){
   const inp=document.getElementById('claude-api-key-inp');
   if(!inp)return;
   const val=inp.value.trim();
-  if(!val)return;
-  if(val.startsWith('••')){
-    // 이미 저장된 키 — 변경 없음
-    showToast('API 키가 이미 저장되어 있어요 ✅');
-    return;
-  }
+  if(!val){showToast('키를 입력해주세요');return;}
+  if(val.startsWith('•')){showToast('이미 저장되어 있어요 ✅');return;}
   S.set('claude_api_key',val);
-  showToast('Claude API 키가 저장됐어요 ✅');
-  inp.value='••••••••••••'+val.slice(-4);
+  showToast('저장됐어요 ✅');
+  inp.value='sk-ant-••••'+val.slice(-4);
   _weatherCache=null;
 }
 function openSettings(){
@@ -3168,6 +3161,8 @@ function goHome(){
   document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='v-home'));
   document.querySelector('.scroll').scrollTop=0;
   renderHome();
+  // 홈이 보일 때마다 이벤트 재등록
+  initHomeEvents();
 }
 
 function getTimeSection(){
@@ -3490,7 +3485,7 @@ async function openWeeklyRoutine(){
   const selectedEl=document.getElementById('routine-selected');
   if(!cardsEl)return;
   const CLAUDE_KEY=S.get('claude_api_key');
-  if(!CLAUDE_KEY||String(CLAUDE_KEY).trim().length<10){
+  if(!CLAUDE_KEY){
     cardsEl.innerHTML='';
     if(emptyEl){emptyEl.style.display='block';emptyEl.textContent='설정에서 Claude API 키를 저장해주세요 🌿';}
     return;
@@ -3661,7 +3656,7 @@ setTimeout(syncAll,600);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
 
-</script></script></script></script></script></script></script></script></script></script></script></script></script></script></script>
+</script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script>
 
 </body>
 </html>
