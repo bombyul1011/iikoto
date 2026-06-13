@@ -1807,6 +1807,179 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 <script>
 
+function renderHomeBody(section){
+  const body=document.getElementById('home-body');
+  if(!body)return;
+  body.innerHTML='';
+  if(section==='morning'){
+    body.appendChild(makeRingRow());
+    body.appendChild(makeLabel('오늘 일정'));
+    const sc=document.createElement('div');sc.className='schedule-card';
+    sc.innerHTML='<div class="schedule-loading">일정 불러오는 중...</div>';
+    body.appendChild(sc);
+    makeScheduleCard('morning').then(function(card){sc.replaceWith(card);});
+    body.appendChild(makeLabel('바로가기'));
+    body.appendChild(makeGrid([makeBtnCard('📰','오늘 뉴스','Claude 요약',homeOpenNews)]));
+    body.appendChild(makeLabel('해빗 현황'));
+    body.appendChild(makeHabitCard());
+  } else if(section==='afternoon'){
+    body.appendChild(makeRingRow());
+    body.appendChild(makeLabel('일정 진행 상황'));
+    const sc2=document.createElement('div');sc2.className='schedule-card';
+    sc2.innerHTML='<div class="schedule-loading">불러오는 중...</div>';
+    body.appendChild(sc2);
+    makeScheduleCard('afternoon').then(function(card){sc2.replaceWith(card);});
+    body.appendChild(makeLabel('클로드와 대화'));
+    body.appendChild(makeActionBtn('수다 떨까요? 💬','오늘 기록 바탕으로 대화 시작','rgba(100,195,185,0.80)',homeOpenChat));
+  } else {
+    body.appendChild(makeRingRow());
+    body.appendChild(makeLabel('내일 일정 미리보기'));
+    const sc3=document.createElement('div');sc3.className='schedule-card';
+    sc3.innerHTML='<div class="schedule-loading">불러오는 중...</div>';
+    body.appendChild(sc3);
+    makeScheduleCard('night').then(function(card){sc3.replaceWith(card);});
+    body.appendChild(makeLabel('하루 마감'));
+    body.appendChild(makeActionBtn('오늘 어땠어?','하루 기록 → Claude에게 털어놓기','rgba(192,112,128,0.85)',homeOpenReview));
+    body.appendChild(makeGrid([
+      makeBtnCard('✦','주간 루틴','Claude 제안',homeOpenRoutine),
+      makeBtnCard('📓','일기 백업','내보내기',openMarkdownBackup)
+    ]));
+    body.appendChild(makeLabel('최근 콘텐츠'));
+    body.appendChild(makeContentsCard());
+  }
+  renderHomeIconBar(section);
+}
+
+function makeLabel(txt){
+  const d=document.createElement('div');
+  d.className='slabel';d.textContent=txt;return d;
+}
+function makeBtnCard(icon,title,sub,fn){
+  const d=document.createElement('div');d.className='home-btn';
+  d.innerHTML='<div style="font-size:20px;">'+icon+'</div><div class="home-btn-title">'+title+'</div><div class="home-btn-sub">'+sub+'</div>';
+  d.addEventListener('click',fn);return d;
+}
+function makeGrid(items){
+  const g=document.createElement('div');g.className='home-btn-grid';
+  items.forEach(function(i){g.appendChild(i);});return g;
+}
+function makeActionBtn(title,sub,iconColor,fn){
+  const d=document.createElement('div');d.className='home-action';
+  d.innerHTML='<div class="home-action-left"><div class="home-action-title">'+title+'</div><div class="home-action-sub">'+sub+'</div></div><div class="home-action-icon" style="background:'+iconColor+';"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round"><line x1="2" y1="7" x2="12" y2="7"/><polyline points="8,3.5 12,7 8,10.5"/></svg></div>';
+  d.addEventListener('click',fn);return d;
+}
+function makeRingRow(){
+  const row=document.createElement('div');
+  row.style.cssText='display:flex;gap:0;margin-bottom:10px;';
+  const dk=dateKey(new Date());
+  const todos=getTodos(dk);
+  const todoPct=todos.length?Math.round(todos.filter(function(t){return t.done;}).length/todos.length*100):0;
+  const habits=getHabits();
+  const wk=weekKey(new Date()),checks=getHabitChecks(wk),dow=(new Date().getDay()+6)%7;
+  const habitPct=habits.length?Math.round(habits.filter(function(h){return checks[h.name+'-'+dow];}).length/habits.length*100):0;
+  row.appendChild(makeRing('투두 완료',todoPct,'rgba(220,150,170,0.85)'));
+  row.appendChild(makeRing('습관 달성',habitPct,'rgba(100,185,255,0.85)'));
+  return row;
+}
+function makeRing(label,pct,color){
+  const wrap=document.createElement('div');
+  wrap.style.cssText='flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 0;';
+  const canvas=document.createElement('canvas');
+  canvas.width=72;canvas.height=72;canvas.style.cssText='width:72px;height:72px;';
+  wrap.appendChild(canvas);
+  const lbl=document.createElement('div');
+  lbl.style.cssText='font-size:10px;color:var(--tm);text-align:center;';
+  lbl.textContent=label;wrap.appendChild(lbl);
+  setTimeout(function(){
+    const dpr=window.devicePixelRatio||2;
+    canvas.width=72*dpr;canvas.height=72*dpr;
+    canvas.style.width='72px';canvas.style.height='72px';
+    const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);
+    const cx=36,cy=36,r=26,lw=5;
+    const isDark=document.documentElement.getAttribute('data-theme')==='dark';
+    ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
+    ctx.strokeStyle=isDark?'rgba(255,255,255,0.10)':'rgba(200,180,170,0.18)';
+    ctx.lineWidth=lw;ctx.lineCap='round';ctx.stroke();
+    if(pct>0){
+      ctx.beginPath();ctx.arc(cx,cy,r,-Math.PI/2,-Math.PI/2+Math.PI*2*(pct/100));
+      ctx.strokeStyle=color;ctx.lineWidth=lw;ctx.lineCap='round';ctx.stroke();
+    }
+    ctx.fillStyle=isDark?'rgba(240,236,255,0.9)':'rgba(90,64,64,0.85)';
+    ctx.font='bold 13px DM Sans,sans-serif';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(pct+'%',cx,cy);
+  },50);
+  return wrap;
+}
+function makeHabitCard(){
+  const card=document.createElement('div');card.className='card m';
+  const habits=getHabits();
+  if(!habits.length){card.innerHTML='<div style="font-size:12px;color:var(--tm);text-align:center;padding:10px 0;">습관을 추가해보세요</div>';return card;}
+  const now=new Date(),wk=weekKey(now),checks=getHabitChecks(wk),dow=(now.getDay()+6)%7;
+  habits.forEach(function(h){
+    const checked=checks[h.name+'-'+dow];
+    const row=document.createElement('div');row.className='home-habit-item';
+    row.innerHTML='<div class="home-habit-dot '+h.color+'"></div><div class="home-habit-name">'+h.name+'</div><div class="home-habit-chk'+(checked?' on':'')+'"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#c07080" stroke-width="1.6" stroke-linecap="round" style="display:'+(checked?'block':'none')+'"><polyline points="2,6 4.5,9 10,3.5"/></svg></div>';
+    card.appendChild(row);
+  });
+  return card;
+}
+function makeRemainCard(){
+  const card=document.createElement('div');card.className='card m';
+  const now=new Date(),wk=weekKey(now),checks=getHabitChecks(wk),dow=(now.getDay()+6)%7;
+  const habits=getHabits();
+  const remainT=getTodos(dateKey(now)).filter(function(t){return !t.done;});
+  if(!remainT.length){card.innerHTML='<div style="font-size:13px;color:var(--ts);padding:10px 0;text-align:center;">🎉 오늘 할 일 모두 완료!</div>';return card;}
+  remainT.slice(0,4).forEach(function(t){
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--div);font-size:13px;color:var(--tp);';
+    row.textContent=t.text;card.appendChild(row);
+  });
+  return card;
+}
+function makeContentsCard(){
+  const wrap=document.createElement('div');
+  const mk=monthKey(new Date()),contents=getContents(mk);
+  if(!contents.length){
+    const d=document.createElement('div');
+    d.style.cssText='font-size:12px;color:var(--tm);padding:4px;';
+    d.textContent='이번 달 콘텐츠가 없어요';wrap.appendChild(d);return wrap;
+  }
+  contents.slice(-3).reverse().forEach(function(c){
+    const item=document.createElement('div');item.className='home-content-item';
+    const bar=document.createElement('div');bar.className='home-content-bar '+c.cat;
+    const info=document.createElement('div');info.className='home-content-info';
+    info.innerHTML='<div class="home-content-cat">'+(CAT_LABELS[c.cat]||c.cat)+'</div><div class="home-content-title">'+c.title+'</div>';
+    item.appendChild(bar);item.appendChild(info);
+    const btn=document.createElement('div');btn.className='home-discuss-btn';
+    btn.innerHTML='<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--acc)"><path d="M13.5 2H2.5C1.7 2 1 2.7 1 3.5V10C1 10.8 1.7 11.5 2.5 11.5H5L8 14.5L11 11.5H13.5C14.3 11.5 15 10.8 15 10V3.5C15 2.7 14.3 2 13.5 2Z"/><circle cx="5.5" cy="7" r="0.7" fill="currentColor"/><circle cx="8" cy="7" r="0.7" fill="currentColor"/><circle cx="10.5" cy="7" r="0.7" fill="currentColor"/></svg>';
+    var _c=c;btn.addEventListener('click',function(){homeDiscuss(_c);});
+    item.appendChild(btn);wrap.appendChild(item);
+  });
+  return wrap;
+}
+function renderHomeIconBar(section){
+  const bar=document.getElementById('home-icon-bar');if(!bar)return;bar.innerHTML='';
+  const CAL='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--ts)"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/></svg>';
+  const CHAT='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--ts)"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+  const HEART='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--ts)"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
+  const ROUTINE='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--ts)"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/><polyline points="8,14 11,17 16,12"/></svg>';
+  const all=[
+    {s:'morning',icon:HEART,fn:homeOpenReview},
+    {s:'morning',icon:ROUTINE,fn:homeOpenRoutine},
+    {s:'afternoon',icon:CAL,fn:homeOpenCalendar},
+    {s:'afternoon',icon:HEART,fn:homeOpenReview},
+    {s:'afternoon',icon:ROUTINE,fn:homeOpenRoutine},
+    {s:'night',icon:CAL,fn:homeOpenCalendar},
+    {s:'night',icon:CHAT,fn:homeOpenChat},
+  ];
+  all.filter(function(b){return b.s!==section;}).forEach(function(b){
+    const btn=document.createElement('div');btn.className='home-icon-btn';
+    btn.innerHTML=b.icon;btn.addEventListener('click',b.fn);
+    bar.appendChild(btn);
+  });
+}
+
 // ══ HOME ══
 const _HOME_DAYS=['일','월','화','수','목','금','토'];
 let _weatherCache=null,_weatherCacheTime=0,_selectedRoutine=null;
@@ -3243,7 +3416,7 @@ setTimeout(syncAll,600);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
 
-</script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script>
+</script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script>
 
 </body>
 </html>
