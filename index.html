@@ -1707,6 +1707,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       </div>
     </div>
     <div>
+      <div class="settings-slbl">데이터 복구</div>
+      <div class="settings-card">
+        <div class="settings-item" style="flex-direction:column;gap:8px;align-items:flex-start;">
+          <span style="font-size:11px;color:var(--tm);">Supabase에서 6/12~6/13 데이터 강제 복구</span>
+          <button onclick="forceRestoreAll()" style="width:100%;padding:9px;border-radius:10px;border:none;background:rgba(100,195,185,0.25);color:#2a7868;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">🔄 데이터 복구하기</button>
+        </div>
+      </div>
       <div class="settings-slbl">앱 정보</div>
       <div class="settings-card">
         <div class="settings-item"><span class="settings-item-lbl">버전</span><span class="settings-item-val">1.0.0</span></div>
@@ -1883,7 +1890,8 @@ async function syncTodosDown(dk){
   }
   const rows=await supaFetch(`todos?date_key=eq.${dk}&order=created`);
   if(!rows)return;
-  // rows=0 포함 항상 Supabase 우선 (로컬 삭제 반영)
+  // 원격이 비어있고 로컬에 데이터 있으면 로컬 유지 (덮어쓰기 방지)
+  if(rows.length===0&&getTodos(dk).length>0)return;
   S.set(S.key('todos',dk),rows.map(r=>({text:r.text,done:r.done,created:r.created})));
 }
 async function syncTodosUp(dk){
@@ -1899,7 +1907,8 @@ async function syncMemosDown(dk){
   }
   const rows=await supaFetch(`memos?date_key=eq.${dk}&order=created`);
   if(!rows)return;
-  // rows=0 포함 항상 Supabase 우선 (로컬 삭제 반영)
+  // 원격이 비어있고 로컬에 데이터 있으면 로컬 유지 (덮어쓰기 방지)
+  if(rows.length===0&&getMemos(dk).length>0)return;
   S.set(S.key('memos',dk),rows.map(r=>({time:r.memo_time,text:r.text,photo:r.photo,created:r.created})));
 }
 async function syncMemosUp(dk){
@@ -3900,13 +3909,49 @@ function saveNewsInterests(){
   if(val){S.set('news_interests',val);showToast('저장됐어요 ✅');}
 }
 
+
+// ── 강제 복구 — Supabase에서 특정 날짜 데이터 강제 다운로드
+async function forceRestoreDate(dk){
+  showToast('복구 중...');
+  try{
+    // memos
+    const mrows=await supaFetch(`memos?date_key=eq.${dk}&order=created`);
+    if(mrows&&mrows.length>0){
+      S.set(S.key('memos',dk),mrows.map(r=>({time:r.memo_time,text:r.text,photo:r.photo,created:r.created})));
+    }
+    // todos
+    const trows=await supaFetch(`todos?date_key=eq.${dk}&order=created`);
+    if(trows&&trows.length>0){
+      S.set(S.key('todos',dk),trows.map(r=>({text:r.text,done:r.done,created:r.created})));
+    }
+    // sleep
+    const srows=await supaFetch(`sleep?date_key=eq.${dk}`);
+    if(srows&&srows.length>0){
+      S.set(S.key('sleep',dk),{sleep:srows[0].sleep_time,wake:srows[0].wake_time});
+    }
+    loadDaily();
+    showToast(`${dk} 복구 완료 ✅`);
+  }catch(e){
+    showToast('복구 실패: '+e.message);
+  }
+}
+async function forceRestoreAll(){
+  // 6/12, 6/13 모두 복구
+  const dates=['2026-06-12','2026-06-13'];
+  for(const dk of dates){
+    await forceRestoreDate(dk);
+    await new Promise(r=>setTimeout(r,300));
+  }
+  showToast('전체 복구 완료 ✅');
+}
+
 // ── INIT
 updateDateUI();
 loadDaily();
 setTimeout(syncAll,600);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
-</script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script>
+</script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script>
 
 </body>
 </html>
