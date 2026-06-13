@@ -1889,10 +1889,12 @@ async function syncTodosDown(dk){
     return;
   }
   const rows=await supaFetch(`todos?date_key=eq.${dk}&order=created`);
-  if(!rows)return;
-  // 원격이 비어있고 로컬에 데이터 있으면 로컬 유지 (덮어쓰기 방지)
-  if(rows.length===0&&getTodos(dk).length>0)return;
-  S.set(S.key('todos',dk),rows.map(r=>({text:r.text,done:r.done,created:r.created})));
+  if(!rows)return; // 연결 오류면 로컬 유지
+  if(rows.length>0){
+    // Supabase에 데이터 있으면 무조건 로컬에 저장
+    S.set(S.key('todos',dk),rows.map(r=>({text:r.text,done:r.done,created:r.created,sort_order:r.sort_order??0})));
+  }
+  // rows=0이면 로컬 그대로 유지 (삭제 반영 안 함 — 안전 우선)
 }
 async function syncTodosUp(dk){
   const todos=getTodos(dk);
@@ -1906,10 +1908,12 @@ async function syncMemosDown(dk){
     return;
   }
   const rows=await supaFetch(`memos?date_key=eq.${dk}&order=created`);
-  if(!rows)return;
-  // 원격이 비어있고 로컬에 데이터 있으면 로컬 유지 (덮어쓰기 방지)
-  if(rows.length===0&&getMemos(dk).length>0)return;
-  S.set(S.key('memos',dk),rows.map(r=>({time:r.memo_time,text:r.text,photo:r.photo,created:r.created})));
+  if(!rows)return; // 연결 오류면 로컬 유지
+  if(rows.length>0){
+    // Supabase에 데이터 있으면 무조건 로컬에 저장
+    S.set(S.key('memos',dk),rows.map(r=>({time:r.memo_time,text:r.text,photo:r.photo,created:r.created})));
+  }
+  // rows=0이면 로컬 그대로 유지
 }
 async function syncMemosUp(dk){
   const memos=getMemos(dk);
