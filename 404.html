@@ -2887,13 +2887,17 @@ function saveClaudeKey(){
   const val=inp.value.trim();
   if(!val){showToast('키를 입력해주세요');return;}
   if(val.startsWith('•')){
-    // 마스킹된 상태 — 삭제 원하면 지우고 새로 입력하라고 안내
-    showToast('새 키를 입력하려면 전체 지우고 다시 입력해주세요');
+    // 마스킹 상태 → 기존 키 완전 삭제 후 재입력 유도
+    localStorage.removeItem('"claude_api_key"');
+    localStorage.removeItem('claude_api_key');
+    inp.value='';
+    showToast('지웠어요 — 키를 다시 입력해주세요');
     return;
   }
-  // 기존 키 완전히 덮어쓰기
+  // 기존 키 완전 삭제 후 새로 저장
   localStorage.removeItem('claude_api_key');
-  S.set('claude_api_key',val);
+  localStorage.removeItem('"claude_api_key"');
+  localStorage.setItem('claude_api_key', JSON.stringify(val));
   showToast('저장됐어요 ✅');
   inp.value='••••'+val.slice(-4);
   _weatherCache=null;
