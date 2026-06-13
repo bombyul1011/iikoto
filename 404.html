@@ -1711,7 +1711,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="settings-card">
         <div class="settings-item" style="flex-direction:column;gap:8px;align-items:flex-start;">
           <span style="font-size:11px;color:var(--tm);">Supabase에서 6/12~6/13 데이터 강제 복구</span>
-          <button onclick="forceRestoreAll()" style="width:100%;padding:9px;border-radius:10px;border:none;background:rgba(100,195,185,0.25);color:#2a7868;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">🔄 데이터 복구하기</button>
+          <button onclick="forceRestoreAll()" style="width:100%;padding:9px;border-radius:10px;border:none;background:rgba(100,195,185,0.25);color:#2a7868;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;" onclick="forceRestoreAll()">🔄 데이터 복구하기</button>
         </div>
       </div>
       <div class="settings-slbl">앱 정보</div>
@@ -3400,13 +3400,13 @@ async function forceRestoreDate(dk){
 }
 async function forceRestoreAll(){
   const dates=['2026-06-11','2026-06-12','2026-06-13','2026-06-14'];
-  showToast('복구 시작... ('+dates.length+'일치)');
+  showToast('복구 시작...');
   for(let i=0;i<dates.length;i++){
     await forceRestoreDate(dates[i]);
     await new Promise(function(r){setTimeout(r,600);});
   }
   loadDaily();
-  showToast('전체 복구 완료 ✅ 날짜 이동해서 확인해주세요');
+  showToast('전체 복구 완료 ✅');
 }
 
 // ── INIT
@@ -3416,7 +3416,7 @@ setTimeout(syncAll,600);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
 
-</script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script>
+</script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script>
 
 </body>
 </html>
