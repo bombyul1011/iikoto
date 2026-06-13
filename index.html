@@ -1284,7 +1284,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .schedule-tag{font-size:9.5px;padding:2px 7px;border-radius:8px;flex-shrink:0;}
 .schedule-tag.cal{background:rgba(200,220,255,0.55);color:#4060a0;}
 .schedule-tag.todo{background:rgba(255,220,180,0.55);color:#a06020;}
-.schedule-summary{font-size:12.5px;color:var(--ts);line-height:1.7;padding:4px 0;}
+.schedule-summary{font-size:13px;color:var(--ts);line-height:1.7;padding:6px 0;word-break:keep-all;}
 </style>
 </head>
 <body>
@@ -3072,49 +3072,49 @@ function updatePdfCount(){
 
 function buildMarkdownText(start,end){
   const months=getMonthRange(start,end);
-  let md=`# iikoto 일기 백업\n`;
-  md+=`> ${start} ~ ${end}\n\n`;
+  let md='';
   months.forEach(mk=>{
     const[y,mo]=mk.split('-').map(Number);
     const dim=new Date(y,mo,0).getDate();
-    md+=`## ${y}년 ${mo}월\n\n`;
-    let hasData=false;
     for(let d=1;d<=dim;d++){
       const dk=`${y}-${pad(mo)}-${pad(d)}`;
       const memos=getMemos(dk);
-      const todos=getTodos(dk);
-      const sleep=getSleep(dk);
+      const sl=getSleep(dk);
       const oneline=S.get(S.key('oneline',dk))||'';
-      if(!memos.length&&!todos.filter(t=>t.done).length&&!sleep.sleep&&!oneline)continue;
-      hasData=true;
+      if(!memos.length&&!sl.sleep&&!oneline)continue;
+      // 날짜 헤더 — YY/MM/DD 요일
       const date=new Date(y,mo-1,d);
       const dayName=DAYS[date.getDay()];
-      md+=`### ${mo}월 ${d}일 (${dayName})\n`;
-      if(oneline)md+=`> ${oneline}\n\n`;
-      if(sleep.sleep||sleep.wake){
+      const yy=String(y).slice(2);
+      const mmStr=String(mo).padStart(2,'0');
+      const ddStr=String(d).padStart(2,'0');
+      md+=`${yy}${mmStr}${ddStr} ${dayName}\n`;
+      // 하루 한줄
+      if(oneline)md+=`"${oneline}"\n`;
+      md+='\n';
+      // 수면
+      if(sl.sleep||sl.wake){
         let dur='';
-        if(sleep.sleep&&sleep.wake){
-          const sv=sleep.sleep.split(':').map(Number),wv=sleep.wake.split(':').map(Number);
+        if(sl.sleep&&sl.wake){
+          const sv=sl.sleep.split(':').map(Number),wv=sl.wake.split(':').map(Number);
           let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;
           dur=` · ${Math.floor(m/60)}h ${m%60}m`;
         }
-        md+=`😴 ${sleep.sleep||'--'} 취침 · ${sleep.wake||'--'} 기상${dur}\n\n`;
+        md+=`🌙 ${sl.sleep||'--'} - ${sl.wake||'--'}${dur}\n`;
       }
-      const doneTodos=todos.filter(t=>t.done);
-      if(doneTodos.length){
-        doneTodos.forEach(t=>md+=`- [x] ${t.text}\n`);
-        md+='\n';
-      }
+      // 메모
       if(memos.length){
+        md+='\n';
         memos.forEach(m=>{
-          if(m.text)md+=`\`${m.time||''}\` ${m.text}\n\n`;
+          if(!m.text)return;
+          if(m.time)md+=`${m.time}  ${m.text}\n`;
+          else md+=`${m.text}\n`;
         });
       }
-      md+='---\n\n';
+      md+='\n---\n\n';
     }
-    if(!hasData)md+=`*이 달의 기록이 없어요*\n\n`;
   });
-  return md;
+  return md.trim();
 }
 
 function exportMarkdown(){
@@ -3636,27 +3636,15 @@ function renderScheduleContent(card,data,section){
   if(data.type==='claude'&&data.summary){
     const sum=document.createElement('div');sum.className='schedule-summary';
     sum.textContent=data.summary;card.appendChild(sum);
-    // 구분선
-    if(data.calEvents.length||data.pendingTodos.length){
-      const div=document.createElement('div');div.style.cssText='height:1px;background:var(--div);margin:10px 0;';
-      card.appendChild(div);
-    }
-  }
-  // 캘린더 일정
-  data.calEvents.slice(0,3).forEach(ev=>{
-    const item=document.createElement('div');item.className='schedule-item';
-    item.innerHTML=`<span class="schedule-time">${ev.time||'종일'}</span><span class="schedule-text">${ev.title}</span><span class="schedule-tag cal">캘린더</span>`;
-    card.appendChild(item);
-  });
-  // 투두
-  const todos=section==='morning'?data.pendingTodos:section==='afternoon'?data.pendingTodos:data.tmrwTodos;
-  todos.slice(0,3).forEach(t=>{
-    const item=document.createElement('div');item.className='schedule-item';
-    item.innerHTML=`<span class="schedule-time">${t.done?'✓':''}</span><span class="schedule-text">${t.text}</span><span class="schedule-tag todo">투두</span>`;
-    card.appendChild(item);
-  });
-  if(card.children.length===0){
-    card.innerHTML='<div class="schedule-loading">등록된 일정이 없어요</div>';
+  } else if(data.calEvents.length===0){
+    card.innerHTML='<div class="schedule-loading">오늘 캘린더 일정이 없어요</div>';
+  } else {
+    // Claude 없을 때만 캘린더 항목 표시
+    data.calEvents.slice(0,3).forEach(ev=>{
+      const item=document.createElement('div');item.className='schedule-item';
+      item.innerHTML=`<span class="schedule-time">${ev.time||'종일'}</span><span class="schedule-text">${ev.title}</span><span class="schedule-tag cal">캘린더</span>`;
+      card.appendChild(item);
+    });
   }
 }
 
@@ -3667,22 +3655,31 @@ async function generateScheduleSummary(section,todos,calEvents,key){
   const calTxt=calEvents.length?calEvents.map(e=>`${e.time||'종일'} ${e.title}`).join(', '):'없음';
 
   const prompts={
-    morning:`오늘 일정을 알려줄게. 캘린더: ${calTxt||'없음'}. 오늘 할 일: ${pending.map(t=>t.text).join(', ')||'없음'}.
+    morning:`오늘 일정. 캘린더: ${calTxt||'없음'}. 오늘 할 일: ${pending.map(t=>t.text).join(', ')||'없음'}.
 
-캘린더 일정이 있으면 그 일정의 맥락을 이해해서 (예: "교토"면 여행 중, "세미나"면 행사 참석 등) 자연스럽게 언급해줘.
-존댓말 구어체로 2문장. 일정을 그대로 나열하지 말고 오늘 하루가 어떤 날인지 느낌으로 말해줘. 이모지 1개.`,
+친한 친구한테 말하듯 자연스러운 한국어 존댓말 구어체로 2문장.
+- 캘린더 일정 맥락 이해해서 언급 ("교토"→여행, "세미나"→행사 등)
+- 일정 나열 금지, 오늘이 어떤 날인지 느낌으로
+- 말이 잘리지 않게 완전한 문장으로 마무리
+- 이모지 없어도 됨`,
 
-    afternoon:`오후 현재 상황이야. 완료한 일: ${done.length}개 (${done.map(t=>t.text).join(', ')||'없음'}). 남은 일: ${pending.map(t=>t.text).join(', ')||'없음'}. 캘린더: ${calTxt||'없음'}.
+    afternoon:`오후 현재 상황. 완료: ${done.length}개 (${done.map(t=>t.text).join(', ')||'없음'}). 남은 것: ${pending.map(t=>t.text).join(', ')||'없음'}. 캘린더: ${calTxt||'없음'}.
 
-존댓말 구어체로 2문장. 규칙:
-- "오후 진행 상황 요약" 같은 제목 표현 금지
-- 완료한 것은 "N개 처리했어요" 식으로 간결하게
-- 남은 것은 항목 나열 말고 "~등이 남아있어요" 식으로 자연스럽게
-- 캘린더 일정 있으면 맥락 이해해서 언급. 이모지 1개.`,
+친한 친구한테 말하듯 자연스러운 한국어 존댓말 구어체로 2문장으로 써줘.
+- 제목/소제목 표현 절대 금지 ("오후 진행", "요약" 등)
+- 완료한 건 "N개 처리했어요" 간결하게
+- 남은 건 항목 나열 말고 자연스럽게 "~등이 남아있어요"
+- 캘린더 일정 있으면 맥락 이해해서 한 마디
+- 말이 잘리지 않게 완전한 문장으로 마무리
+- 이모지 없어도 됨`,
 
-    night:`내일 준비 정보야. 내일 캘린더: ${calTxt||'없음'}. 오늘 미완료: ${pending.map(t=>t.text).join(', ')||'없음'}.
+    night:`내일 준비. 내일 캘린더: ${calTxt||'없음'}. 오늘 미완료: ${pending.map(t=>t.text).join(', ')||'없음'}.
 
-존댓말 구어체로 2문장. 내일 캘린더 일정의 맥락을 이해해서 (예: "교토"면 여행, "메리"면 약속 등) 자연스럽게 언급해줘. 항목 나열 금지. 이모지 1개.`
+친한 친구한테 말하듯 자연스러운 한국어 존댓말 구어체로 2문장.
+- 캘린더 일정 맥락 이해 ("교토"→여행, "메리"→약속 등)
+- 항목 나열 금지
+- 말이 잘리지 않게 완전한 문장으로 마무리
+- 이모지 없어도 됨`
   };
 
   const res=await fetch('https://api.anthropic.com/v1/messages',{
@@ -3831,7 +3828,7 @@ loadDaily();
 setTimeout(syncAll,600);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
-</script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script>
+</script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script>
 
 </body>
 </html>
