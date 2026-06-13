@@ -3710,7 +3710,7 @@ async function generateScheduleSummary(section,todos,calEvents,key){
   const res=await fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',
     headers:{'Content-Type':'application/json','x-api-key':String(key).trim(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-    body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:120,messages:[{role:'user',content:prompts[section]}]})
+    body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:250,messages:[{role:'user',content:prompts[section]}]})
   });
   const data=await res.json();
   return data.content?.[0]?.text?.trim()||null;
@@ -3825,15 +3825,15 @@ async function applyWeather(w,section){
   const emojiGuide=section==='night'?'밤에 어울리는 이모지(🌙✨💫🌃) 중 1개만':section==='morning'?'아침에 어울리는 이모지(🌸🌿🌅) 중 1개만':'낮에 어울리는 이모지(⛅🍃✨) 중 1개만';
   const prompt=`지금 ${sections[section]}이에요. 날씨: 기온 ${w.temp}도, 체감 ${w.feels}도, 습도 ${w.humidity}%.${parts.length?' 오늘 기록: '+parts.join(' / '):''} 
 
-친한 친구에게 말하듯 자연스러운 한국어 존댓말 구어체로 2문장 인사해줘.
+친한 친구한테 말하듯 자연스러운 한국어 반말로 2문장 인사해줘.
 규칙:
-- 기온/습도 숫자를 직접 말하지 말고 "따뜻해요", "선선해요", "좀 습하네요" 같은 느낌으로
-- 존댓말만 사용 (반말 금지)
-- ${emojiGuide} — 시간대와 맞지 않는 이모지 절대 금지 (밤에 ☀️ 금지, 아침에 🌙 금지)
-- 오늘 기록이 있으면 딱 한 가지만 자연스럽게 언급
+- 기온/습도 숫자 직접 말하지 말고 "따뜻하네", "선선하다", "좀 습하네" 느낌으로
+- 반말만 사용 (존댓말 금지)
+- ${emojiGuide} — 시간대 맞지 않는 이모지 절대 금지 (밤에 ☀️ 금지, 아침에 🌙 금지)
+- 오늘 기록 있으면 딱 한 가지만 자연스럽게 언급
 - 40자 내외`;
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':String(CLAUDE_KEY).trim(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:120,messages:[{role:'user',content:prompt}]})});
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':String(CLAUDE_KEY).trim(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:250,messages:[{role:'user',content:prompt}]})});
     const data=await res.json();
     const txt=data.content?.[0]?.text?.trim();
     if(txt){const el=document.getElementById('home-sub');if(el)el.textContent=txt;}
@@ -3906,7 +3906,7 @@ loadDaily();
 setTimeout(syncAll,600);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
-</script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script>
+</script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script>
 
 </body>
 </html>
