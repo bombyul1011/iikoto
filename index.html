@@ -2784,28 +2784,19 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.getRegistrations().then(regs=>{ regs.forEach(r=>r.update()); });
 }
 
-// 앱 시작 시 로컬 없으면 Supabase 즉시 복구
+// 앱 시작 시 항상 Supabase에서 복구 (로컬 무시)
 async function initSync(){
   if(!navigator.onLine) return;
-  var dk=dateKey(currentDate);
-  var hasTodos=getTodos(dk).length>0;
-  var hasMemos=getMemos(dk).length>0;
-  if(!hasTodos && !hasMemos){
-    window._restoring=true;
-    showToast('데이터 자동 복구 중...');
-    var dates=[];
-    for(var i=13;i>=0;i--){var d=new Date();d.setDate(d.getDate()-i);dates.push(dateKey(d));}
-    for(var i=0;i<dates.length;i++){
-      await forceRestoreDate(dates[i]);
-      S.set(S.key('todos_pending',dates[i]),false);
-      S.set(S.key('memos_pending',dates[i]),false);
-    }
-    window._restoring=false;
-    loadDaily();
-    showToast('데이터 자동 복구 완료 ✅');
-  } else {
-    syncAll();
+  window._restoring=true;
+  var dates=[];
+  for(var i=13;i>=0;i--){var d=new Date();d.setDate(d.getDate()-i);dates.push(dateKey(d));}
+  for(var i=0;i<dates.length;i++){
+    await forceRestoreDate(dates[i]);
+    S.set(S.key('todos_pending',dates[i]),false);
+    S.set(S.key('memos_pending',dates[i]),false);
   }
+  window._restoring=false;
+  loadDaily();
 }
 setTimeout(initSync, 500);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
