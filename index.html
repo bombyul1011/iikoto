@@ -3161,6 +3161,14 @@ function getTimeSection(){
   if(h>=12&&h<19)return 'afternoon';
   return 'night';
 }
+
+// ── INIT
+updateDateUI();
+loadDaily();
+setTimeout(syncAll,600);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
+if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
+
 </script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script>
 
 </body>
