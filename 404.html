@@ -2834,7 +2834,10 @@ function initTodoDrag(){
         if(_dragIdx!==toIdx&&toIdx>=0){
           const dk=dateKey(currentDate),todos=getTodos(dk);
           const[mv]=todos.splice(_dragIdx,1);todos.splice(toIdx,0,mv);
+          // sort_order 갱신
+          todos.forEach((t,idx)=>t.sort_order=idx);
           saveTodos(dk,todos);renderTodos();
+          autoSync('todos',dk);
         }
       }
       _dragIdx=-1;_dragEl=null;
@@ -2863,7 +2866,10 @@ function initTodoDrag(){
         if(_dragIdx!==toIdx&&toIdx>=0){
           const dk=dateKey(currentDate),todos=getTodos(dk);
           const[mv]=todos.splice(_dragIdx,1);todos.splice(toIdx,0,mv);
+          // sort_order 갱신
+          todos.forEach((t,idx)=>t.sort_order=idx);
           saveTodos(dk,todos);renderTodos();
+          autoSync('todos',dk);
         }
       }
       _dragIdx=-1;_dragEl=null;
@@ -3966,7 +3972,7 @@ loadDaily();
 setTimeout(syncAll,600);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
-</script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script>
+</script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script>
 
 </body>
 </html>
