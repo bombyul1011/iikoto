@@ -3725,6 +3725,10 @@ async function generateScheduleSummary(section,todos,calEvents,key){
   return data.content?.[0]?.text?.trim()||null;
 }
 
+// GCal 토큰 캐시 (세션 동안 재사용)
+let _gcalToken=null;
+let _gcalTokenTime=0;
+
 async function fetchGCalEvents(clientId,apiKey,section){
   return new Promise((resolve)=>{
     const doFetch=async(token)=>{
@@ -3776,15 +3780,26 @@ async function fetchGCalEvents(clientId,apiKey,section){
       }catch(e){resolve([]);}
     };
 
+    // 캐시된 토큰 있고 50분 이내면 재사용 (구글 토큰 유효시간 1시간)
+    const now2=Date.now();
+    if(_gcalToken&&now2-_gcalTokenTime<50*60*1000){
+      doFetch(_gcalToken);
+      return;
+    }
+
     const loadGIS=()=>{
       const tokenClient=google.accounts.oauth2.initTokenClient({
         client_id:clientId,
         scope:'https://www.googleapis.com/auth/calendar.readonly',
         callback:(resp)=>{
           if(resp.error){resolve([]);return;}
+          // 토큰 캐시 저장
+          _gcalToken=resp.access_token;
+          _gcalTokenTime=Date.now();
           doFetch(resp.access_token);
         }
       });
+      // prompt:'' — 이미 로그인된 경우 팝업 없이 조용히 토큰 발급
       tokenClient.requestAccessToken({prompt:''});
     };
 
