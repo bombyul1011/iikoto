@@ -3109,8 +3109,7 @@ function goHome(){
   document.querySelector('.scroll').scrollTop=0;
   renderHome();
   // 홈이 보일 때마다 이벤트 재등록
-  initHomeEvents();
-}
+  }
 
 function getTimeSection(){
   const h=new Date().getHours();
@@ -3579,7 +3578,6 @@ function saveNewsInterests(){
 // ── INIT
 updateDateUI();
 loadDaily();
-initHomeEvents();
 setTimeout(syncAll,600);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
