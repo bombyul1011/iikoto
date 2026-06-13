@@ -1273,6 +1273,18 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="dark"] .home-action{background:rgba(255,255,255,0.05);border-color:rgba(255,126,179,0.28);}
 [data-theme="dark"] .home-btn,[data-theme="dark"] .home-content-item,[data-theme="dark"] .home-icon-btn{background:rgba(255,255,255,0.06);border-color:rgba(255,255,255,0.10);}
 [data-theme="dark"] .home-icon-bar{border-top-color:rgba(255,255,255,0.08);}
+
+/* ── 일정 카드 */
+.schedule-card{background:var(--card);border:1px solid var(--card-b);border-radius:18px;padding:14px 15px;margin-bottom:10px;}
+.schedule-loading{font-size:12px;color:var(--tm);text-align:center;padding:12px 0;}
+.schedule-item{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--div);align-items:flex-start;}
+.schedule-item:last-child{border-bottom:none;}
+.schedule-time{font-size:11px;color:var(--tm);white-space:nowrap;min-width:38px;padding-top:2px;}
+.schedule-text{font-size:13px;color:var(--tp);line-height:1.5;flex:1;}
+.schedule-tag{font-size:9.5px;padding:2px 7px;border-radius:8px;flex-shrink:0;}
+.schedule-tag.cal{background:rgba(200,220,255,0.55);color:#4060a0;}
+.schedule-tag.todo{background:rgba(255,220,180,0.55);color:#a06020;}
+.schedule-summary{font-size:12.5px;color:var(--ts);line-height:1.7;padding:4px 0;}
 </style>
 </head>
 <body>
@@ -3210,25 +3222,34 @@ function renderHomeBody(section){
   body.innerHTML='';
 
   if(section==='morning'){
-    // 링 + 바로가기
+    // 링 + 일정카드 + 뉴스 + 해빗
     body.appendChild(makeRingRow());
+    body.appendChild(makeLabel('오늘 일정'));
+    const schedCard=document.createElement('div');schedCard.className='schedule-card';schedCard.innerHTML='<div class="schedule-loading">일정 불러오는 중...</div>';
+    body.appendChild(schedCard);
+    makeScheduleCard('morning').then(card=>schedCard.replaceWith(card));
     body.appendChild(makeLabel('바로가기'));
     body.appendChild(makeGrid([
       makeBtnCard('📰','오늘 뉴스','Claude 요약',()=>homeOpenNews()),
-      makeBtnCard('📅','오늘 일정','일정 요약',()=>homeOpenCalendar()),
     ]));
     body.appendChild(makeLabel('해빗 현황'));
     body.appendChild(makeHabitCard());
   } else if(section==='afternoon'){
-    // 링 + 남은 할일 + 대화
+    // 링 + 일정 진행상황 + 남은 할일 + 대화
     body.appendChild(makeRingRow());
-    body.appendChild(makeLabel('남은 할일'));
-    body.appendChild(makeRemainCard());
+    body.appendChild(makeLabel('일정 진행 상황'));
+    const schedCard2=document.createElement('div');schedCard2.className='schedule-card';schedCard2.innerHTML='<div class="schedule-loading">불러오는 중...</div>';
+    body.appendChild(schedCard2);
+    makeScheduleCard('afternoon').then(card=>schedCard2.replaceWith(card));
     body.appendChild(makeLabel('클로드와 대화'));
     body.appendChild(makeActionBtn('수다 떨까요? 💬','오늘 기록 바탕으로 대화 시작','rgba(100,195,185,0.80)',()=>homeOpenChat()));
   } else {
-    // 링 + 오늘어땠어 + 루틴/백업 + 콘텐츠
+    // 링 + 내일 일정 + 오늘어땠어 + 루틴/백업 + 콘텐츠
     body.appendChild(makeRingRow());
+    body.appendChild(makeLabel('내일 일정 미리보기'));
+    const schedCard3=document.createElement('div');schedCard3.className='schedule-card';schedCard3.innerHTML='<div class="schedule-loading">불러오는 중...</div>';
+    body.appendChild(schedCard3);
+    makeScheduleCard('night').then(card=>schedCard3.replaceWith(card));
     body.appendChild(makeLabel('하루 마감'));
     body.appendChild(makeActionBtn('오늘 어땠어?','하루 기록 → Claude에게 털어놓기','rgba(192,112,128,0.85)',()=>homeOpenReview()));
     body.appendChild(makeGrid([
@@ -3360,12 +3381,15 @@ function makeContentsCard(){
 }
 function renderHomeIconBar(section){
   const bar=document.getElementById('home-icon-bar');if(!bar)return;bar.innerHTML='';
+  // 뉴스는 오전 섹션에서만 노출, 아이콘바에서는 제거
   const all=[
-    {s:'morning',icon:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--ts)"><path d="M4 6C4 4.9 4.9 4 6 4H18C19.1 4 20 4.9 20 6V18C20 19.1 19.1 20 18 20H6C4.9 20 4 19.1 4 18V6Z"/><line x1="4" y1="9" x2="20" y2="9"/><line x1="8" y1="4" x2="8" y2="9"/><line x1="8" y1="13" x2="12" y2="13"/><line x1="8" y1="16.5" x2="16" y2="16.5"/></svg>',fn:()=>homeOpenNews()},
     {s:'morning',icon:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--ts)"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/></svg>',fn:()=>homeOpenCalendar()},
     {s:'afternoon',icon:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--ts)"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',fn:()=>homeOpenChat()},
     {s:'night',icon:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--ts)"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>',fn:()=>homeOpenReview()},
     {s:'night',icon:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--ts)"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/><polyline points="8,14 11,17 16,12"/></svg>',fn:()=>homeOpenRoutine()},
+    {s:'morning',icon:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--ts)"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>',fn:()=>homeOpenReview()},
+    {s:'morning',icon:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--ts)"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/><polyline points="8,14 11,17 16,12"/></svg>',fn:()=>homeOpenRoutine()},
+    {s:'afternoon',icon:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--ts)"><path d="M4 6C4 4.9 4.9 4 6 4H18C19.1 4 20 4.9 20 6V18C20 19.1 19.1 20 18 20H6C4.9 20 4 19.1 4 18V6Z"/><line x1="4" y1="9" x2="20" y2="9"/><line x1="8" y1="4" x2="8" y2="9"/><line x1="8" y1="13" x2="12" y2="13"/><line x1="8" y1="16.5" x2="16" y2="16.5"/></svg>',fn:()=>homeOpenNews()},
   ];
   all.filter(b=>b.s!==section).forEach(b=>{
     const btn=document.createElement('div');btn.className='home-icon-btn';
@@ -3495,6 +3519,155 @@ function homeDiscuss(c){
   _openClaude(txt);
 }
 
+
+// ── 일정 카드 (Google Calendar + 투두 + Claude 요약)
+let _scheduleCache=null,_scheduleCacheTime=0,_scheduleCacheSection='';
+
+async function makeScheduleCard(section){
+  const card=document.createElement('div');card.className='schedule-card';
+  card.innerHTML='<div class="schedule-loading">일정 불러오는 중...</div>';
+
+  // 캐시 (10분)
+  const now=Date.now();
+  if(_scheduleCache&&now-_scheduleCacheTime<10*60*1000&&_scheduleCacheSection===section){
+    renderScheduleContent(card,_scheduleCache,section);
+    return card;
+  }
+
+  const CLAUDE_KEY=S.get('claude_api_key');
+  const gcalClientId=S.get('gcal_client_id');
+  const gcalApiKey=S.get('gcal_api_key');
+
+  // 투두 데이터
+  const dk=dateKey(new Date());
+  const todayTodos=getTodos(dk);
+  const doneTodos=todayTodos.filter(t=>t.done);
+  const pendingTodos=todayTodos.filter(t=>!t.done);
+
+  // 내일 투두 (저녁용)
+  const tmrw=new Date();tmrw.setDate(tmrw.getDate()+1);
+  const tmrwTodos=getTodos(dateKey(tmrw));
+
+  let calEvents=[];
+
+  // Google Calendar 가져오기
+  if(gcalClientId&&gcalApiKey){
+    try{
+      calEvents=await fetchGCalEvents(gcalClientId,gcalApiKey,section);
+    }catch(e){console.log('GCal:',e);}
+  }
+
+  // Claude로 요약 생성
+  if(CLAUDE_KEY&&CLAUDE_KEY.length>10){
+    try{
+      const summary=await generateScheduleSummary(section,todayTodos,calEvents,CLAUDE_KEY);
+      _scheduleCache={type:'claude',summary,calEvents,doneTodos,pendingTodos,tmrwTodos};
+      _scheduleCacheTime=now;_scheduleCacheSection=section;
+      renderScheduleContent(card,_scheduleCache,section);
+      return card;
+    }catch(e){console.log('Schedule Claude:',e);}
+  }
+
+  // Claude 없으면 투두 목록만 표시
+  _scheduleCache={type:'simple',calEvents,doneTodos,pendingTodos,tmrwTodos};
+  _scheduleCacheTime=now;_scheduleCacheSection=section;
+  renderScheduleContent(card,_scheduleCache,section);
+  return card;
+}
+
+function renderScheduleContent(card,data,section){
+  card.innerHTML='';
+  if(data.type==='claude'&&data.summary){
+    const sum=document.createElement('div');sum.className='schedule-summary';
+    sum.textContent=data.summary;card.appendChild(sum);
+    // 구분선
+    if(data.calEvents.length||data.pendingTodos.length){
+      const div=document.createElement('div');div.style.cssText='height:1px;background:var(--div);margin:10px 0;';
+      card.appendChild(div);
+    }
+  }
+  // 캘린더 일정
+  data.calEvents.slice(0,3).forEach(ev=>{
+    const item=document.createElement('div');item.className='schedule-item';
+    item.innerHTML=`<span class="schedule-time">${ev.time||'종일'}</span><span class="schedule-text">${ev.title}</span><span class="schedule-tag cal">캘린더</span>`;
+    card.appendChild(item);
+  });
+  // 투두
+  const todos=section==='morning'?data.pendingTodos:section==='afternoon'?data.pendingTodos:data.tmrwTodos;
+  todos.slice(0,3).forEach(t=>{
+    const item=document.createElement('div');item.className='schedule-item';
+    item.innerHTML=`<span class="schedule-time">${t.done?'✓':''}</span><span class="schedule-text">${t.text}</span><span class="schedule-tag todo">투두</span>`;
+    card.appendChild(item);
+  });
+  if(card.children.length===0){
+    card.innerHTML='<div class="schedule-loading">등록된 일정이 없어요</div>';
+  }
+}
+
+async function generateScheduleSummary(section,todos,calEvents,key){
+  const now=new Date();
+  const tmrw=new Date();tmrw.setDate(tmrw.getDate()+1);
+  const done=todos.filter(t=>t.done),pending=todos.filter(t=>!t.done);
+  const calTxt=calEvents.length?calEvents.map(e=>`${e.time||'종일'} ${e.title}`).join(', '):'없음';
+
+  const prompts={
+    morning:`오늘 ${now.toLocaleDateString('ko-KR')} 아침. 캘린더: ${calTxt}. 투두: ${pending.map(t=>t.text).join(', ')||'없음'}. 오늘 하루 일정을 친구처럼 2문장으로 자연스럽게 요약해줘.`,
+    afternoon:`오후 현재까지 완료: ${done.map(t=>t.text).join(', ')||'없음'}. 남은 것: ${pending.map(t=>t.text).join(', ')||'없음'}. 캘린더: ${calTxt}. 진행 상황을 2문장으로 요약해줘.`,
+    night:`내일 ${tmrw.toLocaleDateString('ko-KR')} 캘린더: ${calTxt}. 오늘 미완료: ${pending.map(t=>t.text).join(', ')||'없음'}. 내일을 준비하는 말을 2문장으로 해줘.`
+  };
+
+  const res=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01'},
+    body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:120,messages:[{role:'user',content:prompts[section]}]})
+  });
+  const data=await res.json();
+  return data.content?.[0]?.text?.trim()||null;
+}
+
+async function fetchGCalEvents(clientId,apiKey,section){
+  return new Promise((resolve)=>{
+    const loadGIS=()=>{
+      const tokenClient=google.accounts.oauth2.initTokenClient({
+        client_id:clientId,
+        scope:'https://www.googleapis.com/auth/calendar.readonly',
+        callback:async(resp)=>{
+          if(resp.error){resolve([]);return;}
+          try{
+            const now=new Date();
+            let start,end;
+            if(section==='night'){
+              // 내일 일정
+              start=new Date(now);start.setDate(start.getDate()+1);start.setHours(0,0,0,0);
+              end=new Date(start);end.setHours(23,59,59,999);
+            } else {
+              start=new Date(now);start.setHours(0,0,0,0);
+              end=new Date(now);end.setHours(23,59,59,999);
+            }
+            const url=`https://www.googleapis.com/calendar/v3/calendars/primary/events?key=${apiKey}&timeMin=${start.toISOString()}&timeMax=${end.toISOString()}&singleEvents=true&orderBy=startTime&maxResults=5`;
+            const res=await fetch(url,{headers:{Authorization:`Bearer ${resp.access_token}`}});
+            const data=await res.json();
+            const events=(data.items||[]).map(e=>({
+              title:e.summary||'',
+              time:e.start?.dateTime?new Date(e.start.dateTime).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}):''
+            }));
+            resolve(events);
+          }catch(e){resolve([]);}
+        }
+      });
+      tokenClient.requestAccessToken({prompt:''});
+    };
+    if(window.google?.accounts?.oauth2){
+      loadGIS();
+    } else {
+      const s=document.createElement('script');
+      s.src='https://accounts.google.com/gsi/client';
+      s.onload=loadGIS;s.onerror=()=>resolve([]);
+      document.head.appendChild(s);
+    }
+  });
+}
+
 // ── 날씨
 async function fetchHomeWeather(section){
   if(!navigator.geolocation)return;
@@ -3582,7 +3755,7 @@ setTimeout(syncAll,600);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
 
-</script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script>
+</script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script>
 
 </body>
 </html>
