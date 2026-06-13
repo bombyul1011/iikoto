@@ -1813,37 +1813,37 @@ function renderHomeBody(section){
   body.innerHTML='';
   if(section==='morning'){
     body.appendChild(makeRingRow());
-    body.appendChild(makeLabel('오늘 일정'));
-    const sc=document.createElement('div');sc.className='schedule-card';
-    sc.innerHTML='<div class="schedule-loading">일정 불러오는 중...</div>';
-    body.appendChild(sc);
-    makeScheduleCard('morning').then(function(card){sc.replaceWith(card);});
     body.appendChild(makeLabel('바로가기'));
     body.appendChild(makeGrid([makeBtnCard('📰','오늘 뉴스','Claude 요약',homeOpenNews)]));
     body.appendChild(makeLabel('해빗 현황'));
     body.appendChild(makeHabitCard());
+    body.appendChild(makeLabel('오늘 일정'));
+    const sc=document.createElement('div');sc.className='schedule-card';
+    sc.innerHTML='<div class="schedule-loading">일정 불러오는 중...</div>';
+    body.appendChild(sc);
+    makeScheduleCard('morning').then(function(card){sc.replaceWith(card);}).catch(function(){sc.innerHTML='<div class="schedule-loading">일정을 불러올 수 없어요</div>';});
   } else if(section==='afternoon'){
     body.appendChild(makeRingRow());
+    body.appendChild(makeLabel('클로드와 대화'));
+    body.appendChild(makeActionBtn('수다 떨까요? 💬','오늘 기록 바탕으로 대화 시작','rgba(100,195,185,0.80)',homeOpenChat));
     body.appendChild(makeLabel('일정 진행 상황'));
     const sc2=document.createElement('div');sc2.className='schedule-card';
     sc2.innerHTML='<div class="schedule-loading">불러오는 중...</div>';
     body.appendChild(sc2);
-    makeScheduleCard('afternoon').then(function(card){sc2.replaceWith(card);});
-    body.appendChild(makeLabel('클로드와 대화'));
-    body.appendChild(makeActionBtn('수다 떨까요? 💬','오늘 기록 바탕으로 대화 시작','rgba(100,195,185,0.80)',homeOpenChat));
+    makeScheduleCard('afternoon').then(function(card){sc2.replaceWith(card);}).catch(function(){sc2.innerHTML='<div class="schedule-loading">일정을 불러올 수 없어요</div>';});
   } else {
     body.appendChild(makeRingRow());
-    body.appendChild(makeLabel('내일 일정 미리보기'));
-    const sc3=document.createElement('div');sc3.className='schedule-card';
-    sc3.innerHTML='<div class="schedule-loading">불러오는 중...</div>';
-    body.appendChild(sc3);
-    makeScheduleCard('night').then(function(card){sc3.replaceWith(card);});
     body.appendChild(makeLabel('하루 마감'));
     body.appendChild(makeActionBtn('오늘 어땠어?','하루 기록 → Claude에게 털어놓기','rgba(192,112,128,0.85)',homeOpenReview));
     body.appendChild(makeGrid([
       makeBtnCard('✦','주간 루틴','Claude 제안',homeOpenRoutine),
       makeBtnCard('📓','일기 백업','내보내기',openMarkdownBackup)
     ]));
+    body.appendChild(makeLabel('내일 일정 미리보기'));
+    const sc3=document.createElement('div');sc3.className='schedule-card';
+    sc3.innerHTML='<div class="schedule-loading">불러오는 중...</div>';
+    body.appendChild(sc3);
+    makeScheduleCard('night').then(function(card){sc3.replaceWith(card);}).catch(function(){sc3.innerHTML='<div class="schedule-loading">일정을 불러올 수 없어요</div>';});
     body.appendChild(makeLabel('최근 콘텐츠'));
     body.appendChild(makeContentsCard());
   }
@@ -3416,7 +3416,7 @@ setTimeout(syncAll,600);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
 
-</script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script>
+</script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script>
 
 </body>
 </html>
