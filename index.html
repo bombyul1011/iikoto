@@ -1697,8 +1697,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           <span class="settings-item-lbl">API 키</span>
           <input type="password" class="modal-inp" id="gcal-api-key-inp" placeholder="AIza..." style="margin-bottom:0;font-size:12px;width:100%;" autocomplete="off">
         </div>
-        <div class="settings-item" style="padding-top:0;">
+        <div class="settings-item" style="padding-top:0;gap:8px;flex-direction:column;">
           <button onclick="saveGCalKeys()" style="width:100%;padding:9px;border-radius:10px;border:none;background:var(--acc-soft);color:var(--acc);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">저장</button>
+          <button onclick="clearGCalKeys()" style="width:100%;padding:7px;border-radius:10px;border:1px solid var(--div);background:transparent;color:var(--tm);font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer;">키 삭제</button>
         </div>
         <div class="settings-item">
           <span style="font-size:11px;color:var(--tm);">오늘 일정 요약에 사용돼요</span>
@@ -2889,9 +2890,31 @@ function saveGCalKeys(){
   const ak=document.getElementById('gcal-api-key-inp');
   const clientId=ci?.value.trim()||'';
   const apiKey=ak?.value.trim()||'';
-  if(clientId&&!clientId.startsWith('•')){S.set('gcal_client_id',clientId);if(ci)ci.value='••••'+clientId.slice(-6);}
-  if(apiKey&&!apiKey.startsWith('•')){S.set('gcal_api_key',apiKey);if(ak)ak.value='••••'+apiKey.slice(-6);}
-  showToast('저장됐어요 ✅');
+  let saved=false;
+  if(clientId&&clientId.startsWith('•')){showToast('클라이언트 ID — 삭제 버튼으로 지우고 다시 입력해주세요');return;}
+  if(apiKey&&apiKey.startsWith('•')){showToast('API 키 — 삭제 버튼으로 지우고 다시 입력해주세요');return;}
+  if(clientId){
+    localStorage.removeItem('gcal_client_id');
+    localStorage.setItem('gcal_client_id',JSON.stringify(clientId));
+    if(ci){ci.value='';ci.placeholder='저장됨 (••••'+clientId.slice(-6)+')';}
+    saved=true;
+  }
+  if(apiKey){
+    localStorage.removeItem('gcal_api_key');
+    localStorage.setItem('gcal_api_key',JSON.stringify(apiKey));
+    if(ak){ak.value='';ak.placeholder='저장됨 (••••'+apiKey.slice(-6)+')';}
+    saved=true;
+  }
+  if(saved)showToast('저장됐어요 ✅');
+}
+function clearGCalKeys(){
+  localStorage.removeItem('gcal_client_id');
+  localStorage.removeItem('gcal_api_key');
+  const ci=document.getElementById('gcal-client-id-inp');
+  const ak=document.getElementById('gcal-api-key-inp');
+  if(ci){ci.value='';ci.placeholder='xxxxx.apps.googleusercontent.com';}
+  if(ak){ak.value='';ak.placeholder='AIza...';}
+  showToast('삭제됐어요');
 }
 function saveNewsInterests(){
   const inp=document.getElementById('news-interests-inp');
@@ -2930,8 +2953,10 @@ function openSettings(){
   const el=document.getElementById('sync-status');if(el)el.textContent=navigator.onLine?'온라인 ✅':'오프라인';
   const ki=document.getElementById('claude-api-key-inp');if(ki){const k=S.get('claude_api_key');ki.value=k?'sk-ant-••••'+k.slice(-4):'';}
   const ni=document.getElementById('news-interests-inp');if(ni)ni.value=S.get('news_interests')||'';
-  const ci=document.getElementById('gcal-client-id-inp');if(ci){const v=S.get('gcal_client_id');ci.value=v?'••••'+v.slice(-6):'';}
-  const ai=document.getElementById('gcal-api-key-inp');if(ai){const v=S.get('gcal_api_key');ai.value=v?'••••'+v.slice(-6):'';}
+  const ci=document.getElementById('gcal-client-id-inp');
+  if(ci){const v=S.get('gcal_client_id');ci.value='';ci.placeholder=v?'저장됨 (••••'+String(v).slice(-6)+')':'xxxxx.apps.googleusercontent.com';}
+  const ai=document.getElementById('gcal-api-key-inp');
+  if(ai){const v=S.get('gcal_api_key');ai.value='';ai.placeholder=v?'저장됨 (••••'+String(v).slice(-6)+')':'AIza...';}
   const keyInp=document.getElementById('claude-api-key-inp');
   if(keyInp){const k=S.get('claude_api_key');keyInp.value=k?'••••••••••••'+k.slice(-4):'';}  const newsInp=document.getElementById('news-interests-inp');if(newsInp)newsInp.value=S.get('news_interests')||'';
   const gcalCi=document.getElementById('gcal-client-id-inp');if(gcalCi){const v=S.get('gcal_client_id');gcalCi.value=v?'••••••••'+v.slice(-6):'';}
@@ -3843,9 +3868,31 @@ function saveGCalKeys(){
   const ak=document.getElementById('gcal-api-key-inp');
   const clientId=ci?.value.trim()||'';
   const apiKey=ak?.value.trim()||'';
-  if(clientId&&!clientId.startsWith('•')){S.set('gcal_client_id',clientId);if(ci)ci.value='••••'+clientId.slice(-6);}
-  if(apiKey&&!apiKey.startsWith('•')){S.set('gcal_api_key',apiKey);if(ak)ak.value='••••'+apiKey.slice(-6);}
-  showToast('저장됐어요 ✅');
+  let saved=false;
+  if(clientId&&clientId.startsWith('•')){showToast('클라이언트 ID — 삭제 버튼으로 지우고 다시 입력해주세요');return;}
+  if(apiKey&&apiKey.startsWith('•')){showToast('API 키 — 삭제 버튼으로 지우고 다시 입력해주세요');return;}
+  if(clientId){
+    localStorage.removeItem('gcal_client_id');
+    localStorage.setItem('gcal_client_id',JSON.stringify(clientId));
+    if(ci){ci.value='';ci.placeholder='저장됨 (••••'+clientId.slice(-6)+')';}
+    saved=true;
+  }
+  if(apiKey){
+    localStorage.removeItem('gcal_api_key');
+    localStorage.setItem('gcal_api_key',JSON.stringify(apiKey));
+    if(ak){ak.value='';ak.placeholder='저장됨 (••••'+apiKey.slice(-6)+')';}
+    saved=true;
+  }
+  if(saved)showToast('저장됐어요 ✅');
+}
+function clearGCalKeys(){
+  localStorage.removeItem('gcal_client_id');
+  localStorage.removeItem('gcal_api_key');
+  const ci=document.getElementById('gcal-client-id-inp');
+  const ak=document.getElementById('gcal-api-key-inp');
+  if(ci){ci.value='';ci.placeholder='xxxxx.apps.googleusercontent.com';}
+  if(ak){ak.value='';ak.placeholder='AIza...';}
+  showToast('삭제됐어요');
 }
 function saveNewsInterests(){
   const inp=document.getElementById('news-interests-inp');if(!inp)return;
@@ -3859,7 +3906,7 @@ loadDaily();
 setTimeout(syncAll,600);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
-</script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script>
+</script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script>
 
 </body>
 </html>
