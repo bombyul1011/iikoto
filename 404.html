@@ -3534,7 +3534,7 @@ async function homeOpenRoutine(){
 이번 주 루틴 3가지를 JSON으로만 응답:
 [{"type":"challenge","title":"","reason":"","habits":[]},{"type":"maintain","title":"","reason":"","habits":[]},{"type":"recover","title":"","reason":"","habits":[]}]`;
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':String(CLAUDE_KEY).trim(),'anthropic-version':'2023-06-01'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:600,messages:[{role:'user',content:prompt}]})});
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':String(CLAUDE_KEY).trim(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:600,messages:[{role:'user',content:prompt}]})});
     const data=await res.json();
     if(loadEl)loadEl.style.display='none';
     const txt=(data.content?.[0]?.text||'').replace(/```json|```/g,'').trim();
@@ -3671,7 +3671,7 @@ async function generateScheduleSummary(section,todos,calEvents,key){
 
   const res=await fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',
-    headers:{'Content-Type':'application/json','x-api-key':String(key).trim(),'anthropic-version':'2023-06-01'},
+    headers:{'Content-Type':'application/json','x-api-key':String(key).trim(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
     body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:120,messages:[{role:'user',content:prompts[section]}]})
   });
   const data=await res.json();
@@ -3756,7 +3756,7 @@ async function applyWeather(w,section){
   const emojiGuide=section==='night'?'밤 이모지(🌙✨💫🌃)':section==='morning'?'아침 이모지(🌅🌸🌿)':'낮 이모지(☀️⛅🍃✨)';
   const prompt=`지금 ${sections[section]}, 날씨 기온 ${w.temp}도 체감 ${w.feels}도 습도 ${w.humidity}%${parts.length?', 오늘기록: '+parts.join(' / '):''}. 친구처럼 2~3문장 인사. 수치 나열 금지, 느낌으로 표현. ${emojiGuide} 1~2개만. 30자 내외.`;
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':String(CLAUDE_KEY).trim(),'anthropic-version':'2023-06-01'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:120,messages:[{role:'user',content:prompt}]})});
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':String(CLAUDE_KEY).trim(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:120,messages:[{role:'user',content:prompt}]})});
     const data=await res.json();
     const txt=data.content?.[0]?.text?.trim();
     if(txt){const el=document.getElementById('home-sub');if(el)el.textContent=txt;}
