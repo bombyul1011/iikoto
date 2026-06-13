@@ -3434,17 +3434,33 @@ function renderHomeIconBar(section){
 
 // ── Claude 연동 공통
 function _openClaude(txt){
+  const doOpen=()=>{
+    // 방법 1: window.location
+    try{window.location.href='claude://';}catch(e){}
+    // 방법 2: a.click() 백업
+    setTimeout(()=>{
+      try{
+        const a=document.createElement('a');
+        a.href='claude://';a.style.cssText='position:fixed;top:0;left:0;';
+        document.body.appendChild(a);a.click();
+        setTimeout(()=>document.body.removeChild(a),500);
+      }catch(e){}
+    },100);
+  };
   const copy=(cb)=>{
     if(navigator.clipboard&&navigator.clipboard.writeText){
       navigator.clipboard.writeText(txt).then(cb).catch(()=>{_fallbackCopy(txt);cb();});
     } else {_fallbackCopy(txt);cb();}
   };
   copy(()=>{
-    showToast('클로드에 붙여넣기 해주세요 📋');
-    setTimeout(()=>{
-      const a=document.createElement('a');a.href='claude://';
-      document.body.appendChild(a);a.click();document.body.removeChild(a);
-    },700);
+    // 토스트에 클로드 열기 버튼 추가
+    const toast=document.getElementById('undo-toast');
+    if(toast){
+      toast.innerHTML='복사됐어요! <a href="claude://" style="color:rgba(255,200,180,.90);font-weight:500;text-decoration:none;padding:2px 8px;background:rgba(255,255,255,.15);border-radius:8px;margin-left:4px;">Claude 열기 →</a>';
+      toast.classList.add('on');
+      setTimeout(()=>{toast.classList.remove('on');toast.innerHTML='삭제됐어요 <span class="undo-btn" onclick="undoMemo()">되돌리기</span>';},5000);
+    }
+    doOpen();
   });
 }
 function _fallbackCopy(txt){
@@ -3489,7 +3505,10 @@ function homeOpenReview(){
 }
 async function homeOpenRoutine(){
   const CLAUDE_KEY=S.get('claude_api_key');
-  if(!CLAUDE_KEY||CLAUDE_KEY.length<10){showToast('설정에서 Claude API 키를 등록해주세요');openSettings();return;}
+  if(!CLAUDE_KEY){showToast('설정에서 Claude API 키를 등록해주세요');openSettings();return;}
+  // 키 길이 체크 완화 — 실제 키 길이 다양
+  const keyStr=String(CLAUDE_KEY).trim();
+  if(keyStr.length<5){showToast('설정에서 Claude API 키를 다시 확인해주세요');openSettings();return;}
   openModal('routine-modal');
   const cardsEl=document.getElementById('routine-cards');
   const loadEl=document.getElementById('routine-loading');
@@ -3515,7 +3534,7 @@ async function homeOpenRoutine(){
 이번 주 루틴 3가지를 JSON으로만 응답:
 [{"type":"challenge","title":"","reason":"","habits":[]},{"type":"maintain","title":"","reason":"","habits":[]},{"type":"recover","title":"","reason":"","habits":[]}]`;
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':CLAUDE_KEY,'anthropic-version':'2023-06-01'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:600,messages:[{role:'user',content:prompt}]})});
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':String(CLAUDE_KEY).trim(),'anthropic-version':'2023-06-01'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:600,messages:[{role:'user',content:prompt}]})});
     const data=await res.json();
     if(loadEl)loadEl.style.display='none';
     const txt=(data.content?.[0]?.text||'').replace(/```json|```/g,'').trim();
@@ -3592,7 +3611,7 @@ async function makeScheduleCard(section){
   }
 
   // Claude로 요약 생성
-  if(CLAUDE_KEY&&CLAUDE_KEY.length>10){
+  if(CLAUDE_KEY&&String(CLAUDE_KEY).trim().length>4){
     try{
       const summary=await generateScheduleSummary(section,todayTodos,calEvents,CLAUDE_KEY);
       _scheduleCache={type:'claude',summary,calEvents,doneTodos,pendingTodos,tmrwTodos};
@@ -3652,7 +3671,7 @@ async function generateScheduleSummary(section,todos,calEvents,key){
 
   const res=await fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',
-    headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01'},
+    headers:{'Content-Type':'application/json','x-api-key':String(key).trim(),'anthropic-version':'2023-06-01'},
     body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:120,messages:[{role:'user',content:prompts[section]}]})
   });
   const data=await res.json();
@@ -3726,7 +3745,7 @@ async function applyWeather(w,section){
   const iconEl=document.getElementById('home-weather-icon');
   if(iconEl)iconEl.textContent=_weatherEmoji(w.code);
   const CLAUDE_KEY=S.get('claude_api_key');
-  if(!CLAUDE_KEY||CLAUDE_KEY.length<10){applyDefaultGreeting(w,section);return;}
+  if(!CLAUDE_KEY||String(CLAUDE_KEY).trim().length<5){applyDefaultGreeting(w,section);return;}
   const dk=dateKey(new Date()),todos=getTodos(dk),memos=getMemos(dk),habits=getHabits();
   const wk=weekKey(new Date()),checks=getHabitChecks(wk),dow=(new Date().getDay()+6)%7;
   let parts=[];
@@ -3737,7 +3756,7 @@ async function applyWeather(w,section){
   const emojiGuide=section==='night'?'밤 이모지(🌙✨💫🌃)':section==='morning'?'아침 이모지(🌅🌸🌿)':'낮 이모지(☀️⛅🍃✨)';
   const prompt=`지금 ${sections[section]}, 날씨 기온 ${w.temp}도 체감 ${w.feels}도 습도 ${w.humidity}%${parts.length?', 오늘기록: '+parts.join(' / '):''}. 친구처럼 2~3문장 인사. 수치 나열 금지, 느낌으로 표현. ${emojiGuide} 1~2개만. 30자 내외.`;
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':CLAUDE_KEY,'anthropic-version':'2023-06-01'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:120,messages:[{role:'user',content:prompt}]})});
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':String(CLAUDE_KEY).trim(),'anthropic-version':'2023-06-01'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:120,messages:[{role:'user',content:prompt}]})});
     const data=await res.json();
     const txt=data.content?.[0]?.text?.trim();
     if(txt){const el=document.getElementById('home-sub');if(el)el.textContent=txt;}
@@ -3788,7 +3807,6 @@ loadDaily();
 setTimeout(syncAll,600);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
-
 </script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script></script>
 
 </body>
