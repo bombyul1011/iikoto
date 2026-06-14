@@ -141,8 +141,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 /* ── TODO ── */
 .todo-item{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--div);font-size:12.5px;color:var(--tp);position:relative;overflow:hidden;user-select:none;}
 .todo-item:last-of-type{border-bottom:none;}
-.todo-time-dots{display:flex;gap:2px;align-items:center;flex-shrink:0;}
-.todo-time-dots span{width:5px;height:5px;border-radius:50%;display:inline-block;}
+.todo-time-dots{display:flex;align-items:center;flex-shrink:0;}
+.todo-time-dots span{width:6px;height:6px;border-radius:50%;display:inline-block;}
 .ttd-morning span{background:rgba(250,215,100,0.80);}
 .ttd-afternoon span{background:rgba(255,175,200,0.80);}
 .ttd-night span{background:rgba(185,165,230,0.80);}
@@ -1703,6 +1703,12 @@ async function makeScheduleCard(section){
     return card;
   }
 
+  // 일정 브리핑 캐시 확인 (1시간, 같은 섹션)
+  if(_scheduleCache&&_scheduleCacheSection===section&&Date.now()-_scheduleCacheTime<60*60*1000){
+    card.innerHTML=_scheduleCache;
+    return card;
+  }
+
   // 로딩 표시
   card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">일정 불러오는 중...</div>';
 
@@ -1795,6 +1801,7 @@ async function makeScheduleCard(section){
       p.style.cssText='font-size:13px;color:var(--tp);line-height:1.75;padding:4px 2px;';
       p.textContent=reply.trim();
       card.appendChild(p);
+      _scheduleCache=card.innerHTML;_scheduleCacheTime=Date.now();_scheduleCacheSection=section;
     } else {
       // 폴백: raw 목록
       if(!calLines.length){
@@ -1922,6 +1929,7 @@ async function makeWeeklySummaryCard(){
 }
 // ─ 날씨 + Claude 비서 브리핑
 let _homeWeatherCache=null; // {icon, temp, desc, lat, lon, fetchedAt}
+let _greetingCache=null; // {text, section, fetchedAt}
 
 const WMO_ICON={
   0:'☀️',1:'🌤️',2:'⛅',3:'☁️',
@@ -1935,7 +1943,7 @@ const WMO_ICON={
 
 async function fetchWeatherData(){
   // 30분 캐시
-  if(_homeWeatherCache&&Date.now()-_homeWeatherCache.fetchedAt<30*60*1000)return _homeWeatherCache;
+  if(_homeWeatherCache&&Date.now()-_homeWeatherCache.fetchedAt<60*60*1000)return _homeWeatherCache;
   return new Promise((resolve)=>{
     if(!navigator.geolocation){resolve(null);return;}
     navigator.geolocation.getCurrentPosition(async(pos)=>{
@@ -1967,6 +1975,12 @@ async function fetchHomeWeather(section){
   // 날씨 아이콘 topbar에 표시
   if(weatherIconEl&&weather){
     weatherIconEl.textContent=' '+weather.icon+' '+weather.temp+'°';
+  }
+
+  // 인사 캐시 유효하면 바로 표시 (1시간, 같은 섹션)
+  if(_greetingCache&&_greetingCache.section===section&&Date.now()-_greetingCache.fetchedAt<60*60*1000){
+    if(subEl)subEl.textContent=_greetingCache.text;
+    return;
   }
 
   // Claude 키 없으면 고정 텍스트 + 날씨만
@@ -2040,7 +2054,9 @@ async function fetchHomeWeather(section){
 
   if(subEl){
     if(reply&&!reply.startsWith('__ERR__')){
-      subEl.textContent=reply.trim();
+      const text=reply.trim();
+      subEl.textContent=text;
+      _greetingCache={text,section,fetchedAt:Date.now()};
     } else {
       const wStr=weather?weather.icon+' '+weather.temp+'° · ':'';
       const defaults={morning:wStr+'오늘 하루도 잘 부탁해요 🌿',afternoon:wStr+'오늘도 잘 해내고 있어요 ✨',night:wStr+'오늘 하루 고생 많았어요 🌙'};
@@ -2410,7 +2426,7 @@ function renderTodos(){
     if(hiding&&t.done)return;
     const ts=t.timeSection||'none';
     const dotClass='todo-time-dots ttd-'+ts;
-    const dots=`<div class="${dotClass}"><span></span><span></span><span></span></div>`;
+    const dots=`<div class="${dotClass}"><span></span></div>`;
     const el=document.createElement('div');el.className='todo-item';
     el.innerHTML=`${dots}<div class="chk${t.done?' on':''}" onclick="toggleTodo(${i})"></div><span class="todo-txt${t.done?' done':''}" onclick="openTodoSheet(${i})">${t.text}</span><div class="drag-handle"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--tm)"><line x1="2" y1="4" x2="12" y2="4"/><line x1="2" y1="7" x2="12" y2="7"/><line x1="2" y1="10" x2="12" y2="10"/></svg></div><div class="todo-swipe"><div class="tsw-btn tsw-edit" onclick="todoEditSwipe(${i})">수정</div><div class="tsw-btn tsw-del" onclick="todoDelSwipe(${i})">삭제</div></div>`;
     attachSwipe(el,()=>{_todoSwipeIdx=i;document.getElementById('todo-sheet-title').textContent=t.text;openSheet('todo-sheet');});
