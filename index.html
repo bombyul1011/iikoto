@@ -1574,20 +1574,20 @@ async function sendHomeChat(){
 // ─ 수다 떨까요? (오후)
 function homeOpenChat(){
   const summary=buildTodaySummary();
-  const sys=`당신은 따뜻하고 친근한 일상 친구예요. 오늘 기록을 바탕으로 가볍고 자연스럽게 대화를 시작해요. 한두 문장 정도로, 다정한 구어체 존댓말로. 이름 호칭 없이. 이모지 1-2개.\n\n오늘 기록:\n${summary}`;
+  const sys=`당신은 따뜻하고 친근한 일상 비서예요. 오늘 기록을 바탕으로 가볍고 자연스럽게 대화를 시작해요. 한두 문장 정도로. 이름 호칭 없이. 이모지 1-2개. 반드시 ~해요, ~이에요, ~어요 체 존댓말만 사용. 반말 절대 금지.\n\n오늘 기록:\n${summary}`;
   _openHomeChatModal('수다 떨까요? 💬',sys,null);
 }
 
 // ─ 오늘 어땠어? (밤)
 function homeOpenReview(){
   const summary=buildTodaySummary();
-  const sys=`당신은 따뜻한 저녁 일기 친구예요. 오늘 하루 기록을 보고 공감해주고 수고했다고 말해줘요. 다정한 구어체 존댓말, 이름 호칭 없이, 이모지 1-2개.\n\n오늘 기록:\n${summary}`;
-  _openHomeChatModal('오늘 어땠어? 🌙',sys,null);
+  const sys=`당신은 따뜻한 저녁 일기 친구예요. 오늘 하루 기록을 보고 공감해주고 수고했다고 말해줘요. 이름 호칭 없이, 이모지 1-2개. 반드시 ~해요, ~이에요, ~어요 체 존댓말만 사용. 반말 절대 금지.\n\n오늘 기록:\n${summary}`;
+  _openHomeChatModal('오늘 어땠어요? 🌙',sys,null);
 }
 
 // ─ 콘텐츠 수다 (홈 카드 말풍선 버튼)
 function homeDiscuss(c){
-  const sys=`당신은 책, 드라마, 영화, 음악 이야기를 나누는 친근한 친구예요. 지금 "${c.title}"(${CAT_LABELS[c.cat]||c.cat}) 얘기가 나왔어요. 자연스럽게 반응하고 대화를 이어가요. 다정한 구어체 존댓말, 이름 호칭 없이, 이모지 1개.`;
+  const sys=`당신은 책, 드라마, 영화, 음악 이야기를 나누는 친근한 대화 상대예요. 지금 "${c.title}"(${CAT_LABELS[c.cat]||c.cat}) 얘기가 나왔어요. 자연스럽게 반응하고 대화를 이어가요. 이름 호칭 없이, 이모지 1개. 반드시 ~해요, ~이에요, ~어요 체 존댓말만 사용. 반말 절대 금지.`;
   _openHomeChatModal(c.title+' 이야기 💬',sys,null);
 }
 
@@ -1820,8 +1820,8 @@ async function makeScheduleCard(section){
     let dataContext='';
 
     const commonRules=`규칙:
-- 다정하고 자연스러운 구어체 존댓말
-- 이름 호칭 없음
+- 반드시 ~해요, ~이에요, ~어요 체의 정감있는 존댓말만 사용. ~해, ~야, ~지 등 반말 절대 금지.
+- 이름 호칭 없음. "너", "당신" 등 2인칭 호칭 금지.
 - 이모지 1-2개
 - 오직 브리핑 텍스트만 출력
 - 없는 정보는 억지로 언급하지 않기`;
@@ -2143,8 +2143,9 @@ async function fetchHomeWeather(section){
 
 규칙:
 - 날씨와 지금 이 순간의 분위기/감성만 담아요. 일정·할일 내용은 절대 언급하지 말 것.
-- 메모에서 현재 상황(위치, 상태)을 파악해서 자연스럽게 반영해요. (예: 메모에 교토 도착이 언급되어 있으면 교토에 있다고 인식)
-- 반드시 존댓말. "너", "당신" 등 호칭 절대 사용 금지.
+- 메모에서 현재 상황(위치, 상태)을 파악해서 자연스럽게 반영해요.
+- 반드시 ~해요, ~이에요, ~어요 체의 정감있는 존댓말만 사용. ~해, ~야, ~지 등 반말 절대 금지.
+- "너", "당신" 등 호칭 절대 사용 금지.
 - 이모지 1-2개
 - 오직 인사 문장만 출력`;
 
@@ -2281,13 +2282,13 @@ async function syncTodosDown(dk){
   const rows=await supaFetch('todos?date_key=eq.'+dk+'&order=created');
   if(!rows)return; // 연결 실패 — 로컬 유지
   if(rows.length===0)return; // 서버 비어있음 — 로컬 유지
-  S.set(S.key('todos',dk),rows.map(function(r){return {text:r.text,done:r.done,created:r.created,sort_order:r.sort_order||0};}));
+  S.set(S.key('todos',dk),rows.map(function(r){return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none'};}));
   renderTodos();
 }
 async function syncTodosUp(dk){
   const todos=getTodos(dk);
   await supaFetch(`todos?date_key=eq.${dk}`,'DELETE');
-  if(todos.length)await supaFetch('todos','POST',todos.map(t=>({date_key:dk,text:t.text,done:t.done,created:t.created})));
+  if(todos.length)await supaFetch('todos','POST',todos.map(t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none'})));
 }
 async function syncMemosDown(dk){
   const rows=await supaFetch('memos?date_key=eq.'+dk+'&order=created');
@@ -2516,10 +2517,12 @@ function renderTodos(){
   const list=document.getElementById('todo-list');if(!list)return;
   const hiding=document.getElementById('hide-tog')?.classList.contains('on')||false;
   list.innerHTML='';
-  // 완료된 항목 하단으로 정렬
+  const tsOrder={morning:0,afternoon:1,night:2,none:3};
   const sorted=[...todos.map((t,i)=>({...t,_i:i}))].sort((a,b)=>{
-    if(a.done===b.done)return 0;
-    return a.done?1:-1;
+    if(a.done!==b.done)return a.done?1:-1;
+    const ta=tsOrder[a.timeSection||'none']??3;
+    const tb=tsOrder[b.timeSection||'none']??3;
+    return ta-tb;
   });
   sorted.forEach((t)=>{
     const i=t._i;
@@ -2527,12 +2530,11 @@ function renderTodos(){
     const ts=t.timeSection||'none';
     const tsClass=ts!=='none'?` ts-${ts}`:'';
     const el=document.createElement('div');el.className='todo-item';
-    el.innerHTML=`<div class="chk${tsClass}${t.done?' on':''}" onclick="toggleTodo(${i})"></div><span class="todo-txt${t.done?' done':''}" onclick="openTodoSheet(${i})">${t.text}</span><div class="drag-handle"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--tm)"><line x1="2" y1="4" x2="12" y2="4"/><line x1="2" y1="7" x2="12" y2="7"/><line x1="2" y1="10" x2="12" y2="10"/></svg></div><div class="todo-swipe"><div class="tsw-btn tsw-edit" onclick="todoEditSwipe(${i})">수정</div><div class="tsw-btn tsw-del" onclick="todoDelSwipe(${i})">삭제</div></div>`;
+    el.innerHTML=`<div class="chk${tsClass}${t.done?' on':''}" onclick="toggleTodo(${i})"></div><span class="todo-txt${t.done?' done':''}" onclick="openTodoSheet(${i})">${t.text}</span><div class="todo-swipe"><div class="tsw-btn tsw-edit" onclick="todoEditSwipe(${i})">수정</div><div class="tsw-btn tsw-del" onclick="todoDelSwipe(${i})">삭제</div></div>`;
     attachSwipe(el,()=>{_todoSwipeIdx=i;document.getElementById('todo-sheet-title').textContent=t.text;openSheet('todo-sheet');});
     list.appendChild(el);
   });
   updateStats();
-  initTodoDrag();
 }
 function toggleTodo(i){const dk=dateKey(currentDate),todos=getTodos(dk);todos[i].done=!todos[i].done;saveTodos(dk,todos);renderTodos();}
 function openTodoModal(editIdx=-1){
