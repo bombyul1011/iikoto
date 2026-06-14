@@ -141,16 +141,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 /* ── TODO ── */
 .todo-item{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--div);font-size:12.5px;color:var(--tp);position:relative;overflow:hidden;user-select:none;}
 .todo-item:last-of-type{border-bottom:none;}
-.todo-time-dots{display:flex;align-items:center;flex-shrink:0;}
-.todo-time-dots span{width:6px;height:6px;border-radius:50%;display:inline-block;}
-.ttd-morning span{background:rgba(250,215,100,0.80);}
-.ttd-afternoon span{background:rgba(255,175,200,0.80);}
-.ttd-night span{background:rgba(185,165,230,0.80);}
-.ttd-none span{background:rgba(180,180,180,0.35);}
-[data-theme="dark"] .ttd-morning span{background:rgba(255,209,102,0.78);}
-[data-theme="dark"] .ttd-afternoon span{background:rgba(255,126,179,0.78);}
-[data-theme="dark"] .ttd-night span{background:rgba(200,160,255,0.75);}
-[data-theme="dark"] .ttd-none span{background:rgba(255,255,255,0.18);}
 .todo-time-sel{display:flex;gap:6px;margin:10px 0 4px;}
 .todo-time-sel button{flex:1;padding:6px 0;border-radius:10px;border:1px solid var(--card-b);background:var(--card);font-size:11.5px;color:var(--tm);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;}
 .todo-time-sel button.active{font-weight:600;}
@@ -164,6 +154,24 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .chk{width:16px;height:16px;border-radius:5px;border:1.5px solid rgba(200,160,160,0.55);flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;}
 .chk.on{background:var(--acc-soft);border-color:var(--acc);}
 .chk.on::after{content:'';width:7px;height:4px;border-left:1.5px solid white;border-bottom:1.5px solid white;transform:rotate(-45deg) translateY(-1px);}
+.chk.ts-morning{border-color:rgba(250,215,100,0.70);}
+.chk.ts-morning.on{background:rgba(250,215,100,0.25);border-color:rgba(220,185,60,0.80);}
+.chk.ts-morning.on::after{border-color:rgba(160,130,0,0.9);}
+.chk.ts-afternoon{border-color:rgba(255,175,200,0.70);}
+.chk.ts-afternoon.on{background:rgba(255,175,200,0.25);border-color:rgba(220,120,160,0.80);}
+.chk.ts-afternoon.on::after{border-color:rgba(200,80,120,0.9);}
+.chk.ts-night{border-color:rgba(185,165,230,0.70);}
+.chk.ts-night.on{background:rgba(185,165,230,0.25);border-color:rgba(150,120,210,0.80);}
+.chk.ts-night.on::after{border-color:rgba(110,80,180,0.9);}
+[data-theme="dark"] .chk.ts-morning{border-color:rgba(255,209,102,0.50);}
+[data-theme="dark"] .chk.ts-morning.on{background:rgba(255,209,102,0.18);border-color:rgba(255,209,102,0.80);}
+[data-theme="dark"] .chk.ts-morning.on::after{border-color:rgba(255,209,102,1);}
+[data-theme="dark"] .chk.ts-afternoon{border-color:rgba(255,126,179,0.50);}
+[data-theme="dark"] .chk.ts-afternoon.on{background:rgba(255,126,179,0.18);border-color:rgba(255,126,179,0.80);}
+[data-theme="dark"] .chk.ts-afternoon.on::after{border-color:rgba(255,126,179,1);}
+[data-theme="dark"] .chk.ts-night{border-color:rgba(200,160,255,0.50);}
+[data-theme="dark"] .chk.ts-night.on{background:rgba(200,160,255,0.18);border-color:rgba(200,160,255,0.80);}
+[data-theme="dark"] .chk.ts-night.on::after{border-color:rgba(200,160,255,1);}
 .todo-txt{flex:1;line-height:1.4;cursor:pointer;}
 .todo-txt.done{text-decoration:line-through;color:var(--tm);}
 .todo-swipe{position:absolute;right:0;top:0;bottom:0;display:flex;align-items:stretch;overflow:hidden;transition:width .2s,opacity .2s;width:0;opacity:0;}
@@ -1450,6 +1458,17 @@ const _HOME_DAYS=['일','월','화','수','목','금','토'];
 let _weatherCache=null,_weatherCacheTime=0,_selectedRoutine=null;
 let _gcalToken=null,_gcalTokenTime=0;
 let _scheduleCache=null,_scheduleCacheTime=0,_scheduleCacheSection='';
+let _greetingCache=null; // {text, subSection, fetchedAt}
+
+function getSubSection(){
+  const h=new Date().getHours();
+  if(h>=6&&h<9)return 'morning_1';
+  if(h>=9&&h<12)return 'morning_2';
+  if(h>=12&&h<16)return 'afternoon_1';
+  if(h>=16&&h<19)return 'afternoon_2';
+  if(h>=19&&h<22)return 'night_1';
+  return 'night_2';
+}
 
 
 // ── HOME ACTION FUNCTIONS
@@ -1703,8 +1722,9 @@ async function makeScheduleCard(section){
     return card;
   }
 
-  // 일정 브리핑 캐시 확인 (1시간, 같은 섹션)
-  if(_scheduleCache&&_scheduleCacheSection===section&&Date.now()-_scheduleCacheTime<60*60*1000){
+  // 일정 브리핑 캐시 확인 (sub-section 기준)
+  const subSec=getSubSection();
+  if(_scheduleCache&&_scheduleCacheSection===subSec){
     card.innerHTML=_scheduleCache;
     return card;
   }
@@ -1881,7 +1901,7 @@ ${commonRules}`;
       p.style.cssText='font-size:13px;color:var(--tp);line-height:1.75;padding:4px 2px;';
       p.textContent=reply.trim();
       card.appendChild(p);
-      _scheduleCache=card.innerHTML;_scheduleCacheTime=Date.now();_scheduleCacheSection=section;
+      _scheduleCache=card.innerHTML;_scheduleCacheTime=Date.now();_scheduleCacheSection=subSec;
     } else {
       // 폴백: raw 목록
       if(!calLines.length){
@@ -2009,7 +2029,6 @@ async function makeWeeklySummaryCard(){
 }
 // ─ 날씨 + Claude 비서 브리핑
 let _homeWeatherCache=null; // {icon, temp, desc, lat, lon, fetchedAt}
-let _greetingCache=null; // {text, section, fetchedAt}
 
 const WMO_ICON={
   0:'☀️',1:'🌤️',2:'⛅',3:'☁️',
@@ -2057,8 +2076,9 @@ async function fetchHomeWeather(section){
     weatherIconEl.textContent=' '+weather.icon+' '+weather.temp+'°';
   }
 
-  // 인사 캐시 유효하면 바로 표시 (1시간, 같은 섹션)
-  if(_greetingCache&&_greetingCache.section===section&&Date.now()-_greetingCache.fetchedAt<60*60*1000){
+  // 인사 캐시 유효하면 바로 표시 (sub-section 기준)
+  const subSec=getSubSection();
+  if(_greetingCache&&_greetingCache.subSection===subSec){
     if(subEl)subEl.textContent=_greetingCache.text;
     return;
   }
@@ -2136,7 +2156,7 @@ async function fetchHomeWeather(section){
     if(reply&&!reply.startsWith('__ERR__')){
       const text=reply.trim();
       subEl.textContent=text;
-      _greetingCache={text,section,fetchedAt:Date.now()};
+      _greetingCache={text,subSection:subSec,fetchedAt:Date.now()};
     } else {
       const wStr=weather?weather.icon+' '+weather.temp+'° · ':'';
       const defaults={morning:wStr+'오늘 하루도 잘 부탁해요 🌿',afternoon:wStr+'오늘도 잘 해내고 있어요 ✨',night:wStr+'오늘 하루 고생 많았어요 🌙'};
@@ -2505,10 +2525,9 @@ function renderTodos(){
     const i=t._i;
     if(hiding&&t.done)return;
     const ts=t.timeSection||'none';
-    const dotClass='todo-time-dots ttd-'+ts;
-    const dots=`<div class="${dotClass}"><span></span></div>`;
+    const tsClass=ts!=='none'?` ts-${ts}`:'';
     const el=document.createElement('div');el.className='todo-item';
-    el.innerHTML=`${dots}<div class="chk${t.done?' on':''}" onclick="toggleTodo(${i})"></div><span class="todo-txt${t.done?' done':''}" onclick="openTodoSheet(${i})">${t.text}</span><div class="drag-handle"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--tm)"><line x1="2" y1="4" x2="12" y2="4"/><line x1="2" y1="7" x2="12" y2="7"/><line x1="2" y1="10" x2="12" y2="10"/></svg></div><div class="todo-swipe"><div class="tsw-btn tsw-edit" onclick="todoEditSwipe(${i})">수정</div><div class="tsw-btn tsw-del" onclick="todoDelSwipe(${i})">삭제</div></div>`;
+    el.innerHTML=`<div class="chk${tsClass}${t.done?' on':''}" onclick="toggleTodo(${i})"></div><span class="todo-txt${t.done?' done':''}" onclick="openTodoSheet(${i})">${t.text}</span><div class="drag-handle"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--tm)"><line x1="2" y1="4" x2="12" y2="4"/><line x1="2" y1="7" x2="12" y2="7"/><line x1="2" y1="10" x2="12" y2="10"/></svg></div><div class="todo-swipe"><div class="tsw-btn tsw-edit" onclick="todoEditSwipe(${i})">수정</div><div class="tsw-btn tsw-del" onclick="todoDelSwipe(${i})">삭제</div></div>`;
     attachSwipe(el,()=>{_todoSwipeIdx=i;document.getElementById('todo-sheet-title').textContent=t.text;openSheet('todo-sheet');});
     list.appendChild(el);
   });
