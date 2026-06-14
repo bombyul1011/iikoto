@@ -1609,7 +1609,7 @@ async function _startHomeChatAI(){
   const key=getClaudeKey();
   if(!key){_appendHomeChatBubble('Claude API 키가 없어요. 설정에서 입력해주세요 🌿','ai');return;}
   const loadingBub=_appendHomeChatBubble('생각하는 중...','ai loading');
-  const reply=await callClaude(_homeChatSystemPrompt,[{role:'user',content:'대화 시작해줘'}],250);
+  const reply=await callClaude(_homeChatSystemPrompt,[{role:'user',content:'대화 시작해줘'}],200);
   if(loadingBub)loadingBub.remove();
   const text=reply?reply.startsWith('__ERR__')?'연결 오류: '+reply.slice(7)+' 🌿':reply:'잠깐 연결이 안 됐어요. 다시 시도해볼게요 🌿';
   _appendHomeChatBubble(text,'ai');
