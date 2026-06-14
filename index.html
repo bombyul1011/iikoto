@@ -1579,7 +1579,6 @@ let _gcalAccessToken=null;
 let _gcalTokenExpiry=0;
 
 async function getGCalToken(){
-  // 유효한 토큰이 있으면 재사용
   if(_gcalAccessToken&&Date.now()<_gcalTokenExpiry-60000)return _gcalAccessToken;
   const clientId=S.get('gcal_client_id');
   if(!clientId)return null;
@@ -1594,16 +1593,14 @@ async function getGCalToken(){
         if(popup.closed){clearInterval(timer);resolve(null);return;}
         const hash=popup.location.hash;
         if(hash&&hash.includes('access_token')){
-          clearInterval(timer);
-          popup.close();
+          clearInterval(timer);popup.close();
           const params=new URLSearchParams(hash.slice(1));
           const token=params.get('access_token');
           const expiresIn=parseInt(params.get('expires_in')||'3600',10);
-          _gcalAccessToken=token;
-          _gcalTokenExpiry=Date.now()+expiresIn*1000;
+          _gcalAccessToken=token;_gcalTokenExpiry=Date.now()+expiresIn*1000;
           resolve(token);
         }
-      }catch(e){/* cross-origin — wait */}
+      }catch(e){}
     },300);
     setTimeout(()=>{clearInterval(timer);if(!popup.closed)popup.close();resolve(null);},120000);
   });
@@ -1612,16 +1609,17 @@ async function getGCalToken(){
 async function makeScheduleCard(section){
   const card=document.createElement('div');
   card.className='card m';
+
+  // GCal 토큰 확인
   const clientId=S.get('gcal_client_id');
-  const apiKey=S.get('gcal_api_key');
-  if(!clientId&&!apiKey){
+  const hasToken=_gcalAccessToken&&Date.now()<_gcalTokenExpiry-60000;
+
+  if(!clientId&&!hasToken){
     card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">설정 → Google Calendar에서 연결해보세요 📅</div>';
     return card;
   }
-  // access token 확인
-  let token=_gcalAccessToken&&Date.now()<_gcalTokenExpiry-60000?_gcalAccessToken:null;
-  if(!token&&clientId){
-    // 토큰 없으면 연결 버튼 표시
+
+  if(!hasToken&&clientId){
     const btn=document.createElement('button');
     btn.style.cssText='width:100%;padding:10px;border-radius:12px;border:none;background:var(--acc-soft);color:var(--acc);font-family:"DM Sans",sans-serif;font-size:13px;font-weight:500;cursor:pointer;';
     btn.textContent='📅 Google Calendar 연결하기';
@@ -1634,50 +1632,246 @@ async function makeScheduleCard(section){
     card.appendChild(btn);
     return card;
   }
+
+  // 로딩 표시
+  card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">일정 불러오는 중...</div>';
+
   try{
     const now=new Date();
-    let tMin,tMax;
+    let tMin,tMax,dayLabel;
     if(section==='night'){
       const tom=new Date(now);tom.setDate(tom.getDate()+1);tom.setHours(0,0,0,0);
       const tomEnd=new Date(tom);tomEnd.setHours(23,59,59,999);
-      tMin=tom.toISOString();tMax=tomEnd.toISOString();
+      tMin=tom.toISOString();tMax=tomEnd.toISOString();dayLabel='내일';
     } else {
       const dayEnd=new Date(now);dayEnd.setHours(23,59,59,999);
-      tMin=now.toISOString();tMax=dayEnd.toISOString();
+      tMin=now.toISOString();tMax=dayEnd.toISOString();dayLabel='오늘';
     }
-    const headers={'Authorization':'Bearer '+token};
+
+    const headers={'Authorization':'Bearer '+_gcalAccessToken};
     const url=`https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(tMin)}&timeMax=${encodeURIComponent(tMax)}&singleEvents=true&orderBy=startTime&maxResults=8`;
     const res=await fetch(url,{headers});
+
     if(!res.ok){
       if(res.status===401){_gcalAccessToken=null;_gcalTokenExpiry=0;}
-      console.error('GCal err:',res.status);
-      card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">Calendar 연결 오류 ('+res.status+') — 다시 시도해주세요</div>';
+      card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">Calendar 연결 오류 ('+res.status+')</div>';
       return card;
     }
+
     const data=await res.json();
     const items=data.items||[];
-    if(!items.length){
-      card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">'+(section==='night'?'내일 일정이 없어요 🌙':'오늘 남은 일정이 없어요')+'</div>';
+
+    // 캘린더 이벤트 텍스트 정리
+    const calLines=items.map(ev=>{
+      let t='종일';
+      if(ev.start&&ev.start.dateTime){
+        const d=new Date(ev.start.dateTime);
+        t=(d.getHours()<12?'오전':'오후')+' '+(d.getHours()%12||12)+':'+String(d.getMinutes()).padStart(2,'0');
+      }
+      return t+' '+( ev.summary||'(제목없음)');
+    });
+
+    // Claude 없으면 raw 목록 표시
+    const key=getClaudeKey();
+    if(!key){
+      card.innerHTML='';
+      if(!calLines.length){
+        card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">'+dayLabel+' 남은 일정이 없어요</div>';
+        return card;
+      }
+      calLines.forEach(line=>{
+        const row=document.createElement('div');row.className='schedule-item';
+        const parts=line.match(/^([^\s]+\s\d+:\d+)\s(.+)$/);
+        if(parts){row.innerHTML='<div class="schedule-time">'+parts[1]+'</div><div class="schedule-text">'+parts[2]+'</div>';}
+        else{row.innerHTML='<div class="schedule-text">'+line+'</div>';}
+        card.appendChild(row);
+      });
       return card;
     }
-    items.forEach(function(ev){
-      const row=document.createElement('div');row.className='schedule-item';
-      let timeStr='종일';
-      if(ev.start&&ev.start.dateTime){const d=new Date(ev.start.dateTime);timeStr=(d.getHours()<12?'오전':'오후')+' '+(d.getHours()%12||12)+':'+String(d.getMinutes()).padStart(2,'0');}
-      row.innerHTML='<div class="schedule-time">'+timeStr+'</div><div class="schedule-text">'+(ev.summary||'(제목 없음)')+'</div>';
-      card.appendChild(row);
-    });
+
+    // 오늘 데이터 수집
+    const dk=dateKey(now);
+    const wk=weekKey(now);
+    const dow=(now.getDay()+6)%7;
+    const todos=getTodos(dk);
+    const pendTodos=todos.filter(t=>!t.done).map(t=>t.text);
+    const memos=getMemos(dk).map(m=>m.text).filter(Boolean);
+    const sleep=getSleep(dk);
+    const weather=_homeWeatherCache;
+
+    const dataContext=[
+      weather?`날씨: ${weather.icon} ${weather.temp}도`:'',
+      calLines.length?`${dayLabel} 일정:\n${calLines.join('\n')}`:`${dayLabel} 캘린더 일정 없음`,
+      pendTodos.length?`미완료 할일: ${pendTodos.join(', ')}`:'할일 없음',
+      memos.length?`오늘 메모: ${memos.slice(0,3).join(' / ')}`:'',
+      sleep.wake?`기상: ${sleep.wake}`:''
+    ].filter(Boolean).join('\n');
+
+    const sectionLabel={morning:'오전',afternoon:'오후',night:'저녁'};
+    const sys=`당신은 봄이의 하루 비서예요. ${sectionLabel[section]} 기준으로 ${dayLabel} 일정과 할일을 종합해서 **자연스러운 한 문단 브리핑**을 작성해요.
+- 캘린더 일정, 미완료 할일, 메모 맥락을 자연스럽게 엮어서
+- 따뜻하고 친근한 비서 말투 (존댓말)
+- 3-5문장 이내
+- 이모지 1-2개
+- 오직 브리핑 텍스트만 출력`;
+
+    const reply=await callClaude(sys,[{role:'user',content:dataContext}],250);
+    card.innerHTML='';
+
+    if(reply&&!reply.startsWith('__ERR__')){
+      const p=document.createElement('div');
+      p.style.cssText='font-size:13px;color:var(--tp);line-height:1.75;padding:4px 2px;';
+      p.textContent=reply.trim();
+      card.appendChild(p);
+    } else {
+      // 폴백: raw 목록
+      if(!calLines.length){
+        card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">'+dayLabel+' 남은 일정이 없어요</div>';
+      } else {
+        calLines.forEach(line=>{
+          const row=document.createElement('div');row.className='schedule-item';
+          const parts=line.match(/^([^\s]+\s\d+:\d+)\s(.+)$/);
+          if(parts){row.innerHTML='<div class="schedule-time">'+parts[1]+'</div><div class="schedule-text">'+parts[2]+'</div>';}
+          else{row.innerHTML='<div class="schedule-text">'+line+'</div>';}
+          card.appendChild(row);
+        });
+      }
+    }
   }catch(e){
-    console.error('GCal fetch err:',e);
+    console.error('schedule card err:',e);
     card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">일정을 불러올 수 없어요</div>';
   }
   return card;
 }
 function homeOpenCalendar(){
   openSettings();
-  showToast('설정에서 Calendar API 키를 입력해주세요 🌿');
 }
-function fetchHomeWeather(section){} // 추후 연동 예정
+// ─ 날씨 + Claude 비서 브리핑
+let _homeWeatherCache=null; // {icon, temp, desc, lat, lon, fetchedAt}
+
+const WMO_ICON={
+  0:'☀️',1:'🌤️',2:'⛅',3:'☁️',
+  45:'🌫️',48:'🌫️',
+  51:'🌦️',53:'🌦️',55:'🌧️',
+  61:'🌧️',63:'🌧️',65:'🌧️',
+  71:'🌨️',73:'🌨️',75:'🌨️',
+  80:'🌦️',81:'🌧️',82:'🌧️',
+  95:'⛈️',96:'⛈️',99:'⛈️'
+};
+
+async function fetchWeatherData(){
+  // 30분 캐시
+  if(_homeWeatherCache&&Date.now()-_homeWeatherCache.fetchedAt<30*60*1000)return _homeWeatherCache;
+  return new Promise((resolve)=>{
+    if(!navigator.geolocation){resolve(null);return;}
+    navigator.geolocation.getCurrentPosition(async(pos)=>{
+      try{
+        const {latitude:lat,longitude:lon}=pos.coords;
+        const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weathercode,apparent_temperature&timezone=auto`;
+        const res=await fetch(url);
+        if(!res.ok){resolve(null);return;}
+        const data=await res.json();
+        const cur=data.current;
+        const code=cur.weathercode;
+        const temp=Math.round(cur.temperature_2m);
+        const icon=WMO_ICON[code]||'🌡️';
+        _homeWeatherCache={icon,temp,code,fetchedAt:Date.now()};
+        resolve(_homeWeatherCache);
+      }catch(e){resolve(null);}
+    },(err)=>{resolve(null);},{timeout:8000});
+  });
+}
+
+async function fetchHomeWeather(section){
+  const key=getClaudeKey();
+  const subEl=document.getElementById('home-greeting-sub');
+  const weatherIconEl=document.getElementById('home-weather-icon');
+
+  // 날씨 먼저 가져오기
+  const weather=await fetchWeatherData();
+
+  // 날씨 아이콘 topbar에 표시
+  if(weatherIconEl&&weather){
+    weatherIconEl.textContent=' '+weather.icon+' '+weather.temp+'°';
+  }
+
+  // Claude 키 없으면 고정 텍스트 + 날씨만
+  if(!key){
+    if(subEl){
+      const wStr=weather?weather.icon+' '+weather.temp+'° · ':'';
+      const defaults={
+        morning:wStr+'오늘 하루도 잘 부탁해요 🌿',
+        afternoon:wStr+'오늘도 잘 해내고 있어요 ✨',
+        night:wStr+'오늘 하루 고생 많았어요 🌙'
+      };
+      subEl.textContent=defaults[section];
+    }
+    return;
+  }
+
+  // 오늘 데이터 수집
+  const now=new Date();
+  const dk=dateKey(now);
+  const wk=weekKey(now);
+  const dow=(now.getDay()+6)%7;
+  const todos=getTodos(dk);
+  const pendTodos=todos.filter(t=>!t.done).map(t=>t.text);
+  const doneTodos=todos.filter(t=>t.done).map(t=>t.text);
+  const memos=getMemos(dk).map(m=>m.text).filter(Boolean);
+  const sleep=getSleep(dk);
+  const habits=getHabits();
+  const checks=getHabitChecks(wk);
+  const doneHabits=habits.filter(h=>checks[h.name+'-'+dow]).map(h=>h.name);
+
+  // 캘린더 일정 수집 (토큰 있으면)
+  let calEvents=[];
+  if(_gcalAccessToken&&Date.now()<_gcalTokenExpiry-60000){
+    try{
+      const dayEnd=new Date(now);dayEnd.setHours(23,59,59,999);
+      const url=`https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(now.toISOString())}&timeMax=${encodeURIComponent(dayEnd.toISOString())}&singleEvents=true&orderBy=startTime&maxResults=8`;
+      const r=await fetch(url,{headers:{'Authorization':'Bearer '+_gcalAccessToken}});
+      if(r.ok){const d=await r.json();calEvents=(d.items||[]).map(ev=>{
+        let t='종일';
+        if(ev.start&&ev.start.dateTime){const dd=new Date(ev.start.dateTime);t=(dd.getHours()<12?'오전':'오후')+' '+(dd.getHours()%12||12)+':'+String(dd.getMinutes()).padStart(2,'0');}
+        return t+' '+( ev.summary||'(제목없음)');
+      });}
+    }catch(e){}
+  }
+
+  // Claude에게 인사 서브텍스트 요청
+  const sectionLabel={morning:'오전',afternoon:'오후',night:'저녁'};
+  const weatherDesc=weather?`날씨: ${weather.icon} ${weather.temp}도`:'날씨 정보 없음';
+  const dataContext=[
+    weatherDesc,
+    pendTodos.length?`미완료 할일: ${pendTodos.join(', ')}`:'',
+    doneTodos.length?`완료한 할일: ${doneTodos.join(', ')}`:'',
+    doneHabits.length?`완료한 습관: ${doneHabits.join(', ')}`:'',
+    memos.length?`오늘 메모: ${memos.slice(0,3).join(' / ')}`:'',
+    sleep.sleep||sleep.wake?`수면: ${sleep.sleep||'?'} 취침 ${sleep.wake||'?'} 기상`:'',
+    calEvents.length?`오늘 남은 일정: ${calEvents.join(', ')}`:'오늘 남은 캘린더 일정 없음'
+  ].filter(Boolean).join('\n');
+
+  const sys=`당신은 봄이의 아침 비서예요. 아래 오늘 데이터를 보고 ${sectionLabel[section]} 인사말을 **딱 1-2문장**으로 만들어요.
+- 날씨 정보 자연스럽게 포함
+- 오늘 일정/할일 맥락 반영해서 따뜻하게
+- 이모지 1-2개
+- 반말 금지, 존댓말
+- 오직 인사 문장만 출력, 다른 설명 없이`;
+
+  if(subEl)subEl.textContent='잠깐만요...';
+
+  const reply=await callClaude(sys,[{role:'user',content:dataContext}],150);
+
+  if(subEl){
+    if(reply&&!reply.startsWith('__ERR__')){
+      subEl.textContent=reply.trim();
+    } else {
+      const wStr=weather?weather.icon+' '+weather.temp+'° · ':'';
+      const defaults={morning:wStr+'오늘 하루도 잘 부탁해요 🌿',afternoon:wStr+'오늘도 잘 해내고 있어요 ✨',night:wStr+'오늘 하루 고생 많았어요 🌙'};
+      subEl.textContent=defaults[section];
+    }
+  }
+}
 
 function goHome(){
   document.querySelectorAll('.view').forEach(function(v){v.classList.remove('on');});
