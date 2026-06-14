@@ -2031,8 +2031,9 @@ function goHome(){
 }
 
 function getSection(){
-  const h=new Date().getHours();
-  return h>=6&&h<12?'morning':h>=12&&h<19?'afternoon':'night';
+  return 'night'; // 🔧 임시 테스트 — 확인 후 원본으로 복구할 것
+  // const h=new Date().getHours();
+  // return h>=6&&h<12?'morning':h>=12&&h<19?'afternoon':'night';
 }
 
 function renderHome(){
