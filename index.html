@@ -1219,14 +1219,14 @@ function renderHomeBody(section){
   if(!body)return;
   body.innerHTML='';
   if(section==='morning'){
-    body.appendChild(makeRingRow());
-    body.appendChild(makeLabel('해빗 현황'));
-    body.appendChild(makeHabitCard());
     body.appendChild(makeLabel('오늘 일정'));
     const sc=document.createElement('div');sc.className='schedule-card';
     sc.innerHTML='<div class="schedule-loading">일정 불러오는 중...</div>';
     body.appendChild(sc);
     makeScheduleCard('morning').then(function(card){sc.replaceWith(card);}).catch(function(){sc.innerHTML='<div class="schedule-loading">일정을 불러올 수 없어요</div>';});
+    body.appendChild(makeRingRow());
+    body.appendChild(makeLabel('해빗 현황'));
+    body.appendChild(makeHabitCard());
   } else if(section==='afternoon'){
     body.appendChild(makeRingRow());
     body.appendChild(makeLabel('클로드와 대화'));
@@ -1403,12 +1403,12 @@ async function callClaude(systemPrompt, messages, maxTokens){
     const res=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:maxTokens||600,system:systemPrompt,messages})
+      body:JSON.stringify({model:'claude-haiku-4-5',max_tokens:maxTokens||600,system:systemPrompt,messages})
     });
-    if(!res.ok)return null;
+    if(!res.ok){const err=await res.json().catch(()=>({error:{message:res.status}}));console.error('Claude API err:',err);return '__ERR__'+(err.error?.message||res.status);}
     const data=await res.json();
     return data.content&&data.content[0]&&data.content[0].text||null;
-  }catch(e){return null;}
+  }catch(e){console.error('Claude fetch err:',e);return null;}
 }
 
 // ─ 오늘 하루 데이터 요약 생성
@@ -1470,7 +1470,7 @@ async function _startHomeChatAI(){
   const loadingBub=_appendHomeChatBubble('생각하는 중...','ai loading');
   const reply=await callClaude(_homeChatSystemPrompt,[{role:'user',content:'대화 시작해줘'}],400);
   if(loadingBub)loadingBub.remove();
-  const text=reply||'잠깐 연결이 안 됐어요. 다시 시도해볼게요 🌿';
+  const text=reply?reply.startsWith('__ERR__')?'연결 오류: '+reply.slice(7)+' 🌿':reply:'잠깐 연결이 안 됐어요. 다시 시도해볼게요 🌿';
   _appendHomeChatBubble(text,'ai');
   _homeChatHistory.push({role:'user',content:'대화 시작해줘'},{role:'assistant',content:text});
 }
@@ -1487,7 +1487,7 @@ async function sendHomeChat(){
   const loadingBub=_appendHomeChatBubble('...','ai loading');
   const reply=await callClaude(_homeChatSystemPrompt,_homeChatHistory,500);
   if(loadingBub)loadingBub.remove();
-  const aiText=reply||'잠깐 연결이 안 됐어요 🌿';
+  const aiText=reply?reply.startsWith('__ERR__')?'연결 오류: '+reply.slice(7)+' 🌿':reply:'잠깐 연결이 안 됐어요 🌿';
   _appendHomeChatBubble(aiText,'ai');
   _homeChatHistory.push({role:'assistant',content:aiText});
 }
@@ -1578,8 +1578,9 @@ async function makeScheduleCard(section){
   const card=document.createElement('div');
   card.className='card m';
   const apiKey=S.get('gcal_api_key');
-  if(!apiKey){
-    card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">설정에서 Google Calendar API 키를 연결해보세요</div>';
+  const clientId=S.get('gcal_client_id');
+  if(!apiKey&&!clientId){
+    card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">설정 → Google Calendar에서 연결해보세요 📅</div>';
     return card;
   }
   try{
@@ -1595,7 +1596,17 @@ async function makeScheduleCard(section){
     }
     const url=`https://www.googleapis.com/calendar/v3/calendars/primary/events?key=${apiKey}&timeMin=${encodeURIComponent(tMin)}&timeMax=${encodeURIComponent(tMax)}&singleEvents=true&orderBy=startTime&maxResults=5`;
     const res=await fetch(url);
-    if(!res.ok)throw new Error('gcal_err');
+    if(!res.ok){
+      const errData=await res.json().catch(()=>({}));
+      console.error('GCal err:',res.status,errData);
+      // 401/403: API Key로 개인 캘린더 접근 불가 (OAuth 필요)
+      if(res.status===401||res.status===403){
+        card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">개인 캘린더는 OAuth 인증이 필요해요 — 추후 지원 예정 📅</div>';
+      } else {
+        card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">Calendar 연결 오류 ('+res.status+')</div>';
+      }
+      return card;
+    }
     const data=await res.json();
     const items=data.items||[];
     if(!items.length){
@@ -1604,18 +1615,14 @@ async function makeScheduleCard(section){
     }
     items.forEach(function(ev){
       const row=document.createElement('div');row.className='schedule-item';
-      const st=ev.start&&(ev.start.dateTime||ev.start.date);
       let timeStr='종일';
       if(ev.start&&ev.start.dateTime){const d=new Date(ev.start.dateTime);timeStr=(d.getHours()<12?'오전':'오후')+' '+(d.getHours()%12||12)+':'+(String(d.getMinutes()).padStart(2,'0'));}
       row.innerHTML='<div class="schedule-time">'+timeStr+'</div><div class="schedule-text">'+(ev.summary||'(제목 없음)')+'</div>';
       card.appendChild(row);
     });
   }catch(e){
-    if(e.message==='gcal_err'){
-      card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">Calendar 연결을 확인해주세요</div>';
-    } else {
-      card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">일정을 불러올 수 없어요</div>';
-    }
+    console.error('GCal fetch err:',e);
+    card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">일정을 불러올 수 없어요</div>';
   }
   return card;
 }
