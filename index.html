@@ -3405,6 +3405,7 @@ function saveGCalKeys(){
 }
 function clearGCalKeys(){
   localStorage.removeItem('gcal_api_key');
+  localStorage.removeItem('gcal_client_id');
   const ci=document.getElementById('gcal-client-id-inp');
   const ak=document.getElementById('gcal-api-key-inp');
   if(ci){ci.value='';ci.placeholder='xxxxx.apps.googleusercontent.com';}
@@ -3751,7 +3752,6 @@ async function initSync(){
   loadDaily();
 }
 setTimeout(initSync, 500);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
 
 </script>
 
