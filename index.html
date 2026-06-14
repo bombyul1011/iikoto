@@ -3715,22 +3715,27 @@ async function initSync(){
   window._restoring=true;
   var dates=[];
   for(var i=13;i>=0;i--){var d=new Date();d.setDate(d.getDate()-i);dates.push(dateKey(d));}
+  var uploadedDates={};
   // pending 있는 날짜는 Up 먼저 — 로컬 데이터 보호
   for(var i=0;i<dates.length;i++){
     var dk=dates[i];
+    var didUp=false;
     if(S.get(S.key('todos_pending',dk))){
       await syncTodosUp(dk);
       S.set(S.key('todos_pending',dk),false);
+      didUp=true;
     }
     if(S.get(S.key('memos_pending',dk))){
       await syncMemosUp(dk);
       S.set(S.key('memos_pending',dk),false);
+      didUp=true;
     }
+    if(didUp)uploadedDates[dk]=true;
   }
-  // pending 없는 날짜만 Supabase → 로컬 복원
+  // Up 하지 않은 날짜만 Supabase → 로컬 복원
   for(var i=0;i<dates.length;i++){
     var dk=dates[i];
-    await forceRestoreDate(dk);
+    if(!uploadedDates[dk])await forceRestoreDate(dk);
   }
   window._restoring=false;
   loadDaily();
