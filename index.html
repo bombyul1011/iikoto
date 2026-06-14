@@ -1229,13 +1229,13 @@ function renderHomeBody(section){
     body.appendChild(makeHabitCard());
   } else if(section==='afternoon'){
     body.appendChild(makeRingRow());
-    body.appendChild(makeLabel('클로드와 대화'));
-    body.appendChild(makeActionBtn('수다 떨까요? 💬','오늘 기록 바탕으로 대화 시작','rgba(100,195,185,0.80)',homeOpenChat));
     body.appendChild(makeLabel('일정 진행 상황'));
     const sc2=document.createElement('div');sc2.className='schedule-card';
     sc2.innerHTML='<div class="schedule-loading">불러오는 중...</div>';
     body.appendChild(sc2);
     makeScheduleCard('afternoon').then(function(card){sc2.replaceWith(card);}).catch(function(){sc2.innerHTML='<div class="schedule-loading">일정을 불러올 수 없어요</div>';});
+    body.appendChild(makeLabel('클로드와 대화'));
+    body.appendChild(makeActionBtn('수다 떨까요? 💬','오늘 기록 바탕으로 대화 시작','rgba(100,195,185,0.80)',homeOpenChat));
   } else {
     body.appendChild(makeRingRow());
     body.appendChild(makeLabel('하루 마감'));
@@ -1495,20 +1495,20 @@ async function sendHomeChat(){
 // ─ 수다 떨까요? (오후)
 function homeOpenChat(){
   const summary=buildTodaySummary();
-  const sys=`당신은 봄이의 친근한 일상 친구예요. 오늘 기록을 바탕으로 가볍고 따뜻하게 수다를 나눠요. 너무 길지 않게, 한두 문장 정도로 자연스럽게 대화해요. 존댓말 쓰지 말고 친근하게. 이모지 1-2개 정도 써도 좋아요.\n\n오늘 봄이 기록:\n${summary}`;
+  const sys=`당신은 따뜻하고 친근한 일상 친구예요. 오늘 기록을 바탕으로 가볍고 자연스럽게 대화를 시작해요. 한두 문장 정도로, 다정한 구어체 존댓말로. 이름 호칭 없이. 이모지 1-2개.\n\n오늘 기록:\n${summary}`;
   _openHomeChatModal('수다 떨까요? 💬',sys,null);
 }
 
 // ─ 오늘 어땠어? (밤)
 function homeOpenReview(){
   const summary=buildTodaySummary();
-  const sys=`당신은 봄이의 따뜻한 저녁 다이어리 친구예요. 오늘 하루 기록을 보고 공감해주고, 수고했다고 따뜻하게 말해줘요. 하루를 어떻게 보냈는지 물어봐도 좋아요. 짧고 진심 담긴 말투로, 이모지 1-2개 써도 좋아요.\n\n오늘 봄이 기록:\n${summary}`;
+  const sys=`당신은 따뜻한 저녁 일기 친구예요. 오늘 하루 기록을 보고 공감해주고 수고했다고 말해줘요. 다정한 구어체 존댓말, 이름 호칭 없이, 이모지 1-2개.\n\n오늘 기록:\n${summary}`;
   _openHomeChatModal('오늘 어땠어? 🌙',sys,null);
 }
 
 // ─ 콘텐츠 수다 (홈 카드 말풍선 버튼)
 function homeDiscuss(c){
-  const sys=`당신은 봄이와 책, 드라마, 영화, 음악 이야기를 나누는 수다 친구예요. 지금 봄이가 "${c.title}"(${CAT_LABELS[c.cat]||c.cat}) 얘기를 꺼냈어요. 자연스럽게 반응해주고 대화를 이어가요. 짧고 친근하게, 이모지 1개 정도 써도 좋아요.`;
+  const sys=`당신은 책, 드라마, 영화, 음악 이야기를 나누는 친근한 친구예요. 지금 "${c.title}"(${CAT_LABELS[c.cat]||c.cat}) 얘기가 나왔어요. 자연스럽게 반응하고 대화를 이어가요. 다정한 구어체 존댓말, 이름 호칭 없이, 이모지 1개.`;
   _openHomeChatModal(c.title+' 이야기 💬',sys,null);
 }
 
@@ -1708,9 +1708,10 @@ async function makeScheduleCard(section){
     ].filter(Boolean).join('\n');
 
     const sectionLabel={morning:'오전',afternoon:'오후',night:'저녁'};
-    const sys=`당신은 봄이의 하루 비서예요. ${sectionLabel[section]} 기준으로 ${dayLabel} 일정과 할일을 종합해서 **자연스러운 한 문단 브리핑**을 작성해요.
+    const sys=`당신은 따뜻한 하루 비서예요. ${sectionLabel[section]} 기준으로 ${dayLabel} 일정과 할일을 종합해서 **자연스러운 한 문단 브리핑**을 작성해요.
 - 캘린더 일정, 미완료 할일, 메모 맥락을 자연스럽게 엮어서
-- 따뜻하고 친근한 비서 말투 (존댓말)
+- 다정하고 자연스러운 구어체 존댓말
+- 이름 호칭 없음
 - 3-5문장 이내
 - 이모지 1-2개
 - 오직 브리핑 텍스트만 출력`;
@@ -1851,11 +1852,11 @@ async function fetchHomeWeather(section){
     calEvents.length?`오늘 남은 일정: ${calEvents.join(', ')}`:'오늘 남은 캘린더 일정 없음'
   ].filter(Boolean).join('\n');
 
-  const sys=`당신은 봄이의 아침 비서예요. 아래 오늘 데이터를 보고 ${sectionLabel[section]} 인사말을 **딱 1-2문장**으로 만들어요.
-- 날씨 정보 자연스럽게 포함
-- 오늘 일정/할일 맥락 반영해서 따뜻하게
+  const sys=`당신은 따뜻한 일상 비서예요. 아래 오늘 데이터를 보고 ${sectionLabel[section]} 인사말을 **딱 1-2문장**으로 만들어요.
+- 날씨와 오늘 분위기/감성 위주로만 써요 (일정 내용, 할일 목록은 절대 언급하지 말 것 — 아래 별도 카드에서 다룸)
+- 다정하고 자연스러운 구어체 존댓말
+- 이름 호칭 없음
 - 이모지 1-2개
-- 반말 금지, 존댓말
 - 오직 인사 문장만 출력, 다른 설명 없이`;
 
   if(subEl)subEl.textContent='잠깐만요...';
