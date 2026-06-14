@@ -2052,6 +2052,7 @@ async function makeWeeklySummaryCard(){
     ${topHabit&&topHabit[1]>0?`<div>→ 가장 많이 한 습관: <b>${topHabit[0]}</b></div>`:''}
   </div>`;
 
+  const key=getClaudeKey();
   if(!key) return fallbackHtml;
 
   // Claude에게 요약 요청
