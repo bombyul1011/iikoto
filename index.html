@@ -1847,17 +1847,19 @@ async function fetchHomeWeather(section){
     pendTodos.length?`미완료 할일: ${pendTodos.join(', ')}`:'',
     doneTodos.length?`완료한 할일: ${doneTodos.join(', ')}`:'',
     doneHabits.length?`완료한 습관: ${doneHabits.join(', ')}`:'',
-    memos.length?`오늘 메모: ${memos.slice(0,3).join(' / ')}`:'',
+    memos.length?`오늘 메모 (시간순, 가장 최근 것이 현재 상황): ${memos.slice(0,5).join(' / ')}`:'',
     sleep.sleep||sleep.wake?`수면: ${sleep.sleep||'?'} 취침 ${sleep.wake||'?'} 기상`:'',
     calEvents.length?`오늘 남은 일정: ${calEvents.join(', ')}`:'오늘 남은 캘린더 일정 없음'
   ].filter(Boolean).join('\n');
 
   const sys=`당신은 따뜻한 일상 비서예요. 아래 오늘 데이터를 보고 ${sectionLabel[section]} 인사말을 **딱 1-2문장**으로 만들어요.
-- 날씨와 오늘 분위기/감성 위주로만 써요 (일정 내용, 할일 목록은 절대 언급하지 말 것 — 아래 별도 카드에서 다룸)
-- 다정하고 자연스러운 구어체 존댓말
-- 이름 호칭 없음
+
+규칙:
+- 날씨와 지금 이 순간의 분위기/감성만 담아요. 일정·할일 내용은 절대 언급하지 말 것.
+- 메모에서 현재 상황(위치, 상태)을 파악해서 자연스럽게 반영해요. (예: 메모에 교토 도착이 언급되어 있으면 교토에 있다고 인식)
+- 반드시 존댓말. "너", "당신" 등 호칭 절대 사용 금지.
 - 이모지 1-2개
-- 오직 인사 문장만 출력, 다른 설명 없이`;
+- 오직 인사 문장만 출력`;
 
   if(subEl)subEl.textContent='잠깐만요...';
 
