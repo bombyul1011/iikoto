@@ -1468,8 +1468,20 @@ function renderHomeIconBar(section){
 const _HOME_DAYS=['일','월','화','수','목','금','토'];
 let _weatherCache=null,_weatherCacheTime=0,_selectedRoutine=null;
 let _gcalToken=null,_gcalTokenTime=0;
-let _scheduleCache=null,_scheduleCacheTime=0,_scheduleCacheSection='';
-let _greetingCache=null; // {text, subSection, fetchedAt}
+
+// sessionStorage 캐시 헬퍼
+function _ssGet(key){try{const v=sessionStorage.getItem(key);return v?JSON.parse(v):null;}catch(e){return null;}}
+function _ssSet(key,val){try{sessionStorage.setItem(key,JSON.stringify(val));}catch(e){}}
+
+// 앱 시작 시 sessionStorage에서 복원
+let _scheduleCache=null,_scheduleCacheSection='';
+let _greetingCache=null;
+(function(){
+  const sc=_ssGet('iikoto_schedule_cache');
+  if(sc){_scheduleCache=sc.html;_scheduleCacheSection=sc.subSection;}
+  const gc=_ssGet('iikoto_greeting_cache');
+  if(gc){_greetingCache=gc;}
+})();
 
 function getSubSection(){
   const h=new Date().getHours();
@@ -1912,7 +1924,8 @@ ${commonRules}`;
       p.style.cssText='font-size:13px;color:var(--tp);line-height:1.75;padding:4px 2px;';
       p.textContent=reply.trim();
       card.appendChild(p);
-      _scheduleCache=card.innerHTML;_scheduleCacheTime=Date.now();_scheduleCacheSection=subSec;
+      _scheduleCache=card.innerHTML;_scheduleCacheSection=subSec;
+      _ssSet('iikoto_schedule_cache',{html:_scheduleCache,subSection:subSec});
     } else {
       // 폴백: raw 목록
       if(!calLines.length){
@@ -2185,6 +2198,7 @@ async function fetchHomeWeather(section){
       const text=reply.trim();
       subEl.textContent=text;
       _greetingCache={text,subSection:subSec,fetchedAt:Date.now()};
+      _ssSet('iikoto_greeting_cache',_greetingCache);
     } else {
       const wStr=weather?weather.icon+' '+weather.temp+'° · ':'';
       const defaults={morning:wStr+'오늘 하루도 잘 부탁해요 🌿',afternoon:wStr+'오늘도 잘 해내고 있어요 ✨',night:wStr+'오늘 하루 고생 많았어요 🌙'};
@@ -2557,7 +2571,7 @@ function renderTodos(){
     const ts=t.timeSection||'none';
     const tsClass=ts!=='none'?` ts-${ts}`:'';
     const el=document.createElement('div');el.className='todo-item';
-    el.innerHTML=`<div class="chk${tsClass}${t.done?' on':''}" onclick="toggleTodo(${i})"></div><span class="todo-txt${t.done?' done':''}" onclick="openTodoSheet(${i})">${t.text}</span><div class="todo-swipe"><div class="tsw-btn tsw-edit" onclick="todoEditSwipe(${i})">수정</div><div class="tsw-btn tsw-del" onclick="todoDelSwipe(${i})">삭제</div></div>`;
+    el.innerHTML=`<div class="chk${tsClass}${t.done?' on':''}" onclick="toggleTodo(${i})"></div><span class="todo-txt${t.done?' done':''}" onclick="openTodoSheet(${i})">${t.text}</span>`;
     attachSwipe(el,()=>{_todoSwipeIdx=i;document.getElementById('todo-sheet-title').textContent=t.text;openSheet('todo-sheet');});
     list.appendChild(el);
   });
