@@ -141,7 +141,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 /* ── TODO ── */
 .todo-item{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--div);font-size:12.5px;color:var(--tp);position:relative;overflow:hidden;user-select:none;}
 .todo-item:last-of-type{border-bottom:none;}
-.todo-time-sel{display:flex;gap:6px;margin:10px 0 4px;}
+.weekly-review-banner{position:relative;border-radius:16px;padding:1.5px;background:linear-gradient(135deg,rgba(155,205,255,0.9),rgba(185,165,230,0.9),rgba(255,175,200,0.9),rgba(155,205,255,0.9));background-size:300% 300%;animation:bannerShine 4s ease infinite;cursor:pointer;margin-bottom:2px;}
+.weekly-review-banner-inner{border-radius:14.5px;background:linear-gradient(135deg,rgba(245,240,255,0.96),rgba(240,248,255,0.96));padding:16px 18px;}
+[data-theme="dark"] .weekly-review-banner-inner{background:linear-gradient(135deg,rgba(40,35,60,0.97),rgba(30,40,60,0.97));}
+.weekly-review-banner-title{font-size:13px;font-weight:600;color:rgba(120,100,180,0.95);letter-spacing:0.04em;margin-bottom:4px;}
+[data-theme="dark"] .weekly-review-banner-title{color:rgba(200,160,255,0.95);}
+.weekly-review-banner-sub{font-size:11.5px;color:var(--tm);display:flex;align-items:center;justify-content:space-between;}
+@keyframes bannerShine{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
 .todo-time-sel button{flex:1;padding:6px 0;border-radius:10px;border:1px solid var(--card-b);background:var(--card);font-size:11.5px;color:var(--tm);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;}
 .todo-time-sel button.active{font-weight:600;}
 .todo-time-sel button.ts-morning.active{background:rgba(250,215,100,0.22);border-color:rgba(250,215,100,0.55);color:rgba(180,140,0,0.9);}
@@ -957,6 +963,17 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   </div>
 </div>
 
+<!-- WEEKLY REVIEW SHEET -->
+<div class="overlay" id="weekly-review-sheet" onclick="closeSheet('weekly-review-sheet',event)">
+  <div class="bsheet" style="max-height:82vh;overflow-y:auto;" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div style="padding:0 20px 20px;">
+      <div style="font-size:13px;font-weight:600;color:rgba(80,140,200,0.9);text-align:center;margin-bottom:16px;letter-spacing:0.04em;">✦ 이번주 돌아보기 ✦</div>
+      <div id="weekly-review-content" style="font-size:13px;color:var(--tp);line-height:1.9;"></div>
+    </div>
+  </div>
+</div>
+
 <!-- TIME MODAL -->
 <div class="modal-ov" id="time-modal" onclick="closeModal('time-modal',event)">
   <div class="modal">
@@ -1282,21 +1299,14 @@ function renderHomeBody(section){
     // 일요일 저녁 — 링 대신 주간 요약 (당일 캐시)
     if(isSunday){
       body.appendChild(makeLabel('✦ 이번 주 돌아보기'));
-      const cacheKey='weekly_summary_'+dateKey(new Date());
-      const cached=S.get(cacheKey);
-      const wsum2=document.createElement('div');
-      wsum2.style.cssText='background:rgba(155,205,255,0.18);border:1px solid rgba(155,205,255,0.45);border-radius:16px;padding:18px 17px;';
-      if(cached){
-        wsum2.innerHTML=cached;
-        body.appendChild(wsum2);
-      } else {
-        wsum2.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">한 주 요약 작성 중...</div>';
-        body.appendChild(wsum2);
-        makeWeeklySummaryCard().then(function(html){
-          S.set(cacheKey, html);
-          wsum2.innerHTML=html;
-        });
-      }
+      const banner=document.createElement('div');
+      banner.className='weekly-review-banner';
+      banner.innerHTML=`<div class="weekly-review-banner-inner">
+        <div class="weekly-review-banner-title">✦ 이번주 돌아보기 ✦</div>
+        <div class="weekly-review-banner-sub"><span>지난 한주간의 나는 어땠을까요?</span><span style="font-size:16px;opacity:0.6;">›</span></div>
+      </div>`;
+      banner.addEventListener('click',openWeeklyReviewSheet);
+      body.appendChild(banner);
     } else {
       body.appendChild(makeRingRow());
     }
@@ -1921,6 +1931,22 @@ ${commonRules}`;
     card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">일정을 불러올 수 없어요</div>';
   }
   return card;
+}
+function openWeeklyReviewSheet(){
+  const sheet=document.getElementById('weekly-review-sheet');
+  const content=document.getElementById('weekly-review-content');
+  const cacheKey='weekly_summary_'+dateKey(new Date());
+  const cached=S.get(cacheKey);
+  openSheet('weekly-review-sheet');
+  if(cached){
+    content.innerHTML=cached;
+  } else {
+    content.innerHTML='<div style="text-align:center;color:var(--tm);padding:20px 0;">한 주 요약 작성 중이에요... 🌿</div>';
+    makeWeeklySummaryCard().then(function(html){
+      S.set(cacheKey,html);
+      content.innerHTML=html;
+    });
+  }
 }
 function homeOpenCalendar(){
   openSettings();
@@ -2564,7 +2590,7 @@ function confirmTodo(){
   _todoSubmitting=true;
   const dk=dateKey(currentDate),todos=getTodos(dk);
   const modal=document.getElementById('todo-modal');
-  const editIdx=modal.dataset.editIdx&&modal.dataset.editIdx!==''?parseInt(modal.dataset.editIdx)||(-1):-1;
+  const editIdx=modal.dataset.editIdx!==''&&modal.dataset.editIdx!=null?parseInt(modal.dataset.editIdx):-1;
   const timeSection=modal.dataset.timeSection||'none';
   if(editIdx>=0&&todos[editIdx]){todos[editIdx].text=text;todos[editIdx].timeSection=timeSection;}
   else todos.push({text,done:false,created:Date.now(),timeSection});
@@ -3599,7 +3625,7 @@ async function forceRestoreDate(dk){
   }
   var trows=await supaFetch('todos?date_key=eq.'+dk+'&order=created');
   if(trows&&trows.length>0){
-    S.set(S.key('todos',dk),trows.map(function(r){return {text:r.text,done:r.done,created:r.created,sort_order:r.sort_order||0};}));
+    S.set(S.key('todos',dk),trows.map(function(r){return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none'};}));
   }
   var srows=await supaFetch('sleep?date_key=eq.'+dk);
   if(srows&&srows.length>0){
@@ -3652,10 +3678,22 @@ async function initSync(){
   window._restoring=true;
   var dates=[];
   for(var i=13;i>=0;i--){var d=new Date();d.setDate(d.getDate()-i);dates.push(dateKey(d));}
+  // pending 있는 날짜는 Up 먼저 — 로컬 데이터 보호
   for(var i=0;i<dates.length;i++){
-    await forceRestoreDate(dates[i]);
-    S.set(S.key('todos_pending',dates[i]),false);
-    S.set(S.key('memos_pending',dates[i]),false);
+    var dk=dates[i];
+    if(S.get(S.key('todos_pending',dk))){
+      await syncTodosUp(dk);
+      S.set(S.key('todos_pending',dk),false);
+    }
+    if(S.get(S.key('memos_pending',dk))){
+      await syncMemosUp(dk);
+      S.set(S.key('memos_pending',dk),false);
+    }
+  }
+  // pending 없는 날짜만 Supabase → 로컬 복원
+  for(var i=0;i<dates.length;i++){
+    var dk=dates[i];
+    await forceRestoreDate(dk);
   }
   window._restoring=false;
   loadDaily();
