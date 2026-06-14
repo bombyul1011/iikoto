@@ -1134,6 +1134,17 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           </button>
         </div>
         <div class="settings-item" style="flex-direction:column;align-items:flex-start;gap:8px;">
+          <span class="settings-item-lbl">나에 대해</span>
+          <textarea id="user-profile-inp" class="modal-inp"
+            placeholder="예: DR = 디지털 리마스터링 영상 편집 업무&#10;직업 정보는 약어·용어 이해에만 활용하고, 대화에서 직업 언급은 하지 말 것"
+            style="margin-bottom:0;font-size:12.5px;width:100%;min-height:90px;resize:vertical;line-height:1.6;"
+            autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
+          <button onclick="saveUserProfile()"
+            style="width:100%;padding:9px;border-radius:10px;border:none;background:var(--acc-soft);color:var(--acc);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">
+            저장
+          </button>
+        </div>
+        <div class="settings-item" style="flex-direction:column;align-items:flex-start;gap:8px;">
           <span class="settings-item-lbl">관심 뉴스 분야</span>
           <input type="text" class="modal-inp" id="news-interests-inp"
             placeholder="예: 건강, 라이프스타일, IT"
@@ -1625,14 +1636,18 @@ async function sendHomeChat(){
 // ─ 수다 떨까요? (오후)
 function homeOpenChat(){
   const summary=buildTodaySummary();
-  const sys=`당신은 따뜻하고 친근한 일상 비서예요. 아래 오늘 기록을 정확히 읽고 파악한 뒤, 그 내용을 바탕으로 가볍고 자연스럽게 대화를 시작해요. 메모에 시간이 표기된 경우 언제 있었던 일인지 맥락을 파악해요. 할일의 [오전/오후/저녁] 태그도 시간대 맥락으로 활용해요. 한두 문장 정도로. 이름 호칭 없이. 이모지 1-2개. 반드시 ~해요, ~이에요, ~어요 체 존댓말만 사용. 반말 절대 금지.\n\n오늘 기록:\n${summary}`;
+  const profile=S.get('user_profile');
+  const profileSection=profile?`\n\n[사용자 정보]\n${profile}`:'';
+  const sys=`당신은 따뜻하고 친근한 일상 비서예요. 아래 오늘 기록을 정확히 읽고 파악한 뒤, 그 내용을 바탕으로 가볍고 자연스럽게 대화를 시작해요. 메모에 시간이 표기된 경우 언제 있었던 일인지 맥락을 파악해요. 할일의 [오전/오후/저녁] 태그도 시간대 맥락으로 활용해요. 한두 문장 정도로. 이름 호칭 없이. 이모지 1-2개. 반드시 ~해요, ~이에요, ~어요 체 존댓말만 사용. 반말 절대 금지.${profileSection}\n\n오늘 기록:\n${summary}`;
   _openHomeChatModal('수다 떨까요? 💬',sys,null);
 }
 
 // ─ 오늘 어땠어? (밤)
 function homeOpenReview(){
   const summary=buildTodaySummary();
-  const sys=`당신은 따뜻한 저녁 일기 친구예요. 아래 오늘 기록을 정확히 읽고 파악한 뒤, 하루를 공감하며 수고했다고 말해줘요. 메모에 시간이 표기된 경우 언제 있었던 일인지 맥락을 파악해요. 할일의 [오전/오후/저녁] 태그도 하루 흐름 파악에 활용해요. 이름 호칭 없이, 이모지 1-2개. 반드시 ~해요, ~이에요, ~어요 체 존댓말만 사용. 반말 절대 금지.\n\n오늘 기록:\n${summary}`;
+  const profile=S.get('user_profile');
+  const profileSection=profile?`\n\n[사용자 정보]\n${profile}`:'';
+  const sys=`당신은 따뜻한 저녁 일기 친구예요. 아래 오늘 기록을 정확히 읽고 파악한 뒤, 하루를 공감하며 수고했다고 말해줘요. 메모에 시간이 표기된 경우 언제 있었던 일인지 맥락을 파악해요. 할일의 [오전/오후/저녁] 태그도 하루 흐름 파악에 활용해요. 이름 호칭 없이, 이모지 1-2개. 반드시 ~해요, ~이에요, ~어요 체 존댓말만 사용. 반말 절대 금지.${profileSection}\n\n오늘 기록:\n${summary}`;
   _openHomeChatModal('오늘 어땠어요? 🌙',sys,null);
 }
 
@@ -3412,6 +3427,13 @@ function clearGCalKeys(){
   if(ak){ak.value='';ak.placeholder='AIza...';}
   showToast('삭제됐어요');
 }
+function saveUserProfile(){
+  const inp=document.getElementById('user-profile-inp');
+  if(!inp)return;
+  const val=inp.value.trim();
+  if(val){S.set('user_profile',val);showToast('저장됐어요 ✅');}
+  else{S.remove('user_profile');showToast('삭제됐어요');}
+}
 function saveNewsInterests(){
   const inp=document.getElementById('news-interests-inp');
   if(!inp)return;
@@ -3440,6 +3462,7 @@ function openSettings(){
   if(ai){const v=S.get('gcal_api_key');ai.value='';ai.placeholder=v?'저장됨 (••••'+String(v).slice(-6)+')':'AIza...';}
   const keyInp=document.getElementById('claude-api-key-inp');
   if(keyInp){const k=S.get('claude_api_key');keyInp.value=k?'••••••••••••'+k.slice(-4):'';}  const newsInp=document.getElementById('news-interests-inp');if(newsInp)newsInp.value=S.get('news_interests')||'';
+  const profileInp=document.getElementById('user-profile-inp');if(profileInp)profileInp.value=S.get('user_profile')||'';
   const gcalCi=document.getElementById('gcal-client-id-inp');if(gcalCi){const v=S.get('gcal_client_id');gcalCi.value=v?'••••••••'+v.slice(-6):'';}
   const gcalAk=document.getElementById('gcal-api-key-inp');if(gcalAk){const v=S.get('gcal_api_key');gcalAk.value=v?'••••••••'+v.slice(-6):'';}
   const theme=S.get('theme')||'light';
