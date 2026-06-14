@@ -1767,32 +1767,112 @@ async function makeScheduleCard(section){
 
     // 오늘 데이터 수집
     const dk=dateKey(now);
-    const wk=weekKey(now);
-    const dow=(now.getDay()+6)%7;
     const todos=getTodos(dk);
-    const pendTodos=todos.filter(t=>!t.done).map(t=>t.text);
-    const memos=getMemos(dk).map(m=>m.text).filter(Boolean);
+    const currentHour=now.getHours();
+
+    // 투두 시간대별 분류
+    const bySection=(ts)=>todos.filter(t=>t.timeSection===ts);
+    const morningTodos=bySection('morning');
+    const afternoonTodos=bySection('afternoon');
+    const nightTodos=bySection('night');
+    const noneTodos=bySection('none').concat(todos.filter(t=>!t.timeSection));
+
+    const todoLine=(arr,label)=>{
+      const done=arr.filter(t=>t.done).map(t=>t.text);
+      const pend=arr.filter(t=>!t.done).map(t=>t.text);
+      const parts=[];
+      if(pend.length)parts.push(`미완료: ${pend.join(', ')}`);
+      if(done.length)parts.push(`완료: ${done.join(', ')}`);
+      return parts.length?`${label} 할일 — ${parts.join(' / ')}`:null;
+    };
+
+    const memos=getMemos(dk);
+    const memoLines=memos.map(m=>{
+      const t=m.time?m.time:'';
+      return t?`[${t}] ${m.text}`:m.text;
+    }).filter(Boolean);
+
     const sleep=getSleep(dk);
     const weather=_homeWeatherCache;
 
-    const dataContext=[
-      weather?`날씨: ${weather.icon} ${weather.temp}도`:'',
-      calLines.length?`${dayLabel} 일정:\n${calLines.join('\n')}`:`${dayLabel} 캘린더 일정 없음`,
-      pendTodos.length?`미완료 할일: ${pendTodos.join(', ')}`:'할일 없음',
-      memos.length?`오늘 메모: ${memos.slice(0,3).join(' / ')}`:'',
-      sleep.wake?`기상: ${sleep.wake}`:''
-    ].filter(Boolean).join('\n');
+    // 섹션별 시스템 프롬프트 + dataContext
+    let sys='';
+    let dataContext='';
 
-    const sectionLabel={morning:'오전',afternoon:'오후',night:'저녁'};
-    const sys=`당신은 따뜻한 하루 비서예요. ${sectionLabel[section]} 기준으로 ${dayLabel} 일정과 할일을 종합해서 **자연스러운 한 문단 브리핑**을 작성해요.
-- 캘린더 일정, 미완료 할일, 메모 맥락을 자연스럽게 엮어서
+    const commonRules=`규칙:
 - 다정하고 자연스러운 구어체 존댓말
 - 이름 호칭 없음
-- 3-5문장 이내
 - 이모지 1-2개
-- 오직 브리핑 텍스트만 출력`;
+- 오직 브리핑 텍스트만 출력
+- 없는 정보는 억지로 언급하지 않기`;
 
-    const reply=await callClaude(sys,[{role:'user',content:dataContext}],250);
+    if(section==='morning'){
+      sys=`당신은 따뜻한 하루 비서예요. 오전 일정 브리핑을 작성해요.
+오늘 하루 전체 흐름을 파악하되, 오전 할일을 중심으로 안내해요.
+오후/저녁 캘린더 일정이 있으면 미리 언급해 준비를 도와요.
+메모가 있으면 현재 상황 파악에 활용해요.
+3-5문장 이내.
+${commonRules}`;
+      dataContext=[
+        weather?`날씨: ${weather.icon} ${weather.temp}도`:'',
+        sleep.wake?`기상: ${sleep.wake}`:'',
+        calLines.length?`오늘 캘린더 일정 (전체):\n${calLines.join('\n')}`:'캘린더 일정 없음',
+        todoLine(morningTodos,'오전'),
+        todoLine(afternoonTodos,'오후'),
+        todoLine(noneTodos,'시간지정없음'),
+        memoLines.length?`오늘 메모 (시간순):\n${memoLines.slice(0,5).join('\n')}`:''
+      ].filter(Boolean).join('\n');
+
+    } else if(section==='afternoon'){
+      // 오후 브리핑 1 (12-16시) vs 브리핑 2 (16시 이후)
+      const isLateAfternoon=currentHour>=16;
+      if(!isLateAfternoon){
+        sys=`당신은 따뜻한 하루 비서예요. 오후 브리핑을 작성해요.
+오전이 어떻게 흘렀는지 메모와 완료된 할일로 파악하고 공감해요.
+오전에 못 마친 일이 있으면 자연스럽게 짚어줘요.
+남은 오후 할일과 캘린더 일정을 안내해요.
+3-5문장 이내.
+${commonRules}`;
+      } else {
+        sys=`당신은 따뜻한 하루 비서예요. 늦은 오후 브리핑을 작성해요.
+하루가 많이 지났으니 아직 못 한 일들을 부드럽게 체크해줘요.
+저녁 할일도 함께 파악해서 남은 시간 계획을 도와요.
+메모에서 지금 컨디션/상황을 읽어 공감해요.
+3-5문장 이내.
+${commonRules}`;
+      }
+      dataContext=[
+        weather?`날씨: ${weather.icon} ${weather.temp}도`:'',
+        `현재 시각: ${currentHour}시`,
+        calLines.length?`오늘 캘린더 일정:\n${calLines.join('\n')}`:'캘린더 일정 없음',
+        todoLine(morningTodos,'오전'),
+        todoLine(afternoonTodos,'오후'),
+        isLateAfternoon?todoLine(nightTodos,'저녁'):null,
+        todoLine(noneTodos,'시간지정없음'),
+        memoLines.length?`오늘 메모 (시간순):\n${memoLines.slice(0,6).join('\n')}`:''
+      ].filter(Boolean).join('\n');
+
+    } else {
+      // 저녁: 오늘 짧은 정리 + 내일 브리핑
+      sys=`당신은 따뜻한 하루 비서예요. 저녁 브리핑을 두 파트로 작성해요.
+[파트1] 오늘 하루를 2-3문장으로 따뜻하게 정리 (완료한 일, 메모 기반 흐름, 수고했다는 말)
+[파트2] 내일 캘린더 일정과 내일 할일을 자연스럽게 안내
+파트 구분 없이 자연스럽게 이어지는 한 단락으로.
+전체 5-7문장.
+${commonRules}`;
+      dataContext=[
+        weather?`날씨: ${weather.icon} ${weather.temp}도`:'',
+        calLines.length?`내일 캘린더 일정:\n${calLines.join('\n')}`:'내일 캘린더 일정 없음',
+        todoLine(morningTodos,'오늘 오전'),
+        todoLine(afternoonTodos,'오늘 오후'),
+        todoLine(nightTodos,'오늘 저녁'),
+        todoLine(noneTodos,'오늘 시간지정없음'),
+        memoLines.length?`오늘 메모 (시간순):\n${memoLines.slice(0,6).join('\n')}`:''
+      ].filter(Boolean).join('\n');
+    }
+
+    const maxTok=section==='night'?350:250;
+    const reply=await callClaude(sys,[{role:'user',content:dataContext}],maxTok);
     card.innerHTML='';
 
     if(reply&&!reply.startsWith('__ERR__')){
