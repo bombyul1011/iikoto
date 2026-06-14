@@ -1524,11 +1524,15 @@ async function callClaude(systemPrompt, messages, maxTokens){
   const key=getClaudeKey();
   if(!key){return null;}
   try{
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),30000);
     const res=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
+      signal:controller.signal,
       headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
       body:JSON.stringify({model:'claude-haiku-4-5',max_tokens:maxTokens||600,system:systemPrompt,messages})
     });
+    clearTimeout(timer);
     if(!res.ok){const err=await res.json().catch(()=>({error:{message:res.status}}));console.error('Claude API err:',err);return '__ERR__'+(err.error?.message||res.status);}
     const data=await res.json();
     return data.content&&data.content[0]&&data.content[0].text||null;
@@ -1977,10 +1981,14 @@ function openWeeklyReviewSheet(){
   if(cached){
     content.innerHTML=cached;
   } else {
-    content.innerHTML='<div style="text-align:center;color:var(--tm);padding:20px 0;">한 주 요약 작성 중이에요... 🌿</div>';
+    content.innerHTML='<div style="text-align:center;color:var(--tm);padding:20px 0;">한 주 요약 작성 중이에요... 🌿<br><span style="font-size:11.5px;opacity:0.7;">약 10-20초 소요돼요</span></div>';
     makeWeeklySummaryCard().then(function(html){
-      S.set(cacheKey,html);
-      content.innerHTML=html;
+      if(html&&!html.includes('__ERR__')){
+        S.set(cacheKey,html);
+        content.innerHTML=html;
+      } else {
+        content.innerHTML='<div style="text-align:center;color:var(--tm);padding:20px 0;">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:11.5px;opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
+      }
     });
   }
 }
