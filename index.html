@@ -656,6 +656,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="dark"] .home-btn,[data-theme="dark"] .home-content-item,[data-theme="dark"] .home-icon-btn{background:rgba(255,255,255,0.06);border-color:rgba(255,255,255,0.10);}
 [data-theme="dark"] .home-icon-bar{border-top-color:rgba(255,255,255,0.08);}
 
+/* ── HOME CHAT BUBBLES ── */
+.hchat-bubble{max-width:82%;padding:9px 13px;border-radius:16px;font-size:13px;line-height:1.6;word-break:break-word;}
+.hchat-bubble.user{background:var(--acc);color:#fff;align-self:flex-end;border-bottom-right-radius:5px;}
+.hchat-bubble.ai{background:var(--card);border:1px solid var(--card-b);color:var(--tp);align-self:flex-start;border-bottom-left-radius:5px;}
+.hchat-bubble.ai.loading{color:var(--tm);font-style:italic;}
+[data-theme="dark"] .hchat-bubble.ai{background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.13);}
+
 /* ── 일정 카드 */
 .schedule-card{background:var(--card);border:1px solid var(--card-b);border-radius:18px;padding:16px 16px;margin-bottom:10px;min-height:unset;}
 .schedule-loading{font-size:12px;color:var(--tm);text-align:center;padding:12px 0;}
@@ -861,6 +868,21 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <button class="mbtn cancel" onclick="closeModal('routine-modal')">취소</button>
         <button class="mbtn ok" onclick="applyRoutine()">습관에 반영</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- CLAUDE CHAT MODAL -->
+<div class="modal-ov" id="home-chat-modal" onclick="closeModal('home-chat-modal',event)">
+  <div class="modal" style="max-width:380px;max-height:88vh;display:flex;flex-direction:column;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-shrink:0;">
+      <div class="modal-title" style="margin-bottom:0;" id="home-chat-modal-title">수다 떨까요? 💬</div>
+      <div onclick="closeModal('home-chat-modal')" style="cursor:pointer;color:var(--tm);font-size:20px;line-height:1;">×</div>
+    </div>
+    <div id="home-chat-messages" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px;margin-bottom:12px;min-height:200px;max-height:52vh;padding-right:2px;"></div>
+    <div style="display:flex;gap:8px;flex-shrink:0;">
+      <input id="home-chat-inp" class="modal-inp" style="flex:1;margin-bottom:0;" placeholder="메시지 입력..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendHomeChat();}">
+      <button onclick="sendHomeChat()" style="flex-shrink:0;background:var(--acc);color:#fff;border:none;border-radius:12px;padding:0 16px;font-size:13px;cursor:pointer;">보내기</button>
     </div>
   </div>
 </div>
@@ -1198,8 +1220,6 @@ function renderHomeBody(section){
   body.innerHTML='';
   if(section==='morning'){
     body.appendChild(makeRingRow());
-    body.appendChild(makeLabel('바로가기'));
-    body.appendChild(makeGrid([makeBtnCard('📰','오늘 뉴스','Claude 요약',homeOpenNews)]));
     body.appendChild(makeLabel('해빗 현황'));
     body.appendChild(makeHabitCard());
     body.appendChild(makeLabel('오늘 일정'));
@@ -1373,19 +1393,237 @@ let _scheduleCache=null,_scheduleCacheTime=0,_scheduleCacheSection='';
 
 
 // ── HOME ACTION FUNCTIONS
-function homeOpenNews(){showToast('준비 중이에요 🌿');}
-function homeOpenChat(){showToast('준비 중이에요 🌿');}
-function homeOpenReview(){showToast('준비 중이에요 🌿');}
-function homeOpenRoutine(){showToast('준비 중이에요 🌿');}
-function homeOpenCalendar(){showToast('준비 중이에요 🌿');}
-function homeDiscuss(c){showToast(c.title+' 이야기할게요 🌿');}
-function fetchHomeWeather(section){} // 추후 연동 예정
+
+// ─ Claude API 유틸
+function getClaudeKey(){return S.get('claude_api_key')||'';}
+async function callClaude(systemPrompt, messages, maxTokens){
+  const key=getClaudeKey();
+  if(!key){return null;}
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:maxTokens||600,system:systemPrompt,messages})
+    });
+    if(!res.ok)return null;
+    const data=await res.json();
+    return data.content&&data.content[0]&&data.content[0].text||null;
+  }catch(e){return null;}
+}
+
+// ─ 오늘 하루 데이터 요약 생성
+function buildTodaySummary(){
+  const now=new Date(),dk=dateKey(now),wk=weekKey(now),mk=monthKey(now);
+  const todos=getTodos(dk);
+  const doneTodos=todos.filter(t=>t.done).map(t=>t.text);
+  const pendTodos=todos.filter(t=>!t.done).map(t=>t.text);
+  const memos=getMemos(dk).map(m=>m.text).filter(Boolean);
+  const sleep=getSleep(dk);
+  const habits=getHabits();
+  const checks=getHabitChecks(wk);
+  const dow=(now.getDay()+6)%7;
+  const doneHabits=habits.filter(h=>checks[h.name+'-'+dow]).map(h=>h.name);
+  const contents=getContents(mk).slice(-3).map(c=>(CAT_LABELS[c.cat]||c.cat)+' '+c.title);
+  const lines=[];
+  if(sleep.sleep||sleep.wake)lines.push(`수면: ${sleep.sleep||'?'} 취침, ${sleep.wake||'?'} 기상`);
+  if(doneTodos.length)lines.push(`완료한 할일: ${doneTodos.join(', ')}`);
+  if(pendTodos.length)lines.push(`남은 할일: ${pendTodos.join(', ')}`);
+  if(doneHabits.length)lines.push(`완료한 습관: ${doneHabits.join(', ')}`);
+  if(memos.length)lines.push(`오늘 메모: ${memos.slice(0,3).join(' / ')}`);
+  if(contents.length)lines.push(`최근 콘텐츠: ${contents.join(', ')}`);
+  return lines.length?lines.join('\n'):'기록된 데이터가 없어요.';
+}
+
+// ─ 채팅 모달 공용 열기
+let _homeChatHistory=[];
+let _homeChatSystemPrompt='';
+function _openHomeChatModal(title,systemPrompt,firstMsg){
+  _homeChatHistory=[];
+  _homeChatSystemPrompt=systemPrompt;
+  const titleEl=document.getElementById('home-chat-modal-title');
+  if(titleEl)titleEl.textContent=title;
+  const msgBox=document.getElementById('home-chat-messages');
+  if(msgBox)msgBox.innerHTML='';
+  const inp=document.getElementById('home-chat-inp');
+  if(inp){inp.value='';inp.placeholder='메시지 입력...';}
+  openModal('home-chat-modal');
+  if(firstMsg){
+    _appendHomeChatBubble(firstMsg,'ai');
+    _homeChatHistory.push({role:'assistant',content:firstMsg});
+  } else {
+    _startHomeChatAI();
+  }
+}
+function _appendHomeChatBubble(text,role){
+  const box=document.getElementById('home-chat-messages');
+  if(!box)return null;
+  const b=document.createElement('div');
+  b.className='hchat-bubble '+role;
+  b.textContent=text;
+  box.appendChild(b);
+  box.scrollTop=box.scrollHeight;
+  return b;
+}
+async function _startHomeChatAI(){
+  const key=getClaudeKey();
+  if(!key){_appendHomeChatBubble('Claude API 키가 없어요. 설정에서 입력해주세요 🌿','ai');return;}
+  const loadingBub=_appendHomeChatBubble('생각하는 중...','ai loading');
+  const reply=await callClaude(_homeChatSystemPrompt,[{role:'user',content:'대화 시작해줘'}],400);
+  if(loadingBub)loadingBub.remove();
+  const text=reply||'잠깐 연결이 안 됐어요. 다시 시도해볼게요 🌿';
+  _appendHomeChatBubble(text,'ai');
+  _homeChatHistory.push({role:'user',content:'대화 시작해줘'},{role:'assistant',content:text});
+}
+async function sendHomeChat(){
+  const inp=document.getElementById('home-chat-inp');
+  if(!inp)return;
+  const text=inp.value.trim();
+  if(!text)return;
+  inp.value='';
+  _appendHomeChatBubble(text,'user');
+  _homeChatHistory.push({role:'user',content:text});
+  const key=getClaudeKey();
+  if(!key){_appendHomeChatBubble('Claude API 키가 없어요 🌿','ai');return;}
+  const loadingBub=_appendHomeChatBubble('...','ai loading');
+  const reply=await callClaude(_homeChatSystemPrompt,_homeChatHistory,500);
+  if(loadingBub)loadingBub.remove();
+  const aiText=reply||'잠깐 연결이 안 됐어요 🌿';
+  _appendHomeChatBubble(aiText,'ai');
+  _homeChatHistory.push({role:'assistant',content:aiText});
+}
+
+// ─ 수다 떨까요? (오후)
+function homeOpenChat(){
+  const summary=buildTodaySummary();
+  const sys=`당신은 봄이의 친근한 일상 친구예요. 오늘 기록을 바탕으로 가볍고 따뜻하게 수다를 나눠요. 너무 길지 않게, 한두 문장 정도로 자연스럽게 대화해요. 존댓말 쓰지 말고 친근하게. 이모지 1-2개 정도 써도 좋아요.\n\n오늘 봄이 기록:\n${summary}`;
+  _openHomeChatModal('수다 떨까요? 💬',sys,null);
+}
+
+// ─ 오늘 어땠어? (밤)
+function homeOpenReview(){
+  const summary=buildTodaySummary();
+  const sys=`당신은 봄이의 따뜻한 저녁 다이어리 친구예요. 오늘 하루 기록을 보고 공감해주고, 수고했다고 따뜻하게 말해줘요. 하루를 어떻게 보냈는지 물어봐도 좋아요. 짧고 진심 담긴 말투로, 이모지 1-2개 써도 좋아요.\n\n오늘 봄이 기록:\n${summary}`;
+  _openHomeChatModal('오늘 어땠어? 🌙',sys,null);
+}
+
+// ─ 콘텐츠 수다 (홈 카드 말풍선 버튼)
+function homeDiscuss(c){
+  const sys=`당신은 봄이와 책, 드라마, 영화, 음악 이야기를 나누는 수다 친구예요. 지금 봄이가 "${c.title}"(${CAT_LABELS[c.cat]||c.cat}) 얘기를 꺼냈어요. 자연스럽게 반응해주고 대화를 이어가요. 짧고 친근하게, 이모지 1개 정도 써도 좋아요.`;
+  _openHomeChatModal(c.title+' 이야기 💬',sys,null);
+}
+
+// ─ 주간 루틴 제안
+async function homeOpenRoutine(){
+  const key=getClaudeKey();
+  if(!key){showToast('설정에서 Claude API 키를 입력해주세요 🌿');return;}
+  openModal('routine-modal');
+  const cards=document.getElementById('routine-cards');
+  const loadEl=document.getElementById('routine-loading');
+  const selEl=document.getElementById('routine-selected');
+  if(cards)cards.innerHTML='';
+  if(loadEl)loadEl.style.display='block';
+  if(selEl)selEl.style.display='none';
+  _selectedRoutine=null;
+  const habits=getHabits().map(h=>h.name);
+  const summary=buildTodaySummary();
+  const sys='당신은 생활 루틴 코치예요. JSON 배열만 반환하세요. 다른 텍스트 없이 오직 JSON만.';
+  const userMsg=`현재 습관: ${habits.length?habits.join(', '):'없음'}\n최근 기록: ${summary}\n\n위 정보를 바탕으로 추가하면 좋을 주간 루틴 3가지를 제안해줘. 반드시 아래 JSON 형식만 반환해:\n[{"icon":"🌱","title":"루틴명","desc":"짧은설명","days":"월·수·금"},{"icon":"💧","title":"루틴명","desc":"짧은설명","days":"매일"},{"icon":"📖","title":"루틴명","desc":"짧은설명","days":"주말"}]`;
+  const reply=await callClaude(sys,[{role:'user',content:userMsg}],500);
+  if(loadEl)loadEl.style.display='none';
+  if(!reply){
+    if(cards)cards.innerHTML='<div style="font-size:12px;color:var(--tm);text-align:center;padding:12px 0;">연결에 실패했어요. 다시 시도해주세요 🌿</div>';
+    return;
+  }
+  let routines=[];
+  try{
+    const m=reply.match(/\[[\s\S]*\]/);
+    if(m)routines=JSON.parse(m[0]);
+  }catch(e){
+    if(cards)cards.innerHTML='<div style="font-size:12px;color:var(--tm);text-align:center;padding:12px 0;">응답을 파싱할 수 없어요 🌿</div>';
+    return;
+  }
+  if(!cards)return;
+  routines.forEach(function(r,i){
+    const card=document.createElement('div');
+    card.className='routine-card';
+    card.innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><span style="font-size:20px;">${r.icon||'✦'}</span><div style="flex:1;"><div style="font-size:13.5px;font-weight:500;color:var(--tp);">${r.title}</div><div style="font-size:11px;color:var(--tm);margin-top:2px;">${r.days||''}</div></div><div id="routine-check-${i}" style="width:22px;height:22px;border-radius:50%;border:1.5px solid rgba(200,160,160,0.40);display:flex;align-items:center;justify-content:center;flex-shrink:0;"></div></div><div style="font-size:12px;color:var(--ts);line-height:1.6;">${r.desc}</div>`;
+    card.addEventListener('click',function(){
+      document.querySelectorAll('.routine-card').forEach(function(c){c.style.borderColor='';});
+      card.style.borderColor='var(--acc)';
+      _selectedRoutine=r;
+      if(selEl)selEl.style.display='block';
+      const chk=document.getElementById('routine-check-'+i);
+      if(chk)chk.innerHTML='<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="var(--acc)" stroke-width="1.8" stroke-linecap="round"><polyline points="2,6 4.5,9 10,3.5"/></svg>';
+      document.querySelectorAll('.routine-card').forEach(function(c,j){if(j!==i){const ck=document.getElementById('routine-check-'+j);if(ck)ck.innerHTML='';}});
+    });
+    cards.appendChild(card);
+  });
+}
+function applyRoutine(){
+  if(!_selectedRoutine)return;
+  const habits=getHabits();
+  const exists=habits.some(function(h){return h.name===_selectedRoutine.title;});
+  if(exists){showToast('이미 있는 습관이에요 🌿');}
+  else{
+    const COLORS=['mint','pink','sky','yellow','rose','lavender','peach','teal'];
+    habits.push({name:_selectedRoutine.title,color:COLORS[habits.length%COLORS.length]});
+    saveHabits(habits);
+    showToast(_selectedRoutine.title+' 습관이 추가됐어요 ✅');
+  }
+  closeModal('routine-modal');
+}
+
+// ─ 일정 미리보기 (Google Calendar API Key 방식)
 async function makeScheduleCard(section){
   const card=document.createElement('div');
   card.className='card m';
-  card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">일정 기능 준비 중이에요</div>';
+  const apiKey=S.get('gcal_api_key');
+  if(!apiKey){
+    card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">설정에서 Google Calendar API 키를 연결해보세요</div>';
+    return card;
+  }
+  try{
+    const now=new Date();
+    let tMin,tMax;
+    if(section==='night'){
+      const tom=new Date(now);tom.setDate(tom.getDate()+1);tom.setHours(0,0,0,0);
+      const tomEnd=new Date(tom);tomEnd.setHours(23,59,59,999);
+      tMin=tom.toISOString();tMax=tomEnd.toISOString();
+    } else {
+      const dayEnd=new Date(now);dayEnd.setHours(23,59,59,999);
+      tMin=now.toISOString();tMax=dayEnd.toISOString();
+    }
+    const url=`https://www.googleapis.com/calendar/v3/calendars/primary/events?key=${apiKey}&timeMin=${encodeURIComponent(tMin)}&timeMax=${encodeURIComponent(tMax)}&singleEvents=true&orderBy=startTime&maxResults=5`;
+    const res=await fetch(url);
+    if(!res.ok)throw new Error('gcal_err');
+    const data=await res.json();
+    const items=data.items||[];
+    if(!items.length){
+      card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">'+(section==='night'?'내일 일정이 없어요 🌙':'오늘 남은 일정이 없어요')+'</div>';
+      return card;
+    }
+    items.forEach(function(ev){
+      const row=document.createElement('div');row.className='schedule-item';
+      const st=ev.start&&(ev.start.dateTime||ev.start.date);
+      let timeStr='종일';
+      if(ev.start&&ev.start.dateTime){const d=new Date(ev.start.dateTime);timeStr=(d.getHours()<12?'오전':'오후')+' '+(d.getHours()%12||12)+':'+(String(d.getMinutes()).padStart(2,'0'));}
+      row.innerHTML='<div class="schedule-time">'+timeStr+'</div><div class="schedule-text">'+(ev.summary||'(제목 없음)')+'</div>';
+      card.appendChild(row);
+    });
+  }catch(e){
+    if(e.message==='gcal_err'){
+      card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">Calendar 연결을 확인해주세요</div>';
+    } else {
+      card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">일정을 불러올 수 없어요</div>';
+    }
+  }
   return card;
 }
+function homeOpenCalendar(){
+  openSettings();
+  showToast('설정에서 Calendar API 키를 입력해주세요 🌿');
+}
+function fetchHomeWeather(section){} // 추후 연동 예정
 
 function goHome(){
   document.querySelectorAll('.view').forEach(function(v){v.classList.remove('on');});
@@ -2502,8 +2740,27 @@ function closeSheet(id,e){if(!e||e.target===document.getElementById(id))document
 
 
 
+function saveClaudeKey(){
+  const inp=document.getElementById('claude-api-key-inp');
+  if(!inp)return;
+  const val=inp.value.trim();
+  if(!val||val.startsWith('••••')){showToast('키를 입력해주세요');return;}
+  S.set('claude_api_key',val);
+  inp.value='••••••••••••'+val.slice(-4);
+  const statusEl=document.getElementById('claude-key-status');
+  if(statusEl)statusEl.textContent='저장됐어요 ✅';
+  showToast('Claude API 키 저장됐어요 ✅');
+}
+function saveGCalKeys(){
+  const ci=document.getElementById('gcal-client-id-inp');
+  const ak=document.getElementById('gcal-api-key-inp');
+  let saved=false;
+  if(ci&&ci.value.trim()&&!ci.value.includes('••••')){S.set('gcal_client_id',ci.value.trim());saved=true;}
+  if(ak&&ak.value.trim()&&!ak.value.includes('••••')){S.set('gcal_api_key',ak.value.trim());saved=true;}
+  if(saved)showToast('Calendar 키 저장됐어요 ✅');
+  else showToast('키를 입력해주세요');
+}
 function clearGCalKeys(){
-  localStorage.removeItem('gcal_client_id');
   localStorage.removeItem('gcal_api_key');
   const ci=document.getElementById('gcal-client-id-inp');
   const ak=document.getElementById('gcal-api-key-inp');
