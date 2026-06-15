@@ -2441,6 +2441,12 @@ async function syncGoalUp(key){
 }
 async function syncWChallengeDown(wk){
   const key='wchallenge_'+wk;
+  const pendingKey='wchallenge_pending_'+wk;
+  // 로컬에서 변경이 있었으면 Up 우선 (다른 기기 데이터로 덮어쓰지 않음)
+  if(S.get(pendingKey)){
+    await autoSync('wchallenge',key);
+    return;
+  }
   const rows=await supaFetch(`goal_notes?note_key=eq.${encodeURIComponent(key)}`);
   if(!rows)return;
   if(!rows.length){
@@ -2452,7 +2458,7 @@ async function syncWChallengeDown(wk){
     }
     return;
   }
-  // Supabase 데이터가 있으면 로컬에 반영
+  // pending 없으면 Supabase → 로컬 반영
   S.set(key,rows[0].lines);
 }
 async function syncContentsDown(mk){
@@ -2485,6 +2491,7 @@ async function autoSync(type,key){
     if(data){
       await supaFetch(`goal_notes?note_key=eq.${encodeURIComponent(key)}`,'DELETE');
       await supaFetch('goal_notes','POST',[{note_key:key,lines:data}]);
+      S.set('wchallenge_pending_'+key.replace('wchallenge_',''),false);
     }
   }
   else if(type==='contents'){await syncContentsUp(key);S.set(S.key('contents_pending',key),false);}
@@ -2508,6 +2515,7 @@ async function syncAll(){
   });
   if(S.get(S.key('memos_pending',dk)))upTasks.push(syncMemosUp(dk).then(()=>S.set(S.key('memos_pending',dk),false)));
   if(S.get(S.key('contents_pending',mk)))upTasks.push(syncContentsUp(mk).then(()=>S.set(S.key('contents_pending',mk),false)));
+  if(S.get('wchallenge_pending_'+wk))upTasks.push(autoSync('wchallenge','wchallenge_'+wk));
   if(upTasks.length)await Promise.all(upTasks);
   // Down (Supabase → 로컬)
   await Promise.all([
@@ -2824,7 +2832,7 @@ const WC_COLORS=[
   'rgba(210,165,215,0.85)', // 일 — 라일락
 ];
 function getWChallenge(wk){return S.get('wchallenge_'+wk)||[];}
-function saveWChallenge(wk,data){S.set('wchallenge_'+wk,data);autoSync('wchallenge','wchallenge_'+wk);}
+function saveWChallenge(wk,data){S.set('wchallenge_'+wk,data);S.set('wchallenge_pending_'+wk,true);autoSync('wchallenge','wchallenge_'+wk);}
 
 function renderWeeklyChallenge(){
   const wk=weekKey(new Date());
