@@ -2519,6 +2519,7 @@ async function syncAll(){
     ...weekOnelines
   ]);
   loadDaily();
+  if(document.getElementById('v-weekly')&&document.getElementById('v-weekly').classList.contains('on'))loadWeekly();
 }
 window.addEventListener('online',()=>syncAll());
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
