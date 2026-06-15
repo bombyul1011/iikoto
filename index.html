@@ -2660,7 +2660,6 @@ async function syncAll(){
     syncTodosDown(dk),syncMemosDown(dk),syncSleepDown(dk),
     ...futureDks.map(fdk=>syncTodosDown(fdk)),
     syncHabitsDown(),syncHCDown(wk),syncContentsDown(mk),
-    syncGoalDown(S.key('wgoal',weekKey(now))),
     syncGoalDown(S.key('mgoal',monthKey(now))),
     ...weekOnelines
   ]);
