@@ -143,6 +143,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .todo-item:last-of-type{border-bottom:none;}
 .weekly-review-banner{position:relative;border-radius:16px;padding:1.5px;background:linear-gradient(135deg,rgba(150,215,180,0.95),rgba(235,220,120,0.90),rgba(165,222,188,0.95),rgba(150,215,180,0.95));background-size:300% 300%;animation:bannerShine 4s ease infinite;cursor:pointer;margin-bottom:2px;}
 .weekly-review-banner-inner{border-radius:14.5px;background:linear-gradient(135deg,rgba(210,244,225,0.82),rgba(248,245,200,0.82),rgba(212,242,222,0.82));padding:16px 18px;backdrop-filter:blur(2px);}
+.midweek-remind-banner{position:relative;border-radius:16px;padding:1.5px;background:linear-gradient(135deg,rgba(180,165,230,0.95),rgba(140,200,235,0.90),rgba(190,170,235,0.95),rgba(160,190,230,0.95));background-size:300% 300%;animation:bannerShine 4s ease infinite;cursor:pointer;margin-bottom:2px;}
+.midweek-remind-banner-inner{border-radius:14.5px;background:linear-gradient(135deg,rgba(225,218,248,0.82),rgba(210,235,248,0.82),rgba(228,220,248,0.82));padding:16px 18px;backdrop-filter:blur(2px);}
 [data-theme="dark"] .weekly-review-banner-inner{background:linear-gradient(135deg,rgba(30,60,40,0.92),rgba(60,55,15,0.92),rgba(30,58,38,0.92));}
 .weekly-review-banner-title{font-size:13px;font-weight:700;color:rgba(65,125,70,0.95);letter-spacing:0.05em;margin-bottom:4px;}
 [data-theme="dark"] .weekly-review-banner-title{color:rgba(160,230,170,0.95);}
@@ -976,6 +978,17 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   </div>
 </div>
 
+<!-- MIDWEEK REMIND SHEET -->
+<div class="overlay" id="midweek-remind-sheet" onclick="closeSheet('midweek-remind-sheet',event)">
+  <div class="bsheet" style="max-height:82vh;overflow-y:auto;" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div style="padding:0 20px 20px;">
+      <div style="font-size:13px;font-weight:600;color:rgba(110,90,180,0.9);text-align:center;margin-bottom:16px;letter-spacing:0.04em;">◈ 이번 주 중간 점검 ◈</div>
+      <div id="midweek-remind-content" style="font-size:13px;color:var(--tp);line-height:1.9;"></div>
+    </div>
+  </div>
+</div>
+
 <!-- TIME MODAL -->
 <div class="modal-ov" id="time-modal" onclick="closeModal('time-modal',event)">
   <div class="modal">
@@ -1320,6 +1333,17 @@ function renderHomeBody(section){
       </div>`;
       banner.addEventListener('click',openWeeklyReviewSheet);
       body.appendChild(banner);
+    } else if(new Date().getDay()===3){
+      // 수요일 저녁 — 주간 리마인드 배너
+      body.appendChild(makeLabel('◈ 이번 주 중간 점검'));
+      const mbanner=document.createElement('div');
+      mbanner.className='midweek-remind-banner';
+      mbanner.innerHTML=`<div class="midweek-remind-banner-inner">
+        <div class="weekly-review-banner-title" style="color:rgba(90,70,160,0.9);">◈ 이번 주 리마인드 ◈</div>
+        <div class="weekly-review-banner-sub" style="color:rgba(110,90,170,0.75);"><span>한 주 절반, 지금 어떻게 가고 있나요?</span><span style="font-size:16px;opacity:0.6;">›</span></div>
+      </div>`;
+      mbanner.addEventListener('click',openMidweekRemindSheet);
+      body.appendChild(mbanner);
     } else {
       body.appendChild(makeRingRow());
     }
@@ -2024,8 +2048,116 @@ function openWeeklyReviewSheet(){
     });
   }
 }
+
+function openMidweekRemindSheet(){
+  const content=document.getElementById('midweek-remind-content');
+  const cacheKey='midweek_remind_'+dateKey(new Date());
+  const cached=S.get(cacheKey);
+  openSheet('midweek-remind-sheet');
+  if(cached){
+    content.innerHTML=cached;
+  } else {
+    content.innerHTML='<div style="text-align:center;color:var(--tm);padding:20px 0;">이번 주 중간 점검 중이에요... 🌿<br><span style="font-size:11.5px;opacity:0.7;">약 10-20초 소요돼요</span></div>';
+    makeMidweekRemindCard().then(function(html){
+      if(html&&!html.includes('__ERR__')){
+        S.set(cacheKey,html);
+        content.innerHTML=html;
+      } else {
+        content.innerHTML='<div style="text-align:center;color:var(--tm);padding:20px 0;">잠시 후 다시 시도해주세요 🌿</div>';
+      }
+    });
+  }
+}
 function homeOpenCalendar(){
   openSettings();
+}
+
+async function makeMidweekRemindCard(){
+  const now=new Date();
+  const weekStart=new Date(now);
+  weekStart.setDate(now.getDate()-((now.getDay()+6)%7));
+  weekStart.setHours(0,0,0,0);
+
+  const habits=getHabits();
+  const wk=weekKey(now);
+  const checks=getHabitChecks(wk);
+
+  // 월~수 (완료된 것) 투두 수집
+  const doneTodos=[],pendingTodos=[];
+  for(let i=0;i<3;i++){
+    const d=new Date(weekStart);d.setDate(weekStart.getDate()+i);
+    const dk=dateKey(d);
+    const todos=getTodos(dk);
+    todos.filter(t=>t.done).forEach(t=>doneTodos.push(t.text));
+    todos.filter(t=>!t.done).forEach(t=>pendingTodos.push(t.text));
+  }
+
+  // 목~일 미리 등록된 투두 수집
+  const futureTodos=[];
+  const DAY_LABELS=['목','금','토','일'];
+  for(let i=3;i<7;i++){
+    const d=new Date(weekStart);d.setDate(weekStart.getDate()+i);
+    const dk=dateKey(d);
+    const todos=getTodos(dk).filter(t=>!t.done);
+    todos.forEach(t=>futureTodos.push(`${DAY_LABELS[i-3]}요일: ${t.text}`));
+  }
+
+  // 월~수 습관 달성
+  const habitStats=habits.map(h=>{
+    let cnt=0;
+    for(let i=0;i<3;i++){
+      const d=new Date(weekStart);d.setDate(weekStart.getDate()+i);
+      const dow=(d.getDay()+6)%7;
+      if(checks[h.name+'-'+dow])cnt++;
+    }
+    return `${h.name} ${cnt}/3`;
+  });
+
+  const totalMon3=doneTodos.length+pendingTodos.length;
+  const doneCount=doneTodos.length;
+
+  const key=getClaudeKey();
+  const dataContext=[
+    `월~수 투두: 총 ${totalMon3}개 중 ${doneCount}개 완료`,
+    pendingTodos.length?`아직 못 한 일: ${pendingTodos.slice(0,5).join(', ')}`:'',
+    futureTodos.length?`목~일 예정 투두:\n${futureTodos.join('\n')}`:'목~일 예정 투두 없음',
+    habitStats.length?`습관 달성 (월~수):\n${habitStats.join(', ')}`:'',
+  ].filter(Boolean).join('\n');
+
+  const fallbackHtml=`<div style="font-size:13px;color:var(--tp);line-height:1.9;">
+    <div style="margin-bottom:10px;font-weight:600;color:rgba(110,90,180,0.9);">이번 주 중간 점검</div>
+    <div>✓ 월~수 투두 ${doneCount}/${totalMon3}개 완료</div>
+    ${pendingTodos.length?`<div>→ 미완료: ${pendingTodos.slice(0,3).join(', ')}</div>`:''}
+    ${futureTodos.length?`<div>📌 남은 예정: ${futureTodos.slice(0,3).join(', ')}</div>`:''}
+  </div>`;
+
+  if(!key)return fallbackHtml;
+
+  const sys=`당신은 따뜻한 주간 리마인드 비서예요. 이번 주 수요일 기준 중간 점검 리포트를 작성해요.
+
+형식:
+1. 첫 문장: 이번 주 월~수 흐름 한 문장 요약 (투두 완료율 기반)
+2. 못 다한 일이 있으면 부드럽게 짚어줘요
+3. 빈 줄 후 "남은 이번 주" 소제목
+4. 목~일 예정된 투두 리마인드 (있으면) — "○요일에 ~이 있어요, 잊지 마세요!" 형식
+5. 습관 달성 현황 한 줄
+6. 마지막: 남은 나흘 응원 한 마디
+
+규칙:
+- 반드시 ~해요, ~이에요, ~어요 체 존댓말
+- 이름 호칭 없음
+- 이모지 1-2개
+- 전체 5-7문장`;
+
+  const reply=await callClaude(sys,[{role:'user',content:dataContext}],400);
+  if(!reply||reply.startsWith('__ERR__'))return fallbackHtml;
+
+  const p=document.createElement('div');
+  p.style.cssText='font-size:13px;color:var(--tp);line-height:1.9;padding:4px 2px;word-break:keep-all;';
+  p.textContent=reply.trim();
+  const wrap=document.createElement('div');
+  wrap.appendChild(p);
+  return wrap.innerHTML;
 }
 
 async function makeWeeklySummaryCard(){
@@ -2498,23 +2630,26 @@ async function syncAll(){
   if(!navigator.onLine)return;
   if(window._restoring)return; // 복구 중엔 sync 차단
   const dk=dateKey(currentDate),mk=monthKey(currentDate),now=new Date(),wk=weekKey(now);
-  const tomorrow=new Date(currentDate);tomorrow.setDate(tomorrow.getDate()+1);
-  const dk_tmrw=dateKey(tomorrow);
+  // 오늘부터 6일 후까지 날짜키 생성
+  const futureDks=[];
+  for(let i=1;i<=6;i++){const d=new Date(now);d.setDate(now.getDate()+i);futureDks.push(dateKey(d));}
   // 이번 주 하루한줄
   const weekOnelines=[];
   const mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7));
   for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);weekOnelines.push(syncGoalDown(S.key('oneline',dateKey(d))));}
-  // pending인 것들 먼저 Up (삭제/수정 반영)
+  // pending인 것들 먼저 Up
   const upTasks=[];
   if(S.get(S.key('todos_pending',dk)))upTasks.push(syncTodosUp(dk).then(()=>S.set(S.key('todos_pending',dk),false)));
-  if(S.get(S.key('todos_pending',dk_tmrw)))upTasks.push(syncTodosUp(dk_tmrw).then(()=>S.set(S.key('todos_pending',dk_tmrw),false)));
+  futureDks.forEach(fdk=>{
+    if(S.get(S.key('todos_pending',fdk)))upTasks.push(syncTodosUp(fdk).then(()=>S.set(S.key('todos_pending',fdk),false)));
+  });
   if(S.get(S.key('memos_pending',dk)))upTasks.push(syncMemosUp(dk).then(()=>S.set(S.key('memos_pending',dk),false)));
   if(S.get(S.key('contents_pending',mk)))upTasks.push(syncContentsUp(mk).then(()=>S.set(S.key('contents_pending',mk),false)));
   if(upTasks.length)await Promise.all(upTasks);
-  // 그 다음 Down (Supabase → 로컬)
+  // Down (Supabase → 로컬)
   await Promise.all([
     syncTodosDown(dk),syncMemosDown(dk),syncSleepDown(dk),
-    syncTodosDown(dk_tmrw),
+    ...futureDks.map(fdk=>syncTodosDown(fdk)),
     syncHabitsDown(),syncHCDown(wk),syncContentsDown(mk),
     syncGoalDown(S.key('wgoal',weekKey(now))),
     syncGoalDown(S.key('mgoal',monthKey(now))),
@@ -2568,8 +2703,8 @@ function updateDateUI(){
 }
 function shiftDay(n){
   const d=new Date(currentDate);d.setDate(d.getDate()+n);
-  const tmrw=new Date();tmrw.setDate(tmrw.getDate()+1);tmrw.setHours(23,59,59,999);
-  if(d>tmrw)return;
+  const limit=new Date();limit.setDate(limit.getDate()+6);limit.setHours(23,59,59,999);
+  if(d>limit)return;
   currentDate=d;updateDateUI();
 }
 function goToday(){currentDate=new Date();updateDateUI();loadDaily();}
