@@ -2989,7 +2989,7 @@ function confirmContent(){
   const startVal=document.getElementById('cm-start').value;
   const startDay=startVal?parseInt(startVal.split('-')[2])||1:1;
   const status=_contentCtx.status==='done'?'done':'watching';
-  let endDay=startDay;
+  let endDay=null;
   if(status==='done'){const endVal=document.getElementById('cm-end').value;endDay=endVal?Math.max(parseInt(endVal.split('-')[2])||startDay,startDay):startDay;}
   const review=document.getElementById('cm-review').value.trim();
   const stars=parseInt(document.getElementById('cm-stars').value)||0;
@@ -3069,21 +3069,15 @@ function selectApiResult(title,poster,sub1,sub2){
   }
 }
 async function searchItunesMusic(q,el){
-  const url=`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=album&country=KR&limit=6&lang=ko_KR`;
-  const res=await fetch(url);const data=await res.json();
-  const results=(data.results||[]).slice(0,6);
-  if(!results.length){el.innerHTML='<div class="api-loading">결과 없음</div>';return;}
-  el.innerHTML='';
-  results.forEach(item=>{
-    const title=item.collectionName||item.trackName||'';
-    const artist=item.artistName||'';
-    const poster=item.artworkUrl100||null;
-    const appleUrl=item.collectionViewUrl||item.trackViewUrl||'';
-    const div=document.createElement('div');div.className='api-result-item';
-    div.innerHTML=poster?`<img class="api-result-poster" src="${poster}" alt="">`:`<div class="api-result-poster-placeholder">🎵</div>`;
-    div.innerHTML+=`<div class="api-result-info"><div class="api-result-title">${title}</div><div class="api-result-sub">${artist}</div></div>`;
-    div.addEventListener('click',()=>selectApiResult(title,poster,artist,appleUrl));el.appendChild(div);
-  });
+  // iTunes API는 브라우저 CORS 제한으로 직접 호출 불가
+  // 제목 입력 후 저장, 또는 Apple Music에서 검색 안내
+  el.innerHTML=`<div class="api-result-item" style="cursor:pointer;justify-content:center;gap:8px;" onclick="window.open('https://music.apple.com/search?term=${encodeURIComponent(q)}','_blank');hideApiResults();">
+    <span style="font-size:18px;">🎵</span>
+    <div class="api-result-info"><div class="api-result-title">Apple Music에서 "${q}" 검색</div><div class="api-result-sub">탭하면 Apple Music으로 이동해요</div></div>
+  </div>
+  <div class="api-result-item" style="cursor:pointer;justify-content:center;" onclick="document.getElementById('cm-title').value='${q.replace(/'/g,"\\'")}';hideApiResults();">
+    <div class="api-result-info"><div class="api-result-title" style="color:var(--tm);">"${q}" 그대로 입력</div></div>
+  </div>`;
 }
 function hideApiResults(){const el=document.getElementById('api-results');if(el)el.style.display='none';}
 
