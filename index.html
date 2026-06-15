@@ -3864,6 +3864,9 @@ async function initSync(){
   window._restoring=true;
   var dates=[];
   for(var i=13;i>=0;i--){var d=new Date();d.setDate(d.getDate()-i);dates.push(dateKey(d));}
+  // 미래 6일치 날짜 추가
+  var futureDates=[];
+  for(var i=1;i<=6;i++){var d=new Date();d.setDate(d.getDate()+i);futureDates.push(dateKey(d));}
   var uploadedDates={};
   // pending 있는 날짜는 Up 먼저 — 로컬 데이터 보호
   for(var i=0;i<dates.length;i++){
@@ -3881,6 +3884,15 @@ async function initSync(){
     }
     if(didUp)uploadedDates[dk]=true;
   }
+  // 미래 날짜 pending Up
+  for(var i=0;i<futureDates.length;i++){
+    var fdk=futureDates[i];
+    if(S.get(S.key('todos_pending',fdk))){
+      await syncTodosUp(fdk);
+      S.set(S.key('todos_pending',fdk),false);
+      uploadedDates[fdk]=true;
+    }
+  }
   // wchallenge pending 있으면 Up 먼저
   var wk=weekKey(new Date());
   if(S.get('wchallenge_pending_'+wk)){
@@ -3893,6 +3905,11 @@ async function initSync(){
   for(var i=0;i<dates.length;i++){
     var dk=dates[i];
     if(!uploadedDates[dk])await forceRestoreDate(dk);
+  }
+  // 미래 날짜 Down
+  for(var i=0;i<futureDates.length;i++){
+    var fdk=futureDates[i];
+    if(!uploadedDates[fdk])await syncTodosDown(fdk);
   }
   window._restoring=false;
   loadDaily();
