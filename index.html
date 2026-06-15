@@ -2453,7 +2453,13 @@ async function syncHCUp(wk){
 }
 async function syncGoalDown(key){
   const rows=await supaFetch(`goal_notes?note_key=eq.${encodeURIComponent(key)}`);
-  if(!rows||!rows.length)return;
+  if(!rows)return;
+  if(!rows.length){
+    // 로컬에 데이터 있으면 Supabase로 올려줌 (사파리에서 입력 후 PWA 접속 시)
+    const local=getGoal(key);
+    if(local&&local.some(l=>l.trim()))await syncGoalUp(key);
+    return;
+  }
   S.set(key,rows[0].lines);
 }
 async function syncGoalUp(key){
@@ -2469,7 +2475,8 @@ async function syncContentsDown(mk){
   }
   const rows=await supaFetch(`contents?month_key=eq.${mk}&order=created`);
   if(!rows)return;
-  // rows=0 포함 항상 Supabase 우선
+  // rows=0이고 로컬에 데이터 있으면 덮어쓰지 않음 (사파리↔PWA 엇박 방지)
+  if(!rows.length&&getContents(mk).length)return;
   S.set(S.key('contents',mk),rows.map(r=>({cat:r.content_cat,title:r.title,startDay:r.start_day,endDay:r.end_day,status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,created:r.created})));
 }
 async function syncContentsUp(mk){
