@@ -3269,7 +3269,6 @@ function calShiftMonth(n){
 function renderCalendar(){
   const wrap=document.getElementById('monthly-cal');if(!wrap)return;
   const y=_calYear,mo=_calMonth;
-  const firstDay=new Date(y,mo,1).getDay();
   const daysInMonth=new Date(y,mo+1,0).getDate();
   const today=new Date();
   const hasData={};
@@ -3284,7 +3283,9 @@ function renderCalendar(){
       <div class="nav-arr" onclick="calShiftMonth(1)"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" style="color:var(--tm)"><polyline points="3.5,1.5 7,5 3.5,8.5"/></svg></div>
     </div>
     <div class="cal-grid">`;
-  ['일','월','화','수','목','금','토'].forEach(d=>h+=`<div class="cal-day-name">${d}</div>`);
+  ['월','화','수','목','금','토','일'].forEach(d=>h+=`<div class="cal-day-name">${d}</div>`);
+  const firstDayRaw=new Date(y,mo,1).getDay();
+  const firstDay=(firstDayRaw+6)%7; // 월요일=0 기준으로 변환
   for(let i=0;i<firstDay;i++)h+=`<div class="cal-day other-month"><div class="cal-num"></div></div>`;
   for(let d=1;d<=daysInMonth;d++){
     const isToday2=today.getFullYear()===y&&today.getMonth()===mo&&today.getDate()===d;
