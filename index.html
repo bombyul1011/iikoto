@@ -2439,6 +2439,17 @@ async function syncGoalUp(key){
   await supaFetch(`goal_notes?note_key=eq.${encodeURIComponent(key)}`,'DELETE');
   await supaFetch('goal_notes','POST',[{note_key:key,lines}]);
 }
+async function syncWChallengeDown(wk){
+  const key='wchallenge_'+wk;
+  const rows=await supaFetch(`goal_notes?note_key=eq.${encodeURIComponent(key)}`);
+  if(!rows)return;
+  if(!rows.length){
+    const local=S.get(key);
+    if(local&&local.length&&local.some(i=>i.text&&i.text.trim()))await syncGoalUp(key);
+    return;
+  }
+  S.set(key,rows[0].lines);
+}
 async function syncContentsDown(mk){
   if(S.get(S.key('contents_pending',mk))){
     await syncContentsUp(mk);
@@ -2464,6 +2475,7 @@ async function autoSync(type,key){
   else if(type==='habits')syncHabitsUp();
   else if(type==='hc')syncHCUp(key);
   else if(type==='goal')syncGoalUp(key);
+  else if(type==='wchallenge')syncGoalUp(key);
   else if(type==='contents'){await syncContentsUp(key);S.set(S.key('contents_pending',key),false);}
 }
 async function syncAll(){
@@ -2492,6 +2504,7 @@ async function syncAll(){
     ...futureDks.map(fdk=>syncTodosDown(fdk)),
     syncHabitsDown(),syncHCDown(wk),syncContentsDown(mk),
     syncGoalDown(S.key('mgoal',monthKey(now))),
+    syncWChallengeDown(wk),
     ...weekOnelines
   ]);
   loadDaily();
@@ -2799,7 +2812,7 @@ const WC_COLORS=[
   'rgba(210,165,215,0.85)', // 일 — 라일락
 ];
 function getWChallenge(wk){return S.get('wchallenge_'+wk)||[];}
-function saveWChallenge(wk,data){S.set('wchallenge_'+wk,data);}
+function saveWChallenge(wk,data){S.set('wchallenge_'+wk,data);autoSync('wchallenge','wchallenge_'+wk);}
 
 function renderWeeklyChallenge(){
   const wk=weekKey(new Date());
