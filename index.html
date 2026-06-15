@@ -2702,8 +2702,8 @@ function updateDateUI(){
   if(el)el.textContent=`${d.getFullYear()}. ${d.getMonth()+1}. ${d.getDate()}. ${DAYS[d.getDay()]}`;
   const nxt=document.getElementById('btn-next');
   if(nxt){
-    const tmrw=new Date();tmrw.setDate(tmrw.getDate()+1);tmrw.setHours(23,59,59,999);
-    const over=d>tmrw;
+    const limit=new Date();limit.setDate(limit.getDate()+6);limit.setHours(23,59,59,999);
+    const over=d>=limit;
     nxt.style.opacity=over?'0.3':'1';
     nxt.style.pointerEvents=over?'none':'auto';
   }
