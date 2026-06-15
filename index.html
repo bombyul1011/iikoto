@@ -3406,8 +3406,7 @@ function renderCalendar(){
   }
   h+=`</div></div>`;
   wrap.innerHTML=h;
-  const showDay=_calSelectedDay||(today.getFullYear()===y&&today.getMonth()===mo?today.getDate():null);
-  if(showDay)renderCalDetail(showDay);
+  if(_calSelectedDay)renderCalDetail(_calSelectedDay);
 }
 function calDayClick(d){
   _calSelectedDay=(_calSelectedDay===d)?null:d;
