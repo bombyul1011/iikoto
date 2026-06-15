@@ -2450,7 +2450,6 @@ async function syncWChallengeDown(wk){
   const rows=await supaFetch(`goal_notes?note_key=eq.${encodeURIComponent(key)}`);
   if(!rows)return;
   if(!rows.length){
-    // Supabase에 없고 로컬에 있으면 Up
     const local=S.get(key);
     if(local&&local.length&&local.some(i=>i.text&&i.text.trim())){
       await supaFetch(`goal_notes?note_key=eq.${encodeURIComponent(key)}`,'DELETE');
@@ -2458,8 +2457,9 @@ async function syncWChallengeDown(wk){
     }
     return;
   }
-  // pending 없으면 Supabase → 로컬 반영
+  // Supabase → 로컬 반영 후 화면 갱신
   S.set(key,rows[0].lines);
+  renderWeeklyChallenge();
 }
 async function syncContentsDown(mk){
   if(S.get(S.key('contents_pending',mk))){
