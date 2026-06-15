@@ -1180,24 +1180,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           <span style="font-size:11px;color:var(--tm);" id="claude-key-status">날씨 인사 · 주간 루틴 · 일정 요약에 사용돼요</span>
         </div>
       </div>
-      <div class="settings-slbl">Google Calendar</div>
-      <div class="settings-card">
-        <div class="settings-item" style="flex-direction:column;align-items:flex-start;gap:8px;padding-bottom:12px;">
-          <span class="settings-item-lbl">클라이언트 ID</span>
-          <input type="password" class="modal-inp" id="gcal-client-id-inp" placeholder="xxxxx.apps.googleusercontent.com" style="margin-bottom:0;font-size:12px;width:100%;" autocomplete="off">
-        </div>
-        <div class="settings-item" style="flex-direction:column;align-items:flex-start;gap:8px;padding-bottom:12px;">
-          <span class="settings-item-lbl">API 키</span>
-          <input type="password" class="modal-inp" id="gcal-api-key-inp" placeholder="AIza..." style="margin-bottom:0;font-size:12px;width:100%;" autocomplete="off">
-        </div>
-        <div class="settings-item" style="padding-top:0;gap:8px;flex-direction:column;">
-          <button onclick="saveGCalKeys()" style="width:100%;padding:9px;border-radius:10px;border:none;background:var(--acc-soft);color:var(--acc);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">저장</button>
-          <button onclick="clearGCalKeys()" style="width:100%;padding:7px;border-radius:10px;border:1px solid var(--div);background:transparent;color:var(--tm);font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer;">키 삭제</button>
-        </div>
-        <div class="settings-item">
-          <span style="font-size:11px;color:var(--tm);">오늘 일정 요약에 사용돼요</span>
-        </div>
-      </div>
     </div>
     <div>
       <div class="settings-slbl">데이터 복구</div>
@@ -1307,11 +1289,11 @@ function renderHomeBody(section){
   const isSunday=new Date().getDay()===0;
 
   if(section==='morning'){
-    body.appendChild(makeLabel('오늘 일정'));
-    const sc=document.createElement('div');sc.className='schedule-card';
-    sc.innerHTML='<div class="schedule-loading">일정 불러오는 중...</div>';
+    body.appendChild(makeLabel('오늘 브리핑'));
+    const sc=document.createElement('div');sc.className='card s';
+    sc.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑 작성 중...</div>';
     body.appendChild(sc);
-    makeScheduleCard('morning').then(function(card){sc.replaceWith(card);}).catch(function(){sc.innerHTML='<div class="schedule-loading">일정을 불러올 수 없어요</div>';});
+    makeScheduleCard('morning').then(function(card){sc.replaceWith(card);}).catch(function(){sc.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑을 불러올 수 없어요</div>';});
     body.appendChild(makeRingRow());
     body.appendChild(makeLabel('해빗 현황'));
     body.appendChild(makeHabitCard());
@@ -1321,11 +1303,11 @@ function renderHomeBody(section){
     body.appendChild(makeContentsCard());
   } else if(section==='afternoon'){
     body.appendChild(makeRingRow());
-    body.appendChild(makeLabel('일정 진행 상황'));
-    const sc2=document.createElement('div');sc2.className='schedule-card';
-    sc2.innerHTML='<div class="schedule-loading">불러오는 중...</div>';
+    body.appendChild(makeLabel('오후 브리핑'));
+    const sc2=document.createElement('div');sc2.className='card s';
+    sc2.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑 작성 중...</div>';
     body.appendChild(sc2);
-    makeScheduleCard('afternoon').then(function(card){sc2.replaceWith(card);}).catch(function(){sc2.innerHTML='<div class="schedule-loading">일정을 불러올 수 없어요</div>';});
+    makeScheduleCard('afternoon').then(function(card){sc2.replaceWith(card);}).catch(function(){sc2.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑을 불러올 수 없어요</div>';});
     body.appendChild(makeLabel('클로드와 대화'));
     body.appendChild(makeActionBtn('수다 떨까요? 💬','오늘 기록 바탕으로 대화 시작','rgba(100,195,185,0.80)',homeOpenChat));
     body.appendChild(makeLabel('최근 콘텐츠'));
@@ -1362,11 +1344,11 @@ function renderHomeBody(section){
       makeBtnCard('✦','주간 루틴','Claude 제안',homeOpenRoutine),
       makeBtnCard('◎','일기 백업','내보내기',openMarkdownBackup)
     ]));
-    body.appendChild(makeLabel('내일 일정 미리보기'));
-    const sc3=document.createElement('div');sc3.className='schedule-card';
-    sc3.innerHTML='<div class="schedule-loading">불러오는 중...</div>';
+    body.appendChild(makeLabel('내일 미리보기'));
+    const sc3=document.createElement('div');sc3.className='card s';
+    sc3.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑 작성 중...</div>';
     body.appendChild(sc3);
-    makeScheduleCard('night').then(function(card){sc3.replaceWith(card);}).catch(function(){sc3.innerHTML='<div class="schedule-loading">일정을 불러올 수 없어요</div>';});
+    makeScheduleCard('night').then(function(card){sc3.replaceWith(card);}).catch(function(){sc3.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑을 불러올 수 없어요</div>';});
     body.appendChild(makeLabel('최근 콘텐츠'));
     body.appendChild(makeContentsCard());
   }
@@ -1512,7 +1494,6 @@ function renderHomeIconBar(section){
 // ══ HOME ══
 const _HOME_DAYS=['일','월','화','수','목','금','토'];
 let _weatherCache=null,_weatherCacheTime=0,_selectedRoutine=null;
-let _gcalToken=null,_gcalTokenTime=0;
 
 // localStorage 브리핑 캐시 헬퍼
 function _bcGet(subSec){
@@ -1751,145 +1732,26 @@ function applyRoutine(){
   closeModal('routine-modal');
 }
 
-// ─ 일정 미리보기 (Google Calendar API Key 방식)
-// ─ Google Calendar OAuth
-let _gcalAccessToken=null;
-let _gcalTokenExpiry=0;
-
-// 앱 시작 시 localStorage에서 토큰 복원
-(function(){
-  try{
-    const t=localStorage.getItem('gcal_token');
-    const e=localStorage.getItem('gcal_token_expiry');
-    if(t&&e&&Date.now()<parseInt(e)-60000){
-      _gcalAccessToken=t;_gcalTokenExpiry=parseInt(e);
-    }
-  }catch(e){}
-})();
-
-async function getGCalToken(){
-  if(_gcalAccessToken&&Date.now()<_gcalTokenExpiry-60000)return _gcalAccessToken;
-  const clientId=S.get('gcal_client_id');
-  if(!clientId)return null;
-  return new Promise((resolve)=>{
-    const scope='https://www.googleapis.com/auth/calendar.readonly';
-    const redirectUri=window.location.origin+window.location.pathname;
-    const url=`https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(scope)}`;
-    const popup=window.open(url,'gcal_oauth','width=500,height=600,left=100,top=100');
-    if(!popup){resolve(null);return;}
-    const timer=setInterval(()=>{
-      try{
-        if(popup.closed){clearInterval(timer);resolve(null);return;}
-        const hash=popup.location.hash;
-        if(hash&&hash.includes('access_token')){
-          clearInterval(timer);popup.close();
-          const params=new URLSearchParams(hash.slice(1));
-          const token=params.get('access_token');
-          const expiresIn=parseInt(params.get('expires_in')||'3600',10);
-          _gcalAccessToken=token;_gcalTokenExpiry=Date.now()+expiresIn*1000;
-          try{localStorage.setItem('gcal_token',token);localStorage.setItem('gcal_token_expiry',String(_gcalTokenExpiry));}catch(e){}
-          resolve(token);
-        }
-      }catch(e){}
-    },300);
-    setTimeout(()=>{clearInterval(timer);if(!popup.closed)popup.close();resolve(null);},120000);
-  });
-}
-
 async function makeScheduleCard(section){
   const card=document.createElement('div');
   card.className='card s';
-  const clientId=S.get('gcal_client_id');
-  const hasToken=_gcalAccessToken&&Date.now()<_gcalTokenExpiry-60000;
 
-  if(!clientId&&!hasToken){
-    card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">설정 → Google Calendar에서 연결해보세요 📅</div>';
-    return card;
-  }
-
-  if(!hasToken&&clientId){
-    const btn=document.createElement('button');
-    btn.style.cssText='width:100%;padding:10px;border-radius:12px;border:none;background:var(--acc-soft);color:var(--acc);font-family:"DM Sans",sans-serif;font-size:13px;font-weight:500;cursor:pointer;';
-    btn.textContent='📅 Google Calendar 연결하기';
-    btn.addEventListener('click',async function(){
-      btn.textContent='연결 중...';btn.disabled=true;
-      const t=await getGCalToken();
-      if(t){renderHome();}
-      else{btn.textContent='연결 실패 — 다시 시도해주세요';btn.disabled=false;}
-    });
-    card.appendChild(btn);
-    return card;
-  }
-
-  // 일정 브리핑 캐시 확인 (sub-section 기준)
+  // 브리핑 캐시 확인
   const subSec=getSubSection();
   if(_scheduleCache&&_scheduleCacheSection===subSec){
     card.innerHTML=_scheduleCache;
     return card;
   }
 
-  // 로딩 표시
-  card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">일정 불러오는 중...</div>';
+  card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑 작성 중...</div>';
 
   try{
     const now=new Date();
-    let tMin,tMax,dayLabel;
-    if(section==='night'){
-      const tom=new Date(now);tom.setDate(tom.getDate()+1);tom.setHours(0,0,0,0);
-      const tomEnd=new Date(tom);tomEnd.setHours(23,59,59,999);
-      tMin=tom.toISOString();tMax=tomEnd.toISOString();dayLabel='내일';
-    } else {
-      const dayEnd=new Date(now);dayEnd.setHours(23,59,59,999);
-      tMin=now.toISOString();tMax=dayEnd.toISOString();dayLabel='오늘';
-    }
-
-    const headers={'Authorization':'Bearer '+_gcalAccessToken};
-    const url=`https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(tMin)}&timeMax=${encodeURIComponent(tMax)}&singleEvents=true&orderBy=startTime&maxResults=8`;
-    const res=await fetch(url,{headers});
-
-    if(!res.ok){
-      if(res.status===401){_gcalAccessToken=null;_gcalTokenExpiry=0;}
-      card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">Calendar 연결 오류 ('+res.status+')</div>';
-      return card;
-    }
-
-    const data=await res.json();
-    const items=data.items||[];
-
-    // 캘린더 이벤트 텍스트 정리
-    const calLines=items.map(ev=>{
-      let t='종일';
-      if(ev.start&&ev.start.dateTime){
-        const d=new Date(ev.start.dateTime);
-        t=(d.getHours()<12?'오전':'오후')+' '+(d.getHours()%12||12)+':'+String(d.getMinutes()).padStart(2,'0');
-      }
-      return t+' '+( ev.summary||'(제목없음)');
-    });
-
-    // Claude 없으면 raw 목록 표시
-    const key=getClaudeKey();
-    if(!key){
-      card.innerHTML='';
-      if(!calLines.length){
-        card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">'+dayLabel+' 남은 일정이 없어요</div>';
-        return card;
-      }
-      calLines.forEach(line=>{
-        const row=document.createElement('div');row.className='schedule-item';
-        const parts=line.match(/^([^\s]+\s\d+:\d+)\s(.+)$/);
-        if(parts){row.innerHTML='<div class="schedule-time">'+parts[1]+'</div><div class="schedule-text">'+parts[2]+'</div>';}
-        else{row.innerHTML='<div class="schedule-text">'+line+'</div>';}
-        card.appendChild(row);
-      });
-      return card;
-    }
-
-    // 오늘 데이터 수집
     const dk=dateKey(now);
     const todos=getTodos(dk);
     const currentHour=now.getHours();
+    const key=getClaudeKey();
 
-    // 투두 시간대별 분류
     const bySection=(ts)=>todos.filter(t=>t.timeSection===ts);
     const morningTodos=bySection('morning');
     const afternoonTodos=bySection('afternoon');
@@ -1912,11 +1774,6 @@ async function makeScheduleCard(section){
     }).filter(Boolean);
 
     const sleep=getSleep(dk);
-    const weather=_homeWeatherCache;
-
-    // 섹션별 시스템 프롬프트 + dataContext
-    let sys='';
-    let dataContext='';
 
     const commonRules=`규칙:
 - 반드시 ~해요, ~이에요, ~어요 체의 정감있는 존댓말만 사용. ~해, ~야, ~지 등 반말 절대 금지.
@@ -1924,6 +1781,8 @@ async function makeScheduleCard(section){
 - 이모지 1-2개
 - 오직 브리핑 텍스트만 출력
 - 없는 정보는 억지로 언급하지 않기`;
+
+    let sys='',dataContext='';
 
     if(section==='morning'){
       if(subSec==='morning_1'){
@@ -1938,14 +1797,12 @@ ${commonRules}`;
 상단에 이미 인사말과 날씨 정보가 표시되어 있으니, 인사말과 날씨 언급은 절대 하지 않아요.
 바로 오늘 할일과 일정 이야기로 시작해요.
 오전이 어느 정도 지난 시점이니 남은 오전 할일을 중심으로 안내해요.
-오후/저녁 캘린더 일정이 있으면 미리 언급해 준비를 도와요.
 메모가 있으면 현재 상황 파악에 활용해요.
 3-5문장 이내.
 ${commonRules}`;
       }
       dataContext=[
         sleep.wake?`기상: ${sleep.wake}`:'',
-        calLines.length?`오늘 캘린더 일정 (전체):\n${calLines.join('\n')}`:'캘린더 일정 없음',
         todoLine(morningTodos,'오전'),
         todoLine(afternoonTodos,'오후'),
         todoLine(noneTodos,'시간지정없음'),
@@ -1953,13 +1810,12 @@ ${commonRules}`;
       ].filter(Boolean).join('\n');
 
     } else if(section==='afternoon'){
-      // 오후 브리핑 1 (12-16시) vs 브리핑 2 (16시 이후)
       const isLateAfternoon=currentHour>=16;
       if(!isLateAfternoon){
         sys=`당신은 따뜻한 하루 비서예요. 오후 브리핑을 작성해요.
 오전이 어떻게 흘렀는지 메모와 완료된 할일로 파악하고 공감해요.
 오전에 못 마친 일이 있으면 자연스럽게 짚어줘요.
-남은 오후 할일과 캘린더 일정을 안내해요.
+남은 오후 할일을 안내해요.
 3-5문장 이내.
 ${commonRules}`;
       } else {
@@ -1972,7 +1828,6 @@ ${commonRules}`;
       }
       dataContext=[
         `현재 시각: ${currentHour}시`,
-        calLines.length?`오늘 캘린더 일정:\n${calLines.join('\n')}`:'캘린더 일정 없음',
         todoLine(morningTodos,'오전'),
         todoLine(afternoonTodos,'오후'),
         isLateAfternoon?todoLine(nightTodos,'저녁'):null,
@@ -1984,33 +1839,40 @@ ${commonRules}`;
       if(subSec==='night_1'){
         sys=`당신은 따뜻한 하루 비서예요. 저녁 브리핑을 작성해요.
 오늘 하루를 2-3문장으로 따뜻하게 정리해요 (완료한 일, 메모 기반 흐름, 수고했다는 말).
-이어서 내일 캘린더 일정과 할일을 자연스럽게 안내해요.
+이어서 내일 할일을 자연스럽게 안내해요.
 파트 구분 없이 자연스럽게 이어지는 한 단락으로.
 전체 5-6문장.
 ${commonRules}`;
       } else {
         sys=`당신은 따뜻한 하루 비서예요. 늦은 밤 마무리 브리핑을 작성해요.
 하루가 거의 끝났어요. 오늘 수고한 것을 짧게 정리하고 따뜻하게 마무리해줘요.
-내일 일정이 있으면 한 줄 정도 가볍게 예고해줘요.
 짧고 포근하게. 3-4문장 이내.
 ${commonRules}`;
       }
+      // 내일 투두 수집
+      const tom=new Date(now);tom.setDate(now.getDate()+1);
+      const tomTodos=getTodos(dateKey(tom));
       dataContext=[
-        calLines.length?`내일 캘린더 일정:\n${calLines.join('\n')}`:'내일 캘린더 일정 없음',
         todoLine(morningTodos,'오늘 오전'),
         todoLine(afternoonTodos,'오늘 오후'),
         todoLine(nightTodos,'오늘 저녁'),
         todoLine(noneTodos,'오늘 시간지정없음'),
+        tomTodos.length?`내일 할일: ${tomTodos.filter(t=>!t.done).map(t=>t.text).join(', ')}`:'',
         memoLines.length?`오늘 메모 (시간순):\n${memoLines.slice(0,6).join('\n')}`:''
       ].filter(Boolean).join('\n');
     }
 
-    const maxTok=section==='night'?(subSec==='night_2'?250:350):250;
+    const maxTok=subSec==='night_2'?200:250;
+
+    if(!key){
+      card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">Claude API 키를 설정하면 브리핑을 받을 수 있어요</div>';
+      return card;
+    }
+
     const reply=await callClaude(sys,[{role:'user',content:dataContext}],maxTok);
     card.innerHTML='';
 
     if(reply&&!reply.startsWith('__ERR__')){
-      card.innerHTML='';
       const p=document.createElement('div');
       p.style.cssText='font-size:13px;color:var(--tp);line-height:1.75;padding:4px 2px;word-break:keep-all;';
       p.textContent=reply.trim();
@@ -2018,25 +1880,14 @@ ${commonRules}`;
       _scheduleCache=card.innerHTML;_scheduleCacheSection=subSec;
       _bcSet(subSec,{html:_scheduleCache});
     } else {
-      // 폴백: raw 목록
-      if(!calLines.length){
-        card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">'+dayLabel+' 남은 일정이 없어요</div>';
-      } else {
-        calLines.forEach(line=>{
-          const row=document.createElement('div');row.className='schedule-item';
-          const parts=line.match(/^([^\s]+\s\d+:\d+)\s(.+)$/);
-          if(parts){row.innerHTML='<div class="schedule-time">'+parts[1]+'</div><div class="schedule-text">'+parts[2]+'</div>';}
-          else{row.innerHTML='<div class="schedule-text">'+line+'</div>';}
-          card.appendChild(row);
-        });
-      }
+      card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">잠시 후 다시 시도해주세요</div>';
     }
   }catch(e){
-    console.error('schedule card err:',e);
-    card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">일정을 불러올 수 없어요</div>';
+    card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑을 불러올 수 없어요</div>';
   }
   return card;
 }
+
 function openWeeklyReviewSheet(){
   const sheet=document.getElementById('weekly-review-sheet');
   const content=document.getElementById('weekly-review-content');
@@ -2077,10 +1928,6 @@ function openMidweekRemindSheet(){
     });
   }
 }
-function homeOpenCalendar(){
-  openSettings();
-}
-
 async function makeMidweekRemindCard(){
   const now=new Date();
   const weekStart=new Date(now);
@@ -2355,21 +2202,6 @@ async function fetchHomeWeather(section){
   const checks=getHabitChecks(wk);
   const doneHabits=habits.filter(h=>checks[h.name+'-'+dow]).map(h=>h.name);
 
-  // 캘린더 일정 수집 (토큰 있으면)
-  let calEvents=[];
-  if(_gcalAccessToken&&Date.now()<_gcalTokenExpiry-60000){
-    try{
-      const dayEnd=new Date(now);dayEnd.setHours(23,59,59,999);
-      const url=`https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(now.toISOString())}&timeMax=${encodeURIComponent(dayEnd.toISOString())}&singleEvents=true&orderBy=startTime&maxResults=8`;
-      const r=await fetch(url,{headers:{'Authorization':'Bearer '+_gcalAccessToken}});
-      if(r.ok){const d=await r.json();calEvents=(d.items||[]).map(ev=>{
-        let t='종일';
-        if(ev.start&&ev.start.dateTime){const dd=new Date(ev.start.dateTime);t=(dd.getHours()<12?'오전':'오후')+' '+(dd.getHours()%12||12)+':'+String(dd.getMinutes()).padStart(2,'0');}
-        return t+' '+( ev.summary||'(제목없음)');
-      });}
-    }catch(e){}
-  }
-
   // Claude에게 인사 서브텍스트 요청
   const sectionLabel={morning:'오전',afternoon:'오후',night:'저녁'};
   const weatherDesc=weather?`날씨: ${weather.icon} ${weather.temp}도`:'날씨 정보 없음';
@@ -2379,8 +2211,7 @@ async function fetchHomeWeather(section){
     doneTodos.length?`완료한 할일: ${doneTodos.join(', ')}`:'',
     doneHabits.length?`완료한 습관: ${doneHabits.join(', ')}`:'',
     memos.length?`오늘 메모 (시간순, 가장 최근 것이 현재 상황): ${memos.slice(0,5).join(' / ')}`:'',
-    sleep.sleep||sleep.wake?`수면: ${sleep.sleep||'?'} 취침 ${sleep.wake||'?'} 기상`:'',
-    calEvents.length?`오늘 남은 일정: ${calEvents.join(', ')}`:'오늘 남은 캘린더 일정 없음'
+    sleep.sleep||sleep.wake?`수면: ${sleep.sleep||'?'} 취침 ${sleep.wake||'?'} 기상`:''
   ].filter(Boolean).join('\n');
 
   const sys=`당신은 따뜻한 일상 비서예요. 아래 오늘 데이터를 보고 ${sectionLabel[section]} 인사말을 **딱 1-2문장**으로 만들어요.
@@ -3679,23 +3510,6 @@ function saveClaudeKey(){
   if(statusEl)statusEl.textContent='저장됐어요 ✅';
   showToast('Claude API 키 저장됐어요 ✅');
 }
-function saveGCalKeys(){
-  const ci=document.getElementById('gcal-client-id-inp');
-  const ak=document.getElementById('gcal-api-key-inp');
-  let saved=false;
-  if(ci&&ci.value.trim()&&!ci.value.includes('••••')){S.set('gcal_client_id',ci.value.trim());saved=true;}
-  if(ak&&ak.value.trim()&&!ak.value.includes('••••')){S.set('gcal_api_key',ak.value.trim());saved=true;}
-  if(saved)showToast('Calendar 키 저장됐어요 ✅');
-  else showToast('키를 입력해주세요');
-}
-function clearGCalKeys(){
-  localStorage.removeItem('gcal_api_key');
-  const ci=document.getElementById('gcal-client-id-inp');
-  const ak=document.getElementById('gcal-api-key-inp');
-  if(ci){ci.value='';ci.placeholder='xxxxx.apps.googleusercontent.com';}
-  if(ak){ak.value='';ak.placeholder='AIza...';}
-  showToast('삭제됐어요');
-}
 function saveUserProfile(){
   const inp=document.getElementById('user-profile-inp');
   if(!inp)return;
@@ -3725,16 +3539,9 @@ function openSettings(){
   const el=document.getElementById('sync-status');if(el)el.textContent=navigator.onLine?'온라인 ✅':'오프라인';
   const ki=document.getElementById('claude-api-key-inp');if(ki){const k=S.get('claude_api_key');ki.value=k?'sk-ant-••••'+k.slice(-4):'';}
   const ni=document.getElementById('news-interests-inp');if(ni)ni.value=S.get('news_interests')||'';
-  const ci=document.getElementById('gcal-client-id-inp');
-  if(ci){const v=S.get('gcal_client_id');ci.value='';ci.placeholder=v?'저장됨 (••••'+String(v).slice(-6)+')':'xxxxx.apps.googleusercontent.com';}
-  const ai=document.getElementById('gcal-api-key-inp');
-  if(ai){const v=S.get('gcal_api_key');ai.value='';ai.placeholder=v?'저장됨 (••••'+String(v).slice(-6)+')':'AIza...';}
   const keyInp=document.getElementById('claude-api-key-inp');
-  if(keyInp){const k=S.get('claude_api_key');keyInp.value=k?'••••••••••••'+k.slice(-4):'';}  const newsInp=document.getElementById('news-interests-inp');if(newsInp)newsInp.value=S.get('news_interests')||'';
-  const profileInp=document.getElementById('user-profile-inp');if(profileInp)profileInp.value=S.get('user_profile')||'';
-  const gcalCi=document.getElementById('gcal-client-id-inp');if(gcalCi){const v=S.get('gcal_client_id');gcalCi.value=v?'••••••••'+v.slice(-6):'';}
-  const gcalAk=document.getElementById('gcal-api-key-inp');if(gcalAk){const v=S.get('gcal_api_key');gcalAk.value=v?'••••••••'+v.slice(-6):'';}
-  const theme=S.get('theme')||'light';
+  if(keyInp){const k=S.get('claude_api_key');keyInp.value=k?'••••••••••••'+k.slice(-4):'';} const newsInp=document.getElementById('news-interests-inp');if(newsInp)newsInp.value=S.get('news_interests')||'';
+  const profileInp=document.getElementById('user-profile-inp');if(profileInp)profileInp.value=S.get('user_profile')||'';  const theme=S.get('theme')||'light';
   const darkTog=document.getElementById('dark-tog');if(darkTog)darkTog.classList.toggle('on',theme==='dark');
   document.querySelectorAll('.ctheme-btn').forEach(b=>b.classList.remove('on'));
   const act=document.getElementById('ct-'+theme);if(act)act.classList.add('on');
