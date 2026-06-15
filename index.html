@@ -2457,9 +2457,10 @@ async function syncWChallengeDown(wk){
     }
     return;
   }
-  // Supabase → 로컬 반영 후 화면 갱신
+  // Supabase → 로컬 반영 후 weekly 탭 열려있으면 화면 갱신
   S.set(key,rows[0].lines);
-  renderWeeklyChallenge();
+  const weeklyView=document.getElementById('v-weekly');
+  if(weeklyView&&weeklyView.classList.contains('on'))renderWeeklyChallenge();
 }
 async function syncContentsDown(mk){
   if(S.get(S.key('contents_pending',mk))){
@@ -3874,6 +3875,14 @@ async function initSync(){
       didUp=true;
     }
     if(didUp)uploadedDates[dk]=true;
+  }
+  // wchallenge pending 있으면 Up 먼저
+  var wk=weekKey(new Date());
+  if(S.get('wchallenge_pending_'+wk)){
+    await autoSync('wchallenge','wchallenge_'+wk);
+  } else {
+    // 없으면 Supabase에서 Down
+    await syncWChallengeDown(wk);
   }
   // Up 하지 않은 날짜만 Supabase → 로컬 복원
   for(var i=0;i<dates.length;i++){
