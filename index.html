@@ -2915,7 +2915,7 @@ function renderTimetable(){
         const block=document.createElement('div');block.className=`tt-block ${cat}`;
         block.style.cssText=`width:${w}px;min-width:${w}px;`;
         if(isWatching){
-          block.style.backgroundImage=`repeating-linear-gradient(90deg,transparent,transparent 6px,rgba(255,255,255,0.35) 6px,rgba(255,255,255,0.35) 8px)`;
+          block.style.backgroundImage=`repeating-linear-gradient(45deg,transparent,transparent 4px,rgba(255,255,255,0.4) 4px,rgba(255,255,255,0.4) 6px)`;
           block.style.opacity='0.85';
         }
         block.textContent=item.title;block.title=item.title;
@@ -3025,7 +3025,6 @@ async function apiSearch(q){
   resultsEl.style.display='block';resultsEl.innerHTML='<div class="api-loading">검색 중...</div>';
   try{
     if(cat==='book')await searchKakaoBook(q,resultsEl);
-    else if(cat==='music')await searchItunesMusic(q,resultsEl);
     else await searchTMDB(q,cat,resultsEl);
   }catch(e){resultsEl.innerHTML='<div class="api-loading">검색 실패 — 직접 입력해주세요</div>';}
 }
@@ -3067,17 +3066,6 @@ function selectApiResult(title,poster,sub1,sub2){
     if(poster){preview.style.display='flex';document.getElementById('cm-poster-img').src=poster;document.getElementById('cm-poster-title').textContent=title;document.getElementById('cm-poster-sub').textContent=sub1+(sub2?' · '+sub2:'');}
     else preview.style.display='none';
   }
-}
-async function searchItunesMusic(q,el){
-  // iTunes API는 브라우저 CORS 제한으로 직접 호출 불가
-  // 제목 입력 후 저장, 또는 Apple Music에서 검색 안내
-  el.innerHTML=`<div class="api-result-item" style="cursor:pointer;justify-content:center;gap:8px;" onclick="window.open('https://music.apple.com/search?term=${encodeURIComponent(q)}','_blank');hideApiResults();">
-    <span style="font-size:18px;">🎵</span>
-    <div class="api-result-info"><div class="api-result-title">Apple Music에서 "${q}" 검색</div><div class="api-result-sub">탭하면 Apple Music으로 이동해요</div></div>
-  </div>
-  <div class="api-result-item" style="cursor:pointer;justify-content:center;" onclick="document.getElementById('cm-title').value='${q.replace(/'/g,"\\'")}';hideApiResults();">
-    <div class="api-result-info"><div class="api-result-title" style="color:var(--tm);">"${q}" 그대로 입력</div></div>
-  </div>`;
 }
 function hideApiResults(){const el=document.getElementById('api-results');if(el)el.style.display='none';}
 
