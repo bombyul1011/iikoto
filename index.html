@@ -2637,11 +2637,16 @@ function renderTodos(){
   const hiding=document.getElementById('hide-tog')?.classList.contains('on')||false;
   list.innerHTML='';
   const tsOrder={morning:0,afternoon:1,night:2,none:3};
+  function parseTime(text){
+    const m=text.match(/^(\d{1,2}):(\d{2})/);
+    return m?parseInt(m[1])*60+parseInt(m[2]):9999;
+  }
   const sorted=[...todos.map((t,i)=>({...t,_i:i}))].sort((a,b)=>{
     if(a.done!==b.done)return a.done?1:-1;
     const ta=tsOrder[a.timeSection||'none']??3;
     const tb=tsOrder[b.timeSection||'none']??3;
-    return ta-tb;
+    if(ta!==tb)return ta-tb;
+    return parseTime(a.text)-parseTime(b.text);
   });
   sorted.forEach((t)=>{
     const i=t._i;
