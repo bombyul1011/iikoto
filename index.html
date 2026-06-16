@@ -2281,11 +2281,7 @@ function renderHome(){
   const greetings={morning:'좋은 아침이에요',afternoon:'잘 하고 있어요',night:'오늘도 수고했어요'};
   const greetEl=document.getElementById('home-greeting');
   if(greetEl)greetEl.textContent=greetings[section];
-  const subs={
-    morning:'오늘 하루도 잘 부탁해요 🌿\n작은 것도 기록하면 나중에 보물이 돼요',
-    afternoon:'오늘도 잘 해내고 있어요 ✨\n남은 시간도 봄이답게 보내봐요',
-    night:'오늘 하루 고생 많았어요 🌙\n잠들기 전 오늘을 기록해봐요'
-  };
+  const subs={morning:'잠깐만요...',afternoon:'잠깐만요...',night:'잠깐만요...'};
   const subEl=document.getElementById('home-greeting-sub');
   if(subEl)subEl.textContent=subs[section];
   renderHomeBody(section);
