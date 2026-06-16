@@ -1258,13 +1258,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div class="pdf-modal-body">
       <div class="pdf-range-row">
         <span class="pdf-range-lbl">시작</span>
-        <input type="month" class="modal-inp" id="pdf-start" style="flex:1;margin-bottom:0;" oninput="updatePdfCount()">
+        <input type="date" class="modal-inp" id="pdf-start" style="flex:1;margin-bottom:0;" oninput="updatePdfCount()">
       </div>
       <div class="pdf-range-row">
         <span class="pdf-range-lbl">종료</span>
-        <input type="month" class="modal-inp" id="pdf-end" style="flex:1;margin-bottom:0;" oninput="updatePdfCount()">
+        <input type="date" class="modal-inp" id="pdf-end" style="flex:1;margin-bottom:0;" oninput="updatePdfCount()">
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button onclick="setPdfRange('week')" style="flex:1;padding:7px;border-radius:9px;border:1px solid var(--inp-b);background:var(--inp);color:var(--ts);font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer;">이번 주</button>
         <button onclick="setPdfRange('month')" style="flex:1;padding:7px;border-radius:9px;border:1px solid var(--inp-b);background:var(--inp);color:var(--ts);font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer;">이번 달</button>
         <button onclick="setPdfRange('3month')" style="flex:1;padding:7px;border-radius:9px;border:1px solid var(--inp-b);background:var(--inp);color:var(--ts);font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer;">최근 3개월</button>
         <button onclick="setPdfRange('year')" style="flex:1;padding:7px;border-radius:9px;border:1px solid var(--inp-b);background:var(--inp);color:var(--ts);font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer;">올해 전체</button>
@@ -3693,85 +3694,163 @@ function openMarkdownBackup(){setPdfRange('month');openModal('pdf-modal');}
 function openPdfModal(){openMarkdownBackup();}
 
 function setPdfRange(type){
-  const now=new Date();const y=now.getFullYear(),mo=now.getMonth();
-  let sy=y,sm=mo,ey=y,em=mo;
-  if(type==='3month'){const s=new Date(y,mo-2,1);sy=s.getFullYear();sm=s.getMonth();}
-  else if(type==='year')sm=0;
-  const fmt=(y,m)=>`${y}-${pad(m+1)}`;
-  document.getElementById('pdf-start').value=fmt(sy,sm);
-  document.getElementById('pdf-end').value=fmt(ey,em);
+  const now=new Date();
+  const y=now.getFullYear(),mo=now.getMonth();
+  if(type==='week'){
+    // 이번 주 월~일
+    const dow=(now.getDay()+6)%7;
+    const mon=new Date(now);mon.setDate(now.getDate()-dow);
+    const sun=new Date(mon);sun.setDate(mon.getDate()+6);
+    document.getElementById('pdf-start').value=dateKey(mon);
+    document.getElementById('pdf-end').value=dateKey(sun);
+  } else if(type==='month'){
+    const s=new Date(y,mo,1),e=new Date(y,mo+1,0);
+    document.getElementById('pdf-start').value=dateKey(s);
+    document.getElementById('pdf-end').value=dateKey(e);
+  } else if(type==='3month'){
+    const s=new Date(y,mo-2,1),e=new Date(y,mo+1,0);
+    document.getElementById('pdf-start').value=dateKey(s);
+    document.getElementById('pdf-end').value=dateKey(e);
+  } else if(type==='year'){
+    document.getElementById('pdf-start').value=`${y}-01-01`;
+    document.getElementById('pdf-end').value=`${y}-12-31`;
+  }
   updatePdfCount();
-}
-
-function getMonthRange(start,end){
-  const months=[];const[sy,sm]=start.split('-').map(Number);const[ey,em]=end.split('-').map(Number);
-  let y=sy,m=sm;
-  while(y<ey||(y===ey&&m<=em)){months.push(`${y}-${pad(m)}`);m++;if(m>12){m=1;y++;}}
-  return months;
 }
 
 function updatePdfCount(){
   const start=document.getElementById('pdf-start').value;
   const end=document.getElementById('pdf-end').value;
   if(!start||!end)return;
-  const months=getMonthRange(start,end);
-  let total=0;
-  months.forEach(mk=>{
-    const[y,mo]=mk.split('-').map(Number);
-    const dim=new Date(y,mo,0).getDate();
-    for(let d=1;d<=dim;d++){
-      const dk=`${y}-${pad(mo)}-${pad(d)}`;
-      total+=getMemos(dk).length;
-    }
-  });
+  const s=new Date(start),e=new Date(end);
+  let total=0,days=0;
+  for(let d=new Date(s);d<=e;d.setDate(d.getDate()+1)){
+    const dk=dateKey(d);
+    const memos=getMemos(dk);
+    const todos=getTodos(dk);
+    const sl=getSleep(dk);
+    const ol=S.get(S.key('oneline',dk))||'';
+    if(memos.length||todos.length||sl.sleep||ol){days++;total+=memos.length;}
+  }
   const el=document.getElementById('pdf-preview-count');
-  if(el)el.textContent=`총 ${months.length}개월 · 메모 ${total}개`;
+  if(el)el.textContent=`총 ${days}일 · 메모 ${total}개`;
 }
 
+const DAY_NAMES_KO=['일','월','화','수','목','금','토'];
+const WEEK_DAY_LABELS=['M','T','W','T','F','S','S'];
+const CAT_SYMBOLS={drama:'▷',book:'▤',movie:'◈',music:'♩'};
+
 function buildMarkdownText(start,end){
-  const months=getMonthRange(start,end);
+  const s=new Date(start),e=new Date(end);
+
+  // 주차 계산
+  const monDate=new Date(s);
+  const dowS=(s.getDay()+6)%7;
+  monDate.setDate(s.getDate()-dowS);
+  const sunDate=new Date(monDate);sunDate.setDate(monDate.getDate()+6);
+
+  const fmtDate=(d)=>`${d.getMonth()+1}/${d.getDate()}`;
+  const weekNum=Math.ceil((s.getDate()+new Date(s.getFullYear(),s.getMonth(),1).getDay())/7);
+
   let md='';
-  months.forEach(mk=>{
-    const[y,mo]=mk.split('-').map(Number);
-    const dim=new Date(y,mo,0).getDate();
-    for(let d=1;d<=dim;d++){
-      const dk=`${y}-${pad(mo)}-${pad(d)}`;
-      const memos=getMemos(dk);
-      const sl=getSleep(dk);
-      const oneline=S.get(S.key('oneline',dk))||'';
-      if(!memos.length&&!sl.sleep&&!oneline)continue;
-      // 날짜 헤더 — YY/MM/DD 요일
-      const date=new Date(y,mo-1,d);
-      const dayName=DAYS[date.getDay()];
-      const yy=String(y).slice(2);
-      const mmStr=String(mo).padStart(2,'0');
-      const ddStr=String(d).padStart(2,'0');
-      md+=`${yy}${mmStr}${ddStr} ${dayName}\n`;
-      // 하루 한줄
-      if(oneline)md+=`"${oneline}"\n`;
-      md+='\n';
-      // 수면
-      if(sl.sleep||sl.wake){
-        let dur='';
-        if(sl.sleep&&sl.wake){
-          const sv=sl.sleep.split(':').map(Number),wv=sl.wake.split(':').map(Number);
-          let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;
-          dur=` · ${Math.floor(m/60)}h ${m%60}m`;
-        }
-        md+=`🌙 ${sl.sleep||'--'} - ${sl.wake||'--'}${dur}\n`;
+  md+=`━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  md+=`✦ iikoto 주간 기록\n`;
+  md+=`${s.getFullYear()}년 ${s.getMonth()+1}월 ${weekNum}주차 (${fmtDate(s)} ${DAY_NAMES_KO[s.getDay()]} ~ ${fmtDate(e)} ${DAY_NAMES_KO[e.getDay()]})\n`;
+  md+=`━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+
+  // 이번 주 다짐
+  const wk=weekKey(s);
+  const challenges=getWChallenge(wk).filter(c=>c.text&&c.text.trim());
+  if(challenges.length){
+    md+=`✦ 이번 주 다짐\n`;
+    challenges.forEach(c=>{
+      const dayStr=WEEK_DAY_LABELS.map((l,i)=>c.days[i]?'●':'○').join(' ');
+      md+=`· ${c.text.padEnd(20)} ${dayStr}\n`;
+    });
+  }
+
+  // 날짜별 기록
+  for(let d=new Date(s);d<=e;d.setDate(d.getDate()+1)){
+    const dk=dateKey(d);
+    const memos=getMemos(dk);
+    const todos=getTodos(dk);
+    const sl=getSleep(dk);
+    const ol=S.get(S.key('oneline',dk))||'';
+    if(!memos.length&&!todos.length&&!sl.sleep&&!sl.wake&&!ol)continue;
+
+    md+=`────────────────────────\n`;
+    md+=`☽ ${DAY_NAMES_KO[d.getDay()]}요일 ${d.getMonth()+1}/${d.getDate()}\n`;
+
+    // 수면
+    if(sl.sleep||sl.wake){
+      md+=`- - - - - - - -\n`;
+      let dur='';
+      if(sl.sleep&&sl.wake){
+        const sv=sl.sleep.split(':').map(Number),wv=sl.wake.split(':').map(Number);
+        let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;
+        dur=` · ${Math.floor(m/60)}h ${m%60}m`;
       }
-      // 메모
-      if(memos.length){
-        md+='\n';
-        memos.forEach(m=>{
-          if(!m.text)return;
-          if(m.time)md+=`${m.time}  ${m.text}\n`;
-          else md+=`${m.text}\n`;
-        });
-      }
-      md+='\n---\n\n';
+      md+=`수면  ${sl.sleep||'--'} 취침 · ${sl.wake||'--'} 기상${dur}\n`;
     }
-  });
+
+    // 투두
+    if(todos.length){
+      md+=`- - - - - - - -\n`;
+      md+=`□ 투두\n`;
+      const tsOrder={morning:0,afternoon:1,night:2,none:3};
+      const sorted=[...todos].sort((a,b)=>(tsOrder[a.timeSection||'none']??3)-(tsOrder[b.timeSection||'none']??3));
+      sorted.forEach(t=>{md+=`${t.done?'✓':'○'} ${t.text}\n`;});
+    }
+
+    // 메모
+    if(memos.length){
+      md+=`- - - - - - - -\n`;
+      md+=`✎ 메모\n`;
+      memos.forEach(m=>{
+        if(!m.text)return;
+        md+=m.time?`${m.time}  ${m.text}\n`:`${m.text}\n`;
+      });
+    }
+
+    // 하루 한 줄
+    if(ol){
+      md+=`- - - - - - - -\n`;
+      md+=`◎ 하루 한 줄\n`;
+      md+=`${ol}\n`;
+    }
+  }
+
+  // 습관
+  const habits=getHabits();
+  if(habits.length){
+    md+=`━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    md+=`◉ 이번 주 습관\n`;
+    const checks=getHabitChecks(wk);
+    habits.forEach(h=>{
+      const dots=[0,1,2,3,4,5,6].map(i=>checks[h.name+'-'+i]?'●':'○').join(' ');
+      md+=`${h.name.padEnd(8)} ${dots}\n`;
+    });
+  }
+
+  // 콘텐츠
+  const mk=monthKey(s);
+  const contents=getContents(mk).filter(c=>c.cat!=='music');
+  const music=getContents(mk).filter(c=>c.cat==='music');
+  if(contents.length||music.length){
+    md+=`━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    md+=`◈ 이번 달 콘텐츠\n`;
+    contents.forEach(c=>{
+      const sym=CAT_SYMBOLS[c.cat]||'·';
+      const stars=c.stars?` ${'★'.repeat(c.stars)}${'☆'.repeat(5-c.stars)}`:'';
+      const status=c.status==='watching'?' (보는 중)':'';
+      md+=`${sym} ${c.title}${stars}${status}\n`;
+    });
+    if(music.length){
+      music.forEach(c=>{md+=`♩ ${c.title}\n`;});
+    }
+  }
+
+  md+=`━━━━━━━━━━━━━━━━━━━━━━━━`;
   return md.trim();
 }
 
