@@ -3753,10 +3753,10 @@ function buildMarkdownText(start,end){
   const weekNum=Math.ceil((s.getDate()+new Date(s.getFullYear(),s.getMonth(),1).getDay())/7);
 
   let md='';
-  md+=`━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  md+=`━━━━━━━━━━━━━━━━━━━━\n`;
   md+=`✦ iikoto 주간 기록\n`;
   md+=`${s.getFullYear()}년 ${s.getMonth()+1}월 ${weekNum}주차 (${fmtDate(s)} ${DAY_NAMES_KO[s.getDay()]} ~ ${fmtDate(e)} ${DAY_NAMES_KO[e.getDay()]})\n`;
-  md+=`━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  md+=`━━━━━━━━━━━━━━━━━━━━\n`;
 
   // 이번 주 다짐
   const wk=weekKey(s);
@@ -3778,7 +3778,7 @@ function buildMarkdownText(start,end){
     const ol=S.get(S.key('oneline',dk))||'';
     if(!memos.length&&!todos.length&&!sl.sleep&&!sl.wake&&!ol)continue;
 
-    md+=`────────────────────────\n`;
+    md+=`────────────────────\n`;
     md+=`☽ ${DAY_NAMES_KO[d.getDay()]}요일 ${d.getMonth()+1}/${d.getDate()}\n`;
 
     // 수면
@@ -3823,7 +3823,7 @@ function buildMarkdownText(start,end){
   // 습관
   const habits=getHabits();
   if(habits.length){
-    md+=`━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    md+=`━━━━━━━━━━━━━━━━━━━━\n`;
     md+=`◉ 이번 주 습관\n`;
     const checks=getHabitChecks(wk);
     habits.forEach(h=>{
@@ -3837,7 +3837,7 @@ function buildMarkdownText(start,end){
   const contents=getContents(mk).filter(c=>c.cat!=='music');
   const music=getContents(mk).filter(c=>c.cat==='music');
   if(contents.length||music.length){
-    md+=`━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    md+=`━━━━━━━━━━━━━━━━━━━━\n`;
     md+=`◈ 이번 달 콘텐츠\n`;
     contents.forEach(c=>{
       const sym=CAT_SYMBOLS[c.cat]||'·';
@@ -3850,7 +3850,7 @@ function buildMarkdownText(start,end){
     }
   }
 
-  md+=`━━━━━━━━━━━━━━━━━━━━━━━━`;
+  md+=`━━━━━━━━━━━━━━━━━━━━`;
   return md.trim();
 }
 
