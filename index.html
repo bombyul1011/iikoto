@@ -3816,8 +3816,9 @@ function buildMarkdownText(start,end){
     if(ol){
       md+=`- - - - - - - -\n`;
       md+=`◎ 하루 한 줄\n`;
-      md+=`${ol}\n`;
+      md+=`'${ol}'\n`;
     }
+    md+=`\n`;
   }
 
   // 습관
