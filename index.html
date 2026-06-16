@@ -2195,13 +2195,7 @@ async function fetchHomeWeather(section){
   // Claude 키 없으면 고정 텍스트 + 날씨만
   if(!key){
     if(subEl){
-      const wStr=weather?weather.icon+' '+weather.temp+'° · ':'';
-      const defaults={
-        morning:wStr+'오늘 하루도 잘 부탁해요 🌿',
-        afternoon:wStr+'오늘도 잘 해내고 있어요 ✨',
-        night:wStr+'오늘 하루 고생 많았어요 🌙'
-      };
-      subEl.textContent=defaults[section];
+      subEl.textContent='잠깐만요...';
     }
     return;
   }
