@@ -821,20 +821,20 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="card y" id="todo-card">
         <div id="todo-list"></div>
         <div class="todo-footer">
-          <div class="toggle-row">
-            <span class="toggle-lbl">완료 숨기기</span>
-            <div class="tog" id="hide-tog" onclick="this.classList.toggle('on');renderTodos()"></div>
+          <div class="toggle-row" style="justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="toggle-lbl">완료 숨기기</span>
+              <div class="tog" id="hide-tog" onclick="this.classList.toggle('on');renderTodos()"></div>
+            </div>
+            <a href="shortcuts://x-callback-url/run-shortcut?name=%EC%9D%B4%EC%9D%B4%EC%BD%94%ED%86%A0%20%EB%AF%B8%EB%A6%AC%EC%95%8C%EB%A6%BC&x-success=https%3A%2F%2Fbombyul1011.github.io%2Fiikoto%2F" style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--tp);text-decoration:none;background:var(--card);border:1px solid var(--card-b);padding:5px 10px;border-radius:10px;flex-shrink:0;">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="var(--acc)" stroke="var(--acc)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              미리알림
+            </a>
           </div>
         </div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <button class="add-btn" onclick="openTodoModal()" style="flex:1;">
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" style="color:var(--tm)"><line x1="6.5" y1="2" x2="6.5" y2="11"/><line x1="2" y1="6.5" x2="11" y2="6.5"/></svg>할 일 추가
-          </button>
-          <a href="shortcuts://run-shortcut?name=%EC%9D%B4%EC%9D%B4%EC%BD%94%ED%86%A0%20%EB%AF%B8%EB%A6%AC%EC%95%8C%EB%A6%BC" style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--tp);text-decoration:none;background:var(--card);border:1px solid var(--card-b);padding:9px 12px;border-radius:14px;flex-shrink:0;">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="var(--acc)" stroke="var(--acc)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-            미리알림
-          </a>
-        </div>
+        <button class="add-btn" onclick="openTodoModal()">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" style="color:var(--tm)"><line x1="6.5" y1="2" x2="6.5" y2="11"/><line x1="2" y1="6.5" x2="11" y2="6.5"/></svg>할 일 추가
+        </button>
       </div>
       <div class="slabel">memo</div>
       <div class="card p" id="memo-card">
