@@ -3996,6 +3996,12 @@ async function initSync(){
     // 없으면 Supabase에서 Down
     await syncWChallengeDown(wk);
   }
+  // 하루한줄 — 이번 주 월~일
+  var mon=new Date();mon.setDate(mon.getDate()-((mon.getDay()+6)%7));
+  for(var i=0;i<7;i++){
+    var od=new Date(mon);od.setDate(mon.getDate()+i);
+    await syncGoalDown(S.key('oneline',dateKey(od)));
+  }
   // Up 하지 않은 날짜만 Supabase → 로컬 복원
   for(var i=0;i<dates.length;i++){
     var dk=dates[i];
