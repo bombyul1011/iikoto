@@ -336,7 +336,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .modal-title{font-size:13px;font-weight:500;color:var(--ts);margin-bottom:16px;}
 .modal-inp{width:100%;background:var(--inp);border:1px solid var(--inp-b);border-radius:12px;padding:11px 14px;font-size:16px;color:var(--tp);font-family:'DM Sans',sans-serif;outline:none;margin-bottom:12px;}
 .modal-inp::placeholder{color:var(--tm);}
-.time-inp{font-size:24px;font-weight:300;text-align:center;letter-spacing:2px;box-sizing:border-box;width:100%;max-width:100%;}
+.time-inp{font-size:22px;font-weight:300;text-align:center;letter-spacing:1px;box-sizing:border-box;width:auto;max-width:160px;margin:0 auto 12px;display:block;}
 .modal-actions{display:flex;gap:8px;}
 .mbtn{flex:1;padding:10px;border-radius:12px;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;border:none;}
 .mbtn.cancel{background:var(--card);color:var(--tm);border:1px solid var(--card-b);}
@@ -1006,8 +1006,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 <!-- TIME MODAL -->
 <div class="modal-ov" id="time-modal" onclick="closeModal('time-modal',event)">
-  <div class="modal">
-    <div class="modal-title" id="time-modal-title">취침 시간</div>
+  <div class="modal" style="max-width:220px;">
+    <div class="modal-title" id="time-modal-title" style="text-align:center;">취침 시간</div>
     <input type="time" class="modal-inp time-inp" id="time-inp">
     <div class="modal-actions">
       <button class="mbtn cancel" onclick="closeModal('time-modal')">취소</button>
