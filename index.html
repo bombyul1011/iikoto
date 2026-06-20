@@ -145,6 +145,32 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .weekly-review-banner-inner{border-radius:14.5px;background:linear-gradient(135deg,rgba(210,244,225,0.82),rgba(248,245,200,0.82),rgba(212,242,222,0.82));padding:16px 18px;backdrop-filter:blur(2px);}
 .midweek-remind-banner{position:relative;border-radius:16px;padding:1.5px;background:linear-gradient(135deg,rgba(180,165,230,0.95),rgba(140,200,235,0.90),rgba(190,170,235,0.95),rgba(160,190,230,0.95));background-size:300% 300%;animation:bannerShine 4s ease infinite;cursor:pointer;margin-bottom:2px;}
 .midweek-remind-banner-inner{border-radius:14.5px;background:linear-gradient(135deg,rgba(225,218,248,0.82),rgba(210,235,248,0.82),rgba(228,220,248,0.82));padding:16px 18px;backdrop-filter:blur(2px);}
+.report-banner{position:relative;border-radius:16px;padding:1.6px;background:linear-gradient(135deg,rgba(150,215,180,0.95),rgba(235,220,120,0.90),rgba(165,222,188,0.95),rgba(150,215,180,0.95));background-size:300% 300%;animation:bannerShine 4s ease infinite;cursor:pointer;margin-top:10px;}
+.report-banner-inner{border-radius:14.5px;background:linear-gradient(135deg,rgba(210,244,225,0.85),rgba(248,245,200,0.85),rgba(212,242,222,0.85));padding:13px 17px;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.report-banner-line{font-size:11.5px;font-weight:400;color:rgba(100,140,75,0.80);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rb-title{font-size:13px;font-weight:700;letter-spacing:0.05em;color:rgba(65,125,70,0.95);}
+.report-banner-arrow{font-size:17px;color:rgba(80,130,85,0.55);flex-shrink:0;}
+[data-theme="dark"] .report-banner-inner{background:linear-gradient(135deg,rgba(30,60,40,0.92),rgba(60,55,15,0.92),rgba(30,58,38,0.92));}
+.month-chips{display:flex;gap:6px;margin-bottom:16px;overflow-x:auto;padding-bottom:2px;}
+.m-chip{flex-shrink:0;font-size:11px;color:var(--tm);padding:7px 13px;border-radius:13px;background:var(--card);border:1px solid var(--card-b);cursor:pointer;font-weight:500;}
+.m-chip.active{background:rgba(150,215,180,0.4);border-color:rgba(140,210,170,0.55);color:#3a7858;font-weight:700;}
+.m-chip.disabled{opacity:0.35;cursor:default;}
+.mr-card{border-radius:16px;background:var(--card);border:1px solid var(--card-b);padding:15px 15px 13px;margin-bottom:12px;}
+.mr-sec-title{font-size:10px;color:var(--tm);letter-spacing:.10em;text-transform:uppercase;margin-bottom:11px;}
+.mr-row2{display:flex;gap:8px;margin-bottom:4px;}
+.mr-stat{flex:1;border-radius:14px;background:var(--card);border:1px solid var(--card-b);padding:12px 12px;}
+.mr-stat .v{font-size:22px;font-weight:300;color:var(--tp);letter-spacing:-.5px;line-height:1;}
+.mr-stat .l{font-size:10px;color:var(--tm);margin-top:5px;}
+.mr-tag-cloud{display:flex;flex-wrap:wrap;gap:6px;}
+.mr-tag{font-size:11px;padding:5px 11px;border-radius:13px;background:rgba(255,230,200,0.45);border:1px solid rgba(240,210,160,0.5);color:#8a6840;}
+.mr-week-anchor{margin-bottom:14px;}
+.mr-week-anchor:last-child{margin-bottom:0;}
+.mr-week-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+.mr-week-head .wk{font-size:11px;font-weight:600;color:var(--tp);}
+.mr-week-head .rng{font-size:9.5px;color:var(--tm);}
+.mr-wc-line{display:flex;align-items:center;gap:8px;padding:4px 0;}
+.mr-wc-line .txt{flex:1;font-size:12px;color:var(--tp);}
+.mr-wc-line .pct{font-size:10.5px;color:var(--tm);}
 [data-theme="dark"] .weekly-review-banner-inner{background:linear-gradient(135deg,rgba(30,60,40,0.92),rgba(60,55,15,0.92),rgba(30,58,38,0.92));}
 .weekly-review-banner-title{font-size:13px;font-weight:700;color:rgba(65,125,70,0.95);letter-spacing:0.05em;margin-bottom:4px;}
 [data-theme="dark"] .weekly-review-banner-title{color:rgba(160,230,170,0.95);}
@@ -900,6 +926,12 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="slabel">해빗 모아보기</div>
       <div class="card m"><div id="habit-monthly"></div></div>
       <div id="monthly-stat-bar"></div>
+      <div class="report-banner" onclick="openMonthlyReportSheet()">
+        <div class="report-banner-inner">
+          <div class="report-banner-line">🌿 <span class="rb-title" id="report-banner-month-lbl">6월 리포트</span> · 이번 달 전체 기록 모아보기</div>
+          <div class="report-banner-arrow">›</div>
+        </div>
+      </div>
     </div>
 
   </div><!-- /scroll -->
@@ -980,6 +1012,17 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div class="sheet-title">메모 옵션</div>
     <div class="sheet-item" onclick="memoSheetEdit()"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="color:var(--ts)"><path d="M3 15L5 9L13.5 1.5C14.5.5 16 .5 17 1.5L16.5 2C17.5 3 17.5 4.5 16.5 5.5L8 14Z"/><line x1="5" y1="9" x2="8" y2="14"/></svg>수정</div>
     <div class="sheet-item del" onclick="memoSheetDelete()"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#c05060" stroke-width="1.2" stroke-linecap="round"><polyline points="3,5 15,5"/><rect x="4.5" y="5" width="9" height="10.5" rx="2"/></svg>삭제</div>
+  </div>
+</div>
+
+<!-- MONTHLY REPORT SHEET -->
+<div class="overlay" id="monthly-report-sheet" onclick="closeSheet('monthly-report-sheet',event)">
+  <div class="bsheet" style="max-height:85vh;overflow-y:auto;" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div style="padding:0 20px 24px;">
+      <div class="month-chips" id="mr-month-chips"></div>
+      <div id="mr-content"></div>
+    </div>
   </div>
 </div>
 
@@ -1308,6 +1351,7 @@ function renderHomeBody(section){
   if(!body)return;
   body.innerHTML='';
   const isSunday=new Date().getDay()===0;
+  const isLastDayOfMonth=(()=>{const n=new Date();const t=new Date(n);t.setDate(n.getDate()+1);return t.getDate()===1;})();
 
   if(section==='morning'){
     body.appendChild(makeLabel('오늘 브리핑'));
@@ -1334,8 +1378,18 @@ function renderHomeBody(section){
     body.appendChild(makeLabel('최근 콘텐츠'));
     body.appendChild(makeContentsCard());
   } else {
-    // 일요일 저녁 — 링 대신 주간 요약 (당일 캐시)
-    if(isSunday){
+    // 매달 말일 저녁 — 월간 누계 배너 (최우선)
+    if(isLastDayOfMonth){
+      body.appendChild(makeLabel('🌿 이번 달 누계'));
+      const rbanner=document.createElement('div');
+      rbanner.className='weekly-review-banner';
+      rbanner.innerHTML=`<div class="weekly-review-banner-inner">
+        <div class="weekly-review-banner-title">🌿 이번 달 누계 보기</div>
+        <div class="weekly-review-banner-sub"><span>한 달 동안의 기록을 모아봤어요</span><span style="font-size:16px;opacity:0.6;">›</span></div>
+      </div>`;
+      rbanner.addEventListener('click',openMonthlyReportSheet);
+      body.appendChild(rbanner);
+    } else if(isSunday){
       body.appendChild(makeLabel('✦ 이번 주 돌아보기'));
       const banner=document.createElement('div');
       banner.className='weekly-review-banner';
@@ -1910,6 +1964,132 @@ ${commonRules}`;
     card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑을 불러올 수 없어요</div>';
   }
   return card;
+}
+
+// ── MONTHLY REPORT
+let _reportYear=new Date().getFullYear();
+let _reportMonth=new Date().getMonth();
+function updateReportBannerLabel(){
+  const el=document.getElementById('report-banner-month-lbl');if(!el)return;
+  el.textContent=(new Date().getMonth()+1)+'월 리포트';
+}
+function computeMonthStats(y,mo){
+  const dim=new Date(y,mo+1,0).getDate();
+  let memos=0,doneTodos=0,totalTodos=0,hc=0,ht=0,sleepMin=0,sleepCnt=0;
+  const habits=getHabits();
+  const allMemoTexts=[];
+  const weekSet={};
+  for(let d=1;d<=dim;d++){
+    const dk=`${y}-${pad(mo+1)}-${pad(d)}`;
+    const dayMemos=getMemos(dk);
+    memos+=dayMemos.length;
+    dayMemos.forEach(m=>{if(m.text)allMemoTexts.push(m.text);});
+    const dayTodos=getTodos(dk);
+    totalTodos+=dayTodos.length;doneTodos+=dayTodos.filter(t=>t.done).length;
+    const sl=getSleep(dk);
+    if(sl.sleep&&sl.wake){const sv=sl.sleep.split(':').map(Number),wv=sl.wake.split(':').map(Number);let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;sleepMin+=m;sleepCnt++;}
+    const date=new Date(y,mo,d);const wk=weekKey(date);
+    weekSet[wk]=true;
+    const dow=(date.getDay()+6)%7;
+    const checks=getHabitChecks(wk);
+    habits.forEach(h=>{ht++;if(checks[`${h.name}-${dow}`])hc++;});
+  }
+  const habitPct=ht>0?Math.round(hc/ht*100):0;
+  const todoPct=totalTodos>0?Math.round(doneTodos/totalTodos*100):0;
+  const avgSleep=sleepCnt>0?(sleepMin/sleepCnt/60).toFixed(1):null;
+  const weeks=Object.keys(weekSet).sort();
+  const wcByWeek=weeks.map(wk=>{
+    const items=getWChallenge(wk).filter(c=>c.text&&c.text.trim());
+    const wkStart=new Date(wk.replace('week:',''));
+    const wkEnd=new Date(wkStart);wkEnd.setDate(wkStart.getDate()+6);
+    const label=`${wkStart.getMonth()+1}.${wkStart.getDate()}–${wkEnd.getMonth()+1}.${wkEnd.getDate()}`;
+    const lines=items.map(c=>({text:c.text,pct:Math.round(c.days.filter(Boolean).length/7*100)}));
+    return {wk,label,lines};
+  }).filter(w=>w.lines.length>0);
+  return {memos,doneTodos,totalTodos,todoPct,habitPct,avgSleep,allMemoTexts,wcByWeek};
+}
+async function generateMonthlyReportAI(mk,stats){
+  const key=getClaudeKey();
+  if(!key)return null;
+  const dataContext=[
+    `${mk} 한 달 데이터:`,
+    `투두 완료율 ${stats.todoPct}% (${stats.doneTodos}/${stats.totalTodos})`,
+    `습관 달성률 ${stats.habitPct}%`,
+    stats.avgSleep?`평균 수면 ${stats.avgSleep}시간`:'수면 기록 없음',
+    `메모 총 ${stats.memos}건`,
+    stats.allMemoTexts.length?`메모 내용 일부: ${stats.allMemoTexts.slice(0,15).join(' / ')}`:'',
+    stats.wcByWeek.length?`주간 다짐 현황: ${stats.wcByWeek.map(w=>w.lines.map(l=>`${l.text} ${l.pct}%`).join(', ')).join(' | ')}`:''
+  ].filter(Boolean).join('\n');
+  const sys=`당신은 따뜻한 월간 회고 비서예요. 한 달 데이터를 보고 짧은 총평과 키워드를 만들어요.
+반드시 아래 JSON 형식으로만 응답해요. 다른 텍스트나 마크다운 코드블록 없이 순수 JSON만 출력해요.
+{"comment":"3-5문장의 한 달 총평, ~해요/이에요/어요체, 이모지 1개 정도","keywords":["키워드1","키워드2","키워드3","키워드4"]}
+키워드는 메모 내용에서 자주 등장하거나 인상적인 단어/장소/감정 위주로 2~5개 뽑아요.`;
+  const reply=await callClaude(sys,[{role:'user',content:dataContext}],500);
+  if(!reply||reply.startsWith('__ERR__'))return null;
+  try{
+    const clean=reply.replace(/```json|```/g,'').trim();
+    const parsed=JSON.parse(clean);
+    if(parsed&&parsed.comment)return parsed;
+  }catch(e){}
+  return null;
+}
+function openMonthlyReportSheet(){
+  _reportYear=new Date().getFullYear();_reportMonth=new Date().getMonth();
+  renderReportMonthChips();
+  loadMonthlyReportContent();
+  openSheet('monthly-report-sheet');
+}
+function renderReportMonthChips(){
+  const wrap=document.getElementById('mr-month-chips');if(!wrap)return;
+  const now=new Date();
+  wrap.innerHTML='';
+  for(let m=0;m<12;m++){
+    const future=_reportYear>now.getFullYear()||(_reportYear===now.getFullYear()&&m>now.getMonth());
+    const chip=document.createElement('div');
+    chip.className='m-chip'+(m===_reportMonth?' active':'')+(future?' disabled':'');
+    chip.textContent=(m+1)+'월';
+    if(!future)chip.addEventListener('click',()=>{_reportMonth=m;renderReportMonthChips();loadMonthlyReportContent();});
+    wrap.appendChild(chip);
+  }
+}
+async function loadMonthlyReportContent(){
+  const el=document.getElementById('mr-content');if(!el)return;
+  const y=_reportYear,mo=_reportMonth;
+  const mk=`${y}-${pad(mo+1)}`;
+  const stats=computeMonthStats(y,mo);
+  const statsHtml=`<div class="mr-row2" style="margin-bottom:12px;">
+    <div class="mr-stat"><div class="v">${stats.todoPct}%</div><div class="l">투두 완료율</div></div>
+    <div class="mr-stat"><div class="v">${stats.habitPct}%</div><div class="l">습관 달성률</div></div>
+    <div class="mr-stat"><div class="v">${stats.avgSleep?stats.avgSleep+'h':'-'}</div><div class="l">평균 수면</div></div>
+  </div>`;
+  const wcHtml=stats.wcByWeek.length?`<div class="mr-card">
+    <div class="mr-sec-title">주간 다짐 모음 · 주차별</div>
+    ${stats.wcByWeek.map(w=>`<div class="mr-week-anchor">
+      <div class="mr-week-head"><span class="wk">${w.label}</span></div>
+      ${w.lines.map(l=>`<div class="mr-wc-line"><span class="txt">${l.text}</span><span class="pct">${l.pct}%</span></div>`).join('')}
+    </div>`).join('')}
+  </div>` : `<div class="mr-card"><div class="mr-sec-title">주간 다짐 모음 · 주차별</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:8px 0;">이 달엔 작성한 주간 다짐이 없어요</div></div>`;
+
+  el.innerHTML=`<div id="mr-ai-slot"><div class="mr-card"><div class="mr-sec-title">이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">불러오는 중...</div></div></div>${statsHtml}${wcHtml}`;
+
+  const cacheKey='monthly_report_'+mk;
+  let report=S.get(cacheKey);
+  if(!report){
+    report=await generateMonthlyReportAI(mk,stats);
+    if(report)S.set(cacheKey,report);
+  }
+  // 그 사이에 다른 달로 넘어갔으면 적용하지 않음
+  if(`${_reportYear}-${pad(_reportMonth+1)}`!==mk)return;
+  const slot=document.getElementById('mr-ai-slot');if(!slot)return;
+  if(report){
+    slot.innerHTML=`<div class="mr-card">
+      <div class="mr-sec-title">이번 달 한눈에</div>
+      <p style="font-size:13px;color:var(--tp);line-height:1.9;margin-bottom:${report.keywords&&report.keywords.length?'12px':'0'};">${report.comment}</p>
+      ${report.keywords&&report.keywords.length?`<div class="mr-tag-cloud">${report.keywords.map(k=>`<span class="mr-tag">${k}</span>`).join('')}</div>`:''}
+    </div>`;
+  } else {
+    slot.innerHTML=`<div class="mr-card"><div class="mr-sec-title">이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">코멘트를 만들 데이터가 부족하거나 API 키가 없어요</div></div>`;
+  }
 }
 
 function openWeeklyReviewSheet(){
@@ -3636,6 +3816,7 @@ function loadMonthly(){
   renderGoalNote('monthly-goal-wrap',S.key('mgoal',calMonthKey()),!isCalCurrentMonth());
   updateMonthlyGoalTitle();
   renderCalendar();renderMonthlyStatBar();
+  updateReportBannerLabel();
 }
 
 // ── MODAL / SHEET HELPERS
