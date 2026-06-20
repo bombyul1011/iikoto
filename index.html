@@ -871,7 +871,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <!-- MONTHLY -->
     <div class="view" id="v-monthly">
       <div class="card" style="padding:14px 15px 10px;margin-bottom:10px;">
-        <div class="goal-section-title" style="margin-top:0;">✦ 이번 달 목표</div>
+        <div class="goal-section-title" id="monthly-goal-title" style="margin-top:0;">✦ 이번 달 목표</div>
         <div class="goal-wrap" id="monthly-goal-wrap"></div>
       </div>
       <div id="monthly-cal"></div>
@@ -891,7 +891,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           </div>
         </div>
         <div id="tt-rows"></div>
-        <div class="tt-hint">← 스크롤 · 카테고리명 탭 → 추가 · 블록 탭 → 수정/삭제</div>
+        <div class="tt-hint" id="tt-hint">← 스크롤 · 카테고리명 탭 → 추가 · 블록 탭 → 수정/삭제</div>
       </div>
       <div class="slabel">해빗 모아보기</div>
       <div class="card m"><div id="habit-monthly"></div></div>
@@ -2951,7 +2951,7 @@ function renderWeeklyChallenge(){
 }
 
 // ── GOAL NOTE
-function renderGoalNote(containerId,storageKey){
+function renderGoalNote(containerId,storageKey,readOnly=false){
   const saved=getGoal(storageKey);
   const wrap=document.getElementById(containerId);if(!wrap)return;
   wrap.innerHTML='';
@@ -2960,6 +2960,10 @@ function renderGoalNote(containerId,storageKey){
     const inp=document.createElement('input');
     inp.type='text';inp.className='goal-inp';inp.value=val||'';
     inp.style.fontSize='13px';inp.autocomplete='off';
+    if(readOnly){
+      inp.readOnly=true;inp.style.opacity='0.55';inp.style.cursor='default';
+      wrap.appendChild(inp);return;
+    }
     inp.addEventListener('keydown',e=>{
       if(e.key==='Enter'){
         e.preventDefault();addLine('');
@@ -3031,13 +3035,16 @@ let _selectedPoster=null;
 let _apiTimer=null;
 
 function renderTimetable(){
-  const mk=monthKey(currentDate),contents=getContents(mk);
+  const mk=calMonthKey(),contents=getContents(mk);
   const headInner=document.getElementById('tt-head-inner');
   const headDates=document.getElementById('tt-head-dates');
   const rowsEl=document.getElementById('tt-rows');
   if(!rowsEl)return;
   const todayDay=new Date().getDate();
   const isSameMonth=mk===monthKey(new Date());
+  const readOnly=!isSameMonth;
+  const hintEl=document.getElementById('tt-hint');
+  if(hintEl)hintEl.textContent=readOnly?'← 스크롤 · 지난 달 기록은 읽기 전용이에요':'← 스크롤 · 카테고리명 탭 → 추가 · 블록 탭 → 수정/삭제';
 
   // 헤더
   if(headInner){
@@ -3052,7 +3059,8 @@ function renderTimetable(){
     const row=document.createElement('div');row.className='tt-row';
     const catEl=document.createElement('div');catEl.className='tt-cat-fixed';
     catEl.textContent=CAT_LABELS[cat];
-    catEl.addEventListener('click',()=>openContentModal(cat));
+    if(!readOnly)catEl.addEventListener('click',()=>openContentModal(cat));
+    else catEl.style.opacity='0.5';
     const scroll=document.createElement('div');scroll.className='tt-date-scroll';
     scroll.setAttribute('data-tt','1');
     const inner=document.createElement('div');inner.className='tt-date-inner';
@@ -3078,8 +3086,12 @@ function renderTimetable(){
           block.style.opacity='0.85';
         }
         block.textContent=item.title;block.title=item.title;
-        block.addEventListener('click',()=>openContentModal(cat,item,mk));
-        block.addEventListener('contextmenu',e=>{e.preventDefault();openContentDiscuss(item.title,cat,item.stars||0,item.review||'');});
+        if(!readOnly){
+          block.addEventListener('click',()=>openContentModal(cat,item,mk));
+          block.addEventListener('contextmenu',e=>{e.preventDefault();openContentDiscuss(item.title,cat,item.stars||0,item.review||'');});
+        } else {
+          block.style.cursor='default';
+        }
         inner.appendChild(block);d=endD+1;
       } else {
         const cell=document.createElement('div');cell.className='tt-cell';inner.appendChild(cell);d++;
@@ -3110,7 +3122,7 @@ function renderTimetable(){
 }
 
 function openContentModal(cat,item=null,mk=null){
-  _contentCtx={cat,item,mk:mk||monthKey(currentDate),mode:item?'edit':'add'};
+  _contentCtx={cat,item,mk:mk||calMonthKey(),mode:item?'edit':'add'};
   const titleEl=document.getElementById('content-modal-title');if(titleEl)titleEl.textContent=item?item.title:(CAT_LABELS[cat]+' 추가');
   document.getElementById('cm-title').value=item?.title||'';
   _selectedPoster=null;
@@ -3120,7 +3132,7 @@ function openContentModal(cat,item=null,mk=null){
     else pp.style.display='none';
   }
   const today=dateKey(currentDate);
-  document.getElementById('cm-start').value=item?(()=>{const d=new Date(monthKey(currentDate)+'-'+String(item.startDay).padStart(2,'0'));return isNaN(d)?today:dateKey(d);})():today;
+  document.getElementById('cm-start').value=item?(()=>{const d=new Date(_contentCtx.mk+'-'+String(item.startDay).padStart(2,'0'));return isNaN(d)?today:dateKey(d);})():today;
   document.getElementById('cm-review').value=item?.review||'';
   document.getElementById('cm-stars').value=item?.stars||'';
   document.getElementById('cm-del-btn').style.display=item?'block':'none';
@@ -3230,7 +3242,7 @@ function hideApiResults(){const el=document.getElementById('api-results');if(el)
 
 // ── HABIT MONTHLY
 function renderHabitMonthly(){
-  const habits=getHabits(),now=currentDate,y=now.getFullYear(),mo=now.getMonth();
+  const habits=getHabits(),y=_calYear,mo=_calMonth;
   const dim=new Date(y,mo+1,0).getDate();
   const el=document.getElementById('habit-monthly');if(!el)return;
   el.innerHTML='';
@@ -3257,7 +3269,7 @@ function renderHabitMonthly(){
 
 // ── STATS
 function updateStats(){
-  const now=new Date(),y=now.getFullYear(),mo=now.getMonth();
+  const y=_calYear,mo=_calMonth;
   const dim=new Date(y,mo+1,0).getDate();
   let memos=0,todos=0,hc=0,ht=0;
   const habits=getHabits();
@@ -3268,7 +3280,7 @@ function updateStats(){
     const checks=getHabitChecks(wk);
     habits.forEach(h=>{ht++;if(checks[`${h.name}-${dow}`])hc++;});
   }
-  const mk=monthKey(now);const contents=getContents(mk).length;
+  const mk=calMonthKey();const contents=getContents(mk).length;
   const pct=ht>0?Math.round(hc/ht*100):0;
   const q=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
   q('st-memo',memos);q('st-todo',todos);q('st-habit',pct+'%');q('st-content',contents);
@@ -3277,6 +3289,12 @@ function updateStats(){
 // ── CALENDAR
 let _calYear=new Date().getFullYear();
 let _calMonth=new Date().getMonth();
+function calMonthKey(){return `${_calYear}-${pad(_calMonth+1)}`;}
+function isCalCurrentMonth(){const n=new Date();return _calYear===n.getFullYear()&&_calMonth===n.getMonth();}
+function updateMonthlyGoalTitle(){
+  const el=document.getElementById('monthly-goal-title');if(!el)return;
+  el.textContent=isCalCurrentMonth()?'✦ 이번 달 목표':`✦ ${_calMonth+1}월 목표 (읽기 전용)`;
+}
 let _calSelectedDay=null;
 
 function calShiftMonth(n){
@@ -3286,6 +3304,12 @@ function calShiftMonth(n){
   _calSelectedDay=null;
   const el=document.getElementById('cal-detail');if(el)el.innerHTML='';
   renderCalendar();
+  updateStats();
+  renderTimetable();
+  renderHabitMonthly();
+  renderMonthlyStatBar();
+  renderGoalNote('monthly-goal-wrap',S.key('mgoal',calMonthKey()),isCalCurrentMonth());
+  updateMonthlyGoalTitle();
 }
 function renderCalendar(){
   const wrap=document.getElementById('monthly-cal');if(!wrap)return;
@@ -3362,7 +3386,7 @@ function calShowAll(dk){
 // ── MONTHLY STAT BAR
 function renderMonthlyStatBar(){
   const el=document.getElementById('monthly-stat-bar');if(!el)return;
-  const now=new Date(),y=now.getFullYear(),mo=now.getMonth();
+  const y=_calYear,mo=_calMonth;
   const dim=new Date(y,mo+1,0).getDate();
   let memos=0,todos=0,hc=0,ht=0,sleepMin=0,sleepCnt=0;
   const habits=getHabits();
@@ -3376,7 +3400,7 @@ function renderMonthlyStatBar(){
     habits.forEach(h=>{ht++;if(checks[`${h.name}-${dow}`])hc++;});
   }
   const pct=ht>0?Math.round(hc/ht*100):0;
-  const mk=monthKey(now);const cc=getContents(mk).length;
+  const mk=calMonthKey();const cc=getContents(mk).length;
   const avgSleep=sleepCnt>0?(sleepMin/sleepCnt/60).toFixed(1):'-';
   el.innerHTML=`<div class="stat-bar-wrap">
     <div class="sbar-item"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="color:var(--tm)"><rect x="2" y="1.5" width="10" height="11" rx="2"/><line x1="4.5" y1="5" x2="9.5" y2="5"/><line x1="4.5" y1="7.5" x2="8" y2="7.5"/></svg><span class="sbar-num">${memos}</span></div>
@@ -3564,7 +3588,8 @@ function loadWeekly(){
 function loadMonthly(){
   _calYear=new Date().getFullYear();_calMonth=new Date().getMonth();
   updateStats();renderTimetable();renderHabitMonthly();
-  renderGoalNote('monthly-goal-wrap',S.key('mgoal',monthKey(new Date())));
+  renderGoalNote('monthly-goal-wrap',S.key('mgoal',calMonthKey()),isCalCurrentMonth());
+  updateMonthlyGoalTitle();
   renderCalendar();renderMonthlyStatBar();
 }
 
