@@ -335,6 +335,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .modal-inp::placeholder{color:var(--tm);}
 .time-inp{font-size:22px;font-weight:300;text-align:center;letter-spacing:1px;box-sizing:border-box;width:150px;padding:11px 10px;margin:0 auto 12px;display:block;}
 .modal-actions{display:flex;gap:8px;}
+.msr-item{padding:9px 4px;border-bottom:1px solid var(--div);cursor:pointer;}
+.msr-item:last-child{border-bottom:none;}
+.msr-date{font-size:10px;color:var(--tm);margin-bottom:3px;}
+.msr-text{font-size:12.5px;color:var(--tp);line-height:1.5;}
 .mbtn{flex:1;padding:10px;border-radius:12px;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;border:none;}
 .mbtn.cancel{background:var(--card);color:var(--tm);border:1px solid var(--card-b);}
 .mbtn.ok{background:var(--acc-soft);color:var(--acc);font-weight:500;}
@@ -1039,6 +1043,18 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div class="modal-actions">
       <button class="mbtn cancel" onclick="closeModal('date-modal')">취소</button>
       <button class="mbtn ok" onclick="confirmDate()">이동</button>
+    </div>
+  </div>
+</div>
+
+<!-- MEMO SEARCH MODAL -->
+<div class="modal-ov" id="memo-search-modal" onclick="closeModal('memo-search-modal',event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-title">메모 검색</div>
+    <input type="text" class="modal-inp" id="memo-search-inp" placeholder="검색어를 입력하세요" autocomplete="off" oninput="runMemoSearch()">
+    <div id="memo-search-results" style="max-height:50vh;overflow-y:auto;margin-bottom:12px;"></div>
+    <div class="modal-actions">
+      <button class="mbtn cancel" onclick="closeModal('memo-search-modal')" style="flex:1;">닫기</button>
     </div>
   </div>
 </div>
@@ -2861,9 +2877,38 @@ document.getElementById('memo-inp').addEventListener('keydown',e=>{if(e.key==='E
 document.getElementById('memo-inp').addEventListener('input',e=>{const el=e.target;el.style.height='auto';el.style.height=Math.min(el.scrollHeight,100)+'px';});
 
 function openSearch(){
-  const q=prompt('메모 검색:');if(!q)return;
-  const dk=dateKey(currentDate);const found=getMemos(dk).filter(m=>(m.text||'').includes(q));
-  alert(found.length?found.map(m=>`${m.time}: ${m.text}`).join('\n'):'검색 결과가 없어요');
+  openModal('memo-search-modal');
+  const inp=document.getElementById('memo-search-inp');
+  inp.value='';
+  document.getElementById('memo-search-results').innerHTML='<div style="text-align:center;color:var(--tm);font-size:12px;padding:20px 2px;">검색어를 입력하세요</div>';
+  setTimeout(()=>inp.focus(),150);
+}
+function runMemoSearch(){
+  const q=document.getElementById('memo-search-inp').value.trim();
+  const resEl=document.getElementById('memo-search-results');
+  if(!q){resEl.innerHTML='<div style="text-align:center;color:var(--tm);font-size:12px;padding:20px 2px;">검색어를 입력하세요</div>';return;}
+  const results=[];
+  for(let i=0;i<localStorage.length;i++){
+    const k=localStorage.key(i);
+    if(!k||!k.startsWith('memos:'))continue;
+    const dk=k.slice('memos:'.length);
+    getMemos(dk).forEach(m=>{
+      if((m.text||'').includes(q))results.push({dk,time:m.time||'',text:m.text||''});
+    });
+  }
+  results.sort((a,b)=>(b.dk+(b.time||'')).localeCompare(a.dk+(a.time||'')));
+  if(!results.length){resEl.innerHTML='<div style="text-align:center;color:var(--tm);font-size:12px;padding:20px 2px;">검색 결과가 없어요</div>';return;}
+  resEl.innerHTML=results.map(r=>`<div class="msr-item" onclick="jumpToMemoDate('${r.dk}')"><div class="msr-date">${r.dk}${r.time?' · '+r.time:''}</div><div class="msr-text">${r.text}</div></div>`).join('');
+}
+function jumpToMemoDate(dk){
+  closeModal('memo-search-modal');
+  const parts=dk.split('-').map(Number);
+  currentDate=new Date(parts[0],parts[1]-1,parts[2]);
+  updateDateUI();
+  document.querySelectorAll('.vtab').forEach(t=>t.classList.toggle('on',t.dataset.v==='daily'));
+  document.querySelectorAll('.view').forEach(vw=>vw.classList.toggle('on',vw.id==='v-daily'));
+  document.querySelector('.scroll').scrollTop=0;
+  loadDaily();
 }
 
 // ── WEEKLY CHALLENGE
