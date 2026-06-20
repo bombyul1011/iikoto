@@ -1855,7 +1855,9 @@ async function makeScheduleCard(section){
 - 이름 호칭 없음. "너", "당신" 등 2인칭 호칭 금지.
 - 이모지 1-2개
 - 오직 브리핑 텍스트만 출력
-- 없는 정보는 억지로 언급하지 않기`;
+- 없는 정보는 억지로 언급하지 않기
+- 요일, "새로운 주 시작", "주말" 같은 표현은 실제 제공된 날짜/요일 정보에 근거해서만 사용. 추측해서 쓰지 않기 (이 앱의 주는 월요일 시작 기준)
+- 요일을 직접 언급하지 않아도 되지만, 톤은 요일에 맞게 자연스럽게 조절: 월요일은 부담 줄여주며 응원하는 톤, 금요일은 한 주 마무리를 격려하는 톤, 토/일(주말)은 한결 가볍고 여유로운 톤. 단, "오늘은 월요일이니까~" 식으로 요일을 근거로 직접 설명하지 않고 톤에만 자연스럽게 반영`;
 
     let sys='',dataContext='';
 
@@ -1880,6 +1882,7 @@ ${commonRules}`;
 ${commonRules}`;
       }
       dataContext=[
+        `오늘은 ${_HOME_DAYS[now.getDay()]}요일이에요.`,
         sleep.wake?`기상: ${sleep.wake}`:'',
         todoLine(morningTodos,'오전'),
         todoLine(afternoonTodos,'오후'),
@@ -1905,6 +1908,7 @@ ${commonRules}`;
 ${commonRules}`;
       }
       dataContext=[
+        `오늘은 ${_HOME_DAYS[now.getDay()]}요일이에요.`,
         `현재 시각: ${currentHour}시`,
         todoLine(morningTodos,'오전'),
         todoLine(afternoonTodos,'오후'),
@@ -1931,6 +1935,7 @@ ${commonRules}`;
       const tom=new Date(now);tom.setDate(now.getDate()+1);
       const tomTodos=getTodos(dateKey(tom));
       dataContext=[
+        `오늘은 ${_HOME_DAYS[now.getDay()]}요일, 내일은 ${_HOME_DAYS[tom.getDay()]}요일이에요.`,
         todoLine(morningTodos,'오늘 오전'),
         todoLine(afternoonTodos,'오늘 오후'),
         todoLine(nightTodos,'오늘 저녁'),
