@@ -1095,6 +1095,20 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   <div class="modal" onclick="event.stopPropagation()">
     <div class="modal-title">메모 검색</div>
     <input type="text" class="modal-inp" id="memo-search-inp" placeholder="검색어를 입력하세요" autocomplete="off" oninput="runMemoSearch()">
+    <div onclick="toggleMemoSearchRange()" style="font-size:11.5px;color:var(--tm);cursor:pointer;margin:-4px 2px 8px;display:flex;align-items:center;gap:4px;">
+      <span id="msr-toggle-icon">▸</span> <span id="msr-toggle-label">범위 설정</span>
+    </div>
+    <div id="msr-range-box" style="display:none;margin-bottom:10px;">
+      <div style="display:flex;gap:6px;margin-bottom:8px;">
+        <input type="date" id="msr-start" class="modal-inp" style="margin-bottom:0;font-size:12.5px;" oninput="runMemoSearch()">
+        <input type="date" id="msr-end" class="modal-inp" style="margin-bottom:0;font-size:12.5px;" oninput="runMemoSearch()">
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button class="mbtn" onclick="setMemoSearchRange('thisMonth')" style="flex:1;font-size:11.5px;padding:7px 0;">이번 달</button>
+        <button class="mbtn" onclick="setMemoSearchRange('lastMonth')" style="flex:1;font-size:11.5px;padding:7px 0;">지난 달</button>
+        <button class="mbtn cancel" onclick="setMemoSearchRange('clear')" style="flex:1;font-size:11.5px;padding:7px 0;">초기화</button>
+      </div>
+    </div>
     <div id="memo-search-results" style="max-height:50vh;overflow-y:auto;margin-bottom:12px;"></div>
     <div class="modal-actions">
       <button class="mbtn cancel" onclick="closeModal('memo-search-modal')" style="flex:1;">닫기</button>
@@ -3104,11 +3118,39 @@ function openSearch(){
   openModal('memo-search-modal');
   const inp=document.getElementById('memo-search-inp');
   inp.value='';
+  document.getElementById('msr-start').value='';
+  document.getElementById('msr-end').value='';
+  document.getElementById('msr-range-box').style.display='none';
+  document.getElementById('msr-toggle-icon').textContent='▸';
   document.getElementById('memo-search-results').innerHTML='<div style="text-align:center;color:var(--tm);font-size:12px;padding:20px 2px;">검색어를 입력하세요</div>';
   setTimeout(()=>inp.focus(),150);
 }
+function toggleMemoSearchRange(){
+  const box=document.getElementById('msr-range-box');
+  const icon=document.getElementById('msr-toggle-icon');
+  const open=box.style.display==='none';
+  box.style.display=open?'block':'none';
+  icon.textContent=open?'▾':'▸';
+}
+function setMemoSearchRange(type){
+  const now=new Date();
+  const sEl=document.getElementById('msr-start'),eEl=document.getElementById('msr-end');
+  if(type==='clear'){sEl.value='';eEl.value='';}
+  else if(type==='thisMonth'){
+    sEl.value=`${now.getFullYear()}-${pad(now.getMonth()+1)}-01`;
+    eEl.value=dateKey(now);
+  } else if(type==='lastMonth'){
+    const lm=new Date(now.getFullYear(),now.getMonth()-1,1);
+    const lmEnd=new Date(now.getFullYear(),now.getMonth(),0);
+    sEl.value=`${lm.getFullYear()}-${pad(lm.getMonth()+1)}-01`;
+    eEl.value=dateKey(lmEnd);
+  }
+  runMemoSearch();
+}
 function runMemoSearch(){
   const q=document.getElementById('memo-search-inp').value.trim();
+  const startD=document.getElementById('msr-start').value;
+  const endD=document.getElementById('msr-end').value;
   const resEl=document.getElementById('memo-search-results');
   if(!q){resEl.innerHTML='<div style="text-align:center;color:var(--tm);font-size:12px;padding:20px 2px;">검색어를 입력하세요</div>';return;}
   const results=[];
@@ -3116,6 +3158,8 @@ function runMemoSearch(){
     const k=localStorage.key(i);
     if(!k||!k.startsWith('memos:'))continue;
     const dk=k.slice('memos:'.length);
+    if(startD&&dk<startD)continue;
+    if(endD&&dk>endD)continue;
     getMemos(dk).forEach(m=>{
       if((m.text||'').includes(q))results.push({dk,time:m.time||'',text:m.text||''});
     });
