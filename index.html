@@ -2070,7 +2070,17 @@ async function loadMonthlyReportContent(){
     </div>`).join('')}
   </div>` : `<div class="mr-card"><div class="mr-sec-title">주간 다짐 모음 · 주차별</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:8px 0;">이 달엔 작성한 주간 다짐이 없어요</div></div>`;
 
-  el.innerHTML=`<div id="mr-ai-slot"><div class="mr-card"><div class="mr-sec-title">이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">불러오는 중...</div></div></div>${statsHtml}${wcHtml}`;
+  el.innerHTML=`<div id="mr-ai-slot"></div>${statsHtml}${wcHtml}`;
+  const slot=document.getElementById('mr-ai-slot');
+
+  const now=new Date();
+  const lastDateOfThisMonth=new Date(y,mo+1,0).getDate();
+  const isOngoingMonth=(y===now.getFullYear()&&mo===now.getMonth()&&now.getDate()<lastDateOfThisMonth);
+  if(isOngoingMonth){
+    slot.innerHTML=`<div class="mr-card"><div class="mr-sec-title">이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">🌿 이 달이 끝나면 정리해드릴게요</div></div>`;
+    return;
+  }
+  slot.innerHTML=`<div class="mr-card"><div class="mr-sec-title">이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">불러오는 중...</div></div>`;
 
   const cacheKey='monthly_report_'+mk;
   let report=S.get(cacheKey);
@@ -2080,15 +2090,15 @@ async function loadMonthlyReportContent(){
   }
   // 그 사이에 다른 달로 넘어갔으면 적용하지 않음
   if(`${_reportYear}-${pad(_reportMonth+1)}`!==mk)return;
-  const slot=document.getElementById('mr-ai-slot');if(!slot)return;
+  const slot2=document.getElementById('mr-ai-slot');if(!slot2)return;
   if(report){
-    slot.innerHTML=`<div class="mr-card">
+    slot2.innerHTML=`<div class="mr-card">
       <div class="mr-sec-title">이번 달 한눈에</div>
       <p style="font-size:13px;color:var(--tp);line-height:1.9;margin-bottom:${report.keywords&&report.keywords.length?'12px':'0'};">${report.comment}</p>
       ${report.keywords&&report.keywords.length?`<div class="mr-tag-cloud">${report.keywords.map(k=>`<span class="mr-tag">${k}</span>`).join('')}</div>`:''}
     </div>`;
   } else {
-    slot.innerHTML=`<div class="mr-card"><div class="mr-sec-title">이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">코멘트를 만들 데이터가 부족하거나 API 키가 없어요</div></div>`;
+    slot2.innerHTML=`<div class="mr-card"><div class="mr-sec-title">이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">코멘트를 만들 데이터가 부족하거나 API 키가 없어요</div></div>`;
   }
 }
 
