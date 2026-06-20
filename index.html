@@ -2246,6 +2246,16 @@ async function makeMidweekRemindCard(){
 }
 
 async function makeWeeklySummaryCard(){
+  // 하루치 메모 중 N개를 시간대 전체에 고르게 펼쳐서 뽑기 (아침 루틴 멘트로만 쏠리는 것 방지)
+  const evenSample=(arr,n)=>{
+    if(arr.length<=n)return arr;
+    const result=[];
+    for(let i=0;i<n;i++){
+      const idx=Math.round(i*(arr.length-1)/(n-1));
+      result.push(arr[idx]);
+    }
+    return [...new Set(result)];
+  };
   const card=document.createElement('div');
   card.className='card m';
 
@@ -2270,7 +2280,8 @@ async function makeWeeklySummaryCard(){
     const memos=getMemos(dk);
     allMemos.push(...memos.map(m=>m.text).filter(Boolean));
     const dayName=_HOME_DAYS[d.getDay()]+'요일';
-    memos.forEach(m=>{if(m.text)allMemosWithDay.push(`${dayName}: ${m.text}`);});
+    const dayTexts=memos.map(m=>m.text).filter(Boolean);
+    evenSample(dayTexts,8).forEach(t=>allMemosWithDay.push(`${dayName}: ${t}`));
     const sleep=getSleep(dk);
     if(sleep.sleep&&sleep.wake){
       // 수면 시간 계산
@@ -2318,7 +2329,7 @@ async function makeWeeklySummaryCard(){
     avgSleepStr?`평균 수면: ${avgSleepStr}`:'수면 기록 없음',
     `투두: 총 ${totalTodos}개 중 ${doneTodos}개 완료 (${todoRate}%)`,
     `메모 총 ${allMemos.length}건`,
-    allMemos.length?`메모 내용 (시간순, 요일 표시):\n${allMemosWithDay.slice(0,40).join('\n')}`:'',
+    allMemos.length?`메모 내용 (요일별로 시간대 고르게 샘플링):\n${allMemosWithDay.join('\n')}`:'',
     topHabit&&topHabit[1]>0?`가장 많이 완료한 습관: ${topHabit[0]} (${topHabit[1]}일)`:'',
     bottomHabit&&bottomHabit[1]===0?`한 번도 못 한 습관: ${bottomHabit[0]}`:'',
     challengeSummary.length?`이번 주 다짐 달성:\n${challengeSummary.join(', ')}`:'',
