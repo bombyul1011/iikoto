@@ -1,8 +1,8 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v3';
+const CACHE = 'iikoto-v4';
 const ASSETS = [
-  '/',
-  '/index.html'
+  './',
+  './index.html'
 ];
 
 // 설치 — 핵심 파일 캐시
@@ -37,8 +37,8 @@ self.addEventListener('fetch', e => {
         return res;
       })
       .catch(() => {
-        // 오프라인이면 캐시에서
-        return caches.match(e.request) || caches.match('/');
+        // 오프라인이면 캐시에서 — 상대경로 './'로 폴백 (앱 루트, 절대경로 '/' 아님)
+        return caches.match(e.request) || caches.match('./');
       })
   );
 });

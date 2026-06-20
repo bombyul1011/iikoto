@@ -4038,7 +4038,6 @@ async function initSync(){
   loadDaily();
 }
 setTimeout(initSync, 500);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
 
 </script>
 
