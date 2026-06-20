@@ -2997,11 +2997,18 @@ function renderMemos(){
   const list=document.getElementById('memo-list');if(!list)return;
   list.innerHTML='';
   // time(HH:MM) 기준 오름차순 정렬, 원본 배열 인덱스는 그대로 유지해서 수정/삭제가 정확한 항목을 가리키게 함
+  // 새벽 0~5시는 "전날 자정 넘어 쓴 기록"으로 보고 정렬상 맨 뒤로 보냄 (표시는 그대로 00:30 등 실제 시간)
+  const sortKey=(t)=>{
+    if(!t)return null;
+    const [h,mn]=t.split(':').map(Number);
+    const adjH=h<5?h+24:h;
+    return adjH*60+(mn||0);
+  };
   const ordered=memos.map((m,i)=>({m,i})).sort((a,b)=>{
-    const ta=a.m.time||'';const tb=b.m.time||'';
-    if(ta&&tb)return ta.localeCompare(tb);
-    if(ta&&!tb)return -1;
-    if(!ta&&tb)return 1;
+    const ka=sortKey(a.m.time),kb=sortKey(b.m.time);
+    if(ka!=null&&kb!=null)return ka-kb;
+    if(ka!=null&&kb==null)return -1;
+    if(ka==null&&kb!=null)return 1;
     return (a.m.created||0)-(b.m.created||0);
   });
   ordered.forEach(({m,i})=>{
