@@ -3308,7 +3308,7 @@ function calShiftMonth(n){
   renderTimetable();
   renderHabitMonthly();
   renderMonthlyStatBar();
-  renderGoalNote('monthly-goal-wrap',S.key('mgoal',calMonthKey()),isCalCurrentMonth());
+  renderGoalNote('monthly-goal-wrap',S.key('mgoal',calMonthKey()),!isCalCurrentMonth());
   updateMonthlyGoalTitle();
 }
 function renderCalendar(){
@@ -3588,7 +3588,7 @@ function loadWeekly(){
 function loadMonthly(){
   _calYear=new Date().getFullYear();_calMonth=new Date().getMonth();
   updateStats();renderTimetable();renderHabitMonthly();
-  renderGoalNote('monthly-goal-wrap',S.key('mgoal',calMonthKey()),isCalCurrentMonth());
+  renderGoalNote('monthly-goal-wrap',S.key('mgoal',calMonthKey()),!isCalCurrentMonth());
   updateMonthlyGoalTitle();
   renderCalendar();renderMonthlyStatBar();
 }
