@@ -3044,7 +3044,7 @@ function renderTimetable(){
   const isSameMonth=mk===monthKey(new Date());
   const readOnly=!isSameMonth;
   const hintEl=document.getElementById('tt-hint');
-  if(hintEl)hintEl.textContent=readOnly?'← 스크롤 · 지난 달 기록은 읽기 전용이에요':'← 스크롤 · 카테고리명 탭 → 추가 · 블록 탭 → 수정/삭제';
+  if(hintEl)hintEl.textContent='← 스크롤 · 카테고리명 탭 → 추가 · 블록 탭 → 수정/삭제';
 
   // 헤더
   if(headInner){
@@ -3293,7 +3293,7 @@ function calMonthKey(){return `${_calYear}-${pad(_calMonth+1)}`;}
 function isCalCurrentMonth(){const n=new Date();return _calYear===n.getFullYear()&&_calMonth===n.getMonth();}
 function updateMonthlyGoalTitle(){
   const el=document.getElementById('monthly-goal-title');if(!el)return;
-  el.textContent=isCalCurrentMonth()?'✦ 이번 달 목표':`✦ ${_calMonth+1}월 목표 (읽기 전용)`;
+  el.textContent=isCalCurrentMonth()?'✦ 이번 달 목표':`✦ ${_calMonth+1}월 목표`;
 }
 let _calSelectedDay=null;
 
