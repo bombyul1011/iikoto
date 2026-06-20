@@ -3945,18 +3945,13 @@ async function forceRestoreAll(){
 updateDateUI();
 loadDaily();
 
-// Service Worker 강제 업데이트 (캐시 문제 해결)
+// Service Worker 등록 (오프라인 지원)
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
     navigator.serviceWorker.register('./sw.js').then(reg=>{
       reg.update();
     }).catch(()=>{});
   });
-  // 구버전 SW 캐시 전부 삭제
-  if(caches && caches.keys){
-    caches.keys().then(names=>{ names.forEach(name=>caches.delete(name)); });
-  }
-  navigator.serviceWorker.getRegistrations().then(regs=>{ regs.forEach(r=>r.update()); });
 }
 
 // 앱 시작 시 항상 Supabase에서 복구 (로컬 무시)
