@@ -336,7 +336,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .modal-title{font-size:13px;font-weight:500;color:var(--ts);margin-bottom:16px;}
 .modal-inp{width:100%;background:var(--inp);border:1px solid var(--inp-b);border-radius:12px;padding:11px 14px;font-size:16px;color:var(--tp);font-family:'DM Sans',sans-serif;outline:none;margin-bottom:12px;}
 .modal-inp::placeholder{color:var(--tm);}
-.time-inp{font-size:22px;font-weight:300;text-align:center;letter-spacing:1px;box-sizing:border-box;width:auto;max-width:160px;margin:0 auto 12px;display:block;}
+.time-inp{font-size:22px;font-weight:300;text-align:center;letter-spacing:1px;box-sizing:border-box;width:150px;padding:11px 10px;margin:0 auto 12px;display:block;}
 .modal-actions{display:flex;gap:8px;}
 .mbtn{flex:1;padding:10px;border-radius:12px;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;border:none;}
 .mbtn.cancel{background:var(--card);color:var(--tm);border:1px solid var(--card-b);}
@@ -1050,7 +1050,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 <div class="modal-ov" id="memo-edit-modal" onclick="closeModal('memo-edit-modal',event)">
   <div class="modal">
     <div class="modal-title">메모 수정</div>
-    <input type="time" class="modal-inp" id="memo-edit-time-inp" style="margin-bottom:10px;font-size:14px;">
+    <input type="time" class="modal-inp time-inp" id="memo-edit-time-inp">
     <textarea class="modal-inp" id="memo-edit-inp" rows="4" style="resize:none;line-height:1.6;" autocomplete="off"></textarea>
     <div class="modal-actions">
       <button class="mbtn cancel" onclick="closeModal('memo-edit-modal')">취소</button>
