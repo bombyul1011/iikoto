@@ -2788,7 +2788,15 @@ function renderMemos(){
   const dk=dateKey(currentDate),memos=getMemos(dk);
   const list=document.getElementById('memo-list');if(!list)return;
   list.innerHTML='';
-  memos.forEach((m,i)=>{
+  // time(HH:MM) 기준 오름차순 정렬, 원본 배열 인덱스는 그대로 유지해서 수정/삭제가 정확한 항목을 가리키게 함
+  const ordered=memos.map((m,i)=>({m,i})).sort((a,b)=>{
+    const ta=a.m.time||'';const tb=b.m.time||'';
+    if(ta&&tb)return ta.localeCompare(tb);
+    if(ta&&!tb)return -1;
+    if(!ta&&tb)return 1;
+    return (a.m.created||0)-(b.m.created||0);
+  });
+  ordered.forEach(({m,i})=>{
     const el=document.createElement('div');el.className='memo-item';
     const bub=document.createElement('div');bub.className='memo-bub';
     bub.style.cursor='pointer';
