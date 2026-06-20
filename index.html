@@ -1346,12 +1346,24 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 <script>
 
+function appendSundayBanner(body){
+  body.appendChild(makeLabel('✦ 이번 주 돌아보기'));
+  const banner=document.createElement('div');
+  banner.className='weekly-review-banner';
+  banner.innerHTML=`<div class="weekly-review-banner-inner">
+    <div class="weekly-review-banner-title">✦ 이번주 돌아보기 ✦</div>
+    <div class="weekly-review-banner-sub"><span>지난 한주간의 나는 어땠을까요?</span><span style="font-size:16px;opacity:0.6;">›</span></div>
+  </div>`;
+  banner.addEventListener('click',openWeeklyReviewSheet);
+  body.appendChild(banner);
+}
 function renderHomeBody(section){
   const body=document.getElementById('home-body');
   if(!body)return;
   body.innerHTML='';
-  const isSunday=new Date().getDay()===0;
-  const isLastDayOfMonth=(()=>{const n=new Date();const t=new Date(n);t.setDate(n.getDate()+1);return t.getDate()===1;})();
+  const isSunday=new Date().getDay()===0&&new Date().getHours()>=19;
+  const isWednesdayEvening=new Date().getDay()===3&&new Date().getHours()>=19;
+  const isLastDayOfMonth=(()=>{const n=new Date();const t=new Date(n);t.setDate(n.getDate()+1);return t.getDate()===1;})()&&new Date().getHours()>=19;
 
   if(section==='morning'){
     body.appendChild(makeLabel('오늘 브리핑'));
@@ -1390,16 +1402,8 @@ function renderHomeBody(section){
       rbanner.addEventListener('click',openMonthlyReportSheet);
       body.appendChild(rbanner);
     } else if(isSunday){
-      body.appendChild(makeLabel('✦ 이번 주 돌아보기'));
-      const banner=document.createElement('div');
-      banner.className='weekly-review-banner';
-      banner.innerHTML=`<div class="weekly-review-banner-inner">
-        <div class="weekly-review-banner-title">✦ 이번주 돌아보기 ✦</div>
-        <div class="weekly-review-banner-sub"><span>지난 한주간의 나는 어땠을까요?</span><span style="font-size:16px;opacity:0.6;">›</span></div>
-      </div>`;
-      banner.addEventListener('click',openWeeklyReviewSheet);
-      body.appendChild(banner);
-    } else if(new Date().getDay()===3){
+      appendSundayBanner(body);
+    } else if(isWednesdayEvening){
       // 수요일 저녁 — 주간 리마인드 배너
       body.appendChild(makeLabel('◈ 이번 주 중간 점검'));
       const mbanner=document.createElement('div');
