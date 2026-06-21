@@ -3396,7 +3396,7 @@ function renderTimetable(){
           block.style.backgroundImage=`repeating-linear-gradient(45deg,transparent,transparent 6px,rgba(255,255,255,0.45) 6px,rgba(255,255,255,0.45) 10px)`;
           block.style.opacity='0.85';
         }
-        block.textContent=item.title;block.title=item.title;
+        block.textContent=cat==='music'?(item.title||'').charAt(0):item.title;block.title=item.title;
         if(!readOnly){
           block.addEventListener('click',()=>openContentModal(cat,item,mk));
           block.addEventListener('contextmenu',e=>{e.preventDefault();openContentDiscuss(item.title,cat,item.stars||0,item.review||'');});
@@ -3458,8 +3458,9 @@ function setCStatus(status){
   if(d)d.classList.toggle('dim',status!=='done');
   const edr=document.getElementById('cm-enddate-row');
   if(edr){
-    edr.classList.toggle('show',status==='done');
-    if(status==='done'&&!document.getElementById('cm-end').value)document.getElementById('cm-end').value=dateKey(currentDate);
+    const showEnd=status==='done'&&_contentCtx.cat!=='music';
+    edr.classList.toggle('show',showEnd);
+    if(showEnd&&!document.getElementById('cm-end').value)document.getElementById('cm-end').value=dateKey(currentDate);
   }
 }
 function toggleCDone(){
@@ -3472,7 +3473,8 @@ function confirmContent(){
   const startDay=startVal?parseInt(startVal.split('-')[2])||1:1;
   const status=_contentCtx.status==='done'?'done':'watching';
   let endDay=null;
-  if(status==='done'){const endVal=document.getElementById('cm-end').value;endDay=endVal?Math.max(parseInt(endVal.split('-')[2])||startDay,startDay):startDay;}
+  if(status==='done'&&_contentCtx.cat!=='music'){const endVal=document.getElementById('cm-end').value;endDay=endVal?Math.max(parseInt(endVal.split('-')[2])||startDay,startDay):startDay;}
+  else if(status==='done')endDay=startDay;
   const review=document.getElementById('cm-review').value.trim();
   const stars=parseInt(document.getElementById('cm-stars').value)||0;
   const poster=_selectedPoster||(_contentCtx.item&&_contentCtx.item.poster)||null;
