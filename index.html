@@ -3267,9 +3267,10 @@ function getWChallenge(wk){return S.get('wchallenge_'+wk)||[];}
 function saveWChallenge(wk,data){S.set('wchallenge_'+wk,data);S.set('wchallenge_pending_'+wk,true);autoSync('wchallenge','wchallenge_'+wk);}
 
 function nextWeekKey(){const d=new Date();d.setDate(d.getDate()+7);return weekKey(d);}
-function openNextWeekChallengeSheet(){
+async function openNextWeekChallengeSheet(){
   openSheet('nextweek-sheet');
   const wk=nextWeekKey();
+  if(navigator.onLine)await syncWChallengeDown(wk);
   renderWeeklyChallenge(wk,'nextweek-challenge-wrap');
   loadNextWeekAISuggestions(wk);
 }
