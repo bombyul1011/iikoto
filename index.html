@@ -145,6 +145,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .weekly-review-banner-inner{border-radius:14.5px;background:linear-gradient(135deg,rgba(210,244,225,0.82),rgba(248,245,200,0.82),rgba(212,242,222,0.82));padding:16px 18px;backdrop-filter:blur(2px);}
 .midweek-remind-banner{position:relative;border-radius:16px;padding:1.5px;background:linear-gradient(135deg,rgba(180,165,230,0.95),rgba(140,200,235,0.90),rgba(190,170,235,0.95),rgba(160,190,230,0.95));background-size:300% 300%;animation:bannerShine 4s ease infinite;cursor:pointer;margin-bottom:2px;}
 .midweek-remind-banner-inner{border-radius:14.5px;background:linear-gradient(135deg,rgba(225,218,248,0.82),rgba(210,235,248,0.82),rgba(228,220,248,0.82));padding:16px 18px;backdrop-filter:blur(2px);}
+.nextweek-banner{position:relative;border-radius:16px;padding:1.6px;background:linear-gradient(135deg,rgba(200,184,222,0.85),rgba(247,238,208,0.80),rgba(208,192,225,0.85),rgba(200,184,222,0.85));background-size:300% 300%;animation:bannerShine 4s ease infinite;cursor:pointer;margin-top:10px;}
+.nextweek-banner-inner{border-radius:14.5px;background:linear-gradient(135deg,rgba(250,249,252,0.97),rgba(252,250,243,0.97));padding:16px 18px;}
+.nw-chip-row{display:flex;flex-direction:column;gap:8px;margin-bottom:16px;}
+.nw-chip{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--card-b);border-radius:12px;padding:10px 12px;cursor:pointer;}
+.nw-chip .nwc-sym{font-size:14px;color:var(--tm);flex-shrink:0;}
+.nw-chip .nwc-title{font-size:12.5px;font-weight:600;color:var(--tp);}
+.nw-chip .nwc-desc{font-size:10.5px;color:var(--tm);margin-top:1px;}
+.nw-divider{font-size:10px;color:var(--tm);text-align:center;margin:4px 0 12px;}
 .report-banner{position:relative;border-radius:16px;padding:1.6px;background:linear-gradient(135deg,rgba(150,215,180,0.95),rgba(235,220,120,0.90),rgba(165,222,188,0.95),rgba(150,215,180,0.95));background-size:300% 300%;animation:bannerShine 4s ease infinite;cursor:pointer;margin-top:10px;}
 .report-banner-inner{border-radius:14.5px;background:linear-gradient(135deg,rgba(210,244,225,0.85),rgba(248,245,200,0.85),rgba(212,242,222,0.85));padding:13px 17px;display:flex;align-items:center;justify-content:space-between;gap:10px;}
 .report-banner-line{font-size:11.5px;font-weight:400;color:rgba(100,140,75,0.80);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -1026,6 +1034,21 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   </div>
 </div>
 
+<!-- NEXT WEEK CHALLENGE SHEET -->
+<div class="overlay" id="nextweek-sheet" onclick="closeSheet('nextweek-sheet',event)">
+  <div class="bsheet" style="max-height:85vh;overflow-y:auto;" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div style="padding:0 20px 24px;">
+      <div class="goal-section-title" style="margin-top:0;">◉ 다음 주 챌린지 준비하기</div>
+      <div id="nw-ai-area">
+        <div style="font-size:12px;color:var(--tm);text-align:center;padding:14px 0;">이번 주 기록을 분석하는 중...</div>
+      </div>
+      <div class="nw-divider">— 다음 주 다짐 (수정 가능) —</div>
+      <div id="nextweek-challenge-wrap"></div>
+    </div>
+  </div>
+</div>
+
 <!-- WEEKLY REVIEW SHEET -->
 <div class="overlay" id="weekly-review-sheet" onclick="closeSheet('weekly-review-sheet',event)">
   <div class="bsheet" style="max-height:82vh;overflow-y:auto;" onclick="event.stopPropagation()">
@@ -1212,6 +1235,26 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="settings-slbl">백업</div>
       <div class="settings-card">
         <div class="settings-item" onclick="openMarkdownBackup()" style="cursor:pointer;"><span class="settings-item-lbl"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="color:var(--tp);margin-right:6px;vertical-align:-2px"><path d="M5 3C4 3 3 4 3 5V17C3 18 4 19 5 19H15C16 19 17 18 17 17V7L13 3H5Z"/><polyline points="13,3 13,7 17,7"/><line x1="7" y1="10" x2="13" y2="10"/><line x1="7" y1="13" x2="11" y2="13"/></svg>일기 백업 (마크다운)</span><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--tm)"><polyline points="5,2 9,7 5,12"/></svg></div>
+        <div class="settings-item" style="flex-direction:column;align-items:flex-start;gap:8px;padding-top:12px;">
+          <span class="settings-item-lbl">노션 백업 (베타)</span>
+          <input type="text" id="notion-worker-url-inp" class="modal-inp"
+            placeholder="https://xxxx.workers.dev"
+            style="margin-bottom:0;font-size:12px;width:100%;font-family:monospace;"
+            autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          <input type="text" id="notion-root-page-inp" class="modal-inp"
+            placeholder="루트 페이지 ID (노션 URL 마지막 32자리)"
+            style="margin-bottom:0;font-size:12px;width:100%;font-family:monospace;"
+            autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          <button onclick="saveNotionConfig()"
+            style="width:100%;padding:9px;border-radius:10px;border:none;background:var(--acc-soft);color:var(--acc);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">
+            설정 저장
+          </button>
+          <button onclick="backupTodayToNotion()"
+            style="width:100%;padding:9px;border-radius:10px;border:1px solid var(--div);background:transparent;color:var(--tp);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">
+            지금 오늘 기록 백업하기
+          </button>
+          <div id="notion-backup-status" style="font-size:11px;color:var(--tm);"></div>
+        </div>
       </div>
     </div>
     <div>
@@ -1417,6 +1460,18 @@ function renderHomeBody(section){
       body.appendChild(rbanner);
     } else if(isSunday){
       appendSundayBanner(body);
+      body.appendChild(makeLabel('◉ 다음 주 준비'));
+      const nwBanner=document.createElement('div');
+      nwBanner.className='nextweek-banner';
+      nwBanner.innerHTML=`<div class="nextweek-banner-inner" style="display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:13px;font-weight:700;letter-spacing:.04em;color:rgba(115,95,150,0.88);margin-bottom:3px;">◉ 다음 주 챌린지 준비하기</div>
+          <div style="font-size:11px;color:rgba(145,128,98,0.72);">이번 주 패턴을 보고 루틴도 추천해드릴게요</div>
+        </div>
+        <div style="font-size:17px;color:rgba(135,115,160,0.48);">›</div>
+      </div>`;
+      nwBanner.addEventListener('click',openNextWeekChallengeSheet);
+      body.appendChild(nwBanner);
     } else if(isWednesdayEvening){
       // 수요일 저녁 — 주간 리마인드 배너
       body.appendChild(makeLabel('◈ 이번 주 중간 점검'));
@@ -1431,10 +1486,10 @@ function renderHomeBody(section){
     } else {
       body.appendChild(makeRingRow());
     }
+    if(isLastDayOfMonth||isSunday||isWednesdayEvening)body.appendChild(makeRingRow());
     body.appendChild(makeLabel('하루 마감'));
-    body.appendChild(makeActionBtn('오늘 어땠어?','하루 기록 → Claude에게 털어놓기','rgba(192,112,128,0.85)',homeOpenReview));
     body.appendChild(makeGrid([
-      makeBtnCard('✦','주간 루틴','Claude 제안',homeOpenRoutine),
+      makeBtnCard('♡','오늘 어땠어?','하루 기록 → 털어놓기',homeOpenReview),
       makeBtnCard('◎','일기 백업','내보내기',openMarkdownBackup)
     ]));
     body.appendChild(makeLabel('내일 미리보기'));
@@ -1444,6 +1499,8 @@ function renderHomeBody(section){
     makeScheduleCard('night').then(function(card){sc3.replaceWith(card);}).catch(function(){sc3.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑을 불러올 수 없어요</div>';});
     body.appendChild(makeLabel('최근 콘텐츠'));
     body.appendChild(makeContentsCard());
+    body.appendChild(makeLabel('오늘의 독서'));
+    body.appendChild(makeBookCard());
   }
   renderHomeIconBar(section);
 }
@@ -1534,6 +1591,24 @@ function makeRemainCard(){
     row.textContent=t.text;card.appendChild(row);
   });
   return card;
+}
+function makeBookCard(){
+  const mk=monthKey(new Date()),contents=getContents(mk);
+  const book=contents.find(c=>c.cat==='book'&&c.status==='watching');
+  const wrap=document.createElement('div');wrap.className='card s';
+  if(book){
+    wrap.innerHTML='<div style="display:flex;align-items:center;gap:11px;">'
+      +'<span style="font-size:16px;color:var(--tm);">✎</span>'
+      +'<div><div style="font-size:12.5px;font-weight:600;color:var(--tp);margin-bottom:2px;">'+book.title+'</div>'
+      +'<div style="font-size:11px;color:var(--tm);">하루를 마감하며 15분 독서는 어떨까요?</div></div>'
+      +'</div>';
+  } else {
+    wrap.innerHTML='<div style="display:flex;align-items:center;gap:11px;">'
+      +'<span style="font-size:16px;color:var(--tm);">○</span>'
+      +'<div style="font-size:11.5px;color:var(--tm);">오늘밤엔 새로운 책을 찾아보아요</div>'
+      +'</div>';
+  }
+  return wrap;
 }
 function makeContentsCard(){
   const wrap=document.createElement('div');
@@ -3193,9 +3268,42 @@ const WC_COLORS=[
 function getWChallenge(wk){return S.get('wchallenge_'+wk)||[];}
 function saveWChallenge(wk,data){S.set('wchallenge_'+wk,data);S.set('wchallenge_pending_'+wk,true);autoSync('wchallenge','wchallenge_'+wk);}
 
-function renderWeeklyChallenge(){
-  const wk=weekKey(new Date());
-  const wrap=document.getElementById('weekly-goal-wrap');
+function nextWeekKey(){const d=new Date();d.setDate(d.getDate()+7);return weekKey(d);}
+function openNextWeekChallengeSheet(){
+  openSheet('nextweek-sheet');
+  const wk=nextWeekKey();
+  renderWeeklyChallenge(wk,'nextweek-challenge-wrap');
+  loadNextWeekAISuggestions(wk);
+}
+async function loadNextWeekAISuggestions(wk){
+  const area=document.getElementById('nw-ai-area');if(!area)return;
+  const key=getClaudeKey();
+  if(!key){area.innerHTML='<div style="font-size:11.5px;color:var(--tm);text-align:center;padding:10px 0;">설정에서 Claude API 키를 입력하면 추천을 받을 수 있어요</div>';return;}
+  const habits=getHabits().map(h=>h.name);
+  const summary=buildTodaySummary?buildTodaySummary():'';
+  const sys='당신은 생활 루틴 코치예요. JSON 배열만 반환하세요. 다른 텍스트 없이 오직 JSON만.';
+  const userMsg=`현재 습관: ${habits.length?habits.join(', '):'없음'}\n최근 일주일 기록: ${summary}\n\n위 정보를 바탕으로 다음 주에 시도해볼 만한 짧은 주간 챌린지(다짐) 3가지를 제안해줘. 각 12자 이내, 구체적인 행동으로. 반드시 아래 JSON 형식만 반환해:\n[{"title":"챌린지문구","desc":"왜 추천하는지 짧은 이유"},{"title":"...","desc":"..."},{"title":"...","desc":"..."}]`;
+  const reply=await callClaude(sys,[{role:'user',content:userMsg}],400);
+  if(!reply||reply.startsWith('__ERR__')){area.innerHTML='<div style="font-size:11.5px;color:var(--tm);text-align:center;padding:10px 0;">추천을 불러올 수 없어요</div>';return;}
+  let sugg=[];
+  try{sugg=JSON.parse(reply.replace(/```json|```/g,'').trim());}catch(e){}
+  if(!sugg||!sugg.length){area.innerHTML='<div style="font-size:11.5px;color:var(--tm);text-align:center;padding:10px 0;">추천을 불러올 수 없어요</div>';return;}
+  area.innerHTML=`<div class="nw-chip-row">${sugg.map(s=>`<div class="nw-chip" onclick="applyNwSuggestion('${(s.title||'').replace(/'/g,"\\'")}','${wk}')"><span class="nwc-sym">◉</span><div><div class="nwc-title">${s.title||''}</div><div class="nwc-desc">${s.desc||''}</div></div></div>`).join('')}</div>`;
+}
+function applyNwSuggestion(title,wk){
+  let items=getWChallenge(wk);
+  if(!items.length)items=[{text:'',days:[false,false,false,false,false,false,false]}];
+  const emptyIdx=items.findIndex(it=>!it.text);
+  if(emptyIdx>=0)items[emptyIdx].text=title;
+  else if(items.length<4)items.push({text:title,days:[false,false,false,false,false,false,false]});
+  else items[items.length-1].text=title;
+  saveWChallenge(wk,items);
+  renderWeeklyChallenge(wk,'nextweek-challenge-wrap');
+}
+function renderWeeklyChallenge(wk,containerId){
+  wk=wk||weekKey(new Date());
+  containerId=containerId||'weekly-goal-wrap';
+  const wrap=document.getElementById(containerId);
   if(!wrap)return;
   wrap.innerHTML='';
   let items=getWChallenge(wk);
@@ -3948,6 +4056,106 @@ function closeSheet(id,e){if(!e||e.target===document.getElementById(id))document
 
 
 
+// ── NOTION BACKUP (베타)
+function getNotionConfig(){
+  return {workerUrl:(S.get('notion_worker_url')||'').replace(/\/$/,''),rootPage:S.get('notion_root_page')||''};
+}
+function saveNotionConfig(){
+  const w=document.getElementById('notion-worker-url-inp').value.trim();
+  const r=document.getElementById('notion-root-page-inp').value.trim().replace(/-/g,'');
+  const statusEl=document.getElementById('notion-backup-status');
+  if(!w||!r){if(statusEl)statusEl.textContent='Worker URL과 루트 페이지 ID를 모두 입력해주세요';return;}
+  S.set('notion_worker_url',w);S.set('notion_root_page',r);
+  if(statusEl)statusEl.textContent='설정 저장됐어요 ✅';
+}
+async function notionFetch(path,method='GET',body=null){
+  const {workerUrl}=getNotionConfig();
+  if(!workerUrl)throw new Error('worker_url_missing');
+  const res=await fetch(workerUrl+path,{
+    method,
+    headers:{'Content-Type':'application/json'},
+    body:body?JSON.stringify(body):undefined
+  });
+  const data=await res.json();
+  if(!res.ok)throw new Error(data?.message||'notion_api_error');
+  return data;
+}
+// 캐시된 페이지 ID가 있으면 그걸 쓰고, 없으면 새로 만들어서 캐시
+async function getOrCreateChildPage(cacheKey,parentId,title,extraBlocks=[]){
+  const cached=S.get(cacheKey);
+  if(cached&&cached.id)return cached.id;
+  const page=await notionFetch('/v1/pages','POST',{
+    parent:{page_id:parentId},
+    properties:{title:{title:[{text:{content:title}}]}},
+    children:extraBlocks
+  });
+  S.set(cacheKey,{id:page.id,created:Date.now()});
+  return page.id;
+}
+function notionParagraph(text){
+  return {object:'block',type:'paragraph',paragraph:{rich_text:[{text:{content:text}}]}};
+}
+function notionToDo(text,checked){
+  return {object:'block',type:'to_do',to_do:{rich_text:[{text:{content:text}}],checked:!!checked}};
+}
+function notionHeading(text){
+  return {object:'block',type:'heading_3',heading_3:{rich_text:[{text:{content:text}}]}};
+}
+function buildTodayBlocks(dk){
+  const blocks=[];
+  const sl=getSleep(dk);
+  if(sl&&sl.sleep&&sl.wake){
+    blocks.push(notionHeading('☽ 수면'));
+    blocks.push(notionParagraph(`☽ 굿나잇 ${sl.sleep}  ——  ☼ 굿모닝 ${sl.wake}`));
+  }
+  const todos=getTodos(dk);
+  if(todos.length){
+    blocks.push(notionHeading('✓ 투두'));
+    todos.forEach(t=>blocks.push(notionToDo((t.time?t.time+' ':'')+(t.text||''),t.done)));
+  }
+  const memos=getMemos(dk);
+  if(memos.length){
+    blocks.push(notionHeading('✎ 하루 기록'));
+    memos.forEach(m=>blocks.push(notionParagraph(`${m.time||''}  ${m.text||''}`)));
+  }
+  return blocks;
+}
+async function backupTodayToNotion(){
+  const statusEl=document.getElementById('notion-backup-status');
+  const {workerUrl,rootPage}=getNotionConfig();
+  if(!workerUrl||!rootPage){if(statusEl)statusEl.textContent='설정을 먼저 저장해주세요';return;}
+  if(statusEl)statusEl.textContent='백업 중...';
+  try{
+    const now=new Date();
+    const mk=monthKey(now);
+    const wk=weekKey(now);
+    const dk=dateKey(now);
+
+    // 이미 오늘 페이지를 만든 적 있으면, 중복 생성 방지 위해 건너뜀 (안전 원칙: 한 번 만든 날짜 페이지는 다시 안 건드림)
+    const dayCacheKey='notion_day_'+dk;
+    if(S.get(dayCacheKey)){
+      if(statusEl)statusEl.textContent='오늘은 이미 백업했어요 (' + new Date(S.get(dayCacheKey).created).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}) + ')';
+      return;
+    }
+
+    const monthTitle=`${now.getFullYear()}년 ${now.getMonth()+1}월`;
+    const monthPageId=await getOrCreateChildPage('notion_month_'+mk,rootPage,monthTitle);
+
+    const wkStart=new Date(now);wkStart.setDate(now.getDate()-((now.getDay()+6)%7));
+    const wkEnd=new Date(wkStart);wkEnd.setDate(wkStart.getDate()+6);
+    const weekTitle=`${wkStart.getMonth()+1}.${wkStart.getDate()} → ${wkEnd.getMonth()+1}.${wkEnd.getDate()}`;
+    const weekPageId=await getOrCreateChildPage('notion_week_'+wk,monthPageId,weekTitle);
+
+    const dayTitle=`${now.getMonth()+1}월 ${now.getDate()}일 ${_HOME_DAYS[now.getDay()]}요일`;
+    const blocks=buildTodayBlocks(dk);
+    await getOrCreateChildPage(dayCacheKey,weekPageId,dayTitle,blocks);
+
+    if(statusEl)statusEl.textContent='백업 완료 ✅ ('+dayTitle+')';
+  }catch(e){
+    if(statusEl)statusEl.textContent='백업 실패: '+e.message;
+  }
+}
+
 function saveClaudeKey(){
   const inp=document.getElementById('claude-api-key-inp');
   if(!inp)return;
@@ -3990,7 +4198,9 @@ function openSettings(){
   const ni=document.getElementById('news-interests-inp');if(ni)ni.value=S.get('news_interests')||'';
   const keyInp=document.getElementById('claude-api-key-inp');
   if(keyInp){const k=S.get('claude_api_key');keyInp.value=k?'••••••••••••'+k.slice(-4):'';} const newsInp=document.getElementById('news-interests-inp');if(newsInp)newsInp.value=S.get('news_interests')||'';
-  const profileInp=document.getElementById('user-profile-inp');if(profileInp)profileInp.value=S.get('user_profile')||'';  const theme=S.get('theme')||'light';
+  const profileInp=document.getElementById('user-profile-inp');if(profileInp)profileInp.value=S.get('user_profile')||'';
+  const nwi=document.getElementById('notion-worker-url-inp');if(nwi)nwi.value=S.get('notion_worker_url')||'';
+  const npi=document.getElementById('notion-root-page-inp');if(npi)npi.value=S.get('notion_root_page')||'';  const theme=S.get('theme')||'light';
   const darkTog=document.getElementById('dark-tog');if(darkTog)darkTog.classList.toggle('on',theme==='dark');
   document.querySelectorAll('.ctheme-btn').forEach(b=>b.classList.remove('on'));
   const act=document.getElementById('ct-'+theme);if(act)act.classList.add('on');
@@ -4387,6 +4597,17 @@ async function initSync(){
     // 없으면 Supabase에서 Down
     await syncWChallengeDown(wk);
   }
+  // 습관 / 습관체크 — 항상 동기화 (이전엔 syncAll에만 있어서 PC 사파리 등 새 탭에서 누락되던 버그)
+  await syncHabitsDown();
+  await syncHCDown(wk);
+  // 콘텐츠 — pending 있으면 Up 먼저, 없으면 Down
+  var mk0=monthKey(new Date());
+  if(S.get(S.key('contents_pending',mk0))){
+    await syncContentsUp(mk0);
+    S.set(S.key('contents_pending',mk0),false);
+  } else {
+    await syncContentsDown(mk0);
+  }
   // 하루한줄 — 이번 주 월~일
   var mon=new Date();mon.setDate(mon.getDate()-((mon.getDay()+6)%7));
   for(var i=0;i<7;i++){
@@ -4405,6 +4626,8 @@ async function initSync(){
   }
   window._restoring=false;
   loadDaily();
+  if(document.getElementById('v-weekly')&&document.getElementById('v-weekly').classList.contains('on'))loadWeekly();
+  if(document.getElementById('v-monthly')&&document.getElementById('v-monthly').classList.contains('on'))loadMonthly();
 }
 setTimeout(initSync, 500);
 
