@@ -159,6 +159,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rb-title{font-size:13px;font-weight:700;letter-spacing:0.05em;color:rgba(65,125,70,0.95);}
 .report-banner-arrow{font-size:17px;color:rgba(80,130,85,0.55);flex-shrink:0;}
 [data-theme="dark"] .report-banner-inner{background:linear-gradient(135deg,rgba(30,60,40,0.92),rgba(60,55,15,0.92),rgba(30,58,38,0.92));}
+.meal-row{display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px dashed rgba(195,175,168,0.25);}
+.meal-row:last-child{border-bottom:none;}
+.meal-cat{width:38px;flex-shrink:0;font-size:12px;color:var(--tm);}
+.meal-inp{flex:1;background:none;border:none;border-bottom:1px dashed rgba(195,175,168,0.38);outline:none;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--tp);padding:5px 2px 4px;}
 .month-chips{display:flex;gap:6px;margin-bottom:16px;overflow-x:auto;padding-bottom:2px;}
 .m-chip{flex-shrink:0;font-size:11px;color:var(--tm);padding:7px 13px;border-radius:13px;background:var(--card);border:1px solid var(--card-b);cursor:pointer;font-weight:500;}
 .m-chip.active{background:rgba(150,215,180,0.4);border-color:rgba(140,210,170,0.55);color:#3a7858;font-weight:700;}
@@ -880,6 +884,12 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           <button class="send-btn" onclick="sendMemo()"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="white" stroke-width="1.4" stroke-linecap="round"><line x1="6.5" y1="10.5" x2="6.5" y2="2"/><polyline points="3,5.5 6.5,2 10,5.5"/></svg></button>
         </div>
       </div>
+      <div class="report-banner" onclick="openMealSheet()">
+        <div class="report-banner-inner">
+          <div class="report-banner-line"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="vertical-align:-1px;margin-right:3px;"><path d="M2 5.5h8a4 4 0 0 1-8 0z"/><line x1="2" y1="5.5" x2="10" y2="5.5"/><line x1="6" y1="1.5" x2="6" y2="3.5"/></svg>오늘 뭐 먹지?</div>
+          <div class="report-banner-arrow">›</div>
+        </div>
+      </div>
     </div>
 
     <!-- WEEKLY -->
@@ -947,6 +957,25 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 </div><!-- /app -->
 
 
+
+<!-- MEAL SHEET -->
+<div class="overlay" id="meal-sheet" onclick="closeSheet('meal-sheet',event)">
+  <div class="bsheet" style="max-height:80vh;overflow-y:auto;" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div style="padding:0 20px 20px;">
+      <div class="report-banner" style="margin-top:0;margin-bottom:14px;" onclick="saveMealSheet()">
+        <div class="report-banner-inner">
+          <div class="report-banner-line"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="vertical-align:-1px;margin-right:3px;"><path d="M2 5.5h8a4 4 0 0 1-8 0z"/><line x1="2" y1="5.5" x2="10" y2="5.5"/><line x1="6" y1="1.5" x2="6" y2="3.5"/></svg>오늘 뭐 먹지?</div>
+          <div class="report-banner-arrow">›</div>
+        </div>
+      </div>
+      <div class="meal-row"><div class="meal-cat">아침</div><input class="meal-inp" id="meal-inp-breakfast" type="text" placeholder="메뉴 입력" autocomplete="off"></div>
+      <div class="meal-row"><div class="meal-cat">점심</div><input class="meal-inp" id="meal-inp-lunch" type="text" placeholder="메뉴 입력" autocomplete="off"></div>
+      <div class="meal-row"><div class="meal-cat">저녁</div><input class="meal-inp" id="meal-inp-dinner" type="text" placeholder="메뉴 입력" autocomplete="off"></div>
+      <div class="meal-row"><div class="meal-cat">간식</div><input class="meal-inp" id="meal-inp-snack" type="text" placeholder="메뉴 입력" autocomplete="off"></div>
+    </div>
+  </div>
+</div>
 
 <!-- 주간 루틴 모달 -->
 <div class="modal-ov" id="routine-modal" onclick="closeModal('routine-modal',event)">
@@ -2677,6 +2706,12 @@ function saveMemos(dk,v){
 }
 function getSleep(dk){return S.get(S.key('sleep',dk))||{};}
 function saveSleepData(dk,v){S.set(S.key('sleep',dk),v);autoSync('sleep',dk);}
+function getMeals(dk){return S.get(S.key('meals',dk))||{};}
+function saveMealsData(dk,v){
+  S.set(S.key('meals',dk),v);
+  S.set(S.key('meals_pending',dk),true);
+  autoSync('meals',dk);
+}
 function getHabits(){return S.get('habits')||DEFAULT_HABITS;}
 function saveHabits(v){S.set('habits',v);autoSync('habits',null);}
 function getHabitChecks(wk){return S.get(S.key('hc',wk))||{};}
@@ -2724,6 +2759,20 @@ async function syncSleepUp(dk){
   const d=getSleep(dk);if(!d.sleep&&!d.wake)return;
   await supaFetch(`sleep?date_key=eq.${dk}`,'DELETE');
   await supaFetch('sleep','POST',[{date_key:dk,sleep_time:d.sleep,wake_time:d.wake}]);
+}
+async function syncMealsDown(dk){
+  const rows=await supaFetch(`meals?date_key=eq.${dk}`);
+  if(!rows)return;
+  if(!rows.length)return;
+  const r=rows[0];
+  S.set(S.key('meals',dk),{breakfast:r.breakfast||'',lunch:r.lunch||'',dinner:r.dinner||'',snack:r.snack||''});
+}
+async function syncMealsUp(dk){
+  const m=getMeals(dk);
+  await supaFetch(`meals?date_key=eq.${dk}`,'DELETE');
+  if(m.breakfast||m.lunch||m.dinner||m.snack){
+    await supaFetch('meals','POST',[{date_key:dk,breakfast:m.breakfast||null,lunch:m.lunch||null,dinner:m.dinner||null,snack:m.snack||null,created:Date.now()}]);
+  }
 }
 async function syncHabitsDown(){
   const rows=await supaFetch('habits?order=sort_order');
@@ -2821,6 +2870,7 @@ async function autoSync(type,key){
   if(type==='todos'){await syncTodosUp(key);S.set(S.key('todos_pending',key),false);}
   else if(type==='memos'){await syncMemosUp(key);S.set(S.key('memos_pending',key),false);}
   else if(type==='sleep')syncSleepUp(key);
+  else if(type==='meals'){await syncMealsUp(key);S.set(S.key('meals_pending',key),false);}
   else if(type==='habits')syncHabitsUp();
   else if(type==='hc')syncHCUp(key);
   else if(type==='goal')syncGoalUp(key);
@@ -2852,12 +2902,13 @@ async function syncAll(){
     if(S.get(S.key('todos_pending',fdk)))upTasks.push(syncTodosUp(fdk).then(()=>S.set(S.key('todos_pending',fdk),false)));
   });
   if(S.get(S.key('memos_pending',dk)))upTasks.push(syncMemosUp(dk).then(()=>S.set(S.key('memos_pending',dk),false)));
+  if(S.get(S.key('meals_pending',dk)))upTasks.push(syncMealsUp(dk).then(()=>S.set(S.key('meals_pending',dk),false)));
   if(S.get(S.key('contents_pending',mk)))upTasks.push(syncContentsUp(mk).then(()=>S.set(S.key('contents_pending',mk),false)));
   if(S.get('wchallenge_pending_'+wk))upTasks.push(autoSync('wchallenge','wchallenge_'+wk));
   if(upTasks.length)await Promise.all(upTasks);
   // Down (Supabase → 로컬)
   await Promise.all([
-    syncTodosDown(dk),syncMemosDown(dk),syncSleepDown(dk),
+    syncTodosDown(dk),syncMemosDown(dk),syncSleepDown(dk),syncMealsDown(dk),
     ...futureDks.map(fdk=>syncTodosDown(fdk)),
     syncHabitsDown(),syncHCDown(wk),syncContentsDown(mk),
     syncGoalDown(S.key('mgoal',monthKey(now))),
@@ -3802,6 +3853,7 @@ function renderCalDetail(d){
   const el=document.getElementById('cal-detail');if(!el)return;
   const dk=`${_calYear}-${pad(_calMonth+1)}-${pad(d)}`;
   const allMemos=getMemos(dk);const todos=getTodos(dk).filter(t=>t.done);const sleep=getSleep(dk);
+  const meals=getMeals(dk);
   const date=new Date(_calYear,_calMonth,d);
   const dateStr=`${_calMonth+1}월 ${d}일 ${DAYS[date.getDay()]}`;
   let items='';
@@ -3819,9 +3871,15 @@ function renderCalDetail(d){
   const showMemos=total>MAX?allMemos.slice(-MAX):allMemos;
   if(hiddenCnt>0)items+=`<div class="cal-detail-more" onclick="calShowAll('${dk}')">··· ${hiddenCnt}개 더 보기</div>`;
   showMemos.forEach(m=>{items+=`<div class="cal-detail-row"><span class="cal-detail-time">${m.time||''}</span><span class="cal-detail-text">${m.text||''}</span></div>`;});
-  if(!items){const olh=oneLine?`<span style="font-size:11.5px;color:var(--ts);font-style:italic;flex:1;text-align:right;padding-left:8px;">&#x275D; ${oneLine} &#x275E;</span>`:"";el.innerHTML=`<div class="cal-detail-wrap"><div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;gap:6px;"><span class="cal-detail-date" style="margin-bottom:0;flex-shrink:0;">${dateStr}</span>${olh}</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:10px 0;">기록이 없어요</div></div>`;return;}
+  const MEAL_LABELS={breakfast:'아침',lunch:'점심',dinner:'저녁',snack:'간식'};
+  let mealHtml='';
+  ['breakfast','lunch','dinner','snack'].forEach(k=>{
+    if(meals[k])mealHtml+=`<div class="cal-detail-row"><span class="cal-detail-time">${MEAL_LABELS[k]}</span><span class="cal-detail-text">${meals[k]}</span></div>`;
+  });
+  if(mealHtml)mealHtml=`<div style="font-size:11px;font-weight:500;color:rgba(190,130,70,0.85);margin:12px 0 4px;">더 맛있게 건강하게</div>${mealHtml}`;
+  if(!items&&!mealHtml){const olh=oneLine?`<span style="font-size:11.5px;color:var(--ts);font-style:italic;flex:1;text-align:right;padding-left:8px;">&#x275D; ${oneLine} &#x275E;</span>`:"";el.innerHTML=`<div class="cal-detail-wrap"><div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;gap:6px;"><span class="cal-detail-date" style="margin-bottom:0;flex-shrink:0;">${dateStr}</span>${olh}</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:10px 0;">기록이 없어요</div></div>`;return;}
   const oneLineHtml=oneLine?`<span style="font-size:11.5px;color:var(--ts);font-style:italic;flex:1;text-align:right;padding-left:8px;">&#x275D; ${oneLine} &#x275E;</span>`:'';
-  el.innerHTML=`<div class="cal-detail-wrap"><div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;gap:6px;"><span class="cal-detail-date" style="margin-bottom:0;flex-shrink:0;">${dateStr}</span>${oneLineHtml}</div>${items}</div>`;
+  el.innerHTML=`<div class="cal-detail-wrap"><div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;gap:6px;"><span class="cal-detail-date" style="margin-bottom:0;flex-shrink:0;">${dateStr}</span>${oneLineHtml}</div>${items}${mealHtml}</div>`;
   el.style.display='block';
   setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'nearest'}),100);
 }
@@ -4047,6 +4105,26 @@ function loadMonthly(){
 // ── MODAL / SHEET HELPERS
 function openModal(id){document.getElementById(id).classList.add('on');}
 function closeModal(id,e){if(!e||e.target===document.getElementById(id))document.getElementById(id).classList.remove('on');}
+function openMealSheet(){
+  const dk=dateKey(currentDate);
+  const m=getMeals(dk);
+  document.getElementById('meal-inp-breakfast').value=m.breakfast||'';
+  document.getElementById('meal-inp-lunch').value=m.lunch||'';
+  document.getElementById('meal-inp-dinner').value=m.dinner||'';
+  document.getElementById('meal-inp-snack').value=m.snack||'';
+  openSheet('meal-sheet');
+}
+function saveMealSheet(){
+  const dk=dateKey(currentDate);
+  const m={
+    breakfast:document.getElementById('meal-inp-breakfast').value.trim(),
+    lunch:document.getElementById('meal-inp-lunch').value.trim(),
+    dinner:document.getElementById('meal-inp-dinner').value.trim(),
+    snack:document.getElementById('meal-inp-snack').value.trim()
+  };
+  saveMealsData(dk,m);
+  closeSheet('meal-sheet');
+}
 function openSheet(id){document.getElementById(id).classList.add('on');}
 function closeSheet(id,e){if(!e||e.target===document.getElementById(id))document.getElementById(id).classList.remove('on');}
 
@@ -4517,6 +4595,10 @@ async function forceRestoreDate(dk){
   if(srows&&srows.length>0){
     S.set(S.key('sleep',dk),{sleep:srows[0].sleep_time,wake:srows[0].wake_time});
   }
+  var mlrows=await supaFetch('meals?date_key=eq.'+dk);
+  if(mlrows&&mlrows.length>0){
+    S.set(S.key('meals',dk),{breakfast:mlrows[0].breakfast||'',lunch:mlrows[0].lunch||'',dinner:mlrows[0].dinner||'',snack:mlrows[0].snack||''});
+  }
 }
 async function forceRestoreAll(){
   showToast('복구 시작...');
@@ -4576,6 +4658,10 @@ async function initSync(){
       await syncMemosUp(dk);
       S.set(S.key('memos_pending',dk),false);
       didUp=true;
+    }
+    if(S.get(S.key('meals_pending',dk))){
+      await syncMealsUp(dk);
+      S.set(S.key('meals_pending',dk),false);
     }
     if(didUp)uploadedDates[dk]=true;
   }
