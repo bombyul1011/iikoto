@@ -1497,8 +1497,6 @@ function renderHomeBody(section){
     sc3.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑 작성 중...</div>';
     body.appendChild(sc3);
     makeScheduleCard('night').then(function(card){sc3.replaceWith(card);}).catch(function(){sc3.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑을 불러올 수 없어요</div>';});
-    body.appendChild(makeLabel('최근 콘텐츠'));
-    body.appendChild(makeContentsCard());
     body.appendChild(makeLabel('오늘의 독서'));
     body.appendChild(makeBookCard());
   }
@@ -1595,17 +1593,17 @@ function makeRemainCard(){
 function makeBookCard(){
   const mk=monthKey(new Date()),contents=getContents(mk);
   const book=contents.find(c=>c.cat==='book'&&c.status==='watching');
-  const wrap=document.createElement('div');wrap.className='card s';
+  const wrap=document.createElement('div');wrap.className='home-content-item';
   if(book){
-    wrap.innerHTML='<div style="display:flex;align-items:center;gap:11px;">'
-      +'<span style="font-size:16px;color:var(--tm);">✎</span>'
-      +'<div><div style="font-size:12.5px;font-weight:600;color:var(--tp);margin-bottom:2px;">'+book.title+'</div>'
-      +'<div style="font-size:11px;color:var(--tm);">하루를 마감하며 15분 독서는 어떨까요?</div></div>'
+    wrap.innerHTML='<div class="home-content-bar" style="background:rgba(190,180,170,.4);"></div>'
+      +'<div class="home-content-info">'
+      +'<div class="home-content-cat">읽는 중</div>'
+      +'<div class="home-content-title">'+book.title+'</div>'
       +'</div>';
   } else {
-    wrap.innerHTML='<div style="display:flex;align-items:center;gap:11px;">'
-      +'<span style="font-size:16px;color:var(--tm);">○</span>'
-      +'<div style="font-size:11.5px;color:var(--tm);">오늘밤엔 새로운 책을 찾아보아요</div>'
+    wrap.innerHTML='<div class="home-content-bar" style="background:rgba(190,180,170,.4);"></div>'
+      +'<div class="home-content-info">'
+      +'<div class="home-content-title" style="color:var(--tm);">오늘밤엔 새로운 책을 찾아보아요</div>'
       +'</div>';
   }
   return wrap;
