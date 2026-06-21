@@ -157,10 +157,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .report-banner-inner{border-radius:14.5px;background:linear-gradient(135deg,rgba(210,244,225,0.85),rgba(248,245,200,0.85),rgba(212,242,222,0.85));padding:13px 17px;display:flex;align-items:center;justify-content:space-between;gap:10px;}
 .report-banner-line{font-size:11.5px;font-weight:400;color:rgba(100,140,75,0.80);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .rb-title{font-size:13px;font-weight:700;letter-spacing:0.05em;color:rgba(65,125,70,0.95);}
+.meal-soft{filter:saturate(0.72) brightness(1.02);}
 .report-banner-arrow{font-size:17px;color:rgba(80,130,85,0.55);flex-shrink:0;}
 [data-theme="dark"] .report-banner-inner{background:linear-gradient(135deg,rgba(30,60,40,0.92),rgba(60,55,15,0.92),rgba(30,58,38,0.92));}
-.meal-row{display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px dashed rgba(195,175,168,0.25);}
-.meal-row:last-child{border-bottom:none;}
+.meal-row{display:flex;align-items:center;gap:10px;padding:8px 2px;}
 .meal-cat{width:38px;flex-shrink:0;font-size:12px;color:var(--tm);}
 .meal-inp{flex:1;background:none;border:none;border-bottom:1px dashed rgba(195,175,168,0.38);outline:none;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--tp);padding:5px 2px 4px;}
 .month-chips{display:flex;gap:6px;margin-bottom:16px;overflow-x:auto;padding-bottom:2px;}
@@ -884,7 +884,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           <button class="send-btn" onclick="sendMemo()"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="white" stroke-width="1.4" stroke-linecap="round"><line x1="6.5" y1="10.5" x2="6.5" y2="2"/><polyline points="3,5.5 6.5,2 10,5.5"/></svg></button>
         </div>
       </div>
-      <div class="report-banner" onclick="openMealSheet()">
+      <div class="report-banner meal-soft" onclick="openMealSheet()">
         <div class="report-banner-inner">
           <div class="report-banner-line"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="vertical-align:-1px;margin-right:3px;"><path d="M2 5.5h8a4 4 0 0 1-8 0z"/><line x1="2" y1="5.5" x2="10" y2="5.5"/><line x1="6" y1="1.5" x2="6" y2="3.5"/></svg>오늘 뭐 먹지?</div>
           <div class="report-banner-arrow">›</div>
@@ -963,7 +963,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   <div class="bsheet" style="max-height:80vh;overflow-y:auto;" onclick="event.stopPropagation()">
     <div class="sheet-handle"></div>
     <div style="padding:0 20px 20px;">
-      <div class="report-banner" style="margin-top:0;margin-bottom:14px;" onclick="saveMealSheet()">
+      <div class="report-banner meal-soft" style="margin-top:0;margin-bottom:14px;" onclick="saveMealSheet()">
         <div class="report-banner-inner">
           <div class="report-banner-line"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="vertical-align:-1px;margin-right:3px;"><path d="M2 5.5h8a4 4 0 0 1-8 0z"/><line x1="2" y1="5.5" x2="10" y2="5.5"/><line x1="6" y1="1.5" x2="6" y2="3.5"/></svg>오늘 뭐 먹지?</div>
           <div class="report-banner-arrow">›</div>
