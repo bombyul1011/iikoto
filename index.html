@@ -4298,6 +4298,12 @@ function placeWish(el){
   body.addEventListener('mousedown',handler);
   body.addEventListener('touchstart',handler,{passive:false});
 })();
+function saveOneMealDay(dk){
+  const CATS=['breakfast','lunch','dinner','snack'];
+  const m={};
+  CATS.forEach(k=>{const el=document.getElementById(`wm-${dk}-${k}`);m[k]=el?el.value.trim():'';});
+  saveMealsData(dk,m);
+}
 function openWeekMealSheet(){
   cancelWishPlacing();
   document.getElementById('meal-wishlist-panel').style.display='none';
@@ -4313,7 +4319,7 @@ function openWeekMealSheet(){
     const m=getMeals(dk);
     const block=document.createElement('div');block.className='week-meal-day';block.id='wm-block-'+dk;
     block.innerHTML=`<div class="week-meal-day-label">${DOW[i]} · ${d.getMonth()+1}/${d.getDate()}</div>`+
-      CATS.map(([k,label])=>`<div class="meal-row"><div class="meal-cat">${label}</div><input class="meal-inp" id="wm-${dk}-${k}" type="text" placeholder="메뉴 입력" autocomplete="off" value="${(m[k]||'').replace(/"/g,'&quot;')}"></div>`).join('');
+      CATS.map(([k,label])=>`<div class="meal-row"><div class="meal-cat">${label}</div><input class="meal-inp" id="wm-${dk}-${k}" type="text" placeholder="메뉴 입력" autocomplete="off" value="${(m[k]||'').replace(/"/g,'&quot;')}" onblur="saveOneMealDay('${dk}')"></div>`).join('');
     body.appendChild(block);
   }
   openSheet('week-meal-sheet');
