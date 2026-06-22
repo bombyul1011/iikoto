@@ -58,10 +58,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --inp:rgba(255,255,255,0.50);--inp-b:rgba(220,205,180,0.40);
   --pill:rgba(255,255,255,0.55);
   --memo-b:rgba(255,253,248,0.50);--memo-bb:rgba(240,160,190,0.45);
-  --sleep-b:rgba(255,253,248,0.50);--sleep-bb:rgba(235,175,150,0.55);
+  --sleep-b:rgba(255,253,248,0.50);--sleep-bb:rgba(95,115,170,0.55);
 }
 [data-theme="glass"] .card{border-width:1.4px;box-shadow:0 1.5px 1.5px rgba(255,255,255,0.9) inset,0 -8px 14px -10px rgba(120,110,95,0.15) inset,0 5px 14px rgba(150,140,120,0.08);}
-[data-theme="glass"] #daily-meal-card{background:rgba(225,238,210,0.30)!important;border-color:rgba(150,195,130,0.55)!important;}
+[data-theme="glass"] .sleep-box{border-width:1.4px;box-shadow:0 1.5px 1.5px rgba(255,255,255,0.9) inset,0 -8px 14px -10px rgba(120,110,95,0.15) inset,0 5px 14px rgba(150,140,120,0.08);}
+[data-theme="glass"] #daily-meal-card{background:rgba(255,253,248,0.45)!important;border-color:rgba(150,195,130,0.55)!important;}
 [data-theme="glass"] .meal-soft{filter:none;}
 [data-theme="dark"]{
   --bg:linear-gradient(145deg,#13111e 0%,#1a1628 55%,#110e1a 100%);
@@ -83,10 +84,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 }
 
 /* ══ SPLASH ══ */
-#splash{position:fixed;inset:0;z-index:9999;background:linear-gradient(155deg,#fdf0e8 0%,#fef5d4 45%,#fde8f0 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;transition:opacity .6s,transform .6s;}
+#splash{position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;transition:opacity .6s,transform .6s;}
 #splash.hide{opacity:0;transform:scale(1.04);pointer-events:none;}
 .sp-logo{width:200px;height:auto;opacity:0;transform:translateY(14px);animation:fadeUp .7s .2s cubic-bezier(.22,.8,.44,1) forwards;}
-.sp-sub{font-family:'Comfortaa',cursive;font-size:11px;color:#c8b0a8;letter-spacing:3.5px;text-transform:uppercase;opacity:0;animation:fadeUp .5s .6s ease forwards;}
+.sp-sub{font-family:'Comfortaa',cursive;font-size:11px;color:var(--tm);letter-spacing:3.5px;text-transform:uppercase;opacity:0;animation:fadeUp .5s .6s ease forwards;}
 .sp-dots{display:flex;gap:7px;margin-top:14px;opacity:0;animation:fadeIn .4s 1.05s ease forwards;}
 .sp-dot{width:6px;height:6px;border-radius:50%;}
 @keyframes fadeUp{to{opacity:1;transform:translateY(0);}}
@@ -522,6 +523,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="dark"] .toggle-lbl{color:#7868b0;}
 [data-theme="dark"] .add-btn{color:#7868b0;border-color:rgba(255,126,179,0.25);background:rgba(255,126,179,0.06);}
 [data-theme="dark"] .memo-bub{color:#d8d0f8;background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.12);}
+[data-theme="glass"] .memo-bub{background:none;border:none;border-radius:0;padding:2px 0 0;}
+[data-theme="glass"] .memo-item{margin-bottom:14px;}
 [data-theme="dark"] .memo-time{color:#7868b0;}
 [data-theme="dark"] .stamp-btn{color:#c0b0e8;background:rgba(255,255,255,0.07);border-color:rgba(255,255,255,0.12);}
 [data-theme="dark"] .memo-field{color:#f0ecff;background:rgba(255,255,255,0.07);border-color:rgba(255,255,255,0.12);}
@@ -598,16 +601,31 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="dark"] .tog.on{background:rgba(255,126,179,0.60);}
 
 /* ══ MINT OVERRIDES ══ */
-[data-theme="glass"] .vtab.on{border-color:rgba(201,146,110,0.40);}
-[data-theme="glass"] .day-btn.today{background:rgba(201,146,110,0.12);border-color:rgba(201,146,110,0.28);}
-[data-theme="glass"] .day-btn.today .day-num{color:#c9926e;}
-[data-theme="glass"] .chk.on{background:rgba(201,146,110,0.55);border-color:rgba(201,146,110,0.70);}
-[data-theme="glass"] .cal-day.today .cal-num{background:#c9926e;}
-[data-theme="glass"] .cal-day.selected .cal-num{background:rgba(201,146,110,0.18);color:#c9926e;}
-[data-theme="glass"] .cal-dot{background:#c9926e;}
-[data-theme="glass"] .goal-section-title{background:rgba(255,253,248,0.45);color:#b5805c;border:1.4px solid rgba(201,146,110,0.40);}
-[data-theme="glass"] .send-btn{background:rgba(201,146,110,0.45);}
+[data-theme="glass"] .vtab.on{
+  background-color:transparent;
+  border:1.6px solid transparent;
+  background-image:linear-gradient(rgba(253,251,245,0.95),rgba(253,251,245,0.95)),linear-gradient(135deg,rgba(245,210,140,0.95),rgba(250,225,170,0.85),rgba(232,164,187,0.85),rgba(245,210,140,0.95));
+  background-origin:border-box;
+  background-clip:padding-box,border-box;
+  background-size:100% 100%,300% 300%;
+  animation:bannerShine 4s ease infinite;
+  color:rgba(150,108,40,0.95);
+}
+[data-theme="glass"] .day-btn.today{background:rgba(232,164,187,0.18);border-color:rgba(232,164,187,0.40);}
+[data-theme="glass"] .day-btn.today .day-num{color:#c97a96;}
+[data-theme="glass"] .send-btn{background:rgba(232,164,187,0.55);}
+[data-theme="glass"] #nextweek-sheet .goal-section-title{background:linear-gradient(120deg,rgba(248,212,225,0.55),rgba(250,225,235,0.48));color:#c2638a;border:1.4px solid rgba(232,164,187,0.50);}
+[data-theme="glass"] .chk.on{background:rgba(220,180,100,0.55);border-color:rgba(220,180,100,0.75);}
+[data-theme="glass"] .cal-day.today .cal-num{background:#e8a4bb;}
+[data-theme="glass"] .cal-day.selected .cal-num{background:rgba(232,164,187,0.24);color:#c97a96;}
+[data-theme="glass"] .cal-dot{background:#e8a4bb;}
+[data-theme="glass"] .goal-section-title{background:linear-gradient(120deg,rgba(245,222,170,0.55),rgba(250,232,195,0.48));color:#a67c3e;border:1.4px solid rgba(225,195,130,0.50);}
 [data-theme="glass"] .mbtn.ok{background:rgba(201,146,110,0.42);color:#6e4a30;}
+[data-theme="glass"] .wchallenge-day.on{background:rgba(255,253,248,0.45)!important;color:var(--tp)!important;border-width:2px;}
+[data-theme="glass"] .home-hcard.morning{background:linear-gradient(135deg,rgba(255,238,200,0.32),rgba(255,220,210,0.28));border-color:rgba(255,210,180,0.40);}
+[data-theme="glass"] .home-hcard.afternoon{background:linear-gradient(135deg,rgba(255,220,235,0.30),rgba(255,235,200,0.26));border-color:rgba(255,200,210,0.38);}
+[data-theme="glass"] .home-hcard.night{background:linear-gradient(135deg,rgba(225,215,250,0.30),rgba(255,210,230,0.26));border-color:rgba(210,195,240,0.38);}
+[data-theme="glass"] .report-banner.meal-soft .report-banner-inner{background:rgba(253,251,245,0.95)!important;}
 
 
 /* ── DAILY ONE LINE ── */
@@ -785,6 +803,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 </style>
 </head>
 <body>
+<script>(function(){try{var t=localStorage.getItem('theme');if(t){t=JSON.parse(t);document.documentElement.setAttribute('data-theme',t);}}catch(e){}})();</script>
 
 <!-- SPLASH -->
 <div id="splash">
@@ -913,7 +932,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <!-- WEEKLY -->
     <div class="view" id="v-weekly">
       <div class="week-strip" id="week-strip"></div>
-      <div class="card" style="padding:14px 15px 10px;margin-bottom:10px;">
+      <div class="card" id="wchallenge-card" style="padding:14px 15px 10px;margin-bottom:10px;">
         <div class="goal-section-title" style="margin-top:0;">✦ 이번 주도 화이팅</div>
         <div class="goal-wrap" id="weekly-goal-wrap"></div>
       </div>
@@ -942,7 +961,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
     <!-- MONTHLY -->
     <div class="view" id="v-monthly">
-      <div class="card" style="padding:14px 15px 10px;margin-bottom:10px;">
+      <div class="card" id="monthly-goal-card" style="padding:14px 15px 10px;margin-bottom:10px;">
         <div class="goal-section-title" id="monthly-goal-title" style="margin-top:0;">✦ 이번 달 목표</div>
         <div class="goal-wrap" id="monthly-goal-wrap"></div>
       </div>
