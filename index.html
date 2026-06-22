@@ -2690,7 +2690,7 @@ async function ensureDateSynced(dk){
   const today=new Date();today.setHours(0,0,0,0);
   const d=parseDk(dk);d.setHours(0,0,0,0);
   const diffDays=Math.round((today-d)/86400000);
-  if(diffDays<=13&&diffDays>=-6)return false; // 14일 윈도우 안 — initSync/syncAll이 이미 처리
+  if(diffDays<=29&&diffDays>=-6)return false; // 30일 윈도우 안 — initSync/syncAll이 이미 처리
   if(_oldDateSynced[dk])return false; // 이번 세션에 이미 시도함
   _oldDateSynced[dk]=true;
   await forceRestoreDate(dk);
@@ -3841,6 +3841,35 @@ function updateMonthlyGoalTitle(){
 }
 let _calSelectedDay=null;
 
+const _monthSynced={};
+async function syncMonthRange(y,mo){
+  if(!navigator.onLine)return false;
+  const mk=`${y}-${pad(mo+1)}`;
+  if(_monthSynced[mk])return false;
+  _monthSynced[mk]=true;
+  const daysInMonth=new Date(y,mo+1,0).getDate();
+  const start=`${y}-${pad(mo+1)}-01`;
+  const end=`${y}-${pad(mo+1)}-${pad(daysInMonth)}`;
+  const [mRows,tRows,sRows,mlRows]=await Promise.all([
+    supaFetch(`memos?date_key=gte.${start}&date_key=lte.${end}&order=created`),
+    supaFetch(`todos?date_key=gte.${start}&date_key=lte.${end}&order=created`),
+    supaFetch(`sleep?date_key=gte.${start}&date_key=lte.${end}`),
+    supaFetch(`meals?date_key=gte.${start}&date_key=lte.${end}`)
+  ]);
+  if(mRows){
+    const byDate={};
+    mRows.forEach(r=>{(byDate[r.date_key]=byDate[r.date_key]||[]).push({time:r.memo_time,text:r.text,photo:r.photo,created:r.created,cid:r.client_id||genCid()});});
+    Object.keys(byDate).forEach(dk=>{if(!S.get(S.key('memos_pending',dk)))S.set(S.key('memos',dk),byDate[dk]);});
+  }
+  if(tRows){
+    const byDate={};
+    tRows.forEach(r=>{(byDate[r.date_key]=byDate[r.date_key]||[]).push({text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid()});});
+    Object.keys(byDate).forEach(dk=>{if(!S.get(S.key('todos_pending',dk)))S.set(S.key('todos',dk),byDate[dk]);});
+  }
+  if(sRows)sRows.forEach(r=>S.set(S.key('sleep',r.date_key),{sleep:r.sleep_time,wake:r.wake_time}));
+  if(mlRows)mlRows.forEach(r=>{if(!S.get(S.key('meals_pending',r.date_key)))S.set(S.key('meals',r.date_key),{breakfast:r.breakfast||'',lunch:r.lunch||'',dinner:r.dinner||'',snack:r.snack||''});});
+  return true;
+}
 function calShiftMonth(n){
   _calMonth+=n;
   if(_calMonth>11){_calMonth=0;_calYear++;}
@@ -3854,6 +3883,13 @@ function calShiftMonth(n){
   renderMonthlyStatBar();
   renderGoalNote('monthly-goal-wrap',S.key('mgoal',calMonthKey()),!isCalCurrentMonth());
   updateMonthlyGoalTitle();
+  const sy=_calYear,smo=_calMonth;
+  syncMonthRange(sy,smo).then(fetched=>{
+    if(fetched&&_calYear===sy&&_calMonth===smo){
+      renderCalendar();updateStats();renderTimetable();renderHabitMonthly();renderMonthlyStatBar();
+      if(_calSelectedDay)renderCalDetail(_calSelectedDay);
+    }
+  });
 }
 function renderCalendar(){
   const wrap=document.getElementById('monthly-cal');if(!wrap)return;
@@ -4148,6 +4184,13 @@ function loadMonthly(){
   updateMonthlyGoalTitle();
   renderCalendar();renderMonthlyStatBar();
   updateReportBannerLabel();
+  const sy=_calYear,smo=_calMonth;
+  syncMonthRange(sy,smo).then(fetched=>{
+    if(fetched&&_calYear===sy&&_calMonth===smo){
+      renderCalendar();updateStats();renderTimetable();renderHabitMonthly();renderMonthlyStatBar();
+      if(_calSelectedDay)renderCalDetail(_calSelectedDay);
+    }
+  });
 }
 
 // ── MODAL / SHEET HELPERS
@@ -4688,7 +4731,7 @@ async function initSync(){
   if(!navigator.onLine) return;
   window._restoring=true;
   var dates=[];
-  for(var i=13;i>=0;i--){var d=new Date();d.setDate(d.getDate()-i);dates.push(dateKey(d));}
+  for(var i=29;i>=0;i--){var d=new Date();d.setDate(d.getDate()-i);dates.push(dateKey(d));}
   // 미래 6일치 날짜 추가
   var futureDates=[];
   for(var i=1;i<=6;i++){var d=new Date();d.setDate(d.getDate()+i);futureDates.push(dateKey(d));}
