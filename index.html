@@ -4921,7 +4921,11 @@ async function initSync(){
   // 미래 날짜 Down
   for(var i=0;i<futureDates.length;i++){
     var fdk=futureDates[i];
-    if(!uploadedDates[fdk])await syncTodosDown(fdk);
+    if(!uploadedDates[fdk]){
+      await syncTodosDown(fdk);
+      await syncMemosDown(fdk);
+      await syncMealsDown(fdk);
+    }
   }
   window._restoring=false;
   loadDaily();
