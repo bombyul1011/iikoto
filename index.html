@@ -2671,6 +2671,9 @@ const S={
 
 // ── DATE HELPERS
 function pad(n){return String(n).padStart(2,'0');}
+function genCid(){
+  return Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+}
 function dateKey(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;}
 function monthKey(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;}
 function weekKey(d){const m=new Date(d);m.setDate(d.getDate()-((d.getDay()+6)%7));return `week:${dateKey(m)}`;}
@@ -2753,25 +2756,25 @@ async function syncTodosDown(dk){
   const rows=await supaFetch('todos?date_key=eq.'+dk+'&order=created');
   if(!rows)return; // 연결 실패 — 로컬 유지
   if(rows.length===0)return; // 서버 비어있음 — 로컬 유지
-  S.set(S.key('todos',dk),rows.map(function(r){return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none'};}));
+  S.set(S.key('todos',dk),rows.map(function(r){return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid()};}));
   renderTodos();
 }
 async function syncTodosUp(dk){
   const todos=getTodos(dk);
   await supaFetch(`todos?date_key=eq.${dk}`,'DELETE');
-  if(todos.length)await supaFetch('todos','POST',todos.map(t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none'})));
+  if(todos.length)await supaFetch('todos','POST',todos.map(t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid||genCid()})));
 }
 async function syncMemosDown(dk){
   const rows=await supaFetch('memos?date_key=eq.'+dk+'&order=created');
   if(!rows)return; // 연결 실패 — 로컬 유지
   if(rows.length===0)return; // 서버 비어있음 — 로컬 유지
-  S.set(S.key('memos',dk),rows.map(function(r){return {time:r.memo_time,text:r.text,photo:r.photo,created:r.created};}));
+  S.set(S.key('memos',dk),rows.map(function(r){return {time:r.memo_time,text:r.text,photo:r.photo,created:r.created,cid:r.client_id||genCid()};}));
   renderMemos();
 }
 async function syncMemosUp(dk){
   const memos=getMemos(dk);
   await supaFetch(`memos?date_key=eq.${dk}`,'DELETE');
-  if(memos.length)await supaFetch('memos','POST',memos.map(m=>({date_key:dk,memo_time:m.time,text:m.text,photo:m.photo||null,created:m.created})));
+  if(memos.length)await supaFetch('memos','POST',memos.map(m=>({date_key:dk,memo_time:m.time,text:m.text,photo:m.photo||null,created:m.created,client_id:m.cid||genCid()})));
 }
 async function syncSleepDown(dk){
   const rows=await supaFetch(`sleep?date_key=eq.${dk}`);
@@ -3134,7 +3137,7 @@ function confirmTodo(){
   const editIdx=modal.dataset.editIdx!==''&&modal.dataset.editIdx!=null?parseInt(modal.dataset.editIdx):-1;
   const timeSection=modal.dataset.timeSection||'none';
   if(editIdx>=0&&todos[editIdx]){todos[editIdx].text=text;todos[editIdx].timeSection=timeSection;}
-  else todos.push({text,done:false,created:Date.now(),timeSection});
+  else todos.push({text,done:false,created:Date.now(),timeSection,cid:genCid()});
   saveTodos(dk,todos);closeModal('todo-modal');renderTodos();
   setTimeout(()=>{_todoSubmitting=false;},500);
 }
@@ -3270,7 +3273,7 @@ function sendMemo(){
   const n=new Date();
   const stamp=f.dataset.stamp||`${pad(n.getHours())}:${pad(n.getMinutes())}`;
   const dk=dateKey(currentDate),memos=getMemos(dk);
-  memos.push({text,time:stamp,created:Date.now()});
+  memos.push({text,time:stamp,created:Date.now(),cid:genCid()});
   saveMemos(dk,memos);
   f.value='';delete f.dataset.stamp;f.placeholder='메모 입력';f.style.height='';
   renderMemos();
@@ -4630,11 +4633,11 @@ function getTimeSection(){
 async function forceRestoreDate(dk){
   var mrows=await supaFetch('memos?date_key=eq.'+dk+'&order=created');
   if(mrows&&mrows.length>0){
-    S.set(S.key('memos',dk),mrows.map(function(r){return {time:r.memo_time,text:r.text,photo:r.photo,created:r.created};}));
+    S.set(S.key('memos',dk),mrows.map(function(r){return {time:r.memo_time,text:r.text,photo:r.photo,created:r.created,cid:r.client_id||genCid()};}));
   }
   var trows=await supaFetch('todos?date_key=eq.'+dk+'&order=created');
   if(trows&&trows.length>0){
-    S.set(S.key('todos',dk),trows.map(function(r){return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none'};}));
+    S.set(S.key('todos',dk),trows.map(function(r){return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid()};}));
   }
   var srows=await supaFetch('sleep?date_key=eq.'+dk);
   if(srows&&srows.length>0){
