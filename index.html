@@ -997,7 +997,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       </div>
       <div id="meal-wishlist-panel" style="display:none;margin-bottom:14px;"></div>
       <div id="wish-placing-hint" style="display:none;font-size:11px;color:rgba(100,140,75,0.85);background:rgba(150,215,180,0.14);border-radius:8px;padding:7px 10px;margin-bottom:10px;text-align:center;cursor:pointer;" onclick="cancelWishPlacing()">넣을 칸을 눌러주세요 · 취소하려면 여기를 누르세요</div>
-      <div id="week-meal-body"></div>
+      <div id="week-meal-scroll" style="max-height:50vh;overflow-y:auto;">
+        <div id="week-meal-body"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -4305,12 +4307,19 @@ function openWeekMealSheet(){
     const d=new Date(mon);d.setDate(mon.getDate()+i);
     const dk=dateKey(d);
     const m=getMeals(dk);
-    const block=document.createElement('div');block.className='week-meal-day';
+    const block=document.createElement('div');block.className='week-meal-day';block.id='wm-block-'+dk;
     block.innerHTML=`<div class="week-meal-day-label">${DOW[i]} · ${d.getMonth()+1}/${d.getDate()}</div>`+
       CATS.map(([k,label])=>`<div class="meal-row"><div class="meal-cat">${label}</div><input class="meal-inp" id="wm-${dk}-${k}" type="text" placeholder="메뉴 입력" autocomplete="off" value="${(m[k]||'').replace(/"/g,'&quot;')}"></div>`).join('');
     body.appendChild(block);
   }
   openSheet('week-meal-sheet');
+  const todayDk=dateKey(now);
+  const tEl=document.getElementById('wm-block-'+todayDk);
+  const scroller=document.getElementById('week-meal-scroll');
+  if(tEl&&scroller)setTimeout(()=>{
+    const sr=scroller.getBoundingClientRect(),er=tEl.getBoundingClientRect();
+    scroller.scrollTop+=(er.top-sr.top);
+  },50);
 }
 function saveWeekMealSheet(){
   const now=new Date();
