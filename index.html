@@ -21,7 +21,7 @@
 /* ── RESET ── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 html{height:100%;}
-body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;}
+body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;background:var(--bg);}
 
 /* ══ THEME TOKENS ══ */
 :root,[data-theme="light"]{
@@ -803,7 +803,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 </style>
 </head>
 <body>
-<script>(function(){try{var t=localStorage.getItem('theme');if(t){t=JSON.parse(t);document.documentElement.setAttribute('data-theme',t);}}catch(e){}})();</script>
+<script>(function(){try{var t=localStorage.getItem('theme');if(t){t=JSON.parse(t);document.documentElement.setAttribute('data-theme',t);var c={light:'#fdf0e8',glass:'#f7f4ee',dark:'#13111e'}[t];var m=document.querySelector('meta[name="theme-color"]');if(m&&c)m.setAttribute('content',c);}}catch(e){}})();</script>
 
 <!-- SPLASH -->
 <div id="splash">
@@ -3006,12 +3006,19 @@ window.addEventListener('online',()=>syncAll());
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
 
 // ── THEME
+const THEME_COLORS={light:'#fdf0e8',glass:'#f7f4ee',dark:'#13111e'};
+function applyThemeColorMeta(theme){
+  const m=document.querySelector('meta[name="theme-color"]');
+  if(m)m.setAttribute('content',THEME_COLORS[theme]||THEME_COLORS.light);
+}
 (function initTheme(){
   const t=S.get('theme')||'light';
   document.documentElement.setAttribute('data-theme',t);
+  applyThemeColorMeta(t);
 })();
 function setTheme(theme,btn){
   document.documentElement.setAttribute('data-theme',theme);
+  applyThemeColorMeta(theme);
   S.set('theme',theme);
   if(theme!=='dark')S.set('color-theme',theme);
   document.querySelectorAll('.ctheme-btn').forEach(b=>b.classList.remove('on'));
