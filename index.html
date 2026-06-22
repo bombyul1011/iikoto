@@ -3893,7 +3893,11 @@ function syncContentToReadingBook(title,status,poster,author){
   const books=getBooks();
   let book=books.find(b=>b.title===title&&b.linkedContent);
   if(status==='done'){
-    if(book){book.status='done';book.completedAt=dateKey(new Date());if(poster)book.poster=poster;if(author)book.author=author;upsertBookLocal(book);}
+    if(book){book.status='done';book.completedAt=book.completedAt||dateKey(new Date());if(poster)book.poster=poster;if(author)book.author=author;upsertBookLocal(book);}
+    else{
+      book={cid:genCid(),title,status:'done',unit:'pages',pages:0,totalPages:null,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:dateKey(new Date()),linkedContent:true,poster:poster||null,author:author||''};
+      upsertBookLocal(book);
+    }
   } else {
     if(!book){
       book={cid:genCid(),title,status:'reading',unit:'pages',pages:0,totalPages:null,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:null,linkedContent:true,poster:poster||null,author:author||''};
@@ -4686,9 +4690,20 @@ let _rdTab='reading';
 let _rdOpenCid=null;
 let _swSeconds=0,_swRunning=false,_swInterval=null;
 const RD_SW_C=2*Math.PI*30;
+function backfillReadingLinks(){
+  const now=new Date();
+  for(let i=0;i<6;i++){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const mk=monthKey(d);
+    getContents(mk).filter(c=>c.cat==='book').forEach(c=>{
+      syncContentToReadingBook(c.title,c.status,c.poster,c.author);
+    });
+  }
+}
 function openReading(){
   _rdTab='reading';
   document.querySelectorAll('.rd-tab').forEach(t=>t.classList.toggle('on',t.dataset.status==='reading'));
+  backfillReadingLinks();
   renderReadingHub();
   document.getElementById('reading-ov').classList.add('on');
 }
