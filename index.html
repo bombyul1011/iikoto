@@ -2822,12 +2822,22 @@ async function syncMealsDown(dk){
   S.set(S.key('meals',dk),{breakfast:r.breakfast||'',lunch:r.lunch||'',dinner:r.dinner||'',snack:r.snack||''});
 }
 async function syncMealsUp(dk){
-  const m=getMeals(dk);
-  if(m.breakfast||m.lunch||m.dinner||m.snack){
-    await supaUpsert('meals','date_key',[{date_key:dk,breakfast:m.breakfast||null,lunch:m.lunch||null,dinner:m.dinner||null,snack:m.snack||null,created:Date.now()}]);
+  const local=getMeals(dk);
+  const rows=await supaFetch(`meals?date_key=eq.${dk}`);
+  const server=(rows&&rows[0])?{breakfast:rows[0].breakfast||'',lunch:rows[0].lunch||'',dinner:rows[0].dinner||'',snack:rows[0].snack||''}:{breakfast:'',lunch:'',dinner:'',snack:''};
+  const merged={
+    breakfast:local.breakfast||server.breakfast,
+    lunch:local.lunch||server.lunch,
+    dinner:local.dinner||server.dinner,
+    snack:local.snack||server.snack
+  };
+  if(merged.breakfast||merged.lunch||merged.dinner||merged.snack){
+    await supaUpsert('meals','date_key',[{date_key:dk,breakfast:merged.breakfast||null,lunch:merged.lunch||null,dinner:merged.dinner||null,snack:merged.snack||null,created:Date.now()}]);
   }else{
     await supaFetch(`meals?date_key=eq.${dk}`,'DELETE');
   }
+  S.set(S.key('meals',dk),merged);
+  if(dk===dateKey(currentDate))renderTodayMeal();
 }
 async function syncHabitsDown(){
   const rows=await supaFetch('habits?order=sort_order');
