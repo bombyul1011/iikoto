@@ -1674,15 +1674,14 @@ function makeBookCard(){
   const mk=monthKey(new Date()),contents=getContents(mk);
   const book=contents.find(c=>c.cat==='book'&&c.status==='watching');
   const wrap=document.createElement('div');wrap.className='home-content-item';
-  const bookIcon='<svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--tm);"><path d="M6.5 2.8C5.3 2 3.3 1.7 1.8 2v8.3c1.5-.3 3.5 0 4.7.8M6.5 2.8C7.7 2 9.7 1.7 11.2 2v8.3c-1.5-.3-3.5 0-4.7.8M6.5 2.8v8.3"/></svg>';
+  const bookIcon='<svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--tm);display:block;"><path d="M6.5 2.8C5.3 2 3.3 1.7 1.8 2v8.3c1.5-.3 3.5 0 4.7.8M6.5 2.8C7.7 2 9.7 1.7 11.2 2v8.3c-1.5-.3-3.5 0-4.7.8M6.5 2.8v8.3"/></svg>';
   if(book){
-    wrap.innerHTML='<div class="home-content-info" style="display:flex;align-items:baseline;gap:7px;overflow:hidden;">'
-      +bookIcon
-      +'<span class="home-content-title" style="flex-shrink:0;white-space:nowrap;">'+book.title+'</span>'
+    wrap.innerHTML='<div class="home-content-info" style="display:flex;align-items:center;justify-content:space-between;gap:10px;overflow:hidden;">'
+      +'<span style="display:flex;align-items:center;gap:7px;flex-shrink:0;">'+bookIcon+'<span class="home-content-title" style="white-space:nowrap;">'+book.title+'</span></span>'
       +'<span class="reading-nudge" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">잠들기 전 15분 독서 어떠세요?</span>'
       +'</div>';
   } else {
-    wrap.innerHTML='<div class="home-content-info" style="display:flex;align-items:baseline;gap:7px;">'
+    wrap.innerHTML='<div class="home-content-info" style="display:flex;align-items:center;gap:7px;">'
       +bookIcon
       +'<span class="home-content-title" style="color:var(--tm);">오늘밤엔 새로운 책을 찾아보아요</span>'
       +'</div>';
