@@ -610,13 +610,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rd-top-info{flex:1;min-width:0;display:flex;flex-direction:column;}
 .rd-top-title{font-size:14.5px;font-weight:600;color:var(--tp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .rd-top-author{font-size:11px;color:var(--tm);margin-top:1px;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.rd-top-sw{display:flex;align-items:center;gap:8px;margin-top:auto;}
-.rd-sw-ring-wrap{position:relative;width:42px;height:42px;flex-shrink:0;}
+.rd-top-sw{display:flex;align-items:center;gap:10px;margin-top:auto;}
+.rd-sw-ring-wrap{position:relative;width:54px;height:54px;flex-shrink:0;}
 .rd-sw-ring-wrap svg{transform:rotate(-90deg);transform-origin:50% 50%;}
 .rd-sw-ring-wrap.spinning svg{animation:rdSpin 2.6s linear infinite;}
-.rd-sw-time{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:500;color:var(--tp);font-family:'DM Sans',sans-serif;}
+.rd-sw-time{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:500;color:var(--tp);font-family:'DM Sans',sans-serif;}
 .rd-sw-label{font-size:11px;color:var(--ts);flex:1;}
-.rd-sw-btn{width:32px;height:32px;border-radius:50%;border:none;background:var(--acc);color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.rd-sw-btn{width:40px;height:40px;border-radius:50%;border:none;background:var(--acc);color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-left:-4px;}
 .rd-progress-bar{width:100%;height:9px;border-radius:5px;background:var(--div);overflow:hidden;margin-bottom:7px;position:relative;cursor:pointer;}
 .rd-progress-fill{position:absolute;left:0;top:0;height:100%;border-radius:5px;background:linear-gradient(90deg,#ffb0c8,#ffd28a,#9fd8ff);transition:width .4s ease;}
 .rd-progress-today{position:absolute;top:0;height:100%;background:linear-gradient(90deg,#ff7eb3,#ff9ec0);transition:left .4s ease,width .4s ease;}
@@ -629,6 +629,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .pg-total{font-size:11px;color:var(--tm);text-align:center;margin-bottom:14px;}
 .rd-top-sub{font-size:11px;color:var(--tm);}
 .rd-month-stat{font-size:11.5px;color:var(--ts);text-align:center;margin-top:2px;}
+.rd-quote-section{margin-top:4px;}
+.rd-quote-card{background:rgba(255,210,225,0.18);border:1px solid rgba(240,160,190,0.30);border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;}
+.rd-quote-inp{width:100%;background:none;border:none;outline:none;resize:none;font-family:'DM Sans',sans-serif;font-size:12.5px;color:var(--tp);line-height:1.5;}
+.rd-quote-add{align-self:flex-end;background:rgba(240,160,190,0.32);border:none;border-radius:9px;padding:6px 14px;font-size:11.5px;color:#a85878;cursor:pointer;}
+.rd-quote-item{position:relative;background:rgba(255,250,245,0.5);border-left:2.5px solid rgba(240,160,190,0.55);border-radius:0 10px 10px 0;padding:9px 12px 9px 14px;margin-top:8px;}
+.rd-quote-text{font-size:12.5px;color:var(--tp);font-style:italic;line-height:1.55;}
+.rd-quote-del{position:absolute;top:6px;right:8px;font-size:10px;color:var(--tm);cursor:pointer;}
+.rd-quote-empty{font-size:11.5px;color:var(--tm);text-align:center;padding:8px 0 2px;}
 .rd-page-row{display:flex;align-items:center;gap:8px;}
 .rd-page-inp{flex:1;background:var(--inp);border:1px solid var(--inp-b);border-radius:10px;padding:9px 12px;font-size:13px;color:var(--tp);outline:none;font-family:'DM Sans',sans-serif;}
 .rd-add-btn{background:var(--acc-soft);border:none;border-radius:10px;padding:9px 14px;font-size:12px;color:var(--tp);cursor:pointer;white-space:nowrap;}
@@ -1477,6 +1485,16 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div class="rd-top" id="rd-top"></div>
 
     <div class="rd-streak" id="rd-streak"></div>
+
+    <div class="rd-quote-section">
+      <div class="slabel" style="margin-top:0;">문장 수집</div>
+      <div class="rd-quote-card">
+        <textarea class="rd-quote-inp" id="rd-quote-inp" rows="2" placeholder="마음에 남는 문장을 적어보세요"></textarea>
+        <button class="rd-quote-add" onclick="addQuoteRecord()">담기</button>
+      </div>
+      <div id="rd-quote-list"></div>
+    </div>
+
     <div class="rd-month-stat" id="rd-month-stat"></div>
     <div class="rd-cover-row" id="rd-cover-row"></div>
 
@@ -1486,6 +1504,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div class="rd-tab on" data-status="reading" onclick="switchReadingTab(this,'reading')">읽는 중</div>
         <div class="rd-tab" data-status="done" onclick="switchReadingTab(this,'done')">다 읽음</div>
         <div class="rd-tab" data-status="paused" onclick="switchReadingTab(this,'paused')">중단</div>
+        <div class="rd-tab" data-status="wish" onclick="switchReadingTab(this,'wish')">위시</div>
       </div>
       <div id="rd-book-list"></div>
     </div>
@@ -2846,6 +2865,32 @@ function saveMealsData(dk,v){
   autoSync('meals',dk);
 }
 function getBooks(){return S.get('reading_books')||[];}
+function getQuotes(){return S.get('reading_quotes')||[];}
+function saveQuotesLocal(arr){S.set('reading_quotes',arr);}
+function upsertQuoteLocal(q){
+  const arr=getQuotes();
+  const i=arr.findIndex(x=>x.cid===q.cid);
+  if(i>=0)arr[i]=q;else arr.push(q);
+  saveQuotesLocal(arr);
+  S.set('quote_pending_'+q.cid,true);
+  autoSync('reading_quote',q.cid);
+}
+function deleteQuoteLocal(cid){
+  saveQuotesLocal(getQuotes().filter(q=>q.cid!==cid));
+  supaFetch(`reading_quotes?cid=eq.${cid}`,'DELETE');
+}
+async function syncQuoteUp(cid){
+  const q=getQuotes().find(x=>x.cid===cid);
+  if(!q)return;
+  await supaUpsert('reading_quotes','cid',[{cid:q.cid,book_cid:q.bookCid,text:q.text,created:q.created}]);
+  S.set('quote_pending_'+cid,false);
+}
+async function syncQuotesDownAll(){
+  const rows=await supaFetch('reading_quotes?order=created');
+  if(!rows)return;
+  saveQuotesLocal(rows.map(r=>({cid:r.cid,bookCid:r.book_cid,text:r.text,created:r.created})));
+  renderRdQuotes();
+}
 function saveBooksLocal(arr){S.set('reading_books',arr);}
 function upsertBookLocal(book){
   const arr=getBooks();
@@ -3065,6 +3110,7 @@ async function syncContentsUp(mk){
 async function autoSync(type,key){
   if(!navigator.onLine)return;
   if(type==='reading_book'){await syncBookUp(key);}
+  else if(type==='reading_quote'){await syncQuoteUp(key);}
   else if(type==='todos'){await syncTodosUp(key);S.set(S.key('todos_pending',key),false);}
   else if(type==='memos'){await syncMemosUp(key);S.set(S.key('memos_pending',key),false);}
   else if(type==='sleep')syncSleepUp(key);
@@ -3876,8 +3922,9 @@ function confirmContent(){
 function syncContentToReadingBook(title,status,poster,author){
   const books=getBooks();
   let book=books.find(b=>b.title===title&&b.linkedContent);
+  if(!book)book=books.find(b=>b.title===title&&b.status==='wish');
   if(status==='done'){
-    if(book){book.status='done';book.completedAt=book.completedAt||dateKey(new Date());if(poster)book.poster=poster;if(author)book.author=author;upsertBookLocal(book);}
+    if(book){book.status='done';book.linkedContent=true;book.completedAt=book.completedAt||dateKey(new Date());if(poster)book.poster=poster;if(author)book.author=author;upsertBookLocal(book);}
     else{
       book={cid:genCid(),title,status:'done',unit:'pages',pages:0,totalPages:null,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:dateKey(new Date()),linkedContent:true,poster:poster||null,author:author||''};
       upsertBookLocal(book);
@@ -3887,6 +3934,7 @@ function syncContentToReadingBook(title,status,poster,author){
       book={cid:genCid(),title,status:'reading',unit:'pages',pages:0,totalPages:null,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:null,linkedContent:true,poster:poster||null,author:author||''};
       upsertBookLocal(book);
     } else {
+      book.linkedContent=true;
       if(book.status!=='reading')book.status='reading';
       if(poster)book.poster=poster;if(author)book.author=author;
       upsertBookLocal(book);
@@ -4673,7 +4721,7 @@ function closeSettings(){document.getElementById('settings-ov').classList.remove
 let _rdTab='reading';
 let _rdOpenCid=null;
 let _swSeconds=0,_swRunning=false,_swInterval=null;
-const RD_SW_C=2*Math.PI*16;
+const RD_SW_C=2*Math.PI*22;
 function backfillReadingLinks(){
   const now=new Date();
   for(let i=0;i<6;i++){
@@ -4695,13 +4743,14 @@ function closeReading(){document.getElementById('reading-ov').classList.remove('
 function renderReadingHub(){
   renderRdTop();
   renderRdStreak();
+  renderRdQuotes();
   renderRdMonthStat();
   renderRdCovers();
   renderBookList();
 }
 function swRingSvg(){
   return `<div class="rd-sw-ring-wrap" id="rd-sw-ring-wrap">
-    <svg width="42" height="42" viewBox="0 0 42 42">
+    <svg width="54" height="54" viewBox="0 0 54 54">
       <defs>
         <linearGradient id="rdSwGrad" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stop-color="#ff9ec0"/>
@@ -4710,15 +4759,15 @@ function swRingSvg(){
           <stop offset="100%" stop-color="#9cc8ff"/>
         </linearGradient>
       </defs>
-      <circle cx="21" cy="21" r="16" fill="none" stroke="var(--div)" stroke-width="4"/>
-      <circle id="rd-sw-ring" cx="21" cy="21" r="16" fill="none" stroke="url(#rdSwGrad)" stroke-width="4" stroke-linecap="round" stroke-dasharray="${RD_SW_C}" stroke-dashoffset="${RD_SW_C}"/>
+      <circle cx="27" cy="27" r="22" fill="none" stroke="var(--div)" stroke-width="4.5"/>
+      <circle id="rd-sw-ring" cx="27" cy="27" r="22" fill="none" stroke="url(#rdSwGrad)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="${RD_SW_C}" stroke-dashoffset="${RD_SW_C}"/>
     </svg>
     <div class="rd-sw-time" id="rd-sw-time">00:00</div>
   </div>
-  <div class="rd-sw-label" id="rd-sw-label">독서 시간을 재볼까요?</div>
   <button class="rd-sw-btn" id="rd-sw-btn" onclick="toggleStopwatch()">
-    <svg id="rd-sw-icon" width="12" height="12" viewBox="0 0 15 15" fill="white"><polygon points="3,2 13,7.5 3,13"/></svg>
-  </button>`;
+    <svg id="rd-sw-icon" width="14" height="14" viewBox="0 0 15 15" fill="white"><polygon points="3,2 13,7.5 3,13"/></svg>
+  </button>
+  <div class="rd-sw-label" id="rd-sw-label" style="display:none;"></div>`;
 }
 function renderRdTop(){
   const el=document.getElementById('rd-top');if(!el)return;
@@ -4760,6 +4809,35 @@ function renderRdStreak(){
   const el=document.getElementById('rd-streak');if(!el)return;
   const s=getReadingStreak();
   el.textContent=s>0?`연속 ${s}일째 읽고 있어요`:'오늘부터 다시 시작해볼까요?';
+}
+function renderRdQuotes(){
+  const inp=document.getElementById('rd-quote-inp');
+  const listEl=document.getElementById('rd-quote-list');
+  if(!inp||!listEl)return;
+  const cur=getBooks().find(b=>b.status==='reading');
+  inp.disabled=!cur;
+  inp.placeholder=cur?'마음에 남는 문장을 적어보세요':'읽는 중인 책이 있을 때 모을 수 있어요';
+  if(!cur){listEl.innerHTML='';return;}
+  const quotes=getQuotes().filter(q=>q.bookCid===cur.cid).sort((a,b)=>(b.created||0)-(a.created||0));
+  if(!quotes.length){listEl.innerHTML='<div class="rd-quote-empty">아직 모은 문장이 없어요</div>';return;}
+  listEl.innerHTML=quotes.map(q=>`<div class="rd-quote-item">
+      <span class="rd-quote-del" onclick="removeQuote('${q.cid}')">✕</span>
+      <div class="rd-quote-text">${q.text}</div>
+    </div>`).join('');
+}
+function addQuoteRecord(){
+  const cur=getBooks().find(b=>b.status==='reading');
+  if(!cur)return;
+  const inp=document.getElementById('rd-quote-inp');
+  const text=inp.value.trim();
+  if(!text)return;
+  upsertQuoteLocal({cid:genCid(),bookCid:cur.cid,text,created:Date.now()});
+  inp.value='';
+  renderRdQuotes();
+}
+function removeQuote(cid){
+  deleteQuoteLocal(cid);
+  renderRdQuotes();
 }
 function renderRdMonthStat(){
   const el=document.getElementById('rd-month-stat');if(!el)return;
@@ -4837,7 +4915,8 @@ function confirmAddBook(){
   const title=document.getElementById('rd-new-title').value.trim();
   if(!title)return;
   const total=_rdNewUnit==='pages'?(parseInt(document.getElementById('rd-new-total').value,10)||null):null;
-  const book={cid:genCid(),title,status:'reading',unit:_rdNewUnit,pages:0,totalPages:total,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:null};
+  const status=_rdTab==='wish'?'wish':'reading';
+  const book={cid:genCid(),title,status,unit:_rdNewUnit,pages:0,totalPages:total,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:null};
   upsertBookLocal(book);
   closeModal('add-book-modal');
   renderReadingHub();
@@ -5238,6 +5317,10 @@ async function initSync(){
   await syncBooksDownAll();
   for(const b of getBooks()){
     if(S.get('reading_pending_'+b.cid))await syncBookUp(b.cid);
+  }
+  await syncQuotesDownAll();
+  for(const q of getQuotes()){
+    if(S.get('quote_pending_'+q.cid))await syncQuoteUp(q.cid);
   }
   await syncHCDown(wk);
   // 콘텐츠 — pending 있으면 Up 먼저, 없으면 Down
