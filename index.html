@@ -598,6 +598,57 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="dark"] .theme-toggle-lbl{color:#f0ecff;}
 [data-theme="dark"] .theme-toggle-sub{color:#7868b0;}
 [data-theme="dark"] .tog{background:rgba(255,126,179,0.22);}
+/* ── READING HUB ── */
+.reading-ov{position:fixed;inset:0;z-index:8000;background:var(--bg);display:none;flex-direction:column;overflow-y:auto;transform:translateX(100%);transition:transform .3s cubic-bezier(.32,.72,0,1);}
+.reading-ov.on{display:flex;transform:translateX(0);}
+.reading-body{padding:16px 18px 30px;display:flex;flex-direction:column;gap:18px;}
+.rd-top{position:relative;border-radius:20px;padding:1.8px;background:linear-gradient(120deg,rgba(255,170,200,0.95),rgba(255,205,140,0.92),rgba(160,210,255,0.92),rgba(170,235,200,0.92),rgba(255,170,200,0.95));background-size:300% 300%;animation:bannerShine 5s ease infinite;}
+.rd-top-inner{border-radius:18.5px;background:var(--bg);padding:18px 18px 20px;}
+.rd-top-title{font-size:15px;font-weight:600;color:var(--tp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:9px;}
+.rd-progress-bar{width:100%;height:9px;border-radius:5px;background:var(--div);overflow:hidden;margin-bottom:7px;position:relative;cursor:pointer;}
+.rd-progress-fill{position:absolute;left:0;top:0;height:100%;border-radius:5px;background:linear-gradient(90deg,#ffb0c8,#ffd28a,#9fd8ff);transition:width .4s ease;}
+.rd-progress-today{position:absolute;top:0;height:100%;background:linear-gradient(90deg,#ff7eb3,#ff9ec0);transition:left .4s ease,width .4s ease;}
+.pg-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.pg-box{flex:1;background:var(--inp);border:1px solid var(--inp-b);border-radius:14px;padding:12px;text-align:center;}
+.pg-box-lbl{font-size:11px;color:var(--tm);margin-bottom:4px;}
+.pg-box-val{font-size:22px;font-weight:600;color:var(--tp);}
+.pg-box-inp{width:100%;background:none;border:none;outline:none;font-size:22px;font-weight:600;color:var(--tp);text-align:center;font-family:'DM Sans',sans-serif;}
+.pg-arrow{font-size:16px;color:var(--tm);flex-shrink:0;}
+.pg-total{font-size:11px;color:var(--tm);text-align:center;margin-bottom:14px;}
+.rd-top-sub{font-size:11px;color:var(--tm);}
+.rd-top-month{font-size:11px;color:var(--ts);margin-top:10px;}
+.rd-stopwatch{background:var(--card);border:1px solid var(--card-b);border-radius:20px;padding:16px 18px;display:flex;align-items:center;gap:16px;}
+.rd-sw-ring-wrap{position:relative;width:72px;height:72px;flex-shrink:0;}
+.rd-sw-ring-wrap svg{transform:rotate(-90deg);transform-origin:50% 50%;}
+.rd-sw-ring-wrap.spinning svg{animation:rdSpin 2.6s linear infinite;}
+.rd-sw-time{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:500;color:var(--tp);font-family:'DM Sans',sans-serif;}
+.rd-sw-btn{width:46px;height:46px;border-radius:50%;border:none;background:var(--acc);color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.rd-sw-label{font-size:11.5px;color:var(--ts);flex:1;}
+.rd-page-row{display:flex;align-items:center;gap:8px;}
+.rd-page-inp{flex:1;background:var(--inp);border:1px solid var(--inp-b);border-radius:10px;padding:9px 12px;font-size:13px;color:var(--tp);outline:none;font-family:'DM Sans',sans-serif;}
+.rd-add-btn{background:var(--acc-soft);border:none;border-radius:10px;padding:9px 14px;font-size:12px;color:var(--tp);cursor:pointer;white-space:nowrap;}
+.rd-streak{font-size:11.5px;color:var(--ts);text-align:center;}
+.rd-cover-row{display:flex;gap:8px;margin-top:10px;justify-content:center;}
+.rd-cover{width:calc((100% - 32px)/5);max-width:64px;aspect-ratio:2/3;border-radius:8px;object-fit:cover;box-shadow:0 2px 8px rgba(0,0,0,0.16);flex-shrink:0;background:var(--card);}
+.rd-cover-empty{box-shadow:none;border:1.4px dashed var(--card-b);background:transparent;}
+.rd-tabs{display:flex;gap:6px;}
+.rd-tab{flex:1;text-align:center;padding:7px 4px;border-radius:10px;font-size:12px;color:var(--tm);background:var(--card);border:1px solid var(--card-b);cursor:pointer;}
+.rd-tab.on{background:var(--acc-soft);color:var(--tp);font-weight:500;}
+.rd-book-item{background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:12px 14px;margin-bottom:8px;cursor:pointer;}
+.rd-book-title{font-size:13.5px;color:var(--tp);font-weight:500;}
+.rd-book-meta{font-size:11px;color:var(--tm);margin-top:3px;}
+.rd-book-detail{margin-top:10px;padding-top:10px;border-top:1px solid var(--div);display:none;}
+.rd-book-item.open .rd-book-detail{display:block;}
+.rd-detail-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.rd-status-btn{font-size:11px;padding:5px 10px;border-radius:8px;border:1px solid var(--card-b);background:var(--card);color:var(--ts);cursor:pointer;}
+.rd-status-btn.active{background:var(--acc-soft);color:var(--tp);}
+.rd-del-btn{font-size:11px;color:var(--tm);cursor:pointer;margin-left:auto;}
+.rd-empty{font-size:12px;color:var(--tm);text-align:center;padding:14px 0;}
+.rd-fab{position:fixed;bottom:24px;right:24px;width:48px;height:48px;border-radius:50%;background:var(--acc);color:white;font-size:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.18);z-index:8001;}
+.rd-unit-row{display:flex;gap:6px;margin:10px 0 16px;}
+.rd-unit-btn{flex:1;text-align:center;padding:7px;border-radius:20px;border:1px solid var(--inp-b);background:var(--inp);color:var(--ts);font-size:11.5px;cursor:pointer;}
+.rd-unit-btn.on{background:var(--acc-soft);color:var(--tp);font-weight:500;}
+@keyframes rdSpin{to{transform:rotate(270deg);}}
 [data-theme="dark"] .tog.on{background:rgba(255,126,179,0.60);}
 
 /* ══ MINT OVERRIDES ══ */
@@ -832,8 +883,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" style="color:var(--tm)"><polyline points="3.5,1.5 7,5 3.5,8.5"/></svg>
           </div>
         </div>
-        <div class="icon-btn" onclick="openShareMenu()">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--tm)"><circle cx="11" cy="3" r="1.5"/><circle cx="3" cy="7" r="1.5"/><circle cx="11" cy="11" r="1.5"/><line x1="4.4" y1="6.2" x2="9.6" y2="4"/><line x1="4.4" y1="7.8" x2="9.6" y2="10"/></svg>
+        <div class="icon-btn" onclick="openReading()">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--tm)"><path d="M7 2.8C5.7 2 3.6 1.7 2 2v8.3c1.6-.3 3.7 0 5 .8M7 2.8C8.3 2 10.4 1.7 12 2v8.3c-1.6-.3-3.7 0-5 .8M7 2.8v8.3"/></svg>
         </div>
         <div class="icon-btn" onclick="openSettings()">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--tm)"><circle cx="7" cy="7" r="1.8"/><path d="M7 2.5V3.5M7 10.5V11.5M2.5 7H3.5M10.5 7H11.5M4 4L4.7 4.7M9.3 9.3L10 10M4 10L4.7 9.3M9.3 4.7L10 4"/></svg>
@@ -1063,23 +1114,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 <!-- UNDO TOAST -->
 <div class="undo-toast" id="undo-toast">삭제됐어요 <span class="undo-btn" onclick="undoMemo()">되돌리기</span></div>
-
-<!-- SHARE MENU SHEET -->
-<div class="overlay" id="share-menu-sheet" onclick="closeSheet('share-menu-sheet',event)">
-  <div class="bsheet">
-    <div class="sheet-handle"></div>
-    <div class="sheet-title">공유 카드 만들기</div>
-    <div class="sheet-item" onclick="closeSheet('share-menu-sheet');switchShareAndOpen('weekly')">
-      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="color:var(--ts)"><rect x="2" y="2" width="7" height="7" rx="2"/><rect x="11" y="2" width="7" height="7" rx="2"/><rect x="2" y="11" width="7" height="7" rx="2"/><rect x="11" y="11" width="7" height="7" rx="2"/></svg>주간 요약
-    </div>
-    <div class="sheet-item" onclick="closeSheet('share-menu-sheet');switchShareAndOpen('monthly')">
-      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="color:var(--ts)"><circle cx="10" cy="10" r="7.5"/><line x1="10" y1="5" x2="10" y2="10"/><line x1="10" y1="10" x2="13.5" y2="13.5"/></svg>월간 콘텐츠
-    </div>
-    <div class="sheet-item" onclick="closeSheet('share-menu-sheet');openBookShare()">
-      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="color:var(--ts)"><rect x="3" y="2" width="14" height="16" rx="2"/><line x1="7" y1="7" x2="13" y2="7"/><line x1="7" y1="11" x2="11" y2="11"/></svg>콘텐츠 공유카드
-    </div>
-  </div>
-</div>
 
 <!-- TODO SHEET -->
 <div class="overlay" id="todo-sheet" onclick="closeSheet('todo-sheet',event)">
@@ -1396,61 +1430,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     </div>
   </div>
 </div>
-
-<!-- SHARE OVERLAY -->
-<div class="share-ov" id="share-ov" onclick="closeShare(event)">
-  <div class="share-tabs">
-    <button class="share-tab on" onclick="switchShare('weekly',this)">주간 요약</button>
-    <button class="share-tab" onclick="switchShare('monthly',this)">월간 콘텐츠</button>
-  </div>
-  <div class="share-card" id="share-card">
-    <img class="sc-logo" src="data:image/png;base64,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" alt="iikoto">
-    <div class="sc-period" id="sc-period"></div>
-    <div id="sc-weekly">
-      <div class="sc-stats" id="sc-stats"></div>
-      <div class="sc-habit-title">habit</div>
-      <div id="sc-habits"></div>
-      <div class="sc-quote" id="sc-quote" contenteditable="true">이번 주 한 줄 회고를 입력하세요</div>
-    </div>
-    <div id="sc-monthly" style="display:none;">
-      <div class="sc-contents" id="sc-contents"></div>
-    </div>
-    <div class="sc-footer">
-      <span class="sc-date" id="sc-date"></span>
-      <span class="sc-tag">#iikoto</span>
-    </div>
-  </div>
-  <div class="share-acts">
-    <button class="share-save" onclick="saveShare()">이미지 저장</button>
-    <button class="share-close" onclick="closeShare()">닫기</button>
-  </div>
-</div>
-
-<!-- BOOK SHARE -->
-<div class="book-share-ov" id="book-share-ov" onclick="closeBookShare(event)">
-  <div class="book-card-wrap" id="book-card-wrap">
-    <div class="book-card-bg" id="book-card-bg"></div>
-    <div class="book-card-overlay"></div>
-    <div class="book-card-content">
-      <img class="book-card-logo" src="data:image/png;base64,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" alt="iikoto">
-      <div class="book-card-title" id="bsc-title">책 제목</div>
-      <div class="book-card-author" id="bsc-author">작가명</div>
-      <div class="book-card-quote" id="bsc-quote" style="display:none;"></div>
-    </div>
-  </div>
-  <div style="display:flex;flex-direction:column;gap:8px;width:100%;max-width:300px;">
-    <input class="book-share-field" id="bsc-title-inp" placeholder="책 제목" oninput="updateBookCard()">
-    <input class="book-share-field" id="bsc-author-inp" placeholder="작가명" oninput="updateBookCard()">
-    <textarea class="book-share-field" id="bsc-quote-inp" rows="2" style="resize:none;" placeholder="구절 (선택)" oninput="updateBookCard()"></textarea>
-    <button onclick="document.getElementById('bsc-bg-inp').click()" style="padding:8px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.12);color:rgba(255,255,255,.80);font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;">📷 배경 이미지 선택</button>
-    <input type="file" id="bsc-bg-inp" accept="image/*" style="display:none" onchange="setBscBg(this)">
-  </div>
-  <div class="book-share-acts">
-    <button class="share-save" onclick="saveBookShare()">이미지 저장</button>
-    <button class="share-close" onclick="closeBookShare()">닫기</button>
-  </div>
-</div>
-
 <!-- MARKDOWN BACKUP MODAL -->
 <div class="modal-ov" id="pdf-modal" onclick="closeModal('pdf-modal',event)">
   <div class="modal" style="max-width:340px;">
@@ -1480,6 +1459,100 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   </div>
 </div></div>
 <div id="pdf-content" style="display:none;"></div>
+
+<!-- READING HUB -->
+<div class="reading-ov" id="reading-ov">
+  <div class="settings-hdr">
+    <div class="settings-back" onclick="closeReading()">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="color:var(--ts)"><polyline points="10,3 5,8 10,13"/></svg>
+    </div>
+    <span class="settings-ttl">독서</span>
+  </div>
+  <div class="reading-body">
+    <div class="rd-top" id="rd-top"></div>
+
+    <div class="rd-stopwatch">
+      <div class="rd-sw-ring-wrap" id="rd-sw-ring-wrap">
+        <svg width="72" height="72" viewBox="0 0 72 72">
+          <defs>
+            <linearGradient id="rdSwGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#ff9ec0"/>
+              <stop offset="30%" stop-color="#ffcf86"/>
+              <stop offset="60%" stop-color="#8fe3c0"/>
+              <stop offset="100%" stop-color="#9cc8ff"/>
+            </linearGradient>
+          </defs>
+          <circle cx="36" cy="36" r="30" fill="none" stroke="var(--div)" stroke-width="6"/>
+          <circle id="rd-sw-ring" cx="36" cy="36" r="30" fill="none" stroke="url(#rdSwGrad)" stroke-width="6" stroke-linecap="round" stroke-dasharray="188.5" stroke-dashoffset="188.5"/>
+        </svg>
+        <div class="rd-sw-time" id="rd-sw-time">00:00</div>
+      </div>
+      <div class="rd-sw-label" id="rd-sw-label">독서 시간을 재볼까요?</div>
+      <button class="rd-sw-btn" id="rd-sw-btn" onclick="toggleStopwatch()">
+        <svg id="rd-sw-icon" width="15" height="15" viewBox="0 0 15 15" fill="white"><polygon points="3,2 13,7.5 3,13"/></svg>
+      </button>
+    </div>
+
+    <div class="rd-streak" id="rd-streak"></div>
+    <div class="rd-cover-row" id="rd-cover-row"></div>
+
+    <div>
+      <div class="slabel">아카이브</div>
+      <div class="rd-tabs" style="margin-bottom:10px;">
+        <div class="rd-tab on" data-status="reading" onclick="switchReadingTab(this,'reading')">읽는 중</div>
+        <div class="rd-tab" data-status="done" onclick="switchReadingTab(this,'done')">다 읽음</div>
+        <div class="rd-tab" data-status="paused" onclick="switchReadingTab(this,'paused')">중단</div>
+      </div>
+      <div id="rd-book-list"></div>
+    </div>
+  </div>
+  <div class="rd-fab" onclick="openAddBookModal()">+</div>
+</div>
+
+<!-- ADD BOOK MODAL -->
+<div class="modal-ov" id="add-book-modal" onclick="closeModal('add-book-modal',event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-title">책 추가</div>
+    <input class="modal-inp" id="rd-new-title" type="text" placeholder="책 제목" autocomplete="off">
+    <div class="rd-unit-row">
+      <div class="rd-unit-btn on" id="rd-unit-pages" onclick="setRdUnit('pages')">페이지로 기록</div>
+      <div class="rd-unit-btn" id="rd-unit-percent" onclick="setRdUnit('percent')">퍼센트로 기록</div>
+    </div>
+    <div id="rd-unit-hint" style="display:none;font-size:11px;color:var(--tm);text-align:center;margin:-2px 0 8px;">추가한 뒤 진행률 막대를 눌러 진행 상황을 기록해요</div>
+    <input class="modal-inp" id="rd-new-total" type="number" inputmode="numeric" placeholder="전체 페이지 수 (선택)" style="margin-top:8px;">
+    <div class="modal-actions">
+      <button class="mbtn cancel" onclick="closeModal('add-book-modal')">취소</button>
+      <button class="mbtn ok" onclick="confirmAddBook()">추가</button>
+    </div>
+  </div>
+</div>
+
+<!-- PROGRESS MODAL -->
+<div class="modal-ov" id="progress-modal" onclick="closeModal('progress-modal',event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-title">어디까지 읽으셨나요?</div>
+    <div class="rd-unit-row">
+      <div class="rd-unit-btn" id="pg-unit-pages" onclick="setPgUnit('pages')">페이지</div>
+      <div class="rd-unit-btn" id="pg-unit-percent" onclick="setPgUnit('percent')">퍼센트</div>
+    </div>
+    <div class="pg-row">
+      <div class="pg-box">
+        <div class="pg-box-lbl">시작</div>
+        <div class="pg-box-val" id="pg-start-val">0</div>
+      </div>
+      <div class="pg-arrow">→</div>
+      <div class="pg-box">
+        <div class="pg-box-lbl">종료</div>
+        <input class="pg-box-inp" id="pg-end-inp" type="number" inputmode="numeric">
+      </div>
+    </div>
+    <div class="pg-total" id="pg-total"></div>
+    <div class="modal-actions">
+      <button class="mbtn cancel" onclick="closeModal('progress-modal')">취소</button>
+      <button class="mbtn ok" onclick="confirmProgress()">저장</button>
+    </div>
+  </div>
+</div>
 
 <script>
 
@@ -2709,7 +2782,6 @@ const KAKAO_KEY='33799426c5377181c89616f5b2154bf0';
 const DAYS=['일','월','화','수','목','금','토'];
 const CATS=['drama','book','movie','music'];
 const CAT_LABELS={drama:'드라마',book:'책',movie:'영화',music:'음악'};
-const SHARE_CBAR={drama:'rgba(255,160,185,.70)',book:'rgba(220,190,100,.70)',movie:'rgba(130,200,190,.70)',music:'rgba(140,180,240,.70)'};
 const HABIT_COLORS=['mint','pink','sky','yellow','rose','lavender','peach','teal'];
 const DEFAULT_HABITS=[{name:'운동',color:'mint'},{name:'독서',color:'pink'},{name:'영양제',color:'sky'},{name:'물',color:'yellow'}];
 
@@ -2788,6 +2860,62 @@ function saveMealsData(dk,v){
   S.set(S.key('meals',dk),v);
   S.set(S.key('meals_pending',dk),true);
   autoSync('meals',dk);
+}
+function getBooks(){return S.get('reading_books')||[];}
+function saveBooksLocal(arr){S.set('reading_books',arr);}
+function upsertBookLocal(book){
+  const arr=getBooks();
+  const i=arr.findIndex(b=>b.cid===book.cid);
+  if(i>=0)arr[i]=book;else arr.push(book);
+  saveBooksLocal(arr);
+  S.set('reading_pending_'+book.cid,true);
+  autoSync('reading_book',book.cid);
+}
+function deleteBookLocal(cid){
+  saveBooksLocal(getBooks().filter(b=>b.cid!==cid));
+  supaFetch(`reading_books?cid=eq.${cid}`,'DELETE');
+}
+async function syncBookUp(cid){
+  const book=getBooks().find(b=>b.cid===cid);
+  if(!book)return;
+  await supaUpsert('reading_books','cid',[{
+    cid:book.cid,title:book.title,status:book.status,pages:book.pages||0,
+    total_pages:book.totalPages||null,seconds:book.seconds||0,unit:book.unit||'pages',percent:book.percent||0,
+    today_date:book.todayDate||null,today_start:book.todayStart||0,
+    poster:book.poster||null,author:book.author||'',
+    created:book.created,completed_at:book.completedAt||null
+  }]);
+  S.set('reading_pending_'+cid,false);
+}
+async function syncBooksDownAll(){
+  const rows=await supaFetch('reading_books?order=created');
+  if(!rows)return;
+  saveBooksLocal(rows.map(r=>({
+    cid:r.cid,title:r.title,status:r.status,pages:r.pages||0,
+    totalPages:r.total_pages||null,seconds:r.seconds||0,unit:r.unit||'pages',percent:r.percent||0,
+    todayDate:r.today_date||null,todayStart:r.today_start||0,
+    poster:r.poster||null,author:r.author||'',
+    created:r.created,completedAt:r.completed_at||null
+  })));
+  renderReadingHub();
+}
+function markReadingActivityToday(){
+  const key='reading_dates';
+  const arr=getGoal(key).filter(l=>l&&l.trim());
+  const today=dateKey(new Date());
+  if(!arr.includes(today)){arr.push(today);saveGoal(key,arr);}
+}
+function getReadingStreak(){
+  const arr=getGoal('reading_dates').filter(l=>l&&l.trim()).sort();
+  if(!arr.length)return 0;
+  let streak=0;
+  let cur=new Date();
+  for(let i=0;i<arr.length+1;i++){
+    const dk=dateKey(cur);
+    if(arr.includes(dk)){streak++;cur.setDate(cur.getDate()-1);}
+    else break;
+  }
+  return streak;
 }
 function getHabits(){return S.get('habits')||DEFAULT_HABITS;}
 function saveHabits(v){S.set('habits',v);autoSync('habits',null);}
@@ -2943,16 +3071,17 @@ async function syncContentsDown(mk){
   if(!rows)return;
   // rows=0이고 로컬에 데이터 있으면 덮어쓰지 않음 (사파리↔PWA 엇박 방지)
   if(!rows.length&&getContents(mk).length)return;
-  S.set(S.key('contents',mk),rows.map(r=>({cat:r.content_cat,title:r.title,startDay:r.start_day,endDay:r.end_day,status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,created:r.created})));
+  S.set(S.key('contents',mk),rows.map(r=>({cat:r.content_cat,title:r.title,startDay:r.start_day,endDay:r.end_day,status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',created:r.created})));
 }
 async function syncContentsUp(mk){
   const c=getContents(mk);
   await supaFetch(`contents?month_key=eq.${mk}`,'DELETE');
-  if(c.length)await supaFetch('contents','POST',c.map(c=>({month_key:mk,content_cat:c.cat,title:c.title,start_day:c.startDay,end_day:c.endDay,status:c.status,review:c.review||'',stars:c.stars||0,poster:c.poster||null,created:c.created})));
+  if(c.length)await supaFetch('contents','POST',c.map(c=>({month_key:mk,content_cat:c.cat,title:c.title,start_day:c.startDay,end_day:c.endDay,status:c.status,review:c.review||'',stars:c.stars||0,poster:c.poster||null,author:c.author||'',created:c.created})));
 }
 async function autoSync(type,key){
   if(!navigator.onLine)return;
-  if(type==='todos'){await syncTodosUp(key);S.set(S.key('todos_pending',key),false);}
+  if(type==='reading_book'){await syncBookUp(key);}
+  else if(type==='todos'){await syncTodosUp(key);S.set(S.key('todos_pending',key),false);}
   else if(type==='memos'){await syncMemosUp(key);S.set(S.key('memos_pending',key),false);}
   else if(type==='sleep')syncSleepUp(key);
   else if(type==='meals'){await syncMealsUp(key);S.set(S.key('meals_pending',key),false);}
@@ -3614,6 +3743,7 @@ function confirmHabit(){
 // ── TIMETABLE
 let _contentCtx={};
 let _selectedPoster=null;
+let _selectedAuthor=null;
 let _apiTimer=null;
 
 function renderTimetable(){
@@ -3747,15 +3877,33 @@ function confirmContent(){
   const review=document.getElementById('cm-review').value.trim();
   const stars=parseInt(document.getElementById('cm-stars').value)||0;
   const poster=_selectedPoster||(_contentCtx.item&&_contentCtx.item.poster)||null;
-  _selectedPoster=null;
+  const author=_selectedAuthor||(_contentCtx.item&&_contentCtx.item.author)||'';
+  _selectedPoster=null;_selectedAuthor=null;
   const mk=_contentCtx.mk,contents=getContents(mk);
   if(_contentCtx.mode==='edit'&&_contentCtx.item){
     const idx=contents.findIndex(c=>c.created===_contentCtx.item.created);
-    if(idx>=0)contents[idx]={...contents[idx],title,startDay,endDay,status,review,stars,poster};
+    if(idx>=0)contents[idx]={...contents[idx],title,startDay,endDay,status,review,stars,poster,author};
   } else {
-    contents.push({cat:_contentCtx.cat,title,startDay,endDay,status,review,stars,poster,created:Date.now()});
+    contents.push({cat:_contentCtx.cat,title,startDay,endDay,status,review,stars,poster,author,created:Date.now()});
   }
   saveContents(mk,contents);closeModal('content-modal');renderTimetable();updateStats();
+  if(_contentCtx.cat==='book')syncContentToReadingBook(title,status,poster,author);
+}
+function syncContentToReadingBook(title,status,poster,author){
+  const books=getBooks();
+  let book=books.find(b=>b.title===title&&b.linkedContent);
+  if(status==='done'){
+    if(book){book.status='done';book.completedAt=dateKey(new Date());if(poster)book.poster=poster;if(author)book.author=author;upsertBookLocal(book);}
+  } else {
+    if(!book){
+      book={cid:genCid(),title,status:'reading',unit:'pages',pages:0,totalPages:null,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:null,linkedContent:true,poster:poster||null,author:author||''};
+      upsertBookLocal(book);
+    } else {
+      if(book.status!=='reading')book.status='reading';
+      if(poster)book.poster=poster;if(author)book.author=author;
+      upsertBookLocal(book);
+    }
+  }
 }
 function deleteContent(){
   if(!_contentCtx.item)return;
@@ -3843,7 +3991,7 @@ async function searchKakaoBook(q,el){
 }
 function selectApiResult(title,poster,sub1,sub2){
   document.getElementById('cm-title').value=title;hideApiResults();
-  _selectedPoster=poster;
+  _selectedPoster=poster;_selectedAuthor=sub1||'';
   const preview=document.getElementById('cm-poster-preview');
   if(preview){
     if(poster){preview.style.display='flex';document.getElementById('cm-poster-img').src=poster;document.getElementById('cm-poster-title').textContent=title;document.getElementById('cm-poster-sub').textContent=sub1+(sub2?' · '+sub2:'');}
@@ -4532,91 +4680,215 @@ function openSettings(){
   document.getElementById('settings-ov').classList.add('on');
 }
 function closeSettings(){document.getElementById('settings-ov').classList.remove('on');}
+
+// ── READING HUB
+let _rdTab='reading';
+let _rdOpenCid=null;
+let _swSeconds=0,_swRunning=false,_swInterval=null;
+const RD_SW_C=2*Math.PI*30;
+function openReading(){
+  _rdTab='reading';
+  document.querySelectorAll('.rd-tab').forEach(t=>t.classList.toggle('on',t.dataset.status==='reading'));
+  renderReadingHub();
+  document.getElementById('reading-ov').classList.add('on');
+}
+function closeReading(){document.getElementById('reading-ov').classList.remove('on');}
+function renderReadingHub(){
+  renderRdTop();
+  renderRdStreak();
+  renderRdCovers();
+  renderBookList();
+}
+function renderRdTop(){
+  const el=document.getElementById('rd-top');if(!el)return;
+  const books=getBooks();
+  const cur=books.find(b=>b.status==='reading');
+  const mk=monthKey(new Date());
+  const doneCount=books.filter(b=>b.status==='done'&&b.completedAt&&b.completedAt.slice(0,7)===mk).length;
+  if(cur){
+    let pct=0;
+    if(cur.unit==='percent')pct=cur.percent||0;
+    else if(cur.totalPages)pct=Math.min(100,Math.round((cur.pages/cur.totalPages)*100));
+    const sub=cur.unit==='percent'?`${pct}% 읽음`:(cur.totalPages?`${cur.pages} / ${cur.totalPages}페이지 (${pct}%)`:`${cur.pages}페이지 읽음`);
+    const today=dateKey(new Date());
+    let todayPct=pct;
+    if(cur.todayDate===today){
+      todayPct=cur.unit==='percent'?(cur.todayStart||0):(cur.totalPages?Math.min(100,Math.round((cur.todayStart||0)/cur.totalPages*100)):pct);
+    }
+    todayPct=Math.min(todayPct,pct);
+    el.innerHTML=`<div class="rd-top-inner">
+        <div class="rd-top-title">${cur.title}${cur.author?` <span style="font-size:11px;font-weight:400;color:var(--tm);">· ${cur.author}</span>`:''}</div>
+        <div class="rd-progress-bar" onclick="openProgressModal(0)">
+          <div class="rd-progress-fill" style="width:${pct}%;"></div>
+          <div class="rd-progress-today" style="left:${todayPct}%;width:${Math.max(0,pct-todayPct)}%;"></div>
+        </div>
+        <div class="rd-top-sub">${sub}</div>
+        <div class="rd-top-month">이달 완독 ${doneCount}권</div>
+      </div>`;
+  }else{
+    el.innerHTML=`<div class="rd-top-inner">
+      <div class="rd-top-title" style="color:var(--tm);">지금 읽는 책이 없어요</div>
+      <div class="rd-top-sub">+ 버튼으로 책을 추가해보세요</div>
+      <div class="rd-top-month">이달 완독 ${doneCount}권</div>
+    </div>`;
+  }
+}
+function renderRdStreak(){
+  const el=document.getElementById('rd-streak');if(!el)return;
+  const s=getReadingStreak();
+  el.textContent=s>0?`연속 ${s}일째 읽고 있어요`:'오늘부터 다시 시작해볼까요?';
+}
+function renderRdCovers(){
+  const el=document.getElementById('rd-cover-row');if(!el)return;
+  const covers=getBooks().filter(b=>b.poster).sort((a,b)=>(b.created||0)-(a.created||0)).slice(0,5);
+  const slots=5;
+  let html='';
+  for(let i=0;i<slots;i++){
+    if(covers[i])html+=`<img class="rd-cover" src="${covers[i].poster}" alt="${covers[i].title}">`;
+    else html+='<div class="rd-cover rd-cover-empty"></div>';
+  }
+  el.innerHTML=html;
+}
+function switchReadingTab(btn,status){
+  _rdTab=status;_rdOpenCid=null;
+  document.querySelectorAll('.rd-tab').forEach(t=>t.classList.remove('on'));
+  btn.classList.add('on');
+  renderBookList();
+}
+function renderBookList(){
+  const el=document.getElementById('rd-book-list');if(!el)return;
+  const books=getBooks().filter(b=>b.status===_rdTab).sort((a,b)=>(b.created||0)-(a.created||0));
+  if(!books.length){el.innerHTML='<div class="rd-empty">아직 항목이 없어요</div>';return;}
+  el.innerHTML=books.map(b=>{
+    const sub=b.unit==='percent'?`${b.percent||0}%`:(b.totalPages?`${b.pages}/${b.totalPages}페이지`:`${b.pages||0}페이지`);
+    const timeStr=b.seconds?` · ${Math.floor(b.seconds/60)}분`:'';
+    const open=_rdOpenCid===b.cid;
+    return `<div class="rd-book-item${open?' open':''}" onclick="toggleBookDetail('${b.cid}')">
+      <div class="rd-book-title">${b.title}</div>
+      <div class="rd-book-meta">${sub}${timeStr}</div>
+      <div class="rd-book-detail">
+        <div class="rd-detail-row">
+          <span class="rd-status-btn${b.status==='reading'?' active':''}" onclick="event.stopPropagation();setBookStatus('${b.cid}','reading')">읽는 중</span>
+          <span class="rd-status-btn${b.status==='done'?' active':''}" onclick="event.stopPropagation();setBookStatus('${b.cid}','done')">다 읽음</span>
+          <span class="rd-status-btn${b.status==='paused'?' active':''}" onclick="event.stopPropagation();setBookStatus('${b.cid}','paused')">중단</span>
+          <span class="rd-del-btn" onclick="event.stopPropagation();removeBook('${b.cid}')">삭제</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function toggleBookDetail(cid){_rdOpenCid=_rdOpenCid===cid?null:cid;renderBookList();}
+function setBookStatus(cid,status){
+  const book=getBooks().find(b=>b.cid===cid);if(!book)return;
+  book.status=status;
+  if(status==='done')book.completedAt=dateKey(new Date());
+  upsertBookLocal(book);
+  renderReadingHub();
+}
+function removeBook(cid){
+  if(_rdOpenCid===cid)_rdOpenCid=null;
+  deleteBookLocal(cid);
+  renderBookList();
+}
+let _rdNewUnit='pages';
+function setRdUnit(u){
+  _rdNewUnit=u;
+  document.getElementById('rd-unit-pages').classList.toggle('on',u==='pages');
+  document.getElementById('rd-unit-percent').classList.toggle('on',u==='percent');
+  document.getElementById('rd-new-total').style.display=u==='percent'?'none':'';
+  document.getElementById('rd-unit-hint').style.display=u==='percent'?'block':'none';
+}
+function openAddBookModal(){
+  document.getElementById('rd-new-title').value='';
+  document.getElementById('rd-new-total').value='';
+  setRdUnit('pages');
+  openModal('add-book-modal');
+}
+function confirmAddBook(){
+  const title=document.getElementById('rd-new-title').value.trim();
+  if(!title)return;
+  const total=_rdNewUnit==='pages'?(parseInt(document.getElementById('rd-new-total').value,10)||null):null;
+  const book={cid:genCid(),title,status:'reading',unit:_rdNewUnit,pages:0,totalPages:total,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:null};
+  upsertBookLocal(book);
+  closeModal('add-book-modal');
+  renderReadingHub();
+}
+// ── 진행률 입력 모달
+let _pgBookCid=null,_pgUnit='pages',_pgSeconds=0,_pgStartVal=0;
+function openProgressModal(seconds){
+  const book=getBooks().find(b=>b.status==='reading');
+  if(!book){if(seconds>0){_swSeconds=0;}openAddBookModal();return;}
+  _pgBookCid=book.cid;_pgSeconds=seconds||0;_pgUnit=book.unit||'pages';
+  _pgStartVal=_pgUnit==='percent'?(book.percent||0):(book.pages||0);
+  document.getElementById('pg-unit-pages').classList.toggle('on',_pgUnit==='pages');
+  document.getElementById('pg-unit-percent').classList.toggle('on',_pgUnit==='percent');
+  document.getElementById('pg-start-val').textContent=_pgUnit==='percent'?_pgStartVal+'%':_pgStartVal+'p';
+  document.getElementById('pg-end-inp').value=_pgStartVal;
+  const totalEl=document.getElementById('pg-total');
+  totalEl.textContent=(_pgUnit==='pages'&&book.totalPages)?`총 ${book.totalPages}페이지`:'';
+  openModal('progress-modal');
+  setTimeout(()=>document.getElementById('pg-end-inp').focus(),100);
+}
+function setPgUnit(u){
+  const book=getBooks().find(b=>b.cid===_pgBookCid);if(!book)return;
+  _pgUnit=u;
+  _pgStartVal=u==='percent'?(book.percent||0):(book.pages||0);
+  document.getElementById('pg-unit-pages').classList.toggle('on',u==='pages');
+  document.getElementById('pg-unit-percent').classList.toggle('on',u==='percent');
+  document.getElementById('pg-start-val').textContent=u==='percent'?_pgStartVal+'%':_pgStartVal+'p';
+  document.getElementById('pg-end-inp').value=_pgStartVal;
+  document.getElementById('pg-total').textContent=(u==='pages'&&book.totalPages)?`총 ${book.totalPages}페이지`:'';
+}
+function confirmProgress(){
+  const book=getBooks().find(b=>b.cid===_pgBookCid);if(!book)return;
+  const endVal=parseInt(document.getElementById('pg-end-inp').value,10);
+  if(isNaN(endVal))return;
+  const today=dateKey(new Date());
+  if(book.todayDate!==today){book.todayDate=today;book.todayStart=_pgStartVal;}
+  book.unit=_pgUnit;
+  if(_pgUnit==='percent')book.percent=Math.max(0,Math.min(100,endVal));
+  else book.pages=Math.max(0,endVal);
+  if(_pgSeconds>0)book.seconds=(book.seconds||0)+_pgSeconds;
+  upsertBookLocal(book);
+  markReadingActivityToday();
+  closeModal('progress-modal');
+  _swSeconds=0;
+  renderReadingHub();
+}
+function toggleStopwatch(){
+  const icon=document.getElementById('rd-sw-icon');
+  const wrap=document.getElementById('rd-sw-ring-wrap');
+  const label=document.getElementById('rd-sw-label');
+  if(!_swRunning){
+    _swRunning=true;
+    icon.innerHTML='<rect x="2" y="2" width="4" height="11" rx="1"/><rect x="9" y="2" width="4" height="11" rx="1"/>';
+    wrap.classList.add('spinning');
+    label.textContent='측정 중이에요';
+    _swInterval=setInterval(()=>{
+      _swSeconds++;
+      const m=Math.floor(_swSeconds/60),s=_swSeconds%60;
+      document.getElementById('rd-sw-time').textContent=`${pad(m)}:${pad(s)}`;
+      const pct=(_swSeconds%3600)/3600;
+      const offset=RD_SW_C-(RD_SW_C*pct);
+      document.getElementById('rd-sw-ring').setAttribute('stroke-dashoffset',offset);
+    },1000);
+  }else{
+    _swRunning=false;
+    icon.innerHTML='<polygon points="3,2 13,7.5 3,13"/>';
+    wrap.classList.remove('spinning');
+    label.textContent='독서 시간을 재볼까요?';
+    clearInterval(_swInterval);
+    document.getElementById('rd-sw-time').textContent='00:00';
+    document.getElementById('rd-sw-ring').setAttribute('stroke-dashoffset',RD_SW_C);
+    const seconds=_swSeconds;
+    if(seconds>0)openProgressModal(seconds);
+    else _swSeconds=0;
+  }
+}
 async function manualSync(){
   const el=document.getElementById('sync-status');if(el)el.textContent='동기화 중...';
   await syncAll();
   if(el)el.textContent='완료! '+new Date().toLocaleTimeString();
-}
-
-// ── SHARE
-let _shareType='weekly';
-function openShareMenu(){openSheet('share-menu-sheet');}
-function switchShareAndOpen(type){
-  _shareType=type;
-  document.querySelectorAll('.share-tab').forEach((t,i)=>t.classList.toggle('on',(type==='weekly'&&i===0)||(type==='monthly'&&i===1)));
-  document.getElementById('sc-weekly').style.display=type==='weekly'?'':'none';
-  document.getElementById('sc-monthly').style.display=type==='monthly'?'':'none';
-  if(type==='weekly')buildWeeklyCard();else buildMonthlyCard();
-  document.getElementById('share-ov').classList.add('on');
-}
-function switchShare(type,btn){
-  _shareType=type;
-  document.querySelectorAll('.share-tab').forEach(t=>t.classList.remove('on'));
-  btn.classList.add('on');
-  document.getElementById('sc-weekly').style.display=type==='weekly'?'':'none';
-  document.getElementById('sc-monthly').style.display=type==='monthly'?'':'none';
-  if(type==='weekly')buildWeeklyCard();else buildMonthlyCard();
-}
-function closeShare(e){if(!e||e.target===document.getElementById('share-ov'))document.getElementById('share-ov').classList.remove('on');}
-function buildWeeklyCard(){
-  const now=new Date(),dow=now.getDay();
-  const mon=new Date(now);mon.setDate(now.getDate()-((dow+6)%7));
-  const sun=new Date(mon);sun.setDate(mon.getDate()+6);
-  const fmt=d=>`${d.getMonth()+1}/${d.getDate()}`;
-  document.getElementById('sc-period').textContent=`weekly · ${fmt(mon)} – ${fmt(sun)}`;
-  document.getElementById('sc-date').textContent=`${now.getFullYear()}. ${now.getMonth()+1}.`;
-  let memos=0,todos=0,hc=0,ht=0;
-  const habits=getHabits(),wk=weekKey(now),checks=getHabitChecks(wk);
-  for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);const dk=dateKey(d);memos+=getMemos(dk).length;todos+=getTodos(dk).filter(t=>t.done).length;}
-  habits.forEach(h=>{for(let i=0;i<7;i++){ht++;if(checks[`${h.name}-${i}`])hc++;}});
-  const pct=ht>0?Math.round(hc/ht*100):0;
-  document.getElementById('sc-stats').innerHTML=`<div class="sc-stat"><div class="sc-stat-v">${todos}</div><div class="sc-stat-l">완료 투두</div></div><div class="sc-stat"><div class="sc-stat-v">${memos}</div><div class="sc-stat-l">메모</div></div><div class="sc-stat"><div class="sc-stat-v">${hc}</div><div class="sc-stat-l">해빗 달성</div></div><div class="sc-stat"><div class="sc-stat-v">${pct}%</div><div class="sc-stat-l">달성률</div></div>`;
-  const hEl=document.getElementById('sc-habits');hEl.innerHTML='';
-  habits.slice(0,3).forEach(h=>{const row=document.createElement('div');row.className='sc-habit-row';let dots='';for(let i=0;i<7;i++)dots+=`<div class="sc-dot ${checks[`${h.name}-${i}`]?'on':'off'}"></div>`;row.innerHTML=`<span class="sc-habit-name">${h.name}</span><div class="sc-hdots">${dots}</div>`;hEl.appendChild(row);});
-}
-function buildMonthlyCard(){
-  const now=new Date(),mk=monthKey(now);
-  document.getElementById('sc-period').textContent=`monthly · ${now.getFullYear()}년 ${now.getMonth()+1}월`;
-  document.getElementById('sc-date').textContent=`${now.getFullYear()}. ${now.getMonth()+1}.`;
-  const contents=getContents(mk),el=document.getElementById('sc-contents');
-  el.innerHTML='';
-  if(!contents.length){el.innerHTML='<div style="text-align:center;color:#c8b0a8;font-size:12px;padding:16px 0;">이번 달 콘텐츠가 없어요</div>';return;}
-  contents.slice(0,4).forEach(c=>{const stars='★'.repeat(c.stars||0)+'☆'.repeat(5-(c.stars||0));el.innerHTML+=`<div class="sc-citem"><div class="sc-cbar" style="background:${SHARE_CBAR[c.cat]||'rgba(200,200,200,.5)'}"></div><div class="sc-cinfo"><div class="sc-ccat">${CAT_LABELS[c.cat]||c.cat}</div><div class="sc-ctitle">${c.title}</div></div><div class="sc-cstars">${stars}</div></div>`;});
-}
-async function saveShare(){
-  if(!window.html2canvas){await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
-  try{const canvas=await html2canvas(document.getElementById('share-card'),{scale:3,useCORS:true,backgroundColor:null,logging:false});const a=document.createElement('a');a.download=`iikoto-${_shareType}-${dateKey(new Date())}.png`;a.href=canvas.toDataURL('image/png');a.click();}
-  catch(e){alert('스크린샷으로 저장해주세요!');}
-}
-
-// ── BOOK SHARE
-function openBookShare(title='',author=''){
-  document.getElementById('bsc-title-inp').value=title;
-  document.getElementById('bsc-author-inp').value=author;
-  document.getElementById('bsc-quote-inp').value='';
-  document.getElementById('book-card-bg').style.backgroundImage='';
-  updateBookCard();document.getElementById('book-share-ov').classList.add('on');
-}
-function closeBookShare(e){if(!e||e.target===document.getElementById('book-share-ov'))document.getElementById('book-share-ov').classList.remove('on');}
-function updateBookCard(){
-  const title=document.getElementById('bsc-title-inp').value||'책 제목';
-  const author=document.getElementById('bsc-author-inp').value||'작가명';
-  const quote=document.getElementById('bsc-quote-inp').value.trim();
-  document.getElementById('bsc-title').textContent=title;
-  document.getElementById('bsc-author').textContent=author;
-  const qEl=document.getElementById('bsc-quote');
-  if(quote){qEl.textContent=`"${quote}"`;qEl.style.display='block';}else qEl.style.display='none';
-}
-function setBscBg(inp){
-  const file=inp.files[0];if(!file)return;
-  const reader=new FileReader();
-  reader.onload=e=>{const bg=document.getElementById('book-card-bg');bg.style.backgroundImage=`url(${e.target.result})`;bg.style.backgroundSize='cover';bg.style.backgroundPosition='center';};
-  reader.readAsDataURL(file);inp.value='';
-}
-async function saveBookShare(){
-  if(!window.html2canvas){await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
-  try{const canvas=await html2canvas(document.getElementById('book-card-wrap'),{scale:3,useCORS:true,backgroundColor:null,logging:false});const a=document.createElement('a');a.download=`iikoto-book-${dateKey(new Date())}.png`;a.href=canvas.toDataURL('image/png');a.click();}
-  catch(e){alert('스크린샷으로 저장해주세요!');}
 }
 
 // ── MARKDOWN BACKUP
@@ -4933,6 +5205,11 @@ async function initSync(){
   // 습관 / 습관체크 — 항상 동기화 (이전엔 syncAll에만 있어서 PC 사파리 등 새 탭에서 누락되던 버그)
   await syncHabitsDown();
   await syncGoalDown('wishlist:meal');
+  await syncGoalDown('reading_dates');
+  await syncBooksDownAll();
+  for(const b of getBooks()){
+    if(S.get('reading_pending_'+b.cid))await syncBookUp(b.cid);
+  }
   await syncHCDown(wk);
   // 콘텐츠 — pending 있으면 Up 먼저, 없으면 Down
   var mk0=monthKey(new Date());
