@@ -1523,8 +1523,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 <div class="modal-ov" id="add-book-modal" onclick="closeModal('add-book-modal',event)">
   <div class="modal" onclick="event.stopPropagation()">
     <div class="modal-title">책 추가</div>
-    <input class="modal-inp" id="rd-new-title" type="text" placeholder="책 제목" autocomplete="off" oninput="onRdTitleInput(this.value)" onblur="setTimeout(()=>{const r=document.getElementById('rd-wish-results');if(r)r.style.display='none';},200)">
-    <div class="api-results" id="rd-wish-results" style="display:none;"></div>
+    <div class="api-search-wrap">
+      <input class="modal-inp" id="rd-new-title" type="text" placeholder="책 제목" autocomplete="off" oninput="onRdTitleInput(this.value)" onblur="setTimeout(()=>{const r=document.getElementById('rd-wish-results');if(r)r.style.display='none';},200)">
+      <div class="api-results" id="rd-wish-results" style="display:none;"></div>
+    </div>
     <div class="rd-unit-row">
       <div class="rd-unit-btn on" id="rd-unit-pages" onclick="setRdUnit('pages')">페이지로 기록</div>
       <div class="rd-unit-btn" id="rd-unit-percent" onclick="setRdUnit('percent')">퍼센트로 기록</div>
