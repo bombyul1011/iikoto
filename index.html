@@ -165,6 +165,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .meal-inp{flex:1;background:none;border:none;border-bottom:1px dashed rgba(195,175,168,0.38);outline:none;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--tp);padding:5px 2px 4px;}
 .week-meal-day{margin-bottom:14px;}
 .week-meal-day-label{font-size:11.5px;font-weight:700;color:var(--ts);margin-bottom:4px;}
+#daily-meal-card{background:rgba(198,232,180,0.55);border-color:rgba(170,210,150,0.5);}
+[data-theme="dark"] #daily-meal-card{background:rgba(150,205,165,0.20);border-color:rgba(150,205,165,0.32);}
 .wish-round-btn{width:36px;height:36px;flex-shrink:0;border-radius:50%;border:1.4px solid rgba(150,190,165,0.55);background:rgba(190,230,205,0.22);color:rgba(85,135,100,0.85);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .15s;}
 .wish-round-btn:active{background:rgba(190,230,205,0.4);}
 [data-theme="dark"] .wish-round-btn{border-color:rgba(150,200,170,0.4);background:rgba(150,200,170,0.12);color:rgba(170,220,190,0.9);}
@@ -899,12 +901,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           <button class="send-btn" onclick="sendMemo()"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="white" stroke-width="1.4" stroke-linecap="round"><line x1="6.5" y1="10.5" x2="6.5" y2="2"/><polyline points="3,5.5 6.5,2 10,5.5"/></svg></button>
         </div>
       </div>
-      <div class="report-banner meal-soft" onclick="openMealSheet()">
-        <div class="report-banner-inner">
-          <div class="report-banner-line"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="vertical-align:-1px;margin-right:3px;"><path d="M2 5.5h8a4 4 0 0 1-8 0z"/><line x1="2" y1="5.5" x2="10" y2="5.5"/><line x1="6" y1="1.5" x2="6" y2="3.5"/></svg>오늘 뭐 먹지?</div>
-          <div class="report-banner-arrow">›</div>
-        </div>
-      </div>
+      <div class="slabel">오늘 뭐 먹지</div>
+      <div class="card s" id="daily-meal-card"></div>
     </div>
 
     <!-- WEEKLY -->
@@ -1004,24 +1002,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   </div>
 </div>
 
-<!-- MEAL SHEET -->
-<div class="overlay" id="meal-sheet" onclick="closeSheet('meal-sheet',event)">
-  <div class="bsheet" style="max-height:80vh;overflow-y:auto;" onclick="event.stopPropagation()">
-    <div class="sheet-handle"></div>
-    <div style="padding:0 20px 20px;">
-      <div class="report-banner meal-soft" style="margin-top:0;margin-bottom:14px;" onclick="saveMealSheet()">
-        <div class="report-banner-inner">
-          <div class="report-banner-line"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="vertical-align:-1px;margin-right:3px;"><path d="M2 5.5h8a4 4 0 0 1-8 0z"/><line x1="2" y1="5.5" x2="10" y2="5.5"/><line x1="6" y1="1.5" x2="6" y2="3.5"/></svg>오늘 뭐 먹지?</div>
-          <div class="report-banner-arrow">›</div>
-        </div>
-      </div>
-      <div class="meal-row"><div class="meal-cat">아침</div><input class="meal-inp" id="meal-inp-breakfast" type="text" placeholder="메뉴 입력" autocomplete="off"></div>
-      <div class="meal-row"><div class="meal-cat">점심</div><input class="meal-inp" id="meal-inp-lunch" type="text" placeholder="메뉴 입력" autocomplete="off"></div>
-      <div class="meal-row"><div class="meal-cat">저녁</div><input class="meal-inp" id="meal-inp-dinner" type="text" placeholder="메뉴 입력" autocomplete="off"></div>
-      <div class="meal-row"><div class="meal-cat">간식</div><input class="meal-inp" id="meal-inp-snack" type="text" placeholder="메뉴 입력" autocomplete="off"></div>
-    </div>
-  </div>
-</div>
+
 
 <!-- 주간 루틴 모달 -->
 <div class="modal-ov" id="routine-modal" onclick="closeModal('routine-modal',event)">
@@ -4213,10 +4194,21 @@ function initTodoDrag(){
   }
 }
 // ── LOAD
-function loadDaily(){
-  loadSleep();renderTodos();renderMemos();
+function renderTodayMeal(){
+  const el=document.getElementById('daily-meal-card');if(!el)return;
   const dk=dateKey(currentDate);
-  ensureDateSynced(dk).then(fetched=>{if(fetched){loadSleep();renderTodos();renderMemos();}});
+  const m=getMeals(dk);
+  const MEAL_LABELS={breakfast:'아침',lunch:'점심',dinner:'저녁',snack:'간식'};
+  let html='';
+  ['breakfast','lunch','dinner','snack'].forEach(k=>{
+    if(m[k])html+=`<div class="cal-detail-row"><span class="cal-detail-time">${MEAL_LABELS[k]}</span><span class="cal-detail-text">${m[k]}</span></div>`;
+  });
+  el.innerHTML=html||'<div style="font-size:12px;color:var(--tm);text-align:center;padding:8px 0;">주간 메뉴판에서 적어보세요</div>';
+}
+function loadDaily(){
+  loadSleep();renderTodos();renderMemos();renderTodayMeal();
+  const dk=dateKey(currentDate);
+  ensureDateSynced(dk).then(fetched=>{if(fetched){loadSleep();renderTodos();renderMemos();renderTodayMeal();}});
 }
 function loadWeekly(){
   buildWeekStrip();renderHabitGrid();
@@ -4333,26 +4325,6 @@ function saveWeekMealSheet(){
     saveMealsData(dk,m);
   }
   closeSheet('week-meal-sheet');
-}
-function openMealSheet(){
-  const dk=dateKey(currentDate);
-  const m=getMeals(dk);
-  document.getElementById('meal-inp-breakfast').value=m.breakfast||'';
-  document.getElementById('meal-inp-lunch').value=m.lunch||'';
-  document.getElementById('meal-inp-dinner').value=m.dinner||'';
-  document.getElementById('meal-inp-snack').value=m.snack||'';
-  openSheet('meal-sheet');
-}
-function saveMealSheet(){
-  const dk=dateKey(currentDate);
-  const m={
-    breakfast:document.getElementById('meal-inp-breakfast').value.trim(),
-    lunch:document.getElementById('meal-inp-lunch').value.trim(),
-    dinner:document.getElementById('meal-inp-dinner').value.trim(),
-    snack:document.getElementById('meal-inp-snack').value.trim()
-  };
-  saveMealsData(dk,m);
-  closeSheet('meal-sheet');
 }
 function openSheet(id){document.getElementById(id).classList.add('on');}
 function closeSheet(id,e){if(!e||e.target===document.getElementById(id))document.getElementById(id).classList.remove('on');}
