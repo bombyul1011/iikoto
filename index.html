@@ -2853,9 +2853,13 @@ function upsertQuoteLocal(q){
   S.set('quote_pending_'+q.cid,true);
   autoSync('reading_quote',q.cid);
 }
-function deleteQuoteLocal(cid){
+async function deleteQuoteLocal(cid){
   saveQuotesLocal(getQuotes().filter(q=>q.cid!==cid));
-  supaFetch(`reading_quotes?cid=eq.${cid}`,'DELETE');
+  const pend=S.get('quote_delpending_list')||[];
+  if(!pend.includes(cid))pend.push(cid);
+  S.set('quote_delpending_list',pend);
+  const res=await supaFetch(`reading_quotes?cid=eq.${cid}`,'DELETE');
+  if(res!==null)S.set('quote_delpending_list',(S.get('quote_delpending_list')||[]).filter(c=>c!==cid));
 }
 async function syncQuoteUp(cid){
   const q=getQuotes().find(x=>x.cid===cid);
@@ -3897,19 +3901,25 @@ function confirmContent(){
   saveContents(mk,contents);closeModal('content-modal');renderTimetable();updateStats();
   if(_contentCtx.cat==='book')syncContentToReadingBook(title,status,poster,author);
 }
+function stableCidFromTitle(title){
+  let h=0;
+  for(let i=0;i<title.length;i++){h=(h*31+title.charCodeAt(i))|0;}
+  return 'ct_'+Math.abs(h).toString(36);
+}
 function syncContentToReadingBook(title,status,poster,author){
   const books=getBooks();
   let book=books.find(b=>b.title===title&&b.linkedContent);
   if(!book)book=books.find(b=>b.title===title&&b.status==='wish');
+  const fixedCid=stableCidFromTitle(title);
   if(status==='done'){
     if(book){book.status='done';book.linkedContent=true;book.completedAt=book.completedAt||dateKey(new Date());if(poster)book.poster=poster;if(author)book.author=author;upsertBookLocal(book);}
     else{
-      book={cid:genCid(),title,status:'done',unit:'pages',pages:0,totalPages:null,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:dateKey(new Date()),linkedContent:true,poster:poster||null,author:author||''};
+      book={cid:fixedCid,title,status:'done',unit:'pages',pages:0,totalPages:null,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:dateKey(new Date()),linkedContent:true,poster:poster||null,author:author||''};
       upsertBookLocal(book);
     }
   } else {
     if(!book){
-      book={cid:genCid(),title,status:'reading',unit:'pages',pages:0,totalPages:null,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:null,linkedContent:true,poster:poster||null,author:author||''};
+      book={cid:fixedCid,title,status:'reading',unit:'pages',pages:0,totalPages:null,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:null,linkedContent:true,poster:poster||null,author:author||''};
       upsertBookLocal(book);
     } else {
       book.linkedContent=true;
@@ -5336,6 +5346,12 @@ async function initSync(){
     if(S.get('reading_pending_'+b.cid))await syncBookUp(b.cid);
   }
   await syncQuotesDownAll();
+  const pendDel=S.get('quote_delpending_list')||[];
+  for(const cid of pendDel){
+    saveQuotesLocal(getQuotes().filter(q=>q.cid!==cid));
+    const res=await supaFetch(`reading_quotes?cid=eq.${cid}`,'DELETE');
+    if(res!==null)S.set('quote_delpending_list',(S.get('quote_delpending_list')||[]).filter(c=>c!==cid));
+  }
   for(const q of getQuotes()){
     if(S.get('quote_pending_'+q.cid))await syncQuoteUp(q.cid);
   }
