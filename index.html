@@ -170,7 +170,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="dark"] .report-banner-inner{background:linear-gradient(135deg,rgba(30,60,40,0.92),rgba(60,55,15,0.92),rgba(30,58,38,0.92));}
 .meal-row{display:flex;align-items:center;gap:8px;padding:8px 2px;}
 .meal-cat{width:38px;flex-shrink:0;font-size:12px;color:var(--tm);}
-.meal-time-inp{width:74px;flex-shrink:0;background:none;border:none;border-bottom:1px dashed rgba(195,175,168,0.38);outline:none;font-family:'DM Sans',sans-serif;font-size:11.5px;color:var(--ts);padding:5px 2px 4px;text-align:right;}
+.meal-time-inp{width:60px;flex-shrink:0;background:none;border:none;outline:none;font-family:'DM Sans',sans-serif;font-size:11.5px;color:var(--ts);padding:5px 2px 4px 2px;text-align:right;}
 .meal-time-btn{flex-shrink:0;width:20px;height:20px;border-radius:50%;border:1.2px solid rgba(160,190,140,0.55);background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgba(95,140,75,0.75);padding:0;}
 .meal-time-btn:active{background:rgba(190,230,205,0.30);}
 .meal-time-tag{font-size:10.5px;color:rgba(95,140,75,0.85);font-weight:600;flex-shrink:0;}
@@ -4614,7 +4614,7 @@ function renderTodayMeal(){
   ['breakfast','lunch','dinner','snack'].forEach(k=>{
     if(m[k]){
       const t=m[k+'_time'];
-      const timeHtml=t?`<span class="meal-time-tag">${t}</span>`:`<button class="meal-time-btn" onclick="recordMealTime('${dk}','${k}')" title="식사 시간 기록"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 1.2l1 2.2 2.4.3-1.8 1.6.5 2.4L5 6.4 3 7.7l.5-2.4-1.8-1.6 2.4-.3z"/></svg></button>`;
+      const timeHtml=t?`<span class="meal-time-tag">${t}</span>`:`<button class="meal-time-btn" onclick="recordMealTime('${dk}','${k}')" title="식사 시간 기록"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="1.8,5.2 4,7.5 8.2,2.5"/></svg></button>`;
       html+=`<div class="cal-detail-row"><span class="cal-detail-time">${MEAL_LABELS[k]}</span><span class="cal-detail-text" style="flex:1;">${m[k]}</span>${timeHtml}</div>`;
     }
   });
@@ -4709,6 +4709,24 @@ function placeWish(el){
   body.addEventListener('mousedown',handler);
   body.addEventListener('touchstart',handler,{passive:false});
 })();
+let _mealCatPressTimer=null;
+function mealCatPressStart(el,dk,k){
+  clearTimeout(_mealCatPressTimer);
+  _mealCatPressTimer=setTimeout(()=>{
+    const tEl=document.getElementById(`wm-${dk}-${k}-time`);
+    if(tEl&&tEl.value){
+      tEl.value='';
+      saveOneMealDay(dk);
+      el.style.transition='opacity .15s';el.style.opacity='0.3';
+      setTimeout(()=>{el.style.opacity='';},220);
+    }
+    _mealCatPressTimer=null;
+  },550);
+}
+function mealCatPressEnd(){
+  clearTimeout(_mealCatPressTimer);
+  _mealCatPressTimer=null;
+}
 function saveOneMealDay(dk){
   const CATS=['breakfast','lunch','dinner','snack'];
   const m={};
@@ -4735,7 +4753,7 @@ function openWeekMealSheet(){
     const m=getMeals(dk);
     const block=document.createElement('div');block.className='week-meal-day';block.id='wm-block-'+dk;
     block.innerHTML=`<div class="week-meal-day-label">${DOW[i]} · ${d.getMonth()+1}/${d.getDate()}</div>`+
-      CATS.map(([k,label])=>`<div class="meal-row"><div class="meal-cat">${label}</div><input class="meal-inp" style="flex:1 1 0;min-width:0;" id="wm-${dk}-${k}" type="text" placeholder="메뉴 입력" autocomplete="off" value="${(m[k]||'').replace(/"/g,'&quot;')}" onblur="saveOneMealDay('${dk}')"><input class="meal-time-inp" id="wm-${dk}-${k}-time" type="time" value="${m[k+'_time']||''}" onchange="saveOneMealDay('${dk}')"></div>`).join('');
+      CATS.map(([k,label])=>`<div class="meal-row"><div class="meal-cat" onpointerdown="mealCatPressStart(this,'${dk}','${k}')" onpointerup="mealCatPressEnd(this)" onpointerleave="mealCatPressEnd(this)" onpointercancel="mealCatPressEnd(this)">${label}</div><input class="meal-inp" style="flex:1 1 0;min-width:0;" id="wm-${dk}-${k}" type="text" placeholder="메뉴 입력" autocomplete="off" value="${(m[k]||'').replace(/"/g,'&quot;')}" onblur="saveOneMealDay('${dk}')"><input class="meal-time-inp" id="wm-${dk}-${k}-time" type="time" value="${m[k+'_time']||''}" onchange="saveOneMealDay('${dk}')"></div>`).join('');
     body.appendChild(block);
   }
   openSheet('week-meal-sheet');
