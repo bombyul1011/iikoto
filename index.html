@@ -2251,7 +2251,7 @@ function updateDiaryBannerLabel(){
   let cnt=0;
   for(let d=1;d<=today;d++){
     const dk=`${y}-${pad(mo+1)}-${pad(d)}`;
-    if((S.get(S.key('oneline',dk))||'').trim())cnt++;
+    if(getDailyOneLine(dk).trim())cnt++;
   }
   cntEl.textContent=cnt;
 }
@@ -2294,7 +2294,7 @@ async function renderDiaryMonthSheet(){
       const dow=date.getDay();
       const isHoliday=dow===0||dow===6;
       const isToday=d===today;
-      const text=(S.get(S.key('oneline',dk))||'').trim();
+      const text=getDailyOneLine(dk).trim();
       rowsHtml+=`<div class="diary-row">
         <div class="diary-date-chip${isHoliday?' holiday':''}${isToday?' today':''}">${pad(d)}</div>
         <div class="diary-line-text${text?'':' empty'}">${text?text:'···'}</div>
@@ -2322,7 +2322,7 @@ async function buildDiaryMonthSummaryHtml(y,mo,today,daysInMonth,mk){
     const lines=[];
     for(let d=1;d<=daysInMonth;d++){
       const dk=`${y}-${pad(mo+1)}-${pad(d)}`;
-      const t=(S.get(S.key('oneline',dk))||'').trim();
+      const t=getDailyOneLine(dk).trim();
       if(t)lines.push(t);
     }
     if(lines.length>=2){
@@ -4470,7 +4470,12 @@ function renderHomeRings(suffix=''){
 }
 
 // ── DAILY ONE LINE
-function getDailyOneLine(dk){return S.get(S.key('oneline',dk))||'';}
+function getDailyOneLine(dk){
+  const v=S.get(S.key('oneline',dk));
+  if(typeof v==='string')return v;
+  if(Array.isArray(v))return v.find(x=>typeof x==='string'&&x.trim())||'';
+  return '';
+}
 function saveDailyOneLine(dk,text){
   S.set(S.key('oneline',dk),text);
   // goal_notes 테이블에 동기화 (key: oneline:YYYY-MM-DD)
@@ -5240,7 +5245,7 @@ function updatePdfCount(){
     const memos=getMemos(dk);
     const todos=getTodos(dk);
     const sl=getSleep(dk);
-    const ol=S.get(S.key('oneline',dk))||'';
+    const ol=getDailyOneLine(dk);
     if(memos.length||todos.length||sl.sleep||ol){days++;total+=memos.length;}
   }
   const el=document.getElementById('pdf-preview-count');
@@ -5286,7 +5291,7 @@ function buildMarkdownText(start,end){
     const memos=getMemos(dk);
     const todos=getTodos(dk);
     const sl=getSleep(dk);
-    const ol=S.get(S.key('oneline',dk))||'';
+    const ol=getDailyOneLine(dk);
     if(!memos.length&&!todos.length&&!sl.sleep&&!sl.wake&&!ol)continue;
 
     md+=`────────────────────\n`;
