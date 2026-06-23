@@ -2309,7 +2309,10 @@ async function renderDiaryMonthSheet(){
       </div>`;
     const scrollEl=document.getElementById('diary-month-list-scroll');
     const todayEl=document.getElementById('diary-today-row');
-    if(scrollEl&&todayEl)scrollEl.scrollTop=todayEl.offsetTop-4;
+    if(scrollEl&&todayEl){
+      const top=todayEl.getBoundingClientRect().top-scrollEl.getBoundingClientRect().top+scrollEl.scrollTop;
+      scrollEl.scrollTop=top-4;
+    }
   }catch(e){
     console.warn('diary month sheet err:',e);
     el.innerHTML=`<div style="font-size:12px;color:var(--tm);text-align:center;padding:30px 0;">불러오지 못했어요, 다시 시도해주세요</div>`;
