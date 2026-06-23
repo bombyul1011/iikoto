@@ -2346,12 +2346,22 @@ function computeMonthStats(y,mo){
   let memos=0,doneTodos=0,totalTodos=0,hc=0,ht=0,sleepMin=0,sleepCnt=0;
   const habits=getHabits();
   const allMemoTexts=[];
+  const onelineTexts=[];
+  const mealRecordDaySet={};
+  const menuFreq={};
   const weekSet={};
   for(let d=1;d<=dim;d++){
     const dk=`${y}-${pad(mo+1)}-${pad(d)}`;
     const dayMemos=getMemos(dk);
     memos+=dayMemos.length;
     dayMemos.forEach(m=>{if(m.text)allMemoTexts.push(m.text);});
+    const ol=getDailyOneLine(dk);
+    if(ol&&ol.trim())onelineTexts.push(`${d}일: ${ol.trim()}`);
+    const meal=getMeals(dk);
+    ['breakfast','lunch','dinner','snack'].forEach(k=>{
+      const v=meal[k]&&meal[k].trim();
+      if(v){mealRecordDaySet[dk]=true;menuFreq[v]=(menuFreq[v]||0)+1;}
+    });
     const dayTodos=getTodos(dk);
     totalTodos+=dayTodos.length;doneTodos+=dayTodos.filter(t=>t.done).length;
     const sl=getSleep(dk);
@@ -2374,7 +2384,11 @@ function computeMonthStats(y,mo){
     const lines=items.map(c=>({text:c.text,pct:Math.round(c.days.filter(Boolean).length/7*100)}));
     return {wk,label,lines};
   }).filter(w=>w.lines.length>0);
-  return {memos,doneTodos,totalTodos,todoPct,habitPct,avgSleep,allMemoTexts,wcByWeek};
+  const mk=`${y}-${pad(mo+1)}`;
+  const contentsList=getContents(mk);
+  const mealRecordDays=Object.keys(mealRecordDaySet).length;
+  const topMenus=Object.entries(menuFreq).sort((a,b)=>b[1]-a[1]).slice(0,3).map(e=>e[0]);
+  return {memos,doneTodos,totalTodos,todoPct,habitPct,avgSleep,allMemoTexts,onelineTexts,wcByWeek,contentsList,mealRecordDays,topMenus};
 }
 async function generateMonthlyReportAI(mk,stats){
   const key=getClaudeKey();
@@ -2385,13 +2399,15 @@ async function generateMonthlyReportAI(mk,stats){
     `습관 달성률 ${stats.habitPct}%`,
     stats.avgSleep?`평균 수면 ${stats.avgSleep}시간`:'수면 기록 없음',
     `메모 총 ${stats.memos}건`,
-    stats.allMemoTexts.length?`메모 내용 일부: ${stats.allMemoTexts.slice(0,15).join(' / ')}`:'',
-    stats.wcByWeek.length?`주간 다짐 현황: ${stats.wcByWeek.map(w=>w.lines.map(l=>`${l.text} ${l.pct}%`).join(', ')).join(' | ')}`:''
+    stats.onelineTexts.length?`하루 한 줄 기록:\n${stats.onelineTexts.slice(0,30).join('\n')}`:'',
+    stats.contentsList.length?`콘텐츠 기록: ${stats.contentsList.map(c=>`${c.title}(${c.cat}, ${c.status})`).join(', ')}`:'',
+    stats.mealRecordDays>0?`식사 기록 ${stats.mealRecordDays}일${stats.topMenus.length?` · 자주 먹은 메뉴: ${stats.topMenus.join(', ')}`:''}`:'',
+    stats.wcByWeek.length?`주간 미션 현황: ${stats.wcByWeek.map(w=>w.lines.map(l=>`${l.text} ${l.pct}%`).join(', ')).join(' | ')}`:''
   ].filter(Boolean).join('\n');
   const sys=`당신은 따뜻한 월간 회고 비서예요. 한 달 데이터를 보고 짧은 총평과 키워드를 만들어요.
 반드시 아래 JSON 형식으로만 응답해요. 다른 텍스트나 마크다운 코드블록 없이 순수 JSON만 출력해요.
 {"comment":"3-5문장의 한 달 총평, ~해요/이에요/어요체, 이모지 1개 정도","keywords":["키워드1","키워드2","키워드3","키워드4"]}
-키워드는 메모 내용에서 자주 등장하거나 인상적인 단어/장소/감정 위주로 2~5개 뽑아요.`;
+키워드는 하루 한 줄 기록과 메모 내용에서 자주 등장하거나 인상적인 단어/장소/감정 위주로 2~5개 뽑아요.`;
   const reply=await callClaude(sys,[{role:'user',content:dataContext}],500);
   if(!reply||reply.startsWith('__ERR__'))return null;
   try{
@@ -2431,14 +2447,25 @@ async function loadMonthlyReportContent(){
     <div class="mr-stat"><div class="v">${stats.avgSleep?stats.avgSleep+'h':'-'}</div><div class="l">평균 수면</div></div>
   </div>`;
   const wcHtml=stats.wcByWeek.length?`<div class="mr-card">
-    <div class="mr-sec-title">주간 다짐 모음 · 주차별</div>
+    <div class="mr-sec-title">주간 미션 모음 · 주차별</div>
     ${stats.wcByWeek.map(w=>`<div class="mr-week-anchor">
       <div class="mr-week-head"><span class="wk">${w.label}</span></div>
       ${w.lines.map(l=>`<div class="mr-wc-line"><span class="txt">${l.text}</span><span class="pct">${l.pct}%</span></div>`).join('')}
     </div>`).join('')}
-  </div>` : `<div class="mr-card"><div class="mr-sec-title">주간 다짐 모음 · 주차별</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:8px 0;">이 달엔 작성한 주간 다짐이 없어요</div></div>`;
+  </div>` : `<div class="mr-card"><div class="mr-sec-title">주간 미션 모음 · 주차별</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:8px 0;">이 달엔 작성한 주간 미션이 없어요</div></div>`;
 
-  el.innerHTML=`<div id="mr-ai-slot"></div>${statsHtml}${wcHtml}`;
+  const CAT_DOT={드라마:'rgba(255,210,225,.85)',책:'rgba(255,235,160,.85)',영화:'rgba(200,240,235,.85)',음악:'rgba(200,220,255,.85)'};
+  const contentsHtml=stats.contentsList.length?`<div class="mr-card">
+    <div class="mr-sec-title">콘텐츠 기록</div>
+    ${stats.contentsList.map(c=>`<div class="mr-wc-line"><span class="txt"><span style="display:inline-block;width:7px;height:7px;border-radius:2px;background:${CAT_DOT[c.cat]||'var(--tm)'};margin-right:6px;"></span>${c.title}</span><span class="pct" style="color:var(--tm);font-weight:400;">${c.status}</span></div>`).join('')}
+  </div>` : `<div class="mr-card"><div class="mr-sec-title">콘텐츠 기록</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:8px 0;">이 달엔 기록한 콘텐츠가 없어요</div></div>`;
+
+  const mealHtml=stats.mealRecordDays>0?`<div class="mr-card">
+    <div class="mr-sec-title">이번 달 식사</div>
+    <div style="font-size:13px;color:var(--tp);line-height:1.7;">이번 달 <b>${stats.mealRecordDays}일</b> 식사를 기록했어요.${stats.topMenus.length?`<br>자주 먹은 메뉴는 <b>${stats.topMenus.join(', ')}</b>예요.`:''}</div>
+  </div>` : '';
+
+  el.innerHTML=`<div id="mr-ai-slot"></div>${statsHtml}${wcHtml}${contentsHtml}${mealHtml}`;
   const slot=document.getElementById('mr-ai-slot');
 
   const now=new Date();
