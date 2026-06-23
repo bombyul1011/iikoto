@@ -2983,14 +2983,15 @@ async function syncMealsDown(dk){
   S.set(S.key('meals',dk),{breakfast:r.breakfast||'',lunch:r.lunch||'',dinner:r.dinner||'',snack:r.snack||''});
 }
 async function syncMealsUp(dk){
+  // 로컬이 pending(수정 대기) 상태로 호출되는 함수이므로 로컬을 그대로 진실로 push.
+  // 이전 로직은 local.field가 빈 문자열(=삭제)일 때 server값으로 OR 병합되어
+  // 삭제가 무시되고 되살아나는 버그가 있었음.
   const local=getMeals(dk);
-  const rows=await supaFetch(`meals?date_key=eq.${dk}`);
-  const server=(rows&&rows[0])?{breakfast:rows[0].breakfast||'',lunch:rows[0].lunch||'',dinner:rows[0].dinner||'',snack:rows[0].snack||''}:{breakfast:'',lunch:'',dinner:'',snack:''};
   const merged={
-    breakfast:local.breakfast||server.breakfast,
-    lunch:local.lunch||server.lunch,
-    dinner:local.dinner||server.dinner,
-    snack:local.snack||server.snack
+    breakfast:local.breakfast||'',
+    lunch:local.lunch||'',
+    dinner:local.dinner||'',
+    snack:local.snack||''
   };
   if(merged.breakfast||merged.lunch||merged.dinner||merged.snack){
     await supaUpsert('meals','date_key',[{date_key:dk,breakfast:merged.breakfast||null,lunch:merged.lunch||null,dinner:merged.dinner||null,snack:merged.snack||null,created:Date.now()}]);
