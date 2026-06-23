@@ -2295,7 +2295,7 @@ async function renderDiaryMonthSheet(){
       const isHoliday=dow===0||dow===6;
       const isToday=d===today;
       const text=getDailyOneLine(dk).trim();
-      rowsHtml+=`<div class="diary-row">
+      rowsHtml+=`<div class="diary-row"${isToday?' id="diary-today-row"':''}>
         <div class="diary-date-chip${isHoliday?' holiday':''}${isToday?' today':''}">${pad(d)}</div>
         <div class="diary-line-text${text?'':' empty'}">${text?text:'···'}</div>
       </div>`;
@@ -2304,7 +2304,12 @@ async function renderDiaryMonthSheet(){
     el.innerHTML=`<div style="font-family:'Comfortaa',sans-serif;font-weight:700;font-size:17px;color:var(--tp);margin-bottom:2px;">${mo+1}월의 하루한줄</div>
       <div style="font-size:11px;color:var(--tm);margin-bottom:14px;">${y}.${mo+1}</div>
       ${summaryHtml}
-      <div class="card" style="padding:2px 14px;">${rowsHtml}</div>`;
+      <div id="diary-month-list-scroll" style="max-height:330px;overflow-y:auto;">
+        <div class="card" style="padding:2px 14px;">${rowsHtml}</div>
+      </div>`;
+    const scrollEl=document.getElementById('diary-month-list-scroll');
+    const todayEl=document.getElementById('diary-today-row');
+    if(scrollEl&&todayEl)scrollEl.scrollTop=todayEl.offsetTop-4;
   }catch(e){
     console.warn('diary month sheet err:',e);
     el.innerHTML=`<div style="font-size:12px;color:var(--tm);text-align:center;padding:30px 0;">불러오지 못했어요, 다시 시도해주세요</div>`;
@@ -4255,11 +4260,12 @@ async function syncMonthRange(y,mo){
   const daysInMonth=new Date(y,mo+1,0).getDate();
   const start=`${y}-${pad(mo+1)}-01`;
   const end=`${y}-${pad(mo+1)}-${pad(daysInMonth)}`;
-  const [mRows,tRows,sRows,mlRows]=await Promise.all([
+  const [mRows,tRows,sRows,mlRows,hcRows]=await Promise.all([
     supaFetch(`memos?date_key=gte.${start}&date_key=lte.${end}&order=created`),
     supaFetch(`todos?date_key=gte.${start}&date_key=lte.${end}&order=created`),
     supaFetch(`sleep?date_key=gte.${start}&date_key=lte.${end}`),
-    supaFetch(`meals?date_key=gte.${start}&date_key=lte.${end}`)
+    supaFetch(`meals?date_key=gte.${start}&date_key=lte.${end}`),
+    supaFetch(`habit_checks?date_key=gte.${start}&date_key=lte.${end}`)
   ]);
   if(mRows){
     const byDate={};
@@ -4273,6 +4279,17 @@ async function syncMonthRange(y,mo){
   }
   if(sRows)sRows.forEach(r=>S.set(S.key('sleep',r.date_key),{sleep:r.sleep_time,wake:r.wake_time}));
   if(mlRows)mlRows.forEach(r=>{if(!S.get(S.key('meals_pending',r.date_key)))S.set(S.key('meals',r.date_key),{breakfast:r.breakfast||'',lunch:r.lunch||'',dinner:r.dinner||'',snack:r.snack||''});});
+  if(hcRows){
+    const byWeek={};
+    hcRows.forEach(r=>{
+      const d=new Date(r.date_key);const wk=weekKey(d);const dow=(d.getDay()+6)%7;
+      (byWeek[wk]=byWeek[wk]||{})[`${r.habit_name}-${dow}`]=true;
+    });
+    Object.keys(byWeek).forEach(wk=>{
+      const merged=Object.assign({},getHabitChecks(wk),byWeek[wk]);
+      S.set(S.key('hc',wk),merged);
+    });
+  }
   return true;
 }
 function calShiftMonth(n){
@@ -5527,6 +5544,8 @@ async function initSync(){
     if(S.get('quote_pending_'+q.cid))await syncQuoteUp(q.cid);
   }
   await syncHCDown(wk);
+  await syncGoalDown(S.key('mgoal',monthKey(new Date())));
+  await syncMonthRange(new Date().getFullYear(),new Date().getMonth());
   // 콘텐츠 — pending 있으면 Up 먼저, 없으면 Down
   var mk0=monthKey(new Date());
   if(S.get(S.key('contents_pending',mk0))){
