@@ -593,6 +593,26 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="glass"] .quote-chip-inner{background:rgba(253,251,245,0.95);}
 [data-theme="dark"] .quote-chip-inner{background:#1a1628;color:#e8b8d0;}
 .report-banner.quote-soft{background:linear-gradient(135deg,rgba(195,180,250,0.95),rgba(255,195,220,0.90),rgba(180,205,250,0.92),rgba(195,180,250,0.95));}
+.report-banner.diary-soft{background:linear-gradient(135deg,rgba(245,222,170,0.95),rgba(255,205,210,0.90),rgba(248,230,190,0.92),rgba(245,222,170,0.95));}
+.report-banner.diary-soft .report-banner-inner{background:linear-gradient(135deg,rgba(252,240,215,0.88),rgba(255,232,225,0.85),rgba(252,240,215,0.88));}
+.report-banner.diary-soft .report-banner-line{color:rgba(180,110,90,0.85);}
+.report-banner.diary-soft .rb-title{color:rgba(180,110,90,0.95);}
+.report-banner.diary-soft .report-banner-arrow{color:rgba(180,110,90,0.55);}
+[data-theme="glass"] .report-banner.diary-soft .report-banner-inner{background:rgba(253,251,245,0.95);}
+[data-theme="dark"] .report-banner.diary-soft .report-banner-inner{background:linear-gradient(135deg,rgba(60,50,25,0.92),rgba(60,35,35,0.92));}
+/* 월간 하루한줄 모아보기 */
+.diary-month-summary{border-radius:16px;padding:12px 15px;margin-bottom:16px;background:linear-gradient(120deg,rgba(255,210,230,0.55),rgba(255,230,200,0.45));border:1px solid rgba(255,185,205,0.55);box-shadow:0 2px 10px rgba(200,120,140,0.10);}
+.diary-month-summary-label{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;color:var(--acc);letter-spacing:.03em;margin-bottom:6px;}
+.diary-month-summary-text{font-size:13px;color:var(--tp);line-height:1.55;}
+.diary-row{display:flex;align-items:baseline;gap:9px;padding:9px 2px;border-bottom:1px dashed var(--div);}
+.diary-row:last-child{border-bottom:none;}
+.diary-date-chip{flex-shrink:0;font-size:12px;font-weight:500;color:var(--ts);border-radius:8px;padding:3px 7px;min-width:30px;text-align:center;border:1px solid transparent;}
+.diary-date-chip.holiday{color:#c2638a;}
+.diary-date-chip.today{background:rgba(255,160,180,.16);border-color:rgba(255,140,160,.38);color:var(--acc);font-weight:600;}
+[data-theme="glass"] .diary-date-chip.today{background:rgba(232,164,187,0.18);border-color:rgba(232,164,187,0.40);color:#c97a96;}
+[data-theme="dark"] .diary-date-chip.today{background:rgba(255,126,179,0.18);border-color:rgba(255,126,179,0.40);color:#ff9ec8;}
+.diary-line-text{flex:1;font-size:13.5px;color:var(--tp);line-height:1.5;}
+.diary-line-text.empty{color:var(--tm);font-size:12px;font-style:italic;letter-spacing:2px;}
 .rd-quote-inp{width:100%;background:var(--inp);border:1px solid var(--inp-b);border-radius:12px;padding:12px 14px;outline:none;resize:none;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--tp);line-height:1.6;}
 .rd-quote-item{position:relative;background:rgba(255,250,245,0.5);border-left:2.5px solid rgba(195,170,235,0.55);border-radius:0 10px 10px 0;padding:9px 12px 9px 14px;margin-top:8px;}
 .rd-quote-more{font-size:11px;color:var(--tm);text-align:center;padding:8px 0 2px;cursor:pointer;}
@@ -1012,6 +1032,12 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="slabel">해빗 모아보기</div>
       <div class="card m"><div id="habit-monthly"></div></div>
       <div id="monthly-stat-bar"></div>
+      <div class="report-banner diary-soft" onclick="openDiaryMonthSheet()">
+        <div class="report-banner-inner">
+          <div class="report-banner-line">✦ <span class="rb-title" id="diary-banner-month-lbl">6월의 하루한줄</span> · <span id="diary-banner-count">23</span>일째 기록 중</div>
+          <div class="report-banner-arrow">›</div>
+        </div>
+      </div>
       <div class="report-banner" onclick="openMonthlyReportSheet()">
         <div class="report-banner-inner">
           <div class="report-banner-line">🌿 <span class="rb-title" id="report-banner-month-lbl">6월 리포트</span> · 이번 달 전체 기록 모아보기</div>
@@ -1118,6 +1144,16 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div style="padding:0 20px 24px;">
       <div class="month-chips" id="mr-month-chips"></div>
       <div id="mr-content"></div>
+    </div>
+  </div>
+</div>
+
+<!-- DIARY MONTH SHEET (하루한줄 모아보기) -->
+<div class="overlay" id="diary-month-sheet" onclick="closeSheet('diary-month-sheet',event)">
+  <div class="bsheet" style="max-height:85vh;overflow-y:auto;" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div style="padding:0 20px 24px;">
+      <div id="diary-month-content"></div>
     </div>
   </div>
 </div>
@@ -2203,6 +2239,95 @@ let _reportMonth=new Date().getMonth();
 function updateReportBannerLabel(){
   const el=document.getElementById('report-banner-month-lbl');if(!el)return;
   el.textContent=(new Date().getMonth()+1)+'월 리포트';
+}
+// ── DIARY MONTH (하루한줄 모아보기)
+function updateDiaryBannerLabel(){
+  const lblEl=document.getElementById('diary-banner-month-lbl');
+  const cntEl=document.getElementById('diary-banner-count');
+  if(!lblEl||!cntEl)return;
+  const now=new Date();
+  lblEl.textContent=(now.getMonth()+1)+'월의 하루한줄';
+  const y=now.getFullYear(),mo=now.getMonth(),today=now.getDate();
+  let cnt=0;
+  for(let d=1;d<=today;d++){
+    const dk=`${y}-${pad(mo+1)}-${pad(d)}`;
+    if((S.get(S.key('oneline',dk))||'').trim())cnt++;
+  }
+  cntEl.textContent=cnt;
+}
+async function syncOnelineMonthRange(y,mo){
+  if(!navigator.onLine)return false;
+  const start=`${y}-${pad(mo+1)}-01`;
+  const daysInMonth=new Date(y,mo+1,0).getDate();
+  const end=`${y}-${pad(mo+1)}-${pad(daysInMonth)}`;
+  const rows=await supaFetch(`goal_notes?note_key=gte.oneline:${start}&note_key=lte.oneline:${end}`);
+  if(!rows)return false;
+  rows.forEach(r=>{
+    const dk=r.note_key.replace('oneline:','');
+    if(!S.get(S.key('oneline_pending',dk))&&typeof r.lines==='string')S.set(S.key('oneline',dk),r.lines);
+  });
+  return true;
+}
+async function openDiaryMonthSheet(){
+  openSheet('diary-month-sheet');
+  await renderDiaryMonthSheet();
+}
+async function renderDiaryMonthSheet(){
+  const el=document.getElementById('diary-month-content');if(!el)return;
+  const now=new Date();
+  const y=now.getFullYear(),mo=now.getMonth(),today=now.getDate();
+  const mk=`${y}-${pad(mo+1)}`;
+  const daysInMonth=new Date(y,mo+1,0).getDate();
+  await syncOnelineMonthRange(y,mo);
+  let rowsHtml='';
+  for(let d=1;d<=daysInMonth;d++){
+    const dk=`${y}-${pad(mo+1)}-${pad(d)}`;
+    const date=new Date(y,mo,d);
+    const dow=date.getDay();
+    const isHoliday=dow===0||dow===6;
+    const isToday=d===today;
+    const text=(S.get(S.key('oneline',dk))||'').trim();
+    rowsHtml+=`<div class="diary-row">
+      <div class="diary-date-chip${isHoliday?' holiday':''}${isToday?' today':''}">${pad(d)}</div>
+      <div class="diary-line-text${text?'':' empty'}">${text?text:'···'}</div>
+    </div>`;
+  }
+  const summaryHtml=await buildDiaryMonthSummaryHtml(y,mo,today,daysInMonth,mk);
+  el.innerHTML=`<div style="font-family:'Comfortaa',sans-serif;font-weight:700;font-size:17px;color:var(--tp);margin-bottom:2px;">${mo+1}월의 하루한줄</div>
+    <div style="font-size:11px;color:var(--tm);margin-bottom:14px;">${y}.${mo+1}</div>
+    ${summaryHtml}
+    <div class="card" style="padding:2px 14px;">${rowsHtml}</div>`;
+}
+async function buildDiaryMonthSummaryHtml(y,mo,today,daysInMonth,mk){
+  const isCurrentMonth=(y===new Date().getFullYear()&&mo===new Date().getMonth());
+  const showFrom=daysInMonth-3;
+  if(isCurrentMonth&&today<showFrom){
+    return `<div class="diary-month-summary"><div class="diary-month-summary-label">✦ 이번 달 한눈에</div><div class="diary-month-summary-text" style="color:var(--tm);">이번달 한줄기록도 열심히 남겨보아요</div></div>`;
+  }
+  const cacheKey='diary_month_summary_'+mk;
+  let summary=S.get(cacheKey);
+  if(!summary&&navigator.onLine){
+    const lines=[];
+    for(let d=1;d<=daysInMonth;d++){
+      const dk=`${y}-${pad(mo+1)}-${pad(d)}`;
+      const t=(S.get(S.key('oneline',dk))||'').trim();
+      if(t)lines.push(t);
+    }
+    if(lines.length>=2){
+      summary=await generateDiaryMonthSummaryAI(mo+1,lines);
+      if(summary)S.set(cacheKey,summary);
+    }
+  }
+  if(!summary)return `<div class="diary-month-summary"><div class="diary-month-summary-label">✦ 이번 달 한눈에</div><div class="diary-month-summary-text" style="color:var(--tm);">아직 모아볼 기록이 부족해요</div></div>`;
+  return `<div class="diary-month-summary"><div class="diary-month-summary-label">✦ 이번 달 한눈에</div><div class="diary-month-summary-text">${summary}</div></div>`;
+}
+async function generateDiaryMonthSummaryAI(monthNum,lines){
+  const key=getClaudeKey();
+  if(!key)return null;
+  const sys=`당신은 따뜻한 일기 정리 비서예요. 사용자가 하루에 한 줄씩 적은 기록 ${lines.length}개를 보고, 그 달을 돌아보는 2~3문장의 짧은 코멘트를 정중한 존댓말(~해요/이에요체)로 작성해요. 과장하지 말고 담담하게, 다이어리를 들춰보는 듯한 따뜻한 톤으로 써주세요. 다른 설명 없이 코멘트 텍스트만 반환하세요.`;
+  const reply=await callClaude(sys,[{role:'user',content:lines.join('\n')}],300);
+  if(!reply||reply.startsWith('__ERR__'))return null;
+  return reply.trim();
 }
 function computeMonthStats(y,mo){
   const dim=new Date(y,mo+1,0).getDate();
@@ -4436,6 +4561,7 @@ function loadMonthly(){
   updateMonthlyGoalTitle();
   renderCalendar();renderMonthlyStatBar();
   updateReportBannerLabel();
+  updateDiaryBannerLabel();
   const sy=_calYear,smo=_calMonth;
   syncMonthRange(sy,smo).then(fetched=>{
     if(fetched&&_calYear===sy&&_calMonth===smo){
