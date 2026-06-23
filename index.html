@@ -108,6 +108,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .nav-arr{width:26px;height:26px;background:var(--card);border:1px solid var(--card-b);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
 .nav-arr:active{opacity:.7;}
 .icon-btn{width:30px;height:30px;background:var(--card);border:1px solid var(--card-b);border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+.reading-icon-btn{background:linear-gradient(120deg,rgba(255,210,230,0.80),rgba(255,230,200,0.70));border:1px solid rgba(255,185,205,0.55);box-shadow:0 2px 10px rgba(200,120,140,0.12);}
 .icon-btn:active{opacity:.7;}
 
 /* ── TABS ── */
@@ -510,6 +511,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="dark"] .nav-arr,[data-theme="dark"] .icon-btn{background:rgba(255,255,255,0.07);border-color:rgba(255,255,255,0.12);}
 [data-theme="dark"] .slabel{color:#7868b0;}
 [data-theme="dark"] .goal-section-title{background:rgba(255,126,179,0.20);color:#ff9ec8;border-color:rgba(255,126,179,0.35);}
+[data-theme="dark"] .reading-icon-btn{background:rgba(255,126,179,0.20);border-color:rgba(255,126,179,0.35);}
 [data-theme="dark"] .goal-inp{color:#f0ecff;border-bottom-color:rgba(255,126,179,0.28);}
 [data-theme="dark"] .card{box-shadow:0 4px 24px rgba(0,0,20,0.50),inset 0 1px 0 rgba(255,255,255,0.07);}
 [data-theme="dark"] .card.y{background:rgba(255,209,102,0.08);border-color:rgba(255,209,102,0.16);}
@@ -606,21 +608,22 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .reading-ov{position:fixed;inset:0;z-index:8000;background:var(--bg);display:none;flex-direction:column;overflow-y:auto;transform:translateX(100%);transition:transform .3s cubic-bezier(.32,.72,0,1);}
 .reading-ov.on{display:flex;transform:translateX(0);}
 .reading-body{padding:16px 18px 30px;display:flex;flex-direction:column;gap:18px;}
-.rd-top{position:relative;border-radius:20px;padding:1.8px;background:linear-gradient(120deg,rgba(255,170,200,0.95),rgba(255,205,140,0.92),rgba(160,210,255,0.92),rgba(170,235,200,0.92),rgba(255,170,200,0.95));background-size:300% 300%;animation:bannerShine 10s ease infinite;}
-.rd-top-inner{border-radius:18.5px;background:linear-gradient(160deg,#fff3ec,#fef7ef);padding:16px 16px 18px;box-shadow:0 2px 2px rgba(255,255,255,0.7) inset,0 -10px 18px -14px rgba(0,0,0,0.10) inset,0 6px 20px rgba(120,100,90,0.14);}
+.rd-top{position:relative;border-radius:20px;padding:1.8px;background:linear-gradient(120deg,rgba(255,170,200,0.95),rgba(255,205,140,0.92),rgba(195,200,245,0.65),rgba(170,235,200,0.92),rgba(255,170,200,0.95));background-size:300% 300%;animation:bannerShine 10s ease infinite;}
+.rd-top-inner{border-radius:18.5px;background:linear-gradient(135deg,#fdeee8,#fdf3e2);padding:16px 16px 18px;box-shadow:0 2px 2px rgba(255,255,255,0.7) inset,0 -10px 18px -14px rgba(0,0,0,0.10) inset,0 6px 20px rgba(120,100,90,0.14);}
 .rd-top-main{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
 .rd-top-cover{width:62px;height:93px;border-radius:10px;object-fit:cover;flex-shrink:0;box-shadow:0 3px 10px rgba(0,0,0,0.18);}
 .rd-top-cover-empty{width:62px;height:93px;border-radius:10px;flex-shrink:0;border:1.4px dashed var(--card-b);}
 .rd-top-info{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;}
 .rd-top-title{font-size:14.5px;font-weight:600;color:var(--tp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .rd-top-author{font-size:11px;color:var(--tm);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.rd-top-sw{display:flex;align-items:center;gap:6px;flex-shrink:0;}
-.rd-sw-ring-wrap{position:relative;width:54px;height:54px;flex-shrink:0;}
-.rd-sw-ring-wrap svg{transform:rotate(-90deg);transform-origin:50% 50%;}
-.rd-sw-ring-wrap.spinning svg{animation:rdSpin 2.6s linear infinite;}
-.rd-sw-time{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:500;color:var(--tp);font-family:'DM Sans',sans-serif;}
-.rd-sw-label{font-size:11px;color:var(--ts);flex:1;}
-.rd-sw-btn{width:40px;height:40px;border-radius:50%;border:none;background:var(--acc);color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-left:-4px;}
+.rd-top-sw{display:flex;align-items:center;flex-shrink:0;}
+.rd-sw-ring-wrap{position:relative;width:76px;height:76px;flex-shrink:0;cursor:pointer;}
+.rd-sw-ring-svg{transform:rotate(-90deg);transform-origin:50% 50%;position:relative;z-index:1;}
+.rd-sw-ring-wrap.spinning .rd-sw-ring-svg{animation:rdSpin 2.6s linear infinite;}
+.rd-sw-bg{position:absolute;inset:8px;border-radius:50%;background:rgba(255,255,255,0.55);}
+.rd-sw-ring-wrap.spinning .rd-sw-bg{background:linear-gradient(135deg,#ffd1e2,#ffe6b8,#bdeed0,#c7d8ff,#ffd1e2);background-size:300% 300%;animation:bannerShine 3s ease infinite;}
+.rd-sw-face{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#6a4458;z-index:2;}
+.rd-sw-time{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#6a4458;font-family:'DM Sans',sans-serif;z-index:2;}
 .rd-progress-bar{width:100%;height:9px;border-radius:5px;background:var(--div);overflow:hidden;margin-bottom:7px;position:relative;cursor:pointer;}
 .rd-progress-fill{position:absolute;left:0;top:0;height:100%;border-radius:5px;background:linear-gradient(90deg,#ffb0c8,#ffd28a,#9fd8ff);transition:width .4s ease;}
 .rd-progress-today{position:absolute;top:0;height:100%;background:linear-gradient(90deg,#ff7eb3,#ff9ec0);transition:left .4s ease,width .4s ease;}
@@ -906,14 +909,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" style="color:var(--tm)"><polyline points="3.5,1.5 7,5 3.5,8.5"/></svg>
           </div>
         </div>
-        <div class="icon-btn" onclick="openReading()">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--tm)"><path d="M7 2.8C5.7 2 3.6 1.7 2 2v8.3c1.6-.3 3.7 0 5 .8M7 2.8C8.3 2 10.4 1.7 12 2v8.3c-1.6-.3-3.7 0-5 .8M7 2.8v8.3"/></svg>
-        </div>
         <div class="icon-btn" onclick="openSettings()">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--tm)"><circle cx="7" cy="7" r="1.8"/><path d="M7 2.5V3.5M7 10.5V11.5M2.5 7H3.5M10.5 7H11.5M4 4L4.7 4.7M9.3 9.3L10 10M4 10L4.7 9.3M9.3 4.7L10 4"/></svg>
         </div>
         <div class="icon-btn" onclick="openSearch()">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--tm)"><circle cx="6" cy="6" r="4.5"/><line x1="9.5" y1="9.5" x2="12.5" y2="12.5"/></svg>
+        </div>
+        <div class="icon-btn reading-icon-btn" onclick="openReading()">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" style="color:#a8527a"><path d="M7 2.8C5.7 2 3.6 1.7 2 2v8.3c1.6-.3 3.7 0 5 .8M7 2.8C8.3 2 10.4 1.7 12 2v8.3c-1.6-.3-3.7 0-5 .8M7 2.8v8.3"/></svg>
         </div>
       </div>
     </div>
@@ -4748,7 +4751,7 @@ function closeSettings(){document.getElementById('settings-ov').classList.remove
 let _rdTab='reading';
 let _rdOpenCid=null;
 let _swSeconds=0,_swRunning=false,_swInterval=null;
-const RD_SW_C=2*Math.PI*22;
+const RD_SW_C=2*Math.PI*32;
 function backfillReadingLinks(){
   const now=new Date();
   for(let i=0;i<6;i++){
@@ -4777,8 +4780,9 @@ function renderReadingHub(){
   renderBookList();
 }
 function swRingSvg(){
-  return `<div class="rd-sw-ring-wrap" id="rd-sw-ring-wrap">
-    <svg width="54" height="54" viewBox="0 0 54 54">
+  return `<div class="rd-sw-ring-wrap" id="rd-sw-ring-wrap" onclick="toggleStopwatch()">
+    <div class="rd-sw-bg"></div>
+    <svg class="rd-sw-ring-svg" width="76" height="76" viewBox="0 0 76 76">
       <defs>
         <linearGradient id="rdSwGrad" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stop-color="#ff9ec0"/>
@@ -4787,15 +4791,12 @@ function swRingSvg(){
           <stop offset="100%" stop-color="#9cc8ff"/>
         </linearGradient>
       </defs>
-      <circle cx="27" cy="27" r="22" fill="none" stroke="var(--div)" stroke-width="4.5"/>
-      <circle id="rd-sw-ring" cx="27" cy="27" r="22" fill="none" stroke="url(#rdSwGrad)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="${RD_SW_C}" stroke-dashoffset="${RD_SW_C}"/>
+      <circle cx="38" cy="38" r="32" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="4.5"/>
+      <circle id="rd-sw-ring" cx="38" cy="38" r="32" fill="none" stroke="url(#rdSwGrad)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="${RD_SW_C}" stroke-dashoffset="${RD_SW_C}"/>
     </svg>
-    <div class="rd-sw-time" id="rd-sw-time">00:00</div>
-  </div>
-  <button class="rd-sw-btn" id="rd-sw-btn" onclick="toggleStopwatch()">
-    <svg id="rd-sw-icon" width="14" height="14" viewBox="0 0 15 15" fill="white"><polygon points="3,2 13,7.5 3,13"/></svg>
-  </button>
-  <div class="rd-sw-label" id="rd-sw-label" style="display:none;"></div>`;
+    <div class="rd-sw-face" id="rd-sw-face">시작</div>
+    <div class="rd-sw-time" id="rd-sw-time" style="display:none;">00:00</div>
+  </div>`;
 }
 function renderRdTop(){
   const el=document.getElementById('rd-top');if(!el)return;
@@ -5040,14 +5041,14 @@ function confirmProgress(){
   renderReadingHub();
 }
 function toggleStopwatch(){
-  const icon=document.getElementById('rd-sw-icon');
   const wrap=document.getElementById('rd-sw-ring-wrap');
-  const label=document.getElementById('rd-sw-label');
+  const face=document.getElementById('rd-sw-face');
+  const timeEl=document.getElementById('rd-sw-time');
   if(!_swRunning){
     _swRunning=true;
-    icon.innerHTML='<rect x="2" y="2" width="4" height="11" rx="1"/><rect x="9" y="2" width="4" height="11" rx="1"/>';
     wrap.classList.add('spinning');
-    label.textContent='측정 중이에요';
+    face.style.display='none';
+    timeEl.style.display='block';
     _swInterval=setInterval(()=>{
       _swSeconds++;
       const m=Math.floor(_swSeconds/60),s=_swSeconds%60;
@@ -5058,9 +5059,9 @@ function toggleStopwatch(){
     },1000);
   }else{
     _swRunning=false;
-    icon.innerHTML='<polygon points="3,2 13,7.5 3,13"/>';
     wrap.classList.remove('spinning');
-    label.textContent='독서 시간을 재볼까요?';
+    face.style.display='';
+    timeEl.style.display='none';
     clearInterval(_swInterval);
     document.getElementById('rd-sw-time').textContent='00:00';
     document.getElementById('rd-sw-ring').setAttribute('stroke-dashoffset',RD_SW_C);
