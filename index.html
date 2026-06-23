@@ -168,8 +168,12 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .quote-soft{filter:saturate(0.78) brightness(1.02);}
 .report-banner-arrow{font-size:17px;color:rgba(80,130,85,0.55);flex-shrink:0;}
 [data-theme="dark"] .report-banner-inner{background:linear-gradient(135deg,rgba(30,60,40,0.92),rgba(60,55,15,0.92),rgba(30,58,38,0.92));}
-.meal-row{display:flex;align-items:center;gap:10px;padding:8px 2px;}
+.meal-row{display:flex;align-items:center;gap:8px;padding:8px 2px;}
 .meal-cat{width:38px;flex-shrink:0;font-size:12px;color:var(--tm);}
+.meal-time-inp{width:74px;flex-shrink:0;background:none;border:none;border-bottom:1px dashed rgba(195,175,168,0.38);outline:none;font-family:'DM Sans',sans-serif;font-size:11.5px;color:var(--ts);padding:5px 2px 4px;text-align:right;}
+.meal-time-btn{flex-shrink:0;width:20px;height:20px;border-radius:50%;border:1.2px solid rgba(160,190,140,0.55);background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgba(95,140,75,0.75);padding:0;}
+.meal-time-btn:active{background:rgba(190,230,205,0.30);}
+.meal-time-tag{font-size:10.5px;color:rgba(95,140,75,0.85);font-weight:600;flex-shrink:0;}
 .meal-inp{flex:1;background:none;border:none;border-bottom:1px dashed rgba(195,175,168,0.38);outline:none;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--tp);padding:5px 2px 4px;}
 .week-meal-day{margin-bottom:14px;}
 .week-meal-day-label{font-size:11.5px;font-weight:700;color:var(--ts);margin-bottom:4px;}
@@ -3152,7 +3156,7 @@ async function syncMealsDown(dk){
   if(!rows)return;
   if(!rows.length)return;
   const r=rows[0];
-  S.set(S.key('meals',dk),{breakfast:r.breakfast||'',lunch:r.lunch||'',dinner:r.dinner||'',snack:r.snack||''});
+  S.set(S.key('meals',dk),{breakfast:r.breakfast||'',lunch:r.lunch||'',dinner:r.dinner||'',snack:r.snack||'',breakfast_time:r.breakfast_time||'',lunch_time:r.lunch_time||'',dinner_time:r.dinner_time||'',snack_time:r.snack_time||''});
 }
 async function syncMealsUp(dk){
   // 로컬이 pending(수정 대기) 상태로 호출되는 함수이므로 로컬을 그대로 진실로 push.
@@ -3163,10 +3167,14 @@ async function syncMealsUp(dk){
     breakfast:local.breakfast||'',
     lunch:local.lunch||'',
     dinner:local.dinner||'',
-    snack:local.snack||''
+    snack:local.snack||'',
+    breakfast_time:local.breakfast_time||'',
+    lunch_time:local.lunch_time||'',
+    dinner_time:local.dinner_time||'',
+    snack_time:local.snack_time||''
   };
   if(merged.breakfast||merged.lunch||merged.dinner||merged.snack){
-    await supaUpsert('meals','date_key',[{date_key:dk,breakfast:merged.breakfast||null,lunch:merged.lunch||null,dinner:merged.dinner||null,snack:merged.snack||null,created:Date.now()}]);
+    await supaUpsert('meals','date_key',[{date_key:dk,breakfast:merged.breakfast||null,lunch:merged.lunch||null,dinner:merged.dinner||null,snack:merged.snack||null,breakfast_time:merged.breakfast_time||null,lunch_time:merged.lunch_time||null,dinner_time:merged.dinner_time||null,snack_time:merged.snack_time||null,created:Date.now()}]);
   }else{
     await supaFetch(`meals?date_key=eq.${dk}`,'DELETE');
   }
@@ -4281,7 +4289,7 @@ async function syncMonthRange(y,mo){
     Object.keys(byDate).forEach(dk=>{if(!S.get(S.key('todos_pending',dk)))S.set(S.key('todos',dk),byDate[dk]);});
   }
   if(sRows)sRows.forEach(r=>S.set(S.key('sleep',r.date_key),{sleep:r.sleep_time,wake:r.wake_time}));
-  if(mlRows)mlRows.forEach(r=>{if(!S.get(S.key('meals_pending',r.date_key)))S.set(S.key('meals',r.date_key),{breakfast:r.breakfast||'',lunch:r.lunch||'',dinner:r.dinner||'',snack:r.snack||''});});
+  if(mlRows)mlRows.forEach(r=>{if(!S.get(S.key('meals_pending',r.date_key)))S.set(S.key('meals',r.date_key),{breakfast:r.breakfast||'',lunch:r.lunch||'',dinner:r.dinner||'',snack:r.snack||'',breakfast_time:r.breakfast_time||'',lunch_time:r.lunch_time||'',dinner_time:r.dinner_time||'',snack_time:r.snack_time||''});});
   if(hcRows){
     const byWeek={};
     hcRows.forEach(r=>{
@@ -4604,9 +4612,20 @@ function renderTodayMeal(){
   const MEAL_LABELS={breakfast:'아침',lunch:'점심',dinner:'저녁',snack:'간식'};
   let html='';
   ['breakfast','lunch','dinner','snack'].forEach(k=>{
-    if(m[k])html+=`<div class="cal-detail-row"><span class="cal-detail-time">${MEAL_LABELS[k]}</span><span class="cal-detail-text">${m[k]}</span></div>`;
+    if(m[k]){
+      const t=m[k+'_time'];
+      const timeHtml=t?`<span class="meal-time-tag">${t}</span>`:`<button class="meal-time-btn" onclick="recordMealTime('${dk}','${k}')" title="식사 시간 기록"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 1.2l1 2.2 2.4.3-1.8 1.6.5 2.4L5 6.4 3 7.7l.5-2.4-1.8-1.6 2.4-.3z"/></svg></button>`;
+      html+=`<div class="cal-detail-row"><span class="cal-detail-time">${MEAL_LABELS[k]}</span><span class="cal-detail-text" style="flex:1;">${m[k]}</span>${timeHtml}</div>`;
+    }
   });
   el.innerHTML=html||'<div style="font-size:12px;color:var(--tm);text-align:center;padding:8px 0;">주간 메뉴판에서 적어보세요</div>';
+}
+function recordMealTime(dk,k){
+  const m=getMeals(dk);
+  const now=new Date();
+  m[k+'_time']=`${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  saveMealsData(dk,m);
+  renderTodayMeal();
 }
 function loadDaily(){
   loadSleep();renderTodos();renderMemos();renderTodayMeal();
@@ -4693,7 +4712,12 @@ function placeWish(el){
 function saveOneMealDay(dk){
   const CATS=['breakfast','lunch','dinner','snack'];
   const m={};
-  CATS.forEach(k=>{const el=document.getElementById(`wm-${dk}-${k}`);m[k]=el?el.value.trim():'';});
+  CATS.forEach(k=>{
+    const el=document.getElementById(`wm-${dk}-${k}`);
+    const tEl=document.getElementById(`wm-${dk}-${k}-time`);
+    m[k]=el?el.value.trim():'';
+    m[k+'_time']=tEl?tEl.value:'';
+  });
   saveMealsData(dk,m);
 }
 function openWeekMealSheet(){
@@ -4711,7 +4735,7 @@ function openWeekMealSheet(){
     const m=getMeals(dk);
     const block=document.createElement('div');block.className='week-meal-day';block.id='wm-block-'+dk;
     block.innerHTML=`<div class="week-meal-day-label">${DOW[i]} · ${d.getMonth()+1}/${d.getDate()}</div>`+
-      CATS.map(([k,label])=>`<div class="meal-row"><div class="meal-cat">${label}</div><input class="meal-inp" id="wm-${dk}-${k}" type="text" placeholder="메뉴 입력" autocomplete="off" value="${(m[k]||'').replace(/"/g,'&quot;')}" onblur="saveOneMealDay('${dk}')"></div>`).join('');
+      CATS.map(([k,label])=>`<div class="meal-row"><div class="meal-cat">${label}</div><input class="meal-inp" style="flex:1 1 0;min-width:0;" id="wm-${dk}-${k}" type="text" placeholder="메뉴 입력" autocomplete="off" value="${(m[k]||'').replace(/"/g,'&quot;')}" onblur="saveOneMealDay('${dk}')"><input class="meal-time-inp" id="wm-${dk}-${k}-time" type="time" value="${m[k+'_time']||''}" onchange="saveOneMealDay('${dk}')"></div>`).join('');
     body.appendChild(block);
   }
   openSheet('week-meal-sheet');
@@ -4731,7 +4755,12 @@ function saveWeekMealSheet(){
     const d=new Date(mon);d.setDate(mon.getDate()+i);
     const dk=dateKey(d);
     const m={};
-    CATS.forEach(k=>{const el=document.getElementById(`wm-${dk}-${k}`);m[k]=el?el.value.trim():'';});
+    CATS.forEach(k=>{
+      const el=document.getElementById(`wm-${dk}-${k}`);
+      const tEl=document.getElementById(`wm-${dk}-${k}-time`);
+      m[k]=el?el.value.trim():'';
+      m[k+'_time']=tEl?tEl.value:'';
+    });
     saveMealsData(dk,m);
   }
   closeSheet('week-meal-sheet');
@@ -5443,7 +5472,7 @@ async function forceRestoreDate(dk){
   }
   var mlrows=await supaFetch('meals?date_key=eq.'+dk);
   if(mlrows&&mlrows.length>0){
-    S.set(S.key('meals',dk),{breakfast:mlrows[0].breakfast||'',lunch:mlrows[0].lunch||'',dinner:mlrows[0].dinner||'',snack:mlrows[0].snack||''});
+    S.set(S.key('meals',dk),{breakfast:mlrows[0].breakfast||'',lunch:mlrows[0].lunch||'',dinner:mlrows[0].dinner||'',snack:mlrows[0].snack||'',breakfast_time:mlrows[0].breakfast_time||'',lunch_time:mlrows[0].lunch_time||'',dinner_time:mlrows[0].dinner_time||'',snack_time:mlrows[0].snack_time||''});
   }
 }
 async function forceRestoreAll(){
