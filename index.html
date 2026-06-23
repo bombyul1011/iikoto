@@ -2091,7 +2091,12 @@ async function makeScheduleCard(section){
 
   try{
     const now=new Date();
-    const dk=dateKey(now);
+    // 자정~새벽(아직 잠들기 전, night_2 시간대)에는 달력 날짜가 이미 넘어가있어도
+    // "오늘"을 전날 밤 기준으로 잡아야 함. 안 그러면 "오늘"이 실제로는 다음날이 되고
+    // "내일"이 모레가 되어버림.
+    const refDate=new Date(now);
+    if(now.getHours()<6)refDate.setDate(refDate.getDate()-1);
+    const dk=dateKey(refDate);
     const todos=getTodos(dk);
     const currentHour=now.getHours();
     const key=getClaudeKey();
@@ -2201,10 +2206,10 @@ ${commonRules}`;
 ${commonRules}`;
       }
       // 내일 투두 수집
-      const tom=new Date(now);tom.setDate(now.getDate()+1);
+      const tom=new Date(refDate);tom.setDate(refDate.getDate()+1);
       const tomTodos=getTodos(dateKey(tom));
       dataContext=[
-        `오늘은 ${_HOME_DAYS[now.getDay()]}요일, 내일은 ${_HOME_DAYS[tom.getDay()]}요일이에요.`,
+        `오늘은 ${_HOME_DAYS[refDate.getDay()]}요일, 내일은 ${_HOME_DAYS[tom.getDay()]}요일이에요.`,
         todoLine(morningTodos,'오늘 오전'),
         todoLine(afternoonTodos,'오늘 오후'),
         todoLine(nightTodos,'오늘 저녁'),
