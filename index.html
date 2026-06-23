@@ -5006,7 +5006,7 @@ function toggleStopwatch(){
     _swRunning=true;
     wrap.classList.add('spinning');
     face.style.display='none';
-    timeEl.style.display='block';
+    timeEl.style.display='flex';
     _swInterval=setInterval(()=>{
       _swSeconds++;
       const m=Math.floor(_swSeconds/60),s=_swSeconds%60;
