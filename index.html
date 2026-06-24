@@ -265,18 +265,21 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .add-btn{display:flex;align-items:center;gap:7px;padding:8px 11px;background:rgba(255,255,255,.30);border:1.5px dashed rgba(200,170,160,.40);border-radius:11px;color:var(--tm);font-size:12px;cursor:pointer;margin-top:8px;width:100%;font-family:'DM Sans',sans-serif;}
 
 /* ── MEMO ── */
-.memo-item{display:flex;gap:9px;margin-bottom:10px;align-items:flex-start;position:relative;overflow:hidden;}
+.memo-item{display:flex;gap:9px;margin-bottom:8px;align-items:flex-start;position:relative;overflow:hidden;}
 .memo-time{font-size:10px;color:var(--tm);white-space:nowrap;padding-top:4px;min-width:36px;}
-.memo-bub{background:var(--memo-b);border:1px solid var(--memo-bb);border-radius:4px 14px 14px 14px;padding:8px 11px;font-size:12px;color:var(--tp);line-height:1.55;flex:1;}
+.memo-bub{background:rgba(255,190,165,0.06);border:none;border-left:2.5px solid rgba(225,140,120,0.45);border-radius:0 6px 6px 0;padding:6px 10px;font-size:12px;color:var(--tp);line-height:1.4;flex:1;}
+.memo-bub.tod-morning{background:rgba(255,200,120,0.09);border-left-color:rgba(225,150,45,0.55);}
+.memo-bub.tod-afternoon{background:rgba(255,150,160,0.09);border-left-color:rgba(220,95,115,0.52);}
+.memo-bub.tod-night{background:rgba(180,155,230,0.10);border-left-color:rgba(150,115,210,0.55);}
 
 .undo-toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%) translateY(16px);background:rgba(60,40,40,.90);color:white;font-size:12px;padding:9px 18px;border-radius:20px;display:flex;align-items:center;gap:10px;opacity:0;transition:all .25s;z-index:400;pointer-events:none;backdrop-filter:blur(8px);}
 .undo-toast.on{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto;}
 .undo-btn{font-size:11.5px;color:rgba(255,200,180,.90);font-weight:500;cursor:pointer;}
-.memo-input-row{margin-top:12px;padding-top:11px;border-top:1px solid var(--div);display:flex;gap:7px;align-items:flex-end;}
-.stamp-btn{background:var(--inp);border:1px solid var(--inp-b);border-radius:9px;padding:7px 10px;font-size:11px;color:var(--ts);display:flex;align-items:center;gap:4px;white-space:nowrap;cursor:pointer;font-family:'DM Sans',sans-serif;flex-shrink:0;}
-.memo-field{flex:1;background:var(--inp);border:1px solid var(--inp-b);border-radius:10px;padding:7px 11px;font-size:16px;color:var(--tp);font-family:'DM Sans',sans-serif;outline:none;resize:none;line-height:1.5;max-height:100px;}
+.memo-input-row{margin-top:12px;padding-top:11px;border-top:1px solid var(--div);display:flex;gap:7px;align-items:center;}
+.stamp-btn{width:38px;height:38px;background:var(--inp);border:1px solid var(--inp-b);border-radius:11px;padding:0;font-size:11px;color:var(--ts);display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:'DM Sans',sans-serif;flex-shrink:0;}
+.memo-field{flex:1;height:38px;box-sizing:border-box;background:rgba(255,255,255,.30);border:1.5px dashed rgba(200,170,160,.40);border-radius:11px;padding:8px 12px;font-size:16px;color:var(--tp);font-family:'DM Sans',sans-serif;outline:none;resize:none;line-height:1.3;max-height:100px;}
 .memo-field::placeholder{color:var(--tm);}
-.send-btn{width:32px;height:32px;background:var(--acc-soft);border:none;border-radius:9px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+.send-btn{width:38px;height:38px;background:var(--acc-soft);border:none;border-radius:11px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
 
 /* ── GOAL NOTE ── */
 .goal-wrap{padding:0 2px;margin-bottom:10px;}
@@ -969,7 +972,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="card p" id="memo-card">
         <div id="memo-list"></div>
         <div class="memo-input-row">
-          <button class="stamp-btn" onclick="openMemoTimePicker()" id="memo-stamp-btn"><svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="color:var(--ts)"><circle cx="5.5" cy="5.5" r="4.2"/><polyline points="5.5,3 5.5,5.5 7.2,6.8"/></svg></button>
+          <button class="stamp-btn" onclick="openMemoTimePicker()" id="memo-stamp-btn"><svg width="17" height="17" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" style="color:var(--ts)"><circle cx="5.5" cy="5.5" r="4.2"/><polyline points="5.5,3 5.5,5.5 7.2,6.8"/></svg></button>
           <textarea id="memo-inp" class="memo-field" rows="1" placeholder="메모 입력" autocomplete="off"></textarea>
           <button class="send-btn" onclick="sendMemo()"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="white" stroke-width="1.4" stroke-linecap="round"><line x1="6.5" y1="10.5" x2="6.5" y2="2"/><polyline points="3,5.5 6.5,2 10,5.5"/></svg></button>
         </div>
@@ -1110,7 +1113,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     </div>
     <div id="home-chat-messages" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px;margin-bottom:12px;min-height:200px;max-height:52vh;padding-right:2px;"></div>
     <div style="display:flex;gap:8px;flex-shrink:0;">
-      <input id="home-chat-inp" class="modal-inp" style="flex:1;margin-bottom:0;" placeholder="메시지 입력..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendHomeChat();}">
+      <input id="home-chat-inp" class="modal-inp" style="flex:1;margin-bottom:0;" placeholder="메시지 입력..." onkeydown="if(event.isComposing||event.keyCode===229)return;if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendHomeChat();}">
       <button onclick="sendHomeChat()" style="flex-shrink:0;background:var(--acc);color:#fff;border:none;border-radius:12px;padding:0 16px;font-size:13px;cursor:pointer;">보내기</button>
     </div>
   </div>
@@ -1215,7 +1218,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 <div class="modal-ov" id="todo-modal" onclick="closeModal('todo-modal',event)">
   <div class="modal">
     <div class="modal-title" id="todo-modal-title">할 일 추가</div>
-    <input type="text" class="modal-inp" id="todo-modal-inp" placeholder="할 일을 입력하세요" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmTodo();}">
+    <input type="text" class="modal-inp" id="todo-modal-inp" placeholder="할 일을 입력하세요" autocomplete="off" onkeydown="if(event.isComposing||event.keyCode===229)return;if(event.key==='Enter'){event.preventDefault();confirmTodo();}">
     <div class="todo-time-sel">
       <button class="ts-morning" onclick="selectTodoTime('morning',this)">오전</button>
       <button class="ts-afternoon" onclick="selectTodoTime('afternoon',this)">오후</button>
@@ -3604,7 +3607,9 @@ function renderMemos(){
   });
   ordered.forEach(({m,i})=>{
     const el=document.createElement('div');el.className='memo-item';
-    const bub=document.createElement('div');bub.className='memo-bub';
+    const h=m.time?parseInt(m.time.split(':')[0],10):null;
+    const tod=h==null?'':h>=5&&h<12?' tod-morning':h>=12&&h<18?' tod-afternoon':' tod-night';
+    const bub=document.createElement('div');bub.className='memo-bub'+tod;
     bub.style.cursor='pointer';
     bub.addEventListener('click',()=>{_memoSwipeIdx=i;openSheet('memo-sheet');});
     bub.innerHTML=m.text||'';
@@ -3666,7 +3671,7 @@ function sendMemo(){
   f.value='';delete f.dataset.stamp;f.placeholder='메모 입력';f.style.height='';
   renderMemos();
 }
-document.getElementById('memo-inp').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMemo();}});
+document.getElementById('memo-inp').addEventListener('keydown',e=>{if(e.isComposing||e.keyCode===229)return;if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMemo();}});
 document.getElementById('memo-inp').addEventListener('input',e=>{const el=e.target;el.style.height='auto';el.style.height=Math.min(el.scrollHeight,100)+'px';});
 
 function openSearch(){
@@ -4665,7 +4670,7 @@ function toggleMealWishlist(){
 function renderMealWishlist(){
   const p=document.getElementById('meal-wishlist-panel');
   const items=getMealWishlist();
-  p.innerHTML='<div class="wish-add-row"><input id="wish-add-inp" class="meal-inp" type="text" placeholder="먹고싶은 메뉴 추가" autocomplete="off" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addMealWish();}"><button class="wish-add-btn" onclick="addMealWish()">+</button></div>'+
+  p.innerHTML='<div class="wish-add-row"><input id="wish-add-inp" class="meal-inp" type="text" placeholder="먹고싶은 메뉴 추가" autocomplete="off" onkeydown="if(event.isComposing||event.keyCode===229)return;if(event.key===\'Enter\'){event.preventDefault();addMealWish();}"><button class="wish-add-btn" onclick="addMealWish()">+</button></div>'+
     (items.length?items.map((t,i)=>`<div class="wish-item"><span class="wish-text">${t}</span><span class="wish-place-btn" onclick="startWishPlacing(${i})">넣기</span><span class="wish-del-btn" onclick="removeMealWish(${i})">✕</span></div>`).join(''):'<div style="font-size:11.5px;color:var(--tm);padding:6px 2px;">아직 담아둔 메뉴가 없어요</div>');
 }
 function addMealWish(){
