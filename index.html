@@ -48,7 +48,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --card:rgba(255,253,248,0.45);--card-b:rgba(225,215,195,0.55);
   --card-p:rgba(255,253,248,0.45);--card-pb:rgba(240,160,190,0.55);
   --card-m:rgba(255,253,248,0.45);--card-mb:rgba(135,205,195,0.55);
-  --card-y:rgba(255,253,248,0.45);--card-yb:rgba(225,195,80,0.55);
+  --card-y:rgba(255,253,248,0.45);--card-yb:rgba(250,215,100,0.62);
   --card-s:rgba(255,253,248,0.45);--card-sb:rgba(150,180,225,0.55);
   --div:rgba(180,165,145,0.18);
   --acc:#c9926e;--acc-soft:rgba(201,146,110,0.40);
@@ -663,11 +663,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="glass"] .day-btn.today .day-num{color:#c97a96;}
 [data-theme="glass"] .send-btn{background:rgba(232,164,187,0.55);}
 [data-theme="glass"] #nextweek-sheet .goal-section-title{background:linear-gradient(120deg,rgba(248,212,225,0.55),rgba(250,225,235,0.48));color:#c2638a;border:1.4px solid rgba(232,164,187,0.50);}
-[data-theme="glass"] .chk.on{background:rgba(220,180,100,0.55);border-color:rgba(220,180,100,0.75);}
+[data-theme="glass"] .chk.on{background:rgba(250,215,100,0.55);border-color:rgba(250,215,100,0.78);}
 [data-theme="glass"] .cal-day.today .cal-num{background:#e8a4bb;}
 [data-theme="glass"] .cal-day.selected .cal-num{background:rgba(232,164,187,0.24);color:#c97a96;}
 [data-theme="glass"] .cal-dot{background:#e8a4bb;}
-[data-theme="glass"] .goal-section-title{background:linear-gradient(120deg,rgba(245,222,170,0.55),rgba(250,232,195,0.48));color:#a67c3e;border:1.4px solid rgba(225,195,130,0.50);}
+[data-theme="glass"] .goal-section-title{background:linear-gradient(120deg,rgba(250,215,100,0.50),rgba(255,235,170,0.42));color:#8a6c20;border:1.4px solid rgba(250,205,90,0.55);}
 [data-theme="glass"] .mbtn.ok{background:rgba(201,146,110,0.42);color:#6e4a30;}
 [data-theme="glass"] .wchallenge-day.on{background:rgba(255,253,248,0.45)!important;color:var(--tp)!important;border-width:2px;}
 [data-theme="glass"] .home-hcard.morning{background:linear-gradient(135deg,rgba(255,238,200,0.32),rgba(255,220,210,0.28));border-color:rgba(255,210,180,0.40);}
@@ -1414,16 +1414,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
             저장
           </button>
         </div>
-        <div class="settings-item" style="flex-direction:column;align-items:flex-start;gap:8px;">
-          <span class="settings-item-lbl">관심 뉴스 분야</span>
-          <input type="text" class="modal-inp" id="news-interests-inp"
-            placeholder="예: 건강, 라이프스타일, IT"
-            style="margin-bottom:0;font-size:13px;width:100%;" autocomplete="off">
-          <button onclick="saveNewsInterests()"
-            style="width:100%;padding:9px;border-radius:10px;border:none;background:var(--acc-soft);color:var(--acc);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">
-            저장
-          </button>
-        </div>
         <div class="settings-item">
           <span style="font-size:11px;color:var(--tm);" id="claude-key-status">날씨 인사 · 주간 루틴 · 일정 요약에 사용돼요</span>
         </div>
@@ -1434,7 +1424,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="settings-card">
         <div class="settings-item" style="flex-direction:column;gap:8px;align-items:flex-start;">
           <span style="font-size:11px;color:var(--tm);">Supabase에서 최근 14일 데이터 강제 복구</span>
-          <button onclick="forceRestoreAll()" style="width:100%;padding:9px;border-radius:10px;border:none;background:rgba(100,195,185,0.25);color:#2a7868;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;" onclick="forceRestoreAll()">🔄 데이터 복구하기</button>
+          <button onclick="forceRestoreAll()" style="width:100%;padding:9px;border-radius:10px;border:none;background:rgba(100,195,185,0.25);color:#2a7868;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">🔄 데이터 복구하기</button>
         </div>
       </div>
       <div class="settings-slbl">앱 정보</div>
@@ -4917,13 +4907,6 @@ function saveUserProfile(){
   if(val){S.set('user_profile',val);showToast('저장됐어요 ✅');}
   else{S.remove('user_profile');showToast('삭제됐어요');}
 }
-function saveNewsInterests(){
-  const inp=document.getElementById('news-interests-inp');
-  if(!inp)return;
-  const val=inp.value.trim();
-  if(val){S.set('news_interests',val);showToast('관심 분야가 저장됐어요 ✅');}
-}
-
 function clearClaudeKey(){
   try{
     localStorage.removeItem('claude_api_key');
@@ -4937,10 +4920,8 @@ function clearClaudeKey(){
 }
 function openSettings(){
   const el=document.getElementById('sync-status');if(el)el.textContent=navigator.onLine?'온라인 ✅':'오프라인';
-  const ki=document.getElementById('claude-api-key-inp');if(ki){const k=S.get('claude_api_key');ki.value=k?'sk-ant-••••'+k.slice(-4):'';}
-  const ni=document.getElementById('news-interests-inp');if(ni)ni.value=S.get('news_interests')||'';
   const keyInp=document.getElementById('claude-api-key-inp');
-  if(keyInp){const k=S.get('claude_api_key');keyInp.value=k?'••••••••••••'+k.slice(-4):'';} const newsInp=document.getElementById('news-interests-inp');if(newsInp)newsInp.value=S.get('news_interests')||'';
+  if(keyInp){const k=S.get('claude_api_key');keyInp.value=k?'sk-ant-••••'+k.slice(-4):'';}
   const profileInp=document.getElementById('user-profile-inp');if(profileInp)profileInp.value=S.get('user_profile')||'';
   const nwi=document.getElementById('notion-worker-url-inp');if(nwi)nwi.value=S.get('notion_worker_url')||'';
   const npi=document.getElementById('notion-root-page-inp');if(npi)npi.value=S.get('notion_root_page')||'';  const theme=S.get('theme')||'light';
