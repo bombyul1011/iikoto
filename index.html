@@ -171,6 +171,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .meal-row{display:flex;align-items:center;gap:8px;padding:8px 2px;}
 .meal-cat{width:38px;flex-shrink:0;font-size:12px;color:var(--tm);}
 .meal-time-inp{width:60px;flex-shrink:0;background:none;border:none;outline:none;font-family:'DM Sans',sans-serif;font-size:11.5px;color:var(--ts);padding:5px 2px 4px 2px;text-align:right;}
+.meal-time-inp.mt-empty:not(:focus){color:transparent;}
 .meal-time-btn{flex-shrink:0;width:20px;height:20px;border-radius:50%;border:1.2px solid rgba(160,190,140,0.55);background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgba(95,140,75,0.75);padding:0;}
 .meal-time-btn:active{background:rgba(190,230,205,0.30);}
 .meal-time-tag{font-size:10.5px;color:rgba(95,140,75,0.85);font-weight:600;flex-shrink:0;}
@@ -1589,9 +1590,12 @@ function renderHomeBody(section){
   const body=document.getElementById('home-body');
   if(!body)return;
   body.innerHTML='';
-  const isSunday=new Date().getDay()===0&&new Date().getHours()>=19;
-  const isWednesdayEvening=new Date().getDay()===3&&new Date().getHours()>=19;
-  const isLastDayOfMonth=(()=>{const n=new Date();const t=new Date(n);t.setDate(n.getDate()+1);return t.getDate()===1;})()&&new Date().getHours()>=19;
+  const _ld=getLogicalDate();
+  const _lh=new Date().getHours();
+  const _isEveOrLateNight=_lh>=19||_lh<6;
+  const isSunday=_ld.getDay()===0&&_isEveOrLateNight;
+  const isWednesdayEvening=_ld.getDay()===3&&_isEveOrLateNight;
+  const isLastDayOfMonth=(()=>{const t=new Date(_ld);t.setDate(_ld.getDate()+1);return t.getDate()===1;})()&&_isEveOrLateNight;
 
   if(section==='morning'){
     body.appendChild(makeLabel('오늘 브리핑'));
@@ -1835,21 +1839,21 @@ let _weatherCache=null,_weatherCacheTime=0,_selectedRoutine=null;
 // localStorage 브리핑 캐시 헬퍼
 function _bcGet(subSec){
   try{
-    const key='iikoto_briefing_'+dateKey(new Date())+'_'+subSec;
+    const key='iikoto_briefing_'+dateKey(getLogicalDate())+'_'+subSec;
     const v=localStorage.getItem(key);
     return v?JSON.parse(v):null;
   }catch(e){return null;}
 }
 function _bcSet(subSec,val){
   try{
-    const key='iikoto_briefing_'+dateKey(new Date())+'_'+subSec;
+    const key='iikoto_briefing_'+dateKey(getLogicalDate())+'_'+subSec;
     localStorage.setItem(key,JSON.stringify(val));
   }catch(e){}
 }
-// 오늘 이전 브리핑 캐시 자동 삭제
+// 오늘 이전 브리핑 캐시 자동 삭제 (자정~새벽엔 논리적 날짜=전날이라 그 캐시는 보존됨)
 (function(){
   try{
-    const today=dateKey(new Date());
+    const today=dateKey(getLogicalDate());
     Object.keys(localStorage).forEach(k=>{
       if(k.startsWith('iikoto_briefing_')&&!k.includes(today))localStorage.removeItem(k);
     });
@@ -2535,7 +2539,7 @@ function openWeeklyReviewSheet(){
 
 function openMidweekRemindSheet(){
   const content=document.getElementById('midweek-remind-content');
-  const cacheKey='midweek_remind_'+dateKey(new Date());
+  const cacheKey='midweek_remind_'+dateKey(getLogicalDate());
   const cached=S.get(cacheKey);
   openSheet('midweek-remind-sheet');
   if(cached){
@@ -2954,6 +2958,12 @@ const S={
 
 // ── DATE HELPERS
 function pad(n){return String(n).padStart(2,'0');}
+// 자정~새벽(아직 잠들기 전, night_2)에는 "오늘"을 전날 밤 기준으로 보는 논리적 날짜
+function getLogicalDate(){
+  const d=new Date();
+  if(d.getHours()<6)d.setDate(d.getDate()-1);
+  return d;
+}
 function genCid(){
   return Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 }
@@ -4758,7 +4768,7 @@ function openWeekMealSheet(){
     const m=getMeals(dk);
     const block=document.createElement('div');block.className='week-meal-day';block.id='wm-block-'+dk;
     block.innerHTML=`<div class="week-meal-day-label">${DOW[i]} · ${d.getMonth()+1}/${d.getDate()}</div>`+
-      CATS.map(([k,label])=>`<div class="meal-row"><div class="meal-cat" onpointerdown="mealCatPressStart(this,'${dk}','${k}')" onpointerup="mealCatPressEnd(this)" onpointerleave="mealCatPressEnd(this)" onpointercancel="mealCatPressEnd(this)">${label}</div><input class="meal-inp" style="flex:1 1 0;min-width:0;" id="wm-${dk}-${k}" type="text" placeholder="메뉴 입력" autocomplete="off" value="${(m[k]||'').replace(/"/g,'&quot;')}" onblur="saveOneMealDay('${dk}')"><input class="meal-time-inp" id="wm-${dk}-${k}-time" type="time" value="${m[k+'_time']||''}" onchange="saveOneMealDay('${dk}')"></div>`).join('');
+      CATS.map(([k,label])=>`<div class="meal-row"><div class="meal-cat" onpointerdown="mealCatPressStart(this,'${dk}','${k}')" onpointerup="mealCatPressEnd(this)" onpointerleave="mealCatPressEnd(this)" onpointercancel="mealCatPressEnd(this)">${label}</div><input class="meal-inp" style="flex:1 1 0;min-width:0;" id="wm-${dk}-${k}" type="text" placeholder="메뉴 입력" autocomplete="off" value="${(m[k]||'').replace(/"/g,'&quot;')}" onblur="saveOneMealDay('${dk}')"><input class="meal-time-inp${m[k+'_time']?'':' mt-empty'}" id="wm-${dk}-${k}-time" type="time" value="${m[k+'_time']||''}" onchange="saveOneMealDay('${dk}')"></div>`).join('');
     body.appendChild(block);
   }
   openSheet('week-meal-sheet');
