@@ -850,7 +850,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rt-hourlabel{position:absolute;left:0;width:26px;text-align:right;font-size:8.5px;color:var(--tm);transform:translateY(-50%);}
 .rt-sleepblock{position:absolute;left:25px;width:12px;border-radius:6px;background:linear-gradient(180deg,#8d92c9,#aab0dd);}
 .rt-sleepicon{position:absolute;left:25px;width:12px;height:12px;display:flex;align-items:center;justify-content:center;color:#fff;}
-.rt-dot{position:absolute;left:26px;width:10px;height:10px;border-radius:50%;}
+.rt-dot{position:absolute;left:26px;width:10px;height:10px;border-radius:50%;z-index:2;}
+.rt-connector{position:absolute;left:30px;width:1.5px;background:rgba(200,190,175,0.55);}
 .rt-dot.meal{background:#7fb35f;}
 .rt-dot.tod-morning{background:#e0a23c;}
 .rt-dot.tod-afternoon{background:#d8636f;}
@@ -1955,20 +1956,25 @@ function buildDailyRhythmTrack(dk){
     events.push({type:'memo',min:toMin(m.time),time:m.time,label:summarizeMemo(m.text)});
   });
   events.sort(function(a,b){return a.min-b.min;});
-  const MIN_GAP=24;let lastY=-999;
+  const MIN_GAP=22;let lastY=-999;
   events.forEach(function(ev){
-    let y=toY(ev.min);
+    ev.dotY=toY(ev.min);
+    let y=ev.dotY;
     if(y<lastY+MIN_GAP)y=lastY+MIN_GAP;
     ev.y=y;lastY=y;
   });
   const trackHeight=Math.max(TOTAL_H+10,lastY+24);
 
   events.forEach(function(ev){
+    if(Math.abs(ev.y-ev.dotY)>4){
+      const top=Math.min(ev.y,ev.dotY)+3,h=Math.abs(ev.y-ev.dotY);
+      html+='<div class="rt-connector" style="top:'+top+'px;height:'+h+'px;"></div>';
+    }
     if(ev.type==='meal'){
-      html+='<div class="rt-dot meal" style="top:'+(ev.y+3)+'px;"></div>';
+      html+='<div class="rt-dot meal" style="top:'+(ev.dotY+3)+'px;"></div>';
       html+='<div class="rt-row" style="top:'+ev.y+'px;"><span class="rt-time">'+ev.time+'</span><span class="rt-icon meal">'+RT_MEAL_ICON+'</span><span class="rt-txt">'+ev.label+'</span></div>';
     }else{
-      html+='<div class="rt-dot '+todClass(ev.min)+'" style="top:'+(ev.y+3)+'px;"></div>';
+      html+='<div class="rt-dot '+todClass(ev.min)+'" style="top:'+(ev.dotY+3)+'px;"></div>';
       html+='<div class="rt-row" style="top:'+ev.y+'px;"><span class="rt-time">'+ev.time+'</span><span class="rt-txt memo">'+ev.label+'</span></div>';
     }
   });
