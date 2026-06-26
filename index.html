@@ -1933,14 +1933,22 @@ function buildDailyRhythmTrack(dk){
   });
 
   const wakeMin=toMin(sleep.wake),sleepMin=toMin(sleep.sleep);
-  if(wakeMin!=null){
-    html+='<div class="rt-sleepblock" style="top:0px;height:'+Math.max(toY(wakeMin),8)+'px;"></div>';
-    html+='<div class="rt-sleepicon" style="top:'+Math.max(toY(wakeMin)-9,0)+'px;">'+RT_SUN_ICON+'</div>';
-  }
-  if(sleepMin!=null){
-    const sy=toY(sleepMin);
-    html+='<div class="rt-sleepblock" style="top:'+sy+'px;height:'+Math.max(TOTAL_H-sy,8)+'px;"></div>';
-    html+='<div class="rt-sleepicon" style="top:'+sy+'px;">'+RT_MOON_ICON+'</div>';
+  if(wakeMin!=null&&sleepMin!=null&&sleepMin<=wakeMin){
+    // 자정을 넘기지 않고 같은 날 새벽에 취침→기상한 경우 (예: 01:30 취침, 07:30 기상)
+    const sy=toY(sleepMin),wy=toY(wakeMin);
+    html+='<div class="rt-sleepblock" style="top:'+sy+'px;height:'+Math.max(wy-sy,8)+'px;"></div>';
+    html+='<div class="rt-sleepicon" style="top:'+Math.max(sy-9,0)+'px;">'+RT_MOON_ICON+'</div>';
+    html+='<div class="rt-sleepicon" style="top:'+wy+'px;">'+RT_SUN_ICON+'</div>';
+  }else{
+    if(wakeMin!=null){
+      html+='<div class="rt-sleepblock" style="top:0px;height:'+Math.max(toY(wakeMin),8)+'px;"></div>';
+      html+='<div class="rt-sleepicon" style="top:'+Math.max(toY(wakeMin)-9,0)+'px;">'+RT_SUN_ICON+'</div>';
+    }
+    if(sleepMin!=null){
+      const sy=toY(sleepMin);
+      html+='<div class="rt-sleepblock" style="top:'+sy+'px;height:'+Math.max(TOTAL_H-sy,8)+'px;"></div>';
+      html+='<div class="rt-sleepicon" style="top:'+sy+'px;">'+RT_MOON_ICON+'</div>';
+    }
   }
 
   const MEAL_LABELS={breakfast:'아침 식사',lunch:'점심 식사',dinner:'저녁 식사',snack:'간식'};
@@ -4926,8 +4934,12 @@ function renderWeeklyRhythmBars(){
     const memos=getMemos(dk).filter(function(m){return m.time&&m.text;});
     const wakeMin=toMin(sleep.wake),sleepMin=toMin(sleep.sleep);
     let track='<div class="wrb-track">';
-    if(wakeMin!=null)track+='<div class="wrb-sleep" style="left:0%;width:'+(wakeMin/1440*100)+'%;"></div>';
-    if(sleepMin!=null)track+='<div class="wrb-sleep" style="left:'+(sleepMin/1440*100)+'%;width:'+(100-sleepMin/1440*100)+'%;"></div>';
+    if(wakeMin!=null&&sleepMin!=null&&sleepMin<=wakeMin){
+      track+='<div class="wrb-sleep" style="left:'+(sleepMin/1440*100)+'%;width:'+((wakeMin-sleepMin)/1440*100)+'%;"></div>';
+    }else{
+      if(wakeMin!=null)track+='<div class="wrb-sleep" style="left:0%;width:'+(wakeMin/1440*100)+'%;"></div>';
+      if(sleepMin!=null)track+='<div class="wrb-sleep" style="left:'+(sleepMin/1440*100)+'%;width:'+(100-sleepMin/1440*100)+'%;"></div>';
+    }
     track+='</div>';
     let dots='';
     MEAL_KEYS.forEach(function(k){
