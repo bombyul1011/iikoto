@@ -872,8 +872,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .share-ov-body{flex:1;overflow-y:auto;padding:0 18px 28px;}
 
 .share-stage-wrap{display:flex;justify-content:center;margin-bottom:18px;}
-.share-stage{position:relative;width:280px;height:373px;border-radius:14px;overflow:hidden;background:#2a2620;box-shadow:0 8px 28px rgba(0,0,0,.35);background-size:cover;background-position:center;}
-.share-stage-empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:rgba(246,236,221,0.5);font-size:12px;}
+.share-stage{position:relative;width:280px;height:373px;border-radius:14px;overflow:hidden;background:var(--card-p);border:1.5px dashed var(--card-pb);box-shadow:0 8px 28px rgba(0,0,0,.12);background-size:cover;background-position:center;cursor:pointer;}
+.share-stage-empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--acc);font-size:12px;}
 .share-vignette{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 100%,rgba(0,0,0,.55) 0%,rgba(0,0,0,0) 55%),linear-gradient(180deg,rgba(0,0,0,.28) 0%,rgba(0,0,0,0) 22%);pointer-events:none;}
 .share-txtshadow{text-shadow:0 1px 6px rgba(0,0,0,.55);}
 
@@ -919,6 +919,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .s-cover{position:absolute;width:54px;height:78px;border-radius:4px;box-shadow:0 4px 14px rgba(0,0,0,.4);background:#444 center/cover no-repeat;}
 .s-cover.pos-bl{bottom:20px;left:20px;}
 .s-cover.pos-br2{bottom:20px;right:20px;}
+.s-cover.pos-tr2{top:20px;right:20px;}
 
 /* 문장 스티커 3: 심플형 */
 .s-qs{position:absolute;bottom:20px;left:20px;right:20px;color:#f6ecdd;font-family:'Bareonbatang',serif;}
@@ -1260,19 +1261,15 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   </div>
   <div class="share-ov-body">
     <div class="share-stage-wrap">
-      <div class="share-stage" id="share-stage">
+      <div class="share-stage" id="share-stage" onclick="document.getElementById('share-bg-inp').click();">
         <div class="share-stage-empty" id="share-stage-empty">
           <svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="5" width="20" height="16" rx="2"/><circle cx="9" cy="11" r="1.6"/><path d="M3 17l5.5-5.5 3 3 4-4L23 17"/></svg>
-          <span>배경 사진을 추가해보세요</span>
+          <span>탭해서 배경 사진 추가</span>
         </div>
       </div>
     </div>
 
     <input type="file" accept="image/*" id="share-bg-inp" style="display:none;" onchange="onShareBgPick(event)">
-    <button class="share-upload-btn" onclick="document.getElementById('share-bg-inp').click()">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2" y="3.5" width="12" height="9.5" rx="1.5"/><circle cx="5.5" cy="6.8" r="1"/><path d="M2 10.5l3.3-3.3 2 2 2.5-2.5L14 10"/></svg>
-      배경 사진 선택
-    </button>
 
     <div class="share-cycle-row">
       <div class="share-cycle-btn" id="cyc-header" onclick="cycleShare('header')">
@@ -5322,7 +5319,7 @@ const SHARE_LOGO_B64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAJkAAADXCA
 const SHARE_CYCLE = {
   header: [['none','헤더 없음'],['rl','READING LOG'],['tr',"TODAY'S READING"]],
   quote: [['none','문장 없음'],['qs','문장 · 심플'],['qt','문장 · 테이프']],
-  cover: [['none','표지 없음'],['bl','표지 · 좌하단'],['br2','표지 · 우하단']],
+  cover: [['none','표지 없음'],['bl','표지 · 좌하단'],['br2','표지 · 우하단'],['tr2','표지 · 우상단']],
   logo: [['none','로고 없음'],['br','로고 · 우하단'],['tr','로고 · 우상단']]
 };
 let _shareState = { bg:null, header:'none', quote:'none', quoteCid:null, cover:'none', logo:'none' };
@@ -5345,10 +5342,12 @@ function cycleShare(key){
   const cur=_shareState[key];
   const idx=opts.findIndex(o=>o[0]===cur);
   const next=opts[(idx+1)%opts.length][0];
+  const wasNone=_shareState[key]==='none';
   _shareState[key]=next;
   if(key==='quote'){
-    _shareState.quoteCid=null;
-    if(next!=='none'){
+    if(next==='none'){
+      _shareState.quoteCid=null;
+    }else if(wasNone||!_shareState.quoteCid){
       const cur2=getBooks().find(b=>b.status==='reading');
       const quotes=cur2?getQuotes().filter(q=>q.bookCid===cur2.cid).sort((a,b)=>(b.created||0)-(a.created||0)):[];
       if(quotes.length)_shareState.quoteCid=quotes[0].cid;
@@ -5389,10 +5388,10 @@ function renderShareStage(){
   const quotes=cur?getQuotes().filter(q=>q.bookCid===cur.cid):[];
   const pickedQuote=quotes.find(q=>q.cid===_shareState.quoteCid)||quotes[0];
   stage.style.backgroundImage=_shareState.bg?`url(${_shareState.bg})`:'';
-  stage.style.backgroundColor=_shareState.bg?'':'#2a2620';
+  stage.style.backgroundColor=_shareState.bg?'transparent':'';
 
   let html='';
-  if(!_shareState.bg)html+=`<div class="share-stage-empty" id="share-stage-empty"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="5" width="20" height="16" rx="2"/><circle cx="9" cy="11" r="1.6"/><path d="M3 17l5.5-5.5 3 3 4-4L23 17"/></svg><span>배경 사진을 추가해보세요</span></div>`;
+  if(!_shareState.bg)html+=`<div class="share-stage-empty" id="share-stage-empty"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="5" width="20" height="16" rx="2"/><circle cx="9" cy="11" r="1.6"/><path d="M3 17l5.5-5.5 3 3 4-4L23 17"/></svg><span>탭해서 배경 사진 추가</span></div>`;
   else html+=`<div class="share-vignette"></div>`;
 
   if(cur){
@@ -5402,8 +5401,6 @@ function renderShareStage(){
           <div class="s-rl-capsule share-txtshadow"><span class="s-rl-star">✦</span> READING LOG <span class="s-rl-star">✦</span></div>
           <div class="s-rl-line"></div><span class="s-rl-star">✦</span>
         </div>
-        <div class="s-rl-oneline share-txtshadow"><span class="t">${cur.title}</span><span class="sep">/</span><span class="a">${cur.author||''}</span></div>
-        <div class="s-rl-bottom"><span class="s-rl-star">✦</span><div class="s-rl-underline"></div></div>
       </div>`;
     }else if(_shareState.header==='tr'){
       html+=`<div class="s-tr-head share-txtshadow">
@@ -5414,11 +5411,10 @@ function renderShareStage(){
             <textPath href="#shareArcPath" startOffset="50%" text-anchor="middle">TODAY'S READING</textPath>
           </text>
         </svg>
-        <div class="s-tr-star">✦</div>
       </div>`;
     }
     if(_shareState.cover!=='none'){
-      const posClass=_shareState.cover==='bl'?'pos-bl':'pos-br2';
+      const posClass=_shareState.cover==='bl'?'pos-bl':_shareState.cover==='tr2'?'pos-tr2':'pos-br2';
       html+=`<div class="s-cover ${posClass}" style="${cur.poster?`background-image:url('${cur.poster}')`:''}"></div>`;
     }
     if(_shareState.quote==='qs'&&pickedQuote){
