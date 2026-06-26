@@ -803,12 +803,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .home-btn:active{opacity:.75;}
 .home-btn-title{font-size:12.5px;font-weight:500;color:var(--tp);}
 .home-btn-sub{font-size:10.5px;color:var(--tm);}
-.home-action{display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.42);border:1.5px dashed rgba(192,112,128,0.38);border-radius:16px;padding:15px 14px 15px 18px;cursor:pointer;margin-bottom:8px;-webkit-tap-highlight-color:rgba(192,112,128,0.12);}
-.home-action:active{opacity:.75;}
-.home-action-left{display:flex;flex-direction:column;gap:3px;}
-.home-action-title{font-size:13.5px;font-weight:500;color:var(--tp);}
-.home-action-sub{font-size:11px;color:var(--tm);}
-.home-action-icon{width:36px;height:36px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .home-habit-item{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--div);}
 .home-habit-item:last-child{border-bottom:none;}
 .home-habit-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
@@ -833,24 +827,56 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .home-content-info{flex:1;min-width:0;}
 .home-content-cat{font-size:9px;color:var(--tm);letter-spacing:1px;text-transform:uppercase;margin-bottom:2px;}
 .home-content-title{font-size:13px;color:var(--tp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.home-discuss-btn{width:32px;height:32px;background:rgba(192,112,128,0.10);border:1px solid rgba(192,112,128,0.22);border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:rgba(192,112,128,0.12);}
-.home-discuss-btn:active{opacity:.7;}
 .home-icon-bar{display:flex;justify-content:center;gap:12px;padding:18px 0 8px;border-top:1px solid var(--div);margin-top:8px;}
 .home-icon-btn{width:44px;height:44px;background:var(--card);border:1px solid var(--card-b);border-radius:14px;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:rgba(192,112,128,0.12);}
 .home-icon-btn:active{opacity:.7;}
 [data-theme="dark"] .home-hcard.morning{background:linear-gradient(135deg,rgba(255,210,100,0.12),rgba(255,180,140,0.10));border-color:rgba(255,200,150,0.20);}
 [data-theme="dark"] .home-hcard.afternoon{background:linear-gradient(135deg,rgba(255,126,179,0.12),rgba(255,200,150,0.10));border-color:rgba(255,150,180,0.20);}
 [data-theme="dark"] .home-hcard.night{background:linear-gradient(135deg,rgba(180,140,255,0.14),rgba(255,126,179,0.10));border-color:rgba(180,140,255,0.22);}
-[data-theme="dark"] .home-action{background:rgba(255,255,255,0.05);border-color:rgba(255,126,179,0.28);}
 [data-theme="dark"] .home-btn,[data-theme="dark"] .home-content-item,[data-theme="dark"] .home-icon-btn{background:rgba(255,255,255,0.06);border-color:rgba(255,255,255,0.10);}
 [data-theme="dark"] .home-icon-bar{border-top-color:rgba(255,255,255,0.08);}
 
-/* ── HOME CHAT BUBBLES ── */
-.hchat-bubble{max-width:82%;padding:9px 13px;border-radius:16px;font-size:13px;line-height:1.6;word-break:break-word;}
-.hchat-bubble.user{background:var(--acc);color:#fff;align-self:flex-end;border-bottom-right-radius:5px;}
-.hchat-bubble.ai{background:var(--card);border:1px solid var(--card-b);color:var(--tp);align-self:flex-start;border-bottom-left-radius:5px;}
-.hchat-bubble.ai.loading{color:var(--tm);font-style:italic;}
-[data-theme="dark"] .hchat-bubble.ai{background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.13);}
+/* ── 데일리 리듬 트랙 ── */
+.rhythm-track{position:relative;padding-left:46px;margin-bottom:6px;}
+.rt-line{position:absolute;left:30px;top:2px;bottom:2px;width:2px;background:rgba(200,170,160,0.30);border-radius:2px;}
+.rt-hourlabel{position:absolute;left:0;width:26px;text-align:right;font-size:8.5px;color:var(--tm);transform:translateY(-50%);}
+.rt-sleepblock{position:absolute;left:25px;width:12px;border-radius:6px;background:linear-gradient(180deg,rgba(141,146,201,0.55),rgba(170,176,221,0.45));}
+.rt-sleepicon{position:absolute;left:25px;width:12px;height:12px;display:flex;align-items:center;justify-content:center;color:rgba(120,125,180,0.85);}
+.rt-dot{position:absolute;left:26px;width:10px;height:10px;border-radius:50%;}
+.rt-dot.meal{background:rgba(150,195,130,0.85);}
+.rt-dot.tod-morning{background:rgba(225,150,45,0.85);}
+.rt-dot.tod-afternoon{background:rgba(220,95,115,0.85);}
+.rt-dot.tod-night{background:rgba(150,115,210,0.85);}
+.rt-row{position:absolute;left:46px;right:0;display:flex;align-items:center;gap:7px;font-size:11px;color:var(--tp);white-space:nowrap;overflow:hidden;}
+.rt-row .rt-time{font-size:9px;color:var(--tm);width:36px;flex-shrink:0;font-family:'DM Sans',sans-serif;}
+.rt-icon{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:rgba(150,195,130,0.14);color:rgba(95,140,75,0.80);}
+.rt-txt.memo{color:var(--ts);overflow:hidden;text-overflow:ellipsis;}
+[data-theme="glass"] .rt-line{background:rgba(180,170,150,0.32);}
+[data-theme="glass"] .rt-sleepblock{background:linear-gradient(180deg,rgba(95,115,170,0.45),rgba(125,140,195,0.38));}
+[data-theme="glass"] .rt-sleepicon{color:rgba(95,115,170,0.85);}
+[data-theme="glass"] .rt-dot.tod-morning{background:rgba(201,146,80,0.85);}
+
+.habit-streak-row{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 8px;margin-bottom:2px;-webkit-overflow-scrolling:touch;}
+.habit-streak-item{flex-shrink:0;display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--card-b);border-radius:12px;padding:8px 12px;white-space:nowrap;}
+.habit-streak-name{font-size:12px;color:var(--tp);}
+.habit-streak-cnt{font-size:10.5px;color:var(--tm);font-family:'DM Sans',sans-serif;}
+
+/* ── 주간 가로 리듬바 ── */
+.wrb-wrap{display:flex;flex-direction:column;gap:10px;}
+.wrb-row{display:flex;align-items:center;gap:8px;}
+.wrb-daylabel{width:30px;flex-shrink:0;font-size:10px;color:var(--tm);}
+.wrb-daylabel.today{color:var(--acc);font-weight:700;}
+.wrb-trackwrap{position:relative;flex:1;height:8px;}
+.wrb-track{position:relative;height:6px;border-radius:6px;background:rgba(220,210,195,0.32);}
+.wrb-sleep{position:absolute;top:0;height:6px;border-radius:6px;background:linear-gradient(90deg,rgba(141,146,201,0.6),rgba(170,176,221,0.5));}
+.wrb-dot{position:absolute;top:-2px;width:10px;height:10px;border-radius:50%;transform:translateX(-50%);}
+.wrb-dot.meal{background:rgba(150,195,130,0.9);}
+.wrb-dot.tod-morning{background:rgba(225,150,45,0.9);}
+.wrb-dot.tod-afternoon{background:rgba(220,95,115,0.9);}
+.wrb-dot.tod-night{background:rgba(150,115,210,0.9);}
+[data-theme="glass"] .wrb-track{background:rgba(190,180,160,0.30);}
+[data-theme="glass"] .wrb-sleep{background:linear-gradient(90deg,rgba(95,115,170,0.5),rgba(125,140,195,0.42));}
+[data-theme="glass"] .wrb-dot.tod-morning{background:rgba(201,146,80,0.9);}
 
 /* ── 일정 카드 */
 .schedule-card{background:var(--card);border:1px solid var(--card-b);border-radius:18px;padding:16px 16px;margin-bottom:10px;min-height:unset;}
@@ -1113,6 +1139,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div class="goal-section-title" style="margin-top:0;">✦ 이번 주도 화이팅</div>
         <div class="goal-wrap" id="weekly-goal-wrap"></div>
       </div>
+      <div class="slabel">이번 주 리듬</div>
+      <div class="card s" id="weekly-rhythm-bars"></div>
       <div class="slabel">하루 한 줄</div>
       <div class="card" id="daily-oneline-card">
         <div id="daily-oneline-list"></div>
@@ -1209,6 +1237,17 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   </div>
 </div>
 
+<!-- 홈 상세보기 공용 시트 -->
+<div class="overlay" id="home-detail-sheet" onclick="closeSheet('home-detail-sheet',event)">
+  <div class="bsheet" style="max-height:82vh;overflow-y:auto;" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div style="padding:0 20px 20px;">
+      <div class="modal-title" id="home-detail-sheet-title" style="margin-bottom:14px;"></div>
+      <div id="home-detail-sheet-body"></div>
+    </div>
+  </div>
+</div>
+
 
 
 <!-- 주간 루틴 모달 -->
@@ -1225,21 +1264,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <button class="mbtn cancel" onclick="closeModal('routine-modal')">취소</button>
         <button class="mbtn ok" onclick="applyRoutine()">습관에 반영</button>
       </div>
-    </div>
-  </div>
-</div>
-
-<!-- CLAUDE CHAT MODAL -->
-<div class="modal-ov" id="home-chat-modal" onclick="closeModal('home-chat-modal',event)">
-  <div class="modal" style="max-width:380px;max-height:88vh;display:flex;flex-direction:column;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-shrink:0;">
-      <div class="modal-title" style="margin-bottom:0;" id="home-chat-modal-title">수다 떨까요? 💬</div>
-      <div onclick="closeModal('home-chat-modal')" style="cursor:pointer;color:var(--tm);font-size:20px;line-height:1;">×</div>
-    </div>
-    <div id="home-chat-messages" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px;margin-bottom:12px;min-height:200px;max-height:52vh;padding-right:2px;"></div>
-    <div style="display:flex;gap:8px;flex-shrink:0;">
-      <input id="home-chat-inp" class="modal-inp" style="flex:1;margin-bottom:0;" placeholder="메시지 입력..." onkeydown="if(event.isComposing||event.keyCode===229)return;if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendHomeChat();}">
-      <button onclick="sendHomeChat()" style="flex-shrink:0;background:var(--acc);color:#fff;border:none;border-radius:12px;padding:0 16px;font-size:13px;cursor:pointer;">보내기</button>
     </div>
   </div>
 </div>
@@ -1784,29 +1808,19 @@ function renderHomeBody(section){
   const isLastDayOfMonth=(()=>{const t=new Date(_ld);t.setDate(_ld.getDate()+1);return t.getDate()===1;})()&&_isEveOrLateNight;
 
   if(section==='morning'){
-    body.appendChild(makeLabel('오늘 브리핑'));
-    const sc=document.createElement('div');sc.className='card s';
-    sc.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑 작성 중...</div>';
-    body.appendChild(sc);
-    makeScheduleCard('morning').then(function(card){sc.replaceWith(card);}).catch(function(){sc.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑을 불러올 수 없어요</div>';});
+    body.appendChild(makeLabel('오늘의 리듬'));
+    body.appendChild(buildDailyRhythmTrack(dateKey(_ld)));
+    body.appendChild(makeLabel('해빗'));
+    body.appendChild(makeHabitStreakRow());
     body.appendChild(makeRingRow());
-    body.appendChild(makeLabel('해빗 현황'));
-    body.appendChild(makeHabitCard());
-    body.appendChild(makeLabel('클로드와 대화'));
-    body.appendChild(makeActionBtn('수다 떨까요? 💬','오늘 아침 감상 이야기해요','rgba(100,195,185,0.80)',homeOpenChat));
-    body.appendChild(makeLabel('최근 콘텐츠'));
-    body.appendChild(makeContentsCard());
+    body.appendChild(makeDetailBanner('오늘 브리핑 보기',function(){return makeScheduleCard('morning');}));
+    body.appendChild(makeDetailBanner('최근 콘텐츠 보기',function(){return makeContentsCard();}));
   } else if(section==='afternoon'){
     body.appendChild(makeRingRow());
-    body.appendChild(makeLabel('오후 브리핑'));
-    const sc2=document.createElement('div');sc2.className='card s';
-    sc2.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑 작성 중...</div>';
-    body.appendChild(sc2);
-    makeScheduleCard('afternoon').then(function(card){sc2.replaceWith(card);}).catch(function(){sc2.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑을 불러올 수 없어요</div>';});
-    body.appendChild(makeLabel('클로드와 대화'));
-    body.appendChild(makeActionBtn('수다 떨까요? 💬','오늘 기록 바탕으로 대화 시작','rgba(100,195,185,0.80)',homeOpenChat));
-    body.appendChild(makeLabel('최근 콘텐츠'));
-    body.appendChild(makeContentsCard());
+    body.appendChild(makeLabel('오늘의 리듬'));
+    body.appendChild(buildDailyRhythmTrack(dateKey(_ld)));
+    body.appendChild(makeDetailBanner('오후 브리핑 보기',function(){return makeScheduleCard('afternoon');}));
+    body.appendChild(makeDetailBanner('최근 콘텐츠 보기',function(){return makeContentsCard();}));
   } else {
     // 매달 말일 저녁 — 월간 누계 배너 (최우선)
     if(isLastDayOfMonth){
@@ -1848,11 +1862,8 @@ function renderHomeBody(section){
       body.appendChild(makeRingRow());
     }
     if(isLastDayOfMonth||isSunday||isWednesdayEvening)body.appendChild(makeRingRow());
-    body.appendChild(makeLabel('하루 마감'));
-    body.appendChild(makeGrid([
-      makeBtnCard('♡','오늘 어땠어?','하루 기록 → 털어놓기',homeOpenReview),
-      makeBtnCard('◎','일기 백업','내보내기',openMarkdownBackup)
-    ]));
+    body.appendChild(makeLabel('오늘의 리듬'));
+    body.appendChild(buildDailyRhythmTrack(dateKey(_ld)));
     body.appendChild(makeLabel('내일 미리보기'));
     const sc3=document.createElement('div');sc3.className='card s';
     sc3.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑 작성 중...</div>';
@@ -1877,10 +1888,76 @@ function makeGrid(items){
   const g=document.createElement('div');g.className='home-btn-grid';
   items.forEach(function(i){g.appendChild(i);});return g;
 }
-function makeActionBtn(title,sub,iconColor,fn){
-  const d=document.createElement('div');d.className='home-action';
-  d.innerHTML='<div class="home-action-left"><div class="home-action-title">'+title+'</div><div class="home-action-sub">'+sub+'</div></div><div class="home-action-icon" style="background:'+iconColor+';"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round"><line x1="2" y1="7" x2="12" y2="7"/><polyline points="8,3.5 12,7 8,10.5"/></svg></div>';
-  d.addEventListener('click',fn);return d;
+function summarizeMemo(text){
+  if(!text)return'';
+  const t=text.trim().replace(/\s+/g,' ');
+  return t.length>16?t.slice(0,16)+'…':t;
+}
+const RT_MEAL_ICON='<svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6.5h10a5 5 0 0 1-5 5a5 5 0 0 1-5-5Z"/><path d="M5 6V4.2M7 6V3.2M9 6V4.2"/></svg>';
+const RT_MOON_ICON='<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"><path d="M9.5 7C9.5 9 8 10.5 6 10.5C4 10.5 2.5 9 2.5 7C2.5 5.2 3.8 3.8 5.5 3.5C5.2 5.5 7 6.8 9.5 7Z"/></svg>';
+const RT_SUN_ICON='<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"><circle cx="6" cy="6" r="2.8"/><line x1="6" y1="1" x2="6" y2="2.2"/><line x1="6" y1="9.8" x2="6" y2="11"/><line x1="1" y1="6" x2="2.2" y2="6"/><line x1="9.8" y1="6" x2="11" y2="6"/></svg>';
+function buildDailyRhythmTrack(dk){
+  const wrap=document.createElement('div');wrap.className='rhythm-track';
+  const sleep=getSleep(dk)||{};
+  const meals=getMeals(dk)||{};
+  const memos=getMemos(dk).filter(function(m){return m.time&&m.text;});
+  const TOTAL_H=240;
+  const toMin=function(t){if(!t)return null;const p=t.split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);};
+  const toY=function(min){return Math.round(min/1440*TOTAL_H);};
+  const hourOf=function(min){return Math.floor(min/60);};
+  const todClass=function(min){const h=hourOf(min);return h>=5&&h<12?'tod-morning':h>=12&&h<18?'tod-afternoon':'tod-night';};
+
+  let html='<div class="rt-line"></div>';
+  [0,6,12,18,24].forEach(function(h){
+    html+='<div class="rt-hourlabel" style="top:'+toY(h*60)+'px;">'+String(h).padStart(2,'0')+'</div>';
+  });
+
+  const wakeMin=toMin(sleep.wake),sleepMin=toMin(sleep.sleep);
+  if(wakeMin!=null){
+    html+='<div class="rt-sleepblock" style="top:0px;height:'+Math.max(toY(wakeMin),8)+'px;"></div>';
+    html+='<div class="rt-sleepicon" style="top:'+Math.max(toY(wakeMin)-9,0)+'px;">'+RT_SUN_ICON+'</div>';
+  }
+  if(sleepMin!=null){
+    const sy=toY(sleepMin);
+    html+='<div class="rt-sleepblock" style="top:'+sy+'px;height:'+Math.max(TOTAL_H-sy,8)+'px;"></div>';
+    html+='<div class="rt-sleepicon" style="top:'+sy+'px;">'+RT_MOON_ICON+'</div>';
+  }
+
+  const MEAL_LABELS={breakfast:'아침 식사',lunch:'점심 식사',dinner:'저녁 식사',snack:'간식'};
+  let events=[];
+  Object.keys(MEAL_LABELS).forEach(function(k){
+    const t=meals[k+'_time'];
+    if(t)events.push({type:'meal',min:toMin(t),time:t,label:MEAL_LABELS[k]});
+  });
+  memos.forEach(function(m){
+    events.push({type:'memo',min:toMin(m.time),time:m.time,label:summarizeMemo(m.text)});
+  });
+  events.sort(function(a,b){return a.min-b.min;});
+  const MIN_GAP=24;let lastY=-999;
+  events.forEach(function(ev){
+    let y=toY(ev.min);
+    if(y<lastY+MIN_GAP)y=lastY+MIN_GAP;
+    ev.y=y;lastY=y;
+  });
+  const trackHeight=Math.max(TOTAL_H+10,lastY+24);
+
+  events.forEach(function(ev){
+    if(ev.type==='meal'){
+      html+='<div class="rt-dot meal" style="top:'+(ev.y+3)+'px;"></div>';
+      html+='<div class="rt-row" style="top:'+ev.y+'px;"><span class="rt-time">'+ev.time+'</span><span class="rt-icon meal">'+RT_MEAL_ICON+'</span><span class="rt-txt">'+ev.label+'</span></div>';
+    }else{
+      html+='<div class="rt-dot '+todClass(ev.min)+'" style="top:'+(ev.y+3)+'px;"></div>';
+      html+='<div class="rt-row" style="top:'+ev.y+'px;"><span class="rt-time">'+ev.time+'</span><span class="rt-txt memo">'+ev.label+'</span></div>';
+    }
+  });
+
+  if(wakeMin==null&&sleepMin==null&&!events.length){
+    wrap.innerHTML='<div style="font-size:12px;color:var(--tm);text-align:center;padding:24px 0;">오늘 기록된 수면·식사·메모 시간이 없어요</div>';
+    return wrap;
+  }
+  wrap.style.height=trackHeight+'px';
+  wrap.innerHTML=html;
+  return wrap;
 }
 function makeRingRow(){
   const row=document.createElement('div');
@@ -1938,6 +2015,48 @@ function makeHabitCard(){
   });
   return card;
 }
+function getHabitStreak(name){
+  let streak=0;const cur=new Date();
+  for(let i=0;i<366;i++){
+    const wk=weekKey(cur),dow=(cur.getDay()+6)%7;
+    if(getHabitChecks(wk)[name+'-'+dow]){streak++;cur.setDate(cur.getDate()-1);}
+    else break;
+  }
+  return streak;
+}
+function makeHabitStreakRow(){
+  const wrap=document.createElement('div');wrap.className='habit-streak-row';
+  const habits=getHabits();
+  if(!habits.length){wrap.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 2px;">습관을 추가해보세요</div>';return wrap;}
+  habits.forEach(function(h){
+    const streak=getHabitStreak(h.name);
+    const item=document.createElement('div');item.className='habit-streak-item';
+    item.innerHTML='<span class="home-habit-dot '+h.color+'"></span><span class="habit-streak-name">'+h.name+'</span><span class="habit-streak-cnt">'+streak+'일째</span>';
+    wrap.appendChild(item);
+  });
+  return wrap;
+}
+function makeDetailBanner(lineText,builderFn){
+  const b=document.createElement('div');b.className='report-banner';
+  b.innerHTML='<div class="report-banner-inner"><div class="report-banner-line">'+lineText+'</div><div class="report-banner-arrow">›</div></div>';
+  b.addEventListener('click',function(){openHomeDetailSheet(lineText,builderFn);});
+  return b;
+}
+function openHomeDetailSheet(title,builderFn){
+  const titleEl=document.getElementById('home-detail-sheet-title');
+  if(titleEl)titleEl.textContent=title;
+  const body=document.getElementById('home-detail-sheet-body');
+  if(!body)return;
+  body.innerHTML='<div style="font-size:12px;color:var(--tm);padding:24px 0;text-align:center;">불러오는 중...</div>';
+  openSheet('home-detail-sheet');
+  const result=builderFn();
+  if(result&&typeof result.then==='function'){
+    result.then(function(el){body.innerHTML='';body.appendChild(el);})
+      .catch(function(){body.innerHTML='<div style="font-size:12px;color:var(--tm);padding:24px 0;text-align:center;">불러올 수 없어요</div>';});
+  }else{
+    body.innerHTML='';body.appendChild(result);
+  }
+}
 function makeRemainCard(){
   const card=document.createElement('div');card.className='card m';
   const now=new Date(),wk=weekKey(now),checks=getHabitChecks(wk),dow=(now.getDay()+6)%7;
@@ -1983,30 +2102,22 @@ function makeContentsCard(){
     const info=document.createElement('div');info.className='home-content-info';
     info.innerHTML='<div class="home-content-cat">'+(CAT_LABELS[c.cat]||c.cat)+'</div><div class="home-content-title">'+c.title+'</div>';
     item.appendChild(bar);item.appendChild(info);
-    const btn=document.createElement('div');btn.className='home-discuss-btn';
-    btn.innerHTML='<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--acc)"><path d="M13.5 2H2.5C1.7 2 1 2.7 1 3.5V10C1 10.8 1.7 11.5 2.5 11.5H5L8 14.5L11 11.5H13.5C14.3 11.5 15 10.8 15 10V3.5C15 2.7 14.3 2 13.5 2Z"/><circle cx="5.5" cy="7" r="0.7" fill="currentColor"/><circle cx="8" cy="7" r="0.7" fill="currentColor"/><circle cx="10.5" cy="7" r="0.7" fill="currentColor"/></svg>';
-    var _c=c;btn.addEventListener('click',function(){homeDiscuss(_c);});
-    item.appendChild(btn);wrap.appendChild(item);
+    wrap.appendChild(item);
   });
   return wrap;
 }
 function renderHomeIconBar(section){
   const bar=document.getElementById('home-icon-bar');if(!bar)return;bar.innerHTML='';
-  const CHAT='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--ts)"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
-  const HEART='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--ts)"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
   const ROUTINE='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--ts)"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/><polyline points="8,14 11,17 16,12"/></svg>';
   // 섹션별 아이콘 — 현재 섹션 메인 버튼은 본문에 있으니 보조 기능만
   const configs={
     morning:[
-      {icon:ROUTINE,fn:homeOpenRoutine,label:'루틴 제안'},
-      {icon:HEART,fn:homeOpenReview,label:'오늘 어땠어'}
+      {icon:ROUTINE,fn:homeOpenRoutine,label:'루틴 제안'}
     ],
     afternoon:[
-      {icon:ROUTINE,fn:homeOpenRoutine,label:'루틴 제안'},
-      {icon:HEART,fn:homeOpenReview,label:'오늘 어땠어'}
+      {icon:ROUTINE,fn:homeOpenRoutine,label:'루틴 제안'}
     ],
     night:[
-      {icon:CHAT,fn:homeOpenChat,label:'수다 떨까요'},
       {icon:ROUTINE,fn:homeOpenRoutine,label:'루틴 제안'}
     ]
   };
@@ -2114,88 +2225,6 @@ function buildTodaySummary(){
   if(memos.length)lines.push(`오늘 메모:\n${memos.slice(0,10).map(m=>'- '+m).join('\n')}`);
   if(contents.length)lines.push(`최근 콘텐츠: ${contents.join(', ')}`);
   return lines.length?lines.join('\n'):'기록된 데이터가 없어요.';
-}
-
-// ─ 채팅 모달 공용 열기
-let _homeChatHistory=[];
-let _homeChatSystemPrompt='';
-function _openHomeChatModal(title,systemPrompt,firstMsg){
-  _homeChatHistory=[];
-  _homeChatSystemPrompt=systemPrompt;
-  const titleEl=document.getElementById('home-chat-modal-title');
-  if(titleEl)titleEl.textContent=title;
-  const msgBox=document.getElementById('home-chat-messages');
-  if(msgBox)msgBox.innerHTML='';
-  const inp=document.getElementById('home-chat-inp');
-  if(inp){inp.value='';inp.placeholder='메시지 입력...';}
-  openModal('home-chat-modal');
-  if(firstMsg){
-    _appendHomeChatBubble(firstMsg,'ai');
-    _homeChatHistory.push({role:'assistant',content:firstMsg});
-  } else {
-    _startHomeChatAI();
-  }
-}
-function _appendHomeChatBubble(text,role){
-  const box=document.getElementById('home-chat-messages');
-  if(!box)return null;
-  const b=document.createElement('div');
-  b.className='hchat-bubble '+role;
-  b.textContent=text;
-  box.appendChild(b);
-  box.scrollTop=box.scrollHeight;
-  return b;
-}
-async function _startHomeChatAI(){
-  const key=getClaudeKey();
-  if(!key){_appendHomeChatBubble('Claude API 키가 없어요. 설정에서 입력해주세요 🌿','ai');return;}
-  const loadingBub=_appendHomeChatBubble('생각하는 중...','ai loading');
-  const reply=await callClaude(_homeChatSystemPrompt,[{role:'user',content:'대화 시작해줘'}],200);
-  if(loadingBub)loadingBub.remove();
-  const text=reply?reply.startsWith('__ERR__')?'연결 오류: '+reply.slice(7)+' 🌿':reply:'잠깐 연결이 안 됐어요. 다시 시도해볼게요 🌿';
-  _appendHomeChatBubble(text,'ai');
-  _homeChatHistory.push({role:'user',content:'대화 시작해줘'},{role:'assistant',content:text});
-}
-async function sendHomeChat(){
-  const inp=document.getElementById('home-chat-inp');
-  if(!inp)return;
-  const text=inp.value.trim();
-  if(!text)return;
-  inp.value='';
-  _appendHomeChatBubble(text,'user');
-  _homeChatHistory.push({role:'user',content:text});
-  const key=getClaudeKey();
-  if(!key){_appendHomeChatBubble('Claude API 키가 없어요 🌿','ai');return;}
-  const loadingBub=_appendHomeChatBubble('...','ai loading');
-  const reply=await callClaude(_homeChatSystemPrompt,_homeChatHistory,500);
-  if(loadingBub)loadingBub.remove();
-  const aiText=reply?reply.startsWith('__ERR__')?'연결 오류: '+reply.slice(7)+' 🌿':reply:'잠깐 연결이 안 됐어요 🌿';
-  _appendHomeChatBubble(aiText,'ai');
-  _homeChatHistory.push({role:'assistant',content:aiText});
-}
-
-// ─ 수다 떨까요? (오후)
-function homeOpenChat(){
-  const summary=buildTodaySummary();
-  const profile=S.get('user_profile');
-  const profileSection=profile?`\n\n[사용자 정보]\n${profile}`:'';
-  const sys=`당신은 따뜻하고 친근한 일상 비서예요. 아래 오늘 기록을 정확히 읽고 파악한 뒤, 그 내용을 바탕으로 가볍고 자연스럽게 대화를 시작해요. 메모에 시간이 표기된 경우 언제 있었던 일인지 맥락을 파악해요. 할일의 [오전/오후/저녁] 태그도 시간대 맥락으로 활용해요. 첫 메시지는 반드시 3문장 이내로 끝내고 마지막을 질문으로 마무리해요. 이후 대화는 질문 없이 자연스럽게 이어가도 돼요. 이름 호칭 없이. 이모지 1-2개. 반드시 ~해요, ~이에요, ~어요 체 존댓말만 사용. 반말 절대 금지.${profileSection}\n\n오늘 기록:\n${summary}`;
-  _openHomeChatModal('수다 떨까요? 💬',sys,null);
-}
-
-// ─ 오늘 어땠어? (밤)
-function homeOpenReview(){
-  const summary=buildTodaySummary();
-  const profile=S.get('user_profile');
-  const profileSection=profile?`\n\n[사용자 정보]\n${profile}`:'';
-  const sys=`당신은 따뜻한 저녁 일기 친구예요. 아래 오늘 기록을 정확히 읽고 파악한 뒤, 하루를 공감하며 수고했다고 말해줘요. 메모에 시간이 표기된 경우 언제 있었던 일인지 맥락을 파악해요. 할일의 [오전/오후/저녁] 태그도 하루 흐름 파악에 활용해요. 첫 메시지는 반드시 3문장 이내로 끝내고 마지막을 질문으로 마무리해요. 이후 대화는 질문 없이 자연스럽게 이어가도 돼요. 이름 호칭 없이, 이모지 1-2개. 반드시 ~해요, ~이에요, ~어요 체 존댓말만 사용. 반말 절대 금지.${profileSection}\n\n오늘 기록:\n${summary}`;
-  _openHomeChatModal('오늘 어땠어요? 🌙',sys,null);
-}
-
-// ─ 콘텐츠 수다 (홈 카드 말풍선 버튼)
-function homeDiscuss(c){
-  const sys=`당신은 책, 드라마, 영화, 음악 이야기를 나누는 친근한 대화 상대예요. 지금 "${c.title}"(${CAT_LABELS[c.cat]||c.cat}) 얘기가 나왔어요. 자연스럽게 반응하고 대화를 이어가요. 이름 호칭 없이, 이모지 1개. 반드시 ~해요, ~이에요, ~어요 체 존댓말만 사용. 반말 절대 금지.`;
-  _openHomeChatModal(c.title+' 이야기 💬',sys,null);
 }
 
 // ─ 주간 루틴 제안
@@ -4855,10 +4884,47 @@ function loadDaily(){
   const dk=dateKey(currentDate);
   ensureDateSynced(dk).then(fetched=>{if(fetched){loadSleep();renderTodos();renderMemos();renderTodayMeal();}});
 }
+function renderWeeklyRhythmBars(){
+  const el=document.getElementById('weekly-rhythm-bars');if(!el)return;
+  const now=new Date();
+  const mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7));
+  const DOW=['월','화','수','목','금','토','일'];
+  const todayDk=dateKey(now);
+  const toMin=function(t){if(!t)return null;const p=t.split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);};
+  const MEAL_KEYS=['breakfast','lunch','dinner','snack'];
+  let html='<div class="wrb-wrap">';
+  for(let i=0;i<7;i++){
+    const d=new Date(mon);d.setDate(mon.getDate()+i);
+    const dk=dateKey(d);
+    const sleep=getSleep(dk)||{};
+    const meals=getMeals(dk)||{};
+    const memos=getMemos(dk).filter(function(m){return m.time&&m.text;});
+    const wakeMin=toMin(sleep.wake),sleepMin=toMin(sleep.sleep);
+    let track='<div class="wrb-track">';
+    if(wakeMin!=null)track+='<div class="wrb-sleep" style="left:0%;width:'+(wakeMin/1440*100)+'%;"></div>';
+    if(sleepMin!=null)track+='<div class="wrb-sleep" style="left:'+(sleepMin/1440*100)+'%;width:'+(100-sleepMin/1440*100)+'%;"></div>';
+    track+='</div>';
+    let dots='';
+    MEAL_KEYS.forEach(function(k){
+      const t=meals[k+'_time'];if(!t)return;
+      const min=toMin(t);
+      dots+='<div class="wrb-dot meal" style="left:'+(min/1440*100)+'%;"></div>';
+    });
+    memos.forEach(function(m){
+      const min=toMin(m.time);const h=Math.floor(min/60);
+      const cls=h>=5&&h<12?'tod-morning':h>=12&&h<18?'tod-afternoon':'tod-night';
+      dots+='<div class="wrb-dot '+cls+'" style="left:'+(min/1440*100)+'%;"></div>';
+    });
+    html+='<div class="wrb-row"><div class="wrb-daylabel'+(dk===todayDk?' today':'')+'">'+DOW[i]+'</div><div class="wrb-trackwrap">'+track+dots+'</div></div>';
+  }
+  html+='</div>';
+  el.innerHTML=html;
+}
 function loadWeekly(){
   buildWeekStrip();renderHabitGrid();
   renderWeeklyChallenge();
   renderDailyOneLineWeek();
+  renderWeeklyRhythmBars();
 }
 function loadMonthly(){
   _calYear=new Date().getFullYear();_calMonth=new Date().getMonth();
