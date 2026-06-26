@@ -840,7 +840,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .habit-check-box{background:var(--sleep-b);border:1px solid var(--sleep-bb);border-radius:14px;padding:14px 10px 10px;display:flex;flex-wrap:wrap;justify-content:space-around;gap:10px;}
 .habit-check-col{display:flex;flex-direction:column;align-items:center;gap:7px;min-width:48px;}
 .habit-check-name{font-size:11px;color:var(--tp);text-align:center;}
-.habit-check-foot{width:100%;display:flex;justify-content:flex-end;margin-top:2px;}
+.habit-check-foot{width:100%;display:flex;justify-content:flex-end;margin-top:8px;margin-bottom:2px;}
+.habit-chk2{width:28px;height:28px;border-radius:50%;border:1.5px dashed rgba(195,175,168,0.5);background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;}
+.habit-chk2.on{border-style:solid;}
 
 /* ── 데일리 리듬 트랙 (목업 C 기반) ── */
 .rhythm-track-datelabel{font-size:12px;font-weight:700;color:var(--tp);margin-bottom:14px;display:flex;justify-content:space-between;align-items:baseline;}
@@ -852,19 +854,16 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rt-sleepicon{position:absolute;left:25px;width:12px;height:12px;display:flex;align-items:center;justify-content:center;color:#fff;}
 .rt-dot{position:absolute;left:26px;width:10px;height:10px;border-radius:50%;z-index:2;}
 .rt-connector{position:absolute;left:30px;width:1.5px;background:rgba(200,190,175,0.55);}
-.rt-dot.meal{background:#7fb35f;}
-.rt-dot.tod-morning{background:#e0a23c;}
-.rt-dot.tod-afternoon{background:#d8636f;}
-.rt-dot.tod-night{background:#9673d2;}
+.rt-dot.meal{background:#91d2af;}
+.rt-dot.memo{background:#f0a0aa;}
 .rt-row{position:absolute;left:46px;right:0;display:flex;align-items:center;gap:7px;font-size:11px;color:var(--tp);white-space:nowrap;overflow:hidden;}
 .rt-row .rt-time{font-size:9px;color:var(--tm);width:36px;flex-shrink:0;font-family:'DM Sans',sans-serif;}
-.rt-icon{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:#fffdf8;border:1.5px solid rgba(150,195,130,0.7);color:rgba(95,140,75,0.85);}
+.rt-icon{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:#fffdf8;border:1.5px solid rgba(145,210,175,0.7);color:rgba(80,150,115,0.85);}
 .rt-txt.memo{color:var(--ts);overflow:hidden;text-overflow:ellipsis;}
 .rhythm-track-legend{display:flex;gap:14px;margin-top:8px;padding-left:2px;}
 .rhythm-track-legend span{display:flex;align-items:center;gap:5px;font-size:9.5px;color:var(--tm);}
 .rhythm-track-legend i{width:7px;height:7px;border-radius:50%;flex-shrink:0;display:inline-block;}
 [data-theme="glass"] .rt-sleepblock{background:linear-gradient(180deg,#7b87bf,#9aa3d4);}
-[data-theme="glass"] .rt-dot.tod-morning{background:#c9925e;}
 
 .habit-numbox{display:flex;flex-wrap:wrap;justify-content:space-around;gap:10px;background:var(--card);border:1px solid var(--card-b);border-radius:14px;padding:12px 8px;margin-bottom:2px;}
 .habit-numbox-col{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:44px;}
@@ -880,8 +879,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .wrb-track{position:absolute;top:0;left:0;right:0;height:8px;border-radius:8px;background:rgba(220,210,195,0.35);}
 .wrb-sleep{position:absolute;top:0;height:8px;border-radius:8px;background:linear-gradient(90deg,#8d92c9,#aab0dd);}
 .wrb-dot{position:absolute;top:50%;width:7px;height:7px;border-radius:50%;transform:translate(-50%,-50%);}
-.wrb-dot.meal{background:#7fb35f;}
-.wrb-dot.memo{background:#d8636f;}
+.wrb-dot.meal{background:#91d2af;}
+.wrb-dot.memo{background:#f0a0aa;}
 .wrb-legend{display:flex;gap:14px;margin-top:12px;padding-left:2px;}
 .wrb-legend span{display:flex;align-items:center;gap:5px;font-size:9.5px;color:var(--tm);}
 .wrb-legend i{width:7px;height:7px;border-radius:50%;flex-shrink:0;display:inline-block;}
@@ -1142,6 +1141,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="card s" id="daily-meal-card"></div>
       <div class="slabel">해빗</div>
       <div class="habit-check-box" id="daily-habit-box"></div>
+      <div class="habit-check-foot"><button class="habit-edit-btn" onclick="openHabitModal()">+ 항목 편집</button></div>
     </div>
 
     <!-- WEEKLY -->
@@ -1974,7 +1974,7 @@ function buildDailyRhythmTrack(dk){
       html+='<div class="rt-dot meal" style="top:'+(ev.dotY+3)+'px;"></div>';
       html+='<div class="rt-row" style="top:'+ev.y+'px;"><span class="rt-time">'+ev.time+'</span><span class="rt-icon meal">'+RT_MEAL_ICON+'</span><span class="rt-txt">'+ev.label+'</span></div>';
     }else{
-      html+='<div class="rt-dot '+todClass(ev.min)+'" style="top:'+(ev.dotY+3)+'px;"></div>';
+      html+='<div class="rt-dot memo" style="top:'+(ev.dotY+3)+'px;"></div>';
       html+='<div class="rt-row" style="top:'+ev.y+'px;"><span class="rt-time">'+ev.time+'</span><span class="rt-txt memo">'+ev.label+'</span></div>';
     }
   });
@@ -1988,7 +1988,7 @@ function buildDailyRhythmTrack(dk){
   wrap.innerHTML=html;
   outer.appendChild(wrap);
   const legend=document.createElement('div');legend.className='rhythm-track-legend';
-  legend.innerHTML='<span><i style="background:#aab0dd;"></i>수면</span><span><i style="background:#7fb35f;"></i>식사</span><span><i style="background:#d8636f;"></i>기록(메모/투두)</span>';
+  legend.innerHTML='<span><i style="background:#aab0dd;"></i>수면</span><span><i style="background:#91d2af;"></i>식사</span><span><i style="background:#f0a0aa;"></i>메모</span>';
   outer.appendChild(legend);
   return outer;
 }
@@ -4912,6 +4912,7 @@ function recordMealTime(dk,k){
   saveMealsData(dk,m);
   renderTodayMeal();
 }
+const HABIT_COLOR_RGBA={mint:'rgba(140,210,200,0.85)',pink:'rgba(255,150,180,0.80)',sky:'rgba(130,190,255,0.80)',yellow:'rgba(240,200,80,0.80)',rose:'rgba(240,140,140,0.80)',lavender:'rgba(185,165,230,0.80)',peach:'rgba(255,185,140,0.80)',teal:'rgba(100,195,185,0.80)'};
 function renderDailyHabitCheck(){
   const el=document.getElementById('daily-habit-box');if(!el)return;
   const habits=getHabits();
@@ -4922,9 +4923,10 @@ function renderDailyHabitCheck(){
   habits.forEach(function(h){
     const key=h.name+'-'+dow;
     const checked=!!checks[key];
+    const rgba=HABIT_COLOR_RGBA[h.color]||'rgba(192,112,128,0.80)';
     const col=document.createElement('div');col.className='habit-check-col';
-    col.innerHTML='<div class="habit-check-name">'+h.name+'</div><div class="home-habit-chk'+(checked?' on':'')+'"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#c07080" stroke-width="1.6" stroke-linecap="round" style="display:'+(checked?'block':'none')+'"><polyline points="2,6 4.5,9 10,3.5"/></svg></div>';
-    col.querySelector('.home-habit-chk').addEventListener('click',function(){
+    col.innerHTML='<div class="habit-check-name">'+h.name+'</div><div class="habit-chk2'+(checked?' on':'')+'"'+(checked?' style="background:'+rgba+';border-color:'+rgba+';"':'')+'><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" style="display:'+(checked?'block':'none')+'"><polyline points="2,6 4.5,9 10,3.5"/></svg></div>';
+    col.querySelector('.habit-chk2').addEventListener('click',function(){
       checks[key]=!checks[key];
       saveHabitChecks(wk,checks);
       renderDailyHabitCheck();
@@ -4932,9 +4934,6 @@ function renderDailyHabitCheck(){
     });
     el.appendChild(col);
   });
-  const foot=document.createElement('div');foot.className='habit-check-foot';
-  foot.innerHTML='<button class="habit-edit-btn" onclick="openHabitModal()">+ 항목 편집</button>';
-  el.appendChild(foot);
 }
 function loadDaily(){
   loadSleep();renderTodos();renderMemos();renderTodayMeal();renderDailyHabitCheck();
@@ -4984,7 +4983,7 @@ function renderWeeklyRhythmBars(){
     html+='<div class="wrb-row"><div class="wrb-daylabel'+(dk===todayDk?' today':'')+'">'+DOW[i]+'</div><div class="wrb-trackwrap">'+track+dots+'</div></div>';
   }
   html+='</div>';
-  html+='<div class="wrb-legend"><span><i style="background:#aab0dd;"></i>수면</span><span><i style="background:#7fb35f;"></i>식사</span><span><i style="background:#d8636f;"></i>기록(메모/투두)</span></div>';
+  html+='<div class="wrb-legend"><span><i style="background:#aab0dd;"></i>수면</span><span><i style="background:#91d2af;"></i>식사</span><span><i style="background:#f0a0aa;"></i>메모</span></div>';
   el.innerHTML=html;
 }
 function loadWeekly(){
