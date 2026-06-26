@@ -836,6 +836,12 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="dark"] .home-btn,[data-theme="dark"] .home-content-item,[data-theme="dark"] .home-icon-btn{background:rgba(255,255,255,0.06);border-color:rgba(255,255,255,0.10);}
 [data-theme="dark"] .home-icon-bar{border-top-color:rgba(255,255,255,0.08);}
 
+/* ── 오늘 해빗 체크박스 (수면박스 색) ── */
+.habit-check-box{background:var(--sleep-b);border:1px solid var(--sleep-bb);border-radius:14px;padding:14px 10px 10px;display:flex;flex-wrap:wrap;justify-content:space-around;gap:10px;}
+.habit-check-col{display:flex;flex-direction:column;align-items:center;gap:7px;min-width:48px;}
+.habit-check-name{font-size:11px;color:var(--tp);text-align:center;}
+.habit-check-foot{width:100%;display:flex;justify-content:flex-end;margin-top:2px;}
+
 /* ── 데일리 리듬 트랙 (목업 C 기반) ── */
 .rhythm-track-datelabel{font-size:12px;font-weight:700;color:var(--tp);margin-bottom:14px;display:flex;justify-content:space-between;align-items:baseline;}
 .rhythm-track-datelabel .w{font-size:10px;font-weight:400;color:var(--tm);}
@@ -859,10 +865,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="glass"] .rt-sleepblock{background:linear-gradient(180deg,#7b87bf,#9aa3d4);}
 [data-theme="glass"] .rt-dot.tod-morning{background:#c9925e;}
 
-.habit-streak-row{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 8px;margin-bottom:2px;-webkit-overflow-scrolling:touch;}
-.habit-streak-item{flex-shrink:0;display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--card-b);border-radius:12px;padding:8px 12px;white-space:nowrap;}
-.habit-streak-name{font-size:12px;color:var(--tp);}
-.habit-streak-cnt{font-size:10.5px;color:var(--tm);font-family:'DM Sans',sans-serif;}
+.habit-numbox{display:flex;flex-wrap:wrap;justify-content:space-around;gap:10px;background:var(--card);border:1px solid var(--card-b);border-radius:14px;padding:12px 8px;margin-bottom:2px;}
+.habit-numbox-col{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:44px;}
+.habit-numbox-name{font-size:11px;color:var(--tp);}
+.habit-numbox-num{font-size:16px;font-weight:700;color:var(--ts);font-family:'DM Sans',sans-serif;}
 
 /* ── 주간 가로 리듬바 (목업 B 기반) ── */
 .wrb-wrap{display:flex;flex-direction:column;gap:13px;padding:2px 0;}
@@ -874,15 +880,12 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .wrb-sleep{position:absolute;top:0;height:8px;border-radius:8px;background:linear-gradient(90deg,#8d92c9,#aab0dd);}
 .wrb-dot{position:absolute;top:50%;width:7px;height:7px;border-radius:50%;transform:translate(-50%,-50%);}
 .wrb-dot.meal{background:#7fb35f;}
-.wrb-dot.tod-morning{background:#e0a23c;}
-.wrb-dot.tod-afternoon{background:#d8636f;}
-.wrb-dot.tod-night{background:#9673d2;}
+.wrb-dot.memo{background:#d8636f;}
 .wrb-legend{display:flex;gap:14px;margin-top:12px;padding-left:2px;}
 .wrb-legend span{display:flex;align-items:center;gap:5px;font-size:9.5px;color:var(--tm);}
 .wrb-legend i{width:7px;height:7px;border-radius:50%;flex-shrink:0;display:inline-block;}
 [data-theme="glass"] .wrb-track{background:rgba(190,180,160,0.30);}
 [data-theme="glass"] .wrb-sleep{background:linear-gradient(90deg,#7b87bf,#9aa3d4);}
-[data-theme="glass"] .wrb-dot.tod-morning{background:#c9925e;}
 
 /* ── 일정 카드 */
 .schedule-card{background:var(--card);border:1px solid var(--card-b);border-radius:18px;padding:16px 16px;margin-bottom:10px;min-height:unset;}
@@ -1136,6 +1139,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       </div>
       <div class="slabel">오늘 뭐 먹지</div>
       <div class="card s" id="daily-meal-card"></div>
+      <div class="slabel">해빗</div>
+      <div class="habit-check-box" id="daily-habit-box"></div>
     </div>
 
     <!-- WEEKLY -->
@@ -1145,23 +1150,12 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div class="goal-section-title" style="margin-top:0;">✦ 이번 주도 화이팅</div>
         <div class="goal-wrap" id="weekly-goal-wrap"></div>
       </div>
-      <div class="slabel">이번 주 리듬</div>
-      <div class="card m" id="weekly-rhythm-bars"></div>
       <div class="slabel">하루 한 줄</div>
       <div class="card" id="daily-oneline-card">
         <div id="daily-oneline-list"></div>
       </div>
-      <div class="slabel">habit tracker</div>
-      <div class="card m" id="habit-card">
-        <div class="habit-grid" id="habit-grid">
-          <div></div>
-          <div class="hday">월</div><div class="hday">화</div><div class="hday">수</div>
-          <div class="hday">목</div><div class="hday">금</div><div class="hday">토</div><div class="hday">일</div>
-        </div>
-        <div class="habit-foot">
-          <button class="habit-edit-btn" onclick="openHabitModal()">+ 항목 편집</button>
-        </div>
-      </div>
+      <div class="slabel">이번 주 리듬</div>
+      <div class="card" id="weekly-rhythm-bars"></div>
       <div class="report-banner meal-soft" onclick="openWeekMealSheet()">
         <div class="report-banner-inner">
           <div class="report-banner-line"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="vertical-align:-1px;margin-right:3px;"><path d="M2 5.5h8a4 4 0 0 1-8 0z"/><line x1="2" y1="5.5" x2="10" y2="5.5"/><line x1="6" y1="1.5" x2="6" y2="3.5"/></svg>이번 주 뭐 먹지?</div>
@@ -2058,14 +2052,14 @@ function getHabitStreak(name){
   return streak;
 }
 function makeHabitStreakRow(){
-  const wrap=document.createElement('div');wrap.className='habit-streak-row';
+  const wrap=document.createElement('div');wrap.className='habit-numbox';
   const habits=getHabits();
-  if(!habits.length){wrap.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 2px;">습관을 추가해보세요</div>';return wrap;}
+  if(!habits.length){wrap.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 2px;width:100%;text-align:center;">습관을 추가해보세요</div>';return wrap;}
   habits.forEach(function(h){
     const streak=getHabitStreak(h.name);
-    const item=document.createElement('div');item.className='habit-streak-item';
-    item.innerHTML='<span class="home-habit-dot '+h.color+'"></span><span class="habit-streak-name">'+h.name+'</span><span class="habit-streak-cnt">'+streak+'일째</span>';
-    wrap.appendChild(item);
+    const col=document.createElement('div');col.className='habit-numbox-col';
+    col.innerHTML='<span class="home-habit-dot '+h.color+'"></span><span class="habit-numbox-name">'+h.name+'</span><span class="habit-numbox-num">'+streak+'</span>';
+    wrap.appendChild(col);
   });
   return wrap;
 }
@@ -4204,7 +4198,7 @@ function openHabitModal(){
 function confirmHabit(){
   const val=document.getElementById('habit-modal-inp').value.trim();if(!val)return;
   const newH=val.split('\n').map((n,i)=>({name:n.trim(),color:HABIT_COLORS[i%HABIT_COLORS.length]})).filter(h=>h.name);
-  saveHabits(newH);closeModal('habit-modal');renderHabitGrid();renderHabitMonthly();
+  saveHabits(newH);closeModal('habit-modal');renderHabitGrid();renderHabitMonthly();renderDailyHabitCheck();
 }
 
 // ── TIMETABLE
@@ -4912,10 +4906,34 @@ function recordMealTime(dk,k){
   saveMealsData(dk,m);
   renderTodayMeal();
 }
+function renderDailyHabitCheck(){
+  const el=document.getElementById('daily-habit-box');if(!el)return;
+  const habits=getHabits();
+  if(!habits.length){el.innerHTML='<div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;width:100%;">습관을 추가해보세요</div>';return;}
+  const wk=weekKey(currentDate),dow=(currentDate.getDay()+6)%7;
+  const checks=getHabitChecks(wk);
+  el.innerHTML='';
+  habits.forEach(function(h){
+    const key=h.name+'-'+dow;
+    const checked=!!checks[key];
+    const col=document.createElement('div');col.className='habit-check-col';
+    col.innerHTML='<div class="habit-check-name">'+h.name+'</div><div class="home-habit-chk'+(checked?' on':'')+'"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#c07080" stroke-width="1.6" stroke-linecap="round" style="display:'+(checked?'block':'none')+'"><polyline points="2,6 4.5,9 10,3.5"/></svg></div>';
+    col.querySelector('.home-habit-chk').addEventListener('click',function(){
+      checks[key]=!checks[key];
+      saveHabitChecks(wk,checks);
+      renderDailyHabitCheck();
+      if(document.getElementById('v-monthly')&&document.getElementById('v-monthly').classList.contains('on'))renderHabitMonthly();
+    });
+    el.appendChild(col);
+  });
+  const foot=document.createElement('div');foot.className='habit-check-foot';
+  foot.innerHTML='<button class="habit-edit-btn" onclick="openHabitModal()">+ 항목 편집</button>';
+  el.appendChild(foot);
+}
 function loadDaily(){
-  loadSleep();renderTodos();renderMemos();renderTodayMeal();
+  loadSleep();renderTodos();renderMemos();renderTodayMeal();renderDailyHabitCheck();
   const dk=dateKey(currentDate);
-  ensureDateSynced(dk).then(fetched=>{if(fetched){loadSleep();renderTodos();renderMemos();renderTodayMeal();}});
+  ensureDateSynced(dk).then(fetched=>{if(fetched){loadSleep();renderTodos();renderMemos();renderTodayMeal();renderDailyHabitCheck();}});
 }
 function renderWeeklyRhythmBars(){
   const el=document.getElementById('weekly-rhythm-bars');if(!el)return;
@@ -4942,15 +4960,20 @@ function renderWeeklyRhythmBars(){
     }
     track+='</div>';
     let dots='';
+    const seenMeal={},seenMemo={};
+    const BUCKET=30;
     MEAL_KEYS.forEach(function(k){
       const t=meals[k+'_time'];if(!t)return;
       const min=toMin(t);
+      const b=Math.round(min/BUCKET)*BUCKET;
+      if(seenMeal[b])return;seenMeal[b]=true;
       dots+='<div class="wrb-dot meal" style="left:'+(min/1440*100)+'%;"></div>';
     });
     memos.forEach(function(m){
-      const min=toMin(m.time);const h=Math.floor(min/60);
-      const cls=h>=5&&h<12?'tod-morning':h>=12&&h<18?'tod-afternoon':'tod-night';
-      dots+='<div class="wrb-dot '+cls+'" style="left:'+(min/1440*100)+'%;"></div>';
+      const min=toMin(m.time);
+      const b=Math.round(min/BUCKET)*BUCKET;
+      if(seenMemo[b])return;seenMemo[b]=true;
+      dots+='<div class="wrb-dot memo" style="left:'+(min/1440*100)+'%;"></div>';
     });
     html+='<div class="wrb-row"><div class="wrb-daylabel'+(dk===todayDk?' today':'')+'">'+DOW[i]+'</div><div class="wrb-trackwrap">'+track+dots+'</div></div>';
   }
@@ -4959,7 +4982,7 @@ function renderWeeklyRhythmBars(){
   el.innerHTML=html;
 }
 function loadWeekly(){
-  buildWeekStrip();renderHabitGrid();
+  buildWeekStrip();
   renderWeeklyChallenge();
   renderDailyOneLineWeek();
   renderWeeklyRhythmBars();
