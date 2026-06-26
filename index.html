@@ -872,7 +872,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .share-ov-body{flex:1;overflow-y:auto;padding:0 18px 28px;}
 
 .share-stage-wrap{display:flex;justify-content:center;margin-bottom:18px;}
-.share-stage{position:relative;width:280px;height:373px;border-radius:14px;overflow:hidden;background:var(--card-p);border:1.5px dashed var(--card-pb);box-shadow:0 8px 28px rgba(0,0,0,.12);background-size:cover;background-position:center;cursor:pointer;}
+.share-stage{position:relative;width:280px;height:373px;border-radius:14px;overflow:hidden;border:1.5px dashed var(--card-pb);box-shadow:0 8px 28px rgba(0,0,0,.12);cursor:pointer;background:rgba(255,220,235,0.16);}
+.share-stage-inner{position:absolute;inset:0;background-size:cover;background-position:center;}
 .share-stage-empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--acc);font-size:12px;}
 .share-vignette{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 100%,rgba(0,0,0,.55) 0%,rgba(0,0,0,0) 55%),linear-gradient(180deg,rgba(0,0,0,.28) 0%,rgba(0,0,0,0) 22%);pointer-events:none;}
 .share-txtshadow{text-shadow:0 1px 6px rgba(0,0,0,.55);}
@@ -1262,9 +1263,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   <div class="share-ov-body">
     <div class="share-stage-wrap">
       <div class="share-stage" id="share-stage" onclick="document.getElementById('share-bg-inp').click();">
-        <div class="share-stage-empty" id="share-stage-empty">
-          <svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="5" width="20" height="16" rx="2"/><circle cx="9" cy="11" r="1.6"/><path d="M3 17l5.5-5.5 3 3 4-4L23 17"/></svg>
-          <span>탭해서 배경 사진 추가</span>
+        <div class="share-stage-inner" id="share-stage-inner">
+          <div class="share-stage-empty" id="share-stage-empty">
+            <svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="5" width="20" height="16" rx="2"/><circle cx="9" cy="11" r="1.6"/><path d="M3 17l5.5-5.5 3 3 4-4L23 17"/></svg>
+            <span>탭해서 배경 사진 추가</span>
+          </div>
         </div>
       </div>
     </div>
@@ -5383,7 +5386,7 @@ function pickShareQuote(cid){
   renderShareStage();
 }
 function renderShareStage(){
-  const stage=document.getElementById('share-stage');if(!stage)return;
+  const stage=document.getElementById('share-stage-inner');if(!stage)return;
   const cur=getBooks().find(b=>b.status==='reading');
   const quotes=cur?getQuotes().filter(q=>q.bookCid===cur.cid):[];
   const pickedQuote=quotes.find(q=>q.cid===_shareState.quoteCid)||quotes[0];
@@ -5413,9 +5416,9 @@ function renderShareStage(){
         </svg>
       </div>`;
     }
-    if(_shareState.cover!=='none'){
+    if(_shareState.cover!=='none'&&cur.poster){
       const posClass=_shareState.cover==='bl'?'pos-bl':_shareState.cover==='tr2'?'pos-tr2':'pos-br2';
-      html+=`<div class="s-cover ${posClass}" style="${cur.poster?`background-image:url('${cur.poster}')`:''}"></div>`;
+      html+=`<div class="s-cover ${posClass}" style="background-image:url('${cur.poster}')"></div>`;
     }
     if(_shareState.quote==='qs'&&pickedQuote){
       html+=`<div class="s-qs">
@@ -5438,10 +5441,41 @@ function renderShareStage(){
   }
   stage.innerHTML=html;
 }
+async function imgUrlToDataUrl(url){
+  try{
+    const res=await fetch(url,{mode:'cors'});
+    if(!res.ok)return null;
+    const blob=await res.blob();
+    return await new Promise((resolve,reject)=>{
+      const reader=new FileReader();
+      reader.onload=()=>resolve(reader.result);
+      reader.onerror=reject;
+      reader.readAsDataURL(blob);
+    });
+  }catch(e){return null;}
+}
 async function saveShareCard(){
-  const stage=document.getElementById('share-stage');
+  const stage=document.getElementById('share-stage-inner');
   if(!stage)return;
   if(!_shareState.bg){showToast('배경 사진을 먼저 추가해주세요');return;}
+  const coverEl=stage.querySelector('.s-cover');
+  let restoreCoverBg=null;
+  if(coverEl){
+    const origBg=coverEl.style.backgroundImage;
+    const m=origBg.match(/url\(["']?(.*?)["']?\)/);
+    const origUrl=m?m[1]:null;
+    if(origUrl&&!origUrl.startsWith('data:')){
+      const dataUrl=await imgUrlToDataUrl(origUrl);
+      if(dataUrl){
+        coverEl.style.backgroundImage=`url('${dataUrl}')`;
+        restoreCoverBg=origBg;
+      }else{
+        // 변환 실패 시 빈 박스 대신 표지 스티커를 잠시 숨김(저장본에서만)
+        coverEl.style.display='none';
+        restoreCoverBg='__hide__';
+      }
+    }
+  }
   try{
     const canvas=await html2canvas(stage,{useCORS:true,scale:3,backgroundColor:null});
     const filename='iikoto_reading_'+dateKey(new Date())+'.png';
@@ -5463,6 +5497,11 @@ async function saveShareCard(){
     if(e&&e.name==='AbortError')return; // 공유시트에서 취소한 경우
     console.warn('share card export err:',e);
     showToast('이미지 저장에 실패했어요');
+  }finally{
+    if(coverEl&&restoreCoverBg!==null){
+      if(restoreCoverBg==='__hide__')coverEl.style.display='';
+      else coverEl.style.backgroundImage=restoreCoverBg;
+    }
   }
 }
 function openAddBookModal(){
