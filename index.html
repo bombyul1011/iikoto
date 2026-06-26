@@ -865,25 +865,37 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 @font-face{font-family:'Bareonbatang';src:url('./fonts/HakgyoansimBareonbatangR.woff2') format('woff2');font-weight:400;font-display:swap;}
 @font-face{font-family:'Bareonbatang';src:url('./fonts/HakgyoansimBareonbatangB.woff2') format('woff2');font-weight:700;font-display:swap;}
 
-.share-ov{position:fixed;inset:0;background:#0c0b09;z-index:8500;display:none;flex-direction:column;}
+.share-ov{position:fixed;inset:0;background:var(--bg);z-index:8500;display:none;flex-direction:column;}
 .share-ov.on{display:flex;}
 .share-ov-hdr{display:flex;align-items:center;gap:12px;padding:max(20px,env(safe-area-inset-top)) 18px 14px;flex-shrink:0;}
-.share-ov-ttl{font-size:15px;font-weight:600;color:#f6ecdd;flex:1;}
+.share-ov-ttl{font-size:15px;font-weight:600;color:var(--tp);flex:1;}
 .share-ov-body{flex:1;overflow-y:auto;padding:0 18px 28px;}
 
 .share-stage-wrap{display:flex;justify-content:center;margin-bottom:18px;}
-.share-stage{position:relative;width:280px;height:373px;border-radius:14px;overflow:hidden;background:#2a2620;box-shadow:0 8px 28px rgba(0,0,0,.5);background-size:cover;background-position:center;}
+.share-stage{position:relative;width:280px;height:373px;border-radius:14px;overflow:hidden;background:#2a2620;box-shadow:0 8px 28px rgba(0,0,0,.35);background-size:cover;background-position:center;}
 .share-stage-empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:rgba(246,236,221,0.5);font-size:12px;}
 .share-vignette{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 100%,rgba(0,0,0,.55) 0%,rgba(0,0,0,0) 55%),linear-gradient(180deg,rgba(0,0,0,.28) 0%,rgba(0,0,0,0) 22%);pointer-events:none;}
 .share-txtshadow{text-shadow:0 1px 6px rgba(0,0,0,.55);}
 
-.share-opt-label{font-size:11px;color:var(--tm);margin:18px 2px 8px;letter-spacing:.02em;}
-.share-opt-row{display:flex;gap:7px;flex-wrap:wrap;}
-.share-opt-btn{padding:8px 13px;border-radius:10px;border:1px solid var(--card-b);background:var(--card);font-size:12px;color:var(--ts);cursor:pointer;font-family:'DM Sans',sans-serif;}
-.share-opt-btn.on{background:var(--acc-soft);color:var(--acc);border-color:var(--acc);font-weight:600;}
-.share-opt-btn:disabled{opacity:.4;cursor:not-allowed;}
-.share-upload-btn{width:100%;padding:11px;border-radius:11px;border:1.5px dashed var(--card-b);background:none;color:var(--ts);font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;}
-.share-save-btn{width:100%;padding:13px;border-radius:12px;border:none;background:var(--acc);color:#fff;font-size:14px;font-weight:600;cursor:pointer;margin-top:6px;font-family:'DM Sans',sans-serif;}
+/* 순환식 스티커 버튼 4개 */
+.share-cycle-row{display:flex;gap:8px;margin-bottom:14px;}
+.share-cycle-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 4px;border-radius:12px;border:1px solid var(--card-b);background:var(--card);cursor:pointer;}
+.share-cycle-btn.active{background:var(--acc-soft);border-color:var(--acc);}
+.share-cycle-btn svg{width:16px;height:16px;color:var(--ts);}
+.share-cycle-btn.active svg{color:var(--acc);}
+.share-cycle-btn .lbl{font-size:9.5px;color:var(--tm);font-family:'DM Sans',sans-serif;}
+.share-cycle-btn.active .lbl{color:var(--acc);font-weight:600;}
+
+.share-quote-pick-wrap{margin-bottom:14px;}
+.share-quote-pick-label{font-size:11px;color:var(--tm);margin:0 2px 7px;}
+.share-quote-pick-scroll{display:flex;gap:7px;overflow-x:auto;padding-bottom:4px;}
+.share-quote-pick-item{flex-shrink:0;width:140px;padding:9px 11px;border-radius:10px;border:1px solid var(--card-b);background:var(--card);font-size:11px;color:var(--ts);line-height:1.4;cursor:pointer;}
+.share-quote-pick-item.on{border-color:var(--acc);background:var(--acc-soft);color:var(--acc);}
+
+.share-upload-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:7px;padding:11px;border-radius:11px;border:1.5px dashed var(--card-b);background:none;color:var(--ts);font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;}
+.share-upload-btn svg{width:14px;height:14px;}
+.share-save-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:7px;padding:13px;border-radius:12px;border:none;background:var(--acc);color:#fff;font-size:14px;font-weight:600;cursor:pointer;margin-top:14px;font-family:'DM Sans',sans-serif;}
+.share-save-btn svg{width:15px;height:15px;}
 
 /* 헤더 스티커 1: READING LOG */
 .s-rl{position:absolute;top:20px;left:20px;right:20px;color:#f6ecdd;font-family:'Bareonbatang',serif;}
@@ -898,13 +910,15 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .s-rl-bottom{display:flex;align-items:center;gap:8px;}
 .s-rl-underline{flex:1;height:1px;background:rgba(246,236,221,0.22);}
 
-/* 헤더 스티커 2: TODAY'S READING */
+/* 헤더 스티커 2: TODAY'S READING (텍스트만, 표지 없음) */
 .s-tr-head{position:absolute;top:22px;left:0;right:0;text-align:center;color:#eef2e6;}
-.s-tr-icon{width:14px;height:14px;margin:0 auto 3px;color:rgba(238,242,230,0.85);}
+.s-tr-icon{display:block;width:14px;height:14px;margin:0 auto 3px;color:rgba(238,242,230,0.85);}
 .s-tr-star{margin-top:1px;font-size:8px;color:rgba(238,242,230,0.6);}
-.s-tr-bottom{position:absolute;bottom:20px;left:20px;}
-.s-tr-cover{width:50px;height:72px;border-radius:4px;box-shadow:0 4px 14px rgba(0,0,0,.4);background:#444 center/cover no-repeat;flex-shrink:0;}
-.s-tr-cover-title{margin-top:6px;font-size:10.5px;color:#eef2e6;width:50px;line-height:1.3;font-family:'Bareonbatang',serif;}
+
+/* 표지 스티커 (독립) */
+.s-cover{position:absolute;width:54px;height:78px;border-radius:4px;box-shadow:0 4px 14px rgba(0,0,0,.4);background:#444 center/cover no-repeat;}
+.s-cover.pos-bl{bottom:20px;left:20px;}
+.s-cover.pos-br2{bottom:20px;right:20px;}
 
 /* 문장 스티커 3: 심플형 */
 .s-qs{position:absolute;bottom:20px;left:20px;right:20px;color:#f6ecdd;font-family:'Bareonbatang',serif;}
@@ -916,11 +930,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .s-qs-meta .t{font-weight:700;color:rgba(246,236,221,0.92);}
 .s-qs-meta .a{color:rgba(246,236,221,0.65);}
 
-/* 문장 스티커 4: 테이프형 */
-.s-qt-wrap{position:absolute;bottom:20px;left:20px;right:20px;display:flex;align-items:center;gap:10px;}
-.s-qt-cover{width:46px;height:66px;border-radius:4px;box-shadow:0 4px 14px rgba(0,0,0,.4);background:#444 center/cover no-repeat;flex-shrink:0;}
-.s-qt-col{flex:1;font-family:'Bareonbatang',serif;}
-.s-qt-box{position:relative;border:1.3px solid rgba(246,236,221,0.32);border-radius:18px;padding:14px 13px 11px;color:#f6ecdd;}
+/* 문장 스티커 4: 테이프형 (표지 없음, 박스만) */
+.s-qt-box{position:absolute;bottom:20px;left:20px;right:20px;border:1.3px solid rgba(246,236,221,0.32);border-radius:18px;padding:14px 13px 11px;color:#f6ecdd;font-family:'Bareonbatang',serif;}
 .s-qt-tape{position:absolute;top:-7px;left:22px;width:38px;height:15px;background:linear-gradient(135deg,rgba(190,170,148,0.55),rgba(165,145,122,0.45));border-radius:2px;box-shadow:0 2px 4px rgba(0,0,0,.25);transform:rotate(-6deg);}
 .s-qt-mark-open{font-size:12px;line-height:.5;color:rgba(246,236,221,0.88);}
 .s-qt-text{font-size:11px;line-height:1.5;margin:3px 0 1px;color:#f6ecdd;}
@@ -931,7 +942,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 /* 로고 워터마크 */
 .s-logo{position:absolute;display:flex;flex-direction:column;align-items:center;gap:3px;}
-.s-logo img{height:24px;display:block;transform:translateX(-5px);}
+.s-logo img{height:24px;display:block;}
 .s-logo .books{font-family:'Bareonbatang',serif;font-weight:700;font-size:7.5px;letter-spacing:.24em;color:rgba(246,236,221,0.88);}
 .s-logo.pos-br{bottom:14px;right:16px;}
 .s-logo.pos-tr{top:14px;right:16px;}
@@ -1243,7 +1254,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 <div class="share-ov" id="share-ov">
   <div class="share-ov-hdr">
     <div class="settings-back" onclick="closeShareCard()">
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="color:#f6ecdd"><polyline points="10,3 5,8 10,13"/></svg>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="color:var(--ts)"><polyline points="10,3 5,8 10,13"/></svg>
     </div>
     <span class="share-ov-ttl">독서 공유카드</span>
   </div>
@@ -1258,30 +1269,39 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     </div>
 
     <input type="file" accept="image/*" id="share-bg-inp" style="display:none;" onchange="onShareBgPick(event)">
-    <button class="share-upload-btn" id="share-upload-btn" onclick="document.getElementById('share-bg-inp').click()">🖼 배경 사진 선택</button>
+    <button class="share-upload-btn" onclick="document.getElementById('share-bg-inp').click()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2" y="3.5" width="12" height="9.5" rx="1.5"/><circle cx="5.5" cy="6.8" r="1"/><path d="M2 10.5l3.3-3.3 2 2 2.5-2.5L14 10"/></svg>
+      배경 사진 선택
+    </button>
 
-    <div class="share-opt-label">헤더 스타일</div>
-    <div class="share-opt-row" id="share-header-row">
-      <div class="share-opt-btn on" data-v="none" onclick="setShareHeader('none')">없음</div>
-      <div class="share-opt-btn" data-v="rl" onclick="setShareHeader('rl')">READING LOG</div>
-      <div class="share-opt-btn" data-v="tr" onclick="setShareHeader('tr')">TODAY'S READING</div>
+    <div class="share-cycle-row">
+      <div class="share-cycle-btn" id="cyc-header" onclick="cycleShare('header')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><line x1="2" y1="4" x2="14" y2="4"/><line x1="2" y1="8" x2="9" y2="8"/><line x1="2" y1="12" x2="11" y2="12"/></svg>
+        <span class="lbl" id="cyc-header-lbl">헤더 없음</span>
+      </div>
+      <div class="share-cycle-btn" id="cyc-quote" onclick="cycleShare('quote')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M3 4h10v6H7l-2.5 2.5V10H3z"/></svg>
+        <span class="lbl" id="cyc-quote-lbl">문장 없음</span>
+      </div>
+      <div class="share-cycle-btn" id="cyc-cover" onclick="cycleShare('cover')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M3 2.5C5.2 1.8 7 2.3 8 3.2C9 2.3 10.8 1.8 13 2.5v9.3c-2.2-.7-4-.2-5 .7-1-.9-2.8-1.4-5-.7z"/></svg>
+        <span class="lbl" id="cyc-cover-lbl">표지 없음</span>
+      </div>
+      <div class="share-cycle-btn" id="cyc-logo" onclick="cycleShare('logo')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="8" cy="8" r="5.5"/><path d="M8 4.5v3.5l2.3 1.3"/></svg>
+        <span class="lbl" id="cyc-logo-lbl">로고 없음</span>
+      </div>
     </div>
 
-    <div class="share-opt-label">문장 스티커</div>
-    <div class="share-opt-row" id="share-quote-row">
-      <div class="share-opt-btn on" data-v="none" onclick="setShareQuote('none')">없음</div>
-      <div class="share-opt-btn" data-v="qs" onclick="setShareQuote('qs')">심플형</div>
-      <div class="share-opt-btn" data-v="qt" onclick="setShareQuote('qt')">테이프형</div>
+    <div class="share-quote-pick-wrap" id="share-quote-pick-wrap" style="display:none;">
+      <div class="share-quote-pick-label">문장 선택</div>
+      <div class="share-quote-pick-scroll" id="share-quote-pick-scroll"></div>
     </div>
 
-    <div class="share-opt-label">로고</div>
-    <div class="share-opt-row" id="share-logo-row">
-      <div class="share-opt-btn on" data-v="none" onclick="setShareLogo('none')">끄기</div>
-      <div class="share-opt-btn" data-v="br" onclick="setShareLogo('br')">우측하단</div>
-      <div class="share-opt-btn" data-v="tr" onclick="setShareLogo('tr')">우측상단</div>
-    </div>
-
-    <button class="share-save-btn" onclick="saveShareCard()">📷 이미지로 저장</button>
+    <button class="share-save-btn" onclick="saveShareCard()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="2" y="4.5" width="12" height="9" rx="1.5"/><circle cx="8" cy="9" r="2.3"/><path d="M6 4.5l.8-1.5h2.4l.8 1.5"/></svg>
+      이미지로 저장
+    </button>
   </div>
 </div>
 
@@ -5299,46 +5319,75 @@ function setRdUnit(u){
 
 // ===== 독서 공유카드 =====
 const SHARE_LOGO_B64 = 'data:image/png;base64,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';
-let _shareState = { bg:null, header:'none', quote:'none', logo:'none' };
+const SHARE_CYCLE = {
+  header: [['none','헤더 없음'],['rl','READING LOG'],['tr',"TODAY'S READING"]],
+  quote: [['none','문장 없음'],['qs','문장 · 심플'],['qt','문장 · 테이프']],
+  cover: [['none','표지 없음'],['bl','표지 · 좌하단'],['br2','표지 · 우하단']],
+  logo: [['none','로고 없음'],['br','로고 · 우하단'],['tr','로고 · 우상단']]
+};
+let _shareState = { bg:null, header:'none', quote:'none', quoteCid:null, cover:'none', logo:'none' };
 function openShareCard(){
-  _shareState = { bg:null, header:'none', quote:'none', logo:'none' };
-  document.querySelectorAll('#share-header-row .share-opt-btn,#share-quote-row .share-opt-btn,#share-logo-row .share-opt-btn').forEach(b=>b.classList.toggle('on',b.dataset.v==='none'));
-  const cur=getBooks().find(b=>b.status==='reading');
-  const hasQuote=cur&&getQuotes().some(q=>q.bookCid===cur.cid);
-  document.querySelectorAll('#share-quote-row .share-opt-btn[data-v="qs"],#share-quote-row .share-opt-btn[data-v="qt"]').forEach(b=>b.disabled=!hasQuote);
+  _shareState = { bg:null, header:'none', quote:'none', quoteCid:null, cover:'none', logo:'none' };
+  ['header','quote','cover','logo'].forEach(updateCycleBtn);
+  renderQuotePicker();
   renderShareStage();
-  openSheetClass('share-ov');
+  document.getElementById('share-ov').classList.add('on');
 }
 function closeShareCard(){document.getElementById('share-ov').classList.remove('on');}
-function openSheetClass(id){document.getElementById(id).classList.add('on');}
 function onShareBgPick(e){
   const file=e.target.files&&e.target.files[0];if(!file)return;
   const reader=new FileReader();
-  reader.onload=ev=>{_shareState.bg=ev.target.result;document.getElementById('share-upload-btn').textContent='🖼 배경 사진 변경';renderShareStage();};
+  reader.onload=ev=>{_shareState.bg=ev.target.result;renderShareStage();};
   reader.readAsDataURL(file);
 }
-function setShareHeader(v){
-  _shareState.header=v;
-  document.querySelectorAll('#share-header-row .share-opt-btn').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+function cycleShare(key){
+  const opts=SHARE_CYCLE[key];
+  const cur=_shareState[key];
+  const idx=opts.findIndex(o=>o[0]===cur);
+  const next=opts[(idx+1)%opts.length][0];
+  _shareState[key]=next;
+  if(key==='quote'){
+    _shareState.quoteCid=null;
+    if(next!=='none'){
+      const cur2=getBooks().find(b=>b.status==='reading');
+      const quotes=cur2?getQuotes().filter(q=>q.bookCid===cur2.cid).sort((a,b)=>(b.created||0)-(a.created||0)):[];
+      if(quotes.length)_shareState.quoteCid=quotes[0].cid;
+    }
+    renderQuotePicker();
+  }
+  updateCycleBtn(key);
   renderShareStage();
 }
-function setShareQuote(v){
-  const btn=document.querySelector(`#share-quote-row .share-opt-btn[data-v="${v}"]`);
-  if(btn&&btn.disabled)return;
-  _shareState.quote=v;
-  document.querySelectorAll('#share-quote-row .share-opt-btn').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
-  renderShareStage();
+function updateCycleBtn(key){
+  const opts=SHARE_CYCLE[key];
+  const cur=_shareState[key];
+  const found=opts.find(o=>o[0]===cur)||opts[0];
+  const btn=document.getElementById('cyc-'+key);
+  const lbl=document.getElementById('cyc-'+key+'-lbl');
+  if(btn)btn.classList.toggle('active',cur!=='none');
+  if(lbl)lbl.textContent=found[1];
 }
-function setShareLogo(v){
-  _shareState.logo=v;
-  document.querySelectorAll('#share-logo-row .share-opt-btn').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+function renderQuotePicker(){
+  const wrap=document.getElementById('share-quote-pick-wrap');
+  const scroll=document.getElementById('share-quote-pick-scroll');
+  if(!wrap||!scroll)return;
+  if(_shareState.quote==='none'){wrap.style.display='none';return;}
+  const cur=getBooks().find(b=>b.status==='reading');
+  const quotes=cur?getQuotes().filter(q=>q.bookCid===cur.cid).sort((a,b)=>(b.created||0)-(a.created||0)):[];
+  if(!quotes.length){wrap.style.display='none';_shareState.quote='none';updateCycleBtn('quote');return;}
+  wrap.style.display='block';
+  scroll.innerHTML=quotes.map(q=>`<div class="share-quote-pick-item${q.cid===_shareState.quoteCid?' on':''}" onclick="pickShareQuote('${q.cid}')">${q.text}</div>`).join('');
+}
+function pickShareQuote(cid){
+  _shareState.quoteCid=cid;
+  renderQuotePicker();
   renderShareStage();
 }
 function renderShareStage(){
   const stage=document.getElementById('share-stage');if(!stage)return;
   const cur=getBooks().find(b=>b.status==='reading');
-  const quotes=cur?getQuotes().filter(q=>q.bookCid===cur.cid).sort((a,b)=>(b.created||0)-(a.created||0)):[];
-  const latestQuote=quotes[0];
+  const quotes=cur?getQuotes().filter(q=>q.bookCid===cur.cid):[];
+  const pickedQuote=quotes.find(q=>q.cid===_shareState.quoteCid)||quotes[0];
   stage.style.backgroundImage=_shareState.bg?`url(${_shareState.bg})`:'';
   stage.style.backgroundColor=_shareState.bg?'':'#2a2620';
 
@@ -5366,37 +5415,31 @@ function renderShareStage(){
           </text>
         </svg>
         <div class="s-tr-star">✦</div>
-      </div>
-      <div class="s-tr-bottom">
-        <div class="s-tr-cover" style="${cur.poster?`background-image:url('${cur.poster}')`:''}"></div>
-        <div class="s-tr-cover-title share-txtshadow">${cur.title}</div>
       </div>`;
     }
-    if(_shareState.quote==='qs'&&latestQuote){
+    if(_shareState.cover!=='none'){
+      const posClass=_shareState.cover==='bl'?'pos-bl':'pos-br2';
+      html+=`<div class="s-cover ${posClass}" style="${cur.poster?`background-image:url('${cur.poster}')`:''}"></div>`;
+    }
+    if(_shareState.quote==='qs'&&pickedQuote){
       html+=`<div class="s-qs">
-        <div class="s-qs-body"><span class="s-qs-mark">&#x275D;</span><div class="s-qs-text">${latestQuote.text}</div></div>
+        <div class="s-qs-body"><span class="s-qs-mark">&#x275D;</span><div class="s-qs-text">${pickedQuote.text}</div></div>
         <div class="s-qs-underline"></div>
         <div class="s-qs-meta"><span class="t">${cur.title}</span><span class="a">${cur.author||''}</span></div>
       </div>`;
-    }else if(_shareState.quote==='qt'&&latestQuote){
-      html+=`<div class="s-qt-wrap">
-        <div class="s-qt-cover" style="${cur.poster?`background-image:url('${cur.poster}')`:''}"></div>
-        <div class="s-qt-col">
-          <div class="s-qt-box">
-            <div class="s-qt-tape"></div>
-            <span class="s-qt-mark-open">&#x275D;</span>
-            <div class="s-qt-text">${latestQuote.text}</div>
-            <span class="s-qt-mark-close">&#x275E;</span>
-          </div>
-          <div class="s-qt-meta"><span class="t">${cur.title}</span><span class="a">${cur.author||''}</span></div>
-        </div>
+    }else if(_shareState.quote==='qt'&&pickedQuote){
+      html+=`<div class="s-qt-box">
+        <div class="s-qt-tape"></div>
+        <span class="s-qt-mark-open">&#x275D;</span>
+        <div class="s-qt-text">${pickedQuote.text}</div>
+        <span class="s-qt-mark-close">&#x275E;</span>
+        <div class="s-qt-meta"><span class="t">${cur.title}</span><span class="a">${cur.author||''}</span></div>
       </div>`;
     }
   }
   if(_shareState.logo!=='none'){
     html+=`<div class="s-logo pos-${_shareState.logo}"><img src="${SHARE_LOGO_B64}"><span class="books">BOOKS</span></div>`;
   }
-  // 기존 빈 배경 안내문은 그대로 유지하고 그 위에 덧붙임
   stage.innerHTML=html;
 }
 async function saveShareCard(){
