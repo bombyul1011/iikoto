@@ -921,7 +921,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 /* 헤더 스티커: 인덱스 카드형 */
 .s-idx{position:absolute;top:22px;left:24px;right:24px;}
-.s-idx-cap{font-family:'Bareonbatang',serif;font-style:italic;font-size:10.5px;color:rgba(246,236,221,0.85);margin-bottom:6px;}
+.s-idx-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;font-family:'Bareonbatang',serif;font-style:italic;font-size:10.5px;color:rgba(246,236,221,0.85);}
+.s-idx-title{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.s-idx-divider{width:1px;height:11px;background:rgba(246,236,221,0.4);flex-shrink:0;}
+.s-idx-date{white-space:nowrap;flex-shrink:0;}
 .s-idx-line{height:1px;background:rgba(246,236,221,0.30);}
 
 /* 표지 스티커 (독립) */
@@ -5378,29 +5381,20 @@ function onShareBgPick(e){
   reader.onload=ev=>{_shareState.bg=ev.target.result;renderShareStage();};
   reader.readAsDataURL(file);
 }
-let _lastQuoteType=null;
 function cycleShare(key){
   const opts=SHARE_CYCLE[key];
   const cur=_shareState[key];
-  let next;
-  if(key==='quote'&&cur==='none'&&_lastQuoteType){
-    next=_lastQuoteType;
-  }else{
-    const idx=opts.findIndex(o=>o[0]===cur);
-    next=opts[(idx+1)%opts.length][0];
-  }
+  const idx=opts.findIndex(o=>o[0]===cur);
+  const next=opts[(idx+1)%opts.length][0];
   const wasNone=cur==='none';
   _shareState[key]=next;
   if(key==='quote'){
     if(next==='none'){
       _shareState.quoteCid=null;
-    }else{
-      _lastQuoteType=next;
-      if(wasNone||!_shareState.quoteCid){
-        const cur2=getBooks().find(b=>b.status==='reading');
-        const quotes=cur2?getQuotes().filter(q=>q.bookCid===cur2.cid).sort((a,b)=>(b.created||0)-(a.created||0)):[];
-        if(quotes.length)_shareState.quoteCid=quotes[0].cid;
-      }
+    }else if(wasNone||!_shareState.quoteCid){
+      const cur2=getBooks().find(b=>b.status==='reading');
+      const quotes=cur2?getQuotes().filter(q=>q.bookCid===cur2.cid).sort((a,b)=>(b.created||0)-(a.created||0)):[];
+      if(quotes.length)_shareState.quoteCid=quotes[0].cid;
     }
     renderQuotePicker();
   }
@@ -5458,7 +5452,11 @@ function renderShareStage(){
       </div>`;
     }else if(_shareState.header==='idx'){
       html+=`<div class="s-idx share-txtshadow">
-        <div class="s-idx-cap">도서 목록</div>
+        <div class="s-idx-row">
+          <span class="s-idx-title">${cur.title}</span>
+          <div class="s-idx-divider"></div>
+          <span class="s-idx-date">${dateKey(new Date()).replace(/-/g,'.')}</span>
+        </div>
         <div class="s-idx-line"></div>
       </div>`;
     }
@@ -5598,11 +5596,24 @@ async function buildShareCanvas(){
       const aw=px(140),ah=aw*(arcImg.height/arcImg.width);
       ctx.drawImage(arcImg,W/2-aw/2,px(18),aw,ah);
     }else if(_shareState.header==='idx'){
-      ctx.font=`italic ${px(10.5)}px 'Bareonbatang',serif`;ctx.textAlign='left';
+      const dateStr=dateKey(new Date()).replace(/-/g,'.');
+      ctx.font=`italic ${px(10.5)}px 'Bareonbatang',serif`;
+      const dateW=ctx.measureText(dateStr).width;
+      const rowY=px(28),lineX0=px(24),lineX1=px(256);
+      const dividerX=lineX1-dateW-px(10);
       ctx.fillStyle='rgba(246,236,221,0.85)';
-      ctx.fillText('도서 목록',px(24),px(28));
-      ctx.strokeStyle='rgba(246,236,221,0.30)';ctx.lineWidth=px(1);
-      ctx.beginPath();ctx.moveTo(px(24),px(34));ctx.lineTo(px(256),px(34));ctx.stroke();
+      ctx.textAlign='right';
+      ctx.fillText(dateStr,lineX1,rowY);
+      ctx.textAlign='left';
+      const maxTitleW=dividerX-lineX0-px(10);
+      let titleTxt=cur.title;
+      while(ctx.measureText(titleTxt).width>maxTitleW&&titleTxt.length>1){titleTxt=titleTxt.slice(0,-1);}
+      if(titleTxt!==cur.title)titleTxt=titleTxt.slice(0,-1)+'…';
+      ctx.fillText(titleTxt,lineX0,rowY);
+      ctx.strokeStyle='rgba(246,236,221,0.4)';ctx.lineWidth=px(1);
+      ctx.beginPath();ctx.moveTo(dividerX,rowY-px(8));ctx.lineTo(dividerX,rowY+px(3));ctx.stroke();
+      ctx.strokeStyle='rgba(246,236,221,0.30)';
+      ctx.beginPath();ctx.moveTo(lineX0,px(34));ctx.lineTo(lineX1,px(34));ctx.stroke();
     }
     if(_shareState.progress!=='none'){
       let pct=0;
