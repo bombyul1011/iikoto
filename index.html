@@ -913,9 +913,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .s-rl-oneline .a{font-size:11px;color:rgba(246,236,221,0.78);}
 .s-rl-bottom{display:flex;align-items:center;gap:8px;}
 .s-rl-underline{flex:1;height:1px;background:rgba(246,236,221,0.22);}
+.s-rl-noteline{height:1px;background:rgba(246,236,221,0.30);margin-top:14px;}
 
 /* 헤더 스티커 2: TODAY'S READING (텍스트만, 표지 없음) */
-.s-tr-head{position:absolute;top:22px;left:0;right:0;text-align:center;color:#eef2e6;}
 .s-tr-icon{display:block;width:14px;height:14px;margin:0 auto 3px;color:rgba(238,242,230,0.85);}
 .s-tr-star{margin-top:1px;font-size:8px;color:rgba(238,242,230,0.6);}
 
@@ -926,7 +926,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .s-idx-divider{width:1px;height:11px;background:rgba(246,236,221,0.4);flex-shrink:0;}
 .s-idx-date{white-space:nowrap;flex-shrink:0;}
 .s-idx-line{height:1px;background:rgba(246,236,221,0.30);}
-.s-idx-note{margin-top:6px;text-align:right;font-family:'Bareonbatang',serif;font-style:italic;font-size:9.5px;color:rgba(246,236,221,0.75);}
+.s-idx-note{margin-top:6px;text-align:right;font-family:'DM Sans',sans-serif;font-style:normal;font-size:9px;color:rgba(246,236,221,0.65);}
 
 /* 표지 스티커 (독립) */
 
@@ -960,7 +960,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 /* 문장 스티커 - 편지지형 */
 .s-paper{position:absolute;bottom:38px;left:20px;right:20px;background:rgba(246,236,221,0.07);border-radius:14px;padding:14px 16px 13px;font-family:'Bareonbatang',serif;}
 .s-paper-lines{background-image:repeating-linear-gradient(to bottom, transparent 0, transparent 19px, rgba(246,236,221,0.28) 20px);}
-.s-paper-text{font-size:9.5px;line-height:18px;color:#f6ecdd;}
+.s-paper-text{font-size:9.5px;line-height:20px;color:#f6ecdd;}
 .s-paper-meta{display:flex;align-items:baseline;gap:8px;margin-top:8px;font-size:9px;font-family:'DM Sans',sans-serif;}
 .s-paper-meta .t{font-weight:700;color:rgba(246,236,221,0.9);}
 .s-paper-meta .a{color:rgba(246,236,221,0.62);}
@@ -1327,7 +1327,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     </div>
 
     <div class="share-quote-pick-wrap" id="share-idx-note-wrap" style="display:none;">
-      <div class="share-quote-pick-label">오늘의 메모 (저장은 안 돼요)</div>
+      <div class="share-quote-pick-label">오늘의 메모</div>
       <input type="text" id="share-idx-note-inp" class="meal-field" style="width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--card-b);background:var(--card);font-size:13px;color:var(--tp);font-family:'DM Sans',sans-serif;outline:none;" placeholder="오늘의 한 줄 메모" maxlength="40" oninput="onShareIdxNoteInput(this.value)">
     </div>
 
@@ -5365,9 +5365,8 @@ function setRdUnit(u){
 
 // ===== 독서 공유카드 =====
 const SHARE_LOGO_B64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFgAAAA0CAYAAAAOo/8VAAAD30lEQVR4nO2bP2zUMBTGf0FIVFcWythbWChDO1MkxABLGQAJwVDWdqcDIJgoExJbF6Z2ZQIGBsRCJaYixpaBPwKWdgKOiQqmMCTmHN9zzrnYJJz8Sackzuf3fF/8J7Zfkv1vn4gIhwNNF2DcEQUOjChwYJQJPF3BzhFHXhWbYwFJ4AdACuzmx8WS/Gn+6+XHQ0O4yubSKIX9H5EIbxGpxLPkd+XeJHtwLjZDYp3+w50Afod2WKcPLqutJuZr+PEJveX8+hcO6wgsPf1LNeyFxmwTTiWBE2AjP79HeVNOgP38/CTwzF/RvONwE05tNXgZ6AKrDjYmc+4bT2VyfSMBmPHkM5g/SeBZiiN+2avVa4NbB+YbiYRFjZcC74xrcyBVWAK2SnzaHuqo/v7C91vECeC9wHsCXC6x6eKzygPU8+7i9v7ty18Bvmdyp0fI4/JHqrYOne86uel48ldAk1PlaewF02vE6oj2v+fHFUe+Gqzr+iugSYF3Lelmc7srcLo5T/+ZmMqPa/n9UxZfZv66/gpo22KPy+xuDtgT0ieEtGP1ilPfX1sE3kMWV+o/31psSBOfhxXL4d1fWwS2DUTXatpdqMj37q8tAoM84K3XtPm0It+7vzYJDPDTuP4hcGwLRx0h7cYQWyZ8+gOaFVjqczvA7SH5thhcuOkw+HAAvmjn0gTIZVo+qj+g+RrcFdLuU/xDKwJnh+KUVfqzHx38q2m5Pl326q9pgffIFpZM7GjnayPaPl6R3wvhz7fAm5b05yV5Nhhe26ruftj4rnZ8+RMFNputOEPJ8ci4HuiDcmwY1+bCvEttS8jWnMuwzHBxbPdXQviTVtOaxHWyBaOrTRfEF9om8Nih6UFu7BEFDowocGBEgQMjChwYUeDAiAIHRhQ4MKLAgREFDoyDnuzo2z1NxP22pQwD8FWD2/CH2lCGAYxTF6F2pm1r0o0ghMD61ort+w4zajHFvrm4LXAlfMiPF8jCn8q4+n31G7YXOBJ8LVfq3z4kZPtbPe1axzz9UFJ1L7Vwt+lH1nSBM8ArC1e3oc7nkANHTH8pcB54IXBrwZfAqsCT9IPobKJJ6T65WO5L3McEXtz33UXsD6c4Q+pepFiEOriCfZfYC0INcmcrcG1h+Wq3+auWpoS4ZXB14VUzt/W/C2T7jAnZNyhmfq/w3UUkFIMypG/RpP4Pit0LZJGKnzXuDFkIv55X4SXZQ+2S9de2bkT56wFHLeXxCh81WG/KenM7hxyBeEfj6oOR2b3oO9Tq+wiQhVAtRoWZql3sFLgo8KcM/1IAjBfETc/AGKeJRisRBQ6MKHBg/AE3TPDnCSS3zAAAAABJRU5ErkJggg==';
-const SHARE_ARC_B64 = 'data:image/png;base64,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';
 const SHARE_CYCLE = {
-  header: [['none','헤더 없음'],['rl','모먼츠'],['tr',"TODAY'S READING"],['idx','인덱스 카드']],
+  header: [['none','헤더 없음'],['rl','모먼츠'],['idx','인덱스 카드']],
   quote: [['none','문장 없음'],['qs','문장 · 심플'],['qt','문장 · 테이프'],['hl','문장 · 하이라이트'],['paper','문장 · 편지지']],
   progress: [['none','진행률 없음'],['top','진행률 · 상단좌'],['topright','진행률 · 상단우'],['bottom','진행률 · 하단']],
   logo: [['none','로고 없음'],['br','로고 · 우하단'],['tr','로고 · 우상단']]
@@ -5414,7 +5413,7 @@ function cycleShare(key){
   }
   if(key==='header'){
     const idxWrap=document.getElementById('share-idx-note-wrap');
-    if(idxWrap)idxWrap.style.display=(next==='idx')?'block':'none';
+    if(idxWrap)idxWrap.style.display=(next==='idx'||next==='rl')?'block':'none';
   }
   updateCycleBtn(key);
   renderShareStage();
@@ -5463,10 +5462,8 @@ function renderShareStage(){
           <div class="s-rl-capsule share-txtshadow">iikoto moments</div>
           <div class="s-rl-line"></div><span class="s-rl-star">✦</span>
         </div>
-      </div>`;
-    }else if(_shareState.header==='tr'){
-      html+=`<div class="s-tr-head share-txtshadow">
-        <img src="${SHARE_ARC_B64}" style="width:140px;display:block;margin:0 auto;">
+        <div class="s-rl-noteline share-txtshadow"></div>
+        ${_shareState.idxNote?`<div class="s-idx-note share-txtshadow">${_shareState.idxNote}</div>`:''}
       </div>`;
     }else if(_shareState.header==='idx'){
       html+=`<div class="s-idx share-txtshadow">
@@ -5610,10 +5607,15 @@ async function buildShareCanvas(){
       ctx.beginPath();ctx.moveTo(lineX1,capY+capH/2);ctx.lineTo(lineX2,capY+capH/2);ctx.stroke();
       ctx.textAlign='center';ctx.font=`${px(11)}px 'DM Sans',sans-serif`;
       ctx.fillText('✦',lineX2+px(8),capY+capH/2+px(4));
-    }else if(_shareState.header==='tr'){
-      const arcImg=await loadImg(SHARE_ARC_B64);
-      const aw=px(140),ah=aw*(arcImg.height/arcImg.width);
-      ctx.drawImage(arcImg,W/2-aw/2,px(18),aw,ah);
+      const rlNoteLineY=capY+capH+px(14);
+      ctx.strokeStyle='rgba(246,236,221,0.30)';ctx.lineWidth=px(1);
+      ctx.beginPath();ctx.moveTo(capX,rlNoteLineY);ctx.lineTo(lineX2,rlNoteLineY);ctx.stroke();
+      if(_shareState.idxNote){
+        ctx.font=`${px(9)}px 'DM Sans',sans-serif`;
+        ctx.fillStyle='rgba(246,236,221,0.65)';ctx.textAlign='right';
+        ctx.fillText(_shareState.idxNote,lineX2,rlNoteLineY+px(12));
+        ctx.textAlign='left';
+      }
     }else if(_shareState.header==='idx'){
       const dateStr=dateKey(new Date()).replace(/-/g,'.');
       ctx.font=`italic ${px(10.5)}px 'Bareonbatang',serif`;
@@ -5634,8 +5636,8 @@ async function buildShareCanvas(){
       ctx.strokeStyle='rgba(246,236,221,0.30)';
       ctx.beginPath();ctx.moveTo(lineX0,px(34));ctx.lineTo(lineX1,px(34));ctx.stroke();
       if(_shareState.idxNote){
-        ctx.font=`italic ${px(9.5)}px 'Bareonbatang',serif`;
-        ctx.fillStyle='rgba(246,236,221,0.75)';ctx.textAlign='right';
+        ctx.font=`${px(9)}px 'DM Sans',sans-serif`;
+        ctx.fillStyle='rgba(246,236,221,0.65)';ctx.textAlign='right';
         ctx.fillText(_shareState.idxNote,lineX1,px(46));
         ctx.textAlign='left';
       }
@@ -5724,7 +5726,7 @@ async function buildShareCanvas(){
       const x0=px(20),w0=px(240),padX=px(16),padTop=px(14);
       ctx.font=`${px(9.5)}px 'Bareonbatang',serif`;
       const lines=wrapLines(ctx,pickedQuote.text,w0-padX*2);
-      const lh=px(19);
+      const lh=px(20);
       const boxH=padTop+lines.length*lh+px(22);
       const y0=H-px(38)-boxH;
       ctx.fillStyle='rgba(246,236,221,0.07)';
