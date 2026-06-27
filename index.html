@@ -1842,11 +1842,11 @@ async function syncRhythmBlocksDown(dk){
   if(S.get(S.key('rblocks_pending',dk)))return; // 업로드 대기중인 로컬 수정 있으면 덮어쓰지 않음
   S.set(S.key('rblocks',dk),rows.map(function(r){return {cat:r.cat,start:r.start_time,end:r.end_time,text:r.text||'',created:r.created,cid:r.client_id||genCid()};}));
 }
-let _rhythmTrackEl=null,_rhythmDk=null,_rhythmFormOpen=false,_rhythmFormCat=null,_rhythmFormStart='',_rhythmFormEnd='',_rhythmFormText='',_rhythmEditIdx=null;
+let _rhythmTrackEl=null,_rhythmDk=null,_rhythmFormOpen=false,_rhythmFormCat=null,_rhythmFormStart='',_rhythmFormEnd='',_rhythmFormText='',_rhythmEditIdx=null,_rhythmIncludeReview=false;
 function refreshRhythmTrack(){
   if(!_rhythmTrackEl||!_rhythmDk)return;
   const old=_rhythmTrackEl; // buildDailyRhythmTrack이 _rhythmTrackEl을 새 노드로 덮어쓰기 전에 먼저 잡아둠
-  const fresh=buildDailyRhythmTrack(_rhythmDk);
+  const fresh=buildDailyRhythmTrack(_rhythmDk,_rhythmIncludeReview);
   if(old.parentNode)old.replaceWith(fresh);
   if(document.getElementById('v-weekly')&&document.getElementById('v-weekly').classList.contains('on'))renderWeeklyRhythmBars();
 }
@@ -1918,7 +1918,7 @@ function getDayCategoryDurations(dk){
   if(wakeMin!=null&&sleepMin!=null&&sleepMin<=wakeMin){add('수면',wakeMin-sleepMin);}
   else{
     if(wakeMin!=null)add('수면',wakeMin);
-    if(sleepMin!=null)add('수면',1440-sleepMin);
+    // 기상을 아직 안 누른 경우(sleepMin만 있고 wakeMin 없음)는 진행중이라 누계에서 제외
   }
   ['breakfast','lunch','dinner','snack'].forEach(function(k){if(meals[k+'_time'])add('식사',60);});
   manual.forEach(function(b){
@@ -2024,6 +2024,7 @@ function buildDailyRhythmTrackFresh(dk,includeReview){
 }
 function buildDailyRhythmTrack(dk,includeReview){
   _rhythmDk=dk;
+  _rhythmIncludeReview=!!includeReview;
   const outer=document.createElement('div');
   const d=new Date(dk+'T00:00:00');
   const isToday=dk===dateKey(new Date());
@@ -2067,7 +2068,10 @@ function buildDailyRhythmTrack(dk,includeReview){
     blocks.push({start:sleepMin,end:wakeMin,color:RHYTHM_SLEEP_COLOR,label:'수면',time:sleep.sleep+' – '+sleep.wake});
   }else{
     if(wakeMin!=null)blocks.push({start:0,end:wakeMin,color:RHYTHM_SLEEP_COLOR,label:'수면',time:'00:00 – '+sleep.wake});
-    if(sleepMin!=null)blocks.push({start:sleepMin,end:1440,color:RHYTHM_SLEEP_COLOR,label:'수면',time:sleep.sleep+' – 24:00'});
+    if(sleepMin!=null&&wakeMin==null){
+      // 기상을 아직 안 눌렀으면 24시까지 자동완성하지 않고 진행중으로 표시
+      blocks.push({start:sleepMin,end:null,color:RHYTHM_SLEEP_COLOR,label:'수면',time:sleep.sleep+' – 기상 전',ongoing:true});
+    }
   }
   const MEAL_LABELS={breakfast:'아침 식사',lunch:'점심 식사',dinner:'저녁 식사',snack:'간식'};
   Object.keys(MEAL_LABELS).forEach(function(k){
@@ -2091,13 +2095,14 @@ function buildDailyRhythmTrack(dk,includeReview){
     const cat=RHYTHM_CATS[b.cat];if(!cat)return;
     const sMin=toMin(b.start),eMin=toMin(b.end);
     if(eMin<=sMin&&eMin>0){
-      blocks.push({start:0,end:eMin,color:cat.color,label:(b.text||cat.label)+' (전날 이어짐)',time:'00:00 – '+b.end});
+      blocks.push({start:0,end:eMin,color:cat.color,label:(b.text||cat.label)+' (전날 이어짐)',time:'00:00 – '+b.end,noLabel:true});
     }
   });
   blocks.sort(function(a,b){return a.start-b.start;});
 
   const MIN_GAP=22;let lastY=-999;
   blocks.forEach(function(bk){
+    if(bk.noLabel)return; // 텍스트 없는 블록은 라벨 공간을 차지하지 않음
     bk.anchorY=toY(bk.start);
     let y=bk.anchorY;
     if(y<lastY+MIN_GAP)y=lastY+MIN_GAP;
@@ -2110,13 +2115,14 @@ function buildDailyRhythmTrack(dk,includeReview){
     const stubEnd=bk.end!=null?bk.end:(isToday?(function(){const n=new Date();return n.getHours()*60+n.getMinutes();})():Math.min(bk.start+20,1440));
     const bh=Math.max(toY(stubEnd)-by,8);
     html+='<div class="rt-block'+(bk.ongoing?' ongoing':'')+'" style="top:'+by+'px;height:'+bh+'px;background-color:'+bk.color+';"></div>';
+    if(bk.noLabel)return; // 전날 이어짐 블록은 색상바만, 텍스트줄/연결선 없음
     if(Math.abs(bk.labelY-bk.anchorY)>4){
       const top=Math.min(bk.labelY,bk.anchorY)+3,h=Math.abs(bk.labelY-bk.anchorY);
       html+='<div class="rt-connector" style="top:'+top+'px;height:'+h+'px;"></div>';
     }
     const delBtn=bk.manualIdx!=null?'<span class="rt-del" onclick="deleteRhythmBlock('+bk.manualIdx+')">×</span>':'';
     const editBtn=bk.manualIdx!=null?'<span class="rt-edit" onclick="openRhythmEditForm('+bk.manualIdx+')"><svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M2.5 11.5L3.5 8L9.5 2L12 4.5L6 10.5L2.5 11.5Z"/></svg></span>':'';
-    const finishBtn=bk.ongoing?'<span class="rt-finish" onclick="finishRhythmBlock('+bk.manualIdx+')">종료</span>':'';
+    const finishBtn=(bk.ongoing&&bk.manualIdx!=null)?'<span class="rt-finish" onclick="finishRhythmBlock('+bk.manualIdx+')">종료</span>':'';
     const actions=(finishBtn||editBtn||delBtn)?'<span class="rt-actions">'+finishBtn+editBtn+delBtn+'</span>':'';
     html+='<div class="rt-row" style="top:'+bk.labelY+'px;"><span class="rt-time">'+bk.time+'</span><span class="rt-txt">'+bk.label+'</span>'+actions+'</div>';
   });
@@ -4929,7 +4935,7 @@ function loadDaily(){
 }
 function renderWeeklyRhythmBars(){
   const el=document.getElementById('weekly-rhythm-bars');if(!el)return;
-  const now=new Date();
+  const now=getLogicalDate();
   const mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7));
   const DOW=['월','화','수','목','금','토','일'];
   const todayDk=dateKey(now);
@@ -4948,7 +4954,10 @@ function renderWeeklyRhythmBars(){
       segs.push({start:sleepMin,end:wakeMin,color:RHYTHM_SLEEP_COLOR});
     }else{
       if(wakeMin!=null)segs.push({start:0,end:wakeMin,color:RHYTHM_SLEEP_COLOR});
-      if(sleepMin!=null)segs.push({start:sleepMin,end:1440,color:RHYTHM_SLEEP_COLOR});
+      if(sleepMin!=null&&wakeMin==null){
+        const end=dk===todayDk?(function(){const n=new Date();return n.getHours()<6?1440:(n.getHours()*60+n.getMinutes());})():Math.min(sleepMin+20,1440);
+        segs.push({start:sleepMin,end:end,color:RHYTHM_SLEEP_COLOR,ongoing:true});
+      }
     }
     MEAL_KEYS.forEach(function(k){
       const t=meals[k+'_time'];if(!t)return;
@@ -4963,7 +4972,8 @@ function renderWeeklyRhythmBars(){
         segs.push({start:s,end:e,color:cat.color});
       }else if(dk===todayDk){
         const n=new Date();
-        segs.push({start:toMin(b.start),end:n.getHours()*60+n.getMinutes(),color:cat.color,ongoing:true});
+        const endMin=n.getHours()<6?1440:(n.getHours()*60+n.getMinutes());
+        segs.push({start:toMin(b.start),end:endMin,color:cat.color,ongoing:true});
       }
     });
     // 전날 블록이 자정을 넘겨 오늘로 이어진 구간도 표시
