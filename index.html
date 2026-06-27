@@ -1925,7 +1925,8 @@ function getDayCategoryDurations(dk){
     if(!b.end)return; // 진행중 블록은 누계에서 제외
     const cat=RHYTHM_CATS[b.cat];if(!cat)return;
     const s=toMin(b.start),e=toMin(b.end);
-    if(s!=null&&e!=null&&e>s)add(cat.label,e-s);
+    if(s==null||e==null)return;
+    add(cat.label,e>s?e-s:(1440-s+e)); // 자정을 넘기는 경우도 전체 길이로 집계
   });
   return dur;
 }
@@ -2077,7 +2078,21 @@ function buildDailyRhythmTrack(dk,includeReview){
   });
   manual.forEach(function(b,idx){
     const cat=RHYTHM_CATS[b.cat];if(!cat)return;
-    blocks.push({start:toMin(b.start),end:b.end?toMin(b.end):null,color:cat.color,label:b.text||cat.label,time:b.start+' – '+(b.end||'진행중'),manualIdx:idx,ongoing:!b.end});
+    const sMin=toMin(b.start);
+    let eMin=b.end?toMin(b.end):null;
+    if(eMin!=null&&eMin<=sMin)eMin=1440; // 자정을 넘기는 블록은 당일 트랙에서는 24시까지로 표시
+    blocks.push({start:sMin,end:eMin,color:cat.color,label:b.text||cat.label,time:b.start+' – '+(b.end||'진행중'),manualIdx:idx,ongoing:!b.end});
+  });
+  // 전날 블록이 자정을 넘겨서 오늘로 이어진 경우, 그 이어진 구간(0시~끝시각)을 오늘 트랙에도 표시
+  const prevD=new Date(dk+'T00:00:00');prevD.setDate(prevD.getDate()-1);
+  const prevDk=dateKey(prevD);
+  getRhythmBlocks(prevDk).forEach(function(b){
+    if(!b.end)return;
+    const cat=RHYTHM_CATS[b.cat];if(!cat)return;
+    const sMin=toMin(b.start),eMin=toMin(b.end);
+    if(eMin<=sMin&&eMin>0){
+      blocks.push({start:0,end:eMin,color:cat.color,label:(b.text||cat.label)+' (전날 이어짐)',time:'00:00 – '+b.end});
+    }
   });
   blocks.sort(function(a,b){return a.start-b.start;});
 
@@ -4943,11 +4958,21 @@ function renderWeeklyRhythmBars(){
     manual.forEach(function(b){
       const cat=RHYTHM_CATS[b.cat];if(!cat)return;
       if(b.end){
-        segs.push({start:toMin(b.start),end:toMin(b.end),color:cat.color});
+        const s=toMin(b.start);let e=toMin(b.end);
+        if(e<=s)e=1440; // 자정을 넘기는 블록은 당일 바에서는 24시까지로 표시
+        segs.push({start:s,end:e,color:cat.color});
       }else if(dk===todayDk){
         const n=new Date();
         segs.push({start:toMin(b.start),end:n.getHours()*60+n.getMinutes(),color:cat.color,ongoing:true});
       }
+    });
+    // 전날 블록이 자정을 넘겨 오늘로 이어진 구간도 표시
+    const prevD2=new Date(d);prevD2.setDate(d.getDate()-1);
+    getRhythmBlocks(dateKey(prevD2)).forEach(function(b){
+      if(!b.end)return;
+      const cat=RHYTHM_CATS[b.cat];if(!cat)return;
+      const s=toMin(b.start),e=toMin(b.end);
+      if(e<=s&&e>0)segs.push({start:0,end:e,color:cat.color});
     });
     let track='<div class="wrb-track">';
     segs.forEach(function(sg){
