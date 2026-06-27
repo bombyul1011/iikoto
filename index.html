@@ -2032,7 +2032,7 @@ function buildDailyRhythmTrack(dk,includeReview){
   const sleep=getSleep(dk)||{};
   const meals=getMeals(dk)||{};
   const manual=getRhythmBlocks(dk);
-  const TOTAL_H=240;
+  const TOTAL_H=280;
   const toMin=function(t){if(!t)return null;const p=t.split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);};
   const toY=function(min){return Math.round(Math.min(min,1440)/1440*TOTAL_H);};
 
