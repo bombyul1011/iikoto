@@ -600,13 +600,16 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .report-banner.rhythm-soft .report-banner-arrow{color:rgba(140,90,155,0.55);}
 [data-theme="glass"] .report-banner.rhythm-soft .report-banner-inner{background:rgba(253,251,245,0.95);}
 [data-theme="dark"] .report-banner.rhythm-soft .report-banner-inner{background:linear-gradient(135deg,rgba(60,45,70,0.92),rgba(40,55,75,0.92));}
+.rhythm-review-card{border-radius:18px;background:linear-gradient(135deg,rgba(236,219,242,0.55),rgba(216,228,245,0.50));border:1.5px solid rgba(165,125,180,0.42);padding:14px 15px;margin-bottom:10px;}
+[data-theme="glass"] .rhythm-review-card{background:rgba(253,251,245,0.55);border-color:rgba(165,125,180,0.38);}
+[data-theme="dark"] .rhythm-review-card{background:linear-gradient(135deg,rgba(60,45,70,0.35),rgba(40,55,75,0.32));border-color:rgba(190,150,205,0.40);}
 /* 월간 하루한줄 모아보기 */
-.diary-month-summary{border-radius:16px;padding:12px 15px;margin-bottom:16px;background:var(--card);border:1.5px solid rgba(255,185,205,0.55);}
+.diary-month-summary{border-radius:16px;padding:12px 15px;margin-bottom:16px;background:linear-gradient(120deg,rgba(255,210,230,0.55),rgba(255,230,200,0.45));border:1px solid rgba(255,185,205,0.55);box-shadow:0 2px 10px rgba(200,120,140,0.10);}
 .diary-month-summary-label{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;color:var(--acc);letter-spacing:.03em;margin-bottom:6px;}
 .diary-month-summary-text{font-size:13px;color:var(--tp);line-height:1.55;}
-.mr-ai-card{border-radius:16px;background:var(--card);border:1.5px solid rgba(255,185,205,0.55);padding:15px 15px 13px;margin-bottom:12px;}
-[data-theme="glass"] .diary-month-summary{background:rgba(255,253,248,0.45);}
-[data-theme="glass"] .mr-ai-card{background:rgba(255,253,248,0.45);}
+.mr-ai-card{border-radius:16px;padding:15px 15px 13px;margin-bottom:12px;background:linear-gradient(120deg,rgba(190,230,205,0.45),rgba(250,235,170,0.40));border:1px solid rgba(165,215,190,0.55);box-shadow:0 2px 10px rgba(140,180,120,0.10);}
+[data-theme="glass"] .diary-month-summary{background:rgba(255,253,248,0.45);box-shadow:0 2px 12px rgba(200,150,165,0.10);}
+[data-theme="glass"] .mr-ai-card{background:rgba(255,253,248,0.45);box-shadow:0 2px 12px rgba(150,180,130,0.10);}
 [data-theme="dark"] .diary-month-summary{border-color:rgba(255,126,179,0.35);}
 [data-theme="dark"] .mr-ai-card{border-color:rgba(255,126,179,0.35);}
 .diary-row{display:flex;align-items:baseline;gap:9px;padding:9px 2px;border-bottom:1px dashed var(--div);}
@@ -1939,7 +1942,7 @@ function durSummaryLine(dur){
 function _rrGet(scope){try{return localStorage.getItem('iikoto_rhythmreview_'+scope);}catch(e){return null;}}
 function _rrSet(scope,val){try{localStorage.setItem('iikoto_rhythmreview_'+scope,val);}catch(e){}}
 async function buildRhythmReviewCard(){
-  const card=document.createElement('div');card.className='card s';
+  const card=document.createElement('div');card.className='rhythm-review-card';
   try{
     const _ld=getLogicalDate();
     const isLastDay=(function(){const t=new Date(_ld);t.setDate(_ld.getDate()+1);return t.getDate()===1;})();
@@ -2028,7 +2031,7 @@ function buildDailyRhythmTrack(dk,includeReview){
   if(includeReview){
     const rrWrap=document.createElement('div');rrWrap.style.marginBottom='14px';
     const rrLabel=document.createElement('div');rrLabel.className='rhythm-form-label';rrLabel.style.marginBottom='8px';rrLabel.textContent='하루 리듬 돌아보기';
-    const rrCard=document.createElement('div');rrCard.className='card s';
+    const rrCard=document.createElement('div');rrCard.className='rhythm-review-card';
     rrCard.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">하루 리듬을 돌아보는 중...</div>';
     rrWrap.appendChild(rrLabel);rrWrap.appendChild(rrCard);
     outer.appendChild(rrWrap);
