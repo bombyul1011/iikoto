@@ -844,48 +844,54 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .habit-chk2{width:28px;height:28px;border-radius:50%;border:1.5px dashed rgba(195,175,168,0.5);background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;}
 .habit-chk2.on{border-style:solid;}
 
-/* ── 데일리 리듬 트랙 (목업 C 기반) ── */
+/* ── 데일리 리듬 트랙 (블록 모델) ── */
 .rhythm-track-datelabel{font-size:12px;font-weight:700;color:var(--tp);margin-bottom:14px;display:flex;justify-content:space-between;align-items:baseline;}
 .rhythm-track-datelabel .w{font-size:10px;font-weight:400;color:var(--tm);}
 .rhythm-track{position:relative;padding-left:46px;margin-bottom:10px;}
 .rt-line{position:absolute;left:30px;top:2px;bottom:2px;width:2px;background:rgba(220,210,195,0.55);border-radius:2px;}
 .rt-hourlabel{position:absolute;left:0;width:26px;text-align:right;font-size:8.5px;color:var(--tm);transform:translateY(-50%);}
-.rt-sleepblock{position:absolute;left:25px;width:12px;border-radius:6px;background:linear-gradient(180deg,#8d92c9,#aab0dd);}
-.rt-sleepicon{position:absolute;left:25px;width:12px;height:12px;display:flex;align-items:center;justify-content:center;color:#fff;}
-.rt-dot{position:absolute;left:26px;width:10px;height:10px;border-radius:50%;z-index:2;}
+.rt-block{position:absolute;left:24px;width:14px;border-radius:5px;}
 .rt-connector{position:absolute;left:30px;width:1.5px;background:rgba(200,190,175,0.55);}
-.rt-dot.meal{background:#91d2af;}
-.rt-dot.memo{background:#f0a0aa;}
 .rt-row{position:absolute;left:46px;right:0;display:flex;align-items:center;gap:7px;font-size:11px;color:var(--tp);white-space:nowrap;overflow:hidden;}
-.rt-row .rt-time{font-size:9px;color:var(--tm);width:36px;flex-shrink:0;font-family:'DM Sans',sans-serif;}
-.rt-icon{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:#fffdf8;border:1.5px solid rgba(145,210,175,0.7);color:rgba(80,150,115,0.85);}
-.rt-txt.memo{color:var(--ts);overflow:hidden;text-overflow:ellipsis;}
-.rhythm-track-legend{display:flex;gap:14px;margin-top:8px;padding-left:2px;}
+.rt-row .rt-time{font-size:9px;color:var(--tm);width:78px;flex-shrink:0;font-family:'DM Sans',sans-serif;}
+.rt-row .rt-txt{overflow:hidden;text-overflow:ellipsis;}
+.rt-del{margin-left:auto;flex-shrink:0;color:var(--tm);font-size:14px;line-height:1;padding:0 2px;cursor:pointer;}
+.rhythm-track-legend{display:flex;flex-wrap:wrap;gap:9px 12px;margin-top:8px;padding-left:2px;}
 .rhythm-track-legend span{display:flex;align-items:center;gap:5px;font-size:9.5px;color:var(--tm);}
 .rhythm-track-legend i{width:7px;height:7px;border-radius:50%;flex-shrink:0;display:inline-block;}
-[data-theme="glass"] .rt-sleepblock{background:linear-gradient(180deg,#7b87bf,#9aa3d4);}
+
+/* ── 블록 추가 폼 ── */
+.rhythm-add-btn{width:100%;border:1.5px dashed rgba(192,112,128,0.40);border-radius:14px;background:none;color:var(--acc);font-size:12.5px;font-weight:600;padding:11px 0;margin-top:12px;cursor:pointer;font-family:'DM Sans',sans-serif;}
+.rhythm-add-form{background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:14px 14px 16px;margin-top:12px;}
+.rhythm-form-label{font-size:10px;color:var(--tm);margin-bottom:8px;}
+.rhythm-chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px;}
+.rhythm-chip{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--ts);background:var(--card);border:1.5px solid var(--card-b);border-radius:11px;padding:6px 11px;font-family:'DM Sans',sans-serif;cursor:pointer;}
+.rhythm-chip i{width:7px;height:7px;border-radius:50%;}
+.rhythm-chip.sel{color:#fff;font-weight:600;}
+.rhythm-chip.disabled{opacity:0.45;cursor:default;}
+.rhythm-time-row{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+.rhythm-time-inp{flex:1;background:var(--card);border:1px solid var(--card-b);border-radius:11px;padding:9px 10px;font-size:13px;color:var(--tp);font-family:'DM Sans',sans-serif;}
+.rhythm-arrow{color:var(--tm);font-size:13px;}
+.rhythm-memo-inp{width:100%;background:var(--card);border:1px solid var(--card-b);border-radius:11px;padding:9px 12px;font-size:12.5px;color:var(--tp);margin-bottom:14px;font-family:'DM Sans',sans-serif;}
+.rhythm-save-btn{width:100%;background:var(--acc);color:#fff;border:none;border-radius:12px;padding:11px 0;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;}
 
 .habit-numbox{display:flex;flex-wrap:wrap;justify-content:space-around;gap:10px;background:var(--card);border:1px solid var(--card-b);border-radius:14px;padding:12px 8px;margin-bottom:2px;}
 .habit-numbox-col{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:44px;}
 .habit-numbox-name{font-size:11px;color:var(--tp);}
 .habit-numbox-num{font-size:16px;font-weight:700;color:var(--ts);font-family:'DM Sans',sans-serif;}
 
-/* ── 주간 가로 리듬바 (목업 B 기반) ── */
+/* ── 주간 가로 리듬바 (블록 모델) ── */
 .wrb-wrap{display:flex;flex-direction:column;gap:13px;padding:2px 0;}
 .wrb-row{display:flex;align-items:center;gap:10px;}
 .wrb-daylabel{width:16px;flex-shrink:0;font-size:10px;color:var(--tm);text-align:center;}
 .wrb-daylabel.today{color:var(--acc);font-weight:700;}
 .wrb-trackwrap{position:relative;flex:1;height:8px;}
-.wrb-track{position:absolute;top:0;left:0;right:0;height:8px;border-radius:8px;background:rgba(220,210,195,0.35);}
-.wrb-sleep{position:absolute;top:0;height:8px;border-radius:8px;background:linear-gradient(90deg,#8d92c9,#aab0dd);}
-.wrb-dot{position:absolute;top:50%;width:7px;height:7px;border-radius:50%;transform:translate(-50%,-50%);}
-.wrb-dot.meal{background:#91d2af;}
-.wrb-dot.memo{background:#f0a0aa;}
-.wrb-legend{display:flex;gap:14px;margin-top:12px;padding-left:2px;}
+.wrb-track{position:absolute;top:0;left:0;right:0;height:8px;border-radius:4px;background:rgba(220,210,195,0.35);}
+.wrb-seg{position:absolute;top:0;height:8px;border-radius:4px;}
+.wrb-legend{display:flex;flex-wrap:wrap;gap:9px 12px;margin-top:12px;padding-left:2px;}
 .wrb-legend span{display:flex;align-items:center;gap:5px;font-size:9.5px;color:var(--tm);}
 .wrb-legend i{width:7px;height:7px;border-radius:50%;flex-shrink:0;display:inline-block;}
 [data-theme="glass"] .wrb-track{background:rgba(190,180,160,0.30);}
-[data-theme="glass"] .wrb-sleep{background:linear-gradient(90deg,#7b87bf,#9aa3d4);}
 
 /* ── 일정 카드 */
 .schedule-card{background:var(--card);border:1px solid var(--card-b);border-radius:18px;padding:16px 16px;margin-bottom:10px;min-height:unset;}
@@ -1905,7 +1911,44 @@ function summarizeMemo(text){
 const RT_MEAL_ICON='<svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6.5h10a5 5 0 0 1-5 5a5 5 0 0 1-5-5Z"/><path d="M5 6V4.2M7 6V3.2M9 6V4.2"/></svg>';
 const RT_MOON_ICON='<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"><path d="M9.5 7C9.5 9 8 10.5 6 10.5C4 10.5 2.5 9 2.5 7C2.5 5.2 3.8 3.8 5.5 3.5C5.2 5.5 7 6.8 9.5 7Z"/></svg>';
 const RT_SUN_ICON='<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"><circle cx="6" cy="6" r="2.8"/><line x1="6" y1="1" x2="6" y2="2.2"/><line x1="6" y1="9.8" x2="6" y2="11"/><line x1="1" y1="6" x2="2.2" y2="6"/><line x1="9.8" y1="6" x2="11" y2="6"/></svg>';
+const RHYTHM_CATS={
+  exercise:{label:'운동',color:'rgba(240,190,140,0.85)'},
+  rest:{label:'휴식',color:'rgba(135,190,230,0.85)'},
+  work:{label:'업무',color:'rgba(250,215,100,0.85)'},
+  appointment:{label:'약속',color:'rgba(210,165,215,0.85)'}
+};
+const RHYTHM_SLEEP_COLOR='rgba(180,165,230,0.85)';
+const RHYTHM_MEAL_COLOR='rgba(145,210,175,0.85)';
+function getRhythmBlocks(dk){return S.get(S.key('rblocks',dk))||[];}
+function saveRhythmBlocks(dk,v){S.set(S.key('rblocks',dk),v);}
+let _rhythmTrackEl=null,_rhythmDk=null,_rhythmFormOpen=false,_rhythmFormCat=null;
+function refreshRhythmTrack(){
+  if(!_rhythmTrackEl||!_rhythmDk)return;
+  const fresh=buildDailyRhythmTrack(_rhythmDk);
+  _rhythmTrackEl.replaceWith(fresh);
+  if(document.getElementById('v-weekly')&&document.getElementById('v-weekly').classList.contains('on'))renderWeeklyRhythmBars();
+}
+function toggleRhythmAddForm(){_rhythmFormOpen=!_rhythmFormOpen;if(!_rhythmFormOpen)_rhythmFormCat=null;refreshRhythmTrack();}
+function selectRhythmCat(cat){_rhythmFormCat=cat;refreshRhythmTrack();}
+function saveRhythmBlock(){
+  const cat=_rhythmFormCat;if(!cat)return;
+  const s=document.getElementById('rhythm-start-inp'),e=document.getElementById('rhythm-end-inp'),t=document.getElementById('rhythm-text-inp');
+  const start=s?s.value:'',end=e?e.value:'';
+  if(!start||!end)return;
+  const blocks=getRhythmBlocks(_rhythmDk);
+  blocks.push({cat:cat,start:start,end:end,text:t?t.value.trim():''});
+  saveRhythmBlocks(_rhythmDk,blocks);
+  _rhythmFormOpen=false;_rhythmFormCat=null;
+  refreshRhythmTrack();
+}
+function deleteRhythmBlock(idx){
+  const blocks=getRhythmBlocks(_rhythmDk);
+  blocks.splice(idx,1);
+  saveRhythmBlocks(_rhythmDk,blocks);
+  refreshRhythmTrack();
+}
 function buildDailyRhythmTrack(dk){
+  _rhythmDk=dk;
   const outer=document.createElement('div');
   const d=new Date(dk+'T00:00:00');
   const isToday=dk===dateKey(new Date());
@@ -1915,81 +1958,89 @@ function buildDailyRhythmTrack(dk){
   const wrap=document.createElement('div');wrap.className='rhythm-track';
   const sleep=getSleep(dk)||{};
   const meals=getMeals(dk)||{};
-  const memos=getMemos(dk).filter(function(m){return m.time&&m.text;});
+  const manual=getRhythmBlocks(dk);
   const TOTAL_H=240;
   const toMin=function(t){if(!t)return null;const p=t.split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);};
-  const toY=function(min){return Math.round(min/1440*TOTAL_H);};
-  const hourOf=function(min){return Math.floor(min/60);};
-  const todClass=function(min){const h=hourOf(min);return h>=5&&h<12?'tod-morning':h>=12&&h<18?'tod-afternoon':'tod-night';};
+  const toY=function(min){return Math.round(Math.min(min,1440)/1440*TOTAL_H);};
 
   let html='<div class="rt-line"></div>';
   [0,6,12,18,24].forEach(function(h){
     html+='<div class="rt-hourlabel" style="top:'+toY(h*60)+'px;">'+String(h).padStart(2,'0')+'</div>';
   });
 
+  // 블록 통합 목록: 수면(자동) + 식사(자동,1시간) + 수기 블록
+  let blocks=[];
   const wakeMin=toMin(sleep.wake),sleepMin=toMin(sleep.sleep);
   if(wakeMin!=null&&sleepMin!=null&&sleepMin<=wakeMin){
-    // 자정을 넘기지 않고 같은 날 새벽에 취침→기상한 경우 (예: 01:30 취침, 07:30 기상)
-    const sy=toY(sleepMin),wy=toY(wakeMin);
-    html+='<div class="rt-sleepblock" style="top:'+sy+'px;height:'+Math.max(wy-sy,8)+'px;"></div>';
-    html+='<div class="rt-sleepicon" style="top:'+Math.max(sy-9,0)+'px;">'+RT_MOON_ICON+'</div>';
-    html+='<div class="rt-sleepicon" style="top:'+wy+'px;">'+RT_SUN_ICON+'</div>';
+    blocks.push({start:sleepMin,end:wakeMin,color:RHYTHM_SLEEP_COLOR,label:'수면',time:sleep.sleep+' – '+sleep.wake});
   }else{
-    if(wakeMin!=null){
-      html+='<div class="rt-sleepblock" style="top:0px;height:'+Math.max(toY(wakeMin),8)+'px;"></div>';
-      html+='<div class="rt-sleepicon" style="top:'+Math.max(toY(wakeMin)-9,0)+'px;">'+RT_SUN_ICON+'</div>';
-    }
-    if(sleepMin!=null){
-      const sy=toY(sleepMin);
-      html+='<div class="rt-sleepblock" style="top:'+sy+'px;height:'+Math.max(TOTAL_H-sy,8)+'px;"></div>';
-      html+='<div class="rt-sleepicon" style="top:'+sy+'px;">'+RT_MOON_ICON+'</div>';
-    }
+    if(wakeMin!=null)blocks.push({start:0,end:wakeMin,color:RHYTHM_SLEEP_COLOR,label:'수면',time:'00:00 – '+sleep.wake});
+    if(sleepMin!=null)blocks.push({start:sleepMin,end:1440,color:RHYTHM_SLEEP_COLOR,label:'수면',time:sleep.sleep+' – 24:00'});
   }
-
   const MEAL_LABELS={breakfast:'아침 식사',lunch:'점심 식사',dinner:'저녁 식사',snack:'간식'};
-  let events=[];
   Object.keys(MEAL_LABELS).forEach(function(k){
     const t=meals[k+'_time'];
-    if(t)events.push({type:'meal',min:toMin(t),time:t,label:MEAL_LABELS[k]});
+    if(!t)return;
+    const start=toMin(t);
+    blocks.push({start:start,end:Math.min(start+60,1440),color:RHYTHM_MEAL_COLOR,label:MEAL_LABELS[k],time:t,icon:true});
   });
-  memos.forEach(function(m){
-    events.push({type:'memo',min:toMin(m.time),time:m.time,label:summarizeMemo(m.text)});
+  manual.forEach(function(b,idx){
+    const cat=RHYTHM_CATS[b.cat];if(!cat)return;
+    blocks.push({start:toMin(b.start),end:toMin(b.end),color:cat.color,label:b.text||cat.label,time:b.start+' – '+b.end,manualIdx:idx});
   });
-  events.sort(function(a,b){return a.min-b.min;});
+  blocks.sort(function(a,b){return a.start-b.start;});
+
   const MIN_GAP=22;let lastY=-999;
-  events.forEach(function(ev){
-    ev.dotY=toY(ev.min);
-    let y=ev.dotY;
+  blocks.forEach(function(bk){
+    bk.anchorY=toY(bk.start);
+    let y=bk.anchorY;
     if(y<lastY+MIN_GAP)y=lastY+MIN_GAP;
-    ev.y=y;lastY=y;
+    bk.labelY=y;lastY=y;
   });
   const trackHeight=Math.max(TOTAL_H+10,lastY+24);
 
-  events.forEach(function(ev){
-    if(Math.abs(ev.y-ev.dotY)>4){
-      const top=Math.min(ev.y,ev.dotY)+3,h=Math.abs(ev.y-ev.dotY);
+  blocks.forEach(function(bk){
+    const by=toY(bk.start),bh=Math.max(toY(bk.end)-by,8);
+    html+='<div class="rt-block" style="top:'+by+'px;height:'+bh+'px;background:'+bk.color+';"></div>';
+    if(Math.abs(bk.labelY-bk.anchorY)>4){
+      const top=Math.min(bk.labelY,bk.anchorY)+3,h=Math.abs(bk.labelY-bk.anchorY);
       html+='<div class="rt-connector" style="top:'+top+'px;height:'+h+'px;"></div>';
     }
-    if(ev.type==='meal'){
-      html+='<div class="rt-dot meal" style="top:'+(ev.dotY+3)+'px;"></div>';
-      html+='<div class="rt-row" style="top:'+ev.y+'px;"><span class="rt-time">'+ev.time+'</span><span class="rt-icon meal">'+RT_MEAL_ICON+'</span><span class="rt-txt">'+ev.label+'</span></div>';
-    }else{
-      html+='<div class="rt-dot memo" style="top:'+(ev.dotY+3)+'px;"></div>';
-      html+='<div class="rt-row" style="top:'+ev.y+'px;"><span class="rt-time">'+ev.time+'</span><span class="rt-txt memo">'+ev.label+'</span></div>';
-    }
+    const delBtn=bk.manualIdx!=null?'<span class="rt-del" onclick="deleteRhythmBlock('+bk.manualIdx+')">×</span>':'';
+    html+='<div class="rt-row" style="top:'+bk.labelY+'px;"><span class="rt-time">'+bk.time+'</span><span class="rt-txt">'+bk.label+'</span>'+delBtn+'</div>';
   });
 
-  if(wakeMin==null&&sleepMin==null&&!events.length){
-    wrap.innerHTML='<div style="font-size:12px;color:var(--tm);text-align:center;padding:24px 0;">오늘 기록된 수면·식사·메모 시간이 없어요</div>';
-    outer.appendChild(wrap);
-    return outer;
-  }
   wrap.style.height=trackHeight+'px';
-  wrap.innerHTML=html;
+  wrap.innerHTML=blocks.length?html:'';
+  if(!blocks.length){
+    wrap.innerHTML='<div style="font-size:12px;color:var(--tm);text-align:center;padding:24px 0;">오늘 기록된 수면·식사·블록이 없어요</div>';
+  }
   outer.appendChild(wrap);
+
   const legend=document.createElement('div');legend.className='rhythm-track-legend';
-  legend.innerHTML='<span><i style="background:#aab0dd;"></i>수면</span><span><i style="background:#91d2af;"></i>식사</span><span><i style="background:#f0a0aa;"></i>메모</span>';
+  legend.innerHTML='<span><i style="background:'+RHYTHM_SLEEP_COLOR+';"></i>수면</span><span><i style="background:'+RHYTHM_MEAL_COLOR+';"></i>식사</span>'+
+    Object.keys(RHYTHM_CATS).map(function(k){return '<span><i style="background:'+RHYTHM_CATS[k].color+';"></i>'+RHYTHM_CATS[k].label+'</span>';}).join('');
   outer.appendChild(legend);
+
+  if(_rhythmFormOpen){
+    const form=document.createElement('div');form.className='rhythm-add-form';
+    const chips=Object.keys(RHYTHM_CATS).map(function(k){
+      const c=RHYTHM_CATS[k];const sel=_rhythmFormCat===k;
+      return '<span class="rhythm-chip'+(sel?' sel':'')+'" style="'+(sel?'background:'+c.color+';border-color:'+c.color+';':'')+'" onclick="selectRhythmCat(\''+k+'\')"><i style="background:'+(sel?'#fff':c.color)+';"></i>'+c.label+'</span>';
+    }).join('');
+    form.innerHTML='<div class="rhythm-form-label">어떤 시간이었나요</div>'+
+      '<div class="rhythm-chips"><span class="rhythm-chip disabled">수면</span><span class="rhythm-chip disabled">식사</span>'+chips+'</div>'+
+      '<div class="rhythm-form-label">시작 — 끝</div>'+
+      '<div class="rhythm-time-row"><input type="time" id="rhythm-start-inp" class="rhythm-time-inp"><span class="rhythm-arrow">→</span><input type="time" id="rhythm-end-inp" class="rhythm-time-inp"></div>'+
+      '<input type="text" id="rhythm-text-inp" class="rhythm-memo-inp" placeholder="한 줄 메모 (선택)">'+
+      '<button class="rhythm-save-btn" onclick="saveRhythmBlock()">트랙에 추가</button>';
+    outer.appendChild(form);
+  }else{
+    const addBtn=document.createElement('button');addBtn.className='rhythm-add-btn';addBtn.textContent='＋ 블록 추가';
+    addBtn.addEventListener('click',toggleRhythmAddForm);
+    outer.appendChild(addBtn);
+  }
+  _rhythmTrackEl=outer;
   return outer;
 }
 function makeRingRow(){
@@ -4954,36 +5005,34 @@ function renderWeeklyRhythmBars(){
     const dk=dateKey(d);
     const sleep=getSleep(dk)||{};
     const meals=getMeals(dk)||{};
-    const memos=getMemos(dk).filter(function(m){return m.time&&m.text;});
+    const manual=getRhythmBlocks(dk);
     const wakeMin=toMin(sleep.wake),sleepMin=toMin(sleep.sleep);
-    let track='<div class="wrb-track">';
+    let segs=[];
     if(wakeMin!=null&&sleepMin!=null&&sleepMin<=wakeMin){
-      track+='<div class="wrb-sleep" style="left:'+(sleepMin/1440*100)+'%;width:'+((wakeMin-sleepMin)/1440*100)+'%;"></div>';
+      segs.push({start:sleepMin,end:wakeMin,color:RHYTHM_SLEEP_COLOR});
     }else{
-      if(wakeMin!=null)track+='<div class="wrb-sleep" style="left:0%;width:'+(wakeMin/1440*100)+'%;"></div>';
-      if(sleepMin!=null)track+='<div class="wrb-sleep" style="left:'+(sleepMin/1440*100)+'%;width:'+(100-sleepMin/1440*100)+'%;"></div>';
+      if(wakeMin!=null)segs.push({start:0,end:wakeMin,color:RHYTHM_SLEEP_COLOR});
+      if(sleepMin!=null)segs.push({start:sleepMin,end:1440,color:RHYTHM_SLEEP_COLOR});
     }
-    track+='</div>';
-    let dots='';
-    const seenMeal={},seenMemo={};
-    const BUCKET=30;
     MEAL_KEYS.forEach(function(k){
       const t=meals[k+'_time'];if(!t)return;
-      const min=toMin(t);
-      const b=Math.round(min/BUCKET)*BUCKET;
-      if(seenMeal[b])return;seenMeal[b]=true;
-      dots+='<div class="wrb-dot meal" style="left:'+(min/1440*100)+'%;"></div>';
+      const start=toMin(t);
+      segs.push({start:start,end:Math.min(start+60,1440),color:RHYTHM_MEAL_COLOR});
     });
-    memos.forEach(function(m){
-      const min=toMin(m.time);
-      const b=Math.round(min/BUCKET)*BUCKET;
-      if(seenMemo[b])return;seenMemo[b]=true;
-      dots+='<div class="wrb-dot memo" style="left:'+(min/1440*100)+'%;"></div>';
+    manual.forEach(function(b){
+      const cat=RHYTHM_CATS[b.cat];if(!cat)return;
+      segs.push({start:toMin(b.start),end:toMin(b.end),color:cat.color});
     });
-    html+='<div class="wrb-row"><div class="wrb-daylabel'+(dk===todayDk?' today':'')+'">'+DOW[i]+'</div><div class="wrb-trackwrap">'+track+dots+'</div></div>';
+    let track='<div class="wrb-track">';
+    segs.forEach(function(sg){
+      track+='<div class="wrb-seg" style="left:'+(sg.start/1440*100)+'%;width:'+Math.max((sg.end-sg.start)/1440*100,0.8)+'%;background:'+sg.color+';"></div>';
+    });
+    track+='</div>';
+    html+='<div class="wrb-row"><div class="wrb-daylabel'+(dk===todayDk?' today':'')+'">'+DOW[i]+'</div><div class="wrb-trackwrap">'+track+'</div></div>';
   }
   html+='</div>';
-  html+='<div class="wrb-legend"><span><i style="background:#aab0dd;"></i>수면</span><span><i style="background:#91d2af;"></i>식사</span><span><i style="background:#f0a0aa;"></i>메모</span></div>';
+  html+='<div class="wrb-legend"><span><i style="background:'+RHYTHM_SLEEP_COLOR+';"></i>수면</span><span><i style="background:'+RHYTHM_MEAL_COLOR+';"></i>식사</span>'+
+    Object.keys(RHYTHM_CATS).map(function(k){return '<span><i style="background:'+RHYTHM_CATS[k].color+';"></i>'+RHYTHM_CATS[k].label+'</span>';}).join('')+'</div>';
   el.innerHTML=html;
 }
 function loadWeekly(){
