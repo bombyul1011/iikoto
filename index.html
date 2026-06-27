@@ -2052,7 +2052,7 @@ function buildDailyRhythmTrack(dk){
     outer.appendChild(form);
   }else{
     const addBtn=document.createElement('button');addBtn.className='rhythm-add-btn';addBtn.textContent='＋ 블록 추가';
-    addBtn.addEventListener('click',toggleRhythmAddForm);
+    addBtn.setAttribute('onclick','toggleRhythmAddForm()');
     outer.appendChild(addBtn);
   }
   _rhythmTrackEl=outer;
