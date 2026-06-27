@@ -1939,8 +1939,9 @@ async function syncRhythmBlocksDown(dk){
 let _rhythmTrackEl=null,_rhythmDk=null,_rhythmFormOpen=false,_rhythmFormCat=null;
 function refreshRhythmTrack(){
   if(!_rhythmTrackEl||!_rhythmDk)return;
+  const old=_rhythmTrackEl; // buildDailyRhythmTrack이 _rhythmTrackEl을 새 노드로 덮어쓰기 전에 먼저 잡아둠
   const fresh=buildDailyRhythmTrack(_rhythmDk);
-  _rhythmTrackEl.replaceWith(fresh);
+  if(old.parentNode)old.replaceWith(fresh);
   if(document.getElementById('v-weekly')&&document.getElementById('v-weekly').classList.contains('on'))renderWeeklyRhythmBars();
 }
 function toggleRhythmAddForm(){_rhythmFormOpen=!_rhythmFormOpen;if(!_rhythmFormOpen)_rhythmFormCat=null;refreshRhythmTrack();}
