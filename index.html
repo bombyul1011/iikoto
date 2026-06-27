@@ -1790,8 +1790,7 @@ function renderHomeBody(section){
       body.appendChild(makeRingRow());
     }
     if(isLastDayOfMonth||isSunday||isWednesdayEvening)body.appendChild(makeRingRow());
-    body.appendChild(makeLabel('오늘의 리듬'));
-    body.appendChild(buildDailyRhythmTrackFresh(dateKey(_ld)));
+    body.appendChild(makeDetailBanner('오늘의 리듬 보기',function(){return buildDailyRhythmTrackFresh(dateKey(_ld),getSubSection()==='night_2');},'rhythm-soft'));
     body.appendChild(makeLabel('내일 미리보기'));
     const sc3=document.createElement('div');sc3.className='card s';
     sc3.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑 작성 중...</div>';
@@ -1809,12 +1808,12 @@ function makeLabel(txt){
 const RHYTHM_CATS={
   exercise:{label:'운동',color:'rgba(228,128,105,0.88)'},
   rest:{label:'휴식',color:'rgba(250,215,100,0.85)'},
-  work:{label:'업무',color:'rgba(195,212,205,0.90)'},
+  work:{label:'업무',color:'rgba(178,190,205,0.90)'},
   appointment:{label:'약속',color:'rgba(135,190,230,0.85)'},
   note:{label:'노트',color:'rgba(240,160,170,0.85)'},
   home:{label:'집',color:'rgba(210,165,215,0.85)'}
 };
-const RHYTHM_SLEEP_COLOR='rgba(180,165,230,0.85)';
+const RHYTHM_SLEEP_COLOR='rgba(205,194,182,0.88)';
 const RHYTHM_MEAL_COLOR='rgba(145,210,175,0.85)';
 function getRhythmBlocks(dk){return S.get(S.key('rblocks',dk))||[];}
 function saveRhythmBlocks(dk,v){
@@ -1898,12 +1897,121 @@ function deleteRhythmBlock(idx){
   saveRhythmBlocks(_rhythmDk,blocks);
   refreshRhythmTrack();
 }
-function buildDailyRhythmTrackFresh(dk){
+
+// ── 하루 리듬 돌아보기 (일/주/월 단위 AI 인사이트)
+function getDayCategoryDurations(dk){
+  const sleep=getSleep(dk)||{},meals=getMeals(dk)||{},manual=getRhythmBlocks(dk);
+  const toMin=function(t){if(!t)return null;const p=t.split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);};
+  const dur={};
+  const add=function(label,min){if(min>0)dur[label]=(dur[label]||0)+min;};
+  const wakeMin=toMin(sleep.wake),sleepMin=toMin(sleep.sleep);
+  if(wakeMin!=null&&sleepMin!=null&&sleepMin<=wakeMin){add('수면',wakeMin-sleepMin);}
+  else{
+    if(wakeMin!=null)add('수면',wakeMin);
+    if(sleepMin!=null)add('수면',1440-sleepMin);
+  }
+  ['breakfast','lunch','dinner','snack'].forEach(function(k){if(meals[k+'_time'])add('식사',60);});
+  manual.forEach(function(b){
+    if(!b.end)return; // 진행중 블록은 누계에서 제외
+    const cat=RHYTHM_CATS[b.cat];if(!cat)return;
+    const s=toMin(b.start),e=toMin(b.end);
+    if(s!=null&&e!=null&&e>s)add(cat.label,e-s);
+  });
+  return dur;
+}
+function fmtDur(min){
+  const h=Math.floor(min/60),m=Math.round(min%60);
+  if(h>0&&m>0)return h+'시간 '+m+'분';
+  if(h>0)return h+'시간';
+  return m+'분';
+}
+function durSummaryLine(dur){
+  const keys=Object.keys(dur);
+  if(!keys.length)return '';
+  return keys.map(function(k){return k+' '+fmtDur(dur[k]);}).join(' · ');
+}
+function _rrGet(scope){try{return localStorage.getItem('iikoto_rhythmreview_'+scope);}catch(e){return null;}}
+function _rrSet(scope,val){try{localStorage.setItem('iikoto_rhythmreview_'+scope,val);}catch(e){}}
+async function buildRhythmReviewCard(){
+  const card=document.createElement('div');card.className='card s';
+  try{
+    const _ld=getLogicalDate();
+    const isLastDay=(function(){const t=new Date(_ld);t.setDate(_ld.getDate()+1);return t.getDate()===1;})();
+    const isSun=_ld.getDay()===0;
+    const key=getClaudeKey();
+    if(!key){card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">Claude API 키를 설정하면 리듬 인사이트를 받을 수 있어요</div>';return card;}
+
+    const commonRules=`규칙:
+- 반드시 ~해요, ~이에요, ~어요 체의 정감있는 존댓말만 사용. 반말 절대 금지.
+- 이름 호칭 없음.
+- 이모지 1개.
+- 오직 통찰 텍스트만 출력, 다른 말 없이.`;
+    let scope,dataContext,sys;
+
+    if(isLastDay){
+      const mk=monthKey(_ld);scope='month_'+mk;
+      const dur={};const lines=[];
+      const daysInMonth=new Date(_ld.getFullYear(),_ld.getMonth()+1,0).getDate();
+      for(let d=1;d<=daysInMonth;d++){
+        const dk=_ld.getFullYear()+'-'+pad(_ld.getMonth()+1)+'-'+pad(d);
+        const dd=getDayCategoryDurations(dk);
+        Object.keys(dd).forEach(function(k){dur[k]=(dur[k]||0)+dd[k];});
+        const ol=getDailyOneLine(dk).trim();
+        if(ol)lines.push(ol);
+      }
+      dataContext='이번 달 시간 사용 누계: '+(durSummaryLine(dur)||'기록 없음')+'\n이번 달 하루한줄 모음:\n'+lines.slice(0,20).map(function(l){return '- '+l;}).join('\n');
+      sys='당신은 따뜻한 생활 코치예요. 한 달 전체의 시간 사용 패턴과 하루한줄들을 보고, 이번 한 달을 시간 흐름 관점에서 짚어주는 통찰을 2-3문장으로 줘요. 단순 나열이 아니라 패턴이나 의외의 지점을 짚어줘요.\n'+commonRules;
+    }else if(isSun){
+      const mon=new Date(_ld);mon.setDate(_ld.getDate()-((_ld.getDay()+6)%7));
+      scope='week_'+dateKey(mon);
+      const dur={};const lines=[];
+      for(let i=0;i<7;i++){
+        const d=new Date(mon);d.setDate(mon.getDate()+i);
+        const dk=dateKey(d);
+        const dd=getDayCategoryDurations(dk);
+        Object.keys(dd).forEach(function(k){dur[k]=(dur[k]||0)+dd[k];});
+        const ol=getDailyOneLine(dk).trim();
+        if(ol)lines.push(_HOME_DAYS[d.getDay()]+': '+ol);
+      }
+      dataContext='이번 주(월~일) 시간 사용 누계: '+(durSummaryLine(dur)||'기록 없음')+'\n요일별 하루한줄:\n'+lines.map(function(l){return '- '+l;}).join('\n');
+      sys='당신은 따뜻한 생활 코치예요. 이번 주(월~일) 전체의 시간 사용 패턴과 요일별 하루한줄을 보고, 이번 한 주를 시간 흐름 관점에서 짚어주는 통찰을 2-3문장으로 줘요. 요일 비교나 패턴을 짚어줘도 좋아요.\n'+commonRules;
+    }else{
+      const dk=dateKey(_ld);scope='day_'+dk;
+      const dur=getDayCategoryDurations(dk);
+      const ol=getDailyOneLine(dk).trim();
+      dataContext='오늘 시간 사용: '+(durSummaryLine(dur)||'기록 없음')+'\n오늘 하루한줄: '+(ol||'(작성 안 함)');
+      sys='당신은 따뜻한 생활 비서예요. 오늘 하루의 시간 사용 패턴과 하루한줄을 보고, 둘을 연결한 짧은 통찰을 1-2문장으로 줘요. 시간을 어떻게 썼는지와 그날의 느낌이 어울리는지 어긋나는지를 짚어줘도 좋아요.\n'+commonRules;
+    }
+
+    const cached=_rrGet(scope);
+    if(cached){
+      const p=document.createElement('div');
+      p.style.cssText='font-size:13px;color:var(--tp);line-height:1.75;padding:4px 2px;word-break:keep-all;';
+      p.textContent=cached;card.appendChild(p);return card;
+    }
+    card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">하루 리듬을 돌아보는 중...</div>';
+    const reply=await callClaude(sys,[{role:'user',content:dataContext}],300);
+    card.innerHTML='';
+    if(reply&&!reply.startsWith('__ERR__')){
+      const p=document.createElement('div');
+      p.style.cssText='font-size:13px;color:var(--tp);line-height:1.75;padding:4px 2px;word-break:keep-all;';
+      p.textContent=reply.trim();
+      card.appendChild(p);
+      _rrSet(scope,reply.trim());
+    }else{
+      card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">잠시 후 다시 시도해주세요</div>';
+    }
+  }catch(e){
+    card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">리듬 인사이트를 불러올 수 없어요</div>';
+  }
+  return card;
+}
+function buildDailyRhythmTrackFresh(dk,includeReview){
   // 새로 화면에 들어올 때마다 입력폼은 항상 닫힌 상태로 시작 (열린 채로 남아있던 버그 수정)
   _rhythmFormOpen=false;_resetRhythmForm();
-  return buildDailyRhythmTrack(dk);
+  return buildDailyRhythmTrack(dk,includeReview);
 }
-function buildDailyRhythmTrack(dk){
+function buildDailyRhythmTrack(dk,includeReview){
   _rhythmDk=dk;
   const outer=document.createElement('div');
   const d=new Date(dk+'T00:00:00');
@@ -1911,6 +2019,15 @@ function buildDailyRhythmTrack(dk){
   const dateRow=document.createElement('div');dateRow.className='rhythm-track-datelabel';
   dateRow.innerHTML='<span>'+(d.getMonth()+1)+'월 '+d.getDate()+'일 '+_HOME_DAYS[d.getDay()]+'요일</span><span class="w">'+(isToday?'오늘':'')+'</span>';
   outer.appendChild(dateRow);
+  if(includeReview){
+    const rrWrap=document.createElement('div');rrWrap.style.marginBottom='14px';
+    const rrLabel=document.createElement('div');rrLabel.className='rhythm-form-label';rrLabel.style.marginBottom='8px';rrLabel.textContent='하루 리듬 돌아보기';
+    const rrCard=document.createElement('div');rrCard.className='card s';
+    rrCard.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">하루 리듬을 돌아보는 중...</div>';
+    rrWrap.appendChild(rrLabel);rrWrap.appendChild(rrCard);
+    outer.appendChild(rrWrap);
+    buildRhythmReviewCard().then(function(card){rrCard.replaceWith(card);}).catch(function(){rrCard.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">리듬 인사이트를 불러올 수 없어요</div>';});
+  }
   const wrap=document.createElement('div');wrap.className='rhythm-track';
   const sleep=getSleep(dk)||{};
   const meals=getMeals(dk)||{};
