@@ -712,12 +712,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .home-habit-chk{width:28px;height:28px;border-radius:50%;border:1.5px solid rgba(200,160,160,0.40);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .home-habit-chk.on{background:rgba(192,112,128,0.12);border-color:rgba(192,112,128,0.50);}
 .home-content-row{display:flex;align-items:center;gap:9px;padding:7px 0;}
-.home-content-row+.home-content-row{border-top:1px solid var(--div);}
 .home-content-bar{width:3px;height:15px;border-radius:2px;flex-shrink:0;}
-.home-content-bar.drama{background:rgba(255,160,185,.75);}
-.home-content-bar.book{background:rgba(240,210,90,.75);}
-.home-content-bar.movie{background:rgba(130,200,190,.75);}
-.home-content-bar.music{background:rgba(150,185,255,.75);}
+.home-content-bar.drama{background:rgba(230,130,160,.80);}
+.home-content-bar.book{background:rgba(215,175,60,.80);}
+.home-content-bar.movie{background:rgba(95,175,165,.80);}
+.home-content-bar.music{background:rgba(120,155,235,.80);}
 .home-content-cat{font-size:10.5px;color:var(--tm);flex-shrink:0;width:34px;}
 .home-content-title{font-size:12.5px;color:var(--tp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;}
 .reading-nudge{display:inline-block;font-size:10.5px;color:rgba(150,125,95,0.85);background:rgba(190,170,140,0.14);border-radius:7px;padding:3px 8px;}
@@ -2130,7 +2129,7 @@ function makeBookCard(){
   return wrap;
 }
 function makeContentsCard(){
-  const wrap=document.createElement('div');wrap.className='card s';
+  const wrap=document.createElement('div');wrap.className='card';
   const mk=monthKey(new Date()),contents=getContents(mk);
   if(!contents.length){
     wrap.innerHTML='<div style="font-size:12px;color:var(--tm);padding:4px;">이번 달 콘텐츠가 없어요</div>';
