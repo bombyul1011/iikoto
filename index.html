@@ -1920,7 +1920,22 @@ const RHYTHM_CATS={
 const RHYTHM_SLEEP_COLOR='rgba(180,165,230,0.85)';
 const RHYTHM_MEAL_COLOR='rgba(145,210,175,0.85)';
 function getRhythmBlocks(dk){return S.get(S.key('rblocks',dk))||[];}
-function saveRhythmBlocks(dk,v){S.set(S.key('rblocks',dk),v);}
+function saveRhythmBlocks(dk,v){
+  S.set(S.key('rblocks',dk),v);
+  S.set(S.key('rblocks_pending',dk),true);
+  autoSync('rblocks',dk);
+}
+async function syncRhythmBlocksUp(dk){
+  const blocks=getRhythmBlocks(dk);
+  await supaFetch(`rhythm_blocks?date_key=eq.${dk}`,'DELETE');
+  if(blocks.length)await supaFetch('rhythm_blocks','POST',blocks.map(b=>({date_key:dk,cat:b.cat,start_time:b.start,end_time:b.end,text:b.text||'',created:b.created||Date.now(),client_id:b.cid||genCid()})));
+}
+async function syncRhythmBlocksDown(dk){
+  const rows=await supaFetch('rhythm_blocks?date_key=eq.'+dk+'&order=created');
+  if(!rows)return; // 연결 실패 — 로컬 유지
+  if(S.get(S.key('rblocks_pending',dk)))return; // 업로드 대기중인 로컬 수정 있으면 덮어쓰지 않음
+  S.set(S.key('rblocks',dk),rows.map(function(r){return {cat:r.cat,start:r.start_time,end:r.end_time,text:r.text||'',created:r.created,cid:r.client_id||genCid()};}));
+}
 let _rhythmTrackEl=null,_rhythmDk=null,_rhythmFormOpen=false,_rhythmFormCat=null;
 function refreshRhythmTrack(){
   if(!_rhythmTrackEl||!_rhythmDk)return;
@@ -1936,7 +1951,7 @@ function saveRhythmBlock(){
   const start=s?s.value:'',end=e?e.value:'';
   if(!start||!end)return;
   const blocks=getRhythmBlocks(_rhythmDk);
-  blocks.push({cat:cat,start:start,end:end,text:t?t.value.trim():''});
+  blocks.push({cat:cat,start:start,end:end,text:t?t.value.trim():'',created:Date.now(),cid:genCid()});
   saveRhythmBlocks(_rhythmDk,blocks);
   _rhythmFormOpen=false;_rhythmFormCat=null;
   refreshRhythmTrack();
@@ -3612,6 +3627,7 @@ async function autoSync(type,key){
     }
   }
   else if(type==='contents'){await syncContentsUp(key);S.set(S.key('contents_pending',key),false);}
+  else if(type==='rblocks'){await syncRhythmBlocksUp(key);S.set(S.key('rblocks_pending',key),false);}
 }
 async function syncAll(){
   if(!navigator.onLine)return;
@@ -3634,7 +3650,11 @@ async function syncAll(){
   if(S.get(S.key('meals_pending',dk)))upTasks.push(syncMealsUp(dk).then(()=>S.set(S.key('meals_pending',dk),false)));
   if(S.get(S.key('contents_pending',mk)))upTasks.push(syncContentsUp(mk).then(()=>S.set(S.key('contents_pending',mk),false)));
   if(S.get('wchallenge_pending_'+wk))upTasks.push(autoSync('wchallenge','wchallenge_'+wk));
+  if(S.get(S.key('rblocks_pending',dk)))upTasks.push(syncRhythmBlocksUp(dk).then(()=>S.set(S.key('rblocks_pending',dk),false)));
   if(upTasks.length)await Promise.all(upTasks);
+  // 이번 주 리듬블록(가로바용) 날짜키
+  const weekRblockDks=[];
+  for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);weekRblockDks.push(dateKey(d));}
   // Down (Supabase → 로컬)
   await Promise.all([
     syncTodosDown(dk),syncMemosDown(dk),syncSleepDown(dk),syncMealsDown(dk),
@@ -3642,10 +3662,12 @@ async function syncAll(){
     syncHabitsDown(),syncHCDown(wk),syncContentsDown(mk),
     syncGoalDown(S.key('mgoal',monthKey(now))),
     syncWChallengeDown(wk),
-    ...weekOnelines
+    ...weekOnelines,
+    ...weekRblockDks.map(rdk=>syncRhythmBlocksDown(rdk))
   ]);
   loadDaily();
   if(document.getElementById('v-weekly')&&document.getElementById('v-weekly').classList.contains('on'))loadWeekly();
+  if(_rhythmTrackEl&&document.body.contains(_rhythmTrackEl))refreshRhythmTrack();
 }
 window.addEventListener('online',()=>syncAll());
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
@@ -4607,12 +4629,13 @@ async function syncMonthRange(y,mo){
   const daysInMonth=new Date(y,mo+1,0).getDate();
   const start=`${y}-${pad(mo+1)}-01`;
   const end=`${y}-${pad(mo+1)}-${pad(daysInMonth)}`;
-  const [mRows,tRows,sRows,mlRows,hcRows]=await Promise.all([
+  const [mRows,tRows,sRows,mlRows,hcRows,rbRows]=await Promise.all([
     supaFetch(`memos?date_key=gte.${start}&date_key=lte.${end}&order=created`),
     supaFetch(`todos?date_key=gte.${start}&date_key=lte.${end}&order=created`),
     supaFetch(`sleep?date_key=gte.${start}&date_key=lte.${end}`),
     supaFetch(`meals?date_key=gte.${start}&date_key=lte.${end}`),
-    supaFetch(`habit_checks?date_key=gte.${start}&date_key=lte.${end}`)
+    supaFetch(`habit_checks?date_key=gte.${start}&date_key=lte.${end}`),
+    supaFetch(`rhythm_blocks?date_key=gte.${start}&date_key=lte.${end}&order=created`)
   ]);
   if(mRows){
     const byDate={};
@@ -4626,6 +4649,11 @@ async function syncMonthRange(y,mo){
   }
   if(sRows)sRows.forEach(r=>S.set(S.key('sleep',r.date_key),{sleep:r.sleep_time,wake:r.wake_time}));
   if(mlRows)mlRows.forEach(r=>{if(!S.get(S.key('meals_pending',r.date_key)))S.set(S.key('meals',r.date_key),{breakfast:r.breakfast||'',lunch:r.lunch||'',dinner:r.dinner||'',snack:r.snack||'',breakfast_time:r.breakfast_time||'',lunch_time:r.lunch_time||'',dinner_time:r.dinner_time||'',snack_time:r.snack_time||''});});
+  if(rbRows){
+    const byDate={};
+    rbRows.forEach(r=>{(byDate[r.date_key]=byDate[r.date_key]||[]).push({cat:r.cat,start:r.start_time,end:r.end_time,text:r.text||'',created:r.created,cid:r.client_id||genCid()});});
+    Object.keys(byDate).forEach(dk=>{if(!S.get(S.key('rblocks_pending',dk)))S.set(S.key('rblocks',dk),byDate[dk]);});
+  }
   if(hcRows){
     const byWeek={};
     hcRows.forEach(r=>{
@@ -6312,6 +6340,10 @@ async function forceRestoreDate(dk){
   if(mlrows&&mlrows.length>0){
     S.set(S.key('meals',dk),{breakfast:mlrows[0].breakfast||'',lunch:mlrows[0].lunch||'',dinner:mlrows[0].dinner||'',snack:mlrows[0].snack||'',breakfast_time:mlrows[0].breakfast_time||'',lunch_time:mlrows[0].lunch_time||'',dinner_time:mlrows[0].dinner_time||'',snack_time:mlrows[0].snack_time||''});
   }
+  var rbrows=await supaFetch('rhythm_blocks?date_key=eq.'+dk+'&order=created');
+  if(rbrows&&rbrows.length>0){
+    S.set(S.key('rblocks',dk),rbrows.map(function(r){return {cat:r.cat,start:r.start_time,end:r.end_time,text:r.text||'',created:r.created,cid:r.client_id||genCid()};}));
+  }
 }
 async function forceRestoreAll(){
   showToast('복구 시작...');
@@ -6375,6 +6407,11 @@ async function initSync(){
     if(S.get(S.key('meals_pending',dk))){
       await syncMealsUp(dk);
       S.set(S.key('meals_pending',dk),false);
+    }
+    if(S.get(S.key('rblocks_pending',dk))){
+      await syncRhythmBlocksUp(dk);
+      S.set(S.key('rblocks_pending',dk),false);
+      didUp=true;
     }
     if(didUp)uploadedDates[dk]=true;
   }
@@ -6442,6 +6479,7 @@ async function initSync(){
       await syncTodosDown(fdk);
       await syncMemosDown(fdk);
       await syncMealsDown(fdk);
+      await syncRhythmBlocksDown(fdk);
     }
   }
   window._restoring=false;
