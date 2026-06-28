@@ -1852,7 +1852,7 @@ function buildMonthlyRhythmBar(dur,dim,dayCount){
   const listItems=order.filter(function(k){return k!=='수면'&&k!=='식사'&&(dur[k]||0)>0;});
   const listHtml=listItems.length?'<div class="mr-rhythm-list">'+listItems.map(function(k){
     const v=dur[k],days=(dayCount&&dayCount[k])||1,avg=v/days;
-    return '<div class="mr-rhythm-item"><span class="dot" style="background:'+colorMap[k]+';"></span><span class="lbl">'+k+'</span><span class="val">누계 '+fmtDur(v)+' · 작성일 평균 '+fmtDur(avg)+'</span></div>';
+    return '<div class="mr-rhythm-item"><span class="dot" style="background:'+colorMap[k]+';"></span><span class="lbl">'+k+'</span><span class="val">누계 '+fmtDur(v)+' · 일평균 '+fmtDur(avg)+'</span></div>';
   }).join('')+'</div>':'<div style="font-size:11.5px;color:var(--tm);text-align:center;padding:4px 0;">기록된 리듬 항목이 없어요</div>';
   return barHtml+listHtml;
 }
