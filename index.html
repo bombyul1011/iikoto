@@ -1638,7 +1638,12 @@ function renderHomeBody(section){
       </div>`;
       rbanner.addEventListener('click',openMonthlyReportSheet);
       body.appendChild(rbanner);
+      body.appendChild(makeRingRow());
+      body.appendChild(makeDetailBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(_ld),getSubSection()==='night_2');},'rhythm-soft'));
     } else if(isSunday){
+      // 리듬배너 → 완성률 링 → 이번주 돌아보기 → 다음주 준비
+      body.appendChild(makeDetailBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(_ld),getSubSection()==='night_2');},'rhythm-soft'));
+      body.appendChild(makeRingRow());
       appendSundayBanner(body);
       body.appendChild(makeLabel('◉ 다음 주 준비'));
       const nwBanner=document.createElement('div');
@@ -1663,16 +1668,19 @@ function renderHomeBody(section){
       </div>`;
       mbanner.addEventListener('click',openMidweekRemindSheet);
       body.appendChild(mbanner);
+      body.appendChild(makeRingRow());
+      body.appendChild(makeDetailBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(_ld),getSubSection()==='night_2');},'rhythm-soft'));
     } else {
       body.appendChild(makeRingRow());
+      body.appendChild(makeDetailBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(_ld),getSubSection()==='night_2');},'rhythm-soft'));
     }
-    if(isLastDayOfMonth||isSunday||isWednesdayEvening)body.appendChild(makeRingRow());
-    body.appendChild(makeDetailBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(_ld),getSubSection()==='night_2');},'rhythm-soft'));
-    body.appendChild(makeLabel('내일 미리보기'));
-    const sc3=document.createElement('div');sc3.className='card s';
-    sc3.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑 작성 중...</div>';
-    body.appendChild(sc3);
-    makeScheduleCard('night').then(function(card){sc3.replaceWith(card);}).catch(function(){sc3.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑을 불러올 수 없어요</div>';});
+    if(!isSunday){
+      body.appendChild(makeLabel('내일 미리보기'));
+      const sc3=document.createElement('div');sc3.className='card s';
+      sc3.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑 작성 중...</div>';
+      body.appendChild(sc3);
+      makeScheduleCard('night').then(function(card){sc3.replaceWith(card);}).catch(function(){sc3.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑을 불러올 수 없어요</div>';});
+    }
     body.appendChild(makeLabel('오늘의 독서'));
     body.appendChild(makeBookCard());
   }
@@ -1899,10 +1907,14 @@ function buildDailyRhythmTrack(dk,includeReview){
   dateRow.innerHTML='<span>'+(d.getMonth()+1)+'월 '+d.getDate()+'일 '+_HOME_DAYS[d.getDay()]+'요일</span><span class="w">'+(isToday?'오늘':'')+'</span>';
   outer.appendChild(dateRow);
   if(includeReview){
+    const _rrLd=getLogicalDate();
+    const _rrIsLastDay=(function(){const t=new Date(_rrLd);t.setDate(_rrLd.getDate()+1);return t.getDate()===1;})();
+    const _rrIsSun=_rrLd.getDay()===0;
+    const rrTitle=_rrIsLastDay?'한 달 리듬 돌아보기':(_rrIsSun?'한 주 리듬 돌아보기':'하루 리듬 돌아보기');
     const rrWrap=document.createElement('div');rrWrap.style.marginBottom='14px';
-    const rrLabel=document.createElement('div');rrLabel.className='rhythm-form-label';rrLabel.style.marginBottom='8px';rrLabel.textContent='하루 리듬 돌아보기';
+    const rrLabel=document.createElement('div');rrLabel.className='rhythm-form-label';rrLabel.style.marginBottom='8px';rrLabel.textContent=rrTitle;
     const rrCard=document.createElement('div');rrCard.className='rhythm-review-card';
-    rrCard.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">하루 리듬을 돌아보는 중...</div>';
+    rrCard.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">'+rrTitle+'를 정리하는 중...</div>';
     rrWrap.appendChild(rrLabel);rrWrap.appendChild(rrCard);
     outer.appendChild(rrWrap);
     buildRhythmReviewCard().then(function(card){rrCard.replaceWith(card);}).catch(function(){rrCard.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">리듬 인사이트를 불러올 수 없어요</div>';});
@@ -2935,9 +2947,10 @@ async function makeWeeklySummaryCard(){
 - 기호 사용: ◎ ✓ ✦ → ◐ ★ (이모지 금지)
 - 이름 호칭 없음
 - 전체 7-9문장 이내
+- 분량을 넘기지 않도록 조절하고, 마지막 항목과 마지막 문장까지 반드시 완전한 문장으로 끝맺기 (중간에 잘리지 않게)
 - HTML 태그 없이 순수 텍스트만 출력`;
 
-  const reply=await callClaude(sys,[{role:'user',content:dataContext}],700);
+  const reply=await callClaude(sys,[{role:'user',content:dataContext}],900);
 
   if(reply&&!reply.startsWith('__ERR__')){
     // 텍스트를 HTML로 변환 — 소제목 볼드, 기호 항목 정렬
@@ -4004,6 +4017,9 @@ function buildWeekSummaryForChallenge(){
 }
 async function loadNextWeekAISuggestions(wk){
   const area=document.getElementById('nw-ai-area');if(!area)return;
+  const cacheKey='nextweek_suggest_'+wk;
+  const cached=S.get(cacheKey);
+  if(cached){area.innerHTML=cached;return;}
   const key=getClaudeKey();
   if(!key){area.innerHTML='<div style="font-size:11.5px;color:var(--tm);text-align:center;padding:10px 0;">설정에서 Claude API 키를 입력하면 추천을 받을 수 있어요</div>';return;}
   const habits=getHabits().map(h=>h.name);
@@ -4015,7 +4031,9 @@ async function loadNextWeekAISuggestions(wk){
   let sugg=[];
   try{sugg=JSON.parse(reply.replace(/```json|```/g,'').trim());}catch(e){}
   if(!sugg||!sugg.length){area.innerHTML='<div style="font-size:11.5px;color:var(--tm);text-align:center;padding:10px 0;">추천을 불러올 수 없어요</div>';return;}
-  area.innerHTML=`<div class="nw-chip-row">${sugg.map(s=>`<div class="nw-chip" onclick="applyNwSuggestion('${(s.title||'').replace(/'/g,"\\'")}','${wk}')"><span class="nwc-sym">◉</span><div><div class="nwc-title">${s.title||''}</div><div class="nwc-desc">${s.desc||''}</div></div></div>`).join('')}</div>`;
+  const html=`<div class="nw-chip-row">${sugg.map(s=>`<div class="nw-chip" onclick="applyNwSuggestion('${(s.title||'').replace(/'/g,"\\'")}','${wk}')"><span class="nwc-sym">◉</span><div><div class="nwc-title">${s.title||''}</div><div class="nwc-desc">${s.desc||''}</div></div></div>`).join('')}</div>`;
+  area.innerHTML=html;
+  S.set(cacheKey,html);
 }
 function applyNwSuggestion(title,wk){
   let items=getWChallenge(wk);
