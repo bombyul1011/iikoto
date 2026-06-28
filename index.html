@@ -1836,7 +1836,7 @@ function durSummaryLine(dur){
   if(!keys.length)return '';
   return keys.map(function(k){return k+' '+fmtDur(dur[k]);}).join(' · ');
 }
-function buildMonthlyRhythmBar(dur,dim){
+function buildMonthlyRhythmBar(dur,dim,dayCount){
   const order=['수면','식사'].concat(Object.values(RHYTHM_CATS).map(function(c){return c.label;}));
   const colorMap={'수면':RHYTHM_SLEEP_COLOR,'식사':RHYTHM_MEAL_COLOR};
   Object.values(RHYTHM_CATS).forEach(function(c){colorMap[c.label]=c.color;});
@@ -1851,8 +1851,8 @@ function buildMonthlyRhythmBar(dur,dim){
   barHtml+='</div>';
   const listItems=order.filter(function(k){return k!=='수면'&&k!=='식사'&&(dur[k]||0)>0;});
   const listHtml=listItems.length?'<div class="mr-rhythm-list">'+listItems.map(function(k){
-    const v=dur[k],avg=v/(dim||30);
-    return '<div class="mr-rhythm-item"><span class="dot" style="background:'+colorMap[k]+';"></span><span class="lbl">'+k+'</span><span class="val">누계 '+fmtDur(v)+' · 하루 평균 '+fmtDur(avg)+'</span></div>';
+    const v=dur[k],days=(dayCount&&dayCount[k])||1,avg=v/days;
+    return '<div class="mr-rhythm-item"><span class="dot" style="background:'+colorMap[k]+';"></span><span class="lbl">'+k+'</span><span class="val">누계 '+fmtDur(v)+' · 작성일 평균 '+fmtDur(avg)+'</span></div>';
   }).join('')+'</div>':'<div style="font-size:11.5px;color:var(--tm);text-align:center;padding:4px 0;">기록된 리듬 항목이 없어요</div>';
   return barHtml+listHtml;
 }
@@ -2596,6 +2596,7 @@ function computeMonthStats(y,mo){
   const onelineTexts=[];
   const weekSet={};
   const rhythmDur={};
+  const rhythmDayCount={};
   for(let d=1;d<=dim;d++){
     const dk=`${y}-${pad(mo+1)}-${pad(d)}`;
     const dayMemos=getMemos(dk);
@@ -2613,7 +2614,10 @@ function computeMonthStats(y,mo){
     const checks=getHabitChecks(wk);
     habits.forEach(h=>{ht++;if(checks[`${h.name}-${dow}`])hc++;});
     const dd=getDayCategoryDurations(dk);
-    Object.keys(dd).forEach(function(k){rhythmDur[k]=(rhythmDur[k]||0)+dd[k];});
+    Object.keys(dd).forEach(function(k){
+      rhythmDur[k]=(rhythmDur[k]||0)+dd[k];
+      if(dd[k]>0)rhythmDayCount[k]=(rhythmDayCount[k]||0)+1;
+    });
   }
   const habitPct=ht>0?Math.round(hc/ht*100):0;
   const todoPct=totalTodos>0?Math.round(doneTodos/totalTodos*100):0;
@@ -2630,7 +2634,7 @@ function computeMonthStats(y,mo){
   const mk=`${y}-${pad(mo+1)}`;
   const contentsList=getContents(mk);
   const rhythmSummary=Object.keys(rhythmDur).length?durSummaryLine(rhythmDur):'';
-  return {memos,doneTodos,totalTodos,todoPct,habitPct,avgSleep,allMemoTexts,onelineTexts,wcByWeek,contentsList,rhythmSummary,rhythmDur,dim};
+  return {memos,doneTodos,totalTodos,todoPct,habitPct,avgSleep,allMemoTexts,onelineTexts,wcByWeek,contentsList,rhythmSummary,rhythmDur,rhythmDayCount,dim};
 }
 async function generateMonthlyReportAI(mk,stats){
   const key=getClaudeKey();
@@ -2692,7 +2696,7 @@ async function loadMonthlyReportContent(){
   </div>`;
   const rhythmHtml=stats.rhythmDur&&Object.keys(stats.rhythmDur).length?`<div class="mr-card">
     <div class="mr-sec-title">이번 달 리듬</div>
-    ${buildMonthlyRhythmBar(stats.rhythmDur,stats.dim)}
+    ${buildMonthlyRhythmBar(stats.rhythmDur,stats.dim,stats.rhythmDayCount)}
   </div>` : '';
   const wcHtml=stats.wcByWeek.length?`<div class="mr-card">
     <div class="mr-sec-title">주간 미션 모음 · 주차별</div>
