@@ -230,6 +230,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .chk.ts-night.on::after{border-color:rgba(110,80,180,0.9);}
 .todo-txt{flex:1;line-height:1.4;cursor:pointer;}
 .todo-txt.done{text-decoration:line-through;color:var(--tm);}
+.todo-txt.postponed{color:#9c4a4a;}
+.ring-complete{border-radius:50%;}
+.ring-complete::after{content:'';position:absolute;top:-3px;left:-3px;right:-3px;bottom:-3px;border-radius:50%;border:1.5px solid rgba(255,215,150,0.9);box-shadow:0 0 6px rgba(255,200,140,0.7);animation:ringGlow 1.8s ease-in-out infinite;pointer-events:none;}
+@keyframes ringGlow{0%,100%{opacity:0.45;}50%{opacity:1;}}
 .todo-swipe{position:absolute;right:0;top:0;bottom:0;display:flex;align-items:stretch;overflow:hidden;transition:width .2s,opacity .2s;width:0;opacity:0;}
 .tsw-btn{display:flex;align-items:center;justify-content:center;padding:0 14px;font-size:11px;cursor:pointer;white-space:nowrap;}
 .tsw-edit{background:rgba(190,215,255,.85);color:#3a5fa0;}
@@ -2051,20 +2055,26 @@ function makeRingRow(){
   row.style.cssText='display:flex;gap:0;margin-bottom:10px;';
   const dk=dateKey(new Date());
   const todos=getTodos(dk);
-  const todoPct=todos.length?Math.round(todos.filter(function(t){return t.done;}).length/todos.length*100):0;
+  const todoDone=todos.filter(function(t){return t.done;}).length;
+  const todoPct=todos.length?Math.round(todoDone/todos.length*100):0;
   const habits=getHabits();
   const wk=weekKey(new Date()),checks=getHabitChecks(wk),dow=(new Date().getDay()+6)%7;
-  const habitPct=habits.length?Math.round(habits.filter(function(h){return checks[h.name+'-'+dow];}).length/habits.length*100):0;
-  row.appendChild(makeRing('투두 완료',todoPct,'rgba(220,150,170,0.85)'));
-  row.appendChild(makeRing('습관 달성',habitPct,'rgba(100,185,255,0.85)'));
+  const habitDone=habits.filter(function(h){return checks[h.name+'-'+dow];}).length;
+  const habitPct=habits.length?Math.round(habitDone/habits.length*100):0;
+  row.appendChild(makeRing('투두 완료',todoPct,todoDone,'rgba(220,150,170,0.85)'));
+  row.appendChild(makeRing('습관 달성',habitPct,habitDone,'rgba(100,185,255,0.85)'));
   return row;
 }
-function makeRing(label,pct,color){
+function makeRing(label,pct,count,color){
   const wrap=document.createElement('div');
   wrap.style.cssText='flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 0;';
+  const canvasWrap=document.createElement('div');
+  canvasWrap.style.cssText='position:relative;width:72px;height:72px;';
+  if(pct>=100)canvasWrap.classList.add('ring-complete');
   const canvas=document.createElement('canvas');
-  canvas.width=72;canvas.height=72;canvas.style.cssText='width:72px;height:72px;';
-  wrap.appendChild(canvas);
+  canvas.width=72;canvas.height=72;canvas.style.cssText='width:72px;height:72px;display:block;';
+  canvasWrap.appendChild(canvas);
+  wrap.appendChild(canvasWrap);
   const lbl=document.createElement('div');
   lbl.style.cssText='font-size:10px;color:var(--tm);text-align:center;';
   lbl.textContent=label;wrap.appendChild(lbl);
@@ -2083,9 +2093,9 @@ function makeRing(label,pct,color){
       ctx.strokeStyle=color;ctx.lineWidth=lw;ctx.lineCap='round';ctx.stroke();
     }
     ctx.fillStyle=isDark?'rgba(240,236,255,0.9)':'rgba(90,64,64,0.85)';
-    ctx.font='bold 13px DM Sans,sans-serif';
+    ctx.font='bold 15px DM Sans,sans-serif';
     ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(pct+'%',cx,cy);
+    ctx.fillText(String(count),cx,cy);
   },50);
   return wrap;
 }
@@ -3339,13 +3349,13 @@ async function syncTodosDown(dk){
   const rows=await supaFetch('todos?date_key=eq.'+dk+'&order=created');
   if(!rows)return; // 연결 실패 — 로컬 유지
   if(rows.length===0)return; // 서버 비어있음 — 로컬 유지
-  S.set(S.key('todos',dk),rows.map(function(r){return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid()};}));
+  S.set(S.key('todos',dk),rows.map(function(r){return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),postponeCount:r.postpone_count||0};}));
   renderTodos();
 }
 async function syncTodosUp(dk){
   const todos=getTodos(dk);
   await supaFetch(`todos?date_key=eq.${dk}`,'DELETE');
-  if(todos.length)await supaFetch('todos','POST',todos.map(t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid||genCid()})));
+  if(todos.length)await supaFetch('todos','POST',todos.map(t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid||genCid(),postpone_count:t.postponeCount||0})));
 }
 async function syncMemosDown(dk){
   const rows=await supaFetch('memos?date_key=eq.'+dk+'&order=created');
@@ -3709,7 +3719,8 @@ function renderTodos(){
     const ts=t.timeSection||'none';
     const tsClass=ts!=='none'?` ts-${ts}`:'';
     const el=document.createElement('div');el.className='todo-item';
-    el.innerHTML=`<div class="chk${tsClass}${t.done?' on':''}" onclick="toggleTodo(${i})"></div><span class="todo-txt${t.done?' done':''}" onclick="openTodoSheet(${i})">${t.text}</span>`;
+    const postponedClass=(t.postponeCount||0)>=3?' postponed':'';
+    el.innerHTML=`<div class="chk${tsClass}${t.done?' on':''}" onclick="toggleTodo(${i})"></div><span class="todo-txt${t.done?' done':''}${postponedClass}" onclick="openTodoSheet(${i})">${t.text}</span>`;
     attachSwipe(el,()=>{_todoSwipeIdx=i;document.getElementById('todo-sheet-title').textContent=t.text;openSheet('todo-sheet');});
     list.appendChild(el);
   });
@@ -3786,7 +3797,7 @@ function todoSheetPostpone(type){
   if(type==='tomorrow'){
     const tom=new Date(currentDate);tom.setDate(tom.getDate()+1);
     const tdk=dateKey(tom),ttodos=getTodos(tdk);
-    ttodos.push({...todo,done:false});saveTodos(tdk,ttodos);
+    ttodos.push({...todo,done:false,postponeCount:(todo.postponeCount||0)+1});saveTodos(tdk,ttodos);
     todos.splice(_todoSwipeIdx,1);saveTodos(dk,todos);
     closeSheet('todo-sheet');renderTodos();
   } else {
@@ -3798,7 +3809,7 @@ function todoSheetPostpone(type){
 function confirmDate(){
   const val=document.getElementById('date-inp').value;if(!val||_todoSwipeIdx<0)return;
   const dk=dateKey(currentDate),todos=getTodos(dk),todo=todos[_todoSwipeIdx];
-  const ttodos=getTodos(val);ttodos.push({...todo,done:false});saveTodos(val,ttodos);
+  const ttodos=getTodos(val);ttodos.push({...todo,done:false,postponeCount:(todo.postponeCount||0)+1});saveTodos(val,ttodos);
   todos.splice(_todoSwipeIdx,1);saveTodos(dk,todos);closeModal('date-modal');renderTodos();
 }
 
@@ -6226,7 +6237,7 @@ async function forceRestoreDate(dk){
   }
   var trows=await supaFetch('todos?date_key=eq.'+dk+'&order=created');
   if(trows&&trows.length>0){
-    S.set(S.key('todos',dk),trows.map(function(r){return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid()};}));
+    S.set(S.key('todos',dk),trows.map(function(r){return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),postponeCount:r.postpone_count||0};}));
   }
   var srows=await supaFetch('sleep?date_key=eq.'+dk);
   if(srows&&srows.length>0){
