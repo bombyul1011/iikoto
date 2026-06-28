@@ -2712,7 +2712,7 @@ async function loadMonthlyReportContent(){
 function openWeeklyReviewSheet(){
   const sheet=document.getElementById('weekly-review-sheet');
   const content=document.getElementById('weekly-review-content');
-  const cacheKey='weekly_summary_'+dateKey(new Date());
+  const cacheKey='weekly_summary_'+dateKey(getLogicalDate());
   const cached=S.get(cacheKey);
   openSheet('weekly-review-sheet');
   if(cached){
@@ -2862,7 +2862,7 @@ async function makeWeeklySummaryCard(){
   card.className='card m';
 
   // 이번 주 월~토 데이터 수집
-  const now=new Date();
+  const now=getLogicalDate();
   const weekStart=new Date(now);
   weekStart.setDate(now.getDate()-((now.getDay()+6)%7)); // 월요일
   weekStart.setHours(0,0,0,0);
