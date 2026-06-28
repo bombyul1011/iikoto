@@ -206,6 +206,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .mr-wc-line{display:flex;align-items:center;gap:8px;padding:4px 0;}
 .mr-wc-line .txt{flex:1;font-size:12px;color:var(--tp);}
 .mr-wc-line .pct{font-size:10.5px;color:var(--tm);}
+.mr-rhythm-bar{display:flex;width:100%;height:16px;border-radius:8px;overflow:hidden;margin-bottom:12px;background:rgba(200,195,190,0.18);}
+.mr-rhythm-seg{height:100%;}
+.mr-rhythm-list{display:flex;flex-direction:column;gap:6px;}
+.mr-rhythm-item{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--tp);}
+.mr-rhythm-item .dot{width:8px;height:8px;border-radius:2px;flex-shrink:0;}
+.mr-rhythm-item .lbl{font-weight:600;width:32px;flex-shrink:0;}
+.mr-rhythm-item .val{color:var(--tm);font-size:11px;}
 .weekly-review-banner-title{font-size:13px;font-weight:700;color:rgba(65,125,70,0.95);letter-spacing:0.05em;margin-bottom:4px;}
 .weekly-review-banner-sub{font-size:11.5px;color:rgba(100,140,75,0.80);display:flex;align-items:center;justify-content:space-between;}
 @keyframes bannerShine{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
@@ -1829,6 +1836,26 @@ function durSummaryLine(dur){
   if(!keys.length)return '';
   return keys.map(function(k){return k+' '+fmtDur(dur[k]);}).join(' · ');
 }
+function buildMonthlyRhythmBar(dur,dim){
+  const order=['수면','식사'].concat(Object.values(RHYTHM_CATS).map(function(c){return c.label;}));
+  const colorMap={'수면':RHYTHM_SLEEP_COLOR,'식사':RHYTHM_MEAL_COLOR};
+  Object.values(RHYTHM_CATS).forEach(function(c){colorMap[c.label]=c.color;});
+  const total=order.reduce(function(s,k){return s+(dur[k]||0);},0);
+  if(!total)return '';
+  let barHtml='<div class="mr-rhythm-bar">';
+  order.forEach(function(k){
+    const v=dur[k]||0;if(v<=0)return;
+    const pct=v/total*100;
+    barHtml+='<div class="mr-rhythm-seg" style="width:'+pct+'%;background:'+colorMap[k]+';" title="'+k+' '+fmtDur(v)+'"></div>';
+  });
+  barHtml+='</div>';
+  const listItems=order.filter(function(k){return k!=='수면'&&k!=='식사'&&(dur[k]||0)>0;});
+  const listHtml=listItems.length?'<div class="mr-rhythm-list">'+listItems.map(function(k){
+    const v=dur[k],avg=v/(dim||30);
+    return '<div class="mr-rhythm-item"><span class="dot" style="background:'+colorMap[k]+';"></span><span class="lbl">'+k+'</span><span class="val">누계 '+fmtDur(v)+' · 하루 평균 '+fmtDur(avg)+'</span></div>';
+  }).join('')+'</div>':'<div style="font-size:11.5px;color:var(--tm);text-align:center;padding:4px 0;">기록된 리듬 항목이 없어요</div>';
+  return barHtml+listHtml;
+}
 function _rrGet(scope){try{return localStorage.getItem('iikoto_rhythmreview_'+scope);}catch(e){return null;}}
 function _rrSet(scope,val){try{localStorage.setItem('iikoto_rhythmreview_'+scope,val);}catch(e){}}
 async function buildRhythmReviewCard(){
@@ -2603,7 +2630,7 @@ function computeMonthStats(y,mo){
   const mk=`${y}-${pad(mo+1)}`;
   const contentsList=getContents(mk);
   const rhythmSummary=Object.keys(rhythmDur).length?durSummaryLine(rhythmDur):'';
-  return {memos,doneTodos,totalTodos,todoPct,habitPct,avgSleep,allMemoTexts,onelineTexts,wcByWeek,contentsList,rhythmSummary};
+  return {memos,doneTodos,totalTodos,todoPct,habitPct,avgSleep,allMemoTexts,onelineTexts,wcByWeek,contentsList,rhythmSummary,rhythmDur,dim};
 }
 async function generateMonthlyReportAI(mk,stats){
   const key=getClaudeKey();
@@ -2663,9 +2690,9 @@ async function loadMonthlyReportContent(){
     <div class="mr-stat"><div class="v">${stats.habitPct}%</div><div class="l">습관 달성률</div></div>
     <div class="mr-stat"><div class="v">${stats.avgSleep?stats.avgSleep+'h':'-'}</div><div class="l">평균 수면</div></div>
   </div>`;
-  const rhythmHtml=stats.rhythmSummary?`<div class="mr-card">
-    <div class="mr-sec-title">이번 달 시간 사용 누계</div>
-    <div style="font-size:13px;color:var(--tp);line-height:1.7;">${stats.rhythmSummary}</div>
+  const rhythmHtml=stats.rhythmDur&&Object.keys(stats.rhythmDur).length?`<div class="mr-card">
+    <div class="mr-sec-title">이번 달 리듬</div>
+    ${buildMonthlyRhythmBar(stats.rhythmDur,stats.dim)}
   </div>` : '';
   const wcHtml=stats.wcByWeek.length?`<div class="mr-card">
     <div class="mr-sec-title">주간 미션 모음 · 주차별</div>
