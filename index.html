@@ -1649,18 +1649,21 @@ function renderHomeBody(section){
       body.appendChild(makeDetailBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(_ld),getSubSection()==='night_2');},'rhythm-soft'));
       body.appendChild(makeRingRow());
       appendSundayBanner(body);
-      body.appendChild(makeLabel('◉ 다음 주 준비'));
-      const nwBanner=document.createElement('div');
-      nwBanner.className='nextweek-banner';
-      nwBanner.innerHTML=`<div class="nextweek-banner-inner" style="display:flex;align-items:center;justify-content:space-between;">
-        <div>
-          <div style="font-size:13px;font-weight:700;letter-spacing:.04em;color:rgba(115,95,150,0.88);margin-bottom:3px;">◉ 다음 주 챌린지 준비하기</div>
-          <div style="font-size:11px;color:rgba(145,128,98,0.72);">이번 주 패턴을 보고 루틴도 추천해드릴게요</div>
-        </div>
-        <div style="font-size:17px;color:rgba(135,115,160,0.48);">›</div>
-      </div>`;
-      nwBanner.addEventListener('click',openNextWeekChallengeSheet);
-      body.appendChild(nwBanner);
+      // "다음 주 준비"는 주간 데이터(자정 기준)와 보조를 맞추기 위해 실제 자정까지만 노출
+      if(new Date().getDay()===0){
+        body.appendChild(makeLabel('◉ 다음 주 준비'));
+        const nwBanner=document.createElement('div');
+        nwBanner.className='nextweek-banner';
+        nwBanner.innerHTML=`<div class="nextweek-banner-inner" style="display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <div style="font-size:13px;font-weight:700;letter-spacing:.04em;color:rgba(115,95,150,0.88);margin-bottom:3px;">◉ 다음 주 챌린지 준비하기</div>
+            <div style="font-size:11px;color:rgba(145,128,98,0.72);">이번 주 패턴을 보고 루틴도 추천해드릴게요</div>
+          </div>
+          <div style="font-size:17px;color:rgba(135,115,160,0.48);">›</div>
+        </div>`;
+        nwBanner.addEventListener('click',openNextWeekChallengeSheet);
+        body.appendChild(nwBanner);
+      }
     } else if(isWednesdayEvening){
       // 수요일 저녁 — 주간 리마인드 배너
       body.appendChild(makeLabel('◈ 이번 주 중간 점검'));
@@ -2053,12 +2056,13 @@ function buildDailyRhythmTrack(dk,includeReview){
 function makeRingRow(){
   const row=document.createElement('div');
   row.style.cssText='display:flex;gap:0;margin-bottom:10px;';
-  const dk=dateKey(new Date());
+  const _ld=getLogicalDate();
+  const dk=dateKey(_ld);
   const todos=getTodos(dk);
   const todoDone=todos.filter(function(t){return t.done;}).length;
   const todoPct=todos.length?Math.round(todoDone/todos.length*100):0;
   const habits=getHabits();
-  const wk=weekKey(new Date()),checks=getHabitChecks(wk),dow=(new Date().getDay()+6)%7;
+  const wk=weekKey(_ld),checks=getHabitChecks(wk),dow=(_ld.getDay()+6)%7;
   const habitDone=habits.filter(function(h){return checks[h.name+'-'+dow];}).length;
   const habitPct=habits.length?Math.round(habitDone/habits.length*100):0;
   row.appendChild(makeRing('투두 완료',todoPct,todoDone,'rgba(220,150,170,0.85)'));
@@ -4907,10 +4911,11 @@ function loadDaily(){
 }
 function renderWeeklyRhythmBars(){
   const el=document.getElementById('weekly-rhythm-bars');if(!el)return;
-  const now=getLogicalDate();
+  const now=new Date();
   const mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7));
   const DOW=['월','화','수','목','금','토','일'];
   const todayDk=dateKey(now);
+  const realTodayDk=todayDk; // 진행중 블록 연장 판정용(요일기준과 동일값이지만 의도 명시)
   const toMin=function(t){if(!t)return null;const p=t.split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);};
   const MEAL_KEYS=['breakfast','lunch','dinner','snack'];
   let html='<div class="wrb-wrap">';
@@ -4927,7 +4932,7 @@ function renderWeeklyRhythmBars(){
     }else{
       if(wakeMin!=null)segs.push({start:0,end:wakeMin,color:RHYTHM_SLEEP_COLOR});
       if(sleepMin!=null&&wakeMin==null){
-        const end=dk===todayDk?(function(){const n=new Date();return n.getHours()<6?1440:(n.getHours()*60+n.getMinutes());})():Math.min(sleepMin+20,1440);
+        const end=dk===realTodayDk?(function(){const n=new Date();return n.getHours()<6?1440:(n.getHours()*60+n.getMinutes());})():1440;
         segs.push({start:sleepMin,end:end,color:RHYTHM_SLEEP_COLOR,ongoing:true});
       }
     }
@@ -4942,9 +4947,9 @@ function renderWeeklyRhythmBars(){
         const s=toMin(b.start);let e=toMin(b.end);
         if(e<=s)e=1440; // 자정을 넘기는 블록은 당일 바에서는 24시까지로 표시
         segs.push({start:s,end:e,color:cat.color});
-      }else if(dk===todayDk){
-        const n=new Date();
-        const endMin=n.getHours()<6?1440:(n.getHours()*60+n.getMinutes());
+      }else{
+        // 진행중 블록: 실제 오늘 날짜의 행이면 현재 시각까지, 지난 날짜면 자정(1440)까지 채워 표시(사라짐 방지)
+        const endMin=dk===realTodayDk?(function(){const n=new Date();return n.getHours()*60+n.getMinutes();})():1440;
         segs.push({start:toMin(b.start),end:endMin,color:cat.color,ongoing:true});
       }
     });
