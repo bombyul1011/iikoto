@@ -290,6 +290,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 /* ── TIMETABLE ── */
 .tt-row{display:flex;align-items:center;margin-bottom:3px;gap:0;}
 .tt-cat-fixed{width:54px;flex-shrink:0;font-size:10px;color:var(--ts);cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px;padding-right:4px;-webkit-tap-highlight-color:rgba(192,112,128,0.15);user-select:none;}
+.tt-cat-fixed.tt-cat-sub{cursor:default;text-decoration:none;}
 .tt-date-scroll{flex:1;overflow-x:auto;-webkit-overflow-scrolling:touch;cursor:pointer;touch-action:pan-x;}
 .tt-date-scroll::-webkit-scrollbar{display:none;}
 .tt-date-scroll{-ms-overflow-style:none;scrollbar-width:none;}
@@ -3457,12 +3458,12 @@ async function syncContentsDown(mk){
   if(!rows)return;
   // rows=0이고 로컬에 데이터 있으면 덮어쓰지 않음 (사파리↔PWA 엇박 방지)
   if(!rows.length&&getContents(mk).length)return;
-  S.set(S.key('contents',mk),rows.map(r=>({cat:r.content_cat,title:r.title,startDay:r.start_day,endDay:r.end_day,status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',created:r.created})));
+  S.set(S.key('contents',mk),rows.map(r=>({cat:r.content_cat,title:r.title,startDay:r.start_day,endDay:r.end_day,startDate:r.start_date,endDate:r.end_date,status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',created:r.created})));
 }
 async function syncContentsUp(mk){
   const c=getContents(mk);
   await supaFetch(`contents?month_key=eq.${mk}`,'DELETE');
-  if(c.length)await supaFetch('contents','POST',c.map(c=>({month_key:mk,content_cat:c.cat,title:c.title,start_day:c.startDay,end_day:c.endDay,status:c.status,review:c.review||'',stars:c.stars||0,poster:c.poster||null,author:c.author||'',created:c.created})));
+  if(c.length)await supaFetch('contents','POST',c.map(c=>({month_key:mk,content_cat:c.cat,title:c.title,start_day:c.startDay,end_day:c.endDay,start_date:c.startDate,end_date:c.endDate,status:c.status,review:c.review||'',stars:c.stars||0,poster:c.poster||null,author:c.author||'',created:c.created})));
 }
 async function autoSync(type,key){
   if(!navigator.onLine)return;
@@ -4175,48 +4176,69 @@ function renderTimetable(){
   rowsEl.innerHTML='';
 
   CATS.forEach(cat=>{
-    const row=document.createElement('div');row.className='tt-row';
-    const catEl=document.createElement('div');catEl.className='tt-cat-fixed';
-    catEl.textContent=CAT_LABELS[cat];
-    if(!readOnly)catEl.addEventListener('click',()=>openContentModal(cat));
-    else catEl.style.opacity='0.5';
-    const scroll=document.createElement('div');scroll.className='tt-date-scroll';
-    scroll.setAttribute('data-tt','1');
-    const inner=document.createElement('div');inner.className='tt-date-inner';
     const items=contents.filter(c=>c.cat===cat);
-    const startMap={};items.forEach(item=>startMap[item.startDay||1]=item);
-    let d=1;
-    while(d<=31){
-      if(startMap[d]){
-        const item=startMap[d];
-        const startD=item.startDay||1;
-        const isWatching=item.status==='watching'&&cat!=='music';
-        let endD;
-        if(isWatching&&!item.endDay){
-          endD=isSameMonth?todayDay:31;
-        } else {
-          endD=Math.max(item.endDay||startD,startD);
-        }
-        const span=endD-startD+1,w=span*20+(span-1)*2;
-        const block=document.createElement('div');block.className=`tt-block ${cat}`;
-        block.style.cssText=`width:${w}px;min-width:${w}px;`;
-        if(isWatching){
-          block.style.backgroundImage=`repeating-linear-gradient(45deg,transparent,transparent 6px,rgba(255,255,255,0.45) 6px,rgba(255,255,255,0.45) 10px)`;
-          block.style.opacity='0.85';
-        }
-        block.textContent=cat==='music'?(item.title||'').charAt(0):item.title;block.title=item.title;
-        if(!readOnly){
-          block.addEventListener('click',()=>openContentModal(cat,item,mk));
-          block.addEventListener('contextmenu',e=>{e.preventDefault();openContentDiscuss(item.title,cat,item.stars||0,item.review||'');});
-        } else {
-          block.style.cursor='default';
-        }
-        inner.appendChild(block);d=endD+1;
+    // 각 아이템의 실제 startD/endD 계산 (트랙 배치에 사용)
+    const calc=items.map(item=>{
+      const startD=item.startDay||1;
+      const isWatching=item.status==='watching'&&cat!=='music';
+      let endD;
+      if(isWatching&&!item.endDay){
+        endD=isSameMonth?todayDay:31;
       } else {
-        const cell=document.createElement('div');cell.className='tt-cell';inner.appendChild(cell);d++;
+        endD=Math.max(item.endDay||startD,startD);
       }
-    }
-    scroll.appendChild(inner);row.appendChild(catEl);row.appendChild(scroll);rowsEl.appendChild(row);
+      return {item,startD,endD,isWatching};
+    }).sort((a,b)=>a.startD-b.startD);
+    // 겹치는 아이템은 다음 트랙으로: 트랙별 마지막 endD 추적
+    const trackEnds=[]; // trackEnds[i] = 그 트랙에 마지막으로 배치된 아이템의 endD
+    const tracks=[]; // tracks[i] = [{item,startD,endD,isWatching}, ...]
+    calc.forEach(c=>{
+      let placed=false;
+      for(let i=0;i<trackEnds.length;i++){
+        if(c.startD>trackEnds[i]){trackEnds[i]=c.endD;tracks[i].push(c);placed=true;break;}
+      }
+      if(!placed){trackEnds.push(c.endD);tracks.push([c]);}
+    });
+    if(!tracks.length)tracks.push([]); // 빈 카테고리도 기본 한 줄은 보여줌
+    tracks.forEach((trackItems,tIdx)=>{
+      const row=document.createElement('div');row.className='tt-row';
+      const catEl=document.createElement('div');catEl.className='tt-cat-fixed';
+      if(tIdx===0){
+        catEl.textContent=CAT_LABELS[cat];
+        if(!readOnly)catEl.addEventListener('click',()=>openContentModal(cat));
+        else catEl.style.opacity='0.5';
+      } else {
+        catEl.classList.add('tt-cat-sub');
+      }
+      const scroll=document.createElement('div');scroll.className='tt-date-scroll';
+      scroll.setAttribute('data-tt','1');
+      const inner=document.createElement('div');inner.className='tt-date-inner';
+      const startMap={};trackItems.forEach(c=>startMap[c.startD]=c);
+      let d=1;
+      while(d<=31){
+        if(startMap[d]){
+          const {item,startD,endD,isWatching}=startMap[d];
+          const span=endD-startD+1,w=span*20+(span-1)*2;
+          const block=document.createElement('div');block.className=`tt-block ${cat}`;
+          block.style.cssText=`width:${w}px;min-width:${w}px;`;
+          if(isWatching){
+            block.style.backgroundImage=`repeating-linear-gradient(45deg,transparent,transparent 6px,rgba(255,255,255,0.45) 6px,rgba(255,255,255,0.45) 10px)`;
+            block.style.opacity='0.85';
+          }
+          block.textContent=cat==='music'?(item.title||'').charAt(0):item.title;block.title=item.title;
+          if(!readOnly){
+            block.addEventListener('click',()=>openContentModal(cat,item,mk));
+            block.addEventListener('contextmenu',e=>{e.preventDefault();openContentDiscuss(item.title,cat,item.stars||0,item.review||'');});
+          } else {
+            block.style.cursor='default';
+          }
+          inner.appendChild(block);d=endD+1;
+        } else {
+          const cell=document.createElement('div');cell.className='tt-cell';inner.appendChild(cell);d++;
+        }
+      }
+      scroll.appendChild(inner);row.appendChild(catEl);row.appendChild(scroll);rowsEl.appendChild(row);
+    });
   });
 
   // 스크롤 동기화
