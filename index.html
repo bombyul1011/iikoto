@@ -425,6 +425,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cstatus-btn{flex:1;padding:9px 4px;border-radius:10px;border:1px solid;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;}
 .cstatus-btn.watching{background:rgba(255,235,160,.55);border-color:rgba(240,215,100,.55);color:#9a7020;}
 .cstatus-btn.done{background:rgba(200,240,235,.55);border-color:rgba(160,220,215,.55);color:#3a8878;}
+.cstatus-btn.stop{background:rgba(215,205,200,.55);border-color:rgba(185,168,160,.55);color:#7a6258;}
 .cstatus-btn.dim{opacity:.38;filter:saturate(0.5);}
 .enddate-row{display:none;margin-bottom:10px;}
 .enddate-row.show{display:flex;gap:8px;align-items:center;}
@@ -1323,12 +1324,17 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
       <span style="font-size:12px;color:var(--tm);white-space:nowrap;">시작일</span>
       <input type="date" class="modal-inp" id="cm-start" style="flex:1;margin-bottom:0;">
-      <button class="cstatus-btn done" id="cm-done" onclick="toggleCDone()" style="flex-shrink:0;white-space:nowrap;padding:8px 14px;margin-bottom:0;">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><circle cx="7" cy="7" r="5.5"/><polyline points="4,7 6,9.5 10,4.5"/></svg>완료
-      </button>
+      <div style="display:flex;gap:5px;flex-shrink:0;">
+        <button class="cstatus-btn done" id="cm-done" onclick="toggleCDone()" style="white-space:nowrap;padding:8px 9px;margin-bottom:0;">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><circle cx="7" cy="7" r="5.5"/><polyline points="4,7 6,9.5 10,4.5"/></svg>완료
+        </button>
+        <button class="cstatus-btn stop" id="cm-stop" onclick="toggleCStop()" style="white-space:nowrap;padding:8px 9px;margin-bottom:0;">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><circle cx="7" cy="7" r="5.5"/><rect x="5" y="5" width="4" height="4" rx="0.6"/></svg>중단
+        </button>
+      </div>
     </div>
     <div class="enddate-row" id="cm-enddate-row">
-      <span style="font-size:12px;color:var(--tm);white-space:nowrap;">완료일</span>
+      <span style="font-size:12px;color:var(--tm);white-space:nowrap;" id="cm-enddate-label">완료일</span>
       <input type="date" class="modal-inp" id="cm-end" style="flex:1;margin-bottom:0;">
     </div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
@@ -2561,9 +2567,8 @@ function computeMonthStats(y,mo){
   const habits=getHabits();
   const allMemoTexts=[];
   const onelineTexts=[];
-  const mealRecordDaySet={};
-  const menuFreq={};
   const weekSet={};
+  const rhythmDur={};
   for(let d=1;d<=dim;d++){
     const dk=`${y}-${pad(mo+1)}-${pad(d)}`;
     const dayMemos=getMemos(dk);
@@ -2571,11 +2576,6 @@ function computeMonthStats(y,mo){
     dayMemos.forEach(m=>{if(m.text)allMemoTexts.push(m.text);});
     const ol=getDailyOneLine(dk);
     if(ol&&ol.trim())onelineTexts.push(`${d}일: ${ol.trim()}`);
-    const meal=getMeals(dk);
-    ['breakfast','lunch','dinner','snack'].forEach(k=>{
-      const v=meal[k]&&meal[k].trim();
-      if(v){mealRecordDaySet[dk]=true;menuFreq[v]=(menuFreq[v]||0)+1;}
-    });
     const dayTodos=getTodos(dk);
     totalTodos+=dayTodos.length;doneTodos+=dayTodos.filter(t=>t.done).length;
     const sl=getSleep(dk);
@@ -2585,6 +2585,8 @@ function computeMonthStats(y,mo){
     const dow=(date.getDay()+6)%7;
     const checks=getHabitChecks(wk);
     habits.forEach(h=>{ht++;if(checks[`${h.name}-${dow}`])hc++;});
+    const dd=getDayCategoryDurations(dk);
+    Object.keys(dd).forEach(function(k){rhythmDur[k]=(rhythmDur[k]||0)+dd[k];});
   }
   const habitPct=ht>0?Math.round(hc/ht*100):0;
   const todoPct=totalTodos>0?Math.round(doneTodos/totalTodos*100):0;
@@ -2600,22 +2602,22 @@ function computeMonthStats(y,mo){
   }).filter(w=>w.lines.length>0);
   const mk=`${y}-${pad(mo+1)}`;
   const contentsList=getContents(mk);
-  const mealRecordDays=Object.keys(mealRecordDaySet).length;
-  const topMenus=Object.entries(menuFreq).sort((a,b)=>b[1]-a[1]).slice(0,3).map(e=>e[0]);
-  return {memos,doneTodos,totalTodos,todoPct,habitPct,avgSleep,allMemoTexts,onelineTexts,wcByWeek,contentsList,mealRecordDays,topMenus};
+  const rhythmSummary=Object.keys(rhythmDur).length?durSummaryLine(rhythmDur):'';
+  return {memos,doneTodos,totalTodos,todoPct,habitPct,avgSleep,allMemoTexts,onelineTexts,wcByWeek,contentsList,rhythmSummary};
 }
 async function generateMonthlyReportAI(mk,stats){
   const key=getClaudeKey();
   if(!key)return null;
+  const CSTATUS_LABEL_AI={watching:'보는중',done:'완료',stopped:'중단'};
   const dataContext=[
     `${mk} 한 달 데이터:`,
-    `투두 완료율 ${stats.todoPct}% (${stats.doneTodos}/${stats.totalTodos})`,
+    `투두 완료 ${stats.doneTodos}개 (총 ${stats.totalTodos}개 중)`,
     `습관 달성률 ${stats.habitPct}%`,
     stats.avgSleep?`평균 수면 ${stats.avgSleep}시간`:'수면 기록 없음',
     `메모 총 ${stats.memos}건`,
+    stats.rhythmSummary?`시간 사용 누계: ${stats.rhythmSummary}`:'',
     stats.onelineTexts.length?`하루 한 줄 기록:\n${stats.onelineTexts.slice(0,30).join('\n')}`:'',
-    stats.contentsList.length?`콘텐츠 기록: ${stats.contentsList.map(c=>`${c.title}(${c.cat}, ${c.status})`).join(', ')}`:'',
-    stats.mealRecordDays>0?`식사 기록 ${stats.mealRecordDays}일${stats.topMenus.length?` · 자주 먹은 메뉴: ${stats.topMenus.join(', ')}`:''}`:'',
+    stats.contentsList.length?`콘텐츠 기록: ${stats.contentsList.map(c=>`${c.title}(${c.cat}, ${CSTATUS_LABEL_AI[c.status]||c.status})`).join(', ')}`:'',
     stats.wcByWeek.length?`주간 미션 현황: ${stats.wcByWeek.map(w=>w.lines.map(l=>`${l.text} ${l.pct}%`).join(', ')).join(' | ')}`:''
   ].filter(Boolean).join('\n');
   const sys=`당신은 따뜻한 월간 회고 비서예요. 한 달 데이터를 보고 짧은 총평과 키워드를 만들어요.
@@ -2657,10 +2659,14 @@ async function loadMonthlyReportContent(){
   const mk=`${y}-${pad(mo+1)}`;
   const stats=computeMonthStats(y,mo);
   const statsHtml=`<div class="mr-row2" style="margin-bottom:12px;">
-    <div class="mr-stat"><div class="v">${stats.todoPct}%</div><div class="l">투두 완료율</div></div>
+    <div class="mr-stat"><div class="v">${stats.doneTodos}개</div><div class="l">투두 완료</div></div>
     <div class="mr-stat"><div class="v">${stats.habitPct}%</div><div class="l">습관 달성률</div></div>
     <div class="mr-stat"><div class="v">${stats.avgSleep?stats.avgSleep+'h':'-'}</div><div class="l">평균 수면</div></div>
   </div>`;
+  const rhythmHtml=stats.rhythmSummary?`<div class="mr-card">
+    <div class="mr-sec-title">이번 달 시간 사용 누계</div>
+    <div style="font-size:13px;color:var(--tp);line-height:1.7;">${stats.rhythmSummary}</div>
+  </div>` : '';
   const wcHtml=stats.wcByWeek.length?`<div class="mr-card">
     <div class="mr-sec-title">주간 미션 모음 · 주차별</div>
     ${stats.wcByWeek.map(w=>`<div class="mr-week-anchor">
@@ -2670,18 +2676,13 @@ async function loadMonthlyReportContent(){
   </div>` : `<div class="mr-card"><div class="mr-sec-title">주간 미션 모음 · 주차별</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:8px 0;">이 달엔 작성한 주간 미션이 없어요</div></div>`;
 
   const CAT_DOT={드라마:'rgba(255,210,225,.85)',책:'rgba(255,235,160,.85)',영화:'rgba(200,240,235,.85)',음악:'rgba(200,220,255,.85)'};
-  const CSTATUS_LABEL={watching:'보는중',done:'완료'};
+  const CSTATUS_LABEL={watching:'보는중',done:'완료',stopped:'중단'};
   const contentsHtml=stats.contentsList.length?`<div class="mr-card">
     <div class="mr-sec-title">콘텐츠 기록</div>
     ${stats.contentsList.map(c=>`<div class="mr-wc-line"><span class="txt"><span style="display:inline-block;width:7px;height:7px;border-radius:2px;background:${CAT_DOT[c.cat]||'var(--tm)'};margin-right:6px;"></span>${c.title}</span><span class="pct" style="color:var(--tm);font-weight:400;">${CSTATUS_LABEL[c.status]||c.status}</span></div>`).join('')}
   </div>` : `<div class="mr-card"><div class="mr-sec-title">콘텐츠 기록</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:8px 0;">이 달엔 기록한 콘텐츠가 없어요</div></div>`;
 
-  const mealHtml=stats.mealRecordDays>0?`<div class="mr-card">
-    <div class="mr-sec-title">이번 달 식사</div>
-    <div style="font-size:13px;color:var(--tp);line-height:1.7;">이번 달 <b>${stats.mealRecordDays}일</b> 식사를 기록했어요.${stats.topMenus.length?`<br>자주 먹은 메뉴는 <b>${stats.topMenus.join(', ')}</b>예요.`:''}</div>
-  </div>` : '';
-
-  el.innerHTML=`<div id="mr-ai-slot"></div>${statsHtml}${wcHtml}${contentsHtml}${mealHtml}`;
+  el.innerHTML=`<div id="mr-ai-slot"></div>${statsHtml}${rhythmHtml}${wcHtml}${contentsHtml}`;
   const slot=document.getElementById('mr-ai-slot');
 
   const now=getLogicalDate();
@@ -4239,7 +4240,7 @@ function renderTimetable(){
     const carry=prevContents.filter(c=>{
       if(c.cat!==cat)return false;
       if(c.status==='watching')return true;
-      if(c.status==='done'&&c.endDate&&c.endDate.slice(0,7)>=mk)return true;
+      if((c.status==='done'||c.status==='stopped')&&c.endDate&&c.endDate.slice(0,7)>=mk)return true;
       return false;
     }).map(c=>({...c,_carried:true}));
     const all=[...carry,...items];
@@ -4296,8 +4297,12 @@ function renderTimetable(){
             block.style.backgroundImage=`repeating-linear-gradient(45deg,transparent,transparent 6px,rgba(255,255,255,0.45) 6px,rgba(255,255,255,0.45) 10px)`;
             block.style.opacity='0.85';
           }
+          if(item.status==='stopped'){
+            block.style.filter='saturate(0.45)';
+            block.style.opacity='0.7';
+          }
           block.textContent=cat==='music'?(item.title||'').charAt(0):item.title;
-          block.title=item._carried?item.title+' (전월부터 이어짐)':item.title;
+          block.title=(item._carried?item.title+' (전월부터 이어짐)':item.title)+(item.status==='stopped'?' · 중단':'');
           if(!readOnly&&!item._carried){
             block.addEventListener('click',()=>openContentModal(cat,item,mk));
             block.addEventListener('contextmenu',e=>{e.preventDefault();openContentDiscuss(item.title,cat,item.stars||0,item.review||'');});
@@ -4371,29 +4376,35 @@ function setCStatus(status){
   _contentCtx.status=status;
   const d=document.getElementById('cm-done');
   if(d)d.classList.toggle('dim',status!=='done');
+  const s=document.getElementById('cm-stop');
+  if(s)s.classList.toggle('dim',status!=='stopped');
   const edr=document.getElementById('cm-enddate-row');
+  const lbl=document.getElementById('cm-enddate-label');
   if(edr){
-    const showEnd=status==='done'&&_contentCtx.cat!=='music';
+    const showEnd=(status==='done'||status==='stopped')&&_contentCtx.cat!=='music';
     edr.classList.toggle('show',showEnd);
+    if(lbl)lbl.textContent=status==='stopped'?'중단일':'완료일';
     if(showEnd&&!document.getElementById('cm-end').value)document.getElementById('cm-end').value=dateKey(currentDate);
   }
 }
 function toggleCDone(){
-  const isDone=_contentCtx.status==='done';
-  setCStatus(isDone?'watching':'done');
+  setCStatus(_contentCtx.status==='done'?'watching':'done');
+}
+function toggleCStop(){
+  setCStatus(_contentCtx.status==='stopped'?'watching':'stopped');
 }
 function confirmContent(){
   const title=document.getElementById('cm-title').value.trim();if(!title)return;
   const startVal=document.getElementById('cm-start').value;
   const today=dateKey(currentDate);
   const startDate=startVal||today;
-  const status=_contentCtx.status==='done'?'done':'watching';
+  const status=(_contentCtx.status==='done'||_contentCtx.status==='stopped')?_contentCtx.status:'watching';
   let endDate=null;
-  if(status==='done'&&_contentCtx.cat!=='music'){
+  if((status==='done'||status==='stopped')&&_contentCtx.cat!=='music'){
     const endVal=document.getElementById('cm-end').value;
     endDate=endVal||startDate;
     if(endDate<startDate)endDate=startDate; // 끝이 시작보다 빠를 수 없음
-  } else if(status==='done')endDate=startDate;
+  } else if(status==='done'||status==='stopped')endDate=startDate;
   const review=document.getElementById('cm-review').value.trim();
   const stars=parseInt(document.getElementById('cm-stars').value)||0;
   const poster=_selectedPoster||(_contentCtx.item&&_contentCtx.item.poster)||null;
