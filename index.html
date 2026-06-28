@@ -2643,9 +2643,10 @@ async function loadMonthlyReportContent(){
   </div>` : `<div class="mr-card"><div class="mr-sec-title">주간 미션 모음 · 주차별</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:8px 0;">이 달엔 작성한 주간 미션이 없어요</div></div>`;
 
   const CAT_DOT={드라마:'rgba(255,210,225,.85)',책:'rgba(255,235,160,.85)',영화:'rgba(200,240,235,.85)',음악:'rgba(200,220,255,.85)'};
+  const CSTATUS_LABEL={watching:'보는중',done:'완료'};
   const contentsHtml=stats.contentsList.length?`<div class="mr-card">
     <div class="mr-sec-title">콘텐츠 기록</div>
-    ${stats.contentsList.map(c=>`<div class="mr-wc-line"><span class="txt"><span style="display:inline-block;width:7px;height:7px;border-radius:2px;background:${CAT_DOT[c.cat]||'var(--tm)'};margin-right:6px;"></span>${c.title}</span><span class="pct" style="color:var(--tm);font-weight:400;">${c.status}</span></div>`).join('')}
+    ${stats.contentsList.map(c=>`<div class="mr-wc-line"><span class="txt"><span style="display:inline-block;width:7px;height:7px;border-radius:2px;background:${CAT_DOT[c.cat]||'var(--tm)'};margin-right:6px;"></span>${c.title}</span><span class="pct" style="color:var(--tm);font-weight:400;">${CSTATUS_LABEL[c.status]||c.status}</span></div>`).join('')}
   </div>` : `<div class="mr-card"><div class="mr-sec-title">콘텐츠 기록</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:8px 0;">이 달엔 기록한 콘텐츠가 없어요</div></div>`;
 
   const mealHtml=stats.mealRecordDays>0?`<div class="mr-card">
