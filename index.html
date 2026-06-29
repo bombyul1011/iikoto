@@ -564,6 +564,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="glass"] .goal-section-title{background:linear-gradient(120deg,rgba(250,215,100,0.50),rgba(255,235,170,0.42));color:#8a6c20;border:1.4px solid rgba(250,205,90,0.55);}
 [data-theme="glass"] .mbtn.ok{background:rgba(201,146,110,0.42);color:#6e4a30;}
 [data-theme="glass"] .wchallenge-day.on{background:rgba(255,253,248,0.45)!important;color:var(--tp)!important;border-width:2px;}
+[data-theme="glass"] .habit-chk2.on{background:rgba(255,253,248,0.45)!important;border-color:rgba(255,253,248,0.7)!important;border-width:2px;}
+[data-theme="glass"] .habit-chk2.on svg{stroke:var(--tp)!important;}
 [data-theme="glass"] .home-hcard.morning{background:linear-gradient(135deg,rgba(255,238,200,0.32),rgba(255,220,210,0.28));border-color:rgba(255,210,180,0.40);}
 [data-theme="glass"] .home-hcard.afternoon{background:linear-gradient(135deg,rgba(255,220,235,0.30),rgba(255,235,200,0.26));border-color:rgba(255,200,210,0.38);}
 [data-theme="glass"] .home-hcard.night{background:linear-gradient(135deg,rgba(225,215,250,0.30),rgba(255,210,230,0.26));border-color:rgba(210,195,240,0.38);}
@@ -998,6 +1000,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       </div>
       <div id="monthly-cal"></div>
       <div id="cal-detail"></div>
+      <div id="monthly-stat-bar"></div>
       <div class="slabel">콘텐츠 기록</div>
       <div class="card s" style="padding:14px 10px;">
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
@@ -1017,7 +1020,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       </div>
       <div class="slabel">해빗 모아보기</div>
       <div class="card m"><div id="habit-monthly"></div></div>
-      <div id="monthly-stat-bar"></div>
       <div class="report-banner diary-soft" onclick="openDiaryMonthSheet()">
         <div class="report-banner-inner">
           <div class="report-banner-line">✦ <span class="rb-title" id="diary-banner-month-lbl">6월의 하루한줄</span> · <span id="diary-banner-count">23</span>일째 기록 중</div>
