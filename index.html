@@ -1978,7 +1978,7 @@ function buildDailyRhythmTrack(dk,includeReview){
 
   let html='<div class="rt-line"></div>';
   [0,6,12,18,24].forEach(function(h){
-    html+='<div class="rt-hourlabel" style="top:'+toY(h*60)+'px;">'+String(h).padStart(2,'0')+'</div>';
+    html+='<div class="rt-hourlabel" data-h="'+h+'" style="top:'+toY(h*60)+'px;">'+String(h).padStart(2,'0')+'</div>';
   });
 
   // 블록 통합 목록: 수면(자동) + 식사(자동,1시간) + 수기 블록
@@ -2052,6 +2052,8 @@ function buildDailyRhythmTrack(dk,includeReview){
   if(!blocks.length){
     wrap.innerHTML='<div style="font-size:12px;color:var(--tm);text-align:center;padding:24px 0;">오늘 기록된 수면·식사·블록이 없어요</div>';
   }
+  const lbl24=wrap.querySelector('.rt-hourlabel[data-h="24"]');
+  if(lbl24)lbl24.style.top=(trackHeight-2)+'px'; // 트랙이 늘어나도 24시 라벨이 실제 하단에 맞춰지게
   outer.appendChild(wrap);
 
   const legend=document.createElement('div');legend.className='rhythm-track-legend';
