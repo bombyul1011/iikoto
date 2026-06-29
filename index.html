@@ -239,8 +239,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .todo-txt.done{text-decoration:line-through;color:var(--tm);}
 .todo-txt.postponed{color:#c05060;}
 .ring-complete canvas{filter:none;}
-.ring-glow-dot{position:absolute;width:7px;height:7px;border-radius:50%;top:50%;left:50%;margin-top:-26px;margin-left:-3.5px;transform-origin:3.5px 26px;animation:ringOrbit 2.6s linear infinite;background:radial-gradient(circle,#fff8e6 0%,#ffd28c 55%,rgba(255,210,140,0) 100%);box-shadow:0 0 5px 1.5px rgba(255,200,130,0.9);pointer-events:none;}
-@keyframes ringOrbit{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
 .todo-swipe{position:absolute;right:0;top:0;bottom:0;display:flex;align-items:stretch;overflow:hidden;transition:width .2s,opacity .2s;width:0;opacity:0;}
 .tsw-btn{display:flex;align-items:center;justify-content:center;padding:0 14px;font-size:11px;cursor:pointer;white-space:nowrap;}
 .tsw-edit{background:rgba(190,215,255,.85);color:#3a5fa0;}
@@ -2110,10 +2108,7 @@ function makeRing(label,pct,count,color){
   const canvasWrap=document.createElement('div');
   canvasWrap.style.cssText='position:relative;width:72px;height:72px;';
   if(pct>=100){
-    canvasWrap.classList.add('ring-complete');
-    const dot=document.createElement('div');
-    dot.className='ring-glow-dot';
-    canvasWrap.appendChild(dot);
+    // 100% 달성 효과는 보류 (추후 마음에 드는 디자인으로 재논의)
   }
   const canvas=document.createElement('canvas');
   canvas.width=72;canvas.height=72;canvas.style.cssText='width:72px;height:72px;display:block;';
