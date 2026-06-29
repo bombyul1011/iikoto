@@ -788,7 +788,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .s-idx-date{white-space:nowrap;flex-shrink:0;}
 .s-idx-line{height:1px;background:rgba(246,236,221,0.30);}
 .s-idx-note{margin-top:6px;text-align:right;font-family:'DM Sans',sans-serif;font-style:normal;font-size:9px;color:rgba(246,236,221,0.65);}
-.s-rl .s-idx-note{margin-top:16px;}
+.s-rl .s-idx-note{margin-top:4px;}
 
 /* 표지 스티커 (독립) */
 
@@ -5773,7 +5773,7 @@ async function buildShareCanvas(){
       ctx.beginPath();ctx.moveTo(lineX1,capY+capH/2);ctx.lineTo(lineX2,capY+capH/2);ctx.stroke();
       ctx.textAlign='center';ctx.font=`${px(11)}px 'DM Sans',sans-serif`;
       ctx.fillText('✦',lineX2+px(8),capY+capH/2+px(4));
-      const rlNoteY=capY+capH+px(16);
+      const rlNoteY=capY+capH+px(10);
       if(_shareState.idxNote){
         ctx.font=`${px(9)}px 'DM Sans',sans-serif`;
         ctx.fillStyle='rgba(246,236,221,0.65)';ctx.textAlign='right';
