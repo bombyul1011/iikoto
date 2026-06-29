@@ -788,6 +788,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .s-idx-date{white-space:nowrap;flex-shrink:0;}
 .s-idx-line{height:1px;background:rgba(246,236,221,0.30);}
 .s-idx-note{margin-top:6px;text-align:right;font-family:'DM Sans',sans-serif;font-style:normal;font-size:9px;color:rgba(246,236,221,0.65);}
+.s-rl .s-idx-note{margin-top:16px;}
 
 /* 표지 스티커 (독립) */
 
@@ -5326,7 +5327,7 @@ function closeSettings(){document.getElementById('settings-ov').classList.remove
 // ── READING HUB
 let _rdTab='reading';
 let _rdOpenCid=null;
-let _swSeconds=0,_swRunning=false,_swInterval=null;
+let _swSeconds=0,_swRunning=false,_swInterval=null,_swStartTs=0;
 const RD_SW_C=2*Math.PI*32;
 function backfillReadingLinks(){
   const now=new Date();
@@ -5628,7 +5629,6 @@ function renderShareStage(){
           <div class="s-rl-capsule share-txtshadow">iikoto moments</div>
           <div class="s-rl-line"></div><span class="s-rl-star">✦</span>
         </div>
-        <div class="s-rl-noteline share-txtshadow"></div>
         ${_shareState.idxNote?`<div class="s-idx-note share-txtshadow">${_shareState.idxNote}</div>`:''}
       </div>`;
     }else if(_shareState.header==='idx'){
@@ -5773,13 +5773,11 @@ async function buildShareCanvas(){
       ctx.beginPath();ctx.moveTo(lineX1,capY+capH/2);ctx.lineTo(lineX2,capY+capH/2);ctx.stroke();
       ctx.textAlign='center';ctx.font=`${px(11)}px 'DM Sans',sans-serif`;
       ctx.fillText('✦',lineX2+px(8),capY+capH/2+px(4));
-      const rlNoteLineY=capY+capH+px(14);
-      ctx.strokeStyle='rgba(246,236,221,0.30)';ctx.lineWidth=px(1);
-      ctx.beginPath();ctx.moveTo(capX,rlNoteLineY);ctx.lineTo(lineX2,rlNoteLineY);ctx.stroke();
+      const rlNoteY=capY+capH+px(16);
       if(_shareState.idxNote){
         ctx.font=`${px(9)}px 'DM Sans',sans-serif`;
         ctx.fillStyle='rgba(246,236,221,0.65)';ctx.textAlign='right';
-        ctx.fillText(_shareState.idxNote,lineX2,rlNoteLineY+px(12));
+        ctx.fillText(_shareState.idxNote,lineX2,rlNoteY);
         ctx.textAlign='left';
       }
     }else if(_shareState.header==='idx'){
@@ -6047,17 +6045,11 @@ function toggleStopwatch(){
   const timeEl=document.getElementById('rd-sw-time');
   if(!_swRunning){
     _swRunning=true;
+    _swStartTs=Date.now()-_swSeconds*1000;
     wrap.classList.add('spinning');
     face.style.display='none';
     timeEl.style.display='flex';
-    _swInterval=setInterval(()=>{
-      _swSeconds++;
-      const m=Math.floor(_swSeconds/60),s=_swSeconds%60;
-      document.getElementById('rd-sw-time').textContent=`${pad(m)}:${pad(s)}`;
-      const pct=(_swSeconds%3600)/3600;
-      const offset=RD_SW_C-(RD_SW_C*pct);
-      document.getElementById('rd-sw-ring').setAttribute('stroke-dashoffset',offset);
-    },1000);
+    _swInterval=setInterval(updateStopwatchDisplay,1000);
   }else{
     _swRunning=false;
     wrap.classList.remove('spinning');
@@ -6067,10 +6059,25 @@ function toggleStopwatch(){
     document.getElementById('rd-sw-time').textContent='00:00';
     document.getElementById('rd-sw-ring').setAttribute('stroke-dashoffset',RD_SW_C);
     const seconds=_swSeconds;
+    _swSeconds=0;
     if(seconds>0)openProgressModal(seconds);
-    else _swSeconds=0;
   }
 }
+function updateStopwatchDisplay(){
+  // 실제 경과시간(시작시각 기준)으로 재계산 — 화면이 꺼져 setInterval이 멈췄다 재개되어도
+  // 그 사이 흐른 시간이 누락되지 않고 정확히 보정됨
+  _swSeconds=Math.floor((Date.now()-_swStartTs)/1000);
+  const m=Math.floor(_swSeconds/60),s=_swSeconds%60;
+  const timeEl=document.getElementById('rd-sw-time');
+  if(timeEl)timeEl.textContent=`${pad(m)}:${pad(s)}`;
+  const pct=(_swSeconds%3600)/3600;
+  const offset=RD_SW_C-(RD_SW_C*pct);
+  const ringEl=document.getElementById('rd-sw-ring');
+  if(ringEl)ringEl.setAttribute('stroke-dashoffset',offset);
+}
+document.addEventListener('visibilitychange',function(){
+  if(!document.hidden&&_swRunning)updateStopwatchDisplay(); // 화면 복귀 즉시 정확한 시간으로 보정
+});
 async function manualSync(){
   const el=document.getElementById('sync-status');if(el)el.textContent='동기화 중...';
   await syncAll();
