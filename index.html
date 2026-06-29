@@ -5827,12 +5827,17 @@ async function buildShareCanvas(){
     ctx.textAlign='left';
     if(_shareState.quote==='qs'&&pickedQuote){
       const x0=px(20),w0=px(240);
-      let y=H-px(20)-px(40);
+      ctx.font=`${px(9.5)}px 'Bareonbatang',serif`;
+      const lines=wrapLines(ctx,pickedQuote.text,w0-px(20));
+      const lineH=px(16);
+      // 인용구 줄 수에 따라 전체 블록 높이를 먼저 계산하고, 캔버스 하단에서부터 위로 배치
+      // (줄이 길어져도 항상 카드 안에 들어가게, 고정값으로 잘리지 않도록)
+      const blockH=(lines.length-1)*lineH+px(10)+px(16);
+      let y=H-px(20)-blockH;
       ctx.font=`${px(12)}px serif`;ctx.fillStyle='rgba(246,236,221,0.88)';
       ctx.fillText('❝',x0,y);
       ctx.font=`${px(9.5)}px 'Bareonbatang',serif`;ctx.fillStyle=cream;
-      const lines=wrapLines(ctx,pickedQuote.text,w0-px(20));
-      lines.forEach((ln,i)=>ctx.fillText(ln,x0+px(20),y+i*px(16)));
+      lines.forEach((ln,i)=>ctx.fillText(ln,x0+px(20),y+i*lineH));
       const lastY=y+(lines.length-1)*px(17)+px(10);
       ctx.strokeStyle='rgba(246,236,221,0.22)';ctx.lineWidth=px(1);
       ctx.beginPath();ctx.moveTo(x0,lastY);ctx.lineTo(x0+w0,lastY);ctx.stroke();
