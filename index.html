@@ -209,6 +209,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .mr-week-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
 .mr-week-head .wk{font-size:11px;font-weight:600;color:var(--tp);}
 .mr-week-head .rng{font-size:9.5px;color:var(--tm);}
+.mr-week-ongoing{font-size:9px;color:#a07820;background:rgba(250,215,100,0.25);border-radius:6px;padding:2px 7px;font-weight:500;}
 .mr-wc-line{display:flex;align-items:baseline;gap:8px;padding:4px 0;}
 .mr-wc-line .txt{flex:1;font-size:12px;color:var(--tp);line-height:1.5;}
 .mr-wc-line .pct{font-size:10.5px;color:var(--tm);line-height:1.5;flex-shrink:0;}
@@ -2652,7 +2653,8 @@ function computeMonthStats(y,mo){
     const wkEnd=new Date(wkStart);wkEnd.setDate(wkStart.getDate()+6);
     const label=`${wkStart.getMonth()+1}.${wkStart.getDate()}–${wkEnd.getMonth()+1}.${wkEnd.getDate()}`;
     const lines=items.map(c=>({text:c.text,pct:Math.round(c.days.filter(Boolean).length/7*100)}));
-    return {wk,label,lines};
+    const isOngoing=wkEnd>=new Date(new Date().toDateString()); // 그 주의 마지막 날(일요일)이 아직 안 지났으면 진행중
+    return {wk,label,lines,isOngoing};
   }).filter(w=>w.lines.length>0);
   const mk=`${y}-${pad(mo+1)}`;
   const contentsList=getContentsForReport(mk);
@@ -2742,7 +2744,7 @@ async function loadMonthlyReportContent(){
     </div>
     <div class="mr-accordion-body">
       ${stats.wcByWeek.map(w=>`<div class="mr-week-anchor">
-        <div class="mr-week-head"><span class="wk">${w.label}</span></div>
+        <div class="mr-week-head"><span class="wk">${w.label}</span>${w.isOngoing?'<span class="mr-week-ongoing">진행중</span>':''}</div>
         ${w.lines.map(l=>`<div class="mr-wc-line"><span class="txt">${l.text}</span><span class="pct">${l.pct}%</span></div>`).join('')}
       </div>`).join('')}
     </div>
