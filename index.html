@@ -1964,9 +1964,9 @@ function buildDailyRhythmTrack(dk,includeReview){
   const sleep=getSleep(dk)||{};
   const meals=getMeals(dk)||{};
   const manual=getRhythmBlocks(dk);
-  const TOTAL_H=280;
+  const TOTAL_H=320;
   // 0~6시(자는 시간)는 절반 크기로 압축하고, 줄어든 만큼을 나머지 6~24시 구간에 균일하게 더해줌
-  const NIGHT_END=420; // 7시(분)
+  const NIGHT_END=480; // 8시(분)
   const H1=TOTAL_H/8; // 0~6시 구간이 차지하는 높이 (원래 1/4 → 절반인 1/8로)
   const H2=TOTAL_H-H1; // 6~24시 구간이 차지하는 높이
   const toY=function(min){
