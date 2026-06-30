@@ -2594,6 +2594,21 @@ async function generateDiaryMonthSummaryAI(monthNum,lines){
   if(!reply||reply.startsWith('__ERR__'))return null;
   return reply.trim();
 }
+function getContentsForReport(mk){
+  // 음악: 등록일=완료일로 취급 — 시작월에만 노출/집계, 별도 상태표기 없음
+  // 드라마/영화/책: 보는중인 동안은 관련된 모든 달에 노출되지만(상태:보는중), 집계(완료/중단 확정)는 끝난 달에서만 잡힘
+  const [y,mo]=mk.split('-').map(Number);
+  const prevMk=monthKey(new Date(y,mo-2,1));
+  const cur=getContents(mk);
+  const prev=getContents(prevMk);
+  const carry=prev.filter(c=>{
+    if(c.cat==='음악')return false;
+    if(c.status==='watching')return true;
+    if((c.status==='done'||c.status==='stopped')&&c.endDate&&c.endDate.slice(0,7)>=mk)return true;
+    return false;
+  }).map(c=>({...c,_carried:true}));
+  return [...carry,...cur];
+}
 function computeMonthStats(y,mo){
   const dim=new Date(y,mo+1,0).getDate();
   let memos=0,doneTodos=0,totalTodos=0,hc=0,ht=0,sleepMin=0,sleepCnt=0;
@@ -2638,14 +2653,18 @@ function computeMonthStats(y,mo){
     return {wk,label,lines};
   }).filter(w=>w.lines.length>0);
   const mk=`${y}-${pad(mo+1)}`;
-  const contentsList=getContents(mk);
+  const contentsList=getContentsForReport(mk);
   const rhythmSummary=Object.keys(rhythmDur).length?durSummaryLine(rhythmDur):'';
   return {memos,doneTodos,totalTodos,todoPct,habitPct,avgSleep,allMemoTexts,onelineTexts,wcByWeek,contentsList,rhythmSummary,rhythmDur,rhythmDayCount,dim};
 }
 async function generateMonthlyReportAI(mk,stats){
   const key=getClaudeKey();
   if(!key)return null;
-  const CSTATUS_LABEL_AI={watching:'보는중',done:'완료',stopped:'중단'};
+  const cStatusLabelAI=function(c){
+    if(c.cat==='음악')return '';
+    if(c.cat==='책')return c.status==='stopped'?'중단':(c.status==='done'?'완료':'읽는중');
+    return c.status==='stopped'?'중단':(c.status==='done'?'완료':'보는중');
+  };
   const dataContext=[
     `${mk} 한 달 데이터:`,
     `투두 완료 ${stats.doneTodos}개 (총 ${stats.totalTodos}개 중)`,
@@ -2654,7 +2673,7 @@ async function generateMonthlyReportAI(mk,stats){
     `메모 총 ${stats.memos}건`,
     stats.rhythmSummary?`시간 사용 누계: ${stats.rhythmSummary}`:'',
     stats.onelineTexts.length?`하루 한 줄 기록:\n${stats.onelineTexts.slice(0,30).join('\n')}`:'',
-    stats.contentsList.length?`콘텐츠 기록: ${stats.contentsList.map(c=>`${c.title}(${c.cat}, ${CSTATUS_LABEL_AI[c.status]||c.status})`).join(', ')}`:'',
+    stats.contentsList.length?`콘텐츠 기록: ${stats.contentsList.map(c=>`${c.title}(${c.cat}${cStatusLabelAI(c)?', '+cStatusLabelAI(c):''})`).join(', ')}`:'',
     stats.wcByWeek.length?`주간 미션 현황: ${stats.wcByWeek.map(w=>w.lines.map(l=>`${l.text} ${l.pct}%`).join(', ')).join(' | ')}`:''
   ].filter(Boolean).join('\n');
   const sys=`당신은 따뜻한 월간 회고 비서예요. 한 달 데이터를 보고 짧은 총평과 키워드를 만들어요.
@@ -2713,10 +2732,14 @@ async function loadMonthlyReportContent(){
   </div>` : `<div class="mr-card"><div class="mr-sec-title">주간 미션 모음 · 주차별</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:8px 0;">이 달엔 작성한 주간 미션이 없어요</div></div>`;
 
   const CAT_DOT={드라마:'rgba(255,210,225,.85)',책:'rgba(255,235,160,.85)',영화:'rgba(200,240,235,.85)',음악:'rgba(200,220,255,.85)'};
-  const CSTATUS_LABEL={watching:'보는중',done:'완료',stopped:'중단'};
+  const cStatusLabel=function(c){
+    if(c.cat==='음악')return '';
+    if(c.cat==='책')return c.status==='stopped'?'중단':(c.status==='done'?'완료':'읽는중');
+    return c.status==='stopped'?'중단':(c.status==='done'?'완료':'보는중');
+  };
   const contentsHtml=stats.contentsList.length?`<div class="mr-card">
     <div class="mr-sec-title">콘텐츠 기록</div>
-    ${stats.contentsList.map(c=>`<div class="mr-wc-line"><span class="txt"><span style="display:inline-block;width:7px;height:7px;border-radius:2px;background:${CAT_DOT[c.cat]||'var(--tm)'};margin-right:6px;"></span>${c.title}</span><span class="pct" style="color:var(--tm);font-weight:400;">${CSTATUS_LABEL[c.status]||c.status}</span></div>`).join('')}
+    ${stats.contentsList.map(c=>`<div class="mr-wc-line"><span class="txt"><span style="display:inline-block;width:7px;height:7px;border-radius:2px;background:${CAT_DOT[c.cat]||'var(--tm)'};margin-right:6px;"></span>${c.title}</span><span class="pct" style="color:var(--tm);font-weight:400;">${cStatusLabel(c)}</span></div>`).join('')}
   </div>` : `<div class="mr-card"><div class="mr-sec-title">콘텐츠 기록</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:8px 0;">이 달엔 기록한 콘텐츠가 없어요</div></div>`;
 
   el.innerHTML=`<div id="mr-ai-slot"></div>${statsHtml}${rhythmHtml}${wcHtml}${contentsHtml}`;
