@@ -199,6 +199,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .mr-tag-cloud{display:flex;flex-wrap:wrap;gap:6px;}
 .mr-tag{font-size:11px;padding:5px 11px;border-radius:13px;background:rgba(255,230,200,0.45);border:1px solid rgba(240,210,160,0.5);color:#8a6840;}
 .mr-week-anchor{margin-bottom:14px;}
+.mr-accordion-body{display:none;margin-top:10px;}
+.mr-accordion.open .mr-accordion-body{display:block;}
+.mr-accordion-arrow{transition:transform .2s;color:var(--tm);}
+.mr-accordion.open .mr-accordion-arrow{transform:rotate(90deg);}
 .mr-week-anchor:last-child{margin-bottom:0;}
 .mr-week-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
 .mr-week-head .wk{font-size:11px;font-weight:600;color:var(--tp);}
@@ -2649,8 +2653,9 @@ function computeMonthStats(y,mo){
   }).filter(w=>w.lines.length>0);
   const mk=`${y}-${pad(mo+1)}`;
   const contentsList=getContentsForReport(mk);
+  const goalLines=getGoal(S.key('mgoal',mk)).filter(l=>l&&l.trim());
   const rhythmSummary=Object.keys(rhythmDur).length?durSummaryLine(rhythmDur):'';
-  return {memos,doneTodos,totalTodos,todoPct,habitPct,avgSleep,allMemoTexts,onelineTexts,wcByWeek,contentsList,rhythmSummary,rhythmDur,rhythmDayCount,dim};
+  return {memos,doneTodos,totalTodos,todoPct,habitPct,avgSleep,allMemoTexts,onelineTexts,wcByWeek,contentsList,rhythmSummary,rhythmDur,rhythmDayCount,dim,goalLines};
 }
 async function generateMonthlyReportAI(mk,stats){
   const key=getClaudeKey();
@@ -2662,19 +2667,22 @@ async function generateMonthlyReportAI(mk,stats){
   };
   const dataContext=[
     `${mk} 한 달 데이터:`,
+    stats.goalLines.length?`이번 달 목표:\n${stats.goalLines.map(g=>'- '+g).join('\n')}`:'',
     `투두 완료 ${stats.doneTodos}개 (총 ${stats.totalTodos}개 중)`,
     `습관 달성률 ${stats.habitPct}%`,
     stats.avgSleep?`평균 수면 ${stats.avgSleep}시간`:'수면 기록 없음',
-    `메모 총 ${stats.memos}건`,
     stats.rhythmSummary?`시간 사용 누계: ${stats.rhythmSummary}`:'',
-    stats.onelineTexts.length?`하루 한 줄 기록:\n${stats.onelineTexts.slice(0,30).join('\n')}`:'',
+    stats.onelineTexts.length?`하루 한 줄 기록:\n${stats.onelineTexts.slice(0,31).join('\n')}`:'',
+    stats.allMemoTexts.length?`이번 달 메모 전체 (${stats.allMemoTexts.length}건, 시간순):\n${stats.allMemoTexts.slice(0,2000).join('\n')}`:'',
     stats.contentsList.length?`콘텐츠 기록: ${stats.contentsList.map(c=>`${c.title}(${c.cat}${cStatusLabelAI(c)?', '+cStatusLabelAI(c):''})`).join(', ')}`:'',
     stats.wcByWeek.length?`주간 미션 현황: ${stats.wcByWeek.map(w=>w.lines.map(l=>`${l.text} ${l.pct}%`).join(', ')).join(' | ')}`:''
   ].filter(Boolean).join('\n');
   const sys=`당신은 따뜻한 월간 회고 비서예요. 한 달 데이터를 보고 짧은 총평과 키워드를 만들어요.
 반드시 아래 JSON 형식으로만 응답해요. 다른 텍스트나 마크다운 코드블록 없이 순수 JSON만 출력해요.
 {"comment":"3-5문장의 한 달 총평, ~해요/이에요/어요체, 이모지 1개 정도","keywords":["키워드1","키워드2","키워드3","키워드4"]}
-키워드는 하루 한 줄 기록과 메모 내용에서 자주 등장하거나 인상적인 단어/장소/감정 위주로 2~5개 뽑아요.`;
+키워드는 하루 한 줄 기록과 메모 내용에서 자주 등장하거나 인상적인 단어/장소/감정 위주로 2~5개 뽑아요.
+이번 달 목표가 있다면, 메모나 하루 한 줄 기록에 그 목표와 관련된 직접적인 언급(진행 상황, 결과, 감상 등)이 있는지 찾아서 총평에 자연스럽게 녹여요.
+단, 메모에 명확한 근거가 없는 목표는 달성 여부를 추측하거나 단정하지 말고, 가볍게 언급만 하거나 자연스럽게 비켜가요. "달성했어요" 같은 확정적 표현은 메모에 명확한 근거가 있을 때만 사용해요.`;
   const reply=await callClaude(sys,[{role:'user',content:dataContext}],500);
   if(!reply||reply.startsWith('__ERR__'))return null;
   try{
@@ -2709,6 +2717,10 @@ async function loadMonthlyReportContent(){
   const y=_reportYear,mo=_reportMonth;
   const mk=`${y}-${pad(mo+1)}`;
   const stats=computeMonthStats(y,mo);
+  const goalHtml=stats.goalLines.length?`<div class="mr-card">
+    <div class="mr-sec-title">✦ 이번 달 목표</div>
+    ${stats.goalLines.map(g=>`<div style="font-size:13px;color:var(--tp);line-height:1.7;padding:2px 0;">${g}</div>`).join('')}
+  </div>` : '';
   const statsHtml=`<div class="mr-row2" style="margin-bottom:12px;">
     <div class="mr-stat"><div class="v">${stats.doneTodos}개</div><div class="l">투두 완료</div></div>
     <div class="mr-stat"><div class="v">${stats.habitPct}%</div><div class="l">습관 달성률</div></div>
@@ -2718,12 +2730,17 @@ async function loadMonthlyReportContent(){
     <div class="mr-sec-title">이번 달 리듬</div>
     ${buildMonthlyRhythmBar(stats.rhythmDur,stats.dim,stats.rhythmDayCount)}
   </div>` : '';
-  const wcHtml=stats.wcByWeek.length?`<div class="mr-card">
-    <div class="mr-sec-title">주간 미션 모음 · 주차별</div>
-    ${stats.wcByWeek.map(w=>`<div class="mr-week-anchor">
-      <div class="mr-week-head"><span class="wk">${w.label}</span></div>
-      ${w.lines.map(l=>`<div class="mr-wc-line"><span class="txt">${l.text}</span><span class="pct">${l.pct}%</span></div>`).join('')}
-    </div>`).join('')}
+  const wcHtml=stats.wcByWeek.length?`<div class="mr-card mr-accordion">
+    <div class="mr-sec-title mr-accordion-toggle" onclick="this.closest('.mr-accordion').classList.toggle('open')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
+      <span>주간 미션 모음 · 주차별</span>
+      <span class="mr-accordion-arrow">›</span>
+    </div>
+    <div class="mr-accordion-body">
+      ${stats.wcByWeek.map(w=>`<div class="mr-week-anchor">
+        <div class="mr-week-head"><span class="wk">${w.label}</span></div>
+        ${w.lines.map(l=>`<div class="mr-wc-line"><span class="txt">${l.text}</span><span class="pct">${l.pct}%</span></div>`).join('')}
+      </div>`).join('')}
+    </div>
   </div>` : `<div class="mr-card"><div class="mr-sec-title">주간 미션 모음 · 주차별</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:8px 0;">이 달엔 작성한 주간 미션이 없어요</div></div>`;
 
   const CAT_DOT={드라마:'rgba(255,210,225,.85)',책:'rgba(255,235,160,.85)',영화:'rgba(200,240,235,.85)',음악:'rgba(200,220,255,.85)'};
@@ -2737,7 +2754,7 @@ async function loadMonthlyReportContent(){
     ${stats.contentsList.map(c=>`<div class="mr-wc-line"><span class="txt"><span style="display:inline-block;width:7px;height:7px;border-radius:2px;background:${CAT_DOT[c.cat]||'var(--tm)'};margin-right:6px;"></span>${c.title}</span><span class="pct" style="color:var(--tm);font-weight:400;">${cStatusLabel(c)}</span></div>`).join('')}
   </div>` : `<div class="mr-card"><div class="mr-sec-title">콘텐츠 기록</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:8px 0;">이 달엔 기록한 콘텐츠가 없어요</div></div>`;
 
-  el.innerHTML=`<div id="mr-ai-slot"></div>${statsHtml}${rhythmHtml}${wcHtml}${contentsHtml}`;
+  el.innerHTML=`${goalHtml}<div id="mr-ai-slot"></div>${statsHtml}${rhythmHtml}${wcHtml}${contentsHtml}`;
   const slot=document.getElementById('mr-ai-slot');
 
   const now=new Date();
