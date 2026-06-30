@@ -2669,8 +2669,8 @@ async function generateMonthlyReportAI(mk,stats){
   const key=getClaudeKey();
   if(!key)return null;
   const cStatusLabelAI=function(c){
-    if(c.cat==='음악')return '';
-    if(c.cat==='책')return c.status==='stopped'?'중단':(c.status==='done'?'완료':'읽는중');
+    if(c.cat==='music')return '';
+    if(c.cat==='book')return c.status==='stopped'?'중단':(c.status==='done'?'완료':'읽는중');
     return c.status==='stopped'?'중단':(c.status==='done'?'완료':'보는중');
   };
   const dataContext=[
@@ -2753,10 +2753,10 @@ async function loadMonthlyReportContent(){
     </div>
   </div>` : `<div class="mr-card"><div class="mr-sec-title">주간 미션 모음 · 주차별</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:8px 0;">이 달엔 작성한 주간 미션이 없어요</div></div>`;
 
-  const CAT_DOT={드라마:'rgba(255,210,225,.85)',책:'rgba(255,235,160,.85)',영화:'rgba(200,240,235,.85)',음악:'rgba(200,220,255,.85)'};
+  const CAT_DOT={drama:'rgba(255,210,225,.85)',book:'rgba(255,235,160,.85)',movie:'rgba(200,240,235,.85)',music:'rgba(200,220,255,.85)'};
   const cStatusLabel=function(c){
-    if(c.cat==='음악')return '';
-    if(c.cat==='책')return c.status==='stopped'?'중단':(c.status==='done'?'완료':'읽는중');
+    if(c.cat==='music')return '';
+    if(c.cat==='book')return c.status==='stopped'?'중단':(c.status==='done'?'완료':'읽는중');
     return c.status==='stopped'?'중단':(c.status==='done'?'완료':'보는중');
   };
   const contentsHtml=stats.contentsList.length?`<div class="mr-card">
