@@ -1623,14 +1623,14 @@ function renderHomeBody(section){
   const isLastDayOfMonth=(()=>{const t=new Date(_ld);t.setDate(_ld.getDate()+1);return t.getDate()===1;})()&&_isEveOrLateNight;
 
   if(section==='morning'){
+    body.appendChild(makeRingRow());
+    body.appendChild(makeLabel('해빗'));
+    body.appendChild(makeHabitStreakRow());
     body.appendChild(makeLabel('오늘 브리핑'));
     const sc=document.createElement('div');sc.className='card s';
     sc.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑 작성 중...</div>';
     body.appendChild(sc);
     makeScheduleCard('morning').then(function(card){sc.replaceWith(card);}).catch(function(){sc.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑을 불러올 수 없어요</div>';});
-    body.appendChild(makeRingRow());
-    body.appendChild(makeLabel('해빗'));
-    body.appendChild(makeHabitStreakRow());
     body.appendChild(makeDetailBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(_ld));},'rhythm-soft'));
     body.appendChild(makeLabel('최근 콘텐츠'));
     body.appendChild(makeContentsCard());
@@ -1645,7 +1645,8 @@ function renderHomeBody(section){
     body.appendChild(makeLabel('최근 콘텐츠'));
     body.appendChild(makeContentsCard());
   } else {
-    // 매달 말일 저녁 — 월간 누계 배너 (최우선)
+    // 저녁 공통 틀: [그날의 특수 배너] → 링 → 리듬배너 → (브리핑) → 독서카드
+    // 네 갈래(말일/일요일/수요일/평일) 모두 이 순서를 그대로 따름 — 특수 배너만 가변
     if(isLastDayOfMonth){
       body.appendChild(makeLabel('🌿 이번 달 누계'));
       const rbanner=document.createElement('div');
@@ -1656,30 +1657,9 @@ function renderHomeBody(section){
       </div>`;
       rbanner.addEventListener('click',openMonthlyReportSheet);
       body.appendChild(rbanner);
-      body.appendChild(makeRingRow());
-      body.appendChild(makeDetailBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(_ld),getSubSection()==='night_2');},'rhythm-soft'));
     } else if(isSunday){
-      // 리듬배너 → 완성률 링 → 이번주 돌아보기 → 다음주 준비
-      body.appendChild(makeDetailBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(_ld),getSubSection()==='night_2');},'rhythm-soft'));
-      body.appendChild(makeRingRow());
       appendSundayBanner(body);
-      // "다음 주 준비"는 주간 데이터(자정 기준)와 보조를 맞추기 위해 실제 자정까지만 노출
-      if(new Date().getDay()===0){
-        body.appendChild(makeLabel('◉ 다음 주 준비'));
-        const nwBanner=document.createElement('div');
-        nwBanner.className='nextweek-banner';
-        nwBanner.innerHTML=`<div class="nextweek-banner-inner" style="display:flex;align-items:center;justify-content:space-between;">
-          <div>
-            <div style="font-size:13px;font-weight:700;letter-spacing:.04em;color:rgba(115,95,150,0.88);margin-bottom:3px;">◉ 다음 주 챌린지 준비하기</div>
-            <div style="font-size:11px;color:rgba(145,128,98,0.72);">이번 주 패턴을 보고 루틴도 추천해드릴게요</div>
-          </div>
-          <div style="font-size:17px;color:rgba(135,115,160,0.48);">›</div>
-        </div>`;
-        nwBanner.addEventListener('click',openNextWeekChallengeSheet);
-        body.appendChild(nwBanner);
-      }
     } else if(isWednesdayEvening){
-      // 수요일 저녁 — 주간 리마인드 배너
       body.appendChild(makeLabel('◈ 이번 주 중간 점검'));
       const mbanner=document.createElement('div');
       mbanner.className='midweek-remind-banner';
@@ -1689,14 +1669,26 @@ function renderHomeBody(section){
       </div>`;
       mbanner.addEventListener('click',openMidweekRemindSheet);
       body.appendChild(mbanner);
-      body.appendChild(makeRingRow());
-      body.appendChild(makeDetailBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(_ld),getSubSection()==='night_2');},'rhythm-soft'));
-    } else {
-      body.appendChild(makeRingRow());
-      body.appendChild(makeDetailBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(_ld),getSubSection()==='night_2');},'rhythm-soft'));
+    }
+    body.appendChild(makeRingRow());
+    body.appendChild(makeDetailBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(_ld),getSubSection()==='night_2');},'rhythm-soft'));
+    // 일요일 한정 — 다음 주 준비 배너 (리듬배너 뒤, 공통 틀 끝)
+    if(isSunday&&new Date().getDay()===0){
+      body.appendChild(makeLabel('◉ 다음 주 준비'));
+      const nwBanner=document.createElement('div');
+      nwBanner.className='nextweek-banner';
+      nwBanner.innerHTML=`<div class="nextweek-banner-inner" style="display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:13px;font-weight:700;letter-spacing:.04em;color:rgba(115,95,150,0.88);margin-bottom:3px;">◉ 다음 주 챌린지 준비하기</div>
+          <div style="font-size:11px;color:rgba(145,128,98,0.72);">이번 주 패턴을 보고 루틴도 추천해드릴게요</div>
+        </div>
+        <div style="font-size:17px;color:rgba(135,115,160,0.48);">›</div>
+      </div>`;
+      nwBanner.addEventListener('click',openNextWeekChallengeSheet);
+      body.appendChild(nwBanner);
     }
     if(!isSunday){
-      body.appendChild(makeLabel('내일 미리보기'));
+      body.appendChild(makeLabel(getSubSection()==='night_2'?'오늘 마무리':'오늘 마무리 · 내일 미리보기'));
       const sc3=document.createElement('div');sc3.className='card s';
       sc3.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑 작성 중...</div>';
       body.appendChild(sc3);
@@ -1716,7 +1708,8 @@ const RHYTHM_CATS={
   rest:{label:'휴식',color:'rgba(250,215,100,0.85)'},
   work:{label:'업무',color:'rgba(178,190,205,0.90)'},
   appointment:{label:'약속',color:'rgba(135,190,230,0.85)'},
-  note:{label:'노트',color:'rgba(240,160,170,0.85)'},
+  note:{label:'데스크',color:'rgba(240,160,170,0.85)'},
+  enjoy:{label:'감상',color:'rgba(168,148,222,0.85)'},
   home:{label:'집',color:'rgba(210,165,215,0.85)'}
 };
 const RHYTHM_SLEEP_COLOR='rgba(205,194,182,0.88)';
@@ -2429,9 +2422,11 @@ ${commonRules}`;
 실제 현재 시각과 어긋나는 낮/햇살 묘사는 쓰지 마세요.
 ${commonRules}`;
       } else {
-        sys=`당신은 따뜻한 하루 비서예요. 늦은 밤 마무리 브리핑을 작성해요.
-하루가 거의 끝났어요. 오늘 수고한 것을 짧게 정리하고 따뜻하게 마무리해줘요.
-짧고 포근하게. 3-4문장 이내.
+        sys=`당신은 따뜻한 하루 비서예요. 늦은 밤, 하루를 마감하는 시간이에요.
+전투력이 떨어지는 시간대이니 길게 늘어놓지 않아요.
+오늘 하루 수고했다는 마음을 담아 **딱 한 줄**로 따뜻하게 마무리해요.
+내일에 대한 작은 기대나 응원도 그 한 줄 안에 자연스럽게 녹여요 (내일 할일을 나열하지 말고, 가볍게 응원하는 톤으로만).
+한 문장, 최대 2문장 이내.
 실제 현재 시각과 어긋나는 낮/햇살/노을 묘사는 쓰지 마세요.
 ${commonRules}`;
       }
@@ -2450,7 +2445,7 @@ ${commonRules}`;
       ].filter(Boolean).join('\n');
     }
 
-    const maxTok=subSec==='night_2'?320:480;
+    const maxTok=subSec==='night_2'?80:480;
 
     if(!key){
       card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">Claude API 키를 설정하면 브리핑을 받을 수 있어요</div>';
