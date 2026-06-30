@@ -4516,35 +4516,35 @@ function confirmContent(){
     saveContents(newMk,contents);
   }
   closeModal('content-modal');renderTimetable();updateStats();
-  if(_contentCtx.cat==='book')syncContentToReadingBook(title,status,poster,author);
+  if(_contentCtx.cat==='book')syncContentToReadingBook(title,status,poster,author,newMk);
 }
 function stableCidFromTitle(title){
   let h=0;
   for(let i=0;i<title.length;i++){h=(h*31+title.charCodeAt(i))|0;}
   return 'ct_'+Math.abs(h).toString(36);
 }
-function syncContentToReadingBook(title,status,poster,author){
+function syncContentToReadingBook(title,status,poster,author,mk){
   const books=getBooks();
   let book=books.find(b=>b.title===title);
   const fixedCid=stableCidFromTitle(title);
   if(status==='done'){
-    if(book){book.status='done';book.linkedContent=true;book.completedAt=book.completedAt||dateKey(new Date());if(poster)book.poster=poster;if(author)book.author=author;upsertBookLocal(book);}
+    if(book){book.status='done';book.linkedContent=true;book.contentMk=mk;book.contentTitle=title;book.completedAt=book.completedAt||dateKey(new Date());if(poster)book.poster=poster;if(author)book.author=author;upsertBookLocal(book);}
     else{
-      book={cid:fixedCid,title,status:'done',unit:'pages',pages:0,totalPages:null,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:dateKey(new Date()),linkedContent:true,poster:poster||null,author:author||''};
+      book={cid:fixedCid,title,status:'done',unit:'pages',pages:0,totalPages:null,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:dateKey(new Date()),linkedContent:true,contentMk:mk,contentTitle:title,poster:poster||null,author:author||''};
       upsertBookLocal(book);
     }
   } else if(status==='stopped'){
-    if(book){book.status='paused';book.linkedContent=true;if(poster)book.poster=poster;if(author)book.author=author;upsertBookLocal(book);}
+    if(book){book.status='paused';book.linkedContent=true;book.contentMk=mk;book.contentTitle=title;if(poster)book.poster=poster;if(author)book.author=author;upsertBookLocal(book);}
     else{
-      book={cid:fixedCid,title,status:'paused',unit:'pages',pages:0,totalPages:null,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:null,linkedContent:true,poster:poster||null,author:author||''};
+      book={cid:fixedCid,title,status:'paused',unit:'pages',pages:0,totalPages:null,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:null,linkedContent:true,contentMk:mk,contentTitle:title,poster:poster||null,author:author||''};
       upsertBookLocal(book);
     }
   } else {
     if(!book){
-      book={cid:fixedCid,title,status:'reading',unit:'pages',pages:0,totalPages:null,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:null,linkedContent:true,poster:poster||null,author:author||''};
+      book={cid:fixedCid,title,status:'reading',unit:'pages',pages:0,totalPages:null,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:null,linkedContent:true,contentMk:mk,contentTitle:title,poster:poster||null,author:author||''};
       upsertBookLocal(book);
     } else {
-      book.linkedContent=true;
+      book.linkedContent=true;book.contentMk=mk;book.contentTitle=title;
       if(book.status!=='reading')book.status='reading';
       if(poster)book.poster=poster;if(author)book.author=author;
       upsertBookLocal(book);
@@ -5567,7 +5567,26 @@ function setBookStatus(cid,status){
   book.status=status;
   if(status==='done')book.completedAt=dateKey(new Date());
   upsertBookLocal(book);
+  if(book.linkedContent&&book.contentMk)syncReadingBookToContent(book,status);
   renderReadingHub();
+}
+function syncReadingBookToContent(book,bookStatus){
+  const STATUS_MAP={reading:'watching',done:'done',paused:'stopped'};
+  const cStatus=STATUS_MAP[bookStatus];if(!cStatus)return;
+  const mk=book.contentMk;
+  const contents=getContents(mk);
+  const idx=contents.findIndex(c=>c.cat==='book'&&c.title===(book.contentTitle||book.title));
+  if(idx<0)return;
+  const item=contents[idx];
+  if(cStatus==='watching'){
+    item.endDate=null;
+  } else {
+    item.endDate=item.endDate||dateKey(new Date());
+  }
+  item.status=cStatus;
+  contents[idx]=item;
+  saveContents(mk,contents);
+  renderTimetable();updateStats();
 }
 function removeBook(cid){
   if(_rdOpenCid===cid)_rdOpenCid=null;
