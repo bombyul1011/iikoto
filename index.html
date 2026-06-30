@@ -4533,6 +4533,12 @@ function syncContentToReadingBook(title,status,poster,author){
       book={cid:fixedCid,title,status:'done',unit:'pages',pages:0,totalPages:null,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:dateKey(new Date()),linkedContent:true,poster:poster||null,author:author||''};
       upsertBookLocal(book);
     }
+  } else if(status==='stopped'){
+    if(book){book.status='paused';book.linkedContent=true;if(poster)book.poster=poster;if(author)book.author=author;upsertBookLocal(book);}
+    else{
+      book={cid:fixedCid,title,status:'paused',unit:'pages',pages:0,totalPages:null,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:null,linkedContent:true,poster:poster||null,author:author||''};
+      upsertBookLocal(book);
+    }
   } else {
     if(!book){
       book={cid:fixedCid,title,status:'reading',unit:'pages',pages:0,totalPages:null,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:null,linkedContent:true,poster:poster||null,author:author||''};
