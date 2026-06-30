@@ -2682,8 +2682,9 @@ async function generateMonthlyReportAI(mk,stats){
   ].filter(Boolean).join('\n');
   const sys=`당신은 따뜻한 월간 회고 비서예요. 한 달 데이터를 보고 풍부한 총평과 키워드를 만들어요.
 반드시 아래 JSON 형식으로만 응답해요. 다른 텍스트나 마크다운 코드블록 없이 순수 JSON만 출력해요.
-{"comment":"6-9문장의 한 달 총평, ~해요/이에요/어요체, 이모지 1-2개 정도","keywords":["키워드1","키워드2","키워드3","키워드4"]}
+{"comment":"6-8문장의 한 달 총평, ~해요/이에요/어요체, 이모지 1-2개 정도","keywords":["키워드1","키워드2","키워드3","키워드4"]}
 내용이 좋으면 분량을 아끼지 말고, 그 달의 흐름(시작~중반~막판)과 구체적인 사건/감정 변화를 짚어가며 충분히 풀어서 써요.
+이 코멘트 바로 아래에 투두 완료 개수와 습관 달성률 수치가 별도로 표시되니, 그 숫자(예: "85개", "20%" 같은 구체적 수치)를 코멘트에서 직접 나열하지 말아요. 대신 그 수치가 의미하는 바에 대한 해석이나 코멘트로 자연스럽게 시작하거나 녹여요 (예: "습관 달성률은 낮았지만 ~"처럼 수치 자체보다 그 이면의 맥락 위주로).
 키워드는 하루 한 줄 기록과 메모 내용에서 자주 등장하거나 인상적인 단어/장소/감정 위주로 2~5개 뽑아요.
 이번 달 목표가 있다면, 메모나 하루 한 줄 기록에 그 목표와 관련된 직접적인 언급(진행 상황, 결과, 감상 등)이 있는지 찾아서 총평에 자연스럽게 녹여요.
 단, 메모에 명확한 근거가 없는 목표는 달성 여부를 추측하거나 단정하지 말고, 가볍게 언급만 하거나 자연스럽게 비켜가요. "달성했어요" 같은 확정적 표현은 메모에 명확한 근거가 있을 때만 사용해요.`;
@@ -2723,7 +2724,7 @@ async function loadMonthlyReportContent(){
   const stats=computeMonthStats(y,mo);
   const goalHtml=stats.goalLines.length?`<div class="mr-card mr-goal-card">
     <div class="mr-sec-title">✦ 이번 달 목표</div>
-    ${stats.goalLines.map(g=>`<div style="font-size:13.5px;font-weight:600;color:var(--tp);line-height:1.7;padding:2px 0;">${g}</div>`).join('')}
+    ${stats.goalLines.map(g=>`<div style="font-size:13px;color:var(--tp);line-height:1.7;padding:2px 0;">${g}</div>`).join('')}
   </div>` : '';
   const statsHtml=`<div class="mr-row2" style="margin-bottom:12px;">
     <div class="mr-stat"><div class="v">${stats.doneTodos}개</div><div class="l">투두 완료</div></div>
