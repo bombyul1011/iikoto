@@ -4700,6 +4700,7 @@ let _calYear=new Date().getFullYear();
 let _calMonth=new Date().getMonth();
 function calMonthKey(){return `${_calYear}-${pad(_calMonth+1)}`;}
 function isCalCurrentMonth(){const n=new Date();return _calYear===n.getFullYear()&&_calMonth===n.getMonth();}
+function isCalPastMonth(){const n=new Date();return _calYear<n.getFullYear()||(_calYear===n.getFullYear()&&_calMonth<n.getMonth());}
 function updateMonthlyGoalTitle(){
   const el=document.getElementById('monthly-goal-title');if(!el)return;
   el.textContent=isCalCurrentMonth()?'✦ 이번 달 목표':`✦ ${_calMonth+1}월 목표`;
@@ -4764,7 +4765,7 @@ function calShiftMonth(n){
   renderTimetable();
   renderHabitMonthly();
   renderMonthlyStatBar();
-  renderGoalNote('monthly-goal-wrap',S.key('mgoal',calMonthKey()),!isCalCurrentMonth());
+  renderGoalNote('monthly-goal-wrap',S.key('mgoal',calMonthKey()),isCalPastMonth());
   updateMonthlyGoalTitle();
   const sy=_calYear,smo=_calMonth;
   syncMonthRange(sy,smo).then(fetched=>{
@@ -5084,7 +5085,7 @@ function loadMonthly(){
   const _ld0=new Date();
   _calYear=_ld0.getFullYear();_calMonth=_ld0.getMonth();
   updateStats();renderTimetable();renderHabitMonthly();
-  renderGoalNote('monthly-goal-wrap',S.key('mgoal',calMonthKey()),!isCalCurrentMonth());
+  renderGoalNote('monthly-goal-wrap',S.key('mgoal',calMonthKey()),isCalPastMonth());
   updateMonthlyGoalTitle();
   renderCalendar();renderMonthlyStatBar();
   updateReportBannerLabel();
