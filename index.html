@@ -675,9 +675,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rt-edit{flex-shrink:0;color:var(--tm);display:flex;align-items:center;padding:0 2px;cursor:pointer;}
 .rt-finish{flex-shrink:0;font-size:10px;color:var(--acc);border:1px solid rgba(192,112,128,0.40);border-radius:8px;padding:2px 7px;cursor:pointer;}
 .rt-block.ongoing{background-image:repeating-linear-gradient(135deg,rgba(255,255,255,0.35) 0 3px,transparent 3px 6px);}
-.rhythm-track-legend{display:flex;flex-wrap:wrap;gap:9px 12px;margin-top:8px;padding-left:2px;}
-.rhythm-track-legend span{display:flex;align-items:center;gap:5px;font-size:9.5px;color:var(--tm);}
-.rhythm-track-legend i{width:7px;height:7px;border-radius:50%;flex-shrink:0;display:inline-block;}
+.rhythm-track-legend{display:flex;flex-wrap:nowrap;gap:5px;margin-top:8px;padding-left:2px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+.rhythm-track-legend::-webkit-scrollbar{display:none;}
+.rhythm-track-legend span{display:flex;align-items:center;gap:3px;font-size:8.7px;color:var(--tm);white-space:nowrap;flex-shrink:0;}
+.rhythm-track-legend i{width:6px;height:6px;border-radius:50%;flex-shrink:0;display:inline-block;}
 
 /* ── 블록 추가 폼 ── */
 .rhythm-add-btn{width:100%;border:1.5px dashed rgba(192,112,128,0.40);border-radius:14px;background:none;color:var(--acc);font-size:12.5px;font-weight:600;padding:11px 0;margin-top:12px;cursor:pointer;font-family:'DM Sans',sans-serif;}
@@ -715,9 +716,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .wrb-track{position:absolute;top:0;left:0;right:0;height:8px;border-radius:4px;background:rgba(220,210,195,0.35);}
 .wrb-seg{position:absolute;top:0;height:8px;border-radius:4px;}
 .wrb-seg.ongoing{background-image:repeating-linear-gradient(135deg,rgba(255,255,255,0.35) 0 3px,transparent 3px 6px);}
-.wrb-legend{display:flex;flex-wrap:wrap;gap:9px 12px;margin-top:12px;padding-left:2px;}
-.wrb-legend span{display:flex;align-items:center;gap:5px;font-size:9.5px;color:var(--tm);}
-.wrb-legend i{width:7px;height:7px;border-radius:50%;flex-shrink:0;display:inline-block;}
+.wrb-legend{display:flex;flex-wrap:nowrap;gap:5px;margin-top:12px;padding-left:2px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+.wrb-legend::-webkit-scrollbar{display:none;}
+.wrb-legend span{display:flex;align-items:center;gap:3px;font-size:8.7px;color:var(--tm);white-space:nowrap;flex-shrink:0;}
+.wrb-legend i{width:6px;height:6px;border-radius:50%;flex-shrink:0;display:inline-block;}
 [data-theme="glass"] .wrb-track{background:rgba(190,180,160,0.30);}
 
 /* ── 일정 카드 */
@@ -1717,7 +1719,7 @@ const RHYTHM_CATS={
   appointment:{label:'약속',color:'rgba(135,190,230,0.85)'},
   note:{label:'데스크',color:'rgba(240,160,170,0.85)'},
   enjoy:{label:'감상',color:'rgba(168,148,222,0.85)'},
-  home:{label:'집',color:'rgba(210,165,215,0.85)'}
+  home:{label:'정돈',color:'rgba(210,165,215,0.85)'}
 };
 const RHYTHM_SLEEP_COLOR='rgba(205,194,182,0.88)';
 const RHYTHM_MEAL_COLOR='rgba(145,210,175,0.85)';
@@ -5067,7 +5069,7 @@ function renderWeeklyRhythmBars(){
     html+='<div class="wrb-row"><div class="wrb-daylabel'+(dk===todayDk?' today':'')+'">'+DOW[i]+'</div><div class="wrb-trackwrap">'+track+'</div></div>';
   }
   html+='</div>';
-  html+='<div class="wrb-legend"><span><i style="background:'+RHYTHM_SLEEP_COLOR+';"></i>수면</span><span><i style="background:'+RHYTHM_MEAL_COLOR+';"></i>식사</span>'+
+  html+='<div class="wrb-legend"><span><i style="background:'+RHYTHM_MEAL_COLOR+';"></i>식사</span>'+
     Object.keys(RHYTHM_CATS).map(function(k){return '<span><i style="background:'+RHYTHM_CATS[k].color+';"></i>'+RHYTHM_CATS[k].label+'</span>';}).join('')+'</div>';
   el.innerHTML=html;
 }
