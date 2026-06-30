@@ -2562,8 +2562,11 @@ async function renderDiaryMonthSheet(){
   }
 }
 async function buildDiaryMonthSummaryHtml(y,mo,today,daysInMonth,mk){
-  const isCurrentMonth=(y===getLogicalDate().getFullYear()&&mo===getLogicalDate().getMonth());
-  if(isCurrentMonth&&today<daysInMonth){
+  const _ld=getLogicalDate();
+  const isCurrentMonth=(y===_ld.getFullYear()&&mo===_ld.getMonth());
+  const _lh=new Date().getHours();
+  const isLastDayEvening=today===daysInMonth&&(_lh>=19||_lh<6);
+  if(isCurrentMonth&&!isLastDayEvening){
     return `<div class="diary-month-summary"><div class="diary-month-summary-label">✦ 이번 달 한눈에</div><div class="diary-month-summary-text" style="color:var(--tm);">🌿 이 달이 끝나면 정리해드릴게요</div></div>`;
   }
   const cacheKey='diary_month_summary_'+mk;
@@ -2721,7 +2724,9 @@ async function loadMonthlyReportContent(){
 
   const now=getLogicalDate();
   const lastDateOfThisMonth=new Date(y,mo+1,0).getDate();
-  const isOngoingMonth=(y===now.getFullYear()&&mo===now.getMonth()&&now.getDate()<lastDateOfThisMonth);
+  const _lh=new Date().getHours();
+  const isLastDayEvening=now.getDate()===lastDateOfThisMonth&&(_lh>=19||_lh<6);
+  const isOngoingMonth=(y===now.getFullYear()&&mo===now.getMonth()&&!isLastDayEvening);
   if(isOngoingMonth){
     slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title">이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">🌿 이 달이 끝나면 정리해드릴게요</div></div>`;
     return;
