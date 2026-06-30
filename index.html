@@ -210,8 +210,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .mr-week-head .wk{font-size:11px;font-weight:600;color:var(--tp);}
 .mr-week-head .rng{font-size:9.5px;color:var(--tm);}
 .mr-wc-line{display:flex;align-items:center;gap:8px;padding:4px 0;}
-.mr-wc-line .txt{flex:1;font-size:12px;color:var(--tp);}
-.mr-wc-line .pct{font-size:10.5px;color:var(--tm);}
+.mr-wc-line .txt{flex:1;font-size:12px;color:var(--tp);line-height:1.5;}
+.mr-wc-line .pct{font-size:10.5px;color:var(--tm);line-height:1.5;flex-shrink:0;}
 .mr-rhythm-bar{display:flex;width:100%;height:16px;border-radius:8px;overflow:hidden;margin-bottom:12px;background:rgba(200,195,190,0.18);}
 .mr-rhythm-seg{height:100%;}
 .mr-rhythm-list{display:flex;flex-direction:column;gap:6px;}
@@ -2679,13 +2679,14 @@ async function generateMonthlyReportAI(mk,stats){
     stats.contentsList.length?`콘텐츠 기록: ${stats.contentsList.map(c=>`${c.title}(${c.cat}${cStatusLabelAI(c)?', '+cStatusLabelAI(c):''})`).join(', ')}`:'',
     stats.wcByWeek.length?`주간 미션 현황: ${stats.wcByWeek.map(w=>w.lines.map(l=>`${l.text} ${l.pct}%`).join(', ')).join(' | ')}`:''
   ].filter(Boolean).join('\n');
-  const sys=`당신은 따뜻한 월간 회고 비서예요. 한 달 데이터를 보고 짧은 총평과 키워드를 만들어요.
+  const sys=`당신은 따뜻한 월간 회고 비서예요. 한 달 데이터를 보고 풍부한 총평과 키워드를 만들어요.
 반드시 아래 JSON 형식으로만 응답해요. 다른 텍스트나 마크다운 코드블록 없이 순수 JSON만 출력해요.
-{"comment":"3-5문장의 한 달 총평, ~해요/이에요/어요체, 이모지 1개 정도","keywords":["키워드1","키워드2","키워드3","키워드4"]}
+{"comment":"6-9문장의 한 달 총평, ~해요/이에요/어요체, 이모지 1-2개 정도","keywords":["키워드1","키워드2","키워드3","키워드4"]}
+내용이 좋으면 분량을 아끼지 말고, 그 달의 흐름(시작~중반~막판)과 구체적인 사건/감정 변화를 짚어가며 충분히 풀어서 써요.
 키워드는 하루 한 줄 기록과 메모 내용에서 자주 등장하거나 인상적인 단어/장소/감정 위주로 2~5개 뽑아요.
 이번 달 목표가 있다면, 메모나 하루 한 줄 기록에 그 목표와 관련된 직접적인 언급(진행 상황, 결과, 감상 등)이 있는지 찾아서 총평에 자연스럽게 녹여요.
 단, 메모에 명확한 근거가 없는 목표는 달성 여부를 추측하거나 단정하지 말고, 가볍게 언급만 하거나 자연스럽게 비켜가요. "달성했어요" 같은 확정적 표현은 메모에 명확한 근거가 있을 때만 사용해요.`;
-  const reply=await callClaude(sys,[{role:'user',content:dataContext}],500);
+  const reply=await callClaude(sys,[{role:'user',content:dataContext}],900);
   if(!reply||reply.startsWith('__ERR__'))return null;
   try{
     const clean=reply.replace(/```json|```/g,'').trim();
@@ -2720,8 +2721,8 @@ async function loadMonthlyReportContent(){
   const mk=`${y}-${pad(mo+1)}`;
   const stats=computeMonthStats(y,mo);
   const goalHtml=stats.goalLines.length?`<div class="mr-card mr-goal-card">
-    <div class="mr-sec-title" style="color:#c07080;">✦ 이번 달 목표</div>
-    ${stats.goalLines.map(g=>`<div style="font-size:13.5px;font-weight:500;color:#8a5060;line-height:1.7;padding:2px 0;">${g}</div>`).join('')}
+    <div class="mr-sec-title" style="color:#b5556a;">✦ 이번 달 목표</div>
+    ${stats.goalLines.map(g=>`<div style="font-size:13.5px;font-weight:600;color:#7a4252;line-height:1.7;padding:2px 0;">${g}</div>`).join('')}
   </div>` : '';
   const statsHtml=`<div class="mr-row2" style="margin-bottom:12px;">
     <div class="mr-stat"><div class="v">${stats.doneTodos}개</div><div class="l">투두 완료</div></div>
