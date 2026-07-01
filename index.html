@@ -1526,7 +1526,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     </div>
   </div>
   <div class="reading-body">
-    <!-- 입력 폼 (기본 숨김, + 버튼 누르면 표시) -->
     <div id="seed-form" style="display:none;margin-bottom:14px;">
       <div class="card" style="padding:14px 15px;">
         <input type="text" id="seed-text-inp" placeholder="문장이나 단어를 남겨요" style="width:100%;border:none;background:none;font-size:13.5px;font-family:'DM Sans',sans-serif;color:var(--tp);outline:none;margin-bottom:10px;box-sizing:border-box;">
@@ -1538,11 +1537,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         </div>
       </div>
     </div>
-    <!-- 목록 -->
     <div id="seed-list"></div>
     <div id="seed-empty" style="display:none;text-align:center;padding:48px 0;font-size:13px;color:var(--tm);">✦ 문장이나 단어를 모아두는 공간이에요</div>
   </div>
 </div>
+<div class="reading-ov" id="reading-ov">
   <div class="settings-hdr" style="padding-top:max(20px,env(safe-area-inset-top));">
     <div class="settings-back" onclick="closeReading()">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="color:var(--ts)"><polyline points="10,3 5,8 10,13"/></svg>
