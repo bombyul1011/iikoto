@@ -275,6 +275,17 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .memo-field{flex:1;height:38px;box-sizing:border-box;background:rgba(255,255,255,.30);border:1.5px dashed rgba(200,170,160,.40);border-radius:11px;padding:8px 12px;font-size:16px;color:var(--tp);font-family:'DM Sans',sans-serif;outline:none;resize:none;line-height:1.3;max-height:100px;}
 .memo-field::placeholder{color:var(--tm);}
 .send-btn{width:38px;height:38px;background:var(--acc-soft);border:none;border-radius:11px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+.memo-stamp-sm{width:32px;height:32px;background:var(--inp);border:1px solid var(--inp-b);border-radius:9px;padding:0;font-size:11px;color:var(--ts);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+.memo-field-sm{height:32px;max-height:80px;padding:6px 10px;font-size:14px;}
+.memo-search-sm{width:32px;height:32px;border-radius:9px;}
+.memo-search-btn{background:var(--inp);border:1px solid var(--inp-b);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+.seed-icon-btn{background:linear-gradient(120deg,rgba(200,225,150,0.80),rgba(225,240,180,0.70));border:1px solid rgba(160,200,90,0.55);box-shadow:0 2px 10px rgba(120,170,60,0.12);}
+[data-theme="glass"] .seed-icon-btn{background:linear-gradient(120deg,rgba(200,225,150,0.45),rgba(225,240,180,0.38));border:1.4px solid rgba(160,200,90,0.40);}
+.seed-card{background:var(--card);border:1px solid var(--card-b);border-radius:14px;padding:14px 15px;margin-bottom:10px;cursor:pointer;transition:opacity .15s;}
+.seed-card:active{opacity:.75;}
+.seed-text{font-size:13.5px;font-weight:500;color:var(--tp);line-height:1.55;margin-bottom:0;}
+.seed-comment{font-size:12px;color:var(--tm);line-height:1.6;margin-top:6px;}
+.seed-date{font-size:10.5px;color:var(--tm);margin-top:8px;opacity:.7;}
 
 /* ── GOAL NOTE ── */
 .goal-wrap{padding:0 2px;margin-bottom:10px;}
@@ -450,6 +461,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="glass"] .memo-item{margin-bottom:14px;}
 /* ── READING HUB ── */
 .reading-ov{position:fixed;inset:0;z-index:8000;background:var(--bg);display:none;flex-direction:column;overflow-y:auto;transform:translateX(100%);transition:transform .3s cubic-bezier(.32,.72,0,1);}
+#seed-ov{background:var(--bg);}
 .reading-ov.on{display:flex;transform:translateX(0);}
 .reading-body{padding:16px 18px 30px;display:flex;flex-direction:column;gap:18px;}
 .rd-top{position:relative;border-radius:20px;padding:1.8px;background:linear-gradient(120deg,rgba(255,170,200,0.95),rgba(255,205,140,0.92),rgba(195,200,245,0.65),rgba(170,235,200,0.92),rgba(255,170,200,0.95));background-size:300% 300%;animation:bannerShine 10s ease infinite;}
@@ -884,8 +896,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div class="icon-btn" onclick="openSettings()">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--tm)"><circle cx="7" cy="7" r="1.8"/><path d="M7 2.5V3.5M7 10.5V11.5M2.5 7H3.5M10.5 7H11.5M4 4L4.7 4.7M9.3 9.3L10 10M4 10L4.7 9.3M9.3 4.7L10 4"/></svg>
         </div>
-        <div class="icon-btn" onclick="openSearch()">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--tm)"><circle cx="6" cy="6" r="4.5"/><line x1="9.5" y1="9.5" x2="12.5" y2="12.5"/></svg>
+        <div class="icon-btn seed-icon-btn" onclick="openSeed()">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="color:#5a7a3a"><path d="M8 14V8"/><path d="M8 8C8 8 4.5 6.5 3 4c3-.8 6 1.2 5 4z" fill="rgba(160,195,100,0.25)"/><path d="M8 10C8 10 11.5 8.5 13 6c-3-.8-6 1.2-5 4z" fill="rgba(160,195,100,0.25)"/></svg>
         </div>
         <div class="icon-btn reading-icon-btn" onclick="openReading()">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" style="color:#a8527a"><path d="M7 2.8C5.7 2 3.6 1.7 2 2v8.3c1.6-.3 3.7 0 5 .8M7 2.8C8.3 2 10.4 1.7 12 2v8.3c-1.6-.3-3.7 0-5 .8M7 2.8v8.3"/></svg>
@@ -968,9 +980,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="card p" id="memo-card">
         <div id="memo-list"></div>
         <div class="memo-input-row">
-          <button class="stamp-btn" onclick="openMemoTimePicker()" id="memo-stamp-btn"><svg width="17" height="17" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" style="color:var(--ts)"><circle cx="5.5" cy="5.5" r="4.2"/><polyline points="5.5,3 5.5,5.5 7.2,6.8"/></svg></button>
-          <textarea id="memo-inp" class="memo-field" rows="1" placeholder="메모 입력" autocomplete="off"></textarea>
-          <button class="send-btn" onclick="sendMemo()"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="white" stroke-width="1.4" stroke-linecap="round"><line x1="6.5" y1="10.5" x2="6.5" y2="2"/><polyline points="3,5.5 6.5,2 10,5.5"/></svg></button>
+          <button class="stamp-btn memo-stamp-sm" onclick="openMemoTimePicker()" id="memo-stamp-btn"><svg width="14" height="14" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" style="color:var(--ts)"><circle cx="5.5" cy="5.5" r="4.2"/><polyline points="5.5,3 5.5,5.5 7.2,6.8"/></svg></button>
+          <textarea id="memo-inp" class="memo-field memo-field-sm" rows="1" placeholder="메모 입력" autocomplete="off"></textarea>
+          <button class="memo-search-btn memo-search-sm" onclick="openSearch()"><svg width="12" height="12" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" style="color:var(--tm)"><circle cx="5.5" cy="5.5" r="4"/><line x1="9" y1="9" x2="12" y2="12"/></svg></button>
         </div>
       </div>
       <div class="slabel">오늘 뭐 먹지</div>
@@ -1502,7 +1514,35 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 <div id="pdf-content" style="display:none;"></div>
 
 <!-- READING HUB -->
-<div class="reading-ov" id="reading-ov">
+<div class="reading-ov" id="seed-ov">
+  <div class="settings-hdr" style="padding-top:max(20px,env(safe-area-inset-top));">
+    <div class="settings-back" onclick="closeSeed()">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="color:var(--ts)"><polyline points="10,3 5,8 10,13"/></svg>
+    </div>
+    <span class="settings-ttl">문장 씨앗</span>
+    <div style="flex:1;"></div>
+    <div class="settings-back" style="width:30px;height:30px;" onclick="openSeedForm()">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" style="color:var(--ts)"><line x1="7" y1="2" x2="7" y2="12"/><line x1="2" y1="7" x2="12" y2="7"/></svg>
+    </div>
+  </div>
+  <div class="reading-body">
+    <!-- 입력 폼 (기본 숨김, + 버튼 누르면 표시) -->
+    <div id="seed-form" style="display:none;margin-bottom:14px;">
+      <div class="card" style="padding:14px 15px;">
+        <input type="text" id="seed-text-inp" placeholder="문장이나 단어를 남겨요" style="width:100%;border:none;background:none;font-size:13.5px;font-family:'DM Sans',sans-serif;color:var(--tp);outline:none;margin-bottom:10px;box-sizing:border-box;">
+        <div style="height:0.5px;background:var(--div);margin:0 0 10px;"></div>
+        <textarea id="seed-comment-inp" placeholder="코멘트 (선택)" rows="2" style="width:100%;border:none;background:none;font-size:12.5px;font-family:'DM Sans',sans-serif;color:var(--tp);outline:none;resize:none;box-sizing:border-box;"></textarea>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px;">
+          <button onclick="closeSeedForm()" style="background:none;border:1px solid var(--card-b);border-radius:8px;padding:5px 14px;font-size:12px;color:var(--tm);cursor:pointer;font-family:'DM Sans',sans-serif;">취소</button>
+          <button onclick="saveSeedItem()" style="background:rgba(160,185,110,0.3);border:1px solid rgba(140,170,90,0.4);border-radius:8px;padding:5px 14px;font-size:12px;color:#5a6e3a;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500;">저장</button>
+        </div>
+      </div>
+    </div>
+    <!-- 목록 -->
+    <div id="seed-list"></div>
+    <div id="seed-empty" style="display:none;text-align:center;padding:48px 0;font-size:13px;color:var(--tm);">✦ 문장이나 단어를 모아두는 공간이에요</div>
+  </div>
+</div>
   <div class="settings-hdr" style="padding-top:max(20px,env(safe-area-inset-top));">
     <div class="settings-back" onclick="closeReading()">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="color:var(--ts)"><polyline points="10,3 5,8 10,13"/></svg>
@@ -2205,8 +2245,17 @@ function makeBookCard(){
 }
 function makeContentsCard(){
   const wrap=document.createElement('div');wrap.className='card';
-  const mk=monthKey(new Date()),contents=getContents(mk);
-  if(!contents.length){
+  const mk=monthKey(new Date());
+  const contents=getContents(mk);
+  const prevMk=monthKey(new Date(new Date().getFullYear(),new Date().getMonth()-1,1));
+  const prevContents=getContents(prevMk);
+  const carry=prevContents.filter(function(c){
+    if(c.status==='watching')return true;
+    if((c.status==='done'||c.status==='stopped')&&c.endDate&&c.endDate.slice(0,7)>=mk)return true;
+    return false;
+  }).map(function(c){return {...c,_carried:true};});
+  const allContents=[...carry,...contents];
+  if(!allContents.length){
     wrap.innerHTML='<div style="font-size:12px;color:var(--tm);padding:4px;">이번 달 콘텐츠가 없어요</div>';
     return wrap;
   }
@@ -2214,13 +2263,13 @@ function makeContentsCard(){
   const CAT_UNIT={drama:'개',book:'권',movie:'개',music:'개'};
   let rowsHtml='';
   CAT_ORDER.forEach(function(cat){
-    const list=contents.filter(function(c){return c.cat===cat;});
+    const list=allContents.filter(function(c){return c.cat===cat;});
     if(!list.length)return;
     const c=list[list.length-1];
     rowsHtml+='<div class="home-content-row"><span class="home-content-bar '+c.cat+'"></span><span class="home-content-cat">'+(CAT_LABELS[c.cat]||c.cat)+'</span><span class="home-content-title">'+c.title+'</span></div>';
   });
   const countHtml=CAT_ORDER.map(function(cat){
-    const n=contents.filter(function(c){return c.cat===cat;}).length;
+    const n=allContents.filter(function(c){return c.cat===cat;}).length;
     return '<div class="content-countbox-col"><span class="content-countbox-name">'+(CAT_LABELS[cat]||cat)+'</span><span class="content-countbox-num">'+n+(CAT_UNIT[cat]||'개')+'</span></div>';
   }).join('');
   wrap.innerHTML=rowsHtml+'<div class="content-countbox" style="margin-top:10px;border-top:1px solid var(--div);padding-top:10px;background:none;border-left:none;border-right:none;border-bottom:none;border-radius:0;">'+countHtml+'</div>';
@@ -4390,6 +4439,11 @@ function renderTimetable(){
           if(!readOnly&&!item._carried){
             block.addEventListener('click',()=>openContentModal(cat,item,mk));
             block.addEventListener('contextmenu',e=>{e.preventDefault();openContentDiscuss(item.title,cat,item.stars||0,item.review||'');});
+          }else if(item._carried){
+            // carry 항목은 원본이 저장된 이전 달로 모달 열기 (수정/완료 가능하게)
+            block.addEventListener('click',()=>openContentModal(cat,item,prevMk));
+            block.addEventListener('contextmenu',e=>{e.preventDefault();openContentDiscuss(item.title,cat,item.stars||0,item.review||'');});
+            block.style.cursor='pointer';
           }else{
             block.style.cursor='default';
           }
@@ -5396,6 +5450,105 @@ function backfillReadingLinks(){
     });
   }
 }
+// ══ 씨앗 코너 ══
+function getSeeds(){try{return JSON.parse(localStorage.getItem('iikoto_seeds')||'[]');}catch(e){return[];}}
+function saveSeeds(v){try{localStorage.setItem('iikoto_seeds',JSON.stringify(v));}catch(e){}}
+async function syncSeedsUp(){
+  const seeds=getSeeds();
+  await supaFetch('seeds','DELETE');
+  if(seeds.length)await supaFetch('seeds','POST',seeds.map(function(s){return {text:s.text,comment:s.comment||'',date:s.date||'',created:s.created||Date.now(),client_id:s.cid||genCid()};}));
+}
+async function syncSeedsDown(){
+  const rows=await supaFetch('seeds?order=created.desc');
+  if(!rows)return;
+  if(!rows.length)return;
+  saveSeeds(rows.map(function(r){return {text:r.text,comment:r.comment||'',date:r.date||'',created:r.created||0,cid:r.client_id||genCid()};}));
+  renderSeedList();
+}
+let _seedEditIdx=null;
+
+function openSeed(){
+  renderSeedList();
+  document.getElementById('seed-ov').classList.add('on');
+  if(navigator.onLine)syncSeedsDown();
+}
+function closeSeed(){document.getElementById('seed-ov').classList.remove('on');}
+
+function openSeedForm(editIdx){
+  _seedEditIdx=(editIdx!=null)?editIdx:null;
+  const form=document.getElementById('seed-form');
+  const textInp=document.getElementById('seed-text-inp');
+  const cmtInp=document.getElementById('seed-comment-inp');
+  if(_seedEditIdx!=null){
+    const seeds=getSeeds();
+    const s=seeds[_seedEditIdx];
+    textInp.value=s.text||'';
+    cmtInp.value=s.comment||'';
+  }else{
+    textInp.value='';
+    cmtInp.value='';
+  }
+  form.style.display='block';
+  setTimeout(()=>textInp.focus(),80);
+}
+function closeSeedForm(){
+  document.getElementById('seed-form').style.display='none';
+  _seedEditIdx=null;
+}
+
+function saveSeedItem(){
+  const text=document.getElementById('seed-text-inp').value.trim();
+  if(!text)return;
+  const comment=document.getElementById('seed-comment-inp').value.trim();
+  const seeds=getSeeds();
+  if(_seedEditIdx!=null){
+    seeds[_seedEditIdx]={...seeds[_seedEditIdx],text,comment};
+  }else{
+    seeds.unshift({text,comment,date:dateKey(new Date()),created:Date.now(),cid:genCid()});
+  }
+  saveSeeds(seeds);
+  if(navigator.onLine)syncSeedsUp();
+  closeSeedForm();
+  renderSeedList();
+}
+
+function deleteSeedItem(idx){
+  const seeds=getSeeds();
+  seeds.splice(idx,1);
+  saveSeeds(seeds);
+  if(navigator.onLine)syncSeedsUp();
+  renderSeedList();
+}
+
+function renderSeedList(){
+  const seeds=getSeeds();
+  const el=document.getElementById('seed-list');
+  const empty=document.getElementById('seed-empty');
+  if(!el)return;
+  if(!seeds.length){el.innerHTML='';empty.style.display='block';return;}
+  empty.style.display='none';
+  // 월별로 묶기
+  const byMonth={};
+  seeds.forEach((s,i)=>{
+    const mk=(s.date||'').slice(0,7)||'기타';
+    if(!byMonth[mk])byMonth[mk]=[];
+    byMonth[mk].push({...s,_idx:i});
+  });
+  let html='';
+  Object.keys(byMonth).sort((a,b)=>b.localeCompare(a)).forEach(mk=>{
+    const [y,mo]=mk.split('-');
+    if(y&&mo)html+=`<div style="font-size:10.5px;color:var(--tm);letter-spacing:.06em;margin:14px 0 8px 2px;">${y}년 ${parseInt(mo,10)}월</div>`;
+    byMonth[mk].forEach(s=>{
+      html+=`<div class="seed-card" onclick="openSeedForm(${s._idx})" oncontextmenu="event.preventDefault();deleteSeedItem(${s._idx})">
+        <div class="seed-text">${s.text}</div>
+        ${s.comment?`<div class="seed-comment">${s.comment}</div>`:''}
+        <div class="seed-date">${s.date||''}</div>
+      </div>`;
+    });
+  });
+  el.innerHTML=html;
+}
+
 function openReading(){
   _rdTab='reading';
   _rdQuoteShowAll=false;
