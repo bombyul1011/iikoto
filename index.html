@@ -5291,7 +5291,13 @@ function saveOneMealDay(dk){
     const el=document.getElementById(`wm-${dk}-${k}`);
     const tEl=document.getElementById(`wm-${dk}-${k}-time`);
     m[k]=el?el.value.trim():'';
-    m[k+'_time']=tEl?tEl.value:'';
+    // 메뉴명이 비어있으면 시간도 같이 지움 — 리듬 막대에 잔존하는 문제 방지
+    if(!m[k]){
+      m[k+'_time']='';
+      if(tEl)tEl.value='';
+    }else{
+      m[k+'_time']=tEl?tEl.value:'';
+    }
   });
   saveMealsData(dk,m);
 }
