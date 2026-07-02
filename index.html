@@ -1929,7 +1929,7 @@ async function buildRhythmReviewCard(){
 - 이름 호칭 없음.
 - 이모지 1개.
 - 오직 통찰 텍스트만 출력, 다른 말 없이.`;
-    let scope,dataContext,sys;
+    let scope,dataContext,sys,hasData;
 
     if(isLastDay){
       const mk=monthKey(_ld);scope='month_'+mk;
@@ -1942,6 +1942,7 @@ async function buildRhythmReviewCard(){
         const ol=getDailyOneLine(dk).trim();
         if(ol)lines.push(ol);
       }
+      hasData=!!durSummaryLine(dur)||lines.length>0;
       dataContext='이번 달 시간 사용 누계: '+(durSummaryLine(dur)||'기록 없음')+'\n이번 달 하루한줄 모음:\n'+lines.slice(0,20).map(function(l){return '- '+l;}).join('\n');
       sys='당신은 따뜻한 생활 코치예요. 한 달 전체의 시간 사용 패턴과 하루한줄들을 보고, 이번 한 달을 시간 흐름 관점에서 짚어주는 통찰을 2-3문장으로 줘요. 단순 나열이 아니라 패턴이나 의외의 지점을 짚어줘요.\n'+commonRules;
     }else if(isSun){
@@ -1956,14 +1957,21 @@ async function buildRhythmReviewCard(){
         const ol=getDailyOneLine(dk).trim();
         if(ol)lines.push(_HOME_DAYS[d.getDay()]+': '+ol);
       }
+      hasData=!!durSummaryLine(dur)||lines.length>0;
       dataContext='이번 주(월~일) 시간 사용 누계: '+(durSummaryLine(dur)||'기록 없음')+'\n요일별 하루한줄:\n'+lines.map(function(l){return '- '+l;}).join('\n');
       sys='당신은 따뜻한 생활 코치예요. 이번 주(월~일) 전체의 시간 사용 패턴과 요일별 하루한줄을 보고, 이번 한 주를 시간 흐름 관점에서 짚어주는 통찰을 2-3문장으로 줘요. 요일 비교나 패턴을 짚어줘도 좋아요.\n'+commonRules;
     }else{
       const dk=dateKey(_ld);scope='day_'+dk;
       const dur=getDayCategoryDurations(dk);
       const ol=getDailyOneLine(dk).trim();
+      hasData=!!durSummaryLine(dur)||!!ol;
       dataContext='오늘 시간 사용: '+(durSummaryLine(dur)||'기록 없음')+'\n오늘 하루한줄: '+(ol||'(작성 안 함)');
       sys='당신은 따뜻한 생활 비서예요. 오늘 하루의 시간 사용 패턴과 하루한줄을 보고, 둘을 연결한 짧은 통찰을 1-2문장으로 줘요. 시간을 어떻게 썼는지와 그날의 느낌이 어울리는지 어긋나는지를 짚어줘도 좋아요.\n'+commonRules;
+    }
+
+    if(!hasData){
+      card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">아직 기록된 리듬이 없어요</div>';
+      return card;
     }
 
     const cached=_rrGet(scope);
@@ -4933,7 +4941,11 @@ function renderCalDetail(d){
   const hiddenCnt=Math.max(0,total-MAX);
   const showMemos=hiddenCnt>0?sortedMemos.slice(0,MAX):sortedMemos;
   if(hiddenCnt>0)items+=`<div class="cal-detail-more" onclick="calShowAll('${dk}')">··· ${hiddenCnt}개 더 보기</div>`;
-  showMemos.forEach(m=>{items+=`<div class="cal-detail-row"><span class="cal-detail-time">${m.time||''}</span><span class="cal-detail-text">${m.text||''}</span></div>`;});
+  if(showMemos.length>0){
+    items+=`<div class="cal-memo-rows" id="cal-memo-rows-${dk}">`;
+    showMemos.forEach(m=>{items+=`<div class="cal-detail-row"><span class="cal-detail-time">${m.time||''}</span><span class="cal-detail-text">${m.text||''}</span></div>`;});
+    items+=`</div>`;
+  }
   const MEAL_LABELS={breakfast:'아침',lunch:'점심',dinner:'저녁',snack:'간식'};
   let mealHtml='';
   ['breakfast','lunch','dinner','snack'].forEach(k=>{
@@ -4948,12 +4960,14 @@ function renderCalDetail(d){
 }
 function calShowAll(dk){
   const memos=getMemos(dk);const el=document.getElementById('cal-detail');if(!el)return;
-  const moreBtn=el.querySelector('.cal-detail-more');if(!moreBtn)return;
+  const moreBtn=el.querySelector('.cal-detail-more');
+  const rowsWrap=document.getElementById('cal-memo-rows-'+dk);if(!rowsWrap)return;
   const toSortKey=function(t){if(!t)return 9999;const p=t.split(':');const h=parseInt(p[0],10),m=parseInt(p[1],10);return h<6?h*60+m+1440:h*60+m;};
   const sorted=[...memos].sort(function(a,b){return toSortKey(a.time)-toSortKey(b.time);});
   const MAX=5;
   let extra='';sorted.slice(MAX).forEach(function(m){extra+=`<div class="cal-detail-row"><span class="cal-detail-time">${m.time||''}</span><span class="cal-detail-text">${m.text||''}</span></div>`;});
-  moreBtn.outerHTML=extra;
+  rowsWrap.insertAdjacentHTML('beforeend',extra);
+  if(moreBtn)moreBtn.remove();
 }
 
 // ── MONTHLY STAT BAR
