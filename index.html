@@ -730,6 +730,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .wrb-trackwrap{position:relative;flex:1;height:8px;}
 .wrb-track{position:absolute;top:0;left:0;right:0;height:8px;border-radius:4px;background:rgba(220,210,195,0.35);}
 .wrb-seg{position:absolute;top:0;height:8px;border-radius:4px;}
+.wrb-track{position:relative;isolation:isolate;}
 .wrb-seg.ongoing{background-image:repeating-linear-gradient(135deg,rgba(255,255,255,0.35) 0 3px,transparent 3px 6px);}
 .wrb-legend{display:flex;flex-wrap:nowrap;gap:5px;margin-top:12px;padding-left:2px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
 .wrb-legend::-webkit-scrollbar{display:none;}
@@ -5174,8 +5175,10 @@ function renderWeeklyRhythmBars(){
       if(e<=s&&e>0)segs.push({start:0,end:e,color:cat.color});
     });
     let track='<div class="wrb-track">';
-    segs.forEach(function(sg){
-      track+='<div class="wrb-seg'+(sg.ongoing?' ongoing':'')+'" style="left:'+(sg.start/1440*100)+'%;width:'+Math.max((sg.end-sg.start)/1440*100,0.8)+'%;background-color:'+sg.color+';"></div>';
+    // 짧은 세그먼트가 위로 오도록 — 긴 것 먼저 렌더(낮은 z-index), 짧은 것 나중(높은 z-index)
+    const segsSorted=segs.slice().sort(function(a,b){return (b.end-b.start)-(a.end-a.start);});
+    segsSorted.forEach(function(sg,si){
+      track+='<div class="wrb-seg'+(sg.ongoing?' ongoing':'')+'" style="left:'+(sg.start/1440*100)+'%;width:'+Math.max((sg.end-sg.start)/1440*100,0.8)+'%;background-color:'+sg.color+';z-index:'+(10+si)+';"></div>';
     });
     track+='</div>';
     html+='<div class="wrb-row"><div class="wrb-daylabel'+(dk===todayDk?' today':'')+'">'+DOW[i]+'</div><div class="wrb-trackwrap">'+track+'</div></div>';
