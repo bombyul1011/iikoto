@@ -276,6 +276,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .memo-field::placeholder{color:var(--tm);}
 .send-btn{width:38px;height:38px;background:var(--acc-soft);border:none;border-radius:11px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
 .memo-stamp-sm{width:32px;height:32px;background:var(--inp);border:1px solid var(--inp-b);border-radius:9px;padding:0;font-size:11px;color:var(--ts);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+.memo-add-btn{flex:1;height:32px;background:var(--inp);border:1px dashed rgba(200,170,160,.40);border-radius:9px;display:flex;align-items:center;justify-content:center;gap:5px;cursor:pointer;font-size:13px;color:var(--tm);font-family:'DM Sans',sans-serif;}
+.memo-add-btn:active{background:var(--card);}
 .memo-field-sm{height:32px;max-height:80px;padding:6px 10px;font-size:14px;}
 .memo-search-sm{width:32px;height:32px;border-radius:9px;}
 .memo-search-btn{background:var(--inp);border:1px solid var(--inp-b);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
@@ -966,10 +968,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
               <span class="toggle-lbl">완료 숨기기</span>
               <div class="tog" id="hide-tog" onclick="this.classList.toggle('on');renderTodos()"></div>
             </div>
-            <a href="shortcuts://x-callback-url/run-shortcut?name=%EC%9D%B4%EC%9D%B4%EC%BD%94%ED%86%A0%20%EB%AF%B8%EB%A6%AC%EC%95%8C%EB%A6%BC&x-success=https%3A%2F%2Fbombyul1011.github.io%2Fiikoto%2F" style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--tp);text-decoration:none;background:var(--card);border:1px solid var(--card-b);padding:5px 10px;border-radius:10px;flex-shrink:0;">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="var(--acc)" stroke="var(--acc)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-              미리알림
-            </a>
           </div>
         </div>
         <button class="add-btn" onclick="openTodoModal()">
@@ -980,8 +978,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="card p" id="memo-card">
         <div id="memo-list"></div>
         <div class="memo-input-row">
-          <button class="stamp-btn memo-stamp-sm" onclick="openMemoTimePicker()" id="memo-stamp-btn"><svg width="14" height="14" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" style="color:var(--ts)"><circle cx="5.5" cy="5.5" r="4.2"/><polyline points="5.5,3 5.5,5.5 7.2,6.8"/></svg></button>
-          <textarea id="memo-inp" class="memo-field memo-field-sm" rows="1" placeholder="메모 입력" autocomplete="off"></textarea>
+          <button class="stamp-btn memo-stamp-sm" onclick="openMemoTimePicker()" id="memo-stamp-btn" title="시간 선택 후 메모 입력"><svg width="14" height="14" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" style="color:var(--ts)"><circle cx="5.5" cy="5.5" r="4.2"/><polyline points="5.5,3 5.5,5.5 7.2,6.8"/></svg></button>
+          <button class="memo-add-btn" onclick="openMemoModal()">
+            <svg width="11" height="11" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" style="color:var(--tm)"><line x1="6.5" y1="2" x2="6.5" y2="11"/><line x1="2" y1="6.5" x2="11" y2="6.5"/></svg>
+            메모 추가
+          </button>
           <button class="memo-search-btn memo-search-sm" onclick="openSearch()"><svg width="12" height="12" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" style="color:var(--tm)"><circle cx="5.5" cy="5.5" r="4"/><line x1="9" y1="9" x2="12" y2="12"/></svg></button>
         </div>
       </div>
@@ -1270,6 +1271,18 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div class="modal-actions">
       <button class="mbtn cancel" onclick="closeModal('todo-modal')">취소</button>
       <button class="mbtn ok" onclick="confirmTodo()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- MEMO MODAL -->
+<div class="modal-ov" id="memo-modal" onclick="closeModal('memo-modal',event)">
+  <div class="modal">
+    <div class="modal-title">메모 추가</div>
+    <textarea class="modal-inp" id="memo-modal-inp" placeholder="메모를 입력하세요" rows="3" autocomplete="off" style="resize:none;" onkeydown="if(event.isComposing||event.keyCode===229)return;if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();confirmMemo();}"></textarea>
+    <div class="modal-actions">
+      <button class="mbtn cancel" onclick="closeModal('memo-modal')">취소</button>
+      <button class="mbtn ok" onclick="confirmMemo()">저장</button>
     </div>
   </div>
 </div>
@@ -1753,10 +1766,10 @@ function makeLabel(txt){
   d.className='slabel';d.textContent=txt;return d;
 }
 const RHYTHM_CATS={
-  exercise:{label:'운동',color:'rgba(228,128,105,0.88)'},
+  exercise:{label:'운동',color:'rgba(245,148,90,0.90)'},
   rest:{label:'휴식',color:'rgba(250,215,100,0.85)'},
   work:{label:'업무',color:'rgba(178,190,205,0.90)'},
-  appointment:{label:'약속',color:'rgba(135,190,230,0.85)'},
+  appointment:{label:'외출',color:'rgba(100,185,240,0.85)'},
   note:{label:'데스크',color:'rgba(240,160,170,0.85)'},
   enjoy:{label:'감상',color:'rgba(168,148,222,0.85)'},
   home:{label:'정돈',color:'rgba(210,165,215,0.85)'}
@@ -2064,7 +2077,7 @@ function buildDailyRhythmTrack(dk,includeReview){
   blocks.sort(function(a,b){return a.start-b.start;});
 
   const MIN_GAP=22;let lastY=-999;
-  blocks.forEach(function(bk){
+  blocks.forEach(function(bk,bi){
     if(bk.noLabel)return; // 텍스트 없는 블록은 라벨 공간을 차지하지 않음
     bk.anchorY=toY(bk.start);
     let y=bk.anchorY;
@@ -2073,11 +2086,11 @@ function buildDailyRhythmTrack(dk,includeReview){
   });
   const trackHeight=Math.max(TOTAL_H+10,lastY+24);
 
-  blocks.forEach(function(bk){
+  blocks.forEach(function(bk,bi){
     const by=toY(bk.start);
     const stubEnd=bk.end!=null?bk.end:(isToday?(function(){const n=new Date();return n.getHours()*60+n.getMinutes();})():Math.min(bk.start+20,1440));
     const bh=Math.max(toY(stubEnd)-by,8);
-    html+='<div class="rt-block'+(bk.ongoing?' ongoing':'')+'" style="top:'+by+'px;height:'+bh+'px;background-color:'+bk.color+';"></div>';
+    html+='<div class="rt-block'+(bk.ongoing?' ongoing':'')+'" style="top:'+by+'px;height:'+bh+'px;background-color:'+bk.color+';z-index:'+(10+bi)+';"></div>';
     if(bk.noLabel)return; // 전날 이어짐 블록은 색상바만, 텍스트줄/연결선 없음
     if(Math.abs(bk.labelY-bk.anchorY)>4){
       const top=Math.min(bk.labelY,bk.anchorY)+3,h=Math.abs(bk.labelY-bk.anchorY);
@@ -3801,11 +3814,39 @@ function openTimeModal(t){
   document.getElementById('time-inp').value=t==='sleep'?(d.sleep||''):(d.wake||'');
   openModal('time-modal');
 }
+let _memoSubmitting=false;
+function openMemoModal(){
+  const inp=document.getElementById('memo-modal-inp');
+  if(inp)inp.value='';
+  openModal('memo-modal');
+  setTimeout(()=>{if(inp)inp.focus();},80);
+}
+function confirmMemo(){
+  if(_memoSubmitting)return;
+  const inp=document.getElementById('memo-modal-inp');
+  const text=inp?inp.value.trim():'';
+  if(!text)return;
+  _memoSubmitting=true;
+  const stampBtn=document.getElementById('memo-stamp-btn');
+  const n=new Date();
+  const stamp=(stampBtn&&stampBtn.dataset.stamp)||`${pad(n.getHours())}:${pad(n.getMinutes())}`;
+  const dk=dateKey(currentDate),memos=getMemos(dk);
+  memos.push({text,time:stamp,created:Date.now(),cid:genCid()});
+  saveMemos(dk,memos);
+  if(stampBtn){delete stampBtn.dataset.stamp;stampBtn.title='';}
+  closeModal('memo-modal');
+  renderMemos();
+  setTimeout(()=>{_memoSubmitting=false;},500);
+}
+function sendMemo(){
+  // 기존 직접입력 방식 폴백 (다른 경로에서 호출될 경우 대비)
+  openMemoModal();
+}
 function openMemoTimePicker(){
   _sleepTarget='memo';
-  const f=document.getElementById('memo-inp');
+  const stampBtn=document.getElementById('memo-stamp-btn');
   const n=new Date();
-  const current=f.dataset.stamp||`${pad(n.getHours())}:${pad(n.getMinutes())}`;
+  const current=(stampBtn&&stampBtn.dataset.stamp)||`${pad(n.getHours())}:${pad(n.getMinutes())}`;
   document.getElementById('time-modal-title').textContent='메모 시간';
   document.getElementById('time-inp').value=current;
   openModal('time-modal');
@@ -3819,9 +3860,10 @@ function padTime(v){
 function confirmTime(){
   const v=padTime(document.getElementById('time-inp').value);if(!v)return;
   if(_sleepTarget==='memo'){
-    const f=document.getElementById('memo-inp');
-    f.dataset.stamp=v;f.placeholder=`${v} · 메모 입력`;
-    closeModal('time-modal');f.focus();
+    const stampBtn=document.getElementById('memo-stamp-btn');
+    if(stampBtn){stampBtn.dataset.stamp=v;stampBtn.title=v;}
+    closeModal('time-modal');
+    openMemoModal();
     return;
   }
   if(_sleepTarget==='rblock-start'){_rhythmFormStart=v;closeModal('time-modal');refreshRhythmTrack();return;}
@@ -4037,20 +4079,6 @@ function undoMemo(){
   saveMemos(_deletedMemo.dk,memos);_deletedMemo=null;
   document.getElementById('undo-toast').classList.remove('on');renderMemos();
 }
-function sendMemo(){
-  const f=document.getElementById('memo-inp');
-  const text=f.value.trim();if(!text)return;
-  const n=new Date();
-  const stamp=f.dataset.stamp||`${pad(n.getHours())}:${pad(n.getMinutes())}`;
-  const dk=dateKey(currentDate),memos=getMemos(dk);
-  memos.push({text,time:stamp,created:Date.now(),cid:genCid()});
-  saveMemos(dk,memos);
-  f.value='';delete f.dataset.stamp;f.placeholder='메모 입력';f.style.height='';
-  renderMemos();
-}
-document.getElementById('memo-inp').addEventListener('keydown',e=>{if(e.isComposing||e.keyCode===229)return;if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMemo();}});
-document.getElementById('memo-inp').addEventListener('input',e=>{const el=e.target;el.style.height='auto';el.style.height=Math.min(el.scrollHeight,100)+'px';});
-
 function openSearch(){
   openModal('memo-search-modal');
   const inp=document.getElementById('memo-search-inp');
@@ -4869,6 +4897,12 @@ function renderCalDetail(d){
   const el=document.getElementById('cal-detail');if(!el)return;
   const dk=`${_calYear}-${pad(_calMonth+1)}-${pad(d)}`;
   ensureDateSynced(dk).then(fetched=>{if(fetched)renderCalDetail(d);});
+  // 하루한줄은 별도 테이블 — 새 기기에서 전월 달력 클릭 시 누락될 수 있으므로 한 번 동기화
+  const _olSyncKey='oneline_month_synced_'+`${_calYear}-${pad(_calMonth+1)}`;
+  if(!sessionStorage.getItem(_olSyncKey)&&navigator.onLine){
+    sessionStorage.setItem(_olSyncKey,'1');
+    syncOnelineMonthRange(_calYear,_calMonth).then(fetched=>{if(fetched)renderCalDetail(d);});
+  }
   const allMemos=getMemos(dk);const todos=getTodos(dk).filter(t=>t.done);const sleep=getSleep(dk);
   const meals=getMeals(dk);
   const date=new Date(_calYear,_calMonth,d);
@@ -4884,8 +4918,14 @@ function renderCalDetail(d){
     items+=`<div class="cal-detail-row"><div class="cal-detail-icon"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="color:var(--tm)"><path d="M10.5 9C9 10.5 6.8 11 4.8 10C2.8 9 1.8 6.8 2.2 4.8C2.5 3.2 3.5 1.8 5 1.2C3.5 3.5 3.8 6.5 6 8.2C7.8 9.5 10 9.5 11.8 8.5C11.5 8.7 11 8.9 10.5 9Z" fill="rgba(200,176,168,0.2)"/></svg></div><span class="cal-detail-text" style="color:var(--ts);">${sleep.sleep||'--'} 취침 · ${sleep.wake||'--'} 기상${dur}</span></div>`;
   }
   todos.slice(0,3).forEach(t=>{items+=`<div class="cal-detail-row"><div class="cal-detail-icon"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--tm)"><polyline points="2,6 4.5,9 10,3.5"/></svg></div><span class="cal-detail-text">${t.text}</span></div>`;});
-  const MAX=5;const total=allMemos.length;const hiddenCnt=Math.max(0,total-MAX);
-  const showMemos=total>MAX?allMemos.slice(-MAX):allMemos;
+  const MAX=5;const total=allMemos.length;
+  // 시간순 정렬: 06:00 기준으로 하루 시작 (새벽 0~5시는 하루 끝으로 취급)
+  const sortedMemos=[...allMemos].sort((a,b)=>{
+    const toSortKey=t=>{if(!t)return 9999;const[h,m]=t.split(':').map(Number);return h<6?h+24*60+m:h*60+m;};
+    return toSortKey(a.time)-toSortKey(b.time);
+  });
+  const hiddenCnt=Math.max(0,total-MAX);
+  const showMemos=hiddenCnt>0?sortedMemos.slice(0,MAX):sortedMemos;
   if(hiddenCnt>0)items+=`<div class="cal-detail-more" onclick="calShowAll('${dk}')">··· ${hiddenCnt}개 더 보기</div>`;
   showMemos.forEach(m=>{items+=`<div class="cal-detail-row"><span class="cal-detail-time">${m.time||''}</span><span class="cal-detail-text">${m.text||''}</span></div>`;});
   const MEAL_LABELS={breakfast:'아침',lunch:'점심',dinner:'저녁',snack:'간식'};
@@ -4903,8 +4943,11 @@ function renderCalDetail(d){
 function calShowAll(dk){
   const memos=getMemos(dk);const el=document.getElementById('cal-detail');if(!el)return;
   const moreBtn=el.querySelector('.cal-detail-more');if(!moreBtn)return;
-  const MAX=5;const hiddenMemos=memos.slice(0,memos.length-MAX);
-  let extra='';hiddenMemos.forEach(m=>{extra+=`<div class="cal-detail-row"><span class="cal-detail-time">${m.time||''}</span><span class="cal-detail-text">${m.text||''}</span></div>`;});
+  const toSortKey=t=>{if(!t)return 9999;const[h,m]=t.split(':').map(Number);return h<6?h+24*60+m:h*60+m;};
+  const sorted=[...memos].sort((a,b)=>toSortKey(a.time)-toSortKey(b.time));
+  const MAX=5;const shownKeys=new Set(sorted.slice(0,MAX).map(m=>m.time+'|'+m.text));
+  const hidden=sorted.filter(m=>!shownKeys.has(m.time+'|'+m.text));
+  let extra='';hidden.forEach(m=>{extra+=`<div class="cal-detail-row"><span class="cal-detail-time">${m.time||''}</span><span class="cal-detail-text">${m.text||''}</span></div>`;});
   moreBtn.outerHTML=extra;
 }
 
@@ -5019,13 +5062,22 @@ function renderTodayMeal(){
   const dk=dateKey(currentDate);
   const m=getMeals(dk);
   const MEAL_LABELS={breakfast:'아침',lunch:'점심',dinner:'저녁',snack:'간식'};
+  const DEFAULT_ORDER=['breakfast','lunch','dinner','snack'];
+  const items=DEFAULT_ORDER.filter(k=>m[k]);
+  // 시간이 등록된 항목이 하나라도 있으면 시간순 정렬, 없으면 기본 순서 유지
+  const hasAnyTime=items.some(k=>m[k+'_time']);
+  if(hasAnyTime){
+    items.sort((a,b)=>{
+      const ta=m[a+'_time']||'99:99';
+      const tb=m[b+'_time']||'99:99';
+      return ta.localeCompare(tb);
+    });
+  }
   let html='';
-  ['breakfast','lunch','dinner','snack'].forEach(k=>{
-    if(m[k]){
-      const t=m[k+'_time'];
-      const timeHtml=t?`<span class="meal-time-tag">${t}</span>`:`<button class="meal-time-btn" onclick="recordMealTime('${dk}','${k}')" title="식사 시간 기록"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="1.8,5.2 4,7.5 8.2,2.5"/></svg></button>`;
-      html+=`<div class="cal-detail-row"><span class="cal-detail-time">${MEAL_LABELS[k]}</span><span class="cal-detail-text" style="flex:1;">${m[k]}</span>${timeHtml}</div>`;
-    }
+  items.forEach(k=>{
+    const t=m[k+'_time'];
+    const timeHtml=t?`<span class="meal-time-tag">${t}</span>`:`<button class="meal-time-btn" onclick="recordMealTime('${dk}','${k}')" title="식사 시간 기록"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="1.8,5.2 4,7.5 8.2,2.5"/></svg></button>`;
+    html+=`<div class="cal-detail-row"><span class="cal-detail-time">${MEAL_LABELS[k]}</span><span class="cal-detail-text" style="flex:1;">${m[k]}</span>${timeHtml}</div>`;
   });
   el.innerHTML=html||'<div style="font-size:12px;color:var(--tm);text-align:center;padding:8px 0;">주간 메뉴판에서 적어보세요</div>';
 }
@@ -5254,7 +5306,7 @@ function openWeekMealSheet(){
     const isNextWeekPeek=i===7;
     const block=document.createElement('div');block.className='week-meal-day';block.id='wm-block-'+dk;
     block.innerHTML=`<div class="week-meal-day-label">${DOW[i%7]} · ${d.getMonth()+1}/${d.getDate()}${isNextWeekPeek?' · 다음 주':''}</div>`+
-      CATS.map(([k,label])=>`<div class="meal-row"><div class="meal-cat" onpointerdown="mealCatPressStart(this,'${dk}','${k}')" onpointerup="mealCatPressEnd(this)" onpointerleave="mealCatPressEnd(this)" onpointercancel="mealCatPressEnd(this)">${label}</div><input class="meal-inp" style="flex:1 1 0;min-width:0;" id="wm-${dk}-${k}" type="text" placeholder="메뉴 입력" autocomplete="off" value="${(m[k]||'').replace(/"/g,'&quot;')}" onblur="saveOneMealDay('${dk}')"><input class="meal-time-inp${m[k+'_time']?'':' mt-empty'}" id="wm-${dk}-${k}-time" type="time" value="${m[k+'_time']||''}" onchange="saveOneMealDay('${dk}')"></div>`).join('');
+      CATS.map(([k,label])=>`<div class="meal-row"><div class="meal-cat" onpointerdown="mealCatPressStart(this,'${dk}','${k}')" onpointerup="mealCatPressEnd(this)" onpointerleave="mealCatPressEnd(this)" onpointercancel="mealCatPressEnd(this)">${label}</div><input class="meal-inp" style="flex:1 1 0;min-width:0;" id="wm-${dk}-${k}" type="text" placeholder="메뉴 입력" autocomplete="off" value="${(m[k]||'').replace(/"/g,'&quot;')}" onblur="saveOneMealDay('${dk}')"><input class="meal-time-inp${m[k+'_time']?'':' mt-empty'}" id="wm-${dk}-${k}-time" type="time" value="${m[k+'_time']||''}" onchange="saveOneMealDay('${dk}')" step="60" lang="ko"></div>`).join('');
     body.appendChild(block);
   }
   openSheet('week-meal-sheet');
