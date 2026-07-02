@@ -1769,7 +1769,7 @@ const RHYTHM_CATS={
   exercise:{label:'운동',color:'rgba(245,170,120,0.82)'},
   rest:{label:'휴식',color:'rgba(252,220,110,0.80)'},
   work:{label:'업무',color:'rgba(185,198,215,0.85)'},
-  appointment:{label:'외출',color:'rgba(145,205,245,0.80)'},
+  appointment:{label:'외출',color:'rgba(185,228,252,0.70)'},
   note:{label:'데스크',color:'rgba(245,175,182,0.80)'},
   enjoy:{label:'감상',color:'rgba(190,175,235,0.80)'},
   home:{label:'정돈',color:'rgba(218,180,222,0.80)'}
@@ -4927,7 +4927,7 @@ function renderCalDetail(d){
   const MAX=5;const total=allMemos.length;
   // 시간순 정렬: 06:00 기준으로 하루 시작 (새벽 0~5시는 하루 끝으로 취급)
   const sortedMemos=[...allMemos].sort((a,b)=>{
-    const toSortKey=t=>{if(!t)return 9999;const[h,m]=t.split(':').map(Number);return h<6?h+24*60+m:h*60+m;};
+    const toSortKey=function(t){if(!t)return 9999;const p=t.split(':');const h=parseInt(p[0],10),m=parseInt(p[1],10);return h<6?h*60+m+1440:h*60+m;};
     return toSortKey(a.time)-toSortKey(b.time);
   });
   const hiddenCnt=Math.max(0,total-MAX);
@@ -4949,11 +4949,10 @@ function renderCalDetail(d){
 function calShowAll(dk){
   const memos=getMemos(dk);const el=document.getElementById('cal-detail');if(!el)return;
   const moreBtn=el.querySelector('.cal-detail-more');if(!moreBtn)return;
-  const toSortKey=t=>{if(!t)return 9999;const[h,m]=t.split(':').map(Number);return h<6?h+24*60+m:h*60+m;};
-  const sorted=[...memos].sort((a,b)=>toSortKey(a.time)-toSortKey(b.time));
-  const MAX=5;const shownKeys=new Set(sorted.slice(0,MAX).map(m=>m.time+'|'+m.text));
-  const hidden=sorted.filter(m=>!shownKeys.has(m.time+'|'+m.text));
-  let extra='';hidden.forEach(m=>{extra+=`<div class="cal-detail-row"><span class="cal-detail-time">${m.time||''}</span><span class="cal-detail-text">${m.text||''}</span></div>`;});
+  const toSortKey=function(t){if(!t)return 9999;const p=t.split(':');const h=parseInt(p[0],10),m=parseInt(p[1],10);return h<6?h*60+m+1440:h*60+m;};
+  const sorted=[...memos].sort(function(a,b){return toSortKey(a.time)-toSortKey(b.time);});
+  const MAX=5;
+  let extra='';sorted.slice(MAX).forEach(function(m){extra+=`<div class="cal-detail-row"><span class="cal-detail-time">${m.time||''}</span><span class="cal-detail-text">${m.text||''}</span></div>`;});
   moreBtn.outerHTML=extra;
 }
 
