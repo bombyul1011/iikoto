@@ -1152,7 +1152,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div class="share-stage-wrap">
       <div class="share-stage" id="share-stage" onclick="document.getElementById('share-bg-inp').click();">
         <div class="share-stage-inner" id="share-stage-inner">
-          <div class="share-stage-empty" id="share-stage-empty">
+          <div class="share-stage-empty">
             <svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="5" width="20" height="16" rx="2"/><circle cx="9" cy="11" r="1.6"/><path d="M3 17l5.5-5.5 3 3 4-4L23 17"/></svg>
             <span>탭해서 배경 사진 추가</span>
           </div>
@@ -1784,8 +1784,9 @@ function saveRhythmBlocks(dk,v){
 }
 async function syncRhythmBlocksUp(dk){
   const blocks=getRhythmBlocks(dk);
-  await supaFetch(`rhythm_blocks?date_key=eq.${dk}`,'DELETE');
-  if(blocks.length)await supaFetch('rhythm_blocks','POST',blocks.map(b=>({date_key:dk,cat:b.cat,start_time:b.start,end_time:b.end,text:b.text||'',created:b.created||Date.now(),client_id:b.cid||genCid()})));
+  if(ensureItemCids(blocks))S.set(S.key('rblocks',dk),blocks);
+  return await syncListUp('rhythm_blocks',`date_key=eq.${dk}`,'date_key,client_id',blocks,
+    b=>({date_key:dk,cat:b.cat,start_time:b.start,end_time:b.end,text:b.text||'',created:b.created||Date.now(),client_id:b.cid}));
 }
 async function syncRhythmBlocksDown(dk){
   const rows=await supaFetch('rhythm_blocks?date_key=eq.'+dk+'&order=created');
@@ -3368,6 +3369,30 @@ async function supaUpsert(path,onConflict,body){
     return true;
   }catch(e){return null;}
 }
+// ── 배열형(하루/월 단위 여러 행) 동기화: DELETE 후 POST가 아니라
+// upsert(추가/수정) + 로컬에서 사라진 항목만 개별 삭제로 처리.
+// 이렇게 하면 두 요청 사이에 서버가 통째로 비는 순간이 없어서
+// 그 사이 다른 기기가 syncDown 하거나 네트워크가 끊겨도 데이터가 통째로 날아가지 않음.
+function ensureItemCids(items){
+  let changed=false;
+  items.forEach(it=>{if(!it.cid){it.cid=genCid();changed=true;}});
+  return changed;
+}
+async function syncListUp(table,filterQ,uniqueCols,localItems,toRow){
+  const existing=await supaFetch(`${table}?${filterQ}&select=client_id`);
+  if(existing===null)return false; // 네트워크 실패 — 로컬 그대로 두고 다음 기회에 재시도
+  if(localItems.length){
+    const ok=await supaUpsert(table,uniqueCols,localItems.map(toRow));
+    if(!ok)return false;
+  }
+  const localCids=new Set(localItems.map(it=>it.cid).filter(Boolean));
+  const removeCids=(existing||[]).map(r=>r.client_id).filter(cid=>cid&&!localCids.has(cid));
+  if(removeCids.length){
+    const inList=removeCids.map(c=>encodeURIComponent(c)).join(',');
+    await supaFetch(`${table}?client_id=in.(${inList})&${filterQ}`,'DELETE');
+  }
+  return true;
+}
 // ── DATA ACCESSORS
 function getTodos(dk){return S.get(S.key('todos',dk))||[];}
 function saveTodos(dk,v){
@@ -3496,6 +3521,7 @@ function getContents(mk){
   arr.forEach(item=>{
     if(!item.startDate&&item.startDay){item.startDate=mk+'-'+pad(item.startDay);changed=true;}
     if(!item.endDate&&item.endDay){item.endDate=mk+'-'+pad(item.endDay);changed=true;}
+    if(!item.cid){item.cid=genCid();changed=true;}
   });
   if(changed)S.set(S.key('contents',mk),arr);
   return arr;
@@ -3518,8 +3544,9 @@ async function syncTodosDown(dk){
 }
 async function syncTodosUp(dk){
   const todos=getTodos(dk);
-  await supaFetch(`todos?date_key=eq.${dk}`,'DELETE');
-  if(todos.length)await supaFetch('todos','POST',todos.map(t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid||genCid(),postpone_count:t.postponeCount||0})));
+  if(ensureItemCids(todos))S.set(S.key('todos',dk),todos);
+  return await syncListUp('todos',`date_key=eq.${dk}`,'date_key,client_id',todos,
+    t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,postpone_count:t.postponeCount||0}));
 }
 async function syncMemosDown(dk){
   const rows=await supaFetch('memos?date_key=eq.'+dk+'&order=created');
@@ -3530,8 +3557,9 @@ async function syncMemosDown(dk){
 }
 async function syncMemosUp(dk){
   const memos=getMemos(dk);
-  await supaFetch(`memos?date_key=eq.${dk}`,'DELETE');
-  if(memos.length)await supaFetch('memos','POST',memos.map(m=>({date_key:dk,memo_time:m.time,text:m.text,created:m.created,client_id:m.cid||genCid()})));
+  if(ensureItemCids(memos))S.set(S.key('memos',dk),memos);
+  return await syncListUp('memos',`date_key=eq.${dk}`,'date_key,client_id',memos,
+    m=>({date_key:dk,memo_time:m.time,text:m.text,created:m.created,client_id:m.cid}));
 }
 async function syncSleepDown(dk){
   const rows=await supaFetch(`sleep?date_key=eq.${dk}`);
@@ -3580,12 +3608,15 @@ async function syncHabitsDown(){
 }
 async function syncHabitsUp(){
   const h=getHabits();
-  const existing=await supaFetch('habits?select=id');
-  if(existing&&existing.length){
-    const ids=existing.map(r=>r.id).join(',');
-    await supaFetch(`habits?id=in.(${ids})`,'DELETE');
+  const existing=await supaFetch('habits?select=name');
+  if(existing===null)return;
+  if(h.length)await supaUpsert('habits','name',h.map((hh,i)=>({name:hh.name,color:hh.color,sort_order:i})));
+  const localNames=new Set(h.map(hh=>hh.name));
+  const removeNames=(existing||[]).map(r=>r.name).filter(n=>n&&!localNames.has(n));
+  if(removeNames.length){
+    const inList=removeNames.map(n=>encodeURIComponent(n)).join(',');
+    await supaFetch(`habits?name=in.(${inList})`,'DELETE');
   }
-  if(h.length)await supaFetch('habits','POST',h.map((hh,i)=>({name:hh.name,color:hh.color,sort_order:i})));
 }
 async function syncHCDown(wk){
   const ws=wk.replace('week:','');const we=getWeekEnd(ws);
@@ -3597,7 +3628,6 @@ async function syncHCDown(wk){
 }
 async function syncHCUp(wk){
   const checks=getHabitChecks(wk);const ws=wk.replace('week:','');const we=getWeekEnd(ws);
-  await supaFetch(`habit_checks?date_key=gte.${ws}&date_key=lt.${we}`,'DELETE');
   const rows=[];const mon=new Date(ws);
   Object.keys(checks).filter(k=>checks[k]).forEach(k=>{
     const parts=k.split('-');const dow=parseInt(parts[parts.length-1]);
@@ -3605,7 +3635,15 @@ async function syncHCUp(wk){
     const d=new Date(mon);d.setDate(mon.getDate()+dow);
     rows.push({habit_name:name,date_key:dateKey(d)});
   });
-  if(rows.length)await supaFetch('habit_checks','POST',rows);
+  const filterQ=`date_key=gte.${ws}&date_key=lt.${we}`;
+  const existing=await supaFetch(`habit_checks?${filterQ}&select=habit_name,date_key`);
+  if(existing===null)return; // 네트워크 실패 — 로컬 유지, 다음 기회에 재시도
+  if(rows.length)await supaUpsert('habit_checks','habit_name,date_key',rows);
+  const localKeys=new Set(rows.map(r=>r.habit_name+'|'+r.date_key));
+  const toRemove=(existing||[]).filter(r=>!localKeys.has(r.habit_name+'|'+r.date_key));
+  for(const r of toRemove){
+    await supaFetch(`habit_checks?habit_name=eq.${encodeURIComponent(r.habit_name)}&date_key=eq.${r.date_key}`,'DELETE');
+  }
 }
 async function syncGoalDown(key){
   const rows=await supaFetch(`goal_notes?note_key=eq.${encodeURIComponent(key)}`);
@@ -3654,19 +3692,20 @@ async function syncContentsDown(mk){
   if(!rows)return;
   // rows=0이고 로컬에 데이터 있으면 덮어쓰지 않음 (사파리↔PWA 엇박 방지)
   if(!rows.length&&getContents(mk).length)return;
-  S.set(S.key('contents',mk),rows.map(r=>({cat:r.content_cat,title:r.title,startDate:r.start_date||(r.start_day?mk+'-'+pad(r.start_day):null),endDate:r.end_date||(r.end_day?mk+'-'+pad(r.end_day):null),status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',created:r.created})));
+  S.set(S.key('contents',mk),rows.map(r=>({cat:r.content_cat,title:r.title,startDate:r.start_date||(r.start_day?mk+'-'+pad(r.start_day):null),endDate:r.end_date||(r.end_day?mk+'-'+pad(r.end_day):null),status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',created:r.created,cid:r.client_id||genCid()})));
 }
 async function syncContentsUp(mk){
   const c=getContents(mk);
-  await supaFetch(`contents?month_key=eq.${mk}`,'DELETE');
-  if(c.length)await supaFetch('contents','POST',c.map(c=>({month_key:mk,content_cat:c.cat,title:c.title,start_date:c.startDate,end_date:c.endDate,status:c.status,review:c.review||'',stars:c.stars||0,poster:c.poster||null,author:c.author||'',created:c.created})));
+  if(ensureItemCids(c))S.set(S.key('contents',mk),c);
+  return await syncListUp('contents',`month_key=eq.${mk}`,'month_key,client_id',c,
+    it=>({month_key:mk,content_cat:it.cat,title:it.title,start_date:it.startDate,end_date:it.endDate,status:it.status,review:it.review||'',stars:it.stars||0,poster:it.poster||null,author:it.author||'',created:it.created,client_id:it.cid}));
 }
 async function autoSync(type,key){
   if(!navigator.onLine)return;
   if(type==='reading_book'){await syncBookUp(key);}
   else if(type==='reading_quote'){await syncQuoteUp(key);}
-  else if(type==='todos'){await syncTodosUp(key);S.set(S.key('todos_pending',key),false);}
-  else if(type==='memos'){await syncMemosUp(key);S.set(S.key('memos_pending',key),false);}
+  else if(type==='todos'){if(await syncTodosUp(key))S.set(S.key('todos_pending',key),false);}
+  else if(type==='memos'){if(await syncMemosUp(key))S.set(S.key('memos_pending',key),false);}
   else if(type==='sleep')syncSleepUp(key);
   else if(type==='meals'){await syncMealsUp(key);S.set(S.key('meals_pending',key),false);}
   else if(type==='habits')syncHabitsUp();
@@ -3679,8 +3718,8 @@ async function autoSync(type,key){
       S.set('wchallenge_pending_'+key.replace('wchallenge_',''),false);
     }
   }
-  else if(type==='contents'){await syncContentsUp(key);S.set(S.key('contents_pending',key),false);}
-  else if(type==='rblocks'){await syncRhythmBlocksUp(key);S.set(S.key('rblocks_pending',key),false);}
+  else if(type==='contents'){if(await syncContentsUp(key))S.set(S.key('contents_pending',key),false);}
+  else if(type==='rblocks'){if(await syncRhythmBlocksUp(key))S.set(S.key('rblocks_pending',key),false);}
 }
 async function syncAll(){
   if(!navigator.onLine)return;
@@ -4610,7 +4649,7 @@ function confirmContent(){
     }
   } else {
     const contents=getContents(newMk);
-    contents.push({cat:_contentCtx.cat,title,startDate,endDate,status,review,stars,poster,author,created:Date.now()});
+    contents.push({cat:_contentCtx.cat,title,startDate,endDate,status,review,stars,poster,author,created:Date.now(),cid:genCid()});
     saveContents(newMk,contents);
   }
   closeModal('content-modal');renderTimetable();updateStats();
@@ -5533,8 +5572,16 @@ function getSeeds(){try{return JSON.parse(localStorage.getItem('iikoto_seeds')||
 function saveSeeds(v){try{localStorage.setItem('iikoto_seeds',JSON.stringify(v));}catch(e){}}
 async function syncSeedsUp(){
   const seeds=getSeeds();
-  await supaFetch('seeds','DELETE');
-  if(seeds.length)await supaFetch('seeds','POST',seeds.map(function(s){return {text:s.text,comment:s.comment||'',date:s.date||'',created:s.created||Date.now(),client_id:s.cid||genCid()};}));
+  if(ensureItemCids(seeds))saveSeeds(seeds);
+  const existing=await supaFetch('seeds?select=client_id');
+  if(existing===null)return; // 네트워크 실패 — 로컬 유지, 다음 기회에 재시도
+  if(seeds.length)await supaUpsert('seeds','client_id',seeds.map(function(s){return {text:s.text,comment:s.comment||'',date:s.date||'',created:s.created||Date.now(),client_id:s.cid};}));
+  const localCids=new Set(seeds.map(s=>s.cid).filter(Boolean));
+  const removeCids=(existing||[]).map(r=>r.client_id).filter(cid=>cid&&!localCids.has(cid));
+  if(removeCids.length){
+    const inList=removeCids.map(c=>encodeURIComponent(c)).join(',');
+    await supaFetch(`seeds?client_id=in.(${inList})`,'DELETE');
+  }
 }
 async function syncSeedsDown(){
   const rows=await supaFetch('seeds?order=created.desc');
@@ -6763,6 +6810,25 @@ async function initSync(){
   if(document.getElementById('v-monthly')&&document.getElementById('v-monthly').classList.contains('on'))loadMonthly();
 }
 setTimeout(initSync, 500);
+
+// ── contents 테이블 client_id 마이그레이션 (1회성)
+// Supabase에 contents.client_id 컬럼 + (month_key,client_id) 유니크 제약을 추가한 뒤,
+// 기존에 client_id가 없던 로컬 콘텐츠를 다시 업로드해서 채워줌.
+// 성공한 달만 완료 처리하고, 실패한 달은 다음 접속 때 다시 시도함.
+async function migrateContentsClientIds(){
+  if(!navigator.onLine)return;
+  try{
+    const done=S.get('contents_cid_migrated_months')||[];
+    const keys=Object.keys(localStorage).filter(k=>k.startsWith('contents:'));
+    for(const k of keys){
+      const mk=k.split(':')[1];
+      if(!mk||done.includes(mk))continue;
+      const ok=await syncContentsUp(mk);
+      if(ok){done.push(mk);S.set('contents_cid_migrated_months',done);}
+    }
+  }catch(e){}
+}
+setTimeout(migrateContentsClientIds, 2000);
 
 </script>
 
