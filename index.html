@@ -1425,22 +1425,22 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="settings-card">
         <div class="settings-item" onclick="openMarkdownBackup()" style="cursor:pointer;"><span class="settings-item-lbl"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="color:var(--tp);margin-right:6px;vertical-align:-2px"><path d="M5 3C4 3 3 4 3 5V17C3 18 4 19 5 19H15C16 19 17 18 17 17V7L13 3H5Z"/><polyline points="13,3 13,7 17,7"/><line x1="7" y1="10" x2="13" y2="10"/><line x1="7" y1="13" x2="11" y2="13"/></svg>일기 백업 (마크다운)</span><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--tm)"><polyline points="5,2 9,7 5,12"/></svg></div>
         <div class="settings-item" style="flex-direction:column;align-items:flex-start;gap:8px;padding-top:12px;">
-          <span class="settings-item-lbl">노션 백업 (베타)</span>
+          <span class="settings-item-lbl">노션 백업 (베타) · 매달 1일 지난달분</span>
           <input type="text" id="notion-worker-url-inp" class="modal-inp"
             placeholder="https://xxxx.workers.dev"
             style="margin-bottom:0;font-size:12px;width:100%;font-family:monospace;"
             autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-          <input type="text" id="notion-root-page-inp" class="modal-inp"
-            placeholder="루트 페이지 ID (노션 URL 마지막 32자리)"
+          <input type="text" id="notion-backup-secret-inp" class="modal-inp"
+            placeholder="Worker에 등록한 백업 비밀키"
             style="margin-bottom:0;font-size:12px;width:100%;font-family:monospace;"
             autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-          <button onclick="saveNotionConfig()"
+          <button onclick="saveNotionBackupConfig()"
             style="width:100%;padding:9px;border-radius:10px;border:none;background:var(--acc-soft);color:var(--acc);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">
             설정 저장
           </button>
-          <button onclick="backupTodayToNotion()"
+          <button onclick="backupMonthToNotion()"
             style="width:100%;padding:9px;border-radius:10px;border:1px solid var(--div);background:transparent;color:var(--tp);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">
-            지금 오늘 기록 백업하기
+            지난달 노션 백업하기
           </button>
           <div id="notion-backup-status" style="font-size:11px;color:var(--tm);"></div>
         </div>
@@ -5410,101 +5410,112 @@ function closeSheet(id,e){if(!e||e.target===document.getElementById(id))document
 
 
 
-// ── NOTION BACKUP (베타)
-function getNotionConfig(){
-  return {workerUrl:(S.get('notion_worker_url')||'').replace(/\/$/,''),rootPage:S.get('notion_root_page')||''};
+// ── NOTION BACKUP (월간)
+function getNotionBackupConfig(){
+  return {workerUrl:(S.get('notion_worker_url')||'').replace(/\/$/,''),secret:S.get('notion_backup_secret')||''};
 }
-function saveNotionConfig(){
+function saveNotionBackupConfig(){
   const w=document.getElementById('notion-worker-url-inp').value.trim();
-  const r=document.getElementById('notion-root-page-inp').value.trim().replace(/-/g,'');
+  const s=document.getElementById('notion-backup-secret-inp').value.trim();
   const statusEl=document.getElementById('notion-backup-status');
-  if(!w||!r){if(statusEl)statusEl.textContent='Worker URL과 루트 페이지 ID를 모두 입력해주세요';return;}
-  S.set('notion_worker_url',w);S.set('notion_root_page',r);
+  if(!w||!s){if(statusEl)statusEl.textContent='Worker URL과 비밀키를 모두 입력해주세요';return;}
+  S.set('notion_worker_url',w);S.set('notion_backup_secret',s);
   if(statusEl)statusEl.textContent='설정 저장됐어요 ✅';
 }
-async function notionFetch(path,method='GET',body=null){
-  const {workerUrl}=getNotionConfig();
-  if(!workerUrl)throw new Error('worker_url_missing');
-  const res=await fetch(workerUrl+path,{
-    method,
-    headers:{'Content-Type':'application/json'},
-    body:body?JSON.stringify(body):undefined
-  });
-  const data=await res.json();
-  if(!res.ok)throw new Error(data?.message||'notion_api_error');
-  return data;
-}
-// 캐시된 페이지 ID가 있으면 그걸 쓰고, 없으면 새로 만들어서 캐시
-async function getOrCreateChildPage(cacheKey,parentId,title,extraBlocks=[]){
-  const cached=S.get(cacheKey);
-  if(cached&&cached.id)return cached.id;
-  const page=await notionFetch('/v1/pages','POST',{
-    parent:{page_id:parentId},
-    properties:{title:{title:[{text:{content:title}}]}},
-    children:extraBlocks
-  });
-  S.set(cacheKey,{id:page.id,created:Date.now()});
-  return page.id;
-}
-function notionParagraph(text){
-  return {object:'block',type:'paragraph',paragraph:{rich_text:[{text:{content:text}}]}};
-}
-function notionToDo(text,checked){
-  return {object:'block',type:'to_do',to_do:{rich_text:[{text:{content:text}}],checked:!!checked}};
-}
-function notionHeading(text){
-  return {object:'block',type:'heading_3',heading_3:{rich_text:[{text:{content:text}}]}};
-}
-function buildTodayBlocks(dk){
-  const blocks=[];
-  const sl=getSleep(dk);
-  if(sl&&sl.sleep&&sl.wake){
-    blocks.push(notionHeading('☽ 수면'));
-    blocks.push(notionParagraph(`☽ 굿나잇 ${sl.sleep}  ——  ☼ 굿모닝 ${sl.wake}`));
-  }
-  const todos=getTodos(dk);
-  if(todos.length){
-    blocks.push(notionHeading('✓ 투두'));
-    todos.forEach(t=>blocks.push(notionToDo((t.time?t.time+' ':'')+(t.text||''),t.done)));
-  }
-  const memos=getMemos(dk);
-  if(memos.length){
-    blocks.push(notionHeading('✎ 하루 기록'));
-    memos.forEach(m=>blocks.push(notionParagraph(`${m.time||''}  ${m.text||''}`)));
-  }
-  return blocks;
-}
-async function backupTodayToNotion(){
-  const statusEl=document.getElementById('notion-backup-status');
-  const {workerUrl,rootPage}=getNotionConfig();
-  if(!workerUrl||!rootPage){if(statusEl)statusEl.textContent='설정을 먼저 저장해주세요';return;}
-  if(statusEl)statusEl.textContent='백업 중...';
-  try{
-    const now=new Date();
-    const mk=monthKey(now);
-    const wk=weekKey(now);
-    const dk=dateKey(now);
-
-    // 이미 오늘 페이지를 만든 적 있으면, 중복 생성 방지 위해 건너뜀 (안전 원칙: 한 번 만든 날짜 페이지는 다시 안 건드림)
-    const dayCacheKey='notion_day_'+dk;
-    if(S.get(dayCacheKey)){
-      if(statusEl)statusEl.textContent='오늘은 이미 백업했어요 (' + new Date(S.get(dayCacheKey).created).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}) + ')';
-      return;
+// 그 달의 일간 배열 — 하루한줄/완료투두/평균수면/메모 전체(시간순). 아무 기록도 없는 날은 제외.
+function buildBackupDays(y,mo,dim){
+  const out=[];
+  const toSortKey=function(t){if(!t)return 9999;const p=t.split(':');const h=parseInt(p[0],10),m=parseInt(p[1],10);return h<6?h*60+m+1440:h*60+m;};
+  for(let d=1;d<=dim;d++){
+    const dk=`${y}-${pad(mo+1)}-${pad(d)}`;
+    const date=new Date(y,mo,d);
+    const oneLine=getDailyOneLine(dk).trim();
+    const todos=getTodos(dk).filter(t=>t.done);
+    const sleep=getSleep(dk);
+    let avgSleepStr='';
+    if(sleep.sleep&&sleep.wake){
+      const sv=sleep.sleep.split(':').map(Number),wv=sleep.wake.split(':').map(Number);
+      let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;
+      avgSleepStr=`${Math.floor(m/60)}h ${m%60}m`;
     }
-
-    const monthTitle=`${now.getFullYear()}년 ${now.getMonth()+1}월`;
-    const monthPageId=await getOrCreateChildPage('notion_month_'+mk,rootPage,monthTitle);
-
-    const wkStart=new Date(now);wkStart.setDate(now.getDate()-((now.getDay()+6)%7));
+    const memos=[...getMemos(dk)].sort((a,b)=>toSortKey(a.time)-toSortKey(b.time)).map(m=>({time:m.time||'',text:m.text||''}));
+    if(!oneLine&&!todos.length&&!memos.length&&!avgSleepStr)continue; // 빈 날은 행 자체를 안 만듦
+    out.push({
+      dateKey:dk,
+      dateLabel:`${mo+1}.${d} ${_HOME_DAYS[date.getDay()]}`,
+      oneLine,todoCount:todos.length,avgSleep:avgSleepStr,
+      todos:todos.map(t=>t.text),memos
+    });
+  }
+  return out;
+}
+// 주차별 토글용 — ISO 주(월~일) 기준으로 묶고, 주간미션은 wcByWeek에서 매칭
+function buildBackupWeeks(y,mo,dim,wcByWeek){
+  const weeksMap={};
+  for(let d=1;d<=dim;d++){
+    const wk=weekKey(new Date(y,mo,d));
+    if(!weeksMap[wk])weeksMap[wk]={wk,days:[]};
+    weeksMap[wk].days.push(d);
+  }
+  const wcMap={};(wcByWeek||[]).forEach(w=>{wcMap[w.wk]=w;});
+  const keys=Object.keys(weeksMap).sort();
+  return keys.map((wk,i)=>{
+    const days=weeksMap[wk].days;
+    const wkStart=new Date(wk.replace('week:',''));
     const wkEnd=new Date(wkStart);wkEnd.setDate(wkStart.getDate()+6);
-    const weekTitle=`${wkStart.getMonth()+1}.${wkStart.getDate()} → ${wkEnd.getMonth()+1}.${wkEnd.getDate()}`;
-    const weekPageId=await getOrCreateChildPage('notion_week_'+wk,monthPageId,weekTitle);
-
-    const dayTitle=`${now.getMonth()+1}월 ${now.getDate()}일 ${_HOME_DAYS[now.getDay()]}요일`;
-    const blocks=buildTodayBlocks(dk);
-    await getOrCreateChildPage(dayCacheKey,weekPageId,dayTitle,blocks);
-
-    if(statusEl)statusEl.textContent='백업 완료 ✅ ('+dayTitle+')';
+    const onelines=[];let recorded=0;
+    days.forEach(d=>{
+      const dk=`${y}-${pad(mo+1)}-${pad(d)}`;
+      const ol=getDailyOneLine(dk).trim();
+      if(ol){recorded++;const date=new Date(y,mo,d);onelines.push({date:`${mo+1}.${d} ${_HOME_DAYS[date.getDay()]}`,text:ol});}
+    });
+    const missions=(wcMap[wk]&&wcMap[wk].lines)?wcMap[wk].lines.map(l=>({text:l.text,pct:l.pct})):[];
+    return {label:`${wkStart.getMonth()+1}.${wkStart.getDate()} – ${wkEnd.getMonth()+1}.${wkEnd.getDate()} · ${i+1}주차`,dayCount:recorded,missions,onelines};
+  });
+}
+// 콘텐츠 — book+보는중은 '읽는중'으로 보이도록 status 보정, 완료작만 별점 포함
+function buildBackupContents(contentsList){
+  return (contentsList||[]).map(c=>{
+    let status=c.status;
+    if(c.cat==='book'&&status==='watching')status='reading';
+    return {cat:c.cat,title:c.title,status,stars:status==='done'?(c.stars||0):0};
+  });
+}
+async function buildMonthlyBackupPayload(y,mo){
+  const mk=`${y}-${pad(mo+1)}`;
+  const stats=computeMonthStats(y,mo);
+  let report=S.get('monthly_report_'+mk);
+  if(!report)report=await generateMonthlyReportAI(mk,stats);
+  return {
+    monthLabel:`${mo+1}월의 기록`,
+    goalLines:stats.goalLines,
+    aiSummary:report?report.comment:'',
+    keywords:report?(report.keywords||[]):[],
+    stats:{todoCount:stats.doneTodos,habitRate:stats.habitPct,avgSleep:stats.avgSleep?`${stats.avgSleep}h`:'-'},
+    weeks:buildBackupWeeks(y,mo,stats.dim,stats.wcByWeek),
+    contents:buildBackupContents(stats.contentsList),
+    days:buildBackupDays(y,mo,stats.dim)
+  };
+}
+async function backupMonthToNotion(){
+  const statusEl=document.getElementById('notion-backup-status');
+  const {workerUrl,secret}=getNotionBackupConfig();
+  if(!workerUrl||!secret){if(statusEl)statusEl.textContent='설정을 먼저 저장해주세요';return;}
+  const now=new Date();
+  const target=new Date(now.getFullYear(),now.getMonth()-1,1); // 지난달 기준
+  const y=target.getFullYear(),mo=target.getMonth();
+  if(statusEl)statusEl.textContent=`${mo+1}월 데이터 정리 중...`;
+  try{
+    const payload=await buildMonthlyBackupPayload(y,mo);
+    if(statusEl)statusEl.textContent='노션에 올리는 중... (몇십 초 걸려요)';
+    const res=await fetch(workerUrl+'/notion-backup',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Backup-Secret':secret},
+      body:JSON.stringify(payload)
+    });
+    const data=await res.json();
+    if(!res.ok||!data.ok)throw new Error(data.error||('HTTP '+res.status));
+    if(statusEl)statusEl.textContent=`백업 완료 ✅ (${mo+1}월 · ${payload.days.length}일치)`;
   }catch(e){
     if(statusEl)statusEl.textContent='백업 실패: '+e.message;
   }
@@ -5545,7 +5556,7 @@ function openSettings(){
   if(keyInp){const k=S.get('claude_api_key');keyInp.value=k?'sk-ant-••••'+k.slice(-4):'';}
   const profileInp=document.getElementById('user-profile-inp');if(profileInp)profileInp.value=S.get('user_profile')||'';
   const nwi=document.getElementById('notion-worker-url-inp');if(nwi)nwi.value=S.get('notion_worker_url')||'';
-  const npi=document.getElementById('notion-root-page-inp');if(npi)npi.value=S.get('notion_root_page')||'';  const theme=S.get('theme')||'light';
+  const nsi=document.getElementById('notion-backup-secret-inp');if(nsi)nsi.value=S.get('notion_backup_secret')||'';  const theme=S.get('theme')||'light';
   document.querySelectorAll('.ctheme-btn').forEach(b=>b.classList.remove('on'));
   const act=document.getElementById('ct-'+theme);if(act)act.classList.add('on');
   document.getElementById('settings-ov').classList.add('on');
