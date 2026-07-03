@@ -3635,8 +3635,7 @@ function saveGoal(key,lines){S.set(key,lines);autoSync('goal',key);}
 // ── SUPABASE SYNC
 async function syncTodosDown(dk){
   const rows=await supaFetch('todos?date_key=eq.'+dk+'&order=created');
-  if(!rows)return; // 연결 실패 — 로컬 유지
-  if(rows.length===0)return; // 서버 비어있음 — 로컬 유지
+  if(!rows)return; // 연결 실패(null) — 로컬 유지. 빈 배열은 "서버에 진짜 0개"라는 뜻이라 그대로 반영.
   S.set(S.key('todos',dk),rows.map(function(r){return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),postponeCount:r.postpone_count||0};}));
   renderTodos();
 }
@@ -3652,8 +3651,7 @@ async function syncTodosUp(dk){
 }
 async function syncMemosDown(dk){
   const rows=await supaFetch('memos?date_key=eq.'+dk+'&order=created');
-  if(!rows)return; // 연결 실패 — 로컬 유지
-  if(rows.length===0)return; // 서버 비어있음 — 로컬 유지
+  if(!rows)return; // 연결 실패(null) — 로컬 유지. 빈 배열은 "서버에 진짜 0개"라는 뜻이라 그대로 반영.
   S.set(S.key('memos',dk),rows.map(function(r){return {time:r.memo_time,text:r.text,created:r.created,cid:r.client_id||genCid()};}));
   renderMemos();
 }
@@ -6628,11 +6626,11 @@ const DAYS_KO=['일','월','화','수','목','금','토'];
 // ── 강제 복구
 async function forceRestoreDate(dk){
   var mrows=await supaFetch('memos?date_key=eq.'+dk+'&order=created');
-  if(mrows&&mrows.length>0){
+  if(mrows!==null){
     S.set(S.key('memos',dk),mrows.map(function(r){return {time:r.memo_time,text:r.text,created:r.created,cid:r.client_id||genCid()};}));
   }
   var trows=await supaFetch('todos?date_key=eq.'+dk+'&order=created');
-  if(trows&&trows.length>0){
+  if(trows!==null){
     S.set(S.key('todos',dk),trows.map(function(r){return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),postponeCount:r.postpone_count||0};}));
   }
   var srows=await supaFetch('sleep?date_key=eq.'+dk);
