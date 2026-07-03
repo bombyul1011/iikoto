@@ -675,6 +675,24 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .habit-chk2{width:25px;height:25px;border-radius:50%;border:1.5px dashed rgba(195,175,168,0.5);background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;}
 .habit-chk2.on{border-style:solid;}
 
+/* ── 주간탭: 전반적으로 타이트한 간격 ── */
+#v-weekly .slabel{margin-top:10px;margin-bottom:5px;}
+#v-weekly .card{margin-bottom:6px;}
+#v-weekly .report-banner{margin-top:6px;}
+
+/* ── 주간탭: 이번주 해빗 (도트 매트릭스, 읽기전용) ── */
+.habit-week-box{background:var(--sleep-b);border:1px solid var(--sleep-bb);border-radius:14px;padding:10px 14px 8px;}
+.hw-daylabels{display:flex;padding-left:58px;margin-bottom:5px;}
+.hw-daylabels span{flex:1;text-align:center;font-size:8.5px;color:var(--tm);}
+.hw-row{display:flex;align-items:center;gap:0;padding:4px 0;}
+.hw-row+.hw-row{border-top:1px solid rgba(0,0,0,0.04);}
+.hw-name{width:58px;flex-shrink:0;font-size:10px;color:var(--ts);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:5px;}
+.hw-name-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.hw-dots{flex:1;display:flex;}
+.hw-dot-wrap{flex:1;display:flex;justify-content:center;}
+.hw-dot{width:9px;height:9px;border-radius:50%;border-style:solid;box-sizing:border-box;}
+.hw-streak{width:26px;flex-shrink:0;text-align:right;font-size:9px;color:var(--tm);font-weight:600;}
+
 /* ── 데일리 리듬 트랙 (블록 모델) ── */
 .rhythm-track-datelabel{font-size:12px;font-weight:700;color:var(--tp);margin-bottom:14px;display:flex;justify-content:space-between;align-items:baseline;}
 .rhythm-track-datelabel .w{font-size:10px;font-weight:400;color:var(--tm);}
@@ -1012,7 +1030,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <!-- WEEKLY -->
     <div class="view" id="v-weekly">
       <div class="week-strip" id="week-strip"></div>
-      <div class="card" id="wchallenge-card" style="padding:14px 15px 10px;margin-bottom:10px;">
+      <div class="card" id="wchallenge-card" style="padding:14px 15px 10px;margin-bottom:6px;">
         <div class="goal-section-title" style="margin-top:0;">✦ 이번 주도 화이팅</div>
         <div class="goal-wrap" id="weekly-goal-wrap"></div>
       </div>
@@ -1022,6 +1040,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       </div>
       <div class="slabel">리듬 모아보기</div>
       <div class="card" id="weekly-rhythm-bars"></div>
+      <div class="slabel">이번주 해빗</div>
+      <div class="habit-week-box" id="weekly-habit-box"></div>
       <div class="report-banner meal-soft" onclick="openWeekMealSheet()">
         <div class="report-banner-inner">
           <div class="report-banner-line"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="vertical-align:-1px;margin-right:3px;"><path d="M2 5.5h8a4 4 0 0 1-8 0z"/><line x1="2" y1="5.5" x2="10" y2="5.5"/><line x1="6" y1="1.5" x2="6" y2="3.5"/></svg>이번 주 뭐 먹지?</div>
@@ -5222,6 +5242,7 @@ function renderDailyHabitCheck(){
       saveHabitChecks(wk,checks);
       renderDailyHabitCheck();
       if(document.getElementById('v-monthly')&&document.getElementById('v-monthly').classList.contains('on'))renderHabitMonthly();
+      if(document.getElementById('v-weekly')&&document.getElementById('v-weekly').classList.contains('on'))renderWeeklyHabitBox();
     });
     el.appendChild(col);
   });
@@ -5302,6 +5323,33 @@ function loadWeekly(){
   renderWeeklyChallenge();
   renderDailyOneLineWeek();
   renderWeeklyRhythmBars();
+  renderWeeklyHabitBox();
+}
+function renderWeeklyHabitBox(){
+  const el=document.getElementById('weekly-habit-box');if(!el)return;
+  const habits=getHabits();
+  if(!habits.length){el.innerHTML='<div style="font-size:11px;color:var(--tm);text-align:center;padding:8px 0;">습관을 추가해보세요</div>';return;}
+  const now=new Date();
+  const wk=weekKey(now);
+  const todayDow=(now.getDay()+6)%7;
+  const checks=getHabitChecks(wk);
+  const dayLabels=['월','화','수','목','금','토','일'];
+  let html='<div class="hw-daylabels">'+dayLabels.map(d=>'<span>'+d+'</span>').join('')+'</div>';
+  habits.forEach(function(h){
+    const rgba=HABIT_COLOR_RGBA[h.color]||'rgba(192,112,128,0.80)';
+    let cnt=0,dotsHtml='';
+    for(let d=0;d<7;d++){
+      const on=!!checks[h.name+'-'+d];
+      if(on)cnt++;
+      const isToday=d===todayDow;
+      const borderColor=isToday?'var(--acc)':(on?rgba:'rgba(195,175,168,0.5)');
+      const borderWidth=isToday?'1.6px':'1.3px';
+      const bg=on?rgba:'none';
+      dotsHtml+='<div class="hw-dot-wrap"><div class="hw-dot" style="background:'+bg+';border-color:'+borderColor+';border-width:'+borderWidth+';"></div></div>';
+    }
+    html+='<div class="hw-row"><div class="hw-name"><span class="hw-name-dot" style="background:'+rgba+';"></span>'+h.name+'</div><div class="hw-dots">'+dotsHtml+'</div><div class="hw-streak">'+cnt+'/7</div></div>';
+  });
+  el.innerHTML=html;
 }
 function loadMonthly(){
   const _ld0=new Date();
