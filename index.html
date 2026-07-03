@@ -313,7 +313,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 /* ── HABIT ── */
 .habit-foot{display:flex;justify-content:flex-end;margin-top:10px;}
-.habit-edit-btn{font-size:10.5px;color:var(--tm);background:var(--card);border:1px solid var(--card-b);border-radius:9px;padding:4px 11px;cursor:pointer;font-family:'DM Sans',sans-serif;}
+.habit-edit-btn{font-size:10px;color:var(--tm);background:none;border:none;padding:2px;cursor:pointer;font-family:'DM Sans',sans-serif;opacity:.7;}
+.habit-edit-btn:active{opacity:1;}
 .prog-bar{height:4px;background:rgba(200,180,170,.25);border-radius:4px;margin-top:8px;overflow:hidden;}
 .prog-fill{height:100%;background:linear-gradient(90deg,var(--acc-soft),rgba(200,180,150,.50));border-radius:4px;transition:width .4s;}
 
@@ -667,11 +668,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .home-content-info{flex:1;min-width:0;}
 
 /* ── 오늘 해빗 체크박스 (수면박스 색) ── */
-.habit-check-box{background:var(--sleep-b);border:1px solid var(--sleep-bb);border-radius:14px;padding:14px 10px 10px;display:flex;flex-wrap:wrap;justify-content:space-around;gap:10px;}
-.habit-check-col{display:flex;flex-direction:column;align-items:center;gap:7px;min-width:48px;}
-.habit-check-name{font-size:11px;color:var(--tp);text-align:center;}
-.habit-check-foot{width:100%;display:flex;justify-content:flex-end;margin-top:8px;margin-bottom:2px;}
-.habit-chk2{width:28px;height:28px;border-radius:50%;border:1.5px dashed rgba(195,175,168,0.5);background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;}
+.habit-check-box{background:var(--sleep-b);border:1px solid var(--sleep-bb);border-radius:14px;padding:12px 10px 8px;display:flex;flex-wrap:wrap;justify-content:space-around;gap:8px;}
+.habit-check-col{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:42px;}
+.habit-check-name{font-size:10.5px;color:var(--tp);text-align:center;}
+.habit-check-foot{width:100%;display:flex;justify-content:flex-end;margin-top:5px;margin-bottom:0;}
+.habit-chk2{width:25px;height:25px;border-radius:50%;border:1.5px dashed rgba(195,175,168,0.5);background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;}
 .habit-chk2.on{border-style:solid;}
 
 /* ── 데일리 리듬 트랙 (블록 모델) ── */
