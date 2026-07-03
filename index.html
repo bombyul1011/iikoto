@@ -1821,8 +1821,8 @@ function makeLabel(txt){
 const RHYTHM_CATS={
   exercise:{label:'운동',color:'rgba(245,165,120,0.82)'},
   rest:{label:'휴식',color:'rgba(252,215,110,0.80)'},
-  work:{label:'업무',color:'rgba(140,155,225,0.82)'},
-  appointment:{label:'외출',color:'rgba(120,190,220,0.78)'},
+  work:{label:'업무',color:'rgba(155,165,205,0.72)'},
+  appointment:{label:'외출',color:'rgba(150,205,225,0.68)'},
   note:{label:'기록',color:'rgba(240,150,190,0.80)'},
   enjoy:{label:'감상',color:'rgba(190,160,230,0.80)'},
   home:{label:'정리',color:'rgba(205,215,145,0.80)'}
@@ -2021,9 +2021,12 @@ async function buildRhythmReviewCard(){
       const dk=dateKey(_ld);scope='day_'+dk;
       const dur=getDayCategoryDurations(dk);
       const ol=getDailyOneLine(dk).trim();
-      hasData=!!durSummaryLine(dur)||!!ol;
-      dataContext='오늘 시간 사용: '+(durSummaryLine(dur)||'기록 없음')+'\n오늘 하루한줄: '+(ol||'(작성 안 함)');
-      sys='당신은 따뜻한 생활 비서예요. 오늘 하루의 시간 사용 패턴과 하루한줄을 보고, 둘을 연결한 짧은 통찰을 1-2문장으로 줘요. 시간을 어떻게 썼는지와 그날의 느낌이 어울리는지 어긋나는지를 짚어줘도 좋아요.\n'+commonRules;
+      const blockNotes=getRhythmBlocks(dk)
+        .filter(function(b){return b.text&&b.text.trim();})
+        .map(function(b){const cat=RHYTHM_CATS[b.cat];return '- '+(cat?cat.label:b.cat)+': '+b.text.trim();});
+      hasData=!!durSummaryLine(dur)||!!ol||blockNotes.length>0;
+      dataContext='오늘 시간 사용: '+(durSummaryLine(dur)||'기록 없음')+'\n오늘 하루한줄: '+(ol||'(작성 안 함)')+'\n리듬 기록 메모:\n'+(blockNotes.length?blockNotes.join('\n'):'(작성 안 함)');
+      sys='당신은 따뜻한 생활 비서예요. 오늘 하루의 시간 사용 패턴, 하루한줄, 그리고 리듬 기록에 남긴 메모들을 보고, 이들을 연결한 짧은 통찰을 1-2문장으로 줘요. 시간을 어떻게 썼는지와 그날의 느낌·메모 내용이 어울리는지 어긋나는지를 짚어줘도 좋아요.\n'+commonRules;
     }
 
     if(!hasData){
