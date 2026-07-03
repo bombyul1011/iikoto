@@ -1821,14 +1821,14 @@ function makeLabel(txt){
 const RHYTHM_CATS={
   exercise:{label:'운동',color:'rgba(245,165,120,0.82)'},
   rest:{label:'휴식',color:'rgba(252,215,110,0.80)'},
-  work:{label:'업무',color:'rgba(150,180,225,0.82)'},
-  appointment:{label:'외출',color:'rgba(130,195,235,0.78)'},
-  note:{label:'기록',color:'rgba(245,170,180,0.80)'},
-  enjoy:{label:'감상',color:'rgba(195,175,235,0.80)'},
-  home:{label:'정리',color:'rgba(175,200,150,0.80)'}
+  work:{label:'업무',color:'rgba(140,155,225,0.82)'},
+  appointment:{label:'외출',color:'rgba(120,190,220,0.78)'},
+  note:{label:'기록',color:'rgba(240,150,190,0.80)'},
+  enjoy:{label:'감상',color:'rgba(190,160,230,0.80)'},
+  home:{label:'정리',color:'rgba(205,215,145,0.80)'}
 };
 const RHYTHM_SLEEP_COLOR='rgba(205,194,182,0.88)';
-const RHYTHM_MEAL_COLOR='rgba(145,210,175,0.85)';
+const RHYTHM_MEAL_COLOR='rgba(110,190,145,0.88)';
 function getRhythmBlocks(dk){return S.get(S.key('rblocks',dk))||[];}
 function saveRhythmBlocks(dk,v){
   S.set(S.key('rblocks',dk),v);
