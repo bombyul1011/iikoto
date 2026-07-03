@@ -3027,7 +3027,7 @@ async function makeWeeklySummaryCard(){
   card.className='card m';
 
   // 이번 주 월~토 데이터 수집
-  const now=getLogicalDate();
+  const now=new Date();
   const weekStart=new Date(now);
   weekStart.setDate(now.getDate()-((now.getDay()+6)%7)); // 월요일
   weekStart.setHours(0,0,0,0);
@@ -4220,7 +4220,7 @@ async function openNextWeekChallengeSheet(){
   loadNextWeekAISuggestions(wk);
 }
 function buildWeekSummaryForChallenge(){
-  const now=getLogicalDate();
+  const now=new Date();
   const mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7));
   const wk=weekKey(now);
   const checks=getHabitChecks(wk);
