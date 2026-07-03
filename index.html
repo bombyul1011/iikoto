@@ -3460,6 +3460,37 @@ async function syncListUp(table,filterQ,uniqueCols,localItems,toRow){
   }
   return true;
 }
+// ── 삭제 의도 명시적 추적 (todos/memos) ──
+// "로컬 목록에 없으면 지운 것으로 간주"하던 기존 syncListUp 방식은, 다른 기기가
+// 방금 추가한 항목을 이 기기가 아직 못 받아온 순간에 업로드하면 그걸 삭제해버리는
+// 위험이 있었음. 삭제/이동 시점에 cid를 명시적으로 기록해두고, 업로드 때는 그
+// 목록에 있는 것만 지우도록 분리.
+function addDelPending(type,dk,cid){
+  if(!cid)return;
+  const key=type+'_delpending_list';
+  const list=S.get(key)||[];
+  if(!list.some(e=>e.dk===dk&&e.cid===cid)){list.push({dk,cid});S.set(key,list);}
+}
+function removeDelPending(type,dk,cid){
+  const key=type+'_delpending_list';
+  const list=(S.get(key)||[]).filter(e=>!(e.dk===dk&&e.cid===cid));
+  S.set(key,list);
+}
+function getDelPendingCids(type,dk){
+  return (S.get(type+'_delpending_list')||[]).filter(e=>e.dk===dk).map(e=>e.cid);
+}
+async function syncListUpSafe(table,filterQ,uniqueCols,localItems,toRow,delCids){
+  if(localItems.length){
+    const ok=await supaUpsert(table,uniqueCols,localItems.map(toRow));
+    if(!ok)return false;
+  }
+  if(delCids&&delCids.length){
+    const inList=delCids.map(c=>encodeURIComponent(c)).join(',');
+    const res=await supaFetch(`${table}?client_id=in.(${inList})&${filterQ}`,'DELETE');
+    if(res===null)return false; // 네트워크 실패 — 삭제 대기 목록 유지, 다음 기회에 재시도
+  }
+  return true;
+}
 // ── DATA ACCESSORS
 function getTodos(dk){return S.get(S.key('todos',dk))||[];}
 function saveTodos(dk,v){
@@ -3612,8 +3643,12 @@ async function syncTodosDown(dk){
 async function syncTodosUp(dk){
   const todos=getTodos(dk);
   if(ensureItemCids(todos))S.set(S.key('todos',dk),todos);
-  return await syncListUp('todos',`date_key=eq.${dk}`,'date_key,client_id',todos,
-    t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,postpone_count:t.postponeCount||0}));
+  const delCids=getDelPendingCids('todos',dk);
+  const ok=await syncListUpSafe('todos',`date_key=eq.${dk}`,'date_key,client_id',todos,
+    t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,postpone_count:t.postponeCount||0}),
+    delCids);
+  if(ok)delCids.forEach(cid=>removeDelPending('todos',dk,cid));
+  return ok;
 }
 async function syncMemosDown(dk){
   const rows=await supaFetch('memos?date_key=eq.'+dk+'&order=created');
@@ -3625,8 +3660,12 @@ async function syncMemosDown(dk){
 async function syncMemosUp(dk){
   const memos=getMemos(dk);
   if(ensureItemCids(memos))S.set(S.key('memos',dk),memos);
-  return await syncListUp('memos',`date_key=eq.${dk}`,'date_key,client_id',memos,
-    m=>({date_key:dk,memo_time:m.time,text:m.text,created:m.created,client_id:m.cid}));
+  const delCids=getDelPendingCids('memos',dk);
+  const ok=await syncListUpSafe('memos',`date_key=eq.${dk}`,'date_key,client_id',memos,
+    m=>({date_key:dk,memo_time:m.time,text:m.text,created:m.created,client_id:m.cid}),
+    delCids);
+  if(ok)delCids.forEach(cid=>removeDelPending('memos',dk,cid));
+  return ok;
 }
 async function syncSleepDown(dk){
   const rows=await supaFetch(`sleep?date_key=eq.${dk}`);
@@ -4076,6 +4115,8 @@ function confirmTodo(){
 function todoDelSwipe(i){
   closeSheet('todo-sheet');
   const dk=dateKey(currentDate),todos=getTodos(dk);
+  const t=todos[i];
+  if(t)addDelPending('todos',dk,t.cid);
   todos.splice(i,1);saveTodos(dk,todos);renderTodos();
 }
 function openTodoSheet(i){
@@ -4110,6 +4151,7 @@ function todoSheetPostpone(type){
     const tom=new Date(currentDate);tom.setDate(tom.getDate()+1);
     const tdk=dateKey(tom),ttodos=getTodos(tdk);
     ttodos.push({...todo,done:false,postponeCount:(todo.postponeCount||0)+1});saveTodos(tdk,ttodos);
+    if(todo)addDelPending('todos',dk,todo.cid);
     todos.splice(_todoSwipeIdx,1);saveTodos(dk,todos);
     closeSheet('todo-sheet');renderTodos();
   } else {
@@ -4122,6 +4164,7 @@ function confirmDate(){
   const val=document.getElementById('date-inp').value;if(!val||_todoSwipeIdx<0)return;
   const dk=dateKey(currentDate),todos=getTodos(dk),todo=todos[_todoSwipeIdx];
   const ttodos=getTodos(val);ttodos.push({...todo,done:false,postponeCount:(todo.postponeCount||0)+1});saveTodos(val,ttodos);
+  if(todo)addDelPending('todos',dk,todo.cid);
   todos.splice(_todoSwipeIdx,1);saveTodos(dk,todos);closeModal('date-modal');renderTodos();
 }
 
@@ -4188,6 +4231,7 @@ function memoDelSwipe(i){
   closeSheet('memo-sheet');
   const dk=dateKey(currentDate),memos=getMemos(dk);
   _deletedMemo={memo:memos[i],idx:i,dk};
+  if(memos[i])addDelPending('memos',dk,memos[i].cid);
   memos.splice(i,1);saveMemos(dk,memos);renderMemos();showUndo();
 }
 function memoSheetEdit(){_memoSwipeIdx>=0&&memoEditSwipe(_memoSwipeIdx);}
@@ -4208,6 +4252,7 @@ function showUndo(){
 function undoMemo(){
   if(!_deletedMemo)return;
   const memos=getMemos(_deletedMemo.dk);
+  if(_deletedMemo.memo)removeDelPending('memos',_deletedMemo.dk,_deletedMemo.memo.cid);
   memos.splice(_deletedMemo.idx,0,_deletedMemo.memo);
   saveMemos(_deletedMemo.dk,memos);_deletedMemo=null;
   document.getElementById('undo-toast').classList.remove('on');renderMemos();
