@@ -117,6 +117,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 /* ── SECTION LABELS ── */
 .slabel{font-size:10px;color:var(--tm);letter-spacing:.10em;text-transform:uppercase;margin:14px 0 7px 2px;}
 .slabel:first-child{margin-top:4px;}
+.slabel-row{display:flex;align-items:center;justify-content:space-between;margin:14px 2px 7px 2px;}
+.slabel-row .slabel{margin:0;}
+.slabel-search-btn{background:none;border:none;padding:2px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--tm);opacity:.7;}
+.slabel-search-btn:active{opacity:1;}
 .goal-section-title{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;letter-spacing:.04em;background:linear-gradient(120deg,rgba(255,210,230,0.80),rgba(255,230,200,0.70));color:#c07080;border-radius:10px;padding:5px 13px;margin:14px 0 10px 0;border:1px solid rgba(255,185,205,0.55);box-shadow:0 2px 10px rgba(200,120,140,0.12);}
 
 /* ── CARDS ── */
@@ -274,13 +278,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .stamp-btn{width:38px;height:38px;background:var(--inp);border:1px solid var(--inp-b);border-radius:11px;padding:0;font-size:11px;color:var(--ts);display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:'DM Sans',sans-serif;flex-shrink:0;}
 .memo-field{flex:1;height:38px;box-sizing:border-box;background:rgba(255,255,255,.30);border:1.5px dashed rgba(200,170,160,.40);border-radius:11px;padding:8px 12px;font-size:16px;color:var(--tp);font-family:'DM Sans',sans-serif;outline:none;resize:none;line-height:1.3;max-height:100px;}
 .memo-field::placeholder{color:var(--tm);}
-.send-btn{width:38px;height:38px;background:var(--acc-soft);border:none;border-radius:11px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+.send-btn{width:38px;height:38px;background:var(--inp);border:1px solid var(--inp-b);border-radius:11px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:var(--tm);}
 .memo-stamp-sm{width:32px;height:32px;background:var(--inp);border:1px solid var(--inp-b);border-radius:9px;padding:0;font-size:11px;color:var(--ts);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
-.memo-add-btn{flex:1;height:32px;background:var(--inp);border:1px dashed rgba(200,170,160,.40);border-radius:9px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:'DM Sans',sans-serif;}
-.memo-add-btn:active{background:var(--card);}
 .memo-field-sm{height:32px;max-height:80px;padding:6px 10px;font-size:14px;}
-.memo-search-sm{width:32px;height:32px;border-radius:9px;}
-.memo-search-btn{background:var(--inp);border:1px solid var(--inp-b);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+.send-btn-sm{width:32px;height:32px;border-radius:9px;}
 .seed-icon-btn{background:linear-gradient(120deg,rgba(185,215,140,0.75),rgba(210,230,165,0.65));border:1px solid rgba(145,185,80,0.45);box-shadow:0 2px 10px rgba(110,155,55,0.10);}
 [data-theme="glass"] .seed-icon-btn{background:linear-gradient(120deg,rgba(185,215,140,0.40),rgba(210,230,165,0.32));border:1.4px solid rgba(145,185,80,0.35);}
 .seed-card{background:var(--card);border:1px solid var(--card-b);border-radius:14px;padding:14px 15px;margin-bottom:10px;cursor:pointer;transition:opacity .15s;}
@@ -575,7 +576,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 }
 [data-theme="glass"] .day-btn.today{background:rgba(232,164,187,0.18);border-color:rgba(232,164,187,0.40);}
 [data-theme="glass"] .day-btn.today .day-num{color:#c97a96;}
-[data-theme="glass"] .send-btn{background:rgba(232,164,187,0.55);}
 [data-theme="glass"] #nextweek-sheet .goal-section-title{background:linear-gradient(120deg,rgba(248,212,225,0.55),rgba(250,225,235,0.48));color:#c2638a;border:1.4px solid rgba(232,164,187,0.50);}
 [data-theme="glass"] .chk.on{background:rgba(250,215,100,0.55);border-color:rgba(250,215,100,0.78);}
 [data-theme="glass"] .cal-day.today .cal-num{background:#e8a4bb;}
@@ -989,15 +989,16 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" style="color:var(--tm)"><line x1="6.5" y1="2" x2="6.5" y2="11"/><line x1="2" y1="6.5" x2="11" y2="6.5"/></svg>할 일 추가
         </button>
       </div>
-      <div class="slabel">memo</div>
+      <div class="slabel-row">
+        <div class="slabel">memo</div>
+        <button class="slabel-search-btn" onclick="openSearch()" title="메모 검색"><svg width="12" height="12" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5.5" cy="5.5" r="4"/><line x1="9" y1="9" x2="12" y2="12"/></svg></button>
+      </div>
       <div class="card p" id="memo-card">
         <div id="memo-list"></div>
         <div class="memo-input-row">
           <button class="stamp-btn memo-stamp-sm" onclick="openMemoTimePicker()" id="memo-stamp-btn" title="시간 선택 후 메모 입력"><svg width="14" height="14" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" style="color:var(--ts)"><circle cx="5.5" cy="5.5" r="4.2"/><polyline points="5.5,3 5.5,5.5 7.2,6.8"/></svg></button>
-          <button class="memo-add-btn" onclick="openMemoModal()">
-            <svg width="11" height="11" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" style="color:var(--tm)"><line x1="6.5" y1="2" x2="6.5" y2="11"/><line x1="2" y1="6.5" x2="11" y2="6.5"/></svg>
-          </button>
-          <button class="memo-search-btn memo-search-sm" onclick="openSearch()"><svg width="12" height="12" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" style="color:var(--tm)"><circle cx="5.5" cy="5.5" r="4"/><line x1="9" y1="9" x2="12" y2="12"/></svg></button>
+          <textarea class="memo-field memo-field-sm" id="memo-inline-inp" placeholder="메모를 입력하세요" rows="1" autocomplete="off" onkeydown="if(event.isComposing||event.keyCode===229)return;if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();submitMemoInline();}"></textarea>
+          <button class="send-btn send-btn-sm" onclick="submitMemoInline()" title="메모 등록"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="11" x2="7" y2="2"/><polyline points="3,6 7,2 11,6"/></svg></button>
         </div>
       </div>
       <div class="slabel">오늘 뭐 먹지</div>
@@ -1821,7 +1822,7 @@ async function syncRhythmBlocksDown(dk){
   if(S.get(S.key('rblocks_pending',dk)))return; // 업로드 대기중인 로컬 수정 있으면 덮어쓰지 않음
   S.set(S.key('rblocks',dk),rows.map(function(r){return {cat:r.cat,start:r.start_time,end:r.end_time,text:r.text||'',created:r.created,cid:r.client_id||genCid()};}));
 }
-let _rhythmTrackEl=null,_rhythmDk=null,_rhythmFormOpen=false,_rhythmFormCat=null,_rhythmFormStart='',_rhythmFormEnd='',_rhythmFormText='',_rhythmEditIdx=null,_rhythmIncludeReview=false;
+let _rhythmTrackEl=null,_rhythmDk=null,_rhythmFormOpen=false,_rhythmFormCat=null,_rhythmFormStart='',_rhythmFormEnd='',_rhythmFormText='',_rhythmEditIdx=null,_rhythmIncludeReview=false,_rhythmSubmitting=false;
 function refreshRhythmTrack(){
   if(!_rhythmTrackEl||!_rhythmDk)return;
   const old=_rhythmTrackEl; // buildDailyRhythmTrack이 _rhythmTrackEl을 새 노드로 덮어쓰기 전에 먼저 잡아둠
@@ -1856,10 +1857,12 @@ function openRhythmTimeModal(which){
   openModal('time-modal');
 }
 function saveRhythmBlock(){
+  if(_rhythmSubmitting)return;
   const cat=_rhythmFormCat;if(!cat)return;
   const t=document.getElementById('rhythm-text-inp');
   const start=_rhythmFormStart,end=_rhythmFormEnd;
   if(!start)return;
+  _rhythmSubmitting=true;
   const text=t?t.value.trim():'';
   const blocks=getRhythmBlocks(_rhythmDk);
   if(_rhythmEditIdx!=null&&blocks[_rhythmEditIdx]){
@@ -1871,6 +1874,7 @@ function saveRhythmBlock(){
   saveRhythmBlocks(_rhythmDk,blocks);
   _rhythmFormOpen=false;_resetRhythmForm();
   refreshRhythmTrack();
+  setTimeout(()=>{_rhythmSubmitting=false;},500);
 }
 function finishRhythmBlock(idx){
   const blocks=getRhythmBlocks(_rhythmDk);
@@ -3926,9 +3930,22 @@ function confirmMemo(){
   renderMemos();
   setTimeout(()=>{_memoSubmitting=false;},500);
 }
-function sendMemo(){
-  // 기존 직접입력 방식 폴백 (다른 경로에서 호출될 경우 대비)
-  openMemoModal();
+function submitMemoInline(){
+  if(_memoSubmitting)return;
+  const inp=document.getElementById('memo-inline-inp');
+  const text=inp?inp.value.trim():'';
+  if(!text)return;
+  _memoSubmitting=true;
+  const stampBtn=document.getElementById('memo-stamp-btn');
+  const n=new Date();
+  const stamp=(stampBtn&&stampBtn.dataset.stamp)||`${pad(n.getHours())}:${pad(n.getMinutes())}`;
+  const dk=dateKey(currentDate),memos=getMemos(dk);
+  memos.push({text,time:stamp,created:Date.now(),cid:genCid()});
+  saveMemos(dk,memos);
+  if(stampBtn){delete stampBtn.dataset.stamp;stampBtn.title='';}
+  if(inp){inp.value='';inp.style.height='';}
+  renderMemos();
+  setTimeout(()=>{_memoSubmitting=false;},500);
 }
 function openMemoTimePicker(){
   _sleepTarget='memo';
@@ -4454,6 +4471,7 @@ function confirmHabit(){
 
 // ── TIMETABLE
 let _contentCtx={};
+let _contentSubmitting=false;
 let _selectedPoster=null;
 let _selectedAuthor=null;
 let _apiTimer=null;
@@ -4647,7 +4665,9 @@ function toggleCStop(){
   setCStatus(_contentCtx.status==='stopped'?'watching':'stopped');
 }
 function confirmContent(){
+  if(_contentSubmitting)return;
   const title=document.getElementById('cm-title').value.trim();if(!title)return;
+  _contentSubmitting=true;
   const startVal=document.getElementById('cm-start').value;
   const today=dateKey(currentDate);
   const startDate=startVal||today;
@@ -4689,6 +4709,7 @@ function confirmContent(){
   }
   closeModal('content-modal');renderTimetable();updateStats();
   if(_contentCtx.cat==='book')syncContentToReadingBook(title,status,poster,author,newMk);
+  setTimeout(()=>{_contentSubmitting=false;},500);
 }
 function stableCidFromTitle(title){
   let h=0;
