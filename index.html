@@ -60,8 +60,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --memo-b:rgba(255,253,248,0.50);--memo-bb:rgba(240,160,190,0.45);
   --sleep-b:rgba(255,253,248,0.50);--sleep-bb:rgba(95,115,170,0.55);
 }
-[data-theme="glass"] .card{border-width:1.4px;box-shadow:0 1.5px 1.5px rgba(255,255,255,0.9) inset,0 -8px 14px -10px rgba(120,110,95,0.15) inset,0 5px 14px rgba(150,140,120,0.08);}
-[data-theme="glass"] .sleep-box{border-width:1.4px;box-shadow:0 1.5px 1.5px rgba(255,255,255,0.9) inset,0 -8px 14px -10px rgba(120,110,95,0.15) inset,0 5px 14px rgba(150,140,120,0.08);}
+[data-theme="glass"] .card,[data-theme="glass"] .sleep-box,[data-theme="glass"] .habit-week-box{border-width:1.4px;box-shadow:0 1.5px 1.5px rgba(255,255,255,0.9) inset,0 -8px 14px -10px rgba(120,110,95,0.15) inset,0 5px 14px rgba(150,140,120,0.08);}
 [data-theme="glass"] #daily-meal-card{background:rgba(255,253,248,0.45)!important;border-color:rgba(150,195,130,0.55)!important;}
 [data-theme="glass"] .meal-soft{filter:none;}
 [data-theme="glass"] .rd-top-inner{background:rgba(253,251,245,0.92);}
@@ -683,7 +682,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 #v-weekly .report-banner{margin-top:14px;}
 
 /* ── 주간탭: 이번주 해빗 (도트 매트릭스, 읽기전용) ── */
-.habit-week-box{background:var(--sleep-b);border:1px solid var(--sleep-bb);border-radius:14px;padding:10px 14px 8px;}
+.habit-week-box{background:var(--sleep-b);border:1px solid var(--card-b);border-radius:14px;padding:10px 14px 8px;}
 .hw-daylabels{display:flex;padding-left:58px;padding-right:26px;margin-bottom:5px;}
 .hw-daylabels span{flex:1;text-align:center;font-size:8.5px;color:var(--tm);}
 .hw-row{display:flex;align-items:center;gap:0;padding:4px 0;}
