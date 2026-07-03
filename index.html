@@ -864,6 +864,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .s-logo img{height:16px;display:block;}
 .s-logo.pos-br{bottom:14px;right:16px;}
 .s-logo.pos-tr{top:14px;right:16px;}
+.s-cover{position:absolute;width:34px;height:48px;border-radius:6px;overflow:hidden;box-shadow:0 3px 10px rgba(0,0,0,.4);border:1px solid rgba(246,236,221,0.3);}
+.s-cover img{width:100%;height:100%;object-fit:cover;display:block;}
+.s-cover.pos-bl{bottom:16px;left:18px;}
+.s-cover.pos-br{bottom:16px;right:18px;}
 </style>
 </head>
 <body>
@@ -1178,6 +1182,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="share-cycle-btn" id="cyc-logo" onclick="cycleShare('logo')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="8" cy="8" r="5.5"/><path d="M8 4.5v3.5l2.3 1.3"/></svg>
         <span class="lbl" id="cyc-logo-lbl">로고 없음</span>
+      </div>
+      <div class="share-cycle-btn" id="cyc-cover" onclick="cycleShare('cover')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="2" width="8" height="12" rx="1"/><line x1="3" y1="2" x2="3" y2="14"/></svg>
+        <span class="lbl" id="cyc-cover-lbl">표지 없음</span>
       </div>
     </div>
 
@@ -3305,6 +3313,14 @@ function renderHome(){
 // ── CONSTANTS
 const SUPA_URL='https://vqvpzrxmtpryzhontlxc.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdnB6cnhtdHByeXpob250bHhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTgxMjksImV4cCI6MjA5NjYzNDEyOX0.pbtq1UMPC7ylYM1H2xVa19C1TFlceLmEfEtkz3WK2VI';
+// 카카오 책표지 등 외부 이미지는 CORS 헤더가 없어 html2canvas로 캡처가 안 됨 —
+// 기존 다이어트 앱 Worker에 /img-proxy 라우트를 추가해서 그 경유지로 이미지를 불러옴
+const IMG_PROXY_BASE='https://notion-diet-proxy.faith-003.workers.dev/img-proxy?url=';
+function proxyImgUrl(src){
+  if(!src)return src;
+  if(src.startsWith('data:'))return src; // 이미 base64면 그대로
+  return IMG_PROXY_BASE+encodeURIComponent(src);
+}
 const TMDB_KEY='6c78371ce15bb9d262938a66d5ef256e';
 const KAKAO_KEY='33799426c5377181c89616f5b2154bf0';
 const DAYS=['일','월','화','수','목','금','토'];
@@ -5906,12 +5922,13 @@ const SHARE_CYCLE = {
   header: [['none','헤더 없음'],['rl','모먼츠'],['idx','인덱스 카드']],
   quote: [['none','문장 없음'],['qs','문장 · 심플'],['qt','문장 · 테이프'],['hl','문장 · 하이라이트'],['paper','문장 · 편지지']],
   progress: [['none','진행률 없음'],['top','진행률 · 상단좌'],['topright','진행률 · 상단우'],['bottom','진행률 · 하단']],
-  logo: [['none','로고 없음'],['br','로고 · 우하단'],['tr','로고 · 우상단']]
+  logo: [['none','로고 없음'],['br','로고 · 우하단'],['tr','로고 · 우상단']],
+  cover: [['none','표지 없음'],['bl','표지 · 좌하단'],['br','표지 · 우하단']]
 };
-let _shareState = { bg:null, header:'none', quote:'none', quoteCid:null, progress:'none', logo:'none', idxNote:'' };
+let _shareState = { bg:null, header:'none', quote:'none', quoteCid:null, progress:'none', logo:'none', cover:'none', idxNote:'' };
 function openShareCard(){
-  _shareState = { bg:null, header:'none', quote:'none', quoteCid:null, progress:'none', logo:'none', idxNote:'' };
-  ['header','quote','progress','logo'].forEach(updateCycleBtn);
+  _shareState = { bg:null, header:'none', quote:'none', quoteCid:null, progress:'none', logo:'none', cover:'none', idxNote:'' };
+  ['header','quote','progress','logo','cover'].forEach(updateCycleBtn);
   renderQuotePicker();
   const idxWrap=document.getElementById('share-idx-note-wrap');
   const idxInp=document.getElementById('share-idx-note-inp');
@@ -6051,6 +6068,9 @@ function renderShareStage(){
   }
   if(_shareState.logo!=='none'){
     html+=`<div class="s-logo pos-${_shareState.logo}"><img src="${SHARE_LOGO_B64}"></div>`;
+  }
+  if(_shareState.cover!=='none'&&cur&&cur.poster){
+    html+=`<div class="s-cover pos-${_shareState.cover}"><img src="${proxyImgUrl(cur.poster)}" crossorigin="anonymous"></div>`;
   }
   stage.innerHTML=html;
 }
