@@ -684,7 +684,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 /* ── 주간탭: 이번주 해빗 (도트 매트릭스, 읽기전용) ── */
 .habit-week-box{background:var(--sleep-b);border:1px solid var(--sleep-bb);border-radius:14px;padding:10px 14px 8px;}
-.hw-daylabels{display:flex;padding-left:58px;margin-bottom:5px;}
+.hw-daylabels{display:flex;padding-left:58px;padding-right:26px;margin-bottom:5px;}
 .hw-daylabels span{flex:1;text-align:center;font-size:8.5px;color:var(--tm);}
 .hw-row{display:flex;align-items:center;gap:0;padding:4px 0;}
 .hw-row+.hw-row{border-top:1px solid rgba(0,0,0,0.04);}
@@ -1341,7 +1341,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   <div class="modal">
     <div class="modal-title">날짜 지정</div>
     <div style="display:flex;justify-content:center;margin-bottom:12px;">
-      <input type="date" class="modal-inp" id="date-inp" style="width:auto;text-align:center;margin-bottom:0;">
+      <input type="date" class="modal-inp" id="date-inp" style="width:auto;text-align:center;margin-bottom:0;" lang="en-GB">
     </div>
     <div class="modal-actions">
       <button class="mbtn cancel" onclick="closeModal('date-modal')">취소</button>
@@ -1360,8 +1360,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     </div>
     <div id="msr-range-box" style="display:none;margin-bottom:10px;">
       <div style="display:flex;gap:6px;margin-bottom:8px;">
-        <input type="date" id="msr-start" class="modal-inp" style="margin-bottom:0;font-size:12.5px;" oninput="runMemoSearch()">
-        <input type="date" id="msr-end" class="modal-inp" style="margin-bottom:0;font-size:12.5px;" oninput="runMemoSearch()">
+        <input type="date" id="msr-start" class="modal-inp" style="margin-bottom:0;font-size:12.5px;" oninput="runMemoSearch()" lang="en-GB">
+        <input type="date" id="msr-end" class="modal-inp" style="margin-bottom:0;font-size:12.5px;" oninput="runMemoSearch()" lang="en-GB">
       </div>
       <div style="display:flex;gap:6px;">
         <button class="mbtn" onclick="setMemoSearchRange('thisMonth')" style="flex:1;font-size:11.5px;padding:7px 0;">이번 달</button>
@@ -1415,7 +1415,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     </div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
       <span style="font-size:12px;color:var(--tm);white-space:nowrap;">시작일</span>
-      <input type="date" class="modal-inp" id="cm-start" style="flex:1;margin-bottom:0;">
+      <input type="date" class="modal-inp" id="cm-start" style="flex:1;margin-bottom:0;" lang="en-GB">
       <div style="display:flex;gap:5px;flex-shrink:0;">
         <button class="cstatus-btn done" id="cm-done" onclick="toggleCDone()" style="white-space:nowrap;padding:8px 9px;margin-bottom:0;">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><circle cx="7" cy="7" r="5.5"/><polyline points="4,7 6,9.5 10,4.5"/></svg>완료
@@ -1427,7 +1427,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     </div>
     <div class="enddate-row" id="cm-enddate-row">
       <span style="font-size:12px;color:var(--tm);white-space:nowrap;" id="cm-enddate-label">완료일</span>
-      <input type="date" class="modal-inp" id="cm-end" style="flex:1;margin-bottom:0;">
+      <input type="date" class="modal-inp" id="cm-end" style="flex:1;margin-bottom:0;" lang="en-GB">
     </div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
       <span style="font-size:12px;color:var(--tm);white-space:nowrap;">별점</span>
@@ -1557,11 +1557,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div class="pdf-modal-body">
       <div class="pdf-range-row">
         <span class="pdf-range-lbl">시작</span>
-        <input type="date" class="modal-inp" id="pdf-start" style="flex:1;margin-bottom:0;" oninput="updatePdfCount()">
+        <input type="date" class="modal-inp" id="pdf-start" style="flex:1;margin-bottom:0;" oninput="updatePdfCount()" lang="en-GB">
       </div>
       <div class="pdf-range-row">
         <span class="pdf-range-lbl">종료</span>
-        <input type="date" class="modal-inp" id="pdf-end" style="flex:1;margin-bottom:0;" oninput="updatePdfCount()">
+        <input type="date" class="modal-inp" id="pdf-end" style="flex:1;margin-bottom:0;" oninput="updatePdfCount()" lang="en-GB">
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
         <button onclick="setPdfRange('week')" style="flex:1;padding:7px;border-radius:9px;border:1px solid var(--inp-b);background:var(--inp);color:var(--ts);font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer;">이번 주</button>
@@ -5355,8 +5355,8 @@ function renderWeeklyHabitBox(){
       const on=!!checks[h.name+'-'+d];
       if(on)cnt++;
       const isToday=d===todayDow;
-      const borderColor=isToday?'var(--acc)':(on?rgba:'rgba(195,175,168,0.5)');
-      const borderWidth=isToday?'1.6px':'1.3px';
+      const borderColor=on?rgba:'rgba(195,175,168,0.5)';
+      const borderWidth=isToday?'2px':'1.3px';
       const bg=on?rgba:'none';
       dotsHtml+='<div class="hw-dot-wrap"><div class="hw-dot" style="background:'+bg+';border-color:'+borderColor+';border-width:'+borderWidth+';"></div></div>';
     }
