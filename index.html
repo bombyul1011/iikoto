@@ -3315,7 +3315,7 @@ const SUPA_URL='https://vqvpzrxmtpryzhontlxc.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdnB6cnhtdHByeXpob250bHhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTgxMjksImV4cCI6MjA5NjYzNDEyOX0.pbtq1UMPC7ylYM1H2xVa19C1TFlceLmEfEtkz3WK2VI';
 // 카카오 책표지 등 외부 이미지는 CORS 헤더가 없어 html2canvas로 캡처가 안 됨 —
 // 기존 다이어트 앱 Worker에 /img-proxy 라우트를 추가해서 그 경유지로 이미지를 불러옴
-const IMG_PROXY_BASE='https://notion-diet-proxy.faith-003.workers.dev/img-proxy?url=';
+const IMG_PROXY_BASE='https://iikoto-img-proxy.faith-003.workers.dev/img-proxy?url=';
 function proxyImgUrl(src){
   if(!src)return src;
   if(src.startsWith('data:'))return src; // 이미 base64면 그대로
