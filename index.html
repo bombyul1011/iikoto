@@ -1487,6 +1487,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           <span style="font-size:11px;color:var(--tm);">Supabase에서 최근 14일 데이터 강제 복구</span>
           <button onclick="forceRestoreAll()" style="width:100%;padding:9px;border-radius:10px;border:none;background:rgba(100,195,185,0.25);color:#2a7868;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">🔄 데이터 복구하기</button>
         </div>
+        <div class="settings-item" style="flex-direction:column;gap:8px;align-items:flex-start;padding-top:12px;">
+          <span style="font-size:11px;color:var(--tm);">최근 14일 로컬↔Supabase 개수 비교 (오늘 날짜는 동기화 전이라 다를 수 있어요)</span>
+          <button onclick="checkDataIntegrity()" style="width:100%;padding:9px;border-radius:10px;border:1px solid var(--div);background:transparent;color:var(--tp);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">🔍 데이터 무결성 점검</button>
+          <div id="integrity-check-status" style="font-size:11px;color:var(--tm);line-height:1.6;"></div>
+        </div>
       </div>
       <div class="settings-slbl">앱 정보</div>
       <div class="settings-card">
@@ -6049,42 +6054,6 @@ function renderShareStage(){
   }
   stage.innerHTML=html;
 }
-function loadImg(src){
-  return new Promise((resolve,reject)=>{
-    const img=new Image();
-    if(!src.startsWith('data:'))img.crossOrigin='anonymous';
-    img.onload=()=>resolve(img);
-    img.onerror=reject;
-    img.src=src;
-  });
-}
-function drawCoverFit(ctx,img,x,y,w,h){
-  const ir=img.width/img.height, br=w/h;
-  let sx,sy,sw,sh;
-  if(ir>br){sh=img.height;sw=sh*br;sx=(img.width-sw)/2;sy=0;}
-  else{sw=img.width;sh=sw/br;sx=0;sy=(img.height-sh)/2;}
-  ctx.drawImage(img,sx,sy,sw,sh,x,y,w,h);
-}
-function rr(ctx,x,y,w,h,r){
-  ctx.beginPath();
-  ctx.moveTo(x+r,y);
-  ctx.arcTo(x+w,y,x+w,y+h,r);
-  ctx.arcTo(x+w,y+h,x,y+h,r);
-  ctx.arcTo(x,y+h,x,y,r);
-  ctx.arcTo(x,y,x+w,y,r);
-  ctx.closePath();
-}
-function wrapLines(ctx,text,maxWidth){
-  const lines=[];
-  let cur='';
-  for(const ch of text){
-    const test=cur+ch;
-    if(ctx.measureText(test).width>maxWidth&&cur){lines.push(cur);cur=ch;}
-    else cur=test;
-  }
-  if(cur)lines.push(cur);
-  return lines;
-}
 async function ensureShareFontsLoaded(){
   try{
     await Promise.all([
@@ -6093,209 +6062,28 @@ async function ensureShareFontsLoaded(){
     ]);
   }catch(e){}
 }
-async function buildShareCanvas(){
-  const SC=3.6; // 280px 미리보기 기준 출력 배율 (약 1008x1343, 고해상도)
-  const W=Math.round(280*SC), H=Math.round(373*SC);
-  const canvas=document.createElement('canvas');
-  canvas.width=W;canvas.height=H;
-  const ctx=canvas.getContext('2d');
-  const px=v=>v*SC;
-
-  if(_shareState.bg){
-    const bgImg=await loadImg(_shareState.bg);
-    drawCoverFit(ctx,bgImg,0,0,W,H);
-  }
-  // 비네트
-  const grad1=ctx.createRadialGradient(W/2,H,H*0.1,W/2,H,H*0.78);
-  grad1.addColorStop(0,'rgba(0,0,0,.55)');grad1.addColorStop(1,'rgba(0,0,0,0)');
-  ctx.fillStyle=grad1;ctx.fillRect(0,0,W,H);
-  const grad2=ctx.createLinearGradient(0,0,0,H*0.3);
-  grad2.addColorStop(0,'rgba(0,0,0,.28)');grad2.addColorStop(1,'rgba(0,0,0,0)');
-  ctx.fillStyle=grad2;ctx.fillRect(0,0,W,H*0.3);
-
-  await ensureShareFontsLoaded();
-  const cream='#f6ecdd';
-  ctx.textBaseline='alphabetic';
-  ctx.shadowColor='rgba(0,0,0,.55)';ctx.shadowBlur=px(4);ctx.shadowOffsetY=px(1);
-
-  const cur=getBooks().find(b=>b.status==='reading');
-  const quotes=cur?getQuotes().filter(q=>q.bookCid===cur.cid):[];
-  const pickedQuote=quotes.find(q=>q.cid===_shareState.quoteCid)||quotes[0];
-
-  if(cur){
-    if(_shareState.header==='rl'){
-      // iikoto moments 캡슐 + 라인
-      ctx.font=`italic ${px(9.5)}px 'Bareonbatang',serif`;
-      const label='iikoto moments';
-      const tw=ctx.measureText(label).width;
-      const capW=tw+px(32),capH=px(20),capX=px(20),capY=px(20);
-      ctx.strokeStyle='rgba(246,236,221,0.42)';ctx.lineWidth=px(1);
-      rr(ctx,capX,capY,capW,capH,capH/2);ctx.stroke();
-      ctx.fillStyle=cream;ctx.textAlign='center';
-      ctx.fillText(label,capX+capW/2,capY+capH/2+px(3));
-      const lineX1=capX+capW+px(8),lineX2=px(260);
-      ctx.strokeStyle='rgba(246,236,221,0.30)';ctx.lineWidth=px(1);
-      ctx.beginPath();ctx.moveTo(lineX1,capY+capH/2);ctx.lineTo(lineX2,capY+capH/2);ctx.stroke();
-      ctx.textAlign='center';ctx.font=`${px(11)}px 'DM Sans',sans-serif`;
-      ctx.fillText('✦',lineX2+px(8),capY+capH/2+px(4));
-      const rlNoteY=capY+capH+px(10);
-      if(_shareState.idxNote){
-        ctx.font=`${px(9)}px 'DM Sans',sans-serif`;
-        ctx.fillStyle='rgba(246,236,221,0.65)';ctx.textAlign='right';
-        ctx.fillText(_shareState.idxNote,lineX2,rlNoteY);
-        ctx.textAlign='left';
-      }
-    }else if(_shareState.header==='idx'){
-      const dateStr=dateKey(new Date()).replace(/-/g,'.');
-      ctx.font=`italic ${px(10.5)}px 'Bareonbatang',serif`;
-      const dateW=ctx.measureText(dateStr).width;
-      const rowY=px(28),lineX0=px(24),lineX1=px(256);
-      const dividerX=lineX1-dateW-px(10);
-      ctx.fillStyle='rgba(246,236,221,0.85)';
-      ctx.textAlign='right';
-      ctx.fillText(dateStr,lineX1,rowY);
-      ctx.textAlign='left';
-      const maxTitleW=dividerX-lineX0-px(10);
-      let titleTxt=cur.title;
-      while(ctx.measureText(titleTxt).width>maxTitleW&&titleTxt.length>1){titleTxt=titleTxt.slice(0,-1);}
-      if(titleTxt!==cur.title)titleTxt=titleTxt.slice(0,-1)+'…';
-      ctx.fillText(titleTxt,lineX0,rowY);
-      ctx.strokeStyle='rgba(246,236,221,0.4)';ctx.lineWidth=px(1);
-      ctx.beginPath();ctx.moveTo(dividerX,rowY-px(8));ctx.lineTo(dividerX,rowY+px(3));ctx.stroke();
-      ctx.strokeStyle='rgba(246,236,221,0.30)';
-      ctx.beginPath();ctx.moveTo(lineX0,px(34));ctx.lineTo(lineX1,px(34));ctx.stroke();
-      if(_shareState.idxNote){
-        ctx.font=`${px(9)}px 'DM Sans',sans-serif`;
-        ctx.fillStyle='rgba(246,236,221,0.65)';ctx.textAlign='right';
-        ctx.fillText(_shareState.idxNote,lineX1,px(46));
-        ctx.textAlign='left';
-      }
-    }
-    if(_shareState.progress!=='none'){
-      let pct=0;
-      if(cur.unit==='percent')pct=cur.percent||0;
-      else if(cur.totalPages)pct=Math.min(100,Math.round((cur.pages/cur.totalPages)*100));
-      const label=cur.unit==='percent'?`${pct}%`:(cur.totalPages?`${cur.pages} / ${cur.totalPages}p`:`${pct}%`);
-      const px0=_shareState.progress==='topright'?W-px(24)-px(77):px(24),pw=px(77);
-      const py=_shareState.progress==='bottom'?H-px(16):px(20);
-      ctx.font=`${px(8.5)}px 'DM Sans',sans-serif`;ctx.textAlign='right';
-      ctx.fillStyle='rgba(246,236,221,0.75)';
-      ctx.fillText(label,px0+pw,py-px(4));
-      ctx.strokeStyle='rgba(246,236,221,0.25)';ctx.lineWidth=px(2);ctx.lineCap='round';
-      ctx.beginPath();ctx.moveTo(px0,py);ctx.lineTo(px0+pw,py);ctx.stroke();
-      ctx.strokeStyle='rgba(246,236,221,0.75)';
-      ctx.beginPath();ctx.moveTo(px0,py);ctx.lineTo(px0+pw*pct/100,py);ctx.stroke();
-      ctx.beginPath();ctx.arc(px0+pw*pct/100,py,px(3.5),0,Math.PI*2);
-      ctx.fillStyle='#f6ecdd';ctx.fill();
-      ctx.textAlign='left';
-    }
-    ctx.textAlign='left';
-    if(_shareState.quote==='qs'&&pickedQuote){
-      const x0=px(20),w0=px(240);
-      ctx.font=`${px(9.5)}px 'Bareonbatang',serif`;
-      const lines=wrapLines(ctx,pickedQuote.text,w0-px(20));
-      const lineH=px(16);
-      // 인용구 줄 수에 따라 전체 블록 높이를 먼저 계산하고, 캔버스 하단에서부터 위로 배치
-      // (줄이 길어져도 항상 카드 안에 들어가게, 고정값으로 잘리지 않도록)
-      const blockH=(lines.length-1)*lineH+px(10)+px(16);
-      let y=H-px(20)-blockH;
-      ctx.font=`${px(12)}px serif`;ctx.fillStyle='rgba(246,236,221,0.88)';
-      ctx.fillText('❝',x0,y);
-      ctx.font=`${px(9.5)}px 'Bareonbatang',serif`;ctx.fillStyle=cream;
-      lines.forEach((ln,i)=>ctx.fillText(ln,x0+px(20),y+i*lineH));
-      const lastY=y+(lines.length-1)*px(17)+px(10);
-      ctx.strokeStyle='rgba(246,236,221,0.22)';ctx.lineWidth=px(1);
-      ctx.beginPath();ctx.moveTo(x0,lastY);ctx.lineTo(x0+w0,lastY);ctx.stroke();
-      ctx.font=`700 ${px(10)}px 'DM Sans',sans-serif`;ctx.fillStyle='rgba(246,236,221,0.92)';
-      ctx.fillText(cur.title,x0,lastY+px(16));
-      const tw2=ctx.measureText(cur.title).width;
-      ctx.font=`${px(10)}px 'DM Sans',sans-serif`;ctx.fillStyle='rgba(246,236,221,0.65)';
-      ctx.fillText(cur.author||'',x0+tw2+px(8),lastY+px(16));
-    }else if(_shareState.quote==='qt'&&pickedQuote){
-      const x0=px(20),w0=px(240);
-      ctx.font=`${px(9.5)}px 'Bareonbatang',serif`;
-      const lines=wrapLines(ctx,pickedQuote.text,w0-px(26));
-      const boxH=px(28)+lines.length*px(16)+px(20);
-      const y0=H-px(38)-boxH;
-      ctx.strokeStyle='rgba(246,236,221,0.32)';ctx.lineWidth=px(1.3);
-      rr(ctx,x0,y0,w0,boxH,px(18));ctx.stroke();
-      // 마스킹테이프
-      ctx.save();ctx.translate(x0+px(22)+px(23),y0);ctx.rotate(-6*Math.PI/180);
-      ctx.fillStyle='rgba(190,170,148,0.55)';
-      ctx.fillRect(-px(23),-px(7),px(46),px(15));
-      ctx.restore();
-      ctx.fillStyle='rgba(246,236,221,0.88)';
-      ctx.font=`${px(10)}px serif`;ctx.fillText('❝',x0+px(13),y0+px(22));
-      ctx.font=`${px(9.5)}px 'Bareonbatang',serif`;ctx.fillStyle=cream;
-      lines.forEach((ln,i)=>ctx.fillText(ln,x0+px(13),y0+px(34)+i*px(16)));
-      ctx.font=`${px(12)}px serif`;ctx.textAlign='right';
-      ctx.fillText('❞',x0+w0-px(13),y0+boxH-px(10));
-      ctx.font=`700 ${px(9.5)}px 'DM Sans',sans-serif`;ctx.fillStyle='rgba(246,236,221,0.88)';
-      const metaY=y0+boxH+px(14);
-      ctx.fillText(cur.title,x0+w0,metaY);
-      const tw3=ctx.measureText(cur.title).width;
-      ctx.font=`${px(9.5)}px 'DM Sans',sans-serif`;ctx.fillStyle='rgba(246,236,221,0.6)';
-      ctx.fillText(cur.author||'',x0+w0-tw3-px(8),metaY);
-      ctx.textAlign='left';
-    }else if(_shareState.quote==='hl'&&pickedQuote){
-      const x0=px(20),w0=px(240);
-      ctx.font=`${px(9.5)}px 'Bareonbatang',serif`;
-      const lines=wrapLines(ctx,pickedQuote.text,w0-px(14));
-      const lh=px(22);
-      let y=H-px(20)-(lines.length*lh)-px(26);
-      lines.forEach(ln=>{
-        const tw=ctx.measureText(ln).width;
-        ctx.fillStyle='rgba(255,150,140,0.42)';
-        ctx.fillRect(x0-px(3),y-lh*0.72,tw+px(10),lh*0.92);
-        ctx.fillStyle='#fff8f0';
-        ctx.fillText(ln,x0+px(2),y);
-        y+=lh;
-      });
-      ctx.font=`700 ${px(10)}px 'DM Sans',sans-serif`;ctx.fillStyle='rgba(246,236,221,0.92)';
-      ctx.fillText(cur.title,x0,y+px(4));
-      const tw4=ctx.measureText(cur.title).width;
-      ctx.font=`${px(10)}px 'DM Sans',sans-serif`;ctx.fillStyle='rgba(246,236,221,0.65)';
-      ctx.fillText(cur.author||'',x0+tw4+px(8),y+px(4));
-    }else if(_shareState.quote==='paper'&&pickedQuote){
-      const x0=px(20),w0=px(240),padX=px(16),padTop=px(14);
-      ctx.font=`${px(9.5)}px 'Bareonbatang',serif`;
-      const lines=wrapLines(ctx,pickedQuote.text,w0-padX*2);
-      const lh=px(20);
-      const boxH=padTop+lines.length*lh+px(22);
-      const y0=H-px(38)-boxH;
-      ctx.fillStyle='rgba(246,236,221,0.07)';
-      rr(ctx,x0,y0,w0,boxH,px(14));ctx.fill();
-      ctx.strokeStyle='rgba(246,236,221,0.28)';ctx.lineWidth=px(1);
-      for(let i=0;i<lines.length;i++){
-        const ly=y0+padTop+ (i+1)*lh - px(4);
-        ctx.beginPath();ctx.moveTo(x0+padX,ly);ctx.lineTo(x0+w0-padX,ly);ctx.stroke();
-      }
-      ctx.fillStyle=cream;
-      lines.forEach((ln,i)=>ctx.fillText(ln,x0+padX,y0+padTop+(i+1)*lh-px(7)));
-      const metaY2=y0+boxH-px(8);
-      ctx.font=`700 ${px(10)}px 'DM Sans',sans-serif`;ctx.fillStyle='rgba(246,236,221,0.9)';
-      ctx.fillText(cur.title,x0+padX,metaY2);
-      const tw5=ctx.measureText(cur.title).width;
-      ctx.font=`${px(10)}px 'DM Sans',sans-serif`;ctx.fillStyle='rgba(246,236,221,0.62)';
-      ctx.fillText(cur.author||'',x0+padX+tw5+px(8),metaY2);
-    }
-  }
-  ctx.shadowColor='transparent';ctx.shadowBlur=0;ctx.shadowOffsetY=0;
-  if(_shareState.logo!=='none'){
-    try{
-      const logoImg=await loadImg(SHARE_LOGO_B64);
-      const lh=px(16),lw=lh*(logoImg.width/logoImg.height);
-      const lx=W-px(16)-lw;
-      const ly=_shareState.logo==='tr'?px(14):H-px(14)-lh;
-      ctx.drawImage(logoImg,lx,ly,lw,lh);
-    }catch(e){}
-  }
-  return canvas;
+async function loadHtml2Canvas(){
+  if(window.html2canvas)return;
+  if(window._h2cLoading)return window._h2cLoading;
+  window._h2cLoading=new Promise((resolve,reject)=>{
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    s.onload=resolve;
+    s.onerror=reject;
+    document.head.appendChild(s);
+  });
+  return window._h2cLoading;
 }
+// 미리보기(#share-stage-inner)에 실제로 그려진 CSS 디자인을 그대로 고해상도로 캡처.
+// 예전엔 미리보기와 별개로 Canvas2D 명령어로 다시 그려서(buildShareCanvas) 미리보기/출력이
+// 어긋나고 디테일이 누락됐는데, 이제는 미리보기와 100% 같은 DOM을 캡처하므로 그 문제가 없음.
 async function saveShareCard(){
   if(!_shareState.bg){showToast('배경 사진을 먼저 추가해주세요');return;}
   try{
-    const canvas=await buildShareCanvas();
+    await ensureShareFontsLoaded();
+    await loadHtml2Canvas();
+    const stage=document.getElementById('share-stage-inner');
+    const canvas=await html2canvas(stage,{scale:3.6,useCORS:true,backgroundColor:null,logging:false});
     const filename='iikoto_reading_'+dateKey(new Date())+'.png';
     const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
     if(!blob){showToast('이미지 저장에 실패했어요');return;}
@@ -6699,6 +6487,30 @@ async function forceRestoreAll(){
   window._restoring = false;
   loadDaily();
   showToast('복구 완료 ✅ ' + restored + '일치 데이터 복원됨');
+}
+async function checkDataIntegrity(){
+  const statusEl=document.getElementById('integrity-check-status');
+  if(!navigator.onLine){if(statusEl){statusEl.style.color='#c05060';statusEl.textContent='오프라인 상태에선 점검할 수 없어요';}return;}
+  if(statusEl){statusEl.style.color='';statusEl.textContent='점검 중이에요...';}
+  const dates=[];
+  for(let i=13;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);dates.push(dateKey(d));}
+  const todayDk=dateKey(new Date());
+  const mismatches=[];
+  for(const dk of dates){
+    const localT=getTodos(dk).length,localM=getMemos(dk).length,localR=getRhythmBlocks(dk).length;
+    const [remT,remM,remR]=await Promise.all([
+      supaFetch(`todos?date_key=eq.${dk}&select=client_id`),
+      supaFetch(`memos?date_key=eq.${dk}&select=client_id`),
+      supaFetch(`rhythm_blocks?date_key=eq.${dk}&select=client_id`)
+    ]);
+    if(dk===todayDk)continue; // 오늘은 동기화 진행중일 수 있어 제외
+    if(remT!==null&&remT.length!==localT)mismatches.push(`${dk} 투두 (로컬 ${localT} / 서버 ${remT.length})`);
+    if(remM!==null&&remM.length!==localM)mismatches.push(`${dk} 메모 (로컬 ${localM} / 서버 ${remM.length})`);
+    if(remR!==null&&remR.length!==localR)mismatches.push(`${dk} 리듬 (로컬 ${localR} / 서버 ${remR.length})`);
+  }
+  if(!statusEl)return;
+  if(!mismatches.length){statusEl.style.color='';statusEl.textContent='✓ 최근 14일 데이터가 서로 일치해요';}
+  else{statusEl.style.color='#c05060';statusEl.innerHTML='⚠ 불일치 발견 — 필요시 위 복구 버튼을 눌러보세요<br>'+mismatches.join('<br>');}
 }
 // ── INIT
 updateDateUI();
