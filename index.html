@@ -806,14 +806,20 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .s-tr-star{margin-top:1px;font-size:8px;color:rgba(238,242,230,0.6);}
 
 /* 헤더 스티커: 인덱스 카드형 */
-.s-idx{position:absolute;top:22px;left:24px;right:24px;}
-.s-idx-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;font-family:'Bareonbatang',serif;font-style:italic;font-size:10.5px;color:rgba(246,236,221,0.85);}
-.s-idx-title{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.s-idx-divider{width:1px;height:11px;background:rgba(246,236,221,0.4);flex-shrink:0;}
+.s-idx{position:absolute;top:16px;left:22px;right:56px;}
+.s-idx-row{display:flex;align-items:center;gap:8px;font-family:'Bareonbatang',serif;font-style:italic;font-size:8.5px;letter-spacing:.08em;color:rgba(246,236,221,0.85);white-space:nowrap;}
+.s-idx-label{flex-shrink:0;}
+.s-idx-divider{width:1px;height:9px;background:rgba(246,236,221,0.4);flex-shrink:0;}
 .s-idx-date{white-space:nowrap;flex-shrink:0;}
-.s-idx-line{height:1px;background:rgba(246,236,221,0.30);}
-.s-idx-note{margin-top:6px;text-align:right;font-family:'DM Sans',sans-serif;font-style:normal;font-size:9px;color:rgba(246,236,221,0.65);}
+.s-idx-note{margin-top:6px;text-align:left;font-family:'DM Sans',sans-serif;font-style:normal;font-size:9px;color:rgba(246,236,221,0.65);}
 .s-rl .s-idx-note{margin-top:4px;}
+.s-idx-bookmark{position:absolute;top:0;right:22px;width:17px;height:40px;}
+
+.s-books{position:absolute;top:20px;left:20px;right:20px;}
+.s-books-row{display:flex;align-items:center;gap:9px;}
+.s-books-line{flex:1;height:2px;}
+.s-books-icon{flex-shrink:0;width:14px;height:14px;color:rgba(246,236,221,0.85);}
+.s-books-label{text-align:center;font-size:4.6px;letter-spacing:.14em;font-style:italic;color:rgba(246,236,221,.68);margin-top:2px;font-family:'Bareonbatang',serif;}
 
 /* 표지 스티커 (독립) */
 
@@ -864,10 +870,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .s-logo img{height:16px;display:block;}
 .s-logo.pos-br{bottom:14px;right:16px;}
 .s-logo.pos-tr{top:14px;right:16px;}
-.s-cover{position:absolute;width:34px;height:48px;border-radius:6px;overflow:hidden;box-shadow:0 3px 10px rgba(0,0,0,.4);border:1px solid rgba(246,236,221,0.3);}
+.s-cover{position:absolute;width:34px;height:48px;}
+.s-cover-img{width:100%;height:100%;border-radius:6px;overflow:hidden;box-shadow:0 3px 10px rgba(0,0,0,.4);border:1px solid rgba(246,236,221,0.3);}
 .s-cover img{width:100%;height:100%;object-fit:cover;display:block;}
 .s-cover.pos-bl{bottom:16px;left:18px;}
 .s-cover.pos-br{bottom:16px;right:18px;}
+.s-cover.pos-tl{top:16px;left:18px;}
+.s-cover.pos-tr{top:16px;right:18px;}
+.s-cover-title{margin-top:5px;font-family:'Bareonbatang',serif;font-size:7px;line-height:1.25;color:rgba(246,236,221,0.85);text-align:center;width:52px;margin-left:-9px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
 </style>
 </head>
 <body>
@@ -1186,6 +1196,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="share-cycle-btn" id="cyc-cover" onclick="cycleShare('cover')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="2" width="8" height="12" rx="1"/><line x1="3" y1="2" x2="3" y2="14"/></svg>
         <span class="lbl" id="cyc-cover-lbl">표지 없음</span>
+      </div>
+      <div class="share-cycle-btn" id="cyc-coverTitle" onclick="cycleShare('coverTitle')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="2" width="8" height="8" rx="1"/><line x1="2" y1="13" x2="14" y2="13"/></svg>
+        <span class="lbl" id="cyc-coverTitle-lbl">표지 제목 없음</span>
       </div>
     </div>
 
@@ -5919,16 +5933,17 @@ function setRdUnit(u){
 // ===== 독서 공유카드 =====
 const SHARE_LOGO_B64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFgAAAA0CAYAAAAOo/8VAAAD30lEQVR4nO2bP2zUMBTGf0FIVFcWythbWChDO1MkxABLGQAJwVDWdqcDIJgoExJbF6Z2ZQIGBsRCJaYixpaBPwKWdgKOiQqmMCTmHN9zzrnYJJz8Sackzuf3fF/8J7Zfkv1vn4gIhwNNF2DcEQUOjChwYJQJPF3BzhFHXhWbYwFJ4AdACuzmx8WS/Gn+6+XHQ0O4yubSKIX9H5EIbxGpxLPkd+XeJHtwLjZDYp3+w50Afod2WKcPLqutJuZr+PEJveX8+hcO6wgsPf1LNeyFxmwTTiWBE2AjP79HeVNOgP38/CTwzF/RvONwE05tNXgZ6AKrDjYmc+4bT2VyfSMBmPHkM5g/SeBZiiN+2avVa4NbB+YbiYRFjZcC74xrcyBVWAK2SnzaHuqo/v7C91vECeC9wHsCXC6x6eKzygPU8+7i9v7ty18Bvmdyp0fI4/JHqrYOne86uel48ldAk1PlaewF02vE6oj2v+fHFUe+Gqzr+iugSYF3Lelmc7srcLo5T/+ZmMqPa/n9UxZfZv66/gpo22KPy+xuDtgT0ieEtGP1ilPfX1sE3kMWV+o/31psSBOfhxXL4d1fWwS2DUTXatpdqMj37q8tAoM84K3XtPm0It+7vzYJDPDTuP4hcGwLRx0h7cYQWyZ8+gOaFVjqczvA7SH5thhcuOkw+HAAvmjn0gTIZVo+qj+g+RrcFdLuU/xDKwJnh+KUVfqzHx38q2m5Pl326q9pgffIFpZM7GjnayPaPl6R3wvhz7fAm5b05yV5Nhhe26ruftj4rnZ8+RMFNputOEPJ8ci4HuiDcmwY1+bCvEttS8jWnMuwzHBxbPdXQviTVtOaxHWyBaOrTRfEF9om8Nih6UFu7BEFDowocGBEgQMjChwYUeDAiAIHRhQ4MKLAgREFDoyDnuzo2z1NxP22pQwD8FWD2/CH2lCGAYxTF6F2pm1r0o0ghMD61ort+w4zajHFvrm4LXAlfMiPF8jCn8q4+n31G7YXOBJ8LVfq3z4kZPtbPe1axzz9UFJ1L7Vwt+lH1nSBM8ArC1e3oc7nkANHTH8pcB54IXBrwZfAqsCT9IPobKJJ6T65WO5L3McEXtz33UXsD6c4Q+pepFiEOriCfZfYC0INcmcrcG1h+Wq3+auWpoS4ZXB14VUzt/W/C2T7jAnZNyhmfq/w3UUkFIMypG/RpP4Pit0LZJGKnzXuDFkIv55X4SXZQ+2S9de2bkT56wFHLeXxCh81WG/KenM7hxyBeEfj6oOR2b3oO9Tq+wiQhVAtRoWZql3sFLgo8KcM/1IAjBfETc/AGKeJRisRBQ6MKHBg/AE3TPDnCSS3zAAAAABJRU5ErkJggg==';
 const SHARE_CYCLE = {
-  header: [['none','헤더 없음'],['rl','모먼츠'],['idx','인덱스 카드']],
+  header: [['none','헤더 없음'],['rl','모먼츠'],['idx','인덱스'],['books','북스']],
   quote: [['none','문장 없음'],['qs','문장 · 심플'],['qt','문장 · 테이프'],['hl','문장 · 하이라이트'],['paper','문장 · 편지지']],
   progress: [['none','진행률 없음'],['top','진행률 · 상단좌'],['topright','진행률 · 상단우'],['bottom','진행률 · 하단']],
   logo: [['none','로고 없음'],['br','로고 · 우하단'],['tr','로고 · 우상단']],
-  cover: [['none','표지 없음'],['bl','표지 · 좌하단'],['br','표지 · 우하단']]
+  cover: [['none','표지 없음'],['bl','표지 · 좌하단'],['br','표지 · 우하단'],['tl','표지 · 좌상단'],['tr','표지 · 우상단']],
+  coverTitle: [['off','표지 제목 없음'],['on','표지 제목 표시']]
 };
-let _shareState = { bg:null, header:'none', quote:'none', quoteCid:null, progress:'none', logo:'none', cover:'none', idxNote:'' };
+let _shareState = { bg:null, header:'none', quote:'none', quoteCid:null, progress:'none', logo:'none', cover:'none', coverTitle:'off', idxNote:'' };
 function openShareCard(){
-  _shareState = { bg:null, header:'none', quote:'none', quoteCid:null, progress:'none', logo:'none', cover:'none', idxNote:'' };
-  ['header','quote','progress','logo','cover'].forEach(updateCycleBtn);
+  _shareState = { bg:null, header:'none', quote:'none', quoteCid:null, progress:'none', logo:'none', cover:'none', coverTitle:'off', idxNote:'' };
+  ['header','quote','progress','logo','cover','coverTitle'].forEach(updateCycleBtn);
   renderQuotePicker();
   const idxWrap=document.getElementById('share-idx-note-wrap');
   const idxInp=document.getElementById('share-idx-note-inp');
@@ -5978,7 +5993,7 @@ function updateCycleBtn(key){
   const found=opts.find(o=>o[0]===cur)||opts[0];
   const btn=document.getElementById('cyc-'+key);
   const lbl=document.getElementById('cyc-'+key+'-lbl');
-  if(btn)btn.classList.toggle('active',cur!=='none');
+  if(btn)btn.classList.toggle('active',cur!=='none'&&cur!=='off');
   if(lbl)lbl.textContent=found[1];
 }
 function renderQuotePicker(){
@@ -6019,14 +6034,28 @@ function renderShareStage(){
         ${_shareState.idxNote?`<div class="s-idx-note share-txtshadow">${_shareState.idxNote}</div>`:''}
       </div>`;
     }else if(_shareState.header==='idx'){
-      html+=`<div class="s-idx share-txtshadow">
+      html+=`<svg class="s-idx-bookmark" viewBox="0 0 17 40" fill="none">
+        <path d="M0.5 0.5h16v36l-8-6-8 6z" fill="rgba(246,236,221,.8)" stroke="rgba(246,236,221,.85)" stroke-width="1"/>
+      </svg>
+      <div class="s-idx share-txtshadow">
         <div class="s-idx-row">
-          <span class="s-idx-title">${cur.title}</span>
+          <span class="s-idx-label">READING LOG</span>
           <div class="s-idx-divider"></div>
           <span class="s-idx-date">${dateKey(new Date()).replace(/-/g,'.')}</span>
         </div>
-        <div class="s-idx-line"></div>
-        ${_shareState.idxNote?`<div class="s-idx-note">${_shareState.idxNote}</div>`:''}
+        ${_shareState.idxNote?`<div class="s-idx-note share-txtshadow">${_shareState.idxNote}</div>`:''}
+      </div>`;
+    }else if(_shareState.header==='books'){
+      html+=`<div class="s-books share-txtshadow">
+        <div class="s-books-row">
+          <svg class="s-books-line" viewBox="0 0 100 2" preserveAspectRatio="none"><line x1="0" y1="1" x2="100" y2="1" stroke="rgba(246,236,221,.42)" stroke-width="1" stroke-dasharray="0.5,1.6" stroke-linecap="round"/></svg>
+          <svg class="s-books-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+          </svg>
+          <svg class="s-books-line" viewBox="0 0 100 2" preserveAspectRatio="none"><line x1="0" y1="1" x2="100" y2="1" stroke="rgba(246,236,221,.42)" stroke-width="1" stroke-dasharray="0.5,1.6" stroke-linecap="round"/></svg>
+        </div>
+        <div class="s-books-label">IIKOTO BOOKS</div>
       </div>`;
     }
     if(_shareState.progress!=='none'){
@@ -6070,7 +6099,10 @@ function renderShareStage(){
     html+=`<div class="s-logo pos-${_shareState.logo}"><img src="${SHARE_LOGO_B64}"></div>`;
   }
   if(_shareState.cover!=='none'&&cur&&cur.poster){
-    html+=`<div class="s-cover pos-${_shareState.cover}"><img src="${proxyImgUrl(cur.poster)}" crossorigin="anonymous"></div>`;
+    html+=`<div class="s-cover pos-${_shareState.cover}">
+      <div class="s-cover-img"><img src="${proxyImgUrl(cur.poster)}" crossorigin="anonymous"></div>
+      ${_shareState.coverTitle==='on'?`<div class="s-cover-title share-txtshadow">${cur.title}</div>`:''}
+    </div>`;
   }
   stage.innerHTML=html;
 }
