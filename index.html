@@ -231,10 +231,15 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 @keyframes bannerShine{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
 .todo-time-sel{display:flex;gap:6px;margin:10px 0 4px;}
 .todo-time-sel button{flex:1;padding:6px 0;border-radius:10px;border:1px solid var(--card-b);background:var(--card);font-size:11.5px;color:var(--tm);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;}
+.ts-morning,.ts-afternoon,.ts-night,.ts-none{flex:1;padding:6px 0;border-radius:10px;border:1px solid var(--card-b);background:var(--card);font-size:11.5px;color:var(--tm);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;}
 .todo-time-sel button.active{font-weight:600;}
 .todo-time-sel button.ts-morning.active{background:rgba(250,215,100,0.22);border-color:rgba(250,215,100,0.55);color:rgba(180,140,0,0.9);}
 .todo-time-sel button.ts-afternoon.active{background:rgba(255,175,200,0.22);border-color:rgba(255,175,200,0.55);color:rgba(200,80,120,0.9);}
 .todo-time-sel button.ts-night.active{background:rgba(185,165,230,0.22);border-color:rgba(185,165,230,0.55);color:rgba(120,90,180,0.9);}
+.ts-morning.active{background:rgba(250,215,100,0.22);border-color:rgba(250,215,100,0.55);color:rgba(180,140,0,0.9);}
+.ts-afternoon.active{background:rgba(255,175,200,0.22);border-color:rgba(255,175,200,0.55);color:rgba(200,80,120,0.9);}
+.ts-night.active{background:rgba(185,165,230,0.22);border-color:rgba(185,165,230,0.55);color:rgba(120,90,180,0.9);}
+.ts-none.active{background:rgba(180,180,180,0.15);border-color:rgba(180,180,180,0.40);color:var(--tp);}
 .todo-time-sel button.ts-none.active{background:rgba(180,180,180,0.15);border-color:rgba(180,180,180,0.40);color:var(--tp);}
 .chk{width:16px;height:16px;border-radius:5px;border:1.5px solid rgba(200,160,160,0.55);flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;}
 .chk.on{background:var(--acc-soft);border-color:var(--acc);}
@@ -1155,7 +1160,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   <div class="bsheet" style="max-height:80vh;overflow-y:auto;" onclick="event.stopPropagation()">
     <div class="sheet-handle"></div>
     <div class="sheet-title">예비 투두</div>
-    <div class="memo-input-row" style="padding:0 4px 12px;">
+    <div class="memo-input-row" style="padding:0 16px 12px;">
       <textarea class="memo-field memo-field-sm" id="reserve-inp" placeholder="날짜 미정 할 일" rows="1" autocomplete="off" onkeydown="if(event.isComposing||event.keyCode===229)return;if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();addReserveTodo();}"></textarea>
       <button class="send-btn send-btn-sm" onclick="addReserveTodo()" title="추가"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="11" x2="7" y2="2"/><polyline points="3,6 7,2 11,6"/></svg></button>
     </div>
@@ -1166,11 +1171,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 <div class="modal-ov" id="reserve-date-modal" onclick="closeModal('reserve-date-modal',event)">
   <div class="modal">
     <div class="modal-title">날짜 지정</div>
-    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
-      <button class="mbtn" style="flex:1;" onclick="setReserveSection('morning')">오전</button>
-      <button class="mbtn" style="flex:1;" onclick="setReserveSection('afternoon')">오후</button>
-      <button class="mbtn" style="flex:1;" onclick="setReserveSection('night')">저녁</button>
-      <button class="mbtn" style="flex:1;" onclick="setReserveSection('none')">미정</button>
+    <div style="display:flex;gap:8px;margin-bottom:10px;">
+      <button class="ts-morning" id="rsec-morning" onclick="setReserveSection('morning')">오전</button>
+      <button class="ts-afternoon" id="rsec-afternoon" onclick="setReserveSection('afternoon')">오후</button>
+      <button class="ts-night" id="rsec-night" onclick="setReserveSection('night')">저녁</button>
+      <button class="ts-none active" id="rsec-none" onclick="setReserveSection('none')">미정</button>
     </div>
     <div style="display:flex;justify-content:center;margin-bottom:12px;">
       <input type="date" class="modal-inp" id="reserve-date-inp" style="width:auto;text-align:center;margin-bottom:0;" lang="en-GB">
@@ -6500,16 +6505,20 @@ function deleteReserveTodo(i){
 }
 function openReserveMoveModal(i){
   _reserveMoveIdx=i;_reserveSection='none';
-  document.querySelectorAll('#reserve-date-modal .mbtn').forEach(b=>b.classList.remove('active'));
+  setReserveSection('none');
   const dateInp=document.getElementById('reserve-date-inp');
   if(dateInp)dateInp.value=dateKey(new Date());
   document.getElementById('reserve-date-modal').classList.add('on');
 }
 function setReserveSection(s){
   _reserveSection=s;
-  document.querySelectorAll('#reserve-date-modal .mbtn:not(.cancel):not(.ok)').forEach(b=>{
-    b.classList.toggle('active',b.textContent==={morning:'오전',afternoon:'오후',night:'저녁',none:'미정'}[s]);
+  const map={morning:'rsec-morning',afternoon:'rsec-afternoon',night:'rsec-night',none:'rsec-none'};
+  Object.keys(map).forEach(k=>{
+    const btn=document.getElementById(map[k]);
+    if(!btn)return;
+    btn.classList.toggle('active',k===s);
   });
+  // 기본 active 상태가 취소되지 않도록 none 버튼 클래스 보정
 }
 function confirmReserveMove(){
   const val=document.getElementById('reserve-date-inp').value;
