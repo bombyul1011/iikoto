@@ -122,6 +122,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .slabel-search-btn:active{opacity:1;}
 .wgoal-add-btn{background:none;border:none;padding:2px;cursor:pointer;color:rgba(195,175,168,0.6);display:flex;align-items:center;justify-content:center;}
 .wgoal-add-btn:active{color:rgba(195,175,168,0.9);}
+.reserve-section-btn.active{background:var(--acc-soft);color:var(--tp);border-color:var(--acc-soft);}
 .goal-section-title{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;letter-spacing:.04em;background:linear-gradient(120deg,rgba(255,210,230,0.80),rgba(255,230,200,0.70));color:#c07080;border-radius:10px;padding:5px 13px;margin:14px 0 10px 0;border:1px solid rgba(255,185,205,0.55);box-shadow:0 2px 10px rgba(200,120,140,0.12);}
 
 /* ── CARDS ── */
@@ -994,7 +995,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         </div>
       </div>
       <div class="sleep-dur" id="sleep-dur"></div>
-      <div class="slabel">to do</div>
+      <div class="slabel-row">
+        <div class="slabel">to do</div>
+        <button class="slabel-search-btn" onclick="openReserveSheet()" title="예비 투두"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><line x1="7" y1="2" x2="7" y2="12"/><line x1="2" y1="7" x2="12" y2="7"/></svg></button>
+      </div>
       <div class="card y" id="todo-card">
         <div id="todo-list"></div>
         <div class="todo-footer">
@@ -1146,6 +1150,38 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 <div class="undo-toast" id="undo-toast">삭제됐어요 <span class="undo-btn" onclick="undoMemo()">되돌리기</span></div>
 
 <!-- TODO SHEET -->
+<!-- RESERVE TODO SHEET -->
+<div class="overlay" id="reserve-sheet" onclick="closeSheet('reserve-sheet',event)">
+  <div class="bsheet" style="max-height:80vh;overflow-y:auto;" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">예비 투두</div>
+    <div class="memo-input-row" style="padding:0 4px 12px;">
+      <textarea class="memo-field memo-field-sm" id="reserve-inp" placeholder="날짜 미정 할 일" rows="1" autocomplete="off" onkeydown="if(event.isComposing||event.keyCode===229)return;if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();addReserveTodo();}"></textarea>
+      <button class="send-btn send-btn-sm" onclick="addReserveTodo()" title="추가"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="11" x2="7" y2="2"/><polyline points="3,6 7,2 11,6"/></svg></button>
+    </div>
+    <div id="reserve-list"></div>
+  </div>
+</div>
+<!-- RESERVE TODO MOVE MODAL -->
+<div class="modal-ov" id="reserve-date-modal" onclick="closeModal('reserve-date-modal',event)">
+  <div class="modal">
+    <div class="modal-title">날짜 지정</div>
+    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+      <button class="mbtn" style="flex:1;" onclick="setReserveSection('morning')">오전</button>
+      <button class="mbtn" style="flex:1;" onclick="setReserveSection('afternoon')">오후</button>
+      <button class="mbtn" style="flex:1;" onclick="setReserveSection('night')">저녁</button>
+      <button class="mbtn" style="flex:1;" onclick="setReserveSection('none')">미정</button>
+    </div>
+    <div style="display:flex;justify-content:center;margin-bottom:12px;">
+      <input type="date" class="modal-inp" id="reserve-date-inp" style="width:auto;text-align:center;margin-bottom:0;" lang="en-GB">
+    </div>
+    <div class="modal-actions">
+      <button class="mbtn cancel" onclick="closeModal('reserve-date-modal')">취소</button>
+      <button class="mbtn ok" id="reserve-date-ok" onclick="confirmReserveMove()">이동</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="todo-sheet" onclick="closeSheet('todo-sheet',event)">
   <div class="bsheet">
     <div class="sheet-handle"></div>
@@ -1821,7 +1857,7 @@ function makeLabel(txt){
 const RHYTHM_CATS={
   exercise:{label:'운동',color:'rgba(245,165,120,0.82)'},
   rest:{label:'휴식',color:'rgba(252,215,110,0.80)'},
-  work:{label:'업무',color:'rgba(155,165,205,0.72)'},
+  work:{label:'업무',color:'rgba(185,188,200,0.75)'},
   appointment:{label:'외출',color:'rgba(150,205,225,0.68)'},
   note:{label:'기록',color:'rgba(240,150,190,0.80)'},
   enjoy:{label:'감상',color:'rgba(190,160,230,0.80)'},
@@ -3643,7 +3679,7 @@ async function syncTodosUp(dk){
   if(ensureItemCids(todos))S.set(S.key('todos',dk),todos);
   const delCids=getDelPendingCids('todos',dk);
   const ok=await syncListUpSafe('todos',`date_key=eq.${dk}`,'date_key,client_id',todos,
-    t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,postpone_count:t.postponeCount||0}),
+    t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,postpone_count:t.postponeCount||0,is_reserve:t.is_reserve||false}),
     delCids);
   if(ok)delCids.forEach(cid=>removeDelPending('todos',dk,cid));
   return ok;
@@ -4999,7 +5035,7 @@ async function syncMonthRange(y,mo){
   }
   if(tRows){
     const byDate={};
-    tRows.forEach(r=>{(byDate[r.date_key]=byDate[r.date_key]||[]).push({text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid()});});
+    tRows.forEach(r=>{if(r.date_key===RESERVE_DK)return;(byDate[r.date_key]=byDate[r.date_key]||[]).push({text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid()});});
     Object.keys(byDate).forEach(dk=>{if(!S.get(S.key('todos_pending',dk)))S.set(S.key('todos',dk),byDate[dk]);});
   }
   if(sRows)sRows.forEach(r=>S.set(S.key('sleep',r.date_key),{sleep:r.sleep_time,wake:r.wake_time}));
@@ -6421,8 +6457,79 @@ async function manualSync(){
   if(el)el.textContent='완료! '+new Date().toLocaleTimeString();
 }
 
+// ── 예비 투두 ──
+const RESERVE_DK='reserve';
+let _reserveMoveIdx=-1,_reserveSection='none';
+function getReserveTodos(){return S.get(S.key('todos',RESERVE_DK))||[];}
+function saveReserveTodos(v){
+  S.set(S.key('todos',RESERVE_DK),v);
+  autoSync('todos',RESERVE_DK);
+}
+function openReserveSheet(){
+  renderReserveList();
+  openSheet('reserve-sheet');
+}
+function renderReserveList(){
+  const list=document.getElementById('reserve-list');if(!list)return;
+  const todos=getReserveTodos();
+  if(!todos.length){list.innerHTML='<div style="font-size:12px;color:var(--tm);text-align:center;padding:12px 0;">비어있어요 — 날짜 미정 할 일을 추가해보세요</div>';return;}
+  list.innerHTML='';
+  todos.forEach((t,i)=>{
+    const el=document.createElement('div');
+    el.className='sheet-item';
+    el.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;';
+    el.innerHTML=`<span style="flex:1;color:var(--tp);">${t.text}</span>`
+      +`<button onclick="openReserveMoveModal(${i})" style="background:none;border:1px solid var(--div);border-radius:8px;padding:3px 10px;font-size:11px;color:var(--tm);cursor:pointer;white-space:nowrap;flex-shrink:0;">날짜 지정</button>`
+      +`<button onclick="deleteReserveTodo(${i})" style="background:none;border:none;padding:4px;cursor:pointer;color:rgba(192,80,96,0.7);flex-shrink:0;"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><line x1="3" y1="3" x2="11" y2="11"/><line x1="11" y1="3" x2="3" y2="11"/></svg></button>`;
+    list.appendChild(el);
+  });
+}
+function addReserveTodo(){
+  const inp=document.getElementById('reserve-inp');
+  const text=inp?inp.value.trim():'';if(!text)return;
+  const todos=getReserveTodos();
+  todos.push({text,done:false,created:Date.now(),timeSection:'none',cid:genCid(),is_reserve:true,postponeCount:0});
+  saveReserveTodos(todos);
+  if(inp){inp.value='';inp.style.height='';}
+  renderReserveList();
+}
+function deleteReserveTodo(i){
+  const todos=getReserveTodos();
+  const t=todos[i];if(t)addDelPending('todos',RESERVE_DK,t.cid);
+  todos.splice(i,1);saveReserveTodos(todos);renderReserveList();
+}
+function openReserveMoveModal(i){
+  _reserveMoveIdx=i;_reserveSection='none';
+  document.querySelectorAll('#reserve-date-modal .mbtn').forEach(b=>b.classList.remove('active'));
+  const dateInp=document.getElementById('reserve-date-inp');
+  if(dateInp)dateInp.value=dateKey(new Date());
+  document.getElementById('reserve-date-modal').classList.add('on');
+}
+function setReserveSection(s){
+  _reserveSection=s;
+  document.querySelectorAll('#reserve-date-modal .mbtn:not(.cancel):not(.ok)').forEach(b=>{
+    b.classList.toggle('active',b.textContent==={morning:'오전',afternoon:'오후',night:'저녁',none:'미정'}[s]);
+  });
+}
+function confirmReserveMove(){
+  const val=document.getElementById('reserve-date-inp').value;
+  if(!val||_reserveMoveIdx<0)return;
+  const todos=getReserveTodos();
+  const t=todos[_reserveMoveIdx];if(!t)return;
+  // 예비 목록에서 제거 (삭제 의도 기록)
+  addDelPending('todos',RESERVE_DK,t.cid);
+  todos.splice(_reserveMoveIdx,1);saveReserveTodos(todos);
+  // 선택한 날짜 투두에 추가
+  const newTodo={text:t.text,done:false,created:Date.now(),timeSection:_reserveSection,cid:genCid(),is_reserve:false,postponeCount:0};
+  const targetTodos=getTodos(val);targetTodos.push(newTodo);saveTodos(val,targetTodos);
+  // 오늘 날짜면 화면도 갱신
+  if(val===dateKey(currentDate))renderTodos();
+  closeModal('reserve-date-modal');
+  _reserveMoveIdx=-1;_reserveSection='none';
+  renderReserveList();
+  showToast(val+' 투두에 추가했어요 ✓');
+}
 // ── MARKDOWN BACKUP
-function openMarkdownBackup(){setPdfRange('month');openModal('pdf-modal');}
 
 function setPdfRange(type){
   const now=new Date();
@@ -6807,6 +6914,12 @@ async function initSync(){
     }
   }
   window._restoring=false;
+  // 예비 투두 동기화
+  if(S.get(S.key('todos_pending',RESERVE_DK))){
+    if(await syncTodosUp(RESERVE_DK))S.set(S.key('todos_pending',RESERVE_DK),false);
+  }else{
+    await syncTodosDown(RESERVE_DK);
+  }
   loadDaily();
   if(document.getElementById('v-weekly')&&document.getElementById('v-weekly').classList.contains('on'))loadWeekly();
   if(document.getElementById('v-monthly')&&document.getElementById('v-monthly').classList.contains('on'))loadMonthly();
