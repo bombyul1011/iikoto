@@ -5834,13 +5834,13 @@ function saveClaudeKey(){
   inp.value='••••••••••••'+val.slice(-4);
   const statusEl=document.getElementById('claude-key-status');
   if(statusEl)statusEl.textContent='저장됐어요 ✅';
-  showToast('Claude API 키 저장됐어요 ✅');
+  showToast('Claude API 키 저장됐어요 ✓');
 }
 function saveUserProfile(){
   const inp=document.getElementById('user-profile-inp');
   if(!inp)return;
   const val=inp.value.trim();
-  if(val){S.set('user_profile',val);showToast('저장됐어요 ✅');}
+  if(val){S.set('user_profile',val);showToast('저장됐어요 ✓');}
   else{S.remove('user_profile');showToast('삭제됐어요');}
 }
 function clearClaudeKey(){
@@ -5884,7 +5884,7 @@ function downloadFullJSONBackup(){
     a.href=url;a.download=`iikoto-backup-${dateKey(new Date())}.json`;
     document.body.appendChild(a);a.click();
     document.body.removeChild(a);URL.revokeObjectURL(url);
-    showToast('전체 데이터가 저장됐어요 ⬇️');
+    showToast('전체 데이터가 저장됐어요 ↓');
   }catch(e){
     showToast('백업 실패 — 저장 공간을 확인해주세요');
   }
@@ -6144,7 +6144,7 @@ function sendQuoteToSeed(cid){
   S.set('quote_pending_'+q.cid,true);
   autoSync('reading_quote',q.cid);
   renderRdQuotes();
-  showToast('씨앗으로 보냈어요 🌱');
+  showToast('씨앗으로 보냈어요 ✧');
 }
 function saveQuoteSheet(){
   const cur=getBooks().find(b=>b.status==='reading');
@@ -6888,7 +6888,7 @@ function exportMarkdown(){
   if(navigator.clipboard){
     navigator.clipboard.writeText(md).then(()=>{
       closeModal('pdf-modal');
-      showToast('클립보드에 복사됐어요 📋');
+      showToast('클립보드에 복사됐어요 ✓');
     });
   }
 }
@@ -6905,7 +6905,7 @@ function exportMarkdownDownload(){
   document.body.appendChild(a);a.click();
   document.body.removeChild(a);URL.revokeObjectURL(url);
   closeModal('pdf-modal');
-  showToast('파일이 저장됐어요 ⬇️');
+  showToast('파일이 저장됐어요 ↓');
 }
 
 
@@ -6957,7 +6957,7 @@ async function forceRestoreAll(){
   }
   window._restoring = false;
   loadDaily();
-  showToast('복구 완료 ✅ ' + restored + '일치 데이터 복원됨');
+  showToast('복구 완료 ✓ ' + restored + '일치 데이터 복원됨');
 }
 async function checkDataIntegrity(){
   const statusEl=document.getElementById('integrity-check-status');
