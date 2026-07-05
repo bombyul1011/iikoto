@@ -6429,7 +6429,9 @@ function setBookStatus(cid,status){
   book.status=status;
   if(status==='done')book.completedAt=dateKey(new Date());
   upsertBookLocal(book);
+  console.log('[DEBUG setBookStatus]',{cid,status,linkedContent:book.linkedContent,contentMk:book.contentMk,contentTitle:book.contentTitle,title:book.title});
   if(book.linkedContent&&book.contentMk)syncReadingBookToContent(book,status);
+  else console.log('[DEBUG setBookStatus] 콘텐츠 연동 조건 불충족 — linkedContent 또는 contentMk 없음');
   renderReadingHub();
 }
 function syncReadingBookToContent(book,bookStatus){
@@ -6438,6 +6440,7 @@ function syncReadingBookToContent(book,bookStatus){
   const mk=book.contentMk;
   const contents=getContents(mk);
   const idx=contents.findIndex(c=>c.cat==='book'&&c.title===(book.contentTitle||book.title));
+  console.log('[DEBUG syncReadingBookToContent]',{mk,cStatus,searchTitle:book.contentTitle||book.title,foundIdx:idx,contentsInMk:contents.filter(c=>c.cat==='book').map(c=>({title:c.title,status:c.status}))});
   if(idx<0)return;
   const item=contents[idx];
   if(cStatus==='watching'){
