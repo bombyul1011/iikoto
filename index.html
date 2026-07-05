@@ -2198,12 +2198,33 @@ function buildDailyRhythmTrack(dk,includeReview){
     const start=toMin(t);
     blocks.push({start:start,end:Math.min(start+60,1440),color:RHYTHM_MEAL_COLOR,label:meals[k]||MEAL_LABELS[k],time:t,icon:true});
   });
+  // 자정 넘어 새로 등록된 블록(예: 00:30 시작)을 그날 이른 새벽 활동과 구분하기 위한 기준시각.
+  // 그날 이미 등록된 수기 블록들 중 가장 늦은 시각(끝났으면 end, 진행중이면 start)을 구해두고,
+  // 이보다 훨씬 이른 새벽 시각(06시 이전)에 시작하는 블록이 새로 추가되면 "자정을 넘겨 시작한
+  // 것"으로 보고 정렬 순서(sortKey)만 +1440분(다음날 취급) 적용해 목록 맨 아래로 배치한다.
+  // 막대의 실제 화면 위치(toY)는 축 그대로 두어, 진짜 이른 새벽 활동(수면 등)과 시각적으로 겹치는
+  // 건 유지하되 목록 순서로는 명확히 구분되게 한다.
+  const NEWDAY_CUTOFF=360; // 06:00
+  let _latestManualMin=-1;
+  manual.forEach(function(b){
+    const s=toMin(b.start);if(s==null)return;
+    const e=b.end?toMin(b.end):s;
+    const ref=(e!=null&&e>s)?e:s;
+    if(ref>_latestManualMin)_latestManualMin=ref;
+  });
   manual.forEach(function(b,idx){
     const cat=RHYTHM_CATS[b.cat];if(!cat)return;
-    const sMin=toMin(b.start);
+    let sMin=toMin(b.start);
     let eMin=b.end?toMin(b.end):null;
+    // 이미 그날 안에 이보다 늦은 시각의 블록이 있고, 지금 블록의 시작이 새벽 컷오프
+    // 이전이면서 그 "늦은 시각"보다도 이르면 → 자정 넘겨 새로 시작한 것으로 판단
+    const isLateNightNew=sMin<NEWDAY_CUTOFF&&_latestManualMin>=NEWDAY_CUTOFF&&sMin<_latestManualMin;
+    // sortKey: 리스트/정렬 순서 결정용 (자정 넘긴 블록은 +1440 해서 맨 아래로)
+    // start/end: 실제 트랙 막대 위치(toY) 계산용 — 축 자체는 0~24시 그대로 유지
+    let sortKey=sMin;
+    if(isLateNightNew)sortKey+=1440;
     if(eMin!=null&&eMin<=sMin)eMin=1440; // 자정을 넘기는 블록은 당일 트랙에서는 24시까지로 표시
-    blocks.push({start:sMin,end:eMin,color:cat.color,label:b.text||cat.label,time:b.start+' – '+(b.end||'진행중'),manualIdx:idx,ongoing:!b.end});
+    blocks.push({start:sMin,end:eMin,sortKey:sortKey,color:cat.color,label:b.text||cat.label,time:b.start+' – '+(b.end||'진행중'),manualIdx:idx,ongoing:!b.end});
   });
   // 전날 블록이 자정을 넘겨서 오늘로 이어진 경우, 그 이어진 구간(0시~끝시각)을 오늘 트랙에도 표시
   const prevD=new Date(dk+'T00:00:00');prevD.setDate(prevD.getDate()-1);
@@ -2216,7 +2237,11 @@ function buildDailyRhythmTrack(dk,includeReview){
       blocks.push({start:0,end:eMin,color:cat.color,label:(b.text||cat.label)+' (전날 이어짐)',time:'00:00 – '+b.end,noLabel:true});
     }
   });
-  blocks.sort(function(a,b){return a.start-b.start;});
+  blocks.sort(function(a,b){
+    const ka=a.sortKey!=null?a.sortKey:a.start;
+    const kb=b.sortKey!=null?b.sortKey:b.start;
+    return ka-kb;
+  });
 
   const MIN_GAP=22;let lastY=-999;
   blocks.forEach(function(bk,bi){
@@ -6429,9 +6454,7 @@ function setBookStatus(cid,status){
   book.status=status;
   if(status==='done')book.completedAt=dateKey(new Date());
   upsertBookLocal(book);
-  console.log('[DEBUG setBookStatus]',{cid,status,linkedContent:book.linkedContent,contentMk:book.contentMk,contentTitle:book.contentTitle,title:book.title});
   if(book.linkedContent&&book.contentMk)syncReadingBookToContent(book,status);
-  else console.log('[DEBUG setBookStatus] 콘텐츠 연동 조건 불충족 — linkedContent 또는 contentMk 없음');
   renderReadingHub();
 }
 function syncReadingBookToContent(book,bookStatus){
@@ -6440,7 +6463,6 @@ function syncReadingBookToContent(book,bookStatus){
   const mk=book.contentMk;
   const contents=getContents(mk);
   const idx=contents.findIndex(c=>c.cat==='book'&&c.title===(book.contentTitle||book.title));
-  console.log('[DEBUG syncReadingBookToContent]',{mk,cStatus,searchTitle:book.contentTitle||book.title,foundIdx:idx,contentsInMk:contents.filter(c=>c.cat==='book').map(c=>({title:c.title,status:c.status}))});
   if(idx<0)return;
   const item=contents[idx];
   if(cStatus==='watching'){
