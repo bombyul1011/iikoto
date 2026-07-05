@@ -3489,6 +3489,20 @@ function getLogicalDate(){
 function genCid(){
   return Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 }
+let _toastTimer=null;
+function showToast(msg){
+  let t=document.getElementById('generic-toast');
+  if(!t){
+    t=document.createElement('div');
+    t.id='generic-toast';
+    t.className='undo-toast';
+    document.body.appendChild(t);
+  }
+  t.textContent=msg;
+  t.classList.add('on');
+  clearTimeout(_toastTimer);
+  _toastTimer=setTimeout(function(){t.classList.remove('on');},2200);
+}
 function dateKey(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;}
 function monthKey(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;}
 function weekKey(d){const m=new Date(d);m.setDate(d.getDate()-((d.getDay()+6)%7));return `week:${dateKey(m)}`;}
@@ -5988,10 +6002,13 @@ function renderSeedList(){
     const [y,mo]=mk.split('-');
     if(y&&mo)html+=`<div style="font-size:10.5px;color:var(--tm);letter-spacing:.06em;margin:14px 0 8px 2px;">${y}년 ${parseInt(mo,10)}월</div>`;
     byMonth[mk].forEach(s=>{
-      html+=`<div class="seed-card" onclick="openSeedForm(${s._idx})" oncontextmenu="event.preventDefault();deleteSeedItem(${s._idx})">
+      html+=`<div class="seed-card" onclick="openSeedForm(${s._idx})">
         <div class="seed-text">${s.text}</div>
         ${s.comment?`<div class="seed-comment">${s.comment}</div>`:''}
-        <div class="seed-date">${s.date||''}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;">
+          <div class="seed-date" style="margin-top:0;">${s.date||''}</div>
+          <span onclick="event.stopPropagation();deleteSeedItem(${s._idx})" style="cursor:pointer;color:var(--tm);opacity:0.55;font-size:12px;padding:4px 2px 4px 10px;">✕</span>
+        </div>
       </div>`;
     });
   });
@@ -6088,10 +6105,12 @@ function renderRdQuotes(){
   const MAX=2;
   const shown=_rdQuoteShowAll?quotes:quotes.slice(0,MAX);
   let html=shown.map(q=>`<div class="rd-quote-item">
-      <span class="rd-quote-del" onclick="removeQuote('${q.cid}')">✕</span>
       <div class="rd-quote-text">${q.text}</div>
-      <span class="rd-quote-toseed" onclick="sendQuoteToSeed('${q.cid}')" style="position:absolute;right:8px;bottom:6px;cursor:pointer;display:inline-flex;color:#6a8a50;opacity:0.75;">
-        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 14V8"/><path d="M8 8C8 8 4.5 6.5 3 4c3-.8 6 1.2 5 4z" fill="rgba(140,175,90,0.20)"/><path d="M8 10C8 10 11.5 8.5 13 6c-3-.8-6 1.2-5 4z" fill="rgba(140,175,90,0.20)"/></svg>
+      <span style="position:absolute;right:8px;bottom:6px;display:flex;align-items:center;gap:3px;">
+        <span class="rd-quote-toseed" onclick="sendQuoteToSeed('${q.cid}')" title="${q.sentToSeed?'씨앗으로 다시 보내기':'씨앗으로 보내기'}" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:${q.sentToSeed?'#fff':'#6a8a50'};background:${q.sentToSeed?'rgba(140,175,90,0.85)':'transparent'};opacity:${q.sentToSeed?'1':'0.75'};">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 14V8"/><path d="M8 8C8 8 4.5 6.5 3 4c3-.8 6 1.2 5 4z" fill="${q.sentToSeed?'rgba(255,255,255,0.35)':'rgba(140,175,90,0.20)'}"/><path d="M8 10C8 10 11.5 8.5 13 6c-3-.8-6 1.2-5 4z" fill="${q.sentToSeed?'rgba(255,255,255,0.35)':'rgba(140,175,90,0.20)'}"/></svg>
+        </span>
+        <span class="rd-quote-del" onclick="removeQuote('${q.cid}')" style="position:static;font-size:10px;padding:2px;">✕</span>
       </span>
     </div>`).join('');
   if(quotes.length>MAX){
@@ -6112,13 +6131,17 @@ function openQuoteSheetCheck(){
   openSheet('quote-sheet');
 }
 function sendQuoteToSeed(cid){
-  const q=getQuotes().find(x=>x.cid===cid);if(!q)return;
+  const quotes=getQuotes();
+  const q=quotes.find(x=>x.cid===cid);if(!q)return;
   const book=getBooks().find(b=>b.cid===q.bookCid);
   const source=book?`${book.title}${book.author?' · '+book.author:''}`:'';
   const seeds=getSeeds();
   seeds.unshift({text:q.text,comment:source,date:dateKey(new Date()),created:Date.now(),cid:genCid()});
   saveSeeds(seeds);
   if(navigator.onLine)syncSeedsUp();
+  q.sentToSeed=true;
+  saveQuotesLocal(quotes);
+  renderRdQuotes();
   showToast('씨앗으로 보냈어요 🌱');
 }
 function saveQuoteSheet(){
