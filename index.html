@@ -516,10 +516,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .quote-chip-inner{border-radius:12.5px;background:linear-gradient(135deg,rgba(210,244,225,0.85),rgba(248,245,200,0.85),rgba(212,242,222,0.85));padding:7px 14px;font-size:11px;font-weight:500;color:#5a8a6a;display:flex;align-items:center;gap:5px;white-space:nowrap;}
 [data-theme="glass"] .quote-chip-inner{background:rgba(253,251,245,0.95);}
 .done-banner-row{display:flex;gap:8px;margin-top:10px;}
-.done-quote-chip{flex:1;display:inline-flex;border-radius:14px;padding:1.6px;background:linear-gradient(120deg,rgba(210,175,140,0.9),rgba(235,205,165,0.88),rgba(215,180,145,0.9));background-size:300% 300%;animation:bannerShine 5s ease infinite;cursor:pointer;}
-.done-quote-chip-inner{width:100%;border-radius:12.5px;background:linear-gradient(135deg,rgba(250,238,222,0.9),rgba(253,245,232,0.9));padding:7px 10px;font-size:11px;font-weight:500;color:#8a6a45;display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;}
-.done-comment-chip{flex:1;display:inline-flex;border-radius:14px;padding:1.6px;background:linear-gradient(120deg,rgba(175,190,215,0.9),rgba(205,220,235,0.88),rgba(180,195,218,0.9));background-size:300% 300%;animation:bannerShine 5s ease infinite;cursor:pointer;}
-.done-comment-chip-inner{width:100%;border-radius:12.5px;background:linear-gradient(135deg,rgba(228,236,246,0.9),rgba(240,245,250,0.9));padding:7px 10px;font-size:11px;font-weight:500;color:#4a6a8a;display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;}
+.done-quote-chip{flex:1;display:inline-flex;border-radius:14px;padding:1.6px;background:linear-gradient(120deg,rgba(195,180,250,0.85),rgba(180,205,250,0.85));background-size:300% 300%;animation:bannerShine 5s ease infinite;cursor:pointer;}
+.done-quote-chip-inner{width:100%;border-radius:12.5px;background:linear-gradient(135deg,rgba(228,222,250,0.85),rgba(224,232,250,0.85));padding:7px 10px;font-size:11px;font-weight:500;color:#6a5a9a;display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;}
+.done-comment-chip{flex:1;display:inline-flex;border-radius:14px;padding:1.6px;background:linear-gradient(120deg,rgba(255,195,220,0.85),rgba(248,225,200,0.85));background-size:300% 300%;animation:bannerShine 5s ease infinite;cursor:pointer;}
+.done-comment-chip-inner{width:100%;border-radius:12.5px;background:linear-gradient(135deg,rgba(252,228,236,0.85),rgba(250,236,222,0.85));padding:7px 10px;font-size:11px;font-weight:500;color:#a05a78;display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;}
 [data-theme="glass"] .done-quote-chip-inner,[data-theme="glass"] .done-comment-chip-inner{background:rgba(253,251,245,0.95);}
 .report-banner.quote-soft{background:linear-gradient(135deg,rgba(195,180,250,0.95),rgba(255,195,220,0.90),rgba(180,205,250,0.92),rgba(195,180,250,0.95));}
 .report-banner.diary-soft{background:linear-gradient(135deg,rgba(245,222,170,0.95),rgba(255,205,210,0.90),rgba(248,230,190,0.92),rgba(245,222,170,0.95));}
@@ -6243,15 +6243,11 @@ function removeQuote(cid){
   renderRdQuotes();
   renderBookList();
 }
-let _rdDoneQuoteShowAll={};
 function renderDoneBookQuotes(bookCid){
   const listEl=document.getElementById('rd-done-quote-list-'+bookCid);if(!listEl)return;
   const quotes=getQuotes().filter(q=>q.bookCid===bookCid).sort((a,b)=>(b.created||0)-(a.created||0));
   if(!quotes.length){listEl.innerHTML='<div class="rd-quote-empty">아직 모은 문장이 없어요</div>';listEl.style.maxHeight='';listEl.style.overflowY='';return;}
-  const MAX=2;
-  const showAll=!!_rdDoneQuoteShowAll[bookCid];
-  const shown=showAll?quotes:quotes.slice(0,MAX);
-  let html=shown.map(q=>`<div class="rd-quote-item">
+  listEl.innerHTML=quotes.map(q=>`<div class="rd-quote-item">
       <div class="rd-quote-text">${q.text}</div>
       <span style="position:absolute;right:8px;bottom:6px;display:flex;align-items:center;gap:3px;">
         <span class="rd-quote-toseed" onclick="event.stopPropagation();sendQuoteToSeed('${q.cid}');renderDoneBookQuotes('${bookCid}')" title="${q.sentToSeed?'씨앗에서 빼기':'씨앗으로 보내기'}" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:${q.sentToSeed?'#fff':'#6a8a50'};background:${q.sentToSeed?'rgba(140,175,90,0.85)':'transparent'};opacity:${q.sentToSeed?'1':'0.75'};">
@@ -6260,16 +6256,8 @@ function renderDoneBookQuotes(bookCid){
         <span class="rd-quote-del" onclick="event.stopPropagation();removeQuote('${q.cid}');renderDoneBookQuotes('${bookCid}')" style="position:static;font-size:10px;padding:2px;">✕</span>
       </span>
     </div>`).join('');
-  if(quotes.length>MAX){
-    if(showAll){
-      html+=`<div class="rd-quote-more" onclick="event.stopPropagation();_rdDoneQuoteShowAll['${bookCid}']=false;renderDoneBookQuotes('${bookCid}')">접기</div>`;
-    }else{
-      html+=`<div class="rd-quote-more" onclick="event.stopPropagation();_rdDoneQuoteShowAll['${bookCid}']=true;renderDoneBookQuotes('${bookCid}')">··· ${quotes.length-MAX}개 더 보기</div>`;
-    }
-  }
-  listEl.innerHTML=html;
-  if(showAll){listEl.style.maxHeight='320px';listEl.style.overflowY='auto';}
-  else{listEl.style.maxHeight='';listEl.style.overflowY='';}
+  listEl.style.maxHeight='320px';
+  listEl.style.overflowY='auto';
 }
 function toggleDoneBookQuotes(cid){
   _rdDoneQuoteBookCid=_rdDoneQuoteBookCid===cid?null:cid;
@@ -6314,21 +6302,26 @@ function renderBookList(){
             <div class="done-quote-chip-inner">✎ 수집한 문장</div>
           </div>
           <div class="done-comment-chip" onclick="event.stopPropagation();">
-            <div class="done-comment-chip-inner">💬 코멘트</div>
+            <div class="done-comment-chip-inner">코멘트</div>
           </div>
         </div>
         ${quoteOpen?`<div id="rd-done-quote-list-${b.cid}" style="margin-top:6px;"></div>
         <div class="rd-quote-more" onclick="event.stopPropagation();openQuoteSheetCheck('${b.cid}')">+ 문장 추가</div>`:''}`:'';
-    const detailRow=_rdTab==='done'?
-      `<div class="rd-detail-row"><span class="rd-del-btn" onclick="event.stopPropagation();removeBook('${b.cid}')">삭제</span></div>`:
+    const detailRow=_rdTab==='done'?'':
       `<div class="rd-detail-row">
           <span class="rd-status-btn${b.status==='reading'?' active':''}" onclick="event.stopPropagation();setBookStatus('${b.cid}','reading')">읽는 중</span>
           <span class="rd-status-btn${b.status==='done'?' active':''}" onclick="event.stopPropagation();setBookStatus('${b.cid}','done')">다 읽음</span>
           <span class="rd-status-btn${b.status==='paused'?' active':''}" onclick="event.stopPropagation();setBookStatus('${b.cid}','paused')">중단</span>
           <span class="rd-del-btn" onclick="event.stopPropagation();removeBook('${b.cid}')">삭제</span>
         </div>`;
+    const titleRow=_rdTab==='done'?
+      `<div class="rd-book-title" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>${b.title}</span>
+        <span class="rd-del-btn" onclick="event.stopPropagation();removeBook('${b.cid}')">삭제</span>
+      </div>`:
+      `<div class="rd-book-title">${b.title}</div>`;
     return `<div class="rd-book-item${open?' open':''}" onclick="toggleBookDetail('${b.cid}')">
-      <div class="rd-book-title">${b.title}</div>
+      ${titleRow}
       <div class="rd-book-meta">${sub}${timeStr}</div>
       <div class="rd-book-detail">
         ${detailRow}
