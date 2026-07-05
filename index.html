@@ -4423,7 +4423,19 @@ function nextWeekKey(){const d=new Date();d.setDate(d.getDate()+7);return weekKe
 async function openNextWeekChallengeSheet(){
   openSheet('nextweek-sheet');
   const wk=nextWeekKey();
-  if(navigator.onLine)await syncWChallengeDown(wk);
+  if(navigator.onLine){
+    const now=new Date();
+    const mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7));
+    const dks=[];for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);dks.push(dateKey(d));}
+    // AI 요약을 만들기 전에, 다른 기기에서 방금 체크했을 수 있는 이번 주 데이터를 먼저 최신화
+    await Promise.all([
+      syncWChallengeDown(wk),
+      syncHCDown(weekKey(now)),
+      ...dks.map(dk=>syncTodosDown(dk)),
+      ...dks.map(dk=>syncMemosDown(dk)),
+      ...dks.map(dk=>syncSleepDown(dk))
+    ]);
+  }
   renderWeeklyChallenge(wk,'nextweek-challenge-wrap');
   loadNextWeekAISuggestions(wk);
 }
@@ -4437,6 +4449,7 @@ function buildWeekSummaryForChallenge(){
   const habitDone={};habits.forEach(h=>habitDone[h.name]=0);
   const rhythmDur={};
   const onelineSamples=[];
+  let onelineDays=0;
   for(let i=0;i<7;i++){
     const d=new Date(mon);d.setDate(mon.getDate()+i);
     const dk=dateKey(d);
@@ -4449,13 +4462,14 @@ function buildWeekSummaryForChallenge(){
     const dd=getDayCategoryDurations(dk);
     Object.keys(dd).forEach(function(k){rhythmDur[k]=(rhythmDur[k]||0)+dd[k];});
     const ol=getDailyOneLine(dk).trim();
-    if(ol)onelineSamples.push(_HOME_DAYS[d.getDay()]+': '+ol);
+    if(ol){onelineDays++;onelineSamples.push(_HOME_DAYS[d.getDay()]+': '+ol);}
   }
   const lines=[];
   lines.push(`이번 주(월~일) 할일 완료율: ${totalTodo?Math.round(doneTodo/totalTodo*100):0}% (${doneTodo}/${totalTodo})`);
   if(habits.length)lines.push('습관별 달성: '+habits.map(h=>`${h.name} ${habitDone[h.name]}/7일`).join(', '));
   lines.push(`수면 기록한 날: ${sleepDays}/7일`);
   lines.push(`메모 작성: ${memoCount}개`);
+  lines.push(`하루한줄 작성일: ${onelineDays}/7일`);
   if(Object.keys(rhythmDur).length)lines.push('시간 사용 누계: '+durSummaryLine(rhythmDur));
   if(onelineSamples.length){
     const picked=onelineSamples.length<=3?onelineSamples:[onelineSamples[0],onelineSamples[Math.floor(onelineSamples.length/2)],onelineSamples[onelineSamples.length-1]];
@@ -4473,7 +4487,7 @@ async function loadNextWeekAISuggestions(wk){
   const habits=getHabits().map(h=>h.name);
   const summary=buildWeekSummaryForChallenge();
   const sys='당신은 생활 루틴 코치예요. JSON 배열만 반환하세요. 다른 텍스트 없이 오직 JSON만.';
-  const userMsg=`현재 습관: ${habits.length?habits.join(', '):'없음'}\n이번 주(월~일) 누계 기록: ${summary}\n\n위 정보를 바탕으로 다음 주에 시도해볼 만한 짧은 주간 챌린지(다짐) 3가지를 제안해줘. 시간 사용 누계와 하루한줄의 분위기도 참고해서, 패턴에 맞는 구체적인 제안을 해줘 (예: 특정 활동이 적었거나 휴식이 부족했다면 그에 맞게). 각 12자 이내, 구체적인 행동으로. 반드시 아래 JSON 형식만 반환해:\n[{"title":"챌린지문구","desc":"왜 추천하는지 짧은 이유"},{"title":"...","desc":"..."},{"title":"...","desc":"..."}]`;
+  const userMsg=`현재 습관: ${habits.length?habits.join(', '):'없음'}\n이번 주(월~일) 누계 기록: ${summary}\n\n위 정보를 바탕으로 다음 주에 시도해볼 만한 짧은 주간 챌린지(다짐) 3가지를 제안해줘. 시간 사용 누계와 하루한줄의 분위기도 참고해서, 패턴에 맞는 구체적인 제안을 해줘 (예: 특정 활동이 적었거나 휴식이 부족했다면 그에 맞게). 단, 위에 주어진 수치(각 항목의 X/7일 등)만 근거로 사용하고 절대 임의로 숫자를 만들어내지 마. 하루한줄 내용은 그 날의 분위기 참고용일 뿐이니, 컨디션 저하·생리·감기처럼 일시적인 상태를 다음 주에도 계속되는 것처럼 단정하지 마. 각 12자 이내, 구체적인 행동으로. 반드시 아래 JSON 형식만 반환해:\n[{"title":"챌린지문구","desc":"왜 추천하는지 짧은 이유"},{"title":"...","desc":"..."},{"title":"...","desc":"..."}]`;
   const reply=await callClaude(sys,[{role:'user',content:userMsg}],400);
   if(!reply||reply.startsWith('__ERR__')){area.innerHTML='<div style="font-size:11.5px;color:var(--tm);text-align:center;padding:10px 0;">추천을 불러올 수 없어요</div>';return;}
   let sugg=[];
