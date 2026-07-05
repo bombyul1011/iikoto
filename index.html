@@ -3732,6 +3732,16 @@ function getContents(mk){
   return arr;
 }
 function saveContents(mk,v){
+  const prev=S.get(S.key('contents',mk))||[];
+  const prevByCid={};
+  prev.forEach(it=>{if(it.cid)prevByCid[it.cid]=it;});
+  const now=Date.now();
+  v.forEach(it=>{
+    const p=it.cid?prevByCid[it.cid]:null;
+    const isSame=p&&p.status===it.status&&p.startDate===it.startDate&&p.endDate===it.endDate&&p.review===it.review&&p.stars===it.stars&&p.title===it.title;
+    if(!isSame)it.updatedAt=now;
+    else if(p&&p.updatedAt)it.updatedAt=p.updatedAt;
+  });
   S.set(S.key('contents',mk),v);
   S.set(S.key('contents_pending',mk),true);
   autoSync('contents',mk);
@@ -3903,16 +3913,35 @@ async function syncWChallengeDown(wk){
   if(weeklyView&&weeklyView.classList.contains('on'))renderWeeklyChallenge();
 }
 async function syncContentsDown(mk){
-  if(S.get(S.key('contents_pending',mk))){
-    await syncContentsUp(mk);
-    S.set(S.key('contents_pending',mk),false);
-    return;
-  }
   const rows=await supaFetch(`contents?month_key=eq.${mk}&order=created`);
   if(!rows)return;
   // rows=0이고 로컬에 데이터 있으면 덮어쓰지 않음 (사파리↔PWA 엇박 방지)
-  if(!rows.length&&getContents(mk).length)return;
-  S.set(S.key('contents',mk),rows.map(r=>({cat:r.content_cat,title:r.title,startDate:r.start_date||(r.start_day?mk+'-'+pad(r.start_day):null),endDate:r.end_date||(r.end_day?mk+'-'+pad(r.end_day):null),status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',created:r.created,cid:r.client_id||genCid()})));
+  if(!rows.length&&getContents(mk).length){
+    if(S.get(S.key('contents_pending',mk)))await syncContentsUp(mk);
+    return;
+  }
+  const local=getContents(mk);
+  const localByCid={};
+  local.forEach(it=>{if(it.cid)localByCid[it.cid]=it;});
+  const delCids=new Set(getDelPendingCids('contents',mk));
+  const merged=[];
+  const seenCids=new Set();
+  rows.forEach(r=>{
+    const cid=r.client_id||genCid();
+    seenCids.add(cid);
+    if(delCids.has(cid))return; // 로컬에서 삭제 예정인 항목은 서버값이 와도 무시
+    const l=localByCid[cid];
+    const serverItem={cat:r.content_cat,title:r.title,startDate:r.start_date||(r.start_day?mk+'-'+pad(r.start_day):null),endDate:r.end_date||(r.end_day?mk+'-'+pad(r.end_day):null),status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',created:r.created,cid,updatedAt:r.updated_at};
+    if(!l){merged.push(serverItem);return;}
+    // 로컬/서버 둘 다 있으면 updated_at(서버) vs 로컬수정시각 비교, 서버가 더 최신이거나 로컬에 수정시각 기록이 없으면 서버값 채택
+    const localTs=l.updatedAt?new Date(l.updatedAt).getTime():0;
+    const serverTs=r.updated_at?new Date(r.updated_at).getTime():0;
+    merged.push(serverTs>=localTs?serverItem:l);
+  });
+  // 서버에 없고 로컬에만 있는 항목(아직 업로드 안 된 로컬 신규분)은 보존
+  local.forEach(it=>{if(it.cid&&!seenCids.has(it.cid)&&!delCids.has(it.cid))merged.push(it);});
+  S.set(S.key('contents',mk),merged);
+  if(S.get(S.key('contents_pending',mk)))await syncContentsUp(mk).then(ok=>{if(ok)S.set(S.key('contents_pending',mk),false);});
 }
 async function syncContentsUp(mk){
   const c=getContents(mk);
