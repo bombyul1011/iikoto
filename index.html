@@ -5995,12 +5995,15 @@ function deleteSeedItem(idx){
   if(removed&&removed.fromQuoteCid){
     const quotes=getQuotes();
     const q=quotes.find(x=>x.cid===removed.fromQuoteCid);
-    if(q&&q.sentToSeed){
+    if(q){
       q.sentToSeed=false;
       saveQuotesLocal(quotes);
-      S.set('quote_pending_'+q.cid,true);
-      autoSync('reading_quote',q.cid);
       renderRdQuotes();
+    }
+    if(navigator.onLine){
+      supaUpsert('reading_quotes','cid',[{cid:removed.fromQuoteCid,sent_to_seed:false}]);
+    }else if(q){
+      S.set('quote_pending_'+q.cid,true);
     }
   }
   renderSeedList();
