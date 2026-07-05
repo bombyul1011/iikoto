@@ -2167,7 +2167,13 @@ function buildDailyRhythmTrack(dk,includeReview){
   const NIGHT_END=480; // 8시(분)
   const H1=TOTAL_H/8; // 0~6시 구간이 차지하는 높이 (원래 1/4 → 절반인 1/8로)
   const H2=TOTAL_H-H1; // 6~24시 구간이 차지하는 높이
+  // 자정 넘겨 새로 시작한 블록(sortKey로 +1440 처리된 것)은 24시 지점을 그대로 고정한 채
+  // 그 아래로 이어붙여서 그린다. EXTRA_RATE는 0~6시 구간과 동일한 압축비를 사용.
+  const EXTRA_RATE=H1/NIGHT_END;
   const toY=function(min){
+    if(min>1440){
+      return Math.round(H1+H2+(min-1440)*EXTRA_RATE);
+    }
     const m=Math.min(min,1440);
     if(m<=NIGHT_END)return Math.round(m/NIGHT_END*H1);
     return Math.round(H1+(m-NIGHT_END)/(1440-NIGHT_END)*H2);
@@ -2246,7 +2252,7 @@ function buildDailyRhythmTrack(dk,includeReview){
   const MIN_GAP=22;let lastY=-999;
   blocks.forEach(function(bk,bi){
     if(bk.noLabel)return; // 텍스트 없는 블록은 라벨 공간을 차지하지 않음
-    bk.anchorY=toY(bk.start);
+    bk.anchorY=toY(bk.sortKey!=null?bk.sortKey:bk.start);
     let y=bk.anchorY;
     if(y<lastY+MIN_GAP)y=lastY+MIN_GAP;
     bk.labelY=y;lastY=y;
@@ -2260,9 +2266,10 @@ function buildDailyRhythmTrack(dk,includeReview){
     return durB-durA; // 긴 것 먼저 → 낮은 z-index → 뒤로
   });
   blocksSorted.forEach(function(bk,bi){
-    const by=toY(bk.start);
+    const offset=(bk.sortKey!=null)?(bk.sortKey-bk.start):0; // 자정 넘김 보정값(+1440 또는 0)
+    const by=toY(bk.start+offset);
     const stubEnd=bk.end!=null?bk.end:(isToday?(function(){const n=new Date();return n.getHours()*60+n.getMinutes();})():Math.min(bk.start+20,1440));
-    const bh=Math.max(toY(stubEnd)-by,8);
+    const bh=Math.max(toY(stubEnd+offset)-by,8);
     html+='<div class="rt-block'+(bk.ongoing?' ongoing':'')+'" style="top:'+by+'px;height:'+bh+'px;background-color:'+bk.color+';z-index:'+(10+bi)+';"></div>';
     if(bk.noLabel)return; // 전날 이어짐 블록은 색상바만, 텍스트줄/연결선 없음
     if(Math.abs(bk.labelY-bk.anchorY)>4){
