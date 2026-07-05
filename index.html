@@ -1882,8 +1882,12 @@ function saveRhythmBlocks(dk,v){
 async function syncRhythmBlocksUp(dk){
   const blocks=getRhythmBlocks(dk);
   if(ensureItemCids(blocks))S.set(S.key('rblocks',dk),blocks);
-  return await syncListUp('rhythm_blocks',`date_key=eq.${dk}`,'date_key,client_id',blocks,
-    b=>({date_key:dk,cat:b.cat,start_time:b.start,end_time:b.end,text:b.text||'',created:b.created||Date.now(),client_id:b.cid}));
+  const delCids=getDelPendingCids('rblocks',dk);
+  const ok=await syncListUpSafe('rhythm_blocks',`date_key=eq.${dk}`,'date_key,client_id',blocks,
+    b=>({date_key:dk,cat:b.cat,start_time:b.start,end_time:b.end,text:b.text||'',created:b.created||Date.now(),client_id:b.cid}),
+    delCids);
+  if(ok)delCids.forEach(cid=>removeDelPending('rblocks',dk,cid));
+  return ok;
 }
 async function syncRhythmBlocksDown(dk){
   const rows=await supaFetch('rhythm_blocks?date_key=eq.'+dk+'&order=created');
@@ -1955,6 +1959,8 @@ function finishRhythmBlock(idx){
 }
 function deleteRhythmBlock(idx){
   const blocks=getRhythmBlocks(_rhythmDk);
+  const b=blocks[idx];
+  if(b)addDelPending('rblocks',_rhythmDk,b.cid);
   blocks.splice(idx,1);
   saveRhythmBlocks(_rhythmDk,blocks);
   refreshRhythmTrack();
@@ -3488,21 +3494,6 @@ function ensureItemCids(items){
   items.forEach(it=>{if(!it.cid){it.cid=genCid();changed=true;}});
   return changed;
 }
-async function syncListUp(table,filterQ,uniqueCols,localItems,toRow){
-  const existing=await supaFetch(`${table}?${filterQ}&select=client_id`);
-  if(existing===null)return false; // 네트워크 실패 — 로컬 그대로 두고 다음 기회에 재시도
-  if(localItems.length){
-    const ok=await supaUpsert(table,uniqueCols,localItems.map(toRow));
-    if(!ok)return false;
-  }
-  const localCids=new Set(localItems.map(it=>it.cid).filter(Boolean));
-  const removeCids=(existing||[]).map(r=>r.client_id).filter(cid=>cid&&!localCids.has(cid));
-  if(removeCids.length){
-    const inList=removeCids.map(c=>encodeURIComponent(c)).join(',');
-    await supaFetch(`${table}?client_id=in.(${inList})&${filterQ}`,'DELETE');
-  }
-  return true;
-}
 // ── 삭제 의도 명시적 추적 (todos/memos) ──
 // "로컬 목록에 없으면 지운 것으로 간주"하던 기존 syncListUp 방식은, 다른 기기가
 // 방금 추가한 항목을 이 기기가 아직 못 받아온 순간에 업로드하면 그걸 삭제해버리는
@@ -3755,15 +3746,18 @@ async function syncHabitsDown(){
 }
 async function syncHabitsUp(){
   const h=getHabits();
-  const existing=await supaFetch('habits?select=name');
-  if(existing===null)return;
-  if(h.length)await supaUpsert('habits','name',h.map((hh,i)=>({name:hh.name,color:hh.color,sort_order:i})));
-  const localNames=new Set(h.map(hh=>hh.name));
-  const removeNames=(existing||[]).map(r=>r.name).filter(n=>n&&!localNames.has(n));
-  if(removeNames.length){
-    const inList=removeNames.map(n=>encodeURIComponent(n)).join(',');
-    await supaFetch(`habits?name=in.(${inList})`,'DELETE');
+  if(h.length){
+    const ok=await supaUpsert('habits','name',h.map((hh,i)=>({name:hh.name,color:hh.color,sort_order:i})));
+    if(!ok)return false;
   }
+  const delNames=getDelPendingCids('habits','global');
+  if(delNames.length){
+    const inList=delNames.map(n=>encodeURIComponent(n)).join(',');
+    const res=await supaFetch(`habits?name=in.(${inList})`,'DELETE');
+    if(res===null)return false; // 네트워크 실패 — 삭제 대기 목록 유지, 다음 기회에 재시도
+  }
+  delNames.forEach(n=>removeDelPending('habits','global',n));
+  return true;
 }
 async function syncHCDown(wk){
   const ws=wk.replace('week:','');const we=getWeekEnd(ws);
@@ -3774,7 +3768,7 @@ async function syncHCDown(wk){
   S.set(S.key('hc',wk),checks);
 }
 async function syncHCUp(wk){
-  const checks=getHabitChecks(wk);const ws=wk.replace('week:','');const we=getWeekEnd(ws);
+  const checks=getHabitChecks(wk);const ws=wk.replace('week:','');
   const rows=[];const mon=new Date(ws);
   Object.keys(checks).filter(k=>checks[k]).forEach(k=>{
     const parts=k.split('-');const dow=parseInt(parts[parts.length-1]);
@@ -3782,15 +3776,19 @@ async function syncHCUp(wk){
     const d=new Date(mon);d.setDate(mon.getDate()+dow);
     rows.push({habit_name:name,date_key:dateKey(d)});
   });
-  const filterQ=`date_key=gte.${ws}&date_key=lt.${we}`;
-  const existing=await supaFetch(`habit_checks?${filterQ}&select=habit_name,date_key`);
-  if(existing===null)return; // 네트워크 실패 — 로컬 유지, 다음 기회에 재시도
-  if(rows.length)await supaUpsert('habit_checks','habit_name,date_key',rows);
-  const localKeys=new Set(rows.map(r=>r.habit_name+'|'+r.date_key));
-  const toRemove=(existing||[]).filter(r=>!localKeys.has(r.habit_name+'|'+r.date_key));
-  for(const r of toRemove){
-    await supaFetch(`habit_checks?habit_name=eq.${encodeURIComponent(r.habit_name)}&date_key=eq.${r.date_key}`,'DELETE');
+  if(rows.length){
+    const ok=await supaUpsert('habit_checks','habit_name,date_key',rows);
+    if(!ok)return false;
   }
+  const delKeys=getDelPendingCids('hc',wk);
+  for(const dkKey of delKeys){
+    const sepIdx=dkKey.lastIndexOf('|');
+    const name=dkKey.slice(0,sepIdx),dateStr=dkKey.slice(sepIdx+1);
+    const res=await supaFetch(`habit_checks?habit_name=eq.${encodeURIComponent(name)}&date_key=eq.${dateStr}`,'DELETE');
+    if(res===null)return false; // 네트워크 실패 — 삭제 대기 목록 유지, 다음 기회에 재시도
+  }
+  delKeys.forEach(k=>removeDelPending('hc',wk,k));
+  return true;
 }
 async function syncGoalDown(key){
   const rows=await supaFetch(`goal_notes?note_key=eq.${encodeURIComponent(key)}`);
@@ -3844,8 +3842,12 @@ async function syncContentsDown(mk){
 async function syncContentsUp(mk){
   const c=getContents(mk);
   if(ensureItemCids(c))S.set(S.key('contents',mk),c);
-  return await syncListUp('contents',`month_key=eq.${mk}`,'month_key,client_id',c,
-    it=>({month_key:mk,content_cat:it.cat,title:it.title,start_date:it.startDate,end_date:it.endDate,status:it.status,review:it.review||'',stars:it.stars||0,poster:it.poster||null,author:it.author||'',created:it.created,client_id:it.cid}));
+  const delCids=getDelPendingCids('contents',mk);
+  const ok=await syncListUpSafe('contents',`month_key=eq.${mk}`,'month_key,client_id',c,
+    it=>({month_key:mk,content_cat:it.cat,title:it.title,start_date:it.startDate,end_date:it.endDate,status:it.status,review:it.review||'',stars:it.stars||0,poster:it.poster||null,author:it.author||'',created:it.created,client_id:it.cid}),
+    delCids);
+  if(ok)delCids.forEach(cid=>removeDelPending('contents',mk,cid));
+  return ok;
 }
 async function autoSync(type,key){
   if(!navigator.onLine)return;
@@ -4588,6 +4590,9 @@ function openHabitModal(){
 function confirmHabit(){
   const val=document.getElementById('habit-modal-inp').value.trim();if(!val)return;
   const newH=val.split('\n').map((n,i)=>({name:n.trim(),color:HABIT_COLORS[i%HABIT_COLORS.length]})).filter(h=>h.name);
+  const oldNames=getHabits().map(h=>h.name);
+  const newNames=new Set(newH.map(h=>h.name));
+  oldNames.filter(n=>!newNames.has(n)).forEach(n=>addDelPending('habits','global',n));
   saveHabits(newH);closeModal('habit-modal');renderHabitMonthly();renderDailyHabitCheck();
 }
 
@@ -4817,6 +4822,7 @@ function confirmContent(){
         saveContents(oldMk,oldContents);
       }else{
         // 시작월이 바뀌면 원래 버킷에서 빼고 새 버킷으로 이동
+        addDelPending('contents',oldMk,oldContents[idx].cid);
         oldContents.splice(idx,1);
         saveContents(oldMk,oldContents);
         const newContents=getContents(newMk);
@@ -4870,7 +4876,10 @@ function deleteContent(){
   if(!_contentCtx.item)return;
   const mk=_contentCtx.mk,contents=getContents(mk);
   const idx=contents.findIndex(c=>c.created===_contentCtx.item.created);
-  if(idx>=0)contents.splice(idx,1);
+  if(idx>=0){
+    addDelPending('contents',mk,contents[idx].cid);
+    contents.splice(idx,1);
+  }
   saveContents(mk,contents);closeModal('content-modal');renderTimetable();updateStats();
 }
 
@@ -5339,7 +5348,9 @@ function renderDailyHabitCheck(){
     const col=document.createElement('div');col.className='habit-check-col';
     col.innerHTML='<div class="habit-check-name">'+h.name+'</div><div class="habit-chk2'+(checked?' on':'')+'"'+(checked?' style="background:'+rgba+';border-color:'+rgba+';"':'')+'><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" style="display:'+(checked?'block':'none')+'"><polyline points="2,6 4.5,9 10,3.5"/></svg></div>';
     col.querySelector('.habit-chk2').addEventListener('click',function(){
+      const wasOn=!!checks[key];
       checks[key]=!checks[key];
+      if(wasOn&&!checks[key])addDelPending('hc',wk,h.name+'|'+dateKey(currentDate));
       saveHabitChecks(wk,checks);
       renderDailyHabitCheck();
       if(document.getElementById('v-monthly')&&document.getElementById('v-monthly').classList.contains('on'))renderHabitMonthly();
