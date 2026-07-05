@@ -3957,8 +3957,14 @@ async function syncContentsDown(mk){
     if(serverTs>=localTs)merged.push(serverItem);
     else{l.cid=cid;merged.push(l);} // 로컬값 채택 시에도 서버 cid를 물려받아 다음 매칭이 정상 작동하도록
   });
-  // 서버에 없고 로컬에만 있는 항목(아직 업로드 안 된 로컬 신규분)은 보존
-  local.forEach(it=>{if(it.cid&&!seenCids.has(it.cid)&&!delCids.has(it.cid))merged.push(it);});
+  // 서버에 없는 로컬 항목: 방금(5분 이내) 생성된 것만 "아직 업로드 안 한 신규"로 보고 보존.
+  // 그보다 오래된 항목이 서버에 없다는 건 다른 기기에서 이미 삭제됐다는 뜻이므로 로컬에서도 제거.
+  const RECENT_MS=5*60*1000;
+  const now=Date.now();
+  local.forEach(it=>{
+    if(!it.cid||seenCids.has(it.cid)||delCids.has(it.cid))return;
+    if(it.created&&(now-it.created)<RECENT_MS)merged.push(it);
+  });
   // title+startDate로도 서버와 매칭 안 된 cid-없는 로컬 항목(진짜 신규) — 이제 cid 발급
   Object.values(localNoCidByKey).forEach(it=>{it.cid=genCid();merged.push(it);});
   S.set(S.key('contents',mk),merged);
@@ -7246,14 +7252,9 @@ async function initSync(){
   await syncHCDown(wk);
   await syncGoalDown(S.key('mgoal',monthKey(new Date())));
   await syncMonthRange(new Date().getFullYear(),new Date().getMonth());
-  // 콘텐츠 — pending 있으면 Up 먼저, 없으면 Down
+  // 콘텐츠 — 항상 Down 먼저 호출 (내부에서 pending이면 병합 후 자동 Up까지 처리)
   var mk0=monthKey(new Date());
-  if(S.get(S.key('contents_pending',mk0))){
-    await syncContentsUp(mk0);
-    S.set(S.key('contents_pending',mk0),false);
-  } else {
-    await syncContentsDown(mk0);
-  }
+  await syncContentsDown(mk0);
   // 하루한줄 — 이번 주 월~일
   var mon=new Date();mon.setDate(mon.getDate()-((mon.getDay()+6)%7));
   for(var i=0;i<7;i++){
