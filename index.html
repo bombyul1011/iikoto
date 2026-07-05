@@ -3726,8 +3726,16 @@ function getContents(mk){
   arr.forEach(item=>{
     if(!item.startDate&&item.startDay){item.startDate=mk+'-'+pad(item.startDay);changed=true;}
     if(!item.endDate&&item.endDay){item.endDate=mk+'-'+pad(item.endDay);changed=true;}
-    if(!item.cid){item.cid=genCid();changed=true;}
+    // cid가 없는 항목은 여기서 즉시 발급하지 않음 — syncContentsDown이 서버의
+    // client_id와 title+startDate 기준으로 먼저 매칭할 기회를 준 뒤에도 없으면 그때 발급.
   });
+  if(changed)S.set(S.key('contents',mk),arr);
+  return arr;
+}
+function ensureContentCidsFallback(mk){
+  const arr=S.get(S.key('contents',mk))||[];
+  let changed=false;
+  arr.forEach(item=>{if(!item.cid){item.cid=genCid();changed=true;}});
   if(changed)S.set(S.key('contents',mk),arr);
   return arr;
 }
@@ -3922,7 +3930,11 @@ async function syncContentsDown(mk){
   }
   const local=getContents(mk);
   const localByCid={};
-  local.forEach(it=>{if(it.cid)localByCid[it.cid]=it;});
+  const localNoCidByKey={}; // cid 없는 로컬 항목: title+startDate 키로 매칭 시도
+  local.forEach(it=>{
+    if(it.cid)localByCid[it.cid]=it;
+    else localNoCidByKey[it.title+'|'+(it.startDate||'')]=it;
+  });
   const delCids=new Set(getDelPendingCids('contents',mk));
   const merged=[];
   const seenCids=new Set();
@@ -3930,16 +3942,25 @@ async function syncContentsDown(mk){
     const cid=r.client_id||genCid();
     seenCids.add(cid);
     if(delCids.has(cid))return; // 로컬에서 삭제 예정인 항목은 서버값이 와도 무시
-    const l=localByCid[cid];
+    let l=localByCid[cid];
+    if(!l){
+      // cid로 못 찾으면 title+startDate로 cid 없는 로컬 항목과 매칭 시도 (구버전 이월 데이터 대응)
+      const key=r.title+'|'+(r.start_date||'');
+      const matched=localNoCidByKey[key];
+      if(matched){l=matched;delete localNoCidByKey[key];}
+    }
     const serverItem={cat:r.content_cat,title:r.title,startDate:r.start_date||(r.start_day?mk+'-'+pad(r.start_day):null),endDate:r.end_date||(r.end_day?mk+'-'+pad(r.end_day):null),status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',created:r.created,cid,updatedAt:r.updated_at};
     if(!l){merged.push(serverItem);return;}
     // 로컬/서버 둘 다 있으면 updated_at(서버) vs 로컬수정시각 비교, 서버가 더 최신이거나 로컬에 수정시각 기록이 없으면 서버값 채택
     const localTs=l.updatedAt?new Date(l.updatedAt).getTime():0;
     const serverTs=r.updated_at?new Date(r.updated_at).getTime():0;
-    merged.push(serverTs>=localTs?serverItem:l);
+    if(serverTs>=localTs)merged.push(serverItem);
+    else{l.cid=cid;merged.push(l);} // 로컬값 채택 시에도 서버 cid를 물려받아 다음 매칭이 정상 작동하도록
   });
   // 서버에 없고 로컬에만 있는 항목(아직 업로드 안 된 로컬 신규분)은 보존
   local.forEach(it=>{if(it.cid&&!seenCids.has(it.cid)&&!delCids.has(it.cid))merged.push(it);});
+  // title+startDate로도 서버와 매칭 안 된 cid-없는 로컬 항목(진짜 신규) — 이제 cid 발급
+  Object.values(localNoCidByKey).forEach(it=>{it.cid=genCid();merged.push(it);});
   S.set(S.key('contents',mk),merged);
   if(S.get(S.key('contents_pending',mk)))await syncContentsUp(mk).then(ok=>{if(ok)S.set(S.key('contents_pending',mk),false);});
 }
