@@ -3671,7 +3671,8 @@ async function syncBookUp(cid){
     total_pages:book.totalPages||null,seconds:book.seconds||0,unit:book.unit||'pages',percent:book.percent||0,
     today_date:book.todayDate||null,today_start:book.todayStart||0,
     poster:book.poster||null,author:book.author||'',
-    created:book.created,completed_at:book.completedAt||null
+    created:book.created,completed_at:book.completedAt||null,
+    linked_content:!!book.linkedContent,content_mk:book.contentMk||null,content_title:book.contentTitle||null
   }]);
   S.set('reading_pending_'+cid,false);
 }
@@ -3688,7 +3689,8 @@ async function syncBooksDownAll(){
       totalPages:r.total_pages||null,seconds:r.seconds||0,unit:r.unit||'pages',percent:r.percent||0,
       todayDate:r.today_date||null,todayStart:r.today_start||0,
       poster:r.poster||null,author:r.author||'',
-      created:r.created,completedAt:r.completed_at||null
+      created:r.created,completedAt:r.completed_at||null,
+      linkedContent:!!r.linked_content,contentMk:r.content_mk||null,contentTitle:r.content_title||null
     };
   });
   // 서버에 아직 없지만 로컬에 pending중인 신규 책도 보존
