@@ -5342,6 +5342,10 @@ function renderDailyOneLineWeek(){
 }
 // ── TODO DRAG
 // ── LOAD
+function tabularTimeHtml(str){
+  if(!str)return'';
+  return str.split('').map(c=>`<span style="display:inline-block;width:${c===':'?'0.32em':'0.62em'};text-align:center;">${c}</span>`).join('');
+}
 function renderTodayMeal(){
   const el=document.getElementById('daily-meal-card');if(!el)return;
   const dk=dateKey(currentDate);
@@ -5361,7 +5365,7 @@ function renderTodayMeal(){
   let html='';
   items.forEach(k=>{
     const t=m[k+'_time'];
-    const timeHtml=t?`<span class="meal-time-tag">${t}</span>`:`<button class="meal-time-btn" onclick="recordMealTime('${dk}','${k}')" title="식사 시간 기록"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="1.8,5.2 4,7.5 8.2,2.5"/></svg></button>`;
+    const timeHtml=t?`<span class="meal-time-tag">${tabularTimeHtml(t)}</span>`:`<button class="meal-time-btn" onclick="recordMealTime('${dk}','${k}')" title="식사 시간 기록"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="1.8,5.2 4,7.5 8.2,2.5"/></svg></button>`;
     html+=`<div class="cal-detail-row"><span class="cal-detail-time">${MEAL_LABELS[k]}</span><span class="cal-detail-text" style="flex:1;">${m[k]}</span>${timeHtml}</div>`;
   });
   el.innerHTML=html||'<div style="font-size:12px;color:var(--tm);text-align:center;padding:8px 0;">주간 메뉴판에서 적어보세요</div>';
