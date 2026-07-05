@@ -5897,6 +5897,8 @@ function downloadFullJSONBackup(){
 // ── READING HUB
 let _rdTab='reading';
 let _rdOpenCid=null;
+let _rdDoneQuoteBookCid=null;
+let _rdSheetBookCid=null;
 let _swSeconds=0,_swRunning=false,_swInterval=null,_swStartTs=0;
 const RD_SW_C=2*Math.PI*32;
 function backfillReadingLinks(){
@@ -6176,9 +6178,16 @@ function renderRdQuotes(){
   if(_rdQuoteShowAll){listEl.style.maxHeight='320px';listEl.style.overflowY='auto';}
   else{listEl.style.maxHeight='';listEl.style.overflowY='';}
 }
-function openQuoteSheetCheck(){
+function openQuoteSheetCheck(bookCid){
+  if(bookCid){
+    _rdSheetBookCid=bookCid;
+    document.getElementById('rd-quote-inp').value='';
+    openSheet('quote-sheet');
+    return;
+  }
   const cur=getBooks().find(b=>b.status==='reading');
   if(!cur){openAddBookModal();return;}
+  _rdSheetBookCid=cur.cid;
   document.getElementById('rd-quote-inp').value='';
   openSheet('quote-sheet');
 }
@@ -6212,18 +6221,40 @@ function sendQuoteToSeed(cid){
   showToast('씨앗으로 보냈어요 ✧');
 }
 function saveQuoteSheet(){
-  const cur=getBooks().find(b=>b.status==='reading');
-  if(cur){
+  const targetCid=_rdSheetBookCid||(getBooks().find(b=>b.status==='reading')||{}).cid;
+  if(targetCid){
     const inp=document.getElementById('rd-quote-inp');
     const text=inp.value.trim();
-    if(text)upsertQuoteLocal({cid:genCid(),bookCid:cur.cid,text,created:Date.now()});
+    if(text)upsertQuoteLocal({cid:genCid(),bookCid:targetCid,text,created:Date.now()});
   }
   closeSheet('quote-sheet');
+  _rdSheetBookCid=null;
   renderRdQuotes();
+  renderBookList();
 }
 function removeQuote(cid){
   deleteQuoteLocal(cid);
   renderRdQuotes();
+  renderBookList();
+}
+function renderDoneBookQuotes(bookCid){
+  const listEl=document.getElementById('rd-done-quote-list-'+bookCid);if(!listEl)return;
+  const quotes=getQuotes().filter(q=>q.bookCid===bookCid).sort((a,b)=>(b.created||0)-(a.created||0));
+  if(!quotes.length){listEl.innerHTML='<div class="rd-quote-empty">아직 모은 문장이 없어요</div>';return;}
+  listEl.innerHTML=quotes.map(q=>`<div class="rd-quote-item">
+      <div class="rd-quote-text">${q.text}</div>
+      <span style="position:absolute;right:8px;bottom:6px;display:flex;align-items:center;gap:3px;">
+        <span class="rd-quote-toseed" onclick="event.stopPropagation();sendQuoteToSeed('${q.cid}');renderDoneBookQuotes('${bookCid}')" title="${q.sentToSeed?'씨앗에서 빼기':'씨앗으로 보내기'}" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:${q.sentToSeed?'#fff':'#6a8a50'};background:${q.sentToSeed?'rgba(140,175,90,0.85)':'transparent'};opacity:${q.sentToSeed?'1':'0.75'};">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 14V8"/><path d="M8 8C8 8 4.5 6.5 3 4c3-.8 6 1.2 5 4z" fill="${q.sentToSeed?'rgba(255,255,255,0.35)':'rgba(140,175,90,0.20)'}"/><path d="M8 10C8 10 11.5 8.5 13 6c-3-.8-6 1.2-5 4z" fill="${q.sentToSeed?'rgba(255,255,255,0.35)':'rgba(140,175,90,0.20)'}"/></svg>
+        </span>
+        <span class="rd-quote-del" onclick="event.stopPropagation();removeQuote('${q.cid}');renderDoneBookQuotes('${bookCid}')" style="position:static;font-size:10px;padding:2px;">✕</span>
+      </span>
+    </div>`).join('');
+}
+function toggleDoneBookQuotes(cid){
+  _rdDoneQuoteBookCid=_rdDoneQuoteBookCid===cid?null:cid;
+  renderBookList();
+  if(_rdDoneQuoteBookCid===cid)renderDoneBookQuotes(cid);
 }
 function renderRdMonthStat(){
   const el=document.getElementById('rd-month-stat');if(!el)return;
@@ -6243,7 +6274,7 @@ function renderRdCovers(){
   el.innerHTML=html;
 }
 function switchReadingTab(btn,status){
-  _rdTab=status;_rdOpenCid=null;
+  _rdTab=status;_rdOpenCid=null;_rdDoneQuoteBookCid=null;
   document.querySelectorAll('.rd-tab').forEach(t=>t.classList.remove('on'));
   btn.classList.add('on');
   renderBookList();
@@ -6256,6 +6287,13 @@ function renderBookList(){
     const sub=b.unit==='percent'?`${b.percent||0}%`:(b.totalPages?`${b.pages}/${b.totalPages}페이지`:`${b.pages||0}페이지`);
     const timeStr=b.seconds?` · ${Math.floor(b.seconds/60)}분`:'';
     const open=_rdOpenCid===b.cid;
+    const quoteOpen=_rdDoneQuoteBookCid===b.cid;
+    const doneQuoteBlock=_rdTab==='done'?`
+        <div class="quote-chip" style="margin-top:10px;" onclick="event.stopPropagation();toggleDoneBookQuotes('${b.cid}')">
+          <div class="quote-chip-inner">✎ 문장 수집 둘러보기</div>
+        </div>
+        ${quoteOpen?`<div id="rd-done-quote-list-${b.cid}" style="margin-top:6px;"></div>
+        <div class="rd-quote-more" onclick="event.stopPropagation();openQuoteSheetCheck('${b.cid}')">+ 문장 추가</div>`:''}`:'';
     return `<div class="rd-book-item${open?' open':''}" onclick="toggleBookDetail('${b.cid}')">
       <div class="rd-book-title">${b.title}</div>
       <div class="rd-book-meta">${sub}${timeStr}</div>
@@ -6266,11 +6304,12 @@ function renderBookList(){
           <span class="rd-status-btn${b.status==='paused'?' active':''}" onclick="event.stopPropagation();setBookStatus('${b.cid}','paused')">중단</span>
           <span class="rd-del-btn" onclick="event.stopPropagation();removeBook('${b.cid}')">삭제</span>
         </div>
+        ${doneQuoteBlock}
       </div>
     </div>`;
   }).join('');
 }
-function toggleBookDetail(cid){_rdOpenCid=_rdOpenCid===cid?null:cid;renderBookList();}
+function toggleBookDetail(cid){_rdOpenCid=_rdOpenCid===cid?null:cid;_rdDoneQuoteBookCid=null;renderBookList();}
 function setBookStatus(cid,status){
   const book=getBooks().find(b=>b.cid===cid);if(!book)return;
   book.status=status;
