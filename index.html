@@ -281,7 +281,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .memo-bub.tod-afternoon{background:rgba(255,170,180,0.05);border-left-color:rgba(220,105,125,0.58);}
 .memo-bub.tod-night{background:rgba(190,150,200,0.06);border-left-color:rgba(150,90,165,0.60);}
 
-.undo-toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%) translateY(16px);background:rgba(60,40,40,.90);color:white;font-size:12px;padding:9px 18px;border-radius:20px;display:flex;align-items:center;gap:10px;opacity:0;transition:all .25s;z-index:400;pointer-events:none;backdrop-filter:blur(8px);}
+.undo-toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%) translateY(16px);background:rgba(60,40,40,.90);color:white;font-size:12px;padding:9px 18px;border-radius:20px;display:flex;align-items:center;gap:10px;opacity:0;transition:all .25s;z-index:10500;pointer-events:none;backdrop-filter:blur(8px);}
 .undo-toast.on{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto;}
 .undo-btn{font-size:11.5px;color:rgba(255,200,180,.90);font-weight:500;cursor:pointer;}
 .memo-input-row{margin-top:12px;padding-top:11px;border-top:1px solid var(--div);display:flex;gap:7px;align-items:center;}
@@ -3629,13 +3629,13 @@ async function deleteQuoteLocal(cid){
 async function syncQuoteUp(cid){
   const q=getQuotes().find(x=>x.cid===cid);
   if(!q)return;
-  await supaUpsert('reading_quotes','cid',[{cid:q.cid,book_cid:q.bookCid,text:q.text,created:q.created}]);
+  await supaUpsert('reading_quotes','cid',[{cid:q.cid,book_cid:q.bookCid,text:q.text,created:q.created,sent_to_seed:!!q.sentToSeed}]);
   S.set('quote_pending_'+cid,false);
 }
 async function syncQuotesDownAll(){
   const rows=await supaFetch('reading_quotes?order=created');
   if(!rows)return;
-  saveQuotesLocal(rows.map(r=>({cid:r.cid,bookCid:r.book_cid,text:r.text,created:r.created})));
+  saveQuotesLocal(rows.map(r=>({cid:r.cid,bookCid:r.book_cid,text:r.text,created:r.created,sentToSeed:!!r.sent_to_seed})));
   renderRdQuotes();
 }
 function saveBooksLocal(arr){S.set('reading_books',arr);}
@@ -6141,6 +6141,8 @@ function sendQuoteToSeed(cid){
   if(navigator.onLine)syncSeedsUp();
   q.sentToSeed=true;
   saveQuotesLocal(quotes);
+  S.set('quote_pending_'+q.cid,true);
+  autoSync('reading_quote',q.cid);
   renderRdQuotes();
   showToast('씨앗으로 보냈어요 🌱');
 }
