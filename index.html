@@ -1515,6 +1515,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div>
       <div class="settings-slbl">백업</div>
       <div class="settings-card">
+        <div class="settings-item" onclick="downloadFullJSONBackup()" style="cursor:pointer;"><span class="settings-item-lbl"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="color:var(--tp);margin-right:6px;vertical-align:-2px"><path d="M10 3V13M10 13L6 9M10 13L14 9"/><path d="M4 15V16C4 16.5523 4.44772 17 5 17H15C15.5523 17 16 16.5523 16 16V15"/></svg>전체 데이터 백업 (JSON)</span><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--tm)"><polyline points="5,2 9,7 5,12"/></svg></div>
         <div class="settings-item" onclick="openMarkdownBackup()" style="cursor:pointer;"><span class="settings-item-lbl"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="color:var(--tp);margin-right:6px;vertical-align:-2px"><path d="M5 3C4 3 3 4 3 5V17C3 18 4 19 5 19H15C16 19 17 18 17 17V7L13 3H5Z"/><polyline points="13,3 13,7 17,7"/><line x1="7" y1="10" x2="13" y2="10"/><line x1="7" y1="13" x2="11" y2="13"/></svg>일기 백업 (마크다운)</span><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--tm)"><polyline points="5,2 9,7 5,12"/></svg></div>
         <div class="settings-item" style="flex-direction:column;align-items:flex-start;gap:8px;padding-top:12px;">
           <span class="settings-item-lbl">노션 백업 (베타) · 매달 1일 지난달분</span>
@@ -3670,6 +3671,7 @@ function saveGoal(key,lines){S.set(key,lines);autoSync('goal',key);}
 async function syncTodosDown(dk){
   const rows=await supaFetch('todos?date_key=eq.'+dk+'&order=created');
   if(!rows)return; // 연결 실패(null) — 로컬 유지. 빈 배열은 "서버에 진짜 0개"라는 뜻이라 그대로 반영.
+  if(S.get(S.key('todos_pending',dk)))return; // 업로드 대기중인 로컬 수정(미루기 등) 있으면 덮어쓰지 않음
   S.set(S.key('todos',dk),rows.map(function(r){return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),postponeCount:r.postpone_count||0};}));
   renderTodos();
 }
@@ -3686,6 +3688,7 @@ async function syncTodosUp(dk){
 async function syncMemosDown(dk){
   const rows=await supaFetch('memos?date_key=eq.'+dk+'&order=created');
   if(!rows)return; // 연결 실패(null) — 로컬 유지. 빈 배열은 "서버에 진짜 0개"라는 뜻이라 그대로 반영.
+  if(S.get(S.key('memos_pending',dk)))return; // 업로드 대기중인 로컬 수정 있으면 덮어쓰지 않음
   S.set(S.key('memos',dk),rows.map(function(r){return {time:r.memo_time,text:r.text,created:r.created,cid:r.client_id||genCid()};}));
   renderMemos();
 }
@@ -5779,6 +5782,29 @@ function openSettings(){
   document.getElementById('settings-ov').classList.add('on');
 }
 function closeSettings(){document.getElementById('settings-ov').classList.remove('on');}
+function downloadFullJSONBackup(){
+  try{
+    // API 키/노션 백업 키 등 민감정보는 백업 파일에 포함하지 않음
+    const EXCLUDE_KEYS=new Set(['claude_api_key','notion_worker_url','notion_backup_secret']);
+    const data={};
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(!k||EXCLUDE_KEYS.has(k))continue;
+      data[k]=localStorage.getItem(k);
+    }
+    const payload={app:'iikoto',exportedAt:new Date().toISOString(),data};
+    const json=JSON.stringify(payload,null,2);
+    const blob=new Blob([json],{type:'application/json;charset=utf-8'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download=`iikoto-backup-${dateKey(new Date())}.json`;
+    document.body.appendChild(a);a.click();
+    document.body.removeChild(a);URL.revokeObjectURL(url);
+    showToast('전체 데이터가 저장됐어요 ⬇️');
+  }catch(e){
+    showToast('백업 실패 — 저장 공간을 확인해주세요');
+  }
+}
 
 // ── READING HUB
 let _rdTab='reading';
