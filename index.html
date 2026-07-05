@@ -475,6 +475,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="glass"] .memo-item{margin-bottom:14px;}
 /* ── READING HUB ── */
 .reading-ov{position:fixed;inset:0;z-index:8000;background:var(--bg);display:none;flex-direction:column;overflow-y:auto;transform:translateX(100%);transition:transform .3s cubic-bezier(.32,.72,0,1);}
+.reading-ov .settings-hdr{position:sticky;top:0;z-index:10;background:var(--bg);}
 #seed-ov{background:var(--bg);}
 .reading-ov.on{display:flex;transform:translateX(0);}
 .reading-body{padding:16px 18px 30px;display:flex;flex-direction:column;gap:18px;}
@@ -5913,7 +5914,7 @@ async function syncSeedsUp(){
   if(ensureItemCids(seeds))saveSeeds(seeds);
   const existing=await supaFetch('seeds?select=client_id');
   if(existing===null)return; // 네트워크 실패 — 로컬 유지, 다음 기회에 재시도
-  if(seeds.length)await supaUpsert('seeds','client_id',seeds.map(function(s){return {text:s.text,comment:s.comment||'',date:s.date||'',created:s.created||Date.now(),client_id:s.cid};}));
+  if(seeds.length)await supaUpsert('seeds','client_id',seeds.map(function(s){return {text:s.text,comment:s.comment||'',date:s.date||'',created:s.created||Date.now(),client_id:s.cid,source_quote_cid:s.fromQuoteCid||null};}));
   const localCids=new Set(seeds.map(s=>s.cid).filter(Boolean));
   const removeCids=(existing||[]).map(r=>r.client_id).filter(cid=>cid&&!localCids.has(cid));
   if(removeCids.length){
@@ -5925,7 +5926,7 @@ async function syncSeedsDown(){
   const rows=await supaFetch('seeds?order=created.desc');
   if(!rows)return;
   if(!rows.length)return;
-  saveSeeds(rows.map(function(r){return {text:r.text,comment:r.comment||'',date:r.date||'',created:r.created||0,cid:r.client_id||genCid()};}));
+  saveSeeds(rows.map(function(r){return {text:r.text,comment:r.comment||'',date:r.date||'',created:r.created||0,cid:r.client_id||genCid(),fromQuoteCid:r.source_quote_cid||null};}));
   renderSeedList();
 }
 let _seedEditIdx=null;
@@ -5935,7 +5936,10 @@ function openSeed(){
   document.getElementById('seed-ov').classList.add('on');
   if(navigator.onLine)syncSeedsDown();
 }
-function closeSeed(){document.getElementById('seed-ov').classList.remove('on');}
+function closeSeed(){
+  document.getElementById('seed-ov').classList.remove('on');
+  closeSeedForm();
+}
 
 function openSeedForm(editIdx){
   _seedEditIdx=(editIdx!=null)?editIdx:null;
@@ -5977,9 +5981,21 @@ function saveSeedItem(){
 
 function deleteSeedItem(idx){
   const seeds=getSeeds();
+  const removed=seeds[idx];
   seeds.splice(idx,1);
   saveSeeds(seeds);
   if(navigator.onLine)syncSeedsUp();
+  if(removed&&removed.fromQuoteCid){
+    const quotes=getQuotes();
+    const q=quotes.find(x=>x.cid===removed.fromQuoteCid);
+    if(q&&q.sentToSeed){
+      q.sentToSeed=false;
+      saveQuotesLocal(quotes);
+      S.set('quote_pending_'+q.cid,true);
+      autoSync('reading_quote',q.cid);
+      renderRdQuotes();
+    }
+  }
   renderSeedList();
 }
 
@@ -6107,7 +6123,7 @@ function renderRdQuotes(){
   let html=shown.map(q=>`<div class="rd-quote-item">
       <div class="rd-quote-text">${q.text}</div>
       <span style="position:absolute;right:8px;bottom:6px;display:flex;align-items:center;gap:3px;">
-        <span class="rd-quote-toseed" onclick="sendQuoteToSeed('${q.cid}')" title="${q.sentToSeed?'씨앗으로 다시 보내기':'씨앗으로 보내기'}" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:${q.sentToSeed?'#fff':'#6a8a50'};background:${q.sentToSeed?'rgba(140,175,90,0.85)':'transparent'};opacity:${q.sentToSeed?'1':'0.75'};">
+        <span class="rd-quote-toseed" onclick="sendQuoteToSeed('${q.cid}')" title="${q.sentToSeed?'씨앗에서 빼기':'씨앗으로 보내기'}" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:${q.sentToSeed?'#fff':'#6a8a50'};background:${q.sentToSeed?'rgba(140,175,90,0.85)':'transparent'};opacity:${q.sentToSeed?'1':'0.75'};">
           <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 14V8"/><path d="M8 8C8 8 4.5 6.5 3 4c3-.8 6 1.2 5 4z" fill="${q.sentToSeed?'rgba(255,255,255,0.35)':'rgba(140,175,90,0.20)'}"/><path d="M8 10C8 10 11.5 8.5 13 6c-3-.8-6 1.2-5 4z" fill="${q.sentToSeed?'rgba(255,255,255,0.35)':'rgba(140,175,90,0.20)'}"/></svg>
         </span>
         <span class="rd-quote-del" onclick="removeQuote('${q.cid}')" style="position:static;font-size:10px;padding:2px;">✕</span>
@@ -6133,10 +6149,23 @@ function openQuoteSheetCheck(){
 function sendQuoteToSeed(cid){
   const quotes=getQuotes();
   const q=quotes.find(x=>x.cid===cid);if(!q)return;
+  if(q.sentToSeed){
+    const seeds=getSeeds().filter(s=>s.fromQuoteCid!==cid);
+    saveSeeds(seeds);
+    if(navigator.onLine)syncSeedsUp();
+    q.sentToSeed=false;
+    saveQuotesLocal(quotes);
+    S.set('quote_pending_'+q.cid,true);
+    autoSync('reading_quote',q.cid);
+    renderRdQuotes();
+    renderSeedList();
+    showToast('씨앗에서 뺐어요');
+    return;
+  }
   const book=getBooks().find(b=>b.cid===q.bookCid);
   const source=book?`${book.title}${book.author?' · '+book.author:''}`:'';
   const seeds=getSeeds();
-  seeds.unshift({text:q.text,comment:source,date:dateKey(new Date()),created:Date.now(),cid:genCid()});
+  seeds.unshift({text:q.text,comment:source,date:dateKey(new Date()),created:Date.now(),cid:genCid(),fromQuoteCid:q.cid});
   saveSeeds(seeds);
   if(navigator.onLine)syncSeedsUp();
   q.sentToSeed=true;
