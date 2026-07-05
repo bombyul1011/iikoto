@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v4';
+const CACHE = 'iikoto-v5';
 const ASSETS = [
   './',
   './index.html'
@@ -13,14 +13,13 @@ self.addEventListener('install', e => {
   self.skipWaiting();
 });
 
-// 활성화 — 이전 캐시 삭제
+// 활성화 — 이전 캐시 삭제 후 즉시 클라이언트 점유
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
       Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    )
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 // 요청 처리 — 네트워크 우선, 실패시 캐시
