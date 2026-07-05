@@ -545,7 +545,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .diary-line-text{flex:1;font-size:13.5px;color:var(--tp);line-height:1.5;}
 .diary-line-text.empty{color:var(--tm);font-size:12px;font-style:italic;letter-spacing:2px;}
 .rd-quote-inp{width:100%;background:var(--inp);border:1px solid var(--inp-b);border-radius:12px;padding:12px 14px;outline:none;resize:none;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--tp);line-height:1.6;}
-.rd-quote-item{position:relative;background:rgba(255,250,245,0.5);border-left:2.5px solid rgba(195,170,235,0.55);border-radius:0 10px 10px 0;padding:9px 12px 9px 14px;margin-top:8px;}
+.rd-quote-item{position:relative;background:rgba(255,250,245,0.5);border-left:2.5px solid rgba(195,170,235,0.55);border-radius:0 10px 10px 0;padding:9px 12px 20px 14px;margin-top:8px;}
 .rd-quote-more{font-size:11px;color:var(--tm);text-align:center;padding:8px 0 2px;cursor:pointer;}
 .rd-quote-empty{font-size:11.5px;color:var(--tm);text-align:center;padding:8px 0 2px;}
 .rd-quote-text{font-size:12.5px;color:var(--tp);font-style:italic;line-height:1.55;}
@@ -1783,6 +1783,8 @@ function renderHomeBody(section){
   const isLastDayOfMonth=(()=>{const t=new Date(_ld);t.setDate(_ld.getDate()+1);return t.getDate()===1;})()&&_isEveOrLateNight;
 
   if(section==='morning'){
+    const exCard=makeExerciseCheckCard();
+    if(exCard)body.appendChild(exCard);
     body.appendChild(makeRingRow());
     body.appendChild(makeLabel('해빗'));
     body.appendChild(makeHabitStreakRow());
@@ -1868,7 +1870,7 @@ const RHYTHM_CATS={
   rest:{label:'휴식',color:'rgba(252,215,110,0.80)'},
   work:{label:'업무',color:'rgba(185,188,200,0.75)'},
   appointment:{label:'외출',color:'rgba(150,205,225,0.68)'},
-  note:{label:'기록',color:'rgba(240,150,190,0.80)'},
+  note:{label:'서재',color:'rgba(240,150,190,0.80)'},
   enjoy:{label:'감상',color:'rgba(190,160,230,0.80)'},
   home:{label:'정리',color:'rgba(205,215,145,0.80)'}
 };
@@ -2267,6 +2269,32 @@ function buildDailyRhythmTrack(dk,includeReview){
   }
   _rhythmTrackEl=outer;
   return outer;
+}
+function makeExerciseCheckCard(){
+  const habitName='운동';
+  const habit=getHabits().find(h=>h.name===habitName);
+  if(!habit)return null; // '운동' 습관이 없으면 노출 안 함
+  const dk=dateKey(getLogicalDate());
+  const d=new Date(dk);
+  const wk=weekKey(d);
+  const dow=(d.getDay()+6)%7;
+  const checks=getHabitChecks(wk);
+  const key=`${habitName}-${dow}`;
+  const isOn=!!checks[key];
+  const rgba=HABIT_COLOR_RGBA[habit.color]||'rgba(192,112,128,0.80)';
+  const card=document.createElement('div');
+  card.className='card s';
+  card.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:12px 15px;margin-bottom:8px;';
+  card.innerHTML=`<span style="font-size:13px;color:var(--tp);">오늘 운동 다녀왔나요?</span>
+    <div class="habit-chk2${isOn?' on':''}"${isOn?` style="background:${rgba};border-color:${rgba};"`:''}><svg width="13" height="13" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" style="display:${isOn?'block':'none'}"><polyline points="2,6 4.5,9 10,3.5"/></svg></div>`;
+  card.querySelector('.habit-chk2').addEventListener('click',function(){
+    const wasOn=!!checks[key];
+    checks[key]=!checks[key];
+    if(wasOn&&!checks[key])addDelPending('hc',wk,habitName+'|'+dk);
+    saveHabitChecks(wk,checks);
+    renderHomeBody('morning');
+  });
+  return card;
 }
 function makeRingRow(){
   const row=document.createElement('div');
@@ -2806,6 +2834,7 @@ function computeMonthStats(y,mo){
   const habits=getHabits();
   const allMemoTexts=[];
   const onelineTexts=[];
+  const postponedTally={};
   const weekSet={};
   const rhythmDur={};
   const rhythmDayCount={};
@@ -2818,6 +2847,7 @@ function computeMonthStats(y,mo){
     if(ol&&ol.trim())onelineTexts.push(`${d}일: ${ol.trim()}`);
     const dayTodos=getTodos(dk);
     totalTodos+=dayTodos.length;doneTodos+=dayTodos.filter(t=>t.done).length;
+    dayTodos.forEach(t=>{if((t.postponeCount||0)>=3&&t.text)postponedTally[t.text]=Math.max(postponedTally[t.text]||0,t.postponeCount);});
     const sl=getSleep(dk);
     if(sl.sleep&&sl.wake){const sv=sl.sleep.split(':').map(Number),wv=sl.wake.split(':').map(Number);let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;sleepMin+=m;sleepCnt++;}
     const date=new Date(y,mo,d);const wk=weekKey(date);
@@ -2848,7 +2878,8 @@ function computeMonthStats(y,mo){
   const contentsList=getContentsForReport(mk);
   const goalLines=getGoal(S.key('mgoal',mk)).filter(l=>l&&l.trim());
   const rhythmSummary=Object.keys(rhythmDur).length?durSummaryLine(rhythmDur):'';
-  return {memos,doneTodos,totalTodos,todoPct,habitPct,avgSleep,allMemoTexts,onelineTexts,wcByWeek,contentsList,rhythmSummary,rhythmDur,rhythmDayCount,dim,goalLines};
+  const postponedTasks=Object.keys(postponedTally).sort((a,b)=>postponedTally[b]-postponedTally[a]).map(t=>({text:t,count:postponedTally[t]}));
+  return {memos,doneTodos,totalTodos,todoPct,habitPct,avgSleep,allMemoTexts,onelineTexts,postponedTasks,wcByWeek,contentsList,rhythmSummary,rhythmDur,rhythmDayCount,dim,goalLines};
 }
 async function generateMonthlyReportAI(mk,stats){
   const key=getClaudeKey();
@@ -2865,7 +2896,7 @@ async function generateMonthlyReportAI(mk,stats){
     `습관 달성률 ${stats.habitPct}%`,
     stats.avgSleep?`평균 수면 ${stats.avgSleep}시간`:'수면 기록 없음',
     stats.rhythmSummary?`시간 사용 누계: ${stats.rhythmSummary}`:'',
-    stats.onelineTexts.length?`하루 한 줄 기록:\n${stats.onelineTexts.slice(0,31).join('\n')}`:'',
+    stats.postponedTasks.length?`이번 달 3회 이상 미룬 일: ${stats.postponedTasks.slice(0,5).map(p=>`${p.text}(${p.count}회)`).join(', ')}`:'',
     stats.allMemoTexts.length?`이번 달 메모 전체 (${stats.allMemoTexts.length}건, 시간순):\n${stats.allMemoTexts.slice(0,2000).join('\n')}`:'',
     stats.contentsList.length?`콘텐츠 기록: ${stats.contentsList.map(c=>`${c.title}(${c.cat}${cStatusLabelAI(c)?', '+cStatusLabelAI(c):''})`).join(', ')}`:'',
     stats.wcByWeek.length?`주간 미션 현황: ${stats.wcByWeek.map(w=>w.lines.map(l=>`${l.text} ${l.pct}%`).join(', ')).join(' | ')}`:''
@@ -6026,6 +6057,9 @@ function renderRdQuotes(){
   let html=shown.map(q=>`<div class="rd-quote-item">
       <span class="rd-quote-del" onclick="removeQuote('${q.cid}')">✕</span>
       <div class="rd-quote-text">${q.text}</div>
+      <span class="rd-quote-toseed" onclick="sendQuoteToSeed('${q.cid}')" style="position:absolute;right:8px;bottom:6px;cursor:pointer;display:inline-flex;color:#6a8a50;opacity:0.75;">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 14V8"/><path d="M8 8C8 8 4.5 6.5 3 4c3-.8 6 1.2 5 4z" fill="rgba(140,175,90,0.20)"/><path d="M8 10C8 10 11.5 8.5 13 6c-3-.8-6 1.2-5 4z" fill="rgba(140,175,90,0.20)"/></svg>
+      </span>
     </div>`).join('');
   if(quotes.length>MAX){
     if(_rdQuoteShowAll){
@@ -6043,6 +6077,16 @@ function openQuoteSheetCheck(){
   if(!cur){openAddBookModal();return;}
   document.getElementById('rd-quote-inp').value='';
   openSheet('quote-sheet');
+}
+function sendQuoteToSeed(cid){
+  const q=getQuotes().find(x=>x.cid===cid);if(!q)return;
+  const book=getBooks().find(b=>b.cid===q.bookCid);
+  const source=book?`${book.title}${book.author?' · '+book.author:''}`:'';
+  const seeds=getSeeds();
+  seeds.unshift({text:q.text,comment:source,date:dateKey(new Date()),created:Date.now(),cid:genCid()});
+  saveSeeds(seeds);
+  if(navigator.onLine)syncSeedsUp();
+  showToast('씨앗으로 보냈어요 🌱');
 }
 function saveQuoteSheet(){
   const cur=getBooks().find(b=>b.status==='reading');
