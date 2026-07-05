@@ -3754,7 +3754,21 @@ function saveContents(mk,v){
   });
   S.set(S.key('contents',mk),v);
   S.set(S.key('contents_pending',mk),true);
-  autoSync('contents',mk);
+  // contents 동기화(Up/Down)는 mk별로 직렬화 — runContentsSyncLocked 큐를 통해서만 실행
+  runContentsSyncLocked(mk,()=>autoSync('contents',mk));
+}
+// ── contents mk별 동기화 락
+// syncContentsDown(다운로드+병합)과 saveContents→syncContentsUp(업로드)이
+// 같은 월(mk)에 대해 동시에 실행되면, 늦게 끝나는 쪽이 오래된 스냅샷으로
+// 최신 로컬 변경을 덮어써버리는 경합이 생김(독서코너 상태변경이 콘텐츠탭
+// 왕복 후 되돌아가는 문제의 원인). mk별 Promise 체인으로 항상 한 번에
+// 하나의 동기화 작업만 실행되도록 강제한다.
+const _contentsSyncChain={};
+function runContentsSyncLocked(mk,fn){
+  const prevChain=_contentsSyncChain[mk]||Promise.resolve();
+  const nextChain=prevChain.then(fn).catch(()=>{});
+  _contentsSyncChain[mk]=nextChain;
+  return nextChain;
 }
 function getGoal(key){return S.get(key)||[''];}
 function saveGoal(key,lines){S.set(key,lines);autoSync('goal',key);}
@@ -3922,7 +3936,12 @@ async function syncWChallengeDown(wk){
   const weeklyView=document.getElementById('v-weekly');
   if(weeklyView&&weeklyView.classList.contains('on'))renderWeeklyChallenge();
 }
+// syncContentsDown은 mk별 락 큐를 통해서만 실제 로직(syncContentsDownRaw)을 실행 —
+// saveContents가 유발하는 syncContentsUp과 절대 동시에 실행되지 않도록 보장한다.
 async function syncContentsDown(mk){
+  return runContentsSyncLocked(mk,()=>syncContentsDownRaw(mk));
+}
+async function syncContentsDownRaw(mk){
   const rows=await supaFetch(`contents?month_key=eq.${mk}&order=created`);
   if(!rows)return;
   // rows=0이고 로컬에 데이터 있으면 덮어쓰지 않음 (사파리↔PWA 엇박 방지)
@@ -4022,7 +4041,7 @@ async function syncAll(){
   });
   if(S.get(S.key('memos_pending',dk)))upTasks.push(syncMemosUp(dk).then(()=>S.set(S.key('memos_pending',dk),false)));
   if(S.get(S.key('meals_pending',dk)))upTasks.push(syncMealsUp(dk).then(()=>S.set(S.key('meals_pending',dk),false)));
-  if(S.get(S.key('contents_pending',mk)))upTasks.push(syncContentsUp(mk).then(()=>S.set(S.key('contents_pending',mk),false)));
+  if(S.get(S.key('contents_pending',mk)))upTasks.push(runContentsSyncLocked(mk,()=>syncContentsUp(mk)).then(()=>S.set(S.key('contents_pending',mk),false)));
   if(S.get('wchallenge_pending_'+wk))upTasks.push(autoSync('wchallenge','wchallenge_'+wk));
   if(S.get(S.key('rblocks_pending',dk)))upTasks.push(syncRhythmBlocksUp(dk).then(()=>S.set(S.key('rblocks_pending',dk),false)));
   if(upTasks.length)await Promise.all(upTasks);
@@ -7332,7 +7351,7 @@ async function migrateContentsClientIds(){
     for(const k of keys){
       const mk=k.split(':')[1];
       if(!mk||done.includes(mk))continue;
-      const ok=await syncContentsUp(mk);
+      const ok=await runContentsSyncLocked(mk,()=>syncContentsUp(mk));
       if(ok){done.push(mk);S.set('contents_cid_migrated_months',done);}
     }
   }catch(e){}

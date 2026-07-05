@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v8';
+const CACHE = 'iikoto-v9';
 const ASSETS = [
   './',
   './index.html'
