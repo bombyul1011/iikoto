@@ -1866,16 +1866,16 @@ function makeLabel(txt){
   d.className='slabel';d.textContent=txt;return d;
 }
 const RHYTHM_CATS={
-  exercise:{label:'운동',color:'rgba(245,165,120,0.82)'},
+  exercise:{label:'운동',color:'rgba(248,192,160,0.82)'},
   rest:{label:'휴식',color:'rgba(252,215,110,0.80)'},
   work:{label:'업무',color:'rgba(185,188,200,0.75)'},
   appointment:{label:'외출',color:'rgba(150,205,225,0.68)'},
-  note:{label:'서재',color:'rgba(240,150,190,0.80)'},
+  note:{label:'서재',color:'rgba(244,177,206,0.80)'},
   enjoy:{label:'감상',color:'rgba(190,160,230,0.80)'},
   home:{label:'정리',color:'rgba(205,215,145,0.80)'}
 };
 const RHYTHM_SLEEP_COLOR='rgba(205,194,182,0.88)';
-const RHYTHM_MEAL_COLOR='rgba(110,190,145,0.88)';
+const RHYTHM_MEAL_COLOR='rgba(163,214,185,0.88)';
 function getRhythmBlocks(dk){return S.get(S.key('rblocks',dk))||[];}
 function saveRhythmBlocks(dk,v){
   S.set(S.key('rblocks',dk),v);
