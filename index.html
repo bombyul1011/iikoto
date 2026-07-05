@@ -5995,12 +5995,18 @@ let _rdSheetBookCid=null;
 let _swSeconds=0,_swRunning=false,_swInterval=null,_swStartTs=0;
 const RD_SW_C=2*Math.PI*32;
 function backfillReadingLinks(){
+  // 주의: 여기서는 "아직 독서코너와 연결되지 않은" 콘텐츠 book 항목만 최초 연결한다.
+  // 이미 linkedContent=true인 책은 절대 건드리지 않음 — 그렇지 않으면 독서코너에서
+  // 방금 바꾼 상태(setBookStatus)를 여기서 콘텐츠의 예전/다른 상태값으로 역전파해
+  // 되돌려버리는 문제가 생김(독서코너 진입할 때마다 상태가 리셋되던 원인).
   const now=new Date();
   for(let i=0;i<6;i++){
     const d=new Date(now.getFullYear(),now.getMonth()-i,1);
     const mk=monthKey(d);
     getContents(mk).filter(c=>c.cat==='book').forEach(c=>{
-      syncContentToReadingBook(c.title,c.status,c.poster,c.author);
+      const already=getBooks().find(b=>b.title===c.title&&b.linkedContent);
+      if(already)return; // 이미 연결된 책은 스킵 — 상태 역전파 방지
+      syncContentToReadingBook(c.title,c.status,c.poster,c.author,mk);
     });
   }
 }
