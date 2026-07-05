@@ -3963,7 +3963,13 @@ function shiftDay(n){
   if(d>limit)return;
   currentDate=d;updateDateUI();
 }
-function goToday(){currentDate=new Date();updateDateUI();loadDaily();}
+function goToday(){
+  currentDate=new Date();
+  document.querySelectorAll('.vtab').forEach(t=>t.classList.toggle('on',t.dataset.v==='daily'));
+  document.querySelectorAll('.view').forEach(vw=>vw.classList.toggle('on',vw.id==='v-daily'));
+  const sc=document.querySelector('.scroll');if(sc)sc.scrollTop=0;
+  updateDateUI();
+}
 
 // ── TABS
 document.querySelectorAll('.vtab').forEach(b=>b.addEventListener('click',()=>{
