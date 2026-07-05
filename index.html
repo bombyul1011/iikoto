@@ -1761,14 +1761,23 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 <script>
 
 function appendSundayBanner(body){
+  const isNight2=getSubSection()==='night_2';
   body.appendChild(makeLabel('✦ 이번 주 돌아보기'));
   const banner=document.createElement('div');
   banner.className='weekly-review-banner';
-  banner.innerHTML=`<div class="weekly-review-banner-inner">
-    <div class="weekly-review-banner-title">✦ 이번주 돌아보기 ✦</div>
-    <div class="weekly-review-banner-sub"><span>지난 한주간의 나는 어땠을까요?</span><span style="font-size:16px;opacity:0.6;">›</span></div>
-  </div>`;
-  banner.addEventListener('click',openWeeklyReviewSheet);
+  if(isNight2){
+    banner.innerHTML=`<div class="weekly-review-banner-inner">
+      <div class="weekly-review-banner-title">✦ 이번주 돌아보기 ✦</div>
+      <div class="weekly-review-banner-sub"><span>지난 한주간의 나는 어땠을까요?</span><span style="font-size:16px;opacity:0.6;">›</span></div>
+    </div>`;
+    banner.addEventListener('click',openWeeklyReviewSheet);
+  }else{
+    banner.style.cssText+='cursor:default;opacity:0.62;animation:none;';
+    banner.innerHTML=`<div class="weekly-review-banner-inner">
+      <div class="weekly-review-banner-title">✦ 이번주 돌아보기 ✦</div>
+      <div class="weekly-review-banner-sub"><span>22시에 요약해드릴게요</span></div>
+    </div>`;
+  }
   body.appendChild(banner);
 }
 function renderHomeBody(section){
