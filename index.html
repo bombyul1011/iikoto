@@ -1806,7 +1806,6 @@ function renderHomeBody(section){
   if(section==='morning'){
     const exCard=makeExerciseCheckCard();
     if(exCard)body.appendChild(exCard);
-    body.appendChild(makeRingRow());
     body.appendChild(makeLabel('해빗'));
     body.appendChild(makeHabitStreakRow());
     body.appendChild(makeLabel('오늘 브리핑'));
@@ -2230,7 +2229,6 @@ function buildDailyRhythmTrack(dk,includeReview){
     let sortKey=sMin;
     if(isLateNightNew)sortKey+=1440;
     if(eMin!=null&&eMin<=sMin)eMin=1440; // 자정을 넘기는 블록은 당일 트랙에서는 24시까지로 표시
-    console.log('[DEBUG rhythm]',{text:b.text,start:b.start,sMin,latestManualMin:_latestManualMin,isLateNightNew,sortKey});
     blocks.push({start:sMin,end:eMin,sortKey:sortKey,color:cat.color,label:b.text||cat.label,time:b.start+' – '+(b.end||'진행중'),manualIdx:idx,ongoing:!b.end});
   });
   // 전날 블록이 자정을 넘겨서 오늘로 이어진 경우, 그 이어진 구간(0시~끝시각)을 오늘 트랙에도 표시
@@ -2269,7 +2267,6 @@ function buildDailyRhythmTrack(dk,includeReview){
   blocksSorted.forEach(function(bk,bi){
     const offset=(bk.sortKey!=null)?(bk.sortKey-bk.start):0; // 자정 넘김 보정값(+1440 또는 0)
     const by=toY(bk.start+offset);
-    console.log('[DEBUG render]',{label:bk.label,start:bk.start,sortKey:bk.sortKey,offset,by});
     const stubEnd=bk.end!=null?bk.end:(isToday?(function(){const n=new Date();return n.getHours()*60+n.getMinutes();})():Math.min(bk.start+20,1440));
     const bh=Math.max(toY(stubEnd+offset)-by,8);
     html+='<div class="rt-block'+(bk.ongoing?' ongoing':'')+'" style="top:'+by+'px;height:'+bh+'px;background-color:'+bk.color+';z-index:'+(10+bi)+';"></div>';
@@ -2338,11 +2335,14 @@ function makeExerciseCheckCard(){
   const isOn=!!checks[key];
   const rgba=HABIT_COLOR_RGBA[habit.color]||'rgba(192,112,128,0.80)';
   const card=document.createElement('div');
-  card.className='card s';
-  card.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:12px 15px;margin-bottom:8px;';
-  card.innerHTML=`<span style="font-size:13px;color:var(--tp);">오늘 운동 다녀왔나요?</span>
-    <div class="habit-chk2${isOn?' on':''}"${isOn?` style="background:${rgba};border-color:${rgba};"`:''}><svg width="13" height="13" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" style="display:${isOn?'block':'none'}"><polyline points="2,6 4.5,9 10,3.5"/></svg></div>`;
-  card.querySelector('.habit-chk2').addEventListener('click',function(){
+  card.className='report-banner meal-soft';
+  card.style.cssText='margin-top:0;margin-bottom:8px;';
+  card.innerHTML=`<div class="report-banner-inner">
+    <div class="report-banner-line" style="font-size:12.5px;">오늘 운동 다녀왔나요?</div>
+    <div class="habit-chk2${isOn?' on':''}"${isOn?` style="background:${rgba};border-color:${rgba};"`:''}><svg width="13" height="13" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" style="display:${isOn?'block':'none'}"><polyline points="2,6 4.5,9 10,3.5"/></svg></div>
+  </div>`;
+  card.querySelector('.habit-chk2').addEventListener('click',function(e){
+    e.stopPropagation();
     const wasOn=!!checks[key];
     checks[key]=!checks[key];
     if(wasOn&&!checks[key])addDelPending('hc',wk,habitName+'|'+dk);
