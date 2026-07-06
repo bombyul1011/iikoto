@@ -2230,6 +2230,7 @@ function buildDailyRhythmTrack(dk,includeReview){
     let sortKey=sMin;
     if(isLateNightNew)sortKey+=1440;
     if(eMin!=null&&eMin<=sMin)eMin=1440; // 자정을 넘기는 블록은 당일 트랙에서는 24시까지로 표시
+    console.log('[DEBUG rhythm]',{text:b.text,start:b.start,sMin,latestManualMin:_latestManualMin,isLateNightNew,sortKey});
     blocks.push({start:sMin,end:eMin,sortKey:sortKey,color:cat.color,label:b.text||cat.label,time:b.start+' – '+(b.end||'진행중'),manualIdx:idx,ongoing:!b.end});
   });
   // 전날 블록이 자정을 넘겨서 오늘로 이어진 경우, 그 이어진 구간(0시~끝시각)을 오늘 트랙에도 표시
@@ -2268,6 +2269,7 @@ function buildDailyRhythmTrack(dk,includeReview){
   blocksSorted.forEach(function(bk,bi){
     const offset=(bk.sortKey!=null)?(bk.sortKey-bk.start):0; // 자정 넘김 보정값(+1440 또는 0)
     const by=toY(bk.start+offset);
+    console.log('[DEBUG render]',{label:bk.label,start:bk.start,sortKey:bk.sortKey,offset,by});
     const stubEnd=bk.end!=null?bk.end:(isToday?(function(){const n=new Date();return n.getHours()*60+n.getMinutes();})():Math.min(bk.start+20,1440));
     const bh=Math.max(toY(stubEnd+offset)-by,8);
     html+='<div class="rt-block'+(bk.ongoing?' ongoing':'')+'" style="top:'+by+'px;height:'+bh+'px;background-color:'+bk.color+';z-index:'+(10+bi)+';"></div>';
