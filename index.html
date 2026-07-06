@@ -5251,11 +5251,16 @@ function updateMonthlyGoalTitle(){
 let _calSelectedDay=null;
 
 const _monthSynced={};
+const MONTH_SYNC_TTL=60*1000; // 60초 — 이 시간이 지나면 캐시를 신뢰하지 않고 서버를 다시 조회.
+// 무기한 캐시였을 때는, 세션 도중 서버 데이터가 외부(다른 기기, 직접 SQL 등)에서 바뀌어도
+// 이 세션은 그 변경을 전혀 모른 채 "구버전 로컬 스냅샷"을 계속 유지하다가, 그 스냅샷을 그대로
+// 업로드(saveContents 등)해버리면 서버의 새 데이터가 지워진 것처럼 되는 사고로 이어졌음.
 async function syncMonthRange(y,mo){
   if(!navigator.onLine)return false;
   const mk=`${y}-${pad(mo+1)}`;
-  if(_monthSynced[mk])return false;
-  _monthSynced[mk]=true;
+  const lastSync=_monthSynced[mk];
+  if(lastSync&&(Date.now()-lastSync)<MONTH_SYNC_TTL)return false;
+  _monthSynced[mk]=Date.now();
   const daysInMonth=new Date(y,mo+1,0).getDate();
   const start=`${y}-${pad(mo+1)}-01`;
   const end=`${y}-${pad(mo+1)}-${pad(daysInMonth)}`;
