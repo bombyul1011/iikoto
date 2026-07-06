@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-vcombined';
+const CACHE = 'iikoto-vscrollbg';
 const ASSETS = [
   './',
   './index.html'
