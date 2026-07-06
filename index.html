@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260706-10-meal30 -->
+<!-- build: 20260706-11-weekmeal30 -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -80,6 +80,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 /* ══ APP SHELL ══ */
 #app{max-width:430px;margin:0 auto;height:100vh;height:-webkit-fill-available;display:flex;flex-direction:column;background:var(--bg);overflow:hidden;}
+html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg);z-index:-1;}
 
 /* ── TOPBAR ── */
 .topbar{flex-shrink:0;display:flex;flex-direction:column;background:transparent;}
@@ -5598,7 +5599,7 @@ function renderWeeklyRhythmBars(){
     MEAL_KEYS.forEach(function(k){
       const t=meals[k+'_time'];if(!t)return;
       const start=toMin(t);
-      segs.push({start:start,end:Math.min(start+60,1440),color:RHYTHM_MEAL_COLOR});
+      segs.push({start:start,end:Math.min(start+30,1440),color:RHYTHM_MEAL_COLOR});
     });
     manual.forEach(function(b){
       const cat=RHYTHM_CATS[b.cat];if(!cat)return;
