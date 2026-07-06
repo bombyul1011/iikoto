@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260706-weekmeal30';
+const CACHE = 'iikoto-v20260706-retry';
 const ASSETS = [
   './',
   './index.html'
