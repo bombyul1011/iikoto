@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260706-overshoot';
+const CACHE = 'iikoto-v20260706-default-final';
 const ASSETS = [
   './',
   './index.html'
