@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260706-vhfix';
+const CACHE = 'iikoto-v20260706-statusbar';
 const ASSETS = [
   './',
   './index.html'
