@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-vgrandtruth';
+const CACHE = 'iikoto-vnoanim-real';
 const ASSETS = [
   './',
   './index.html'
