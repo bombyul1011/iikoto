@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260706-12-retry -->
+<!-- build: 20260706-13-weekmeal45 -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -5599,7 +5599,7 @@ function renderWeeklyRhythmBars(){
     MEAL_KEYS.forEach(function(k){
       const t=meals[k+'_time'];if(!t)return;
       const start=toMin(t);
-      segs.push({start:start,end:Math.min(start+30,1440),color:RHYTHM_MEAL_COLOR});
+      segs.push({start:start,end:Math.min(start+45,1440),color:RHYTHM_MEAL_COLOR});
     });
     manual.forEach(function(b){
       const cat=RHYTHM_CATS[b.cat];if(!cat)return;
