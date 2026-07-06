@@ -6537,7 +6537,7 @@ function removeBook(cid){
     }
   }
   deleteBookLocal(cid);
-  renderBookList();
+  renderReadingHub(); // 아카이브 리스트뿐 아니라 상단(진행중 표시/커버 등)까지 즉시 갱신
 }
 let _rdNewUnit='pages';
 function setRdUnit(u){
@@ -6780,9 +6780,8 @@ function openAddBookModal(){
   document.getElementById('rd-new-total').value='';
   document.getElementById('rd-wish-results').style.display='none';
   _rdNewPoster=null;_rdNewAuthor='';
-  // 모달을 열 때마다 현재 아카이브 탭이 위시면 위시로, 아니면 읽는 중으로 기본값을 잡되
-  // 모달 안에서 직접 다시 고를 수 있게 함
-  setRdAddStatus(_rdTab==='wish'?'wish':'reading');
+  // 위시가 우선 노출 — 아카이브 탭 상태와 무관하게 항상 위시를 기본 선택으로 잡음
+  setRdAddStatus('wish');
   setRdUnit('pages');
   openModal('add-book-modal');
 }
