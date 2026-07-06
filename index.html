@@ -1710,16 +1710,22 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 <div class="modal-ov" id="add-book-modal" onclick="closeModal('add-book-modal',event)">
   <div class="modal" onclick="event.stopPropagation()">
     <div class="modal-title">책 추가</div>
+    <div class="rd-unit-row" style="margin-bottom:10px;">
+      <div class="rd-unit-btn on" id="rd-status-reading" onclick="setRdAddStatus('reading')">읽는 중</div>
+      <div class="rd-unit-btn" id="rd-status-wish" onclick="setRdAddStatus('wish')">위시</div>
+    </div>
     <div class="api-search-wrap">
       <input class="modal-inp" id="rd-new-title" type="text" placeholder="책 제목" autocomplete="off" oninput="onRdTitleInput(this.value)" onblur="setTimeout(()=>{const r=document.getElementById('rd-wish-results');if(r)r.style.display='none';},200)">
       <div class="api-results" id="rd-wish-results" style="display:none;"></div>
     </div>
-    <div class="rd-unit-row">
-      <div class="rd-unit-btn on" id="rd-unit-pages" onclick="setRdUnit('pages')">페이지로 기록</div>
-      <div class="rd-unit-btn" id="rd-unit-percent" onclick="setRdUnit('percent')">퍼센트로 기록</div>
+    <div id="rd-progress-fields">
+      <div class="rd-unit-row">
+        <div class="rd-unit-btn on" id="rd-unit-pages" onclick="setRdUnit('pages')">페이지로 기록</div>
+        <div class="rd-unit-btn" id="rd-unit-percent" onclick="setRdUnit('percent')">퍼센트로 기록</div>
+      </div>
+      <div id="rd-unit-hint" style="display:none;font-size:11px;color:var(--tm);text-align:center;margin:-2px 0 8px;">추가한 뒤 진행률 막대를 눌러 진행 상황을 기록해요</div>
+      <input class="modal-inp" id="rd-new-total" type="number" inputmode="numeric" placeholder="전체 페이지 수 (선택)" style="margin-top:8px;">
     </div>
-    <div id="rd-unit-hint" style="display:none;font-size:11px;color:var(--tm);text-align:center;margin:-2px 0 8px;">추가한 뒤 진행률 막대를 눌러 진행 상황을 기록해요</div>
-    <input class="modal-inp" id="rd-new-total" type="number" inputmode="numeric" placeholder="전체 페이지 수 (선택)" style="margin-top:8px;">
     <div class="modal-actions">
       <button class="mbtn cancel" onclick="closeModal('add-book-modal')">취소</button>
       <button class="mbtn ok" onclick="confirmAddBook()">추가</button>
@@ -6751,17 +6757,26 @@ async function saveShareCard(){
     showToast('이미지 저장에 실패했어요');
   }
 }
+let _rdAddStatus='reading';
 function openAddBookModal(){
   document.getElementById('rd-new-title').value='';
   document.getElementById('rd-new-total').value='';
   document.getElementById('rd-wish-results').style.display='none';
   _rdNewPoster=null;_rdNewAuthor='';
+  // 모달을 열 때마다 현재 아카이브 탭이 위시면 위시로, 아니면 읽는 중으로 기본값을 잡되
+  // 모달 안에서 직접 다시 고를 수 있게 함
+  setRdAddStatus(_rdTab==='wish'?'wish':'reading');
   setRdUnit('pages');
   openModal('add-book-modal');
 }
+function setRdAddStatus(s){
+  _rdAddStatus=s;
+  document.getElementById('rd-status-reading').classList.toggle('on',s==='reading');
+  document.getElementById('rd-status-wish').classList.toggle('on',s==='wish');
+  document.getElementById('rd-progress-fields').style.display=s==='wish'?'none':'';
+}
 let _rdWishTimer=null,_rdNewPoster=null,_rdNewAuthor='';
 function onRdTitleInput(v){
-  if(_rdTab!=='wish')return;
   clearTimeout(_rdWishTimer);
   _rdNewPoster=null;_rdNewAuthor='';
   const resultsEl=document.getElementById('rd-wish-results');
@@ -6795,7 +6810,7 @@ function confirmAddBook(){
   const title=document.getElementById('rd-new-title').value.trim();
   if(!title)return;
   const total=_rdNewUnit==='pages'?(parseInt(document.getElementById('rd-new-total').value,10)||null):null;
-  const status=_rdTab==='wish'?'wish':'reading';
+  const status=_rdAddStatus==='wish'?'wish':'reading';
   const today=dateKey(new Date());
   const mk=monthKey(new Date());
   const book={cid:genCid(),title,status,unit:_rdNewUnit,pages:0,totalPages:total,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:null,poster:_rdNewPoster||null,author:_rdNewAuthor||''};
