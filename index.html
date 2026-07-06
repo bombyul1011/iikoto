@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260706-13-weekmeal45 -->
+<!-- build: 20260706-14-diarybanner -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -5678,6 +5678,9 @@ function loadMonthly(){
   updateReportBannerLabel();
   updateDiaryBannerLabel();
   const sy=_calYear,smo=_calMonth;
+  syncOnelineMonthRange(sy,smo).then(fetched=>{
+    if(fetched&&_calYear===sy&&_calMonth===smo)updateDiaryBannerLabel();
+  });
   syncMonthRange(sy,smo).then(fetched=>{
     if(fetched&&_calYear===sy&&_calMonth===smo){
       renderCalendar();updateStats();renderTimetable();renderHabitMonthly();renderMonthlyStatBar();
