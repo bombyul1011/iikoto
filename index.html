@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260706-9-cleanup-final -->
+<!-- build: 20260706-10-meal30 -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -80,7 +80,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 /* ══ APP SHELL ══ */
 #app{max-width:430px;margin:0 auto;height:100vh;height:-webkit-fill-available;display:flex;flex-direction:column;background:var(--bg);overflow:hidden;}
-html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg);z-index:-1;}
 
 /* ── TOPBAR ── */
 .topbar{flex-shrink:0;display:flex;flex-direction:column;background:transparent;}
@@ -2191,7 +2190,7 @@ function buildDailyRhythmTrack(dk,includeReview){
     html+='<div class="rt-hourlabel" data-h="'+h+'" style="top:'+toY(h*60)+'px;">'+String(h).padStart(2,'0')+'</div>';
   });
 
-  // 블록 통합 목록: 수면(자동) + 식사(자동,1시간) + 수기 블록
+  // 블록 통합 목록: 수면(자동) + 식사(자동,30분) + 수기 블록
   let blocks=[];
   const wakeMin=toMin(sleep.wake),sleepMin=toMin(sleep.sleep);
   if(wakeMin!=null&&sleepMin!=null&&sleepMin<=wakeMin){
@@ -2208,7 +2207,7 @@ function buildDailyRhythmTrack(dk,includeReview){
     const t=meals[k+'_time'];
     if(!t)return;
     const start=toMin(t);
-    blocks.push({start:start,end:Math.min(start+60,1440),color:RHYTHM_MEAL_COLOR,label:meals[k]||MEAL_LABELS[k],time:t,icon:true});
+    blocks.push({start:start,end:Math.min(start+30,1440),color:RHYTHM_MEAL_COLOR,label:meals[k]||MEAL_LABELS[k],time:t,icon:true});
   });
   // 자정 넘어 새로 등록된 블록(예: 00:30 시작)을 그날 이른 새벽 활동과 구분하기 위한 기준시각.
   // 그날 이미 등록된 수기 블록들 중 가장 늦은 시각(끝났으면 end, 진행중이면 start)을 구해두고,
