@@ -1821,7 +1821,7 @@ function renderHomeBody(section){
     sc.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑 작성 중...</div>';
     body.appendChild(sc);
     makeScheduleCard('morning').then(function(card){sc.replaceWith(card);}).catch(function(){sc.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑을 불러올 수 없어요</div>';});
-    body.appendChild(makeDetailBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(_ld));},'rhythm-soft',12.5));
+    body.appendChild(makeDetailBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getRhythmLogicalDate()));},'rhythm-soft',12.5));
     body.appendChild(makeLabel('최근 콘텐츠'));
     body.appendChild(makeContentsCard());
   } else if(section==='afternoon'){
@@ -1831,7 +1831,7 @@ function renderHomeBody(section){
     sc2.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑 작성 중...</div>';
     body.appendChild(sc2);
     makeScheduleCard('afternoon').then(function(card){sc2.replaceWith(card);}).catch(function(){sc2.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑을 불러올 수 없어요</div>';});
-    body.appendChild(makeDetailBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(_ld));},'rhythm-soft',12.5));
+    body.appendChild(makeDetailBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getRhythmLogicalDate()));},'rhythm-soft',12.5));
     body.appendChild(makeLabel('최근 콘텐츠'));
     body.appendChild(makeContentsCard());
   } else {
@@ -1861,7 +1861,7 @@ function renderHomeBody(section){
       body.appendChild(mbanner);
     }
     body.appendChild(makeRingRow());
-    body.appendChild(makeDetailBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(_ld),getSubSection()==='night_2');},'rhythm-soft',12.5));
+    body.appendChild(makeDetailBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getRhythmLogicalDate()),getSubSection()==='night_2');},'rhythm-soft',12.5));
     // 일요일 한정 — 다음 주 준비 배너 (리듬배너 뒤, 공통 틀 끝)
     if(isSunday&&new Date().getDay()===0){
       body.appendChild(makeLabel('◉ 다음 주 준비'));
@@ -3599,6 +3599,13 @@ function pad(n){return String(n).padStart(2,'0');}
 function getLogicalDate(){
   const d=new Date();
   if(d.getHours()<6)d.setDate(d.getDate()-1);
+  return d;
+}
+// 리듬 기능 전용 — 다른 화면(오늘탭 전환, 인사말 등)의 6시 기준과 별개로,
+// 리듬은 새벽 4시를 하루 경계로 봄 (극히 드문 새벽 4시 이후 활동까지만 전날로 인정)
+function getRhythmLogicalDate(){
+  const d=new Date();
+  if(d.getHours()<4)d.setDate(d.getDate()-1);
   return d;
 }
 function genCid(){
@@ -5628,6 +5635,7 @@ function renderWeeklyRhythmBars(){
   const DOW=['월','화','수','목','금','토','일'];
   const todayDk=dateKey(now);
   const realTodayDk=todayDk; // 진행중 블록 연장 판정용(요일기준과 동일값이지만 의도 명시)
+  const _curLogicalDk=dateKey(getRhythmLogicalDate()); // 자정 넘겨 아직 안 끝난 논리적 '오늘' (리듬 전용, 새벽 4시 기준)
   const toMin=function(t){if(!t)return null;const p=t.split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);};
   const MEAL_KEYS=['breakfast','lunch','dinner','snack'];
   let html='<div class="wrb-wrap">';
@@ -5644,7 +5652,7 @@ function renderWeeklyRhythmBars(){
     }else{
       if(wakeMin!=null)segs.push({start:0,end:wakeMin,color:RHYTHM_SLEEP_COLOR});
       if(sleepMin!=null&&wakeMin==null){
-        const end=dk===realTodayDk?(function(){const n=new Date();return n.getHours()<6?1440:(n.getHours()*60+n.getMinutes());})():1440;
+        const end=dk===realTodayDk?(function(){const n=new Date();return n.getHours()<4?1440:(n.getHours()*60+n.getMinutes());})():1440;
         segs.push({start:sleepMin,end:end,color:RHYTHM_SLEEP_COLOR,ongoing:true});
       }
     }
@@ -5655,23 +5663,35 @@ function renderWeeklyRhythmBars(){
     });
     manual.forEach(function(b){
       const cat=RHYTHM_CATS[b.cat];if(!cat)return;
+      const s=toMin(b.start);
+      // 리듬 전용 논리적 날짜(새벽 4시 기준) 저장 방식상, 새벽 0~3시대에 시작한 블록은
+      // 실제로는 '다음날 새벽'에 해당하므로 이 날짜 칸에서는 그리지 않고 익일 칸에서 처리한다
+      if(s!=null&&s<240)return;
       if(b.end){
-        const s=toMin(b.start);let e=toMin(b.end);
+        let e=toMin(b.end);
         if(e<=s)e=1440; // 자정을 넘기는 블록은 당일 바에서는 24시까지로 표시
         segs.push({start:s,end:e,color:cat.color});
       }else{
         // 진행중 블록: 실제 오늘 날짜의 행이면 현재 시각까지, 지난 날짜면 자정(1440)까지 채워 표시(사라짐 방지)
         const endMin=dk===realTodayDk?(function(){const n=new Date();return n.getHours()*60+n.getMinutes();})():1440;
-        segs.push({start:toMin(b.start),end:endMin,color:cat.color,ongoing:true});
+        segs.push({start:s,end:endMin,color:cat.color,ongoing:true});
       }
     });
-    // 전날 블록이 자정을 넘겨 오늘로 이어진 구간도 표시
-    const prevD2=new Date(d);prevD2.setDate(d.getDate()-1);
-    getRhythmBlocks(dateKey(prevD2)).forEach(function(b){
-      if(!b.end)return;
+    // 전날의 논리적 날짜에 저장된, 새벽 0~3시대 시작 블록을 오늘(익일) 칸의 새벽 구간으로 이어서 표시
+    const prevD=new Date(d);prevD.setDate(d.getDate()-1);
+    getRhythmBlocks(dateKey(prevD)).forEach(function(b){
       const cat=RHYTHM_CATS[b.cat];if(!cat)return;
-      const s=toMin(b.start),e=toMin(b.end);
-      if(e<=s&&e>0)segs.push({start:0,end:e,color:cat.color});
+      const s=toMin(b.start);
+      if(s==null||s>=240)return; // 새벽 4시 이전 시작 블록만 대상
+      if(b.end){
+        let e=toMin(b.end);
+        if(e<=s)e=240; // 방어적으로 새벽 4시까지만
+        segs.push({start:s,end:e,color:cat.color});
+      }else{
+        // 진행중 블록이 전날 논리날짜에 남아있는 경우(자정 넘겨 아직 종료 안 함): 오늘 칸에서 현재 시각까지 이어서 표시
+        const endMin=dateKey(prevD)===_curLogicalDk?(function(){const n=new Date();return n.getHours()*60+n.getMinutes();})():240;
+        segs.push({start:s,end:endMin,color:cat.color,ongoing:true});
+      }
     });
     let track='<div class="wrb-track">';
     // 짧은 세그먼트가 위로 오도록 — 긴 것 먼저 렌더(낮은 z-index), 짧은 것 나중(높은 z-index)
