@@ -6965,8 +6965,27 @@ function toggleStopwatch(){
     if(homeBtn)homeBtn.classList.remove('sw-active');
     const seconds=_swSeconds;
     _swSeconds=0;
+    autoLogReadingRhythm(_swStartTs,Date.now());
     if(seconds>0)openProgressModal(seconds);
   }
+}
+// 스톱워치 종료 시 독서 시간을 '감상' 카테고리 리듬 블록으로 자동 기록
+// 1분 미만은 실수로 켰다 끈 경우일 수 있어 기록하지 않음
+function autoLogReadingRhythm(startTs,endTs){
+  if(!startTs||!endTs||endTs-startTs<60000)return;
+  const minToHHMM=function(mins){mins=((mins%1440)+1440)%1440;const h=Math.floor(mins/60),m=mins%60;return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');};
+  const dkOf=function(ts){const d=new Date(ts);if(d.getHours()<4)d.setDate(d.getDate()-1);return dateKey(d);};
+  const startD=new Date(startTs),endD=new Date(endTs);
+  const dk=dkOf(startTs);
+  const startMin=startD.getHours()*60+startD.getMinutes();
+  let endMin=endD.getHours()*60+endD.getMinutes();
+  // 자정을 넘겨 끝난 경우, 같은 논리적 하루(리듬 4시 기준) 안이면 24시를 더해 이어지도록 표시
+  if(dkOf(endTs)!==dk)endMin+=1440;
+  const book=getBooks().find(b=>b.status==='reading');
+  const text=book&&book.title?('독서 - '+book.title):'독서';
+  const blocks=getRhythmBlocks(dk);
+  blocks.push({cat:'enjoy',start:minToHHMM(startMin),end:minToHHMM(endMin),text:text,created:Date.now(),cid:genCid()});
+  saveRhythmBlocks(dk,blocks);
 }
 function updateStopwatchDisplay(){
   // 실제 경과시간(시작시각 기준)으로 재계산 — 화면이 꺼져 setInterval이 멈췄다 재개되어도
