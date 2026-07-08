@@ -1898,7 +1898,7 @@ const RHYTHM_CATS={
   rest:{label:'휴식',color:'rgba(252,215,110,0.80)'},
   work:{label:'업무',color:'rgba(185,188,200,0.75)'},
   appointment:{label:'외출',color:'rgba(150,205,225,0.68)'},
-  note:{label:'서재',color:'rgba(244,177,206,0.80)'},
+  note:{label:'책상',color:'rgba(244,177,206,0.80)'},
   enjoy:{label:'감상',color:'rgba(190,160,230,0.80)'},
   home:{label:'정리',color:'rgba(205,215,145,0.80)'}
 };
@@ -1969,6 +1969,7 @@ function saveRhythmBlock(){
   _rhythmSubmitting=true;
   const text=t?t.value.trim():'';
   const blocks=getRhythmBlocks(_rhythmDk);
+  const isNew=_rhythmEditIdx==null;
   if(_rhythmEditIdx!=null&&blocks[_rhythmEditIdx]){
     const old=blocks[_rhythmEditIdx];
     blocks[_rhythmEditIdx]={cat:cat,start:start,end:end||'',text:text,created:old.created,cid:old.cid||genCid()};
@@ -1976,9 +1977,30 @@ function saveRhythmBlock(){
     blocks.push({cat:cat,start:start,end:end||'',text:text,created:Date.now(),cid:genCid()});
   }
   saveRhythmBlocks(_rhythmDk,blocks);
+  if(isNew)autoCheckHabitFromRhythm(cat,_rhythmDk);
   _rhythmFormOpen=false;_resetRhythmForm();
   refreshRhythmTrack();
   setTimeout(()=>{_rhythmSubmitting=false;},500);
+}
+// 리듬 블록 카테고리에 대응하는 습관(월간 결산용)을 자동으로 체크
+// 카테고리 1:1로 명확히 매칭되는 것만: 운동→'운동'
+function autoCheckHabitFromRhythm(cat,dk){
+  const map={exercise:'운동'};
+  const habitName=map[cat];if(!habitName)return;
+  checkHabitDirect(habitName,dk);
+}
+// 습관 이름을 지정해 직접 체크(이미 켜져 있으면 그대로 둠 - 수동으로 끈 걸 되돌리지 않기 위함)
+function checkHabitDirect(habitName,dk){
+  const habits=getHabits();
+  if(!habits.some(h=>h.name===habitName))return;
+  const d=new Date(dk+'T00:00:00');
+  const wk=weekKey(d),dow=(d.getDay()+6)%7;
+  const key=habitName+'-'+dow;
+  const checks=getHabitChecks(wk);
+  if(checks[key])return;
+  checks[key]=true;
+  saveHabitChecks(wk,checks);
+  if(document.getElementById('daily-habit-box'))renderDailyHabitCheck();
 }
 function finishRhythmBlock(idx){
   const blocks=getRhythmBlocks(_rhythmDk);
@@ -6986,6 +7008,7 @@ function autoLogReadingRhythm(startTs,endTs){
   const blocks=getRhythmBlocks(dk);
   blocks.push({cat:'enjoy',start:minToHHMM(startMin),end:minToHHMM(endMin),text:text,created:Date.now(),cid:genCid()});
   saveRhythmBlocks(dk,blocks);
+  checkHabitDirect('독서',dk); // 스톱워치 독서 활동은 카테고리(감상)와 무관하게 '독서' 습관을 직접 체크
 }
 function updateStopwatchDisplay(){
   // 실제 경과시간(시작시각 기준)으로 재계산 — 화면이 꺼져 setInterval이 멈췄다 재개되어도
