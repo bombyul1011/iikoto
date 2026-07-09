@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260709-24-eveningpolish -->
+<!-- build: 20260709-25-tighttoast -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -418,6 +418,7 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
 .sheet-item{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--div);cursor:pointer;font-size:13px;color:var(--tp);}
 .sheet-item:last-child{border-bottom:none;}
 .sheet-item.del{color:#c05060;}
+.archive-sheet-textarea:focus{border-color:rgba(150,175,120,0.55);}
 .modal-ov{position:fixed;inset:0;background:rgba(60,40,35,.22);z-index:9999;display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px);}
 .modal-ov.on{display:flex;}
 .modal{width:calc(100% - 48px);max-width:300px;max-height:85vh;overflow-y:auto;background:var(--modal);border:1px solid rgba(255,255,255,.80);border-radius:22px;padding:22px 20px;box-shadow:0 8px 40px rgba(0,0,0,.18);box-sizing:border-box;}
@@ -1233,7 +1234,7 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
     <div class="sheet-title">오늘 이 문장에서 떠오른 생각</div>
     <div style="padding:16px 20px 0;">
       <div id="archive-sheet-quote" style="font-size:12.5px;color:var(--tm);line-height:1.6;margin-bottom:12px;"></div>
-      <textarea id="archive-sheet-inp" style="width:100%;box-sizing:border-box;font-size:14px;padding:12px;border-radius:12px;border:1px solid var(--card-b);background:var(--card);color:var(--tp);resize:none;min-height:100px;font-family:inherit;" placeholder="생각나는 대로 적어보세요"></textarea>
+      <textarea id="archive-sheet-inp" class="archive-sheet-textarea" style="width:100%;box-sizing:border-box;font-size:14px;padding:12px;border-radius:12px;border:1px solid var(--card-b);background:var(--card);color:var(--tp);resize:none;min-height:100px;font-family:inherit;outline:none;" placeholder="생각나는 대로 적어보세요"></textarea>
       <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:10px;">
         <span onclick="closeSheet('archive-comment-sheet')" style="font-size:13px;color:var(--tm);cursor:pointer;padding:8px 14px;">취소</span>
         <span onclick="commitArchiveSheetComment()" style="font-size:13px;color:#fff;background:rgba(140,160,110,0.9);cursor:pointer;padding:8px 16px;border-radius:10px;font-weight:600;">저장</span>
@@ -4845,7 +4846,7 @@ function makePendingTodosCard(){
   const pendingWithIdx=todos.map((t,i)=>({...t,_i:i})).filter(t=>!t.done);
   const card=document.createElement('div');
   card.className='card';
-  card.style.cssText='box-shadow:none;border:1px solid var(--card-b);';
+  card.style.cssText='box-shadow:none;border:1px solid var(--card-b);padding:9px 12px;';
   card.id='home-pending-todos-card';
   if(!pendingWithIdx.length){
     card.innerHTML='<div style="font-size:13px;color:var(--tm);padding:6px 2px;text-align:center;">오늘 할일 끝! 고생하셨어요 🌿</div>';
@@ -4860,7 +4861,7 @@ function makePendingTodosCard(){
     const postponedClass=(t.postponeCount||0)>=3?' postponed':'';
     const el=document.createElement('div');
     el.className='todo-item';
-    el.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px;';
+    el.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 0;';
     el.innerHTML=`<div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
       <div class="chk" onclick="homeToggleTodo(${t._i})"></div>
       <span class="todo-txt${postponedClass}" style="flex:1;color:var(--tm);">${t.text}</span>
