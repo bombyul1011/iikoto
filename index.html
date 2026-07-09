@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260709-20-outsideclick -->
+<!-- build: 20260709-21-copyconfirm -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -1177,6 +1177,9 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
 
 <!-- UNDO TOAST -->
 <div class="undo-toast" id="undo-toast">삭제됐어요 <span class="undo-btn" onclick="undoMemo()">되돌리기</span></div>
+
+<!-- TODO COPY CONFIRM TOAST -->
+<div class="undo-toast" id="todo-copy-confirm-toast">내일로 복사할까요? <span class="undo-btn" onclick="confirmCopyWholeTodo()">네</span></div>
 
 <!-- TODO SHEET -->
 <!-- RESERVE TODO SHEET -->
@@ -4733,12 +4736,28 @@ document.addEventListener('click',e=>{
   _todoPartModeIdx=-1;
   renderTodos();
 });
+// 구분자(,/) 없는 단일 항목 전체를 내일로 복사 (오늘 항목은 그대로 유지). 스와이프하면 먼저 확인 토스트로 묻고, "네" 눌러야 실제 복사됨.
+let _pendingCopyTodoIdx=-1,_copyConfirmTimer=null;
 function copyWholeTodoToTomorrow(i){
+  _pendingCopyTodoIdx=i;
+  const t=document.getElementById('todo-copy-confirm-toast');
+  if(!t)return;
+  clearTimeout(_copyConfirmTimer);
+  t.classList.add('on');
+  _copyConfirmTimer=setTimeout(()=>{t.classList.remove('on');_pendingCopyTodoIdx=-1;},4000);
+}
+function confirmCopyWholeTodo(){
+  const t=document.getElementById('todo-copy-confirm-toast');
+  if(t)t.classList.remove('on');
+  clearTimeout(_copyConfirmTimer);
+  const i=_pendingCopyTodoIdx;
+  _pendingCopyTodoIdx=-1;
+  if(i<0)return;
   const dk=dateKey(currentDate),todos=getTodos(dk),todo=todos[i];
   if(!todo)return;
   const tom=new Date(currentDate);tom.setDate(tom.getDate()+1);
   const tdk=dateKey(tom),ttodos=getTodos(tdk);
-  if(ttodos.some(t=>t.text===todo.text)){
+  if(ttodos.some(x=>x.text===todo.text)){
     showToast('이미 내일에 있어요');
     return;
   }
