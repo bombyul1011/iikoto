@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260710-02-arrowprefix -->
+<!-- build: 20260710-03-timesectionfix -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -4588,7 +4588,7 @@ function confirmCopyUnstruckParts(){
   const tom=new Date(currentDate);tom.setDate(tom.getDate()+1);
   const tdk=dateKey(tom),ttodos=getTodos(tdk);
   if(!ttodos.some(x=>x.text===movedText)){
-    ttodos.push({text:movedText,done:false,created:Date.now(),timeSection:'none',cid:genCid(),postponeCount:0,strikeParts:[]});
+    ttodos.push({text:movedText,done:false,created:Date.now(),timeSection:todo.timeSection||'none',cid:genCid(),postponeCount:0,strikeParts:[]});
     saveTodos(tdk,ttodos);
   }
 
@@ -4688,7 +4688,7 @@ function confirmCopyWholeTodo(){
     showToast('이미 내일에 있어요');
     return;
   }
-  ttodos.push({text:todo.text,done:false,created:Date.now(),timeSection:'none',cid:genCid(),postponeCount:0,strikeParts:[]});
+  ttodos.push({text:todo.text,done:false,created:Date.now(),timeSection:todo.timeSection||'none',cid:genCid(),postponeCount:0,strikeParts:[]});
   saveTodos(tdk,ttodos);
   showToast('내일에도 추가했어요');
 }
