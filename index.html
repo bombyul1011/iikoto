@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260709-21-copyconfirm -->
+<!-- build: 20260709-23-cleanup -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -1179,7 +1179,7 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
 <div class="undo-toast" id="undo-toast">삭제됐어요 <span class="undo-btn" onclick="undoMemo()">되돌리기</span></div>
 
 <!-- TODO COPY CONFIRM TOAST -->
-<div class="undo-toast" id="todo-copy-confirm-toast">내일로 복사할까요? <span class="undo-btn" onclick="confirmCopyWholeTodo()">네</span></div>
+<div class="undo-toast" id="todo-copy-confirm-toast">내일로 복사할까요? <span class="undo-btn" onclick="confirmTodoCopyToast()">네</span></div>
 
 <!-- TODO SHEET -->
 <!-- RESERVE TODO SHEET -->
@@ -2581,12 +2581,9 @@ function _bcSet(subSec,val){
 })();
 
 // 앱 시작 시 오늘 캐시 복원
-let _scheduleCache=null,_scheduleCacheSection='';
 let _greetingCache=null;
 function _initBriefingCache(){
   const subSec=getSubSection();
-  const sc=_bcGet(subSec);
-  if(sc&&sc.html){_scheduleCache=sc.html;_scheduleCacheSection=subSec;}
   const gc=_bcGet(subSec+'_greeting');
   if(gc){_greetingCache=gc;}
 }
@@ -2630,183 +2627,6 @@ async function callClaude(systemPrompt, messages, maxTokens){
 const TS_LABEL={'morning':'오전','afternoon':'오후','night':'저녁','none':''};
 
 
-async function makeScheduleCard(section){
-  const card=document.createElement('div');
-  card.className='card s';
-
-  // 브리핑 캐시 확인
-  const subSec=getSubSection();
-  if(_scheduleCache&&_scheduleCacheSection===subSec){
-    card.innerHTML=_scheduleCache;
-    return card;
-  }
-
-  card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑 작성 중...</div>';
-
-  try{
-    const now=new Date();
-    // 자정~새벽(아직 잠들기 전, night_2 시간대)에는 달력 날짜가 이미 넘어가있어도
-    // "오늘"을 전날 밤 기준으로 잡아야 함. 안 그러면 "오늘"이 실제로는 다음날이 되고
-    // "내일"이 모레가 되어버림.
-    const refDate=new Date(now);
-    if(now.getHours()<6)refDate.setDate(refDate.getDate()-1);
-    const dk=dateKey(refDate);
-    const todos=getTodos(dk);
-    const currentHour=now.getHours();
-    const key=getClaudeKey();
-
-    const bySection=(ts)=>todos.filter(t=>t.timeSection===ts);
-    const morningTodos=bySection('morning');
-    const afternoonTodos=bySection('afternoon');
-    const nightTodos=bySection('night');
-    const noneTodos=bySection('none').concat(todos.filter(t=>!t.timeSection));
-
-    const todoLine=(arr,label)=>{
-      const done=arr.filter(t=>t.done).map(t=>t.text);
-      const pend=arr.filter(t=>!t.done).map(t=>t.text);
-      const parts=[];
-      if(pend.length)parts.push(`미완료: ${pend.join(', ')}`);
-      if(done.length)parts.push(`완료: ${done.join(', ')}`);
-      return parts.length?`${label} 할일 — ${parts.join(' / ')}`:null;
-    };
-
-    const memos=getMemos(dk);
-    const memoLines=memos.map(m=>{
-      const t=m.time?m.time:'';
-      return t?`[${t}] ${m.text}`:m.text;
-    }).filter(Boolean);
-
-    const sleep=getSleep(dk);
-
-    const profile=S.get('user_profile');
-    const profileSection=profile?`\n\n[사용자 정보 — 아래 정보를 참고해서 할일/메모에 등장하는 용어를 정확히 해석해요. 예를 들어 "카페"가 일반 커피숍이 아니라 업무용 온라인 카페/블로그를 뜻할 수 있으니 헷갈리지 않게 문맥에 맞게 해석해요.]\n${profile}`:'';
-    const commonRules=`규칙:
-- 반드시 ~해요, ~이에요, ~어요 체의 정감있는 존댓말만 사용. ~해, ~야, ~지 등 반말 절대 금지.
-- 이름 호칭 없음. "너", "당신" 등 2인칭 호칭 금지.
-- 이모지 1-2개
-- 오직 브리핑 텍스트만 출력
-- 없는 정보는 억지로 언급하지 않기
-- 요일, "새로운 주 시작", "주말" 같은 표현은 실제 제공된 날짜/요일 정보에 근거해서만 사용. 추측해서 쓰지 않기 (이 앱의 주는 월요일 시작 기준)
-- 요일을 직접 언급하지 않아도 되지만, 톤은 요일에 맞게 자연스럽게 조절: 월요일은 부담 줄여주며 응원하는 톤, 금요일은 한 주 마무리를 격려하는 톤, 토/일(주말)은 한결 가볍고 여유로운 톤. 단, "오늘은 월요일이니까~" 식으로 요일을 근거로 직접 설명하지 않고 톤에만 자연스럽게 반영
-- 날씨, 햇살, 노을, 계절 등 실제로 제공되지 않은 환경 묘사는 지어내지 않기 (제공된 시각·할일·메모 정보에만 근거)${profileSection}`;
-
-    let sys='',dataContext='';
-
-    if(section==='morning'){
-      if(subSec==='morning_1'){
-        sys=`당신은 따뜻한 하루 비서예요. 기상 직후 오전 브리핑을 작성해요.
-상단에 이미 "좋은 아침이에요" 같은 인사말과 날씨 정보가 표시되어 있어요.
-절대로 인사말("좋은 아침", "안녕" 등)로 시작하지 말고, 날씨 언급도 하지 않아요.
-바로 오늘 할일 이야기로 시작해요.
-막 일어난 시간이니 오늘 할일을 가볍고 부드럽게 안내해요.
-오전 할일 위주로, 오후 일정이 있으면 한 줄 정도 예고해줘요.
-3-4문장 이내.
-${commonRules}`;
-      } else {
-        sys=`당신은 따뜻한 하루 비서예요. 오전 활동 시간 브리핑을 작성해요.
-상단에 이미 "좋은 아침이에요" 같은 인사말과 날씨 정보가 표시되어 있어요.
-절대로 인사말("좋은 아침", "안녕" 등)로 시작하지 말고, 날씨 언급도 하지 않아요.
-바로 오늘 할일과 일정 이야기로 시작해요.
-오전이 어느 정도 지난 시점이니 남은 오전 할일을 중심으로 안내해요.
-메모가 있으면 현재 상황 파악에 활용해요.
-3-5문장 이내.
-${commonRules}`;
-      }
-      dataContext=[
-        `오늘은 ${_HOME_DAYS[now.getDay()]}요일이에요.`,
-        `현재 시각: ${currentHour}시`,
-        sleep.wake?`기상: ${sleep.wake}`:'',
-        todoLine(morningTodos,'오전'),
-        todoLine(afternoonTodos,'오후'),
-        todoLine(noneTodos,'시간지정없음'),
-        memoLines.length?`오늘 메모 (시간순):\n${memoLines.slice(0,5).join('\n')}`:''
-      ].filter(Boolean).join('\n');
-
-    } else if(section==='afternoon'){
-      const isLateAfternoon=currentHour>=16;
-      if(!isLateAfternoon){
-        sys=`당신은 따뜻한 하루 비서예요. 오후 브리핑을 작성해요.
-오전이 어떻게 흘렀는지 메모와 완료된 할일로 파악하고 공감해요.
-오전에 못 마친 일이 있으면 자연스럽게 짚어줘요.
-남은 오후 할일을 안내해요.
-3-5문장 이내.
-${commonRules}`;
-      } else {
-        sys=`당신은 따뜻한 하루 비서예요. 늦은 오후 브리핑을 작성해요.
-하루가 많이 지났으니 아직 못 한 일들을 부드럽게 체크해줘요.
-저녁 할일도 함께 파악해서 남은 시간 계획을 도와요.
-메모에서 지금 컨디션/상황을 읽어 공감해요.
-3-5문장 이내.
-${commonRules}`;
-      }
-      dataContext=[
-        `오늘은 ${_HOME_DAYS[now.getDay()]}요일이에요.`,
-        `현재 시각: ${currentHour}시`,
-        todoLine(morningTodos,'오전'),
-        todoLine(afternoonTodos,'오후'),
-        isLateAfternoon?todoLine(nightTodos,'저녁'):null,
-        todoLine(noneTodos,'시간지정없음'),
-        memoLines.length?`오늘 메모 (시간순):\n${memoLines.slice(0,6).join('\n')}`:''
-      ].filter(Boolean).join('\n');
-
-    } else {
-      if(subSec==='night_1'){
-        sys=`당신은 따뜻한 하루 비서예요. 저녁 브리핑을 작성해요.
-오늘 하루를 2-3문장으로 따뜻하게 정리해요 (완료한 일, 메모 기반 흐름, 수고했다는 말).
-이어서 내일 할일을 자연스럽게 안내해요.
-파트 구분 없이 자연스럽게 이어지는 한 단락으로.
-전체 5-6문장.
-실제 현재 시각과 어긋나는 낮/햇살 묘사는 쓰지 마세요.
-${commonRules}`;
-      } else {
-        sys=`당신은 따뜻한 하루 비서예요. 늦은 밤, 하루를 마감하는 시간이에요.
-전투력이 떨어지는 시간대이니 너무 길게 늘어놓지 않아요.
-오늘 하루를 2-3문장으로 따뜻하게 요약해요 (완료한 일, 메모 기반 흐름, 수고했다는 말).
-그 다음 내일에 대한 작은 기대나 응원을 딱 한 문장만 추가해요 (내일 할일을 나열하지 말고, 가볍게 응원하는 톤으로만).
-전체 3-4문장.
-실제 현재 시각과 어긋나는 낮/햇살/노을 묘사는 쓰지 마세요.
-${commonRules}`;
-      }
-      // 내일 투두 수집
-      const tom=new Date(refDate);tom.setDate(refDate.getDate()+1);
-      const tomTodos=getTodos(dateKey(tom));
-      dataContext=[
-        `오늘은 ${_HOME_DAYS[refDate.getDay()]}요일, 내일은 ${_HOME_DAYS[tom.getDay()]}요일이에요.`,
-        `현재 시각: ${currentHour}시 (이미 해가 진 밤 시간이에요. "저녁 햇살", "노을" 같은 낮 시간 묘사는 쓰지 마세요)`,
-        todoLine(morningTodos,'오늘 오전'),
-        todoLine(afternoonTodos,'오늘 오후'),
-        todoLine(nightTodos,'오늘 저녁'),
-        todoLine(noneTodos,'오늘 시간지정없음'),
-        tomTodos.length?`내일 할일: ${tomTodos.filter(t=>!t.done).map(t=>t.text).join(', ')}`:'',
-        memoLines.length?`오늘 메모 (시간순):\n${memoLines.slice(0,6).join('\n')}`:''
-      ].filter(Boolean).join('\n');
-    }
-
-    const maxTok=subSec==='night_2'?220:480;
-
-    if(!key){
-      card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">Claude API 키를 설정하면 브리핑을 받을 수 있어요</div>';
-      return card;
-    }
-
-    const reply=await callClaude(sys,[{role:'user',content:dataContext}],maxTok);
-    card.innerHTML='';
-
-    if(reply&&!reply.startsWith('__ERR__')){
-      const p=document.createElement('div');
-      p.style.cssText='font-size:13px;color:var(--tp);line-height:1.75;padding:4px 2px;word-break:keep-all;';
-      p.textContent=reply.trim();
-      card.appendChild(p);
-      _scheduleCache=card.innerHTML;_scheduleCacheSection=subSec;
-      _bcSet(subSec,{html:_scheduleCache});
-    } else {
-      card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">잠시 후 다시 시도해주세요</div>';
-    }
-  }catch(e){
-    card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑을 불러올 수 없어요</div>';
-  }
-  return card;
-}
 
 // ── MONTHLY REPORT
 let _reportYear=new Date().getFullYear();
@@ -4609,7 +4429,7 @@ function parseTodoTextParts(text){
   return {prefix,parts,hadCloseParen:closeIdx>=0};
 }
 // 투두 텍스트를 조각내어 렌더링. strikeParts에 포함된 조각 인덱스는 취소선 처리.
-// 조각 모드일 때만 각 조각 옆에 작은 복사(내일로) 버튼 노출.
+// 조각 모드일 때 항목 끝에 "미체크 조각 전부 내일로 복사" 버튼 하나를 노출.
 function renderTodoTextParts(text,strikeParts,todoIdx){
   const {prefix,parts,hadCloseParen}=parseTodoTextParts(text);
   const inPartMode=_todoPartModeIdx===todoIdx;
@@ -4621,12 +4441,15 @@ function renderTodoTextParts(text,strikeParts,todoIdx){
     const isStruck=strikeParts.includes(partIdx);
     if(partIdx>0)html+=' / ';
     html+=`<span class="todo-part" data-part-idx="${partIdx}" onclick="onTodoPartClick(event,${todoIdx},${partIdx})" style="${isStruck?'text-decoration:line-through;opacity:0.55;':''}">${seg}</span>`;
-    if(inPartMode){
-      html+=`<span onclick="event.stopPropagation();copyTodoPartToTomorrow(${todoIdx},${partIdx})" title="내일로 복사" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;margin-left:3px;border-radius:50%;background:rgba(150,190,225,0.25);cursor:pointer;vertical-align:middle;">
-        <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="color:rgba(90,130,180,0.85);"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h8"/></svg>
+  });
+  if(inPartMode){
+    const hasUnstruck=parts.some((_,idx)=>!strikeParts.includes(idx));
+    if(hasUnstruck){
+      html+=`<span onclick="event.stopPropagation();copyUnstruckPartsToTomorrow(${todoIdx})" title="미완료 조각 내일로 복사" style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;margin-left:6px;border-radius:50%;background:rgba(150,190,225,0.25);cursor:pointer;vertical-align:middle;">
+        <svg width="9.5" height="9.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="color:rgba(90,130,180,0.85);"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h8"/></svg>
       </span>`;
     }
-  });
+  }
   return html;
 }
 // 조각 모드가 아닐 때 조각(part)을 클릭하면 시트 열림(기존 동작 유지). 조각 모드일 땐 취소선 토글.
@@ -4648,33 +4471,43 @@ function toggleTodoStrikePart(i,partIdx){
   renderTodos();
 }
 // 조각 하나를 내일로 복사(새 항목 생성) 후, 오늘 항목에서 해당 조각은 삭제.
-function copyTodoPartToTomorrow(i,partIdx){
+// 조각모드에서 미체크(취소선 없는) 조각 전부를 내일로 복사. 먼저 확인 토스트로 묻고 "네" 눌러야 실행.
+let _pendingPartCopyIdx=-1,_partCopyConfirmTimer=null;
+function copyUnstruckPartsToTomorrow(i){
+  _pendingPartCopyIdx=i;
+  const t=document.getElementById('todo-copy-confirm-toast');
+  if(!t)return;
+  clearTimeout(_partCopyConfirmTimer);
+  clearTimeout(_copyConfirmTimer);
+  _pendingCopyTodoIdx=-1; // 전체복사 확인과 겹치지 않게
+  t.classList.add('on');
+  _partCopyConfirmTimer=setTimeout(()=>{t.classList.remove('on');_pendingPartCopyIdx=-1;},4000);
+}
+function confirmCopyUnstruckParts(){
+  const i=_pendingPartCopyIdx;
+  _pendingPartCopyIdx=-1;
+  if(i<0)return;
   const dk=dateKey(currentDate),todos=getTodos(dk),todo=todos[i];
   if(!todo)return;
   const {prefix,parts,hadCloseParen}=parseTodoTextParts(todo.text);
-  if(partIdx<0||partIdx>=parts.length)return;
-  const movedText=hadCloseParen?`${prefix}) ${parts[partIdx]}`:parts[partIdx];
+  const strikeSet=new Set(todo.strikeParts||[]);
+  const unstruckIdxs=parts.map((_,idx)=>idx).filter(idx=>!strikeSet.has(idx));
+  if(!unstruckIdxs.length)return;
 
-  // 내일 항목 생성
+  // 내일 항목 생성 (미체크 조각들을 접두어와 함께 하나로 묶어 복사)
+  const movedParts=unstruckIdxs.map(idx=>parts[idx]);
+  const movedText=hadCloseParen?`${prefix}) ${movedParts.join(' / ')}`:movedParts.join(' / ');
   const tom=new Date(currentDate);tom.setDate(tom.getDate()+1);
   const tdk=dateKey(tom),ttodos=getTodos(tdk);
-  ttodos.push({text:movedText,done:false,created:Date.now(),timeSection:'none',cid:genCid(),postponeCount:0,strikeParts:[]});
-  saveTodos(tdk,ttodos);
+  if(!ttodos.some(x=>x.text===movedText)){
+    ttodos.push({text:movedText,done:false,created:Date.now(),timeSection:'none',cid:genCid(),postponeCount:0,strikeParts:[]});
+    saveTodos(tdk,ttodos);
+  }
 
-  // 오늘 항목에서 해당 조각 제거, strikeParts 인덱스 재정렬
-  const remainingParts=parts.filter((_,idx)=>idx!==partIdx);
-  const newText=remainingParts.length
-    ? (hadCloseParen?`${prefix}) ${remainingParts.join(' / ')}`:remainingParts.join(' / '))
-    : (hadCloseParen?`${prefix})`:'');
-  const oldStrike=new Set(todo.strikeParts||[]);
-  const newStrike=[];
-  remainingParts.forEach((_,newIdx)=>{
-    const oldIdx=newIdx<partIdx?newIdx:newIdx+1;
-    if(oldStrike.has(oldIdx))newStrike.push(newIdx);
-  });
-
+  // 오늘 항목에서 미체크 조각들 제거, 취소선 친 조각만 남김 (인덱스 재정렬)
+  const remainingParts=parts.filter((_,idx)=>strikeSet.has(idx));
   if(!remainingParts.length){
-    // 조각이 다 없어졌으면 항목 자체를 삭제
+    // 남는 조각이 없으면 항목 자체를 삭제
     const dkTodos=getTodos(dk);
     const cur=dkTodos[i];
     if(cur)addDelPending('todos',dk,cur.cid);
@@ -4682,8 +4515,8 @@ function copyTodoPartToTomorrow(i,partIdx){
     saveTodos(dk,dkTodos);
     _todoPartModeIdx=-1;
   }else{
-    todo.text=newText;
-    todo.strikeParts=newStrike;
+    todo.text=hadCloseParen?`${prefix}) ${remainingParts.join(' / ')}`:remainingParts.join(' / ');
+    todo.strikeParts=remainingParts.map((_,idx)=>idx); // 남은 건 전부 취소선 친 것들이므로 전부 유지
     saveTodos(dk,todos);
   }
   showToast('내일로 복사했어요');
@@ -4727,7 +4560,6 @@ function attachTodoSwipeMode(el,i,hasMultipleParts){
   el.addEventListener('pointerup',endDrag);
   el.addEventListener('pointercancel',endDrag);
 }
-// 구분자(,/) 없는 단일 항목 전체를 내일로 복사 (오늘 항목은 그대로 유지). 이미 내일에 동일 텍스트 있으면 중복 방지.
 // 조각모드가 켜진 상태에서, 그 항목 바깥(다른 투두, 체크박스, 다른 UI 등)을 클릭하면 자동으로 조각모드 해제
 document.addEventListener('click',e=>{
   if(_todoPartModeIdx<0)return;
@@ -4736,6 +4568,11 @@ document.addEventListener('click',e=>{
   _todoPartModeIdx=-1;
   renderTodos();
 });
+// 확인 토스트의 "네" 버튼 - 대기 중인 작업(전체복사 or 조각복사)에 따라 분기
+function confirmTodoCopyToast(){
+  if(_pendingCopyTodoIdx>=0)confirmCopyWholeTodo();
+  else if(_pendingPartCopyIdx>=0)confirmCopyUnstruckParts();
+}
 // 구분자(,/) 없는 단일 항목 전체를 내일로 복사 (오늘 항목은 그대로 유지). 스와이프하면 먼저 확인 토스트로 묻고, "네" 눌러야 실제 복사됨.
 let _pendingCopyTodoIdx=-1,_copyConfirmTimer=null;
 function copyWholeTodoToTomorrow(i){
@@ -4743,6 +4580,8 @@ function copyWholeTodoToTomorrow(i){
   const t=document.getElementById('todo-copy-confirm-toast');
   if(!t)return;
   clearTimeout(_copyConfirmTimer);
+  clearTimeout(_partCopyConfirmTimer);
+  _pendingPartCopyIdx=-1; // 조각복사 확인과 겹치지 않게
   t.classList.add('on');
   _copyConfirmTimer=setTimeout(()=>{t.classList.remove('on');_pendingCopyTodoIdx=-1;},4000);
 }
