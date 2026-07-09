@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260710-03-timesectionfix -->
+<!-- build: 20260710-04-cleanup -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -4486,9 +4486,9 @@ function renderTodos(){
   });
   updateStats();
 }
-// 투두 텍스트를 접두어(')' 앞부분)와 조각(,/기준)으로 파싱.
-// 예: "업무) 블로그 / 카페 / 전단홍보만들기" -> prefix:"업무", parts:["블로그","카페","전단홍보만들기"]
-// ')' 없으면 prefix는 빈 문자열, 전체가 조각 대상.
+// 투두 텍스트를 접두어('>' 앞부분)와 조각(,/기준)으로 파싱.
+// 예: "업무 > 블로그, 카페" -> prefix:"업무", parts:["블로그","카페"]
+// '>' 없으면 prefix는 빈 문자열, 전체가 조각 대상.
 function parseTodoTextParts(text){
   // '>' 를 접두어(카테고리) 구분자로 사용. 예: "업무 > 블로그, 카페" -> prefix:"업무", parts:["블로그","카페"]
   // ')' 대신 '>' 를 쓰는 이유: 일반 문장에서 괄호는 자주 쓰이지만 '>' 는 투두 텍스트에 거의 등장하지 않아 오인식 위험이 적음.
@@ -4948,7 +4948,7 @@ function makePendingTodosCard(){
     more.textContent=`+${restCount}개 더보기`;
     more.addEventListener('click',function(){
       document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));
-      const vt=document.getElementById('v-todo');
+      const vt=document.getElementById('v-daily');
       if(vt)vt.classList.add('on');
     });
     card.appendChild(more);
@@ -5598,7 +5598,6 @@ function setCmStars(n){
 }
 function openContentModal(cat,item=null,mk=null){
   _contentCtx={cat,item,mk:mk||calMonthKey(),mode:item?'edit':'add'};
-  const titleEl=document.getElementById('content-modal-title');if(titleEl)titleEl.textContent=item?item.title:(CAT_LABELS[cat]+' 추가');
   document.getElementById('cm-title').value=item?.title||'';
   _selectedPoster=null;
   const pp=document.getElementById('cm-poster-preview');
