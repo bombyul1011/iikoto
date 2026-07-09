@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260709-10-partcopy -->
+<!-- build: 20260709-11-pointerswipe -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -4685,16 +4685,23 @@ function copyTodoPartToTomorrow(i,partIdx){
   showToast('내일로 복사했어요');
   renderTodos();
 }
-// 왼쪽 스와이프 = 조각 선택 모드 진입/해제 (기존 시트는 텍스트 클릭으로 그대로 열림)
+// 왼쪽 스와이프(터치 및 PC 마우스 드래그 모두 지원) = 조각 선택 모드 진입/해제
 // 단, 구분자(,/)가 없어 조각이 1개뿐인 항목은 조각모드가 의미 없으므로 스와이프해도 기존처럼 시트가 열림
 function attachTodoSwipeMode(el,i,hasMultipleParts){
-  let sx=0,moved=false;
-  el.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;moved=false;},{passive:true});
-  el.addEventListener('touchmove',e=>{
-    const dx=e.touches[0].clientX-sx;
+  let sx=0,moved=false,dragging=false;
+  el.addEventListener('pointerdown',e=>{
+    // 조각(todo-part)이나 복사버튼 위에서 시작한 드래그는 클릭 동작과 충돌하지 않게 무시
+    if(e.target.closest('.todo-part')||e.target.closest('.chk'))return;
+    sx=e.clientX;moved=false;dragging=true;
+  });
+  el.addEventListener('pointermove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-sx;
     if(dx<-20){el.style.transform=`translateX(${Math.max(dx,-30)}px)`;moved=true;}
-  },{passive:true});
-  el.addEventListener('touchend',()=>{
+  });
+  const endDrag=()=>{
+    if(!dragging)return;
+    dragging=false;
     el.style.transform='';
     if(moved){
       if(hasMultipleParts){
@@ -4705,7 +4712,9 @@ function attachTodoSwipeMode(el,i,hasMultipleParts){
       }
     }
     moved=false;
-  });
+  };
+  el.addEventListener('pointerup',endDrag);
+  el.addEventListener('pointerleave',()=>{dragging=false;el.style.transform='';moved=false;});
 }
 function toggleTodo(i){const dk=dateKey(currentDate),todos=getTodos(dk);todos[i].done=!todos[i].done;saveTodos(dk,todos);renderTodos();}
 
