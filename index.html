@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260709-11-pointerswipe -->
+<!-- build: 20260709-12-partmodefix -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -3638,8 +3638,10 @@ function goHome(){
   document.querySelectorAll('.view').forEach(function(v){v.classList.remove('on');});
   const vh=document.getElementById('v-home');
   if(vh)vh.classList.add('on');
+  _todoPartModeIdx=-1;
   renderHome();
 }
+let _todoPartModeIdx=-1;
 
 function getSection(){
   const h=new Date().getHours();
@@ -4426,6 +4428,7 @@ document.querySelectorAll('.vtab').forEach(b=>b.addEventListener('click',()=>{
   document.querySelectorAll('.vtab').forEach(t=>t.classList.toggle('on',t.dataset.v===v));
   document.querySelectorAll('.view').forEach(vw=>vw.classList.toggle('on',vw.id===`v-${v}`));
   document.querySelector('.scroll').scrollTop=0;
+  _todoPartModeIdx=-1;
   if(v==='daily')loadDaily();
   else if(v==='weekly')loadWeekly();
   else if(v==='monthly')loadMonthly();
@@ -4573,10 +4576,8 @@ function renderTodos(){
     const el=document.createElement('div');el.className='todo-item';
     const postponedClass=(t.postponeCount||0)>=3?' postponed':'';
     const textHtml=renderTodoTextParts(t.text,t.strikeParts||[],i);
-    el.innerHTML=`<div class="chk${tsClass}${t.done?' on':''}" onclick="toggleTodo(${i})"></div><span class="todo-txt${t.done?' done':''}${postponedClass}" data-todo-i="${i}">${textHtml}</span>`;
-    if(_todoPartModeIdx===i){
-      el.style.cssText+='background:rgba(150,190,225,0.10);border-radius:10px;';
-    }
+    const partModeStyle=_todoPartModeIdx===i?'background:rgba(255,255,255,0.45);border-radius:8px;padding:2px 6px;margin:-2px -6px;':'';
+    el.innerHTML=`<div class="chk${tsClass}${t.done?' on':''}" onclick="toggleTodo(${i})"></div><span class="todo-txt${t.done?' done':''}${postponedClass}" data-todo-i="${i}" style="${partModeStyle}">${textHtml}</span>`;
     const hasMultipleParts=parseTodoTextParts(t.text).parts.length>1;
     attachTodoSwipeMode(el,i,hasMultipleParts);
     list.appendChild(el);
@@ -4610,7 +4611,7 @@ function renderTodoTextParts(text,strikeParts,todoIdx){
   const inPartMode=_todoPartModeIdx===todoIdx;
   let html='';
   if(hadCloseParen){
-    html+=`<span style="color:var(--tm);">${prefix})</span> `;
+    html+=`<span>${prefix})</span> `;
   }
   parts.forEach((seg,partIdx)=>{
     const isStruck=strikeParts.includes(partIdx);
@@ -4633,7 +4634,6 @@ function onTodoPartClick(evt,todoIdx,partIdx){
     openTodoSheet(todoIdx);
   }
 }
-let _todoPartModeIdx=-1;
 function toggleTodoStrikePart(i,partIdx){
   const dk=dateKey(currentDate),todos=getTodos(dk),todo=todos[i];
   if(!todo)return;
