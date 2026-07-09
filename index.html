@@ -1835,6 +1835,7 @@ function renderHomeBody(section){
   } else if(section==='afternoon'){
     body.appendChild(makeRingRow());
     body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getRhythmLogicalDate()));},'rhythm-soft',12.5,dateKey(getRhythmLogicalDate())));
+    body.appendChild(makeHabitWeekTrendCard());
     body.appendChild(makeLabel('최근 콘텐츠'));
     body.appendChild(makeContentsCard());
   } else {
@@ -2435,23 +2436,28 @@ function makeRing(label,pct,count,color){
   },50);
   return wrap;
 }
-function getHabitStreak(name){
-  let streak=0;const cur=new Date();
-  for(let i=0;i<366;i++){
+function getHabitMonthCount(name){
+  const now=new Date();
+  const yr=now.getFullYear(),mo=now.getMonth();
+  const firstDay=new Date(yr,mo,1);
+  const today=new Date(yr,mo,now.getDate());
+  let count=0;
+  const cur=new Date(firstDay);
+  while(cur<=today){
     const wk=weekKey(cur),dow=(cur.getDay()+6)%7;
-    if(getHabitChecks(wk)[name+'-'+dow]){streak++;cur.setDate(cur.getDate()-1);}
-    else break;
+    if(getHabitChecks(wk)[name+'-'+dow])count++;
+    cur.setDate(cur.getDate()+1);
   }
-  return streak;
+  return count;
 }
 function makeHabitStreakRow(){
   const wrap=document.createElement('div');wrap.className='habit-numbox';
   const habits=getHabits();
   if(!habits.length){wrap.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 2px;width:100%;text-align:center;">습관을 추가해보세요</div>';return wrap;}
   habits.forEach(function(h){
-    const streak=getHabitStreak(h.name);
+    const monthCount=getHabitMonthCount(h.name);
     const col=document.createElement('div');col.className='habit-numbox-col';
-    col.innerHTML='<span class="home-habit-dot '+h.color+'"></span><span class="habit-numbox-name">'+h.name+'</span><span class="habit-numbox-num">'+streak+'</span>';
+    col.innerHTML='<span class="home-habit-dot '+h.color+'"></span><span class="habit-numbox-name">'+h.name+'</span><span class="habit-numbox-num">'+monthCount+'</span>';
     wrap.appendChild(col);
   });
   return wrap;
@@ -4573,6 +4579,49 @@ function renderTodos(){
   updateStats();
 }
 function toggleTodo(i){const dk=dateKey(currentDate),todos=getTodos(dk);todos[i].done=!todos[i].done;saveTodos(dk,todos);renderTodos();}
+
+// ── 오후 파트: 이번 주 습관 도트 트렌드 카드
+function makeHabitWeekTrendCard(){
+  const card=document.createElement('div');
+  card.className='card s';
+  card.style.cursor='pointer';
+  const habits=getHabits().slice(0,4); // 최대 4개만
+  if(!habits.length){card.style.display='none';return card;}
+
+  const now=new Date();
+  const todayDow=(now.getDay()+6)%7; // 0=월 ... 6=일
+  const wk=weekKey(now);
+  const checks=getHabitChecks(wk);
+  const dowLabels=['월','화','수','목','금','토','일'];
+
+  let rows='';
+  habits.forEach(h=>{
+    let doneCount=0;
+    let dots='';
+    for(let d=0;d<7;d++){
+      const checked=!!checks[h.name+'-'+d];
+      if(d>todayDow){
+        dots+=`<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--card-b);margin-right:4px;"></span>`;
+      }else{
+        if(checked)doneCount++;
+        dots+=`<span class="home-habit-dot ${checked?h.color:''}" style="width:7px;height:7px;margin-right:4px;${checked?'':'background:var(--card-b);'}"></span>`;
+      }
+    }
+    rows+=`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;">
+      <span style="font-size:11.5px;color:var(--tp);width:34px;flex-shrink:0;">${h.name}</span>
+      <span style="display:flex;align-items:center;">${dots}</span>
+      <span style="font-size:10.5px;color:var(--tm);margin-left:auto;flex-shrink:0;">${doneCount}/${todayDow+1}</span>
+    </div>`;
+  });
+
+  card.innerHTML=`<div style="font-size:11px;color:var(--tm);margin-bottom:2px;">이번 주 습관</div>${rows}`;
+  card.addEventListener('click',function(){
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));
+    const vw=document.getElementById('v-weekly');
+    if(vw)vw.classList.add('on');
+  });
+  return card;
+}
 
 // ── 아침(morning_1) 전용: 어제 리뷰 + 오늘의 팁 카드, 하루 1회 캐싱
 function makeYesterdayReviewCard(){
