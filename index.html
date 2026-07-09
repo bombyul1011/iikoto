@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260710-04-cleanup -->
+<!-- build: 20260710-05-archivebanner -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -4845,7 +4845,7 @@ function makeTextArchiveCard(){
   }
 
   const commentBlock=picked.comment
-    ?`<div style="font-size:11px;color:#7a9552;margin-top:6px;padding:5px 8px;background:rgba(232,246,220,0.6);border-radius:8px;">${picked.comment}</div>`
+    ?`<div style="font-size:11px;color:var(--ts);margin-top:6px;padding:5px 8px;background:rgba(200,176,168,0.14);border-radius:8px;">${picked.comment}</div>`
     :'';
   card.innerHTML=`
     <div style="font-size:11px;color:var(--tm);margin-bottom:5px;">✎ 오늘의 문장</div>
