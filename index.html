@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260709-18-retry3 -->
+<!-- build: 20260709-19-wholecopy -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -4685,8 +4685,9 @@ function copyTodoPartToTomorrow(i,partIdx){
   showToast('내일로 복사했어요');
   renderTodos();
 }
-// 왼쪽 스와이프(터치 및 PC 마우스 드래그 모두 지원) = 조각 선택 모드 진입/해제
-// 단, 구분자(,/)가 없어 조각이 1개뿐인 항목은 조각모드가 의미 없으므로 스와이프해도 기존처럼 시트가 열림
+// 왼쪽 스와이프(터치 및 PC 마우스 드래그 모두 지원)
+// - 구분자(,/)가 있는 항목: 조각 선택 모드 진입/해제
+// - 구분자 없는 단일 항목: 항목 전체를 내일로 복사(오늘 항목은 유지, "오늘도 내일도 해야 하는 일" 용도)
 function attachTodoSwipeMode(el,i,hasMultipleParts){
   let sx=0,sy=0,moved=false,dragging=false,pid=null;
   el.addEventListener('pointerdown',e=>{
@@ -4714,13 +4715,27 @@ function attachTodoSwipeMode(el,i,hasMultipleParts){
         _todoPartModeIdx=(_todoPartModeIdx===i)?-1:i;
         renderTodos();
       }else{
-        openTodoSheet(i);
+        copyWholeTodoToTomorrow(i);
       }
     }
     moved=false;
   };
   el.addEventListener('pointerup',endDrag);
   el.addEventListener('pointercancel',endDrag);
+}
+// 구분자(,/) 없는 단일 항목 전체를 내일로 복사 (오늘 항목은 그대로 유지). 이미 내일에 동일 텍스트 있으면 중복 방지.
+function copyWholeTodoToTomorrow(i){
+  const dk=dateKey(currentDate),todos=getTodos(dk),todo=todos[i];
+  if(!todo)return;
+  const tom=new Date(currentDate);tom.setDate(tom.getDate()+1);
+  const tdk=dateKey(tom),ttodos=getTodos(tdk);
+  if(ttodos.some(t=>t.text===todo.text)){
+    showToast('이미 내일에 있어요');
+    return;
+  }
+  ttodos.push({text:todo.text,done:false,created:Date.now(),timeSection:'none',cid:genCid(),postponeCount:0,strikeParts:[]});
+  saveTodos(tdk,ttodos);
+  showToast('내일에도 추가했어요');
 }
 function toggleTodo(i){const dk=dateKey(currentDate),todos=getTodos(dk);todos[i].done=!todos[i].done;saveTodos(dk,todos);renderTodos();}
 
