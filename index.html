@@ -1821,25 +1821,19 @@ function renderHomeBody(section){
   const isLastDayOfMonth=(()=>{const t=new Date(_ld);t.setDate(_ld.getDate()+1);return t.getDate()===1;})()&&_isEveOrLateNight;
 
   if(section==='morning'){
-    const exCard=makeExerciseCheckCard();
-    if(exCard)body.appendChild(exCard);
+    if(getSubSection()==='morning_1'){
+      body.appendChild(makeYesterdayReviewCard());
+    } else {
+      const exCard=makeExerciseCheckCard();
+      if(exCard)body.appendChild(exCard);
+    }
     body.appendChild(makeLabel('해빗'));
     body.appendChild(makeHabitStreakRow());
-    body.appendChild(makeLabel('오늘 브리핑'));
-    const sc=document.createElement('div');sc.className='card s';
-    sc.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑 작성 중...</div>';
-    body.appendChild(sc);
-    makeScheduleCard('morning').then(function(card){sc.replaceWith(card);}).catch(function(){sc.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑을 불러올 수 없어요</div>';});
     body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getRhythmLogicalDate()));},'rhythm-soft',12.5,dateKey(getRhythmLogicalDate())));
     body.appendChild(makeLabel('최근 콘텐츠'));
     body.appendChild(makeContentsCard());
   } else if(section==='afternoon'){
     body.appendChild(makeRingRow());
-    body.appendChild(makeLabel('오후 브리핑'));
-    const sc2=document.createElement('div');sc2.className='card s';
-    sc2.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑 작성 중...</div>';
-    body.appendChild(sc2);
-    makeScheduleCard('afternoon').then(function(card){sc2.replaceWith(card);}).catch(function(){sc2.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑을 불러올 수 없어요</div>';});
     body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getRhythmLogicalDate()));},'rhythm-soft',12.5,dateKey(getRhythmLogicalDate())));
     body.appendChild(makeLabel('최근 콘텐츠'));
     body.appendChild(makeContentsCard());
@@ -1889,11 +1883,7 @@ function renderHomeBody(section){
       body.appendChild(nwBanner);
     }
     if(!isSunday){
-      body.appendChild(makeLabel(getSubSection()==='night_2'?'오늘 마무리':'오늘 마무리 · 내일 미리보기'));
-      const sc3=document.createElement('div');sc3.className='card s';
-      sc3.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑 작성 중...</div>';
-      body.appendChild(sc3);
-      makeScheduleCard('night').then(function(card){sc3.replaceWith(card);}).catch(function(){sc3.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">브리핑을 불러올 수 없어요</div>';});
+      // "오늘 마무리" 브리핑은 통합카드(상단 인삿말)가 흡수함
     }
     body.appendChild(makeLabel('오늘의 독서'));
     body.appendChild(makeBookCard());
@@ -3489,6 +3479,7 @@ async function fetchHomeWeather(section){
   const checks=getHabitChecks(wk);
   const doneHabitsCount=habits.filter(h=>checks[h.name+'-'+dow]).length;
   const rblocks=getRhythmBlocks(dk);
+  const weatherDesc=weather?`날씨: ${weather.icon} ${weather.temp}도`:'날씨 정보 없음';
 
   // 서브섹션별 메모 조회 범위
   let pickedMemos=[];
@@ -3522,39 +3513,97 @@ async function fetchHomeWeather(section){
     afternoon_1:'한낮(하루의 중반)',afternoon_2:'늦은 오후(하루가 저물어가는 시점)',
     night_1:'초저녁(하루 마무리를 시작하는 시점)',night_2:'밤(하루의 끝, 다음 하루로 넘어가는 문턱)'
   };
-  const weatherDesc=weather?`날씨: ${weather.icon} ${weather.temp}도`:'날씨 정보 없음';
-  const dataContext=[
-    weatherDesc,
-    `지금 시점: ${subSecLabel[subSec]}`,
-    pendCount||doneCount?`오늘 할일 진행 정도(참고용, 구체적 항목·숫자는 언급 금지): 완료 ${doneCount}건 / 미완료 ${pendCount}건`:'',
-    doneHabitsCount?`오늘 완료한 습관 개수(참고용, 숫자 그대로 언급 금지): ${doneHabitsCount}개`:'',
-    rhythmSummary,
-    pickedMemos.length?`오늘 메모(현재 상황이나 컨디션 파악용): ${pickedMemos.join(' / ')}`:'',
-    sleep.sleep||sleep.wake?`수면: ${sleep.sleep||'?'} 취침 ${sleep.wake||'?'} 기상`:''
-  ].filter(Boolean).join('\n');
 
-  const sys=`당신은 다양한 문장을 유연하게 구사하는 에세이스트예요. 아래 오늘 데이터를 참고해서 ${sectionLabel[section]}(${subSecLabel[subSec]}) 시점에 어울리는 짧은 에세이풍 문장을 만들어요.
+  // 할일 항목명 상세 (통합카드는 구체적 언급 허용)
+  const bySection=(ts)=>todos.filter(t=>t.timeSection===ts);
+  const morningTodos=bySection('morning'),afternoonTodos=bySection('afternoon'),nightTodos=bySection('night');
+  const noneTodos=bySection('none').concat(todos.filter(t=>!t.timeSection));
+  const todoLine=(arr,label)=>{
+    const done=arr.filter(t=>t.done).map(t=>t.text);
+    const pend=arr.filter(t=>!t.done).map(t=>t.text);
+    const parts=[];
+    if(pend.length)parts.push(`미완료: ${pend.join(', ')}`);
+    if(done.length)parts.push(`완료: ${done.join(', ')}`);
+    return parts.length?`${label} 할일 — ${parts.join(' / ')}`:null;
+  };
+
+  let dataContext,sys;
+
+  if(section==='night'){
+    // 저녁은 기존 브리핑처럼 하루 요약+내일 예고가 핵심이라 별도 구성
+    const tom=new Date(now);tom.setDate(now.getDate()+1);
+    const tomTodos=getTodos(dateKey(tom));
+    dataContext=[
+      `오늘은 ${_HOME_DAYS[now.getDay()]}요일이에요.`,
+      weatherDesc,
+      `현재 시각: ${now.getHours()}시 (지금 시점: ${subSecLabel[subSec]})`,
+      todoLine(morningTodos,'오늘 오전'),
+      todoLine(afternoonTodos,'오늘 오후'),
+      todoLine(nightTodos,'오늘 저녁'),
+      todoLine(noneTodos,'오늘 시간지정없음'),
+      tomTodos.length?`내일 할일: ${tomTodos.filter(t=>!t.done).map(t=>t.text).join(', ')}`:'',
+      rhythmSummary,
+      pickedMemos.length?`오늘 메모: ${pickedMemos.join(' / ')}`:'',
+      sleep.sleep||sleep.wake?`수면: ${sleep.sleep||'?'} 취침 ${sleep.wake||'?'} 기상`:''
+    ].filter(Boolean).join('\n');
+    sys=`당신은 날씨와 하루의 결을 살필 줄 아는 따뜻한 하루 비서예요. 오늘 하루를 마무리하는 저녁(${subSecLabel[subSec]}) 시점에 어울리는 브리핑을 작성해요.
 
 **분량 제한 (반드시 지킬 것):**
-- 최대 2문장, 전체 공백 포함 90자 이내. 이 길이를 넘기지 말 것.
-- 재료(날씨/수면/리듬/메모 등)를 전부 다 담으려 하지 말고, 그중 가장 인상적인 것 1-2가지만 골라 압축해서 표현해요.
+- ${subSec==='night_2'?'전투력이 떨어지는 늦은 밤이니 짧게: 전체 3-4문장 이내.':'전체 4-5문장 이내.'}
 
 기타 규칙:
-- 날씨, 수면, 리듬, 메모, 할일/습관 진행 정도를 재료 삼아 그 순간의 분위기를 은유적으로 그려내요. 다만 구체적 할일 이름이나 정확한 숫자는 절대 언급하지 말 것 — "많이 채워진", "고요했던", "쉼이 있었던"처럼 정도로만 표현.
-- 리듬 카테고리를 언급할 땐 가장 비중 컸던 것 하나 정도만 은유적으로 녹여내요. 전부 나열하지 말 것.
-- morning_1(아침) 시점에는 수면 시간을 매번 안내하듯 말하지 말고, 날씨·메모·계절감 등과 섞어 다채롭게 표현하되 하루를 여는 희망찬 분위기를 담아요.
-- 너무 추상적이거나 뜬구름 잡는 표현은 피하고, 그 시간대의 실제 결을 담백하게 그려내요.
+- 오늘 하루를 완료한 일 중심으로 따뜻하게 정리해요 (구체적 항목명 언급 가능).
+- ${subSec==='night_2'?'내일에 대한 작은 기대나 응원을 딱 한 문장만, 할일을 나열하지 말고 가볍게.':'이어서 내일 할일을 자연스럽게 안내해요 (구체적 항목명 언급 가능).'}
+- 날씨/계절/메모 등에서 느껴지는 분위기를 한 줄 정도 자연스럽게 녹이되, 날씨 수치(온도)는 최상단에 별도 표기되니 본문에서 다시 언급하지 말 것.
+- 리듬 카테고리를 언급할 땐 가장 비중 컸던 것 하나 정도만 은유적으로.
+- 실제 시각과 어긋나는 낮/햇살/노을 묘사 금지 (이미 해가 진 시간).
 - 메모에서 현재 상황(위치, 컨디션)을 자연스럽게 반영해요.
-- 현재 월(${new Date().getMonth()+1}월)을 반드시 참고해서 계절 언급 시 오류 없도록. 예: 6월은 여름, 12월은 겨울.
-- 반드시 ~해요, ~이에요, ~어요 체의 정감있는 존댓말만 사용. ~해, ~야, ~지 등 반말 절대 금지.
+- 메모에 담긴 컨디션(피곤함, 아픔, 특정 신체 상태 등)은 그 시점의 일시적 상황으로만 참고하고, 이를 근거로 "쉬어야 해요", "무리하지 마세요" 같은 조언이나 걱정을 반복적으로 얹지 말 것. 컨디션 언급이 여러 날 메모 조회 범위에 걸쳐 있어도 매번 다시 꺼내 강조하지 않기 — 특히 생리/월경처럼 주기적 신체 상태는 하루이틀 지나면 이미 지난 일로 간주하고 재언급하지 말 것.
+- 메모 속 컨디션 정보는 "오늘 어떤 하루였는지" 분위기를 파악하는 참고 재료일 뿐, 매번 되짚어 걱정하거나 지속 상태로 단정하는 근거로 쓰지 말 것.
+- 현재 월(${new Date().getMonth()+1}월)을 반드시 참고해서 계절 언급 시 오류 없도록.
+- 반드시 ~해요, ~이에요, ~어요 체의 정감있는 존댓말만 사용. 반말 절대 금지.
 - "너", "당신" 등 호칭 절대 사용 금지.
-- 이모지 1개
-- "오후 인사말이에요", "이 시간엔" 같이 스스로 문장을 설명하거나 소개하는 표현 절대 금지. 곧바로 본문 내용으로 시작할 것.
+- 이모지 1-2개
+- 스스로를 소개하거나 설명하는 표현 절대 금지. 곧바로 본문으로 시작.
 - 오직 문장만 출력, 따옴표나 설명 없이`;
+  } else {
+    const sectionTodos=section==='morning'?morningTodos:afternoonTodos;
+    dataContext=[
+      `오늘은 ${_HOME_DAYS[now.getDay()]}요일이에요.`,
+      weatherDesc,
+      `현재 시각: ${now.getHours()}시 (지금 시점: ${subSecLabel[subSec]})`,
+      todoLine(sectionTodos,section==='morning'?'오늘 오전':'오늘 오후'),
+      todoLine(noneTodos,'시간지정없음'),
+      doneHabitsCount?`오늘 완료한 습관: ${doneHabitsCount}개`:'',
+      rhythmSummary,
+      pickedMemos.length?`오늘 메모: ${pickedMemos.join(' / ')}`:'',
+      sleep.sleep||sleep.wake?`수면: ${sleep.sleep||'?'} 취침 ${sleep.wake||'?'} 기상`:''
+    ].filter(Boolean).join('\n');
+    sys=`당신은 날씨와 하루의 결을 살필 줄 아는 따뜻한 하루 비서예요. 아래 데이터를 참고해서 ${sectionLabel[section]}(${subSecLabel[subSec]}) 시점에 맞는 브리핑을 작성해요.
+
+**분량 제한 (반드시 지킬 것):**
+- 최대 3-4문장, 전체 공백 포함 150자 이내.
+
+기타 규칙:
+- 날씨/계절/메모 등에서 느껴지는 그 순간의 분위기를 한 줄 정도 자연스럽게 녹이되, 날씨 수치(온도)는 최상단에 별도 표기되니 본문에서 다시 언급하지 말 것.
+- 오늘 할일은 구체적인 항목명을 언급해도 좋아요. 단, 나열식으로 딱딱하게 늘어놓지 말고 자연스러운 문장 속에 녹여내요.
+- 리듬 카테고리를 언급할 땐 가장 비중 컸던 것 하나 정도만 은유적으로 녹여내요.
+- morning_1(아침) 시점에는 수면 시간을 매번 안내하듯 말하지 말고, 계절감·할일 등과 섞어 다채롭게, 하루를 여는 희망찬 분위기로.
+- 메모에서 현재 상황(위치, 컨디션)을 자연스럽게 반영해요.
+- 메모에 담긴 컨디션(피곤함, 아픔, 특정 신체 상태 등)은 그 시점의 일시적 상황으로만 참고하고, 이를 근거로 "쉬어야 해요", "무리하지 마세요" 같은 조언이나 걱정을 반복적으로 얹지 말 것. 컨디션 언급이 여러 날 메모 조회 범위에 걸쳐 있어도 매번 다시 꺼내 강조하지 않기 — 특히 생리/월경처럼 주기적 신체 상태는 하루이틀 지나면 이미 지난 일로 간주하고 재언급하지 말 것.
+- 메모 속 컨디션 정보는 "오늘 어떤 하루였는지" 분위기를 파악하는 참고 재료일 뿐, 매번 되짚어 걱정하거나 지속 상태로 단정하는 근거로 쓰지 말 것.
+- 현재 월(${new Date().getMonth()+1}월)을 반드시 참고해서 계절 언급 시 오류 없도록.
+- 반드시 ~해요, ~이에요, ~어요 체의 정감있는 존댓말만 사용. 반말 절대 금지.
+- "너", "당신" 등 호칭 절대 사용 금지.
+- 이모지 1-2개
+- 스스로를 소개하거나 설명하는 표현 절대 금지. 곧바로 본문으로 시작.
+- 오직 문장만 출력, 따옴표나 설명 없이`;
+  }
 
   if(subEl)subEl.textContent='잠깐만요...';
 
-  const reply=await callClaude(sys,[{role:'user',content:dataContext}],150);
+  const maxTok=section==='night'?(subSec==='night_2'?220:420):280;
+  const reply=await callClaude(sys,[{role:'user',content:dataContext}],maxTok);
 
   if(subEl){
     if(reply&&!reply.startsWith('__ERR__')){
@@ -4524,6 +4573,86 @@ function renderTodos(){
   updateStats();
 }
 function toggleTodo(i){const dk=dateKey(currentDate),todos=getTodos(dk);todos[i].done=!todos[i].done;saveTodos(dk,todos);renderTodos();}
+
+// ── 아침(morning_1) 전용: 어제 리뷰 + 오늘의 팁 카드, 하루 1회 캐싱
+function makeYesterdayReviewCard(){
+  const card=document.createElement('div');
+  card.className='card s';
+  card.id='home-yesterday-review-card';
+  const dk=dateKey(getLogicalDate());
+
+  let cache=null;
+  try{cache=JSON.parse(localStorage.getItem('iikoto_yesterday_review')||'null');}catch(e){}
+  if(cache&&cache.dk===dk&&cache.text){
+    card.innerHTML=`<div style="font-size:13px;color:var(--tp);line-height:1.7;">${cache.text}</div>`;
+    return card;
+  }
+
+  card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">어제 하루를 살펴보는 중...</div>';
+  _buildYesterdayReview(dk).then(text=>{
+    const el=document.getElementById('home-yesterday-review-card');
+    if(el)el.innerHTML=`<div style="font-size:13px;color:var(--tp);line-height:1.7;">${text}</div>`;
+  }).catch(()=>{
+    const el=document.getElementById('home-yesterday-review-card');
+    if(el)el.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">불러올 수 없어요</div>';
+  });
+  return card;
+}
+async function _buildYesterdayReview(todayDk){
+  const key=getClaudeKey();
+  const yst=new Date(getLogicalDate());yst.setDate(yst.getDate()-1);
+  const ydk=dateKey(yst);
+  const yMemos=getMemos(ydk).map(m=>m.text).filter(Boolean);
+  const yTodos=getTodos(ydk);
+  const yDone=yTodos.filter(t=>t.done).length,yPend=yTodos.filter(t=>!t.done).length;
+  const yRblocks=getRhythmBlocks(ydk);
+  const yRhythmSummary=(()=>{
+    if(!yRblocks||!yRblocks.length)return '';
+    const durByCat={};
+    yRblocks.forEach(b=>{
+      if(!b.cat||!RHYTHM_CATS[b.cat])return;
+      if(b.start==null||b.end==null)return;
+      durByCat[b.cat]=(durByCat[b.cat]||0)+Math.max(0,b.end-b.start);
+    });
+    const top=Object.entries(durByCat).sort((a,b)=>b[1]-a[1])[0];
+    return top?`어제 리듬 중 비중이 컸던 카테고리: ${RHYTHM_CATS[top[0]].label}`:'';
+  })();
+
+  const dataContext=[
+    yMemos.length?`어제 메모: ${yMemos.join(' / ')}`:'',
+    (yDone||yPend)?`어제 할일: 완료 ${yDone}건 / 미완료 ${yPend}건`:'',
+    yRhythmSummary
+  ].filter(Boolean).join('\n');
+
+  const fallback='어제도 오늘도, 그저 하루하루 잘 쌓아가고 있어요 🌿';
+  if(!key||!dataContext){
+    const text=fallback;
+    try{localStorage.setItem('iikoto_yesterday_review',JSON.stringify({dk:todayDk,text}));}catch(e){}
+    return text;
+  }
+
+  const sys=`당신은 담백하게 흐름을 짚어주는 하루 비서예요. 어제 하루의 메모와 기록을 참고해서, 오늘 아침 짧은 리뷰와 팁 한 줄을 만들어요.
+
+**분량 제한 (반드시 지킬 것):**
+- 전체 2문장 이내, 공백 포함 80자 이내.
+- 1문장: 어제 하루 흐름을 아주 짧게 되짚기 (좋았던 점이든 아쉬웠던 점이든 담백하게, 과장 없이)
+- 1문장: 그 흐름에서 나온 오늘을 위한 실용적인 팁 한 줄 (구체적이고 행동 가능한 조언, 뜬구름 잡는 말 금지)
+
+기타 규칙:
+- 어제 메모에 담긴 컨디션(피곤함, 아픔 등)은 일시적 상황으로만 참고하고, 이를 근거로 "쉬어야 해요" 식 걱정을 반복하지 말 것. 특히 생리/월경 등 주기적 신체 상태는 하루 지나면 이미 지난 일로 간주.
+- 어제 완료/미완료한 일이 있다면 담백하게 반영 가능하나, 죄책감을 유발하는 톤("또 못 했네요" 등)은 금지.
+- 팁은 실질적이고 구체적이어야 함 — "오늘도 힘내세요" 같은 추상적 응원 금지.
+- 반드시 ~해요, ~이에요, ~어요 체의 정감있는 존댓말만 사용. 반말 금지.
+- "너", "당신" 등 호칭 금지.
+- 이모지 0-1개
+- 스스로를 소개하거나 설명하는 표현 금지, 곧바로 본문 시작.
+- 오직 문장만 출력, 따옴표나 설명 없이`;
+
+  const reply=await callClaude(sys,[{role:'user',content:dataContext}],120);
+  const text=(reply&&!reply.startsWith('__ERR__'))?reply.trim():fallback;
+  try{localStorage.setItem('iikoto_yesterday_review',JSON.stringify({dk:todayDk,text}));}catch(e){}
+  return text;
+}
 
 // ── 홈탭 저녁 파트: 텍스트 아카이브 위젯 (씨앗+문장수집 통합 랜덤, 하루 1회 고정)
 function _archivePool(){
