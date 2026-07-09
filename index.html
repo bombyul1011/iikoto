@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260709-23-cleanup -->
+<!-- build: 20260709-24-eveningpolish -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -1227,6 +1227,21 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
   </div>
 </div>
 
+<div class="overlay" id="archive-comment-sheet" onclick="closeSheet('archive-comment-sheet',event)">
+  <div class="bsheet" style="padding-bottom:20px;">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">오늘 이 문장에서 떠오른 생각</div>
+    <div style="padding:16px 20px 0;">
+      <div id="archive-sheet-quote" style="font-size:12.5px;color:var(--tm);line-height:1.6;margin-bottom:12px;"></div>
+      <textarea id="archive-sheet-inp" style="width:100%;box-sizing:border-box;font-size:14px;padding:12px;border-radius:12px;border:1px solid var(--card-b);background:var(--card);color:var(--tp);resize:none;min-height:100px;font-family:inherit;" placeholder="생각나는 대로 적어보세요"></textarea>
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:10px;">
+        <span onclick="closeSheet('archive-comment-sheet')" style="font-size:13px;color:var(--tm);cursor:pointer;padding:8px 14px;">취소</span>
+        <span onclick="commitArchiveSheetComment()" style="font-size:13px;color:#fff;background:rgba(140,160,110,0.9);cursor:pointer;padding:8px 16px;border-radius:10px;font-weight:600;">저장</span>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- MEMO SHEET -->
 <div class="overlay" id="memo-sheet" onclick="closeSheet('memo-sheet',event)">
   <div class="bsheet">
@@ -1889,9 +1904,9 @@ function renderHomeBody(section){
     if(!isSunday){
       // "오늘 마무리" 브리핑은 통합카드(상단 인삿말)가 흡수함
     }
+    body.appendChild(makeTextArchiveCard());
     body.appendChild(makeLabel('오늘의 독서'));
     body.appendChild(makeBookCard());
-    body.appendChild(makeTextArchiveCard());
   }
 }
 
@@ -4757,46 +4772,43 @@ function makeTextArchiveCard(){
   }
 
   const commentBlock=picked.comment
-    ?`<div onclick="toggleArchiveCommentEditor()" style="font-size:11px;color:#7a9552;margin-top:6px;padding:5px 8px;background:rgba(232,246,220,0.6);border-radius:8px;cursor:pointer;">${picked.comment}</div>`
+    ?`<div style="font-size:11px;color:#7a9552;margin-top:6px;padding:5px 8px;background:rgba(232,246,220,0.6);border-radius:8px;">${picked.comment}</div>`
     :'';
   card.innerHTML=`
     <div style="font-size:11px;color:var(--tm);margin-bottom:5px;">✎ 오늘의 문장</div>
     <div style="font-size:13.5px;color:var(--tp);line-height:1.6;">${picked.text}</div>
     ${picked.source?`<div style="font-size:11px;color:var(--tm);margin-top:5px;text-align:right;">— ${picked.source}</div>`:''}
     ${commentBlock}
-    <div id="archive-comment-editor" style="display:none;margin-top:6px;">
-      <textarea id="archive-comment-inp" style="width:100%;box-sizing:border-box;font-size:11.5px;padding:6px 8px;border-radius:8px;border:1px solid var(--card-b);background:var(--card);color:var(--tp);resize:none;min-height:44px;font-family:inherit;" placeholder="오늘 이 문장에서 떠오른 생각">${picked.comment||''}</textarea>
-      <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px;">
-        <span onclick="document.getElementById('archive-comment-editor').style.display='none';" style="font-size:11px;color:var(--tm);cursor:pointer;padding:3px 8px;">취소</span>
-        <span onclick="commitArchiveComment('${picked.kind}','${picked.cid}')" style="font-size:11px;color:#6a8a50;cursor:pointer;padding:3px 8px;font-weight:600;">저장</span>
-      </div>
-    </div>
     <div style="text-align:right;margin-top:4px;">
-      <span onclick="toggleArchiveCommentEditor()" style="font-size:11px;color:var(--tm);cursor:pointer;">${picked.comment?'코멘트 수정':'생각 남기기 +'}</span>
+      <span onclick="openArchiveCommentSheet('${picked.kind}','${picked.cid}')" style="font-size:11px;color:var(--tm);cursor:pointer;">${picked.comment?'코멘트 수정':'생각 남기기 +'}</span>
     </div>`;
   return card;
 }
-function toggleArchiveCommentEditor(){
-  const el=document.getElementById('archive-comment-editor');
-  if(!el)return;
-  const isOpen=el.style.display==='block';
-  el.style.display=isOpen?'none':'block';
-  if(!isOpen){
-    const inp=document.getElementById('archive-comment-inp');
-    if(inp)setTimeout(()=>inp.focus(),50);
-  }
+let _archiveSheetKind='',_archiveSheetCid='';
+function openArchiveCommentSheet(kind,cid){
+  _archiveSheetKind=kind;_archiveSheetCid=cid;
+  const pool=_archivePool();
+  const picked=pool.find(p=>p.kind===kind&&p.cid===cid);
+  if(!picked)return;
+  const quoteEl=document.getElementById('archive-sheet-quote');
+  if(quoteEl)quoteEl.textContent=picked.text;
+  const inp=document.getElementById('archive-sheet-inp');
+  if(inp)inp.value=picked.comment||'';
+  openSheet('archive-comment-sheet');
+  setTimeout(()=>{if(inp)inp.focus();},250);
 }
-function commitArchiveComment(kind,cid){
-  const inp=document.getElementById('archive-comment-inp');
+function commitArchiveSheetComment(){
+  const inp=document.getElementById('archive-sheet-inp');
   if(!inp)return;
   const text=inp.value.trim();
-  if(kind==='seed'){
+  if(_archiveSheetKind==='seed'){
     const seeds=getSeeds();
-    const s=seeds.find(x=>x.cid===cid);
+    const s=seeds.find(x=>x.cid===_archiveSheetCid);
     if(s){s.comment=text;saveSeeds(seeds);if(navigator.onLine)syncSeedsUp();}
   }else{
-    saveQuoteComment(cid,text);
+    saveQuoteComment(_archiveSheetCid,text);
   }
+  closeSheet('archive-comment-sheet');
   const old=document.getElementById('home-text-archive-card');
   const fresh=makeTextArchiveCard();
   if(old&&fresh)old.replaceWith(fresh);
@@ -4832,10 +4844,11 @@ function makePendingTodosCard(){
   const todos=getTodos(dk);
   const pendingWithIdx=todos.map((t,i)=>({...t,_i:i})).filter(t=>!t.done);
   const card=document.createElement('div');
-  card.className='card s';
+  card.className='card';
+  card.style.cssText='box-shadow:none;border:1px solid var(--card-b);';
   card.id='home-pending-todos-card';
   if(!pendingWithIdx.length){
-    card.innerHTML='<div style="font-size:13px;color:var(--tp);padding:6px 2px;text-align:center;">오늘 할일 끝! 고생하셨어요 🌿</div>';
+    card.innerHTML='<div style="font-size:13px;color:var(--tm);padding:6px 2px;text-align:center;">오늘 할일 끝! 고생하셨어요 🌿</div>';
     return card;
   }
   pendingWithIdx.sort((a,b)=>(b.postponeCount||0)-(a.postponeCount||0));
@@ -4850,9 +4863,9 @@ function makePendingTodosCard(){
     el.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px;';
     el.innerHTML=`<div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
       <div class="chk" onclick="homeToggleTodo(${t._i})"></div>
-      <span class="todo-txt${postponedClass}" style="flex:1;">${t.text}</span>
+      <span class="todo-txt${postponedClass}" style="flex:1;color:var(--tm);">${t.text}</span>
     </div>
-    <span onclick="homePostponeTodo(${t._i})" style="font-size:11px;color:var(--tm);white-space:nowrap;padding:3px 7px;border-radius:8px;background:var(--card);cursor:pointer;">내일로 ›</span>`;
+    <span onclick="homePostponeTodo(${t._i})" style="font-size:11px;color:var(--tm);white-space:nowrap;padding:3px 7px;border-radius:8px;background:var(--card-s);cursor:pointer;opacity:0.8;">내일로 ›</span>`;
     list.appendChild(el);
   });
   card.appendChild(list);
