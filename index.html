@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260709-12-partmodefix -->
+<!-- build: 20260709-13-noweathertime -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -3485,7 +3485,7 @@ async function fetchHomeWeather(section){
   const checks=getHabitChecks(wk);
   const doneHabitsCount=habits.filter(h=>checks[h.name+'-'+dow]).length;
   const rblocks=getRhythmBlocks(dk);
-  const weatherDesc=weather?`날씨: ${weather.icon} ${weather.temp}도`:'날씨 정보 없음';
+  const weatherDesc=weather?`(참고용, 수치 그대로 출력 금지) 날씨: ${weather.icon} ${weather.temp}도`:'날씨 정보 없음';
 
   // 서브섹션별 메모 조회 범위
   let pickedMemos=[];
@@ -3542,7 +3542,7 @@ async function fetchHomeWeather(section){
     dataContext=[
       `오늘은 ${_HOME_DAYS[now.getDay()]}요일이에요.`,
       weatherDesc,
-      `현재 시각: ${now.getHours()}시 (지금 시점: ${subSecLabel[subSec]})`,
+      `(참고용, 출력 금지) 현재 시각: ${now.getHours()}시 · 지금 시점: ${subSecLabel[subSec]}`,
       todoLine(morningTodos,'오늘 오전'),
       todoLine(afternoonTodos,'오늘 오후'),
       todoLine(nightTodos,'오늘 저녁'),
@@ -3560,7 +3560,7 @@ async function fetchHomeWeather(section){
 기타 규칙:
 - 오늘 하루를 완료한 일 중심으로 따뜻하게 정리해요 (구체적 항목명 언급 가능).
 - ${subSec==='night_2'?'내일에 대한 작은 기대나 응원을 딱 한 문장만, 할일을 나열하지 말고 가볍게.':'이어서 내일 할일을 자연스럽게 안내해요 (구체적 항목명 언급 가능).'}
-- 날씨/계절/메모 등에서 느껴지는 분위기를 한 줄 정도 자연스럽게 녹이되, 날씨 수치(온도)는 최상단에 별도 표기되니 본문에서 다시 언급하지 말 것.
+- 날씨/계절/메모 등에서 느껴지는 분위기를 한 줄 정도 자연스럽게 녹여요. 단, 날씨(온도, 맑음/흐림 등)와 현재 시각(몇 시, 오전/오후)은 화면 상단에 이미 별도로 표시되고 있으니, 본문에 숫자나 문장으로 다시 적지 말 것 — "26도", "오후 4시" 같은 표현 절대 금지.
 - 리듬 카테고리를 언급할 땐 가장 비중 컸던 것 하나 정도만 은유적으로.
 - 실제 시각과 어긋나는 낮/햇살/노을 묘사 금지 (이미 해가 진 시간).
 - 메모에서 현재 상황(위치, 컨디션)을 자연스럽게 반영해요.
@@ -3577,7 +3577,7 @@ async function fetchHomeWeather(section){
     dataContext=[
       `오늘은 ${_HOME_DAYS[now.getDay()]}요일이에요.`,
       weatherDesc,
-      `현재 시각: ${now.getHours()}시 (지금 시점: ${subSecLabel[subSec]})`,
+      `(참고용, 출력 금지) 현재 시각: ${now.getHours()}시 · 지금 시점: ${subSecLabel[subSec]}`,
       todoLine(sectionTodos,section==='morning'?'오늘 오전':'오늘 오후'),
       todoLine(noneTodos,'시간지정없음'),
       doneHabitsCount?`오늘 완료한 습관: ${doneHabitsCount}개`:'',
@@ -3591,7 +3591,7 @@ async function fetchHomeWeather(section){
 - 최대 3-4문장, 전체 공백 포함 150자 이내.
 
 기타 규칙:
-- 날씨/계절/메모 등에서 느껴지는 그 순간의 분위기를 한 줄 정도 자연스럽게 녹이되, 날씨 수치(온도)는 최상단에 별도 표기되니 본문에서 다시 언급하지 말 것.
+- 날씨/계절/메모 등에서 느껴지는 그 순간의 분위기를 한 줄 정도 자연스럽게 녹여요. 단, 날씨(온도, 맑음/흐림 등)와 현재 시각(몇 시, 오전/오후)은 화면 상단에 이미 별도로 표시되고 있으니, 본문에 숫자나 문장으로 다시 적지 말 것 — "26도", "오후 4시" 같은 표현 절대 금지.
 - 오늘 할일은 구체적인 항목명을 언급해도 좋아요. 단, 나열식으로 딱딱하게 늘어놓지 말고 자연스러운 문장 속에 녹여내요.
 - 리듬 카테고리를 언급할 땐 가장 비중 컸던 것 하나 정도만 은유적으로 녹여내요.
 - morning_1(아침) 시점에는 수면 시간을 매번 안내하듯 말하지 말고, 계절감·할일 등과 섞어 다채롭게, 하루를 여는 희망찬 분위기로.
