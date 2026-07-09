@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260709-25-tighttoast -->
+<!-- build: 20260709-26-midmonth -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -1838,6 +1838,7 @@ function renderHomeBody(section){
   const isSunday=_ld.getDay()===0&&_isEveOrLateNight;
   const isWednesdayEvening=_ld.getDay()===3&&_isEveOrLateNight;
   const isLastDayOfMonth=(()=>{const t=new Date(_ld);t.setDate(_ld.getDate()+1);return t.getDate()===1;})()&&_isEveOrLateNight;
+  const isMidMonth=_ld.getDate()===15&&_isEveOrLateNight;
 
   if(section==='morning'){
     if(getSubSection()==='morning_1'){
@@ -1870,6 +1871,16 @@ function renderHomeBody(section){
       </div>`;
       rbanner.addEventListener('click',openMonthlyReportSheet);
       body.appendChild(rbanner);
+    } else if(isMidMonth){
+      body.appendChild(makeLabel('🌿 이번 달 중간 소식'));
+      const midBanner=document.createElement('div');
+      midBanner.className='weekly-review-banner';
+      midBanner.innerHTML=`<div class="weekly-review-banner-inner">
+        <div class="weekly-review-banner-title">🌿 이번 달 중간 소식 보기</div>
+        <div class="weekly-review-banner-sub"><span>한 달의 절반, 지금까지의 흐름을 모아봤어요</span><span style="font-size:16px;opacity:0.6;">›</span></div>
+      </div>`;
+      midBanner.addEventListener('click',openMonthlyReportSheet);
+      body.appendChild(midBanner);
     } else if(isSunday){
       appendSundayBanner(body);
     } else if(isWednesdayEvening){
@@ -2777,8 +2788,9 @@ function getContentsForReport(mk){
   }).map(c=>({...c,_carried:true}));
   return [...carry,...cur];
 }
-function computeMonthStats(y,mo){
+function computeMonthStats(y,mo,endDay){
   const dim=new Date(y,mo+1,0).getDate();
+  const lastDay=endDay?Math.min(endDay,dim):dim;
   let memos=0,doneTodos=0,totalTodos=0,hc=0,ht=0,sleepMin=0,sleepCnt=0;
   const habits=getHabits();
   const allMemoTexts=[];
@@ -2787,7 +2799,7 @@ function computeMonthStats(y,mo){
   const weekSet={};
   const rhythmDur={};
   const rhythmDayCount={};
-  for(let d=1;d<=dim;d++){
+  for(let d=1;d<=lastDay;d++){
     const dk=`${y}-${pad(mo+1)}-${pad(d)}`;
     const dayMemos=getMemos(dk);
     memos+=dayMemos.length;
@@ -2830,7 +2842,7 @@ function computeMonthStats(y,mo){
   const postponedTasks=Object.keys(postponedTally).sort((a,b)=>postponedTally[b]-postponedTally[a]).map(t=>({text:t,count:postponedTally[t]}));
   return {memos,doneTodos,totalTodos,todoPct,habitPct,avgSleep,allMemoTexts,onelineTexts,postponedTasks,wcByWeek,contentsList,rhythmSummary,rhythmDur,rhythmDayCount,dim,goalLines};
 }
-async function generateMonthlyReportAI(mk,stats){
+async function generateMonthlyReportAI(mk,stats,isMidReport){
   const key=getClaudeKey();
   if(!key)return null;
   const cStatusLabelAI=function(c){
@@ -2839,7 +2851,7 @@ async function generateMonthlyReportAI(mk,stats){
     return c.status==='stopped'?'중단':(c.status==='done'?'완료':'보는중');
   };
   const dataContext=[
-    `${mk} 한 달 데이터:`,
+    isMidReport?`${mk} 1~15일 데이터 (한 달의 절반, 아직 진행 중):`:`${mk} 한 달 데이터:`,
     stats.goalLines.length?`이번 달 목표:\n${stats.goalLines.map(g=>'- '+g).join('\n')}`:'',
     `투두 완료 ${stats.doneTodos}개 (총 ${stats.totalTodos}개 중)`,
     `습관 달성률 ${stats.habitPct}%`,
@@ -2850,10 +2862,10 @@ async function generateMonthlyReportAI(mk,stats){
     stats.contentsList.length?`콘텐츠 기록: ${stats.contentsList.map(c=>`${c.title}(${c.cat}${cStatusLabelAI(c)?', '+cStatusLabelAI(c):''})`).join(', ')}`:'',
     stats.wcByWeek.length?`주간 미션 현황: ${stats.wcByWeek.map(w=>w.lines.map(l=>`${l.text} ${l.pct}%`).join(', ')).join(' | ')}`:''
   ].filter(Boolean).join('\n');
-  const sys=`당신은 따뜻한 월간 회고 비서예요. 한 달 데이터를 보고 풍부한 총평과 키워드를 만들어요.
+  const sys=`당신은 따뜻한 월간 회고 비서예요. ${isMidReport?'한 달의 절반(1~15일) 데이터를 보고 지금까지의 흐름을 담은 중간 소식을':'한 달 데이터를 보고 풍부한 총평과 키워드를'} 만들어요.
 반드시 아래 JSON 형식으로만 응답해요. 다른 텍스트나 마크다운 코드블록 없이 순수 JSON만 출력해요.
-{"comment":"6-8문장의 한 달 총평, ~해요/이에요/어요체, 이모지 1-2개 정도","keywords":["키워드1","키워드2","키워드3","키워드4"]}
-내용이 좋으면 분량을 아끼지 말고, 그 달의 흐름(시작~중반~막판)과 구체적인 사건/감정 변화를 짚어가며 충분히 풀어서 써요.
+{"comment":"6-8문장의 ${isMidReport?'중간 소식':'한 달 총평'}, ~해요/이에요/어요체, 이모지 1-2개 정도","keywords":["키워드1","키워드2","키워드3","키워드4"]}
+${isMidReport?'아직 한 달이 끝나지 않았으니 "이번 달은 ~했어요"처럼 확정짓는 총평 톤이 아니라, "지금까지 이런 결로 흘러가고 있어요", "절반을 지나며 ~한 흐름이에요"처럼 현재진행형 톤으로 써요. 나머지 절반에 대한 부담을 주는 표현(예: "남은 기간 힘내야")은 쓰지 말고 담백하게 지금까지의 흐름만 짚어요.':'내용이 좋으면 분량을 아끼지 말고, 그 달의 흐름(시작~중반~막판)과 구체적인 사건/감정 변화를 짚어가며 충분히 풀어서 써요.'}
 이 코멘트 바로 아래에 투두 완료 개수와 습관 달성률 수치가 별도로 표시되니, 그 숫자(예: "85개", "20%" 같은 구체적 수치)를 코멘트에서 직접 나열하지 말아요. 대신 그 수치가 의미하는 바에 대한 해석이나 코멘트로 자연스럽게 시작하거나 녹여요 (예: "습관 달성률은 낮았지만 ~"처럼 수치 자체보다 그 이면의 맥락 위주로).
 키워드는 하루 한 줄 기록과 메모 내용에서 자주 등장하거나 인상적인 단어/장소/감정 위주로 2~5개 뽑아요.
 이번 달 목표가 있다면, 메모나 하루 한 줄 기록에 그 목표와 관련된 직접적인 언급(진행 상황, 결과, 감상 등)이 있는지 찾아서 총평에 자연스럽게 녹여요.
@@ -2936,25 +2948,44 @@ async function loadMonthlyReportContent(){
   const lastDateOfThisMonth=new Date(y,mo+1,0).getDate();
   const _lh=new Date().getHours();
   const isLastDayEvening=now.getDate()===lastDateOfThisMonth&&(_lh>=19||_lh<6);
-  const isOngoingMonth=(y===now.getFullYear()&&mo===now.getMonth()&&!isLastDayEvening);
-  if(isOngoingMonth){
-    slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title">이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">🌿 이 달이 끝나면 정리해드릴게요</div></div>`;
+  const isThisMonth=(y===now.getFullYear()&&mo===now.getMonth());
+  const isOngoingMonth=isThisMonth&&!isLastDayEvening;
+  const hasPassedMidMonth=isThisMonth&&now.getDate()>=15;
+
+  if(isOngoingMonth&&!hasPassedMidMonth){
+    // 1~14일: 아직 중간집계 시점도 안 됨
+    slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title">이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">🌿 15일에 중간 소식을, 이 달이 끝나면 전체를 정리해드릴게요</div></div>`;
     return;
   }
   slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title">이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">불러오는 중...</div></div>`;
 
-  const cacheKey='monthly_report_'+mk;
-  let report=S.get(cacheKey);
-  if(!report){
-    report=await generateMonthlyReportAI(mk,stats);
-    if(report)S.set(cacheKey,report);
+  let report,cacheKey,statsForAI=stats;
+  if(isOngoingMonth&&hasPassedMidMonth){
+    // 15~29일: 15일자 중간집계 고정(15일 데이터로만 캐싱, 이후 재열람해도 그대로)
+    cacheKey='monthly_report_mid_'+mk;
+    report=S.get(cacheKey);
+    if(!report){
+      const midStats=computeMonthStats(y,mo,15);
+      report=await generateMonthlyReportAI(mk,midStats,true);
+      if(report)S.set(cacheKey,report);
+    }
+  } else {
+    // 말일 저녁 이후 또는 지난 달: 전체 기간으로 최종 리포트
+    cacheKey='monthly_report_'+mk;
+    report=S.get(cacheKey);
+    if(!report){
+      report=await generateMonthlyReportAI(mk,stats);
+      if(report)S.set(cacheKey,report);
+    }
   }
   // 그 사이에 다른 달로 넘어갔으면 적용하지 않음
   if(`${_reportYear}-${pad(_reportMonth+1)}`!==mk)return;
   const slot2=document.getElementById('mr-ai-slot');if(!slot2)return;
   if(report){
+    const midNote=(isOngoingMonth&&hasPassedMidMonth)?`<div style="font-size:11px;color:var(--tm);margin-bottom:6px;">15일 기준 중간 소식이에요, 이 달이 끝나면 전체로 다시 정리해드려요</div>`:'';
     slot2.innerHTML=`<div class="mr-ai-card">
       <div class="mr-sec-title">이번 달 한눈에</div>
+      ${midNote}
       <p style="font-size:13px;color:var(--tp);line-height:1.9;margin-bottom:${report.keywords&&report.keywords.length?'12px':'0'};">${report.comment}</p>
       ${report.keywords&&report.keywords.length?`<div class="mr-tag-cloud">${report.keywords.map(k=>`<span class="mr-tag">${k}</span>`).join('')}</div>`:''}
     </div>`;
