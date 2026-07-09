@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260709-19-wholecopy -->
+<!-- build: 20260709-20-outsideclick -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -4574,6 +4574,7 @@ function renderTodos(){
     const ts=t.timeSection||'none';
     const tsClass=ts!=='none'?` ts-${ts}`:'';
     const el=document.createElement('div');el.className='todo-item';
+    if(_todoPartModeIdx===i)el.dataset.partModeIdx=i;
     const postponedClass=(t.postponeCount||0)>=3?' postponed':'';
     const textHtml=renderTodoTextParts(t.text,t.strikeParts||[],i);
     const partModeStyle=_todoPartModeIdx===i?'background:rgba(255,255,255,0.45);border-radius:8px;padding:2px 6px;':'';
@@ -4713,7 +4714,7 @@ function attachTodoSwipeMode(el,i,hasMultipleParts){
     if(moved){
       if(hasMultipleParts){
         _todoPartModeIdx=(_todoPartModeIdx===i)?-1:i;
-        renderTodos();
+        setTimeout(renderTodos,0);
       }else{
         copyWholeTodoToTomorrow(i);
       }
@@ -4724,6 +4725,14 @@ function attachTodoSwipeMode(el,i,hasMultipleParts){
   el.addEventListener('pointercancel',endDrag);
 }
 // 구분자(,/) 없는 단일 항목 전체를 내일로 복사 (오늘 항목은 그대로 유지). 이미 내일에 동일 텍스트 있으면 중복 방지.
+// 조각모드가 켜진 상태에서, 그 항목 바깥(다른 투두, 체크박스, 다른 UI 등)을 클릭하면 자동으로 조각모드 해제
+document.addEventListener('click',e=>{
+  if(_todoPartModeIdx<0)return;
+  const activeEl=document.querySelector(`.todo-item[data-part-mode-idx="${_todoPartModeIdx}"]`);
+  if(activeEl&&activeEl.contains(e.target))return; // 조각모드 항목 내부 클릭은 무시(정상 조작)
+  _todoPartModeIdx=-1;
+  renderTodos();
+});
 function copyWholeTodoToTomorrow(i){
   const dk=dateKey(currentDate),todos=getTodos(dk),todo=todos[i];
   if(!todo)return;
