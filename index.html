@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260709-29-narrativefix -->
+<!-- build: 20260710-02-arrowprefix -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -4490,7 +4490,17 @@ function renderTodos(){
 // 예: "업무) 블로그 / 카페 / 전단홍보만들기" -> prefix:"업무", parts:["블로그","카페","전단홍보만들기"]
 // ')' 없으면 prefix는 빈 문자열, 전체가 조각 대상.
 function parseTodoTextParts(text){
-  const closeIdx=text.indexOf(')');
+  // '>' 를 접두어(카테고리) 구분자로 사용. 예: "업무 > 블로그, 카페" -> prefix:"업무", parts:["블로그","카페"]
+  // ')' 대신 '>' 를 쓰는 이유: 일반 문장에서 괄호는 자주 쓰이지만 '>' 는 투두 텍스트에 거의 등장하지 않아 오인식 위험이 적음.
+  // 단, "->"(화살표 표현)는 접두어 구분자가 아니므로 건너뛰고 그다음 '>' 를 찾음.
+  let closeIdx=-1;
+  let searchFrom=0;
+  while(searchFrom<text.length){
+    const idx=text.indexOf('>',searchFrom);
+    if(idx<0)break;
+    if(text[idx-1]==='-'){searchFrom=idx+1;continue;} // "->" 화살표는 건너뜀
+    closeIdx=idx;break;
+  }
   let prefix='',body=text;
   if(closeIdx>=0){
     prefix=text.slice(0,closeIdx).trim();
@@ -4504,16 +4514,16 @@ function parseTodoTextParts(text){
     if(seg.trim()==='')return;
     parts.push(seg);
   });
-  return {prefix,parts,hadCloseParen:closeIdx>=0};
+  return {prefix,parts,hasPrefix:closeIdx>=0};
 }
 // 투두 텍스트를 조각내어 렌더링. strikeParts에 포함된 조각 인덱스는 취소선 처리.
 // 조각 모드일 때 항목 끝에 "미체크 조각 전부 내일로 복사" 버튼 하나를 노출.
 function renderTodoTextParts(text,strikeParts,todoIdx){
-  const {prefix,parts,hadCloseParen}=parseTodoTextParts(text);
+  const {prefix,parts,hasPrefix}=parseTodoTextParts(text);
   const inPartMode=_todoPartModeIdx===todoIdx;
   let html='';
-  if(hadCloseParen){
-    html+=`<span>${prefix})</span> `;
+  if(hasPrefix){
+    html+=`<span>${prefix} ></span> `;
   }
   parts.forEach((seg,partIdx)=>{
     const isStruck=strikeParts.includes(partIdx);
@@ -4567,14 +4577,14 @@ function confirmCopyUnstruckParts(){
   if(i<0)return;
   const dk=dateKey(currentDate),todos=getTodos(dk),todo=todos[i];
   if(!todo)return;
-  const {prefix,parts,hadCloseParen}=parseTodoTextParts(todo.text);
+  const {prefix,parts,hasPrefix}=parseTodoTextParts(todo.text);
   const strikeSet=new Set(todo.strikeParts||[]);
   const unstruckIdxs=parts.map((_,idx)=>idx).filter(idx=>!strikeSet.has(idx));
   if(!unstruckIdxs.length)return;
 
   // 내일 항목 생성 (미체크 조각들을 접두어와 함께 하나로 묶어 복사)
   const movedParts=unstruckIdxs.map(idx=>parts[idx]);
-  const movedText=hadCloseParen?`${prefix}) ${movedParts.join(' / ')}`:movedParts.join(' / ');
+  const movedText=hasPrefix?`${prefix} > ${movedParts.join(' / ')}`:movedParts.join(' / ');
   const tom=new Date(currentDate);tom.setDate(tom.getDate()+1);
   const tdk=dateKey(tom),ttodos=getTodos(tdk);
   if(!ttodos.some(x=>x.text===movedText)){
@@ -4593,7 +4603,7 @@ function confirmCopyUnstruckParts(){
     saveTodos(dk,dkTodos);
     _todoPartModeIdx=-1;
   }else{
-    todo.text=hadCloseParen?`${prefix}) ${remainingParts.join(' / ')}`:remainingParts.join(' / ');
+    todo.text=hasPrefix?`${prefix} > ${remainingParts.join(' / ')}`:remainingParts.join(' / ');
     todo.strikeParts=remainingParts.map((_,idx)=>idx); // 남은 건 전부 취소선 친 것들이므로 전부 유지
     saveTodos(dk,todos);
   }
