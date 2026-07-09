@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260709-15-retry -->
+<!-- build: 20260709-16-pointercapture -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -4688,24 +4688,27 @@ function copyTodoPartToTomorrow(i,partIdx){
 // 왼쪽 스와이프(터치 및 PC 마우스 드래그 모두 지원) = 조각 선택 모드 진입/해제
 // 단, 구분자(,/)가 없어 조각이 1개뿐인 항목은 조각모드가 의미 없으므로 스와이프해도 기존처럼 시트가 열림
 function attachTodoSwipeMode(el,i,hasMultipleParts){
-  let sx=0,sy=0,moved=false,dragging=false;
+  let sx=0,sy=0,moved=false,dragging=false,pid=null;
   el.addEventListener('pointerdown',e=>{
     // 체크박스 위에서 시작한 드래그는 완료 토글과 충돌하지 않게 무시. 조각(.todo-part)은 이제 허용(조각모드 재진입 가능해야 함).
     if(e.target.closest('.chk'))return;
     sx=e.clientX;sy=e.clientY;moved=false;dragging=true;
+    pid=e.pointerId;
+    try{el.setPointerCapture(pid);}catch(err){}
   });
   el.addEventListener('pointermove',e=>{
     if(!dragging)return;
     const dx=e.clientX-sx;
     const dy=Math.abs(e.clientY-sy);
     // 세로 이동이 크면 스크롤 의도로 보고 드래그 취소
-    if(dy>15){dragging=false;el.style.transform='';return;}
-    if(dx<-20){el.style.transform=`translateX(${Math.max(dx,-30)}px)`;moved=true;}
+    if(dy>18&&Math.abs(dx)<18){dragging=false;el.style.transform='';return;}
+    if(dx<-15){el.style.transform=`translateX(${Math.max(dx,-30)}px)`;moved=true;}
   });
   const endDrag=()=>{
     if(!dragging)return;
     dragging=false;
     el.style.transform='';
+    if(pid!=null){try{el.releasePointerCapture(pid);}catch(err){}pid=null;}
     if(moved){
       if(hasMultipleParts){
         _todoPartModeIdx=(_todoPartModeIdx===i)?-1:i;
@@ -4717,7 +4720,7 @@ function attachTodoSwipeMode(el,i,hasMultipleParts){
     moved=false;
   };
   el.addEventListener('pointerup',endDrag);
-  el.addEventListener('pointerleave',()=>{dragging=false;el.style.transform='';moved=false;});
+  el.addEventListener('pointercancel',endDrag);
 }
 function toggleTodo(i){const dk=dateKey(currentDate),todos=getTodos(dk);todos[i].done=!todos[i].done;saveTodos(dk,todos);renderTodos();}
 
