@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260709-27-timelinefix -->
+<!-- build: 20260709-28-durationhint -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -2158,23 +2158,41 @@ async function buildRhythmReviewCard(){
       const dur=getDayCategoryDurations(dk);
       const ol=getDailyOneLine(dk).trim();
       const toMinLocal=function(t){if(!t)return null;const p=t.split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);};
-      // 시간순 타임라인: 수면 + 리듬 블록을 실제 시작시각 기준으로 정렬해서 제공 (AI가 순서를 카테고리 나열순으로 오인하지 않도록)
+      // 시간순 타임라인: 수면 + 리듬 블록을 실제 시작시각 기준으로 정렬해서 제공.
+      // 각 항목에 실제 소요시간(분→시간분 환산)을 명시적으로 계산해 함께 줘서,
+      // AI가 텍스트 나열만 보고 비중을 어림짐작하다 오판하는 것을 방지.
       const sleepInfo=getSleep(dk)||{};
       const timelineItems=[];
       if(sleepInfo.sleep&&sleepInfo.wake){
-        timelineItems.push({start:toMinLocal(sleepInfo.sleep),label:'수면 '+sleepInfo.sleep+'~'+sleepInfo.wake});
+        const sMin=toMinLocal(sleepInfo.sleep),wMin=toMinLocal(sleepInfo.wake);
+        const durMin=wMin>sMin?wMin-sMin:(1440-sMin+wMin);
+        timelineItems.push({start:sMin,durMin,label:'수면 '+sleepInfo.sleep+'~'+sleepInfo.wake+' ('+fmtDur(durMin)+')'});
       }
       getRhythmBlocks(dk).forEach(function(b){
         const cat=RHYTHM_CATS[b.cat];if(!cat)return;
         const s=toMinLocal(b.start);if(s==null)return;
+        let durMin=null,durText='진행중';
+        if(b.end){
+          const e=toMinLocal(b.end);
+          durMin=e>s?e-s:(1440-s+e);
+          durText=fmtDur(durMin);
+        }
         const timeRange=b.start+(b.end?'~'+b.end:'~진행중');
-        timelineItems.push({start:s,label:cat.label+' '+timeRange+(b.text&&b.text.trim()?' ('+b.text.trim()+')':'')});
+        timelineItems.push({start:s,durMin:durMin||0,label:cat.label+' '+timeRange+' ('+durText+')'+(b.text&&b.text.trim()?' — '+b.text.trim():'')});
       });
       timelineItems.sort(function(a,b){return a.start-b.start;});
       const timelineText=timelineItems.length?timelineItems.map(function(t){return '- '+t.label;}).join('\n'):'(기록 없음)';
+      // 가장 소요시간이 길었던 활동을 미리 계산해 힌트로 제공 (AI가 스스로 시간을 다시 빼서 비중을 오판하지 않도록)
+      // 수면은 항상 가장 길기 마련이라 별도로 분리하고, 수면을 제외한 '활동' 중 최다비중도 함께 짚어줌
+      const longestOverall=timelineItems.filter(function(t){return t.durMin>0;}).sort(function(a,b){return b.durMin-a.durMin;})[0];
+      const longestActivity=timelineItems.filter(function(t){return t.durMin>0&&t.label.indexOf('수면')!==0;}).sort(function(a,b){return b.durMin-a.durMin;})[0];
+      const hints=[];
+      if(longestOverall)hints.push('오늘 가장 오래 이어진 항목: '+longestOverall.label);
+      if(longestActivity&&longestActivity!==longestOverall)hints.push('수면을 제외하면 가장 오래 이어진 활동: '+longestActivity.label+' — 이 활동의 비중을 절대 과소평가하거나 누락하지 말 것.');
+      const longestHint=hints.join('\n');
       hasData=!!durSummaryLine(dur)||!!ol||timelineItems.length>0;
-      dataContext='오늘 시간 흐름(실제 발생 순서대로):\n'+timelineText+'\n오늘 하루한줄: '+(ol||'(작성 안 함)');
-      sys='당신은 따뜻한 생활 비서예요. 아래 "오늘 시간 흐름"은 실제로 일어난 시간 순서 그대로 나열된 것이니, 반드시 이 순서를 그대로 따라 이해하고 통찰을 만들어요 (순서를 바꾸거나 다르게 추측하지 말 것). 이 흐름과 하루한줄을 보고, 시간을 어떻게 썼는지와 그날의 느낌이 어울리는지 어긋나는지를 짚어주는 짧은 통찰을 1-2문장으로 줘요.\n'+commonRules;
+      dataContext=['오늘 시간 흐름(실제 발생 순서대로, 각 항목 옆 괄호는 실제 소요시간):',timelineText,longestHint,'오늘 하루한줄: '+(ol||'(작성 안 함)')].filter(Boolean).join('\n');
+      sys='당신은 따뜻한 생활 비서예요. 아래 "오늘 시간 흐름"은 실제로 일어난 시간 순서와 각 활동의 실제 소요시간이 정확히 기록된 데이터예요. 이 순서와 소요시간을 반드시 그대로 따르고, 시간을 다시 어림짐작하거나 비중을 추측하지 말아요 — 특히 소요시간이 가장 길게 표시된 활동은 그날 시간 사용의 핵심이니 이를 빠뜨리거나 가볍게 다루지 말 것. 이 흐름과 하루한줄을 보고, 시간을 어떻게 썼는지와 그날의 느낌이 어울리는지 어긋나는지를 짚어주는 짧은 통찰을 1-2문장으로 줘요.\n'+commonRules;
     }
 
     if(!hasData){
