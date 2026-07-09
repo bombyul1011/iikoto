@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260709-26-midmonth -->
+<!-- build: 20260709-27-timelinefix -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -2157,12 +2157,24 @@ async function buildRhythmReviewCard(){
       const dk=dateKey(_ld);scope='day_'+dk;
       const dur=getDayCategoryDurations(dk);
       const ol=getDailyOneLine(dk).trim();
-      const blockNotes=getRhythmBlocks(dk)
-        .filter(function(b){return b.text&&b.text.trim();})
-        .map(function(b){const cat=RHYTHM_CATS[b.cat];return '- '+(cat?cat.label:b.cat)+': '+b.text.trim();});
-      hasData=!!durSummaryLine(dur)||!!ol||blockNotes.length>0;
-      dataContext='오늘 시간 사용: '+(durSummaryLine(dur)||'기록 없음')+'\n오늘 하루한줄: '+(ol||'(작성 안 함)')+'\n리듬 기록 메모:\n'+(blockNotes.length?blockNotes.join('\n'):'(작성 안 함)');
-      sys='당신은 따뜻한 생활 비서예요. 오늘 하루의 시간 사용 패턴, 하루한줄, 그리고 리듬 기록에 남긴 메모들을 보고, 이들을 연결한 짧은 통찰을 1-2문장으로 줘요. 시간을 어떻게 썼는지와 그날의 느낌·메모 내용이 어울리는지 어긋나는지를 짚어줘도 좋아요.\n'+commonRules;
+      const toMinLocal=function(t){if(!t)return null;const p=t.split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);};
+      // 시간순 타임라인: 수면 + 리듬 블록을 실제 시작시각 기준으로 정렬해서 제공 (AI가 순서를 카테고리 나열순으로 오인하지 않도록)
+      const sleepInfo=getSleep(dk)||{};
+      const timelineItems=[];
+      if(sleepInfo.sleep&&sleepInfo.wake){
+        timelineItems.push({start:toMinLocal(sleepInfo.sleep),label:'수면 '+sleepInfo.sleep+'~'+sleepInfo.wake});
+      }
+      getRhythmBlocks(dk).forEach(function(b){
+        const cat=RHYTHM_CATS[b.cat];if(!cat)return;
+        const s=toMinLocal(b.start);if(s==null)return;
+        const timeRange=b.start+(b.end?'~'+b.end:'~진행중');
+        timelineItems.push({start:s,label:cat.label+' '+timeRange+(b.text&&b.text.trim()?' ('+b.text.trim()+')':'')});
+      });
+      timelineItems.sort(function(a,b){return a.start-b.start;});
+      const timelineText=timelineItems.length?timelineItems.map(function(t){return '- '+t.label;}).join('\n'):'(기록 없음)';
+      hasData=!!durSummaryLine(dur)||!!ol||timelineItems.length>0;
+      dataContext='오늘 시간 흐름(실제 발생 순서대로):\n'+timelineText+'\n오늘 하루한줄: '+(ol||'(작성 안 함)');
+      sys='당신은 따뜻한 생활 비서예요. 아래 "오늘 시간 흐름"은 실제로 일어난 시간 순서 그대로 나열된 것이니, 반드시 이 순서를 그대로 따라 이해하고 통찰을 만들어요 (순서를 바꾸거나 다르게 추측하지 말 것). 이 흐름과 하루한줄을 보고, 시간을 어떻게 썼는지와 그날의 느낌이 어울리는지 어긋나는지를 짚어주는 짧은 통찰을 1-2문장으로 줘요.\n'+commonRules;
     }
 
     if(!hasData){
@@ -4897,7 +4909,7 @@ function makePendingTodosCard(){
       <div class="chk" onclick="homeToggleTodo(${t._i})"></div>
       <span class="todo-txt${postponedClass}" style="flex:1;color:var(--tm);">${t.text}</span>
     </div>
-    <span onclick="homePostponeTodo(${t._i})" style="font-size:11px;color:var(--tm);white-space:nowrap;padding:3px 7px;border-radius:8px;background:var(--card-s);cursor:pointer;opacity:0.8;">내일로 ›</span>`;
+    <span onclick="homePostponeTodo(${t._i})" style="font-size:10.5px;color:rgba(150,125,95,0.85);white-space:nowrap;padding:3px 8px;border-radius:7px;background:rgba(190,170,140,0.14);cursor:pointer;">내일로 ›</span>`;
     list.appendChild(el);
   });
   card.appendChild(list);
