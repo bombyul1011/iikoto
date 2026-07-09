@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260709-08-habitalign -->
+<!-- build: 20260709-10-partcopy -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -4078,7 +4078,7 @@ async function syncTodosDown(dk){
   const rows=await supaFetch('todos?date_key=eq.'+dk+'&order=created');
   if(!rows)return; // 연결 실패(null) — 로컬 유지. 빈 배열은 "서버에 진짜 0개"라는 뜻이라 그대로 반영.
   if(S.get(S.key('todos_pending',dk)))return; // 업로드 대기중인 로컬 수정(미루기 등) 있으면 덮어쓰지 않음
-  S.set(S.key('todos',dk),rows.map(function(r){return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),postponeCount:r.postpone_count||0};}));
+  S.set(S.key('todos',dk),rows.map(function(r){return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),postponeCount:r.postpone_count||0,strikeParts:r.strike_parts||[]};}));
   renderTodos();
 }
 async function syncTodosUp(dk){
@@ -4086,7 +4086,7 @@ async function syncTodosUp(dk){
   if(ensureItemCids(todos))S.set(S.key('todos',dk),todos);
   const delCids=getDelPendingCids('todos',dk);
   const ok=await syncListUpSafe('todos',`date_key=eq.${dk}`,'date_key,client_id',todos,
-    t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,postpone_count:t.postponeCount||0,is_reserve:t.is_reserve||false}),
+    t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,postpone_count:t.postponeCount||0,is_reserve:t.is_reserve||false,strike_parts:t.strikeParts||[]}),
     delCids);
   if(ok)delCids.forEach(cid=>removeDelPending('todos',dk,cid));
   return ok;
@@ -4572,11 +4572,140 @@ function renderTodos(){
     const tsClass=ts!=='none'?` ts-${ts}`:'';
     const el=document.createElement('div');el.className='todo-item';
     const postponedClass=(t.postponeCount||0)>=3?' postponed':'';
-    el.innerHTML=`<div class="chk${tsClass}${t.done?' on':''}" onclick="toggleTodo(${i})"></div><span class="todo-txt${t.done?' done':''}${postponedClass}" onclick="openTodoSheet(${i})">${t.text}</span>`;
-    attachSwipe(el,()=>{_todoSwipeIdx=i;document.getElementById('todo-sheet-title').textContent=t.text;openSheet('todo-sheet');});
+    const textHtml=renderTodoTextParts(t.text,t.strikeParts||[],i);
+    el.innerHTML=`<div class="chk${tsClass}${t.done?' on':''}" onclick="toggleTodo(${i})"></div><span class="todo-txt${t.done?' done':''}${postponedClass}" data-todo-i="${i}">${textHtml}</span>`;
+    if(_todoPartModeIdx===i){
+      el.style.cssText+='background:rgba(150,190,225,0.10);border-radius:10px;';
+    }
+    const hasMultipleParts=parseTodoTextParts(t.text).parts.length>1;
+    attachTodoSwipeMode(el,i,hasMultipleParts);
     list.appendChild(el);
   });
   updateStats();
+}
+// 투두 텍스트를 접두어(')' 앞부분)와 조각(,/기준)으로 파싱.
+// 예: "업무) 블로그 / 카페 / 전단홍보만들기" -> prefix:"업무", parts:["블로그","카페","전단홍보만들기"]
+// ')' 없으면 prefix는 빈 문자열, 전체가 조각 대상.
+function parseTodoTextParts(text){
+  const closeIdx=text.indexOf(')');
+  let prefix='',body=text;
+  if(closeIdx>=0){
+    prefix=text.slice(0,closeIdx).trim();
+    body=text.slice(closeIdx+1);
+  }
+  // body를 구분자 보존하며 split
+  const rawParts=body.split(/([,/])/);
+  const parts=[];
+  rawParts.forEach(seg=>{
+    if(seg===','||seg==='/')return;
+    if(seg.trim()==='')return;
+    parts.push(seg);
+  });
+  return {prefix,parts,hadCloseParen:closeIdx>=0};
+}
+// 투두 텍스트를 조각내어 렌더링. strikeParts에 포함된 조각 인덱스는 취소선 처리.
+// 조각 모드일 때만 각 조각 옆에 작은 복사(내일로) 버튼 노출.
+function renderTodoTextParts(text,strikeParts,todoIdx){
+  const {prefix,parts,hadCloseParen}=parseTodoTextParts(text);
+  const inPartMode=_todoPartModeIdx===todoIdx;
+  let html='';
+  if(hadCloseParen){
+    html+=`<span style="color:var(--tm);">${prefix})</span> `;
+  }
+  parts.forEach((seg,partIdx)=>{
+    const isStruck=strikeParts.includes(partIdx);
+    if(partIdx>0)html+=' / ';
+    html+=`<span class="todo-part" data-part-idx="${partIdx}" onclick="onTodoPartClick(event,${todoIdx},${partIdx})" style="${isStruck?'text-decoration:line-through;opacity:0.55;':''}">${seg}</span>`;
+    if(inPartMode){
+      html+=`<span onclick="event.stopPropagation();copyTodoPartToTomorrow(${todoIdx},${partIdx})" title="내일로 복사" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;margin-left:3px;border-radius:50%;background:rgba(150,190,225,0.25);cursor:pointer;vertical-align:middle;">
+        <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="color:rgba(90,130,180,0.85);"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h8"/></svg>
+      </span>`;
+    }
+  });
+  return html;
+}
+// 조각 모드가 아닐 때 조각(part)을 클릭하면 시트 열림(기존 동작 유지). 조각 모드일 땐 취소선 토글.
+function onTodoPartClick(evt,todoIdx,partIdx){
+  evt.stopPropagation();
+  if(_todoPartModeIdx===todoIdx){
+    toggleTodoStrikePart(todoIdx,partIdx);
+  }else{
+    openTodoSheet(todoIdx);
+  }
+}
+let _todoPartModeIdx=-1;
+function toggleTodoStrikePart(i,partIdx){
+  const dk=dateKey(currentDate),todos=getTodos(dk),todo=todos[i];
+  if(!todo)return;
+  const sp=new Set(todo.strikeParts||[]);
+  if(sp.has(partIdx))sp.delete(partIdx);else sp.add(partIdx);
+  todo.strikeParts=Array.from(sp);
+  saveTodos(dk,todos);
+  renderTodos();
+}
+// 조각 하나를 내일로 복사(새 항목 생성) 후, 오늘 항목에서 해당 조각은 삭제.
+function copyTodoPartToTomorrow(i,partIdx){
+  const dk=dateKey(currentDate),todos=getTodos(dk),todo=todos[i];
+  if(!todo)return;
+  const {prefix,parts,hadCloseParen}=parseTodoTextParts(todo.text);
+  if(partIdx<0||partIdx>=parts.length)return;
+  const movedText=hadCloseParen?`${prefix}) ${parts[partIdx]}`:parts[partIdx];
+
+  // 내일 항목 생성
+  const tom=new Date(currentDate);tom.setDate(tom.getDate()+1);
+  const tdk=dateKey(tom),ttodos=getTodos(tdk);
+  ttodos.push({text:movedText,done:false,created:Date.now(),timeSection:'none',cid:genCid(),postponeCount:0,strikeParts:[]});
+  saveTodos(tdk,ttodos);
+
+  // 오늘 항목에서 해당 조각 제거, strikeParts 인덱스 재정렬
+  const remainingParts=parts.filter((_,idx)=>idx!==partIdx);
+  const newText=remainingParts.length
+    ? (hadCloseParen?`${prefix}) ${remainingParts.join(' / ')}`:remainingParts.join(' / '))
+    : (hadCloseParen?`${prefix})`:'');
+  const oldStrike=new Set(todo.strikeParts||[]);
+  const newStrike=[];
+  remainingParts.forEach((_,newIdx)=>{
+    const oldIdx=newIdx<partIdx?newIdx:newIdx+1;
+    if(oldStrike.has(oldIdx))newStrike.push(newIdx);
+  });
+
+  if(!remainingParts.length){
+    // 조각이 다 없어졌으면 항목 자체를 삭제
+    const dkTodos=getTodos(dk);
+    const cur=dkTodos[i];
+    if(cur)addDelPending('todos',dk,cur.cid);
+    dkTodos.splice(i,1);
+    saveTodos(dk,dkTodos);
+    _todoPartModeIdx=-1;
+  }else{
+    todo.text=newText;
+    todo.strikeParts=newStrike;
+    saveTodos(dk,todos);
+  }
+  showToast('내일로 복사했어요');
+  renderTodos();
+}
+// 왼쪽 스와이프 = 조각 선택 모드 진입/해제 (기존 시트는 텍스트 클릭으로 그대로 열림)
+// 단, 구분자(,/)가 없어 조각이 1개뿐인 항목은 조각모드가 의미 없으므로 스와이프해도 기존처럼 시트가 열림
+function attachTodoSwipeMode(el,i,hasMultipleParts){
+  let sx=0,moved=false;
+  el.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;moved=false;},{passive:true});
+  el.addEventListener('touchmove',e=>{
+    const dx=e.touches[0].clientX-sx;
+    if(dx<-20){el.style.transform=`translateX(${Math.max(dx,-30)}px)`;moved=true;}
+  },{passive:true});
+  el.addEventListener('touchend',()=>{
+    el.style.transform='';
+    if(moved){
+      if(hasMultipleParts){
+        _todoPartModeIdx=(_todoPartModeIdx===i)?-1:i;
+        renderTodos();
+      }else{
+        openTodoSheet(i);
+      }
+    }
+    moved=false;
+  });
 }
 function toggleTodo(i){const dk=dateKey(currentDate),todos=getTodos(dk);todos[i].done=!todos[i].done;saveTodos(dk,todos);renderTodos();}
 
@@ -7842,7 +7971,7 @@ async function forceRestoreDate(dk){
   }
   var trows=await supaFetch('todos?date_key=eq.'+dk+'&order=created');
   if(trows!==null){
-    S.set(S.key('todos',dk),trows.map(function(r){return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),postponeCount:r.postpone_count||0};}));
+    S.set(S.key('todos',dk),trows.map(function(r){return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),postponeCount:r.postpone_count||0,strikeParts:r.strike_parts||[]};}));
   }
   var srows=await supaFetch('sleep?date_key=eq.'+dk);
   if(srows&&srows.length>0){
