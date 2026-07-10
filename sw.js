@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260711-10-commentchip-clickfix';
+const CACHE = 'iikoto-v20260711-12-postponecount-scope-clarify';
 const ASSETS = [
   './',
   './index.html'
