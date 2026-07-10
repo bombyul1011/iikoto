@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260711-21-icons-home-rhythm-fixes -->
+<!-- build: 20260711-22-icon-fixes-orb-size -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -174,15 +174,15 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
 .report-banner-arrow{font-size:17px;color:rgba(80,130,85,0.55);flex-shrink:0;}
 @keyframes rhythmOrbFloat{
   0%{transform:translate(0,0);}
-  20%{transform:translate(14px,-8px);}
-  40%{transform:translate(4px,7px);}
-  60%{transform:translate(-12px,3px);}
-  80%{transform:translate(-5px,-9px);}
+  20%{transform:translate(16px,-6px);}
+  40%{transform:translate(5px,5px);}
+  60%{transform:translate(-14px,4px);}
+  80%{transform:translate(-6px,-7px);}
   100%{transform:translate(0,0);}
 }
-.rhythm-orb-field{position:relative;width:48px;height:26px;flex-shrink:0;overflow:visible;}
-.rhythm-orb{position:absolute;top:50%;left:50%;width:16px;height:16px;margin-top:-8px;margin-left:-8px;border-radius:50%;display:flex;align-items:center;justify-content:center;animation:rhythmOrbFloat 5.5s ease-in-out infinite;box-shadow:0 1px 3px rgba(0,0,0,0.12),inset 0 1px 1px rgba(255,255,255,0.5);}
-.rhythm-orb i{font-size:9px;color:#fff;}
+.rhythm-orb-field{position:relative;width:56px;height:32px;flex-shrink:0;overflow:visible;}
+.rhythm-orb{position:absolute;top:50%;left:50%;width:22px;height:22px;margin-top:-11px;margin-left:-11px;border-radius:50%;display:flex;align-items:center;justify-content:center;animation:rhythmOrbFloat 5.5s ease-in-out infinite;box-shadow:0 1px 3px rgba(0,0,0,0.12),inset 0 1px 1px rgba(255,255,255,0.5);}
+.rhythm-orb i{font-size:12px;color:#fff;}
 .meal-row{display:flex;align-items:center;gap:8px;padding:8px 2px;}
 .meal-cat{width:38px;flex-shrink:0;font-size:12px;color:var(--tm);}
 .meal-time-inp{width:60px;flex-shrink:0;background:none;border:none;outline:none;font-family:'DM Sans',sans-serif;font-size:11.5px;color:var(--ts);padding:5px 2px 4px 2px;text-align:right;font-variant-numeric:tabular-nums;}
@@ -5012,7 +5012,7 @@ function makePendingTodosCard(){
       <div class="chk" onclick="homeToggleTodo(${t._i})"></div>
       <span class="todo-txt${postponedClass}" style="flex:1;color:var(--tm);">${t.text}</span>
     </div>
-    <span onclick="homePostponeTodo(${t._i})" title="내일로 미루기" style="display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;padding:5px 8px;border-radius:7px;background:rgba(190,170,140,0.14);cursor:pointer;"><i class="ti ti-clock-forward" style="font-size:13px;color:rgba(150,125,95,0.85);" aria-hidden="true"></i></span>`;
+    <span onclick="homePostponeTodo(${t._i})" title="내일로 미루기" style="display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;padding:5px 8px;border-radius:7px;background:rgba(190,170,140,0.14);cursor:pointer;"><i class="ti ti-calendar-repeat" style="font-size:15px;color:rgba(150,125,95,0.85);" aria-hidden="true"></i></span>`;
     list.appendChild(el);
   });
   card.appendChild(list);

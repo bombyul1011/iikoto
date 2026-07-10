@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260711-21-icons-home-rhythm-fixes';
+const CACHE = 'iikoto-v20260711-22-icon-fixes-orb-size';
 const ASSETS = [
   './',
   './index.html'
