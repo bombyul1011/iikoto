@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260711-12-postponecount-scope-clarify -->
+<!-- build: 20260711-15-pointercapture-clickfix -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -4621,13 +4621,15 @@ function confirmCopyUnstruckParts(){
 // - 구분자(,/)가 있는 항목: 조각 선택 모드 진입/해제
 // - 구분자 없는 단일 항목: 항목 전체를 내일로 복사(오늘 항목은 유지, "오늘도 내일도 해야 하는 일" 용도)
 function attachTodoSwipeMode(el,i,hasMultipleParts){
-  let sx=0,sy=0,moved=false,dragging=false,pid=null;
+  let sx=0,sy=0,moved=false,dragging=false,pid=null,captured=false;
   el.addEventListener('pointerdown',e=>{
     // 체크박스 위에서 시작한 드래그는 완료 토글과 충돌하지 않게 무시. 조각(.todo-part)은 이제 허용(조각모드 재진입 가능해야 함).
     if(e.target.closest('.chk'))return;
-    sx=e.clientX;sy=e.clientY;moved=false;dragging=true;
+    sx=e.clientX;sy=e.clientY;moved=false;dragging=true;captured=false;
     pid=e.pointerId;
-    try{el.setPointerCapture(pid);}catch(err){}
+    // 주의: 여기서 곧바로 setPointerCapture를 걸면 PC 마우스에서 순수 클릭(드래그 없는 탭)의
+    // click 이벤트 target이 el(줄 전체)로 왜곡되어, 클릭한 조각(.todo-part)의 onclick이 실행되지 않는
+    // 부작용이 있었음. 그래서 실제로 좌측 드래그 임계값(pointermove에서 dx<-15)을 넘었을 때만 캡처한다.
   });
   el.addEventListener('pointermove',e=>{
     if(!dragging)return;
@@ -4635,13 +4637,17 @@ function attachTodoSwipeMode(el,i,hasMultipleParts){
     const dy=Math.abs(e.clientY-sy);
     // 세로 이동이 크면 스크롤 의도로 보고 드래그 취소
     if(dy>18&&Math.abs(dx)<18){dragging=false;el.style.transform='';return;}
-    if(dx<-15){el.style.transform=`translateX(${Math.max(dx,-30)}px)`;moved=true;}
+    if(dx<-15){
+      el.style.transform=`translateX(${Math.max(dx,-30)}px)`;moved=true;
+      if(!captured){try{el.setPointerCapture(pid);captured=true;}catch(err){}}
+    }
   });
   const endDrag=()=>{
     if(!dragging)return;
     dragging=false;
     el.style.transform='';
-    if(pid!=null){try{el.releasePointerCapture(pid);}catch(err){}pid=null;}
+    if(captured&&pid!=null){try{el.releasePointerCapture(pid);}catch(err){}}
+    pid=null;captured=false;
     if(moved){
       if(hasMultipleParts){
         _todoPartModeIdx=(_todoPartModeIdx===i)?-1:i;
