@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260711-32-dawn-content-color-order';
+const CACHE = 'iikoto-v20260711-33-dawn-review-persist';
 const ASSETS = [
   './',
   './index.html'

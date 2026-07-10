@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260711-32-dawn-content-color-order -->
+<!-- build: 20260711-33-dawn-review-persist -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -5214,8 +5214,19 @@ function makeDawnRecapCard(){
   return wrap;
 }
 let _dawnReviewCache=null;
+function _dawnReviewGet(dk){
+  try{
+    const v=localStorage.getItem('iikoto_dawn_review_'+dk);
+    return v?JSON.parse(v):null;
+  }catch(e){return null;}
+}
+function _dawnReviewSet(dk,text){
+  try{localStorage.setItem('iikoto_dawn_review_'+dk,JSON.stringify({dk,text}));}catch(e){}
+}
 async function _fetchDawnReview(dk){
   if(_dawnReviewCache&&_dawnReviewCache.dk===dk)return _dawnReviewCache.text;
+  const stored=_dawnReviewGet(dk);
+  if(stored){_dawnReviewCache=stored;return stored.text;}
   const key=getClaudeKey();
   if(!key)return '';
   const todos=getTodos(dk).filter(t=>t.done).map(t=>t.text);
@@ -5229,9 +5240,20 @@ async function _fetchDawnReview(dk){
 확정적이지 않은 내용은 추측하지 말고, 실제 기록에 있는 내용 위주로 자연스럽게 풀어써요. 이모지나 특수기호는 쓰지 않아요.`;
   const reply=await callClaude(sys,[{role:'user',content:dataContext}],200);
   if(!reply||reply.startsWith('__ERR__'))return '';
-  _dawnReviewCache={dk,text:reply.trim()};
-  return reply.trim();
+  const text=reply.trim();
+  _dawnReviewCache={dk,text};
+  _dawnReviewSet(dk,text);
+  return text;
 }
+// 오늘 이전 dawn 리뷰 캐시 자동 삭제(용량 누적 방지) — 브리핑 캐시 정리와 동일한 패턴
+(function(){
+  try{
+    const today=dateKey(getLogicalDate());
+    Object.keys(localStorage).forEach(k=>{
+      if(k.startsWith('iikoto_dawn_review_')&&!k.includes(today))localStorage.removeItem(k);
+    });
+  }catch(e){}
+})();
 function makeMonthlyHeatmapCard(){
   const card=document.createElement('div');
   card.className='card forest-density-card';
