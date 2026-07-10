@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260711-26-cleanup-rhythmui-habitcolor -->
+<!-- build: 20260711-27-caldetail-forest-final -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -172,17 +172,6 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
 .meal-soft{filter:saturate(0.72) brightness(1.02);}
 .quote-soft{filter:saturate(0.78) brightness(1.02);}
 .report-banner-arrow{font-size:17px;color:rgba(80,130,85,0.55);flex-shrink:0;}
-@keyframes rhythmOrbFloat{
-  0%{transform:translate(0,0);}
-  20%{transform:translate(16px,-6px);}
-  40%{transform:translate(5px,5px);}
-  60%{transform:translate(-14px,4px);}
-  80%{transform:translate(-6px,-7px);}
-  100%{transform:translate(0,0);}
-}
-.rhythm-orb-field{position:relative;width:56px;height:32px;flex-shrink:0;overflow:visible;}
-.rhythm-orb{position:absolute;top:50%;left:50%;width:22px;height:22px;margin-top:-11px;margin-left:-11px;border-radius:50%;display:flex;align-items:center;justify-content:center;animation:rhythmOrbFloat 5.5s ease-in-out infinite;box-shadow:0 1px 3px rgba(0,0,0,0.12),inset 0 1px 1px rgba(255,255,255,0.5);}
-.rhythm-orb i{font-size:12px;color:#fff;}
 .meal-row{display:flex;align-items:center;gap:8px;padding:8px 2px;}
 .meal-cat{width:38px;flex-shrink:0;font-size:12px;color:var(--tm);}
 .meal-time-inp{width:60px;flex-shrink:0;background:none;border:none;outline:none;font-family:'DM Sans',sans-serif;font-size:11.5px;color:var(--ts);padding:5px 2px 4px 2px;text-align:right;font-variant-numeric:tabular-nums;}
@@ -711,17 +700,16 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
 .rt-edit{flex-shrink:0;color:var(--tm);display:flex;align-items:center;padding:0 2px;cursor:pointer;}
 .rt-finish{flex-shrink:0;font-size:10px;color:var(--acc);border:1px solid rgba(192,112,128,0.40);border-radius:8px;padding:2px 7px;cursor:pointer;}
 .rt-block.ongoing{background-image:repeating-linear-gradient(135deg,rgba(255,255,255,0.35) 0 3px,transparent 3px 6px);}
-.rhythm-track-legend{display:flex;flex-wrap:nowrap;gap:6px;margin-top:8px;padding-left:2px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
-.rhythm-track-legend::-webkit-scrollbar{display:none;}
-.rhythm-legend-dot{width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
-.rhythm-legend-dot i{font-size:10px;color:#fff;}
+.rhythm-track-legend{display:flex;flex-wrap:nowrap;gap:6px;margin-top:8px;}
+.rhythm-legend-dot{flex:1;aspect-ratio:1;max-width:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;}
+.rhythm-legend-dot i{font-size:15px;color:#fff;}
 /* ── 블록 추가 폼 ── */
 .rhythm-add-btn{width:100%;border:1.5px dashed rgba(192,112,128,0.40);border-radius:14px;background:none;color:var(--acc);font-size:12.5px;font-weight:600;padding:11px 0;margin-top:12px;cursor:pointer;font-family:'DM Sans',sans-serif;}
 .rhythm-add-form{background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:14px 14px 16px;margin-top:12px;}
 .rhythm-form-label{font-size:10px;color:var(--tm);margin-bottom:8px;}
-.rhythm-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;}
-.rhythm-chip-tag{display:inline-flex;align-items:center;font-size:11.5px;font-weight:500;color:#fff;border-radius:12px;padding:7px 13px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:transform .15s;}
-.rhythm-chip-tag.sel{transform:scale(1.06);box-shadow:0 2px 8px rgba(0,0,0,0.18);font-weight:700;}
+.rhythm-chips{display:flex;flex-wrap:nowrap;gap:4px;margin-bottom:16px;}
+.rhythm-chip-tag{flex:1;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:500;color:#fff;border-radius:9px;padding:6px 2px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:transform .15s;white-space:nowrap;}
+.rhythm-chip-tag.sel{transform:scale(1.03);box-shadow:0 2px 8px rgba(0,0,0,0.18);font-weight:700;}
 .rhythm-chip-tag.disabled{opacity:0.45;cursor:default;}
 .rhythm-time-row{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
 .rhythm-timebox{flex:1;background:var(--card);border:1px solid var(--card-b);border-radius:11px;padding:9px 10px;display:flex;align-items:center;gap:6px;}
@@ -2471,20 +2459,8 @@ function makeHabitStreakRow(){
 }
 function makeRhythmBanner(lineText,builderFn,extraClass,fontSize,dk){
   const b=document.createElement('div');b.className='report-banner'+(extraClass?' '+extraClass:'');
-  // 오늘 리듬 중 최다비중 카테고리 산출 (수면 제외)
-  const blocks=getRhythmBlocks(dk)||[];
-  const durByCat={};
-  blocks.forEach(bl=>{
-    if(!bl.cat||!RHYTHM_CATS[bl.cat])return;
-    if(bl.start==null||bl.end==null)return;
-    const dur=Math.max(0,bl.end-bl.start);
-    durByCat[bl.cat]=(durByCat[bl.cat]||0)+dur;
-  });
-  const top=Object.entries(durByCat).sort((a,b2)=>b2[1]-a[1])[0];
-  const topCat=top?RHYTHM_CATS[top[0]]:null;
-  const orbHtml=topCat?`<div class="rhythm-orb-field"><div class="rhythm-orb" style="background:${topCat.color};"><i class="ti ${topCat.icon}" aria-hidden="true"></i></div></div>`:'<div class="rhythm-orb-field"></div>';
   const lineIcon=extraClass==='rhythm-soft'?'<i class="ti ti-wave-sine" style="font-size:12px;vertical-align:-1px;margin-right:4px;" aria-hidden="true"></i>':'';
-  b.innerHTML='<div class="report-banner-inner"><div class="report-banner-line"'+(fontSize?` style="font-size:${fontSize}px;"`:'')+'>'+lineIcon+lineText+'</div>'+orbHtml+'<div class="report-banner-arrow">›</div></div>';
+  b.innerHTML='<div class="report-banner-inner"><div class="report-banner-line"'+(fontSize?` style="font-size:${fontSize}px;"`:'')+'>'+lineIcon+lineText+'</div><div class="report-banner-arrow">›</div></div>';
   b.addEventListener('click',function(){openHomeDetailSheet(lineText,builderFn);});
   return b;
 }
@@ -5024,11 +5000,11 @@ function makeMonthlyHeatmapCard(){
   const maxCnt=Math.max(1,...densities.map(x=>x.cnt));
   // 밀도 5단계: 씨앗 - 새싹 - 잎 - 작은나무 - 큰나무 (그 달의 최대 기록량 대비 상대적 비율 기준)
   const STAGES=[
-    {icon:'ti-seeding',color:'rgba(150,140,120,0.55)'},
-    {icon:'ti-plant-2',color:'rgba(140,175,110,0.75)'},
-    {icon:'ti-leaf',color:'rgba(106,154,85,0.85)'},
-    {icon:'ti-tree',color:'rgba(74,128,64,0.9)'},
-    {icon:'ti-christmas-tree',color:'rgba(42,96,48,1)'}
+    {icon:'ti-growth',color:'rgba(212,207,118,0.75)'},
+    {icon:'ti-leaf',color:'rgba(195,210,120,0.8)'},
+    {icon:'ti-flower',color:'rgba(160,195,95,0.85)'},
+    {icon:'ti-christmas-tree',color:'rgba(120,175,75,0.9)'},
+    {icon:'ti-trees',color:'rgba(75,150,55,0.95)'}
   ];
   function stageFor(cnt){
     if(cnt===0)return null;
@@ -5039,7 +5015,7 @@ function makeMonthlyHeatmapCard(){
   let cells='';
   densities.forEach(x=>{
     const st=stageFor(x.cnt);
-    const inner=st?`<i class="ti ${st.icon}" style="font-size:11px;color:#fff;" aria-hidden="true"></i>`:'';
+    const inner=st?`<i class="ti ${st.icon}" style="font-size:13px;color:#fff;" aria-hidden="true"></i>`:'';
     const bg=st?st.color:'rgba(200,176,168,0.08)';
     cells+=`<div class="heatmap-cell" onclick="openHomeDetailSheet('${mo+1}월 ${x.d}일',function(){return makeDaySummaryEl('${x.dk}');})" title="${x.d}일 · 기록 ${x.cnt}개" style="background:${bg};">${inner}</div>`;
   });
@@ -5047,12 +5023,12 @@ function makeMonthlyHeatmapCard(){
       <span style="font-size:9.5px;color:var(--tm);">${mo+1}월</span>
     </div>
     <div class="heatmap-grid">${cells}</div>
-    <div style="display:flex;justify-content:flex-end;align-items:center;gap:4px;margin-top:6px;">
-      <span style="font-size:8px;color:var(--tm);">적음</span>
-      <i class="ti ti-seeding" style="font-size:10px;color:rgba(150,140,120,0.55);" aria-hidden="true"></i>
-      <i class="ti ti-leaf" style="font-size:10px;color:rgba(106,154,85,0.85);" aria-hidden="true"></i>
-      <i class="ti ti-christmas-tree" style="font-size:10px;color:rgba(42,96,48,1);" aria-hidden="true"></i>
-      <span style="font-size:8px;color:var(--tm);">많음</span>
+    <div style="display:flex;justify-content:flex-end;align-items:center;gap:5px;margin-top:6px;">
+      <i class="ti ti-growth" style="font-size:11px;color:rgba(212,207,118,0.9);" aria-hidden="true"></i>
+      <i class="ti ti-leaf" style="font-size:11px;color:rgba(195,210,120,0.9);" aria-hidden="true"></i>
+      <i class="ti ti-flower" style="font-size:11px;color:rgba(160,195,95,0.9);" aria-hidden="true"></i>
+      <i class="ti ti-christmas-tree" style="font-size:11px;color:rgba(120,175,75,0.9);" aria-hidden="true"></i>
+      <i class="ti ti-trees" style="font-size:11px;color:rgba(75,150,55,0.95);" aria-hidden="true"></i>
     </div>`;
   return card;
 }
@@ -6133,16 +6109,20 @@ function renderCalDetail(d){
     sessionStorage.setItem(_olSyncKey,'1');
     syncOnelineMonthRange(_calYear,_calMonth).then(fetched=>{if(fetched)renderCalDetail(d);});
   }
-  const allMemos=getMemos(dk);const todos=getTodos(dk).filter(t=>t.done);const sleep=getSleep(dk);
+  const allMemos=getMemos(dk);const todos=getTodos(dk);const doneTodos=todos.filter(t=>t.done);const sleep=getSleep(dk);
   const meals=getMeals(dk);
   const date=new Date(_calYear,_calMonth,d);
   const dateStr=`${_calMonth+1}월 ${d}일 ${DAYS[date.getDay()]}`;
   const _rbTodayDk=dateKey(new Date());
   const _rbCurLogicalDk=dateKey(getRhythmLogicalDate());
   const rhythmBarHtml=renderRhythmBarHtml(computeRhythmSegsForDay(dk,_rbTodayDk,_rbCurLogicalDk));
-  let items='';
-  // 하루 한줄 메시지 — 날짜 옆에 나란히 (renderCalDetail 헤더에서 처리)
   const oneLine=getDailyOneLine(dk);
+  const headerHtml=`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;">
+      <span class="cal-detail-date" style="margin-bottom:0;flex-shrink:0;">${dateStr}</span>
+      <div style="flex:1;max-width:180px;">${rhythmBarHtml}</div>
+    </div>
+    ${oneLine?`<div style="font-size:11.5px;color:var(--ts);font-style:italic;margin-bottom:10px;">&#x275D; ${oneLine} &#x275E;</div>`:'<div style="margin-bottom:10px;"></div>'}`;
+  let items='';
   if(sleep.sleep||sleep.wake){
     const sv=sleep.sleep?sleep.sleep.split(':').map(Number):null;
     const wv=sleep.wake?sleep.wake.split(':').map(Number):null;
@@ -6150,8 +6130,11 @@ function renderCalDetail(d){
     if(sv&&wv){let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;dur=` · ${Math.floor(m/60)}h ${m%60}m`;}
     items+=`<div class="cal-detail-row"><div class="cal-detail-icon"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="color:var(--tm)"><path d="M10.5 9C9 10.5 6.8 11 4.8 10C2.8 9 1.8 6.8 2.2 4.8C2.5 3.2 3.5 1.8 5 1.2C3.5 3.5 3.8 6.5 6 8.2C7.8 9.5 10 9.5 11.8 8.5C11.5 8.7 11 8.9 10.5 9Z" fill="rgba(200,176,168,0.2)"/></svg></div><span class="cal-detail-text" style="color:var(--ts);">${sleep.sleep||'--'} 취침 · ${sleep.wake||'--'} 기상${dur}</span></div>`;
   }
-  todos.slice(0,3).forEach(t=>{items+=`<div class="cal-detail-row"><div class="cal-detail-icon"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--tm)"><polyline points="2,6 4.5,9 10,3.5"/></svg></div><span class="cal-detail-text">${t.text}</span></div>`;});
-  const MAX=5;const total=allMemos.length;
+  if(doneTodos.length>0){
+    items+=`<div class="cal-detail-row" style="cursor:pointer;" onclick="calShowTodos('${dk}')"><div class="cal-detail-icon"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--tm)"><polyline points="2,6 4.5,9 10,3.5"/></svg></div><span class="cal-detail-text" id="cal-todo-summary-${dk}">완료한 일 ${doneTodos.length}개 ›</span></div>
+      <div id="cal-todo-rows-${dk}" style="display:none;"></div>`;
+  }
+  const MAX=3;const total=allMemos.length;
   // 시간순 정렬: 06:00 기준으로 하루 시작 (새벽 0~5시는 하루 끝으로 취급)
   const sortedMemos=[...allMemos].sort((a,b)=>{
     const toSortKey=function(t){if(!t)return 9999;const p=t.split(':');const h=parseInt(p[0],10),m=parseInt(p[1],10);return h<6?h*60+m+1440:h*60+m;};
@@ -6171,11 +6154,24 @@ function renderCalDetail(d){
     if(meals[k])mealHtml+=`<div class="cal-detail-row"><span class="cal-detail-time">${MEAL_LABELS[k]}</span><span class="cal-detail-text" style="flex:1;">${meals[k]}</span>${meals[k+'_time']?`<span style="font-size:10.5px;color:var(--tm);flex-shrink:0;">${meals[k+'_time']}</span>`:''}</div>`;
   });
   if(mealHtml)mealHtml=`<div style="font-size:11px;font-weight:500;color:rgba(190,130,70,0.85);margin:12px 0 4px;">식사</div>${mealHtml}`;
-  if(!items&&!mealHtml){const olh=oneLine?`<span style="font-size:11.5px;color:var(--ts);font-style:italic;flex:1;text-align:right;padding-left:8px;">&#x275D; ${oneLine} &#x275E;</span>`:"";el.innerHTML=`<div class="cal-detail-wrap"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;"><span class="cal-detail-date" style="margin-bottom:0;flex-shrink:0;">${dateStr}</span><div style="flex:1;max-width:120px;">${rhythmBarHtml}</div>${olh}</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:10px 0;">기록이 없어요</div></div>`;return;}
-  const oneLineHtml=oneLine?`<span style="font-size:11.5px;color:var(--ts);font-style:italic;flex:1;text-align:right;padding-left:8px;">&#x275D; ${oneLine} &#x275E;</span>`:'';
-  el.innerHTML=`<div class="cal-detail-wrap"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;"><span class="cal-detail-date" style="margin-bottom:0;flex-shrink:0;">${dateStr}</span><div style="flex:1;max-width:120px;">${rhythmBarHtml}</div>${oneLineHtml}</div>${items}${mealHtml}</div>`;
+  if(!items&&!mealHtml){el.innerHTML=`<div class="cal-detail-wrap">${headerHtml}<div style="font-size:12px;color:var(--tm);text-align:center;padding:10px 0;">기록이 없어요</div></div>`;return;}
+  el.innerHTML=`<div class="cal-detail-wrap">${headerHtml}${items}${mealHtml}</div>`;
   el.style.display='block';
   setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'nearest'}),100);
+}
+function calShowTodos(dk){
+  const todos=getTodos(dk).filter(t=>t.done);
+  const rowsWrap=document.getElementById('cal-todo-rows-'+dk);if(!rowsWrap)return;
+  const summaryEl=document.getElementById('cal-todo-summary-'+dk);
+  const isOpen=rowsWrap.style.display!=='none';
+  if(isOpen){
+    rowsWrap.style.display='none';
+    if(summaryEl)summaryEl.textContent=`완료한 일 ${todos.length}개 ›`;
+  }else{
+    rowsWrap.innerHTML=todos.map(t=>`<div class="cal-detail-row" style="padding-left:20px;"><span class="cal-detail-text">${t.text}</span></div>`).join('');
+    rowsWrap.style.display='block';
+    if(summaryEl)summaryEl.textContent=`완료한 일 ${todos.length}개 ⌄`;
+  }
 }
 function calShowAll(dk){
   const memos=getMemos(dk);const el=document.getElementById('cal-detail');if(!el)return;
@@ -6183,7 +6179,7 @@ function calShowAll(dk){
   const rowsWrap=document.getElementById('cal-memo-rows-'+dk);if(!rowsWrap)return;
   const toSortKey=function(t){if(!t)return 9999;const p=t.split(':');const h=parseInt(p[0],10),m=parseInt(p[1],10);return h<6?h*60+m+1440:h*60+m;};
   const sorted=[...memos].sort(function(a,b){return toSortKey(a.time)-toSortKey(b.time);});
-  const MAX=5;
+  const MAX=3;
   let extra='';sorted.slice(MAX).forEach(function(m){extra+=`<div class="cal-detail-row"><span class="cal-detail-time">${m.time||''}</span><span class="cal-detail-text">${m.text||''}</span></div>`;});
   rowsWrap.insertAdjacentHTML('beforeend',extra);
   if(moreBtn)moreBtn.remove();
