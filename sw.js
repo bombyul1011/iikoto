@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260711-31-dawn-header-unify';
+const CACHE = 'iikoto-v20260711-32-dawn-content-color-order';
 const ASSETS = [
   './',
   './index.html'
