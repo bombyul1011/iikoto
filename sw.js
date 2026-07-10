@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260711-28-rhythm-icon-direct-input';
+const CACHE = 'iikoto-v20260711-29-night3-dawn-recap';
 const ASSETS = [
   './',
   './index.html'
