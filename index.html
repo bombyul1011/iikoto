@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260711-29-night3-dawn-recap -->
+<!-- build: 20260711-31-dawn-header-unify -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -648,7 +648,7 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
   background:linear-gradient(140deg,rgba(95,95,155,0.34) 0%,rgba(160,140,190,0.34) 45%,rgba(255,215,222,0.34) 100%);
   border:1px solid rgba(110,105,170,0.42);}
 [data-theme="glass"] .dawn-banner{background:rgba(253,251,245,0.95);border-color:rgba(110,105,170,0.35);}
-.dawn-banner-time{font-size:11px;color:#a08d95;margin-bottom:6px;}
+.dawn-banner-time{font-size:11px;color:var(--tm);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;}
 .dawn-banner-greeting{font-size:22px;font-weight:500;color:#4d4358;line-height:1.35;margin-bottom:8px;}
 .dawn-banner-sub{font-size:12.5px;color:#7d6d80;line-height:1.7;}
 .day-recap-card{background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:16px;box-shadow:0 2px 12px rgba(180,140,120,0.06);}
@@ -3311,7 +3311,7 @@ async function fetchWeatherData(){
 }
 
 async function fetchHomeWeatherIconOnly(){
-  const weatherIconEl=document.getElementById('home-weather-icon');
+  const weatherIconEl=document.getElementById('dawn-weather-icon');
   const weather=await fetchWeatherData();
   if(weatherIconEl&&weather)weatherIconEl.textContent=' '+weather.icon+' '+weather.temp+'°';
 }
@@ -5059,8 +5059,9 @@ function makeDawnRecapCard(){
   const dow=(getLogicalDate().getDay()+6)%7;
   const now=new Date();
   const h=now.getHours(),m=now.getMinutes();
-  const hh=h===0?12:h;
-  const timeStr='새벽 '+hh+':'+pad(m);
+  const ap=h<12?'오전':'오후';
+  const hh=h===0?12:h>12?h-12:h;
+  const timeStr=ap+' '+hh+':'+pad(m)+' · '+_HOME_DAYS[now.getDay()]+'요일';
 
   const todos=getTodos(dk);
   const doneTodos=todos.filter(t=>t.done);
@@ -5080,12 +5081,12 @@ function makeDawnRecapCard(){
   }
   const SLEEP_GOAL=450; // 7.5h
   const sleepRatio=sleepMin!=null?Math.min(1,sleepMin/SLEEP_GOAL):0;
-  const sleepLabel=sleepMin!=null?(Math.floor(sleepMin/60)+'h'+(sleepMin%60?' '+(sleepMin%60)+'m':'')+(sleepRatio>=1?'+':'')):'-';
+  const sleepLabel=sleepMin!=null?((sleepMin/60).toFixed(1).replace(/\.0$/,'')+'h'+(sleepRatio>=1?'+':'')):'-';
 
   // 습관 달성률
   const habitPct=habits.length?Math.round(doneHabits.length/habits.length*100):0;
 
-  // 리듬 시간분포 (분 단위 합산, 카테고리별)
+  // 리듬 시간분포 (분 단위 합산, 카테고리별) — 수면은 위 도넛에서 이미 보여주므로 여기선 제외
   const durByCat={};let totalDur=0;
   rblocks.forEach(b=>{
     const s=_dawnTimeToMin(b.start),e=_dawnTimeToMin(b.end);
@@ -5094,7 +5095,6 @@ function makeDawnRecapCard(){
     if(dur<=0)return;
     durByCat[b.cat]=(durByCat[b.cat]||0)+dur;totalDur+=dur;
   });
-  if(sleepMin){durByCat['_sleep']=(durByCat['_sleep']||0)+sleepMin;totalDur+=sleepMin;}
 
   // 독서 시간 (감상 카테고리 중 텍스트가 "독서"로 시작하는 블록 합산)
   let readingMin=0;
@@ -5106,8 +5106,14 @@ function makeDawnRecapCard(){
     readingMin+=Math.max(0,dur);
   });
 
-  // 오늘 본 콘텐츠 (감상 카테고리, 독서 제외, 텍스트 있는 것만)
-  const contentItems=rblocks.filter(b=>b.cat==='enjoy'&&b.text&&!b.text.startsWith('독서'))
+  // 오늘 본 콘텐츠 (감상 카테고리 전체 - 독서 포함, 텍스트 있는 것만)
+  // 텍스트가 "분류 - 제목" 형식이면 좌우로 분할 표시, 아니면 그대로 제목 자리에 노출
+  const contentItems=rblocks.filter(b=>b.cat==='enjoy'&&b.text)
+    .map(b=>{
+      const m=b.text.match(/^(.+?)\s*-\s*(.+)$/);
+      const parsed=m?{cat:m[1].trim(),title:m[2].trim()}:{cat:'',title:b.text};
+      return {...parsed,start:b.start};
+    })
     .sort((a,b)=>(_dawnTimeToMin(a.start)||0)-(_dawnTimeToMin(b.start)||0));
 
   // 완료투두 랜덤 4개 캡션
@@ -5115,7 +5121,7 @@ function makeDawnRecapCard(){
   const pickedTodos=shuffled.slice(0,4);
 
   const banner=document.createElement('div');banner.className='dawn-banner';
-  banner.innerHTML=`<div class="dawn-banner-time">🌙 ${timeStr}</div>
+  banner.innerHTML=`<div class="dawn-banner-time">${timeStr} <span id="dawn-weather-icon"></span></div>
     <div class="dawn-banner-greeting">오늘 하루도 잘 보내셨어요</div>
     <div class="dawn-banner-sub" id="dawn-review-sub">오늘 하루를 돌아보는 중...</div>`;
   wrap.appendChild(banner);
@@ -5124,7 +5130,7 @@ function makeDawnRecapCard(){
     if(el)el.textContent=text||'오늘도 하루를 잘 채워내셨어요. 편안한 밤 되세요.';
   });
 
-  const label=document.createElement('div');label.className='slabel';label.textContent='오늘 하루 취합';
+  const label=document.createElement('div');label.className='slabel';label.textContent='오늘 하루';
   wrap.appendChild(label);
 
   const card=document.createElement('div');card.className='day-recap-card';
@@ -5152,6 +5158,7 @@ function makeDawnRecapCard(){
   }else{
     html+=`<div style="font-size:11px;color:var(--tm);text-align:center;padding:6px 0;">오늘 완료한 일이 없어요</div>`;
   }
+  html+=`<div class="day-recap-line" style="margin-top:8px;"><span class="lbl"><i class="ti ti-book" aria-hidden="true"></i>독서</span><span>${readingMin>0?readingMin+'분':'기록 없음'}</span></div>`;
 
   html+=`<div class="day-recap-divider"></div>`;
   html+=`<div class="recap-donut-row">
@@ -5162,20 +5169,18 @@ function makeDawnRecapCard(){
     <div class="recap-donut-item"><div class="recap-donut-wrap"><svg width="62" height="62" viewBox="0 0 62 62">
       <circle cx="31" cy="31" r="26" fill="none" stroke="var(--div)" stroke-width="7"/>
       <circle cx="31" cy="31" r="26" fill="none" stroke="rgba(205,194,182,0.9)" stroke-width="7" stroke-dasharray="163.4" stroke-dashoffset="${163.4*(1-sleepRatio)}" stroke-linecap="round"/>
-    </svg><div class="recap-donut-label">${sleepLabel}</div></div><div class="recap-donut-l">수면(어제)</div></div>
+    </svg><div class="recap-donut-label">${sleepLabel}</div></div><div class="recap-donut-l">수면</div></div>
   </div>`;
 
   if(totalDur>0){
     html+=`<div class="day-recap-divider"></div>
-      <div class="day-recap-sec-title"><i class="ti ti-wave-sine" style="font-size:12px;" aria-hidden="true"></i> 오늘의 시간 분포</div>
+      <div class="day-recap-sec-title"><i class="ti ti-wave-sine" style="font-size:12px;" aria-hidden="true"></i> 오늘의 리듬</div>
       <div class="recap-rhythm-bar-chart">`;
-    if(durByCat['_sleep'])html+=`<div class="recap-rhythm-bar-seg" style="width:${durByCat['_sleep']/totalDur*100}%;background:${RHYTHM_SLEEP_COLOR};"><i class="ti ti-moon"></i></div>`;
     Object.keys(RHYTHM_CATS).forEach(k=>{
       if(!durByCat[k])return;
       html+=`<div class="recap-rhythm-bar-seg" style="width:${durByCat[k]/totalDur*100}%;background:${RHYTHM_CATS[k].color};"><i class="ti ${RHYTHM_CATS[k].icon}"></i></div>`;
     });
     html+=`</div><div class="recap-rhythm-chip-legend">`;
-    if(durByCat['_sleep'])html+=`<span><span class="dot" style="background:${RHYTHM_SLEEP_COLOR};"></span>수면 ${Math.floor(durByCat['_sleep']/60)}h${durByCat['_sleep']%60?' '+(durByCat['_sleep']%60)+'m':''}</span>`;
     Object.keys(RHYTHM_CATS).forEach(k=>{
       if(!durByCat[k])return;
       html+=`<span><span class="dot" style="background:${RHYTHM_CATS[k].color};"></span>${RHYTHM_CATS[k].label} ${Math.floor(durByCat[k]/60)}h${durByCat[k]%60?' '+(durByCat[k]%60)+'m':''}</span>`;
@@ -5184,14 +5189,13 @@ function makeDawnRecapCard(){
   }
 
   html+=`<div class="day-recap-divider"></div>
-    <div class="day-recap-line"><span class="lbl"><i class="ti ti-notes" aria-hidden="true"></i>메모</span><span>${memos.length}개 남김</span></div>
-    <div class="day-recap-line"><span class="lbl"><i class="ti ti-books" aria-hidden="true"></i>독서</span><span>${readingMin>0?readingMin+'분':'기록 없음'}</span></div>`;
+    <div class="day-recap-line"><span class="lbl"><i class="ti ti-notes" aria-hidden="true"></i>메모</span><span>${memos.length}개</span></div>`;
 
   if(contentItems.length){
     html+=`<div class="day-recap-divider"></div>
       <div class="day-recap-sec-title"><i class="ti ${RHYTHM_CATS.enjoy.icon}" style="font-size:12px;" aria-hidden="true"></i> 오늘 본 콘텐츠</div>`;
     contentItems.forEach(c=>{
-      html+=`<div class="recap-content-item"><span class="cdot"></span>${c.text}<span class="ctime">${c.start||''}</span></div>`;
+      html+=`<div class="recap-content-item"><span class="cdot"></span>${c.cat||'감상'}<span class="ctime">${c.title}</span></div>`;
     });
   }
 
