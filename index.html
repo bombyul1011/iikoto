@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260711-19-icons-habit-monthreport -->
+<!-- build: 20260711-20-icons-reading-corner -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -970,7 +970,7 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
           </div>
         </div>
         <div class="icon-btn" onclick="openSettings()">
-          <i class="ti ti-settings" style="font-size:15px;color:var(--tm);" aria-hidden="true"></i>
+          <i class="ti ti-settings-2" style="font-size:15px;color:var(--tm);" aria-hidden="true"></i>
         </div>
         <div class="icon-btn seed-icon-btn" onclick="openSeed()">
           <i class="ti ti-seeding" style="font-size:16px;color:#6a8a50;" aria-hidden="true"></i>
@@ -1127,7 +1127,7 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
       </div>
       <div class="report-banner month-soft" onclick="openMonthlyReportSheet()">
         <div class="report-banner-inner">
-          <div class="report-banner-line">🌿 <span class="rb-title" id="report-banner-month-lbl">6월 리포트</span> · 이번 달 전체 기록 모아보기</div>
+          <div class="report-banner-line"><i class="ti ti-chart-bar" style="font-size:12px;vertical-align:-1px;margin-right:3px;" aria-hidden="true"></i><span class="rb-title" id="report-banner-month-lbl">6월 리포트</span> · 이번 달 전체 기록 모아보기</div>
           <div class="report-banner-arrow">›</div>
         </div>
       </div>
@@ -1280,7 +1280,7 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
       <div class="share-stage" id="share-stage" onclick="document.getElementById('share-bg-inp').click();">
         <div class="share-stage-inner" id="share-stage-inner">
           <div class="share-stage-empty">
-            <svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="5" width="20" height="16" rx="2"/><circle cx="9" cy="11" r="1.6"/><path d="M3 17l5.5-5.5 3 3 4-4L23 17"/></svg>
+            <i class="ti ti-photo" style="font-size:26px;" aria-hidden="true"></i>
             <span>탭해서 배경 사진 추가</span>
           </div>
         </div>
@@ -1299,20 +1299,12 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
         <span class="lbl" id="cyc-quote-lbl">문장 없음</span>
       </div>
       <div class="share-cycle-btn" id="cyc-progress" onclick="cycleShare('progress')">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><line x1="2" y1="8" x2="14" y2="8"/><circle cx="9" cy="8" r="2.2" fill="currentColor" stroke="none"/></svg>
+        <i class="ti ti-progress" style="font-size:16px;" aria-hidden="true"></i>
         <span class="lbl" id="cyc-progress-lbl">진행률 없음</span>
       </div>
-      <div class="share-cycle-btn" id="cyc-logo" onclick="cycleShare('logo')">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="8" cy="8" r="5.5"/><path d="M8 4.5v3.5l2.3 1.3"/></svg>
-        <span class="lbl" id="cyc-logo-lbl">로고 없음</span>
-      </div>
       <div class="share-cycle-btn" id="cyc-cover" onclick="cycleShare('cover')">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="2" width="8" height="12" rx="1"/><line x1="3" y1="2" x2="3" y2="14"/></svg>
+        <i class="ti ti-rectangle-vertical" style="font-size:16px;" aria-hidden="true"></i>
         <span class="lbl" id="cyc-cover-lbl">표지 없음</span>
-      </div>
-      <div class="share-cycle-btn" id="cyc-coverTitle" onclick="cycleShare('coverTitle')">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="2" width="8" height="8" rx="1"/><line x1="2" y1="13" x2="14" y2="13"/></svg>
-        <span class="lbl" id="cyc-coverTitle-lbl">표지 제목 없음</span>
       </div>
     </div>
 
@@ -1327,7 +1319,7 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
     </div>
 
     <button class="share-save-btn" onclick="saveShareCard()">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="2" y="4.5" width="12" height="9" rx="1.5"/><circle cx="8" cy="9" r="2.3"/><path d="M6 4.5l.8-1.5h2.4l.8 1.5"/></svg>
+      <i class="ti ti-photo-share" style="font-size:15px;" aria-hidden="true"></i>
       이미지로 저장
     </button>
   </div>
@@ -1705,7 +1697,7 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
     <span class="settings-ttl">독서</span>
     <div style="flex:1;"></div>
     <div class="settings-back" style="width:30px;height:30px;" onclick="openShareCard()">
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="color:var(--ts)"><path d="M7 1.5v7.2M4.3 4.2L7 1.5l2.7 2.7"/><path d="M2.5 7.5v3.8c0 .7.6 1.2 1.2 1.2h6.6c.7 0 1.2-.5 1.2-1.2V7.5"/></svg>
+      <i class="ti ti-photo-share" style="font-size:15px;color:var(--ts);" aria-hidden="true"></i>
     </div>
     <div class="settings-back" style="width:30px;height:30px;" onclick="openAddBookModal()">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" style="color:var(--ts)"><line x1="7" y1="2" x2="7" y2="12"/><line x1="2" y1="7" x2="12" y2="7"/></svg>
@@ -1718,7 +1710,7 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
 
     <div class="rd-quote-section">
       <div class="quote-chip" onclick="openQuoteSheetCheck()">
-        <div class="quote-chip-inner">✎ 문장 수집</div>
+        <div class="quote-chip-inner"><i class="ti ti-quote" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 문장 수집</div>
       </div>
       <div id="rd-quote-list"></div>
     </div>
@@ -1732,7 +1724,7 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
         <div class="rd-tab on" data-status="reading" onclick="switchReadingTab(this,'reading')">읽는 중</div>
         <div class="rd-tab" data-status="done" onclick="switchReadingTab(this,'done')">다 읽음</div>
         <div class="rd-tab" data-status="paused" onclick="switchReadingTab(this,'paused')">중단</div>
-        <div class="rd-tab" data-status="wish" onclick="switchReadingTab(this,'wish')">위시</div>
+        <div class="rd-tab" data-status="wish" onclick="switchReadingTab(this,'wish')"><i class="ti ti-star" style="font-size:11px;vertical-align:-1px;" aria-hidden="true"></i> 위시</div>
       </div>
       <div id="rd-book-list"></div>
     </div>
@@ -1744,7 +1736,7 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
   <div class="modal" onclick="event.stopPropagation()">
     <div class="modal-title">책 추가</div>
     <div class="rd-tabs" style="margin-bottom:10px;">
-      <div class="rd-tab on" id="rd-status-wish" onclick="setRdAddStatus('wish')">위시</div>
+      <div class="rd-tab on" id="rd-status-wish" onclick="setRdAddStatus('wish')"><i class="ti ti-star" style="font-size:11px;vertical-align:-1px;" aria-hidden="true"></i> 위시</div>
       <div class="rd-tab" id="rd-status-reading" onclick="setRdAddStatus('reading')">읽는 중</div>
     </div>
     <div class="api-search-wrap">
@@ -2780,7 +2772,7 @@ async function buildDiaryMonthSummaryHtml(y,mo,today,daysInMonth,mk){
   const _lh=new Date().getHours();
   const isLastDayEvening=today===daysInMonth&&(_lh>=19||_lh<6);
   if(isCurrentMonth&&!isLastDayEvening){
-    return `<div class="diary-month-summary"><div class="diary-month-summary-label" style="text-align:center;"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div><div class="diary-month-summary-text" style="color:var(--tm);text-align:center;">이 달이 끝나면 정리해드릴게요</div></div>`;
+    return `<div class="diary-month-summary"><div class="diary-month-summary-label"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div><div class="diary-month-summary-text" style="color:var(--tm);text-align:center;">이 달이 끝나면 정리해드릴게요</div></div>`;
   }
   const cacheKey='diary_month_summary_'+mk;
   let summary=S.get(cacheKey);
@@ -2796,8 +2788,8 @@ async function buildDiaryMonthSummaryHtml(y,mo,today,daysInMonth,mk){
       if(summary)S.set(cacheKey,summary);
     }
   }
-  if(!summary)return `<div class="diary-month-summary"><div class="diary-month-summary-label" style="text-align:center;"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div><div class="diary-month-summary-text" style="color:var(--tm);">아직 모아볼 기록이 부족해요</div></div>`;
-  return `<div class="diary-month-summary"><div class="diary-month-summary-label" style="text-align:center;"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div><div class="diary-month-summary-text">${summary}</div></div>`;
+  if(!summary)return `<div class="diary-month-summary"><div class="diary-month-summary-label"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div><div class="diary-month-summary-text" style="color:var(--tm);">아직 모아볼 기록이 부족해요</div></div>`;
+  return `<div class="diary-month-summary"><div class="diary-month-summary-label"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div><div class="diary-month-summary-text">${summary}</div></div>`;
 }
 async function generateDiaryMonthSummaryAI(monthNum,lines){
   const key=getClaudeKey();
@@ -2948,12 +2940,12 @@ async function loadMonthlyReportContent(){
     <div class="mr-stat"><div class="v">${stats.avgSleep?stats.avgSleep+'h':'-'}</div><div class="l">평균 수면</div></div>
   </div>`;
   const rhythmHtml=stats.rhythmDur&&Object.keys(stats.rhythmDur).length?`<div class="mr-card">
-    <div class="mr-sec-title">이번 달 리듬</div>
+    <div class="mr-sec-title"><i class="ti ti-wave-sine" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 리듬</div>
     ${buildMonthlyRhythmBar(stats.rhythmDur,stats.dim,stats.rhythmDayCount)}
   </div>` : '';
   const wcHtml=stats.wcByWeek.length?`<div class="mr-card mr-accordion">
     <div class="mr-sec-title mr-accordion-toggle" onclick="this.closest('.mr-accordion').classList.toggle('open')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
-      <span>주간 미션 모음 · 주차별</span>
+      <span><i class="ti ti-flag-3" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 주간 미션 모음 · 주차별</span>
       <span class="mr-accordion-arrow">›</span>
     </div>
     <div class="mr-accordion-body">
@@ -2962,7 +2954,7 @@ async function loadMonthlyReportContent(){
         ${w.lines.map(l=>`<div class="mr-wc-line"><span class="txt">${l.text}</span><span class="pct">${l.pct}%</span></div>`).join('')}
       </div>`).join('')}
     </div>
-  </div>` : `<div class="mr-card"><div class="mr-sec-title">주간 미션 모음 · 주차별</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:8px 0;">이 달엔 작성한 주간 미션이 없어요</div></div>`;
+  </div>` : `<div class="mr-card"><div class="mr-sec-title"><i class="ti ti-flag-3" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 주간 미션 모음 · 주차별</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:8px 0;">이 달엔 작성한 주간 미션이 없어요</div></div>`;
 
   const CAT_DOT={drama:'rgba(255,210,225,.85)',book:'rgba(255,235,160,.85)',movie:'rgba(200,240,235,.85)',music:'rgba(200,220,255,.85)'};
   const cStatusLabel=function(c){
@@ -2971,9 +2963,9 @@ async function loadMonthlyReportContent(){
     return c.status==='stopped'?'중단':(c.status==='done'?'완료':'보는중');
   };
   const contentsHtml=stats.contentsList.length?`<div class="mr-card">
-    <div class="mr-sec-title">콘텐츠 기록</div>
+    <div class="mr-sec-title"><i class="ti ti-stack-2" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 콘텐츠 기록</div>
     ${stats.contentsList.map(c=>`<div class="mr-wc-line"><span class="txt"><span style="display:inline-block;width:7px;height:7px;border-radius:2px;background:${CAT_DOT[c.cat]||'var(--tm)'};margin-right:6px;"></span>${c.title}</span><span class="pct" style="color:var(--tm);font-weight:400;">${cStatusLabel(c)}</span></div>`).join('')}
-  </div>` : `<div class="mr-card"><div class="mr-sec-title">콘텐츠 기록</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:8px 0;">이 달엔 기록한 콘텐츠가 없어요</div></div>`;
+  </div>` : `<div class="mr-card"><div class="mr-sec-title"><i class="ti ti-stack-2" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 콘텐츠 기록</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:8px 0;">이 달엔 기록한 콘텐츠가 없어요</div></div>`;
 
   el.innerHTML=`${goalHtml}<div id="mr-ai-slot"></div>${statsHtml}${rhythmHtml}${wcHtml}${contentsHtml}`;
   const slot=document.getElementById('mr-ai-slot');
@@ -2988,10 +2980,10 @@ async function loadMonthlyReportContent(){
 
   if(isOngoingMonth&&!hasPassedMidMonth){
     // 1~14일: 아직 중간집계 시점도 안 됨
-    slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title" style="text-align:center;"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">15일에 중간 소식을, 이 달이 끝나면 전체를 정리해드릴게요</div></div>`;
+    slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">15일에 중간 소식을, 이 달이 끝나면 전체를 정리해드릴게요</div></div>`;
     return;
   }
-  slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title" style="text-align:center;"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">불러오는 중...</div></div>`;
+  slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">불러오는 중...</div></div>`;
 
   let report,cacheKey,statsForAI=stats;
   if(isOngoingMonth&&hasPassedMidMonth){
@@ -3018,13 +3010,13 @@ async function loadMonthlyReportContent(){
   if(report){
     const midNote=(isOngoingMonth&&hasPassedMidMonth)?`<div style="font-size:11px;color:var(--tm);margin-bottom:6px;">15일 기준 중간 소식이에요, 이 달이 끝나면 전체로 다시 정리해드려요</div>`:'';
     slot2.innerHTML=`<div class="mr-ai-card">
-      <div class="mr-sec-title" style="text-align:center;"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div>
+      <div class="mr-sec-title"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div>
       ${midNote}
       <p style="font-size:13px;color:var(--tp);line-height:1.9;margin-bottom:${report.keywords&&report.keywords.length?'12px':'0'};">${report.comment}</p>
       ${report.keywords&&report.keywords.length?`<div class="mr-tag-cloud">${report.keywords.map(k=>`<span class="mr-tag">${k}</span>`).join('')}</div>`:''}
     </div>`;
   } else {
-    slot2.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title" style="text-align:center;"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">코멘트를 만들 데이터가 부족하거나 API 키가 없어요</div></div>`;
+    slot2.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">코멘트를 만들 데이터가 부족하거나 API 키가 없어요</div></div>`;
   }
 }
 
@@ -6948,7 +6940,7 @@ function swRingSvg(){
       <circle cx="38" cy="38" r="32" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="4.5"/>
       <circle id="rd-sw-ring" cx="38" cy="38" r="32" fill="none" stroke="url(#rdSwGrad)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="${RD_SW_C}" stroke-dashoffset="${RD_SW_C}"/>
     </svg>
-    <div class="rd-sw-face" id="rd-sw-face">시작</div>
+    <div class="rd-sw-face" id="rd-sw-face"><i class="ti ti-player-play" style="font-size:20px;" aria-hidden="true"></i></div>
     <div class="rd-sw-time" id="rd-sw-time" style="display:none;">00:00</div>
   </div>`;
 }
@@ -7225,10 +7217,10 @@ function renderBookList(){
     const doneQuoteBlock=_rdTab==='done'?`
         <div class="done-banner-row">
           <div class="done-quote-chip" onclick="event.stopPropagation();toggleDoneBookQuotes('${b.cid}')">
-            <div class="done-quote-chip-inner" onclick="event.stopPropagation();toggleDoneBookQuotes('${b.cid}')">✎ 수집한 문장</div>
+            <div class="done-quote-chip-inner" onclick="event.stopPropagation();toggleDoneBookQuotes('${b.cid}')"><i class="ti ti-quote" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 수집한 문장</div>
           </div>
           <div class="done-comment-chip" onclick="event.stopPropagation();toggleDoneBookComments('${b.cid}')">
-            <div class="done-comment-chip-inner" onclick="event.stopPropagation();toggleDoneBookComments('${b.cid}')">코멘트</div>
+            <div class="done-comment-chip-inner" onclick="event.stopPropagation();toggleDoneBookComments('${b.cid}')"><i class="ti ti-message-circle" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 코멘트</div>
           </div>
         </div>
         ${quoteOpen?`<div id="rd-done-quote-list-${b.cid}" style="margin-top:6px;"></div>
@@ -7328,19 +7320,16 @@ function setRdUnit(u){
 }
 
 // ===== 독서 공유카드 =====
-const SHARE_LOGO_B64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFgAAAA0CAYAAAAOo/8VAAAD30lEQVR4nO2bP2zUMBTGf0FIVFcWythbWChDO1MkxABLGQAJwVDWdqcDIJgoExJbF6Z2ZQIGBsRCJaYixpaBPwKWdgKOiQqmMCTmHN9zzrnYJJz8Sackzuf3fF/8J7Zfkv1vn4gIhwNNF2DcEQUOjChwYJQJPF3BzhFHXhWbYwFJ4AdACuzmx8WS/Gn+6+XHQ0O4yubSKIX9H5EIbxGpxLPkd+XeJHtwLjZDYp3+w50Afod2WKcPLqutJuZr+PEJveX8+hcO6wgsPf1LNeyFxmwTTiWBE2AjP79HeVNOgP38/CTwzF/RvONwE05tNXgZ6AKrDjYmc+4bT2VyfSMBmPHkM5g/SeBZiiN+2avVa4NbB+YbiYRFjZcC74xrcyBVWAK2SnzaHuqo/v7C91vECeC9wHsCXC6x6eKzygPU8+7i9v7ty18Bvmdyp0fI4/JHqrYOne86uel48ldAk1PlaewF02vE6oj2v+fHFUe+Gqzr+iugSYF3Lelmc7srcLo5T/+ZmMqPa/n9UxZfZv66/gpo22KPy+xuDtgT0ieEtGP1ilPfX1sE3kMWV+o/31psSBOfhxXL4d1fWwS2DUTXatpdqMj37q8tAoM84K3XtPm0It+7vzYJDPDTuP4hcGwLRx0h7cYQWyZ8+gOaFVjqczvA7SH5thhcuOkw+HAAvmjn0gTIZVo+qj+g+RrcFdLuU/xDKwJnh+KUVfqzHx38q2m5Pl326q9pgffIFpZM7GjnayPaPl6R3wvhz7fAm5b05yV5Nhhe26ruftj4rnZ8+RMFNputOEPJ8ci4HuiDcmwY1+bCvEttS8jWnMuwzHBxbPdXQviTVtOaxHWyBaOrTRfEF9om8Nih6UFu7BEFDowocGBEgQMjChwYUeDAiAIHRhQ4MKLAgREFDoyDnuzo2z1NxP22pQwD8FWD2/CH2lCGAYxTF6F2pm1r0o0ghMD61ort+w4zajHFvrm4LXAlfMiPF8jCn8q4+n31G7YXOBJ8LVfq3z4kZPtbPe1axzz9UFJ1L7Vwt+lH1nSBM8ArC1e3oc7nkANHTH8pcB54IXBrwZfAqsCT9IPobKJJ6T65WO5L3McEXtz33UXsD6c4Q+pepFiEOriCfZfYC0INcmcrcG1h+Wq3+auWpoS4ZXB14VUzt/W/C2T7jAnZNyhmfq/w3UUkFIMypG/RpP4Pit0LZJGKnzXuDFkIv55X4SXZQ+2S9de2bkT56wFHLeXxCh81WG/KenM7hxyBeEfj6oOR2b3oO9Tq+wiQhVAtRoWZql3sFLgo8KcM/1IAjBfETc/AGKeJRisRBQ6MKHBg/AE3TPDnCSS3zAAAAABJRU5ErkJggg==';
 const SHARE_CYCLE = {
   header: [['none','헤더 없음'],['rl','모먼츠'],['idx','인덱스'],['books','북스']],
   quote: [['none','문장 없음'],['qs','문장 · 심플'],['qt','문장 · 테이프'],['hl','문장 · 하이라이트'],['paper','문장 · 편지지']],
   progress: [['none','진행률 없음'],['top','진행률 · 상단좌'],['topright','진행률 · 상단우'],['bottom','진행률 · 하단']],
-  logo: [['none','로고 없음'],['br','로고 · 우하단'],['tr','로고 · 우상단']],
-  cover: [['none','표지 없음'],['bl','표지 · 좌하단'],['br','표지 · 우하단'],['tl','표지 · 좌상단'],['tr','표지 · 우상단']],
-  coverTitle: [['off','표지 제목 없음'],['on','표지 제목 표시']]
+  cover: [['none','표지 없음'],['bl','표지 · 좌하단'],['bl-title','표지 · 좌하단+제목'],['br','표지 · 우하단'],['br-title','표지 · 우하단+제목'],['tl','표지 · 좌상단'],['tl-title','표지 · 좌상단+제목'],['tr','표지 · 우상단'],['tr-title','표지 · 우상단+제목']]
 };
-let _shareState = { bg:null, header:'none', quote:'none', quoteCid:null, progress:'none', logo:'none', cover:'none', coverTitle:'off', idxNote:'' };
+let _shareState = { bg:null, header:'none', quote:'none', quoteCid:null, progress:'none', cover:'none', idxNote:'' };
 function openShareCard(){
-  _shareState = { bg:null, header:'none', quote:'none', quoteCid:null, progress:'none', logo:'none', cover:'none', coverTitle:'off', idxNote:'' };
-  ['header','quote','progress','logo','cover','coverTitle'].forEach(updateCycleBtn);
+  _shareState = { bg:null, header:'none', quote:'none', quoteCid:null, progress:'none', cover:'none', idxNote:'' };
+  ['header','quote','progress','cover'].forEach(updateCycleBtn);
   renderQuotePicker();
   const idxWrap=document.getElementById('share-idx-note-wrap');
   const idxInp=document.getElementById('share-idx-note-inp');
@@ -7418,7 +7407,7 @@ function renderShareStage(){
   stage.style.backgroundColor=_shareState.bg?'transparent':'';
 
   let html='';
-  if(!_shareState.bg)html+=`<div class="share-stage-empty" id="share-stage-empty"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="5" width="20" height="16" rx="2"/><circle cx="9" cy="11" r="1.6"/><path d="M3 17l5.5-5.5 3 3 4-4L23 17"/></svg><span>탭해서 배경 사진 추가</span></div>`;
+  if(!_shareState.bg)html+=`<div class="share-stage-empty" id="share-stage-empty"><i class="ti ti-photo" style="font-size:26px;" aria-hidden="true"></i><span>탭해서 배경 사진 추가</span></div>`;
   else html+=`<div class="share-vignette"></div>`;
 
   if(cur){
@@ -7492,13 +7481,12 @@ function renderShareStage(){
       </div>`;
     }
   }
-  if(_shareState.logo!=='none'){
-    html+=`<div class="s-logo pos-${_shareState.logo}"><img src="${SHARE_LOGO_B64}"></div>`;
-  }
   if(_shareState.cover!=='none'&&cur&&cur.poster){
-    html+=`<div class="s-cover pos-${_shareState.cover}">
+    const hasTitle=_shareState.cover.endsWith('-title');
+    const posKey=hasTitle?_shareState.cover.replace('-title',''):_shareState.cover;
+    html+=`<div class="s-cover pos-${posKey}">
       <div class="s-cover-img"><img src="${proxyImgUrl(cur.poster)}" crossorigin="anonymous"></div>
-      ${_shareState.coverTitle==='on'?`<div class="s-cover-title share-txtshadow">${cur.title}</div>`:''}
+      ${hasTitle?`<div class="s-cover-title share-txtshadow">${cur.title}</div>`:''}
     </div>`;
   }
   stage.innerHTML=html;
