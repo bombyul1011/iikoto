@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260711-27-caldetail-forest-final';
+const CACHE = 'iikoto-v20260711-28-rhythm-icon-direct-input';
 const ASSETS = [
   './',
   './index.html'
