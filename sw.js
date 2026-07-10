@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260711-22-icon-fixes-orb-size';
+const CACHE = 'iikoto-v20260711-25-forest-card-reorder';
 const ASSETS = [
   './',
   './index.html'

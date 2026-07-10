@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260711-22-icon-fixes-orb-size -->
+<!-- build: 20260711-25-forest-card-reorder -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -777,14 +777,25 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
 .rhythm-memo-inp{width:100%;background:var(--card);border:1px solid var(--card-b);border-radius:11px;padding:9px 12px;font-size:12.5px;color:var(--tp);margin-bottom:14px;font-family:'DM Sans',sans-serif;}
 .rhythm-save-btn{width:100%;background:var(--acc);color:#fff;border:none;border-radius:12px;padding:11px 0;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;}
 
-.habit-numbox{display:flex;flex-wrap:wrap;justify-content:space-around;gap:10px;background:var(--card);border:1px solid var(--card-b);border-radius:14px;padding:12px 8px;margin-bottom:2px;}
+.habit-numbox-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(78px,1fr));gap:8px;margin-bottom:2px;}
+.habit-numbox-card{display:flex;flex-direction:column;align-items:center;background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:14px 8px;}
 .content-countbox{display:flex;flex-wrap:wrap;justify-content:space-around;gap:10px;background:var(--card);border:1px solid var(--card-b);border-radius:14px;padding:12px 8px;margin-top:8px;}
 .content-countbox-col{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:44px;}
 .content-countbox-name{font-size:11px;color:var(--tp);}
 .content-countbox-num{font-size:15px;font-weight:700;color:var(--ts);font-family:'DM Sans',sans-serif;}
-.habit-numbox-col{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:44px;}
-.habit-numbox-name{font-size:11px;color:var(--tp);}
-.habit-numbox-num{font-size:16px;font-weight:700;color:var(--ts);font-family:'DM Sans',sans-serif;}
+.habit-numbox-name{font-size:11px;color:var(--tp);margin-bottom:2px;}
+.habit-numbox-num{font-size:18px;font-weight:700;color:var(--tp);font-family:'DM Sans',sans-serif;}
+.habit-trend-row{display:flex;align-items:center;gap:8px;}
+.habit-trend-icon{display:flex;align-items:center;justify-content:center;width:16px;flex-shrink:0;}
+.habit-trend-name{font-size:11px;color:var(--tp);width:34px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.habit-trend-bar-wrap{flex:1;height:7px;background:var(--card-b);border-radius:4px;overflow:hidden;}
+.habit-trend-bar-fill{height:100%;border-radius:4px;transition:width .3s;}
+.habit-trend-pct{font-size:10px;color:var(--tm);width:30px;text-align:right;flex-shrink:0;}
+.forest-density-card{background:linear-gradient(135deg,rgba(230,225,195,0.4),rgba(190,210,175,0.4));border-color:rgba(170,195,150,0.45);}
+[data-theme="glass"] .forest-density-card{background:rgba(253,251,245,0.95);}
+.heatmap-grid{display:grid;grid-template-columns:repeat(10,1fr);gap:3px;}
+.heatmap-cell{aspect-ratio:1;border-radius:3px;cursor:pointer;background:rgba(200,176,168,0.08);display:flex;align-items:center;justify-content:center;}
+.heatmap-legend-dot{width:6px;height:6px;border-radius:2px;display:inline-block;}
 
 /* ── 주간 가로 리듬바 (블록 모델) ── */
 .wrb-wrap{display:flex;flex-direction:column;gap:13px;padding:2px 0;}
@@ -1861,6 +1872,8 @@ function renderHomeBody(section){
     body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getRhythmLogicalDate()));},'rhythm-soft',12.5,dateKey(getRhythmLogicalDate())));
     body.appendChild(makeLabel('최근 콘텐츠'));
     body.appendChild(makeContentsCard());
+    body.appendChild(makeLabel('오늘의 문장'));
+    body.appendChild(makeTextArchiveCard());
   } else {
     // 저녁 공통 틀: [그날의 특수 배너] → 링 → 리듬배너 → (브리핑) → 독서카드
     // 네 갈래(말일/일요일/수요일/평일) 모두 이 순서를 그대로 따름 — 특수 배너만 가변
@@ -1897,7 +1910,7 @@ function renderHomeBody(section){
       mbanner.addEventListener('click',openMidweekRemindSheet);
       body.appendChild(mbanner);
     }
-    body.appendChild(makeRingRow());
+    body.appendChild(makeHabitMiniCheckRow());
     body.appendChild(makeLabel('아직 남은 일'));
     body.appendChild(makePendingTodosCard());
     body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getRhythmLogicalDate()),getSubSection()==='night_2');},'rhythm-soft',12.5,dateKey(getRhythmLogicalDate())));
@@ -1919,7 +1932,8 @@ function renderHomeBody(section){
     if(!isSunday){
       // "오늘 마무리" 브리핑은 통합카드(상단 인삿말)가 흡수함
     }
-    body.appendChild(makeTextArchiveCard());
+    body.appendChild(makeLabel('밀도의 숲'));
+    body.appendChild(makeMonthlyHeatmapCard());
     body.appendChild(makeLabel('오늘의 독서'));
     body.appendChild(makeBookCard());
   }
@@ -2517,13 +2531,16 @@ function getHabitMonthCount(name){
   return count;
 }
 function makeHabitStreakRow(){
-  const wrap=document.createElement('div');wrap.className='habit-numbox';
+  const wrap=document.createElement('div');wrap.className='habit-numbox-grid';
   const habits=getHabits();
   if(!habits.length){wrap.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 2px;width:100%;text-align:center;">습관을 추가해보세요</div>';return wrap;}
   habits.forEach(function(h){
     const monthCount=getHabitMonthCount(h.name);
-    const col=document.createElement('div');col.className='habit-numbox-col';
-    col.innerHTML='<span class="home-habit-dot '+h.color+'"></span><span class="habit-numbox-name">'+h.name+'</span><span class="habit-numbox-num">'+monthCount+'</span>';
+    const hIcon=getHabitIcon(h.name);
+    const iconColor=getHabitIconColor(h.name);
+    const col=document.createElement('div');col.className='habit-numbox-card';
+    col.innerHTML=(hIcon?`<i class="ti ${hIcon}" style="font-size:20px;color:${iconColor};margin-bottom:6px;" aria-hidden="true"></i>`:`<span class="home-habit-dot ${h.color}" style="margin-bottom:6px;"></span>`)
+      +`<span class="habit-numbox-name">${h.name}</span><span class="habit-numbox-num">${monthCount}</span>`;
     wrap.appendChild(col);
   });
   return wrap;
@@ -3621,15 +3638,20 @@ const HABIT_COLORS=['mint','pink','sky','yellow','rose','lavender','peach','teal
 const DEFAULT_HABITS=[{name:'운동',color:'mint'},{name:'독서',color:'pink'},{name:'영양제',color:'sky'},{name:'물',color:'yellow'}];
 // 습관명은 자유 텍스트라 완전 자동매칭엔 한계가 있음 — 이름에 특정 키워드가 포함되면 아이콘을 붙이고, 매칭 안 되면 아이콘 없이 텍스트만 표시
 const HABIT_ICON_RULES=[
-  {keywords:['운동','헬스','필라테스','런닝','러닝','조깅'],icon:'ti-run'},
-  {keywords:['독서','책'],icon:'ti-book'},
-  {keywords:['일기','다이어리','글쓰기'],icon:'ti-writing'},
-  {keywords:['영양제','비타민','약'],icon:'ti-pill'}
+  {keywords:['운동','헬스','필라테스','런닝','러닝','조깅'],icon:'ti-run',color:'#c07a4a'},
+  {keywords:['독서','책'],icon:'ti-book',color:'#a8527a'},
+  {keywords:['일기','다이어리','글쓰기'],icon:'ti-writing',color:'#5a7a9a'},
+  {keywords:['영양제','비타민','약'],icon:'ti-pill',color:'#6a8a50'}
 ];
 function getHabitIcon(name){
   if(!name)return null;
   const rule=HABIT_ICON_RULES.find(r=>r.keywords.some(k=>name.includes(k)));
   return rule?rule.icon:null;
+}
+function getHabitIconColor(name){
+  if(!name)return 'var(--tp)';
+  const rule=HABIT_ICON_RULES.find(r=>r.keywords.some(k=>name.includes(k)));
+  return rule?rule.color:'var(--tp)';
 }
 
 // ── STORAGE
@@ -4730,34 +4752,33 @@ function toggleTodo(i){const dk=dateKey(currentDate),todos=getTodos(dk);todos[i]
 function makeHabitWeekTrendCard(){
   const card=document.createElement('div');
   card.className='card s';
-  card.style.cursor='pointer';
   const habits=getHabits().slice(0,4); // 최대 4개만
   if(!habits.length){card.style.display='none';return card;}
 
   const now=new Date();
   const todayDow=(now.getDay()+6)%7; // 0=월 ... 6=일
+  const daysSoFar=todayDow+1; // 이번 주 중 오늘까지 지난 일수(분모)
   const wk=weekKey(now);
   const checks=getHabitChecks(wk);
 
-  let cells='';
+  let rows='';
   habits.forEach(h=>{
-    let dots='';
-    for(let d=0;d<7;d++){
-      const checked=!!checks[h.name+'-'+d];
-      if(d>todayDow){
-        dots+=`<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--card-b);"></span>`;
-      }else{
-        dots+=`<span class="home-habit-dot ${checked?h.color:''}" style="width:7px;height:7px;${checked?'':'background:var(--card-b);'}"></span>`;
-      }
-    }
-    cells+=`<div style="display:flex;align-items:center;padding:6px 0;min-width:0;">
-      <span style="font-size:11px;color:var(--tp);width:36px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${h.name}</span>
-      <span style="display:flex;align-items:center;justify-content:space-between;flex:1;min-width:0;">${dots}</span>
+    let checkedCount=0;
+    for(let d=0;d<=todayDow;d++){if(checks[h.name+'-'+d])checkedCount++;}
+    const pct=daysSoFar>0?Math.round(checkedCount/daysSoFar*100):0;
+    const hIcon=getHabitIcon(h.name);
+    const iconColor=getHabitIconColor(h.name);
+    const iconHtml=hIcon?`<i class="ti ${hIcon}" style="font-size:12px;color:${iconColor};" aria-hidden="true"></i>`:`<span class="home-habit-dot ${h.color}" style="width:8px;height:8px;"></span>`;
+    rows+=`<div class="habit-trend-row">
+      <span class="habit-trend-icon">${iconHtml}</span>
+      <span class="habit-trend-name">${h.name}</span>
+      <div class="habit-trend-bar-wrap"><div class="habit-trend-bar-fill" style="width:${pct}%;background:${iconColor};"></div></div>
+      <span class="habit-trend-pct">${pct}%</span>
     </div>`;
   });
 
-  card.innerHTML=`<div style="font-size:11px;color:var(--tm);margin-bottom:6px;">이번 주 습관</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;column-gap:14px;">${cells}</div>`;
+  card.innerHTML=`<div style="font-size:11px;color:var(--tm);margin-bottom:8px;">이번 주 습관</div>
+    <div style="display:flex;flex-direction:column;gap:8px;">${rows}</div>`;
   card.addEventListener('click',function(){
     document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));
     const vw=document.getElementById('v-weekly');
@@ -4897,7 +4918,6 @@ function makeTextArchiveCard(){
     ?`<div style="font-size:11px;color:var(--ts);margin-top:6px;padding:5px 8px;background:rgba(200,176,168,0.14);border-radius:8px;">${picked.comment}</div>`
     :'';
   card.innerHTML=`
-    <div style="font-size:11px;color:var(--tm);margin-bottom:5px;"><i class="ti ti-quote" style="font-size:11px;vertical-align:-1px;" aria-hidden="true"></i> 오늘의 문장</div>
     <div style="font-size:13.5px;color:var(--tp);line-height:1.6;">${picked.text}</div>
     ${picked.source?`<div style="font-size:11px;color:var(--tm);margin-top:5px;text-align:right;">— ${picked.source}</div>`:''}
     ${commentBlock}
@@ -4995,7 +5015,7 @@ function makePendingTodosCard(){
   card.style.cssText='box-shadow:none;border:1px solid var(--card-b);padding:9px 12px;';
   card.id='home-pending-todos-card';
   if(!pendingWithIdx.length){
-    card.innerHTML='<div style="font-size:13px;color:var(--tm);padding:6px 2px;text-align:center;">오늘 할일 끝! 고생하셨어요 🌿</div>';
+    card.innerHTML='<div style="font-size:13px;color:var(--tm);padding:6px 2px;text-align:center;">오늘 할일 끝! 고생하셨어요</div>';
     return card;
   }
   pendingWithIdx.sort((a,b)=>(b.postponeCount||0)-(a.postponeCount||0));
@@ -5012,7 +5032,7 @@ function makePendingTodosCard(){
       <div class="chk" onclick="homeToggleTodo(${t._i})"></div>
       <span class="todo-txt${postponedClass}" style="flex:1;color:var(--tm);">${t.text}</span>
     </div>
-    <span onclick="homePostponeTodo(${t._i})" title="내일로 미루기" style="display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;padding:5px 8px;border-radius:7px;background:rgba(190,170,140,0.14);cursor:pointer;"><i class="ti ti-calendar-repeat" style="font-size:15px;color:rgba(150,125,95,0.85);" aria-hidden="true"></i></span>`;
+    <span onclick="homePostponeTodo(${t._i})" title="내일로 미루기" style="display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;padding:5px 8px;border-radius:7px;background:rgba(190,170,140,0.14);cursor:pointer;"><i class="ti ti-arrow-move-right" style="font-size:15px;color:rgba(150,125,95,0.85);" aria-hidden="true"></i></span>`;
     list.appendChild(el);
   });
   card.appendChild(list);
@@ -5028,6 +5048,120 @@ function makePendingTodosCard(){
     card.appendChild(more);
   }
   return card;
+}
+function getDayRecordDensity(dk){
+  const memos=getMemos(dk).length;
+  const doneTodos=getTodos(dk).filter(t=>t.done).length;
+  const habits=getHabits();
+  const wk=weekKey(new Date(dk+'T00:00:00'));
+  const dow=(new Date(dk+'T00:00:00').getDay()+6)%7;
+  const checks=getHabitChecks(wk);
+  let habitChecked=0;
+  habits.forEach(h=>{if(checks[h.name+'-'+dow])habitChecked++;});
+  return memos+doneTodos+habitChecked;
+}
+function makeHabitMiniCheckRow(){
+  const wrap=document.createElement('div');
+  wrap.style.cssText='display:flex;justify-content:space-around;padding:6px 4px;margin-bottom:10px;';
+  const habits=getHabits();
+  if(!habits.length){wrap.style.display='none';return wrap;}
+  const _ld=getLogicalDate();
+  const wk=weekKey(_ld),checks=getHabitChecks(wk),dow=(_ld.getDay()+6)%7;
+  habits.forEach(h=>{
+    const checked=!!checks[h.name+'-'+dow];
+    const hIcon=getHabitIcon(h.name);
+    const iconColor=getHabitIconColor(h.name);
+    const badge=document.createElement('div');
+    badge.style.cssText=`width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;background:${checked?iconColor:'rgba(200,176,168,0.15)'};`;
+    badge.title=h.name;
+    badge.innerHTML=hIcon
+      ?`<i class="ti ${hIcon}" style="font-size:15px;color:${checked?'#fff':'rgba(200,176,168,0.7)'};" aria-hidden="true"></i>`
+      :`<span class="home-habit-dot ${checked?h.color:''}" style="width:9px;height:9px;${checked?'':'background:rgba(200,176,168,0.5);'}"></span>`;
+    badge.addEventListener('click',function(){
+      const key=h.name+'-'+dow;
+      const wasOn=!!checks[key];
+      checks[key]=!checks[key];
+      if(wasOn&&!checks[key])addDelPending('hc',wk,h.name+'|'+dateKey(_ld));
+      saveHabitChecks(wk,checks);
+      const fresh=makeHabitMiniCheckRow();
+      wrap.replaceWith(fresh);
+      if(document.getElementById('v-monthly')&&document.getElementById('v-monthly').classList.contains('on'))renderHabitMonthly();
+      if(document.getElementById('v-weekly')&&document.getElementById('v-weekly').classList.contains('on'))renderWeeklyHabitBox();
+    });
+    wrap.appendChild(badge);
+  });
+  return wrap;
+}
+function makeMonthlyHeatmapCard(){
+  const card=document.createElement('div');
+  card.className='card forest-density-card';
+  const now=new Date();
+  const y=now.getFullYear(),mo=now.getMonth();
+  const today=now.getDate();
+  const densities=[];
+  for(let d=1;d<=today;d++){
+    const dk=`${y}-${pad(mo+1)}-${pad(d)}`;
+    densities.push({d,dk,cnt:getDayRecordDensity(dk)});
+  }
+  const maxCnt=Math.max(1,...densities.map(x=>x.cnt));
+  // 밀도 5단계: 씨앗 - 새싹 - 잎 - 작은나무 - 큰나무 (그 달의 최대 기록량 대비 상대적 비율 기준)
+  const STAGES=[
+    {icon:'ti-seeding',color:'rgba(150,140,120,0.55)'},
+    {icon:'ti-plant-2',color:'rgba(140,175,110,0.75)'},
+    {icon:'ti-leaf',color:'rgba(106,154,85,0.85)'},
+    {icon:'ti-tree',color:'rgba(74,128,64,0.9)'},
+    {icon:'ti-christmas-tree',color:'rgba(42,96,48,1)'}
+  ];
+  function stageFor(cnt){
+    if(cnt===0)return null;
+    const ratio=cnt/maxCnt;
+    const idx=Math.min(4,Math.floor(ratio*5));
+    return STAGES[idx];
+  }
+  let cells='';
+  densities.forEach(x=>{
+    const st=stageFor(x.cnt);
+    const inner=st?`<i class="ti ${st.icon}" style="font-size:11px;color:${st.color};" aria-hidden="true"></i>`:'';
+    cells+=`<div class="heatmap-cell" onclick="openHomeDetailSheet('${mo+1}월 ${x.d}일',function(){return makeDaySummaryEl('${x.dk}');})" title="${x.d}일 · 기록 ${x.cnt}개">${inner}</div>`;
+  });
+  card.innerHTML=`<div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:7px;">
+      <span style="font-size:9.5px;color:var(--tm);">${mo+1}월</span>
+    </div>
+    <div class="heatmap-grid">${cells}</div>
+    <div style="display:flex;justify-content:flex-end;align-items:center;gap:4px;margin-top:6px;">
+      <span style="font-size:8px;color:var(--tm);">적음</span>
+      <i class="ti ti-seeding" style="font-size:10px;color:rgba(150,140,120,0.55);" aria-hidden="true"></i>
+      <i class="ti ti-leaf" style="font-size:10px;color:rgba(106,154,85,0.85);" aria-hidden="true"></i>
+      <i class="ti ti-christmas-tree" style="font-size:10px;color:rgba(42,96,48,1);" aria-hidden="true"></i>
+      <span style="font-size:8px;color:var(--tm);">많음</span>
+    </div>`;
+  return card;
+}
+function makeDaySummaryEl(dk){
+  const wrap=document.createElement('div');
+  const memos=getMemos(dk);
+  const doneTodos=getTodos(dk).filter(t=>t.done);
+  const habits=getHabits();
+  const wk=weekKey(new Date(dk+'T00:00:00'));
+  const dow=(new Date(dk+'T00:00:00').getDay()+6)%7;
+  const checks=getHabitChecks(wk);
+  const checkedHabits=habits.filter(h=>checks[h.name+'-'+dow]);
+  let html='';
+  if(memos.length){
+    html+=`<div style="font-size:11px;font-weight:600;color:var(--tp);margin-bottom:4px;">메모</div>`;
+    memos.slice(0,5).forEach(m=>{html+=`<div style="font-size:12px;color:var(--ts);padding:3px 0;">${m.time?m.time+' · ':''}${m.text||''}</div>`;});
+  }
+  if(doneTodos.length){
+    html+=`<div style="font-size:11px;font-weight:600;color:var(--tp);margin:8px 0 4px;">완료한 일</div>`;
+    doneTodos.forEach(t=>{html+=`<div style="font-size:12px;color:var(--ts);padding:3px 0;">✓ ${t.text}</div>`;});
+  }
+  if(checkedHabits.length){
+    html+=`<div style="font-size:11px;font-weight:600;color:var(--tp);margin:8px 0 4px;">체크한 습관</div>`;
+    html+=`<div style="font-size:12px;color:var(--ts);">${checkedHabits.map(h=>h.name).join(', ')}</div>`;
+  }
+  if(!html)html='<div style="font-size:12px;color:var(--tm);text-align:center;padding:20px 0;">이 날은 기록이 없어요</div>';
+  wrap.innerHTML=html;
+  return wrap;
 }
 function openTodoModal(editIdx=-1){
   const modal=document.getElementById('todo-modal');
@@ -6085,6 +6219,9 @@ function renderCalDetail(d){
   const meals=getMeals(dk);
   const date=new Date(_calYear,_calMonth,d);
   const dateStr=`${_calMonth+1}월 ${d}일 ${DAYS[date.getDay()]}`;
+  const _rbTodayDk=dateKey(new Date());
+  const _rbCurLogicalDk=dateKey(getRhythmLogicalDate());
+  const rhythmBarHtml=renderRhythmBarHtml(computeRhythmSegsForDay(dk,_rbTodayDk,_rbCurLogicalDk));
   let items='';
   // 하루 한줄 메시지 — 날짜 옆에 나란히 (renderCalDetail 헤더에서 처리)
   const oneLine=getDailyOneLine(dk);
@@ -6116,9 +6253,9 @@ function renderCalDetail(d){
     if(meals[k])mealHtml+=`<div class="cal-detail-row"><span class="cal-detail-time">${MEAL_LABELS[k]}</span><span class="cal-detail-text" style="flex:1;">${meals[k]}</span>${meals[k+'_time']?`<span style="font-size:10.5px;color:var(--tm);flex-shrink:0;">${meals[k+'_time']}</span>`:''}</div>`;
   });
   if(mealHtml)mealHtml=`<div style="font-size:11px;font-weight:500;color:rgba(190,130,70,0.85);margin:12px 0 4px;">식사</div>${mealHtml}`;
-  if(!items&&!mealHtml){const olh=oneLine?`<span style="font-size:11.5px;color:var(--ts);font-style:italic;flex:1;text-align:right;padding-left:8px;">&#x275D; ${oneLine} &#x275E;</span>`:"";el.innerHTML=`<div class="cal-detail-wrap"><div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;gap:6px;"><span class="cal-detail-date" style="margin-bottom:0;flex-shrink:0;">${dateStr}</span>${olh}</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:10px 0;">기록이 없어요</div></div>`;return;}
+  if(!items&&!mealHtml){const olh=oneLine?`<span style="font-size:11.5px;color:var(--ts);font-style:italic;flex:1;text-align:right;padding-left:8px;">&#x275D; ${oneLine} &#x275E;</span>`:"";el.innerHTML=`<div class="cal-detail-wrap"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;"><span class="cal-detail-date" style="margin-bottom:0;flex-shrink:0;">${dateStr}</span><div style="flex:1;max-width:120px;">${rhythmBarHtml}</div>${olh}</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:10px 0;">기록이 없어요</div></div>`;return;}
   const oneLineHtml=oneLine?`<span style="font-size:11.5px;color:var(--ts);font-style:italic;flex:1;text-align:right;padding-left:8px;">&#x275D; ${oneLine} &#x275E;</span>`:'';
-  el.innerHTML=`<div class="cal-detail-wrap"><div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;gap:6px;"><span class="cal-detail-date" style="margin-bottom:0;flex-shrink:0;">${dateStr}</span>${oneLineHtml}</div>${items}${mealHtml}</div>`;
+  el.innerHTML=`<div class="cal-detail-wrap"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;"><span class="cal-detail-date" style="margin-bottom:0;flex-shrink:0;">${dateStr}</span><div style="flex:1;max-width:120px;">${rhythmBarHtml}</div>${oneLineHtml}</div>${items}${mealHtml}</div>`;
   el.style.display='block';
   setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'nearest'}),100);
 }
@@ -6282,88 +6419,87 @@ function loadDaily(){
   const dk=dateKey(currentDate);
   ensureDateSynced(dk).then(fetched=>{if(fetched){loadSleep();renderTodos();renderMemos();renderTodayMeal();renderDailyHabitCheck();}});
 }
+function computeRhythmSegsForDay(dk,realTodayDk,_curLogicalDk){
+  const toMin=function(t){if(!t)return null;const p=t.split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);};
+  const MEAL_KEYS=['breakfast','lunch','dinner','snack'];
+  const sleep=getSleep(dk)||{};
+  const meals=getMeals(dk)||{};
+  const manual=getRhythmBlocks(dk);
+  const wakeMin=toMin(sleep.wake),sleepMin=toMin(sleep.sleep);
+  let segs=[];
+  if(wakeMin!=null&&sleepMin!=null&&sleepMin<=wakeMin){
+    segs.push({start:sleepMin,end:wakeMin,color:RHYTHM_SLEEP_COLOR});
+  }else{
+    if(wakeMin!=null)segs.push({start:0,end:wakeMin,color:RHYTHM_SLEEP_COLOR});
+    if(sleepMin!=null&&wakeMin==null){
+      const end=dk===realTodayDk?(function(){const n=new Date();return n.getHours()<4?1440:(n.getHours()*60+n.getMinutes());})():1440;
+      segs.push({start:sleepMin,end:end,color:RHYTHM_SLEEP_COLOR,ongoing:true});
+    }
+  }
+  MEAL_KEYS.forEach(function(k){
+    const t=meals[k+'_time'];if(!t)return;
+    const start=toMin(t);
+    segs.push({start:start,end:Math.min(start+45,1440),color:RHYTHM_MEAL_COLOR});
+  });
+  manual.forEach(function(b){
+    const cat=RHYTHM_CATS[b.cat];if(!cat)return;
+    const s=toMin(b.start);
+    if(s!=null&&s<240)return;
+    if(b.end){
+      let e=toMin(b.end);
+      if(e<=s)e=1440;
+      segs.push({start:s,end:e,color:cat.color});
+    }else{
+      const endMin=dk===realTodayDk?(function(){const n=new Date();return n.getHours()*60+n.getMinutes();})():1440;
+      segs.push({start:s,end:endMin,color:cat.color,ongoing:true});
+    }
+  });
+  const d=new Date(dk+'T00:00:00');
+  const prevD=new Date(d);prevD.setDate(d.getDate()-1);
+  getRhythmBlocks(dateKey(prevD)).forEach(function(b){
+    const cat=RHYTHM_CATS[b.cat];if(!cat)return;
+    const s=toMin(b.start);
+    if(s==null)return;
+    if(b.end){
+      const eRaw=toMin(b.end);
+      if(s<240){
+        let e=eRaw<=s?240:eRaw;
+        segs.push({start:s,end:e,color:cat.color});
+      }else if(eRaw<=s){
+        segs.push({start:0,end:eRaw,color:cat.color});
+      }
+    }else{
+      if(s<240||s>=1380){
+        const endMin=dateKey(prevD)===_curLogicalDk?(function(){const n=new Date();return n.getHours()*60+n.getMinutes();})():240;
+        segs.push({start:0,end:endMin,color:cat.color,ongoing:true});
+      }
+    }
+  });
+  return segs;
+}
+function renderRhythmBarHtml(segs){
+  let track='<div class="wrb-track">';
+  const segsSorted=segs.slice().sort(function(a,b){return (b.end-b.start)-(a.end-a.start);});
+  segsSorted.forEach(function(sg,si){
+    track+='<div class="wrb-seg'+(sg.ongoing?' ongoing':'')+'" style="left:'+(sg.start/1440*100)+'%;width:'+Math.max((sg.end-sg.start)/1440*100,0.8)+'%;background-color:'+sg.color+';z-index:'+(10+si)+';"></div>';
+  });
+  track+='</div>';
+  return track;
+}
 function renderWeeklyRhythmBars(){
   const el=document.getElementById('weekly-rhythm-bars');if(!el)return;
   const now=new Date();
   const mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7));
   const DOW=['월','화','수','목','금','토','일'];
   const todayDk=dateKey(now);
-  const realTodayDk=todayDk; // 진행중 블록 연장 판정용(요일기준과 동일값이지만 의도 명시)
-  const _curLogicalDk=dateKey(getRhythmLogicalDate()); // 자정 넘겨 아직 안 끝난 논리적 '오늘' (리듬 전용, 새벽 4시 기준)
-  const toMin=function(t){if(!t)return null;const p=t.split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);};
-  const MEAL_KEYS=['breakfast','lunch','dinner','snack'];
+  const realTodayDk=todayDk;
+  const _curLogicalDk=dateKey(getRhythmLogicalDate());
   let html='<div class="wrb-wrap">';
   for(let i=0;i<7;i++){
     const d=new Date(mon);d.setDate(mon.getDate()+i);
     const dk=dateKey(d);
-    const sleep=getSleep(dk)||{};
-    const meals=getMeals(dk)||{};
-    const manual=getRhythmBlocks(dk);
-    const wakeMin=toMin(sleep.wake),sleepMin=toMin(sleep.sleep);
-    let segs=[];
-    if(wakeMin!=null&&sleepMin!=null&&sleepMin<=wakeMin){
-      segs.push({start:sleepMin,end:wakeMin,color:RHYTHM_SLEEP_COLOR});
-    }else{
-      if(wakeMin!=null)segs.push({start:0,end:wakeMin,color:RHYTHM_SLEEP_COLOR});
-      if(sleepMin!=null&&wakeMin==null){
-        const end=dk===realTodayDk?(function(){const n=new Date();return n.getHours()<4?1440:(n.getHours()*60+n.getMinutes());})():1440;
-        segs.push({start:sleepMin,end:end,color:RHYTHM_SLEEP_COLOR,ongoing:true});
-      }
-    }
-    MEAL_KEYS.forEach(function(k){
-      const t=meals[k+'_time'];if(!t)return;
-      const start=toMin(t);
-      segs.push({start:start,end:Math.min(start+45,1440),color:RHYTHM_MEAL_COLOR});
-    });
-    manual.forEach(function(b){
-      const cat=RHYTHM_CATS[b.cat];if(!cat)return;
-      const s=toMin(b.start);
-      // 리듬 전용 논리적 날짜(새벽 4시 기준) 저장 방식상, 새벽 0~3시대에 시작한 블록은
-      // 실제로는 '다음날 새벽'에 해당하므로 이 날짜 칸에서는 그리지 않고 익일 칸에서 처리한다
-      if(s!=null&&s<240)return;
-      if(b.end){
-        let e=toMin(b.end);
-        if(e<=s)e=1440; // 자정을 넘기는 블록은 당일 바에서는 24시까지로 표시
-        segs.push({start:s,end:e,color:cat.color});
-      }else{
-        // 진행중 블록: 실제 오늘 날짜의 행이면 현재 시각까지, 지난 날짜면 자정(1440)까지 채워 표시(사라짐 방지)
-        const endMin=dk===realTodayDk?(function(){const n=new Date();return n.getHours()*60+n.getMinutes();})():1440;
-        segs.push({start:s,end:endMin,color:cat.color,ongoing:true});
-      }
-    });
-    // 전날에 저장된 블록 중, 자정을 넘겨 오늘 새벽까지 이어지는 것을 오늘 칸의 새벽 구간으로 이어서 표시
-    // 대상 1) 새벽 0~3시대에 시작한 블록(논리적 날짜 경계상 전날로 저장됨)
-    // 대상 2) 전날 밤(예: 23시대)에 시작해 end가 자정을 넘겨(end<=start) 익일 새벽까지 이어지는 블록
-    const prevD=new Date(d);prevD.setDate(d.getDate()-1);
-    getRhythmBlocks(dateKey(prevD)).forEach(function(b){
-      const cat=RHYTHM_CATS[b.cat];if(!cat)return;
-      const s=toMin(b.start);
-      if(s==null)return;
-      if(b.end){
-        const eRaw=toMin(b.end);
-        if(s<240){
-          // 새벽 시작 블록: 기존 로직 그대로
-          let e=eRaw<=s?240:eRaw;
-          segs.push({start:s,end:e,color:cat.color});
-        }else if(eRaw<=s){
-          // 야간 시작(자정 이전) + 자정을 넘겨 종료되는 블록: 새벽 구간(0~end)만 오늘 칸에 이어 그림
-          segs.push({start:0,end:eRaw,color:cat.color});
-        }
-      }else{
-        // 진행중 블록(아직 종료 안 함): 전날 논리날짜에 남아있다면 오늘 칸에서 현재 시각까지 이어서 표시
-        if(s<240||s>=1380){ // 새벽대 시작이거나, 자정 임박(23시 이후) 시작인 경우만 이어붙임 대상
-          const endMin=dateKey(prevD)===_curLogicalDk?(function(){const n=new Date();return n.getHours()*60+n.getMinutes();})():240;
-          segs.push({start:0,end:endMin,color:cat.color,ongoing:true});
-        }
-      }
-    });
-    let track='<div class="wrb-track">';
-    // 짧은 세그먼트가 위로 오도록 — 긴 것 먼저 렌더(낮은 z-index), 짧은 것 나중(높은 z-index)
-    const segsSorted=segs.slice().sort(function(a,b){return (b.end-b.start)-(a.end-a.start);});
-    segsSorted.forEach(function(sg,si){
-      track+='<div class="wrb-seg'+(sg.ongoing?' ongoing':'')+'" style="left:'+(sg.start/1440*100)+'%;width:'+Math.max((sg.end-sg.start)/1440*100,0.8)+'%;background-color:'+sg.color+';z-index:'+(10+si)+';"></div>';
-    });
-    track+='</div>';
+    const segs=computeRhythmSegsForDay(dk,realTodayDk,_curLogicalDk);
+    const track=renderRhythmBarHtml(segs);
     html+='<div class="wrb-row"><div class="wrb-daylabel'+(dk===todayDk?' today':'')+'">'+DOW[i]+'</div><div class="wrb-trackwrap">'+track+'</div></div>';
   }
   html+='</div>';
