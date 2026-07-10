@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260711-07-rhythmbar-midnightfix -->
+<!-- build: 20260711-08-focusring-spacing-fix -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -421,6 +421,7 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
 .sheet-item:last-child{border-bottom:none;}
 .sheet-item.del{color:#c05060;}
 .archive-sheet-textarea:focus{border-color:rgba(150,175,120,0.55);}
+.qc-comment-textarea:focus{border-color:rgba(200,176,168,0.65);}
 .modal-ov{position:fixed;inset:0;background:rgba(60,40,35,.22);z-index:9999;display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px);}
 .modal-ov.on{display:flex;}
 .modal{width:calc(100% - 48px);max-width:300px;max-height:85vh;overflow-y:auto;background:var(--modal);border:1px solid rgba(255,255,255,.80);border-radius:22px;padding:22px 20px;box-shadow:0 8px 40px rgba(0,0,0,.18);box-sizing:border-box;}
@@ -571,7 +572,7 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
 .diary-line-text{flex:1;font-size:13.5px;color:var(--tp);line-height:1.5;}
 .diary-line-text.empty{color:var(--tm);font-size:12px;font-style:italic;letter-spacing:2px;}
 .rd-quote-inp{width:100%;background:var(--inp);border:1px solid var(--inp-b);border-radius:12px;padding:12px 14px;outline:none;resize:none;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--tp);line-height:1.6;}
-.rd-quote-item{position:relative;background:rgba(255,250,245,0.5);border-left:2.5px solid rgba(195,170,235,0.55);border-radius:0 10px 10px 0;padding:9px 12px 20px 14px;margin-top:8px;}
+.rd-quote-item{position:relative;background:rgba(255,250,245,0.5);border-left:2.5px solid rgba(195,170,235,0.55);border-radius:0 10px 10px 0;padding:9px 12px 26px 14px;margin-top:8px;}
 .rd-quote-more{font-size:11px;color:var(--tm);text-align:center;padding:8px 0 2px;cursor:pointer;}
 .rd-quote-empty{font-size:11.5px;color:var(--tm);text-align:center;padding:8px 0 2px;}
 .rd-quote-text{font-size:12.5px;color:var(--tp);font-style:italic;line-height:1.55;}
@@ -6979,7 +6980,7 @@ function renderRdQuotes(){
       <div class="rd-quote-text">${q.text}</div>
       ${q.comment?`<div class="rd-quote-comment" onclick="toggleQuoteCommentEditor('${q.cid}')" style="font-size:11px;color:#7a9552;margin-top:4px;padding:5px 8px;background:rgba(232,246,220,0.6);border-radius:8px;cursor:pointer;">${q.comment}</div>`:''}
       <div id="qc-editor-${q.cid}" class="qc-editor" style="display:none;margin-top:5px;">
-        <textarea style="width:100%;box-sizing:border-box;font-size:11.5px;padding:6px 8px;border-radius:8px;border:1px solid var(--card-b);background:var(--card);color:var(--tp);resize:none;min-height:44px;font-family:inherit;" placeholder="이 문장에 대한 감상을 적어보세요">${q.comment||''}</textarea>
+        <textarea class="qc-comment-textarea" style="width:100%;box-sizing:border-box;font-size:11.5px;padding:6px 8px;border-radius:8px;border:1px solid var(--card-b);background:var(--card);color:var(--tp);resize:none;min-height:44px;font-family:inherit;outline:none;" placeholder="이 문장에 대한 감상을 적어보세요">${q.comment||''}</textarea>
         <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px;">
           <span onclick="document.getElementById('qc-editor-${q.cid}').style.display='none';" style="font-size:11px;color:var(--tm);cursor:pointer;padding:3px 8px;">취소</span>
           <span onclick="commitQuoteComment('${q.cid}')" style="font-size:11px;color:#6a8a50;cursor:pointer;padding:3px 8px;font-weight:600;">저장</span>
@@ -7110,7 +7111,7 @@ function renderDoneBookQuotes(bookCid){
   listEl.innerHTML=quotes.map(q=>`<div class="rd-quote-item">
       <div class="rd-quote-text">${q.text}</div>
       <div id="qc-editor-${q.cid}" class="qc-editor" style="display:none;margin-top:5px;">
-        <textarea style="width:100%;box-sizing:border-box;font-size:11.5px;padding:6px 8px;border-radius:8px;border:1px solid var(--card-b);background:var(--card);color:var(--tp);resize:none;min-height:44px;font-family:inherit;" placeholder="이 문장에 대한 감상을 적어보세요">${q.comment||''}</textarea>
+        <textarea class="qc-comment-textarea" style="width:100%;box-sizing:border-box;font-size:11.5px;padding:6px 8px;border-radius:8px;border:1px solid var(--card-b);background:var(--card);color:var(--tp);resize:none;min-height:44px;font-family:inherit;outline:none;" placeholder="이 문장에 대한 감상을 적어보세요">${q.comment||''}</textarea>
         <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px;">
           <span onclick="event.stopPropagation();document.getElementById('qc-editor-${q.cid}').style.display='none';" style="font-size:11px;color:var(--tm);cursor:pointer;padding:3px 8px;">취소</span>
           <span onclick="event.stopPropagation();commitDoneQuoteComment('${q.cid}','${bookCid}')" style="font-size:11px;color:#6a8a50;cursor:pointer;padding:3px 8px;font-weight:600;">저장</span>
@@ -7149,7 +7150,7 @@ function renderDoneBookComments(bookCid){
       <div class="rd-quote-text" style="font-size:11px;color:var(--tm);margin-bottom:4px;">${q.text}</div>
       <div class="rd-quote-comment" onclick="event.stopPropagation();toggleQuoteCommentEditor('${q.cid}')" style="font-size:12.5px;color:var(--tp);padding:6px 8px;background:rgba(200,176,168,0.14);border-radius:8px;cursor:pointer;">${q.comment}</div>
       <div id="qc-editor-${q.cid}" class="qc-editor" style="display:none;margin-top:5px;">
-        <textarea style="width:100%;box-sizing:border-box;font-size:11.5px;padding:6px 8px;border-radius:8px;border:1px solid var(--card-b);background:var(--card);color:var(--tp);resize:none;min-height:44px;font-family:inherit;" placeholder="이 문장에 대한 감상을 적어보세요">${q.comment||''}</textarea>
+        <textarea class="qc-comment-textarea" style="width:100%;box-sizing:border-box;font-size:11.5px;padding:6px 8px;border-radius:8px;border:1px solid var(--card-b);background:var(--card);color:var(--tp);resize:none;min-height:44px;font-family:inherit;outline:none;" placeholder="이 문장에 대한 감상을 적어보세요">${q.comment||''}</textarea>
         <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px;">
           <span onclick="event.stopPropagation();document.getElementById('qc-editor-${q.cid}').style.display='none';" style="font-size:11px;color:var(--tm);cursor:pointer;padding:3px 8px;">취소</span>
           <span onclick="event.stopPropagation();commitDoneQuoteComment('${q.cid}','${bookCid}');renderDoneBookComments('${bookCid}')" style="font-size:11px;color:#6a8a50;cursor:pointer;padding:3px 8px;font-weight:600;">저장</span>
