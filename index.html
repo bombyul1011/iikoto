@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260711-18-icons-monthly-content -->
+<!-- build: 20260711-19-icons-habit-monthreport -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -345,7 +345,8 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
 
 /* ── TIMETABLE ── */
 .tt-row{display:flex;align-items:center;margin-bottom:3px;gap:0;}
-.tt-cat-fixed{width:60px;flex-shrink:0;font-size:10px;color:var(--ts);cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px;padding-right:4px;-webkit-tap-highlight-color:rgba(192,112,128,0.15);user-select:none;}
+.tt-cat-fixed{width:60px;flex-shrink:0;font-size:10px;color:var(--ts);cursor:pointer;padding-right:4px;-webkit-tap-highlight-color:rgba(192,112,128,0.15);user-select:none;}
+.tt-cat-fixed span span:last-child{text-decoration:underline dotted;text-decoration-color:rgba(150,130,120,0.35);text-underline-offset:2px;}
 .tt-cat-fixed.tt-cat-sub{cursor:default;text-decoration:none;opacity:0.35;}
 .tt-date-scroll{flex:1;overflow-x:auto;-webkit-overflow-scrolling:touch;cursor:pointer;touch-action:pan-x;}
 .tt-date-scroll::-webkit-scrollbar{display:none;}
@@ -2779,7 +2780,7 @@ async function buildDiaryMonthSummaryHtml(y,mo,today,daysInMonth,mk){
   const _lh=new Date().getHours();
   const isLastDayEvening=today===daysInMonth&&(_lh>=19||_lh<6);
   if(isCurrentMonth&&!isLastDayEvening){
-    return `<div class="diary-month-summary"><div class="diary-month-summary-label"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div><div class="diary-month-summary-text" style="color:var(--tm);"><i class="ti ti-seeding" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이 달이 끝나면 정리해드릴게요</div></div>`;
+    return `<div class="diary-month-summary"><div class="diary-month-summary-label" style="text-align:center;"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div><div class="diary-month-summary-text" style="color:var(--tm);text-align:center;">이 달이 끝나면 정리해드릴게요</div></div>`;
   }
   const cacheKey='diary_month_summary_'+mk;
   let summary=S.get(cacheKey);
@@ -2795,8 +2796,8 @@ async function buildDiaryMonthSummaryHtml(y,mo,today,daysInMonth,mk){
       if(summary)S.set(cacheKey,summary);
     }
   }
-  if(!summary)return `<div class="diary-month-summary"><div class="diary-month-summary-label"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div><div class="diary-month-summary-text" style="color:var(--tm);">아직 모아볼 기록이 부족해요</div></div>`;
-  return `<div class="diary-month-summary"><div class="diary-month-summary-label"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div><div class="diary-month-summary-text">${summary}</div></div>`;
+  if(!summary)return `<div class="diary-month-summary"><div class="diary-month-summary-label" style="text-align:center;"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div><div class="diary-month-summary-text" style="color:var(--tm);">아직 모아볼 기록이 부족해요</div></div>`;
+  return `<div class="diary-month-summary"><div class="diary-month-summary-label" style="text-align:center;"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div><div class="diary-month-summary-text">${summary}</div></div>`;
 }
 async function generateDiaryMonthSummaryAI(monthNum,lines){
   const key=getClaudeKey();
@@ -2987,10 +2988,10 @@ async function loadMonthlyReportContent(){
 
   if(isOngoingMonth&&!hasPassedMidMonth){
     // 1~14일: 아직 중간집계 시점도 안 됨
-    slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title">이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;"><i class="ti ti-seeding" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 15일에 중간 소식을, 이 달이 끝나면 전체를 정리해드릴게요</div></div>`;
+    slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title" style="text-align:center;"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">15일에 중간 소식을, 이 달이 끝나면 전체를 정리해드릴게요</div></div>`;
     return;
   }
-  slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title">이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">불러오는 중...</div></div>`;
+  slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title" style="text-align:center;"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">불러오는 중...</div></div>`;
 
   let report,cacheKey,statsForAI=stats;
   if(isOngoingMonth&&hasPassedMidMonth){
@@ -3017,13 +3018,13 @@ async function loadMonthlyReportContent(){
   if(report){
     const midNote=(isOngoingMonth&&hasPassedMidMonth)?`<div style="font-size:11px;color:var(--tm);margin-bottom:6px;">15일 기준 중간 소식이에요, 이 달이 끝나면 전체로 다시 정리해드려요</div>`:'';
     slot2.innerHTML=`<div class="mr-ai-card">
-      <div class="mr-sec-title">이번 달 한눈에</div>
+      <div class="mr-sec-title" style="text-align:center;"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div>
       ${midNote}
       <p style="font-size:13px;color:var(--tp);line-height:1.9;margin-bottom:${report.keywords&&report.keywords.length?'12px':'0'};">${report.comment}</p>
       ${report.keywords&&report.keywords.length?`<div class="mr-tag-cloud">${report.keywords.map(k=>`<span class="mr-tag">${k}</span>`).join('')}</div>`:''}
     </div>`;
   } else {
-    slot2.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title">이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">코멘트를 만들 데이터가 부족하거나 API 키가 없어요</div></div>`;
+    slot2.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title" style="text-align:center;"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">코멘트를 만들 데이터가 부족하거나 API 키가 없어요</div></div>`;
   }
 }
 
@@ -3614,6 +3615,18 @@ const CAT_ICON_META={
 };
 const HABIT_COLORS=['mint','pink','sky','yellow','rose','lavender','peach','teal'];
 const DEFAULT_HABITS=[{name:'운동',color:'mint'},{name:'독서',color:'pink'},{name:'영양제',color:'sky'},{name:'물',color:'yellow'}];
+// 습관명은 자유 텍스트라 완전 자동매칭엔 한계가 있음 — 이름에 특정 키워드가 포함되면 아이콘을 붙이고, 매칭 안 되면 아이콘 없이 텍스트만 표시
+const HABIT_ICON_RULES=[
+  {keywords:['운동','헬스','필라테스','런닝','러닝','조깅'],icon:'ti-run'},
+  {keywords:['독서','책'],icon:'ti-book'},
+  {keywords:['일기','다이어리','글쓰기'],icon:'ti-writing'},
+  {keywords:['영양제','비타민','약'],icon:'ti-pill'}
+];
+function getHabitIcon(name){
+  if(!name)return null;
+  const rule=HABIT_ICON_RULES.find(r=>r.keywords.some(k=>name.includes(k)));
+  return rule?rule.icon:null;
+}
 
 // ── STORAGE
 const S={
@@ -5550,7 +5563,7 @@ function renderTimetable(){
       const catEl=document.createElement('div');catEl.className='tt-cat-fixed';
       if(tIdx===0){
         const meta=CAT_ICON_META[cat];
-        catEl.innerHTML=meta?`<span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:4px;background:${meta.color};margin-right:4px;vertical-align:-2px;"><i class="ti ${meta.icon}" style="font-size:9px;color:#fff;" aria-hidden="true"></i></span>${CAT_LABELS[cat]}`:CAT_LABELS[cat];
+        catEl.innerHTML=meta?`<span style="display:inline-flex;align-items:center;gap:4px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:4px;background:${meta.color};flex-shrink:0;"><i class="ti ${meta.icon}" style="font-size:9px;color:#fff;" aria-hidden="true"></i></span><span>${CAT_LABELS[cat]}</span></span>`:CAT_LABELS[cat];
         if(!readOnly)catEl.addEventListener('click',()=>openContentModal(cat));
         else catEl.style.opacity='0.5';
       }else{
@@ -5864,7 +5877,9 @@ function renderHabitMonthly(){
   el.innerHTML='';
   habits.forEach(h=>{
     const row=document.createElement('div');row.className='hm-row';
-    const lbl=document.createElement('span');lbl.className='hm-lbl';lbl.textContent=h.name;
+    const lbl=document.createElement('span');lbl.className='hm-lbl';
+    const hIcon=getHabitIcon(h.name);
+    lbl.innerHTML=hIcon?`<i class="ti ${hIcon}" style="font-size:12px;vertical-align:-1px;margin-right:3px;" aria-hidden="true"></i>${h.name}`:h.name;
     row.appendChild(lbl);
     const dots=document.createElement('div');dots.className='hm-dots';
     let checked_cnt=0;
@@ -6215,8 +6230,12 @@ function renderDailyHabitCheck(){
     const key=h.name+'-'+dow;
     const checked=!!checks[key];
     const rgba=HABIT_COLOR_RGBA[h.color]||'rgba(192,112,128,0.80)';
+    const hIcon=getHabitIcon(h.name);
+    const innerMark=hIcon
+      ?'<i class="ti '+hIcon+'" style="font-size:12px;color:#fff;display:'+(checked?'block':'none')+';" aria-hidden="true"></i>'
+      :'<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" style="display:'+(checked?'block':'none')+'"><polyline points="2,6 4.5,9 10,3.5"/></svg>';
     const col=document.createElement('div');col.className='habit-check-col';
-    col.innerHTML='<div class="habit-check-name">'+h.name+'</div><div class="habit-chk2'+(checked?' on':'')+'"'+(checked?' style="background:'+rgba+';border-color:'+rgba+';"':'')+'><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" style="display:'+(checked?'block':'none')+'"><polyline points="2,6 4.5,9 10,3.5"/></svg></div>';
+    col.innerHTML='<div class="habit-check-name">'+h.name+'</div><div class="habit-chk2'+(checked?' on':'')+'"'+(checked?' style="background:'+rgba+';border-color:'+rgba+';"':'')+'>'+innerMark+'</div>';
     col.querySelector('.habit-chk2').addEventListener('click',function(){
       const wasOn=!!checks[key];
       checks[key]=!checks[key];
