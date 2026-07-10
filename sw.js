@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260711-17-icons-sleep-reading-memo';
+const CACHE = 'iikoto-v20260711-18-icons-monthly-content';
 const ASSETS = [
   './',
   './index.html'
