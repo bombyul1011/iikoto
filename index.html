@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260711-05-exercisebanner-ivory -->
+<!-- build: 20260711-07-rhythmbar-midnightfix -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -10,6 +10,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="iikoto">
 <meta name="theme-color" content="#fdf0e8">
+<link rel="apple-touch-startup-image" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3)" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1206' height='2622'%3E%3Crect width='1206' height='2622' fill='%23fdf0e8'/%3E%3C/svg%3E">
+<link rel="apple-touch-startup-image" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1206' height='2622'%3E%3Crect width='1206' height='2622' fill='%23fdf0e8'/%3E%3C/svg%3E">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>iikoto</title>
@@ -6270,20 +6272,30 @@ function renderWeeklyRhythmBars(){
         segs.push({start:s,end:endMin,color:cat.color,ongoing:true});
       }
     });
-    // 전날의 논리적 날짜에 저장된, 새벽 0~3시대 시작 블록을 오늘(익일) 칸의 새벽 구간으로 이어서 표시
+    // 전날에 저장된 블록 중, 자정을 넘겨 오늘 새벽까지 이어지는 것을 오늘 칸의 새벽 구간으로 이어서 표시
+    // 대상 1) 새벽 0~3시대에 시작한 블록(논리적 날짜 경계상 전날로 저장됨)
+    // 대상 2) 전날 밤(예: 23시대)에 시작해 end가 자정을 넘겨(end<=start) 익일 새벽까지 이어지는 블록
     const prevD=new Date(d);prevD.setDate(d.getDate()-1);
     getRhythmBlocks(dateKey(prevD)).forEach(function(b){
       const cat=RHYTHM_CATS[b.cat];if(!cat)return;
       const s=toMin(b.start);
-      if(s==null||s>=240)return; // 새벽 4시 이전 시작 블록만 대상
+      if(s==null)return;
       if(b.end){
-        let e=toMin(b.end);
-        if(e<=s)e=240; // 방어적으로 새벽 4시까지만
-        segs.push({start:s,end:e,color:cat.color});
+        const eRaw=toMin(b.end);
+        if(s<240){
+          // 새벽 시작 블록: 기존 로직 그대로
+          let e=eRaw<=s?240:eRaw;
+          segs.push({start:s,end:e,color:cat.color});
+        }else if(eRaw<=s){
+          // 야간 시작(자정 이전) + 자정을 넘겨 종료되는 블록: 새벽 구간(0~end)만 오늘 칸에 이어 그림
+          segs.push({start:0,end:eRaw,color:cat.color});
+        }
       }else{
-        // 진행중 블록이 전날 논리날짜에 남아있는 경우(자정 넘겨 아직 종료 안 함): 오늘 칸에서 현재 시각까지 이어서 표시
-        const endMin=dateKey(prevD)===_curLogicalDk?(function(){const n=new Date();return n.getHours()*60+n.getMinutes();})():240;
-        segs.push({start:s,end:endMin,color:cat.color,ongoing:true});
+        // 진행중 블록(아직 종료 안 함): 전날 논리날짜에 남아있다면 오늘 칸에서 현재 시각까지 이어서 표시
+        if(s<240||s>=1380){ // 새벽대 시작이거나, 자정 임박(23시 이후) 시작인 경우만 이어붙임 대상
+          const endMin=dateKey(prevD)===_curLogicalDk?(function(){const n=new Date();return n.getHours()*60+n.getMinutes();})():240;
+          segs.push({start:0,end:endMin,color:cat.color,ongoing:true});
+        }
       }
     });
     let track='<div class="wrb-track">';
