@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260711-15-pointercapture-clickfix';
+const CACHE = 'iikoto-v20260711-16-tabler-icons-phase1';
 const ASSETS = [
   './',
   './index.html'

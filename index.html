@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260711-15-pointercapture-clickfix -->
+<!-- build: 20260711-16-tabler-icons-phase1 -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -16,6 +16,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>iikoto</title>
 <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css">
 <style>
 /* ═══════════════════════════════════════
    IIKOTO — CSS
@@ -968,13 +969,13 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
           </div>
         </div>
         <div class="icon-btn" onclick="openSettings()">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--tm)"><circle cx="7" cy="7" r="1.8"/><path d="M7 2.5V3.5M7 10.5V11.5M2.5 7H3.5M10.5 7H11.5M4 4L4.7 4.7M9.3 9.3L10 10M4 10L4.7 9.3M9.3 4.7L10 4"/></svg>
+          <i class="ti ti-settings" style="font-size:15px;color:var(--tm);" aria-hidden="true"></i>
         </div>
         <div class="icon-btn seed-icon-btn" onclick="openSeed()">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" style="color:#6a8a50"><path d="M8 14V8"/><path d="M8 8C8 8 4.5 6.5 3 4c3-.8 6 1.2 5 4z" fill="rgba(140,175,90,0.20)"/><path d="M8 10C8 10 11.5 8.5 13 6c-3-.8-6 1.2-5 4z" fill="rgba(140,175,90,0.20)"/></svg>
+          <i class="ti ti-seeding" style="font-size:16px;color:#6a8a50;" aria-hidden="true"></i>
         </div>
         <div class="icon-btn reading-icon-btn" onclick="openReading()">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" style="color:#a8527a"><path d="M7 2.8C5.7 2 3.6 1.7 2 2v8.3c1.6-.3 3.7 0 5 .8M7 2.8C8.3 2 10.4 1.7 12 2v8.3c-1.6-.3-3.7 0-5 .8M7 2.8v8.3"/></svg>
+          <i class="ti ti-book-2" style="font-size:15px;color:#a8527a;" aria-hidden="true"></i>
         </div>
       </div>
     </div>
@@ -1074,7 +1075,7 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
       <div class="week-strip" id="week-strip"></div>
       <div class="card" id="wchallenge-card" style="padding:14px 15px 10px;margin-bottom:7px;">
         <div style="display:flex;align-items:center;justify-content:space-between;">
-          <div class="goal-section-title" style="margin-top:0;">✦ 이번 주도 화이팅</div>
+          <div class="goal-section-title" style="margin-top:0;"><i class="ti ti-sparkles" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i> 이번 주도 화이팅</div>
           <button class="wgoal-add-btn" id="wgoal-add-btn" title="항목 추가"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><line x1="7" y1="2" x2="7" y2="12"/><line x1="2" y1="7" x2="12" y2="7"/></svg></button>
         </div>
         <div class="goal-wrap" id="weekly-goal-wrap"></div>
@@ -1098,7 +1099,7 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
     <!-- MONTHLY -->
     <div class="view" id="v-monthly">
       <div class="card" id="monthly-goal-card" style="padding:14px 15px 10px;margin-bottom:10px;">
-        <div class="goal-section-title" id="monthly-goal-title" style="margin-top:0;">✦ 이번 달 목표</div>
+        <div class="goal-section-title" id="monthly-goal-title" style="margin-top:0;"><i class="ti ti-sparkles" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 목표</div>
         <div class="goal-wrap" id="monthly-goal-wrap"></div>
       </div>
       <div id="monthly-cal"></div>
@@ -1107,10 +1108,10 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
       <div class="slabel">콘텐츠 기록</div>
       <div class="card s" style="padding:14px 10px;">
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
-          <span style="font-size:10px;color:var(--tm);display:flex;align-items:center;gap:4px;"><span style="width:9px;height:9px;border-radius:3px;background:rgba(255,210,225,.75);display:inline-block"></span>드라마</span>
-          <span style="font-size:10px;color:var(--tm);display:flex;align-items:center;gap:4px;"><span style="width:9px;height:9px;border-radius:3px;background:rgba(255,235,160,.75);display:inline-block"></span>책</span>
-          <span style="font-size:10px;color:var(--tm);display:flex;align-items:center;gap:4px;"><span style="width:9px;height:9px;border-radius:3px;background:rgba(200,240,235,.75);display:inline-block"></span>영화</span>
-          <span style="font-size:10px;color:var(--tm);display:flex;align-items:center;gap:4px;"><span style="width:9px;height:9px;border-radius:3px;background:rgba(200,220,255,.75);display:inline-block"></span>음악</span>
+          <span style="font-size:10px;color:var(--tm);display:flex;align-items:center;gap:4px;"><span style="width:9px;height:9px;border-radius:3px;background:rgba(255,210,225,.75);display:inline-block"></span><i class="ti ti-device-tv" style="font-size:11px;" aria-hidden="true"></i>드라마</span>
+          <span style="font-size:10px;color:var(--tm);display:flex;align-items:center;gap:4px;"><span style="width:9px;height:9px;border-radius:3px;background:rgba(255,235,160,.75);display:inline-block"></span><i class="ti ti-book" style="font-size:11px;" aria-hidden="true"></i>책</span>
+          <span style="font-size:10px;color:var(--tm);display:flex;align-items:center;gap:4px;"><span style="width:9px;height:9px;border-radius:3px;background:rgba(200,240,235,.75);display:inline-block"></span><i class="ti ti-movie" style="font-size:11px;" aria-hidden="true"></i>영화</span>
+          <span style="font-size:10px;color:var(--tm);display:flex;align-items:center;gap:4px;"><span style="width:9px;height:9px;border-radius:3px;background:rgba(200,220,255,.75);display:inline-block"></span><i class="ti ti-music" style="font-size:11px;" aria-hidden="true"></i>음악</span>
         </div>
         <div class="tt-head-row" id="tt-head-row">
           <div class="tt-head-spacer"></div>
@@ -1367,7 +1368,7 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
   <div class="bsheet" style="max-height:82vh;overflow-y:auto;" onclick="event.stopPropagation()">
     <div class="sheet-handle"></div>
     <div style="padding:0 20px 20px;">
-      <div style="font-size:13px;font-weight:600;color:rgba(80,140,200,0.9);text-align:center;margin-bottom:16px;letter-spacing:0.04em;">✦ 이번주 돌아보기 ✦</div>
+      <div style="font-size:13px;font-weight:600;color:rgba(80,140,200,0.9);text-align:center;margin-bottom:16px;letter-spacing:0.04em;"><i class="ti ti-sparkles" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i> 이번주 돌아보기 <i class="ti ti-sparkles" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i></div>
       <div id="weekly-review-content" style="font-size:13px;color:var(--tp);line-height:1.9;"></div>
     </div>
   </div>
@@ -1698,7 +1699,7 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
       </div>
     </div>
     <div id="seed-list"></div>
-    <div id="seed-empty" style="display:none;text-align:center;padding:48px 0;font-size:13px;color:var(--tm);">✦ 문장이나 단어를 모아두는 공간이에요</div>
+    <div id="seed-empty" style="display:none;text-align:center;padding:48px 0;font-size:13px;color:var(--tm);"><i class="ti ti-seeding" style="font-size:14px;vertical-align:-1px;" aria-hidden="true"></i> 문장이나 단어를 모아두는 공간이에요</div>
   </div>
 </div>
 <div class="reading-ov" id="reading-ov">
@@ -1822,14 +1823,14 @@ function appendSundayBanner(body){
   banner.className='weekly-review-banner';
   if(isNight2){
     banner.innerHTML=`<div class="weekly-review-banner-inner">
-      <div class="weekly-review-banner-title">✦ 이번주 돌아보기 ✦</div>
+      <div class="weekly-review-banner-title"><i class="ti ti-sparkles" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i> 이번주 돌아보기 <i class="ti ti-sparkles" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i></div>
       <div class="weekly-review-banner-sub"><span>지난 한주간의 나는 어땠을까요?</span><span style="font-size:16px;opacity:0.6;">›</span></div>
     </div>`;
     banner.addEventListener('click',openWeeklyReviewSheet);
   }else{
     banner.style.cssText+='cursor:default;opacity:0.62;animation:none;';
     banner.innerHTML=`<div class="weekly-review-banner-inner">
-      <div class="weekly-review-banner-title">✦ 이번주 돌아보기 ✦</div>
+      <div class="weekly-review-banner-title"><i class="ti ti-sparkles" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i> 이번주 돌아보기 <i class="ti ti-sparkles" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i></div>
       <div class="weekly-review-banner-sub"><span>22시에 요약해드릴게요</span></div>
     </div>`;
   }
@@ -2784,7 +2785,7 @@ async function buildDiaryMonthSummaryHtml(y,mo,today,daysInMonth,mk){
   const _lh=new Date().getHours();
   const isLastDayEvening=today===daysInMonth&&(_lh>=19||_lh<6);
   if(isCurrentMonth&&!isLastDayEvening){
-    return `<div class="diary-month-summary"><div class="diary-month-summary-label">✦ 이번 달 한눈에</div><div class="diary-month-summary-text" style="color:var(--tm);">🌿 이 달이 끝나면 정리해드릴게요</div></div>`;
+    return `<div class="diary-month-summary"><div class="diary-month-summary-label"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div><div class="diary-month-summary-text" style="color:var(--tm);"><i class="ti ti-seeding" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이 달이 끝나면 정리해드릴게요</div></div>`;
   }
   const cacheKey='diary_month_summary_'+mk;
   let summary=S.get(cacheKey);
@@ -2800,8 +2801,8 @@ async function buildDiaryMonthSummaryHtml(y,mo,today,daysInMonth,mk){
       if(summary)S.set(cacheKey,summary);
     }
   }
-  if(!summary)return `<div class="diary-month-summary"><div class="diary-month-summary-label">✦ 이번 달 한눈에</div><div class="diary-month-summary-text" style="color:var(--tm);">아직 모아볼 기록이 부족해요</div></div>`;
-  return `<div class="diary-month-summary"><div class="diary-month-summary-label">✦ 이번 달 한눈에</div><div class="diary-month-summary-text">${summary}</div></div>`;
+  if(!summary)return `<div class="diary-month-summary"><div class="diary-month-summary-label"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div><div class="diary-month-summary-text" style="color:var(--tm);">아직 모아볼 기록이 부족해요</div></div>`;
+  return `<div class="diary-month-summary"><div class="diary-month-summary-label"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div><div class="diary-month-summary-text">${summary}</div></div>`;
 }
 async function generateDiaryMonthSummaryAI(monthNum,lines){
   const key=getClaudeKey();
@@ -2943,7 +2944,7 @@ async function loadMonthlyReportContent(){
   const mk=`${y}-${pad(mo+1)}`;
   const stats=computeMonthStats(y,mo);
   const goalHtml=stats.goalLines.length?`<div class="mr-card mr-goal-card">
-    <div class="mr-sec-title">✦ 이번 달 목표</div>
+    <div class="mr-sec-title"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 목표</div>
     ${stats.goalLines.map(g=>`<div style="font-size:13px;color:var(--tp);line-height:1.7;padding:2px 0;">${g}</div>`).join('')}
   </div>` : '';
   const statsHtml=`<div class="mr-row2" style="margin-bottom:12px;">
@@ -2992,7 +2993,7 @@ async function loadMonthlyReportContent(){
 
   if(isOngoingMonth&&!hasPassedMidMonth){
     // 1~14일: 아직 중간집계 시점도 안 됨
-    slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title">이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">🌿 15일에 중간 소식을, 이 달이 끝나면 전체를 정리해드릴게요</div></div>`;
+    slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title">이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;"><i class="ti ti-seeding" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 15일에 중간 소식을, 이 달이 끝나면 전체를 정리해드릴게요</div></div>`;
     return;
   }
   slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title">이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">불러오는 중...</div></div>`;
@@ -5907,7 +5908,8 @@ function isCalCurrentMonth(){const n=new Date();return _calYear===n.getFullYear(
 function isCalPastMonth(){const n=new Date();return _calYear<n.getFullYear()||(_calYear===n.getFullYear()&&_calMonth<n.getMonth());}
 function updateMonthlyGoalTitle(){
   const el=document.getElementById('monthly-goal-title');if(!el)return;
-  el.textContent=isCalCurrentMonth()?'✦ 이번 달 목표':`✦ ${_calMonth+1}월 목표`;
+  const ic='<i class="ti ti-sparkles" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i>';
+  el.innerHTML=isCalCurrentMonth()?`${ic} 이번 달 목표`:`${ic} ${_calMonth+1}월 목표`;
 }
 let _calSelectedDay=null;
 
