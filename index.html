@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260711-03-tokenlimitfix -->
+<!-- build: 20260711-05-exercisebanner-ivory -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -539,6 +539,10 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
 .report-banner.diary-soft .report-banner-line{color:rgba(180,110,90,0.85);}
 .report-banner.diary-soft .rb-title{color:rgba(180,110,90,0.95);}
 .report-banner.diary-soft .report-banner-arrow{color:rgba(180,110,90,0.55);}
+.report-banner.exercise-check-soft{background:linear-gradient(135deg,rgba(165,205,185,0.85),rgba(250,244,222,0.85),rgba(170,208,190,0.85));}
+.report-banner.exercise-check-soft .report-banner-inner{background:linear-gradient(135deg,rgba(232,244,236,0.88),rgba(254,250,238,0.88),rgba(232,244,236,0.88));}
+.report-banner.exercise-check-soft .report-banner-line{color:var(--tp);}
+[data-theme="glass"] .report-banner.exercise-check-soft .report-banner-inner{background:rgba(253,251,245,0.95)!important;}
 [data-theme="glass"] .report-banner.diary-soft .report-banner-inner{background:rgba(253,251,245,0.95);}
 [data-theme="glass"] .report-banner.month-soft .report-banner-inner{background:rgba(253,251,245,0.95);}
 .report-banner.rhythm-soft{background:linear-gradient(135deg,rgba(185,140,195,0.92),rgba(155,190,222,0.85),rgba(195,150,195,0.90),rgba(185,140,195,0.92));}
@@ -2429,8 +2433,8 @@ function makeExerciseCheckCard(){
   const isOn=!!checks[key];
   const rgba='rgba(140,195,165,0.90)';
   const card=document.createElement('div');
-  card.className='report-banner meal-soft';
-  card.style.cssText='margin-top:0;margin-bottom:8px;filter:saturate(0.68) brightness(1.01);';
+  card.className='report-banner exercise-check-soft';
+  card.style.cssText='margin-top:0;margin-bottom:8px;';
   card.innerHTML=`<div class="report-banner-inner">
     <div class="report-banner-line" style="font-size:12.5px;">오늘 운동 다녀왔나요?</div>
     <div class="habit-chk2${isOn?' on':''}" style="border-color:rgba(100,140,75,0.55);${isOn?`background:${rgba};`:''}"><svg width="13" height="13" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" style="display:${isOn?'block':'none'}"><polyline points="2,6 4.5,9 10,3.5"/></svg></div>
@@ -4739,7 +4743,7 @@ function makeYesterdayReviewCard(){
   const card=document.createElement('div');
   card.className='card';
   card.id='home-yesterday-review-card';
-  card.style.cssText='background:rgba(255,250,240,0.55);border-color:rgba(225,205,180,0.5);';
+  card.style.cssText='background:linear-gradient(135deg,rgba(255,246,224,0.60),rgba(255,236,229,0.55));border-color:rgba(240,215,195,0.45);';
   const dk=dateKey(getLogicalDate());
 
   const label='<div style="font-size:11px;color:var(--tm);margin-bottom:5px;">◐ 어제 돌아보기</div>';
@@ -4770,6 +4774,16 @@ async function _buildYesterdayReview(todayDk){
   const yTodos=getTodos(ydk);
   const yDone=yTodos.filter(t=>t.done).length,yPend=yTodos.filter(t=>!t.done).length;
   const yRblocks=getRhythmBlocks(ydk);
+  const ySleep=getSleep(ydk);
+  const ySleepSummary=(()=>{
+    if(!ySleep||!ySleep.sleep||!ySleep.wake)return '';
+    const [sh,sm]=ySleep.sleep.split(':').map(Number);
+    const [wh,wm]=ySleep.wake.split(':').map(Number);
+    let mins=(wh*60+wm)-(sh*60+sm);
+    if(mins<0)mins+=24*60;
+    const h=Math.floor(mins/60),m=mins%60;
+    return `어제 수면: ${ySleep.sleep}에 잠들어 ${ySleep.wake}에 기상 (총 ${h}시간${m?` ${m}분`:''})`;
+  })();
   const yRhythmSummary=(()=>{
     if(!yRblocks||!yRblocks.length)return '';
     const durByCat={};
@@ -4783,6 +4797,7 @@ async function _buildYesterdayReview(todayDk){
   })();
 
   const dataContext=[
+    ySleepSummary,
     yMemos.length?`어제 메모: ${yMemos.join(' / ')}`:'',
     (yDone||yPend)?`어제 할일: 완료 ${yDone}건 / 미완료 ${yPend}건`:'',
     yRhythmSummary
@@ -4804,6 +4819,7 @@ async function _buildYesterdayReview(todayDk){
 - 두 문장 사이는 반드시 줄바꿈(\\n)으로 구분할 것 — 이어 붙이지 말 것
 
 기타 규칙:
+- 어제 수면 데이터(취침/기상 시각, 총 수면시간)가 주어지면 이를 실제 근거로 삼아 정확하게 언급 가능(예: "7시간 넘게 푹 주무셨네요"). 데이터 없이 추측하지 말 것.
 - 어제 메모에 담긴 컨디션(피곤함, 아픔 등)은 일시적 상황으로만 참고하고, 이를 근거로 "쉬어야 해요" 식 걱정을 반복하지 말 것. 특히 생리/월경 등 주기적 신체 상태는 하루 지나면 이미 지난 일로 간주.
 - 어제 완료/미완료한 일이 있다면 담백하게 반영 가능하나, 죄책감을 유발하는 톤("또 못 했네요" 등)은 금지.
 - 팁은 실질적이고 구체적이어야 함 — "오늘도 힘내세요" 같은 추상적 응원 금지.
