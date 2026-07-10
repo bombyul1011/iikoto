@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260711-08-focusring-spacing-fix';
+const CACHE = 'iikoto-v20260711-10-commentchip-clickfix';
 const ASSETS = [
   './',
   './index.html'

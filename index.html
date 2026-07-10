@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260711-08-focusring-spacing-fix -->
+<!-- build: 20260711-10-commentchip-clickfix -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -6979,7 +6979,7 @@ function renderRdQuotes(){
   let html=shown.map(q=>`<div class="rd-quote-item">
       <div class="rd-quote-text">${q.text}</div>
       ${q.comment?`<div class="rd-quote-comment" onclick="toggleQuoteCommentEditor('${q.cid}')" style="font-size:11px;color:#7a9552;margin-top:4px;padding:5px 8px;background:rgba(232,246,220,0.6);border-radius:8px;cursor:pointer;">${q.comment}</div>`:''}
-      <div id="qc-editor-${q.cid}" class="qc-editor" style="display:none;margin-top:5px;">
+      <div id="qc-editor-${q.cid}" class="qc-editor" style="display:none;margin-top:5px;" onclick="event.stopPropagation();">
         <textarea class="qc-comment-textarea" style="width:100%;box-sizing:border-box;font-size:11.5px;padding:6px 8px;border-radius:8px;border:1px solid var(--card-b);background:var(--card);color:var(--tp);resize:none;min-height:44px;font-family:inherit;outline:none;" placeholder="이 문장에 대한 감상을 적어보세요">${q.comment||''}</textarea>
         <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px;">
           <span onclick="document.getElementById('qc-editor-${q.cid}').style.display='none';" style="font-size:11px;color:var(--tm);cursor:pointer;padding:3px 8px;">취소</span>
@@ -7110,7 +7110,7 @@ function renderDoneBookQuotes(bookCid){
   if(!quotes.length){listEl.innerHTML='<div class="rd-quote-empty">아직 모은 문장이 없어요</div>';listEl.style.maxHeight='';listEl.style.overflowY='';return;}
   listEl.innerHTML=quotes.map(q=>`<div class="rd-quote-item">
       <div class="rd-quote-text">${q.text}</div>
-      <div id="qc-editor-${q.cid}" class="qc-editor" style="display:none;margin-top:5px;">
+      <div id="qc-editor-${q.cid}" class="qc-editor" style="display:none;margin-top:5px;" onclick="event.stopPropagation();">
         <textarea class="qc-comment-textarea" style="width:100%;box-sizing:border-box;font-size:11.5px;padding:6px 8px;border-radius:8px;border:1px solid var(--card-b);background:var(--card);color:var(--tp);resize:none;min-height:44px;font-family:inherit;outline:none;" placeholder="이 문장에 대한 감상을 적어보세요">${q.comment||''}</textarea>
         <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px;">
           <span onclick="event.stopPropagation();document.getElementById('qc-editor-${q.cid}').style.display='none';" style="font-size:11px;color:var(--tm);cursor:pointer;padding:3px 8px;">취소</span>
@@ -7149,7 +7149,7 @@ function renderDoneBookComments(bookCid){
   listEl.innerHTML=quotes.map(q=>`<div class="rd-quote-item">
       <div class="rd-quote-text" style="font-size:11px;color:var(--tm);margin-bottom:4px;">${q.text}</div>
       <div class="rd-quote-comment" onclick="event.stopPropagation();toggleQuoteCommentEditor('${q.cid}')" style="font-size:12.5px;color:var(--tp);padding:6px 8px;background:rgba(200,176,168,0.14);border-radius:8px;cursor:pointer;">${q.comment}</div>
-      <div id="qc-editor-${q.cid}" class="qc-editor" style="display:none;margin-top:5px;">
+      <div id="qc-editor-${q.cid}" class="qc-editor" style="display:none;margin-top:5px;" onclick="event.stopPropagation();">
         <textarea class="qc-comment-textarea" style="width:100%;box-sizing:border-box;font-size:11.5px;padding:6px 8px;border-radius:8px;border:1px solid var(--card-b);background:var(--card);color:var(--tp);resize:none;min-height:44px;font-family:inherit;outline:none;" placeholder="이 문장에 대한 감상을 적어보세요">${q.comment||''}</textarea>
         <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px;">
           <span onclick="event.stopPropagation();document.getElementById('qc-editor-${q.cid}').style.display='none';" style="font-size:11px;color:var(--tm);cursor:pointer;padding:3px 8px;">취소</span>
@@ -7196,10 +7196,10 @@ function renderBookList(){
     const doneQuoteBlock=_rdTab==='done'?`
         <div class="done-banner-row">
           <div class="done-quote-chip" onclick="event.stopPropagation();toggleDoneBookQuotes('${b.cid}')">
-            <div class="done-quote-chip-inner">✎ 수집한 문장</div>
+            <div class="done-quote-chip-inner" onclick="event.stopPropagation();toggleDoneBookQuotes('${b.cid}')">✎ 수집한 문장</div>
           </div>
           <div class="done-comment-chip" onclick="event.stopPropagation();toggleDoneBookComments('${b.cid}')">
-            <div class="done-comment-chip-inner">코멘트</div>
+            <div class="done-comment-chip-inner" onclick="event.stopPropagation();toggleDoneBookComments('${b.cid}')">코멘트</div>
           </div>
         </div>
         ${quoteOpen?`<div id="rd-done-quote-list-${b.cid}" style="margin-top:6px;"></div>
