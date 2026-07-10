@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260711-25-forest-card-reorder';
+const CACHE = 'iikoto-v20260711-26-cleanup-rhythmui-habitcolor';
 const ASSETS = [
   './',
   './index.html'
