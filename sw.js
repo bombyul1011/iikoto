@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260711-73-rhythm-banner-color';
+const CACHE = 'iikoto-v20260711-74-rhythm-rainbow-icon';
 const ASSETS = [
   './',
   './index.html'

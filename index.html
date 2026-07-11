@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260711-73-rhythm-banner-color -->
-<!-- 20260711-72 → 73: 리듬배너 색상을 보라-파랑 2색에서 리듬 카테고리 5색(운동/휴식/외출/감상/책상 계열) 그라디언트로 변경 — 라이트테마는 배경+테두리 모두, 유리알테마는 테두리만 동일 색상 적용하고 안쪽은 기존 흰배경 유지 -->
+<!-- build: 20260711-74-rhythm-rainbow-icon -->
+<!-- 20260711-73 → 74: 리듬 관련 아이콘(리듬배너/월간리포트 이번달리듬/새벽리캡 오늘의리듬) 물결(ti-wave-sine)에서 무지개(ti-rainbow)로 통일 -->
 
 <html lang="ko">
 <head>
@@ -2708,7 +2708,7 @@ function makeHabitStreakRow(){
 }
 function makeRhythmBanner(lineText,builderFn,extraClass,fontSize,dk){
   const b=document.createElement('div');b.className='report-banner'+(extraClass?' '+extraClass:'');
-  const lineIcon=extraClass==='rhythm-soft'?'<i class="ti ti-wave-sine" style="font-size:12px;vertical-align:-1px;margin-right:4px;" aria-hidden="true"></i>':'';
+  const lineIcon=extraClass==='rhythm-soft'?'<i class="ti ti-rainbow" style="font-size:13px;vertical-align:-1px;margin-right:4px;" aria-hidden="true"></i>':'';
   b.innerHTML='<div class="report-banner-inner"><div class="report-banner-line"'+(fontSize?` style="font-size:${fontSize}px;"`:'')+'>'+lineIcon+lineText+'</div><div class="report-banner-arrow">›</div></div>';
   b.addEventListener('click',function(){openHomeDetailSheet(lineText,builderFn);});
   return b;
@@ -3080,7 +3080,7 @@ async function loadMonthlyReportContent(){
     <div class="mr-stat"><div class="v">${stats.avgSleep?stats.avgSleep+'h':'-'}</div><div class="l">평균 수면</div></div>
   </div>`;
   const rhythmHtml=stats.rhythmDur&&Object.keys(stats.rhythmDur).length?`<div class="mr-card">
-    <div class="mr-sec-title"><i class="ti ti-wave-sine" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 리듬</div>
+    <div class="mr-sec-title"><i class="ti ti-rainbow" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 리듬</div>
     ${buildMonthlyRhythmBar(stats.rhythmDur,stats.dim,stats.rhythmDayCount)}
   </div>` : '';
   const wcHtml=stats.wcByWeek.length?`<div class="mr-card mr-accordion">
@@ -5714,7 +5714,7 @@ function makeDawnRecapCard(){
 
   if(totalDur>0){
     html+=`<div class="day-recap-divider"></div>
-      <div class="day-recap-sec-title"><i class="ti ti-wave-sine" style="font-size:12px;" aria-hidden="true"></i> 오늘의 리듬</div>
+      <div class="day-recap-sec-title"><i class="ti ti-rainbow" style="font-size:13px;" aria-hidden="true"></i> 오늘의 리듬</div>
       <div class="recap-rhythm-bar-chart">`;
     Object.keys(RHYTHM_CATS).forEach(k=>{
       if(!durByCat[k])return;
