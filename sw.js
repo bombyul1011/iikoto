@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260711-72-dup-bg-layer-removed';
+const CACHE = 'iikoto-v20260711-73-rhythm-banner-color';
 const ASSETS = [
   './',
   './index.html'

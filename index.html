@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260711-72-dup-bg-layer-removed -->
-<!-- 20260711-71 → 72: 원격디버깅으로 발견한 기존 html::before/body::before(z-index:-1) 고정배경 규칙 제거 — #bg-fixed(z-index:0)와 중복/충돌해 흰화면 깜빡임 유발 추정 -->
+<!-- build: 20260711-73-rhythm-banner-color -->
+<!-- 20260711-72 → 73: 리듬배너 색상을 보라-파랑 2색에서 리듬 카테고리 5색(운동/휴식/외출/감상/책상 계열) 그라디언트로 변경 — 라이트테마는 배경+테두리 모두, 유리알테마는 테두리만 동일 색상 적용하고 안쪽은 기존 흰배경 유지 -->
 
 <html lang="ko">
 <head>
@@ -574,10 +574,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="glass"] .report-banner.exercise-check-soft .report-banner-inner{background:rgba(253,251,245,0.95)!important;}
 [data-theme="glass"] .report-banner.diary-soft .report-banner-inner{background:rgba(253,251,245,0.95);}
 [data-theme="glass"] .report-banner.month-soft .report-banner-inner{background:rgba(253,251,245,0.95);}
-.report-banner.rhythm-soft{background:linear-gradient(135deg,rgba(185,140,195,0.92),rgba(155,190,222,0.85),rgba(195,150,195,0.90),rgba(185,140,195,0.92));}
-.report-banner.rhythm-soft .report-banner-inner{background:linear-gradient(135deg,rgba(236,219,242,0.90),rgba(216,228,245,0.88),rgba(236,219,242,0.90));}
-.report-banner.rhythm-soft .report-banner-line{color:rgba(140,90,155,0.88);}
-.report-banner.rhythm-soft .report-banner-arrow{color:rgba(140,90,155,0.55);}
+.report-banner.rhythm-soft{background:linear-gradient(120deg,rgba(248,192,160,0.85) 0%,rgba(252,215,110,0.80) 25%,rgba(150,205,225,0.75) 50%,rgba(190,160,230,0.80) 75%,rgba(244,177,206,0.82) 100%);}
+.report-banner.rhythm-soft .report-banner-inner{background:linear-gradient(120deg,rgba(253,242,232,0.92) 0%,rgba(253,247,225,0.90) 25%,rgba(235,246,250,0.90) 50%,rgba(246,240,252,0.90) 75%,rgba(253,238,244,0.92) 100%);}
+.report-banner.rhythm-soft .report-banner-line{color:#8a6a55;}
+.report-banner.rhythm-soft .report-banner-arrow{color:#a68a72;}
+[data-theme="glass"] .report-banner.rhythm-soft{background:linear-gradient(120deg,rgba(248,192,160,0.85) 0%,rgba(252,215,110,0.80) 25%,rgba(150,205,225,0.75) 50%,rgba(190,160,230,0.80) 75%,rgba(244,177,206,0.82) 100%);}
 [data-theme="glass"] .report-banner.rhythm-soft .report-banner-inner{background:rgba(253,251,245,0.95);}
 [data-theme="glass"] .weekly-review-banner-inner{background:rgba(253,251,245,0.95)!important;backdrop-filter:none;}
 .rhythm-review-card{border-radius:18px;background:linear-gradient(135deg,rgba(236,219,242,0.55),rgba(216,228,245,0.50));border:1.5px solid rgba(165,125,180,0.42);padding:14px 15px;margin-bottom:10px;}
