@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260711-48-afternoon-pace-cleanup';
+const CACHE = 'iikoto-v20260711-50-pace-bar-speed-compare';
 const ASSETS = [
   './',
   './index.html'
