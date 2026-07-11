@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260711-54-pace-card-debug-log';
+const CACHE = 'iikoto-v20260711-55-weekly-summary-rhythm-diff';
 const ASSETS = [
   './',
   './index.html'
