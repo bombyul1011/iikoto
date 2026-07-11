@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260711-69-fixed-bg-layer-glass-icon';
+const CACHE = 'iikoto-v20260711-70-bg-layer-zindex-fix';
 const ASSETS = [
   './',
   './index.html'
