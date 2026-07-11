@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260711-45-morning-exercise-banner-final -->
+<!-- build: 20260711-46-afternoon-pace-card -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -513,6 +513,33 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
 .rd-progress-fill{position:absolute;left:0;top:0;height:100%;border-radius:3px;background:#ffc9da;transition:width .4s ease;}
 .rd-progress-today{position:absolute;top:0;height:100%;background:#ff9ec0;transition:left .4s ease,width .4s ease;}
 .rd-progress-bead{position:absolute;top:50%;width:13px;height:13px;border-radius:50%;transform:translate(-50%,-50%);border:1.6px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.25);background:linear-gradient(270deg,#ffb0c8,#ffd28a,#bdf0c4,#9fd8ff,#c9a8ff,#ffb0c8);background-size:500% 100%;animation:beadRainbow 22s linear infinite;transition:left .4s ease;}
+
+/* ── 오후 홈탭: 통계 카드 (오늘vs어제 진행바 + 웨이브게이지 + 리듬비교) ── */
+.pace-card{background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:16px;}
+.pace-title{font-size:12px;color:var(--tm);margin-bottom:10px;display:flex;align-items:center;gap:5px;}
+.pace-track-wrap{margin-bottom:8px;}
+.pace-track-lbl{font-size:10px;color:var(--tm);margin-bottom:3px;display:flex;justify-content:space-between;}
+.pace-track{height:6px;border-radius:3px;background:var(--div);position:relative;overflow:visible;}
+.pace-fill-y{position:absolute;left:0;top:0;height:100%;border-radius:3px;background:rgba(200,190,180,0.55);}
+.pace-fill-t{position:absolute;left:0;top:0;height:100%;border-radius:3px;background:#ffc9da;}
+.pace-bead2{position:absolute;top:50%;width:13px;height:13px;border-radius:50%;transform:translate(-50%,-50%);border:1.6px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.25);
+  background:linear-gradient(270deg,#ffb0c8,#ffd28a,#bdf0c4,#9fd8ff,#c9a8ff,#ffb0c8);background-size:500% 100%;animation:beadRainbow 22s linear infinite;}
+.pace-divider{height:1px;background:var(--div);margin:16px 0;}
+.wave-title{font-size:12px;color:var(--tm);margin-bottom:12px;display:flex;align-items:center;gap:5px;}
+.wave-row{display:flex;justify-content:center;gap:32px;}
+.wave-col{text-align:center;}
+.wave-wrap{position:relative;width:84px;height:84px;}
+.wave-svg{width:84px;height:84px;}
+.wave-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:2;pointer-events:none;}
+.wave-center .n{font-size:18px;font-weight:700;color:var(--tp);}
+.wave-center .l{font-size:9px;color:var(--ts);margin-top:1px;}
+.wave-lbl{font-size:10.5px;color:var(--tm);margin-top:8px;}
+@keyframes waveMove{0%{transform:translateX(0);}100%{transform:translateX(-50px);}}
+.wave-anim{animation:waveMove 3.5s linear infinite;}
+.rc-flow{display:flex;align-items:center;justify-content:center;gap:16px;padding:6px 0;}
+.rc-flow i{font-size:28px;}
+.rc-arrow-dot{color:#d4ac85;display:flex;align-items:center;}
+.pace-comment{font-size:11.5px;color:var(--ts);text-align:center;line-height:1.6;padding-top:12px;margin-top:2px;border-top:1px solid var(--div);}
 @keyframes beadRainbow{0%{background-position:0% 50%;}100%{background-position:500% 50%;}}
 .pg-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
 .pg-box{flex:1;background:var(--inp);border:1px solid var(--inp-b);border-radius:14px;padding:12px;text-align:center;}
@@ -1763,8 +1790,8 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
       </div>
       <div class="settings-slbl">앱 정보</div>
       <div class="settings-card">
-        <div class="settings-item"><span class="settings-item-lbl">버전</span><span class="settings-item-val">2.2</span></div>
-        <div class="settings-item"><span class="settings-item-lbl">2.2 주요 업데이트</span><span class="settings-item-val">문장씨앗, 하루 리듬</span></div>
+        <div class="settings-item"><span class="settings-item-lbl">버전</span><span class="settings-item-val">2.3</span></div>
+        <div class="settings-item"><span class="settings-item-lbl">2.3 주요 업데이트</span><span class="settings-item-val">모노모드, 밀도의 숲, 홈탭 개편</span></div>
       </div>
     </div>
   </div>
@@ -1989,10 +2016,8 @@ function renderHomeBody(section){
     body.appendChild(makeContentsCard());
   } else if(section==='afternoon'){
     body.appendChild(makeRingRow());
-    body.appendChild(makeHabitWeekTrendCard());
+    body.appendChild(makeAfternoonPaceCard());
     body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getRhythmLogicalDate()));},'rhythm-soft',12.5,dateKey(getRhythmLogicalDate())));
-    body.appendChild(makeLabel('최근 콘텐츠'));
-    body.appendChild(makeContentsCard());
     body.appendChild(makeLabel('오늘의 문장'));
     body.appendChild(makeTextArchiveCard());
   } else if(section==='dawn'){
@@ -4901,6 +4926,117 @@ function confirmCopyWholeTodo(){
   ttodos.push({text:todo.text,done:false,created:Date.now(),timeSection:todo.timeSection||'none',cid:genCid(),postponeCount:0,strikeParts:[]});
   saveTodos(tdk,ttodos);
   showToast('내일에도 추가했어요');
+}
+// ── 오후 파트: 오늘vs어제 진행바 + 목표대비 웨이브게이지 + 리듬 비교 통합 카드
+const AFTERNOON_TODO_GOAL=5,AFTERNOON_HABIT_GOAL=4;
+function _paceCountDoneUntilNow(dk,nowMinLimit){
+  const todos=getTodos(dk);
+  return todos.filter(t=>{
+    if(!t.done)return false;
+    if(nowMinLimit==null)return true; // 오늘이 아닌 날은 하루 전체 기준
+    if(!t.completedAt)return false; // completedAt 없는 과거 데이터는 시각 비교 불가하므로 제외
+    const d=new Date(t.completedAt);
+    return d.getHours()*60+d.getMinutes()<=nowMinLimit;
+  }).length;
+}
+function _paceHabitCheckedCount(dk){
+  const wk=weekKey(new Date(dk+'T00:00:00'));
+  const dow=(new Date(dk+'T00:00:00').getDay()+6)%7;
+  const habits=getHabits();
+  const checks=getHabitChecks(wk);
+  return habits.filter(h=>checks[h.name+'-'+dow]).length;
+}
+function _paceTopRhythmCat(dk){
+  const blocks=getRhythmBlocks(dk);
+  const dur={};
+  blocks.forEach(b=>{
+    const s=b.start?parseInt(b.start.split(':')[0],10)*60+parseInt(b.start.split(':')[1],10):null;
+    const e=b.end?parseInt(b.end.split(':')[0],10)*60+parseInt(b.end.split(':')[1],10):null;
+    if(s==null||e==null)return;
+    let d=e-s;if(d<0)d+=1440;
+    dur[b.cat]=(dur[b.cat]||0)+d;
+  });
+  const top=Object.keys(dur).sort((a,b)=>dur[b]-dur[a])[0];
+  return top&&RHYTHM_CATS[top]?{key:top,icon:RHYTHM_CATS[top].icon,color:RHYTHM_CATS[top].color,label:RHYTHM_CATS[top].label}:null;
+}
+function makeAfternoonPaceCard(){
+  const now=new Date();
+  const nowMin=now.getHours()*60+now.getMinutes();
+  const todayDk=dateKey(now);
+  const yestD=new Date(now);yestD.setDate(now.getDate()-1);
+  const yestDk=dateKey(yestD);
+  const lastWeekD=new Date(now);lastWeekD.setDate(now.getDate()-7);
+  const lastWeekDk=dateKey(lastWeekD);
+
+  const todayDone=_paceCountDoneUntilNow(todayDk,nowMin);
+  const yestDone=_paceCountDoneUntilNow(yestDk,nowMin);
+  const yestMax=Math.max(yestDone,todayDone,1);
+
+  const todayHabit=_paceHabitCheckedCount(todayDk);
+  const lastWeekHabit=_paceHabitCheckedCount(lastWeekDk);
+  const lastWeekTodoDone=_paceCountDoneUntilNow(lastWeekDk,null);
+
+  const todaySum=Math.min(todayDone,AFTERNOON_TODO_GOAL)+Math.min(todayHabit,AFTERNOON_HABIT_GOAL);
+  const lastWeekSum=Math.min(lastWeekTodoDone,AFTERNOON_TODO_GOAL)+Math.min(lastWeekHabit,AFTERNOON_HABIT_GOAL);
+  const goalTotal=AFTERNOON_TODO_GOAL+AFTERNOON_HABIT_GOAL;
+
+  const lastWeekTop=_paceTopRhythmCat(lastWeekDk);
+  const todayTop=_paceTopRhythmCat(todayDk);
+
+  const card=document.createElement('div');card.className='pace-card';
+  const hh=now.getHours(),mm=now.getMinutes();
+  const ap=hh<12?'오전':'오후',h12=hh===0?12:hh>12?hh-12:hh;
+
+  let html='';
+  html+=`<div class="pace-title"><i class="ti ti-clock" style="font-size:13px;" aria-hidden="true"></i> ${ap} ${h12}:${pad(mm)} 기준 완료한 일</div>`;
+  html+=`<div class="pace-track-wrap"><div class="pace-track-lbl"><span>어제</span><span>${yestDone}개</span></div>
+    <div class="pace-track"><div class="pace-fill-y" style="width:${yestDone/yestMax*100}%;"></div></div></div>`;
+  html+=`<div class="pace-track-wrap" style="margin-bottom:0;"><div class="pace-track-lbl"><span>오늘</span><span>${todayDone}개</span></div>
+    <div class="pace-track"><div class="pace-fill-t" style="width:${todayDone/yestMax*100}%;"></div><div class="pace-bead2" style="left:${todayDone/yestMax*100}%;"></div></div></div>`;
+
+  html+=`<div class="pace-divider"></div>`;
+  html+=`<div class="wave-title"><i class="ti ti-droplet" style="font-size:13px;" aria-hidden="true"></i> 오늘 목표 총 ${goalTotal}개 (투두${AFTERNOON_TODO_GOAL}+습관${AFTERNOON_HABIT_GOAL})</div>`;
+  html+=`<div class="wave-row">
+    <div class="wave-col"><div class="wave-wrap"><svg class="wave-svg" viewBox="0 0 90 90">
+      <defs><clipPath id="paceClipLast"><circle cx="45" cy="45" r="40"/></clipPath></defs>
+      <circle cx="45" cy="45" r="40" fill="rgba(150,130,110,0.06)"/>
+      <g clip-path="url(#paceClipLast)"><path class="wave-anim" d="M0,${90-lastWeekSum/goalTotal*80} Q12.5,${90-lastWeekSum/goalTotal*80-6} 25,${90-lastWeekSum/goalTotal*80} T50,${90-lastWeekSum/goalTotal*80} T75,${90-lastWeekSum/goalTotal*80} T100,${90-lastWeekSum/goalTotal*80} T125,${90-lastWeekSum/goalTotal*80} T150,${90-lastWeekSum/goalTotal*80} V90 H0 Z" fill="rgba(190,180,172,0.85)"/></g>
+      <circle cx="45" cy="45" r="40" fill="none" stroke="var(--card-b)" stroke-width="1.5"/>
+    </svg><div class="wave-center"><div class="n">${lastWeekSum}</div><div class="l">/ ${goalTotal}</div></div></div>
+    <div class="wave-lbl">지난주 같은요일</div></div>
+    <div class="wave-col"><div class="wave-wrap"><svg class="wave-svg" viewBox="0 0 90 90">
+      <defs><clipPath id="paceClipToday"><circle cx="45" cy="45" r="40"/></clipPath>
+      <linearGradient id="paceWaterGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#eafbff"/><stop offset="45%" stop-color="#c3ecf7"/><stop offset="100%" stop-color="#8fd8ec"/>
+      </linearGradient></defs>
+      <circle cx="45" cy="45" r="40" fill="rgba(150,130,110,0.06)"/>
+      <g clip-path="url(#paceClipToday)"><path class="wave-anim" d="M0,${90-todaySum/goalTotal*80} Q12.5,${90-todaySum/goalTotal*80-6} 25,${90-todaySum/goalTotal*80} T50,${90-todaySum/goalTotal*80} T75,${90-todaySum/goalTotal*80} T100,${90-todaySum/goalTotal*80} T125,${90-todaySum/goalTotal*80} T150,${90-todaySum/goalTotal*80} V90 H0 Z" fill="url(#paceWaterGrad)" opacity="0.95"/></g>
+      <circle cx="45" cy="45" r="40" fill="none" stroke="var(--card-b)" stroke-width="1.5"/>
+    </svg><div class="wave-center"><div class="n">${todaySum}</div><div class="l">/ ${goalTotal}</div></div></div>
+    <div class="wave-lbl">오늘 (현재까지)</div></div>
+  </div>`;
+
+  if(lastWeekTop&&todayTop){
+    html+=`<div class="pace-divider"></div>`;
+    html+=`<div class="rc-flow">
+      <i class="ti ${lastWeekTop.icon}" style="color:${lastWeekTop.color};"></i>
+      <span class="rc-arrow-dot"><svg width="56" height="10" viewBox="0 0 56 10">
+        <circle cx="4" cy="5" r="1.8" fill="currentColor" opacity="0.5"/>
+        <circle cx="16" cy="5" r="1.8" fill="currentColor" opacity="0.65"/>
+        <circle cx="28" cy="5" r="1.8" fill="currentColor" opacity="0.8"/>
+        <circle cx="40" cy="5" r="1.8" fill="currentColor" opacity="0.95"/>
+        <circle cx="52" cy="5" r="2.2" fill="currentColor"/>
+      </svg></span>
+      <i class="ti ${todayTop.icon}" style="color:${todayTop.color};"></i>
+    </div>`;
+  }
+
+  const paceCmp=todayDone>yestDone?'어제보다 빠르게':todayDone<yestDone?'어제보다 조금 천천히':'어제와 비슷하게';
+  const topCmp=(todayTop&&lastWeekTop&&todayTop.key!==lastWeekTop.key)?`오늘은 ${todayTop.label}에 시간을 많이 썼어요`:'';
+  html+=`<div class="pace-comment">${paceCmp} 진행 중이에요${topCmp?'. '+topCmp:''}</div>`;
+
+  card.innerHTML=html;
+  return card;
 }
 function toggleTodo(i){const dk=dateKey(currentDate),todos=getTodos(dk);todos[i].done=!todos[i].done;todos[i].completedAt=todos[i].done?Date.now():null;saveTodos(dk,todos);renderTodos();}
 
