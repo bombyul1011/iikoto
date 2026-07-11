@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260711-59-settings-cleanup';
+const CACHE = 'iikoto-v20260711-60-todo-part-swipe-fix';
 const ASSETS = [
   './',
   './index.html'

@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260711-59-settings-cleanup -->
+<!-- build: 20260711-60-todo-part-swipe-fix -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -4789,7 +4789,7 @@ function renderTodoTextParts(text,strikeParts,todoIdx){
   parts.forEach((seg,partIdx)=>{
     const isStruck=strikeParts.includes(partIdx);
     if(partIdx>0)html+=' / ';
-    html+=`<span class="todo-part" data-part-idx="${partIdx}" onclick="onTodoPartClick(event,${todoIdx},${partIdx})" style="${isStruck?'text-decoration:line-through;opacity:0.55;':''}">${seg}</span>`;
+    html+=`<span class="todo-part" data-part-idx="${partIdx}" onclick="onTodoPartClick(event,${todoIdx},${partIdx})" style="user-select:none;-webkit-user-select:none;-webkit-user-drag:none;${isStruck?'text-decoration:line-through;opacity:0.55;':''}">${seg}</span>`;
   });
   if(inPartMode){
     const hasUnstruck=parts.some((_,idx)=>!strikeParts.includes(idx));
@@ -4893,6 +4893,7 @@ function attachTodoSwipeMode(el,i,hasMultipleParts){
     if(dy>18&&Math.abs(dx)<18){dragging=false;el.style.transform='';return;}
     if(dx<-15){
       el.style.transform=`translateX(${Math.max(dx,-30)}px)`;moved=true;
+      if(window.getSelection)window.getSelection().removeAllRanges(); // 트랙패드 드래그 중 텍스트가 선택돼버리는 것을 방지
       if(!captured){try{el.setPointerCapture(pid);captured=true;}catch(err){}}
     }
   });
