@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260711-41-mono-habit-shade-fix';
+const CACHE = 'iikoto-v20260711-45-morning-exercise-banner-final';
 const ASSETS = [
   './',
   './index.html'
