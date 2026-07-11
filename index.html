@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260711-51-pace-bar-total-ratio-final -->
+<!-- build: 20260711-53-pace-card-refresh-fix -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -2016,6 +2016,7 @@ function renderHomeBody(section){
     body.appendChild(makeContentsCard());
   } else if(section==='afternoon'){
     body.appendChild(makeAfternoonPaceCard());
+    refreshAfternoonPaceCard();
     body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getRhythmLogicalDate()));},'rhythm-soft',12.5,dateKey(getRhythmLogicalDate())));
     body.appendChild(makeLabel('오늘의 문장'));
     body.appendChild(makeTextArchiveCard());
@@ -4958,6 +4959,28 @@ function _paceTopRhythmCat(dk){
   const top=Object.keys(dur).sort((a,b)=>dur[b]-dur[a])[0];
   return top&&RHYTHM_CATS[top]?{key:top,icon:RHYTHM_CATS[top].icon,color:RHYTHM_CATS[top].color,label:RHYTHM_CATS[top].label}:null;
 }
+// 오후 통계 카드는 로컬 캐시에 없는 과거 날짜(어제/지난주) 데이터가 필요할 수 있어
+// 렌더링 직후 해당 날짜들을 서버에서 새로 받아와 카드를 다시 그림 (completed_at 등 최신값 반영)
+async function refreshAfternoonPaceCard(){
+  const now=new Date();
+  const todayDk=dateKey(now);
+  const yestD=new Date(now);yestD.setDate(now.getDate()-1);
+  const lastWeekD=new Date(now);lastWeekD.setDate(now.getDate()-7);
+  const doRefresh=()=>{
+    const old=document.getElementById('afternoon-pace-card');
+    if(old&&old.parentNode){
+      const fresh=makeAfternoonPaceCard();
+      old.replaceWith(fresh);
+    }
+  };
+  // 각 sync를 개별적으로 안전하게 실행 - 하나가 실패/에러여도 나머지와 최종 갱신에 영향 없도록
+  await Promise.allSettled([
+    syncTodosDown(todayDk),
+    syncTodosDown(dateKey(yestD)),
+    syncTodosDown(dateKey(lastWeekD))
+  ]);
+  doRefresh();
+}
 function makeAfternoonPaceCard(){
   const now=new Date();
   const nowMin=now.getHours()*60+now.getMinutes();
@@ -4983,7 +5006,7 @@ function makeAfternoonPaceCard(){
   const lastWeekTop=_paceTopRhythmCat(lastWeekDk);
   const todayTop=_paceTopRhythmCat(todayDk);
 
-  const card=document.createElement('div');card.className='pace-card';
+  const card=document.createElement('div');card.className='pace-card';card.id='afternoon-pace-card';
   const hh=now.getHours(),mm=now.getMinutes();
   const ap=hh<12?'오전':'오후',h12=hh===0?12:hh>12?hh-12:hh;
 
