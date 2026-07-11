@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260711-76-evening-part-split';
+const CACHE = 'iikoto-v20260711-77-evening-details';
 const ASSETS = [
   './',
   './index.html'
