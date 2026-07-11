@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260711-66-pace-comment-instant-wait';
+const CACHE = 'iikoto-v20260711-67-rc-arrow-dot-color';
 const ASSETS = [
   './',
   './index.html'
