@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260711-77-evening-details -->
-<!-- 20260711-76 → 77: 저녁 파트1 미니통계를 배경없는 텍스트형(완료투두/체크습관/메모개수/최다리듬 4항목)으로 재작업, 습관미니체크 바로 아래 배치. 오늘의독서 카드 2버전 분리 — 파트1은 표지+진행바 포함형(makeBookCardWithCover), 파트2는 기존 심플 한줄형(makeBookCard) 유지 -->
+<!-- build: 20260711-79-night1-prompt-balance -->
+<!-- 20260711-78 → 79: 저녁 파트1(night_1) 인사배너 프롬프트 — 내일 할일 항목 무제한 나열을 2-3개로 제한, 오늘 리뷰:내일안내 비중을 약 7:3으로 명시해 문장 길이 축소 -->
 
 <html lang="ko">
 <head>
@@ -2022,6 +2022,7 @@ function renderHomeBody(section){
     body.appendChild(makeLabel('해빗'));
     body.appendChild(makeHabitStreakRow());
     body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getRhythmLogicalDate()));},'rhythm-soft',12.5,dateKey(getRhythmLogicalDate())));
+    body.appendChild(makeRecentContentsCard());
   } else if(section==='afternoon'){
     body.appendChild(makeAfternoonPaceCard());
     refreshAfternoonPaceCard();
@@ -2071,7 +2072,6 @@ function renderHomeBody(section){
     body.appendChild(makeLabel('아직 남은 일'));
     body.appendChild(makePendingTodosCard());
     body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getRhythmLogicalDate()),getSubSection()==='night_2');},'rhythm-soft',12.5,dateKey(getRhythmLogicalDate())));
-    if(getSubSection()!=='night_2')body.appendChild(makeRecentContentsCard());
     // 일요일 한정 — 다음 주 준비 배너 (리듬배너 뒤, 공통 틀 끝)
     if(isSunday&&new Date().getDay()===0){
       body.appendChild(makeLabel('◉ 다음 주 준비'));
@@ -3645,7 +3645,7 @@ async function fetchHomeWeather(section){
 
 기타 규칙:
 - 오늘 하루를 완료한 일 중심으로 따뜻하게 정리해요 (구체적 항목명 언급 가능).
-- ${subSec==='night_2'?'내일에 대한 작은 기대나 응원을 딱 한 문장만, 할일을 나열하지 말고 가볍게.':'이어서 내일 할일을 자연스럽게 안내해요 (구체적 항목명 언급 가능).'}
+- ${subSec==='night_2'?'내일에 대한 작은 기대나 응원을 딱 한 문장만, 할일을 나열하지 말고 가볍게.':'오늘 하루를 돌아보는 내용이 전체 문장의 중심이 되도록 하고(비중 약 7:3), 내일 할일은 마지막에 짧게 한 문장으로만 덧붙여요 — 항목명은 최대 2-3개까지만 언급하고 그 이상은 나열하지 말 것.'}
 - 날씨/계절/메모 등에서 느껴지는 분위기를 한 줄 정도 자연스럽게 녹여요. 단, 날씨(온도, 맑음/흐림 등)와 현재 시각(몇 시, 오전/오후)은 화면 상단에 이미 별도로 표시되고 있으니, 본문에 숫자나 문장으로 다시 적지 말 것 — "26도", "오후 4시" 같은 표현 절대 금지.
 - 리듬 카테고리를 언급할 땐 가장 비중 컸던 것 하나 정도만 은유적으로.
 - 실제 시각과 어긋나는 낮/햇살/노을 묘사 금지 (이미 해가 진 시간).
