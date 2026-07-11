@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260711-74-rhythm-rainbow-icon -->
-<!-- 20260711-73 → 74: 리듬 관련 아이콘(리듬배너/월간리포트 이번달리듬/새벽리캡 오늘의리듬) 물결(ti-wave-sine)에서 무지개(ti-rainbow)로 통일 -->
+<!-- build: 20260711-75-icon-tweaks -->
+<!-- 20260711-74 → 75: 배너 열림 화살표(›)를 ti-chevron-up으로, 투두 내일로 이동 아이콘(⚬→)을 ti-chevrons-right로 교체. 설정화면 섹션 라벨(.settings-slbl) 위쪽 여백 추가해 앱정보 라벨이 데이터복구 카드에 붙는 문제 수정 -->
 
 <html lang="ko">
 <head>
@@ -445,7 +445,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .settings-back{width:36px;height:36px;background:var(--card);border:1px solid var(--card-b);border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .settings-ttl{font-size:18px;font-weight:500;color:var(--tp);}
 .settings-body{padding:20px;display:flex;flex-direction:column;gap:20px;}
-.settings-slbl{font-size:10px;color:var(--tm);letter-spacing:3px;text-transform:uppercase;margin-bottom:10px;}
+.settings-slbl{font-size:10px;color:var(--tm);letter-spacing:3px;text-transform:uppercase;margin:18px 0 10px;}
 .settings-card{background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:16px;}
 .color-themes{display:flex;gap:10px;flex-wrap:wrap;}
 .ctheme-btn{width:52px;height:52px;border-radius:14px;cursor:pointer;border:3px solid transparent;transition:all .15s;display:flex;align-items:center;justify-content:center;font-size:14px;color:transparent;}
@@ -1255,7 +1255,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="report-banner meal-soft" onclick="openWeekMealSheet()">
         <div class="report-banner-inner">
           <div class="report-banner-line"><i class="ti ti-tools-kitchen-3" style="font-size:12px;vertical-align:-1px;margin-right:3px;" aria-hidden="true"></i>이번 주 뭐 먹지?</div>
-          <div class="report-banner-arrow">›</div>
+          <div class="report-banner-arrow"><i class="ti ti-chevron-up" style="font-size:15px;" aria-hidden="true"></i></div>
         </div>
       </div>
     </div>
@@ -1285,13 +1285,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="report-banner diary-soft" onclick="openDiaryMonthSheet()">
         <div class="report-banner-inner">
           <div class="report-banner-line">✦ <span class="rb-title" id="diary-banner-month-lbl">6월의 하루한줄</span> · <span id="diary-banner-count">23</span>일째 기록 중</div>
-          <div class="report-banner-arrow">›</div>
+          <div class="report-banner-arrow"><i class="ti ti-chevron-up" style="font-size:15px;" aria-hidden="true"></i></div>
         </div>
       </div>
       <div class="report-banner month-soft" onclick="openMonthlyReportSheet()">
         <div class="report-banner-inner">
           <div class="report-banner-line"><i class="ti ti-chart-bar" style="font-size:12px;vertical-align:-1px;margin-right:3px;" aria-hidden="true"></i><span class="rb-title" id="report-banner-month-lbl">6월 리포트</span> · 이번 달 전체 기록 모아보기</div>
-          <div class="report-banner-arrow">›</div>
+          <div class="report-banner-arrow"><i class="ti ti-chevron-up" style="font-size:15px;" aria-hidden="true"></i></div>
         </div>
       </div>
     </div>
@@ -1311,7 +1311,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div class="report-banner meal-soft" style="margin:0;flex:1;" onclick="saveWeekMealSheet()">
           <div class="report-banner-inner">
             <div class="report-banner-line"><i class="ti ti-tools-kitchen-3" style="font-size:12px;vertical-align:-1px;margin-right:3px;" aria-hidden="true"></i>이번 주 뭐 먹지?</div>
-            <div class="report-banner-arrow">›</div>
+            <div class="report-banner-arrow"><i class="ti ti-chevron-up" style="font-size:15px;" aria-hidden="true"></i></div>
           </div>
         </div>
         <button class="wish-round-btn" onclick="toggleMealWishlist()" title="먹고싶은 메뉴">
@@ -1944,7 +1944,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="report-banner quote-soft" style="margin-top:0;margin-bottom:14px;" onclick="saveQuoteSheet()">
         <div class="report-banner-inner">
           <div class="report-banner-line">문장 담기</div>
-          <div class="report-banner-arrow">›</div>
+          <div class="report-banner-arrow"><i class="ti ti-chevron-up" style="font-size:15px;" aria-hidden="true"></i></div>
         </div>
       </div>
       <textarea class="rd-quote-inp" id="rd-quote-inp" rows="4" placeholder="마음에 남는 문장을 적어보세요"></textarea>
@@ -2709,7 +2709,7 @@ function makeHabitStreakRow(){
 function makeRhythmBanner(lineText,builderFn,extraClass,fontSize,dk){
   const b=document.createElement('div');b.className='report-banner'+(extraClass?' '+extraClass:'');
   const lineIcon=extraClass==='rhythm-soft'?'<i class="ti ti-rainbow" style="font-size:13px;vertical-align:-1px;margin-right:4px;" aria-hidden="true"></i>':'';
-  b.innerHTML='<div class="report-banner-inner"><div class="report-banner-line"'+(fontSize?` style="font-size:${fontSize}px;"`:'')+'>'+lineIcon+lineText+'</div><div class="report-banner-arrow">›</div></div>';
+  b.innerHTML='<div class="report-banner-inner"><div class="report-banner-line"'+(fontSize?` style="font-size:${fontSize}px;"`:'')+'>'+lineIcon+lineText+'</div><div class="report-banner-arrow"><i class="ti ti-chevron-up" style="font-size:15px;" aria-hidden="true"></i></div></div>';
   b.addEventListener('click',function(){openHomeDetailSheet(lineText,builderFn);});
   return b;
 }
@@ -5529,7 +5529,7 @@ function makePendingTodosCard(){
       <div class="chk" onclick="homeToggleTodo(${t._i})"></div>
       <span class="todo-txt${postponedClass}" style="flex:1;color:var(--tm);">${t.text}</span>
     </div>
-    <span onclick="homePostponeTodo(${t._i})" title="내일로 미루기" style="display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;padding:5px 8px;border-radius:7px;background:rgba(190,170,140,0.14);cursor:pointer;"><i class="ti ti-arrow-move-right" style="font-size:15px;color:rgba(150,125,95,0.85);" aria-hidden="true"></i></span>`;
+    <span onclick="homePostponeTodo(${t._i})" title="내일로 미루기" style="display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;padding:5px 8px;border-radius:7px;background:rgba(190,170,140,0.14);cursor:pointer;"><i class="ti ti-chevrons-right" style="font-size:15px;color:rgba(150,125,95,0.85);" aria-hidden="true"></i></span>`;
     list.appendChild(el);
   });
   card.appendChild(list);
