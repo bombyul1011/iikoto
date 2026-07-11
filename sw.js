@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260711-65-pace-comment-cache-filter';
+const CACHE = 'iikoto-v20260711-66-pace-comment-instant-wait';
 const ASSETS = [
   './',
   './index.html'
