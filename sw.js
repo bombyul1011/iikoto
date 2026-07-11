@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260711-61-completedat-sync-protect';
+const CACHE = 'iikoto-v20260711-63-pace-comment-debounce';
 const ASSETS = [
   './',
   './index.html'

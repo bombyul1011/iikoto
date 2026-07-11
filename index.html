@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260711-61-completedat-sync-protect -->
+<!-- build: 20260711-63-pace-comment-debounce -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -5168,8 +5168,11 @@ function makeAfternoonPaceCard(){
   const yestPct=yestDone/yestTotal*100;
   const subSec=getSubSection();
   const sig=todayDone+'-'+todayHabit+'-'+(todayTop?todayTop.key:'none');
-  const cacheKey=_paceCommentCacheKey(todayDk,subSec,sig);
-  const cachedComment=S.get(cacheKey);
+  // 서브섹션 단위로만 캐시(하루 최대 7회). 캐시엔 "이 서브섹션에서 API를 처음 만들었을 때의 sig"도 함께 저장해서,
+  // 이후 체크값이 달라지면(sig 불일치) API를 재호출하지 않고 그 자리에서 로컬 문구로 자동 전환한다.
+  const cacheKey=_paceCommentCacheKey(todayDk,subSec,'');
+  const cachedRaw=S.get(cacheKey);
+  const cached=cachedRaw?(function(){try{return JSON.parse(cachedRaw);}catch(e){return null;}})():null;
 
   html+=`<div class="pace-divider"></div>`;
   html+=`<div class="pace-comment" id="pace-comment-text"></div>`;
@@ -5181,25 +5184,42 @@ function makeAfternoonPaceCard(){
     if(commentEl)commentEl.innerHTML=text.split('\n').map(l=>`<div>${l}</div>`).join('');
   };
 
-  if(cachedComment){
-    renderComment(cachedComment);
-  }else{
-    // 캐시 없음(서브섹션 전환 또는 체크값 변경) — 즉시 로컬 문구로 먼저 보여주고, 백그라운드에서 AI로 보강
+  if(cached&&cached.sig===sig){
+    // 이 서브섹션에서 API로 만든 문구가 있고, 그때 이후로 체크값이 안 바뀌었으면 그대로 사용
+    renderComment(cached.text);
+  }else if(cached){
+    // API 문구는 있지만 체크값이 그때와 달라짐 — API 재호출 없이 로컬 문구로 실시간 반영
     renderComment(_paceLocalComment(todayPct,yestPct,todayTop,lastWeekTop));
-    // 비교할 데이터가 사실상 없는 극단 상황(오늘/어제 둘 다 완료 0건)에서는
-    // AI가 "데이터가 없다"는 메타발언을 할 여지 자체를 차단하기 위해 API 호출을 생략하고 로컬 문구만 유지
+  }else{
+    // 이 서브섹션에서 아직 한 번도 API를 호출한 적 없음 — 로컬 문구 먼저 보여주고,
+    // 데이터가 완전히 안정될 시간을 준 뒤(4초 디바운스) 백그라운드에서 최초 1회 API 호출
+    renderComment(_paceLocalComment(todayPct,yestPct,todayTop,lastWeekTop));
     const hasEnoughData=(todayDone>0||yestDone>0);
     if(hasEnoughData){
-      _paceAiComment(todayPct,yestPct,todayTop,lastWeekTop).then(aiText=>{
-        if(!aiText)return; // API 불가 시 로컬 문구 유지
-        S.set(cacheKey,aiText);
-        // 같은 카드가 여전히 화면에 있을 때만 교체(다른 곳으로 이동했으면 갱신 안 함)
-        const stillThere=document.getElementById('afternoon-pace-card');
-        if(stillThere){
-          const liveEl=stillThere.querySelector('#pace-comment-text');
-          if(liveEl)liveEl.innerHTML=aiText.split('\n').map(l=>`<div>${l}</div>`).join('');
-        }
-      });
+      setTimeout(()=>{
+        const stillThere1=document.getElementById('afternoon-pace-card');
+        if(!stillThere1)return; // 그 사이 카드가 화면에서 사라졌으면 호출 자체를 취소
+        // 대기 문구로 전환(체크값이 그 사이 또 바뀌었을 수 있으니 여기서도 sig를 다시 확인)
+        const waitSig=todayDone+'-'+todayHabit+'-'+(todayTop?todayTop.key:'none');
+        if(waitSig!==sig)return; // 4초 사이 값이 또 바뀌었으면 이번 시도는 포기(다음 렌더링에서 새로 판단됨)
+        const waitEl=stillThere1.querySelector('#pace-comment-text');
+        if(waitEl)waitEl.innerHTML='<div>오늘 기록을 살펴보는 중이에요...</div>';
+        _paceAiComment(todayPct,yestPct,todayTop,lastWeekTop).then(aiText=>{
+          if(!aiText){renderComment(_paceLocalComment(todayPct,yestPct,todayTop,lastWeekTop));return;}
+          S.set(cacheKey,JSON.stringify({sig,text:aiText}));
+          const stillThere2=document.getElementById('afternoon-pace-card');
+          if(stillThere2){
+            const nowSig=todayDone+'-'+todayHabit+'-'+(todayTop?todayTop.key:'none');
+            const liveEl=stillThere2.querySelector('#pace-comment-text');
+            if(nowSig===sig){
+              if(liveEl)liveEl.innerHTML=aiText.split('\n').map(l=>`<div>${l}</div>`).join('');
+            }else if(liveEl){
+              // 4초 대기 + API 호출 사이에 값이 또 바뀌었으면 캐시는 저장해두되 화면은 로컬 문구로
+              liveEl.innerHTML=_paceLocalComment(todayPct,yestPct,todayTop,lastWeekTop).split('\n').map(l=>`<div>${l}</div>`).join('');
+            }
+          }
+        });
+      },4000);
     }
   }
 
