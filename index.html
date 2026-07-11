@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260711-64-pace-comment-no-empty-mention -->
+<!-- build: 20260711-65-pace-comment-cache-filter -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -5188,10 +5188,16 @@ function makeAfternoonPaceCard(){
   const renderComment=(text)=>{
     if(commentEl)commentEl.innerHTML=text.split('\n').map(l=>`<div>${l}</div>`).join('');
   };
+  // 메타발언(데이터 부족 안내 등)이 섞인 텍스트인지 검사 — 캐시에 잘못 저장된 과거 응답이 화면에 노출되는 것을 막기 위한 안전망
+  const _isBadComment=(t)=>!t||/말씀해|알려주시|제공해|정보를 주시|구체적으로|비교할 데이터|데이터가 (부족|없|전달)/.test(t);
 
-  if(cached&&cached.sig===sig){
+  if(cached&&cached.sig===sig&&!_isBadComment(cached.text)){
     // 이 서브섹션에서 API로 만든 문구가 있고, 그때 이후로 체크값이 안 바뀌었으면 그대로 사용
     renderComment(cached.text);
+  }else if(cached&&cached.sig===sig){
+    // 캐시된 문구가 메타발언이면 신뢰하지 않고 캐시를 비운 뒤 로컬 문구로 즉시 대체(재호출은 다음 진입 때 자연히 일어남)
+    S.set(cacheKey,'');
+    renderComment(_paceLocalComment(todayPct,yestPct,todayTop,lastWeekTop));
   }else if(cached){
     // API 문구는 있지만 체크값이 그때와 달라짐 — API 재호출 없이 로컬 문구로 실시간 반영
     renderComment(_paceLocalComment(todayPct,yestPct,todayTop,lastWeekTop));
@@ -5210,7 +5216,7 @@ function makeAfternoonPaceCard(){
         const waitEl=stillThere1.querySelector('#pace-comment-text');
         if(waitEl)waitEl.innerHTML='<div>오늘 기록을 살펴보는 중이에요...</div>';
         _paceAiComment(todayPct,yestPct,todayTop,lastWeekTop).then(aiText=>{
-          if(!aiText){renderComment(_paceLocalComment(todayPct,yestPct,todayTop,lastWeekTop));return;}
+          if(!aiText||_isBadComment(aiText)){renderComment(_paceLocalComment(todayPct,yestPct,todayTop,lastWeekTop));return;}
           S.set(cacheKey,JSON.stringify({sig,text:aiText}));
           const stillThere2=document.getElementById('afternoon-pace-card');
           if(stillThere2){
