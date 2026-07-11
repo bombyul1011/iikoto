@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260711-55-weekly-summary-rhythm-diff -->
+<!-- build: 20260711-56-pace-comment-ai-hybrid -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -4969,6 +4969,55 @@ async function refreshAfternoonPaceCard(){
   ]);
   doRefresh();
 }
+// ── 오후 통계 카드 하단 코멘트: 로컬 문구풀(즉시 표시/폴백용)
+// 오늘 이전 날짜의 pace_comment 캐시 자동 삭제 (누적 방지)
+(function(){
+  try{
+    const today=dateKey(getLogicalDate());
+    Object.keys(localStorage).forEach(k=>{
+      if(k.startsWith('pace_comment_')&&!k.includes(today))localStorage.removeItem(k);
+    });
+  }catch(e){}
+})();
+function _paceLocalComment(todayPct,yestPct,todayTop,lastWeekTop){
+  const diff=todayPct-yestPct;
+  let pacePool;
+  if(diff>15)pacePool=['어제보다 훨씬 빠르게 나아가고 있어요','오늘따라 속도가 붙었어요','어제보다 진도가 쭉쭉 나가고 있어요'];
+  else if(diff>3)pacePool=['어제보다 조금 더 빠르게 진행 중이에요','오늘이 어제보다 살짝 앞서있어요'];
+  else if(diff>-3)pacePool=['어제와 비슷한 흐름이에요','어제만큼 차분하게 진행 중이에요'];
+  else if(diff>-15)pacePool=['어제보다 조금 여유롭게 가고 있어요','오늘은 어제보다 천천히 가는 중이에요'];
+  else pacePool=['오늘은 할 일이 많아 진도가 더디게 보일 수 있어요','오늘따라 여유가 필요한 하루인가봐요'];
+  const paceLine=pacePool[Math.floor(Math.random()*pacePool.length)];
+
+  let rhythmLine='';
+  if(todayTop&&lastWeekTop){
+    const rhythmPool=todayTop.key!==lastWeekTop.key
+      ?[`오늘은 ${todayTop.label}에 가장 많은 시간을 썼어요`,`지난주엔 ${lastWeekTop.label}이 많았는데, 오늘은 ${todayTop.label} 비중이 커졌어요`,`오늘의 중심은 ${todayTop.label}이었어요`]
+      :[`지난주에 이어 오늘도 ${todayTop.label}에 가장 많은 시간을 썼어요`,`${todayTop.label} 비중이 지난주와 비슷하게 이어지고 있어요`];
+    rhythmLine=rhythmPool[Math.floor(Math.random()*rhythmPool.length)];
+  }
+  return rhythmLine?`${paceLine}\n${rhythmLine}`:paceLine;
+}
+function _paceCommentCacheKey(dk,subSec,sig){return 'pace_comment_'+dk+'_'+subSec+'_'+sig;}
+async function _paceAiComment(todayPct,yestPct,todayTop,lastWeekTop){
+  const key=getClaudeKey();
+  if(!key)return null;
+  const sys=`오후 홈탭 통계 카드 하단에 들어갈 짧은 코멘트 두 문장을 써요. 반드시 두 줄(줄바꿈으로 구분)로 출력해요.
+
+아래 두 데이터를 바탕으로 자유롭게 표현을 만들어요. 매번 다른 어투와 소재로 다양하게 변주해요 — 같은 뜻이어도 "빠르다/느리다" 같은 뻔한 표현만 반복하지 말고, 매번 다른 각도(예: 몸 상태·날씨·시간 감각·계절·소소한 행동 제안·감정선·비교 대상 등 중 매번 다르게 골라서)에서 그날의 상황을 상상해 생활감 있는 문장으로 풀어써요. 앞서 만든 문장과 겹치는 소재나 표현은 피하고 매번 새롭게 접근해요.
+
+1번째 줄 소재: 오늘 진행률 ${todayPct.toFixed(0)}%와 어제 같은 시각 진행률 ${yestPct.toFixed(0)}%의 차이. 절대 개수는 언급하지 않고 비율 차이의 크고 작음만 반영해서 자유롭게 표현해요.
+
+2번째 줄 소재: 오늘과 지난주 같은요일의 리듬 데이터.
+${todayTop?`- 오늘 가장 많이 쓴 시간: ${todayTop.label}`:'- 오늘 리듬 기록 없음'}
+${lastWeekTop?`- 지난주 같은요일 가장 많이 쓴 시간: ${lastWeekTop.label}`:'- 지난주 리듬 기록 없음'}
+카테고리명은 정확히 언급하되, 문장 구성은 자유롭게. 리듬 데이터가 둘 다 없으면 이 줄은 생략하고 1번째 줄만 출력해요.
+
+규칙: 따뜻한 구어체 존댓말, 각 줄 22자 내외로 짧게, 이모지·특수기호 없이, 두 줄 다 완전한 문장으로 끝맺기. 숫자(퍼센트)는 문장에 직접 쓰지 않아도 돼요 — 크기감만 표현에 녹이면 충분해요.`;
+  const reply=await callClaude(sys,[{role:'user',content:'코멘트 작성'}],120);
+  if(!reply||reply.startsWith('__ERR__'))return null;
+  return reply.trim();
+}
 function makeAfternoonPaceCard(){
   const now=new Date();
   const nowMin=now.getHours()*60+now.getMinutes();
@@ -5042,12 +5091,40 @@ function makeAfternoonPaceCard(){
     </div>`;
   }
 
-  const paceCmp=todayDone>yestDone?'어제보다 빠르게':todayDone<yestDone?'어제보다 조금 천천히':'어제와 비슷하게';
-  const topCmp=(todayTop&&lastWeekTop&&todayTop.key!==lastWeekTop.key)?`오늘은 ${todayTop.label}에 시간을 많이 썼어요`:'';
+  const todayPct=todayDone/todayTotal*100;
+  const yestPct=yestDone/yestTotal*100;
+  const subSec=getSubSection();
+  const sig=todayDone+'-'+todayHabit+'-'+(todayTop?todayTop.key:'none');
+  const cacheKey=_paceCommentCacheKey(todayDk,subSec,sig);
+  const cachedComment=S.get(cacheKey);
+
   html+=`<div class="pace-divider"></div>`;
-  html+=`<div class="pace-comment">${paceCmp} 진행 중이에요${topCmp?'. '+topCmp:''}</div>`;
+  html+=`<div class="pace-comment" id="pace-comment-text"></div>`;
 
   card.innerHTML=html;
+
+  const commentEl=card.querySelector('#pace-comment-text');
+  const renderComment=(text)=>{
+    if(commentEl)commentEl.innerHTML=text.split('\n').map(l=>`<div>${l}</div>`).join('');
+  };
+
+  if(cachedComment){
+    renderComment(cachedComment);
+  }else{
+    // 캐시 없음(서브섹션 전환 또는 체크값 변경) — 즉시 로컬 문구로 먼저 보여주고, 백그라운드에서 AI로 보강
+    renderComment(_paceLocalComment(todayPct,yestPct,todayTop,lastWeekTop));
+    _paceAiComment(todayPct,yestPct,todayTop,lastWeekTop).then(aiText=>{
+      if(!aiText)return; // API 불가 시 로컬 문구 유지
+      S.set(cacheKey,aiText);
+      // 같은 카드가 여전히 화면에 있을 때만 교체(다른 곳으로 이동했으면 갱신 안 함)
+      const stillThere=document.getElementById('afternoon-pace-card');
+      if(stillThere){
+        const liveEl=stillThere.querySelector('#pace-comment-text');
+        if(liveEl)liveEl.innerHTML=aiText.split('\n').map(l=>`<div>${l}</div>`).join('');
+      }
+    });
+  }
+
   return card;
 }
 function toggleTodo(i){const dk=dateKey(currentDate),todos=getTodos(dk);todos[i].done=!todos[i].done;todos[i].completedAt=todos[i].done?Date.now():null;saveTodos(dk,todos);renderTodos();}

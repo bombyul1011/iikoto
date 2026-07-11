@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260711-55-weekly-summary-rhythm-diff';
+const CACHE = 'iikoto-v20260711-56-pace-comment-ai-hybrid';
 const ASSETS = [
   './',
   './index.html'
