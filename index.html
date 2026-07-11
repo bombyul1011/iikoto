@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260711-47-afternoon-pace-detail-fix -->
+<!-- build: 20260711-48-afternoon-pace-cleanup -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -4987,7 +4987,7 @@ function makeAfternoonPaceCard(){
   const ap=hh<12?'오전':'오후',h12=hh===0?12:hh>12?hh-12:hh;
 
   let html='';
-  html+=`<div class="pace-title"><i class="ti ti-clock" style="font-size:13px;" aria-hidden="true"></i> ${ap} ${h12}:${pad(mm)} 기준 오늘 진행도</div>`;
+  html+=`<div class="pace-title"><i class="ti ti-clock" style="font-size:13px;" aria-hidden="true"></i> 오늘 진행도</div>`;
   html+=`<div class="pace-track-wrap"><div class="pace-track-lbl"><span>어제</span><span>${yestDone}개</span></div>
     <div class="pace-track"><div class="pace-fill-y" style="width:${yestDone/yestMax*100}%;"></div></div></div>`;
   html+=`<div class="pace-track-wrap" style="margin-bottom:0;"><div class="pace-track-lbl"><span>오늘</span><span>${todayDone}개</span></div>
@@ -5002,7 +5002,7 @@ function makeAfternoonPaceCard(){
       <g clip-path="url(#paceClipLast)"><path class="wave-anim" d="M0,${90-lastWeekSum/goalTotal*80} Q12.5,${90-lastWeekSum/goalTotal*80-6} 25,${90-lastWeekSum/goalTotal*80} T50,${90-lastWeekSum/goalTotal*80} T75,${90-lastWeekSum/goalTotal*80} T100,${90-lastWeekSum/goalTotal*80} T125,${90-lastWeekSum/goalTotal*80} T150,${90-lastWeekSum/goalTotal*80} V90 H0 Z" fill="rgba(190,180,172,0.85)"/></g>
       <circle cx="45" cy="45" r="40" fill="none" stroke="var(--card-b)" stroke-width="1.5"/>
     </svg><div class="wave-center"><div class="n">${lastWeekSum}</div></div></div>
-    <div class="wave-lbl">지난주 같은요일</div></div>
+    <div class="wave-lbl"></div></div>
     <div class="wave-col"><div class="wave-wrap"><svg class="wave-svg" viewBox="0 0 90 90">
       <defs><clipPath id="paceClipToday"><circle cx="45" cy="45" r="40"/></clipPath>
       <linearGradient id="paceWaterGrad" x1="0" y1="0" x2="0" y2="1">
@@ -5012,13 +5012,13 @@ function makeAfternoonPaceCard(){
       <g clip-path="url(#paceClipToday)"><path class="wave-anim" d="M0,${90-todaySum/goalTotal*80} Q12.5,${90-todaySum/goalTotal*80-6} 25,${90-todaySum/goalTotal*80} T50,${90-todaySum/goalTotal*80} T75,${90-todaySum/goalTotal*80} T100,${90-todaySum/goalTotal*80} T125,${90-todaySum/goalTotal*80} T150,${90-todaySum/goalTotal*80} V90 H0 Z" fill="url(#paceWaterGrad)" opacity="0.95"/></g>
       <circle cx="45" cy="45" r="40" fill="none" stroke="var(--card-b)" stroke-width="1.5"/>
     </svg><div class="wave-center"><div class="n">${todaySum}</div></div></div>
-    <div class="wave-lbl">오늘 (현재까지)</div></div>
+    <div class="wave-lbl"></div></div>
   </div>`;
 
   if(lastWeekTop&&todayTop){
     html+=`<div class="pace-divider"></div>`;
     html+=`<div class="rc-flow">
-      <i class="ti ${lastWeekTop.icon}" style="color:${lastWeekTop.color};"></i>
+      <i class="ti ${lastWeekTop.icon}" style="color:rgba(160,150,140,0.85);"></i>
       <span class="rc-arrow-dot"><svg width="56" height="10" viewBox="0 0 56 10">
         <circle cx="4" cy="5" r="1.8" fill="currentColor" opacity="0.5"/>
         <circle cx="16" cy="5" r="1.8" fill="currentColor" opacity="0.65"/>
