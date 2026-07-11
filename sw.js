@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260711-63-pace-comment-debounce';
+const CACHE = 'iikoto-v20260711-64-pace-comment-no-empty-mention';
 const ASSETS = [
   './',
   './index.html'
