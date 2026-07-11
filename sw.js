@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260711-53-pace-card-refresh-fix';
+const CACHE = 'iikoto-v20260711-54-pace-card-debug-log';
 const ASSETS = [
   './',
   './index.html'

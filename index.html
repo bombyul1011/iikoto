@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260711-53-pace-card-refresh-fix -->
+<!-- build: 20260711-54-pace-card-debug-log -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -4993,6 +4993,7 @@ function makeAfternoonPaceCard(){
   const todayDone=_paceCountDoneUntilNow(todayDk,nowMin);
   const yestDone=_paceCountDoneUntilNow(yestDk,nowMin);
   const todayTotal=Math.max(getTodos(todayDk).length,1);
+  console.log('[PACE DEBUG] todayDk=',todayDk,'todayDone=',todayDone,'todayTotal(getTodos.length)=',getTodos(todayDk).length,'yestDk=',yestDk,'yestDone=',yestDone);
   const yestTotal=Math.max(getTodos(yestDk).length,1);
 
   const todayHabit=_paceHabitCheckedCount(todayDk);
