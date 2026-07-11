@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260711-80-evening-final -->
-<!-- 20260711-79 → 80: (1) 저녁 파트1 인사배너 프롬프트 추가 압축 — 분량 4-5문장→3-4문장, 완료한 일 전부 나열 대신 인상적인 1-2가지만 언급, max_tokens 420→320. (2) 저녁 파트2 구성 대폭 심플화 — 습관미니체크/아직남은일 제거, 순서를 메인배너→리듬배너→오늘의독서(표지형)→오늘의문장→밀도의숲으로 재배치 -->
+<!-- build: 20260711-81-final-touches -->
+<!-- 20260711-80 → 81: (1) 죽은 nextweek-banner CSS 정리. (2) 새벽 습관달성링/메인배너 mono 색상 조정(무채색화, 보라톤 연하게). (3) 완료한일 캡션 랜덤 4개→3개. (4) mono/glass 테마 habit-chk2 체크시 아이콘 색상 버그 수정(흰배경+흰아이콘으로 안보이던 문제). (5) 리듬입력창 범례 수면/식사도 7개 카테고리와 동일 스타일로 통일(disabled 예외 제거). (6) 주간탭 위시리스트 텍스트 클릭시 인라인 수정 가능하게. (7) 오늘의문장 랜덤을 날짜기반 결정적 해시로 변경(기기간 통일 시도). (8) mono 테마 투두시간분포 도트 색상을 새벽배너 톤(라벤더)으로 포인트 적용 -->
 
 <html lang="ko">
 <head>
@@ -177,8 +177,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .weekly-review-banner-inner{border-radius:14.5px;background:linear-gradient(135deg,rgba(210,244,225,0.82),rgba(248,245,200,0.82),rgba(212,242,222,0.82));padding:16px 18px;backdrop-filter:blur(2px);}
 .midweek-remind-banner{position:relative;border-radius:16px;padding:1.5px;background:linear-gradient(135deg,rgba(180,165,230,0.95),rgba(140,200,235,0.90),rgba(190,170,235,0.95),rgba(160,190,230,0.95));background-size:300% 300%;animation:bannerShine 4s ease infinite;cursor:pointer;margin-bottom:2px;}
 .midweek-remind-banner-inner{border-radius:14.5px;background:linear-gradient(135deg,rgba(225,218,248,0.82),rgba(210,235,248,0.82),rgba(228,220,248,0.82));padding:16px 18px;backdrop-filter:blur(2px);}
-.nextweek-banner{position:relative;border-radius:16px;padding:1.6px;background:linear-gradient(135deg,rgba(200,184,222,0.85),rgba(247,238,208,0.80),rgba(208,192,225,0.85),rgba(200,184,222,0.85));background-size:300% 300%;animation:bannerShine 4s ease infinite;cursor:pointer;margin-top:10px;}
-.nextweek-banner-inner{border-radius:14.5px;background:linear-gradient(135deg,rgba(250,249,252,0.97),rgba(252,250,243,0.97));padding:16px 18px;}
 .nw-chip-row{display:flex;flex-direction:column;gap:8px;margin-bottom:16px;}
 .nw-chip{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--card-b);border-radius:12px;padding:10px 12px;cursor:pointer;}
 .nw-chip .nwc-sym{font-size:14px;color:var(--tm);flex-shrink:0;}
@@ -215,7 +213,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .wish-add-row .meal-inp{border-bottom:1px dashed rgba(195,175,168,0.38);}
 .wish-add-btn{width:28px;height:28px;border-radius:50%;border:none;background:rgba(150,215,180,0.55);color:rgba(50,95,65,0.9);font-size:15px;line-height:1;flex-shrink:0;cursor:pointer;}
 .wish-item{display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px dashed rgba(195,175,168,0.22);}
-.wish-text{flex:1;font-size:12.5px;color:var(--tp);}
+.wish-text{flex:1;font-size:12.5px;color:var(--tp);cursor:pointer;}
 .wish-place-btn{font-size:10.5px;color:rgba(85,135,100,0.9);background:rgba(190,230,205,0.28);border-radius:7px;padding:4px 8px;cursor:pointer;flex-shrink:0;white-space:nowrap;}
 .wish-del-btn{font-size:12px;color:var(--tm);cursor:pointer;padding:2px 4px;flex-shrink:0;}
 .meal-inp.wish-target{background:rgba(190,230,205,0.18);border-radius:6px;}
@@ -583,8 +581,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="glass"] .weekly-review-banner-inner{background:rgba(253,251,245,0.95)!important;backdrop-filter:none;}
 .rhythm-review-card{border-radius:18px;background:linear-gradient(135deg,rgba(236,219,242,0.55),rgba(216,228,245,0.50));border:1.5px solid rgba(165,125,180,0.42);padding:14px 15px;margin-bottom:10px;}
 [data-theme="glass"] .rhythm-review-card{background:rgba(253,251,245,0.55);border-color:rgba(165,125,180,0.38);}
-[data-theme="glass"] .rhythm-legend-dot:not(.disabled){background:rgba(253,251,245,0.95)!important;border:2px solid var(--cat-color)!important;}
-[data-theme="glass"] .rhythm-legend-dot:not(.disabled) i{color:var(--cat-color)!important;}
+[data-theme="glass"] .rhythm-legend-dot{background:rgba(253,251,245,0.95)!important;border:2px solid var(--cat-color)!important;}
+[data-theme="glass"] .rhythm-legend-dot i{color:var(--cat-color)!important;}
 /* 월간 하루한줄 모아보기 */
 .diary-month-summary{border-radius:16px;padding:12px 15px;margin-bottom:16px;background:linear-gradient(120deg,rgba(255,210,230,0.55),rgba(255,230,200,0.45));border:1px solid rgba(255,185,205,0.55);box-shadow:0 2px 10px rgba(200,120,140,0.10);}
 .diary-month-summary-label{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;color:var(--acc);letter-spacing:.03em;margin-bottom:6px;}
@@ -653,6 +651,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="glass"] .wchallenge-day.on{background:rgba(255,253,248,0.45)!important;color:var(--tp)!important;border-width:2px;}
 [data-theme="glass"] .habit-chk2.on{background:rgba(255,253,248,0.45)!important;border-width:2px;}
 [data-theme="glass"] .habit-chk2.on svg{stroke:var(--tp)!important;}
+[data-theme="glass"] .habit-chk2.on i{color:var(--tp)!important;}
 [data-theme="glass"] .home-hcard.morning{background:linear-gradient(135deg,rgba(255,238,200,0.32),rgba(255,220,210,0.28));border-color:rgba(255,210,180,0.40);}
 [data-theme="glass"] .home-hcard.afternoon{background:linear-gradient(135deg,rgba(255,220,235,0.30),rgba(255,235,200,0.26));border-color:rgba(255,200,210,0.38);}
 [data-theme="glass"] .home-hcard.night{background:linear-gradient(135deg,rgba(225,215,250,0.30),rgba(255,210,230,0.26));border-color:rgba(210,195,240,0.38);}
@@ -701,11 +700,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .recap-todo-strip-line{position:absolute;left:0;right:0;top:50%;height:1.5px;background:var(--div);}
 .recap-todo-strip-dots{position:absolute;left:0;right:0;top:0;bottom:0;display:flex;align-items:center;}
 .recap-todo-strip-dot{width:9px;height:9px;border-radius:50%;background:rgba(192,112,128,0.78);box-shadow:0 0 0 3px var(--card);position:absolute;transform:translateX(-50%);}
+[data-theme="mono"] .recap-todo-strip-dot{background:rgba(160,140,190,0.85)!important;}
 .recap-todo-strip-caption{font-size:10.5px;color:var(--tm);text-align:center;margin-top:6px;}
 .recap-donut-row{display:flex;justify-content:space-around;margin-bottom:2px;}
 .recap-donut-item{text-align:center;}
 .recap-donut-wrap{position:relative;width:62px;height:62px;margin:0 auto 6px;}
 .recap-donut-wrap svg{transform:rotate(-90deg);}
+.recap-donut-habit-fg{stroke:rgba(150,205,225,0.80);}
+[data-theme="mono"] .recap-donut-habit-fg{stroke:rgba(40,37,32,0.55);}
 .recap-donut-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:700;color:var(--tp);}
 .recap-donut-l{font-size:10px;color:var(--ts);}
 .recap-rhythm-bar-chart{display:flex;height:26px;border-radius:8px;overflow:hidden;margin-bottom:6px;}
@@ -821,8 +823,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   border:1px solid rgba(40,37,32,0.26);
 }
 [data-theme="mono"] .dawn-banner{
-  background:linear-gradient(140deg,rgba(95,95,155,0.30) 0%,rgba(160,140,190,0.30) 45%,rgba(255,215,222,0.30) 100%);
-  border:1px solid rgba(110,105,170,0.38);
+  background:linear-gradient(140deg,rgba(95,95,155,0.14) 0%,rgba(160,140,190,0.14) 45%,rgba(255,215,222,0.14) 100%);
+  border:1px solid rgba(110,105,170,0.22);
 }
 
 /* 오늘탭 투두 시간대구분 - 색상 대신 명도 단계 (아침<오후<저녁 순으로 진하게) */
@@ -867,8 +869,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="mono"] .heatmap-cell:not(.empty){border-color:rgba(40,37,32,0.72)!important;}
 
 /* 리듬 카테고리(가로바/세로트랙/범례) - 9종을 명도 5단계 순환으로. JS에서 --cat-color 커스텀 프로퍼티를 명도값으로 주입하는 방식과 함께 사용 */
-[data-theme="mono"] .rhythm-legend-dot:not(.disabled){background:rgba(255,255,255,0.5)!important;border:2px solid var(--cat-color)!important;}
-[data-theme="mono"] .rhythm-legend-dot:not(.disabled) i{color:var(--cat-color)!important;}
+[data-theme="mono"] .rhythm-legend-dot{background:rgba(255,255,255,0.5)!important;border:2px solid var(--cat-color)!important;}
+[data-theme="mono"] .rhythm-legend-dot i{color:var(--cat-color)!important;}
 
 /* 카드류 공통 배경(기존 glass 대응 요소들) - 전부 모노 카드톤으로 */
 [data-theme="mono"] #daily-meal-card{background:rgba(255,255,255,0.30)!important;border-color:rgba(40,37,32,0.16)!important;}
@@ -902,7 +904,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="mono"] .done-quote-chip-inner,[data-theme="mono"] .done-comment-chip-inner{background:rgba(255,255,255,0.35)!important;color:var(--tp)!important;}
 [data-theme="mono"] .done-quote-chip,[data-theme="mono"] .done-comment-chip{background:rgba(40,37,32,0.30)!important;animation:none!important;}
 [data-theme="mono"] .report-banner .report-banner-inner{background:rgba(255,255,255,0.30)!important;backdrop-filter:none;}
-[data-theme="mono"] .weekly-review-banner-inner,[data-theme="mono"] .midweek-remind-banner-inner,[data-theme="mono"] .nextweek-banner-inner{background:rgba(255,255,255,0.30)!important;backdrop-filter:none;border:1px solid rgba(40,37,32,0.16);}
+[data-theme="mono"] .weekly-review-banner-inner,[data-theme="mono"] .midweek-remind-banner-inner{background:rgba(255,255,255,0.30)!important;backdrop-filter:none;border:1px solid rgba(40,37,32,0.16);}
 [data-theme="mono"] .rhythm-review-card{background:rgba(255,255,255,0.30);border-color:rgba(40,37,32,0.20);}
 [data-theme="mono"] .diary-month-summary{background:rgba(255,255,255,0.30)!important;border-color:rgba(40,37,32,0.16)!important;box-shadow:none!important;}
 [data-theme="mono"] .mr-ai-card{background:rgba(255,255,255,0.30);}
@@ -937,6 +939,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="mono"] .wchallenge-day.on{background:rgba(255,255,255,0.35)!important;color:var(--tp)!important;border-width:2px;border-color:rgba(40,37,32,0.5)!important;}
 [data-theme="mono"] .habit-chk2.on{background:rgba(255,255,255,0.35)!important;border-width:2px;border-color:rgba(40,37,32,0.5)!important;}
 [data-theme="mono"] .habit-chk2.on svg{stroke:var(--tp)!important;}
+[data-theme="mono"] .habit-chk2.on i{color:var(--tp)!important;}
 [data-theme="mono"] .forest-density-card{background:rgba(255,255,255,0.30);}
 [data-theme="mono"] .wrb-track{background:rgba(40,37,32,0.10);}
 [data-theme="mono"] .report-banner{background:rgba(40,37,32,0.30)!important;animation:none!important;}
@@ -947,8 +950,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="mono"] .report-banner.meal-soft,
 [data-theme="mono"] .report-banner.month-soft{background:rgba(40,37,32,0.30)!important;animation:none!important;}
 [data-theme="mono"] .weekly-review-banner,
-[data-theme="mono"] .midweek-remind-banner,
-[data-theme="mono"] .nextweek-banner{
+[data-theme="mono"] .midweek-remind-banner{
   background:linear-gradient(135deg,rgba(40,37,32,0.42),rgba(40,37,32,0.18),rgba(40,37,32,0.42));
   background-size:300% 300%;animation:bannerShine 6s ease infinite;
 }
@@ -1239,7 +1241,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="week-strip" id="week-strip"></div>
       <div class="card" id="wchallenge-card" style="padding:14px 15px 10px;margin-bottom:7px;">
         <div style="display:flex;align-items:center;justify-content:space-between;">
-          <div class="goal-section-title" style="margin-top:0;"><i class="ti ti-flag-3" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i> 이번 주도 화이팅</div>
+          <div class="goal-section-title" id="wchallenge-title" style="margin-top:0;"><i class="ti ti-flag-3" id="wchallenge-icon" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i> 주간 목표</div>
           <button class="wgoal-add-btn" id="wgoal-add-btn" title="항목 추가"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><line x1="7" y1="2" x2="7" y2="12"/><line x1="2" y1="7" x2="12" y2="7"/></svg></button>
         </div>
         <div class="goal-wrap" id="weekly-goal-wrap"></div>
@@ -2007,7 +2009,8 @@ function renderHomeBody(section){
   const _ld=getLogicalDate();
   const _lh=new Date().getHours();
   const _isEveOrLateNight=_lh>=19||_lh<6;
-  const isSunday=_ld.getDay()===0&&_isEveOrLateNight;
+  const _isLateNightOrDawn=_lh>=22||_lh<6; // 일요일 리포트 전용 — 파트2(22시)+새벽에만 노출
+  const isSunday=_ld.getDay()===0&&_isLateNightOrDawn;
   const isWednesdayEvening=_ld.getDay()===3&&_isEveOrLateNight;
   const isLastDayOfMonth=(()=>{const t=new Date(_ld);t.setDate(_ld.getDate()+1);return t.getDate()===1;})()&&_isEveOrLateNight;
   const isMidMonth=_ld.getDate()===15&&_isEveOrLateNight;
@@ -2075,21 +2078,7 @@ function renderHomeBody(section){
       body.appendChild(makePendingTodosCard());
     }
     body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getRhythmLogicalDate()),getSubSection()==='night_2');},'rhythm-soft',12.5,dateKey(getRhythmLogicalDate())));
-    // 일요일 한정 — 다음 주 준비 배너 (리듬배너 뒤, 공통 틀 끝)
-    if(isSunday&&new Date().getDay()===0){
-      body.appendChild(makeLabel('◉ 다음 주 준비'));
-      const nwBanner=document.createElement('div');
-      nwBanner.className='nextweek-banner';
-      nwBanner.innerHTML=`<div class="nextweek-banner-inner" style="display:flex;align-items:center;justify-content:space-between;">
-        <div>
-          <div style="font-size:13px;font-weight:700;letter-spacing:.04em;color:rgba(115,95,150,0.88);margin-bottom:3px;">◉ 다음 주 챌린지 준비하기</div>
-          <div style="font-size:11px;color:rgba(145,128,98,0.72);">이번 주 패턴을 보고 루틴도 추천해드릴게요</div>
-        </div>
-        <div style="font-size:17px;color:rgba(135,115,160,0.48);">›</div>
-      </div>`;
-      nwBanner.addEventListener('click',openNextWeekChallengeSheet);
-      body.appendChild(nwBanner);
-    }
+    // 일요일 다음 주 챌린지 준비 배너는 홈탭에서 제거 — 주간탭 "이번 주도 화이팅" 카드로 흡수됨
     if(!isSunday){
       // "오늘 마무리" 브리핑은 통합카드(상단 인삿말)가 흡수함
     }
@@ -2582,8 +2571,8 @@ function buildDailyRhythmTrack(dk,includeReview){
   outer.appendChild(wrap);
 
   const legend=document.createElement('div');legend.className='rhythm-track-legend';
-  legend.innerHTML='<span class="rhythm-legend-item"><span class="rhythm-legend-dot disabled" style="background:'+getRhythmColor('_sleep')+';" title="수면"><i class="ti ti-moon" aria-hidden="true"></i></span><span class="rhythm-legend-lbl">수면</span></span>'+
-    '<span class="rhythm-legend-item"><span class="rhythm-legend-dot disabled" style="background:'+getRhythmColor('_meal')+';" title="식사"><i class="ti ti-tools-kitchen-3" aria-hidden="true"></i></span><span class="rhythm-legend-lbl">식사</span></span>'+
+  legend.innerHTML='<span class="rhythm-legend-item"><span class="rhythm-legend-dot disabled" style="background:'+getRhythmColor('_sleep')+';--cat-color:'+getRhythmColor('_sleep')+';" title="수면"><i class="ti ti-moon" aria-hidden="true"></i></span><span class="rhythm-legend-lbl">수면</span></span>'+
+    '<span class="rhythm-legend-item"><span class="rhythm-legend-dot disabled" style="background:'+getRhythmColor('_meal')+';--cat-color:'+getRhythmColor('_meal')+';" title="식사"><i class="ti ti-tools-kitchen-3" aria-hidden="true"></i></span><span class="rhythm-legend-lbl">식사</span></span>'+
     Object.keys(RHYTHM_CATS).map(function(k){const c=RHYTHM_CATS[k];const rc=getRhythmColor(k);const sel=_rhythmFormOpen&&_rhythmFormCat===k;return '<span class="rhythm-legend-item"><span class="rhythm-legend-dot'+(sel?' sel':'')+'" style="background:'+rc+';--cat-color:'+rc+';" title="'+c.label+'" onclick="selectRhythmCatAndOpen(\''+k+'\')"><i class="ti '+c.icon+'" aria-hidden="true"></i></span><span class="rhythm-legend-lbl">'+c.label+'</span></span>';}).join('');
   outer.appendChild(legend);
 
@@ -4387,7 +4376,7 @@ async function syncWChallengeDown(wk){
   // Supabase → 로컬 반영 후 weekly 탭 열려있으면 화면 갱신
   S.set(key,rows[0].lines);
   const weeklyView=document.getElementById('v-weekly');
-  if(weeklyView&&weeklyView.classList.contains('on'))renderWeeklyChallenge();
+  if(weeklyView&&weeklyView.classList.contains('on'))setupWeeklyChallengeToggle();
 }
 // syncContentsDown은 mk별 락 큐를 통해서만 실제 로직(syncContentsDownRaw)을 실행 —
 // saveContents가 유발하는 syncContentsUp과 절대 동시에 실행되지 않도록 보장한다.
@@ -5485,6 +5474,12 @@ function _archivePool(){
   });
   return seeds.concat(quotes);
 }
+// 날짜 문자열 기반 간단 해시 — 같은 날짜(dk)면 항상 같은 정수를 반환해 기기 간 랜덤 결과를 통일시킴
+function _dkSeedHash(dk){
+  let h=0;
+  for(let i=0;i<dk.length;i++){h=(h*31+dk.charCodeAt(i))>>>0;}
+  return h;
+}
 function makeTextArchiveCard(){
   const dk=dateKey(getLogicalDate());
   const card=document.createElement('div');
@@ -5501,7 +5496,9 @@ function makeTextArchiveCard(){
     picked=pool.find(p=>p.kind===cache.kind&&p.cid===cache.cid);
   }
   if(!picked){
-    picked=pool[Math.floor(Math.random()*pool.length)];
+    // 날짜 시드 기반 결정적 선택 — PC/모바일 등 기기가 달라도 pool 구성이 같다면 항상 같은 항목이 뽑힘
+    const idx=_dkSeedHash(dk)%pool.length;
+    picked=pool[idx];
     try{localStorage.setItem('iikoto_archive_pick',JSON.stringify({dk,kind:picked.kind,cid:picked.cid}));}catch(e){}
   }
 
@@ -5750,9 +5747,9 @@ function makeDawnRecapCard(){
     })
     .sort((a,b)=>(_dawnTimeToMin(a.start)||0)-(_dawnTimeToMin(b.start)||0));
 
-  // 완료투두 랜덤 4개 캡션
+  // 완료투두 랜덤 3개 캡션
   const shuffled=[...doneTodos].sort(()=>Math.random()-0.5);
-  const pickedTodos=shuffled.slice(0,4);
+  const pickedTodos=shuffled.slice(0,3);
 
   const banner=document.createElement('div');banner.className='dawn-banner';
   banner.innerHTML=`<div class="dawn-banner-time">${timeStr} <span id="dawn-weather-icon"></span></div>
@@ -5788,7 +5785,7 @@ function makeDawnRecapCard(){
       });
       html+=`</div></div>`;
     }
-    html+=`<div class="recap-todo-strip-caption">${pickedTodos.map(t=>t.text).join(' · ')}${doneTodos.length>4?' 외 '+(doneTodos.length-4)+'개':''}</div>`;
+    html+=`<div class="recap-todo-strip-caption">${pickedTodos.map(t=>t.text).join(' · ')}${doneTodos.length>3?' 외 '+(doneTodos.length-3)+'개':''}</div>`;
   }else{
     html+=`<div style="font-size:11px;color:var(--tm);text-align:center;padding:6px 0;">오늘 완료한 일이 없어요</div>`;
   }
@@ -5799,7 +5796,7 @@ function makeDawnRecapCard(){
   html+=`<div class="recap-donut-row">
     <div class="recap-donut-item"><div class="recap-donut-wrap"><svg width="62" height="62" viewBox="0 0 62 62">
       <circle cx="31" cy="31" r="26" fill="none" stroke="var(--div)" stroke-width="7"/>
-      <circle cx="31" cy="31" r="26" fill="none" stroke="rgba(150,205,225,0.80)" stroke-width="7" stroke-dasharray="163.4" stroke-dashoffset="${163.4*(1-habitPct/100)}" stroke-linecap="round"/>
+      <circle cx="31" cy="31" r="26" fill="none" class="recap-donut-habit-fg" stroke-width="7" stroke-dasharray="163.4" stroke-dashoffset="${163.4*(1-habitPct/100)}" stroke-linecap="round"/>
     </svg><div class="recap-donut-label">${habitPct}%</div></div><div class="recap-donut-l">습관 달성</div></div>
     <div class="recap-donut-item"><div class="recap-donut-wrap"><svg width="62" height="62" viewBox="0 0 62 62">
       <circle cx="31" cy="31" r="26" fill="none" stroke="var(--div)" stroke-width="7"/>
@@ -6303,6 +6300,28 @@ function applyNwSuggestion(title,wk){
   else items[items.length-1].text=title;
   saveWChallenge(wk,items);
   renderWeeklyChallenge(wk,'nextweek-challenge-wrap');
+}
+// 목요일(4)부터 일요일까지 "이번 주도 화이팅" 카드의 깃발 아이콘을 flag-plus로 교체 —
+// 클릭하면 기존 다음 주 챌린지 시트(openNextWeekChallengeSheet)가 열려 다음 주 목표를 미리 입력 가능.
+// 저장은 nextWeekKey() 기준 별도 키라 다음 주 월요일이 되면 자동으로 "이번 주" 목표로 반영됨.
+function setupWeeklyChallengeToggle(){
+  const iconEl=document.getElementById('wchallenge-icon');
+  const titleEl=document.getElementById('wchallenge-title');
+  if(!iconEl||!titleEl)return;
+  const dow=new Date().getDay();
+  const isPrepWindow=dow===4||dow===5||dow===6||dow===0; // 목,금,토,일
+  titleEl.onclick=null;
+  titleEl.style.cursor='default';
+  if(isPrepWindow){
+    iconEl.className='ti ti-flag-plus';
+    titleEl.title='다음 주 목표 미리 준비하기';
+    titleEl.style.cursor='pointer';
+    titleEl.onclick=openNextWeekChallengeSheet;
+  }else{
+    iconEl.className='ti ti-flag-3';
+    titleEl.title='';
+  }
+  renderWeeklyChallenge(weekKey(new Date()),'weekly-goal-wrap');
 }
 function renderWeeklyChallenge(wk,containerId){
   wk=wk||weekKey(new Date());
@@ -7364,7 +7383,7 @@ function toggleWrbDetail(i){
 }
 function loadWeekly(){
   buildWeekStrip();
-  renderWeeklyChallenge();
+  setupWeeklyChallengeToggle();
   renderDailyOneLineWeek();
   renderWeeklyRhythmBars();
   renderWeeklyHabitBox();
@@ -7431,7 +7450,26 @@ function renderMealWishlist(){
   const p=document.getElementById('meal-wishlist-panel');
   const items=getMealWishlist();
   p.innerHTML='<div class="wish-add-row"><input id="wish-add-inp" class="meal-inp" type="text" placeholder="먹고싶은 메뉴 추가" autocomplete="off" onkeydown="if(event.isComposing||event.keyCode===229)return;if(event.key===\'Enter\'){event.preventDefault();addMealWish();}"><button class="wish-add-btn" onclick="addMealWish()">+</button></div>'+
-    (items.length?items.map((t,i)=>`<div class="wish-item"><span class="wish-text">${t}</span><span class="wish-place-btn" onclick="startWishPlacing(${i})">넣기</span><span class="wish-del-btn" onclick="removeMealWish(${i})">✕</span></div>`).join(''):'<div style="font-size:11.5px;color:var(--tm);padding:6px 2px;">아직 담아둔 메뉴가 없어요</div>');
+    (items.length?items.map((t,i)=>`<div class="wish-item"><span class="wish-text" onclick="editMealWish(${i},this)">${t}</span><span class="wish-place-btn" onclick="startWishPlacing(${i})">넣기</span><span class="wish-del-btn" onclick="removeMealWish(${i})">✕</span></div>`).join(''):'<div style="font-size:11.5px;color:var(--tm);padding:6px 2px;">아직 담아둔 메뉴가 없어요</div>');
+}
+function editMealWish(i,spanEl){
+  const items=getMealWishlist();
+  const cur=items[i];if(cur==null)return;
+  const inp=document.createElement('input');
+  inp.type='text';inp.className='meal-inp';inp.value=cur;inp.autocomplete='off';
+  inp.style.cssText='flex:1;font-size:13px;';
+  function commit(){
+    const v=inp.value.trim();
+    if(v){items[i]=v;saveMealWishlist(items);}
+    renderMealWishlist();
+  }
+  inp.addEventListener('keydown',e=>{
+    if(e.isComposing||e.keyCode===229)return;
+    if(e.key==='Enter'){e.preventDefault();commit();}
+  });
+  inp.addEventListener('blur',commit);
+  spanEl.replaceWith(inp);
+  inp.focus();inp.select();
 }
 function addMealWish(){
   const inp=document.getElementById('wish-add-inp');
