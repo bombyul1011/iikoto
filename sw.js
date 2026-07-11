@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260711-60-todo-part-swipe-fix';
+const CACHE = 'iikoto-v20260711-61-completedat-sync-protect';
 const ASSETS = [
   './',
   './index.html'
