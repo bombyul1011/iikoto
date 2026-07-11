@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260711-68-rc-arrow-dot-white-start -->
+<!-- build: 20260711-69-fixed-bg-layer-glass-icon -->
+<!-- 20260711-68 → 69: 최상단 status-bar 안전영역 흰색 노출 버그 수정(#bg-fixed 고정배경 레이어 추가), 밀도의숲 유리알테마 테두리/아이콘 크기 조정 -->
+
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -26,6 +28,7 @@
 /* ── RESET ── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 html{height:100%;min-height:calc(100% + env(safe-area-inset-top));background:var(--bg);}
+#bg-fixed{position:fixed;inset:0;z-index:-1;background:var(--bg);}
 body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;background:var(--bg);}
 
 /* ══ THEME TOKENS ══ */
@@ -806,8 +809,8 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
 .habit-trend-pct{font-size:10px;color:var(--tm);width:30px;text-align:right;flex-shrink:0;}
 .forest-density-card{background:linear-gradient(135deg,rgba(230,225,195,0.4),rgba(190,210,175,0.4));border-color:rgba(170,195,150,0.45);}
 [data-theme="glass"] .forest-density-card{background:rgba(253,251,245,0.95);}
-[data-theme="glass"] .heatmap-cell:not(.empty){background:rgba(253,251,245,0.95)!important;border:2px solid var(--cell-color)!important;}
-[data-theme="glass"] .heatmap-cell:not(.empty) i{color:var(--cell-color)!important;}
+[data-theme="glass"] .heatmap-cell:not(.empty){background:rgba(253,251,245,0.95)!important;border:1px solid var(--cell-color)!important;}
+[data-theme="glass"] .heatmap-cell:not(.empty) i{color:var(--cell-color)!important;font-size:17px!important;}
 
 /* ══════════ MONO THEME OVERRIDES ══════════ */
 /* 통합 인삿말 카드 - 유일하게 컬러 유지 (톤온톤 은은한 그라데이션) */
@@ -1099,6 +1102,7 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
 </style>
 </head>
 <body>
+<div id="bg-fixed"></div>
 <script>(function(){try{var t=localStorage.getItem('theme');if(t){t=JSON.parse(t);document.documentElement.setAttribute('data-theme',t);var c={light:'#fdf0e8',glass:'#f7f4ee',dark:'#13111e'}[t];var m=document.querySelector('meta[name="theme-color"]');if(m&&c)m.setAttribute('content',c);}}catch(e){}})();</script>
 
 <!-- SPLASH -->
