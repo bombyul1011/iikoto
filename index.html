@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260711-38-mono-report-banner-full -->
+<!-- build: 20260711-41-mono-habit-shade-fix -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -814,7 +814,7 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
 [data-theme="mono"] .chk.ts-afternoon.on{background:rgba(40,37,32,0.55);border-color:rgba(40,37,32,0.75);}
 [data-theme="mono"] .chk.ts-afternoon.on::after{border-color:#fff;}
 [data-theme="mono"] .chk.ts-night{border-color:rgba(40,37,32,0.65);}
-[data-theme="mono"] .chk.ts-night.on{background:rgba(40,37,32,0.80);border-color:rgba(40,37,32,0.95);}
+[data-theme="mono"] .chk.ts-night.on{background:rgba(40,37,32,0.62);border-color:rgba(40,37,32,0.78);}
 [data-theme="mono"] .chk.ts-night.on::after{border-color:#fff;}
 [data-theme="mono"] .todo-time-sel button.ts-morning.active{background:rgba(40,37,32,0.20);border-color:rgba(40,37,32,0.45);color:#1e1c18;}
 [data-theme="mono"] .todo-time-sel button.ts-afternoon.active{background:rgba(40,37,32,0.35);border-color:rgba(40,37,32,0.60);color:#1e1c18;}
@@ -830,26 +830,26 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
 [data-theme="mono"] .hm-dot.sky,[data-theme="mono"] .hm-dot.yellow,
 [data-theme="mono"] .hm-dot.rose,[data-theme="mono"] .hm-dot.lavender,
 [data-theme="mono"] .hm-dot.peach,[data-theme="mono"] .hm-dot.teal{
-  background:rgba(40,37,32,0.85)!important;
+  background:rgba(40,37,32,0.32)!important;
 }
 [data-theme="mono"] .day-btn{border:1px solid rgba(40,37,32,0.16);background:rgba(255,255,255,0.30);}
-  background:rgba(40,37,32,0.85)!important;
+  background:rgba(40,37,32,0.32)!important;
 }
 [data-theme="mono"] .hw-dot{border-color:rgba(40,37,32,0.30)!important;}
-[data-theme="mono"] .hw-name-dot{background:rgba(40,37,32,0.85)!important;}
+[data-theme="mono"] .hw-name-dot{background:rgba(40,37,32,0.32)!important;}
 
 /* 월간탭 콘텐츠 기록 색 - drama/book/movie/music 명도 4단계로 */
-[data-theme="mono"] .home-content-bar.drama{background:rgba(40,37,32,0.35)!important;}
-[data-theme="mono"] .home-content-bar.book{background:rgba(40,37,32,0.55)!important;}
-[data-theme="mono"] .home-content-bar.movie{background:rgba(40,37,32,0.70)!important;}
-[data-theme="mono"] .home-content-bar.music{background:rgba(40,37,32,0.90)!important;}
-[data-theme="mono"] .tt-block.drama{background:rgba(40,37,32,0.35)!important;}
-[data-theme="mono"] .tt-block.book{background:rgba(40,37,32,0.55)!important;}
-[data-theme="mono"] .tt-block.movie{background:rgba(40,37,32,0.70)!important;}
-[data-theme="mono"] .tt-block.music{background:rgba(40,37,32,0.90)!important;}
+[data-theme="mono"] .home-content-bar.drama{background:rgba(40,37,32,0.32)!important;}
+[data-theme="mono"] .home-content-bar.book{background:rgba(40,37,32,0.48)!important;}
+[data-theme="mono"] .home-content-bar.movie{background:rgba(40,37,32,0.62)!important;}
+[data-theme="mono"] .home-content-bar.music{background:rgba(40,37,32,0.76)!important;}
+[data-theme="mono"] .tt-block.drama{background:rgba(40,37,32,0.32)!important;}
+[data-theme="mono"] .tt-block.book{background:rgba(40,37,32,0.48)!important;}
+[data-theme="mono"] .tt-block.movie{background:rgba(40,37,32,0.62)!important;}
+[data-theme="mono"] .tt-block.music{background:rgba(40,37,32,0.76)!important;}
 
 /* 밀도의 숲 5단계 - 명도만 (아이콘은 흰색 고정) */
-[data-theme="mono"] .heatmap-cell:not(.empty){border-color:rgba(40,37,32,0.9)!important;}
+[data-theme="mono"] .heatmap-cell:not(.empty){border-color:rgba(40,37,32,0.72)!important;}
 
 /* 리듬 카테고리(가로바/세로트랙/범례) - 9종을 명도 5단계 순환으로. JS에서 --cat-color 커스텀 프로퍼티를 명도값으로 주입하는 방식과 함께 사용 */
 [data-theme="mono"] .rhythm-legend-dot:not(.disabled){background:rgba(255,255,255,0.5)!important;border:2px solid var(--cat-color)!important;}
@@ -860,6 +860,11 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
 [data-theme="mono"] .meal-soft{filter:grayscale(1) contrast(0.9);}
 [data-theme="mono"] .rd-top-inner{background:rgba(255,255,255,0.35);}
 [data-theme="mono"] .rd-top{background:rgba(40,37,32,0.30)!important;animation:none!important;}
+[data-theme="mono"] .rd-top-cover,[data-theme="mono"] .rd-cover,[data-theme="mono"] .s-cover img,[data-theme="mono"] #cm-poster-img{filter:grayscale(1) contrast(1.05) brightness(0.98);}
+[data-theme="mono"] .quote-chip{background:rgba(40,37,32,0.30)!important;animation:none!important;}
+[data-theme="mono"] .rd-progress-fill{background:rgba(40,37,32,0.35)!important;}
+[data-theme="mono"] .rd-progress-today{background:rgba(40,37,32,0.60)!important;}
+[data-theme="mono"] .rd-progress-bead{background:rgba(40,37,32,0.75)!important;animation:none!important;border-color:#fff!important;}
 [data-theme="mono"] .report-banner.quote-soft{background:rgba(40,37,32,0.30)!important;animation:none!important;}
 [data-theme="mono"] .quote-soft{filter:grayscale(1) contrast(0.9);}
 [data-theme="mono"] .mr-goal-card{background:rgba(40,37,32,0.08);border:1.4px solid rgba(40,37,32,0.18);}
@@ -871,7 +876,8 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
 [data-theme="mono"] .memo-bub{background:none;border:none;border-left:2.5px solid rgba(40,37,32,0.25);border-radius:0;padding:2px 0 0 10px;}
 [data-theme="mono"] .memo-bub.tod-morning,[data-theme="mono"] .memo-bub.tod-afternoon,[data-theme="mono"] .memo-bub.tod-night{background:none;border-left-color:rgba(40,37,32,0.35);}
 [data-theme="mono"] .quote-chip-inner{background:rgba(255,255,255,0.35);}
-[data-theme="mono"] .done-quote-chip-inner,[data-theme="mono"] .done-comment-chip-inner{background:rgba(255,255,255,0.35);}
+[data-theme="mono"] .done-quote-chip-inner,[data-theme="mono"] .done-comment-chip-inner{background:rgba(255,255,255,0.35);color:var(--tp)!important;}
+[data-theme="mono"] .done-quote-chip,[data-theme="mono"] .done-comment-chip{background:rgba(40,37,32,0.30)!important;animation:none!important;}
 [data-theme="mono"] .report-banner .report-banner-inner{background:rgba(255,255,255,0.30)!important;backdrop-filter:none;}
 [data-theme="mono"] .weekly-review-banner-inner,[data-theme="mono"] .midweek-remind-banner-inner,[data-theme="mono"] .nextweek-banner-inner{background:rgba(255,255,255,0.30)!important;backdrop-filter:none;border:1px solid rgba(40,37,32,0.16);}
 [data-theme="mono"] .rhythm-review-card{background:rgba(255,255,255,0.30);border-color:rgba(40,37,32,0.20);}
@@ -948,6 +954,9 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
 .wrb-track{position:relative;isolation:isolate;}
 .wrb-seg.ongoing{background-image:repeating-linear-gradient(135deg,rgba(255,255,255,0.35) 0 3px,transparent 3px 6px);}
 .wrb-legend{display:flex;flex-wrap:nowrap;gap:5px;margin-top:12px;padding-left:2px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+.wrb-detail{margin:2px 0 8px 28px;padding:8px 10px;background:rgba(40,37,32,0.06);border-radius:8px;}
+.wrb-detail-line{font-size:11px;color:var(--ts);display:flex;gap:8px;padding:2px 0;}
+.wrb-detail-t{color:var(--tm);width:38px;flex-shrink:0;}
 .wrb-legend::-webkit-scrollbar{display:none;}
 .wrb-legend span{display:flex;align-items:center;gap:3px;font-size:8.7px;color:var(--tm);white-space:nowrap;flex-shrink:0;}
 .wrb-legend i{width:6px;height:6px;border-radius:50%;flex-shrink:0;display:inline-block;}
@@ -2072,7 +2081,7 @@ const RHYTHM_SLEEP_COLOR='rgba(205,194,182,0.88)';
 const RHYTHM_MEAL_COLOR='rgba(130,205,145,0.90)';
 // 모노테마에서 리듬 카테고리 색을 명도 5단계 순환으로 대체.
 // 순서: 수면 → 식사 → RHYTHM_CATS 7종(운동/휴식/업무/외출/책상/감상/정리) = 총 9개, 5단계를 순환 재사용.
-const MONO_RHYTHM_SHADES=['rgba(40,37,32,0.30)','rgba(40,37,32,0.45)','rgba(40,37,32,0.60)','rgba(40,37,32,0.75)','rgba(40,37,32,0.90)'];
+const MONO_RHYTHM_SHADES=['rgba(40,37,32,0.28)','rgba(40,37,32,0.40)','rgba(40,37,32,0.52)','rgba(40,37,32,0.64)','rgba(40,37,32,0.76)'];
 const MONO_RHYTHM_ORDER=['_sleep','_meal','exercise','rest','work','appointment','note','enjoy','home'];
 function getRhythmColor(key){
   if(document.documentElement.dataset.theme!=='mono'){
@@ -3766,7 +3775,7 @@ const CAT_ICON_META={
   movie:{icon:'ti-movie',color:'rgba(160,220,210,.85)'},
   music:{icon:'ti-music',color:'rgba(170,195,255,.85)'}
 };
-const MONO_CAT_COLOR={drama:'rgba(40,37,32,0.35)',book:'rgba(40,37,32,0.55)',movie:'rgba(40,37,32,0.70)',music:'rgba(40,37,32,0.90)'};
+const MONO_CAT_COLOR={drama:'rgba(40,37,32,0.32)',book:'rgba(40,37,32,0.48)',movie:'rgba(40,37,32,0.62)',music:'rgba(40,37,32,0.76)'};
 const CONTENT_BAR_COLOR={drama:'rgba(230,130,160,.80)',book:'rgba(215,175,60,.80)',movie:'rgba(95,175,165,.80)',music:'rgba(120,155,235,.80)'};
 // 콘텐츠 카테고리 아이콘 배지(파스텔톤, CAT_ICON_META 기반) 색상
 function getCatColor(cat){
@@ -6754,7 +6763,7 @@ function recordMealTime(dk,k){
 }
 const HABIT_COLOR_RGBA={mint:'rgba(140,210,200,0.85)',pink:'rgba(255,150,180,0.80)',sky:'rgba(130,190,255,0.80)',yellow:'rgba(240,200,80,0.80)',rose:'rgba(240,140,140,0.80)',lavender:'rgba(185,165,230,0.80)',peach:'rgba(255,185,140,0.80)',teal:'rgba(100,195,185,0.80)'};
 function getHabitColor(colorKey){
-  if(document.documentElement.dataset.theme==='mono')return 'rgba(40,37,32,0.85)';
+  if(document.documentElement.dataset.theme==='mono')return 'rgba(40,37,32,0.32)';
   return HABIT_COLOR_RGBA[colorKey]||'rgba(192,112,128,0.80)';
 }
 function renderDailyHabitCheck(){
@@ -6800,30 +6809,31 @@ function computeRhythmSegsForDay(dk,realTodayDk,_curLogicalDk){
   const wakeMin=toMin(sleep.wake),sleepMin=toMin(sleep.sleep);
   let segs=[];
   if(wakeMin!=null&&sleepMin!=null&&sleepMin<=wakeMin){
-    segs.push({start:sleepMin,end:wakeMin,color:getRhythmColor('_sleep')});
+    segs.push({start:sleepMin,end:wakeMin,color:getRhythmColor('_sleep'),label:'수면'});
   }else{
-    if(wakeMin!=null)segs.push({start:0,end:wakeMin,color:getRhythmColor('_sleep')});
+    if(wakeMin!=null)segs.push({start:0,end:wakeMin,color:getRhythmColor('_sleep'),label:'수면'});
     if(sleepMin!=null&&wakeMin==null){
       const end=dk===realTodayDk?(function(){const n=new Date();return n.getHours()<4?1440:(n.getHours()*60+n.getMinutes());})():1440;
-      segs.push({start:sleepMin,end:end,color:getRhythmColor('_sleep'),ongoing:true});
+      segs.push({start:sleepMin,end:end,color:getRhythmColor('_sleep'),ongoing:true,label:'수면'});
     }
   }
   MEAL_KEYS.forEach(function(k){
     const t=meals[k+'_time'];if(!t)return;
     const start=toMin(t);
-    segs.push({start:start,end:Math.min(start+45,1440),color:getRhythmColor('_meal')});
+    segs.push({start:start,end:Math.min(start+45,1440),color:getRhythmColor('_meal'),label:'식사'});
   });
   manual.forEach(function(b){
     const cat=RHYTHM_CATS[b.cat];if(!cat)return;
     const s=toMin(b.start);
     if(s!=null&&s<240)return;
+    const lbl=cat.label+(b.text?' · '+b.text:'');
     if(b.end){
       let e=toMin(b.end);
       if(e<=s)e=1440;
-      segs.push({start:s,end:e,color:getRhythmColor(b.cat)});
+      segs.push({start:s,end:e,color:getRhythmColor(b.cat),label:lbl});
     }else{
       const endMin=dk===realTodayDk?(function(){const n=new Date();return n.getHours()*60+n.getMinutes();})():1440;
-      segs.push({start:s,end:endMin,color:getRhythmColor(b.cat),ongoing:true});
+      segs.push({start:s,end:endMin,color:getRhythmColor(b.cat),ongoing:true,label:lbl});
     }
   });
   const d=new Date(dk+'T00:00:00');
@@ -6832,52 +6842,86 @@ function computeRhythmSegsForDay(dk,realTodayDk,_curLogicalDk){
     const cat=RHYTHM_CATS[b.cat];if(!cat)return;
     const s=toMin(b.start);
     if(s==null)return;
+    const lbl=cat.label+(b.text?' · '+b.text:'');
     if(b.end){
       const eRaw=toMin(b.end);
       if(s<240){
         let e=eRaw<=s?240:eRaw;
-        segs.push({start:s,end:e,color:getRhythmColor(b.cat)});
+        segs.push({start:s,end:e,color:getRhythmColor(b.cat),label:lbl});
       }else if(eRaw<=s){
-        segs.push({start:0,end:eRaw,color:getRhythmColor(b.cat)});
+        segs.push({start:0,end:eRaw,color:getRhythmColor(b.cat),label:lbl});
       }
     }else{
       if(s<240||s>=1380){
         const endMin=dateKey(prevD)===_curLogicalDk?(function(){const n=new Date();return n.getHours()*60+n.getMinutes();})():240;
-        segs.push({start:0,end:endMin,color:getRhythmColor(b.cat),ongoing:true});
+        segs.push({start:0,end:endMin,color:getRhythmColor(b.cat),ongoing:true,label:lbl});
       }
     }
   });
   return segs;
 }
 function renderRhythmBarHtml(segs){
+  const isMono=document.documentElement.dataset.theme==='mono';
   let track='<div class="wrb-track">';
   const segsSorted=segs.slice().sort(function(a,b){return (b.end-b.start)-(a.end-a.start);});
   segsSorted.forEach(function(sg,si){
-    track+='<div class="wrb-seg'+(sg.ongoing?' ongoing':'')+'" style="left:'+(sg.start/1440*100)+'%;width:'+Math.max((sg.end-sg.start)/1440*100,0.8)+'%;background-color:'+sg.color+';z-index:'+(10+si)+';"></div>';
+    let bg=sg.color;
+    if(isMono){
+      // 밀도 표현: 카테고리 구분 없이, 활동 길이에 따라 명도만 다르게 (짧을수록 옅게, 길수록 진하게)
+      const durMin=sg.end-sg.start;
+      const d=durMin>=180?0.62:durMin>=60?0.42:0.24;
+      bg='rgba(40,37,32,'+d+')';
+    }
+    track+='<div class="wrb-seg'+(sg.ongoing?' ongoing':'')+'" style="left:'+(sg.start/1440*100)+'%;width:'+Math.max((sg.end-sg.start)/1440*100,0.8)+'%;background-color:'+bg+';z-index:'+(10+si)+';"></div>';
   });
   track+='</div>';
   return track;
 }
 function renderWeeklyRhythmBars(){
   const el=document.getElementById('weekly-rhythm-bars');if(!el)return;
+  const isMono=document.documentElement.dataset.theme==='mono';
   const now=new Date();
   const mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7));
   const DOW=['월','화','수','목','금','토','일'];
   const todayDk=dateKey(now);
   const realTodayDk=todayDk;
   const _curLogicalDk=dateKey(getRhythmLogicalDate());
+  const dayData=[];
   let html='<div class="wrb-wrap">';
   for(let i=0;i<7;i++){
     const d=new Date(mon);d.setDate(mon.getDate()+i);
     const dk=dateKey(d);
     const segs=computeRhythmSegsForDay(dk,realTodayDk,_curLogicalDk);
+    dayData.push({dk,segs,label:DOW[i]});
     const track=renderRhythmBarHtml(segs);
-    html+='<div class="wrb-row"><div class="wrb-daylabel'+(dk===todayDk?' today':'')+'">'+DOW[i]+'</div><div class="wrb-trackwrap">'+track+'</div></div>';
+    const clickAttr=isMono?` onclick="toggleWrbDetail(${i})" style="cursor:pointer;"`:'';
+    html+='<div class="wrb-row"'+clickAttr+'><div class="wrb-daylabel'+(dk===todayDk?' today':'')+'">'+DOW[i]+'</div><div class="wrb-trackwrap">'+track+'</div></div>';
+    if(isMono){
+      const sorted=segs.slice().filter(s=>s.label).sort((a,b)=>a.start-b.start);
+      let detailHtml='';
+      if(sorted.length){
+        detailHtml=sorted.map(s=>{
+          const sh=Math.floor(s.start/60),sm=s.start%60;
+          return '<div class="wrb-detail-line"><span class="wrb-detail-t">'+pad(sh)+':'+pad(sm)+'</span><span>'+s.label+'</span></div>';
+        }).join('');
+      }else{
+        detailHtml='<div class="wrb-detail-line" style="color:var(--tm);">기록 없음</div>';
+      }
+      html+='<div class="wrb-detail" id="wrb-detail-'+i+'" style="display:none;">'+detailHtml+'</div>';
+    }
   }
   html+='</div>';
-  html+='<div class="wrb-legend"><span><i style="background:'+getRhythmColor('_meal')+';"></i>식사</span>'+
-    Object.keys(RHYTHM_CATS).map(function(k){return '<span><i style="background:'+getRhythmColor(k)+';"></i>'+RHYTHM_CATS[k].label+'</span>';}).join('')+'</div>';
+  if(!isMono){
+    html+='<div class="wrb-legend"><span><i style="background:'+getRhythmColor('_meal')+';"></i>식사</span>'+
+      Object.keys(RHYTHM_CATS).map(function(k){return '<span><i style="background:'+getRhythmColor(k)+';"></i>'+RHYTHM_CATS[k].label+'</span>';}).join('')+'</div>';
+  }
   el.innerHTML=html;
+}
+function toggleWrbDetail(i){
+  const el=document.getElementById('wrb-detail-'+i);if(!el)return;
+  const isOpen=el.style.display==='block';
+  document.querySelectorAll('[id^="wrb-detail-"]').forEach(d=>d.style.display='none');
+  el.style.display=isOpen?'none':'block';
 }
 function loadWeekly(){
   buildWeekStrip();
