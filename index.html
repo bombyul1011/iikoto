@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260711-57-pace-comment-tone-fix -->
+<!-- build: 20260711-59-settings-cleanup -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -67,21 +67,21 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 }
 [data-theme="mono"]{
   --bg:linear-gradient(145deg,#e3e0d8 0%,#e6e3db 50%,#e2ded6 100%);
-  --tp:#1e1c18;--ts:#3a3730;--tm:#4a4740;
-  --card:rgba(255,255,255,0.30);--card-b:rgba(40,37,32,0.16);
-  --card-p:rgba(255,255,255,0.30);--card-pb:rgba(40,37,32,0.16);
-  --card-m:rgba(255,255,255,0.30);--card-mb:rgba(40,37,32,0.16);
-  --card-y:rgba(255,255,255,0.30);--card-yb:rgba(40,37,32,0.16);
-  --card-s:rgba(255,255,255,0.30);--card-sb:rgba(40,37,32,0.16);
+  --tp:#2a2620;--ts:#3a3730;--tm:#4a4740;
+  --card:rgba(255,255,255,0.55);--card-b:rgba(40,37,32,0.13);
+  --card-p:rgba(255,255,255,0.55);--card-pb:rgba(40,37,32,0.13);
+  --card-m:rgba(255,255,255,0.55);--card-mb:rgba(40,37,32,0.13);
+  --card-y:rgba(255,255,255,0.55);--card-yb:rgba(40,37,32,0.13);
+  --card-s:rgba(255,255,255,0.55);--card-sb:rgba(40,37,32,0.13);
   --div:rgba(40,37,32,0.14);
   --acc:#3a3730;--acc-soft:rgba(40,37,32,0.30);
-  --nav:rgba(255,255,255,0.35);--nav-b:rgba(40,37,32,0.16);
+  --nav:rgba(255,255,255,0.55);--nav-b:rgba(40,37,32,0.13);
   --sheet:linear-gradient(160deg,#e3e0d8,#e6e3db);
   --modal:linear-gradient(145deg,#e3e0d8,#e6e3db);
-  --inp:rgba(255,255,255,0.32);--inp-b:rgba(40,37,32,0.16);
-  --pill:rgba(255,255,255,0.32);
-  --memo-b:rgba(255,255,255,0.32);--memo-bb:rgba(40,37,32,0.16);
-  --sleep-b:rgba(255,255,255,0.32);--sleep-bb:rgba(40,37,32,0.16);
+  --inp:rgba(255,255,255,0.50);--inp-b:rgba(40,37,32,0.13);
+  --pill:rgba(255,255,255,0.50);
+  --memo-b:rgba(255,255,255,0.50);--memo-bb:rgba(40,37,32,0.13);
+  --sleep-b:rgba(255,255,255,0.50);--sleep-bb:rgba(40,37,32,0.13);
 }
 [data-theme="glass"] .card,[data-theme="glass"] .sleep-box,[data-theme="glass"] .habit-week-box{border-width:1.4px;box-shadow:0 1.5px 1.5px rgba(255,255,255,0.9) inset,0 -8px 14px -10px rgba(120,110,95,0.15) inset,0 5px 14px rgba(150,140,120,0.08);}
 [data-theme="glass"] #daily-meal-card{background:rgba(255,253,248,0.45)!important;border-color:rgba(150,195,130,0.55)!important;}
@@ -832,8 +832,8 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
 [data-theme="mono"] .chk.ts-night{border-color:rgba(40,37,32,0.65);}
 [data-theme="mono"] .chk.ts-night.on{background:rgba(40,37,32,0.62);border-color:rgba(40,37,32,0.78);}
 [data-theme="mono"] .chk.ts-night.on::after{border-color:#fff;}
-[data-theme="mono"] .todo-time-sel button.ts-morning.active{background:rgba(40,37,32,0.20);border-color:rgba(40,37,32,0.45);color:#1e1c18;}
-[data-theme="mono"] .todo-time-sel button.ts-afternoon.active{background:rgba(40,37,32,0.35);border-color:rgba(40,37,32,0.60);color:#1e1c18;}
+[data-theme="mono"] .todo-time-sel button.ts-morning.active{background:rgba(40,37,32,0.20);border-color:rgba(40,37,32,0.45);color:#2a2620;}
+[data-theme="mono"] .todo-time-sel button.ts-afternoon.active{background:rgba(40,37,32,0.35);border-color:rgba(40,37,32,0.60);color:#2a2620;}
 [data-theme="mono"] .todo-time-sel button.ts-night.active{background:rgba(40,37,32,0.55);border-color:rgba(40,37,32,0.80);color:#fff;}
 
 /* 습관 색상(8종) - 전부 동일 모노 톤으로, 체크 여부만 명도로 구분 */
@@ -869,6 +869,14 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
 
 /* 카드류 공통 배경(기존 glass 대응 요소들) - 전부 모노 카드톤으로 */
 [data-theme="mono"] #daily-meal-card{background:rgba(255,255,255,0.30)!important;border-color:rgba(40,37,32,0.16)!important;}
+[data-theme="mono"] #daily-meal-card .cal-detail-time{color:var(--tm)!important;}
+[data-theme="mono"] #daily-meal-card .cal-detail-row{border-bottom-color:var(--div)!important;}
+[data-theme="mono"] .meal-time-btn{border-color:rgba(40,37,32,0.35)!important;color:rgba(40,37,32,0.65)!important;}
+[data-theme="mono"] .meal-time-tag{color:var(--tm)!important;}
+[data-theme="mono"] .wish-round-btn{border-color:rgba(40,37,32,0.30)!important;background:rgba(40,37,32,0.08)!important;color:rgba(40,37,32,0.75)!important;}
+[data-theme="mono"] .wish-add-btn{background:rgba(40,37,32,0.65)!important;color:#fff!important;}
+[data-theme="mono"] #wish-placing-hint{color:var(--tp)!important;background:rgba(40,37,32,0.08)!important;}
+[data-theme="mono"] .meal-inp.wish-target{background:rgba(40,37,32,0.10)!important;}
 [data-theme="mono"] .meal-soft{filter:grayscale(1) contrast(0.9);}
 [data-theme="mono"] .rd-top-inner{background:rgba(255,255,255,0.35);}
 [data-theme="mono"] .rd-top{background:rgba(40,37,32,0.30)!important;animation:none!important;}
@@ -881,21 +889,24 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
 [data-theme="mono"] .quote-soft{filter:grayscale(1) contrast(0.9);}
 [data-theme="mono"] .mr-goal-card{background:rgba(40,37,32,0.08);border:1.4px solid rgba(40,37,32,0.18);}
 [data-theme="mono"] .seed-icon-btn{background:rgba(40,37,32,0.14);border:1.4px solid rgba(40,37,32,0.24);}
-[data-theme="mono"] .seed-icon-btn i{color:#1e1c18!important;}
+[data-theme="mono"] .seed-icon-btn i{color:#2a2620!important;}
 [data-theme="mono"] .reading-icon-btn{background:rgba(40,37,32,0.28)!important;border:1px solid rgba(40,37,32,0.40)!important;box-shadow:none!important;}
 [data-theme="mono"] .reading-icon-btn i{color:#fff!important;}
 [data-theme="mono"] .reading-icon-btn.sw-active{background:rgba(40,37,32,0.60)!important;animation:none!important;}
 [data-theme="mono"] .memo-bub{background:none;border:none;border-left:2.5px solid rgba(40,37,32,0.25);border-radius:0;padding:2px 0 0 10px;}
 [data-theme="mono"] .memo-bub.tod-morning,[data-theme="mono"] .memo-bub.tod-afternoon,[data-theme="mono"] .memo-bub.tod-night{background:none;border-left-color:rgba(40,37,32,0.35);}
 [data-theme="mono"] .quote-chip-inner{background:rgba(255,255,255,0.35);}
-[data-theme="mono"] .done-quote-chip-inner,[data-theme="mono"] .done-comment-chip-inner{background:rgba(255,255,255,0.35);color:var(--tp)!important;}
+[data-theme="mono"] .done-quote-chip-inner,[data-theme="mono"] .done-comment-chip-inner{background:rgba(255,255,255,0.35)!important;color:var(--tp)!important;}
 [data-theme="mono"] .done-quote-chip,[data-theme="mono"] .done-comment-chip{background:rgba(40,37,32,0.30)!important;animation:none!important;}
 [data-theme="mono"] .report-banner .report-banner-inner{background:rgba(255,255,255,0.30)!important;backdrop-filter:none;}
 [data-theme="mono"] .weekly-review-banner-inner,[data-theme="mono"] .midweek-remind-banner-inner,[data-theme="mono"] .nextweek-banner-inner{background:rgba(255,255,255,0.30)!important;backdrop-filter:none;border:1px solid rgba(40,37,32,0.16);}
 [data-theme="mono"] .rhythm-review-card{background:rgba(255,255,255,0.30);border-color:rgba(40,37,32,0.20);}
-[data-theme="mono"] .diary-month-summary{background:rgba(255,255,255,0.30);}
+[data-theme="mono"] .diary-month-summary{background:rgba(255,255,255,0.30)!important;border-color:rgba(40,37,32,0.16)!important;box-shadow:none!important;}
 [data-theme="mono"] .mr-ai-card{background:rgba(255,255,255,0.30);}
-[data-theme="mono"] .diary-date-chip.today{background:rgba(40,37,32,0.14);border-color:rgba(40,37,32,0.30);color:#1e1c18;}
+[data-theme="mono"] .diary-date-chip.today{background:rgba(40,37,32,0.14);border-color:rgba(40,37,32,0.30);color:#2a2620;}
+[data-theme="mono"] .diary-date-chip.holiday{color:var(--tm)!important;}
+[data-theme="mono"] .rd-quote-item{background:rgba(255,255,255,0.32)!important;border-left-color:rgba(40,37,32,0.30)!important;}
+[data-theme="mono"] .m-chip.active{background:rgba(40,37,32,0.16)!important;border-color:rgba(40,37,32,0.35)!important;color:#2a2620!important;}
 
 /* 상단 오늘/주간/월간 탭(vtab) 선택 상태 */
 [data-theme="mono"] .vtab.on{
@@ -911,15 +922,15 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
 
 /* 날짜 today 표시류 */
 [data-theme="mono"] .day-btn.today{background:rgba(40,37,32,0.14);border-color:rgba(40,37,32,0.30);}
-[data-theme="mono"] .day-btn.today .day-num{color:#1e1c18;}
+[data-theme="mono"] .day-btn.today .day-num{color:#2a2620;}
 [data-theme="mono"] .rd-tab.on{background:rgba(40,37,32,0.14);border-color:rgba(40,37,32,0.30);}
-[data-theme="mono"] #nextweek-sheet .goal-section-title{background:rgba(40,37,32,0.12)!important;color:#1e1c18!important;border:1.4px solid rgba(40,37,32,0.24)!important;}
+[data-theme="mono"] #nextweek-sheet .goal-section-title{background:rgba(40,37,32,0.12)!important;color:#2a2620!important;border:1.4px solid rgba(40,37,32,0.24)!important;}
 [data-theme="mono"] .chk.on{background:rgba(40,37,32,0.55)!important;border-color:rgba(40,37,32,0.80)!important;}
 [data-theme="mono"] .cal-day.today .cal-num{background:rgba(40,37,32,0.75);}
-[data-theme="mono"] .cal-day.selected .cal-num{background:rgba(40,37,32,0.18);color:#1e1c18;}
+[data-theme="mono"] .cal-day.selected .cal-num{background:rgba(40,37,32,0.18);color:#2a2620;}
 [data-theme="mono"] .cal-dot{background:rgba(40,37,32,0.75);}
-[data-theme="mono"] .goal-section-title{background:rgba(40,37,32,0.12)!important;color:#1e1c18!important;border:1.4px solid rgba(40,37,32,0.24)!important;}
-[data-theme="mono"] .mbtn.ok{background:rgba(40,37,32,0.20);color:#1e1c18;}
+[data-theme="mono"] .goal-section-title{background:rgba(40,37,32,0.12)!important;color:#2a2620!important;border:1.4px solid rgba(40,37,32,0.24)!important;}
+[data-theme="mono"] .mbtn.ok{background:rgba(40,37,32,0.20);color:#2a2620;}
 [data-theme="mono"] .wchallenge-day.on{background:rgba(255,255,255,0.35)!important;color:var(--tp)!important;border-width:2px;border-color:rgba(40,37,32,0.5)!important;}
 [data-theme="mono"] .habit-chk2.on{background:rgba(255,255,255,0.35)!important;border-width:2px;border-color:rgba(40,37,32,0.5)!important;}
 [data-theme="mono"] .habit-chk2.on svg{stroke:var(--tp)!important;}
@@ -1690,6 +1701,10 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
           <div class="ctheme-btn" id="ct-glass" style="background:linear-gradient(135deg,#f7f4ee,#f3f1ec)" onclick="setTheme('glass',this)">✓</div>
           <div class="ctheme-btn" id="ct-mono" style="background:linear-gradient(135deg,#e3e0d8,#e2ded6)" onclick="setTheme('mono',this)">✓</div>
         </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;padding-top:14px;border-top:1px solid var(--div);">
+          <div class="toggle-lbl">자정 자동 전환</div>
+          <div class="tog" id="auto-mono-tog" onclick="toggleAutoMono(this)"></div>
+        </div>
       </div>
     </div>
     <div>
@@ -1761,16 +1776,22 @@ html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg)
       </div>
     </div>
     <div>
-      <div class="settings-slbl">데이터 복구</div>
-      <div class="settings-card">
-        <div class="settings-item" style="flex-direction:column;gap:8px;align-items:flex-start;">
-          <span style="font-size:11px;color:var(--tm);">Supabase에서 최근 14일 데이터 강제 복구</span>
-          <button onclick="forceRestoreAll()" style="width:100%;padding:9px;border-radius:10px;border:none;background:rgba(100,195,185,0.25);color:#2a7868;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">🔄 데이터 복구하기</button>
+      <div class="settings-card mr-accordion" id="data-recovery-accordion">
+        <div class="settings-slbl mr-accordion-toggle" onclick="this.closest('.mr-accordion').classList.toggle('open')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;margin-bottom:0;">
+          <span>데이터 복구</span>
+          <span class="mr-accordion-arrow">›</span>
         </div>
-        <div class="settings-item" style="flex-direction:column;gap:8px;align-items:flex-start;padding-top:12px;">
-          <span style="font-size:11px;color:var(--tm);">최근 14일 로컬↔Supabase 개수 비교 (오늘 날짜는 동기화 전이라 다를 수 있어요)</span>
-          <button onclick="checkDataIntegrity()" style="width:100%;padding:9px;border-radius:10px;border:1px solid var(--div);background:transparent;color:var(--tp);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">🔍 데이터 무결성 점검</button>
-          <div id="integrity-check-status" style="font-size:11px;color:var(--tm);line-height:1.6;"></div>
+        <div class="mr-accordion-body">
+          <div id="data-recovery-last-used" style="font-size:10px;color:var(--tm);padding-top:12px;"></div>
+          <div class="settings-item" style="flex-direction:column;gap:8px;align-items:flex-start;padding-top:12px;">
+            <span style="font-size:11px;color:var(--tm);">Supabase에서 최근 14일 데이터 강제 복구</span>
+            <button onclick="forceRestoreAll()" style="width:100%;padding:9px;border-radius:10px;border:1px solid var(--div);background:var(--card);color:var(--tp);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">데이터 복구하기</button>
+          </div>
+          <div class="settings-item" style="flex-direction:column;gap:8px;align-items:flex-start;padding-top:12px;">
+            <span style="font-size:11px;color:var(--tm);">최근 14일 로컬↔Supabase 개수 비교 (오늘 날짜는 동기화 전이라 다를 수 있어요)</span>
+            <button onclick="checkDataIntegrity()" style="width:100%;padding:9px;border-radius:10px;border:1px solid var(--div);background:transparent;color:var(--tp);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">데이터 무결성 점검</button>
+            <div id="integrity-check-status" style="font-size:11px;color:var(--tm);line-height:1.6;"></div>
+          </div>
         </div>
       </div>
       <div class="settings-slbl">앱 정보</div>
@@ -3071,7 +3092,6 @@ async function loadMonthlyReportContent(){
     </div>
   </div>` : `<div class="mr-card"><div class="mr-sec-title"><i class="ti ti-flag-3" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 주간 미션 모음 · 주차별</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:8px 0;">이 달엔 작성한 주간 미션이 없어요</div></div>`;
 
-  const CAT_DOT={drama:'rgba(255,210,225,.85)',book:'rgba(255,235,160,.85)',movie:'rgba(200,240,235,.85)',music:'rgba(200,220,255,.85)'};
   const cStatusLabel=function(c){
     if(c.cat==='music')return '';
     if(c.cat==='book')return c.status==='stopped'?'중단':(c.status==='done'?'완료':'읽는중');
@@ -3079,7 +3099,7 @@ async function loadMonthlyReportContent(){
   };
   const contentsHtml=stats.contentsList.length?`<div class="mr-card">
     <div class="mr-sec-title"><i class="ti ti-stack-2" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 콘텐츠 기록</div>
-    ${stats.contentsList.map(c=>`<div class="mr-wc-line"><span class="txt"><span style="display:inline-block;width:7px;height:7px;border-radius:2px;background:${CAT_DOT[c.cat]||'var(--tm)'};margin-right:6px;"></span>${c.title}</span><span class="pct" style="color:var(--tm);font-weight:400;">${cStatusLabel(c)}</span></div>`).join('')}
+    ${stats.contentsList.map(c=>`<div class="mr-wc-line"><span class="txt"><span style="display:inline-block;width:7px;height:7px;border-radius:2px;background:${getCatColor(c.cat)};margin-right:6px;"></span>${c.title}</span><span class="pct" style="color:var(--tm);font-weight:400;">${cStatusLabel(c)}</span></div>`).join('')}
   </div>` : `<div class="mr-card"><div class="mr-sec-title"><i class="ti ti-stack-2" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 콘텐츠 기록</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:8px 0;">이 달엔 기록한 콘텐츠가 없어요</div></div>`;
 
   el.innerHTML=`${goalHtml}<div id="mr-ai-slot"></div>${statsHtml}${rhythmHtml}${wcHtml}${contentsHtml}`;
@@ -3705,6 +3725,7 @@ function getSection(){
 }
 
 function renderHome(){
+  _checkAutoMonoSwitch();
   const now=new Date();
   const section=getSection();
   const hcard=document.getElementById('home-header-card');
@@ -4474,18 +4495,57 @@ function applyThemeColorMeta(theme){
   const m=document.querySelector('meta[name="theme-color"]');
   if(m)m.setAttribute('content',THEME_COLORS[theme]||THEME_COLORS.light);
 }
+function _isDawnHour(){
+  const h=new Date().getHours();
+  return h>=0&&h<6;
+}
+function _checkAutoMonoSwitch(){
+  if(!S.get('auto_mono_enabled'))return;
+  const t=S.get('theme')||'light';
+  if(_isDawnHour()&&t!=='mono'){
+    S.set('theme_pref',t);
+    document.documentElement.setAttribute('data-theme','mono');
+    applyThemeColorMeta('mono');
+    S.set('theme','mono');
+  }else if(!_isDawnHour()&&t==='mono'){
+    const pref=S.get('theme_pref')||'light';
+    document.documentElement.setAttribute('data-theme',pref);
+    applyThemeColorMeta(pref);
+    S.set('theme',pref);
+  }
+}
 (function initTheme(){
   let t=S.get('theme')||'light';
   if(t==='dark'){t='light';S.set('theme','light');} // 다크모드 폐지 - 기존에 켜져있던 경우 라이트로 이전
+  S.set('theme',t);
   document.documentElement.setAttribute('data-theme',t);
   applyThemeColorMeta(t);
+  _checkAutoMonoSwitch(); // 자동전환 켜져있으면 여기서 현재 시간대에 맞게 다시 조정
 })();
 function setTheme(theme,btn){
   document.documentElement.setAttribute('data-theme',theme);
   applyThemeColorMeta(theme);
   S.set('theme',theme);
+  if(theme!=='mono')S.set('theme_pref',theme); // 사용자가 직접 고른 라이트/글래스는 새벽 이후 복귀할 기본값으로도 저장
   document.querySelectorAll('.ctheme-btn').forEach(b=>b.classList.remove('on'));
   if(btn)btn.classList.add('on');
+}
+function toggleAutoMono(el){
+  const on=el.classList.toggle('on');
+  S.set('auto_mono_enabled',on);
+  if(on&&_isDawnHour()&&S.get('theme')!=='mono'){
+    // 스위치를 새벽 시간대에 막 켰다면 즉시 mono로 전환
+    S.set('theme_pref',S.get('theme')||'light');
+    setTheme('mono');
+    document.querySelectorAll('.ctheme-btn').forEach(b=>b.classList.remove('on'));
+    const monoBtn=document.getElementById('ct-mono');if(monoBtn)monoBtn.classList.add('on');
+  }else if(!on&&S.get('theme')==='mono'){
+    // 스위치를 껐는데 현재 mono라면(자동전환으로 들어와있던 상태) 원래 선호 테마로 복귀
+    const pref=S.get('theme_pref')||'light';
+    setTheme(pref);
+    document.querySelectorAll('.ctheme-btn').forEach(b=>b.classList.remove('on'));
+    const prefBtn=document.getElementById('ct-'+pref);if(prefBtn)prefBtn.classList.add('on');
+  }
 }
 
 // ── SPLASH
@@ -6980,6 +7040,7 @@ function recordMealTime(dk,k){
   renderTodayMeal();
 }
 const HABIT_COLOR_RGBA={mint:'rgba(140,210,200,0.85)',pink:'rgba(255,150,180,0.80)',sky:'rgba(130,190,255,0.80)',yellow:'rgba(240,200,80,0.80)',rose:'rgba(240,140,140,0.80)',lavender:'rgba(185,165,230,0.80)',peach:'rgba(255,185,140,0.80)',teal:'rgba(100,195,185,0.80)'};
+function _isMono(){return document.documentElement.dataset.theme==='mono';}
 function getHabitColor(colorKey){
   if(document.documentElement.dataset.theme==='mono')return 'rgba(40,37,32,0.32)';
   return HABIT_COLOR_RGBA[colorKey]||'rgba(192,112,128,0.80)';
@@ -7483,7 +7544,7 @@ function clearClaudeKey(){
   }catch(e){}
 }
 function openSettings(){
-  const el=document.getElementById('sync-status');if(el)el.textContent=navigator.onLine?'온라인 ✅':'오프라인';
+  const el=document.getElementById('sync-status');if(el)el.textContent=navigator.onLine?'온라인':'오프라인';
   const keyInp=document.getElementById('claude-api-key-inp');
   if(keyInp){const k=S.get('claude_api_key');keyInp.value=k?'sk-ant-••••'+k.slice(-4):'';}
   const profileInp=document.getElementById('user-profile-inp');if(profileInp)profileInp.value=S.get('user_profile')||'';
@@ -7491,6 +7552,18 @@ function openSettings(){
   const nsi=document.getElementById('notion-backup-secret-inp');if(nsi)nsi.value=S.get('notion_backup_secret')||'';  const theme=S.get('theme')||'light';
   document.querySelectorAll('.ctheme-btn').forEach(b=>b.classList.remove('on'));
   const act=document.getElementById('ct-'+theme);if(act)act.classList.add('on');
+  const autoTog=document.getElementById('auto-mono-tog');
+  if(autoTog)autoTog.classList.toggle('on',!!S.get('auto_mono_enabled'));
+  const lastUsedEl=document.getElementById('data-recovery-last-used');
+  if(lastUsedEl){
+    const lastUsed=S.get('data_recovery_last_used');
+    if(lastUsed){
+      const days=Math.floor((new Date()-new Date(lastUsed+'T00:00:00'))/86400000);
+      lastUsedEl.textContent=days>=30?`마지막 사용: ${lastUsed} (${days}일 전 — 오래 안 썼다면 정리를 고려해보세요)`:`마지막 사용: ${lastUsed}`;
+    }else{
+      lastUsedEl.textContent='아직 사용한 적 없어요';
+    }
+  }
   document.getElementById('settings-ov').classList.add('on');
 }
 function closeSettings(){document.getElementById('settings-ov').classList.remove('on');}
@@ -7807,19 +7880,19 @@ function renderRdQuotes(){
   const shown=_rdQuoteShowAll?quotes:quotes.slice(0,MAX);
   let html=shown.map(q=>`<div class="rd-quote-item">
       <div class="rd-quote-text">${q.text}</div>
-      ${q.comment?`<div class="rd-quote-comment" onclick="toggleQuoteCommentEditor('${q.cid}')" style="font-size:11px;color:#7a9552;margin-top:4px;padding:5px 8px;background:rgba(232,246,220,0.6);border-radius:8px;cursor:pointer;">${q.comment}</div>`:''}
+      ${q.comment?`<div class="rd-quote-comment" onclick="toggleQuoteCommentEditor('${q.cid}')" style="font-size:11px;color:${_isMono()?'var(--tp)':'#7a9552'};margin-top:4px;padding:5px 8px;background:${_isMono()?'rgba(40,37,32,0.08)':'rgba(232,246,220,0.6)'};border-radius:8px;cursor:pointer;">${q.comment}</div>`:''}
       <div id="qc-editor-${q.cid}" class="qc-editor" style="display:none;margin-top:5px;" onclick="event.stopPropagation();">
         <textarea class="qc-comment-textarea" style="width:100%;box-sizing:border-box;font-size:11.5px;padding:6px 8px;border-radius:8px;border:1px solid var(--card-b);background:var(--card);color:var(--tp);resize:none;min-height:44px;font-family:inherit;outline:none;" placeholder="이 문장에 대한 감상을 적어보세요">${q.comment||''}</textarea>
         <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px;">
           <span onclick="document.getElementById('qc-editor-${q.cid}').style.display='none';" style="font-size:11px;color:var(--tm);cursor:pointer;padding:3px 8px;">취소</span>
-          <span onclick="commitQuoteComment('${q.cid}')" style="font-size:11px;color:#6a8a50;cursor:pointer;padding:3px 8px;font-weight:600;">저장</span>
+          <span onclick="commitQuoteComment('${q.cid}')" style="font-size:11px;color:${_isMono()?'var(--tp)':'#6a8a50'};cursor:pointer;padding:3px 8px;font-weight:600;">저장</span>
         </div>
       </div>
       <span style="position:absolute;right:8px;bottom:6px;display:flex;align-items:center;gap:3px;">
-        <span onclick="toggleQuoteCommentEditor('${q.cid}')" title="${q.comment?'코멘트 수정':'코멘트 남기기'}" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:${q.comment?'#fff':'#8878ab'};background:${q.comment?'rgba(140,120,180,0.85)':'transparent'};opacity:${q.comment?'1':'0.7'};">
+        <span onclick="toggleQuoteCommentEditor('${q.cid}')" title="${q.comment?'코멘트 수정':'코멘트 남기기'}" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:${q.comment?'#fff':(_isMono()?'var(--tm)':'#8878ab')};background:${q.comment?(_isMono()?'rgba(40,37,32,0.55)':'rgba(140,120,180,0.85)'):'transparent'};opacity:${q.comment?'1':'0.7'};">
           <i class="ti ti-message-circle" style="font-size:11px;" aria-hidden="true"></i>
         </span>
-        <span class="rd-quote-toseed" onclick="sendQuoteToSeed('${q.cid}')" title="${q.sentToSeed?'씨앗에서 빼기':'씨앗으로 보내기'}" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:${q.sentToSeed?'#fff':'#6a8a50'};background:${q.sentToSeed?'rgba(140,175,90,0.85)':'transparent'};opacity:${q.sentToSeed?'1':'0.75'};">
+        <span class="rd-quote-toseed" onclick="sendQuoteToSeed('${q.cid}')" title="${q.sentToSeed?'씨앗에서 빼기':'씨앗으로 보내기'}" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:${q.sentToSeed?'#fff':(_isMono()?'var(--tm)':'#6a8a50')};background:${q.sentToSeed?(_isMono()?'rgba(40,37,32,0.55)':'rgba(140,175,90,0.85)'):'transparent'};opacity:${q.sentToSeed?'1':'0.75'};">
           <i class="ti ti-seeding" style="font-size:12px;" aria-hidden="true"></i>
         </span>
         <span class="rd-quote-del" onclick="removeQuote('${q.cid}')" style="position:static;font-size:10px;padding:2px;display:inline-flex;align-items:center;justify-content:center;"><i class="ti ti-x" style="font-size:11px;" aria-hidden="true"></i></span>
@@ -8855,6 +8928,7 @@ async function forceRestoreDate(dk){
   }
 }
 async function forceRestoreAll(){
+  S.set('data_recovery_last_used',dateKey(new Date()));
   showToast('복구 시작...');
   window._restoring = true;
   var dates = [];
@@ -8877,6 +8951,7 @@ async function forceRestoreAll(){
   showToast('복구 완료 ✓ ' + restored + '일치 데이터 복원됨');
 }
 async function checkDataIntegrity(){
+  S.set('data_recovery_last_used',dateKey(new Date()));
   const statusEl=document.getElementById('integrity-check-status');
   if(!navigator.onLine){if(statusEl){statusEl.style.color='#c05060';statusEl.textContent='오프라인 상태에선 점검할 수 없어요';}return;}
   if(statusEl){statusEl.style.color='';statusEl.textContent='점검 중이에요...';}
