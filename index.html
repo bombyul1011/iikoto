@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260711-50-pace-bar-speed-compare -->
+<!-- build: 20260711-51-pace-bar-total-ratio-final -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -4969,7 +4969,8 @@ function makeAfternoonPaceCard(){
 
   const todayDone=_paceCountDoneUntilNow(todayDk,nowMin);
   const yestDone=_paceCountDoneUntilNow(yestDk,nowMin);
-  const paceMax=Math.max(yestDone,todayDone,1);
+  const todayTotal=Math.max(getTodos(todayDk).length,1);
+  const yestTotal=Math.max(getTodos(yestDk).length,1);
 
   const todayHabit=_paceHabitCheckedCount(todayDk);
   const lastWeekHabit=_paceHabitCheckedCount(lastWeekDk);
@@ -4989,9 +4990,9 @@ function makeAfternoonPaceCard(){
   let html='';
   html+=`<div class="pace-title"><i class="ti ti-clock" style="font-size:13px;" aria-hidden="true"></i> 오늘 진행도</div>`;
   html+=`<div class="pace-track-wrap"><div class="pace-track-lbl"><span>어제</span><span>${yestDone}개</span></div>
-    <div class="pace-track"><div class="pace-fill-y" style="width:${yestDone/paceMax*100}%;"></div></div></div>`;
+    <div class="pace-track"><div class="pace-fill-y" style="width:${yestDone/yestTotal*100}%;"></div></div></div>`;
   html+=`<div class="pace-track-wrap" style="margin-bottom:0;"><div class="pace-track-lbl"><span>오늘</span><span>${todayDone}개</span></div>
-    <div class="pace-track"><div class="pace-fill-t" style="width:${todayDone/paceMax*100}%;"></div><div class="pace-bead2" style="left:${todayDone/paceMax*100}%;"></div></div></div>`;
+    <div class="pace-track"><div class="pace-fill-t" style="width:${todayDone/todayTotal*100}%;"></div><div class="pace-bead2" style="left:${todayDone/todayTotal*100}%;"></div></div></div>`;
 
   html+=`<div class="pace-divider"></div>`;
   html+=`<div class="wave-title"><i class="ti ti-droplet" style="font-size:13px;" aria-hidden="true"></i> 지난주와 오늘</div>`;

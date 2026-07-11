@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260711-50-pace-bar-speed-compare';
+const CACHE = 'iikoto-v20260711-51-pace-bar-total-ratio-final';
 const ASSETS = [
   './',
   './index.html'
