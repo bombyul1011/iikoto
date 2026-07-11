@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260711-75-icon-tweaks';
+const CACHE = 'iikoto-v20260711-76-evening-part-split';
 const ASSETS = [
   './',
   './index.html'

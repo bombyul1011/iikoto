@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260711-75-icon-tweaks -->
-<!-- 20260711-74 → 75: 배너 열림 화살표(›)를 ti-chevron-up으로, 투두 내일로 이동 아이콘(⚬→)을 ti-chevrons-right로 교체. 설정화면 섹션 라벨(.settings-slbl) 위쪽 여백 추가해 앱정보 라벨이 데이터복구 카드에 붙는 문제 수정 -->
+<!-- build: 20260711-76-evening-part-split -->
+<!-- 20260711-75 → 76: 저녁 홈탭을 파트1(19-22시)/파트2(22시~)로 분리. 파트1: 습관미니체크→아직남은일→리듬배너→미니통계(신규,당일 완료투두/체크습관/최다리듬)→오늘의독서. 파트2: 습관미니체크→아직남은일→리듬배너→밀도의숲→오늘의독서→오늘의문장(아침에서 이동)→최근콘텐츠(신규,진행중인것만-책%/드라마N일째/영화감상중·완료/음악당일텍스트없음). 아침 홈탭에서 오늘의문장 카드 제거 -->
 
 <html lang="ko">
 <head>
@@ -2022,8 +2022,6 @@ function renderHomeBody(section){
     body.appendChild(makeLabel('해빗'));
     body.appendChild(makeHabitStreakRow());
     body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getRhythmLogicalDate()));},'rhythm-soft',12.5,dateKey(getRhythmLogicalDate())));
-    body.appendChild(makeLabel('오늘의 문장'));
-    body.appendChild(makeTextArchiveCard());
   } else if(section==='afternoon'){
     body.appendChild(makeAfternoonPaceCard());
     refreshAfternoonPaceCard();
@@ -2090,10 +2088,19 @@ function renderHomeBody(section){
     if(!isSunday){
       // "오늘 마무리" 브리핑은 통합카드(상단 인삿말)가 흡수함
     }
-    body.appendChild(makeLabel('밀도의 숲'));
-    body.appendChild(makeMonthlyHeatmapCard());
-    body.appendChild(makeLabel('오늘의 독서'));
-    body.appendChild(makeBookCard());
+    if(getSubSection()==='night_2'){
+      body.appendChild(makeLabel('밀도의 숲'));
+      body.appendChild(makeMonthlyHeatmapCard());
+      body.appendChild(makeLabel('오늘의 독서'));
+      body.appendChild(makeBookCard());
+      body.appendChild(makeLabel('오늘의 문장'));
+      body.appendChild(makeTextArchiveCard());
+      body.appendChild(makeRecentContentsCard());
+    }else{
+      body.appendChild(makeEveningMiniStatCard());
+      body.appendChild(makeLabel('오늘의 독서'));
+      body.appendChild(makeBookCard());
+    }
   }
 }
 
@@ -5017,6 +5024,78 @@ function _paceTopRhythmCat(dk){
   const top=Object.keys(dur).sort((a,b)=>dur[b]-dur[a])[0];
   return top&&RHYTHM_CATS[top]?{key:top,icon:RHYTHM_CATS[top].icon,color:RHYTHM_CATS[top].color,label:RHYTHM_CATS[top].label}:null;
 }
+// 저녁 파트1용 미니통계 카드 — 당일 기록 기준(완료 투두 / 체크 습관 / 오늘의 최다 리듬), 오후 통계카드보다 훨씬 컴팩트하게
+function makeEveningMiniStatCard(){
+  const dk=dateKey(getLogicalDate());
+  const doneTodos=_paceCountDoneUntilNow(dk,null);
+  const checkedHabits=_paceHabitCheckedCount(dk);
+  const topRhythm=_paceTopRhythmCat(dk);
+  const card=document.createElement('div');card.className='pace-card';
+  let html=`<div class="pace-title"><i class="ti ti-moon-stars" style="font-size:13px;" aria-hidden="true"></i> 오늘 하루</div>`;
+  html+=`<div style="display:flex;justify-content:space-around;">`;
+  html+=`<div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
+    <div style="width:36px;height:36px;border-radius:12px;background:rgba(150,205,225,0.9);display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;font-weight:500;">${doneTodos}</div>
+    <i class="ti ti-checks" style="font-size:12px;color:var(--tm);" aria-hidden="true"></i>
+  </div>`;
+  html+=`<div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
+    <div style="width:36px;height:36px;border-radius:12px;background:rgba(190,160,230,0.9);display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;font-weight:500;">${checkedHabits}</div>
+    <i class="ti ti-flame" style="font-size:12px;color:var(--tm);" aria-hidden="true"></i>
+  </div>`;
+  if(topRhythm){
+    html+=`<div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
+      <div style="width:36px;height:36px;border-radius:12px;background:rgba(244,177,206,0.9);display:flex;align-items:center;justify-content:center;">
+        <i class="ti ${topRhythm.icon}" style="font-size:16px;color:#fff;" aria-hidden="true"></i>
+      </div>
+      <i class="ti ti-sparkles" style="font-size:12px;color:var(--tm);" aria-hidden="true"></i>
+    </div>`;
+  }
+  html+=`</div>`;
+  card.innerHTML=html;
+  return card;
+}
+// 저녁 파트2용 최근 콘텐츠 카드 — 진행중인 것 기준(책은 %, 드라마는 N일째, 영화는 감상중/감상완료, 음악은 당일만 텍스트없이)
+function makeRecentContentsCard(){
+  const mk=monthKey(getLogicalDate());
+  const todayDk=dateKey(getLogicalDate());
+  const contents=getContents(mk);
+  const items=[];
+  const book=getBooks().find(b=>b.status==='reading');
+  if(book)items.push({cat:'book',title:book.title,rightText:(book.percent||0)+'%'});
+  contents.forEach(c=>{
+    if(c.cat==='drama'&&c.status==='watching'&&c.startDate){
+      const start=new Date(c.startDate+'T00:00:00');
+      const now=new Date(todayDk+'T00:00:00');
+      const days=Math.max(1,Math.round((now-start)/86400000)+1);
+      items.push({cat:'drama',title:c.title,rightText:days+'일째 보는 중'});
+    }else if(c.cat==='movie'&&(c.status==='watching'||c.status==='done')&&c.startDate===todayDk){
+      items.push({cat:'movie',title:c.title,rightText:c.status==='done'?'감상 완료':'감상 중'});
+    }else if(c.cat==='music'&&c.startDate===todayDk){
+      items.push({cat:'music',title:c.title,rightText:null});
+    }
+  });
+  const card=document.createElement('div');card.className='pace-card';
+  if(!items.length){
+    card.innerHTML=`<div class="pace-title"><i class="ti ti-stack-2" style="font-size:13px;" aria-hidden="true"></i> 최근 콘텐츠</div>
+      <div style="text-align:center;padding:8px 0;">
+        <div style="font-size:11px;color:var(--tm);">지금 즐기고 있는 콘텐츠가 없어요</div>
+      </div>`;
+    return card;
+  }
+  let html=`<div class="pace-title"><i class="ti ti-stack-2" style="font-size:13px;" aria-hidden="true"></i> 최근 콘텐츠</div>`;
+  html+=`<div style="display:flex;flex-direction:column;gap:9px;">`;
+  items.forEach(it=>{
+    const meta=CAT_ICON_META[it.cat];
+    html+=`<div style="display:flex;align-items:center;gap:8px;">
+      <div style="width:26px;height:26px;border-radius:8px;background:${meta.color.replace('.85','.5')};display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="ti ${meta.icon}" style="font-size:13px;color:${getCatBarColor(it.cat)};" aria-hidden="true"></i></div>
+      <span style="font-size:12px;color:var(--tp);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${it.title}</span>
+      ${it.rightText?`<span style="font-size:10px;color:var(--tm);">${it.rightText}</span>`:''}
+    </div>`;
+  });
+  html+=`</div>`;
+  card.innerHTML=html;
+  return card;
+}
+
 // 오후 통계 카드는 로컬 캐시에 없는 과거 날짜(어제/지난주) 데이터가 필요할 수 있어
 // 렌더링 직후 해당 날짜들을 서버에서 새로 받아와 카드를 다시 그림 (completed_at 등 최신값 반영)
 async function refreshAfternoonPaceCard(){
