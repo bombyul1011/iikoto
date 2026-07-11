@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260711-70-bg-layer-zindex-fix -->
-<!-- 20260711-69 → 70: bg-fixed z-index:-1→0 + #app z-index:1 명시적 스택 순서로 변경 (스플래시 사라진 직후 0.5초 흰화면 재발 대응) -->
+<!-- build: 20260711-72-dup-bg-layer-removed -->
+<!-- 20260711-71 → 72: 원격디버깅으로 발견한 기존 html::before/body::before(z-index:-1) 고정배경 규칙 제거 — #bg-fixed(z-index:0)와 중복/충돌해 흰화면 깜빡임 유발 추정 -->
 
 <html lang="ko">
 <head>
@@ -104,7 +104,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 /* ══ APP SHELL ══ */
 #app{position:relative;z-index:1;max-width:430px;margin:0 auto;height:100vh;height:-webkit-fill-available;height:100dvh;display:flex;flex-direction:column;background:var(--bg);overflow:hidden;}
-html::before,body::before{content:'';position:fixed;inset:0;background:var(--bg);z-index:-1;}
 
 /* ── TOPBAR ── */
 .topbar{flex-shrink:0;display:flex;flex-direction:column;background:transparent;}
@@ -4571,7 +4570,8 @@ function toggleAutoMono(el){
 setTimeout(()=>{
   const s=document.getElementById('splash');
   s.classList.add('hide');
-  setTimeout(()=>s.remove(),650);
+  // s.remove() 하지 않음 — DOM에서 완전히 지우면 그 순간 reflow로 배경이 잠깐 씹히는 현상 있어
+  // opacity 0 + pointer-events none 상태로 계속 남겨서 배경 역할은 유지
 },2200);
 
 // ── DATE NAV
