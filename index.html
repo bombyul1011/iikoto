@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260712-12-weekly-rhythm-input -->
-<!-- 20260712-11 → 12: (1) 리포트 노출시간 통일 — 데일리 리듬리뷰는 원래부터 저녁파트2(22시~) 전용이었음(수정 불필요, 확인만). 수요일 중간점검/월간(15일 중간·말일)은 파트1(19시~)이던 걸 파트2(22시~)로 변경, 일요일 주간리뷰는 기존 그대로. (2) 주간탭 리듬바에 있던 mono 전용 상세보기(toggleWrbDetail, 시간대별 텍스트 나열) 완전 삭제 — 애초 목적(하루 흐름을 한눈에 보기)과 안 맞는 세부기능이었고 다른 기능들과 중복이라 제거. (3) 주간탭 리듬바 "당일 바"에 리듬 입력 폼 신규 연결 — 홈탭의 폼 HTML을 buildRhythmFormEl()로 공통 함수화해 홈탭/주간탭이 코드를 공유, 저장·편집·삭제 로직(saveRhythmBlock 등)은 전혀 안 건드리고 그대로 재사용. refreshRhythmTrack()이 홈탭 트랙 유무와 무관하게 양쪽 다 안전하게 갱신하도록 통합. 리포트/리뷰는 붙이지 않고 순수 입력 기능만 제공. 다른 6개 요일은 기존처럼 읽기 전용 유지. 알려진 제약: 탭 전환 시 미완성 입력값에 대한 자동저장은 미구현(기존 앱에 onblur 자동저장 선례 있음, saveOneMealDay 참고) — 실사용 중 불편하면 추후 추가 예정. -->
+<!-- build: 20260712-13-weekly-rhythm-fix -->
+<!-- 20260712-12 → 13: 주간탭 리듬 입력 폼 버그 수정 — (1) 진행중(끝시간 없는) 블록을 종료할 방법이 없던 문제 발견 및 수정: 폼 위에 진행중 블록 요약(시작시각+카테고리+종료버튼)을 추가, buildRhythmFormEl에 showOngoingList 파라미터를 명시적으로 둬서 홈탭 호출(false, 이미 전체 타임라인에 동일 기능 있어 중복방지)과 주간탭 호출(true)을 구분. (2) 폼 슬롯의 margin-left:26px가 요일라벨 폭 때문에 중앙정렬이 어긋나 보이던 문제 수정 — 마진 제거 및 진행중 블록 표시용 .rt-row가 홈탭 타임라인의 절대좌표 스타일을 그대로 물려받던 것을 주간탭 전용 CSS로 분리. -->
 
 <html lang="ko">
 <head>
@@ -983,8 +983,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .wrb-legend::-webkit-scrollbar{display:none;}
 .wrb-legend span{display:flex;align-items:center;gap:3px;font-size:8.7px;color:var(--tm);white-space:nowrap;flex-shrink:0;}
 .wrb-legend i{width:6px;height:6px;border-radius:50%;flex-shrink:0;display:inline-block;}
-.wrb-form-slot{margin:2px 0 4px 26px;padding:10px 12px;background:rgba(40,37,32,0.04);border-radius:12px;}
+.wrb-form-slot{margin:2px 0 4px 0;padding:10px 12px;background:rgba(40,37,32,0.04);border-radius:12px;}
 [data-theme="mono"] .wrb-form-slot{background:rgba(255,255,255,0.35);}
+.rhythm-track-ongoing{margin-bottom:8px;}
+.rhythm-track-ongoing .rt-row{position:static;left:auto;right:auto;padding:5px 0;white-space:normal;}
 [data-theme="glass"] .wrb-track{background:rgba(190,180,160,0.30);}
 
 /* ===== 독서 공유카드 ===== */
@@ -2557,7 +2559,7 @@ function buildDailyRhythmTrack(dk,includeReview){
     wrap.innerHTML='<div style="font-size:12px;color:var(--tm);text-align:center;padding:24px 0;">오늘 기록된 수면·식사·블록이 없어요</div>';
   }
   outer.appendChild(wrap);
-  outer.appendChild(buildRhythmFormEl());
+  outer.appendChild(buildRhythmFormEl(false));
   _rhythmTrackEl=outer;
   return outer;
 }
@@ -7299,7 +7301,7 @@ function renderWeeklyRhythmBars(){
   el.innerHTML=html;
   if(_weeklyRhythmFormOpen){
     const slot=document.getElementById('wrb-today-form');
-    if(slot)slot.appendChild(buildRhythmFormEl());
+    if(slot)slot.appendChild(buildRhythmFormEl(true));
   }
 }
 // 주간탭 "당일 바" 클릭 시 리듬 입력 폼 토글 — 홈탭과 동일한 폼(카테고리 선택+시간+메모)을 그대로 재사용.
@@ -7313,8 +7315,22 @@ function toggleWeeklyRhythmForm(){
 }
 // 카테고리 레전드 + 시간/메모 입력 폼 — buildDailyRhythmTrack의 폼 부분과 동일한 HTML을 생성하는 공통 함수.
 // 홈탭(buildDailyRhythmTrack)과 주간탭(renderWeeklyRhythmBars) 양쪽에서 재사용됨.
-function buildRhythmFormEl(){
+function buildRhythmFormEl(showOngoingList){
   const wrap=document.createElement('div');
+  // 진행중인(끝 시간 없는) 블록이 있으면 폼 위에 간단히 보여주고 종료 버튼 제공.
+  // 홈탭은 buildDailyRhythmTrack의 전체 타임라인에 이미 동일한 진행중 항목+종료버튼이 있으므로 중복 방지 차 여기선 생략.
+  // 주간탭 호출 시(showOngoingList=true)에만 이 요약 목록을 노출.
+  if(showOngoingList){
+    const ongoingBlocks=getRhythmBlocks(_rhythmDk).map((b,idx)=>({...b,idx})).filter(b=>b.start&&!b.end);
+    if(ongoingBlocks.length){
+      const ongoingWrap=document.createElement('div');ongoingWrap.className='rhythm-track-ongoing';
+      ongoingWrap.innerHTML=ongoingBlocks.map(function(b){
+        const cat=RHYTHM_CATS[b.cat];if(!cat)return '';
+        return '<div class="rt-row"><span class="rt-time">'+b.start+'~</span><span class="rt-txt">'+cat.label+(b.text&&b.text.trim()?' — '+b.text.trim():'')+'</span><span class="rt-actions"><span class="rt-finish" onclick="finishRhythmBlock('+b.idx+')">종료</span></span></div>';
+      }).join('');
+      wrap.appendChild(ongoingWrap);
+    }
+  }
   const legend=document.createElement('div');legend.className='rhythm-track-legend';
   legend.innerHTML='<span class="rhythm-legend-item"><span class="rhythm-legend-dot disabled" style="background:'+getRhythmColor('_sleep')+';--cat-color:'+getRhythmColor('_sleep')+';" title="수면"><i class="ti ti-moon" aria-hidden="true"></i></span><span class="rhythm-legend-lbl">수면</span></span>'+
     '<span class="rhythm-legend-item"><span class="rhythm-legend-dot disabled" style="background:'+getRhythmColor('_meal')+';--cat-color:'+getRhythmColor('_meal')+';" title="식사"><i class="ti ti-tools-kitchen-3" aria-hidden="true"></i></span><span class="rhythm-legend-lbl">식사</span></span>'+
