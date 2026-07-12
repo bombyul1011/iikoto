@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260712-18-report-polish -->
-<!-- 20260712-17 → 18: 오늘 발견된 리포트 버그/분량 정리 — (1) 데일리 리듬리뷰 제목이 일요일/말일엔 "한 주/한 달 리듬 돌아보기"로 잘못 나오던 잔재(_rrIsSun/_rrIsLastDay, 지난번 isLastDay 분기 삭제 시 놓침) 완전 제거 — 항상 "하루 리듬 돌아보기"로 고정. (2) 일요일 주간리뷰: 정리형 항목(◎✓✦→◇◐◈★) 최대 8줄 나열 방식이 900토큰에 항상 빠듯해 하단이 잘리던 문제 — 여러 소재를 자연스럽게 엮어 최대 4~5줄로 종합하도록 프롬프트 수정, 전체 6-8문장으로 축소, 토큰도 900으로 되돌림. 렌더링 정규식에 ◇ 기호 누락되어있던 기존 버그도 같이 수정. (3) 월간리포트(말일): "충분히 풀어서" 지시는 유지하되 "새 내용 있을 때만 늘리고 반복으로 늘리지 말 것 + 10문장 상한" 명시, 토큰 1400으로 조정. 15일 중간리포트는 원래 나열형 구조가 아니라 이번 변경 영향 없음(6-8문장 그대로), 8/15 실사용 후 재점검 예정. 수요일 중간점검은 회고 목적으로 유지하기로 확인, 리마인드+회고 겸용 구조 그대로 둠. -->
+<!-- build: 20260712-19-habit-check-textcard-tone -->
+<!-- 20260712-18 → 19: (1) 오늘탭 하단 습관 체크박스(renderDailyHabitCheck, 전 테마 공통) — 체크 시 배경을 진한 고유색으로 채우던 방식에서 테두리만 고유색 유지 + 배경은 원래 톤 그대로 두고 아이콘/체크마크 색을 고유색으로 변경. 아이콘 크기 12px→16px, 체크마크 SVG 12px→15px로 확대해 더 채워진 느낌으로 조정. (2) 저녁파트2 "오늘의 문장" 카드(makeTextArchiveCard) 배경을 card s(파란톤, --card-s)에서 기본 card(웜톤)로 변경 — 바로 위 독서카드(pace-card, 동일하게 --card 사용)와 톤이 맞지 않아 튀어보이던 문제 수정. -->
 
 <html lang="ko">
 <head>
@@ -5492,7 +5492,7 @@ function _dkSeedHash(dk){
 function makeTextArchiveCard(){
   const dk=dateKey(getLogicalDate());
   const card=document.createElement('div');
-  card.className='card s';
+  card.className='card';
   card.id='home-text-archive-card';
 
   let cache=null;
@@ -7385,10 +7385,10 @@ function renderDailyHabitCheck(){
     const rgba=getHabitColor(h.color);
     const hIcon=getHabitIcon(h.name);
     const innerMark=hIcon
-      ?'<i class="ti '+hIcon+'" style="font-size:12px;color:#fff;display:'+(checked?'block':'none')+';" aria-hidden="true"></i>'
-      :'<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" style="display:'+(checked?'block':'none')+'"><polyline points="2,6 4.5,9 10,3.5"/></svg>';
+      ?'<i class="ti '+hIcon+'" style="font-size:16px;color:'+rgba+';display:'+(checked?'block':'none')+';" aria-hidden="true"></i>'
+      :'<svg width="15" height="15" viewBox="0 0 12 12" fill="none" stroke="'+rgba+'" stroke-width="2" stroke-linecap="round" style="display:'+(checked?'block':'none')+'"><polyline points="2,6 4.5,9 10,3.5"/></svg>';
     const col=document.createElement('div');col.className='habit-check-col';
-    col.innerHTML='<div class="habit-check-name">'+h.name+'</div><div class="habit-chk2'+(checked?' on':'')+'"'+(checked?' style="background:'+rgba+';border-color:'+rgba+';"':'')+'>'+innerMark+'</div>';
+    col.innerHTML='<div class="habit-check-name">'+h.name+'</div><div class="habit-chk2'+(checked?' on':'')+'"'+(checked?' style="border-color:'+rgba+';"':'')+'>'+innerMark+'</div>';
     col.querySelector('.habit-chk2').addEventListener('click',function(){
       const wasOn=!!checks[key];
       checks[key]=!checks[key];
