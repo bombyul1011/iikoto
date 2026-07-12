@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260712-16-monday-challenge-review -->
-<!-- 20260712-15 → 16: 챌린지 관련 대규모 개편 — (1) 다음주 챌린지 제안 캐시를 논리적 날짜(새벽6시) 기준 1일 1회로 수정, 참고범위를 이번주+지난주 2주로 확장(리듬 비교/챌린지 달성현황 모두), 프롬프트에 여러 지표 교차분석 지시 추가. (2) 일요일 주간리뷰 캐시(원래 하루 단위로 이미 있었음)에 14일 경과분 자동정리 추가. (3) 신규: 월요일 전용 "지난주 목표 돌아보기" 리포트 — 주간목표 배너가 월요일(getLogicalDate 기준 새벽6시~)엔 report-banner rhythm-soft(오늘의 리듬 기록 배너와 완전 동일한 스타일)로 전환, 클릭시 하단시트에서 지난주 메모 원문을 근거로 각 챌린지의 실제 노력 흔적을 찾아 코멘트(단순 체크일수 나열이 아님). 아이콘 ti-flag-heart. 캐시는 주 단위, 14일 후 자동정리. -->
+<!-- build: 20260712-17-rhythm-cat-guide -->
+<!-- 20260712-16 → 17: (1) 다음주 챌린지 제안(buildWeekSummaryForChallenge)에서 "식사 시간"이 실측이 아니라 끼니 기록 시 자동 60분 고정값(getDayCategoryDurations)인데도 운동/업무 등 실측 활동과 나란히 "많다/적다" 비교되던 문제 수정 — 활동 시간 누계와 식사 기록 횟수를 분리, 프롬프트에도 식사 시간 비교 금지 명시. 수요일/일요일 리포트는 원래 RHYTHM_CATS만 순회해 식사가 안 섞이므로 문제없었음(확인만). (2) 리듬 카테고리 분류 설명(RHYTHM_CAT_GUIDE 상수) 신규 추가 — 운동/휴식/업무/외출/책상/감상/정리 각각 어떤 활동을 포함하는지 한 줄 요약, 리듬 데이터를 다루는 6개 프롬프트(월간리포트/수요일중간점검/일요일주간리뷰/다음주챌린지제안/월요일챌린지리뷰/데일리리듬리뷰)에 공통 적용해 카테고리 오분류 방지. -->
 
 <html lang="ko">
 <head>
@@ -2121,6 +2121,8 @@ const RHYTHM_CATS={
 };
 const RHYTHM_SLEEP_COLOR='rgba(205,194,182,0.88)';
 const RHYTHM_MEAL_COLOR='rgba(130,205,145,0.90)';
+// 리듬 카테고리 분류 설명 — AI 프롬프트에서 시간 사용 데이터를 다룰 때 카테고리 오분류(예: 업무↔책상, 휴식↔감상)를 줄이기 위해 공통으로 붙이는 한 줄 설명.
+const RHYTHM_CAT_GUIDE='(카테고리 참고: 운동=홈트/헬스장/러닝 등, 휴식=낮잠/멍때리기/게임 등, 업무=주로 노트북으로 하는 작업(가끔 외근 포함), 외출=지인과의 약속이나 혼자 가는 카페/산책 등, 책상=일기·공부·앱 정비·노트정리 등 책상에서 하는 작업, 감상=드라마·독서·영화, 정리=청소·빨래 등 집안 정리)';
 // 모노테마에서 리듬 카테고리 색을 명도 5단계 순환으로 대체.
 // 순서: 수면 → 식사 → RHYTHM_CATS 7종(운동/휴식/업무/외출/책상/감상/정리) = 총 9개, 5단계를 순환 재사용.
 const MONO_RHYTHM_SHADES=['rgba(40,37,32,0.28)','rgba(40,37,32,0.40)','rgba(40,37,32,0.52)','rgba(40,37,32,0.64)','rgba(40,37,32,0.76)'];
@@ -2372,6 +2374,7 @@ async function buildRhythmReviewCard(){
       hasData=!!durSummaryLine(dur)||!!ol||timelineItems.length>0;
       dataContext=['오늘 시간 흐름(실제 발생 순서대로, 각 항목 옆 괄호는 참고용 소요시간):',timelineText,'오늘 하루한줄: '+(ol||'(작성 안 함)')].filter(Boolean).join('\n');
       sys=`당신은 따뜻한 생활 비서예요. 아래 "오늘 시간 흐름"은 실제로 일어난 순서 그대로예요. 이 흐름을 하루가 어떻게 흘러갔는지 이야기하듯 자연스럽게 짚어주는 짧은 통찰을 1-2문장으로 줘요.
+${RHYTHM_CAT_GUIDE}
 
 **서술 방식 (중요):**
 - 시간 순서를 따라가며 하루가 어떤 결로 흘러갔는지 그려요. 예: "푹 자고 개운하게 시작해, 오후엔 잠시 업무를 보고, 저녁엔 즐거운 시간을 보낸 하루예요" 같은 흐름형 문장.
@@ -2921,6 +2924,7 @@ async function generateMonthlyReportAI(mk,stats,isMidReport){
     stats.wcByWeek.length?`주간 미션 현황: ${stats.wcByWeek.map(w=>w.lines.map(l=>`${l.text} ${l.pct}%`).join(', ')).join(' | ')}`:''
   ].filter(Boolean).join('\n');
   const sys=`당신은 따뜻한 월간 회고 비서예요. ${isMidReport?'한 달의 절반(1~15일) 데이터를 보고 지금까지의 흐름을 담은 중간 소식을':'한 달 데이터를 보고 풍부한 총평과 키워드를'} 만들어요.
+${RHYTHM_CAT_GUIDE}
 반드시 아래 JSON 형식으로만 응답해요. 다른 텍스트나 마크다운 코드블록 없이 순수 JSON만 출력해요.
 {"comment":"6-8문장의 ${isMidReport?'중간 소식':'한 달 총평'}, ~해요/이에요/어요체, 이모지 1-2개 정도","keywords":["키워드1","키워드2","키워드3","키워드4"]}
 ${isMidReport?'아직 한 달이 끝나지 않았으니 "이번 달은 ~했어요"처럼 확정짓는 총평 톤이 아니라, "지금까지 이런 결로 흘러가고 있어요", "절반을 지나며 ~한 흐름이에요"처럼 현재진행형 톤으로 써요. 나머지 절반에 대한 부담을 주는 표현(예: "남은 기간 힘내야")은 쓰지 말고 담백하게 지금까지의 흐름만 짚어요.':'내용이 좋으면 분량을 아끼지 말고, 그 달의 흐름(시작~중반~막판)과 구체적인 사건/감정 변화를 짚어가며 충분히 풀어서 써요.'}
@@ -3202,6 +3206,7 @@ async function makeMidweekRemindCard(){
   if(!key)return fallbackHtml;
 
   const sys=`당신은 따뜻한 주간 리마인드 비서예요. 이번 주 수요일 기준 중간 점검 리포트를 작성해요.
+${RHYTHM_CAT_GUIDE}
 
 형식:
 1. 첫 문장: 이번 주 월~수 흐름 한 문장 요약 (투두 완료율 기반)
@@ -3369,6 +3374,7 @@ async function makeWeeklySummaryCard(){
   ].filter(Boolean).join('\n');
 
   const sys=`당신은 따뜻한 한 주 정리 비서예요. 이번 주 데이터를 보고 주간 회고 카드를 작성해요.
+${RHYTHM_CAT_GUIDE}
 
 메모 분석 시 유의할 점:
 - 단순히 "바빴어요/피곤했어요" 같은 뭉뚱그린 표현 대신, 메모에 실제로 등장한 장소/활동/사람/사건을 구체적으로 짚어서 언급해요.
@@ -6274,6 +6280,7 @@ async function buildChallengeReviewHtml(wk){
   ].join('\n\n');
 
   const sys=`당신은 따뜻한 생활 코치예요. 지난주 지정했던 목표(챌린지)들을 돌아보는 짧은 코멘트를 작성해요.
+${RHYTHM_CAT_GUIDE}
 
 **핵심 분석 방식(가장 중요): 체크된 일수(X/7일)를 그대로 나열하지 마요. 대신 지난주 메모 원문을 뒤져서, 각 목표와 관련된 실제 노력이나 상황의 흔적을 찾아 구체적으로 언급해요.**
 예: 목표가 "운동 주 3회"라면, 메모에 운동 가기 싫었던 마음, 운동 후 느낌, 컨디션 관련 언급이 있는지 찾아서 그 내용을 근거로 코멘트해요. "체크 표시상으로는 2회지만, 메모를 보니 실제로는 꾸준히 신경 쓰고 있었던 흔적이 보여요" 같은 식으로, 체크 숫자 너머의 진짜 노력을 짚어줘요.
@@ -6322,7 +6329,12 @@ function buildWeekSummaryForChallenge(){
   lines.push(`수면 기록한 날: ${sleepDays}/7일`);
   lines.push(`메모 작성: ${memoCount}개`);
   lines.push(`하루한줄 작성일: ${onelineDays}/7일`);
-  if(Object.keys(rhythmDur).length)lines.push('시간 사용 누계: '+durSummaryLine(rhythmDur));
+  // 시간 사용 누계 — "식사"는 실측이 아니라 끼니 기록 시 자동으로 60분씩 부여되는 관례값이라(getDayCategoryDurations 참고),
+  // 다른 활동(운동/업무 등 실제 소요시간)과 나란히 "많다/적다" 비교하면 왜곡됨. 별도 줄로 분리해서 비교 대상에서 제외.
+  const rhythmDurActivity={};let mealMin=0;
+  Object.keys(rhythmDur).forEach(k=>{if(k==='식사')mealMin=rhythmDur[k];else if(k!=='수면')rhythmDurActivity[k]=rhythmDur[k];});
+  if(Object.keys(rhythmDurActivity).length)lines.push('활동 시간 사용 누계: '+durSummaryLine(rhythmDurActivity));
+  if(mealMin>0)lines.push(`식사 기록 횟수: ${Math.round(mealMin/60)}회 (시간 비교 대상 아님, 끼니 기록 여부만 참고)`);
 
   // 지난주 대비 리듬 변화(30분 이상 증감난 카테고리, 최대 2개) — 일요일 주간리뷰와 동일한 계산 방식 재사용
   const lastWeekMon=new Date(mon);lastWeekMon.setDate(mon.getDate()-7);
@@ -6383,11 +6395,13 @@ async function loadNextWeekAISuggestions(wk){
   const habits=getHabits().map(h=>h.name);
   const summary=buildWeekSummaryForChallenge();
   const sys='당신은 생활 루틴 코치예요. JSON 배열만 반환하세요. 다른 텍스트 없이 오직 JSON만.';
-  const userMsg=`현재 습관: ${habits.length?habits.join(', '):'없음'}\n이번 주(월~일) 누계 기록: ${summary}\n\n위 정보를 바탕으로 다음 주에 시도해볼 만한 짧은 주간 챌린지(다짐) 3가지를 제안해줘.
+  const userMsg=`현재 습관: ${habits.length?habits.join(', '):'없음'}\n이번 주(월~일) 누계 기록: ${summary}\n${RHYTHM_CAT_GUIDE}\n\n위 정보를 바탕으로 다음 주에 시도해볼 만한 짧은 주간 챌린지(다짐) 3가지를 제안해줘.
 
 **분석 방식(중요): 지표 하나만 보고 판단하지 말고, 여러 지표를 교차로 엮어서 표면적으로 드러나지 않는 패턴을 짚어줘.** 예를 들어 "일기를 이번 주에 못 썼다"는 사실 하나만 보면 그냥 부족한 걸로 보이지만, 메모 개수가 많고 하루한줄을 꾸준히 써왔다면 "이미 기록하는 습관 자체는 있으니 일기로 확장하기 좋은 시점"이라는 식으로, 여러 항목을 연결해서 왜 그 챌린지가 지금 이 사람에게 맞는지 근거를 만들어줘. 단순히 "부족한 항목을 그대로 채우자"는 제안보다, 이미 가진 강점(잘 되고 있는 다른 지표)을 발판 삼아 확장하는 제안을 우선해줘.
 
 시간 사용 누계와 지난주 대비 변화, 하루한줄의 분위기도 참고해서, 패턴에 맞는 구체적인 제안을 해줘 (예: 특정 활동이 적었거나 휴식이 부족했다면 그에 맞게).
+
+**주의: "식사 기록 횟수"는 실제 식사에 걸린 시간이 아니라 단순히 끼니를 기록한 횟수야. 다른 활동(운동, 업무 등)과 "시간이 많다/적다" 식으로 비교하지 마. 식사 관련 제안을 하고 싶다면 시간 비교가 아니라 끼니를 거르지 않았는지, 규칙적으로 기록했는지 정도로만 참고해.**
 
 "이번 주 지정했던 챌린지 달성 현황"과 "지난주 지정했던 챌린지 달성 현황"이 주어졌다면, 2주간의 흐름을 보고 다음 주 제안에 반영해줘:
 - 거의 매일(6~7일) 지켰다면: 같은 걸 반복 제안하기보다 비슷한 방향에서 한 단계 더 나아간 챌린지를 제안해줘 (예: 강도를 살짝 높이거나 범위를 넓히는 식).

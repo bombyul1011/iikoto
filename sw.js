@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260712-16-monday-challenge-review';
+const CACHE = 'iikoto-v20260712-17-rhythm-cat-guide';
 const ASSETS = [
   './',
   './index.html'
