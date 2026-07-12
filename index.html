@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260712-06-morning-routine-initsync-fix -->
-<!-- 20260712-05 → 06: 아침루틴 누계 그래프가 안 채워지던 버그 수정 — syncAll()에만 다운로드 로직을 넣고 앱 최초 로드시 실제 실행되는 initSync()엔 빠뜨렸던 것을 발견, initSync()에도 이번달 1일~오늘까지 아침루틴 다운로드 추가 -->
+<!-- build: 20260712-08-rhythm-top-cat-fix -->
+<!-- 20260712-07 → 08: 오후통계/저녁미니통계의 "최다리듬" 표시 버그 수정 — 수면만 있고 다른 활동이 없으면 _paceTopRhythmCat이 null을 반환해 비교섹션 자체가 안 보이던 문제 발견. 수면은 항상 최장이라 최다카테고리 후보에서 아예 제외하도록 수정, 식사는 유효활동으로 유지. 활동이 하나도 없으면 "아직 본격적인 활동이 시작되지 않았어요" 안내문구(ti-hourglass-empty)로 대체 -->
 
 <html lang="ko">
 <head>
@@ -2020,18 +2020,18 @@ function renderHomeBody(section){
 
   if(section==='morning'){
     if(getSubSection()==='morning_1'){
-      // 어제 돌아보기 카드 제거됨 — 자리에 아침 루틴 카드 추가 예정(디자인 확정 후)
+      // 어제 돌아보기 카드 제거됨 — 아침 루틴 카드로 대체
     } else {
       const exCard=makeExerciseCheckCard();
       if(exCard)body.appendChild(exCard);
     }
+    body.appendChild(makeMorningRoutineCard());
     body.appendChild(makeLabel('해빗'));
     body.appendChild(makeHabitStreakRow());
     body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getRhythmLogicalDate()));},'rhythm-soft',12.5,dateKey(getRhythmLogicalDate())));
     body.appendChild(makeRecentContentsCard());
   } else if(section==='afternoon'){
     body.appendChild(makeAfternoonPaceCard());
-    body.appendChild(makeMorningRoutineCard()); // 임시 배치 — 디자인 확인 후 아침 파트1로 이동 예정
     refreshAfternoonPaceCard();
     body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getRhythmLogicalDate()));},'rhythm-soft',12.5,dateKey(getRhythmLogicalDate())));
   } else if(section==='dawn'){
@@ -5159,6 +5159,7 @@ function _paceTopRhythmCat(dk){
   const blocks=getRhythmBlocks(dk);
   const dur={};
   blocks.forEach(b=>{
+    if(b.cat==='_sleep')return; // 수면은 항상 최장이라 최다카테고리 후보에서 제외
     const s=b.start?parseInt(b.start.split(':')[0],10)*60+parseInt(b.start.split(':')[1],10):null;
     const e=b.end?parseInt(b.end.split(':')[0],10)*60+parseInt(b.end.split(':')[1],10):null;
     if(s==null||e==null)return;
@@ -5166,7 +5167,10 @@ function _paceTopRhythmCat(dk){
     dur[b.cat]=(dur[b.cat]||0)+d;
   });
   const top=Object.keys(dur).sort((a,b)=>dur[b]-dur[a])[0];
-  return top&&RHYTHM_CATS[top]?{key:top,icon:RHYTHM_CATS[top].icon,color:RHYTHM_CATS[top].color,label:RHYTHM_CATS[top].label}:null;
+  if(!top)return null;
+  if(RHYTHM_CATS[top])return {key:top,icon:RHYTHM_CATS[top].icon,color:RHYTHM_CATS[top].color,label:RHYTHM_CATS[top].label};
+  if(top==='_meal')return {key:top,icon:'ti-tools-kitchen-3',color:RHYTHM_MEAL_COLOR,label:'식사'};
+  return null;
 }
 // 저녁 파트1용 미니통계 카드 — 당일 기록 기준(완료 투두 / 체크 습관 / 오늘의 최다 리듬), 오후 통계카드보다 훨씬 컴팩트하게
 function makeEveningMiniStatCard(){
@@ -5410,6 +5414,9 @@ function makeAfternoonPaceCard(){
       </svg></span>
       <i class="ti ${todayTop.icon}" style="color:${todayColor};"></i>
     </div>`;
+  }else if(!todayTop){
+    html+=`<div class="pace-divider"></div>`;
+    html+=`<div style="text-align:center;font-size:11px;color:var(--tm);padding:4px 0;"><i class="ti ti-hourglass-empty" style="font-size:14px;margin-right:4px;vertical-align:-2px;" aria-hidden="true"></i>아직 본격적인 활동이 시작되지 않았어요</div>`;
   }
 
   const todayPct=todayDone/todayTotal*100;
