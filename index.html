@@ -5116,12 +5116,12 @@ function makeMorningRoutineCard(){
   });
 
   const now=getLogicalDate();
-  const daysPassed=now.getDate(); // 이번 달 오늘까지 지난 일수 (분모)
+  const daysInThisMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate(); // 이번 달 전체 일수 (분모)
 
   let monthlyHtml='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;margin-top:14px;">';
   MORNING_ROUTINE_ITEMS.forEach(it=>{
     const cnt=_mroutineMonthCount(it.key);
-    const pct=Math.min(100,Math.round(cnt/Math.max(daysPassed,1)*100));
+    const pct=Math.min(100,Math.round(cnt/Math.max(daysInThisMonth,1)*100));
     monthlyHtml+=`<div style="display:flex;align-items:center;gap:8px;">
       <i class="ti ${it.icon}" style="font-size:14px;color:rgb(${it.colorRgb});flex-shrink:0;" aria-hidden="true"></i>
       <div style="flex:1;height:5px;border-radius:3px;background:rgba(200,176,168,0.15);overflow:hidden;"><div style="width:${pct}%;height:100%;background:rgb(${it.colorRgb});"></div></div>
