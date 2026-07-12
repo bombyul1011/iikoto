@@ -151,6 +151,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .wgoal-add-btn:active{color:rgba(195,175,168,0.9);}
 .reserve-section-btn.active{background:var(--acc-soft);color:var(--tp);border-color:var(--acc-soft);}
 .goal-section-title{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;letter-spacing:.04em;background:linear-gradient(120deg,rgba(255,210,230,0.80),rgba(255,230,200,0.70));color:#c07080;border-radius:10px;padding:5px 13px;margin:14px 0 10px 0;border:1px solid rgba(255,185,205,0.55);box-shadow:0 2px 10px rgba(200,120,140,0.12);}
+.goal-section-title.wchallenge-review-tag{background:linear-gradient(120deg,rgba(150,215,180,0.55),rgba(235,220,120,0.42));color:#4a8a68;border:1px solid rgba(150,215,180,0.55);}
 
 /* ── CARDS ── */
 .card{background:var(--card);border:1px solid var(--card-b);border-radius:18px;padding:14px 15px;margin-bottom:10px;box-shadow:0 2px 20px rgba(0,0,0,0.06),inset 0 1px 0 rgba(255,255,255,0.80);height:auto;min-height:0;}
@@ -6443,10 +6444,10 @@ function setupWeeklyChallengeToggle(){
   titleEl.onclick=null;
   titleEl.style.cursor='default';
   if(isMonday){
-    // report-banner rhythm-soft 구조로 완전히 교체 — 오늘의 리듬 기록 배너와 동일한 배경/테두리
-    titleEl.className='report-banner rhythm-soft';
-    titleEl.style.margin='0 0 4px 0';
-    titleEl.innerHTML='<div class="report-banner-inner"><div class="report-banner-line" style="font-size:11px;"><i class="ti ti-flag-heart" style="font-size:13px;vertical-align:-1px;margin-right:4px;" aria-hidden="true"></i>지난주 목표 돌아보기</div></div>';
+    // goal-section-title 구조 유지(기존 "주간 목표" 태그와 동일 크기) — 색상만 rhythm-soft 톤으로 구분
+    titleEl.className='goal-section-title wchallenge-review-tag';
+    titleEl.style.margin='0';
+    titleEl.innerHTML='<i class="ti ti-flag-heart" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i> 지난주 목표 돌아보기';
     titleEl.style.cursor='pointer';
     titleEl.onclick=openChallengeReviewSheet;
     renderWeeklyChallenge(weekKey(new Date()),'weekly-goal-wrap');
