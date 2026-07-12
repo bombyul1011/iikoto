@@ -1992,13 +1992,12 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 function appendSundayBanner(body){
   const isNight2=getSubSection()==='night_2';
-  body.appendChild(makeLabel('✦ 이번 주 돌아보기'));
   const banner=document.createElement('div');
   banner.className='weekly-review-banner';
   if(isNight2){
     banner.innerHTML=`<div class="weekly-review-banner-inner">
       <div class="weekly-review-banner-title"><i class="ti ti-sparkles" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i> 이번주 돌아보기 <i class="ti ti-sparkles" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i></div>
-      <div class="weekly-review-banner-sub"><span>지난 한주간의 나는 어땠을까요?</span><span style="font-size:16px;opacity:0.6;">›</span></div>
+      <div class="weekly-review-banner-sub"><span>지난 한주간의 나는 어땠을까요?</span><span style="font-size:15px;opacity:0.6;"><i class="ti ti-chevron-up" aria-hidden="true"></i></span></div>
     </div>`;
     banner.addEventListener('click',openWeeklyReviewSheet);
   }else{
@@ -6432,12 +6431,13 @@ function applyNwSuggestion(title,wk){
 // 클릭하면 기존 다음 주 챌린지 시트(openNextWeekChallengeSheet)가 열려 다음 주 목표를 미리 입력 가능.
 // 저장은 nextWeekKey() 기준 별도 키라 다음 주 월요일이 되면 자동으로 "이번 주" 목표로 반영됨.
 // 월요일(1)엔 지난주 목표 돌아보기(openChallengeReviewSheet)로 전환 — "오늘의 리듬 기록" 배너(report-banner rhythm-soft)와
-// 완전히 동일한 배경/테두리 스타일을 그대로 가져다 씀. 요일 판단은 getLogicalDate() 기준(새벽 6시 경계)이라
-// 월요일 새벽 6시부터 정확히 전환되고, 그 전(자정~6시)엔 아직 일요일로 취급되어 평소 상태 유지.
+// 완전히 동일한 배경/테두리 스타일을 그대로 가져다 씀. 요일 판단은 new Date() 기준(자정 경계, 주간탭 표준)이라
+// 자정이 지나 주간탭이 다음 주로 넘어가는 순간 차주입력창(ti-flag-plus)도 함께 내려감 — 새벽6시(getLogicalDate) 기준이면
+// 일요일 자정~6시 사이 주간탭은 이미 다음주인데 배너만 구주 상태로 남아 불필요한 API 제안이 발생하던 문제 수정.
 function setupWeeklyChallengeToggle(){
   const titleEl=document.getElementById('wchallenge-title');
   if(!titleEl)return;
-  const dow=getLogicalDate().getDay();
+  const dow=new Date().getDay();
   const isPrepWindow=dow===4||dow===5||dow===6||dow===0; // 목,금,토,일
   const isMonday=dow===1;
   titleEl.onclick=null;

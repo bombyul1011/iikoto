@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260712-20-habit-check-theme-split';
+const CACHE = 'iikoto-v20260713-21-weekly-banner-fix';
 const ASSETS = [
   './',
   './index.html'
