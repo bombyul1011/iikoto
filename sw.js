@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260712-14-weekly-form-tab-reset';
+const CACHE = 'iikoto-v20260712-15-pace-local-fix';
 const ASSETS = [
   './',
   './index.html'
