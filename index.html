@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260712-13-weekly-rhythm-fix -->
-<!-- 20260712-12 → 13: 주간탭 리듬 입력 폼 버그 수정 — (1) 진행중(끝시간 없는) 블록을 종료할 방법이 없던 문제 발견 및 수정: 폼 위에 진행중 블록 요약(시작시각+카테고리+종료버튼)을 추가, buildRhythmFormEl에 showOngoingList 파라미터를 명시적으로 둬서 홈탭 호출(false, 이미 전체 타임라인에 동일 기능 있어 중복방지)과 주간탭 호출(true)을 구분. (2) 폼 슬롯의 margin-left:26px가 요일라벨 폭 때문에 중앙정렬이 어긋나 보이던 문제 수정 — 마진 제거 및 진행중 블록 표시용 .rt-row가 홈탭 타임라인의 절대좌표 스타일을 그대로 물려받던 것을 주간탭 전용 CSS로 분리. -->
+<!-- build: 20260712-14-weekly-form-tab-reset -->
+<!-- 20260712-13 → 14: 탭 전환 시 주간탭 리듬 입력폼이 열린 채로 방치되던 문제 수정 — .vtab 클릭 이벤트에 _weeklyRhythmFormOpen/_rhythmFormOpen 초기화 추가, 다른 탭 갔다가 주간탭으로 돌아오면 항상 닫힌 정돈된 상태로 시작. 저장 안 한 입력값은 그대로 소실됨(자동저장 미구현, 추후 필요시 검토). 시간 수정 기능은 이번엔 추가하지 않음 — 주간탭 폼은 "빠른 입력+진행중 종료"까지만 담당, 세밀한 수정은 홈탭 역할로 유지하기로 결정. -->
 
 <html lang="ko">
 <head>
@@ -4539,6 +4539,7 @@ document.querySelectorAll('.vtab').forEach(b=>b.addEventListener('click',()=>{
   document.querySelectorAll('.view').forEach(vw=>vw.classList.toggle('on',vw.id===`v-${v}`));
   document.querySelector('.scroll').scrollTop=0;
   _todoPartModeIdx=-1;
+  if(_weeklyRhythmFormOpen){_weeklyRhythmFormOpen=false;_rhythmFormOpen=false;_resetRhythmForm();}
   if(v==='daily')loadDaily();
   else if(v==='weekly')loadWeekly();
   else if(v==='monthly')loadMonthly();
