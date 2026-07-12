@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260713-22-monday-banner-size-fix';
+const CACHE = 'iikoto-v20260713-23-monday-banner-size-only';
 const ASSETS = [
   './',
   './index.html'
