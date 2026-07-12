@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260712-08-rhythm-top-cat-fix';
+const CACHE = 'iikoto-v20260712-10-pace-comment-tone';
 const ASSETS = [
   './',
   './index.html'

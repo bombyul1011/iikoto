@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260712-08-rhythm-top-cat-fix -->
-<!-- 20260712-07 → 08: 오후통계/저녁미니통계의 "최다리듬" 표시 버그 수정 — 수면만 있고 다른 활동이 없으면 _paceTopRhythmCat이 null을 반환해 비교섹션 자체가 안 보이던 문제 발견. 수면은 항상 최장이라 최다카테고리 후보에서 아예 제외하도록 수정, 식사는 유효활동으로 유지. 활동이 하나도 없으면 "아직 본격적인 활동이 시작되지 않았어요" 안내문구(ti-hourglass-empty)로 대체 -->
+<!-- build: 20260712-10-pace-comment-tone -->
+<!-- 20260712-09 → 10: 오후탭 통계 카드 AI 코멘트(_paceAiComment) 프롬프트 수정 — "묶이다/싸매다" 등 어색한 은유가 나오던 문제. 원인: "매번 다른 각도로 참신하게" 지시가 과한 비유를 유도. 참신함 요구를 줄이고 쉬운 일상어만 쓰도록 제약 추가, 실제 잘 나온 문장을 few-shot 예시로 프롬프트에 삽입. 로직/캐싱/호출방식 변경 없음, 프롬프트 문구만 수정. -->
 
 <html lang="ko">
 <head>
@@ -54,10 +54,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --bg:linear-gradient(165deg,#f7f4ee 0%,#f3f1ec 55%,#f6f3ee 100%);
   --tp:#5c5650;--ts:#8a8278;--tm:#b8b0a4;
   --card:rgba(255,253,248,0.45);--card-b:rgba(225,215,195,0.55);
-  --card-p:rgba(255,253,248,0.45);--card-pb:rgba(240,160,190,0.55);
-  --card-m:rgba(255,253,248,0.45);--card-mb:rgba(135,205,195,0.55);
-  --card-y:rgba(255,253,248,0.45);--card-yb:rgba(250,215,100,0.62);
-  --card-s:rgba(255,253,248,0.45);--card-sb:rgba(150,180,225,0.55);
+  --card-p:var(--card);--card-pb:rgba(240,160,190,0.55);
+  --card-m:var(--card);--card-mb:rgba(135,205,195,0.55);
+  --card-y:var(--card);--card-yb:rgba(250,215,100,0.62);
+  --card-s:var(--card);--card-sb:rgba(150,180,225,0.55);
   --div:rgba(180,165,145,0.18);
   --acc:#c9926e;--acc-soft:rgba(201,146,110,0.40);
   --nav:rgba(250,246,238,0.80);--nav-b:rgba(225,210,185,0.40);
@@ -72,10 +72,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --bg:linear-gradient(145deg,#e3e0d8 0%,#e6e3db 50%,#e2ded6 100%);
   --tp:#2a2620;--ts:#3a3730;--tm:#4a4740;
   --card:rgba(255,255,255,0.55);--card-b:rgba(40,37,32,0.13);
-  --card-p:rgba(255,255,255,0.55);--card-pb:rgba(40,37,32,0.13);
-  --card-m:rgba(255,255,255,0.55);--card-mb:rgba(40,37,32,0.13);
-  --card-y:rgba(255,255,255,0.55);--card-yb:rgba(40,37,32,0.13);
-  --card-s:rgba(255,255,255,0.55);--card-sb:rgba(40,37,32,0.13);
+  --card-p:var(--card);--card-pb:var(--card-b);
+  --card-m:var(--card);--card-mb:var(--card-b);
+  --card-y:var(--card);--card-yb:var(--card-b);
+  --card-s:var(--card);--card-sb:var(--card-b);
   --div:rgba(40,37,32,0.14);
   --acc:#3a3730;--acc-soft:rgba(40,37,32,0.30);
   --nav:rgba(255,255,255,0.55);--nav-b:rgba(40,37,32,0.13);
@@ -2628,58 +2628,6 @@ function makeExerciseCheckCard(){
   });
   return card;
 }
-function makeRingRow(){
-  const row=document.createElement('div');
-  row.style.cssText='display:flex;gap:0;margin-bottom:10px;';
-  const _ld=getLogicalDate();
-  const dk=dateKey(_ld);
-  const todos=getTodos(dk);
-  const todoDone=todos.filter(function(t){return t.done;}).length;
-  const todoPct=todos.length?Math.round(todoDone/todos.length*100):0;
-  const habits=getHabits();
-  const wk=weekKey(_ld),checks=getHabitChecks(wk),dow=(_ld.getDay()+6)%7;
-  const habitDone=habits.filter(function(h){return checks[h.name+'-'+dow];}).length;
-  const habitPct=habits.length?Math.round(habitDone/habits.length*100):0;
-  row.appendChild(makeRing('투두 완료',todoPct,todoDone,'rgba(220,150,170,0.85)'));
-  row.appendChild(makeRing('습관 달성',habitPct,habitDone,'rgba(100,185,255,0.85)'));
-  return row;
-}
-function makeRing(label,pct,count,color){
-  const wrap=document.createElement('div');
-  wrap.style.cssText='flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 0;';
-  const canvasWrap=document.createElement('div');
-  canvasWrap.style.cssText='position:relative;width:72px;height:72px;';
-  if(pct>=100){
-    // 100% 달성 효과는 보류 (추후 마음에 드는 디자인으로 재논의)
-  }
-  const canvas=document.createElement('canvas');
-  canvas.width=72;canvas.height=72;canvas.style.cssText='width:72px;height:72px;display:block;';
-  canvasWrap.appendChild(canvas);
-  wrap.appendChild(canvasWrap);
-  const lbl=document.createElement('div');
-  lbl.style.cssText='font-size:10px;color:var(--tm);text-align:center;';
-  lbl.textContent=label;wrap.appendChild(lbl);
-  setTimeout(function(){
-    const dpr=window.devicePixelRatio||2;
-    canvas.width=72*dpr;canvas.height=72*dpr;
-    canvas.style.width='72px';canvas.style.height='72px';
-    const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);
-    const cx=36,cy=36,r=26,lw=5;
-    const isDark=document.documentElement.getAttribute('data-theme')==='dark';
-    ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
-    ctx.strokeStyle=isDark?'rgba(255,255,255,0.10)':'rgba(200,180,170,0.18)';
-    ctx.lineWidth=lw;ctx.lineCap='round';ctx.stroke();
-    if(pct>0){
-      ctx.beginPath();ctx.arc(cx,cy,r,-Math.PI/2,-Math.PI/2+Math.PI*2*(pct/100));
-      ctx.strokeStyle=color;ctx.lineWidth=lw;ctx.lineCap='round';ctx.stroke();
-    }
-    ctx.fillStyle=isDark?'rgba(240,236,255,0.9)':'rgba(90,64,64,0.85)';
-    ctx.font='bold 15px DM Sans,sans-serif';
-    ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(String(count),cx,cy);
-  },50);
-  return wrap;
-}
 function getHabitMonthCount(name){
   const now=new Date();
   const yr=now.getFullYear(),mo=now.getMonth();
@@ -2730,23 +2678,6 @@ function openHomeDetailSheet(title,builderFn){
   }else{
     body.innerHTML='';body.appendChild(result);
   }
-}
-function makeBookCard(){
-  const book=getBooks().find(b=>b.status==='reading');
-  const wrap=document.createElement('div');wrap.className='home-content-item';
-  const bookIcon='<i class="ti ti-book" style="font-size:13px;flex-shrink:0;color:var(--tm);" aria-hidden="true"></i>';
-  if(book){
-    wrap.innerHTML='<div class="home-content-info" style="display:flex;align-items:center;justify-content:space-between;gap:10px;overflow:hidden;">'
-      +'<span style="display:flex;align-items:center;gap:7px;flex-shrink:0;">'+bookIcon+'<span class="home-content-title" style="white-space:nowrap;">'+book.title+'</span></span>'
-      +'<span class="reading-nudge" onclick="openReading()" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;">잠들기 전 15분 독서 어떠세요?</span>'
-      +'</div>';
-  } else {
-    wrap.innerHTML='<div class="home-content-info" style="display:flex;align-items:center;gap:7px;">'
-      +bookIcon
-      +'<span class="home-content-title" style="color:var(--tm);">오늘밤엔 새로운 책을 찾아보아요</span>'
-      +'</div>';
-  }
-  return wrap;
 }
 // ══ HOME ══
 const _HOME_DAYS=['일','월','화','수','목','금','토'];
@@ -5319,11 +5250,17 @@ async function _paceAiComment(todayPct,yestPct,todayTop,lastWeekTop){
 
 **출력 형식(절대 규칙): 순수 텍스트만 출력해요. 제목, 마크다운 기호(#, *, - 등), 소제목, 안내문 없이 오직 코멘트 문장만 출력해요.**
 
-아래 데이터를 바탕으로 자유롭게 표현을 만들어요. 매번 다른 어투와 소재로 다양하게 변주해요 — 같은 뜻이어도 "빠르다/느리다" 같은 뻔한 표현만 반복하지 말고, 매번 다른 각도(예: 몸 상태·날씨·시간 감각·계절·소소한 행동 제안·감정선·비교 대상 등 중 매번 다르게 골라서)에서 그날의 상황을 상상해 생활감 있는 문장으로 풀어써요. 앞서 만든 문장과 겹치는 소재나 표현은 피하고 매번 새롭게 접근해요.
+**단어 선택(중요): 일상 대화에서 실제로 쓰는 쉬운 단어만 써요. "묶이다", "싸매다", "휘감기다", "물들다" 처럼 몸이 갇히거나 감싸이는 느낌을 주는 은유, 혹은 소설적이고 문학적인 동사는 쓰지 마요. 비유를 억지로 만들어내려 하지 말고, 담백하게 상황을 설명하는 쪽이 화려한 비유보다 훨씬 좋아요.**
+
+아래 데이터를 바탕으로 표현을 만들어요. 문장 구조나 어순은 매번 다르게 써도 좋지만, 단어 자체는 항상 쉽고 익숙한 것만 골라요.
 
 **톤(중요): 오늘이 어제보다 느리거나 적더라도 절대 부족함·실패·아쉬움처럼 들리지 않게 써요. "덜 나갔다", "부족해요", "아쉽네요" 같은 부정적 뉘앙스는 금지. 느린 것은 "여유롭다", "차분하다", "쉬어가는 하루"처럼 긍정적이거나 중립적인 결로 표현해요.**
 
-**문장 스타일(중요): 완전한 서술형 설명문("~하느라 ~했는데 오늘은 ~해요")보다, 리듬감 있는 짧은 대구나 함축형 표현을 우선해요. 예: "외출이 길었던 지난주, 오늘은 휴식이 채워주네요" 같은 절제된 대비 구조. 앞뒤를 다 설명하지 않고 여운을 남기는 쪽이 더 좋아요.**
+**문장 스타일(중요): 담백한 대비 구조를 우선해요. 아래는 좋은 예시예요 — 이 정도의 담백함과 쉬운 단어 수준을 기준으로 삼아요.
+- "작업으로 바빴던 지난주, 오늘은 편안한 시간이 이어져요"
+- "외출이 길었던 지난주, 오늘은 휴식이 채워주네요"
+- "어제보다 한 발 더 나아간 오늘, 작은 진전이 모여가네요"
+이렇게 앞뒤를 짧게 대비만 시키고, 과한 형용사나 낯선 동사로 꾸미지 마요.**
 
 ${hasRhythm?`아래 두 소재로 정확히 두 줄(줄바꿈으로 구분)을 써요.
 
@@ -5487,142 +5424,7 @@ function makeAfternoonPaceCard(){
 }
 function toggleTodo(i){const dk=dateKey(currentDate),todos=getTodos(dk);todos[i].done=!todos[i].done;todos[i].completedAt=todos[i].done?Date.now():null;saveTodos(dk,todos);renderTodos();}
 
-// ── 오후 파트: 이번 주 습관 도트 트렌드 카드
-function makeHabitWeekTrendCard(){
-  const card=document.createElement('div');
-  card.className='card s';
-  const habits=getHabits().slice(0,4); // 최대 4개만
-  if(!habits.length){card.style.display='none';return card;}
-
-  const now=new Date();
-  const todayDow=(now.getDay()+6)%7; // 0=월 ... 6=일
-  const daysSoFar=todayDow+1; // 이번 주 중 오늘까지 지난 일수(분모)
-  const wk=weekKey(now);
-  const checks=getHabitChecks(wk);
-
-  let rows='';
-  habits.forEach(h=>{
-    let checkedCount=0;
-    for(let d=0;d<=todayDow;d++){if(checks[h.name+'-'+d])checkedCount++;}
-    const pct=daysSoFar>0?Math.round(checkedCount/daysSoFar*100):0;
-    const hIcon=getHabitIcon(h.name);
-    const iconColor=getHabitIconColor(h.name,h.color);
-    const iconHtml=hIcon?`<i class="ti ${hIcon}" style="font-size:12px;color:${iconColor};" aria-hidden="true"></i>`:`<span class="home-habit-dot ${h.color}" style="width:8px;height:8px;"></span>`;
-    rows+=`<div class="habit-trend-row">
-      <span class="habit-trend-icon">${iconHtml}</span>
-      <span class="habit-trend-name">${h.name}</span>
-      <div class="habit-trend-bar-wrap"><div class="habit-trend-bar-fill" style="width:${pct}%;background:${iconColor};"></div></div>
-      <span class="habit-trend-pct">${pct}%</span>
-    </div>`;
-  });
-
-  card.innerHTML=`<div style="font-size:11px;color:var(--tm);margin-bottom:8px;">이번 주 습관</div>
-    <div style="display:flex;flex-direction:column;gap:8px;">${rows}</div>`;
-  card.addEventListener('click',function(){
-    document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));
-    const vw=document.getElementById('v-weekly');
-    if(vw)vw.classList.add('on');
-  });
-  return card;
-}
-
 // ── 아침(morning_1) 전용: 어제 리뷰 + 오늘의 팁 카드, 하루 1회 캐싱
-function makeYesterdayReviewCard(){
-  const card=document.createElement('div');
-  card.className='card';
-  card.id='home-yesterday-review-card';
-  card.style.cssText='background:linear-gradient(135deg,rgba(255,246,224,0.60),rgba(255,236,229,0.55));border-color:rgba(240,215,195,0.45);';
-  const dk=dateKey(getLogicalDate());
-
-  const label='<div style="font-size:11px;color:var(--tm);margin-bottom:5px;">◐ 어제 돌아보기</div>';
-  const fmt=t=>(t||'').replace(/\n+/g,'<br>');
-
-  let cache=null;
-  try{cache=JSON.parse(localStorage.getItem('iikoto_yesterday_review')||'null');}catch(e){}
-  if(cache&&cache.dk===dk&&cache.text){
-    card.innerHTML=`${label}<div style="font-size:13px;color:var(--tp);line-height:1.7;">${fmt(cache.text)}</div>`;
-    return card;
-  }
-
-  card.innerHTML=`${label}<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">어제 하루를 살펴보는 중...</div>`;
-  _buildYesterdayReview(dk).then(text=>{
-    const el=document.getElementById('home-yesterday-review-card');
-    if(el)el.innerHTML=`${label}<div style="font-size:13px;color:var(--tp);line-height:1.7;">${fmt(text)}</div>`;
-  }).catch(()=>{
-    const el=document.getElementById('home-yesterday-review-card');
-    if(el)el.innerHTML=`${label}<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">불러올 수 없어요</div>`;
-  });
-  return card;
-}
-async function _buildYesterdayReview(todayDk){
-  const key=getClaudeKey();
-  const yst=new Date(getLogicalDate());yst.setDate(yst.getDate()-1);
-  const ydk=dateKey(yst);
-  const yMemos=getMemos(ydk).map(m=>m.text).filter(Boolean);
-  const yTodos=getTodos(ydk);
-  const yDone=yTodos.filter(t=>t.done).length,yPend=yTodos.filter(t=>!t.done).length;
-  const yRblocks=getRhythmBlocks(ydk);
-  const ySleep=getSleep(ydk);
-  const ySleepSummary=(()=>{
-    if(!ySleep||!ySleep.sleep||!ySleep.wake)return '';
-    const [sh,sm]=ySleep.sleep.split(':').map(Number);
-    const [wh,wm]=ySleep.wake.split(':').map(Number);
-    let mins=(wh*60+wm)-(sh*60+sm);
-    if(mins<0)mins+=24*60;
-    const h=Math.floor(mins/60),m=mins%60;
-    return `어제 수면: ${ySleep.sleep}에 잠들어 ${ySleep.wake}에 기상 (총 ${h}시간${m?` ${m}분`:''})`;
-  })();
-  const yRhythmSummary=(()=>{
-    if(!yRblocks||!yRblocks.length)return '';
-    const durByCat={};
-    yRblocks.forEach(b=>{
-      if(!b.cat||!RHYTHM_CATS[b.cat])return;
-      if(b.start==null||b.end==null)return;
-      durByCat[b.cat]=(durByCat[b.cat]||0)+Math.max(0,b.end-b.start);
-    });
-    const top=Object.entries(durByCat).sort((a,b)=>b[1]-a[1])[0];
-    return top?`어제 리듬 중 비중이 컸던 카테고리: ${RHYTHM_CATS[top[0]].label}`:'';
-  })();
-
-  const dataContext=[
-    ySleepSummary,
-    yMemos.length?`어제 메모: ${yMemos.join(' / ')}`:'',
-    (yDone||yPend)?`어제 할일: 완료 ${yDone}건 / 미완료 ${yPend}건`:'',
-    yRhythmSummary
-  ].filter(Boolean).join('\n');
-
-  const fallback='어제도 오늘도, 그저 하루하루 잘 쌓아가고 있어요 🌿';
-  if(!key||!dataContext){
-    const text=fallback;
-    try{localStorage.setItem('iikoto_yesterday_review',JSON.stringify({dk:todayDk,text}));}catch(e){}
-    return text;
-  }
-
-  const sys=`당신은 담백하게 흐름을 짚어주는 하루 비서예요. 어제 하루의 메모와 기록을 참고해서, 오늘 아침 짧은 리뷰와 팁 한 줄을 만들어요.
-
-**분량 제한 (반드시 지킬 것):**
-- 전체 2문장 이내, 공백 포함 80자 이내.
-- 1문장: 어제 하루 흐름을 아주 짧게 되짚기 (좋았던 점이든 아쉬웠던 점이든 담백하게, 과장 없이)
-- 1문장: 그 흐름에서 나온 오늘을 위한 실용적인 팁 한 줄 (구체적이고 행동 가능한 조언, 뜬구름 잡는 말 금지)
-- 두 문장 사이는 반드시 줄바꿈(\\n)으로 구분할 것 — 이어 붙이지 말 것
-
-기타 규칙:
-- 어제 수면 데이터(취침/기상 시각, 총 수면시간)가 주어지면 이를 실제 근거로 삼아 정확하게 언급 가능(예: "7시간 넘게 푹 주무셨네요"). 데이터 없이 추측하지 말 것.
-- 어제 메모에 담긴 컨디션(피곤함, 아픔 등)은 일시적 상황으로만 참고하고, 이를 근거로 "쉬어야 해요" 식 걱정을 반복하지 말 것. 특히 생리/월경 등 주기적 신체 상태는 하루 지나면 이미 지난 일로 간주.
-- 어제 완료/미완료한 일이 있다면 담백하게 반영 가능하나, 죄책감을 유발하는 톤("또 못 했네요" 등)은 금지.
-- 팁은 실질적이고 구체적이어야 함 — "오늘도 힘내세요" 같은 추상적 응원 금지.
-- 반드시 ~해요, ~이에요, ~어요 체의 정감있는 존댓말만 사용. 반말 금지.
-- "너", "당신" 등 호칭 금지.
-- 이모지 0-1개
-- 스스로를 소개하거나 설명하는 표현 금지, 곧바로 본문 시작.
-- 오직 문장만 출력, 따옴표나 설명 없이`;
-
-  const reply=await callClaude(sys,[{role:'user',content:dataContext}],200);
-  const text=(reply&&!reply.startsWith('__ERR__'))?reply.trim():fallback;
-  try{localStorage.setItem('iikoto_yesterday_review',JSON.stringify({dk:todayDk,text}));}catch(e){}
-  return text;
-}
-
 // ── 홈탭 저녁 파트: 텍스트 아카이브 위젯 (씨앗+문장수집 통합 랜덤, 하루 1회 고정)
 function _archivePool(){
   const seeds=getSeeds().map(s=>({kind:'seed',cid:s.cid,text:s.text,source:s.source||'',comment:s.comment||''}));
@@ -6204,21 +6006,6 @@ function confirmDate(){
   const ttodos=getTodos(val);ttodos.push({...todo,done:false,postponeCount:(todo.postponeCount||0)+1});saveTodos(val,ttodos);
   if(todo)addDelPending('todos',dk,todo.cid);
   todos.splice(_todoSwipeIdx,1);saveTodos(dk,todos);closeModal('date-modal');renderTodos();
-}
-
-// ── SWIPE HELPER
-function attachSwipe(el,onSwipe){
-  let sx=0,moved=false;
-  el.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;moved=false;},{passive:true});
-  el.addEventListener('touchmove',e=>{
-    const dx=e.touches[0].clientX-sx;
-    if(dx<-20){el.style.transform=`translateX(${Math.max(dx,-100)}px)`;moved=true;}
-  },{passive:true});
-  el.addEventListener('touchend',()=>{
-    el.style.transform='';
-    if(moved){onSwipe();}
-    moved=false;
-  });
 }
 
 // ── MEMO
