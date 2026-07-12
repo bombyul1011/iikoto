@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260712-05-morning-routine-final -->
-<!-- 20260712-04 → 05: 아침루틴 카드 완성 — (1) 리듬 카테고리 색상 매핑(휴식/책상/외출/정리) 적용, colorRgb 필드로 rgba 처리 통일 (2) 배경 궤도 점선을 아이콘 각도보다 안쪽에서 시작/끝나도록 조정해 잔여 점선 완전 제거 (3) 제목 아이콘 sunrise→apple로 변경. Supabase morning_routine_checks 테이블 신규 생성(date_key/item_key/checked_order/client_id) + 7/1~11일 4항목 소급 체크 44행 입력 완료. toggleMorningRoutineCheck/syncMorningRoutineUp/syncMorningRoutineDown 구현, syncAll()에 이번달 전체 다운로드 연결 -->
+<!-- build: 20260712-06-morning-routine-initsync-fix -->
+<!-- 20260712-05 → 06: 아침루틴 누계 그래프가 안 채워지던 버그 수정 — syncAll()에만 다운로드 로직을 넣고 앱 최초 로드시 실제 실행되는 initSync()엔 빠뜨렸던 것을 발견, initSync()에도 이번달 1일~오늘까지 아침루틴 다운로드 추가 -->
 
 <html lang="ko">
 <head>
@@ -9392,6 +9392,14 @@ async function initSync(){
   }
   // 습관 / 습관체크 — 항상 동기화 (이전엔 syncAll에만 있어서 PC 사파리 등 새 탭에서 누락되던 버그)
   await syncHabitsDown();
+  // 아침 루틴 — 이번 달 1일~오늘까지 전체 다운로드 (누계 통계 정확성을 위해 매번 최신화)
+  {
+    const mk0forRoutine=monthKey(new Date());
+    const todayD=new Date().getDate();
+    const mroutineTasks=[];
+    for(let d=1;d<=todayD;d++){mroutineTasks.push(syncMorningRoutineDown(mk0forRoutine+'-'+pad(d)));}
+    await Promise.all(mroutineTasks);
+  }
   await syncGoalDown('wishlist:meal');
   await syncGoalDown('reading_dates');
   await syncBooksDownAll();
