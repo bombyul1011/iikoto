@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260712-19-habit-check-textcard-tone';
+const CACHE = 'iikoto-v20260712-20-habit-check-theme-split';
 const ASSETS = [
   './',
   './index.html'

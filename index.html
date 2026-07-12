@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260712-19-habit-check-textcard-tone -->
-<!-- 20260712-18 → 19: (1) 오늘탭 하단 습관 체크박스(renderDailyHabitCheck, 전 테마 공통) — 체크 시 배경을 진한 고유색으로 채우던 방식에서 테두리만 고유색 유지 + 배경은 원래 톤 그대로 두고 아이콘/체크마크 색을 고유색으로 변경. 아이콘 크기 12px→16px, 체크마크 SVG 12px→15px로 확대해 더 채워진 느낌으로 조정. (2) 저녁파트2 "오늘의 문장" 카드(makeTextArchiveCard) 배경을 card s(파란톤, --card-s)에서 기본 card(웜톤)로 변경 — 바로 위 독서카드(pace-card, 동일하게 --card 사용)와 톤이 맞지 않아 튀어보이던 문제 수정. -->
+<!-- build: 20260712-20-habit-check-theme-split -->
+<!-- 20260712-19 → 20: 습관체크(renderDailyHabitCheck) 테마별 재조정 — 지난 빌드에서 light/glass 구분 없이 전 테마에 테두리+아이콘 고유색 스타일을 적용했던 걸 정정. light는 원본(체크시 배경 꽉 채움+흰 아이콘)으로 복원, glass만 새 스타일(테두리+아이콘 고유색, 확대 크기) 유지. 부수 발견: glass의 CSS !important 규칙(.habit-chk2.on svg/i)이 인라인 습관색을 덮어쓰고 있어 실제로는 전부 --tp(테마 텍스트색)로만 보이던 문제 — 해당 규칙 제거해 습관별 고유색이 실제 반영되도록 수정. mono도 테두리와 아이콘 색이 서로 다른 소스(고정 회색 vs --tp)를 쓰던 걸 동일 색(rgba(40,37,32,0.5))으로 통일. -->
 
 <html lang="ko">
 <head>
@@ -649,8 +649,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="glass"] .mbtn.ok{background:rgba(201,146,110,0.42);color:#6e4a30;}
 [data-theme="glass"] .wchallenge-day.on{background:rgba(255,253,248,0.45)!important;color:var(--tp)!important;border-width:2px;}
 [data-theme="glass"] .habit-chk2.on{background:rgba(255,253,248,0.45)!important;border-width:2px;}
-[data-theme="glass"] .habit-chk2.on svg{stroke:var(--tp)!important;}
-[data-theme="glass"] .habit-chk2.on i{color:var(--tp)!important;}
 [data-theme="glass"] .home-hcard.morning{background:linear-gradient(135deg,rgba(255,238,200,0.32),rgba(255,220,210,0.28));border-color:rgba(255,210,180,0.40);}
 [data-theme="glass"] .home-hcard.afternoon{background:linear-gradient(135deg,rgba(255,220,235,0.30),rgba(255,235,200,0.26));border-color:rgba(255,200,210,0.38);}
 [data-theme="glass"] .home-hcard.night{background:linear-gradient(135deg,rgba(225,215,250,0.30),rgba(255,210,230,0.26));border-color:rgba(210,195,240,0.38);}
@@ -936,8 +934,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="mono"] .mbtn.ok{background:rgba(40,37,32,0.20);color:#2a2620;}
 [data-theme="mono"] .wchallenge-day.on{background:rgba(255,255,255,0.35)!important;color:var(--tp)!important;border-width:2px;border-color:rgba(40,37,32,0.5)!important;}
 [data-theme="mono"] .habit-chk2.on{background:rgba(255,255,255,0.35)!important;border-width:2px;border-color:rgba(40,37,32,0.5)!important;}
-[data-theme="mono"] .habit-chk2.on svg{stroke:var(--tp)!important;}
-[data-theme="mono"] .habit-chk2.on i{color:var(--tp)!important;}
+[data-theme="mono"] .habit-chk2.on svg{stroke:rgba(40,37,32,0.5)!important;}
+[data-theme="mono"] .habit-chk2.on i{color:rgba(40,37,32,0.5)!important;}
 [data-theme="mono"] .forest-density-card{background:rgba(255,255,255,0.30);}
 [data-theme="mono"] .wrb-track{background:rgba(40,37,32,0.10);}
 [data-theme="mono"] .report-banner{background:rgba(40,37,32,0.30)!important;animation:none!important;}
@@ -7384,11 +7382,17 @@ function renderDailyHabitCheck(){
     const checked=!!checks[key];
     const rgba=getHabitColor(h.color);
     const hIcon=getHabitIcon(h.name);
-    const innerMark=hIcon
-      ?'<i class="ti '+hIcon+'" style="font-size:16px;color:'+rgba+';display:'+(checked?'block':'none')+';" aria-hidden="true"></i>'
-      :'<svg width="15" height="15" viewBox="0 0 12 12" fill="none" stroke="'+rgba+'" stroke-width="2" stroke-linecap="round" style="display:'+(checked?'block':'none')+'"><polyline points="2,6 4.5,9 10,3.5"/></svg>';
+    const isGlass=document.documentElement.dataset.theme==='glass';
+    const innerMark=isGlass
+      ?(hIcon
+        ?'<i class="ti '+hIcon+'" style="font-size:16px;color:'+rgba+';display:'+(checked?'block':'none')+';" aria-hidden="true"></i>'
+        :'<svg width="15" height="15" viewBox="0 0 12 12" fill="none" stroke="'+rgba+'" stroke-width="2" stroke-linecap="round" style="display:'+(checked?'block':'none')+'"><polyline points="2,6 4.5,9 10,3.5"/></svg>')
+      :(hIcon
+        ?'<i class="ti '+hIcon+'" style="font-size:12px;color:#fff;display:'+(checked?'block':'none')+';" aria-hidden="true"></i>'
+        :'<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" style="display:'+(checked?'block':'none')+'"><polyline points="2,6 4.5,9 10,3.5"/></svg>');
     const col=document.createElement('div');col.className='habit-check-col';
-    col.innerHTML='<div class="habit-check-name">'+h.name+'</div><div class="habit-chk2'+(checked?' on':'')+'"'+(checked?' style="border-color:'+rgba+';"':'')+'>'+innerMark+'</div>';
+    const chkStyle=checked?(isGlass?' style="border-color:'+rgba+';"':' style="background:'+rgba+';border-color:'+rgba+';"'):'';
+    col.innerHTML='<div class="habit-check-name">'+h.name+'</div><div class="habit-chk2'+(checked?' on':'')+'"'+chkStyle+'>'+innerMark+'</div>';
     col.querySelector('.habit-chk2').addEventListener('click',function(){
       const wasOn=!!checks[key];
       checks[key]=!checks[key];
