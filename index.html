@@ -4993,10 +4993,10 @@ const AFTERNOON_TODO_GOAL=5,AFTERNOON_HABIT_GOAL=4;
 
 // 아침 루틴 (임시: 오후 파트에 배치해서 디자인 확인 중, 추후 아침 파트1로 이동 예정)
 const MORNING_ROUTINE_ITEMS=[
-  {key:'bed',label:'침대 탈출',icon:'ti-sunset-2',color:'#e0a050'},
-  {key:'water',label:'물 한잔',icon:'ti-bucket-droplet',color:'#7ab0d8'},
-  {key:'pill',label:'공복 영양제',icon:'ti-clipboard-heart',color:'#d9648f'},
-  {key:'stretch',label:'스트레칭',icon:'ti-stretching-2',color:'#c9a13a'}
+  {key:'bed',label:'침대 탈출',icon:'ti-sunset-2',colorRgb:'252,215,110'},
+  {key:'water',label:'물 한잔',icon:'ti-bucket-droplet',colorRgb:'244,177,206'},
+  {key:'pill',label:'공복 영양제',icon:'ti-clipboard-heart',colorRgb:'205,215,145'},
+  {key:'stretch',label:'스트레칭',icon:'ti-stretching-2',colorRgb:'150,205,225'}
 ];
 function getMorningRoutineChecks(dk){return S.get('mroutine_'+dk)||{};}
 function toggleMorningRoutineCheck(key){
@@ -5040,25 +5040,27 @@ function makeMorningRoutineCard(){
   card.className='pace-card';
   card.id='morning-routine-card';
 
-  // 반원 궤도 위 4개 지점 — 중심(160,100), 반지름 105의 반원을 균등 4등분
-  const cx=160,cy=100,r=105;
+  // 반원 궤도 위 4개 지점 — 중심(160,cy), 반지름 100의 반원을 균등 4등분
+  const cx=160,cy=100,r=100;
   const angles=[160,120,60,20];
   const positions=angles.map(deg=>{
     const rad=deg*Math.PI/180;
     return {x:cx+r*Math.cos(rad),y:cy-r*Math.sin(rad)};
   });
 
-  let svg=`<svg width="100%" height="120" viewBox="0 0 320 120" style="overflow:visible;">`;
+  let svg=`<svg width="100%" height="${cy+2}" viewBox="0 0 320 ${cy+2}" style="overflow:visible;">`;
   svg+=`<defs><linearGradient id="mrGrad" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#ffcba3"/><stop offset="100%" stop-color="#ffc2d6"/></linearGradient></defs>`;
-  svg+=`<path d="M${cx-r},${cy} A${r},${r} 0 0,1 ${cx+r},${cy}" fill="none" stroke="rgba(205,185,165,0.38)" stroke-width="1.5" stroke-dasharray="1 6"/>`;
+  // 배경 점선은 실제 아이콘 각도(160°~20°)보다 안쪽에서 시작/끝나도록 해 원 뒤로 완전히 가려지게 함
+  const bgStartAngle=145, bgEndAngle=35;
+  const bgStart={x:cx+r*Math.cos(bgStartAngle*Math.PI/180),y:cy-r*Math.sin(bgStartAngle*Math.PI/180)};
+  const bgEnd={x:cx+r*Math.cos(bgEndAngle*Math.PI/180),y:cy-r*Math.sin(bgEndAngle*Math.PI/180)};
+  svg+=`<path d="M${bgStart.x},${bgStart.y} A${r},${r} 0 0,1 ${bgEnd.x},${bgEnd.y}" fill="none" stroke="rgba(205,185,165,0.38)" stroke-width="1.5" stroke-dasharray="1 6"/>`;
   for(let i=0;i<positions.length-1;i++){
     const a=positions[i],b=positions[i+1];
-    const segAngleMid=(angles[i]+angles[i+1])/2*Math.PI/180;
-    const midX=cx+r*1.08*Math.cos(segAngleMid), midY=cy-r*1.08*Math.sin(segAngleMid);
-    // 재배치된 순서(orderedItems) 기준으로 연속 두 자리가 모두 체크된 경우만 실선 연결
+    // 진행선도 배경 점선과 정확히 같은 원(cx,cy,r) 위의 호(arc)로 그려서 곡률을 일치시킴
     const segDone=!!checks[orderedItems[i].key]&&!!checks[orderedItems[i+1].key];
     if(segDone){
-      svg+=`<path d="M${a.x},${a.y} Q${midX},${midY} ${b.x},${b.y}" fill="none" stroke="url(#mrGrad)" stroke-width="3" stroke-linecap="round"/>`;
+      svg+=`<path d="M${a.x},${a.y} A${r},${r} 0 0,1 ${b.x},${b.y}" fill="none" stroke="url(#mrGrad)" stroke-width="3" stroke-linecap="round"/>`;
     }
   }
   svg+=`</svg>`;
@@ -5071,10 +5073,10 @@ function makeMorningRoutineCard(){
     const iconSize=15;
     iconsHtml+=`<div onclick="toggleMorningRoutineCheck('${it.key}')" style="position:absolute;left:${pos.x/320*100}%;top:${pos.y}px;width:${size}px;height:${size}px;border-radius:50%;display:flex;align-items:center;justify-content:center;transform:translate(-50%,-50%);cursor:pointer;transition:all .3s cubic-bezier(.34,1.4,.64,1);${
       isDone
-        ? `background:${it.color}22;border:1.5px solid ${it.color}88;box-shadow:0 2px 8px ${it.color}30;`
-        : `background:rgba(150,130,110,0.04);border:1px solid rgba(210,195,180,0.30);`
+        ? `background:color-mix(in srgb, rgb(${it.colorRgb}) 22%, #fdf8f2);border:1.5px solid rgba(${it.colorRgb},0.85);box-shadow:0 2px 8px rgba(${it.colorRgb},0.30);`
+        : `background:#fdf8f2;border:1px solid rgba(210,195,180,0.30);`
     }">
-      <i class="ti ${it.icon}" style="font-size:${iconSize}px;color:${isDone?it.color:'rgba(180,165,155,0.5)'};" aria-hidden="true"></i>
+      <i class="ti ${it.icon}" style="font-size:${iconSize}px;color:${isDone?`rgb(${it.colorRgb})`:'rgba(180,165,155,0.5)'};" aria-hidden="true"></i>
     </div>`;
   });
 
@@ -5086,8 +5088,8 @@ function makeMorningRoutineCard(){
     const cnt=_mroutineMonthCount(it.key);
     const pct=Math.min(100,Math.round(cnt/Math.max(daysPassed,1)*100));
     monthlyHtml+=`<div style="display:flex;align-items:center;gap:8px;">
-      <i class="ti ${it.icon}" style="font-size:14px;color:${it.color};flex-shrink:0;" aria-hidden="true"></i>
-      <div style="flex:1;height:5px;border-radius:3px;background:rgba(200,176,168,0.15);overflow:hidden;"><div style="width:${pct}%;height:100%;background:${it.color};"></div></div>
+      <i class="ti ${it.icon}" style="font-size:14px;color:rgb(${it.colorRgb});flex-shrink:0;" aria-hidden="true"></i>
+      <div style="flex:1;height:5px;border-radius:3px;background:rgba(200,176,168,0.15);overflow:hidden;"><div style="width:${pct}%;height:100%;background:rgb(${it.colorRgb});"></div></div>
     </div>`;
   });
   monthlyHtml+='</div>';
@@ -5096,7 +5098,7 @@ function makeMorningRoutineCard(){
       <div class="pace-title" style="margin-bottom:0;"><i class="ti ti-sunrise" style="font-size:13px;color:#e0a050;" aria-hidden="true"></i> 아침 루틴</div>
       <div style="font-size:11px;color:var(--tm);">${doneCount}/${total}</div>
     </div>
-    <div style="position:relative;height:130px;">${svg}${iconsHtml}</div>
+    <div style="position:relative;height:102px;">${svg}${iconsHtml}</div>
     ${monthlyHtml}`;
   return card;
 }
