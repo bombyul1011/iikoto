@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260712-04-morning-routine-size';
+const CACHE = 'iikoto-v20260712-05-morning-routine-final';
 const ASSETS = [
   './',
   './index.html'

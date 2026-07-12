@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260712-04-morning-routine-size -->
-<!-- 20260712-03 → 04: 아침루틴 카드 크기/간격 재조정 — 반지름 축소(130→105), 균등 4등분 각도(160/120/60/20도)로 간격 통일, viewBox·카드높이 축소, 배경궤도선 더 옅게. Playwright 라이브 렌더링으로 실제 함수 코드 기반 미리보기 확인 완료 -->
+<!-- build: 20260712-05-morning-routine-final -->
+<!-- 20260712-04 → 05: 아침루틴 카드 완성 — (1) 리듬 카테고리 색상 매핑(휴식/책상/외출/정리) 적용, colorRgb 필드로 rgba 처리 통일 (2) 배경 궤도 점선을 아이콘 각도보다 안쪽에서 시작/끝나도록 조정해 잔여 점선 완전 제거 (3) 제목 아이콘 sunrise→apple로 변경. Supabase morning_routine_checks 테이블 신규 생성(date_key/item_key/checked_order/client_id) + 7/1~11일 4항목 소급 체크 44행 입력 완료. toggleMorningRoutineCheck/syncMorningRoutineUp/syncMorningRoutineDown 구현, syncAll()에 이번달 전체 다운로드 연결 -->
 
 <html lang="ko">
 <head>
@@ -4467,6 +4467,7 @@ async function autoSync(type,key){
   }
   else if(type==='contents'){if(await syncContentsUp(key))S.set(S.key('contents_pending',key),false);}
   else if(type==='rblocks'){if(await syncRhythmBlocksUp(key))S.set(S.key('rblocks_pending',key),false);}
+  else if(type==='mroutine')syncMorningRoutineUp(key);
 }
 async function syncAll(){
   if(!navigator.onLine)return;
@@ -4494,6 +4495,10 @@ async function syncAll(){
   // 이번 주 리듬블록(가로바용) 날짜키
   const weekRblockDks=[];
   for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);weekRblockDks.push(dateKey(d));}
+  // 이번 달 1일~오늘까지 아침루틴 날짜키 (누계 통계 정확성을 위해 이번 달 전체)
+  const mroutineDks=[];
+  const todayDate=now.getDate();
+  for(let d=1;d<=todayDate;d++){mroutineDks.push(mk+'-'+pad(d));}
   // Down (Supabase → 로컬)
   await Promise.all([
     syncTodosDown(dk),syncMemosDown(dk),syncSleepDown(dk),syncMealsDown(dk),
@@ -4502,7 +4507,8 @@ async function syncAll(){
     syncGoalDown(S.key('mgoal',monthKey(now))),
     syncWChallengeDown(wk),
     ...weekOnelines,
-    ...weekRblockDks.map(rdk=>syncRhythmBlocksDown(rdk))
+    ...weekRblockDks.map(rdk=>syncRhythmBlocksDown(rdk)),
+    ...mroutineDks.map(mdk=>syncMorningRoutineDown(mdk))
   ]);
   loadDaily();
   if(document.getElementById('v-weekly')&&document.getElementById('v-weekly').classList.contains('on'))loadWeekly();
@@ -5005,17 +5011,46 @@ function toggleMorningRoutineCheck(key){
   if(checks[key]){
     delete checks[key];
   }else{
-    // 체크 순서 기록: 이미 체크된 항목들 중 최댓값+1
     const maxOrder=Math.max(0,...MORNING_ROUTINE_ITEMS.map(it=>checks[it.key]?.order||0));
     checks[key]={order:maxOrder+1};
   }
   S.set('mroutine_'+dk,checks);
+  autoSync('mroutine',dk);
   const fresh=makeMorningRoutineCard();
   const old=document.getElementById('morning-routine-card');
   if(old)old.replaceWith(fresh);
 }
+async function syncMorningRoutineUp(dk){
+  const checks=getMorningRoutineChecks(dk);
+  const rows=Object.keys(checks).map(key=>({date_key:dk,item_key:key,checked_order:checks[key].order||1,client_id:dk+'_'+key}));
+  // 이 날짜의 서버 데이터를 로컬 상태로 완전히 맞춤: 남은 것 upsert, 로컬에서 해제된 항목은 삭제
+  if(rows.length){
+    const ok=await supaUpsert('morning_routine_checks','date_key,item_key',rows);
+    if(!ok)return false;
+  }
+  const allKeys=MORNING_ROUTINE_ITEMS.map(it=>it.key);
+  const uncheckedKeys=allKeys.filter(k=>!checks[k]);
+  for(const k of uncheckedKeys){
+    const res=await supaFetch(`morning_routine_checks?date_key=eq.${dk}&item_key=eq.${k}`,'DELETE');
+    if(res===null)return false;
+  }
+  return true;
+}
+async function syncMorningRoutineDown(dk){
+  const rows=await supaFetch(`morning_routine_checks?date_key=eq.${dk}`);
+  if(!rows)return;
+  if(!rows.length){
+    // 서버에 없고 로컬에 체크가 있으면(오프라인에서 체크한 경우) 업로드 시도
+    const local=getMorningRoutineChecks(dk);
+    if(Object.keys(local).length)await syncMorningRoutineUp(dk);
+    return;
+  }
+  const checks={};
+  rows.forEach(r=>{checks[r.item_key]={order:r.checked_order};});
+  S.set('mroutine_'+dk,checks);
+}
 function _mroutineMonthCount(key){
-  // 이번 달 며칠 체크했는지 — 로컬 스토리지 스캔(임시 버전, 서버 동기화 전)
+  // 이번 달 며칠 체크했는지 — 로컬 캐시 스캔 (앱 로드 시 syncMorningRoutineDown으로 최신화됨)
   const now=getLogicalDate();
   const mk=monthKey(now);
   let cnt=0;
@@ -5095,7 +5130,7 @@ function makeMorningRoutineCard(){
   monthlyHtml+='</div>';
 
   card.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-      <div class="pace-title" style="margin-bottom:0;"><i class="ti ti-sunrise" style="font-size:13px;color:#e0a050;" aria-hidden="true"></i> 아침 루틴</div>
+      <div class="pace-title" style="margin-bottom:0;"><i class="ti ti-apple" style="font-size:13px;color:#e0a050;" aria-hidden="true"></i> 아침 루틴</div>
       <div style="font-size:11px;color:var(--tm);">${doneCount}/${total}</div>
     </div>
     <div style="position:relative;height:102px;">${svg}${iconsHtml}</div>
