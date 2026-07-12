@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260712-15-pace-local-fix';
+const CACHE = 'iikoto-v20260712-16-monday-challenge-review';
 const ASSETS = [
   './',
   './index.html'

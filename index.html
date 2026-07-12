@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260712-15-pace-local-fix -->
-<!-- 20260712-14 → 15: 오후탭 통계 카드 로컬 문구(_paceLocalComment) 두 가지 수정 — (1) 체크값(sig)이 안 바뀌었는데도 홈탭 재진입마다 로컬 문구가 랜덤 재추첨되던 문제: API 문구처럼 sig 기준 캐시(_paceLocalCommentCached, localStorage key: pace_local_)를 추가해 체크값이 실제로 바뀔 때만 새 문구가 뽑히도록 수정, 자동 정리 로직에도 해당 키 포함. (2) 리듬 비교 문구에서 조사 "이"가 받침 유무 무관하게 고정되어 "업무이" 같은 오류가 나던 문제: 받침 판별 헬퍼(_hasBatchim, _josa) 추가해 "업무가/책상이" 등 정확한 조사가 붙도록 수정, 과거형("~였어요/이었어요")도 함께 보정. API 코멘트(_paceAiComment) 프롬프트는 이번엔 변경 없음 — 카테고리별 고정 표현 매핑이 아니라 매 호출마다 자유롭게 지어내는 현재 방식 유지하기로 확인. -->
+<!-- build: 20260712-16-monday-challenge-review -->
+<!-- 20260712-15 → 16: 챌린지 관련 대규모 개편 — (1) 다음주 챌린지 제안 캐시를 논리적 날짜(새벽6시) 기준 1일 1회로 수정, 참고범위를 이번주+지난주 2주로 확장(리듬 비교/챌린지 달성현황 모두), 프롬프트에 여러 지표 교차분석 지시 추가. (2) 일요일 주간리뷰 캐시(원래 하루 단위로 이미 있었음)에 14일 경과분 자동정리 추가. (3) 신규: 월요일 전용 "지난주 목표 돌아보기" 리포트 — 주간목표 배너가 월요일(getLogicalDate 기준 새벽6시~)엔 report-banner rhythm-soft(오늘의 리듬 기록 배너와 완전 동일한 스타일)로 전환, 클릭시 하단시트에서 지난주 메모 원문을 근거로 각 챌린지의 실제 노력 흔적을 찾아 코멘트(단순 체크일수 나열이 아님). 아이콘 ti-flag-heart. 캐시는 주 단위, 14일 후 자동정리. -->
 
 <html lang="ko">
 <head>
@@ -1524,6 +1524,17 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div style="padding:0 20px 20px;">
       <div style="font-size:13px;font-weight:600;color:rgba(80,140,200,0.9);text-align:center;margin-bottom:16px;letter-spacing:0.04em;"><i class="ti ti-sparkles" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i> 이번주 돌아보기 <i class="ti ti-sparkles" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i></div>
       <div id="weekly-review-content" style="font-size:13px;color:var(--tp);line-height:1.9;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- LAST WEEK CHALLENGE REVIEW SHEET -->
+<div class="overlay" id="challenge-review-sheet" onclick="closeSheet('challenge-review-sheet',event)">
+  <div class="bsheet" style="max-height:82vh;overflow-y:auto;" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div style="padding:0 20px 20px;">
+      <div style="font-size:13px;font-weight:600;color:rgba(80,140,200,0.9);text-align:center;margin-bottom:16px;letter-spacing:0.04em;"><i class="ti ti-sparkles" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i> 지난주 목표 돌아보기 <i class="ti ti-sparkles" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i></div>
+      <div id="challenge-review-content" style="font-size:13px;color:var(--tp);line-height:1.9;"></div>
     </div>
   </div>
 </div>
@@ -5219,6 +5230,24 @@ async function refreshAfternoonPaceCard(){
     const today=dateKey(getLogicalDate());
     Object.keys(localStorage).forEach(k=>{
       if((k.startsWith('pace_comment_')||k.startsWith('pace_local_'))&&!k.includes(today))localStorage.removeItem(k);
+      if(k.startsWith('nextweek_suggest_')&&!k.includes(today))localStorage.removeItem(k);
+    });
+    // weekly_summary_는 하루 단위 캐시라 매주 새 키가 생김 — 2주(14일) 지난 것만 정리해 최근 2주치는 남겨둠
+    const todayMs=new Date(today).getTime();
+    Object.keys(localStorage).forEach(k=>{
+      if(!k.startsWith('weekly_summary_'))return;
+      const dk=k.replace('weekly_summary_','');
+      const dkMs=new Date(dk).getTime();
+      if(isNaN(dkMs))return; // 키 형식이 예상과 다르면 건드리지 않음(안전)
+      if((todayMs-dkMs)/86400000>14)localStorage.removeItem(k);
+    });
+    // challenge_review_는 주 단위 캐시(key: challenge_review_week:YYYY-MM-DD) — 마찬가지로 14일 지난 것만 정리
+    Object.keys(localStorage).forEach(k=>{
+      if(!k.startsWith('challenge_review_'))return;
+      const dk=k.replace('challenge_review_week:','');
+      const dkMs=new Date(dk).getTime();
+      if(isNaN(dkMs))return;
+      if((todayMs-dkMs)/86400000>14)localStorage.removeItem(k);
     });
   }catch(e){}
 })();
@@ -6173,6 +6202,7 @@ function getWChallenge(wk){return S.get('wchallenge_'+wk)||[];}
 function saveWChallenge(wk,data){S.set('wchallenge_'+wk,data);S.set('wchallenge_pending_'+wk,true);autoSync('wchallenge','wchallenge_'+wk);}
 
 function nextWeekKey(){const d=new Date();d.setDate(d.getDate()+7);return weekKey(d);}
+function lastWeekKey(){const d=new Date();d.setDate(d.getDate()-7);return weekKey(d);}
 async function openNextWeekChallengeSheet(){
   openSheet('nextweek-sheet');
   const wk=nextWeekKey();
@@ -6191,6 +6221,75 @@ async function openNextWeekChallengeSheet(){
   }
   renderWeeklyChallenge(wk,'nextweek-challenge-wrap');
   loadNextWeekAISuggestions(wk);
+}
+// ── 지난주 목표 돌아보기 (월요일 전용) ──
+// 일요일 밤 주간리뷰와 겹치지 않도록, 순수하게 "지난주 지정했던 챌린지"에 초점을 맞춘 리포트.
+// 단순 달성일수(X/7일) 나열이 아니라, 지난주 메모 원문에서 각 챌린지와 관련된 노력의 흔적을 찾아 코멘트함.
+async function openChallengeReviewSheet(){
+  openSheet('challenge-review-sheet');
+  const wk=lastWeekKey();
+  const content=document.getElementById('challenge-review-content');
+  const cacheKey='challenge_review_'+wk;
+  const cached=S.get(cacheKey);
+  if(cached){content.innerHTML=cached;return;}
+  content.innerHTML='<div style="text-align:center;color:var(--tm);padding:20px 0;">지난주 목표를 돌아보는 중이에요... 🌿<br><span style="font-size:11.5px;opacity:0.7;">약 10-20초 소요돼요</span></div>';
+  const html=await buildChallengeReviewHtml(wk);
+  if(html){S.set(cacheKey,html);content.innerHTML=html;}
+  else content.innerHTML='<div style="text-align:center;color:var(--tm);padding:20px 0;">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:11.5px;opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
+}
+async function buildChallengeReviewHtml(wk){
+  const items=getWChallenge(wk).filter(it=>it.text&&it.text.trim());
+  if(!items.length)return '<div style="text-align:center;color:var(--tm);padding:20px 0;">지난주에 지정한 목표가 없었어요</div>';
+  const key=getClaudeKey();
+  if(!key)return '<div style="text-align:center;color:var(--tm);padding:20px 0;">설정에서 Claude API 키를 입력하면 분석을 받을 수 있어요</div>';
+
+  // 지난주(월~일) 7일치 메모를 요일별로 고르게 샘플링 — 일요일 리포트(makeWeeklySummaryCard)와 동일한 방식 재사용
+  const evenSample=(arr,n)=>{
+    if(arr.length<=n)return arr;
+    const result=[];
+    for(let i=0;i<n;i++){
+      const idx=Math.round(i*(arr.length-1)/(n-1));
+      result.push(arr[idx]);
+    }
+    return [...new Set(result)];
+  };
+  const [wy,wmo,wd]=wk.replace('week:','').split('-').map(Number);
+  const weekStart=new Date(wy,wmo-1,wd);
+  const allMemosWithDay=[];
+  let onelineCount=0;
+  for(let i=0;i<7;i++){
+    const d=new Date(weekStart);d.setDate(weekStart.getDate()+i);
+    const dk=dateKey(d);
+    const dayName=_HOME_DAYS[d.getDay()]+'요일';
+    const dayTexts=getMemos(dk).map(m=>m.text).filter(Boolean);
+    evenSample(dayTexts,8).forEach(t=>allMemosWithDay.push(`${dayName}: ${t}`));
+    if(getDailyOneLine(dk).trim())onelineCount++;
+  }
+
+  const challengeText=items.map(it=>`"${it.text}" — ${it.days.filter(Boolean).length}/7일 체크`).join('\n');
+  const dataContext=[
+    `지난주(월~일) 지정했던 목표:\n${challengeText}`,
+    allMemosWithDay.length?`지난주 메모 (요일별로 시간대 고르게 샘플링):\n${allMemosWithDay.join('\n')}`:'지난주 메모 없음',
+    `하루한줄 작성일: ${onelineCount}/7일`
+  ].join('\n\n');
+
+  const sys=`당신은 따뜻한 생활 코치예요. 지난주 지정했던 목표(챌린지)들을 돌아보는 짧은 코멘트를 작성해요.
+
+**핵심 분석 방식(가장 중요): 체크된 일수(X/7일)를 그대로 나열하지 마요. 대신 지난주 메모 원문을 뒤져서, 각 목표와 관련된 실제 노력이나 상황의 흔적을 찾아 구체적으로 언급해요.**
+예: 목표가 "운동 주 3회"라면, 메모에 운동 가기 싫었던 마음, 운동 후 느낌, 컨디션 관련 언급이 있는지 찾아서 그 내용을 근거로 코멘트해요. "체크 표시상으로는 2회지만, 메모를 보니 실제로는 꾸준히 신경 쓰고 있었던 흔적이 보여요" 같은 식으로, 체크 숫자 너머의 진짜 노력을 짚어줘요.
+목표와 직접 관련된 메모가 없는 항목은 억지로 연결짓지 말고, 체크 일수만 담백하게 언급하고 넘어가요. 없는 내용을 지어내지 마요.
+
+각 목표당 1~2문장, 목표별로 줄바꿈해서 구분해요. 목표가 여러 개면 각각 다루되, 전체 분량은 목표 개수에 비례해서 조절해요(과하게 길어지지 않게).
+
+톤 규칙:
+- 체크 일수가 낮아도 "실패", "부족", "아쉽다" 같은 부정적 평가 금지. 노력의 흔적이 있다면 그걸 우선 짚어주고, 다음 시도를 위한 담백한 제안으로 마무리.
+- 다정한 구어체 존댓말, 이름 호칭 없음
+- 이모지 최대 1개, 전체 응답 순수 텍스트만 (마크다운 기호 없이)`;
+
+  const reply=await callClaude(sys,[{role:'user',content:dataContext}],700);
+  if(!reply||reply.startsWith('__ERR__'))return null;
+  const lines=reply.trim().split('\n').filter(l=>l.trim());
+  return lines.map(l=>`<div style="margin:8px 0;">${l.trim()}</div>`).join('');
 }
 function buildWeekSummaryForChallenge(){
   const now=new Date();
@@ -6224,6 +6323,47 @@ function buildWeekSummaryForChallenge(){
   lines.push(`메모 작성: ${memoCount}개`);
   lines.push(`하루한줄 작성일: ${onelineDays}/7일`);
   if(Object.keys(rhythmDur).length)lines.push('시간 사용 누계: '+durSummaryLine(rhythmDur));
+
+  // 지난주 대비 리듬 변화(30분 이상 증감난 카테고리, 최대 2개) — 일요일 주간리뷰와 동일한 계산 방식 재사용
+  const lastWeekMon=new Date(mon);lastWeekMon.setDate(mon.getDate()-7);
+  const rhythmDurLast={};
+  for(let i=0;i<7;i++){
+    const d=new Date(lastWeekMon);d.setDate(lastWeekMon.getDate()+i);
+    const dd=getDayCategoryDurations(dateKey(d));
+    Object.keys(dd).forEach(function(k){rhythmDurLast[k]=(rhythmDurLast[k]||0)+dd[k];});
+  }
+  const rhythmChanges=Object.keys(RHYTHM_CATS).map(k=>{
+    const thisMin=rhythmDur[k]||0,lastMin=rhythmDurLast[k]||0;
+    return {label:RHYTHM_CATS[k].label,thisMin,lastMin,diff:thisMin-lastMin};
+  }).filter(c=>Math.abs(c.diff)>=30).sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff)).slice(0,2);
+  if(rhythmChanges.length){
+    const changeText=rhythmChanges.map(c=>{
+      const dir=c.diff>0?'늘고':'줄고';
+      const thisH=(c.thisMin/60).toFixed(1).replace(/\.0$/,''),lastH=(c.lastMin/60).toFixed(1).replace(/\.0$/,'');
+      return `${c.label} ${dir}있음 (지난주 ${lastH}h → 이번주 ${thisH}h)`;
+    }).join(', ');
+    lines.push(`지난주 대비 시간 사용 변화: ${changeText}`);
+  }
+
+  // 이번 주 + 지난주 지정했던 챌린지의 실제 달성 현황 — 2주치 추이를 보고 다음 주 제안의 강도를 조절하는 데 씀
+  const thisWeekChallenges=getWChallenge(wk).filter(it=>it.text&&it.text.trim());
+  if(thisWeekChallenges.length){
+    const challengeText=thisWeekChallenges.map(it=>{
+      const checkedDays=it.days.filter(Boolean).length;
+      return `"${it.text}" ${checkedDays}/7일 지킴`;
+    }).join(', ');
+    lines.push(`이번 주 지정했던 챌린지 달성 현황: ${challengeText}`);
+  }
+  const lastWeekWk=weekKey(lastWeekMon);
+  const lastWeekChallenges=getWChallenge(lastWeekWk).filter(it=>it.text&&it.text.trim());
+  if(lastWeekChallenges.length){
+    const lastChallengeText=lastWeekChallenges.map(it=>{
+      const checkedDays=it.days.filter(Boolean).length;
+      return `"${it.text}" ${checkedDays}/7일 지킴`;
+    }).join(', ');
+    lines.push(`지난주 지정했던 챌린지 달성 현황: ${lastChallengeText}`);
+  }
+
   if(onelineSamples.length){
     const picked=onelineSamples.length<=3?onelineSamples:[onelineSamples[0],onelineSamples[Math.floor(onelineSamples.length/2)],onelineSamples[onelineSamples.length-1]];
     lines.push('하루한줄 일부:\n'+picked.map(function(l){return '- '+l;}).join('\n'));
@@ -6232,7 +6372,10 @@ function buildWeekSummaryForChallenge(){
 }
 async function loadNextWeekAISuggestions(wk){
   const area=document.getElementById('nw-ai-area');if(!area)return;
-  const cacheKey='nextweek_suggest_'+wk;
+  // 캐시 키에 논리적 날짜(getLogicalDate, 새벽 6시 기준)를 포함시켜 하루 1회만 갱신되게 함.
+  // 목~일 중 같은 날 안에서는 재진입해도 동일한 제안이 유지되고, 날짜가 바뀌면(오전 6시 이후) 자동으로 새로 생성됨.
+  const todayKey=dateKey(getLogicalDate());
+  const cacheKey='nextweek_suggest_'+wk+'_'+todayKey;
   const cached=S.get(cacheKey);
   if(cached){area.innerHTML=cached;return;}
   const key=getClaudeKey();
@@ -6240,7 +6383,20 @@ async function loadNextWeekAISuggestions(wk){
   const habits=getHabits().map(h=>h.name);
   const summary=buildWeekSummaryForChallenge();
   const sys='당신은 생활 루틴 코치예요. JSON 배열만 반환하세요. 다른 텍스트 없이 오직 JSON만.';
-  const userMsg=`현재 습관: ${habits.length?habits.join(', '):'없음'}\n이번 주(월~일) 누계 기록: ${summary}\n\n위 정보를 바탕으로 다음 주에 시도해볼 만한 짧은 주간 챌린지(다짐) 3가지를 제안해줘. 시간 사용 누계와 하루한줄의 분위기도 참고해서, 패턴에 맞는 구체적인 제안을 해줘 (예: 특정 활동이 적었거나 휴식이 부족했다면 그에 맞게). 단, 위에 주어진 수치(각 항목의 X/7일 등)만 근거로 사용하고 절대 임의로 숫자를 만들어내지 마. 하루한줄 내용은 그 날의 분위기 참고용일 뿐이니, 컨디션 저하·생리·감기처럼 일시적인 상태를 다음 주에도 계속되는 것처럼 단정하지 마. 각 12자 이내, 구체적인 행동으로. 반드시 아래 JSON 형식만 반환해:\n[{"title":"챌린지문구","desc":"왜 추천하는지 짧은 이유"},{"title":"...","desc":"..."},{"title":"...","desc":"..."}]`;
+  const userMsg=`현재 습관: ${habits.length?habits.join(', '):'없음'}\n이번 주(월~일) 누계 기록: ${summary}\n\n위 정보를 바탕으로 다음 주에 시도해볼 만한 짧은 주간 챌린지(다짐) 3가지를 제안해줘.
+
+**분석 방식(중요): 지표 하나만 보고 판단하지 말고, 여러 지표를 교차로 엮어서 표면적으로 드러나지 않는 패턴을 짚어줘.** 예를 들어 "일기를 이번 주에 못 썼다"는 사실 하나만 보면 그냥 부족한 걸로 보이지만, 메모 개수가 많고 하루한줄을 꾸준히 써왔다면 "이미 기록하는 습관 자체는 있으니 일기로 확장하기 좋은 시점"이라는 식으로, 여러 항목을 연결해서 왜 그 챌린지가 지금 이 사람에게 맞는지 근거를 만들어줘. 단순히 "부족한 항목을 그대로 채우자"는 제안보다, 이미 가진 강점(잘 되고 있는 다른 지표)을 발판 삼아 확장하는 제안을 우선해줘.
+
+시간 사용 누계와 지난주 대비 변화, 하루한줄의 분위기도 참고해서, 패턴에 맞는 구체적인 제안을 해줘 (예: 특정 활동이 적었거나 휴식이 부족했다면 그에 맞게).
+
+"이번 주 지정했던 챌린지 달성 현황"과 "지난주 지정했던 챌린지 달성 현황"이 주어졌다면, 2주간의 흐름을 보고 다음 주 제안에 반영해줘:
+- 거의 매일(6~7일) 지켰다면: 같은 걸 반복 제안하기보다 비슷한 방향에서 한 단계 더 나아간 챌린지를 제안해줘 (예: 강도를 살짝 높이거나 범위를 넓히는 식).
+- 절반 정도(3~5일) 지켰다면: 잘 되고 있는 흐름이니 같은 챌린지를 유지하거나 아주 살짝만 조정해줘.
+- 거의 못 지켰다면(0~2일): 실패로 단정하거나 지적하지 말고, 부담을 낮춘 더 가벼운 버전으로 조정해서 제안해줘.
+- 지난주와 이번 주 모두 같은 챌린지를 어려워했다면(2주 연속 낮은 달성), 그 챌린지 자체가 지금 생활 리듬과 안 맞을 수 있으니 완전히 다른 방향의 챌린지를 제안해줘.
+- 지정했던 챌린지가 없었다면 이 항목은 무시하고 다른 데이터만으로 제안해줘.
+
+단, 위에 주어진 수치(각 항목의 X/7일 등)만 근거로 사용하고 절대 임의로 숫자를 만들어내지 마. 하루한줄 내용은 그 날의 분위기 참고용일 뿐이니, 컨디션 저하·생리·감기처럼 일시적인 상태를 다음 주에도 계속되는 것처럼 단정하지 마. 각 12자 이내, 구체적인 행동으로. 반드시 아래 JSON 형식만 반환해:\n[{"title":"챌린지문구","desc":"왜 추천하는지 짧은 이유"},{"title":"...","desc":"..."},{"title":"...","desc":"..."}]`;
   const reply=await callClaude(sys,[{role:'user',content:userMsg}],400);
   if(!reply||reply.startsWith('__ERR__')){area.innerHTML='<div style="font-size:11.5px;color:var(--tm);text-align:center;padding:10px 0;">추천을 불러올 수 없어요</div>';return;}
   let sugg=[];
@@ -6263,14 +6419,32 @@ function applyNwSuggestion(title,wk){
 // 목요일(4)부터 일요일까지 "이번 주도 화이팅" 카드의 깃발 아이콘을 flag-plus로 교체 —
 // 클릭하면 기존 다음 주 챌린지 시트(openNextWeekChallengeSheet)가 열려 다음 주 목표를 미리 입력 가능.
 // 저장은 nextWeekKey() 기준 별도 키라 다음 주 월요일이 되면 자동으로 "이번 주" 목표로 반영됨.
+// 월요일(1)엔 지난주 목표 돌아보기(openChallengeReviewSheet)로 전환 — "오늘의 리듬 기록" 배너(report-banner rhythm-soft)와
+// 완전히 동일한 배경/테두리 스타일을 그대로 가져다 씀. 요일 판단은 getLogicalDate() 기준(새벽 6시 경계)이라
+// 월요일 새벽 6시부터 정확히 전환되고, 그 전(자정~6시)엔 아직 일요일로 취급되어 평소 상태 유지.
 function setupWeeklyChallengeToggle(){
-  const iconEl=document.getElementById('wchallenge-icon');
   const titleEl=document.getElementById('wchallenge-title');
-  if(!iconEl||!titleEl)return;
-  const dow=new Date().getDay();
+  if(!titleEl)return;
+  const dow=getLogicalDate().getDay();
   const isPrepWindow=dow===4||dow===5||dow===6||dow===0; // 목,금,토,일
+  const isMonday=dow===1;
   titleEl.onclick=null;
   titleEl.style.cursor='default';
+  if(isMonday){
+    // report-banner rhythm-soft 구조로 완전히 교체 — 오늘의 리듬 기록 배너와 동일한 배경/테두리
+    titleEl.className='report-banner rhythm-soft';
+    titleEl.style.margin='0 0 4px 0';
+    titleEl.innerHTML='<div class="report-banner-inner"><div class="report-banner-line" style="font-size:11px;"><i class="ti ti-flag-heart" style="font-size:13px;vertical-align:-1px;margin-right:4px;" aria-hidden="true"></i>지난주 목표 돌아보기</div></div>';
+    titleEl.style.cursor='pointer';
+    titleEl.onclick=openChallengeReviewSheet;
+    renderWeeklyChallenge(weekKey(new Date()),'weekly-goal-wrap');
+    return;
+  }
+  // 월요일이 아니면 원래 구조(goal-section-title + 아이콘)로 복원
+  titleEl.className='goal-section-title';
+  titleEl.style.margin='0';
+  titleEl.innerHTML='<i class="ti ti-flag-3" id="wchallenge-icon" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i> 주간 목표';
+  const iconEl=document.getElementById('wchallenge-icon');
   if(isPrepWindow){
     iconEl.className='ti ti-flag-plus';
     titleEl.title='다음 주 목표 미리 준비하기';
