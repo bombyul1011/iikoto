@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260712-01-morning-cleanup -->
-<!-- 20260711-81 → 20260712-01: (1) 콘텐츠 상세모달 상태버튼(보는중/완료/중단) mono테마 무채색 처리 — 초록색 등 컬러 그대로 남아있던 버그 수정. (2) 아침 파트1에서 어제돌아보기 카드 제거 — 아침 루틴 체크(침대탈출/물한잔/영양제/스트레칭) 카드로 대체 예정, 디자인 시안 논의 중이라 자리는 우선 비워둠 -->
+<!-- build: 20260712-04-morning-routine-size -->
+<!-- 20260712-03 → 04: 아침루틴 카드 크기/간격 재조정 — 반지름 축소(130→105), 균등 4등분 각도(160/120/60/20도)로 간격 통일, viewBox·카드높이 축소, 배경궤도선 더 옅게. Playwright 라이브 렌더링으로 실제 함수 코드 기반 미리보기 확인 완료 -->
 
 <html lang="ko">
 <head>
@@ -2031,6 +2031,7 @@ function renderHomeBody(section){
     body.appendChild(makeRecentContentsCard());
   } else if(section==='afternoon'){
     body.appendChild(makeAfternoonPaceCard());
+    body.appendChild(makeMorningRoutineCard()); // 임시 배치 — 디자인 확인 후 아침 파트1로 이동 예정
     refreshAfternoonPaceCard();
     body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getRhythmLogicalDate()));},'rhythm-soft',12.5,dateKey(getRhythmLogicalDate())));
   } else if(section==='dawn'){
@@ -4989,6 +4990,93 @@ function confirmCopyWholeTodo(){
 }
 // ── 오후 파트: 오늘vs어제 진행바 + 목표대비 웨이브게이지 + 리듬 비교 통합 카드
 const AFTERNOON_TODO_GOAL=5,AFTERNOON_HABIT_GOAL=4;
+
+// 아침 루틴 (임시: 오후 파트에 배치해서 디자인 확인 중, 추후 아침 파트1로 이동 예정)
+const MORNING_ROUTINE_ITEMS=[
+  {key:'bed',label:'침대 탈출',icon:'ti-sunset-2',color:'#e0a050'},
+  {key:'water',label:'물 한잔',icon:'ti-bucket-droplet',color:'#7ab0d8'},
+  {key:'pill',label:'공복 영양제',icon:'ti-clipboard-heart',color:'#d9648f'},
+  {key:'stretch',label:'스트레칭',icon:'ti-stretching-2',color:'#c9a13a'}
+];
+function getMorningRoutineChecks(dk){return S.get('mroutine_'+dk)||{};}
+function toggleMorningRoutineCheck(key){
+  const dk=dateKey(getLogicalDate());
+  const checks=getMorningRoutineChecks(dk);
+  checks[key]=!checks[key];
+  S.set('mroutine_'+dk,checks);
+  const fresh=makeMorningRoutineCard();
+  const old=document.getElementById('morning-routine-card');
+  if(old)old.replaceWith(fresh);
+}
+function _mroutineMonthCount(key){
+  // 이번 달 며칠 체크했는지 — 로컬 스토리지 스캔(임시 버전, 서버 동기화 전)
+  const now=getLogicalDate();
+  const mk=monthKey(now);
+  let cnt=0;
+  const daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+  for(let d=1;d<=daysInMonth;d++){
+    const dk=mk+'-'+pad(d);
+    const checks=S.get('mroutine_'+dk);
+    if(checks&&checks[key])cnt++;
+  }
+  return cnt;
+}
+function makeMorningRoutineCard(){
+  const dk=dateKey(getLogicalDate());
+  const checks=getMorningRoutineChecks(dk);
+  const doneCount=MORNING_ROUTINE_ITEMS.filter(it=>checks[it.key]).length;
+  const total=MORNING_ROUTINE_ITEMS.length;
+
+  const card=document.createElement('div');
+  card.className='pace-card';
+  card.id='morning-routine-card';
+
+  // 진짜 반원 궤도 위 4개 지점 — 중심(160,100), 반지름 70의 반원을 4등분
+  const cx=160,cy=100,r=105;
+  const angles=[160,120,60,20];
+  const positions=angles.map(deg=>{
+    const rad=deg*Math.PI/180;
+    return {x:cx+r*Math.cos(rad),y:cy-r*Math.sin(rad)};
+  });
+
+  let svg=`<svg width="100%" height="120" viewBox="0 0 320 120" style="overflow:visible;">`;
+  svg+=`<defs><linearGradient id="mrGrad" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#ffcba3"/><stop offset="100%" stop-color="#ffc2d6"/></linearGradient></defs>`;
+  svg+=`<path d="M${cx-r},${cy} A${r},${r} 0 0,1 ${cx+r},${cy}" fill="none" stroke="rgba(220,205,190,0.18)" stroke-width="1.5" stroke-dasharray="1 6"/>`;
+  for(let i=0;i<positions.length-1;i++){
+    const a=positions[i],b=positions[i+1];
+    const segAngleMid=(angles[i]+angles[i+1])/2*Math.PI/180;
+    const midX=cx+r*1.08*Math.cos(segAngleMid), midY=cy-r*1.08*Math.sin(segAngleMid);
+    const segDone=checks[MORNING_ROUTINE_ITEMS[i].key]&&checks[MORNING_ROUTINE_ITEMS[i+1].key];
+    if(segDone){
+      svg+=`<path d="M${a.x},${a.y} Q${midX},${midY} ${b.x},${b.y}" fill="none" stroke="url(#mrGrad)" stroke-width="3" stroke-linecap="round"/>`;
+    }
+  }
+  svg+=`</svg>`;
+
+  let iconsHtml='';
+  MORNING_ROUTINE_ITEMS.forEach((it,i)=>{
+    const pos=positions[i];
+    const isDone=!!checks[it.key];
+    const size=isDone?46:34;
+    const iconSize=isDone?20:15;
+    iconsHtml+=`<div onclick="toggleMorningRoutineCheck('${it.key}')" style="position:absolute;left:${pos.x/320*100}%;top:${pos.y}px;width:${size}px;height:${size}px;border-radius:50%;display:flex;align-items:center;justify-content:center;transform:translate(-50%,-50%);cursor:pointer;transition:all .3s cubic-bezier(.34,1.4,.64,1);${
+      isDone
+        ? `background:linear-gradient(180deg,#eafbff 0%,#c3ecf7 45%,#8fd8ec 100%);border:1.5px solid var(--card-b);box-shadow:0 3px 10px rgba(140,190,210,0.35);`
+        : `background:rgba(150,130,110,0.04);border:1px solid rgba(210,195,180,0.30);`
+    }">
+      <i class="ti ${it.icon}" style="font-size:${iconSize}px;color:${isDone?'#3f7d94':'rgba(180,165,155,0.5)'};" aria-hidden="true"></i>
+    </div>`;
+  });
+
+  card.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
+      <div class="pace-title" style="margin-bottom:0;"><i class="ti ti-sunrise" style="font-size:13px;color:#e0a050;" aria-hidden="true"></i> 아침 루틴</div>
+      <div style="font-size:11px;color:var(--tm);">${doneCount}/${total}</div>
+    </div>
+    <div style="position:relative;height:130px;margin-top:4px;">${svg}${iconsHtml}</div>
+    <div style="text-align:center;font-size:10px;color:var(--tm);margin-top:2px;">탭해서 체크 · 오늘 아침의 시작</div>`;
+  return card;
+}
+
 function _paceCountDoneUntilNow(dk,nowMinLimit){
   const todos=getTodos(dk);
   return todos.filter(t=>{
