@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- iikoto v2.3 -->
-<!-- build: 20260711-81-final-touches -->
-<!-- 20260711-80 → 81: (1) 죽은 nextweek-banner CSS 정리. (2) 새벽 습관달성링/메인배너 mono 색상 조정(무채색화, 보라톤 연하게). (3) 완료한일 캡션 랜덤 4개→3개. (4) mono/glass 테마 habit-chk2 체크시 아이콘 색상 버그 수정(흰배경+흰아이콘으로 안보이던 문제). (5) 리듬입력창 범례 수면/식사도 7개 카테고리와 동일 스타일로 통일(disabled 예외 제거). (6) 주간탭 위시리스트 텍스트 클릭시 인라인 수정 가능하게. (7) 오늘의문장 랜덤을 날짜기반 결정적 해시로 변경(기기간 통일 시도). (8) mono 테마 투두시간분포 도트 색상을 새벽배너 톤(라벤더)으로 포인트 적용 -->
+<!-- build: 20260712-01-morning-cleanup -->
+<!-- 20260711-81 → 20260712-01: (1) 콘텐츠 상세모달 상태버튼(보는중/완료/중단) mono테마 무채색 처리 — 초록색 등 컬러 그대로 남아있던 버그 수정. (2) 아침 파트1에서 어제돌아보기 카드 제거 — 아침 루틴 체크(침대탈출/물한잔/영양제/스트레칭) 카드로 대체 예정, 디자인 시안 논의 중이라 자리는 우선 비워둠 -->
 
 <html lang="ko">
 <head>
@@ -477,6 +477,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cstatus-btn.done{background:rgba(200,240,235,.55);border-color:rgba(160,220,215,.55);color:#3a8878;}
 .cstatus-btn.stop{background:rgba(215,205,200,.55);border-color:rgba(185,168,160,.55);color:#7a6258;}
 .cstatus-btn.dim{opacity:.38;filter:saturate(0.5);}
+[data-theme="mono"] .cstatus-btn.watching{background:rgba(40,37,32,0.16);border-color:rgba(40,37,32,0.30);color:var(--tp);}
+[data-theme="mono"] .cstatus-btn.done{background:rgba(40,37,32,0.28);border-color:rgba(40,37,32,0.42);color:var(--tp);}
+[data-theme="mono"] .cstatus-btn.stop{background:rgba(40,37,32,0.10);border-color:rgba(40,37,32,0.22);color:var(--tp);}
 .enddate-row{display:none;margin-bottom:10px;}
 .enddate-row.show{display:flex;gap:8px;align-items:center;}
 
@@ -2017,7 +2020,7 @@ function renderHomeBody(section){
 
   if(section==='morning'){
     if(getSubSection()==='morning_1'){
-      body.appendChild(makeYesterdayReviewCard());
+      // 어제 돌아보기 카드 제거됨 — 자리에 아침 루틴 카드 추가 예정(디자인 확정 후)
     } else {
       const exCard=makeExerciseCheckCard();
       if(exCard)body.appendChild(exCard);
