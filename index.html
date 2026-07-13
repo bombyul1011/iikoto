@@ -72,10 +72,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --bg:linear-gradient(145deg,#e3e0d8 0%,#e6e3db 50%,#e2ded6 100%);
   --tp:#2a2620;--ts:#3a3730;--tm:#4a4740;
   --card:rgba(255,255,255,0.55);--card-b:rgba(158,128,149,0.13);
-  --card-p:var(--card);--card-pb:var(--card-b);
-  --card-m:var(--card);--card-mb:var(--card-b);
-  --card-y:var(--card);--card-yb:var(--card-b);
-  --card-s:var(--card);--card-sb:var(--card-b);
+  --card-p:rgba(177,144,162,0.16);--card-pb:rgba(177,144,162,0.42);
+  --card-m:rgba(158,175,143,0.16);--card-mb:rgba(158,175,143,0.42);
+  --card-y:rgba(194,163,130,0.18);--card-yb:rgba(194,163,130,0.48);
+  --card-s:rgba(135,154,177,0.16);--card-sb:rgba(135,154,177,0.42);
   --div:rgba(158,128,149,0.14);
   --acc:#3a3730;--acc-soft:rgba(158,128,149,0.30);
   --nav:rgba(255,255,255,0.55);--nav-b:rgba(158,128,149,0.13);
@@ -84,7 +84,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --inp:rgba(255,255,255,0.50);--inp-b:rgba(158,128,149,0.13);
   --pill:rgba(255,255,255,0.50);
   --memo-b:rgba(255,255,255,0.50);--memo-bb:rgba(158,128,149,0.13);
-  --sleep-b:rgba(255,255,255,0.50);--sleep-bb:rgba(158,128,149,0.13);
+  --sleep-b:rgba(135,154,177,0.14);--sleep-bb:rgba(135,154,177,0.38);
 }
 [data-theme="glass"] .card,[data-theme="glass"] .sleep-box,[data-theme="glass"] .habit-week-box{border-width:1.4px;box-shadow:0 1.5px 1.5px rgba(255,255,255,0.9) inset,0 -8px 14px -10px rgba(120,110,95,0.15) inset,0 5px 14px rgba(150,140,120,0.08);}
 [data-theme="glass"] #daily-meal-card{background:rgba(255,253,248,0.45)!important;border-color:rgba(150,195,130,0.55)!important;}
@@ -824,7 +824,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 /* 오늘탭 투두 시간대구분 - 색상 대신 명도 단계 (아침<오후<저녁 순으로 진하게) */
 [data-theme="mono"] .chk.ts-morning{border-color:rgba(177,144,162,0.35);}
-[data-theme="mono"] .chk.ts-morning.on{background:rgba(177,144,162,0.30);border-color:rgba(177,144,162,0.55);}
+[data-theme="mono"] .chk.ts-morning.on{background:rgba(177,144,162,0.42);border-color:rgba(177,144,162,0.65);}
 [data-theme="mono"] .chk.ts-morning.on::after{border-color:#fff;}
 [data-theme="mono"] .chk.ts-afternoon{border-color:rgba(177,144,162,0.50);}
 [data-theme="mono"] .chk.ts-afternoon.on{background:rgba(177,144,162,0.55);border-color:rgba(177,144,162,0.75);}
@@ -919,7 +919,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 }
 
 /* 날짜 today 표시류 */
-[data-theme="mono"] .day-btn.today{background:rgba(158,175,143,0.14);border-color:rgba(158,175,143,0.30);}
+[data-theme="mono"] .day-btn.today{background:rgba(158,175,143,0.35);border-color:rgba(158,175,143,0.55);}
 [data-theme="mono"] .day-btn.today .day-num{color:#2a2620;}
 [data-theme="mono"] .rd-tab.on{background:rgba(158,175,143,0.14);border-color:rgba(158,175,143,0.30);}
 [data-theme="mono"] #nextweek-sheet .goal-section-title{background:rgba(135,154,177,0.12)!important;color:#2a2620!important;border:1.4px solid rgba(135,154,177,0.24)!important;}
@@ -929,10 +929,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="mono"] .cal-dot{background:rgba(158,175,143,0.75);}
 [data-theme="mono"] .goal-section-title{background:rgba(135,154,177,0.12)!important;color:#2a2620!important;border:1.4px solid rgba(135,154,177,0.24)!important;}
 [data-theme="mono"] .mbtn.ok{background:rgba(158,175,143,0.20);color:#2a2620;}
-[data-theme="mono"] .wchallenge-day.on{background:rgba(255,255,255,0.35)!important;color:var(--tp)!important;border-width:2px;border-color:rgba(177,144,162,0.5)!important;}
-[data-theme="mono"] .habit-chk2.on{background:rgba(255,255,255,0.35)!important;border-width:2px;border-color:rgba(177,144,162,0.5)!important;}
-[data-theme="mono"] .habit-chk2.on svg{stroke:rgba(177,144,162,0.5)!important;}
-[data-theme="mono"] .habit-chk2.on i{color:rgba(177,144,162,0.5)!important;}
+[data-theme="mono"] .wchallenge-day.on{background:rgba(177,144,162,0.62)!important;color:#fff!important;border-width:1.5px;border-color:rgba(177,144,162,0.85)!important;}
+[data-theme="mono"] .habit-chk2.on{background:rgba(177,144,162,0.62)!important;border-width:1.5px;border-color:rgba(177,144,162,0.85)!important;}
+[data-theme="mono"] .habit-chk2.on svg{stroke:#fff!important;}
+[data-theme="mono"] .habit-chk2.on i{color:#fff!important;}
 [data-theme="mono"] .forest-density-card{background:rgba(255,255,255,0.30);}
 [data-theme="mono"] .wrb-track{background:rgba(158,128,149,0.10);}
 [data-theme="mono"] .report-banner{background:rgba(158,128,149,0.30)!important;animation:none!important;}
@@ -5467,6 +5467,18 @@ function makeHabitMiniCheckRow(){
 }
 // ── 새벽(dawn/night_3) 전용: 하루 마감 배너 + 당일 취합 리포트
 function _dawnTimeToMin(t){if(!t)return null;const p=t.split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);}
+// 주어진 날짜(dk)로부터 과거로 거슬러 올라가며 독서 기록(감상 카테고리, 텍스트가 "독서"로 시작)이
+// 마지막으로 있었던 날까지 며칠 지났는지 계산. 최대 90일까지만 탐색(그 이상은 사실상 의미 없어 상한).
+function _daysSinceLastReading(dk){
+  const d=new Date(dk+'T00:00:00');
+  for(let i=1;i<=90;i++){
+    const prev=new Date(d);prev.setDate(d.getDate()-i);
+    const prevDk=dateKey(prev);
+    const hasReading=getRhythmBlocks(prevDk).some(b=>b.cat==='enjoy'&&b.text&&b.text.startsWith('독서'));
+    if(hasReading)return i;
+  }
+  return 90;
+}
 function makeDawnRecapCard(){
   const wrap=document.createElement('div');
   const dk=dateKey(getLogicalDate());
@@ -5574,7 +5586,8 @@ function makeDawnRecapCard(){
     html+=`<div style="font-size:11px;color:var(--tm);text-align:center;padding:6px 0;">오늘 완료한 일이 없어요</div>`;
   }
   html+=`<div class="day-recap-line" style="margin-top:8px;"><span class="lbl"><i class="ti ti-notes" aria-hidden="true"></i>메모</span><span>${memos.length}개</span></div>`;
-  html+=`<div class="day-recap-line"><span class="lbl"><i class="ti ti-book" aria-hidden="true"></i>독서</span><span>${readingMin>0?readingMin+'분':'기록 없음'}</span></div>`;
+  const readingLabel=readingMin>0?readingMin+'분':_daysSinceLastReading(dk)+'일째 안읽음';
+  html+=`<div class="day-recap-line"><span class="lbl"><i class="ti ti-book" aria-hidden="true"></i>독서</span><span>${readingLabel}</span></div>`;
 
   html+=`<div class="day-recap-divider"></div>`;
   html+=`<div class="recap-donut-row">
