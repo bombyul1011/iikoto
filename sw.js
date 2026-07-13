@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260713-36-mono-card-bg-fill';
+const CACHE = 'iikoto-v20260714-37-wrb-mutual-exclusive-toggle-morning-gap';
 const ASSETS = [
   './',
   './index.html'

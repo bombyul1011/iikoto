@@ -516,7 +516,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rd-progress-bead{position:absolute;top:50%;width:13px;height:13px;border-radius:50%;transform:translate(-50%,-50%);border:1.6px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.25);background:linear-gradient(270deg,#ffb0c8,#ffd28a,#bdf0c4,#9fd8ff,#c9a8ff,#ffb0c8);background-size:500% 100%;animation:beadRainbow 22s linear infinite;transition:left .4s ease;}
 
 /* ── 오후 홈탭: 통계 카드 (오늘vs어제 진행바 + 웨이브게이지 + 리듬비교) ── */
-.pace-card{background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:16px;}
+.pace-card{background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:16px;margin-bottom:10px;}
 .pace-title{font-size:12px;color:var(--tm);margin-bottom:10px;display:flex;align-items:center;gap:5px;}
 .pace-track-wrap{margin-bottom:8px;}
 .pace-track-lbl{font-size:10px;color:var(--tm);margin-bottom:3px;display:flex;justify-content:space-between;}
@@ -7322,7 +7322,7 @@ function renderWeeklyRhythmBars(){
       html+='<div class="wrb-form-slot" id="wrb-today-form"></div>';
     }
     if(isPast&&isOpen){
-      html+='<div class="wrb-flow-slot">'+renderRhythmFlowHtml(segs)+'</div>';
+      html+='<div class="wrb-flow-slot">'+renderRhythmFlowHtml(segs,dk)+'</div>';
     }
   }
   html+='</div>';
@@ -7342,14 +7342,61 @@ function renderWeeklyRhythmBars(){
 let _wrbFlowOpenDk=null;
 function toggleWeeklyRhythmFlow(dk){
   _wrbFlowOpenDk=(_wrbFlowOpenDk===dk)?null:dk;
+  // 흐름보기를 열 때(또는 다른 요일로 전환할 때) 오늘 요일 입력폼이 열려있으면 함께 닫아서
+  // 항상 한 번에 하나의 슬롯만 펼쳐지도록 함(과거 요일 흐름보기 ↔ 오늘 입력폼 서로 배타적).
+  if(_wrbFlowOpenDk!=null&&_weeklyRhythmFormOpen){
+    _weeklyRhythmFormOpen=false;_rhythmFormOpen=false;_resetRhythmForm();
+  }
   renderWeeklyRhythmBars();
 }
-function renderRhythmFlowHtml(segs){
+function renderRhythmFlowHtml(segs,dk){
   const toHHMM=function(min){
     const m=((min%1440)+1440)%1440;
     return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
   };
-  const items=segs.filter(s=>s.label).slice().sort((a,b)=>a.start-b.start);
+  // 세로 리듬바(buildDailyRhythmTrack)와 동일한 데이터 소스(그날 자체 블록만)를 사용.
+  // computeRhythmSegsForDay가 만드는 segs는 가로바 그리기용이라 "전날 밤~익일 새벽으로 이어지는 조각"이
+  // 섞여 들어있는데, 이 조각은 실제로는 전날 소속 활동이라 흐름보기(텍스트 목록)에는 포함하면 안 됨.
+  // 그래서 segs를 쓰지 않고 getRhythmBlocks(dk)에서 직접 세그를 다시 구성.
+  const toMinLocal=function(t){if(!t)return null;const p=t.split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);};
+  const sleep=getSleep(dk)||{};
+  const meals=getMeals(dk)||{};
+  const manual=dk?getRhythmBlocks(dk):[];
+  const dayItems=[];
+  const wakeMin=toMinLocal(sleep.wake),sleepMin=toMinLocal(sleep.sleep);
+  if(wakeMin!=null&&sleepMin!=null&&sleepMin<=wakeMin){
+    dayItems.push({start:sleepMin,end:wakeMin,color:getRhythmColor('_sleep'),label:'수면'});
+  }else{
+    if(wakeMin!=null)dayItems.push({start:0,end:wakeMin,color:getRhythmColor('_sleep'),label:'수면'});
+    if(sleepMin!=null&&wakeMin==null)dayItems.push({start:sleepMin,end:1440,color:getRhythmColor('_sleep'),ongoing:true,label:'수면'});
+  }
+  ['breakfast','lunch','dinner','snack'].forEach(function(k){
+    const t=meals[k+'_time'];if(!t)return;
+    const start=toMinLocal(t);
+    dayItems.push({start:start,end:Math.min(start+45,1440),color:getRhythmColor('_meal'),label:'식사'});
+  });
+  // 세로바와 동일한 자정넘김 판단: 그날 등록된 블록 중 가장 늦은 시각을 기준으로,
+  // 06시 이전 시작 블록이 그보다 이르면 "자정 넘겨 새로 시작한 것"으로 보고 맨 아래로 정렬.
+  const NEWDAY_CUTOFF=360; // 06:00
+  let latestManualMin=-1;
+  manual.forEach(function(b){
+    const s=toMinLocal(b.start);if(s==null)return;
+    const e=b.end?toMinLocal(b.end):s;
+    const ref=(e!=null&&e>s)?e:s;
+    if(ref>latestManualMin)latestManualMin=ref;
+  });
+  manual.forEach(function(b){
+    const cat=RHYTHM_CATS[b.cat];if(!cat)return;
+    const s=toMinLocal(b.start);if(s==null)return;
+    let e=b.end?toMinLocal(b.end):null;
+    if(e!=null&&e<=s)e=1440;
+    const lbl=cat.label+(b.text?' · '+b.text:'');
+    const isLateNightNew=s<NEWDAY_CUTOFF&&latestManualMin>=NEWDAY_CUTOFF&&s<latestManualMin;
+    dayItems.push({start:s,end:e==null?s:e,ongoing:e==null,color:getRhythmColor(b.cat),label:lbl,sortKey:isLateNightNew?s+1440:s});
+  });
+  const items=dayItems.filter(s=>s.label).map(function(s){
+    return Object.assign({},s,{sortKey:s.sortKey!=null?s.sortKey:s.start});
+  }).sort((a,b)=>a.sortKey-b.sortKey);
   if(!items.length)return '<div class="wrb-flow-empty">이날은 기록된 리듬이 없어요</div>';
   const rows=items.map(function(s){
     const timeRange=toHHMM(s.start)+(s.ongoing?'~진행중':'~'+toHHMM(s.end));
@@ -7364,6 +7411,8 @@ function toggleWeeklyRhythmForm(){
   _weeklyRhythmFormOpen=!_weeklyRhythmFormOpen;
   _rhythmDk=dateKey(new Date());
   if(!_weeklyRhythmFormOpen){_rhythmFormOpen=false;_resetRhythmForm();}
+  // 입력폼을 열 때 과거 요일 흐름보기가 열려있으면 함께 닫음(서로 배타적으로 하나만 열림).
+  if(_weeklyRhythmFormOpen&&_wrbFlowOpenDk!=null){_wrbFlowOpenDk=null;}
   renderWeeklyRhythmBars();
 }
 // 카테고리 레전드 + 시간/메모 입력 폼 — buildDailyRhythmTrack의 폼 부분과 동일한 HTML을 생성하는 공통 함수.
