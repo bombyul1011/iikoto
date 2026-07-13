@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260713-27-rhythm-live-top-pace-recall';
+const CACHE = 'iikoto-v20260713-28-pace-comment-guard-strengthen';
 const ASSETS = [
   './',
   './index.html'

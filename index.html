@@ -5139,7 +5139,10 @@ ${hasRhythm?`아래 두 소재로 정확히 두 줄(줄바꿈으로 구분)을 �
 소재: 오늘 진행률 ${todayPct.toFixed(0)}%와 어제 같은 시각 진행률 ${yestPct.toFixed(0)}%의 차이. 절대 개수는 언급하지 않고 비율 차이의 크고 작음만 반영해서 자유롭게 표현해요.`}
 
 규칙: 따뜻한 구어체 존댓말, 한 줄당 22자 내외로 짧게, 이모지·특수기호 없이, 완전한 문장으로 끝맺기. 숫자(퍼센트)는 문장에 직접 쓰지 않아도 돼요 — 크기감만 표현에 녹이면 충분해요.`;
-  const reply=await callClaude(sys,[{role:'user',content:'코멘트 작성'}],120);
+  const userMsg=hasRhythm
+    ?`오늘 진행률 ${todayPct.toFixed(0)}%, 어제 같은 시각 진행률 ${yestPct.toFixed(0)}%, 오늘 최다 활동 "${todayTop.label}", 지난주 같은요일 최다 활동 "${lastWeekTop.label}". 이 데이터로 코멘트를 작성해줘.`
+    :`오늘 진행률 ${todayPct.toFixed(0)}%, 어제 같은 시각 진행률 ${yestPct.toFixed(0)}%. 이 데이터로 코멘트를 작성해줘.`;
+  const reply=await callClaude(sys,[{role:'user',content:userMsg}],120);
   if(!reply||reply.startsWith('__ERR__'))return null;
   return reply.trim().replace(/^#+\s*/gm,'').replace(/^\*+\s*/gm,'').trim();
 }
@@ -5241,7 +5244,7 @@ function makeAfternoonPaceCard(){
     if(commentEl)commentEl.innerHTML=text.split('\n').map(l=>`<div>${l}</div>`).join('');
   };
   // 메타발언(데이터 부족 안내 등)이 섞인 텍스트인지 검사 — 캐시에 잘못 저장된 과거 응답이 화면에 노출되는 것을 막기 위한 안전망
-  const _isBadComment=(t)=>!t||/말씀해|알려주시|제공해|정보를 주시|구체적으로|비교할 데이터|데이터가 (부족|없|전달)/.test(t);
+  const _isBadComment=(t)=>!t||/말씀해|알려주시|제공해|정보를 주시|구체적으로|비교할 데이터|데이터가 (부족|없|전달)|요청을 받았|확인할 수 없|필요해요|필요합니다|\*\*|답변해|입력해 주|알 수 없어|주어지지 않|누락/.test(t);
 
   if(cached&&cached.sig===sig&&!_isBadComment(cached.text)){
     // 이 서브섹션에서 API로 만든 문구가 있고, 그때 이후로 체크값이 안 바뀌었으면 그대로 사용
