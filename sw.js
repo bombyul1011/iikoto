@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260713-31-todo-frag-color-rhythm-content-picker';
+const CACHE = 'iikoto-v20260713-32-mono-theme-pastel-lavender-palette';
 const ASSETS = [
   './',
   './index.html'
