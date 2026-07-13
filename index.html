@@ -2029,7 +2029,6 @@ function renderHomeBody(section){
       if(exCard)body.appendChild(exCard);
     }
     body.appendChild(makeMorningRoutineCard());
-    body.appendChild(makeLabel('해빗'));
     body.appendChild(makeHabitStreakRow());
     body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getRhythmLogicalDate()));},'rhythm-soft',12.5,dateKey(getRhythmLogicalDate())));
     body.appendChild(makeRecentContentsCard());
@@ -4434,7 +4433,7 @@ async function syncAll(){
   if(S.get(S.key('memos_pending',dk)))upTasks.push(syncMemosUp(dk).then(()=>S.set(S.key('memos_pending',dk),false)));
   if(S.get(S.key('meals_pending',dk)))upTasks.push(syncMealsUp(dk).then(()=>S.set(S.key('meals_pending',dk),false)));
   if(S.get(S.key('contents_pending',mk)))upTasks.push(runContentsSyncLocked(mk,()=>syncContentsUp(mk)).then(()=>S.set(S.key('contents_pending',mk),false)));
-  if(S.get('wchallenge_pending_'+wk))upTasks.push(autoSync('wchallenge','wchallenge_'+wk));
+  if(S.get('wchallenge_pending_'+wk))upTasks.push(autoSync('wchallenge','wchallenge_'+wk).then(()=>S.set('wchallenge_pending_'+wk,false)));
   if(S.get(S.key('rblocks_pending',dk)))upTasks.push(syncRhythmBlocksUp(dk).then(()=>S.set(S.key('rblocks_pending',dk),false)));
   if(upTasks.length)await Promise.all(upTasks);
   // 이번 주 리듬블록(가로바용) 날짜키
@@ -5077,7 +5076,7 @@ function makeMorningRoutineCard(){
   monthlyHtml+='</div>';
 
   card.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-      <div class="pace-title" style="margin-bottom:0;"><i class="ti ti-apple" style="font-size:13px;color:#e0a050;" aria-hidden="true"></i> 아침 루틴</div>
+      <div class="pace-title" style="margin-bottom:0;"><i class="ti ti-apple" style="font-size:13px;color:#e0a050;" aria-hidden="true"></i> 굿모닝</div>
       <div style="font-size:11px;color:var(--tm);">${doneCount}/${total}</div>
     </div>
     <div style="position:relative;height:102px;">${svg}${iconsHtml}</div>
@@ -6202,7 +6201,7 @@ const WC_COLORS=[
   'rgba(210,165,215,0.85)', // 일 — 라일락
 ];
 function getWChallenge(wk){return S.get('wchallenge_'+wk)||[];}
-function saveWChallenge(wk,data){S.set('wchallenge_'+wk,data);S.set('wchallenge_pending_'+wk,true);autoSync('wchallenge','wchallenge_'+wk);}
+function saveWChallenge(wk,data){S.set('wchallenge_'+wk,data);S.set('wchallenge_pending_'+wk,true);}
 
 function nextWeekKey(){const d=new Date();d.setDate(d.getDate()+7);return weekKey(d);}
 function lastWeekKey(){const d=new Date();d.setDate(d.getDate()-7);return weekKey(d);}
