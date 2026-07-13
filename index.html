@@ -580,8 +580,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="glass"] .report-banner.rhythm-soft{background:linear-gradient(120deg,rgba(248,192,160,0.85) 0%,rgba(252,215,110,0.80) 25%,rgba(150,205,225,0.75) 50%,rgba(190,160,230,0.80) 75%,rgba(244,177,206,0.82) 100%);}
 [data-theme="glass"] .report-banner.rhythm-soft .report-banner-inner{background:rgba(253,251,245,0.95);}
 [data-theme="glass"] .weekly-review-banner-inner{background:rgba(253,251,245,0.95)!important;backdrop-filter:none;}
-.rhythm-review-card{border-radius:18px;background:linear-gradient(135deg,rgba(236,219,242,0.55),rgba(216,228,245,0.50));border:1.5px solid rgba(165,125,180,0.42);padding:14px 15px;margin-bottom:10px;}
-[data-theme="glass"] .rhythm-review-card{background:rgba(253,251,245,0.55);border-color:rgba(165,125,180,0.38);}
 [data-theme="glass"] .rhythm-legend-dot{background:rgba(253,251,245,0.95)!important;border:2px solid var(--cat-color)!important;}
 [data-theme="glass"] .rhythm-legend-dot i{color:var(--cat-color)!important;}
 /* 월간 하루한줄 모아보기 */
@@ -900,7 +898,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="mono"] .done-quote-chip,[data-theme="mono"] .done-comment-chip{background:rgba(40,37,32,0.30)!important;animation:none!important;}
 [data-theme="mono"] .report-banner .report-banner-inner{background:rgba(255,255,255,0.30)!important;backdrop-filter:none;}
 [data-theme="mono"] .weekly-review-banner-inner{background:rgba(255,255,255,0.30)!important;backdrop-filter:none;border:1px solid rgba(40,37,32,0.16);}
-[data-theme="mono"] .rhythm-review-card{background:rgba(255,255,255,0.30);border-color:rgba(40,37,32,0.20);}
 [data-theme="mono"] .mr-ai-card{background:rgba(255,255,255,0.30);}
 [data-theme="mono"] .diary-date-chip.today{background:rgba(40,37,32,0.14);border-color:rgba(40,37,32,0.30);color:#2a2620;}
 [data-theme="mono"] .diary-date-chip.holiday{color:var(--tm)!important;}
@@ -980,6 +977,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .wrb-legend i{width:6px;height:6px;border-radius:50%;flex-shrink:0;display:inline-block;}
 .wrb-form-slot{margin:2px 0 4px 0;padding:10px 12px;background:rgba(40,37,32,0.04);border-radius:12px;}
 [data-theme="mono"] .wrb-form-slot{background:rgba(255,255,255,0.35);}
+.wrb-flow-slot{margin:2px 0 4px 26px;padding:10px 12px;background:rgba(40,37,32,0.04);border-radius:12px;}
+[data-theme="mono"] .wrb-flow-slot{background:rgba(255,255,255,0.35);}
+.wrb-flow-list{display:flex;flex-direction:column;gap:7px;}
+.wrb-flow-row{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--tp);}
+.wrb-flow-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.wrb-flow-time{color:var(--tm);font-size:10.5px;flex-shrink:0;min-width:82px;}
+.wrb-flow-label{flex:1;word-break:keep-all;}
+.wrb-flow-empty{font-size:11.5px;color:var(--tm);text-align:center;padding:6px 0;}
 .rhythm-track-ongoing{margin-bottom:8px;}
 .rhythm-track-ongoing .rt-row{position:static;left:auto;right:auto;padding:5px 0;white-space:normal;}
 [data-theme="glass"] .wrb-track{background:rgba(190,180,160,0.30);}
@@ -2058,7 +2063,7 @@ function renderHomeBody(section){
       body.appendChild(makeLabel('아직 남은 일'));
       body.appendChild(makePendingTodosCard());
     }
-    body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getRhythmLogicalDate()),getSubSection()==='night_2');},'rhythm-soft',12.5,dateKey(getRhythmLogicalDate())));
+    body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getRhythmLogicalDate()));},'rhythm-soft',12.5,dateKey(getRhythmLogicalDate())));
     // 일요일 다음 주 챌린지 준비 배너는 홈탭에서 제거 — 주간탭 "이번 주도 화이팅" 카드로 흡수됨
     if(!isSunday){
       // "오늘 마무리" 브리핑은 통합카드(상단 인삿말)가 흡수함
@@ -2130,14 +2135,14 @@ async function syncRhythmBlocksDown(dk){
   if(S.get(S.key('rblocks_pending',dk)))return; // 업로드 대기중인 로컬 수정 있으면 덮어쓰지 않음
   S.set(S.key('rblocks',dk),rows.map(function(r){return {cat:r.cat,start:r.start_time,end:r.end_time,text:r.text||'',created:r.created,cid:r.client_id||genCid()};}));
 }
-let _rhythmTrackEl=null,_rhythmDk=null,_rhythmFormOpen=false,_rhythmFormCat=null,_rhythmFormStart='',_rhythmFormEnd='',_rhythmFormText='',_rhythmEditIdx=null,_rhythmIncludeReview=false,_rhythmSubmitting=false;
+let _rhythmTrackEl=null,_rhythmDk=null,_rhythmFormOpen=false,_rhythmFormCat=null,_rhythmFormStart='',_rhythmFormEnd='',_rhythmFormText='',_rhythmEditIdx=null,_rhythmSubmitting=false;
 // 홈탭 트랙과 주간탭 리듬바 양쪽에서 폼이 열려있을 수 있으므로, 저장/취소/편집 시 둘 다 안전하게 갱신.
 // 홈탭 트랙이 화면에 없으면(주간탭에서 입력 중인 경우) 그 부분만 건너뛰고 주간탭만 갱신.
 // 주간탭에서 폼을 열었다가 취소/저장으로 닫히면(_rhythmFormOpen=false) 바 아래 슬롯도 함께 접음.
 function refreshRhythmTrack(){
   if(_rhythmTrackEl&&_rhythmDk){
     const old=_rhythmTrackEl; // buildDailyRhythmTrack이 _rhythmTrackEl을 새 노드로 덮어쓰기 전에 먼저 잡아둠
-    const fresh=buildDailyRhythmTrack(_rhythmDk,_rhythmIncludeReview);
+    const fresh=buildDailyRhythmTrack(_rhythmDk);
     if(old.parentNode)old.replaceWith(fresh);
   }
   if(_weeklyRhythmFormOpen&&!_rhythmFormOpen)_weeklyRhythmFormOpen=false;
@@ -2243,7 +2248,7 @@ function deleteRhythmBlock(idx){
   refreshRhythmTrack();
 }
 
-// ── 하루 리듬 돌아보기 (일/주/월 단위 AI 인사이트)
+// ── 리듬 카테고리별 시간 집계 유틸 (월간/주간 등 여러 리포트에서 공용으로 사용)
 function getDayCategoryDurations(dk){
   const sleep=getSleep(dk)||{},meals=getMeals(dk)||{},manual=getRhythmBlocks(dk);
   const toMin=function(t){if(!t)return null;const p=t.split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);};
@@ -2297,119 +2302,19 @@ function buildMonthlyRhythmBar(dur,dim,dayCount){
   }).join('')+'</div>':'<div style="font-size:11.5px;color:var(--tm);text-align:center;padding:4px 0;">기록된 리듬 항목이 없어요</div>';
   return barHtml+listHtml;
 }
-function _rrGet(scope){try{return localStorage.getItem('iikoto_rhythmreview_'+scope);}catch(e){return null;}}
-function _rrSet(scope,val){try{localStorage.setItem('iikoto_rhythmreview_'+scope,val);}catch(e){}}
-async function buildRhythmReviewCard(){
-  const card=document.createElement('div');card.className='rhythm-review-card';
-  try{
-    const _ld=getLogicalDate();
-    const key=getClaudeKey();
-    if(!key){card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">Claude API 키를 설정하면 리듬 인사이트를 받을 수 있어요</div>';return card;}
-
-    const commonRules=`규칙:
-- 반드시 ~해요, ~이에요, ~어요 체의 정감있는 존댓말만 사용. 반말 절대 금지.
-- 이름 호칭 없음.
-- 이모지 1개.
-- 오직 통찰 텍스트만 출력, 다른 말 없이.`;
-    let scope,dataContext,sys,hasData;
-
-    {
-      const dk=dateKey(_ld);scope='day_'+dk;
-      const dur=getDayCategoryDurations(dk);
-      const ol=getDailyOneLine(dk).trim();
-      const toMinLocal=function(t){if(!t)return null;const p=t.split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);};
-      // 시간순 타임라인: 수면 + 리듬 블록을 실제 시작시각 기준으로 정렬해서 제공.
-      // 각 항목에 실제 소요시간을 함께 적어 사실관계(몇 시간이었는지) 오류는 막되,
-      // "길이 = 중요도"로 서사를 짜지 않도록 프롬프트에서 별도로 강하게 안내함.
-      const sleepInfo=getSleep(dk)||{};
-      const timelineItems=[];
-      if(sleepInfo.sleep&&sleepInfo.wake){
-        const sMin=toMinLocal(sleepInfo.sleep),wMin=toMinLocal(sleepInfo.wake);
-        const durMin=wMin>sMin?wMin-sMin:(1440-sMin+wMin);
-        timelineItems.push({start:sMin,durMin,label:'수면 '+sleepInfo.sleep+'~'+sleepInfo.wake+' ('+fmtDur(durMin)+')'});
-      }
-      getRhythmBlocks(dk).forEach(function(b){
-        const cat=RHYTHM_CATS[b.cat];if(!cat)return;
-        const s=toMinLocal(b.start);if(s==null)return;
-        let durText='진행중';
-        if(b.end){
-          const e=toMinLocal(b.end);
-          const durMin=e>s?e-s:(1440-s+e);
-          durText=fmtDur(durMin);
-        }
-        const timeRange=b.start+(b.end?'~'+b.end:'~진행중');
-        timelineItems.push({start:s,label:cat.label+' '+timeRange+' ('+durText+')'+(b.text&&b.text.trim()?' — '+b.text.trim():'')});
-      });
-      timelineItems.sort(function(a,b){return a.start-b.start;});
-      const timelineText=timelineItems.length?timelineItems.map(function(t){return '- '+t.label;}).join('\n'):'(기록 없음)';
-      hasData=!!durSummaryLine(dur)||!!ol||timelineItems.length>0;
-      dataContext=['오늘 시간 흐름(실제 발생 순서대로, 각 항목 옆 괄호는 참고용 소요시간):',timelineText,'오늘 하루한줄: '+(ol||'(작성 안 함)')].filter(Boolean).join('\n');
-      sys=`당신은 따뜻한 생활 비서예요. 아래 "오늘 시간 흐름"은 실제로 일어난 순서 그대로예요. 이 흐름을 하루가 어떻게 흘러갔는지 이야기하듯 자연스럽게 짚어주는 짧은 통찰을 1-2문장으로 줘요.
-${RHYTHM_CAT_GUIDE}
-
-**서술 방식 (중요):**
-- 시간 순서를 따라가며 하루가 어떤 결로 흘러갔는지 그려요. 예: "푹 자고 개운하게 시작해, 오후엔 잠시 업무를 보고, 저녁엔 즐거운 시간을 보낸 하루예요" 같은 흐름형 문장.
-- 소요시간(괄호 안 숫자)은 사실관계 참고용일 뿐, "제일 길었으니 제일 중요하다"는 식으로 비중을 매기거나 비교하지 말아요. 길이가 짧은 활동(예: 1시간 휴식, 3시간 업무)도 하루 흐름에서 자연스러운 한 장면으로 다뤄요.
-- 특정 활동 하나만 골라 "이게 하루의 절반을 차지했다", "이것만 의미있었다"는 식으로 나머지를 깎아내리듯 서술하지 말아요.
-- 모든 활동을 다 나열할 필요는 없고, 흐름이 잘 드러나는 2~4개 구간을 골라 자연스럽게 이어 붙여요.
-- 단순히 순서대로 나열만 하지 말고, 그 안에서 눈에 띄는 결(예: 평소보다 이른 시작, 활동 사이 텀, 흐름의 완급)이 있다면 자연스럽게 짚어요. 특별한 결이 없는 평이한 하루라면 억지로 의미를 부여하지 말고 담백하게 흘러가는 대로 그려요.
-
-이 흐름과 하루한줄을 보고, 시간을 어떻게 썼는지와 그날의 느낌이 어울리는지 어긋나는지도 짚어주면 좋아요.
-${commonRules}`;
-    }
-
-    if(!hasData){
-      card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">아직 기록된 리듬이 없어요</div>';
-      return card;
-    }
-
-    const cached=_rrGet(scope);
-    if(cached){
-      const p=document.createElement('div');
-      p.style.cssText='font-size:13px;color:var(--tp);line-height:1.75;padding:4px 2px;word-break:keep-all;';
-      p.textContent=cached;card.appendChild(p);return card;
-    }
-    card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">하루 리듬을 돌아보는 중...</div>';
-    const reply=await callClaude(sys,[{role:'user',content:dataContext}],300);
-    card.innerHTML='';
-    if(reply&&!reply.startsWith('__ERR__')){
-      const p=document.createElement('div');
-      p.style.cssText='font-size:13px;color:var(--tp);line-height:1.75;padding:4px 2px;word-break:keep-all;';
-      p.textContent=reply.trim();
-      card.appendChild(p);
-      _rrSet(scope,reply.trim());
-    }else{
-      card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">잠시 후 다시 시도해주세요</div>';
-    }
-  }catch(e){
-    card.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">리듬 인사이트를 불러올 수 없어요</div>';
-  }
-  return card;
-}
-function buildDailyRhythmTrackFresh(dk,includeReview){
+function buildDailyRhythmTrackFresh(dk){
   // 새로 화면에 들어올 때마다 입력폼은 항상 닫힌 상태로 시작 (열린 채로 남아있던 버그 수정)
   _rhythmFormOpen=false;_resetRhythmForm();
-  return buildDailyRhythmTrack(dk,includeReview);
+  return buildDailyRhythmTrack(dk);
 }
-function buildDailyRhythmTrack(dk,includeReview){
+function buildDailyRhythmTrack(dk){
   _rhythmDk=dk;
-  _rhythmIncludeReview=!!includeReview;
   const outer=document.createElement('div');
   const d=new Date(dk+'T00:00:00');
   const isToday=dk===dateKey(new Date());
   const dateRow=document.createElement('div');dateRow.className='rhythm-track-datelabel';
   dateRow.innerHTML='<span>'+(d.getMonth()+1)+'월 '+d.getDate()+'일 '+_HOME_DAYS[d.getDay()]+'요일</span><span class="w">'+(isToday?'오늘':'')+'</span>';
   outer.appendChild(dateRow);
-  if(includeReview){
-    const rrTitle='하루 리듬 돌아보기';
-    const rrWrap=document.createElement('div');rrWrap.style.marginBottom='14px';
-    const rrLabel=document.createElement('div');rrLabel.className='rhythm-form-label';rrLabel.style.marginBottom='8px';rrLabel.textContent=rrTitle;
-    const rrCard=document.createElement('div');rrCard.className='rhythm-review-card';
-    rrCard.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">'+rrTitle+'를 정리하는 중...</div>';
-    rrWrap.appendChild(rrLabel);rrWrap.appendChild(rrCard);
-    outer.appendChild(rrWrap);
-    buildRhythmReviewCard().then(function(card){rrCard.replaceWith(card);}).catch(function(){rrCard.innerHTML='<div style="font-size:12px;color:var(--tm);padding:8px 0;text-align:center;">리듬 인사이트를 불러올 수 없어요</div>';});
-  }
   const wrap=document.createElement('div');wrap.className='rhythm-track';
   const sleep=getSleep(dk)||{};
   const meals=getMeals(dk)||{};
@@ -4374,6 +4279,7 @@ document.querySelectorAll('.vtab').forEach(b=>b.addEventListener('click',()=>{
   document.querySelector('.scroll').scrollTop=0;
   _todoPartModeIdx=-1;
   if(_weeklyRhythmFormOpen){_weeklyRhythmFormOpen=false;_rhythmFormOpen=false;_resetRhythmForm();}
+  _wrbFlowOpenDk=null;
   if(_wishPlacing)cancelWishPlacing();
   if(v==='daily')loadDaily();
   else if(v==='weekly')loadWeekly();
@@ -7364,10 +7270,16 @@ function renderWeeklyRhythmBars(){
     const segs=computeRhythmSegsForDay(dk,realTodayDk,_curLogicalDk);
     const track=renderRhythmBarHtml(segs);
     const isToday=dk===todayDk;
-    const clickAttr=isToday?' onclick="toggleWeeklyRhythmForm()" style="cursor:pointer;"':'';
+    const isPast=dk<todayDk;
+    const isOpen=_wrbFlowOpenDk===dk;
+    const clickAttr=isToday?' onclick="toggleWeeklyRhythmForm()" style="cursor:pointer;"'
+      :(isPast?' onclick="toggleWeeklyRhythmFlow(\''+dk+'\')" style="cursor:pointer;"':'');
     html+='<div class="wrb-row"'+clickAttr+'><div class="wrb-daylabel'+(isToday?' today':'')+'">'+DOW[i]+'</div><div class="wrb-trackwrap">'+track+'</div></div>';
     if(isToday&&_weeklyRhythmFormOpen){
       html+='<div class="wrb-form-slot" id="wrb-today-form"></div>';
+    }
+    if(isPast&&isOpen){
+      html+='<div class="wrb-flow-slot">'+renderRhythmFlowHtml(segs)+'</div>';
     }
   }
   html+='</div>';
@@ -7380,6 +7292,27 @@ function renderWeeklyRhythmBars(){
     const slot=document.getElementById('wrb-today-form');
     if(slot)slot.appendChild(buildRhythmFormEl(true));
   }
+}
+// 주간탭 "과거 요일 바" 클릭 시 그날의 시간순 흐름(타임라인)을 텍스트로 펼쳐 보여줌.
+// 당일은 제외(당일은 홈탭 세로 리듬바로 이미 볼 수 있음). AI 분석 없이 순수하게 기록만 나열해
+// 스스로 "이날은 이런 시간이 길었구나" 판단할 수 있게 하는 목적.
+let _wrbFlowOpenDk=null;
+function toggleWeeklyRhythmFlow(dk){
+  _wrbFlowOpenDk=(_wrbFlowOpenDk===dk)?null:dk;
+  renderWeeklyRhythmBars();
+}
+function renderRhythmFlowHtml(segs){
+  const toHHMM=function(min){
+    const m=((min%1440)+1440)%1440;
+    return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+  };
+  const items=segs.filter(s=>s.label).slice().sort((a,b)=>a.start-b.start);
+  if(!items.length)return '<div class="wrb-flow-empty">이날은 기록된 리듬이 없어요</div>';
+  const rows=items.map(function(s){
+    const timeRange=toHHMM(s.start)+(s.ongoing?'~진행중':'~'+toHHMM(s.end));
+    return '<div class="wrb-flow-row"><span class="wrb-flow-dot" style="background:'+s.color+';"></span><span class="wrb-flow-time">'+timeRange+'</span><span class="wrb-flow-label">'+s.label+'</span></div>';
+  }).join('');
+  return '<div class="wrb-flow-list">'+rows+'</div>';
 }
 // 주간탭 "당일 바" 클릭 시 리듬 입력 폼 토글 — 홈탭과 동일한 폼(카테고리 선택+시간+메모)을 그대로 재사용.
 // 리듬 리뷰나 다른 리포트는 붙이지 않고 순수 입력 기능만 제공.

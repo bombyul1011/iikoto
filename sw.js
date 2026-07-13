@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260713-29-rhythm-bar-midnight-fix-cleanup';
+const CACHE = 'iikoto-v20260713-30-daily-rhythm-review-removed-weekly-flow-added';
 const ASSETS = [
   './',
   './index.html'
