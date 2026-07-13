@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260713-25-morning-habit-wchallenge-sync-fix';
+const CACHE = 'iikoto-v20260713-26-wed-report-removed-kr-labels';
 const ASSETS = [
   './',
   './index.html'
