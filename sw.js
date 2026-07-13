@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260713-32-mono-theme-pastel-lavender-palette';
+const CACHE = 'iikoto-v20260713-33-mono-palette-mid-strength';
 const ASSETS = [
   './',
   './index.html'
