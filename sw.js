@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260713-30-daily-rhythm-review-removed-weekly-flow-added';
+const CACHE = 'iikoto-v20260713-31-todo-frag-color-rhythm-content-picker';
 const ASSETS = [
   './',
   './index.html'

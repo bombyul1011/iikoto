@@ -790,6 +790,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rhythm-timebox-now{width:18px;height:18px;display:flex;align-items:center;justify-content:center;color:var(--tm);cursor:pointer;flex-shrink:0;}
 .rhythm-arrow{color:var(--tm);font-size:13px;}
 .rhythm-memo-inp{width:100%;background:var(--card);border:1px solid var(--card-b);border-radius:11px;padding:9px 12px;font-size:12.5px;color:var(--tp);margin-bottom:14px;font-family:'DM Sans',sans-serif;}
+.rhythm-content-picker{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
+.rhythm-content-chip{font-size:11px;color:var(--tp);background:var(--card);border:1px solid var(--card-b);border-radius:9px;padding:6px 10px;cursor:pointer;white-space:nowrap;}
 .rhythm-save-btn{width:100%;background:var(--acc);color:#fff;border:none;border-radius:12px;padding:11px 0;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;}
 
 .habit-numbox-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(78px,1fr));gap:8px;margin-bottom:2px;}
@@ -2161,6 +2163,13 @@ function openRhythmEditForm(idx){
   _rhythmEditIdx=idx;_rhythmFormCat=b.cat;_rhythmFormStart=b.start;_rhythmFormEnd=b.end||'';_rhythmFormText=b.text||'';
   _rhythmFormOpen=true;
   refreshRhythmTrack();
+}
+// 리듬바 감상 입력 폼에서 진행중 드라마/영화 칩을 누르면 한줄메모 인풋에 제목을 채움.
+// 전체 폼을 다시 그리지 않고 인풋 값만 직접 갱신해 다른 입력값(시작/끝 시각 등) 유지.
+function pickRhythmContentTitle(fullTitle){
+  _rhythmFormText=fullTitle;
+  const inp=document.getElementById('rhythm-text-inp');
+  if(inp)inp.value=fullTitle;
 }
 function selectRhythmCatAndOpen(cat){
   if(_rhythmFormOpen&&_rhythmFormCat===cat&&_rhythmEditIdx==null){
@@ -3830,6 +3839,27 @@ function getContents(mk){
   if(changed)S.set(S.key('contents',mk),arr);
   return arr;
 }
+// 리듬바 "감상" 입력 시 진행중 드라마/영화를 제목 선택용으로 제공.
+// 책은 독서 스톱워치가 종료 시점에 감상 리듬을 자동 기록하므로 여기서는 제외.
+// 월 경계에 걸쳐 이번 달로 넘어온 콘텐츠도 놓치지 않도록 이번달+지난달 두 달치를 합쳐서 조회.
+function getOngoingWatchingContents(){
+  const now=new Date();
+  const mk=monthKey(now);
+  const prevMk=monthKey(new Date(now.getFullYear(),now.getMonth()-1,1));
+  const seen=new Set();
+  const result=[];
+  [prevMk,mk].forEach(function(m){
+    getContents(m).forEach(function(c){
+      if(c.status!=='watching')return;
+      if(c.cat!=='drama'&&c.cat!=='movie')return;
+      const dedupeKey=c.cid||c.title;
+      if(seen.has(dedupeKey))return;
+      seen.add(dedupeKey);
+      result.push({cat:c.cat,title:c.title});
+    });
+  });
+  return result.slice(0,4);
+}
 function saveContents(mk,v){
   const prev=S.get(S.key('contents',mk))||[];
   const prevByCid={};
@@ -4484,7 +4514,7 @@ function renderTodoTextParts(text,strikeParts,todoIdx){
   parts.forEach((seg,partIdx)=>{
     const isStruck=strikeParts.includes(partIdx);
     if(partIdx>0)html+=' / ';
-    html+=`<span class="todo-part" data-part-idx="${partIdx}" onclick="onTodoPartClick(event,${todoIdx},${partIdx})" style="user-select:none;-webkit-user-select:none;-webkit-user-drag:none;${isStruck?'text-decoration:line-through;opacity:0.55;':''}">${seg}</span>`;
+    html+=`<span class="todo-part" data-part-idx="${partIdx}" onclick="onTodoPartClick(event,${todoIdx},${partIdx})" style="user-select:none;-webkit-user-select:none;-webkit-user-drag:none;${isStruck?'text-decoration:line-through;color:var(--tm);':''}">${seg}</span>`;
   });
   if(inPartMode){
     const hasUnstruck=parts.some((_,idx)=>!strikeParts.includes(idx));
@@ -7348,6 +7378,16 @@ function buildRhythmFormEl(showOngoingList){
   wrap.appendChild(legend);
   if(_rhythmFormOpen){
     const form=document.createElement('div');form.className='rhythm-add-form';
+    const ongoingContents=_rhythmFormCat==='enjoy'?getOngoingWatchingContents():[];
+    const contentPickerHtml=ongoingContents.length?(
+      '<div class="rhythm-content-picker">'+
+      ongoingContents.map(function(c){
+        const catLabel=c.cat==='drama'?'드라마':'영화';
+        const full=catLabel+' - '+c.title;
+        return '<span class="rhythm-content-chip" onclick="pickRhythmContentTitle(\''+full.replace(/'/g,"\\'")+'\')">'+full+'</span>';
+      }).join('')+
+      '</div>'
+    ):'';
     form.innerHTML=
       '<div class="rhythm-form-label">시작 — 끝</div>'+
       '<div class="rhythm-time-row">'+
@@ -7355,6 +7395,7 @@ function buildRhythmFormEl(showOngoingList){
         '<span class="rhythm-arrow">→</span>'+
         '<div class="rhythm-timebox"><span class="rhythm-timebox-l">끝(선택)</span><span class="rhythm-timebox-v" onclick="openRhythmTimeModal(\'end\')">'+(_rhythmFormEnd||'--:--')+'</span><span class="rhythm-timebox-now" onclick="setRhythmNow(\'end\')"><i class="ti ti-clock-hour-4" style="font-size:11px;" aria-hidden="true"></i></span></div>'+
       '</div>'+
+      contentPickerHtml+
       '<input type="text" id="rhythm-text-inp" class="rhythm-memo-inp" placeholder="한 줄 메모 (선택)" value="'+(_rhythmFormText||'').replace(/"/g,'&quot;')+'" oninput="_rhythmFormText=this.value">'+
       '<div style="display:flex;gap:8px;">'+
         '<button class="rhythm-save-btn" style="background:none;border:1.5px solid var(--card-b);color:var(--tm);flex:0 0 80px;" onclick="toggleRhythmAddForm()">취소</button>'+
