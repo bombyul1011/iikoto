@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260713-26-wed-report-removed-kr-labels';
+const CACHE = 'iikoto-v20260713-27-rhythm-live-top-pace-recall';
 const ASSETS = [
   './',
   './index.html'

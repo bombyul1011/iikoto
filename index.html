@@ -4913,11 +4913,21 @@ function _paceHabitCheckedCount(dk){
 function _paceTopRhythmCat(dk){
   const blocks=getRhythmBlocks(dk);
   const dur={};
+  const isToday=dk===dateKey(getLogicalDate());
+  const nowMin=isToday?(new Date().getHours()*60+new Date().getMinutes()):null;
   blocks.forEach(b=>{
     if(b.cat==='_sleep')return; // 수면은 항상 최장이라 최다카테고리 후보에서 제외
     const s=b.start?parseInt(b.start.split(':')[0],10)*60+parseInt(b.start.split(':')[1],10):null;
-    const e=b.end?parseInt(b.end.split(':')[0],10)*60+parseInt(b.end.split(':')[1],10):null;
-    if(s==null||e==null)return;
+    if(s==null)return;
+    let e;
+    if(b.end){
+      e=parseInt(b.end.split(':')[0],10)*60+parseInt(b.end.split(':')[1],10);
+    }else if(isToday&&nowMin!=null){
+      // 진행중 블록(종료 미입력) — 오늘 데이터라면 현재 시각까지로 잠정 집계
+      e=nowMin;
+    }else{
+      return; // 오늘이 아닌데 종료가 없으면 집계 제외(과거 데이터 이상값 방어)
+    }
     let d=e-s;if(d<0)d+=1440;
     dur[b.cat]=(dur[b.cat]||0)+d;
   });
@@ -5240,8 +5250,27 @@ function makeAfternoonPaceCard(){
     // 캐시된 문구가 메타발언이면 신뢰하지 않고 캐시를 비운 뒤 로컬 문구로 즉시 대체(재호출은 다음 진입 때 자연히 일어남)
     S.set(cacheKey,'');
     renderComment(_paceLocalCommentCached(todayPct,yestPct,todayTop,lastWeekTop,todayDk,sig));
+  }else if(cached&&!cached.reCalled){
+    // API 문구는 있지만 체크값이 그때와 달라짐 — 서브섹션당 1회에 한해 변화 반영 재호출 허용(최초 1회+재호출 1회=최대 2회)
+    renderComment('오늘 기록을 다시 살펴보는 중이에요...');
+    setTimeout(()=>{
+      const stillThereR=document.getElementById('afternoon-pace-card');
+      if(!stillThereR)return;
+      const waitSigR=todayDone+'-'+todayHabit+'-'+(todayTop?todayTop.key:'none');
+      if(waitSigR!==sig)return; // 대기 중 값이 또 바뀌었으면 이번엔 포기(다음 렌더링에서 재판단)
+      _paceAiComment(todayPct,yestPct,todayTop,lastWeekTop).then(aiText=>{
+        if(!aiText||_isBadComment(aiText)){S.set(cacheKey,JSON.stringify({sig,text:cached.text,reCalled:true}));return;}
+        S.set(cacheKey,JSON.stringify({sig,text:aiText,reCalled:true}));
+        const stillThereR2=document.getElementById('afternoon-pace-card');
+        if(stillThereR2){
+          const nowSigR=todayDone+'-'+todayHabit+'-'+(todayTop?todayTop.key:'none');
+          const liveElR=stillThereR2.querySelector('#pace-comment-text');
+          if(nowSigR===sig&&liveElR)liveElR.innerHTML=aiText.split('\n').map(l=>`<div>${l}</div>`).join('');
+        }
+      });
+    },4000);
   }else if(cached){
-    // API 문구는 있지만 체크값이 그때와 달라짐 — API 재호출 없이 로컬 문구로 실시간 반영
+    // 이미 서브섹션당 재호출까지 소진됨(reCalled=true) — 더 이상 API 부르지 않고 로컬 문구로만 표시
     renderComment(_paceLocalCommentCached(todayPct,yestPct,todayTop,lastWeekTop,todayDk,sig));
   }else{
     // 이 서브섹션에서 아직 한 번도 API를 호출한 적 없음 — 데이터가 완전히 안정될 시간을 준 뒤(4초 디바운스) 백그라운드에서 최초 1회 API 호출
@@ -5256,7 +5285,7 @@ function makeAfternoonPaceCard(){
         if(waitSig!==sig)return; // 4초 사이 값이 또 바뀌었으면 이번 시도는 포기(다음 렌더링에서 새로 판단됨)
         _paceAiComment(todayPct,yestPct,todayTop,lastWeekTop).then(aiText=>{
           if(!aiText||_isBadComment(aiText)){renderComment(_paceLocalCommentCached(todayPct,yestPct,todayTop,lastWeekTop,todayDk,sig));return;}
-          S.set(cacheKey,JSON.stringify({sig,text:aiText}));
+          S.set(cacheKey,JSON.stringify({sig,text:aiText,reCalled:false}));
           const stillThere2=document.getElementById('afternoon-pace-card');
           if(stillThere2){
             const nowSig=todayDone+'-'+todayHabit+'-'+(todayTop?todayTop.key:'none');
