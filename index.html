@@ -3430,7 +3430,7 @@ async function fetchHomeWeather(section){
 
   if(subEl)subEl.textContent='잠깐만요...';
 
-  const maxTok=section==='night'?(subSec==='night_2'?220:320):280;
+  const maxTok=section==='night'?320:280;
   const reply=await callClaude(sys,[{role:'user',content:dataContext}],maxTok);
 
   if(subEl){
@@ -7307,8 +7307,24 @@ function computeRhythmSegsForDay(dk,realTodayDk,_curLogicalDk){
         segs.push({start:0,end:eRaw,color:getRhythmColor(b.cat),label:lbl});
       }
     }else{
-      if(s<240||s>=1380){
+      if(s<240){
+        // 00:00~03:59 사이 시작한 미종료 블록: 이미 자정을 넘긴 시각에 시작한 것이므로
+        // 항상 익일(=오늘) 바에 그려짐. 끝나는 지점은 논리적으로 아직 오늘이 안 끝났으면 현재시각,
+        // 논리적 날짜가 넘어갔으면(다음날 새벽6시 이후) 고정 240분.
         const endMin=dateKey(prevD)===_curLogicalDk?(function(){const n=new Date();return n.getHours()*60+n.getMinutes();})():240;
+        segs.push({start:0,end:endMin,color:getRhythmColor(b.cat),ongoing:true,label:lbl});
+      }else if(s>=1380){
+        // 23:00~23:59 시작한 미종료 블록: 자정을 아직 안 넘겼으면(같은 논리적 날짜=아직 전날 저녁)
+        // 익일 바엔 그리지 않음(경과분 0). 자정을 넘긴 뒤부터 그 경과분만큼만 채움.
+        let endMin;
+        if(dateKey(prevD)===_curLogicalDk){
+          const n=new Date();
+          const nowMinToday=n.getHours()*60+n.getMinutes();
+          endMin=n.getHours()<12?nowMinToday:0; // 자정~정오 사이면 실제 경과분, 아직 전날 저녁~밤이면 0(안보임)
+        }else{
+          endMin=240;
+        }
+        if(endMin<=0)return;
         segs.push({start:0,end:endMin,color:getRhythmColor(b.cat),ongoing:true,label:lbl});
       }
     }
@@ -7341,13 +7357,11 @@ function renderWeeklyRhythmBars(){
   const todayDk=dateKey(now);
   const realTodayDk=todayDk;
   const _curLogicalDk=dateKey(getRhythmLogicalDate());
-  const dayData=[];
   let html='<div class="wrb-wrap">';
   for(let i=0;i<7;i++){
     const d=new Date(mon);d.setDate(mon.getDate()+i);
     const dk=dateKey(d);
     const segs=computeRhythmSegsForDay(dk,realTodayDk,_curLogicalDk);
-    dayData.push({dk,segs,label:DOW[i]});
     const track=renderRhythmBarHtml(segs);
     const isToday=dk===todayDk;
     const clickAttr=isToday?' onclick="toggleWeeklyRhythmForm()" style="cursor:pointer;"':'';

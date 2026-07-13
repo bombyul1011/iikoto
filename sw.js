@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260713-28-pace-comment-guard-strengthen';
+const CACHE = 'iikoto-v20260713-29-rhythm-bar-midnight-fix-cleanup';
 const ASSETS = [
   './',
   './index.html'
