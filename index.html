@@ -396,6 +396,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cal-day-name{text-align:center;font-size:10px;color:var(--tm);padding:0 0 10px;}
 .cal-day{display:flex;flex-direction:column;align-items:center;padding:4px 2px 8px;cursor:pointer;position:relative;}
 .cal-num{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--tp);transition:all .15s;}
+#tdp-cal-wrap .cal-num{width:32px;height:32px;font-size:14px;}
+#tdp-cal-wrap .cal-day{padding:2px 2px 4px;}
+#tdp-cal-wrap .cal-day-name{padding:0 0 4px;}
 .cal-day.today .cal-num{background:var(--acc);color:white;}
 .cal-day.selected .cal-num{background:rgba(192,112,128,0.16);color:var(--acc);}
 .cal-day.other-month .cal-num{color:rgba(200,180,175,.38);}
@@ -1398,14 +1401,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   </div>
 </div>
 
-<!-- [v2] 투두 날짜변경 전용 커스텀 캘린더 — 네이티브 input[type=date] 대체, 월간탭과 동일한 시각 스타일 재사용 -->
-<div class="overlay" id="todo-date-picker-sheet" onclick="closeSheet('todo-date-picker-sheet',event)">
-  <div class="bsheet">
-    <div class="sheet-handle"></div>
-    <div id="tdp-cal-wrap" style="padding:4px 4px 16px;"></div>
-    <div style="display:flex;gap:8px;padding:0 4px 4px;">
-      <button class="mbtn cancel" style="flex:1;" onclick="closeSheet('todo-date-picker-sheet')">취소</button>
-      <button class="mbtn ok" style="flex:1;" onclick="tdpConfirm()">이동</button>
+<!-- [v2] 투두 날짜변경 전용 커스텀 캘린더 — 중앙 모달(메모 수정과 동일 스타일), 월간탭(.cal-grid/.cal-day)과 동일한 시각 스타일 재사용 -->
+<div class="modal-ov" id="shared-date-picker-modal" onclick="closeModal('shared-date-picker-modal',event)" style="z-index:10050;">
+  <div class="modal" style="max-width:360px;padding:18px 18px 16px;">
+    <div class="modal-title" id="dp-modal-title">날짜 선택</div>
+    <div id="tdp-cal-wrap" style="margin:2px 0 8px;"></div>
+    <div class="modal-actions">
+      <button class="mbtn cancel" onclick="closeModal('shared-date-picker-modal')">취소</button>
+      <button class="mbtn ok" onclick="tdpConfirm()">확인</button>
     </div>
   </div>
 </div>
@@ -1660,7 +1663,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     </div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
       <span style="font-size:12px;color:var(--tm);white-space:nowrap;">시작일</span>
-      <input type="date" class="modal-inp" id="cm-start" style="flex:1;margin-bottom:0;" lang="en-GB">
+      <input type="text" class="modal-inp" id="cm-start" readonly onclick="openContentDatePicker('cm-start')" style="flex:1;margin-bottom:0;cursor:pointer;" placeholder="날짜 선택">
       <div style="display:flex;gap:5px;flex-shrink:0;">
         <button class="cstatus-btn done" id="cm-done" onclick="toggleCDone()" style="white-space:nowrap;padding:8px 9px;margin-bottom:0;">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><circle cx="7" cy="7" r="5.5"/><polyline points="4,7 6,9.5 10,4.5"/></svg>완료
@@ -1672,7 +1675,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     </div>
     <div class="enddate-row" id="cm-enddate-row">
       <span style="font-size:12px;color:var(--tm);white-space:nowrap;" id="cm-enddate-label">완료일</span>
-      <input type="date" class="modal-inp" id="cm-end" style="flex:1;margin-bottom:0;" lang="en-GB">
+      <input type="text" class="modal-inp" id="cm-end" readonly onclick="openContentDatePicker('cm-end')" style="flex:1;margin-bottom:0;cursor:pointer;" placeholder="날짜 선택">
     </div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
       <span style="font-size:12px;color:var(--tm);white-space:nowrap;">별점</span>
@@ -6045,25 +6048,32 @@ function todoSheetPostpone(type){
     openTodoDatePickerSheet(_todoSwipeIdx);
   }
 }
-// [v2] 투두 날짜변경 전용 커스텀 캘린더 — 월간탭(.cal-grid/.cal-day)과 동일한 시각 스타일 재사용.
-let _tdpYear=0,_tdpMonth=0,_tdpSelectedDk=null,_tdpTodoIdx=-1;
-function openTodoDatePickerSheet(todoIdx){
-  _tdpTodoIdx=todoIdx;
-  const base=new Date(currentDate);base.setDate(base.getDate()+1); // 기본 선택은 내일
-  _tdpYear=base.getFullYear();_tdpMonth=base.getMonth();
-  _tdpSelectedDk=dateKey(base);
-  renderTodoDatePicker();
-  openSheet('todo-date-picker-sheet');
+// [v2] 범용 커스텀 캘린더 팝업 — 월간탭(.cal-grid/.cal-day)과 동일한 시각 스타일 재사용.
+// 투두 날짜변경, 콘텐츠 시작일/완료일 등 "단일 날짜 하나 선택" UI가 필요한 곳에서 공용으로 사용.
+let _dpYear=0,_dpMonth=0,_dpSelectedDk=null,_dpOnConfirm=null;
+// initialDk: 처음 열렸을 때 선택돼 있을 날짜(YYYY-MM-DD). onConfirm(dk): 확정 시 호출될 콜백.
+// title/confirmLabel: 호출 상황에 맞는 문구(예: 투두는 "날짜 변경"/"이동", 콘텐츠는 "시작일 선택"/"확인").
+function openDatePickerModal(initialDk,onConfirm,title,confirmLabel){
+  const base=initialDk?new Date(initialDk+'T00:00:00'):new Date();
+  _dpYear=base.getFullYear();_dpMonth=base.getMonth();
+  _dpSelectedDk=initialDk||dateKey(base);
+  _dpOnConfirm=onConfirm;
+  const titleEl=document.getElementById('dp-modal-title');
+  if(titleEl)titleEl.textContent=title||'날짜 선택';
+  const confirmBtn=document.querySelector('#shared-date-picker-modal .mbtn.ok');
+  if(confirmBtn)confirmBtn.textContent=confirmLabel||'확인';
+  renderDatePickerModal();
+  openModal('shared-date-picker-modal');
 }
-function renderTodoDatePicker(){
+function renderDatePickerModal(){
   const wrap=document.getElementById('tdp-cal-wrap');if(!wrap)return;
-  const y=_tdpYear,mo=_tdpMonth;
+  const y=_dpYear,mo=_dpMonth;
   const daysInMonth=new Date(y,mo+1,0).getDate();
   const today=new Date();
-  let h=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding:0 4px;">
-    <div class="nav-arr" onclick="tdpShiftMonth(-1)"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" style="color:var(--tm)"><polyline points="6.5,1.5 3,5 6.5,8.5"/></svg></div>
+  let h=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding:0 4px;">
+    <div class="nav-arr" onclick="dpShiftMonth(-1)"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" style="color:var(--tm)"><polyline points="6.5,1.5 3,5 6.5,8.5"/></svg></div>
     <span style="font-size:15px;font-weight:500;color:var(--tp);">${y}년 ${mo+1}월</span>
-    <div class="nav-arr" onclick="tdpShiftMonth(1)"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" style="color:var(--tm)"><polyline points="3.5,1.5 7,5 3.5,8.5"/></svg></div>
+    <div class="nav-arr" onclick="dpShiftMonth(1)"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" style="color:var(--tm)"><polyline points="3.5,1.5 7,5 3.5,8.5"/></svg></div>
   </div>
   <div class="cal-grid">`;
   ['월','화','수','목','금','토','일'].forEach(d=>h+=`<div class="cal-day-name">${d}</div>`);
@@ -6073,30 +6083,49 @@ function renderTodoDatePicker(){
   for(let d=1;d<=daysInMonth;d++){
     const dk=`${y}-${pad(mo+1)}-${pad(d)}`;
     const isToday2=today.getFullYear()===y&&today.getMonth()===mo&&today.getDate()===d;
-    const isSel=_tdpSelectedDk===dk;
+    const isSel=_dpSelectedDk===dk;
     let cls='cal-day';if(isToday2)cls+=' today';if(isSel)cls+=' selected';
-    h+=`<div class="${cls}" onclick="tdpDayClick('${dk}')"><div class="cal-num">${d}</div></div>`;
+    h+=`<div class="${cls}" onclick="dpDayClick('${dk}')"><div class="cal-num">${d}</div></div>`;
   }
   h+=`</div>`;
   wrap.innerHTML=h;
 }
-function tdpShiftMonth(delta){
-  _tdpMonth+=delta;
-  if(_tdpMonth<0){_tdpMonth=11;_tdpYear--;}
-  else if(_tdpMonth>11){_tdpMonth=0;_tdpYear++;}
-  renderTodoDatePicker();
+function dpShiftMonth(delta){
+  _dpMonth+=delta;
+  if(_dpMonth<0){_dpMonth=11;_dpYear--;}
+  else if(_dpMonth>11){_dpMonth=0;_dpYear++;}
+  renderDatePickerModal();
 }
-function tdpDayClick(dk){
-  _tdpSelectedDk=dk;
-  renderTodoDatePicker();
+function dpDayClick(dk){
+  _dpSelectedDk=dk;
+  renderDatePickerModal();
 }
 function tdpConfirm(){
-  if(_tdpTodoIdx<0||!_tdpSelectedDk)return;
-  const dk=dateKey(currentDate);
-  const result=relocateTodo(dk,_tdpTodoIdx,_tdpSelectedDk,'move');
-  showToast(result.message);
-  closeSheet('todo-date-picker-sheet');
-  renderTodos();
+  if(!_dpSelectedDk)return;
+  closeModal('shared-date-picker-modal');
+  if(typeof _dpOnConfirm==='function')_dpOnConfirm(_dpSelectedDk);
+}
+// 콘텐츠 모달(시작일/완료일) 전용 래퍼 — 대상 input의 현재 값을 초기 선택값으로 사용, 확정 시 그 input에 값 반영.
+function openContentDatePicker(targetInputId){
+  const targetInp=document.getElementById(targetInputId);
+  const curVal=targetInp?.value||dateKey(currentDate);
+  const title=targetInputId==='cm-start'?'시작일 선택':'완료일 선택';
+  openDatePickerModal(curVal,function(selectedDk){
+    if(targetInp){
+      targetInp.value=selectedDk;
+      targetInp.dispatchEvent(new Event('change',{bubbles:true}));
+    }
+  },title,'확인');
+}
+// 투두 날짜변경 전용 래퍼 — 기존 호출부(todoSheetPostpone)와의 연결 유지.
+function openTodoDatePickerSheet(todoIdx){
+  const base=new Date(currentDate);base.setDate(base.getDate()+1); // 기본 선택은 내일
+  openDatePickerModal(dateKey(base),function(selectedDk){
+    const dk=dateKey(currentDate);
+    const result=relocateTodo(dk,todoIdx,selectedDk,'move');
+    showToast(result.message);
+    renderTodos();
+  },'날짜 변경','이동');
 }
 // ── MEMO
 let _deletedMemo=null,_undoTimer=null,_memoSwipeIdx=-1;

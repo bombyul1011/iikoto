@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260714-56-custom-date-picker';
+const CACHE = 'iikoto-v20260714-59-compact-calendar-sizing';
 const ASSETS = [
   './',
   './index.html'
