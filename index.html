@@ -1403,8 +1403,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div class="sheet-item" onclick="todoSheetEdit()"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="color:var(--ts)"><path d="M3 15L5 9L13.5 1.5C14.5.5 16 .5 17 1.5L16.5 2C17.5 3 17.5 4.5 16.5 5.5L8 14Z"/><line x1="5" y1="9" x2="8" y2="14"/></svg>수정</div>
     <div class="sheet-item" onclick="todoSheetPostpone('tomorrow')"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="color:var(--ts)"><rect x="2" y="2.5" width="14" height="13" rx="2.5"/><line x1="2" y1="7" x2="16" y2="7"/><line x1="6" y1="2.5" x2="6" y2="4.5"/><line x1="12" y1="2.5" x2="12" y2="4.5"/></svg>내일로 미루기</div>
     <div class="sheet-item" onclick="todoSheetPostpone('pick')"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="color:var(--ts)"><rect x="2" y="2.5" width="14" height="13" rx="2.5"/><line x1="2" y1="7" x2="16" y2="7"/><line x1="9" y1="10" x2="9" y2="14"/><line x1="7" y1="12" x2="11" y2="12"/></svg>날짜 지정</div>
-    <div class="sheet-item" onclick="todoSheetMove(-1)"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="color:var(--ts)"><line x1="9" y1="15" x2="9" y2="3"/><polyline points="4,8 9,3 14,8"/></svg>위로 이동</div>
-    <div class="sheet-item" onclick="todoSheetMove(1)"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="color:var(--ts)"><line x1="9" y1="3" x2="9" y2="15"/><polyline points="4,10 9,15 14,10"/></svg>아래로 이동</div>
     <div class="sheet-item del" onclick="todoSheetDelete()"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#c05060" stroke-width="1.2" stroke-linecap="round"><polyline points="3,5 15,5"/><rect x="4.5" y="5" width="9" height="10.5" rx="2"/></svg>삭제</div>
   </div>
 </div>
@@ -5968,23 +5966,6 @@ function openTodoSheet(i){
   openSheet('todo-sheet');
 }
 function todoSheetEdit(){_todoSwipeIdx>=0&&(closeSheet('todo-sheet'),openTodoModal(_todoSwipeIdx));}
-function todoSheetMove(dir){
-  if(_todoSwipeIdx<0)return;
-  const dk=dateKey(currentDate),todos=getTodos(dk);
-  const i=_todoSwipeIdx,t=todos[i];if(!t)return;
-  const ts=t.timeSection||'none',done=t.done;
-  // 같은 시간대(오전/오후/저녁/지정없음) + 같은 완료상태 그룹 안에서만 이동
-  const groupIdx=todos.map((x,idx)=>idx).filter(idx=>(todos[idx].timeSection||'none')===ts&&todos[idx].done===done);
-  const pos=groupIdx.indexOf(i),swapPos=pos+dir;
-  if(swapPos<0||swapPos>=groupIdx.length)return;
-  const j=groupIdx[swapPos];
-  [todos[i],todos[j]]=[todos[j],todos[i]];
-  // 동기화(서버는 created 기준 정렬)되어도 바뀐 순서가 유지되도록, 그룹 내 created를 새 배열순서에 맞춰 재부여
-  const base=Date.now()-groupIdx.length*1000;
-  groupIdx.forEach(function(idx,k){todos[idx].created=base+k*1000;});
-  saveTodos(dk,todos);
-  closeSheet('todo-sheet');renderTodos();
-}
 function todoSheetDelete(){todoDelSwipe(_todoSwipeIdx);}
 function todoSheetPostpone(type){
   if(_todoSwipeIdx<0)return;
