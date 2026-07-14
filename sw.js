@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260715-68-rhythm-flow-fix-content-color';
+const CACHE = 'iikoto-v20260715-69-user-profile-in-all-prompts';
 const ASSETS = [
   './',
   './index.html'
