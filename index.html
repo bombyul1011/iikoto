@@ -68,24 +68,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --memo-b:rgba(255,253,248,0.50);--memo-bb:rgba(240,160,190,0.45);
   --sleep-b:rgba(255,253,248,0.50);--sleep-bb:rgba(95,115,170,0.55);
 }
-[data-theme="mono"]{
-  --bg:linear-gradient(145deg,#e2ddd4 0%,#e5e0d7 50%,#e1dbd3 100%);
-  --tp:#2a2620;--ts:#3a3730;--tm:#4a4740;
-  --card:rgba(252,248,240,0.34);--card-b:rgba(180,140,100,0.16);
-  --card-p:rgba(224,206,213,0.48);--card-pb:rgba(207,163,182,0.42);
-  --card-m:rgba(191,194,174,0.46);--card-mb:rgba(172,177,139,0.42);
-  --card-y:rgba(205,194,164,0.48);--card-yb:rgba(198,178,121,0.44);
-  --card-s:rgba(181,196,202,0.46);--card-sb:rgba(144,175,186,0.42);
-  --div:rgba(158,128,149,0.14);
-  --acc:#3a3730;--acc-soft:rgba(158,128,149,0.30);
-  --nav:rgba(252,248,240,0.45);--nav-b:rgba(180,140,100,0.14);
-  --sheet:linear-gradient(160deg,#e2ddd4,#e5e0d7);
-  --modal:linear-gradient(145deg,#e2ddd4,#e5e0d7);
-  --inp:rgba(252,248,240,0.35);--inp-b:rgba(180,140,100,0.14);
-  --pill:rgba(252,248,240,0.35);
-  --memo-b:rgba(224,206,213,0.48);--memo-bb:rgba(207,163,182,0.38);
-  --sleep-b:rgba(201,198,194,0.40);--sleep-bb:rgba(180,140,100,0.34);
-}
 [data-theme="glass"] .card,[data-theme="glass"] .sleep-box,[data-theme="glass"] .habit-week-box{border-width:1.4px;box-shadow:0 1.5px 1.5px rgba(255,255,255,0.9) inset,0 -8px 14px -10px rgba(120,110,95,0.15) inset,0 5px 14px rgba(150,140,120,0.08);}
 [data-theme="glass"] #daily-meal-card{background:rgba(255,253,248,0.45)!important;border-color:rgba(150,195,130,0.55)!important;}
 [data-theme="glass"] .meal-soft{filter:none;}
@@ -489,9 +471,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cstatus-btn.done{background:rgba(200,240,235,.55);border-color:rgba(160,220,215,.55);color:#3a8878;}
 .cstatus-btn.stop{background:rgba(215,205,200,.55);border-color:rgba(185,168,160,.55);color:#7a6258;}
 .cstatus-btn.dim{opacity:.38;filter:saturate(0.5);}
-[data-theme="mono"] .cstatus-btn.watching{background:rgba(177,144,162,0.16);border-color:rgba(177,144,162,0.30);color:var(--tp);}
-[data-theme="mono"] .cstatus-btn.done{background:rgba(177,144,162,0.28);border-color:rgba(177,144,162,0.42);color:var(--tp);}
-[data-theme="mono"] .cstatus-btn.stop{background:rgba(177,144,162,0.10);border-color:rgba(177,144,162,0.22);color:var(--tp);}
 .enddate-row{display:none;margin-bottom:10px;}
 .enddate-row.show{display:flex;gap:8px;align-items:center;}
 
@@ -687,10 +666,32 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .home-hcard.morning{background:linear-gradient(135deg,rgba(255,205,175,0.72),rgba(255,235,180,0.55));border:1px solid rgba(255,200,165,0.55);}
 .home-hcard.afternoon{background:linear-gradient(135deg,rgba(255,220,235,0.65),rgba(255,235,200,0.60));border:1px solid rgba(255,200,210,0.50);}
 .home-hcard.night{background:linear-gradient(135deg,rgba(225,215,250,0.65),rgba(255,210,230,0.55));border:1px solid rgba(210,195,240,0.50);}
-.dawn-banner{border-radius:20px;padding:20px 18px 18px;margin-bottom:14px;position:relative;overflow:hidden;box-shadow:0 2px 20px rgba(180,140,120,0.08),inset 0 1px 0 rgba(255,255,255,0.70);
-  background:linear-gradient(135deg,rgba(225,215,250,0.55),rgba(255,225,210,0.50));
+.dawn-banner{border-radius:20px;padding:20px 18px 18px;margin-bottom:14px;position:relative;overflow:hidden;
+  box-shadow:inset 0 0 40px rgba(120,95,150,0.12),0 2px 20px rgba(180,140,120,0.08),inset 0 1px 0 rgba(255,255,255,0.70);
+  background:
+    radial-gradient(circle at 78% 12%, rgba(255,252,230,0.95) 1.8px, transparent 1.8px),
+    radial-gradient(circle at 88% 8%, rgba(255,252,230,0.85) 1.3px, transparent 1.3px),
+    radial-gradient(circle at 94% 22%, rgba(255,252,230,0.90) 1.5px, transparent 1.5px),
+    radial-gradient(circle at 82% 28%, rgba(255,252,230,0.75) 1.1px, transparent 1.1px),
+    radial-gradient(circle at 70% 6%, rgba(255,252,230,0.80) 1.2px, transparent 1.2px),
+    radial-gradient(circle at 98% 15%, rgba(255,252,230,0.70) 1px, transparent 1px),
+    radial-gradient(circle at 90% 35%, rgba(255,252,230,0.65) 1px, transparent 1px),
+    radial-gradient(circle at 75% 20%, rgba(255,252,230,0.60) 0.9px, transparent 0.9px),
+    radial-gradient(circle at 20% 65%, rgba(255,252,230,0.45) 1px, transparent 1px),
+    radial-gradient(circle at 10% 45%, rgba(255,252,230,0.40) 0.9px, transparent 0.9px),
+    linear-gradient(135deg,rgba(225,215,250,0.55),rgba(255,225,210,0.50));
   border:1px solid rgba(215,200,240,0.50);}
-[data-theme="glass"] .dawn-banner{background:rgba(253,251,245,0.95);border-color:rgba(110,105,170,0.35);}
+[data-theme="glass"] .dawn-banner{
+  background:
+    radial-gradient(circle at 78% 12%, rgba(120,105,170,0.55) 1.8px, transparent 1.8px),
+    radial-gradient(circle at 88% 8%, rgba(120,105,170,0.45) 1.3px, transparent 1.3px),
+    radial-gradient(circle at 94% 22%, rgba(120,105,170,0.50) 1.5px, transparent 1.5px),
+    radial-gradient(circle at 82% 28%, rgba(120,105,170,0.38) 1.1px, transparent 1.1px),
+    radial-gradient(circle at 70% 6%, rgba(120,105,170,0.42) 1.2px, transparent 1.2px),
+    radial-gradient(circle at 98% 15%, rgba(120,105,170,0.35) 1px, transparent 1px),
+    rgba(253,251,245,0.95);
+  border-color:rgba(110,105,170,0.35);
+}
 .dawn-banner-time{font-size:11px;color:var(--tm);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;opacity:0.85;}
 .dawn-banner-greeting{font-size:22px;font-weight:500;color:var(--tp);line-height:1.35;margin-bottom:8px;}
 .dawn-banner-sub{font-size:12.5px;color:var(--ts);line-height:1.7;}
@@ -703,14 +704,12 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .recap-todo-strip-line{position:absolute;left:0;right:0;top:50%;height:1.5px;background:var(--div);}
 .recap-todo-strip-dots{position:absolute;left:0;right:0;top:0;bottom:0;display:flex;align-items:center;}
 .recap-todo-strip-dot{width:9px;height:9px;border-radius:50%;background:rgba(192,112,128,0.78);box-shadow:0 0 0 3px var(--card);position:absolute;transform:translateX(-50%);}
-[data-theme="mono"] .recap-todo-strip-dot{background:rgba(160,140,190,0.85)!important;}
 .recap-todo-strip-caption{font-size:10.5px;color:var(--tm);text-align:center;margin-top:6px;}
 .recap-donut-row{display:flex;justify-content:space-around;margin-bottom:2px;}
 .recap-donut-item{text-align:center;}
 .recap-donut-wrap{position:relative;width:62px;height:62px;margin:0 auto 6px;}
 .recap-donut-wrap svg{transform:rotate(-90deg);}
 .recap-donut-habit-fg{stroke:rgba(150,205,225,0.80);}
-[data-theme="mono"] .recap-donut-habit-fg{stroke:rgba(158,128,149,0.55);}
 .recap-donut-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:700;color:var(--tp);}
 .recap-donut-l{font-size:10px;color:var(--ts);}
 .recap-rhythm-bar-chart{display:flex;height:26px;border-radius:8px;overflow:hidden;margin-bottom:6px;}
@@ -821,152 +820,24 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 /* ══════════ MONO THEME OVERRIDES ══════════ */
 /* 통합 인삿말 카드 - 유일하게 컬러 유지 (톤온톤 은은한 그라데이션) */
-[data-theme="mono"] .home-hcard.morning,
-[data-theme="mono"] .home-hcard.afternoon,
-[data-theme="mono"] .home-hcard.night{
-  background:linear-gradient(135deg,rgba(158,128,149,0.14),rgba(158,128,149,0.07));
-  border:1px solid rgba(158,128,149,0.26);
-}
-[data-theme="mono"] .dawn-banner{
-  background:linear-gradient(140deg,rgba(95,95,155,0.14) 0%,rgba(160,140,190,0.14) 45%,rgba(255,215,222,0.14) 100%);
-  border:1px solid rgba(110,105,170,0.22);
-}
 
 /* 오늘탭 투두 시간대구분 - 색상 대신 명도 단계 (아침<오후<저녁 순으로 진하게) */
-[data-theme="mono"] .chk.ts-morning{border-color:rgba(177,144,162,0.35);}
-[data-theme="mono"] .chk.ts-morning.on{background:rgba(177,144,162,0.42);border-color:rgba(177,144,162,0.65);}
-[data-theme="mono"] .chk.ts-morning.on::after{border-color:#fff;}
-[data-theme="mono"] .chk.ts-afternoon{border-color:rgba(177,144,162,0.50);}
-[data-theme="mono"] .chk.ts-afternoon.on{background:rgba(177,144,162,0.55);border-color:rgba(177,144,162,0.75);}
-[data-theme="mono"] .chk.ts-afternoon.on::after{border-color:#fff;}
-[data-theme="mono"] .chk.ts-night{border-color:rgba(177,144,162,0.65);}
-[data-theme="mono"] .chk.ts-night.on{background:rgba(177,144,162,0.62);border-color:rgba(177,144,162,0.78);}
-[data-theme="mono"] .chk.ts-night.on::after{border-color:#fff;}
-[data-theme="mono"] .todo-time-sel button.ts-morning.active{background:rgba(194,163,130,0.20);border-color:rgba(194,163,130,0.45);color:#2a2620;}
-[data-theme="mono"] .todo-time-sel button.ts-afternoon.active{background:rgba(194,163,130,0.35);border-color:rgba(194,163,130,0.60);color:#2a2620;}
-[data-theme="mono"] .todo-time-sel button.ts-night.active{background:rgba(194,163,130,0.55);border-color:rgba(194,163,130,0.80);color:#fff;}
 
 /* 습관 색상(8종) - 전부 동일 모노 톤으로, 체크 여부만 명도로 구분 */
-[data-theme="mono"] .habit-badge,
-[data-theme="mono"] .home-habit-dot.mint,[data-theme="mono"] .home-habit-dot.pink,
-[data-theme="mono"] .home-habit-dot.sky,[data-theme="mono"] .home-habit-dot.yellow,
-[data-theme="mono"] .home-habit-dot.rose,[data-theme="mono"] .home-habit-dot.lavender,
-[data-theme="mono"] .home-habit-dot.peach,[data-theme="mono"] .home-habit-dot.teal,
-[data-theme="mono"] .hm-dot.mint,[data-theme="mono"] .hm-dot.pink,
-[data-theme="mono"] .hm-dot.sky,[data-theme="mono"] .hm-dot.yellow,
-[data-theme="mono"] .hm-dot.rose,[data-theme="mono"] .hm-dot.lavender,
-[data-theme="mono"] .hm-dot.peach,[data-theme="mono"] .hm-dot.teal{
   background:rgba(158,128,149,0.32)!important;
 }
-[data-theme="mono"] .day-btn{border:1px solid rgba(158,175,143,0.16);background:rgba(255,255,255,0.30);}
-  background:rgba(158,128,149,0.32)!important;
-}
-[data-theme="mono"] .hw-dot{border-color:rgba(158,128,149,0.30)!important;}
-[data-theme="mono"] .hw-name-dot{background:rgba(158,128,149,0.32)!important;}
 
 /* 월간탭 콘텐츠 기록 색 - drama/book/movie/music 명도 4단계로 */
-[data-theme="mono"] .tt-block.drama{background:rgba(194,163,130,0.32)!important;}
-[data-theme="mono"] .tt-block.book{background:rgba(194,163,130,0.48)!important;}
-[data-theme="mono"] .tt-block.movie{background:rgba(194,163,130,0.62)!important;}
-[data-theme="mono"] .tt-block.music{background:rgba(194,163,130,0.76)!important;}
 
 /* 밀도의 숲 5단계 - 명도만 (아이콘은 흰색 고정) */
-[data-theme="mono"] .heatmap-cell:not(.empty){border-color:rgba(158,128,149,0.72)!important;}
 
 /* 리듬 카테고리(가로바/세로트랙/범례) - 9종을 명도 5단계 순환으로. JS에서 --cat-color 커스텀 프로퍼티를 명도값으로 주입하는 방식과 함께 사용 */
-[data-theme="mono"] .rhythm-legend-dot{background:rgba(255,255,255,0.5)!important;border:2px solid var(--cat-color)!important;}
-[data-theme="mono"] .rhythm-legend-dot i{color:var(--cat-color)!important;}
 
 /* 카드류 공통 배경(기존 glass 대응 요소들) - 전부 모노 카드톤으로 */
-[data-theme="mono"] #daily-meal-card{background:rgba(255,255,255,0.30)!important;border-color:rgba(158,128,149,0.16)!important;}
-[data-theme="mono"] #daily-meal-card .cal-detail-time{color:var(--tm)!important;}
-[data-theme="mono"] #daily-meal-card .cal-detail-row{border-bottom-color:var(--div)!important;}
-[data-theme="mono"] .meal-time-btn{border-color:rgba(135,154,177,0.35)!important;color:rgba(135,154,177,0.65)!important;}
-[data-theme="mono"] .meal-time-tag{color:var(--tm)!important;}
-[data-theme="mono"] .wish-round-btn{border-color:rgba(135,154,177,0.30)!important;background:rgba(135,154,177,0.08)!important;color:rgba(135,154,177,0.75)!important;}
-[data-theme="mono"] .wish-add-btn{background:rgba(135,154,177,0.65)!important;color:#fff!important;}
-[data-theme="mono"] #wish-placing-hint{color:var(--tp)!important;background:rgba(158,128,149,0.08)!important;}
-[data-theme="mono"] .meal-inp.wish-target{background:rgba(135,154,177,0.10)!important;}
-[data-theme="mono"] .meal-soft{filter:grayscale(1) contrast(0.9);}
-[data-theme="mono"] .rd-top-inner{background:rgba(255,255,255,0.35);}
-[data-theme="mono"] .rd-top{background:rgba(194,163,130,0.30)!important;animation:none!important;}
-[data-theme="mono"] .rd-top-cover,[data-theme="mono"] .rd-cover,[data-theme="mono"] .s-cover img,[data-theme="mono"] #cm-poster-img{filter:grayscale(1) contrast(1.05) brightness(0.98);}
-[data-theme="mono"] .quote-chip{background:rgba(194,163,130,0.30)!important;animation:none!important;}
-[data-theme="mono"] .rd-progress-fill{background:rgba(194,163,130,0.35)!important;}
-[data-theme="mono"] .rd-progress-today{background:rgba(194,163,130,0.60)!important;}
-[data-theme="mono"] .rd-progress-bead{background:rgba(194,163,130,0.75)!important;animation:none!important;border-color:#fff!important;}
-[data-theme="mono"] .report-banner.quote-soft{background:linear-gradient(135deg,rgba(197,189,209,0.45),rgba(224,206,213,0.35),rgba(181,196,202,0.40),rgba(197,189,209,0.45))!important;background-size:300% 300%;animation:bannerShine 4s ease infinite!important;}
-[data-theme="mono"] .quote-soft{filter:none;}
-[data-theme="mono"] .mr-goal-card{background:rgba(191,194,174,0.14);border:1.4px solid rgba(191,194,174,0.30);}
-[data-theme="mono"] .seed-icon-btn{background:rgba(135,154,177,0.14);border:1.4px solid rgba(135,154,177,0.24);}
-[data-theme="mono"] .seed-icon-btn i{color:#2a2620!important;}
-[data-theme="mono"] .reading-icon-btn{background:rgba(194,163,130,0.28)!important;border:1px solid rgba(194,163,130,0.40)!important;box-shadow:none!important;}
-[data-theme="mono"] .reading-icon-btn i{color:#fff!important;}
-[data-theme="mono"] .reading-icon-btn.sw-active{background:rgba(194,163,130,0.60)!important;animation:none!important;}
-[data-theme="mono"] .memo-bub{background:none;border:none;border-left:2.5px solid rgba(158,128,149,0.25);border-radius:0;padding:2px 0 0 10px;}
-[data-theme="mono"] .memo-bub.tod-morning,[data-theme="mono"] .memo-bub.tod-afternoon,[data-theme="mono"] .memo-bub.tod-night{background:none;border-left-color:rgba(158,128,149,0.35);}
-[data-theme="mono"] .quote-chip-inner{background:rgba(255,255,255,0.35);}
-[data-theme="mono"] .done-quote-chip-inner,[data-theme="mono"] .done-comment-chip-inner{background:rgba(255,255,255,0.35)!important;color:var(--tp)!important;}
-[data-theme="mono"] .done-quote-chip,[data-theme="mono"] .done-comment-chip{background:rgba(194,163,130,0.30)!important;animation:none!important;}
-[data-theme="mono"] .report-banner .report-banner-inner{background:rgba(255,255,255,0.42)!important;backdrop-filter:none;}
-[data-theme="mono"] .weekly-review-banner-inner{background:rgba(255,255,255,0.42)!important;backdrop-filter:none;border:1px solid rgba(158,128,149,0.16);}
-[data-theme="mono"] .mr-ai-card{background:rgba(255,255,255,0.42);}
-[data-theme="mono"] .diary-date-chip.today{background:rgba(177,144,162,0.14);border-color:rgba(177,144,162,0.30);color:#2a2620;}
-[data-theme="mono"] .diary-date-chip.holiday{color:var(--tm)!important;}
-[data-theme="mono"] .rd-quote-item{background:rgba(255,255,255,0.32)!important;border-left-color:rgba(158,128,149,0.30)!important;}
-[data-theme="mono"] .m-chip.active{background:rgba(135,154,177,0.16)!important;border-color:rgba(135,154,177,0.35)!important;color:#2a2620!important;}
 
 /* 상단 오늘/주간/월간 탭(vtab) 선택 상태 */
-[data-theme="mono"] .vtab.on{
-  background-color:transparent!important;
-  border:1.6px solid transparent!important;
-  background-image:linear-gradient(var(--card),var(--card)),linear-gradient(135deg,rgba(158,128,149,0.55),rgba(158,128,149,0.20),rgba(158,128,149,0.55))!important;
-  background-origin:border-box;
-  background-clip:padding-box,border-box;
-  background-size:100% 100%,300% 300%;
-  animation:bannerShine 4s ease infinite;
-  color:var(--tp)!important;
-}
 
 /* 날짜 today 표시류 */
-[data-theme="mono"] .day-btn.today{background:rgba(177,144,162,0.30);border-color:rgba(177,144,162,0.50);}
-[data-theme="mono"] .day-btn.today .day-num{color:#2a2620;}
-[data-theme="mono"] .rd-tab.on{background:rgba(177,144,162,0.14);border-color:rgba(177,144,162,0.30);}
-[data-theme="mono"] #nextweek-sheet .goal-section-title{background:rgba(135,154,177,0.12)!important;color:#2a2620!important;border:1.4px solid rgba(135,154,177,0.24)!important;}
-[data-theme="mono"] .chk.on{background:rgba(177,144,162,0.55)!important;border-color:rgba(177,144,162,0.80)!important;}
-[data-theme="mono"] .cal-day.today .cal-num{background:rgba(177,144,162,0.75);}
-[data-theme="mono"] .cal-day.selected .cal-num{background:rgba(177,144,162,0.18);color:#2a2620;}
-[data-theme="mono"] .cal-dot{background:rgba(177,144,162,0.75);}
-[data-theme="mono"] .goal-section-title{background:rgba(135,154,177,0.12)!important;color:#2a2620!important;border:1.4px solid rgba(135,154,177,0.24)!important;}
-[data-theme="mono"] .mbtn.ok{background:rgba(158,175,143,0.20);color:#2a2620;}
-[data-theme="mono"] .wchallenge-day.on{background:rgba(177,144,162,0.62)!important;color:#fff!important;border-width:1.5px;border-color:rgba(177,144,162,0.85)!important;}
-[data-theme="mono"] .habit-chk2.on{background:rgba(177,144,162,0.62)!important;border-width:1.5px;border-color:rgba(177,144,162,0.85)!important;}
-[data-theme="mono"] .habit-chk2.on svg{stroke:#fff!important;}
-[data-theme="mono"] .habit-chk2.on i{color:#fff!important;}
-[data-theme="mono"] .forest-density-card{background:rgba(255,255,255,0.30);}
-[data-theme="mono"] .wrb-track{background:rgba(158,128,149,0.10);}
-[data-theme="mono"] .report-banner{background:linear-gradient(135deg,rgba(158,128,149,0.35),rgba(158,128,149,0.15),rgba(158,128,149,0.35))!important;background-size:300% 300%;animation:bannerShine 4s ease infinite!important;}
-[data-theme="mono"] .report-banner.diary-soft{background:linear-gradient(135deg,rgba(205,194,164,0.45),rgba(224,206,213,0.35),rgba(220,205,196,0.40),rgba(205,194,164,0.45))!important;background-size:300% 300%;animation:bannerShine 4s ease infinite!important;}
-[data-theme="mono"] .report-banner.rhythm-soft{background:linear-gradient(120deg,rgba(220,205,196,0.55) 0%,rgba(205,194,164,0.55) 25%,rgba(181,196,202,0.55) 50%,rgba(197,189,209,0.55) 75%,rgba(224,206,213,0.55) 100%)!important;animation:none!important;}
-[data-theme="mono"] .report-banner.meal-soft{background:linear-gradient(135deg,rgba(160,182,164,0.45),rgba(191,194,174,0.35),rgba(160,182,164,0.45))!important;background-size:300% 300%;animation:bannerShine 4s ease infinite!important;}
-[data-theme="mono"] .report-banner.month-soft{background:linear-gradient(135deg,rgba(191,194,174,0.45),rgba(205,194,164,0.35),rgba(191,194,174,0.45))!important;background-size:300% 300%;animation:bannerShine 4s ease infinite!important;}
-[data-theme="mono"] .weekly-review-banner{
-  background:linear-gradient(135deg,rgba(197,189,209,0.42),rgba(181,196,202,0.20),rgba(197,189,209,0.42));
-  background-size:300% 300%;animation:bannerShine 6s ease infinite;
-}
-[data-theme="mono"] .report-banner-line{color:var(--tp)!important;}
-[data-theme="mono"] .report-banner.diary-soft .report-banner-line,
-[data-theme="mono"] .report-banner.rhythm-soft .report-banner-line{color:var(--tp)!important;}
-[data-theme="mono"] .report-banner.diary-soft .report-banner-inner,
-[data-theme="mono"] .report-banner.rhythm-soft .report-banner-inner,
-[data-theme="mono"] .report-banner.month-soft .report-banner-inner,
-[data-theme="mono"] .report-banner.meal-soft .report-banner-inner,
-[data-theme="mono"] .report-banner.quote-soft .report-banner-inner{background:rgba(255,255,255,0.45)!important;}
-[data-theme="mono"] .rb-title{color:var(--tp)!important;}
-[data-theme="mono"] .report-banner-arrow{color:var(--tm)!important;}
-[data-theme="mono"] .report-banner.diary-soft .rb-title,
-[data-theme="mono"] .report-banner.diary-soft .report-banner-arrow,
-[data-theme="mono"] .report-banner.rhythm-soft .report-banner-arrow{color:var(--tp)!important;}
 .heatmap-grid{display:grid;grid-template-columns:repeat(10,1fr);gap:3px;}
 .heatmap-cell{aspect-ratio:1;border-radius:3px;cursor:pointer;background:rgba(200,176,168,0.08);display:flex;align-items:center;justify-content:center;}
 
@@ -985,9 +856,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .wrb-legend span{display:flex;align-items:center;gap:3px;font-size:8.7px;color:var(--tm);white-space:nowrap;flex-shrink:0;}
 .wrb-legend i{width:6px;height:6px;border-radius:50%;flex-shrink:0;display:inline-block;}
 .wrb-form-slot{margin:2px 0 4px 0;padding:10px 12px;background:rgba(158,128,149,0.04);border-radius:12px;}
-[data-theme="mono"] .wrb-form-slot{background:rgba(255,255,255,0.35);}
 .wrb-flow-slot{margin:2px 0 4px 26px;padding:10px 12px;background:rgba(158,128,149,0.04);border-radius:12px;}
-[data-theme="mono"] .wrb-flow-slot{background:rgba(255,255,255,0.35);}
 .wrb-flow-list{display:flex;flex-direction:column;gap:7px;}
 .wrb-flow-row{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--tp);}
 .wrb-flow-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
@@ -1706,11 +1575,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div class="color-themes">
           <div class="ctheme-btn on" id="ct-light" style="background:linear-gradient(135deg,#fdf0e8,#fde8f0)" onclick="setTheme('light',this)">✓</div>
           <div class="ctheme-btn" id="ct-glass" style="background:linear-gradient(135deg,#f7f4ee,#f3f1ec)" onclick="setTheme('glass',this)">✓</div>
-          <div class="ctheme-btn" id="ct-mono" style="background:linear-gradient(135deg,#e3e0d8,#e2ded6)" onclick="setTheme('mono',this)">✓</div>
-        </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;padding-top:14px;border-top:1px solid var(--div);">
-          <div class="toggle-lbl">자정 자동 전환</div>
-          <div class="tog" id="auto-mono-tog" onclick="toggleAutoMono(this)"></div>
         </div>
       </div>
     </div>
@@ -2099,28 +1963,10 @@ const RHYTHM_SLEEP_COLOR='rgba(205,194,182,0.88)';
 const RHYTHM_MEAL_COLOR='rgba(130,205,145,0.90)';
 // 리듬 카테고리 분류 설명 — AI 프롬프트에서 시간 사용 데이터를 다룰 때 카테고리 오분류(예: 업무↔책상, 휴식↔감상)를 줄이기 위해 공통으로 붙이는 한 줄 설명.
 const RHYTHM_CAT_GUIDE='(카테고리 참고: 운동=홈트/헬스장/러닝 등, 휴식=낮잠/멍때리기/게임 등, 업무=주로 노트북으로 하는 작업(가끔 외근 포함), 외출=지인과의 약속이나 혼자 가는 카페/산책 등, 책상=일기·공부·앱 정비·노트정리 등 책상에서 하는 작업, 감상=드라마·독서·영화, 정리=청소·빨래 등 집안 정리)';
-// 모노테마 리듬 카테고리 색 — 라이트 테마 색상(hue)을 유지한 채 채도만 낮추고 명도를 살짝 올린 "맑게 바랜" 톤.
-// 9개 카테고리(수면/식사/운동/휴식/업무/외출/책상/감상/정리) 각각 고유 색 — 더 이상 5색 순환 아님.
-const MONO_CAT_COLORS={
-  exercise:'rgba(220,205,196,0.82)',   // 운동
-  rest:'rgba(205,194,164,0.80)',       // 휴식
-  work:'rgba(194,195,198,0.75)',       // 업무
-  appointment:'rgba(181,196,202,0.68)', // 외출
-  note:'rgba(224,206,213,0.80)',       // 책상
-  enjoy:'rgba(197,189,209,0.80)',      // 감상
-  home:'rgba(191,194,174,0.80)'        // 정리
-};
-const MONO_SLEEP_COLOR='rgba(201,198,194,0.88)';
-const MONO_MEAL_COLOR='rgba(160,182,164,0.90)';
 function getRhythmColor(key){
-  if(document.documentElement.dataset.theme!=='mono'){
-    if(key==='_sleep')return RHYTHM_SLEEP_COLOR;
-    if(key==='_meal')return RHYTHM_MEAL_COLOR;
-    return RHYTHM_CATS[key]?RHYTHM_CATS[key].color:'var(--tm)';
-  }
-  if(key==='_sleep')return MONO_SLEEP_COLOR;
-  if(key==='_meal')return MONO_MEAL_COLOR;
-  return MONO_CAT_COLORS[key]||'var(--tm)';
+  if(key==='_sleep')return RHYTHM_SLEEP_COLOR;
+  if(key==='_meal')return RHYTHM_MEAL_COLOR;
+  return RHYTHM_CATS[key]?RHYTHM_CATS[key].color:'var(--tm)';
 }
 function getRhythmBlocks(dk){return S.get(S.key('rblocks',dk))||[];}
 function saveRhythmBlocks(dk,v){
@@ -3474,16 +3320,13 @@ const CAT_ICON_META={
   movie:{icon:'ti-movie',color:'rgba(160,220,210,.85)'},
   music:{icon:'ti-music',color:'rgba(170,195,255,.85)'}
 };
-const MONO_CAT_COLOR={drama:'rgba(194,163,130,0.32)',book:'rgba(194,163,130,0.48)',movie:'rgba(194,163,130,0.62)',music:'rgba(194,163,130,0.76)'};
 const CONTENT_BAR_COLOR={drama:'rgba(230,130,160,.80)',book:'rgba(215,175,60,.80)',movie:'rgba(95,175,165,.80)',music:'rgba(120,155,235,.80)'};
 // 콘텐츠 카테고리 아이콘 배지(파스텔톤, CAT_ICON_META 기반) 색상
 function getCatColor(cat){
-  if(document.documentElement.dataset.theme==='mono')return MONO_CAT_COLOR[cat]||'rgba(194,163,130,0.5)';
   return CAT_ICON_META[cat]?CAT_ICON_META[cat].color:'var(--tm)';
 }
 // 콘텐츠 바/점(진한 톤, dawn 리포트 기반) 색상
 function getCatBarColor(cat){
-  if(document.documentElement.dataset.theme==='mono')return MONO_CAT_COLOR[cat]||'rgba(194,163,130,0.5)';
   return CONTENT_BAR_COLOR[cat]||'var(--tm)';
 }
 const HABIT_COLORS=['mint','pink','sky','yellow','rose','lavender','peach','teal'];
@@ -4255,62 +4098,24 @@ window.addEventListener('online',()=>syncAll());
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
 
 // ── THEME
-const THEME_COLORS={light:'#fdf0e8',glass:'#f7f4ee',mono:'#e3e0d8'};
+const THEME_COLORS={light:'#fdf0e8',glass:'#f7f4ee'};
 function applyThemeColorMeta(theme){
   const m=document.querySelector('meta[name="theme-color"]');
   if(m)m.setAttribute('content',THEME_COLORS[theme]||THEME_COLORS.light);
 }
-function _isDawnHour(){
-  const h=new Date().getHours();
-  return h>=0&&h<6;
-}
-function _checkAutoMonoSwitch(){
-  if(!S.get('auto_mono_enabled'))return;
-  const t=S.get('theme')||'light';
-  if(_isDawnHour()&&t!=='mono'){
-    S.set('theme_pref',t);
-    document.documentElement.setAttribute('data-theme','mono');
-    applyThemeColorMeta('mono');
-    S.set('theme','mono');
-  }else if(!_isDawnHour()&&t==='mono'){
-    const pref=S.get('theme_pref')||'light';
-    document.documentElement.setAttribute('data-theme',pref);
-    applyThemeColorMeta(pref);
-    S.set('theme',pref);
-  }
-}
 (function initTheme(){
   let t=S.get('theme')||'light';
-  if(t==='dark'){t='light';S.set('theme','light');} // 다크모드 폐지 - 기존에 켜져있던 경우 라이트로 이전
+  if(t==='dark'||t==='mono'){t='light';S.set('theme','light');} // 다크모드/모노테마 폐지 - 기존에 켜져있던 경우 라이트로 이전
   S.set('theme',t);
   document.documentElement.setAttribute('data-theme',t);
   applyThemeColorMeta(t);
-  _checkAutoMonoSwitch(); // 자동전환 켜져있으면 여기서 현재 시간대에 맞게 다시 조정
 })();
 function setTheme(theme,btn){
   document.documentElement.setAttribute('data-theme',theme);
   applyThemeColorMeta(theme);
   S.set('theme',theme);
-  if(theme!=='mono')S.set('theme_pref',theme); // 사용자가 직접 고른 라이트/글래스는 새벽 이후 복귀할 기본값으로도 저장
   document.querySelectorAll('.ctheme-btn').forEach(b=>b.classList.remove('on'));
   if(btn)btn.classList.add('on');
-}
-function toggleAutoMono(el){
-  const on=el.classList.toggle('on');
-  S.set('auto_mono_enabled',on);
-  if(on&&_isDawnHour()&&S.get('theme')!=='mono'){
-    // 스위치를 새벽 시간대에 막 켰다면 즉시 mono로 전환
-    S.set('theme_pref',S.get('theme')||'light');
-    setTheme('mono');
-    document.querySelectorAll('.ctheme-btn').forEach(b=>b.classList.remove('on'));
-    const monoBtn=document.getElementById('ct-mono');if(monoBtn)monoBtn.classList.add('on');
-  }else if(!on&&S.get('theme')==='mono'){
-    // 스위치를 껐는데 현재 mono라면(자동전환으로 들어와있던 상태) 원래 선호 테마로 복귀
-    const pref=S.get('theme_pref')||'light';
-    setTheme(pref);
-    document.querySelectorAll('.ctheme-btn').forEach(b=>b.classList.remove('on'));
-    const prefBtn=document.getElementById('ct-'+pref);if(prefBtn)prefBtn.classList.add('on');
-  }
 }
 
 // ── SPLASH
@@ -5865,7 +5670,7 @@ function makeDawnRecapCard(){
       <div class="day-recap-sec-title"><i class="ti ${RHYTHM_CATS.enjoy.icon}" style="font-size:12px;" aria-hidden="true"></i> 오늘 본 콘텐츠</div>`;
     contentItems.forEach(c=>{
       const key=catToKey(c.cat);
-      const dotColor=key?getCatBarColor(key):(document.documentElement.dataset.theme==='mono'?'rgba(158,128,149,0.5)':'rgba(190,160,230,0.80)');
+      const dotColor=key?getCatBarColor(key):'rgba(190,160,230,0.80)';
       html+=`<div class="recap-content-item"><span class="cdot" style="background:${dotColor};"></span>${c.cat||'감상'}<span class="ctime">${c.title}</span></div>`;
     });
   }
@@ -7513,9 +7318,7 @@ function recordMealTime(dk,k){
   renderTodayMeal();
 }
 const HABIT_COLOR_RGBA={mint:'rgba(140,210,200,0.85)',pink:'rgba(255,150,180,0.80)',sky:'rgba(130,190,255,0.80)',yellow:'rgba(240,200,80,0.80)',rose:'rgba(240,140,140,0.80)',lavender:'rgba(185,165,230,0.80)',peach:'rgba(255,185,140,0.80)',teal:'rgba(100,195,185,0.80)'};
-function _isMono(){return document.documentElement.dataset.theme==='mono';}
 function getHabitColor(colorKey){
-  if(document.documentElement.dataset.theme==='mono')return 'rgba(158,128,149,0.32)';
   return HABIT_COLOR_RGBA[colorKey]||'rgba(192,112,128,0.80)';
 }
 function renderDailyHabitCheck(){
@@ -7635,17 +7438,10 @@ function computeRhythmSegsForDay(dk,realTodayDk,_curLogicalDk){
   return segs;
 }
 function renderRhythmBarHtml(segs){
-  const isMono=document.documentElement.dataset.theme==='mono';
   let track='<div class="wrb-track">';
   const segsSorted=segs.slice().sort(function(a,b){return (b.end-b.start)-(a.end-a.start);});
   segsSorted.forEach(function(sg,si){
-    let bg=sg.color;
-    if(isMono){
-      // 밀도 표현: 카테고리 구분 없이, 활동 길이에 따라 명도만 다르게 (짧을수록 옅게, 길수록 진하게)
-      const durMin=sg.end-sg.start;
-      const d=durMin>=180?0.62:durMin>=60?0.42:0.24;
-      bg='rgba(158,128,149,'+d+')';
-    }
+    const bg=sg.color;
     track+='<div class="wrb-seg'+(sg.ongoing?' ongoing':'')+'" style="left:'+(sg.start/1440*100)+'%;width:'+Math.max((sg.end-sg.start)/1440*100,0.8)+'%;background-color:'+bg+';z-index:'+(10+si)+';"></div>';
   });
   track+='</div>';
@@ -7653,7 +7449,6 @@ function renderRhythmBarHtml(segs){
 }
 function renderWeeklyRhythmBars(){
   const el=document.getElementById('weekly-rhythm-bars');if(!el)return;
-  const isMono=document.documentElement.dataset.theme==='mono';
   const now=new Date();
   const mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7));
   const DOW=['월','화','수','목','금','토','일'];
@@ -7680,10 +7475,8 @@ function renderWeeklyRhythmBars(){
     }
   }
   html+='</div>';
-  if(!isMono){
-    html+='<div class="wrb-legend"><span><i style="background:'+getRhythmColor('_meal')+';"></i>식사</span>'+
-      Object.keys(RHYTHM_CATS).map(function(k){return '<span><i style="background:'+getRhythmColor(k)+';"></i>'+RHYTHM_CATS[k].label+'</span>';}).join('')+'</div>';
-  }
+  html+='<div class="wrb-legend"><span><i style="background:'+getRhythmColor('_meal')+';"></i>식사</span>'+
+    Object.keys(RHYTHM_CATS).map(function(k){return '<span><i style="background:'+getRhythmColor(k)+';"></i>'+RHYTHM_CATS[k].label+'</span>';}).join('')+'</div>';
   el.innerHTML=html;
   if(_weeklyRhythmFormOpen){
     const slot=document.getElementById('wrb-today-form');
@@ -8205,8 +7998,6 @@ function openSettings(){
   const nsi=document.getElementById('notion-backup-secret-inp');if(nsi)nsi.value=S.get('notion_backup_secret')||'';  const theme=S.get('theme')||'light';
   document.querySelectorAll('.ctheme-btn').forEach(b=>b.classList.remove('on'));
   const act=document.getElementById('ct-'+theme);if(act)act.classList.add('on');
-  const autoTog=document.getElementById('auto-mono-tog');
-  if(autoTog)autoTog.classList.toggle('on',!!S.get('auto_mono_enabled'));
   const lastUsedEl=document.getElementById('data-recovery-last-used');
   if(lastUsedEl){
     const lastUsed=S.get('data_recovery_last_used');
@@ -8534,19 +8325,19 @@ function renderRdQuotes(){
   const shown=_rdQuoteShowAll?quotes:quotes.slice(0,MAX);
   let html=shown.map(q=>`<div class="rd-quote-item">
       <div class="rd-quote-text">${q.text}</div>
-      ${q.comment?`<div class="rd-quote-comment" onclick="toggleQuoteCommentEditor('${q.cid}')" style="font-size:11px;color:${_isMono()?'var(--tp)':'#7a9552'};margin-top:4px;padding:5px 8px;background:${_isMono()?'rgba(194,163,130,0.08)':'rgba(232,246,220,0.6)'};border-radius:8px;cursor:pointer;">${q.comment}</div>`:''}
+      ${q.comment?`<div class="rd-quote-comment" onclick="toggleQuoteCommentEditor('${q.cid}')" style="font-size:11px;color:#7a9552;margin-top:4px;padding:5px 8px;background:rgba(232,246,220,0.6);border-radius:8px;cursor:pointer;">${q.comment}</div>`:''}
       <div id="qc-editor-${q.cid}" class="qc-editor" style="display:none;margin-top:5px;" onclick="event.stopPropagation();">
         <textarea class="qc-comment-textarea" style="width:100%;box-sizing:border-box;font-size:11.5px;padding:6px 8px;border-radius:8px;border:1px solid var(--card-b);background:var(--card);color:var(--tp);resize:none;min-height:44px;font-family:inherit;outline:none;" placeholder="이 문장에 대한 감상을 적어보세요">${q.comment||''}</textarea>
         <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px;">
           <span onclick="document.getElementById('qc-editor-${q.cid}').style.display='none';" style="font-size:11px;color:var(--tm);cursor:pointer;padding:3px 8px;">취소</span>
-          <span onclick="commitQuoteComment('${q.cid}')" style="font-size:11px;color:${_isMono()?'var(--tp)':'#6a8a50'};cursor:pointer;padding:3px 8px;font-weight:600;">저장</span>
+          <span onclick="commitQuoteComment('${q.cid}')" style="font-size:11px;color:#6a8a50;cursor:pointer;padding:3px 8px;font-weight:600;">저장</span>
         </div>
       </div>
       <span style="position:absolute;right:8px;bottom:6px;display:flex;align-items:center;gap:3px;">
-        <span onclick="toggleQuoteCommentEditor('${q.cid}')" title="${q.comment?'코멘트 수정':'코멘트 남기기'}" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:${q.comment?'#fff':(_isMono()?'var(--tm)':'#8878ab')};background:${q.comment?(_isMono()?'rgba(194,163,130,0.55)':'rgba(140,120,180,0.85)'):'transparent'};opacity:${q.comment?'1':'0.7'};">
+        <span onclick="toggleQuoteCommentEditor('${q.cid}')" title="${q.comment?'코멘트 수정':'코멘트 남기기'}" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:${q.comment?'#fff':'#8878ab'};background:${q.comment?'rgba(140,120,180,0.85)':'transparent'};opacity:${q.comment?'1':'0.7'};">
           <i class="ti ti-message-circle" style="font-size:11px;" aria-hidden="true"></i>
         </span>
-        <span class="rd-quote-toseed" onclick="sendQuoteToSeed('${q.cid}')" title="${q.sentToSeed?'씨앗에서 빼기':'씨앗으로 보내기'}" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:${q.sentToSeed?'#fff':(_isMono()?'var(--tm)':'#6a8a50')};background:${q.sentToSeed?(_isMono()?'rgba(194,163,130,0.55)':'rgba(140,175,90,0.85)'):'transparent'};opacity:${q.sentToSeed?'1':'0.75'};">
+        <span class="rd-quote-toseed" onclick="sendQuoteToSeed('${q.cid}')" title="${q.sentToSeed?'씨앗에서 빼기':'씨앗으로 보내기'}" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:${q.sentToSeed?'#fff':'#6a8a50'};background:${q.sentToSeed?'rgba(140,175,90,0.85)':'transparent'};opacity:${q.sentToSeed?'1':'0.75'};">
           <i class="ti ti-seeding" style="font-size:12px;" aria-hidden="true"></i>
         </span>
         <span class="rd-quote-del" onclick="removeQuote('${q.cid}')" style="position:static;font-size:10px;padding:2px;display:inline-flex;align-items:center;justify-content:center;"><i class="ti ti-x" style="font-size:11px;" aria-hidden="true"></i></span>

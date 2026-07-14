@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260714-62-mono-card-alpha-today-color-fix';
+const CACHE = 'iikoto-v20260715-64-dawn-banner-starlight';
 const ASSETS = [
   './',
   './index.html'
