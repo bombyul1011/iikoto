@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260714-47-remove-legacy-move-menu';
+const CACHE = 'iikoto-v20260714-51-ai-cache-server-sync';
 const ASSETS = [
   './',
   './index.html'

@@ -293,7 +293,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .chk.ts-night.on::after{border-color:rgba(110,80,180,0.9);}
 .todo-txt{flex:1;line-height:1.4;cursor:pointer;}
 .todo-txt.done{text-decoration:line-through;color:var(--tm);}
-.todo-txt.postponed{color:#c05060;}
 .ring-complete canvas{filter:none;}
 .todo-footer{display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding-top:8px;border-top:1px solid var(--div);}
 .toggle-row{display:flex;align-items:center;gap:6px;}
@@ -1215,14 +1214,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       </div>
       <div class="card y" id="todo-card">
         <div id="todo-list"></div>
-        <div class="todo-footer">
-          <div class="toggle-row" style="justify-content:space-between;">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span class="toggle-lbl">완료 숨기기</span>
-              <div class="tog" id="hide-tog" onclick="this.classList.toggle('on');renderTodos()"></div>
-            </div>
-          </div>
-        </div>
         <button class="add-btn" onclick="openTodoModal()">
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" style="color:var(--tm)"><line x1="6.5" y1="2" x2="6.5" y2="11"/><line x1="2" y1="6.5" x2="11" y2="6.5"/></svg>할 일 추가
         </button>
@@ -2687,7 +2678,6 @@ function computeMonthStats(y,mo,endDay){
   const habits=getHabits();
   const allMemoTexts=[];
   const onelineTexts=[];
-  const postponedTally={};
   const weekSet={};
   const rhythmDur={};
   const rhythmDayCount={};
@@ -2700,7 +2690,6 @@ function computeMonthStats(y,mo,endDay){
     if(ol&&ol.trim())onelineTexts.push(`${d}일: ${ol.trim()}`);
     const dayTodos=getTodos(dk);
     totalTodos+=dayTodos.length;doneTodos+=dayTodos.filter(t=>t.done).length;
-    dayTodos.forEach(t=>{if((t.postponeCount||0)>=3&&t.text)postponedTally[t.text]=Math.max(postponedTally[t.text]||0,t.postponeCount);});
     const sl=getSleep(dk);
     if(sl.sleep&&sl.wake){const sv=sl.sleep.split(':').map(Number),wv=sl.wake.split(':').map(Number);let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;sleepMin+=m;sleepCnt++;}
     const date=new Date(y,mo,d);const wk=weekKey(date);
@@ -2749,8 +2738,7 @@ function computeMonthStats(y,mo,endDay){
     return `${c.label} 전월 ${lastH}h → 이번달 ${thisH}h, ${dir}`;
   }).join(' / ');
   const rhythmSummary=Object.keys(rhythmDur).length?durSummaryLine(rhythmDur):'';
-  const postponedTasks=Object.keys(postponedTally).sort((a,b)=>postponedTally[b]-postponedTally[a]).map(t=>({text:t,count:postponedTally[t]}));
-  return {memos,doneTodos,totalTodos,todoPct,habitPct,avgSleep,allMemoTexts,onelineTexts,postponedTasks,wcByWeek,contentsList,rhythmSummary,rhythmCompareText,rhythmDur,rhythmDayCount,dim,goalLines};
+  return {memos,doneTodos,totalTodos,todoPct,habitPct,avgSleep,allMemoTexts,onelineTexts,wcByWeek,contentsList,rhythmSummary,rhythmCompareText,rhythmDur,rhythmDayCount,dim,goalLines};
 }
 async function generateMonthlyReportAI(mk,stats,isMidReport){
   const key=getClaudeKey();
@@ -2768,7 +2756,6 @@ async function generateMonthlyReportAI(mk,stats,isMidReport){
     stats.avgSleep?`평균 수면 ${stats.avgSleep}시간`:'수면 기록 없음',
     stats.rhythmSummary?`시간 사용 누계: ${stats.rhythmSummary}`:'',
     stats.rhythmCompareText?`전월 같은 기간 대비 시간 사용 변화: ${stats.rhythmCompareText}`:'',
-    stats.postponedTasks.length?`이번 달 3회 이상 미룬 일: ${stats.postponedTasks.slice(0,5).map(p=>`${p.text}(${p.count}회)`).join(', ')}`:'',
     stats.allMemoTexts.length?`이번 달 메모 전체 (${stats.allMemoTexts.length}건, 시간순):\n${stats.allMemoTexts.slice(0,2000).join('\n')}`:'',
     stats.contentsList.length?`콘텐츠 기록: ${stats.contentsList.map(c=>`${c.title}(${c.cat}${cStatusLabelAI(c)?', '+cStatusLabelAI(c):''})`).join(', ')}`:'',
     stats.wcByWeek.length?`주간 미션 현황: ${stats.wcByWeek.map(w=>w.lines.map(l=>`${l.text} ${l.pct}%`).join(', ')).join(' | ')}`:''
@@ -2877,17 +2864,35 @@ async function loadMonthlyReportContent(){
     cacheKey='monthly_report_mid_'+mk;
     report=S.get(cacheKey);
     if(!report){
+      const serverJson=await aiCacheGet(cacheKey);
+      if(serverJson){
+        try{report=JSON.parse(serverJson);S.set(cacheKey,report);}catch(e){}
+      }
+    }
+    if(!report&&getClaudeKey()){
       const midStats=computeMonthStats(y,mo,15);
       report=await generateMonthlyReportAI(mk,midStats,true);
-      if(report)S.set(cacheKey,report);
+      if(report){
+        S.set(cacheKey,report);
+        aiCacheSet(cacheKey,JSON.stringify(report),AI_CACHE_TTL.monthlyReport);
+      }
     }
   } else {
     // 말일 저녁 이후 또는 지난 달: 전체 기간으로 최종 리포트
     cacheKey='monthly_report_'+mk;
     report=S.get(cacheKey);
     if(!report){
+      const serverJson=await aiCacheGet(cacheKey);
+      if(serverJson){
+        try{report=JSON.parse(serverJson);S.set(cacheKey,report);}catch(e){}
+      }
+    }
+    if(!report&&getClaudeKey()){
       report=await generateMonthlyReportAI(mk,stats);
-      if(report)S.set(cacheKey,report);
+      if(report){
+        S.set(cacheKey,report);
+        aiCacheSet(cacheKey,JSON.stringify(report),AI_CACHE_TTL.monthlyReport);
+      }
     }
   }
   // 그 사이에 다른 달로 넘어갔으면 적용하지 않음
@@ -2902,7 +2907,7 @@ async function loadMonthlyReportContent(){
       ${report.keywords&&report.keywords.length?`<div class="mr-tag-cloud">${report.keywords.map(k=>`<span class="mr-tag">${k}</span>`).join('')}</div>`:''}
     </div>`;
   } else {
-    slot2.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">코멘트를 만들 데이터가 부족하거나 API 키가 없어요</div></div>`;
+    slot2.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">${getClaudeKey()?'코멘트를 만들 데이터가 부족해요':'아직 준비 중이에요 (다른 기기에서 먼저 열어보시면 여기서도 볼 수 있어요)'}</div></div>`;
   }
 }
 
@@ -2914,17 +2919,29 @@ function openWeeklyReviewSheet(){
   openSheet('weekly-review-sheet');
   if(cached){
     content.innerHTML=cached;
-  } else {
-    content.innerHTML='<div style="text-align:center;color:var(--tm);padding:20px 0;">한 주 요약 작성 중이에요... 🌿<br><span style="font-size:11.5px;opacity:0.7;">약 10-20초 소요돼요</span></div>';
+    return;
+  }
+  content.innerHTML='<div style="text-align:center;color:var(--tm);padding:20px 0;">한 주 요약 작성 중이에요... 🌿<br><span style="font-size:11.5px;opacity:0.7;">약 10-20초 소요돼요</span></div>';
+  aiCacheGet(cacheKey).then(function(serverHtml){
+    if(serverHtml){
+      S.set(cacheKey,serverHtml);
+      content.innerHTML=serverHtml;
+      return;
+    }
+    if(!getClaudeKey()){
+      content.innerHTML='<div style="text-align:center;color:var(--tm);padding:20px 0;">아직 준비 중이에요 🌿<br><span style="font-size:11.5px;opacity:0.7;">다른 기기에서 먼저 열어보시면 여기서도 볼 수 있어요</span></div>';
+      return;
+    }
     makeWeeklySummaryCard().then(function(html){
       if(html&&!html.includes('__ERR__')){
         S.set(cacheKey,html);
+        aiCacheSet(cacheKey,html,AI_CACHE_TTL.weeklyReport);
         content.innerHTML=html;
       } else {
         content.innerHTML='<div style="text-align:center;color:var(--tm);padding:20px 0;">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:11.5px;opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
       }
     });
-  }
+  });
 }
 
 async function makeWeeklySummaryCard(){
@@ -2948,7 +2965,6 @@ async function makeWeeklySummaryCard(){
   weekStart.setHours(0,0,0,0);
 
   const allTodos=[],allMemos=[],allMemosWithDay=[],allSleep=[];
-  const postponedTally={};
   const habits=getHabits();
   const wk=weekKey(now);
   const checks=getHabitChecks(wk);
@@ -2961,7 +2977,6 @@ async function makeWeeklySummaryCard(){
     const dk=dateKey(d);
     const todos=getTodos(dk);
     allTodos.push(...todos);
-    todos.forEach(t=>{if((t.postponeCount||0)>=3&&t.text)postponedTally[t.text]=Math.max(postponedTally[t.text]||0,t.postponeCount);});
     const memos=getMemos(dk);
     allMemos.push(...memos.map(m=>m.text).filter(Boolean));
     const dayName=_HOME_DAYS[d.getDay()]+'요일';
@@ -3024,7 +3039,6 @@ async function makeWeeklySummaryCard(){
   const avgSleepStr=avgSleep?`${Math.floor(avgSleep/60)}시간 ${avgSleep%60}분`:null;
   const topHabit=Object.entries(habitDoneCounts).sort((a,b)=>b[1]-a[1])[0];
   const bottomHabit=Object.entries(habitDoneCounts).sort((a,b)=>a[1]-b[1])[0];
-  const postponedTasks=Object.keys(postponedTally).sort((a,b)=>postponedTally[b]-postponedTally[a]).map(t=>({text:t,count:postponedTally[t]}));
   // 자주 등장한 투두 (같은 텍스트가 여러 날 반복 등록된 것) — 완료율 대신 실행 빈도 중심 코멘트용
   const todoTextTally={};
   allTodos.forEach(t=>{if(t.text)todoTextTally[t.text]=(todoTextTally[t.text]||0)+1;});
@@ -3037,7 +3051,6 @@ async function makeWeeklySummaryCard(){
     <div>✦ 메모 총 <b>${allMemos.length}건</b></div>
     ${topHabit&&topHabit[1]>0?`<div>→ 가장 많이 한 습관: <b>${topHabit[0]}</b></div>`:''}
     ${frequentTodo?`<div>◇ 자주 등장한 일: <b>${frequentTodo[0]}(${frequentTodo[1]}회)</b></div>`:''}
-    ${postponedTasks.length?`<div>◐ 자주 미룬 일: <b>${postponedTasks.slice(0,5).map(p=>`${p.text}(${p.count}회)`).join(', ')}</b></div>`:''}
     ${rhythmChangeText?`<div>◈ 리듬 변화: <b>${rhythmChangeText}</b></div>`:''}
   </div>`;
 
@@ -3060,7 +3073,6 @@ async function makeWeeklySummaryCard(){
     topHabit&&topHabit[1]>0?`가장 많이 완료한 습관: ${topHabit[0]} (${topHabit[1]}일)`:'',
     bottomHabit&&bottomHabit[1]===0?`한 번도 못 한 습관: ${bottomHabit[0]}`:'',
     frequentTodo?`이번 주 자주 등장한 투두: ${frequentTodo[0]} (${frequentTodo[1]}회)`:'',
-    postponedTasks.length?`이번 주 3회 이상 미룬 일: ${postponedTasks.slice(0,5).map(p=>`${p.text}(${p.count}회)`).join(', ')}`:'',
     challengeSummary.length?`이번 주 다짐 달성:\n${challengeSummary.join(', ')}`:'',
     rhythmChangeText?`지난주 대비 리듬 시간 변화: ${rhythmChangeText}`:'',
   ].filter(Boolean).join('\n');
@@ -3175,10 +3187,12 @@ async function fetchHomeWeather(section){
     return;
   }
 
-  // Claude 키 없으면 고정 텍스트 + 날씨만
+  // Claude 키 없으면 서버 캐시 조회 → 있으면 그 문구 표시, 없으면 준비중 안내
   if(!key){
     if(subEl){
-      subEl.textContent='잠깐만요...';
+      const serverCacheKey='greeting_'+dateKey(new Date())+'_'+subSec;
+      const cached=await aiCacheGet(serverCacheKey);
+      subEl.textContent=cached||'생성 대기중이에요';
     }
     return;
   }
@@ -3329,6 +3343,7 @@ async function fetchHomeWeather(section){
       subEl.textContent=text;
       _greetingCache={text,subSection:subSec,fetchedAt:Date.now()};
       _bcSet(subSec+'_greeting',_greetingCache);
+      aiCacheSet('greeting_'+dateKey(new Date())+'_'+subSec,text,AI_CACHE_TTL.short);
     } else {
       const wStr=weather?weather.icon+' '+weather.temp+'° · ':'';
       const defaults={morning:wStr+'오늘 하루도 잘 부탁해요 🌿',afternoon:wStr+'오늘도 잘 해내고 있어요 ✨',night:wStr+'오늘 하루 고생 많았어요 🌙'};
@@ -3647,6 +3662,26 @@ async function supaUpsert(path,onConflict,body){
     return true;
   }catch(e){return null;}
 }
+// ── AI 캐시 (서버 공유) ──
+// 목적: API 키가 있는 기기(주로 모바일)가 생성한 AI 문구를, 키가 없는 기기(주로 PC)도 그대로 볼 수 있게 서버에 저장.
+// 만료된 항목은 여기서 지우지 않고 조회 시점에 expires_at 비교로 무시만 함 — 정리는 별도로 월 1회 정도 수동 실행.
+// ttlMs가 null이면 만료 없음(월간 리포트용).
+async function aiCacheGet(cacheKey){
+  const rows=await supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent(cacheKey)}&select=content,expires_at`);
+  if(!rows||!rows.length)return null;
+  const row=rows[0];
+  if(row.expires_at!=null&&row.expires_at<Date.now())return null; // 만료됨 — 없는 것으로 취급
+  return row.content;
+}
+async function aiCacheSet(cacheKey,content,ttlMs){
+  const expiresAt=ttlMs==null?null:Date.now()+ttlMs;
+  await supaUpsert('ai_cache','cache_key',[{cache_key:cacheKey,content,expires_at:expiresAt}]);
+}
+const AI_CACHE_TTL={
+  short:14*24*60*60*1000,   // 2주 — 인사말, 오후코멘트, 새벽리뷰, 다음주제안 등 일반 캐시
+  weeklyReport:30*24*60*60*1000, // 한 달 — 주간 리포트
+  monthlyReport:null        // 만료 없음 — 월간 리포트(영구 보관)
+};
 // goal_notes 테이블에서 특정 note_key 하나를 삭제. 오늘의 다짐처럼 하루 지나면
 // 소멸해야 하는 데이터의 서버측 정리에 사용.
 async function supaDeleteGoalNote(noteKey){
@@ -3899,7 +3934,7 @@ async function syncTodosDown(dk){
     const cid=r.client_id||genCid();
     const localMatch=localByCid[cid];
     const completedAt=r.completed_at!=null?r.completed_at:(localMatch&&localMatch.completedAt!=null?localMatch.completedAt:null);
-    return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid,postponeCount:r.postpone_count||0,strikeParts:r.strike_parts||[],completedAt,sortOrder:(r.sort_order!=null?r.sort_order:undefined)};
+    return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid,strikeParts:r.strike_parts||[],completedAt,sortOrder:(r.sort_order!=null?r.sort_order:undefined)};
   }));
   renderTodos();
 }
@@ -3915,7 +3950,7 @@ async function syncTodosUp(dk){
     if(existing)existing.forEach(r=>{if(r.client_id)serverCompletedAt[r.client_id]=r.completed_at;});
   }catch(e){}
   const ok=await syncListUpSafe('todos',`date_key=eq.${dk}`,'date_key,client_id',todos,
-    t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,postpone_count:t.postponeCount||0,is_reserve:t.is_reserve||false,strike_parts:t.strikeParts||[],completed_at:(t.completedAt!=null?t.completedAt:(serverCompletedAt[t.cid]!=null?serverCompletedAt[t.cid]:null)),sort_order:(typeof t.sortOrder==='number'?t.sortOrder:null)}),
+    t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,is_reserve:t.is_reserve||false,strike_parts:t.strikeParts||[],completed_at:(t.completedAt!=null?t.completedAt:(serverCompletedAt[t.cid]!=null?serverCompletedAt[t.cid]:null)),sort_order:(typeof t.sortOrder==='number'?t.sortOrder:null)}),
     delCids);
   if(ok)delCids.forEach(cid=>removeDelPending('todos',dk,cid));
   return ok;
@@ -4505,7 +4540,6 @@ function toggleTodoReorderMode(){
 function renderTodos(){
   const dk=dateKey(currentDate),todos=getTodos(dk);
   const list=document.getElementById('todo-list');if(!list)return;
-  const hiding=document.getElementById('hide-tog')?.classList.contains('on')||false;
   list.innerHTML='';
   const tsOrder={morning:0,afternoon:1,night:2,none:3};
   function parseTime(text){
@@ -4523,19 +4557,17 @@ function renderTodos(){
   });
   sorted.forEach((t)=>{
     const i=t._i;
-    if(hiding&&t.done)return;
     const ts=t.timeSection||'none';
     const tsClass=ts!=='none'?` ts-${ts}`:'';
     const el=document.createElement('div');el.className='todo-item';
     el.dataset.todoIdx=i;
     el.dataset.tsGroup=ts;
     if(_todoPartModeIdx===i)el.dataset.partModeIdx=i;
-    const postponedClass=(t.postponeCount||0)>=3?' postponed':'';
     const textHtml=renderTodoTextParts(t.text,t.strikeParts||[],i);
     const partModeStyle=_todoPartModeIdx===i?'background:rgba(255,255,255,0.45);border-radius:8px;padding:2px 6px;':'';
     const rmEligible=_todoReorderMode&&!t.done;
     const handleHtml=`<div class="todo-drag-handle${rmEligible?' rm-eligible':''}"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><line x1="3" y1="4.5" x2="11" y2="4.5"/><line x1="3" y1="7" x2="11" y2="7"/><line x1="3" y1="9.5" x2="11" y2="9.5"/></svg></div>`;
-    el.innerHTML=`${handleHtml}<div class="chk${tsClass}${t.done?' on':''}" onclick="toggleTodo(${i})"></div><span class="todo-txt${t.done?' done':''}${postponedClass}" data-todo-i="${i}" style="${partModeStyle}">${textHtml}</span>`;
+    el.innerHTML=`${handleHtml}<div class="chk${tsClass}${t.done?' on':''}" onclick="toggleTodo(${i})"></div><span class="todo-txt${t.done?' done':''}" data-todo-i="${i}" style="${partModeStyle}">${textHtml}</span>`;
     const hasMultipleParts=_isTouchDevice()&&parseTodoTextParts(t.text).parts.length>1;
     if(rmEligible){
       attachTodoReorderDrag(el,i,ts);
@@ -4572,7 +4604,7 @@ function parseTodoTextParts(text){
   rawParts.forEach(seg=>{
     if(seg===','||seg==='/')return;
     if(seg.trim()==='')return;
-    parts.push(seg);
+    parts.push(seg.trim()); // [v2 개선] 이전엔 trim 안 해서 조각 재조립(미루기/복사) 시 공백이 남는 문제가 있었음
   });
   return {prefix,parts,hasPrefix:closeIdx>=0};
 }
@@ -4609,6 +4641,60 @@ function onTodoPartClick(evt,todoIdx,partIdx){
     openTodoSheet(todoIdx);
   }
 }
+// [v2] 항목을 완료조각/미완료조각으로 나눠 이동 또는 복사하는 통합 로직.
+// mode:'move' → 원본에서 미완료조각 제거(미루기/날짜지정 공용)
+// mode:'copy' → 원본은 유지하되, 완료조각만 남기고 미완료조각은 제거(스와이프 복사 공용)
+// 조각 없는 단일 항목은 mode에 따라 전체 이동/전체 복사로 동일하게 처리(기존 동작 유지).
+// 남은 완료조각만으로 구성되면 항목 전체를 자동 완료 체크(done=true) 처리.
+function relocateTodo(dk,idx,targetDk,mode){
+  const todos=getTodos(dk),todo=todos[idx];
+  if(!todo)return{success:false,message:'항목을 찾을 수 없어요'};
+  const {prefix,parts,hasPrefix}=parseTodoTextParts(todo.text);
+  const strikeSet=new Set(todo.strikeParts||[]);
+  const hasMultipleParts=parts.length>1;
+
+  if(!hasMultipleParts){
+    const targetTodos=getTodos(targetDk);
+    if(targetTodos.some(x=>x.text===todo.text))return{success:false,message:'이미 해당 날짜에 있어요'};
+    targetTodos.push({text:todo.text,done:false,created:Date.now(),timeSection:todo.timeSection||'none',cid:genCid(),strikeParts:[]});
+    saveTodos(targetDk,targetTodos);
+    if(mode==='move'){
+      addDelPending('todos',dk,todo.cid);
+      todos.splice(idx,1);
+      saveTodos(dk,todos);
+    }
+    return{success:true,message:mode==='move'?'다음 날로 옮겼어요':'내일에도 추가했어요'};
+  }
+
+  const unstruckIdxs=parts.map((_,i)=>i).filter(i=>!strikeSet.has(i));
+  if(!unstruckIdxs.length)return{success:false,message:'이동할 미완료 조각이 없어요'};
+  const movedParts=unstruckIdxs.map(i=>parts[i]);
+  const movedText=hasPrefix?`${prefix} > ${movedParts.join(' / ')}`:movedParts.join(' / ');
+  const targetTodos=getTodos(targetDk);
+  if(!targetTodos.some(x=>x.text===movedText)){
+    targetTodos.push({text:movedText,done:false,created:Date.now(),timeSection:todo.timeSection||'none',cid:genCid(),strikeParts:[]});
+    saveTodos(targetDk,targetTodos);
+  }
+
+  const remainingParts=parts.filter((_,i)=>strikeSet.has(i));
+  const dkTodos=getTodos(dk);
+  const cur=dkTodos[idx];
+  if(!cur)return{success:true,message:'이동했어요'};
+  if(!remainingParts.length){
+    addDelPending('todos',dk,cur.cid);
+    dkTodos.splice(idx,1);
+    saveTodos(dk,dkTodos);
+    _todoPartModeIdx=-1;
+  }else{
+    cur.text=hasPrefix?`${prefix} > ${remainingParts.join(' / ')}`:remainingParts.join(' / ');
+    cur.strikeParts=remainingParts.map((_,i)=>i);
+    cur.done=true; // 남은 조각이 전부 완료 상태이므로 항목 전체도 완료로 자동 체크
+    cur.completedAt=cur.completedAt!=null?cur.completedAt:Date.now();
+    saveTodos(dk,dkTodos);
+  }
+  return{success:true,message:mode==='move'?'다음 날로 옮겼어요':'내일에도 추가했어요'};
+}
+// [v2] 조각 하나의 완료(취소선) 상태 토글. strikeParts 변경 시 항상 saveTodos로 즉시 저장+동기화.
 function toggleTodoStrikePart(i,partIdx){
   const dk=dateKey(currentDate),todos=getTodos(dk),todo=todos[i];
   if(!todo)return;
@@ -4635,39 +4721,11 @@ function confirmCopyUnstruckParts(){
   const i=_pendingPartCopyIdx;
   _pendingPartCopyIdx=-1;
   if(i<0)return;
-  const dk=dateKey(currentDate),todos=getTodos(dk),todo=todos[i];
-  if(!todo)return;
-  const {prefix,parts,hasPrefix}=parseTodoTextParts(todo.text);
-  const strikeSet=new Set(todo.strikeParts||[]);
-  const unstruckIdxs=parts.map((_,idx)=>idx).filter(idx=>!strikeSet.has(idx));
-  if(!unstruckIdxs.length)return;
-
-  // 내일 항목 생성 (미체크 조각들을 접두어와 함께 하나로 묶어 복사)
-  const movedParts=unstruckIdxs.map(idx=>parts[idx]);
-  const movedText=hasPrefix?`${prefix} > ${movedParts.join(' / ')}`:movedParts.join(' / ');
+  const dk=dateKey(currentDate);
   const tom=new Date(currentDate);tom.setDate(tom.getDate()+1);
-  const tdk=dateKey(tom),ttodos=getTodos(tdk);
-  if(!ttodos.some(x=>x.text===movedText)){
-    ttodos.push({text:movedText,done:false,created:Date.now(),timeSection:todo.timeSection||'none',cid:genCid(),postponeCount:0,strikeParts:[]});
-    saveTodos(tdk,ttodos);
-  }
-
-  // 오늘 항목에서 미체크 조각들 제거, 취소선 친 조각만 남김 (인덱스 재정렬)
-  const remainingParts=parts.filter((_,idx)=>strikeSet.has(idx));
-  if(!remainingParts.length){
-    // 남는 조각이 없으면 항목 자체를 삭제
-    const dkTodos=getTodos(dk);
-    const cur=dkTodos[i];
-    if(cur)addDelPending('todos',dk,cur.cid);
-    dkTodos.splice(i,1);
-    saveTodos(dk,dkTodos);
-    _todoPartModeIdx=-1;
-  }else{
-    todo.text=hasPrefix?`${prefix} > ${remainingParts.join(' / ')}`:remainingParts.join(' / ');
-    todo.strikeParts=remainingParts.map((_,idx)=>idx); // 남은 건 전부 취소선 친 것들이므로 전부 유지
-    saveTodos(dk,todos);
-  }
-  showToast('내일로 복사했어요');
+  const tdk=dateKey(tom);
+  const result=relocateTodo(dk,i,tdk,'copy');
+  showToast(result.message);
   renderTodos();
 }
 // 왼쪽 스와이프(터치 및 PC 마우스 드래그 모두 지원)
@@ -4837,17 +4895,12 @@ function confirmCopyWholeTodo(){
   const i=_pendingCopyTodoIdx;
   _pendingCopyTodoIdx=-1;
   if(i<0)return;
-  const dk=dateKey(currentDate),todos=getTodos(dk),todo=todos[i];
-  if(!todo)return;
+  const dk=dateKey(currentDate);
   const tom=new Date(currentDate);tom.setDate(tom.getDate()+1);
-  const tdk=dateKey(tom),ttodos=getTodos(tdk);
-  if(ttodos.some(x=>x.text===todo.text)){
-    showToast('이미 내일에 있어요');
-    return;
-  }
-  ttodos.push({text:todo.text,done:false,created:Date.now(),timeSection:todo.timeSection||'none',cid:genCid(),postponeCount:0,strikeParts:[]});
-  saveTodos(tdk,ttodos);
-  showToast('내일에도 추가했어요');
+  const tdk=dateKey(tom);
+  const result=relocateTodo(dk,i,tdk,'copy');
+  showToast(result.message);
+  renderTodos();
 }
 // ── 오후 파트: 오늘vs어제 진행바 + 목표대비 웨이브게이지 + 리듬 비교 통합 카드
 const AFTERNOON_TODO_GOAL=5,AFTERNOON_HABIT_GOAL=4;
@@ -5509,7 +5562,7 @@ function homePostponeTodo(i){
   if(!todo)return;
   const tom=new Date(getLogicalDate());tom.setDate(tom.getDate()+1);
   const tdk=dateKey(tom),ttodos=getTodos(tdk);
-  ttodos.push({...todo,done:false,postponeCount:(todo.postponeCount||0)+1});
+  ttodos.push({...todo,done:false});
   saveTodos(tdk,ttodos);
   addDelPending('todos',dk,todo.cid);
   todos.splice(i,1);
@@ -5555,19 +5608,17 @@ function makePendingTodosCard(){
     card.innerHTML='<div style="font-size:13px;color:var(--tm);padding:6px 2px;text-align:center;">오늘 할일 끝! 고생하셨어요</div>';
     return card;
   }
-  pendingWithIdx.sort((a,b)=>(b.postponeCount||0)-(a.postponeCount||0));
   const showCount=5;
   const visible=pendingWithIdx.slice(0,showCount);
   const restCount=pendingWithIdx.length-visible.length;
   const list=document.createElement('div');
   visible.forEach(t=>{
-    const postponedClass=(t.postponeCount||0)>=3?' postponed':'';
     const el=document.createElement('div');
     el.className='todo-item';
     el.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 0;';
     el.innerHTML=`<div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
       <div class="chk" onclick="homeToggleTodo(${t._i})"></div>
-      <span class="todo-txt${postponedClass}" style="flex:1;color:var(--tm);">${t.text}</span>
+      <span class="todo-txt" style="flex:1;color:var(--tm);">${t.text}</span>
     </div>
     <span onclick="homePostponeTodo(${t._i})" title="내일로 미루기" style="display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;padding:5px 8px;border-radius:7px;background:rgba(190,170,140,0.14);cursor:pointer;"><i class="ti ti-chevrons-right" style="font-size:15px;color:rgba(150,125,95,0.85);" aria-hidden="true"></i></span>`;
     list.appendChild(el);
@@ -5819,7 +5870,11 @@ async function _fetchDawnReview(dk){
   const stored=_dawnReviewGet(dk);
   if(stored){_dawnReviewCache=stored;return stored.text;}
   const key=getClaudeKey();
-  if(!key)return '';
+  if(!key){
+    const serverCached=await aiCacheGet('dawn_review_'+dk);
+    if(serverCached){_dawnReviewCache={dk,text:serverCached};_dawnReviewSet(dk,serverCached);return serverCached;}
+    return '';
+  }
   const todos=getTodos(dk).filter(t=>t.done).map(t=>t.text);
   const memos=getMemos(dk).map(m=>m.text).filter(Boolean);
   const oneLine=getDailyOneLine(dk).trim();
@@ -5834,6 +5889,7 @@ async function _fetchDawnReview(dk){
   const text=reply.trim();
   _dawnReviewCache={dk,text};
   _dawnReviewSet(dk,text);
+  aiCacheSet('dawn_review_'+dk,text,AI_CACHE_TTL.short);
   return text;
 }
 // 오늘 이전 dawn 리뷰 캐시 자동 삭제(용량 누적 방지) — 브리핑 캐시 정리와 동일한 패턴
@@ -5969,13 +6025,12 @@ function todoSheetEdit(){_todoSwipeIdx>=0&&(closeSheet('todo-sheet'),openTodoMod
 function todoSheetDelete(){todoDelSwipe(_todoSwipeIdx);}
 function todoSheetPostpone(type){
   if(_todoSwipeIdx<0)return;
-  const dk=dateKey(currentDate),todos=getTodos(dk),todo=todos[_todoSwipeIdx];
+  const dk=dateKey(currentDate);
   if(type==='tomorrow'){
     const tom=new Date(currentDate);tom.setDate(tom.getDate()+1);
-    const tdk=dateKey(tom),ttodos=getTodos(tdk);
-    ttodos.push({...todo,done:false,postponeCount:(todo.postponeCount||0)+1});saveTodos(tdk,ttodos);
-    if(todo)addDelPending('todos',dk,todo.cid);
-    todos.splice(_todoSwipeIdx,1);saveTodos(dk,todos);
+    const tdk=dateKey(tom);
+    const result=relocateTodo(dk,_todoSwipeIdx,tdk,'move');
+    showToast(result.message);
     closeSheet('todo-sheet');renderTodos();
   } else {
     const tom=new Date(currentDate);tom.setDate(tom.getDate()+1);
@@ -5985,10 +6040,10 @@ function todoSheetPostpone(type){
 }
 function confirmDate(){
   const val=document.getElementById('date-inp').value;if(!val||_todoSwipeIdx<0)return;
-  const dk=dateKey(currentDate),todos=getTodos(dk),todo=todos[_todoSwipeIdx];
-  const ttodos=getTodos(val);ttodos.push({...todo,done:false,postponeCount:(todo.postponeCount||0)+1});saveTodos(val,ttodos);
-  if(todo)addDelPending('todos',dk,todo.cid);
-  todos.splice(_todoSwipeIdx,1);saveTodos(dk,todos);closeModal('date-modal');renderTodos();
+  const dk=dateKey(currentDate);
+  const result=relocateTodo(dk,_todoSwipeIdx,val,'move');
+  showToast(result.message);
+  closeModal('date-modal');renderTodos();
 }
 
 // ── MEMO
@@ -6174,8 +6229,18 @@ async function openChallengeReviewSheet(){
   const cached=S.get(cacheKey);
   if(cached){content.innerHTML=cached;return;}
   content.innerHTML='<div style="text-align:center;color:var(--tm);padding:20px 0;">지난주 목표를 돌아보는 중이에요... 🌿<br><span style="font-size:11.5px;opacity:0.7;">약 10-20초 소요돼요</span></div>';
+  const serverHtml=await aiCacheGet(cacheKey);
+  if(serverHtml){S.set(cacheKey,serverHtml);content.innerHTML=serverHtml;return;}
+  if(!getClaudeKey()){
+    content.innerHTML='<div style="text-align:center;color:var(--tm);padding:20px 0;">아직 준비 중이에요 🌿<br><span style="font-size:11.5px;opacity:0.7;">다른 기기에서 먼저 열어보시면 여기서도 볼 수 있어요</span></div>';
+    return;
+  }
   const html=await buildChallengeReviewHtml(wk);
-  if(html){S.set(cacheKey,html);content.innerHTML=html;}
+  if(html){
+    S.set(cacheKey,html);
+    aiCacheSet(cacheKey,html,AI_CACHE_TTL.weeklyReport);
+    content.innerHTML=html;
+  }
   else content.innerHTML='<div style="text-align:center;color:var(--tm);padding:20px 0;">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:11.5px;opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
 }
 async function buildChallengeReviewHtml(wk){
@@ -6326,8 +6391,10 @@ async function loadNextWeekAISuggestions(wk){
   const cacheKey='nextweek_suggest_'+wk+'_'+todayKey;
   const cached=S.get(cacheKey);
   if(cached){area.innerHTML=cached;return;}
+  const serverHtml=await aiCacheGet(cacheKey);
+  if(serverHtml){S.set(cacheKey,serverHtml);area.innerHTML=serverHtml;return;}
   const key=getClaudeKey();
-  if(!key){area.innerHTML='<div style="font-size:11.5px;color:var(--tm);text-align:center;padding:10px 0;">설정에서 Claude API 키를 입력하면 추천을 받을 수 있어요</div>';return;}
+  if(!key){area.innerHTML='<div style="font-size:11.5px;color:var(--tm);text-align:center;padding:10px 0;">아직 준비 중이에요 (다른 기기에서 먼저 열어보시면 여기서도 볼 수 있어요)</div>';return;}
   const habits=getHabits().map(h=>h.name);
   const summary=buildWeekSummaryForChallenge();
   const sys='당신은 생활 루틴 코치예요. JSON 배열만 반환하세요. 다른 텍스트 없이 오직 JSON만.';
@@ -6355,6 +6422,7 @@ async function loadNextWeekAISuggestions(wk){
   const html=`<div class="nw-chip-row">${sugg.map(s=>`<div class="nw-chip" onclick="applyNwSuggestion('${(s.title||'').replace(/'/g,"\\'")}','${wk}')"><span class="nwc-sym">◉</span><div><div class="nwc-title">${s.title||''}</div><div class="nwc-desc">${s.desc||''}</div></div></div>`).join('')}</div>`;
   area.innerHTML=html;
   S.set(cacheKey,html);
+  aiCacheSet(cacheKey,html,AI_CACHE_TTL.short);
 }
 function applyNwSuggestion(title,wk){
   let items=getWChallenge(wk);
@@ -9155,7 +9223,7 @@ function addReserveTodo(){
   const inp=document.getElementById('reserve-inp');
   const text=inp?inp.value.trim():'';if(!text)return;
   const todos=getReserveTodos();
-  todos.push({text,done:false,created:Date.now(),timeSection:'none',cid:genCid(),is_reserve:true,postponeCount:0});
+  todos.push({text,done:false,created:Date.now(),timeSection:'none',cid:genCid(),is_reserve:true});
   saveReserveTodos(todos);
   if(inp){inp.value='';inp.style.height='';}
   renderReserveList();
@@ -9191,7 +9259,7 @@ function confirmReserveMove(){
   addDelPending('todos',RESERVE_DK,t.cid);
   todos.splice(_reserveMoveIdx,1);saveReserveTodos(todos);
   // 선택한 날짜 투두에 추가
-  const newTodo={text:t.text,done:false,created:Date.now(),timeSection:_reserveSection,cid:genCid(),is_reserve:false,postponeCount:0};
+  const newTodo={text:t.text,done:false,created:Date.now(),timeSection:_reserveSection,cid:genCid(),is_reserve:false};
   const targetTodos=getTodos(val);targetTodos.push(newTodo);saveTodos(val,targetTodos);
   // 오늘 날짜면 화면도 갱신
   if(val===dateKey(currentDate))renderTodos();
@@ -9408,7 +9476,7 @@ async function forceRestoreDate(dk){
   }
   var trows=await supaFetch('todos?date_key=eq.'+dk+'&order=created');
   if(trows!==null){
-    S.set(S.key('todos',dk),trows.map(function(r){return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),postponeCount:r.postpone_count||0,strikeParts:r.strike_parts||[]};}));
+    S.set(S.key('todos',dk),trows.map(function(r){return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[]};}));
   }
   var srows=await supaFetch('sleep?date_key=eq.'+dk);
   if(srows&&srows.length>0){
