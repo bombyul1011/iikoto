@@ -179,8 +179,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .todo-item:last-of-type{border-bottom:none;}
 .todo-item.reorder-active{z-index:5;background:var(--card);box-shadow:0 2px 8px rgba(0,0,0,0.12);border-radius:8px;}
 .todo-item.reorder-shift{transition:transform .12s ease;}
-.todo-drag-handle{display:none;flex-shrink:0;width:16px;height:16px;align-items:center;justify-content:center;color:var(--tm);opacity:.55;cursor:grab;touch-action:none;}
+.todo-drag-handle{display:none;flex-shrink:0;width:16px;height:16px;align-items:center;justify-content:center;color:var(--tm);opacity:.55;cursor:grab;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
 .todo-reorder-mode .todo-drag-handle.rm-eligible{display:flex;}
+.todo-reorder-mode{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
+.todo-reorder-mode .todo-item{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
 .todo-reorder-mode .chk{pointer-events:none;opacity:.5;}
 .todo-reorder-mode .todo-txt{pointer-events:none;}
 .weekly-review-banner{position:relative;border-radius:16px;padding:1.5px;background:linear-gradient(135deg,rgba(150,215,180,0.95),rgba(235,220,120,0.90),rgba(165,222,188,0.95),rgba(150,215,180,0.95));background-size:300% 300%;animation:bannerShine 4s ease infinite;cursor:pointer;margin-bottom:2px;}
@@ -4717,34 +4719,45 @@ function attachTodoSwipeMode(el,i,hasMultipleParts){
 }
 // 정렬모드 전용 드래그: 같은 시간대 그룹 내에서만, DOM 재생성 없이 transform으로만 이동.
 // 손 뗄 때 1회만 배열 재정렬 + sortOrder 재기록 + 리렌더링.
+// 항목 높이가 제각각(1줄/2줄 텍스트)이라 고정 높이 분할 대신, 형제 요소들의 실제 좌표를 기준으로 판단한다.
 function attachTodoReorderDrag(el,i,tsGroup){
-  const ITEM_H=el.offsetHeight||34;
   let sy=0,dragging=false,pid=null,captured=false,curShift=0;
   const handle=el.querySelector('.todo-drag-handle');
   if(!handle)return;
-  let siblings=[]; // 같은 그룹 내 형제 엘리먼트들(자기 자신 제외), 화면 순서대로
+  let siblings=[]; // {el, top, mid, height}, 화면 순서대로(자기 자신 제외)
+  const startDrag=(clientY,pointerId)=>{
+    sy=clientY;dragging=true;captured=false;pid=pointerId;curShift=0;
+    el.classList.add('reorder-active');
+    const selfRect=el.getBoundingClientRect();
+    siblings=Array.from(document.querySelectorAll(`.todo-item[data-ts-group="${tsGroup}"]`))
+      .filter(s=>s!==el)
+      .map(s=>{const r=s.getBoundingClientRect();return {el:s,top:r.top,mid:r.top+r.height/2,height:r.height};})
+      .sort((a,b)=>a.top-b.top);
+    siblings._selfTop=selfRect.top;
+  };
   handle.addEventListener('pointerdown',e=>{
     e.preventDefault();
-    sy=e.clientY;dragging=true;captured=false;pid=e.pointerId;curShift=0;
-    el.classList.add('reorder-active');
-    siblings=Array.from(document.querySelectorAll(`.todo-item[data-ts-group="${tsGroup}"]`)).filter(s=>s!==el);
+    startDrag(e.clientY,e.pointerId);
     try{handle.setPointerCapture(pid);captured=true;}catch(err){}
   });
   handle.addEventListener('pointermove',e=>{
     if(!dragging)return;
     const dy=e.clientY-sy;
     el.style.transform=`translateY(${dy}px)`;
-    // 몇 칸 이동했는지 계산해 형제 요소들을 밀어냄
-    const shift=Math.round(dy/ITEM_H);
+    const selfH=el.offsetHeight;
+    const selfMid=siblings._selfTop+dy+selfH/2;
+    let shift=0;
+    siblings.forEach(sib=>{
+      if(sib.top<siblings._selfTop&&selfMid<sib.mid)shift-=1; // 위쪽 형제를 앞질렀음
+      else if(sib.top>siblings._selfTop&&selfMid>sib.mid)shift+=1; // 아래쪽 형제를 앞질렀음
+    });
     if(shift!==curShift){
       curShift=shift;
-      const selfRect=el.getBoundingClientRect();
       siblings.forEach(sib=>{
-        const sibRect=sib.getBoundingClientRect();
-        const willPass=(shift>0&&sibRect.top>selfRect.top&&sibRect.top<=selfRect.top+shift*ITEM_H+ITEM_H)
-                     ||(shift<0&&sibRect.top<selfRect.top&&sibRect.top>=selfRect.top+shift*ITEM_H-ITEM_H);
-        sib.classList.add('reorder-shift');
-        sib.style.transform=willPass?`translateY(${shift>0?-ITEM_H:ITEM_H}px)`:'';
+        const isAbove=sib.top<siblings._selfTop;
+        const willPass=isAbove?(selfMid<sib.mid):(selfMid>sib.mid);
+        sib.el.classList.add('reorder-shift');
+        sib.el.style.transform=willPass?`translateY(${isAbove?selfH:-selfH}px)`:'';
       });
     }
   });
@@ -4753,7 +4766,7 @@ function attachTodoReorderDrag(el,i,tsGroup){
     dragging=false;
     el.classList.remove('reorder-active');
     el.style.transform='';
-    siblings.forEach(sib=>{sib.classList.remove('reorder-shift');sib.style.transform='';});
+    siblings.forEach(sib=>{sib.el.classList.remove('reorder-shift');sib.el.style.transform='';});
     if(captured&&pid!=null){try{handle.releasePointerCapture(pid);}catch(err){}}
     pid=null;captured=false;
     if(curShift!==0)applyTodoReorder(i,tsGroup,curShift);
@@ -4792,6 +4805,15 @@ document.addEventListener('click',e=>{
   if(activeEl&&activeEl.contains(e.target))return; // 조각모드 항목 내부 클릭은 무시(정상 조작)
   _todoPartModeIdx=-1;
   renderTodos();
+});
+// 정렬모드 중 카드 바깥을 클릭하면 자동 종료(저장은 이미 각 드래그 종료 시점에 완료된 상태)
+document.addEventListener('click',e=>{
+  if(!_todoReorderMode)return;
+  const card=document.getElementById('todo-card');
+  const btn=document.getElementById('todo-reorder-btn');
+  if(card&&card.contains(e.target))return; // 카드 내부(핸들 포함) 클릭은 무시
+  if(btn&&btn.contains(e.target))return; // 버튼 자체 클릭은 toggleTodoReorderMode가 처리
+  toggleTodoReorderMode();
 });
 // 확인 토스트의 "네" 버튼 - 대기 중인 작업(전체복사 or 조각복사)에 따라 분기
 function confirmTodoCopyToast(){
