@@ -69,22 +69,22 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --sleep-b:rgba(255,253,248,0.50);--sleep-bb:rgba(95,115,170,0.55);
 }
 [data-theme="mono"]{
-  --bg:linear-gradient(145deg,#e3e0d8 0%,#e6e3db 50%,#e2ded6 100%);
+  --bg:linear-gradient(145deg,#e2ddd4 0%,#e5e0d7 50%,#e1dbd3 100%);
   --tp:#2a2620;--ts:#3a3730;--tm:#4a4740;
-  --card:rgba(255,255,255,0.55);--card-b:rgba(158,128,149,0.13);
-  --card-p:rgba(177,144,162,0.16);--card-pb:rgba(177,144,162,0.42);
-  --card-m:rgba(158,175,143,0.16);--card-mb:rgba(158,175,143,0.42);
-  --card-y:rgba(194,163,130,0.18);--card-yb:rgba(194,163,130,0.48);
-  --card-s:rgba(135,154,177,0.16);--card-sb:rgba(135,154,177,0.42);
+  --card:rgba(252,248,240,0.34);--card-b:rgba(180,140,100,0.16);
+  --card-p:rgba(224,206,213,0.48);--card-pb:rgba(207,163,182,0.42);
+  --card-m:rgba(191,194,174,0.46);--card-mb:rgba(172,177,139,0.42);
+  --card-y:rgba(205,194,164,0.48);--card-yb:rgba(198,178,121,0.44);
+  --card-s:rgba(181,196,202,0.46);--card-sb:rgba(144,175,186,0.42);
   --div:rgba(158,128,149,0.14);
   --acc:#3a3730;--acc-soft:rgba(158,128,149,0.30);
-  --nav:rgba(255,255,255,0.55);--nav-b:rgba(158,128,149,0.13);
-  --sheet:linear-gradient(160deg,#e3e0d8,#e6e3db);
-  --modal:linear-gradient(145deg,#e3e0d8,#e6e3db);
-  --inp:rgba(255,255,255,0.50);--inp-b:rgba(158,128,149,0.13);
-  --pill:rgba(255,255,255,0.50);
-  --memo-b:rgba(255,255,255,0.50);--memo-bb:rgba(158,128,149,0.13);
-  --sleep-b:rgba(135,154,177,0.14);--sleep-bb:rgba(135,154,177,0.38);
+  --nav:rgba(252,248,240,0.45);--nav-b:rgba(180,140,100,0.14);
+  --sheet:linear-gradient(160deg,#e2ddd4,#e5e0d7);
+  --modal:linear-gradient(145deg,#e2ddd4,#e5e0d7);
+  --inp:rgba(252,248,240,0.35);--inp-b:rgba(180,140,100,0.14);
+  --pill:rgba(252,248,240,0.35);
+  --memo-b:rgba(224,206,213,0.48);--memo-bb:rgba(207,163,182,0.38);
+  --sleep-b:rgba(201,198,194,0.40);--sleep-bb:rgba(180,140,100,0.34);
 }
 [data-theme="glass"] .card,[data-theme="glass"] .sleep-box,[data-theme="glass"] .habit-week-box{border-width:1.4px;box-shadow:0 1.5px 1.5px rgba(255,255,255,0.9) inset,0 -8px 14px -10px rgba(120,110,95,0.15) inset,0 5px 14px rgba(150,140,120,0.08);}
 [data-theme="glass"] #daily-meal-card{background:rgba(255,253,248,0.45)!important;border-color:rgba(150,195,130,0.55)!important;}
@@ -895,9 +895,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="mono"] .rd-progress-fill{background:rgba(194,163,130,0.35)!important;}
 [data-theme="mono"] .rd-progress-today{background:rgba(194,163,130,0.60)!important;}
 [data-theme="mono"] .rd-progress-bead{background:rgba(194,163,130,0.75)!important;animation:none!important;border-color:#fff!important;}
-[data-theme="mono"] .report-banner.quote-soft{background:rgba(194,163,130,0.30)!important;animation:none!important;}
-[data-theme="mono"] .quote-soft{filter:grayscale(1) contrast(0.9);}
-[data-theme="mono"] .mr-goal-card{background:rgba(158,128,149,0.08);border:1.4px solid rgba(158,128,149,0.18);}
+[data-theme="mono"] .report-banner.quote-soft{background:linear-gradient(135deg,rgba(197,189,209,0.45),rgba(224,206,213,0.35),rgba(181,196,202,0.40),rgba(197,189,209,0.45))!important;background-size:300% 300%;animation:bannerShine 4s ease infinite!important;}
+[data-theme="mono"] .quote-soft{filter:none;}
+[data-theme="mono"] .mr-goal-card{background:rgba(191,194,174,0.14);border:1.4px solid rgba(191,194,174,0.30);}
 [data-theme="mono"] .seed-icon-btn{background:rgba(135,154,177,0.14);border:1.4px solid rgba(135,154,177,0.24);}
 [data-theme="mono"] .seed-icon-btn i{color:#2a2620!important;}
 [data-theme="mono"] .reading-icon-btn{background:rgba(194,163,130,0.28)!important;border:1px solid rgba(194,163,130,0.40)!important;box-shadow:none!important;}
@@ -908,10 +908,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="mono"] .quote-chip-inner{background:rgba(255,255,255,0.35);}
 [data-theme="mono"] .done-quote-chip-inner,[data-theme="mono"] .done-comment-chip-inner{background:rgba(255,255,255,0.35)!important;color:var(--tp)!important;}
 [data-theme="mono"] .done-quote-chip,[data-theme="mono"] .done-comment-chip{background:rgba(194,163,130,0.30)!important;animation:none!important;}
-[data-theme="mono"] .report-banner .report-banner-inner{background:rgba(255,255,255,0.30)!important;backdrop-filter:none;}
-[data-theme="mono"] .weekly-review-banner-inner{background:rgba(255,255,255,0.30)!important;backdrop-filter:none;border:1px solid rgba(158,128,149,0.16);}
-[data-theme="mono"] .mr-ai-card{background:rgba(255,255,255,0.30);}
-[data-theme="mono"] .diary-date-chip.today{background:rgba(158,175,143,0.14);border-color:rgba(158,175,143,0.30);color:#2a2620;}
+[data-theme="mono"] .report-banner .report-banner-inner{background:rgba(255,255,255,0.42)!important;backdrop-filter:none;}
+[data-theme="mono"] .weekly-review-banner-inner{background:rgba(255,255,255,0.42)!important;backdrop-filter:none;border:1px solid rgba(158,128,149,0.16);}
+[data-theme="mono"] .mr-ai-card{background:rgba(255,255,255,0.42);}
+[data-theme="mono"] .diary-date-chip.today{background:rgba(177,144,162,0.14);border-color:rgba(177,144,162,0.30);color:#2a2620;}
 [data-theme="mono"] .diary-date-chip.holiday{color:var(--tm)!important;}
 [data-theme="mono"] .rd-quote-item{background:rgba(255,255,255,0.32)!important;border-left-color:rgba(158,128,149,0.30)!important;}
 [data-theme="mono"] .m-chip.active{background:rgba(135,154,177,0.16)!important;border-color:rgba(135,154,177,0.35)!important;color:#2a2620!important;}
@@ -929,14 +929,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 }
 
 /* 날짜 today 표시류 */
-[data-theme="mono"] .day-btn.today{background:rgba(158,175,143,0.35);border-color:rgba(158,175,143,0.55);}
+[data-theme="mono"] .day-btn.today{background:rgba(177,144,162,0.30);border-color:rgba(177,144,162,0.50);}
 [data-theme="mono"] .day-btn.today .day-num{color:#2a2620;}
-[data-theme="mono"] .rd-tab.on{background:rgba(158,175,143,0.14);border-color:rgba(158,175,143,0.30);}
+[data-theme="mono"] .rd-tab.on{background:rgba(177,144,162,0.14);border-color:rgba(177,144,162,0.30);}
 [data-theme="mono"] #nextweek-sheet .goal-section-title{background:rgba(135,154,177,0.12)!important;color:#2a2620!important;border:1.4px solid rgba(135,154,177,0.24)!important;}
 [data-theme="mono"] .chk.on{background:rgba(177,144,162,0.55)!important;border-color:rgba(177,144,162,0.80)!important;}
-[data-theme="mono"] .cal-day.today .cal-num{background:rgba(158,175,143,0.75);}
-[data-theme="mono"] .cal-day.selected .cal-num{background:rgba(158,175,143,0.18);color:#2a2620;}
-[data-theme="mono"] .cal-dot{background:rgba(158,175,143,0.75);}
+[data-theme="mono"] .cal-day.today .cal-num{background:rgba(177,144,162,0.75);}
+[data-theme="mono"] .cal-day.selected .cal-num{background:rgba(177,144,162,0.18);color:#2a2620;}
+[data-theme="mono"] .cal-dot{background:rgba(177,144,162,0.75);}
 [data-theme="mono"] .goal-section-title{background:rgba(135,154,177,0.12)!important;color:#2a2620!important;border:1.4px solid rgba(135,154,177,0.24)!important;}
 [data-theme="mono"] .mbtn.ok{background:rgba(158,175,143,0.20);color:#2a2620;}
 [data-theme="mono"] .wchallenge-day.on{background:rgba(177,144,162,0.62)!important;color:#fff!important;border-width:1.5px;border-color:rgba(177,144,162,0.85)!important;}
@@ -945,14 +945,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="mono"] .habit-chk2.on i{color:#fff!important;}
 [data-theme="mono"] .forest-density-card{background:rgba(255,255,255,0.30);}
 [data-theme="mono"] .wrb-track{background:rgba(158,128,149,0.10);}
-[data-theme="mono"] .report-banner{background:rgba(158,128,149,0.30)!important;animation:none!important;}
-[data-theme="mono"] .report-banner.quote-soft,
-[data-theme="mono"] .report-banner.diary-soft,
-[data-theme="mono"] .report-banner.rhythm-soft,
-[data-theme="mono"] .report-banner.meal-soft,
-[data-theme="mono"] .report-banner.month-soft{background:rgba(158,128,149,0.30)!important;animation:none!important;}
+[data-theme="mono"] .report-banner{background:linear-gradient(135deg,rgba(158,128,149,0.35),rgba(158,128,149,0.15),rgba(158,128,149,0.35))!important;background-size:300% 300%;animation:bannerShine 4s ease infinite!important;}
+[data-theme="mono"] .report-banner.diary-soft{background:linear-gradient(135deg,rgba(205,194,164,0.45),rgba(224,206,213,0.35),rgba(220,205,196,0.40),rgba(205,194,164,0.45))!important;background-size:300% 300%;animation:bannerShine 4s ease infinite!important;}
+[data-theme="mono"] .report-banner.rhythm-soft{background:linear-gradient(120deg,rgba(220,205,196,0.55) 0%,rgba(205,194,164,0.55) 25%,rgba(181,196,202,0.55) 50%,rgba(197,189,209,0.55) 75%,rgba(224,206,213,0.55) 100%)!important;animation:none!important;}
+[data-theme="mono"] .report-banner.meal-soft{background:linear-gradient(135deg,rgba(160,182,164,0.45),rgba(191,194,174,0.35),rgba(160,182,164,0.45))!important;background-size:300% 300%;animation:bannerShine 4s ease infinite!important;}
+[data-theme="mono"] .report-banner.month-soft{background:linear-gradient(135deg,rgba(191,194,174,0.45),rgba(205,194,164,0.35),rgba(191,194,174,0.45))!important;background-size:300% 300%;animation:bannerShine 4s ease infinite!important;}
 [data-theme="mono"] .weekly-review-banner{
-  background:linear-gradient(135deg,rgba(158,128,149,0.42),rgba(158,128,149,0.18),rgba(158,128,149,0.42));
+  background:linear-gradient(135deg,rgba(197,189,209,0.42),rgba(181,196,202,0.20),rgba(197,189,209,0.42));
   background-size:300% 300%;animation:bannerShine 6s ease infinite;
 }
 [data-theme="mono"] .report-banner-line{color:var(--tp)!important;}
@@ -962,7 +961,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="mono"] .report-banner.rhythm-soft .report-banner-inner,
 [data-theme="mono"] .report-banner.month-soft .report-banner-inner,
 [data-theme="mono"] .report-banner.meal-soft .report-banner-inner,
-[data-theme="mono"] .report-banner.quote-soft .report-banner-inner{background:rgba(255,255,255,0.30)!important;}
+[data-theme="mono"] .report-banner.quote-soft .report-banner-inner{background:rgba(255,255,255,0.45)!important;}
 [data-theme="mono"] .rb-title{color:var(--tp)!important;}
 [data-theme="mono"] .report-banner-arrow{color:var(--tm)!important;}
 [data-theme="mono"] .report-banner.diary-soft .rb-title,
@@ -2100,19 +2099,28 @@ const RHYTHM_SLEEP_COLOR='rgba(205,194,182,0.88)';
 const RHYTHM_MEAL_COLOR='rgba(130,205,145,0.90)';
 // 리듬 카테고리 분류 설명 — AI 프롬프트에서 시간 사용 데이터를 다룰 때 카테고리 오분류(예: 업무↔책상, 휴식↔감상)를 줄이기 위해 공통으로 붙이는 한 줄 설명.
 const RHYTHM_CAT_GUIDE='(카테고리 참고: 운동=홈트/헬스장/러닝 등, 휴식=낮잠/멍때리기/게임 등, 업무=주로 노트북으로 하는 작업(가끔 외근 포함), 외출=지인과의 약속이나 혼자 가는 카페/산책 등, 책상=일기·공부·앱 정비·노트정리 등 책상에서 하는 작업, 감상=드라마·독서·영화, 정리=청소·빨래 등 집안 정리)';
-// 모노테마 리듬 카테고리 색 — 저채도 파스텔 5색 순환(라벤더로즈/살구베이지/세이지/더스티블루/베이스라벤더).
-// 순서: 수면 → 식사 → RHYTHM_CATS 7종(운동/휴식/업무/외출/책상/감상/정리) = 총 9개, 5색을 순환 재사용.
-const MONO_RHYTHM_SHADES=['rgba(177,144,162,0.80)','rgba(194,163,130,0.78)','rgba(158,175,143,0.76)','rgba(135,154,177,0.76)','rgba(158,128,149,0.82)'];
-const MONO_RHYTHM_ORDER=['_sleep','_meal','exercise','rest','work','appointment','note','enjoy','home'];
+// 모노테마 리듬 카테고리 색 — 라이트 테마 색상(hue)을 유지한 채 채도만 낮추고 명도를 살짝 올린 "맑게 바랜" 톤.
+// 9개 카테고리(수면/식사/운동/휴식/업무/외출/책상/감상/정리) 각각 고유 색 — 더 이상 5색 순환 아님.
+const MONO_CAT_COLORS={
+  exercise:'rgba(220,205,196,0.82)',   // 운동
+  rest:'rgba(205,194,164,0.80)',       // 휴식
+  work:'rgba(194,195,198,0.75)',       // 업무
+  appointment:'rgba(181,196,202,0.68)', // 외출
+  note:'rgba(224,206,213,0.80)',       // 책상
+  enjoy:'rgba(197,189,209,0.80)',      // 감상
+  home:'rgba(191,194,174,0.80)'        // 정리
+};
+const MONO_SLEEP_COLOR='rgba(201,198,194,0.88)';
+const MONO_MEAL_COLOR='rgba(160,182,164,0.90)';
 function getRhythmColor(key){
   if(document.documentElement.dataset.theme!=='mono'){
     if(key==='_sleep')return RHYTHM_SLEEP_COLOR;
     if(key==='_meal')return RHYTHM_MEAL_COLOR;
     return RHYTHM_CATS[key]?RHYTHM_CATS[key].color:'var(--tm)';
   }
-  const idx=MONO_RHYTHM_ORDER.indexOf(key);
-  if(idx<0)return MONO_RHYTHM_SHADES[0];
-  return MONO_RHYTHM_SHADES[idx%MONO_RHYTHM_SHADES.length];
+  if(key==='_sleep')return MONO_SLEEP_COLOR;
+  if(key==='_meal')return MONO_MEAL_COLOR;
+  return MONO_CAT_COLORS[key]||'var(--tm)';
 }
 function getRhythmBlocks(dk){return S.get(S.key('rblocks',dk))||[];}
 function saveRhythmBlocks(dk,v){

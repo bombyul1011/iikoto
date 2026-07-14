@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260714-59-compact-calendar-sizing';
+const CACHE = 'iikoto-v20260714-62-mono-card-alpha-today-color-fix';
 const ASSETS = [
   './',
   './index.html'
