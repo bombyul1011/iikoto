@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260715-67-midmonth-timing-2200';
+const CACHE = 'iikoto-v20260715-68-rhythm-flow-fix-content-color';
 const ASSETS = [
   './',
   './index.html'

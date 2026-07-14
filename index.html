@@ -5649,7 +5649,7 @@ function makeDawnRecapCard(){
       <div class="day-recap-sec-title"><i class="ti ${RHYTHM_CATS.enjoy.icon}" style="font-size:12px;" aria-hidden="true"></i> 오늘 본 콘텐츠</div>`;
     contentItems.forEach(c=>{
       const key=catToKey(c.cat);
-      const dotColor=key?getCatBarColor(key):'rgba(190,160,230,0.80)';
+      const dotColor=key?getCatColor(key):'rgba(190,160,230,0.80)';
       html+=`<div class="recap-content-item"><span class="cdot" style="background:${dotColor};"></span>${c.cat||'감상'}<span class="ctime">${c.title}</span></div>`;
     });
   }
@@ -7516,17 +7516,24 @@ function renderRhythmFlowHtml(segs,dk){
     const cat=RHYTHM_CATS[b.cat];if(!cat)return;
     const s=toMinLocal(b.start);if(s==null)return;
     let e=b.end?toMinLocal(b.end):null;
-    if(e!=null&&e<=s)e=1440;
+    // labelEnd: 텍스트 라벨(예: "23:54~01:37")에 쓸 실제 종료시각 — 자정을 넘겨도 원본 그대로 유지
+    // e(정렬/화면용): 자정을 넘긴 경우 1440으로 보정해 정렬 순서 계산에 문제 없게 함(라벨과는 무관)
+    let labelEnd=e;
+    if(e!=null&&e<=s){
+      labelEnd=e+1440; // 예: 01:37(97분) → 1537분으로, toHHMM에서 %1440 처리해 "01:37"로 정확히 표시됨
+      e=1440;
+    }
     const lbl=cat.label+(b.text?' · '+b.text:'');
     const isLateNightNew=s<NEWDAY_CUTOFF&&latestManualMin>=NEWDAY_CUTOFF&&s<latestManualMin;
-    dayItems.push({start:s,end:e==null?s:e,ongoing:e==null,color:getRhythmColor(b.cat),label:lbl,sortKey:isLateNightNew?s+1440:s});
+    dayItems.push({start:s,end:e==null?s:e,labelEnd:labelEnd==null?s:labelEnd,ongoing:e==null,color:getRhythmColor(b.cat),label:lbl,sortKey:isLateNightNew?s+1440:s});
   });
   const items=dayItems.filter(s=>s.label).map(function(s){
     return Object.assign({},s,{sortKey:s.sortKey!=null?s.sortKey:s.start});
   }).sort((a,b)=>a.sortKey-b.sortKey);
   if(!items.length)return '<div class="wrb-flow-empty">이날은 기록된 리듬이 없어요</div>';
   const rows=items.map(function(s){
-    const timeRange=toHHMM(s.start)+(s.ongoing?'~진행중':'~'+toHHMM(s.end));
+    const displayEnd=s.labelEnd!=null?s.labelEnd:s.end;
+    const timeRange=toHHMM(s.start)+(s.ongoing?'~진행중':'~'+toHHMM(displayEnd));
     return '<div class="wrb-flow-row"><span class="wrb-flow-dot" style="background:'+s.color+';"></span><span class="wrb-flow-time">'+timeRange+'</span><span class="wrb-flow-label">'+s.label+'</span></div>';
   }).join('');
   return '<div class="wrb-flow-list">'+rows+'</div>';
