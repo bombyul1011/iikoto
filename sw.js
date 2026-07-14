@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260714-53-prefix-click-settings-swipe';
+const CACHE = 'iikoto-v20260714-54-date-change-flow-simplify';
 const ASSETS = [
   './',
   './index.html'
