@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260714-51-ai-cache-server-sync';
+const CACHE = 'iikoto-v20260714-52-unify-greeting-cache-fix-dawn-bg';
 const ASSETS = [
   './',
   './index.html'
