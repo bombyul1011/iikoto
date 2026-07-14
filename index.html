@@ -3200,7 +3200,7 @@ async function fetchHomeWeather(section){
     if(subEl){
       const serverCacheKey='greeting_'+dateKey(new Date())+'_'+getGreetingSubSection();
       const cached=await aiCacheGet(serverCacheKey);
-      subEl.textContent=cached||'생성 대기중이에요';
+      subEl.textContent=cached||'곧 준비될 거예요';
     }
     return;
   }
@@ -4623,7 +4623,7 @@ function renderTodoTextParts(text,strikeParts,todoIdx){
   const inPartMode=_todoPartModeIdx===todoIdx;
   let html='';
   if(hasPrefix){
-    html+=`<span>${prefix} ></span> `;
+    html+=`<span onclick="event.stopPropagation();if(_todoPartModeIdx!==${todoIdx})openTodoSheet(${todoIdx});">${prefix} ></span> `;
   }
   parts.forEach((seg,partIdx)=>{
     const isStruck=strikeParts.includes(partIdx);
@@ -8330,11 +8330,11 @@ function openReading(){
 }
 function closeReading(){document.getElementById('reading-ov').classList.remove('on');}
 
-// ── 독서/씨앗 코너 엣지 스와이프 뒤로가기 ──
+// ── 독서/씨앗/설정 코너 엣지 스와이프 뒤로가기 ──
 (function(){
   let sx=null,sy=null,active=false;
   document.addEventListener('touchstart',function(e){
-    const ov=document.querySelector('.reading-ov.on');
+    const ov=document.querySelector('.reading-ov.on,.settings-ov.on');
     if(!ov){active=false;return;}
     if(document.querySelector('.overlay.on,.modal-ov.on')){active=false;return;} // 시트/모달 열려있으면 무시
     const t=e.touches[0];
@@ -8347,10 +8347,11 @@ function closeReading(){document.getElementById('reading-ov').classList.remove('
     const t=e.changedTouches[0];
     const dx=t.clientX-sx,dy=t.clientY-sy;
     if(dx>80&&Math.abs(dy)<60){
-      const ov=document.querySelector('.reading-ov.on');
+      const ov=document.querySelector('.reading-ov.on,.settings-ov.on');
       if(!ov)return;
       if(ov.id==='reading-ov')closeReading();
       else if(ov.id==='seed-ov')closeSeed();
+      else if(ov.id==='settings-ov')closeSettings();
     }
   },{passive:true});
 })();

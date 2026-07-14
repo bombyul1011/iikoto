@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260714-52-unify-greeting-cache-fix-dawn-bg';
+const CACHE = 'iikoto-v20260714-53-prefix-click-settings-swipe';
 const ASSETS = [
   './',
   './index.html'
