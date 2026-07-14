@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260714-41-todo-reorder-scrolllock-livepos';
+const CACHE = 'iikoto-v20260714-42-todo-reorder-transform-only-rewrite';
 const ASSETS = [
   './',
   './index.html'
