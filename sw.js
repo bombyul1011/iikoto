@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260715-64-dawn-banner-starlight';
+const CACHE = 'iikoto-v20260715-67-midmonth-timing-2200';
 const ASSETS = [
   './',
   './index.html'
