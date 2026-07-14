@@ -177,6 +177,12 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 /* ── TODO ── */
 .todo-item{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--div);font-size:12.5px;color:var(--tp);position:relative;overflow:hidden;user-select:none;}
 .todo-item:last-of-type{border-bottom:none;}
+.todo-item.reorder-active{z-index:5;background:var(--card);box-shadow:0 2px 8px rgba(0,0,0,0.12);border-radius:8px;}
+.todo-item.reorder-shift{transition:transform .12s ease;}
+.todo-drag-handle{display:none;flex-shrink:0;width:16px;height:16px;align-items:center;justify-content:center;color:var(--tm);opacity:.55;cursor:grab;touch-action:none;}
+.todo-reorder-mode .todo-drag-handle.rm-eligible{display:flex;}
+.todo-reorder-mode .chk{pointer-events:none;opacity:.5;}
+.todo-reorder-mode .todo-txt{pointer-events:none;}
 .weekly-review-banner{position:relative;border-radius:16px;padding:1.5px;background:linear-gradient(135deg,rgba(150,215,180,0.95),rgba(235,220,120,0.90),rgba(165,222,188,0.95),rgba(150,215,180,0.95));background-size:300% 300%;animation:bannerShine 4s ease infinite;cursor:pointer;margin-bottom:2px;}
 .weekly-review-banner-inner{border-radius:14.5px;background:linear-gradient(135deg,rgba(210,244,225,0.82),rgba(248,245,200,0.82),rgba(212,242,222,0.82));padding:16px 18px;backdrop-filter:blur(2px);}
 .nw-chip-row{display:flex;flex-direction:column;gap:8px;margin-bottom:16px;}
@@ -1200,7 +1206,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="sleep-dur" id="sleep-dur"></div>
       <div class="slabel-row">
         <div class="slabel">오늘 할 일</div>
-        <button class="slabel-search-btn" onclick="openReserveSheet()" title="예비 투두"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><line x1="7" y1="2" x2="7" y2="12"/><line x1="2" y1="7" x2="12" y2="7"/></svg></button>
+        <div style="display:flex;align-items:center;gap:4px;">
+          <button class="slabel-search-btn" id="todo-reorder-btn" onclick="toggleTodoReorderMode()" title="순서 변경"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><line x1="3.5" y1="4" x2="10.5" y2="4"/><line x1="2" y1="7" x2="12" y2="7"/><line x1="3.5" y1="10" x2="10.5" y2="10"/></svg></button>
+          <button class="slabel-search-btn" onclick="openReserveSheet()" title="예비 투두"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><line x1="7" y1="2" x2="7" y2="12"/><line x1="2" y1="7" x2="12" y2="7"/></svg></button>
+        </div>
       </div>
       <div class="card y" id="todo-card">
         <div id="todo-list"></div>
@@ -4481,10 +4490,17 @@ function confirmTime(){
 
 // ── TODO
 let _todoSwipeIdx=-1;
+let _todoReorderMode=false;
 // 부분완료(조각모드) 기능은 트랙패드 드래그가 브라우저 기본 텍스트선택과 충돌해
 // PC에서 스와이프가 정상 동작하지 않으므로, 터치 지원 기기(모바일)에서만 활성화한다.
 function _isTouchDevice(){
   return ('ontouchstart' in window)||navigator.maxTouchPoints>0;
+}
+function toggleTodoReorderMode(){
+  _todoReorderMode=!_todoReorderMode;
+  document.getElementById('todo-card')?.classList.toggle('todo-reorder-mode',_todoReorderMode);
+  document.getElementById('todo-reorder-btn')?.classList.toggle('on',_todoReorderMode);
+  renderTodos();
 }
 function renderTodos(){
   const dk=dateKey(currentDate),todos=getTodos(dk);
@@ -4501,6 +4517,8 @@ function renderTodos(){
     const ta=tsOrder[a.timeSection||'none']??3;
     const tb=tsOrder[b.timeSection||'none']??3;
     if(ta!==tb)return ta-tb;
+    // 수동 순서(sortOrder)가 둘 다 있으면 그것을 우선 적용, 없으면 기존 시각순 유지
+    if(typeof a.sortOrder==='number'&&typeof b.sortOrder==='number')return a.sortOrder-b.sortOrder;
     return parseTime(a.text)-parseTime(b.text);
   });
   sorted.forEach((t)=>{
@@ -4509,13 +4527,21 @@ function renderTodos(){
     const ts=t.timeSection||'none';
     const tsClass=ts!=='none'?` ts-${ts}`:'';
     const el=document.createElement('div');el.className='todo-item';
+    el.dataset.todoIdx=i;
+    el.dataset.tsGroup=ts;
     if(_todoPartModeIdx===i)el.dataset.partModeIdx=i;
     const postponedClass=(t.postponeCount||0)>=3?' postponed':'';
     const textHtml=renderTodoTextParts(t.text,t.strikeParts||[],i);
     const partModeStyle=_todoPartModeIdx===i?'background:rgba(255,255,255,0.45);border-radius:8px;padding:2px 6px;':'';
-    el.innerHTML=`<div class="chk${tsClass}${t.done?' on':''}" onclick="toggleTodo(${i})"></div><span class="todo-txt${t.done?' done':''}${postponedClass}" data-todo-i="${i}" style="${partModeStyle}">${textHtml}</span>`;
+    const rmEligible=_todoReorderMode&&!t.done;
+    const handleHtml=`<div class="todo-drag-handle${rmEligible?' rm-eligible':''}"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><line x1="3" y1="4.5" x2="11" y2="4.5"/><line x1="3" y1="7" x2="11" y2="7"/><line x1="3" y1="9.5" x2="11" y2="9.5"/></svg></div>`;
+    el.innerHTML=`${handleHtml}<div class="chk${tsClass}${t.done?' on':''}" onclick="toggleTodo(${i})"></div><span class="todo-txt${t.done?' done':''}${postponedClass}" data-todo-i="${i}" style="${partModeStyle}">${textHtml}</span>`;
     const hasMultipleParts=_isTouchDevice()&&parseTodoTextParts(t.text).parts.length>1;
-    attachTodoSwipeMode(el,i,hasMultipleParts);
+    if(rmEligible){
+      attachTodoReorderDrag(el,i,ts);
+    }else if(!_todoReorderMode){
+      attachTodoSwipeMode(el,i,hasMultipleParts);
+    }
     list.appendChild(el);
   });
   updateStats();
@@ -4688,6 +4714,76 @@ function attachTodoSwipeMode(el,i,hasMultipleParts){
   };
   el.addEventListener('pointerup',endDrag);
   el.addEventListener('pointercancel',endDrag);
+}
+// 정렬모드 전용 드래그: 같은 시간대 그룹 내에서만, DOM 재생성 없이 transform으로만 이동.
+// 손 뗄 때 1회만 배열 재정렬 + sortOrder 재기록 + 리렌더링.
+function attachTodoReorderDrag(el,i,tsGroup){
+  const ITEM_H=el.offsetHeight||34;
+  let sy=0,dragging=false,pid=null,captured=false,curShift=0;
+  const handle=el.querySelector('.todo-drag-handle');
+  if(!handle)return;
+  let siblings=[]; // 같은 그룹 내 형제 엘리먼트들(자기 자신 제외), 화면 순서대로
+  handle.addEventListener('pointerdown',e=>{
+    e.preventDefault();
+    sy=e.clientY;dragging=true;captured=false;pid=e.pointerId;curShift=0;
+    el.classList.add('reorder-active');
+    siblings=Array.from(document.querySelectorAll(`.todo-item[data-ts-group="${tsGroup}"]`)).filter(s=>s!==el);
+    try{handle.setPointerCapture(pid);captured=true;}catch(err){}
+  });
+  handle.addEventListener('pointermove',e=>{
+    if(!dragging)return;
+    const dy=e.clientY-sy;
+    el.style.transform=`translateY(${dy}px)`;
+    // 몇 칸 이동했는지 계산해 형제 요소들을 밀어냄
+    const shift=Math.round(dy/ITEM_H);
+    if(shift!==curShift){
+      curShift=shift;
+      const selfRect=el.getBoundingClientRect();
+      siblings.forEach(sib=>{
+        const sibRect=sib.getBoundingClientRect();
+        const willPass=(shift>0&&sibRect.top>selfRect.top&&sibRect.top<=selfRect.top+shift*ITEM_H+ITEM_H)
+                     ||(shift<0&&sibRect.top<selfRect.top&&sibRect.top>=selfRect.top+shift*ITEM_H-ITEM_H);
+        sib.classList.add('reorder-shift');
+        sib.style.transform=willPass?`translateY(${shift>0?-ITEM_H:ITEM_H}px)`:'';
+      });
+    }
+  });
+  const endDrag=()=>{
+    if(!dragging)return;
+    dragging=false;
+    el.classList.remove('reorder-active');
+    el.style.transform='';
+    siblings.forEach(sib=>{sib.classList.remove('reorder-shift');sib.style.transform='';});
+    if(captured&&pid!=null){try{handle.releasePointerCapture(pid);}catch(err){}}
+    pid=null;captured=false;
+    if(curShift!==0)applyTodoReorder(i,tsGroup,curShift);
+    curShift=0;
+  };
+  handle.addEventListener('pointerup',endDrag);
+  handle.addEventListener('pointercancel',endDrag);
+}
+// 같은 시간대 그룹 내에서 idx 항목을 shift칸 이동시키고 sortOrder를 재기록
+function applyTodoReorder(idx,tsGroup,shift){
+  const dk=dateKey(currentDate),todos=getTodos(dk);
+  const tsOrder={morning:0,afternoon:1,night:2,none:3};
+  function parseTime(text){const m=text.match(/^(\d{1,2}):(\d{2})/);return m?parseInt(m[1])*60+parseInt(m[2]):9999;}
+  // 현재 화면 표시 순서와 동일한 기준으로, 이 그룹(미완료+같은 시간대)만 추출
+  const group=todos.map((t,i)=>({...t,_i:i})).filter(t=>!t.done&&(t.timeSection||'none')===tsGroup)
+    .sort((a,b)=>{
+      if(typeof a.sortOrder==='number'&&typeof b.sortOrder==='number')return a.sortOrder-b.sortOrder;
+      return parseTime(a.text)-parseTime(b.text);
+    });
+  const curPos=group.findIndex(t=>t._i===idx);
+  if(curPos<0)return;
+  let newPos=curPos+shift;
+  newPos=Math.max(0,Math.min(group.length-1,newPos));
+  if(newPos===curPos)return;
+  const [moved]=group.splice(curPos,1);
+  group.splice(newPos,0,moved);
+  // 그룹 내 순서대로 sortOrder를 1,2,3...으로 재기록
+  group.forEach((t,order)=>{todos[t._i].sortOrder=order;});
+  saveTodos(dk,todos);
+  renderTodos();
 }
 // 조각모드가 켜진 상태에서, 그 항목 바깥(다른 투두, 체크박스, 다른 UI 등)을 클릭하면 자동으로 조각모드 해제
 document.addEventListener('click',e=>{
