@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260714-45-todo-reorder-refine';
+const CACHE = 'iikoto-v20260714-46-todo-sortorder-sync-fix';
 const ASSETS = [
   './',
   './index.html'

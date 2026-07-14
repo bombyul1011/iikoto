@@ -3901,7 +3901,7 @@ async function syncTodosDown(dk){
     const cid=r.client_id||genCid();
     const localMatch=localByCid[cid];
     const completedAt=r.completed_at!=null?r.completed_at:(localMatch&&localMatch.completedAt!=null?localMatch.completedAt:null);
-    return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid,postponeCount:r.postpone_count||0,strikeParts:r.strike_parts||[],completedAt};
+    return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid,postponeCount:r.postpone_count||0,strikeParts:r.strike_parts||[],completedAt,sortOrder:(r.sort_order!=null?r.sort_order:undefined)};
   }));
   renderTodos();
 }
@@ -3917,7 +3917,7 @@ async function syncTodosUp(dk){
     if(existing)existing.forEach(r=>{if(r.client_id)serverCompletedAt[r.client_id]=r.completed_at;});
   }catch(e){}
   const ok=await syncListUpSafe('todos',`date_key=eq.${dk}`,'date_key,client_id',todos,
-    t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,postpone_count:t.postponeCount||0,is_reserve:t.is_reserve||false,strike_parts:t.strikeParts||[],completed_at:(t.completedAt!=null?t.completedAt:(serverCompletedAt[t.cid]!=null?serverCompletedAt[t.cid]:null))}),
+    t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,postpone_count:t.postponeCount||0,is_reserve:t.is_reserve||false,strike_parts:t.strikeParts||[],completed_at:(t.completedAt!=null?t.completedAt:(serverCompletedAt[t.cid]!=null?serverCompletedAt[t.cid]:null)),sort_order:(typeof t.sortOrder==='number'?t.sortOrder:null)}),
     delCids);
   if(ok)delCids.forEach(cid=>removeDelPending('todos',dk,cid));
   return ok;
