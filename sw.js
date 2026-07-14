@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260714-54-date-change-flow-simplify';
+const CACHE = 'iikoto-v20260714-55-picker-fix-sheet-icons';
 const ASSETS = [
   './',
   './index.html'
