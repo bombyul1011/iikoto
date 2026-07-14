@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260714-39-tab-swipe-fade-slide-anim';
+const CACHE = 'iikoto-v20260714-40-todo-longpress-reorder';
 const ASSETS = [
   './',
   './index.html'

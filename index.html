@@ -176,6 +176,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 /* ── TODO ── */
 .todo-item{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--div);font-size:12.5px;color:var(--tp);position:relative;overflow:hidden;user-select:none;}
+.todo-item.todo-reordering{background:var(--card);box-shadow:0 4px 14px rgba(0,0,0,0.12);border-radius:9px;z-index:5;transition:none;}
 .todo-item:last-of-type{border-bottom:none;}
 .weekly-review-banner{position:relative;border-radius:16px;padding:1.5px;background:linear-gradient(135deg,rgba(150,215,180,0.95),rgba(235,220,120,0.90),rgba(165,222,188,0.95),rgba(150,215,180,0.95));background-size:300% 300%;animation:bannerShine 4s ease infinite;cursor:pointer;margin-bottom:2px;}
 .weekly-review-banner-inner{border-radius:14.5px;background:linear-gradient(135deg,rgba(210,244,225,0.82),rgba(248,245,200,0.82),rgba(212,242,222,0.82));padding:16px 18px;backdrop-filter:blur(2px);}
@@ -4649,33 +4650,79 @@ function confirmCopyUnstruckParts(){
 // - 구분자 없는 단일 항목: 항목 전체를 내일로 복사(오늘 항목은 유지, "오늘도 내일도 해야 하는 일" 용도)
 function attachTodoSwipeMode(el,i,hasMultipleParts){
   let sx=0,sy=0,moved=false,dragging=false,pid=null,captured=false;
+  let reorderMode=false,longPressTimer=null,reorderStartY=0,reorderRowH=0;
+  const clearLongPress=()=>{if(longPressTimer){clearTimeout(longPressTimer);longPressTimer=null;}};
   el.addEventListener('pointerdown',e=>{
     // 체크박스 위에서 시작한 드래그는 완료 토글과 충돌하지 않게 무시. 조각(.todo-part)은 이제 허용(조각모드 재진입 가능해야 함).
     if(e.target.closest('.chk'))return;
-    sx=e.clientX;sy=e.clientY;moved=false;dragging=true;captured=false;
+    sx=e.clientX;sy=e.clientY;moved=false;dragging=true;captured=false;reorderMode=false;
     pid=e.pointerId;
     // 주의: 여기서 곧바로 setPointerCapture를 걸면 PC 마우스에서 순수 클릭(드래그 없는 탭)의
     // click 이벤트 target이 el(줄 전체)로 왜곡되어, 클릭한 조각(.todo-part)의 onclick이 실행되지 않는
     // 부작용이 있었음. 그래서 실제로 좌측 드래그 임계값(pointermove에서 dx<-15)을 넘었을 때만 캡처한다.
+    // 롱프레스(420ms) 동안 손가락/마우스가 거의 안 움직였으면 순서변경 모드로 진입.
+    // 좌우 드래그(내일로 복사/조각모드)와 겹치지 않도록, 롱프레스 완료 시점까지 dx/dy가 임계값(6px) 이내여야 함.
+    clearLongPress();
+    longPressTimer=setTimeout(()=>{
+      if(!dragging)return;
+      const dx0=Math.abs(e.clientX-sx),dy0=Math.abs(e.clientY-sy);
+      if(dx0>6||dy0>6)return; // 이미 다른 방향으로 움직이기 시작했으면 순서변경 진입 취소
+      reorderMode=true;
+      reorderStartY=sy;
+      reorderRowH=el.offsetHeight||36;
+      el.classList.add('todo-reordering');
+      if(navigator.vibrate)navigator.vibrate(8);
+    },420);
   });
   el.addEventListener('pointermove',e=>{
     if(!dragging)return;
     const dx=e.clientX-sx;
-    const dy=Math.abs(e.clientY-sy);
+    const dy=e.clientY-sy;
+    if(reorderMode){
+      el.style.transform=`translateY(${dy}px)`;
+      moved=true;
+      if(!captured){try{el.setPointerCapture(pid);captured=true;}catch(err){}}
+      return;
+    }
+    const dyAbs=Math.abs(dy);
+    // 롱프레스 확정 전에 이미 크게 움직이면(좌우든 세로든) 순서변경 후보에서 제외
+    if(dxOrDyMoved(dx,dyAbs))clearLongPress();
     // 세로 이동이 크면 스크롤 의도로 보고 드래그 취소
-    if(dy>18&&Math.abs(dx)<18){dragging=false;el.style.transform='';return;}
+    if(dyAbs>18&&Math.abs(dx)<18){dragging=false;el.style.transform='';clearLongPress();return;}
     if(dx<-15){
+      clearLongPress();
       el.style.transform=`translateX(${Math.max(dx,-30)}px)`;moved=true;
       if(window.getSelection)window.getSelection().removeAllRanges(); // 트랙패드 드래그 중 텍스트가 선택돼버리는 것을 방지
       if(!captured){try{el.setPointerCapture(pid);captured=true;}catch(err){}}
     }
   });
-  const endDrag=()=>{
+  function dxOrDyMoved(dx,dyAbs){return Math.abs(dx)>6||dyAbs>6;}
+  const endDrag=e=>{
     if(!dragging)return;
+    clearLongPress();
     dragging=false;
     el.style.transform='';
+    el.classList.remove('todo-reordering');
     if(captured&&pid!=null){try{el.releasePointerCapture(pid);}catch(err){}}
     pid=null;captured=false;
+    if(reorderMode){
+      const dy=(e&&e.clientY!=null?e.clientY:reorderStartY)-reorderStartY;
+      const stepsMoved=Math.round(dy/Math.max(reorderRowH,28));
+      reorderMode=false;
+      if(stepsMoved!==0){
+        const dk=dateKey(currentDate),todos=getTodos(dk),t=todos[i];
+        if(t){
+          const ts=t.timeSection||'none',done=t.done;
+          const groupIdx=todos.map((x,idx)=>idx).filter(idx=>(todos[idx].timeSection||'none')===ts&&todos[idx].done===done);
+          const curPos=groupIdx.indexOf(i);
+          if(curPos>=0)reorderTodoDrag(i,curPos+stepsMoved);
+        }
+      }else{
+        renderTodos();
+      }
+      moved=false;
+      return;
+    }
     if(moved){
       if(hasMultipleParts){
         _todoPartModeIdx=(_todoPartModeIdx===i)?-1:i;
@@ -5850,6 +5897,28 @@ function openTodoSheet(i){
   openSheet('todo-sheet');
 }
 function todoSheetEdit(){_todoSwipeIdx>=0&&(closeSheet('todo-sheet'),openTodoModal(_todoSwipeIdx));}
+// 드래그로 투두 순서를 실시간 재배치. todoSheetMove와 동일하게 같은 시간대+완료상태 그룹 안에서만 이동.
+// fromIdx 항목을 그룹 내 목표 위치(targetPos, 0-indexed)로 옮기고 나머지는 밀림.
+function reorderTodoDrag(fromIdx,targetGroupPos){
+  const dk=dateKey(currentDate),todos=getTodos(dk);
+  const t=todos[fromIdx];if(!t)return;
+  const ts=t.timeSection||'none',done=t.done;
+  const groupIdx=todos.map((x,idx)=>idx).filter(idx=>(todos[idx].timeSection||'none')===ts&&todos[idx].done===done);
+  const curPos=groupIdx.indexOf(fromIdx);
+  if(curPos<0)return;
+  const clampedTarget=Math.max(0,Math.min(targetGroupPos,groupIdx.length-1));
+  if(clampedTarget===curPos)return;
+  // 그룹 내 실제 배열 인덱스들을 순서만 재배열
+  const groupObjs=groupIdx.map(idx=>todos[idx]);
+  const [moved]=groupObjs.splice(curPos,1);
+  groupObjs.splice(clampedTarget,0,moved);
+  groupIdx.forEach((idx,k)=>{todos[idx]=groupObjs[k];});
+  // 동기화되어도 순서가 유지되도록 그룹 내 created 재부여(todoSheetMove와 동일 패턴)
+  const base=Date.now()-groupIdx.length*1000;
+  groupIdx.forEach((idx,k)=>{todos[idx].created=base+k*1000;});
+  saveTodos(dk,todos);
+  renderTodos();
+}
 function todoSheetMove(dir){
   if(_todoSwipeIdx<0)return;
   const dk=dateKey(currentDate),todos=getTodos(dk);
