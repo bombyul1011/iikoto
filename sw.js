@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260715-80-vow-save-immediate-refresh';
+const CACHE = 'iikoto-v20260715-81-vow-server-download';
 const ASSETS = [
   './',
   './index.html'

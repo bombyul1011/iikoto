@@ -7203,6 +7203,14 @@ function saveDailyVow(dk,text){
 async function syncDailyVowUp(key,text){
   await supaUpsert('goal_notes','note_key',[{note_key:key,lines:[text]}]);
 }
+// PC 등 다른 기기가 모바일에서 작성한 오늘의 다짐을 볼 수 있도록 서버에서 받아와 로컬에 채움.
+async function syncDailyVowDown(dk){
+  const key=S.key('dailyvow',dk);
+  const rows=await supaFetch(`goal_notes?note_key=eq.${encodeURIComponent(key)}`);
+  if(!rows||!rows.length)return;
+  const serverText=(rows[0].lines&&rows[0].lines[0])||'';
+  if(serverText&&serverText!==getDailyVow(dk))S.set(key,serverText);
+}
 // 오전 파트2 전용 "오늘의 다짐" 입력 카드. 짧은 한 줄로 오늘 하루를 어떻게 보낼지 적어두면,
 // 저녁 주간탭 하루한줄 오늘 칸에 placeholder로 흐리게 노출되어 스스로 다짐과 실제 하루를 대조해볼 수 있음.
 // 하루 지나면(자정 넘어 새 날짜가 되면) cleanupOldDailyVows가 자동으로 정리.
@@ -7258,6 +7266,14 @@ function renderDailyOneLineWeek(){
   const el=document.getElementById('daily-oneline-list');if(!el)return;
   const now=new Date(),dow=now.getDay();
   const mon=new Date(now);mon.setDate(now.getDate()-((dow+6)%7));
+  const todayDk=dateKey(now);
+  if(navigator.onLine){
+    syncDailyVowDown(todayDk).then(()=>{
+      // 서버에서 받아온 값이 로컬과 다를 수 있으니, today 입력창의 placeholder만 다시 갱신
+      const inp=document.querySelector(`#daily-oneline-list .oneline-today .oneline-inp`);
+      if(inp)inp.placeholder=getDailyVow(todayDk)||'오늘 하루 한 줄...';
+    });
+  }
   el.innerHTML='';
   for(let i=0;i<7;i++){
     const d=new Date(mon);d.setDate(mon.getDate()+i);
