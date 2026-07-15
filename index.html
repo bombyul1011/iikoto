@@ -7198,6 +7198,7 @@ function getDailyVow(dk){return S.get(S.key('dailyvow',dk))||'';}
 function saveDailyVow(dk,text){
   S.set(S.key('dailyvow',dk),text);
   if(navigator.onLine)syncDailyVowUp(S.key('dailyvow',dk),text);
+  if(document.getElementById('daily-oneline-list'))renderDailyOneLineWeek(); // 주간탭이 이미 열려있으면 즉시 반영
 }
 async function syncDailyVowUp(key,text){
   await supaUpsert('goal_notes','note_key',[{note_key:key,lines:[text]}]);

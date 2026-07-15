@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260715-79-vow-immediate-in-weekly';
+const CACHE = 'iikoto-v20260715-80-vow-save-immediate-refresh';
 const ASSETS = [
   './',
   './index.html'
