@@ -7210,7 +7210,7 @@ function makeDailyVowCard(){
   card.style.cssText='padding:14px 15px;margin-bottom:0;border:none;box-shadow:none;background:var(--card);border-radius:18px;';
   const existing=getDailyVow(dk);
   card.innerHTML=`
-    <div class="slabel" style="margin-bottom:8px;display:flex;align-items:center;gap:5px;"><i class="ti ti-sparkle-highlight" style="font-size:14px;color:#c9976a;" aria-hidden="true"></i>오늘의 다짐</div>
+    <div class="slabel" style="margin-bottom:8px;display:flex;align-items:center;gap:5px;"><i class="ti ti-sparkles" style="font-size:14px;color:#c9976a;" aria-hidden="true"></i>오늘의 다짐</div>
     <input type="text" id="daily-vow-inp" class="oneline-inp" style="width:100%;" placeholder="오늘 하루를 어떻게 보내고 싶나요?" value="${existing.replace(/"/g,'&quot;')}" autocomplete="off">
   `;
   outer.appendChild(card);
