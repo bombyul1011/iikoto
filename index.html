@@ -7272,7 +7272,7 @@ function renderDailyOneLineWeek(){
     const inp=document.createElement('input');
     inp.type='text';inp.className='oneline-inp';
     inp.value=getDailyOneLine(dk);
-    const showVow=isToday&&new Date().getHours()>=18;
+    const showVow=isToday;
     inp.placeholder=isToday?((showVow&&getDailyVow(dk))||'오늘 하루 한 줄...'):'';
     inp.autocomplete='off';
     inp.addEventListener('blur',()=>saveDailyOneLine(dk,inp.value.trim()));

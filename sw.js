@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260715-78-CRITICAL-fix-music-enddate-crash';
+const CACHE = 'iikoto-v20260715-79-vow-immediate-in-weekly';
 const ASSETS = [
   './',
   './index.html'
