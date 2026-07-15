@@ -803,7 +803,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rhythm-content-chip{font-size:11px;color:var(--tp);background:var(--card);border:1px solid var(--card-b);border-radius:9px;padding:6px 10px;cursor:pointer;white-space:nowrap;}
 .rhythm-save-btn{width:100%;background:var(--acc);color:#fff;border:none;border-radius:12px;padding:11px 0;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;}
 
-.habit-numbox-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(78px,1fr));gap:8px;margin-bottom:2px;}
+.habit-numbox-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(78px,1fr));gap:8px;margin-bottom:10px;}
 .habit-numbox-card{display:flex;flex-direction:column;align-items:center;background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:14px 8px;}
 .habit-numbox-name{font-size:11px;color:var(--tp);margin-bottom:2px;}
 .habit-numbox-num{font-size:18px;font-weight:700;color:var(--tp);font-family:'DM Sans',sans-serif;}
@@ -1077,7 +1077,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div id="memo-list"></div>
         <div class="memo-input-row">
           <button class="stamp-btn memo-stamp-sm" onclick="openMemoTimePicker()" id="memo-stamp-btn" title="시간 선택 후 메모 입력"><i class="ti ti-clock-hour-4" style="font-size:14px;color:var(--ts);" aria-hidden="true"></i></button>
-          <textarea class="memo-field memo-field-sm" id="memo-inline-inp" placeholder="메모를 입력하세요" rows="1" autocomplete="off" onkeydown="if(event.isComposing||event.keyCode===229)return;if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();submitMemoInline();}"></textarea>
+          <textarea class="memo-field memo-field-sm" id="memo-inline-inp" placeholder="메모를 입력하세요" rows="1" autocomplete="off" onkeydown="if(event.isComposing||event.keyCode===229||event.key===' '||event.code==='Space')return;if((event.key==='Enter'||event.keyCode===13)&&!event.shiftKey){event.preventDefault();submitMemoInline();}"></textarea>
           <button class="send-btn send-btn-sm" onclick="submitMemoInline()" title="메모 등록"><i class="ti ti-arrow-up" style="font-size:14px;" aria-hidden="true"></i></button>
         </div>
       </div>
@@ -1436,7 +1436,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 <div class="modal-ov" id="memo-modal" onclick="closeModal('memo-modal',event)">
   <div class="modal">
     <div class="modal-title">메모 추가</div>
-    <textarea class="modal-inp" id="memo-modal-inp" placeholder="메모를 입력하세요" rows="3" autocomplete="off" style="resize:none;" onkeydown="if(event.isComposing||event.keyCode===229)return;if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();confirmMemo();}"></textarea>
+    <textarea class="modal-inp" id="memo-modal-inp" placeholder="메모를 입력하세요" rows="3" autocomplete="off" style="resize:none;" onkeydown="if(event.isComposing||event.keyCode===229||event.key===' '||event.code==='Space')return;if((event.key==='Enter'||event.keyCode===13)&&!event.shiftKey){event.preventDefault();confirmMemo();}"></textarea>
     <div class="modal-actions">
       <button class="mbtn cancel" onclick="closeModal('memo-modal')">취소</button>
       <button class="mbtn ok" onclick="confirmMemo()">저장</button>
@@ -1859,13 +1859,16 @@ function renderHomeBody(section){
 
   if(section==='morning'){
     // 어제 돌아보기 카드, 운동 체크 배너 모두 제거됨 — 아침 루틴(굿모닝) 카드로 대체
-    body.appendChild(makeMorningRoutineCard());
-    body.appendChild(makeHabitStreakRow());
-    if(getSubSection()==='morning_2'){
+    const isMorning2=getSubSection()==='morning_2';
+    if(isMorning2){
       body.appendChild(makeDailyVowCard());
     }
+    body.appendChild(makeMorningRoutineCard());
+    body.appendChild(makeHabitStreakRow());
     body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getRhythmLogicalDate()));},'rhythm-soft',12.5,dateKey(getRhythmLogicalDate())));
-    body.appendChild(makeRecentContentsCard());
+    if(!isMorning2){
+      body.appendChild(makeRecentContentsCard());
+    }
   } else if(section==='afternoon'){
     body.appendChild(makeAfternoonPaceCard());
     refreshAfternoonPaceCard();
@@ -5279,7 +5282,6 @@ function makeAfternoonPaceCard(){
 }
 function toggleTodo(i){const dk=dateKey(currentDate),todos=getTodos(dk);todos[i].done=!todos[i].done;todos[i].completedAt=todos[i].done?Date.now():null;saveTodos(dk,todos);renderTodos();}
 
-// ── 아침(morning_1) 전용: 어제 리뷰 + 오늘의 팁 카드, 하루 1회 캐싱
 // ── 홈탭 저녁 파트: 텍스트 아카이브 위젯 (씨앗+문장수집 통합 랜덤, 하루 1회 고정)
 function _archivePool(){
   const seeds=getSeeds().map(s=>({kind:'seed',cid:s.cid,text:s.text,source:s.source||'',comment:s.comment||''}));
@@ -7201,18 +7203,21 @@ async function syncDailyVowUp(key,text){
 // 하루 지나면(자정 넘어 새 날짜가 되면) cleanupOldDailyVows가 자동으로 정리.
 function makeDailyVowCard(){
   const dk=dateKey(new Date());
+  const outer=document.createElement('div');
+  outer.style.cssText='border-radius:19.5px;padding:1.6px;margin-bottom:10px;background:linear-gradient(135deg,rgba(235,175,165,0.55),rgba(240,205,150,0.50),rgba(235,175,165,0.55));';
   const card=document.createElement('div');
   card.className='card';
-  card.style.cssText='padding:14px 15px;margin-bottom:8px;';
+  card.style.cssText='padding:14px 15px;margin-bottom:0;border:none;box-shadow:none;background:var(--card);border-radius:18px;';
   const existing=getDailyVow(dk);
   card.innerHTML=`
-    <div class="slabel" style="margin-bottom:8px;">오늘의 다짐</div>
+    <div class="slabel" style="margin-bottom:8px;display:flex;align-items:center;gap:5px;"><i class="ti ti-sparkle-highlight" style="font-size:14px;color:#c9976a;" aria-hidden="true"></i>오늘의 다짐</div>
     <input type="text" id="daily-vow-inp" class="oneline-inp" style="width:100%;" placeholder="오늘 하루를 어떻게 보내고 싶나요?" value="${existing.replace(/"/g,'&quot;')}" autocomplete="off">
   `;
+  outer.appendChild(card);
   const inp=card.querySelector('#daily-vow-inp');
   inp.addEventListener('blur',()=>saveDailyVow(dk,inp.value.trim()));
   inp.addEventListener('keydown',e=>{if(e.key==='Enter')inp.blur();});
-  return card;
+  return outer;
 }
 // 앱 진입 시 1회 호출 — 오늘이 아닌 dailyvow:*를 로컬+서버 양쪽에서 정리.
 // 정확한 날짜 계산을 위해 물리적 자정이 아니라 오늘 날짜(dateKey(new Date())) 기준으로 판단.
