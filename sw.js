@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260715-74-vow-card-icon-fix';
+const CACHE = 'iikoto-v20260715-75-vow-card-opaque-bg';
 const ASSETS = [
   './',
   './index.html'
