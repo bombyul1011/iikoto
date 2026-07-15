@@ -6559,8 +6559,12 @@ function renderTimetable(){
       let endD;
       if(isWatching&&!eStr){
         endD=isSameMonth?todayDay:daysInMonth;
+      }else if(!eStr){
+        // music처럼 isWatching이 항상 false로 계산되는 카테고리는 위 분기를 못 타므로,
+        // 종료일이 없는 경우 여기서 별도로 처리(시작일과 동일하게, 또는 진행중이면 오늘/월말까지).
+        endD=item.status==='watching'?(isSameMonth?todayDay:daysInMonth):startD;
       }else{
-        const eMonth=eStr?eStr.slice(0,7):mk;
+        const eMonth=eStr.slice(0,7);
         endD=eMonth===mk?Math.max(parseInt(eStr.slice(8,10),10)||startD,startD):daysInMonth;
       }
       endD=Math.min(Math.max(endD,startD),31);

@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260715-77-vow-card-revert-translucent';
+const CACHE = 'iikoto-v20260715-78-CRITICAL-fix-music-enddate-crash';
 const ASSETS = [
   './',
   './index.html'
