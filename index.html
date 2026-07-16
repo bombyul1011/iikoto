@@ -996,11 +996,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="topbar-right">
         <div class="date-nav">
           <div class="nav-arr" id="btn-prev" onclick="shiftDay(-1)">
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" style="color:var(--tm)"><polyline points="6.5,1.5 3,5 6.5,8.5"/></svg>
+            <i class="ti ti-chevron-left" style="font-size:10px;color:var(--tm);" aria-hidden="true"></i>
           </div>
           <span class="date-pill" id="js-date" onclick="goToday()"></span>
           <div class="nav-arr" id="btn-next" onclick="shiftDay(1)">
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" style="color:var(--tm)"><polyline points="3.5,1.5 7,5 3.5,8.5"/></svg>
+            <i class="ti ti-chevron-right" style="font-size:10px;color:var(--tm);" aria-hidden="true"></i>
           </div>
         </div>
         <div class="icon-btn" onclick="openSettings()">
@@ -1010,7 +1010,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           <i class="ti ti-seeding" style="font-size:16px;color:#6a8a50;" aria-hidden="true"></i>
         </div>
         <div class="icon-btn reading-icon-btn" onclick="openReading()">
-          <i class="ti ti-book" style="font-size:15px;color:#a8527a;" aria-hidden="true"></i>
+          <i class="ti ti-macro" style="font-size:15px;color:#a8527a;" aria-hidden="true"></i>
         </div>
       </div>
     </div>
@@ -1045,7 +1045,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div class="sleep-box">
           <div class="sleep-lft">
             <div class="sleep-lbl">
-              <i class="ti ti-moon" style="font-size:13px;color:var(--tm);vertical-align:-2px;margin-right:2px;" aria-hidden="true"></i>취침
+              <i class="ti ti-moon-stars" style="font-size:13px;color:var(--tm);vertical-align:-2px;margin-right:2px;" aria-hidden="true"></i>취침
             </div>
             <div class="sleep-val" id="sleep-time" onclick="openTimeModal('sleep')">--:--</div>
           </div>
@@ -1071,14 +1071,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="slabel-row">
         <div class="slabel">오늘 할 일</div>
         <div style="display:flex;align-items:center;gap:4px;">
-          <button class="slabel-search-btn" id="todo-reorder-btn" onclick="toggleTodoReorderMode()" title="순서 변경"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><line x1="3.5" y1="4" x2="10.5" y2="4"/><line x1="2" y1="7" x2="12" y2="7"/><line x1="3.5" y1="10" x2="10.5" y2="10"/></svg></button>
-          <button class="slabel-search-btn" onclick="openReserveSheet()" title="예비 투두"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><line x1="7" y1="2" x2="7" y2="12"/><line x1="2" y1="7" x2="12" y2="7"/></svg></button>
+          <button class="slabel-search-btn" id="todo-reorder-btn" onclick="toggleTodoReorderMode()" title="순서 변경"><i class="ti ti-menu-2" style="font-size:13px;" aria-hidden="true"></i></button>
+          <button class="slabel-search-btn" onclick="openReserveSheet()" title="예비 투두"><i class="ti ti-plus" style="font-size:12px;" aria-hidden="true"></i></button>
         </div>
       </div>
       <div class="card y" id="todo-card">
         <div id="todo-list"></div>
         <button class="add-btn" onclick="openTodoModal()">
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" style="color:var(--tm)"><line x1="6.5" y1="2" x2="6.5" y2="11"/><line x1="2" y1="6.5" x2="11" y2="6.5"/></svg>할 일 추가
+          <i class="ti ti-plus" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i>할 일 추가
         </button>
       </div>
       <div class="slabel-row">
@@ -1106,7 +1106,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="card" id="wchallenge-card" style="padding:14px 15px 10px;margin-bottom:7px;">
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <div class="goal-section-title" id="wchallenge-title" style="margin-top:0;"><i class="ti ti-flag-3" id="wchallenge-icon" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i> 주간 목표</div>
-          <button class="wgoal-add-btn" id="wgoal-add-btn" title="항목 추가"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><line x1="7" y1="2" x2="7" y2="12"/><line x1="2" y1="7" x2="12" y2="7"/></svg></button>
+          <button class="wgoal-add-btn" id="wgoal-add-btn" title="항목 추가"><i class="ti ti-plus" style="font-size:12px;" aria-hidden="true"></i></button>
         </div>
         <div class="goal-wrap" id="weekly-goal-wrap"></div>
       </div>
@@ -1293,8 +1293,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   <div class="bsheet">
     <div class="sheet-handle"></div>
     <div class="sheet-title">메모 옵션</div>
-    <div class="sheet-item" onclick="memoSheetEdit()"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="color:var(--ts)"><path d="M3 15L5 9L13.5 1.5C14.5.5 16 .5 17 1.5L16.5 2C17.5 3 17.5 4.5 16.5 5.5L8 14Z"/><line x1="5" y1="9" x2="8" y2="14"/></svg>수정</div>
-    <div class="sheet-item del" onclick="memoSheetDelete()"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#c05060" stroke-width="1.2" stroke-linecap="round"><polyline points="3,5 15,5"/><rect x="4.5" y="5" width="9" height="10.5" rx="2"/></svg>삭제</div>
+    <div class="sheet-item" onclick="memoSheetEdit()"><i class="ti ti-edit" style="font-size:18px;color:var(--ts);" aria-hidden="true"></i>수정</div>
+    <div class="sheet-item del" onclick="memoSheetDelete()"><i class="ti ti-trash" style="font-size:18px;color:#c05060;" aria-hidden="true"></i>삭제</div>
   </div>
 </div>
 
@@ -1313,7 +1313,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 <div class="share-ov" id="share-ov">
   <div class="share-ov-hdr">
     <div class="settings-back" onclick="closeShareCard()">
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="color:var(--ts)"><polyline points="10,3 5,8 10,13"/></svg>
+      <i class="ti ti-chevron-left" style="font-size:16px;color:var(--ts);" aria-hidden="true"></i>
     </div>
     <span class="share-ov-ttl">독서 공유카드</span>
   </div>
@@ -1333,11 +1333,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
     <div class="share-cycle-row">
       <div class="share-cycle-btn" id="cyc-header" onclick="cycleShare('header')">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><line x1="2" y1="4" x2="14" y2="4"/><line x1="2" y1="8" x2="9" y2="8"/><line x1="2" y1="12" x2="11" y2="12"/></svg>
+        <i class="ti ti-align-left" style="font-size:15px;" aria-hidden="true"></i>
         <span class="lbl" id="cyc-header-lbl">헤더 없음</span>
       </div>
       <div class="share-cycle-btn" id="cyc-quote" onclick="cycleShare('quote')">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M3 4h10v6H7l-2.5 2.5V10H3z"/></svg>
+        <i class="ti ti-message" style="font-size:15px;" aria-hidden="true"></i>
         <span class="lbl" id="cyc-quote-lbl">문장 없음</span>
       </div>
       <div class="share-cycle-btn" id="cyc-progress" onclick="cycleShare('progress')">
@@ -1526,10 +1526,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <input type="text" class="modal-inp" id="cm-start" readonly onclick="openContentDatePicker('cm-start')" style="flex:1;margin-bottom:0;cursor:pointer;" placeholder="날짜 선택">
       <div style="display:flex;gap:5px;flex-shrink:0;">
         <button class="cstatus-btn done" id="cm-done" onclick="toggleCDone()" style="white-space:nowrap;padding:8px 9px;margin-bottom:0;">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><circle cx="7" cy="7" r="5.5"/><polyline points="4,7 6,9.5 10,4.5"/></svg>완료
+          <i class="ti ti-circle-check" style="font-size:14px;" aria-hidden="true"></i>완료
         </button>
         <button class="cstatus-btn stop" id="cm-stop" onclick="toggleCStop()" style="white-space:nowrap;padding:8px 9px;margin-bottom:0;">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><circle cx="7" cy="7" r="5.5"/><rect x="5" y="5" width="4" height="4" rx="0.6"/></svg>중단
+          <i class="ti ti-copy-off" style="font-size:14px;" aria-hidden="true"></i>중단
         </button>
       </div>
     </div>
@@ -1555,7 +1555,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 <div class="settings-ov" id="settings-ov">
   <div class="settings-hdr" style="padding-top:max(20px,env(safe-area-inset-top));">
     <div class="settings-back" onclick="closeSettings()">
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="color:var(--ts)"><polyline points="10,3 5,8 10,13"/></svg>
+      <i class="ti ti-chevron-left" style="font-size:16px;color:var(--ts);" aria-hidden="true"></i>
     </div>
     <span class="settings-ttl">설정</span>
   </div>
@@ -1574,14 +1574,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="settings-slbl">동기화</div>
       <div class="settings-card">
         <div class="settings-item"><span class="settings-item-lbl">상태</span><span class="settings-item-val" id="sync-status">확인 중...</span></div>
-        <div class="settings-item" onclick="manualSync()" style="cursor:pointer;"><span class="settings-item-lbl">지금 동기화</span><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--tm)"><polyline points="5,2 9,7 5,12"/></svg></div>
+        <div class="settings-item" onclick="manualSync()" style="cursor:pointer;"><span class="settings-item-lbl">지금 동기화</span><i class="ti ti-chevron-right" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i></div>
       </div>
     </div>
     <div>
       <div class="settings-slbl">백업</div>
       <div class="settings-card">
-        <div class="settings-item" onclick="downloadFullJSONBackup()" style="cursor:pointer;"><span class="settings-item-lbl"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="color:var(--tp);margin-right:6px;vertical-align:-2px"><path d="M10 3V13M10 13L6 9M10 13L14 9"/><path d="M4 15V16C4 16.5523 4.44772 17 5 17H15C15.5523 17 16 16.5523 16 16V15"/></svg>전체 데이터 백업 (JSON)</span><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--tm)"><polyline points="5,2 9,7 5,12"/></svg></div>
-        <div class="settings-item" onclick="openMarkdownBackup()" style="cursor:pointer;"><span class="settings-item-lbl"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="color:var(--tp);margin-right:6px;vertical-align:-2px"><path d="M5 3C4 3 3 4 3 5V17C3 18 4 19 5 19H15C16 19 17 18 17 17V7L13 3H5Z"/><polyline points="13,3 13,7 17,7"/><line x1="7" y1="10" x2="13" y2="10"/><line x1="7" y1="13" x2="11" y2="13"/></svg>일기 백업 (마크다운)</span><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--tm)"><polyline points="5,2 9,7 5,12"/></svg></div>
+        <div class="settings-item" onclick="downloadFullJSONBackup()" style="cursor:pointer;"><span class="settings-item-lbl"><i class="ti ti-download" style="font-size:15px;color:var(--tp);margin-right:6px;vertical-align:-2px;" aria-hidden="true"></i>전체 데이터 백업 (JSON)</span><i class="ti ti-chevron-right" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i></div>
+        <div class="settings-item" onclick="openMarkdownBackup()" style="cursor:pointer;"><span class="settings-item-lbl"><i class="ti ti-file-text" style="font-size:15px;color:var(--tp);margin-right:6px;vertical-align:-2px;" aria-hidden="true"></i>일기 백업 (마크다운)</span><i class="ti ti-chevron-right" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i></div>
         <div class="settings-item" style="flex-direction:column;align-items:flex-start;gap:8px;padding-top:12px;">
           <span class="settings-item-lbl">노션 백업 (베타) · 매달 1일 지난달분</span>
           <input type="text" id="notion-worker-url-inp" class="modal-inp"
@@ -1699,12 +1699,12 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 <div class="reading-ov" id="seed-ov">
   <div class="settings-hdr" style="padding-top:max(20px,env(safe-area-inset-top));">
     <div class="settings-back" onclick="closeSeed()">
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="color:var(--ts)"><polyline points="10,3 5,8 10,13"/></svg>
+      <i class="ti ti-chevron-left" style="font-size:16px;color:var(--ts);" aria-hidden="true"></i>
     </div>
     <span class="settings-ttl">문장 씨앗</span>
     <div style="flex:1;"></div>
     <div class="settings-back" style="width:30px;height:30px;" onclick="openSeedForm()">
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" style="color:var(--ts)"><line x1="7" y1="2" x2="7" y2="12"/><line x1="2" y1="7" x2="12" y2="7"/></svg>
+      <i class="ti ti-plus" style="font-size:14px;color:var(--ts);" aria-hidden="true"></i>
     </div>
   </div>
   <div class="reading-body">
@@ -1728,7 +1728,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 <div class="reading-ov" id="reading-ov">
   <div class="settings-hdr" style="padding-top:max(20px,env(safe-area-inset-top));">
     <div class="settings-back" onclick="closeReading()">
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="color:var(--ts)"><polyline points="10,3 5,8 10,13"/></svg>
+      <i class="ti ti-chevron-left" style="font-size:16px;color:var(--ts);" aria-hidden="true"></i>
     </div>
     <span class="settings-ttl">독서</span>
     <div style="flex:1;"></div>
@@ -2304,7 +2304,7 @@ function buildDailyRhythmTrack(dk){
       html+='<div class="rt-connector" style="top:'+top+'px;height:'+h+'px;"></div>';
     }
     const delBtn=bk.manualIdx!=null?'<span class="rt-del" onclick="deleteRhythmBlock('+bk.manualIdx+')">×</span>':'';
-    const editBtn=bk.manualIdx!=null?'<span class="rt-edit" onclick="openRhythmEditForm('+bk.manualIdx+')"><svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M2.5 11.5L3.5 8L9.5 2L12 4.5L6 10.5L2.5 11.5Z"/></svg></span>':'';
+    const editBtn=bk.manualIdx!=null?'<span class="rt-edit" onclick="openRhythmEditForm('+bk.manualIdx+')"><i class="ti ti-edit" style="font-size:11px;" aria-hidden="true"></i></span>':'';
     const finishBtn=(bk.ongoing&&bk.manualIdx!=null)?'<span class="rt-finish" onclick="finishRhythmBlock('+bk.manualIdx+')">종료</span>':'';
     const actions=(finishBtn||editBtn||delBtn)?'<span class="rt-actions">'+finishBtn+editBtn+delBtn+'</span>':'';
     html+='<div class="rt-row" style="top:'+bk.labelY+'px;"><span class="rt-time">'+bk.time+'</span><span class="rt-txt">'+bk.label+'</span>'+actions+'</div>';
@@ -4408,7 +4408,7 @@ function renderTodos(){
     const textHtml=renderTodoTextParts(t.text,t.strikeParts||[],i);
     const partModeStyle=_todoPartModeIdx===i?'background:rgba(255,255,255,0.45);border-radius:8px;padding:2px 6px;':'';
     const rmEligible=_todoReorderMode&&!t.done;
-    const handleHtml=`<div class="todo-drag-handle${rmEligible?' rm-eligible':''}"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><line x1="3" y1="4.5" x2="11" y2="4.5"/><line x1="3" y1="7" x2="11" y2="7"/><line x1="3" y1="9.5" x2="11" y2="9.5"/></svg></div>`;
+    const handleHtml=`<div class="todo-drag-handle${rmEligible?' rm-eligible':''}"><i class="ti ti-grip-vertical" style="font-size:13px;" aria-hidden="true"></i></div>`;
     el.innerHTML=`${handleHtml}<div class="chk${tsClass}${t.done?' on':''}" onclick="toggleTodo(${i})"></div><span class="todo-txt${t.done?' done':''}" data-todo-i="${i}" style="${partModeStyle}">${textHtml}</span>`;
     const hasMultipleParts=_isTouchDevice()&&parseTodoTextParts(t.text).parts.length>1;
     if(rmEligible){
@@ -4468,7 +4468,7 @@ function renderTodoTextParts(text,strikeParts,todoIdx){
     const hasUnstruck=parts.some((_,idx)=>!strikeParts.includes(idx));
     if(hasUnstruck){
       html+=`<span onclick="event.stopPropagation();copyUnstruckPartsToTomorrow(${todoIdx})" title="미완료 조각 내일로 복사" style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;margin-left:6px;border-radius:50%;background:rgba(150,190,225,0.25);cursor:pointer;vertical-align:middle;">
-        <svg width="9.5" height="9.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="color:rgba(90,130,180,0.85);"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h8"/></svg>
+        <i class="ti ti-copy" style="font-size:10px;color:rgba(90,130,180,0.85);" aria-hidden="true"></i>
       </span>`;
     }
   }
@@ -5943,9 +5943,9 @@ function renderDatePickerModal(){
   const daysInMonth=new Date(y,mo+1,0).getDate();
   const today=new Date();
   let h=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding:0 4px;">
-    <div class="nav-arr" onclick="dpShiftMonth(-1)"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" style="color:var(--tm)"><polyline points="6.5,1.5 3,5 6.5,8.5"/></svg></div>
+    <div class="nav-arr" onclick="dpShiftMonth(-1)"><i class="ti ti-chevron-left" style="font-size:10px;color:var(--tm);" aria-hidden="true"></i></div>
     <span style="font-size:15px;font-weight:500;color:var(--tp);">${y}년 ${mo+1}월</span>
-    <div class="nav-arr" onclick="dpShiftMonth(1)"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" style="color:var(--tm)"><polyline points="3.5,1.5 7,5 3.5,8.5"/></svg></div>
+    <div class="nav-arr" onclick="dpShiftMonth(1)"><i class="ti ti-chevron-right" style="font-size:10px;color:var(--tm);" aria-hidden="true"></i></div>
   </div>
   <div class="cal-grid">`;
   ['월','화','수','목','금','토','일'].forEach(d=>h+=`<div class="cal-day-name">${d}</div>`);
@@ -7109,9 +7109,9 @@ function renderCalendar(){
   }
   let h=`<div style="padding:4px 2px 0;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-      <div class="nav-arr" onclick="calShiftMonth(-1)"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" style="color:var(--tm)"><polyline points="6.5,1.5 3,5 6.5,8.5"/></svg></div>
+      <div class="nav-arr" onclick="calShiftMonth(-1)"><i class="ti ti-chevron-left" style="font-size:10px;color:var(--tm);" aria-hidden="true"></i></div>
       <span style="font-size:15px;font-weight:500;color:var(--tp);">${y}년 ${mo+1}월</span>
-      <div class="nav-arr" onclick="calShiftMonth(1)"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" style="color:var(--tm)"><polyline points="3.5,1.5 7,5 3.5,8.5"/></svg></div>
+      <div class="nav-arr" onclick="calShiftMonth(1)"><i class="ti ti-chevron-right" style="font-size:10px;color:var(--tm);" aria-hidden="true"></i></div>
     </div>
     <div class="cal-grid">`;
   ['월','화','수','목','금','토','일'].forEach(d=>h+=`<div class="cal-day-name">${d}</div>`);
@@ -7163,10 +7163,10 @@ function renderCalDetail(d){
     const wv=sleep.wake?sleep.wake.split(':').map(Number):null;
     let dur='';
     if(sv&&wv){let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;dur=` · ${Math.floor(m/60)}h ${m%60}m`;}
-    items+=`<div class="cal-detail-row"><div class="cal-detail-icon"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="color:var(--tm)"><path d="M10.5 9C9 10.5 6.8 11 4.8 10C2.8 9 1.8 6.8 2.2 4.8C2.5 3.2 3.5 1.8 5 1.2C3.5 3.5 3.8 6.5 6 8.2C7.8 9.5 10 9.5 11.8 8.5C11.5 8.7 11 8.9 10.5 9Z" fill="rgba(200,176,168,0.2)"/></svg></div><span class="cal-detail-text" style="color:var(--ts);">${sleep.sleep||'--'} 취침 · ${sleep.wake||'--'} 기상${dur}</span></div>`;
+    items+=`<div class="cal-detail-row"><div class="cal-detail-icon"><i class="ti ti-moon-stars" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i></div><span class="cal-detail-text" style="color:var(--ts);">${sleep.sleep||'--'} 취침 · ${sleep.wake||'--'} 기상${dur}</span></div>`;
   }
   if(doneTodos.length>0){
-    items+=`<div class="cal-detail-row" style="cursor:pointer;" onclick="calShowTodos('${dk}')"><div class="cal-detail-icon"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="color:var(--tm)"><polyline points="2,6 4.5,9 10,3.5"/></svg></div><span class="cal-detail-text" id="cal-todo-summary-${dk}">완료한 일 ${doneTodos.length}개 ›</span></div>
+    items+=`<div class="cal-detail-row" style="cursor:pointer;" onclick="calShowTodos('${dk}')"><div class="cal-detail-icon"><i class="ti ti-check" style="font-size:12px;color:var(--tm);" aria-hidden="true"></i></div><span class="cal-detail-text" id="cal-todo-summary-${dk}">완료한 일 ${doneTodos.length}개 ›</span></div>
       <div id="cal-todo-rows-${dk}" style="display:none;"></div>`;
   }
   const MAX=3;const total=allMemos.length;
@@ -7248,7 +7248,7 @@ function renderMonthlyStatBar(){
     <div class="sbar-div"></div>
     <div class="sbar-item"><i class="ti ti-stack-2" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i><span class="sbar-num">${cc}</span></div>
     <div class="sbar-div"></div>
-    <div class="sbar-item"><i class="ti ti-moon" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i><span class="sbar-num">${avgSleep}h</span></div>
+    <div class="sbar-item"><i class="ti ti-moon-stars" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i><span class="sbar-num">${avgSleep}h</span></div>
   </div>`;
 }
 
@@ -7391,7 +7391,7 @@ function renderTodayMeal(){
   let html='';
   items.forEach(k=>{
     const t=m[k+'_time'];
-    const timeHtml=t?`<span class="meal-time-tag">${tabularTimeHtml(t)}</span>`:`<button class="meal-time-btn" onclick="recordMealTime('${dk}','${k}')" title="식사 시간 기록"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="1.8,5.2 4,7.5 8.2,2.5"/></svg></button>`;
+    const timeHtml=t?`<span class="meal-time-tag">${tabularTimeHtml(t)}</span>`:`<button class="meal-time-btn" onclick="recordMealTime('${dk}','${k}')" title="식사 시간 기록"><i class="ti ti-check" style="font-size:10px;" aria-hidden="true"></i></button>`;
     html+=`<div class="cal-detail-row"><span class="cal-detail-time">${MEAL_LABELS[k]}</span><span class="cal-detail-text" style="flex:1;">${m[k]}</span>${timeHtml}</div>`;
   });
   el.innerHTML=html||'<div style="font-size:12px;color:var(--tm);text-align:center;padding:8px 0;">주간 메뉴판에서 적어보세요</div>';
@@ -7423,10 +7423,10 @@ function renderDailyHabitCheck(){
     const innerMark=isGlass
       ?(hIcon
         ?'<i class="ti '+hIcon+'" style="font-size:16px;color:'+rgba+';display:'+(checked?'block':'none')+';" aria-hidden="true"></i>'
-        :'<svg width="15" height="15" viewBox="0 0 12 12" fill="none" stroke="'+rgba+'" stroke-width="2" stroke-linecap="round" style="display:'+(checked?'block':'none')+'"><polyline points="2,6 4.5,9 10,3.5"/></svg>')
+        :'<i class="ti ti-check" style="font-size:15px;color:'+rgba+';display:'+(checked?'block':'none')+';" aria-hidden="true"></i>')
       :(hIcon
         ?'<i class="ti '+hIcon+'" style="font-size:12px;color:#fff;display:'+(checked?'block':'none')+';" aria-hidden="true"></i>'
-        :'<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" style="display:'+(checked?'block':'none')+'"><polyline points="2,6 4.5,9 10,3.5"/></svg>');
+        :'<i class="ti ti-check" style="font-size:12px;color:#fff;display:'+(checked?'block':'none')+';" aria-hidden="true"></i>');
     const col=document.createElement('div');col.className='habit-check-col';
     const chkStyle=checked?(isGlass?' style="border-color:'+rgba+';"':' style="background:'+rgba+';border-color:'+rgba+';"'):'';
     col.innerHTML='<div class="habit-check-name">'+h.name+'</div><div class="habit-chk2'+(checked?' on':'')+'"'+chkStyle+'>'+innerMark+'</div>';
@@ -7675,7 +7675,7 @@ function buildRhythmFormEl(showOngoingList){
     }
   }
   const legend=document.createElement('div');legend.className='rhythm-track-legend';
-  legend.innerHTML='<span class="rhythm-legend-item"><span class="rhythm-legend-dot disabled" style="background:'+getRhythmColor('_sleep')+';--cat-color:'+getRhythmColor('_sleep')+';" title="수면"><i class="ti ti-moon" aria-hidden="true"></i></span><span class="rhythm-legend-lbl">수면</span></span>'+
+  legend.innerHTML='<span class="rhythm-legend-item"><span class="rhythm-legend-dot disabled" style="background:'+getRhythmColor('_sleep')+';--cat-color:'+getRhythmColor('_sleep')+';" title="수면"><i class="ti ti-moon-stars" aria-hidden="true"></i></span><span class="rhythm-legend-lbl">수면</span></span>'+
     '<span class="rhythm-legend-item"><span class="rhythm-legend-dot disabled" style="background:'+getRhythmColor('_meal')+';--cat-color:'+getRhythmColor('_meal')+';" title="식사"><i class="ti ti-tools-kitchen-3" aria-hidden="true"></i></span><span class="rhythm-legend-lbl">식사</span></span>'+
     Object.keys(RHYTHM_CATS).map(function(k){const c=RHYTHM_CATS[k];const rc=getRhythmColor(k);const sel=_rhythmFormOpen&&_rhythmFormCat===k;return '<span class="rhythm-legend-item"><span class="rhythm-legend-dot'+(sel?' sel':'')+'" style="background:'+rc+';--cat-color:'+rc+';" title="'+c.label+'" onclick="selectRhythmCatAndOpen(\''+k+'\')"><i class="ti '+c.icon+'" aria-hidden="true"></i></span><span class="rhythm-legend-lbl">'+c.label+'</span></span>';}).join('');
   wrap.appendChild(legend);
@@ -9184,7 +9184,7 @@ function renderReserveList(){
     el.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;';
     el.innerHTML=`<span class="reserve-text" data-i="${i}" style="flex:1;color:var(--tp);cursor:pointer;">${t.text}</span>`
       +`<button onclick="openReserveMoveModal(${i})" style="background:none;border:1px solid var(--div);border-radius:8px;padding:3px 10px;font-size:11px;color:var(--tm);cursor:pointer;white-space:nowrap;flex-shrink:0;">날짜 지정</button>`
-      +`<button onclick="deleteReserveTodo(${i})" style="background:none;border:none;padding:4px;cursor:pointer;color:rgba(192,80,96,0.7);flex-shrink:0;"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><line x1="3" y1="3" x2="11" y2="11"/><line x1="11" y1="3" x2="3" y2="11"/></svg></button>`;
+      +`<button onclick="deleteReserveTodo(${i})" style="background:none;border:none;padding:4px;cursor:pointer;color:rgba(192,80,96,0.7);flex-shrink:0;"><i class="ti ti-x" style="font-size:14px;" aria-hidden="true"></i></button>`;
     el.querySelector('.reserve-text').addEventListener('click',()=>startEditReserveTodo(i));
     list.appendChild(el);
   });

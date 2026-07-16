@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260716-83-rhythm-chip-align-meal-layout';
+const CACHE = 'iikoto-v20260716-84-icon-cleanup-complete';
 const ASSETS = [
   './',
   './index.html'
