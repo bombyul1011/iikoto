@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260716-82-pace-card-rhythm-quickpick';
+const CACHE = 'iikoto-v20260716-83-rhythm-chip-align-meal-layout';
 const ASSETS = [
   './',
   './index.html'
