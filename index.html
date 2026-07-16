@@ -5251,13 +5251,11 @@ function makeAfternoonPaceCard(){
       </svg></span>
       <div class="rc-flow-icon-box"><i class="ti ${todayTop.icon}" style="color:${todayColor};"></i></div>
     </div>`;
-    if(lastWeekTop.memo||todayTop.memo){
-      html+=`<div class="rc-flow-memo-row">
-        <div class="rc-flow-memo">${lastWeekTop.memo?escapeHtml(lastWeekTop.memo):''}</div>
-        <div class="rc-flow-memo-spacer"></div>
-        <div class="rc-flow-memo">${todayTop.memo?escapeHtml(todayTop.memo):''}</div>
+    html+=`<div class="rc-flow-memo-row">
+      <div class="rc-flow-memo">${escapeHtml(lastWeekTop.memo||lastWeekTop.label)}</div>
+      <div class="rc-flow-memo-spacer"></div>
+      <div class="rc-flow-memo">${escapeHtml(todayTop.memo||todayTop.label)}</div>
       </div>`;
-    }
   }else if(!todayTop){
     html+=`<div class="pace-divider"></div>`;
     html+=`<div style="text-align:center;font-size:11px;color:var(--tm);padding:4px 0;"><i class="ti ti-hourglass-empty" style="font-size:14px;margin-right:4px;vertical-align:-2px;" aria-hidden="true"></i>아직 본격적인 활동이 시작되지 않았어요</div>`;
