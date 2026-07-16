@@ -1413,6 +1413,12 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 <!-- CONTENT MODAL -->
 <div class="modal-ov" id="content-modal" onclick="closeModal('content-modal',event)">
+<div class="modal-ov" id="music-group-modal" onclick="closeModal('music-group-modal',event)">
+  <div class="modal" style="max-width:300px;">
+    <div style="font-size:13px;font-weight:600;color:var(--tp);margin-bottom:10px;">이 날의 음악</div>
+    <div id="mg-list" style="display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto;"></div>
+  </div>
+</div>
   <div class="modal" style="max-width:340px;">
     <div class="api-search-wrap">
       <input type="text" class="modal-inp" id="cm-title" placeholder="제목 검색..." autocomplete="off" oninput="apiSearchDebounce(this.value)" onblur="setTimeout(()=>hideApiResults(),200)">
@@ -1643,8 +1649,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div class="rd-streak" id="rd-streak"></div>
 
     <div class="rd-quote-section">
-      <div class="quote-chip" onclick="openQuoteSheetCheck()">
-        <div class="quote-chip-inner"><i class="ti ti-quote" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 문장 수집</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div class="quote-chip" onclick="openQuoteSheetCheck()">
+          <div class="quote-chip-inner"><i class="ti ti-quote" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 문장 수집</div>
+        </div>
+        <div id="rd-quote-fold" class="rd-quote-more" style="display:none;padding:6px 4px;" onclick="_rdQuoteShowAll=false;renderRdQuotes();">접기</div>
       </div>
       <div id="rd-quote-list"></div>
     </div>
@@ -6605,14 +6614,23 @@ function renderTimetable(){
       const scroll=document.createElement('div');scroll.className='tt-date-scroll';
       scroll.setAttribute('data-tt','1');
       const inner=document.createElement('div');inner.className='tt-date-inner';
-      const startMap={};trackItems.forEach(c=>startMap[c.startD]=c);
+      const startMap={};
+      trackItems.forEach(c=>{
+        if(cat==='music'){
+          if(!startMap[c.startD])startMap[c.startD]=[];
+          startMap[c.startD].push(c);
+        }else{
+          startMap[c.startD]=c;
+        }
+      });
       let d=1;
       while(d<=31){
         if(startMap[d]){
-          const {item,startD,endD,isWatching}=startMap[d];
+          const group=cat==='music'?startMap[d]:[startMap[d]];
+          const {startD,endD,isWatching,item}=group[0];
           const span=endD-startD+1,w=span*20+(span-1)*2;
           const block=document.createElement('div');block.className=`tt-block ${cat}`;
-          block.style.cssText=`width:${w}px;min-width:${w}px;`;
+          block.style.cssText=`width:${w}px;min-width:${w}px;position:relative;`;
           if(isWatching){
             block.style.backgroundImage=`repeating-linear-gradient(45deg,transparent,transparent 6px,rgba(255,255,255,0.45) 6px,rgba(255,255,255,0.45) 10px)`;
             block.style.opacity='0.85';
@@ -6621,18 +6639,25 @@ function renderTimetable(){
             block.style.filter='saturate(0.45)';
             block.style.opacity='0.7';
           }
-          block.textContent=cat==='music'?(item.title||'').charAt(0):item.title;
-          block.title=(item._carried?item.title+' (전월부터 이어짐)':item.title)+(item.status==='stopped'?' · 중단':'');
-          if(!readOnly&&!item._carried){
-            block.addEventListener('click',()=>openContentModal(cat,item,mk));
-            block.addEventListener('contextmenu',e=>{e.preventDefault();openContentDiscuss(item.title,cat,item.stars||0,item.review||'');});
-          }else if(item._carried){
-            // carry 항목은 원본이 저장된 이전 달로 모달 열기 (수정/완료 가능하게)
-            block.addEventListener('click',()=>openContentModal(cat,item,prevMk));
-            block.addEventListener('contextmenu',e=>{e.preventDefault();openContentDiscuss(item.title,cat,item.stars||0,item.review||'');});
+          if(cat==='music'&&group.length>1){
+            block.innerHTML=`<span>${(item.title||'').charAt(0)}</span><span style="position:absolute;top:-4px;right:-4px;min-width:12px;height:12px;padding:0 2px;border-radius:6px;background:var(--acc,#8878ab);color:#fff;font-size:8px;line-height:12px;text-align:center;font-weight:700;">${group.length}</span>`;
+            block.title=group.map(g=>g.item.title).join(', ');
+            block.addEventListener('click',()=>openMusicGroupModal(group.map(g=>g.item),mk));
             block.style.cursor='pointer';
           }else{
-            block.style.cursor='default';
+            block.textContent=cat==='music'?(item.title||'').charAt(0):item.title;
+            block.title=(item._carried?item.title+' (전월부터 이어짐)':item.title)+(item.status==='stopped'?' · 중단':'');
+            if(!readOnly&&!item._carried){
+              block.addEventListener('click',()=>openContentModal(cat,item,mk));
+              block.addEventListener('contextmenu',e=>{e.preventDefault();openContentDiscuss(item.title,cat,item.stars||0,item.review||'');});
+              block.style.cursor='pointer';
+            }else if(item._carried){
+              block.addEventListener('click',()=>openContentModal(cat,item,prevMk));
+              block.addEventListener('contextmenu',e=>{e.preventDefault();openContentDiscuss(item.title,cat,item.stars||0,item.review||'');});
+              block.style.cursor='pointer';
+            }else{
+              block.style.cursor='default';
+            }
           }
           inner.appendChild(block);d=endD+1;
         } else {
@@ -6674,6 +6699,18 @@ function setCmStars(n){
   const next=cur===n?0:n; // 같은 별 다시 탭하면 취소
   inp.value=next;
   renderCmStarPicker(next);
+}
+function openMusicGroupModal(items,mk){
+  const listEl=document.getElementById('mg-list');
+  listEl.innerHTML='';
+  items.forEach(item=>{
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;background:var(--card);border:1px solid var(--card-b);cursor:pointer;';
+    row.innerHTML=`<i class="ti ti-music" style="font-size:14px;color:${getCatColor('music')};flex-shrink:0;" aria-hidden="true"></i><span style="font-size:12.5px;color:var(--tp);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${item.title||''}</span>`;
+    row.addEventListener('click',()=>{closeModal('music-group-modal');openContentModal('music',item,mk);});
+    listEl.appendChild(row);
+  });
+  openModal('music-group-modal');
 }
 function openContentModal(cat,item=null,mk=null){
   _contentCtx={cat,item,mk:mk||calMonthKey(),mode:item?'edit':'add'};
@@ -8377,10 +8414,11 @@ function renderRdStreak(){
 let _rdQuoteShowAll=false;
 function renderRdQuotes(){
   const listEl=document.getElementById('rd-quote-list');if(!listEl)return;
+  const foldEl=document.getElementById('rd-quote-fold');
   const cur=getBooks().find(b=>b.status==='reading');
-  if(!cur){listEl.innerHTML='';listEl.style.maxHeight='';listEl.style.overflowY='';return;}
+  if(!cur){listEl.innerHTML='';listEl.style.maxHeight='';listEl.style.overflowY='';if(foldEl)foldEl.style.display='none';return;}
   const quotes=getQuotes().filter(q=>q.bookCid===cur.cid).sort((a,b)=>(b.created||0)-(a.created||0));
-  if(!quotes.length){listEl.innerHTML='<div class="rd-quote-empty">아직 모은 문장이 없어요</div>';listEl.style.maxHeight='';listEl.style.overflowY='';return;}
+  if(!quotes.length){listEl.innerHTML='<div class="rd-quote-empty">아직 모은 문장이 없어요</div>';listEl.style.maxHeight='';listEl.style.overflowY='';if(foldEl)foldEl.style.display='none';return;}
   const MAX=2;
   const shown=_rdQuoteShowAll?quotes:quotes.slice(0,MAX);
   let html=shown.map(q=>`<div class="rd-quote-item">
@@ -8405,10 +8443,13 @@ function renderRdQuotes(){
     </div>`).join('');
   if(quotes.length>MAX){
     if(_rdQuoteShowAll){
-      html+=`<div class="rd-quote-more" onclick="_rdQuoteShowAll=false;renderRdQuotes();">접기</div>`;
+      if(foldEl)foldEl.style.display='';
     }else{
       html+=`<div class="rd-quote-more" onclick="_rdQuoteShowAll=true;renderRdQuotes();">··· ${quotes.length-MAX}개 더 보기</div>`;
+      if(foldEl)foldEl.style.display='none';
     }
+  }else{
+    if(foldEl)foldEl.style.display='none';
   }
   listEl.innerHTML=html;
   if(_rdQuoteShowAll){listEl.style.maxHeight='320px';listEl.style.overflowY='auto';}
