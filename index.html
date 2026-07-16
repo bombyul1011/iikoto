@@ -607,6 +607,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rd-book-item{background:var(--card);border:1px solid rgba(225,215,195,0.30);border-radius:16px;padding:12px 14px;margin-bottom:8px;cursor:pointer;}
 .rd-book-title{font-size:13.5px;color:var(--tp);font-weight:500;}
 .rd-book-meta{font-size:11px;color:var(--tm);margin-top:3px;}
+.rd-est-line{font-size:10.5px;color:rgba(180,130,110,0.85);margin-top:4px;}
+.rd-est-line.dim{color:var(--tm);opacity:0.75;}
 .rd-book-detail{margin-top:10px;padding-top:10px;border-top:1px solid var(--div);display:none;}
 .rd-book-item.open .rd-book-detail{display:block;}
 .rd-detail-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
@@ -863,37 +865,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 @font-face{font-family:'Bareonbatang';src:url('./fonts/HakgyoansimBareonbatangR.woff2') format('woff2');font-weight:400;font-display:swap;}
 @font-face{font-family:'Bareonbatang';src:url('./fonts/HakgyoansimBareonbatangB.woff2') format('woff2');font-weight:700;font-display:swap;}
 
-.share-ov{position:fixed;inset:0;background:var(--bg);z-index:8500;display:none;flex-direction:column;}
-.share-ov.on{display:flex;}
-.share-ov-hdr{display:flex;align-items:center;gap:12px;padding:max(20px,env(safe-area-inset-top)) 18px 14px;flex-shrink:0;}
-.share-ov-ttl{font-size:15px;font-weight:600;color:var(--tp);flex:1;}
-.share-ov-body{flex:1;overflow-y:auto;padding:0 18px 28px;}
-
-.share-stage-wrap{display:flex;justify-content:center;margin-bottom:18px;}
-.share-stage{position:relative;width:280px;height:373px;border-radius:14px;overflow:hidden;border:1.5px dashed rgba(255,255,255,0.55);box-shadow:0 8px 28px rgba(0,0,0,.12);cursor:pointer;background:rgba(255,220,235,0.16);}
-.share-stage-inner{position:absolute;inset:0;background-size:cover;background-position:center;}
-.share-stage-empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--acc);font-size:12px;}
-.share-vignette{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 100%,rgba(0,0,0,.55) 0%,rgba(0,0,0,0) 55%),linear-gradient(180deg,rgba(0,0,0,.28) 0%,rgba(0,0,0,0) 22%);pointer-events:none;}
-.share-txtshadow{text-shadow:0 1px 6px rgba(0,0,0,.55);}
-
-/* 순환식 스티커 버튼 4개 */
-.share-cycle-row{display:flex;gap:8px;margin-bottom:14px;}
-.share-cycle-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 4px;border-radius:12px;border:1px solid var(--card-b);background:var(--card);cursor:pointer;}
-.share-cycle-btn.active{background:var(--acc-soft);border-color:var(--acc);}
-.share-cycle-btn svg{width:16px;height:16px;color:var(--ts);}
-.share-cycle-btn.active svg{color:var(--acc);}
-.share-cycle-btn .lbl{font-size:9.5px;color:var(--tm);font-family:'DM Sans',sans-serif;}
-.share-cycle-btn.active .lbl{color:var(--acc);font-weight:600;}
-
-.share-quote-pick-wrap{margin-bottom:14px;}
-.share-quote-pick-label{font-size:11px;color:var(--tm);margin:0 2px 7px;}
-.share-quote-pick-scroll{display:flex;gap:7px;overflow-x:auto;padding-bottom:4px;}
-.share-quote-pick-item{flex-shrink:0;width:140px;padding:9px 11px;border-radius:10px;border:1px solid var(--card-b);background:var(--card);font-size:11px;color:var(--ts);line-height:1.4;cursor:pointer;}
-.share-quote-pick-item.on{border-color:var(--acc);background:var(--acc-soft);color:var(--acc);}
-
-.share-save-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:7px;padding:13px;border-radius:12px;border:none;background:var(--acc);color:#fff;font-size:14px;font-weight:600;cursor:pointer;margin-top:14px;font-family:'DM Sans',sans-serif;}
-.share-save-btn svg{width:15px;height:15px;}
-
 /* 헤더 스티커 1: READING LOG */
 .s-rl{position:absolute;top:20px;left:20px;right:20px;color:#f6ecdd;font-family:'Bareonbatang',serif;}
 .s-rl-top{display:flex;align-items:center;gap:8px;margin-bottom:14px;}
@@ -1004,7 +975,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           </div>
         </div>
         <div class="icon-btn" onclick="openSettings()">
-          <i class="ti ti-settings-2" style="font-size:15px;color:var(--tm);" aria-hidden="true"></i>
+          <i class="ti ti-settings-2" style="font-size:16px;color:var(--tm);" aria-hidden="true"></i>
         </div>
         <div class="icon-btn seed-icon-btn" onclick="openSeed()">
           <i class="ti ti-seeding" style="font-size:16px;color:#6a8a50;" aria-hidden="true"></i>
@@ -1306,64 +1277,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="month-chips" id="mr-month-chips"></div>
       <div id="mr-content"></div>
     </div>
-  </div>
-</div>
-
-<!-- READING SHARE CARD -->
-<div class="share-ov" id="share-ov">
-  <div class="share-ov-hdr">
-    <div class="settings-back" onclick="closeShareCard()">
-      <i class="ti ti-chevron-left" style="font-size:16px;color:var(--ts);" aria-hidden="true"></i>
-    </div>
-    <span class="share-ov-ttl">독서 공유카드</span>
-  </div>
-  <div class="share-ov-body">
-    <div class="share-stage-wrap">
-      <div class="share-stage" id="share-stage" onclick="document.getElementById('share-bg-inp').click();">
-        <div class="share-stage-inner" id="share-stage-inner">
-          <div class="share-stage-empty">
-            <i class="ti ti-photo" style="font-size:26px;" aria-hidden="true"></i>
-            <span>탭해서 배경 사진 추가</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <input type="file" accept="image/*" id="share-bg-inp" style="display:none;" onchange="onShareBgPick(event)">
-
-    <div class="share-cycle-row">
-      <div class="share-cycle-btn" id="cyc-header" onclick="cycleShare('header')">
-        <i class="ti ti-align-left" style="font-size:15px;" aria-hidden="true"></i>
-        <span class="lbl" id="cyc-header-lbl">헤더 없음</span>
-      </div>
-      <div class="share-cycle-btn" id="cyc-quote" onclick="cycleShare('quote')">
-        <i class="ti ti-message" style="font-size:15px;" aria-hidden="true"></i>
-        <span class="lbl" id="cyc-quote-lbl">문장 없음</span>
-      </div>
-      <div class="share-cycle-btn" id="cyc-progress" onclick="cycleShare('progress')">
-        <i class="ti ti-progress" style="font-size:16px;" aria-hidden="true"></i>
-        <span class="lbl" id="cyc-progress-lbl">진행률 없음</span>
-      </div>
-      <div class="share-cycle-btn" id="cyc-cover" onclick="cycleShare('cover')">
-        <i class="ti ti-rectangle-vertical" style="font-size:16px;" aria-hidden="true"></i>
-        <span class="lbl" id="cyc-cover-lbl">표지 없음</span>
-      </div>
-    </div>
-
-    <div class="share-quote-pick-wrap" id="share-quote-pick-wrap" style="display:none;">
-      <div class="share-quote-pick-label">문장 선택</div>
-      <div class="share-quote-pick-scroll" id="share-quote-pick-scroll"></div>
-    </div>
-
-    <div class="share-quote-pick-wrap" id="share-idx-note-wrap" style="display:none;">
-      <div class="share-quote-pick-label">오늘의 메모</div>
-      <input type="text" id="share-idx-note-inp" class="meal-field" style="width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--card-b);background:var(--card);font-size:13px;color:var(--tp);font-family:'DM Sans',sans-serif;outline:none;" placeholder="오늘의 한 줄 메모" maxlength="40" oninput="onShareIdxNoteInput(this.value)">
-    </div>
-
-    <button class="share-save-btn" onclick="saveShareCard()">
-      <i class="ti ti-photo-share" style="font-size:15px;" aria-hidden="true"></i>
-      이미지로 저장
-    </button>
   </div>
 </div>
 
@@ -1732,9 +1645,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     </div>
     <span class="settings-ttl">독서</span>
     <div style="flex:1;"></div>
-    <div class="settings-back" style="width:30px;height:30px;" onclick="openShareCard()">
-      <i class="ti ti-photo-share" style="font-size:15px;color:var(--ts);" aria-hidden="true"></i>
-    </div>
     <div class="settings-back" style="width:30px;height:30px;" onclick="openAddBookModal()">
       <i class="ti ti-books" style="font-size:15px;color:var(--ts);" aria-hidden="true"></i>
     </div>
@@ -4134,6 +4044,9 @@ function setTheme(theme,btn){
   S.set('theme',theme);
   document.querySelectorAll('.ctheme-btn').forEach(b=>b.classList.remove('on'));
   if(btn)btn.classList.add('on');
+  // 습관 체크 아이콘 마크업이 테마(글라스 여부)에 따라 렌더링 시점에 분기되므로, 테마 전환 즉시 다시 그려줘야 함
+  // (다시 그리지 않으면 이전 테마 기준 DOM이 남아있어, 체크를 한번 더 토글해야만 아이콘이 나타나는 문제가 있었음)
+  if(document.getElementById('daily-habit-box'))renderDailyHabitCheck();
 }
 
 // ── SPLASH
@@ -8646,6 +8559,41 @@ function switchReadingTab(btn,status){
   btn.classList.add('on');
   renderBookList();
 }
+// 리듬 블록(감상 카테고리, text에 "독서 - 책제목" 형식으로 자동 기록됨)을 세어 이 책을 읽은 세션(회차) 수를 계산.
+// 병렬독서 시에도 책 제목으로 구분되므로 책별로 독립적으로 정확함.
+function countReadingSessionsForBook(title){
+  if(!title)return 0;
+  const target='독서 - '+title;
+  let count=0;
+  // 오늘부터 최대 365일 전까지 훑되, 데이터 없으면 자연히 일찍 멈춤(무한 루프 방지용 상한)
+  const today=new Date();
+  for(let i=0;i<365;i++){
+    const d=new Date(today);d.setDate(today.getDate()-i);
+    const dk=dateKey(d);
+    const blocks=getRhythmBlocks(dk);
+    count+=blocks.filter(b=>b.cat==='enjoy'&&b.text===target).length;
+  }
+  return count;
+}
+// 남은 예상 회차 계산. 데이터(회차)가 3회 미만이면 아직 추정하기 이르다고 판단해 null 반환.
+// sessionCount를 이미 계산해둔 경우 재계산 없이 그대로 전달 가능(호출부 중복 연산 방지).
+function estimateRemainingReadingSessions(book,sessionCount){
+  if(!book||book.status!=='reading')return null;
+  const sessions=sessionCount!=null?sessionCount:countReadingSessionsForBook(book.title);
+  if(sessions<3)return {sessions,ready:false};
+  let currentAmt,totalAmt;
+  if(book.unit==='percent'){
+    currentAmt=book.percent||0;totalAmt=100;
+  }else{
+    if(!book.totalPages)return null; // 전체 페이지 수를 모르면 추정 불가
+    currentAmt=book.pages||0;totalAmt=book.totalPages;
+  }
+  if(currentAmt<=0)return {sessions,ready:false};
+  const perSession=currentAmt/sessions;
+  const remaining=Math.max(totalAmt-currentAmt,0);
+  const remainingSessions=Math.ceil(remaining/perSession);
+  return {sessions,ready:true,remainingSessions};
+}
 function renderBookList(){
   const el=document.getElementById('rd-book-list');if(!el)return;
   const books=getBooks().filter(b=>b.status===_rdTab).sort((a,b)=>(b.created||0)-(a.created||0));
@@ -8653,6 +8601,14 @@ function renderBookList(){
   el.innerHTML=books.map(b=>{
     const sub=b.unit==='percent'?`${b.percent||0}%`:(b.totalPages?`${b.pages}/${b.totalPages}페이지`:`${b.pages||0}페이지`);
     const timeStr=b.seconds?` · ${Math.floor(b.seconds/60)}분`:'';
+    const sessionCount=b.status==='reading'?countReadingSessionsForBook(b.title):0;
+    const sessionStr=sessionCount>0?` · ${sessionCount}회차`:'';
+    const est=b.status==='reading'?estimateRemainingReadingSessions(b,sessionCount):null;
+    const estHtml=est?(
+      est.ready
+        ?`<div class="rd-est-line">이 페이스면 약 ${est.remainingSessions}회 더 읽으면 완독해요</div>`
+        :`<div class="rd-est-line dim">기록이 조금 더 쌓이면 예상 회차를 알려드릴게요</div>`
+    ):'';
     const open=_rdOpenCid===b.cid;
     const quoteOpen=_rdDoneQuoteBookCid===b.cid;
     const commentOpen=_rdDoneCommentBookCid===b.cid;
@@ -8683,7 +8639,8 @@ function renderBookList(){
       `<div class="rd-book-title">${b.title}</div>`;
     return `<div class="rd-book-item${open?' open':''}" onclick="toggleBookDetail('${b.cid}')">
       ${titleRow}
-      <div class="rd-book-meta">${sub}${timeStr}</div>
+      <div class="rd-book-meta">${sub}${timeStr}${sessionStr}</div>
+      ${estHtml}
       <div class="rd-book-detail">
         ${detailRow}
         ${doneQuoteBlock}
@@ -8768,221 +8725,6 @@ const SHARE_CYCLE = {
   progress: [['none','진행률 없음'],['top','진행률 · 상단좌'],['topright','진행률 · 상단우'],['bottom','진행률 · 하단']],
   cover: [['none','표지 없음'],['bl','표지 · 좌하단'],['bl-title','표지 · 좌하단+제목'],['br','표지 · 우하단'],['br-title','표지 · 우하단+제목'],['tl','표지 · 좌상단'],['tl-title','표지 · 좌상단+제목'],['tr','표지 · 우상단'],['tr-title','표지 · 우상단+제목']]
 };
-let _shareState = { bg:null, header:'none', quote:'none', quoteCid:null, progress:'none', cover:'none', idxNote:'' };
-function openShareCard(){
-  _shareState = { bg:null, header:'none', quote:'none', quoteCid:null, progress:'none', cover:'none', idxNote:'' };
-  ['header','quote','progress','cover'].forEach(updateCycleBtn);
-  renderQuotePicker();
-  const idxWrap=document.getElementById('share-idx-note-wrap');
-  const idxInp=document.getElementById('share-idx-note-inp');
-  if(idxWrap)idxWrap.style.display='none';
-  if(idxInp)idxInp.value='';
-  renderShareStage();
-  document.getElementById('share-ov').classList.add('on');
-}
-function closeShareCard(){document.getElementById('share-ov').classList.remove('on');}
-function onShareBgPick(e){
-  const file=e.target.files&&e.target.files[0];if(!file)return;
-  const reader=new FileReader();
-  reader.onload=ev=>{_shareState.bg=ev.target.result;renderShareStage();};
-  reader.readAsDataURL(file);
-}
-function onShareIdxNoteInput(val){
-  _shareState.idxNote=val;
-  renderShareStage();
-}
-function cycleShare(key){
-  const opts=SHARE_CYCLE[key];
-  const cur=_shareState[key];
-  const idx=opts.findIndex(o=>o[0]===cur);
-  const next=opts[(idx+1)%opts.length][0];
-  const wasNone=cur==='none';
-  _shareState[key]=next;
-  if(key==='quote'){
-    if(next==='none'){
-      _shareState.quoteCid=null;
-    }else if(wasNone||!_shareState.quoteCid){
-      const cur2=getBooks().find(b=>b.status==='reading');
-      const quotes=cur2?getQuotes().filter(q=>q.bookCid===cur2.cid).sort((a,b)=>(b.created||0)-(a.created||0)):[];
-      if(quotes.length)_shareState.quoteCid=quotes[0].cid;
-    }
-    renderQuotePicker();
-  }
-  if(key==='header'){
-    const idxWrap=document.getElementById('share-idx-note-wrap');
-    if(idxWrap)idxWrap.style.display=(next==='idx'||next==='rl')?'block':'none';
-  }
-  updateCycleBtn(key);
-  renderShareStage();
-}
-function updateCycleBtn(key){
-  const opts=SHARE_CYCLE[key];
-  const cur=_shareState[key];
-  const found=opts.find(o=>o[0]===cur)||opts[0];
-  const btn=document.getElementById('cyc-'+key);
-  const lbl=document.getElementById('cyc-'+key+'-lbl');
-  if(btn)btn.classList.toggle('active',cur!=='none'&&cur!=='off');
-  if(lbl)lbl.textContent=found[1];
-}
-function renderQuotePicker(){
-  const wrap=document.getElementById('share-quote-pick-wrap');
-  const scroll=document.getElementById('share-quote-pick-scroll');
-  if(!wrap||!scroll)return;
-  if(_shareState.quote==='none'){wrap.style.display='none';return;}
-  const cur=getBooks().find(b=>b.status==='reading');
-  const quotes=cur?getQuotes().filter(q=>q.bookCid===cur.cid).sort((a,b)=>(b.created||0)-(a.created||0)):[];
-  if(!quotes.length){wrap.style.display='none';_shareState.quote='none';updateCycleBtn('quote');return;}
-  wrap.style.display='block';
-  scroll.innerHTML=quotes.map(q=>`<div class="share-quote-pick-item${q.cid===_shareState.quoteCid?' on':''}" onclick="pickShareQuote('${q.cid}')">${q.text}</div>`).join('');
-}
-function pickShareQuote(cid){
-  _shareState.quoteCid=cid;
-  renderQuotePicker();
-  renderShareStage();
-}
-function renderShareStage(){
-  const stage=document.getElementById('share-stage-inner');if(!stage)return;
-  const cur=getBooks().find(b=>b.status==='reading');
-  const quotes=cur?getQuotes().filter(q=>q.bookCid===cur.cid):[];
-  const pickedQuote=quotes.find(q=>q.cid===_shareState.quoteCid)||quotes[0];
-  stage.style.backgroundImage=_shareState.bg?`url(${_shareState.bg})`:'';
-  stage.style.backgroundColor=_shareState.bg?'transparent':'';
-
-  let html='';
-  if(!_shareState.bg)html+=`<div class="share-stage-empty" id="share-stage-empty"><i class="ti ti-photo" style="font-size:26px;" aria-hidden="true"></i><span>탭해서 배경 사진 추가</span></div>`;
-  else html+=`<div class="share-vignette"></div>`;
-
-  if(cur){
-    if(_shareState.header==='rl'){
-      html+=`<div class="s-rl">
-        <div class="s-rl-top">
-          <div class="s-rl-capsule share-txtshadow">iikoto moments</div>
-          <div class="s-rl-line"></div><span class="s-rl-star">✦</span>
-        </div>
-        ${_shareState.idxNote?`<div class="s-idx-note share-txtshadow">${_shareState.idxNote}</div>`:''}
-      </div>`;
-    }else if(_shareState.header==='idx'){
-      html+=`<svg class="s-idx-bookmark" viewBox="0 0 17 40" fill="none">
-        <path d="M0.5 0.5h16v36l-8-6-8 6z" fill="rgba(246,236,221,.8)" stroke="rgba(246,236,221,.85)" stroke-width="1"/>
-      </svg>
-      <div class="s-idx share-txtshadow">
-        <div class="s-idx-row">
-          <span class="s-idx-label">READING LOG</span>
-          <div class="s-idx-divider"></div>
-          <span class="s-idx-date">${dateKey(new Date()).replace(/-/g,'.')}</span>
-        </div>
-        ${_shareState.idxNote?`<div class="s-idx-note share-txtshadow">${_shareState.idxNote}</div>`:''}
-      </div>`;
-    }else if(_shareState.header==='books'){
-      html+=`<div class="s-books share-txtshadow">
-        <div class="s-books-row">
-          <svg class="s-books-line" viewBox="0 0 100 2" preserveAspectRatio="none"><line x1="0" y1="1" x2="100" y2="1" stroke="rgba(246,236,221,.42)" stroke-width="1" stroke-dasharray="0.5,1.6" stroke-linecap="round"/></svg>
-          <svg class="s-books-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
-            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
-          </svg>
-          <svg class="s-books-line" viewBox="0 0 100 2" preserveAspectRatio="none"><line x1="0" y1="1" x2="100" y2="1" stroke="rgba(246,236,221,.42)" stroke-width="1" stroke-dasharray="0.5,1.6" stroke-linecap="round"/></svg>
-        </div>
-        <div class="s-books-label">IIKOTO BOOKS</div>
-      </div>`;
-    }
-    if(_shareState.progress!=='none'){
-      let pct=0;
-      if(cur.unit==='percent')pct=cur.percent||0;
-      else if(cur.totalPages)pct=Math.min(100,Math.round((cur.pages/cur.totalPages)*100));
-      const label=cur.unit==='percent'?`${pct}%`:(cur.totalPages?`${cur.pages} / ${cur.totalPages}p`:`${pct}%`);
-      const posStyle=_shareState.progress==='top'?'top:16px;left:24px;':_shareState.progress==='topright'?'top:16px;right:24px;':'bottom:16px;left:24px;';
-      html+=`<div class="s-prog share-txtshadow" style="${posStyle}">
-        <div class="s-prog-label">${label}</div>
-        <div class="s-prog-track"><div class="s-prog-fill" style="width:${pct}%;"></div><div class="s-prog-bead" style="left:${pct}%;"></div></div>
-      </div>`;
-    }
-    if(_shareState.quote==='qs'&&pickedQuote){
-      html+=`<div class="s-qs">
-        <div class="s-qs-body"><span class="s-qs-mark">&#x275D;</span><div class="s-qs-text">${pickedQuote.text}</div></div>
-        <div class="s-qs-underline"></div>
-        <div class="s-qs-meta"><span class="t">${cur.title}</span><span class="a">${cur.author||''}</span></div>
-      </div>`;
-    }else if(_shareState.quote==='qt'&&pickedQuote){
-      html+=`<div class="s-qt-box">
-        <div class="s-qt-tape"></div>
-        <span class="s-qt-mark-open">&#x275D;</span>
-        <div class="s-qt-text">${pickedQuote.text}</div>
-        <span class="s-qt-mark-close">&#x275E;</span>
-        <div class="s-qt-meta"><span class="t">${cur.title}</span><span class="a">${cur.author||''}</span></div>
-      </div>`;
-    }else if(_shareState.quote==='hl'&&pickedQuote){
-      html+=`<div class="s-hl">
-        <span class="s-hl-text">${pickedQuote.text}</span>
-        <div class="s-hl-meta"><span class="t">${cur.title}</span><span class="a">${cur.author||''}</span></div>
-      </div>`;
-    }else if(_shareState.quote==='paper'&&pickedQuote){
-      html+=`<div class="s-paper">
-        <div class="s-paper-lines"><div class="s-paper-text">${pickedQuote.text}</div></div>
-        <div class="s-paper-meta"><span class="t">${cur.title}</span><span class="a">${cur.author||''}</span></div>
-      </div>`;
-    }
-  }
-  if(_shareState.cover!=='none'&&cur&&cur.poster){
-    const hasTitle=_shareState.cover.endsWith('-title');
-    const posKey=hasTitle?_shareState.cover.replace('-title',''):_shareState.cover;
-    html+=`<div class="s-cover pos-${posKey}">
-      <div class="s-cover-img"><img src="${proxyImgUrl(cur.poster)}" crossorigin="anonymous"></div>
-      ${hasTitle?`<div class="s-cover-title share-txtshadow">${cur.title}</div>`:''}
-    </div>`;
-  }
-  stage.innerHTML=html;
-}
-async function ensureShareFontsLoaded(){
-  try{
-    await Promise.all([
-      document.fonts.load("400 16px 'Bareonbatang'"),
-      document.fonts.load("700 16px 'Bareonbatang'")
-    ]);
-  }catch(e){}
-}
-async function loadHtml2Canvas(){
-  if(window.html2canvas)return;
-  if(window._h2cLoading)return window._h2cLoading;
-  window._h2cLoading=new Promise((resolve,reject)=>{
-    const s=document.createElement('script');
-    s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-    s.onload=resolve;
-    s.onerror=reject;
-    document.head.appendChild(s);
-  });
-  return window._h2cLoading;
-}
-// 미리보기(#share-stage-inner)에 실제로 그려진 CSS 디자인을 그대로 고해상도로 캡처.
-// 예전엔 미리보기와 별개로 Canvas2D 명령어로 다시 그려서(buildShareCanvas) 미리보기/출력이
-// 어긋나고 디테일이 누락됐는데, 이제는 미리보기와 100% 같은 DOM을 캡처하므로 그 문제가 없음.
-async function saveShareCard(){
-  if(!_shareState.bg){showToast('배경 사진을 먼저 추가해주세요');return;}
-  try{
-    await ensureShareFontsLoaded();
-    await loadHtml2Canvas();
-    const stage=document.getElementById('share-stage-inner');
-    const canvas=await html2canvas(stage,{scale:3.6,useCORS:true,backgroundColor:null,logging:false});
-    const filename='iikoto_reading_'+dateKey(new Date())+'.png';
-    const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
-    if(!blob){showToast('이미지 저장에 실패했어요');return;}
-    const file=new File([blob],filename,{type:'image/png'});
-    if(navigator.canShare&&navigator.canShare({files:[file]})){
-      await navigator.share({files:[file]});
-    }else{
-      const url=URL.createObjectURL(blob);
-      const link=document.createElement('a');
-      link.download=filename;
-      link.href=url;
-      link.click();
-      setTimeout(()=>URL.revokeObjectURL(url),3000);
-    }
-  }catch(e){
-    if(e&&e.name==='AbortError')return;
-    console.warn('share card export err:',e);
-    showToast('이미지 저장에 실패했어요');
-  }
-}
 let _rdAddStatus='reading';
 function openAddBookModal(){
   document.getElementById('rd-new-title').value='';
