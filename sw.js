@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260716-84-icon-cleanup-complete';
+const CACHE = 'iikoto-v20260716-85-pencil-icon-size-match';
 const ASSETS = [
   './',
   './index.html'

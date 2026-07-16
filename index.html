@@ -1010,7 +1010,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           <i class="ti ti-seeding" style="font-size:16px;color:#6a8a50;" aria-hidden="true"></i>
         </div>
         <div class="icon-btn reading-icon-btn" onclick="openReading()">
-          <i class="ti ti-macro" style="font-size:15px;color:#a8527a;" aria-hidden="true"></i>
+          <i class="ti ti-macro" style="font-size:16px;color:#a8527a;" aria-hidden="true"></i>
         </div>
       </div>
     </div>
@@ -2304,7 +2304,7 @@ function buildDailyRhythmTrack(dk){
       html+='<div class="rt-connector" style="top:'+top+'px;height:'+h+'px;"></div>';
     }
     const delBtn=bk.manualIdx!=null?'<span class="rt-del" onclick="deleteRhythmBlock('+bk.manualIdx+')">×</span>':'';
-    const editBtn=bk.manualIdx!=null?'<span class="rt-edit" onclick="openRhythmEditForm('+bk.manualIdx+')"><i class="ti ti-edit" style="font-size:11px;" aria-hidden="true"></i></span>':'';
+    const editBtn=bk.manualIdx!=null?'<span class="rt-edit" onclick="openRhythmEditForm('+bk.manualIdx+')"><i class="ti ti-pencil" style="font-size:11px;" aria-hidden="true"></i></span>':'';
     const finishBtn=(bk.ongoing&&bk.manualIdx!=null)?'<span class="rt-finish" onclick="finishRhythmBlock('+bk.manualIdx+')">종료</span>':'';
     const actions=(finishBtn||editBtn||delBtn)?'<span class="rt-actions">'+finishBtn+editBtn+delBtn+'</span>':'';
     html+='<div class="rt-row" style="top:'+bk.labelY+'px;"><span class="rt-time">'+bk.time+'</span><span class="rt-txt">'+bk.label+'</span>'+actions+'</div>';
