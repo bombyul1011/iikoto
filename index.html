@@ -528,9 +528,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .wave-center .n{font-size:18px;font-weight:700;color:var(--tp);}
 .wave-center .l{font-size:9px;color:var(--ts);margin-top:1px;}
 .wave-lbl{font-size:10.5px;color:var(--tm);margin-top:8px;}
+.pace-habit-beads-row{display:flex;justify-content:center;gap:6px;}
+.pace-habit-bead{width:12px;height:12px;border-radius:50%;display:inline-block;transition:opacity .3s;}
 @keyframes waveMove{0%{transform:translateX(0);}100%{transform:translateX(-50px);}}
 .wave-anim{animation:waveMove 3.5s linear infinite;}
 .rc-flow{display:flex;align-items:center;justify-content:center;gap:16px;padding:2px 0;}
+.rc-flow-memo-row{display:flex;align-items:flex-start;justify-content:center;gap:16px;padding:2px 0 0;}
+.rc-flow-memo{flex:0 0 auto;width:70px;font-size:9.5px;color:var(--tm);text-align:center;line-height:1.4;word-break:break-word;}
 .rc-flow i{font-size:28px;}
 .rc-arrow-dot{color:#d4ac85;display:flex;align-items:center;}
 .pace-comment{font-size:11.5px;color:var(--ts);text-align:center;line-height:1.6;}
@@ -800,7 +804,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rhythm-arrow{color:var(--tm);font-size:13px;}
 .rhythm-memo-inp{width:100%;background:var(--card);border:1px solid var(--card-b);border-radius:11px;padding:9px 12px;font-size:12.5px;color:var(--tp);margin-bottom:14px;font-family:'DM Sans',sans-serif;}
 .rhythm-content-picker{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
-.rhythm-content-chip{font-size:11px;color:var(--tp);background:var(--card);border:1px solid var(--card-b);border-radius:9px;padding:6px 10px;cursor:pointer;white-space:nowrap;}
+.rhythm-content-picker-swipe{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px;}
+.rhythm-content-picker-swipe::-webkit-scrollbar{display:none;}
+.rhythm-content-picker-swipe .rhythm-content-chip{flex-shrink:0;}
+.rhythm-content-chip{font-size:11px;color:var(--tp);background:var(--card);border:1px solid var(--card-b);border-radius:9px;padding:6px 10px;cursor:pointer;white-space:nowrap;transition:all .15s;}
+.rhythm-content-chip.sel{border:1.6px solid rgba(190,160,230,0.75);background:rgba(190,160,230,0.12);color:rgba(120,90,160,0.95);font-weight:600;}
 .rhythm-save-btn{width:100%;background:var(--acc);color:#fff;border:none;border-radius:12px;padding:11px 0;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;}
 
 .habit-numbox-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(78px,1fr));gap:8px;margin-bottom:10px;}
@@ -1886,7 +1894,7 @@ function renderHomeBody(section){
       rbanner.className='weekly-review-banner';
       rbanner.innerHTML=`<div class="weekly-review-banner-inner">
         <div class="weekly-review-banner-title">🌿 이번 달 누계 보기</div>
-        <div class="weekly-review-banner-sub"><span>한 달 동안의 기록을 모아봤어요</span><span style="font-size:16px;opacity:0.6;">›</span></div>
+        <div class="weekly-review-banner-sub"><span>한 달 동안의 기록을 모아봤어요</span><div class="report-banner-arrow" style="display:inline-flex;"><i class="ti ti-chevron-up" style="font-size:15px;" aria-hidden="true"></i></div></div>
       </div>`;
       rbanner.addEventListener('click',openMonthlyReportSheet);
       body.appendChild(rbanner);
@@ -1896,7 +1904,7 @@ function renderHomeBody(section){
       midBanner.className='weekly-review-banner';
       midBanner.innerHTML=`<div class="weekly-review-banner-inner">
         <div class="weekly-review-banner-title">🌿 이번 달 중간 소식 보기</div>
-        <div class="weekly-review-banner-sub"><span>한 달의 절반, 지금까지의 흐름을 모아봤어요</span><span style="font-size:16px;opacity:0.6;">›</span></div>
+        <div class="weekly-review-banner-sub"><span>한 달의 절반, 지금까지의 흐름을 모아봤어요</span><div class="report-banner-arrow" style="display:inline-flex;"><i class="ti ti-chevron-up" style="font-size:15px;" aria-hidden="true"></i></div></div>
       </div>`;
       midBanner.addEventListener('click',openMonthlyReportSheet);
       body.appendChild(midBanner);
@@ -2002,10 +2010,16 @@ function openRhythmEditForm(idx){
 }
 // 리듬바 감상 입력 폼에서 진행중 드라마/영화 칩을 누르면 한줄메모 인풋에 제목을 채움.
 // 전체 폼을 다시 그리지 않고 인풋 값만 직접 갱신해 다른 입력값(시작/끝 시각 등) 유지.
-function pickRhythmContentTitle(fullTitle){
+// 책상 카테고리에서 '일기'를 선택하면 '일기' 습관이 있을 경우 자동으로 체크(습관 이름이 바뀌었거나 없으면 조용히 무시).
+function pickRhythmContentTitle(fullTitle,chipEl){
   _rhythmFormText=fullTitle;
   const inp=document.getElementById('rhythm-text-inp');
   if(inp)inp.value=fullTitle;
+  document.querySelectorAll('.rhythm-content-chip').forEach(el=>el.classList.remove('sel'));
+  if(chipEl)chipEl.classList.add('sel');
+  if(_rhythmFormCat==='note'&&fullTitle==='일기'){
+    checkHabitDirect('일기',_rhythmDk||dateKey(getLogicalDate()));
+  }
 }
 function selectRhythmCatAndOpen(cat){
   if(_rhythmFormOpen&&_rhythmFormCat===cat&&_rhythmEditIdx==null){
@@ -3351,6 +3365,7 @@ const S={
 
 // ── DATE HELPERS
 function pad(n){return String(n).padStart(2,'0');}
+function escapeHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 // 자정~새벽(아직 잠들기 전, night_2)에는 "오늘"을 전날 밤 기준으로 보는 논리적 날짜
 // ── 절기(節氣) 정보 — 7~12월 우선 적용, 필요시 이후 확장
 // 날짜는 한국천문연구원 절입시각 기준 (연도별로 1~2일 오차 가능, 매년 갱신 필요)
@@ -4719,7 +4734,7 @@ function confirmCopyWholeTodo(){
   renderTodos();
 }
 // ── 오후 파트: 오늘vs어제 진행바 + 목표대비 웨이브게이지 + 리듬 비교 통합 카드
-const AFTERNOON_TODO_GOAL=5,AFTERNOON_HABIT_GOAL=4;
+const AFTERNOON_TODO_GOAL=5,AFTERNOON_HABIT_GOAL=4,AFTERNOON_MORNING_GOAL=4;
 
 // 아침 루틴 (임시: 오후 파트에 배치해서 디자인 확인 중, 추후 아침 파트1로 이동 예정)
 const MORNING_ROUTINE_ITEMS=[
@@ -4879,9 +4894,23 @@ function _paceHabitCheckedCount(dk){
   const checks=getHabitChecks(wk);
   return habits.filter(h=>checks[h.name+'-'+dow]).length;
 }
+// 습관 각각의 온/오프 상태 + 지정색을 함께 반환 — 물방울 원 하단 구슬 표시용.
+function _paceHabitBeadsData(dk){
+  const wk=weekKey(new Date(dk+'T00:00:00'));
+  const dow=(new Date(dk+'T00:00:00').getDay()+6)%7;
+  const habits=getHabits();
+  const checks=getHabitChecks(wk);
+  return habits.map(h=>({on:!!checks[h.name+'-'+dow],color:getHabitColor(h.color)}));
+}
+// 오늘 진행도 가로바에 아침루틴 체크도 합산하기 위한 헬퍼.
+function _paceMorningRoutineCheckedCount(dk){
+  const checks=getMorningRoutineChecks(dk);
+  return MORNING_ROUTINE_ITEMS.filter(it=>checks[it.key]).length;
+}
 function _paceTopRhythmCat(dk){
   const blocks=getRhythmBlocks(dk);
   const dur={};
+  const catBlocks={}; // 카테고리별 블록 목록(메모 텍스트 탐색용)
   const isToday=dk===dateKey(getLogicalDate());
   const nowMin=isToday?(new Date().getHours()*60+new Date().getMinutes()):null;
   blocks.forEach(b=>{
@@ -4899,11 +4928,15 @@ function _paceTopRhythmCat(dk){
     }
     let d=e-s;if(d<0)d+=1440;
     dur[b.cat]=(dur[b.cat]||0)+d;
+    (catBlocks[b.cat]=catBlocks[b.cat]||[]).push({...b,_dur:d});
   });
   const top=Object.keys(dur).sort((a,b)=>dur[b]-dur[a])[0];
   if(!top)return null;
-  if(RHYTHM_CATS[top])return {key:top,icon:RHYTHM_CATS[top].icon,color:RHYTHM_CATS[top].color,label:RHYTHM_CATS[top].label};
-  if(top==='_meal')return {key:top,icon:'ti-tools-kitchen-3',color:RHYTHM_MEAL_COLOR,label:'식사'};
+  // 최다 카테고리 블록들 중 메모(text)가 있는 것 하나 — 가장 긴 블록 우선
+  const memoBlock=(catBlocks[top]||[]).filter(b=>b.text&&b.text.trim()).sort((a,b)=>b._dur-a._dur)[0];
+  const memo=memoBlock?memoBlock.text.trim():'';
+  if(RHYTHM_CATS[top])return {key:top,icon:RHYTHM_CATS[top].icon,color:RHYTHM_CATS[top].color,label:RHYTHM_CATS[top].label,memo};
+  if(top==='_meal')return {key:top,icon:'ti-tools-kitchen-3',color:RHYTHM_MEAL_COLOR,label:'식사',memo};
   return null;
 }
 // 저녁 파트1용 미니통계 카드 — 당일 기록 기준(완료 투두 / 체크 습관 / 오늘의 최다 리듬), 오후 통계카드보다 훨씬 컴팩트하게
@@ -5132,12 +5165,25 @@ function makeAfternoonPaceCard(){
   const yestTotal=Math.max(getTodos(yestDk).length,1);
 
   const todayHabit=_paceHabitCheckedCount(todayDk);
+  const yestHabit=_paceHabitCheckedCount(yestDk);
+  const todayMorning=_paceMorningRoutineCheckedCount(todayDk);
+  const yestMorning=_paceMorningRoutineCheckedCount(yestDk);
+  const HABIT_TOTAL=getHabits().length||1;
+  const MORNING_TOTAL=MORNING_ROUTINE_ITEMS.length;
+
+  // 오늘 진행도 가로바 — 투두뿐 아니라 습관/아침루틴까지 포함해 하루 전체 활동을 반영
+  const todayBarDone=todayDone+todayHabit+todayMorning;
+  const todayBarTotal=todayTotal+HABIT_TOTAL+MORNING_TOTAL;
+  const yestBarDone=yestDone+yestHabit+yestMorning;
+  const yestBarTotal=yestTotal+HABIT_TOTAL+MORNING_TOTAL;
+
   const lastWeekHabit=_paceHabitCheckedCount(lastWeekDk);
+  const lastWeekMorning=_paceMorningRoutineCheckedCount(lastWeekDk); // 아침루틴 도입 전 주라면 자연히 0
   const lastWeekTodoDone=_paceCountDoneUntilNow(lastWeekDk,null);
 
-  const todaySum=Math.min(todayDone,AFTERNOON_TODO_GOAL)+Math.min(todayHabit,AFTERNOON_HABIT_GOAL);
-  const lastWeekSum=Math.min(lastWeekTodoDone,AFTERNOON_TODO_GOAL)+Math.min(lastWeekHabit,AFTERNOON_HABIT_GOAL);
-  const goalTotal=AFTERNOON_TODO_GOAL+AFTERNOON_HABIT_GOAL;
+  const todaySum=Math.min(todayDone,AFTERNOON_TODO_GOAL)+Math.min(todayHabit,AFTERNOON_HABIT_GOAL)+Math.min(todayMorning,AFTERNOON_MORNING_GOAL);
+  const lastWeekSum=Math.min(lastWeekTodoDone,AFTERNOON_TODO_GOAL)+Math.min(lastWeekHabit,AFTERNOON_HABIT_GOAL)+Math.min(lastWeekMorning,AFTERNOON_MORNING_GOAL);
+  const goalTotal=AFTERNOON_TODO_GOAL+AFTERNOON_HABIT_GOAL+AFTERNOON_MORNING_GOAL;
 
   const lastWeekTop=_paceTopRhythmCat(lastWeekDk);
   const todayTop=_paceTopRhythmCat(todayDk);
@@ -5148,10 +5194,14 @@ function makeAfternoonPaceCard(){
 
   let html='';
   html+=`<div class="pace-title"><i class="ti ti-clock" style="font-size:13px;" aria-hidden="true"></i> 오늘 진행도</div>`;
-  html+=`<div class="pace-track-wrap"><div class="pace-track-lbl"><span>어제</span><span>${yestDone}개</span></div>
-    <div class="pace-track"><div class="pace-fill-y" style="width:${yestDone/yestTotal*100}%;"></div></div></div>`;
-  html+=`<div class="pace-track-wrap" style="margin-bottom:0;"><div class="pace-track-lbl"><span>오늘</span><span>${todayDone}개</span></div>
-    <div class="pace-track"><div class="pace-fill-t" style="width:${todayDone/todayTotal*100}%;"></div><div class="pace-bead2" style="left:${todayDone/todayTotal*100}%;"></div></div></div>`;
+  html+=`<div class="pace-track-wrap"><div class="pace-track-lbl"><span>어제</span><span>${yestBarDone}개</span></div>
+    <div class="pace-track"><div class="pace-fill-y" style="width:${yestBarDone/yestBarTotal*100}%;"></div></div></div>`;
+  html+=`<div class="pace-track-wrap" style="margin-bottom:0;"><div class="pace-track-lbl"><span>오늘</span><span>${todayBarDone}개</span></div>
+    <div class="pace-track"><div class="pace-fill-t" style="width:${todayBarDone/todayBarTotal*100}%;"></div><div class="pace-bead2" style="left:${todayBarDone/todayBarTotal*100}%;"></div></div></div>`;
+
+  const lastWeekHabitBeads=_paceHabitBeadsData(lastWeekDk);
+  const todayHabitBeads=_paceHabitBeadsData(todayDk);
+  const habitBeadsHtml=beads=>beads.map(b=>`<span class="pace-habit-bead" style="background:${b.color};opacity:${b.on?1:0.18};"></span>`).join('');
 
   html+=`<div class="pace-divider"></div>`;
   html+=`<div class="wave-title"><i class="ti ti-droplet" style="font-size:13px;" aria-hidden="true"></i> 지난주와 오늘</div>`;
@@ -5162,7 +5212,7 @@ function makeAfternoonPaceCard(){
       <g clip-path="url(#paceClipLast)"><path class="wave-anim" d="M0,${90-lastWeekSum/goalTotal*80} Q12.5,${90-lastWeekSum/goalTotal*80-6} 25,${90-lastWeekSum/goalTotal*80} T50,${90-lastWeekSum/goalTotal*80} T75,${90-lastWeekSum/goalTotal*80} T100,${90-lastWeekSum/goalTotal*80} T125,${90-lastWeekSum/goalTotal*80} T150,${90-lastWeekSum/goalTotal*80} V90 H0 Z" fill="rgba(190,180,172,0.85)"/></g>
       <circle cx="45" cy="45" r="40" fill="none" stroke="var(--card-b)" stroke-width="1.5"/>
     </svg><div class="wave-center"><div class="n">${lastWeekSum}</div></div></div>
-    <div class="wave-lbl"></div></div>
+    <div class="wave-lbl pace-habit-beads-row">${habitBeadsHtml(lastWeekHabitBeads)}</div></div>
     <div class="wave-col"><div class="wave-wrap"><svg class="wave-svg" viewBox="0 0 90 90">
       <defs><clipPath id="paceClipToday"><circle cx="45" cy="45" r="40"/></clipPath>
       <linearGradient id="paceWaterGrad" x1="0" y1="0" x2="0" y2="1">
@@ -5172,7 +5222,7 @@ function makeAfternoonPaceCard(){
       <g clip-path="url(#paceClipToday)"><path class="wave-anim" d="M0,${90-todaySum/goalTotal*80} Q12.5,${90-todaySum/goalTotal*80-6} 25,${90-todaySum/goalTotal*80} T50,${90-todaySum/goalTotal*80} T75,${90-todaySum/goalTotal*80} T100,${90-todaySum/goalTotal*80} T125,${90-todaySum/goalTotal*80} T150,${90-todaySum/goalTotal*80} V90 H0 Z" fill="url(#paceWaterGrad)" opacity="0.95"/></g>
       <circle cx="45" cy="45" r="40" fill="none" stroke="var(--card-b)" stroke-width="1.5"/>
     </svg><div class="wave-center"><div class="n">${todaySum}</div></div></div>
-    <div class="wave-lbl"></div></div>
+    <div class="wave-lbl pace-habit-beads-row">${habitBeadsHtml(todayHabitBeads)}</div></div>
   </div>`;
 
   if(lastWeekTop&&todayTop){
@@ -5190,6 +5240,13 @@ function makeAfternoonPaceCard(){
       </svg></span>
       <i class="ti ${todayTop.icon}" style="color:${todayColor};"></i>
     </div>`;
+    if(lastWeekTop.memo||todayTop.memo){
+      html+=`<div class="rc-flow-memo-row">
+        <div class="rc-flow-memo">${lastWeekTop.memo?escapeHtml(lastWeekTop.memo):''}</div>
+        <div class="rc-flow-memo"></div>
+        <div class="rc-flow-memo">${todayTop.memo?escapeHtml(todayTop.memo):''}</div>
+      </div>`;
+    }
   }else if(!todayTop){
     html+=`<div class="pace-divider"></div>`;
     html+=`<div style="text-align:center;font-size:11px;color:var(--tm);padding:4px 0;"><i class="ti ti-hourglass-empty" style="font-size:14px;margin-right:4px;vertical-align:-2px;" aria-hidden="true"></i>아직 본격적인 활동이 시작되지 않았어요</div>`;
@@ -6560,9 +6617,9 @@ function renderTimetable(){
       if(isWatching&&!eStr){
         endD=isSameMonth?todayDay:daysInMonth;
       }else if(!eStr){
-        // music처럼 isWatching이 항상 false로 계산되는 카테고리는 위 분기를 못 타므로,
-        // 종료일이 없는 경우 여기서 별도로 처리(시작일과 동일하게, 또는 진행중이면 오늘/월말까지).
-        endD=item.status==='watching'?(isSameMonth?todayDay:daysInMonth):startD;
+        // music은 '며칠씩 걸리는' 개념이 없으므로 상태(watching 포함)와 무관하게 항상 시작일 하루짜리 점으로 고정.
+        // music 외 다른 카테고리가 혹시 이 분기를 타는 경우(예외적 데이터)에는 기존처럼 watching이면 오늘/월말까지 연장.
+        endD=(cat!=='music'&&item.status==='watching')?(isSameMonth?todayDay:daysInMonth):startD;
       }else{
         const eMonth=eStr.slice(0,7);
         endD=eMonth===mk?Math.max(parseInt(eStr.slice(8,10),10)||startD,startD):daysInMonth;
@@ -6721,7 +6778,8 @@ function confirmContent(){
     const endVal=document.getElementById('cm-end').value;
     endDate=endVal||startDate;
     if(endDate<startDate)endDate=startDate; // 끝이 시작보다 빠를 수 없음
-  } else if(status==='done'||status==='stopped')endDate=startDate;
+  }
+  // 음악은 '듣는 데 며칠씩 걸리는' 개념이 아니므로 완료/중단 상태여도 endDate는 항상 null로 유지.
   const review=document.getElementById('cm-review').value.trim();
   const stars=parseInt(document.getElementById('cm-stars').value)||0;
   const poster=_selectedPoster||(_contentCtx.item&&_contentCtx.item.poster)||null;
@@ -7614,16 +7672,28 @@ function buildRhythmFormEl(showOngoingList){
   wrap.appendChild(legend);
   if(_rhythmFormOpen){
     const form=document.createElement('div');form.className='rhythm-add-form';
-    const ongoingContents=_rhythmFormCat==='enjoy'?getOngoingWatchingContents():[];
-    const contentPickerHtml=ongoingContents.length?(
-      '<div class="rhythm-content-picker">'+
-      ongoingContents.map(function(c){
-        const catLabel=c.cat==='drama'?'드라마':'영화';
-        const full=catLabel+' - '+c.title;
-        return '<span class="rhythm-content-chip" onclick="pickRhythmContentTitle(\''+full.replace(/'/g,"\\'")+'\')">'+full+'</span>';
-      }).join('')+
-      '</div>'
-    ):'';
+    // 카테고리별 빠른 선택지: 감상은 콘텐츠탭 연동(객체), 나머지는 고정 문구(문자열) 배열.
+    const RHYTHM_QUICK_CHOICES={exercise:['홈트','헬스장'],rest:['낮잠','빈둥빈둥'],note:['일기','노트정리','개인작업']};
+    let contentPickerHtml='';
+    if(_rhythmFormCat==='enjoy'){
+      const ongoingContents=getOngoingWatchingContents();
+      contentPickerHtml=ongoingContents.length?(
+        '<div class="rhythm-content-picker">'+
+        ongoingContents.map(function(c){
+          const catLabel=c.cat==='drama'?'드라마':'영화';
+          const full=catLabel+' - '+c.title;
+          return '<span class="rhythm-content-chip" onclick="pickRhythmContentTitle(\''+full.replace(/'/g,"\\'")+'\',this)">'+full+'</span>';
+        }).join('')+
+        '</div>'
+      ):'';
+    } else if(RHYTHM_QUICK_CHOICES[_rhythmFormCat]){
+      contentPickerHtml=
+        '<div class="rhythm-content-picker rhythm-content-picker-swipe">'+
+        RHYTHM_QUICK_CHOICES[_rhythmFormCat].map(function(label){
+          return '<span class="rhythm-content-chip" onclick="pickRhythmContentTitle(\''+label.replace(/'/g,"\\'")+'\',this)">'+label+'</span>';
+        }).join('')+
+        '</div>';
+    }
     form.innerHTML=
       '<div class="rhythm-form-label">시작 — 끝</div>'+
       '<div class="rhythm-time-row">'+
@@ -7632,7 +7702,7 @@ function buildRhythmFormEl(showOngoingList){
         '<div class="rhythm-timebox"><span class="rhythm-timebox-l">끝(선택)</span><span class="rhythm-timebox-v" onclick="openRhythmTimeModal(\'end\')">'+(_rhythmFormEnd||'--:--')+'</span><span class="rhythm-timebox-now" onclick="setRhythmNow(\'end\')"><i class="ti ti-clock-hour-4" style="font-size:11px;" aria-hidden="true"></i></span></div>'+
       '</div>'+
       contentPickerHtml+
-      '<input type="text" id="rhythm-text-inp" class="rhythm-memo-inp" placeholder="한 줄 메모 (선택)" value="'+(_rhythmFormText||'').replace(/"/g,'&quot;')+'" oninput="_rhythmFormText=this.value">'+
+      '<input type="text" id="rhythm-text-inp" class="rhythm-memo-inp" placeholder="한 줄 메모 (선택)" value="'+(_rhythmFormText||'').replace(/"/g,'&quot;')+'" oninput="_rhythmFormText=this.value;document.querySelectorAll(\'.rhythm-content-chip.sel\').forEach(function(el){if(el.textContent!==this.value)el.classList.remove(\'sel\');}.bind(this))">'+
       '<div style="display:flex;gap:8px;">'+
         '<button class="rhythm-save-btn" style="background:none;border:1.5px solid var(--card-b);color:var(--tm);flex:0 0 80px;" onclick="toggleRhythmAddForm()">취소</button>'+
         '<button class="rhythm-save-btn" style="flex:1;" onclick="saveRhythmBlock()">'+(_rhythmEditIdx!=null?'수정 완료':'트랙에 추가')+'</button>'+
@@ -7802,6 +7872,15 @@ function mealCatPressEnd(){
   clearTimeout(_mealCatPressTimer);
   _mealCatPressTimer=null;
 }
+// 시간 입력창(type=time) 자체엔 지우기 버튼이 없어 한번 넣은 시간을 못 지우던 문제 — 별도 X 버튼으로 지원.
+function clearMealTime(dk,k){
+  const tEl=document.getElementById(`wm-${dk}-${k}-time`);
+  if(tEl)tEl.value='';
+  saveOneMealDay(dk);
+  const btn=document.getElementById(`wm-${dk}-${k}`)?.parentElement?.querySelector('span[onclick^="clearMealTime"]');
+  if(btn)btn.remove();
+  if(tEl)tEl.classList.add('mt-empty');
+}
 function saveOneMealDay(dk){
   const CATS=['breakfast','lunch','dinner','snack'];
   const m={};
@@ -7837,7 +7916,7 @@ function openWeekMealSheet(){
     const isNextWeekPeek=i===7;
     const block=document.createElement('div');block.className='week-meal-day';block.id='wm-block-'+dk;
     block.innerHTML=`<div class="week-meal-day-label">${DOW[i%7]} · ${d.getMonth()+1}/${d.getDate()}${isNextWeekPeek?' · 다음 주':''}</div>`+
-      CATS.map(([k,label])=>`<div class="meal-row"><div class="meal-cat" onpointerdown="mealCatPressStart(this,'${dk}','${k}')" onpointerup="mealCatPressEnd(this)" onpointerleave="mealCatPressEnd(this)" onpointercancel="mealCatPressEnd(this)">${label}</div><input class="meal-inp" style="flex:1 1 0;min-width:0;" id="wm-${dk}-${k}" type="text" placeholder="메뉴 입력" autocomplete="off" value="${(m[k]||'').replace(/"/g,'&quot;')}" onblur="saveOneMealDay('${dk}')"><input class="meal-time-inp${m[k+'_time']?'':' mt-empty'}" id="wm-${dk}-${k}-time" type="time" value="${m[k+'_time']||''}" onchange="saveOneMealDay('${dk}')" step="60" lang="en-GB"></div>`).join('');
+      CATS.map(([k,label])=>`<div class="meal-row"><div class="meal-cat" onpointerdown="mealCatPressStart(this,'${dk}','${k}')" onpointerup="mealCatPressEnd(this)" onpointerleave="mealCatPressEnd(this)" onpointercancel="mealCatPressEnd(this)">${label}</div><input class="meal-inp" style="flex:1 1 0;min-width:0;" id="wm-${dk}-${k}" type="text" placeholder="메뉴 입력" autocomplete="off" value="${(m[k]||'').replace(/"/g,'&quot;')}" onblur="saveOneMealDay('${dk}')"><input class="meal-time-inp${m[k+'_time']?'':' mt-empty'}" id="wm-${dk}-${k}-time" type="time" value="${m[k+'_time']||''}" onchange="saveOneMealDay('${dk}')" step="60" lang="en-GB">${m[k+'_time']?`<span onclick="clearMealTime('${dk}','${k}')" style="cursor:pointer;color:var(--tm);font-size:13px;padding:0 2px;flex-shrink:0;" title="시간 지우기">✕</span>`:''}</div>`).join('');
     body.appendChild(block);
   }
   openSheet('week-meal-sheet');

@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260715-81-vow-server-download';
+const CACHE = 'iikoto-v20260716-82-pace-card-rhythm-quickpick';
 const ASSETS = [
   './',
   './index.html'
