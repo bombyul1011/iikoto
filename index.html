@@ -160,14 +160,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 /* ── TODO ── */
 .todo-item{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--div);font-size:12.5px;color:var(--tp);position:relative;overflow:hidden;user-select:none;}
-.wd-section{display:flex;flex-direction:column;}
-.wd-item{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12.5px;color:var(--tp);}
-.wd-item i.ti-pin{color:rgba(180,130,90,0.85);}
-.wd-text{flex:1;min-width:0;}
-.wd-overdue-tag{font-size:10px;color:#c05060;background:rgba(192,80,96,0.10);border-radius:7px;padding:2px 7px;flex-shrink:0;cursor:pointer;white-space:nowrap;}
-.wd-del{flex-shrink:0;color:var(--tm);opacity:0.6;cursor:pointer;padding:2px;}
-.wd-more{font-size:11px;color:var(--tm);text-align:center;padding:4px 0;cursor:pointer;}
-.wd-divider{border-bottom:1px dashed rgba(200,180,168,0.45);margin:4px 0 6px;}
 .todo-item:last-of-type{border-bottom:none;}
 .todo-item.reorder-active{z-index:5;background:var(--card);box-shadow:0 2px 8px rgba(0,0,0,0.12);border-radius:8px;}
 .todo-item.reorder-shift{transition:transform .12s ease;}
@@ -1039,12 +1031,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div class="slabel">오늘 할 일</div>
         <div style="display:flex;align-items:center;gap:4px;">
           <button class="slabel-search-btn" id="todo-reorder-btn" onclick="toggleTodoReorderMode()" title="순서 변경"><i class="ti ti-menu-2" style="font-size:13px;" aria-hidden="true"></i></button>
-          <button class="slabel-search-btn" onclick="openWeeklyDeadlineInput()" title="이번주안 할 일"><i class="ti ti-pin" style="font-size:12px;" aria-hidden="true"></i></button>
           <button class="slabel-search-btn" onclick="openReserveSheet()" title="예비 투두"><i class="ti ti-plus" style="font-size:12px;" aria-hidden="true"></i></button>
         </div>
       </div>
       <div class="card y" id="todo-card">
-        <div id="weekly-deadline-list"></div>
         <div id="todo-list"></div>
         <button class="add-btn" onclick="openTodoModal()">
           <i class="ti ti-plus" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i>할 일 추가
@@ -1351,18 +1341,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div class="modal-actions">
       <button class="mbtn cancel" onclick="closeModal('todo-modal')">취소</button>
       <button class="mbtn ok" onclick="confirmTodo()">저장</button>
-    </div>
-  </div>
-</div>
-
-<!-- WEEKLY DEADLINE TODO MODAL -->
-<div class="modal-ov" id="weekly-deadline-modal" onclick="closeModal('weekly-deadline-modal',event)">
-  <div class="modal">
-    <div class="modal-title">📌 이번주안 할 일 추가</div>
-    <input type="text" class="modal-inp" id="weekly-deadline-inp" placeholder="이번 주 안에 끝낼 일을 입력하세요" autocomplete="off" onkeydown="if(event.isComposing||event.keyCode===229)return;if(event.key==='Enter'){event.preventDefault();confirmWeeklyDeadlineTodo();}">
-    <div class="modal-actions">
-      <button class="mbtn cancel" onclick="closeModal('weekly-deadline-modal')">취소</button>
-      <button class="mbtn ok" onclick="confirmWeeklyDeadlineTodo()">저장</button>
     </div>
   </div>
 </div>
@@ -2019,6 +1997,7 @@ function checkHabitDirect(habitName,dk){
   if(checks[key])return;
   checks[key]=true;
   saveHabitChecks(wk,checks);
+  recordHabitCheckTime(wk,key);
   if(document.getElementById('daily-habit-box'))renderDailyHabitCheck();
 }
 function finishRhythmBlock(idx){
@@ -3657,6 +3636,20 @@ function getHabits(){return S.get('habits')||DEFAULT_HABITS;}
 function saveHabits(v){S.set('habits',v);autoSync('habits',null);}
 function getHabitChecks(wk){return S.get(S.key('hc',wk))||{};}
 function saveHabitChecks(wk,v){S.set(S.key('hc',wk),v);autoSync('hc',wk);}
+// 습관 체크 시각(별도 저장소) — 기존 checks[key]=true/false 불리언 구조를 안 건드리기 위해 분리.
+// 새벽홈탭 타임라인 등에서 "몇 시에 체크했는지"가 필요할 때만 참조.
+function getHabitCheckTimes(wk){return S.get(S.key('hcTime',wk))||{};}
+function saveHabitCheckTimes(wk,v){S.set(S.key('hcTime',wk),v);autoSync('hcTime',wk);}
+function recordHabitCheckTime(wk,key){
+  const times=getHabitCheckTimes(wk);
+  const now=new Date();
+  times[key]=pad(now.getHours())+':'+pad(now.getMinutes());
+  saveHabitCheckTimes(wk,times);
+}
+function clearHabitCheckTime(wk,key){
+  const times=getHabitCheckTimes(wk);
+  if(times[key]){delete times[key];saveHabitCheckTimes(wk,times);}
+}
 function getContents(mk){
   const arr=S.get(S.key('contents',mk))||[];
   let changed=false;
@@ -3836,18 +3829,20 @@ async function syncHCDown(wk){
   const ws=wk.replace('week:','');const we=getWeekEnd(ws);
   const rows=await supaFetch(`habit_checks?date_key=gte.${ws}&date_key=lt.${we}`);
   if(!rows)return;
-  const checks={};
-  rows.forEach(r=>{const d=new Date(r.date_key);const dow=(d.getDay()+6)%7;checks[`${r.habit_name}-${dow}`]=true;});
+  const checks={};const times={};
+  rows.forEach(r=>{const d=new Date(r.date_key);const dow=(d.getDay()+6)%7;const key=`${r.habit_name}-${dow}`;checks[key]=true;if(r.checked_time)times[key]=r.checked_time;});
   S.set(S.key('hc',wk),checks);
+  if(Object.keys(times).length)S.set(S.key('hcTime',wk),times);
 }
 async function syncHCUp(wk){
   const checks=getHabitChecks(wk);const ws=wk.replace('week:','');
+  const times=getHabitCheckTimes(wk);
   const rows=[];const mon=new Date(ws);
   Object.keys(checks).filter(k=>checks[k]).forEach(k=>{
     const parts=k.split('-');const dow=parseInt(parts[parts.length-1]);
     const name=parts.slice(0,-1).join('-');
     const d=new Date(mon);d.setDate(mon.getDate()+dow);
-    rows.push({habit_name:name,date_key:dateKey(d)});
+    rows.push({habit_name:name,date_key:dateKey(d),checked_time:times[k]||null});
   });
   if(rows.length){
     const ok=await supaUpsert('habit_checks','habit_name,date_key',rows);
@@ -4302,41 +4297,9 @@ function toggleTodoReorderMode(){
   document.getElementById('todo-reorder-btn')?.classList.toggle('on',_todoReorderMode);
   renderTodos();
 }
-let _weeklyDeadlineExpanded=false;
-// "이번주안" 항목 렌더링 — 완료 안 된 것만 표시(완료되면 사라짐, 하루 단위로 리셋되지 않음).
-// 지난 주에 등록된 채 아직 안 끝났으면 '기한 지남'으로 표시하고, 다음 주로 미루거나 완료/삭제 가능.
-function renderWeeklyDeadlineSection(){
-  const wrap=document.getElementById('weekly-deadline-list');if(!wrap)return;
-  const all=getWeeklyDeadlineTodos();
-  const curWeek=weekKey(new Date());
-  const pending=all.map((t,i)=>({...t,_i:i})).filter(t=>!t.done);
-  if(!pending.length){wrap.innerHTML='';return;}
-  const showCount=_weeklyDeadlineExpanded?pending.length:Math.min(pending.length,2);
-  const visible=pending.slice(0,showCount);
-  const hiddenCount=pending.length-visible.length;
-  let html='<div class="wd-section">';
-  visible.forEach(t=>{
-    const isOverdue=t.createdWeek&&t.createdWeek!==curWeek;
-    html+=`<div class="wd-item${isOverdue?' overdue':''}">
-      <div class="chk" onclick="toggleWeeklyDeadlineTodo(${t._i})"></div>
-      <i class="ti ti-pin" style="font-size:12px;flex-shrink:0;" aria-hidden="true"></i>
-      <span class="wd-text">${t.text}</span>
-      ${isOverdue?`<span class="wd-overdue-tag" onclick="event.stopPropagation();rolloverWeeklyDeadlineTodo(${t._i})">기한 지남 · 이번주로</span>`:''}
-      <span class="wd-del" onclick="event.stopPropagation();deleteWeeklyDeadlineTodo(${t._i})"><i class="ti ti-x" style="font-size:12px;" aria-hidden="true"></i></span>
-    </div>`;
-  });
-  if(hiddenCount>0){
-    html+=`<div class="wd-more" onclick="_weeklyDeadlineExpanded=true;renderWeeklyDeadlineSection();">+${hiddenCount}개 더보기</div>`;
-  }else if(_weeklyDeadlineExpanded&&pending.length>2){
-    html+=`<div class="wd-more" onclick="_weeklyDeadlineExpanded=false;renderWeeklyDeadlineSection();">접기</div>`;
-  }
-  html+='</div><div class="wd-divider"></div>';
-  wrap.innerHTML=html;
-}
 function renderTodos(){
   const dk=dateKey(currentDate),todos=getTodos(dk);
   const list=document.getElementById('todo-list');if(!list)return;
-  renderWeeklyDeadlineSection();
   list.innerHTML='';
   const tsOrder={morning:0,afternoon:1,night:2,none:3};
   function parseTime(text){
@@ -4717,7 +4680,8 @@ function toggleMorningRoutineCheck(key){
     delete checks[key];
   }else{
     const maxOrder=Math.max(0,...MORNING_ROUTINE_ITEMS.map(it=>checks[it.key]?.order||0));
-    checks[key]={order:maxOrder+1};
+    const now=new Date();
+    checks[key]={order:maxOrder+1,time:pad(now.getHours())+':'+pad(now.getMinutes())};
   }
   S.set('mroutine_'+dk,checks);
   autoSync('mroutine',dk);
@@ -4727,7 +4691,7 @@ function toggleMorningRoutineCheck(key){
 }
 async function syncMorningRoutineUp(dk){
   const checks=getMorningRoutineChecks(dk);
-  const rows=Object.keys(checks).map(key=>({date_key:dk,item_key:key,checked_order:checks[key].order||1,client_id:dk+'_'+key}));
+  const rows=Object.keys(checks).map(key=>({date_key:dk,item_key:key,checked_order:checks[key].order||1,checked_time:checks[key].time||null,client_id:dk+'_'+key}));
   // 이 날짜의 서버 데이터를 로컬 상태로 완전히 맞춤: 남은 것 upsert, 로컬에서 해제된 항목은 삭제
   if(rows.length){
     const ok=await supaUpsert('morning_routine_checks','date_key,item_key',rows);
@@ -4751,7 +4715,7 @@ async function syncMorningRoutineDown(dk){
     return;
   }
   const checks={};
-  rows.forEach(r=>{checks[r.item_key]={order:r.checked_order};});
+  rows.forEach(r=>{checks[r.item_key]={order:r.checked_order,time:r.checked_time||null};});
   S.set('mroutine_'+dk,checks);
 }
 function _mroutineMonthCount(key){
@@ -5507,7 +5471,8 @@ function makeHabitMiniCheckRow(){
       const key=h.name+'-'+dow;
       const wasOn=!!checks[key];
       checks[key]=!checks[key];
-      if(wasOn&&!checks[key])addDelPending('hc',wk,h.name+'|'+dateKey(_ld));
+      if(wasOn&&!checks[key]){addDelPending('hc',wk,h.name+'|'+dateKey(_ld));clearHabitCheckTime(wk,key);}
+      else if(!wasOn&&checks[key])recordHabitCheckTime(wk,key);
       saveHabitChecks(wk,checks);
       const fresh=makeHabitMiniCheckRow();
       wrap.replaceWith(fresh);
@@ -5621,22 +5586,45 @@ function makeDawnRecapCard(){
   }
 
   html+=`<div class="day-recap-sec-title"><i class="ti ti-check" style="font-size:12px;" aria-hidden="true"></i> 완료한 일 · ${doneTodos.length}개</div>`;
-  if(doneTodos.length){
-    const withMin=doneTodos.map(t=>({t,min:t.completedAt?new Date(t.completedAt).getHours()*60+new Date(t.completedAt).getMinutes():null})).filter(x=>x.min!=null);
+  {
+    const withMin=doneTodos.map(t=>({t,min:t.completedAt?new Date(t.completedAt).getHours()*60+new Date(t.completedAt).getMinutes():null,kind:'todo'})).filter(x=>x.min!=null);
+    // 오전루틴 체크 시각 추가 (checked_time 저장 이후 체크된 것만 반영됨)
+    const mroutineChecks=getMorningRoutineChecks(dk);
+    MORNING_ROUTINE_ITEMS.forEach(it=>{
+      const c=mroutineChecks[it.key];
+      if(c&&c.time){
+        const[h,m]=c.time.split(':').map(Number);
+        withMin.push({t:{text:it.label},min:h*60+m,kind:'routine'});
+      }
+    });
+    // 습관 체크 시각 추가
+    const wk=weekKey(new Date(dk+'T00:00:00'));
+    const dow=(new Date(dk+'T00:00:00').getDay()+6)%7;
+    const hcTimes=getHabitCheckTimes(wk);
+    getHabits().forEach(h=>{
+      const t=hcTimes[h.name+'-'+dow];
+      if(t){
+        const[hh,mm]=t.split(':').map(Number);
+        withMin.push({t:{text:h.name},min:hh*60+mm,kind:'habit'});
+      }
+    });
     if(withMin.length){
       const minV=Math.min(...withMin.map(x=>x.min)),maxV=Math.max(...withMin.map(x=>x.min));
       const range=Math.max(1,maxV-minV);
+      const dotColor={todo:'rgba(192,112,128,0.78)',routine:'rgba(150,175,205,0.80)',habit:'rgba(158,175,143,0.80)'};
       html+=`<div class="recap-todo-strip-labels"><span>${pad(Math.floor(minV/60))}:${pad(minV%60)}</span><span>${pad(Math.floor(maxV/60))}:${pad(maxV%60)}</span></div>
         <div class="recap-todo-strip-wrap"><div class="recap-todo-strip-line"></div><div class="recap-todo-strip-dots">`;
       withMin.forEach(x=>{
         const pct=((x.min-minV)/range*100);
-        html+=`<div class="recap-todo-strip-dot" style="left:${pct}%;" title="${pad(Math.floor(x.min/60))}:${pad(x.min%60)} · ${x.t.text}"></div>`;
+        html+=`<div class="recap-todo-strip-dot" style="left:${pct}%;background:${dotColor[x.kind]};" title="${pad(Math.floor(x.min/60))}:${pad(x.min%60)} · ${x.t.text}"></div>`;
       });
       html+=`</div></div>`;
     }
-    html+=`<div class="recap-todo-strip-caption">${pickedTodos.map(t=>t.text).join(' · ')}${doneTodos.length>3?' 외 '+(doneTodos.length-3)+'개':''}</div>`;
-  }else{
-    html+=`<div style="font-size:11px;color:var(--tm);text-align:center;padding:6px 0;">오늘 완료한 일이 없어요</div>`;
+    if(doneTodos.length){
+      html+=`<div class="recap-todo-strip-caption">${pickedTodos.map(t=>t.text).join(' · ')}${doneTodos.length>3?' 외 '+(doneTodos.length-3)+'개':''}</div>`;
+    }else if(!withMin.length){
+      html+=`<div style="font-size:11px;color:var(--tm);text-align:center;padding:6px 0;">오늘 완료한 일이 없어요</div>`;
+    }
   }
   html+=`<div class="day-recap-line" style="margin-top:8px;"><span class="lbl"><i class="ti ti-notes" aria-hidden="true"></i>메모</span><span>${memos.length}개</span></div>`;
   const readingLabel=readingMin>0?readingMin+'분':_daysSinceLastReading(dk)+'일째 안읽음';
@@ -7005,7 +6993,7 @@ async function syncMonthRange(y,mo){
   }
   if(tRows){
     const byDate={};
-    tRows.forEach(r=>{if(r.date_key===RESERVE_DK||r.date_key===WEEKLY_DEADLINE_DK)return;(byDate[r.date_key]=byDate[r.date_key]||[]).push({text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid()});});
+    tRows.forEach(r=>{if(r.date_key===RESERVE_DK)return;(byDate[r.date_key]=byDate[r.date_key]||[]).push({text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid()});});
     Object.keys(byDate).forEach(dk=>{if(!S.get(S.key('todos_pending',dk)))S.set(S.key('todos',dk),byDate[dk]);});
   }
   if(sRows)sRows.forEach(r=>S.set(S.key('sleep',r.date_key),{sleep:r.sleep_time,wake:r.wake_time}));
@@ -7388,7 +7376,8 @@ function renderDailyHabitCheck(){
     col.querySelector('.habit-chk2').addEventListener('click',function(){
       const wasOn=!!checks[key];
       checks[key]=!checks[key];
-      if(wasOn&&!checks[key])addDelPending('hc',wk,h.name+'|'+dateKey(currentDate));
+      if(wasOn&&!checks[key]){addDelPending('hc',wk,h.name+'|'+dateKey(currentDate));clearHabitCheckTime(wk,key);}
+      else if(!wasOn&&checks[key])recordHabitCheckTime(wk,key);
       saveHabitChecks(wk,checks);
       renderDailyHabitCheck();
       if(document.getElementById('v-monthly')&&document.getElementById('v-monthly').classList.contains('on'))renderHabitMonthly();
@@ -8648,7 +8637,7 @@ function renderBookList(){
     const est=b.status==='reading'?estimateRemainingReadingSessions(b,sessionCount):null;
     const estHtml=est?(
       est.ready
-        ?`<div class="rd-est-line">이 페이스면 약 ${est.remainingSessions}회 더 읽으면 완독해요</div>`
+        ?`<div class="rd-est-line">완독까지 약 ${est.remainingSessions}회 남았어요</div>`
         :`<div class="rd-est-line dim">기록이 조금 더 쌓이면 예상 회차를 알려드릴게요</div>`
     ):'';
     const open=_rdOpenCid===b.cid;
@@ -8954,59 +8943,6 @@ function saveReserveTodos(v){
   autoSync('todos',RESERVE_DK);
 }
 
-// ── 이번주안 투두 (주간 기한형) ──
-// 특정 날짜에 묶이지 않고, "이번 주 안에만 끝내면 되는" 항목. 매주 월요일이 되면 지난 주 미완료분은
-// 자동 삭제되지 않고 그대로 남아 "기한 지남"으로 표시됨(사용자가 직접 다음 주로 넘기거나 완료/삭제해야 함).
-const WEEKLY_DEADLINE_DK='weekly_deadline';
-function getWeeklyDeadlineTodos(){return S.get(S.key('todos',WEEKLY_DEADLINE_DK))||[];}
-function saveWeeklyDeadlineTodos(v){
-  S.set(S.key('todos',WEEKLY_DEADLINE_DK),v);
-  autoSync('todos',WEEKLY_DEADLINE_DK);
-}
-function addWeeklyDeadlineTodo(text){
-  if(!text||!text.trim())return;
-  const todos=getWeeklyDeadlineTodos();
-  todos.push({text:text.trim(),done:false,createdWeek:weekKey(new Date()),cid:genCid()});
-  saveWeeklyDeadlineTodos(todos);
-}
-function toggleWeeklyDeadlineTodo(i){
-  const todos=getWeeklyDeadlineTodos();
-  if(!todos[i])return;
-  todos[i].done=!todos[i].done;
-  todos[i].completedAt=todos[i].done?Date.now():null;
-  saveWeeklyDeadlineTodos(todos);
-  renderTodos();
-}
-function deleteWeeklyDeadlineTodo(i){
-  const todos=getWeeklyDeadlineTodos();
-  const t=todos[i];
-  if(t)addDelPending('todos',WEEKLY_DEADLINE_DK,t.cid);
-  todos.splice(i,1);
-  saveWeeklyDeadlineTodos(todos);
-  renderTodos();
-}
-// "다음 주로 미루기" — 기한이 지난(지난 주에 등록된) 항목을 이번 주로 이월(createdWeek만 갱신).
-function rolloverWeeklyDeadlineTodo(i){
-  const todos=getWeeklyDeadlineTodos();
-  if(!todos[i])return;
-  todos[i].createdWeek=weekKey(new Date());
-  saveWeeklyDeadlineTodos(todos);
-  renderTodos();
-}
-function openWeeklyDeadlineInput(){
-  const inp=document.getElementById('weekly-deadline-inp');
-  if(inp)inp.value='';
-  openModal('weekly-deadline-modal');
-  setTimeout(()=>inp&&inp.focus(),100);
-}
-function confirmWeeklyDeadlineTodo(){
-  const inp=document.getElementById('weekly-deadline-inp');
-  const text=inp?inp.value.trim():'';
-  if(!text)return;
-  addWeeklyDeadlineTodo(text);
-  closeModal('weekly-deadline-modal');
-  renderTodos();
-}
 function openReserveSheet(){
   renderReserveList();
   openSheet('reserve-sheet');
