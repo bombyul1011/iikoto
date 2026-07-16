@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260716-86-reading-session-estimate';
+const CACHE = 'iikoto-v20260716-87-weekly-deadline-sleep-compact';
 const ASSETS = [
   './',
   './index.html'
