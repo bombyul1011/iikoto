@@ -156,10 +156,12 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .sleep-curve{margin-top:8px;height:8px;display:block;width:100%;}
 .sleep-curve-wrap{position:relative;margin:14px 9px 0;height:8px;}
 .sleep-curve-wrap .sleep-curve{margin-top:0;position:absolute;top:0;left:0;}
-.sleep-badge{position:absolute;top:50%;width:18px;height:18px;border-radius:50%;background:var(--sleep-badge-bg);border:1.5px solid #fff;display:flex;align-items:center;justify-content:center;transform:translate(-50%,-50%);box-shadow:0 1px 3px rgba(90,70,60,0.18);}
+.sleep-badge{position:absolute;top:50%;width:18px;height:18px;border-radius:50%;border:1.5px solid #fff;display:flex;align-items:center;justify-content:center;transform:translate(-50%,-50%);box-shadow:0 1px 3px rgba(90,70,60,0.18);}
 .sleep-badge i{font-size:10px;}
-#sleep-badge-start i{color:#9c8fc0;}
-#sleep-badge-end i{color:#e0a860;}
+#sleep-badge-start{background:#8a7ab0;}
+#sleep-badge-start i{color:#fdf9ff;}
+#sleep-badge-end{background:#e0a860;}
+#sleep-badge-end i{color:#fffaf0;}
 .sleep-times{display:flex;justify-content:space-between;margin-top:6px;}
 .sleep-time-item{display:flex;align-items:center;gap:5px;cursor:pointer;}
 .sleep-time-item i{font-size:13px;color:var(--tm);}
@@ -1044,7 +1046,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
             </g>
           </svg>
           <div class="sleep-badge" id="sleep-badge-start" style="display:none;"><i class="ti ti-moon-stars" aria-hidden="true"></i></div>
-          <div class="sleep-badge" id="sleep-badge-end" style="display:none;"><i class="ti ti-sun" aria-hidden="true"></i></div>
+          <div class="sleep-badge" id="sleep-badge-end" style="display:none;"><i class="ti ti-sunset-2" aria-hidden="true"></i></div>
         </div>
         <div class="sleep-times">
           <div class="sleep-time-item" onclick="openTimeModal('sleep')">
@@ -4231,7 +4233,7 @@ function calcSleep(s,w){
   }
   const sv=s.split(':').map(Number),wv=w.split(':').map(Number);
   let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;
-  numEl.textContent='총 수면 '+Math.floor(m/60)+'시간'+(m%60?' '+(m%60)+'분':'');
+  numEl.textContent=Math.floor(m/60)+'시간'+(m%60?' '+(m%60)+'분':'');
   unitEl.textContent='';
 
   // 00:00~08:00(480분) 추천 구간 축에, 취침·기상 시각을 각각 독립적으로 매핑
