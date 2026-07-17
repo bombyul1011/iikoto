@@ -365,7 +365,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .tt-block.drama{background:rgba(255,210,225,.62);}
 .tt-block.book{background:rgba(255,235,160,.62);}
 .tt-block.movie{background:rgba(200,240,235,.62);}
-.tt-block.music{background:rgba(200,220,255,.62);}
+.tt-block.music{background:rgba(200,220,255,.62);justify-content:center;padding:0;}
 .tt-head-row{display:flex;align-items:center;margin-bottom:4px;}
 .tt-head-spacer{width:54px;flex-shrink:0;}
 .tt-head-dates{flex:1;overflow-x:hidden;}
@@ -6596,19 +6596,6 @@ let _selectedPoster=null;
 let _selectedAuthor=null;
 let _apiTimer=null;
 
-// 드라마/영화/책 콘텐츠의 리듬 기록 정확 매칭이 가능해진 기준일(그 이전 날짜는 텍스트 형식이
-// 자유 입력이라 신뢰할 수 없으므로, 실제 시청일 오버레이 계산에서 제외).
-const CONTENT_RHYTHM_MATCH_START='2026-07-15';
-// 특정 날짜(dk)에 해당 콘텐츠(cat: drama/movie/book, title)를 실제로 감상한 리듬 기록이 있는지 확인.
-// 책은 '독서 - 제목', 드라마/영화는 '드라마 - 제목'/'영화 - 제목' 형식의 정확 문자열 매칭.
-function hasContentRhythmOnDate(dk,cat,title){
-  if(!title||dk<CONTENT_RHYTHM_MATCH_START)return null; // 기준일 이전은 판단 불가(null=오버레이 미적용)
-  const prefix=cat==='book'?'독서':cat==='drama'?'드라마':cat==='movie'?'영화':null;
-  if(!prefix)return null; // 음악 등은 대상 아님
-  const target=prefix+' - '+title;
-  return getRhythmBlocks(dk).some(b=>b.cat==='enjoy'&&b.text===target);
-}
-
 function renderTimetable(){
   const mk=calMonthKey();
   const prevDateObj=new Date(_calYear,_calMonth-1,1);
@@ -6738,18 +6725,6 @@ function renderTimetable(){
               block.style.cursor='pointer';
             }else{
               block.style.cursor='default';
-            }
-          }
-          // 실제 리듬 기록이 있는 날만 선명하게, 없는 날은 밝은 오버레이로 흐리게
-          // (드라마/영화/책, 기준일 이후, 이틀 이상 걸친 항목만 — textContent 설정 이후에 추가해야 지워지지 않음)
-          if((cat==='drama'||cat==='movie'||cat==='book')&&span>1&&!item._carried){
-            for(let di=0;di<span;di++){
-              const dk=mk+'-'+pad(startD+di);
-              if(hasContentRhythmOnDate(dk,cat,item.title)===false){
-                const seg=document.createElement('div');
-                seg.style.cssText=`position:absolute;top:0;bottom:0;left:${di*22}px;width:20px;background:rgba(255,255,255,0.55);pointer-events:none;`;
-                block.appendChild(seg);
-              }
             }
           }
           inner.appendChild(block);d=endD+1;
