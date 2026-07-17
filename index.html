@@ -1998,9 +1998,7 @@ function pickRhythmContentTitle(fullTitle,chipEl){
   if(inp)inp.value=fullTitle;
   document.querySelectorAll('.rhythm-content-chip').forEach(el=>el.classList.remove('sel'));
   if(chipEl)chipEl.classList.add('sel');
-  if(_rhythmFormCat==='note'&&fullTitle==='일기'){
-    checkHabitDirect('일기',_rhythmDk||dateKey(getLogicalDate()));
-  }
+  // 일기 습관 자동체크는 실제 저장 시점(saveRhythmBlock)에서 처리 — 칩만 누르고 저장 안 하면 습관이 먼저 체크되는 걸 방지
 }
 function selectRhythmCatAndOpen(cat){
   if(_rhythmFormOpen&&_rhythmFormCat===cat&&_rhythmEditIdx==null){
@@ -2047,30 +2045,45 @@ function saveRhythmBlock(){
     blocks.push({cat:cat,start:start,end:end||'',text:text,created:Date.now(),cid:genCid()});
   }
   saveRhythmBlocks(_rhythmDk,blocks);
-  if(isNew)autoCheckHabitFromRhythm(cat,_rhythmDk);
+  if(isNew){
+    autoCheckHabitFromRhythm(cat,_rhythmDk,start);
+    if(cat==='note'&&text==='일기')checkHabitDirect('일기',_rhythmDk,start);
+  }
   _rhythmFormOpen=false;_resetRhythmForm();
   refreshRhythmTrack();
   setTimeout(()=>{_rhythmSubmitting=false;},500);
 }
 // 리듬 블록 카테고리에 대응하는 습관(월간 결산용)을 자동으로 체크
 // 카테고리 1:1로 명확히 매칭되는 것만: 운동→'운동'
-function autoCheckHabitFromRhythm(cat,dk){
+function autoCheckHabitFromRhythm(cat,dk,startTime){
   const map={exercise:'운동'};
   const habitName=map[cat];if(!habitName)return;
-  checkHabitDirect(habitName,dk);
+  checkHabitDirect(habitName,dk,startTime);
 }
-// 습관 이름을 지정해 직접 체크(이미 켜져 있으면 그대로 둠 - 수동으로 끈 걸 되돌리지 않기 위함)
-function checkHabitDirect(habitName,dk){
+// 습관 이름을 지정해 직접 체크(이미 켜져 있으면 그대로 둠 - 수동으로 끈 걸 되돌리지 않기 위함).
+// timeStr('HH:MM')을 넘기면 그 시각(예: 리듬 블록의 시작시간)을 기록하고, 없으면 현재 시각을 씀.
+// 이미 체크되어 있는 상태여도, 아직 시각 기록이 없다면 시각만은 보강해서 남긴다.
+function checkHabitDirect(habitName,dk,timeStr){
   const habits=getHabits();
   if(!habits.some(h=>h.name===habitName))return;
   const d=new Date(dk+'T00:00:00');
   const wk=weekKey(d),dow=(d.getDay()+6)%7;
   const key=habitName+'-'+dow;
   const checks=getHabitChecks(wk);
-  if(checks[key])return;
-  checks[key]=true;
-  saveHabitChecks(wk,checks);
-  recordHabitCheckTime(wk,key);
+  const alreadyChecked=!!checks[key];
+  if(!alreadyChecked){
+    checks[key]=true;
+    saveHabitChecks(wk,checks);
+  }
+  // 이미 체크돼 있었더라도 시각 기록이 비어 있으면 이번 자동체크 시각으로 채움
+  const hcTimes=getHabitCheckTimes(wk);
+  if(alreadyChecked&&hcTimes[key])return; // 이미 체크+시각 둘 다 있으면 더 할 일 없음
+  if(timeStr){
+    hcTimes[key]=timeStr;
+    saveHabitCheckTimes(wk,hcTimes);
+  }else{
+    recordHabitCheckTime(wk,key);
+  }
   if(document.getElementById('daily-habit-box'))renderDailyHabitCheck();
 }
 function finishRhythmBlock(idx){
@@ -5617,17 +5630,17 @@ function makeDawnRecapCard(){
 
   html+=`<div class="day-recap-sec-title"><i class="ti ti-check" style="font-size:12px;" aria-hidden="true"></i> 완료한 일 · ${doneTodos.length}개</div>`;
   {
-    const withMin=doneTodos.map(t=>({t,min:t.completedAt?new Date(t.completedAt).getHours()*60+new Date(t.completedAt).getMinutes():null,kind:'todo'})).filter(x=>x.min!=null);
-    // 오전루틴 체크 시각 추가 (checked_time 저장 이후 체크된 것만 반영됨)
+    const withMin=doneTodos.map(t=>({t,min:t.completedAt?new Date(t.completedAt).getHours()*60+new Date(t.completedAt).getMinutes():null,kind:'todo',dotColor:'rgba(136,120,171,0.85)'})).filter(x=>x.min!=null);
+    // 오전루틴 체크 시각 추가 (checked_time 저장 이후 체크된 것만 반영됨) — 각 루틴 항목 고유색 사용
     const mroutineChecks=getMorningRoutineChecks(dk);
     MORNING_ROUTINE_ITEMS.forEach(it=>{
       const c=mroutineChecks[it.key];
       if(c&&c.time){
         const[h,m]=c.time.split(':').map(Number);
-        withMin.push({t:{text:it.label},min:h*60+m,kind:'routine'});
+        withMin.push({t:{text:it.label},min:h*60+m,kind:'routine',dotColor:`rgba(${it.colorRgb},0.85)`});
       }
     });
-    // 습관 체크 시각 추가
+    // 습관 체크 시각 추가 — 각 습관 고유색 사용
     const wk=weekKey(new Date(dk+'T00:00:00'));
     const dow=(new Date(dk+'T00:00:00').getDay()+6)%7;
     const hcTimes=getHabitCheckTimes(wk);
@@ -5635,18 +5648,17 @@ function makeDawnRecapCard(){
       const t=hcTimes[h.name+'-'+dow];
       if(t){
         const[hh,mm]=t.split(':').map(Number);
-        withMin.push({t:{text:h.name},min:hh*60+mm,kind:'habit'});
+        withMin.push({t:{text:h.name},min:hh*60+mm,kind:'habit',dotColor:getHabitColor(h.color)});
       }
     });
     if(withMin.length){
       const minV=Math.min(...withMin.map(x=>x.min)),maxV=Math.max(...withMin.map(x=>x.min));
       const range=Math.max(1,maxV-minV);
-      const dotColor={todo:'rgba(192,112,128,0.78)',routine:'rgba(150,175,205,0.80)',habit:'rgba(158,175,143,0.80)'};
       html+=`<div class="recap-todo-strip-labels"><span>${pad(Math.floor(minV/60))}:${pad(minV%60)}</span><span>${pad(Math.floor(maxV/60))}:${pad(maxV%60)}</span></div>
         <div class="recap-todo-strip-wrap"><div class="recap-todo-strip-line"></div><div class="recap-todo-strip-dots">`;
       withMin.forEach(x=>{
         const pct=((x.min-minV)/range*100);
-        html+=`<div class="recap-todo-strip-dot" style="left:${pct}%;background:${dotColor[x.kind]};" title="${pad(Math.floor(x.min/60))}:${pad(x.min%60)} · ${x.t.text}"></div>`;
+        html+=`<div class="recap-todo-strip-dot" style="left:${pct}%;background:${x.dotColor};" title="${pad(Math.floor(x.min/60))}:${pad(x.min%60)} · ${x.t.text}"></div>`;
       });
       html+=`</div></div>`;
     }
@@ -9025,7 +9037,7 @@ function autoLogReadingRhythm(startTs,endTs){
   const blocks=getRhythmBlocks(dk);
   blocks.push({cat:'enjoy',start:minToHHMM(startMin),end:minToHHMM(endMin),text:text,created:Date.now(),cid:genCid()});
   saveRhythmBlocks(dk,blocks);
-  checkHabitDirect('독서',dk); // 스톱워치 독서 활동은 카테고리(감상)와 무관하게 '독서' 습관을 직접 체크
+  checkHabitDirect('독서',dk,minToHHMM(startMin)); // 스톱워치 독서 활동은 카테고리(감상)와 무관하게 '독서' 습관을 직접 체크, 시작시각 기준
 }
 function updateStopwatchDisplay(){
   // 실제 경과시간(시작시각 기준)으로 재계산 — 화면이 꺼져 setInterval이 멈췄다 재개되어도

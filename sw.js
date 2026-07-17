@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260717-109-music-btn-size-disc-icon';
+const CACHE = 'iikoto-v20260718-111-habit-check-time-timeline-colors';
 const ASSETS = [
   './',
   './index.html'
