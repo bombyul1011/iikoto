@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260718-111-habit-check-time-timeline-colors';
+const CACHE = 'iikoto-v20260718-112-dawn-timeline-caption-fix';
 const ASSETS = [
   './',
   './index.html'

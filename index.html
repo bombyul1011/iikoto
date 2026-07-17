@@ -5604,10 +5604,6 @@ function makeDawnRecapCard(){
     })
     .sort((a,b)=>(_dawnTimeToMin(a.start)||0)-(_dawnTimeToMin(b.start)||0));
 
-  // 완료투두 랜덤 3개 캡션
-  const shuffled=[...doneTodos].sort(()=>Math.random()-0.5);
-  const pickedTodos=shuffled.slice(0,3);
-
   const banner=document.createElement('div');banner.className='dawn-banner';
   banner.innerHTML=`<div class="dawn-banner-time">${timeStr} <span id="dawn-weather-icon"></span></div>
     <div class="dawn-banner-greeting">오늘 하루도 잘 보내셨어요</div>
@@ -5630,14 +5626,16 @@ function makeDawnRecapCard(){
 
   html+=`<div class="day-recap-sec-title"><i class="ti ti-check" style="font-size:12px;" aria-hidden="true"></i> 완료한 일 · ${doneTodos.length}개</div>`;
   {
-    const withMin=doneTodos.map(t=>({t,min:t.completedAt?new Date(t.completedAt).getHours()*60+new Date(t.completedAt).getMinutes():null,kind:'todo',dotColor:'rgba(136,120,171,0.85)'})).filter(x=>x.min!=null);
+    // 자정~새벽 4시 사이에 찍힌 시각은 "그 전날 논리적 하루의 연장선"이므로 1440분을 더해 맨 뒤로 보냄(리듬트랙과 동일 원칙)
+    const adjMin=function(mins){return mins<240?mins+1440:mins;};
+    const withMin=doneTodos.map(t=>({t,min:t.completedAt?adjMin(new Date(t.completedAt).getHours()*60+new Date(t.completedAt).getMinutes()):null,kind:'todo',dotColor:'rgba(136,120,171,0.85)'})).filter(x=>x.min!=null);
     // 오전루틴 체크 시각 추가 (checked_time 저장 이후 체크된 것만 반영됨) — 각 루틴 항목 고유색 사용
     const mroutineChecks=getMorningRoutineChecks(dk);
     MORNING_ROUTINE_ITEMS.forEach(it=>{
       const c=mroutineChecks[it.key];
       if(c&&c.time){
         const[h,m]=c.time.split(':').map(Number);
-        withMin.push({t:{text:it.label},min:h*60+m,kind:'routine',dotColor:`rgba(${it.colorRgb},0.85)`});
+        withMin.push({t:{text:it.label},min:adjMin(h*60+m),kind:'routine',dotColor:`rgba(${it.colorRgb},0.85)`});
       }
     });
     // 습관 체크 시각 추가 — 각 습관 고유색 사용
@@ -5648,23 +5646,22 @@ function makeDawnRecapCard(){
       const t=hcTimes[h.name+'-'+dow];
       if(t){
         const[hh,mm]=t.split(':').map(Number);
-        withMin.push({t:{text:h.name},min:hh*60+mm,kind:'habit',dotColor:getHabitColor(h.color)});
+        withMin.push({t:{text:h.name},min:adjMin(hh*60+mm),kind:'habit',dotColor:getHabitColor(h.color)});
       }
     });
     if(withMin.length){
       const minV=Math.min(...withMin.map(x=>x.min)),maxV=Math.max(...withMin.map(x=>x.min));
       const range=Math.max(1,maxV-minV);
-      html+=`<div class="recap-todo-strip-labels"><span>${pad(Math.floor(minV/60))}:${pad(minV%60)}</span><span>${pad(Math.floor(maxV/60))}:${pad(maxV%60)}</span></div>
+      const fmt=function(m){return pad(Math.floor((m%1440)/60))+':'+pad(m%60);}; // 1440 넘는 값은 실제 시각으로 되돌려 표기
+      html+=`<div class="recap-todo-strip-labels"><span>${fmt(minV)}</span><span>${fmt(maxV)}</span></div>
         <div class="recap-todo-strip-wrap"><div class="recap-todo-strip-line"></div><div class="recap-todo-strip-dots">`;
       withMin.forEach(x=>{
         const pct=((x.min-minV)/range*100);
-        html+=`<div class="recap-todo-strip-dot" style="left:${pct}%;background:${x.dotColor};" title="${pad(Math.floor(x.min/60))}:${pad(x.min%60)} · ${x.t.text}"></div>`;
+        html+=`<div class="recap-todo-strip-dot" style="left:${pct}%;background:${x.dotColor};" title="${fmt(x.min)} · ${x.t.text}"></div>`;
       });
       html+=`</div></div>`;
     }
-    if(doneTodos.length){
-      html+=`<div class="recap-todo-strip-caption">${pickedTodos.map(t=>t.text).join(' · ')}${doneTodos.length>3?' 외 '+(doneTodos.length-3)+'개':''}</div>`;
-    }else if(!withMin.length){
+    if(!doneTodos.length&&!withMin.length){
       html+=`<div style="font-size:11px;color:var(--tm);text-align:center;padding:6px 0;">오늘 완료한 일이 없어요</div>`;
     }
   }
