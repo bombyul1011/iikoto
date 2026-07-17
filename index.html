@@ -1465,7 +1465,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div><div id="cm-poster-title" style="font-size:12px;color:var(--tp);font-weight:500;"></div><div id="cm-poster-sub" style="font-size:10px;color:var(--tm);margin-top:2px;"></div></div>
     </div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
-      <span style="font-size:12px;color:var(--tm);white-space:nowrap;">시작일</span>
+      <span style="font-size:12px;color:var(--tm);white-space:nowrap;" id="cm-start-label">시작일</span>
       <input type="text" class="modal-inp" id="cm-start" readonly onclick="openContentDatePicker('cm-start')" style="flex:1;margin-bottom:0;cursor:pointer;" placeholder="날짜 선택">
       <div style="display:flex;gap:5px;flex-shrink:0;" id="cm-status-btns">
         <button class="cstatus-btn done" id="cm-done" onclick="toggleCDone()" style="white-space:nowrap;padding:8px 9px;margin-bottom:0;">
@@ -1475,7 +1475,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           <i class="ti ti-copy-off" style="font-size:14px;" aria-hidden="true"></i>중단
         </button>
       </div>
-      <button class="mbtn" id="cm-music-play-btn" onclick="openAppleMusicLink()" style="display:none;flex-shrink:0;width:auto;margin-bottom:0;padding:8px 10px;white-space:nowrap;background:rgba(255,150,180,.16);color:#a8527a;border:1px solid rgba(255,150,180,.40);">
+      <button class="mbtn" id="cm-music-play-btn" onclick="openAppleMusicLink()" style="display:none;flex:1;margin-bottom:0;padding:8px 10px;white-space:nowrap;background:rgba(255,150,180,.16);color:#a8527a;border:1px solid rgba(255,150,180,.40);">
         <i class="ti ti-brand-apple" style="font-size:14px;vertical-align:-2px;margin-right:3px;" aria-hidden="true"></i>애플뮤직
       </button>
     </div>
@@ -1906,8 +1906,8 @@ function renderHomeBody(section){
       body.appendChild(makeLabel('밀도의 숲'));
       body.appendChild(makeMonthlyHeatmapCard());
     }else{
-      body.appendChild(makeLabel('오늘의 독서'));
-      body.appendChild(makeBookCardWithCover());
+      body.appendChild(makeLabel('이달의 플리'));
+      body.appendChild(makePlaylistMiniCard());
     }
   }
 }
@@ -4994,6 +4994,42 @@ function makeEveningMiniStatCard(){
     +(topRhythm?`<span style="display:flex;align-items:center;"><i class="ti ${topRhythm.icon}" style="font-size:15px;color:${topRhythm.color};" aria-hidden="true"></i></span>`:'');
   return wrap;
 }
+// 저녁 파트1용 이달의 플리 미니카드 — 최근 등록 2건, 앨범커버+제목/가수+재생버튼, 하단에 전체보기 연결
+function makePlaylistMiniCard(){
+  const mk=monthKey(getLogicalDate());
+  const items=getContents(mk).filter(c=>c.cat==='music').sort((a,b)=>(b.created||0)-(a.created||0)).slice(0,2);
+  const wrap=document.createElement('div');wrap.className='pace-card';
+  if(!items.length){
+    wrap.innerHTML='<div class="home-content-info" style="display:flex;align-items:center;gap:7px;">'
+      +'<i class="ti ti-music" style="font-size:13px;flex-shrink:0;color:var(--tm);" aria-hidden="true"></i>'
+      +'<span class="home-content-title" style="color:var(--tm);">이번 달엔 아직 등록된 음악이 없어요</span>'
+      +'</div>';
+    return wrap;
+  }
+  const musicRgb='136,120,171'; // disc/재생버튼과 동일한 라벤더톤
+  const rows=items.map(item=>{
+    const coverInner=item.poster
+      ?`<img src="${item.poster}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;" alt="">`
+      :`<i class="ti ti-music" style="font-size:16px;color:rgba(120,155,235,0.7);" aria-hidden="true"></i>`;
+    const hasUrl=!!item.musicUrl;
+    return `<div style="display:flex;gap:10px;align-items:center;">
+      <div style="width:40px;height:40px;border-radius:8px;background:linear-gradient(135deg,rgba(200,220,255,.5),rgba(220,210,255,.4));flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden;">${coverInner}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:12.5px;font-weight:500;color:var(--tp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(item.title||'')}</div>
+        ${item.author?`<div style="font-size:10.5px;color:var(--ts);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(item.author)}</div>`:''}
+      </div>
+      <div class="pl-item-play${hasUrl?'':' dim'}" style="background:rgba(${musicRgb},.18);border:1px solid rgba(${musicRgb},.45);flex-shrink:0;" ${hasUrl?`onclick="window.location.href='${item.musicUrl.replace(/'/g,"\\'")}'"`:''}><i class="ti ti-player-play-filled" style="color:rgba(${musicRgb},1);" aria-hidden="true"></i></div>
+    </div>`;
+  }).join('<div style="height:10px;"></div>');
+  wrap.innerHTML=`${rows}
+    <div style="text-align:right;margin-top:10px;"><span class="reading-nudge" onclick="openPlaylistModalFromHome()" style="cursor:pointer;">이달의 플레이리스트 보기</span></div>`;
+  return wrap;
+}
+// 저녁 홈탭에서 이달의 플리 시트를 열 때는 편집 컨텍스트가 없으므로 이번 달 기준으로 직접 채워서 연다
+function openPlaylistModalFromHome(){
+  _contentCtx=_contentCtx||{};_contentCtx.mk=monthKey(getLogicalDate());
+  openPlaylistModal();
+}
 // 저녁 파트1용 독서 카드 B — 표지(또는 대체 아이콘)+진행바 포함, 넛지 문구는 우측 정렬로 기존 A와 동일 스타일
 function makeBookCardWithCover(){
   const book=getBooks().find(b=>b.status==='reading');
@@ -6735,6 +6771,8 @@ function openContentModal(cat,item=null,mk=null){
   const starRow=document.getElementById('cm-star-row');
   const playBtn=document.getElementById('cm-music-play-btn');
   const playlistBtn=document.getElementById('cm-playlist-btn');
+  const startLabel=document.getElementById('cm-start-label');
+  if(startLabel)startLabel.style.display=isMusic?'none':'inline';
   if(statusBtns)statusBtns.style.display=isMusic?'none':'flex';
   if(starRow)starRow.style.display=isMusic?'none':'flex';
   if(playBtn)playBtn.style.display=(isMusic&&_selectedMusicUrl)?'block':'none';

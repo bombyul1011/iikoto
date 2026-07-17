@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260717-107-content-modal-refine';
+const CACHE = 'iikoto-v20260717-108-evening-playlist-split';
 const ASSETS = [
   './',
   './index.html'
