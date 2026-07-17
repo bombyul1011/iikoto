@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260717-106-content-sort-playlist-color';
+const CACHE = 'iikoto-v20260717-107-content-modal-refine';
 const ASSETS = [
   './',
   './index.html'

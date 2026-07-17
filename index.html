@@ -1475,6 +1475,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           <i class="ti ti-copy-off" style="font-size:14px;" aria-hidden="true"></i>중단
         </button>
       </div>
+      <button class="mbtn" id="cm-music-play-btn" onclick="openAppleMusicLink()" style="display:none;flex-shrink:0;width:auto;margin-bottom:0;padding:8px 10px;white-space:nowrap;background:rgba(255,150,180,.16);color:#a8527a;border:1px solid rgba(255,150,180,.40);">
+        <i class="ti ti-brand-apple" style="font-size:14px;vertical-align:-2px;margin-right:3px;" aria-hidden="true"></i>애플뮤직
+      </button>
     </div>
     <div class="enddate-row" id="cm-enddate-row">
       <span style="font-size:12px;color:var(--tm);white-space:nowrap;" id="cm-enddate-label">완료일</span>
@@ -1485,9 +1488,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div id="cm-star-picker" class="cm-star-picker"></div>
       <input type="hidden" id="cm-stars" value="0">
     </div>
-    <button class="mbtn" id="cm-music-play-btn" onclick="openAppleMusicLink()" style="display:none;width:100%;margin-bottom:12px;background:rgba(255,150,180,.16);color:#a8527a;border:1px solid rgba(255,150,180,.40);">
-      <i class="ti ti-music-heart" style="font-size:14px;vertical-align:-2px;margin-right:4px;" aria-hidden="true"></i>애플뮤직에서 열기
-    </button>
     <textarea class="modal-inp" id="cm-review" rows="2" style="resize:none;" placeholder="감상 메모 (선택)" autocomplete="off"></textarea>
     <div class="modal-actions" style="flex-wrap:wrap;gap:8px;">
       <button class="mbtn cancel" onclick="closeModal('content-modal')">취소</button>
@@ -6710,7 +6710,13 @@ function openContentModal(cat,item=null,mk=null){
   _selectedPoster=null;_selectedAuthor=null;_selectedMusicUrl=item?.musicUrl||null;
   const pp=document.getElementById('cm-poster-preview');
   if(pp){
-    if(item?.poster){pp.style.display='flex';const pimg=document.getElementById('cm-poster-img');if(pimg)pimg.src=item.poster;document.getElementById('cm-poster-title').textContent=item.title||'';}
+    if(item?.poster){
+      pp.style.display='flex';
+      const pimg=document.getElementById('cm-poster-img');if(pimg)pimg.src=item.poster;
+      document.getElementById('cm-poster-title').textContent=item.title||'';
+      const subEl=document.getElementById('cm-poster-sub');
+      if(subEl)subEl.textContent=((cat==='book'||cat==='music')&&item.author)?item.author:'';
+    }
     else pp.style.display='none';
   }
   const today=dateKey(currentDate);
@@ -6748,8 +6754,7 @@ function openPlaylistModal(){
     listEl.innerHTML='<div style="text-align:center;font-size:12px;color:var(--tm);padding:16px 0;">이번 달 등록된 음악이 없어요</div>';
   }else{
     listEl.innerHTML='';
-    const musicColor=getCatColor('music'); // rgba(170,195,255,.85) 형식
-    const musicRgb=musicColor.match(/[\d.]+/g).slice(0,3).join(','); // "170,195,255"
+    const musicRgb='136,120,171'; // #8878ab — disc 아이콘과 동일한 라벤더톤
     items.forEach(item=>{
       const row=document.createElement('div');row.className='pl-item';
       const posterHtml=item.poster?`<img class="pl-item-poster" src="${item.poster}" alt="">`:`<div class="pl-item-poster-ph"><i class="ti ti-music" aria-hidden="true"></i></div>`;
