@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260717-99-music-modal-fix';
+const CACHE = 'iikoto-v20260717-100-content-overlay';
 const ASSETS = [
   './',
   './index.html'
