@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260717-101-music-align-fix';
+const CACHE = 'iikoto-v20260717-102-music-simplify-applemusic';
 const ASSETS = [
   './',
   './index.html'
