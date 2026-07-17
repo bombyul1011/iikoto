@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260717-104-playlist-bottomsheet';
+const CACHE = 'iikoto-v20260717-105-playlist-sheet-overlap-fix';
 const ASSETS = [
   './',
   './index.html'

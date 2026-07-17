@@ -6734,6 +6734,7 @@ function openAppleMusicLink(){
 // 이번 달 등록된 음악을 최신 등록순으로 모아 보여주는 팝업. 새 곡 추가 기능 없이 감상/재생 전용.
 function openPlaylistModal(){
   const mk=_contentCtx?.mk||calMonthKey();
+  closeModal('content-modal'); // 등록 팝업을 먼저 닫아야 바텀시트가 겹쳐 보이지 않음
   const listEl=document.getElementById('pl-list');
   const items=getContents(mk).filter(c=>c.cat==='music').sort((a,b)=>(b.created||0)-(a.created||0));
   if(!items.length){
