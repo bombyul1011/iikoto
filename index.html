@@ -49,6 +49,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --pill:rgba(255,255,255,0.65);
   --memo-b:rgba(255,255,255,0.68);--memo-bb:rgba(255,210,200,0.50);
   --sleep-b:rgba(255,255,255,0.60);--sleep-bb:rgba(255,200,180,0.42);
+  --sleep-badge-bg:#fffaf5;
 }
 [data-theme="glass"]{
   --bg:linear-gradient(165deg,#f7f4ee 0%,#f3f1ec 55%,#f6f3ee 100%);
@@ -67,6 +68,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --pill:rgba(255,255,255,0.55);
   --memo-b:rgba(255,253,248,0.50);--memo-bb:rgba(240,160,190,0.45);
   --sleep-b:rgba(255,253,248,0.50);--sleep-bb:rgba(95,115,170,0.55);
+  --sleep-badge-bg:#fdfbf6;
 }
 [data-theme="glass"] .card,[data-theme="glass"] .sleep-card,[data-theme="glass"] .habit-week-box{border-width:1.4px;box-shadow:0 1.5px 1.5px rgba(255,255,255,0.9) inset,0 -8px 14px -10px rgba(120,110,95,0.15) inset,0 5px 14px rgba(150,140,120,0.08);}
 [data-theme="glass"] #daily-meal-card{background:rgba(255,253,248,0.45)!important;border-color:rgba(150,195,130,0.55)!important;}
@@ -147,24 +149,24 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 /* ── SLEEP ── */
 .sleep-card{position:relative;border-radius:20px;padding:16px 18px 14px;margin-bottom:14px;overflow:hidden;background:var(--sleep-b);border:1px solid var(--sleep-bb);}
-.sleep-top{display:flex;align-items:center;gap:6px;}
-.sleep-top-icon{font-size:14px;color:var(--tm);}
-.sleep-top-num{font-size:18px;font-weight:500;color:var(--tp);}
-.sleep-top-unit{font-size:11px;color:var(--tm);}
+.sleep-top{display:flex;align-items:center;gap:5px;}
+.sleep-top-icon{font-size:10px;color:var(--tm);}
+.sleep-top-num{font-size:10px;font-weight:400;color:var(--tm);letter-spacing:.10em;}
+.sleep-top-unit{font-size:10px;color:var(--tm);letter-spacing:.10em;}
 .sleep-curve{margin-top:8px;height:8px;display:block;width:100%;}
 .sleep-curve-wrap{position:relative;margin:14px 9px 0;height:8px;}
 .sleep-curve-wrap .sleep-curve{margin-top:0;position:absolute;top:0;left:0;}
-.sleep-badge{position:absolute;top:50%;width:18px;height:18px;border-radius:50%;background:var(--sleep-b);border:1.5px solid #fff;display:flex;align-items:center;justify-content:center;transform:translate(-50%,-50%);box-shadow:0 1px 3px rgba(90,70,60,0.18);}
+.sleep-badge{position:absolute;top:50%;width:18px;height:18px;border-radius:50%;background:var(--sleep-badge-bg);border:1.5px solid #fff;display:flex;align-items:center;justify-content:center;transform:translate(-50%,-50%);box-shadow:0 1px 3px rgba(90,70,60,0.18);}
 .sleep-badge i{font-size:10px;}
-#sleep-badge-start i{color:#544a78;}
-#sleep-badge-end i{color:#c9822e;}
+#sleep-badge-start i{color:#9c8fc0;}
+#sleep-badge-end i{color:#e0a860;}
 .sleep-times{display:flex;justify-content:space-between;margin-top:6px;}
 .sleep-time-item{display:flex;align-items:center;gap:5px;cursor:pointer;}
 .sleep-time-item i{font-size:13px;color:var(--tm);}
 .sleep-time-val{font-size:14px;color:var(--tp);font-weight:400;}
-.sleep-btn{width:26px;height:26px;background:var(--card);border:1px solid var(--card-b);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
-.sleep-btn:active{opacity:.7;}
-.sleep-btn i{font-size:12px;color:var(--tm);}
+.sleep-btn{width:26px;height:26px;background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+.sleep-btn:active{opacity:.5;}
+.sleep-btn i{font-size:13px;color:var(--tm);}
 
 /* ── TODO ── */
 .todo-item{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--div);font-size:12.5px;color:var(--tp);position:relative;overflow:hidden;user-select:none;}
@@ -1023,8 +1025,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div class="view on" id="v-daily">
       <div class="slabel">수면</div>
       <div class="sleep-card" id="sleep-card">
-        <div class="sleep-top">
-          <i class="ti ti-moon-stars sleep-top-icon" aria-hidden="true"></i>
+        <div class="sleep-top" style="justify-content:flex-end;">
           <span class="sleep-top-num" id="sleep-dur-num">--</span>
           <span class="sleep-top-unit" id="sleep-dur-unit"></span>
         </div>
@@ -1032,8 +1033,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           <svg class="sleep-curve" id="sleep-curve-svg" viewBox="0 0 340 8" preserveAspectRatio="none">
             <defs>
               <linearGradient id="sleepWaveGrad" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="340" y2="0">
-                <stop offset="0%" stop-color="#544a78"/><stop offset="30%" stop-color="#7c6a95"/>
-                <stop offset="62%" stop-color="#c592a0"/><stop offset="100%" stop-color="#f0b878"/>
+                <stop offset="0%" stop-color="#9c8fc0"/><stop offset="30%" stop-color="#b3a4c4"/>
+                <stop offset="62%" stop-color="#e0b8bd"/><stop offset="100%" stop-color="#f3cd9a"/>
               </linearGradient>
               <clipPath id="sleepClip"><rect id="sleep-clip-rect" x="0" y="0" width="0" height="8"/></clipPath>
             </defs>
@@ -1047,7 +1048,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         </div>
         <div class="sleep-times">
           <div class="sleep-time-item" onclick="openTimeModal('sleep')">
-            <i class="ti ti-moon-stars" aria-hidden="true"></i>
             <div class="sleep-time-val" id="sleep-time">--:--</div>
           </div>
           <div class="sleep-btn" onclick="setNow('sleep')"><i class="ti ti-clock-hour-4" aria-hidden="true"></i></div>
@@ -1055,7 +1055,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           <div class="sleep-btn" onclick="setNow('wake')"><i class="ti ti-clock-hour-4" aria-hidden="true"></i></div>
           <div class="sleep-time-item" onclick="openTimeModal('wake')">
             <div class="sleep-time-val" id="wake-time">--:--</div>
-            <i class="ti ti-sun" aria-hidden="true"></i>
           </div>
         </div>
       </div>
