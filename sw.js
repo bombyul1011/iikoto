@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260718-1-remove-future-todos-sync';
+const CACHE = 'iikoto-v20260718-2-initial-load-sync';
 const ASSETS = [
   './',
   './index.html'

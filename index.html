@@ -4276,35 +4276,44 @@ function calcSleep(s,w){
   const clipRect=document.getElementById('sleep-clip-rect');
   const badgeStart=document.getElementById('sleep-badge-start'),badgeEnd=document.getElementById('sleep-badge-end');
   if(!numEl)return;
-  if(!s||!w||s==='--:--'||w==='--:--'){
+  if(!s||s==='--:--'){
     numEl.textContent='--';unitEl.textContent='';
     if(clipRect)clipRect.setAttribute('width','0');
     if(badgeStart)badgeStart.style.display='none';
     if(badgeEnd)badgeEnd.style.display='none';
     return;
   }
-  const sv=s.split(':').map(Number),wv=w.split(':').map(Number);
-  let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;
-  numEl.textContent=Math.floor(m/60)+'시간'+(m%60?' '+(m%60)+'분':'');
-  unitEl.textContent='';
-
-  // 00:00~08:00(480분) 추천 구간 축에, 취침·기상 시각을 각각 독립적으로 매핑
   const AXIS_MIN=480,SVG_W=340;
   const toAxisMin=(t)=>{ // 정오 이후 값은 "그 전날 밤"으로 보고 축 이전(음수) 취급
     let mm=t[0]*60+t[1];
     if(mm>=720)mm-=1440;
     return mm;
   };
+  const sv=s.split(':').map(Number);
   let startPx=(toAxisMin(sv)/AXIS_MIN)*SVG_W;
-  let endPx=(toAxisMin(wv)/AXIS_MIN)*SVG_W;
   startPx=Math.max(0,Math.min(SVG_W,startPx));
+  if(badgeStart){badgeStart.style.left=(startPx/SVG_W*100)+'%';badgeStart.style.display='';}
+
+  if(!w||w==='--:--'){
+    // 취침만 입력된 상태 — 시작 아이콘만 표시, 바는 아직 채우지 않고 종료 배지도 숨김
+    numEl.textContent='--';unitEl.textContent='';
+    if(clipRect)clipRect.setAttribute('width','0');
+    if(badgeEnd)badgeEnd.style.display='none';
+    return;
+  }
+  const wv=w.split(':').map(Number);
+  let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;
+  numEl.textContent=Math.floor(m/60)+'시간'+(m%60?' '+(m%60)+'분':'');
+  unitEl.textContent='';
+
+  // 00:00~08:00(480분) 추천 구간 축에, 취침·기상 시각을 각각 독립적으로 매핑
+  let endPx=(toAxisMin(wv)/AXIS_MIN)*SVG_W;
   endPx=Math.max(0,Math.min(SVG_W,endPx));
   if(endPx<startPx)endPx=startPx;
 
   if(clipRect){clipRect.setAttribute('x',startPx);clipRect.setAttribute('width',Math.max(0,endPx-startPx));}
   const grad=document.getElementById('sleepWaveGrad');
   if(grad){grad.setAttribute('x1',startPx);grad.setAttribute('x2',Math.max(startPx+1,endPx));}
-  if(badgeStart){badgeStart.style.left=(startPx/SVG_W*100)+'%';badgeStart.style.display='';}
   if(badgeEnd){badgeEnd.style.left=(endPx/SVG_W*100)+'%';badgeEnd.style.display='';}
 }
 function maskTimeInput(el){
@@ -9439,6 +9448,9 @@ async function checkDataIntegrity(){
 updateDateUI();
 loadDaily();
 cleanupOldDailyVows();
+// 최초 로드 시엔 로컬 캐시만으로 그려지므로(completedAt 등 최신 서버값 반영 전),
+// online/visibilitychange 이벤트를 기다리지 않고 여기서 한 번 동기화를 실행해 최신 상태로 맞춘다.
+if(navigator.onLine)syncAll();
 
 // Service Worker 등록 (오프라인 지원)
 if('serviceWorker' in navigator){
