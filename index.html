@@ -1488,15 +1488,15 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <button class="mbtn" id="cm-music-play-btn" onclick="openAppleMusicLink()" style="display:none;width:100%;margin-bottom:12px;background:rgba(255,150,180,.16);color:#a8527a;border:1px solid rgba(255,150,180,.40);">
       <i class="ti ti-music-heart" style="font-size:14px;vertical-align:-2px;margin-right:4px;" aria-hidden="true"></i>애플뮤직에서 열기
     </button>
-    <button class="mbtn" id="cm-playlist-btn" onclick="openPlaylistModal()" style="display:none;width:100%;margin-bottom:12px;background:rgba(200,220,255,.28);color:#5a5a8a;border:1px solid rgba(200,220,255,.55);">
-      <i class="ti ti-music-heart" style="font-size:14px;vertical-align:-2px;margin-right:4px;" aria-hidden="true"></i>이달의 플레이리스트
-    </button>
     <textarea class="modal-inp" id="cm-review" rows="2" style="resize:none;" placeholder="감상 메모 (선택)" autocomplete="off"></textarea>
     <div class="modal-actions" style="flex-wrap:wrap;gap:8px;">
       <button class="mbtn cancel" onclick="closeModal('content-modal')">취소</button>
       <button class="mbtn" id="cm-del-btn" onclick="deleteContent()" style="display:none;background:rgba(255,200,210,.55);color:#c05060;border:1px solid rgba(240,170,185,.50);">삭제</button>
       <button class="mbtn ok" onclick="confirmContent()">저장</button>
     </div>
+    <button class="mbtn" id="cm-playlist-btn" onclick="openPlaylistModal()" style="display:none;width:100%;margin-top:8px;background:rgba(200,220,255,.28);color:#5a5a8a;border:1px solid rgba(200,220,255,.55);">
+      <i class="ti ti-music-heart" style="font-size:14px;vertical-align:-2px;margin-right:4px;" aria-hidden="true"></i>이달의 플레이리스트
+    </button>
   </div>
 </div>
 
@@ -1509,13 +1509,16 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 </div>
 
 <!-- PLAYLIST MODAL -->
-<div class="modal-ov" id="playlist-modal" onclick="closeModal('playlist-modal',event)">
-  <div class="modal" style="max-width:320px;">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
-      <i class="ti ti-disc playlist-disc-spin" style="font-size:20px;color:#8878ab;" aria-hidden="true"></i>
-      <span style="font-size:14px;font-weight:600;color:var(--tp);">이달의 플레이리스트</span>
+<div class="overlay" id="playlist-modal" onclick="closeSheet('playlist-modal',event)">
+  <div class="bsheet" style="max-height:80vh;overflow-y:auto;" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div style="padding:0 20px 20px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+        <i class="ti ti-disc playlist-disc-spin" style="font-size:20px;color:#8878ab;" aria-hidden="true"></i>
+        <span style="font-size:14px;font-weight:600;color:var(--tp);">이달의 플레이리스트</span>
+      </div>
+      <div id="pl-list" style="display:flex;flex-direction:column;gap:6px;"></div>
     </div>
-    <div id="pl-list" style="display:flex;flex-direction:column;gap:6px;max-height:360px;overflow-y:auto;"></div>
   </div>
 </div>
 
@@ -6722,7 +6725,7 @@ function openContentModal(cat,item=null,mk=null){
   if(statusBtns)statusBtns.style.display=isMusic?'none':'flex';
   if(starRow)starRow.style.display=isMusic?'none':'flex';
   if(playBtn)playBtn.style.display=(isMusic&&_selectedMusicUrl)?'block':'none';
-  if(playlistBtn)playlistBtn.style.display=isMusic?'block':'none';
+  if(playlistBtn)playlistBtn.style.display=(isMusic&&!item)?'block':'none';
   openModal('content-modal');setTimeout(()=>document.getElementById('cm-title').focus(),100);
 }
 function openAppleMusicLink(){
@@ -6742,11 +6745,11 @@ function openPlaylistModal(){
       const posterHtml=item.poster?`<img class="pl-item-poster" src="${item.poster}" alt="">`:`<div class="pl-item-poster-ph"><i class="ti ti-music" aria-hidden="true"></i></div>`;
       const hasUrl=!!item.musicUrl;
       row.innerHTML=`${posterHtml}<div class="pl-item-info"><div class="pl-item-title">${escapeHtml(item.title||'')}</div>${item.author?`<div class="pl-item-sub">${escapeHtml(item.author)}</div>`:''}</div>
-        <div class="pl-item-play${hasUrl?'':' dim'}" ${hasUrl?`onclick="window.location.href='${item.musicUrl.replace(/'/g,"\\'")}'"`:''}><i class="ti ti-music-heart" aria-hidden="true"></i></div>`;
+        <div class="pl-item-play${hasUrl?'':' dim'}" ${hasUrl?`onclick="window.location.href='${item.musicUrl.replace(/'/g,"\\'")}'"`:''}><i class="ti ti-player-play-filled" aria-hidden="true"></i></div>`;
       listEl.appendChild(row);
     });
   }
-  openModal('playlist-modal');
+  openSheet('playlist-modal');
 }
 function setCStatus(status){
   _contentCtx.status=status;

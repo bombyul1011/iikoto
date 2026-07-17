@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260717-103-playlist-modal';
+const CACHE = 'iikoto-v20260717-104-playlist-bottomsheet';
 const ASSETS = [
   './',
   './index.html'
