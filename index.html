@@ -68,7 +68,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --memo-b:rgba(255,253,248,0.50);--memo-bb:rgba(240,160,190,0.45);
   --sleep-b:rgba(255,253,248,0.50);--sleep-bb:rgba(95,115,170,0.55);
 }
-[data-theme="glass"] .card,[data-theme="glass"] .sleep-box,[data-theme="glass"] .habit-week-box{border-width:1.4px;box-shadow:0 1.5px 1.5px rgba(255,255,255,0.9) inset,0 -8px 14px -10px rgba(120,110,95,0.15) inset,0 5px 14px rgba(150,140,120,0.08);}
+[data-theme="glass"] .card,[data-theme="glass"] .sleep-card,[data-theme="glass"] .habit-week-box{border-width:1.4px;box-shadow:0 1.5px 1.5px rgba(255,255,255,0.9) inset,0 -8px 14px -10px rgba(120,110,95,0.15) inset,0 5px 14px rgba(150,140,120,0.08);}
 [data-theme="glass"] #daily-meal-card{background:rgba(255,253,248,0.45)!important;border-color:rgba(150,195,130,0.55)!important;}
 [data-theme="glass"] .meal-soft{filter:none;}
 [data-theme="glass"] .rd-top-inner{background:rgba(253,251,245,0.92);}
@@ -146,17 +146,25 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .card.s{background:var(--card-s);border-color:var(--card-sb);}
 
 /* ── SLEEP ── */
-.sleep-row{display:flex;gap:8px;margin-bottom:6px;}
-.sleep-box{flex:1;background:var(--sleep-b);border:1px solid var(--sleep-bb);border-radius:14px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;}
-.sleep-box.compact{padding:9px 12px;gap:8px;}
-.sleep-lft{display:flex;flex-direction:column;gap:3px;}
-.sleep-lbl{font-size:10px;color:var(--tm);display:flex;align-items:center;gap:4px;}
-.sleep-val{font-size:22px;font-weight:300;color:var(--tp);letter-spacing:-.5px;line-height:1.1;cursor:pointer;}
-.sleep-val.compact{font-size:19px;flex:1;}
-.sleep-rgt{display:flex;flex-direction:column;gap:5px;}
-.sleep-btn{width:28px;height:28px;background:var(--card);border:1px solid var(--card-b);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.sleep-card{position:relative;border-radius:20px;padding:16px 18px 14px;margin-bottom:14px;overflow:hidden;background:var(--sleep-b);border:1px solid var(--sleep-bb);}
+.sleep-top{display:flex;align-items:center;gap:6px;}
+.sleep-top-icon{font-size:14px;color:var(--tm);}
+.sleep-top-num{font-size:18px;font-weight:500;color:var(--tp);}
+.sleep-top-unit{font-size:11px;color:var(--tm);}
+.sleep-curve{margin-top:8px;height:8px;display:block;width:100%;}
+.sleep-curve-wrap{position:relative;margin:14px 9px 0;height:8px;}
+.sleep-curve-wrap .sleep-curve{margin-top:0;position:absolute;top:0;left:0;}
+.sleep-badge{position:absolute;top:50%;width:18px;height:18px;border-radius:50%;background:var(--sleep-b);border:1.5px solid #fff;display:flex;align-items:center;justify-content:center;transform:translate(-50%,-50%);box-shadow:0 1px 3px rgba(90,70,60,0.18);}
+.sleep-badge i{font-size:10px;}
+#sleep-badge-start i{color:#544a78;}
+#sleep-badge-end i{color:#c9822e;}
+.sleep-times{display:flex;justify-content:space-between;margin-top:6px;}
+.sleep-time-item{display:flex;align-items:center;gap:5px;cursor:pointer;}
+.sleep-time-item i{font-size:13px;color:var(--tm);}
+.sleep-time-val{font-size:14px;color:var(--tp);font-weight:400;}
+.sleep-btn{width:26px;height:26px;background:var(--card);border:1px solid var(--card-b);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
 .sleep-btn:active{opacity:.7;}
-.sleep-dur{font-size:10.5px;color:var(--tm);margin:0 2px 10px 0;text-align:right;}
+.sleep-btn i{font-size:12px;color:var(--tm);}
 
 /* ── TODO ── */
 .todo-item{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--div);font-size:12.5px;color:var(--tp);position:relative;overflow:hidden;user-select:none;}
@@ -1014,19 +1022,43 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <!-- DAILY -->
     <div class="view on" id="v-daily">
       <div class="slabel">수면</div>
-      <div class="sleep-row">
-        <div class="sleep-box compact">
-          <i class="ti ti-moon-stars" style="font-size:15px;color:var(--tm);flex-shrink:0;" aria-hidden="true"></i>
-          <div class="sleep-val compact" id="sleep-time" onclick="openTimeModal('sleep')">--:--</div>
-          <div class="sleep-btn" onclick="setNow('sleep')"><i class="ti ti-clock-hour-4" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i></div>
+      <div class="sleep-card" id="sleep-card">
+        <div class="sleep-top">
+          <i class="ti ti-moon-stars sleep-top-icon" aria-hidden="true"></i>
+          <span class="sleep-top-num" id="sleep-dur-num">--</span>
+          <span class="sleep-top-unit" id="sleep-dur-unit"></span>
         </div>
-        <div class="sleep-box compact">
-          <i class="ti ti-sun" style="font-size:15px;color:var(--tm);flex-shrink:0;" aria-hidden="true"></i>
-          <div class="sleep-val compact" id="wake-time" onclick="openTimeModal('wake')">--:--</div>
-          <div class="sleep-btn" onclick="setNow('wake')"><i class="ti ti-clock-hour-4" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i></div>
+        <div class="sleep-curve-wrap" id="sleep-curve-wrap">
+          <svg class="sleep-curve" id="sleep-curve-svg" viewBox="0 0 340 8" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="sleepWaveGrad" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="340" y2="0">
+                <stop offset="0%" stop-color="#544a78"/><stop offset="30%" stop-color="#7c6a95"/>
+                <stop offset="62%" stop-color="#c592a0"/><stop offset="100%" stop-color="#f0b878"/>
+              </linearGradient>
+              <clipPath id="sleepClip"><rect id="sleep-clip-rect" x="0" y="0" width="0" height="8"/></clipPath>
+            </defs>
+            <path d="M0,4 L340,4" fill="none" stroke="rgba(180,160,170,0.25)" stroke-width="2.5" stroke-linecap="round"/>
+            <g clip-path="url(#sleepClip)">
+              <path d="M0,4 L340,4" fill="none" stroke="url(#sleepWaveGrad)" stroke-width="2.5" stroke-linecap="round"/>
+            </g>
+          </svg>
+          <div class="sleep-badge" id="sleep-badge-start" style="display:none;"><i class="ti ti-moon-stars" aria-hidden="true"></i></div>
+          <div class="sleep-badge" id="sleep-badge-end" style="display:none;"><i class="ti ti-sun" aria-hidden="true"></i></div>
+        </div>
+        <div class="sleep-times">
+          <div class="sleep-time-item" onclick="openTimeModal('sleep')">
+            <i class="ti ti-moon-stars" aria-hidden="true"></i>
+            <div class="sleep-time-val" id="sleep-time">--:--</div>
+          </div>
+          <div class="sleep-btn" onclick="setNow('sleep')"><i class="ti ti-clock-hour-4" aria-hidden="true"></i></div>
+          <div style="flex:1;"></div>
+          <div class="sleep-btn" onclick="setNow('wake')"><i class="ti ti-clock-hour-4" aria-hidden="true"></i></div>
+          <div class="sleep-time-item" onclick="openTimeModal('wake')">
+            <div class="sleep-time-val" id="wake-time">--:--</div>
+            <i class="ti ti-sun" aria-hidden="true"></i>
+          </div>
         </div>
       </div>
-      <div class="sleep-dur" id="sleep-dur"></div>
       <div class="slabel-row">
         <div class="slabel">오늘 할 일</div>
         <div style="display:flex;align-items:center;gap:4px;">
@@ -4187,11 +4219,40 @@ function loadSleep(){
   calcSleep(d.sleep,d.wake);
 }
 function calcSleep(s,w){
-  const el=document.getElementById('sleep-dur');if(!el)return;
-  if(!s||!w||s==='--:--'||w==='--:--'){el.textContent='';return;}
+  const numEl=document.getElementById('sleep-dur-num'),unitEl=document.getElementById('sleep-dur-unit');
+  const clipRect=document.getElementById('sleep-clip-rect');
+  const badgeStart=document.getElementById('sleep-badge-start'),badgeEnd=document.getElementById('sleep-badge-end');
+  if(!numEl)return;
+  if(!s||!w||s==='--:--'||w==='--:--'){
+    numEl.textContent='--';unitEl.textContent='';
+    if(clipRect)clipRect.setAttribute('width','0');
+    if(badgeStart)badgeStart.style.display='none';
+    if(badgeEnd)badgeEnd.style.display='none';
+    return;
+  }
   const sv=s.split(':').map(Number),wv=w.split(':').map(Number);
   let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;
-  el.textContent=`수면 ${Math.floor(m/60)}시간 ${m%60}분`;
+  numEl.textContent='총 수면 '+Math.floor(m/60)+'시간'+(m%60?' '+(m%60)+'분':'');
+  unitEl.textContent='';
+
+  // 00:00~08:00(480분) 추천 구간 축에, 취침·기상 시각을 각각 독립적으로 매핑
+  const AXIS_MIN=480,SVG_W=340;
+  const toAxisMin=(t)=>{ // 정오 이후 값은 "그 전날 밤"으로 보고 축 이전(음수) 취급
+    let mm=t[0]*60+t[1];
+    if(mm>=720)mm-=1440;
+    return mm;
+  };
+  let startPx=(toAxisMin(sv)/AXIS_MIN)*SVG_W;
+  let endPx=(toAxisMin(wv)/AXIS_MIN)*SVG_W;
+  startPx=Math.max(0,Math.min(SVG_W,startPx));
+  endPx=Math.max(0,Math.min(SVG_W,endPx));
+  if(endPx<startPx)endPx=startPx;
+
+  if(clipRect){clipRect.setAttribute('x',startPx);clipRect.setAttribute('width',Math.max(0,endPx-startPx));}
+  const grad=document.getElementById('sleepWaveGrad');
+  if(grad){grad.setAttribute('x1',startPx);grad.setAttribute('x2',Math.max(startPx+1,endPx));}
+  if(badgeStart){badgeStart.style.left=(startPx/SVG_W*100)+'%';badgeStart.style.display='';}
+  if(badgeEnd){badgeEnd.style.left=(endPx/SVG_W*100)+'%';badgeEnd.style.display='';}
 }
 function maskTimeInput(el){
   let digits=el.value.replace(/[^0-9]/g,'').slice(0,4);
