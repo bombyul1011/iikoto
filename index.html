@@ -4082,9 +4082,6 @@ async function syncAll(){
   if(!navigator.onLine)return;
   if(window._restoring)return; // 복구 중엔 sync 차단
   const dk=dateKey(currentDate),mk=monthKey(currentDate),now=new Date(),wk=weekKey(now);
-  // 오늘부터 6일 후까지 날짜키 생성
-  const futureDks=[];
-  for(let i=1;i<=6;i++){const d=new Date(now);d.setDate(now.getDate()+i);futureDks.push(dateKey(d));}
   // 이번 주 하루한줄
   const weekOnelines=[];
   const mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7));
@@ -4092,9 +4089,6 @@ async function syncAll(){
   // pending인 것들 먼저 Up
   const upTasks=[];
   if(S.get(S.key('todos_pending',dk)))upTasks.push(syncTodosUp(dk).then(()=>S.set(S.key('todos_pending',dk),false)));
-  futureDks.forEach(fdk=>{
-    if(S.get(S.key('todos_pending',fdk)))upTasks.push(syncTodosUp(fdk).then(()=>S.set(S.key('todos_pending',fdk),false)));
-  });
   if(S.get(S.key('memos_pending',dk)))upTasks.push(syncMemosUp(dk).then(()=>S.set(S.key('memos_pending',dk),false)));
   if(S.get(S.key('meals_pending',dk)))upTasks.push(syncMealsUp(dk).then(()=>S.set(S.key('meals_pending',dk),false)));
   if(S.get(S.key('contents_pending',mk)))upTasks.push(runContentsSyncLocked(mk,()=>syncContentsUp(mk)).then(()=>S.set(S.key('contents_pending',mk),false)));
@@ -4111,7 +4105,6 @@ async function syncAll(){
   // Down (Supabase → 로컬)
   await Promise.all([
     syncTodosDown(dk),syncMemosDown(dk),syncSleepDown(dk),syncMealsDown(dk),
-    ...futureDks.map(fdk=>syncTodosDown(fdk)),
     syncHabitsDown(),syncHCDown(wk),syncContentsDown(mk),
     syncGoalDown(S.key('mgoal',monthKey(now))),
     syncWChallengeDown(wk),
