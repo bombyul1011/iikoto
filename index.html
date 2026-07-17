@@ -204,7 +204,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .playlist-disc-spin{display:inline-block;animation:discSpin 3s linear infinite;}
 .pl-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;background:var(--card);border:1px solid var(--card-b);}
 .pl-item-poster{width:34px;height:34px;border-radius:7px;object-fit:cover;flex-shrink:0;}
-.pl-item-poster-ph{width:34px;height:34px;border-radius:7px;background:rgba(200,220,255,.35);display:flex;align-items:center;justify-content:center;font-size:14px;color:#8878ab;flex-shrink:0;}
+.pl-item-poster-ph{width:34px;height:34px;border-radius:7px;background:rgba(136,120,171,.20);display:flex;align-items:center;justify-content:center;font-size:14px;color:#8878ab;flex-shrink:0;}
 .pl-item-info{flex:1;min-width:0;}
 .pl-item-title{font-size:12.5px;color:var(--tp);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .pl-item-sub{font-size:10px;color:var(--tm);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -376,7 +376,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .tt-block.drama{background:rgba(255,210,225,.62);}
 .tt-block.book{background:rgba(255,235,160,.62);}
 .tt-block.movie{background:rgba(200,240,235,.62);}
-.tt-block.music{background:rgba(200,220,255,.62);justify-content:center;padding:0;}
+.tt-block.music{background:rgba(136,120,171,.30);justify-content:center;padding:0;}
 .tt-head-row{display:flex;align-items:center;margin-bottom:4px;}
 .tt-head-spacer{width:54px;flex-shrink:0;}
 .tt-head-dates{flex:1;overflow-x:hidden;}
@@ -1494,7 +1494,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <button class="mbtn" id="cm-del-btn" onclick="deleteContent()" style="display:none;background:rgba(255,200,210,.55);color:#c05060;border:1px solid rgba(240,170,185,.50);">삭제</button>
       <button class="mbtn ok" onclick="confirmContent()">저장</button>
     </div>
-    <button class="mbtn" id="cm-playlist-btn" onclick="openPlaylistModal()" style="display:none;width:100%;margin-top:8px;background:rgba(200,220,255,.28);color:#5a5a8a;border:1px solid rgba(200,220,255,.55);">
+    <button class="mbtn" id="cm-playlist-btn" onclick="openPlaylistModal()" style="display:none;width:100%;margin-top:8px;background:rgba(136,120,171,.18);color:#5a5078;border:1px solid rgba(136,120,171,.45);">
       <i class="ti ti-music-heart" style="font-size:14px;vertical-align:-2px;margin-right:4px;" aria-hidden="true"></i>이달의 플레이리스트
     </button>
   </div>
@@ -3314,9 +3314,9 @@ const CAT_ICON_META={
   drama:{icon:'ti-device-tv',color:'rgba(255,190,215,.85)'},
   book:{icon:'ti-book',color:'rgba(255,220,120,.85)'},
   movie:{icon:'ti-movie',color:'rgba(160,220,210,.85)'},
-  music:{icon:'ti-music',color:'rgba(170,195,255,.85)'}
+  music:{icon:'ti-music',color:'rgba(136,120,171,.85)'}
 };
-const CONTENT_BAR_COLOR={drama:'rgba(230,130,160,.80)',book:'rgba(215,175,60,.80)',movie:'rgba(95,175,165,.80)',music:'rgba(120,155,235,.80)'};
+const CONTENT_BAR_COLOR={drama:'rgba(230,130,160,.80)',book:'rgba(215,175,60,.80)',movie:'rgba(95,175,165,.80)',music:'rgba(136,120,171,.80)'};
 // 콘텐츠 카테고리 아이콘 배지(파스텔톤, CAT_ICON_META 기반) 색상
 function getCatColor(cat){
   return CAT_ICON_META[cat]?CAT_ICON_META[cat].color:'var(--tm)';
@@ -5010,10 +5010,10 @@ function makePlaylistMiniCard(){
   const rows=items.map(item=>{
     const coverInner=item.poster
       ?`<img src="${item.poster}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;" alt="">`
-      :`<i class="ti ti-music" style="font-size:16px;color:rgba(120,155,235,0.7);" aria-hidden="true"></i>`;
+      :`<i class="ti ti-music" style="font-size:16px;color:rgba(136,120,171,0.75);" aria-hidden="true"></i>`;
     const hasUrl=!!item.musicUrl;
     return `<div style="display:flex;gap:10px;align-items:center;">
-      <div style="width:40px;height:40px;border-radius:8px;background:linear-gradient(135deg,rgba(200,220,255,.5),rgba(220,210,255,.4));flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden;">${coverInner}</div>
+      <div style="width:40px;height:40px;border-radius:8px;background:linear-gradient(135deg,rgba(136,120,171,.28),rgba(160,145,190,.22));flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden;">${coverInner}</div>
       <div style="flex:1;min-width:0;">
         <div style="font-size:12.5px;font-weight:500;color:var(--tp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(item.title||'')}</div>
         ${item.author?`<div style="font-size:10.5px;color:var(--ts);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(item.author)}</div>`:''}
