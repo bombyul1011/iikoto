@@ -153,10 +153,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .sleep-top-icon{font-size:10px;color:var(--tm);}
 .sleep-top-num{font-size:10px;font-weight:400;color:var(--tm);letter-spacing:.10em;}
 .sleep-top-unit{font-size:10px;color:var(--tm);letter-spacing:.10em;}
-.sleep-curve{margin-top:8px;height:8px;display:block;width:100%;}
-.sleep-curve-wrap{position:relative;margin:14px 9px 0;height:8px;}
+.sleep-curve{margin-top:8px;height:10px;display:block;width:100%;}
+.sleep-curve-wrap{position:relative;margin:14px 9px 0;height:10px;}
 .sleep-curve-wrap .sleep-curve{margin-top:0;position:absolute;top:0;left:0;}
 .sleep-badge{position:absolute;top:50%;width:22px;height:22px;border-radius:50%;background:var(--sleep-badge-bg);border:1.5px solid #fff;display:flex;align-items:center;justify-content:center;transform:translate(-50%,-50%);box-shadow:0 1px 3px rgba(90,70,60,0.18);}
+@keyframes sleepIconGlow{0%,100%{filter:brightness(1) drop-shadow(0 0 0 rgba(255,255,255,0));}50%{filter:brightness(1.35) drop-shadow(0 0 3px rgba(255,255,255,0.55));}}
+.sleep-badge i{animation:sleepIconGlow 2.6s ease-in-out infinite;}
+#sleep-badge-end i{animation-delay:0.6s;}
 .sleep-badge i{font-size:12px;}
 #sleep-badge-start i{color:#8a7ab0;}
 #sleep-badge-end i{color:#e0a860;}
@@ -1041,17 +1044,17 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           <span class="sleep-top-unit" id="sleep-dur-unit"></span>
         </div>
         <div class="sleep-curve-wrap" id="sleep-curve-wrap">
-          <svg class="sleep-curve" id="sleep-curve-svg" viewBox="0 0 340 8" preserveAspectRatio="none">
+          <svg class="sleep-curve" id="sleep-curve-svg" viewBox="0 0 340 10" preserveAspectRatio="none">
             <defs>
               <linearGradient id="sleepWaveGrad" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="340" y2="0">
                 <stop offset="0%" stop-color="#9c8fc0"/><stop offset="30%" stop-color="#b3a4c4"/>
                 <stop offset="62%" stop-color="#e0b8bd"/><stop offset="100%" stop-color="#f3cd9a"/>
               </linearGradient>
-              <clipPath id="sleepClip"><rect id="sleep-clip-rect" x="0" y="0" width="0" height="8"/></clipPath>
+              <clipPath id="sleepClip"><rect id="sleep-clip-rect" x="0" y="0" width="0" height="10"/></clipPath>
             </defs>
-            <path d="M0,4 L340,4" fill="none" stroke="rgba(180,160,170,0.25)" stroke-width="2.5" stroke-linecap="round"/>
+            <path d="M0,5 L340,5" fill="none" stroke="rgba(180,160,170,0.22)" stroke-width="5" stroke-linecap="round"/>
             <g clip-path="url(#sleepClip)">
-              <path d="M0,4 L340,4" fill="none" stroke="url(#sleepWaveGrad)" stroke-width="2.5" stroke-linecap="round"/>
+              <path d="M0,5 L340,5" fill="none" stroke="url(#sleepWaveGrad)" stroke-width="5" stroke-linecap="round"/>
             </g>
           </svg>
           <div class="sleep-badge" id="sleep-badge-start" style="display:none;"><i class="ti ti-moon-stars" aria-hidden="true"></i></div>
@@ -1059,13 +1062,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         </div>
         <div class="sleep-times">
           <div class="sleep-time-item" onclick="openTimeModal('sleep')">
-            <div class="sleep-time-val" id="sleep-time">--:--</div>
+            <div class="sleep-time-val" id="sleep-time" style="color:#9c8fc0;">--:--</div>
           </div>
           <div class="sleep-btn" onclick="setNow('sleep')"><i class="ti ti-clock-hour-4" aria-hidden="true"></i></div>
           <div style="flex:1;"></div>
           <div class="sleep-btn" onclick="setNow('wake')"><i class="ti ti-clock-hour-4" aria-hidden="true"></i></div>
           <div class="sleep-time-item" onclick="openTimeModal('wake')">
-            <div class="sleep-time-val" id="wake-time">--:--</div>
+            <div class="sleep-time-val" id="wake-time" style="color:#d99a4e;">--:--</div>
           </div>
         </div>
       </div>
