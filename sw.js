@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260718-113-dawn-recap-resync-fix';
+const CACHE = 'iikoto-v20260718-114-todo-sync-speedup';
 const ASSETS = [
   './',
   './index.html'

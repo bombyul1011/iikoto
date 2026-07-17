@@ -3831,10 +3831,13 @@ async function syncTodosUp(dk){
   // completedAt처럼 "다른 기기가 나중에 채운 필드"를 로컬이 모른다는 이유로 null로 덮어쓰지 않도록,
   // 업로드 직전에 서버의 현재 completed_at을 조회해서 로컬 값이 없을 때만 서버값을 그대로 보존한다.
   let serverCompletedAt={};
-  try{
-    const existing=await supaFetch(`todos?date_key=eq.${dk}&select=client_id,completed_at`);
-    if(existing)existing.forEach(r=>{if(r.client_id)serverCompletedAt[r.client_id]=r.completed_at;});
-  }catch(e){}
+  const needCheckCids=todos.filter(t=>t.completedAt==null&&t.cid).map(t=>t.cid);
+  if(needCheckCids.length){
+    try{
+      const existing=await supaFetch(`todos?date_key=eq.${dk}&client_id=in.(${needCheckCids.join(',')})&select=client_id,completed_at`);
+      if(existing)existing.forEach(r=>{if(r.client_id)serverCompletedAt[r.client_id]=r.completed_at;});
+    }catch(e){}
+  }
   const ok=await syncListUpSafe('todos',`date_key=eq.${dk}`,'date_key,client_id',todos,
     t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,is_reserve:t.is_reserve||false,strike_parts:t.strikeParts||[],completed_at:(t.completedAt!=null?t.completedAt:(serverCompletedAt[t.cid]!=null?serverCompletedAt[t.cid]:null)),sort_order:(typeof t.sortOrder==='number'?t.sortOrder:null)}),
     delCids);
