@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260718-112-dawn-timeline-caption-fix';
+const CACHE = 'iikoto-v20260718-113-dawn-recap-resync-fix';
 const ASSETS = [
   './',
   './index.html'

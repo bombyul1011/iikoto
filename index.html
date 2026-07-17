@@ -4119,6 +4119,11 @@ async function syncAll(){
   loadDaily();
   if(document.getElementById('v-weekly')&&document.getElementById('v-weekly').classList.contains('on'))loadWeekly();
   if(_rhythmTrackEl&&document.body.contains(_rhythmTrackEl))refreshRhythmTrack();
+  // loadDaily()가 다시 그리지 못하는 새벽 리캡 카드(완료한 일 타임라인 등)를 최신 데이터로 교체
+  const oldDawnCard=document.getElementById('dawn-recap-card');
+  if(oldDawnCard&&document.getElementById('v-home')&&document.getElementById('v-home').classList.contains('on')){
+    oldDawnCard.replaceWith(makeDawnRecapCard());
+  }
 }
 window.addEventListener('online',()=>syncAll());
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
@@ -5542,6 +5547,7 @@ function _daysSinceLastReading(dk){
 }
 function makeDawnRecapCard(){
   const wrap=document.createElement('div');
+  wrap.id='dawn-recap-card';
   const dk=dateKey(getLogicalDate());
   const wk=weekKey(getLogicalDate());
   const dow=(getLogicalDate().getDay()+6)%7;
