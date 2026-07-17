@@ -1444,12 +1444,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 <!-- CONTENT MODAL -->
 <div class="modal-ov" id="content-modal" onclick="closeModal('content-modal',event)">
-<div class="modal-ov" id="music-group-modal" onclick="closeModal('music-group-modal',event)">
-  <div class="modal" style="max-width:300px;">
-    <div style="font-size:13px;font-weight:600;color:var(--tp);margin-bottom:10px;">이 날의 음악</div>
-    <div id="mg-list" style="display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto;"></div>
-  </div>
-</div>
   <div class="modal" style="max-width:340px;">
     <div class="api-search-wrap">
       <input type="text" class="modal-inp" id="cm-title" placeholder="제목 검색..." autocomplete="off" oninput="apiSearchDebounce(this.value)" onblur="setTimeout(()=>hideApiResults(),200)">
@@ -1486,6 +1480,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <button class="mbtn" id="cm-del-btn" onclick="deleteContent()" style="display:none;background:rgba(255,200,210,.55);color:#c05060;border:1px solid rgba(240,170,185,.50);">삭제</button>
       <button class="mbtn ok" onclick="confirmContent()">저장</button>
     </div>
+  </div>
+</div>
+
+<!-- MUSIC GROUP MODAL -->
+<div class="modal-ov" id="music-group-modal" onclick="closeModal('music-group-modal',event)">
+  <div class="modal" style="max-width:300px;">
+    <div style="font-size:13px;font-weight:600;color:var(--tp);margin-bottom:10px;">이 날의 음악</div>
+    <div id="mg-list" style="display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto;"></div>
   </div>
 </div>
 
@@ -6706,7 +6708,7 @@ function renderTimetable(){
             block.style.opacity='0.7';
           }
           if(cat==='music'&&group.length>1){
-            block.innerHTML=`<span>${(item.title||'').charAt(0)}</span><span style="position:absolute;top:-4px;right:-4px;min-width:12px;height:12px;padding:0 2px;border-radius:6px;background:var(--acc,#8878ab);color:#fff;font-size:8px;line-height:12px;text-align:center;font-weight:700;">${group.length}</span>`;
+            block.innerHTML=`<span>${(item.title||'').charAt(0)}</span><span style="position:absolute;top:1px;right:1px;min-width:11px;height:11px;padding:0 2px;border-radius:5.5px;background:var(--acc,#8878ab);color:#fff;font-size:7.5px;line-height:11px;text-align:center;font-weight:700;">${group.length}</span>`;
             block.title=group.map(g=>g.item.title).join(', ');
             block.addEventListener('click',()=>openMusicGroupModal(group.map(g=>g.item),mk));
             block.style.cursor='pointer';
