@@ -208,8 +208,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .pl-item-info{flex:1;min-width:0;}
 .pl-item-title{font-size:12.5px;color:var(--tp);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .pl-item-sub{font-size:10px;color:var(--tm);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.pl-item-play{width:28px;height:28px;border-radius:50%;background:rgba(255,150,180,.16);border:1px solid rgba(255,150,180,.40);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
-.pl-item-play i{font-size:13px;color:#a8527a;}
+.pl-item-play{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+.pl-item-play i{font-size:13px;}
 .pl-item-play.dim{opacity:.35;cursor:default;}
 .cm-star{color:rgba(200,180,160,0.45);cursor:pointer;transition:transform .1s;}
 .cm-star:active{transform:scale(0.85);}
@@ -1157,7 +1157,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       </div>
       <div class="report-banner month-soft" onclick="openMonthlyReportSheet()">
         <div class="report-banner-inner">
-          <div class="report-banner-line"><i class="ti ti-chart-bar" style="font-size:12px;vertical-align:-1px;margin-right:3px;" aria-hidden="true"></i><span class="rb-title" id="report-banner-month-lbl">6월 리포트</span> · 이번 달 전체 기록 모아보기</div>
+          <div class="report-banner-line"><i class="ti ti-chart-bar" style="font-size:12px;vertical-align:-1px;margin-right:3px;" aria-hidden="true"></i><span class="rb-title" id="report-banner-month-lbl">6월 리포트</span></div>
           <div class="report-banner-arrow"><i class="ti ti-chevron-up" style="font-size:15px;" aria-hidden="true"></i></div>
         </div>
       </div>
@@ -2520,7 +2520,14 @@ function getContentsForReport(mk){
     if((c.status==='done'||c.status==='stopped')&&c.endDate&&c.endDate.slice(0,7)>=mk)return true;
     return false;
   }).map(c=>({...c,_carried:true}));
-  return [...carry,...cur];
+  const all=[...carry,...cur];
+  // 콘텐츠 종류(드라마→책→영화→음악)별로 묶은 뒤, 그 안에서는 시작일 오름차순으로 정렬
+  const catOrder={drama:0,book:1,movie:2,music:3};
+  return all.sort((a,b)=>{
+    const co=(catOrder[a.cat]??9)-(catOrder[b.cat]??9);
+    if(co!==0)return co;
+    return (a.startDate||'').localeCompare(b.startDate||'');
+  });
 }
 function computeMonthStats(y,mo,endDay){
   const dim=new Date(y,mo+1,0).getDate();
@@ -6741,12 +6748,15 @@ function openPlaylistModal(){
     listEl.innerHTML='<div style="text-align:center;font-size:12px;color:var(--tm);padding:16px 0;">이번 달 등록된 음악이 없어요</div>';
   }else{
     listEl.innerHTML='';
+    const musicColor=getCatColor('music'); // rgba(170,195,255,.85) 형식
+    const musicRgb=musicColor.match(/[\d.]+/g).slice(0,3).join(','); // "170,195,255"
     items.forEach(item=>{
       const row=document.createElement('div');row.className='pl-item';
       const posterHtml=item.poster?`<img class="pl-item-poster" src="${item.poster}" alt="">`:`<div class="pl-item-poster-ph"><i class="ti ti-music" aria-hidden="true"></i></div>`;
       const hasUrl=!!item.musicUrl;
+      const playStyle=`background:rgba(${musicRgb},.18);border:1px solid rgba(${musicRgb},.45);`;
       row.innerHTML=`${posterHtml}<div class="pl-item-info"><div class="pl-item-title">${escapeHtml(item.title||'')}</div>${item.author?`<div class="pl-item-sub">${escapeHtml(item.author)}</div>`:''}</div>
-        <div class="pl-item-play${hasUrl?'':' dim'}" ${hasUrl?`onclick="window.location.href='${item.musicUrl.replace(/'/g,"\\'")}'"`:''}><i class="ti ti-player-play-filled" aria-hidden="true"></i></div>`;
+        <div class="pl-item-play${hasUrl?'':' dim'}" style="${playStyle}" ${hasUrl?`onclick="window.location.href='${item.musicUrl.replace(/'/g,"\\'")}'"`:''}><i class="ti ti-player-play-filled" style="color:rgba(${musicRgb},1);" aria-hidden="true"></i></div>`;
       listEl.appendChild(row);
     });
   }

@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260717-105-playlist-sheet-overlap-fix';
+const CACHE = 'iikoto-v20260717-106-content-sort-playlist-color';
 const ASSETS = [
   './',
   './index.html'
