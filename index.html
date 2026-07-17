@@ -1475,7 +1475,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           <i class="ti ti-copy-off" style="font-size:14px;" aria-hidden="true"></i>중단
         </button>
       </div>
-      <button class="mbtn" id="cm-music-play-btn" onclick="openAppleMusicLink()" style="display:none;flex:1;margin-bottom:0;padding:8px 10px;white-space:nowrap;background:rgba(255,150,180,.16);color:#a8527a;border:1px solid rgba(255,150,180,.40);">
+      <button class="mbtn" id="cm-music-play-btn" onclick="openAppleMusicLink()" style="display:none;flex:1;margin-bottom:0;padding:11px 14px;border-radius:12px;font-size:14px;white-space:nowrap;background:rgba(255,150,180,.16);color:#a8527a;border:1px solid rgba(255,150,180,.40);">
         <i class="ti ti-brand-apple" style="font-size:14px;vertical-align:-2px;margin-right:3px;" aria-hidden="true"></i>애플뮤직
       </button>
     </div>
@@ -5022,7 +5022,7 @@ function makePlaylistMiniCard(){
     </div>`;
   }).join('<div style="height:10px;"></div>');
   wrap.innerHTML=`${rows}
-    <div style="text-align:right;margin-top:10px;"><span class="reading-nudge" onclick="openPlaylistModalFromHome()" style="cursor:pointer;">이달의 플레이리스트 보기</span></div>`;
+    <div style="text-align:right;margin-top:10px;"><span class="reading-nudge" onclick="openPlaylistModalFromHome()" style="cursor:pointer;"><i class="ti ti-disc playlist-disc-spin" style="font-size:12px;vertical-align:-1px;margin-right:3px;color:#8878ab;" aria-hidden="true"></i>이달의 플레이리스트 보기</span></div>`;
   return wrap;
 }
 // 저녁 홈탭에서 이달의 플리 시트를 열 때는 편집 컨텍스트가 없으므로 이번 달 기준으로 직접 채워서 연다

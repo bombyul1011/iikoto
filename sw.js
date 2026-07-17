@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260717-108-evening-playlist-split';
+const CACHE = 'iikoto-v20260717-109-music-btn-size-disc-icon';
 const ASSETS = [
   './',
   './index.html'
