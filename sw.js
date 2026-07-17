@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260717-96-sleep-sunset-icon';
+const CACHE = 'iikoto-v20260717-98-music-track-fix';
 const ASSETS = [
   './',
   './index.html'
