@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260717-102-music-simplify-applemusic';
+const CACHE = 'iikoto-v20260717-103-playlist-modal';
 const ASSETS = [
   './',
   './index.html'
