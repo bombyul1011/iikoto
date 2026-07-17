@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260718-2-initial-load-sync';
+const CACHE = 'iikoto-v20260718-4-todo-timeline-simple';
 const ASSETS = [
   './',
   './index.html'

@@ -3813,14 +3813,8 @@ async function syncTodosDown(dk){
   const rows=await supaFetch('todos?date_key=eq.'+dk+'&order=created');
   if(!rows)return; // 연결 실패(null) — 로컬 유지. 빈 배열은 "서버에 진짜 0개"라는 뜻이라 그대로 반영.
   if(S.get(S.key('todos_pending',dk)))return; // 업로드 대기중인 로컬 수정(미루기 등) 있으면 덮어쓰지 않음
-  // 서버 completed_at이 null인데 로컬(cid 매칭)에 이미 값이 있으면, 아직 서버 반영 전인 최신 로컬값을 잃지 않도록 보존
-  const localByCid={};
-  getTodos(dk).forEach(t=>{if(t.cid)localByCid[t.cid]=t;});
   S.set(S.key('todos',dk),rows.map(function(r){
-    const cid=r.client_id||genCid();
-    const localMatch=localByCid[cid];
-    const completedAt=r.completed_at!=null?r.completed_at:(localMatch&&localMatch.completedAt!=null?localMatch.completedAt:null);
-    return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid,strikeParts:r.strike_parts||[],completedAt,sortOrder:(r.sort_order!=null?r.sort_order:undefined)};
+    return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined)};
   }));
   renderTodos();
 }
@@ -3828,18 +3822,8 @@ async function syncTodosUp(dk){
   const todos=getTodos(dk);
   if(ensureItemCids(todos))S.set(S.key('todos',dk),todos);
   const delCids=getDelPendingCids('todos',dk);
-  // completedAt처럼 "다른 기기가 나중에 채운 필드"를 로컬이 모른다는 이유로 null로 덮어쓰지 않도록,
-  // 업로드 직전에 서버의 현재 completed_at을 조회해서 로컬 값이 없을 때만 서버값을 그대로 보존한다.
-  let serverCompletedAt={};
-  const needCheckCids=todos.filter(t=>t.completedAt==null&&t.cid).map(t=>t.cid);
-  if(needCheckCids.length){
-    try{
-      const existing=await supaFetch(`todos?date_key=eq.${dk}&client_id=in.(${needCheckCids.join(',')})&select=client_id,completed_at`);
-      if(existing)existing.forEach(r=>{if(r.client_id)serverCompletedAt[r.client_id]=r.completed_at;});
-    }catch(e){}
-  }
   const ok=await syncListUpSafe('todos',`date_key=eq.${dk}`,'date_key,client_id',todos,
-    t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,is_reserve:t.is_reserve||false,strike_parts:t.strikeParts||[],completed_at:(t.completedAt!=null?t.completedAt:(serverCompletedAt[t.cid]!=null?serverCompletedAt[t.cid]:null)),sort_order:(typeof t.sortOrder==='number'?t.sortOrder:null)}),
+    t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,is_reserve:t.is_reserve||false,strike_parts:t.strikeParts||[],completed_at:(t.completedAt!=null?t.completedAt:null),sort_order:(typeof t.sortOrder==='number'?t.sortOrder:null)}),
     delCids);
   if(ok)delCids.forEach(cid=>removeDelPending('todos',dk,cid));
   return ok;
@@ -5639,7 +5623,14 @@ function makeDawnRecapCard(){
   {
     // 자정~새벽 4시 사이에 찍힌 시각은 "그 전날 논리적 하루의 연장선"이므로 1440분을 더해 맨 뒤로 보냄(리듬트랙과 동일 원칙)
     const adjMin=function(mins){return mins<240?mins+1440:mins;};
-    const withMin=doneTodos.map(t=>({t,min:t.completedAt?adjMin(new Date(t.completedAt).getHours()*60+new Date(t.completedAt).getMinutes()):null,kind:'todo',dotColor:'rgba(136,120,171,0.85)'})).filter(x=>x.min!=null);
+    const withMin=[];
+    // 투두 완료 시각 추가 — completedAt 있는 것만
+    doneTodos.forEach(t=>{
+      if(t.completedAt){
+        const d=new Date(t.completedAt);
+        withMin.push({t:{text:t.text},min:adjMin(d.getHours()*60+d.getMinutes()),kind:'todo',dotColor:'rgba(136,120,171,0.85)'});
+      }
+    });
     // 오전루틴 체크 시각 추가 (checked_time 저장 이후 체크된 것만 반영됨) — 각 루틴 항목 고유색 사용
     const mroutineChecks=getMorningRoutineChecks(dk);
     MORNING_ROUTINE_ITEMS.forEach(it=>{
@@ -5671,9 +5662,6 @@ function makeDawnRecapCard(){
         html+=`<div class="recap-todo-strip-dot" style="left:${pct}%;background:${x.dotColor};" title="${fmt(x.min)} · ${x.t.text}"></div>`;
       });
       html+=`</div></div>`;
-    }
-    if(!doneTodos.length&&!withMin.length){
-      html+=`<div style="font-size:11px;color:var(--tm);text-align:center;padding:6px 0;">오늘 완료한 일이 없어요</div>`;
     }
   }
   html+=`<div class="day-recap-line" style="margin-top:8px;"><span class="lbl"><i class="ti ti-notes" aria-hidden="true"></i>메모</span><span>${memos.length}개</span></div>`;
