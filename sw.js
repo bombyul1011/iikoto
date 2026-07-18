@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260718-15-sleep-avg-detail';
+const CACHE = 'iikoto-v20260718-17-sleep-avg-score-badge';
 const ASSETS = [
   './',
   './index.html'

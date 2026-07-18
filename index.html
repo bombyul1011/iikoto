@@ -1038,9 +1038,12 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div class="view on" id="v-daily">
       <div class="slabel">수면</div>
       <div class="sleep-card" id="sleep-card">
-        <div class="sleep-top" style="justify-content:flex-end;">
-          <span class="sleep-top-num" id="sleep-dur-num">--</span>
-          <span class="sleep-top-unit" id="sleep-dur-unit"></span>
+        <div class="sleep-top" style="justify-content:space-between;">
+          <span id="sleep-avg-score-badge" style="display:none;"></span>
+          <span>
+            <span class="sleep-top-num" id="sleep-dur-num">--</span>
+            <span class="sleep-top-unit" id="sleep-dur-unit"></span>
+          </span>
         </div>
         <div class="sleep-curve-wrap" id="sleep-curve-wrap">
           <svg class="sleep-curve" id="sleep-curve-svg" viewBox="0 0 340 10" preserveAspectRatio="none">
@@ -1063,16 +1066,20 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         </div>
         <div class="sleep-times">
           <div>
-            <div class="sleep-time-item" onclick="openTimeModal('sleep')">
-              <div class="sleep-time-val" id="sleep-time">--:--</div>
+            <div style="display:flex;align-items:center;gap:5px;">
+              <div class="sleep-time-item" onclick="openTimeModal('sleep')">
+                <div class="sleep-time-val" id="sleep-time">--:--</div>
+              </div>
+              <div class="sleep-btn" onclick="setNow('sleep')"><i class="ti ti-clock-hour-4" aria-hidden="true"></i></div>
             </div>
             <div class="sleep-avg-compare" id="sleep-avg-compare" style="display:none;"></div>
           </div>
-          <div class="sleep-btn" onclick="setNow('sleep')"><i class="ti ti-clock-hour-4" aria-hidden="true"></i></div>
           <div style="flex:1;"></div>
-          <div class="sleep-btn" onclick="setNow('wake')"><i class="ti ti-clock-hour-4" aria-hidden="true"></i></div>
-          <div class="sleep-time-item" onclick="openTimeModal('wake')">
-            <div class="sleep-time-val" id="wake-time">--:--</div>
+          <div style="display:flex;align-items:center;gap:5px;">
+            <div class="sleep-btn" onclick="setNow('wake')"><i class="ti ti-clock-hour-4" aria-hidden="true"></i></div>
+            <div class="sleep-time-item" onclick="openTimeModal('wake')">
+              <div class="sleep-time-val" id="wake-time">--:--</div>
+            </div>
           </div>
         </div>
       </div>
@@ -3628,6 +3635,27 @@ function saveMemos(dk,v){
 }
 function getSleep(dk){return S.get(S.key('sleep',dk))||{};}
 function saveSleepData(dk,v){S.set(S.key('sleep',dk),v);autoSync('sleep',dk);}
+function getSleepScore(dk){const d=getSleep(dk);return d.score!=null?d.score:null;}
+function saveSleepScore(dk,score){
+  const d=getSleep(dk);
+  d.score=score;
+  saveSleepData(dk,d);
+}
+// 최근 N일(오늘 제외, 어제부터)의 평균 수면 점수 계산
+function getAvgSleepScore(days){
+  days=days||7;
+  let vals=[];
+  let d=getRhythmLogicalDate?getRhythmLogicalDate():getLogicalDate();
+  for(let i=1;i<=days;i++){
+    const dd=new Date(d);dd.setDate(dd.getDate()-i);
+    const dk=dateKey(dd);
+    const sc=getSleepScore(dk);
+    if(sc!=null)vals.push(sc);
+  }
+  if(vals.length===0)return null;
+  const avg=Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
+  return {avg:avg,sampleCount:vals.length};
+}
 // 최근 N일(오늘 제외, 어제부터)의 평균 취침·기상 시각 계산
 // 취침시각이 00~11시대면 자정 넘어 잔 것으로 보고 +1440분 보정 후 평균, 다시 mod 1440으로 환산
 function getAvgSleepWindow(days){
@@ -3891,11 +3919,11 @@ async function syncMemosUp(dk){
 async function syncSleepDown(dk){
   const rows=await supaFetch(`sleep?date_key=eq.${dk}`);
   if(!rows||!rows.length)return;
-  S.set(S.key('sleep',dk),{sleep:rows[0].sleep_time,wake:rows[0].wake_time});
+  S.set(S.key('sleep',dk),{sleep:rows[0].sleep_time,wake:rows[0].wake_time,score:rows[0].score});
 }
 async function syncSleepUp(dk){
-  const d=getSleep(dk);if(!d.sleep&&!d.wake)return;
-  await supaUpsert('sleep','date_key',[{date_key:dk,sleep_time:d.sleep,wake_time:d.wake}]);
+  const d=getSleep(dk);if(!d.sleep&&!d.wake&&d.score==null)return;
+  await supaUpsert('sleep','date_key',[{date_key:dk,sleep_time:d.sleep,wake_time:d.wake,score:d.score!=null?d.score:null}]);
 }
 async function syncMealsDown(dk){
   const rows=await supaFetch(`meals?date_key=eq.${dk}`);
@@ -4298,10 +4326,21 @@ function loadSleep(){
   if(wt)wt.textContent=d.wake||'--:--';
   calcSleep(d.sleep,d.wake);
 }
+function renderSleepAvgScoreBadge(){
+  const el=document.getElementById('sleep-avg-score-badge');
+  if(!el)return;
+  const avg=getAvgSleepScore(7);
+  if(!avg||avg.sampleCount<3){el.style.display='none';return;}
+  const lv=getSleepScoreLevel(avg.avg);
+  el.innerHTML=`<i class="ti ${lv.icon}" style="font-size:14px;color:var(--tm);" aria-hidden="true"></i>`;
+  el.title='최근 7일 평균 수면점수 '+avg.avg+'점 ('+lv.label+')';
+  el.style.display='';
+}
 function calcSleep(s,w){
   const numEl=document.getElementById('sleep-dur-num'),unitEl=document.getElementById('sleep-dur-unit');
   const clipRect=document.getElementById('sleep-clip-rect');
   const badgeStart=document.getElementById('sleep-badge-start'),badgeEnd=document.getElementById('sleep-badge-end');
+  renderSleepAvgScoreBadge();
   if(!numEl)return;
   if(!s||s==='--:--'){
     numEl.textContent='--';unitEl.textContent='';
@@ -4925,6 +4964,34 @@ function _mroutineMonthCount(key){
   }
   return cnt;
 }
+function renderSleepScoreBadge(dk){
+  const score=getSleepScore(dk);
+  if(score==null){
+    return `<div onclick="promptSleepScore('${dk}')" style="width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1px solid rgba(200,180,165,0.4);cursor:pointer;" title="수면 점수 입력">
+      <i class="ti ti-bed" style="font-size:12px;color:var(--tm);" aria-hidden="true"></i>
+    </div>`;
+  }
+  const lv=getSleepScoreLevel(score);
+  return `<div onclick="promptSleepScore('${dk}')" style="width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;" title="수면 점수 ${score}점 (${lv.label})">
+    <i class="ti ${lv.icon}" style="font-size:16px;color:var(--ts);" aria-hidden="true"></i>
+  </div>`;
+}
+function promptSleepScore(dk){
+  const cur=getSleepScore(dk);
+  const input=prompt('오늘 수면 점수를 입력하세요 (0~100)',cur!=null?String(cur):'');
+  if(input===null)return;
+  const num=parseInt(input,10);
+  if(isNaN(num)||num<0||num>100){
+    alert('0~100 사이의 숫자를 입력해주세요.');
+    return;
+  }
+  saveSleepScore(dk,num);
+  const card=document.getElementById('morning-routine-card');
+  if(card){
+    const fresh=makeMorningRoutineCard();
+    card.replaceWith(fresh);
+  }
+}
 function makeMorningRoutineCard(){
   const dk=dateKey(getLogicalDate());
   const checks=getMorningRoutineChecks(dk);
@@ -4994,7 +5061,7 @@ function makeMorningRoutineCard(){
 
   card.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
       <div class="pace-title" style="margin-bottom:0;"><i class="ti ti-apple" style="font-size:13px;color:#e0a050;" aria-hidden="true"></i> 굿모닝</div>
-      <div style="font-size:11px;color:var(--tm);">${doneCount}/${total}</div>
+      ${renderSleepScoreBadge(dk)}
     </div>
     <div style="position:relative;height:102px;">${svg}${iconsHtml}</div>
     ${monthlyHtml}`;
@@ -7192,7 +7259,7 @@ async function syncMonthRange(y,mo){
     tRows.forEach(r=>{if(r.date_key===RESERVE_DK)return;(byDate[r.date_key]=byDate[r.date_key]||[]).push({text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid()});});
     Object.keys(byDate).forEach(dk=>{if(!S.get(S.key('todos_pending',dk)))S.set(S.key('todos',dk),byDate[dk]);});
   }
-  if(sRows)sRows.forEach(r=>S.set(S.key('sleep',r.date_key),{sleep:r.sleep_time,wake:r.wake_time}));
+  if(sRows)sRows.forEach(r=>S.set(S.key('sleep',r.date_key),{sleep:r.sleep_time,wake:r.wake_time,score:r.score}));
   if(mlRows)mlRows.forEach(r=>{if(!S.get(S.key('meals_pending',r.date_key)))S.set(S.key('meals',r.date_key),{breakfast:r.breakfast||'',lunch:r.lunch||'',dinner:r.dinner||'',snack:r.snack||'',breakfast_time:r.breakfast_time||'',lunch_time:r.lunch_time||'',dinner_time:r.dinner_time||'',snack_time:r.snack_time||''});});
   if(rbRows){
     const byDate={};
@@ -9465,7 +9532,7 @@ async function forceRestoreDate(dk){
   }
   var srows=await supaFetch('sleep?date_key=eq.'+dk);
   if(srows&&srows.length>0){
-    S.set(S.key('sleep',dk),{sleep:srows[0].sleep_time,wake:srows[0].wake_time});
+    S.set(S.key('sleep',dk),{sleep:srows[0].sleep_time,wake:srows[0].wake_time,score:srows[0].score});
   }
   var mlrows=await supaFetch('meals?date_key=eq.'+dk);
   if(mlrows&&mlrows.length>0){
