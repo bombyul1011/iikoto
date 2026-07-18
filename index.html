@@ -4131,6 +4131,7 @@ async function autoSync(type,key){
   else if(type==='meals'){await syncMealsUp(key);S.set(S.key('meals_pending',key),false);}
   else if(type==='habits')syncHabitsUp();
   else if(type==='hc')syncHCUp(key);
+  else if(type==='hcTime')syncHCUp(key); // 습관체크 시각도 결국 habit_checks 테이블의 checked_time 컬럼이라 같은 upload 함수(syncHCUp)를 재사용
   else if(type==='goal')syncGoalUp(key);
   else if(type==='wchallenge'){
     const data=S.get(key);
@@ -4697,12 +4698,23 @@ function relocateTodo(dk,idx,targetDk,mode){
   return{success:true,message:mode==='move'?'다음 날로 옮겼어요':'내일에도 추가했어요'};
 }
 // [v2] 조각 하나의 완료(취소선) 상태 토글. strikeParts 변경 시 항상 saveTodos로 즉시 저장+동기화.
+// 모든 조각에 취소선이 그어지면 항목 전체를 자동 완료 처리(done=true, completedAt 기록) — 새벽 리캡 등 시각 통계가 이 값을 참조하므로 누락 없이 채워야 함.
 function toggleTodoStrikePart(i,partIdx){
   const dk=dateKey(currentDate),todos=getTodos(dk),todo=todos[i];
   if(!todo)return;
   const sp=new Set(todo.strikeParts||[]);
   if(sp.has(partIdx))sp.delete(partIdx);else sp.add(partIdx);
   todo.strikeParts=Array.from(sp);
+  const totalParts=parseTodoTextParts(todo.text).parts.length;
+  const allStruck=totalParts>0&&sp.size>=totalParts;
+  if(allStruck&&!todo.done){
+    todo.done=true;
+    todo.completedAt=todo.completedAt!=null?todo.completedAt:Date.now();
+  }else if(!allStruck&&todo.done){
+    // 취소선을 다시 풀어 미완료 조각이 생기면 완료 상태도 되돌림
+    todo.done=false;
+    todo.completedAt=null;
+  }
   saveTodos(dk,todos);
   renderTodos();
 }

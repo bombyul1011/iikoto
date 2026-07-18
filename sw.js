@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260718-23-sun-icon';
+const CACHE = 'iikoto-v20260718-24-fix-time-tracking';
 const ASSETS = [
   './',
   './index.html'
