@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260718-26-dawn-debug-log';
+const CACHE = 'iikoto-v20260718-27-fix-isconnected-bug';
 const ASSETS = [
   './',
   './index.html'
