@@ -1384,9 +1384,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 </div>
 
 <div class="modal-ov" id="sleep-score-modal" onclick="closeModal('sleep-score-modal',event)">
-  <div class="modal" style="max-width:220px;" onclick="event.stopPropagation()">
+  <div class="modal" style="max-width:220px;">
     <div class="modal-title" style="text-align:center;">오늘 수면 점수</div>
-    <input type="text" inputmode="numeric" maxlength="3" placeholder="0~100" class="modal-inp" id="sleep-score-inp">
+    <input type="text" inputmode="numeric" maxlength="3" placeholder="0~100" class="modal-inp time-inp" id="sleep-score-inp">
     <div class="modal-actions">
       <button class="mbtn cancel" onclick="closeModal('sleep-score-modal')">취소</button>
       <button class="mbtn ok" onclick="confirmSleepScore()">저장</button>
@@ -4978,12 +4978,12 @@ function renderSleepScoreBadge(dk){
   const score=getSleepScore(dk);
   if(score==null){
     return `<div onclick="promptSleepScore('${dk}')" style="width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1px solid rgba(200,180,165,0.4);cursor:pointer;" title="수면 점수 입력">
-      <i class="ti ti-bed" style="font-size:12px;color:var(--tm);" aria-hidden="true"></i>
+      <i class="ti ti-bed" style="font-size:14px;color:var(--tm);" aria-hidden="true"></i>
     </div>`;
   }
   const lv=getSleepScoreLevel(score);
   return `<div onclick="promptSleepScore('${dk}')" style="width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;" title="수면 점수 ${score}점 (${lv.label})">
-    <i class="ti ${lv.icon}" style="font-size:16px;color:var(--ts);" aria-hidden="true"></i>
+    <i class="ti ${lv.icon}" style="font-size:19px;color:var(--ts);" aria-hidden="true"></i>
   </div>`;
 }
 let _sleepScoreModalDk='';

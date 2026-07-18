@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260718-18-sleep-score-modal';
+const CACHE = 'iikoto-v20260718-20-modal-style-unify';
 const ASSETS = [
   './',
   './index.html'
