@@ -1921,7 +1921,7 @@ const RHYTHM_CATS={
   rest:{label:'휴식',color:'rgba(184,212,204,0.80)',icon:'ti-armchair'},
   groom:{label:'정돈',color:'rgba(255,217,138,0.82)',icon:'ti-mood-spark'},
   work:{label:'업무',color:'rgba(204,208,220,0.80)',icon:'ti-keyboard'},
-  appointment:{label:'외출',color:'rgba(110,184,212,0.75)',icon:'ti-bus'},
+  appointment:{label:'외출',color:'rgba(168,212,232,0.75)',icon:'ti-bus'},
   note:{label:'책상',color:'rgba(240,187,158,0.82)',icon:'ti-desk'},
   enjoy:{label:'감상',color:'rgba(198,180,222,0.80)',icon:'ti-stack-2'},
   home:{label:'정리',color:'rgba(210,224,160,0.82)',icon:'ti-home'}
@@ -7591,9 +7591,7 @@ function renderRhythmBarHtml(segs){
   const segsSorted=segs.slice().sort(function(a,b){return (b.end-b.start)-(a.end-a.start);});
   segsSorted.forEach(function(sg,si){
     const bg=sg.color;
-    const isMeal=sg.label==='식사';
-    const border=isMeal?'box-shadow:0 0 0 1.5px rgba(250,245,232,0.9);':'';
-    track+='<div class="wrb-seg'+(sg.ongoing?' ongoing':'')+'" style="left:'+(sg.start/1440*100)+'%;width:'+Math.max((sg.end-sg.start)/1440*100,0.8)+'%;background-color:'+bg+';'+border+'z-index:'+(10+si+(isMeal?100:0))+';"></div>';
+    track+='<div class="wrb-seg'+(sg.ongoing?' ongoing':'')+'" style="left:'+(sg.start/1440*100)+'%;width:'+Math.max((sg.end-sg.start)/1440*100,0.8)+'%;background-color:'+bg+';z-index:'+(10+si)+';"></div>';
   });
   track+='</div>';
   return track;
