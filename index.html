@@ -7530,7 +7530,7 @@ function computeRhythmSegsForDay(dk,realTodayDk,_curLogicalDk){
   MEAL_KEYS.forEach(function(k){
     const t=meals[k+'_time'];if(!t)return;
     const start=toMin(t);
-    segs.push({start:start,end:Math.min(start+45,1440),color:getRhythmColor('_meal'),label:'식사'});
+    segs.push({start:start,end:Math.min(start+30,1440),color:getRhythmColor('_meal'),label:'식사'});
   });
   manual.forEach(function(b){
     const cat=RHYTHM_CATS[b.cat];if(!cat)return;
@@ -7586,12 +7586,28 @@ function computeRhythmSegsForDay(dk,realTodayDk,_curLogicalDk){
   });
   return segs;
 }
+// 주간탭 가로바 시간축 압축: 1시~7시 구간을 1/3로 축소, 남는 폭은 나머지 시간대에 균등 배분
+const WRB_COMPRESS_START=60, WRB_COMPRESS_END=420; // 1시~7시(분)
+const WRB_COMPRESS_RATIO=1/3;
+const WRB_ORIG_SPAN=WRB_COMPRESS_END-WRB_COMPRESS_START; // 360
+const WRB_COMPRESSED_SPAN=WRB_ORIG_SPAN*WRB_COMPRESS_RATIO; // 120
+const WRB_SAVED=WRB_ORIG_SPAN-WRB_COMPRESSED_SPAN; // 240
+const WRB_REST_SPAN=1440-WRB_ORIG_SPAN; // 1080
+const WRB_EXPAND_RATE=(WRB_REST_SPAN+WRB_SAVED)/WRB_REST_SPAN;
+function wrbCompressX(min){
+  if(min<=WRB_COMPRESS_START)return min*WRB_EXPAND_RATE;
+  if(min<=WRB_COMPRESS_END)return WRB_COMPRESS_START*WRB_EXPAND_RATE+(min-WRB_COMPRESS_START)*(WRB_COMPRESSED_SPAN/WRB_ORIG_SPAN);
+  return WRB_COMPRESS_START*WRB_EXPAND_RATE+WRB_COMPRESSED_SPAN+(min-WRB_COMPRESS_END)*WRB_EXPAND_RATE;
+}
+const WRB_TOTAL_COMPRESSED=wrbCompressX(1440);
 function renderRhythmBarHtml(segs){
   let track='<div class="wrb-track">';
   const segsSorted=segs.slice().sort(function(a,b){return (b.end-b.start)-(a.end-a.start);});
   segsSorted.forEach(function(sg,si){
     const bg=sg.color;
-    track+='<div class="wrb-seg'+(sg.ongoing?' ongoing':'')+'" style="left:'+(sg.start/1440*100)+'%;width:'+Math.max((sg.end-sg.start)/1440*100,0.8)+'%;background-color:'+bg+';z-index:'+(10+si)+';"></div>';
+    const left=wrbCompressX(sg.start)/WRB_TOTAL_COMPRESSED*100;
+    const right=wrbCompressX(sg.end)/WRB_TOTAL_COMPRESSED*100;
+    track+='<div class="wrb-seg'+(sg.ongoing?' ongoing':'')+'" style="left:'+left+'%;width:'+Math.max(right-left,0.8)+'%;background-color:'+bg+';z-index:'+(10+si)+';"></div>';
   });
   track+='</div>';
   return track;
