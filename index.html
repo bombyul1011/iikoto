@@ -157,6 +157,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .sleep-curve-wrap{position:relative;margin:14px 9px 0;height:10px;}
 .sleep-curve-wrap .sleep-curve{margin-top:0;position:absolute;top:0;left:0;}
 .sleep-badge{position:absolute;top:50%;width:22px;height:22px;border-radius:50%;background:var(--sleep-badge-bg);border:1.5px solid #fff;display:flex;align-items:center;justify-content:center;transform:translate(-50%,-50%);box-shadow:0 1px 3px rgba(90,70,60,0.18);}
+.sleep-avg-marker{position:absolute;top:50%;width:1.5px;height:16px;background:rgba(120,110,100,0.5);transform:translate(-50%,-50%);pointer-events:none;}
+.sleep-avg-compare{font-size:12px;color:var(--tm);margin-top:10px;text-align:center;}
 .sleep-badge i{font-size:12px;}
 #sleep-badge-start i{color:#8a7ab0;}
 #sleep-badge-end i{color:#e0a860;}
@@ -1056,6 +1058,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           </svg>
           <div class="sleep-badge" id="sleep-badge-start" style="display:none;"><i class="ti ti-moon-stars" aria-hidden="true"></i></div>
           <div class="sleep-badge" id="sleep-badge-end" style="display:none;"><i class="ti ti-sunset-2" aria-hidden="true"></i></div>
+          <div class="sleep-avg-marker" id="sleep-avg-marker-start" style="display:none;"></div>
+          <div class="sleep-avg-marker" id="sleep-avg-marker-end" style="display:none;"></div>
         </div>
         <div class="sleep-times">
           <div class="sleep-time-item" onclick="openTimeModal('sleep')">
@@ -1068,6 +1072,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
             <div class="sleep-time-val" id="wake-time">--:--</div>
           </div>
         </div>
+        <div class="sleep-avg-compare" id="sleep-avg-compare" style="display:none;"></div>
       </div>
       <div class="slabel-row">
         <div class="slabel">오늘 할 일</div>
@@ -3621,6 +3626,41 @@ function saveMemos(dk,v){
 }
 function getSleep(dk){return S.get(S.key('sleep',dk))||{};}
 function saveSleepData(dk,v){S.set(S.key('sleep',dk),v);autoSync('sleep',dk);}
+// 최근 N일(오늘 제외, 어제부터)의 평균 취침·기상 시각 계산
+// 취침시각이 00~11시대면 자정 넘어 잔 것으로 보고 +1440분 보정 후 평균, 다시 mod 1440으로 환산
+function getAvgSleepWindow(days){
+  days=days||7;
+  const toMin=function(t){if(!t)return null;const p=t.split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);};
+  let sleepVals=[],wakeVals=[];
+  let d=parseDk(getRhythmLogicalDate?getRhythmLogicalDate():getLogicalDate());
+  for(let i=1;i<=days;i++){
+    const dd=new Date(d);dd.setDate(dd.getDate()-i);
+    const dk=dateKey(dd);
+    const sl=getSleep(dk);
+    if(!sl||!sl.sleep||!sl.wake)continue;
+    let sMin=toMin(sl.sleep),wMin=toMin(sl.wake);
+    if(sMin==null||wMin==null)continue;
+    if(sMin<720)sMin+=1440; // 00~11시대 취침은 자정 넘어간 것으로 보정
+    sleepVals.push(sMin);
+    wakeVals.push(wMin);
+  }
+  if(sleepVals.length===0)return null;
+  const avgSleep=((sleepVals.reduce((a,b)=>a+b,0)/sleepVals.length)%1440+1440)%1440;
+  const avgWake=((wakeVals.reduce((a,b)=>a+b,0)/wakeVals.length)%1440+1440)%1440;
+  const fmt=function(m){const h=Math.floor(m/60),mm=Math.round(m%60);return pad(h)+':'+pad(mm);};
+  return {sleepMin:avgSleep,wakeMin:avgWake,sleepStr:fmt(avgSleep),wakeStr:fmt(avgWake),sampleCount:sleepVals.length};
+}
+// 수면 점수(애플워치 등 외부 기록) → 표정 아이콘 매핑
+const SLEEP_SCORE_LEVELS=[
+  {max:50,  key:'verylow',  icon:'ti-mood-angry',      label:'매우낮음'},
+  {max:65,  key:'low',      icon:'ti-mood-sad',        label:'낮음'},
+  {max:78,  key:'normal',   icon:'ti-mood-empty',      label:'보통'},
+  {max:89,  key:'high',     icon:'ti-mood-smile',      label:'높음'},
+  {max:101, key:'veryhigh', icon:'ti-mood-smile-beam', label:'매우높음'}
+];
+function getSleepScoreLevel(score){
+  return SLEEP_SCORE_LEVELS.find(l=>score<=l.max) || SLEEP_SCORE_LEVELS[SLEEP_SCORE_LEVELS.length-1];
+}
 function getMeals(dk){return S.get(S.key('meals',dk))||{};}
 function saveMealsData(dk,v){
   S.set(S.key('meals',dk),v);
@@ -4300,6 +4340,41 @@ function calcSleep(s,w){
   const grad=document.getElementById('sleepWaveGrad');
   if(grad){grad.setAttribute('x1',startPx);grad.setAttribute('x2',Math.max(startPx+1,endPx));}
   if(badgeEnd){badgeEnd.style.left=(endPx/SVG_W*100)+'%';badgeEnd.style.display='';}
+  renderSleepAvgMarkers(AXIS_MIN,SVG_W,toAxisMin,sv);
+}
+function renderSleepAvgMarkers(AXIS_MIN,SVG_W,toAxisMin,sv){
+  const mStart=document.getElementById('sleep-avg-marker-start'),mEnd=document.getElementById('sleep-avg-marker-end');
+  const compareEl=document.getElementById('sleep-avg-compare');
+  if(!mStart||!mEnd)return;
+  const avg=getAvgSleepWindow(7);
+  if(!avg||avg.sampleCount<3){
+    mStart.style.display='none';mEnd.style.display='none';
+    if(compareEl)compareEl.style.display='none';
+    return;
+  }
+  const avgSleepArr=[Math.floor(avg.sleepMin/60)%24,Math.round(avg.sleepMin%60)];
+  const avgWakeArr=[Math.floor(avg.wakeMin/60)%24,Math.round(avg.wakeMin%60)];
+  let avgStartPx=(toAxisMin(avgSleepArr)/AXIS_MIN)*SVG_W;
+  avgStartPx=Math.max(0,Math.min(SVG_W,avgStartPx));
+  let avgEndPx=(toAxisMin(avgWakeArr)/AXIS_MIN)*SVG_W;
+  avgEndPx=Math.max(0,Math.min(SVG_W,avgEndPx));
+  mStart.style.left=(avgStartPx/SVG_W*100)+'%';mStart.style.display='';
+  mEnd.style.left=(avgEndPx/SVG_W*100)+'%';mEnd.style.display='';
+  if(compareEl&&sv){
+    let todayMin=toAxisMin(sv);
+    let avgMin=toAxisMin(avgSleepArr);
+    let diff=Math.round(todayMin-avgMin); // 양수=오늘이 더 늦게, 음수=오늘이 더 빠르게
+    if(Math.abs(diff)<3){
+      compareEl.textContent='평소와 비슷하게 잠들었어요';
+    }else{
+      const absMin=Math.abs(diff);
+      const word=diff>0?'늦게':'빠르게';
+      compareEl.textContent='평균보다 '+absMin+'분 '+word+' 잠들었어요';
+    }
+    compareEl.style.display='';
+  }else if(compareEl){
+    compareEl.style.display='none';
+  }
 }
 function maskTimeInput(el){
   let digits=el.value.replace(/[^0-9]/g,'').slice(0,4);
