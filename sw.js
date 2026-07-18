@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260718-4-todo-timeline-simple';
+const CACHE = 'iikoto-v20260718-5-groom-cat';
 const ASSETS = [
   './',
   './index.html'

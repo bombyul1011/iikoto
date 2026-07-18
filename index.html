@@ -1918,7 +1918,8 @@ function makeLabel(txt){
 }
 const RHYTHM_CATS={
   exercise:{label:'운동',color:'rgba(248,192,160,0.82)',icon:'ti-run'},
-  rest:{label:'휴식',color:'rgba(252,215,110,0.80)',icon:'ti-armchair'},
+  rest:{label:'휴식',color:'rgba(232,201,160,0.80)',icon:'ti-armchair'},
+  groom:{label:'정돈',color:'rgba(252,215,110,0.80)',icon:'ti-mood-spark'},
   work:{label:'업무',color:'rgba(185,188,200,0.75)',icon:'ti-keyboard'},
   appointment:{label:'외출',color:'rgba(150,205,225,0.68)',icon:'ti-bus'},
   note:{label:'책상',color:'rgba(244,177,206,0.80)',icon:'ti-desk'},
@@ -1928,7 +1929,7 @@ const RHYTHM_CATS={
 const RHYTHM_SLEEP_COLOR='rgba(205,194,182,0.88)';
 const RHYTHM_MEAL_COLOR='rgba(130,205,145,0.90)';
 // 리듬 카테고리 분류 설명 — AI 프롬프트에서 시간 사용 데이터를 다룰 때 카테고리 오분류(예: 업무↔책상, 휴식↔감상)를 줄이기 위해 공통으로 붙이는 한 줄 설명.
-const RHYTHM_CAT_GUIDE='(카테고리 참고: 운동=홈트/헬스장/러닝 등, 휴식=낮잠/멍때리기/게임 등, 업무=주로 노트북으로 하는 작업(가끔 외근 포함), 외출=지인과의 약속이나 혼자 가는 카페/산책 등, 책상=일기·공부·앱 정비·노트정리 등 책상에서 하는 작업, 감상=드라마·독서·영화, 정리=청소·빨래 등 집안 정리)';
+const RHYTHM_CAT_GUIDE='(카테고리 참고: 운동=홈트/헬스장/러닝 등, 휴식=낮잠/멍때리기/게임 등 목적 없이 흘려보내는 시간, 정돈=기상 후 스트레칭·오디오북 들으며 씻고 준비하는 루틴 또는 취침 전 씻고 정돈하는 루틴(매일 반복되는 몸단장 루틴, 휴식과 구분됨), 업무=주로 노트북으로 하는 작업(가끔 외근 포함), 외출=지인과의 약속이나 혼자 가는 카페/산책 등, 책상=일기·공부·앱 정비·노트정리 등 책상에서 하는 작업, 감상=드라마·독서·영화, 정리=청소·빨래 등 집안 정리)';
 function getRhythmColor(key){
   if(key==='_sleep')return RHYTHM_SLEEP_COLOR;
   if(key==='_meal')return RHYTHM_MEAL_COLOR;
@@ -7623,7 +7624,7 @@ function renderWeeklyRhythmBars(){
     }
   }
   html+='</div>';
-  html+='<div class="wrb-legend"><span><i style="background:'+getRhythmColor('_meal')+';"></i>식사</span>'+
+  html+='<div class="wrb-legend">'+
     Object.keys(RHYTHM_CATS).map(function(k){return '<span><i style="background:'+getRhythmColor(k)+';"></i>'+RHYTHM_CATS[k].label+'</span>';}).join('')+'</div>';
   el.innerHTML=html;
   if(_weeklyRhythmFormOpen){
@@ -7737,9 +7738,7 @@ function buildRhythmFormEl(showOngoingList){
     }
   }
   const legend=document.createElement('div');legend.className='rhythm-track-legend';
-  legend.innerHTML='<span class="rhythm-legend-item"><span class="rhythm-legend-dot disabled" style="background:'+getRhythmColor('_sleep')+';--cat-color:'+getRhythmColor('_sleep')+';" title="수면"><i class="ti ti-moon-stars" aria-hidden="true"></i></span><span class="rhythm-legend-lbl">수면</span></span>'+
-    '<span class="rhythm-legend-item"><span class="rhythm-legend-dot disabled" style="background:'+getRhythmColor('_meal')+';--cat-color:'+getRhythmColor('_meal')+';" title="식사"><i class="ti ti-tools-kitchen-3" aria-hidden="true"></i></span><span class="rhythm-legend-lbl">식사</span></span>'+
-    Object.keys(RHYTHM_CATS).map(function(k){const c=RHYTHM_CATS[k];const rc=getRhythmColor(k);const sel=_rhythmFormOpen&&_rhythmFormCat===k;return '<span class="rhythm-legend-item"><span class="rhythm-legend-dot'+(sel?' sel':'')+'" style="background:'+rc+';--cat-color:'+rc+';" title="'+c.label+'" onclick="selectRhythmCatAndOpen(\''+k+'\')"><i class="ti '+c.icon+'" aria-hidden="true"></i></span><span class="rhythm-legend-lbl">'+c.label+'</span></span>';}).join('');
+  legend.innerHTML=Object.keys(RHYTHM_CATS).map(function(k){const c=RHYTHM_CATS[k];const rc=getRhythmColor(k);const sel=_rhythmFormOpen&&_rhythmFormCat===k;return '<span class="rhythm-legend-item"><span class="rhythm-legend-dot'+(sel?' sel':'')+'" style="background:'+rc+';--cat-color:'+rc+';" title="'+c.label+'" onclick="selectRhythmCatAndOpen(\''+k+'\')"><i class="ti '+c.icon+'" aria-hidden="true"></i></span><span class="rhythm-legend-lbl">'+c.label+'</span></span>';}).join('');
   wrap.appendChild(legend);
   if(_rhythmFormOpen){
     const form=document.createElement('div');form.className='rhythm-add-form';
