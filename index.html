@@ -157,7 +157,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .sleep-curve-wrap{position:relative;margin:14px 9px 0;height:10px;}
 .sleep-curve-wrap .sleep-curve{margin-top:0;position:absolute;top:0;left:0;}
 .sleep-badge{position:absolute;top:50%;width:22px;height:22px;border-radius:50%;background:var(--sleep-badge-bg);border:1.5px solid #fff;display:flex;align-items:center;justify-content:center;transform:translate(-50%,-50%);box-shadow:0 1px 3px rgba(90,70,60,0.18);z-index:2;}
-.sleep-avg-marker{position:absolute;top:50%;width:1.5px;height:14px;background:rgba(180,168,155,0.55);transform:translate(-50%,-50%);pointer-events:none;z-index:1;}
+.sleep-avg-marker{position:absolute;top:50%;width:1.5px;height:14px;background:rgba(180,168,155,0.32);transform:translate(-50%,-50%);pointer-events:none;z-index:1;}
 .sleep-avg-compare{font-size:12px;color:var(--tm);margin-top:4px;text-align:left;}
 .sleep-badge i{font-size:12px;}
 #sleep-badge-start i{color:#8a7ab0;}
@@ -1039,7 +1039,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="slabel">수면</div>
       <div class="sleep-card" id="sleep-card">
         <div class="sleep-top" style="justify-content:space-between;">
-          <span id="sleep-avg-score-badge" style="display:none;"></span>
+          <span id="sleep-avg-score-badge" style="display:inline-flex;width:20px;height:20px;align-items:center;justify-content:center;"></span>
           <span>
             <span class="sleep-top-num" id="sleep-dur-num">--</span>
             <span class="sleep-top-unit" id="sleep-dur-unit"></span>
@@ -1379,6 +1379,17 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div class="modal-actions">
       <button class="mbtn cancel" onclick="closeModal('time-modal')">취소</button>
       <button class="mbtn ok" onclick="confirmTime()">저장</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-ov" id="sleep-score-modal" onclick="closeModal('sleep-score-modal',event)">
+  <div class="modal" style="max-width:220px;" onclick="event.stopPropagation()">
+    <div class="modal-title" style="text-align:center;">오늘 수면 점수</div>
+    <input type="text" inputmode="numeric" maxlength="3" placeholder="0~100" class="modal-inp" id="sleep-score-inp">
+    <div class="modal-actions">
+      <button class="mbtn cancel" onclick="closeModal('sleep-score-modal')">취소</button>
+      <button class="mbtn ok" onclick="confirmSleepScore()">저장</button>
     </div>
   </div>
 </div>
@@ -4330,11 +4341,10 @@ function renderSleepAvgScoreBadge(){
   const el=document.getElementById('sleep-avg-score-badge');
   if(!el)return;
   const avg=getAvgSleepScore(7);
-  if(!avg||avg.sampleCount<3){el.style.display='none';return;}
+  if(!avg||avg.sampleCount<3){el.innerHTML='';el.title='';return;}
   const lv=getSleepScoreLevel(avg.avg);
-  el.innerHTML=`<i class="ti ${lv.icon}" style="font-size:14px;color:var(--tm);" aria-hidden="true"></i>`;
+  el.innerHTML=`<i class="ti ${lv.icon}" style="font-size:19px;color:var(--tm);" aria-hidden="true"></i>`;
   el.title='최근 7일 평균 수면점수 '+avg.avg+'점 ('+lv.label+')';
-  el.style.display='';
 }
 function calcSleep(s,w){
   const numEl=document.getElementById('sleep-dur-num'),unitEl=document.getElementById('sleep-dur-unit');
@@ -4976,21 +4986,30 @@ function renderSleepScoreBadge(dk){
     <i class="ti ${lv.icon}" style="font-size:16px;color:var(--ts);" aria-hidden="true"></i>
   </div>`;
 }
+let _sleepScoreModalDk='';
 function promptSleepScore(dk){
+  _sleepScoreModalDk=dk;
   const cur=getSleepScore(dk);
-  const input=prompt('오늘 수면 점수를 입력하세요 (0~100)',cur!=null?String(cur):'');
-  if(input===null)return;
-  const num=parseInt(input,10);
+  const inp=document.getElementById('sleep-score-inp');
+  if(inp)inp.value=cur!=null?String(cur):'';
+  openModal('sleep-score-modal');
+  setTimeout(()=>{if(inp)inp.focus();},80);
+}
+function confirmSleepScore(){
+  const inp=document.getElementById('sleep-score-inp');
+  const num=parseInt(inp.value,10);
   if(isNaN(num)||num<0||num>100){
-    alert('0~100 사이의 숫자를 입력해주세요.');
+    inp.style.borderColor='#c05060';
     return;
   }
-  saveSleepScore(dk,num);
+  saveSleepScore(_sleepScoreModalDk,num);
+  closeModal('sleep-score-modal');
   const card=document.getElementById('morning-routine-card');
   if(card){
     const fresh=makeMorningRoutineCard();
     card.replaceWith(fresh);
   }
+  renderSleepAvgScoreBadge();
 }
 function makeMorningRoutineCard(){
   const dk=dateKey(getLogicalDate());
