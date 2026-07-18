@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260718-22-sleep-badge-size-down';
+const CACHE = 'iikoto-v20260718-23-sun-icon';
 const ASSETS = [
   './',
   './index.html'
