@@ -5731,6 +5731,36 @@ function makeDawnRecapCard(){
   const rblocks=getRhythmBlocks(dk);
   const oneLine=getDailyOneLine(dk).trim();
 
+  // 완료한 일 타임라인: 투두/습관/오전루틴 완료 시각을 점으로 표기 (자정~새벽4시는 1440 더해 맨 뒤 배치)
+  const timelineDots=[];
+  todos.forEach(t=>{
+    if(!t.done||!t.completedAt)return;
+    const d=new Date(t.completedAt);
+    let mins=d.getHours()*60+d.getMinutes();
+    if(mins<240)mins+=1440;
+    timelineDots.push({mins,color:'rgba(192,112,128,0.78)'});
+  });
+  const mroutineChecks=getMorningRoutineChecks(dk);
+  Object.values(mroutineChecks).forEach(c=>{
+    if(!c||!c.time)return;
+    const mv=_dawnTimeToMin(c.time);
+    if(mv==null)return;
+    let mins=mv;if(mins<240)mins+=1440;
+    timelineDots.push({mins,color:'rgba(205,194,182,0.9)'});
+  });
+  const habitCheckTimes=getHabitCheckTimes(wk);
+  habits.forEach(hb=>{
+    const key=hb.name+'-'+dow;
+    if(!checks[key])return;
+    const t=habitCheckTimes[key];
+    if(!t)return;
+    const mv=_dawnTimeToMin(t);
+    if(mv==null)return;
+    let mins=mv;if(mins<240)mins+=1440;
+    timelineDots.push({mins,color:getHabitColor(hb.color)});
+  });
+  timelineDots.sort((a,b)=>a.mins-b.mins);
+
   // 수면: 어제 기록된 sleep~wake 시간 기준, 7.5시간을 만근으로
   let sleepMin=null;
   if(sleep.sleep&&sleep.wake){
@@ -5794,7 +5824,6 @@ function makeDawnRecapCard(){
     html+=`<div class="oneline-quote">&#x275D; ${oneLine} &#x275E;</div><div class="day-recap-divider"></div>`;
   }
 
-  html+=`<div id="dawn-todo-timeline-slot"></div>`;
   html+=`<div class="day-recap-line" style="margin-top:8px;"><span class="lbl"><i class="ti ti-notes" aria-hidden="true"></i>메모</span><span>${memos.length}개</span></div>`;
   const readingLabel=readingMin>0?readingMin+'분':_daysSinceLastReading(dk)+'일째 안읽음';
   html+=`<div class="day-recap-line"><span class="lbl"><i class="ti ti-book" aria-hidden="true"></i>독서</span><span>${readingLabel}</span></div>`;
@@ -5810,6 +5839,24 @@ function makeDawnRecapCard(){
       <circle cx="31" cy="31" r="26" fill="none" stroke="rgba(205,194,182,0.9)" stroke-width="7" stroke-dasharray="163.4" stroke-dashoffset="${163.4*(1-sleepRatio)}" stroke-linecap="round"/>
     </svg><div class="recap-donut-label">${sleepLabel}</div></div><div class="recap-donut-l">수면</div></div>
   </div>`;
+
+  if(timelineDots.length){
+    const minM=Math.min(...timelineDots.map(d=>d.mins)),maxM=Math.max(...timelineDots.map(d=>d.mins));
+    const lo=Math.max(0,minM-30),hi=Math.min(1680,maxM+30); // 최대 새벽4시(1440+240)까지 허용
+    const span=Math.max(1,hi-lo);
+    const fmtT=mn=>{const rm=((mn%1440)+1440)%1440;const hh2=Math.floor(rm/60),mm2=rm%60;const ap2=hh2<12?'오전':'오후';const h12=hh2===0?12:hh2>12?hh2-12:hh2;return ap2+' '+h12+':'+pad(mm2);};
+    html+=`<div class="day-recap-divider"></div>
+      <div class="day-recap-sec-title"><i class="ti ti-timeline" style="font-size:13px;" aria-hidden="true"></i> 완료한 일 타임라인</div>
+      <div class="recap-todo-strip-labels"><span>${fmtT(lo)}</span><span>${fmtT(hi)}</span></div>
+      <div class="recap-todo-strip-wrap">
+        <div class="recap-todo-strip-line"></div>
+        <div class="recap-todo-strip-dots">`;
+    timelineDots.forEach(d=>{
+      const pct=((d.mins-lo)/span*100).toFixed(1);
+      html+=`<span class="recap-todo-strip-dot" style="left:${pct}%;background:${d.color};"></span>`;
+    });
+    html+=`</div></div>`;
+  }
 
   if(totalDur>0){
     html+=`<div class="day-recap-divider"></div>
@@ -5848,65 +5895,7 @@ function makeDawnRecapCard(){
 
   card.innerHTML=html;
   wrap.appendChild(card);
-  renderDawnTodoTimelineFromServer(dk);
   return wrap;
-}
-// 새벽 리캡의 "완료한 일" 타임라인 전용 — 로컬 캐시(pending 플래그, 여러 겹 sync 함수)를 전혀 거치지 않고
-// 이 카드를 열 때 서버에서 오늘자 원본 데이터를 직접 한 번 가져와 그린다.
-// 하루를 마감하며 단 한 번 보여주는 화면이라 실시간성/오프라인 대응이 필요 없으므로,
-// 체크 동작 자체(로컬 우선 저장)와는 별개로 이 화면만 서버를 그대로 신뢰하는 방식을 쓴다.
-// 세 소스가 모두 도착한 뒤 한 번에 그려 중간에 미완성 상태로 노출되지 않게 한다.
-async function renderDawnTodoTimelineFromServer(dk){
-  const slot=document.getElementById('dawn-todo-timeline-slot');
-  if(!slot)return;
-  try{
-    const d=new Date(dk+'T00:00:00');
-    const wk=weekKey(d),dow=(d.getDay()+6)%7;
-    const [todoRows,habitRows,routineRows]=await Promise.all([
-      supaFetch(`todos?date_key=eq.${dk}&done=eq.true`),
-      supaFetch(`habit_checks?date_key=eq.${dk}`),
-      supaFetch(`morning_routine_checks?date_key=eq.${dk}`)
-    ]);
-    // (조회 중 카드가 교체될 가능성 대비 안전장치는 제거함 — 실제로는 오작동만 유발했음.
-    //  카드가 사라진 뒤 innerHTML을 세팅해도 그냥 무해하게 무시될 뿐이라 안전장치 자체가 불필요했음)
-    const adjMin=function(mins){return mins<240?mins+1440:mins;};
-    const withMin=[];
-    (todoRows||[]).forEach(r=>{
-      if(r.completed_at!=null){
-        const dd=new Date(r.completed_at);
-        withMin.push({text:r.text,min:adjMin(dd.getHours()*60+dd.getMinutes()),dotColor:RHYTHM_CATS.enjoy.color});
-      }
-    });
-    (routineRows||[]).forEach(r=>{
-      if(r.checked_time){
-        const item=MORNING_ROUTINE_ITEMS.find(it=>it.key===r.item_key);
-        if(!item)return;
-        const[h,m]=r.checked_time.split(':').map(Number);
-        withMin.push({text:item.label,min:adjMin(h*60+m),dotColor:RHYTHM_CATS.groom.color});
-      }
-    });
-    (habitRows||[]).forEach(r=>{
-      if(r.checked_time){
-        const habit=getHabits().find(h=>h.name===r.habit_name);
-        const[hh,mm]=r.checked_time.split(':').map(Number);
-        withMin.push({text:r.habit_name,min:adjMin(hh*60+mm),dotColor:habit?getHabitColor(habit.color):'rgba(150,150,150,0.85)'});
-      }
-    });
-    if(!withMin.length){slot.innerHTML='';return;}
-    const minV=Math.min(...withMin.map(x=>x.min)),maxV=Math.max(...withMin.map(x=>x.min));
-    const range=Math.max(1,maxV-minV);
-    const fmt=function(m){return pad(Math.floor((m%1440)/60))+':'+pad(m%60);};
-    let html=`<div class="recap-todo-strip-labels"><span>${fmt(minV)}</span><span>${fmt(maxV)}</span></div>
-      <div class="recap-todo-strip-wrap"><div class="recap-todo-strip-line"></div><div class="recap-todo-strip-dots">`;
-    withMin.forEach(x=>{
-      const pct=((x.min-minV)/range*100);
-      html+=`<div class="recap-todo-strip-dot" style="left:${pct}%;background:${x.dotColor};" title="${fmt(x.min)} · ${x.text}"></div>`;
-    });
-    html+='</div></div>';
-    slot.innerHTML=html;
-  }catch(e){
-    // 네트워크 실패 시 조용히 빈 상태 유지 (기존 로컬 fallback 없음 — 이 화면은 서버 값만 신뢰)
-  }
 }
 let _dawnReviewCache=null;
 function _dawnReviewGet(dk){

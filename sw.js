@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260718-28-remove-safety-check';
+const CACHE = 'iikoto-v20260719-2-dawn-timeline-added';
 const ASSETS = [
   './',
   './index.html'
