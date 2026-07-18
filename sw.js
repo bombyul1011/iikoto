@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260718-25-dawn-timeline-rebuild';
+const CACHE = 'iikoto-v20260718-26-dawn-debug-log';
 const ASSETS = [
   './',
   './index.html'
