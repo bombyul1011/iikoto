@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260718-27-fix-isconnected-bug';
+const CACHE = 'iikoto-v20260718-28-remove-safety-check';
 const ASSETS = [
   './',
   './index.html'

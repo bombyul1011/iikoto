@@ -5867,7 +5867,8 @@ async function renderDawnTodoTimelineFromServer(dk){
       supaFetch(`habit_checks?date_key=eq.${dk}`),
       supaFetch(`morning_routine_checks?date_key=eq.${dk}`)
     ]);
-    if(!document.body.contains(slot))return; // 조회 중 카드가 이미 교체/제거된 경우 중단
+    // (조회 중 카드가 교체될 가능성 대비 안전장치는 제거함 — 실제로는 오작동만 유발했음.
+    //  카드가 사라진 뒤 innerHTML을 세팅해도 그냥 무해하게 무시될 뿐이라 안전장치 자체가 불필요했음)
     const adjMin=function(mins){return mins<240?mins+1440:mins;};
     const withMin=[];
     (todoRows||[]).forEach(r=>{
