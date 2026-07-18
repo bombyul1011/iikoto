@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260718-5-groom-cat';
+const CACHE = 'iikoto-v20260718-6-groom-color-c';
 const ASSETS = [
   './',
   './index.html'
