@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260718-11-appointment-lighter';
+const CACHE = 'iikoto-v20260718-12-sky-unify';
 const ASSETS = [
   './',
   './index.html'
