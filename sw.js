@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260718-13-sleep-avg';
+const CACHE = 'iikoto-v20260718-14-fix-parsedk-bug';
 const ASSETS = [
   './',
   './index.html'

@@ -3632,7 +3632,7 @@ function getAvgSleepWindow(days){
   days=days||7;
   const toMin=function(t){if(!t)return null;const p=t.split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);};
   let sleepVals=[],wakeVals=[];
-  let d=parseDk(getRhythmLogicalDate?getRhythmLogicalDate():getLogicalDate());
+  let d=getRhythmLogicalDate?getRhythmLogicalDate():getLogicalDate();
   for(let i=1;i<=days;i++){
     const dd=new Date(d);dd.setDate(dd.getDate()-i);
     const dk=dateKey(dd);
