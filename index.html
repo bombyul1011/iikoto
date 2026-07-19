@@ -706,20 +706,21 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .home-hcard.afternoon{background:linear-gradient(135deg,rgba(255,220,235,0.65),rgba(255,235,200,0.60));border:1px solid rgba(255,200,210,0.50);}
 .home-hcard.night{background:linear-gradient(135deg,rgba(225,215,250,0.65),rgba(255,210,230,0.55));border:1px solid rgba(210,195,240,0.50);}
 .home-hcard.dawn{
-  box-shadow:inset 0 0 40px rgba(90,70,120,0.14),0 2px 20px rgba(0,0,0,0.08),inset 0 1px 0 rgba(255,255,255,0.22);
+  box-shadow:inset 0 0 40px rgba(70,60,120,0.05),0 2px 20px rgba(180,140,120,0.08),inset 0 1px 0 rgba(255,255,255,0.4);
   background:
-    radial-gradient(circle at 78% 12%, rgba(255,250,240,0.95) 1.8px, transparent 1.8px),
-    radial-gradient(circle at 88% 8%, rgba(255,250,240,0.85) 1.3px, transparent 1.3px),
-    radial-gradient(circle at 94% 22%, rgba(255,250,240,0.90) 1.5px, transparent 1.5px),
-    radial-gradient(circle at 82% 28%, rgba(255,250,240,0.75) 1.1px, transparent 1.1px),
-    radial-gradient(circle at 70% 6%, rgba(255,250,240,0.80) 1.2px, transparent 1.2px),
-    radial-gradient(circle at 98% 15%, rgba(255,250,240,0.70) 1px, transparent 1px),
-    radial-gradient(circle at 90% 35%, rgba(255,250,240,0.65) 1px, transparent 1px),
-    radial-gradient(circle at 75% 20%, rgba(255,250,240,0.60) 0.9px, transparent 0.9px),
-    radial-gradient(circle at 20% 65%, rgba(255,250,240,0.45) 1px, transparent 1px),
-    radial-gradient(circle at 10% 45%, rgba(255,250,240,0.40) 0.9px, transparent 0.9px),
-    linear-gradient(135deg,rgba(85,70,120,0.55),rgba(140,90,110,0.45));
-  border:1px solid rgba(160,120,150,0.35);}
+    radial-gradient(circle at 78% 12%, rgba(255,255,252,0.90) 1.7px, transparent 1.7px),
+    radial-gradient(circle at 88% 8%, rgba(255,255,252,0.80) 1.3px, transparent 1.3px),
+    radial-gradient(circle at 94% 22%, rgba(255,255,252,0.85) 1.5px, transparent 1.5px),
+    radial-gradient(circle at 82% 28%, rgba(255,255,252,0.65) 1.1px, transparent 1.1px),
+    radial-gradient(circle at 70% 6%, rgba(255,255,252,0.72) 1.2px, transparent 1.2px),
+    radial-gradient(circle at 98% 15%, rgba(255,255,252,0.60) 1px, transparent 1px),
+    radial-gradient(circle at 20% 65%, rgba(255,255,252,0.42) 1px, transparent 1px),
+    radial-gradient(circle at 10% 45%, rgba(255,255,252,0.38) 0.9px, transparent 0.9px),
+    linear-gradient(135deg,rgba(180,168,205,0.78),rgba(210,180,188,0.72) 68%,rgba(150,155,230,0.10) 100%);
+  border:1px solid rgba(170,155,190,0.45);}
+.home-hcard.dawn .home-hcard-time{color:#7a6684;}
+.home-hcard.dawn .home-hcard-greeting{color:#362b3e;}
+.home-hcard.dawn .home-hcard-sub{color:#524555;}
 [data-theme="glass"] .home-hcard.dawn{
   background:
     radial-gradient(circle at 78% 12%, rgba(120,105,170,0.55) 1.8px, transparent 1.8px),
@@ -7371,14 +7372,20 @@ async function syncMonthRange(y,mo){
     Object.keys(byDate).forEach(dk=>{if(!S.get(S.key('rblocks_pending',dk)))S.set(S.key('rblocks',dk),byDate[dk]);});
   }
   if(hcRows){
-    const byWeek={};
+    const byWeek={};const timesByWeek={};
     hcRows.forEach(r=>{
       const d=new Date(r.date_key);const wk=weekKey(d);const dow=(d.getDay()+6)%7;
-      (byWeek[wk]=byWeek[wk]||{})[`${r.habit_name}-${dow}`]=true;
+      const key=`${r.habit_name}-${dow}`;
+      (byWeek[wk]=byWeek[wk]||{})[key]=true;
+      if(r.checked_time)(timesByWeek[wk]=timesByWeek[wk]||{})[key]=r.checked_time;
     });
     Object.keys(byWeek).forEach(wk=>{
       const merged=Object.assign({},getHabitChecks(wk),byWeek[wk]);
       S.set(S.key('hc',wk),merged);
+      if(timesByWeek[wk]){
+        const mergedTimes=Object.assign({},getHabitCheckTimes(wk),timesByWeek[wk]);
+        S.set(S.key('hcTime',wk),mergedTimes);
+      }
     });
   }
   const prevMk2=(()=>{const d=new Date(y,mo-1,1);return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;})();
