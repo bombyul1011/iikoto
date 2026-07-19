@@ -566,6 +566,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rc-flow i{font-size:28px;}
 .rc-arrow-dot{color:#d4ac85;display:flex;align-items:center;}
 .pace-comment{font-size:11.5px;color:var(--ts);text-align:center;line-height:1.6;}
+.pace-dot-track{position:relative;margin-top:4px;}
+.pace-dot-baseline{position:absolute;left:0;right:0;height:1px;background:var(--div);}
+.pace-dot-hourline{position:absolute;top:28px;width:1px;height:8px;background:var(--div);}
+.pace-dot-hourlabel{position:absolute;top:40px;font-size:9px;color:var(--tm);transform:translateX(-50%);}
+.pace-dot{position:absolute;width:8px;height:8px;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 1px 2px rgba(0,0,0,0.12);}
 @keyframes beadRainbow{0%{background-position:0% 50%;}100%{background-position:500% 50%;}}
 .pg-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
 .pg-box{flex:1;background:var(--inp);border:1px solid var(--inp-b);border-radius:14px;padding:12px;text-align:center;}
@@ -5392,6 +5397,66 @@ function _paceLocalCommentCached(todayPct,yestPct,todayTop,lastWeekTop,dk,sig){
   S.set(key,text);
   return text;
 }
+// 오늘(dk) 하루의 투두/습관/아침루틴 완료 시각을 {type,min,label} 배열로 반환.
+// 시각 정보 없는 항목(과거 completedAt/hcTime 미기록)은 자연히 제외됨.
+function _paceDayEvents(dk){
+  const events=[];
+  getTodos(dk).forEach(t=>{
+    if(!t.done||!t.completedAt)return;
+    const d=new Date(t.completedAt);
+    events.push({type:'todo',min:d.getHours()*60+d.getMinutes(),label:t.text||''});
+  });
+  const wk=weekKey(new Date(dk+'T00:00:00'));
+  const dow=(new Date(dk+'T00:00:00').getDay()+6)%7;
+  const habits=getHabits();
+  const checks=getHabitChecks(wk);
+  const times=getHabitCheckTimes(wk);
+  habits.forEach(h=>{
+    const key=h.name+'-'+dow;
+    if(!checks[key]||!times[key])return;
+    const p=times[key].split(':');
+    events.push({type:'habit',min:parseInt(p[0],10)*60+parseInt(p[1],10),label:h.name});
+  });
+  const mchecks=getMorningRoutineChecks(dk);
+  MORNING_ROUTINE_ITEMS.forEach(it=>{
+    const c=mchecks[it.key];
+    if(!c||!c.time)return;
+    const p=c.time.split(':');
+    events.push({type:'morning',min:parseInt(p[0],10)*60+parseInt(p[1],10),label:it.label});
+  });
+  return events;
+}
+// 오늘 하루 활동 시각 분포를 작은 점 타임라인(HTML)으로 렌더링.
+// 겹치는 시각대는 점을 위로 살짝씩 쌓아 자연스럽게 분산.
+const PACE_DOT_COLORS={todo:'#e8a0ac',habit:'#a3c9ae',morning:'#f2cf8e'};
+function _paceDotTimelineHtml(dk){
+  const events=_paceDayEvents(dk).sort((a,b)=>a.min-b.min);
+  if(!events.length)return '';
+  const DOT_SIZE=8,MIN_GAP_PCT=1.6,TRACK_H=52,BASE_Y=34;
+  const placed=[];
+  let dotsHtml='';
+  events.forEach(ev=>{
+    const xPct=ev.min/1440*100;
+    let y=BASE_Y,tries=0;
+    while(placed.some(p=>Math.abs(p.x-xPct)<MIN_GAP_PCT&&Math.abs(p.y-y)<DOT_SIZE+3)&&tries<10){
+      y-=(DOT_SIZE+3);tries++;
+    }
+    placed.push({x:xPct,y});
+    dotsHtml+=`<div class="pace-dot" style="left:${xPct}%;top:${y}px;background:${PACE_DOT_COLORS[ev.type]};" title="${escapeHtml(ev.label)}"></div>`;
+  });
+  let hourMarks='';
+  for(let h=0;h<=24;h+=6){
+    hourMarks+=`<div class="pace-dot-hourline" style="left:${h/24*100}%;"></div><div class="pace-dot-hourlabel" style="left:${h/24*100}%;">${h}시</div>`;
+  }
+  return `<div class="pace-divider"></div>
+    <div class="pace-title"><i class="ti ti-clock-hour-4" style="font-size:13px;" aria-hidden="true"></i> 오늘 활동 분포</div>
+    <div class="pace-dot-track" style="height:${TRACK_H}px;">
+      <div class="pace-dot-baseline" style="top:${BASE_Y}px;"></div>
+      ${hourMarks}
+      ${dotsHtml}
+    </div>`;
+}
+
 function makeAfternoonPaceCard(){
   const now=new Date();
   const nowMin=now.getHours()*60+now.getMinutes();
@@ -5491,6 +5556,8 @@ function makeAfternoonPaceCard(){
     html+=`<div class="pace-divider"></div>`;
     html+=`<div style="text-align:center;font-size:11px;color:var(--tm);padding:4px 0;"><i class="ti ti-hourglass-empty" style="font-size:14px;margin-right:4px;vertical-align:-2px;" aria-hidden="true"></i>아직 본격적인 활동이 시작되지 않았어요</div>`;
   }
+
+  html+=_paceDotTimelineHtml(todayDk);
 
   const todayPct=todayBarDone/todayBarTotal*100;
   const yestPct=yestBarDone/yestBarTotal*100;

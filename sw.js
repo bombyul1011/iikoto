@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260719-5-pace-card-fix';
+const CACHE = 'iikoto-v20260719-6-afternoon-dot-timeline';
 const ASSETS = [
   './',
   './index.html'
