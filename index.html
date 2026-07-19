@@ -4590,7 +4590,7 @@ function renderTodos(){
     const partModeStyle=_todoPartModeIdx===i?'background:rgba(255,255,255,0.45);border-radius:8px;padding:2px 6px;':'';
     const rmEligible=_todoReorderMode&&!t.done;
     const handleHtml=`<div class="todo-drag-handle${rmEligible?' rm-eligible':''}"><i class="ti ti-grip-vertical" style="font-size:13px;" aria-hidden="true"></i></div>`;
-    el.innerHTML=`${handleHtml}<div class="chk${tsClass}${t.done?' on':''}" onclick="toggleTodo(${i})"></div><span class="todo-txt${t.done?' done':''}" data-todo-i="${i}" style="${partModeStyle}">${textHtml}</span>`;
+    el.innerHTML=`${handleHtml}<div class="chk${tsClass}${t.done?' on':''}" onclick="toggleTodo(${i},'${t.cid||''}')"></div><span class="todo-txt${t.done?' done':''}" data-todo-i="${i}" style="${partModeStyle}">${textHtml}</span>`;
     const hasMultipleParts=_isTouchDevice()&&parseTodoTextParts(t.text).parts.length>1;
     if(rmEligible){
       attachTodoReorderDrag(el,i,ts);
@@ -5575,7 +5575,21 @@ function makeAfternoonPaceCard(){
 
   return card;
 }
-function toggleTodo(i){const dk=dateKey(currentDate),todos=getTodos(dk);todos[i].done=!todos[i].done;todos[i].completedAt=todos[i].done?Date.now():null;saveTodos(dk,todos);renderTodos();}
+// [안전화] 렌더링 시점(sorted 배열)과 클릭 처리 시점 사이에 백그라운드 동기화 등으로
+// 원본 todos 배열 순서/개수가 바뀌면 인덱스 i가 엉뚱한 항목을 가리킬 수 있음.
+// cid를 함께 받아 todos[i]의 cid가 다르면 cid로 정확한 항목을 재탐색해 그 항목을 토글.
+function toggleTodo(i,expectedCid){
+  const dk=dateKey(currentDate),todos=getTodos(dk);
+  let target=todos[i];
+  if(expectedCid&&(!target||target.cid!==expectedCid)){
+    const realIdx=todos.findIndex(t=>t.cid===expectedCid);
+    if(realIdx>=0){i=realIdx;target=todos[i];}
+  }
+  if(!target)return;
+  target.done=!target.done;
+  target.completedAt=target.done?Date.now():null;
+  saveTodos(dk,todos);renderTodos();
+}
 
 // ── 홈탭 저녁 파트: 텍스트 아카이브 위젯 (씨앗+문장수집 통합 랜덤, 하루 1회 고정)
 function _archivePool(){
@@ -5658,23 +5672,33 @@ function commitArchiveSheetComment(){
 }
 
 // ── 홈탭 저녁 파트: 미완료 투두 카드 (오늘 날짜 고정, 인덱스는 오늘 todos 배열 기준)
-function homeToggleTodo(i){
+function homeToggleTodo(i,expectedCid){
   const dk=dateKey(getLogicalDate()),todos=getTodos(dk);
-  if(!todos[i])return;
-  todos[i].done=!todos[i].done;
-  todos[i].completedAt=todos[i].done?Date.now():null;
+  let target=todos[i];
+  if(expectedCid&&(!target||target.cid!==expectedCid)){
+    const realIdx=todos.findIndex(t=>t.cid===expectedCid);
+    if(realIdx>=0){i=realIdx;target=todos[i];}
+  }
+  if(!target)return;
+  target.done=!target.done;
+  target.completedAt=target.done?Date.now():null;
   saveTodos(dk,todos);
   const card=makePendingTodosCard();
   const old=document.getElementById('home-pending-todos-card');
   if(old&&card)old.replaceWith(card);
 }
 let _postponedTodo=null,_postponeUndoTimer=null;
-function homePostponeTodo(i){
-  const dk=dateKey(getLogicalDate()),todos=getTodos(dk),todo=todos[i];
+function homePostponeTodo(i,expectedCid){
+  const dk=dateKey(getLogicalDate()),todos=getTodos(dk);
+  let todo=todos[i];
+  if(expectedCid&&(!todo||todo.cid!==expectedCid)){
+    const realIdx=todos.findIndex(t=>t.cid===expectedCid);
+    if(realIdx>=0){i=realIdx;todo=todos[i];}
+  }
   if(!todo)return;
   const tom=new Date(getLogicalDate());tom.setDate(tom.getDate()+1);
   const tdk=dateKey(tom),ttodos=getTodos(tdk);
-  ttodos.push({...todo,done:false});
+  ttodos.push({...todo,done:false,completedAt:null});
   saveTodos(tdk,ttodos);
   addDelPending('todos',dk,todo.cid);
   todos.splice(i,1);
@@ -5729,10 +5753,10 @@ function makePendingTodosCard(){
     el.className='todo-item';
     el.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 0;';
     el.innerHTML=`<div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
-      <div class="chk" onclick="homeToggleTodo(${t._i})"></div>
+      <div class="chk" onclick="homeToggleTodo(${t._i},'${t.cid||''}')"></div>
       <span class="todo-txt" style="flex:1;color:var(--tm);">${t.text}</span>
     </div>
-    <span onclick="homePostponeTodo(${t._i})" title="내일로 미루기" style="display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;padding:5px 8px;border-radius:7px;background:rgba(190,170,140,0.14);cursor:pointer;"><i class="ti ti-chevrons-right" style="font-size:15px;color:rgba(150,125,95,0.85);" aria-hidden="true"></i></span>`;
+    <span onclick="homePostponeTodo(${t._i},'${t.cid||''}')" title="내일로 미루기" style="display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;padding:5px 8px;border-radius:7px;background:rgba(190,170,140,0.14);cursor:pointer;"><i class="ti ti-chevrons-right" style="font-size:15px;color:rgba(150,125,95,0.85);" aria-hidden="true"></i></span>`;
     list.appendChild(el);
   });
   card.appendChild(list);

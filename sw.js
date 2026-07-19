@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260719-6-afternoon-dot-timeline';
+const CACHE = 'iikoto-v20260719-7-todo-cid-safe-toggle';
 const ASSETS = [
   './',
   './index.html'
