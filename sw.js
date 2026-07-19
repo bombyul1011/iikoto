@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260719-11-fix-completedat-wipe-bug';
+const CACHE = 'iikoto-v20260719-12-dot-timeline-both-tabs';
 const ASSETS = [
   './',
   './index.html'

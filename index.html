@@ -5586,6 +5586,9 @@ function makeAfternoonPaceCard(){
     html+=`<div style="text-align:center;font-size:11px;color:var(--tm);padding:4px 0;"><i class="ti ti-hourglass-empty" style="font-size:14px;margin-right:4px;vertical-align:-2px;" aria-hidden="true"></i>아직 본격적인 활동이 시작되지 않았어요</div>`;
   }
 
+  const dotTimelineInner=_paceDotTimelineHtml(todayDk);
+  if(dotTimelineInner)html+='<div class="pace-divider"></div>'+dotTimelineInner;
+
   const todayPct=todayBarDone/todayBarTotal*100;
   const yestPct=yestBarDone/yestBarTotal*100;
   const sig=todayDone+'-'+todayHabit+'-'+todayMorning+'-'+yestDone+'-'+yestHabit+'-'+yestMorning+'-'+(todayTop?todayTop.key:'none');
