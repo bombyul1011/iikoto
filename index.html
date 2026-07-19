@@ -1869,18 +1869,18 @@ function renderHomeBody(section){
     }
     body.appendChild(makeMorningRoutineCard());
     body.appendChild(makeHabitStreakRow());
-    body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getRhythmLogicalDate()));},'rhythm-soft',12.5,dateKey(getRhythmLogicalDate())));
+    body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getLogicalDate()));},'rhythm-soft',12.5,dateKey(getLogicalDate())));
     if(!isMorning2){
       body.appendChild(makeRecentContentsCard());
     }
   } else if(section==='afternoon'){
     body.appendChild(makeAfternoonPaceCard());
     refreshAfternoonPaceCard();
-    body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getRhythmLogicalDate()));},'rhythm-soft',12.5,dateKey(getRhythmLogicalDate())));
+    body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getLogicalDate()));},'rhythm-soft',12.5,dateKey(getLogicalDate())));
   } else if(section==='dawn'){
     body.appendChild(makeDawnRecapCard());
     body.appendChild(makeLabel('오늘의 리듬'));
-    body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getRhythmLogicalDate()));},'rhythm-soft',12.5,dateKey(getRhythmLogicalDate())));
+    body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getLogicalDate()));},'rhythm-soft',12.5,dateKey(getLogicalDate())));
   } else {
     // 저녁 공통 틀: [그날의 특수 배너] → 링 → 리듬배너 → (브리핑) → 독서카드
     // 네 갈래(말일/일요일/수요일/평일) 모두 이 순서를 그대로 따름 — 특수 배너만 가변
@@ -1916,7 +1916,7 @@ function renderHomeBody(section){
       const dotCard=makeDotTimelineCard();
       if(dotCard)body.appendChild(dotCard);
     }
-    body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getRhythmLogicalDate()));},'rhythm-soft',12.5,dateKey(getRhythmLogicalDate())));
+    body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getLogicalDate()));},'rhythm-soft',12.5,dateKey(getLogicalDate())));
     // 일요일 다음 주 챌린지 준비 배너는 홈탭에서 제거 — 주간탭 "이번 주도 화이팅" 카드로 흡수됨
     if(!isSunday){
       // "오늘 마무리" 브리핑은 통합카드(상단 인삿말)가 흡수함
@@ -2429,14 +2429,14 @@ function _bcSet(subSec,val){
 // 앱 시작 시 오늘 캐시 복원
 let _greetingCache=null;
 function _initBriefingCache(){
-  const subSec=getSubSection();
+  const subSec=getGreetingSubSection();
   const gc=_bcGet(subSec+'_greeting');
   if(gc){_greetingCache=gc;}
 }
 
 function getSubSection(){
   const h=new Date().getHours();
-  if(h>=6&&h<9)return 'morning_1';
+  if(h>=4&&h<9)return 'morning_1';
   if(h>=9&&h<12)return 'morning_2';
   if(h>=12&&h<16)return 'afternoon_1';
   if(h>=16&&h<19)return 'afternoon_2';
@@ -2448,7 +2448,7 @@ function getSubSection(){
 // "인사말 캐시 키"만 이 함수로 새벽(dawn)까지 포함해 7개로 확장.
 function getGreetingSubSection(){
   const h=new Date().getHours();
-  if(h>=0&&h<6)return 'dawn';
+  if(h>=0&&h<4)return 'dawn';
   return getSubSection();
 }
 _initBriefingCache();
@@ -3331,7 +3331,7 @@ let _todoPartModeIdx=-1;
 
 function getSection(){
   const h=new Date().getHours();
-  return h>=6&&h<12?'morning':h>=12&&h<19?'afternoon':h>=19?'night':'dawn';
+  return h>=4&&h<12?'morning':h>=12&&h<19?'afternoon':h>=19?'night':'dawn';
 }
 
 function renderHome(){
@@ -3532,13 +3532,6 @@ function getSolarTermLine(){
 }
 function getLogicalDate(){
   const d=new Date();
-  if(d.getHours()<6)d.setDate(d.getDate()-1);
-  return d;
-}
-// 리듬 기능 전용 — 다른 화면(오늘탭 전환, 인사말 등)의 6시 기준과 별개로,
-// 리듬은 새벽 4시를 하루 경계로 봄 (극히 드문 새벽 4시 이후 활동까지만 전날로 인정)
-function getRhythmLogicalDate(){
-  const d=new Date();
   if(d.getHours()<4)d.setDate(d.getDate()-1);
   return d;
 }
@@ -3698,7 +3691,7 @@ function saveSleepScore(dk,score){
 function getAvgSleepScore(days){
   days=days||7;
   let vals=[];
-  let d=getRhythmLogicalDate?getRhythmLogicalDate():getLogicalDate();
+  let d=getLogicalDate();
   for(let i=1;i<=days;i++){
     const dd=new Date(d);dd.setDate(dd.getDate()-i);
     const dk=dateKey(dd);
@@ -3715,7 +3708,7 @@ function getAvgSleepWindow(days){
   days=days||7;
   const toMin=function(t){if(!t)return null;const p=t.split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);};
   let sleepVals=[],wakeVals=[];
-  let d=getRhythmLogicalDate?getRhythmLogicalDate():getLogicalDate();
+  let d=getLogicalDate();
   for(let i=1;i<=days;i++){
     const dd=new Date(d);dd.setDate(dd.getDate()-i);
     const dk=dateKey(dd);
@@ -6576,8 +6569,8 @@ function buildWeekSummaryForChallenge(){
 }
 async function loadNextWeekAISuggestions(wk){
   const area=document.getElementById('nw-ai-area');if(!area)return;
-  // 캐시 키에 논리적 날짜(getLogicalDate, 새벽 6시 기준)를 포함시켜 하루 1회만 갱신되게 함.
-  // 목~일 중 같은 날 안에서는 재진입해도 동일한 제안이 유지되고, 날짜가 바뀌면(오전 6시 이후) 자동으로 새로 생성됨.
+  // 캐시 키에 논리적 날짜(getLogicalDate, 새벽 4시 기준)를 포함시켜 하루 1회만 갱신되게 함.
+  // 목~일 중 같은 날 안에서는 재진입해도 동일한 제안이 유지되고, 날짜가 바뀌면(오전 4시 이후) 자동으로 새로 생성됨.
   const todayKey=dateKey(getLogicalDate());
   const cacheKey='nextweek_suggest_'+wk+'_'+todayKey;
   const cached=S.get(cacheKey);
@@ -6631,8 +6624,8 @@ function applyNwSuggestion(title,wk){
 // 저장은 nextWeekKey() 기준 별도 키라 다음 주 월요일이 되면 자동으로 "이번 주" 목표로 반영됨.
 // 월요일(1)엔 지난주 목표 돌아보기(openChallengeReviewSheet)로 전환 — "오늘의 리듬 기록" 배너(report-banner rhythm-soft)와
 // 완전히 동일한 배경/테두리 스타일을 그대로 가져다 씀. 요일 판단은 new Date() 기준(자정 경계, 주간탭 표준)이라
-// 자정이 지나 주간탭이 다음 주로 넘어가는 순간 차주입력창(ti-flag-plus)도 함께 내려감 — 새벽6시(getLogicalDate) 기준이면
-// 일요일 자정~6시 사이 주간탭은 이미 다음주인데 배너만 구주 상태로 남아 불필요한 API 제안이 발생하던 문제 수정.
+// 자정이 지나 주간탭이 다음 주로 넘어가는 순간 차주입력창(ti-flag-plus)도 함께 내려감 — 새벽4시(getLogicalDate) 기준이면
+// 일요일 자정~4시 사이 주간탭은 이미 다음주인데 배너만 구주 상태로 남아 불필요한 API 제안이 발생하던 문제 수정.
 function setupWeeklyChallengeToggle(){
   const titleEl=document.getElementById('wchallenge-title');
   if(!titleEl)return;
@@ -7466,7 +7459,7 @@ function renderCalDetail(d){
   const date=new Date(_calYear,_calMonth,d);
   const dateStr=`${_calMonth+1}월 ${d}일 ${DAYS[date.getDay()]}`;
   const _rbTodayDk=dateKey(new Date());
-  const _rbCurLogicalDk=dateKey(getRhythmLogicalDate());
+  const _rbCurLogicalDk=dateKey(getLogicalDate());
   const rhythmBarHtml=renderRhythmBarHtml(computeRhythmSegsForDay(dk,_rbTodayDk,_rbCurLogicalDk));
   const oneLine=getDailyOneLine(dk);
   const headerHtml=`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;">
@@ -7874,7 +7867,7 @@ function renderWeeklyRhythmBars(){
   const DOW=['월','화','수','목','금','토','일'];
   const todayDk=dateKey(now);
   const realTodayDk=todayDk;
-  const _curLogicalDk=dateKey(getRhythmLogicalDate());
+  const _curLogicalDk=dateKey(getLogicalDate());
   let html='<div class="wrb-wrap">';
   for(let i=0;i<7;i++){
     const d=new Date(mon);d.setDate(mon.getDate()+i);

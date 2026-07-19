@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260720-3-dawn-tone-prompt';
+const CACHE = 'iikoto-v20260720-4-unified-4am-boundary';
 const ASSETS = [
   './',
   './index.html'
