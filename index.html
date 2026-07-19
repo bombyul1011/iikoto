@@ -568,8 +568,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .pace-comment{font-size:11.5px;color:var(--ts);text-align:center;line-height:1.6;}
 .pace-dot-track{position:relative;margin-top:4px;}
 .pace-dot-baseline{position:absolute;left:0;right:0;height:1px;background:var(--div);}
-.pace-dot-hourline{position:absolute;top:28px;width:1px;height:8px;background:var(--div);}
-.pace-dot-hourlabel{position:absolute;top:40px;font-size:9px;color:var(--tm);transform:translateX(-50%);}
+.pace-dot-hourline{position:absolute;top:18px;width:1px;height:8px;background:var(--div);}
+.pace-dot-hourlabel{position:absolute;top:28px;font-size:9px;color:var(--tm);transform:translateX(-50%);}
 .pace-dot{position:absolute;width:8px;height:8px;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 1px 2px rgba(0,0,0,0.12);}
 @keyframes beadRainbow{0%{background-position:0% 50%;}100%{background-position:500% 50%;}}
 .pg-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
@@ -5427,22 +5427,33 @@ function _paceDayEvents(dk){
   return events;
 }
 // 오늘 하루 활동 시각 분포를 작은 점 타임라인(HTML)으로 렌더링.
-// 겹치는 시각대는 점을 위로 살짝씩 쌓아 자연스럽게 분산.
+// 겹치는 시각대는 그룹으로 묶어 시간순으로 좌우에 살짝씩 벌려 배치(가로 분산).
 const PACE_DOT_COLORS={todo:'#e8a0ac',habit:'#a3c9ae',morning:'#f2cf8e'};
 function _paceDotTimelineHtml(dk){
   const events=_paceDayEvents(dk).sort((a,b)=>a.min-b.min);
   if(!events.length)return '';
-  const DOT_SIZE=8,MIN_GAP_PCT=1.6,TRACK_H=52,BASE_Y=34;
-  const placed=[];
-  let dotsHtml='';
+  const DOT_SIZE=8,MIN_GAP_PCT=2.0,TRACK_H=42,BASE_Y=18;
+  // 겹치는(간격이 MIN_GAP_PCT 미만인) 이벤트끼리 그룹으로 묶기
+  const groups=[];
   events.forEach(ev=>{
     const xPct=ev.min/1440*100;
-    let y=BASE_Y,tries=0;
-    while(placed.some(p=>Math.abs(p.x-xPct)<MIN_GAP_PCT&&Math.abs(p.y-y)<DOT_SIZE+3)&&tries<10){
-      y-=(DOT_SIZE+3);tries++;
+    const last=groups[groups.length-1];
+    if(last&&xPct-last.centerX<MIN_GAP_PCT){
+      last.items.push({...ev,xPct});
+      last.centerX=last.items.reduce((s,it)=>s+it.xPct,0)/last.items.length;
+    }else{
+      groups.push({centerX:xPct,items:[{...ev,xPct}]});
     }
-    placed.push({x:xPct,y});
-    dotsHtml+=`<div class="pace-dot" style="left:${xPct}%;top:${y}px;background:${PACE_DOT_COLORS[ev.type]};" title="${escapeHtml(ev.label)}"></div>`;
+  });
+  let dotsHtml='';
+  groups.forEach(g=>{
+    const n=g.items.length;
+    // 그룹 내에서 시간순(이미 정렬됨)으로 중심을 기준으로 좌우 균등 분산
+    g.items.forEach((ev,idx)=>{
+      const offset=(idx-(n-1)/2)*MIN_GAP_PCT;
+      const x=Math.min(100,Math.max(0,g.centerX+offset));
+      dotsHtml+=`<div class="pace-dot" style="left:${x}%;top:${BASE_Y}px;background:${PACE_DOT_COLORS[ev.type]};" title="${escapeHtml(ev.label)}"></div>`;
+    });
   });
   let hourMarks='';
   for(let h=0;h<=24;h+=6){

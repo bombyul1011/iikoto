@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260719-7-todo-cid-safe-toggle';
+const CACHE = 'iikoto-v20260719-8-dot-horizontal-spread';
 const ASSETS = [
   './',
   './index.html'
