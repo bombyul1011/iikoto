@@ -7402,7 +7402,7 @@ async function syncMonthRange(y,mo){
   }
   if(tRows){
     const byDate={};
-    tRows.forEach(r=>{if(r.date_key===RESERVE_DK)return;(byDate[r.date_key]=byDate[r.date_key]||[]).push({text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid()});});
+    tRows.forEach(r=>{if(r.date_key===RESERVE_DK)return;(byDate[r.date_key]=byDate[r.date_key]||[]).push({text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined)});});
     Object.keys(byDate).forEach(dk=>{if(!S.get(S.key('todos_pending',dk)))S.set(S.key('todos',dk),byDate[dk]);});
   }
   if(sRows)sRows.forEach(r=>S.set(S.key('sleep',r.date_key),{sleep:r.sleep_time,wake:r.wake_time,score:r.score}));
@@ -9674,7 +9674,7 @@ async function forceRestoreDate(dk){
   }
   var trows=await supaFetch('todos?date_key=eq.'+dk+'&order=created');
   if(trows!==null){
-    S.set(S.key('todos',dk),trows.map(function(r){return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[]};}));
+    S.set(S.key('todos',dk),trows.map(function(r){return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined)};}));
   }
   var srows=await supaFetch('sleep?date_key=eq.'+dk);
   if(srows&&srows.length>0){
