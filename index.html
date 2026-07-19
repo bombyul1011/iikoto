@@ -1916,6 +1916,8 @@ function renderHomeBody(section){
       body.appendChild(makeEveningMiniStatCard());
       body.appendChild(makeLabel('아직 남은 일'));
       body.appendChild(makePendingTodosCard());
+      const dotCard=makeDotTimelineCard();
+      if(dotCard)body.appendChild(dotCard);
     }
     body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getRhythmLogicalDate()));},'rhythm-soft',12.5,dateKey(getRhythmLogicalDate())));
     // 일요일 다음 주 챌린지 준비 배너는 홈탭에서 제거 — 주간탭 "이번 주도 화이팅" 카드로 흡수됨
@@ -5197,6 +5199,17 @@ function _paceTopRhythmCat(dk){
   return null;
 }
 // 저녁 파트1용 미니통계 카드 — 당일 기록 기준(완료 투두 / 체크 습관 / 오늘의 최다 리듬), 오후 통계카드보다 훨씬 컴팩트하게
+// 저녁 홈탭 — 오늘 활동 분포(점 타임라인) 카드. 내용 없으면 카드 자체를 만들지 않음.
+function makeDotTimelineCard(){
+  const dk=dateKey(getLogicalDate());
+  const inner=_paceDotTimelineHtml(dk);
+  if(!inner)return null;
+  const wrap=document.createElement('div');
+  wrap.className='pace-card';
+  wrap.id='home-dot-timeline-card';
+  wrap.innerHTML=inner;
+  return wrap;
+}
 function makeEveningMiniStatCard(){
   const dk=dateKey(getLogicalDate());
   const doneTodos=_paceCountDoneUntilNow(dk,null);
@@ -5465,8 +5478,7 @@ function _paceDotTimelineHtml(dk){
     const x=(h*60-PACE_DOT_RANGE_START)/rangeLen*100;
     hourMarks+=`<div class="pace-dot-hourline" style="left:${x}%;"></div><div class="pace-dot-hourlabel" style="left:${x}%;">${h}시</div>`;
   }
-  return `<div class="pace-divider"></div>
-    <div class="pace-title"><i class="ti ti-clock-hour-4" style="font-size:13px;" aria-hidden="true"></i> 오늘 활동 분포</div>
+  return `<div class="pace-title"><i class="ti ti-clock-hour-4" style="font-size:13px;" aria-hidden="true"></i> 오늘 활동 분포</div>
     <div class="pace-dot-track" style="height:${TRACK_H}px;">
       <div class="pace-dot-baseline" style="top:${BASE_Y}px;"></div>
       ${hourMarks}
@@ -5573,8 +5585,6 @@ function makeAfternoonPaceCard(){
     html+=`<div class="pace-divider"></div>`;
     html+=`<div style="text-align:center;font-size:11px;color:var(--tm);padding:4px 0;"><i class="ti ti-hourglass-empty" style="font-size:14px;margin-right:4px;vertical-align:-2px;" aria-hidden="true"></i>아직 본격적인 활동이 시작되지 않았어요</div>`;
   }
-
-  html+=_paceDotTimelineHtml(todayDk);
 
   const todayPct=todayBarDone/todayBarTotal*100;
   const yestPct=yestBarDone/yestBarTotal*100;
@@ -5688,6 +5698,15 @@ function commitArchiveSheetComment(){
   if(old&&fresh)old.replaceWith(fresh);
 }
 
+// 투두/습관 체크 등으로 오늘 활동 분포가 바뀌었을 때 저녁 홈탭의 점 타임라인 카드를 새로 그려 교체.
+// 카드가 화면에 없으면(다른 화면이거나 데이터가 비어 카드 자체가 없던 경우) 조용히 무시.
+function refreshDotTimelineCard(){
+  const old=document.getElementById('home-dot-timeline-card');
+  if(!old)return;
+  const fresh=makeDotTimelineCard();
+  if(fresh)old.replaceWith(fresh);
+  else old.remove();
+}
 // ── 홈탭 저녁 파트: 미완료 투두 카드 (오늘 날짜 고정, 인덱스는 오늘 todos 배열 기준)
 function homeToggleTodo(i,expectedCid){
   const dk=dateKey(getLogicalDate()),todos=getTodos(dk);
@@ -5703,6 +5722,7 @@ function homeToggleTodo(i,expectedCid){
   const card=makePendingTodosCard();
   const old=document.getElementById('home-pending-todos-card');
   if(old&&card)old.replaceWith(card);
+  refreshDotTimelineCard();
 }
 let _postponedTodo=null,_postponeUndoTimer=null;
 function homePostponeTodo(i,expectedCid){
@@ -5725,6 +5745,7 @@ function homePostponeTodo(i,expectedCid){
   const card=makePendingTodosCard();
   const old=document.getElementById('home-pending-todos-card');
   if(old&&card)old.replaceWith(card);
+  refreshDotTimelineCard();
 }
 function showPostponeUndo(){
   clearTimeout(_postponeUndoTimer);
@@ -5827,6 +5848,7 @@ function makeHabitMiniCheckRow(){
       saveHabitChecks(wk,checks);
       const fresh=makeHabitMiniCheckRow();
       wrap.replaceWith(fresh);
+      refreshDotTimelineCard();
       if(document.getElementById('v-monthly')&&document.getElementById('v-monthly').classList.contains('on'))renderHabitMonthly();
       if(document.getElementById('v-weekly')&&document.getElementById('v-weekly').classList.contains('on'))renderWeeklyHabitBox();
     });
