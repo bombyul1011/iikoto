@@ -706,20 +706,20 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .home-hcard.afternoon{background:linear-gradient(135deg,rgba(255,220,235,0.65),rgba(255,235,200,0.60));border:1px solid rgba(255,200,210,0.50);}
 .home-hcard.night{background:linear-gradient(135deg,rgba(225,215,250,0.65),rgba(255,210,230,0.55));border:1px solid rgba(210,195,240,0.50);}
 .home-hcard.dawn{
-  box-shadow:inset 0 0 40px rgba(120,95,150,0.12),0 2px 20px rgba(180,140,120,0.08),inset 0 1px 0 rgba(255,255,255,0.70);
+  box-shadow:inset 0 0 40px rgba(90,70,120,0.14),0 2px 20px rgba(0,0,0,0.08),inset 0 1px 0 rgba(255,255,255,0.22);
   background:
-    radial-gradient(circle at 78% 12%, rgba(255,252,230,0.95) 1.8px, transparent 1.8px),
-    radial-gradient(circle at 88% 8%, rgba(255,252,230,0.85) 1.3px, transparent 1.3px),
-    radial-gradient(circle at 94% 22%, rgba(255,252,230,0.90) 1.5px, transparent 1.5px),
-    radial-gradient(circle at 82% 28%, rgba(255,252,230,0.75) 1.1px, transparent 1.1px),
-    radial-gradient(circle at 70% 6%, rgba(255,252,230,0.80) 1.2px, transparent 1.2px),
-    radial-gradient(circle at 98% 15%, rgba(255,252,230,0.70) 1px, transparent 1px),
-    radial-gradient(circle at 90% 35%, rgba(255,252,230,0.65) 1px, transparent 1px),
-    radial-gradient(circle at 75% 20%, rgba(255,252,230,0.60) 0.9px, transparent 0.9px),
-    radial-gradient(circle at 20% 65%, rgba(255,252,230,0.45) 1px, transparent 1px),
-    radial-gradient(circle at 10% 45%, rgba(255,252,230,0.40) 0.9px, transparent 0.9px),
-    linear-gradient(135deg,rgba(225,215,250,0.55),rgba(255,225,210,0.50));
-  border:1px solid rgba(215,200,240,0.50);}
+    radial-gradient(circle at 78% 12%, rgba(255,250,240,0.95) 1.8px, transparent 1.8px),
+    radial-gradient(circle at 88% 8%, rgba(255,250,240,0.85) 1.3px, transparent 1.3px),
+    radial-gradient(circle at 94% 22%, rgba(255,250,240,0.90) 1.5px, transparent 1.5px),
+    radial-gradient(circle at 82% 28%, rgba(255,250,240,0.75) 1.1px, transparent 1.1px),
+    radial-gradient(circle at 70% 6%, rgba(255,250,240,0.80) 1.2px, transparent 1.2px),
+    radial-gradient(circle at 98% 15%, rgba(255,250,240,0.70) 1px, transparent 1px),
+    radial-gradient(circle at 90% 35%, rgba(255,250,240,0.65) 1px, transparent 1px),
+    radial-gradient(circle at 75% 20%, rgba(255,250,240,0.60) 0.9px, transparent 0.9px),
+    radial-gradient(circle at 20% 65%, rgba(255,250,240,0.45) 1px, transparent 1px),
+    radial-gradient(circle at 10% 45%, rgba(255,250,240,0.40) 0.9px, transparent 0.9px),
+    linear-gradient(135deg,rgba(85,70,120,0.55),rgba(140,90,110,0.45));
+  border:1px solid rgba(160,120,150,0.35);}
 [data-theme="glass"] .home-hcard.dawn{
   background:
     radial-gradient(circle at 78% 12%, rgba(120,105,170,0.55) 1.8px, transparent 1.8px),
@@ -3175,29 +3175,34 @@ async function fetchHomeWeather(section){
   let dataContext,sys;
 
   if(section==='dawn'){
-    // 새벽은 "방금 지나간 하루"를 담담히 돌아보는 회고 — 내일 예고나 재촉 없이, 딱 오늘(어제) 있었던 일만 다룸
+    // 새벽은 "방금 지나간 하루"를 담담히 돌아보는 총평 — 시간대별 사건 나열이 아니라
+    // 하루 전체를 하나로 뭉뚱그려 "이런 결의 하루였다"는 인상 위주로 전달
+    const allDoneTodos=todos.filter(t=>t.done).map(t=>t.text);
+    const allPendTodos=todos.filter(t=>!t.done).map(t=>t.text);
     dataContext=[
       `방금 지나간 어제는 ${_HOME_DAYS[dataDate.getDay()]}요일이었어요.`,
       getUserProfileContext(),
       `(참고용, 출력 금지) 지금은 하루를 마감하는 새벽 시간대예요.`,
-      todoLine(morningTodos,'오전'),
-      todoLine(afternoonTodos,'오후'),
-      todoLine(nightTodos,'저녁'),
-      todoLine(noneTodos,'시간지정없음'),
+      allDoneTodos.length?`오늘 완료한 일: ${allDoneTodos.join(', ')}`:'',
+      allPendTodos.length?`오늘 못한 일: ${allPendTodos.join(', ')}`:'',
       rhythmSummary,
       pickedMemos.length?`메모: ${pickedMemos.join(' / ')}`:'',
       sleep.sleep||sleep.wake?`수면: ${sleep.sleep||'?'} 취침 ${sleep.wake||'?'} 기상`:''
     ].filter(Boolean).join('\n');
-    sys=`당신은 따뜻한 생활 코치예요. 방금 지나간 하루의 기록을 보고, "오늘은 이런 하루였을 것 같다"는 회고와 포근한 한마디를 건네요.
+    sys=`당신은 따뜻한 생활 코치예요. 방금 지나간 하루의 기록을 보고, "오늘은 이런 결의 하루였다"는 한 줄 총평과 포근한 한마디를 건네요.
 
 **분량 제한 (반드시 지킬 것):**
 - 전체 2-3문장 이내로 짧게.
 
+**절대 원칙 — 사건 나열 금지:**
+- "오전에 X하고 오후에 Y하고 저녁에 Z했다" 같은 시간순 사건 나열 문장을 절대 만들지 말 것.
+- 개별 항목을 순서대로 이어붙이지 말고, 먼저 하루 전체를 관통하는 인상이나 결(분주했다/차분했다/바깥일이 많았다/집중하는 하루였다 등)을 한 문장으로 요약하고, 그 다음에 인상적인 일 1개 정도만 자연스럽게 곁들일 것.
+- 완료한 일들을 나열형으로 다시 읊지 말 것 — "이것저것 챙기며", "바쁘게 움직인" 처럼 뭉뚱그려 표현.
+
 기타 규칙:
-- 지금은 하루를 마감하는 새벽 시간대예요 — "아직 안 자냐"거나 재촉하는 말은 하지 말고, 담담하고 편안한 톤으로 하루를 정리해주는 느낌으로.
-- 내일 할일이나 예고는 언급하지 말 것 — 오직 지나간 하루에 대한 회고만.
-- 확정적이지 않은 내용은 추측하지 말고, 실제 기록에 있는 내용 위주로 자연스럽게 풀어써요.
-- 완료한 일은 전부 나열하지 말고, 인상적인 1-2가지만 자연스럽게 녹여요.
+- 지금은 하루를 마감하는 새벽 시간대예요 — "아직 안 자냐"거나 재촉하는 말은 하지 말고, 담담하고 편안한 톤으로.
+- 내일 할일이나 예고는 언급하지 말 것 — 오직 지나간 하루에 대한 총평만.
+- 확정적이지 않은 내용은 추측하지 말고, 실제 기록에 있는 내용 위주로.
 - 메모에 담긴 컨디션(피곤함, 아픔 등)은 그 시점의 일시적 상황으로만 참고하고, 이를 근거로 "쉬어야 해요" 같은 조언을 반복적으로 얹지 말 것.
 - 반드시 ~해요, ~이에요, ~어요 체의 정감있는 존댓말만 사용. 반말 절대 금지.
 - "너", "당신" 등 호칭 절대 사용 금지.
