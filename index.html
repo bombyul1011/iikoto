@@ -1960,6 +1960,24 @@ function saveRhythmBlocks(dk,v){
   S.set(S.key('rblocks_pending',dk),true);
   autoSync('rblocks',dk);
 }
+// 취침 시각이 등록되면 당일(dk) 리듬 블록 중 end가 비어있는(미완료) 블록을 찾아
+// 취침 1분 전 시각으로 조용히 완료 처리. 알림 없음. start가 취침시각 이후인 비정상 데이터는 건드리지 않음.
+function autoCloseUnfinishedRhythmBlocks(dk,sleepTime){
+  if(!sleepTime)return;
+  const blocks=getRhythmBlocks(dk);
+  const sleepMin=_dawnTimeToMin(sleepTime);
+  if(sleepMin==null)return;
+  let changed=false;
+  blocks.forEach(b=>{
+    if(b.end)return; // 이미 완료된 블록은 건드리지 않음
+    const startMin=_dawnTimeToMin(b.start);
+    if(startMin==null||startMin>=sleepMin)return; // 시작 시각이 취침시각 이후/동일이면 스킵(비정상 데이터 보호)
+    const closeMin=sleepMin-1<0?0:sleepMin-1;
+    b.end=pad(Math.floor(closeMin/60))+':'+pad(closeMin%60);
+    changed=true;
+  });
+  if(changed)saveRhythmBlocks(dk,blocks);
+}
 async function syncRhythmBlocksUp(dk){
   const blocks=getRhythmBlocks(dk);
   if(ensureItemCids(blocks))S.set(S.key('rblocks',dk),blocks);
@@ -4441,6 +4459,7 @@ function setNow(t){
   const dk=dateKey(currentDate),d=getSleep(dk);
   if(t==='sleep')d.sleep=v;else d.wake=v;
   saveSleepData(dk,d);loadSleep();
+  if(t==='sleep'){autoCloseUnfinishedRhythmBlocks(dk,v);refreshRhythmTrack();}
 }
 function openTimeModal(t){
   _sleepTarget=t;
@@ -4519,6 +4538,7 @@ function confirmTime(){
   const dk=dateKey(currentDate),d=getSleep(dk);
   if(_sleepTarget==='sleep')d.sleep=v;else d.wake=v;
   saveSleepData(dk,d);loadSleep();closeModal('time-modal');
+  if(_sleepTarget==='sleep'){autoCloseUnfinishedRhythmBlocks(dk,v);refreshRhythmTrack();}
 }
 
 // ── TODO
@@ -5103,12 +5123,21 @@ function _paceCountDoneUntilNow(dk,nowMinLimit){
     return d.getHours()*60+d.getMinutes()<=nowMinLimit;
   }).length;
 }
-function _paceHabitCheckedCount(dk){
+function _paceHabitCheckedCount(dk,nowMinLimit){
   const wk=weekKey(new Date(dk+'T00:00:00'));
   const dow=(new Date(dk+'T00:00:00').getDay()+6)%7;
   const habits=getHabits();
   const checks=getHabitChecks(wk);
-  return habits.filter(h=>checks[h.name+'-'+dow]).length;
+  const times=getHabitCheckTimes(wk);
+  return habits.filter(h=>{
+    const key=h.name+'-'+dow;
+    if(!checks[key])return false;
+    if(nowMinLimit==null)return true; // 하루 전체 기준(지난주 물채우기 등)
+    const t=times[key];
+    if(!t)return false; // 시각 기록 없는 과거 체크는 시각 비교 불가하므로 제외
+    const p=t.split(':');
+    return parseInt(p[0],10)*60+parseInt(p[1],10)<=nowMinLimit;
+  }).length;
 }
 // 습관 각각의 온/오프 상태 + 지정색을 함께 반환 — 물방울 원 하단 구슬 표시용.
 function _paceHabitBeadsData(dk){
@@ -5119,9 +5148,16 @@ function _paceHabitBeadsData(dk){
   return habits.map(h=>({on:!!checks[h.name+'-'+dow],color:getHabitColor(h.color)}));
 }
 // 오늘 진행도 가로바에 아침루틴 체크도 합산하기 위한 헬퍼.
-function _paceMorningRoutineCheckedCount(dk){
+function _paceMorningRoutineCheckedCount(dk,nowMinLimit){
   const checks=getMorningRoutineChecks(dk);
-  return MORNING_ROUTINE_ITEMS.filter(it=>checks[it.key]).length;
+  return MORNING_ROUTINE_ITEMS.filter(it=>{
+    const c=checks[it.key];
+    if(!c)return false;
+    if(nowMinLimit==null)return true; // 하루 전체 기준(지난주 물채우기 등)
+    if(!c.time)return false; // 시각 기록 없는 과거 체크는 시각 비교 불가하므로 제외
+    const p=c.time.split(':');
+    return parseInt(p[0],10)*60+parseInt(p[1],10)<=nowMinLimit;
+  }).length;
 }
 function _paceTopRhythmCat(dk){
   const blocks=getRhythmBlocks(dk);
@@ -5370,10 +5406,10 @@ function makeAfternoonPaceCard(){
   const todayTotal=Math.max(getTodos(todayDk).length,1);
   const yestTotal=Math.max(getTodos(yestDk).length,1);
 
-  const todayHabit=_paceHabitCheckedCount(todayDk);
-  const yestHabit=_paceHabitCheckedCount(yestDk);
-  const todayMorning=_paceMorningRoutineCheckedCount(todayDk);
-  const yestMorning=_paceMorningRoutineCheckedCount(yestDk);
+  const todayHabit=_paceHabitCheckedCount(todayDk,nowMin);
+  const yestHabit=_paceHabitCheckedCount(yestDk,nowMin);
+  const todayMorning=_paceMorningRoutineCheckedCount(todayDk,nowMin);
+  const yestMorning=_paceMorningRoutineCheckedCount(yestDk,nowMin);
   const HABIT_TOTAL=getHabits().length||1;
   const MORNING_TOTAL=MORNING_ROUTINE_ITEMS.length;
 
@@ -5456,9 +5492,9 @@ function makeAfternoonPaceCard(){
     html+=`<div style="text-align:center;font-size:11px;color:var(--tm);padding:4px 0;"><i class="ti ti-hourglass-empty" style="font-size:14px;margin-right:4px;vertical-align:-2px;" aria-hidden="true"></i>아직 본격적인 활동이 시작되지 않았어요</div>`;
   }
 
-  const todayPct=todayDone/todayTotal*100;
-  const yestPct=yestDone/yestTotal*100;
-  const sig=todayDone+'-'+todayHabit+'-'+(todayTop?todayTop.key:'none');
+  const todayPct=todayBarDone/todayBarTotal*100;
+  const yestPct=yestBarDone/yestBarTotal*100;
+  const sig=todayDone+'-'+todayHabit+'-'+todayMorning+'-'+yestDone+'-'+yestHabit+'-'+yestMorning+'-'+(todayTop?todayTop.key:'none');
   html+=`<div class="pace-divider"></div>`;
   html+=`<div class="pace-comment" id="pace-comment-text"></div>`;
 
