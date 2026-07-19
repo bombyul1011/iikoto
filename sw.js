@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260719-8-dot-horizontal-spread';
+const CACHE = 'iikoto-v20260719-9-dot-6to24-range';
 const ASSETS = [
   './',
   './index.html'
