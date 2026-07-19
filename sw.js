@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260719-12-dot-timeline-both-tabs';
+const CACHE = 'iikoto-v20260720-2-dawn-unified-greeting';
 const ASSETS = [
   './',
   './index.html'
