@@ -6157,6 +6157,7 @@ async function _fetchVowRecapComment(dk,vow,oneLine){
 - 메모는 그날의 흐름을 파악하는 참고용일 뿐, 메모 속 구체적 내용을 언급하거나 인용하지 마세요.
 - 다짐과 한 줄 중 하나만 있으면, 있는 것만 가지고 짧게.
 - 설명하거나 조언하려 하지 말고, 그냥 다정하게 공감하는 말투로.
+- 반드시 ~해요, ~이에요, ~어요 체의 정감있는 존댓말만 사용하세요. 문장 끝을 반말(~돼, ~해, ~야 등)로 맺지 마세요. 모든 문장이 예외 없이 존댓말로 끝나야 해요.
 - 이모지나 특수기호는 쓰지 않아요.
 - 오직 문장만 출력, 따옴표나 설명 없이.`;
   const reply=await callClaude(sys,[{role:'user',content:dataContext}],100);
@@ -6182,7 +6183,7 @@ function makeDawnRecapCard(){
   const sleep=getSleep(dk)||{};
   const rblocks=getRhythmBlocks(dk);
   const oneLine=getDailyOneLine(dk).trim();
-  const vow=getDailyVow(dateKey(new Date())).trim(); // 다짐은 자정 기준(오늘탭과 동일 체계)으로 저장되므로 dk(4시 기준)와 별도 조회
+  const vow=getDailyVow(dk).trim(); // 다짐은 아침에 자정 기준으로 저장되지만, 저장 시점의 달력날짜는 dk(4시 기준 회고 대상일)와 동일함
 
   // 수면: 어제 기록된 sleep~wake 시간 기준, 7.5시간을 만근으로
   let sleepMin=null;

@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260721-5-elearn-cache-cleanup';
+const CACHE = 'iikoto-v20260721-6-vow-dk-fix-honorific';
 const ASSETS = [
   './',
   './index.html'
