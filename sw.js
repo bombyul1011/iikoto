@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260720-13-elearn-mustard-olive';
+const CACHE = 'iikoto-v20260720-15-elearn-olive-gold-blend';
 const ASSETS = [
   './',
   './index.html'
