@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260721-3-vowrecap-pattern-unified';
+const CACHE = 'iikoto-v20260721-4-vowrecap-simplified';
 const ASSETS = [
   './',
   './index.html'

@@ -6120,18 +6120,15 @@ function _daysSinceLastReading(dk){
   return 90;
 }
 // 다짐-하루한줄 병렬 비교에 얹는 짧은 코멘트 — 판단(성공/실패)하지 않고, 봄이님 문장에 자연스럽게
-// 말을 보태는 방식으로 한 줄만 생성. 다짐과 하루한줄은 그날 하루가 지나면 더 이상 안 바뀌는 확정 데이터라
-// 로컬(S)에 1회 생성 후 영구 고정 — 다른 AI 기능(저녁의 채움 등)과 동일한 패턴.
+// 말을 보태는 방식으로 한 줄만 생성. 인사배너(_greetingCache)와 동일한 패턴 — 메모리 캐시 + 서버 캐시.
 let _vowRecapCache={};
 async function _fetchVowRecapComment(dk,vow,oneLine){
   if(!vow&&!oneLine)return '';
   if(_vowRecapCache[dk])return _vowRecapCache[dk];
-  const stored=S.get(S.key('vowrecap',dk));
-  if(stored){_vowRecapCache[dk]=stored;return stored;}
   const key=getClaudeKey();
   if(!key){
     const cached=await aiCacheGet('vowrecap_'+dk);
-    if(cached){_vowRecapCache[dk]=cached;S.set(S.key('vowrecap',dk),cached);return cached;}
+    if(cached){_vowRecapCache[dk]=cached;return cached;}
     return '';
   }
   const memoTexts=getMemos(dk).map(m=>m.text).filter(Boolean);
@@ -6157,7 +6154,6 @@ async function _fetchVowRecapComment(dk,vow,oneLine){
   if(!reply||reply.startsWith('__ERR__'))return '';
   const text=reply.trim();
   _vowRecapCache[dk]=text;
-  S.set(S.key('vowrecap',dk),text);
   aiCacheSet('vowrecap_'+dk,text,AI_CACHE_TTL.short);
   return text;
 }
