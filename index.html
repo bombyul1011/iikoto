@@ -569,7 +569,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .pace-dot-track{position:relative;margin-top:4px;}
 .pace-dot-baseline{position:absolute;left:0;right:0;height:1px;background:var(--div);}
 .pace-dot-hourline{position:absolute;top:18px;width:1px;height:8px;background:var(--div);}
-.pace-dot-hourlabel{position:absolute;top:28px;font-size:9px;color:var(--tm);transform:translateX(-50%);}
+.pace-dot-hourlabel{position:absolute;top:28px;font-size:9px;color:var(--tm);transform:translateX(-50%);white-space:nowrap;}
 .pace-dot{position:absolute;width:8px;height:8px;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 1px 2px rgba(0,0,0,0.12);}
 @keyframes beadRainbow{0%{background-position:0% 50%;}100%{background-position:500% 50%;}}
 .pg-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
@@ -1101,7 +1101,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div id="memo-list"></div>
         <div class="memo-input-row">
           <button class="stamp-btn memo-stamp-sm" onclick="openMemoTimePicker()" id="memo-stamp-btn" title="시간 선택 후 메모 입력"><i class="ti ti-clock-hour-4" style="font-size:14px;color:var(--ts);" aria-hidden="true"></i></button>
-          <textarea class="memo-field memo-field-sm" id="memo-inline-inp" placeholder="메모를 입력하세요" rows="1" autocomplete="off" onkeydown="if(event.isComposing||event.keyCode===229||event.key===' '||event.code==='Space')return;if((event.key==='Enter'||event.keyCode===13)&&!event.shiftKey){event.preventDefault();submitMemoInline();}"></textarea>
+          <textarea class="memo-field memo-field-sm" id="memo-inline-inp" placeholder="메모를 입력하세요" rows="1" autocomplete="off"></textarea>
           <button class="send-btn send-btn-sm" onclick="submitMemoInline()" title="메모 등록"><i class="ti ti-arrow-up" style="font-size:14px;" aria-hidden="true"></i></button>
         </div>
       </div>
@@ -4516,6 +4516,28 @@ function confirmMemo(){
   renderMemos();
   setTimeout(()=>{_memoSubmitting=false;},500);
 }
+// 모바일 한글 IME 대응: event.isComposing/keyCode===229만으로는 iOS Safari 일부 버전에서
+// 조합 중 특정 시점(주로 받침 있는 음절 완성 찰나)에 오탐이 발생해 Enter로 잘못 처리되는 사례가 있음.
+// compositionstart/compositionend로 조합 상태를 직접 추적해 이중으로 확인.
+let _memoInlineComposing=false;
+function setupMemoInlineInput(){
+  const inp=document.getElementById('memo-inline-inp');
+  if(!inp||inp.dataset.imeSetup)return;
+  inp.dataset.imeSetup='1';
+  inp.addEventListener('compositionstart',()=>{_memoInlineComposing=true;});
+  inp.addEventListener('compositionend',()=>{
+    // compositionend 직후 한 박자(다음 이벤트 루프) 뒤에 플래그를 내림 —
+    // 조합 종료와 거의 동시에 발생하는 keydown이 여전히 조합의 일부로 취급되게 함
+    setTimeout(()=>{_memoInlineComposing=false;},0);
+  });
+  inp.addEventListener('keydown',e=>{
+    if(_memoInlineComposing||e.isComposing||e.keyCode===229)return;
+    if((e.key==='Enter'||e.keyCode===13)&&!e.shiftKey){
+      e.preventDefault();
+      submitMemoInline();
+    }
+  });
+}
 function submitMemoInline(){
   if(_memoSubmitting)return;
   const inp=document.getElementById('memo-inline-inp');
@@ -5028,7 +5050,7 @@ function renderSleepScoreBadge(dk){
   const score=getSleepScore(dk);
   if(score==null){
     return `<div onclick="promptSleepScore('${dk}')" style="width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1px solid rgba(200,180,165,0.4);cursor:pointer;" title="수면 점수 입력">
-      <i class="ti ti-bed" style="font-size:14px;color:var(--tm);" aria-hidden="true"></i>
+      <i class="ti ti-zzz" style="font-size:14px;color:var(--tm);" aria-hidden="true"></i>
     </div>`;
   }
   const lv=getSleepScoreLevel(score);
@@ -5495,7 +5517,7 @@ function _paceDotTimelineHtml(dk){
     const x=(h*60-PACE_DOT_RANGE_START)/rangeLen*100;
     hourMarks+=`<div class="pace-dot-hourline" style="left:${x}%;"></div><div class="pace-dot-hourlabel" style="left:${x}%;">${h}시</div>`;
   }
-  return `<div class="pace-title"><i class="ti ti-clock-hour-4" style="font-size:13px;" aria-hidden="true"></i> 오늘 활동 분포</div>
+  return `<div class="pace-title"><i class="ti ti-chart-circles" style="font-size:13px;" aria-hidden="true"></i> 오늘 활동 분포</div>
     <div class="pace-dot-track" style="height:${TRACK_H}px;">
       <div class="pace-dot-baseline" style="top:${BASE_Y}px;"></div>
       ${hourMarks}
@@ -6263,6 +6285,7 @@ function renderMemos(){
     el.appendChild(time);el.appendChild(bub);
     list.appendChild(el);
   });
+  setupMemoInlineInput();
 }
 function memoEditSwipe(i){
   closeSheet('memo-sheet');

@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260720-6-dawn-lavender-final';
+const CACHE = 'iikoto-v20260720-9-memo-ime-fix-dot-tweaks';
 const ASSETS = [
   './',
   './index.html'
