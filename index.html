@@ -3655,6 +3655,10 @@ async function aiCacheSet(cacheKey,content,ttlMs){
   const expiresAt=ttlMs==null?null:Date.now()+ttlMs;
   await supaUpsert('ai_cache','cache_key',[{cache_key:cacheKey,content,expires_at:expiresAt}]);
 }
+// 확정(선택)되지 않아 더 이상 쓸모없어진 캐시를 지울 때 사용 — 예: 저녁의 채움에서 시작하지 않은 뽑기 결과
+async function aiCacheDelete(cacheKey){
+  await supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent(cacheKey)}`,'DELETE');
+}
 const AI_CACHE_TTL={
   short:14*24*60*60*1000,   // 2주 — 인사말, 오후코멘트, 새벽리뷰, 다음주제안 등 일반 캐시
   weeklyReport:30*24*60*60*1000, // 한 달 — 주간 리포트
@@ -5441,6 +5445,11 @@ function startEveningLearn(){
   saveEveningLearnState(dk,s);
   const banner=document.querySelector('.elearn-banner');
   if(banner)banner.replaceWith(makeEveningLearnCard());
+
+  // 오늘 뽑혔지만 선택되지 않은 나머지 주제들의 서버 캐시는 더 이상 쓸모없으므로 정리
+  (s.topics||[]).filter(t=>t!==topic).forEach(t=>{
+    aiCacheDelete('eveninglearn_'+dk+'_'+t);
+  });
 
   if(navigator.clipboard){
     navigator.clipboard.writeText(prompt).then(()=>{
