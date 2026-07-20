@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260720-10-dawn-dot-timeline-vow-recap';
+const CACHE = 'iikoto-v20260720-11-evening-learn-card';
 const ASSETS = [
   './',
   './index.html'

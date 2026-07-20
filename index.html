@@ -571,6 +571,17 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .pace-dot-hourline{position:absolute;top:18px;width:1px;height:8px;background:var(--div);}
 .pace-dot-hourlabel{position:absolute;top:28px;font-size:9px;color:var(--tm);transform:translateX(-50%);white-space:nowrap;}
 .pace-dot{position:absolute;width:8px;height:8px;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 1px 2px rgba(0,0,0,0.12);}
+.elearn-topic-chip{display:inline-block;font-size:11px;color:var(--acc);background:var(--acc-soft);padding:3px 10px;border-radius:10px;margin-bottom:8px;}
+.elearn-title{font-size:15px;font-weight:600;color:var(--tp);line-height:1.4;margin-bottom:10px;}
+.elearn-outline{margin:0 0 12px;padding-left:18px;}
+.elearn-outline li{font-size:12.5px;color:var(--ts);line-height:1.7;}
+.elearn-btn-row{display:flex;gap:8px;margin-top:4px;}
+.elearn-btn{flex:1;padding:9px;border-radius:10px;font-size:12.5px;font-weight:500;cursor:pointer;border:none;font-family:'DM Sans',sans-serif;}
+.elearn-btn-ghost{background:transparent;border:1px solid var(--div);color:var(--tm);}
+.elearn-btn-fill{background:var(--acc-soft);color:var(--acc);}
+.elearn-remain{font-size:10.5px;color:var(--tm);text-align:center;margin-top:8px;}
+.elearn-loading{font-size:12.5px;color:var(--tm);text-align:center;padding:8px 0;}
+.elearn-empty{font-size:12.5px;color:var(--tm);text-align:center;padding:8px 0;}
 @keyframes beadRainbow{0%{background-position:0% 50%;}100%{background-position:500% 50%;}}
 .pg-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
 .pg-box{flex:1;background:var(--inp);border:1px solid var(--inp-b);border-radius:14px;padding:12px;text-align:center;}
@@ -1637,6 +1648,25 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       </div>
     </div>
     <div>
+      <div class="settings-slbl">저녁 학습 주제</div>
+      <div class="settings-card">
+        <div class="settings-item" style="flex-direction:column;align-items:flex-start;gap:8px;">
+          <span class="settings-item-lbl">주제 목록 (한 줄에 하나씩)</span>
+          <textarea id="evening-topics-inp" class="modal-inp"
+            placeholder="외국어 공부&#10;현대미학&#10;예술사&#10;인문학&#10;시사상식"
+            style="margin-bottom:0;font-size:12.5px;width:100%;min-height:110px;resize:vertical;line-height:1.7;"
+            autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
+          <button onclick="saveEveningTopics()"
+            style="width:100%;padding:9px;border-radius:10px;border:none;background:var(--acc-soft);color:var(--acc);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">
+            저장
+          </button>
+        </div>
+        <div class="settings-item">
+          <span style="font-size:11px;color:var(--tm);">저녁 홈탭(19~22시)에서 랜덤으로 하루 배움 주제를 골라 제안해요</span>
+        </div>
+      </div>
+    </div>
+    <div>
       <div class="settings-card mr-accordion" id="data-recovery-accordion">
         <div class="settings-slbl mr-accordion-toggle" onclick="this.closest('.mr-accordion').classList.toggle('open')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;margin-bottom:0;">
           <span>데이터 복구</span>
@@ -1917,8 +1947,7 @@ function renderHomeBody(section){
     if(!isNight2){
       body.appendChild(makeHabitMiniCheckRow());
       body.appendChild(makeEveningMiniStatCard());
-      body.appendChild(makeLabel('아직 남은 일'));
-      body.appendChild(makePendingTodosCard());
+      body.appendChild(makeEveningLearnCard());
       const dotCard=makeDotTimelineCard();
       if(dotCard)body.appendChild(dotCard);
     }
@@ -5264,6 +5293,115 @@ function _paceTopRhythmCat(dk){
 }
 // 저녁 파트1용 미니통계 카드 — 당일 기록 기준(완료 투두 / 체크 습관 / 오늘의 최다 리듬), 오후 통계카드보다 훨씬 컴팩트하게
 // 저녁 홈탭 — 오늘 활동 분포(점 타임라인) 카드. 내용 없으면 카드 자체를 만들지 않음.
+// ── 저녁 학습 배너 (파트1, 19~22시) ──
+// 하루 상태: {count(오늘 뽑은 횟수, 최대2), topics(오늘 나온 주제 텍스트 목록 - 반복회피용),
+//            current:{topic,title,outline[]} 현재 표시중인 카드 내용}
+function getEveningLearnState(dk){return S.get(S.key('eveninglearn',dk))||{count:0,topics:[],current:null};}
+function saveEveningLearnState(dk,v){S.set(S.key('eveninglearn',dk),v);}
+
+async function _fetchEveningLearnTopic(dk,avoidTopics){
+  const key=getClaudeKey();
+  const topics=getEveningTopics();
+  const picked=topics[Math.floor(Math.random()*topics.length)];
+  if(!key){
+    // PC 등 키 없는 기기 — 모바일이 미리 만들어 서버에 캐시해둔 결과가 있으면 그것만 조회
+    const cached=await aiCacheGet('eveninglearn_'+dk+'_'+picked);
+    if(cached){try{return JSON.parse(cached);}catch(e){return null;}}
+    return null;
+  }
+  const avoidLine=avoidTopics&&avoidTopics.length?`오늘 이미 다룬 주제: ${avoidTopics.join(', ')} — 이것과 겹치지 않는 새로운 소주제로.`:'';
+  const dataContext=[`오늘의 대주제: ${picked}`,avoidLine].filter(Boolean).join('\n');
+  const sys=`당신은 저녁 학습 큐레이터예요. 주어진 대주제 안에서 오늘 하루 한 시간 정도 공부해볼 만한
+구체적인 소주제 하나와, 그 흐름을 짚어주는 간단한 목차(3-4개)를 만들어주세요.
+${picked==='시사상식'?'시사상식이라면 최근 화제가 되는 경제/정치/사회 이슈 중 하나를 골라주세요.':''}
+
+반드시 아래 JSON 형식으로만 응답해요. 다른 텍스트나 마크다운 코드블록 없이 순수 JSON만 출력해요.
+{"title":"흥미를 끄는 구체적인 소주제 제목 (한 줄)","outline":["목차1","목차2","목차3"]}
+
+제목은 궁금증을 자아내는 질문형이나 구체적인 문장으로. 목차는 각 3-8단어로 짧게.`;
+  const reply=await callClaude(sys,[{role:'user',content:dataContext}],250);
+  if(!reply||reply.startsWith('__ERR__'))return null;
+  try{
+    const clean=reply.replace(/```json|```/g,'').trim();
+    const parsed=JSON.parse(clean);
+    if(parsed&&parsed.title&&Array.isArray(parsed.outline)){
+      const result={topic:picked,title:parsed.title,outline:parsed.outline};
+      aiCacheSet('eveninglearn_'+dk+'_'+picked,JSON.stringify(result),AI_CACHE_TTL.short);
+      return result;
+    }
+  }catch(e){}
+  return null;
+}
+
+function makeEveningLearnCard(){
+  const dk=dateKey(getLogicalDate());
+  const state=getEveningLearnState(dk);
+  const wrap=document.createElement('div');
+  wrap.className='pace-card';
+  wrap.id='evening-learn-card';
+
+  const remain=Math.max(0,2-state.count);
+  let bodyHtml='';
+  if(state.current){
+    bodyHtml=`<div class="elearn-topic-chip">${escapeHtml(state.current.topic)}</div>
+      <div class="elearn-title">${escapeHtml(state.current.title)}</div>
+      <ul class="elearn-outline">${state.current.outline.map(o=>`<li>${escapeHtml(o)}</li>`).join('')}</ul>
+      <div class="elearn-btn-row">
+        ${remain>0?`<button class="elearn-btn elearn-btn-ghost" onclick="rerollEveningLearn()">다시 뽑기</button>`:''}
+        <button class="elearn-btn elearn-btn-fill" onclick="startEveningLearn()">시작하기</button>
+      </div>
+      <div class="elearn-remain">오늘 ${remain}번 더 뽑을 수 있어요</div>`;
+  }else if(state.count>=2){
+    bodyHtml=`<div class="elearn-empty">오늘의 배움은 다 뽑았어요, 내일 또 만나요</div>`;
+  }else{
+    bodyHtml=`<div class="elearn-loading" id="elearn-loading-${dk}">오늘의 배움을 고르는 중...</div>`;
+  }
+
+  wrap.innerHTML=`<div class="pace-title"><i class="ti ti-bulb" style="font-size:13px;" aria-hidden="true"></i> 오늘의 배움</div>${bodyHtml}`;
+
+  if(!state.current&&state.count<2){
+    _fetchEveningLearnTopic(dk,state.topics).then(result=>{
+      if(!result)return;
+      const s=getEveningLearnState(dk);
+      s.current=result;
+      s.count+=1;
+      s.topics=[...s.topics,result.topic];
+      saveEveningLearnState(dk,s);
+      const old=document.getElementById('evening-learn-card');
+      if(old)old.replaceWith(makeEveningLearnCard());
+    });
+  }
+  return wrap;
+}
+
+function rerollEveningLearn(){
+  const dk=dateKey(getLogicalDate());
+  const s=getEveningLearnState(dk);
+  if(s.count>=2)return;
+  s.current=null;
+  saveEveningLearnState(dk,s);
+  const old=document.getElementById('evening-learn-card');
+  if(old)old.replaceWith(makeEveningLearnCard());
+}
+
+function startEveningLearn(){
+  const dk=dateKey(getLogicalDate());
+  const s=getEveningLearnState(dk);
+  if(!s.current)return;
+  const {topic,title,outline}=s.current;
+  const prompt=`오늘 저녁 [${topic}] 주제로 "${title}"를 한 시간 정도 배워보려고 해. 아래 흐름으로 설명해줘:\n`+
+    outline.map(o=>`- ${o}`).join('\n')+
+    `\n쉽고 흥미롭게 설명해주고, 더 찾아볼 만한 유튜브 영상이나 웹사이트 자료도 추천해줘.`;
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(prompt).then(()=>{
+      showToast('프롬프트가 복사됐어요 ✓');
+      window.open('https://claude.ai/new','_blank');
+    });
+  }else{
+    showToast('클립보드 복사를 지원하지 않는 환경이에요');
+  }
+}
+
 function makeDotTimelineCard(){
   const dk=dateKey(getLogicalDate());
   const inner=_paceDotTimelineHtml(dk);
@@ -8512,6 +8650,21 @@ function saveClaudeKey(){
   if(statusEl)statusEl.textContent='저장됐어요 ✅';
   showToast('Claude API 키 저장됐어요 ✓');
 }
+// 저녁 학습 주제 — 설정에서 자유롭게 추가/삭제 가능한 목록. 비어있으면 기본값 사용.
+const DEFAULT_EVENING_TOPICS=['외국어 공부','현대미학','예술사','인문학','시사상식'];
+function getEveningTopics(){
+  const raw=S.get('evening_topics');
+  if(!raw)return DEFAULT_EVENING_TOPICS;
+  const list=raw.split('\n').map(s=>s.trim()).filter(Boolean);
+  return list.length?list:DEFAULT_EVENING_TOPICS;
+}
+function saveEveningTopics(){
+  const inp=document.getElementById('evening-topics-inp');
+  if(!inp)return;
+  const val=inp.value.trim();
+  if(val){S.set('evening_topics',val);showToast('저장됐어요 ✓');}
+  else{S.remove('evening_topics');showToast('기본 목록으로 돌아가요');}
+}
 function saveUserProfile(){
   const inp=document.getElementById('user-profile-inp');
   if(!inp)return;
@@ -8535,6 +8688,7 @@ function openSettings(){
   const keyInp=document.getElementById('claude-api-key-inp');
   if(keyInp){const k=S.get('claude_api_key');keyInp.value=k?'sk-ant-••••'+k.slice(-4):'';}
   const profileInp=document.getElementById('user-profile-inp');if(profileInp)profileInp.value=S.get('user_profile')||'';
+  const topicsInp=document.getElementById('evening-topics-inp');if(topicsInp)topicsInp.value=S.get('evening_topics')||'';
   const nwi=document.getElementById('notion-worker-url-inp');if(nwi)nwi.value=S.get('notion_worker_url')||'';
   const nsi=document.getElementById('notion-backup-secret-inp');if(nsi)nsi.value=S.get('notion_backup_secret')||'';  const theme=S.get('theme')||'light';
   document.querySelectorAll('.ctheme-btn').forEach(b=>b.classList.remove('on'));
