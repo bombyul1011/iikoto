@@ -137,7 +137,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .slabel-search-btn:active{opacity:1;}
 .wgoal-add-btn{background:none;border:none;padding:2px;cursor:pointer;color:rgba(195,175,168,0.6);display:flex;align-items:center;justify-content:center;}
 .wgoal-add-btn:active{color:rgba(195,175,168,0.9);}
-.reserve-section-btn.active{background:var(--acc-soft);color:var(--tp);border-color:var(--acc-soft);}
+.reserve-section-btn{flex:1;padding:7px 0;border-radius:10px;border:1px solid var(--card-b);background:var(--card);font-size:12px;color:var(--tm);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;}
+.reserve-section-btn.active{background:var(--acc-soft);color:var(--tp);border-color:var(--acc-soft);font-weight:600;}
 .goal-section-title{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;letter-spacing:.04em;background:linear-gradient(120deg,rgba(255,210,230,0.80),rgba(255,230,200,0.70));color:#c07080;border-radius:10px;padding:5px 13px;margin:14px 0 10px 0;border:1px solid rgba(255,185,205,0.55);box-shadow:0 2px 10px rgba(200,120,140,0.12);}
 
 /* ── CARDS ── */
@@ -749,9 +750,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .day-recap-sec-title{font-size:11.5px;font-weight:600;color:var(--ts);margin-bottom:9px;display:flex;align-items:center;gap:5px;}
 .oneline-quote{font-size:13px;color:var(--tp);font-style:italic;line-height:1.7;text-align:center;padding:2px 4px;}
 .vow-recap-block{padding:2px 4px;}
-.vow-recap-row{margin-bottom:10px;}
-.vow-recap-label{font-size:11px;color:var(--tm);margin-bottom:3px;}
-.vow-recap-text{font-size:14px;color:var(--tp);line-height:1.5;padding-left:8px;}
+.vow-recap-row{margin-bottom:12px;}
+.vow-recap-label{font-size:10.5px;color:var(--tm);margin-bottom:5px;letter-spacing:0.02em;}
+.vow-recap-text{font-size:14.5px;font-weight:500;color:var(--tp);line-height:1.5;padding:8px 12px;background:rgba(255,255,255,0.35);border-radius:10px;border-left:2.5px solid var(--acc-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .vow-recap-comment{font-size:12.5px;color:var(--ts);line-height:1.6;margin-top:10px;padding-top:10px;border-top:1px dashed var(--div);min-height:1em;}
 
 .recap-donut-row{display:flex;justify-content:space-around;margin-bottom:2px;}
@@ -1264,10 +1265,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   <div class="modal">
     <div class="modal-title">날짜 지정</div>
     <div style="display:flex;gap:8px;margin-bottom:10px;">
-      <button class="ts-morning" id="rsec-morning" onclick="setReserveSection('morning')">오전</button>
-      <button class="ts-afternoon" id="rsec-afternoon" onclick="setReserveSection('afternoon')">오후</button>
-      <button class="ts-night" id="rsec-night" onclick="setReserveSection('night')">저녁</button>
-      <button class="ts-none active" id="rsec-none" onclick="setReserveSection('none')">미정</button>
+      <button class="reserve-section-btn" id="rsec-morning" onclick="setReserveSection('morning')">오전</button>
+      <button class="reserve-section-btn" id="rsec-afternoon" onclick="setReserveSection('afternoon')">오후</button>
+      <button class="reserve-section-btn" id="rsec-night" onclick="setReserveSection('night')">저녁</button>
+      <button class="reserve-section-btn active" id="rsec-none" onclick="setReserveSection('none')">미정</button>
     </div>
     <div style="display:flex;justify-content:center;margin-bottom:12px;">
       <input type="date" class="modal-inp" id="reserve-date-inp" style="width:auto;text-align:center;margin-bottom:0;" lang="en-GB">
@@ -3320,7 +3321,7 @@ async function fetchHomeWeather(section){
 
   if(subEl)subEl.textContent='잠깐만요...';
 
-  const maxTok=section==='night'?320:section==='dawn'?200:280;
+  const maxTok=section==='night'||section==='dawn'?320:280;
   const reply=await callClaude(sys,[{role:'user',content:dataContext}],maxTok);
 
   if(subEl){
@@ -3394,9 +3395,17 @@ function renderHome(){
       termEl.style.display='none';
     }
   }
-  const greetings={morning:'좋은 아침이에요',afternoon:'잘 하고 있어요',night:'오늘도 수고했어요',dawn:'오늘 하루도 잘 보내셨어요'};
+  const greetingPool={
+    morning:['좋은 아침이에요','오늘도 좋은 하루예요','활기찬 하루 보내요','상쾌한 아침이에요'],
+    afternoon:['잘 하고 있어요','오늘도 순항 중이에요','좋은 흐름이에요','한창인 하루예요'],
+    night:['오늘도 수고했어요','오늘 하루도 애쓰셨어요','하루를 잘 마무리해요','편안한 저녁 되세요'],
+    dawn:['오늘 하루도 잘 보내셨어요','하루를 잘 채워내셨어요','오늘도 무사히 지나갔어요','편안한 밤 되세요']
+  };
   const greetEl=document.getElementById('home-greeting');
-  if(greetEl)greetEl.textContent=greetings[section];
+  if(greetEl){
+    const pool=greetingPool[section]||['좋은 하루예요'];
+    greetEl.textContent=pool[Math.floor(Math.random()*pool.length)];
+  }
   const subs={morning:'잠깐만요...',afternoon:'잠깐만요...',night:'잠깐만요...',dawn:'잠깐만요...'};
   const subEl=document.getElementById('home-greeting-sub');
   if(subEl)subEl.textContent=subs[section];
@@ -5348,7 +5357,12 @@ function renderEveningLearnSheetBody(){
 
   const remain=Math.max(0,2-state.count);
   let html='';
-  if(state.current){
+  if(state.started){
+    // "시작하기"를 누른 순간 그날의 학습은 확정됨 — 더 이상 뽑기/되돌리기 없이 고정 노출만
+    html=`<div class="elearn-topic-chip">${escapeHtml(state.started.topic)}</div>
+      <div class="elearn-title">${escapeHtml(state.started.title)}</div>
+      <div class="elearn-remain">오늘은 이 주제로 시작했어요</div>`;
+  }else if(state.current){
     const leftBtn=state.prev
       ?`<button class="elearn-btn elearn-btn-ghost" onclick="undoEveningLearn()">아까 걸로</button>`
       :(remain>0?`<button class="elearn-btn elearn-btn-ghost" onclick="rerollEveningLearn()">다시 뽑기</button>`:'');
@@ -5364,6 +5378,8 @@ function renderEveningLearnSheetBody(){
       ${state.prev?`<div class="elearn-btn-row"><button class="elearn-btn elearn-btn-ghost" onclick="undoEveningLearn()">아까 걸로 돌아가기</button></div>`:''}`;
   }
   body.innerHTML=html;
+
+  if(state.started)return; // 이미 시작한 세션은 재생성 로직을 아예 타지 않음
 
   if(!state.current&&state.count<2){
     const requestToken=Date.now();
@@ -6115,21 +6131,24 @@ async function _fetchVowRecapComment(dk,vow,oneLine){
     if(cached){_vowRecapCache[dk]=cached;return cached;}
     return '';
   }
+  const memoTexts=getMemos(dk).map(m=>m.text).filter(Boolean);
   const lines=[];
   if(vow)lines.push(`오늘 하루 다짐: "${vow}"`);
   if(oneLine)lines.push(`하루를 마무리하며 남긴 한 줄: "${oneLine}"`);
+  if(memoTexts.length)lines.push(`오늘 남긴 메모: ${memoTexts.join(' / ')}`);
   const dataContext=lines.join('\n');
-  const sys=`당신은 따뜻하고 실용적인 생활 코치예요. 아래는 사용자가 오늘 아침에 남긴 다짐과, 밤에 하루를 마무리하며 남긴 한 줄이에요.
-이 두 문장을 사용자가 직접 이어서 말하듯, 대화를 이어가는 자연스러운 말투로 짧은 한마디를 덧붙여주세요 — 사용자의 문장에 당신이 말을 보태는 느낌으로, 새로운 이야기를 시작하지 마세요.
+  const sys=`당신은 따뜻하고 실용적인 생활 코치예요. 아래는 사용자가 오늘 아침에 남긴 다짐과, 밤에 하루를 마무리하며 남긴 한 줄이에요. 참고로 오늘 남긴 메모도 함께 주어져요.
+이 두 문장(다짐, 하루한줄)을 사용자가 직접 이어서 말하듯, 대화를 이어가는 자연스러운 말투로 짧은 코멘트를 덧붙여주세요 — 사용자의 문장에 당신이 말을 보태는 느낌으로, 새로운 이야기를 시작하지 마세요.
+메모는 그날 실제로 어땠는지 파악하는 참고 자료로만 쓰고, 메모 내용을 직접 인용하거나 나열하지는 마세요.
 
 **절대 원칙:**
 - "성공했다/실패했다/지켰다/못 지켰다" 같은 달성 여부 평가는 절대 하지 말 것.
 - 다짐과 결과가 다르더라도 판단하지 말고, 있는 그대로 받아들이며 다음을 향한 따뜻하고 실용적인 한마디를 건넬 것.
-- 다짐과 한 줄 중 하나만 있으면, 있는 것만 가지고 자연스럽게 한마디.
-- 분량은 한 문장, 최대 두 문장 이내로 짧게.
+- 다짐과 한 줄 중 하나만 있으면, 있는 것만 가지고 자연스럽게 코멘트.
+- 분량은 두 문장 정도로.
 - 이모지나 특수기호는 쓰지 않아요.
 - 오직 문장만 출력, 따옴표나 설명 없이.`;
-  const reply=await callClaude(sys,[{role:'user',content:dataContext}],120);
+  const reply=await callClaude(sys,[{role:'user',content:dataContext}],160);
   if(!reply||reply.startsWith('__ERR__'))return '';
   const text=reply.trim();
   _vowRecapCache[dk]=text;
@@ -6215,10 +6234,6 @@ function makeDawnRecapCard(){
     });
   }
 
-  html+=`<div class="day-recap-line" style="margin-top:8px;"><span class="lbl"><i class="ti ti-notes" aria-hidden="true"></i>메모</span><span>${memos.length}개</span></div>`;
-  const readingLabel=readingMin>0?readingMin+'분':_daysSinceLastReading(dk)+'일째 안읽음';
-  html+=`<div class="day-recap-line"><span class="lbl"><i class="ti ti-book" aria-hidden="true"></i>독서</span><span>${readingLabel}</span></div>`;
-
   html+=`<div class="day-recap-divider"></div>`;
   html+=`<div class="recap-donut-row">
     <div class="recap-donut-item"><div class="recap-donut-wrap"><svg width="62" height="62" viewBox="0 0 62 62">
@@ -6250,9 +6265,7 @@ function makeDawnRecapCard(){
   const dotTimelineInner=_paceDotTimelineHtml(dk);
   if(dotTimelineInner)html+='<div class="day-recap-divider"></div>'+dotTimelineInner;
 
-  html+=`<div class="day-recap-divider"></div>`;
-
-  if(contentItems.length){
+  if(contentItems.length||readingMin===0){
     const catToKey=(cat)=>{
       if(cat==='독서')return 'book';
       if(cat==='드라마')return 'drama';
@@ -6262,6 +6275,10 @@ function makeDawnRecapCard(){
     };
     html+=`<div class="day-recap-divider"></div>
       <div class="day-recap-sec-title"><i class="ti ${RHYTHM_CATS.enjoy.icon}" style="font-size:12px;" aria-hidden="true"></i> 오늘 본 콘텐츠</div>`;
+    if(!contentItems.some(c=>c.cat==='독서')){
+      const readingLabel=readingMin>0?readingMin+'분':_daysSinceLastReading(dk)+'일째 안읽음';
+      html+=`<div class="recap-content-item"><span class="cdot" style="background:${getCatColor('book')};"></span>독서<span class="ctime">${readingLabel}</span></div>`;
+    }
     contentItems.forEach(c=>{
       const key=catToKey(c.cat);
       const dotColor=key?getCatColor(key):'rgba(190,160,230,0.80)';

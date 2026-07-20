@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260720-18-elearn-undo-2btn-clover-bg';
+const CACHE = 'iikoto-v20260721-1-dawn-fixes-reserve-btn';
 const ASSETS = [
   './',
   './index.html'
