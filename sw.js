@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260721-1-dawn-fixes-reserve-btn';
+const CACHE = 'iikoto-v20260721-3-vowrecap-pattern-unified';
 const ASSETS = [
   './',
   './index.html'
