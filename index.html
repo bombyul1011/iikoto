@@ -571,6 +571,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .pace-dot-hourline{position:absolute;top:18px;width:1px;height:8px;background:var(--div);}
 .pace-dot-hourlabel{position:absolute;top:28px;font-size:9px;color:var(--tm);transform:translateX(-50%);white-space:nowrap;}
 .pace-dot{position:absolute;width:8px;height:8px;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 1px 2px rgba(0,0,0,0.12);}
+.elearn-banner{position:relative;border-radius:16px;padding:1.6px;background:linear-gradient(135deg,rgba(220,190,220,0.95),rgba(240,195,180,0.90),rgba(200,180,225,0.95),rgba(220,190,220,0.95));background-size:300% 300%;animation:bannerShine 4s ease infinite;cursor:pointer;margin-top:10px;margin-bottom:10px;}
+.elearn-banner-inner{border-radius:14.5px;background:linear-gradient(135deg,rgba(238,222,238,0.85),rgba(248,222,210,0.85),rgba(222,210,238,0.85));padding:15px 17px;display:flex;align-items:center;gap:12px;}
+.elearn-banner-icon{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.55);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:17px;color:rgba(140,100,150,0.85);}
+.elearn-banner-text{flex:1;min-width:0;}
+.elearn-banner-title{font-size:13.5px;font-weight:700;color:rgba(105,75,115,0.92);letter-spacing:0.01em;}
+.elearn-banner-sub{font-size:11px;color:rgba(120,95,125,0.72);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.elearn-banner-arrow{font-size:16px;color:rgba(120,90,130,0.55);flex-shrink:0;}
 .elearn-topic-chip{display:inline-block;font-size:11px;color:var(--acc);background:var(--acc-soft);padding:3px 10px;border-radius:10px;margin-bottom:8px;}
 .elearn-title{font-size:15px;font-weight:600;color:var(--tp);line-height:1.4;margin-bottom:10px;}
 .elearn-outline{margin:0 0 12px;padding-left:18px;}
@@ -1333,6 +1340,17 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div style="padding:0 20px 24px;">
       <div class="month-chips" id="mr-month-chips"></div>
       <div id="mr-content"></div>
+    </div>
+  </div>
+</div>
+
+<!-- EVENING LEARN SHEET (저녁의 채움) -->
+<div class="overlay" id="evening-learn-sheet" onclick="closeSheet('evening-learn-sheet',event)">
+  <div class="bsheet" style="max-height:80vh;overflow-y:auto;" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div style="padding:0 20px 24px;">
+      <div class="sheet-title">저녁의 채움</div>
+      <div id="evening-learn-sheet-body"></div>
     </div>
   </div>
 </div>
@@ -5316,16 +5334,16 @@ async function _fetchEveningLearnTopic(dk,avoidTopics){
 ${picked==='시사상식'?'시사상식이라면 최근 화제가 되는 경제/정치/사회 이슈 중 하나를 골라주세요.':''}
 
 반드시 아래 JSON 형식으로만 응답해요. 다른 텍스트나 마크다운 코드블록 없이 순수 JSON만 출력해요.
-{"title":"흥미를 끄는 구체적인 소주제 제목 (한 줄)","outline":["목차1","목차2","목차3"]}
+{"title":"흥미를 끄는 구체적인 소주제 제목 (한 줄)","shortTitle":"핵심 키워드만 5-10자 내외로 짧게","outline":["목차1","목차2","목차3"]}
 
-제목은 궁금증을 자아내는 질문형이나 구체적인 문장으로. 목차는 각 3-8단어로 짧게.`;
+제목은 궁금증을 자아내는 질문형이나 구체적인 문장으로. shortTitle은 title의 핵심 소재만 뽑은 짧은 명사구(예: "고대 그리스 철학자", "인상주의 화풍"). 목차는 각 3-8단어로 짧게.`;
   const reply=await callClaude(sys,[{role:'user',content:dataContext}],250);
   if(!reply||reply.startsWith('__ERR__'))return null;
   try{
     const clean=reply.replace(/```json|```/g,'').trim();
     const parsed=JSON.parse(clean);
     if(parsed&&parsed.title&&Array.isArray(parsed.outline)){
-      const result={topic:picked,title:parsed.title,outline:parsed.outline};
+      const result={topic:picked,title:parsed.title,shortTitle:parsed.shortTitle||parsed.title,outline:parsed.outline};
       aiCacheSet('eveninglearn_'+dk+'_'+picked,JSON.stringify(result),AI_CACHE_TTL.short);
       return result;
     }
@@ -5333,17 +5351,43 @@ ${picked==='시사상식'?'시사상식이라면 최근 화제가 되는 경제/
   return null;
 }
 
+// 홈탭에 노출되는 진입 배너 — API 호출 없음, 탭해야만 openEveningLearnSheet가 실제로 데이터를 불러옴
 function makeEveningLearnCard(){
   const dk=dateKey(getLogicalDate());
   const state=getEveningLearnState(dk);
   const wrap=document.createElement('div');
-  wrap.className='pace-card';
-  wrap.id='evening-learn-card';
+  wrap.className='elearn-banner';
+  wrap.addEventListener('click',openEveningLearnSheet);
+  const doneToday=state.count>=2;
+  const subText=doneToday
+    ? '오늘의 배움을 다 뽑았어요'
+    : (state.current ? escapeHtml(state.current.title) : '탭해서 오늘의 주제를 만나보세요');
+  wrap.innerHTML=`<div class="elearn-banner-inner">
+    <div class="elearn-banner-icon"><i class="ti ti-bulb" aria-hidden="true"></i></div>
+    <div class="elearn-banner-text">
+      <div class="elearn-banner-title">저녁의 채움</div>
+      <div class="elearn-banner-sub">${subText}</div>
+    </div>
+    <i class="ti ti-chevron-right elearn-banner-arrow" aria-hidden="true"></i>
+  </div>`;
+  return wrap;
+}
+
+function openEveningLearnSheet(){
+  openSheet('evening-learn-sheet');
+  renderEveningLearnSheetBody();
+}
+
+function renderEveningLearnSheetBody(){
+  const dk=dateKey(getLogicalDate());
+  const state=getEveningLearnState(dk);
+  const body=document.getElementById('evening-learn-sheet-body');
+  if(!body)return;
 
   const remain=Math.max(0,2-state.count);
-  let bodyHtml='';
+  let html='';
   if(state.current){
-    bodyHtml=`<div class="elearn-topic-chip">${escapeHtml(state.current.topic)}</div>
+    html=`<div class="elearn-topic-chip">${escapeHtml(state.current.topic)}</div>
       <div class="elearn-title">${escapeHtml(state.current.title)}</div>
       <ul class="elearn-outline">${state.current.outline.map(o=>`<li>${escapeHtml(o)}</li>`).join('')}</ul>
       <div class="elearn-btn-row">
@@ -5352,12 +5396,11 @@ function makeEveningLearnCard(){
       </div>
       <div class="elearn-remain">오늘 ${remain}번 더 뽑을 수 있어요</div>`;
   }else if(state.count>=2){
-    bodyHtml=`<div class="elearn-empty">오늘의 배움은 다 뽑았어요, 내일 또 만나요</div>`;
+    html=`<div class="elearn-empty">오늘의 배움은 다 뽑았어요, 내일 또 만나요</div>`;
   }else{
-    bodyHtml=`<div class="elearn-loading" id="elearn-loading-${dk}">오늘의 배움을 고르는 중...</div>`;
+    html=`<div class="elearn-loading">오늘의 배움을 고르는 중...</div>`;
   }
-
-  wrap.innerHTML=`<div class="pace-title"><i class="ti ti-bulb" style="font-size:13px;" aria-hidden="true"></i> 오늘의 배움</div>${bodyHtml}`;
+  body.innerHTML=html;
 
   if(!state.current&&state.count<2){
     _fetchEveningLearnTopic(dk,state.topics).then(result=>{
@@ -5367,11 +5410,12 @@ function makeEveningLearnCard(){
       s.count+=1;
       s.topics=[...s.topics,result.topic];
       saveEveningLearnState(dk,s);
-      const old=document.getElementById('evening-learn-card');
-      if(old)old.replaceWith(makeEveningLearnCard());
+      renderEveningLearnSheetBody();
+      // 홈탭에 배너가 떠 있으면 부제(sub) 텍스트도 최신화
+      const banner=document.querySelector('.elearn-banner');
+      if(banner)banner.replaceWith(makeEveningLearnCard());
     });
   }
-  return wrap;
 }
 
 function rerollEveningLearn(){
@@ -5380,22 +5424,30 @@ function rerollEveningLearn(){
   if(s.count>=2)return;
   s.current=null;
   saveEveningLearnState(dk,s);
-  const old=document.getElementById('evening-learn-card');
-  if(old)old.replaceWith(makeEveningLearnCard());
+  renderEveningLearnSheetBody();
 }
 
 function startEveningLearn(){
   const dk=dateKey(getLogicalDate());
   const s=getEveningLearnState(dk);
   if(!s.current)return;
-  const {topic,title,outline}=s.current;
+  const {topic,title,shortTitle,outline}=s.current;
   const prompt=`오늘 저녁 [${topic}] 주제로 "${title}"를 한 시간 정도 배워보려고 해. 아래 흐름으로 설명해줘:\n`+
     outline.map(o=>`- ${o}`).join('\n')+
     `\n쉽고 흥미롭게 설명해주고, 더 찾아볼 만한 유튜브 영상이나 웹사이트 자료도 추천해줘.`;
+
+  // 리듬 블록 자동 등록 — 책상 카테고리, 시작시각만 찍고 종료는 직접(진행중 상태)
+  const now=new Date();
+  const startStr=pad(now.getHours())+':'+pad(now.getMinutes());
+  const blocks=getRhythmBlocks(dk);
+  blocks.push({cat:'note',start:startStr,end:'',text:`${topic} - ${shortTitle||title}`,created:Date.now(),cid:genCid()});
+  saveRhythmBlocks(dk,blocks);
+
   if(navigator.clipboard){
     navigator.clipboard.writeText(prompt).then(()=>{
-      showToast('프롬프트가 복사됐어요 ✓');
+      showToast('프롬프트가 복사됐어요, 리듬에도 기록했어요 ✓');
       window.open('https://claude.ai/new','_blank');
+      closeSheet('evening-learn-sheet');
     });
   }else{
     showToast('클립보드 복사를 지원하지 않는 환경이에요');
