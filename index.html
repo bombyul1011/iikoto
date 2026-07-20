@@ -5345,12 +5345,41 @@ function makeEveningLearnCard(){
     </div>
     <i class="ti ti-chevron-right elearn-banner-arrow" aria-hidden="true"></i>
   </div>`;
+  // 로컬에 확정된 상태가 없으면(=다른 기기에서 먼저 시작했을 수 있음) 서버 확인 후 갱신
+  if(!state.started){
+    aiCacheGet('eveninglearn_started_'+dk).then(cached=>{
+      if(!cached)return;
+      try{
+        const started=JSON.parse(cached);
+        const s=getEveningLearnState(dk);
+        if(s.started)return; // 그 사이 이 기기에서 직접 시작했으면 덮어쓰지 않음
+        s.started=started;
+        saveEveningLearnState(dk,s);
+        const subEl=wrap.querySelector('.elearn-banner-sub');
+        if(subEl)subEl.textContent=started.title;
+      }catch(e){}
+    });
+  }
   return wrap;
 }
 
 function openEveningLearnSheet(){
   openSheet('evening-learn-sheet');
-  renderEveningLearnSheetBody();
+  const dk=dateKey(getLogicalDate());
+  const state=getEveningLearnState(dk);
+  if(!state.started){
+    aiCacheGet('eveninglearn_started_'+dk).then(cached=>{
+      if(cached){
+        try{
+          const s=getEveningLearnState(dk);
+          if(!s.started){s.started=JSON.parse(cached);saveEveningLearnState(dk,s);}
+        }catch(e){}
+      }
+      renderEveningLearnSheetBody();
+    });
+  }else{
+    renderEveningLearnSheetBody();
+  }
 }
 
 function renderEveningLearnSheetBody(){
@@ -5443,6 +5472,7 @@ function startEveningLearn(){
   s.started={topic,title};
   s.prev=null;
   saveEveningLearnState(dk,s);
+  aiCacheSet('eveninglearn_started_'+dk,JSON.stringify(s.started),AI_CACHE_TTL.short);
   const banner=document.querySelector('.elearn-banner');
   if(banner)banner.replaceWith(makeEveningLearnCard());
 
@@ -6134,10 +6164,13 @@ let _vowRecapCache={};
 async function _fetchVowRecapComment(dk,vow,oneLine){
   if(!vow&&!oneLine)return '';
   if(_vowRecapCache[dk])return _vowRecapCache[dk];
+  // 로컬 브리핑 캐시(localStorage) 먼저 확인 — 인사배너와 동일 패턴, 앱 재실행해도 유지됨
+  const localCached=_bcGet('vowrecap_'+dk);
+  if(localCached){_vowRecapCache[dk]=localCached;return localCached;}
   const key=getClaudeKey();
   if(!key){
     const cached=await aiCacheGet('vowrecap_'+dk);
-    if(cached){_vowRecapCache[dk]=cached;return cached;}
+    if(cached){_vowRecapCache[dk]=cached;_bcSet('vowrecap_'+dk,cached);return cached;}
     return '';
   }
   const memoTexts=getMemos(dk).map(m=>m.text).filter(Boolean);
@@ -6164,6 +6197,7 @@ async function _fetchVowRecapComment(dk,vow,oneLine){
   if(!reply||reply.startsWith('__ERR__'))return '';
   const text=reply.trim();
   _vowRecapCache[dk]=text;
+  _bcSet('vowrecap_'+dk,text);
   aiCacheSet('vowrecap_'+dk,text,AI_CACHE_TTL.short);
   return text;
 }
