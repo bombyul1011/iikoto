@@ -8182,8 +8182,10 @@ function renderRhythmBarHtml(segs){
   const segsSorted=segs.slice().sort(function(a,b){return (b.end-b.start)-(a.end-a.start);});
   segsSorted.forEach(function(sg,si){
     const bg=sg.color;
+    // 실제 기록 시간은 그대로 두되, 30분 미만 활동은 그리기용 종료 시각만 늘려서 최소 30분 폭으로 표시
+    const drawEnd=(!sg.ongoing&&sg.end-sg.start<30)?Math.min(sg.start+30,1440):sg.end;
     const left=wrbCompressX(sg.start)/WRB_TOTAL_COMPRESSED*100;
-    const right=wrbCompressX(sg.end)/WRB_TOTAL_COMPRESSED*100;
+    const right=wrbCompressX(drawEnd)/WRB_TOTAL_COMPRESSED*100;
     track+='<div class="wrb-seg'+(sg.ongoing?' ongoing':'')+'" style="left:'+left+'%;width:'+Math.max(right-left,0.8)+'%;background-color:'+bg+';z-index:'+(10+si)+';"></div>';
   });
   track+='</div>';
@@ -8263,7 +8265,7 @@ function renderRhythmFlowHtml(segs,dk){
     const t=meals[k+'_time'];if(!t)return;
     const start=toMinLocal(t);
     const label=meals[k]?'식사 · '+meals[k]:'식사';
-    dayItems.push({start:start,end:Math.min(start+45,1440),color:getRhythmColor('_meal'),label:label});
+    dayItems.push({start:start,end:Math.min(start+30,1440),color:getRhythmColor('_meal'),label:label});
   });
   // 세로바와 동일한 자정넘김 판단: 그날 등록된 블록 중 가장 늦은 시각을 기준으로,
   // 06시 이전 시작 블록이 그보다 이르면 "자정 넘겨 새로 시작한 것"으로 보고 맨 아래로 정렬.

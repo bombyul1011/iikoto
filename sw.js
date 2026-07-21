@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260721-8-elearn-started-sync';
+const CACHE = 'iikoto-v20260721-9-rhythm-min-width';
 const ASSETS = [
   './',
   './index.html'
