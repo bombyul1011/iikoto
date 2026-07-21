@@ -560,7 +560,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rc-flow-memo-spacer{flex:0 0 56px;}
 .rc-flow i{font-size:28px;}
 .rc-arrow-dot{color:#d4ac85;display:flex;align-items:center;}
-.pace-comment{font-size:11.5px;color:var(--ts);text-align:center;line-height:1.6;}
 .pace-dot-track{position:relative;margin-top:4px;}
 .pace-dot-baseline{position:absolute;left:0;right:0;height:1px;background:var(--div);}
 .pace-dot-hourline{position:absolute;top:18px;width:1px;height:8px;background:var(--div);}
@@ -5644,13 +5643,11 @@ async function refreshAfternoonPaceCard(){
   ]);
   doRefresh();
 }
-// ── 오후 통계 카드 하단 코멘트: 로컬 문구풀(즉시 표시/폴백용)
-// 오늘 이전 날짜의 pace_comment 캐시 자동 삭제 (누적 방지)
+// 오늘 이전 날짜의 nextweek_suggest 캐시 자동 삭제 (누적 방지)
 (function(){
   try{
     const today=dateKey(getLogicalDate());
     Object.keys(localStorage).forEach(k=>{
-      if((k.startsWith('pace_comment_')||k.startsWith('pace_local_'))&&!k.includes(today))localStorage.removeItem(k);
       if(k.startsWith('nextweek_suggest_')&&!k.includes(today))localStorage.removeItem(k);
     });
     // weekly_summary_는 하루 단위 캐시라 매주 새 키가 생김 — 2주(14일) 지난 것만 정리해 최근 2주치는 남겨둠
@@ -5672,36 +5669,6 @@ async function refreshAfternoonPaceCard(){
     });
   }catch(e){}
 })();
-function _paceLocalComment(todayPct,yestPct,todayTop,lastWeekTop){
-  const diff=todayPct-yestPct;
-  let pacePool;
-  if(diff>15)pacePool=['어제보다 훨씬 빠르게 나아가고 있어요','오늘따라 속도가 붙었어요','어제보다 진도가 쭉쭉 나가고 있어요'];
-  else if(diff>3)pacePool=['어제보다 조금 더 빠르게 진행 중이에요','오늘이 어제보다 살짝 앞서있어요'];
-  else if(diff>-3)pacePool=['어제와 비슷한 흐름이에요','어제만큼 차분하게 진행 중이에요'];
-  else if(diff>-15)pacePool=['어제보다 조금 여유롭게 가고 있어요','오늘은 어제보다 천천히 가는 중이에요'];
-  else pacePool=['오늘은 여유롭게 흘러가는 하루예요','오늘은 한 박자 쉬어가는 중이에요'];
-  const paceLine=pacePool[Math.floor(Math.random()*pacePool.length)];
-
-  let rhythmLine='';
-  if(todayTop&&lastWeekTop){
-    const lwJosa=_josa(lastWeekTop.label,'이가'),tdJosa=_josa(todayTop.label,'이가');
-    const rhythmPool=todayTop.key!==lastWeekTop.key
-      ?[`오늘은 ${todayTop.label}에 가장 많은 시간을 썼어요`,`${lastWeekTop.label}${lwJosa} 길었던 지난주, 오늘은 ${todayTop.label}${tdJosa} 채워주네요`,`오늘의 중심은 ${todayTop.label}${_hasBatchim(todayTop.label)?'이었어요':'였어요'}`]
-      :[`지난주에 이어 오늘도 ${todayTop.label}에 가장 많은 시간을 썼어요`,`${todayTop.label} 비중이 지난주와 비슷하게 이어지고 있어요`];
-    rhythmLine=rhythmPool[Math.floor(Math.random()*rhythmPool.length)];
-  }
-  return rhythmLine?`${paceLine}\n${rhythmLine}`:paceLine;
-}
-// 로컬 문구 전용 캐시 — sig(체크값 시그니처)가 같으면 랜덤 재추첨 없이 이전에 뽑은 문구를 그대로 재사용.
-// sig가 실제로 바뀌었을 때만 새로 뽑음.
-function _paceLocalCommentCached(todayPct,yestPct,todayTop,lastWeekTop,dk,sig){
-  const key='pace_local_'+dk+'_'+sig;
-  const cached=S.get(key);
-  if(cached)return cached;
-  const text=_paceLocalComment(todayPct,yestPct,todayTop,lastWeekTop);
-  S.set(key,text);
-  return text;
-}
 // 오늘(dk) 하루의 투두/습관/아침루틴 완료 시각을 {type,min,label} 배열로 반환.
 // 시각 정보 없는 항목(과거 completedAt/hcTime 미기록)은 자연히 제외됨.
 function _paceDayEvents(dk){
@@ -5881,19 +5848,7 @@ function makeAfternoonPaceCard(){
   const dotTimelineInner=_paceDotTimelineHtml(todayDk);
   if(dotTimelineInner)html+='<div class="pace-divider"></div>'+dotTimelineInner;
 
-  const todayPct=todayBarDone/todayBarTotal*100;
-  const yestPct=yestBarDone/yestBarTotal*100;
-  const sig=todayDone+'-'+todayHabit+'-'+todayMorning+'-'+yestDone+'-'+yestHabit+'-'+yestMorning+'-'+(todayTop?todayTop.key:'none');
-  html+=`<div class="pace-divider"></div>`;
-  html+=`<div class="pace-comment" id="pace-comment-text"></div>`;
-
   card.innerHTML=html;
-
-  const commentEl=card.querySelector('#pace-comment-text');
-  const renderComment=(text)=>{
-    if(commentEl)commentEl.innerHTML=text.split('\n').map(l=>`<div>${l}</div>`).join('');
-  };
-  renderComment(_paceLocalCommentCached(todayPct,yestPct,todayTop,lastWeekTop,todayDk,sig));
 
   return card;
 }

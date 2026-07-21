@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260721-9-rhythm-min-width';
+const CACHE = 'iikoto-v20260721-10-remove-pace-comment';
 const ASSETS = [
   './',
   './index.html'
