@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260721-12-olive-theme-foreign-lang';
+const CACHE = 'iikoto-v20260721-14-chaeum-prompt-fix';
 const ASSETS = [
   './',
   './index.html'
