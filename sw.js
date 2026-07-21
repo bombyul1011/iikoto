@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260721-10-remove-pace-comment';
+const CACHE = 'iikoto-v20260721-11-chaeum-corner';
 const ASSETS = [
   './',
   './index.html'

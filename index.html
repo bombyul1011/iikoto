@@ -654,6 +654,37 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rd-book-item.open .rd-book-detail{display:block;}
 .rd-detail-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
 .rd-status-btn{font-size:11px;padding:5px 10px;border-radius:8px;border:1px solid var(--card-b);background:var(--card);color:var(--ts);cursor:pointer;}
+/* ── 채움 코너 (독서 코너와 동일 톤) ── */
+.chaeum-ov{position:fixed;inset:0;z-index:8000;background:var(--bg);display:flex;flex-direction:column;overflow-y:auto;transform:translateX(100%);transition:transform .3s cubic-bezier(.32,.72,0,1);pointer-events:none;}
+.chaeum-ov .settings-hdr{position:sticky;top:0;z-index:10;background:var(--bg);}
+.chaeum-ov.on{transform:translateX(0);pointer-events:auto;}
+.chaeum-body{padding:16px 18px 30px;display:flex;flex-direction:column;gap:18px;}
+.chaeum-topcard{position:relative;border-radius:20px;padding:1.8px;background:linear-gradient(120deg,rgba(222,178,75,0.95),rgba(210,197,110,0.90),rgba(212,168,65,0.95));background-size:300% 300%;animation:bannerShine 10s ease infinite;}
+.chaeum-topcard-inner{border-radius:18.5px;background:linear-gradient(135deg,rgba(250,227,172,0.85),rgba(240,232,180,0.85));padding:16px 17px 18px;box-shadow:0 2px 2px rgba(255,255,255,0.7) inset,0 -10px 18px -14px rgba(0,0,0,0.10) inset,0 6px 20px rgba(120,100,90,0.14);}
+.chaeum-topic-chip{display:inline-block;font-size:11px;color:rgba(122,90,18,0.92);background:rgba(240,222,160,0.55);padding:3px 10px;border-radius:10px;margin-bottom:8px;}
+.chaeum-title{font-size:15px;font-weight:600;color:var(--tp);line-height:1.4;margin-bottom:10px;}
+.chaeum-outline{margin:0 0 12px;padding-left:18px;}
+.chaeum-outline li{font-size:12.5px;color:var(--ts);line-height:1.7;}
+.chaeum-btn-row{display:flex;gap:8px;margin-top:4px;}
+.chaeum-btn{flex:1;padding:9px;border-radius:10px;font-size:12.5px;font-weight:500;cursor:pointer;border:none;font-family:'DM Sans',sans-serif;}
+.chaeum-btn-ghost{background:transparent;border:1px solid var(--div);color:var(--tm);}
+.chaeum-btn-fill{background:rgba(222,178,75,0.35);color:rgba(122,90,18,0.95);}
+.chaeum-remain{font-size:10.5px;color:var(--tm);text-align:center;margin-top:8px;}
+.chaeum-loading{font-size:12.5px;color:var(--tm);text-align:center;padding:8px 0;}
+.chaeum-empty{font-size:12.5px;color:var(--tm);text-align:center;padding:8px 0;}
+.chaeum-filter-tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch;}
+.chaeum-filter-tabs::-webkit-scrollbar{display:none;}
+.chaeum-filter-tab{flex-shrink:0;font-size:11.5px;color:var(--tm);background:var(--card);border:1px solid var(--card-b);border-radius:10px;padding:6px 12px;white-space:nowrap;cursor:pointer;}
+.chaeum-filter-tab.on{background:rgba(222,178,75,0.22);border-color:rgba(222,178,75,0.45);color:rgba(122,90,18,0.95);font-weight:500;}
+.chaeum-log-item{position:relative;background:rgba(255,250,245,0.5);border-left:2.5px solid rgba(222,178,75,0.55);border-radius:0 12px 12px 0;padding:11px 30px 12px 14px;margin-bottom:8px;}
+.chaeum-log-meta{font-size:10.5px;color:var(--tm);display:flex;align-items:center;gap:6px;}
+.chaeum-log-topic{color:rgba(150,110,20,0.85);font-weight:500;}
+.chaeum-log-title{font-size:13px;color:var(--tp);font-weight:500;margin-top:4px;line-height:1.4;}
+.chaeum-log-comment{font-size:12px;color:var(--ts);font-style:italic;line-height:1.55;margin-top:7px;padding-top:7px;border-top:1px dashed var(--div);}
+.chaeum-log-comment-btn{font-size:11px;color:var(--tm);margin-top:8px;cursor:pointer;display:inline-flex;align-items:center;gap:3px;}
+.chaeum-log-del{position:absolute;top:9px;right:10px;font-size:10px;color:var(--tm);cursor:pointer;padding:4px;}
+.chaeum-log-comment-inp{width:100%;background:var(--inp);border:1px solid var(--inp-b);border-radius:10px;padding:9px 11px;outline:none;resize:none;font-family:'DM Sans',sans-serif;font-size:12.5px;color:var(--tp);line-height:1.6;margin-top:8px;}
+.chaeum-log-comment-save{font-size:11px;color:rgba(122,90,18,0.95);background:rgba(222,178,75,0.25);border:none;border-radius:8px;padding:6px 12px;margin-top:6px;cursor:pointer;}
 .rd-status-btn.active{background:var(--acc-soft);color:var(--tp);}
 .rd-del-btn{font-size:11px;color:var(--tm);cursor:pointer;margin-left:auto;}
 .rd-empty{font-size:12px;color:var(--tm);text-align:center;padding:14px 0;}
@@ -1016,7 +1047,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div class="icon-btn" onclick="openSettings()">
           <i class="ti ti-settings-2" style="font-size:16px;color:var(--tm);" aria-hidden="true"></i>
         </div>
-        <div class="icon-btn seed-icon-btn" style="cursor:default;">
+        <div class="icon-btn seed-icon-btn" onclick="openChaeum()">
           <i class="ti ti-clover" style="font-size:17.5px;color:#6a8a50;" aria-hidden="true"></i>
         </div>
         <div class="icon-btn reading-icon-btn" onclick="openReading()">
@@ -1334,17 +1365,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div style="padding:0 20px 24px;">
       <div class="month-chips" id="mr-month-chips"></div>
       <div id="mr-content"></div>
-    </div>
-  </div>
-</div>
-
-<!-- EVENING LEARN SHEET (저녁의 채움) -->
-<div class="overlay" id="evening-learn-sheet" onclick="closeSheet('evening-learn-sheet',event)">
-  <div class="bsheet" style="max-height:80vh;overflow-y:auto;" onclick="event.stopPropagation()">
-    <div class="sheet-handle"></div>
-    <div style="padding:0 20px 24px;">
-      <div class="sheet-title">저녁의 채움</div>
-      <div id="evening-learn-sheet-body"></div>
     </div>
   </div>
 </div>
@@ -1774,6 +1794,27 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div class="rd-tab" data-status="wish" onclick="switchReadingTab(this,'wish')"><i class="ti ti-star-filled" style="font-size:13px;" aria-hidden="true"></i></div>
       </div>
       <div id="rd-book-list"></div>
+    </div>
+  </div>
+</div>
+
+<div class="chaeum-ov" id="chaeum-ov">
+  <div class="settings-hdr" style="padding-top:max(20px,env(safe-area-inset-top));">
+    <div class="settings-back" onclick="closeChaeum()">
+      <i class="ti ti-chevron-left" style="font-size:16px;color:var(--ts);" aria-hidden="true"></i>
+    </div>
+    <span class="settings-ttl">채움</span>
+    <div style="flex:1;"></div>
+  </div>
+  <div class="chaeum-body">
+    <div>
+      <div class="slabel">오늘의 채움</div>
+      <div id="chaeum-today-slot"></div>
+    </div>
+    <div id="chaeum-topic-stats-slot"></div>
+    <div>
+      <div class="slabel">지난 채움</div>
+      <div id="chaeum-log-list"></div>
     </div>
   </div>
 </div>
@@ -4227,6 +4268,7 @@ async function autoSync(type,key){
   else if(type==='contents'){if(await syncContentsUp(key))S.set(S.key('contents_pending',key),false);}
   else if(type==='rblocks'){if(await syncRhythmBlocksUp(key))S.set(S.key('rblocks_pending',key),false);}
   else if(type==='mroutine')syncMorningRoutineUp(key);
+  else if(type==='eveninglearnlog'){if(await syncEveningLearnLogUp())S.set('eveninglearnlog_pending',false);}
 }
 async function syncAll(){
   if(!navigator.onLine)return;
@@ -4244,6 +4286,7 @@ async function syncAll(){
   if(S.get(S.key('contents_pending',mk)))upTasks.push(runContentsSyncLocked(mk,()=>syncContentsUp(mk)).then(()=>S.set(S.key('contents_pending',mk),false)));
   if(S.get('wchallenge_pending_'+wk))upTasks.push(autoSync('wchallenge','wchallenge_'+wk).then(()=>S.set('wchallenge_pending_'+wk,false)));
   if(S.get(S.key('rblocks_pending',dk)))upTasks.push(syncRhythmBlocksUp(dk).then(()=>S.set(S.key('rblocks_pending',dk),false)));
+  if(S.get('eveninglearnlog_pending'))upTasks.push(syncEveningLearnLogUp().then(()=>S.set('eveninglearnlog_pending',false)));
   if(upTasks.length)await Promise.all(upTasks);
   // 이번 주 리듬블록(가로바용) 날짜키
   const weekRblockDks=[];
@@ -5289,7 +5332,7 @@ function _paceTopRhythmCat(dk){
 // ── 저녁 학습 배너 (파트1, 19~22시) ──
 // 하루 상태: {count(오늘 뽑은 횟수, 최대2), topics(오늘 나온 주제 텍스트 목록 - 반복회피용),
 //            current:{topic,title,outline[]} 현재 표시중인 카드 내용}
-function getEveningLearnState(dk){return S.get(S.key('eveninglearn',dk))||{count:0,topics:[],current:null,prev:null,started:null};}
+function getEveningLearnState(dk){return S.get(S.key('eveninglearn',dk))||{count:0,topics:[],picks:[],started:null};}
 function saveEveningLearnState(dk,v){S.set(S.key('eveninglearn',dk),v);}
 
 async function _fetchEveningLearnTopic(dk,avoidTopics){
@@ -5326,13 +5369,13 @@ ${picked==='시사상식'?'시사상식이라면 최근 화제가 되는 경제/
   return null;
 }
 
-// 홈탭에 노출되는 진입 배너 — API 호출 없음, 탭해야만 openEveningLearnSheet가 실제로 데이터를 불러옴
+// 홈탭에 노출되는 진입 배너 — API 호출 없음, 탭하면 채움 코너로 이동
 function makeEveningLearnCard(){
   const dk=dateKey(getLogicalDate());
   const state=getEveningLearnState(dk);
   const wrap=document.createElement('div');
   wrap.className='elearn-banner';
-  wrap.addEventListener('click',openEveningLearnSheet);
+  wrap.addEventListener('click',openChaeum);
   const subText=state.started
     ? escapeHtml(state.started.title)
     : '탭해서 오늘의 주제를 만나보세요';
@@ -5362,8 +5405,9 @@ function makeEveningLearnCard(){
   return wrap;
 }
 
-function openEveningLearnSheet(){
-  openSheet('evening-learn-sheet');
+// ── 채움 코너 (풀스크린) ──
+function openChaeum(){
+  document.getElementById('chaeum-ov').classList.add('on');
   const dk=dateKey(getLogicalDate());
   const state=getEveningLearnState(dk);
   if(!state.started){
@@ -5374,88 +5418,103 @@ function openEveningLearnSheet(){
           if(!s.started){s.started=JSON.parse(cached);saveEveningLearnState(dk,s);}
         }catch(e){}
       }
-      renderEveningLearnSheetBody();
+      renderChaeumTodaySlot();
     });
   }else{
-    renderEveningLearnSheetBody();
+    renderChaeumTodaySlot();
   }
+  renderChaeumTopicStats();
+  renderChaeumLogList();
+  syncEveningLearnLogDown().then(()=>{renderChaeumTopicStats();renderChaeumLogList();});
 }
+function closeChaeum(){document.getElementById('chaeum-ov').classList.remove('on');}
 
-function renderEveningLearnSheetBody(){
+function renderChaeumTodaySlot(){
   const dk=dateKey(getLogicalDate());
   const state=getEveningLearnState(dk);
-  const body=document.getElementById('evening-learn-sheet-body');
+  const body=document.getElementById('chaeum-today-slot');
   if(!body)return;
 
-  const remain=Math.max(0,2-state.count);
+  // 키 없는 기기(PC/모바일 사파리)는 뽑기 자체를 하지 않고 확정된 결과만 노출 — 뽑기는 모바일 웹앱 전용
+  if(!getClaudeKey()){
+    body.innerHTML=state.started
+      ?`<div class="chaeum-topcard"><div class="chaeum-topcard-inner">
+          <div class="chaeum-topic-chip">${escapeHtml(state.started.topic)}</div>
+          <div class="chaeum-title">${escapeHtml(state.started.title)}</div>
+          <div class="chaeum-remain">오늘은 이 주제로 시작했어요</div>
+        </div></div>`
+      :`<div class="chaeum-topcard"><div class="chaeum-topcard-inner"><div class="chaeum-empty">모바일에서 카드를 먼저 골라주세요</div></div></div>`;
+    return;
+  }
+
+  const picks=state.picks||[];
   let html='';
   if(state.started){
-    // "시작하기"를 누른 순간 그날의 학습은 확정됨 — 더 이상 뽑기/되돌리기 없이 고정 노출만
-    html=`<div class="elearn-topic-chip">${escapeHtml(state.started.topic)}</div>
-      <div class="elearn-title">${escapeHtml(state.started.title)}</div>
-      <div class="elearn-remain">오늘은 이 주제로 시작했어요</div>`;
-  }else if(state.current){
-    const leftBtn=state.prev
-      ?`<button class="elearn-btn elearn-btn-ghost" onclick="undoEveningLearn()">아까 걸로</button>`
-      :(remain>0?`<button class="elearn-btn elearn-btn-ghost" onclick="rerollEveningLearn()">다시 뽑기</button>`:'');
-    html=`<div class="elearn-topic-chip">${escapeHtml(state.current.topic)}</div>
-      <div class="elearn-title">${escapeHtml(state.current.title)}</div>
-      <ul class="elearn-outline">${state.current.outline.map(o=>`<li>${escapeHtml(o)}</li>`).join('')}</ul>
-      <div class="elearn-btn-row">${leftBtn}<button class="elearn-btn elearn-btn-fill" onclick="startEveningLearn()">시작하기</button></div>
-      <div class="elearn-remain">오늘 ${remain}번 더 뽑을 수 있어요</div>`;
+    // "시작하기"를 누른 순간 그날의 학습은 확정됨 — 더 이상 뽑기/선택 없이 고정 노출만
+    html=`<div class="chaeum-topcard"><div class="chaeum-topcard-inner">
+      <div class="chaeum-topic-chip">${escapeHtml(state.started.topic)}</div>
+      <div class="chaeum-title">${escapeHtml(state.started.title)}</div>
+      <div class="chaeum-remain">오늘은 이 주제로 시작했어요</div>
+    </div></div>`;
+  }else if(picks.length>0){
+    // 뽑힌 만큼(1개 또는 2개) 카드를 나란히 보여주고, 각 카드에서 바로 선택 가능
+    html=picks.map((p,idx)=>`<div class="chaeum-topcard"><div class="chaeum-topcard-inner">
+      <div class="chaeum-topic-chip">${escapeHtml(p.topic)}</div>
+      <div class="chaeum-title">${escapeHtml(p.title)}</div>
+      <ul class="chaeum-outline">${p.outline.map(o=>`<li>${escapeHtml(o)}</li>`).join('')}</ul>
+      <button class="chaeum-btn chaeum-btn-fill" style="width:100%;" onclick="startEveningLearn(${idx})">이걸로 시작하기</button>
+    </div></div>`).join('<div style="height:8px;"></div>');
+    if(_evLearnRerollLoading){
+      html+='<div style="height:8px;"></div><div class="chaeum-topcard"><div class="chaeum-topcard-inner"><div class="chaeum-loading">다른 주제를 고르는 중...</div></div></div>';
+    }else if(picks.length<2){
+      html+=`<div class="chaeum-btn-row" style="margin-top:8px;"><button class="chaeum-btn chaeum-btn-ghost" style="flex:none;width:100%;" onclick="rerollEveningLearn()">다른 주제도 뽑아보기</button></div>`;
+    }else{
+      html+=`<div class="chaeum-remain">두 주제 중 하나를 골라주세요</div>`;
+    }
   }else if(state.count>=2){
-    html=`<div class="elearn-empty">오늘의 배움은 다 뽑았어요, 내일 또 만나요</div>`;
+    html=`<div class="chaeum-topcard"><div class="chaeum-topcard-inner"><div class="chaeum-empty">오늘의 배움은 다 뽑았어요, 내일 또 만나요</div></div></div>`;
   }else{
-    html=`<div class="elearn-loading">오늘의 배움을 고르는 중...</div>
-      ${state.prev?`<div class="elearn-btn-row"><button class="elearn-btn elearn-btn-ghost" onclick="undoEveningLearn()">아까 걸로 돌아가기</button></div>`:''}`;
+    html=`<div class="chaeum-topcard"><div class="chaeum-topcard-inner"><div class="chaeum-loading">오늘의 배움을 고르는 중...</div></div></div>`;
   }
   body.innerHTML=html;
 
   if(state.started)return; // 이미 시작한 세션은 재생성 로직을 아예 타지 않음
 
-  if(!state.current&&state.count<2){
+  if(picks.length<2&&picks.length===state.count){
     const requestToken=Date.now();
     _evLearnPendingToken=requestToken;
     _fetchEveningLearnTopic(dk,state.topics).then(result=>{
-      if(!result)return;
-      if(_evLearnPendingToken!==requestToken)return; // 그 사이 "돌아가기"가 눌려 이 요청은 더 이상 유효하지 않음
+      if(!result){_evLearnRerollLoading=false;return;}
+      if(_evLearnPendingToken!==requestToken)return; // 그 사이 다른 조작이 있었으면 이 요청은 더 이상 유효하지 않음
       const s=getEveningLearnState(dk);
-      s.current=result;
+      s.picks=[...(s.picks||[]),result];
       s.count+=1;
       s.topics=[...s.topics,result.topic];
       saveEveningLearnState(dk,s);
-      renderEveningLearnSheetBody();
+      _evLearnRerollLoading=false;
+      renderChaeumTodaySlot();
     });
   }
 }
 
+let _evLearnRerollLoading=false;
 function rerollEveningLearn(){
   const dk=dateKey(getLogicalDate());
   const s=getEveningLearnState(dk);
   if(s.count>=2)return;
-  s.prev=s.current; // 되돌리기용 백업 — "다시 뽑았는데 아까 게 나았다"를 대비
-  s.current=null;
-  saveEveningLearnState(dk,s);
-  renderEveningLearnSheetBody();
+  _evLearnRerollLoading=true;
+  renderChaeumTodaySlot();
 }
 
 let _evLearnPendingToken=null;
-function undoEveningLearn(){
-  const dk=dateKey(getLogicalDate());
-  const s=getEveningLearnState(dk);
-  if(!s.prev)return;
-  _evLearnPendingToken=null; // 진행 중이던 재생성 요청이 있다면 무효화
-  s.current=s.prev;
-  s.prev=null;
-  saveEveningLearnState(dk,s);
-  renderEveningLearnSheetBody();
-}
 
-function startEveningLearn(){
+function startEveningLearn(idx){
   const dk=dateKey(getLogicalDate());
   const s=getEveningLearnState(dk);
-  if(!s.current)return;
-  const {topic,title,shortTitle,outline}=s.current;
+  const picks=s.picks||[];
+  const chosen=picks[idx];
+  if(!chosen)return;
+  const {topic,title,shortTitle,outline}=chosen;
   const prompt=`오늘 저녁 [${topic}] 주제로 "${title}"를 한 시간 정도 배워보려고 해. 아래 흐름으로 설명해줘:\n`+
     outline.map(o=>`- ${o}`).join('\n')+
     `\n쉽고 흥미롭게 설명해주고, 더 찾아볼 만한 유튜브 영상이나 웹사이트 자료도 추천해줘.`;
@@ -5469,26 +5528,127 @@ function startEveningLearn(){
 
   // "시작하기"를 실제로 누른 주제만 배너에 노출(단순히 뽑히기만 한 것과 구분)
   s.started={topic,title};
-  s.prev=null;
   saveEveningLearnState(dk,s);
   aiCacheSet('eveninglearn_started_'+dk,JSON.stringify(s.started),AI_CACHE_TTL.short);
   const banner=document.querySelector('.elearn-banner');
   if(banner)banner.replaceWith(makeEveningLearnCard());
+  renderChaeumTodaySlot();
 
-  // 오늘 뽑혔지만 선택되지 않은 나머지 주제들의 서버 캐시는 더 이상 쓸모없으므로 정리
-  (s.topics||[]).filter(t=>t!==topic).forEach(t=>{
-    aiCacheDelete('eveninglearn_'+dk+'_'+t);
+  // 오늘 뽑혔지만 선택되지 않은 나머지 주제의 서버 캐시는 더 이상 쓸모없으므로 정리
+  picks.filter((p,i)=>i!==idx).forEach(p=>{
+    aiCacheDelete('eveninglearn_'+dk+'_'+p.topic);
   });
+
+  // 확정된 채움만 아카이브 로그에 1건 적재 — 지난 채움 목록/주제별 카운트의 원천 데이터
+  const log=getEveningLearnLog();
+  log.push({dk,topic,title,outline,comment:'',created:Date.now(),cid:genCid()});
+  saveEveningLearnLog(log);
+  S.set('eveninglearnlog_pending',true);
+  autoSync('eveninglearnlog');
+  renderChaeumTopicStats();
+  renderChaeumLogList();
 
   if(navigator.clipboard){
     navigator.clipboard.writeText(prompt).then(()=>{
       showToast('프롬프트가 복사됐어요, 리듬에도 기록했어요 ✓');
       window.open('https://claude.ai/new','_blank');
-      closeSheet('evening-learn-sheet');
     });
   }else{
     showToast('클립보드 복사를 지원하지 않는 환경이에요');
   }
+}
+
+// ── 채움 아카이브 로그 (지난 채움) — todos/rblocks와 동일한 cid 기반 upsert+delPending 패턴 ──
+function getEveningLearnLog(){return S.get('eveninglearnlog')||[];}
+function saveEveningLearnLog(v){S.set('eveninglearnlog',v);}
+async function syncEveningLearnLogUp(){
+  const log=getEveningLearnLog();
+  if(ensureItemCids(log))saveEveningLearnLog(log);
+  const delCids=getDelPendingCids('eveninglearnlog','_all');
+  const ok=await syncListUpSafe('evening_learn_log','date_key=neq.__none__','client_id',log,
+    l=>({date_key:l.dk,topic:l.topic,title:l.title,outline:l.outline||[],comment:l.comment||'',created:l.created||Date.now(),client_id:l.cid}),
+    delCids);
+  if(ok)delCids.forEach(cid=>removeDelPending('eveninglearnlog','_all',cid));
+  return ok;
+}
+async function syncEveningLearnLogDown(){
+  const rows=await supaFetch('evening_learn_log?order=created.desc');
+  if(!rows)return; // 연결 실패 — 로컬 유지
+  if(S.get('eveninglearnlog_pending'))return; // 업로드 대기중인 로컬 수정 있으면 덮어쓰지 않음
+  saveEveningLearnLog(rows.map(function(r){return {dk:r.date_key,topic:r.topic,title:r.title,outline:r.outline||[],comment:r.comment||'',created:r.created,cid:r.client_id||genCid()};}));
+}
+function deleteEveningLearnLogItem(cid){
+  const log=getEveningLearnLog().filter(l=>l.cid!==cid);
+  saveEveningLearnLog(log);
+  addDelPending('eveninglearnlog','_all',cid);
+  S.set('eveninglearnlog_pending',true);
+  autoSync('eveninglearnlog');
+  renderChaeumTopicStats();
+  renderChaeumLogList();
+}
+function openChaeumCommentEditor(cid){
+  const item=document.querySelector(`.chaeum-log-item[data-cid="${cid}"]`);
+  if(!item)return;
+  const slot=item.querySelector('.chaeum-log-comment-slot');
+  if(!slot)return;
+  const log=getEveningLearnLog();
+  const target=log.find(l=>l.cid===cid);
+  const cur=target?target.comment||'':'';
+  slot.innerHTML=`<textarea class="chaeum-log-comment-inp" rows="2" placeholder="어떤 내용을 배웠는지 남겨보세요" id="chaeum-comment-ta-${cid}">${escapeHtml(cur)}</textarea>
+    <button class="chaeum-log-comment-save" onclick="saveChaeumComment('${cid}')">저장</button>`;
+  const ta=document.getElementById(`chaeum-comment-ta-${cid}`);
+  if(ta)ta.focus();
+}
+function saveChaeumComment(cid){
+  const ta=document.getElementById(`chaeum-comment-ta-${cid}`);
+  if(!ta)return;
+  const text=ta.value.trim();
+  const log=getEveningLearnLog();
+  const target=log.find(l=>l.cid===cid);
+  if(target)target.comment=text;
+  saveEveningLearnLog(log);
+  S.set('eveninglearnlog_pending',true);
+  autoSync('eveninglearnlog');
+  renderChaeumLogList();
+}
+let _chaeumFilterTopic='all';
+function setChaeumFilter(topic){
+  _chaeumFilterTopic=topic;
+  renderChaeumTopicStats();
+  renderChaeumLogList();
+}
+function renderChaeumTopicStats(){
+  const el=document.getElementById('chaeum-topic-stats-slot');
+  if(!el)return;
+  const log=getEveningLearnLog();
+  if(!log.length){el.innerHTML='';_chaeumFilterTopic='all';return;}
+  const counts={};
+  log.forEach(l=>{counts[l.topic]=(counts[l.topic]||0)+1;});
+  const topics=Object.keys(counts).sort((a,b)=>counts[b]-counts[a]);
+  if(_chaeumFilterTopic!=='all'&&!topics.includes(_chaeumFilterTopic))_chaeumFilterTopic='all';
+  const allTab=`<div class="chaeum-filter-tab${_chaeumFilterTopic==='all'?' on':''}" onclick="setChaeumFilter('all')">전체 <b>${log.length}</b></div>`;
+  const chips=topics.map(t=>`<div class="chaeum-filter-tab${_chaeumFilterTopic===t?' on':''}" onclick="setChaeumFilter('${t}')">${escapeHtml(t)} <b>${counts[t]}</b></div>`).join('');
+  el.innerHTML=`<div class="slabel">주제별로 이만큼 채웠어요</div><div class="chaeum-filter-tabs">${allTab}${chips}</div>`;
+}
+function renderChaeumLogList(){
+  const el=document.getElementById('chaeum-log-list');
+  if(!el)return;
+  let log=getEveningLearnLog().slice().sort((a,b)=>b.created-a.created);
+  if(_chaeumFilterTopic!=='all')log=log.filter(l=>l.topic===_chaeumFilterTopic);
+  if(!log.length){el.innerHTML='<div class="chaeum-empty">아직 채운 기록이 없어요</div>';return;}
+  el.innerHTML=log.map(l=>{
+    const dateLabel=l.dk?`${parseInt(l.dk.slice(5,7),10)}/${parseInt(l.dk.slice(8,10),10)}`:'';
+    const commentHtml=l.comment
+      ?`<div class="chaeum-log-comment">${escapeHtml(l.comment)}</div><div class="chaeum-log-comment-slot"></div>`
+      :`<div class="chaeum-log-comment-slot"><div class="chaeum-log-comment-btn" onclick="openChaeumCommentEditor('${l.cid}')"><i class="ti ti-pencil" style="font-size:11px;" aria-hidden="true"></i> 코멘트 남기기</div></div>`;
+    return `<div class="chaeum-log-item" data-cid="${l.cid}">
+      <div class="chaeum-log-del" onclick="deleteEveningLearnLogItem('${l.cid}')"><i class="ti ti-x" aria-hidden="true"></i></div>
+      <div class="chaeum-log-meta"><span>${dateLabel}</span><span class="chaeum-log-topic">${escapeHtml(l.topic)}</span></div>
+      <div class="chaeum-log-title">${escapeHtml(l.title)}</div>
+      ${l.comment?`<div class="chaeum-log-comment-btn" onclick="openChaeumCommentEditor('${l.cid}')" style="margin-top:6px;"><i class="ti ti-pencil" style="font-size:11px;" aria-hidden="true"></i> 코멘트 수정</div>`:''}
+      ${commentHtml}
+    </div>`;
+  }).join('');
 }
 
 function makeDotTimelineCard(){
@@ -8813,11 +8973,11 @@ function openReading(){
 }
 function closeReading(){document.getElementById('reading-ov').classList.remove('on');}
 
-// ── 독서/씨앗/설정 코너 엣지 스와이프 뒤로가기 ──
+// ── 독서/씨앗/설정/채움 코너 엣지 스와이프 뒤로가기 ──
 (function(){
   let sx=null,sy=null,active=false;
   document.addEventListener('touchstart',function(e){
-    const ov=document.querySelector('.reading-ov.on,.settings-ov.on');
+    const ov=document.querySelector('.reading-ov.on,.settings-ov.on,.chaeum-ov.on');
     if(!ov){active=false;return;}
     if(document.querySelector('.overlay.on,.modal-ov.on')){active=false;return;} // 시트/모달 열려있으면 무시
     const t=e.touches[0];
@@ -8830,10 +8990,11 @@ function closeReading(){document.getElementById('reading-ov').classList.remove('
     const t=e.changedTouches[0];
     const dx=t.clientX-sx,dy=t.clientY-sy;
     if(dx>80&&Math.abs(dy)<60){
-      const ov=document.querySelector('.reading-ov.on,.settings-ov.on');
+      const ov=document.querySelector('.reading-ov.on,.settings-ov.on,.chaeum-ov.on');
       if(!ov)return;
       if(ov.id==='reading-ov')closeReading();
       else if(ov.id==='settings-ov')closeSettings();
+      else if(ov.id==='chaeum-ov')closeChaeum();
     }
   },{passive:true});
 })();
