@@ -1341,21 +1341,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   </div>
 </div>
 
-<div class="overlay" id="archive-comment-sheet" onclick="closeSheet('archive-comment-sheet',event)">
-  <div class="bsheet" style="padding-bottom:20px;">
-    <div class="sheet-handle"></div>
-    <div class="sheet-title">오늘 이 문장에서 떠오른 생각</div>
-    <div style="padding:16px 20px 0;">
-      <div id="archive-sheet-quote" style="font-size:12.5px;color:var(--tm);line-height:1.6;margin-bottom:12px;"></div>
-      <textarea id="archive-sheet-inp" class="archive-sheet-textarea" style="width:100%;box-sizing:border-box;font-size:14px;padding:12px;border-radius:12px;border:1px solid var(--card-b);background:var(--card);color:var(--tp);resize:none;min-height:100px;font-family:inherit;outline:none;" placeholder="생각나는 대로 적어보세요"></textarea>
-      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:10px;">
-        <span onclick="closeSheet('archive-comment-sheet')" style="font-size:13px;color:var(--tm);cursor:pointer;padding:8px 14px;">취소</span>
-        <span onclick="commitArchiveSheetComment()" style="font-size:13px;color:#fff;background:rgba(140,160,110,0.9);cursor:pointer;padding:8px 16px;border-radius:10px;font-weight:600;">저장</span>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- MEMO SHEET -->
 <div class="overlay" id="memo-sheet" onclick="closeSheet('memo-sheet',event)">
   <div class="bsheet">
@@ -1990,8 +1975,6 @@ function renderHomeBody(section){
     if(isNight2){
       body.appendChild(makeLabel('오늘의 독서'));
       body.appendChild(makeBookCardWithCover());
-      body.appendChild(makeLabel('오늘의 문장'));
-      body.appendChild(makeTextArchiveCard());
       body.appendChild(makeLabel('밀도의 숲'));
       body.appendChild(makeMonthlyHeatmapCard());
     }else{
@@ -4488,11 +4471,16 @@ function calcSleep(s,w){
   const badgeStart=document.getElementById('sleep-badge-start'),badgeEnd=document.getElementById('sleep-badge-end');
   renderSleepAvgScoreBadge();
   if(!numEl)return;
+  const mStart0=document.getElementById('sleep-avg-marker-start'),mEnd0=document.getElementById('sleep-avg-marker-end');
+  const compareEl0=document.getElementById('sleep-avg-compare');
   if(!s||s==='--:--'){
     numEl.textContent='--';unitEl.textContent='';
     if(clipRect)clipRect.setAttribute('width','0');
     if(badgeStart)badgeStart.style.display='none';
     if(badgeEnd)badgeEnd.style.display='none';
+    if(mStart0)mStart0.style.display='none';
+    if(mEnd0)mEnd0.style.display='none';
+    if(compareEl0)compareEl0.style.display='none';
     return;
   }
   const AXIS_MIN=480,SVG_W=340;
@@ -6145,79 +6133,6 @@ function toggleTodo(i,expectedCid){
     target.completedAt=null;
   }
   saveTodos(dk,todos);renderTodos();
-}
-
-// ── 홈탭 저녁 파트: 텍스트 아카이브 위젯 (문장수집 랜덤, 하루 1회 고정)
-function _archivePool(){
-  const books=getBooks();
-  const quotes=getQuotes().map(q=>{
-    const book=books.find(b=>b.cid===q.bookCid);
-    return {kind:'quote',cid:q.cid,text:q.text,source:book?book.title:'',comment:q.comment||''};
-  });
-  return quotes;
-}
-// 날짜 문자열 기반 간단 해시 — 같은 날짜(dk)면 항상 같은 정수를 반환해 기기 간 랜덤 결과를 통일시킴
-function _dkSeedHash(dk){
-  let h=0;
-  for(let i=0;i<dk.length;i++){h=(h*31+dk.charCodeAt(i))>>>0;}
-  return h;
-}
-function makeTextArchiveCard(){
-  const dk=dateKey(getLogicalDate());
-  const card=document.createElement('div');
-  card.className='card';
-  card.id='home-text-archive-card';
-
-  let cache=null;
-  try{cache=JSON.parse(localStorage.getItem('iikoto_archive_pick')||'null');}catch(e){}
-  const pool=_archivePool();
-  if(!pool.length){card.style.display='none';return card;}
-
-  let picked;
-  if(cache&&cache.dk===dk&&cache.kind&&cache.cid){
-    picked=pool.find(p=>p.kind===cache.kind&&p.cid===cache.cid);
-  }
-  if(!picked){
-    // 날짜 시드 기반 결정적 선택 — PC/모바일 등 기기가 달라도 pool 구성이 같다면 항상 같은 항목이 뽑힘
-    const idx=_dkSeedHash(dk)%pool.length;
-    picked=pool[idx];
-    try{localStorage.setItem('iikoto_archive_pick',JSON.stringify({dk,kind:picked.kind,cid:picked.cid}));}catch(e){}
-  }
-
-  const commentBlock=picked.comment
-    ?`<div style="font-size:11px;color:var(--ts);margin-top:6px;padding:5px 8px;background:rgba(200,176,168,0.14);border-radius:8px;">${picked.comment}</div>`
-    :'';
-  card.innerHTML=`
-    <div style="font-size:13.5px;color:var(--tp);line-height:1.6;">${picked.text}</div>
-    ${picked.source?`<div style="font-size:11px;color:var(--tm);margin-top:5px;text-align:right;">— ${picked.source}</div>`:''}
-    ${commentBlock}
-    <div style="text-align:right;margin-top:4px;">
-      <span onclick="openArchiveCommentSheet('${picked.kind}','${picked.cid}')" style="font-size:11px;color:var(--tm);cursor:pointer;">${picked.comment?'코멘트 수정':'생각 남기기 +'}</span>
-    </div>`;
-  return card;
-}
-let _archiveSheetKind='',_archiveSheetCid='';
-function openArchiveCommentSheet(kind,cid){
-  _archiveSheetKind=kind;_archiveSheetCid=cid;
-  const pool=_archivePool();
-  const picked=pool.find(p=>p.kind===kind&&p.cid===cid);
-  if(!picked)return;
-  const quoteEl=document.getElementById('archive-sheet-quote');
-  if(quoteEl)quoteEl.textContent=picked.text;
-  const inp=document.getElementById('archive-sheet-inp');
-  if(inp)inp.value=picked.comment||'';
-  openSheet('archive-comment-sheet');
-  setTimeout(()=>{if(inp)inp.focus();},250);
-}
-function commitArchiveSheetComment(){
-  const inp=document.getElementById('archive-sheet-inp');
-  if(!inp)return;
-  const text=inp.value.trim();
-  saveQuoteComment(_archiveSheetCid,text);
-  closeSheet('archive-comment-sheet');
-  const old=document.getElementById('home-text-archive-card');
-  const fresh=makeTextArchiveCard();
-  if(old&&fresh)old.replaceWith(fresh);
 }
 
 // 투두/습관 체크 등으로 오늘 활동 분포가 바뀌었을 때 저녁 홈탭의 점 타임라인 카드를 새로 그려 교체.

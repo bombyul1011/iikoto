@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260722-5-chaeum-comment-collapse-fix';
+const CACHE = 'iikoto-v20260722-6-sleepbanner-textarchive-removed';
 const ASSETS = [
   './',
   './index.html'
