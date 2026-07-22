@@ -791,7 +791,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .vow-recap-row{margin-bottom:12px;}
 .vow-recap-label{font-size:10.5px;color:var(--tm);margin-bottom:5px;letter-spacing:0.02em;}
 .vow-recap-text{font-size:14px;color:var(--tp);line-height:1.5;background:none;border:none;border-left:2.5px solid rgba(225,140,120,0.45);border-radius:0;padding:2px 0 2px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.vow-recap-comment{font-size:12.5px;color:var(--ts);line-height:1.6;margin-top:10px;padding-top:10px;border-top:1px dashed var(--div);min-height:1em;}
+.vow-recap-comment{font-size:12.5px;color:var(--ts);line-height:1.6;margin-top:10px;padding-top:10px;min-height:1em;}
 
 .recap-donut-row{display:flex;justify-content:space-around;margin-bottom:2px;}
 .recap-donut-item{text-align:center;}
@@ -5909,6 +5909,9 @@ async function refreshAfternoonPaceCard(){
 // 오늘(dk) 하루의 투두/습관/아침루틴 완료 시각을 {type,min,label} 배열로 반환.
 // 시각 정보 없는 항목(과거 completedAt/hcTime 미기록)은 자연히 제외됨.
 // 조각별 완료 시각(strikeTimes)이 있으면 조각마다 점을 찍고, 없으면 기존처럼 항목 전체 completedAt 기준 점 1개.
+// 논리적 하루(새벽 4시까지 전날 귀속) 기준 보정: 00:00~03:59 사이 실제 시계 시각은
+// 활동 분포 타임라인에서 24:00~27:59로 표시되어야 전날 마지막 구간(24시 옆)에 붙어 보임.
+function _paceAdjustMin(min){return min<PACE_DOT_RANGE_START?min+1440:min;}
 function _paceDayEvents(dk){
   const events=[];
   getTodos(dk).forEach(t=>{
@@ -5920,11 +5923,11 @@ function _paceDayEvents(dk){
       timeEntries.forEach(([idxStr,ms])=>{
         const idx=parseInt(idxStr,10);
         const d=new Date(ms);
-        events.push({type:'todo',min:d.getHours()*60+d.getMinutes(),label:parts[idx]||t.text||''});
+        events.push({type:'todo',min:_paceAdjustMin(d.getHours()*60+d.getMinutes()),label:parts[idx]||t.text||''});
       });
     }else if(t.done&&t.completedAt){
       const d=new Date(t.completedAt);
-      events.push({type:'todo',min:d.getHours()*60+d.getMinutes(),label:t.text||''});
+      events.push({type:'todo',min:_paceAdjustMin(d.getHours()*60+d.getMinutes()),label:t.text||''});
     }
   });
   const wk=weekKey(new Date(dk+'T00:00:00'));
@@ -5936,14 +5939,14 @@ function _paceDayEvents(dk){
     const key=h.name+'-'+dow;
     if(!checks[key]||!times[key])return;
     const p=times[key].split(':');
-    events.push({type:'habit',min:parseInt(p[0],10)*60+parseInt(p[1],10),label:h.name});
+    events.push({type:'habit',min:_paceAdjustMin(parseInt(p[0],10)*60+parseInt(p[1],10)),label:h.name});
   });
   const mchecks=getMorningRoutineChecks(dk);
   MORNING_ROUTINE_ITEMS.forEach(it=>{
     const c=mchecks[it.key];
     if(!c||!c.time)return;
     const p=c.time.split(':');
-    events.push({type:'morning',min:parseInt(p[0],10)*60+parseInt(p[1],10),label:it.label});
+    events.push({type:'morning',min:_paceAdjustMin(parseInt(p[0],10)*60+parseInt(p[1],10)),label:it.label});
   });
   return events;
 }
@@ -5955,16 +5958,10 @@ const PACE_DOT_RANGE_START=6*60; // 06:00
 const PACE_DOT_RANGE_END=24*60; // 24:00
 function _paceDotTimelineHtml(dk){
   const rangeLen=PACE_DOT_RANGE_END-PACE_DOT_RANGE_START;
-  const allEvents=_paceDayEvents(dk);
-  // 6~24시 구간은 실제 시각 비율로 배치
-  const inRange=allEvents
+  const events=_paceDayEvents(dk)
     .filter(ev=>ev.min>=PACE_DOT_RANGE_START)
-    .map(ev=>({...ev,xPct:(ev.min-PACE_DOT_RANGE_START)/rangeLen*100}));
-  // 00~01시(자정 넘어 취침 전 활동)는 실제 시각과 무관하게 맨 끝(24시 옆)에 고정 배치
-  const lateNight=allEvents
-    .filter(ev=>ev.min<60)
-    .map(ev=>({...ev,xPct:100}));
-  const events=[...inRange,...lateNight].sort((a,b)=>a.xPct-b.xPct);
+    .map(ev=>({...ev,xPct:Math.min(100,(ev.min-PACE_DOT_RANGE_START)/rangeLen*100)}))
+    .sort((a,b)=>a.xPct-b.xPct);
   if(!events.length)return '';
   const MIN_GAP_PCT=2.0,TRACK_H=42,BASE_Y=18;
   // 겹치는(간격이 MIN_GAP_PCT 미만인) 이벤트끼리 그룹으로 묶기
