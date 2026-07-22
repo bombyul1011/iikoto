@@ -5887,17 +5887,17 @@ async function refreshAfternoonPaceCard(){
 function _paceDayEvents(dk){
   const events=[];
   getTodos(dk).forEach(t=>{
-    if(!t.done)return;
     const st=t.strikeTimes||{};
     const timeEntries=Object.entries(st).filter(([,v])=>typeof v==='number');
     if(timeEntries.length){
+      // 조각 일부만 완료된 상태(항목 전체는 아직 done:false)여도, 완료된 조각은 점으로 찍혀야 함
       const {parts}=parseTodoTextParts(t.text);
       timeEntries.forEach(([idxStr,ms])=>{
         const idx=parseInt(idxStr,10);
         const d=new Date(ms);
         events.push({type:'todo',min:d.getHours()*60+d.getMinutes(),label:parts[idx]||t.text||''});
       });
-    }else if(t.completedAt){
+    }else if(t.done&&t.completedAt){
       const d=new Date(t.completedAt);
       events.push({type:'todo',min:d.getHours()*60+d.getMinutes(),label:t.text||''});
     }
