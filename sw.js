@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260722-3-partial-part-dots-fix';
+const CACHE = 'iikoto-v20260722-4-todo-full-check-fills-parts';
 const ASSETS = [
   './',
   './index.html'

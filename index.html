@@ -6088,7 +6088,25 @@ function toggleTodo(i,expectedCid){
   }
   if(!target)return;
   target.done=!target.done;
-  target.completedAt=target.done?Date.now():null;
+  const now=Date.now();
+  if(target.done){
+    target.completedAt=now;
+    // 조각모드 투두를 전체 체크로 완료하면, 아직 조각 체크가 안 된 나머지 조각들도
+    // "지금 이 시각에 끝냈다"로 간주해 strikeParts/strikeTimes를 마저 채움 —
+    // 그래야 활동 분포에서 이미 조각 체크된 것만 찍히고 나머지가 누락되는 일이 없음
+    const {parts}=parseTodoTextParts(target.text);
+    if(parts.length>1){
+      const st={...(target.strikeTimes||{})};
+      const sp=new Set(target.strikeParts||[]);
+      parts.forEach((_,idx)=>{
+        if(!sp.has(idx)){sp.add(idx);st[idx]=now;}
+      });
+      target.strikeParts=Array.from(sp);
+      target.strikeTimes=st;
+    }
+  }else{
+    target.completedAt=null;
+  }
   saveTodos(dk,todos);renderTodos();
 }
 
