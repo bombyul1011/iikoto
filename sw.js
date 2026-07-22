@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260722-1-v2.4-dawn-vow-fix';
+const CACHE = 'iikoto-v20260722-2-todo-part-strike-times';
 const ASSETS = [
   './',
   './index.html'

@@ -4029,7 +4029,7 @@ async function syncTodosDown(dk){
   if(!rows)return; // 연결 실패(null) — 로컬 유지. 빈 배열은 "서버에 진짜 0개"라는 뜻이라 그대로 반영.
   if(S.get(S.key('todos_pending',dk)))return; // 업로드 대기중인 로컬 수정(미루기 등) 있으면 덮어쓰지 않음
   S.set(S.key('todos',dk),rows.map(function(r){
-    return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined)};
+    return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined)};
   }));
   renderTodos();
 }
@@ -4038,7 +4038,7 @@ async function syncTodosUp(dk){
   if(ensureItemCids(todos))S.set(S.key('todos',dk),todos);
   const delCids=getDelPendingCids('todos',dk);
   const ok=await syncListUpSafe('todos',`date_key=eq.${dk}`,'date_key,client_id',todos,
-    t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,is_reserve:t.is_reserve||false,strike_parts:t.strikeParts||[],completed_at:(t.completedAt!=null?t.completedAt:null),sort_order:(typeof t.sortOrder==='number'?t.sortOrder:null)}),
+    t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,is_reserve:t.is_reserve||false,strike_parts:t.strikeParts||[],strike_times:t.strikeTimes||{},completed_at:(t.completedAt!=null?t.completedAt:null),sort_order:(typeof t.sortOrder==='number'?t.sortOrder:null)}),
     delCids);
   if(ok)delCids.forEach(cid=>removeDelPending('todos',dk,cid));
   return ok;
@@ -4814,12 +4814,13 @@ function relocateTodo(dk,idx,targetDk,mode){
   if(!todo)return{success:false,message:'항목을 찾을 수 없어요'};
   const {prefix,parts,hasPrefix}=parseTodoTextParts(todo.text);
   const strikeSet=new Set(todo.strikeParts||[]);
+  const strikeTimes=todo.strikeTimes||{};
   const hasMultipleParts=parts.length>1;
 
   if(!hasMultipleParts){
     const targetTodos=getTodos(targetDk);
     if(targetTodos.some(x=>x.text===todo.text))return{success:false,message:'이미 해당 날짜에 있어요'};
-    targetTodos.push({text:todo.text,done:false,created:Date.now(),timeSection:todo.timeSection||'none',cid:genCid(),strikeParts:[]});
+    targetTodos.push({text:todo.text,done:false,created:Date.now(),timeSection:todo.timeSection||'none',cid:genCid(),strikeParts:[],strikeTimes:{}});
     saveTodos(targetDk,targetTodos);
     if(mode==='move'){
       addDelPending('todos',dk,todo.cid);
@@ -4835,11 +4836,19 @@ function relocateTodo(dk,idx,targetDk,mode){
   const movedText=hasPrefix?`${prefix} > ${movedParts.join(' / ')}`:movedParts.join(' / ');
   const targetTodos=getTodos(targetDk);
   if(!targetTodos.some(x=>x.text===movedText)){
-    targetTodos.push({text:movedText,done:false,created:Date.now(),timeSection:todo.timeSection||'none',cid:genCid(),strikeParts:[]});
+    // 옮겨가는 조각들은 아직 미완료 상태이므로 시각 정보 없이 새로 시작
+    targetTodos.push({text:movedText,done:false,created:Date.now(),timeSection:todo.timeSection||'none',cid:genCid(),strikeParts:[],strikeTimes:{}});
     saveTodos(targetDk,targetTodos);
   }
 
-  const remainingParts=parts.filter((_,i)=>strikeSet.has(i));
+  const remainingIdxs=parts.map((_,i)=>i).filter(i=>strikeSet.has(i));
+  const remainingParts=remainingIdxs.map(i=>parts[i]);
+  // 완료된 조각만 남기며 인덱스가 0,1,2...로 재배치되므로, strikeTimes도 원래 인덱스 → 새 인덱스로 함께 리매핑
+  // (재매핑을 안 하면 시각이 엉뚱한 위치의 조각에 붙거나 유실됨 — 이동/복사 시 가장 신경 써야 하는 지점)
+  const newStrikeTimes={};
+  remainingIdxs.forEach((origIdx,newIdx)=>{
+    if(strikeTimes[origIdx]!=null)newStrikeTimes[newIdx]=strikeTimes[origIdx];
+  });
   const dkTodos=getTodos(dk);
   const cur=dkTodos[idx];
   if(!cur)return{success:true,message:'이동했어요'};
@@ -4851,25 +4860,40 @@ function relocateTodo(dk,idx,targetDk,mode){
   }else{
     cur.text=hasPrefix?`${prefix} > ${remainingParts.join(' / ')}`:remainingParts.join(' / ');
     cur.strikeParts=remainingParts.map((_,i)=>i);
+    cur.strikeTimes=newStrikeTimes;
     cur.done=true; // 남은 조각이 전부 완료 상태이므로 항목 전체도 완료로 자동 체크
-    cur.completedAt=cur.completedAt!=null?cur.completedAt:Date.now();
+    // 전체 완료시각은 "지금(이동한 시각)"이 아니라 실제 조각을 완료했던 시각 중 가장 늦은 것으로 —
+    // 그래야 "아까 완료한 조각"이 "방금 이동한 시각"으로 잘못 찍히지 않음
+    const times=Object.values(newStrikeTimes).filter(v=>typeof v==='number');
+    cur.completedAt=times.length?Math.max(...times):(cur.completedAt!=null?cur.completedAt:Date.now());
     saveTodos(dk,dkTodos);
   }
   return{success:true,message:mode==='move'?'다음 날로 옮겼어요':'내일에도 추가했어요'};
 }
 // [v2] 조각 하나의 완료(취소선) 상태 토글. strikeParts 변경 시 항상 saveTodos로 즉시 저장+동기화.
 // 모든 조각에 취소선이 그어지면 항목 전체를 자동 완료 처리(done=true, completedAt 기록) — 새벽 리캡 등 시각 통계가 이 값을 참조하므로 누락 없이 채워야 함.
+// strikeTimes: 조각 인덱스 → 완료 시각(ms). 홈탭 활동 분포에서 조각별로 점을 찍기 위한 용도.
 function toggleTodoStrikePart(i,partIdx){
   const dk=dateKey(currentDate),todos=getTodos(dk),todo=todos[i];
   if(!todo)return;
   const sp=new Set(todo.strikeParts||[]);
-  if(sp.has(partIdx))sp.delete(partIdx);else sp.add(partIdx);
+  const st={...(todo.strikeTimes||{})};
+  if(sp.has(partIdx)){
+    sp.delete(partIdx);
+    delete st[partIdx];
+  }else{
+    sp.add(partIdx);
+    st[partIdx]=Date.now();
+  }
   todo.strikeParts=Array.from(sp);
+  todo.strikeTimes=st;
   const totalParts=parseTodoTextParts(todo.text).parts.length;
   const allStruck=totalParts>0&&sp.size>=totalParts;
   if(allStruck&&!todo.done){
     todo.done=true;
-    todo.completedAt=todo.completedAt!=null?todo.completedAt:Date.now();
+    // 항목 전체 완료시각은 마지막으로 체크된 조각의 시각을 그대로 사용 — "방금 다 끝냈다"는 실제 순간과 일치시킴
+    const times=Object.values(st).filter(v=>typeof v==='number');
+    todo.completedAt=times.length?Math.max(...times):Date.now();
   }else if(!allStruck&&todo.done){
     // 취소선을 다시 풀어 미완료 조각이 생기면 완료 상태도 되돌림
     todo.done=false;
@@ -5859,12 +5883,24 @@ async function refreshAfternoonPaceCard(){
 })();
 // 오늘(dk) 하루의 투두/습관/아침루틴 완료 시각을 {type,min,label} 배열로 반환.
 // 시각 정보 없는 항목(과거 completedAt/hcTime 미기록)은 자연히 제외됨.
+// 조각별 완료 시각(strikeTimes)이 있으면 조각마다 점을 찍고, 없으면 기존처럼 항목 전체 completedAt 기준 점 1개.
 function _paceDayEvents(dk){
   const events=[];
   getTodos(dk).forEach(t=>{
-    if(!t.done||!t.completedAt)return;
-    const d=new Date(t.completedAt);
-    events.push({type:'todo',min:d.getHours()*60+d.getMinutes(),label:t.text||''});
+    if(!t.done)return;
+    const st=t.strikeTimes||{};
+    const timeEntries=Object.entries(st).filter(([,v])=>typeof v==='number');
+    if(timeEntries.length){
+      const {parts}=parseTodoTextParts(t.text);
+      timeEntries.forEach(([idxStr,ms])=>{
+        const idx=parseInt(idxStr,10);
+        const d=new Date(ms);
+        events.push({type:'todo',min:d.getHours()*60+d.getMinutes(),label:parts[idx]||t.text||''});
+      });
+    }else if(t.completedAt){
+      const d=new Date(t.completedAt);
+      events.push({type:'todo',min:d.getHours()*60+d.getMinutes(),label:t.text||''});
+    }
   });
   const wk=weekKey(new Date(dk+'T00:00:00'));
   const dow=(new Date(dk+'T00:00:00').getDay()+6)%7;
@@ -7826,7 +7862,7 @@ async function syncMonthRange(y,mo){
   }
   if(tRows){
     const byDate={};
-    tRows.forEach(r=>{if(r.date_key===RESERVE_DK)return;(byDate[r.date_key]=byDate[r.date_key]||[]).push({text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined)});});
+    tRows.forEach(r=>{if(r.date_key===RESERVE_DK)return;(byDate[r.date_key]=byDate[r.date_key]||[]).push({text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined)});});
     Object.keys(byDate).forEach(dk=>{if(!S.get(S.key('todos_pending',dk)))S.set(S.key('todos',dk),byDate[dk]);});
   }
   if(sRows)sRows.forEach(r=>S.set(S.key('sleep',r.date_key),{sleep:r.sleep_time,wake:r.wake_time,score:r.score}));
@@ -9957,7 +9993,7 @@ async function forceRestoreDate(dk){
   }
   var trows=await supaFetch('todos?date_key=eq.'+dk+'&order=created');
   if(trows!==null){
-    S.set(S.key('todos',dk),trows.map(function(r){return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined)};}));
+    S.set(S.key('todos',dk),trows.map(function(r){return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined)};}));
   }
   var srows=await supaFetch('sleep?date_key=eq.'+dk);
   if(srows&&srows.length>0){
