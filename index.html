@@ -795,10 +795,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 .recap-donut-row{display:flex;justify-content:space-around;margin-bottom:2px;}
 .recap-donut-item{text-align:center;}
-.recap-donut-wrap{position:relative;width:62px;height:62px;margin:0 auto 6px;}
-.recap-donut-wrap svg{transform:rotate(-90deg);}
+.recap-donut-wrap{position:relative;width:88px;height:48px;margin:0 auto 2px;}
+.recap-donut-wrap svg{display:block;}
 .recap-donut-habit-fg{stroke:rgba(150,205,225,0.80);}
-.recap-donut-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:700;color:var(--tp);}
+.recap-donut-label{position:absolute;left:0;right:0;bottom:2px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--tp);}
 .recap-donut-l{font-size:10px;color:var(--ts);}
 .recap-rhythm-bar-chart{display:flex;height:26px;border-radius:8px;overflow:hidden;margin-bottom:6px;}
 .recap-rhythm-bar-seg{display:flex;align-items:center;justify-content:center;}
@@ -5955,10 +5955,16 @@ const PACE_DOT_RANGE_START=6*60; // 06:00
 const PACE_DOT_RANGE_END=24*60; // 24:00
 function _paceDotTimelineHtml(dk){
   const rangeLen=PACE_DOT_RANGE_END-PACE_DOT_RANGE_START;
-  const events=_paceDayEvents(dk)
+  const allEvents=_paceDayEvents(dk);
+  // 6~24시 구간은 실제 시각 비율로 배치
+  const inRange=allEvents
     .filter(ev=>ev.min>=PACE_DOT_RANGE_START)
-    .map(ev=>({...ev,xPct:(ev.min-PACE_DOT_RANGE_START)/rangeLen*100}))
-    .sort((a,b)=>a.xPct-b.xPct);
+    .map(ev=>({...ev,xPct:(ev.min-PACE_DOT_RANGE_START)/rangeLen*100}));
+  // 00~01시(자정 넘어 취침 전 활동)는 실제 시각과 무관하게 맨 끝(24시 옆)에 고정 배치
+  const lateNight=allEvents
+    .filter(ev=>ev.min<60)
+    .map(ev=>({...ev,xPct:100}));
+  const events=[...inRange,...lateNight].sort((a,b)=>a.xPct-b.xPct);
   if(!events.length)return '';
   const MIN_GAP_PCT=2.0,TRACK_H=42,BASE_Y=18;
   // 겹치는(간격이 MIN_GAP_PCT 미만인) 이벤트끼리 그룹으로 묶기
@@ -6417,9 +6423,8 @@ function makeDawnRecapCard(){
   const card=document.createElement('div');card.className='day-recap-card';
   let html='';
 
-  if(vow||oneLine){
+  if(oneLine||vow){
     let vowHtml='';
-    if(vow)vowHtml+=`<div class="vow-recap-row"><div class="vow-recap-label">오늘 하루 다짐</div><div class="vow-recap-text">${escapeHtml(vow)}</div></div>`;
     if(oneLine)vowHtml+=`<div class="vow-recap-row"><div class="vow-recap-label">하루를 마무리하며</div><div class="vow-recap-text">${escapeHtml(oneLine)}</div></div>`;
     vowHtml+=`<div class="vow-recap-comment" id="vow-recap-comment-${dk}"></div>`;
     html+=`<div class="vow-recap-block">${vowHtml}</div><div class="day-recap-divider"></div>`;
@@ -6431,13 +6436,13 @@ function makeDawnRecapCard(){
 
   html+=`<div class="day-recap-divider"></div>`;
   html+=`<div class="recap-donut-row">
-    <div class="recap-donut-item"><div class="recap-donut-wrap"><svg width="62" height="62" viewBox="0 0 62 62">
-      <circle cx="31" cy="31" r="26" fill="none" stroke="var(--div)" stroke-width="7"/>
-      <circle cx="31" cy="31" r="26" fill="none" class="recap-donut-habit-fg" stroke-width="7" stroke-dasharray="163.4" stroke-dashoffset="${163.4*(1-habitPct/100)}" stroke-linecap="round"/>
+    <div class="recap-donut-item"><div class="recap-donut-wrap"><svg width="88" height="48" viewBox="0 0 88 48">
+      <path d="M 6 44 A 38 38 0 0 1 82 44" fill="none" stroke="var(--div)" stroke-width="7" stroke-linecap="round"/>
+      <path d="M 6 44 A 38 38 0 0 1 82 44" fill="none" class="recap-donut-habit-fg" stroke-width="7" stroke-dasharray="119.4" stroke-dashoffset="${119.4*(1-habitPct/100)}" stroke-linecap="round"/>
     </svg><div class="recap-donut-label">${habitPct}%</div></div><div class="recap-donut-l">습관 달성</div></div>
-    <div class="recap-donut-item"><div class="recap-donut-wrap"><svg width="62" height="62" viewBox="0 0 62 62">
-      <circle cx="31" cy="31" r="26" fill="none" stroke="var(--div)" stroke-width="7"/>
-      <circle cx="31" cy="31" r="26" fill="none" stroke="rgba(205,194,182,0.9)" stroke-width="7" stroke-dasharray="163.4" stroke-dashoffset="${163.4*(1-sleepRatio)}" stroke-linecap="round"/>
+    <div class="recap-donut-item"><div class="recap-donut-wrap"><svg width="88" height="48" viewBox="0 0 88 48">
+      <path d="M 6 44 A 38 38 0 0 1 82 44" fill="none" stroke="var(--div)" stroke-width="7" stroke-linecap="round"/>
+      <path d="M 6 44 A 38 38 0 0 1 82 44" fill="none" stroke="rgba(205,194,182,0.9)" stroke-width="7" stroke-dasharray="119.4" stroke-dashoffset="${119.4*(1-sleepRatio)}" stroke-linecap="round"/>
     </svg><div class="recap-donut-label">${sleepLabel}</div></div><div class="recap-donut-l">수면</div></div>
   </div>`;
 
