@@ -5603,7 +5603,7 @@ function startEveningLearn(idx){
   if(navigator.clipboard){
     navigator.clipboard.writeText(prompt).then(()=>{
       showToast('프롬프트가 복사됐어요, 리듬에도 기록했어요 ✓');
-      window.open('https://claude.ai/new','_blank');
+      window.location.href='https://claude.ai/new';
     });
   }else{
     showToast('클립보드 복사를 지원하지 않는 환경이에요');
@@ -5643,6 +5643,7 @@ function openChaeumCommentEditor(cid){
   if(!item)return;
   const slot=item.querySelector('.chaeum-log-comment-slot');
   if(!slot)return;
+  _chaeumOpenComments.add(cid); // 편집 중엔 항상 펼침 상태로 취급
   const log=getEveningLearnLog();
   const target=log.find(l=>l.cid===cid);
   const cur=target?target.comment||'':'';
@@ -5650,6 +5651,14 @@ function openChaeumCommentEditor(cid){
     <button class="chaeum-log-comment-save" onclick="saveChaeumComment('${cid}')">저장</button>`;
   const ta=document.getElementById(`chaeum-comment-ta-${cid}`);
   if(ta)ta.focus();
+  // 편집창 바깥을 클릭하면 저장 버튼을 누르지 않아도 자동 저장 — 다음 클릭 이벤트 한 번만 감지
+  setTimeout(()=>{
+    document.addEventListener('click',function outsideClick(e){
+      if(slot.contains(e.target))return; // 편집창(텍스트영역/저장버튼) 안 클릭이면 무시하고 계속 대기
+      document.removeEventListener('click',outsideClick);
+      if(document.getElementById(`chaeum-comment-ta-${cid}`))saveChaeumComment(cid);
+    });
+  },0);
 }
 function saveChaeumComment(cid){
   const ta=document.getElementById(`chaeum-comment-ta-${cid}`);
@@ -5682,6 +5691,35 @@ function renderChaeumTopicStats(){
   const chips=topics.map(t=>`<div class="chaeum-filter-tab${_chaeumFilterTopic===t?' on':''}" onclick="setChaeumFilter('${t}')">${escapeHtml(t)} <b>${counts[t]}</b></div>`).join('');
   el.innerHTML=`<div class="slabel">주제별로 이만큼 채웠어요</div><div class="chaeum-filter-tabs">${allTab}${chips}</div>`;
 }
+function toggleChaeumComment(cid,btnEl){
+  const item=document.querySelector(`.chaeum-log-item[data-cid="${cid}"]`);
+  if(!item)return;
+  const log=getEveningLearnLog();
+  const target=log.find(l=>l.cid===cid);
+  if(!target)return;
+  const commentEl=item.querySelector('.chaeum-log-comment-text');
+  const editBtn=item.querySelector('.chaeum-log-comment-edit-btn');
+  if(commentEl){
+    // 이미 펼쳐져 있으면 다시 눌러서 접기 — 코멘트 텍스트와 수정 버튼 둘 다 제거
+    commentEl.remove();
+    if(editBtn)editBtn.remove();
+    if(btnEl)btnEl.innerHTML='<i class="ti ti-chevron-down" style="font-size:11px;" aria-hidden="true"></i> 코멘트 보기';
+    return;
+  }
+  const div=document.createElement('div');
+  div.className='chaeum-log-comment chaeum-log-comment-text';
+  div.textContent=target.comment||'';
+  if(btnEl){
+    btnEl.insertAdjacentElement('afterend',div);
+    btnEl.innerHTML='<i class="ti ti-chevron-up" style="font-size:11px;" aria-hidden="true"></i> 코멘트 접기';
+    const edit=document.createElement('div');
+    edit.className='chaeum-log-comment-btn chaeum-log-comment-edit-btn';
+    edit.style.marginTop='6px';
+    edit.innerHTML='<i class="ti ti-pencil" style="font-size:11px;" aria-hidden="true"></i> 코멘트 수정';
+    edit.onclick=()=>openChaeumCommentEditor(cid);
+    div.insertAdjacentElement('afterend',edit);
+  }
+}
 function renderChaeumLogList(){
   const el=document.getElementById('chaeum-log-list');
   if(!el)return;
@@ -5691,13 +5729,12 @@ function renderChaeumLogList(){
   el.innerHTML=log.map(l=>{
     const dateLabel=l.dk?`${parseInt(l.dk.slice(5,7),10)}/${parseInt(l.dk.slice(8,10),10)}`:'';
     const commentHtml=l.comment
-      ?`<div class="chaeum-log-comment">${escapeHtml(l.comment)}</div><div class="chaeum-log-comment-slot"></div>`
+      ?`<div class="chaeum-log-comment-btn" onclick="toggleChaeumComment('${l.cid}',this)"><i class="ti ti-chevron-down" style="font-size:11px;" aria-hidden="true"></i> 코멘트 보기</div><div class="chaeum-log-comment-slot"></div>`
       :`<div class="chaeum-log-comment-slot"><div class="chaeum-log-comment-btn" onclick="openChaeumCommentEditor('${l.cid}')"><i class="ti ti-pencil" style="font-size:11px;" aria-hidden="true"></i> 코멘트 남기기</div></div>`;
     return `<div class="chaeum-log-item" data-cid="${l.cid}">
       <div class="chaeum-log-del" onclick="deleteEveningLearnLogItem('${l.cid}')"><i class="ti ti-x" aria-hidden="true"></i></div>
       <div class="chaeum-log-meta"><span>${dateLabel}</span><span class="chaeum-log-topic">${escapeHtml(l.topic)}</span></div>
       <div class="chaeum-log-title">${escapeHtml(l.title)}</div>
-      ${l.comment?`<div class="chaeum-log-comment-btn" onclick="openChaeumCommentEditor('${l.cid}')" style="margin-top:6px;"><i class="ti ti-pencil" style="font-size:11px;" aria-hidden="true"></i> 코멘트 수정</div>`:''}
       ${commentHtml}
     </div>`;
   }).join('');

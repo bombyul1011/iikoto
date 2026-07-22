@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260722-4-todo-full-check-fills-parts';
+const CACHE = 'iikoto-v20260722-5-chaeum-comment-collapse-fix';
 const ASSETS = [
   './',
   './index.html'
