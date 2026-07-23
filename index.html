@@ -5369,7 +5369,12 @@ function saveEveningLearnState(dk,v){S.set(S.key('eveninglearn',dk),v);}
 async function _fetchEveningLearnTopic(dk,avoidTopics){
   const key=getClaudeKey();
   const topics=getEveningTopics();
-  const picked=topics[Math.floor(Math.random()*topics.length)];
+  // 오늘 이미 나온 카테고리는 후보에서 제외 — 남은 카테고리가 있으면 그중에서만, 없으면 전체에서(안전장치)
+  const pool=(avoidTopics&&avoidTopics.length)
+    ? topics.filter(t=>!avoidTopics.includes(t))
+    : topics;
+  const candidates=pool.length?pool:topics;
+  const picked=candidates[Math.floor(Math.random()*candidates.length)];
   if(!key){
     // PC 등 키 없는 기기 — 모바일이 미리 만들어 서버에 캐시해둔 결과가 있으면 그것만 조회
     const cached=await aiCacheGet('eveninglearn_'+dk+'_'+picked);
