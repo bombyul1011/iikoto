@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260723-7-dawn-star-pace';
+const CACHE = 'iikoto-v20260723-10-reading-done-simple';
 const ASSETS = [
   './',
   './index.html'

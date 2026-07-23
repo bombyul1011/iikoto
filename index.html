@@ -457,6 +457,16 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .mbtn{flex:1;padding:10px;border-radius:12px;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;border:none;}
 .mbtn.cancel{background:var(--card);color:var(--tm);border:1px solid var(--card-b);}
 .mbtn.ok{background:var(--acc-soft);color:var(--acc);font-weight:500;}
+/* ── 독서 완독 확인 — 축하하는 느낌의 반짝이는 테두리 버튼 ── */
+.pg-done-msg{font-size:13.5px;color:var(--tp);text-align:center;margin:6px 0 14px;font-weight:500;}
+.mbtn-done-wrap{flex:1;display:inline-flex;border-radius:12px;padding:1.8px;
+  background:linear-gradient(120deg,#ffd28a,#ffb0c8,#c9a8ff,#9fd8ff,#ffd28a);
+  background-size:300% 300%;animation:bannerShine 3s ease infinite;cursor:pointer;}
+.mbtn-done{flex:1;width:100%;padding:9.2px;border-radius:10.5px;border:none;cursor:pointer;
+  background:linear-gradient(135deg,rgba(255,250,240,0.95),rgba(255,245,248,0.95));
+  color:#8a6d3a;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;
+  display:flex;align-items:center;justify-content:center;gap:5px;}
+[data-theme="glass"] .mbtn-done{background:rgba(40,36,30,0.85);color:#f0d090;}
 
 /* ── SETTINGS ── */
 .settings-ov{position:fixed;inset:0;z-index:8000;background:var(--bg);display:none;flex-direction:column;overflow-y:auto;transform:translateX(100%);transition:transform .3s cubic-bezier(.32,.72,0,1);}
@@ -1323,7 +1333,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 <div class="undo-toast" id="todo-postpone-undo-toast">내일로 미뤘어요 <span class="undo-btn" onclick="undoHomePostponeTodo()">되돌리기</span></div>
 
 <!-- READING PROGRESS DONE CONFIRM TOAST -->
-<div class="undo-toast" id="reading-progress-done-toast">다 읽으셨나요? <span class="undo-btn" onclick="confirmReadingProgressDone()">네</span></div>
 
 <!-- TODO SHEET -->
 <!-- RESERVE TODO SHEET -->
@@ -1916,7 +1925,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       </div>
     </div>
     <div class="pg-total" id="pg-total"></div>
-    <div class="modal-actions">
+    <div id="pg-done-confirm" style="display:none;"></div>
+    <div class="modal-actions" id="pg-modal-actions">
       <button class="mbtn cancel" onclick="closeModal('progress-modal')">취소</button>
       <button class="mbtn ok" onclick="confirmProgress()">저장</button>
     </div>
@@ -9782,6 +9792,14 @@ function openProgressModal(seconds){
   document.getElementById('pg-end-inp').value=_pgStartVal;
   const totalEl=document.getElementById('pg-total');
   totalEl.textContent=(_pgUnit==='pages'&&book.totalPages)?`총 ${book.totalPages}페이지`:'';
+  // 완독확인 UI가 이전 열람에서 떠 있던 상태로 남지 않도록 저장버튼 초기 상태로 리셋
+  const confirmEl=document.getElementById('pg-done-confirm');
+  const actionsEl=document.getElementById('pg-modal-actions');
+  if(confirmEl){confirmEl.style.display='none';confirmEl.innerHTML='';}
+  if(actionsEl){
+    actionsEl.innerHTML=`<button class="mbtn cancel" onclick="closeModal('progress-modal')">취소</button>
+      <button class="mbtn ok" onclick="confirmProgress()">저장</button>`;
+  }
   openModal('progress-modal');
   setTimeout(()=>document.getElementById('pg-end-inp').focus(),100);
 }
@@ -9795,7 +9813,7 @@ function setPgUnit(u){
   document.getElementById('pg-end-inp').value=_pgStartVal;
   document.getElementById('pg-total').textContent=(u==='pages'&&book.totalPages)?`총 ${book.totalPages}페이지`:'';
 }
-let _pgDoneConfirmCid=null,_pgDoneConfirmTimer=null;
+let _pgDoneConfirmCid=null;
 function confirmProgress(){
   const book=getBooks().find(b=>b.cid===_pgBookCid);if(!book)return;
   const endVal=parseInt(document.getElementById('pg-end-inp').value,10);
@@ -9812,30 +9830,32 @@ function confirmProgress(){
   // 스톱워치 없이 진행바만 직접 클릭해 페이지/퍼센트를 입력한 경우에도 "책을 읽은 행위"로 보고 체크함.
   const progressIncreased=_pgUnit==='percent'?book.percent>_pgStartVal:book.pages>_pgStartVal;
   if(progressIncreased)checkHabitDirect('독서',today,pad(new Date().getHours())+':'+pad(new Date().getMinutes()));
-  closeModal('progress-modal');
   _swSeconds=0;
   renderReadingHub();
   // 진행률이 사실상 다 읽은 지점에 도달하면(percent=100, 또는 pages가 totalPages 이상)
-  // 완독으로 넘어갈지 확인 토스트로 물어봄. totalPages를 안 적어둔 책은 "도달" 판정이
-  // 불가능하므로 페이지 단위에선 totalPages가 있을 때만 노출.
+  // 완독으로 넘어갈지 모달 안에서 바로 물어봄 — 하단 토스트는 놓치기 쉬워 모달을 닫지 않고 그 자리에서 확인.
+  // totalPages를 안 적어둔 책은 "도달" 판정이 불가능하므로 페이지 단위에선 totalPages가 있을 때만 노출.
   const reachedDone=_pgUnit==='percent'
     ?book.percent>=100
     :(book.totalPages&&book.pages>=book.totalPages);
   if(reachedDone&&book.status==='reading'){
     _pgDoneConfirmCid=book.cid;
-    const t=document.getElementById('reading-progress-done-toast');
-    if(t){
-      clearTimeout(_pgDoneConfirmTimer);
-      t.classList.add('on');
-      _pgDoneConfirmTimer=setTimeout(()=>{t.classList.remove('on');_pgDoneConfirmCid=null;},4000);
+    const confirmEl=document.getElementById('pg-done-confirm');
+    const actionsEl=document.getElementById('pg-modal-actions');
+    if(confirmEl&&actionsEl){
+      confirmEl.style.display='block';
+      confirmEl.innerHTML=`<div class="pg-done-msg">다 읽으셨나요?</div>`;
+      actionsEl.innerHTML=`<button class="mbtn cancel" onclick="closeModal('progress-modal')">나중에</button>
+        <div class="mbtn-done-wrap" onclick="confirmReadingProgressDone()"><button class="mbtn-done"><i class="ti ti-sparkles" style="font-size:14px;" aria-hidden="true"></i> 완독</button></div>`;
     }
+    return;
   }
+  closeModal('progress-modal');
 }
 function confirmReadingProgressDone(){
   const cid=_pgDoneConfirmCid;
   _pgDoneConfirmCid=null;
-  const t=document.getElementById('reading-progress-done-toast');
-  if(t)t.classList.remove('on');
+  closeModal('progress-modal');
   if(!cid)return;
   setBookStatus(cid,'done'); // 상태전환 공용 경로 — 콘텐츠 연동(syncReadingBookToContent)까지 함께 처리됨
 }
