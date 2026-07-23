@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260722-6-sleepbanner-textarchive-removed';
+const CACHE = 'iikoto-v20260723-1-code-cleanup-abcd';
 const ASSETS = [
   './',
   './index.html'

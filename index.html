@@ -4563,7 +4563,11 @@ function setNow(t){
   const dk=dateKey(currentDate),d=getSleep(dk);
   if(t==='sleep')d.sleep=v;else d.wake=v;
   saveSleepData(dk,d);loadSleep();
-  if(t==='sleep'){autoCloseUnfinishedRhythmBlocks(dateKey(getLogicalDate()),v);refreshRhythmTrack();}
+  // currentDate가 "지금 실제 날짜"와 같을 때만 논리적 하루(getLogicalDate) 기준으로 보정.
+  // 과거 날짜로 넘겨서 소급 입력하는 경우(currentDate가 실제 오늘과 다름)엔 dk를 그대로 써야
+  // 엉뚱한 날짜(오늘)의 리듬블록이 잘못 마감되지 않음.
+  const closeDk=dateKey(currentDate)===dateKey(new Date())?dateKey(getLogicalDate()):dk;
+  if(t==='sleep'){autoCloseUnfinishedRhythmBlocks(closeDk,v);refreshRhythmTrack();}
 }
 function openTimeModal(t){
   _sleepTarget=t;
@@ -4664,7 +4668,11 @@ function confirmTime(){
   const dk=dateKey(currentDate),d=getSleep(dk);
   if(_sleepTarget==='sleep')d.sleep=v;else d.wake=v;
   saveSleepData(dk,d);loadSleep();closeModal('time-modal');
-  if(_sleepTarget==='sleep'){autoCloseUnfinishedRhythmBlocks(dateKey(getLogicalDate()),v);refreshRhythmTrack();}
+  // currentDate가 "지금 실제 날짜"와 같을 때만 논리적 하루(getLogicalDate) 기준으로 보정.
+  // 과거 날짜로 넘겨서 소급 입력하는 경우(currentDate가 실제 오늘과 다름)엔 dk를 그대로 써야
+  // 엉뚱한 날짜(오늘)의 리듬블록이 잘못 마감되지 않음.
+  const closeDk=dateKey(currentDate)===dateKey(new Date())?dateKey(getLogicalDate()):dk;
+  if(_sleepTarget==='sleep'){autoCloseUnfinishedRhythmBlocks(closeDk,v);refreshRhythmTrack();}
 }
 
 // ── TODO
