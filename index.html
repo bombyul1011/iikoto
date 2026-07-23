@@ -571,6 +571,43 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .pace-dot-hourline{position:absolute;top:18px;width:1px;height:8px;background:var(--div);}
 .pace-dot-hourlabel{position:absolute;top:28px;font-size:9px;color:var(--tm);transform:translateX(-50%);white-space:nowrap;}
 .pace-dot{position:absolute;width:8px;height:8px;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 1px 2px rgba(0,0,0,0.12);}
+/* ── 새벽 전용 활동분포 배너 — 인사카드(dawn 톤: 라벤더~딥퍼플)와 색을 이어받은 별빛 디자인 ── */
+.dawn-pace-banner{
+  background:linear-gradient(150deg,#3a3560 0%,#2b2850 45%,#221f42 100%);
+  border:1px solid rgba(190,175,220,0.18);
+  border-radius:16px;padding:14px 15px;margin-bottom:10px;
+  box-shadow:0 4px 20px rgba(60,45,110,0.18),inset 0 1px 0 rgba(255,255,255,0.05);
+  position:relative;overflow:hidden;
+}
+.dawn-pace-banner::before{
+  content:'';position:absolute;inset:0;
+  background-image:
+    radial-gradient(1px 1px at 12% 25%, rgba(255,255,255,0.4) 50%, transparent),
+    radial-gradient(1px 1px at 30% 75%, rgba(255,255,255,0.28) 50%, transparent),
+    radial-gradient(1px 1px at 55% 15%, rgba(255,255,255,0.32) 50%, transparent),
+    radial-gradient(1px 1px at 72% 60%, rgba(255,255,255,0.22) 50%, transparent),
+    radial-gradient(1px 1px at 88% 35%, rgba(255,255,255,0.36) 50%, transparent),
+    radial-gradient(1px 1px at 95% 80%, rgba(255,255,255,0.25) 50%, transparent);
+  pointer-events:none;
+}
+.pace-title-dawn{font-size:12px;color:rgba(225,215,245,0.75);margin-bottom:10px;display:flex;align-items:center;gap:5px;position:relative;z-index:1;}
+.pace-dot-track-dawn{position:relative;margin-top:4px;z-index:1;}
+.pace-dot-baseline-dawn{position:absolute;left:0;right:0;height:1px;background:rgba(255,255,255,0.09);}
+.pace-dot-hourline-dawn{position:absolute;top:18px;width:1px;height:8px;background:rgba(255,255,255,0.09);}
+.pace-dot-hourlabel-dawn{position:absolute;top:28px;font-size:9px;color:rgba(225,215,245,0.42);transform:translateX(-50%);white-space:nowrap;}
+.star-dot{
+  position:absolute;border-radius:50%;transform:translate(-50%,-50%);
+  animation:twinkle 2.6s ease-in-out infinite;
+}
+.star-dot::after{
+  content:'';position:absolute;inset:-4px;border-radius:50%;
+  background:radial-gradient(circle, currentColor 0%, transparent 70%);
+  opacity:0.5;
+}
+@keyframes twinkle{
+  0%,100%{opacity:0.55;transform:translate(-50%,-50%) scale(0.85);}
+  50%{opacity:1;transform:translate(-50%,-50%) scale(1.15);}
+}
 .elearn-banner{position:relative;border-radius:16px;padding:1.6px;background:linear-gradient(135deg,rgba(168,186,110,0.9),rgba(222,196,90,0.85),rgba(190,200,130,0.9));background-size:300% 300%;animation:bannerShine 4s ease infinite;cursor:pointer;margin-top:10px;margin-bottom:10px;}
 .elearn-banner-inner{border-radius:14.5px;background:linear-gradient(135deg,rgba(235,238,205,0.85),rgba(248,238,195,0.85));padding:15px 17px;display:flex;align-items:center;gap:12px;}
 .elearn-banner-icon{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.55);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:17px;color:rgba(100,110,45,0.85);}
@@ -1935,6 +1972,9 @@ function renderHomeBody(section){
     refreshAfternoonPaceCard();
     body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getLogicalDate()));},'rhythm-soft',12.5,dateKey(getLogicalDate())));
   } else if(section==='dawn'){
+    const dawnDk=dateKey(getLogicalDate());
+    const paceBanner=makeDawnPaceBanner(dawnDk);
+    if(paceBanner)body.appendChild(paceBanner);
     body.appendChild(makeDawnRecapCard());
     body.appendChild(makeLabel('오늘의 리듬'));
     body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getLogicalDate()));},'rhythm-soft',12.5,dateKey(getLogicalDate())));
@@ -5366,6 +5406,25 @@ function _paceTopRhythmCat(dk){
 function getEveningLearnState(dk){return S.get(S.key('eveninglearn',dk))||{count:0,topics:[],picks:[],selected:null,started:null};}
 function saveEveningLearnState(dk,v){S.set(S.key('eveninglearn',dk),v);}
 
+// 새벽 4시 기준 dk가 바뀌면, 어제(혹은 그 이전) 날짜에 "선택은 했지만 시작은 안 한" 미완료 건을 자동 폐기.
+// - started가 있는 날은 이미 확정된 학습 기록이라 건드리지 않음(과거 로그로 그대로 유지)
+// - selected만 있고 started가 없는 날만 대상 — 로컬 상태 비우고, 서버의 selected 캐시도 삭제
+function cleanupStaleEveningLearnSelections(){
+  const todayDk=dateKey(getLogicalDate());
+  for(let i=0;i<localStorage.length;i++){
+    const k=localStorage.key(i);
+    if(!k||!k.startsWith('eveninglearn:'))continue;
+    const dk=k.slice('eveninglearn:'.length);
+    if(dk===todayDk)continue; // 오늘 것은 대상 아님
+    let s;try{s=JSON.parse(localStorage.getItem(k));}catch(e){continue;}
+    if(!s||s.started||!s.selected)continue; // 이미 시작했거나, 애초에 선택된 게 없으면 대상 아님
+    s.selected=null;
+    s.picks=[];
+    saveEveningLearnState(dk,s);
+    aiCacheDelete('eveninglearn_selected_'+dk);
+  }
+}
+
 async function _fetchEveningLearnTopic(dk,avoidTopics){
   const key=getClaudeKey();
   const topics=getEveningTopics();
@@ -5419,6 +5478,7 @@ ${extraLine}
 
 // 홈탭에 노출되는 진입 배너 — API 호출 없음, 탭하면 채움 코너로 이동
 function makeEveningLearnCard(){
+  cleanupStaleEveningLearnSelections();
   const dk=dateKey(getLogicalDate());
   const state=getEveningLearnState(dk);
   const wrap=document.createElement('div');
@@ -5473,6 +5533,7 @@ function makeEveningLearnCard(){
 
 // ── 채움 코너 (풀스크린) ──
 function openChaeum(){
+  cleanupStaleEveningLearnSelections();
   document.getElementById('chaeum-ov').classList.add('on');
   const dk=dateKey(getLogicalDate());
   const state=getEveningLearnState(dk);
@@ -5713,14 +5774,27 @@ function deleteEveningLearnLogItem(cid){
 function openChaeumCommentEditor(cid){
   const item=document.querySelector(`.chaeum-log-item[data-cid="${cid}"]`);
   if(!item)return;
-  const slot=item.querySelector('.chaeum-log-comment-slot');
-  if(!slot)return;
   _chaeumOpenComments.add(cid); // 편집 중엔 항상 펼침 상태로 취급
   const log=getEveningLearnLog();
   const target=log.find(l=>l.cid===cid);
   const cur=target?target.comment||'':'';
-  slot.innerHTML=`<textarea class="chaeum-log-comment-inp" rows="2" placeholder="어떤 내용을 배웠는지 남겨보세요" id="chaeum-comment-ta-${cid}">${escapeHtml(cur)}</textarea>
+  const editorHtml=`<textarea class="chaeum-log-comment-inp" rows="2" placeholder="어떤 내용을 배웠는지 남겨보세요" id="chaeum-comment-ta-${cid}">${escapeHtml(cur)}</textarea>
     <button class="chaeum-log-comment-save" onclick="saveChaeumComment('${cid}')">저장</button>`;
+  let slot=item.querySelector('.chaeum-log-comment-slot');
+  if(slot){
+    // 접힌(코멘트 남기기) 상태 — 기존 slot 자리에 그대로 렌더
+    slot.innerHTML=editorHtml;
+  }else{
+    // 펼친(코멘트 보기) 상태 — 텍스트/수정버튼이 slot 없이 직접 삽입돼 있으므로, 그 자리를 통째로 textarea로 교체
+    const commentEl=item.querySelector('.chaeum-log-comment-text');
+    const editBtn=item.querySelector('.chaeum-log-comment-edit-btn');
+    if(!commentEl)return;
+    slot=document.createElement('div');
+    slot.className='chaeum-log-comment-slot';
+    commentEl.replaceWith(slot);
+    if(editBtn)editBtn.remove();
+    slot.innerHTML=editorHtml;
+  }
   const ta=document.getElementById(`chaeum-comment-ta-${cid}`);
   if(ta)ta.focus();
   // 편집창 바깥을 클릭하면 저장 버튼을 누르지 않아도 자동 저장 — 다음 클릭 이벤트 한 번만 감지
@@ -6088,6 +6162,56 @@ function _paceDotTimelineHtml(dk){
       ${hourMarks}
       ${dotsHtml}
     </div>`;
+}
+
+// 새벽 전용 별빛 활동분포 배너 — 인사카드(dawn 톤) 바로 아래 독립 배너로 노출.
+// 로직(이벤트 계산/그룹핑)은 _paceDotTimelineHtml과 동일, 렌더링만 별빛 스타일로 분리.
+const DAWN_STAR_COLORS=['#f2cf8e','#f0a5b0','#a8d4b3'];
+function makeDawnPaceBanner(dk){
+  const rangeLen=PACE_DOT_RANGE_END-PACE_DOT_RANGE_START;
+  const events=_paceDayEvents(dk)
+    .filter(ev=>ev.min>=PACE_DOT_RANGE_START)
+    .map(ev=>({...ev,xPct:Math.min(100,(ev.min-PACE_DOT_RANGE_START)/rangeLen*100)}))
+    .sort((a,b)=>a.xPct-b.xPct);
+  if(!events.length)return null;
+  const MIN_GAP_PCT=2.0,TRACK_H=42,BASE_Y=18;
+  const groups=[];
+  events.forEach(ev=>{
+    const last=groups[groups.length-1];
+    if(last&&ev.xPct-last.centerX<MIN_GAP_PCT){
+      last.items.push(ev);
+      last.centerX=last.items.reduce((s,it)=>s+it.xPct,0)/last.items.length;
+    }else{
+      groups.push({centerX:ev.xPct,items:[ev]});
+    }
+  });
+  let dotsHtml='';let i=0;
+  groups.forEach(g=>{
+    const n=g.items.length;
+    g.items.forEach((ev,idx)=>{
+      const offset=(idx-(n-1)/2)*MIN_GAP_PCT;
+      const x=Math.min(100,Math.max(0,g.centerX+offset));
+      const color=DAWN_STAR_COLORS[i%DAWN_STAR_COLORS.length];
+      const size=5+(i%2); // 5px/6px 번갈아 — 반짝임에 미세한 크기 변주
+      const delay=((i*0.45)%2.6).toFixed(2);
+      dotsHtml+=`<div class="star-dot" style="left:${x}%;top:${BASE_Y}px;width:${size}px;height:${size}px;background:${color};color:${color};animation-delay:${delay}s;" title="${escapeHtml(ev.label)}"></div>`;
+      i++;
+    });
+  });
+  let hourMarks='';
+  for(let h=PACE_DOT_RANGE_START/60;h<=PACE_DOT_RANGE_END/60;h+=6){
+    const x=(h*60-PACE_DOT_RANGE_START)/rangeLen*100;
+    hourMarks+=`<div class="pace-dot-hourline-dawn" style="left:${x}%;"></div><div class="pace-dot-hourlabel-dawn" style="left:${x}%;">${h}시</div>`;
+  }
+  const wrap=document.createElement('div');
+  wrap.className='dawn-pace-banner';
+  wrap.innerHTML=`<div class="pace-title-dawn"><span>✦</span> 오늘 활동 분포</div>
+    <div class="pace-dot-track-dawn" style="height:${TRACK_H}px;">
+      <div class="pace-dot-baseline-dawn" style="top:${BASE_Y}px;"></div>
+      ${hourMarks}
+      ${dotsHtml}
+    </div>`;
+  return wrap;
 }
 
 function makeAfternoonPaceCard(){
@@ -6576,9 +6700,6 @@ function makeDawnRecapCard(){
     });
     html+=`</div>`;
   }
-
-  const dotTimelineInner=_paceDotTimelineHtml(dk);
-  if(dotTimelineInner)html+=dotTimelineInner;
 
   if(contentItems.length||readingMin===0){
     const catToKey=(cat)=>{
