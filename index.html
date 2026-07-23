@@ -788,10 +788,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .day-recap-sec-title{font-size:11.5px;font-weight:600;color:var(--ts);margin-bottom:9px;display:flex;align-items:center;gap:5px;}
 .oneline-quote{font-size:13px;color:var(--tp);font-style:italic;line-height:1.7;text-align:center;padding:2px 4px;}
 .vow-recap-block{padding:2px 4px;}
-.vow-recap-row{margin-bottom:12px;}
+.vow-recap-row{margin-bottom:6px;}
 .vow-recap-label{font-size:10.5px;color:var(--tm);margin-bottom:5px;letter-spacing:0.02em;}
 .vow-recap-text{font-size:14px;color:var(--tp);line-height:1.5;background:none;border:none;border-left:2.5px solid rgba(225,140,120,0.45);border-radius:0;padding:2px 0 2px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.vow-recap-comment{font-size:12.5px;color:var(--ts);line-height:1.6;margin-top:10px;padding-top:10px;min-height:1em;}
+.vow-recap-comment{font-size:12.5px;color:var(--ts);line-height:1.6;margin-top:4px;padding-top:0;min-height:1em;}
 
 .recap-donut-row{display:flex;justify-content:space-around;margin-bottom:2px;}
 .recap-donut-item{text-align:center;}
@@ -2018,14 +2018,17 @@ function saveRhythmBlocks(dk,v){
 function autoCloseUnfinishedRhythmBlocks(dk,sleepTime){
   if(!sleepTime)return;
   const blocks=getRhythmBlocks(dk);
-  const sleepMin=_dawnTimeToMin(sleepTime);
+  // 취침시각이 00:00~03:59(자정 넘어 취침)이면 24:00~27:59로 보정 — 그래야 전날 23시대에 시작한
+  // 미완료 블록(예: 23:39 시작 감상)보다 항상 나중 시각으로 비교되어 정상적으로 자동완료 처리됨
+  const sleepMin=dawnTimeToAdjustedMin(sleepTime);
   if(sleepMin==null)return;
   let changed=false;
   blocks.forEach(b=>{
     if(b.end)return; // 이미 완료된 블록은 건드리지 않음
-    const startMin=_dawnTimeToMin(b.start);
-    if(startMin==null||startMin>=sleepMin)return; // 시작 시각이 취침시각 이후/동일이면 스킵(비정상 데이터 보호)
-    const closeMin=sleepMin-1<0?0:sleepMin-1;
+    const startMin=dawnTimeToAdjustedMin(b.start);
+    if(startMin==null)return;
+    if(startMin>=sleepMin)return; // 시작 시각이 취침시각 이후/동일이면 스킵(비정상 데이터 보호)
+    const closeMin=(sleepMin-1)%1440;
     b.end=pad(Math.floor(closeMin/60))+':'+pad(closeMin%60);
     changed=true;
   });
@@ -2162,19 +2165,20 @@ function checkHabitDirect(habitName,dk,timeStr){
   const key=habitName+'-'+dow;
   const checks=getHabitChecks(wk);
   const alreadyChecked=!!checks[key];
-  if(!alreadyChecked){
-    checks[key]=true;
-    saveHabitChecks(wk,checks);
-  }
-  // 이미 체크돼 있었더라도 시각 기록이 비어 있으면 이번 자동체크 시각으로 채움
   const hcTimes=getHabitCheckTimes(wk);
-  if(alreadyChecked&&hcTimes[key])return; // 이미 체크+시각 둘 다 있으면 더 할 일 없음
-  if(timeStr){
-    hcTimes[key]=timeStr;
-    saveHabitCheckTimes(wk,hcTimes);
-  }else{
-    recordHabitCheckTime(wk,key);
+  const alreadyHasTime=!!hcTimes[key];
+  if(alreadyChecked&&alreadyHasTime)return; // 이미 체크+시각 둘 다 있으면 더 할 일 없음
+  if(!alreadyChecked)checks[key]=true;
+  if(!alreadyHasTime){
+    if(timeStr)hcTimes[key]=timeStr;
+    else hcTimes[key]=pad(new Date().getHours())+':'+pad(new Date().getMinutes());
   }
+  // checks/hcTimes를 로컬에 먼저 반영한 뒤, 서버 동기화는 한 번만 트리거해 레이스 컨디션 방지
+  // (이전엔 saveHabitChecks/saveHabitCheckTimes가 각각 autoSync→syncHCUp을 별도 호출해
+  //  hcTimes 세팅 전에 나간 첫 호출이 checked_time:null로 서버를 덮어쓰는 경우가 있었음)
+  S.set(S.key('hc',wk),checks);
+  S.set(S.key('hcTime',wk),hcTimes);
+  autoSync('hc',wk);
   if(document.getElementById('daily-habit-box'))renderDailyHabitCheck();
 }
 function finishRhythmBlock(idx){
@@ -3784,10 +3788,11 @@ function getAvgSleepScore(days){
   return {avg:avg,sampleCount:vals.length};
 }
 // 최근 N일(오늘 제외, 어제부터)의 평균 취침·기상 시각 계산
-// 취침시각이 00~11시대면 자정 넘어 잔 것으로 보고 +1440분 보정 후 평균, 다시 mod 1440으로 환산
+// 취침시각은 밤 11시~새벽까지 넓게 걸쳐 나타나므로, 자정 기준(4시)보다 늦은 12시를 경계로 보정한다.
+// (예: 23시 취침도 01시 취침도 모두 "그날 밤 잠든 것"으로 같은 방향으로 평균에 반영되어야 함)
 function getAvgSleepWindow(days){
   days=days||7;
-  const toMin=function(t){if(!t)return null;const p=t.split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);};
+  const SLEEP_CUTOFF_MIN=12*60; // 정오 — 이 시각 이전은 전날 밤에 걸친 취침으로 간주
   let sleepVals=[],wakeVals=[];
   let d=getLogicalDate();
   for(let i=1;i<=days;i++){
@@ -3795,9 +3800,8 @@ function getAvgSleepWindow(days){
     const dk=dateKey(dd);
     const sl=getSleep(dk);
     if(!sl||!sl.sleep||!sl.wake)continue;
-    let sMin=toMin(sl.sleep),wMin=toMin(sl.wake);
+    const sMin=dawnTimeToAdjustedMin(sl.sleep,SLEEP_CUTOFF_MIN),wMin=_dawnTimeToMin(sl.wake);
     if(sMin==null||wMin==null)continue;
-    if(sMin<720)sMin+=1440; // 00~11시대 취침은 자정 넘어간 것으로 보정
     sleepVals.push(sMin);
     wakeVals.push(wMin);
   }
@@ -4570,7 +4574,7 @@ function setNow(t){
   const dk=dateKey(currentDate),d=getSleep(dk);
   if(t==='sleep')d.sleep=v;else d.wake=v;
   saveSleepData(dk,d);loadSleep();
-  if(t==='sleep'){autoCloseUnfinishedRhythmBlocks(dk,v);refreshRhythmTrack();}
+  if(t==='sleep'){autoCloseUnfinishedRhythmBlocks(dateKey(getLogicalDate()),v);refreshRhythmTrack();}
 }
 function openTimeModal(t){
   _sleepTarget=t;
@@ -4671,7 +4675,7 @@ function confirmTime(){
   const dk=dateKey(currentDate),d=getSleep(dk);
   if(_sleepTarget==='sleep')d.sleep=v;else d.wake=v;
   saveSleepData(dk,d);loadSleep();closeModal('time-modal');
-  if(_sleepTarget==='sleep'){autoCloseUnfinishedRhythmBlocks(dk,v);refreshRhythmTrack();}
+  if(_sleepTarget==='sleep'){autoCloseUnfinishedRhythmBlocks(dateKey(getLogicalDate()),v);refreshRhythmTrack();}
 }
 
 // ── TODO
@@ -5911,7 +5915,7 @@ async function refreshAfternoonPaceCard(){
 // 조각별 완료 시각(strikeTimes)이 있으면 조각마다 점을 찍고, 없으면 기존처럼 항목 전체 completedAt 기준 점 1개.
 // 논리적 하루(새벽 4시까지 전날 귀속) 기준 보정: 00:00~03:59 사이 실제 시계 시각은
 // 활동 분포 타임라인에서 24:00~27:59로 표시되어야 전날 마지막 구간(24시 옆)에 붙어 보임.
-function _paceAdjustMin(min){return min<PACE_DOT_RANGE_START?min+1440:min;}
+function _paceAdjustMin(min){return toDawnAdjustedMin(min,PACE_DOT_RANGE_START);}
 function _paceDayEvents(dk){
   const events=[];
   getTodos(dk).forEach(t=>{
@@ -6296,8 +6300,27 @@ function makeHabitMiniCheckRow(){
   });
   return wrap;
 }
-// ── 새벽(dawn/night_3) 전용: 하루 마감 배너 + 당일 취합 리포트
+// 시:분 문자열 → 정렬용 분값. 06:00 이전 시각은 전날 늦은 시간대로 보고 +1440분(하루 끝으로 밀어 정렬).
+// 값이 없으면 9999(항상 맨 뒤)를 반환.
+function toSortKey(t){
+  if(!t)return 9999;
+  const min=_dawnTimeToMin(t);
+  if(min==null)return 9999;
+  return toDawnAdjustedMin(min,6*60);
+}
 function _dawnTimeToMin(t){if(!t)return null;const p=t.split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);}
+// 논리적 하루 경계 보정 공통 유틸.
+// "00:00부터 cutoffMin 이전"의 시각은 전날 늦은 시간대로 취급해 +1440분 해준다.
+// - 일반 활동(투두/습관/리듬블록 정렬 등): cutoffMin=DAWN_CUTOFF_MIN(getLogicalDate와 동일한 4시 기준)
+// - 취침시각처럼 밤 11시~새벽에 넓게 걸치는 특수 케이스: cutoffMin을 더 늦게(예: 12시) 넘겨서 호출
+const DAWN_CUTOFF_MIN=4*60; // 04:00 — getLogicalDate()와 동일한 기준
+function toDawnAdjustedMin(min,cutoffMin){
+  if(min==null)return null;
+  const c=cutoffMin!=null?cutoffMin:DAWN_CUTOFF_MIN;
+  return min<c?min+1440:min;
+}
+// 시:분 문자열을 곧바로 새벽보정 분 단위로 변환하는 축약형
+function dawnTimeToAdjustedMin(t,cutoffMin){return toDawnAdjustedMin(_dawnTimeToMin(t),cutoffMin);}
 // 주어진 날짜(dk)로부터 과거로 거슬러 올라가며 독서 기록(감상 카테고리, 텍스트가 "독서"로 시작)이
 // 마지막으로 있었던 날까지 며칠 지났는지 계산. 최대 90일까지만 탐색(그 이상은 사실상 의미 없어 상한).
 function _daysSinceLastReading(dk){
@@ -6424,14 +6447,13 @@ function makeDawnRecapCard(){
     let vowHtml='';
     if(oneLine)vowHtml+=`<div class="vow-recap-row"><div class="vow-recap-label">하루를 마무리하며</div><div class="vow-recap-text">${escapeHtml(oneLine)}</div></div>`;
     vowHtml+=`<div class="vow-recap-comment" id="vow-recap-comment-${dk}"></div>`;
-    html+=`<div class="vow-recap-block">${vowHtml}</div><div class="day-recap-divider"></div>`;
+    html+=`<div class="vow-recap-block">${vowHtml}</div>`;
     _fetchVowRecapComment(dk,vow,oneLine).then(text=>{
       const el=document.getElementById('vow-recap-comment-'+dk);
       if(el&&text)el.textContent=text;
     });
   }
 
-  html+=`<div class="day-recap-divider"></div>`;
   html+=`<div class="recap-donut-row">
     <div class="recap-donut-item"><div class="recap-donut-wrap"><svg width="88" height="48" viewBox="0 0 88 48">
       <path d="M 6 44 A 38 38 0 0 1 82 44" fill="none" stroke="var(--div)" stroke-width="7" stroke-linecap="round"/>
@@ -6444,8 +6466,7 @@ function makeDawnRecapCard(){
   </div>`;
 
   if(totalDur>0){
-    html+=`<div class="day-recap-divider"></div>
-      <div class="day-recap-sec-title"><i class="ti ti-rainbow" style="font-size:13px;" aria-hidden="true"></i> 오늘의 리듬</div>
+    html+=`<div class="day-recap-sec-title"><i class="ti ti-rainbow" style="font-size:13px;" aria-hidden="true"></i> 오늘의 리듬</div>
       <div class="recap-rhythm-bar-chart">`;
     Object.keys(RHYTHM_CATS).forEach(k=>{
       if(!durByCat[k])return;
@@ -6460,7 +6481,7 @@ function makeDawnRecapCard(){
   }
 
   const dotTimelineInner=_paceDotTimelineHtml(dk);
-  if(dotTimelineInner)html+='<div class="day-recap-divider"></div>'+dotTimelineInner;
+  if(dotTimelineInner)html+=dotTimelineInner;
 
   if(contentItems.length||readingMin===0){
     const catToKey=(cat)=>{
@@ -6470,8 +6491,7 @@ function makeDawnRecapCard(){
       if(cat==='음악')return 'music';
       return Object.keys(CAT_LABELS).find(k=>CAT_LABELS[k]===cat)||null;
     };
-    html+=`<div class="day-recap-divider"></div>
-      <div class="day-recap-sec-title"><i class="ti ${RHYTHM_CATS.enjoy.icon}" style="font-size:12px;" aria-hidden="true"></i> 오늘 본 콘텐츠</div>`;
+    html+=`<div class="day-recap-sec-title"><i class="ti ${RHYTHM_CATS.enjoy.icon}" style="font-size:12px;" aria-hidden="true"></i> 오늘 본 콘텐츠</div>`;
     if(!contentItems.some(c=>c.cat==='독서')){
       const readingLabel=readingMin>0?readingMin+'분':_daysSinceLastReading(dk)+'일째 안읽음';
       html+=`<div class="recap-content-item"><span class="cdot" style="background:${getCatColor('book')};"></span>독서<span class="ctime">${readingLabel}</span></div>`;
@@ -7962,8 +7982,7 @@ function renderCalDetail(d){
   const MAX=3;const total=allMemos.length;
   // 시간순 정렬: 06:00 기준으로 하루 시작 (새벽 0~5시는 하루 끝으로 취급)
   const sortedMemos=[...allMemos].sort((a,b)=>{
-    const toSortKey=function(t){if(!t)return 9999;const p=t.split(':');const h=parseInt(p[0],10),m=parseInt(p[1],10);return h<6?h*60+m+1440:h*60+m;};
-    return toSortKey(a.time)-toSortKey(b.time);
+        return toSortKey(a.time)-toSortKey(b.time);
   });
   const hiddenCnt=Math.max(0,total-MAX);
   const showMemos=hiddenCnt>0?sortedMemos.slice(0,MAX):sortedMemos;
@@ -8002,8 +8021,7 @@ function calShowAll(dk){
   const memos=getMemos(dk);const el=document.getElementById('cal-detail');if(!el)return;
   const moreBtn=el.querySelector('.cal-detail-more');
   const rowsWrap=document.getElementById('cal-memo-rows-'+dk);if(!rowsWrap)return;
-  const toSortKey=function(t){if(!t)return 9999;const p=t.split(':');const h=parseInt(p[0],10),m=parseInt(p[1],10);return h<6?h*60+m+1440:h*60+m;};
-  const sorted=[...memos].sort(function(a,b){return toSortKey(a.time)-toSortKey(b.time);});
+    const sorted=[...memos].sort(function(a,b){return toSortKey(a.time)-toSortKey(b.time);});
   const MAX=3;
   let extra='';sorted.slice(MAX).forEach(function(m){extra+=`<div class="cal-detail-row"><span class="cal-detail-time">${m.time||''}</span><span class="cal-detail-text">${m.text||''}</span></div>`;});
   rowsWrap.insertAdjacentHTML('beforeend',extra);
@@ -8789,8 +8807,7 @@ function saveNotionBackupConfig(){
 // 그 달의 일간 배열 — 하루한줄/완료투두/평균수면/메모 전체(시간순). 아무 기록도 없는 날은 제외.
 function buildBackupDays(y,mo,dim){
   const out=[];
-  const toSortKey=function(t){if(!t)return 9999;const p=t.split(':');const h=parseInt(p[0],10),m=parseInt(p[1],10);return h<6?h*60+m+1440:h*60+m;};
-  for(let d=1;d<=dim;d++){
+    for(let d=1;d<=dim;d++){
     const dk=`${y}-${pad(mo+1)}-${pad(d)}`;
     const date=new Date(y,mo,d);
     const oneLine=getDailyOneLine(dk).trim();
