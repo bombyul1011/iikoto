@@ -1285,6 +1285,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 <!-- TODO POSTPONE UNDO TOAST -->
 <div class="undo-toast" id="todo-postpone-undo-toast">내일로 미뤘어요 <span class="undo-btn" onclick="undoHomePostponeTodo()">되돌리기</span></div>
 
+<!-- READING PROGRESS DONE CONFIRM TOAST -->
+<div class="undo-toast" id="reading-progress-done-toast">다 읽으셨나요? <span class="undo-btn" onclick="confirmReadingProgressDone()">네</span></div>
+
 <!-- TODO SHEET -->
 <!-- RESERVE TODO SHEET -->
 <div class="overlay" id="reserve-sheet" onclick="closeSheet('reserve-sheet',event)">
@@ -2209,7 +2212,7 @@ function getDayCategoryDurations(dk){
     if(wakeMin!=null)add('수면',wakeMin);
     // 기상을 아직 안 누른 경우(sleepMin만 있고 wakeMin 없음)는 진행중이라 누계에서 제외
   }
-  ['breakfast','lunch','dinner','snack'].forEach(function(k){if(meals[k+'_time'])add('식사',60);});
+  MEAL_KEYS.forEach(function(k){if(meals[k+'_time'])add('식사',60);});
   manual.forEach(function(b){
     if(!b.end)return; // 진행중 블록은 누계에서 제외
     const cat=RHYTHM_CATS[b.cat];if(!cat)return;
@@ -2269,12 +2272,12 @@ function buildDailyRhythmTrack(dk){
   const meals=getMeals(dk)||{};
   const manual=getRhythmBlocks(dk);
   const TOTAL_H=320;
-  // 0~6시(자는 시간)는 절반 크기로 압축하고, 줄어든 만큼을 나머지 6~24시 구간에 균일하게 더해줌
+  // 0~8시(자는 시간)는 절반 크기로 압축하고, 줄어든 만큼을 나머지 8~24시 구간에 균일하게 더해줌
   const NIGHT_END=480; // 8시(분)
-  const H1=TOTAL_H/8; // 0~6시 구간이 차지하는 높이 (원래 1/4 → 절반인 1/8로)
-  const H2=TOTAL_H-H1; // 6~24시 구간이 차지하는 높이
+  const H1=TOTAL_H/8; // 0~8시 구간이 차지하는 높이 (원래 1/4 → 절반인 1/8로)
+  const H2=TOTAL_H-H1; // 8~24시 구간이 차지하는 높이
   // 자정 넘겨 새로 시작한 블록(sortKey로 +1440 처리된 것)은 24시 지점을 그대로 고정한 채
-  // 그 아래로 이어붙여서 그린다. EXTRA_RATE는 0~6시 구간과 동일한 압축비를 사용.
+  // 그 아래로 이어붙여서 그린다. EXTRA_RATE는 0~8시 구간과 동일한 압축비를 사용.
   const EXTRA_RATE=H1/NIGHT_END;
   const toY=function(min){
     if(min>1440){
@@ -2302,8 +2305,7 @@ function buildDailyRhythmTrack(dk){
       blocks.push({start:sleepMin,end:null,color:getRhythmColor('_sleep'),label:'수면',time:sleep.sleep+' – 기상 전',ongoing:true});
     }
   }
-  const MEAL_LABELS={breakfast:'아침 식사',lunch:'점심 식사',dinner:'저녁 식사',snack:'간식'};
-  Object.keys(MEAL_LABELS).forEach(function(k){
+  MEAL_KEYS.forEach(function(k){
     const t=meals[k+'_time'];
     if(!t)return;
     const start=toMin(t);
@@ -2311,11 +2313,10 @@ function buildDailyRhythmTrack(dk){
   });
   // 자정 넘어 새로 등록된 블록(예: 00:30 시작)을 그날 이른 새벽 활동과 구분하기 위한 기준시각.
   // 그날 이미 등록된 수기 블록들 중 가장 늦은 시각(끝났으면 end, 진행중이면 start)을 구해두고,
-  // 이보다 훨씬 이른 새벽 시각(06시 이전)에 시작하는 블록이 새로 추가되면 "자정을 넘겨 시작한
+  // 이보다 훨씬 이른 새벽 시각(DAWN_CUTOFF_MIN, 04시 이전)에 시작하는 블록이 새로 추가되면 "자정을 넘겨 시작한
   // 것"으로 보고 정렬 순서(sortKey)만 +1440분(다음날 취급) 적용해 목록 맨 아래로 배치한다.
   // 막대의 실제 화면 위치(toY)는 축 그대로 두어, 진짜 이른 새벽 활동(수면 등)과 시각적으로 겹치는
   // 건 유지하되 목록 순서로는 명확히 구분되게 한다.
-  const NEWDAY_CUTOFF=360; // 06:00
   let _latestManualMin=-1;
   manual.forEach(function(b){
     const s=toMin(b.start);if(s==null)return;
@@ -2329,7 +2330,7 @@ function buildDailyRhythmTrack(dk){
     let eMin=b.end?toMin(b.end):null;
     // 이미 그날 안에 이보다 늦은 시각의 블록이 있고, 지금 블록의 시작이 새벽 컷오프
     // 이전이면서 그 "늦은 시각"보다도 이르면 → 자정 넘겨 새로 시작한 것으로 판단
-    const isLateNightNew=sMin<NEWDAY_CUTOFF&&_latestManualMin>=NEWDAY_CUTOFF&&sMin<_latestManualMin;
+    const isLateNightNew=sMin<DAWN_CUTOFF_MIN&&_latestManualMin>=DAWN_CUTOFF_MIN&&sMin<_latestManualMin;
     // sortKey: 리스트/정렬 순서 결정용 (자정 넘긴 블록은 +1440 해서 맨 아래로)
     // start/end: 실제 트랙 막대 위치(toY) 계산용 — 축 자체는 0~24시 그대로 유지
     let sortKey=sMin;
@@ -2613,6 +2614,14 @@ async function renderDiaryMonthSheet(){
     el.innerHTML=`<div style="font-size:12px;color:var(--tm);text-align:center;padding:30px 0;">불러오지 못했어요, 다시 시도해주세요</div>`;
   }
 }
+// 콘텐츠가 이번 달(mk)로 이월되는지 판정하는 공통 조건.
+// 진행중(watching)이거나, 완료/중단됐어도 종료월이 이번 달 이후면 이월 대상.
+// getContentsForReport(리포트)와 renderTimetable(타임테이블) 양쪽에서 각자 재구현되던 로직을 통일.
+function isContentCarryOver(c,mk){
+  if(c.status==='watching')return true;
+  if((c.status==='done'||c.status==='stopped')&&c.endDate&&c.endDate.slice(0,7)>=mk)return true;
+  return false;
+}
 function getContentsForReport(mk){
   // 음악: 등록일=완료일로 취급 — 시작월에만 노출/집계, 별도 상태표기 없음
   // 드라마/영화/책: 보는중인 동안은 관련된 모든 달에 노출되지만(상태:보는중), 집계(완료/중단 확정)는 끝난 달에서만 잡힘
@@ -2622,9 +2631,7 @@ function getContentsForReport(mk){
   const prev=getContents(prevMk);
   const carry=prev.filter(c=>{
     if(c.cat==='음악')return false;
-    if(c.status==='watching')return true;
-    if((c.status==='done'||c.status==='stopped')&&c.endDate&&c.endDate.slice(0,7)>=mk)return true;
-    return false;
+    return isContentCarryOver(c,mk);
   }).map(c=>({...c,_carried:true}));
   const all=[...carry,...cur];
   // 콘텐츠 종류(드라마→책→영화→음악)별로 묶은 뒤, 그 안에서는 시작일 오름차순으로 정렬
@@ -2722,14 +2729,16 @@ function computeMonthStats(y,mo,endDay){
   const rhythmSummary=Object.keys(rhythmDur).length?durSummaryLine(rhythmDur):'';
   return {memos,doneTodos,totalTodos,todoPct,habitPct,avgSleep,allMemoTexts,onelineTexts,wcByWeek,contentsList,rhythmSummary,rhythmCompareText,monthCompareText,rhythmDur,rhythmDayCount,dim,goalLines};
 }
+// 콘텐츠 상태(watching/done/stopped)를 한글 라벨로 변환 — 월간 리포트 화면 표시와
+// AI 프롬프트 두 곳에서 완전히 동일하게 재구현되던 것을 통일.
+function cStatusLabel(c){
+  if(c.cat==='music')return '';
+  if(c.cat==='book')return c.status==='stopped'?'중단':(c.status==='done'?'완료':'읽는중');
+  return c.status==='stopped'?'중단':(c.status==='done'?'완료':'보는중');
+}
 async function generateMonthlyReportAI(mk,stats,isMidReport){
   const key=getClaudeKey();
   if(!key)return null;
-  const cStatusLabelAI=function(c){
-    if(c.cat==='music')return '';
-    if(c.cat==='book')return c.status==='stopped'?'중단':(c.status==='done'?'완료':'읽는중');
-    return c.status==='stopped'?'중단':(c.status==='done'?'완료':'보는중');
-  };
   const dataContext=[
     isMidReport?`${mk} 1~15일 데이터 (한 달의 절반, 아직 진행 중):`:`${mk} 한 달 데이터:`,
     getUserProfileContext(),
@@ -2741,7 +2750,7 @@ async function generateMonthlyReportAI(mk,stats,isMidReport){
     stats.rhythmCompareText?`전월 같은 기간 대비 시간 사용 변화: ${stats.rhythmCompareText}`:'',
     stats.monthCompareText?`전월 같은 기간 대비 투두/습관/수면 변화: ${stats.monthCompareText}`:'',
     stats.allMemoTexts.length?`이번 달 메모 전체 (${stats.allMemoTexts.length}건, 시간순):\n${stats.allMemoTexts.slice(0,2000).join('\n')}`:'',
-    stats.contentsList.length?`콘텐츠 기록: ${stats.contentsList.map(c=>`${c.title}(${c.cat}${cStatusLabelAI(c)?', '+cStatusLabelAI(c):''})`).join(', ')}`:'',
+    stats.contentsList.length?`콘텐츠 기록: ${stats.contentsList.map(c=>`${c.title}(${c.cat}${cStatusLabel(c)?', '+cStatusLabel(c):''})`).join(', ')}`:'',
     stats.wcByWeek.length?`주간 미션 현황: ${stats.wcByWeek.map(w=>w.lines.map(l=>`${l.text} ${l.pct}%`).join(', ')).join(' | ')}`:''
   ].filter(Boolean).join('\n');
   const sys=`당신은 따뜻한 월간 회고 비서예요. ${isMidReport?'한 달의 절반(1~15일) 데이터를 보고 지금까지의 흐름을 담은 중간 소식을':'한 달 데이터를 보고 풍부한 총평과 키워드를'} 만들어요.
@@ -2815,11 +2824,6 @@ async function loadMonthlyReportContent(){
     </div>
   </div>` : `<div class="mr-card"><div class="mr-sec-title"><i class="ti ti-flag-3" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 주간 미션 모음 · 주차별</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:8px 0;">이 달엔 작성한 주간 미션이 없어요</div></div>`;
 
-  const cStatusLabel=function(c){
-    if(c.cat==='music')return '';
-    if(c.cat==='book')return c.status==='stopped'?'중단':(c.status==='done'?'완료':'읽는중');
-    return c.status==='stopped'?'중단':(c.status==='done'?'완료':'보는중');
-  };
   const contentsHtml=stats.contentsList.length?`<div class="mr-card">
     <div class="mr-sec-title"><i class="ti ti-stack-2" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 콘텐츠 기록</div>
     ${stats.contentsList.map(c=>`<div class="mr-wc-line"><span class="txt"><span style="display:inline-block;width:7px;height:7px;border-radius:2px;background:${getCatColor(c.cat)};margin-right:6px;"></span>${c.title}</span><span class="pct" style="color:var(--tm);font-weight:400;">${cStatusLabel(c)}</span></div>`).join('')}
@@ -3588,8 +3592,10 @@ function getSolarTermLine(){
   }
   return null;
 }
-function getLogicalDate(){
-  const d=new Date();
+// 논리적 하루(새벽 4시 기준) 판정. 인자를 생략하면 "지금"을, ts를 넘기면 그 시각 기준으로 판정.
+// (기존 호출부는 대부분 인자 없이 "지금" 기준으로 쓰고 있어 그대로 호환됨)
+function getLogicalDate(ts){
+  const d=ts!=null?new Date(ts):new Date();
   if(d.getHours()<4)d.setDate(d.getDate()-1);
   return d;
 }
@@ -3805,6 +3811,10 @@ const SLEEP_SCORE_LEVELS=[
 function getSleepScoreLevel(score){
   return SLEEP_SCORE_LEVELS.find(l=>score<=l.max) || SLEEP_SCORE_LEVELS[SLEEP_SCORE_LEVELS.length-1];
 }
+// 식사 카테고리 라벨/키 순서 — 리듬바, 오늘탭 카드, 캘린더 상세보기, 마크다운 백업 등
+// 여러 화면에서 각자 다른 문구("아침"/"아침 식사")로 중복 정의되던 것을 통일.
+const MEAL_LABELS={breakfast:'아침',lunch:'점심',dinner:'저녁',snack:'간식'};
+const MEAL_KEYS=['breakfast','lunch','dinner','snack'];
 function getMeals(dk){return S.get(S.key('meals',dk))||{};}
 function saveMealsData(dk,v){
   S.set(S.key('meals',dk),v);
@@ -5294,8 +5304,7 @@ function _paceHabitCheckedCount(dk,nowMinLimit){
     if(nowMinLimit==null)return true; // 하루 전체 기준(지난주 물채우기 등)
     const t=times[key];
     if(!t)return false; // 시각 기록 없는 과거 체크는 시각 비교 불가하므로 제외
-    const p=t.split(':');
-    return parseInt(p[0],10)*60+parseInt(p[1],10)<=nowMinLimit;
+    return _dawnTimeToMin(t)<=nowMinLimit;
   }).length;
 }
 // 습관 각각의 온/오프 상태 + 지정색을 함께 반환 — 물방울 원 하단 구슬 표시용.
@@ -5314,8 +5323,7 @@ function _paceMorningRoutineCheckedCount(dk,nowMinLimit){
     if(!c)return false;
     if(nowMinLimit==null)return true; // 하루 전체 기준(지난주 물채우기 등)
     if(!c.time)return false; // 시각 기록 없는 과거 체크는 시각 비교 불가하므로 제외
-    const p=c.time.split(':');
-    return parseInt(p[0],10)*60+parseInt(p[1],10)<=nowMinLimit;
+    return _dawnTimeToMin(c.time)<=nowMinLimit;
   }).length;
 }
 function _paceTopRhythmCat(dk){
@@ -5326,11 +5334,11 @@ function _paceTopRhythmCat(dk){
   const nowMin=isToday?(new Date().getHours()*60+new Date().getMinutes()):null;
   blocks.forEach(b=>{
     if(b.cat==='_sleep')return; // 수면은 항상 최장이라 최다카테고리 후보에서 제외
-    const s=b.start?parseInt(b.start.split(':')[0],10)*60+parseInt(b.start.split(':')[1],10):null;
+    const s=_dawnTimeToMin(b.start);
     if(s==null)return;
     let e;
     if(b.end){
-      e=parseInt(b.end.split(':')[0],10)*60+parseInt(b.end.split(':')[1],10);
+      e=_dawnTimeToMin(b.end);
     }else if(isToday&&nowMin!=null){
       // 진행중 블록(종료 미입력) — 오늘 데이터라면 현재 시각까지로 잠정 집계
       e=nowMin;
@@ -5821,7 +5829,16 @@ function makeBookCardWithCover(){
 function makeRecentContentsCard(){
   const mk=monthKey(getLogicalDate());
   const todayDk=dateKey(getLogicalDate());
-  const contents=getContents(mk);
+  // 월초에 지난달부터 이어지는 진행중 콘텐츠를 놓치지 않도록 이번달+지난달 두 달치를 합쳐서 조회
+  // (getOngoingWatchingContents와 동일한 이유 — 자정 넘어 mk가 바뀌면 지난달에 시작한 콘텐츠가 안 보이는 문제 방지)
+  const prevMk=monthKey(new Date(getLogicalDate().getFullYear(),getLogicalDate().getMonth()-1,1));
+  const seenCids=new Set();
+  const contents=[...getContents(prevMk),...getContents(mk)].filter(c=>{
+    const key=c.cid||(c.cat+'|'+c.title+'|'+c.startDate);
+    if(seenCids.has(key))return false;
+    seenCids.add(key);
+    return true;
+  });
   const items=[];
   const book=getBooks().find(b=>b.status==='reading');
   if(book)items.push({cat:'book',title:book.title,rightText:(book.percent||0)+'%'});
@@ -6301,13 +6318,14 @@ function makeHabitMiniCheckRow(){
   });
   return wrap;
 }
-// 시:분 문자열 → 정렬용 분값. 06:00 이전 시각은 전날 늦은 시간대로 보고 +1440분(하루 끝으로 밀어 정렬).
+// 시:분 문자열 → 정렬용 분값. 04:00 이전 시각은 전날 늦은 시간대로 보고 +1440분(하루 끝으로 밀어 정렬).
+// getLogicalDate()와 동일한 4시 기준(DAWN_CUTOFF_MIN)을 사용 — 과거엔 6시로 별도 계산해 데이터 소속 기준과 어긋났음.
 // 값이 없으면 9999(항상 맨 뒤)를 반환.
 function toSortKey(t){
   if(!t)return 9999;
   const min=_dawnTimeToMin(t);
   if(min==null)return 9999;
-  return toDawnAdjustedMin(min,6*60);
+  return toDawnAdjustedMin(min);
 }
 function _dawnTimeToMin(t){if(!t)return null;const p=t.split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);}
 // 과거 여러 함수에서 각자 재구현하던 동일 로직(toMin/toMinLocal)을 _dawnTimeToMin 하나로 통일.
@@ -6734,18 +6752,13 @@ function renderMemos(){
   const list=document.getElementById('memo-list');if(!list)return;
   list.innerHTML='';
   // time(HH:MM) 기준 오름차순 정렬, 원본 배열 인덱스는 그대로 유지해서 수정/삭제가 정확한 항목을 가리키게 함
-  // 새벽 0~5시는 "전날 자정 넘어 쓴 기록"으로 보고 정렬상 맨 뒤로 보냄 (표시는 그대로 00:30 등 실제 시간)
-  const sortKey=(t)=>{
-    if(!t)return null;
-    const [h,mn]=t.split(':').map(Number);
-    const adjH=h<5?h+24:h;
-    return adjH*60+(mn||0);
-  };
+  // 새벽 시각은 "전날 자정 넘어 쓴 기록"으로 보고 정렬상 맨 뒤로 보냄(표시는 그대로 00:30 등 실제 시간).
+  // 전역 toSortKey(06:00 기준 새벽보정)를 그대로 사용 — 과거엔 여기만 5시 기준으로 별도 계산해 다른 화면과 기준이 달랐음.
   const ordered=memos.map((m,i)=>({m,i})).sort((a,b)=>{
-    const ka=sortKey(a.m.time),kb=sortKey(b.m.time);
-    if(ka!=null&&kb!=null)return ka-kb;
-    if(ka!=null&&kb==null)return -1;
-    if(ka==null&&kb!=null)return 1;
+    const ka=toSortKey(a.m.time),kb=toSortKey(b.m.time);
+    if(ka!==9999&&kb!==9999)return ka-kb;
+    if(ka!==9999&&kb===9999)return -1;
+    if(ka===9999&&kb!==9999)return 1;
     return (a.m.created||0)-(b.m.created||0);
   });
   ordered.forEach(({m,i})=>{
@@ -7341,9 +7354,7 @@ function renderTimetable(){
     // 전월에서 시작해서 이번 달까지 이어지는 항목(진행중, 또는 끝났어도 종료달이 이번달 이후)도 같이 표시
     const carry=prevContents.filter(c=>{
       if(c.cat!==cat)return false;
-      if(c.status==='watching')return true;
-      if((c.status==='done'||c.status==='stopped')&&c.endDate&&c.endDate.slice(0,7)>=mk)return true;
-      return false;
+      return isContentCarryOver(c,mk);
     }).map(c=>({...c,_carried:true}));
     const all=[...carry,...items];
 
@@ -7607,7 +7618,10 @@ function confirmContent(){
   const oldMk=_contentCtx.mk;
   if(_contentCtx.mode==='edit'&&_contentCtx.item){
     const oldContents=getContents(oldMk);
-    const idx=oldContents.findIndex(c=>c.created===_contentCtx.item.created);
+    // cid가 있으면 cid로, 없는 옛 데이터(cid 도입 이전)는 created로 폴백 매칭
+    const idx=_contentCtx.item.cid
+      ?oldContents.findIndex(c=>c.cid===_contentCtx.item.cid)
+      :oldContents.findIndex(c=>c.created===_contentCtx.item.created);
     const updated=idx>=0?{...oldContents[idx],title,startDate,endDate,status,review,stars,poster,author,musicUrl}:null;
     if(idx>=0){
       if(newMk===oldMk){
@@ -7668,7 +7682,10 @@ function syncContentToReadingBook(title,status,poster,author,mk){
 function deleteContent(){
   if(!_contentCtx.item)return;
   const mk=_contentCtx.mk,contents=getContents(mk);
-  const idx=contents.findIndex(c=>c.created===_contentCtx.item.created);
+  // cid가 있으면 cid로, 없는 옛 데이터(cid 도입 이전)는 created로 폴백 매칭
+  const idx=_contentCtx.item.cid
+    ?contents.findIndex(c=>c.cid===_contentCtx.item.cid)
+    :contents.findIndex(c=>c.created===_contentCtx.item.created);
   if(idx>=0){
     const deletedItem=contents[idx];
     addDelPending('contents',mk,deletedItem.cid);
@@ -7985,7 +8002,7 @@ function renderCalDetail(d){
       <div id="cal-todo-rows-${dk}" style="display:none;"></div>`;
   }
   const MAX=3;const total=allMemos.length;
-  // 시간순 정렬: 06:00 기준으로 하루 시작 (새벽 0~5시는 하루 끝으로 취급)
+  // 시간순 정렬: toSortKey(04:00 기준)로 하루 시작 — 새벽 0~3시대는 하루 끝으로 취급
   const sortedMemos=[...allMemos].sort((a,b)=>{
         return toSortKey(a.time)-toSortKey(b.time);
   });
@@ -7997,9 +8014,8 @@ function renderCalDetail(d){
     showMemos.forEach(m=>{items+=`<div class="cal-detail-row"><span class="cal-detail-time">${m.time||''}</span><span class="cal-detail-text">${m.text||''}</span></div>`;});
     items+=`</div>`;
   }
-  const MEAL_LABELS={breakfast:'아침',lunch:'점심',dinner:'저녁',snack:'간식'};
   let mealHtml='';
-  ['breakfast','lunch','dinner','snack'].forEach(k=>{
+  MEAL_KEYS.forEach(k=>{
     if(meals[k])mealHtml+=`<div class="cal-detail-row"><span class="cal-detail-time">${MEAL_LABELS[k]}</span><span class="cal-detail-text" style="flex:1;">${meals[k]}</span>${meals[k+'_time']?`<span style="font-size:10.5px;color:var(--tm);flex-shrink:0;">${meals[k+'_time']}</span>`:''}</div>`;
   });
   if(mealHtml)mealHtml=`<div style="font-size:11px;font-weight:500;color:rgba(190,130,70,0.85);margin:12px 0 4px;">식사</div>${mealHtml}`;
@@ -8171,8 +8187,7 @@ function renderDailyOneLineWeek(){
     const inp=document.createElement('input');
     inp.type='text';inp.className='oneline-inp';
     inp.value=getDailyOneLine(dk);
-    const showVow=isToday;
-    inp.placeholder=isToday?((showVow&&getDailyVow(dk))||'오늘 하루 한 줄...'):'';
+    inp.placeholder=isToday?(getDailyVow(dk)||'오늘 하루 한 줄...'):'';
     inp.autocomplete='off';
     inp.addEventListener('blur',()=>saveDailyOneLine(dk,inp.value.trim()));
     inp.addEventListener('compositionend',()=>{}); // 한글 IME 안전
@@ -8191,9 +8206,7 @@ function renderTodayMeal(){
   const el=document.getElementById('daily-meal-card');if(!el)return;
   const dk=dateKey(currentDate);
   const m=getMeals(dk);
-  const MEAL_LABELS={breakfast:'아침',lunch:'점심',dinner:'저녁',snack:'간식'};
-  const DEFAULT_ORDER=['breakfast','lunch','dinner','snack'];
-  const items=DEFAULT_ORDER.filter(k=>m[k]);
+  const items=MEAL_KEYS.filter(k=>m[k]);
   // 시간이 등록된 항목이 하나라도 있으면 시간순 정렬, 없으면 기본 순서 유지
   const hasAnyTime=items.some(k=>m[k+'_time']);
   if(hasAnyTime){
@@ -8260,7 +8273,6 @@ function loadDaily(){
   ensureDateSynced(dk).then(fetched=>{if(fetched){loadSleep();renderTodos();renderMemos();renderTodayMeal();renderDailyHabitCheck();}});
 }
 function computeRhythmSegsForDay(dk,realTodayDk,_curLogicalDk){
-  const MEAL_KEYS=['breakfast','lunch','dinner','snack'];
   const sleep=getSleep(dk)||{};
   const meals=getMeals(dk)||{};
   const manual=getRhythmBlocks(dk);
@@ -8271,7 +8283,8 @@ function computeRhythmSegsForDay(dk,realTodayDk,_curLogicalDk){
   }else{
     if(wakeMin!=null)segs.push({start:0,end:wakeMin,color:getRhythmColor('_sleep'),label:'수면'});
     if(sleepMin!=null&&wakeMin==null){
-      const end=dk===realTodayDk?(function(){const n=new Date();return n.getHours()<4?1440:(n.getHours()*60+n.getMinutes());})():1440;
+      // 자정~4시(DAWN_CUTOFF_MIN) 사이엔 "아직 자는 중"으로 보고 그날 끝(1440)까지, 4시 이후엔 지금 시각까지 그림
+      const end=dk===realTodayDk?(function(){const n=new Date();return n.getHours()*60+n.getMinutes()<DAWN_CUTOFF_MIN?1440:(n.getHours()*60+n.getMinutes());})():1440;
       segs.push({start:sleepMin,end:end,color:getRhythmColor('_sleep'),ongoing:true,label:'수면'});
     }
   }
@@ -8368,13 +8381,12 @@ function renderWeeklyRhythmBars(){
   const mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7));
   const DOW=['월','화','수','목','금','토','일'];
   const todayDk=dateKey(now);
-  const realTodayDk=todayDk;
   const _curLogicalDk=dateKey(getLogicalDate());
   let html='<div class="wrb-wrap">';
   for(let i=0;i<7;i++){
     const d=new Date(mon);d.setDate(mon.getDate()+i);
     const dk=dateKey(d);
-    const segs=computeRhythmSegsForDay(dk,realTodayDk,_curLogicalDk);
+    const segs=computeRhythmSegsForDay(dk,todayDk,_curLogicalDk);
     const track=renderRhythmBarHtml(segs);
     const isToday=dk===todayDk;
     const isPast=dk<todayDk;
@@ -8431,15 +8443,14 @@ function renderRhythmFlowHtml(segs,dk){
     if(wakeMin!=null)dayItems.push({start:0,end:wakeMin,color:getRhythmColor('_sleep'),label:'수면'});
     if(sleepMin!=null&&wakeMin==null)dayItems.push({start:sleepMin,end:1440,color:getRhythmColor('_sleep'),ongoing:true,label:'수면'});
   }
-  ['breakfast','lunch','dinner','snack'].forEach(function(k){
+  MEAL_KEYS.forEach(function(k){
     const t=meals[k+'_time'];if(!t)return;
     const start=toMinLocal(t);
     const label=meals[k]?'식사 · '+meals[k]:'식사';
     dayItems.push({start:start,end:Math.min(start+30,1440),color:getRhythmColor('_meal'),label:label});
   });
   // 세로바와 동일한 자정넘김 판단: 그날 등록된 블록 중 가장 늦은 시각을 기준으로,
-  // 06시 이전 시작 블록이 그보다 이르면 "자정 넘겨 새로 시작한 것"으로 보고 맨 아래로 정렬.
-  const NEWDAY_CUTOFF=360; // 06:00
+  // DAWN_CUTOFF_MIN(04시) 이전 시작 블록이 그보다 이르면 "자정 넘겨 새로 시작한 것"으로 보고 맨 아래로 정렬.
   let latestManualMin=-1;
   manual.forEach(function(b){
     const s=toMinLocal(b.start);if(s==null)return;
@@ -8459,7 +8470,7 @@ function renderRhythmFlowHtml(segs,dk){
       e=1440;
     }
     const lbl=cat.label+(b.text?' · '+b.text:'');
-    const isLateNightNew=s<NEWDAY_CUTOFF&&latestManualMin>=NEWDAY_CUTOFF&&s<latestManualMin;
+    const isLateNightNew=s<DAWN_CUTOFF_MIN&&latestManualMin>=DAWN_CUTOFF_MIN&&s<latestManualMin;
     dayItems.push({start:s,end:e==null?s:e,labelEnd:labelEnd==null?s:labelEnd,ongoing:e==null,color:getRhythmColor(b.cat),label:lbl,sortKey:isLateNightNew?s+1440:s});
   });
   const items=dayItems.filter(s=>s.label).map(function(s){
@@ -8719,9 +8730,8 @@ function clearMealTime(dk,k){
   if(tEl)tEl.classList.add('mt-empty');
 }
 function saveOneMealDay(dk){
-  const CATS=['breakfast','lunch','dinner','snack'];
   const m={};
-  CATS.forEach(k=>{
+  MEAL_KEYS.forEach(k=>{
     const el=document.getElementById(`wm-${dk}-${k}`);
     const tEl=document.getElementById(`wm-${dk}-${k}-time`);
     m[k]=el?el.value.trim():'';
@@ -8743,7 +8753,7 @@ function openWeekMealSheet(){
   const body=document.getElementById('week-meal-body');
   body.innerHTML='';
   const DOW=['월','화','수','목','금','토','일'];
-  const CATS=[['breakfast','아침'],['lunch','점심'],['dinner','저녁'],['snack','간식']];
+  const CATS=MEAL_KEYS.map(k=>[k,MEAL_LABELS[k]]);
   const isSundayToday=now.getDay()===0;
   const dayCount=isSundayToday?8:7; // 일요일엔 다음 주 월요일 칸까지 미리 보여줌
   for(let i=0;i<dayCount;i++){
@@ -8768,12 +8778,11 @@ function openWeekMealSheet(){
 function saveWeekMealSheet(){
   const now=new Date();
   const mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7));
-  const CATS=['breakfast','lunch','dinner','snack'];
   for(let i=0;i<7;i++){
     const d=new Date(mon);d.setDate(mon.getDate()+i);
     const dk=dateKey(d);
     const m={};
-    CATS.forEach(k=>{
+    MEAL_KEYS.forEach(k=>{
       const el=document.getElementById(`wm-${dk}-${k}`);
       const tEl=document.getElementById(`wm-${dk}-${k}-time`);
       m[k]=el?el.value.trim():'';
@@ -9000,6 +9009,10 @@ let _rdDoneCommentBookCid=null;
 let _rdSheetBookCid=null;
 let _swSeconds=0,_swRunning=false,_swInterval=null,_swStartTs=0;
 const RD_SW_C=2*Math.PI*32;
+// 스톱워치 시작시각을 localStorage에 영속화 — 새로고침/앱 완전종료 후 재시작해도
+// 이 값이 남아있으면 경과시간을 그대로 이어서 복원한다(백그라운드 전환은 메모리가 유지돼
+// 원래도 문제없었지만, 새로고침·앱 재시작은 메모리 변수가 초기화되어 별도 보존이 필요했음).
+const SW_PERSIST_KEY='iikoto_reading_sw_start';
 function backfillReadingLinks(){
   // 주의: 여기서는 "아직 독서코너와 연결되지 않은" 콘텐츠 book 항목만 최초 연결한다.
   // 이미 linkedContent=true인 책은 절대 건드리지 않음 — 그렇지 않으면 독서코너에서
@@ -9526,12 +9539,15 @@ async function searchKakaoBookWish(q){
     resultsEl.innerHTML='';
     results.forEach(item=>{
       const title=item.title||'';const author=(item.authors||[]).join(', ');const poster=item.thumbnail||null;
+      const pageCount=parseInt(item.page,10)||null; // 카카오 책검색 API가 제공하는 총 페이지 수 — 등록 시 자동 채움
       const div=document.createElement('div');div.className='api-result-item';
       div.innerHTML=poster?`<img class="api-result-poster" src="${poster}" alt="">`:`<div class="api-result-poster-placeholder">📚</div>`;
       div.innerHTML+=`<div class="api-result-info"><div class="api-result-title">${title}</div><div class="api-result-sub">${author}</div></div>`;
       div.addEventListener('click',()=>{
         document.getElementById('rd-new-title').value=title;
         _rdNewPoster=poster;_rdNewAuthor=author;
+        const totalInp=document.getElementById('rd-new-total');
+        if(totalInp&&pageCount)totalInp.value=pageCount;
         resultsEl.style.display='none';
       });
       resultsEl.appendChild(div);
@@ -9584,6 +9600,7 @@ function setPgUnit(u){
   document.getElementById('pg-end-inp').value=_pgStartVal;
   document.getElementById('pg-total').textContent=(u==='pages'&&book.totalPages)?`총 ${book.totalPages}페이지`:'';
 }
+let _pgDoneConfirmCid=null,_pgDoneConfirmTimer=null;
 function confirmProgress(){
   const book=getBooks().find(b=>b.cid===_pgBookCid);if(!book)return;
   const endVal=parseInt(document.getElementById('pg-end-inp').value,10);
@@ -9596,9 +9613,36 @@ function confirmProgress(){
   if(_pgSeconds>0)book.seconds=(book.seconds||0)+_pgSeconds;
   upsertBookLocal(book);
   markReadingActivityToday();
+  // 진행률이 실제로 늘어난 경우(시작값보다 큰 값을 입력)에만 독서 습관 체크.
+  // 스톱워치 없이 진행바만 직접 클릭해 페이지/퍼센트를 입력한 경우에도 "책을 읽은 행위"로 보고 체크함.
+  const progressIncreased=_pgUnit==='percent'?book.percent>_pgStartVal:book.pages>_pgStartVal;
+  if(progressIncreased)checkHabitDirect('독서',today,pad(new Date().getHours())+':'+pad(new Date().getMinutes()));
   closeModal('progress-modal');
   _swSeconds=0;
   renderReadingHub();
+  // 진행률이 사실상 다 읽은 지점에 도달하면(percent=100, 또는 pages가 totalPages 이상)
+  // 완독으로 넘어갈지 확인 토스트로 물어봄. totalPages를 안 적어둔 책은 "도달" 판정이
+  // 불가능하므로 페이지 단위에선 totalPages가 있을 때만 노출.
+  const reachedDone=_pgUnit==='percent'
+    ?book.percent>=100
+    :(book.totalPages&&book.pages>=book.totalPages);
+  if(reachedDone&&book.status==='reading'){
+    _pgDoneConfirmCid=book.cid;
+    const t=document.getElementById('reading-progress-done-toast');
+    if(t){
+      clearTimeout(_pgDoneConfirmTimer);
+      t.classList.add('on');
+      _pgDoneConfirmTimer=setTimeout(()=>{t.classList.remove('on');_pgDoneConfirmCid=null;},4000);
+    }
+  }
+}
+function confirmReadingProgressDone(){
+  const cid=_pgDoneConfirmCid;
+  _pgDoneConfirmCid=null;
+  const t=document.getElementById('reading-progress-done-toast');
+  if(t)t.classList.remove('on');
+  if(!cid)return;
+  setBookStatus(cid,'done'); // 상태전환 공용 경로 — 콘텐츠 연동(syncReadingBookToContent)까지 함께 처리됨
 }
 function toggleStopwatch(){
   const wrap=document.getElementById('rd-sw-ring-wrap');
@@ -9608,6 +9652,7 @@ function toggleStopwatch(){
   if(!_swRunning){
     _swRunning=true;
     _swStartTs=Date.now()-_swSeconds*1000;
+    try{localStorage.setItem(SW_PERSIST_KEY,String(_swStartTs));}catch(e){}
     wrap.classList.add('spinning');
     face.style.display='none';
     timeEl.style.display='flex';
@@ -9615,6 +9660,7 @@ function toggleStopwatch(){
     if(homeBtn)homeBtn.classList.add('sw-active');
   }else{
     _swRunning=false;
+    try{localStorage.removeItem(SW_PERSIST_KEY);}catch(e){}
     wrap.classList.remove('spinning');
     face.style.display='';
     timeEl.style.display='none';
@@ -9633,13 +9679,12 @@ function toggleStopwatch(){
 function autoLogReadingRhythm(startTs,endTs){
   if(!startTs||!endTs||endTs-startTs<60000)return;
   const minToHHMM=function(mins){mins=((mins%1440)+1440)%1440;const h=Math.floor(mins/60),m=mins%60;return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');};
-  const dkOf=function(ts){const d=new Date(ts);if(d.getHours()<4)d.setDate(d.getDate()-1);return dateKey(d);};
   const startD=new Date(startTs),endD=new Date(endTs);
-  const dk=dkOf(startTs);
+  const dk=dateKey(getLogicalDate(startTs));
   const startMin=startD.getHours()*60+startD.getMinutes();
   let endMin=endD.getHours()*60+endD.getMinutes();
   // 자정을 넘겨 끝난 경우, 같은 논리적 하루(리듬 4시 기준) 안이면 24시를 더해 이어지도록 표시
-  if(dkOf(endTs)!==dk)endMin+=1440;
+  if(dateKey(getLogicalDate(endTs))!==dk)endMin+=1440;
   const book=getBooks().find(b=>b.status==='reading');
   const text=book&&book.title?('독서 - '+book.title):'독서';
   const blocks=getRhythmBlocks(dk);
@@ -10047,6 +10092,21 @@ async function checkDataIntegrity(){
 updateDateUI();
 loadDaily();
 cleanupOldDailyVows();
+// 새로고침/앱 완전종료 후 재시작 시, 켜져 있던 독서 스톱워치를 이어서 복원.
+// localStorage에 저장된 시작시각이 있으면(=종료 처리 없이 앱이 닫힌 경우) 그 시각 기준으로
+// 경과시간을 계산해 스톱워치를 다시 돌아가는 상태로 되살린다.
+(function restoreStopwatchFromStorage(){
+  try{
+    const saved=localStorage.getItem(SW_PERSIST_KEY);
+    if(!saved)return;
+    const startTs=parseInt(saved,10);
+    if(!startTs||isNaN(startTs))return;
+    _swStartTs=startTs;
+    _swSeconds=Math.floor((Date.now()-startTs)/1000);
+    _swRunning=true;
+    _swInterval=setInterval(updateStopwatchDisplay,1000);
+  }catch(e){}
+})();
 // 최초 로드 시엔 로컬 캐시만으로 그려지므로(completedAt 등 최신 서버값 반영 전),
 // online/visibilitychange 이벤트를 기다리지 않고 여기서 한 번 동기화를 실행해 최신 상태로 맞춘다.
 if(navigator.onLine)syncAll();

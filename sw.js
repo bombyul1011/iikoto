@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260723-1-code-cleanup-abcd';
+const CACHE = 'iikoto-v20260723-2-reading-sw-persist-content-sync';
 const ASSETS = [
   './',
   './index.html'
