@@ -2201,7 +2201,6 @@ function deleteRhythmBlock(idx){
 // ── 리듬 카테고리별 시간 집계 유틸 (월간/주간 등 여러 리포트에서 공용으로 사용)
 function getDayCategoryDurations(dk){
   const sleep=getSleep(dk)||{},meals=getMeals(dk)||{},manual=getRhythmBlocks(dk);
-  const toMin=function(t){if(!t)return null;const p=t.split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);};
   const dur={};
   const add=function(label,min){if(min>0)dur[label]=(dur[label]||0)+min;};
   const wakeMin=toMin(sleep.wake),sleepMin=toMin(sleep.sleep);
@@ -2285,7 +2284,6 @@ function buildDailyRhythmTrack(dk){
     if(m<=NIGHT_END)return Math.round(m/NIGHT_END*H1);
     return Math.round(H1+(m-NIGHT_END)/(1440-NIGHT_END)*H2);
   };
-  const toMin=function(t){if(!t)return null;const p=t.split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);};
 
   let html='<div class="rt-line"></div>';
   [0,6,12,18,24].forEach(function(h){
@@ -3459,14 +3457,6 @@ function renderHome(){
 // ── CONSTANTS
 const SUPA_URL='https://vqvpzrxmtpryzhontlxc.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdnB6cnhtdHByeXpob250bHhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTgxMjksImV4cCI6MjA5NjYzNDEyOX0.pbtq1UMPC7ylYM1H2xVa19C1TFlceLmEfEtkz3WK2VI';
-// 카카오 책표지 등 외부 이미지는 CORS 헤더가 없어 html2canvas로 캡처가 안 됨 —
-// 기존 다이어트 앱 Worker에 /img-proxy 라우트를 추가해서 그 경유지로 이미지를 불러옴
-const IMG_PROXY_BASE='https://iikoto-img-proxy.faith-003.workers.dev/img-proxy?url=';
-function proxyImgUrl(src){
-  if(!src)return src;
-  if(src.startsWith('data:'))return src; // 이미 base64면 그대로
-  return IMG_PROXY_BASE+encodeURIComponent(src);
-}
 const TMDB_KEY='6c78371ce15bb9d262938a66d5ef256e';
 const KAKAO_KEY='33799426c5377181c89616f5b2154bf0';
 const DAYS=['일','월','화','수','목','금','토'];
@@ -3581,19 +3571,6 @@ function _batchimSuffix(word){
   const hasBatchim=(last-0xAC00)%28!==0;
   return hasBatchim?'이에요':'예요';
 }
-// 한글 단어 받침 유무에 따라 조사(이/가, 은/는) 선택. type: 'igа'(이/가) 또는 'eunneun'(은/는)
-function _hasBatchim(word){
-  if(!word)return false;
-  const last=word.charCodeAt(word.length-1);
-  if(last<0xAC00||last>0xD7A3)return false; // 한글 완성형 범위 밖(영문/숫자 등)이면 받침 없는 것으로 취급
-  return (last-0xAC00)%28!==0;
-}
-function _josa(word,type){
-  const hasBatchim=_hasBatchim(word);
-  if(type==='igа'||type==='이가')return hasBatchim?'이':'가';
-  if(type==='eunneun'||type==='은는')return hasBatchim?'은':'는';
-  return '';
-}
 function getSolarTermLine(){
   const today=getTodaySolarTerm();
   if(today){
@@ -3637,7 +3614,6 @@ function dateKey(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.ge
 function monthKey(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;}
 function weekKey(d){const m=new Date(d);m.setDate(d.getDate()-((d.getDay()+6)%7));return `week:${dateKey(m)}`;}
 function getWeekEnd(wkStart){const d=new Date(wkStart);d.setDate(d.getDate()+7);return dateKey(d);}
-function isToday(d){const t=new Date();return d.getFullYear()===t.getFullYear()&&d.getMonth()===t.getMonth()&&d.getDate()===t.getDate();}
 
 let currentDate=new Date();
 
@@ -3930,20 +3906,33 @@ function getReadingStreak(){
 function getHabits(){return S.get('habits')||DEFAULT_HABITS;}
 function saveHabits(v){S.set('habits',v);autoSync('habits',null);}
 function getHabitChecks(wk){return S.get(S.key('hc',wk))||{};}
-function saveHabitChecks(wk,v){S.set(S.key('hc',wk),v);autoSync('hc',wk);}
 // 습관 체크 시각(별도 저장소) — 기존 checks[key]=true/false 불리언 구조를 안 건드리기 위해 분리.
 // 새벽홈탭 타임라인 등에서 "몇 시에 체크했는지"가 필요할 때만 참조.
 function getHabitCheckTimes(wk){return S.get(S.key('hcTime',wk))||{};}
-function saveHabitCheckTimes(wk,v){S.set(S.key('hcTime',wk),v);autoSync('hcTime',wk);}
-function recordHabitCheckTime(wk,key){
-  const times=getHabitCheckTimes(wk);
-  const now=new Date();
-  times[key]=pad(now.getHours())+':'+pad(now.getMinutes());
-  saveHabitCheckTimes(wk,times);
-}
-function clearHabitCheckTime(wk,key){
-  const times=getHabitCheckTimes(wk);
-  if(times[key]){delete times[key];saveHabitCheckTimes(wk,times);}
+// 습관 체크/시각 저장(setter+동기화)은 checkHabitDirect(자동체크)와 toggleHabitCheckWithTime(수동체크)
+// 두 곳으로 통일되어 있음 — 과거엔 saveHabitChecks/saveHabitCheckTimes를 각각 따로 호출해
+// syncHCUp이 두 번 발사되며 레이스 컨디션(checked_time이 null로 덮어써짐)이 있었음.
+// 습관 체크 온/오프를 시각 기록과 함께 한 번에 처리하는 공통 함수.
+// checks[key]와 hcTimes[key]를 모두 로컬에 반영한 뒤 서버 동기화(syncHCUp)를 1회만 호출해
+// checkHabitDirect와 동일하게 레이스 컨디션(먼저 나간 시각-없는 요청이 나중에 도착해 checked_time을
+// null로 덮어쓰는 문제)을 방지한다. 호출부는 checks 객체를 직접 변경하지 않고 이 함수만 호출하면 됨.
+function toggleHabitCheckWithTime(wk,habitName,dow,dk){
+  const key=habitName+'-'+dow;
+  const checks=getHabitChecks(wk);
+  const wasOn=!!checks[key];
+  const hcTimes=getHabitCheckTimes(wk);
+  if(wasOn){
+    delete checks[key];
+    if(hcTimes[key])delete hcTimes[key];
+    addDelPending('hc',wk,habitName+'|'+dk);
+  }else{
+    checks[key]=true;
+    hcTimes[key]=pad(new Date().getHours())+':'+pad(new Date().getMinutes());
+  }
+  S.set(S.key('hc',wk),checks);
+  S.set(S.key('hcTime',wk),hcTimes);
+  autoSync('hc',wk);
+  return checks;
 }
 function getContents(mk){
   const arr=S.get(S.key('contents',mk))||[];
@@ -6284,12 +6273,7 @@ function makeHabitMiniCheckRow(){
       ?`<i class="ti ${hIcon}" style="font-size:15px;color:${checked?'#fff':'rgba(200,176,168,0.7)'};" aria-hidden="true"></i>`
       :`<span class="home-habit-dot ${checked?h.color:''}" style="width:9px;height:9px;${checked?'':'background:rgba(200,176,168,0.5);'}"></span>`;
     badge.addEventListener('click',function(){
-      const key=h.name+'-'+dow;
-      const wasOn=!!checks[key];
-      checks[key]=!checks[key];
-      if(wasOn&&!checks[key]){addDelPending('hc',wk,h.name+'|'+dateKey(_ld));clearHabitCheckTime(wk,key);}
-      else if(!wasOn&&checks[key])recordHabitCheckTime(wk,key);
-      saveHabitChecks(wk,checks);
+      toggleHabitCheckWithTime(wk,h.name,dow,dateKey(_ld));
       const fresh=makeHabitMiniCheckRow();
       wrap.replaceWith(fresh);
       refreshDotTimelineCard();
@@ -6309,6 +6293,10 @@ function toSortKey(t){
   return toDawnAdjustedMin(min,6*60);
 }
 function _dawnTimeToMin(t){if(!t)return null;const p=t.split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);}
+// 과거 여러 함수에서 각자 재구현하던 동일 로직(toMin/toMinLocal)을 _dawnTimeToMin 하나로 통일.
+// 기존 호출부 이름은 그대로 두고 별칭만 연결해 각 호출 지점을 일일이 바꾸는 리스크를 피함.
+const toMin=_dawnTimeToMin;
+const toMinLocal=_dawnTimeToMin;
 // 논리적 하루 경계 보정 공통 유틸.
 // "00:00부터 cutoffMin 이전"의 시각은 전날 늦은 시간대로 취급해 +1440분 해준다.
 // - 일반 활동(투두/습관/리듬블록 정렬 등): cutoffMin=DAWN_CUTOFF_MIN(getLogicalDate와 동일한 4시 기준)
@@ -8241,11 +8229,7 @@ function renderDailyHabitCheck(){
     const chkStyle=checked?(isGlass?' style="border-color:'+rgba+';"':' style="background:'+rgba+';border-color:'+rgba+';"'):'';
     col.innerHTML='<div class="habit-check-name">'+h.name+'</div><div class="habit-chk2'+(checked?' on':'')+'"'+chkStyle+'>'+innerMark+'</div>';
     col.querySelector('.habit-chk2').addEventListener('click',function(){
-      const wasOn=!!checks[key];
-      checks[key]=!checks[key];
-      if(wasOn&&!checks[key]){addDelPending('hc',wk,h.name+'|'+dateKey(currentDate));clearHabitCheckTime(wk,key);}
-      else if(!wasOn&&checks[key])recordHabitCheckTime(wk,key);
-      saveHabitChecks(wk,checks);
+      toggleHabitCheckWithTime(wk,h.name,dow,dateKey(currentDate));
       renderDailyHabitCheck();
       if(document.getElementById('v-monthly')&&document.getElementById('v-monthly').classList.contains('on'))renderHabitMonthly();
       if(document.getElementById('v-weekly')&&document.getElementById('v-weekly').classList.contains('on'))renderWeeklyHabitBox();
@@ -8259,7 +8243,6 @@ function loadDaily(){
   ensureDateSynced(dk).then(fetched=>{if(fetched){loadSleep();renderTodos();renderMemos();renderTodayMeal();renderDailyHabitCheck();}});
 }
 function computeRhythmSegsForDay(dk,realTodayDk,_curLogicalDk){
-  const toMin=function(t){if(!t)return null;const p=t.split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);};
   const MEAL_KEYS=['breakfast','lunch','dinner','snack'];
   const sleep=getSleep(dk)||{};
   const meals=getMeals(dk)||{};
@@ -8420,7 +8403,6 @@ function renderRhythmFlowHtml(segs,dk){
   // computeRhythmSegsForDay가 만드는 segs는 가로바 그리기용이라 "전날 밤~익일 새벽으로 이어지는 조각"이
   // 섞여 들어있는데, 이 조각은 실제로는 전날 소속 활동이라 흐름보기(텍스트 목록)에는 포함하면 안 됨.
   // 그래서 segs를 쓰지 않고 getRhythmBlocks(dk)에서 직접 세그를 다시 구성.
-  const toMinLocal=function(t){if(!t)return null;const p=t.split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);};
   const sleep=getSleep(dk)||{};
   const meals=getMeals(dk)||{};
   const manual=dk?getRhythmBlocks(dk):[];
