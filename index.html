@@ -9819,7 +9819,7 @@ function confirmProgress(){
   const book=getBooks().find(b=>b.cid===_pgBookCid);if(!book)return;
   const endVal=parseInt(document.getElementById('pg-end-inp').value,10);
   if(isNaN(endVal))return;
-  const today=dateKey(new Date());
+  const today=dateKey(getLogicalDate());
   if(book.todayDate!==today){book.todayDate=today;book.todayStart=_pgStartVal;}
   book.unit=_pgUnit;
   if(_pgUnit==='percent')book.percent=Math.max(0,Math.min(100,endVal));
@@ -9827,10 +9827,8 @@ function confirmProgress(){
   if(_pgSeconds>0)book.seconds=(book.seconds||0)+_pgSeconds;
   upsertBookLocal(book);
   markReadingActivityToday();
-  // 진행률이 실제로 늘어난 경우(시작값보다 큰 값을 입력)에만 독서 습관 체크.
-  // 스톱워치 없이 진행바만 직접 클릭해 페이지/퍼센트를 입력한 경우에도 "책을 읽은 행위"로 보고 체크함.
-  const progressIncreased=_pgUnit==='percent'?book.percent>_pgStartVal:book.pages>_pgStartVal;
-  if(progressIncreased)checkHabitDirect('독서',today,pad(new Date().getHours())+':'+pad(new Date().getMinutes()));
+  // 독서 습관체크는 스톱워치 종료 시점(autoLogReadingRhythm)에서만 처리 —
+  // 진행바를 직접 클릭해 페이지/퍼센트만 입력한 경우는 습관체크하지 않음.
   _swSeconds=0;
   renderReadingHub();
   // 진행률이 사실상 다 읽은 지점에 도달하면(percent=100, 또는 pages가 totalPages 이상)

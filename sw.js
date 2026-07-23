@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260724-1-dawn-copy-spacing';
+const CACHE = 'iikoto-v20260724-3-reading-habit-swonly';
 const ASSETS = [
   './',
   './index.html'
