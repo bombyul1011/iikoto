@@ -3728,6 +3728,13 @@ async function syncListUpSafe(table,filterQ,uniqueCols,localItems,toRow,delCids)
   return true;
 }
 // ── DATA ACCESSORS
+// 투두 시간대(timeSection) 정렬 순서 및 텍스트 앞머리 시:분 파싱 — 여러 곳(정렬/재정렬/백업내보내기)에서
+// 각자 재구현되던 로직을 통일. 시간대 없음('none')은 항상 맨 뒤로 취급.
+const TODO_TS_ORDER={morning:0,afternoon:1,night:2,none:3};
+function parseTodoLeadingTime(text){
+  const m=text.match(/^(\d{1,2}):(\d{2})/);
+  return m?parseInt(m[1],10)*60+parseInt(m[2],10):9999;
+}
 function getTodos(dk){return S.get(S.key('todos',dk))||[];}
 function saveTodos(dk,v){
   S.set(S.key('todos',dk),v);
@@ -4693,19 +4700,14 @@ function renderTodos(){
   const dk=dateKey(currentDate),todos=getTodos(dk);
   const list=document.getElementById('todo-list');if(!list)return;
   list.innerHTML='';
-  const tsOrder={morning:0,afternoon:1,night:2,none:3};
-  function parseTime(text){
-    const m=text.match(/^(\d{1,2}):(\d{2})/);
-    return m?parseInt(m[1])*60+parseInt(m[2]):9999;
-  }
   const sorted=[...todos.map((t,i)=>({...t,_i:i}))].sort((a,b)=>{
     if(a.done!==b.done)return a.done?1:-1;
-    const ta=tsOrder[a.timeSection||'none']??3;
-    const tb=tsOrder[b.timeSection||'none']??3;
+    const ta=TODO_TS_ORDER[a.timeSection||'none']??3;
+    const tb=TODO_TS_ORDER[b.timeSection||'none']??3;
     if(ta!==tb)return ta-tb;
     // 수동 순서(sortOrder)가 둘 다 있으면 그것을 우선 적용, 없으면 기존 시각순 유지
     if(typeof a.sortOrder==='number'&&typeof b.sortOrder==='number')return a.sortOrder-b.sortOrder;
-    return parseTime(a.text)-parseTime(b.text);
+    return parseTodoLeadingTime(a.text)-parseTodoLeadingTime(b.text);
   });
   sorted.forEach((t)=>{
     const i=t._i;
@@ -4805,6 +4807,7 @@ function relocateTodo(dk,idx,targetDk,mode){
   const strikeSet=new Set(todo.strikeParts||[]);
   const strikeTimes=todo.strikeTimes||{};
   const hasMultipleParts=parts.length>1;
+  const successMsg=mode==='move'?'다음 날로 옮겼어요':'내일에도 추가했어요';
 
   if(!hasMultipleParts){
     const targetTodos=getTodos(targetDk);
@@ -4816,7 +4819,7 @@ function relocateTodo(dk,idx,targetDk,mode){
       todos.splice(idx,1);
       saveTodos(dk,todos);
     }
-    return{success:true,message:mode==='move'?'다음 날로 옮겼어요':'내일에도 추가했어요'};
+    return{success:true,message:successMsg};
   }
 
   const unstruckIdxs=parts.map((_,i)=>i).filter(i=>!strikeSet.has(i));
@@ -4838,13 +4841,13 @@ function relocateTodo(dk,idx,targetDk,mode){
   remainingIdxs.forEach((origIdx,newIdx)=>{
     if(strikeTimes[origIdx]!=null)newStrikeTimes[newIdx]=strikeTimes[origIdx];
   });
-  const dkTodos=getTodos(dk);
-  const cur=dkTodos[idx];
+  // dk 쪽엔 이 시점까지 저장이 일어난 적이 없으므로(targetDk에만 저장) todos 스냅샷을 그대로 재사용.
+  const cur=todos[idx];
   if(!cur)return{success:true,message:'이동했어요'};
   if(!remainingParts.length){
     addDelPending('todos',dk,cur.cid);
-    dkTodos.splice(idx,1);
-    saveTodos(dk,dkTodos);
+    todos.splice(idx,1);
+    saveTodos(dk,todos);
     _todoPartModeIdx=-1;
   }else{
     cur.text=hasPrefix?`${prefix} > ${remainingParts.join(' / ')}`:remainingParts.join(' / ');
@@ -4855,9 +4858,9 @@ function relocateTodo(dk,idx,targetDk,mode){
     // 그래야 "아까 완료한 조각"이 "방금 이동한 시각"으로 잘못 찍히지 않음
     const times=Object.values(newStrikeTimes).filter(v=>typeof v==='number');
     cur.completedAt=times.length?Math.max(...times):(cur.completedAt!=null?cur.completedAt:Date.now());
-    saveTodos(dk,dkTodos);
+    saveTodos(dk,todos);
   }
-  return{success:true,message:mode==='move'?'다음 날로 옮겼어요':'내일에도 추가했어요'};
+  return{success:true,message:successMsg};
 }
 // [v2] 조각 하나의 완료(취소선) 상태 토글. strikeParts 변경 시 항상 saveTodos로 즉시 저장+동기화.
 // 모든 조각에 취소선이 그어지면 항목 전체를 자동 완료 처리(done=true, completedAt 기록) — 새벽 리캡 등 시각 통계가 이 값을 참조하므로 누락 없이 채워야 함.
@@ -5021,13 +5024,11 @@ function attachTodoReorderDrag(el,i,tsGroup){
 // 같은 시간대 그룹 내에서 idx 항목을 shift칸 이동시키고 sortOrder를 재기록
 function applyTodoReorder(idx,tsGroup,shift){
   const dk=dateKey(currentDate),todos=getTodos(dk);
-  const tsOrder={morning:0,afternoon:1,night:2,none:3};
-  function parseTime(text){const m=text.match(/^(\d{1,2}):(\d{2})/);return m?parseInt(m[1])*60+parseInt(m[2]):9999;}
   // 현재 화면 표시 순서와 동일한 기준으로, 이 그룹(미완료+같은 시간대)만 추출
   const group=todos.map((t,i)=>({...t,_i:i})).filter(t=>!t.done&&(t.timeSection||'none')===tsGroup)
     .sort((a,b)=>{
       if(typeof a.sortOrder==='number'&&typeof b.sortOrder==='number')return a.sortOrder-b.sortOrder;
-      return parseTime(a.text)-parseTime(b.text);
+      return parseTodoLeadingTime(a.text)-parseTodoLeadingTime(b.text);
     });
   const curPos=group.findIndex(t=>t._i===idx);
   if(curPos<0)return;
@@ -6107,32 +6108,41 @@ function makeAfternoonPaceCard(){
 }
 // [안전화] 렌더링 시점(sorted 배열)과 클릭 처리 시점 사이에 백그라운드 동기화 등으로
 // 원본 todos 배열 순서/개수가 바뀌면 인덱스 i가 엉뚱한 항목을 가리킬 수 있음.
-// cid를 함께 받아 todos[i]의 cid가 다르면 cid로 정확한 항목을 재탐색해 그 항목을 토글.
-function toggleTodo(i,expectedCid){
-  const dk=dateKey(currentDate),todos=getTodos(dk);
+// expectedCid가 주어졌는데 todos[i]와 cid가 다르면(동기화 등으로 인덱스가 어긋난 경우)
+// cid로 실제 항목을 재탐색. { target, idx } 형태로 반환하며 못 찾으면 target은 null.
+function findTodoSafe(todos,i,expectedCid){
   let target=todos[i];
   if(expectedCid&&(!target||target.cid!==expectedCid)){
     const realIdx=todos.findIndex(t=>t.cid===expectedCid);
     if(realIdx>=0){i=realIdx;target=todos[i];}
   }
+  return{target,idx:i};
+}
+// 투두 항목을 완료 처리할 때, 조각모드(여러 파트로 구성된 텍스트)라면 아직 체크 안 된
+// 나머지 조각들도 "지금 이 시각에 끝냈다"로 간주해 strikeParts/strikeTimes를 마저 채움 —
+// 그래야 활동 분포에서 이미 조각 체크된 것만 찍히고 나머지가 누락되는 일이 없음.
+// toggleTodo/homeToggleTodo 양쪽에서 동일하게 호출해 두 화면의 완료 처리 결과가 일치하도록 함.
+function fillRemainingTodoStrikeParts(target,now){
+  const{parts}=parseTodoTextParts(target.text);
+  if(parts.length<=1)return;
+  const st={...(target.strikeTimes||{})};
+  const sp=new Set(target.strikeParts||[]);
+  parts.forEach((_,idx)=>{
+    if(!sp.has(idx)){sp.add(idx);st[idx]=now;}
+  });
+  target.strikeParts=Array.from(sp);
+  target.strikeTimes=st;
+}
+// cid를 함께 받아 todos[i]의 cid가 다르면 cid로 정확한 항목을 재탐색해 그 항목을 토글.
+function toggleTodo(i,expectedCid){
+  const dk=dateKey(currentDate),todos=getTodos(dk);
+  const{target}=findTodoSafe(todos,i,expectedCid);
   if(!target)return;
   target.done=!target.done;
   const now=Date.now();
   if(target.done){
     target.completedAt=now;
-    // 조각모드 투두를 전체 체크로 완료하면, 아직 조각 체크가 안 된 나머지 조각들도
-    // "지금 이 시각에 끝냈다"로 간주해 strikeParts/strikeTimes를 마저 채움 —
-    // 그래야 활동 분포에서 이미 조각 체크된 것만 찍히고 나머지가 누락되는 일이 없음
-    const {parts}=parseTodoTextParts(target.text);
-    if(parts.length>1){
-      const st={...(target.strikeTimes||{})};
-      const sp=new Set(target.strikeParts||[]);
-      parts.forEach((_,idx)=>{
-        if(!sp.has(idx)){sp.add(idx);st[idx]=now;}
-      });
-      target.strikeParts=Array.from(sp);
-      target.strikeTimes=st;
-    }
+    fillRemainingTodoStrikeParts(target,now);
   }else{
     target.completedAt=null;
   }
@@ -6151,14 +6161,16 @@ function refreshDotTimelineCard(){
 // ── 홈탭 저녁 파트: 미완료 투두 카드 (오늘 날짜 고정, 인덱스는 오늘 todos 배열 기준)
 function homeToggleTodo(i,expectedCid){
   const dk=dateKey(getLogicalDate()),todos=getTodos(dk);
-  let target=todos[i];
-  if(expectedCid&&(!target||target.cid!==expectedCid)){
-    const realIdx=todos.findIndex(t=>t.cid===expectedCid);
-    if(realIdx>=0){i=realIdx;target=todos[i];}
-  }
+  const{target}=findTodoSafe(todos,i,expectedCid);
   if(!target)return;
   target.done=!target.done;
-  target.completedAt=target.done?Date.now():null;
+  const now=Date.now();
+  if(target.done){
+    target.completedAt=now;
+    fillRemainingTodoStrikeParts(target,now);
+  }else{
+    target.completedAt=null;
+  }
   saveTodos(dk,todos);
   const card=makePendingTodosCard();
   const old=document.getElementById('home-pending-todos-card');
@@ -6168,11 +6180,8 @@ function homeToggleTodo(i,expectedCid){
 let _postponedTodo=null,_postponeUndoTimer=null;
 function homePostponeTodo(i,expectedCid){
   const dk=dateKey(getLogicalDate()),todos=getTodos(dk);
-  let todo=todos[i];
-  if(expectedCid&&(!todo||todo.cid!==expectedCid)){
-    const realIdx=todos.findIndex(t=>t.cid===expectedCid);
-    if(realIdx>=0){i=realIdx;todo=todos[i];}
-  }
+  const{target:todo,idx}=findTodoSafe(todos,i,expectedCid);
+  i=idx;
   if(!todo)return;
   const tom=new Date(getLogicalDate());tom.setDate(tom.getDate()+1);
   const tdk=dateKey(tom),ttodos=getTodos(tdk);
@@ -9878,8 +9887,7 @@ function buildMarkdownText(start,end){
     if(todos.length){
       md+=`- - - - - - - -\n`;
       md+=`□ 투두\n`;
-      const tsOrder={morning:0,afternoon:1,night:2,none:3};
-      const sorted=[...todos].sort((a,b)=>(tsOrder[a.timeSection||'none']??3)-(tsOrder[b.timeSection||'none']??3));
+      const sorted=[...todos].sort((a,b)=>(TODO_TS_ORDER[a.timeSection||'none']??3)-(TODO_TS_ORDER[b.timeSection||'none']??3));
       sorted.forEach(t=>{md+=`${t.done?'✓':'○'} ${t.text}\n`;});
     }
 
