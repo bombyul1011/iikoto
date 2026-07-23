@@ -832,7 +832,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 }
 .day-recap-card{background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:16px;box-shadow:0 2px 12px rgba(180,140,120,0.06);}
 .day-recap-divider{height:1px;background:var(--div);margin:12px 0;}
-.day-recap-sec-title{font-size:11.5px;font-weight:600;color:var(--ts);margin-bottom:9px;display:flex;align-items:center;gap:5px;}
+.day-recap-sec-title{font-size:11.5px;font-weight:600;color:var(--ts);margin:14px 0 9px;padding-top:12px;border-top:1px solid rgba(200,176,168,0.18);display:flex;align-items:center;gap:5px;}
+.day-recap-sec-title:first-child{margin-top:0;padding-top:0;border-top:none;}
 .oneline-quote{font-size:13px;color:var(--tp);font-style:italic;line-height:1.7;text-align:center;padding:2px 4px;}
 .vow-recap-block{padding:2px 4px;}
 .vow-recap-row{margin-bottom:6px;}
@@ -840,7 +841,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .vow-recap-text{font-size:14px;color:var(--tp);line-height:1.5;background:none;border:none;border-left:2.5px solid rgba(225,140,120,0.45);border-radius:0;padding:2px 0 2px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .vow-recap-comment{font-size:12.5px;color:var(--ts);line-height:1.6;margin-top:4px;padding-top:0;min-height:1em;}
 
-.recap-donut-row{display:flex;justify-content:space-around;margin-bottom:2px;}
+.recap-donut-row{display:flex;justify-content:space-around;margin-bottom:2px;padding-bottom:2px;}
 .recap-donut-item{text-align:center;}
 .recap-donut-wrap{position:relative;width:88px;height:48px;margin:0 auto 2px;}
 .recap-donut-wrap svg{display:block;}
@@ -3305,7 +3306,7 @@ async function fetchHomeWeather(section){
     const allDoneTodos=todos.filter(t=>t.done).map(t=>t.text);
     const allPendTodos=todos.filter(t=>!t.done).map(t=>t.text);
     dataContext=[
-      `방금 지나간 어제는 ${_HOME_DAYS[dataDate.getDay()]}요일이었어요.`,
+      `지금은 새벽 시간대라 ${_HOME_DAYS[dataDate.getDay()]}요일 하루를 마감하는 시점이에요. 이 하루는 아직 "오늘"이며 "어제"라고 부르면 안 돼요(자정이 지났어도 새벽 4시 전까지는 이 논리적 하루가 계속 "오늘"이에요).`,
       getUserProfileContext(),
       `(참고용, 출력 금지) 지금은 하루를 마감하는 새벽 시간대예요.`,
       allDoneTodos.length?`오늘 완료한 일: ${allDoneTodos.join(', ')}`:'',
