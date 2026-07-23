@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260723-4-chaeum-no-repeat-cat';
+const CACHE = 'iikoto-v20260723-5-chaeum-selected-crossdevice';
 const ASSETS = [
   './',
   './index.html'

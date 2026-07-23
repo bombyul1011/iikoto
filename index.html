@@ -5437,19 +5437,35 @@ function makeEveningLearnCard(){
     </div>
     <i class="ti ti-chevron-right elearn-banner-arrow" aria-hidden="true"></i>
   </div>`;
-  // 로컬에 확정된 상태가 없으면(=다른 기기에서 먼저 시작했을 수 있음) 서버 확인 후 갱신
+  // 로컬에 확정된 상태가 없으면(=다른 기기에서 먼저 선택/시작했을 수 있음) 서버 확인 후 갱신
   if(!state.started){
     aiCacheGet('eveninglearn_started_'+dk).then(cached=>{
-      if(!cached)return;
-      try{
-        const started=JSON.parse(cached);
-        const s=getEveningLearnState(dk);
-        if(s.started)return; // 그 사이 이 기기에서 직접 시작했으면 덮어쓰지 않음
-        s.started=started;
-        saveEveningLearnState(dk,s);
-        const subEl=wrap.querySelector('.elearn-banner-sub');
-        if(subEl)subEl.textContent=started.title;
-      }catch(e){}
+      if(cached){
+        try{
+          const started=JSON.parse(cached);
+          const s=getEveningLearnState(dk);
+          if(s.started)return; // 그 사이 이 기기에서 직접 시작했으면 덮어쓰지 않음
+          s.started=started;
+          s.selected=null;
+          saveEveningLearnState(dk,s);
+          const subEl=wrap.querySelector('.elearn-banner-sub');
+          if(subEl)subEl.textContent=started.title;
+        }catch(e){}
+        return;
+      }
+      if(state.selected)return; // 이미 이 기기에서 선택된 상태면 추가 조회 불필요
+      aiCacheGet('eveninglearn_selected_'+dk).then(selCached=>{
+        if(!selCached)return;
+        try{
+          const selected=JSON.parse(selCached);
+          const s=getEveningLearnState(dk);
+          if(s.started||s.selected)return; // 그 사이 이 기기에서 상태가 바뀌었으면 덮어쓰지 않음
+          s.selected=selected;
+          saveEveningLearnState(dk,s);
+          const subEl=wrap.querySelector('.elearn-banner-sub');
+          if(subEl)subEl.textContent=selected.title+' · 시작 대기중';
+        }catch(e){}
+      });
     });
   }
   return wrap;
@@ -5465,10 +5481,21 @@ function openChaeum(){
       if(cached){
         try{
           const s=getEveningLearnState(dk);
-          if(!s.started){s.started=JSON.parse(cached);saveEveningLearnState(dk,s);}
+          if(!s.started){s.started=JSON.parse(cached);s.selected=null;saveEveningLearnState(dk,s);}
         }catch(e){}
+        renderChaeumTodaySlot();
+        return;
       }
-      renderChaeumTodaySlot();
+      if(state.selected){renderChaeumTodaySlot();return;}
+      aiCacheGet('eveninglearn_selected_'+dk).then(selCached=>{
+        if(selCached){
+          try{
+            const s=getEveningLearnState(dk);
+            if(!s.started&&!s.selected){s.selected=JSON.parse(selCached);saveEveningLearnState(dk,s);}
+          }catch(e){}
+        }
+        renderChaeumTodaySlot();
+      });
     });
   }else{
     renderChaeumTodaySlot();
@@ -5485,15 +5512,25 @@ function renderChaeumTodaySlot(){
   const body=document.getElementById('chaeum-today-slot');
   if(!body)return;
 
-  // 키 없는 기기(PC/모바일 사파리)는 뽑기 자체를 하지 않고 확정된 결과만 노출 — 뽑기는 모바일 웹앱 전용
+  // 키 없는 기기(PC/모바일 사파리)는 뽑기 자체를 하지 않지만, 선택 확정된 카드부터는 노출하고 시작하기도 가능
   if(!getClaudeKey()){
-    body.innerHTML=state.started
-      ?`<div class="chaeum-topcard"><div class="chaeum-topcard-inner">
+    if(state.started){
+      body.innerHTML=`<div class="chaeum-topcard"><div class="chaeum-topcard-inner">
           <div class="chaeum-topic-chip">${escapeHtml(state.started.topic)}</div>
           <div class="chaeum-title">${escapeHtml(state.started.title)}</div>
           <div class="chaeum-remain">오늘은 이 주제로 시작했어요</div>
-        </div></div>`
-      :`<div class="chaeum-topcard"><div class="chaeum-topcard-inner"><div class="chaeum-empty">모바일에서 카드를 먼저 골라주세요</div></div></div>`;
+        </div></div>`;
+    }else if(state.selected){
+      const sel=state.selected;
+      body.innerHTML=`<div class="chaeum-topcard"><div class="chaeum-topcard-inner">
+        <div class="chaeum-topic-chip">${escapeHtml(sel.topic)}</div>
+        <div class="chaeum-title">${escapeHtml(sel.title)}</div>
+        <ul class="chaeum-outline">${(sel.outline||[]).map(o=>`<li>${escapeHtml(o)}</li>`).join('')}</ul>
+        <button class="chaeum-btn chaeum-btn-fill" style="width:100%;" onclick="startEveningLearn()">시작하기</button>
+      </div></div>`;
+    }else{
+      body.innerHTML=`<div class="chaeum-topcard"><div class="chaeum-topcard-inner"><div class="chaeum-empty">모바일에서 카드를 먼저 골라주세요</div></div></div>`;
+    }
     return;
   }
 
@@ -5591,6 +5628,10 @@ function selectEveningLearn(idx){
   s.selected=chosen;
   s.picks=[];
   saveEveningLearnState(dk,s);
+  // 선택은 "확정"이므로 다른 기기(PC 등)도 볼 수 있도록 서버에도 저장
+  aiCacheSet('eveninglearn_selected_'+dk,JSON.stringify(chosen),AI_CACHE_TTL.short);
+  const banner=document.querySelector('.elearn-banner');
+  if(banner)banner.replaceWith(makeEveningLearnCard());
   renderChaeumTodaySlot();
 }
 
@@ -5617,6 +5658,7 @@ function startEveningLearn(){
   s.selected=null;
   saveEveningLearnState(dk,s);
   aiCacheSet('eveninglearn_started_'+dk,JSON.stringify(s.started),AI_CACHE_TTL.short);
+  aiCacheDelete('eveninglearn_selected_'+dk); // 선택 단계 캐시는 더 이상 필요 없음
   const banner=document.querySelector('.elearn-banner');
   if(banner)banner.replaceWith(makeEveningLearnCard());
   renderChaeumTodaySlot();
