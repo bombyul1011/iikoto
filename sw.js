@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260723-2-reading-sw-persist-content-sync';
+const CACHE = 'iikoto-v20260723-3-chaeum-select-step';
 const ASSETS = [
   './',
   './index.html'

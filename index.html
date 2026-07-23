@@ -5363,7 +5363,7 @@ function _paceTopRhythmCat(dk){
 // ── 저녁 학습 배너 (파트1, 19~22시) ──
 // 하루 상태: {count(오늘 뽑은 횟수, 최대2), topics(오늘 나온 주제 텍스트 목록 - 반복회피용),
 //            current:{topic,title,outline[]} 현재 표시중인 카드 내용}
-function getEveningLearnState(dk){return S.get(S.key('eveninglearn',dk))||{count:0,topics:[],picks:[],started:null};}
+function getEveningLearnState(dk){return S.get(S.key('eveninglearn',dk))||{count:0,topics:[],picks:[],selected:null,started:null};}
 function saveEveningLearnState(dk,v){S.set(S.key('eveninglearn',dk),v);}
 
 async function _fetchEveningLearnTopic(dk,avoidTopics){
@@ -5421,7 +5421,9 @@ function makeEveningLearnCard(){
   wrap.addEventListener('click',openChaeum);
   const subText=state.started
     ? escapeHtml(state.started.title)
-    : '탭해서 오늘의 주제를 만나보세요';
+    : state.selected
+      ? escapeHtml(state.selected.title)+' · 시작 대기중'
+      : '탭해서 오늘의 주제를 만나보세요';
   wrap.innerHTML=`<div class="elearn-banner-inner">
     <div class="elearn-banner-icon"><i class="ti ti-bulb" aria-hidden="true"></i></div>
     <div class="elearn-banner-text">
@@ -5493,19 +5495,28 @@ function renderChaeumTodaySlot(){
   const picks=state.picks||[];
   let html='';
   if(state.started){
-    // "시작하기"를 누른 순간 그날의 학습은 확정됨 — 더 이상 뽑기/선택 없이 고정 노출만
+    // "시작하기"를 누른 순간 그날의 학습은 확정됨 — 더 이상 뽑기/선택/대기 없이 고정 노출만
     html=`<div class="chaeum-topcard"><div class="chaeum-topcard-inner">
       <div class="chaeum-topic-chip">${escapeHtml(state.started.topic)}</div>
       <div class="chaeum-title">${escapeHtml(state.started.title)}</div>
       <div class="chaeum-remain">오늘은 이 주제로 시작했어요</div>
     </div></div>`;
+  }else if(state.selected){
+    // 선택은 확정됐지만 아직 시작 전 — 이 카드만 노출, 시작하기 버튼으로 대기
+    const sel=state.selected;
+    html=`<div class="chaeum-topcard"><div class="chaeum-topcard-inner">
+      <div class="chaeum-topic-chip">${escapeHtml(sel.topic)}</div>
+      <div class="chaeum-title">${escapeHtml(sel.title)}</div>
+      <ul class="chaeum-outline">${(sel.outline||[]).map(o=>`<li>${escapeHtml(o)}</li>`).join('')}</ul>
+      <button class="chaeum-btn chaeum-btn-fill" style="width:100%;" onclick="startEveningLearn()">시작하기</button>
+    </div></div>`;
   }else if(picks.length>0){
-    // 뽑힌 만큼(1개 또는 2개) 카드를 나란히 보여주고, 각 카드에서 바로 선택 가능
+    // 뽑힌 만큼(1개 또는 2개) 카드를 나란히 보여주고, 각 카드에서 선택만 진행(시작은 다음 단계)
     html=picks.map((p,idx)=>`<div class="chaeum-topcard"><div class="chaeum-topcard-inner">
       <div class="chaeum-topic-chip">${escapeHtml(p.topic)}</div>
       <div class="chaeum-title">${escapeHtml(p.title)}</div>
       <ul class="chaeum-outline">${p.outline.map(o=>`<li>${escapeHtml(o)}</li>`).join('')}</ul>
-      <button class="chaeum-btn chaeum-btn-fill" style="width:100%;" onclick="startEveningLearn(${idx})">이걸로 시작하기</button>
+      <button class="chaeum-btn chaeum-btn-fill" style="width:100%;" onclick="selectEveningLearn(${idx})">이걸로 선택하기</button>
     </div></div>`).join('<div style="height:8px;"></div>');
     if(_evLearnRerollLoading){
       html+='<div style="height:8px;"></div><div class="chaeum-topcard"><div class="chaeum-topcard-inner"><div class="chaeum-loading">다른 주제를 고르는 중...</div></div></div>';
@@ -5527,7 +5538,7 @@ function renderChaeumTodaySlot(){
   }
   body.innerHTML=html;
 
-  if(state.started)return; // 이미 시작한 세션은 재생성 로직을 아예 타지 않음
+  if(state.started||state.selected)return; // 이미 시작했거나 선택 대기 중인 세션은 재생성 로직을 아예 타지 않음
   if(!_evLearnRerollLoading)return; // 뽑기 버튼을 눌렀을 때만 아래에서 실제 fetch 진행
 
   if(picks.length<2&&picks.length===state.count){
@@ -5558,11 +5569,31 @@ function rerollEveningLearn(){
 
 let _evLearnPendingToken=null;
 
-function startEveningLearn(idx){
+// 뽑힌 카드 중 하나를 "선택"만 확정 — 아직 시작(프롬프트 복사/리듬기록/클로드이동)은 하지 않음.
+// 선택 즉시 나머지 카드는 폐기(서버 캐시 삭제), picks는 비우고 selected로 이동해 대기 상태로 저장.
+function selectEveningLearn(idx){
   const dk=dateKey(getLogicalDate());
   const s=getEveningLearnState(dk);
   const picks=s.picks||[];
   const chosen=picks[idx];
+  if(!chosen)return;
+
+  // 선택되지 않은 나머지 주제는 즉시 폐기 — 서버 캐시도 함께 삭제
+  picks.filter((p,i)=>i!==idx).forEach(p=>{
+    aiCacheDelete('eveninglearn_'+dk+'_'+p.topic);
+  });
+
+  s.selected=chosen;
+  s.picks=[];
+  saveEveningLearnState(dk,s);
+  renderChaeumTodaySlot();
+}
+
+// 선택된 카드로 실제 학습을 "시작" — 리듬 블록 등록, 프롬프트 복사, 클로드 이동, 아카이브 로그 적재.
+function startEveningLearn(){
+  const dk=dateKey(getLogicalDate());
+  const s=getEveningLearnState(dk);
+  const chosen=s.selected;
   if(!chosen)return;
   const {topic,title,shortTitle,outline}=chosen;
   const prompt=`오늘 저녁 [${topic}] 주제로 "${title}"를 한 시간 정도 배워보려고 해. 아래 흐름으로 설명해줘:\n`+
@@ -5576,18 +5607,14 @@ function startEveningLearn(idx){
   blocks.push({cat:'note',start:startStr,end:'',text:`${topic} - ${shortTitle||title}`,created:Date.now(),cid:genCid()});
   saveRhythmBlocks(dk,blocks);
 
-  // "시작하기"를 실제로 누른 주제만 배너에 노출(단순히 뽑히기만 한 것과 구분)
+  // "시작하기"를 실제로 누른 주제만 배너에 노출(단순히 선택만 된 것과 구분)
   s.started={topic,title};
+  s.selected=null;
   saveEveningLearnState(dk,s);
   aiCacheSet('eveninglearn_started_'+dk,JSON.stringify(s.started),AI_CACHE_TTL.short);
   const banner=document.querySelector('.elearn-banner');
   if(banner)banner.replaceWith(makeEveningLearnCard());
   renderChaeumTodaySlot();
-
-  // 오늘 뽑혔지만 선택되지 않은 나머지 주제의 서버 캐시는 더 이상 쓸모없으므로 정리
-  picks.filter((p,i)=>i!==idx).forEach(p=>{
-    aiCacheDelete('eveninglearn_'+dk+'_'+p.topic);
-  });
 
   // 확정된 채움만 아카이브 로그에 1건 적재 — 지난 채움 목록/주제별 카운트의 원천 데이터
   const log=getEveningLearnLog();
