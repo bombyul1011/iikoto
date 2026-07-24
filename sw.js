@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260724-6-weekly-goal-creative';
+const CACHE = 'iikoto-v20260724-7-weekly-goal-maxtoken';
 const ASSETS = [
   './',
   './index.html'
