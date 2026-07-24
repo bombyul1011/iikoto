@@ -1140,7 +1140,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="slabel">수면</div>
       <div class="sleep-card" id="sleep-card">
         <div class="sleep-top" style="justify-content:space-between;">
-          <span id="sleep-avg-score-badge" style="display:inline-flex;width:20px;height:20px;align-items:center;justify-content:center;"></span>
+          <span id="sleep-avg-score-badge" style="display:inline-flex;width:20px;height:20px;align-items:center;justify-content:center;cursor:pointer;" onclick="promptSleepScore(dateKey(currentDate))"></span>
           <span>
             <span class="sleep-top-num" id="sleep-dur-num">--</span>
             <span class="sleep-top-unit" id="sleep-dur-unit"></span>
