@@ -7305,6 +7305,8 @@ async function loadNextWeekAISuggestions(wk){
 
 **분석 방식(중요): 지표 하나만 보고 판단하지 말고, 여러 지표를 교차로 엮어서 표면적으로 드러나지 않는 패턴을 짚어줘.** 예를 들어 "일기를 이번 주에 못 썼다"는 사실 하나만 보면 그냥 부족한 걸로 보이지만, 메모 개수가 많고 하루한줄을 꾸준히 써왔다면 "이미 기록하는 습관 자체는 있으니 일기로 확장하기 좋은 시점"이라는 식으로, 여러 항목을 연결해서 왜 그 챌린지가 지금 이 사람에게 맞는지 근거를 만들어줘. 단순히 "부족한 항목을 그대로 채우자"는 제안보다, 이미 가진 강점(잘 되고 있는 다른 지표)을 발판 삼아 확장하는 제안을 우선해줘.
 
+**창의성(중요): 3개 제안이 전부 "부족한 걸 채우기" 또는 "잘하는 걸 더 하기" 같은 뻔한 방향으로만 몰리지 않게 해줘.** 서로 관련 없어 보이는 두 지표(예: 운동 시간과 독서량, 콘텐츠 감상과 리듬 카테고리, 메모 주제와 습관 종류 등)를 의외의 방식으로 엮어서, 스스로는 잘 떠올리지 못했을 법한 조합형 챌린지를 최소 1개는 포함해줘. 데이터에 실제로 근거가 있어야 하고, 억지로 이어붙인 티가 나면 안 돼 — 왜 그 두 지표를 엮었는지 desc에서 납득 가게 설명해줘. 3개 전부를 이런 식으로 만들 필요는 없고, 최소 1개는 이렇게 의외의 조합으로, 나머지는 기존 방식(확장/유지/완화)으로 균형을 맞춰줘.
+
 시간 사용 누계와 지난주 대비 변화, 하루한줄의 분위기도 참고해서, 패턴에 맞는 구체적인 제안을 해줘 (예: 특정 활동이 적었거나 휴식이 부족했다면 그에 맞게).
 
 **주의: "식사 기록 횟수"는 실제 식사에 걸린 시간이 아니라 단순히 끼니를 기록한 횟수야. 다른 활동(운동, 업무 등)과 "시간이 많다/적다" 식으로 비교하지 마. 식사 관련 제안을 하고 싶다면 시간 비교가 아니라 끼니를 거르지 않았는지, 규칙적으로 기록했는지 정도로만 참고해.**
@@ -9602,12 +9604,12 @@ function renderBookList(){
   const books=getBooks().filter(b=>b.status===_rdTab).sort((a,b)=>(b.created||0)-(a.created||0));
   if(!books.length){el.innerHTML='<div class="rd-empty">아직 항목이 없어요</div>';return;}
   el.innerHTML=books.map(b=>{
-    const sub=b.unit==='percent'?`${b.percent||0}%`:(b.totalPages?`${b.pages}/${b.totalPages}페이지`:`${b.pages||0}페이지`);
-    const timeStr=b.seconds?` · ${Math.floor(b.seconds/60)}분`:'';
+    const sub=b.status==='done'?'':(b.unit==='percent'?`${b.percent||0}%`:(b.totalPages?`${b.pages}/${b.totalPages}페이지`:`${b.pages||0}페이지`));
+    const timeStr=b.seconds?`${Math.floor(b.seconds/60)}분`:'';
     const durLabel=getBookDurationLabel(b);
-    const durStr=durLabel?` · ${durLabel}`:'';
     const sessionCount=b.status==='reading'?countReadingSessionsForBook(b.title):0;
-    const sessionStr=sessionCount>0?` · ${sessionCount}회차`:'';
+    const sessionStr=sessionCount>0?`${sessionCount}회차`:'';
+    const metaStr=[sub,timeStr,durLabel,sessionStr].filter(Boolean).join(' · ');
     const est=b.status==='reading'?estimateRemainingReadingSessions(b,sessionCount):null;
     const estHtml=est?(
       est.ready
@@ -9644,7 +9646,7 @@ function renderBookList(){
       `<div class="rd-book-title">${b.title}</div>`;
     return `<div class="rd-book-item${open?' open':''}" onclick="toggleBookDetail('${b.cid}')">
       ${titleRow}
-      <div class="rd-book-meta">${sub}${timeStr}${durStr}${sessionStr}</div>
+      <div class="rd-book-meta">${metaStr}</div>
       ${estHtml}
       <div class="rd-book-detail">
         ${detailRow}

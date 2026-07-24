@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260724-5-reading-duration-label';
+const CACHE = 'iikoto-v20260724-6-weekly-goal-creative';
 const ASSETS = [
   './',
   './index.html'
