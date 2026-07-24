@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260724-4-sleepscore-daily-tab';
+const CACHE = 'iikoto-v20260724-5-reading-duration-label';
 const ASSETS = [
   './',
   './index.html'

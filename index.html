@@ -9578,6 +9578,25 @@ function estimateRemainingReadingSessions(book,sessionCount){
   const remainingSessions=Math.ceil(remaining/perSession);
   return {sessions,ready:true,remainingSessions};
 }
+// book에 연결된 contents 항목(startDate/endDate)을 찾아 읽는중="며칠째", 다읽음="며칠간" 문구를 만듦.
+// 연결정보(linkedContent)가 없는 책(옛날에 위시 없이 바로 등록된 경우 등)은 null 반환 — 표시 생략.
+function getBookDurationLabel(book){
+  if(!book.linkedContent||!book.contentMk)return null;
+  const contents=getContents(book.contentMk);
+  const item=contents.find(c=>c.cat==='book'&&c.title===(book.contentTitle||book.title));
+  if(!item||!item.startDate)return null;
+  const start=new Date(item.startDate+'T00:00:00');
+  if(book.status==='reading'){
+    const days=Math.max(1,Math.floor((new Date(dateKey(new Date())+'T00:00:00')-start)/86400000)+1);
+    return `${days}일째 읽는 중`;
+  }
+  if(book.status==='done'&&item.endDate){
+    const end=new Date(item.endDate+'T00:00:00');
+    const days=Math.max(1,Math.floor((end-start)/86400000)+1);
+    return `${days}일간 읽음`;
+  }
+  return null;
+}
 function renderBookList(){
   const el=document.getElementById('rd-book-list');if(!el)return;
   const books=getBooks().filter(b=>b.status===_rdTab).sort((a,b)=>(b.created||0)-(a.created||0));
@@ -9585,6 +9604,8 @@ function renderBookList(){
   el.innerHTML=books.map(b=>{
     const sub=b.unit==='percent'?`${b.percent||0}%`:(b.totalPages?`${b.pages}/${b.totalPages}페이지`:`${b.pages||0}페이지`);
     const timeStr=b.seconds?` · ${Math.floor(b.seconds/60)}분`:'';
+    const durLabel=getBookDurationLabel(b);
+    const durStr=durLabel?` · ${durLabel}`:'';
     const sessionCount=b.status==='reading'?countReadingSessionsForBook(b.title):0;
     const sessionStr=sessionCount>0?` · ${sessionCount}회차`:'';
     const est=b.status==='reading'?estimateRemainingReadingSessions(b,sessionCount):null;
@@ -9623,7 +9644,7 @@ function renderBookList(){
       `<div class="rd-book-title">${b.title}</div>`;
     return `<div class="rd-book-item${open?' open':''}" onclick="toggleBookDetail('${b.cid}')">
       ${titleRow}
-      <div class="rd-book-meta">${sub}${timeStr}${sessionStr}</div>
+      <div class="rd-book-meta">${sub}${timeStr}${durStr}${sessionStr}</div>
       ${estHtml}
       <div class="rd-book-detail">
         ${detailRow}
