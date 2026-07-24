@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260724-8-nextweek-ai-removed';
+const CACHE = 'iikoto-v20260724-9-greeting-prompt-dedup';
 const ASSETS = [
   './',
   './index.html'
