@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260724-9-greeting-prompt-dedup';
+const CACHE = 'iikoto-v20260724-10-rhythm-color-tuning';
 const ASSETS = [
   './',
   './index.html'
