@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260724-10-rhythm-color-tuning';
+const CACHE = 'iikoto-v20260726-2-sleep-carryover-weekbar';
 const ASSETS = [
   './',
   './index.html'
