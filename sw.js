@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260726-2-sleep-carryover-weekbar';
+const CACHE = 'iikoto-v20260726-4-vacation-time-based';
 const ASSETS = [
   './',
   './index.html'
