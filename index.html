@@ -6735,7 +6735,7 @@ function makeDawnRecapCard(){
     .map(b=>{
       const m=b.text.match(/^(.+?)\s*-\s*(.+)$/);
       const parsed=m?{cat:m[1].trim(),title:m[2].trim()}:{cat:'',title:b.text};
-      return {...parsed,start:b.start};
+      return {...parsed,start:b.start,end:b.end};
     })
     .sort((a,b)=>(_dawnTimeToMin(a.start)||0)-(_dawnTimeToMin(b.start)||0));
 
@@ -6795,10 +6795,26 @@ function makeDawnRecapCard(){
       const readingLabel=readingMin>0?readingMin+'분':_daysSinceLastReading(dk)+'일째 안읽음';
       html+=`<div class="recap-content-item"><span class="cdot" style="background:${getCatColor('book')};"></span>독서<span class="ctime">${readingLabel}</span></div>`;
     }
+    // 같은 콘텐츠(카테고리+제목)를 여러 번 읽거나 봤을 경우 항목이 중복되지 않도록 병합.
+    // 시간(분)은 각 블록의 실제 재생시간을 합산해 표시.
+    const mergedContentMap=new Map();
     contentItems.forEach(c=>{
+      const s=_dawnTimeToMin(c.start),e=_dawnTimeToMin(c.end);
+      let dur=0;
+      if(s!=null&&e!=null){dur=e-s;if(dur<0)dur+=1440;}
+      const mkey=(c.cat||'')+'|'+c.title;
+      if(mergedContentMap.has(mkey)){
+        const existing=mergedContentMap.get(mkey);
+        existing.dur+=Math.max(0,dur);
+      }else{
+        mergedContentMap.set(mkey,{cat:c.cat,title:c.title,dur:Math.max(0,dur)});
+      }
+    });
+    Array.from(mergedContentMap.values()).forEach(c=>{
       const key=catToKey(c.cat);
       const dotColor=key?getCatColor(key):'rgba(190,160,230,0.80)';
-      html+=`<div class="recap-content-item"><span class="cdot" style="background:${dotColor};"></span>${c.cat||'감상'}<span class="ctime">${c.title}</span></div>`;
+      const durLabel=c.dur>0?`${Math.floor(c.dur/60)}h${c.dur%60?' '+(c.dur%60)+'m':''}`.replace(/^0h /,''):'';
+      html+=`<div class="recap-content-item"><span class="cdot" style="background:${dotColor};"></span>${c.cat||'감상'}<span class="ctime">${c.title}${durLabel?' · '+durLabel:''}</span></div>`;
     });
   }
 
