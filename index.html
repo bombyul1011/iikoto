@@ -963,6 +963,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .wrb-row{display:flex;align-items:center;gap:10px;}
 .wrb-daylabel{width:16px;flex-shrink:0;font-size:10px;color:var(--tm);text-align:center;}
 .wrb-daylabel.today{color:var(--acc);font-weight:700;}
+.wrb-daylabel.vacation{color:var(--tm);opacity:0.55;font-size:11px;}
+.wrb-trackwrap.vacation{opacity:0.4;}
 .wrb-trackwrap{position:relative;flex:1;height:8px;}
 .wrb-track{position:absolute;top:0;left:0;right:0;height:8px;border-radius:4px;background:rgba(220,210,195,0.35);}
 .wrb-seg{position:absolute;top:0;height:8px;border-radius:4px;}
@@ -2253,6 +2255,7 @@ function checkHabitDirect(habitName,dk,timeStr){
   //  hcTimes 세팅 전에 나간 첫 호출이 checked_time:null로 서버를 덮어쓰는 경우가 있었음)
   S.set(S.key('hc',wk),checks);
   S.set(S.key('hcTime',wk),hcTimes);
+  S.set('hc_pending_'+wk,true);
   autoSync('hc',wk);
   if(document.getElementById('daily-habit-box'))renderDailyHabitCheck();
 }
@@ -4054,6 +4057,7 @@ function toggleHabitCheckWithTime(wk,habitName,dow,dk){
   }
   S.set(S.key('hc',wk),checks);
   S.set(S.key('hcTime',wk),hcTimes);
+  S.set('hc_pending_'+wk,true);
   autoSync('hc',wk);
   return checks;
 }
@@ -4363,8 +4367,8 @@ async function autoSync(type,key){
   else if(type==='sleep')syncSleepUp(key);
   else if(type==='meals'){await syncMealsUp(key);S.set(S.key('meals_pending',key),false);}
   else if(type==='habits')syncHabitsUp();
-  else if(type==='hc')syncHCUp(key);
-  else if(type==='hcTime')syncHCUp(key); // 습관체크 시각도 결국 habit_checks 테이블의 checked_time 컬럼이라 같은 upload 함수(syncHCUp)를 재사용
+  else if(type==='hc'){await syncHCUp(key);S.set('hc_pending_'+key,false);}
+  else if(type==='hcTime'){await syncHCUp(key);S.set('hc_pending_'+key,false);} // 습관체크 시각도 결국 habit_checks 테이블의 checked_time 컬럼이라 같은 upload 함수(syncHCUp)를 재사용
   else if(type==='goal')syncGoalUp(key);
   else if(type==='wchallenge'){
     const data=S.get(key);
@@ -4395,6 +4399,7 @@ async function syncAll(){
   if(S.get(S.key('contents_pending',mk)))upTasks.push(runContentsSyncLocked(mk,()=>syncContentsUp(mk)).then(()=>S.set(S.key('contents_pending',mk),false)));
   if(S.get('wchallenge_pending_'+wk))upTasks.push(autoSync('wchallenge','wchallenge_'+wk).then(()=>S.set('wchallenge_pending_'+wk,false)));
   if(S.get(S.key('rblocks_pending',dk)))upTasks.push(syncRhythmBlocksUp(dk).then(()=>S.set(S.key('rblocks_pending',dk),false)));
+  if(S.get('hc_pending_'+wk))upTasks.push(syncHCUp(wk).then(()=>S.set('hc_pending_'+wk,false)));
   if(S.get('eveninglearnlog_pending'))upTasks.push(syncEveningLearnLogUp().then(()=>S.set('eveninglearnlog_pending',false)));
   if(S.get('vacation_periods_pending'))upTasks.push(syncVacationPeriodsUp());
   if(upTasks.length)await Promise.all(upTasks);
@@ -8542,9 +8547,11 @@ function renderWeeklyRhythmBars(){
     const isToday=dk===todayDk;
     const isPast=dk<todayDk;
     const isOpen=_wrbFlowOpenDk===dk;
+    const isVac=isVacationDay(dk);
     const clickAttr=isToday?' onclick="toggleWeeklyRhythmForm()" style="cursor:pointer;"'
       :(isPast?' onclick="toggleWeeklyRhythmFlow(\''+dk+'\')" style="cursor:pointer;"':'');
-    html+='<div class="wrb-row"'+clickAttr+'><div class="wrb-daylabel'+(isToday?' today':'')+'">'+DOW[i]+'</div><div class="wrb-trackwrap">'+track+'</div></div>';
+    const dayLabelHtml=isVac?'<i class="ti ti-plane" aria-hidden="true"></i>':DOW[i];
+    html+='<div class="wrb-row"'+clickAttr+'><div class="wrb-daylabel'+(isToday?' today':'')+(isVac?' vacation':'')+'">'+dayLabelHtml+'</div><div class="wrb-trackwrap'+(isVac?' vacation':'')+'">'+track+'</div></div>';
     if(isToday&&_weeklyRhythmFormOpen){
       html+='<div class="wrb-form-slot" id="wrb-today-form"></div>';
     }
@@ -8738,8 +8745,8 @@ function renderWeeklyHabitBox(){
     const rgba=getHabitColor(h.color);
     let cnt=0,dotsHtml='';
     for(let d=0;d<7;d++){
-      if(vacDow[d]){dotsHtml+='<div class="hw-dot-wrap"><div class="hw-dot vacation"></div></div>';continue;}
       const on=!!checks[h.name+'-'+d];
+      if(vacDow[d]&&!on){dotsHtml+='<div class="hw-dot-wrap"><div class="hw-dot vacation"></div></div>';continue;}
       if(on)cnt++;
       const isToday=d===todayDow;
       const borderColor=on?rgba:'rgba(195,175,168,0.5)';
@@ -8747,7 +8754,7 @@ function renderWeeklyHabitBox(){
       const bg=on?rgba:'none';
       dotsHtml+='<div class="hw-dot-wrap"><div class="hw-dot" style="background:'+bg+';border-color:'+borderColor+';border-width:'+borderWidth+';"></div></div>';
     }
-    html+='<div class="hw-row"><div class="hw-name"><span class="hw-name-dot" style="background:'+rgba+';"></span>'+h.name+'</div><div class="hw-dots">'+dotsHtml+'</div><div class="hw-streak">'+cnt+'/'+effectiveDays+'</div></div>';
+    html+='<div class="hw-row"><div class="hw-name"><span class="hw-name-dot" style="background:'+rgba+';"></span>'+h.name+'</div><div class="hw-dots">'+dotsHtml+'</div><div class="hw-streak">'+Math.min(cnt,effectiveDays)+'/'+effectiveDays+'</div></div>';
   });
   el.innerHTML=html;
 }
