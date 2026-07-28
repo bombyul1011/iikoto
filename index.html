@@ -362,6 +362,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 /* ── TIMETABLE ── */
 .tt-row{display:flex;align-items:center;margin-bottom:3px;gap:0;}
+.tt-complete-stats{display:flex;align-items:center;justify-content:center;gap:16px;padding:12px 4px 4px;border-top:1px solid var(--div);margin-top:10px;flex-wrap:wrap;}
+.tt-complete-stat{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ts);}
+.tt-complete-stat i{font-size:12px;}
+.tt-complete-stat b{font-weight:700;color:var(--tp);}
 .tt-cat-fixed{width:60px;flex-shrink:0;font-size:10px;color:var(--ts);cursor:pointer;padding-right:4px;-webkit-tap-highlight-color:rgba(192,112,128,0.15);user-select:none;}
 .tt-cat-fixed span span:last-child{text-decoration:underline dotted;text-decoration-color:rgba(150,130,120,0.35);text-underline-offset:2px;}
 .tt-cat-fixed.tt-cat-sub{cursor:default;text-decoration:none;opacity:0.35;}
@@ -1259,6 +1263,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           </div>
         </div>
         <div id="tt-rows"></div>
+        <div id="tt-complete-stats"></div>
 
       </div>
       <div class="slabel">해빗 모아보기</div>
@@ -5614,6 +5619,17 @@ function makeEveningLearnCard(){
 
 // ── 채움 코너 (풀스크린) ──
 function openChaeum(){
+  document.getElementById('chaeum-ov').classList.add('on');
+  // 휴가모드 중엔 홈탭 배너와 동일하게 "오늘의 채움"을 쉬어감 — 뽑기/API 호출 없이 안내만 표시.
+  // 지난 채움 목록/통계는 과거 기록 열람이라 휴가 여부와 무관하게 그대로 노출.
+  if(getActiveVacation()){
+    const body=document.getElementById('chaeum-today-slot');
+    if(body)body.innerHTML=`<div class="card" style="text-align:center;padding:28px 16px;color:var(--tm);">휴가 중에는 쉬어가요 🌴</div>`;
+    renderChaeumTopicStats();
+    renderChaeumLogList();
+    syncEveningLearnLogDown().then(()=>{renderChaeumTopicStats();renderChaeumLogList();});
+    return;
+  }
   cleanupStaleEveningLearnSelections();
   document.getElementById('chaeum-ov').classList.add('on');
   const dk=dateKey(getLogicalDate());
@@ -7637,9 +7653,39 @@ function renderTimetable(){
       allScrolls.forEach(s=>s.scrollLeft=scrollX);
     },50);
   }
+  // 완결 콘텐츠 미니 통계 — 카테고리별 이번 달 "완결" 수량.
+  // 완결 기준은 종료일(endDate)의 월 = 이번 달(mk). 전월에 시작해 이번 달에 끝난 것도 포함,
+  // 반대로 이번 달에 시작했어도 다음 달 이후에 끝나면 이번 달 완결에서 제외(carry 로직과 동일 기준).
+  // music은 완결 개념이 없는 카테고리라 대신 "이번 달 기록 수량"(시작일=이번달 기준)으로 집계.
+  const statsEl=document.getElementById('tt-complete-stats');
+  if(statsEl){
+    const allForStats=[...contents,...prevContents];
+    const seen=new Set();
+    const counts={};
+    CATS.forEach(c=>{counts[c]=0;});
+    allForStats.forEach(c=>{
+      if(counts[c.cat]===undefined)return;
+      if(c.cat==='music'){
+        const sMonth=(c.startDate||'').slice(0,7);
+        if(sMonth!==mk)return;
+        const dedupeKey=c.cat+'|'+c.title+'|'+c.startDate;
+        if(seen.has(dedupeKey))return;
+        seen.add(dedupeKey);
+        counts[c.cat]++;
+        return;
+      }
+      if(c.status!=='done'||!c.endDate||c.endDate.slice(0,7)!==mk)return;
+      const dedupeKey=c.cat+'|'+c.title+'|'+c.endDate;
+      if(seen.has(dedupeKey))return;
+      seen.add(dedupeKey);
+      counts[c.cat]++;
+    });
+    statsEl.innerHTML='<div class="tt-complete-stats">'+CATS.map(cat=>{
+      const meta=CAT_ICON_META[cat];
+      return `<div class="tt-complete-stat"><i class="ti ${meta.icon}" style="color:${getCatColor(cat)};" aria-hidden="true"></i>${CAT_LABELS[cat]} <b>${counts[cat]}</b></div>`;
+    }).join('')+'</div>';
+  }
 }
-
-function renderCmStarPicker(val){
   const el=document.getElementById('cm-star-picker');if(!el)return;
   el.innerHTML=[1,2,3,4,5].map(n=>`<svg class="cm-star${n<=val?' on':''}" data-val="${n}" onclick="setCmStars(${n})" width="19" height="19" viewBox="0 0 18 18" fill="${n<=val?'currentColor':'none'}" stroke="currentColor" stroke-width="1"><polygon points="9,1.3 11.3,6.3 16.8,7 12.7,10.6 13.8,16.1 9,13.3 4.2,16.1 5.3,10.6 1.2,7 6.7,6.3"/></svg>`).join('');
 }
