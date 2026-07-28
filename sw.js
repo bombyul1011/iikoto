@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260726-4-vacation-time-based';
+const CACHE = 'iikoto-v20260728-5-content-vacation-fix';
 const ASSETS = [
   './',
   './index.html'
