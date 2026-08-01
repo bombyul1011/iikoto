@@ -2694,6 +2694,7 @@ async function renderDiaryMonthSheet(){
 // 진행중(watching)이거나, 완료/중단됐어도 종료월이 이번 달 이후면 이월 대상.
 // getContentsForReport(리포트)와 renderTimetable(타임테이블) 양쪽에서 각자 재구현되던 로직을 통일.
 function isContentCarryOver(c,mk){
+  if(c.cat==='music')return false; // 음악은 등록일=완료일 개념이라 이월 대상이 아님(status가 항상 'watching'으로 저장되는 것과 무관하게 항상 false)
   if(c.status==='watching')return true;
   if((c.status==='done'||c.status==='stopped')&&c.endDate&&c.endDate.slice(0,7)>=mk)return true;
   return false;
@@ -2705,10 +2706,7 @@ function getContentsForReport(mk){
   const prevMk=monthKey(new Date(y,mo-2,1));
   const cur=getContents(mk);
   const prev=getContents(prevMk);
-  const carry=prev.filter(c=>{
-    if(c.cat==='음악')return false;
-    return isContentCarryOver(c,mk);
-  }).map(c=>({...c,_carried:true}));
+  const carry=prev.filter(c=>isContentCarryOver(c,mk)).map(c=>({...c,_carried:true}));
   const all=[...carry,...cur];
   // 콘텐츠 종류(드라마→책→영화→음악)별로 묶은 뒤, 그 안에서는 시작일 오름차순으로 정렬
   const catOrder={drama:0,book:1,movie:2,music:3};
@@ -2859,6 +2857,12 @@ function openMonthlyReportSheet(){
   renderReportMonthChips();
   loadMonthlyReportContent();
   openSheet('monthly-report-sheet');
+  // 시트 오픈 트랜지션/레이아웃 계산 이후 한 번 더 스크롤 위치 보정 (initial render 시점엔 요소 폭이 0으로 잡히는 경우 방지)
+  setTimeout(()=>{
+    const wrap=document.getElementById('mr-month-chips');
+    const activeChip=wrap&&wrap.querySelector('.m-chip.active');
+    if(activeChip)activeChip.scrollIntoView({behavior:'auto',block:'nearest',inline:'center'});
+  },50);
 }
 function renderReportMonthChips(){
   const wrap=document.getElementById('mr-month-chips');if(!wrap)return;
@@ -2872,6 +2876,8 @@ function renderReportMonthChips(){
     if(!future)chip.addEventListener('click',()=>{_reportMonth=m;renderReportMonthChips();loadMonthlyReportContent();});
     wrap.appendChild(chip);
   }
+  const activeChip=wrap.querySelector('.m-chip.active');
+  if(activeChip)activeChip.scrollIntoView({behavior:'auto',block:'nearest',inline:'center'});
 }
 async function loadMonthlyReportContent(){
   const el=document.getElementById('mr-content');if(!el)return;
@@ -7676,7 +7682,7 @@ function renderTimetable(){
       seen.add(dedupeKey);
       counts[c.cat]++;
     });
-    statsEl.innerHTML='<div class="stat-bar-wrap">'+CATS.map((cat,i)=>{
+    statsEl.innerHTML='<div class="stat-bar-wrap" style="border-top:none;margin-top:0;padding-top:10px;">'+CATS.map((cat,i)=>{
       const meta=CAT_ICON_META[cat];
       return (i>0?'<div class="sbar-div"></div>':'')+`<div class="sbar-item"><i class="ti ${meta.icon}" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i><span class="sbar-num">${counts[cat]}</span></div>`;
     }).join('')+'</div>';
