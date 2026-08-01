@@ -2004,7 +2004,7 @@ function renderHomeBody(section){
     // 어제 돌아보기 카드, 운동 체크 배너 모두 제거됨 — 아침 루틴(굿모닝) 카드로 대체
     const isMorning2=getSubSection()==='morning_2';
     if(isMorning2){
-      body.appendChild(makeDailyVowCard());
+      body.appendChild(makeNutriCommentBanner());
     }
     body.appendChild(makeMorningRoutineCard());
     body.appendChild(makeHabitStreakRow());
@@ -2054,7 +2054,6 @@ function renderHomeBody(section){
       body.appendChild(makeEveningLearnCard());
       body.appendChild(makeHabitMiniCheckRow());
       body.appendChild(makeEveningMiniStatCard());
-      body.appendChild(makeNutriCommentBanner());
     }
     body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getLogicalDate()));},'rhythm-soft',12.5,dateKey(getLogicalDate())));
     // 일요일 다음 주 챌린지 준비 배너는 홈탭에서 제거 — 주간탭 "이번 주도 화이팅" 카드로 흡수됨
@@ -3172,7 +3171,7 @@ async function makeWeeklySummaryCard(){
     topHabit&&topHabit[1]>0?`가장 많이 완료한 습관: ${topHabit[0]} (${topHabit[1]}일)`:'',
     bottomHabit&&bottomHabit[1]===0?`한 번도 못 한 습관: ${bottomHabit[0]}`:'',
     frequentTodo?`이번 주 자주 등장한 투두: ${frequentTodo[0]} (${frequentTodo[1]}회)`:'',
-    challengeSummary.length?`이번 주 다짐 달성:\n${challengeSummary.join(', ')}`:'',
+    challengeSummary.length?`이번 주 목표 달성:\n${challengeSummary.join(', ')}`:'',
     rhythmChangeText?`지난주 대비 리듬 시간 변화: ${rhythmChangeText}`:'',
   ].filter(Boolean).join('\n');
 
@@ -3192,13 +3191,13 @@ ${RHYTHM_CAT_GUIDE}
 1. 첫 문장: 이번 주 전반적인 흐름을 한 문장으로 (수면/컨디션 언급, 투두 완료율·완성도 언급 금지)
 2. "한 주간의 흐름을 보면 주 초반에는~" 으로 시작하는 감정/분위기 요약 2문장 (메모에 등장한 구체적 사건/장소 기반, 위 유의사항 반영)
 3. 빈 줄 후 "이번 주 기록 요약" 소제목
-4. 아래 소재들을 각각 기호를 붙인 짧은 한 줄씩으로 표현하되, 있는 것만 자연스럽게 골라서 최대 4~5줄로 압축해요. 여러 소재를 하나의 줄에 자연스럽게 엮어도 좋아요(예: 수면과 투두를 한 줄에, 리듬 변화와 다짐 현황을 한 줄에 묶는 식). 없는 항목은 억지로 만들지 말고 건너뛰어요.
+4. 아래 소재들을 각각 기호를 붙인 짧은 한 줄씩으로 표현하되, 있는 것만 자연스럽게 골라서 최대 4~5줄로 압축해요. 여러 소재를 하나의 줄에 자연스럽게 엮어도 좋아요(예: 수면과 투두를 한 줄에, 리듬 변화와 목표 현황을 한 줄에 묶는 식). 없는 항목은 억지로 만들지 말고 건너뛰어요.
    - ◎ 평균 수면 + ✓ 실행한 투두 개수 + ✦ 메모 건수 (이 셋은 보통 한 줄로 묶어서 표현, 투두 완료율/퍼센트는 절대 쓰지 않음)
    - → 이동/특이사항이 있으면 짧게
    - ◇ 자주 등장한 일(반복 등록된 투두)이 있으면
    - ◐ 자주 미룬 일이 있으면
    - ◈ 지난주 대비 리듬 시간 변화가 있으면 (예: ◈ 업무 시간이 늘고 휴식이 줄었어요)
-   - ★ 이번 주 다짐 달성 현황이 있으면
+   - ★ 이번 주 목표 달성 현황이 있으면
 5. 빈 줄 후 다음 주를 위한 따뜻한 한 마디
 
 규칙:
@@ -3820,8 +3819,7 @@ const AI_CACHE_TTL={
   weeklyReport:30*24*60*60*1000, // 한 달 — 주간 리포트
   monthlyReport:null        // 만료 없음 — 월간 리포트(영구 보관)
 };
-// goal_notes 테이블에서 특정 note_key 하나를 삭제. 오늘의 다짐처럼 하루 지나면
-// 소멸해야 하는 데이터의 서버측 정리에 사용.
+// goal_notes 테이블에서 특정 note_key 하나를 삭제. 하루 지나면 소멸해야 하는 데이터의 서버측 정리에 사용.
 async function supaDeleteGoalNote(noteKey){
   try{
     const res=await fetch(SUPA_URL+'/rest/v1/goal_notes?note_key=eq.'+encodeURIComponent(noteKey),{
@@ -6663,29 +6661,28 @@ function _daysSinceLastReading(dk){
   }
   return 90;
 }
-// 다짐-하루한줄 병렬 비교에 얹는 짧은 코멘트 — 판단(성공/실패)하지 않고, 봄이님 문장에 자연스럽게
+// 하루한줄에 얹는 짧은 코멘트 — 판단(성공/실패)하지 않고, 봄이님 문장에 자연스럽게
 // 말을 보태는 방식으로 한 줄만 생성. 인사배너(_greetingCache)와 동일한 패턴 — 메모리 캐시 + 서버 캐시.
 let _vowRecapCache={};
-async function _fetchVowRecapComment(dk,vow,oneLine){
-  if(!vow&&!oneLine)return '';
+async function _fetchVowRecapComment(dk,oneLine){
+  if(!oneLine)return '';
   if(_vowRecapCache[dk])return _vowRecapCache[dk];
   // 로컬 브리핑 캐시(localStorage) 먼저 확인 — 인사배너와 동일 패턴, 앱 재실행해도 유지됨
-  const localCached=_bcGet('vowrecap_'+dk);
+  const localCached=_bcGet('dayrecap_'+dk);
   if(localCached){_vowRecapCache[dk]=localCached;return localCached;}
   const key=getClaudeKey();
   if(!key){
-    const cached=await aiCacheGet('vowrecap_'+dk);
-    if(cached){_vowRecapCache[dk]=cached;_bcSet('vowrecap_'+dk,cached);return cached;}
+    const cached=await aiCacheGet('dayrecap_'+dk);
+    if(cached){_vowRecapCache[dk]=cached;_bcSet('dayrecap_'+dk,cached);return cached;}
     return '';
   }
   const memoTexts=getMemos(dk).map(m=>m.text).filter(Boolean);
   const lines=[];
-  if(vow)lines.push(`오늘 하루 다짐: "${vow}"`);
-  if(oneLine)lines.push(`하루를 마무리하며 남긴 한 줄: "${oneLine}"`);
+  lines.push(`하루를 마무리하며 남긴 한 줄: "${oneLine}"`);
   if(memoTexts.length)lines.push(`(참고용, 직접 언급 금지) 오늘 하루 흐름 파악용 메모: ${memoTexts.join(' / ')}`);
   const dataContext=lines.join('\n');
-  const sys=`당신은 따뜻한 친구예요. 아래는 사용자가 오늘 아침에 남긴 다짐과, 밤에 하루를 마무리하며 남긴 한 줄이에요.
-이 두 문장을 사용자가 직접 이어서 말하듯, 짧고 다정한 한두 마디를 건네주세요 — 사용자의 문장에 자연스럽게 말을 보태는 느낌으로.
+  const sys=`당신은 따뜻한 친구예요. 아래는 사용자가 밤에 하루를 마무리하며 남긴 한 줄이에요.
+이 문장을 사용자가 직접 이어서 말하듯, 짧고 다정한 한두 마디를 건네주세요 — 사용자의 문장에 자연스럽게 말을 보태는 느낌으로.
 
 **분량 — 반드시 지킬 것:**
 - 한 문장 또는 두 문장. 절대 세 문장을 넘기지 마세요. 각 문장은 짧게.
@@ -6693,7 +6690,6 @@ async function _fetchVowRecapComment(dk,vow,oneLine){
 **절대 원칙:**
 - "성공했다/실패했다/지켰다/못 지켰다" 같은 평가는 하지 마세요.
 - 메모는 그날의 흐름을 파악하는 참고용일 뿐, 메모 속 구체적 내용을 언급하거나 인용하지 마세요.
-- 다짐과 한 줄 중 하나만 있으면, 있는 것만 가지고 짧게.
 - 설명하거나 조언하려 하지 말고, 그냥 다정하게 공감하는 말투로.
 - 반드시 ~해요, ~이에요, ~어요 체의 정감있는 존댓말만 사용하세요. 문장 끝을 반말(~돼, ~해, ~야 등)로 맺지 마세요. 모든 문장이 예외 없이 존댓말로 끝나야 해요.
 - 이모지나 특수기호는 쓰지 않아요.
@@ -6702,14 +6698,14 @@ async function _fetchVowRecapComment(dk,vow,oneLine){
   if(!reply||reply.startsWith('__ERR__'))return '';
   const text=reply.trim();
   _vowRecapCache[dk]=text;
-  _bcSet('vowrecap_'+dk,text);
-  aiCacheSet('vowrecap_'+dk,text,AI_CACHE_TTL.short);
+  _bcSet('dayrecap_'+dk,text);
+  aiCacheSet('dayrecap_'+dk,text,AI_CACHE_TTL.short);
   return text;
 }
 
 // ── 저녁 파트1 "식사 분석" 배너 — 어제+오늘 meals 데이터를 메뉴명 기준으로 AI가 정성적으로 분석.
 // 정량 수치(g)는 앱에 입력되지 않으므로 사용하지 않고, 메뉴 구성 기반 추정 코멘트만 생성.
-// 인사배너/다짐회고와 동일한 캐시 패턴(메모리→로컬→서버 ai_cache) 재사용.
+// 인사배너와 동일한 캐시 패턴(메모리→로컬→서버 ai_cache) 재사용.
 let _nutriCommentCache={};
 function _nutriHeadlineFallback(){return '오늘의 식사를 살펴봤어요';}
 async function _fetchNutriComment(dk){
@@ -6742,6 +6738,7 @@ async function _fetchNutriComment(dk){
     recentLines.length?`최근 며칠 참고용 식사 흐름: ${recentLines.join(' / ')}`:''
   ].filter(Boolean).join('\n');
   const sys=`당신은 탄단지 균형과 건강식에 관심이 많은 사용자를 위한 다정한 영양 코멘트 작성자예요.
+사용자는 현재 체지방 감량과 근육량 향상을 목표로 운동과 식단을 철저히 관리하고 있어요. 이 목표를 염두에 두고 분석과 제안의 관점을 잡아주세요(예: 단백질 섭취가 목표에 도움이 되는지, 근손실 우려는 없는지, 체지방 감량에 방해될 만한 구성인지 등을 자연스럽게 반영).
 아래는 사용자의 어제 식사, 오늘 식사(계획 포함), 최근 며칠 식사 흐름이에요. 메뉴명만으로 탄수화물/단백질/지방 구성을 정성적으로 추정해서 코멘트를 작성하세요.
 
 **출력 형식 — 반드시 아래 JSON 형식만 출력, 다른 텍스트 없이:**
@@ -6750,7 +6747,8 @@ async function _fetchNutriComment(dk){
 **절대 원칙:**
 - g, mg, kcal 같은 구체적 수치는 절대 쓰지 마세요. "충분히", "든든하게", "가볍게", "비중이 높았어요" 같은 정성적 표현만 사용.
 - 메뉴명은 이미 화면 위쪽에 목록으로 노출되어 있어요. 문장에서 메뉴를 하나하나 다시 나열하지 마세요. 대신 그 구성이 어떤 특징을 가지는지(예: 단백질 중심, 지방 비중, 식이섬유 균형 등) 분석과 코멘트에 집중하세요.
-- 제안은 선택 사항이에요. 최근 며칠 흐름에 비해 뚜렷하게 잘 안 보였던 영양소가 있을 때만 today 코멘트에 자연스럽게 한 번 제안하세요. 이미 균형이 괜찮으면 억지로 제안을 만들지 말고 분석과 긍정적인 마무리로 끝내세요.
+- 체지방 감량·근육량 향상이라는 목표를 과하게 반복 언급하지 말고, 관련 있을 때만 자연스럽게 녹여주세요. 매 코멘트마다 목표를 직접 언급할 필요는 없어요.
+- 제안은 선택 사항이에요. 최근 며칠 흐름에 비해 뚜렷하게 잘 안 보였던 영양소가 있거나 목표 관점에서 아쉬운 부분이 있을 때만 today 코멘트에 자연스럽게 한 번 제안하세요. 이미 균형이 괜찮으면 억지로 제안을 만들지 말고 분석과 긍정적인 마무리로 끝내세요.
 - 어제나 오늘 중 기록이 없는 쪽은 해당 필드에 "기록이 없어요" 같은 짧은 문장으로 자연스럽게 처리.
 - 잔소리 톤이나 단정적 진단 금지 — 친한 친구가 툭 건네는 다정한 말투.
 - 반드시 ~해요, ~이에요, ~어요 체의 존댓말만 사용.
@@ -6822,7 +6820,6 @@ function makeDawnRecapCard(){
   const sleep=getSleep(dk)||{};
   const rblocks=getRhythmBlocks(dk);
   const oneLine=getDailyOneLine(dk).trim();
-  const vow=getDailyVow(dk).trim(); // 다짐은 아침에 자정 기준으로 저장되지만, 저장 시점의 달력날짜는 dk(4시 기준 회고 대상일)와 동일함
 
   // 수면: 어제 기록된 sleep~wake 시간 기준, 7.5시간을 만근으로
   let sleepMin=null;
@@ -6873,12 +6870,12 @@ function makeDawnRecapCard(){
   const card=document.createElement('div');card.className='day-recap-card';
   let html='';
 
-  if(oneLine||vow){
+  if(oneLine){
     let vowHtml='';
-    if(oneLine)vowHtml+=`<div class="vow-recap-row"><div class="vow-recap-label">하루를 마무리하며</div><div class="vow-recap-text">${escapeHtml(oneLine)}</div></div>`;
+    vowHtml+=`<div class="vow-recap-row"><div class="vow-recap-label">하루를 마무리하며</div><div class="vow-recap-text">${escapeHtml(oneLine)}</div></div>`;
     vowHtml+=`<div class="vow-recap-comment" id="vow-recap-comment-${dk}"></div>`;
     html+=`<div class="vow-recap-block">${vowHtml}</div>`;
-    _fetchVowRecapComment(dk,vow,oneLine).then(text=>{
+    _fetchVowRecapComment(dk,oneLine).then(text=>{
       const el=document.getElementById('vow-recap-comment-'+dk);
       if(el&&text)el.textContent=text;
     });
@@ -8404,69 +8401,6 @@ function renderMonthlyStatBar(){
 // ── 진행률 링
 
 // ── DAILY ONE LINE
-// ── 오늘의 다짐 (오전 파트2 전용, 자정 되면 자동 소멸)
-// 주간탭 하루한줄 오늘 칸 placeholder로 흐리게 노출되고, 사용자가 직접 타이핑해서
-// 최종 하루한줄로 확정하지 않는 한 실제로 저장되진 않음(placeholder일 뿐).
-// 자정(논리적 날짜 경계)이 지나면 어제 이전 다짐은 모두 삭제 — dailyvow_YYYY-MM-DD 키.
-function getDailyVow(dk){return S.get(S.key('dailyvow',dk))||'';}
-function saveDailyVow(dk,text){
-  S.set(S.key('dailyvow',dk),text);
-  if(navigator.onLine)syncDailyVowUp(S.key('dailyvow',dk),text);
-  if(document.getElementById('daily-oneline-list'))renderDailyOneLineWeek(); // 주간탭이 이미 열려있으면 즉시 반영
-}
-async function syncDailyVowUp(key,text){
-  await supaUpsert('goal_notes','note_key',[{note_key:key,lines:[text]}]);
-}
-// PC 등 다른 기기가 모바일에서 작성한 오늘의 다짐을 볼 수 있도록 서버에서 받아와 로컬에 채움.
-async function syncDailyVowDown(dk){
-  const key=S.key('dailyvow',dk);
-  const rows=await supaFetch(`goal_notes?note_key=eq.${encodeURIComponent(key)}`);
-  if(!rows||!rows.length)return;
-  const serverText=(rows[0].lines&&rows[0].lines[0])||'';
-  if(serverText&&serverText!==getDailyVow(dk))S.set(key,serverText);
-}
-// 오전 파트2 전용 "오늘의 다짐" 입력 카드. 짧은 한 줄로 오늘 하루를 어떻게 보낼지 적어두면,
-// 저녁 주간탭 하루한줄 오늘 칸에 placeholder로 흐리게 노출되어 스스로 다짐과 실제 하루를 대조해볼 수 있음.
-// 하루 지나면(자정 넘어 새 날짜가 되면) cleanupOldDailyVows가 자동으로 정리.
-function makeDailyVowCard(){
-  const dk=dateKey(new Date());
-  const outer=document.createElement('div');
-  outer.style.cssText='border-radius:19.5px;padding:1.6px;margin-bottom:10px;background:linear-gradient(135deg,rgba(235,175,165,0.55),rgba(240,205,150,0.50),rgba(235,175,165,0.55));';
-  const card=document.createElement('div');
-  card.className='card';
-  card.style.cssText='padding:14px 15px;margin-bottom:0;border:none;box-shadow:none;background:var(--card);border-radius:18px;';
-  const existing=getDailyVow(dk);
-  card.innerHTML=`
-    <div class="slabel" style="margin-bottom:8px;display:flex;align-items:center;gap:5px;"><i class="ti ti-sparkles" style="font-size:14px;color:#c9976a;" aria-hidden="true"></i>오늘의 다짐</div>
-    <input type="text" id="daily-vow-inp" class="oneline-inp" style="width:100%;" placeholder="오늘 하루를 어떻게 보내고 싶나요?" value="${existing.replace(/"/g,'&quot;')}" autocomplete="off">
-  `;
-  outer.appendChild(card);
-  const inp=card.querySelector('#daily-vow-inp');
-  inp.addEventListener('blur',()=>saveDailyVow(dk,inp.value.trim()));
-  inp.addEventListener('keydown',e=>{if(e.key==='Enter')inp.blur();});
-  return outer;
-}
-// 앱 진입 시 1회 호출 — 오늘이 아닌 dailyvow:*를 로컬+서버 양쪽에서 정리.
-// 정확한 날짜 계산을 위해 물리적 자정이 아니라 오늘 날짜(dateKey(new Date())) 기준으로 판단.
-function cleanupOldDailyVows(){
-  // 새벽 회고 카드는 4시 기준 논리적 날짜(getLogicalDate)로 어제 다짐을 보여주므로,
-  // 정리 기준도 동일하게 맞춰야 함 — 자정(new Date) 기준으로 하면 회고 전에 지워지는 버그가 생김
-  const todayDk=dateKey(getLogicalDate());
-  const prefix='dailyvow:';
-  const toDelete=[];
-  for(let i=0;i<localStorage.length;i++){
-    const k=localStorage.key(i);
-    if(!k||!k.startsWith(prefix))continue;
-    const dk=k.slice(prefix.length);
-    if(dk&&dk!==todayDk&&/^\d{4}-\d{2}-\d{2}$/.test(dk)){
-      toDelete.push({localKey:k,noteKey:k});
-    }
-  }
-  toDelete.forEach(function(item){
-    localStorage.removeItem(item.localKey);
-    if(navigator.onLine)supaDeleteGoalNote(item.noteKey);
-  });
-}
 function getDailyOneLine(dk){
   const v=S.get(S.key('oneline',dk));
   if(typeof v==='string')return v;
@@ -8482,14 +8416,6 @@ function renderDailyOneLineWeek(){
   const el=document.getElementById('daily-oneline-list');if(!el)return;
   const now=new Date(),dow=now.getDay();
   const mon=new Date(now);mon.setDate(now.getDate()-((dow+6)%7));
-  const todayDk=dateKey(now);
-  if(navigator.onLine){
-    syncDailyVowDown(todayDk).then(()=>{
-      // 서버에서 받아온 값이 로컬과 다를 수 있으니, today 입력창의 placeholder만 다시 갱신
-      const inp=document.querySelector(`#daily-oneline-list .oneline-today .oneline-inp`);
-      if(inp)inp.placeholder=getDailyVow(todayDk)||'오늘 하루 한 줄...';
-    });
-  }
   el.innerHTML='';
   for(let i=0;i<7;i++){
     const d=new Date(mon);d.setDate(mon.getDate()+i);
@@ -8505,7 +8431,7 @@ function renderDailyOneLineWeek(){
     const inp=document.createElement('input');
     inp.type='text';inp.className='oneline-inp';
     inp.value=getDailyOneLine(dk);
-    inp.placeholder=isToday?(getDailyVow(dk)||'오늘 하루 한 줄...'):'';
+    inp.placeholder='오늘 하루 한 줄...';
     inp.autocomplete='off';
     inp.addEventListener('blur',()=>saveDailyOneLine(dk,inp.value.trim()));
     inp.addEventListener('compositionend',()=>{}); // 한글 IME 안전
@@ -10428,11 +10354,11 @@ function buildMarkdownText(start,end){
   md+=`${s.getFullYear()}년 ${s.getMonth()+1}월 ${weekNum}주차 (${fmtDate(s)} ${DAY_NAMES_KO[s.getDay()]} ~ ${fmtDate(e)} ${DAY_NAMES_KO[e.getDay()]})\n`;
   md+=`━━━━━━━━━━━━━━━━━━━━\n`;
 
-  // 이번 주 다짐
+  // 이번 주 목표
   const wk=weekKey(s);
   const challenges=getWChallenge(wk).filter(c=>c.text&&c.text.trim());
   if(challenges.length){
-    md+=`✦ 이번 주 다짐\n`;
+    md+=`✦ 이번 주 목표\n`;
     challenges.forEach(c=>{
       const dayStr=WEEK_DAY_LABELS.map((l,i)=>c.days[i]?'●':'○').join(' ');
       md+=`· ${c.text.padEnd(20)} ${dayStr}\n`;
@@ -10634,7 +10560,6 @@ async function checkDataIntegrity(){
 // ── INIT
 updateDateUI();
 loadDaily();
-cleanupOldDailyVows();
 // 새로고침/앱 완전종료 후 재시작 시, 켜져 있던 독서 스톱워치를 이어서 복원.
 // localStorage에 저장된 시작시각이 있으면(=종료 처리 없이 앱이 닫힌 경우) 그 시각 기준으로
 // 경과시간을 계산해 스톱워치를 다시 돌아가는 상태로 되살린다.
