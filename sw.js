@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260728-7-memo-enter-fix';
+const CACHE = 'iikoto-v20260728-8-memo-blur-save';
 const ASSETS = [
   './',
   './index.html'

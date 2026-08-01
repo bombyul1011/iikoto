@@ -4760,6 +4760,12 @@ function setupMemoInlineInput(){
       submitMemoInline();
     }
   });
+  // 모바일에서만: 입력 중 화면의 다른 부분을 눌러 포커스가 빠지면 자동 저장.
+  // submitMemoInline 자체가 빈 텍스트/중복 호출을 이미 방어하므로 여기선 조건 없이 호출.
+  // 등록 버튼 클릭 시에도 blur가 먼저 뜰 수 있지만, _memoSubmitting 가드 덕분에 두 번 등록되지 않음.
+  if(_isTouchDevice()){
+    inp.addEventListener('blur',()=>{submitMemoInline();});
+  }
 }
 function submitMemoInline(){
   if(_memoSubmitting)return;
