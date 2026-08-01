@@ -4652,7 +4652,7 @@ function renderSleepAvgMarkers(AXIS_MIN,SVG_W,toAxisMin,sv){
   const mStart=document.getElementById('sleep-avg-marker-start'),mEnd=document.getElementById('sleep-avg-marker-end');
   const compareEl=document.getElementById('sleep-avg-compare');
   if(!mStart||!mEnd)return;
-  const avg=getAvgSleepWindow(7);
+  const avg=getAvgSleepWindow(14);
   if(!avg||avg.sampleCount<3){
     mStart.style.display='none';mEnd.style.display='none';
     if(compareEl)compareEl.style.display='none';
@@ -4753,6 +4753,9 @@ function setupMemoInlineInput(){
   inp.addEventListener('keydown',e=>{
     if(_memoInlineComposing||e.isComposing||e.keyCode===229)return;
     if((e.key==='Enter'||e.keyCode===13)&&!e.shiftKey){
+      // 모바일(터치기기)에서는 Enter가 줄바꿈으로 동작 — 타이핑 중 실수로 조기 등록되는 것 방지.
+      // PC는 기존처럼 Enter=등록 유지(키보드 오조작 빈도가 낮아 굳이 바꿀 필요 없음).
+      if(_isTouchDevice())return;
       e.preventDefault();
       submitMemoInline();
     }
@@ -5557,17 +5560,6 @@ ${extraLine}
 function makeEveningLearnCard(){
   const wrap=document.createElement('div');
   wrap.className='elearn-banner';
-  // 휴가모드 중엔 채움 코너 자체를 쉬어감 — 뽑기/API 호출 없이 안내만 표시
-  if(getActiveVacation()){
-    wrap.innerHTML=`<div class="elearn-banner-inner">
-      <div class="elearn-banner-icon"><i class="ti ti-bulb" aria-hidden="true"></i></div>
-      <div class="elearn-banner-text">
-        <div class="elearn-banner-title">저녁의 채움</div>
-        <div class="elearn-banner-sub">휴가 중에는 쉬어가요 🌴</div>
-      </div>
-    </div>`;
-    return wrap;
-  }
   cleanupStaleEveningLearnSelections();
   const dk=dateKey(getLogicalDate());
   const state=getEveningLearnState(dk);
@@ -5622,18 +5614,7 @@ function makeEveningLearnCard(){
 // ── 채움 코너 (풀스크린) ──
 function openChaeum(){
   document.getElementById('chaeum-ov').classList.add('on');
-  // 휴가모드 중엔 홈탭 배너와 동일하게 "오늘의 채움"을 쉬어감 — 뽑기/API 호출 없이 안내만 표시.
-  // 지난 채움 목록/통계는 과거 기록 열람이라 휴가 여부와 무관하게 그대로 노출.
-  if(getActiveVacation()){
-    const body=document.getElementById('chaeum-today-slot');
-    if(body)body.innerHTML=`<div class="card" style="text-align:center;padding:28px 16px;color:var(--tm);">휴가 중에는 쉬어가요 🌴</div>`;
-    renderChaeumTopicStats();
-    renderChaeumLogList();
-    syncEveningLearnLogDown().then(()=>{renderChaeumTopicStats();renderChaeumLogList();});
-    return;
-  }
   cleanupStaleEveningLearnSelections();
-  document.getElementById('chaeum-ov').classList.add('on');
   const dk=dateKey(getLogicalDate());
   const state=getEveningLearnState(dk);
   if(!state.started){
