@@ -662,6 +662,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="glass"] .report-banner.month-soft .report-banner-inner{background:rgba(253,251,245,0.95);}
 .report-banner.rhythm-soft{background:linear-gradient(120deg,rgba(248,192,160,0.85) 0%,rgba(252,215,110,0.80) 25%,rgba(150,205,225,0.75) 50%,rgba(190,160,230,0.80) 75%,rgba(244,177,206,0.82) 100%);}
 .report-banner.rhythm-soft .report-banner-inner{background:linear-gradient(120deg,rgba(253,242,232,0.92) 0%,rgba(253,247,225,0.90) 25%,rgba(235,246,250,0.90) 50%,rgba(246,240,252,0.90) 75%,rgba(253,238,244,0.92) 100%);}
+.report-banner.nutri-soft .report-banner-inner{background:linear-gradient(135deg,rgba(255,236,220,0.88),rgba(253,244,214,0.85),rgba(255,236,220,0.88));}
 .report-banner.rhythm-soft .report-banner-line{color:#8a6a55;}
 .report-banner.rhythm-soft .report-banner-arrow{color:#a68a72;}
 [data-theme="glass"] .report-banner.rhythm-soft{background:linear-gradient(120deg,rgba(248,192,160,0.85) 0%,rgba(252,215,110,0.80) 25%,rgba(150,205,225,0.75) 50%,rgba(190,160,230,0.80) 75%,rgba(244,177,206,0.82) 100%);}
@@ -769,6 +770,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="glass"] .home-hcard.afternoon{background:linear-gradient(135deg,rgba(255,220,235,0.30),rgba(255,235,200,0.26));border-color:rgba(255,200,210,0.38);}
 [data-theme="glass"] .home-hcard.night{background:linear-gradient(135deg,rgba(225,215,250,0.30),rgba(255,210,230,0.26));border-color:rgba(210,195,240,0.38);}
 [data-theme="glass"] .report-banner.meal-soft .report-banner-inner{background:rgba(253,251,245,0.95)!important;}
+[data-theme="glass"] .report-banner.nutri-soft .report-banner-inner{background:rgba(253,251,245,0.95)!important;}
 [data-theme="glass"] .report-banner.quote-soft .report-banner-inner{background:rgba(253,251,245,0.95)!important;}
 
 
@@ -836,6 +838,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .vow-recap-label{font-size:10.5px;color:var(--tm);margin-bottom:5px;letter-spacing:0.02em;}
 .vow-recap-text{font-size:14px;color:var(--tp);line-height:1.5;background:none;border:none;border-left:2.5px solid rgba(225,140,120,0.45);border-radius:0;padding:2px 0 2px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .vow-recap-comment{font-size:12.5px;color:var(--ts);line-height:1.6;margin-top:4px;padding-top:0;min-height:1em;}
+.nutri-menu-row{display:flex;align-items:baseline;gap:8px;padding:5px 0;font-size:13px;color:var(--tp);}
+.nutri-menu-cat{width:32px;flex-shrink:0;font-size:11.5px;color:var(--tm);}
+.nutri-section-label{font-size:11.5px;font-weight:700;color:var(--ts);margin:14px 0 6px;}
+.nutri-analysis-text{font-size:13px;color:var(--tp);line-height:1.65;padding:2px 0;}
+.nutri-empty{font-size:12.5px;color:var(--tm);padding:6px 0;}
 
 .recap-donut-row{display:flex;justify-content:space-around;margin-bottom:2px;padding-bottom:2px;}
 .recap-donut-item{text-align:center;}
@@ -1305,6 +1312,21 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div id="week-meal-scroll" style="max-height:50vh;overflow-y:auto;">
         <div id="week-meal-body"></div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- NUTRI COMMENT SHEET -->
+<div class="overlay" id="nutri-comment-sheet" onclick="closeSheet('nutri-comment-sheet',event)">
+  <div class="bsheet" style="max-height:80vh;overflow-y:auto;" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div style="padding:0 20px 24px;">
+      <div class="report-banner nutri-soft" style="margin:0 0 14px;">
+        <div class="report-banner-inner">
+          <div class="report-banner-line"><i class="ti ti-apple" style="font-size:12px;vertical-align:-1px;margin-right:3px;" aria-hidden="true"></i>식사 분석</div>
+        </div>
+      </div>
+      <div id="nutri-comment-body"></div>
     </div>
   </div>
 </div>
@@ -2032,6 +2054,7 @@ function renderHomeBody(section){
       body.appendChild(makeEveningLearnCard());
       body.appendChild(makeHabitMiniCheckRow());
       body.appendChild(makeEveningMiniStatCard());
+      body.appendChild(makeNutriCommentBanner());
     }
     body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getLogicalDate()));},'rhythm-soft',12.5,dateKey(getLogicalDate())));
     // 일요일 다음 주 챌린지 준비 배너는 홈탭에서 제거 — 주간탭 "이번 주도 화이팅" 카드로 흡수됨
@@ -6683,6 +6706,106 @@ async function _fetchVowRecapComment(dk,vow,oneLine){
   aiCacheSet('vowrecap_'+dk,text,AI_CACHE_TTL.short);
   return text;
 }
+
+// ── 저녁 파트1 "식사 분석" 배너 — 어제+오늘 meals 데이터를 메뉴명 기준으로 AI가 정성적으로 분석.
+// 정량 수치(g)는 앱에 입력되지 않으므로 사용하지 않고, 메뉴 구성 기반 추정 코멘트만 생성.
+// 인사배너/다짐회고와 동일한 캐시 패턴(메모리→로컬→서버 ai_cache) 재사용.
+let _nutriCommentCache={};
+function _nutriHeadlineFallback(){return '오늘의 식사를 살펴봤어요';}
+async function _fetchNutriComment(dk){
+  if(_nutriCommentCache[dk])return _nutriCommentCache[dk];
+  const localCached=_bcGet('nutricomment_'+dk);
+  if(localCached){try{const parsed=JSON.parse(localCached);_nutriCommentCache[dk]=parsed;return parsed;}catch(e){}}
+  const key=getClaudeKey();
+  if(!key){
+    const cached=await aiCacheGet('nutricomment_'+dk);
+    if(cached){try{const parsed=JSON.parse(cached);_nutriCommentCache[dk]=parsed;_bcSet('nutricomment_'+dk,cached);return parsed;}catch(e){}}
+    return null;
+  }
+  const yDate=new Date(dk+'T00:00:00');yDate.setDate(yDate.getDate()-1);
+  const ydk=dateKey(yDate);
+  const todayMeals=getMeals(dk)||{},yMeals=getMeals(ydk)||{};
+  const fmtMeals=m=>MEAL_KEYS.map(k=>m[k]?`${MEAL_LABELS[k]}: ${m[k]}`:null).filter(Boolean).join(', ');
+  const yText=fmtMeals(yMeals),tText=fmtMeals(todayMeals);
+  if(!yText&&!tText)return null;
+  // 최근 며칠 메뉴 흐름도 함께 참고자료로 전달 — 반복 패턴/부족한 영양소 판단에 활용
+  const recentLines=[];
+  for(let i=2;i<=6;i++){
+    const d=new Date(dk+'T00:00:00');d.setDate(d.getDate()-i);
+    const rdk=dateKey(d);
+    const rt=fmtMeals(getMeals(rdk)||{});
+    if(rt)recentLines.push(rt);
+  }
+  const dataContext=[
+    yText?`어제 식사: ${yText}`:'어제 식사 기록 없음',
+    tText?`오늘 식사(예정 포함): ${tText}`:'오늘 식사 기록 없음',
+    recentLines.length?`최근 며칠 참고용 식사 흐름: ${recentLines.join(' / ')}`:''
+  ].filter(Boolean).join('\n');
+  const sys=`당신은 탄단지 균형과 건강식에 관심이 많은 사용자를 위한 다정한 영양 코멘트 작성자예요.
+아래는 사용자의 어제 식사, 오늘 식사(계획 포함), 최근 며칠 식사 흐름이에요. 메뉴명만으로 탄수화물/단백질/지방 구성을 정성적으로 추정해서 코멘트를 작성하세요.
+
+**출력 형식 — 반드시 아래 JSON 형식만 출력, 다른 텍스트 없이:**
+{"headline":"짧은 헤드라인 한 줄(정량 수치 없이, 예: '단백질 든든하게 채운 하루')","yesterday":"어제 식사 분석 2문장 이내","today":"오늘 식사 분석과 제안 2~3문장 이내"}
+
+**절대 원칙:**
+- g, mg, kcal 같은 구체적 수치는 절대 쓰지 마세요. "충분히", "든든하게", "가볍게", "비중이 높았어요" 같은 정성적 표현만 사용.
+- 실제 언급된 메뉴명을 자연스럽게 문장에 녹여서 언급하세요.
+- 최근 며칠 흐름에 비해 잘 안 보였던 영양소(예: 식이섬유, 채소, 오메가3, 철분 등)가 있으면 today 코멘트에 자연스럽게 한 번만 제안하세요. 매번 지적하지 말고, 균형이 좋았던 날은 긍정적으로 마무리.
+- 어제나 오늘 중 기록이 없는 쪽은 해당 필드에 "기록이 없어요" 같은 짧은 문장으로 자연스럽게 처리.
+- 잔소리 톤이나 단정적 진단 금지 — 친한 친구가 툭 건네는 다정한 말투.
+- 반드시 ~해요, ~이에요, ~어요 체의 존댓말만 사용.
+- 이모지나 특수기호는 쓰지 않아요.`;
+  const reply=await callClaude(sys,[{role:'user',content:dataContext}],400);
+  if(!reply||reply.startsWith('__ERR__'))return null;
+  let parsed;
+  try{
+    const cleaned=reply.trim().replace(/^```json|```$/g,'').trim();
+    parsed=JSON.parse(cleaned);
+  }catch(e){return null;}
+  if(!parsed||!parsed.headline)return null;
+  _nutriCommentCache[dk]=parsed;
+  const raw=JSON.stringify(parsed);
+  _bcSet('nutricomment_'+dk,raw);
+  aiCacheSet('nutricomment_'+dk,raw,AI_CACHE_TTL.short);
+  return parsed;
+}
+function makeNutriCommentBanner(){
+  const dk=dateKey(getLogicalDate());
+  const banner=document.createElement('div');
+  banner.className='report-banner nutri-soft';
+  banner.id='nutri-comment-banner';
+  banner.innerHTML=`<div class="report-banner-inner">
+    <div class="report-banner-line"><i class="ti ti-apple" style="font-size:12px;vertical-align:-1px;margin-right:3px;" aria-hidden="true"></i><span id="nutri-banner-headline">식사를 살펴보고 있어요</span></div>
+    <div class="report-banner-arrow"><i class="ti ti-chevron-up" style="font-size:15px;" aria-hidden="true"></i></div>
+  </div>`;
+  banner.onclick=()=>openNutriCommentSheet(dk);
+  _fetchNutriComment(dk).then(data=>{
+    const hEl=document.getElementById('nutri-banner-headline');
+    if(hEl)hEl.textContent=data&&data.headline?data.headline:_nutriHeadlineFallback();
+  });
+  return banner;
+}
+async function openNutriCommentSheet(dk){
+  const body=document.getElementById('nutri-comment-body');
+  const yDate=new Date(dk+'T00:00:00');yDate.setDate(yDate.getDate()-1);
+  const ydk=dateKey(yDate);
+  const yMeals=getMeals(ydk)||{},tMeals=getMeals(dk)||{};
+  const fmtRows=m=>MEAL_KEYS.map(k=>m[k]?`<div class="nutri-menu-row"><div class="nutri-menu-cat">${MEAL_LABELS[k]}</div><div>${escapeHtml(m[k])}</div></div>`:'').join('');
+  const yRows=fmtRows(yMeals),tRows=fmtRows(tMeals);
+  body.innerHTML=`
+    <div class="nutri-section-label">어제 먹은 메뉴</div>
+    ${yRows||'<div class="nutri-empty">기록된 식사가 없어요</div>'}
+    <div class="nutri-analysis-text" id="nutri-yesterday-text">분석하는 중이에요...</div>
+    <div class="nutri-section-label">오늘 메뉴</div>
+    ${tRows||'<div class="nutri-empty">기록된 식사가 없어요</div>'}
+    <div class="nutri-analysis-text" id="nutri-today-text">분석하는 중이에요...</div>
+  `;
+  openSheet('nutri-comment-sheet');
+  const data=await _fetchNutriComment(dk);
+  const yEl=document.getElementById('nutri-yesterday-text'),tEl=document.getElementById('nutri-today-text');
+  if(yEl)yEl.textContent=data&&data.yesterday?data.yesterday:'분석할 식사 기록이 부족해요.';
+  if(tEl)tEl.textContent=data&&data.today?data.today:'분석할 식사 기록이 부족해요.';
+}
 function makeDawnRecapCard(){
   const wrap=document.createElement('div');
   wrap.id='dawn-recap-card';
@@ -8972,13 +9095,12 @@ function openWeekMealSheet(){
   body.innerHTML='';
   const DOW=['월','화','수','목','금','토','일'];
   const CATS=MEAL_KEYS.map(k=>[k,MEAL_LABELS[k]]);
-  const isSundayToday=now.getDay()===0;
-  const dayCount=isSundayToday?8:7; // 일요일엔 다음 주 월요일 칸까지 미리 보여줌
+  const dayCount=14; // 이번 주 + 다음 주, 2주치 노출
   for(let i=0;i<dayCount;i++){
     const d=new Date(mon);d.setDate(mon.getDate()+i);
     const dk=dateKey(d);
     const m=getMeals(dk);
-    const isNextWeekPeek=i===7;
+    const isNextWeekPeek=i>=7;
     const block=document.createElement('div');block.className='week-meal-day';block.id='wm-block-'+dk;
     block.innerHTML=`<div class="week-meal-day-label">${DOW[i%7]} · ${d.getMonth()+1}/${d.getDate()}${isNextWeekPeek?' · 다음 주':''}</div>`+
       CATS.map(([k,label])=>`<div class="meal-row"><div class="meal-cat" onpointerdown="mealCatPressStart(this,'${dk}','${k}')" onpointerup="mealCatPressEnd(this)" onpointerleave="mealCatPressEnd(this)" onpointercancel="mealCatPressEnd(this)">${label}</div><input class="meal-inp" style="flex:1 1 0;min-width:0;" id="wm-${dk}-${k}" type="text" placeholder="메뉴 입력" autocomplete="off" value="${(m[k]||'').replace(/"/g,'&quot;')}" onblur="saveOneMealDay('${dk}')"><div class="meal-time-group"><input class="meal-time-inp${m[k+'_time']?'':' mt-empty'}" id="wm-${dk}-${k}-time" type="time" value="${m[k+'_time']||''}" onchange="saveOneMealDay('${dk}')" step="60" lang="en-GB">${m[k+'_time']?`<span onclick="clearMealTime('${dk}','${k}')" class="meal-time-clear" title="시간 지우기">✕</span>`:''}</div></div>`).join('');
@@ -8996,7 +9118,7 @@ function openWeekMealSheet(){
 function saveWeekMealSheet(){
   const now=new Date();
   const mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7));
-  for(let i=0;i<7;i++){
+  for(let i=0;i<14;i++){
     const d=new Date(mon);d.setDate(mon.getDate()+i);
     const dk=dateKey(d);
     const m={};
