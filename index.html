@@ -2101,7 +2101,7 @@ function makeLabel(txt){
 const RHYTHM_CATS={
   exercise:{label:'운동',color:'rgba(234,187,190,0.85)',icon:'ti-run'},
   rest:{label:'휴식',color:'rgba(190,225,205,0.75)',icon:'ti-armchair'},
-  groom:{label:'정돈',color:'rgba(255,217,138,0.82)',icon:'ti-mood-spark'},
+  groom:{label:'단장',color:'rgba(255,217,138,0.82)',icon:'ti-mood-spark'},
   work:{label:'업무',color:'rgba(204,208,220,0.80)',icon:'ti-keyboard'},
   appointment:{label:'외출',color:'rgba(168,212,232,0.75)',icon:'ti-bus'},
   note:{label:'책상',color:'rgba(240,187,158,0.82)',icon:'ti-desk'},
@@ -2111,7 +2111,7 @@ const RHYTHM_CATS={
 const RHYTHM_SLEEP_COLOR='rgba(205,194,182,0.88)';
 const RHYTHM_MEAL_COLOR='rgba(130,205,145,0.90)';
 // 리듬 카테고리 분류 설명 — AI 프롬프트에서 시간 사용 데이터를 다룰 때 카테고리 오분류(예: 업무↔책상, 휴식↔감상)를 줄이기 위해 공통으로 붙이는 한 줄 설명.
-const RHYTHM_CAT_GUIDE='(카테고리 참고: 운동=홈트/헬스장/러닝 등, 휴식=낮잠/멍때리기/게임 등 목적 없이 흘려보내는 시간, 정돈=기상 후 스트레칭·오디오북 들으며 씻고 준비하는 루틴 또는 취침 전 씻고 정돈하는 루틴(매일 반복되는 몸단장 루틴, 휴식과 구분됨), 업무=주로 노트북으로 하는 작업(가끔 외근 포함), 외출=지인과의 약속이나 혼자 가는 카페/산책 등, 책상=일기·공부·앱 정비·노트정리 등 책상에서 하는 작업, 감상=드라마·독서·영화, 정리=청소·빨래 등 집안 정리)';
+const RHYTHM_CAT_GUIDE='(카테고리 참고: 운동=홈트/헬스장/러닝 등, 휴식=낮잠/멍때리기/게임 등 목적 없이 흘려보내는 시간, 단장=기상 후 스트레칭·씻기·스킨케어 등 몸을 준비하는 루틴이나 취침 전 씻고 정돈하는 루틴, 그리고 다음날/다음 일정을 위해 미리 손 써두는 시간(여행 짐 챙기기, 다음날 식사 미리 준비해두기 등)까지 포함 — 지금 당장이 아니라 다가올 시간을 위해 준비하는 행위 전반(휴식과 구분됨), 업무=주로 노트북으로 하는 작업(가끔 외근 포함), 외출=지인과의 약속이나 혼자 가는 카페/산책 등, 책상=일기·공부·앱 정비·노트정리 등 책상에서 하는 작업, 감상=드라마·독서·영화, 정리=청소·빨래 등 집안 정리)';
 function getRhythmColor(key){
   if(key==='_sleep')return RHYTHM_SLEEP_COLOR;
   if(key==='_meal')return RHYTHM_MEAL_COLOR;
@@ -3216,15 +3216,17 @@ async function makeWeeklySummaryCard(){
   const habitDoneCounts={};
   habits.forEach(h=>{habitDoneCounts[h.name]=0;});
   const rhythmDurThis={};
+  const vacationDayNames=[]; // 이번 주 중 휴가였던 요일들 — 통계에서 제외하지 않고 AI 맥락으로만 전달
 
   for(let i=0;i<7;i++){
     const d=new Date(weekStart);d.setDate(weekStart.getDate()+i);
     const dk=dateKey(d);
+    const dayName=_HOME_DAYS[d.getDay()]+'요일';
+    if(isVacationDay(dk))vacationDayNames.push(dayName);
     const todos=getTodos(dk);
     allTodos.push(...todos);
     const memos=getMemos(dk);
     allMemos.push(...memos.map(m=>m.text).filter(Boolean));
-    const dayName=_HOME_DAYS[d.getDay()]+'요일';
     const dayTexts=memos.map(m=>m.text).filter(Boolean);
     evenSample(dayTexts,8).forEach(t=>allMemosWithDay.push(`${dayName}: ${t}`));
     const sleep=getSleep(dk);
@@ -3312,6 +3314,7 @@ async function makeWeeklySummaryCard(){
   const dataContext=[
     `이번 주(월~일) 데이터:`,
     getUserProfileContext(),
+    vacationDayNames.length?`이번 주 ${vacationDayNames.join(', ')}은 휴가 기간이었어요. 휴가 중이라 투두/리듬 기록은 거의 없지만, 습관 체크나 메모 등 남아있는 기록은 있는 그대로 참고해서 작성해요.`:'',
     avgSleepStr?`평균 수면: ${avgSleepStr}`:'수면 기록 없음',
     `투두: 총 ${totalTodos}개 중 ${doneTodos}개 실행함`,
     `메모 총 ${allMemos.length}건`,
@@ -3325,7 +3328,7 @@ async function makeWeeklySummaryCard(){
 
   const sys=`당신은 따뜻한 한 주 정리 비서예요. 이번 주 데이터를 보고 주간 회고 카드를 작성해요.
 ${RHYTHM_CAT_GUIDE}
-
+${vacationDayNames.length?`\n휴가 관련 유의점: 이번 주 중 일부가 휴가 기간이었어요. 투두 완료 개수나 리듬 시간이 평소보다 적은 건 게을렀던 게 아니라 휴가라 그런 거예요 — 이 점을 자연스럽게 감안하되, 습관 체크나 메모처럼 실제로 남아있는 기록은 건너뛰지 말고 있는 그대로 분석에 반영해요. "휴가라 기록이 없다"고 단정하지 말고, 있는 데이터는 정상적으로 다뤄요.\n`:''}
 메모 분석 시 유의할 점:
 - 단순히 "바빴어요/피곤했어요" 같은 뭉뚱그린 표현 대신, 메모에 실제로 등장한 장소/활동/사람/사건을 구체적으로 짚어서 언급해요.
 - 요일별로 흐름이 어떻게 바뀌었는지 (예: 초반엔 OO, 중반부터 OO로 전환) 구체적인 사건 기반으로 설명해요.
