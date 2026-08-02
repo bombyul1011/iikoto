@@ -1365,7 +1365,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   <div class="bsheet" style="max-height:80vh;overflow-y:auto;" onclick="event.stopPropagation()">
     <div class="sheet-handle"></div>
     <div class="sheet-title" style="border-bottom:none;">예비 투두</div>
-    <div class="memo-input-row" style="padding:0 16px 12px;">
+    <div class="memo-input-row" style="padding:0 16px 12px;margin-top:0;border-top:none;">
       <textarea class="memo-field memo-field-sm" id="reserve-inp" placeholder="날짜 미정 할 일" rows="1" autocomplete="off" onkeydown="if(event.isComposing||event.keyCode===229)return;if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();addReserveTodo();}"></textarea>
       <button class="send-btn send-btn-sm" onclick="addReserveTodo()" title="추가"><i class="ti ti-arrow-down" style="font-size:14px;" aria-hidden="true"></i></button>
     </div>
