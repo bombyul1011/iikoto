@@ -387,7 +387,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .hm-lbl{width:52px;flex-shrink:0;font-size:11px;color:var(--ts);padding-top:2px;}
 .hm-dots{display:flex;flex-wrap:wrap;gap:3px;}
 .hm-dot{width:14px;height:14px;border-radius:4px;background:rgba(220,200,195,.22);}
-.hm-dot.vacation{background:repeating-linear-gradient(45deg,rgba(190,160,230,0.25),rgba(190,160,230,0.25) 2px,rgba(190,160,230,0.08) 2px,rgba(190,160,230,0.08) 4px);}
 .hm-dot.mint{background:rgba(140,210,200,.68);}
 .hm-dot.pink{background:rgba(255,175,200,.62);}
 .hm-dot.sky{background:rgba(155,205,255,.62);}
@@ -902,7 +901,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .hw-dots{flex:1;display:flex;}
 .hw-dot-wrap{flex:1;display:flex;justify-content:center;}
 .hw-dot{width:9px;height:9px;border-radius:50%;border-style:solid;box-sizing:border-box;}
-.hw-dot.vacation{background:repeating-linear-gradient(45deg,rgba(190,160,230,0.35),rgba(190,160,230,0.35) 1.5px,transparent 1.5px,transparent 3px);border:none;}
 .hw-streak{width:26px;flex-shrink:0;text-align:right;font-size:9px;color:var(--tm);font-weight:600;}
 
 /* ── 데일리 리듬 트랙 (블록 모델) ── */
@@ -969,8 +967,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .wrb-row{display:flex;align-items:center;gap:10px;}
 .wrb-daylabel{width:16px;flex-shrink:0;font-size:10px;color:var(--tm);text-align:center;}
 .wrb-daylabel.today{color:var(--acc);font-weight:700;}
-.wrb-daylabel.vacation{color:var(--tm);opacity:0.55;font-size:11px;}
-.wrb-trackwrap.vacation{opacity:0.4;}
 .wrb-trackwrap{position:relative;flex:1;height:8px;}
 .wrb-track{position:absolute;top:0;left:0;right:0;height:8px;border-radius:4px;background:rgba(220,210,195,0.35);}
 .wrb-seg{position:absolute;top:0;height:8px;border-radius:4px;}
@@ -1760,22 +1756,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div class="settings-item">
           <span style="font-size:11px;color:var(--tm);" id="claude-key-status">날씨 인사 · 주간 루틴 · 일정 요약에 사용돼요</span>
         </div>
-      </div>
-    </div>
-    <div>
-      <div class="settings-slbl">휴가모드</div>
-      <div class="settings-card">
-        <div class="settings-item" style="flex-direction:column;align-items:flex-start;gap:8px;">
-          <div style="display:flex;gap:8px;width:100%;">
-            <input type="date" id="vacation-start-inp" class="modal-inp" style="margin-bottom:0;flex:1;font-size:12.5px;">
-            <input type="date" id="vacation-end-inp" class="modal-inp" style="margin-bottom:0;flex:1;font-size:12.5px;">
-          </div>
-          <button onclick="addVacationPeriodFromInputs()"
-            style="width:100%;padding:9px;border-radius:10px;border:none;background:var(--acc-soft);color:var(--acc);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">
-            휴가기간 등록
-          </button>
-        </div>
-        <div id="vacation-list-slot" style="width:100%;"></div>
       </div>
     </div>
     <div>
@@ -2770,10 +2750,8 @@ function computeMonthStats(y,mo,endDay){
   const weekSet={};
   const rhythmDur={};
   const rhythmDayCount={};
-  const vacationDays=[];
   for(let d=1;d<=lastDay;d++){
     const dk=`${y}-${pad(mo+1)}-${pad(d)}`;
-    if(isVacationDay(dk)){vacationDays.push(d);continue;} // 휴가기간은 모든 누계(습관/투두/수면/리듬)에서 완전히 제외
     const dayMemos=getMemos(dk);
     memos+=dayMemos.length;
     dayMemos.forEach(m=>{if(m.text)allMemoTexts.push(m.text);});
@@ -2847,8 +2825,7 @@ function computeMonthStats(y,mo,endDay){
     return `${c.label} 전월 ${lastH}h → 이번달 ${thisH}h, ${dir}`;
   }).join(' / ');
   const rhythmSummary=Object.keys(rhythmDur).length?durSummaryLine(rhythmDur):'';
-  const vacationText=vacationDays.length?`이번 달 ${vacationDays.join(', ')}일은 휴가 기간이라 기록이 없거나 적어요(통계에서도 제외됨) — 이 날짜들은 게을렀던 게 아니라 휴가였다는 걸 리포트에서 자연스럽게 반영해줘.`:'';
-  return {memos,doneTodos,totalTodos,todoPct,habitPct,avgSleep,allMemoTexts,onelineTexts,wcByWeek,contentsList,rhythmSummary,rhythmCompareText,monthCompareText,rhythmDur,rhythmDayCount,dim,goalLines,vacationDays,vacationText};
+  return {memos,doneTodos,totalTodos,todoPct,habitPct,avgSleep,allMemoTexts,onelineTexts,wcByWeek,contentsList,rhythmSummary,rhythmCompareText,monthCompareText,rhythmDur,rhythmDayCount,dim,goalLines};
 }
 // 콘텐츠 상태(watching/done/stopped)를 한글 라벨로 변환 — 월간 리포트 화면 표시와
 // AI 프롬프트 두 곳에서 완전히 동일하게 재구현되던 것을 통일.
@@ -2870,7 +2847,6 @@ async function generateMonthlyReportAI(mk,stats){
     stats.rhythmSummary?`시간 사용 누계: ${stats.rhythmSummary}`:'',
     stats.rhythmCompareText?`전월 같은 기간 대비 시간 사용 변화: ${stats.rhythmCompareText}`:'',
     stats.monthCompareText?`전월 같은 기간 대비 투두/습관/수면 변화: ${stats.monthCompareText}`:'',
-    stats.vacationText||'',
     stats.allMemoTexts.length?`이번 달 메모 전체 (${stats.allMemoTexts.length}건, 시간순):\n${stats.allMemoTexts.slice(0,2000).join('\n')}`:'',
     stats.contentsList.length?`콘텐츠 기록: ${stats.contentsList.map(c=>`${c.title}(${c.cat}${cStatusLabel(c)?', '+cStatusLabel(c):''})`).join(', ')}`:'',
     stats.wcByWeek.length?`주간 미션 현황: ${stats.wcByWeek.map(w=>w.lines.map(l=>`${l.text} ${l.pct}%`).join(', ')).join(' | ')}`:''
@@ -3216,13 +3192,11 @@ async function makeWeeklySummaryCard(){
   const habitDoneCounts={};
   habits.forEach(h=>{habitDoneCounts[h.name]=0;});
   const rhythmDurThis={};
-  const vacationDayNames=[]; // 이번 주 중 휴가였던 요일들 — 통계에서 제외하지 않고 AI 맥락으로만 전달
 
   for(let i=0;i<7;i++){
     const d=new Date(weekStart);d.setDate(weekStart.getDate()+i);
     const dk=dateKey(d);
     const dayName=_HOME_DAYS[d.getDay()]+'요일';
-    if(isVacationDay(dk))vacationDayNames.push(dayName);
     const todos=getTodos(dk);
     allTodos.push(...todos);
     const memos=getMemos(dk);
@@ -3314,7 +3288,6 @@ async function makeWeeklySummaryCard(){
   const dataContext=[
     `이번 주(월~일) 데이터:`,
     getUserProfileContext(),
-    vacationDayNames.length?`이번 주 ${vacationDayNames.join(', ')}은 휴가 기간이었어요. 휴가 중이라 투두/리듬 기록은 거의 없지만, 습관 체크나 메모 등 남아있는 기록은 있는 그대로 참고해서 작성해요.`:'',
     avgSleepStr?`평균 수면: ${avgSleepStr}`:'수면 기록 없음',
     `투두: 총 ${totalTodos}개 중 ${doneTodos}개 실행함`,
     `메모 총 ${allMemos.length}건`,
@@ -3328,7 +3301,6 @@ async function makeWeeklySummaryCard(){
 
   const sys=`당신은 따뜻한 한 주 정리 비서예요. 이번 주 데이터를 보고 주간 회고 카드를 작성해요.
 ${RHYTHM_CAT_GUIDE}
-${vacationDayNames.length?`\n휴가 관련 유의점: 이번 주 중 일부가 휴가 기간이었어요. 투두 완료 개수나 리듬 시간이 평소보다 적은 건 게을렀던 게 아니라 휴가라 그런 거예요 — 이 점을 자연스럽게 감안하되, 습관 체크나 메모처럼 실제로 남아있는 기록은 건너뛰지 말고 있는 그대로 분석에 반영해요. "휴가라 기록이 없다"고 단정하지 말고, 있는 데이터는 정상적으로 다뤄요.\n`:''}
 메모 분석 시 유의할 점:
 - 단순히 "바빴어요/피곤했어요" 같은 뭉뚱그린 표현 대신, 메모에 실제로 등장한 장소/활동/사람/사건을 구체적으로 짚어서 언급해요.
 - 요일별로 흐름이 어떻게 바뀌었는지 (예: 초반엔 OO, 중반부터 OO로 전환) 구체적인 사건 기반으로 설명해요.
@@ -3426,35 +3398,6 @@ const GREETING_WEATHER_SEASON_RULE=(extra)=>`- ${extra} 단, 날씨(온도, 맑�
 async function fetchHomeWeather(section){
   const subEl=document.getElementById('home-greeting-sub');
   const weatherIconEl=document.getElementById('home-weather-icon');
-
-  // 휴가모드 활성 중이면 날씨/AI 호출 전부 건너뛰고 로컬 멘트로 즉시 대체
-  const vac=getActiveVacation();
-  if(vac){
-    if(subEl)subEl.textContent=VACATION_GREETING_LINES[Math.floor(Math.random()*VACATION_GREETING_LINES.length)];
-    if(weatherIconEl)weatherIconEl.textContent='';
-    return;
-  }
-
-  // 휴가가 방금 끝났으면 평소 인사 로직보다 우선해서 복귀 인사말을 생성.
-  // 이미 복귀 인사말을 만들어둔 경우엔, 오늘 하루 동안(자정까지) 새 활동 기록이 없는 한 그 문구를 계속 유지하고,
-  // 새 투두/메모/리듬블록이 하나라도 생기면 그 시점부터 바로 일반 인사 모드로 전환.
-  const justEnded=getJustEndedVacation();
-  if(justEnded){
-    if(subEl)subEl.textContent='다녀오셨어요? 여행 기록 정리하는 중...';
-    const recap=await generateVacationRecapGreeting(justEnded);
-    markVacationRecapDone(justEnded.cid);
-    if(subEl)subEl.textContent=recap||'다녀오셨네요, 다시 시작해봐요 🌿';
-    if(weatherIconEl)weatherIconEl.textContent='';
-    return;
-  }
-  const recapPeriod=getVacationPeriods().find(p=>p.recapDone&&p.recapDoneAt&&dateKey(new Date(p.recapDoneAt))===dateKey(getLogicalDate()));
-  if(recapPeriod&&!hasNewActivitySinceVacationRecap(recapPeriod.recapDoneAt)){
-    // 복귀 인사말을 만든 바로 그날이고, 그 이후 새 활동이 아직 없으면 캐시된 복귀 인사말을 그대로 유지
-    const cached=await aiCacheGet('vacation_recap_greeting_'+recapPeriod.cid);
-    if(subEl)subEl.textContent=cached||'다녀오셨네요, 다시 시작해봐요 🌿';
-    if(weatherIconEl)weatherIconEl.textContent='';
-    return;
-  }
 
   const key=getClaudeKey();
 
@@ -4560,7 +4503,6 @@ async function autoSync(type,key){
   else if(type==='rblocks'){if(await syncRhythmBlocksUp(key))S.set(S.key('rblocks_pending',key),false);}
   else if(type==='mroutine')syncMorningRoutineUp(key);
   else if(type==='eveninglearnlog'){if(await syncEveningLearnLogUp())S.set('eveninglearnlog_pending',false);}
-  else if(type==='vacation_periods')await syncVacationPeriodsUp();
 }
 async function syncAll(){
   if(!navigator.onLine)return;
@@ -4580,7 +4522,6 @@ async function syncAll(){
   if(S.get(S.key('rblocks_pending',dk)))upTasks.push(syncRhythmBlocksUp(dk).then(()=>S.set(S.key('rblocks_pending',dk),false)));
   if(S.get('hc_pending_'+wk))upTasks.push(syncHCUp(wk).then(()=>S.set('hc_pending_'+wk,false)));
   if(S.get('eveninglearnlog_pending'))upTasks.push(syncEveningLearnLogUp().then(()=>S.set('eveninglearnlog_pending',false)));
-  if(S.get('vacation_periods_pending'))upTasks.push(syncVacationPeriodsUp());
   if(upTasks.length)await Promise.all(upTasks);
   // 이번 주 리듬블록(가로바용) 날짜키
   const weekRblockDks=[];
@@ -4595,7 +4536,6 @@ async function syncAll(){
     syncHabitsDown(),syncHCDown(wk),syncContentsDown(mk),
     syncGoalDown(S.key('mgoal',monthKey(now))),
     syncWChallengeDown(wk),
-    syncVacationPeriodsDown(),
     ...weekOnelines,
     ...weekRblockDks.map(rdk=>syncRhythmBlocksDown(rdk)),
     ...mroutineDks.map(mdk=>syncMorningRoutineDown(mdk))
@@ -8300,21 +8240,17 @@ function renderHabitMonthly(){
     lbl.innerHTML=hIcon?`<i class="ti ${hIcon}" style="font-size:12px;vertical-align:-1px;margin-right:3px;" aria-hidden="true"></i>${h.name}`:h.name;
     row.appendChild(lbl);
     const dots=document.createElement('div');dots.className='hm-dots';
-    let checked_cnt=0,vacationCnt=0;
+    let checked_cnt=0;
     for(let d=1;d<=dim;d++){
       const date=new Date(y,mo,d);const wk=weekKey(date);const dow=(date.getDay()+6)%7;
-      const dk=`${y}-${pad(mo+1)}-${pad(d)}`;
-      const isVac=isVacationDay(dk);
-      if(isVac){vacationCnt++;const dot=document.createElement('div');dot.className='hm-dot vacation';dots.appendChild(dot);continue;}
       const checked=getHabitChecks(wk)[`${h.name}-${dow}`];
       if(checked)checked_cnt++;
       const dot=document.createElement('div');dot.className='hm-dot'+(checked?' '+h.color:'');dots.appendChild(dot);
     }
-    const effectiveDim=dim-vacationCnt;
-    const pct=effectiveDim>0?Math.round(checked_cnt/effectiveDim*100):0;
+    const pct=dim>0?Math.round(checked_cnt/dim*100):0;
     const pctEl=document.createElement('div');
     pctEl.style.cssText='font-size:10px;color:var(--tm);margin-top:5px;margin-left:2px;padding-bottom:8px;border-bottom:1px solid var(--div);width:100%;';
-    pctEl.textContent=`${checked_cnt}/${effectiveDim}일 · ${pct}%`;
+    pctEl.textContent=`${checked_cnt}/${dim}일 · ${pct}%`;
     const wrap=document.createElement('div');wrap.style.cssText='display:flex;flex-direction:column;flex:1;';
     wrap.appendChild(dots);wrap.appendChild(pctEl);row.appendChild(wrap);el.appendChild(row);
   });
@@ -8838,11 +8774,10 @@ function renderWeeklyRhythmBars(){
     const isToday=dk===todayDk;
     const isPast=dk<todayDk;
     const isOpen=_wrbFlowOpenDk===dk;
-    const isVac=isVacationDay(dk);
     const clickAttr=isToday?' onclick="toggleWeeklyRhythmForm()" style="cursor:pointer;"'
       :(isPast?' onclick="toggleWeeklyRhythmFlow(\''+dk+'\')" style="cursor:pointer;"':'');
-    const dayLabelHtml=isVac?'<i class="ti ti-plane" aria-hidden="true"></i>':DOW[i];
-    html+='<div class="wrb-row"'+clickAttr+'><div class="wrb-daylabel'+(isToday?' today':'')+(isVac?' vacation':'')+'">'+dayLabelHtml+'</div><div class="wrb-trackwrap'+(isVac?' vacation':'')+'">'+track+'</div></div>';
+    const dayLabelHtml=DOW[i];
+    html+='<div class="wrb-row"'+clickAttr+'><div class="wrb-daylabel'+(isToday?' today':'')+'">'+dayLabelHtml+'</div><div class="wrb-trackwrap">'+track+'</div></div>';
     if(isToday&&_weeklyRhythmFormOpen){
       html+='<div class="wrb-form-slot" id="wrb-today-form"></div>';
     }
@@ -9025,19 +8960,12 @@ function renderWeeklyHabitBox(){
   const todayDow=(now.getDay()+6)%7;
   const checks=getHabitChecks(wk);
   const dayLabels=['월','화','수','목','금','토','일'];
-  const vacDow=[];
-  for(let d=0;d<7;d++){
-    const date=new Date(mon);date.setDate(mon.getDate()+d);
-    vacDow.push(isVacationDay(dateKey(date)));
-  }
-  const effectiveDays=vacDow.filter(v=>!v).length;
   let html='<div class="hw-daylabels">'+dayLabels.map(d=>'<span>'+d+'</span>').join('')+'</div>';
   habits.forEach(function(h){
     const rgba=getHabitColor(h.color);
     let cnt=0,dotsHtml='';
     for(let d=0;d<7;d++){
       const on=!!checks[h.name+'-'+d];
-      if(vacDow[d]&&!on){dotsHtml+='<div class="hw-dot-wrap"><div class="hw-dot vacation"></div></div>';continue;}
       if(on)cnt++;
       const isToday=d===todayDow;
       const borderColor=on?rgba:'rgba(195,175,168,0.5)';
@@ -9045,7 +8973,7 @@ function renderWeeklyHabitBox(){
       const bg=on?rgba:'none';
       dotsHtml+='<div class="hw-dot-wrap"><div class="hw-dot" style="background:'+bg+';border-color:'+borderColor+';border-width:'+borderWidth+';"></div></div>';
     }
-    html+='<div class="hw-row"><div class="hw-name"><span class="hw-name-dot" style="background:'+rgba+';"></span>'+h.name+'</div><div class="hw-dots">'+dotsHtml+'</div><div class="hw-streak">'+Math.min(cnt,effectiveDays)+'/'+effectiveDays+'</div></div>';
+    html+='<div class="hw-row"><div class="hw-name"><span class="hw-name-dot" style="background:'+rgba+';"></span>'+h.name+'</div><div class="hw-dots">'+dotsHtml+'</div><div class="hw-streak">'+cnt+'/7</div></div>';
   });
   el.innerHTML=html;
 }
@@ -9379,186 +9307,6 @@ function saveClaudeKey(){
 }
 // 저녁 학습 주제 — 설정에서 자유롭게 추가/삭제 가능한 목록. 비어있으면 기본값 사용.
 const DEFAULT_EVENING_TOPICS=['외국어 공부','현대미학','예술사','인문학','시사상식'];
-// ── 휴가모드: 기간을 미리 등록해두면 그 기간 동안 홈탭 인사배너/채움코너 API 호출을 멈추고
-// 습관·리듬 통계 누계에서도 제외함. 투두/메모는 평소처럼 계속 사용 가능(막지 않음).
-// 종료는 날짜(end)로 미리 등록해두지만, 실제 복귀는 "지금 종료" 버튼으로 정확한 시각(endedAt)에 처리—
-// 날짜 단위가 아니라 시각 단위라야 "오전에 조기 귀국" 같은 케이스도 정확하게 처리됨.
-function getVacationPeriods(){return S.get('vacation_periods')||[];}
-function saveVacationPeriods(v){
-  S.set('vacation_periods',v);
-  S.set('vacation_periods_pending',true);
-  autoSync('vacation_periods');
-}
-// 지금 이 순간이 활성 휴가기간에 속하는지 반환(없으면 null).
-// endedAt(수기 종료 시각)이 있으면 그 시각 이전까지만 유효, 없으면 end(등록해둔 종료 예정일) 자정까지 유효.
-function getActiveVacation(){
-  const now=Date.now();
-  const periods=getVacationPeriods();
-  const startOfToday=new Date(new Date().setHours(0,0,0,0)).getTime();
-  return periods.find(function(p){
-    const startMs=new Date(p.start+'T00:00:00').getTime();
-    if(now<startMs)return false;
-    if(p.endedAt!=null)return now<p.endedAt; // 수기 종료 시각 이전까지만 활성
-    const endMs=new Date(p.end+'T23:59:59').getTime();
-    return now<=endMs;
-  })||null;
-}
-// 주어진 기간(start~end, 양끝 포함)이 휴가기간과 겹치는 날짜 수를 반환 — 습관/리듬 달성률 분모 계산에 사용.
-function countVacationDaysInRange(startDk,endDk){
-  const periods=getVacationPeriods();
-  let count=0;
-  const s=new Date(startDk+'T00:00:00'),e=new Date(endDk+'T00:00:00');
-  for(let d=new Date(s);d<=e;d.setDate(d.getDate()+1)){
-    const dk=dateKey(d);
-    if(isVacationDay(dk,periods))count++;
-  }
-  return count;
-}
-// 특정 날짜(dk) 하루 전체가 휴가기간에 포함되는지 — 통계용 날짜단위 판정(시각 무관, 그날 자체가 휴가였는지).
-function isVacationDay(dk,periods){
-  periods=periods||getVacationPeriods();
-  return periods.some(function(p){
-    const endDk=p.endedAt!=null?dateKey(new Date(p.endedAt)):p.end;
-    return dk>=p.start&&dk<=endDk;
-  });
-}
-// 방금 종료된(수기로 endedAt이 찍혔고, 아직 복귀 인사말을 안 만든) 휴가기간을 반환 — 복귀 인사말 트리거용.
-function getJustEndedVacation(){
-  const now=Date.now();
-  const periods=getVacationPeriods();
-  return periods.find(function(p){
-    return p.endedAt!=null&&p.endedAt<=now&&!p.recapDone;
-  })||null;
-}
-function markVacationRecapDone(cid){
-  const periods=getVacationPeriods();
-  const p=periods.find(function(x){return x.cid===cid;});
-  if(p){p.recapDone=true;p.recapDoneAt=Date.now();saveVacationPeriods(periods);}
-}
-// 복귀 인사말 생성(recapDoneAt) 이후, 오늘 하루 동안 투두/메모/리듬블록 중 하나라도 새로 생겼는지 확인.
-// 하나라도 생겼으면 더 이상 복귀 인사말을 유지할 이유가 없으므로 일반 인사 모드로 전환.
-function hasNewActivitySinceVacationRecap(recapDoneAt){
-  const todayDk=dateKey(getLogicalDate());
-  const todos=getTodos(todayDk);
-  if(todos.some(t=>(t.created||0)>recapDoneAt))return true;
-  const memos=getMemos(todayDk);
-  if(memos.some(m=>(m.created||0)>recapDoneAt))return true;
-  const rblocks=getRhythmBlocks(todayDk);
-  if(rblocks.some(b=>(b.created||0)>recapDoneAt))return true;
-  return false;
-}
-function addVacationPeriod(start,end){
-  const periods=getVacationPeriods();
-  periods.push({start,end,endedAt:null,recapDone:false,recapDoneAt:null,created:Date.now(),cid:genCid()});
-  saveVacationPeriods(periods);
-}
-// "지금 종료" — 정확한 현재 시각으로 종료 처리. 시작 시각보다 이르게 종료되는 비정상 케이스만 방어.
-function endVacationNow(cid){
-  const periods=getVacationPeriods();
-  const p=periods.find(function(x){return x.cid===cid;});
-  if(!p)return;
-  const now=Date.now();
-  const startMs=new Date(p.start+'T00:00:00').getTime();
-  p.endedAt=now<startMs?startMs:now;
-  saveVacationPeriods(periods);
-}
-function deleteVacationPeriod(cid){
-  addDelPending('vacation_periods','all',cid);
-  saveVacationPeriods(getVacationPeriods().filter(function(x){return x.cid!==cid;}));
-}
-async function syncVacationPeriodsUp(){
-  if(window._vacUpInFlight)return await window._vacUpInFlight; // 이미 진행 중이면 새로 시작하지 않고 그 결과를 기다림 (중복 Up 경합 방지)
-  const run=(async()=>{
-    const periods=getVacationPeriods();
-    const delCids=getDelPendingCids('vacation_periods','all');
-    const ok=await syncListUpSafe('vacation_periods','',
-      'client_id',periods,
-      p=>({start_date:p.start,end_date:p.end,ended_at:p.endedAt||null,recap_done:!!p.recapDone,recap_done_at:p.recapDoneAt||null,created:p.created||Date.now(),client_id:p.cid}),
-      delCids);
-    if(ok){
-      delCids.forEach(cid=>removeDelPending('vacation_periods','all',cid));
-      S.set('vacation_periods_pending',false);
-    }
-    return ok;
-  })();
-  window._vacUpInFlight=run;
-  try{return await run;}
-  finally{window._vacUpInFlight=null;}
-}
-async function syncVacationPeriodsDown(){
-  if(window._vacUpInFlight)return; // 업로드 진행 중이면 절대 덮어쓰지 않음
-  const rows=await supaFetch('vacation_periods?order=created');
-  if(!rows)return; // 연결 실패 — 로컬 유지
-  if(S.get('vacation_periods_pending'))return; // 업로드 대기중인 로컬 수정 있으면 덮어쓰지 않음
-  if(window._vacUpInFlight)return; // fetch 도중 새 업로드가 시작됐을 수 있으니 한 번 더 확인
-  S.set('vacation_periods',rows.map(function(r){
-    return {start:r.start_date,end:r.end_date,endedAt:r.ended_at,recapDone:r.recap_done,recapDoneAt:r.recap_done_at,created:r.created,cid:r.client_id||genCid()};
-  }));
-}
-function addVacationPeriodFromInputs(){
-  const s=document.getElementById('vacation-start-inp').value;
-  const e=document.getElementById('vacation-end-inp').value;
-  if(!s||!e){showToast('시작일과 종료일을 모두 입력해주세요');return;}
-  if(e<s){showToast('종료일이 시작일보다 빠를 수 없어요');return;}
-  addVacationPeriod(s,e);
-  document.getElementById('vacation-start-inp').value='';
-  document.getElementById('vacation-end-inp').value='';
-  renderVacationList();
-  showToast('휴가기간이 등록됐어요');
-}
-function renderVacationList(){
-  const el=document.getElementById('vacation-list-slot');if(!el)return;
-  const periods=getVacationPeriods().slice().sort((a,b)=>b.start.localeCompare(a.start));
-  if(!periods.length){el.innerHTML='';return;}
-  const now=Date.now();
-  el.innerHTML=periods.map(p=>{
-    const startMs=new Date(p.start+'T00:00:00').getTime();
-    const endMs=p.endedAt!=null?p.endedAt:new Date(p.end+'T23:59:59').getTime();
-    const isActive=now>=startMs&&now<endMs;
-    const isEndedEarly=p.endedAt!=null;
-    const n=new Date(p.endedAt||0);
-    const endLabel=isEndedEarly?`${dateKey(n)} ${pad(n.getHours())}:${pad(n.getMinutes())} 종료`:p.end;
-    return `<div class="settings-item">
-      <span class="settings-item-lbl" style="font-size:12.5px;">${p.start} ~ ${endLabel}${isActive?' <b style="color:var(--acc);">진행중</b>':''}</span>
-      <div style="display:flex;gap:8px;">
-        ${isActive?`<span style="font-size:11px;color:var(--tm);cursor:pointer;" onclick="endVacationNow('${p.cid}');renderVacationList();">지금 종료</span>`:''}
-        <i class="ti ti-trash" style="font-size:14px;color:var(--tm);cursor:pointer;" onclick="deleteVacationPeriod('${p.cid}');renderVacationList();"></i>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-// 휴가모드 로컬 인사 멘트(API 호출 없이 랜덤 표시)
-const VACATION_GREETING_LINES=['즐거운 휴가 보내세요 ✈️','푹 쉬고 좋은 추억 많이 만드세요 🌿','오늘 하루도 여행 즐기세요 🌊','편안한 휴가 되세요 🏖️'];
-// 휴가 종료 직후 딱 한 번 노출되는 복귀 인사말 — 휴가기간 동안 쓴 메모를 모아 짧게 반영.
-// 메모가 거의 없어도(여행 중이라 기록을 못했을 수 있음) 자연스럽게 짧은 환영 인사로 대체.
-async function generateVacationRecapGreeting(vac){
-  const key=getClaudeKey();
-  const end=vac.endedAt?dateKey(new Date(vac.endedAt)):vac.end;
-  const memoTexts=[];
-  const s=new Date(vac.start+'T00:00:00'),e=new Date(end+'T00:00:00');
-  for(let d=new Date(s);d<=e;d.setDate(d.getDate()+1)){
-    getMemos(dateKey(d)).forEach(m=>{if(m.text)memoTexts.push(m.text);});
-  }
-  let result;
-  if(!key){
-    result=memoTexts.length?'다녀오셨네요, 여행 이야기가 궁금해요 🌿':'다녀오셨네요, 다시 시작해봐요 🌿';
-  }else{
-    const dataContext=memoTexts.length
-      ?`휴가기간(${vac.start}~${end}) 동안 남긴 메모:\n${memoTexts.slice(0,50).join('\n')}`
-      :`휴가기간(${vac.start}~${end})이었고, 그동안 남긴 메모는 거의 없음(여행 중이라 기록을 못했을 가능성 높음 — 이건 자연스러운 일이니 언급하지 말 것).`;
-    const sys=`당신은 여행에서 막 돌아온 사람에게 건네는 따뜻한 첫 인사말을 만들어요.
-- 딱 1-2문장, ~해요/이에요/어요체.
-- 메모 내용이 있다면 그중 인상적인 것 하나 정도만 아주 가볍게 언급(장소, 음식, 순간 등). 나열하지 말고 자연스럽게 녹여요.
-- 메모가 없거나 부실해도 절대 지적하거나 아쉬워하지 말 것 — 휴가 중 기록 안 하는 건 당연한 일.
-- "이제 다시 일상으로" 같은 부담 주는 톤 대신, 반갑고 편안한 환영의 느낌으로.
-- 스스로를 소개하거나 설명하는 표현 금지. 오직 문장만 출력, 따옴표나 설명 없이.`;
-    const reply=await callClaude(sys,[{role:'user',content:dataContext}],150);
-    result=(!reply||reply.startsWith('__ERR__'))?null:reply.trim();
-  }
-  if(result)aiCacheSet('vacation_recap_greeting_'+vac.cid,result,AI_CACHE_TTL.short);
-  return result;
-}
 function getEveningTopics(){
   const raw=S.get('evening_topics');
   if(!raw)return DEFAULT_EVENING_TOPICS;
@@ -9611,8 +9359,6 @@ function openSettings(){
     }
   }
   document.getElementById('settings-ov').classList.add('on');
-  renderVacationList();
-  syncVacationPeriodsDown().then(()=>renderVacationList());
 }
 function closeSettings(){document.getElementById('settings-ov').classList.remove('on');}
 function downloadFullJSONBackup(){
