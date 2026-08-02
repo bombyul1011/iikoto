@@ -2857,11 +2857,11 @@ function cStatusLabel(c){
   if(c.cat==='book')return c.status==='stopped'?'중단':(c.status==='done'?'완료':'읽는중');
   return c.status==='stopped'?'중단':(c.status==='done'?'완료':'보는중');
 }
-async function generateMonthlyReportAI(mk,stats,isMidReport){
+async function generateMonthlyReportAI(mk,stats){
   const key=getClaudeKey();
   if(!key)return null;
   const dataContext=[
-    isMidReport?`${mk} 1~15일 데이터 (한 달의 절반, 아직 진행 중):`:`${mk} 한 달 데이터:`,
+    `${mk} 한 달 데이터:`,
     getUserProfileContext(),
     stats.goalLines.length?`이번 달 목표:\n${stats.goalLines.map(g=>'- '+g).join('\n')}`:'',
     `투두 완료 ${stats.doneTodos}개 (총 ${stats.totalTodos}개 중)`,
@@ -2875,11 +2875,11 @@ async function generateMonthlyReportAI(mk,stats,isMidReport){
     stats.contentsList.length?`콘텐츠 기록: ${stats.contentsList.map(c=>`${c.title}(${c.cat}${cStatusLabel(c)?', '+cStatusLabel(c):''})`).join(', ')}`:'',
     stats.wcByWeek.length?`주간 미션 현황: ${stats.wcByWeek.map(w=>w.lines.map(l=>`${l.text} ${l.pct}%`).join(', ')).join(' | ')}`:''
   ].filter(Boolean).join('\n');
-  const sys=`당신은 따뜻한 월간 회고 비서예요. ${isMidReport?'한 달의 절반(1~15일) 데이터를 보고 지금까지의 흐름을 담은 중간 소식을':'한 달 데이터를 보고 풍부한 총평과 키워드를'} 만들어요.
+  const sys=`당신은 따뜻한 월간 회고 비서예요. 한 달 데이터를 보고 풍부한 총평과 키워드를 만들어요.
 ${RHYTHM_CAT_GUIDE}
 반드시 아래 JSON 형식으로만 응답해요. 다른 텍스트나 마크다운 코드블록 없이 순수 JSON만 출력해요.
-{"comment":"6-8문장의 ${isMidReport?'중간 소식':'한 달 총평'}, ~해요/이에요/어요체, 이모지 1-2개 정도","keywords":["키워드1","키워드2","키워드3","키워드4"]}
-${isMidReport?'아직 한 달이 끝나지 않았으니 "이번 달은 ~했어요"처럼 확정짓는 총평 톤이 아니라, "지금까지 이런 결로 흘러가고 있어요", "절반을 지나며 ~한 흐름이에요"처럼 현재진행형 톤으로 써요. 나머지 절반에 대한 부담을 주는 표현(예: "남은 기간 힘내야")은 쓰지 말고 담백하게 지금까지의 흐름만 짚어요.':'정말 짚어줄 만한 구체적인 사건/감정 변화가 있다면 분량을 아끼지 말고 그 달의 흐름(시작~중반~막판)을 충분히 풀어서 써도 좋아요. 다만 내용을 늘리기 위해 같은 얘기를 다른 말로 반복하거나 억지로 문장을 쪼개지 말고, 실제로 새로운 내용이 있을 때만 늘려요. 어떤 경우에도 전체 10문장은 넘기지 않아요.'}
+{"comment":"6-8문장의 한 달 총평, ~해요/이에요/어요체, 이모지 1-2개 정도","keywords":["키워드1","키워드2","키워드3","키워드4"]}
+정말 짚어줄 만한 구체적인 사건/감정 변화가 있다면 분량을 아끼지 말고 그 달의 흐름(시작~중반~막판)을 충분히 풀어서 써도 좋아요. 다만 내용을 늘리기 위해 같은 얘기를 다른 말로 반복하거나 억지로 문장을 쪼개지 말고, 실제로 새로운 내용이 있을 때만 늘려요. 어떤 경우에도 전체 10문장은 넘기지 않아요.
 이 코멘트 바로 아래에 투두 완료 개수와 습관 달성률 수치가 별도로 표시되니, 그 숫자(예: "85개", "20%" 같은 구체적 수치)를 코멘트에서 직접 나열하지 말아요. 대신 그 수치가 의미하는 바에 대한 해석이나 코멘트로 자연스럽게 시작하거나 녹여요 (예: "습관 달성률은 낮았지만 ~"처럼 수치 자체보다 그 이면의 맥락 위주로).
 키워드는 하루 한 줄 기록과 메모 내용에서 자주 등장하거나 인상적인 단어/장소/감정 위주로 2~5개 뽑아요.
 전월 대비 시간 사용 변화 데이터가 주어졌다면, 총평 안에 자연스럽게 한 문장 정도 녹여요 (예: "전월보다 ○○에 시간을 더 쓴 한 달이었어요" 처럼). 수치를 나열하기보다 그 변화가 이 달의 흐름과 어떻게 맞닿는지로 풀어요.
@@ -3118,60 +3118,36 @@ async function loadMonthlyReportContent(){
   const isLastDayEvening=now.getDate()===lastDateOfThisMonth&&(_lh>=19||_lh<6);
   const isThisMonth=(y===now.getFullYear()&&mo===now.getMonth());
   const isOngoingMonth=isThisMonth&&!isLastDayEvening;
-  const hasPassedMidMonth=isThisMonth&&(now.getDate()>15||(now.getDate()===15&&_lh>=22));
 
-  if(isOngoingMonth&&!hasPassedMidMonth){
-    // 1~14일: 아직 중간집계 시점도 안 됨
-    slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">15일 밤에 중간 소식을, 이 달이 끝나면 전체를 정리해드릴게요</div></div>`;
+  if(isOngoingMonth){
+    // 이 달이 아직 끝나지 않음: 말일 저녁까지는 종합 리포트 없이 안내만
+    slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">이 달이 끝나면 전체를 정리해드릴게요</div></div>`;
     return;
   }
   slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">불러오는 중...</div></div>`;
 
-  let report,cacheKey,statsForAI=stats;
-  if(isOngoingMonth&&hasPassedMidMonth){
-    // 15~29일: 15일자 중간집계 고정(15일 데이터로만 캐싱, 이후 재열람해도 그대로)
-    cacheKey='monthly_report_mid_'+mk;
-    report=S.get(cacheKey);
-    if(!report){
-      const serverJson=await aiCacheGet(cacheKey);
-      if(serverJson){
-        try{report=JSON.parse(serverJson);S.set(cacheKey,report);}catch(e){}
-      }
+  // 말일 저녁 이후 또는 지난 달: 전체 기간으로 최종 리포트
+  const cacheKey='monthly_report_'+mk;
+  let report=S.get(cacheKey);
+  if(!report){
+    const serverJson=await aiCacheGet(cacheKey);
+    if(serverJson){
+      try{report=JSON.parse(serverJson);S.set(cacheKey,report);}catch(e){}
     }
-    if(!report&&getClaudeKey()){
-      const midStats=computeMonthStats(y,mo,15);
-      report=await generateMonthlyReportAI(mk,midStats,true);
-      if(report){
-        S.set(cacheKey,report);
-        aiCacheSet(cacheKey,JSON.stringify(report),AI_CACHE_TTL.monthlyReport);
-      }
-    }
-  } else {
-    // 말일 저녁 이후 또는 지난 달: 전체 기간으로 최종 리포트
-    cacheKey='monthly_report_'+mk;
-    report=S.get(cacheKey);
-    if(!report){
-      const serverJson=await aiCacheGet(cacheKey);
-      if(serverJson){
-        try{report=JSON.parse(serverJson);S.set(cacheKey,report);}catch(e){}
-      }
-    }
-    if(!report&&getClaudeKey()){
-      report=await generateMonthlyReportAI(mk,stats);
-      if(report){
-        S.set(cacheKey,report);
-        aiCacheSet(cacheKey,JSON.stringify(report),AI_CACHE_TTL.monthlyReport);
-      }
+  }
+  if(!report&&getClaudeKey()){
+    report=await generateMonthlyReportAI(mk,stats);
+    if(report){
+      S.set(cacheKey,report);
+      aiCacheSet(cacheKey,JSON.stringify(report),AI_CACHE_TTL.monthlyReport);
     }
   }
   // 그 사이에 다른 달로 넘어갔으면 적용하지 않음
   if(`${_reportYear}-${pad(_reportMonth+1)}`!==mk)return;
   const slot2=document.getElementById('mr-ai-slot');if(!slot2)return;
   if(report){
-    const midNote=(isOngoingMonth&&hasPassedMidMonth)?`<div style="font-size:11px;color:var(--tm);margin-bottom:6px;">15일 기준 중간 소식이에요, 이 달이 끝나면 전체로 다시 정리해드려요</div>`:'';
     slot2.innerHTML=`<div class="mr-ai-card">
       <div class="mr-sec-title"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div>
-      ${midNote}
       <p style="font-size:13px;color:var(--tp);line-height:1.9;margin-bottom:${report.keywords&&report.keywords.length?'12px':'0'};">${report.comment}</p>
       ${report.keywords&&report.keywords.length?`<div class="mr-tag-cloud">${report.keywords.map(k=>`<span class="mr-tag">${k}</span>`).join('')}</div>`:''}
     </div>`;
@@ -7465,8 +7441,7 @@ function setupNextWeekFeedbackToggle(){
   if(isSundayEvening){
     titleEl.className='report-banner rhythm-soft';
     titleEl.style.margin='0 0 12px';
-    titleEl.style.borderRadius='10px';
-    titleEl.innerHTML='<div class="report-banner-inner" style="padding:5px 13px;border-radius:8.5px;justify-content:flex-start;gap:5px;"><div class="report-banner-line" style="font-size:11px;white-space:nowrap;"><i class="ti ti-flag-heart" style="font-size:13px;vertical-align:-1px;margin-right:4px;" aria-hidden="true"></i>다음주 챌린지 점검하기</div></div>';
+    titleEl.innerHTML='<div class="report-banner-inner" style="justify-content:flex-start;gap:5px;"><div class="report-banner-line" style="white-space:nowrap;"><i class="ti ti-flag-heart" style="font-size:13px;vertical-align:-1px;margin-right:4px;" aria-hidden="true"></i>다음주 챌린지 점검하기</div></div>';
     titleEl.style.cursor='pointer';
     titleEl.onclick=openNextWeekFeedbackSheet;
   }else{
@@ -9489,22 +9464,30 @@ function deleteVacationPeriod(cid){
   saveVacationPeriods(getVacationPeriods().filter(function(x){return x.cid!==cid;}));
 }
 async function syncVacationPeriodsUp(){
-  const periods=getVacationPeriods();
-  const delCids=getDelPendingCids('vacation_periods','all');
-  const ok=await syncListUpSafe('vacation_periods','',
-    'client_id',periods,
-    p=>({start_date:p.start,end_date:p.end,ended_at:p.endedAt||null,recap_done:!!p.recapDone,recap_done_at:p.recapDoneAt||null,created:p.created||Date.now(),client_id:p.cid}),
-    delCids);
-  if(ok){
-    delCids.forEach(cid=>removeDelPending('vacation_periods','all',cid));
-    S.set('vacation_periods_pending',false);
-  }
-  return ok;
+  if(window._vacUpInFlight)return await window._vacUpInFlight; // 이미 진행 중이면 새로 시작하지 않고 그 결과를 기다림 (중복 Up 경합 방지)
+  const run=(async()=>{
+    const periods=getVacationPeriods();
+    const delCids=getDelPendingCids('vacation_periods','all');
+    const ok=await syncListUpSafe('vacation_periods','',
+      'client_id',periods,
+      p=>({start_date:p.start,end_date:p.end,ended_at:p.endedAt||null,recap_done:!!p.recapDone,recap_done_at:p.recapDoneAt||null,created:p.created||Date.now(),client_id:p.cid}),
+      delCids);
+    if(ok){
+      delCids.forEach(cid=>removeDelPending('vacation_periods','all',cid));
+      S.set('vacation_periods_pending',false);
+    }
+    return ok;
+  })();
+  window._vacUpInFlight=run;
+  try{return await run;}
+  finally{window._vacUpInFlight=null;}
 }
 async function syncVacationPeriodsDown(){
+  if(window._vacUpInFlight)return; // 업로드 진행 중이면 절대 덮어쓰지 않음
   const rows=await supaFetch('vacation_periods?order=created');
   if(!rows)return; // 연결 실패 — 로컬 유지
   if(S.get('vacation_periods_pending'))return; // 업로드 대기중인 로컬 수정 있으면 덮어쓰지 않음
+  if(window._vacUpInFlight)return; // fetch 도중 새 업로드가 시작됐을 수 있으니 한 번 더 확인
   S.set('vacation_periods',rows.map(function(r){
     return {start:r.start_date,end:r.end_date,endedAt:r.ended_at,recapDone:r.recap_done,recapDoneAt:r.recap_done_at,created:r.created,cid:r.client_id||genCid()};
   }));
