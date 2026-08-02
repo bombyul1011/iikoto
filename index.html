@@ -1234,6 +1234,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         </div>
         <div class="goal-wrap" id="weekly-goal-wrap"></div>
       </div>
+      <div id="weekly-stat-bar"></div>
       <div class="slabel">하루 한 줄</div>
       <div class="card" id="daily-oneline-card">
         <div id="daily-oneline-list"></div>
@@ -7633,6 +7634,7 @@ function setupWeeklyChallengeToggle(){
     titleEl.style.cursor='pointer';
     titleEl.onclick=openChallengeReviewSheet;
     renderWeeklyChallenge(weekKey(new Date()),'weekly-goal-wrap');
+    renderWeeklyStatBar();
     return;
   }
   // 월요일이 아니면 원래 구조(goal-section-title + 아이콘)로 복원
@@ -7650,6 +7652,7 @@ function setupWeeklyChallengeToggle(){
     titleEl.title='';
   }
   renderWeeklyChallenge(weekKey(new Date()),'weekly-goal-wrap');
+  renderWeeklyStatBar();
 }
 function renderWeeklyChallenge(wk,containerId){
   wk=wk||weekKey(new Date());
@@ -8569,7 +8572,12 @@ function renderMonthlyStatBar(){
     habits.forEach(h=>{ht++;if(checks[`${h.name}-${dow}`])hc++;});
   }
   const pct=ht>0?Math.round(hc/ht*100):0;
-  const mk=calMonthKey();const cc=getContents(mk).length;
+  const mk=calMonthKey();
+  // 콘텐츠 통계: 진행중은 제외, 완료(done/stopped)된 것만 종료일(endDate) 기준으로 그 달에 정확히 1회 카운트.
+  // getContentsForReport가 이미 "당월+전월 이월분"을 합쳐서 정확히 제공하므로 그대로 재사용.
+  const cc=getContentsForReport(mk).filter(c=>
+    (c.status==='done'||c.status==='stopped')&&c.endDate&&c.endDate.slice(0,7)===mk
+  ).length;
   const avgSleep=sleepCnt>0?(sleepMin/sleepCnt/60).toFixed(1):'-';
   el.innerHTML=`<div class="stat-bar-wrap">
     <div class="sbar-item"><i class="ti ti-notes" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i><span class="sbar-num">${memos}</span></div>
@@ -8581,6 +8589,47 @@ function renderMonthlyStatBar(){
     <div class="sbar-item"><i class="ti ti-stack-2" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i><span class="sbar-num">${cc}</span></div>
     <div class="sbar-div"></div>
     <div class="sbar-item"><i class="ti ti-moon-stars" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i><span class="sbar-num">${avgSleep}h</span></div>
+  </div>`;
+}
+// 주간탭 미니 통계바 — renderMonthlyStatBar와 동일한 원칙(콘텐츠는 완료+종료일 기준)을 주 단위로 적용.
+function renderWeeklyStatBar(){
+  const el=document.getElementById('weekly-stat-bar');if(!el)return;
+  const wk=weekKey(new Date());
+  const wkStart=new Date(wk.replace('week:',''));
+  let memos=0,todos=0,hc=0,ht=0,sleepMin=0,sleepCnt=0;
+  const habits=getHabits();
+  const days=[];
+  for(let i=0;i<7;i++){
+    const d=new Date(wkStart);d.setDate(wkStart.getDate()+i);
+    days.push(d);
+    const dk=dateKey(d);
+    memos+=getMemos(dk).length;todos+=getTodos(dk).filter(t=>t.done).length;
+    const sl=getSleep(dk);
+    if(sl.sleep&&sl.wake){const sv=sl.sleep.split(':').map(Number),wv=sl.wake.split(':').map(Number);let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;sleepMin+=m;sleepCnt++;}
+    const dow=(d.getDay()+6)%7;
+    const checks=getHabitChecks(wk);
+    habits.forEach(h=>{ht++;if(checks[`${h.name}-${dow}`])hc++;});
+  }
+  const pct=ht>0?Math.round(hc/ht*100):0;
+  // 콘텐츠: 완료(done/stopped)된 것만, 종료일이 이 주(월~일) 안에 속하면 1회 카운트.
+  // getContentsForReport(m)이 이미 "m월+전달 이월분"을 합쳐서 주므로, 한 주(최대 7일)는
+  // 항상 같은 달이거나 인접한 두 달에만 걸치기 때문에 종료일이 속한 달(wkEnd 기준) 하나만 조회하면 충분.
+  const wkEnd=days[6];
+  const cc=getContentsForReport(monthKey(wkEnd)).filter(c=>
+    (c.status==='done'||c.status==='stopped')&&c.endDate&&
+    c.endDate>=dateKey(wkStart)&&c.endDate<=dateKey(wkEnd)
+  ).length;
+  const wkAvgSleep=sleepCnt>0?(sleepMin/sleepCnt/60).toFixed(1):'-';
+  el.innerHTML=`<div class="stat-bar-wrap" style="border-top:none;margin-top:0;">
+    <div class="sbar-item"><i class="ti ti-notes" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i><span class="sbar-num">${memos}</span></div>
+    <div class="sbar-div"></div>
+    <div class="sbar-item"><i class="ti ti-checkbox" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i><span class="sbar-num">${todos}</span></div>
+    <div class="sbar-div"></div>
+    <div class="sbar-item"><i class="ti ti-chart-donut" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i><span class="sbar-num">${pct}%</span></div>
+    <div class="sbar-div"></div>
+    <div class="sbar-item"><i class="ti ti-stack-2" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i><span class="sbar-num">${cc}</span></div>
+    <div class="sbar-div"></div>
+    <div class="sbar-item"><i class="ti ti-moon-stars" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i><span class="sbar-num">${wkAvgSleep}h</span></div>
   </div>`;
 }
 
