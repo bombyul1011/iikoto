@@ -1227,7 +1227,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="card" id="wchallenge-card" style="padding:14px 15px 10px;margin-bottom:7px;">
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <div class="goal-section-title" id="wchallenge-title" style="margin-top:0;"><i class="ti ti-flag-3" id="wchallenge-icon" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i> 주간 목표</div>
-          <button class="wgoal-add-btn" id="wgoal-add-btn" title="항목 추가"><i class="ti ti-plus" style="font-size:12px;" aria-hidden="true"></i></button>
+          <button class="wgoal-add-btn" id="wgoal-archive-btn" title="주간 목표 모아보기" onclick="openMonthlyGoalReportSheet()"><i class="ti ti-target-arrow" style="font-size:13px;" aria-hidden="true"></i></button>
         </div>
         <div class="goal-wrap" id="weekly-goal-wrap"></div>
       </div>
@@ -1461,6 +1461,18 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div style="padding:0 20px 24px;">
       <div class="goal-section-title" style="margin-top:0;">◉ 다음주 챌린지 점검하기</div>
       <div id="nextweek-feedback-content"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MONTHLY GOAL REPORT SHEET (주간목표 전용 아카이브, 월간리포트와 독립) -->
+<div class="overlay" id="monthly-goal-report-sheet" onclick="closeSheet('monthly-goal-report-sheet',event)">
+  <div class="bsheet" style="max-height:85vh;overflow-y:auto;" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div style="padding:0 20px 24px;">
+      <div class="goal-section-title" style="margin-top:0;"><i class="ti ti-target-arrow" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i> 주간 목표 모아보기</div>
+      <div class="month-chips" id="mgr-month-chips" style="margin:10px 0 14px;"></div>
+      <div id="mgr-content"></div>
     </div>
   </div>
 </div>
@@ -2883,6 +2895,150 @@ ${isMidReport?'아직 한 달이 끝나지 않았으니 "이번 달은 ~했어�
   }catch(e){}
   return null;
 }
+// ── 주간목표 월간 결산 (별도 아카이브 시트, 월간리포트와 독립적으로 동작) ──
+// "월"의 소속 판정은 주(週)의 시작일(월요일) 기준 — 8/31~9/6 같은 월 경계 주는 월요일이 속한 달로 계산.
+// 진입점(주간목표 카드 상단 target-arrow 아이콘)은 항상 상시 노출됨 — + 버튼 완전 대체(Enter로 항목 추가는 그대로 가능).
+// 리포트 생성 가능 조건(달마다 개별 판정): 그 달의 마지막 챌린지 주가 이미 끝났고,
+// 그 주의 "지난주 목표 돌아보기"가 최소 1회 열람되어 challenge_review_ 캐시가 로컬에 존재해야 함.
+// 조건 미충족 시엔 시트 안에서 "아직 준비 중" 안내만 뜨고, 아이콘 노출 여부와는 무관.
+// 특정 (y,mo)에 속한 챌린지 주차들(월요일 기준)과 각 주차의 목표+달성률만 가볍게 계산.
+// computeMonthStats처럼 투두/리듬/수면까지 계산하지 않는 전용 경량 버전.
+function computeMonthlyGoalWeeks(y,mo){
+  const dim=new Date(y,mo+1,0).getDate();
+  const weekSet={};
+  for(let d=1;d<=dim;d++){
+    const date=new Date(y,mo,d);
+    weekSet[weekKey(date)]=true;
+  }
+  const weeks=Object.keys(weekSet).sort();
+  return weeks.map(wk=>{
+    const items=getWChallenge(wk).filter(c=>c.text&&c.text.trim());
+    const wkStart=new Date(wk.replace('week:',''));
+    const wkEnd=new Date(wkStart);wkEnd.setDate(wkStart.getDate()+6);
+    const label=`${wkStart.getMonth()+1}.${wkStart.getDate()}–${wkEnd.getMonth()+1}.${wkEnd.getDate()}`;
+    const lines=items.map(c=>({text:c.text,pct:Math.round(c.days.filter(Boolean).length/7*100)}));
+    const isOngoing=wkEnd>=new Date(new Date().toDateString());
+    return {wk,label,lines,isOngoing};
+  }).filter(w=>w.lines.length>0);
+}
+// 그 달의 마지막 챌린지 주가 끝났고(오늘 기준), 그 주의 지난주 돌아보기 캐시가 있는지 확인
+function isMonthlyGoalReportReady(y,mo,weeks){
+  if(!weeks.length)return false;
+  const lastWeek=weeks[weeks.length-1];
+  if(lastWeek.isOngoing)return false; // 그 달의 마지막 챌린지 주가 아직 진행 중이면 미완료
+  return !!S.get('challenge_review_'+lastWeek.wk);
+}
+
+let _mgrYear=null,_mgrMonth=null;
+function openMonthlyGoalReportSheet(){
+  const now=new Date();
+  _mgrYear=now.getFullYear();_mgrMonth=now.getMonth();
+  renderMgrMonthChips();
+  loadMonthlyGoalReportContent();
+  openSheet('monthly-goal-report-sheet');
+  setTimeout(()=>{
+    const wrap=document.getElementById('mgr-month-chips');
+    const activeChip=wrap&&wrap.querySelector('.m-chip.active');
+    if(activeChip)activeChip.scrollIntoView({behavior:'auto',block:'nearest',inline:'center'});
+  },50);
+}
+function renderMgrMonthChips(){
+  const wrap=document.getElementById('mgr-month-chips');if(!wrap)return;
+  const now=new Date();
+  wrap.innerHTML='';
+  for(let m=0;m<12;m++){
+    const future=_mgrYear>now.getFullYear()||(_mgrYear===now.getFullYear()&&m>now.getMonth());
+    const chip=document.createElement('div');
+    chip.className='m-chip'+(m===_mgrMonth?' active':'')+(future?' disabled':'');
+    chip.textContent=(m+1)+'월';
+    if(!future)chip.addEventListener('click',()=>{_mgrMonth=m;renderMgrMonthChips();loadMonthlyGoalReportContent();});
+    wrap.appendChild(chip);
+  }
+  const activeChip=wrap.querySelector('.m-chip.active');
+  if(activeChip)activeChip.scrollIntoView({behavior:'auto',block:'nearest',inline:'center'});
+}
+async function loadMonthlyGoalReportContent(){
+  const el=document.getElementById('mgr-content');if(!el)return;
+  const y=_mgrYear,mo=_mgrMonth;
+  const mk=`${y}-${pad(mo+1)}`;
+  const weeks=computeMonthlyGoalWeeks(y,mo);
+
+  if(!weeks.length){
+    el.innerHTML='<div style="text-align:center;color:var(--tm);padding:24px 0;">이 달엔 작성한 주간 목표가 없어요</div>';
+    return;
+  }
+
+  // 주차별 달성률 아코디언 — 기존 월간리포트 wcHtml과 동일한 방식(순수 계산, API 불필요)
+  const weekHtml=`<div class="mr-card">
+    ${weeks.map(w=>`<div class="mr-week-anchor">
+      <div class="mr-week-head"><span class="wk">${w.label}</span>${w.isOngoing?'<span class="mr-week-ongoing">진행중</span>':''}</div>
+      ${w.lines.map(l=>`<div class="mr-wc-line"><span class="txt">${l.text}</span><span class="pct">${l.pct}%</span></div>`).join('')}
+    </div>`).join('')}
+  </div>`;
+
+  const ready=isMonthlyGoalReportReady(y,mo,weeks);
+  if(!ready){
+    el.innerHTML=`${weekHtml}<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 목표 총평</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">이 달의 마지막 주가 끝나고, 지난주 목표 돌아보기를 한 번 열어보시면 정리해드려요</div></div>`;
+    return;
+  }
+
+  el.innerHTML=`${weekHtml}<div id="mgr-ai-slot"></div>`;
+  const slot=document.getElementById('mgr-ai-slot');
+  slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 목표 총평</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">불러오는 중...</div></div>`;
+
+  const cacheKey='monthly_goal_report_'+mk;
+  let comment=S.get(cacheKey);
+  if(!comment){
+    const serverText=await aiCacheGet(cacheKey);
+    if(serverText){comment=serverText;S.set(cacheKey,comment);}
+  }
+  if(!comment&&getClaudeKey()){
+    comment=await buildMonthlyGoalCommentText(weeks);
+    if(comment){
+      S.set(cacheKey,comment);
+      aiCacheSet(cacheKey,comment,AI_CACHE_TTL.monthlyReport);
+    }
+  }
+  if(comment){
+    slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 목표 총평</div><div style="font-size:13px;color:var(--tp);line-height:1.7;padding:2px 0;">${comment}</div></div>`;
+  }else{
+    slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 목표 총평</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">${getClaudeKey()?'잠시 후 다시 시도해주세요':'설정에서 Claude API 키를 입력하면 분석을 받을 수 있어요'}</div></div>`;
+  }
+}
+// 이번 달 챌린지 주차들의 원본 목표 텍스트(카테고리 판단용)와, 이미 생성된 주간 코멘트(challenge_review_,
+// 근거 서술용)를 함께 재료로 넘겨 한 달을 관통하는 총평 하나만 생성. 캐시 없는 주는 %만 보충.
+async function buildMonthlyGoalCommentText(weeks){
+  const lines=[];
+  weeks.forEach(w=>{
+    const goalText=w.lines.map(l=>`"${l.text}"(${l.pct}%)`).join(', ');
+    const reviewCache=S.get('challenge_review_'+w.wk);
+    if(reviewCache){
+      lines.push(`${w.label} 목표: ${goalText}\n해당 주 코멘트: ${reviewCache.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim()}`);
+    }else{
+      lines.push(`${w.label} 목표: ${goalText} (코멘트 없음, 달성률만 참고)`);
+    }
+  });
+  const dataContext=lines.join('\n\n');
+  const sys=`당신은 따뜻한 생활 코치예요. 사용자가 이번 달 동안 세웠던 주간 목표들과, 매주 받았던 "지난주 목표 돌아보기" 코멘트를 함께 보고, 한 달 전체를 관통하는 짧은 총평을 만들어주세요.
+
+핵심 관점:
+1. 이번 달 몇 주에 걸쳐 어떤 유형의 목표를 반복해서 세웠는지 파악하세요. 텍스트가 정확히 같지 않아도 의미상 비슷한 카테고리는 하나로 묶어 판단하세요(예: 헬스장/홈트/걷기 → 운동).
+2. 그 유형별로 대체로 잘 지켜진 편인지, 어려웠던 편인지 전체적인 경향을 짚어주세요. 이때 각 주차 코멘트에 담긴 노력의 흔적(체크 숫자 너머의 실제 맥락)을 근거로 활용하세요.
+3. 이번 달 전체를 관통하는 패턴이 있다면(예: 특정 유형에 자주 도전했지만 유독 어려웠다, 혹은 꾸준히 잘 지킨 영역이 있다) 자연스럽게 언급하세요.
+
+절대 원칙:
+- 주차별로 나눠 언급하지 마세요("1주차엔..." 금지) — 위에 이미 주차별 달성률이 보이니, 여기서는 전체를 관통하는 흐름만.
+- 정확한 %나 날짜, 체크 횟수를 다시 쓰지 마세요.
+- 부정적 평가 금지, 노력의 흔적 우선.
+- 코멘트가 없는(아직 생성 안 된) 주가 있다면 그 주는 목표 텍스트와 달성률만 참고하고 넘어가세요.
+- 3~4문장 이내로 간결하게.
+- 반드시 ~해요, ~이에요, ~어요 체의 정감있는 존댓말만 사용. 반말 절대 금지. 이름 호칭 없음.
+- 이모지 최대 1개, 전체 응답 순수 텍스트만(마크다운 기호 없이).`;
+  const reply=await callClaude(sys,[{role:'user',content:dataContext}],400);
+  if(!reply||reply.startsWith('__ERR__'))return null;
+  return reply.trim();
+}
+
 function openMonthlyReportSheet(){
   const _ld=new Date();
   _reportYear=_ld.getFullYear();_reportMonth=_ld.getMonth();
@@ -7565,20 +7721,15 @@ function renderWeeklyChallenge(wk,containerId){
       row.appendChild(inpRow);row.appendChild(daysRow);wrap.appendChild(row);
     });
 
-    // 항목 추가 버튼 (최대 4개)
+    // 항목 추가는 weekly-goal-wrap에서는 입력창 Enter로만 처리 (상단 target-arrow 아이콘은 항상 주간 목표 모아보기로 연결됨).
+    // nextweek-challenge-wrap(다음 주 챌린지 준비 시트)에서는 여전히 "+항목 추가" 버튼 사용.
     const useTopAddBtn=containerId==='weekly-goal-wrap';
     const doAdd=()=>{
       items.push({text:'',days:[false,false,false,false,false,false,false]});
       save();renderItems();
       setTimeout(()=>{const inps=wrap.querySelectorAll('.wchallenge-inp');if(inps[items.length-1])inps[items.length-1].focus();},50);
     };
-    if(useTopAddBtn){
-      const topBtn=document.getElementById('wgoal-add-btn');
-      if(topBtn){
-        topBtn.style.display=items.length<4?'flex':'none';
-        topBtn.onclick=doAdd;
-      }
-    }else if(items.length<4){
+    if(!useTopAddBtn&&items.length<4){
       const addBtn=document.createElement('button');addBtn.className='wchallenge-add';
       addBtn.innerHTML='<span style="font-size:16px;line-height:1;">+</span> 항목 추가';
       addBtn.addEventListener('click',doAdd);
