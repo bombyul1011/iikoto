@@ -146,11 +146,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .reserve-section-btn{flex:1;padding:7px 0;border-radius:10px;border:1px solid var(--card-b);background:var(--card);font-size:12px;color:var(--tm);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;}
 .reserve-section-btn.active{background:var(--acc-soft);color:var(--tp);border-color:var(--acc-soft);font-weight:600;}
 .goal-section-title{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;letter-spacing:.04em;background:linear-gradient(120deg,rgba(255,210,230,0.80),rgba(255,230,200,0.70));color:#c07080;border-radius:10px;padding:5px 13px;margin:14px 0 10px 0;border:1px solid rgba(255,185,205,0.55);box-shadow:0 2px 10px rgba(200,120,140,0.12);}
-.nwf-item{display:flex;align-items:flex-start;gap:9px;background:var(--card);border:1px solid var(--card-b);border-radius:14px;padding:12px 13px;margin-bottom:9px;box-shadow:0 2px 14px rgba(0,0,0,0.05),inset 0 1px 0 rgba(255,255,255,0.75);}
-.nwf-item-icon{font-size:14px;color:#c2638a;flex-shrink:0;margin-top:1.5px;}
+.nwf-item{display:flex;flex-direction:column;gap:6px;background:var(--card);border:1px solid var(--card-b);border-radius:14px;padding:12px 13px;margin-bottom:9px;box-shadow:0 2px 14px rgba(0,0,0,0.05),inset 0 1px 0 rgba(255,255,255,0.75);}
+.nwf-item-head{display:flex;align-items:center;gap:7px;}
+.nwf-item-icon{font-size:14px;color:#c2638a;flex-shrink:0;}
+.nwf-item-goal{font-size:12.5px;font-weight:600;color:#c2638a;}
 .nwf-item-text{font-size:13px;line-height:1.55;color:var(--tp);}
 [data-theme="glass"] .nwf-item{background:rgba(253,251,245,0.92);}
-[data-theme="glass"] .nwf-item-icon{color:#c2638a;}
+[data-theme="glass"] .nwf-item-icon,[data-theme="glass"] .nwf-item-goal{color:#c2638a;}
 
 /* ── CARDS ── */
 .card{background:var(--card);border:1px solid var(--card-b);border-radius:18px;padding:14px 15px;margin-bottom:10px;box-shadow:0 2px 20px rgba(0,0,0,0.06),inset 0 1px 0 rgba(255,255,255,0.80);height:auto;min-height:0;}
@@ -7547,12 +7549,13 @@ async function buildNextWeekFeedbackHtml(wk){
 
 **출력 형식(반드시 준수):**
 각 목표마다 정확히 다음 형식의 한 줄로 시작하세요:
-[카테고리] 코멘트내용
+[카테고리] 목표원문 :: 코멘트내용
 
 카테고리는 다음 중 목표 성격에 가장 가까운 것 하나만 골라 대괄호 안에 그대로 쓰세요: 운동, 식사, 수면, 공부, 업무, 마음가짐, 습관
+목표원문은 사용자가 입력한 목표 텍스트를 그대로(줄이거나 바꾸지 말고) 쓰세요.
 예:
-[운동] 운동 조금 더 집중해서! 이전에도 비슷한 목표를 몇 번 도전하셨던 것 같아요.
-[습관] 밥먹고 계단 걷기, 밥 직후 가벼운 움직임은 혈당 안정화에도 도움이 되니 좋은 습관이에요.
+[운동] 주 3회 헬스장 가기 :: 이전에도 비슷한 목표를 몇 번 도전하셨던 것 같아요.
+[습관] 밥먹고 계단 걷기 :: 밥 직후 가벼운 움직임은 혈당 안정화에도 도움이 되니 좋은 습관이에요.
 
 목표가 여러 개면 목표 개수만큼 줄을 만드세요. 한 목표에 대한 코멘트가 길어져도 그 목표의 한 줄(문단) 안에서만 이어가고, 다음 줄로 넘어가면 안 돼요.`;
 
@@ -7564,12 +7567,13 @@ async function buildNextWeekFeedbackHtml(wk){
     '업무':'ti-briefcase','마음가짐':'ti-heart','습관':'ti-repeat'
   };
   const lines=reply.trim().split('\n').filter(l=>l.trim());
-  return lines.map(l=>{
-    const m=l.trim().match(/^\[(.+?)\]\s*(.+)$/);
+  return lines.map((l,idx)=>{
+    const m=l.trim().match(/^\[(.+?)\]\s*(.+?)\s*::\s*(.+)$/);
     const cat=m?m[1].trim():'';
-    const text=m?m[2].trim():l.trim();
+    const goalText=m?m[2].trim():(items[idx]?items[idx].text:'');
+    const text=m?m[3].trim():l.trim();
     const icon=CAT_ICON[cat]||'ti-sparkles';
-    return `<div class="nwf-item"><i class="ti ${icon} nwf-item-icon" aria-hidden="true"></i><span class="nwf-item-text">${text}</span></div>`;
+    return `<div class="nwf-item"><div class="nwf-item-head"><i class="ti ${icon} nwf-item-icon" aria-hidden="true"></i><span class="nwf-item-goal">${escapeHtml(goalText)}</span></div><span class="nwf-item-text">${text}</span></div>`;
   }).join('');
 }
 
