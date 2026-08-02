@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260802-3-goal-week-fix';
+const CACHE = 'iikoto-v20260802-4-thu-week-rule';
 const ASSETS = [
   './',
   './index.html'

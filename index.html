@@ -2902,8 +2902,8 @@ ${isMidReport?'아직 한 달이 끝나지 않았으니 "이번 달은 ~했어�
 // 그 주의 "지난주 목표 돌아보기"가 최소 1회 열람되어 challenge_review_ 캐시가 로컬에 존재해야 함.
 // 조건 미충족 시엔 시트 안에서 "아직 준비 중" 안내만 뜨고, 아이콘 노출 여부와는 무관.
 // 특정 (y,mo)에 속한 챌린지 주차들과 각 주차의 목표+달성률만 가볍게 계산.
-// "월" 소속 판정은 그 주의 시작일(월요일)이 어느 달인지로 결정 — 8/31~9/6처럼 월 경계에 걸친 주는
-// 월요일이 속한 달로만 잡힘(예: 7/27~8/2 주는 월요일이 7월이므로 7월에만 소속, 8월엔 안 나타남).
+// "월" 소속 판정은 그 주의 목요일(ISO 8601 방식 — 7일 중 정중앙, 4일 이상 속한 쪽)이 어느 달인지로 결정.
+// 예: 7/27~8/2 주는 목요일이 7/30이라 7월 소속. 8/31~9/6 주는 목요일이 9/3이라 9월 소속(월요일만 8월이어도 9월로 잡힘).
 // computeMonthStats처럼 투두/리듬/수면까지 계산하지 않는 전용 경량 버전.
 function computeMonthlyGoalWeeks(y,mo){
   const dim=new Date(y,mo+1,0).getDate();
@@ -2912,8 +2912,9 @@ function computeMonthlyGoalWeeks(y,mo){
     const date=new Date(y,mo,d);
     const wk=weekKey(date);
     const wkStart=new Date(wk.replace('week:',''));
-    // 그 주의 월요일이 이 달(y,mo)에 속할 때만 포함 — 월 경계에 걸친 주가 양쪽 달에 중복 노출되는 것 방지
-    if(wkStart.getFullYear()===y&&wkStart.getMonth()===mo)weekSet[wk]=true;
+    const wkThu=new Date(wkStart);wkThu.setDate(wkStart.getDate()+3); // 월요일+3일=목요일
+    // 그 주의 목요일이 이 달(y,mo)에 속할 때만 포함 — 월 경계에 걸친 주가 양쪽 달에 중복 노출되는 것 방지
+    if(wkThu.getFullYear()===y&&wkThu.getMonth()===mo)weekSet[wk]=true;
   }
   const weeks=Object.keys(weekSet).sort();
   return weeks.map(wk=>{
