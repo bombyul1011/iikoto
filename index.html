@@ -728,6 +728,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .chaeum-remain{font-size:10.5px;color:var(--tm);text-align:center;margin-top:8px;}
 .chaeum-loading{font-size:12.5px;color:var(--tm);text-align:center;padding:8px 0;}
 .chaeum-empty{font-size:12.5px;color:var(--tm);text-align:center;padding:8px 0;}
+.chaeum-topic-pick-wrap{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;}
+.chaeum-topic-pick-chip{font-size:12.5px;color:rgba(85,95,35,0.92);background:rgba(210,215,150,0.55);border:none;padding:7px 14px;border-radius:14px;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500;}
+.chaeum-topic-pick-chip:active{background:rgba(190,180,90,0.55);}
 .chaeum-filter-tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch;}
 .chaeum-filter-tabs::-webkit-scrollbar{display:none;}
 .chaeum-filter-tab{flex-shrink:0;font-size:11.5px;color:var(--tm);background:var(--card);border:1px solid var(--card-b);border-radius:10px;padding:6px 12px;white-space:nowrap;cursor:pointer;}
@@ -5662,15 +5665,20 @@ function cleanupStaleEveningLearnSelections(){
   }
 }
 
-async function _fetchEveningLearnTopic(dk,avoidTopics){
+async function _fetchEveningLearnTopic(dk,avoidTopics,forceTopic){
   const key=getClaudeKey();
   const topics=getEveningTopics();
-  // 오늘 이미 나온 카테고리는 후보에서 제외 — 남은 카테고리가 있으면 그중에서만, 없으면 전체에서(안전장치)
-  const pool=(avoidTopics&&avoidTopics.length)
-    ? topics.filter(t=>!avoidTopics.includes(t))
-    : topics;
-  const candidates=pool.length?pool:topics;
-  const picked=candidates[Math.floor(Math.random()*candidates.length)];
+  let picked;
+  if(forceTopic){
+    picked=forceTopic;
+  }else{
+    // 오늘 이미 나온 카테고리는 후보에서 제외 — 남은 카테고리가 있으면 그중에서만, 없으면 전체에서(안전장치)
+    const pool=(avoidTopics&&avoidTopics.length)
+      ? topics.filter(t=>!avoidTopics.includes(t))
+      : topics;
+    const candidates=pool.length?pool:topics;
+    picked=candidates[Math.floor(Math.random()*candidates.length)];
+  }
   if(!key){
     // PC 등 키 없는 기기 — 모바일이 미리 만들어 서버에 캐시해둔 결과가 있으면 그것만 조회
     const cached=await aiCacheGet('eveninglearn_'+dk+'_'+picked);
@@ -5860,8 +5868,13 @@ function renderChaeumTodaySlot(){
     </div></div>`).join('<div style="height:8px;"></div>');
     if(_evLearnRerollLoading){
       html+='<div style="height:8px;"></div><div class="chaeum-topcard"><div class="chaeum-topcard-inner"><div class="chaeum-loading">다른 주제를 고르는 중...</div></div></div>';
+    }else if(_evLearnShowTopicPicker){
+      html+='<div style="height:8px;"></div>'+renderEveningTopicPickerCard();
     }else if(picks.length<2){
-      html+=`<div class="chaeum-btn-row" style="margin-top:8px;"><button class="chaeum-btn chaeum-btn-ghost" style="flex:none;width:100%;" onclick="rerollEveningLearn()">다른 주제도 뽑아보기</button></div>`;
+      html+=`<div class="chaeum-btn-row" style="margin-top:8px;gap:8px;">
+        <button class="chaeum-btn chaeum-btn-ghost" style="flex:1;" onclick="rerollEveningLearn()">다른 주제도 뽑아보기</button>
+        <button class="chaeum-btn chaeum-btn-ghost" style="flex:1;" onclick="openEveningLearnTopicPicker()">주제 직접 고르기</button>
+      </div>`;
     }else{
       html+=`<div class="chaeum-remain">두 주제 중 하나를 골라주세요</div>`;
     }
@@ -5869,11 +5882,16 @@ function renderChaeumTodaySlot(){
     html=`<div class="chaeum-topcard"><div class="chaeum-topcard-inner"><div class="chaeum-empty">오늘의 배움은 다 뽑았어요, 내일 또 만나요</div></div></div>`;
   }else if(_evLearnRerollLoading){
     html=`<div class="chaeum-topcard"><div class="chaeum-topcard-inner"><div class="chaeum-loading">오늘의 배움을 고르는 중...</div></div></div>`;
+  }else if(_evLearnShowTopicPicker){
+    html=renderEveningTopicPickerCard();
   }else{
     // 진입 즉시 자동 뽑기 없이, 버튼을 눌러야만 1차 뽑기가 시작됨 (홈탭 배너와 동일한 동작)
     html=`<div class="chaeum-topcard"><div class="chaeum-topcard-inner">
       <div class="chaeum-empty">탭해서 오늘의 주제를 만나보세요</div>
-      <button class="chaeum-btn chaeum-btn-fill" style="width:100%;margin-top:10px;" onclick="rerollEveningLearn()">오늘의 배움 뽑기</button>
+      <div class="chaeum-btn-row" style="margin-top:10px;gap:8px;">
+        <button class="chaeum-btn chaeum-btn-fill" style="flex:1;" onclick="rerollEveningLearn()">오늘의 배움 뽑기</button>
+        <button class="chaeum-btn chaeum-btn-ghost" style="flex:1;" onclick="openEveningLearnTopicPicker()">주제 직접 고르기</button>
+      </div>
     </div></div>`;
   }
   body.innerHTML=html;
@@ -5884,7 +5902,9 @@ function renderChaeumTodaySlot(){
   if(picks.length<2&&picks.length===state.count){
     const requestToken=Date.now();
     _evLearnPendingToken=requestToken;
-    _fetchEveningLearnTopic(dk,state.topics).then(result=>{
+    const forceTopic=_evLearnForceTopic;
+    _evLearnForceTopic=null;
+    _fetchEveningLearnTopic(dk,state.topics,forceTopic).then(result=>{
       if(!result){_evLearnRerollLoading=false;return;}
       if(_evLearnPendingToken!==requestToken)return; // 그 사이 다른 조작이 있었으면 이 요청은 더 이상 유효하지 않음
       const s=getEveningLearnState(dk);
@@ -5899,11 +5919,32 @@ function renderChaeumTodaySlot(){
 }
 
 let _evLearnRerollLoading=false;
-function rerollEveningLearn(){
+let _evLearnShowTopicPicker=false;
+let _evLearnForceTopic=null;
+function rerollEveningLearn(forceTopic){
   const dk=dateKey(getLogicalDate());
   const s=getEveningLearnState(dk);
   if(s.count>=2)return;
+  _evLearnShowTopicPicker=false;
   _evLearnRerollLoading=true;
+  _evLearnForceTopic=forceTopic||null;
+  renderChaeumTodaySlot();
+}
+function renderEveningTopicPickerCard(){
+  const topics=getEveningTopics();
+  const chips=topics.map(t=>`<button class="chaeum-topic-pick-chip" onclick="rerollEveningLearn('${t.replace(/'/g,"\\'")}')">${escapeHtml(t)}</button>`).join('');
+  return `<div class="chaeum-topcard"><div class="chaeum-topcard-inner">
+    <div class="chaeum-remain" style="margin-bottom:8px;">어떤 주제로 만나볼까요?</div>
+    <div class="chaeum-topic-pick-wrap">${chips}</div>
+    <button class="chaeum-btn chaeum-btn-ghost" style="width:100%;margin-top:10px;" onclick="closeEveningLearnTopicPicker()">취소</button>
+  </div></div>`;
+}
+function openEveningLearnTopicPicker(){
+  _evLearnShowTopicPicker=true;
+  renderChaeumTodaySlot();
+}
+function closeEveningLearnTopicPicker(){
+  _evLearnShowTopicPicker=false;
   renderChaeumTodaySlot();
 }
 
@@ -9428,7 +9469,7 @@ function saveClaudeKey(){
   showToast('Claude API 키 저장됐어요 ✓');
 }
 // 저녁 학습 주제 — 설정에서 자유롭게 추가/삭제 가능한 목록. 비어있으면 기본값 사용.
-const DEFAULT_EVENING_TOPICS=['외국어 공부','현대미학','예술사','인문학','시사상식'];
+const DEFAULT_EVENING_TOPICS=['외국어 공부','현대미학','예술사','인문학','시사상식','세계사','음악사'];
 function getEveningTopics(){
   const raw=S.get('evening_topics');
   if(!raw)return DEFAULT_EVENING_TOPICS;
