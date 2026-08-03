@@ -9946,10 +9946,12 @@ function saveQuoteSheet(){
   if(targetCid){
     const inp=document.getElementById('rd-quote-inp');
     const text=inp.value.trim();
-    if(text)upsertQuoteLocal({cid:genCid(),bookCid:targetCid,text,created:Date.now()});
+    if(text){
+      upsertQuoteLocal({cid:genCid(),bookCid:targetCid,text,created:Date.now()});
+      inp.value='';
+      inp.focus();
+    }
   }
-  closeSheet('quote-sheet');
-  _rdSheetBookCid=null;
   renderRdQuotes();
   renderBookList();
 }
