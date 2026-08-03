@@ -712,7 +712,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 }
 .today-quote-card{
   position:relative;background:linear-gradient(160deg, rgba(255,251,244,0.92), rgba(253,242,230,0.95));
-  border-radius:16.5px;padding:22px 20px 20px;overflow:hidden;
+  border-radius:16.5px;padding:14px 16px 13px;overflow:hidden;
   box-shadow:inset 0 1px 0 rgba(255,255,255,0.9);cursor:pointer;
 }
 .today-quote-card::before{
@@ -723,16 +723,16 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 }
 @keyframes tqFlicker{0%,100%{opacity:0.7;transform:translateX(-50%) scale(1);}50%{opacity:1;transform:translateX(-50%) scale(1.05);}}
 .today-quote-title{
-  font-size:12.5px;font-weight:600;color:#c99a7a;letter-spacing:0.02em;
-  margin-bottom:14px;position:relative;z-index:1;display:flex;align-items:center;gap:5px;
+  font-size:11px;font-weight:500;color:#5a8a6a;letter-spacing:0;
+  margin-bottom:8px;position:relative;z-index:1;display:flex;align-items:center;gap:5px;
 }
-.today-quote-title i{font-size:13px;opacity:0.85;}
+.today-quote-title i{font-size:12px;opacity:0.9;vertical-align:-1px;}
 .today-quote-text{
-  font-family:'Bareonbatang',serif;font-size:14.5px;font-weight:400;line-height:1.8;
+  font-family:'Bareonbatang',serif;font-size:13px;font-weight:400;line-height:1.65;
   color:var(--tp);position:relative;z-index:1;letter-spacing:-0.01em;
 }
-.today-quote-footer{display:flex;align-items:center;gap:6px;margin-top:16px;position:relative;z-index:1;}
-.today-quote-source{font-size:11px;color:var(--ts);}
+.today-quote-footer{display:flex;align-items:center;justify-content:flex-end;margin-top:9px;position:relative;z-index:1;}
+.today-quote-source{font-size:10.5px;color:var(--ts);}
 .rd-quote-more{font-size:11px;color:var(--tm);text-align:center;padding:8px 0 2px;cursor:pointer;}
 .rd-quote-empty{font-size:11.5px;color:var(--tm);text-align:center;padding:8px 0 2px;}
 .rd-quote-text{font-size:12.5px;color:var(--tp);font-style:italic;line-height:1.55;}
@@ -6247,7 +6247,7 @@ function makeTodayQuoteCard(){
   const book=getBooks().find(b=>b.cid===q.bookCid);
   const wrap=document.createElement('div');wrap.className='today-quote-wrap';
   wrap.innerHTML=`<div class="today-quote-card" onclick="openReading()">
-    <div class="today-quote-title"><i class="ti ti-bulb" aria-hidden="true"></i>오늘의 문장</div>
+    <div class="today-quote-title"><i class="ti ti-quote" aria-hidden="true"></i>오늘의 문장</div>
     <div class="today-quote-text">${escapeHtml(q.text)}</div>
     <div class="today-quote-footer"><span class="today-quote-source">${escapeHtml(book?book.title:'')}</span></div>
   </div>`;
