@@ -327,7 +327,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .memo-bub.tod-morning{background:rgba(255,205,170,0.05);border-left-color:rgba(225,145,85,0.58);}
 .memo-bub.tod-afternoon{background:rgba(255,170,180,0.05);border-left-color:rgba(220,105,125,0.58);}
 .memo-bub.tod-night{background:rgba(190,150,200,0.06);border-left-color:rgba(150,90,165,0.60);}
-.memo-bub.memo-bub-seed{background:rgba(200,225,150,0.08);border-left-color:rgba(120,165,70,0.65);}
+.memo-bub.memo-bub-seed{background:rgba(180,205,205,0.08);border-left-color:rgba(120,155,160,0.65);}
 
 .undo-toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%) translateY(16px);background:rgba(60,40,40,.90);color:white;font-size:12px;padding:9px 18px;border-radius:20px;display:flex;align-items:center;gap:10px;opacity:0;transition:all .25s;z-index:10500;pointer-events:none;backdrop-filter:blur(8px);}
 .undo-toast.on{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto;}
@@ -341,9 +341,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .memo-field-sm{height:32px;max-height:80px;padding:6px 10px;font-size:14px;}
 .memo-field-wrap{position:relative;flex:1;}
 .memo-field-wrap .memo-field{width:100%;}
-.memo-seed-toggle{position:absolute;right:5px;top:0;bottom:0;margin:auto;height:20px;background:none;border:none;padding:0;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--tm);opacity:0.18;transition:opacity .15s,color .15s;}
-.memo-seed-toggle i{font-size:15px;line-height:1;display:block;}
-.memo-seed-toggle.on{opacity:1;color:rgba(120,165,70,0.95);}
+.memo-seed-toggle{position:absolute;right:5px;top:0;bottom:0;margin:auto;height:22px;width:22px;background:none;border:none;padding:0;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--tm);opacity:0.23;transition:opacity .15s,color .15s;}
+.memo-seed-toggle i{font-size:17px;line-height:0;}
+.memo-seed-toggle.on{opacity:1;color:rgba(120,155,160,0.95);}
 .send-btn-sm{width:32px;height:32px;border-radius:9px;}
 .seed-icon-btn{background:linear-gradient(120deg,rgba(185,215,140,0.75),rgba(210,230,165,0.65));border:1px solid rgba(145,185,80,0.45);box-shadow:0 2px 10px rgba(110,155,55,0.10);}
 [data-theme="glass"] .seed-icon-btn{background:linear-gradient(120deg,rgba(185,215,140,0.40),rgba(210,230,165,0.32));border:1.4px solid rgba(145,185,80,0.35);}
@@ -527,7 +527,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="glass"] .memo-bub.tod-morning{background:none;border-left-color:rgba(250,215,100,0.62);}
 [data-theme="glass"] .memo-bub.tod-afternoon{background:none;border-left-color:rgba(220,95,115,0.50);}
 [data-theme="glass"] .memo-bub.tod-night{background:none;border-left-color:rgba(150,115,210,0.55);}
-[data-theme="glass"] .memo-bub.memo-bub-seed{background:none;border-left-color:rgba(120,165,70,0.70);}
+[data-theme="glass"] .memo-bub.memo-bub-seed{background:none;border-left-color:rgba(120,155,160,0.70);}
 [data-theme="glass"] .memo-item{margin-bottom:14px;}
 /* ── READING HUB ── */
 .reading-ov{position:fixed;inset:0;z-index:8000;background:var(--bg);display:flex;flex-direction:column;overflow-y:auto;transform:translateX(100%);transition:transform .3s cubic-bezier(.32,.72,0,1);pointer-events:none;}
@@ -1221,7 +1221,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div class="slabel">메모</div>
         <div style="display:flex;align-items:center;gap:4px;">
           <button class="slabel-search-btn" onclick="openSearch()" title="메모 검색"><i class="ti ti-search" style="font-size:12px;" aria-hidden="true"></i></button>
-          <button class="slabel-search-btn" onclick="openSeedArchive()" title="씨앗 모아보기"><i class="ti ti-seeding" style="font-size:12px;" aria-hidden="true"></i></button>
+          <button class="slabel-search-btn" onclick="openSeedArchive()" title="씨앗 모아보기"><i class="ti ti-diamond" style="font-size:12px;" aria-hidden="true"></i></button>
         </div>
       </div>
       <div class="card p" id="memo-card">
@@ -1230,7 +1230,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           <button class="stamp-btn memo-stamp-sm" onclick="openMemoTimePicker()" id="memo-stamp-btn" title="시간 선택 후 메모 입력"><i class="ti ti-clock-hour-4" style="font-size:14px;color:var(--ts);" aria-hidden="true"></i></button>
           <div class="memo-field-wrap">
             <textarea class="memo-field memo-field-sm" id="memo-inline-inp" placeholder="메모를 입력하세요" rows="1" autocomplete="off"></textarea>
-            <button class="memo-seed-toggle" id="memo-seed-toggle" onclick="toggleMemoSeed()" title="씨앗으로 남기기"><i class="ti ti-seeding" aria-hidden="true"></i></button>
+            <button class="memo-seed-toggle" id="memo-seed-toggle" onclick="toggleMemoSeed()" title="씨앗으로 남기기"><i class="ti ti-diamond" aria-hidden="true"></i></button>
           </div>
           <button class="send-btn send-btn-sm" onclick="submitMemoInline()" title="메모 등록"><i class="ti ti-arrow-up" style="font-size:14px;" aria-hidden="true"></i></button>
         </div>
@@ -7372,7 +7372,7 @@ function renderMemos(){
     bub.innerHTML=m.text||'';
     const time=document.createElement('span');
     time.className='memo-time';
-    if(isSeed){time.innerHTML='<i class="ti ti-seeding" style="font-size:13px;color:rgba(120,165,70,0.95);" aria-hidden="true"></i>';}
+    if(isSeed){time.innerHTML='<i class="ti ti-diamond" style="font-size:13px;color:rgba(120,155,160,0.95);" aria-hidden="true"></i>';}
     else{time.textContent=m.time||'';}
     el.appendChild(time);el.appendChild(bub);
     list.appendChild(el);
@@ -7496,7 +7496,7 @@ function openSeedArchive(){
   if(!results.length){
     resEl.innerHTML='<div style="text-align:center;color:var(--tm);font-size:12px;padding:20px 2px;">아직 남긴 씨앗이 없어요</div>';
   }else{
-    resEl.innerHTML=results.map(r=>`<div class="msr-item" onclick="jumpToMemoDateFromSeed('${r.dk}')"><div class="msr-date"><i class="ti ti-seeding" style="font-size:11px;color:rgba(120,165,70,0.95);margin-right:3px;" aria-hidden="true"></i>${r.dk}${r.time?' · '+r.time:''}</div><div class="msr-text">${r.text}</div></div>`).join('');
+    resEl.innerHTML=results.map(r=>`<div class="msr-item" onclick="jumpToMemoDateFromSeed('${r.dk}')"><div class="msr-date"><i class="ti ti-diamond" style="font-size:11px;color:rgba(120,155,160,0.95);margin-right:3px;" aria-hidden="true"></i>${r.dk}${r.time?' · '+r.time:''}</div><div class="msr-text">${r.text}</div></div>`).join('');
   }
   openModal('seed-archive-modal');
 }
