@@ -4084,7 +4084,7 @@ function getSleepScoreLevel(score){
 // 식사 카테고리 라벨/키 순서 — 리듬바, 오늘탭 카드, 캘린더 상세보기, 마크다운 백업 등
 // 여러 화면에서 각자 다른 문구("아침"/"아침 식사")로 중복 정의되던 것을 통일.
 const MEAL_LABELS={breakfast:'아침',lunch:'점심',dinner:'저녁',snack:'간식'};
-const MEAL_KEYS=['breakfast','lunch','dinner','snack'];
+const MEAL_KEYS=['breakfast','lunch','snack','dinner'];
 function getMeals(dk){return S.get(S.key('meals',dk))||{};}
 function saveMealsData(dk,v){
   S.set(S.key('meals',dk),v);
@@ -6810,7 +6810,17 @@ async function _fetchNutriComment(dk){
   const yDate=new Date(dk+'T00:00:00');yDate.setDate(yDate.getDate()-1);
   const ydk=dateKey(yDate);
   const todayMeals=getMeals(dk)||{},yMeals=getMeals(ydk)||{};
-  const fmtMeals=m=>MEAL_KEYS.map(k=>m[k]?`${MEAL_LABELS[k]}: ${m[k]}`:null).filter(Boolean).join(', ');
+  // 시간이 있으면 함께 표기하고, 시간 기준으로 정렬 — 간식은 저장 순서상 항상 맨 뒤라
+  // 시간 없이는 "밤에 먹은 것"으로 오분석되기 쉬움(실제론 점심-저녁 사이인 경우가 많음).
+  const fmtMeals=m=>{
+    const items=MEAL_KEYS.map(k=>{
+      if(!m[k])return null;
+      const t=m[k+'_time'];
+      return {label:MEAL_LABELS[k],menu:m[k],time:t||'',sortKey:t||'99:99'};
+    }).filter(Boolean);
+    items.sort((a,b)=>a.sortKey.localeCompare(b.sortKey));
+    return items.map(it=>it.time?`${it.label}(${it.time}): ${it.menu}`:`${it.label}: ${it.menu}`).join(', ');
+  };
   const yText=fmtMeals(yMeals),tText=fmtMeals(todayMeals);
   if(!yText&&!tText)return null;
   // 최근 며칠 메뉴 흐름도 함께 참고자료로 전달 — 반복 패턴/부족한 영양소 판단에 활용
@@ -6829,6 +6839,7 @@ async function _fetchNutriComment(dk){
   const sys=`당신은 탄단지 균형과 건강식에 관심이 많은 사용자를 위한 다정한 영양 코멘트 작성자예요.
 사용자는 현재 체지방 감량과 근육량 향상을 목표로 운동과 식단을 철저히 관리하고 있어요. 이 목표를 염두에 두고 분석과 제안의 관점을 잡아주세요(예: 단백질 섭취가 목표에 도움이 되는지, 근손실 우려는 없는지, 체지방 감량에 방해될 만한 구성인지 등을 자연스럽게 반영).
 아래는 사용자의 어제 식사, 오늘 식사(계획 포함), 최근 며칠 식사 흐름이에요. 메뉴명만으로 탄수화물/단백질/지방 구성을 정성적으로 추정해서 코멘트를 작성하세요.
+각 끼니 옆 괄호 안 시간은 실제 섭취 시각이에요. 특히 간식은 저장 순서상 항상 마지막에 나열되지만 시간 기준으로 보면 점심-저녁 사이 등 다른 시점일 수 있으니, 반드시 괄호 안 시간을 기준으로 언제 먹은 것인지 판단하세요(시간이 없으면 순서나 짐작만으로 야식이라 단정하지 말 것).
 
 **출력 형식 — 반드시 아래 JSON 형식만 출력, 다른 텍스트 없이:**
 {"headline":"짧은 헤드라인 한 줄(정량 수치 없이, 예: '단백질 든든하게 채운 하루')","yesterday":"어제 식사 분석 2문장 이내","today":"오늘 식사 분석과 제안 2~3문장 이내"}
@@ -8668,7 +8679,7 @@ function renderDailyOneLineWeek(){
     const inp=document.createElement('input');
     inp.type='text';inp.className='oneline-inp';
     inp.value=getDailyOneLine(dk);
-    inp.placeholder='오늘 하루 한 줄...';
+    inp.placeholder=isToday?'오늘 하루 한 줄...':'';
     inp.autocomplete='off';
     inp.addEventListener('blur',()=>saveDailyOneLine(dk,inp.value.trim()));
     inp.addEventListener('compositionend',()=>{}); // 한글 IME 안전
