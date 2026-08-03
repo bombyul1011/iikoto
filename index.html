@@ -434,8 +434,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 /* ── STAT BAR ── */
 .stat-bar-wrap{display:flex;align-items:center;justify-content:center;gap:14px;padding:14px 4px 6px;border-top:1px solid var(--div);margin-top:8px;}
 .sbar-item{display:flex;align-items:center;gap:5px;}
-.sbar-item-active{cursor:pointer;border-radius:8px;padding:3px 6px;margin:-3px -6px;background:linear-gradient(120deg,rgba(200,150,220,0.35),rgba(255,210,150,0.35),rgba(150,210,230,0.35));background-size:300% 300%;animation:bannerShine 6s ease infinite;}
-.sbar-item-active i,.sbar-item-active .sbar-num{color:rgba(140,90,150,0.95)!important;font-weight:600;}
+.sbar-item-active{cursor:pointer;}
+.sbar-item-active i,.sbar-item-active .sbar-num{
+  background:linear-gradient(120deg,rgba(200,150,220,1),rgba(255,180,140,1),rgba(140,200,225,1),rgba(200,150,220,1));
+  background-size:300% 100%;
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;
+  animation:bannerShine 4s linear infinite;
+  font-weight:600;
+}
 .sbar-num{font-size:13px;color:var(--ts);}
 .sbar-div{width:1px;height:14px;background:rgba(200,175,165,.28);}
 
@@ -7710,7 +7716,7 @@ async function buildWeeklyMemoReportHtml(wk){
   for(let i=0;i<7;i++){
     const d=new Date(wkStart);d.setDate(wkStart.getDate()+i);
     const dk=dateKey(d);
-    getMemos(dk).forEach(m=>{if(m.text&&m.text.trim())lines.push(`[${dk} ${m.time||''}] ${m.text.trim()}`);});
+    getMemos(dk).forEach(m=>{if(m.text&&m.text.trim())lines.push(`${m.type==='seed'?'[씨앗] ':''}[${dk} ${m.time||''}] ${m.text.trim()}`);});
   }
   if(!lines.length)return '<div style="text-align:center;color:var(--tm);padding:20px 0;">이번 주 남긴 메모가 없어요</div>';
   if(!key)return null;
@@ -7718,6 +7724,7 @@ async function buildWeeklyMemoReportHtml(wk){
   const sys=`당신은 사용자의 한 주 메모(일기 형식의 짧은 기록들)를 읽고, 이번 주에 어떤 화두나 감정 흐름이 있었는지
 짚어주는 다정한 관찰자예요.
 아래는 사용자가 이번 한 주(월~일) 동안 남긴 메모 전체예요. 시간순으로 나열되어 있어요.
+앞에 [씨앗]이 붙은 항목은 일반 메모와 성격이 달라요 — 사용자가 그날 겪은 일이 아니라, 어디선가 발견해 남겨둔 인상 깊은 문장이나 장면(드라마 대사, 책 구절, 우연히 들은 말 등)이에요. 이 항목은 사용자가 실제로 겪은 일처럼 단정하지 말고, "이런 문장을 마음에 담아두셨네요" 정도로만 참고하세요.
 
 이걸 바탕으로:
 1. 이번 주에 자주 등장했거나 인상적이었던 화두/사건 1-2가지
