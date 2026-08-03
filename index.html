@@ -704,6 +704,35 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .diary-line-text.empty{color:var(--tm);font-size:12px;font-style:italic;letter-spacing:2px;}
 .rd-quote-inp{width:100%;background:var(--inp);border:1px solid var(--inp-b);border-radius:12px;padding:12px 14px;outline:none;resize:none;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--tp);line-height:1.6;}
 .rd-quote-item{position:relative;background:rgba(255,250,245,0.5);border-left:2.5px solid rgba(195,170,235,0.55);border-radius:0 10px 10px 0;padding:9px 12px 26px 14px;margin-top:8px;}
+
+/* ===== 홈탭 저녁파트2: 오늘의 문장 카드 ===== */
+.today-quote-wrap{
+  position:relative;margin-top:10px;border-radius:18px;padding:1.5px;
+  background:linear-gradient(135deg, rgba(201,154,122,0.55), rgba(185,143,174,0.40), rgba(201,154,122,0.30));
+}
+.today-quote-card{
+  position:relative;background:linear-gradient(160deg, rgba(255,251,244,0.92), rgba(253,242,230,0.95));
+  border-radius:16.5px;padding:22px 20px 20px;overflow:hidden;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.9);cursor:pointer;
+}
+.today-quote-card::before{
+  content:'';position:absolute;top:-30%;left:50%;width:200px;height:200px;
+  transform:translateX(-50%);
+  background:radial-gradient(circle, rgba(255,222,180,0.35) 0%, rgba(255,222,180,0.10) 45%, transparent 70%);
+  animation:tqFlicker 6s ease-in-out infinite;pointer-events:none;
+}
+@keyframes tqFlicker{0%,100%{opacity:0.7;transform:translateX(-50%) scale(1);}50%{opacity:1;transform:translateX(-50%) scale(1.05);}}
+.today-quote-title{
+  font-size:12.5px;font-weight:600;color:#c99a7a;letter-spacing:0.02em;
+  margin-bottom:14px;position:relative;z-index:1;display:flex;align-items:center;gap:5px;
+}
+.today-quote-title i{font-size:13px;opacity:0.85;}
+.today-quote-text{
+  font-family:'Bareonbatang',serif;font-size:14.5px;font-weight:400;line-height:1.8;
+  color:var(--tp);position:relative;z-index:1;letter-spacing:-0.01em;
+}
+.today-quote-footer{display:flex;align-items:center;gap:6px;margin-top:16px;position:relative;z-index:1;}
+.today-quote-source{font-size:11px;color:var(--ts);}
 .rd-quote-more{font-size:11px;color:var(--tm);text-align:center;padding:8px 0 2px;cursor:pointer;}
 .rd-quote-empty{font-size:11.5px;color:var(--tm);text-align:center;padding:8px 0 2px;}
 .rd-quote-text{font-size:12.5px;color:var(--tp);font-style:italic;line-height:1.55;}
@@ -1013,86 +1042,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rhythm-track-ongoing .rt-row{position:static;left:auto;right:auto;padding:5px 0;white-space:normal;}
 [data-theme="glass"] .wrb-track{background:rgba(190,180,160,0.30);}
 
-/* ===== 독서 공유카드 ===== */
+/* ===== Bareonbatang 폰트 (독서 공유카드에서 쓰던 폰트, "오늘의 문장" 카드 등에서 재사용) ===== */
 @font-face{font-family:'Bareonbatang';src:url('./fonts/HakgyoansimBareonbatangR.woff2') format('woff2');font-weight:400;font-display:swap;}
 @font-face{font-family:'Bareonbatang';src:url('./fonts/HakgyoansimBareonbatangB.woff2') format('woff2');font-weight:700;font-display:swap;}
-
-/* 헤더 스티커 1: READING LOG */
-.s-rl{position:absolute;top:20px;left:20px;right:20px;color:#f6ecdd;font-family:'Bareonbatang',serif;}
-.s-rl-top{display:flex;align-items:center;gap:8px;margin-bottom:14px;}
-.s-rl-capsule{border:1px solid rgba(246,236,221,0.42);border-radius:18px;padding:4px 16px;font-family:'Bareonbatang',serif;font-style:italic;font-size:9.5px;letter-spacing:.08em;white-space:nowrap;display:flex;align-items:center;gap:5px;}
-.s-rl-line{flex:1;height:1px;background:rgba(246,236,221,0.30);}
-.s-rl-star{flex-shrink:0;font-size:10px;color:rgba(246,236,221,0.85);}
-
-/* 헤더 스티커: 인덱스 카드형 */
-.s-idx{position:absolute;top:16px;left:22px;right:56px;}
-.s-idx-row{display:flex;align-items:center;gap:8px;font-family:'Bareonbatang',serif;font-style:italic;font-size:8.5px;letter-spacing:.08em;color:rgba(246,236,221,0.85);white-space:nowrap;}
-.s-idx-label{flex-shrink:0;}
-.s-idx-divider{width:1px;height:9px;background:rgba(246,236,221,0.4);flex-shrink:0;}
-.s-idx-date{white-space:nowrap;flex-shrink:0;}
-.s-idx-note{margin-top:6px;text-align:left;font-family:'DM Sans',sans-serif;font-style:normal;font-size:9px;color:rgba(246,236,221,0.65);}
-.s-rl .s-idx-note{margin-top:4px;}
-.s-idx-bookmark{position:absolute;top:0;right:22px;width:17px;height:40px;}
-
-.s-books{position:absolute;top:20px;left:20px;right:20px;}
-.s-books-row{display:flex;align-items:center;gap:9px;}
-.s-books-line{flex:1;height:2px;}
-.s-books-icon{flex-shrink:0;width:14px;height:14px;color:rgba(246,236,221,0.85);}
-.s-books-label{text-align:center;font-size:4.6px;letter-spacing:.14em;font-style:italic;color:rgba(246,236,221,.68);margin-top:2px;font-family:'Bareonbatang',serif;}
-
-/* 표지 스티커 (독립) */
-
-/* 문장 스티커 3: 심플형 */
-.s-qs{position:absolute;bottom:20px;left:20px;right:20px;color:#f6ecdd;font-family:'Bareonbatang',serif;}
-.s-qs-body{display:flex;gap:6px;align-items:flex-start;}
-.s-qs-mark{font-size:12px;line-height:.6;color:rgba(246,236,221,0.88);flex-shrink:0;margin-top:1px;}
-.s-qs-text{font-size:9.5px;line-height:1.5;color:#f6ecdd;flex:1;}
-.s-qs-underline{height:1px;background:rgba(246,236,221,0.22);margin-top:6px;}
-.s-qs-meta{display:flex;align-items:baseline;gap:8px;margin-top:8px;font-size:9px;font-family:'DM Sans',sans-serif;}
-.s-qs-meta .t{font-weight:700;color:rgba(246,236,221,0.92);}
-.s-qs-meta .a{color:rgba(246,236,221,0.65);}
-
-/* 문장 스티커 4: 테이프형 (표지 없음, 박스만) */
-.s-qt-box{position:absolute;bottom:38px;left:20px;right:20px;border:1.3px solid rgba(246,236,221,0.32);border-radius:18px;padding:14px 13px 11px;color:#f6ecdd;font-family:'Bareonbatang',serif;}
-.s-qt-tape{position:absolute;top:-7px;left:22px;width:38px;height:15px;background:linear-gradient(135deg,rgba(190,170,148,0.55),rgba(165,145,122,0.45));border-radius:2px;box-shadow:0 2px 4px rgba(0,0,0,.25);transform:rotate(-6deg);}
-.s-qt-mark-open{font-size:10px;line-height:.5;color:rgba(246,236,221,0.88);}
-.s-qt-text{font-size:9.5px;line-height:1.5;margin:3px 0 1px;color:#f6ecdd;}
-.s-qt-mark-close{font-size:12px;line-height:.3;color:rgba(246,236,221,0.88);text-align:right;display:block;}
-.s-qt-meta{display:flex;align-items:baseline;justify-content:flex-end;gap:6px;margin-top:6px;font-size:8.5px;font-family:'DM Sans',sans-serif;}
-.s-qt-meta .t{font-weight:700;color:rgba(246,236,221,0.88);}
-.s-qt-meta .a{color:rgba(246,236,221,0.6);}
-
-/* 문장 스티커 - 하이라이트형 */
-.s-hl{position:absolute;bottom:20px;left:20px;right:20px;font-family:'Bareonbatang',serif;}
-.s-hl-text{font-size:9.5px;line-height:1.6;color:#fff8f0;background:rgba(255,150,140,0.42);box-decoration-break:clone;-webkit-box-decoration-break:clone;padding:2px 7px;border-radius:3px;}
-.s-hl-meta{display:flex;align-items:baseline;gap:8px;margin-top:10px;font-size:9px;font-family:'DM Sans',sans-serif;}
-.s-hl-meta .t{font-weight:700;color:rgba(246,236,221,0.92);}
-.s-hl-meta .a{color:rgba(246,236,221,0.65);}
-
-/* 문장 스티커 - 편지지형 */
-.s-paper{position:absolute;bottom:38px;left:20px;right:20px;background:rgba(246,236,221,0.07);border-radius:14px;padding:14px 16px 13px;font-family:'Bareonbatang',serif;}
-.s-paper-lines{background-image:repeating-linear-gradient(to bottom, transparent 0, transparent 19px, rgba(246,236,221,0.28) 20px);}
-.s-paper-text{font-size:9.5px;line-height:20px;color:#f6ecdd;}
-.s-paper-meta{display:flex;align-items:baseline;gap:8px;margin-top:8px;font-size:9px;font-family:'DM Sans',sans-serif;}
-.s-paper-meta .t{font-weight:700;color:rgba(246,236,221,0.9);}
-.s-paper-meta .a{color:rgba(246,236,221,0.62);}
-
-/* 진행률 스티커 */
-.s-prog{position:absolute;width:77px;}
-.s-prog-label{font-size:8.5px;color:rgba(246,236,221,0.75);font-family:'DM Sans',sans-serif;text-align:right;margin-bottom:4px;letter-spacing:.04em;}
-.s-prog-track{height:2px;background:rgba(246,236,221,0.25);border-radius:2px;position:relative;}
-.s-prog-fill{position:absolute;left:0;top:0;height:100%;background:rgba(246,236,221,0.75);border-radius:2px;}
-.s-prog-bead{position:absolute;top:50%;width:7px;height:7px;border-radius:50%;background:#f6ecdd;transform:translate(-50%,-50%);box-shadow:0 1px 3px rgba(0,0,0,.3);}
-
-/* 로고 워터마크 */
-.s-cover{position:absolute;width:34px;height:48px;}
-.s-cover-img{width:100%;height:100%;border-radius:6px;overflow:hidden;box-shadow:0 3px 10px rgba(0,0,0,.4);border:1px solid rgba(246,236,221,0.3);}
-.s-cover img{width:100%;height:100%;object-fit:cover;display:block;}
-.s-cover.pos-bl{bottom:16px;left:18px;}
-.s-cover.pos-br{bottom:16px;right:18px;}
-.s-cover.pos-tl{top:16px;left:18px;}
-.s-cover.pos-tr{top:16px;right:18px;}
-.s-cover-title{margin-top:5px;font-family:'Bareonbatang',serif;font-size:7px;line-height:1.25;color:rgba(246,236,221,0.85);text-align:center;width:52px;margin-left:-9px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
 </style>
 </head>
 <body>
@@ -2119,6 +2071,8 @@ function renderHomeBody(section){
     if(isNight2){
       body.appendChild(makeLabel('오늘의 독서'));
       body.appendChild(makeBookCardWithCover());
+      const quoteCard=makeTodayQuoteCard();
+      if(quoteCard)body.appendChild(quoteCard);
       body.appendChild(makeLabel('밀도의 숲'));
       body.appendChild(makeMonthlyHeatmapCard());
     }else{
@@ -6282,6 +6236,23 @@ function openPlaylistModalFromHome(){
   openPlaylistModal();
 }
 // 저녁 파트1용 독서 카드 B — 표지(또는 대체 아이콘)+진행바 포함, 넛지 문구는 우측 정렬로 기존 A와 동일 스타일
+function makeTodayQuoteCard(){
+  const quotes=getQuotes().filter(q=>q.text&&q.text.trim());
+  if(!quotes.length)return null;
+  // 그날 하루 동안은 같은 문장이 나오도록, 날짜 기반 시드로 고정 선택
+  const dk=dateKey(getLogicalDate());
+  let seed=0;for(let i=0;i<dk.length;i++)seed=(seed*31+dk.charCodeAt(i))>>>0;
+  const idx=seed%quotes.length;
+  const q=quotes[idx];
+  const book=getBooks().find(b=>b.cid===q.bookCid);
+  const wrap=document.createElement('div');wrap.className='today-quote-wrap';
+  wrap.innerHTML=`<div class="today-quote-card" onclick="openReading()">
+    <div class="today-quote-title"><i class="ti ti-bulb" aria-hidden="true"></i>오늘의 문장</div>
+    <div class="today-quote-text">${escapeHtml(q.text)}</div>
+    <div class="today-quote-footer"><span class="today-quote-source">${escapeHtml(book?book.title:'')}</span></div>
+  </div>`;
+  return wrap;
+}
 function makeBookCardWithCover(){
   const book=getBooks().find(b=>b.status==='reading');
   const wrap=document.createElement('div');wrap.className='pace-card';
