@@ -2945,12 +2945,13 @@ function loadContentMonthlyReportContent(){
   el.innerHTML=cats.filter(cat=>byCat[cat].length>0).map(cat=>{
     const meta=CAT_ICON_META[cat];
     const items=byCat[cat].map(c=>{
-      const starsHtml=c.stars>0?`<span style="color:#e0b050;font-size:11px;margin-left:6px;">${'★'.repeat(c.stars)}</span>`:'';
-      const statusHtml=c.status==='stopped'?`<span style="color:var(--tm);font-size:11px;margin-left:6px;">중단</span>`:(c.status==='watching'?`<span style="color:var(--tm);font-size:11px;margin-left:6px;">진행중</span>`:'');
+      const starsHtml=c.stars>0?`<span style="color:#e0b050;font-size:11px;">${'★'.repeat(c.stars)}</span>`:'';
+      const statusHtml=c.cat==='music'?'':(c.status==='stopped'?`<span style="color:var(--tm);font-size:11px;">중단</span>`:(c.status==='watching'?`<span style="color:var(--tm);font-size:11px;">진행중</span>`:''));
       const posterHtml=c.poster?`<img src="${c.poster}" style="width:36px;height:36px;border-radius:8px;object-fit:cover;flex-shrink:0;" />`:`<div style="width:36px;height:36px;border-radius:8px;background:${meta.color};flex-shrink:0;display:flex;align-items:center;justify-content:center;"><i class="ti ${meta.icon}" style="font-size:15px;color:#fff;" aria-hidden="true"></i></div>`;
       return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;">
         ${posterHtml}
-        <div style="flex:1;min-width:0;font-size:13px;color:var(--tp);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.title}${starsHtml}${statusHtml}</div>
+        <div style="flex:1;min-width:0;font-size:13px;color:var(--tp);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.title}</div>
+        ${(starsHtml||statusHtml)?`<div style="flex-shrink:0;text-align:right;">${starsHtml}${statusHtml}</div>`:''}
       </div>`;
     }).join('');
     return `<div class="mr-card" style="margin-bottom:10px;">
@@ -3161,19 +3162,7 @@ function openMonthlyReportSheet(){
   },50);
 }
 function renderReportMonthChips(){
-  const wrap=document.getElementById('mr-month-chips');if(!wrap)return;
-  const now=new Date();
-  wrap.innerHTML='';
-  for(let m=0;m<12;m++){
-    const future=_reportYear>now.getFullYear()||(_reportYear===now.getFullYear()&&m>now.getMonth());
-    const chip=document.createElement('div');
-    chip.className='m-chip'+(m===_reportMonth?' active':'')+(future?' disabled':'');
-    chip.textContent=(m+1)+'월';
-    if(!future)chip.addEventListener('click',()=>{_reportMonth=m;renderReportMonthChips();loadMonthlyReportContent();});
-    wrap.appendChild(chip);
-  }
-  const activeChip=wrap.querySelector('.m-chip.active');
-  if(activeChip)activeChip.scrollIntoView({behavior:'auto',block:'nearest',inline:'center'});
+  renderMonthChipsGeneric('mr-month-chips',_reportYear,_reportMonth,m=>{_reportMonth=m;renderReportMonthChips();loadMonthlyReportContent();});
 }
 async function loadMonthlyReportContent(){
   const el=document.getElementById('mr-content');if(!el)return;
