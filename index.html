@@ -2899,30 +2899,25 @@ ${RHYTHM_CAT_GUIDE}
 // 원칙: 콘텐츠는 항상 "현재 상태가 속한 딱 한 달"에만 존재.
 //  - 완결(done/stopped): 종료월(drama/book/movie는 endDate, music은 startDate — 음악은 등록=감상 시점)에 딱 한 번만.
 //  - 진행중(watching): 오늘이 속한 달을 볼 때만 노출(화면이 비어 보이지 않게). 다른 달엔 절대 안 보임.
-// 콘텐츠는 등록 시점의 month_key(mk)에 저장되고 종료월과 다를 수 있으므로, 원본이 저장됐을 법한
-// 인접 달들을 넓게 훑되(최대 6개월 전까지) 최종 판정은 "종료월이 정확히 이 달인가" 하나로만 함.
+// 콘텐츠는 시작월(mk)에 저장되므로 대부분 당월 데이터만으로 충분함.
+// 예외는 "전월에 시작해 이번 달에 끝난" 이월 콘텐츠뿐 — 전월 데이터에서 그 케이스만 추려서 합침.
+function isContentEndedInMonth(c,targetMk){
+  const endMk=c.cat==='music'?(c.startDate||'').slice(0,7):(c.endDate||c.startDate||'').slice(0,7);
+  return endMk===targetMk;
+}
 function computeContentMonthlyList(y,mo){
   const targetMk=`${y}-${pad(mo+1)}`;
   const now=new Date();
   const isCurMonth=(y===now.getFullYear()&&mo===now.getMonth());
-  const seen=new Set();
-  const result=[];
-  for(let back=6;back>=0;back--){
-    const mk=monthKey(new Date(y,mo-back,1));
-    getContents(mk).forEach(c=>{
-      const key=c.cid||(c.title+c.startDate);
-      if(seen.has(key))return;
-      let belongs=false;
-      if(c.status==='done'||c.status==='stopped'){
-        const endMk=c.cat==='music'?(c.startDate||'').slice(0,7):(c.endDate||c.startDate||'').slice(0,7);
-        belongs=endMk===targetMk;
-      }else if(c.status==='watching'){
-        belongs=isCurMonth;
-      }
-      if(belongs){seen.add(key);result.push(c);}
-    });
-  }
-  return result;
+  const cur=getContents(targetMk);
+  const prevMk=monthKey(new Date(y,mo-1,1));
+  const carriedOver=getContents(prevMk).filter(c=>
+    (c.status==='done'||c.status==='stopped')&&isContentEndedInMonth(c,targetMk)
+  );
+  return cur.filter(c=>
+    (c.status==='done'||c.status==='stopped')&&isContentEndedInMonth(c,targetMk)
+    || (isCurMonth&&c.status==='watching')
+  ).concat(carriedOver);
 }
 function computeContentMonthlyByCat(y,mo){
   const list=computeContentMonthlyList(y,mo);
