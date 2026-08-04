@@ -2903,25 +2903,21 @@ ${RHYTHM_CAT_GUIDE}
 // 예외는 "전월에 시작해 이번 달에 끝난" 이월 콘텐츠뿐 — 전월 데이터에서 그 케이스만 추려서 합침.
 // 음악은 등록과 동시에 status='done'으로 저장되므로(confirmContent 참고), endDate는 항상 null.
 // 아래 계산에서 endDate||startDate로 자연스럽게 startDate(=감상월)를 종료월로 쓰게 됨 — 별도 분기 불필요.
+// 원칙: 콘텐츠 월별 모아보기는 "종료일 기준 취합"이 기본 규칙.
+//  - 완결(done/stopped): 종료월(drama/book/movie는 endDate, music은 등록 즉시 done 처리되어 endDate=null→startDate 사용)에 딱 한 번만.
+//  - 진행중(watching): 종료되기 전까지는 시작월부터 지금까지 매달 노출(오늘 날짜 여부와 무관 — 타임테이블처럼 흐름을 보여줌).
+//    종료되는 순간 이 규칙에서 빠지고 위 완결 규칙으로 넘어가 종료월 한 곳에만 남음.
 function isContentEndedInMonth(c,targetMk){
   return (c.endDate||c.startDate||'').slice(0,7)===targetMk;
 }
 function computeContentMonthlyList(y,mo){
   const targetMk=`${y}-${pad(mo+1)}`;
-  const now=new Date();
-  const isCurMonth=(y===now.getFullYear()&&mo===now.getMonth());
-  const cur=getContents(targetMk);
-  const prevMk=monthKey(new Date(y,mo-1,1));
   const belongsHere=c=>{
     if(c.status==='done'||c.status==='stopped')return isContentEndedInMonth(c,targetMk);
-    return isCurMonth&&c.status==='watching';
+    return c.status==='watching';
   };
-  // 이월 대상: (완결이면서 종료월이 당월) 또는 (당월 조회 중이고 아직 진행중 — 전월 시작해 여태 보고 있는 경우)
-  const carriedOver=getContents(prevMk).filter(c=>
-    (c.status==='done'||c.status==='stopped')&&isContentEndedInMonth(c,targetMk)
-    || (isCurMonth&&c.status==='watching')
-  );
-  return cur.filter(belongsHere).concat(carriedOver);
+  const prevMk=monthKey(new Date(y,mo-1,1));
+  return getContents(targetMk).filter(belongsHere).concat(getContents(prevMk).filter(belongsHere));
 }
 function computeContentMonthlyByCat(y,mo){
   const list=computeContentMonthlyList(y,mo);
