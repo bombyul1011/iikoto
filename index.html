@@ -2895,20 +2895,34 @@ ${RHYTHM_CAT_GUIDE}
   }catch(e){}
   return null;
 }
-// ── 콘텐츠 월별 모아보기 (별도 아카이브 시트, 월간리포트와 독립적으로 동작) ──
-// 기존 공용 함수 getContentsForReport(mk) 재사용 — 당월+전월(이월 포함) 판정 로직을 그대로 씀.
-// 당월(오늘이 속한 달)을 볼 때만 watching(진행중)도 노출 — 지금 보고 있는 중이니까.
-// 지난달을 볼 때는 done/stopped(완결 확정)만 남김 — 완결까지 봐야 '봤다'로 집계, 중복 집계 방지 목적.
-// 음악은 항상 시작월=완료월로 이미 필터링되어 들어오므로 그대로 통과.
+// ── 콘텐츠 월별 모아보기 (별도 아카이브 시트, 월간리포트와 독립적으로 동작. 타임테이블과는 무관 — 손대지 않음) ──
+// 원칙: 콘텐츠는 항상 "현재 상태가 속한 딱 한 달"에만 존재.
+//  - 완결(done/stopped): 종료월(drama/book/movie는 endDate, music은 startDate — 음악은 등록=감상 시점)에 딱 한 번만.
+//  - 진행중(watching): 오늘이 속한 달을 볼 때만 노출(화면이 비어 보이지 않게). 다른 달엔 절대 안 보임.
+// 콘텐츠는 등록 시점의 month_key(mk)에 저장되고 종료월과 다를 수 있으므로, 원본이 저장됐을 법한
+// 인접 달들을 넓게 훑되(최대 6개월 전까지) 최종 판정은 "종료월이 정확히 이 달인가" 하나로만 함.
 function computeContentMonthlyList(y,mo){
-  const mk=`${y}-${pad(mo+1)}`;
+  const targetMk=`${y}-${pad(mo+1)}`;
   const now=new Date();
   const isCurMonth=(y===now.getFullYear()&&mo===now.getMonth());
-  return getContentsForReport(mk).filter(c=>{
-    if(c.cat==='music')return true;
-    if(c.status==='done'||c.status==='stopped')return true;
-    return isCurMonth&&c.status==='watching';
-  });
+  const seen=new Set();
+  const result=[];
+  for(let back=6;back>=0;back--){
+    const mk=monthKey(new Date(y,mo-back,1));
+    getContents(mk).forEach(c=>{
+      const key=c.cid||(c.title+c.startDate);
+      if(seen.has(key))return;
+      let belongs=false;
+      if(c.status==='done'||c.status==='stopped'){
+        const endMk=c.cat==='music'?(c.startDate||'').slice(0,7):(c.endDate||c.startDate||'').slice(0,7);
+        belongs=endMk===targetMk;
+      }else if(c.status==='watching'){
+        belongs=isCurMonth;
+      }
+      if(belongs){seen.add(key);result.push(c);}
+    });
+  }
+  return result;
 }
 function computeContentMonthlyByCat(y,mo){
   const list=computeContentMonthlyList(y,mo);
@@ -8064,7 +8078,6 @@ function renderTimetable(){
   if(!rowsEl)return;
   const todayDay=new Date().getDate();
   const isSameMonth=mk===monthKey(new Date());
-  const readOnly=!isSameMonth;
   const daysInMonth=new Date(_calYear,_calMonth+1,0).getDate();
 
   // 헤더
@@ -8128,8 +8141,7 @@ function renderTimetable(){
       if(tIdx===0){
         const meta=CAT_ICON_META[cat];
         catEl.innerHTML=meta?`<span style="display:inline-flex;align-items:center;gap:4px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:4px;background:${getCatColor(cat)};flex-shrink:0;"><i class="ti ${meta.icon}" style="font-size:9px;color:#fff;" aria-hidden="true"></i></span><span>${CAT_LABELS[cat]}</span></span>`:CAT_LABELS[cat];
-        if(!readOnly)catEl.addEventListener('click',()=>openContentModal(cat));
-        else catEl.style.opacity='0.5';
+        catEl.addEventListener('click',()=>openContentModal(cat));
       }else{
         catEl.classList.add('tt-cat-sub');
       }
@@ -8169,16 +8181,14 @@ function renderTimetable(){
           }else{
             block.textContent=cat==='music'?(item.title||'').charAt(0):item.title;
             block.title=(item._carried?item.title+' (전월부터 이어짐)':item.title)+(item.status==='stopped'?' · 중단':'');
-            if(!readOnly&&!item._carried){
+            if(!item._carried){
               block.addEventListener('click',()=>openContentModal(cat,item,mk));
               block.addEventListener('contextmenu',e=>{e.preventDefault();openContentDiscuss(item.title,cat,item.stars||0,item.review||'');});
               block.style.cursor='pointer';
-            }else if(item._carried){
+            }else{
               block.addEventListener('click',()=>openContentModal(cat,item,prevMk));
               block.addEventListener('contextmenu',e=>{e.preventDefault();openContentDiscuss(item.title,cat,item.stars||0,item.review||'');});
               block.style.cursor='pointer';
-            }else{
-              block.style.cursor='default';
             }
           }
           inner.appendChild(block);d=endD+1;
