@@ -342,7 +342,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .memo-field-wrap{position:relative;flex:1;}
 .memo-field-wrap .memo-field{width:100%;}
 .memo-seed-toggle{position:absolute;right:5px;top:0;bottom:0;margin:auto;height:22px;width:22px;background:none;border:none;padding:0;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--tm);opacity:0.23;transition:opacity .15s,color .15s;}
-.memo-seed-toggle i{font-size:17px;line-height:0;position:relative;top:-4px;}
+.memo-seed-toggle i{font-size:17px;line-height:0;position:relative;top:-1px;}
 .memo-seed-toggle.on{opacity:1;color:rgba(120,155,160,0.95);}
 .send-btn-sm{width:32px;height:32px;border-radius:9px;}
 .seed-icon-btn{background:linear-gradient(120deg,rgba(185,215,140,0.75),rgba(210,230,165,0.65));border:1px solid rgba(145,185,80,0.45);box-shadow:0 2px 10px rgba(110,155,55,0.10);}
@@ -8739,11 +8739,17 @@ function renderMonthlyStatBar(){
   const dim=new Date(y,mo+1,0).getDate();
   let memos=0,todos=0,hc=0,ht=0,sleepMin=0,sleepCnt=0;
   const habits=getHabits();
+  const today=new Date();
+  // 습관 달성률(%)만 당월인 경우 "오늘까지"로 분모를 제한 — 아직 오지 않은 날을 미달성으로 세지 않기 위함.
+  // memos/todos/sleep은 누적 합계·평균이라 31일 기준이어도 왜곡 없음(안 온 날은 그냥 안 더해짐).
+  const isCurMonth=(y===today.getFullYear()&&mo===today.getMonth());
+  const habitLastDay=isCurMonth?today.getDate():dim;
   for(let d=1;d<=dim;d++){
     const dk=`${y}-${pad(mo+1)}-${pad(d)}`;
     memos+=getMemos(dk).length;todos+=getTodos(dk).filter(t=>t.done).length;
     const sl=getSleep(dk);
     if(sl.sleep&&sl.wake){const sv=sl.sleep.split(':').map(Number),wv=sl.wake.split(':').map(Number);let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;sleepMin+=m;sleepCnt++;}
+    if(d>habitLastDay)continue;
     const date=new Date(y,mo,d);const wk=weekKey(date);const dow=(date.getDay()+6)%7;
     const checks=getHabitChecks(wk);
     habits.forEach(h=>{ht++;if(checks[`${h.name}-${dow}`])hc++;});
