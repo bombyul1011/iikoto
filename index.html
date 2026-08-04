@@ -2916,7 +2916,11 @@ function computeContentMonthlyList(y,mo){
     if(c.status==='done'||c.status==='stopped')return isContentEndedInMonth(c,targetMk);
     return isCurMonth&&c.status==='watching';
   };
-  const carriedOver=getContents(prevMk).filter(c=>(c.status==='done'||c.status==='stopped')&&isContentEndedInMonth(c,targetMk));
+  // 이월 대상: (완결이면서 종료월이 당월) 또는 (당월 조회 중이고 아직 진행중 — 전월 시작해 여태 보고 있는 경우)
+  const carriedOver=getContents(prevMk).filter(c=>
+    (c.status==='done'||c.status==='stopped')&&isContentEndedInMonth(c,targetMk)
+    || (isCurMonth&&c.status==='watching')
+  );
   return cur.filter(belongsHere).concat(carriedOver);
 }
 function computeContentMonthlyByCat(y,mo){
