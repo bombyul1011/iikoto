@@ -1236,7 +1236,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div id="monthly-cal"></div>
       <div id="cal-detail"></div>
       <div id="monthly-stat-bar"></div>
-      <div class="slabel">콘텐츠 기록</div>
+      <div class="slabel-row">
+        <div class="slabel">콘텐츠 기록</div>
+        <button class="slabel-search-btn" onclick="openContentMonthlyReportSheet()" title="콘텐츠 모아보기"><i class="ti ti-movie" style="font-size:12px;" aria-hidden="true"></i></button>
+      </div>
       <div class="card s" style="padding:14px 10px;">
         <div class="tt-head-row" id="tt-head-row">
           <div class="tt-head-spacer"></div>
@@ -1467,6 +1470,19 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     </div>
   </div>
 </div>
+
+<!-- CONTENT MONTHLY REPORT SHEET (콘텐츠 전용 아카이브, 월간리포트와 독립 — 종료일 기준 집계) -->
+<div class="overlay" id="content-monthly-report-sheet" onclick="closeSheet('content-monthly-report-sheet',event)">
+  <div class="bsheet" style="max-height:85vh;overflow-y:auto;" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div style="padding:0 20px 24px;">
+      <div class="goal-section-title" style="margin-top:0;"><i class="ti ti-movie" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i> 콘텐츠 모아보기</div>
+      <div class="month-chips" id="cmr-month-chips" style="margin:10px 0 14px;"></div>
+      <div id="cmr-content"></div>
+    </div>
+  </div>
+</div>
+
 
 <!-- WEEKLY REVIEW SHEET -->
 <div class="overlay" id="weekly-review-sheet" onclick="closeSheet('weekly-review-sheet',event)">
@@ -2879,6 +2895,79 @@ ${RHYTHM_CAT_GUIDE}
   }catch(e){}
   return null;
 }
+// ── 콘텐츠 월별 모아보기 (별도 아카이브 시트, 월간리포트와 독립적으로 동작) ──
+// 기존 공용 함수 getContentsForReport(mk) 재사용 — 당월+전월(이월 포함) 판정 로직을 그대로 씀.
+// 여기서는 "완결 확정된 것"만 남기는 필터만 추가: done/stopped(음악은 등록=완료로 취급)만 포함,
+// watching(진행중, 아직 이월 표시로만 나온 것)은 제외 — 완결까지 봐야 '봤다'로 집계, 중복 집계 방지 목적.
+function computeContentMonthlyList(y,mo){
+  const mk=`${y}-${pad(mo+1)}`;
+  return getContentsForReport(mk).filter(c=>{
+    if(c.cat==='music')return true; // 음악은 항상 시작월=완료월로 이미 필터링되어 들어옴
+    return c.status==='done'||c.status==='stopped';
+  });
+}
+function computeContentMonthlyByCat(y,mo){
+  const list=computeContentMonthlyList(y,mo);
+  const byCat={drama:[],book:[],movie:[],music:[]};
+  list.forEach(c=>{if(byCat[c.cat])byCat[c.cat].push(c);});
+  return byCat;
+}
+let _cmrYear=null,_cmrMonth=null;
+function openContentMonthlyReportSheet(){
+  const now=new Date();
+  _cmrYear=now.getFullYear();_cmrMonth=now.getMonth();
+  renderCmrMonthChips();
+  loadContentMonthlyReportContent();
+  openSheet('content-monthly-report-sheet');
+  setTimeout(()=>{
+    const wrap=document.getElementById('cmr-month-chips');
+    const activeChip=wrap&&wrap.querySelector('.m-chip.active');
+    if(activeChip)activeChip.scrollIntoView({behavior:'auto',block:'nearest',inline:'center'});
+  },50);
+}
+function renderCmrMonthChips(){
+  const wrap=document.getElementById('cmr-month-chips');if(!wrap)return;
+  const now=new Date();
+  wrap.innerHTML='';
+  for(let m=0;m<12;m++){
+    const future=_cmrYear>now.getFullYear()||(_cmrYear===now.getFullYear()&&m>now.getMonth());
+    const chip=document.createElement('div');
+    chip.className='m-chip'+(m===_cmrMonth?' active':'')+(future?' disabled':'');
+    chip.textContent=(m+1)+'월';
+    if(!future)chip.addEventListener('click',()=>{_cmrMonth=m;renderCmrMonthChips();loadContentMonthlyReportContent();});
+    wrap.appendChild(chip);
+  }
+  const activeChip=wrap.querySelector('.m-chip.active');
+  if(activeChip)activeChip.scrollIntoView({behavior:'auto',block:'nearest',inline:'center'});
+}
+const CONTENT_CAT_LABEL={drama:'드라마',book:'책',movie:'영화',music:'음악'};
+function loadContentMonthlyReportContent(){
+  const el=document.getElementById('cmr-content');if(!el)return;
+  const byCat=computeContentMonthlyByCat(_cmrYear,_cmrMonth);
+  const cats=['drama','book','movie','music'];
+  const hasAny=cats.some(cat=>byCat[cat].length>0);
+  if(!hasAny){
+    el.innerHTML='<div style="text-align:center;color:var(--tm);padding:24px 0;">이 달엔 완료한 콘텐츠가 없어요</div>';
+    return;
+  }
+  el.innerHTML=cats.filter(cat=>byCat[cat].length>0).map(cat=>{
+    const meta=CAT_ICON_META[cat];
+    const items=byCat[cat].map(c=>{
+      const starsHtml=c.stars>0?`<span style="color:#e0b050;font-size:11px;margin-left:6px;">${'★'.repeat(c.stars)}</span>`:'';
+      const statusHtml=c.status==='stopped'?`<span style="color:var(--tm);font-size:11px;margin-left:6px;">중단</span>`:'';
+      const posterHtml=c.poster?`<img src="${c.poster}" style="width:36px;height:36px;border-radius:8px;object-fit:cover;flex-shrink:0;" />`:`<div style="width:36px;height:36px;border-radius:8px;background:${meta.color};flex-shrink:0;display:flex;align-items:center;justify-content:center;"><i class="ti ${meta.icon}" style="font-size:15px;color:#fff;" aria-hidden="true"></i></div>`;
+      return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;">
+        ${posterHtml}
+        <div style="flex:1;min-width:0;font-size:13px;color:var(--tp);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.title}${starsHtml}${statusHtml}</div>
+      </div>`;
+    }).join('');
+    return `<div class="mr-card" style="margin-bottom:10px;">
+      <div class="mr-sec-title"><i class="ti ${meta.icon}" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> ${CONTENT_CAT_LABEL[cat]}</div>
+      ${items}
+    </div>`;
+  }).join('');
+}
+
 // ── 주간목표 월간 결산 (별도 아카이브 시트, 월간리포트와 독립적으로 동작) ──
 // "월"의 소속 판정은 주(週)의 시작일(월요일) 기준 — 8/31~9/6 같은 월 경계 주는 월요일이 속한 달로 계산.
 // 진입점(주간목표 카드 상단 target-arrow 아이콘)은 항상 상시 노출됨 — + 버튼 완전 대체(Enter로 항목 추가는 그대로 가능).
