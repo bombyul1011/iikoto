@@ -4374,7 +4374,8 @@ async function syncSleepUp(dk){
 }
 async function syncMealsDown(dk){
   const rows=await supaFetch(`meals?date_key=eq.${dk}`);
-  if(!rows)return;
+  if(!rows)return; // 연결 실패(null) — 로컬 유지
+  if(S.get(S.key('meals_pending',dk)))return; // 업로드 대기중인 로컬 수정 있으면 덮어쓰지 않음 (memos와 동일 원칙)
   if(!rows.length)return;
   const r=rows[0];
   S.set(S.key('meals',dk),{breakfast:r.breakfast||'',lunch:r.lunch||'',dinner:r.dinner||'',snack:r.snack||'',breakfast_time:r.breakfast_time||'',lunch_time:r.lunch_time||'',dinner_time:r.dinner_time||'',snack_time:r.snack_time||''});
