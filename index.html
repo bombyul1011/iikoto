@@ -250,6 +250,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .m-chip.disabled{opacity:0.35;cursor:default;}
 .mr-card{border-radius:16px;background:var(--card);border:1px solid var(--card-b);padding:15px 15px 13px;margin-bottom:12px;}
 .mr-sec-title{font-size:11px;color:var(--tm);letter-spacing:.10em;text-transform:uppercase;margin-bottom:11px;}
+.sheet-loading-msg{text-align:center;color:var(--tm);padding:20px 0;}
 .mr-row2{display:flex;gap:8px;margin-bottom:4px;}
 .mr-stat{flex:1;border-radius:14px;background:var(--card);border:1px solid var(--card-b);padding:12px 12px;}
 .mr-stat .v{font-size:22px;font-weight:300;color:var(--tp);letter-spacing:-.5px;line-height:1;}
@@ -3228,7 +3229,7 @@ function openWeeklyReviewSheet(){
     content.innerHTML=cached;
     return;
   }
-  content.innerHTML='<div style="text-align:center;color:var(--tm);padding:20px 0;">한 주 요약 작성 중이에요... 🌿<br><span style="font-size:11.5px;opacity:0.7;">약 10-20초 소요돼요</span></div>';
+  content.innerHTML='<div class="sheet-loading-msg">한 주 요약 작성 중이에요... 🌿<br><span style="font-size:11.5px;opacity:0.7;">약 10-20초 소요돼요</span></div>';
   aiCacheGet(cacheKey).then(function(serverHtml){
     if(serverHtml){
       S.set(cacheKey,serverHtml);
@@ -3236,7 +3237,7 @@ function openWeeklyReviewSheet(){
       return;
     }
     if(!getClaudeKey()){
-      content.innerHTML='<div style="text-align:center;color:var(--tm);padding:20px 0;">아직 준비 중이에요 🌿<br><span style="font-size:11.5px;opacity:0.7;">다른 기기에서 먼저 열어보시면 여기서도 볼 수 있어요</span></div>';
+      content.innerHTML='<div class="sheet-loading-msg">아직 준비 중이에요 🌿<br><span style="font-size:11.5px;opacity:0.7;">다른 기기에서 먼저 열어보시면 여기서도 볼 수 있어요</span></div>';
       return;
     }
     makeWeeklySummaryCard().then(function(html){
@@ -3245,7 +3246,7 @@ function openWeeklyReviewSheet(){
         aiCacheSet(cacheKey,html,AI_CACHE_TTL.weeklyReport);
         content.innerHTML=html;
       } else {
-        content.innerHTML='<div style="text-align:center;color:var(--tm);padding:20px 0;">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:11.5px;opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
+        content.innerHTML='<div class="sheet-loading-msg">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:11.5px;opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
       }
     });
   });
@@ -5429,7 +5430,7 @@ function confirmCopyWholeTodo(){
 // ── 오후 파트: 오늘vs어제 진행바 + 목표대비 웨이브게이지 + 리듬 비교 통합 카드
 const AFTERNOON_TODO_GOAL=5,AFTERNOON_HABIT_GOAL=4,AFTERNOON_MORNING_GOAL=4;
 
-// 아침 루틴 (임시: 오후 파트에 배치해서 디자인 확인 중, 추후 아침 파트1로 이동 예정)
+// 아침 루틴
 const MORNING_ROUTINE_ITEMS=[
   {key:'bed',label:'침대 탈출',icon:'ti-sunset-2',colorRgb:'252,215,110'},
   {key:'water',label:'물 한잔',icon:'ti-bucket-droplet',colorRgb:'244,177,206'},
@@ -7592,11 +7593,11 @@ async function openChallengeReviewSheet(){
   const cacheKey='challenge_review_'+wk;
   const cached=S.get(cacheKey);
   if(cached){content.innerHTML=cached;return;}
-  content.innerHTML='<div style="text-align:center;color:var(--tm);padding:20px 0;">지난주 목표를 돌아보는 중이에요... 🌿<br><span style="font-size:11.5px;opacity:0.7;">약 10-20초 소요돼요</span></div>';
+  content.innerHTML='<div class="sheet-loading-msg">지난주 목표를 돌아보는 중이에요... 🌿<br><span style="font-size:11.5px;opacity:0.7;">약 10-20초 소요돼요</span></div>';
   const serverHtml=await aiCacheGet(cacheKey);
   if(serverHtml){S.set(cacheKey,serverHtml);content.innerHTML=serverHtml;return;}
   if(!getClaudeKey()){
-    content.innerHTML='<div style="text-align:center;color:var(--tm);padding:20px 0;">아직 준비 중이에요 🌿<br><span style="font-size:11.5px;opacity:0.7;">다른 기기에서 먼저 열어보시면 여기서도 볼 수 있어요</span></div>';
+    content.innerHTML='<div class="sheet-loading-msg">아직 준비 중이에요 🌿<br><span style="font-size:11.5px;opacity:0.7;">다른 기기에서 먼저 열어보시면 여기서도 볼 수 있어요</span></div>';
     return;
   }
   const html=await buildChallengeReviewHtml(wk);
@@ -7605,13 +7606,13 @@ async function openChallengeReviewSheet(){
     aiCacheSet(cacheKey,html,AI_CACHE_TTL.weeklyReport);
     content.innerHTML=html;
   }
-  else content.innerHTML='<div style="text-align:center;color:var(--tm);padding:20px 0;">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:11.5px;opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
+  else content.innerHTML='<div class="sheet-loading-msg">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:11.5px;opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
 }
 async function buildChallengeReviewHtml(wk){
   const items=getWChallenge(wk).filter(it=>it.text&&it.text.trim());
-  if(!items.length)return '<div style="text-align:center;color:var(--tm);padding:20px 0;">지난주에 지정한 목표가 없었어요</div>';
+  if(!items.length)return '<div class="sheet-loading-msg">지난주에 지정한 목표가 없었어요</div>';
   const key=getClaudeKey();
-  if(!key)return '<div style="text-align:center;color:var(--tm);padding:20px 0;">설정에서 Claude API 키를 입력하면 분석을 받을 수 있어요</div>';
+  if(!key)return '<div class="sheet-loading-msg">설정에서 Claude API 키를 입력하면 분석을 받을 수 있어요</div>';
 
   // 지난주(월~일) 7일치 메모를 요일별로 고르게 샘플링 — 일요일 리포트(makeWeeklySummaryCard)와 동일한 방식 재사용
   const evenSample=(arr,n)=>{
@@ -7675,11 +7676,11 @@ async function openNextWeekFeedbackSheet(){
   const cacheKey='nextweek_feedback_'+wk;
   const cached=S.get(cacheKey);
   if(cached){content.innerHTML=cached;return;}
-  content.innerHTML='<div style="text-align:center;color:var(--tm);padding:20px 0;">다음주 챌린지를 살펴보는 중이에요... 🌿<br><span style="font-size:11.5px;opacity:0.7;">약 10-20초 소요돼요</span></div>';
+  content.innerHTML='<div class="sheet-loading-msg">다음주 챌린지를 살펴보는 중이에요... 🌿<br><span style="font-size:11.5px;opacity:0.7;">약 10-20초 소요돼요</span></div>';
   const serverHtml=await aiCacheGet(cacheKey);
   if(serverHtml){S.set(cacheKey,serverHtml);content.innerHTML=serverHtml;return;}
   if(!getClaudeKey()){
-    content.innerHTML='<div style="text-align:center;color:var(--tm);padding:20px 0;">아직 준비 중이에요 🌿<br><span style="font-size:11.5px;opacity:0.7;">다른 기기에서 먼저 열어보시면 여기서도 볼 수 있어요</span></div>';
+    content.innerHTML='<div class="sheet-loading-msg">아직 준비 중이에요 🌿<br><span style="font-size:11.5px;opacity:0.7;">다른 기기에서 먼저 열어보시면 여기서도 볼 수 있어요</span></div>';
     return;
   }
   const html=await buildNextWeekFeedbackHtml(wk);
@@ -7688,7 +7689,7 @@ async function openNextWeekFeedbackSheet(){
     aiCacheSet(cacheKey,html,AI_CACHE_TTL.weeklyReport);
     content.innerHTML=html;
   }
-  else content.innerHTML='<div style="text-align:center;color:var(--tm);padding:20px 0;">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:11.5px;opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
+  else content.innerHTML='<div class="sheet-loading-msg">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:11.5px;opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
 }
 // 주간 미니통계의 메모 아이콘(일요일 19시 이후 홀로그램 활성화)을 누르면 열리는 시트.
 // 그 주(월~일) 메모를 모두 모아 AI에 넘겨, 이번 주 메모에 드러난 화두/톤을 짧게 정리해줌.
@@ -7702,11 +7703,11 @@ async function openWeeklyMemoReport(){
   const cacheKey='weekly_memo_report_'+wk;
   const cached=S.get(cacheKey);
   if(cached){content.innerHTML=cached;return;}
-  content.innerHTML='<div style="text-align:center;color:var(--tm);padding:20px 0;">이번 주 메모를 살펴보는 중이에요... 🌿<br><span style="font-size:11.5px;opacity:0.7;">약 10-20초 소요돼요</span></div>';
+  content.innerHTML='<div class="sheet-loading-msg">이번 주 메모를 살펴보는 중이에요... 🌿<br><span style="font-size:11.5px;opacity:0.7;">약 10-20초 소요돼요</span></div>';
   const serverHtml=await aiCacheGet(cacheKey);
   if(serverHtml){S.set(cacheKey,serverHtml);content.innerHTML=serverHtml;return;}
   if(!getClaudeKey()){
-    content.innerHTML='<div style="text-align:center;color:var(--tm);padding:20px 0;">아직 준비 중이에요 🌿<br><span style="font-size:11.5px;opacity:0.7;">다른 기기에서 먼저 열어보시면 여기서도 볼 수 있어요</span></div>';
+    content.innerHTML='<div class="sheet-loading-msg">아직 준비 중이에요 🌿<br><span style="font-size:11.5px;opacity:0.7;">다른 기기에서 먼저 열어보시면 여기서도 볼 수 있어요</span></div>';
     return;
   }
   const html=await buildWeeklyMemoReportHtml(wk);
@@ -7715,7 +7716,7 @@ async function openWeeklyMemoReport(){
     aiCacheSet(cacheKey,html,AI_CACHE_TTL.weeklyReport);
     content.innerHTML=html;
   }
-  else content.innerHTML='<div style="text-align:center;color:var(--tm);padding:20px 0;">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:11.5px;opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
+  else content.innerHTML='<div class="sheet-loading-msg">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:11.5px;opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
 }
 async function buildWeeklyMemoReportHtml(wk){
   const wkStart=new Date(wk.replace('week:',''));
@@ -7726,7 +7727,7 @@ async function buildWeeklyMemoReportHtml(wk){
     const dk=dateKey(d);
     getMemos(dk).forEach(m=>{if(m.text&&m.text.trim())lines.push(`${m.type==='seed'?'[씨앗] ':''}[${dk} ${m.time||''}] ${m.text.trim()}`);});
   }
-  if(!lines.length)return '<div style="text-align:center;color:var(--tm);padding:20px 0;">이번 주 남긴 메모가 없어요</div>';
+  if(!lines.length)return '<div class="sheet-loading-msg">이번 주 남긴 메모가 없어요</div>';
   if(!key)return null;
   const dataContext=lines.join('\n');
   const sys=`당신은 사용자의 한 주 메모(일기 형식의 짧은 기록들)를 읽고, 지난 한 주에 어떤 화두나 감정 흐름이 있었는지
@@ -7757,9 +7758,9 @@ async function buildWeeklyMemoReportHtml(wk){
 }
 async function buildNextWeekFeedbackHtml(wk){
   const items=getWChallenge(wk).filter(it=>it.text&&it.text.trim());
-  if(!items.length)return '<div style="text-align:center;color:var(--tm);padding:20px 0;">다음주에 지정한 목표가 없어요</div>';
+  if(!items.length)return '<div class="sheet-loading-msg">다음주에 지정한 목표가 없어요</div>';
   const key=getClaudeKey();
-  if(!key)return '<div style="text-align:center;color:var(--tm);padding:20px 0;">설정에서 Claude API 키를 입력하면 분석을 받을 수 있어요</div>';
+  if(!key)return '<div class="sheet-loading-msg">설정에서 Claude API 키를 입력하면 분석을 받을 수 있어요</div>';
 
   // 최근 8주간의 챌린지 이력(이번에 준비 중인 주 제외) — 텍스트+체크일수만 간단히, 어느 주인지는 굳이 안 밝힘
   const historyLines=[];
@@ -9441,25 +9442,27 @@ function saveOneMealDay(dk){
     }else{
       m[k+'_time']=tEl?tEl.value:'';
     }
-    // 시간 입력 후 화면(✕ 지우기 버튼, 빈값 스타일)이 즉시 반영되도록 갱신 — 이전엔 저장만 하고
-    // 화면을 다시 그리지 않아, 재진입 전까지 시간을 입력해도 표시가 따라오지 않는 문제가 있었음.
-    if(tEl){
-      tEl.classList.toggle('mt-empty',!tEl.value);
-      const group=tEl.parentElement;
-      let clearBtn=group?group.querySelector(`span[onclick^="clearMealTime('${dk}','${k}')"]`):null;
-      if(tEl.value&&!clearBtn&&group){
-        clearBtn=document.createElement('span');
-        clearBtn.className='meal-time-clear';
-        clearBtn.title='시간 지우기';
-        clearBtn.textContent='✕';
-        clearBtn.onclick=()=>clearMealTime(dk,k);
-        group.appendChild(clearBtn);
-      }else if(!tEl.value&&clearBtn){
-        clearBtn.remove();
-      }
-    }
   });
   saveMealsData(dk,m);
+  // 시간 입력 직후 ✕ 지우기 버튼과 빈값 스타일이 재진입 없이 바로 반영되도록,
+  // meal-time-group만 다시 그림(이전에 onclick 비교로 기존 버튼을 찾던 방식은
+  // 매번 못 찾아 새로 추가되며 ✕가 중첩되는 버그가 있었음 — 통째로 재렌더링으로 교체).
+  MEAL_KEYS.forEach(k=>{
+    const tEl=document.getElementById(`wm-${dk}-${k}-time`);
+    if(!tEl)return;
+    const group=tEl.parentElement;if(!group)return;
+    const tVal=m[k+'_time']||'';
+    tEl.classList.toggle('mt-empty',!tVal);
+    group.querySelectorAll('.meal-time-clear').forEach(b=>b.remove());
+    if(tVal){
+      const clearBtn=document.createElement('span');
+      clearBtn.className='meal-time-clear';
+      clearBtn.title='시간 지우기';
+      clearBtn.textContent='✕';
+      clearBtn.onclick=()=>clearMealTime(dk,k);
+      group.appendChild(clearBtn);
+    }
+  });
 }
 function openWeekMealSheet(){
   cancelWishPlacing();
