@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260805-7-topbar-tabs';
+const CACHE = 'iikoto-v20260805-8-home-tab';
 const ASSETS = [
   './',
   './index.html'
