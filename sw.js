@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260805-10-icon-size';
+const CACHE = 'iikoto-v20260805-11-meal-sync-fix';
 const ASSETS = [
   './',
   './index.html'
