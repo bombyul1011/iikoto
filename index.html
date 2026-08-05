@@ -2121,8 +2121,11 @@ function autoCloseUnfinishedRhythmBlocks(todayDk,sleepTime){
       }else{
         // 전날에 시작해 자정을 넘겨 오늘 새벽 취침시각까지 이어졌을 수 있음(예: 23:50 시작→익일 00:50 종료).
         // yesterdayDk 블록이 아직 미완료로 남아있다는 것 자체가 "오늘 새벽에 잠들었다"는 뜻이므로
-        // sleepMin은 항상 자정을 넘긴 값(1440분 이상, 새벽보정 표기)이라고 보고 그 직전 시각으로 정확히 마감.
-        const closeMin=sleepMin-1;
+        // sleepMin은 항상 자정을 넘긴 값(1440분 이상, 새벽보정 표기)이라고 보고 그 직전 시각을 계산.
+        // 단, 저장 형식은 24시 이상 확장 표기가 아니라 "실제 시:분"(예: 00:49)이어야 함 —
+        // computeRhythmSegsForDay의 렌더러가 자정 넘김을 "end < start"로 판별하는 방식이라
+        // 24:xx처럼 큰 값을 넣으면 오히려 그 판별 조건에서 벗어나 블록이 아예 안 그려지는 문제가 있었음.
+        const closeMin=(sleepMin-1)%1440;
         b.end=pad(Math.floor(closeMin/60))+':'+pad(closeMin%60);
       }
       changed=true;
