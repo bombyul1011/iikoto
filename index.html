@@ -8511,6 +8511,11 @@ async function searchITunes(q,el){
     moreBtn.style.cursor='pointer';
     moreBtn.style.color='var(--acc)';
     moreBtn.textContent='찾는 곡이 없나요? 해외 카탈로그도 찾아보기';
+    // mousedown에서 blur를 막아야 함 — 클릭 시 입력창(#cm-title)이 blur되면서
+    // onblur의 200ms 타이머(hideApiResults)가 먼저 발동해 US 재검색 결과가 채워지기 전에
+    // 결과창 자체가 숨겨져버리는 문제가 있었음(버튼 클릭 = 입력창 포커스 이탈).
+    moreBtn.addEventListener('mousedown',(e)=>e.preventDefault());
+    moreBtn.addEventListener('touchstart',(e)=>e.preventDefault());
     moreBtn.addEventListener('click',()=>_searchITunesRetryUS(q,el));
     el.appendChild(moreBtn);
   }else{
