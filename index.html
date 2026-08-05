@@ -2119,7 +2119,11 @@ function autoCloseUnfinishedRhythmBlocks(todayDk,sleepTime){
         const closeMin=(sleepMin-1)%1440;
         b.end=pad(Math.floor(closeMin/60))+':'+pad(closeMin%60);
       }else{
-        b.end='23:59'; // 전날에 걸친 미완료 블록은 그날 23:59로 마감
+        // 전날에 시작해 자정을 넘겨 오늘 새벽 취침시각까지 이어졌을 수 있음(예: 23:50 시작→익일 00:50 종료).
+        // yesterdayDk 블록이 아직 미완료로 남아있다는 것 자체가 "오늘 새벽에 잠들었다"는 뜻이므로
+        // sleepMin은 항상 자정을 넘긴 값(1440분 이상, 새벽보정 표기)이라고 보고 그 직전 시각으로 정확히 마감.
+        const closeMin=sleepMin-1;
+        b.end=pad(Math.floor(closeMin/60))+':'+pad(closeMin%60);
       }
       changed=true;
     });
@@ -8469,16 +8473,15 @@ async function apiSearch(q){
     else await searchTMDB(q,cat,resultsEl);
   }catch(e){resultsEl.innerHTML='<div class="api-loading">검색 실패 — 직접 입력해주세요</div>';}
 }
-// country 하나로 iTunes 검색 1회 시도. resolve(true)=결과 있음, resolve(false)=결과 없음/실패.
-function _searchITunesOnce(q,el,country){
+function searchITunes(q,el){
   return new Promise((resolve)=>{
-    const cbName='_itunesCb'+Date.now()+Math.floor(Math.random()*1000);
+    const cbName='_itunesCb'+Date.now();
     const cleanup=()=>{delete window[cbName];const s=document.getElementById(cbName);if(s)s.remove();};
-    const timer=setTimeout(()=>{cleanup();resolve(false);},6000);
+    const timer=setTimeout(()=>{cleanup();el.innerHTML='<div class="api-loading">검색 실패 — 직접 입력해주세요</div>';resolve();},6000);
     window[cbName]=function(data){
       clearTimeout(timer);cleanup();
       const results=(data.results||[]).slice(0,6);
-      if(!results.length){resolve(false);return;}
+      if(!results.length){el.innerHTML='<div class="api-loading">결과 없음</div>';resolve();return;}
       el.innerHTML='';
       results.forEach(item=>{
         const title=item.trackName||'';
@@ -8490,43 +8493,14 @@ function _searchITunesOnce(q,el,country){
         div.innerHTML+=`<div class="api-result-info"><div class="api-result-title">${title}</div><div class="api-result-sub">${artist}${date?' · '+date:''}</div></div>`;
         div.addEventListener('click',()=>selectApiResult(title,poster,artist,date,item.trackViewUrl||null));el.appendChild(div);
       });
-      resolve(true);
+      resolve();
     };
     const script=document.createElement('script');
     script.id=cbName;
-    script.src=`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=song&limit=6&country=${country}&callback=${cbName}`;
-    script.onerror=()=>{clearTimeout(timer);cleanup();resolve(false);};
+    script.src=`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=song&limit=6&country=KR&callback=${cbName}`;
+    script.onerror=()=>{clearTimeout(timer);cleanup();el.innerHTML='<div class="api-loading">검색 실패 — 직접 입력해주세요</div>';resolve();};
     document.body.appendChild(script);
   });
-}
-// 한국 스토어로 검색 — 결과가 있어도(원하는 곡이 없을 수 있어) 목록 끝에 "해외 카탈로그도 찾아보기" 버튼을 항상 남겨둠.
-// 자동으로 US 재시도하지 않는 이유: 검색어가 느슨해서 KR에도 결과가 몇 개는 뜨는 경우가 많아,
-// "결과 있음=원하는 곡 찾음"으로 자동 판단하면 정작 필요한 해외 재검색으로 못 넘어가는 문제가 있었음.
-async function searchITunes(q,el){
-  el.innerHTML='<div class="api-loading">검색 중...</div>';
-  const found=await _searchITunesOnce(q,el,'KR');
-  if(found){
-    const moreBtn=document.createElement('div');
-    moreBtn.className='api-loading';
-    moreBtn.style.cursor='pointer';
-    moreBtn.style.color='var(--acc)';
-    moreBtn.textContent='찾는 곡이 없나요? 해외 카탈로그도 찾아보기';
-    moreBtn.addEventListener('click',()=>_searchITunesRetryUS(q,el));
-    el.appendChild(moreBtn);
-  }else{
-    await _searchITunesRetryUS(q,el);
-  }
-}
-// US 재검색 도중엔 입력창 blur로 인한 hideApiResults()가 결과창을 숨기지 못하게 막는 플래그.
-// (버튼 클릭이 입력창 포커스를 잃게 만들어 200ms 후 자동으로 결과창이 닫히던 문제 대응 —
-//  이벤트 타이밍을 막는 대신, hideApiResults 쪽에서 이 플래그만 확인하도록 최소한으로 처리)
-let _itunesRetryInProgress=false;
-async function _searchITunesRetryUS(q,el){
-  _itunesRetryInProgress=true;
-  el.innerHTML='<div class="api-loading">검색 중... (해외 카탈로그 확인)</div>';
-  const found=await _searchITunesOnce(q,el,'US');
-  if(!found)el.innerHTML='<div class="api-loading">결과 없음 — 직접 입력해주세요</div>';
-  _itunesRetryInProgress=false;
 }
 async function searchTMDB(q,cat,el){
   const type=cat==='movie'?'movie':'tv';
@@ -8567,7 +8541,7 @@ function selectApiResult(title,poster,sub1,sub2,musicUrl){
     else preview.style.display='none';
   }
 }
-function hideApiResults(){if(_itunesRetryInProgress)return;const el=document.getElementById('api-results');if(el)el.style.display='none';}
+function hideApiResults(){const el=document.getElementById('api-results');if(el)el.style.display='none';}
 
 // ── HABIT MONTHLY
 function renderHabitMonthly(){
