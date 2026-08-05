@@ -207,7 +207,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .meal-time-group{display:flex;align-items:center;gap:1px;flex-shrink:0;}
 .meal-time-clear{cursor:pointer;color:var(--tm);font-size:12px;padding:0 3px 0 0;flex-shrink:0;}
 .meal-cat{width:38px;flex-shrink:0;font-size:13px;color:var(--tm);margin-right:6px;}
-.meal-time-inp{width:52px;flex-shrink:0;background:none;border:none;outline:none;font-family:'DM Sans',sans-serif;font-size:11.5px;color:var(--ts);padding:5px 2px 4px 6px;text-align:right;font-variant-numeric:tabular-nums;}
+.meal-time-inp{width:52px;flex-shrink:0;background:none;border:none;outline:none;font-family:'DM Sans',sans-serif;font-size:12px;color:var(--ts);padding:5px 2px 4px 6px;text-align:right;font-variant-numeric:tabular-nums;}
 .cm-star-picker{display:flex;gap:3px;flex:1;}
 @keyframes discSpin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
 .playlist-disc-spin{display:inline-block;animation:discSpin 3s linear infinite;}
@@ -229,7 +229,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .meal-time-tag{font-size:10.5px;color:rgba(95,140,75,0.85);font-weight:600;flex-shrink:0;font-variant-numeric:tabular-nums;}
 .meal-inp{flex:1;background:none;border:none;border-bottom:1px dashed rgba(195,175,168,0.38);outline:none;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--tp);padding:5px 2px 4px;}
 .week-meal-day{margin-bottom:14px;}
-.week-meal-day-label{font-size:11.5px;font-weight:700;color:var(--ts);margin-bottom:4px;}
+.week-meal-day-label{font-size:12px;font-weight:700;color:var(--ts);margin-bottom:4px;}
 #daily-meal-card{background:rgba(205,222,180,0.30);border-color:rgba(185,208,155,0.42);}
 #daily-meal-card .cal-detail-row{border-bottom-color:rgba(170,198,140,0.25);}
 #daily-meal-card .cal-detail-time{color:rgba(110,148,88,0.80);font-weight:600;}
@@ -921,15 +921,15 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 /* ── 주간탭: 이번주 해빗 (도트 매트릭스, 읽기전용) ── */
 .habit-week-box{background:var(--sleep-b);border:1px solid var(--card-b);border-radius:14px;padding:10px 14px 8px;}
 .hw-daylabels{display:flex;padding-left:58px;padding-right:26px;margin-bottom:5px;}
-.hw-daylabels span{flex:1;text-align:center;font-size:8.5px;color:var(--tm);}
+.hw-daylabels span{flex:1;text-align:center;font-size:10px;color:var(--tm);}
 .hw-row{display:flex;align-items:center;gap:0;padding:4px 0;}
 .hw-row+.hw-row{border-top:1px solid rgba(0,0,0,0.04);}
-.hw-name{width:58px;flex-shrink:0;font-size:10px;color:var(--ts);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:5px;}
+.hw-name{width:58px;flex-shrink:0;font-size:11.5px;color:var(--ts);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:5px;}
 .hw-name-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
 .hw-dots{flex:1;display:flex;}
 .hw-dot-wrap{flex:1;display:flex;justify-content:center;}
 .hw-dot{width:9px;height:9px;border-radius:50%;border-style:solid;box-sizing:border-box;}
-.hw-streak{width:26px;flex-shrink:0;text-align:right;font-size:9px;color:var(--tm);font-weight:600;}
+.hw-streak{width:26px;flex-shrink:0;text-align:right;font-size:10.5px;color:var(--tm);font-weight:600;}
 
 /* ── 데일리 리듬 트랙 (블록 모델) ── */
 .rhythm-track-datelabel{font-size:12px;font-weight:700;color:var(--tp);margin-bottom:14px;display:flex;justify-content:space-between;align-items:baseline;}
@@ -1188,7 +1188,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       </div>
       <div class="slabel">리듬 모아보기</div>
       <div class="card" id="weekly-rhythm-bars"></div>
-      <div class="slabel">이번주 해빗</div>
+      <div class="slabel" style="margin-top:20px;">이번주 해빗</div>
       <div class="habit-week-box" id="weekly-habit-box"></div>
     </div>
 
@@ -1244,7 +1244,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div class="sheet-handle"></div>
     <div style="padding:0 20px 20px;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
-        <div class="goal-section-title" style="margin:0;flex:1;justify-content:center;" onclick="saveWeekMealSheet()"><i class="ti ti-tools-kitchen-3" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i> 주간 식사 계획</div>
+        <div class="goal-section-title" style="margin:0;background:rgba(190,230,205,0.30);color:rgba(85,135,100,0.90);border:1px solid rgba(150,190,165,0.45);box-shadow:none;" onclick="saveWeekMealSheet()"><i class="ti ti-tools-kitchen-3" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i> 주간 식사 계획</div>
         <button class="wish-round-btn" onclick="toggleMealWishlist()" title="먹고싶은 메뉴">
           <i class="ti ti-chef-hat" style="font-size:16px;" aria-hidden="true"></i>
         </button>

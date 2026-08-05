@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260805-3-meal-sheet-seed';
+const CACHE = 'iikoto-v20260805-4-weekly-tab';
 const ASSETS = [
   './',
   './index.html'
