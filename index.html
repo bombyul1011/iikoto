@@ -8469,15 +8469,16 @@ async function apiSearch(q){
     else await searchTMDB(q,cat,resultsEl);
   }catch(e){resultsEl.innerHTML='<div class="api-loading">검색 실패 — 직접 입력해주세요</div>';}
 }
-function searchITunes(q,el){
+// country 하나로 iTunes 검색 1회 시도. resolve(true)=결과 있음, resolve(false)=결과 없음/실패.
+function _searchITunesOnce(q,el,country){
   return new Promise((resolve)=>{
-    const cbName='_itunesCb'+Date.now();
+    const cbName='_itunesCb'+Date.now()+Math.floor(Math.random()*1000);
     const cleanup=()=>{delete window[cbName];const s=document.getElementById(cbName);if(s)s.remove();};
-    const timer=setTimeout(()=>{cleanup();el.innerHTML='<div class="api-loading">검색 실패 — 직접 입력해주세요</div>';resolve();},6000);
+    const timer=setTimeout(()=>{cleanup();resolve(false);},6000);
     window[cbName]=function(data){
       clearTimeout(timer);cleanup();
       const results=(data.results||[]).slice(0,6);
-      if(!results.length){el.innerHTML='<div class="api-loading">결과 없음</div>';resolve();return;}
+      if(!results.length){resolve(false);return;}
       el.innerHTML='';
       results.forEach(item=>{
         const title=item.trackName||'';
@@ -8489,14 +8490,24 @@ function searchITunes(q,el){
         div.innerHTML+=`<div class="api-result-info"><div class="api-result-title">${title}</div><div class="api-result-sub">${artist}${date?' · '+date:''}</div></div>`;
         div.addEventListener('click',()=>selectApiResult(title,poster,artist,date,item.trackViewUrl||null));el.appendChild(div);
       });
-      resolve();
+      resolve(true);
     };
     const script=document.createElement('script');
     script.id=cbName;
-    script.src=`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=song&limit=6&country=KR&callback=${cbName}`;
-    script.onerror=()=>{clearTimeout(timer);cleanup();el.innerHTML='<div class="api-loading">검색 실패 — 직접 입력해주세요</div>';resolve();};
+    script.src=`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=song&limit=6&country=${country}&callback=${cbName}`;
+    script.onerror=()=>{clearTimeout(timer);cleanup();resolve(false);};
     document.body.appendChild(script);
   });
+}
+// 한국 스토어에서 먼저 찾고, 결과가 없으면 미국 스토어로 재시도(한국 카탈로그에 없는 곡 대응).
+async function searchITunes(q,el){
+  el.innerHTML='<div class="api-loading">검색 중...</div>';
+  const foundKR=await _searchITunesOnce(q,el,'KR');
+  if(foundKR)return;
+  el.innerHTML='<div class="api-loading">검색 중... (해외 카탈로그 확인)</div>';
+  const foundUS=await _searchITunesOnce(q,el,'US');
+  if(foundUS)return;
+  el.innerHTML='<div class="api-loading">결과 없음 — 직접 입력해주세요</div>';
 }
 async function searchTMDB(q,cat,el){
   const type=cat==='movie'?'movie':'tv';
