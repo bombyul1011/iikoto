@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260802-4-thu-week-rule';
+const CACHE = 'iikoto-v20260805-1-font-size';
 const ASSETS = [
   './',
   './index.html'
