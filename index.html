@@ -8499,15 +8499,28 @@ function _searchITunesOnce(q,el,country){
     document.body.appendChild(script);
   });
 }
-// 한국 스토어에서 먼저 찾고, 결과가 없으면 미국 스토어로 재시도(한국 카탈로그에 없는 곡 대응).
+// 한국 스토어로 검색 — 결과가 있어도(원하는 곡이 없을 수 있어) 목록 끝에 "해외 카탈로그도 찾아보기" 버튼을 항상 남겨둠.
+// 자동으로 US 재시도하지 않는 이유: 검색어가 느슨해서 KR에도 결과가 몇 개는 뜨는 경우가 많아,
+// "결과 있음=원하는 곡 찾음"으로 자동 판단하면 정작 필요한 해외 재검색으로 못 넘어가는 문제가 있었음.
 async function searchITunes(q,el){
   el.innerHTML='<div class="api-loading">검색 중...</div>';
-  const foundKR=await _searchITunesOnce(q,el,'KR');
-  if(foundKR)return;
+  const found=await _searchITunesOnce(q,el,'KR');
+  if(found){
+    const moreBtn=document.createElement('div');
+    moreBtn.className='api-loading';
+    moreBtn.style.cursor='pointer';
+    moreBtn.style.color='var(--acc)';
+    moreBtn.textContent='찾는 곡이 없나요? 해외 카탈로그도 찾아보기';
+    moreBtn.addEventListener('click',()=>_searchITunesRetryUS(q,el));
+    el.appendChild(moreBtn);
+  }else{
+    await _searchITunesRetryUS(q,el);
+  }
+}
+async function _searchITunesRetryUS(q,el){
   el.innerHTML='<div class="api-loading">검색 중... (해외 카탈로그 확인)</div>';
-  const foundUS=await _searchITunesOnce(q,el,'US');
-  if(foundUS)return;
-  el.innerHTML='<div class="api-loading">결과 없음 — 직접 입력해주세요</div>';
+  const found=await _searchITunesOnce(q,el,'US');
+  if(!found)el.innerHTML='<div class="api-loading">결과 없음 — 직접 입력해주세요</div>';
 }
 async function searchTMDB(q,cat,el){
   const type=cat==='movie'?'movie':'tv';
