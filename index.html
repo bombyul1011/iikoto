@@ -5462,11 +5462,10 @@ const MORNING_ROUTINE_ITEMS=[
 // 확정되면 오전 파트로 옮기고 이 배열은 제거 예정.
 const MORNING_ROUTINE_ITEMS_TEST6=[
   {key:'t_wake',label:'기상',icon:'ti-sunset-2',colorRgb:'252,215,110'},
-  {key:'t_wash',label:'세안',icon:'ti-droplet',colorRgb:'168,212,232'},
-  {key:'t_tea',label:'티타임',icon:'ti-cup',colorRgb:'244,177,206'},
+  {key:'t_tea',label:'티타임',icon:'ti-mug',colorRgb:'244,177,206'},
   {key:'t_audiobook',label:'오디오북',icon:'ti-radio',colorRgb:'216,168,205'},
   {key:'t_weight',label:'체중',icon:'ti-scale-outline',colorRgb:'150,205,225'},
-  {key:'t_pill',label:'영양제',icon:'ti-clipboard-heart',colorRgb:'205,215,145'}
+  {key:'t_pill',label:'영양제',icon:'ti-pill',colorRgb:'205,215,145'}
 ];
 function getMorningRoutineChecks(dk){return S.get('mroutine_'+dk)||{};}
 function toggleMorningRoutineCheck(key){
@@ -5618,11 +5617,32 @@ function makeTestMorningRoutine6Card(){
   });
 
   card.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
-    <span style="font-size:12px;color:var(--tm);">[테스트] 오전루틴 6개안</span>
+    <span style="font-size:12px;color:var(--tm);">[테스트] 오전루틴 5개안</span>
     <span style="font-size:11.5px;color:var(--tm);">${doneCount}/${total}</span>
   </div>
-  <div style="position:relative;">${svg}<div style="position:absolute;top:0;left:0;width:100%;height:${cy+2}px;">${iconsHtml}</div></div>`;
+  <div style="position:relative;">${svg}<div style="position:absolute;top:0;left:0;width:100%;height:${cy+2}px;">${iconsHtml}</div></div>
+  ${_buildTestMorningRoutineStatGrid(items,checks,doneCount,total)}`;
   return card;
+}
+// 하단 개별 항목 달성 그래프(5개) + 남는 한 칸에 총 합산 달성률 막대.
+// 실제 저장 기록이 없는 테스트라 "이번 달 %" 대신 이 세션 동안의 체크 여부(0/100%)만 임시로 보여줌 — 간격/배치 확인용.
+function _buildTestMorningRoutineStatGrid(items,checks,doneCount,total){
+  let html='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;margin-top:14px;">';
+  items.forEach(it=>{
+    const pct=checks[it.key]?100:0;
+    html+=`<div style="display:flex;align-items:center;gap:8px;">
+      <i class="ti ${it.icon}" style="font-size:14px;color:rgb(${it.colorRgb});flex-shrink:0;" aria-hidden="true"></i>
+      <div style="flex:1;height:5px;border-radius:3px;background:rgba(200,176,168,0.15);overflow:hidden;"><div style="width:${pct}%;height:100%;background:rgb(${it.colorRgb});"></div></div>
+    </div>`;
+  });
+  // 남는 한 칸: 총 합산 달성률 — 색상은 홈탭 리듬배너(.report-banner.rhythm-soft)의 무지개 그라디언트를 그대로 가져옴
+  const totalPct=total>0?Math.round(doneCount/total*100):0;
+  html+=`<div style="display:flex;align-items:center;gap:8px;">
+    <i class="ti ti-chart-donut" style="font-size:14px;color:var(--tm);flex-shrink:0;" aria-hidden="true"></i>
+    <div style="flex:1;height:5px;border-radius:3px;background:rgba(200,176,168,0.15);overflow:hidden;"><div style="width:${totalPct}%;height:100%;background:linear-gradient(90deg,rgba(248,192,160,0.95) 0%,rgba(252,215,110,0.95) 25%,rgba(150,205,225,0.95) 50%,rgba(190,160,230,0.95) 75%,rgba(244,177,206,0.95) 100%);"></div></div>
+  </div>`;
+  html+='</div>';
+  return html;
 }
 function toggleTestMorningRoutineCheck6(key){
   if(_testMorningChecks6[key])delete _testMorningChecks6[key];
