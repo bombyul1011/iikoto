@@ -183,7 +183,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .sleep-btn i{font-size:16px;color:var(--tm);}
 
 /* ── TODO ── */
-.todo-item{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--div);font-size:13px;color:var(--tp);position:relative;overflow:hidden;user-select:none;}
+.todo-item{display:flex;align-items:center;gap:9px;padding:5px 0;border-bottom:1px solid var(--div);font-size:13px;color:var(--tp);position:relative;overflow:hidden;user-select:none;}
 .todo-item:last-of-type{border-bottom:none;}
 .todo-item.reorder-active{z-index:5;background:var(--card);box-shadow:0 2px 8px rgba(0,0,0,0.12);border-radius:8px;}
 .todo-item.reorder-shift{transition:transform .12s ease;}
@@ -459,8 +459,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .modal-actions{display:flex;gap:8px;}
 .msr-item{padding:9px 4px;border-bottom:1px solid var(--div);cursor:pointer;}
 .msr-item:last-child{border-bottom:none;}
-.msr-date{font-size:10px;color:var(--tm);margin-bottom:3px;}
-.msr-text{font-size:12.5px;color:var(--tp);line-height:1.5;}
+.msr-date{font-size:12px;color:var(--tm);margin-bottom:3px;}
+.msr-text{font-size:13px;color:var(--tp);line-height:1.5;}
 .mbtn{flex:1;padding:10px;border-radius:12px;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;border:none;}
 .mbtn.cancel{background:var(--card);color:var(--tm);border:1px solid var(--card-b);}
 .mbtn.ok{background:var(--acc-soft);color:var(--acc);font-weight:500;}
@@ -1161,7 +1161,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           <button class="send-btn send-btn-sm" onclick="submitMemoInline()" title="메모 등록"><i class="ti ti-arrow-up" style="font-size:14px;" aria-hidden="true"></i></button>
         </div>
       </div>
-      <div class="slabel">오늘 뭐 먹지</div>
+      <div class="slabel-row">
+        <div class="slabel">오늘 뭐 먹지</div>
+        <button class="slabel-search-btn" onclick="openWeekMealSheet()" title="이번 주 뭐 먹지"><i class="ti ti-tools-kitchen-3" style="font-size:14px;" aria-hidden="true"></i></button>
+      </div>
       <div class="card s" id="daily-meal-card"></div>
       <div class="slabel">해빗</div>
       <div class="habit-check-box" id="daily-habit-box"></div>
@@ -1187,12 +1190,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="card" id="weekly-rhythm-bars"></div>
       <div class="slabel">이번주 해빗</div>
       <div class="habit-week-box" id="weekly-habit-box"></div>
-      <div class="report-banner meal-soft" onclick="openWeekMealSheet()">
-        <div class="report-banner-inner">
-          <div class="report-banner-line"><i class="ti ti-tools-kitchen-3" style="font-size:12px;vertical-align:-1px;margin-right:3px;" aria-hidden="true"></i>이번 주 뭐 먹지?</div>
-          <div class="report-banner-arrow"><i class="ti ti-chevron-up" style="font-size:15px;" aria-hidden="true"></i></div>
-        </div>
-      </div>
     </div>
 
     <!-- MONTHLY -->
@@ -1247,12 +1244,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div class="sheet-handle"></div>
     <div style="padding:0 20px 20px;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
-        <div class="report-banner meal-soft" style="margin:0;flex:1;" onclick="saveWeekMealSheet()">
-          <div class="report-banner-inner">
-            <div class="report-banner-line"><i class="ti ti-tools-kitchen-3" style="font-size:12px;vertical-align:-1px;margin-right:3px;" aria-hidden="true"></i>이번 주 뭐 먹지?</div>
-            <div class="report-banner-arrow"><i class="ti ti-chevron-up" style="font-size:15px;" aria-hidden="true"></i></div>
-          </div>
-        </div>
+        <div class="goal-section-title" style="margin:0;flex:1;justify-content:center;" onclick="saveWeekMealSheet()"><i class="ti ti-tools-kitchen-3" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i> 주간 식사 계획</div>
         <button class="wish-round-btn" onclick="toggleMealWishlist()" title="먹고싶은 메뉴">
           <i class="ti ti-chef-hat" style="font-size:16px;" aria-hidden="true"></i>
         </button>

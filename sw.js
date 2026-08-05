@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260805-1-font-size';
+const CACHE = 'iikoto-v20260805-3-meal-sheet-seed';
 const ASSETS = [
   './',
   './index.html'
