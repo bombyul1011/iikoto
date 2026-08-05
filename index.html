@@ -207,7 +207,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .meal-time-group{display:flex;align-items:center;gap:1px;flex-shrink:0;}
 .meal-time-clear{cursor:pointer;color:var(--tm);font-size:12px;padding:0 3px 0 0;flex-shrink:0;}
 .meal-cat{width:38px;flex-shrink:0;font-size:13px;color:var(--tm);margin-right:6px;}
-.meal-time-inp{width:52px;flex-shrink:0;background:none;border:none;outline:none;font-family:'DM Sans',sans-serif;font-size:12px;color:var(--ts);padding:5px 2px 4px 6px;text-align:right;font-variant-numeric:tabular-nums;}
+.meal-time-inp{width:62px;flex-shrink:0;background:none;border:none;outline:none;font-family:'DM Sans',sans-serif;font-size:12px;color:var(--ts);padding:5px 2px 4px 6px;text-align:right;font-variant-numeric:tabular-nums;}
 .cm-star-picker{display:flex;gap:3px;flex:1;}
 @keyframes discSpin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
 .playlist-disc-spin{display:inline-block;animation:discSpin 3s linear infinite;}
@@ -9439,6 +9439,23 @@ function saveOneMealDay(dk){
       if(tEl)tEl.value='';
     }else{
       m[k+'_time']=tEl?tEl.value:'';
+    }
+    // 시간 입력 후 화면(✕ 지우기 버튼, 빈값 스타일)이 즉시 반영되도록 갱신 — 이전엔 저장만 하고
+    // 화면을 다시 그리지 않아, 재진입 전까지 시간을 입력해도 표시가 따라오지 않는 문제가 있었음.
+    if(tEl){
+      tEl.classList.toggle('mt-empty',!tEl.value);
+      const group=tEl.parentElement;
+      let clearBtn=group?group.querySelector(`span[onclick^="clearMealTime('${dk}','${k}')"]`):null;
+      if(tEl.value&&!clearBtn&&group){
+        clearBtn=document.createElement('span');
+        clearBtn.className='meal-time-clear';
+        clearBtn.title='시간 지우기';
+        clearBtn.textContent='✕';
+        clearBtn.onclick=()=>clearMealTime(dk,k);
+        group.appendChild(clearBtn);
+      }else if(!tEl.value&&clearBtn){
+        clearBtn.remove();
+      }
     }
   });
   saveMealsData(dk,m);
