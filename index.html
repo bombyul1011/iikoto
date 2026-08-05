@@ -6948,6 +6948,8 @@ async function _fetchNutriComment(dk){
   };
   const yText=fmtMeals(yMeals),tText=fmtMeals(todayMeals);
   if(!yText&&!tText)return null;
+  // 어제 운동 여부(리듬트랙 exercise 카테고리 존재 여부) — "오늘 예정" 쪽은 아직 일어나지 않은 일이라 반영하지 않음
+  const yExercised=getRhythmBlocks(ydk).some(b=>b.cat==='exercise');
   // 최근 며칠 메뉴 흐름도 함께 참고자료로 전달 — 반복 패턴/부족한 영양소 판단에 활용
   const recentLines=[];
   for(let i=2;i<=6;i++){
@@ -6957,7 +6959,7 @@ async function _fetchNutriComment(dk){
     if(rt)recentLines.push(rt);
   }
   const dataContext=[
-    yText?`어제 식사: ${yText}`:'어제 식사 기록 없음',
+    yText?`어제 식사: ${yText}${yExercised?' (참고: 어제 운동함)':''}`:'어제 식사 기록 없음',
     tText?`오늘 식사(예정 포함): ${tText}`:'오늘 식사 기록 없음',
     recentLines.length?`최근 며칠 참고용 식사 흐름: ${recentLines.join(' / ')}`:''
   ].filter(Boolean).join('\n');
@@ -6975,6 +6977,7 @@ async function _fetchNutriComment(dk){
 - 체지방 감량·근육량 향상이라는 목표를 과하게 반복 언급하지 말고, 관련 있을 때만 자연스럽게 녹여주세요. 매 코멘트마다 목표를 직접 언급할 필요는 없어요.
 - 제안은 선택 사항이에요. 최근 며칠 흐름에 비해 뚜렷하게 잘 안 보였던 영양소가 있거나 목표 관점에서 아쉬운 부분이 있을 때만 today 코멘트에 자연스럽게 한 번 제안하세요. 이미 균형이 괜찮으면 억지로 제안을 만들지 말고 분석과 긍정적인 마무리로 끝내세요.
 - 어제나 오늘 중 기록이 없는 쪽은 해당 필드에 "기록이 없어요" 같은 짧은 문장으로 자연스럽게 처리.
+- 어제 식사 옆에 "(참고: 어제 운동함)" 표시가 있으면, 운동한 날 단백질/전체적인 섭취량이 어땠는지 정도로만 가볍게 참고하세요.
 - 잔소리 톤이나 단정적 진단 금지 — 친한 친구가 툭 건네는 다정한 말투.
 - 반드시 ~해요, ~이에요, ~어요 체의 존댓말만 사용.
 - 이모지나 특수기호는 쓰지 않아요.`;
