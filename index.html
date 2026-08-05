@@ -224,6 +224,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cm-star:active{transform:scale(0.85);}
 .cm-star.on{color:rgba(250,190,80,0.95);}
 .meal-time-inp.mt-empty:not(:focus){color:transparent;}
+.meal-time-readonly{font-size:12px;color:var(--ts);font-variant-numeric:tabular-nums;padding:5px 6px 4px 6px;white-space:nowrap;}
 .meal-time-btn{flex-shrink:0;width:20px;height:20px;border-radius:50%;border:1.2px solid rgba(160,190,140,0.55);background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgba(95,140,75,0.75);padding:0;}
 .meal-time-btn:active{background:rgba(190,230,205,0.30);}
 .meal-time-tag{font-size:10.5px;color:rgba(95,140,75,0.85);font-weight:600;flex-shrink:0;font-variant-numeric:tabular-nums;}
@@ -9477,7 +9478,17 @@ function openWeekMealSheet(){
     const isNextWeekPeek=i>=7;
     const block=document.createElement('div');block.className='week-meal-day';block.id='wm-block-'+dk;
     block.innerHTML=`<div class="week-meal-day-label">${DOW[i%7]} · ${d.getMonth()+1}/${d.getDate()}${isNextWeekPeek?' · 다음 주':''}</div>`+
-      CATS.map(([k,label])=>`<div class="meal-row"><div class="meal-cat" onpointerdown="mealCatPressStart(this,'${dk}','${k}')" onpointerup="mealCatPressEnd(this)" onpointerleave="mealCatPressEnd(this)" onpointercancel="mealCatPressEnd(this)">${label}</div><input class="meal-inp" style="flex:1 1 0;min-width:0;" id="wm-${dk}-${k}" type="text" placeholder="메뉴 입력" autocomplete="off" value="${(m[k]||'').replace(/"/g,'&quot;')}" onblur="saveOneMealDay('${dk}')"><div class="meal-time-group"><input class="meal-time-inp${m[k+'_time']?'':' mt-empty'}" id="wm-${dk}-${k}-time" type="time" value="${m[k+'_time']||''}" onchange="saveOneMealDay('${dk}')" step="60" lang="en-GB">${m[k+'_time']?`<span onclick="clearMealTime('${dk}','${k}')" class="meal-time-clear" title="시간 지우기">✕</span>`:''}</div></div>`).join('');
+      CATS.map(([k,label])=>{
+        const tVal=m[k+'_time']||'';
+        // PC(비터치)에서는 네이티브 time input이 시(hour) 포커스 시 파란 하이라이트가
+        // 필드 폭을 넘어 튀어나오고, 폭을 넓히면 메뉴 입력칸이 과도하게 좁아지는 문제가 있어
+        // PC에서는 시간을 읽기 전용 텍스트로만 표기(24시간제)하고, 입력/수정은 모바일 또는
+        // 오늘탭 "오늘 뭐 먹지" 체크 기능에서 하도록 분리함.
+        const timeBlock=_isTouchDevice()
+          ? `<input class="meal-time-inp${tVal?'':' mt-empty'}" id="wm-${dk}-${k}-time" type="time" value="${tVal}" onchange="saveOneMealDay('${dk}')" step="60" lang="en-GB">${tVal?`<span onclick="clearMealTime('${dk}','${k}')" class="meal-time-clear" title="시간 지우기">✕</span>`:''}`
+          : (tVal?`<span class="meal-time-readonly">${tVal}</span>`:'');
+        return `<div class="meal-row"><div class="meal-cat" onpointerdown="mealCatPressStart(this,'${dk}','${k}')" onpointerup="mealCatPressEnd(this)" onpointerleave="mealCatPressEnd(this)" onpointercancel="mealCatPressEnd(this)">${label}</div><input class="meal-inp" style="flex:1 1 0;min-width:0;" id="wm-${dk}-${k}" type="text" placeholder="메뉴 입력" autocomplete="off" value="${(m[k]||'').replace(/"/g,'&quot;')}" onblur="saveOneMealDay('${dk}')"><div class="meal-time-group">${timeBlock}</div></div>`;
+      }).join('');
     body.appendChild(block);
   }
   openSheet('week-meal-sheet');
