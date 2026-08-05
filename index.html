@@ -251,6 +251,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .mr-card{border-radius:16px;background:var(--card);border:1px solid var(--card-b);padding:15px 15px 13px;margin-bottom:12px;}
 .mr-sec-title{font-size:11px;color:var(--tm);letter-spacing:.10em;text-transform:uppercase;margin-bottom:11px;}
 .sheet-loading-msg{text-align:center;color:var(--tm);padding:20px 0;}
+.ico-13{font-size:13px;vertical-align:-1px;}
+.ico-12{font-size:12px;vertical-align:-1px;}
+.sub-tm-13{font-size:13px;color:var(--tm);}
 .mr-row2{display:flex;gap:8px;margin-bottom:4px;}
 .mr-stat{flex:1;border-radius:14px;background:var(--card);border:1px solid var(--card-b);padding:12px 12px;}
 .mr-stat .v{font-size:22px;font-weight:300;color:var(--tp);letter-spacing:-.5px;line-height:1;}
@@ -1142,7 +1145,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="card y" id="todo-card">
         <div id="todo-list"></div>
         <button class="add-btn" onclick="openTodoModal()">
-          <i class="ti ti-plus" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i>할 일 추가
+          <i class="ti ti-plus sub-tm-13" aria-hidden="true"></i>할 일 추가
         </button>
       </div>
       <div class="slabel-row">
@@ -1178,7 +1181,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="week-strip" id="week-strip"></div>
       <div class="card" id="wchallenge-card" style="padding:14px 15px 10px;margin-bottom:7px;">
         <div style="display:flex;align-items:center;justify-content:space-between;">
-          <div class="goal-section-title" id="wchallenge-title" style="margin-top:0;"><i class="ti ti-flag-3" id="wchallenge-icon" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i> 주간 목표</div>
+          <div class="goal-section-title" id="wchallenge-title" style="margin-top:0;"><i class="ti ti-flag-3" id="wchallenge-icon" class="ico-13" aria-hidden="true"></i> 주간 목표</div>
           <button class="wgoal-add-btn" id="wgoal-archive-btn" title="주간 목표 모아보기" onclick="openMonthlyGoalReportSheet()"><i class="ti ti-target-arrow" style="font-size:13px;" aria-hidden="true"></i></button>
         </div>
         <div class="goal-wrap" id="weekly-goal-wrap"></div>
@@ -1197,7 +1200,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <!-- MONTHLY -->
     <div class="view" id="v-monthly">
       <div class="card" id="monthly-goal-card" style="padding:14px 15px 10px;margin-bottom:10px;">
-        <div class="goal-section-title" id="monthly-goal-title" style="margin-top:0;"><i class="ti ti-flag-3" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 목표</div>
+        <div class="goal-section-title" id="monthly-goal-title" style="margin-top:0;"><i class="ti ti-flag-3 ico-13" aria-hidden="true"></i> 이번 달 목표</div>
         <div class="goal-wrap" id="monthly-goal-wrap"></div>
       </div>
       <div id="monthly-cal"></div>
@@ -1246,7 +1249,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div class="sheet-handle"></div>
     <div style="padding:0 20px 20px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px;">
-        <div class="goal-section-title" style="margin:0;background:rgba(190,230,205,0.30);color:rgba(85,135,100,0.90);border:1px solid rgba(150,190,165,0.45);box-shadow:none;" onclick="saveWeekMealSheet()"><i class="ti ti-tools-kitchen-3" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i> 주간 식사 계획</div>
+        <div class="goal-section-title" style="margin:0;background:rgba(190,230,205,0.30);color:rgba(85,135,100,0.90);border:1px solid rgba(150,190,165,0.45);box-shadow:none;" onclick="saveWeekMealSheet()"><i class="ti ti-tools-kitchen-3 ico-13" aria-hidden="true"></i> 주간 식사 계획</div>
         <button class="wish-round-btn" onclick="toggleMealWishlist()" title="먹고싶은 메뉴">
           <i class="ti ti-chef-hat" style="font-size:16px;" aria-hidden="true"></i>
         </button>
@@ -1415,7 +1418,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   <div class="bsheet" style="max-height:80vh;overflow-y:auto;" onclick="event.stopPropagation()">
     <div class="sheet-handle"></div>
     <div style="padding:0 20px 24px;">
-      <div class="goal-section-title" style="margin-top:0;"><i class="ti ti-notes" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i> 이번 주 메모 리포트</div>
+      <div class="goal-section-title" style="margin-top:0;"><i class="ti ti-notes ico-13" aria-hidden="true"></i> 이번 주 메모 리포트</div>
       <div id="weekly-memo-report-content"></div>
     </div>
   </div>
@@ -1426,7 +1429,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   <div class="bsheet" style="max-height:85vh;overflow-y:auto;" onclick="event.stopPropagation()">
     <div class="sheet-handle"></div>
     <div style="padding:0 20px 24px;">
-      <div class="goal-section-title" style="margin-top:0;"><i class="ti ti-target-arrow" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i> 주간 목표 모아보기</div>
+      <div class="goal-section-title" style="margin-top:0;"><i class="ti ti-target-arrow ico-13" aria-hidden="true"></i> 주간 목표 모아보기</div>
       <div class="month-chips" id="mgr-month-chips" style="margin:10px 0 14px;"></div>
       <div id="mgr-content"></div>
     </div>
@@ -1438,7 +1441,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   <div class="bsheet" style="max-height:85vh;overflow-y:auto;" onclick="event.stopPropagation()">
     <div class="sheet-handle"></div>
     <div style="padding:0 20px 24px;">
-      <div class="goal-section-title" style="margin-top:0;"><i class="ti ti-movie" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i> 콘텐츠 모아보기</div>
+      <div class="goal-section-title" style="margin-top:0;"><i class="ti ti-movie ico-13" aria-hidden="true"></i> 콘텐츠 모아보기</div>
       <div class="month-chips" id="cmr-month-chips" style="margin:10px 0 14px;"></div>
       <div id="cmr-content"></div>
     </div>
@@ -1451,7 +1454,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   <div class="bsheet" style="max-height:82vh;overflow-y:auto;" onclick="event.stopPropagation()">
     <div class="sheet-handle"></div>
     <div style="padding:0 20px 20px;">
-      <div style="font-size:13px;font-weight:600;color:rgba(80,140,200,0.9);text-align:center;margin-bottom:16px;letter-spacing:0.04em;"><i class="ti ti-sparkles" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i> 이번주 돌아보기 <i class="ti ti-sparkles" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i></div>
+      <div style="font-size:13px;font-weight:600;color:rgba(80,140,200,0.9);text-align:center;margin-bottom:16px;letter-spacing:0.04em;"><i class="ti ti-sparkles ico-13" aria-hidden="true"></i> 이번주 돌아보기 <i class="ti ti-sparkles ico-13" aria-hidden="true"></i></div>
       <div id="weekly-review-content" style="font-size:13px;color:var(--tp);line-height:1.9;"></div>
     </div>
   </div>
@@ -1462,7 +1465,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   <div class="bsheet" style="max-height:82vh;overflow-y:auto;" onclick="event.stopPropagation()">
     <div class="sheet-handle"></div>
     <div style="padding:0 20px 20px;">
-      <div style="font-size:13px;font-weight:600;color:rgba(80,140,200,0.9);text-align:center;margin-bottom:16px;letter-spacing:0.04em;"><i class="ti ti-sparkles" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i> 지난주 목표 돌아보기 <i class="ti ti-sparkles" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i></div>
+      <div style="font-size:13px;font-weight:600;color:rgba(80,140,200,0.9);text-align:center;margin-bottom:16px;letter-spacing:0.04em;"><i class="ti ti-sparkles ico-13" aria-hidden="true"></i> 지난주 목표 돌아보기 <i class="ti ti-sparkles ico-13" aria-hidden="true"></i></div>
       <div id="challenge-review-content" style="font-size:13px;color:var(--tp);line-height:1.9;"></div>
     </div>
   </div>
@@ -1678,14 +1681,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="settings-slbl">동기화</div>
       <div class="settings-card">
         <div class="settings-item"><span class="settings-item-lbl">상태</span><span class="settings-item-val" id="sync-status">확인 중...</span></div>
-        <div class="settings-item" onclick="manualSync()" style="cursor:pointer;"><span class="settings-item-lbl">지금 동기화</span><i class="ti ti-chevron-right" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i></div>
+        <div class="settings-item" onclick="manualSync()" style="cursor:pointer;"><span class="settings-item-lbl">지금 동기화</span><i class="ti ti-chevron-right sub-tm-13" aria-hidden="true"></i></div>
       </div>
     </div>
     <div>
       <div class="settings-slbl">백업</div>
       <div class="settings-card">
-        <div class="settings-item" onclick="downloadFullJSONBackup()" style="cursor:pointer;"><span class="settings-item-lbl"><i class="ti ti-download" style="font-size:15px;color:var(--tp);margin-right:6px;vertical-align:-2px;" aria-hidden="true"></i>전체 데이터 백업 (JSON)</span><i class="ti ti-chevron-right" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i></div>
-        <div class="settings-item" onclick="openMarkdownBackup()" style="cursor:pointer;"><span class="settings-item-lbl"><i class="ti ti-file-text" style="font-size:15px;color:var(--tp);margin-right:6px;vertical-align:-2px;" aria-hidden="true"></i>일기 백업 (마크다운)</span><i class="ti ti-chevron-right" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i></div>
+        <div class="settings-item" onclick="downloadFullJSONBackup()" style="cursor:pointer;"><span class="settings-item-lbl"><i class="ti ti-download" style="font-size:15px;color:var(--tp);margin-right:6px;vertical-align:-2px;" aria-hidden="true"></i>전체 데이터 백업 (JSON)</span><i class="ti ti-chevron-right sub-tm-13" aria-hidden="true"></i></div>
+        <div class="settings-item" onclick="openMarkdownBackup()" style="cursor:pointer;"><span class="settings-item-lbl"><i class="ti ti-file-text" style="font-size:15px;color:var(--tp);margin-right:6px;vertical-align:-2px;" aria-hidden="true"></i>일기 백업 (마크다운)</span><i class="ti ti-chevron-right sub-tm-13" aria-hidden="true"></i></div>
         <div class="settings-item" style="flex-direction:column;align-items:flex-start;gap:8px;padding-top:12px;">
           <span class="settings-item-lbl">노션 백업 (베타) · 매달 1일 지난달분</span>
           <input type="text" id="notion-worker-url-inp" class="modal-inp"
@@ -1839,7 +1842,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div class="rd-quote-section">
       <div style="display:flex;align-items:center;justify-content:space-between;">
         <div class="quote-chip" onclick="openQuoteSheetCheck()">
-          <div class="quote-chip-inner"><i class="ti ti-quote" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 문장 수집</div>
+          <div class="quote-chip-inner"><i class="ti ti-quote ico-12" aria-hidden="true"></i> 문장 수집</div>
         </div>
         <div id="rd-quote-fold" class="rd-quote-more" style="display:none;padding:6px 4px;" onclick="_rdQuoteShowAll=false;renderRdQuotes();">접기</div>
       </div>
@@ -1962,14 +1965,14 @@ function appendSundayBanner(body){
   banner.className='weekly-review-banner';
   if(isNight2){
     banner.innerHTML=`<div class="weekly-review-banner-inner">
-      <div class="weekly-review-banner-title"><i class="ti ti-sparkles" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i> 이번주 돌아보기 <i class="ti ti-sparkles" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i></div>
+      <div class="weekly-review-banner-title"><i class="ti ti-sparkles ico-13" aria-hidden="true"></i> 이번주 돌아보기 <i class="ti ti-sparkles ico-13" aria-hidden="true"></i></div>
       <div class="weekly-review-banner-sub"><span>지난 한주간의 나는 어땠을까요?</span><span style="font-size:15px;opacity:0.6;"><i class="ti ti-chevron-up" aria-hidden="true"></i></span></div>
     </div>`;
     banner.addEventListener('click',openWeeklyReviewSheet);
   }else{
     banner.style.cssText+='cursor:default;opacity:0.62;animation:none;';
     banner.innerHTML=`<div class="weekly-review-banner-inner">
-      <div class="weekly-review-banner-title"><i class="ti ti-sparkles" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i> 이번주 돌아보기 <i class="ti ti-sparkles" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i></div>
+      <div class="weekly-review-banner-title"><i class="ti ti-sparkles ico-13" aria-hidden="true"></i> 이번주 돌아보기 <i class="ti ti-sparkles ico-13" aria-hidden="true"></i></div>
       <div class="weekly-review-banner-sub"><span>22시에 요약해드릴게요</span></div>
     </div>`;
   }
@@ -2927,7 +2930,7 @@ function loadContentMonthlyReportContent(){
       </div>`;
     }).join('');
     return `<div class="mr-card" style="margin-bottom:10px;">
-      <div class="mr-sec-title"><i class="ti ${meta.icon}" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> ${CONTENT_CAT_LABEL[cat]}</div>
+      <div class="mr-sec-title"><i class="ti ${meta.icon} ico-12" aria-hidden="true"></i> ${CONTENT_CAT_LABEL[cat]}</div>
       ${items}
     </div>`;
   }).join('');
@@ -3059,13 +3062,13 @@ async function loadMonthlyGoalReportContent(){
 
   const ready=isMonthlyGoalReportReady(y,mo,weeks);
   if(!ready){
-    el.innerHTML=`${weekHtml}<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 목표 총평</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">이 달의 목표가 모두 끝나면 정리해드려요</div></div>`;
+    el.innerHTML=`${weekHtml}<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles ico-12" aria-hidden="true"></i> 이번 달 목표 총평</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">이 달의 목표가 모두 끝나면 정리해드려요</div></div>`;
     return;
   }
 
   el.innerHTML=`${weekHtml}<div id="mgr-ai-slot"></div>`;
   const slot=document.getElementById('mgr-ai-slot');
-  slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 목표 총평</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">불러오는 중...</div></div>`;
+  slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles ico-12" aria-hidden="true"></i> 이번 달 목표 총평</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">불러오는 중...</div></div>`;
 
   const cacheKey='monthly_goal_report_'+mk;
   let comment=S.get(cacheKey);
@@ -3081,9 +3084,9 @@ async function loadMonthlyGoalReportContent(){
     }
   }
   if(comment){
-    slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 목표 총평</div><div style="font-size:13px;color:var(--tp);line-height:1.7;padding:2px 0;">${comment}</div></div>`;
+    slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles ico-12" aria-hidden="true"></i> 이번 달 목표 총평</div><div style="font-size:13px;color:var(--tp);line-height:1.7;padding:2px 0;">${comment}</div></div>`;
   }else{
-    slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 목표 총평</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">${getClaudeKey()?'잠시 후 다시 시도해주세요':'설정에서 Claude API 키를 입력하면 분석을 받을 수 있어요'}</div></div>`;
+    slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles ico-12" aria-hidden="true"></i> 이번 달 목표 총평</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">${getClaudeKey()?'잠시 후 다시 시도해주세요':'설정에서 Claude API 키를 입력하면 분석을 받을 수 있어요'}</div></div>`;
   }
 }
 // 이번 달 챌린지 주차들의 원본 목표 텍스트(카테고리 판단용)와, 이미 생성된 주간 코멘트(challenge_review_,
@@ -3142,7 +3145,7 @@ async function loadMonthlyReportContent(){
   const mk=`${y}-${pad(mo+1)}`;
   const stats=computeMonthStats(y,mo);
   const goalHtml=stats.goalLines.length?`<div class="mr-card mr-goal-card">
-    <div class="mr-sec-title"><i class="ti ti-flag-3" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 목표</div>
+    <div class="mr-sec-title"><i class="ti ti-flag-3 ico-12" aria-hidden="true"></i> 이번 달 목표</div>
     ${stats.goalLines.map(g=>`<div style="font-size:13px;color:var(--tp);line-height:1.7;padding:2px 0;">${g}</div>`).join('')}
   </div>` : '';
   const statsHtml=`<div class="mr-row2" style="margin-bottom:12px;">
@@ -3151,12 +3154,12 @@ async function loadMonthlyReportContent(){
     <div class="mr-stat"><div class="v">${stats.avgSleep?stats.avgSleep+'h':'-'}</div><div class="l">평균 수면</div></div>
   </div>`;
   const rhythmHtml=stats.rhythmDur&&Object.keys(stats.rhythmDur).length?`<div class="mr-card">
-    <div class="mr-sec-title"><i class="ti ti-rainbow" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 리듬</div>
+    <div class="mr-sec-title"><i class="ti ti-rainbow ico-13" aria-hidden="true"></i> 이번 달 리듬</div>
     ${buildMonthlyRhythmBar(stats.rhythmDur,stats.dim,stats.rhythmDayCount)}
   </div>` : '';
   const wcHtml=stats.wcByWeek.length?`<div class="mr-card mr-accordion">
     <div class="mr-sec-title mr-accordion-toggle" onclick="this.closest('.mr-accordion').classList.toggle('open')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
-      <span><i class="ti ti-flag-3" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 주간 미션 모음 · 주차별</span>
+      <span><i class="ti ti-flag-3 ico-12" aria-hidden="true"></i> 주간 미션 모음 · 주차별</span>
       <span class="mr-accordion-arrow">›</span>
     </div>
     <div class="mr-accordion-body">
@@ -3165,12 +3168,12 @@ async function loadMonthlyReportContent(){
         ${w.lines.map(l=>`<div class="mr-wc-line"><span class="txt">${l.text}</span><span class="pct">${l.pct}%</span></div>`).join('')}
       </div>`).join('')}
     </div>
-  </div>` : `<div class="mr-card"><div class="mr-sec-title"><i class="ti ti-flag-3" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 주간 미션 모음 · 주차별</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:8px 0;">이 달엔 작성한 주간 미션이 없어요</div></div>`;
+  </div>` : `<div class="mr-card"><div class="mr-sec-title"><i class="ti ti-flag-3 ico-12" aria-hidden="true"></i> 주간 미션 모음 · 주차별</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:8px 0;">이 달엔 작성한 주간 미션이 없어요</div></div>`;
 
   const contentsHtml=stats.contentsList.length?`<div class="mr-card">
-    <div class="mr-sec-title"><i class="ti ti-stack-2" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 콘텐츠 기록</div>
+    <div class="mr-sec-title"><i class="ti ti-stack-2 ico-12" aria-hidden="true"></i> 콘텐츠 기록</div>
     ${stats.contentsList.map(c=>`<div class="mr-wc-line"><span class="txt"><span style="display:inline-block;width:7px;height:7px;border-radius:2px;background:${getCatColor(c.cat)};margin-right:6px;"></span>${c.title}</span><span class="pct" style="color:var(--tm);font-weight:400;">${cStatusLabel(c)}</span></div>`).join('')}
-  </div>` : `<div class="mr-card"><div class="mr-sec-title"><i class="ti ti-stack-2" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 콘텐츠 기록</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:8px 0;">이 달엔 기록한 콘텐츠가 없어요</div></div>`;
+  </div>` : `<div class="mr-card"><div class="mr-sec-title"><i class="ti ti-stack-2 ico-12" aria-hidden="true"></i> 콘텐츠 기록</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:8px 0;">이 달엔 기록한 콘텐츠가 없어요</div></div>`;
 
   el.innerHTML=`${goalHtml}<div id="mr-ai-slot"></div>${statsHtml}${rhythmHtml}${wcHtml}${contentsHtml}`;
   const slot=document.getElementById('mr-ai-slot');
@@ -3184,10 +3187,10 @@ async function loadMonthlyReportContent(){
 
   if(isOngoingMonth){
     // 이 달이 아직 끝나지 않음: 말일 저녁까지는 종합 리포트 없이 안내만
-    slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">이 달이 끝나면 전체를 정리해드릴게요</div></div>`;
+    slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles ico-12" aria-hidden="true"></i> 이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">이 달이 끝나면 전체를 정리해드릴게요</div></div>`;
     return;
   }
-  slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">불러오는 중...</div></div>`;
+  slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles ico-12" aria-hidden="true"></i> 이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">불러오는 중...</div></div>`;
 
   // 말일 저녁 이후 또는 지난 달: 전체 기간으로 최종 리포트
   const cacheKey='monthly_report_'+mk;
@@ -3210,12 +3213,12 @@ async function loadMonthlyReportContent(){
   const slot2=document.getElementById('mr-ai-slot');if(!slot2)return;
   if(report){
     slot2.innerHTML=`<div class="mr-ai-card">
-      <div class="mr-sec-title"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div>
+      <div class="mr-sec-title"><i class="ti ti-sparkles ico-12" aria-hidden="true"></i> 이번 달 한눈에</div>
       <p style="font-size:13px;color:var(--tp);line-height:1.9;margin-bottom:${report.keywords&&report.keywords.length?'12px':'0'};">${report.comment}</p>
       ${report.keywords&&report.keywords.length?`<div class="mr-tag-cloud">${report.keywords.map(k=>`<span class="mr-tag">${k}</span>`).join('')}</div>`:''}
     </div>`;
   } else {
-    slot2.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">${getClaudeKey()?'코멘트를 만들 데이터가 부족해요':'아직 준비 중이에요 (다른 기기에서 먼저 열어보시면 여기서도 볼 수 있어요)'}</div></div>`;
+    slot2.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles ico-12" aria-hidden="true"></i> 이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">${getClaudeKey()?'코멘트를 만들 데이터가 부족해요':'아직 준비 중이에요 (다른 기기에서 먼저 열어보시면 여기서도 볼 수 있어요)'}</div></div>`;
   }
 }
 
@@ -4050,6 +4053,15 @@ function parseTodoLeadingTime(text){
   const m=text.match(/^(\d{1,2}):(\d{2})/);
   return m?parseInt(m[1],10)*60+parseInt(m[2],10):9999;
 }
+// 미완료 투두 정렬 비교 함수: timeSection → sortOrder(수동 순서, 있으면 우선) → 텍스트 앞머리 시:분.
+// renderTodos(전체 목록)와 applyTodoReorder(같은 시간대 그룹 추출)가 공통으로 사용 — done 여부는 호출측에서 별도 처리.
+function compareTodoOrder(a,b){
+  const ta=TODO_TS_ORDER[a.timeSection||'none']??3;
+  const tb=TODO_TS_ORDER[b.timeSection||'none']??3;
+  if(ta!==tb)return ta-tb;
+  if(typeof a.sortOrder==='number'&&typeof b.sortOrder==='number')return a.sortOrder-b.sortOrder;
+  return parseTodoLeadingTime(a.text)-parseTodoLeadingTime(b.text);
+}
 function getTodos(dk){return S.get(S.key('todos',dk))||[];}
 function saveTodos(dk,v){
   S.set(S.key('todos',dk),v);
@@ -4057,13 +4069,17 @@ function saveTodos(dk,v){
   autoSync('todos',dk); // 온라인이면 즉시 업로드
 }
 function getMemos(dk){return S.get(S.key('memos',dk))||[];}
+// memos 서버 row → 로컬 저장 포맷 변환 (down/월간프리페치/강제복구 3곳 공통 사용)
+function memoRowToLocal(r){return {time:r.memo_time,text:r.text,created:r.created,cid:r.client_id||genCid(),type:r.type||undefined};}
 function saveMemos(dk,v){
   S.set(S.key('memos',dk),v);
   S.set(S.key('memos_pending',dk),true);
   autoSync('memos',dk);
 }
 function getSleep(dk){return S.get(S.key('sleep',dk))||{};}
-function saveSleepData(dk,v){S.set(S.key('sleep',dk),v);autoSync('sleep',dk);}
+function saveSleepData(dk,v){S.set(S.key('sleep',dk),v);S.set(S.key('sleep_pending',dk),true);autoSync('sleep',dk);}
+// sleep 서버 row → 로컬 저장 포맷 변환 (down/월간프리페치/강제복구 3곳 공통 사용)
+function sleepRowToLocal(r){return {sleep:r.sleep_time,wake:r.wake_time,score:r.score};}
 function getSleepScore(dk){const d=getSleep(dk);return d.score!=null?d.score:null;}
 function saveSleepScore(dk,score){
   const d=getSleep(dk);
@@ -4125,6 +4141,10 @@ function getSleepScoreLevel(score){
 const MEAL_LABELS={breakfast:'아침',lunch:'점심',dinner:'저녁',snack:'간식'};
 const MEAL_KEYS=['breakfast','lunch','snack','dinner'];
 function getMeals(dk){return S.get(S.key('meals',dk))||{};}
+// meals 서버 row(단일 객체) → 로컬 저장 포맷 변환. 서버에서 내려온 3군데 지점이 모두 이 함수를 거침.
+function mealRowToLocal(r){
+  return {breakfast:r.breakfast||'',lunch:r.lunch||'',dinner:r.dinner||'',snack:r.snack||'',breakfast_time:r.breakfast_time||'',lunch_time:r.lunch_time||'',dinner_time:r.dinner_time||'',snack_time:r.snack_time||''};
+}
 function saveMealsData(dk,v){
   S.set(S.key('meals',dk),v);
   S.set(S.key('meals_pending',dk),true);
@@ -4341,7 +4361,7 @@ async function syncTodosUp(dk){
   if(ensureItemCids(todos))S.set(S.key('todos',dk),todos);
   const delCids=getDelPendingCids('todos',dk);
   const ok=await syncListUpSafe('todos',`date_key=eq.${dk}`,'date_key,client_id',todos,
-    t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,is_reserve:t.is_reserve||false,strike_parts:t.strikeParts||[],strike_times:t.strikeTimes||{},completed_at:(t.completedAt!=null?t.completedAt:null),sort_order:(typeof t.sortOrder==='number'?t.sortOrder:null)}),
+    t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,strike_parts:t.strikeParts||[],strike_times:t.strikeTimes||{},completed_at:(t.completedAt!=null?t.completedAt:null),sort_order:(typeof t.sortOrder==='number'?t.sortOrder:null)}),
     delCids);
   if(ok)delCids.forEach(cid=>removeDelPending('todos',dk,cid));
   return ok;
@@ -4350,7 +4370,7 @@ async function syncMemosDown(dk){
   const rows=await supaFetch('memos?date_key=eq.'+dk+'&order=created');
   if(!rows)return; // 연결 실패(null) — 로컬 유지. 빈 배열은 "서버에 진짜 0개"라는 뜻이라 그대로 반영.
   if(S.get(S.key('memos_pending',dk)))return; // 업로드 대기중인 로컬 수정 있으면 덮어쓰지 않음
-  S.set(S.key('memos',dk),rows.map(function(r){return {time:r.memo_time,text:r.text,created:r.created,cid:r.client_id||genCid()};}));
+  S.set(S.key('memos',dk),rows.map(memoRowToLocal));
   renderMemos();
 }
 async function syncMemosUp(dk){
@@ -4358,15 +4378,17 @@ async function syncMemosUp(dk){
   if(ensureItemCids(memos))S.set(S.key('memos',dk),memos);
   const delCids=getDelPendingCids('memos',dk);
   const ok=await syncListUpSafe('memos',`date_key=eq.${dk}`,'date_key,client_id',memos,
-    m=>({date_key:dk,memo_time:m.time,text:m.text,created:m.created,client_id:m.cid}),
+    m=>({date_key:dk,memo_time:m.time,text:m.text,created:m.created,client_id:m.cid,type:m.type||null}),
     delCids);
   if(ok)delCids.forEach(cid=>removeDelPending('memos',dk,cid));
   return ok;
 }
 async function syncSleepDown(dk){
   const rows=await supaFetch(`sleep?date_key=eq.${dk}`);
-  if(!rows||!rows.length)return;
-  S.set(S.key('sleep',dk),{sleep:rows[0].sleep_time,wake:rows[0].wake_time,score:rows[0].score});
+  if(!rows)return; // 연결 실패(null) — 로컬 유지
+  if(S.get(S.key('sleep_pending',dk)))return; // 업로드 대기중인 로컬 수정 있으면 덮어쓰지 않음
+  if(!rows.length)return;
+  S.set(S.key('sleep',dk),sleepRowToLocal(rows[0]));
 }
 async function syncSleepUp(dk){
   const d=getSleep(dk);if(!d.sleep&&!d.wake&&d.score==null)return;
@@ -4377,8 +4399,7 @@ async function syncMealsDown(dk){
   if(!rows)return; // 연결 실패(null) — 로컬 유지
   if(S.get(S.key('meals_pending',dk)))return; // 업로드 대기중인 로컬 수정 있으면 덮어쓰지 않음 (memos와 동일 원칙)
   if(!rows.length)return;
-  const r=rows[0];
-  S.set(S.key('meals',dk),{breakfast:r.breakfast||'',lunch:r.lunch||'',dinner:r.dinner||'',snack:r.snack||'',breakfast_time:r.breakfast_time||'',lunch_time:r.lunch_time||'',dinner_time:r.dinner_time||'',snack_time:r.snack_time||''});
+  S.set(S.key('meals',dk),mealRowToLocal(rows[0]));
 }
 async function syncMealsUp(dk){
   // 로컬이 pending(수정 대기) 상태로 호출되는 함수이므로 로컬을 그대로 진실로 push.
@@ -4565,7 +4586,7 @@ async function autoSync(type,key){
   else if(type==='reading_quote'){await syncQuoteUp(key);}
   else if(type==='todos'){if(await syncTodosUp(key))S.set(S.key('todos_pending',key),false);}
   else if(type==='memos'){if(await syncMemosUp(key))S.set(S.key('memos_pending',key),false);}
-  else if(type==='sleep')syncSleepUp(key);
+  else if(type==='sleep'){await syncSleepUp(key);S.set(S.key('sleep_pending',key),false);}
   else if(type==='meals'){await syncMealsUp(key);S.set(S.key('meals_pending',key),false);}
   else if(type==='habits')syncHabitsUp();
   else if(type==='hc'){await syncHCUp(key);S.set('hc_pending_'+key,false);}
@@ -4596,6 +4617,7 @@ async function syncAll(){
   if(S.get(S.key('todos_pending',dk)))upTasks.push(syncTodosUp(dk).then(()=>S.set(S.key('todos_pending',dk),false)));
   if(S.get(S.key('memos_pending',dk)))upTasks.push(syncMemosUp(dk).then(()=>S.set(S.key('memos_pending',dk),false)));
   if(S.get(S.key('meals_pending',dk)))upTasks.push(syncMealsUp(dk).then(()=>S.set(S.key('meals_pending',dk),false)));
+  if(S.get(S.key('sleep_pending',dk)))upTasks.push(syncSleepUp(dk).then(()=>S.set(S.key('sleep_pending',dk),false)));
   if(S.get(S.key('contents_pending',mk)))upTasks.push(runContentsSyncLocked(mk,()=>syncContentsUp(mk)).then(()=>S.set(S.key('contents_pending',mk),false)));
   if(S.get('wchallenge_pending_'+wk))upTasks.push(autoSync('wchallenge','wchallenge_'+wk).then(()=>S.set('wchallenge_pending_'+wk,false)));
   if(S.get(S.key('rblocks_pending',dk)))upTasks.push(syncRhythmBlocksUp(dk).then(()=>S.set(S.key('rblocks_pending',dk),false)));
@@ -5041,12 +5063,7 @@ function renderTodos(){
   list.innerHTML='';
   const sorted=[...todos.map((t,i)=>({...t,_i:i}))].sort((a,b)=>{
     if(a.done!==b.done)return a.done?1:-1;
-    const ta=TODO_TS_ORDER[a.timeSection||'none']??3;
-    const tb=TODO_TS_ORDER[b.timeSection||'none']??3;
-    if(ta!==tb)return ta-tb;
-    // 수동 순서(sortOrder)가 둘 다 있으면 그것을 우선 적용, 없으면 기존 시각순 유지
-    if(typeof a.sortOrder==='number'&&typeof b.sortOrder==='number')return a.sortOrder-b.sortOrder;
-    return parseTodoLeadingTime(a.text)-parseTodoLeadingTime(b.text);
+    return compareTodoOrder(a,b);
   });
   sorted.forEach((t)=>{
     const i=t._i;
@@ -5070,9 +5087,9 @@ function renderTodos(){
     list.appendChild(el);
   });
 }
-// 투두 텍스트를 접두어(')' 앞부분)와 조각(,/기준)으로 파싱.
-// 예: "업무) 블로그 / 카페 / 전단홍보만들기" -> prefix:"업무", parts:["블로그","카페","전단홍보만들기"]
-// ')' 없으면 prefix는 빈 문자열, 전체가 조각 대상.
+// 투두 텍스트를 접두어('>' 앞부분)와 조각(,/기준)으로 파싱. (아래 parseTodoTextParts 본문의 상세 설명 참고)
+// 예: "업무 > 블로그, 카페" -> prefix:"업무", parts:["블로그","카페"]
+// '>' 없으면 prefix는 빈 문자열, 전체가 조각 대상.
 function parseTodoTextParts(text){
   // '>' 를 접두어(카테고리) 구분자로 사용. 예: "업무 > 블로그, 카페" -> prefix:"업무", parts:["블로그","카페"]
   // ')' 대신 '>' 를 쓰는 이유: 일반 문장에서 괄호는 자주 쓰이지만 '>' 는 투두 텍스트에 거의 등장하지 않아 오인식 위험이 적음.
@@ -5160,6 +5177,10 @@ function relocateTodo(dk,idx,targetDk,mode){
     return{success:true,message:successMsg};
   }
 
+  // 조각(strikeParts)이 있는 todo는 mode(move/copy) 구분 없이 항상 동일하게 동작(의도한 설계):
+  // 미완료 조각만 targetDk로 넘기고, 원본(dk)은 완료된 조각만 남겨 정리(=사실상 항상 move).
+  // "복사" 버튼을 눌러도 순수 복사가 아니라 이 동작으로 통일되어 있음.
+
   const unstruckIdxs=parts.map((_,i)=>i).filter(i=>!strikeSet.has(i));
   if(!unstruckIdxs.length)return{success:false,message:'이동할 미완료 조각이 없어요'};
   const movedParts=unstruckIdxs.map(i=>parts[i]);
@@ -5198,7 +5219,7 @@ function relocateTodo(dk,idx,targetDk,mode){
     cur.completedAt=times.length?Math.max(...times):(cur.completedAt!=null?cur.completedAt:Date.now());
     saveTodos(dk,todos);
   }
-  return{success:true,message:successMsg};
+  return{success:true,message:'다음 날로 옮겼어요'};
 }
 // [v2] 조각 하나의 완료(취소선) 상태 토글. strikeParts 변경 시 항상 saveTodos로 즉시 저장+동기화.
 // 모든 조각에 취소선이 그어지면 항목 전체를 자동 완료 처리(done=true, completedAt 기록) — 새벽 리캡 등 시각 통계가 이 값을 참조하므로 누락 없이 채워야 함.
@@ -5364,10 +5385,7 @@ function applyTodoReorder(idx,tsGroup,shift){
   const dk=dateKey(currentDate),todos=getTodos(dk);
   // 현재 화면 표시 순서와 동일한 기준으로, 이 그룹(미완료+같은 시간대)만 추출
   const group=todos.map((t,i)=>({...t,_i:i})).filter(t=>!t.done&&(t.timeSection||'none')===tsGroup)
-    .sort((a,b)=>{
-      if(typeof a.sortOrder==='number'&&typeof b.sortOrder==='number')return a.sortOrder-b.sortOrder;
-      return parseTodoLeadingTime(a.text)-parseTodoLeadingTime(b.text);
-    });
+    .sort(compareTodoOrder);
   const curPos=group.findIndex(t=>t._i===idx);
   if(curPos<0)return;
   let newPos=curPos+shift;
@@ -7855,7 +7873,7 @@ function setupWeeklyChallengeToggle(){
   // 월요일이 아니면 원래 구조(goal-section-title + 아이콘)로 복원
   titleEl.className='goal-section-title';
   titleEl.style.margin='0';
-  titleEl.innerHTML='<i class="ti ti-flag-3" id="wchallenge-icon" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i> 주간 목표';
+  titleEl.innerHTML='<i class="ti ti-flag-3" id="wchallenge-icon" class="ico-13" aria-hidden="true"></i> 주간 목표';
   const iconEl=document.getElementById('wchallenge-icon');
   if(isPrepWindow){
     iconEl.className='ti ti-flag-plus';
@@ -8197,7 +8215,7 @@ function renderTimetable(){
     });
     statsEl.innerHTML='<div class="stat-bar-wrap" style="border-top:none;margin-top:0;padding-top:10px;">'+CATS.map((cat,i)=>{
       const meta=CAT_ICON_META[cat];
-      return (i>0?'<div class="sbar-div"></div>':'')+`<div class="sbar-item"><i class="ti ${meta.icon}" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i><span class="sbar-num">${counts[cat]}</span></div>`;
+      return (i>0?'<div class="sbar-div"></div>':'')+`<div class="sbar-item"><i class="ti ${meta.icon} sub-tm-13" aria-hidden="true"></i><span class="sbar-num">${counts[cat]}</span></div>`;
     }).join('')+'</div>';
   }
 }
@@ -8547,7 +8565,7 @@ function isCalCurrentMonth(){const n=new Date();return _calYear===n.getFullYear(
 function isCalPastMonth(){const n=new Date();return _calYear<n.getFullYear()||(_calYear===n.getFullYear()&&_calMonth<n.getMonth());}
 function updateMonthlyGoalTitle(){
   const el=document.getElementById('monthly-goal-title');if(!el)return;
-  const ic='<i class="ti ti-flag-3" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i>';
+  const ic='<i class="ti ti-flag-3 ico-13" aria-hidden="true"></i>';
   el.innerHTML=isCalCurrentMonth()?`${ic} 이번 달 목표`:`${ic} ${_calMonth+1}월 목표`;
 }
 let _calSelectedDay=null;
@@ -8576,16 +8594,16 @@ async function syncMonthRange(y,mo){
   ]);
   if(mRows){
     const byDate={};
-    mRows.forEach(r=>{(byDate[r.date_key]=byDate[r.date_key]||[]).push({time:r.memo_time,text:r.text,created:r.created,cid:r.client_id||genCid()});});
+    mRows.forEach(r=>{(byDate[r.date_key]=byDate[r.date_key]||[]).push(memoRowToLocal(r));});
     Object.keys(byDate).forEach(dk=>{if(!S.get(S.key('memos_pending',dk)))S.set(S.key('memos',dk),byDate[dk]);});
   }
   if(tRows){
     const byDate={};
-    tRows.forEach(r=>{if(r.date_key===RESERVE_DK)return;(byDate[r.date_key]=byDate[r.date_key]||[]).push({text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined)});});
+    tRows.forEach(r=>{if(r.date_key===RESERVE_DK)return;/* 예비투두 관련 로직은 파일 하단 RESERVE_DK 블록(getReserveTodos 등) 참고 */(byDate[r.date_key]=byDate[r.date_key]||[]).push({text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined)});});
     Object.keys(byDate).forEach(dk=>{if(!S.get(S.key('todos_pending',dk)))S.set(S.key('todos',dk),byDate[dk]);});
   }
-  if(sRows)sRows.forEach(r=>S.set(S.key('sleep',r.date_key),{sleep:r.sleep_time,wake:r.wake_time,score:r.score}));
-  if(mlRows)mlRows.forEach(r=>{if(!S.get(S.key('meals_pending',r.date_key)))S.set(S.key('meals',r.date_key),{breakfast:r.breakfast||'',lunch:r.lunch||'',dinner:r.dinner||'',snack:r.snack||'',breakfast_time:r.breakfast_time||'',lunch_time:r.lunch_time||'',dinner_time:r.dinner_time||'',snack_time:r.snack_time||''});});
+  if(sRows)sRows.forEach(r=>{if(!S.get(S.key('sleep_pending',r.date_key)))S.set(S.key('sleep',r.date_key),sleepRowToLocal(r));});
+  if(mlRows)mlRows.forEach(r=>{if(!S.get(S.key('meals_pending',r.date_key)))S.set(S.key('meals',r.date_key),mealRowToLocal(r));});
   if(rbRows){
     const byDate={};
     rbRows.forEach(r=>{(byDate[r.date_key]=byDate[r.date_key]||[]).push({cat:r.cat,start:r.start_time,end:r.end_time,text:r.text||'',created:r.created,cid:r.client_id||genCid()});});
@@ -8695,7 +8713,7 @@ function renderCalDetail(d){
     const wv=sleep.wake?sleep.wake.split(':').map(Number):null;
     let dur='';
     if(sv&&wv){let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;dur=` · ${Math.floor(m/60)}h ${m%60}m`;}
-    items+=`<div class="cal-detail-row"><div class="cal-detail-icon"><i class="ti ti-moon-stars" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i></div><span class="cal-detail-text" style="color:var(--ts);">${sleep.sleep||'--'} 취침 · ${sleep.wake||'--'} 기상${dur}</span></div>`;
+    items+=`<div class="cal-detail-row"><div class="cal-detail-icon"><i class="ti ti-moon-stars sub-tm-13" aria-hidden="true"></i></div><span class="cal-detail-text" style="color:var(--ts);">${sleep.sleep||'--'} 취침 · ${sleep.wake||'--'} 기상${dur}</span></div>`;
   }
   if(doneTodos.length>0){
     items+=`<div class="cal-detail-row" style="cursor:pointer;" onclick="calShowTodos('${dk}')"><div class="cal-detail-icon"><i class="ti ti-check" style="font-size:12px;color:var(--tm);" aria-hidden="true"></i></div><span class="cal-detail-text" id="cal-todo-summary-${dk}">완료한 일 ${doneTodos.length}개 ›</span></div>
@@ -8780,15 +8798,15 @@ function renderMonthlyStatBar(){
   ).length;
   const avgSleep=sleepCnt>0?(sleepMin/sleepCnt/60).toFixed(1):'-';
   el.innerHTML=`<div class="stat-bar-wrap">
-    <div class="sbar-item"><i class="ti ti-notes" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i><span class="sbar-num">${memos}</span></div>
+    <div class="sbar-item"><i class="ti ti-notes sub-tm-13" aria-hidden="true"></i><span class="sbar-num">${memos}</span></div>
     <div class="sbar-div"></div>
-    <div class="sbar-item"><i class="ti ti-checkbox" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i><span class="sbar-num">${todos}</span></div>
+    <div class="sbar-item"><i class="ti ti-checkbox sub-tm-13" aria-hidden="true"></i><span class="sbar-num">${todos}</span></div>
     <div class="sbar-div"></div>
-    <div class="sbar-item"><i class="ti ti-chart-donut" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i><span class="sbar-num">${pct}%</span></div>
+    <div class="sbar-item"><i class="ti ti-chart-donut sub-tm-13" aria-hidden="true"></i><span class="sbar-num">${pct}%</span></div>
     <div class="sbar-div"></div>
-    <div class="sbar-item"><i class="ti ti-stack-2" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i><span class="sbar-num">${cc}</span></div>
+    <div class="sbar-item"><i class="ti ti-stack-2 sub-tm-13" aria-hidden="true"></i><span class="sbar-num">${cc}</span></div>
     <div class="sbar-div"></div>
-    <div class="sbar-item"><i class="ti ti-moon-stars" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i><span class="sbar-num">${avgSleep}h</span></div>
+    <div class="sbar-item"><i class="ti ti-moon-stars sub-tm-13" aria-hidden="true"></i><span class="sbar-num">${avgSleep}h</span></div>
   </div>`;
 }
 // 주간탭 미니 통계바 — renderMonthlyStatBar와 동일한 원칙(콘텐츠는 완료+종료일 기준)을 주 단위로 적용.
@@ -8826,15 +8844,15 @@ function renderWeeklyStatBar(){
   const memoItemClass=isReportDay?'sbar-item sbar-item-active':'sbar-item';
   const memoItemAttr=isReportDay?`onclick="openWeeklyMemoReport()" title="이번 주 메모 리포트 보기"`:'';
   el.innerHTML=`<div class="stat-bar-wrap" style="border-top:none;margin-top:0;">
-    <div class="${memoItemClass}" ${memoItemAttr}><i class="ti ti-notes" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i><span class="sbar-num">${memos}</span></div>
+    <div class="${memoItemClass}" ${memoItemAttr}><i class="ti ti-notes sub-tm-13" aria-hidden="true"></i><span class="sbar-num">${memos}</span></div>
     <div class="sbar-div"></div>
-    <div class="sbar-item"><i class="ti ti-checkbox" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i><span class="sbar-num">${todos}</span></div>
+    <div class="sbar-item"><i class="ti ti-checkbox sub-tm-13" aria-hidden="true"></i><span class="sbar-num">${todos}</span></div>
     <div class="sbar-div"></div>
-    <div class="sbar-item"><i class="ti ti-chart-donut" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i><span class="sbar-num">${pct}%</span></div>
+    <div class="sbar-item"><i class="ti ti-chart-donut sub-tm-13" aria-hidden="true"></i><span class="sbar-num">${pct}%</span></div>
     <div class="sbar-div"></div>
-    <div class="sbar-item"><i class="ti ti-stack-2" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i><span class="sbar-num">${cc}</span></div>
+    <div class="sbar-item"><i class="ti ti-stack-2 sub-tm-13" aria-hidden="true"></i><span class="sbar-num">${cc}</span></div>
     <div class="sbar-div"></div>
-    <div class="sbar-item"><i class="ti ti-moon-stars" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i><span class="sbar-num">${wkAvgSleep}h</span></div>
+    <div class="sbar-item"><i class="ti ti-moon-stars sub-tm-13" aria-hidden="true"></i><span class="sbar-num">${wkAvgSleep}h</span></div>
   </div>`;
 }
 
@@ -10145,10 +10163,10 @@ function renderBookList(){
     const doneQuoteBlock=_rdTab==='done'?`
         <div class="done-banner-row">
           <div class="done-quote-chip" onclick="event.stopPropagation();toggleDoneBookQuotes('${b.cid}')">
-            <div class="done-quote-chip-inner" onclick="event.stopPropagation();toggleDoneBookQuotes('${b.cid}')"><i class="ti ti-quote" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 수집한 문장</div>
+            <div class="done-quote-chip-inner" onclick="event.stopPropagation();toggleDoneBookQuotes('${b.cid}')"><i class="ti ti-quote ico-12" aria-hidden="true"></i> 수집한 문장</div>
           </div>
           <div class="done-comment-chip" onclick="event.stopPropagation();toggleDoneBookComments('${b.cid}')">
-            <div class="done-comment-chip-inner" onclick="event.stopPropagation();toggleDoneBookComments('${b.cid}')"><i class="ti ti-message-circle" style="font-size:12px;vertical-align:-1px;" aria-hidden="true"></i> 코멘트</div>
+            <div class="done-comment-chip-inner" onclick="event.stopPropagation();toggleDoneBookComments('${b.cid}')"><i class="ti ti-message-circle ico-12" aria-hidden="true"></i> 코멘트</div>
           </div>
         </div>
         ${quoteOpen?`<div id="rd-done-quote-list-${b.cid}" style="margin-top:6px;"></div>
@@ -10479,6 +10497,7 @@ let _reserveMoveIdx=-1,_reserveSection='none';
 function getReserveTodos(){return S.get(S.key('todos',RESERVE_DK))||[];}
 function saveReserveTodos(v){
   S.set(S.key('todos',RESERVE_DK),v);
+  S.set(S.key('todos_pending',RESERVE_DK),true);
   autoSync('todos',RESERVE_DK);
 }
 
@@ -10533,7 +10552,7 @@ function addReserveTodo(){
   const inp=document.getElementById('reserve-inp');
   const text=inp?inp.value.trim():'';if(!text)return;
   const todos=getReserveTodos();
-  todos.push({text,done:false,created:Date.now(),timeSection:'none',cid:genCid(),is_reserve:true});
+  todos.push({text,done:false,created:Date.now(),timeSection:'none',cid:genCid()});
   saveReserveTodos(todos);
   if(inp){inp.value='';inp.style.height='';}
   renderReserveList();
@@ -10569,7 +10588,7 @@ function confirmReserveMove(){
   addDelPending('todos',RESERVE_DK,t.cid);
   todos.splice(_reserveMoveIdx,1);saveReserveTodos(todos);
   // 선택한 날짜 투두에 추가
-  const newTodo={text:t.text,done:false,created:Date.now(),timeSection:_reserveSection,cid:genCid(),is_reserve:false};
+  const newTodo={text:t.text,done:false,created:Date.now(),timeSection:_reserveSection,cid:genCid()};
   const targetTodos=getTodos(val);targetTodos.push(newTodo);saveTodos(val,targetTodos);
   // 오늘 날짜면 화면도 갱신
   if(val===dateKey(currentDate))renderTodos();
@@ -10781,7 +10800,7 @@ const DAYS_KO=['일','월','화','수','목','금','토'];
 async function forceRestoreDate(dk){
   var mrows=await supaFetch('memos?date_key=eq.'+dk+'&order=created');
   if(mrows!==null){
-    S.set(S.key('memos',dk),mrows.map(function(r){return {time:r.memo_time,text:r.text,created:r.created,cid:r.client_id||genCid()};}));
+    S.set(S.key('memos',dk),mrows.map(memoRowToLocal));
   }
   var trows=await supaFetch('todos?date_key=eq.'+dk+'&order=created');
   if(trows!==null){
@@ -10789,11 +10808,11 @@ async function forceRestoreDate(dk){
   }
   var srows=await supaFetch('sleep?date_key=eq.'+dk);
   if(srows&&srows.length>0){
-    S.set(S.key('sleep',dk),{sleep:srows[0].sleep_time,wake:srows[0].wake_time,score:srows[0].score});
+    S.set(S.key('sleep',dk),sleepRowToLocal(srows[0]));
   }
   var mlrows=await supaFetch('meals?date_key=eq.'+dk);
   if(mlrows&&mlrows.length>0){
-    S.set(S.key('meals',dk),{breakfast:mlrows[0].breakfast||'',lunch:mlrows[0].lunch||'',dinner:mlrows[0].dinner||'',snack:mlrows[0].snack||'',breakfast_time:mlrows[0].breakfast_time||'',lunch_time:mlrows[0].lunch_time||'',dinner_time:mlrows[0].dinner_time||'',snack_time:mlrows[0].snack_time||''});
+    S.set(S.key('meals',dk),mealRowToLocal(mlrows[0]));
   }
   var rbrows=await supaFetch('rhythm_blocks?date_key=eq.'+dk+'&order=created');
   if(rbrows&&rbrows.length>0){
