@@ -111,7 +111,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 /* ── TABS ── */
 .view-tabs{display:flex;gap:6px;padding:0 18px 10px;flex-shrink:0;}
-.vtab{flex:1;padding:7px 4px;border-radius:12px;font-size:11.5px;text-align:center;color:var(--tm);border:1px solid rgba(255,220,200,0.25);background:rgba(255,255,255,0.20);cursor:pointer;transition:all .2s;user-select:none;}
+.vtab{flex:1;padding:7px 4px;border-radius:12px;font-size:13px;text-align:center;color:var(--tm);border:1px solid rgba(255,220,200,0.25);background:rgba(255,255,255,0.20);cursor:pointer;transition:all .2s;user-select:none;}
 .vtab.on{
   background-color:transparent;
   border:1.6px solid transparent;
@@ -164,8 +164,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 /* ── SLEEP ── */
 .sleep-card{position:relative;border-radius:20px;padding:16px 18px 14px;margin-bottom:14px;overflow:hidden;background:var(--sleep-b);border:1px solid var(--sleep-bb);}
 .sleep-top{display:flex;align-items:center;gap:5px;}
-.sleep-top-num{font-size:10px;font-weight:400;color:var(--tm);letter-spacing:.10em;}
-.sleep-top-unit{font-size:10px;color:var(--tm);letter-spacing:.10em;}
+.sleep-top-num{font-size:13px;font-weight:400;color:var(--tm);letter-spacing:.10em;}
+.sleep-top-unit{font-size:13px;color:var(--tm);letter-spacing:.10em;}
 .sleep-curve{margin-top:8px;height:10px;display:block;width:100%;}
 .sleep-curve-wrap{position:relative;margin:14px 9px 0;height:10px;}
 .sleep-curve-wrap .sleep-curve{margin-top:0;position:absolute;top:0;left:0;}
@@ -173,14 +173,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 #sleep-badge-start{background:#8a7ab0;}
 #sleep-badge-end{background:#e0a860;}
 .sleep-avg-marker{position:absolute;top:50%;width:1.5px;height:14px;background:rgba(180,168,155,0.32);transform:translate(-50%,-50%);pointer-events:none;z-index:1;}
-.sleep-avg-compare{font-size:12px;color:var(--tm);margin-top:4px;text-align:left;}
+.sleep-avg-compare{font-size:13px;color:var(--tm);margin-top:4px;text-align:left;}
 .sleep-times{display:flex;justify-content:space-between;align-items:flex-start;margin-top:6px;}
 .sleep-time-item{display:flex;align-items:center;gap:5px;cursor:pointer;}
 .sleep-time-item i{font-size:13px;color:var(--tm);}
 .sleep-time-val{font-size:14px;color:var(--tp);font-weight:400;}
 .sleep-btn{width:26px;height:26px;background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
 .sleep-btn:active{opacity:.5;}
-.sleep-btn i{font-size:13px;color:var(--tm);}
+.sleep-btn i{font-size:16px;color:var(--tm);}
 
 /* ── TODO ── */
 .todo-item{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--div);font-size:13px;color:var(--tp);position:relative;overflow:hidden;user-select:none;}
@@ -908,7 +908,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 /* ── 오늘 해빗 체크박스 (수면박스 색) ── */
 .habit-check-box{background:var(--sleep-b);border:1px solid var(--sleep-bb);border-radius:14px;padding:12px 10px 8px;display:flex;flex-wrap:wrap;justify-content:space-around;gap:8px;}
 .habit-check-col{display:flex;flex-direction:column;align-items:center;gap:7px;min-width:42px;}
-.habit-check-name{font-size:13px;color:var(--tp);text-align:center;}
+.habit-check-name{font-size:12px;color:var(--tm);text-align:center;}
 .habit-check-foot{width:100%;display:flex;justify-content:flex-end;margin-top:5px;margin-bottom:0;}
 .habit-chk2{width:25px;height:25px;border-radius:50%;border:1.5px dashed rgba(195,175,168,0.5);background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;}
 .habit-chk2.on{border-style:solid;}
@@ -974,7 +974,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 .habit-numbox-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(78px,1fr));gap:8px;margin-bottom:10px;}
 .habit-numbox-card{display:flex;flex-direction:column;align-items:center;background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:14px 8px;}
-.habit-numbox-name{font-size:13px;color:var(--tp);margin-bottom:2px;}
+.habit-numbox-name{font-size:12px;color:var(--tm);margin-bottom:2px;}
 .habit-numbox-num{font-size:18px;font-weight:700;color:var(--tp);font-family:'DM Sans',sans-serif;}
 .forest-density-card{background:linear-gradient(135deg,rgba(230,225,195,0.4),rgba(190,210,175,0.4));border-color:rgba(170,195,150,0.45);}
 [data-theme="glass"] .forest-density-card{background:rgba(253,251,245,0.95);}
