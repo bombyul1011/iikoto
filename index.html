@@ -249,11 +249,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .m-chip.active{background:rgba(150,215,180,0.4);border-color:rgba(140,210,170,0.55);color:#3a7858;font-weight:700;}
 .m-chip.disabled{opacity:0.35;cursor:default;}
 .mr-card{border-radius:16px;background:var(--card);border:1px solid var(--card-b);padding:15px 15px 13px;margin-bottom:12px;}
-.mr-sec-title{font-size:10px;color:var(--tm);letter-spacing:.10em;text-transform:uppercase;margin-bottom:11px;}
+.mr-sec-title{font-size:12px;color:var(--tm);letter-spacing:.10em;text-transform:uppercase;margin-bottom:11px;}
 .mr-row2{display:flex;gap:8px;margin-bottom:4px;}
 .mr-stat{flex:1;border-radius:14px;background:var(--card);border:1px solid var(--card-b);padding:12px 12px;}
 .mr-stat .v{font-size:22px;font-weight:300;color:var(--tp);letter-spacing:-.5px;line-height:1;}
-.mr-stat .l{font-size:10px;color:var(--tm);margin-top:5px;}
+.mr-stat .l{font-size:12px;color:var(--tm);margin-top:5px;}
 .mr-tag-cloud{display:flex;flex-wrap:wrap;gap:6px;}
 .mr-tag{font-size:11px;padding:5px 11px;border-radius:13px;background:rgba(255,230,200,0.45);border:1px solid rgba(240,210,160,0.5);color:#8a6840;}
 .mr-week-anchor{margin-bottom:14px;}
@@ -2657,7 +2657,7 @@ async function openDiaryMonthSheet(){
   if(el){
     const now=new Date();
     el.innerHTML=`<div style="font-family:'Comfortaa',sans-serif;font-weight:700;font-size:17px;color:var(--tp);margin-bottom:2px;">${now.getMonth()+1}월의 하루한줄</div>
-      <div style="font-size:11px;color:var(--tm);margin-bottom:14px;">${now.getFullYear()}.${now.getMonth()+1}</div>
+      <div style="font-size:12px;color:var(--tm);margin-bottom:14px;">${now.getFullYear()}.${now.getMonth()+1}</div>
       <div style="font-size:12px;color:var(--tm);text-align:center;padding:30px 0;">불러오는 중...</div>`;
   }
   openSheet('diary-month-sheet');
@@ -2684,7 +2684,7 @@ async function renderDiaryMonthSheet(){
       </div>`;
     }
     el.innerHTML=`<div style="font-family:'Comfortaa',sans-serif;font-weight:700;font-size:17px;color:var(--tp);margin-bottom:2px;">${mo+1}월의 하루한줄</div>
-      <div style="font-size:11px;color:var(--tm);margin-bottom:14px;">${y}.${mo+1}</div>
+      <div style="font-size:12px;color:var(--tm);margin-bottom:14px;">${y}.${mo+1}</div>
       <div id="diary-month-list-scroll" style="max-height:330px;overflow-y:auto;">
         <div class="card" style="padding:2px 14px;">${rowsHtml}</div>
       </div>`;
