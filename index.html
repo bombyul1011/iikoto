@@ -2057,6 +2057,7 @@ function renderHomeBody(section){
       if(quoteCard)body.appendChild(quoteCard);
       body.appendChild(makeLabel('밀도의 숲'));
       body.appendChild(makeMonthlyHeatmapCard());
+      body.appendChild(makeTestMorningRoutine6Card()); // [테스트용] 오전루틴 6개안 확인 후 제거 예정
     }else{
       body.appendChild(makeLabel('이달의 플리'));
       body.appendChild(makePlaylistMiniCard());
@@ -4804,11 +4805,11 @@ function loadSleep(){
 function renderSleepAvgScoreBadge(){
   const el=document.getElementById('sleep-avg-score-badge');
   if(!el)return;
-  const avg=getAvgSleepScore(7);
+  const avg=getAvgSleepScore(14);
   if(!avg||avg.sampleCount<3){el.innerHTML='';el.title='';return;}
   const lv=getSleepScoreLevel(avg.avg);
   el.innerHTML=`<i class="ti ${lv.icon}" style="font-size:19px;color:var(--tm);" aria-hidden="true"></i>`;
-  el.title='최근 7일 평균 수면점수 '+avg.avg+'점 ('+lv.label+')';
+  el.title='최근 14일 평균 수면점수 '+avg.avg+'점 ('+lv.label+')';
 }
 function calcSleep(s,w){
   const numEl=document.getElementById('sleep-dur-num'),unitEl=document.getElementById('sleep-dur-unit');
@@ -5457,6 +5458,16 @@ const MORNING_ROUTINE_ITEMS=[
   {key:'pill',label:'공복 영양제',icon:'ti-clipboard-heart',colorRgb:'205,215,145'},
   {key:'stretch',label:'스트레칭',icon:'ti-stretching-2',colorRgb:'150,205,225'}
 ];
+// [테스트용] 오전루틴 6개 실험안 — 저녁파트2 하단에 임시로 붙여서 간격/느낌만 확인하는 용도.
+// 확정되면 오전 파트로 옮기고 이 배열은 제거 예정.
+const MORNING_ROUTINE_ITEMS_TEST6=[
+  {key:'t_wake',label:'기상',icon:'ti-sunset-2',colorRgb:'252,215,110'},
+  {key:'t_wash',label:'세안',icon:'ti-droplet',colorRgb:'168,212,232'},
+  {key:'t_tea',label:'티타임',icon:'ti-cup',colorRgb:'244,177,206'},
+  {key:'t_audiobook',label:'오디오북',icon:'ti-radio',colorRgb:'216,168,205'},
+  {key:'t_weight',label:'체중',icon:'ti-scale-outline',colorRgb:'150,205,225'},
+  {key:'t_pill',label:'영양제',icon:'ti-clipboard-heart',colorRgb:'205,215,145'}
+];
 function getMorningRoutineChecks(dk){return S.get('mroutine_'+dk)||{};}
 function toggleMorningRoutineCheck(key){
   const dk=dateKey(getLogicalDate());
@@ -5552,6 +5563,72 @@ function confirmSleepScore(){
     card.replaceWith(fresh);
   }
   renderSleepAvgScoreBadge();
+}
+// [테스트용] 6개 오전루틴 실험 카드 — 실제 체크 저장 없이 순수하게 간격/느낌만 눈으로 확인하는 용도.
+// 확정 여부 결정 후 이 함수와 makeTestMorningRoutine6Card 호출부, MORNING_ROUTINE_ITEMS_TEST6 배열을 함께 제거할 예정.
+let _testMorningChecks6={}; // 이 세션 동안만 유지되는 임시 체크 상태(저장 안 됨)
+function makeTestMorningRoutine6Card(){
+  const items=MORNING_ROUTINE_ITEMS_TEST6;
+  const checks=_testMorningChecks6;
+  const doneItems=items.filter(it=>checks[it.key]);
+  const pendingItems=items.filter(it=>!checks[it.key]);
+  const orderedItems=[...doneItems,...pendingItems];
+  const doneCount=doneItems.length;
+  const total=items.length;
+
+  const card=document.createElement('div');
+  card.className='pace-card';
+  card.id='test-morning-routine-6-card';
+
+  const cx=160,cy=100,r=100;
+  // 6개를 기존 4개와 같은 각도 범위(160°~20°, 140도)에 균등 배치
+  const n=items.length;
+  const startAngle=160,endAngle=20;
+  const step=(startAngle-endAngle)/(n-1);
+  const angles=Array.from({length:n},(_,i)=>startAngle-i*step);
+  const positions=angles.map(deg=>{
+    const rad=deg*Math.PI/180;
+    return {x:cx+r*Math.cos(rad),y:cy-r*Math.sin(rad)};
+  });
+
+  let svg=`<svg width="100%" height="${cy+2}" viewBox="0 0 320 ${cy+2}" style="overflow:visible;">`;
+  svg+=`<defs><linearGradient id="mrGradTest6" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#ffcba3"/><stop offset="100%" stop-color="#ffc2d6"/></linearGradient></defs>`;
+  const bgStartAngle=145, bgEndAngle=35;
+  const bgStart={x:cx+r*Math.cos(bgStartAngle*Math.PI/180),y:cy-r*Math.sin(bgStartAngle*Math.PI/180)};
+  const bgEnd={x:cx+r*Math.cos(bgEndAngle*Math.PI/180),y:cy-r*Math.sin(bgEndAngle*Math.PI/180)};
+  svg+=`<path d="M${bgStart.x},${bgStart.y} A${r},${r} 0 0,1 ${bgEnd.x},${bgEnd.y}" fill="none" stroke="rgba(205,185,165,0.38)" stroke-width="1.5" stroke-dasharray="1 6"/>`;
+  for(let i=0;i<positions.length-1;i++){
+    const a=positions[i],b=positions[i+1];
+    const segDone=!!checks[orderedItems[i].key]&&!!checks[orderedItems[i+1].key];
+    if(segDone){
+      svg+=`<path d="M${a.x},${a.y} A${r},${r} 0 0,1 ${b.x},${b.y}" fill="none" stroke="url(#mrGradTest6)" stroke-width="3" stroke-linecap="round"/>`;
+    }
+  }
+  svg+=`</svg>`;
+
+  let iconsHtml='';
+  orderedItems.forEach((it,i)=>{
+    const pos=positions[i];
+    const isDone=!!checks[it.key];
+    const size=34;
+    const iconSize=15;
+    iconsHtml+=`<div onclick="toggleTestMorningRoutineCheck6('${it.key}')" style="position:absolute;left:${pos.x/320*100}%;top:${pos.y}px;width:${size}px;height:${size}px;border-radius:50%;display:flex;align-items:center;justify-content:center;transform:translate(-50%,-50%);cursor:pointer;transition:all .3s cubic-bezier(.34,1.4,.64,1);${
+      isDone?`background:rgba(${it.colorRgb},0.85);box-shadow:0 2px 8px rgba(${it.colorRgb},0.4);`:'background:var(--card);border:1.5px solid var(--card-b);'
+    }"><i class="ti ${it.icon}" style="font-size:${iconSize}px;color:${isDone?'#fff':'var(--tm)'};" aria-hidden="true"></i></div>`;
+  });
+
+  card.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
+    <span style="font-size:12px;color:var(--tm);">[테스트] 오전루틴 6개안</span>
+    <span style="font-size:11.5px;color:var(--tm);">${doneCount}/${total}</span>
+  </div>
+  <div style="position:relative;">${svg}<div style="position:absolute;top:0;left:0;width:100%;height:${cy+2}px;">${iconsHtml}</div></div>`;
+  return card;
+}
+function toggleTestMorningRoutineCheck6(key){
+  if(_testMorningChecks6[key])delete _testMorningChecks6[key];
+  else _testMorningChecks6[key]=true;
+  const card=document.getElementById('test-morning-routine-6-card');
+  if(card){const fresh=makeTestMorningRoutine6Card();card.replaceWith(fresh);}
 }
 function makeMorningRoutineCard(){
   const dk=dateKey(getLogicalDate());
@@ -8821,6 +8898,7 @@ function renderWeeklyStatBar(){
   let memos=0,todos=0,hc=0,ht=0,sleepMin=0,sleepCnt=0;
   const habits=getHabits();
   const days=[];
+  const today=new Date();today.setHours(0,0,0,0);
   for(let i=0;i<7;i++){
     const d=new Date(wkStart);d.setDate(wkStart.getDate()+i);
     days.push(d);
@@ -8828,6 +8906,8 @@ function renderWeeklyStatBar(){
     memos+=getMemos(dk).length;todos+=getTodos(dk).filter(t=>t.done).length;
     const sl=getSleep(dk);
     if(sl.sleep&&sl.wake){const sv=sl.sleep.split(':').map(Number),wv=sl.wake.split(':').map(Number);let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;sleepMin+=m;sleepCnt++;}
+    // 습관 달성률(%)만 "오늘까지"로 분모를 제한 — 아직 오지 않은 날을 미달성으로 세지 않기 위함(월간탭과 동일한 원칙).
+    if(d>today)continue;
     const dow=(d.getDay()+6)%7;
     const checks=getHabitChecks(wk);
     habits.forEach(h=>{ht++;if(checks[`${h.name}-${dow}`])hc++;});
