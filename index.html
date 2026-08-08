@@ -9567,17 +9567,23 @@ function clearMealTime(dk,k){
   if(tEl)tEl.classList.add('mt-empty');
 }
 function saveOneMealDay(dk){
+  const existing=getMeals(dk); // PC(비터치)에서는 시간 input(wm-${dk}-${k}-time) 자체가 DOM에 없으므로,
+  // tEl 부재를 '시간 삭제'로 오인하지 않고 기존 저장값을 그대로 보존해야 함 (이전 버그: PC에서 메뉴칸만 건드려도 그날 전체 시간이 삭제되어 서버까지 반영됨)
   const m={};
   MEAL_KEYS.forEach(k=>{
     const el=document.getElementById(`wm-${dk}-${k}`);
     const tEl=document.getElementById(`wm-${dk}-${k}-time`);
-    m[k]=el?el.value.trim():'';
+    m[k]=el?el.value.trim():(existing[k]||'');
     // 메뉴명이 비어있으면 시간도 같이 지움 — 리듬 막대에 잔존하는 문제 방지
     if(!m[k]){
       m[k+'_time']='';
       if(tEl)tEl.value='';
+    }else if(tEl){
+      // 시간 input이 DOM에 있는 경우(모바일)에만 그 값을 반영
+      m[k+'_time']=tEl.value;
     }else{
-      m[k+'_time']=tEl?tEl.value:'';
+      // 시간 input이 없는 경우(PC) — 기존 저장된 시간을 그대로 유지
+      m[k+'_time']=existing[k+'_time']||'';
     }
   });
   saveMealsData(dk,m);
