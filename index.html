@@ -1249,7 +1249,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   <div class="bsheet" style="max-height:85vh;overflow-y:auto;" onclick="event.stopPropagation()">
     <div class="sheet-handle"></div>
     <div style="padding:0 20px 24px;">
-      <div class="goal-section-title" style="margin-top:0;"><i class="ti ti-calendar-stats ico-13" aria-hidden="true"></i> 독서 달력</div>
       <div id="rdcal-view"></div>
     </div>
   </div>
@@ -10533,24 +10532,22 @@ function renderReadingCalView(){
     const dk=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const dayLogs=_rdCalLogsByDate[dk]||[];
     const cids=[...new Set(dayLogs.map(r=>r.book_cid))];
-    const isOpen=_rdCalOpenDk===dk;
     let cellInner;
     if(cids.length){
       // 표지가 있는 날은 밀리의 서재 방식대로 일자 숫자를 생략 — 표지 자체가 그 날의 표식이 됨
       const cover=bookMap[cids[0]]&&bookMap[cids[0]].poster;
-      cellInner=`<div style="position:relative;width:34px;height:46px;margin:0 auto;border-radius:6px;overflow:hidden;background:var(--card);border:1px solid ${isOpen?'var(--acc,#c07080)':'var(--card-b)'};${isOpen?'box-shadow:0 0 0 1.5px var(--acc,#c07080);':''}${cover?`background-image:url('${cover}');background-size:cover;background-position:center;`:''}">
+      cellInner=`<div style="position:relative;width:34px;height:46px;margin:0 auto;border-radius:6px;overflow:hidden;background:var(--card);border:1px solid var(--card-b);${cover?`background-image:url('${cover}');background-size:cover;background-position:center;`:''}">
         ${cids.length>1?`<div style="position:absolute;bottom:2px;right:2px;background:rgba(60,40,35,0.72);color:#fff;font-size:9px;font-weight:600;border-radius:7px;min-width:14px;height:14px;display:flex;align-items:center;justify-content:center;padding:0 3px;">${cids.length}</div>`:''}
       </div>`;
     }else{
       cellInner=`<div style="text-align:center;font-size:11px;color:var(--tm);height:46px;display:flex;align-items:center;justify-content:center;">${d}</div>`;
     }
     html+=`<div style="cursor:${cids.length?'pointer':'default'};" ${cids.length?`onclick="rdCalDayTap('${dk}')"`:''}>${cellInner}</div>`;
-    // 이 날짜가 펼쳐진 상태면, 같은 주 행이 끝나는 지점이 아니어도 바로 아래에 상세를 폭 전체로 삽입
-    if(isOpen){
-      html+=`<div style="grid-column:1/-1;">${renderReadingCalDayDetailHtml(dk,dayLogs,bookMap)}</div>`;
-    }
   }
   html+='</div>';
+  if(_rdCalOpenDk&&_rdCalLogsByDate[_rdCalOpenDk]){
+    html+=`<div style="margin-top:18px;">${renderReadingCalDayDetailHtml(_rdCalOpenDk,_rdCalLogsByDate[_rdCalOpenDk],bookMap)}</div>`;
+  }
   el.innerHTML=html;
 }
 function renderReadingCalDayDetailHtml(dk,dayLogs,bookMap){
