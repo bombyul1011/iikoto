@@ -10255,15 +10255,9 @@ function renderBookList(){
     const titleRow=_rdTab==='done'?
       `<div class="rd-book-title" style="display:flex;justify-content:space-between;align-items:center;">
         <span>${b.title}</span>
-        <span style="display:flex;align-items:center;gap:6px;">
-          <span onclick="event.stopPropagation();shareTodayReadingCard('${b.cid}')" title="공유 이미지" style="cursor:pointer;color:var(--ts);opacity:0.75;"><i class="ti ti-share" style="font-size:13px;" aria-hidden="true"></i></span>
-          <span class="rd-del-btn" onclick="event.stopPropagation();removeBook('${b.cid}')">삭제</span>
-        </span>
+        <span class="rd-del-btn" onclick="event.stopPropagation();removeBook('${b.cid}')">삭제</span>
       </div>`:
-      `<div class="rd-book-title" style="display:flex;justify-content:space-between;align-items:center;">
-        <span>${b.title}</span>
-        <span onclick="event.stopPropagation();shareTodayReadingCard('${b.cid}')" title="공유 이미지" style="cursor:pointer;color:var(--ts);opacity:0.75;"><i class="ti ti-share" style="font-size:13px;" aria-hidden="true"></i></span>
-      </div>`;
+      `<div class="rd-book-title">${b.title}</div>`;
     return `<div class="rd-book-item${open?' open':''}" onclick="toggleBookDetail('${b.cid}')">
       ${titleRow}
       <div class="rd-book-meta">${metaStr}</div>
@@ -10573,6 +10567,8 @@ function renderReadingCalDayDetailHtml(dk,dayLogs,bookMap){
     const timeText=r.seconds>0?Math.round(r.seconds/60)+'분':'';
     const metaLine=[progText,amountText,timeText].filter(Boolean).join(' · ');
     const posterHtml=cover?`<img src="${cover}" style="width:32px;height:44px;border-radius:5px;object-fit:cover;flex-shrink:0;" />`:`<div style="width:32px;height:44px;border-radius:5px;background:var(--card2);flex-shrink:0;display:flex;align-items:center;justify-content:center;"><i class="ti ti-book ico-13" style="color:var(--tm);" aria-hidden="true"></i></div>`;
+    const isToday=dk===dateKey(getLogicalDate());
+    const shareBtn=isToday?`<span onclick="event.stopPropagation();openTodayReadingShareModal('${r.book_cid}','${r.unit}',${r.percent_after!=null?r.percent_after:'null'},${r.pages_after!=null?r.pages_after:'null'},${r.seconds||0})" title="공유 이미지" style="cursor:pointer;color:var(--ts);opacity:0.75;flex-shrink:0;padding:4px;"><i class="ti ti-share" style="font-size:14px;" aria-hidden="true"></i></span>`:'';
     return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;">
       ${posterHtml}
       <div style="flex:1;min-width:0;">
@@ -10580,6 +10576,7 @@ function renderReadingCalDayDetailHtml(dk,dayLogs,bookMap){
         ${author?`<div style="font-size:10.5px;color:var(--tm);margin-top:1px;">${author}</div>`:''}
         <div style="font-size:11px;color:var(--ts);margin-top:2px;">${metaLine}</div>
       </div>
+      ${shareBtn}
     </div>`;
   }).join('');
   return `<div class="mr-card" style="margin:2px 0 4px;">
@@ -10587,14 +10584,16 @@ function renderReadingCalDayDetailHtml(dk,dayLogs,bookMap){
     ${items}
   </div>`;
 }
-// ── 독서 공유카드 (투명 PNG, 클립보드 복사) ──
-// 카드 공통 유틸: 텍스트 줄바꿈
+// ── 독서 공유카드 (투명 PNG) ──
+// 원칙: canvas는 처음부터 끝까지 완전 투명 배경 하나만 그린다.
+// 미리보기는 그 canvas를 앱 배경(--bg) 위에 그대로 얹어서 보여주면 되므로,
+// "미리보기용 불투명 버전"을 별도로 그릴 필요가 없다 — 그리기는 1회, 표시/복사는 같은 결과물 재사용.
 function _shareWrapText(ctx,text,maxWidth){
-  const words=text.split('');
+  const chars=text.split('');
   let lines=[],cur='';
-  for(let i=0;i<words.length;i++){
-    const test=cur+words[i];
-    if(ctx.measureText(test).width>maxWidth&&cur){lines.push(cur);cur=words[i];}
+  for(let i=0;i<chars.length;i++){
+    const test=cur+chars[i];
+    if(ctx.measureText(test).width>maxWidth&&cur){lines.push(cur);cur=chars[i];}
     else cur=test;
   }
   if(cur)lines.push(cur);
@@ -10606,9 +10605,7 @@ async function _shareCanvasToClipboard(canvas){
       try{
         await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
         resolve(true);
-      }catch(e){
-        resolve(false);
-      }
+      }catch(e){resolve(false);}
     },'image/png');
   });
 }
@@ -10619,60 +10616,6 @@ function _shareToast(msg){
   document.body.appendChild(t);
   setTimeout(()=>t.remove(),1800);
 }
-// 문장 카드 — 카드 인 카드형(H), 반투명 패널 + 하단 책정보 + iikoto books 워터마크
-async function shareQuoteCard(quoteCid){
-  const q=getQuotes().find(x=>x.cid===quoteCid);if(!q)return;
-  const book=getBooks().find(b=>b.cid===q.bookCid);
-  const W=1080,H=1350;
-  const canvas=document.createElement('canvas');
-  canvas.width=W;canvas.height=H;
-  const ctx=canvas.getContext('2d');
-  // 배경: 앱 톤 그라디언트
-  const bg=ctx.createLinearGradient(0,0,W,H);
-  bg.addColorStop(0,'#fdf0e8');bg.addColorStop(0.5,'#fef5d4');bg.addColorStop(1,'#fde8f0');
-  ctx.fillStyle=bg;
-  _roundRect(ctx,0,0,W,H,48);ctx.fill();
-  // 패널
-  const px=88,py=250,pw=W-176,ph=H-500;
-  ctx.fillStyle='rgba(255,255,255,0.55)';
-  _roundRect(ctx,px,py,pw,ph,32);ctx.fill();
-  ctx.strokeStyle='rgba(255,255,255,0.7)';ctx.lineWidth=2;
-  _roundRect(ctx,px,py,pw,ph,32);ctx.stroke();
-  // 문장 텍스트
-  await _ensureBareonbatangLoaded();
-  ctx.fillStyle='#5a4040';
-  ctx.font='400 40px Bareonbatang, serif';
-  ctx.textBaseline='top';
-  const lines=_shareWrapText(ctx,q.text,pw-96);
-  let ty=py+56;
-  lines.forEach(line=>{ctx.fillText(line,px+48,ty);ty+=64;});
-  // footer 구분선
-  const fy=ty+30;
-  ctx.strokeStyle='rgba(154,128,112,0.3)';
-  ctx.setLineDash([6,6]);ctx.lineWidth=1.5;
-  ctx.beginPath();ctx.moveTo(px+48,fy);ctx.lineTo(px+pw-48,fy);ctx.stroke();
-  ctx.setLineDash([]);
-  // 책 제목 · 저자
-  ctx.font='600 26px "DM Sans",sans-serif';
-  ctx.fillStyle='#5a4040';
-  const title=book?book.title:'';
-  ctx.fillText(title,px+48,fy+28);
-  const titleW=ctx.measureText(title).width;
-  if(book&&book.author){
-    ctx.font='400 24px "DM Sans",sans-serif';
-    ctx.fillStyle='#9a8070';
-    ctx.fillText(' · '+book.author,px+48+titleW,fy+28);
-  }
-  // iikoto books 워터마크 (이탤릭 + book 아이콘)
-  ctx.font='italic 400 24px Bareonbatang, serif';
-  ctx.fillStyle='#c8b0a8';
-  ctx.textAlign='right';
-  ctx.fillText('iikoto books',px+pw-48-30,fy+68);
-  ctx.textAlign='left';
-  _drawBookIcon(ctx,px+pw-48-24,fy+62,20,'#c8b0a8');
-  const ok=await _shareCanvasToClipboard(canvas);
-  _shareToast(ok?'이미지가 복사됐어요':'복사에 실패했어요');
-}
 function _roundRect(ctx,x,y,w,h,r){
   ctx.beginPath();
   ctx.moveTo(x+r,y);
@@ -10682,7 +10625,6 @@ function _roundRect(ctx,x,y,w,h,r){
   ctx.arcTo(x,y,x+w,y,r);
   ctx.closePath();
 }
-// ti-book 아이콘을 canvas 선으로 간단히 재현 (책 표지+페이지 형태)
 function _drawBookIcon(ctx,x,y,size,color){
   ctx.save();
   ctx.translate(x,y);
@@ -10699,73 +10641,6 @@ async function _ensureBareonbatangLoaded(){
   if(_bareonbatangLoaded)return;
   try{await document.fonts.load('400 40px Bareonbatang');await document.fonts.load('italic 400 24px Bareonbatang');_bareonbatangLoaded=true;}catch(e){}
 }
-// 오늘의 기록 카드 — 미니멀 숫자형(A), 진도율 큰 숫자 + 오늘 기록(읽은 시간/회차)
-async function shareTodayReadingCard(bookCid){
-  const book=getBooks().find(b=>b.cid===bookCid);if(!book)return;
-  const W=1080,H=1350;
-  const canvas=document.createElement('canvas');
-  canvas.width=W;canvas.height=H;
-  const ctx=canvas.getContext('2d');
-  const bg=ctx.createLinearGradient(0,0,W,H);
-  bg.addColorStop(0,'#fdf0e8');bg.addColorStop(0.5,'#fef5d4');bg.addColorStop(1,'#fde8f0');
-  ctx.fillStyle=bg;
-  _roundRect(ctx,0,0,W,H,48);ctx.fill();
-  await _ensureBareonbatangLoaded();
-  const cx=W/2;
-  // 상단 워터마크 로고 (앱 상단바 로고 base64 재사용)
-  const logoImg=await _loadShareLogo();
-  if(logoImg){
-    const lh=56,lw=lh*(logoImg.width/logoImg.height);
-    ctx.globalAlpha=0.6;
-    ctx.drawImage(logoImg,cx-lw/2,120,lw,lh);
-    ctx.globalAlpha=1;
-  }
-  // TODAY'S READING 라벨
-  ctx.textAlign='center';
-  ctx.font='500 26px "DM Sans",sans-serif';
-  ctx.fillStyle='#9a8070';
-  ctx.fillText("TODAY'S READING",cx,232);
-  // 책 제목
-  ctx.font='400 46px Bareonbatang, serif';
-  ctx.fillStyle='#5a4040';
-  const titleLines=_shareWrapText(ctx,book.title,W-240);
-  let ty=310;
-  titleLines.forEach(line=>{ctx.fillText(line,cx,ty);ty+=64;});
-  // 진도율 큰 숫자
-  const progVal=book.unit==='percent'?(book.percent||0):(book.pages||0);
-  const progUnit=book.unit==='percent'?'%':'p';
-  ty+=50;
-  ctx.font='700 118px "DM Sans",sans-serif';
-  ctx.fillStyle='#5a4040';
-  ctx.fillText(progVal+progUnit,cx,ty);
-  ty+=56;
-  ctx.font='500 26px "DM Sans",sans-serif';
-  ctx.fillStyle='#9a8070';
-  ctx.fillText('완독',cx,ty);
-  // 오늘 기록 박스
-  ty+=70;
-  ctx.strokeStyle='rgba(154,128,112,0.2)';ctx.lineWidth=2;
-  ctx.beginPath();ctx.moveTo(cx-(W-176)/2,ty);ctx.lineTo(cx+(W-176)/2,ty);ctx.stroke();
-  ty+=54;
-  ctx.font='600 22px "DM Sans",sans-serif';
-  ctx.fillStyle='#3d8a78';
-  ctx.fillText('오늘 기록',cx,ty);
-  ty+=54;
-  const timeStr=book.seconds?Math.floor(book.seconds/60)+'분':'-';
-  const sessionCount=book.status==='reading'?countReadingSessionsForBook(book.title):0;
-  const sessionStr=sessionCount>0?sessionCount+'회차':'-';
-  ctx.font='600 34px "DM Sans",sans-serif';
-  ctx.fillStyle='#5a4040';
-  const gap=60;
-  const w1=ctx.measureText(timeStr).width,w2=ctx.measureText(sessionStr).width;
-  const totalW=w1+w2+gap;
-  ctx.textAlign='left';
-  ctx.fillText(timeStr,cx-totalW/2,ty);
-  ctx.fillText(sessionStr,cx-totalW/2+w1+gap,ty);
-  ctx.textAlign='center';
-  const ok=await _shareCanvasToClipboard(canvas);
-  _shareToast(ok?'이미지가 복사됐어요':'복사에 실패했어요');
-}
 let _shareLogoImg=null;
 function _loadShareLogo(){
   if(_shareLogoImg)return Promise.resolve(_shareLogoImg);
@@ -10777,6 +10652,264 @@ function _loadShareLogo(){
     img.onerror=()=>resolve(null);
     img.src=imgEl.src;
   });
+}
+
+// ── 문장 카드: G(배경 따옴표형) / H(카드 인 카드형) — 배경은 항상 투명, H만 반투명 패널 사용
+async function _drawQuoteCardG(ctx,W,H,q,book){
+  await _ensureBareonbatangLoaded();
+  ctx.fillStyle='rgba(90,64,64,0.10)';
+  ctx.font='700 200px Georgia, serif';
+  ctx.textBaseline='top';
+  ctx.fillText('"',60,40);
+  ctx.fillStyle='#5a4040';
+  ctx.font='400 40px Bareonbatang, serif';
+  const lines=_shareWrapText(ctx,q.text,W-176);
+  let ty=300;
+  lines.forEach(line=>{ctx.fillText(line,88,ty);ty+=64;});
+  ty+=40;
+  ctx.font='600 26px "DM Sans",sans-serif';
+  ctx.fillStyle='#5a4040';
+  const title=book?book.title:'';
+  ctx.fillText(title,88,ty);
+  const titleW=ctx.measureText(title).width;
+  if(book&&book.author){
+    ctx.font='400 24px "DM Sans",sans-serif';
+    ctx.fillStyle='#9a8070';
+    ctx.fillText(' · '+book.author,88+titleW,ty);
+  }
+  ty+=54;
+  ctx.font='italic 400 24px Bareonbatang, serif';
+  ctx.fillStyle='#c8b0a8';
+  ctx.fillText('iikoto books',88,ty);
+  const wmW=ctx.measureText('iikoto books').width;
+  _drawBookIcon(ctx,88+wmW+18,ty-2,22,'#c8b0a8');
+}
+async function _drawQuoteCardH(ctx,W,H,q,book){
+  await _ensureBareonbatangLoaded();
+  const px=88,py=250,pw=W-176,ph=H-500;
+  ctx.fillStyle='rgba(255,255,255,0.42)';
+  _roundRect(ctx,px,py,pw,ph,32);ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,0.6)';ctx.lineWidth=2;
+  _roundRect(ctx,px,py,pw,ph,32);ctx.stroke();
+  ctx.fillStyle='#5a4040';
+  ctx.font='400 40px Bareonbatang, serif';
+  ctx.textBaseline='top';
+  const lines=_shareWrapText(ctx,q.text,pw-96);
+  let ty=py+56;
+  lines.forEach(line=>{ctx.fillText(line,px+48,ty);ty+=64;});
+  const fy=ty+30;
+  ctx.strokeStyle='rgba(154,128,112,0.3)';
+  ctx.setLineDash([6,6]);ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(px+48,fy);ctx.lineTo(px+pw-48,fy);ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.font='600 26px "DM Sans",sans-serif';
+  ctx.fillStyle='#5a4040';
+  const title=book?book.title:'';
+  ctx.fillText(title,px+48,fy+28);
+  const titleW=ctx.measureText(title).width;
+  if(book&&book.author){
+    ctx.font='400 24px "DM Sans",sans-serif';
+    ctx.fillStyle='#9a8070';
+    ctx.fillText(' · '+book.author,px+48+titleW,fy+28);
+  }
+  ty=fy+70;
+  ctx.font='italic 400 24px Bareonbatang, serif';
+  ctx.fillStyle='#c8b0a8';
+  ctx.fillText('iikoto books',px+48,ty);
+  const wmW=ctx.measureText('iikoto books').width;
+  _drawBookIcon(ctx,px+48+wmW+18,ty-2,22,'#c8b0a8');
+}
+const QUOTE_CARD_STYLES={G:{label:'따옴표형',draw:_drawQuoteCardG},H:{label:'카드형',draw:_drawQuoteCardH}};
+
+// ── 오늘의 기록 카드: A(미니멀 숫자형) / B(표지 포함형) — 배경 없이 텍스트/숫자만
+async function _drawTodayCardA(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds){
+  await _ensureBareonbatangLoaded();
+  const cx=W/2;
+  const logoImg=await _loadShareLogo();
+  if(logoImg){
+    const lh=44,lw=lh*(logoImg.width/logoImg.height);
+    ctx.globalAlpha=0.6;
+    ctx.drawImage(logoImg,cx-lw/2,120,lw,lh);
+    ctx.globalAlpha=1;
+  }
+  ctx.textAlign='center';
+  ctx.font='500 24px "DM Sans",sans-serif';
+  ctx.fillStyle='#9a8070';
+  ctx.fillText("TODAY'S READING",cx,220);
+  ctx.font='400 46px Bareonbatang, serif';
+  ctx.fillStyle='#5a4040';
+  const titleLines=_shareWrapText(ctx,book.title,W-240);
+  let ty=300;
+  titleLines.forEach(line=>{ctx.fillText(line,cx,ty);ty+=64;});
+  const progVal=unit==='percent'?(percentAfter!=null?percentAfter:0):(pagesAfter!=null?pagesAfter:0);
+  const progUnit=unit==='percent'?'%':'p';
+  ty+=50;
+  ctx.font='700 118px "DM Sans",sans-serif';
+  ctx.fillStyle='#5a4040';
+  ctx.fillText(progVal+progUnit,cx,ty);
+  ty+=56;
+  ctx.font='500 26px "DM Sans",sans-serif';
+  ctx.fillStyle='#9a8070';
+  ctx.fillText('완독',cx,ty);
+  ty+=70;
+  ctx.strokeStyle='rgba(154,128,112,0.25)';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(cx-(W-176)/2,ty);ctx.lineTo(cx+(W-176)/2,ty);ctx.stroke();
+  ty+=54;
+  ctx.font='600 22px "DM Sans",sans-serif';
+  ctx.fillStyle='#3d8a78';
+  ctx.fillText('오늘 기록',cx,ty);
+  ty+=54;
+  const timeStr=seconds?Math.floor(seconds/60)+'분':'-';
+  const sessionCount=book.status==='reading'?countReadingSessionsForBook(book.title):0;
+  const sessionStr=sessionCount>0?sessionCount+'회차':'-';
+  ctx.font='600 34px "DM Sans",sans-serif';
+  ctx.fillStyle='#5a4040';
+  const gap=60;
+  const w1=ctx.measureText(timeStr).width,w2=ctx.measureText(sessionStr).width;
+  const totalW=w1+w2+gap;
+  ctx.textAlign='left';
+  ctx.fillText(timeStr,cx-totalW/2,ty);
+  ctx.fillText(sessionStr,cx-totalW/2+w1+gap,ty);
+  ctx.textAlign='center';
+}
+async function _drawTodayCardB(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds){
+  await _ensureBareonbatangLoaded();
+  const px=88;
+  let ty=140;
+  const logoImg=await _loadShareLogo();
+  if(logoImg){
+    const lh=36,lw=lh*(logoImg.width/logoImg.height);
+    ctx.globalAlpha=0.6;
+    ctx.drawImage(logoImg,px,ty,lw,lh);
+    ctx.globalAlpha=1;
+  }
+  ty+=36+40;
+  const coverW=176,coverH=240;
+  if(book.poster){
+    try{
+      const img=await new Promise((res,rej)=>{const im=new Image();im.crossOrigin='anonymous';im.onload=()=>res(im);im.onerror=rej;im.src=book.poster;});
+      _roundRect(ctx,px,ty,coverW,coverH,14);ctx.save();ctx.clip();ctx.drawImage(img,px,ty,coverW,coverH);ctx.restore();
+    }catch(e){
+      ctx.fillStyle='rgba(200,225,215,0.55)';_roundRect(ctx,px,ty,coverW,coverH,14);ctx.fill();
+    }
+  }else{
+    ctx.fillStyle='rgba(200,225,215,0.55)';_roundRect(ctx,px,ty,coverW,coverH,14);ctx.fill();
+  }
+  ty+=coverH+36;
+  ctx.textAlign='left';
+  ctx.font='400 38px Bareonbatang, serif';
+  ctx.fillStyle='#5a4040';
+  ctx.fillText(book.title,px,ty);
+  ty+=44;
+  if(book.author){
+    ctx.font='400 24px "DM Sans",sans-serif';
+    ctx.fillStyle='#9a8070';
+    ctx.fillText(book.author,px,ty);
+    ty+=48;
+  }else ty+=20;
+  const progVal=unit==='percent'?(percentAfter!=null?percentAfter:0):(pagesAfter!=null?pagesAfter:0);
+  const progUnit=unit==='percent'?'% 완독':'p';
+  ty+=16;
+  ctx.font='700 80px "DM Sans",sans-serif';
+  ctx.fillStyle='#5a4040';
+  ctx.fillText(progVal,px,ty);
+  const numW=ctx.measureText(String(progVal)).width;
+  ctx.font='500 32px "DM Sans",sans-serif';
+  ctx.fillStyle='#9a8070';
+  ctx.fillText(progUnit,px+numW+12,ty-6);
+  ty+=40;
+  const barW=W-176;
+  ctx.fillStyle='rgba(154,128,112,0.18)';
+  _roundRect(ctx,px,ty,barW,10,5);ctx.fill();
+  const pct=unit==='percent'?(percentAfter||0):(book.totalPages?Math.min(100,(pagesAfter||0)/book.totalPages*100):0);
+  ctx.fillStyle='#3d8a78';
+  _roundRect(ctx,px,ty,barW*(pct/100),10,5);ctx.fill();
+  ty+=50;
+  ctx.strokeStyle='rgba(154,128,112,0.25)';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(px,ty);ctx.lineTo(px+barW,ty);ctx.stroke();
+  ty+=44;
+  ctx.font='600 20px "DM Sans",sans-serif';
+  ctx.fillStyle='#3d8a78';
+  ctx.fillText('오늘 기록',px,ty);
+  ty+=48;
+  const timeStr=seconds?Math.floor(seconds/60)+'분':'-';
+  const sessionCount=book.status==='reading'?countReadingSessionsForBook(book.title):0;
+  const sessionStr=sessionCount>0?sessionCount+'회차':'-';
+  ctx.font='600 30px "DM Sans",sans-serif';
+  ctx.fillStyle='#5a4040';
+  ctx.fillText(timeStr,px,ty);
+  const w1=ctx.measureText(timeStr).width;
+  ctx.fillText(sessionStr,px+w1+40,ty);
+}
+const TODAY_CARD_STYLES={A:{label:'숫자형',draw:_drawTodayCardA},B:{label:'표지형',draw:_drawTodayCardB}};
+
+// ── 공유 모달 공통: 캔버스 생성 → 앱 배경 위에 미리보기 표시 → 스타일 선택 → 복사
+async function _buildQuoteCanvas(styleKey,q,book){
+  const W=1080,H=1350;
+  const canvas=document.createElement('canvas');
+  canvas.width=W;canvas.height=H;
+  const ctx=canvas.getContext('2d');
+  await QUOTE_CARD_STYLES[styleKey].draw(ctx,W,H,q,book);
+  return canvas;
+}
+async function _buildTodayCanvas(styleKey,book,unit,percentAfter,pagesAfter,seconds){
+  const W=1080,H=1350;
+  const canvas=document.createElement('canvas');
+  canvas.width=W;canvas.height=H;
+  const ctx=canvas.getContext('2d');
+  await TODAY_CARD_STYLES[styleKey].draw(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds);
+  return canvas;
+}
+let _shareModalCtx=null; // {kind:'quote'|'today', args:[...], styleKey}
+function _closeShareModal(){
+  const ov=document.getElementById('share-card-modal');
+  if(ov)ov.remove();
+  _shareModalCtx=null;
+}
+async function _renderShareModal(){
+  const ctx=_shareModalCtx;if(!ctx)return;
+  const styles=ctx.kind==='quote'?QUOTE_CARD_STYLES:TODAY_CARD_STYLES;
+  const canvas=ctx.kind==='quote'?await _buildQuoteCanvas(ctx.styleKey,...ctx.args):await _buildTodayCanvas(ctx.styleKey,...ctx.args);
+  const dataUrl=canvas.toDataURL('image/png');
+  let ov=document.getElementById('share-card-modal');
+  const isNew=!ov;
+  if(isNew){
+    ov=document.createElement('div');
+    ov.id='share-card-modal';
+    ov.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(60,40,35,0.35);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);';
+    ov.onclick=e=>{if(e.target===ov)_closeShareModal();};
+    document.body.appendChild(ov);
+  }
+  const styleBtns=Object.keys(styles).map(k=>`<button onclick="_shareModalCtx.styleKey='${k}';_renderShareModal();" style="flex:1;padding:9px 0;border-radius:12px;border:1px solid ${k===ctx.styleKey?'var(--acc,#c07080)':'var(--card-b)'};background:${k===ctx.styleKey?'rgba(192,112,128,0.12)':'var(--card)'};color:${k===ctx.styleKey?'var(--acc,#c07080)':'var(--tp)'};font-size:12.5px;font-weight:600;cursor:pointer;">${styles[k].label}</button>`).join('');
+  ov.innerHTML=`<div style="background:var(--sheet);border-radius:24px;padding:20px;width:min(88vw,380px);max-height:88vh;overflow-y:auto;box-sizing:border-box;" onclick="event.stopPropagation();">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <div style="font-weight:600;font-size:14px;color:var(--tp);">공유 이미지</div>
+      <i class="ti ti-x" style="font-size:18px;color:var(--ts);cursor:pointer;" onclick="_closeShareModal()" aria-hidden="true"></i>
+    </div>
+    <div style="border-radius:18px;overflow:hidden;background:var(--bg);box-shadow:0 4px 20px rgba(0,0,0,0.12);margin-bottom:14px;">
+      <img src="${dataUrl}" style="width:100%;display:block;" />
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;">${styleBtns}</div>
+    <button onclick="_confirmShareCopy()" style="width:100%;padding:13px 0;border-radius:14px;border:none;background:var(--acc,#c07080);color:#fff;font-size:14px;font-weight:600;cursor:pointer;">이미지 복사하기</button>
+  </div>`;
+}
+async function _confirmShareCopy(){
+  const ctx=_shareModalCtx;if(!ctx)return;
+  const canvas=ctx.kind==='quote'?await _buildQuoteCanvas(ctx.styleKey,...ctx.args):await _buildTodayCanvas(ctx.styleKey,...ctx.args);
+  const ok=await _shareCanvasToClipboard(canvas);
+  _shareToast(ok?'이미지가 복사됐어요':'복사에 실패했어요 (사파리 최신버전 권장)');
+  if(ok)_closeShareModal();
+}
+async function shareQuoteCard(quoteCid){
+  const q=getQuotes().find(x=>x.cid===quoteCid);if(!q)return;
+  const book=getBooks().find(b=>b.cid===q.bookCid);
+  _shareModalCtx={kind:'quote',args:[q,book],styleKey:'H'};
+  await _renderShareModal();
+}
+async function openTodayReadingShareModal(bookCid,unit,percentAfter,pagesAfter,seconds){
+  const book=getBooks().find(b=>b.cid===bookCid);if(!book)return;
+  _shareModalCtx={kind:'today',args:[book,unit,percentAfter,pagesAfter,seconds],styleKey:'A'};
+  await _renderShareModal();
 }
 function setPgUnit(u){
   const book=getBooks().find(b=>b.cid===_pgBookCid);if(!book)return;
