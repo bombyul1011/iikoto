@@ -10097,6 +10097,9 @@ function renderDoneBookQuotes(bookCid){
         </div>
       </div>
       <span style="position:absolute;right:8px;bottom:6px;display:flex;align-items:center;gap:3px;">
+        <span onclick="event.stopPropagation();shareQuoteCard('${q.cid}')" title="공유 이미지" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:#8878ab;opacity:0.7;">
+          <i class="ti ti-share" style="font-size:11px;" aria-hidden="true"></i>
+        </span>
         <span onclick="event.stopPropagation();toggleQuoteCommentEditor('${q.cid}')" title="${q.comment?'코멘트 수정':'코멘트 남기기'}" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:${q.comment?'#fff':'#8878ab'};background:${q.comment?'rgba(140,120,180,0.85)':'transparent'};opacity:${q.comment?'1':'0.7'};">
           <i class="ti ti-message-circle" style="font-size:11px;" aria-hidden="true"></i>
         </span>
@@ -10556,7 +10559,7 @@ function renderReadingCalView(){
   el.innerHTML=html;
 }
 function renderReadingCalDayDetailHtml(dk,dayLogs,bookMap){
-  const dispDate=dk.slice(5,7)+'월 '+parseInt(dk.slice(8,10),10)+'일';
+  const dispDate=parseInt(dk.slice(5,7),10)+'월 '+parseInt(dk.slice(8,10),10)+'일';
   const items=dayLogs.map(r=>{
     const book=bookMap[r.book_cid];
     const title=book?book.title:'(삭제된 책)';
@@ -10592,7 +10595,7 @@ function _shareWrapText(ctx,text,maxWidth){
   let lines=[],cur='';
   for(let i=0;i<chars.length;i++){
     const test=cur+chars[i];
-    if(ctx.measureText(test).width>maxWidth&&cur){lines.push(cur);cur=chars[i];}
+    if(ctx.measureText(test).width>maxWidth&&cur){lines.push(cur);cur=chars[i]===' '?'':chars[i];}
     else cur=test;
   }
   if(cur)lines.push(cur);
@@ -10679,18 +10682,25 @@ function _loadShareLogo(){
 
 // ── 문장 카드: G(배경 따옴표형) / H(카드 인 카드형) — 배경은 항상 투명, H만 반투명 패널 사용
 // ── 문장 카드: G(로고형) / H(카드형, 가변 높이) — 배경은 항상 투명, H만 반투명 패널
-async function _drawQuoteCardG(ctx,W,H,q,book,colorMode,showBookInfo,italicMode){
+async function _drawQuoteCardG(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize){
   await _ensureBareonbatangLoaded();
   const isWhite=colorMode==='white';
   const textColor=isWhite?'#fff':'#5a4040';
   const subColor=isWhite?'rgba(255,255,255,0.75)':'#9a8070';
   const fontStyle=italicMode?'italic ':'';
+  const isCenter=alignMode==='center';
+  const fs=fontSize||40;
+  const lineH=Math.round(fs*1.6);
   ctx.fillStyle=textColor;
-  ctx.font=fontStyle+'400 40px Bareonbatang, serif';
+  ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
   ctx.textBaseline='top';
-  const lines=_shareWrapText(ctx,q.text,W-176);
+  const quoteText=quoteMark?('\u275b'+q.text+'\u275c'):q.text;
+  const lines=_shareWrapText(ctx,quoteText,W-176);
   let ty=140;
-  lines.forEach(line=>{ctx.fillText(line,88,ty);ty+=64;});
+  ctx.textAlign=isCenter?'center':'left';
+  const tx0=isCenter?W/2:88;
+  lines.forEach(line=>{ctx.fillText(line,tx0,ty);ty+=lineH;});
+  ctx.textAlign='left';
   ty+=44;
   const showInfo=showBookInfo&&book;
   if(showInfo){
@@ -10712,18 +10722,21 @@ async function _drawQuoteCardG(ctx,W,H,q,book,colorMode,showBookInfo,italicMode)
     }
   }
 }
-async function _drawQuoteCardH(ctx,W,H,q,book,colorMode,showBookInfo,italicMode){
+async function _drawQuoteCardH(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode){
   await _ensureBareonbatangLoaded();
   const isWhite=colorMode==='white';
   const textColor=isWhite?'#fff':'#5a4040';
   const subColor=isWhite?'rgba(255,255,255,0.75)':'#9a8070';
   const fontStyle=italicMode?'italic ':'';
+  const isCenter=alignMode==='center';
   const showInfo=showBookInfo&&book;
+  const fs=fontSize||40;
+  const lineH=Math.round(fs*1.6);
   // 문장 길이에 맞춰 패널 높이를 먼저 계산(가변형) — 여백 최소화
-  ctx.font=fontStyle+'400 40px Bareonbatang, serif';
+  ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
   const px=88,pw=W-176;
-  const lines=_shareWrapText(ctx,q.text,pw-96);
-  const lineH=64;
+  const quoteText=quoteMark?('\u275b'+q.text+'\u275c'):q.text;
+  const lines=_shareWrapText(ctx,quoteText,pw-96);
   const textBlockH=lines.length*lineH;
   const footerH=showInfo?96:0;
   const padTop=56,padBottom=48,gapBeforeFooter=30;
@@ -10733,11 +10746,30 @@ async function _drawQuoteCardH(ctx,W,H,q,book,colorMode,showBookInfo,italicMode)
   _roundRect(ctx,px,py,pw,ph,32);ctx.fill();
   ctx.strokeStyle=isWhite?'rgba(255,255,255,0.35)':'rgba(255,255,255,0.6)';ctx.lineWidth=2;
   _roundRect(ctx,px,py,pw,ph,32);ctx.stroke();
-  ctx.fillStyle=textColor;
-  ctx.font=fontStyle+'400 40px Bareonbatang, serif';
+  ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
   ctx.textBaseline='top';
+  ctx.textAlign=isCenter?'center':'left';
+  const tx0=isCenter?px+pw/2:px+48;
+  const HIGHLIGHT_COLORS={yellow:'rgba(255,214,130,0.55)',pink:'rgba(230,140,160,0.38)',mint:'rgba(150,200,180,0.42)'};
+  if(highlightMode&&HIGHLIGHT_COLORS[highlightMode]){
+    let hy=py+padTop;
+    const padH=Math.round(fs*0.14);
+    lines.forEach(line=>{
+      const w=ctx.measureText(line).width;
+      const bx=isCenter?tx0-w/2:tx0;
+      ctx.fillStyle=HIGHLIGHT_COLORS[highlightMode];
+      ctx.save();
+      ctx.translate(bx-8,hy-padH/2);
+      ctx.rotate(-0.006);
+      ctx.fillRect(0,0,w+16,fs+padH);
+      ctx.restore();
+      hy+=lineH;
+    });
+  }
+  ctx.fillStyle=textColor;
   let ty=py+padTop;
-  lines.forEach(line=>{ctx.fillText(line,px+48,ty);ty+=lineH;});
+  lines.forEach(line=>{ctx.fillText(line,tx0,ty);ty+=lineH;});
+  ctx.textAlign='left';
   if(showInfo){
     const fy=ty+gapBeforeFooter;
     ctx.strokeStyle=isWhite?'rgba(255,255,255,0.3)':'rgba(154,128,112,0.3)';
@@ -10759,7 +10791,7 @@ async function _drawQuoteCardH(ctx,W,H,q,book,colorMode,showBookInfo,italicMode)
 const QUOTE_CARD_STYLES={G:{label:'로고형',draw:_drawQuoteCardG},H:{label:'카드형',draw:_drawQuoteCardH}};
 
 // ── 오늘의 기록 카드: A(미니멀 숫자형) / C(로고+텍스트형)
-async function _drawTodayCardA(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds,colorMode){
+async function _drawTodayCardA(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds,colorMode,dk){
   await _ensureBareonbatangLoaded();
   const isWhite=colorMode==='white';
   const textColor=isWhite?'#fff':'#5a4040';
@@ -10791,10 +10823,11 @@ async function _drawTodayCardA(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds
   ty+=134;
   ctx.font='500 26px "DM Sans",sans-serif';
   ctx.fillStyle=subColor;
+  const dispDate=dk?(parseInt(dk.slice(5,7),10)+'월 '+parseInt(dk.slice(8,10),10)+'일'):null;
   const timeStr=seconds?Math.floor(seconds/60)+'분':null;
-  const sessionCount=book.status==='reading'?countReadingSessionsForBook(book.title):0;
+  const sessionCount=countReadingSessionsForBook(book.title);
   const sessionStr=sessionCount>0?sessionCount+'회차':null;
-  const completeLine=[timeStr,sessionStr].filter(Boolean).join('  ·  ');
+  const completeLine=[dispDate,timeStr,sessionStr].filter(Boolean).join('  ·  ');
   if(completeLine)ctx.fillText(completeLine,cx,ty);
 }
 // C: 로고01(80% 투명도) 왼쪽 + 오른쪽에 날짜 한 줄 / 책제목 한 줄 / 시간·독서량 한 줄 — 표지 이미지 불필요, CORS 문제 없음
@@ -10811,22 +10844,22 @@ async function _drawTodayCardC(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds
   const tw=W-tx-88;
   ctx.textAlign='left';
   ctx.textBaseline='top';
-  const dispDate=dk?(dk.slice(5,7)+'월 '+parseInt(dk.slice(8,10),10)+'일'):'';
+  const dispDate=dk?(parseInt(dk.slice(5,7),10)+'월 '+parseInt(dk.slice(8,10),10)+'일'):'';
   const timeStr=seconds?Math.floor(seconds/60)+'분':null;
   const progVal=unit==='percent'?(percentAfter!=null?percentAfter:0):(pagesAfter!=null?pagesAfter:0);
   const progUnit=unit==='percent'?'%':'p';
   const metaLine=[timeStr,progVal+progUnit].filter(Boolean).join('  ·  ');
   // 세 줄(날짜/제목/시간·독서량)의 전체 높이를 계산해 로고 세로 중앙에 맞춤 — 로고가 커진 만큼 텍스트도 확대
-  ctx.font='400 46px Bareonbatang, serif';
+  ctx.font='400 56px Bareonbatang, serif';
   const titleLines=_shareWrapText(ctx,book.title,tw).slice(0,2);
-  const dateH=32,titleLineH=60,gapAfterDate=20,gapAfterTitle=28,metaH=44;
+  const dateH=32,titleLineH=73,gapAfterDate=20,gapAfterTitle=28,metaH=44;
   const totalH=dateH+gapAfterDate+titleLines.length*titleLineH+gapAfterTitle+metaH;
   let ty=logoY+(logoH-totalH)/2;
   ctx.font='500 30px "DM Sans",sans-serif';
   ctx.fillStyle=subColor;
   ctx.fillText(dispDate,tx,ty);
   ty+=dateH+gapAfterDate;
-  ctx.font='400 46px Bareonbatang, serif';
+  ctx.font='400 56px Bareonbatang, serif';
   ctx.fillStyle=textColor;
   titleLines.forEach(line=>{ctx.fillText(line,tx,ty);ty+=titleLineH;});
   ty+=gapAfterTitle;
@@ -10837,12 +10870,12 @@ async function _drawTodayCardC(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds
 const TODAY_CARD_STYLES={A:{label:'숫자형',draw:_drawTodayCardA},C:{label:'로고형',draw:_drawTodayCardC}};
 
 // ── 공유 모달 공통: 캔버스 생성 → 앱 배경 위에 미리보기 표시 → 스타일 선택 → 복사
-async function _buildQuoteCanvas(styleKey,q,book,colorMode,showBookInfo,italicMode){
+async function _buildQuoteCanvas(styleKey,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode){
   const W=1080,H=1350;
   const canvas=document.createElement('canvas');
   canvas.width=W;canvas.height=H;
   const ctx=canvas.getContext('2d');
-  await QUOTE_CARD_STYLES[styleKey].draw(ctx,W,H,q,book,colorMode,showBookInfo,italicMode);
+  await QUOTE_CARD_STYLES[styleKey].draw(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode);
   return canvas;
 }
 async function _buildTodayCanvas(styleKey,book,unit,percentAfter,pagesAfter,seconds,colorMode,dk){
@@ -10861,12 +10894,15 @@ function _closeShareModal(){
 }
 async function _buildCurrentShareCanvas(){
   const ctx=_shareModalCtx;if(!ctx)return null;
-  if(ctx.kind==='quote')return await _buildQuoteCanvas(ctx.styleKey,ctx.args[0],ctx.args[1],ctx.colorMode,ctx.showBookInfo,ctx.italicMode);
+  if(ctx.kind==='quote')return await _buildQuoteCanvas(ctx.styleKey,ctx.args[0],ctx.args[1],ctx.colorMode,ctx.showBookInfo,ctx.italicMode,ctx.quoteMark,ctx.alignMode,ctx.fontSize,ctx.highlightMode);
   const [book,unit,percentAfter,pagesAfter,seconds,dk]=ctx.args;
   return await _buildTodayCanvas(ctx.styleKey,book,unit,percentAfter,pagesAfter,seconds,ctx.colorMode,dk);
 }
 function _shareIconBtn(active,onclick,inner,title){
-  return `<button onclick="${onclick}" title="${title||''}" style="width:52px;height:52px;flex-shrink:0;border-radius:16px;border:1.5px solid ${active?'var(--acc,#c07080)':'var(--card-b)'};background:${active?'rgba(192,112,128,0.10)':'var(--card)'};color:${active?'var(--acc,#c07080)':'var(--ts)'};display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;transition:all .15s;">${inner}</button>`;
+  return `<button onclick="${onclick}" title="${title||''}" style="width:36px;height:36px;flex-shrink:0;border-radius:10px;border:none;background:transparent;color:${active?'var(--acc,#c07080)':'var(--ts)'};display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;opacity:${active?1:0.55};transition:all .15s;">${inner}</button>`;
+}
+function _shareStyleBanner(active,onclick,label){
+  return `<button onclick="${onclick}" style="flex:1;min-width:0;height:40px;border-radius:12px;border:1.5px solid ${active?'var(--acc,#c07080)':'var(--card-b)'};background:${active?'rgba(192,112,128,0.10)':'var(--card)'};color:${active?'var(--acc,#c07080)':'var(--ts)'};display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:11.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 4px;transition:all .15s;">${label}</button>`;
 }
 async function _renderShareModal(){
   const ctx=_shareModalCtx;if(!ctx)return;
@@ -10882,12 +10918,15 @@ async function _renderShareModal(){
     ov.onclick=e=>{if(e.target===ov)_closeShareModal();};
     document.body.appendChild(ov);
   }
-  // 스타일 선택도 아이콘 행에 통합 — 배너 박스 없이 텍스트 라벨 아이콘 버튼으로, 색상/폰트/정보 토글과 나란히 가운데 정렬
-  const styleBtnList=Object.keys(styles).map(k=>_shareIconBtn(k===ctx.styleKey,`_shareModalCtx.styleKey='${k}';_renderShareModal();`,
-    `<span style="font-size:11px;font-weight:600;">${styles[k].label}</span>`,styles[k].label));
+  // 스타일 선택: 가로로 길고 얇은 배너 4칸(한 줄), 향후 스타일 추가를 위한 여유 슬롯 포함
+  const styleKeys=Object.keys(styles);
+  const styleSlotCount=Math.max(4,styleKeys.length);
+  const styleBanners=styleKeys.map(k=>_shareStyleBanner(k===ctx.styleKey,`_shareModalCtx.styleKey='${k}';_renderShareModal();`,styles[k].label));
+  while(styleBanners.length<styleSlotCount)styleBanners.push(`<div style="flex:1;min-width:0;height:40px;border-radius:12px;border:1.5px dashed rgba(154,128,112,0.45);"></div>`);
+  const styleBannerRow=`<div style="display:flex;gap:8px;margin-bottom:14px;">${styleBanners.join('')}</div>`;
   // 색상: 반반 원 하나로 브라운/아이보리 토글 (클릭 시 전환)
   const colorSwatch=_shareIconBtn(true,`_shareModalCtx.colorMode=_shareModalCtx.colorMode==='brown'?'white':'brown';_renderShareModal();`,
-    `<span style="width:24px;height:24px;border-radius:50%;overflow:hidden;display:flex;box-shadow:inset 0 0 0 1px rgba(154,128,112,0.25);">
+    `<span style="width:22px;height:22px;border-radius:50%;overflow:hidden;display:flex;box-shadow:inset 0 0 0 1px rgba(154,128,112,0.25);">
       <span style="width:50%;background:${ctx.colorMode==='brown'?'#5a4040':'#f3e8d8'};"></span>
       <span style="width:50%;background:${ctx.colorMode==='brown'?'#f3e8d8':'#5a4040'};"></span>
     </span>`,'글자색 전환');
@@ -10896,7 +10935,21 @@ async function _renderShareModal(){
     `<span style="font-family:'DM Sans',sans-serif;font-weight:600;font-style:${ctx.italicMode?'italic':'normal'};">A</span>`,ctx.italicMode?'이탤릭체':'기본체'):'';
   const bookToggle=ctx.kind==='quote'?_shareIconBtn(!!ctx.showBookInfo,`_shareModalCtx.showBookInfo=!_shareModalCtx.showBookInfo;_renderShareModal();`,
     `<i class="ti ti-book" aria-hidden="true"></i>`,'책 정보 표시'):'';
-  const iconRow=[...styleBtnList,colorSwatch,fontToggle,bookToggle].filter(Boolean).join('');
+  const quoteMarkToggle=ctx.kind==='quote'?_shareIconBtn(!!ctx.quoteMark,`_shareModalCtx.quoteMark=!_shareModalCtx.quoteMark;_renderShareModal();`,
+    `<span style="font-family:'DM Sans',sans-serif;font-weight:600;font-size:18px;">\u275b</span>`,ctx.quoteMark?'인용부호 끄기':'인용부호 켜기'):'';
+  const alignToggle=ctx.kind==='quote'?_shareIconBtn(true,`_shareModalCtx.alignMode=_shareModalCtx.alignMode==='center'?'left':'center';_renderShareModal();`,
+    `<i class="ti ti-align-${ctx.alignMode==='center'?'center':'left'}" aria-hidden="true"></i>`,ctx.alignMode==='center'?'중앙정렬':'좌측정렬'):'';
+  const curFs=ctx.fontSize||40;
+  const fontSizeDown=ctx.kind==='quote'?_shareIconBtn(false,`_shareModalCtx.fontSize=Math.max(32,(_shareModalCtx.fontSize||40)-2);_renderShareModal();`,
+    `<span style="font-weight:600;font-size:17px;">−</span>`,'글자 작게'):'';
+  const fontSizeUp=ctx.kind==='quote'?_shareIconBtn(false,`_shareModalCtx.fontSize=Math.min(48,(_shareModalCtx.fontSize||40)+2);_renderShareModal();`,
+    `<span style="font-weight:600;font-size:17px;">+</span>`,'글자 크게'):'';
+  const HL_CYCLE=[null,'yellow','pink','mint'];
+  const HL_SWATCH={yellow:'#ffd682',pink:'#e68ca0',mint:'#96c8b4'};
+  const curHl=ctx.highlightMode||null;
+  const highlightToggle=(ctx.kind==='quote'&&ctx.styleKey==='H')?_shareIconBtn(!!curHl,`_shareModalCtx.highlightMode=(()=>{const c=${JSON.stringify(HL_CYCLE)};return c[(c.indexOf(_shareModalCtx.highlightMode)+1)%c.length];})();_renderShareModal();`,
+    curHl?`<span style="width:20px;height:20px;border-radius:6px;background:${HL_SWATCH[curHl]};display:inline-block;"></span>`:`<i class="ti ti-highlight" aria-hidden="true"></i>`,curHl?'형광펜 색상 변경':'형광펜 켜기'):'';
+  const iconRow=[colorSwatch,fontToggle,alignToggle,bookToggle,quoteMarkToggle,highlightToggle,fontSizeDown,fontSizeUp].filter(Boolean).join('');
   ov.innerHTML=`<div style="background:var(--sheet);border-radius:26px;padding:22px;width:min(88vw,380px);max-height:88vh;overflow-y:auto;box-sizing:border-box;" onclick="event.stopPropagation();">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
       <div style="font-weight:600;font-size:15px;color:var(--tp);">공유 이미지</div>
@@ -10905,7 +10958,8 @@ async function _renderShareModal(){
     <div style="border-radius:20px;overflow:hidden;background:var(--bg);box-shadow:0 6px 24px rgba(90,64,64,0.16);margin-bottom:16px;">
       <img src="${dataUrl}" style="width:100%;display:block;" />
     </div>
-    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:16px;">${iconRow}</div>
+    ${styleBannerRow}
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:16px;">${iconRow}</div>
     <button onclick="_confirmShareCopy()" style="width:100%;padding:15px 0;border-radius:16px;border:none;background:linear-gradient(120deg,#c07080,#b25a72);color:#fff;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(192,112,128,0.35);display:flex;align-items:center;justify-content:center;gap:7px;">
       <i class="ti ti-copy" style="font-size:17px;" aria-hidden="true"></i>이미지 복사하기
     </button>
@@ -10921,7 +10975,7 @@ async function _confirmShareCopy(){
 async function shareQuoteCard(quoteCid){
   const q=getQuotes().find(x=>x.cid===quoteCid);if(!q)return;
   const book=getBooks().find(b=>b.cid===q.bookCid);
-  _shareModalCtx={kind:'quote',args:[q,book],styleKey:'H',colorMode:'brown',showBookInfo:true,italicMode:false};
+  _shareModalCtx={kind:'quote',args:[q,book],styleKey:'H',colorMode:'brown',showBookInfo:true,italicMode:false,quoteMark:true,alignMode:'left',fontSize:40,highlightMode:null};
   await _renderShareModal();
 }
 async function openTodayReadingShareModal(bookCid,unit,percentAfter,pagesAfter,seconds,dk){
