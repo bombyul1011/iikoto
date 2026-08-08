@@ -1632,6 +1632,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <span style="font-size:12px;color:var(--tm);white-space:nowrap;" id="cm-enddate-label">완료일</span>
       <input type="text" class="modal-inp" id="cm-end" readonly onclick="openContentDatePicker('cm-end')" style="flex:1;margin-bottom:0;cursor:pointer;" placeholder="날짜 선택">
     </div>
+    <div id="cm-book-unit-row" style="display:none;">
+      <div class="rd-unit-row">
+        <div class="rd-unit-btn on" id="cm-unit-percent" onclick="setCmUnit('percent')">퍼센트로 기록</div>
+        <div class="rd-unit-btn" id="cm-unit-pages" onclick="setCmUnit('pages')">페이지로 기록</div>
+      </div>
+      <input class="modal-inp" id="cm-total-pages" type="number" inputmode="numeric" placeholder="전체 페이지 수 (선택)" style="margin-top:8px;display:none;">
+    </div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;" id="cm-star-row">
       <span style="font-size:12px;color:var(--tm);white-space:nowrap;">별점</span>
       <div id="cm-star-picker" class="cm-star-picker"></div>
@@ -1916,8 +1923,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     </div>
     <div id="rd-progress-fields">
       <div class="rd-unit-row">
-        <div class="rd-unit-btn on" id="rd-unit-pages" onclick="setRdUnit('pages')">페이지로 기록</div>
-        <div class="rd-unit-btn" id="rd-unit-percent" onclick="setRdUnit('percent')">퍼센트로 기록</div>
+        <div class="rd-unit-btn on" id="rd-unit-percent" onclick="setRdUnit('percent')">퍼센트로 기록</div>
+        <div class="rd-unit-btn" id="rd-unit-pages" onclick="setRdUnit('pages')">페이지로 기록</div>
       </div>
       <div id="rd-unit-hint" style="display:none;font-size:11px;color:var(--tm);text-align:center;margin:-2px 0 8px;">추가한 뒤 진행률 막대를 눌러 진행 상황을 기록해요</div>
       <input class="modal-inp" id="rd-new-total" type="number" inputmode="numeric" placeholder="전체 페이지 수 (선택)" style="margin-top:8px;">
@@ -8346,6 +8353,7 @@ function openContentModal(cat,item=null,mk=null){
   hideApiResults();
   // 음악은 완료/중단/별점 개념이 없으므로 숨기고, 대신 애플뮤직 재생 버튼을 보여줌
   const isMusic=cat==='music';
+  const isBook=cat==='book';
   const statusBtns=document.getElementById('cm-status-btns');
   const starRow=document.getElementById('cm-star-row');
   const playBtn=document.getElementById('cm-music-play-btn');
@@ -8356,7 +8364,25 @@ function openContentModal(cat,item=null,mk=null){
   if(starRow)starRow.style.display=isMusic?'none':'flex';
   if(playBtn)playBtn.style.display=(isMusic&&_selectedMusicUrl)?'block':'none';
   if(playlistBtn)playlistBtn.style.display=(isMusic&&!item)?'block':'none';
+  // 책: 독서코너와 동일하게 페이지/퍼센트 기록 방식 선택 — 콘텐츠탭 등록 시에도 함께 반영되도록 연동
+  const bookUnitRow=document.getElementById('cm-book-unit-row');
+  if(bookUnitRow){
+    bookUnitRow.style.display=isBook?'block':'none';
+    if(isBook){
+      const linkedBook=getBooks().find(b=>b.title===(item?.title||''));
+      const initialUnit=linkedBook?.unit||'percent';
+      setCmUnit(initialUnit);
+      document.getElementById('cm-total-pages').value=linkedBook?.totalPages||'';
+    }
+  }
   openModal('content-modal');setTimeout(()=>document.getElementById('cm-title').focus(),100);
+}
+let _cmUnit='percent';
+function setCmUnit(u){
+  _cmUnit=u;
+  document.getElementById('cm-unit-percent').classList.toggle('on',u==='percent');
+  document.getElementById('cm-unit-pages').classList.toggle('on',u==='pages');
+  document.getElementById('cm-total-pages').style.display=u==='pages'?'':'none';
 }
 function openAppleMusicLink(){
   if(_selectedMusicUrl)window.location.href=_selectedMusicUrl;
@@ -8457,7 +8483,11 @@ function confirmContent(){
     saveContents(newMk,contents);
   }
   closeModal('content-modal');renderTimetable();
-  if(_contentCtx.cat==='book')syncContentToReadingBook(title,status,poster,author,newMk);
+  if(_contentCtx.cat==='book'){
+    const bookUnit=_cmUnit||'percent';
+    const bookTotalPages=bookUnit==='pages'?(parseInt(document.getElementById('cm-total-pages').value,10)||null):null;
+    syncContentToReadingBook(title,status,poster,author,newMk,bookUnit,bookTotalPages);
+  }
   setTimeout(()=>{_contentSubmitting=false;},500);
 }
 function stableCidFromTitle(title){
@@ -8465,30 +8495,33 @@ function stableCidFromTitle(title){
   for(let i=0;i<title.length;i++){h=(h*31+title.charCodeAt(i))|0;}
   return 'ct_'+Math.abs(h).toString(36);
 }
-function syncContentToReadingBook(title,status,poster,author,mk){
+function syncContentToReadingBook(title,status,poster,author,mk,unit,totalPages){
   const books=getBooks();
   let book=books.find(b=>b.title===title);
   const fixedCid=stableCidFromTitle(title);
+  const finalUnit=unit||'percent';
+  const finalTotalPages=finalUnit==='pages'?(totalPages||null):null;
   if(status==='done'){
-    if(book){book.status='done';book.linkedContent=true;book.contentMk=mk;book.contentTitle=title;book.completedAt=book.completedAt||dateKey(new Date());if(poster)book.poster=poster;if(author)book.author=author;upsertBookLocal(book);}
+    if(book){book.status='done';book.linkedContent=true;book.contentMk=mk;book.contentTitle=title;book.completedAt=book.completedAt||dateKey(new Date());if(poster)book.poster=poster;if(author)book.author=author;book.unit=finalUnit;book.totalPages=finalTotalPages;upsertBookLocal(book);}
     else{
-      book={cid:fixedCid,title,status:'done',unit:'pages',pages:0,totalPages:null,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:dateKey(new Date()),linkedContent:true,contentMk:mk,contentTitle:title,poster:poster||null,author:author||''};
+      book={cid:fixedCid,title,status:'done',unit:finalUnit,pages:0,totalPages:finalTotalPages,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:dateKey(new Date()),linkedContent:true,contentMk:mk,contentTitle:title,poster:poster||null,author:author||''};
       upsertBookLocal(book);
     }
   } else if(status==='stopped'){
-    if(book){book.status='paused';book.linkedContent=true;book.contentMk=mk;book.contentTitle=title;if(poster)book.poster=poster;if(author)book.author=author;upsertBookLocal(book);}
+    if(book){book.status='paused';book.linkedContent=true;book.contentMk=mk;book.contentTitle=title;if(poster)book.poster=poster;if(author)book.author=author;book.unit=finalUnit;book.totalPages=finalTotalPages;upsertBookLocal(book);}
     else{
-      book={cid:fixedCid,title,status:'paused',unit:'pages',pages:0,totalPages:null,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:null,linkedContent:true,contentMk:mk,contentTitle:title,poster:poster||null,author:author||''};
+      book={cid:fixedCid,title,status:'paused',unit:finalUnit,pages:0,totalPages:finalTotalPages,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:null,linkedContent:true,contentMk:mk,contentTitle:title,poster:poster||null,author:author||''};
       upsertBookLocal(book);
     }
   } else {
     if(!book){
-      book={cid:fixedCid,title,status:'reading',unit:'pages',pages:0,totalPages:null,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:null,linkedContent:true,contentMk:mk,contentTitle:title,poster:poster||null,author:author||''};
+      book={cid:fixedCid,title,status:'reading',unit:finalUnit,pages:0,totalPages:finalTotalPages,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:null,linkedContent:true,contentMk:mk,contentTitle:title,poster:poster||null,author:author||''};
       upsertBookLocal(book);
     } else {
       book.linkedContent=true;book.contentMk=mk;book.contentTitle=title;
       if(book.status!=='reading')book.status='reading';
       if(poster)book.poster=poster;if(author)book.author=author;
+      book.unit=finalUnit;book.totalPages=finalTotalPages;
       upsertBookLocal(book);
     }
   }
@@ -10343,7 +10376,7 @@ function removeBook(cid){
   deleteBookLocal(cid);
   renderReadingHub(); // 아카이브 리스트뿐 아니라 상단(진행중 표시/커버 등)까지 즉시 갱신
 }
-let _rdNewUnit='pages';
+let _rdNewUnit='percent';
 function setRdUnit(u){
   _rdNewUnit=u;
   document.getElementById('rd-unit-pages').classList.toggle('on',u==='pages');
@@ -10367,7 +10400,7 @@ function openAddBookModal(){
   _rdNewPoster=null;_rdNewAuthor='';
   // 위시가 우선 노출 — 아카이브 탭 상태와 무관하게 항상 위시를 기본 선택으로 잡음
   setRdAddStatus('wish');
-  setRdUnit('pages');
+  setRdUnit('percent');
   openModal('add-book-modal');
 }
 function setRdAddStatus(s){
