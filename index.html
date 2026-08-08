@@ -1244,6 +1244,16 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 
 
+<!-- READING CALENDAR SHEET -->
+<div class="overlay" id="reading-cal-sheet" onclick="closeSheet('reading-cal-sheet',event)">
+  <div class="bsheet" style="max-height:85vh;overflow-y:auto;" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div style="padding:0 20px 20px;">
+      <div id="rdcal-view"></div>
+    </div>
+  </div>
+</div>
+
 <!-- WEEK MEAL SHEET -->
 <div class="overlay" id="week-meal-sheet" onclick="closeSheet('week-meal-sheet',event)">
   <div class="bsheet" style="max-height:85vh;overflow-y:auto;" onclick="event.stopPropagation()">
@@ -1831,6 +1841,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     </div>
     <span class="settings-ttl">독서</span>
     <div style="flex:1;"></div>
+    <div class="settings-back" style="width:30px;height:30px;" onclick="openReadingCalendar()">
+      <i class="ti ti-calendar-stats" style="font-size:15px;color:var(--ts);" aria-hidden="true"></i>
+    </div>
     <div class="settings-back" style="width:30px;height:30px;" onclick="openAddBookModal()">
       <i class="ti ti-books" style="font-size:15px;color:var(--ts);" aria-hidden="true"></i>
     </div>
@@ -4611,6 +4624,7 @@ async function autoSync(type,key){
   else if(type==='rblocks'){if(await syncRhythmBlocksUp(key))S.set(S.key('rblocks_pending',key),false);}
   else if(type==='mroutine')syncMorningRoutineUp(key);
   else if(type==='eveninglearnlog'){if(await syncEveningLearnLogUp())S.set('eveninglearnlog_pending',false);}
+  else if(type==='rdlog'){if(await syncReadingDailyLogUp(key))S.set(S.key('rdlog_pending',key),false);}
 }
 async function syncAll(){
   if(!navigator.onLine)return;
@@ -10422,6 +10436,129 @@ function openProgressModal(seconds){
   openModal('progress-modal');
   setTimeout(()=>document.getElementById('pg-end-inp').focus(),100);
 }
+// ── 일자별 독서 로그 (달력용) — 진행률 저장 시점(confirmProgress)에만 기록됨.
+// 같은 날 여러 세션(스톱워치 여러 번)이면 client_id를 date_key+book_cid로 고정해 upsert로 누적.
+function getReadingDailyLog(dk){return S.get(S.key('rdlog',dk))||[];}
+function saveReadingDailyLog(dk,arr){
+  S.set(S.key('rdlog',dk),arr);
+  S.set(S.key('rdlog_pending',dk),true);
+  autoSync('rdlog',dk);
+}
+function logReadingDaily(book,dk,amountRead,seconds,unit,percentAfter,pagesAfter){
+  const logs=getReadingDailyLog(dk);
+  const cid='rdlog_'+dk+'_'+book.cid;
+  const idx=logs.findIndex(l=>l.cid===cid);
+  if(idx>=0){
+    logs[idx].amountRead=(logs[idx].amountRead||0)+amountRead;
+    logs[idx].seconds=(logs[idx].seconds||0)+(seconds||0);
+    logs[idx].unit=unit;
+    logs[idx].percentAfter=percentAfter;
+    logs[idx].pagesAfter=pagesAfter;
+  }else{
+    logs.push({cid:cid,bookCid:book.cid,unit:unit,amountRead:amountRead,seconds:seconds||0,percentAfter:percentAfter,pagesAfter:pagesAfter,created:Date.now()});
+  }
+  saveReadingDailyLog(dk,logs);
+}
+async function syncReadingDailyLogUp(dk){
+  const logs=getReadingDailyLog(dk);
+  if(!logs.length)return true;
+  const ok=await supaUpsert('reading_daily_log','client_id',logs.map(l=>({
+    date_key:dk,book_cid:l.bookCid,unit:l.unit,amount_read:l.amountRead||0,
+    percent_after:(l.unit==='percent'?l.percentAfter:null),
+    pages_after:(l.unit==='pages'?l.pagesAfter:null),
+    seconds:l.seconds||0,created:l.created,client_id:l.cid
+  })));
+  return ok;
+}
+// ── 독서 달력 (일자별 로그 모아보기) ──
+let _rdCalDate=new Date();
+function openReadingCalendar(){
+  _rdCalDate=new Date();
+  openSheet('reading-cal-sheet');
+  renderReadingCalGrid();
+}
+function rdCalMonthShift(delta){
+  _rdCalDate.setMonth(_rdCalDate.getMonth()+delta);
+  renderReadingCalGrid();
+}
+async function renderReadingCalGrid(){
+  const el=document.getElementById('rdcal-view');
+  const y=_rdCalDate.getFullYear(),m=_rdCalDate.getMonth();
+  const mk=y+'-'+String(m+1).padStart(2,'0');
+  const first=new Date(y,m,1);
+  const startWeekday=first.getDay();
+  const daysInMonth=new Date(y,m+1,0).getDate();
+  el.innerHTML='<div class="sheet-loading-msg">불러오는 중...</div>';
+  const rows=await supaFetch(`reading_daily_log?date_key=gte.${mk}-01&date_key=lte.${mk}-31&select=date_key,book_cid`);
+  const byDate={};
+  (rows||[]).forEach(r=>{
+    if(!byDate[r.date_key])byDate[r.date_key]=new Set();
+    byDate[r.date_key].add(r.book_cid);
+  });
+  const books=getBooks();
+  const bookMap={};books.forEach(b=>bookMap[b.cid]=b);
+  const totalBooksThisMonth=new Set();
+  Object.values(byDate).forEach(set=>set.forEach(cid=>totalBooksThisMonth.add(cid)));
+  const weekdays=['일','월','화','수','목','금','토'];
+  let html=`<div style="display:flex;align-items:center;justify-content:center;gap:16px;margin:6px 0 4px;">
+    <i class="ti ti-chevron-left" style="font-size:18px;cursor:pointer;" onclick="rdCalMonthShift(-1)" aria-hidden="true"></i>
+    <div style="font-weight:600;font-size:15px;">${y}년 ${String(m+1).padStart(2,'0')}월</div>
+    <i class="ti ti-chevron-right" style="font-size:18px;cursor:pointer;" onclick="rdCalMonthShift(1)" aria-hidden="true"></i>
+  </div>
+  <div style="text-align:center;font-size:26px;font-weight:700;margin:10px 0 16px;">${totalBooksThisMonth.size}권</div>
+  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px 0;font-size:11px;color:var(--ts);text-align:center;margin-bottom:6px;">
+    ${weekdays.map(w=>`<div>${w}</div>`).join('')}
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px 0;">`;
+  for(let i=0;i<startWeekday;i++)html+='<div></div>';
+  for(let d=1;d<=daysInMonth;d++){
+    const dk=mk+'-'+String(d).padStart(2,'0');
+    const cids=byDate[dk]?Array.from(byDate[dk]):[];
+    let cellInner=`<div style="font-size:11px;color:var(--ts);margin-bottom:3px;">${d}</div>`;
+    if(cids.length){
+      const cover=bookMap[cids[0]]&&bookMap[cids[0]].poster;
+      cellInner+=`<div style="position:relative;width:32px;height:44px;margin:0 auto;border-radius:4px;overflow:hidden;background:var(--card2);${cover?`background-image:url('${cover}');background-size:cover;background-position:center;`:''}">
+        ${cids.length>1?`<div style="position:absolute;bottom:1px;right:1px;background:rgba(0,0,0,0.65);color:#fff;font-size:9px;border-radius:6px;padding:0 4px;line-height:1.4;">${cids.length}</div>`:''}
+      </div>`;
+    }
+    html+=`<div style="text-align:center;cursor:${cids.length?'pointer':'default'};" ${cids.length?`onclick="openReadingCalDayDetail('${dk}')"`:''}>${cellInner}</div>`;
+  }
+  html+='</div>';
+  el.innerHTML=html;
+}
+async function openReadingCalDayDetail(dk){
+  const el=document.getElementById('rdcal-view');
+  el.innerHTML='<div class="sheet-loading-msg">불러오는 중...</div>';
+  const rows=await supaFetch(`reading_daily_log?date_key=eq.${dk}&order=created`);
+  const books=getBooks();
+  const bookMap={};books.forEach(b=>bookMap[b.cid]=b);
+  let html=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+    <div style="font-weight:700;font-size:17px;">${dk.replace(/-/g,'. ')}</div>
+    <i class="ti ti-x" style="font-size:18px;cursor:pointer;color:var(--ts);" onclick="renderReadingCalGrid()" aria-hidden="true"></i>
+  </div>`;
+  if(!rows||!rows.length){
+    html+='<div class="sheet-loading-msg">기록이 없어요</div>';
+  }else{
+    rows.forEach(r=>{
+      const book=bookMap[r.book_cid];
+      const title=book?book.title:'(삭제된 책)';
+      const author=book?book.author:'';
+      const cover=book&&book.poster;
+      const progText=r.unit==='percent'?`${r.percent_after}%`:`${r.pages_after}p`;
+      const amountText=r.amount_read>0?(r.unit==='percent'?`+${r.amount_read}%`:`+${r.amount_read}p`):'';
+      const timeText=r.seconds>0?Math.round(r.seconds/60)+'분':'';
+      html+=`<div style="display:flex;gap:12px;margin-bottom:16px;">
+        <div style="width:48px;height:66px;flex-shrink:0;border-radius:5px;overflow:hidden;background:var(--card2);${cover?`background-image:url('${cover}');background-size:cover;background-position:center;`:''}"></div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:600;font-size:14px;">${title}</div>
+          ${author?`<div style="font-size:11.5px;color:var(--ts);margin-top:1px;">${author}</div>`:''}
+          <div style="font-size:12px;color:var(--ts);margin-top:4px;">${progText}${amountText?' · '+amountText:''}${timeText?' · '+timeText:''}</div>
+        </div>
+      </div>`;
+    });
+  }
+  el.innerHTML=html;
+}
 function setPgUnit(u){
   const book=getBooks().find(b=>b.cid===_pgBookCid);if(!book)return;
   _pgUnit=u;
@@ -10444,6 +10581,8 @@ function confirmProgress(){
   else book.pages=Math.max(0,endVal);
   if(_pgSeconds>0)book.seconds=(book.seconds||0)+_pgSeconds;
   upsertBookLocal(book);
+  const _amountRead=Math.max(0,endVal-_pgStartVal);
+  logReadingDaily(book,today,_amountRead,_pgSeconds,_pgUnit,book.percent,book.pages);
   markReadingActivityToday();
   // 독서 습관체크는 스톱워치 종료 시점(autoLogReadingRhythm)에서만 처리 —
   // 진행바를 직접 클릭해 페이지/퍼센트만 입력한 경우는 습관체크하지 않음.
