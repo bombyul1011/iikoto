@@ -10736,7 +10736,7 @@ function _loadShareLogo(){
 
 // ── 문장 카드: G(배경 따옴표형) / H(카드 인 카드형) — 배경은 항상 투명, H만 반투명 패널 사용
 // ── 문장 카드: G(로고형) / H(카드형, 가변 높이) — 배경은 항상 투명, H만 반투명 패널
-async function _drawQuoteCardG(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize){
+async function _drawQuoteCardG(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode){
   await _ensureBareonbatangLoaded();
   const isWhite=colorMode==='white';
   const textColor=isWhite?'#fff':'#5a4040';
@@ -10753,6 +10753,23 @@ async function _drawQuoteCardG(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
   let ty=140;
   ctx.textAlign=isCenter?'center':'left';
   const tx0=isCenter?W/2:88;
+  const HIGHLIGHT_COLORS={yellow:'rgba(255,214,130,0.55)',pink:'rgba(230,140,160,0.38)',mint:'rgba(150,200,180,0.42)'};
+  if(highlightMode&&HIGHLIGHT_COLORS[highlightMode]){
+    let hy=ty;
+    const padH=Math.round(fs*0.14);
+    lines.forEach(line=>{
+      const w=ctx.measureText(line).width;
+      const bx=isCenter?tx0-w/2:tx0;
+      ctx.fillStyle=HIGHLIGHT_COLORS[highlightMode];
+      ctx.save();
+      ctx.translate(bx-8,hy-padH/2);
+      ctx.rotate(-0.006);
+      ctx.fillRect(0,0,w+16,fs+padH);
+      ctx.restore();
+      hy+=lineH;
+    });
+    ctx.fillStyle=textColor;
+  }
   lines.forEach(line=>{ctx.fillText(line,tx0,ty);ty+=lineH;});
   ctx.textAlign='left';
   ty+=44;
@@ -10776,7 +10793,7 @@ async function _drawQuoteCardG(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
     }
   }
 }
-async function _drawQuoteCardH(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode){
+async function _drawQuoteCardH(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize){
   await _ensureBareonbatangLoaded();
   const isWhite=colorMode==='white';
   const textColor=isWhite?'#fff':'#5a4040';
@@ -10800,27 +10817,11 @@ async function _drawQuoteCardH(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
   _roundRect(ctx,px,py,pw,ph,32);ctx.fill();
   ctx.strokeStyle=isWhite?'rgba(255,255,255,0.35)':'rgba(255,255,255,0.6)';ctx.lineWidth=2;
   _roundRect(ctx,px,py,pw,ph,32);ctx.stroke();
+  ctx.fillStyle=textColor;
   ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
   ctx.textBaseline='top';
   ctx.textAlign=isCenter?'center':'left';
   const tx0=isCenter?px+pw/2:px+48;
-  const HIGHLIGHT_COLORS={yellow:'rgba(255,214,130,0.55)',pink:'rgba(230,140,160,0.38)',mint:'rgba(150,200,180,0.42)'};
-  if(highlightMode&&HIGHLIGHT_COLORS[highlightMode]){
-    let hy=py+padTop;
-    const padH=Math.round(fs*0.14);
-    lines.forEach(line=>{
-      const w=ctx.measureText(line).width;
-      const bx=isCenter?tx0-w/2:tx0;
-      ctx.fillStyle=HIGHLIGHT_COLORS[highlightMode];
-      ctx.save();
-      ctx.translate(bx-8,hy-padH/2);
-      ctx.rotate(-0.006);
-      ctx.fillRect(0,0,w+16,fs+padH);
-      ctx.restore();
-      hy+=lineH;
-    });
-  }
-  ctx.fillStyle=textColor;
   let ty=py+padTop;
   lines.forEach(line=>{ctx.fillText(line,tx0,ty);ty+=lineH;});
   ctx.textAlign='left';
@@ -10953,7 +10954,7 @@ async function _buildCurrentShareCanvas(){
   return await _buildTodayCanvas(ctx.styleKey,book,unit,percentAfter,pagesAfter,seconds,ctx.colorMode,dk);
 }
 function _shareIconBtn(active,onclick,inner,title){
-  return `<button onclick="${onclick}" title="${title||''}" style="width:36px;height:36px;flex-shrink:0;border-radius:10px;border:none;background:transparent;color:${active?'var(--acc,#c07080)':'var(--ts)'};display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;opacity:${active?1:0.55};transition:all .15s;">${inner}</button>`;
+  return `<button onclick="${onclick}" title="${title||''}" style="width:27px;height:27px;flex-shrink:0;border-radius:8px;border:none;background:transparent;color:${active?'var(--acc,#c07080)':'var(--ts)'};display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;opacity:${active?1:0.55};transition:all .15s;">${inner}</button>`;
 }
 function _shareStyleBanner(active,onclick,label){
   return `<button onclick="${onclick}" style="flex:1;min-width:0;height:40px;border-radius:12px;border:1.5px solid ${active?'var(--acc,#c07080)':'var(--card-b)'};background:${active?'rgba(192,112,128,0.10)':'var(--card)'};color:${active?'var(--acc,#c07080)':'var(--ts)'};display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:11.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 4px;transition:all .15s;">${label}</button>`;
@@ -10980,7 +10981,7 @@ async function _renderShareModal(){
   const styleBannerRow=`<div style="display:flex;gap:8px;margin-bottom:14px;">${styleBanners.join('')}</div>`;
   // 색상: 반반 원 하나로 브라운/아이보리 토글 (클릭 시 전환)
   const colorSwatch=_shareIconBtn(true,`_shareModalCtx.colorMode=_shareModalCtx.colorMode==='brown'?'white':'brown';_renderShareModal();`,
-    `<span style="width:22px;height:22px;border-radius:50%;overflow:hidden;display:flex;box-shadow:inset 0 0 0 1px rgba(154,128,112,0.25);">
+    `<span style="width:18px;height:18px;border-radius:50%;overflow:hidden;display:flex;box-shadow:inset 0 0 0 1px rgba(154,128,112,0.25);">
       <span style="width:50%;background:${ctx.colorMode==='brown'?'#5a4040':'#f3e8d8'};"></span>
       <span style="width:50%;background:${ctx.colorMode==='brown'?'#f3e8d8':'#5a4040'};"></span>
     </span>`,'글자색 전환');
@@ -11001,8 +11002,8 @@ async function _renderShareModal(){
   const HL_CYCLE=[null,'yellow','pink','mint'];
   const HL_SWATCH={yellow:'#ffd682',pink:'#e68ca0',mint:'#96c8b4'};
   const curHl=ctx.highlightMode||null;
-  const highlightToggle=(ctx.kind==='quote'&&ctx.styleKey==='H')?_shareIconBtn(!!curHl,`_shareModalCtx.highlightMode=(()=>{const c=${JSON.stringify(HL_CYCLE)};return c[(c.indexOf(_shareModalCtx.highlightMode)+1)%c.length];})();_renderShareModal();`,
-    curHl?`<span style="width:20px;height:20px;border-radius:6px;background:${HL_SWATCH[curHl]};display:inline-block;"></span>`:`<i class="ti ti-highlight" aria-hidden="true"></i>`,curHl?'형광펜 색상 변경':'형광펜 켜기'):'';
+  const highlightToggle=(ctx.kind==='quote'&&ctx.styleKey==='G')?_shareIconBtn(!!curHl,`_shareModalCtx.highlightMode=(()=>{const c=${JSON.stringify(HL_CYCLE)};return c[(c.indexOf(_shareModalCtx.highlightMode)+1)%c.length];})();_renderShareModal();`,
+    curHl?`<span style="width:16px;height:16px;border-radius:5px;background:${HL_SWATCH[curHl]};display:inline-block;"></span>`:`<i class="ti ti-highlight" aria-hidden="true"></i>`,curHl?'형광펜 색상 변경':'형광펜 켜기'):'';
   const iconRow=[colorSwatch,fontToggle,alignToggle,bookToggle,quoteMarkToggle,highlightToggle,fontSizeDown,fontSizeUp].filter(Boolean).join('');
   ov.innerHTML=`<div style="background:var(--sheet);border-radius:26px;padding:22px;width:min(88vw,380px);max-height:88vh;overflow-y:auto;box-sizing:border-box;" onclick="event.stopPropagation();">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
@@ -11013,7 +11014,7 @@ async function _renderShareModal(){
       <img src="${dataUrl}" style="width:100%;display:block;" />
     </div>
     ${styleBannerRow}
-    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:16px;">${iconRow}</div>
+    <div style="display:flex;gap:2px;justify-content:center;flex-wrap:nowrap;margin-bottom:16px;overflow-x:auto;">${iconRow}</div>
     <button onclick="_confirmShareCopy()" style="width:100%;padding:15px 0;border-radius:16px;border:none;background:linear-gradient(120deg,#c07080,#b25a72);color:#fff;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(192,112,128,0.35);display:flex;align-items:center;justify-content:center;gap:7px;">
       <i class="ti ti-copy" style="font-size:17px;" aria-hidden="true"></i>이미지 복사하기
     </button>
