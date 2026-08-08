@@ -8355,13 +8355,11 @@ function openContentModal(cat,item=null,mk=null){
   const isMusic=cat==='music';
   const isBook=cat==='book';
   const statusBtns=document.getElementById('cm-status-btns');
-  const starRow=document.getElementById('cm-star-row');
   const playBtn=document.getElementById('cm-music-play-btn');
   const playlistBtn=document.getElementById('cm-playlist-btn');
   const startLabel=document.getElementById('cm-start-label');
   if(startLabel)startLabel.style.display=isMusic?'none':'inline';
   if(statusBtns)statusBtns.style.display=isMusic?'none':'flex';
-  if(starRow)starRow.style.display=isMusic?'none':'flex';
   if(playBtn)playBtn.style.display=(isMusic&&_selectedMusicUrl)?'block':'none';
   if(playlistBtn)playlistBtn.style.display=(isMusic&&!item)?'block':'none';
   // 책: 독서코너와 동일하게 페이지/퍼센트 기록 방식 선택 — 콘텐츠탭 등록 시에도 함께 반영되도록 연동
@@ -8424,6 +8422,13 @@ function setCStatus(status){
     if(lbl)lbl.textContent=status==='stopped'?'중단일':'완료일';
     if(showEnd&&!document.getElementById('cm-end').value)document.getElementById('cm-end').value=dateKey(currentDate);
   }
+  // 별점·감상은 완료/중단 상태에서만 의미가 있으므로, 그 전까지는 숨겨서 등록 화면을 간결하게 유지 (음악은 원래부터 별점 개념이 없어 항상 숨김)
+  const isMusic=_contentCtx.cat==='music';
+  const showReviewFields=!isMusic&&(status==='done'||status==='stopped');
+  const starRow=document.getElementById('cm-star-row');
+  const reviewEl=document.getElementById('cm-review');
+  if(starRow)starRow.style.display=showReviewFields?'flex':'none';
+  if(reviewEl)reviewEl.style.display=showReviewFields?'':'none';
 }
 function toggleCDone(){
   setCStatus(_contentCtx.status==='done'?'watching':'done');
