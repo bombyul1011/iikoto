@@ -10567,8 +10567,7 @@ function renderReadingCalDayDetailHtml(dk,dayLogs,bookMap){
     const timeText=r.seconds>0?Math.round(r.seconds/60)+'분':'';
     const metaLine=[progText,amountText,timeText].filter(Boolean).join(' · ');
     const posterHtml=cover?`<img src="${cover}" style="width:32px;height:44px;border-radius:5px;object-fit:cover;flex-shrink:0;" />`:`<div style="width:32px;height:44px;border-radius:5px;background:var(--card2);flex-shrink:0;display:flex;align-items:center;justify-content:center;"><i class="ti ti-book ico-13" style="color:var(--tm);" aria-hidden="true"></i></div>`;
-    const isToday=dk===dateKey(getLogicalDate());
-    const shareBtn=isToday?`<span onclick="event.stopPropagation();openTodayReadingShareModal('${r.book_cid}','${r.unit}',${r.percent_after!=null?r.percent_after:'null'},${r.pages_after!=null?r.pages_after:'null'},${r.seconds||0})" title="공유 이미지" style="cursor:pointer;color:var(--ts);opacity:0.75;flex-shrink:0;padding:4px;"><i class="ti ti-share" style="font-size:14px;" aria-hidden="true"></i></span>`:'';
+    const shareBtn=`<span onclick="event.stopPropagation();openTodayReadingShareModal('${r.book_cid}','${r.unit}',${r.percent_after!=null?r.percent_after:'null'},${r.pages_after!=null?r.pages_after:'null'},${r.seconds||0})" title="공유 이미지" style="cursor:pointer;color:var(--ts);opacity:0.75;flex-shrink:0;padding:4px;"><i class="ti ti-share" style="font-size:14px;" aria-hidden="true"></i></span>`;
     return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;">
       ${posterHtml}
       <div style="flex:1;min-width:0;">
@@ -10629,11 +10628,21 @@ function _drawBookIcon(ctx,x,y,size,color){
   ctx.save();
   ctx.translate(x,y);
   ctx.scale(size/24,size/24);
-  ctx.strokeStyle=color;ctx.lineWidth=1.6;ctx.lineCap='round';ctx.lineJoin='round';
-  ctx.beginPath();
-  ctx.moveTo(3,19); ctx.lineTo(3,5); ctx.quadraticCurveTo(3,4,4,4); ctx.lineTo(19,4); ctx.lineTo(19,17); ctx.lineTo(6,17); ctx.quadraticCurveTo(3,17,3,19);
-  ctx.stroke();
-  ctx.beginPath();ctx.moveTo(3,19);ctx.quadraticCurveTo(3,17,6,17);ctx.lineTo(19,17);ctx.stroke();
+  ctx.strokeStyle=color;ctx.lineWidth=2;ctx.lineCap='round';ctx.lineJoin='round';
+  const p=new Path2D('M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0');ctx.stroke(p);
+  const p2=new Path2D('M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0');ctx.stroke(p2);
+  ctx.beginPath();ctx.moveTo(3,6);ctx.lineTo(3,19);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(12,6);ctx.lineTo(12,19);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(21,6);ctx.lineTo(21,19);ctx.stroke();
+  ctx.restore();
+}
+function _drawQuoteIcon(ctx,x,y,size,color){
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.scale(size/24,size/24);
+  ctx.strokeStyle=color;ctx.lineWidth=2;ctx.lineCap='round';ctx.lineJoin='round';
+  const p1=new Path2D('M10 11h-4a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1h3a1 1 0 0 1 1 1v6c0 2.667 -1.333 4.333 -4 5');ctx.stroke(p1);
+  const p2=new Path2D('M19 11h-4a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1h3a1 1 0 0 1 1 1v6c0 2.667 -1.333 4.333 -4 5');ctx.stroke(p2);
   ctx.restore();
 }
 let _bareonbatangLoaded=false;
@@ -10655,69 +10664,77 @@ function _loadShareLogo(){
 }
 
 // ── 문장 카드: G(배경 따옴표형) / H(카드 인 카드형) — 배경은 항상 투명, H만 반투명 패널 사용
-async function _drawQuoteCardG(ctx,W,H,q,book){
+async function _drawQuoteCardG(ctx,W,H,q,book,colorMode){
   await _ensureBareonbatangLoaded();
-  ctx.fillStyle='rgba(90,64,64,0.10)';
-  ctx.font='700 200px Georgia, serif';
-  ctx.textBaseline='top';
-  ctx.fillText('"',60,40);
-  ctx.fillStyle='#5a4040';
+  const isWhite=colorMode==='white';
+  const textColor=isWhite?'#fff':'#5a4040';
+  const subColor=isWhite?'rgba(255,255,255,0.75)':'#9a8070';
+  const wmColor=isWhite?'rgba(255,255,255,0.6)':'#c8b0a8';
+  ctx.globalAlpha=isWhite?0.35:0.12;
+  _drawQuoteIcon(ctx,64,50,140,textColor);
+  ctx.globalAlpha=1;
+  ctx.fillStyle=textColor;
   ctx.font='400 40px Bareonbatang, serif';
+  ctx.textBaseline='top';
   const lines=_shareWrapText(ctx,q.text,W-176);
   let ty=300;
   lines.forEach(line=>{ctx.fillText(line,88,ty);ty+=64;});
   ty+=40;
   ctx.font='600 26px "DM Sans",sans-serif';
-  ctx.fillStyle='#5a4040';
+  ctx.fillStyle=textColor;
   const title=book?book.title:'';
   ctx.fillText(title,88,ty);
   const titleW=ctx.measureText(title).width;
   if(book&&book.author){
     ctx.font='400 24px "DM Sans",sans-serif';
-    ctx.fillStyle='#9a8070';
+    ctx.fillStyle=subColor;
     ctx.fillText(' · '+book.author,88+titleW,ty);
   }
   ty+=54;
   ctx.font='italic 400 24px Bareonbatang, serif';
-  ctx.fillStyle='#c8b0a8';
+  ctx.fillStyle=wmColor;
   ctx.fillText('iikoto books',88,ty);
   const wmW=ctx.measureText('iikoto books').width;
-  _drawBookIcon(ctx,88+wmW+18,ty-2,22,'#c8b0a8');
+  _drawBookIcon(ctx,88+wmW+18,ty-2,22,wmColor);
 }
-async function _drawQuoteCardH(ctx,W,H,q,book){
+async function _drawQuoteCardH(ctx,W,H,q,book,colorMode){
   await _ensureBareonbatangLoaded();
+  const isWhite=colorMode==='white';
+  const textColor=isWhite?'#fff':'#5a4040';
+  const subColor=isWhite?'rgba(255,255,255,0.75)':'#9a8070';
+  const wmColor=isWhite?'rgba(255,255,255,0.6)':'#c8b0a8';
   const px=88,py=250,pw=W-176,ph=H-500;
-  ctx.fillStyle='rgba(255,255,255,0.42)';
+  ctx.fillStyle=isWhite?'rgba(0,0,0,0.22)':'rgba(255,255,255,0.42)';
   _roundRect(ctx,px,py,pw,ph,32);ctx.fill();
-  ctx.strokeStyle='rgba(255,255,255,0.6)';ctx.lineWidth=2;
+  ctx.strokeStyle=isWhite?'rgba(255,255,255,0.35)':'rgba(255,255,255,0.6)';ctx.lineWidth=2;
   _roundRect(ctx,px,py,pw,ph,32);ctx.stroke();
-  ctx.fillStyle='#5a4040';
+  ctx.fillStyle=textColor;
   ctx.font='400 40px Bareonbatang, serif';
   ctx.textBaseline='top';
   const lines=_shareWrapText(ctx,q.text,pw-96);
   let ty=py+56;
   lines.forEach(line=>{ctx.fillText(line,px+48,ty);ty+=64;});
   const fy=ty+30;
-  ctx.strokeStyle='rgba(154,128,112,0.3)';
+  ctx.strokeStyle=isWhite?'rgba(255,255,255,0.3)':'rgba(154,128,112,0.3)';
   ctx.setLineDash([6,6]);ctx.lineWidth=1.5;
   ctx.beginPath();ctx.moveTo(px+48,fy);ctx.lineTo(px+pw-48,fy);ctx.stroke();
   ctx.setLineDash([]);
   ctx.font='600 26px "DM Sans",sans-serif';
-  ctx.fillStyle='#5a4040';
+  ctx.fillStyle=textColor;
   const title=book?book.title:'';
   ctx.fillText(title,px+48,fy+28);
   const titleW=ctx.measureText(title).width;
   if(book&&book.author){
     ctx.font='400 24px "DM Sans",sans-serif';
-    ctx.fillStyle='#9a8070';
+    ctx.fillStyle=subColor;
     ctx.fillText(' · '+book.author,px+48+titleW,fy+28);
   }
   ty=fy+70;
   ctx.font='italic 400 24px Bareonbatang, serif';
-  ctx.fillStyle='#c8b0a8';
+  ctx.fillStyle=wmColor;
   ctx.fillText('iikoto books',px+48,ty);
   const wmW=ctx.measureText('iikoto books').width;
-  _drawBookIcon(ctx,px+48+wmW+18,ty-2,22,'#c8b0a8');
+  _drawBookIcon(ctx,px+48+wmW+18,ty-2,22,wmColor);
 }
 const QUOTE_CARD_STYLES={G:{label:'따옴표형',draw:_drawQuoteCardG},H:{label:'카드형',draw:_drawQuoteCardH}};
 
@@ -10844,12 +10861,12 @@ async function _drawTodayCardB(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds
 const TODAY_CARD_STYLES={A:{label:'숫자형',draw:_drawTodayCardA},B:{label:'표지형',draw:_drawTodayCardB}};
 
 // ── 공유 모달 공통: 캔버스 생성 → 앱 배경 위에 미리보기 표시 → 스타일 선택 → 복사
-async function _buildQuoteCanvas(styleKey,q,book){
+async function _buildQuoteCanvas(styleKey,q,book,colorMode){
   const W=1080,H=1350;
   const canvas=document.createElement('canvas');
   canvas.width=W;canvas.height=H;
   const ctx=canvas.getContext('2d');
-  await QUOTE_CARD_STYLES[styleKey].draw(ctx,W,H,q,book);
+  await QUOTE_CARD_STYLES[styleKey].draw(ctx,W,H,q,book,colorMode);
   return canvas;
 }
 async function _buildTodayCanvas(styleKey,book,unit,percentAfter,pagesAfter,seconds){
@@ -10869,7 +10886,7 @@ function _closeShareModal(){
 async function _renderShareModal(){
   const ctx=_shareModalCtx;if(!ctx)return;
   const styles=ctx.kind==='quote'?QUOTE_CARD_STYLES:TODAY_CARD_STYLES;
-  const canvas=ctx.kind==='quote'?await _buildQuoteCanvas(ctx.styleKey,...ctx.args):await _buildTodayCanvas(ctx.styleKey,...ctx.args);
+  const canvas=ctx.kind==='quote'?await _buildQuoteCanvas(ctx.styleKey,ctx.args[0],ctx.args[1],ctx.colorMode):await _buildTodayCanvas(ctx.styleKey,...ctx.args);
   const dataUrl=canvas.toDataURL('image/png');
   let ov=document.getElementById('share-card-modal');
   const isNew=!ov;
@@ -10881,6 +10898,10 @@ async function _renderShareModal(){
     document.body.appendChild(ov);
   }
   const styleBtns=Object.keys(styles).map(k=>`<button onclick="_shareModalCtx.styleKey='${k}';_renderShareModal();" style="flex:1;padding:9px 0;border-radius:12px;border:1px solid ${k===ctx.styleKey?'var(--acc,#c07080)':'var(--card-b)'};background:${k===ctx.styleKey?'rgba(192,112,128,0.12)':'var(--card)'};color:${k===ctx.styleKey?'var(--acc,#c07080)':'var(--tp)'};font-size:12.5px;font-weight:600;cursor:pointer;">${styles[k].label}</button>`).join('');
+  const colorBtns=ctx.kind==='quote'?`<div style="display:flex;gap:8px;margin-bottom:14px;">
+    <button onclick="_shareModalCtx.colorMode='brown';_renderShareModal();" style="flex:1;padding:9px 0;border-radius:12px;border:1px solid ${ctx.colorMode==='brown'?'var(--acc,#c07080)':'var(--card-b)'};background:${ctx.colorMode==='brown'?'rgba(192,112,128,0.12)':'var(--card)'};color:${ctx.colorMode==='brown'?'var(--acc,#c07080)':'var(--tp)'};font-size:12.5px;font-weight:600;cursor:pointer;">브라운 글자</button>
+    <button onclick="_shareModalCtx.colorMode='white';_renderShareModal();" style="flex:1;padding:9px 0;border-radius:12px;border:1px solid ${ctx.colorMode==='white'?'var(--acc,#c07080)':'var(--card-b)'};background:${ctx.colorMode==='white'?'rgba(192,112,128,0.12)':'var(--card)'};color:${ctx.colorMode==='white'?'var(--acc,#c07080)':'var(--tp)'};font-size:12.5px;font-weight:600;cursor:pointer;">흰색 글자</button>
+  </div>`:'';
   ov.innerHTML=`<div style="background:var(--sheet);border-radius:24px;padding:20px;width:min(88vw,380px);max-height:88vh;overflow-y:auto;box-sizing:border-box;" onclick="event.stopPropagation();">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
       <div style="font-weight:600;font-size:14px;color:var(--tp);">공유 이미지</div>
@@ -10889,13 +10910,14 @@ async function _renderShareModal(){
     <div style="border-radius:18px;overflow:hidden;background:var(--bg);box-shadow:0 4px 20px rgba(0,0,0,0.12);margin-bottom:14px;">
       <img src="${dataUrl}" style="width:100%;display:block;" />
     </div>
-    <div style="display:flex;gap:8px;margin-bottom:14px;">${styleBtns}</div>
+    <div style="display:flex;gap:8px;margin-bottom:${colorBtns?'10px':'14px'};">${styleBtns}</div>
+    ${colorBtns}
     <button onclick="_confirmShareCopy()" style="width:100%;padding:13px 0;border-radius:14px;border:none;background:var(--acc,#c07080);color:#fff;font-size:14px;font-weight:600;cursor:pointer;">이미지 복사하기</button>
   </div>`;
 }
 async function _confirmShareCopy(){
   const ctx=_shareModalCtx;if(!ctx)return;
-  const canvas=ctx.kind==='quote'?await _buildQuoteCanvas(ctx.styleKey,...ctx.args):await _buildTodayCanvas(ctx.styleKey,...ctx.args);
+  const canvas=ctx.kind==='quote'?await _buildQuoteCanvas(ctx.styleKey,ctx.args[0],ctx.args[1],ctx.colorMode):await _buildTodayCanvas(ctx.styleKey,...ctx.args);
   const ok=await _shareCanvasToClipboard(canvas);
   _shareToast(ok?'이미지가 복사됐어요':'복사에 실패했어요 (사파리 최신버전 권장)');
   if(ok)_closeShareModal();
@@ -10903,7 +10925,7 @@ async function _confirmShareCopy(){
 async function shareQuoteCard(quoteCid){
   const q=getQuotes().find(x=>x.cid===quoteCid);if(!q)return;
   const book=getBooks().find(b=>b.cid===q.bookCid);
-  _shareModalCtx={kind:'quote',args:[q,book],styleKey:'H'};
+  _shareModalCtx={kind:'quote',args:[q,book],styleKey:'H',colorMode:'brown'};
   await _renderShareModal();
 }
 async function openTodayReadingShareModal(bookCid,unit,percentAfter,pagesAfter,seconds){
