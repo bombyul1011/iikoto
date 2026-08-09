@@ -10563,13 +10563,16 @@ function renderReadingCalView(){
   for(let d=1;d<=daysInMonth;d++){
     const dk=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const dayLogs=_rdCalLogsByDate[dk]||[];
-    const cids=[...new Set(dayLogs.map(r=>r.book_cid))];
+    const cids=[...new Set(dayLogs.slice().reverse().map(r=>r.book_cid))];
     let cellInner;
     if(cids.length){
       // 표지가 있는 날은 밀리의 서재 방식대로 일자 숫자를 생략 — 표지 자체가 그 날의 표식이 됨
       const cover=bookMap[cids[0]]&&bookMap[cids[0]].poster;
-      cellInner=`<div style="position:relative;width:34px;height:46px;margin:0 auto;border-radius:6px;overflow:hidden;background:var(--card);border:1px solid var(--card-b);${cover?`background-image:url('${cover}');background-size:cover;background-position:center;`:''}">
-        ${cids.length>1?`<div style="position:absolute;bottom:2px;right:2px;background:rgba(60,40,35,0.72);color:#fff;font-size:9px;font-weight:600;border-radius:7px;min-width:14px;height:14px;display:flex;align-items:center;justify-content:center;padding:0 3px;">${cids.length}</div>`:''}
+      const cover2=cids.length>1&&bookMap[cids[1]]&&bookMap[cids[1]].poster;
+      cellInner=`<div style="position:relative;width:34px;height:46px;margin:0 auto;">
+        ${cids.length>1?`<div style="position:absolute;top:2px;left:3px;width:34px;height:46px;border-radius:6px;overflow:hidden;background:var(--card);border:1px solid var(--card-b);box-shadow:0 1px 3px rgba(0,0,0,0.15);${cover2?`background-image:url('${cover2}');background-size:cover;background-position:center;`:''}"></div>`:''}
+        <div style="position:absolute;top:0;left:0;width:34px;height:46px;border-radius:6px;overflow:hidden;background:var(--card);border:1px solid var(--card-b);${cids.length>1?'box-shadow:-1px 1px 4px rgba(0,0,0,0.18);':''}${cover?`background-image:url('${cover}');background-size:cover;background-position:center;`:''}"></div>
+        ${cids.length>1?`<div style="position:absolute;bottom:-4px;right:-4px;background:rgba(60,40,35,0.85);color:#fff;font-size:9px;font-weight:600;border-radius:7px;min-width:14px;height:14px;display:flex;align-items:center;justify-content:center;padding:0 3px;z-index:2;">${cids.length}</div>`:''}
       </div>`;
     }else{
       cellInner=`<div style="text-align:center;font-size:11px;color:var(--tm);height:46px;display:flex;align-items:center;justify-content:center;">${d}</div>`;
