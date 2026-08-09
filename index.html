@@ -1994,23 +1994,26 @@ function _thisWeekSundayDk(){
   else if(now.getHours()<4)d.setDate(d.getDate()-1); // 그 외 요일은 기존 getLogicalDate와 동일한 새벽 4시 컷 유지
   return dateKey(d);
 }
-function appendSundayBanner(body){
-  const isNight2=getSubSection()==='night_2';
+// 일요일 22시(생성 시점) 전용 배너 — 클릭 시 없으면 새로 생성(openWeeklyReviewSheet).
+function appendSundayGenerateBanner(body){
   const banner=document.createElement('div');
   banner.className='weekly-review-banner';
-  if(isNight2){
-    banner.innerHTML=`<div class="weekly-review-banner-inner">
-      <div class="weekly-review-banner-title"><i class="ti ti-sparkles ico-13" aria-hidden="true"></i> 이번주 돌아보기 <i class="ti ti-sparkles ico-13" aria-hidden="true"></i></div>
-      <div class="weekly-review-banner-sub"><span>지난 한주간의 나는 어땠을까요?</span><span style="font-size:15px;opacity:0.6;"><i class="ti ti-chevron-up" aria-hidden="true"></i></span></div>
-    </div>`;
-    banner.addEventListener('click',openWeeklyReviewSheet);
-  }else{
-    banner.style.cssText+='cursor:default;opacity:0.62;animation:none;';
-    banner.innerHTML=`<div class="weekly-review-banner-inner">
-      <div class="weekly-review-banner-title"><i class="ti ti-sparkles ico-13" aria-hidden="true"></i> 이번주 돌아보기 <i class="ti ti-sparkles ico-13" aria-hidden="true"></i></div>
-      <div class="weekly-review-banner-sub"><span>22시에 요약해드릴게요</span></div>
-    </div>`;
-  }
+  banner.innerHTML=`<div class="weekly-review-banner-inner">
+    <div class="weekly-review-banner-title"><i class="ti ti-sparkles ico-13" aria-hidden="true"></i> 이번주 돌아보기 <i class="ti ti-sparkles ico-13" aria-hidden="true"></i></div>
+    <div class="weekly-review-banner-sub"><span>지난 한주간의 나는 어땠을까요?</span><span style="font-size:15px;opacity:0.6;"><i class="ti ti-chevron-up" aria-hidden="true"></i></span></div>
+  </div>`;
+  banner.addEventListener('click',openWeeklyReviewSheet);
+  body.appendChild(banner);
+}
+// 그 외 노출 구간(새벽~월요일 종일) 전용 배너 — 클릭해도 조회만(openWeeklyReviewSheetReadOnly), 절대 생성하지 않음.
+function appendSundayReadOnlyBanner(body){
+  const banner=document.createElement('div');
+  banner.className='weekly-review-banner';
+  banner.innerHTML=`<div class="weekly-review-banner-inner">
+    <div class="weekly-review-banner-title"><i class="ti ti-sparkles ico-13" aria-hidden="true"></i> 이번주 돌아보기 <i class="ti ti-sparkles ico-13" aria-hidden="true"></i></div>
+    <div class="weekly-review-banner-sub"><span>지난 한주간의 나는 어땠을까요?</span><span style="font-size:15px;opacity:0.6;"><i class="ti ti-chevron-up" aria-hidden="true"></i></span></div>
+  </div>`;
+  banner.addEventListener('click',openWeeklyReviewSheetReadOnly);
   body.appendChild(banner);
 }
 function renderHomeBody(section){
@@ -2020,11 +2023,11 @@ function renderHomeBody(section){
   const _ld=getLogicalDate();
   const _lh=new Date().getHours();
   const _isLateNightOrDawn=_lh>=22||_lh<6; // 기간별 리포트(월간 중간·말일) 전용 — 파트2(22시)+새벽에만 노출
-  // 주간리포트만 별도 연장 노출: 일요일 22시 ~ 월요일 24시(자정)까지, 즉 "일요일 night" 전체 + "월요일 night" 전체.
-  // section==='night'일 때만 이 배너가 있는 else 분기를 타므로(오전/오후/새벽은 각자 분기 있음),
-  // 결국 조건은 "지금이 night 섹션이면서 요일이 일 또는 월"로 단순화됨.
-  const _dow=new Date().getDay();
-  const showWeeklyReviewBanner=(_dow===0||_dow===1); // section==='night'일 때만 쓰이므로 시간 조건은 불필요
+  // 주간리포트 배너: 일요일 22시(night_2)에만 "생성 가능" 배너, 그 외 일~월요일 전체(새벽/아침/오후/저녁)엔 "조회 전용" 배너.
+  // 생성과 조회를 완전히 다른 함수(appendSundayGenerateBanner/appendSundayReadOnlyBanner)로 분리해뒀기 때문에,
+  // 여기선 "지금이 몇 시인지" 더 따질 필요 없이 이 두 값만 보면 됨.
+  const isSundayNight2=new Date().getDay()===0&&getSubSection()==='night_2';
+  const showWeeklyReviewReadOnly=(new Date().getDay()===0||new Date().getDay()===1)&&!isSundayNight2;
   const isLastDayOfMonth=(()=>{const t=new Date(_ld);t.setDate(_ld.getDate()+1);return t.getDate()===1;})()&&_isLateNightOrDawn;
   const isMidMonth=_ld.getDate()===15&&_isLateNightOrDawn;
 
@@ -2034,6 +2037,7 @@ function renderHomeBody(section){
     if(isMorning2){
       body.appendChild(makeNutriCommentBanner());
     }
+    if(showWeeklyReviewReadOnly)appendSundayReadOnlyBanner(body);
     body.appendChild(makeMorningRoutineCard());
     body.appendChild(makeHabitStreakRow());
     body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getLogicalDate()));},'rhythm-soft',12.5,dateKey(getLogicalDate())));
@@ -2041,11 +2045,13 @@ function renderHomeBody(section){
       body.appendChild(makeRecentContentsCard());
     }
   } else if(section==='afternoon'){
+    if(showWeeklyReviewReadOnly)appendSundayReadOnlyBanner(body);
     body.appendChild(makeAfternoonPaceCard());
     refreshAfternoonPaceCard();
     body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getLogicalDate()));},'rhythm-soft',12.5,dateKey(getLogicalDate())));
   } else if(section==='dawn'){
     const dawnDk=dateKey(getLogicalDate());
+    if(showWeeklyReviewReadOnly)appendSundayReadOnlyBanner(body);
     const paceBanner=makeDawnPaceBanner(dawnDk);
     if(paceBanner)body.appendChild(paceBanner);
     body.appendChild(makeDawnRecapCard());
@@ -2074,8 +2080,10 @@ function renderHomeBody(section){
       </div>`;
       midBanner.addEventListener('click',openMonthlyReportSheet);
       body.appendChild(midBanner);
-    } else if(showWeeklyReviewBanner){
-      appendSundayBanner(body);
+    } else if(isSundayNight2){
+      appendSundayGenerateBanner(body);
+    } else if(showWeeklyReviewReadOnly){
+      appendSundayReadOnlyBanner(body);
     }
     const isNight2=getSubSection()==='night_2';
     if(!isNight2){
@@ -2085,7 +2093,7 @@ function renderHomeBody(section){
     }
     body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getLogicalDate()));},'rhythm-soft',12.5,dateKey(getLogicalDate())));
     // 일요일 다음 주 챌린지 준비 배너는 홈탭에서 제거 — 주간탭 "이번 주도 화이팅" 카드로 흡수됨
-    if(!showWeeklyReviewBanner){
+    if(!isSundayNight2&&!showWeeklyReviewReadOnly){
       // "오늘 마무리" 브리핑은 통합카드(상단 인삿말)가 흡수함
     }
     if(isNight2){
@@ -3281,7 +3289,8 @@ function _recentWeekSundays(){
   }
   return out; // [이번주 일요일, 1주전, 2주전, 3주전]
 }
-function renderWeekReviewChips(activeDk){
+// 칩 렌더링 — readOnly=true면 클릭 시 조회만(생성 경로 없음), false면 기존처럼 이번주 캐시 없을 시 생성 시도.
+function renderWeekReviewChips(activeDk,readOnly){
   const wrap=document.getElementById('wr-week-chips');if(!wrap)return;
   const weeks=_recentWeekSundays();
   wrap.innerHTML='';
@@ -3289,8 +3298,25 @@ function renderWeekReviewChips(activeDk){
     const chip=document.createElement('div');
     chip.className='m-chip'+(dk===activeDk?' active':'');
     chip.textContent=i===0?'이번주':i+'주전';
-    chip.addEventListener('click',()=>loadWeeklyReviewFor(dk));
+    chip.addEventListener('click',()=>readOnly?loadWeeklyReviewReadOnly(dk):loadWeeklyReviewFor(dk));
     wrap.appendChild(chip);
+  });
+}
+// 순수 조회 — 캐시에 있으면 보여주고, 없으면 "아직 없어요" 안내만. 절대 생성하지 않음.
+function loadWeeklyReviewReadOnly(dk){
+  renderWeekReviewChips(dk,true);
+  const content=document.getElementById('weekly-review-content');
+  const cacheKey='weekly_summary_'+dk;
+  const cached=S.get(cacheKey);
+  if(cached){content.innerHTML=cached;return;}
+  content.innerHTML='<div class="sheet-loading-msg">불러오는 중이에요...</div>';
+  aiCacheGet(cacheKey).then(function(serverHtml){
+    if(serverHtml){
+      S.set(cacheKey,serverHtml);
+      content.innerHTML=serverHtml;
+    }else{
+      content.innerHTML='<div class="sheet-loading-msg">이 주는 아직 기록된 요약이 없어요 🌿</div>';
+    }
   });
 }
 function loadWeeklyReviewFor(dk){
@@ -3330,6 +3356,13 @@ function loadWeeklyReviewFor(dk){
 function openWeeklyReviewSheet(){
   openSheet('weekly-review-sheet');
   loadWeeklyReviewFor(_thisWeekSundayDk());
+}
+// 조회 전용 진입점 — 일요일 22시(생성 시점) 외의 모든 노출 구간(새벽/월요일 종일)에서 씀.
+// 캐시 조회만 하고 생성 경로(makeWeeklySummaryCard)를 아예 타지 않으므로,
+// "지금이 생성해도 되는 시점인가"를 따질 필요가 원천적으로 없음 — 재생성 우려 자체가 없는 구조.
+function openWeeklyReviewSheetReadOnly(){
+  openSheet('weekly-review-sheet');
+  loadWeeklyReviewReadOnly(_thisWeekSundayDk());
 }
 
 async function makeWeeklySummaryCard(){

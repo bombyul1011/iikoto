@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260809-17-timeslot-refactor';
+const CACHE = 'iikoto-v20260809-20-weekly-review-split-generate-readonly';
 const ASSETS = [
   './',
   './index.html'
