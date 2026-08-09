@@ -10625,12 +10625,29 @@ function renderReadingCalDayDetailHtml(dk,dayLogs,bookMap){
 // 미리보기는 그 canvas를 앱 배경(--bg) 위에 그대로 얹어서 보여주면 되므로,
 // "미리보기용 불투명 버전"을 별도로 그릴 필요가 없다 — 그리기는 1회, 표시/복사는 같은 결과물 재사용.
 function _shareWrapText(ctx,text,maxWidth){
-  const chars=text.split('');
+  // 단어(공백) 단위로 줄바꿈 — 글자 단위로 자르면 어절 중간에서 끊길 수 있어 단어 경계를 지킴
+  const words=text.split(' ');
   let lines=[],cur='';
-  for(let i=0;i<chars.length;i++){
-    const test=cur+chars[i];
-    if(ctx.measureText(test).width>maxWidth&&cur){lines.push(cur);cur=chars[i]===' '?'':chars[i];}
-    else cur=test;
+  for(let i=0;i<words.length;i++){
+    const word=words[i];
+    const test=cur?cur+' '+word:word;
+    if(ctx.measureText(test).width>maxWidth&&cur){
+      lines.push(cur);
+      // 단어 자체가 한 줄 폭보다 긴 경우(매우 긴 합성어 등)에만 글자 단위로 강제 분할
+      if(ctx.measureText(word).width>maxWidth){
+        let sub='';
+        for(const ch of word){
+          const t2=sub+ch;
+          if(ctx.measureText(t2).width>maxWidth&&sub){lines.push(sub);sub=ch;}
+          else sub=t2;
+        }
+        cur=sub;
+      }else{
+        cur=word;
+      }
+    }else{
+      cur=test;
+    }
   }
   if(cur)lines.push(cur);
   return lines;
@@ -10711,6 +10728,21 @@ function _loadShareLogo(){
     img.onload=()=>{_shareLogoImg=img;resolve(img);};
     img.onerror=()=>resolve(null);
     img.src=imgEl.src;
+  });
+}
+// 표지 이미지(카카오/애플뮤직/TMDB 등 외부 CDN)를 캔버스에 그릴 때 CORS 오염 방지용 프록시 경유 로더
+// 저장 없이 매번 즉시 중계만 하는 Cloudflare Worker(iikoto-img-proxy)를 통해 로드
+const IMG_PROXY_BASE='https://iikoto-img-proxy.faith-003.workers.dev/img-proxy?url=';
+const _posterImgCache={};
+function _loadPosterViaProxy(posterUrl){
+  if(!posterUrl)return Promise.resolve(null);
+  if(_posterImgCache[posterUrl])return Promise.resolve(_posterImgCache[posterUrl]);
+  return new Promise(resolve=>{
+    const img=new Image();
+    img.crossOrigin='anonymous';
+    img.onload=()=>{_posterImgCache[posterUrl]=img;resolve(img);};
+    img.onerror=()=>resolve(null);
+    img.src=IMG_PROXY_BASE+encodeURIComponent(posterUrl);
   });
 }
 
@@ -10917,7 +10949,13 @@ async function _drawTodayCardA(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds
   ctx.fillStyle=textColor;
   const titleLines=_shareWrapText(ctx,book.title,W-240);
   titleLines.forEach(line=>{ctx.fillText(line,cx,ty);ty+=64;});
-  ty+=48;
+  if(book.author){
+    ctx.font='400 22px "DM Sans",sans-serif';
+    ctx.fillStyle=subColor;
+    ctx.fillText(book.author,cx,ty);
+    ty+=32;
+  }
+  ty+=(book.author?16:48);
   const progVal=unit==='percent'?(percentAfter!=null?percentAfter:0):(pagesAfter!=null?pagesAfter:0);
   const progUnit=unit==='percent'?'%':'p';
   ctx.font='500 26px "DM Sans",sans-serif';
@@ -10952,7 +10990,8 @@ async function _drawTodayCardC(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds
   ctx.font='400 56px Bareonbatang, serif';
   const titleLines=_shareWrapText(ctx,book.title,tw).slice(0,2);
   const dateH=32,titleLineH=73,gapAfterDate=20,gapAfterTitle=28,metaH=44;
-  const totalH=dateH+gapAfterDate+titleLines.length*titleLineH+gapAfterTitle+metaH;
+  const authorH=book.author?36:0;
+  const totalH=dateH+gapAfterDate+titleLines.length*titleLineH+authorH+gapAfterTitle+metaH;
   let ty=logoY+(logoH-totalH)/2;
   ctx.font='500 30px "DM Sans",sans-serif';
   ctx.fillStyle=subColor;
@@ -10961,12 +11000,85 @@ async function _drawTodayCardC(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds
   ctx.font='400 56px Bareonbatang, serif';
   ctx.fillStyle=textColor;
   titleLines.forEach(line=>{ctx.fillText(line,tx,ty);ty+=titleLineH;});
+  if(book.author){
+    ctx.font='400 26px "DM Sans",sans-serif';
+    ctx.fillStyle=subColor;
+    ctx.fillText(book.author,tx,ty);
+    ty+=authorH;
+  }
   ty+=gapAfterTitle;
   ctx.font='600 38px "DM Sans",sans-serif';
   ctx.fillStyle=subColor;
   ctx.fillText(metaLine,tx,ty);
 }
-const TODAY_CARD_STYLES={A:{label:'숫자형',draw:_drawTodayCardA},C:{label:'로고형',draw:_drawTodayCardC}};
+// D: 표지형 — 왼쪽 책 표지(프록시 경유 로드) + 오른쪽 날짜/제목/시간·진행률. 표지는 흰색 전환 시에도 그대로, 텍스트 색만 전환
+async function _drawTodayCardD(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds,colorMode,dk){
+  await _ensureBareonbatangLoaded();
+  const isWhite=colorMode==='white';
+  const textColor=isWhite?'#fff':'#5a4040';
+  const subColor=isWhite?'rgba(255,255,255,0.7)':'#9a8070';
+  const coverImg=book.poster?await _loadPosterViaProxy(book.poster):null;
+  const coverH=260,coverW=coverH*(2/3);
+  const coverX=90,coverY=(H-coverH)/2;
+  if(coverImg){
+    ctx.save();
+    _roundRect(ctx,coverX,coverY,coverW,coverH,12);
+    ctx.clip();
+    // object-fit:cover 방식으로 표지 비율 유지하며 프레임을 꽉 채움
+    const ir=coverImg.width/coverImg.height,fr=coverW/coverH;
+    let sw=coverImg.width,sh=coverImg.height,sx=0,sy=0;
+    if(ir>fr){sw=coverImg.height*fr;sx=(coverImg.width-sw)/2;}else{sh=coverImg.width/fr;sy=(coverImg.height-sh)/2;}
+    ctx.drawImage(coverImg,sx,sy,sw,sh,coverX,coverY,coverW,coverH);
+    ctx.restore();
+    ctx.strokeStyle=isWhite?'rgba(255,255,255,0.25)':'rgba(154,128,112,0.25)';
+    ctx.lineWidth=1.5;
+    _roundRect(ctx,coverX,coverY,coverW,coverH,12);ctx.stroke();
+  }else{
+    ctx.fillStyle=isWhite?'rgba(255,255,255,0.14)':'rgba(154,128,112,0.14)';
+    _roundRect(ctx,coverX,coverY,coverW,coverH,12);ctx.fill();
+  }
+  const tx=coverX+coverW+56;
+  const tw=W-tx-88;
+  ctx.textAlign='left';
+  ctx.textBaseline='top';
+  const dispDate=dk?(parseInt(dk.slice(5,7),10)+'월 '+parseInt(dk.slice(8,10),10)+'일'):'';
+  const timeStr=seconds?Math.floor(seconds/60)+'분':null;
+  const progVal=unit==='percent'?(percentAfter!=null?percentAfter:0):(pagesAfter!=null?pagesAfter:0);
+  const progUnit=unit==='percent'?'%':'p';
+  const metaLine=[timeStr,progVal+progUnit].filter(Boolean).join('  ·  ');
+  ctx.font='400 56px Bareonbatang, serif';
+  const titleLines=_shareWrapText(ctx,book.title,tw).slice(0,2);
+  const dateH=32,titleLineH=73,gapAfterDate=20,gapAfterTitle=28,metaH=44;
+  const authorH=book.author?36:0;
+  const totalH=dateH+gapAfterDate+titleLines.length*titleLineH+authorH+gapAfterTitle+metaH;
+  let ty=coverY+(coverH-totalH)/2;
+  ctx.font='500 30px "DM Sans",sans-serif';
+  ctx.fillStyle=subColor;
+  ctx.fillText(dispDate,tx,ty);
+  ty+=dateH+gapAfterDate;
+  ctx.font='400 56px Bareonbatang, serif';
+  ctx.fillStyle=textColor;
+  let lastTitleLineW=0;
+  titleLines.forEach(line=>{ctx.fillText(line,tx,ty);lastTitleLineW=ctx.measureText(line).width;ty+=titleLineH;});
+  if(book.author){
+    ctx.font='400 26px "DM Sans",sans-serif';
+    ctx.fillStyle=subColor;
+    ctx.fillText(book.author,tx,ty);
+    ty+=authorH;
+  }
+  ty+=gapAfterTitle;
+  ctx.font='600 38px "DM Sans",sans-serif';
+  ctx.fillStyle=subColor;
+  ctx.fillText(metaLine,tx,ty);
+  // iikoto 워터마크: 진행률과 같은 줄, 제목 마지막 줄 오른쪽 끝에 맞춰 배치
+  const metaW=ctx.measureText(metaLine).width;
+  const wmX=tx+Math.max(metaW,lastTitleLineW);
+  ctx.textAlign='right';
+  ctx.font='italic 500 30px "DM Sans",sans-serif';
+  ctx.fillStyle=isWhite?'rgba(255,255,255,0.55)':'rgba(154,128,112,0.6)';
+  ctx.fillText('iikoto',wmX,ty+4);
+}
+const TODAY_CARD_STYLES={A:{label:'숫자형',draw:_drawTodayCardA},C:{label:'로고형',draw:_drawTodayCardC},D:{label:'표지형',draw:_drawTodayCardD}};
 
 // ── 공유 모달 공통: 캔버스 생성 → 앱 배경 위에 미리보기 표시 → 스타일 선택 → 복사
 async function _buildQuoteCanvas(styleKey,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode,showComment){
