@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260809-20-weekly-review-split-generate-readonly';
+const CACHE = 'iikoto-v20260809-23-weekly-review-polish';
 const ASSETS = [
   './',
   './index.html'
