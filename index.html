@@ -2115,41 +2115,32 @@ function saveRhythmBlocks(dk,v){
   S.set(S.key('rblocks_pending',dk),true);
   autoSync('rblocks',dk);
 }
-// 취침 시각이 등록되면(화면이 어느 날짜를 보고 있든 상관없이) 최근 리듬 블록 중
-// end가 비어있는(미완료) 블록을 찾아 조용히 완료 처리. 알림 없음.
-// 소급 입력은 없고(취침시각은 항상 그 순간 실시간으로만 등록됨), 이미 입력된 값을 나중에 "수정"하는
-// 경우는 자동마감을 다시 돌릴 필요가 없으므로 고려하지 않음 — 늘 "방금 처음 등록하는 순간" 기준.
-// 미완료 블록이 30시간(하루+약간의 여유) 이상 방치될 일은 사실상 없으므로, 각 블록의 등록시각(created)이
-// 지금으로부터 30시간 이내인 것만 대상으로 삼아 안전하게 마감 — 날짜(dk)를 미리 계산할 필요가 없어짐.
+// 취침 시각이 등록되면(화면이 보던 날짜 dk와 그 전날, 총 이틀) end가 비어있거나
+// 이전에 자동종료로 채워진(autoClosed=true) 블록을 찾아 취침시각 기준으로 (재)완료 처리.
+// - 사용자가 직접 "종료" 버튼으로 채운 end(finishRhythmBlock)는 autoClosed가 없으므로 절대 건드리지 않음.
+// - 자동종료로 채운 end는 취침시각이 이후에 다시 수정되면(예: 08:26으로 잘못 입력 후 01:50으로 정정)
+//   그때마다 다시 이 함수가 불려 최신 취침시각 기준으로 end가 재계산됨 — 몇 번을 고쳐도 계속 따라감.
 function autoCloseUnfinishedRhythmBlocks(todayDk,sleepTime){
   if(!sleepTime)return;
   const sleepMin=dawnTimeToAdjustedMin(sleepTime);
   if(sleepMin==null)return;
-  const now=Date.now(),WINDOW_MS=30*60*60*1000;
   const yesterdayDk=dateKey(new Date(new Date(todayDk+'T00:00:00').getTime()-86400000));
   [todayDk,yesterdayDk].forEach(dk=>{
     const blocks=getRhythmBlocks(dk);
     if(!blocks.length)return;
     let changed=false;
     blocks.forEach(b=>{
-      if(b.end)return; // 이미 완료된 블록은 건드리지 않음
-      if(!b.created||now-b.created>WINDOW_MS)return; // 30시간 넘게 지난 건 대상에서 제외(안전장치)
+      if(b.end&&!b.autoClosed)return; // 사용자가 직접 종료한 블록은 절대 건드리지 않음
       const startMin=dawnTimeToAdjustedMin(b.start);
       if(startMin==null)return;
       if(dk===todayDk){
         if(startMin>=sleepMin)return; // 시작시각이 취침시각 이후/동일이면 스킵(비정상 데이터 보호)
-        const closeMin=(sleepMin-1)%1440;
-        b.end=pad(Math.floor(closeMin/60))+':'+pad(closeMin%60);
-      }else{
-        // 전날에 시작해 자정을 넘겨 오늘 새벽 취침시각까지 이어졌을 수 있음(예: 23:50 시작→익일 00:50 종료).
-        // yesterdayDk 블록이 아직 미완료로 남아있다는 것 자체가 "오늘 새벽에 잠들었다"는 뜻이므로
-        // sleepMin은 항상 자정을 넘긴 값(1440분 이상, 새벽보정 표기)이라고 보고 그 직전 시각을 계산.
-        // 단, 저장 형식은 24시 이상 확장 표기가 아니라 "실제 시:분"(예: 00:49)이어야 함 —
-        // computeRhythmSegsForDay의 렌더러가 자정 넘김을 "end < start"로 판별하는 방식이라
-        // 24:xx처럼 큰 값을 넣으면 오히려 그 판별 조건에서 벗어나 블록이 아예 안 그려지는 문제가 있었음.
-        const closeMin=(sleepMin-1)%1440;
-        b.end=pad(Math.floor(closeMin/60))+':'+pad(closeMin%60);
       }
+      // dk===yesterdayDk인 경우: 전날 시작해 자정을 넘겨 오늘 새벽 취침시각까지 이어진 블록.
+      // sleepMin은 항상 새벽보정(1440분 이상)된 값이므로 그 직전 시각을 그대로 종료시각으로 씀.
+      const closeMin=(sleepMin-1)%1440;
+      b.end=pad(Math.floor(closeMin/60))+':'+pad(closeMin%60);
+      b.autoClosed=true;
       changed=true;
     });
     if(changed)saveRhythmBlocks(dk,blocks);
@@ -2160,7 +2151,7 @@ async function syncRhythmBlocksUp(dk){
   if(ensureItemCids(blocks))S.set(S.key('rblocks',dk),blocks);
   const delCids=getDelPendingCids('rblocks',dk);
   const ok=await syncListUpSafe('rhythm_blocks',`date_key=eq.${dk}`,'date_key,client_id',blocks,
-    b=>({date_key:dk,cat:b.cat,start_time:b.start,end_time:b.end,text:b.text||'',created:b.created||Date.now(),client_id:b.cid}),
+    b=>({date_key:dk,cat:b.cat,start_time:b.start,end_time:b.end,text:b.text||'',created:b.created||Date.now(),client_id:b.cid,auto_closed:!!b.autoClosed}),
     delCids);
   if(ok)delCids.forEach(cid=>removeDelPending('rblocks',dk,cid));
   return ok;
@@ -2169,7 +2160,7 @@ async function syncRhythmBlocksDown(dk){
   const rows=await supaFetch('rhythm_blocks?date_key=eq.'+dk+'&order=created');
   if(!rows)return; // 연결 실패 — 로컬 유지
   if(S.get(S.key('rblocks_pending',dk)))return; // 업로드 대기중인 로컬 수정 있으면 덮어쓰지 않음
-  S.set(S.key('rblocks',dk),rows.map(function(r){return {cat:r.cat,start:r.start_time,end:r.end_time,text:r.text||'',created:r.created,cid:r.client_id||genCid()};}));
+  S.set(S.key('rblocks',dk),rows.map(function(r){return {cat:r.cat,start:r.start_time,end:r.end_time,text:r.text||'',created:r.created,cid:r.client_id||genCid(),autoClosed:!!r.auto_closed};}));
 }
 let _rhythmTrackEl=null,_rhythmDk=null,_rhythmFormOpen=false,_rhythmFormCat=null,_rhythmFormStart='',_rhythmFormEnd='',_rhythmFormText='',_rhythmEditIdx=null,_rhythmSubmitting=false;
 // 홈탭 트랙과 주간탭 리듬바 양쪽에서 폼이 열려있을 수 있으므로, 저장/취소/편집 시 둘 다 안전하게 갱신.
@@ -2308,6 +2299,7 @@ function finishRhythmBlock(idx){
   if(!blocks[idx])return;
   const n=new Date();
   blocks[idx].end=pad(n.getHours())+':'+pad(n.getMinutes());
+  delete blocks[idx].autoClosed; // 사용자가 직접 종료했으므로 자동종료 표시를 지워 이후 취침시각 재수정에 영향받지 않게 확정
   saveRhythmBlocks(_rhythmDk,blocks);
   refreshRhythmTrack();
 }
@@ -4945,9 +4937,10 @@ function setNow(t){
   const dk=dateKey(currentDate),d=getSleep(dk);
   if(t==='sleep')d.sleep=v;else d.wake=v;
   saveSleepData(dk,d);loadSleep();
-  // 미완료 리듬블록 자동마감은 화면(currentDate)이 어느 날짜를 보고 있든 상관없이 항상
-  // "지금 이 순간의 실제 논리적 오늘"을 기준으로 호출 — 그 안에서 최근 3일을 알아서 훑어 처리함.
-  if(t==='sleep'){autoCloseUnfinishedRhythmBlocks(dateKey(getLogicalDate()),v);refreshRhythmTrack();}
+  // 미완료 리듬블록 자동마감은 "수면 데이터가 실제로 저장되는 날짜(dk, 화면이 보던 날짜)"를 기준으로 스캔해야 함.
+  // 예전엔 getLogicalDate()(지금 이 순간의 실제 오늘)를 썼는데, 사용자가 다음날 이후에 화면을 과거 날짜로
+  // 옮겨 소급 입력하는 경우 dk와 어긋나서 자동마감 대상 범위([오늘,어제] 단 이틀)를 벗어나 버리는 버그가 있었음.
+  if(t==='sleep'){autoCloseUnfinishedRhythmBlocks(dk,v);refreshRhythmTrack();}
 }
 function openTimeModal(t){
   _sleepTarget=t;
@@ -5069,9 +5062,10 @@ function confirmTime(){
   const dk=dateKey(currentDate),d=getSleep(dk);
   if(_sleepTarget==='sleep')d.sleep=v;else d.wake=v;
   saveSleepData(dk,d);loadSleep();closeModal('time-modal');
-  // 미완료 리듬블록 자동마감은 화면(currentDate)이 어느 날짜를 보고 있든 상관없이 항상
-  // "지금 이 순간의 실제 논리적 오늘"을 기준으로 호출 — 그 안에서 최근 3일을 알아서 훑어 처리함.
-  if(_sleepTarget==='sleep'){autoCloseUnfinishedRhythmBlocks(dateKey(getLogicalDate()),v);refreshRhythmTrack();}
+  // 미완료 리듬블록 자동마감은 "수면 데이터가 실제로 저장되는 날짜(dk, 화면이 보던 날짜)"를 기준으로 스캔해야 함.
+  // getLogicalDate()(지금 이 순간의 실제 오늘)를 쓰면, 다음날 이후 화면을 과거 날짜로 옮겨 소급 입력할 때
+  // dk와 어긋나 자동마감 대상 범위([오늘,어제] 단 이틀)를 벗어나 버리는 버그가 있었음.
+  if(_sleepTarget==='sleep'){autoCloseUnfinishedRhythmBlocks(dk,v);refreshRhythmTrack();}
 }
 
 // ── TODO
@@ -10614,6 +10608,7 @@ function renderReadingCalView(){
 }
 function renderReadingCalDayDetailHtml(dk,dayLogs,bookMap){
   const dispDate=parseInt(dk.slice(5,7),10)+'월 '+parseInt(dk.slice(8,10),10)+'일';
+  const dayRblocks=getRhythmBlocks(dk);
   const items=dayLogs.map(r=>{
     const book=bookMap[r.book_cid];
     const title=book?book.title:'(삭제된 책)';
@@ -10621,7 +10616,11 @@ function renderReadingCalDayDetailHtml(dk,dayLogs,bookMap){
     const cover=book&&book.poster;
     const progText=_rdProgressLabel(r.unit,r.percent_after,r.pages_after);
     const amountText=r.amount_read>0?(r.unit==='percent'?`+${r.amount_read}%`:`+${r.amount_read}p`):'';
-    const timeText=r.seconds>0?Math.round(r.seconds/60)+'분':'';
+    // rblocks(리듬 블록)는 스톱워치 종료 시점에 세션 단위로 시작~종료 시각을 정확히 남기므로, 이걸 그대로 가져와 표시.
+    // rdlog(진행률 로그)는 하루/책 단위로 시간을 합산해 저장하는 구조라 시각 정보가 없음 — 같은 책을 여러 세션 읽었으면 각 세션을 모두 나열.
+    const target='독서 - '+title;
+    const sessionRanges=book?dayRblocks.filter(b=>b.cat==='enjoy'&&b.text===target).map(b=>`${b.start}-${b.end}`):[];
+    const timeText=sessionRanges.length?sessionRanges.join(', '):(r.seconds>0?Math.round(r.seconds/60)+'분':'');
     const metaLine=[progText,amountText,timeText].filter(Boolean).join(' · ');
     const posterHtml=cover?`<img src="${cover}" style="width:32px;height:44px;border-radius:5px;object-fit:cover;flex-shrink:0;" />`:`<div style="width:32px;height:44px;border-radius:5px;background:var(--card2);flex-shrink:0;display:flex;align-items:center;justify-content:center;"><i class="ti ti-book ico-13" style="color:var(--tm);" aria-hidden="true"></i></div>`;
     const shareBtn=`<span onclick="event.stopPropagation();openTodayReadingShareModal('${r.book_cid}','${r.unit}',${r.percent_after!=null?r.percent_after:'null'},${r.pages_after!=null?r.pages_after:'null'},${r.seconds||0},'${dk}')" title="공유 이미지" style="cursor:pointer;color:var(--ts);opacity:0.75;flex-shrink:0;padding:4px;"><i class="ti ti-share" style="font-size:14px;" aria-hidden="true"></i></span>`;
@@ -10736,13 +10735,13 @@ function _loadShareLogo(){
 
 // ── 문장 카드: G(배경 따옴표형) / H(카드 인 카드형) — 배경은 항상 투명, H만 반투명 패널 사용
 // ── 문장 카드: G(로고형) / H(카드형, 가변 높이) — 배경은 항상 투명, H만 반투명 패널
-async function _drawQuoteCardG(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode){
+async function _drawQuoteCardG(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode,showComment){
   await _ensureBareonbatangLoaded();
   const isWhite=colorMode==='white';
   const textColor=isWhite?'#fff':'#5a4040';
   const subColor=isWhite?'rgba(255,255,255,0.75)':'#9a8070';
   const fontStyle=italicMode?'italic ':'';
-  const isCenter=alignMode==='center';
+  const align=alignMode||'left'; // 'left' | 'center' | 'right'
   const fs=fontSize||40;
   const lineH=Math.round(fs*1.6);
   ctx.fillStyle=textColor;
@@ -10751,15 +10750,15 @@ async function _drawQuoteCardG(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
   const quoteText=quoteMark?('\u275b'+q.text+'\u275c'):q.text;
   const lines=_shareWrapText(ctx,quoteText,W-176);
   let ty=140;
-  ctx.textAlign=isCenter?'center':'left';
-  const tx0=isCenter?W/2:88;
+  ctx.textAlign=align;
+  const tx0=align==='center'?W/2:(align==='right'?W-88:88);
   const HIGHLIGHT_COLORS={yellow:'rgba(255,214,130,0.55)',pink:'rgba(230,140,160,0.38)',mint:'rgba(150,200,180,0.42)'};
   if(highlightMode&&HIGHLIGHT_COLORS[highlightMode]){
     let hy=ty;
     const padH=Math.round(fs*0.14);
     lines.forEach(line=>{
       const w=ctx.measureText(line).width;
-      const bx=isCenter?tx0-w/2:tx0;
+      const bx=align==='center'?tx0-w/2:(align==='right'?tx0-w:tx0);
       ctx.fillStyle=HIGHLIGHT_COLORS[highlightMode];
       ctx.save();
       ctx.translate(bx-8,hy-padH/2);
@@ -10773,6 +10772,21 @@ async function _drawQuoteCardG(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
   lines.forEach(line=>{ctx.fillText(line,tx0,ty);ty+=lineH;});
   ctx.textAlign='left';
   ty+=44;
+  // 코멘트: 인용문과 명확히 구분되도록 앱 기본 폰트(DM Sans) + 둥근 배경 배너로 표시
+  const showCmt=showComment&&q.comment;
+  if(showCmt){
+    const cmtFs=24;
+    ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
+    const cmtPadX=24,cmtPadY=18,cmtLineH=Math.round(cmtFs*1.5);
+    const cmtLines=_shareWrapText(ctx,q.comment,W-176-cmtPadX*2);
+    const cmtBoxH=cmtLineH*cmtLines.length+cmtPadY*2;
+    ctx.fillStyle=isWhite?'rgba(255,255,255,0.16)':'rgba(154,128,112,0.12)';
+    _roundRect(ctx,88,ty,W-176,cmtBoxH,18);ctx.fill();
+    ctx.fillStyle=isWhite?'rgba(255,255,255,0.92)':'#6b5548';
+    let cy=ty+cmtPadY;
+    cmtLines.forEach(line=>{ctx.fillText(line,88+cmtPadX,cy);cy+=cmtLineH;});
+    ty+=cmtBoxH+32;
+  }
   const showInfo=showBookInfo&&book;
   if(showInfo){
     // 로고를 왼쪽에, 오른쪽에 책 제목(위)/작가명(아래)을 로고 높이 기준 상하 중앙 정렬 — 정보 노출 시에만 함께 표시
@@ -10793,14 +10807,15 @@ async function _drawQuoteCardG(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
     }
   }
 }
-async function _drawQuoteCardH(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize){
+async function _drawQuoteCardH(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode,showComment){
   await _ensureBareonbatangLoaded();
   const isWhite=colorMode==='white';
   const textColor=isWhite?'#fff':'#5a4040';
   const subColor=isWhite?'rgba(255,255,255,0.75)':'#9a8070';
   const fontStyle=italicMode?'italic ':'';
-  const isCenter=alignMode==='center';
+  const align=alignMode||'left';
   const showInfo=showBookInfo&&book;
+  const showCmt=showComment&&q.comment;
   const fs=fontSize||40;
   const lineH=Math.round(fs*1.6);
   // 문장 길이에 맞춰 패널 높이를 먼저 계산(가변형) — 여백 최소화
@@ -10809,9 +10824,17 @@ async function _drawQuoteCardH(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
   const quoteText=quoteMark?('\u275b'+q.text+'\u275c'):q.text;
   const lines=_shareWrapText(ctx,quoteText,pw-96);
   const textBlockH=lines.length*lineH;
+  // 코멘트 블록 높이도 패널 전체 높이 계산에 포함 — DM Sans(앱 기본 폰트) 사용, 인용문과 별도 배경 배너로 구분
+  const cmtFs=24,cmtPadX=20,cmtPadY=16,cmtLineH=Math.round(cmtFs*1.5);
+  let cmtLines=[],cmtBoxH=0;
+  if(showCmt){
+    ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
+    cmtLines=_shareWrapText(ctx,q.comment,pw-96-cmtPadX*2);
+    cmtBoxH=cmtLineH*cmtLines.length+cmtPadY*2;
+  }
   const footerH=showInfo?96:0;
-  const padTop=56,padBottom=48,gapBeforeFooter=30;
-  const ph=padTop+textBlockH+(footerH?gapBeforeFooter+footerH:0)+padBottom;
+  const padTop=56,padBottom=48,gapBeforeFooter=30,gapBeforeCmt=28;
+  const ph=padTop+textBlockH+(showCmt?gapBeforeCmt+cmtBoxH:0)+(footerH?gapBeforeFooter+footerH:0)+padBottom;
   const py=(H-ph)/2;
   ctx.fillStyle=isWhite?'rgba(0,0,0,0.22)':'rgba(255,255,255,0.42)';
   _roundRect(ctx,px,py,pw,ph,32);ctx.fill();
@@ -10820,11 +10843,22 @@ async function _drawQuoteCardH(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
   ctx.fillStyle=textColor;
   ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
   ctx.textBaseline='top';
-  ctx.textAlign=isCenter?'center':'left';
-  const tx0=isCenter?px+pw/2:px+48;
+  ctx.textAlign=align;
+  const tx0=align==='center'?px+pw/2:(align==='right'?px+pw-48:px+48);
   let ty=py+padTop;
   lines.forEach(line=>{ctx.fillText(line,tx0,ty);ty+=lineH;});
   ctx.textAlign='left';
+  if(showCmt){
+    ty+=gapBeforeCmt;
+    const cmtBoxX=px+48,cmtBoxW=pw-96;
+    ctx.fillStyle=isWhite?'rgba(255,255,255,0.14)':'rgba(154,128,112,0.14)';
+    _roundRect(ctx,cmtBoxX,ty,cmtBoxW,cmtBoxH,16);ctx.fill();
+    ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
+    ctx.fillStyle=isWhite?'rgba(255,255,255,0.92)':'#6b5548';
+    let cy=ty+cmtPadY;
+    cmtLines.forEach(line=>{ctx.fillText(line,cmtBoxX+cmtPadX,cy);cy+=cmtLineH;});
+    ty+=cmtBoxH;
+  }
   if(showInfo){
     const fy=ty+gapBeforeFooter;
     ctx.strokeStyle=isWhite?'rgba(255,255,255,0.3)':'rgba(154,128,112,0.3)';
@@ -10925,12 +10959,12 @@ async function _drawTodayCardC(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds
 const TODAY_CARD_STYLES={A:{label:'숫자형',draw:_drawTodayCardA},C:{label:'로고형',draw:_drawTodayCardC}};
 
 // ── 공유 모달 공통: 캔버스 생성 → 앱 배경 위에 미리보기 표시 → 스타일 선택 → 복사
-async function _buildQuoteCanvas(styleKey,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode){
+async function _buildQuoteCanvas(styleKey,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode,showComment){
   const W=1080,H=1350;
   const canvas=document.createElement('canvas');
   canvas.width=W;canvas.height=H;
   const ctx=canvas.getContext('2d');
-  await QUOTE_CARD_STYLES[styleKey].draw(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode);
+  await QUOTE_CARD_STYLES[styleKey].draw(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode,showComment);
   return canvas;
 }
 async function _buildTodayCanvas(styleKey,book,unit,percentAfter,pagesAfter,seconds,colorMode,dk){
@@ -10949,12 +10983,12 @@ function _closeShareModal(){
 }
 async function _buildCurrentShareCanvas(){
   const ctx=_shareModalCtx;if(!ctx)return null;
-  if(ctx.kind==='quote')return await _buildQuoteCanvas(ctx.styleKey,ctx.args[0],ctx.args[1],ctx.colorMode,ctx.showBookInfo,ctx.italicMode,ctx.quoteMark,ctx.alignMode,ctx.fontSize,ctx.highlightMode);
+  if(ctx.kind==='quote')return await _buildQuoteCanvas(ctx.styleKey,ctx.args[0],ctx.args[1],ctx.colorMode,ctx.showBookInfo,ctx.italicMode,ctx.quoteMark,ctx.alignMode,ctx.fontSize,ctx.highlightMode,ctx.showComment);
   const [book,unit,percentAfter,pagesAfter,seconds,dk]=ctx.args;
   return await _buildTodayCanvas(ctx.styleKey,book,unit,percentAfter,pagesAfter,seconds,ctx.colorMode,dk);
 }
 function _shareIconBtn(active,onclick,inner,title){
-  return `<button onclick="${onclick}" title="${title||''}" style="width:36px;height:36px;flex-shrink:0;border-radius:11px;border:none;background:transparent;color:${active?'var(--acc,#c07080)':'var(--ts)'};display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:17px;opacity:${active?1:0.55};transition:all .15s;">${inner}</button>`;
+  return `<button onclick="${onclick}" title="${title||''}" style="width:33px;height:33px;flex-shrink:0;border-radius:10px;border:none;background:transparent;color:${active?'var(--acc,#c07080)':'var(--ts)'};display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;opacity:${active?1:0.55};transition:all .15s;">${inner}</button>`;
 }
 function _shareStyleBanner(active,onclick,label){
   return `<button onclick="${onclick}" style="flex:1;min-width:0;height:46px;border-radius:14px;border:1.5px solid ${active?'var(--acc,#c07080)':'var(--card-b)'};background:${active?'rgba(192,112,128,0.10)':'var(--card)'};color:${active?'var(--acc,#c07080)':'var(--ts)'};display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 6px;transition:all .15s;">${label}</button>`;
@@ -10962,6 +10996,11 @@ function _shareStyleBanner(active,onclick,label){
 function _cycleHighlightMode(){
   const c=[null,'yellow','pink','mint'];
   _shareModalCtx.highlightMode=c[(c.indexOf(_shareModalCtx.highlightMode)+1)%c.length];
+  _renderShareModal();
+}
+function _cycleAlignMode(){
+  const c=['left','center','right'];
+  _shareModalCtx.alignMode=c[(c.indexOf(_shareModalCtx.alignMode)+1)%c.length];
   _renderShareModal();
 }
 async function _renderShareModal(){
@@ -10995,20 +11034,25 @@ async function _renderShareModal(){
     `<span style="font-family:'DM Sans',sans-serif;font-weight:600;font-style:${ctx.italicMode?'italic':'normal'};">A</span>`,ctx.italicMode?'이탤릭체':'기본체'):'';
   const bookToggle=ctx.kind==='quote'?_shareIconBtn(!!ctx.showBookInfo,`_shareModalCtx.showBookInfo=!_shareModalCtx.showBookInfo;_renderShareModal();`,
     `<i class="ti ti-book" aria-hidden="true"></i>`,'책 정보 표시'):'';
+  const hasComment=ctx.kind==='quote'&&ctx.args[0]&&ctx.args[0].comment;
+  const commentToggle=hasComment?_shareIconBtn(!!ctx.showComment,`_shareModalCtx.showComment=!_shareModalCtx.showComment;_renderShareModal();`,
+    `<i class="ti ti-message-circle" aria-hidden="true"></i>`,'코멘트 표시'):'';
   const quoteMarkToggle=ctx.kind==='quote'?_shareIconBtn(!!ctx.quoteMark,`_shareModalCtx.quoteMark=!_shareModalCtx.quoteMark;_renderShareModal();`,
     `<span style="font-family:'DM Sans',sans-serif;font-weight:600;font-size:18px;">\u275b</span>`,ctx.quoteMark?'인용부호 끄기':'인용부호 켜기'):'';
-  const alignToggle=ctx.kind==='quote'?_shareIconBtn(true,`_shareModalCtx.alignMode=_shareModalCtx.alignMode==='center'?'left':'center';_renderShareModal();`,
-    `<i class="ti ti-align-${ctx.alignMode==='center'?'center':'left'}" aria-hidden="true"></i>`,ctx.alignMode==='center'?'중앙정렬':'좌측정렬'):'';
+  const ALIGN_ICON={left:'left',center:'center',right:'right'};
+  const curAlign=ctx.alignMode||'left';
+  const alignToggle=ctx.kind==='quote'?_shareIconBtn(true,`_cycleAlignMode();`,
+    `<i class="ti ti-align-${ALIGN_ICON[curAlign]}" aria-hidden="true"></i>`,curAlign==='center'?'중앙정렬':(curAlign==='right'?'우측정렬':'좌측정렬')):'';
   const curFs=ctx.fontSize||40;
-  const fontSizeDown=ctx.kind==='quote'?_shareIconBtn(false,`_shareModalCtx.fontSize=Math.max(32,(_shareModalCtx.fontSize||40)-2);_renderShareModal();`,
+  const fontSizeDown=ctx.kind==='quote'?_shareIconBtn(false,`_shareModalCtx.fontSize=Math.max(28,(_shareModalCtx.fontSize||40)-1);_renderShareModal();`,
     `<span style="font-weight:600;font-size:17px;">−</span>`,'글자 작게'):'';
-  const fontSizeUp=ctx.kind==='quote'?_shareIconBtn(false,`_shareModalCtx.fontSize=Math.min(48,(_shareModalCtx.fontSize||40)+2);_renderShareModal();`,
+  const fontSizeUp=ctx.kind==='quote'?_shareIconBtn(false,`_shareModalCtx.fontSize=Math.min(52,(_shareModalCtx.fontSize||40)+1);_renderShareModal();`,
     `<span style="font-weight:600;font-size:17px;">+</span>`,'글자 크게'):'';
   const HL_SWATCH={yellow:'#ffd682',pink:'#e68ca0',mint:'#96c8b4'};
   const curHl=ctx.highlightMode||null;
   const highlightToggle=(ctx.kind==='quote'&&ctx.styleKey==='G')?_shareIconBtn(!!curHl,`_cycleHighlightMode();`,
     curHl?`<span style="width:20px;height:20px;border-radius:6px;background:${HL_SWATCH[curHl]};display:inline-block;"></span>`:`<i class="ti ti-highlight" aria-hidden="true"></i>`,curHl?'형광펜 색상 변경':'형광펜 켜기'):'';
-  const iconRow=[colorSwatch,fontToggle,alignToggle,bookToggle,quoteMarkToggle,highlightToggle,fontSizeDown,fontSizeUp].filter(Boolean).join('');
+  const iconRow=[colorSwatch,fontToggle,alignToggle,bookToggle,commentToggle,quoteMarkToggle,highlightToggle,fontSizeDown,fontSizeUp].filter(Boolean).join('');
   ov.innerHTML=`<div style="background:var(--sheet);border-radius:26px;padding:22px;width:min(90vw,420px);max-height:88vh;overflow-y:auto;box-sizing:border-box;" onclick="event.stopPropagation();">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
       <div style="font-weight:600;font-size:15px;color:var(--tp);">공유 이미지</div>
@@ -11018,7 +11062,7 @@ async function _renderShareModal(){
       <img src="${dataUrl}" style="width:100%;display:block;" />
     </div>
     ${styleBannerRow}
-    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:nowrap;margin-bottom:16px;overflow-x:auto;">${iconRow}</div>
+    <div style="display:flex;gap:5px;justify-content:center;flex-wrap:nowrap;margin-bottom:16px;overflow-x:auto;">${iconRow}</div>
     <button onclick="_confirmShareCopy()" style="width:100%;padding:15px 0;border-radius:16px;border:none;background:linear-gradient(120deg,#c07080,#b25a72);color:#fff;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(192,112,128,0.35);display:flex;align-items:center;justify-content:center;gap:7px;">
       <i class="ti ti-copy" style="font-size:17px;" aria-hidden="true"></i>이미지 복사하기
     </button>
@@ -11034,7 +11078,7 @@ async function _confirmShareCopy(){
 async function shareQuoteCard(quoteCid){
   const q=getQuotes().find(x=>x.cid===quoteCid);if(!q)return;
   const book=getBooks().find(b=>b.cid===q.bookCid);
-  _shareModalCtx={kind:'quote',args:[q,book],styleKey:'G',colorMode:'brown',showBookInfo:true,italicMode:false,quoteMark:true,alignMode:'left',fontSize:40,highlightMode:null};
+  _shareModalCtx={kind:'quote',args:[q,book],styleKey:'G',colorMode:'brown',showBookInfo:false,italicMode:false,quoteMark:true,alignMode:'left',fontSize:40,highlightMode:null,showComment:!!q.comment};
   await _renderShareModal();
 }
 async function openTodayReadingShareModal(bookCid,unit,percentAfter,pagesAfter,seconds,dk){
