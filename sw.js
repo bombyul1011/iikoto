@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260809-25-week-chips-fullwidth';
+const CACHE = 'iikoto-v20260810-03-dawn-recap-comment-fix';
 const ASSETS = [
   './',
   './index.html'

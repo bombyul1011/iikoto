@@ -1988,7 +1988,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 <script>
 
-// 일요일 22시~월요일 24시 구간에 노출되는 "주간 돌아보기" 배너/시트가 참조할 "그 주 일요일" 날짜키.
+// 일요일 0시~월요일 24시 구간(일요일 전체+월요일 전체)에 노출되는 "주간 돌아보기" 배너/시트가 참조할 "그 주 일요일" 날짜키.
+// 그중 생성 가능한 시점은 일요일 22시(night_2)뿐이고 나머지는 모두 조회 전용(appendSundayReadOnlyBanner 참고).
 // getLogicalDate()는 새벽 4시 컷이라 월요일 저녁(19~24시)엔 그냥 "월요일"을 반환해버려서,
 // 이 구간에서 곧이곧대로 쓰면 일요일 밤에 만들어둔 weekly_summary_ 캐시를 못 찾는 문제가 생김.
 // 그래서 "화~토요일(2~6)"이면 오늘, "일요일(0)"이면 오늘, "월요일(1)"이면 하루 전으로 보정.
@@ -3016,7 +3017,7 @@ function renderMonthChipsGeneric(wrapId,curYear,curMonth,onSelect){
   if(activeChip)activeChip.scrollIntoView({behavior:'auto',block:'nearest',inline:'center'});
 }
 // ── 주간목표 월간 결산 (별도 아카이브 시트, 월간리포트와 독립적으로 동작) ──
-// "월"의 소속 판정은 주(週)의 시작일(월요일) 기준 — 8/31~9/6 같은 월 경계 주는 월요일이 속한 달로 계산.
+// "월"의 소속 판정은 주(週)의 목요일(ISO 8601 방식) 기준 — 8/31~9/6 같은 월 경계 주는 목요일(9/3)이 속한 9월로 계산.
 // 진입점(주간목표 카드 상단 target-arrow 아이콘)은 항상 상시 노출됨 — + 버튼 완전 대체(Enter로 항목 추가는 그대로 가능).
 // 리포트 생성 가능 조건(달마다 개별 판정): 그 달의 마지막 챌린지 주가 이미 끝났고,
 // 그 주의 "지난주 목표 돌아보기"가 최소 1회 열람되어 challenge_review_ 캐시가 로컬에 존재해야 함.
@@ -3058,9 +3059,8 @@ function isMonthlyGoalReportReady(y,mo,weeks){
 let _mgrYear=null,_mgrMonth=null;
 // 리포트 시트 진입 시 기본으로 보여줄 (year, month)를 계산.
 // 기준: 이번 달의 마지막 챌린지 주(computeMonthlyGoalWeeks 마지막 항목) 종료일(일요일) 다음날인
-// "월요일"까지는 아직 전월 리포트를 보여주고, 그 다음날(화요일)부터 이번 달로 전환.
-// 예: 8월 마지막 챌린지 주가 8/31(월)~9/6(일)이면 -> 9/7(월)까지 7월 리포트... 아니라 "직전월(7월이 아니라 이번 달의 바로 전달)"
-// 정확히는: 이번 달(y,mo) 자체의 마지막 챌린지 주가 아직 끝나지 않았거나, 끝난 지 하루(월요일)까지면
+// "월요일"까지는 아직 전월 리포트를 보여주고, 그 다음날(화요일) 0시부터 이번 달로 전환(publishNextDay).
+// 즉 이번 달(y,mo) 자체의 마지막 챌린지 주가 아직 끝나지 않았거나, 끝난 지 하루(월요일)까지면
 // 사용자가 보고 싶은 건 "가장 최근에 끝난 달"의 리포트이므로 전월로 진입.
 function computeMgrDefaultMonth(){
   const now=new Date();
@@ -3373,7 +3373,7 @@ function openWeeklyReviewSheet(){
   openSheet('weekly-review-sheet');
   loadWeeklyReviewFor(_thisWeekSundayDk());
 }
-// 조회 전용 진입점 — 일요일 22시(생성 시점) 외의 모든 노출 구간(새벽/월요일 종일)에서 씀.
+// 조회 전용 진입점 — 일요일 22시(생성 시점) 외의 모든 노출 구간(일요일 0~22시/월요일 종일)에서 씀.
 // 캐시 조회만 하고 생성 경로(makeWeeklySummaryCard)를 아예 타지 않으므로,
 // "지금이 생성해도 되는 시점인가"를 따질 필요가 원천적으로 없음 — 재생성 우려 자체가 없는 구조.
 function openWeeklyReviewSheetReadOnly(){
@@ -4147,7 +4147,7 @@ async function aiCacheSet(cacheKey,content,ttlMs){
   const expiresAt=ttlMs==null?null:Date.now()+ttlMs;
   await supaUpsert('ai_cache','cache_key',[{cache_key:cacheKey,content,expires_at:expiresAt}]);
 }
-// 확정(선택)되지 않아 더 이상 쓸모없어진 캐시를 지울 때 사용 — 예: 저녁의 채움에서 시작하지 않은 뽑기 결과
+// 확정(선택)되지 않아 더 이상 쓸모없어진 캐시를 지울 때 사용 — 예: 저녁 학습에서 시작하지 않은 뽑기 결과
 async function aiCacheDelete(cacheKey){
   await supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent(cacheKey)}`,'DELETE');
 }
@@ -4800,7 +4800,7 @@ async function syncAll(){
   loadDaily();
   if(document.getElementById('v-weekly')&&document.getElementById('v-weekly').classList.contains('on'))loadWeekly();
   if(_rhythmTrackEl&&document.body.contains(_rhythmTrackEl))refreshRhythmTrack();
-  // loadDaily()가 다시 그리지 못하는 새벽 리캡 카드(완료한 일 타임라인 등)를 최신 데이터로 교체
+  // loadDaily()가 다시 그리지 못하는 새벽 리캡 카드(어제 투두/습관/수면 요약 등)를 최신 데이터로 교체
   const oldDawnCard=document.getElementById('dawn-recap-card');
   if(oldDawnCard&&document.getElementById('v-home')&&document.getElementById('v-home').classList.contains('on')){
     oldDawnCard.replaceWith(makeDawnRecapCard());
@@ -7056,7 +7056,7 @@ function _daysSinceLastReading(dk){
   return 90;
 }
 
-// ── 아침 파트2(9시경) "식사 분석" 배너 — 인사카드 하단, 어제+오늘 meals 데이터를 메뉴명 기준으로 AI가 정성적으로 분석.
+// ── 아침 파트2(9~12시, morning_2) "식사 분석" 배너 — 인사카드 하단, 어제+오늘 meals 데이터를 메뉴명 기준으로 AI가 정성적으로 분석.
 // 정량 수치(g)는 앱에 입력되지 않으므로 사용하지 않고, 메뉴 구성 기반 추정 코멘트만 생성.
 // 인사배너와 동일한 캐시 패턴(메모리→로컬→서버 ai_cache) 재사용.
 let _nutriCommentCache={};
