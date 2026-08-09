@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260810-03-dawn-recap-comment-fix';
+const CACHE = 'iikoto-v20260810-04-review-sheet-text-unify';
 const ASSETS = [
   './',
   './index.html'
