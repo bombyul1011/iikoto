@@ -10750,25 +10750,35 @@ async function _drawQuoteCardG(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
   lines.forEach(line=>{ctx.fillText(line,tx0,ty);ty+=lineH;});
   ctx.textAlign='left';
   ty+=20;
-  // 코멘트: 배경 박스 대신 왼쪽 세로바 + "comment" 소문자 라벨로 인용문과 구분, 비대칭 들여쓰기로 "덧붙이는 말" 위계 표현
+  // 코멘트 표시 스타일 두 가지: 'label'=영문 라벨(다른 서체)+텍스트, 'bar'=세로바+들여쓰기(라벨 없음)
   const showCmt=showComment&&q.comment;
   if(showCmt){
-    const barX=88+28;
-    const cmtFs=23,labelFs=15,cmtLineH=Math.round(cmtFs*1.5),gapLabelToText=10;
-    ctx.font='600 '+labelFs+'px "DM Sans",sans-serif';
-    ctx.fillStyle=isWhite?'rgba(255,255,255,0.5)':'rgba(154,128,112,0.75)';
-    ctx.fillText('comment',barX+22,ty);
-    ty+=labelFs+gapLabelToText;
-    ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
-    const cmtLines=_shareWrapText(ctx,q.comment,W-176-28-22);
-    const cmtBoxH=cmtLineH*cmtLines.length;
-    ctx.strokeStyle=isWhite?'rgba(255,255,255,0.35)':'rgba(154,128,112,0.4)';
-    ctx.lineWidth=2;
-    ctx.beginPath();ctx.moveTo(barX,ty-4);ctx.lineTo(barX,ty+cmtBoxH-6);ctx.stroke();
-    ctx.fillStyle=isWhite?'rgba(255,255,255,0.92)':'#6b5548';
-    let cy=ty;
-    cmtLines.forEach(line=>{ctx.fillText(line,barX+22,cy);cy+=cmtLineH;});
-    ty+=cmtBoxH+36;
+    const cmtFs=27,labelFs=17,cmtLineH=Math.round(cmtFs*1.5);
+    ctx.fillStyle=textColor;
+    if(showComment==='label'){
+      const gapLabelToText=12;
+      ctx.font='600 '+labelFs+'px "DM Sans",sans-serif';
+      ctx.fillStyle=isWhite?'rgba(255,255,255,0.5)':'rgba(154,128,112,0.8)';
+      ctx.fillText('comment',88,ty);
+      ty+=labelFs+gapLabelToText;
+      ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
+      ctx.fillStyle=isWhite?'rgba(255,255,255,0.92)':'#6b5548';
+      const cmtLines=_shareWrapText(ctx,q.comment,W-176);
+      cmtLines.forEach(line=>{ctx.fillText(line,88,ty);ty+=cmtLineH;});
+      ty+=36;
+    }else{
+      const barX=88+28;
+      ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
+      const cmtLines=_shareWrapText(ctx,q.comment,W-176-28-22);
+      const cmtBoxH=cmtLineH*cmtLines.length;
+      ctx.strokeStyle=isWhite?'rgba(255,255,255,0.35)':'rgba(154,128,112,0.4)';
+      ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(barX,ty-4);ctx.lineTo(barX,ty+cmtBoxH-6);ctx.stroke();
+      ctx.fillStyle=isWhite?'rgba(255,255,255,0.92)':'#6b5548';
+      let cy=ty;
+      cmtLines.forEach(line=>{ctx.fillText(line,barX+22,cy);cy+=cmtLineH;});
+      ty+=cmtBoxH+36;
+    }
   }
   const showInfo=showBookInfo&&book;
   if(showInfo){
@@ -10807,13 +10817,18 @@ async function _drawQuoteCardH(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
   const quoteText=quoteMark?('\u275b'+q.text+'\u275c'):q.text;
   const lines=_shareWrapText(ctx,quoteText,pw-96);
   const textBlockH=lines.length*lineH;
-  // 코멘트 블록 높이도 패널 전체 높이 계산에 포함 — DM Sans(앱 기본 폰트) 사용, 인용문과 별도 배경 배너로 구분
-  const cmtFs=23,labelFs=15,cmtPadX=0,cmtLineH=Math.round(cmtFs*1.5),gapLabelToText=10;
+  // 코멘트 블록 높이도 패널 전체 높이 계산에 포함 — 표시 스타일 두 가지: 'label'=영문 라벨+본문폭 전체, 'bar'=세로바+들여쓰기
+  const cmtFs=27,labelFs=17,cmtLineH=Math.round(cmtFs*1.5),gapLabelToText=12;
   let cmtLines=[],cmtBoxH=0;
   if(showCmt){
     ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
-    cmtLines=_shareWrapText(ctx,q.comment,pw-96-28-22);
-    cmtBoxH=labelFs+gapLabelToText+cmtLineH*cmtLines.length;
+    if(showComment==='label'){
+      cmtLines=_shareWrapText(ctx,q.comment,pw-96);
+      cmtBoxH=labelFs+gapLabelToText+cmtLineH*cmtLines.length;
+    }else{
+      cmtLines=_shareWrapText(ctx,q.comment,pw-96-28-22);
+      cmtBoxH=cmtLineH*cmtLines.length;
+    }
   }
   const footerH=showInfo?96:0;
   const padTop=56,padBottom=48,gapBeforeFooter=30,gapBeforeCmt=16;
@@ -10833,20 +10848,27 @@ async function _drawQuoteCardH(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
   ctx.textAlign='left';
   if(showCmt){
     ty+=gapBeforeCmt;
-    const barX=px+48+28;
-    ctx.font='600 '+labelFs+'px "DM Sans",sans-serif';
-    ctx.fillStyle=isWhite?'rgba(255,255,255,0.5)':'rgba(154,128,112,0.75)';
-    ctx.fillText('comment',barX+22,ty);
-    ty+=labelFs+gapLabelToText;
-    ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
-    const textTop=ty;
-    ctx.strokeStyle=isWhite?'rgba(255,255,255,0.35)':'rgba(154,128,112,0.4)';
-    ctx.lineWidth=2;
-    ctx.beginPath();ctx.moveTo(barX,textTop-4);ctx.lineTo(barX,textTop+cmtLineH*cmtLines.length-6);ctx.stroke();
-    ctx.fillStyle=isWhite?'rgba(255,255,255,0.92)':'#6b5548';
-    let cy=textTop;
-    cmtLines.forEach(line=>{ctx.fillText(line,barX+22,cy);cy+=cmtLineH;});
-    ty+=cmtLineH*cmtLines.length;
+    ctx.fillStyle=textColor;
+    if(showComment==='label'){
+      ctx.font='600 '+labelFs+'px "DM Sans",sans-serif';
+      ctx.fillStyle=isWhite?'rgba(255,255,255,0.5)':'rgba(154,128,112,0.8)';
+      ctx.fillText('comment',px+48,ty);
+      ty+=labelFs+gapLabelToText;
+      ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
+      ctx.fillStyle=isWhite?'rgba(255,255,255,0.92)':'#6b5548';
+      cmtLines.forEach(line=>{ctx.fillText(line,px+48,ty);ty+=cmtLineH;});
+    }else{
+      const barX=px+48+28;
+      ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
+      const textTop=ty;
+      ctx.strokeStyle=isWhite?'rgba(255,255,255,0.35)':'rgba(154,128,112,0.4)';
+      ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(barX,textTop-4);ctx.lineTo(barX,textTop+cmtLineH*cmtLines.length-6);ctx.stroke();
+      ctx.fillStyle=isWhite?'rgba(255,255,255,0.92)':'#6b5548';
+      let cy=textTop;
+      cmtLines.forEach(line=>{ctx.fillText(line,barX+22,cy);cy+=cmtLineH;});
+      ty+=cmtLineH*cmtLines.length;
+    }
   }
   if(showInfo){
     const fy=ty+gapBeforeFooter;
@@ -10988,6 +11010,11 @@ function _cycleAlignMode(){
   _shareModalCtx.alignMode=c[(c.indexOf(_shareModalCtx.alignMode)+1)%c.length];
   _renderShareModal();
 }
+function _cycleCommentStyle(){
+  const c=[null,'label','bar'];
+  _shareModalCtx.showComment=c[(c.indexOf(_shareModalCtx.showComment)+1)%c.length];
+  _renderShareModal();
+}
 async function _renderShareModal(){
   const ctx=_shareModalCtx;if(!ctx)return;
   const styles=ctx.kind==='quote'?QUOTE_CARD_STYLES:TODAY_CARD_STYLES;
@@ -11020,8 +11047,8 @@ async function _renderShareModal(){
   const bookToggle=ctx.kind==='quote'?_shareIconBtn(!!ctx.showBookInfo,`_shareModalCtx.showBookInfo=!_shareModalCtx.showBookInfo;_renderShareModal();`,
     `<i class="ti ti-book" aria-hidden="true"></i>`,'책 정보 표시'):'';
   const hasComment=ctx.kind==='quote'&&ctx.args[0]&&ctx.args[0].comment;
-  const commentToggle=hasComment?_shareIconBtn(!!ctx.showComment,`_shareModalCtx.showComment=!_shareModalCtx.showComment;_renderShareModal();`,
-    `<i class="ti ti-message-circle" aria-hidden="true"></i>`,'코멘트 표시'):'';
+  const commentToggle=hasComment?_shareIconBtn(!!ctx.showComment,`_cycleCommentStyle();`,
+    `<i class="ti ti-message-circle" aria-hidden="true"></i>`,ctx.showComment==='label'?'코멘트: 라벨형 (탭하면 세로바형)':(ctx.showComment==='bar'?'코멘트: 세로바형 (탭하면 끄기)':'코멘트 표시')):'';
   const quoteMarkToggle=ctx.kind==='quote'?_shareIconBtn(!!ctx.quoteMark,`_shareModalCtx.quoteMark=!_shareModalCtx.quoteMark;_renderShareModal();`,
     `<span style="font-family:'DM Sans',sans-serif;font-weight:600;font-size:18px;">\u275b</span>`,ctx.quoteMark?'인용부호 끄기':'인용부호 켜기'):'';
   const ALIGN_ICON={left:'left',center:'center',right:'right'};
@@ -11063,7 +11090,7 @@ async function _confirmShareCopy(){
 async function shareQuoteCard(quoteCid){
   const q=getQuotes().find(x=>x.cid===quoteCid);if(!q)return;
   const book=getBooks().find(b=>b.cid===q.bookCid);
-  _shareModalCtx={kind:'quote',args:[q,book],styleKey:'G',colorMode:'brown',showBookInfo:false,italicMode:false,quoteMark:true,alignMode:'left',fontSize:40,highlightMode:null,showComment:!!q.comment};
+  _shareModalCtx={kind:'quote',args:[q,book],styleKey:'G',colorMode:'brown',showBookInfo:false,italicMode:false,quoteMark:true,alignMode:'left',fontSize:40,highlightMode:null,showComment:q.comment?'label':null};
   await _renderShareModal();
 }
 async function openTodayReadingShareModal(bookCid,unit,percentAfter,pagesAfter,seconds,dk){
