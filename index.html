@@ -692,6 +692,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .diary-line-text.empty{color:var(--tm);font-size:12px;font-style:italic;letter-spacing:2px;}
 .rd-quote-inp{width:100%;background:var(--inp);border:1px solid var(--inp-b);border-radius:12px;padding:12px 14px;outline:none;resize:none;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--tp);line-height:1.6;}
 .rd-quote-item{position:relative;background:rgba(255,250,245,0.5);border-left:2.5px solid rgba(195,170,235,0.55);border-radius:0 10px 10px 0;padding:9px 12px 26px 14px;margin-top:8px;}
+.rd-comment-item{position:relative;background:rgba(255,250,245,0.5);border-left:2.5px solid rgba(160,195,130,0.55);border-radius:0 10px 10px 0;padding:9px 12px 9px 14px;margin-top:8px;}
 
 /* ===== 홈탭 저녁파트2: 오늘의 문장 카드 ===== */
 .today-quote-wrap{
@@ -10148,7 +10149,7 @@ function renderDoneBookComments(bookCid){
   const listEl=document.getElementById('rd-done-comment-list-'+bookCid);if(!listEl)return;
   const quotes=getQuotes().filter(q=>q.bookCid===bookCid&&q.comment).sort((a,b)=>(b.created||0)-(a.created||0));
   if(!quotes.length){listEl.innerHTML='<div class="rd-quote-empty">아직 남긴 코멘트가 없어요</div>';listEl.style.maxHeight='';listEl.style.overflowY='';return;}
-  listEl.innerHTML=quotes.map(q=>`<div class="rd-quote-item">
+  listEl.innerHTML=quotes.map(q=>`<div class="rd-comment-item">
       <div class="rd-quote-text" style="font-size:11px;color:var(--tm);margin-bottom:4px;">${q.text}</div>
       <div class="rd-quote-comment" onclick="event.stopPropagation();toggleQuoteCommentEditor('${q.cid}')" style="font-size:12.5px;color:var(--tp);padding:6px 8px;background:rgba(200,176,168,0.14);border-radius:8px;cursor:pointer;">${q.comment}</div>
       <div id="qc-editor-${q.cid}" class="qc-editor" style="display:none;margin-top:5px;" onclick="event.stopPropagation();">
@@ -10594,8 +10595,10 @@ function renderReadingCalDayDetailHtml(dk,dayLogs,bookMap){
     // rblocks(리듬 블록)는 스톱워치 종료 시점에 세션 단위로 시작~종료 시각을 정확히 남기므로, 이걸 그대로 가져와 표시.
     // rdlog(진행률 로그)는 하루/책 단위로 시간을 합산해 저장하는 구조라 시각 정보가 없음 — 같은 책을 여러 세션 읽었으면 각 세션을 모두 나열.
     const target='독서 - '+title;
-    const sessionRanges=book?dayRblocks.filter(b=>b.cat==='enjoy'&&b.text===target).map(b=>`${b.start}-${b.end}`):[];
-    const timeText=sessionRanges.length?sessionRanges.join(', '):(r.seconds>0?Math.round(r.seconds/60)+'분':'');
+    const sessionBlocks=book?dayRblocks.filter(b=>b.cat==='enjoy'&&b.text===target):[];
+    const sessionRanges=sessionBlocks.map(b=>`${b.start}-${b.end}`);
+    const totalMin=sessionBlocks.reduce((sum,b)=>sum+Math.max(0,toMin(b.end)-toMin(b.start)),0);
+    const timeText=sessionRanges.length?`${sessionRanges.join(', ')} (총 ${totalMin}분)`:(r.seconds>0?Math.round(r.seconds/60)+'분':'');
     const metaLine=[progText,amountText,timeText].filter(Boolean).join(' · ');
     const posterHtml=cover?`<img src="${cover}" style="width:32px;height:44px;border-radius:5px;object-fit:cover;flex-shrink:0;" />`:`<div style="width:32px;height:44px;border-radius:5px;background:var(--card2);flex-shrink:0;display:flex;align-items:center;justify-content:center;"><i class="ti ti-book ico-13" style="color:var(--tm);" aria-hidden="true"></i></div>`;
     const shareBtn=`<span onclick="event.stopPropagation();openTodayReadingShareModal('${r.book_cid}','${r.unit}',${r.percent_after!=null?r.percent_after:'null'},${r.pages_after!=null?r.pages_after:'null'},${r.seconds||0},'${dk}')" title="공유 이미지" style="cursor:pointer;color:var(--ts);opacity:0.75;flex-shrink:0;padding:4px;"><i class="ti ti-share" style="font-size:14px;" aria-hidden="true"></i></span>`;
@@ -10746,21 +10749,26 @@ async function _drawQuoteCardG(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
   }
   lines.forEach(line=>{ctx.fillText(line,tx0,ty);ty+=lineH;});
   ctx.textAlign='left';
-  ty+=44;
-  // 코멘트: 인용문과 명확히 구분되도록 앱 기본 폰트(DM Sans) + 둥근 배경 배너로 표시
+  ty+=20;
+  // 코멘트: 배경 박스 대신 왼쪽 세로바 + "comment" 소문자 라벨로 인용문과 구분, 비대칭 들여쓰기로 "덧붙이는 말" 위계 표현
   const showCmt=showComment&&q.comment;
   if(showCmt){
-    const cmtFs=24;
+    const barX=88+28;
+    const cmtFs=23,labelFs=15,cmtLineH=Math.round(cmtFs*1.5),gapLabelToText=10;
+    ctx.font='600 '+labelFs+'px "DM Sans",sans-serif';
+    ctx.fillStyle=isWhite?'rgba(255,255,255,0.5)':'rgba(154,128,112,0.75)';
+    ctx.fillText('comment',barX+22,ty);
+    ty+=labelFs+gapLabelToText;
     ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
-    const cmtPadX=24,cmtPadY=18,cmtLineH=Math.round(cmtFs*1.5);
-    const cmtLines=_shareWrapText(ctx,q.comment,W-176-cmtPadX*2);
-    const cmtBoxH=cmtLineH*cmtLines.length+cmtPadY*2;
-    ctx.fillStyle=isWhite?'rgba(255,255,255,0.16)':'rgba(154,128,112,0.12)';
-    _roundRect(ctx,88,ty,W-176,cmtBoxH,18);ctx.fill();
+    const cmtLines=_shareWrapText(ctx,q.comment,W-176-28-22);
+    const cmtBoxH=cmtLineH*cmtLines.length;
+    ctx.strokeStyle=isWhite?'rgba(255,255,255,0.35)':'rgba(154,128,112,0.4)';
+    ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(barX,ty-4);ctx.lineTo(barX,ty+cmtBoxH-6);ctx.stroke();
     ctx.fillStyle=isWhite?'rgba(255,255,255,0.92)':'#6b5548';
-    let cy=ty+cmtPadY;
-    cmtLines.forEach(line=>{ctx.fillText(line,88+cmtPadX,cy);cy+=cmtLineH;});
-    ty+=cmtBoxH+32;
+    let cy=ty;
+    cmtLines.forEach(line=>{ctx.fillText(line,barX+22,cy);cy+=cmtLineH;});
+    ty+=cmtBoxH+36;
   }
   const showInfo=showBookInfo&&book;
   if(showInfo){
@@ -10800,15 +10808,15 @@ async function _drawQuoteCardH(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
   const lines=_shareWrapText(ctx,quoteText,pw-96);
   const textBlockH=lines.length*lineH;
   // 코멘트 블록 높이도 패널 전체 높이 계산에 포함 — DM Sans(앱 기본 폰트) 사용, 인용문과 별도 배경 배너로 구분
-  const cmtFs=24,cmtPadX=20,cmtPadY=16,cmtLineH=Math.round(cmtFs*1.5);
+  const cmtFs=23,labelFs=15,cmtPadX=0,cmtLineH=Math.round(cmtFs*1.5),gapLabelToText=10;
   let cmtLines=[],cmtBoxH=0;
   if(showCmt){
     ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
-    cmtLines=_shareWrapText(ctx,q.comment,pw-96-cmtPadX*2);
-    cmtBoxH=cmtLineH*cmtLines.length+cmtPadY*2;
+    cmtLines=_shareWrapText(ctx,q.comment,pw-96-28-22);
+    cmtBoxH=labelFs+gapLabelToText+cmtLineH*cmtLines.length;
   }
   const footerH=showInfo?96:0;
-  const padTop=56,padBottom=48,gapBeforeFooter=30,gapBeforeCmt=28;
+  const padTop=56,padBottom=48,gapBeforeFooter=30,gapBeforeCmt=16;
   const ph=padTop+textBlockH+(showCmt?gapBeforeCmt+cmtBoxH:0)+(footerH?gapBeforeFooter+footerH:0)+padBottom;
   const py=(H-ph)/2;
   ctx.fillStyle=isWhite?'rgba(0,0,0,0.22)':'rgba(255,255,255,0.42)';
@@ -10825,14 +10833,20 @@ async function _drawQuoteCardH(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
   ctx.textAlign='left';
   if(showCmt){
     ty+=gapBeforeCmt;
-    const cmtBoxX=px+48,cmtBoxW=pw-96;
-    ctx.fillStyle=isWhite?'rgba(255,255,255,0.14)':'rgba(154,128,112,0.14)';
-    _roundRect(ctx,cmtBoxX,ty,cmtBoxW,cmtBoxH,16);ctx.fill();
+    const barX=px+48+28;
+    ctx.font='600 '+labelFs+'px "DM Sans",sans-serif';
+    ctx.fillStyle=isWhite?'rgba(255,255,255,0.5)':'rgba(154,128,112,0.75)';
+    ctx.fillText('comment',barX+22,ty);
+    ty+=labelFs+gapLabelToText;
     ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
+    const textTop=ty;
+    ctx.strokeStyle=isWhite?'rgba(255,255,255,0.35)':'rgba(154,128,112,0.4)';
+    ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(barX,textTop-4);ctx.lineTo(barX,textTop+cmtLineH*cmtLines.length-6);ctx.stroke();
     ctx.fillStyle=isWhite?'rgba(255,255,255,0.92)':'#6b5548';
-    let cy=ty+cmtPadY;
-    cmtLines.forEach(line=>{ctx.fillText(line,cmtBoxX+cmtPadX,cy);cy+=cmtLineH;});
-    ty+=cmtBoxH;
+    let cy=textTop;
+    cmtLines.forEach(line=>{ctx.fillText(line,barX+22,cy);cy+=cmtLineH;});
+    ty+=cmtLineH*cmtLines.length;
   }
   if(showInfo){
     const fy=ty+gapBeforeFooter;
@@ -10874,24 +10888,20 @@ async function _drawTodayCardA(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds
   ctx.fillStyle=subColor;
   ctx.fillText("TODAY'S READING",cx,ty);
   ty+=44;
-  ctx.font='400 44px Bareonbatang, serif';
+  ctx.font='400 48px Bareonbatang, serif';
   ctx.fillStyle=textColor;
   const titleLines=_shareWrapText(ctx,book.title,W-240);
-  titleLines.forEach(line=>{ctx.fillText(line,cx,ty);ty+=58;});
-  ty+=24;
+  titleLines.forEach(line=>{ctx.fillText(line,cx,ty);ty+=64;});
+  ty+=48;
   const progVal=unit==='percent'?(percentAfter!=null?percentAfter:0):(pagesAfter!=null?pagesAfter:0);
   const progUnit=unit==='percent'?'%':'p';
-  ctx.font='700 108px "DM Sans",sans-serif';
-  ctx.fillStyle=textColor;
-  ctx.fillText(progVal+progUnit,cx,ty);
-  ty+=134;
   ctx.font='500 26px "DM Sans",sans-serif';
   ctx.fillStyle=subColor;
   const dispDate=dk?(parseInt(dk.slice(5,7),10)+'월 '+parseInt(dk.slice(8,10),10)+'일'):null;
   const timeStr=seconds?Math.floor(seconds/60)+'분':null;
   const sessionCount=countReadingSessionsForBook(book.title);
   const sessionStr=sessionCount>0?sessionCount+'회차':null;
-  const completeLine=[dispDate,timeStr,sessionStr].filter(Boolean).join('  ·  ');
+  const completeLine=[dispDate,progVal+progUnit,timeStr,sessionStr].filter(Boolean).join('  ·  ');
   if(completeLine)ctx.fillText(completeLine,cx,ty);
 }
 // C: 로고01(80% 투명도) 왼쪽 + 오른쪽에 날짜 한 줄 / 책제목 한 줄 / 시간·독서량 한 줄 — 표지 이미지 불필요, CORS 문제 없음
