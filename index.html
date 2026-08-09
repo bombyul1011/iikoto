@@ -1263,7 +1263,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div class="sheet-handle"></div>
     <div style="padding:0 20px 20px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px;">
-        <div class="goal-section-title" style="margin:0;background:rgba(190,230,205,0.30);color:rgba(85,135,100,0.90);border:1px solid rgba(150,190,165,0.45);box-shadow:none;" onclick="saveWeekMealSheet()"><i class="ti ti-tools-kitchen-3 ico-13" aria-hidden="true"></i> 주간 식사 계획</div>
+        <div class="goal-section-title" style="margin:0;background:rgba(190,230,205,0.30);color:rgba(85,135,100,0.90);border:1px solid rgba(150,190,165,0.45);box-shadow:none;" onclick="closeSheet('week-meal-sheet')"><i class="ti ti-tools-kitchen-3 ico-13" aria-hidden="true"></i> 주간 식사 계획</div>
         <button class="wish-round-btn" onclick="toggleMealWishlist()" title="먹고싶은 메뉴">
           <i class="ti ti-chef-hat" style="font-size:16px;" aria-hidden="true"></i>
         </button>
@@ -4172,10 +4172,22 @@ function getMeals(dk){return S.get(S.key('meals',dk))||{};}
 function mealRowToLocal(r){
   return {breakfast:r.breakfast||'',lunch:r.lunch||'',dinner:r.dinner||'',snack:r.snack||'',breakfast_time:r.breakfast_time||'',lunch_time:r.lunch_time||'',dinner_time:r.dinner_time||'',snack_time:r.snack_time||''};
 }
-function saveMealsData(dk,v){
-  S.set(S.key('meals',dk),v);
-  S.set(S.key('meals_pending',dk),true);
-  autoSync('meals',dk);
+// 식사 필드 단위 저장 — 메뉴명 또는 시간 중 "실제로 바뀐 필드 하나"만 로컬 갱신 + 서버 patch.
+// 예전엔 그 날 4끼 전체를 객체로 합쳐 통째로 push하는 구조라, 로컬 캐시가 최신이 아닌
+// 상태(예: 다른 기기에서 방금 등록한 시간을 아직 못 받아온 상태)에서 메뉴만 고쳐도
+// 무관한 시간 필드까지 서버에서 통째로 사라지는 문제가 반복됐음.
+// 이제는 바뀐 필드 하나만 pending 큐에 쌓고 서버로도 그 필드만 patch하므로,
+// 로컬이 낡아 있어도 서버의 다른 필드를 건드릴 방법 자체가 없음.
+function patchMealField(dk,key,field,value){
+  const m=getMeals(dk);
+  const col=field==='time'?key+'_time':key;
+  m[col]=value;
+  S.set(S.key('meals',dk),m);
+  const pend=S.get(S.key('meals_fields_pending',dk))||[];
+  if(!pend.includes(col))pend.push(col);
+  S.set(S.key('meals_fields_pending',dk),pend);
+  autoSync('meals_field',dk);
+  if(dk===dateKey(currentDate))renderTodayMeal();
 }
 function getBooks(){return S.get('reading_books')||[];}
 function getQuotes(){return S.get('reading_quotes')||[];}
@@ -4424,32 +4436,23 @@ async function syncSleepUp(dk){
 async function syncMealsDown(dk){
   const rows=await supaFetch(`meals?date_key=eq.${dk}`);
   if(!rows)return; // 연결 실패(null) — 로컬 유지
-  if(S.get(S.key('meals_pending',dk)))return; // 업로드 대기중인 로컬 수정 있으면 덮어쓰지 않음 (memos와 동일 원칙)
+  if((S.get(S.key('meals_fields_pending',dk))||[]).length)return; // 업로드 대기중인 필드 있으면 덮어쓰지 않음
   if(!rows.length)return;
   S.set(S.key('meals',dk),mealRowToLocal(rows[0]));
 }
+// 필드 단위 patch — pending 큐에 쌓인 컬럼만 골라서 서버로 보냄(나머지 컬럼은 손대지 않음).
+// resolution=merge-duplicates upsert는 body에 없는 컬럼을 기존값 그대로 두므로,
+// 로컬이 낡아 있어도 서버의 다른 필드를 덮어쓸 방법이 없어짐.
 async function syncMealsUp(dk){
-  // 로컬이 pending(수정 대기) 상태로 호출되는 함수이므로 로컬을 그대로 진실로 push.
-  // 이전 로직은 local.field가 빈 문자열(=삭제)일 때 server값으로 OR 병합되어
-  // 삭제가 무시되고 되살아나는 버그가 있었음.
+  const pend=S.get(S.key('meals_fields_pending',dk))||[];
+  if(!pend.length)return true;
   const local=getMeals(dk);
-  const merged={
-    breakfast:local.breakfast||'',
-    lunch:local.lunch||'',
-    dinner:local.dinner||'',
-    snack:local.snack||'',
-    breakfast_time:local.breakfast_time||'',
-    lunch_time:local.lunch_time||'',
-    dinner_time:local.dinner_time||'',
-    snack_time:local.snack_time||''
-  };
-  if(merged.breakfast||merged.lunch||merged.dinner||merged.snack){
-    await supaUpsert('meals','date_key',[{date_key:dk,breakfast:merged.breakfast||null,lunch:merged.lunch||null,dinner:merged.dinner||null,snack:merged.snack||null,breakfast_time:merged.breakfast_time||null,lunch_time:merged.lunch_time||null,dinner_time:merged.dinner_time||null,snack_time:merged.snack_time||null,created:Date.now()}]);
-  }else{
-    await supaFetch(`meals?date_key=eq.${dk}`,'DELETE');
-  }
-  S.set(S.key('meals',dk),merged);
+  const row={date_key:dk,created:Date.now()};
+  pend.forEach(col=>{row[col]=local[col]||null;});
+  const ok=await supaUpsert('meals','date_key',[row]);
+  if(ok)S.set(S.key('meals_fields_pending',dk),(S.get(S.key('meals_fields_pending',dk))||[]).filter(c=>!pend.includes(c)));
   if(dk===dateKey(currentDate))renderTodayMeal();
+  return !!ok;
 }
 async function syncHabitsDown(){
   const rows=await supaFetch('habits?order=sort_order');
@@ -4614,7 +4617,7 @@ async function autoSync(type,key){
   else if(type==='todos'){if(await syncTodosUp(key))S.set(S.key('todos_pending',key),false);}
   else if(type==='memos'){if(await syncMemosUp(key))S.set(S.key('memos_pending',key),false);}
   else if(type==='sleep'){await syncSleepUp(key);S.set(S.key('sleep_pending',key),false);}
-  else if(type==='meals'){await syncMealsUp(key);S.set(S.key('meals_pending',key),false);}
+  else if(type==='meals_field'){await syncMealsUp(key);}
   else if(type==='habits')syncHabitsUp();
   else if(type==='hc'){await syncHCUp(key);S.set('hc_pending_'+key,false);}
   else if(type==='hcTime'){await syncHCUp(key);S.set('hc_pending_'+key,false);} // 습관체크 시각도 결국 habit_checks 테이블의 checked_time 컬럼이라 같은 upload 함수(syncHCUp)를 재사용
@@ -4644,7 +4647,7 @@ async function syncAll(){
   const upTasks=[];
   if(S.get(S.key('todos_pending',dk)))upTasks.push(syncTodosUp(dk).then(()=>S.set(S.key('todos_pending',dk),false)));
   if(S.get(S.key('memos_pending',dk)))upTasks.push(syncMemosUp(dk).then(()=>S.set(S.key('memos_pending',dk),false)));
-  if(S.get(S.key('meals_pending',dk)))upTasks.push(syncMealsUp(dk).then(()=>S.set(S.key('meals_pending',dk),false)));
+  if((S.get(S.key('meals_fields_pending',dk))||[]).length)upTasks.push(syncMealsUp(dk));
   if(S.get(S.key('sleep_pending',dk)))upTasks.push(syncSleepUp(dk).then(()=>S.set(S.key('sleep_pending',dk),false)));
   if(S.get(S.key('contents_pending',mk)))upTasks.push(runContentsSyncLocked(mk,()=>syncContentsUp(mk)).then(()=>S.set(S.key('contents_pending',mk),false)));
   if(S.get('wchallenge_pending_'+wk))upTasks.push(autoSync('wchallenge','wchallenge_'+wk).then(()=>S.set('wchallenge_pending_'+wk,false)));
@@ -6956,7 +6959,7 @@ function _daysSinceLastReading(dk){
   return 90;
 }
 
-// ── 저녁 파트1 "식사 분석" 배너 — 어제+오늘 meals 데이터를 메뉴명 기준으로 AI가 정성적으로 분석.
+// ── 아침 파트2(9시경) "식사 분석" 배너 — 인사카드 하단, 어제+오늘 meals 데이터를 메뉴명 기준으로 AI가 정성적으로 분석.
 // 정량 수치(g)는 앱에 입력되지 않으므로 사용하지 않고, 메뉴 구성 기반 추정 코멘트만 생성.
 // 인사배너와 동일한 캐시 패턴(메모리→로컬→서버 ai_cache) 재사용.
 let _nutriCommentCache={};
@@ -8715,7 +8718,16 @@ async function syncMonthRange(y,mo){
     Object.keys(byDate).forEach(dk=>{if(!S.get(S.key('todos_pending',dk)))S.set(S.key('todos',dk),byDate[dk]);});
   }
   if(sRows)sRows.forEach(r=>{if(!S.get(S.key('sleep_pending',r.date_key)))S.set(S.key('sleep',r.date_key),sleepRowToLocal(r));});
-  if(mlRows)mlRows.forEach(r=>{if(!S.get(S.key('meals_pending',r.date_key)))S.set(S.key('meals',r.date_key),mealRowToLocal(r));});
+  if(mlRows)mlRows.forEach(r=>{
+    const pend=S.get(S.key('meals_fields_pending',r.date_key))||[];
+    const serverRow=mealRowToLocal(r);
+    if(!pend.length){S.set(S.key('meals',r.date_key),serverRow);return;}
+    // pending인 필드(아직 서버로 못 올라간 로컬 수정)만 로컬값 유지, 나머지는 서버값 반영.
+    const local=getMeals(r.date_key);
+    const merged={...serverRow};
+    pend.forEach(col=>{merged[col]=local[col];});
+    S.set(S.key('meals',r.date_key),merged);
+  });
   if(rbRows){
     const byDate={};
     rbRows.forEach(r=>{(byDate[r.date_key]=byDate[r.date_key]||[]).push({cat:r.cat,start:r.start_time,end:r.end_time,text:r.text||'',created:r.created,cid:r.client_id||genCid()});});
@@ -9044,11 +9056,8 @@ function renderTodayMeal(){
   el.innerHTML=html||'<div style="font-size:12px;color:var(--tm);text-align:center;padding:8px 0;">주간 메뉴판에서 적어보세요</div>';
 }
 function recordMealTime(dk,k){
-  const m=getMeals(dk);
   const now=new Date();
-  m[k+'_time']=`${pad(now.getHours())}:${pad(now.getMinutes())}`;
-  saveMealsData(dk,m);
-  renderTodayMeal();
+  patchMealField(dk,k,'time',`${pad(now.getHours())}:${pad(now.getMinutes())}`);
 }
 const HABIT_COLOR_RGBA={mint:'rgba(140,210,200,0.85)',pink:'rgba(255,150,180,0.80)',sky:'rgba(168,212,232,0.80)',yellow:'rgba(240,200,80,0.80)',rose:'rgba(240,140,140,0.80)',lavender:'rgba(185,165,230,0.80)',peach:'rgba(255,185,140,0.80)',teal:'rgba(100,195,185,0.80)'};
 function getHabitColor(colorKey){
@@ -9484,9 +9493,9 @@ function placeWish(el){
   if(!_wishPlacing)return;
   el.value=el.value?el.value+', '+_wishPlacing:_wishPlacing;
   // onblur로만 저장되는 구조라, 배치 직후엔 아직 blur가 안 일어난 상태 — 명시적으로 저장 호출.
-  // el.id는 wm-${dk}-${k} 형식이므로 dk만 뽑아 saveOneMealDay 호출.
+  // el.id는 wm-${dk}-${k} 형식(dk 자체에 '-'가 포함되므로 마지막 조각만 k, 나머지가 dk).
   const idParts=el.id.split('-');
-  if(idParts[0]==='wm')saveOneMealDay(idParts.slice(1,-1).join('-'));
+  if(idParts[0]==='wm')saveMealMenu(idParts.slice(1,-1).join('-'),idParts[idParts.length-1]);
   // 특정 날짜 칸에 배치됐으니 위시리스트에서 제거
   if(_wishPlacingIdx!=null){
     const items=getMealWishlist();
@@ -9516,7 +9525,8 @@ function mealCatPressStart(el,dk,k){
     const tEl=document.getElementById(`wm-${dk}-${k}-time`);
     if(tEl&&tEl.value){
       tEl.value='';
-      saveOneMealDay(dk);
+      patchMealField(dk,k,'time','');
+      refreshMealTimeGroup(dk,k,'');
       el.style.transition='opacity .15s';el.style.opacity='0.3';
       setTimeout(()=>{el.style.opacity='';},220);
     }
@@ -9531,51 +9541,44 @@ function mealCatPressEnd(){
 function clearMealTime(dk,k){
   const tEl=document.getElementById(`wm-${dk}-${k}-time`);
   if(tEl)tEl.value='';
-  saveOneMealDay(dk);
-  const btn=document.getElementById(`wm-${dk}-${k}`)?.parentElement?.querySelector('span[onclick^="clearMealTime"]');
-  if(btn)btn.remove();
-  if(tEl)tEl.classList.add('mt-empty');
+  patchMealField(dk,k,'time','');
+  refreshMealTimeGroup(dk,k,'');
 }
-function saveOneMealDay(dk){
-  const existing=getMeals(dk); // PC(비터치)에서는 시간 input(wm-${dk}-${k}-time) 자체가 DOM에 없으므로,
-  // tEl 부재를 '시간 삭제'로 오인하지 않고 기존 저장값을 그대로 보존해야 함 (이전 버그: PC에서 메뉴칸만 건드려도 그날 전체 시간이 삭제되어 서버까지 반영됨)
-  const m={};
-  MEAL_KEYS.forEach(k=>{
-    const el=document.getElementById(`wm-${dk}-${k}`);
+// 메뉴칸(onblur) — 메뉴 필드만 patch. 메뉴가 비면 시간도 같이 지움(리듬 막대 잔존 방지).
+// 시간 필드는 절대 건드리지 않으므로 다른 기기가 등록한 시간이 여기서 사라질 수 없음.
+function saveMealMenu(dk,k){
+  const el=document.getElementById(`wm-${dk}-${k}`);
+  const val=el?el.value.trim():'';
+  patchMealField(dk,k,'menu',val);
+  if(!val){
+    patchMealField(dk,k,'time','');
     const tEl=document.getElementById(`wm-${dk}-${k}-time`);
-    m[k]=el?el.value.trim():(existing[k]||'');
-    // 메뉴명이 비어있으면 시간도 같이 지움 — 리듬 막대에 잔존하는 문제 방지
-    if(!m[k]){
-      m[k+'_time']='';
-      if(tEl)tEl.value='';
-    }else if(tEl){
-      // 시간 input이 DOM에 있는 경우(모바일)에만 그 값을 반영
-      m[k+'_time']=tEl.value;
-    }else{
-      // 시간 input이 없는 경우(PC) — 기존 저장된 시간을 그대로 유지
-      m[k+'_time']=existing[k+'_time']||'';
-    }
-  });
-  saveMealsData(dk,m);
-  // 시간 입력 직후 ✕ 지우기 버튼과 빈값 스타일이 재진입 없이 바로 반영되도록,
-  // meal-time-group만 다시 그림(이전에 onclick 비교로 기존 버튼을 찾던 방식은
-  // 매번 못 찾아 새로 추가되며 ✕가 중첩되는 버그가 있었음 — 통째로 재렌더링으로 교체).
-  MEAL_KEYS.forEach(k=>{
-    const tEl=document.getElementById(`wm-${dk}-${k}-time`);
-    if(!tEl)return;
-    const group=tEl.parentElement;if(!group)return;
-    const tVal=m[k+'_time']||'';
-    tEl.classList.toggle('mt-empty',!tVal);
-    group.querySelectorAll('.meal-time-clear').forEach(b=>b.remove());
-    if(tVal){
-      const clearBtn=document.createElement('span');
-      clearBtn.className='meal-time-clear';
-      clearBtn.title='시간 지우기';
-      clearBtn.textContent='✕';
-      clearBtn.onclick=()=>clearMealTime(dk,k);
-      group.appendChild(clearBtn);
-    }
-  });
+    if(tEl)tEl.value='';
+    refreshMealTimeGroup(dk,k,'');
+  }
+}
+// 시간 input(onchange, 모바일 전용 — PC는 이 input 자체가 DOM에 없어 호출될 일이 없음) — 시간 필드만 patch.
+function saveMealTimeInput(dk,k){
+  const tEl=document.getElementById(`wm-${dk}-${k}-time`);
+  const val=tEl?tEl.value:'';
+  patchMealField(dk,k,'time',val);
+  refreshMealTimeGroup(dk,k,val);
+}
+// 시간 입력 직후 ✕ 지우기 버튼과 빈값 스타일이 재진입 없이 바로 반영되도록 meal-time-group만 다시 그림.
+function refreshMealTimeGroup(dk,k,tVal){
+  const tEl=document.getElementById(`wm-${dk}-${k}-time`);
+  if(!tEl)return;
+  const group=tEl.parentElement;if(!group)return;
+  tEl.classList.toggle('mt-empty',!tVal);
+  group.querySelectorAll('.meal-time-clear').forEach(b=>b.remove());
+  if(tVal){
+    const clearBtn=document.createElement('span');
+    clearBtn.className='meal-time-clear';
+    clearBtn.title='시간 지우기';
+    clearBtn.textContent='✕';
+    clearBtn.onclick=()=>clearMealTime(dk,k);
+    group.appendChild(clearBtn);
+  }
 }
 function openWeekMealSheet(){
   cancelWishPlacing();
@@ -9601,9 +9604,9 @@ function openWeekMealSheet(){
         // PC에서는 시간을 읽기 전용 텍스트로만 표기(24시간제)하고, 입력/수정은 모바일 또는
         // 오늘탭 "오늘 뭐 먹지" 체크 기능에서 하도록 분리함.
         const timeBlock=_isTouchDevice()
-          ? `<input class="meal-time-inp${tVal?'':' mt-empty'}" id="wm-${dk}-${k}-time" type="time" value="${tVal}" onchange="saveOneMealDay('${dk}')" step="60" lang="en-GB">${tVal?`<span onclick="clearMealTime('${dk}','${k}')" class="meal-time-clear" title="시간 지우기">✕</span>`:''}`
+          ? `<input class="meal-time-inp${tVal?'':' mt-empty'}" id="wm-${dk}-${k}-time" type="time" value="${tVal}" onchange="saveMealTimeInput('${dk}','${k}')" step="60" lang="en-GB">${tVal?`<span onclick="clearMealTime('${dk}','${k}')" class="meal-time-clear" title="시간 지우기">✕</span>`:''}`
           : (tVal?`<span class="meal-time-readonly">${tVal}</span>`:'');
-        return `<div class="meal-row"><div class="meal-cat" onpointerdown="mealCatPressStart(this,'${dk}','${k}')" onpointerup="mealCatPressEnd(this)" onpointerleave="mealCatPressEnd(this)" onpointercancel="mealCatPressEnd(this)">${label}</div><input class="meal-inp" style="flex:1 1 0;min-width:0;" id="wm-${dk}-${k}" type="text" placeholder="메뉴 입력" autocomplete="off" value="${(m[k]||'').replace(/"/g,'&quot;')}" onblur="saveOneMealDay('${dk}')"><div class="meal-time-group">${timeBlock}</div></div>`;
+        return `<div class="meal-row"><div class="meal-cat" onpointerdown="mealCatPressStart(this,'${dk}','${k}')" onpointerup="mealCatPressEnd(this)" onpointerleave="mealCatPressEnd(this)" onpointercancel="mealCatPressEnd(this)">${label}</div><input class="meal-inp" style="flex:1 1 0;min-width:0;" id="wm-${dk}-${k}" type="text" placeholder="메뉴 입력" autocomplete="off" value="${(m[k]||'').replace(/"/g,'&quot;')}" onblur="saveMealMenu('${dk}','${k}')"><div class="meal-time-group">${timeBlock}</div></div>`;
       }).join('');
     body.appendChild(block);
   }
@@ -9615,23 +9618,6 @@ function openWeekMealSheet(){
     const sr=scroller.getBoundingClientRect(),er=tEl.getBoundingClientRect();
     scroller.scrollTop+=(er.top-sr.top);
   },50);
-}
-function saveWeekMealSheet(){
-  const now=new Date();
-  const mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7));
-  for(let i=0;i<14;i++){
-    const d=new Date(mon);d.setDate(mon.getDate()+i);
-    const dk=dateKey(d);
-    const m={};
-    MEAL_KEYS.forEach(k=>{
-      const el=document.getElementById(`wm-${dk}-${k}`);
-      const tEl=document.getElementById(`wm-${dk}-${k}-time`);
-      m[k]=el?el.value.trim():'';
-      m[k+'_time']=tEl?tEl.value:'';
-    });
-    saveMealsData(dk,m);
-  }
-  closeSheet('week-meal-sheet');
 }
 function openSheet(id){document.getElementById(id).classList.add('on');}
 function closeSheet(id,e){if(!e||e.target===document.getElementById(id))document.getElementById(id).classList.remove('on');}
@@ -11660,7 +11646,17 @@ async function forceRestoreDate(dk){
   }
   var mlrows=await supaFetch('meals?date_key=eq.'+dk);
   if(mlrows&&mlrows.length>0){
-    S.set(S.key('meals',dk),mealRowToLocal(mlrows[0]));
+    var mlPend=S.get(S.key('meals_fields_pending',dk))||[];
+    var mlServer=mealRowToLocal(mlrows[0]);
+    if(!mlPend.length){
+      S.set(S.key('meals',dk),mlServer);
+    }else{
+      // Up 단계에서 아직 못 올라간 필드가 있다면(예: 일시적 네트워크 실패) 그 필드는 로컬 유지.
+      var mlLocal=getMeals(dk);
+      var mlMerged=Object.assign({},mlServer);
+      mlPend.forEach(function(col){mlMerged[col]=mlLocal[col];});
+      S.set(S.key('meals',dk),mlMerged);
+    }
   }
   var rbrows=await supaFetch('rhythm_blocks?date_key=eq.'+dk+'&order=created');
   if(rbrows&&rbrows.length>0){
@@ -11770,9 +11766,8 @@ async function initSync(){
       S.set(S.key('memos_pending',dk),false);
       didUp=true;
     }
-    if(S.get(S.key('meals_pending',dk))){
+    if((S.get(S.key('meals_fields_pending',dk))||[]).length){
       await syncMealsUp(dk);
-      S.set(S.key('meals_pending',dk),false);
     }
     if(S.get(S.key('rblocks_pending',dk))){
       await syncRhythmBlocksUp(dk);
