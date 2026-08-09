@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260808-12-done-quote-share';
+const CACHE = 'iikoto-v20260809-13-rhythm-refactor';
 const ASSETS = [
   './',
   './index.html'
