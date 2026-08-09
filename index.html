@@ -1469,6 +1469,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div class="sheet-handle"></div>
     <div style="padding:0 20px 20px;">
       <div style="font-size:13px;font-weight:600;color:rgba(80,140,200,0.9);text-align:center;margin-bottom:16px;letter-spacing:0.04em;"><i class="ti ti-sparkles ico-13" aria-hidden="true"></i> 이번주 돌아보기 <i class="ti ti-sparkles ico-13" aria-hidden="true"></i></div>
+      <div id="wr-week-chips" class="month-chips" style="margin-bottom:14px;"></div>
       <div id="weekly-review-content" style="font-size:13px;color:var(--tp);line-height:1.9;"></div>
     </div>
   </div>
@@ -1982,6 +1983,17 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 <script>
 
+// 일요일 22시~월요일 24시 구간에 노출되는 "이번주 돌아보기" 배너/시트가 참조할 "그 주 일요일" 날짜키.
+// getLogicalDate()는 새벽 4시 컷이라 월요일 저녁(19~24시)엔 그냥 "월요일"을 반환해버려서,
+// 이 구간에서 곧이곧대로 쓰면 일요일 밤에 만들어둔 weekly_summary_ 캐시를 못 찾는 문제가 생김.
+// 그래서 "화~토요일(2~6)"이면 오늘, "일요일(0)"이면 오늘, "월요일(1)"이면 하루 전으로 보정.
+function _thisWeekSundayDk(){
+  const now=new Date();
+  const d=new Date(now);
+  if(now.getDay()===1)d.setDate(d.getDate()-1); // 월요일 전체(0~24시) → 어제(일요일)로 보정
+  else if(now.getHours()<4)d.setDate(d.getDate()-1); // 그 외 요일은 기존 getLogicalDate와 동일한 새벽 4시 컷 유지
+  return dateKey(d);
+}
 function appendSundayBanner(body){
   const isNight2=getSubSection()==='night_2';
   const banner=document.createElement('div');
@@ -2007,8 +2019,12 @@ function renderHomeBody(section){
   body.innerHTML='';
   const _ld=getLogicalDate();
   const _lh=new Date().getHours();
-  const _isLateNightOrDawn=_lh>=22||_lh<6; // 기간별 리포트(일요일/월간 중간·말일) 전용 — 파트2(22시)+새벽에만 노출
-  const isSunday=_ld.getDay()===0&&_isLateNightOrDawn;
+  const _isLateNightOrDawn=_lh>=22||_lh<6; // 기간별 리포트(월간 중간·말일) 전용 — 파트2(22시)+새벽에만 노출
+  // 주간리포트만 별도 연장 노출: 일요일 22시 ~ 월요일 24시(자정)까지, 즉 "일요일 night" 전체 + "월요일 night" 전체.
+  // section==='night'일 때만 이 배너가 있는 else 분기를 타므로(오전/오후/새벽은 각자 분기 있음),
+  // 결국 조건은 "지금이 night 섹션이면서 요일이 일 또는 월"로 단순화됨.
+  const _dow=new Date().getDay();
+  const showWeeklyReviewBanner=(_dow===0||_dow===1); // section==='night'일 때만 쓰이므로 시간 조건은 불필요
   const isLastDayOfMonth=(()=>{const t=new Date(_ld);t.setDate(_ld.getDate()+1);return t.getDate()===1;})()&&_isLateNightOrDawn;
   const isMidMonth=_ld.getDate()===15&&_isLateNightOrDawn;
 
@@ -2058,7 +2074,7 @@ function renderHomeBody(section){
       </div>`;
       midBanner.addEventListener('click',openMonthlyReportSheet);
       body.appendChild(midBanner);
-    } else if(isSunday){
+    } else if(showWeeklyReviewBanner){
       appendSundayBanner(body);
     }
     const isNight2=getSubSection()==='night_2';
@@ -2069,7 +2085,7 @@ function renderHomeBody(section){
     }
     body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getLogicalDate()));},'rhythm-soft',12.5,dateKey(getLogicalDate())));
     // 일요일 다음 주 챌린지 준비 배너는 홈탭에서 제거 — 주간탭 "이번 주도 화이팅" 카드로 흡수됨
-    if(!isSunday){
+    if(!showWeeklyReviewBanner){
       // "오늘 마무리" 브리핑은 통합카드(상단 인삿말)가 흡수함
     }
     if(isNight2){
@@ -2602,22 +2618,27 @@ function _initBriefingCache(){
   if(gc){_greetingCache=gc;}
 }
 
-function getSubSection(){
+// ── 홈탭 전용 시간대 판정 (단일 소스) ──
+// 물리적 하루를 7구간으로: 아침1(기상~9시)→아침2(~12)→오후1(~16)→오후2(~19)→저녁1(~22)→저녁2(~24)→새벽(자정~기상, 마지막 구간).
+// "잠들고 일어나야 하루가 시작된다"는 생활 개념과 맞춰, 새벽(dawn)이 하루의 끝에 오도록 배치.
+// 이 값은 홈탭이 그때그때 어떤 카드/배너를 보여줄지 정하는 화면 판정 전용이며,
+// 기록이 어느 날짜에 소속되는지는 별개 개념(DAWN_CUTOFF_MIN/getLogicalDate, 아래쪽 데이터 유틸 섹션 참고).
+// getSection/getSubSection/getGreetingSubSection은 모두 이 함수에서 파생되므로 서로 어긋날 수 없음.
+function getHomeTimeSlot(){
   const h=new Date().getHours();
-  if(h>=4&&h<9)return 'morning_1';
-  if(h>=9&&h<12)return 'morning_2';
-  if(h>=12&&h<16)return 'afternoon_1';
-  if(h>=16&&h<19)return 'afternoon_2';
-  if(h>=19&&h<22)return 'night_1';
+  if(h<4)return 'dawn';
+  if(h<9)return 'morning_1';
+  if(h<12)return 'morning_2';
+  if(h<16)return 'afternoon_1';
+  if(h<19)return 'afternoon_2';
+  if(h<22)return 'night_1';
   return 'night_2';
 }
-// [v2] 홈탭 인사말 캐시 전용 — 아침1·2/오후1·2/저녁1·2/새벽, 총 7개 서브섹션을 하나의 개념으로 통합.
-// getSubSection()은 다른 여러 곳(리듬바, 통계 등)에서도 쓰이는 함수라 그대로 두고,
-// "인사말 캐시 키"만 이 함수로 새벽(dawn)까지 포함해 7개로 확장.
+function getSubSection(){
+  return getHomeTimeSlot();
+}
 function getGreetingSubSection(){
-  const h=new Date().getHours();
-  if(h>=0&&h<4)return 'dawn';
-  return getSubSection();
+  return getHomeTimeSlot();
 }
 _initBriefingCache();
 
@@ -3249,21 +3270,46 @@ async function loadMonthlyReportContent(){
   }
 }
 
-function openWeeklyReviewSheet(){
-  const sheet=document.getElementById('weekly-review-sheet');
-  const content=document.getElementById('weekly-review-content');
-  const cacheKey='weekly_summary_'+dateKey(getLogicalDate());
-  const cached=S.get(cacheKey);
-  openSheet('weekly-review-sheet');
-  if(cached){
-    content.innerHTML=cached;
-    return;
+// 최근 4주(이번주 포함) 일요일 논리일 날짜키 목록 — weekly_summary 캐시 키와 1:1 대응.
+function _recentWeekSundays(){
+  const base=_thisWeekSundayDk();
+  const baseDate=new Date(base+'T00:00:00');
+  const out=[];
+  for(let i=0;i<4;i++){
+    const d=new Date(baseDate);d.setDate(baseDate.getDate()-7*i);
+    out.push(dateKey(d));
   }
+  return out; // [이번주 일요일, 1주전, 2주전, 3주전]
+}
+function renderWeekReviewChips(activeDk){
+  const wrap=document.getElementById('wr-week-chips');if(!wrap)return;
+  const weeks=_recentWeekSundays();
+  wrap.innerHTML='';
+  weeks.forEach((dk,i)=>{
+    const chip=document.createElement('div');
+    chip.className='m-chip'+(dk===activeDk?' active':'');
+    chip.textContent=i===0?'이번주':i+'주전';
+    chip.addEventListener('click',()=>loadWeeklyReviewFor(dk));
+    wrap.appendChild(chip);
+  });
+}
+function loadWeeklyReviewFor(dk){
+  renderWeekReviewChips(dk);
+  const content=document.getElementById('weekly-review-content');
+  const cacheKey='weekly_summary_'+dk;
+  const cached=S.get(cacheKey);
+  if(cached){content.innerHTML=cached;return;}
   content.innerHTML='<div class="sheet-loading-msg">한 주 요약 작성 중이에요... 🌿<br><span style="font-size:11.5px;opacity:0.7;">약 10-20초 소요돼요</span></div>';
   aiCacheGet(cacheKey).then(function(serverHtml){
     if(serverHtml){
       S.set(cacheKey,serverHtml);
       content.innerHTML=serverHtml;
+      return;
+    }
+    const isCurrentWeek=dk===_thisWeekSundayDk();
+    if(!isCurrentWeek){
+      // 지난 주차는 그 시점에 한 번도 열람 안 됐다면(=생성 이력 없음) 새로 만들지 않고 안내만.
+      content.innerHTML='<div class="sheet-loading-msg">이 주는 아직 기록된 요약이 없어요 🌿</div>';
       return;
     }
     if(!getClaudeKey()){
@@ -3281,6 +3327,10 @@ function openWeeklyReviewSheet(){
     });
   });
 }
+function openWeeklyReviewSheet(){
+  openSheet('weekly-review-sheet');
+  loadWeeklyReviewFor(_thisWeekSundayDk());
+}
 
 async function makeWeeklySummaryCard(){
   // 하루치 메모 중 N개를 시간대 전체에 고르게 펼쳐서 뽑기 (아침 루틴 멘트로만 쏠리는 것 방지)
@@ -3297,10 +3347,12 @@ async function makeWeeklySummaryCard(){
   card.className='card m';
 
   // 이번 주 월~토 데이터 수집
-  const now=new Date();
+  // now.getDay() 기준으로 계산하면 월요일 저녁(이 함수가 이제 이 시간대에도 호출될 수 있음)엔
+  // "이번 주"가 오늘부터 시작하는 걸로 잘못 잡힘 — 항상 "그 주 일요일"을 기준으로 역산.
+  const sundayDk=_thisWeekSundayDk();
+  const now=new Date(sundayDk+'T00:00:00');
   const weekStart=new Date(now);
-  weekStart.setDate(now.getDate()-((now.getDay()+6)%7)); // 월요일
-  weekStart.setHours(0,0,0,0);
+  weekStart.setDate(now.getDate()-6); // 그 주 일요일의 6일 전 = 월요일
 
   const allTodos=[],allMemos=[],allMemosWithDay=[],allSleep=[];
   const habits=getHabits();
@@ -3754,8 +3806,11 @@ function goHome(fromSwipe){
 let _todoPartModeIdx=-1;
 
 function getSection(){
-  const h=new Date().getHours();
-  return h>=4&&h<12?'morning':h>=12&&h<19?'afternoon':h>=19?'night':'dawn';
+  const slot=getHomeTimeSlot();
+  if(slot==='dawn')return 'dawn';
+  if(slot==='morning_1'||slot==='morning_2')return 'morning';
+  if(slot==='afternoon_1'||slot==='afternoon_2')return 'afternoon';
+  return 'night';
 }
 
 function renderHome(){
@@ -3947,6 +4002,28 @@ function getLogicalDate(ts){
   const d=ts!=null?new Date(ts):new Date();
   if(d.getHours()<4)d.setDate(d.getDate()-1);
   return d;
+}
+// ── 논리적 하루 경계 보정 유틸 모음 (getLogicalDate와 같은 04:00 기준을 공유) ──
+// 시:분 문자열 → 분값 변환, 그리고 "00:00~cutoffMin 이전" 시각을 전날 늦은 시간대로 보고
+// +1440분 밀어주는 정렬 보정까지 한 곳에 모아둠. 과거 여러 함수에서 각자 재구현하던 걸 통일.
+const DAWN_CUTOFF_MIN=4*60; // 04:00 — getLogicalDate()와 동일한 기준
+function _dawnTimeToMin(t){if(!t)return null;const p=t.split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);}
+const toMin=_dawnTimeToMin;
+// cutoffMin 생략 시 DAWN_CUTOFF_MIN(4시) 기준.
+// - 일반 활동(투두/습관/리듬블록 정렬 등): 기본값 그대로 사용
+// - 취침시각처럼 밤 11시~새벽에 넓게 걸치는 특수 케이스: cutoffMin을 더 늦게(예: 12시) 넘겨서 호출
+function toDawnAdjustedMin(min,cutoffMin){
+  if(min==null)return null;
+  const c=cutoffMin!=null?cutoffMin:DAWN_CUTOFF_MIN;
+  return min<c?min+1440:min;
+}
+function dawnTimeToAdjustedMin(t,cutoffMin){return toDawnAdjustedMin(_dawnTimeToMin(t),cutoffMin);}
+// 시:분 문자열 → 정렬용 분값(04:00 이전은 +1440). 값이 없으면 9999(항상 맨 뒤).
+function toSortKey(t){
+  if(!t)return 9999;
+  const min=_dawnTimeToMin(t);
+  if(min==null)return 9999;
+  return toDawnAdjustedMin(min);
 }
 function genCid(){
   return Date.now().toString(36)+Math.random().toString(36).slice(2,8);
@@ -6922,30 +6999,6 @@ function makeHabitMiniCheckRow(){
   });
   return wrap;
 }
-// 시:분 문자열 → 정렬용 분값. 04:00 이전 시각은 전날 늦은 시간대로 보고 +1440분(하루 끝으로 밀어 정렬).
-// getLogicalDate()와 동일한 4시 기준(DAWN_CUTOFF_MIN)을 사용 — 과거엔 6시로 별도 계산해 데이터 소속 기준과 어긋났음.
-// 값이 없으면 9999(항상 맨 뒤)를 반환.
-function toSortKey(t){
-  if(!t)return 9999;
-  const min=_dawnTimeToMin(t);
-  if(min==null)return 9999;
-  return toDawnAdjustedMin(min);
-}
-function _dawnTimeToMin(t){if(!t)return null;const p=t.split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);}
-// 과거 여러 함수에서 각자 재구현하던 동일 로직을 _dawnTimeToMin 하나로 통일.
-const toMin=_dawnTimeToMin;
-// 논리적 하루 경계 보정 공통 유틸.
-// "00:00부터 cutoffMin 이전"의 시각은 전날 늦은 시간대로 취급해 +1440분 해준다.
-// - 일반 활동(투두/습관/리듬블록 정렬 등): cutoffMin=DAWN_CUTOFF_MIN(getLogicalDate와 동일한 4시 기준)
-// - 취침시각처럼 밤 11시~새벽에 넓게 걸치는 특수 케이스: cutoffMin을 더 늦게(예: 12시) 넘겨서 호출
-const DAWN_CUTOFF_MIN=4*60; // 04:00 — getLogicalDate()와 동일한 기준
-function toDawnAdjustedMin(min,cutoffMin){
-  if(min==null)return null;
-  const c=cutoffMin!=null?cutoffMin:DAWN_CUTOFF_MIN;
-  return min<c?min+1440:min;
-}
-// 시:분 문자열을 곧바로 새벽보정 분 단위로 변환하는 축약형
-function dawnTimeToAdjustedMin(t,cutoffMin){return toDawnAdjustedMin(_dawnTimeToMin(t),cutoffMin);}
 // 주어진 날짜(dk)로부터 과거로 거슬러 올라가며 독서 기록(감상 카테고리, 텍스트가 "독서"로 시작)이
 // 마지막으로 있었던 날까지 며칠 지났는지 계산. 최대 90일까지만 탐색(그 이상은 사실상 의미 없어 상한).
 function _daysSinceLastReading(dk){

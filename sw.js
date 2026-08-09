@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260809-14-meal-field-patch';
+const CACHE = 'iikoto-v20260809-17-timeslot-refactor';
 const ASSETS = [
   './',
   './index.html'
