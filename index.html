@@ -2043,26 +2043,26 @@ function renderHomeBody(section){
     if(isMorning2){
       body.appendChild(makeNutriCommentBanner());
     }
-    if(showWeeklyReviewReadOnly)appendSundayReadOnlyBanner(body);
     body.appendChild(makeMorningRoutineCard());
     body.appendChild(makeHabitStreakRow());
     body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getLogicalDate()));},'rhythm-soft',12.5,dateKey(getLogicalDate())));
     if(!isMorning2){
       body.appendChild(makeRecentContentsCard());
     }
-  } else if(section==='afternoon'){
     if(showWeeklyReviewReadOnly)appendSundayReadOnlyBanner(body);
+  } else if(section==='afternoon'){
     body.appendChild(makeAfternoonPaceCard());
     refreshAfternoonPaceCard();
     body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getLogicalDate()));},'rhythm-soft',12.5,dateKey(getLogicalDate())));
+    if(showWeeklyReviewReadOnly)appendSundayReadOnlyBanner(body);
   } else if(section==='dawn'){
     const dawnDk=dateKey(getLogicalDate());
-    if(showWeeklyReviewReadOnly)appendSundayReadOnlyBanner(body);
     const paceBanner=makeDawnPaceBanner(dawnDk);
     if(paceBanner)body.appendChild(paceBanner);
     body.appendChild(makeDawnRecapCard());
     body.appendChild(makeLabel('오늘의 리듬'));
     body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getLogicalDate()));},'rhythm-soft',12.5,dateKey(getLogicalDate())));
+    if(showWeeklyReviewReadOnly)appendSundayReadOnlyBanner(body);
   } else {
     // 저녁 공통 틀: [그날의 특수 배너] → 링 → 리듬배너 → (브리핑) → 독서카드
     // 네 갈래(말일/일요일/수요일/평일) 모두 이 순서를 그대로 따름 — 특수 배너만 가변
@@ -2088,8 +2088,6 @@ function renderHomeBody(section){
       body.appendChild(midBanner);
     } else if(isSundayNight2){
       appendSundayGenerateBanner(body);
-    } else if(showWeeklyReviewReadOnly){
-      appendSundayReadOnlyBanner(body);
     }
     const isNight2=getSubSection()==='night_2';
     if(!isNight2){
@@ -2113,6 +2111,7 @@ function renderHomeBody(section){
       body.appendChild(makeLabel('이달의 플리'));
       body.appendChild(makePlaylistMiniCard());
     }
+    if(showWeeklyReviewReadOnly)appendSundayReadOnlyBanner(body);
   }
 }
 
