@@ -6472,7 +6472,11 @@ function makeTodayQuoteCard(){
   const book=getBooks().find(b=>b.cid===q.bookCid);
   const wrap=document.createElement('div');wrap.className='today-quote-wrap';
   wrap.innerHTML=`<div class="today-quote-card" onclick="openReading()">
-    <div class="today-quote-title"><i class="ti ti-quote" aria-hidden="true"></i>오늘의 문장</div>
+    <div class="today-quote-title"><i class="ti ti-quote" aria-hidden="true"></i>오늘의 문장
+      <span onclick="event.stopPropagation();shareQuoteCard('${q.cid}')" title="공유 이미지" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:#8878ab;opacity:0.7;margin-left:auto;">
+        <i class="ti ti-photo-square-rounded" style="font-size:11px;" aria-hidden="true"></i>
+      </span>
+    </div>
     <div class="today-quote-text">${escapeHtml(q.text)}</div>
     <div class="today-quote-footer"><span class="today-quote-source">${escapeHtml(book?book.title:'')}</span></div>
   </div>`;
@@ -10142,7 +10146,7 @@ function renderRdQuotes(){
       </div>
       <span style="position:absolute;right:8px;bottom:6px;display:flex;align-items:center;gap:3px;">
         <span onclick="shareQuoteCard('${q.cid}')" title="공유 이미지" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:#8878ab;opacity:0.7;">
-          <i class="ti ti-share" style="font-size:11px;" aria-hidden="true"></i>
+          <i class="ti ti-photo-square-rounded" style="font-size:11px;" aria-hidden="true"></i>
         </span>
         <span onclick="toggleQuoteCommentEditor('${q.cid}')" title="${q.comment?'코멘트 수정':'코멘트 남기기'}" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:${q.comment?'#fff':'#8878ab'};background:${q.comment?'rgba(140,120,180,0.85)':'transparent'};opacity:${q.comment?'1':'0.7'};">
           <i class="ti ti-message-circle" style="font-size:11px;" aria-hidden="true"></i>
@@ -10249,7 +10253,7 @@ function renderDoneBookQuotes(bookCid){
       </div>
       <span style="position:absolute;right:8px;bottom:6px;display:flex;align-items:center;gap:3px;">
         <span onclick="event.stopPropagation();shareQuoteCard('${q.cid}')" title="공유 이미지" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:#8878ab;opacity:0.7;">
-          <i class="ti ti-share" style="font-size:11px;" aria-hidden="true"></i>
+          <i class="ti ti-photo-square-rounded" style="font-size:11px;" aria-hidden="true"></i>
         </span>
         <span onclick="event.stopPropagation();toggleQuoteCommentEditor('${q.cid}')" title="${q.comment?'코멘트 수정':'코멘트 남기기'}" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:${q.comment?'#fff':'#8878ab'};background:${q.comment?'rgba(140,120,180,0.85)':'transparent'};opacity:${q.comment?'1':'0.7'};">
           <i class="ti ti-message-circle" style="font-size:11px;" aria-hidden="true"></i>
@@ -10731,7 +10735,7 @@ function renderReadingCalDayDetailHtml(dk,dayLogs,bookMap){
     const timeText=sessionRanges.length?`${sessionRanges.join(', ')} (총 ${totalMin}분)`:(r.seconds>0?Math.round(r.seconds/60)+'분':'');
     const metaLine=[progText,amountText,timeText].filter(Boolean).join(' · ');
     const posterHtml=cover?`<img src="${cover}" style="width:32px;height:44px;border-radius:5px;object-fit:cover;flex-shrink:0;" />`:`<div style="width:32px;height:44px;border-radius:5px;background:var(--card2);flex-shrink:0;display:flex;align-items:center;justify-content:center;"><i class="ti ti-book ico-13" style="color:var(--tm);" aria-hidden="true"></i></div>`;
-    const shareBtn=`<span onclick="event.stopPropagation();openTodayReadingShareModal('${r.book_cid}','${r.unit}',${r.percent_after!=null?r.percent_after:'null'},${r.pages_after!=null?r.pages_after:'null'},${r.seconds||0},'${dk}')" title="공유 이미지" style="cursor:pointer;color:var(--ts);opacity:0.75;flex-shrink:0;padding:4px;"><i class="ti ti-share" style="font-size:14px;" aria-hidden="true"></i></span>`;
+    const shareBtn=`<span onclick="event.stopPropagation();openTodayReadingShareModal('${r.book_cid}','${r.unit}',${r.percent_after!=null?r.percent_after:'null'},${r.pages_after!=null?r.pages_after:'null'},${r.seconds||0},'${dk}')" title="공유 이미지" style="cursor:pointer;color:var(--ts);opacity:0.75;flex-shrink:0;padding:4px;"><i class="ti ti-photo-square-rounded" style="font-size:14px;" aria-hidden="true"></i></span>`;
     return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;">
       ${posterHtml}
       <div style="flex:1;min-width:0;">
