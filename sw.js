@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260810-07-share-icon-v2';
+const CACHE = 'iikoto-v20260810-08-day-detail-unify';
 const ASSETS = [
   './',
   './index.html'
