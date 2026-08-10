@@ -8954,7 +8954,7 @@ function buildDayDetailHtml(dk){
     items+=`<div class="cal-detail-row"><div class="cal-detail-icon"><i class="ti ti-moon-stars sub-tm-13" aria-hidden="true"></i></div><span class="cal-detail-text" style="color:var(--ts);">${sleep.sleep||'--'} 취침 · ${sleep.wake||'--'} 기상${dur}</span></div>`;
   }
   if(doneTodos.length>0){
-    items+=`<div class="cal-detail-row" style="cursor:pointer;" onclick="calShowTodos('${dk}')"><div class="cal-detail-icon"><i class="ti ti-check" style="font-size:12px;color:var(--tm);" aria-hidden="true"></i></div><span class="cal-detail-text" id="cal-todo-summary-${dk}">완료한 일 ${doneTodos.length}개 ›</span></div>
+    items+=`<div class="cal-detail-row" style="cursor:pointer;" onclick="calShowTodos('${dk}')"><div class="cal-detail-icon"><i class="ti ti-check" style="font-size:12px;color:var(--tm);" aria-hidden="true"></i></div><span class="cal-detail-text" id="cal-todo-summary-${dk}">완료한 일 ${doneTodos.length}개 <i class="ti ti-chevron-right" style="font-size:11px;vertical-align:-1px;" aria-hidden="true"></i></span></div>
       <div id="cal-todo-rows-${dk}" style="display:none;"></div>`;
   }
   const MAX=3;const total=allMemos.length;
@@ -9007,11 +9007,11 @@ function calShowTodos(dk){
   const isOpen=rowsWrap.style.display!=='none';
   if(isOpen){
     rowsWrap.style.display='none';
-    if(summaryEl)summaryEl.textContent=`완료한 일 ${todos.length}개 ›`;
+    if(summaryEl)summaryEl.innerHTML=`완료한 일 ${todos.length}개 <i class="ti ti-chevron-right" style="font-size:11px;vertical-align:-1px;" aria-hidden="true"></i>`;
   }else{
     rowsWrap.innerHTML=todos.map(t=>`<div class="cal-detail-row" style="padding-left:20px;"><span class="cal-detail-text">${t.text}</span></div>`).join('');
     rowsWrap.style.display='block';
-    if(summaryEl)summaryEl.textContent=`완료한 일 ${todos.length}개 ⌄`;
+    if(summaryEl)summaryEl.innerHTML=`완료한 일 ${todos.length}개 <i class="ti ti-chevron-down" style="font-size:11px;vertical-align:-1px;" aria-hidden="true"></i>`;
   }
 }
 function calShowAll(dk){
