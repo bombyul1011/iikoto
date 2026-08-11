@@ -1817,15 +1817,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       </div>
     </div>
     <div>
-      <div class="settings-slbl">[임시] 시간대 팝업 테스트</div>
-      <div class="settings-card">
-        <div class="settings-item" style="flex-direction:column;gap:8px;align-items:flex-start;">
-          <span style="font-size:11px;color:var(--tm);">미리알림 자동등록 팝업을 시간 조건 없이 바로 열어봅니다. 검증 끝나면 이 섹션은 삭제 예정.</span>
-          <button onclick="showReminderShortcutPopup()" style="width:100%;padding:9px;border-radius:10px;border:1px solid var(--div);background:var(--card);color:var(--tp);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">미리알림 팝업 테스트</button>
-        </div>
-      </div>
-    </div>
-    <div>
       <div class="settings-card mr-accordion" id="data-recovery-accordion">
         <div class="settings-slbl mr-accordion-toggle" onclick="this.closest('.mr-accordion').classList.toggle('open')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;margin-bottom:0;">
           <span>데이터 복구</span>
@@ -4860,10 +4851,12 @@ function syncOnTabEnter(){
 
 // ── TIME SLOT POPUP (시간대 리마인더 팝업) ──
 // 공용 열기/닫기. innerHtml만 넘기면 .tsp-box 안을 채우고 오버레이를 켠다.
-function openTimeSlotPopup(innerHtml){
+// Bareonbatang 로딩을 먼저 기다린 뒤 내용을 채워서, 기본 폰트로 잠깐 그려졌다가 바뀌는 깜빡임(FOUT)을 없앤다.
+async function openTimeSlotPopup(innerHtml){
   const box=document.getElementById('tsp-box');
   const ov=document.getElementById('tsp-overlay');
   if(!box||!ov)return;
+  await _ensureBareonbatangLoaded();
   box.innerHTML=innerHtml;
   ov.classList.add('on');
 }
