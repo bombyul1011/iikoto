@@ -256,6 +256,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 @keyframes rdCalFadeSlide{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
 .rdcal-detail-in{animation:rdCalFadeSlide .28s ease;}
 .mr-sec-title{font-size:11px;color:var(--tm);letter-spacing:.10em;text-transform:uppercase;margin-bottom:11px;}
+.cmr-review-icon{color:var(--tm);opacity:0.65;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center;}
+.cmr-review-box{font-size:12px;color:var(--tp);line-height:1.6;background:rgba(210,180,160,0.14);border-radius:10px;padding:9px 11px;margin:0 0 7px 46px;display:none;}
+.cmr-review-box.on{display:block;}
 .sheet-loading-msg{text-align:center;color:var(--tm);padding:20px 0;}
 .ico-13{font-size:13px;vertical-align:-1px;}
 .ico-12{font-size:12px;vertical-align:-1px;}
@@ -3013,17 +3016,26 @@ function loadContentMonthlyReportContent(){
       // 음악은 항상 status='done'으로 저장되므로 stopped/watching 조건에 자연히 안 걸림 — 별도 예외 불필요
       const statusHtml=c.status==='stopped'?`<span style="color:var(--tm);font-size:11px;">중단</span>`:(c.status==='watching'?`<span style="color:var(--tm);font-size:11px;">진행중</span>`:'');
       const posterHtml=c.poster?`<img src="${c.poster}" style="width:36px;height:36px;border-radius:8px;object-fit:cover;flex-shrink:0;" />`:`<div style="width:36px;height:36px;border-radius:8px;background:${meta.color};flex-shrink:0;display:flex;align-items:center;justify-content:center;"><i class="ti ${meta.icon}" style="font-size:15px;color:#fff;" aria-hidden="true"></i></div>`;
+      const reviewId=c.cid||('t'+(c.created||0));
+      const reviewIconHtml=c.review?`<span class="cmr-review-icon" onclick="toggleCmrReview('${reviewId}')" title="코멘트 보기"><i class="ti ti-message-circle" style="font-size:13px;" aria-hidden="true"></i></span>`:'';
+      const reviewBoxHtml=c.review?`<div class="cmr-review-box" id="cmr-review-${reviewId}">${escapeHtml(c.review)}</div>`:'';
       return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;">
         ${posterHtml}
-        <div style="flex:1;min-width:0;font-size:13px;color:var(--tp);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.title}</div>
+        <div style="flex:1;min-width:0;font-size:13px;color:var(--tp);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:5px;">
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.title}</span>${reviewIconHtml}
+        </div>
         ${(starsHtml||statusHtml)?`<div style="flex-shrink:0;text-align:right;">${starsHtml}${statusHtml}</div>`:''}
-      </div>`;
+      </div>${reviewBoxHtml}`;
     }).join('');
     return `<div class="mr-card" style="margin-bottom:10px;">
       <div class="mr-sec-title"><i class="ti ${meta.icon} ico-12" aria-hidden="true"></i> ${CONTENT_CAT_LABEL[cat]}</div>
       ${items}
     </div>`;
   }).join('');
+}
+function toggleCmrReview(id){
+  const box=document.getElementById('cmr-review-'+id);
+  if(box)box.classList.toggle('on');
 }
 
 // ── 월 선택 칩 공용 렌더러 (주간목표 모아보기, 콘텐츠 모아보기 등에서 공유) ──
