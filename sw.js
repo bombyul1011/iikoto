@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260811-05-timeslot-popups';
+const CACHE = 'iikoto-v20260811-07-popup-notime-clicknav';
 const ASSETS = [
   './',
   './index.html'

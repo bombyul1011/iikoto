@@ -297,13 +297,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .tsp-box{
   width:250px;padding:26px 22px 22px;border-radius:20px;text-align:center;
   background-color:transparent;border:1.6px solid transparent;
-  background-image:linear-gradient(var(--modal),var(--modal)),linear-gradient(135deg,rgba(245,210,140,0.95),rgba(250,225,170,0.85),rgba(232,164,187,0.85),rgba(245,210,140,0.95));
+  background-image:var(--modal),linear-gradient(135deg,rgba(245,210,140,0.95),rgba(250,225,170,0.85),rgba(232,164,187,0.85),rgba(245,210,140,0.95));
   background-origin:border-box;background-clip:padding-box,border-box;
   background-size:100% 100%,300% 300%;
   animation:bannerShine 4s ease infinite;
   box-shadow:0 12px 32px rgba(90,64,64,.16);
 }
-[data-theme="glass"] .tsp-box{background-image:linear-gradient(var(--modal),var(--modal)),linear-gradient(135deg,rgba(245,210,140,0.95),rgba(250,225,170,0.85),rgba(232,164,187,0.85),rgba(245,210,140,0.95));}
+[data-theme="glass"] .tsp-box{background-image:var(--modal),linear-gradient(135deg,rgba(245,210,140,0.95),rgba(250,225,170,0.85),rgba(232,164,187,0.85),rgba(245,210,140,0.95));}
 .tsp-slot{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--acc);margin-bottom:10px;}
 .tsp-msg{font-family:'Bareonbatang',serif;font-size:16px;line-height:1.65;color:var(--tp);font-weight:400;}
 .tsp-sub{font-size:11px;color:var(--tm);margin-top:10px;}
@@ -4881,21 +4881,19 @@ function runReminderShortcut(){
 }
 function showReminderShortcutPopup(){
   const html=`
-    <div class="tsp-slot">저녁 · 23:00</div>
     <div class="tsp-msg">내일 할일을<br>미리 챙겨볼까요</div>
     <button class="tsp-btn" onclick="runReminderShortcut()">미리 알림에 등록하기</button>
   `;
   openTimeSlotPopup(html);
 }
 
-// ── 19시 팝업: 저녁 남은 투두 안내 (0개면 인사) ──
+// ── 19시 팝업: 저녁 남은 투두 안내 (0개면 인사) — 클릭 시 오늘탭으로 이동 ──
 function showEveningTodoPopup(){
   const dk=dateKey(currentDate);
   const remain=getTodos(dk).filter(t=>!t.done);
   if(!remain.length){
     openTimeSlotPopup(`
-      <div class="tsp-slot">저녁 · 19:00</div>
-      <div class="tsp-msg">오늘 할일을<br>모두 마쳤어요</div>
+      <div class="tsp-msg" onclick="closeTimeSlotPopup();switchToTab('daily');" style="cursor:pointer;">오늘 할일을<br>모두 마쳤어요</div>
       <div class="tsp-sub">수고하셨어요</div>
     `);
     return;
@@ -4905,20 +4903,22 @@ function showEveningTodoPopup(){
   const listHtml=shown.map(t=>`<div class="tsp-todo-item"><span class="tsp-todo-dot"></span>${escapeHtml(t.text||'')}</div>`).join('')
     +(moreCount>0?`<div class="tsp-todo-more">외 ${moreCount}개</div>`:'');
   openTimeSlotPopup(`
-    <div class="tsp-slot">저녁 · 19:00</div>
-    <div class="tsp-msg">오늘 할일이<br>${remain.length}개 남았어요</div>
+    <div class="tsp-msg" onclick="closeTimeSlotPopup();switchToTab('daily');" style="cursor:pointer;">오늘 할일이<br>${remain.length}개 남았어요</div>
     <div class="tsp-todo-list">${listHtml}</div>
   `);
 }
 
-// ── 20시 팝업: 저녁 학습 세션 리마인드 (오늘 이미 했으면 안 뜸) ──
+// ── 20시 팝업: 채움 코너(저녁 학습) 리마인드 — 오늘 이미 시작했으면 안 뜸, 클릭 시 채움 코너로 이동 ──
 function showEveningLearnPopup(){
   const dk=dateKey(getLogicalDate());
   const doneToday=getEveningLearnLog().some(l=>l.dk===dk);
   if(doneToday)return; // 이미 했으면 아예 띄우지 않음
+  const state=getEveningLearnState(dk);
+  // 이미 뽑아둔 주제(선택만 하고 시작 전)가 있으면 미리보기로 보여줌
+  const preview=state.selected?`<div class="tsp-sub">오늘의 주제 · ${escapeHtml(state.selected.topic)}</div>`:'';
   openTimeSlotPopup(`
-    <div class="tsp-slot">저녁 · 20:00</div>
-    <div class="tsp-msg">오늘의 배움을<br>시작해볼까요</div>
+    <div class="tsp-msg" onclick="closeTimeSlotPopup();openChaeum();" style="cursor:pointer;">오늘의 채움을<br>시작해볼까요</div>
+    ${preview}
   `);
 }
 
@@ -12168,7 +12168,7 @@ async function initSync(){
   if(document.getElementById('v-monthly')&&document.getElementById('v-monthly').classList.contains('on'))loadMonthly();
 }
 setTimeout(initSync, 500);
-setTimeout(maybeShowTimeSlotPopup, 800);
+setTimeout(maybeShowTimeSlotPopup, 2400);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(maybeShowTimeSlotPopup,400);});
 
 // ── contents 테이블 client_id 마이그레이션 (1회성)
