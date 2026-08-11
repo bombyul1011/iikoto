@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260811-03-popup-zindex-fix';
+const CACHE = 'iikoto-v20260811-05-timeslot-popups';
 const ASSETS = [
   './',
   './index.html'

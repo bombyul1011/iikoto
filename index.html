@@ -297,13 +297,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .tsp-box{
   width:250px;padding:26px 22px 22px;border-radius:20px;text-align:center;
   background-color:transparent;border:1.6px solid transparent;
-  background-image:linear-gradient(var(--card),var(--card)),linear-gradient(135deg,rgba(245,210,140,0.95),rgba(250,225,170,0.85),rgba(232,164,187,0.85),rgba(245,210,140,0.95));
+  background-image:linear-gradient(var(--modal),var(--modal)),linear-gradient(135deg,rgba(245,210,140,0.95),rgba(250,225,170,0.85),rgba(232,164,187,0.85),rgba(245,210,140,0.95));
   background-origin:border-box;background-clip:padding-box,border-box;
   background-size:100% 100%,300% 300%;
   animation:bannerShine 4s ease infinite;
   box-shadow:0 12px 32px rgba(90,64,64,.16);
 }
-[data-theme="glass"] .tsp-box{background-image:linear-gradient(var(--glass-chip-bg),var(--glass-chip-bg)),linear-gradient(135deg,rgba(245,210,140,0.95),rgba(250,225,170,0.85),rgba(232,164,187,0.85),rgba(245,210,140,0.95));}
+[data-theme="glass"] .tsp-box{background-image:linear-gradient(var(--modal),var(--modal)),linear-gradient(135deg,rgba(245,210,140,0.95),rgba(250,225,170,0.85),rgba(232,164,187,0.85),rgba(245,210,140,0.95));}
 .tsp-slot{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--acc);margin-bottom:10px;}
 .tsp-msg{font-family:'Bareonbatang',serif;font-size:16px;line-height:1.65;color:var(--tp);font-weight:400;}
 .tsp-sub{font-size:11px;color:var(--tm);margin-top:10px;}
@@ -4886,6 +4886,101 @@ function showReminderShortcutPopup(){
     <button class="tsp-btn" onclick="runReminderShortcut()">미리 알림에 등록하기</button>
   `;
   openTimeSlotPopup(html);
+}
+
+// ── 19시 팝업: 저녁 남은 투두 안내 (0개면 인사) ──
+function showEveningTodoPopup(){
+  const dk=dateKey(currentDate);
+  const remain=getTodos(dk).filter(t=>!t.done);
+  if(!remain.length){
+    openTimeSlotPopup(`
+      <div class="tsp-slot">저녁 · 19:00</div>
+      <div class="tsp-msg">오늘 할일을<br>모두 마쳤어요</div>
+      <div class="tsp-sub">수고하셨어요</div>
+    `);
+    return;
+  }
+  const shown=remain.slice(0,3);
+  const moreCount=remain.length-shown.length;
+  const listHtml=shown.map(t=>`<div class="tsp-todo-item"><span class="tsp-todo-dot"></span>${escapeHtml(t.text||'')}</div>`).join('')
+    +(moreCount>0?`<div class="tsp-todo-more">외 ${moreCount}개</div>`:'');
+  openTimeSlotPopup(`
+    <div class="tsp-slot">저녁 · 19:00</div>
+    <div class="tsp-msg">오늘 할일이<br>${remain.length}개 남았어요</div>
+    <div class="tsp-todo-list">${listHtml}</div>
+  `);
+}
+
+// ── 20시 팝업: 저녁 학습 세션 리마인드 (오늘 이미 했으면 안 뜸) ──
+function showEveningLearnPopup(){
+  const dk=dateKey(getLogicalDate());
+  const doneToday=getEveningLearnLog().some(l=>l.dk===dk);
+  if(doneToday)return; // 이미 했으면 아예 띄우지 않음
+  openTimeSlotPopup(`
+    <div class="tsp-slot">저녁 · 20:00</div>
+    <div class="tsp-msg">오늘의 배움을<br>시작해볼까요</div>
+  `);
+}
+
+// ── 09시 팝업: 절기 당일 알림 (당일만, 전날 예고는 제외) ──
+function showSolarTermPopup(){
+  const info=getSolarTermLine();
+  if(!info||info.isEve)return; // 당일이 아니면 띄우지 않음
+  openTimeSlotPopup(`
+    <div class="tsp-slot">${info.term.name} · ${info.term.hanja}</div>
+    <div class="tsp-msg">${escapeHtml(info.line)}</div>
+  `);
+}
+
+// ── 00:30 팝업: 새벽 수면 유도 + 씨앗 메모 입력 ──
+// 자정을 넘긴 물리적 시각이지만, 저장되는 날짜는 그 이전 날(자정 전 날짜)로 고정.
+function _dawnPopupTargetDk(){
+  const d=new Date();
+  d.setDate(d.getDate()-1);
+  return dateKey(d);
+}
+function submitDawnSeedMemo(){
+  const inp=document.getElementById('tsp-seed-inp');
+  const text=inp?inp.value.trim():'';
+  if(!text)return;
+  const dk=_dawnPopupTargetDk();
+  const memos=getMemos(dk);
+  const n=new Date();
+  memos.push({text,time:`${pad(n.getHours())}:${pad(n.getMinutes())}`,created:Date.now(),cid:genCid(),type:'seed'});
+  saveMemos(dk,memos);
+  closeTimeSlotPopup();
+  showToast('씨앗으로 남겼어요');
+}
+function showDawnSleepPopup(){
+  openTimeSlotPopup(`
+    <div class="tsp-msg">내일이<br>기다리고 있어요</div>
+    <div class="tsp-seed-wrap">
+      <input class="tsp-seed-inp" id="tsp-seed-inp" placeholder="스치는 생각이 있다면">
+      <div class="tsp-seed-submit" onclick="submitDawnSeedMemo()"><i class="ti ti-diamond" aria-hidden="true"></i></div>
+    </div>
+  `);
+}
+
+// ── 시간대 팝업 스케줄러 ──
+// 앱을 그 시각 구간에 "처음" 켰을 때 1회만 뜨도록, 날짜+슬롯ID 조합을 localStorage에 남겨 중복 노출을 막는다.
+// 우선순위: 미입력/세션 리마인더류가 순수 문구형보다 먼저 오도록 시간 슬롯별로 하나씩만 배치.
+const TIME_SLOT_POPUPS=[
+  {id:'dawn-sleep',startMin:0*60+30,endMin:4*60,fn:showDawnSleepPopup},
+  {id:'solar-term',startMin:9*60,endMin:9*60+59,fn:showSolarTermPopup},
+  {id:'evening-todo',startMin:19*60,endMin:19*60+59,fn:showEveningTodoPopup},
+  {id:'evening-learn',startMin:20*60,endMin:20*60+59,fn:showEveningLearnPopup},
+  {id:'reminder-shortcut',startMin:23*60,endMin:23*60+59,fn:showReminderShortcutPopup}
+];
+function maybeShowTimeSlotPopup(){
+  const now=new Date();
+  const nowMin=now.getHours()*60+now.getMinutes();
+  const dk=dateKey(now);
+  const slot=TIME_SLOT_POPUPS.find(s=>nowMin>=s.startMin&&nowMin<=s.endMin);
+  if(!slot)return;
+  const seenKey='tsp_seen_'+dk+'_'+slot.id;
+  if(S.get(seenKey))return;
+  S.set(seenKey,true);
+  slot.fn();
 }
 
 // ── THEME
@@ -12073,6 +12168,8 @@ async function initSync(){
   if(document.getElementById('v-monthly')&&document.getElementById('v-monthly').classList.contains('on'))loadMonthly();
 }
 setTimeout(initSync, 500);
+setTimeout(maybeShowTimeSlotPopup, 800);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(maybeShowTimeSlotPopup,400);});
 
 // ── contents 테이블 client_id 마이그레이션 (1회성)
 // Supabase에 contents.client_id 컬럼 + (month_key,client_id) 유니크 제약을 추가한 뒤,
