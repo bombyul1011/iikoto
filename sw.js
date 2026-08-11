@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260810-09-chevron-icon-fix';
+const CACHE = 'iikoto-v20260811-02-reminder-popup-test';
 const ASSETS = [
   './',
   './index.html'

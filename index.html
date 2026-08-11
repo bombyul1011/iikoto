@@ -291,6 +291,31 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .weekly-review-banner-title{font-size:13px;font-weight:700;color:rgba(65,125,70,0.95);letter-spacing:0.05em;margin-bottom:4px;}
 .weekly-review-banner-sub{font-size:11.5px;color:rgba(100,140,75,0.80);display:flex;align-items:center;justify-content:space-between;}
 @keyframes bannerShine{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+/* ── TIME SLOT POPUP (시간대 리마인더 팝업) ── */
+.tsp-overlay{display:none;position:fixed;inset:0;z-index:960;background:rgba(30,20,20,0.18);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);align-items:center;justify-content:center;}
+.tsp-overlay.on{display:flex;}
+.tsp-box{
+  width:250px;padding:26px 22px 22px;border-radius:20px;text-align:center;
+  background-color:transparent;border:1.6px solid transparent;
+  background-image:linear-gradient(var(--card),var(--card)),linear-gradient(135deg,rgba(245,210,140,0.95),rgba(250,225,170,0.85),rgba(232,164,187,0.85),rgba(245,210,140,0.95));
+  background-origin:border-box;background-clip:padding-box,border-box;
+  background-size:100% 100%,300% 300%;
+  animation:bannerShine 4s ease infinite;
+  box-shadow:0 12px 32px rgba(90,64,64,.16);
+}
+[data-theme="glass"] .tsp-box{background-image:linear-gradient(var(--glass-chip-bg),var(--glass-chip-bg)),linear-gradient(135deg,rgba(245,210,140,0.95),rgba(250,225,170,0.85),rgba(232,164,187,0.85),rgba(245,210,140,0.95));}
+.tsp-slot{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--acc);margin-bottom:10px;}
+.tsp-msg{font-family:'Bareonbatang',serif;font-size:16px;line-height:1.65;color:var(--tp);font-weight:400;}
+.tsp-sub{font-size:11px;color:var(--tm);margin-top:10px;}
+.tsp-todo-list{margin-top:16px;border-top:1px solid var(--div);padding-top:14px;text-align:left;display:flex;flex-direction:column;gap:8px;}
+.tsp-todo-item{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ts);}
+.tsp-todo-dot{width:5px;height:5px;border-radius:50%;background:var(--acc);flex-shrink:0;}
+.tsp-todo-more{font-size:11px;color:var(--tm);padding-left:13px;}
+.tsp-btn{margin-top:16px;width:100%;padding:10px;border-radius:12px;border:none;background:var(--acc-soft);color:var(--acc);font-family:'DM Sans',sans-serif;font-size:12.5px;font-weight:500;cursor:pointer;}
+.tsp-seed-wrap{margin-top:16px;display:flex;align-items:center;gap:6px;border-top:1px solid var(--div);padding-top:14px;}
+.tsp-seed-inp{flex:1;background:none;border:none;border-bottom:1px dashed var(--div);outline:none;font-size:12.5px;color:var(--tp);padding:4px 2px;font-family:'DM Sans',sans-serif;}
+.tsp-seed-inp::placeholder{color:var(--tm);}
+.tsp-seed-submit{width:26px;height:26px;border-radius:50%;background:var(--acc-soft);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--acc);font-size:13px;cursor:pointer;flex-shrink:0;}
 .todo-time-sel{display:flex;gap:6px;margin:10px 0 4px;}
 .todo-time-sel button{flex:1;padding:6px 0;border-radius:10px;border:1px solid var(--card-b);background:var(--card);font-size:11.5px;color:var(--tm);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;}
 #reserve-date-modal .ts-morning,
@@ -1792,6 +1817,15 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       </div>
     </div>
     <div>
+      <div class="settings-slbl">[임시] 시간대 팝업 테스트</div>
+      <div class="settings-card">
+        <div class="settings-item" style="flex-direction:column;gap:8px;align-items:flex-start;">
+          <span style="font-size:11px;color:var(--tm);">미리알림 자동등록 팝업을 시간 조건 없이 바로 열어봅니다. 검증 끝나면 이 섹션은 삭제 예정.</span>
+          <button onclick="showReminderShortcutPopup()" style="width:100%;padding:9px;border-radius:10px;border:1px solid var(--div);background:var(--card);color:var(--tp);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">미리알림 팝업 테스트</button>
+        </div>
+      </div>
+    </div>
+    <div>
       <div class="settings-card mr-accordion" id="data-recovery-accordion">
         <div class="settings-slbl mr-accordion-toggle" onclick="this.closest('.mr-accordion').classList.toggle('open')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;margin-bottom:0;">
           <span>데이터 복구</span>
@@ -1817,6 +1851,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       </div>
     </div>
   </div>
+</div>
+<!-- TIME SLOT POPUP (시간대 리마인더 팝업) -->
+<div class="tsp-overlay" id="tsp-overlay" onclick="if(event.target===this)closeTimeSlotPopup();">
+  <div class="tsp-box" id="tsp-box"></div>
 </div>
 <!-- MARKDOWN BACKUP MODAL -->
 <div class="modal-ov" id="pdf-modal" onclick="closeModal('pdf-modal',event)">
@@ -3850,6 +3888,7 @@ function goHome(fromSwipe){
   document.querySelectorAll('.vtab').forEach(t=>t.classList.remove('on'));
   _todoPartModeIdx=-1;
   renderHome();
+  syncOnTabEnter();
 }
 let _todoPartModeIdx=-1;
 
@@ -4798,6 +4837,7 @@ async function syncAll(){
   ]);
   loadDaily();
   if(document.getElementById('v-weekly')&&document.getElementById('v-weekly').classList.contains('on'))loadWeekly();
+  if(document.getElementById('v-monthly')&&document.getElementById('v-monthly').classList.contains('on'))loadMonthly();
   if(_rhythmTrackEl&&document.body.contains(_rhythmTrackEl))refreshRhythmTrack();
   // loadDaily()가 다시 그리지 못하는 새벽 리캡 카드(어제 투두/습관/수면 요약 등)를 최신 데이터로 교체
   const oldDawnCard=document.getElementById('dawn-recap-card');
@@ -4807,6 +4847,46 @@ async function syncAll(){
 }
 window.addEventListener('online',()=>syncAll());
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
+// 탭 전환(같은 화면 안에서 오늘↔주간↔월간↔홈 이동) 시에도 최신 서버 데이터 반영 —
+// PC/모바일 번갈아 사용 시 다른 기기에서 바꾼 값이 탭 이동만으로 보이도록.
+// 8초 debounce로 연속 탭 클릭 시 요청 폭주 방지.
+let _lastTabSync=0;
+function syncOnTabEnter(){
+  const now=Date.now();
+  if(now-_lastTabSync<8000)return;
+  _lastTabSync=now;
+  if(navigator.onLine)syncAll();
+}
+
+// ── TIME SLOT POPUP (시간대 리마인더 팝업) ──
+// 공용 열기/닫기. innerHtml만 넘기면 .tsp-box 안을 채우고 오버레이를 켠다.
+function openTimeSlotPopup(innerHtml){
+  const box=document.getElementById('tsp-box');
+  const ov=document.getElementById('tsp-overlay');
+  if(!box||!ov)return;
+  box.innerHTML=innerHtml;
+  ov.classList.add('on');
+}
+function closeTimeSlotPopup(){
+  const ov=document.getElementById('tsp-overlay');
+  if(ov)ov.classList.remove('on');
+}
+
+// ── 23시 팝업: 내일 할일 미리알림 자동등록 (단축어 연동) ──
+// 단축어 쪽 "목록에서 선택" 단계를 없앤 자동화 버전 이름 그대로 사용.
+const REMINDER_SHORTCUT_NAME='이이코토 미리알림 (자동화)';
+function runReminderShortcut(){
+  location.href='shortcuts://run-shortcut?name='+encodeURIComponent(REMINDER_SHORTCUT_NAME);
+  closeTimeSlotPopup();
+}
+function showReminderShortcutPopup(){
+  const html=`
+    <div class="tsp-slot">저녁 · 23:00</div>
+    <div class="tsp-msg">내일 할일을<br>미리 챙겨볼까요</div>
+    <button class="tsp-btn" onclick="runReminderShortcut()">미리 알림에 등록하기</button>
+  `;
+  openTimeSlotPopup(html);
+}
 
 // ── THEME
 const THEME_COLORS={light:'#fdf0e8',glass:'#f7f4ee'};
@@ -4881,6 +4961,7 @@ function switchToTab(v,direction){
   if(v==='daily')loadDaily();
   else if(v==='weekly')loadWeekly();
   else if(v==='monthly')loadMonthly();
+  syncOnTabEnter();
   // direction이 지정된 경우(스와이프로 전환된 경우)에만 가벼운 페이드+슬라이드 진입 애니메이션 적용.
   // 탭 클릭(direction 없음)은 기존처럼 즉시 전환.
   if(direction){
