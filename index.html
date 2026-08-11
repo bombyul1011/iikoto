@@ -256,6 +256,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 @keyframes rdCalFadeSlide{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
 .rdcal-detail-in{animation:rdCalFadeSlide .28s ease;}
 .mr-sec-title{font-size:11px;color:var(--tm);letter-spacing:.10em;text-transform:uppercase;margin-bottom:11px;}
+.mr-ai-empty{font-size:12px;color:var(--tm);text-align:center;padding:6px 0;}
+.memo-search-empty{text-align:center;color:var(--tm);font-size:12px;padding:20px 2px;}
+/* 설정탭 공용 버튼 — fill(채움)/outline(테두리)/small(축소) 3종, 새 설정 항목에도 재사용 */
+.settings-btn-fill{width:100%;padding:9px;border-radius:10px;border:none;background:var(--acc-soft);color:var(--acc);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;}
+.settings-btn-outline{width:100%;padding:9px;border-radius:10px;border:1px solid var(--div);background:transparent;color:var(--tp);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;}
+.settings-btn-small{width:100%;padding:7px;border-radius:10px;border:1px solid var(--div);background:transparent;color:var(--tm);font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer;}
+.settings-key-inp{margin-bottom:0;font-size:12px;width:100%;font-family:monospace;}
 .cmr-review-icon{color:var(--tm);opacity:0.65;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center;}
 .cmr-review-box{font-size:12px;color:var(--tp);line-height:1.6;background:rgba(210,180,160,0.14);border-radius:10px;padding:9px 11px;margin:0 0 7px 46px;display:none;}
 .cmr-review-box.on{display:block;}
@@ -487,6 +494,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .sheet-item:last-child{border-bottom:none;}
 .sheet-item.del{color:#c05060;}
 .archive-sheet-textarea:focus{border-color:rgba(150,175,120,0.55);}
+.qc-comment-textarea{width:100%;box-sizing:border-box;font-size:11.5px;padding:6px 8px;border-radius:8px;border:1px solid var(--card-b);background:var(--card);color:var(--tp);resize:none;min-height:44px;font-family:inherit;outline:none;}
 .qc-comment-textarea:focus{border-color:rgba(200,176,168,0.65);}
 .modal-ov{position:fixed;inset:0;background:rgba(60,40,35,.22);z-index:9999;display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px);}
 .modal-ov.on{display:flex;}
@@ -1746,20 +1754,18 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div class="settings-item" onclick="openMarkdownBackup()" style="cursor:pointer;"><span class="settings-item-lbl"><i class="ti ti-file-text" style="font-size:15px;color:var(--tp);margin-right:6px;vertical-align:-2px;" aria-hidden="true"></i>일기 백업 (마크다운)</span><i class="ti ti-chevron-right sub-tm-13" aria-hidden="true"></i></div>
         <div class="settings-item" style="flex-direction:column;align-items:flex-start;gap:8px;padding-top:12px;">
           <span class="settings-item-lbl">노션 백업 (베타) · 매달 1일 지난달분</span>
-          <input type="text" id="notion-worker-url-inp" class="modal-inp"
+          <input type="text" id="notion-worker-url-inp" class="modal-inp settings-key-inp"
             placeholder="https://xxxx.workers.dev"
-            style="margin-bottom:0;font-size:12px;width:100%;font-family:monospace;"
             autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-          <input type="text" id="notion-backup-secret-inp" class="modal-inp"
+          <input type="text" id="notion-backup-secret-inp" class="modal-inp settings-key-inp"
             placeholder="Worker에 등록한 백업 비밀키"
-            style="margin-bottom:0;font-size:12px;width:100%;font-family:monospace;"
             autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
           <button onclick="saveNotionBackupConfig()"
-            style="width:100%;padding:9px;border-radius:10px;border:none;background:var(--acc-soft);color:var(--acc);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">
+            class="settings-btn-fill">
             설정 저장
           </button>
           <button onclick="backupMonthToNotion()"
-            style="width:100%;padding:9px;border-radius:10px;border:1px solid var(--div);background:transparent;color:var(--tp);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">
+            class="settings-btn-outline">
             지난달 노션 백업하기
           </button>
           <div id="notion-backup-status" style="font-size:11px;color:var(--tm);"></div>
@@ -1771,16 +1777,15 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="settings-card">
         <div class="settings-item" style="flex-direction:column;align-items:flex-start;gap:8px;padding-bottom:12px;">
           <span class="settings-item-lbl">API 키</span>
-          <input type="text" id="claude-api-key-inp" class="modal-inp"
+          <input type="text" id="claude-api-key-inp" class="modal-inp settings-key-inp"
             placeholder="sk-ant-api03-..."
-            style="margin-bottom:0;font-size:12px;width:100%;font-family:monospace;"
             autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
           <button onclick="saveClaudeKey()"
-            style="width:100%;padding:9px;border-radius:10px;border:none;background:var(--acc-soft);color:var(--acc);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">
+            class="settings-btn-fill">
             저장
           </button>
           <button onclick="clearClaudeKey()"
-            style="width:100%;padding:7px;border-radius:10px;border:1px solid var(--div);background:transparent;color:var(--tm);font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer;">
+            class="settings-btn-small">
             키 삭제
           </button>
         </div>
@@ -1791,7 +1796,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
             style="margin-bottom:0;font-size:12.5px;width:100%;min-height:90px;resize:vertical;line-height:1.6;"
             autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
           <button onclick="saveUserProfile()"
-            style="width:100%;padding:9px;border-radius:10px;border:none;background:var(--acc-soft);color:var(--acc);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">
+            class="settings-btn-fill">
             저장
           </button>
         </div>
@@ -1810,7 +1815,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
             style="margin-bottom:0;font-size:12.5px;width:100%;min-height:110px;resize:vertical;line-height:1.7;"
             autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
           <button onclick="saveEveningTopics()"
-            style="width:100%;padding:9px;border-radius:10px;border:none;background:var(--acc-soft);color:var(--acc);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">
+            class="settings-btn-fill">
             저장
           </button>
         </div>
@@ -1829,11 +1834,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           <div id="data-recovery-last-used" style="font-size:10px;color:var(--tm);padding-top:12px;"></div>
           <div class="settings-item" style="flex-direction:column;gap:8px;align-items:flex-start;padding-top:12px;">
             <span style="font-size:11px;color:var(--tm);">Supabase에서 최근 14일 데이터 강제 복구</span>
-            <button onclick="forceRestoreAll()" style="width:100%;padding:9px;border-radius:10px;border:1px solid var(--div);background:var(--card);color:var(--tp);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">데이터 복구하기</button>
+            <button onclick="forceRestoreAll()" class="settings-btn-outline">데이터 복구하기</button>
           </div>
           <div class="settings-item" style="flex-direction:column;gap:8px;align-items:flex-start;padding-top:12px;">
             <span style="font-size:11px;color:var(--tm);">최근 14일 로컬↔Supabase 개수 비교 (오늘 날짜는 동기화 전이라 다를 수 있어요)</span>
-            <button onclick="checkDataIntegrity()" style="width:100%;padding:9px;border-radius:10px;border:1px solid var(--div);background:transparent;color:var(--tp);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">데이터 무결성 점검</button>
+            <button onclick="checkDataIntegrity()" class="settings-btn-outline">데이터 무결성 점검</button>
             <div id="integrity-check-status" style="font-size:11px;color:var(--tm);line-height:1.6;"></div>
           </div>
         </div>
@@ -3163,13 +3168,13 @@ async function loadMonthlyGoalReportContent(){
 
   const ready=isMonthlyGoalReportReady(y,mo,weeks);
   if(!ready){
-    el.innerHTML=`${weekHtml}<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles ico-12" aria-hidden="true"></i> 이번 달 목표 총평</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">이 달의 목표가 모두 끝나면 정리해드려요</div></div>`;
+    el.innerHTML=`${weekHtml}<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles ico-12" aria-hidden="true"></i> 이번 달 목표 총평</div><div class="mr-ai-empty">이 달의 목표가 모두 끝나면 정리해드려요</div></div>`;
     return;
   }
 
   el.innerHTML=`${weekHtml}<div id="mgr-ai-slot"></div>`;
   const slot=document.getElementById('mgr-ai-slot');
-  slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles ico-12" aria-hidden="true"></i> 이번 달 목표 총평</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">불러오는 중...</div></div>`;
+  slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles ico-12" aria-hidden="true"></i> 이번 달 목표 총평</div><div class="mr-ai-empty">불러오는 중...</div></div>`;
 
   const cacheKey='monthly_goal_report_'+mk;
   let comment=S.get(cacheKey);
@@ -3187,7 +3192,7 @@ async function loadMonthlyGoalReportContent(){
   if(comment){
     slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles ico-12" aria-hidden="true"></i> 이번 달 목표 총평</div><div style="font-size:13px;color:var(--tp);line-height:1.7;padding:2px 0;">${comment}</div></div>`;
   }else{
-    slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles ico-12" aria-hidden="true"></i> 이번 달 목표 총평</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">${getClaudeKey()?'잠시 후 다시 시도해주세요':'설정에서 Claude API 키를 입력하면 분석을 받을 수 있어요'}</div></div>`;
+    slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles ico-12" aria-hidden="true"></i> 이번 달 목표 총평</div><div class="mr-ai-empty">${getClaudeKey()?'잠시 후 다시 시도해주세요':'설정에서 Claude API 키를 입력하면 분석을 받을 수 있어요'}</div></div>`;
   }
 }
 // 이번 달 챌린지 주차들의 원본 목표 텍스트(카테고리 판단용)와, 이미 생성된 주간 코멘트(challenge_review_,
@@ -3288,10 +3293,10 @@ async function loadMonthlyReportContent(){
 
   if(isOngoingMonth){
     // 이 달이 아직 끝나지 않음: 말일 저녁까지는 종합 리포트 없이 안내만
-    slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles ico-12" aria-hidden="true"></i> 이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">이 달이 끝나면 전체를 정리해드릴게요</div></div>`;
+    slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles ico-12" aria-hidden="true"></i> 이번 달 한눈에</div><div class="mr-ai-empty">이 달이 끝나면 전체를 정리해드릴게요</div></div>`;
     return;
   }
-  slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles ico-12" aria-hidden="true"></i> 이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">불러오는 중...</div></div>`;
+  slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles ico-12" aria-hidden="true"></i> 이번 달 한눈에</div><div class="mr-ai-empty">불러오는 중...</div></div>`;
 
   // 말일 저녁 이후 또는 지난 달: 전체 기간으로 최종 리포트
   const cacheKey='monthly_report_'+mk;
@@ -3319,7 +3324,7 @@ async function loadMonthlyReportContent(){
       ${report.keywords&&report.keywords.length?`<div class="mr-tag-cloud">${report.keywords.map(k=>`<span class="mr-tag">${k}</span>`).join('')}</div>`:''}
     </div>`;
   } else {
-    slot2.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles ico-12" aria-hidden="true"></i> 이번 달 한눈에</div><div style="font-size:12px;color:var(--tm);text-align:center;padding:6px 0;">${getClaudeKey()?'코멘트를 만들 데이터가 부족해요':'아직 준비 중이에요 (다른 기기에서 먼저 열어보시면 여기서도 볼 수 있어요)'}</div></div>`;
+    slot2.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles ico-12" aria-hidden="true"></i> 이번 달 한눈에</div><div class="mr-ai-empty">${getClaudeKey()?'코멘트를 만들 데이터가 부족해요':'아직 준비 중이에요 (다른 기기에서 먼저 열어보시면 여기서도 볼 수 있어요)'}</div></div>`;
   }
 }
 
@@ -7795,7 +7800,7 @@ function openSearch(){
   document.getElementById('msr-end').value='';
   document.getElementById('msr-range-box').style.display='none';
   document.getElementById('msr-toggle-icon').textContent='▸';
-  document.getElementById('memo-search-results').innerHTML='<div style="text-align:center;color:var(--tm);font-size:12px;padding:20px 2px;">검색어를 입력하세요</div>';
+  document.getElementById('memo-search-results').innerHTML='<div class="memo-search-empty">검색어를 입력하세요</div>';
   setTimeout(()=>inp.focus(),150);
 }
 function toggleMemoSearchRange(){
@@ -7825,7 +7830,7 @@ function runMemoSearch(){
   const startD=document.getElementById('msr-start').value;
   const endD=document.getElementById('msr-end').value;
   const resEl=document.getElementById('memo-search-results');
-  if(!q){resEl.innerHTML='<div style="text-align:center;color:var(--tm);font-size:12px;padding:20px 2px;">검색어를 입력하세요</div>';return;}
+  if(!q){resEl.innerHTML='<div class="memo-search-empty">검색어를 입력하세요</div>';return;}
   const results=[];
   for(let i=0;i<localStorage.length;i++){
     const k=localStorage.key(i);
@@ -7838,7 +7843,7 @@ function runMemoSearch(){
     });
   }
   results.sort((a,b)=>(b.dk+(b.time||'')).localeCompare(a.dk+(a.time||'')));
-  if(!results.length){resEl.innerHTML='<div style="text-align:center;color:var(--tm);font-size:12px;padding:20px 2px;">검색 결과가 없어요</div>';return;}
+  if(!results.length){resEl.innerHTML='<div class="memo-search-empty">검색 결과가 없어요</div>';return;}
   resEl.innerHTML=results.map(r=>`<div class="msr-item" onclick="jumpToMemoDate('${r.dk}')"><div class="msr-date">${r.dk}${r.time?' · '+r.time:''}</div><div class="msr-text">${r.text}</div></div>`).join('');
 }
 function jumpToMemoDate(dk){
@@ -7864,7 +7869,7 @@ function openSeedArchive(){
   }
   results.sort((a,b)=>(b.dk+(b.time||'')).localeCompare(a.dk+(a.time||'')));
   if(!results.length){
-    resEl.innerHTML='<div style="text-align:center;color:var(--tm);font-size:12px;padding:20px 2px;">아직 남긴 씨앗이 없어요</div>';
+    resEl.innerHTML='<div class="memo-search-empty">아직 남긴 씨앗이 없어요</div>';
   }else{
     resEl.innerHTML=results.map(r=>`<div class="msr-item" onclick="jumpToMemoDateFromSeed('${r.dk}')"><div class="msr-date"><i class="ti ti-diamond" style="font-size:11px;color:rgba(120,155,160,0.95);margin-right:3px;" aria-hidden="true"></i>${r.dk}${r.time?' · '+r.time:''}</div><div class="msr-text">${r.text}</div></div>`).join('');
   }
@@ -10308,7 +10313,7 @@ function renderRdQuotes(){
       <div class="rd-quote-text">${q.text}</div>
       ${q.comment?`<div class="rd-quote-comment" onclick="toggleQuoteCommentEditor('${q.cid}')" style="font-size:11px;color:#7a9552;margin-top:4px;padding:5px 8px;background:rgba(232,246,220,0.6);border-radius:8px;cursor:pointer;">${q.comment}</div>`:''}
       <div id="qc-editor-${q.cid}" class="qc-editor" style="display:none;margin-top:5px;" onclick="event.stopPropagation();">
-        <textarea class="qc-comment-textarea" style="width:100%;box-sizing:border-box;font-size:11.5px;padding:6px 8px;border-radius:8px;border:1px solid var(--card-b);background:var(--card);color:var(--tp);resize:none;min-height:44px;font-family:inherit;outline:none;" placeholder="이 문장에 대한 감상을 적어보세요">${q.comment||''}</textarea>
+        <textarea class="qc-comment-textarea" placeholder="이 문장에 대한 감상을 적어보세요">${q.comment||''}</textarea>
         <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px;">
           <span onclick="document.getElementById('qc-editor-${q.cid}').style.display='none';" style="font-size:11px;color:var(--tm);cursor:pointer;padding:3px 8px;">취소</span>
           <span onclick="commitQuoteComment('${q.cid}')" style="font-size:11px;color:#6a8a50;cursor:pointer;padding:3px 8px;font-weight:600;">저장</span>
@@ -10415,7 +10420,7 @@ function renderDoneBookQuotes(bookCid){
   listEl.innerHTML=quotes.map(q=>`<div class="rd-quote-item">
       <div class="rd-quote-text">${q.text}</div>
       <div id="qc-editor-${q.cid}" class="qc-editor" style="display:none;margin-top:5px;" onclick="event.stopPropagation();">
-        <textarea class="qc-comment-textarea" style="width:100%;box-sizing:border-box;font-size:11.5px;padding:6px 8px;border-radius:8px;border:1px solid var(--card-b);background:var(--card);color:var(--tp);resize:none;min-height:44px;font-family:inherit;outline:none;" placeholder="이 문장에 대한 감상을 적어보세요">${q.comment||''}</textarea>
+        <textarea class="qc-comment-textarea" placeholder="이 문장에 대한 감상을 적어보세요">${q.comment||''}</textarea>
         <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px;">
           <span onclick="event.stopPropagation();document.getElementById('qc-editor-${q.cid}').style.display='none';" style="font-size:11px;color:var(--tm);cursor:pointer;padding:3px 8px;">취소</span>
           <span onclick="event.stopPropagation();commitDoneQuoteComment('${q.cid}','${bookCid}')" style="font-size:11px;color:#6a8a50;cursor:pointer;padding:3px 8px;font-weight:600;">저장</span>
@@ -10454,7 +10459,7 @@ function renderDoneBookComments(bookCid){
       <div class="rd-quote-text" style="font-size:11px;color:var(--tm);margin-bottom:4px;">${q.text}</div>
       <div class="rd-quote-comment" onclick="event.stopPropagation();toggleQuoteCommentEditor('${q.cid}')" style="font-size:12.5px;color:var(--tp);padding:6px 8px;background:rgba(200,176,168,0.14);border-radius:8px;cursor:pointer;">${q.comment}</div>
       <div id="qc-editor-${q.cid}" class="qc-editor" style="display:none;margin-top:5px;" onclick="event.stopPropagation();">
-        <textarea class="qc-comment-textarea" style="width:100%;box-sizing:border-box;font-size:11.5px;padding:6px 8px;border-radius:8px;border:1px solid var(--card-b);background:var(--card);color:var(--tp);resize:none;min-height:44px;font-family:inherit;outline:none;" placeholder="이 문장에 대한 감상을 적어보세요">${q.comment||''}</textarea>
+        <textarea class="qc-comment-textarea" placeholder="이 문장에 대한 감상을 적어보세요">${q.comment||''}</textarea>
         <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px;">
           <span onclick="event.stopPropagation();document.getElementById('qc-editor-${q.cid}').style.display='none';" style="font-size:11px;color:var(--tm);cursor:pointer;padding:3px 8px;">취소</span>
           <span onclick="event.stopPropagation();commitDoneQuoteComment('${q.cid}','${bookCid}');renderDoneBookComments('${bookCid}')" style="font-size:11px;color:#6a8a50;cursor:pointer;padding:3px 8px;font-weight:600;">저장</span>
