@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260813-1-bookmark-white-bar-height-match';
+const CACHE = 'iikoto-v20260813-2-bookmark-opaque-check';
 const ASSETS = [
   './',
   './index.html'
