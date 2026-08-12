@@ -634,7 +634,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .wave-lbl{font-size:11px;color:var(--tm);margin-top:8px;}
 .pace-habit-pctbar-row{width:76px;margin:8px auto 0;}
 .pace-habit-pctbar-track{height:5px;border-radius:3px;background:rgba(200,176,168,0.15);overflow:hidden;}
-.pace-habit-pctbar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,rgba(248,192,160,0.95) 0%,rgba(252,215,110,0.95) 25%,rgba(150,205,225,0.95) 50%,rgba(190,160,230,0.95) 75%,rgba(244,177,206,0.95) 100%);transition:width .4s;}
+.pace-habit-pctbar-fill{height:100%;border-radius:3px;transition:width .4s;}
 @keyframes waveMove{0%{transform:translateX(0);}100%{transform:translateX(-50px);}}
 .wave-anim{animation:waveMove 3.5s linear infinite;}
 .rc-flow{display:flex;align-items:center;justify-content:center;gap:16px;padding:2px 0;}
@@ -7021,19 +7021,22 @@ function makeAfternoonPaceCard(){
   html+=`<div class="pace-track-wrap" style="margin-bottom:0;"><div class="pace-track-lbl"><span>오늘</span><span>${todayBarDone}개</span></div>
     <div class="pace-track"><div class="pace-fill-t" style="width:${todayBarDone/todayBarTotal*100}%;"></div><div class="pace-bead2" style="left:${todayBarDone/todayBarTotal*100}%;"></div></div></div>`;
 
+  const habitBarGrad=_habitPctBarGradient();
   const habitPctBarHtml=pct=>`<div class="pace-habit-pctbar-row">
-    <div class="pace-habit-pctbar-track"><div class="pace-habit-pctbar-fill" style="width:${pct}%;"></div></div>
+    <div class="pace-habit-pctbar-track"><div class="pace-habit-pctbar-fill" style="width:${pct}%;background:${habitBarGrad};"></div></div>
   </div>`;
 
   html+=`<div class="pace-divider"></div>`;
-  html+=`<div class="wave-title"><i class="ti ti-droplet ico-sz-13" aria-hidden="true"></i> 지난 요일과 오늘</div>`;
+  const DOW_LABELS=['월','화','수','목','금','토','일'];
+  const todayDowLabel=DOW_LABELS[(now.getDay()+6)%7];
+  html+=`<div class="wave-title"><i class="ti ti-droplet ico-sz-13" aria-hidden="true"></i> 지난 ${todayDowLabel}요일과 오늘</div>`;
   html+=`<div class="wave-row">
     <div class="wave-col"><div class="wave-wrap"><svg class="wave-svg" viewBox="0 0 90 90">
       <defs><clipPath id="paceClipLast"><circle cx="45" cy="45" r="40"/></clipPath></defs>
       <circle cx="45" cy="45" r="40" fill="rgba(150,130,110,0.06)"/>
       <g clip-path="url(#paceClipLast)"><path class="wave-anim" d="M0,${90-lastWeekSum/goalTotal*80} Q12.5,${90-lastWeekSum/goalTotal*80-6} 25,${90-lastWeekSum/goalTotal*80} T50,${90-lastWeekSum/goalTotal*80} T75,${90-lastWeekSum/goalTotal*80} T100,${90-lastWeekSum/goalTotal*80} T125,${90-lastWeekSum/goalTotal*80} T150,${90-lastWeekSum/goalTotal*80} V90 H0 Z" fill="rgba(190,180,172,0.85)"/></g>
       <circle cx="45" cy="45" r="40" fill="none" stroke="var(--card-b)" stroke-width="1.5"/>
-    </svg><div class="wave-center"><div class="n">${lastWeekSum}</div></div></div>
+    </svg><div class="wave-center"><div class="n">${Math.round(lastWeekSum*10)/10}</div></div></div>
     <div class="wave-lbl">${habitPctBarHtml(lastDowHabitAvg.pct)}</div></div>
     <div class="wave-col"><div class="wave-wrap"><svg class="wave-svg" viewBox="0 0 90 90">
       <defs><clipPath id="paceClipToday"><circle cx="45" cy="45" r="40"/></clipPath>
@@ -9424,6 +9427,21 @@ function recordMealTime(dk,k){
 const HABIT_COLOR_RGBA={mint:'rgba(140,210,200,0.85)',pink:'rgba(255,150,180,0.80)',sky:'rgba(168,212,232,0.80)',yellow:'rgba(240,200,80,0.80)',rose:'rgba(240,140,140,0.80)',lavender:'rgba(185,165,230,0.80)',peach:'rgba(255,185,140,0.80)',teal:'rgba(100,195,185,0.80)'};
 function getHabitColor(colorKey){
   return HABIT_COLOR_RGBA[colorKey]||'rgba(192,112,128,0.80)';
+}
+// 습관 달성률 가로바용 — 사용자가 지정한 습관 색상들을 부드럽게 섞은 그라디언트.
+// 습관이 4개 미만이면 있는 색만, 5개 이상이면 앞 4개만 사용. 습관이 없으면 기본 무지개로 폴백.
+function _habitPctBarGradient(){
+  const habits=getHabits();
+  if(!habits.length)return 'linear-gradient(90deg,rgba(248,192,160,0.55) 0%,rgba(252,215,110,0.55) 25%,rgba(150,205,225,0.55) 50%,rgba(190,160,230,0.55) 75%,rgba(244,177,206,0.55) 100%)';
+  const colors=habits.slice(0,4).map(h=>{
+    const rgba=HABIT_COLOR_RGBA[h.color]||'rgba(192,112,128,0.80)';
+    // 기존 지정색의 alpha를 낮춰 더 연하고 부드러운 톤으로 조정
+    return rgba.replace(/[\d.]+\)$/,'0.55)');
+  });
+  if(colors.length===1)return colors[0];
+  const step=100/(colors.length-1);
+  const stops=colors.map((c,i)=>`${c} ${Math.round(i*step)}%`).join(',');
+  return `linear-gradient(90deg,${stops})`;
 }
 function renderDailyHabitCheck(){
   const el=document.getElementById('daily-habit-box');if(!el)return;
