@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260812-3-habit-bar-grad-dow-title';
+const CACHE = 'iikoto-v20260812-5-todo-slash-only-split';
 const ASSETS = [
   './',
   './index.html'

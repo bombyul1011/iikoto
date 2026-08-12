@@ -5443,7 +5443,7 @@ function renderTodos(){
     list.appendChild(el);
   });
 }
-// 투두 텍스트를 접두어('>' 앞부분)와 조각(,/기준)으로 파싱. (아래 parseTodoTextParts 본문의 상세 설명 참고)
+// 투두 텍스트를 접두어('>' 앞부분)와 조각(/ 기준)으로 파싱. (아래 parseTodoTextParts 본문의 상세 설명 참고)
 // 예: "업무 > 블로그, 카페" -> prefix:"업무", parts:["블로그","카페"]
 // '>' 없으면 prefix는 빈 문자열, 전체가 조각 대상.
 function parseTodoTextParts(text){
@@ -5463,11 +5463,11 @@ function parseTodoTextParts(text){
     prefix=text.slice(0,closeIdx).trim();
     body=text.slice(closeIdx+1);
   }
-  // body를 구분자 보존하며 split
-  const rawParts=body.split(/([,/])/);
+  // body를 구분자(슬래시만) 보존하며 split — 쉼표(,)는 일반 문장부호로 취급, 조각 분리 트리거 아님
+  const rawParts=body.split(/(\/)/);
   const parts=[];
   rawParts.forEach(seg=>{
-    if(seg===','||seg==='/')return;
+    if(seg==='/')return;
     if(seg.trim()==='')return;
     parts.push(seg.trim()); // [v2 개선] 이전엔 trim 안 해서 조각 재조립(미루기/복사) 시 공백이 남는 문제가 있었음
   });
@@ -9432,11 +9432,14 @@ function getHabitColor(colorKey){
 // 습관이 4개 미만이면 있는 색만, 5개 이상이면 앞 4개만 사용. 습관이 없으면 기본 무지개로 폴백.
 function _habitPctBarGradient(){
   const habits=getHabits();
-  if(!habits.length)return 'linear-gradient(90deg,rgba(248,192,160,0.55) 0%,rgba(252,215,110,0.55) 25%,rgba(150,205,225,0.55) 50%,rgba(190,160,230,0.55) 75%,rgba(244,177,206,0.55) 100%)';
+  if(!habits.length)return 'linear-gradient(90deg,rgba(252,222,206,0.9) 0%,rgba(253,233,183,0.9) 25%,rgba(203,230,240,0.9) 50%,rgba(222,209,243,0.9) 75%,rgba(250,216,229,0.9) 100%)';
   const colors=habits.slice(0,4).map(h=>{
     const rgba=HABIT_COLOR_RGBA[h.color]||'rgba(192,112,128,0.80)';
-    // 기존 지정색의 alpha를 낮춰 더 연하고 부드러운 톤으로 조정
-    return rgba.replace(/[\d.]+\)$/,'0.55)');
+    // 기존 지정색을 흰색과 섞어 파스텔톤으로, alpha도 낮춰 은은하게 조정
+    const m=rgba.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+    if(!m)return rgba;
+    const mix=v=>Math.round(Number(v)*0.55+255*0.45); // 흰색 45% 블렌딩
+    return `rgba(${mix(m[1])},${mix(m[2])},${mix(m[3])},0.9)`;
   });
   if(colors.length===1)return colors[0];
   const step=100/(colors.length-1);
