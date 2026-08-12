@@ -11333,7 +11333,7 @@ async function _drawQuoteCardI(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
   const isWhite=colorMode==='white';
   const textColor=isWhite?'#fff':'#292824';
   const subColor=isWhite?'rgba(255,255,255,0.75)':'#9a8070';
-  const barColor=isWhite?'rgba(255,255,255,0.45)':'#dcd4c8';
+  const barColor='rgba(255,255,255,0.45)'; // 브라운/화이트 모드 무관하게 항상 흰색 반투명(우연히 발견된 톤이 더 나아서 고정)
   const fontStyle=italicMode?'italic ':'';
   const align=alignMode||'left';
   const showInfo=showBookInfo&&book;
@@ -11655,20 +11655,21 @@ async function _drawTodayCardD(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds
   const coverH=260,coverW=coverH*(2/3);
   const coverX=90,coverY=(H-coverH)/2;
   // 책갈피 옵션 — 문장카드 사이드바형(I스타일)과 완전히 동일한 반투명 배경 패널 + 사이드바 + 마름모
+  // 패널 높이를 표지(=사이드바) 높이와 정확히 맞춰서 하나의 책처럼 보이게 함
   if(showBookmark){
-    const panelPad=40; // 카드 전체를 감싸는 반투명 패널의 표지 기준 여백
-    const panelX=coverX-panelPad,panelY=coverY-panelPad;
-    const panelRight=W-88+panelPad; // 텍스트 영역 오른쪽 끝(W-88)에 동일 여백을 더해 대칭
-    const panelW=panelRight-panelX,panelH=coverH+panelPad*2;
+    const panelPadX=40; // 좌우 여백만 유지, 상하는 표지와 동일
+    const panelX=coverX-panelPadX,panelY=coverY;
+    const panelRight=W-88+panelPadX; // 텍스트 영역 오른쪽 끝(W-88)에 동일 여백을 더해 대칭
+    const panelW=panelRight-panelX,panelH=coverH;
     const panelColors=_sharePanelFillStroke(isWhite);
     ctx.fillStyle=panelColors.fill;
-    _roundRect(ctx,panelX,panelY,panelW,panelH,24);ctx.fill();
+    _roundRect(ctx,panelX,panelY,panelW,panelH,28);ctx.fill();
     ctx.strokeStyle=panelColors.stroke;ctx.lineWidth=2;
-    _roundRect(ctx,panelX,panelY,panelW,panelH,24);ctx.stroke();
+    _roundRect(ctx,panelX,panelY,panelW,panelH,28);ctx.stroke();
   }
   // 사이드바 — 표지와 정확히 같은 높이(coverY~coverY+coverH)
   if(showBookmark){
-    const barColor=isWhite?'rgba(255,255,255,0.45)':'#dcd4c8';
+    const barColor='rgba(255,255,255,0.45)'; // 브라운/화이트 모드 무관하게 항상 흰색 반투명(우연히 발견된 톤이 더 나아서 고정)
     const barW=14;
     ctx.save();
     ctx.fillStyle=barColor;
@@ -11694,7 +11695,7 @@ async function _drawTodayCardD(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds
   }
   // 마름모는 표지를 다 그린 뒤에 그려서 표지 위에 살짝 걸치는 느낌을 냄
   if(showBookmark){
-    const barColor=isWhite?'rgba(255,255,255,0.45)':'#dcd4c8';
+    const barColor='rgba(255,255,255,0.45)'; // 브라운/화이트 모드 무관하게 항상 흰색 반투명(우연히 발견된 톤이 더 나아서 고정)
     ctx.save();
     ctx.translate(coverX,coverY+coverH/2);
     ctx.rotate(Math.PI/4);
