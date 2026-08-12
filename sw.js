@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260812-11-chaeum-topic-tree';
+const CACHE = 'iikoto-v20260812-23-today-card-remove-session';
 const ASSETS = [
   './',
   './index.html'

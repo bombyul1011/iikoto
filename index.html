@@ -11131,11 +11131,25 @@ async function _drawQuoteCardG(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
   ctx.fillStyle=textColor;
   ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
   ctx.textBaseline='top';
-  const quoteText=quoteMark?('\u275b'+q.text+'\u275c'):q.text;
+  const quoteText=q.text;
   const lines=_shareWrapText(ctx,quoteText,W-176);
-  let ty=140;
+  let ty=quoteMark?200:140;
   ctx.textAlign=align;
   const tx0=align==='center'?W/2:(align==='right'?W-88:88);
+  if(quoteMark){
+    // 여는 따옴표를 문장 위에 큼직한 장식 요소로 독립 배치 (인라인으로 텍스트에 붙이지 않음)
+    ctx.save();
+    ctx.font="700 88px 'Apple SD Gothic Neo', 'Noto Sans Symbols', Georgia, serif";
+    ctx.textAlign=align;
+    ctx.textBaseline='alphabetic';
+    ctx.fillStyle=textColor;
+    const qy=140;
+    ctx.fillText('\u275d',tx0,qy);
+    ctx.restore();
+    ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
+    ctx.textBaseline='top';
+    ctx.textAlign=align;
+  }
   const HIGHLIGHT_COLORS={yellow:'rgba(255,214,130,0.55)',pink:'rgba(230,140,160,0.38)',mint:'rgba(150,200,180,0.42)'};
   if(highlightMode&&HIGHLIGHT_COLORS[highlightMode]){
     let hy=ty;
@@ -11206,6 +11220,13 @@ async function _drawQuoteCardG(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
     }
   }
 }
+// H/I 스타일 공용 — 앱 전역 반투명 카드 규칙(흰 배경 컬러모드에 따라 채움/테두리 색이 달라짐)
+function _sharePanelFillStroke(isWhite){
+  return {
+    fill: isWhite?'rgba(0,0,0,0.22)':'rgba(255,255,255,0.42)',
+    stroke: isWhite?'rgba(255,255,255,0.35)':'rgba(255,255,255,0.6)'
+  };
+}
 async function _drawQuoteCardH(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode,showComment){
   await _ensureBareonbatangLoaded();
   const isWhite=colorMode==='white';
@@ -11220,9 +11241,10 @@ async function _drawQuoteCardH(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
   // 문장 길이에 맞춰 패널 높이를 먼저 계산(가변형) — 여백 최소화
   ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
   const px=88,pw=W-176;
-  const quoteText=quoteMark?('\u275b'+q.text+'\u275c'):q.text;
+  const quoteText=q.text;
   const lines=_shareWrapText(ctx,quoteText,pw-96);
   const textBlockH=lines.length*lineH;
+  const quoteMarkH=quoteMark?76:0; // 여는 따옴표를 문장 위에 독립 배치할 때 필요한 여유 높이
   // 코멘트 블록 높이도 패널 전체 높이 계산에 포함 — 표시 스타일 두 가지: 'label'=영문 라벨+본문폭 전체, 'bar'=세로바+들여쓰기
   const cmtFs=27,labelFs=17,cmtLineH=Math.round(cmtFs*1.5),gapLabelToText=12;
   let cmtLines=[],cmtBoxH=0;
@@ -11238,18 +11260,29 @@ async function _drawQuoteCardH(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
   }
   const footerH=showInfo?96:0;
   const padTop=56,padBottom=48,gapBeforeFooter=30,gapBeforeCmt=16;
-  const ph=padTop+textBlockH+(showCmt?gapBeforeCmt+cmtBoxH:0)+(footerH?gapBeforeFooter+footerH:0)+padBottom;
+  const ph=padTop+quoteMarkH+textBlockH+(showCmt?gapBeforeCmt+cmtBoxH:0)+(footerH?gapBeforeFooter+footerH:0)+padBottom;
   const py=(H-ph)/2;
-  ctx.fillStyle=isWhite?'rgba(0,0,0,0.22)':'rgba(255,255,255,0.42)';
+  const panelColors=_sharePanelFillStroke(isWhite);
+  ctx.fillStyle=panelColors.fill;
   _roundRect(ctx,px,py,pw,ph,32);ctx.fill();
-  ctx.strokeStyle=isWhite?'rgba(255,255,255,0.35)':'rgba(255,255,255,0.6)';ctx.lineWidth=2;
+  ctx.strokeStyle=panelColors.stroke;ctx.lineWidth=2;
   _roundRect(ctx,px,py,pw,ph,32);ctx.stroke();
+  const tx0=align==='center'?px+pw/2:(align==='right'?px+pw-48:px+48);
+  let ty=py+padTop;
+  if(quoteMark){
+    ctx.save();
+    ctx.font="700 64px 'Apple SD Gothic Neo', 'Noto Sans Symbols', Georgia, serif";
+    ctx.textAlign=align;
+    ctx.textBaseline='alphabetic';
+    ctx.fillStyle=textColor;
+    ctx.fillText('\u275d',tx0,ty+56);
+    ctx.restore();
+    ty+=quoteMarkH;
+  }
   ctx.fillStyle=textColor;
   ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
   ctx.textBaseline='top';
   ctx.textAlign=align;
-  const tx0=align==='center'?px+pw/2:(align==='right'?px+pw-48:px+48);
-  let ty=py+padTop;
   lines.forEach(line=>{ctx.fillText(line,tx0,ty);ty+=lineH;});
   ctx.textAlign='left';
   if(showCmt){
@@ -11294,7 +11327,237 @@ async function _drawQuoteCardH(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
     }
   }
 }
-const QUOTE_CARD_STYLES={G:{label:'로고형',draw:_drawQuoteCardG},H:{label:'카드형',draw:_drawQuoteCardH}};
+// I스타일: 왼쪽 사이드바 + 마름모 꺾임 포인트, 가변 높이, 앱 반투명 카드 규칙 재사용(H와 동일 규칙)
+async function _drawQuoteCardI(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode,showComment){
+  await _ensureBareonbatangLoaded();
+  const isWhite=colorMode==='white';
+  const textColor=isWhite?'#fff':'#292824';
+  const subColor=isWhite?'rgba(255,255,255,0.75)':'#9a8070';
+  const barColor=isWhite?'rgba(255,255,255,0.45)':'#dcd4c8';
+  const fontStyle=italicMode?'italic ':'';
+  const align=alignMode||'left';
+  const showInfo=showBookInfo&&book;
+  const showCmt=showComment&&q.comment;
+  const fs=fontSize||40;
+  const lineH=Math.round(fs*1.6);
+  const barW=32;
+  const px=60,py=0; // py는 세로 중앙 배치를 위해 이후 재계산
+  const padLeft=barW+56,padRight=76,padTop=48,padBottom=32; // 텍스트 baseline 특성상 아래쪽이 더 넓어 보이는 착시 보정, 좌측 마름모 때문에 우측을 조금 더 넓게
+  const pw=W-120;
+  ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
+  const quoteText=q.text;
+  const lines=_shareWrapText(ctx,quoteText,pw-padLeft-padRight+56);
+  const textBlockH=lines.length*lineH;
+  const quoteMarkH=quoteMark?76:0;
+  const cmtFs=27,labelFs=17,cmtLineH=Math.round(cmtFs*1.5),gapLabelToText=12;
+  let cmtLines=[],cmtBoxH=0;
+  if(showCmt){
+    ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
+    if(showComment==='label'){
+      cmtLines=_shareWrapText(ctx,q.comment,pw-padLeft-padRight+56);
+      cmtBoxH=labelFs+gapLabelToText+cmtLineH*cmtLines.length;
+    }else{
+      cmtLines=_shareWrapText(ctx,q.comment,pw-padLeft-padRight+56-28-22);
+      cmtBoxH=cmtLineH*cmtLines.length;
+    }
+  }
+  const footerH=showInfo?96:0;
+  const gapBeforeFooter=30,gapBeforeCmt=16;
+  const ph=padTop+quoteMarkH+textBlockH+(showCmt?gapBeforeCmt+cmtBoxH:0)+(footerH?gapBeforeFooter+footerH:0)+padBottom;
+  const pyReal=(H-ph)/2;
+  // 카드: 앱 반투명 규칙 재사용(H스타일과 동일 헬퍼)
+  const panelColors=_sharePanelFillStroke(isWhite);
+  ctx.fillStyle=panelColors.fill;
+  _roundRect(ctx,px,pyReal,pw,ph,24);ctx.fill();
+  ctx.strokeStyle=panelColors.stroke;ctx.lineWidth=2;
+  _roundRect(ctx,px,pyReal,pw,ph,24);ctx.stroke();
+  // 왼쪽 사이드바 — 카드 모양대로 클리핑 후 채움
+  ctx.save();
+  _roundRect(ctx,px,pyReal,pw,ph,24);
+  ctx.clip();
+  ctx.fillStyle=barColor;
+  ctx.fillRect(px,pyReal,barW,ph);
+  ctx.restore();
+  // 마름모 꺾임 포인트 — 항상 카드 세로 중앙
+  ctx.save();
+  ctx.translate(px+barW,pyReal+ph/2);
+  ctx.rotate(Math.PI/4);
+  ctx.fillStyle=barColor;
+  ctx.fillRect(-12,-12,24,24);
+  ctx.restore();
+  const tx0=align==='center'?px+padLeft+(pw-padLeft-padRight)/2:(align==='right'?px+pw-padRight:px+padLeft);
+  let ty=pyReal+padTop;
+  if(quoteMark){
+    ctx.save();
+    ctx.font="700 64px 'Apple SD Gothic Neo', 'Noto Sans Symbols', Georgia, serif";
+    ctx.textAlign=align;
+    ctx.textBaseline='alphabetic';
+    ctx.fillStyle=textColor;
+    ctx.fillText('\u275d',tx0,ty+56);
+    ctx.restore();
+    ty+=quoteMarkH;
+  }
+  ctx.fillStyle=textColor;
+  ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
+  ctx.textBaseline='top';
+  ctx.textAlign=align;
+  lines.forEach(line=>{ctx.fillText(line,tx0,ty);ty+=lineH;});
+  ctx.textAlign='left';
+  if(showCmt){
+    ty+=gapBeforeCmt;
+    ctx.fillStyle=textColor;
+    if(showComment==='label'){
+      ctx.font='600 '+labelFs+'px "DM Sans",sans-serif';
+      ctx.fillStyle=isWhite?'rgba(255,255,255,0.5)':'rgba(154,128,112,0.8)';
+      ctx.fillText('comment',px+padLeft,ty);
+      ty+=labelFs+gapLabelToText;
+      ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
+      ctx.fillStyle=isWhite?'rgba(255,255,255,0.92)':'#6b5548';
+      cmtLines.forEach(line=>{ctx.fillText(line,px+padLeft,ty);ty+=cmtLineH;});
+    }else{
+      const barX=px+padLeft+28;
+      ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
+      const textTop=ty;
+      ctx.strokeStyle=isWhite?'rgba(255,255,255,0.35)':'rgba(154,128,112,0.4)';
+      ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(barX,textTop-4);ctx.lineTo(barX,textTop+cmtLineH*cmtLines.length-6);ctx.stroke();
+      ctx.fillStyle=isWhite?'rgba(255,255,255,0.92)':'#6b5548';
+      let cy=textTop;
+      cmtLines.forEach(line=>{ctx.fillText(line,barX+22,cy);cy+=cmtLineH;});
+      ty+=cmtLineH*cmtLines.length;
+    }
+  }
+  if(showInfo){
+    const fy=ty+gapBeforeFooter;
+    ctx.strokeStyle=isWhite?'rgba(255,255,255,0.3)':'rgba(154,128,112,0.3)';
+    ctx.setLineDash([6,6]);ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(px+padLeft,fy);ctx.lineTo(px+pw-padRight,fy);ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.font='600 26px "DM Sans",sans-serif';
+    ctx.fillStyle=textColor;
+    const title=book.title||'';
+    ctx.fillText(title,px+padLeft,fy+28);
+    const titleW=ctx.measureText(title).width;
+    if(book.author){
+      ctx.font='400 24px "DM Sans",sans-serif';
+      ctx.fillStyle=subColor;
+      ctx.fillText(' · '+book.author,px+padLeft+titleW,fy+28);
+    }
+  }
+}
+// J스타일: 완전 투명 배경 + 점선 테두리(흰색/현재색 전환은 기존 colorMode 토글 재사용) + 독서 로고 + 포인트 별 2개(고정 색)
+async function _drawQuoteCardJ(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode,showComment){
+  await _ensureBareonbatangLoaded();
+  const isWhite=colorMode==='white';
+  const textColor=isWhite?'#fff':'#4a3830';
+  const subColor=isWhite?'rgba(255,255,255,0.75)':'#9a8070';
+  const dashColor=isWhite?'rgba(255,255,255,0.85)':'rgba(74,56,48,0.75)'; // 로고/텍스트와 같은 계열로 진하게 — 사진 위에서도 잘 보이도록
+  const fontStyle=italicMode?'italic ':'';
+  const align=alignMode||'center';
+  const showInfo=showBookInfo&&book;
+  const showCmt=showComment&&q.comment;
+  const fs=fontSize||40;
+  const lineH=Math.round(fs*1.6);
+  const px=56,padX=48;
+  const pw=W-112;
+  ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
+  const lines=_shareWrapText(ctx,q.text,pw-padX*2);
+  const textBlockH=lines.length*lineH;
+  const logoH=154; // 상단 독서 로고 자리 (로고 116px + 여백)
+  const cmtFs=27,labelFs=17,cmtLineH=Math.round(cmtFs*1.5),gapLabelToText=12;
+  let cmtLines=[],cmtBoxH=0;
+  if(showCmt){
+    ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
+    if(showComment==='label'){
+      cmtLines=_shareWrapText(ctx,q.comment,pw-padX*2);
+      cmtBoxH=labelFs+gapLabelToText+cmtLineH*cmtLines.length;
+    }else{
+      cmtLines=_shareWrapText(ctx,q.comment,pw-padX*2-28-22);
+      cmtBoxH=cmtLineH*cmtLines.length;
+    }
+  }
+  const footerH=showInfo?96:0;
+  const padTop=48,padBottom=48,gapBeforeFooter=30,gapBeforeCmt=16;
+  const ph=padTop+logoH+textBlockH+(showCmt?gapBeforeCmt+cmtBoxH:0)+(footerH?gapBeforeFooter+footerH:0)+padBottom;
+  const py=(H-ph)/2;
+  // 배경 완전 투명 — fill 없이 점선 테두리만
+  const ix=px+12,iy=py+12,iw=pw-24,ih=ph-24,ir=20;
+  ctx.strokeStyle=dashColor;
+  ctx.lineWidth=2;
+  ctx.setLineDash([6,5]);
+  _roundRect(ctx,ix,iy,iw,ih,ir);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // 포인트 별 2개 — 색은 항상 고정(테두리 색 전환과 무관하게 유지)
+  const STAR1_Y_PCT=0.28,STAR2_Y_PCT=0.86;
+  ctx.save();
+  ctx.translate(ix+iw,iy+ih*STAR1_Y_PCT);
+  ctx.fillStyle='rgba(240,200,80,0.9)';
+  ctx.font="28px 'Apple SD Gothic Neo', sans-serif";
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText('\u2726',0,0);
+  ctx.restore();
+  ctx.save();
+  ctx.translate(ix,iy+ih*STAR2_Y_PCT);
+  ctx.fillStyle='rgba(230,140,160,0.9)';
+  ctx.font="28px 'Apple SD Gothic Neo', sans-serif";
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText('\u2726',0,0);
+  ctx.restore();
+  // 상단 독서 로고
+  const logoImg=await _loadReadingLogo('02',colorMode);
+  if(logoImg){
+    const logoDrawH=116,logoDrawW=logoImg.width/logoImg.height*logoDrawH;
+    ctx.drawImage(logoImg,px+pw/2-logoDrawW/2,py+padTop,logoDrawW,logoDrawH);
+  }
+  const tx0=align==='center'?px+pw/2:(align==='right'?px+pw-padX:px+padX);
+  let ty=py+padTop+logoH;
+  ctx.fillStyle=textColor;
+  ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
+  ctx.textBaseline='top';
+  ctx.textAlign=align;
+  lines.forEach(line=>{ctx.fillText(line,tx0,ty);ty+=lineH;});
+  ctx.textAlign='left';
+  if(showCmt){
+    ty+=gapBeforeCmt;
+    ctx.fillStyle=textColor;
+    if(showComment==='label'){
+      ctx.font='600 '+labelFs+'px "DM Sans",sans-serif';
+      ctx.fillStyle=isWhite?'rgba(255,255,255,0.5)':'rgba(154,128,112,0.8)';
+      ctx.fillText('comment',px+padX,ty);
+      ty+=labelFs+gapLabelToText;
+      ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
+      ctx.fillStyle=isWhite?'rgba(255,255,255,0.92)':'#6b5548';
+      cmtLines.forEach(line=>{ctx.fillText(line,px+padX,ty);ty+=cmtLineH;});
+    }else{
+      const barX=px+padX+28;
+      ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
+      const textTop=ty;
+      ctx.strokeStyle=dashColor;
+      ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(barX,textTop-4);ctx.lineTo(barX,textTop+cmtLineH*cmtLines.length-6);ctx.stroke();
+      ctx.fillStyle=isWhite?'rgba(255,255,255,0.92)':'#6b5548';
+      let cy=textTop;
+      cmtLines.forEach(line=>{ctx.fillText(line,barX+22,cy);cy+=cmtLineH;});
+      ty+=cmtLineH*cmtLines.length;
+    }
+  }
+  if(showInfo){
+    const fy=ty+gapBeforeFooter;
+    ctx.strokeStyle=dashColor;
+    ctx.setLineDash([6,6]);ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(px+padX,fy);ctx.lineTo(px+pw-padX,fy);ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.font='600 26px "DM Sans",sans-serif';
+    ctx.fillStyle=textColor;
+    ctx.textAlign='center';
+    const title=book.title||'';
+    const author=book.author?' · '+book.author:'';
+    ctx.fillText(title+author,px+pw/2,fy+28);
+    ctx.textAlign='left';
+  }
+}
+const QUOTE_CARD_STYLES={G:{label:'로고형',draw:_drawQuoteCardG},H:{label:'카드형',draw:_drawQuoteCardH},I:{label:'사이드바형',draw:_drawQuoteCardI},J:{label:'점선형',draw:_drawQuoteCardJ}};
 
 // ── 오늘의 기록 카드: A(미니멀 숫자형) / C(로고+텍스트형)
 async function _drawTodayCardA(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds,colorMode,dk){
@@ -11333,9 +11596,7 @@ async function _drawTodayCardA(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds
   ctx.fillStyle=subColor;
   const dispDate=dk?(parseInt(dk.slice(5,7),10)+'월 '+parseInt(dk.slice(8,10),10)+'일'):null;
   const timeStr=seconds?Math.floor(seconds/60)+'분':null;
-  const sessionCount=countReadingSessionsForBook(book.title);
-  const sessionStr=sessionCount>0?sessionCount+'회차':null;
-  const completeLine=[dispDate,progVal+progUnit,timeStr,sessionStr].filter(Boolean).join('  ·  ');
+  const completeLine=[dispDate,progVal+progUnit,timeStr].filter(Boolean).join('  ·  ');
   if(completeLine)ctx.fillText(completeLine,cx,ty);
 }
 // C: 로고01(80% 투명도) 왼쪽 + 오른쪽에 날짜 한 줄 / 책제목 한 줄 / 시간·독서량 한 줄 — 표지 이미지 불필요, CORS 문제 없음
@@ -11497,6 +11758,18 @@ function _cycleAlignMode(){
   _shareModalCtx.alignMode=c[(c.indexOf(_shareModalCtx.alignMode)+1)%c.length];
   _renderShareModal();
 }
+// 인용부호 토글 — 켤 때는 자동으로 중앙정렬(따옴표 스타일에 어울림), 끌 때는 이전 정렬로 복귀.
+function _toggleQuoteMark(){
+  const ctx=_shareModalCtx;
+  ctx.quoteMark=!ctx.quoteMark;
+  if(ctx.quoteMark){
+    ctx._prevAlignMode=ctx.alignMode||'left';
+    ctx.alignMode='center';
+  }else{
+    ctx.alignMode=ctx._prevAlignMode||'left';
+  }
+  _renderShareModal();
+}
 function _cycleCommentStyle(){
   const c=[null,'label','bar'];
   _shareModalCtx.showComment=c[(c.indexOf(_shareModalCtx.showComment)+1)%c.length];
@@ -11536,8 +11809,8 @@ async function _renderShareModal(){
   const hasComment=ctx.kind==='quote'&&ctx.args[0]&&ctx.args[0].comment;
   const commentToggle=hasComment?_shareIconBtn(!!ctx.showComment,`_cycleCommentStyle();`,
     `<i class="ti ti-message-circle" aria-hidden="true"></i>`,ctx.showComment==='label'?'코멘트: 라벨형 (탭하면 세로바형)':(ctx.showComment==='bar'?'코멘트: 세로바형 (탭하면 끄기)':'코멘트 표시')):'';
-  const quoteMarkToggle=ctx.kind==='quote'?_shareIconBtn(!!ctx.quoteMark,`_shareModalCtx.quoteMark=!_shareModalCtx.quoteMark;_renderShareModal();`,
-    `<span style="font-family:'DM Sans',sans-serif;font-weight:600;font-size:18px;">\u275b</span>`,ctx.quoteMark?'인용부호 끄기':'인용부호 켜기'):'';
+  const quoteMarkToggle=ctx.kind==='quote'?_shareIconBtn(!!ctx.quoteMark,`_toggleQuoteMark();`,
+    `<span style="font-family:'DM Sans',sans-serif;font-weight:600;font-size:18px;">\u275d</span>`,ctx.quoteMark?'인용부호 끄기':'인용부호 켜기'):'';
   const ALIGN_ICON={left:'left',center:'center',right:'right'};
   const curAlign=ctx.alignMode||'left';
   const alignToggle=ctx.kind==='quote'?_shareIconBtn(true,`_cycleAlignMode();`,
@@ -11577,7 +11850,7 @@ async function _confirmShareCopy(){
 async function shareQuoteCard(quoteCid){
   const q=getQuotes().find(x=>x.cid===quoteCid);if(!q)return;
   const book=getBooks().find(b=>b.cid===q.bookCid);
-  _shareModalCtx={kind:'quote',args:[q,book],styleKey:'G',colorMode:'brown',showBookInfo:false,italicMode:false,quoteMark:true,alignMode:'left',fontSize:40,highlightMode:null,showComment:q.comment?'label':null};
+  _shareModalCtx={kind:'quote',args:[q,book],styleKey:'G',colorMode:'brown',showBookInfo:false,italicMode:false,quoteMark:false,alignMode:'left',fontSize:40,highlightMode:null,showComment:q.comment?'label':null};
   await _renderShareModal();
 }
 async function openTodayReadingShareModal(bookCid,unit,percentAfter,pagesAfter,seconds,dk){
