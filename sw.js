@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260812-7-habit-bar-sage-sand-butter';
+const CACHE = 'iikoto-v20260812-10-wave-habit-pctbar-rename';
 const ASSETS = [
   './',
   './index.html'

@@ -630,11 +630,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .wave-svg{width:84px;height:84px;}
 .wave-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:2;pointer-events:none;}
 .wave-center .n{font-size:18px;font-weight:700;color:var(--tp);}
-.wave-center .l{font-size:11px;color:var(--ts);margin-top:1px;}
 .wave-lbl{font-size:11px;color:var(--tm);margin-top:8px;}
-.pace-habit-pctbar-row{width:76px;margin:8px auto 0;}
-.pace-habit-pctbar-track{height:5px;border-radius:3px;background:rgba(200,176,168,0.15);overflow:hidden;}
-.pace-habit-pctbar-fill{height:100%;border-radius:3px;transition:width .4s;}
+.wave-habit-pctbar-row{width:76px;margin:8px auto 0;}
+.wave-habit-pctbar-track{height:5px;border-radius:3px;background:rgba(200,176,168,0.15);overflow:hidden;}
+.wave-habit-pctbar-fill{height:100%;border-radius:3px;transition:width .4s;}
 @keyframes waveMove{0%{transform:translateX(0);}100%{transform:translateX(-50px);}}
 .wave-anim{animation:waveMove 3.5s linear infinite;}
 .rc-flow{display:flex;align-items:center;justify-content:center;gap:16px;padding:2px 0;}
@@ -5996,15 +5995,30 @@ function makeMorningRoutineCard(){
   return card;
 }
 
+// 완료 개수 카운트 — 조각 단위. 조각이 있는 투두는 완료된 조각 수만큼, 조각 없는 투두는 done이면 1개로 센다.
+// (활동 분포 점 찍기와 동일한 단위로 통일 — 파트별로 하나씩 끝낼 때마다 카운트되는 게 실사용에 더 맞음)
 function _paceCountDoneUntilNow(dk,nowMinLimit){
   const todos=getTodos(dk);
-  return todos.filter(t=>{
-    if(!t.done)return false;
-    if(nowMinLimit==null)return true; // 오늘이 아닌 날은 하루 전체 기준
-    if(!t.completedAt)return false; // completedAt 없는 과거 데이터는 시각 비교 불가하므로 제외
-    const d=new Date(t.completedAt);
-    return d.getHours()*60+d.getMinutes()<=nowMinLimit;
-  }).length;
+  let count=0;
+  todos.forEach(t=>{
+    const st=t.strikeTimes||{};
+    const timeEntries=Object.entries(st).filter(([,v])=>typeof v==='number');
+    if(timeEntries.length){
+      // 조각 투두 — 완료된 조각마다 1개씩, nowMinLimit 있으면 해당 조각의 완료 시각으로 필터
+      timeEntries.forEach(([,ms])=>{
+        if(nowMinLimit==null){count++;return;}
+        const d=new Date(ms);
+        if(d.getHours()*60+d.getMinutes()<=nowMinLimit)count++;
+      });
+    }else if(t.done){
+      // 조각 없는 일반 투두 — done이면 1개
+      if(nowMinLimit==null){count++;return;}
+      if(!t.completedAt)return; // completedAt 없는 과거 데이터는 시각 비교 불가하므로 제외
+      const d=new Date(t.completedAt);
+      if(d.getHours()*60+d.getMinutes()<=nowMinLimit)count++;
+    }
+  });
+  return count;
 }
 function _paceHabitCheckedCount(dk,nowMinLimit){
   const wk=weekKey(new Date(dk+'T00:00:00'));
@@ -7011,8 +7025,6 @@ function makeAfternoonPaceCard(){
   const todayTop=_paceTopRhythmCat(todayDk);
 
   const card=document.createElement('div');card.className='pace-card';card.id='afternoon-pace-card';
-  const hh=now.getHours(),mm=now.getMinutes();
-  const ap=hh<12?'오전':'오후',h12=hh===0?12:hh>12?hh-12:hh;
 
   let html='';
   html+=`<div class="pace-title"><i class="ti ti-clock ico-sz-13" aria-hidden="true"></i> 오늘 진행도</div>`;
@@ -7022,8 +7034,8 @@ function makeAfternoonPaceCard(){
     <div class="pace-track"><div class="pace-fill-t" style="width:${todayBarDone/todayBarTotal*100}%;"></div><div class="pace-bead2" style="left:${todayBarDone/todayBarTotal*100}%;"></div></div></div>`;
 
   const habitBarGrad=_habitPctBarGradient();
-  const habitPctBarHtml=pct=>`<div class="pace-habit-pctbar-row">
-    <div class="pace-habit-pctbar-track"><div class="pace-habit-pctbar-fill" style="width:${pct}%;background:${habitBarGrad};"></div></div>
+  const habitPctBarHtml=pct=>`<div class="wave-habit-pctbar-row">
+    <div class="wave-habit-pctbar-track"><div class="wave-habit-pctbar-fill" style="width:${pct}%;background:${habitBarGrad};"></div></div>
   </div>`;
 
   html+=`<div class="pace-divider"></div>`;
