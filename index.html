@@ -11654,13 +11654,25 @@ async function _drawTodayCardD(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds
   const coverImg=book.poster?await _loadPosterViaProxy(book.poster):null;
   const coverH=260,coverW=coverH*(2/3);
   const coverX=90,coverY=(H-coverH)/2;
-  // 책갈피 느낌 옵션 — 표지 왼쪽에 얇은 사이드바(문장카드 사이드바형과 같은 톤)
+  // 책갈피 옵션 — 문장카드 사이드바형(I스타일)과 완전히 동일한 반투명 배경 패널 + 사이드바 + 마름모
+  if(showBookmark){
+    const panelPad=40; // 카드 전체를 감싸는 반투명 패널의 표지 기준 여백
+    const panelX=coverX-panelPad,panelY=coverY-panelPad;
+    const panelRight=W-88+panelPad; // 텍스트 영역 오른쪽 끝(W-88)에 동일 여백을 더해 대칭
+    const panelW=panelRight-panelX,panelH=coverH+panelPad*2;
+    const panelColors=_sharePanelFillStroke(isWhite);
+    ctx.fillStyle=panelColors.fill;
+    _roundRect(ctx,panelX,panelY,panelW,panelH,24);ctx.fill();
+    ctx.strokeStyle=panelColors.stroke;ctx.lineWidth=2;
+    _roundRect(ctx,panelX,panelY,panelW,panelH,24);ctx.stroke();
+  }
+  // 사이드바 — 표지와 정확히 같은 높이(coverY~coverY+coverH)
   if(showBookmark){
     const barColor=isWhite?'rgba(255,255,255,0.45)':'#dcd4c8';
     const barW=14;
     ctx.save();
     ctx.fillStyle=barColor;
-    ctx.fillRect(coverX-barW,coverY+8,barW,coverH-16);
+    ctx.fillRect(coverX-barW,coverY,barW,coverH);
     ctx.restore();
   }
   if(coverImg){
@@ -11687,7 +11699,7 @@ async function _drawTodayCardD(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds
     ctx.translate(coverX,coverY+coverH/2);
     ctx.rotate(Math.PI/4);
     ctx.fillStyle=barColor;
-    ctx.fillRect(-10,-10,20,20);
+    ctx.fillRect(-12,-12,24,24);
     ctx.restore();
   }
   const tx=coverX+coverW+56;
