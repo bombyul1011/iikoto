@@ -11378,7 +11378,7 @@ async function _drawQuoteCardI(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
   ctx.fillStyle=barColor;
   ctx.fillRect(px,pyReal,barW,ph);
   ctx.restore();
-  // 마름모 꺾임 포인트 — 항상 카드 세로 중앙
+  // 마름모 꺾임 포인트 — 항상 카드 세로 중앙. barW(32)가 마름모 반경(12)보다 충분히 커서 clip 없이도 카드 밖으로 안 나감
   ctx.save();
   ctx.translate(px+barW,pyReal+ph/2);
   ctx.rotate(Math.PI/4);
@@ -11670,7 +11670,7 @@ async function _drawTodayCardD(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds
   // 사이드바 — 표지와 정확히 같은 높이(coverY~coverY+coverH)
   if(showBookmark){
     const barColor='#f5f0e8'; // 브라운/화이트 모드 무관하게 항상 불투명 아이보리(사이드바/마름모는 반투명 시 배경이 비쳐 보이므로 불투명 고정)
-    const barW=14;
+    const barW=32;
     ctx.save();
     ctx.fillStyle=barColor;
     ctx.fillRect(coverX-barW,coverY,barW,coverH);
@@ -11693,7 +11693,7 @@ async function _drawTodayCardD(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds
     ctx.fillStyle=isWhite?'rgba(255,255,255,0.14)':'rgba(154,128,112,0.14)';
     _roundRect(ctx,coverX,coverY,coverW,coverH,12);ctx.fill();
   }
-  // 마름모는 표지를 다 그린 뒤에 그려서 표지 위에 살짝 걸치는 느낌을 냄
+  // 마름모는 표지를 다 그린 뒤에 그려서 표지 위에 살짝 걸치는 느낌을 냄. barW(32)가 마름모 반경(12)보다 커서 clip 불필요
   if(showBookmark){
     const barColor='#f5f0e8'; // 브라운/화이트 모드 무관하게 항상 불투명 아이보리(사이드바/마름모는 반투명 시 배경이 비쳐 보이므로 불투명 고정)
     ctx.save();
