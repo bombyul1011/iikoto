@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260812-10-wave-habit-pctbar-rename';
+const CACHE = 'iikoto-v20260812-11-chaeum-topic-tree';
 const ASSETS = [
   './',
   './index.html'
