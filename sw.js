@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260811-12-dead-code-removal';
+const CACHE = 'iikoto-v20260812-2-habit-pctbar-clean';
 const ASSETS = [
   './',
   './index.html'
