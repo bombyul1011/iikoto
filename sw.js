@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260812-23-today-card-remove-session';
+const CACHE = 'iikoto-v20260812-24-today-card-bookmark-option';
 const ASSETS = [
   './',
   './index.html'
