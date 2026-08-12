@@ -11646,7 +11646,7 @@ async function _drawTodayCardC(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds
   ctx.fillText(metaLine,tx,ty);
 }
 // D: 표지형 — 왼쪽 책 표지(프록시 경유 로드) + 오른쪽 날짜/제목/시간·진행률. 표지는 흰색 전환 시에도 그대로, 텍스트 색만 전환
-async function _drawTodayCardD(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds,colorMode,dk,showBookmark){
+async function _drawTodayCardD(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds,colorMode,dk){
   await _ensureBareonbatangLoaded();
   const isWhite=colorMode==='white';
   const textColor=isWhite?'#fff':'#5a4040';
@@ -11654,28 +11654,6 @@ async function _drawTodayCardD(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds
   const coverImg=book.poster?await _loadPosterViaProxy(book.poster):null;
   const coverH=260,coverW=coverH*(2/3);
   const coverX=90,coverY=(H-coverH)/2;
-  // 책갈피 옵션 — 문장카드 사이드바형(I스타일)과 완전히 동일한 반투명 배경 패널 + 사이드바 + 마름모
-  // 패널 높이를 표지(=사이드바) 높이와 정확히 맞춰서 하나의 책처럼 보이게 함
-  if(showBookmark){
-    const panelPadX=40; // 좌우 여백만 유지, 상하는 표지와 동일
-    const panelX=coverX-panelPadX,panelY=coverY;
-    const panelRight=W-88+panelPadX; // 텍스트 영역 오른쪽 끝(W-88)에 동일 여백을 더해 대칭
-    const panelW=panelRight-panelX,panelH=coverH;
-    const panelColors=_sharePanelFillStroke(isWhite);
-    ctx.fillStyle=panelColors.fill;
-    _roundRect(ctx,panelX,panelY,panelW,panelH,28);ctx.fill();
-    ctx.strokeStyle=panelColors.stroke;ctx.lineWidth=2;
-    _roundRect(ctx,panelX,panelY,panelW,panelH,28);ctx.stroke();
-  }
-  // 사이드바 — 표지와 정확히 같은 높이(coverY~coverY+coverH)
-  if(showBookmark){
-    const barColor='#f5f0e8'; // 브라운/화이트 모드 무관하게 항상 불투명 아이보리(사이드바/마름모는 반투명 시 배경이 비쳐 보이므로 불투명 고정)
-    const barW=32;
-    ctx.save();
-    ctx.fillStyle=barColor;
-    ctx.fillRect(coverX-barW,coverY,barW,coverH);
-    ctx.restore();
-  }
   if(coverImg){
     ctx.save();
     _roundRect(ctx,coverX,coverY,coverW,coverH,12);
@@ -11692,16 +11670,6 @@ async function _drawTodayCardD(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds
   }else{
     ctx.fillStyle=isWhite?'rgba(255,255,255,0.14)':'rgba(154,128,112,0.14)';
     _roundRect(ctx,coverX,coverY,coverW,coverH,12);ctx.fill();
-  }
-  // 마름모는 표지를 다 그린 뒤에 그려서 표지 위에 살짝 걸치는 느낌을 냄. barW(32)가 마름모 반경(12)보다 커서 clip 불필요
-  if(showBookmark){
-    const barColor='#f5f0e8'; // 브라운/화이트 모드 무관하게 항상 불투명 아이보리(사이드바/마름모는 반투명 시 배경이 비쳐 보이므로 불투명 고정)
-    ctx.save();
-    ctx.translate(coverX,coverY+coverH/2);
-    ctx.rotate(Math.PI/4);
-    ctx.fillStyle=barColor;
-    ctx.fillRect(-12,-12,24,24);
-    ctx.restore();
   }
   const tx=coverX+coverW+56;
   const tw=W-tx-88;
@@ -11754,15 +11722,15 @@ async function _buildQuoteCanvas(styleKey,q,book,colorMode,showBookInfo,italicMo
   await QUOTE_CARD_STYLES[styleKey].draw(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode,showComment);
   return canvas;
 }
-async function _buildTodayCanvas(styleKey,book,unit,percentAfter,pagesAfter,seconds,colorMode,dk,showBookmark){
+async function _buildTodayCanvas(styleKey,book,unit,percentAfter,pagesAfter,seconds,colorMode,dk){
   const W=1080,H=1350;
   const canvas=document.createElement('canvas');
   canvas.width=W;canvas.height=H;
   const ctx=canvas.getContext('2d');
-  await TODAY_CARD_STYLES[styleKey].draw(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds,colorMode,dk,showBookmark);
+  await TODAY_CARD_STYLES[styleKey].draw(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds,colorMode,dk);
   return canvas;
 }
-let _shareModalCtx=null; // {kind:'quote'|'today', args:[...], styleKey, colorMode, showBookInfo, italicMode, showBookmark}
+let _shareModalCtx=null; // {kind:'quote'|'today', args:[...], styleKey, colorMode, showBookInfo, italicMode}
 function _closeShareModal(){
   const ov=document.getElementById('share-card-modal');
   if(ov)ov.remove();
@@ -11772,7 +11740,7 @@ async function _buildCurrentShareCanvas(){
   const ctx=_shareModalCtx;if(!ctx)return null;
   if(ctx.kind==='quote')return await _buildQuoteCanvas(ctx.styleKey,ctx.args[0],ctx.args[1],ctx.colorMode,ctx.showBookInfo,ctx.italicMode,ctx.quoteMark,ctx.alignMode,ctx.fontSize,ctx.highlightMode,ctx.showComment);
   const [book,unit,percentAfter,pagesAfter,seconds,dk]=ctx.args;
-  return await _buildTodayCanvas(ctx.styleKey,book,unit,percentAfter,pagesAfter,seconds,ctx.colorMode,dk,ctx.showBookmark);
+  return await _buildTodayCanvas(ctx.styleKey,book,unit,percentAfter,pagesAfter,seconds,ctx.colorMode,dk);
 }
 function _shareIconBtn(active,onclick,inner,title){
   return `<button onclick="${onclick}" title="${title||''}" style="width:33px;height:33px;flex-shrink:0;border-radius:10px;border:none;background:transparent;color:${active?'var(--acc,#c07080)':'var(--ts)'};display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;opacity:${active?1:0.55};transition:all .15s;">${inner}</button>`;
@@ -11838,9 +11806,6 @@ async function _renderShareModal(){
     `<span style="font-family:'DM Sans',sans-serif;font-weight:600;font-style:${ctx.italicMode?'italic':'normal'};">A</span>`,ctx.italicMode?'이탤릭체':'기본체'):'';
   const bookToggle=ctx.kind==='quote'?_shareIconBtn(!!ctx.showBookInfo,`_shareModalCtx.showBookInfo=!_shareModalCtx.showBookInfo;_renderShareModal();`,
     `<i class="ti ti-book" aria-hidden="true"></i>`,'책 정보 표시'):'';
-  // 표지형(D) 전용 — 표지 왼쪽에 책갈피(사이드바+마름모) 장식 on/off
-  const bookmarkToggle=(ctx.kind==='today'&&ctx.styleKey==='D')?_shareIconBtn(!!ctx.showBookmark,`_shareModalCtx.showBookmark=!_shareModalCtx.showBookmark;_renderShareModal();`,
-    `<i class="ti ti-bookmark" aria-hidden="true"></i>`,ctx.showBookmark?'책갈피 장식 끄기':'책갈피 장식 켜기'):'';
   const hasComment=ctx.kind==='quote'&&ctx.args[0]&&ctx.args[0].comment;
   const commentToggle=hasComment?_shareIconBtn(!!ctx.showComment,`_cycleCommentStyle();`,
     `<i class="ti ti-message-circle" aria-hidden="true"></i>`,ctx.showComment==='label'?'코멘트: 라벨형 (탭하면 세로바형)':(ctx.showComment==='bar'?'코멘트: 세로바형 (탭하면 끄기)':'코멘트 표시')):'';
@@ -11859,7 +11824,7 @@ async function _renderShareModal(){
   const curHl=ctx.highlightMode||null;
   const highlightToggle=(ctx.kind==='quote'&&ctx.styleKey==='G')?_shareIconBtn(!!curHl,`_cycleHighlightMode();`,
     curHl?`<span style="width:20px;height:20px;border-radius:6px;background:${HL_SWATCH[curHl]};display:inline-block;"></span>`:`<i class="ti ti-highlight" aria-hidden="true"></i>`,curHl?'형광펜 색상 변경':'형광펜 켜기'):'';
-  const iconRow=[colorSwatch,fontToggle,alignToggle,bookToggle,bookmarkToggle,commentToggle,quoteMarkToggle,highlightToggle,fontSizeDown,fontSizeUp].filter(Boolean).join('');
+  const iconRow=[colorSwatch,fontToggle,alignToggle,bookToggle,commentToggle,quoteMarkToggle,highlightToggle,fontSizeDown,fontSizeUp].filter(Boolean).join('');
   ov.innerHTML=`<div style="background:var(--sheet);border-radius:26px;padding:22px;width:min(90vw,420px);max-height:88vh;overflow-y:auto;box-sizing:border-box;" onclick="event.stopPropagation();">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
       <div style="font-weight:600;font-size:15px;color:var(--tp);">공유 이미지</div>
@@ -11890,7 +11855,7 @@ async function shareQuoteCard(quoteCid){
 }
 async function openTodayReadingShareModal(bookCid,unit,percentAfter,pagesAfter,seconds,dk){
   const book=getBooks().find(b=>b.cid===bookCid);if(!book)return;
-  _shareModalCtx={kind:'today',args:[book,unit,percentAfter,pagesAfter,seconds,dk],styleKey:'A',colorMode:'brown',showBookmark:false};
+  _shareModalCtx={kind:'today',args:[book,unit,percentAfter,pagesAfter,seconds,dk],styleKey:'A',colorMode:'brown'};
   await _renderShareModal();
 }
 function setPgUnit(u){

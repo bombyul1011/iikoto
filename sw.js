@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260813-5-diamond-clip-removed-simplify';
+const CACHE = 'iikoto-v20260813-6-remove-cover-bookmark-option';
 const ASSETS = [
   './',
   './index.html'
