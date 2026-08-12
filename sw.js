@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260812-5-todo-slash-only-split';
+const CACHE = 'iikoto-v20260812-7-habit-bar-sage-sand-butter';
 const ASSETS = [
   './',
   './index.html'

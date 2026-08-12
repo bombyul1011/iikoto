@@ -7036,7 +7036,7 @@ function makeAfternoonPaceCard(){
       <circle cx="45" cy="45" r="40" fill="rgba(150,130,110,0.06)"/>
       <g clip-path="url(#paceClipLast)"><path class="wave-anim" d="M0,${90-lastWeekSum/goalTotal*80} Q12.5,${90-lastWeekSum/goalTotal*80-6} 25,${90-lastWeekSum/goalTotal*80} T50,${90-lastWeekSum/goalTotal*80} T75,${90-lastWeekSum/goalTotal*80} T100,${90-lastWeekSum/goalTotal*80} T125,${90-lastWeekSum/goalTotal*80} T150,${90-lastWeekSum/goalTotal*80} V90 H0 Z" fill="rgba(190,180,172,0.85)"/></g>
       <circle cx="45" cy="45" r="40" fill="none" stroke="var(--card-b)" stroke-width="1.5"/>
-    </svg><div class="wave-center"><div class="n">${Math.round(lastWeekSum*10)/10}</div></div></div>
+    </svg><div class="wave-center"><div class="n">${Math.round(lastWeekSum)}</div></div></div>
     <div class="wave-lbl">${habitPctBarHtml(lastDowHabitAvg.pct)}</div></div>
     <div class="wave-col"><div class="wave-wrap"><svg class="wave-svg" viewBox="0 0 90 90">
       <defs><clipPath id="paceClipToday"><circle cx="45" cy="45" r="40"/></clipPath>
@@ -9428,23 +9428,11 @@ const HABIT_COLOR_RGBA={mint:'rgba(140,210,200,0.85)',pink:'rgba(255,150,180,0.8
 function getHabitColor(colorKey){
   return HABIT_COLOR_RGBA[colorKey]||'rgba(192,112,128,0.80)';
 }
-// 습관 달성률 가로바용 — 사용자가 지정한 습관 색상들을 부드럽게 섞은 그라디언트.
-// 습관이 4개 미만이면 있는 색만, 5개 이상이면 앞 4개만 사용. 습관이 없으면 기본 무지개로 폴백.
+// 습관 달성률 가로바용 — 앱 톤(따뜻한 베이지~피치 계열)에 맞춘 은은한 그라디언트.
+// 습관 색상과 무관하게 항상 자연스러운 톤이 나오도록 고정 그라디언트 사용.
+// G안: 세이지 → 샌드 → 버터, 동일 채도·명도로 톤온톤 연결.
 function _habitPctBarGradient(){
-  const habits=getHabits();
-  if(!habits.length)return 'linear-gradient(90deg,rgba(252,222,206,0.9) 0%,rgba(253,233,183,0.9) 25%,rgba(203,230,240,0.9) 50%,rgba(222,209,243,0.9) 75%,rgba(250,216,229,0.9) 100%)';
-  const colors=habits.slice(0,4).map(h=>{
-    const rgba=HABIT_COLOR_RGBA[h.color]||'rgba(192,112,128,0.80)';
-    // 기존 지정색을 흰색과 섞어 파스텔톤으로, alpha도 낮춰 은은하게 조정
-    const m=rgba.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-    if(!m)return rgba;
-    const mix=v=>Math.round(Number(v)*0.55+255*0.45); // 흰색 45% 블렌딩
-    return `rgba(${mix(m[1])},${mix(m[2])},${mix(m[3])},0.9)`;
-  });
-  if(colors.length===1)return colors[0];
-  const step=100/(colors.length-1);
-  const stops=colors.map((c,i)=>`${c} ${Math.round(i*step)}%`).join(',');
-  return `linear-gradient(90deg,${stops})`;
+  return 'linear-gradient(90deg,#b8ceb4 0%,#d4cfa8 50%,#e8ce8f 100%)';
 }
 function renderDailyHabitCheck(){
   const el=document.getElementById('daily-habit-box');if(!el)return;
