@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260813-11-thin-bookinfo-divider-j-center';
+const CACHE = 'iikoto-v20260813-17-add-event-from-calendar';
 const ASSETS = [
   './',
   './index.html'

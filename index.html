@@ -353,6 +353,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .ts-night.active{background:rgba(185,165,230,0.22);border-color:rgba(185,165,230,0.55);color:rgba(120,90,180,0.9);}
 .ts-none.active{background:rgba(180,180,180,0.15);border-color:rgba(180,180,180,0.40);color:var(--tp);}
 .todo-time-sel button.ts-none.active{background:rgba(180,180,180,0.15);border-color:rgba(180,180,180,0.40);color:var(--tp);}
+.todo-event-sel{display:flex;gap:6px;margin:8px 0 4px;}
+.todo-event-sel button{flex:1;padding:6px 0;border-radius:10px;border:1px solid var(--card-b);background:var(--card);font-size:11px;color:var(--tm);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;white-space:nowrap;}
+.todo-event-sel button.active{font-weight:600;}
+.todo-event-sel button.ev-schedule.active{background:rgba(216,168,205,0.28);border-color:rgba(216,168,205,0.6);color:#96568a;}
+.todo-event-sel button.ev-work.active{background:rgba(168,212,232,0.28);border-color:rgba(168,212,232,0.6);color:#4a7d96;}
+.todo-event-sel button.ev-etc.active{background:rgba(210,224,160,0.32);border-color:rgba(210,224,160,0.6);color:#7a8a48;}
+.todo-event-sel button.ev-off.active{background:rgba(180,180,180,0.15);border-color:rgba(180,180,180,0.40);color:var(--tp);}
 .chk{width:16px;height:16px;border-radius:5px;border:1.5px solid rgba(200,160,160,0.55);flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;}
 .chk.on{background:var(--acc-soft);border-color:var(--acc);}
 .chk.on::after{content:'';width:7px;height:4px;border-left:1.5px solid white;border-bottom:1.5px solid white;transform:rotate(-45deg) translateY(-1px);}
@@ -464,6 +471,17 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cal-day{display:flex;flex-direction:column;align-items:center;padding:4px 2px 8px;cursor:pointer;position:relative;}
 .cal-num{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--tp);transition:all .15s;}
 #tdp-cal-wrap .cal-num{width:32px;height:32px;font-size:14px;}
+/* 월간탭 캘린더 전용 — 날짜 칸 안에 일정 배지가 들어가므로 세로 공간 확보(다른 캘린더 팝업엔 영향 없음) */
+#monthly-cal .cal-day{min-height:56px;padding:3px 1px;}
+#monthly-cal .cal-num{width:24px;height:24px;font-size:12px;margin-bottom:2px;}
+#monthly-cal .cal-day.has-record .cal-num{background:rgba(200,176,168,0.12);}
+#monthly-cal .cal-day.today .cal-num{background:var(--acc);color:white;}
+#monthly-cal .cal-day.selected .cal-num{background:rgba(192,112,128,0.16);color:var(--acc);}
+#monthly-cal .cal-event-badge{font-size:8px;line-height:1.35;padding:1px 3px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;margin-bottom:1px;}
+#monthly-cal .cal-event-badge.ev-schedule{color:#96568a;background:rgba(216,168,205,0.28);}
+#monthly-cal .cal-event-badge.ev-work{color:#4a7d96;background:rgba(168,212,232,0.28);}
+#monthly-cal .cal-event-badge.ev-etc{color:#7a8a48;background:rgba(210,224,160,0.32);}
+#monthly-cal .cal-event-more{font-size:8px;color:var(--tm);line-height:1.35;}
 #tdp-cal-wrap .cal-day{padding:2px 2px 4px;}
 #tdp-cal-wrap .cal-day-name{padding:0 0 4px;}
 .cal-day.today .cal-num{background:var(--acc);color:white;}
@@ -479,6 +497,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cal-detail-time{font-size:10px;color:var(--tm);white-space:nowrap;padding-top:2px;min-width:34px;}
 .cal-detail-text{font-size:12px;color:var(--tp);line-height:1.5;flex:1;}
 .cal-detail-more{font-size:11px;color:var(--acc);padding:6px 0;text-align:center;cursor:pointer;}
+.cal-add-event-btn{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:10px;padding:8px 10px;border:1px dashed rgba(154,128,112,0.3);border-radius:10px;color:var(--ts);font-size:12px;cursor:pointer;transition:all .15s;}
+.cal-add-event-btn:active{background:rgba(255,255,255,0.3);}
 
 /* ── STAT BAR ── */
 .stat-bar-wrap{display:flex;align-items:center;justify-content:center;gap:14px;padding:14px 4px 6px;border-top:1px solid var(--div);margin-top:8px;}
@@ -854,6 +874,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="glass"] .chk.on{background:rgba(250,215,100,0.55);border-color:rgba(250,215,100,0.78);}
 [data-theme="glass"] .cal-day.today .cal-num{background:#e8a4bb;}
 [data-theme="glass"] .cal-day.selected .cal-num{background:rgba(232,164,187,0.24);color:#c97a96;}
+[data-theme="glass"] #monthly-cal .cal-day.has-record .cal-num{background:rgba(200,176,168,0.14);}
+[data-theme="glass"] #monthly-cal .cal-day.today .cal-num{background:#e8a4bb;}
+[data-theme="glass"] #monthly-cal .cal-day.selected .cal-num{background:rgba(232,164,187,0.24);color:#c97a96;}
 [data-theme="glass"] .cal-dot{background:#e8a4bb;}
 [data-theme="glass"] .goal-section-title{background:linear-gradient(120deg,rgba(250,215,100,0.50),rgba(255,235,170,0.42));color:#8a6c20;border:1.4px solid rgba(250,205,90,0.55);}
 [data-theme="glass"] .mbtn.ok{background:rgba(201,146,110,0.42);color:#6e4a30;}
@@ -1563,7 +1586,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 </div>
 
 <!-- TODO MODAL -->
-<div class="modal-ov" id="todo-modal" onclick="closeModal('todo-modal',event)">
+<div class="modal-ov" id="todo-modal" onclick="closeTodoModal(event)">
   <div class="modal">
     <div class="modal-title" id="todo-modal-title">할 일 추가</div>
     <input type="text" class="modal-inp" id="todo-modal-inp" placeholder="할 일을 입력하세요" autocomplete="off" onkeydown="if(event.isComposing||event.keyCode===229)return;if(event.key==='Enter'){event.preventDefault();confirmTodo();}">
@@ -1573,8 +1596,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <button class="ts-night" onclick="selectTodoTime('night',this)">저녁</button>
       <button class="ts-none active" onclick="selectTodoTime('none',this)">지정없음</button>
     </div>
+    <div class="todo-event-sel" id="todo-event-sel">
+      <button class="ev-schedule" onclick="selectTodoEventCat('schedule',this)"><i class="ti ti-users ico-sz-13" aria-hidden="true"></i> 스케줄</button>
+      <button class="ev-work" onclick="selectTodoEventCat('work',this)"><i class="ti ti-briefcase ico-sz-13" aria-hidden="true"></i> 업무</button>
+      <button class="ev-etc" onclick="selectTodoEventCat('etc',this)"><i class="ti ti-dots ico-sz-13" aria-hidden="true"></i> 기타</button>
+      <button class="ev-off active" onclick="selectTodoEventCat(null,this)"><i class="ti ti-x ico-sz-13" aria-hidden="true"></i> 일정 아님</button>
+    </div>
     <div class="modal-actions">
-      <button class="mbtn cancel" onclick="closeModal('todo-modal')">취소</button>
+      <button class="mbtn cancel" onclick="closeTodoModal()">취소</button>
       <button class="mbtn ok" onclick="confirmTodo()">저장</button>
     </div>
   </div>
@@ -2182,6 +2211,14 @@ function getRhythmColor(key){
   if(key==='_meal')return RHYTHM_MEAL_COLOR;
   return RHYTHM_CATS[key]?RHYTHM_CATS[key].color:'var(--tm)';
 }
+// 투두 중 '일정'(isEvent:true)에 붙는 카테고리 — 애플 캘린더식 3분류(스케줄/업무/기타).
+// 색은 리듬바 팔레트에서 겹치지 않는 톤을 재사용(스케줄=감상 라벤더핑크, 업무=외출 연블루, 기타=정리 세이지그린).
+const EVENT_CATS={
+  schedule:{label:'스케줄',color:'rgba(216,168,205,0.80)',textColor:'#96568a',bg:'rgba(216,168,205,0.28)',icon:'ti-users'},
+  work:{label:'업무',color:'rgba(168,212,232,0.75)',textColor:'#4a7d96',bg:'rgba(168,212,232,0.28)',icon:'ti-briefcase'},
+  etc:{label:'기타',color:'rgba(210,224,160,0.82)',textColor:'#7a8a48',bg:'rgba(210,224,160,0.32)',icon:'ti-dots'}
+};
+function getEventCat(key){return EVENT_CATS[key]||EVENT_CATS.etc;}
 function getRhythmBlocks(dk){return S.get(S.key('rblocks',dk))||[];}
 function saveRhythmBlocks(dk,v){
   S.set(S.key('rblocks',dk),v);
@@ -5427,7 +5464,8 @@ function renderTodos(){
     const partModeStyle=_todoPartModeIdx===i?'background:rgba(255,255,255,0.45);border-radius:8px;padding:2px 6px;':'';
     const rmEligible=_todoReorderMode&&!t.done;
     const handleHtml=`<div class="todo-drag-handle${rmEligible?' rm-eligible':''}"><i class="ti ti-grip-vertical ico-sz-13" aria-hidden="true"></i></div>`;
-    el.innerHTML=`${handleHtml}<div class="chk${tsClass}${t.done?' on':''}" onclick="toggleTodo(${i},'${t.cid||''}')"></div><span class="todo-txt${t.done?' done':''}" data-todo-i="${i}" style="${partModeStyle}">${textHtml}</span>`;
+    const eventBadge=t.isEvent?(()=>{const ec=getEventCat(t.eventCat);return `<i class="ti ${ec.icon}" style="font-size:12px;color:${ec.textColor};flex-shrink:0;" title="${ec.label}" aria-hidden="true"></i>`;})():'';
+    el.innerHTML=`${handleHtml}<div class="chk${tsClass}${t.done?' on':''}" onclick="toggleTodo(${i},'${t.cid||''}')"></div>${eventBadge}<span class="todo-txt${t.done?' done':''}" data-todo-i="${i}" style="${partModeStyle}">${textHtml}</span>`;
     const hasMultipleParts=_isTouchDevice()&&parseTodoTextParts(t.text).parts.length>1;
     if(rmEligible){
       attachTodoReorderDrag(el,i,ts);
@@ -7607,9 +7645,20 @@ function makeDaySummaryEl(dk){
   wrap.innerHTML=buildDayDetailHtml(dk);
   return wrap;
 }
+function closeTodoModal(e){
+  const modal=document.getElementById('todo-modal');
+  if(e&&e.target!==modal)return; // 오버레이 클릭 시에는 modal-ov 자체를 클릭했을 때만 닫힘(기존 closeModal과 동일 동작)
+  if(modal.dataset.calMode==='1'){
+    modal.dataset.calMode='';
+    const restoreDate=modal.dataset.calRestoreDate;
+    if(restoreDate)currentDate=new Date(restoreDate);
+  }
+  modal.classList.remove('on');
+}
 function openTodoModal(editIdx=-1){
   const modal=document.getElementById('todo-modal');
   modal.dataset.editIdx=editIdx>=0?editIdx:'';
+  modal.dataset.calMode=''; // 다른 진입 경로(+버튼, 스와이프 수정)로 열릴 때 이전 캘린더모드 잔존 방지 — 캘린더 경로는 이 호출 직후 별도로 다시 세팅함
   document.getElementById('todo-modal-title').textContent=editIdx>=0?'할 일 수정':'할 일 추가';
   const dk=dateKey(currentDate);
   const existing=editIdx>=0?getTodos(dk)[editIdx]:null;
@@ -7620,6 +7669,12 @@ function openTodoModal(editIdx=-1){
   const activeBtn=document.querySelector(`.todo-time-sel button.ts-${ts}`);
   if(activeBtn)activeBtn.classList.add('active');
   modal.dataset.timeSection=ts;
+  // 일정 카테고리 버튼 초기화 — isEvent가 없으면 '일정 아님'을 기본값으로
+  const ec=existing?.isEvent?(existing.eventCat||'etc'):null;
+  document.querySelectorAll('.todo-event-sel button').forEach(b=>b.classList.remove('active'));
+  const activeEvBtn=document.querySelector(ec?`.todo-event-sel button.ev-${ec}`:'.todo-event-sel button.ev-off');
+  if(activeEvBtn)activeEvBtn.classList.add('active');
+  modal.dataset.eventCat=ec||'';
   openModal('todo-modal');setTimeout(()=>document.getElementById('todo-modal-inp').focus(),100);
 }
 let _todoSubmitting=false;
@@ -7627,6 +7682,11 @@ function selectTodoTime(ts,btn){
   document.querySelectorAll('.todo-time-sel button').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('todo-modal').dataset.timeSection=ts;
+}
+function selectTodoEventCat(cat,btn){
+  document.querySelectorAll('.todo-event-sel button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('todo-modal').dataset.eventCat=cat||'';
 }
 function confirmTodo(){
   if(_todoSubmitting)return;
@@ -7636,6 +7696,8 @@ function confirmTodo(){
   const modal=document.getElementById('todo-modal');
   const editIdx=modal.dataset.editIdx!==''&&modal.dataset.editIdx!=null?parseInt(modal.dataset.editIdx):-1;
   const timeSection=modal.dataset.timeSection||'none';
+  const eventCat=modal.dataset.eventCat||'';
+  const isEvent=!!eventCat;
   if(editIdx>=0&&todos[editIdx]){
     const old=todos[editIdx];
     // 조각(strikeParts)이 있는 투두의 텍스트를 수기 편집하면, 조각 개수/순서가 바뀔 수 있음.
@@ -7664,9 +7726,20 @@ function confirmTodo(){
       if(!newParts.length||newStrikeParts.length<newParts.length)old.done=false;
     }
     old.text=text;old.timeSection=timeSection;
+    old.isEvent=isEvent;old.eventCat=isEvent?eventCat:null;
   }
-  else todos.push({text,done:false,created:Date.now(),timeSection,cid:genCid()});
-  saveTodos(dk,todos);closeModal('todo-modal');renderTodos();
+  else todos.push({text,done:false,created:Date.now(),timeSection,isEvent,eventCat:isEvent?eventCat:null,cid:genCid()});
+  saveTodos(dk,todos);closeModal('todo-modal');
+  // 월간 캘린더의 "이 날에 일정 추가"에서 열린 경우 — currentDate를 원래대로 되돌리고 캘린더/상세를 갱신
+  if(modal.dataset.calMode==='1'){
+    modal.dataset.calMode='';
+    const restoreDate=modal.dataset.calRestoreDate;
+    if(restoreDate)currentDate=new Date(restoreDate);
+    renderCalendar();
+    if(_calSelectedDay)renderCalDetail(_calSelectedDay);
+  }else{
+    renderTodos();
+  }
   setTimeout(()=>{_todoSubmitting=false;},500);
 }
 function todoDelSwipe(i){
@@ -9149,10 +9222,14 @@ function renderCalendar(){
   const y=_calYear,mo=_calMonth;
   const daysInMonth=new Date(y,mo+1,0).getDate();
   const today=new Date();
-  const hasData={};
+  const hasRecord={};
+  const eventsByDay={};
   for(let d=1;d<=daysInMonth;d++){
     const dk=`${y}-${pad(mo+1)}-${pad(d)}`;
-    if(getMemos(dk).length>0||getTodos(dk).some(t=>t.done)||getSleep(dk).sleep)hasData[d]=true;
+    const todos=getTodos(dk);
+    if(getMemos(dk).length>0||todos.some(t=>t.done)||getSleep(dk).sleep)hasRecord[d]=true;
+    const evs=todos.filter(t=>t.isEvent);
+    if(evs.length)eventsByDay[d]=evs;
   }
   let h=`<div style="padding:4px 2px 0;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
@@ -9168,9 +9245,20 @@ function renderCalendar(){
   for(let d=1;d<=daysInMonth;d++){
     const isToday2=today.getFullYear()===y&&today.getMonth()===mo&&today.getDate()===d;
     const isSel=_calSelectedDay===d;
-    let cls='cal-day';if(isToday2)cls+=' today';if(isSel)cls+=' selected';
-    const dot=hasData[d]?'<div class="cal-dot"></div>':'';
-    h+=`<div class="${cls}" onclick="calDayClick(${d})"><div class="cal-num">${d}</div>${dot}</div>`;
+    let cls='cal-day';if(isToday2)cls+=' today';if(isSel)cls+=' selected';if(hasRecord[d])cls+=' has-record';
+    // 일정 배지 — 카테고리별 색으로 최대 2개까지 텍스트 노출, 그 이상은 "+n개"로 요약(칸 높이 항상 일정하게 유지)
+    let badges='';
+    const evs=eventsByDay[d];
+    if(evs&&evs.length){
+      const MAXB=2;
+      evs.slice(0,MAXB).forEach(ev=>{
+        const ec=getEventCat(ev.eventCat);
+        const title=parseTodoTextParts(ev.text).parts[0]||ev.text;
+        badges+=`<div class="cal-event-badge ev-${ev.eventCat||'etc'}" title="${ec.label}: ${title}">${title}</div>`;
+      });
+      if(evs.length>MAXB)badges+=`<div class="cal-event-more">+${evs.length-MAXB}개</div>`;
+    }
+    h+=`<div class="${cls}" onclick="calDayClick(${d})"><div class="cal-num">${d}</div>${badges}</div>`;
   }
   h+=`</div></div>`;
   wrap.innerHTML=h;
@@ -9223,6 +9311,21 @@ function buildDayDetailHtml(dk){
   }
   return headerHtml+items+mealHtml;
 }
+// 월간 캘린더의 "이 날에 일정 추가" 진입점 — currentDate를 선택 날짜로 임시 전환해 기존 openTodoModal을 그대로 재사용.
+// 저장/취소 후에는 confirmTodo(calMode 분기) 또는 closeModal에서 원래 날짜로 복원됨.
+function openEventFromCalendar(d){
+  const targetDate=new Date(_calYear,_calMonth,d);
+  const restoreDate=currentDate.toISOString();
+  currentDate=targetDate;
+  openTodoModal(-1);
+  const modal=document.getElementById('todo-modal');
+  modal.dataset.calMode='1';
+  modal.dataset.calRestoreDate=restoreDate;
+  document.getElementById('todo-modal-title').textContent='일정 추가';
+  // 캘린더에서 여는 일정 추가는 기본적으로 '스케줄' 카테고리를 미리 선택해둠(가장 흔한 용도)
+  const scheduleBtn=document.querySelector('.todo-event-sel button.ev-schedule');
+  if(scheduleBtn)selectTodoEventCat('schedule',scheduleBtn);
+}
 function renderCalDetail(d){
   const el=document.getElementById('cal-detail');if(!el)return;
   const dk=`${_calYear}-${pad(_calMonth+1)}-${pad(d)}`;
@@ -9239,7 +9342,8 @@ function renderCalDetail(d){
       <span class="cal-detail-date" style="margin-bottom:0;flex-shrink:0;">${dateStr}</span>
     </div>`;
   const bodyHtml=buildDayDetailHtml(dk);
-  el.innerHTML=`<div class="cal-detail-wrap">${dateHeaderHtml}${bodyHtml}</div>`;
+  const addEventBtnHtml=`<div class="cal-add-event-btn" onclick="openEventFromCalendar(${d})"><i class="ti ti-plus ico-sz-13" aria-hidden="true"></i> 이 날에 일정 추가</div>`;
+  el.innerHTML=`<div class="cal-detail-wrap">${dateHeaderHtml}${bodyHtml}${addEventBtnHtml}</div>`;
   el.style.display='block';
   setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'nearest'}),100);
 }
@@ -11092,34 +11196,18 @@ async function _drawQuoteCardG(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
   const textColor=isWhite?'#fff':'#5a4040';
   const subColor=isWhite?'rgba(255,255,255,0.75)':'#9a8070';
   const fontStyle=italicMode?'italic ':'';
-  const align=alignMode||'left'; // 'left' | 'center' | 'right'
+  const align=alignMode||'left';
   const fs=fontSize||40;
   const lineH=Math.round(fs*1.6);
-  ctx.fillStyle=textColor;
-  ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
-  ctx.textBaseline='top';
-  const quoteText=q.text;
-  const lines=_shareWrapText(ctx,quoteText,W-176);
-  let ty=quoteMark?200:140;
-  ctx.textAlign=align;
+  const contentW=W-176;
   const tx0=align==='center'?W/2:(align==='right'?W-88:88);
-  if(quoteMark){
-    // 여는 따옴표를 문장 위에 큼직한 장식 요소로 독립 배치 (인라인으로 텍스트에 붙이지 않음)
-    ctx.save();
-    ctx.font="700 88px 'Apple SD Gothic Neo', 'Noto Sans Symbols', Georgia, serif";
-    ctx.textAlign=align;
-    ctx.textBaseline='alphabetic';
-    ctx.fillStyle=textColor;
-    const qy=140;
-    ctx.fillText('\u275d',tx0,qy);
-    ctx.restore();
-    ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
-    ctx.textBaseline='top';
-    ctx.textAlign=align;
-  }
+  const ty=quoteMark?200:140;
+  // 형광펜은 G스타일 전용 장식이라 공용 파이프라인 밖에서 본문 줄 위치에 맞춰 먼저 그림
   const HIGHLIGHT_COLORS={yellow:'rgba(255,214,130,0.55)',pink:'rgba(230,140,160,0.38)',mint:'rgba(150,200,180,0.42)'};
   if(highlightMode&&HIGHLIGHT_COLORS[highlightMode]){
-    let hy=ty;
+    ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
+    const lines=_shareWrapText(ctx,q.text,contentW);
+    let hy=ty+(quoteMark?76:0);
     const padH=Math.round(fs*0.14);
     lines.forEach(line=>{
       const w=ctx.measureText(line).width;
@@ -11132,53 +11220,22 @@ async function _drawQuoteCardG(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
       ctx.restore();
       hy+=lineH;
     });
-    ctx.fillStyle=textColor;
   }
-  lines.forEach(line=>{ctx.fillText(line,tx0,ty);ty+=lineH;});
-  ctx.textAlign='left';
-  ty+=20;
-  // 코멘트 표시 스타일 두 가지: 'label'=영문 라벨(다른 서체)+텍스트, 'bar'=세로바+들여쓰기(라벨 없음)
-  const showCmt=showComment&&q.comment;
-  if(showCmt){
-    const cmtFs=27,labelFs=17,cmtLineH=Math.round(cmtFs*1.5);
-    ctx.fillStyle=textColor;
-    if(showComment==='label'){
-      const gapLabelToText=12;
-      ctx.font='600 '+labelFs+'px "DM Sans",sans-serif';
-      ctx.fillStyle=isWhite?'rgba(255,255,255,0.5)':'rgba(154,128,112,0.8)';
-      ctx.fillText('comment',88,ty);
-      ty+=labelFs+gapLabelToText;
-      ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
-      ctx.fillStyle=isWhite?'rgba(255,255,255,0.92)':'#6b5548';
-      const cmtLines=_shareWrapText(ctx,q.comment,W-176);
-      cmtLines.forEach(line=>{ctx.fillText(line,88,ty);ty+=cmtLineH;});
-      ty+=36;
-    }else{
-      const barX=88+28;
-      ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
-      const cmtLines=_shareWrapText(ctx,q.comment,W-176-28-22);
-      const cmtBoxH=cmtLineH*cmtLines.length;
-      ctx.strokeStyle=isWhite?'rgba(255,255,255,0.35)':'rgba(154,128,112,0.4)';
-      ctx.lineWidth=2;
-      ctx.beginPath();ctx.moveTo(barX,ty-4);ctx.lineTo(barX,ty+cmtBoxH-6);ctx.stroke();
-      ctx.fillStyle=isWhite?'rgba(255,255,255,0.92)':'#6b5548';
-      let cy=ty;
-      cmtLines.forEach(line=>{ctx.fillText(line,barX+22,cy);cy+=cmtLineH;});
-      ty+=cmtBoxH+36;
-    }
-  }
+  await _drawQuoteBody(ctx,{tx0,ty,contentW,align,footerAlign:'left',showInfo:false},q,book,textColor,subColor,isWhite,fontStyle,fs,quoteMark,showComment);
+  // G스타일 footer는 로고+제목/작가 상하배치 고유 디자인이라 공용 파이프라인과 별도로 처리
   const showInfo=showBookInfo&&book;
   if(showInfo){
-    // 로고를 왼쪽에, 오른쪽에 책 제목(위)/작가명(아래)을 로고 높이 기준 상하 중앙 정렬 — 정보 노출 시에만 함께 표시
+    const bodyH=_measureQuoteBody(ctx,contentW,q,fs,quoteMark,showComment,false);
+    let fty=ty+bodyH+30;
     const logoImg=await _loadReadingLogo('02',colorMode);
     const logoH=76,logoW=logoImg?logoH*(logoImg.width/logoImg.height):0;
-    if(logoImg)ctx.drawImage(logoImg,88,ty,logoW,logoH);
+    if(logoImg)ctx.drawImage(logoImg,88,fty,logoW,logoH);
     const tx=88+logoW+20;
     const title=book.title||'';
     const author=book.author||'';
     ctx.font='600 26px "DM Sans",sans-serif';
     ctx.fillStyle=textColor;
-    const titleY=author?ty+8:ty+logoH/2-16;
+    const titleY=author?fty+8:fty+logoH/2-16;
     ctx.fillText(title,tx,titleY);
     if(author){
       ctx.font='400 22px "DM Sans",sans-serif';
@@ -11187,7 +11244,128 @@ async function _drawQuoteCardG(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
     }
   }
 }
-// H/I 스타일 공용 — 앱 전역 반투명 카드 규칙(흰 배경 컬러모드에 따라 채움/테두리 색이 달라짐)
+// 코멘트 라벨용 pencil-heart 아이콘(습관탭 '일기' 아이콘과 동일 SVG) — 24x24 뷰박스 기준 path를 지정 크기·색으로 그림
+const _PENCIL_HEART_PATHS=[
+  new Path2D('M17 11l1.5 -1.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4h4l2 -2'),
+  new Path2D('M13.5 6.5l4 4'),
+  new Path2D('M18 22l3.35 -3.284a2.143 2.143 0 0 0 .005 -3.071a2.242 2.242 0 0 0 -3.129 -.006l-.224 .22l-.223 -.22a2.242 2.242 0 0 0 -3.128 -.006a2.143 2.143 0 0 0 -.006 3.071l3.355 3.296')
+];
+function _drawPencilHeartIcon(ctx,x,y,size,color){
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.scale(size/24,size/24);
+  ctx.strokeStyle=color;
+  ctx.lineWidth=2;
+  ctx.lineCap='round';
+  ctx.lineJoin='round';
+  _PENCIL_HEART_PATHS.forEach(p=>ctx.stroke(p));
+  ctx.restore();
+}
+
+// 문장카드 공용 파이프라인 — G/H/J가 배경·패널만 각자 그리고, 따옴표/본문/코멘트/footer는 이 함수가 전담
+// layout: {tx0, ty, contentW, align, footerAlign:'left'|'center', dashColor(footer 구분선 색, 옵션)}
+async function _drawQuoteBody(ctx,layout,q,book,textColor,subColor,isWhite,fontStyle,fs,quoteMark,showComment,footerDashColor){
+  const {tx0,contentW,align}=layout;
+  let ty=layout.ty;
+  const lineH=Math.round(fs*1.6);
+  const lines=_shareWrapText(ctx,q.text,contentW);
+  if(quoteMark){
+    ctx.save();
+    ctx.font="700 64px 'Apple SD Gothic Neo', 'Noto Sans Symbols', Georgia, serif";
+    ctx.textAlign=align;
+    ctx.textBaseline='alphabetic';
+    ctx.fillStyle=textColor;
+    ctx.fillText('\u275d',tx0,ty+56);
+    ctx.restore();
+    ty+=76;
+  }
+  ctx.fillStyle=textColor;
+  ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
+  ctx.textBaseline='top';
+  ctx.textAlign=align;
+  lines.forEach(line=>{ctx.fillText(line,tx0,ty);ty+=lineH;});
+  ctx.textAlign='left';
+  const showCmt=showComment&&q.comment;
+  if(showCmt){
+    const cmtFs=27,labelFs=17,cmtLineH=Math.round(cmtFs*1.5),gapLabelToText=12;
+    ty+=16;
+    ctx.fillStyle=textColor;
+    const labelX=layout.footerAlign==='center'?tx0-contentW/2:tx0;
+    if(showComment==='label'){
+      const iconSize=labelFs,gapIconToLabel=6;
+      const labelColor=isWhite?'rgba(255,255,255,0.5)':'rgba(154,128,112,0.8)';
+      _drawPencilHeartIcon(ctx,labelX,ty,iconSize,labelColor);
+      ctx.font='600 '+labelFs+'px "DM Sans",sans-serif';
+      ctx.fillStyle=labelColor;
+      ctx.fillText('comment',labelX+iconSize+gapIconToLabel,ty);
+      ty+=labelFs+gapLabelToText;
+      ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
+      ctx.fillStyle=isWhite?'rgba(255,255,255,0.92)':'#6b5548';
+      const cmtLines=_shareWrapText(ctx,q.comment,contentW);
+      cmtLines.forEach(line=>{ctx.fillText(line,labelX,ty);ty+=cmtLineH;});
+    }else{
+      const barX=labelX+28;
+      ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
+      const cmtLines=_shareWrapText(ctx,q.comment,contentW-28-22);
+      const textTop=ty;
+      ctx.strokeStyle=isWhite?'rgba(255,255,255,0.35)':'rgba(154,128,112,0.4)';
+      ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(barX,textTop-4);ctx.lineTo(barX,textTop+cmtLineH*cmtLines.length-6);ctx.stroke();
+      ctx.fillStyle=isWhite?'rgba(255,255,255,0.92)':'#6b5548';
+      let cy=textTop;
+      cmtLines.forEach(line=>{ctx.fillText(line,barX+22,cy);cy+=cmtLineH;});
+      ty+=cmtLineH*cmtLines.length;
+    }
+  }
+  const showInfo=layout.showInfo;
+  if(showInfo){
+    const fy=ty+30;
+    const fx0=layout.footerAlign==='center'?tx0-contentW/2:tx0;
+    ctx.strokeStyle=footerDashColor||(isWhite?'rgba(255,255,255,0.18)':'rgba(154,128,112,0.18)');
+    ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(fx0,fy);ctx.lineTo(fx0+contentW,fy);ctx.stroke();
+    ctx.font='600 26px "DM Sans",sans-serif';
+    ctx.fillStyle=textColor;
+    const title=book.title||'';
+    if(layout.footerAlign==='center'){
+      ctx.textAlign='center';
+      const author=book.author?' · '+book.author:'';
+      ctx.fillText(title+author,fx0+contentW/2,fy+28);
+      ctx.textAlign='left';
+    }else{
+      ctx.fillText(title,fx0,fy+28);
+      const titleW=ctx.measureText(title).width;
+      if(book.author){
+        ctx.font='400 24px "DM Sans",sans-serif';
+        ctx.fillStyle=subColor;
+        ctx.fillText(' · '+book.author,fx0+titleW,fy+28);
+      }
+    }
+  }
+}
+// 코멘트/footer 블록 높이를 미리 계산(가변 카드 높이용) — _drawQuoteBody와 동일한 규칙을 따름
+function _measureQuoteBody(ctx,contentW,q,fs,quoteMark,showComment,showInfo){
+  const lineH=Math.round(fs*1.6);
+  const lines=_shareWrapText(ctx,q.text,contentW);
+  let h=lines.length*lineH;
+  if(quoteMark)h+=76;
+  const showCmt=showComment&&q.comment;
+  if(showCmt){
+    const cmtFs=27,labelFs=17,cmtLineH=Math.round(cmtFs*1.5),gapLabelToText=12;
+    ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
+    h+=16;
+    if(showComment==='label'){
+      const cmtLines=_shareWrapText(ctx,q.comment,contentW);
+      h+=labelFs+gapLabelToText+cmtLineH*cmtLines.length;
+    }else{
+      const cmtLines=_shareWrapText(ctx,q.comment,contentW-28-22);
+      h+=cmtLineH*cmtLines.length;
+    }
+  }
+  if(showInfo)h+=30+96;
+  return h;
+}
+
 function _sharePanelFillStroke(isWhite){
   return {
     fill: isWhite?'rgba(0,0,0,0.22)':'rgba(255,255,255,0.42)',
@@ -11204,35 +11382,16 @@ async function _drawQuoteCardH(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
   const fontStyle=italicMode?'italic ':'';
   const align=alignMode||'left';
   const showInfo=showBookInfo&&book;
-  const showCmt=showComment&&q.comment;
   const fs=fontSize||40;
-  const lineH=Math.round(fs*1.6);
   // 카드 자체는 항상 고정 좌표계(H스타일 기본값) — 사이드바는 카드 내부에 삽입되는 요소이므로 padLeft만 늘어남
   const px=88,pw=W-176,roundR=32;
   const padLeft=sidebarMode?barW+56:48;
   const padRight=48;
-  // 문장 길이에 맞춰 패널 높이를 먼저 계산(가변형) — 여백 최소화
+  const contentW=pw-padLeft-padRight;
   ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
-  const quoteText=q.text;
-  const lines=_shareWrapText(ctx,quoteText,pw-padLeft-padRight);
-  const textBlockH=lines.length*lineH;
-  const quoteMarkH=quoteMark?76:0; // 여는 따옴표를 문장 위에 독립 배치할 때 필요한 여유 높이
-  // 코멘트 블록 높이도 패널 전체 높이 계산에 포함 — 표시 스타일 두 가지: 'label'=영문 라벨+본문폭 전체, 'bar'=세로바+들여쓰기
-  const cmtFs=27,labelFs=17,cmtLineH=Math.round(cmtFs*1.5),gapLabelToText=12;
-  let cmtLines=[],cmtBoxH=0;
-  if(showCmt){
-    ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
-    if(showComment==='label'){
-      cmtLines=_shareWrapText(ctx,q.comment,pw-padLeft-padRight);
-      cmtBoxH=labelFs+gapLabelToText+cmtLineH*cmtLines.length;
-    }else{
-      cmtLines=_shareWrapText(ctx,q.comment,pw-padLeft-padRight-28-22);
-      cmtBoxH=cmtLineH*cmtLines.length;
-    }
-  }
-  const footerH=showInfo?96:0;
-  const padTop=56,padBottom=48,gapBeforeFooter=30,gapBeforeCmt=16;
-  const ph=padTop+quoteMarkH+textBlockH+(showCmt?gapBeforeCmt+cmtBoxH:0)+(footerH?gapBeforeFooter+footerH:0)+padBottom;
+  const bodyH=_measureQuoteBody(ctx,contentW,q,fs,quoteMark,showComment,showInfo);
+  const padTop=56,padBottom=48;
+  const ph=padTop+bodyH+padBottom;
   const py=(H-ph)/2;
   const panelColors=_sharePanelFillStroke(isWhite);
   ctx.fillStyle=panelColors.fill;
@@ -11255,64 +11414,8 @@ async function _drawQuoteCardH(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
     ctx.fillRect(-12,-12,24,24);
     ctx.restore();
   }
-  const tx0=align==='center'?px+padLeft+(pw-padLeft-padRight)/2:(align==='right'?px+pw-padRight:px+padLeft);
-  let ty=py+padTop;
-  if(quoteMark){
-    ctx.save();
-    ctx.font="700 64px 'Apple SD Gothic Neo', 'Noto Sans Symbols', Georgia, serif";
-    ctx.textAlign=align;
-    ctx.textBaseline='alphabetic';
-    ctx.fillStyle=textColor;
-    ctx.fillText('\u275d',tx0,ty+56);
-    ctx.restore();
-    ty+=quoteMarkH;
-  }
-  ctx.fillStyle=textColor;
-  ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
-  ctx.textBaseline='top';
-  ctx.textAlign=align;
-  lines.forEach(line=>{ctx.fillText(line,tx0,ty);ty+=lineH;});
-  ctx.textAlign='left';
-  if(showCmt){
-    ty+=gapBeforeCmt;
-    ctx.fillStyle=textColor;
-    if(showComment==='label'){
-      ctx.font='600 '+labelFs+'px "DM Sans",sans-serif';
-      ctx.fillStyle=isWhite?'rgba(255,255,255,0.5)':'rgba(154,128,112,0.8)';
-      ctx.fillText('comment',px+padLeft,ty);
-      ty+=labelFs+gapLabelToText;
-      ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
-      ctx.fillStyle=isWhite?'rgba(255,255,255,0.92)':'#6b5548';
-      cmtLines.forEach(line=>{ctx.fillText(line,px+padLeft,ty);ty+=cmtLineH;});
-    }else{
-      const barX=px+padLeft+28;
-      ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
-      const textTop=ty;
-      ctx.strokeStyle=isWhite?'rgba(255,255,255,0.35)':'rgba(154,128,112,0.4)';
-      ctx.lineWidth=2;
-      ctx.beginPath();ctx.moveTo(barX,textTop-4);ctx.lineTo(barX,textTop+cmtLineH*cmtLines.length-6);ctx.stroke();
-      ctx.fillStyle=isWhite?'rgba(255,255,255,0.92)':'#6b5548';
-      let cy=textTop;
-      cmtLines.forEach(line=>{ctx.fillText(line,barX+22,cy);cy+=cmtLineH;});
-      ty+=cmtLineH*cmtLines.length;
-    }
-  }
-  if(showInfo){
-    const fy=ty+gapBeforeFooter;
-    ctx.strokeStyle=isWhite?'rgba(255,255,255,0.18)':'rgba(154,128,112,0.18)';
-    ctx.lineWidth=1;
-    ctx.beginPath();ctx.moveTo(px+padLeft,fy);ctx.lineTo(px+pw-padRight,fy);ctx.stroke();
-    ctx.font='600 26px "DM Sans",sans-serif';
-    ctx.fillStyle=textColor;
-    const title=book.title||'';
-    ctx.fillText(title,px+padLeft,fy+28);
-    const titleW=ctx.measureText(title).width;
-    if(book.author){
-      ctx.font='400 24px "DM Sans",sans-serif';
-      ctx.fillStyle=subColor;
-      ctx.fillText(' · '+book.author,px+48+titleW,fy+28);
-    }
-  }
+  const tx0=align==='center'?px+padLeft+contentW/2:(align==='right'?px+pw-padRight:px+padLeft);
+  await _drawQuoteBody(ctx,{tx0,ty:py+padTop,contentW,align,footerAlign:'left',showInfo},q,book,textColor,subColor,isWhite,fontStyle,fs,quoteMark,showComment);
 }
 // J스타일: 완전 투명 배경 + 점선 테두리(흰색/현재색 전환은 기존 colorMode 토글 재사용) + 독서 로고 + 포인트 별 2개(고정 색)
 async function _drawQuoteCardJ(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode,showComment){
@@ -11324,30 +11427,15 @@ async function _drawQuoteCardJ(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
   const fontStyle=italicMode?'italic ':'';
   const align=alignMode||'center';
   const showInfo=showBookInfo&&book;
-  const showCmt=showComment&&q.comment;
   const fs=fontSize||40;
-  const lineH=Math.round(fs*1.6);
   const px=56,padX=48;
   const pw=W-112;
+  const contentW=pw-padX*2;
   ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
-  const lines=_shareWrapText(ctx,q.text,pw-padX*2);
-  const textBlockH=lines.length*lineH;
   const logoH=154; // 상단 독서 로고 자리 (로고 116px + 여백)
-  const cmtFs=27,labelFs=17,cmtLineH=Math.round(cmtFs*1.5),gapLabelToText=12;
-  let cmtLines=[],cmtBoxH=0;
-  if(showCmt){
-    ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
-    if(showComment==='label'){
-      cmtLines=_shareWrapText(ctx,q.comment,pw-padX*2);
-      cmtBoxH=labelFs+gapLabelToText+cmtLineH*cmtLines.length;
-    }else{
-      cmtLines=_shareWrapText(ctx,q.comment,pw-padX*2-28-22);
-      cmtBoxH=cmtLineH*cmtLines.length;
-    }
-  }
-  const footerH=showInfo?96:0;
-  const padTop=48,padBottom=48,gapBeforeFooter=30,gapBeforeCmt=16;
-  const ph=padTop+logoH+textBlockH+(showCmt?gapBeforeCmt+cmtBoxH:0)+(footerH?gapBeforeFooter+footerH:0)+padBottom;
+  const bodyH=_measureQuoteBody(ctx,contentW,q,fs,false,showComment,showInfo); // J는 자체 상단 로고를 쓰므로 quoteMark 장식은 미사용
+  const padTop=48,padBottom=48;
+  const ph=padTop+logoH+bodyH+padBottom;
   const py=(H-ph)/2;
   // 배경 완전 투명 — fill 없이 점선 테두리만
   const ix=px+12,iy=py+12,iw=pw-24,ih=ph-24,ir=20;
@@ -11380,50 +11468,7 @@ async function _drawQuoteCardJ(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
     ctx.drawImage(logoImg,px+pw/2-logoDrawW/2,py+padTop,logoDrawW,logoDrawH);
   }
   const tx0=align==='center'?px+pw/2:(align==='right'?px+pw-padX:px+padX);
-  let ty=py+padTop+logoH;
-  ctx.fillStyle=textColor;
-  ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
-  ctx.textBaseline='top';
-  ctx.textAlign=align;
-  lines.forEach(line=>{ctx.fillText(line,tx0,ty);ty+=lineH;});
-  ctx.textAlign='left';
-  if(showCmt){
-    ty+=gapBeforeCmt;
-    ctx.fillStyle=textColor;
-    if(showComment==='label'){
-      ctx.font='600 '+labelFs+'px "DM Sans",sans-serif';
-      ctx.fillStyle=isWhite?'rgba(255,255,255,0.5)':'rgba(154,128,112,0.8)';
-      ctx.fillText('comment',px+padX,ty);
-      ty+=labelFs+gapLabelToText;
-      ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
-      ctx.fillStyle=isWhite?'rgba(255,255,255,0.92)':'#6b5548';
-      cmtLines.forEach(line=>{ctx.fillText(line,px+padX,ty);ty+=cmtLineH;});
-    }else{
-      const barX=px+padX+28;
-      ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
-      const textTop=ty;
-      ctx.strokeStyle=dashColor;
-      ctx.lineWidth=2;
-      ctx.beginPath();ctx.moveTo(barX,textTop-4);ctx.lineTo(barX,textTop+cmtLineH*cmtLines.length-6);ctx.stroke();
-      ctx.fillStyle=isWhite?'rgba(255,255,255,0.92)':'#6b5548';
-      let cy=textTop;
-      cmtLines.forEach(line=>{ctx.fillText(line,barX+22,cy);cy+=cmtLineH;});
-      ty+=cmtLineH*cmtLines.length;
-    }
-  }
-  if(showInfo){
-    const fy=ty+gapBeforeFooter;
-    ctx.strokeStyle=isWhite?'rgba(255,255,255,0.18)':'rgba(90,64,64,0.18)';
-    ctx.lineWidth=1;
-    ctx.beginPath();ctx.moveTo(px+padX,fy);ctx.lineTo(px+pw-padX,fy);ctx.stroke();
-    ctx.font='600 26px "DM Sans",sans-serif';
-    ctx.fillStyle=textColor;
-    ctx.textAlign='center';
-    const title=book.title||'';
-    const author=book.author?' · '+book.author:'';
-    ctx.fillText(title+author,px+pw/2,fy+28);
-    ctx.textAlign='left';
-  }
+  await _drawQuoteBody(ctx,{tx0,ty:py+padTop+logoH,contentW,align,footerAlign:'center',showInfo},q,book,textColor,subColor,isWhite,fontStyle,fs,false,showComment,dashColor);
 }
 const QUOTE_CARD_STYLES={G:{label:'로고형',draw:_drawQuoteCardG},H:{label:'카드형',draw:_drawQuoteCardH},J:{label:'점선형',draw:_drawQuoteCardJ}};
 
