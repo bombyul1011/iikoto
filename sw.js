@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260813-30-confetti-schedule-modal-zorder';
+const CACHE = 'iikoto-v20260813-31-confetti-schedule-color-fix';
 const ASSETS = [
   './',
   './index.html'

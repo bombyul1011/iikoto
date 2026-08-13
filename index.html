@@ -2266,10 +2266,10 @@ function getRhythmColor(key){
   return RHYTHM_CATS[key]?RHYTHM_CATS[key].color:'var(--tm)';
 }
 // 투두 중 '일정'(isEvent:true)에 붙는 카테고리 — 애플 캘린더식 4분류(약속/개인/업무/기타).
-// 약속·개인은 투두 시간대 버튼(저녁=핑크/오전=노랑)과 동일한 색을 그대로 재사용해 앱 전체 색 언어를 통일.
+// 약속·개인은 투두 시간대 버튼(저녁=보라/오전=노랑)과 동일한 색을 그대로 재사용해 앱 전체 색 언어를 통일.
 // 업무·기타는 기존 3분류 때 색을 그대로 유지(리듬바 외출/정리 톤).
 const EVENT_CATS={
-  schedule:{label:'약속',color:'rgba(255,175,200,0.9)',textColor:'rgba(200,80,120,0.9)',bg:'rgba(255,175,200,0.22)',icon:'ti-confetti'},
+  schedule:{label:'약속',color:'rgba(185,165,230,0.9)',textColor:'rgba(120,90,180,0.9)',bg:'rgba(185,165,230,0.22)',icon:'ti-confetti'},
   personal:{label:'개인',color:'rgba(250,215,100,0.9)',textColor:'rgba(180,140,0,0.9)',bg:'rgba(250,215,100,0.22)',icon:'ti-chart-bubble'},
   work:{label:'업무',color:'rgba(168,212,232,0.75)',textColor:'#4a7d96',bg:'rgba(168,212,232,0.28)',icon:'ti-moneybag-heart'},
   etc:{label:'기타',color:'rgba(210,224,160,0.82)',textColor:'#7a8a48',bg:'rgba(210,224,160,0.32)',icon:'ti-calendar-smile'}
