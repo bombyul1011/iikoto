@@ -33,10 +33,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 /* ══ EVENT CATEGORY COLORS — 단일 소스. 값 변경 시 여기만 고치면 JS(EVENT_CATS)·모달버튼·캘린더배지에 모두 반영됨 ══ */
 :root{
-  --ev-schedule:rgba(185,165,230,0.9);--ev-schedule-text:rgba(150,120,210,0.85);--ev-schedule-bg:rgba(185,165,230,0.22);--ev-schedule-border:rgba(185,165,230,0.55);
-  --ev-personal:rgba(250,215,100,0.9);--ev-personal-text:rgba(180,140,0,0.9);--ev-personal-bg:rgba(250,215,100,0.22);--ev-personal-border:rgba(250,215,100,0.55);
-  --ev-work:rgba(168,212,232,0.75);--ev-work-text:#4a7d96;--ev-work-bg:rgba(168,212,232,0.28);--ev-work-border:rgba(168,212,232,0.6);
-  --ev-etc:rgba(210,224,160,0.82);--ev-etc-text:#7a8a48;--ev-etc-bg:rgba(210,224,160,0.32);--ev-etc-border:rgba(210,224,160,0.6);
+  --ev-schedule:rgba(185,165,230,0.9);--ev-schedule-text:rgba(150,120,210,0.78);--ev-schedule-bg:rgba(185,165,230,0.22);--ev-schedule-border:rgba(185,165,230,0.55);
+  --ev-personal:rgba(250,215,100,0.9);--ev-personal-text:rgba(180,140,0,0.8);--ev-personal-bg:rgba(250,215,100,0.22);--ev-personal-border:rgba(250,215,100,0.55);
+  --ev-work:rgba(168,212,232,0.75);--ev-work-text:rgba(74,125,150,0.85);--ev-work-bg:rgba(168,212,232,0.28);--ev-work-border:rgba(168,212,232,0.6);
+  --ev-etc:rgba(210,224,160,0.82);--ev-etc-text:rgba(122,138,72,0.85);--ev-etc-bg:rgba(210,224,160,0.32);--ev-etc-border:rgba(210,224,160,0.6);
 }
 /* ══ THEME TOKENS ══ */
 :root,[data-theme="light"]{
@@ -180,15 +180,15 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .sleep-collapsed-row{display:none;align-items:center;gap:8px;padding:9px 0;position:relative;}
 .sleep-card.collapsed .sleep-collapsed-row{display:flex;}
 .sleep-card.collapsed .sleep-expanded-content{display:none;}
-#sleep-collapsed-score{color:#6b6f85;}
+#sleep-collapsed-score{color:#8a8078;}
 .sleep-collapsed-mid{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;align-items:center;gap:6px;white-space:nowrap;}
-.sleep-collapsed-icon{font-size:13px;color:#6b6f85;}
+.sleep-collapsed-icon{font-size:13px;color:#8a8078;}
 .sleep-collapsed-time{font-size:12.5px;color:#3d3d42;font-variant-numeric:tabular-nums;font-weight:500;}
 .sleep-collapsed-dur{font-size:11px;color:#75757f;flex-shrink:0;margin-left:auto;}
-.sleep-collapsed-arrow{font-size:13px;color:#6b6f85;transition:transform .2s;flex-shrink:0;}
+.sleep-collapsed-arrow{font-size:13px;color:#8a8078;transition:transform .2s;flex-shrink:0;}
 .sleep-top{display:flex;align-items:center;gap:5px;}
-.sleep-top-num{font-size:12px;font-weight:500;color:#6b6f85;letter-spacing:.02em;}
-.sleep-top-unit{font-size:12px;color:#6b6f85;letter-spacing:.02em;}
+.sleep-top-num{font-size:12px;font-weight:500;color:#8a8078;letter-spacing:.02em;}
+.sleep-top-unit{font-size:12px;color:#8a8078;letter-spacing:.02em;}
 .sleep-curve{margin-top:8px;height:10px;display:block;width:100%;}
 .sleep-curve-wrap{position:relative;margin:14px 9px 0;height:10px;}
 .sleep-curve-wrap .sleep-curve{margin-top:0;position:absolute;top:0;left:0;}
@@ -196,11 +196,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 #sleep-badge-start{background:#8a7ab0;}
 #sleep-badge-end{background:#e0a860;}
 .sleep-avg-marker{position:absolute;top:50%;width:1.5px;height:14px;background:rgba(180,168,155,0.32);transform:translate(-50%,-50%);pointer-events:none;z-index:1;}
-.sleep-avg-compare{font-size:11px;color:#6b6f85;margin-top:4px;text-align:left;}
+.sleep-avg-compare{font-size:11px;color:#8a8078;margin-top:4px;text-align:left;}
 .sleep-times{display:flex;justify-content:space-between;align-items:flex-start;margin-top:6px;}
 .sleep-time-item{display:flex;align-items:center;gap:5px;cursor:pointer;}
 .sleep-time-item i{font-size:13px;color:var(--tm);}
-.sleep-time-val{font-size:14px;color:#6b6f85;font-weight:500;}
+.sleep-time-val{font-size:14px;color:#8a8078;font-weight:500;}
 .sleep-btn{width:26px;height:26px;background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
 .sleep-btn:active{opacity:.5;}
 .sleep-btn i{font-size:16px;color:#a89088;}
@@ -5286,7 +5286,7 @@ function renderSleepCollapsedRow(s,w){
   if(scoreEl&&srcBadge){
     scoreEl.innerHTML=srcBadge.innerHTML;
     const icon=scoreEl.querySelector('i');
-    if(icon)icon.style.color='#6b6f85'; // 인라인 color:var(--tm)를 접힌 배너 톤(연한 남색 무채)에 맞게 재적용 — CSS만으로는 인라인 스타일을 못 덮어씀
+    if(icon)icon.style.color='#8a8078'; // 인라인 color:var(--tm)를 접힌 배너 톤(연한 남색 무채)에 맞게 재적용 — CSS만으로는 인라인 스타일을 못 덮어씀
   }
   const sEl=document.getElementById('sleep-collapsed-sleep'),wEl=document.getElementById('sleep-collapsed-wake'),dEl=document.getElementById('sleep-collapsed-dur');
   if(sEl)sEl.textContent=s&&s!=='--:--'?s:'--:--';
@@ -7031,6 +7031,14 @@ function _paceAdjustMin(min){return toDawnAdjustedMin(min,PACE_DOT_RANGE_START);
 function _paceDayEvents(dk){
   const events=[];
   getTodos(dk).forEach(t=>{
+    if(t.isEvent){
+      // 일정은 완료 개념이 없어 eventTime(사용자가 지정한 시각)을 그대로 좌표로 사용. 시간 미지정 일정은 찍을 좌표가 없어 제외.
+      if(!t.eventTime)return;
+      const p=t.eventTime.split(':');
+      const {parts}=parseTodoTextParts(t.text);
+      events.push({type:'event',min:_paceAdjustMin(parseInt(p[0],10)*60+parseInt(p[1],10)),label:parts[0]||t.text||''});
+      return;
+    }
     const st=t.strikeTimes||{};
     const timeEntries=Object.entries(st).filter(([,v])=>typeof v==='number');
     if(timeEntries.length){
@@ -7101,7 +7109,7 @@ function _paceHourMarksHtml(rangeStart,rangeEnd,lineClass,labelClass){
 // 오늘 하루 활동 시각 분포를 작은 점 타임라인(HTML)으로 렌더링.
 // 활동이 거의 없는 0~6시는 제외하고 6~24시 구간만 넓게 표시.
 // 겹치는 시각대는 그룹으로 묶어 시간순으로 좌우에 살짝씩 벌려 배치(가로 분산).
-const PACE_DOT_COLORS={todo:'#e8a0ac',habit:'#a3c9ae',morning:'#f2cf8e'};
+const PACE_DOT_COLORS={todo:'#e8a0ac',habit:'#a3c9ae',morning:'#f2cf8e',event:'#b9a5e6'};
 const PACE_DOT_RANGE_START=6*60; // 06:00
 const PACE_DOT_RANGE_END=24*60; // 24:00
 function _paceDotTimelineHtml(dk){

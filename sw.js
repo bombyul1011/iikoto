@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260813-34-sleep-text-color-refine';
+const CACHE = 'iikoto-v20260813-37-event-text-color-alpha-up';
 const ASSETS = [
   './',
   './index.html'
