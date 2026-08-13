@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260813-21-edit-event-from-calendar';
+const CACHE = 'iikoto-v20260813-27-sleep-collapse-reset-color-layout';
 const ASSETS = [
   './',
   './index.html'
