@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260813-28-sleep-navy-final-footsteps-icon';
+const CACHE = 'iikoto-v20260813-29-moneybag-heart-center-align';
 const ASSETS = [
   './',
   './index.html'
