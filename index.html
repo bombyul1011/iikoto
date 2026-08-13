@@ -226,7 +226,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .meal-time-group{display:flex;align-items:center;gap:1px;flex-shrink:0;min-width:52px;justify-content:flex-end;}
 .meal-time-clear{cursor:pointer;color:var(--tm);font-size:12px;padding:0 3px 0 0;flex-shrink:0;}
 .meal-cat{width:38px;flex-shrink:0;font-size:13px;color:var(--tm);margin-right:6px;}
-.meal-time-inp{width:62px;flex-shrink:0;background:none;border:none;outline:none;font-family:'DM Sans',sans-serif;font-size:12px;color:var(--ts);padding:5px 2px 4px 6px;text-align:right;font-variant-numeric:tabular-nums;}
+.meal-time-inp{width:62px;flex-shrink:0;background:none;border:none;outline:none;font-family:'DM Sans',sans-serif;font-size:12px;color:var(--ts);padding:5px 2px 4px 6px;text-align:right;font-variant-numeric:tabular-nums;cursor:pointer;}
 .cm-star-picker{display:flex;gap:3px;flex:1;}
 @keyframes discSpin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
 .playlist-disc-spin{display:inline-block;animation:discSpin 3s linear infinite;}
@@ -378,8 +378,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .todo-event-sel button.ev-personal.active{background:rgba(250,215,100,0.22);border-color:rgba(250,215,100,0.55);color:rgba(180,140,0,0.9);}
 .todo-event-sel button.ev-work.active{background:rgba(168,212,232,0.28);border-color:rgba(168,212,232,0.6);color:#4a7d96;}
 .todo-event-sel button.ev-etc.active{background:rgba(210,224,160,0.32);border-color:rgba(210,224,160,0.6);color:#7a8a48;}
-.todo-event-time-row{display:flex;align-items:center;gap:8px;margin:8px 0 4px;padding:8px 12px;border-radius:10px;border:1px solid var(--card-b);background:var(--card);color:var(--tm);}
-.todo-event-time-inp{flex:1;background:none;border:none;outline:none;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--tp);font-variant-numeric:tabular-nums;}
+.todo-event-time-row{display:flex;align-items:center;gap:8px;margin:8px 0 4px;padding:8px 12px;border-radius:10px;border:1px solid var(--card-b);background:var(--card);color:var(--tm);cursor:pointer;}
+.todo-event-time-inp{flex:1;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--tp);font-variant-numeric:tabular-nums;}
 .todo-event-time-clear{cursor:pointer;font-size:11px;color:var(--tm);padding:2px 4px;}
 /* 할일/일정 책갈피형 탭 — 선택된 쪽이 아래로 살짝 튀어나온 듯 강조되고, 나머지는 뒤로 물러난 톤 */
 /* 할일/일정 탭 — 모달 상단 패딩을 상쇄해 팝업 전체 폭에 걸치도록, 모서리 둥근 정도는 모달과 동일하게 이어받음 */
@@ -1648,10 +1648,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <button class="ev-work" onclick="selectTodoEventCat('work',this)"><i class="ti ti-moneybag-heart ico-sz-13" aria-hidden="true"></i> 업무</button>
       <button class="ev-etc" onclick="selectTodoEventCat('etc',this)"><i class="ti ti-calendar-smile ico-sz-13" aria-hidden="true"></i> 기타</button>
     </div>
-    <div class="todo-event-time-row" id="todo-event-time-row" style="display:none;">
+    <div class="todo-event-time-row" id="todo-event-time-row" style="display:none;" onclick="openEventTimePicker()">
       <i class="ti ti-clock ico-sz-13" aria-hidden="true"></i>
-      <input type="time" class="todo-event-time-inp" id="todo-event-time-inp" step="60" lang="en-GB" oninput="document.getElementById('todo-event-time-clear').style.display=this.value?'block':'none';">
-      <span class="todo-event-time-clear" id="todo-event-time-clear" onclick="clearTodoEventTime()" title="시간 지우기" style="display:none;">✕</span>
+      <span class="todo-event-time-inp" id="todo-event-time-inp" data-value="">시간 선택</span>
+      <span class="todo-event-time-clear" id="todo-event-time-clear" onclick="event.stopPropagation();clearTodoEventTime()" title="시간 지우기" style="display:none;">✕</span>
     </div>
     <div class="modal-actions">
       <button class="mbtn cancel" onclick="closeTodoModal()">취소</button>
@@ -5518,6 +5518,20 @@ function confirmTime(){
   }
   if(_sleepTarget==='rblock-start'){_rhythmFormStart=v;closeModal('time-modal');refreshRhythmTrack();return;}
   if(_sleepTarget==='rblock-end'){_rhythmFormEnd=v;closeModal('time-modal');refreshRhythmTrack();return;}
+  if(_sleepTarget==='event'){
+    const inp=document.getElementById('todo-event-time-inp');
+    inp.dataset.value=v;inp.textContent=v;
+    document.getElementById('todo-event-time-clear').style.display='block';
+    closeModal('time-modal');
+    return;
+  }
+  if(_sleepTarget==='meal'){
+    const {dk,k}=_mealTimeTarget;
+    patchMealField(dk,k,'time',v);
+    refreshMealTimeGroup(dk,k,v);
+    closeModal('time-modal');
+    return;
+  }
   const dk=dateKey(currentDate),d=getSleep(dk);
   if(_sleepTarget==='sleep')d.sleep=v;else d.wake=v;
   saveSleepData(dk,d);loadSleep();closeModal('time-modal');
@@ -7696,8 +7710,9 @@ function openTodoModal(editIdx=-1){
   modal.dataset.eventCat=ec;
   // 일정 시간 초기화
   const evTimeInp=document.getElementById('todo-event-time-inp');
-  evTimeInp.value=existing?.eventTime||'';
-  document.getElementById('todo-event-time-clear').style.display=evTimeInp.value?'block':'none';
+  const evTimeVal=existing?.eventTime||'';
+  evTimeInp.dataset.value=evTimeVal;evTimeInp.textContent=evTimeVal||'시간 선택';
+  document.getElementById('todo-event-time-clear').style.display=evTimeVal?'block':'none';
   // 할일/일정 탭 초기화 — 기존 항목의 isEvent 값에 따라, 신규는 항상 '할일' 탭에서 시작
   selectTodoKind(existing?.isEvent?'event':'todo',document.querySelector(`.todo-kind-tabs button.tk-${existing?.isEvent?'event':'todo'}`));
   openModal('todo-modal');setTimeout(()=>document.getElementById('todo-modal-inp').focus(),100);
@@ -7712,8 +7727,18 @@ function selectTodoKind(kind,btn){
   document.getElementById('todo-event-time-row').style.display=kind==='event'?'flex':'none';
 }
 function clearTodoEventTime(){
-  document.getElementById('todo-event-time-inp').value='';
+  const inp=document.getElementById('todo-event-time-inp');
+  inp.dataset.value='';inp.textContent='시간 선택';
   document.getElementById('todo-event-time-clear').style.display='none';
+}
+function openEventTimePicker(){
+  _sleepTarget='event';
+  const inp=document.getElementById('todo-event-time-inp');
+  const n=new Date();
+  const current=inp.dataset.value||`${pad(n.getHours())}:${pad(n.getMinutes())}`;
+  document.getElementById('time-modal-title').textContent='일정 시간';
+  document.getElementById('time-inp').value=current;
+  openModal('time-modal');
 }
 function selectTodoTime(ts,btn){
   document.querySelectorAll('.todo-time-sel button').forEach(b=>b.classList.remove('active'));
@@ -7735,7 +7760,7 @@ function confirmTodo(){
   const timeSection=modal.dataset.timeSection||'none';
   const isEvent=modal.dataset.kind==='event';
   const eventCat=isEvent?(modal.dataset.eventCat||'schedule'):'';
-  const eventTime=isEvent?(document.getElementById('todo-event-time-inp').value||null):null;
+  const eventTime=isEvent?(document.getElementById('todo-event-time-inp').dataset.value||null):null;
   if(editIdx>=0&&todos[editIdx]){
     const old=todos[editIdx];
     // 조각(strikeParts)이 있는 투두의 텍스트를 수기 편집하면, 조각 개수/순서가 바뀔 수 있음.
@@ -10075,7 +10100,7 @@ function mealCatPressEnd(){
 // 시간 입력창(type=time) 자체엔 지우기 버튼이 없어 한번 넣은 시간을 못 지우던 문제 — 별도 X 버튼으로 지원.
 function clearMealTime(dk,k){
   const tEl=document.getElementById(`wm-${dk}-${k}-time`);
-  if(tEl)tEl.value='';
+  if(tEl)tEl.dataset.value='';
   patchMealField(dk,k,'time','');
   refreshMealTimeGroup(dk,k,'');
 }
@@ -10088,16 +10113,21 @@ function saveMealMenu(dk,k){
   if(!val){
     patchMealField(dk,k,'time','');
     const tEl=document.getElementById(`wm-${dk}-${k}-time`);
-    if(tEl)tEl.value='';
+    if(tEl)tEl.dataset.value='';
     refreshMealTimeGroup(dk,k,'');
   }
 }
-// 시간 input(onchange, 모바일 전용 — PC는 이 input 자체가 DOM에 없어 호출될 일이 없음) — 시간 필드만 patch.
-function saveMealTimeInput(dk,k){
+// 식사 시간 피커 — 취침/메모/일정과 동일한 공용 time-modal 재사용
+let _mealTimeTarget=null;
+function openMealTimePicker(dk,k){
+  _sleepTarget='meal';
+  _mealTimeTarget={dk,k};
   const tEl=document.getElementById(`wm-${dk}-${k}-time`);
-  const val=tEl?tEl.value:'';
-  patchMealField(dk,k,'time',val);
-  refreshMealTimeGroup(dk,k,val);
+  const n=new Date();
+  const current=(tEl&&tEl.dataset.value)||`${pad(n.getHours())}:${pad(n.getMinutes())}`;
+  document.getElementById('time-modal-title').textContent=(MEAL_LABELS[k]||'식사')+' 시간';
+  document.getElementById('time-inp').value=current;
+  openModal('time-modal');
 }
 // 시간 입력 직후 ✕ 지우기 버튼과 빈값 스타일이 재진입 없이 바로 반영되도록 meal-time-group만 다시 그림.
 function refreshMealTimeGroup(dk,k,tVal){
@@ -10105,6 +10135,8 @@ function refreshMealTimeGroup(dk,k,tVal){
   if(!tEl)return;
   const group=tEl.parentElement;if(!group)return;
   tEl.classList.toggle('mt-empty',!tVal);
+  tEl.textContent=tVal||'--:--';
+  tEl.dataset.value=tVal||'';
   group.querySelectorAll('.meal-time-clear').forEach(b=>b.remove());
   if(tVal){
     const clearBtn=document.createElement('span');
@@ -10139,7 +10171,7 @@ function openWeekMealSheet(){
         // PC에서는 시간을 읽기 전용 텍스트로만 표기(24시간제)하고, 입력/수정은 모바일 또는
         // 오늘탭 "오늘 뭐 먹지" 체크 기능에서 하도록 분리함.
         const timeBlock=_isTouchDevice()
-          ? `<input class="meal-time-inp${tVal?'':' mt-empty'}" id="wm-${dk}-${k}-time" type="time" value="${tVal}" onchange="saveMealTimeInput('${dk}','${k}')" step="60" lang="en-GB">${tVal?`<span onclick="clearMealTime('${dk}','${k}')" class="meal-time-clear" title="시간 지우기">✕</span>`:''}`
+          ? `<span class="meal-time-inp${tVal?'':' mt-empty'}" id="wm-${dk}-${k}-time" data-value="${tVal}" onclick="openMealTimePicker('${dk}','${k}')">${tVal||'--:--'}</span>${tVal?`<span onclick="clearMealTime('${dk}','${k}')" class="meal-time-clear" title="시간 지우기">✕</span>`:''}`
           : (tVal?`<span class="meal-time-readonly">${tVal}</span>`:'');
         return `<div class="meal-row"><div class="meal-cat" onpointerdown="mealCatPressStart(this,'${dk}','${k}')" onpointerup="mealCatPressEnd(this)" onpointerleave="mealCatPressEnd(this)" onpointercancel="mealCatPressEnd(this)">${label}</div><input class="meal-inp" style="flex:1 1 0;min-width:0;" id="wm-${dk}-${k}" type="text" placeholder="메뉴 입력" autocomplete="off" value="${(m[k]||'').replace(/"/g,'&quot;')}" onblur="saveMealMenu('${dk}','${k}')"><div class="meal-time-group">${timeBlock}</div></div>`;
       }).join('');
