@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260813-27-sleep-collapse-reset-color-layout';
+const CACHE = 'iikoto-v20260813-28-sleep-navy-final-footsteps-icon';
 const ASSETS = [
   './',
   './index.html'

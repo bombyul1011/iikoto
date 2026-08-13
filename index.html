@@ -74,6 +74,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --glass-chip-bg:rgba(253,251,245,0.95); /* 완료칩/배너 등 14곳에서 반복되던 배경색 통합 */
 }
 [data-theme="glass"] .card,[data-theme="glass"] .sleep-card,[data-theme="glass"] .habit-week-box{border-width:1.4px;box-shadow:0 1.5px 1.5px rgba(255,255,255,0.9) inset,0 -8px 14px -10px rgba(120,110,95,0.15) inset,0 5px 14px rgba(150,140,120,0.08);}
+[data-theme="glass"] .sleep-card.collapsed{background:var(--card);border-color:rgba(95,115,170,0.55);}
 [data-theme="glass"] #daily-meal-card{background:rgba(255,253,248,0.45)!important;border-color:rgba(150,195,130,0.55)!important;}
 [data-theme="glass"] .meal-soft{filter:none;}
 [data-theme="glass"] .rd-top-inner{background:rgba(253,251,245,0.92);}
@@ -167,16 +168,16 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 /* ── SLEEP ── */
 .sleep-card{position:relative;border-radius:20px;padding:16px 18px 14px;margin-bottom:14px;overflow:hidden;background:var(--sleep-b);border:1px solid var(--sleep-bb);}
-.sleep-card.collapsed{padding:4px 14px;cursor:pointer;background:linear-gradient(120deg,rgba(190,178,222,0.18) 0%,rgba(222,192,202,0.16) 100%);border-color:rgba(190,175,215,0.32);}
+.sleep-card.collapsed{padding:4px 14px;cursor:pointer;background:linear-gradient(120deg,rgba(95,115,170,0.08) 0%,rgba(156,143,192,0.07) 100%);border-color:rgba(110,120,175,0.20);}
 .sleep-collapsed-row{display:none;align-items:center;gap:8px;padding:9px 0;}
 .sleep-card.collapsed .sleep-collapsed-row{display:flex;}
 .sleep-card.collapsed .sleep-expanded-content{display:none;}
-#sleep-collapsed-score{color:#8a7ba8;}
+#sleep-collapsed-score{color:#6b6f85;}
 .sleep-collapsed-mid{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;}
-.sleep-collapsed-icon{font-size:13px;color:#8a7ba8;}
-.sleep-collapsed-time{font-size:12.5px;color:#5a4a68;font-variant-numeric:tabular-nums;font-weight:500;}
-.sleep-collapsed-dur{font-size:11px;color:#8a7592;flex-shrink:0;}
-.sleep-collapsed-arrow{font-size:13px;color:#8a7ba8;transition:transform .2s;flex-shrink:0;}
+.sleep-collapsed-icon{font-size:13px;color:#6b6f85;}
+.sleep-collapsed-time{font-size:12.5px;color:#3d3d42;font-variant-numeric:tabular-nums;font-weight:500;}
+.sleep-collapsed-dur{font-size:11px;color:#75757f;flex-shrink:0;}
+.sleep-collapsed-arrow{font-size:13px;color:#6b6f85;transition:transform .2s;flex-shrink:0;}
 .sleep-top{display:flex;align-items:center;gap:5px;}
 .sleep-top-num{font-size:12px;font-weight:400;color:var(--tm);letter-spacing:.10em;}
 .sleep-top-unit{font-size:12px;color:var(--tm);letter-spacing:.10em;}
@@ -1644,7 +1645,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div class="todo-event-sel" id="todo-event-sel" style="display:none;">
       <button class="ev-schedule active" onclick="selectTodoEventCat('schedule',this)"><i class="ti ti-pacman ico-sz-13" aria-hidden="true"></i> 약속</button>
       <button class="ev-personal" onclick="selectTodoEventCat('personal',this)"><i class="ti ti-chart-bubble ico-sz-13" aria-hidden="true"></i> 개인</button>
-      <button class="ev-work" onclick="selectTodoEventCat('work',this)"><i class="ti ti-run-sprint ico-sz-13" aria-hidden="true"></i> 업무</button>
+      <button class="ev-work" onclick="selectTodoEventCat('work',this)"><i class="ti ti-footsteps ico-sz-13" aria-hidden="true"></i> 업무</button>
       <button class="ev-etc" onclick="selectTodoEventCat('etc',this)"><i class="ti ti-calendar-smile ico-sz-13" aria-hidden="true"></i> 기타</button>
     </div>
     <div class="todo-event-time-row" id="todo-event-time-row" style="display:none;">
@@ -2267,7 +2268,7 @@ function getRhythmColor(key){
 const EVENT_CATS={
   schedule:{label:'약속',color:'rgba(185,165,230,0.9)',textColor:'rgba(120,90,180,0.9)',bg:'rgba(185,165,230,0.22)',icon:'ti-pacman'},
   personal:{label:'개인',color:'rgba(250,215,100,0.9)',textColor:'rgba(180,140,0,0.9)',bg:'rgba(250,215,100,0.22)',icon:'ti-chart-bubble'},
-  work:{label:'업무',color:'rgba(168,212,232,0.75)',textColor:'#4a7d96',bg:'rgba(168,212,232,0.28)',icon:'ti-run-sprint'},
+  work:{label:'업무',color:'rgba(168,212,232,0.75)',textColor:'#4a7d96',bg:'rgba(168,212,232,0.28)',icon:'ti-footsteps'},
   etc:{label:'기타',color:'rgba(210,224,160,0.82)',textColor:'#7a8a48',bg:'rgba(210,224,160,0.32)',icon:'ti-calendar-smile'}
 };
 function getEventCat(key){return EVENT_CATS[key]||EVENT_CATS.etc;}
@@ -5273,7 +5274,7 @@ function renderSleepCollapsedRow(s,w){
   if(scoreEl&&srcBadge){
     scoreEl.innerHTML=srcBadge.innerHTML;
     const icon=scoreEl.querySelector('i');
-    if(icon)icon.style.color='#8a7ba8'; // 인라인 color:var(--tm)를 접힌 배너 톤(보라)에 맞게 재적용 — CSS만으로는 인라인 스타일을 못 덮어씀
+    if(icon)icon.style.color='#6b6f85'; // 인라인 color:var(--tm)를 접힌 배너 톤(연한 남색 무채)에 맞게 재적용 — CSS만으로는 인라인 스타일을 못 덮어씀
   }
   const sEl=document.getElementById('sleep-collapsed-sleep'),wEl=document.getElementById('sleep-collapsed-wake'),dEl=document.getElementById('sleep-collapsed-dur');
   if(sEl)sEl.textContent=s&&s!=='--:--'?s:'--:--';
