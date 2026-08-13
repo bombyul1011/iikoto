@@ -1655,7 +1655,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <!-- 아이콘은 EVENT_CATS(JS)와 이 4개 버튼 두 곳에 각각 하드코딩됨 — 아이콘 변경 시 반드시 둘 다 수정. 색상은 CSS 변수(--ev-*)로 단일화되어 여기 손댈 필요 없음. -->
     <div class="todo-event-sel" id="todo-event-sel" style="display:none;">
       <button class="ev-schedule active" onclick="selectTodoEventCat('schedule',this)"><i class="ti ti-confetti ico-sz-13" aria-hidden="true"></i> 약속</button>
-      <button class="ev-personal" onclick="selectTodoEventCat('personal',this)"><i class="ti ti-chart-bubble ico-sz-13" aria-hidden="true"></i> 개인</button>
+      <button class="ev-personal" onclick="selectTodoEventCat('personal',this)"><i class="ti ti-plant ico-sz-13" aria-hidden="true"></i> 개인</button>
       <button class="ev-work" onclick="selectTodoEventCat('work',this)"><i class="ti ti-moneybag-heart ico-sz-13" aria-hidden="true"></i> 업무</button>
       <button class="ev-etc" onclick="selectTodoEventCat('etc',this)"><i class="ti ti-calendar-smile ico-sz-13" aria-hidden="true"></i> 기타</button>
     </div>
@@ -2279,7 +2279,7 @@ function getRhythmColor(key){
 function _evVar(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim();}
 const EVENT_CATS={
   schedule:{label:'약속',color:_evVar('--ev-schedule'),textColor:_evVar('--ev-schedule-text'),bg:_evVar('--ev-schedule-bg'),icon:'ti-confetti'},
-  personal:{label:'개인',color:_evVar('--ev-personal'),textColor:_evVar('--ev-personal-text'),bg:_evVar('--ev-personal-bg'),icon:'ti-chart-bubble'},
+  personal:{label:'개인',color:_evVar('--ev-personal'),textColor:_evVar('--ev-personal-text'),bg:_evVar('--ev-personal-bg'),icon:'ti-plant'},
   work:{label:'업무',color:_evVar('--ev-work'),textColor:_evVar('--ev-work-text'),bg:_evVar('--ev-work-bg'),icon:'ti-moneybag-heart'},
   etc:{label:'기타',color:_evVar('--ev-etc'),textColor:_evVar('--ev-etc-text'),bg:_evVar('--ev-etc-bg'),icon:'ti-calendar-smile'}
 };
