@@ -11299,10 +11299,9 @@ async function _drawQuoteCardH(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
   }
   if(showInfo){
     const fy=ty+gapBeforeFooter;
-    ctx.strokeStyle=isWhite?'rgba(255,255,255,0.3)':'rgba(154,128,112,0.3)';
-    ctx.setLineDash([6,6]);ctx.lineWidth=1.5;
+    ctx.strokeStyle=isWhite?'rgba(255,255,255,0.18)':'rgba(154,128,112,0.18)';
+    ctx.lineWidth=1;
     ctx.beginPath();ctx.moveTo(px+padLeft,fy);ctx.lineTo(px+pw-padRight,fy);ctx.stroke();
-    ctx.setLineDash([]);
     ctx.font='600 26px "DM Sans",sans-serif';
     ctx.fillStyle=textColor;
     const title=book.title||'';
@@ -11414,10 +11413,9 @@ async function _drawQuoteCardJ(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
   }
   if(showInfo){
     const fy=ty+gapBeforeFooter;
-    ctx.strokeStyle=dashColor;
-    ctx.setLineDash([6,6]);ctx.lineWidth=1.5;
+    ctx.strokeStyle=isWhite?'rgba(255,255,255,0.18)':'rgba(90,64,64,0.18)';
+    ctx.lineWidth=1;
     ctx.beginPath();ctx.moveTo(px+padX,fy);ctx.lineTo(px+pw-padX,fy);ctx.stroke();
-    ctx.setLineDash([]);
     ctx.font='600 26px "DM Sans",sans-serif';
     ctx.fillStyle=textColor;
     ctx.textAlign='center';
@@ -11629,6 +11627,19 @@ function _cycleAlignMode(){
   _renderShareModal();
 }
 // 인용부호 토글 — 켤 때는 자동으로 중앙정렬(따옴표 스타일에 어울림), 끌 때는 이전 정렬로 복귀.
+function _selectShareStyle(k){
+  const ctx=_shareModalCtx;
+  const wasJ=ctx.styleKey==='J';
+  ctx.styleKey=k;
+  // J(점선형)은 기본 노출이 중앙정렬 — 진입 시 이전 정렬 백업 후 중앙으로, 이탈 시 복귀
+  if(k==='J'&&!wasJ){
+    ctx._prevAlignMode=ctx.alignMode||'left';
+    ctx.alignMode='center';
+  }else if(k!=='J'&&wasJ){
+    ctx.alignMode=ctx._prevAlignMode||'left';
+  }
+  _renderShareModal();
+}
 function _toggleQuoteMark(){
   const ctx=_shareModalCtx;
   ctx.quoteMark=!ctx.quoteMark;
@@ -11662,7 +11673,7 @@ async function _renderShareModal(){
   // 스타일 선택: 가로로 길고 얇은 배너 4칸(한 줄), 향후 스타일 추가를 위한 여유 슬롯 포함
   const styleKeys=Object.keys(styles);
   const styleSlotCount=Math.max(4,styleKeys.length);
-  const styleBanners=styleKeys.map(k=>_shareStyleBanner(k===ctx.styleKey,`_shareModalCtx.styleKey='${k}';_renderShareModal();`,styles[k].label));
+  const styleBanners=styleKeys.map(k=>_shareStyleBanner(k===ctx.styleKey,`_selectShareStyle('${k}');`,styles[k].label));
   while(styleBanners.length<styleSlotCount)styleBanners.push(`<div style="flex:1;min-width:0;height:46px;border-radius:14px;border:1.5px dashed rgba(154,128,112,0.45);"></div>`);
   const styleBannerRow=`<div style="display:flex;gap:8px;margin-bottom:14px;">${styleBanners.join('')}</div>`;
   // 색상: 반반 원 하나로 브라운/아이보리 토글 (클릭 시 전환)

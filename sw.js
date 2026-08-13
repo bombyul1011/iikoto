@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260813-10-simplify-sidebar-fixed-card';
+const CACHE = 'iikoto-v20260813-11-thin-bookinfo-divider-j-center';
 const ASSETS = [
   './',
   './index.html'
