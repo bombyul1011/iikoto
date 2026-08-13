@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260813-39-monthly-content-habit-neutral-card';
+const CACHE = 'iikoto-v20260813-42-tt-cell-border-alpha-up';
 const ASSETS = [
   './',
   './index.html'
