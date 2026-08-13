@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260813-8-unify-j-text-color';
+const CACHE = 'iikoto-v20260813-9-remove-reading-wishlist';
 const ASSETS = [
   './',
   './index.html'

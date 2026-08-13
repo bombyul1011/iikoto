@@ -1936,7 +1936,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div class="rd-tab on" data-status="reading" onclick="switchReadingTab(this,'reading')">읽는 중</div>
         <div class="rd-tab" data-status="done" onclick="switchReadingTab(this,'done')">다 읽음</div>
         <div class="rd-tab" data-status="paused" onclick="switchReadingTab(this,'paused')">중단</div>
-        <div class="rd-tab" data-status="wish" onclick="switchReadingTab(this,'wish')"><i class="ti ti-star-filled ico-sz-13" aria-hidden="true"></i></div>
       </div>
       <div id="rd-book-list"></div>
     </div>
@@ -1968,10 +1967,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 <div class="modal-ov" id="add-book-modal" onclick="closeModal('add-book-modal',event)">
   <div class="modal" onclick="event.stopPropagation()">
     <div class="modal-title">책 추가</div>
-    <div class="rd-tabs" style="margin-bottom:10px;">
-      <div class="rd-tab on" id="rd-status-wish" onclick="setRdAddStatus('wish')"><i class="ti ti-star-filled ico-sz-13" aria-hidden="true"></i></div>
-      <div class="rd-tab" id="rd-status-reading" onclick="setRdAddStatus('reading')">읽는 중</div>
-    </div>
     <div class="api-search-wrap">
       <input class="modal-inp" id="rd-new-title" type="text" placeholder="책 제목" autocomplete="off" oninput="onRdTitleInput(this.value)" onblur="setTimeout(()=>{const r=document.getElementById('rd-wish-results');if(r)r.style.display='none';},200)">
       <div class="api-results" id="rd-wish-results" style="display:none;"></div>
@@ -10575,7 +10570,7 @@ function renderRdMonthStat(){
 }
 function renderRdCovers(){
   const el=document.getElementById('rd-cover-row');if(!el)return;
-  const covers=getBooks().filter(b=>b.poster&&b.status!=='wish').sort((a,b)=>(b.created||0)-(a.created||0)).slice(0,5);
+  const covers=getBooks().filter(b=>b.poster).sort((a,b)=>(b.created||0)-(a.created||0)).slice(0,5);
   const slots=5;
   let html='';
   for(let i=0;i<slots;i++){
@@ -10703,25 +10698,8 @@ function renderBookList(){
 function toggleBookDetail(cid){_rdOpenCid=_rdOpenCid===cid?null:cid;_rdDoneQuoteBookCid=null;renderBookList();}
 function setBookStatus(cid,status){
   const book=getBooks().find(b=>b.cid===cid);if(!book)return;
-  const wasWish=book.status==='wish';
   book.status=status;
   if(status==='done')book.completedAt=dateKey(new Date());
-  // 위시 상태였던 책을 읽는중/다읽음/중단으로 바꾸는 경우 — 위시로 등록될 땐 콘텐츠 연결
-  // 정보(linkedContent/contentMk) 자체가 없었으므로, 여기서 최초로 콘텐츠 항목을 만들고
-  // 연결해줘야 함. 시작일은 상태를 바꾼 오늘로 잡음.
-  if(wasWish&&status!=='wish'&&!book.linkedContent){
-    const today=dateKey(new Date());
-    const mk=monthKey(new Date());
-    const STATUS_MAP={reading:'watching',done:'done',paused:'stopped'};
-    const cStatus=STATUS_MAP[status]||'watching';
-    book.linkedContent=true;book.contentMk=mk;book.contentTitle=book.title;
-    const contents=getContents(mk);
-    contents.push({cat:'book',title:book.title,startDate:today,endDate:cStatus==='watching'?null:today,status:cStatus,review:'',stars:0,poster:book.poster||null,author:book.author||'',created:Date.now(),cid:genCid()});
-    saveContents(mk,contents);
-    upsertBookLocal(book);
-    renderReadingHub();
-    return;
-  }
   upsertBookLocal(book);
   if(book.linkedContent&&book.contentMk)syncReadingBookToContent(book,status);
   renderReadingHub();
@@ -10777,22 +10755,13 @@ const SHARE_CYCLE = {
   progress: [['none','진행률 없음'],['top','진행률 · 상단좌'],['topright','진행률 · 상단우'],['bottom','진행률 · 하단']],
   cover: [['none','표지 없음'],['bl','표지 · 좌하단'],['bl-title','표지 · 좌하단+제목'],['br','표지 · 우하단'],['br-title','표지 · 우하단+제목'],['tl','표지 · 좌상단'],['tl-title','표지 · 좌상단+제목'],['tr','표지 · 우상단'],['tr-title','표지 · 우상단+제목']]
 };
-let _rdAddStatus='reading';
 function openAddBookModal(){
   document.getElementById('rd-new-title').value='';
   document.getElementById('rd-new-total').value='';
   document.getElementById('rd-wish-results').style.display='none';
   _rdNewPoster=null;_rdNewAuthor='';
-  // 위시가 우선 노출 — 아카이브 탭 상태와 무관하게 항상 위시를 기본 선택으로 잡음
-  setRdAddStatus('wish');
   setRdUnit('percent');
   openModal('add-book-modal');
-}
-function setRdAddStatus(s){
-  _rdAddStatus=s;
-  document.getElementById('rd-status-reading').classList.toggle('on',s==='reading');
-  document.getElementById('rd-status-wish').classList.toggle('on',s==='wish');
-  document.getElementById('rd-progress-fields').style.display=s==='wish'?'none':'';
 }
 let _rdWishTimer=null,_rdNewPoster=null,_rdNewAuthor='';
 function onRdTitleInput(v){
@@ -10832,17 +10801,15 @@ function confirmAddBook(){
   const title=document.getElementById('rd-new-title').value.trim();
   if(!title)return;
   const total=_rdNewUnit==='pages'?(parseInt(document.getElementById('rd-new-total').value,10)||null):null;
-  const status=_rdAddStatus==='wish'?'wish':'reading';
+  const status='reading';
   const today=dateKey(new Date());
   const mk=monthKey(new Date());
   const book={cid:genCid(),title,status,unit:_rdNewUnit,pages:0,totalPages:total,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:null,poster:_rdNewPoster||null,author:_rdNewAuthor||''};
-  // 위시가 아니면 콘텐츠 타임테이블에도 자동 등록 (쌍방 연동)
-  if(status!=='wish'){
-    book.linkedContent=true;book.contentMk=mk;book.contentTitle=title;
-    const contents=getContents(mk);
-    contents.push({cat:'book',title,startDate:today,endDate:null,status:'watching',review:'',stars:0,poster:book.poster,author:book.author,created:Date.now(),cid:genCid()});
-    saveContents(mk,contents);
-  }
+  // 콘텐츠 타임테이블에도 자동 등록 (쌍방 연동)
+  book.linkedContent=true;book.contentMk=mk;book.contentTitle=title;
+  const contents=getContents(mk);
+  contents.push({cat:'book',title,startDate:today,endDate:null,status:'watching',review:'',stars:0,poster:book.poster,author:book.author,created:Date.now(),cid:genCid()});
+  saveContents(mk,contents);
   upsertBookLocal(book);
   _rdNewPoster=null;_rdNewAuthor='';
   closeModal('add-book-modal');
