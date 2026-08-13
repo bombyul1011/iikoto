@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260813-6-remove-cover-bookmark-option';
+const CACHE = 'iikoto-v20260813-8-unify-j-text-color';
 const ASSETS = [
   './',
   './index.html'

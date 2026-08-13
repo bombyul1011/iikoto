@@ -11227,22 +11227,29 @@ function _sharePanelFillStroke(isWhite){
     stroke: isWhite?'rgba(255,255,255,0.35)':'rgba(255,255,255,0.6)'
   };
 }
-async function _drawQuoteCardH(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode,showComment){
+async function _drawQuoteCardH(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode,showComment,sidebarMode){
   await _ensureBareonbatangLoaded();
   const isWhite=colorMode==='white';
   const textColor=isWhite?'#fff':'#5a4040';
   const subColor=isWhite?'rgba(255,255,255,0.75)':'#9a8070';
+  const barColor='#f5f0e8'; // 사이드바/마름모는 브라운/화이트 모드 무관하게 항상 불투명 아이보리 고정(반투명 시 배경이 비쳐 보임)
+  const barW=32;
   const fontStyle=italicMode?'italic ':'';
   const align=alignMode||'left';
   const showInfo=showBookInfo&&book;
   const showCmt=showComment&&q.comment;
   const fs=fontSize||40;
   const lineH=Math.round(fs*1.6);
+  // 사이드바 유무에 따라 카드 좌표계 분기 — 사이드바 켜면 좌측에 barW+56만큼 여유 확보, 카드 자체는 좀 더 좁게(px=60)
+  const px=sidebarMode?60:88;
+  const pw=sidebarMode?W-120:W-176;
+  const padLeft=sidebarMode?barW+56:48;
+  const padRight=sidebarMode?76:48;
+  const roundR=sidebarMode?24:32;
   // 문장 길이에 맞춰 패널 높이를 먼저 계산(가변형) — 여백 최소화
   ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
-  const px=88,pw=W-176;
   const quoteText=q.text;
-  const lines=_shareWrapText(ctx,quoteText,pw-96);
+  const lines=_shareWrapText(ctx,quoteText,pw-padLeft-padRight);
   const textBlockH=lines.length*lineH;
   const quoteMarkH=quoteMark?76:0; // 여는 따옴표를 문장 위에 독립 배치할 때 필요한 여유 높이
   // 코멘트 블록 높이도 패널 전체 높이 계산에 포함 — 표시 스타일 두 가지: 'label'=영문 라벨+본문폭 전체, 'bar'=세로바+들여쓰기
@@ -11251,142 +11258,40 @@ async function _drawQuoteCardH(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
   if(showCmt){
     ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
     if(showComment==='label'){
-      cmtLines=_shareWrapText(ctx,q.comment,pw-96);
+      cmtLines=_shareWrapText(ctx,q.comment,pw-padLeft-padRight);
       cmtBoxH=labelFs+gapLabelToText+cmtLineH*cmtLines.length;
     }else{
-      cmtLines=_shareWrapText(ctx,q.comment,pw-96-28-22);
+      cmtLines=_shareWrapText(ctx,q.comment,pw-padLeft-padRight-28-22);
       cmtBoxH=cmtLineH*cmtLines.length;
     }
   }
   const footerH=showInfo?96:0;
-  const padTop=56,padBottom=48,gapBeforeFooter=30,gapBeforeCmt=16;
+  const padTop=sidebarMode?48:56,padBottom=sidebarMode?32:48,gapBeforeFooter=30,gapBeforeCmt=16;
   const ph=padTop+quoteMarkH+textBlockH+(showCmt?gapBeforeCmt+cmtBoxH:0)+(footerH?gapBeforeFooter+footerH:0)+padBottom;
   const py=(H-ph)/2;
   const panelColors=_sharePanelFillStroke(isWhite);
   ctx.fillStyle=panelColors.fill;
-  _roundRect(ctx,px,py,pw,ph,32);ctx.fill();
+  _roundRect(ctx,px,py,pw,ph,roundR);ctx.fill();
   ctx.strokeStyle=panelColors.stroke;ctx.lineWidth=2;
-  _roundRect(ctx,px,py,pw,ph,32);ctx.stroke();
-  const tx0=align==='center'?px+pw/2:(align==='right'?px+pw-48:px+48);
-  let ty=py+padTop;
-  if(quoteMark){
+  _roundRect(ctx,px,py,pw,ph,roundR);ctx.stroke();
+  if(sidebarMode){
+    // 왼쪽 사이드바 — 카드 모양대로 클리핑 후 채움
     ctx.save();
-    ctx.font="700 64px 'Apple SD Gothic Neo', 'Noto Sans Symbols', Georgia, serif";
-    ctx.textAlign=align;
-    ctx.textBaseline='alphabetic';
-    ctx.fillStyle=textColor;
-    ctx.fillText('\u275d',tx0,ty+56);
+    _roundRect(ctx,px,py,pw,ph,roundR);
+    ctx.clip();
+    ctx.fillStyle=barColor;
+    ctx.fillRect(px,py,barW,ph);
     ctx.restore();
-    ty+=quoteMarkH;
+    // 마름모 꺾임 포인트 — 항상 카드 세로 중앙. barW(32)가 마름모 반경(12)보다 충분히 커서 clip 없이도 카드 밖으로 안 나감
+    ctx.save();
+    ctx.translate(px+barW,py+ph/2);
+    ctx.rotate(Math.PI/4);
+    ctx.fillStyle=barColor;
+    ctx.fillRect(-12,-12,24,24);
+    ctx.restore();
   }
-  ctx.fillStyle=textColor;
-  ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
-  ctx.textBaseline='top';
-  ctx.textAlign=align;
-  lines.forEach(line=>{ctx.fillText(line,tx0,ty);ty+=lineH;});
-  ctx.textAlign='left';
-  if(showCmt){
-    ty+=gapBeforeCmt;
-    ctx.fillStyle=textColor;
-    if(showComment==='label'){
-      ctx.font='600 '+labelFs+'px "DM Sans",sans-serif';
-      ctx.fillStyle=isWhite?'rgba(255,255,255,0.5)':'rgba(154,128,112,0.8)';
-      ctx.fillText('comment',px+48,ty);
-      ty+=labelFs+gapLabelToText;
-      ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
-      ctx.fillStyle=isWhite?'rgba(255,255,255,0.92)':'#6b5548';
-      cmtLines.forEach(line=>{ctx.fillText(line,px+48,ty);ty+=cmtLineH;});
-    }else{
-      const barX=px+48+28;
-      ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
-      const textTop=ty;
-      ctx.strokeStyle=isWhite?'rgba(255,255,255,0.35)':'rgba(154,128,112,0.4)';
-      ctx.lineWidth=2;
-      ctx.beginPath();ctx.moveTo(barX,textTop-4);ctx.lineTo(barX,textTop+cmtLineH*cmtLines.length-6);ctx.stroke();
-      ctx.fillStyle=isWhite?'rgba(255,255,255,0.92)':'#6b5548';
-      let cy=textTop;
-      cmtLines.forEach(line=>{ctx.fillText(line,barX+22,cy);cy+=cmtLineH;});
-      ty+=cmtLineH*cmtLines.length;
-    }
-  }
-  if(showInfo){
-    const fy=ty+gapBeforeFooter;
-    ctx.strokeStyle=isWhite?'rgba(255,255,255,0.3)':'rgba(154,128,112,0.3)';
-    ctx.setLineDash([6,6]);ctx.lineWidth=1.5;
-    ctx.beginPath();ctx.moveTo(px+48,fy);ctx.lineTo(px+pw-48,fy);ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.font='600 26px "DM Sans",sans-serif';
-    ctx.fillStyle=textColor;
-    const title=book.title||'';
-    ctx.fillText(title,px+48,fy+28);
-    const titleW=ctx.measureText(title).width;
-    if(book.author){
-      ctx.font='400 24px "DM Sans",sans-serif';
-      ctx.fillStyle=subColor;
-      ctx.fillText(' · '+book.author,px+48+titleW,fy+28);
-    }
-  }
-}
-// I스타일: 왼쪽 사이드바 + 마름모 꺾임 포인트, 가변 높이, 앱 반투명 카드 규칙 재사용(H와 동일 규칙)
-async function _drawQuoteCardI(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode,showComment){
-  await _ensureBareonbatangLoaded();
-  const isWhite=colorMode==='white';
-  const textColor=isWhite?'#fff':'#292824';
-  const subColor=isWhite?'rgba(255,255,255,0.75)':'#9a8070';
-  const barColor='#f5f0e8'; // 브라운/화이트 모드 무관하게 항상 불투명 아이보리(사이드바/마름모는 반투명 시 배경이 비쳐 보이므로 불투명 고정)
-  const fontStyle=italicMode?'italic ':'';
-  const align=alignMode||'left';
-  const showInfo=showBookInfo&&book;
-  const showCmt=showComment&&q.comment;
-  const fs=fontSize||40;
-  const lineH=Math.round(fs*1.6);
-  const barW=32;
-  const px=60,py=0; // py는 세로 중앙 배치를 위해 이후 재계산
-  const padLeft=barW+56,padRight=76,padTop=48,padBottom=32; // 텍스트 baseline 특성상 아래쪽이 더 넓어 보이는 착시 보정, 좌측 마름모 때문에 우측을 조금 더 넓게
-  const pw=W-120;
-  ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
-  const quoteText=q.text;
-  const lines=_shareWrapText(ctx,quoteText,pw-padLeft-padRight+56);
-  const textBlockH=lines.length*lineH;
-  const quoteMarkH=quoteMark?76:0;
-  const cmtFs=27,labelFs=17,cmtLineH=Math.round(cmtFs*1.5),gapLabelToText=12;
-  let cmtLines=[],cmtBoxH=0;
-  if(showCmt){
-    ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
-    if(showComment==='label'){
-      cmtLines=_shareWrapText(ctx,q.comment,pw-padLeft-padRight+56);
-      cmtBoxH=labelFs+gapLabelToText+cmtLineH*cmtLines.length;
-    }else{
-      cmtLines=_shareWrapText(ctx,q.comment,pw-padLeft-padRight+56-28-22);
-      cmtBoxH=cmtLineH*cmtLines.length;
-    }
-  }
-  const footerH=showInfo?96:0;
-  const gapBeforeFooter=30,gapBeforeCmt=16;
-  const ph=padTop+quoteMarkH+textBlockH+(showCmt?gapBeforeCmt+cmtBoxH:0)+(footerH?gapBeforeFooter+footerH:0)+padBottom;
-  const pyReal=(H-ph)/2;
-  // 카드: 앱 반투명 규칙 재사용(H스타일과 동일 헬퍼)
-  const panelColors=_sharePanelFillStroke(isWhite);
-  ctx.fillStyle=panelColors.fill;
-  _roundRect(ctx,px,pyReal,pw,ph,24);ctx.fill();
-  ctx.strokeStyle=panelColors.stroke;ctx.lineWidth=2;
-  _roundRect(ctx,px,pyReal,pw,ph,24);ctx.stroke();
-  // 왼쪽 사이드바 — 카드 모양대로 클리핑 후 채움
-  ctx.save();
-  _roundRect(ctx,px,pyReal,pw,ph,24);
-  ctx.clip();
-  ctx.fillStyle=barColor;
-  ctx.fillRect(px,pyReal,barW,ph);
-  ctx.restore();
-  // 마름모 꺾임 포인트 — 항상 카드 세로 중앙. barW(32)가 마름모 반경(12)보다 충분히 커서 clip 없이도 카드 밖으로 안 나감
-  ctx.save();
-  ctx.translate(px+barW,pyReal+ph/2);
-  ctx.rotate(Math.PI/4);
-  ctx.fillStyle=barColor;
-  ctx.fillRect(-12,-12,24,24);
-  ctx.restore();
   const tx0=align==='center'?px+padLeft+(pw-padLeft-padRight)/2:(align==='right'?px+pw-padRight:px+padLeft);
-  let ty=pyReal+padTop;
+  let ty=py+padTop;
   if(quoteMark){
     ctx.save();
     ctx.font="700 64px 'Apple SD Gothic Neo', 'Noto Sans Symbols', Georgia, serif";
@@ -11441,7 +11346,7 @@ async function _drawQuoteCardI(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
     if(book.author){
       ctx.font='400 24px "DM Sans",sans-serif';
       ctx.fillStyle=subColor;
-      ctx.fillText(' · '+book.author,px+padLeft+titleW,fy+28);
+      ctx.fillText(' · '+book.author,px+48+titleW,fy+28);
     }
   }
 }
@@ -11449,9 +11354,9 @@ async function _drawQuoteCardI(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
 async function _drawQuoteCardJ(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode,showComment){
   await _ensureBareonbatangLoaded();
   const isWhite=colorMode==='white';
-  const textColor=isWhite?'#fff':'#4a3830';
+  const textColor=isWhite?'#fff':'#5a4040';
   const subColor=isWhite?'rgba(255,255,255,0.75)':'#9a8070';
-  const dashColor=isWhite?'rgba(255,255,255,0.85)':'rgba(74,56,48,0.75)'; // 로고/텍스트와 같은 계열로 진하게 — 사진 위에서도 잘 보이도록
+  const dashColor=isWhite?'rgba(255,255,255,0.85)':'rgba(90,64,64,0.75)'; // 다른 카드들과 동일한 #5a4040 계열로 통일 — 사진 위에서도 잘 보이도록
   const fontStyle=italicMode?'italic ':'';
   const align=alignMode||'center';
   const showInfo=showBookInfo&&book;
@@ -11557,7 +11462,7 @@ async function _drawQuoteCardJ(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
     ctx.textAlign='left';
   }
 }
-const QUOTE_CARD_STYLES={G:{label:'로고형',draw:_drawQuoteCardG},H:{label:'카드형',draw:_drawQuoteCardH},I:{label:'사이드바형',draw:_drawQuoteCardI},J:{label:'점선형',draw:_drawQuoteCardJ}};
+const QUOTE_CARD_STYLES={G:{label:'로고형',draw:_drawQuoteCardG},H:{label:'카드형',draw:_drawQuoteCardH},J:{label:'점선형',draw:_drawQuoteCardJ}};
 
 // ── 오늘의 기록 카드: A(미니멀 숫자형) / C(로고+텍스트형)
 async function _drawTodayCardA(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds,colorMode,dk){
@@ -11714,12 +11619,12 @@ async function _drawTodayCardD(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds
 const TODAY_CARD_STYLES={A:{label:'숫자형',draw:_drawTodayCardA},C:{label:'로고형',draw:_drawTodayCardC},D:{label:'표지형',draw:_drawTodayCardD}};
 
 // ── 공유 모달 공통: 캔버스 생성 → 앱 배경 위에 미리보기 표시 → 스타일 선택 → 복사
-async function _buildQuoteCanvas(styleKey,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode,showComment){
+async function _buildQuoteCanvas(styleKey,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode,showComment,sidebarMode){
   const W=1080,H=1350;
   const canvas=document.createElement('canvas');
   canvas.width=W;canvas.height=H;
   const ctx=canvas.getContext('2d');
-  await QUOTE_CARD_STYLES[styleKey].draw(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode,showComment);
+  await QUOTE_CARD_STYLES[styleKey].draw(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode,showComment,sidebarMode);
   return canvas;
 }
 async function _buildTodayCanvas(styleKey,book,unit,percentAfter,pagesAfter,seconds,colorMode,dk){
@@ -11738,7 +11643,7 @@ function _closeShareModal(){
 }
 async function _buildCurrentShareCanvas(){
   const ctx=_shareModalCtx;if(!ctx)return null;
-  if(ctx.kind==='quote')return await _buildQuoteCanvas(ctx.styleKey,ctx.args[0],ctx.args[1],ctx.colorMode,ctx.showBookInfo,ctx.italicMode,ctx.quoteMark,ctx.alignMode,ctx.fontSize,ctx.highlightMode,ctx.showComment);
+  if(ctx.kind==='quote')return await _buildQuoteCanvas(ctx.styleKey,ctx.args[0],ctx.args[1],ctx.colorMode,ctx.showBookInfo,ctx.italicMode,ctx.quoteMark,ctx.alignMode,ctx.fontSize,ctx.highlightMode,ctx.showComment,ctx.sidebarMode);
   const [book,unit,percentAfter,pagesAfter,seconds,dk]=ctx.args;
   return await _buildTodayCanvas(ctx.styleKey,book,unit,percentAfter,pagesAfter,seconds,ctx.colorMode,dk);
 }
@@ -11824,7 +11729,10 @@ async function _renderShareModal(){
   const curHl=ctx.highlightMode||null;
   const highlightToggle=(ctx.kind==='quote'&&ctx.styleKey==='G')?_shareIconBtn(!!curHl,`_cycleHighlightMode();`,
     curHl?`<span style="width:20px;height:20px;border-radius:6px;background:${HL_SWATCH[curHl]};display:inline-block;"></span>`:`<i class="ti ti-highlight" aria-hidden="true"></i>`,curHl?'형광펜 색상 변경':'형광펜 켜기'):'';
-  const iconRow=[colorSwatch,fontToggle,alignToggle,bookToggle,commentToggle,quoteMarkToggle,highlightToggle,fontSizeDown,fontSizeUp].filter(Boolean).join('');
+  // 사이드바 토글 — 카드형(H)에서만 노출, 왼쪽 사이드바+마름모 포인트 추가
+  const sidebarToggle=(ctx.kind==='quote'&&ctx.styleKey==='H')?_shareIconBtn(!!ctx.sidebarMode,`_shareModalCtx.sidebarMode=!_shareModalCtx.sidebarMode;_renderShareModal();`,
+    `<i class="ti ti-layout-sidebar" aria-hidden="true"></i>`,ctx.sidebarMode?'사이드바 끄기':'사이드바 켜기'):'';
+  const iconRow=[colorSwatch,fontToggle,alignToggle,bookToggle,commentToggle,quoteMarkToggle,sidebarToggle,highlightToggle,fontSizeDown,fontSizeUp].filter(Boolean).join('');
   ov.innerHTML=`<div style="background:var(--sheet);border-radius:26px;padding:22px;width:min(90vw,420px);max-height:88vh;overflow-y:auto;box-sizing:border-box;" onclick="event.stopPropagation();">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
       <div style="font-weight:600;font-size:15px;color:var(--tp);">공유 이미지</div>
@@ -11850,7 +11758,7 @@ async function _confirmShareCopy(){
 async function shareQuoteCard(quoteCid){
   const q=getQuotes().find(x=>x.cid===quoteCid);if(!q)return;
   const book=getBooks().find(b=>b.cid===q.bookCid);
-  _shareModalCtx={kind:'quote',args:[q,book],styleKey:'G',colorMode:'brown',showBookInfo:false,italicMode:false,quoteMark:false,alignMode:'left',fontSize:40,highlightMode:null,showComment:q.comment?'label':null};
+  _shareModalCtx={kind:'quote',args:[q,book],styleKey:'G',colorMode:'brown',showBookInfo:false,italicMode:false,quoteMark:false,alignMode:'left',fontSize:40,highlightMode:null,showComment:q.comment?'label':null,sidebarMode:false};
   await _renderShareModal();
 }
 async function openTodayReadingShareModal(bookCid,unit,percentAfter,pagesAfter,seconds,dk){
