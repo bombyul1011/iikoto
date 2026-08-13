@@ -31,6 +31,13 @@ html{height:100%;min-height:calc(100% + env(safe-area-inset-top));background:var
 #bg-fixed{position:fixed;inset:0;z-index:0;background:var(--bg);}
 body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;background:var(--bg);}
 
+/* ══ EVENT CATEGORY COLORS — 단일 소스. 값 변경 시 여기만 고치면 JS(EVENT_CATS)·모달버튼·캘린더배지에 모두 반영됨 ══ */
+:root{
+  --ev-schedule:rgba(185,165,230,0.9);--ev-schedule-text:rgba(150,120,210,0.85);--ev-schedule-bg:rgba(185,165,230,0.22);--ev-schedule-border:rgba(185,165,230,0.55);
+  --ev-personal:rgba(250,215,100,0.9);--ev-personal-text:rgba(180,140,0,0.9);--ev-personal-bg:rgba(250,215,100,0.22);--ev-personal-border:rgba(250,215,100,0.55);
+  --ev-work:rgba(168,212,232,0.75);--ev-work-text:#4a7d96;--ev-work-bg:rgba(168,212,232,0.28);--ev-work-border:rgba(168,212,232,0.6);
+  --ev-etc:rgba(210,224,160,0.82);--ev-etc-text:#7a8a48;--ev-etc-bg:rgba(210,224,160,0.32);--ev-etc-border:rgba(210,224,160,0.6);
+}
 /* ══ THEME TOKENS ══ */
 :root,[data-theme="light"]{
   --bg:linear-gradient(145deg,#fdf0e8 0%,#fef5d4 50%,#fde8f0 100%);
@@ -180,8 +187,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .sleep-collapsed-dur{font-size:11px;color:#75757f;flex-shrink:0;margin-left:auto;}
 .sleep-collapsed-arrow{font-size:13px;color:#6b6f85;transition:transform .2s;flex-shrink:0;}
 .sleep-top{display:flex;align-items:center;gap:5px;}
-.sleep-top-num{font-size:12px;font-weight:500;color:#3d3d42;letter-spacing:.02em;}
-.sleep-top-unit{font-size:12px;color:#3d3d42;letter-spacing:.02em;}
+.sleep-top-num{font-size:12px;font-weight:500;color:#6b6f85;letter-spacing:.02em;}
+.sleep-top-unit{font-size:12px;color:#6b6f85;letter-spacing:.02em;}
 .sleep-curve{margin-top:8px;height:10px;display:block;width:100%;}
 .sleep-curve-wrap{position:relative;margin:14px 9px 0;height:10px;}
 .sleep-curve-wrap .sleep-curve{margin-top:0;position:absolute;top:0;left:0;}
@@ -193,10 +200,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .sleep-times{display:flex;justify-content:space-between;align-items:flex-start;margin-top:6px;}
 .sleep-time-item{display:flex;align-items:center;gap:5px;cursor:pointer;}
 .sleep-time-item i{font-size:13px;color:var(--tm);}
-.sleep-time-val{font-size:14px;color:var(--tp);font-weight:400;}
+.sleep-time-val{font-size:14px;color:#6b6f85;font-weight:500;}
 .sleep-btn{width:26px;height:26px;background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
 .sleep-btn:active{opacity:.5;}
-.sleep-btn i{font-size:16px;color:var(--tm);}
+.sleep-btn i{font-size:16px;color:#a89088;}
 
 /* ── TODO ── */
 .todo-item{display:flex;align-items:center;gap:9px;padding:5px 0;border-bottom:1px solid var(--div);font-size:13px;color:var(--tp);position:relative;overflow:hidden;user-select:none;}
@@ -375,10 +382,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .todo-event-sel{display:flex;gap:5px;margin:8px 0 4px;}
 .todo-event-sel button{flex:1;padding:6px 0;border-radius:10px;border:1px solid var(--card-b);background:var(--card);font-size:10px;color:var(--tm);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;white-space:nowrap;}
 .todo-event-sel button.active{font-weight:600;}
-.todo-event-sel button.ev-schedule.active{background:rgba(185,165,230,0.22);border-color:rgba(185,165,230,0.55);color:rgba(120,90,180,0.9);}
-.todo-event-sel button.ev-personal.active{background:rgba(250,215,100,0.22);border-color:rgba(250,215,100,0.55);color:rgba(180,140,0,0.9);}
-.todo-event-sel button.ev-work.active{background:rgba(168,212,232,0.28);border-color:rgba(168,212,232,0.6);color:#4a7d96;}
-.todo-event-sel button.ev-etc.active{background:rgba(210,224,160,0.32);border-color:rgba(210,224,160,0.6);color:#7a8a48;}
+.todo-event-sel button.ev-schedule.active{background:var(--ev-schedule-bg);border-color:var(--ev-schedule-border);color:var(--ev-schedule-text);}
+.todo-event-sel button.ev-personal.active{background:var(--ev-personal-bg);border-color:var(--ev-personal-border);color:var(--ev-personal-text);}
+.todo-event-sel button.ev-work.active{background:var(--ev-work-bg);border-color:var(--ev-work-border);color:var(--ev-work-text);}
+.todo-event-sel button.ev-etc.active{background:var(--ev-etc-bg);border-color:var(--ev-etc-border);color:var(--ev-etc-text);}
 .todo-event-time-row{display:flex;align-items:center;gap:8px;margin:8px 0 4px;padding:8px 12px;border-radius:10px;border:1px solid var(--card-b);background:var(--card);color:var(--tm);cursor:pointer;}
 .todo-event-time-inp{flex:1;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--tp);font-variant-numeric:tabular-nums;}
 .todo-event-time-clear{cursor:pointer;font-size:11px;color:var(--tm);padding:2px 4px;}
@@ -505,10 +512,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 #monthly-cal .cal-day.today .cal-num{background:var(--acc);color:white;}
 #monthly-cal .cal-day.selected .cal-num{background:rgba(192,112,128,0.16);color:var(--acc);}
 #monthly-cal .cal-event-badge{font-size:8px;line-height:1.35;padding:1px 3px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;align-self:stretch;box-sizing:border-box;margin-bottom:1px;text-align:center;}
-#monthly-cal .cal-event-badge.ev-schedule{color:rgba(120,90,180,0.9);background:rgba(185,165,230,0.22);}
-#monthly-cal .cal-event-badge.ev-personal{color:rgba(180,140,0,0.9);background:rgba(250,215,100,0.22);}
-#monthly-cal .cal-event-badge.ev-work{color:#4a7d96;background:rgba(168,212,232,0.28);}
-#monthly-cal .cal-event-badge.ev-etc{color:#7a8a48;background:rgba(210,224,160,0.32);}
+#monthly-cal .cal-event-badge.ev-schedule{color:var(--ev-schedule-text);background:var(--ev-schedule-bg);}
+#monthly-cal .cal-event-badge.ev-personal{color:var(--ev-personal-text);background:var(--ev-personal-bg);}
+#monthly-cal .cal-event-badge.ev-work{color:var(--ev-work-text);background:var(--ev-work-bg);}
+#monthly-cal .cal-event-badge.ev-etc{color:var(--ev-etc-text);background:var(--ev-etc-bg);}
 #monthly-cal .cal-event-more{font-size:8px;color:var(--tm);line-height:1.35;text-align:center;}
 #tdp-cal-wrap .cal-day{padding:2px 2px 4px;}
 #tdp-cal-wrap .cal-day-name{padding:0 0 4px;}
@@ -1645,8 +1652,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <button class="ts-night" onclick="selectTodoTime('night',this)">저녁</button>
       <button class="ts-none active" onclick="selectTodoTime('none',this)">지정없음</button>
     </div>
+    <!-- 아이콘은 EVENT_CATS(JS)와 이 4개 버튼 두 곳에 각각 하드코딩됨 — 아이콘 변경 시 반드시 둘 다 수정. 색상은 CSS 변수(--ev-*)로 단일화되어 여기 손댈 필요 없음. -->
     <div class="todo-event-sel" id="todo-event-sel" style="display:none;">
-      <button class="ev-schedule active" onclick="selectTodoEventCat('schedule',this)"><i class="ti ti-pacman ico-sz-13" aria-hidden="true"></i> 약속</button>
+      <button class="ev-schedule active" onclick="selectTodoEventCat('schedule',this)"><i class="ti ti-confetti ico-sz-13" aria-hidden="true"></i> 약속</button>
       <button class="ev-personal" onclick="selectTodoEventCat('personal',this)"><i class="ti ti-chart-bubble ico-sz-13" aria-hidden="true"></i> 개인</button>
       <button class="ev-work" onclick="selectTodoEventCat('work',this)"><i class="ti ti-moneybag-heart ico-sz-13" aria-hidden="true"></i> 업무</button>
       <button class="ev-etc" onclick="selectTodoEventCat('etc',this)"><i class="ti ti-calendar-smile ico-sz-13" aria-hidden="true"></i> 기타</button>
@@ -2266,13 +2274,14 @@ function getRhythmColor(key){
   return RHYTHM_CATS[key]?RHYTHM_CATS[key].color:'var(--tm)';
 }
 // 투두 중 '일정'(isEvent:true)에 붙는 카테고리 — 애플 캘린더식 4분류(약속/개인/업무/기타).
-// 약속·개인은 투두 시간대 버튼(저녁=보라/오전=노랑)과 동일한 색을 그대로 재사용해 앱 전체 색 언어를 통일.
-// 업무·기타는 기존 3분류 때 색을 그대로 유지(리듬바 외출/정리 톤).
+// 색상 단일 소스는 CSS :root의 --ev-* 변수(위 THEME TOKENS 앞 EVENT CATEGORY COLORS 블록) —
+// 값을 바꿀 땐 그 CSS 블록만 고치면 여기·모달버튼·캘린더배지에 자동 반영됨.
+function _evVar(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim();}
 const EVENT_CATS={
-  schedule:{label:'약속',color:'rgba(185,165,230,0.9)',textColor:'rgba(150,120,210,0.85)',bg:'rgba(185,165,230,0.22)',icon:'ti-confetti'},
-  personal:{label:'개인',color:'rgba(250,215,100,0.9)',textColor:'rgba(180,140,0,0.9)',bg:'rgba(250,215,100,0.22)',icon:'ti-chart-bubble'},
-  work:{label:'업무',color:'rgba(168,212,232,0.75)',textColor:'#4a7d96',bg:'rgba(168,212,232,0.28)',icon:'ti-moneybag-heart'},
-  etc:{label:'기타',color:'rgba(210,224,160,0.82)',textColor:'#7a8a48',bg:'rgba(210,224,160,0.32)',icon:'ti-calendar-smile'}
+  schedule:{label:'약속',color:_evVar('--ev-schedule'),textColor:_evVar('--ev-schedule-text'),bg:_evVar('--ev-schedule-bg'),icon:'ti-confetti'},
+  personal:{label:'개인',color:_evVar('--ev-personal'),textColor:_evVar('--ev-personal-text'),bg:_evVar('--ev-personal-bg'),icon:'ti-chart-bubble'},
+  work:{label:'업무',color:_evVar('--ev-work'),textColor:_evVar('--ev-work-text'),bg:_evVar('--ev-work-bg'),icon:'ti-moneybag-heart'},
+  etc:{label:'기타',color:_evVar('--ev-etc'),textColor:_evVar('--ev-etc-text'),bg:_evVar('--ev-etc-bg'),icon:'ti-calendar-smile'}
 };
 function getEventCat(key){return EVENT_CATS[key]||EVENT_CATS.etc;}
 function getRhythmBlocks(dk){return S.get(S.key('rblocks',dk))||[];}
