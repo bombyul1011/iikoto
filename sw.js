@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260813-38-personal-event-icon-plant';
+const CACHE = 'iikoto-v20260813-39-monthly-content-habit-neutral-card';
 const ASSETS = [
   './',
   './index.html'
