@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260813-42-tt-cell-border-alpha-up';
+const CACHE = 'iikoto-v20260813-43-vanilla-neutral-unify';
 const ASSETS = [
   './',
   './index.html'
