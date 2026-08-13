@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260813-9-remove-reading-wishlist';
+const CACHE = 'iikoto-v20260813-10-simplify-sidebar-fixed-card';
 const ASSETS = [
   './',
   './index.html'
