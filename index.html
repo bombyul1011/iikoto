@@ -167,7 +167,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .card.e{background:var(--card-e);border-color:var(--card-eb);}
 
 /* ── SLEEP ── */
-.sleep-card{position:relative;border-radius:20px;padding:16px 18px 14px;margin-bottom:14px;overflow:hidden;background:var(--sleep-b);border:1px solid var(--sleep-bb);}
+.sleep-card{position:relative;border-radius:20px;padding:13px 18px 11px;margin-bottom:14px;overflow:hidden;background:var(--sleep-b);border:1px solid var(--sleep-bb);}
+[data-theme="light"] .sleep-card:not(.collapsed){background:linear-gradient(120deg,rgba(95,115,170,0.08) 0%,rgba(156,143,192,0.07) 100%);border-color:rgba(110,120,175,0.20);}
 .sleep-card.collapsed{padding:4px 14px;cursor:pointer;background:linear-gradient(120deg,rgba(95,115,170,0.08) 0%,rgba(156,143,192,0.07) 100%);border-color:rgba(110,120,175,0.20);}
 .sleep-collapsed-row{display:none;align-items:center;gap:8px;padding:9px 0;position:relative;}
 .sleep-card.collapsed .sleep-collapsed-row{display:flex;}
@@ -179,8 +180,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .sleep-collapsed-dur{font-size:11px;color:#75757f;flex-shrink:0;margin-left:auto;}
 .sleep-collapsed-arrow{font-size:13px;color:#6b6f85;transition:transform .2s;flex-shrink:0;}
 .sleep-top{display:flex;align-items:center;gap:5px;}
-.sleep-top-num{font-size:12px;font-weight:400;color:var(--tm);letter-spacing:.10em;}
-.sleep-top-unit{font-size:12px;color:var(--tm);letter-spacing:.10em;}
+.sleep-top-num{font-size:12px;font-weight:400;color:var(--tm);letter-spacing:.02em;}
+.sleep-top-unit{font-size:12px;color:var(--tm);letter-spacing:.02em;}
 .sleep-curve{margin-top:8px;height:10px;display:block;width:100%;}
 .sleep-curve-wrap{position:relative;margin:14px 9px 0;height:10px;}
 .sleep-curve-wrap .sleep-curve{margin-top:0;position:absolute;top:0;left:0;}
@@ -188,7 +189,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 #sleep-badge-start{background:#8a7ab0;}
 #sleep-badge-end{background:#e0a860;}
 .sleep-avg-marker{position:absolute;top:50%;width:1.5px;height:14px;background:rgba(180,168,155,0.32);transform:translate(-50%,-50%);pointer-events:none;z-index:1;}
-.sleep-avg-compare{font-size:12px;color:var(--tm);margin-top:4px;text-align:left;}
+.sleep-avg-compare{font-size:11px;color:var(--tm);margin-top:4px;text-align:left;}
 .sleep-times{display:flex;justify-content:space-between;align-items:flex-start;margin-top:6px;}
 .sleep-time-item{display:flex;align-items:center;gap:5px;cursor:pointer;}
 .sleep-time-item i{font-size:13px;color:var(--tm);}
@@ -1206,8 +1207,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         </div>
         <div class="sleep-expanded-content" id="sleep-expanded-content">
         <div class="sleep-top" style="justify-content:space-between;">
-          <span id="sleep-avg-score-badge" style="display:inline-flex;width:20px;height:20px;align-items:center;justify-content:center;cursor:pointer;" onclick="promptSleepScore(dateKey(currentDate))"></span>
-          <span>
+          <span style="display:flex;align-items:center;gap:6px;min-width:0;">
+            <span id="sleep-avg-score-badge" style="display:inline-flex;width:20px;height:20px;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;" onclick="promptSleepScore(dateKey(currentDate))"></span>
+            <span class="sleep-avg-compare" id="sleep-avg-compare" style="display:none;margin-top:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
+          </span>
+          <span style="display:flex;align-items:baseline;gap:2px;flex-shrink:0;">
             <span class="sleep-top-num" id="sleep-dur-num">--</span>
             <span class="sleep-top-unit" id="sleep-dur-unit"></span>
           </span>
@@ -1239,7 +1243,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
               </div>
               <div class="sleep-btn" onclick="setNow('sleep')"><i class="ti ti-moon-stars" aria-hidden="true"></i></div>
             </div>
-            <div class="sleep-avg-compare" id="sleep-avg-compare" style="display:none;"></div>
           </div>
           <div style="flex:1;"></div>
           <div style="display:flex;align-items:center;gap:5px;">
@@ -2263,10 +2266,10 @@ function getRhythmColor(key){
   return RHYTHM_CATS[key]?RHYTHM_CATS[key].color:'var(--tm)';
 }
 // 투두 중 '일정'(isEvent:true)에 붙는 카테고리 — 애플 캘린더식 4분류(약속/개인/업무/기타).
-// 약속·개인은 투두 시간대 버튼(저녁=보라/오전=노랑)과 동일한 색을 그대로 재사용해 앱 전체 색 언어를 통일.
+// 약속·개인은 투두 시간대 버튼(저녁=핑크/오전=노랑)과 동일한 색을 그대로 재사용해 앱 전체 색 언어를 통일.
 // 업무·기타는 기존 3분류 때 색을 그대로 유지(리듬바 외출/정리 톤).
 const EVENT_CATS={
-  schedule:{label:'약속',color:'rgba(185,165,230,0.9)',textColor:'rgba(120,90,180,0.9)',bg:'rgba(185,165,230,0.22)',icon:'ti-pacman'},
+  schedule:{label:'약속',color:'rgba(255,175,200,0.9)',textColor:'rgba(200,80,120,0.9)',bg:'rgba(255,175,200,0.22)',icon:'ti-confetti'},
   personal:{label:'개인',color:'rgba(250,215,100,0.9)',textColor:'rgba(180,140,0,0.9)',bg:'rgba(250,215,100,0.22)',icon:'ti-chart-bubble'},
   work:{label:'업무',color:'rgba(168,212,232,0.75)',textColor:'#4a7d96',bg:'rgba(168,212,232,0.28)',icon:'ti-moneybag-heart'},
   etc:{label:'기타',color:'rgba(210,224,160,0.82)',textColor:'#7a8a48',bg:'rgba(210,224,160,0.32)',icon:'ti-calendar-smile'}
@@ -5329,7 +5332,7 @@ function calcSleep(s,w){
   }
   const wv=w.split(':').map(Number);
   let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;
-  numEl.textContent=Math.floor(m/60)+'시간'+(m%60?' '+(m%60)+'분':'');
+  numEl.textContent=Math.floor(m/60)+'h'+(m%60?' '+(m%60)+'m':'');
   unitEl.textContent='';
 
   // 00:00~08:00(480분) 추천 구간 축에, 취침·기상 시각을 각각 독립적으로 매핑
@@ -9470,9 +9473,11 @@ function renderMonthlyStatBar(){
   const mk=calMonthKey();
   // 콘텐츠 통계: 진행중은 제외, 완료(done/stopped)된 것만 종료일(endDate) 기준으로 그 달에 정확히 1회 카운트.
   // getContentsForReport가 이미 "당월+전월 이월분"을 합쳐서 정확히 제공하므로 그대로 재사용.
-  const cc=getContentsForReport(mk).filter(c=>
-    (c.status==='done'||c.status==='stopped')&&c.endDate&&c.endDate.slice(0,7)===mk
-  ).length;
+  // music은 완결 개념이 없어 status가 항상 'watching'이므로 위 필터를 통과 못 함 — 등록일(startDate) 기준으로 별도 집계.
+  const mcAll=getContentsForReport(mk);
+  const cc=mcAll.filter(c=>
+    c.cat!=='music'&&(c.status==='done'||c.status==='stopped')&&c.endDate&&c.endDate.slice(0,7)===mk
+  ).length+mcAll.filter(c=>c.cat==='music'&&(c.startDate||'').slice(0,7)===mk).length;
   const avgSleep=sleepCnt>0?(sleepMin/sleepCnt/60).toFixed(1):'-';
   el.innerHTML=`<div class="stat-bar-wrap">
     <div class="sbar-item"><i class="ti ti-notes sub-tm-13" aria-hidden="true"></i><span class="sbar-num">${memos}</span></div>
@@ -9513,9 +9518,13 @@ function renderWeeklyStatBar(){
   // getContentsForReport(m)이 이미 "m월+전달 이월분"을 합쳐서 주므로, 한 주(최대 7일)는
   // 항상 같은 달이거나 인접한 두 달에만 걸치기 때문에 종료일이 속한 달(wkEnd 기준) 하나만 조회하면 충분.
   const wkEnd=days[6];
-  const cc=getContentsForReport(monthKey(wkEnd)).filter(c=>
-    (c.status==='done'||c.status==='stopped')&&c.endDate&&
+  // music은 완결 개념이 없어 status가 항상 'watching'이므로 위 필터를 통과 못 함 — 등록일(startDate) 기준으로 별도 집계.
+  const wcAll=getContentsForReport(monthKey(wkEnd));
+  const cc=wcAll.filter(c=>
+    c.cat!=='music'&&(c.status==='done'||c.status==='stopped')&&c.endDate&&
     c.endDate>=dateKey(wkStart)&&c.endDate<=dateKey(wkEnd)
+  ).length+wcAll.filter(c=>
+    c.cat==='music'&&c.startDate&&c.startDate>=dateKey(wkStart)&&c.startDate<=dateKey(wkEnd)
   ).length;
   const wkAvgSleep=sleepCnt>0?(sleepMin/sleepCnt/60).toFixed(1):'-';
   const now=new Date();
@@ -9992,7 +10001,7 @@ function loadMonthly(){
 }
 
 // ── MODAL / SHEET HELPERS
-function openModal(id){document.getElementById(id).classList.add('on');}
+function openModal(id){const el=document.getElementById(id);document.body.appendChild(el);el.classList.add('on');}
 function closeModal(id,e){if(!e||e.target===document.getElementById(id))document.getElementById(id).classList.remove('on');}
 function getMealWishlist(){return getGoal('wishlist:meal').filter(l=>l&&l.trim());}
 function saveMealWishlist(arr){saveGoal('wishlist:meal',arr.length?arr:['']);}

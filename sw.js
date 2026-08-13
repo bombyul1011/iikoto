@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260813-29-moneybag-heart-center-align';
+const CACHE = 'iikoto-v20260813-30-confetti-schedule-modal-zorder';
 const ASSETS = [
   './',
   './index.html'
