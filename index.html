@@ -7826,15 +7826,24 @@ function makeDaySummaryEl(dk){
   wrap.innerHTML=buildDayDetailHtml(dk);
   return wrap;
 }
-function closeTodoModal(e){
-  const modal=document.getElementById('todo-modal');
-  if(e&&e.target!==modal)return; // 오버레이 클릭 시에는 modal-ov 자체를 클릭했을 때만 닫힘(기존 closeModal과 동일 동작)
+// calMode(월간탭에서 다른 날짜를 임시로 열어 편집 중)였다면 원래 날짜로 복원하고 관련 화면을 다시 그림.
+// withCalendar=true면 캘린더/상세까지 갱신(저장·삭제 후), false면 오늘탭만 가볍게 갱신(단순 닫기).
+function restoreCalModeAndRender(modal,withCalendar){
   if(modal.dataset.calMode==='1'){
     modal.dataset.calMode='';
     const restoreDate=modal.dataset.calRestoreDate;
     if(restoreDate)currentDate=new Date(restoreDate);
-    renderTodos(); // currentDate가 다른 날짜(연속일정 편집 등)로 전환됐다가 복원된 경우, 화면(오늘탭 이벤트 리스트)도 반드시 다시 그려야 다음 클릭 시 인덱스가 최신 상태로 맞음
+    if(withCalendar){
+      renderCalendar();
+      if(_calSelectedDay)renderCalDetail(_calSelectedDay);
+    }
   }
+  renderTodos(); // currentDate가 다른 날짜(연속일정 편집 등)로 전환됐다가 복원된 경우, 화면(오늘탭 이벤트 리스트)도 반드시 다시 그려야 다음 클릭 시 인덱스가 최신 상태로 맞음
+}
+function closeTodoModal(e){
+  const modal=document.getElementById('todo-modal');
+  if(e&&e.target!==modal)return; // 오버레이 클릭 시에는 modal-ov 자체를 클릭했을 때만 닫힘(기존 closeModal과 동일 동작)
+  restoreCalModeAndRender(modal,false);
   modal.classList.remove('on');
 }
 function openTodoModal(editIdx=-1){
@@ -7939,6 +7948,18 @@ function selectTodoEventCat(cat,btn){
   btn.classList.add('active');
   document.getElementById('todo-modal').dataset.eventCat=cat||'';
 }
+// ── 투두/일정 삭제 코어 — dk+cid로 대상 하나를 찾아 addDelPending+splice+saveTodos까지 처리.
+// 진입 경로(스와이프/시트/모달)와 무관하게 "실제로 지우는 동작"은 이거 하나로 통일.
+// 반환값: 실제로 지워졌으면 true, 대상을 못 찾았으면 false.
+function removeTodoByCid(dk,cid){
+  if(!cid)return false;
+  const todos=getTodos(dk);
+  const idx=todos.findIndex(t=>t.cid===cid);
+  if(idx<0)return false;
+  addDelPending('todos',dk,cid);
+  todos.splice(idx,1);saveTodos(dk,todos);
+  return true;
+}
 // 일정/할일 모달 안 삭제 버튼 — 오늘탭 일정처럼 스와이프 진입점이 없는 곳에서도 모달을 열어 바로 삭제할 수 있게 함.
 // calMode(연속일정 등 다른 날짜를 임시로 열어 편집 중)인 경우, 그 날짜(currentDate) 기준으로 삭제 후 원래 날짜로 복원.
 function deleteTodoFromModal(){
@@ -7947,19 +7968,9 @@ function deleteTodoFromModal(){
   if(editIdx<0)return; // 신규 등록 상태(삭제 대상 없음) 방어
   const dk=dateKey(currentDate),todos=getTodos(dk);
   const t=todos[editIdx];
-  if(t)addDelPending('todos',dk,t.cid);
-  todos.splice(editIdx,1);saveTodos(dk,todos);
+  if(t)removeTodoByCid(dk,t.cid);
   closeModal('todo-modal');
-  if(modal.dataset.calMode==='1'){
-    modal.dataset.calMode='';
-    const restoreDate=modal.dataset.calRestoreDate;
-    if(restoreDate)currentDate=new Date(restoreDate);
-    renderCalendar();
-    if(_calSelectedDay)renderCalDetail(_calSelectedDay);
-    renderTodos();
-  }else{
-    renderTodos();
-  }
+  restoreCalModeAndRender(modal,true);
 }
 function confirmTodo(){
   if(_todoSubmitting)return;
@@ -8008,24 +8019,16 @@ function confirmTodo(){
   else todos.push({text,done:false,created:Date.now(),timeSection,isEvent,eventCat:isEvent?eventCat:null,eventTime:isEvent?eventTime:null,eventEndDate:isEvent?eventEndDate:null,cid:genCid()});
   saveTodos(dk,todos);closeModal('todo-modal');
   // 월간 캘린더의 "이 날에 일정 추가"에서 열린 경우 — currentDate를 원래대로 되돌리고 캘린더/상세를 갱신
-  if(modal.dataset.calMode==='1'){
-    modal.dataset.calMode='';
-    const restoreDate=modal.dataset.calRestoreDate;
-    if(restoreDate)currentDate=new Date(restoreDate);
-    renderCalendar();
-    if(_calSelectedDay)renderCalDetail(_calSelectedDay);
-    renderTodos(); // 오늘탭에서 연속일정 편집을 이 경로로 열었을 수도 있으므로 함께 갱신(오늘탭이 아니면 내부에서 안전하게 무시됨)
-  }else{
-    renderTodos();
-  }
+  // (calMode가 아니면 restoreCalModeAndRender 내부에서 renderTodos만 실행됨)
+  restoreCalModeAndRender(modal,true);
   setTimeout(()=>{_todoSubmitting=false;},500);
 }
 function todoDelSwipe(i){
   closeSheet('todo-sheet');
   const dk=dateKey(currentDate),todos=getTodos(dk);
   const t=todos[i];
-  if(t)addDelPending('todos',dk,t.cid);
-  todos.splice(i,1);saveTodos(dk,todos);renderTodos();
+  if(t)removeTodoByCid(dk,t.cid);
+  renderTodos();
 }
 function openTodoSheet(i){
   _todoSwipeIdx=i;
@@ -8055,12 +8058,7 @@ function eventSheetEdit(){
 }
 function eventSheetDelete(){
   closeSheet('event-sheet');
-  if(!_eventSheetDk||!_eventSheetCid)return;
-  const todos=getTodos(_eventSheetDk);
-  const idx=todos.findIndex(t=>t.cid===_eventSheetCid);
-  if(idx<0)return;
-  addDelPending('todos',_eventSheetDk,_eventSheetCid);
-  todos.splice(idx,1);saveTodos(_eventSheetDk,todos);
+  if(!removeTodoByCid(_eventSheetDk,_eventSheetCid))return;
   renderTodos();
   if(document.getElementById('monthly-cal'))renderCalendar();
 }

@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260814-20-brightness-spacing-tune';
+const CACHE = 'iikoto-v20260814-21-event-delete-refactor';
 const ASSETS = [
   './',
   './index.html'
