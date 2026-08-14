@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260814-1-vanilla-unify';
+const CACHE = 'iikoto-v20260814-2-colorbox-mid';
 const ASSETS = [
   './',
   './index.html'
