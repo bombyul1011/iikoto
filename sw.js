@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260813-43-vanilla-neutral-unify';
+const CACHE = 'iikoto-v20260814-1-vanilla-unify';
 const ASSETS = [
   './',
   './index.html'
