@@ -434,9 +434,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .memo-field::placeholder{color:var(--tm);}
 .send-btn{width:38px;height:38px;background:var(--inp);border:1px solid var(--inp-b);border-radius:11px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:var(--tm);}
 .memo-stamp-sm{width:32px;height:32px;background:var(--inp);border:1px solid var(--inp-b);border-radius:9px;padding:0;font-size:11px;color:var(--ts);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
-.memo-field-sm{height:32px;max-height:80px;padding:7px 10px 5px;font-size:14px;}
+.memo-field-sm{height:32px;min-height:32px;max-height:80px;padding:5px 10px;font-size:14px;line-height:20px;box-sizing:border-box;}
 .memo-field-wrap{position:relative;flex:1;}
-.memo-field-wrap .memo-field{width:100%;}
+.memo-field-wrap .memo-field{width:100%;display:block;}
 .memo-seed-toggle{position:absolute;right:5px;top:0;bottom:0;margin:auto;height:22px;width:22px;background:none;border:none;padding:0;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--tm);opacity:0.23;transition:opacity .15s,color .15s;}
 .memo-seed-toggle i{font-size:17px;line-height:0;position:relative;top:-3px;}
 .memo-seed-toggle.on{opacity:1;color:rgba(120,155,160,0.95);}

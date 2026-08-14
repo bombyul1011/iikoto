@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260814-21-event-delete-refactor';
+const CACHE = 'iikoto-v20260814-25-memo-input-align-fix';
 const ASSETS = [
   './',
   './index.html'
