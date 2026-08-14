@@ -53,8 +53,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --nav:rgba(255,250,240,0.78);--nav-b:rgba(255,210,200,0.42);
   --sheet:linear-gradient(160deg,#fdf3ec,#fef7e8);
   --modal:linear-gradient(145deg,#fdf3ec,#fef7e8);
-  --inp:rgba(255,250,240,0.55);--inp-b:rgba(255,210,200,0.42);
-  --pill:rgba(255,250,240,0.60);
+  --inp:rgba(255,250,240,0.82);--inp-b:rgba(255,210,200,0.42);
+  --pill:rgba(255,250,240,0.82);
   --memo-b:rgba(255,250,240,0.68);--memo-bb:rgba(255,210,200,0.50);
   --sleep-b:rgba(255,250,240,0.60);--sleep-bb:rgba(255,200,180,0.42);
   --sleep-badge-bg:#fffaf5;
@@ -366,7 +366,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .tsp-seed-inp::placeholder{color:var(--tm);}
 .tsp-seed-submit{width:26px;height:26px;border-radius:50%;background:var(--acc-soft);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--acc);font-size:13px;cursor:pointer;flex-shrink:0;}
 .todo-time-sel{display:flex;gap:6px;margin:10px 0 4px;}
-.todo-time-sel button{flex:1;padding:6px 0;border-radius:10px;border:1px solid var(--card-b);background:var(--card);font-size:11.5px;color:var(--tm);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;}
+.todo-time-sel button{flex:1;padding:6px 0;border-radius:10px;border:1px solid var(--inp-b);background:var(--inp);font-size:11.5px;color:var(--tm);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;}
 #reserve-date-modal .ts-morning,
 #reserve-date-modal .ts-afternoon,
 #reserve-date-modal .ts-night,
@@ -381,18 +381,18 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .ts-none.active{background:rgba(180,180,180,0.15);border-color:rgba(180,180,180,0.40);color:var(--tp);}
 .todo-time-sel button.ts-none.active{background:rgba(180,180,180,0.15);border-color:rgba(180,180,180,0.40);color:var(--tp);}
 .todo-event-sel{display:flex;gap:5px;margin:8px 0 4px;}
-.todo-event-sel button{flex:1;padding:6px 0;border-radius:10px;border:1px solid var(--card-b);background:var(--card);font-size:10px;color:var(--tm);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;white-space:nowrap;}
+.todo-event-sel button{flex:1;padding:6px 0;border-radius:10px;border:1px solid var(--inp-b);background:var(--inp);font-size:10px;color:var(--tm);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;white-space:nowrap;}
 .todo-event-sel button.active{font-weight:600;}
 .todo-event-sel button.ev-schedule.active{background:var(--ev-schedule-bg);border-color:var(--ev-schedule-border);color:var(--ev-schedule-text);}
 .todo-event-sel button.ev-personal.active{background:var(--ev-personal-bg);border-color:var(--ev-personal-border);color:var(--ev-personal-text);}
 .todo-event-sel button.ev-work.active{background:var(--ev-work-bg);border-color:var(--ev-work-border);color:var(--ev-work-text);}
 .todo-event-sel button.ev-etc.active{background:var(--ev-etc-bg);border-color:var(--ev-etc-border);color:var(--ev-etc-text);}
-.todo-event-time-row{display:flex;align-items:center;gap:8px;margin:8px 0 4px;padding:8px 12px;border-radius:10px;border:1px solid var(--card-b);background:var(--card);color:var(--tm);}
+.todo-event-time-row{display:flex;align-items:center;gap:8px;margin:8px 0 4px;padding:8px 12px;border-radius:10px;border:1px solid var(--inp-b);background:var(--inp);color:var(--tm);}
 .todo-multiday-arrow{display:flex;align-items:center;justify-content:center;width:22px;height:22px;flex-shrink:0;cursor:pointer;color:var(--tm);transition:transform .2s;}
 .todo-multiday-arrow.on{transform:rotate(180deg);color:var(--tp);}
-.todo-multiday-end-row{display:flex;align-items:center;gap:8px;padding:0 12px;height:38px;border-radius:10px;border:1px solid var(--card-b);background:var(--card);margin:4px 0;}
-.todo-multiday-lbl{font-size:11.5px;color:var(--ts);flex-shrink:0;}
-.todo-multiday-end-inp{flex:none!important;width:150px!important;height:26px;line-height:26px;margin-bottom:0;font-size:12.5px;padding:0 8px;box-sizing:border-box;}
+.todo-multiday-end-row{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;border:1px solid var(--card-b);background:var(--card);margin:4px 0;}
+.todo-multiday-lbl{font-size:12px;color:var(--tm);white-space:nowrap;flex-shrink:0;line-height:16px;}
+.todo-multiday-end-inp{flex:1;margin-bottom:0;cursor:pointer;font-size:13px;padding:0;border:none;background:none;height:16px;line-height:16px;}
 .todo-event-time-inp{flex:1;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--tp);font-variant-numeric:tabular-nums;}
 .todo-event-time-clear{cursor:pointer;font-size:11px;color:var(--tm);padding:2px 4px;}
 /* 할일/일정 책갈피형 탭 — 선택된 쪽이 아래로 살짝 튀어나온 듯 강조되고, 나머지는 뒤로 물러난 톤 */
@@ -510,9 +510,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cal-day-name-row{margin-bottom:0;}
 /* 월간탭 연속일정 bar — 각 날짜 칸이 자기 몫의 "조각"만 그리는 방식(칸 폭 100%로 딱 맞음, 절대 밀리거나 클릭 영역이 어긋나지 않음).
    시작조각=왼쪽 둥근모서리+텍스트, 중간조각=사각형 빈 막대, 끝조각=오른쪽 둥근모서리. 옆 칸과 이어붙어 하나의 막대처럼 보임. */
-#monthly-cal .cal-day{overflow:visible;position:relative;}
-#monthly-cal .cal-event-bar{display:block;width:calc(100% + 2px);margin-left:-1px;margin-right:-1px;height:13px;line-height:13px;font-size:8.5px;color:#fff;padding:0 4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;text-align:left;cursor:pointer;box-sizing:border-box;}
-#monthly-cal .cal-event-bar+.cal-event-bar,#monthly-cal .cal-event-bar{margin-top:1px;margin-bottom:1px;}
+#monthly-cal .cal-event-bar{display:block;width:calc(100% + 2px);margin-left:-1px;margin-right:-1px;height:13px;line-height:13px;font-size:8.5px;color:#fff;padding:0 4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;text-align:left;cursor:pointer;box-sizing:border-box;margin-top:1px;margin-bottom:1px;}
 #monthly-cal .cal-event-bar.bar-round-l{border-top-left-radius:4px;border-bottom-left-radius:4px;}
 #monthly-cal .cal-event-bar.bar-round-r{border-top-right-radius:4px;border-bottom-right-radius:4px;}
 #monthly-cal .cal-event-bar.ev-schedule{background:var(--ev-schedule-text);}
@@ -523,8 +521,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cal-day{display:flex;flex-direction:column;align-items:center;padding:4px 2px 8px;cursor:pointer;position:relative;}
 .cal-num{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--tp);transition:all .15s;}
 #tdp-cal-wrap .cal-num{width:32px;height:32px;font-size:14px;}
-/* 월간탭 캘린더 전용 — 날짜 칸 안에 일정 배지가 들어가므로 세로 공간 확보(다른 캘린더 팝업엔 영향 없음) */
-#monthly-cal .cal-day{min-height:56px;padding:3px 1px;min-width:0;overflow:visible;}
+/* 월간탭 캘린더 전용 — 날짜 칸 안에 일정 배지+bar가 들어가므로 세로 공간 확보, overflow:visible로 bar 마진 확장분이 잘리지 않게 함(다른 캘린더 팝업엔 영향 없음) */
+#monthly-cal .cal-day{min-height:56px;padding:3px 1px;min-width:0;overflow:visible;position:relative;}
 #monthly-cal .cal-num{width:24px;height:24px;font-size:12px;margin-bottom:2px;}
 #monthly-cal .cal-day.has-record .cal-num{background:rgba(200,176,168,0.12);}
 #monthly-cal .cal-day.today .cal-num{background:var(--acc);color:white;}
@@ -587,13 +585,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .modal-inp{width:100%;background:var(--inp);border:1px solid var(--inp-b);border-radius:12px;padding:11px 14px;font-size:16px;color:var(--tp);font-family:'DM Sans',sans-serif;outline:none;margin-bottom:12px;}
 .modal-inp::placeholder{color:var(--tm);}
 .time-inp{font-size:22px;font-weight:300;text-align:center;letter-spacing:1px;box-sizing:border-box;width:150px;padding:11px 10px;margin:0 auto 12px;display:block;}
-.modal-actions{display:flex;gap:8px;}
+.modal-actions{display:flex;gap:8px;margin-top:8px;}
 .msr-item{padding:9px 4px;border-bottom:1px solid var(--div);cursor:pointer;}
 .msr-item:last-child{border-bottom:none;}
 .msr-date{font-size:12px;color:var(--tm);margin-bottom:3px;}
 .msr-text{font-size:13px;color:var(--tp);line-height:1.5;}
 .mbtn{flex:1;padding:10px;border-radius:12px;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;border:none;}
-.mbtn.cancel{background:var(--card);color:var(--tm);border:1px solid var(--card-b);}
+.mbtn.cancel{background:var(--inp);color:var(--tm);border:1px solid var(--inp-b);}
 .mbtn.ok{background:var(--acc-soft);color:var(--acc);font-weight:500;}
 /* ── 독서 완독 확인 — 축하하는 느낌의 반짝이는 테두리 버튼 ── */
 .pg-done-msg{font-size:13.5px;color:var(--tp);text-align:center;margin:6px 0 14px;font-weight:500;}
@@ -1695,7 +1693,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     </div>
     <div class="todo-multiday-end-row" id="todo-multiday-end-row" style="display:none;">
       <span class="todo-multiday-lbl">종료일</span>
-      <input type="date" class="modal-inp todo-multiday-end-inp" id="todo-event-end-date" lang="en-GB" onchange="onTodoEventEndDateChange()">
+      <input type="text" class="todo-multiday-end-inp" id="todo-event-end-date" readonly onclick="openTodoEventEndDatePicker()" placeholder="날짜 선택">
     </div>
     <div class="modal-actions">
       <button class="mbtn cancel" id="todo-modal-delete" onclick="deleteTodoFromModal()" style="display:none;color:#c05060;flex:0.8;">삭제</button>
@@ -4446,7 +4444,7 @@ function getActiveMultiDayEvents(dk){
     const d=new Date(target);d.setDate(d.getDate()-i);
     const startDk=dateKey(d);
     const todos=getTodos(startDk);
-    todos.forEach((t,idx)=>{
+    todos.forEach((t)=>{
       if(!t.isEvent||!t.eventEndDate)return; // 연속일정이 아니면 스킵(하루짜리는 여기서 제외)
       if(startDk>dk||t.eventEndDate<dk)return; // 오늘이 범위 밖이면 스킵
       if(startDk===dk&&t.eventEndDate===dk)return; // 시작=종료(=오늘)면 실질적으로 하루짜리이므로 스킵(방어)
@@ -4454,7 +4452,7 @@ function getActiveMultiDayEvents(dk){
       const endD=new Date(t.eventEndDate+'T00:00:00');
       const totalDays=Math.round((endD-startD)/86400000)+1;
       const dayIndex=Math.round((target-startD)/86400000)+1;
-      result.push({...t,_startDk:startDk,_idx:idx,dayIndex,totalDays});
+      result.push({...t,_startDk:startDk,dayIndex,totalDays});
     });
   }
   return result;
@@ -4479,7 +4477,7 @@ function getMultiDayEventsForMonth(y,mo){
       if(t.eventEndDate<monthStart||startDk>monthEnd)return; // 이번 달과 전혀 안 겹치면 제외
       const key=t.cid||`${startDk}_${idx}`;
       if(seen.has(key))return;seen.add(key);
-      result.push({...t,_startDk:startDk,_idx:idx});
+      result.push({...t,_startDk:startDk});
     });
   }
   return result;
@@ -5718,7 +5716,7 @@ function renderEventList(dk,todos){
   const list=document.getElementById('event-list');
   if(!section||!list)return;
   // 하루짜리 일정(오늘 date_key에 저장된 것) — 연속일정(eventEndDate 있는 것)은 여기서 제외하고 아래서 별도 병합
-  const events=todos.map((t,i)=>({...t,_i:i})).filter(t=>t.isEvent&&!t.eventEndDate);
+  const events=todos.filter(t=>t.isEvent&&!t.eventEndDate);
   // 연속일정 — 오늘이 시작일이든 아니든, 오늘을 범위로 품는 모든 연속일정을 공용 함수로 조회
   const multiday=getActiveMultiDayEvents(dk);
   const all=[...events,...multiday];
@@ -7873,7 +7871,6 @@ function openTodoModal(editIdx=-1){
   multidayArrow.classList.toggle('on',hasMultiday);
   multidayEndRow.style.display=hasMultiday?'flex':'none';
   endDateInp.value=existingEndDate||'';
-  endDateInp.min=dk; // 종료일은 시작일(당일) 이전으로 선택 불가
   modal.dataset.eventEndDate=hasMultiday?existingEndDate:'';
   // 할일/일정 탭 초기화 — 기존 항목의 isEvent 값에 따라, 신규는 항상 '할일' 탭에서 시작
   selectTodoKind(existing?.isEvent?'event':'todo',document.querySelector(`.todo-kind-tabs button.tk-${existing?.isEvent?'event':'todo'}`));
@@ -7906,9 +7903,17 @@ function toggleTodoMultiday(){
     document.getElementById('todo-modal').dataset.eventEndDate=endInp.value;
   }
 }
-function onTodoEventEndDateChange(){
-  const v=document.getElementById('todo-event-end-date').value;
-  document.getElementById('todo-modal').dataset.eventEndDate=v||'';
+// 콘텐츠 등록 모달(cm-start/cm-end)과 동일한 방식 — 공용 openDatePickerModal 재사용.
+// 네이티브 input[type=date]는 iOS/브라우저별 세로정렬·렌더링이 불안정해서, 텍스트+커스텀 피커 방식으로 통일함.
+function openTodoEventEndDatePicker(){
+  const endInp=document.getElementById('todo-event-end-date');
+  const dk=dateKey(currentDate);
+  const curVal=endInp.value||dk;
+  openDatePickerModal(curVal,function(selectedDk){
+    if(selectedDk<dk){showToast('종료일은 시작일 이후로 선택해주세요');return;} // 시작일(오늘) 이전 선택 방지
+    endInp.value=selectedDk;
+    document.getElementById('todo-modal').dataset.eventEndDate=selectedDk;
+  },'종료일 선택','확인');
 }
 function clearTodoEventTime(){
   const inp=document.getElementById('todo-event-time-inp');
@@ -9530,8 +9535,8 @@ function renderCalendar(){
     const dk=`${y}-${pad(mo+1)}-${pad(d)}`;
     const todos=getTodos(dk);
     if(getMemos(dk).length>0||todos.some(t=>t.done)||getSleep(dk).sleep)hasRecord[d]=true;
-    // 하루짜리 일정만 배지 대상(연속일정은 eventEndDate가 있으므로 여기서 제외 — 아래 bar 행으로 별도 렌더)
-    const evs=todos.map((t,idx)=>({...t,_idx:idx})).filter(t=>t.isEvent&&!t.eventEndDate);
+    // 하루짜리 일정만 배지 대상(연속일정은 eventEndDate가 있으므로 여기서 제외 — 아래 bar로 별도 렌더)
+    const evs=todos.filter(t=>t.isEvent&&!t.eventEndDate);
     if(evs.length)eventsByDay[d]=evs;
   }
   const multidayEvents=getMultiDayEventsForMonth(y,mo); // 이 달에 걸치는 연속일정 원본(중복 제거됨)
@@ -9685,16 +9690,6 @@ function openEventEditFromCalendar(d,editIdx,year,month){
   const modal=document.getElementById('todo-modal');
   modal.dataset.calMode='1';
   modal.dataset.calRestoreDate=restoreDate;
-}
-// 연속일정 전용 편집 진입 — 인덱스가 아니라 cid(고유 id)로 찾음.
-// 오늘탭처럼 renderEventList가 자주 다시 그려지는 화면에서, 클릭 시점과 렌더링 시점 사이에 다른 조작으로
-// 배열 인덱스가 밀리면 엉뚱한 항목이 열리는 문제(인덱스 기반의 근본적 취약점)를 cid 매칭으로 원천 차단.
-function openMultiDayEventEdit(startDk,cid){
-  const startDate=new Date(startDk+'T00:00:00');
-  const targetTodos=getTodos(startDk);
-  const realIdx=targetTodos.findIndex(t=>t.cid===cid);
-  if(realIdx<0)return; // 그 사이 삭제된 경우 등 방어
-  openEventEditFromCalendar(startDate.getDate(),realIdx,startDate.getFullYear(),startDate.getMonth());
 }
 function renderCalDetail(d){
   const el=document.getElementById('cal-detail');if(!el)return;

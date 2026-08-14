@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260814-13-event-text-click-fix';
+const CACHE = 'iikoto-v20260814-20-brightness-spacing-tune';
 const ASSETS = [
   './',
   './index.html'
