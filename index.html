@@ -1505,7 +1505,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   </div>
 </div>
 
-<!-- 일정(하루짜리+연속) 전용 시트 — 투두 시트와 동일 스타일, 일정 특성상 수정/삭제만 제공(날짜변경·미루기는 일정에 해당 없음) -->
+<!-- 일정(하루짜리+연속) 전용 시트 — 투두 시트와 동일 스타일, 수정/삭제만 제공. 날짜 변경은 "수정" 모달 안 아코디언(화살표)에서 처리(별도 버튼 없음), 조각 이동 개념이 없어 "미루기"도 불필요 -->
 <div class="overlay" id="event-sheet" onclick="closeSheet('event-sheet',event)">
   <div class="bsheet">
     <div class="sheet-handle"></div>
@@ -1689,11 +1689,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <i class="ti ti-clock ico-sz-13" aria-hidden="true" onclick="openEventTimePicker()" style="cursor:pointer;"></i>
       <span class="todo-event-time-inp" id="todo-event-time-inp" data-value="" onclick="openEventTimePicker()" style="cursor:pointer;">시간 선택</span>
       <span class="todo-event-time-clear" id="todo-event-time-clear" onclick="event.stopPropagation();clearTodoEventTime()" title="시간 지우기" style="display:none;">✕</span>
-      <span class="todo-multiday-arrow" id="todo-multiday-arrow" onclick="toggleTodoMultiday()" title="며칠간 이어지는 일정"><i class="ti ti-chevron-down ico-sz-13" aria-hidden="true"></i></span>
+      <span class="todo-multiday-arrow" id="todo-multiday-arrow" onclick="toggleTodoMultiday()" title="날짜 변경 · 며칠간 이어지는 일정"><i class="ti ti-chevron-down ico-sz-13" aria-hidden="true"></i></span>
     </div>
     <div class="todo-multiday-end-row" id="todo-multiday-end-row" style="display:none;">
-      <span class="todo-multiday-lbl">종료일</span>
-      <input type="text" class="todo-multiday-end-inp" id="todo-event-end-date" readonly onclick="openTodoEventEndDatePicker()" placeholder="날짜 선택">
+      <span class="todo-multiday-lbl">날짜</span>
+      <input type="text" class="todo-multiday-end-inp" id="todo-event-start-date" readonly onclick="openTodoEventStartDatePicker()" placeholder="날짜 선택" style="flex:1;">
+      <span class="todo-multiday-lbl">~</span>
+      <input type="text" class="todo-multiday-end-inp" id="todo-event-end-date" readonly onclick="openTodoEventEndDatePicker()" placeholder="종료일(선택)" style="flex:1;">
     </div>
     <div class="modal-actions">
       <button class="mbtn cancel" id="todo-modal-delete" onclick="deleteTodoFromModal()" style="display:none;color:#c05060;flex:0.8;">삭제</button>
@@ -7874,12 +7876,15 @@ function openTodoModal(editIdx=-1){
   // 연속일정(며칠간) 초기화 — 기존에 eventEndDate가 있고 시작일과 다르면 화살표 펼침 상태로 복원
   const multidayArrow=document.getElementById('todo-multiday-arrow');
   const multidayEndRow=document.getElementById('todo-multiday-end-row');
+  const startDateInp=document.getElementById('todo-event-start-date');
   const endDateInp=document.getElementById('todo-event-end-date');
   const existingEndDate=existing?.eventEndDate||'';
   const hasMultiday=!!(existingEndDate&&existingEndDate!==dk);
   multidayArrow.classList.toggle('on',hasMultiday);
   multidayEndRow.style.display=hasMultiday?'flex':'none';
+  startDateInp.value=dk; // 시작일 입력의 초기값 = 이 일정이 속한 현재 date_key(하루짜리든 연속이든 동일)
   endDateInp.value=existingEndDate||'';
+  modal.dataset.eventStartDate=dk;
   modal.dataset.eventEndDate=hasMultiday?existingEndDate:'';
   // 할일/일정 탭 초기화 — 기존 항목의 isEvent 값에 따라, 신규는 항상 '할일' 탭에서 시작
   selectTodoKind(existing?.isEvent?'event':'todo',document.querySelector(`.todo-kind-tabs button.tk-${existing?.isEvent?'event':'todo'}`));
@@ -7905,23 +7910,37 @@ function toggleTodoMultiday(){
     document.getElementById('todo-event-end-date').value='';
     document.getElementById('todo-modal').dataset.eventEndDate='';
   }else{
-    // 펼칠 때 종료일 기본값 = 시작일(당일)로 세팅, 사용자가 바로 조정하도록
-    const dk=dateKey(currentDate);
+    // 펼칠 때 종료일 기본값 = 현재 선택된 시작일로 세팅, 사용자가 바로 조정하도록
+    const modal=document.getElementById('todo-modal');
+    const startDk=document.getElementById('todo-event-start-date').value||modal.dataset.eventStartDate||dateKey(currentDate);
     const endInp=document.getElementById('todo-event-end-date');
-    if(!endInp.value)endInp.value=dk;
-    document.getElementById('todo-modal').dataset.eventEndDate=endInp.value;
+    if(!endInp.value)endInp.value=startDk;
+    modal.dataset.eventEndDate=endInp.value;
   }
 }
 // 콘텐츠 등록 모달(cm-start/cm-end)과 동일한 방식 — 공용 openDatePickerModal 재사용.
 // 네이티브 input[type=date]는 iOS/브라우저별 세로정렬·렌더링이 불안정해서, 텍스트+커스텀 피커 방식으로 통일함.
+// 시작일(=이 일정이 속한 날짜) 변경 — 하루짜리 일정도 이 아코디언을 펼치면 날짜를 바꿀 수 있음(별도 "날짜 변경" 버튼 없이 수정모달에서 처리).
+function openTodoEventStartDatePicker(){
+  const startInp=document.getElementById('todo-event-start-date');
+  const modal=document.getElementById('todo-modal');
+  const curVal=startInp.value||modal.dataset.eventStartDate||dateKey(currentDate);
+  openDatePickerModal(curVal,function(selectedDk){
+    const endVal=modal.dataset.eventEndDate;
+    if(endVal&&selectedDk>endVal){showToast('시작일은 종료일 이전으로 선택해주세요');return;}
+    startInp.value=selectedDk;
+    modal.dataset.eventStartDate=selectedDk;
+  },'날짜 선택','확인');
+}
 function openTodoEventEndDatePicker(){
   const endInp=document.getElementById('todo-event-end-date');
-  const dk=dateKey(currentDate);
-  const curVal=endInp.value||dk;
+  const modal=document.getElementById('todo-modal');
+  const startVal=document.getElementById('todo-event-start-date').value||modal.dataset.eventStartDate||dateKey(currentDate);
+  const curVal=endInp.value||startVal;
   openDatePickerModal(curVal,function(selectedDk){
-    if(selectedDk<dk){showToast('종료일은 시작일 이후로 선택해주세요');return;} // 시작일(오늘) 이전 선택 방지
+    if(selectedDk<startVal){showToast('종료일은 시작일 이후로 선택해주세요');return;}
     endInp.value=selectedDk;
-    document.getElementById('todo-modal').dataset.eventEndDate=selectedDk;
+    modal.dataset.eventEndDate=selectedDk;
   },'종료일 선택','확인');
 }
 function clearTodoEventTime(){
@@ -7983,9 +8002,25 @@ function confirmTodo(){
   const isEvent=modal.dataset.kind==='event';
   const eventCat=isEvent?(modal.dataset.eventCat||'schedule'):'';
   const eventTime=isEvent?(document.getElementById('todo-event-time-inp').dataset.value||null):null;
+  // 시작일(=일정이 속한 date_key) — 아코디언에서 바꾸지 않았다면 modal.dataset.eventStartDate가 원래 dk와 같음
+  const newDk=isEvent?(modal.dataset.eventStartDate||dk):dk;
   // 종료일이 시작일과 같거나 비어있으면 하루짜리 일정으로 취급(eventEndDate:null) — 하위호환 유지
   const rawEndDate=isEvent?(modal.dataset.eventEndDate||''):'';
-  const eventEndDate=(rawEndDate&&rawEndDate!==dk)?rawEndDate:null;
+  const eventEndDate=(rawEndDate&&rawEndDate!==newDk)?rawEndDate:null;
+  // 일정 시작일이 원래 날짜(dk)와 달라진 경우 — 기존 row를 dk에서 제거하고 newDk에 새로 저장(투두의 조각 이동과 달리 일정은 통째로 이동이라 단순함)
+  if(isEvent&&editIdx>=0&&todos[editIdx]&&newDk!==dk){
+    const old=todos[editIdx];
+    addDelPending('todos',dk,old.cid);
+    todos.splice(editIdx,1);
+    saveTodos(dk,todos);
+    const targetTodos=getTodos(newDk);
+    targetTodos.push({text,done:old.done||false,created:old.created||Date.now(),timeSection,isEvent:true,eventCat,eventTime,eventEndDate,cid:old.cid,strikeParts:[],strikeTimes:{}});
+    saveTodos(newDk,targetTodos);
+    closeModal('todo-modal');
+    restoreCalModeAndRender(modal,true);
+    setTimeout(()=>{_todoSubmitting=false;},500);
+    return;
+  }
   if(editIdx>=0&&todos[editIdx]){
     const old=todos[editIdx];
     // 조각(strikeParts)이 있는 투두의 텍스트를 수기 편집하면, 조각 개수/순서가 바뀔 수 있음.
