@@ -390,9 +390,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .todo-event-time-row{display:flex;align-items:center;gap:8px;margin:8px 0 4px;padding:8px 12px;border-radius:10px;border:1px solid var(--inp-b);background:var(--inp);color:var(--tm);}
 .todo-multiday-arrow{display:flex;align-items:center;justify-content:center;width:22px;height:22px;flex-shrink:0;cursor:pointer;color:var(--tm);transition:transform .2s;}
 .todo-multiday-arrow.on{transform:rotate(180deg);color:var(--tp);}
-.todo-multiday-end-row{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;border:1px solid var(--card-b);background:var(--card);margin:4px 0;}
+.todo-multiday-end-row{display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:10px;border:1px solid var(--card-b);background:var(--card);margin:4px 0;}
 .todo-multiday-lbl{font-size:12px;color:var(--tm);white-space:nowrap;flex-shrink:0;line-height:16px;}
-.todo-multiday-end-inp{flex:1;margin-bottom:0;cursor:pointer;font-size:13px;padding:0;border:none;background:none;height:16px;line-height:16px;}
+.todo-multiday-end-inp{flex:1;min-width:0;margin-bottom:0;cursor:pointer;font-size:13px;padding:0;border:none;background:none;height:16px;line-height:16px;}
 .todo-event-time-inp{flex:1;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--tp);font-variant-numeric:tabular-nums;}
 .todo-event-time-clear{cursor:pointer;font-size:11px;color:var(--tm);padding:2px 4px;}
 /* 할일/일정 책갈피형 탭 — 선택된 쪽이 아래로 살짝 튀어나온 듯 강조되고, 나머지는 뒤로 물러난 톤 */
@@ -1692,10 +1692,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <span class="todo-multiday-arrow" id="todo-multiday-arrow" onclick="toggleTodoMultiday()" title="날짜 변경 · 며칠간 이어지는 일정"><i class="ti ti-chevron-down ico-sz-13" aria-hidden="true"></i></span>
     </div>
     <div class="todo-multiday-end-row" id="todo-multiday-end-row" style="display:none;">
-      <span class="todo-multiday-lbl">날짜</span>
-      <input type="text" class="todo-multiday-end-inp" id="todo-event-start-date" readonly onclick="openTodoEventStartDatePicker()" placeholder="날짜 선택" style="flex:1;">
+      <input type="text" class="todo-multiday-end-inp" id="todo-event-start-date" readonly onclick="openTodoEventStartDatePicker()" placeholder="MM.DD" style="flex:1;text-align:center;">
       <span class="todo-multiday-lbl">~</span>
-      <input type="text" class="todo-multiday-end-inp" id="todo-event-end-date" readonly onclick="openTodoEventEndDatePicker()" placeholder="종료일(선택)" style="flex:1;">
+      <input type="text" class="todo-multiday-end-inp" id="todo-event-end-date" readonly onclick="openTodoEventEndDatePicker()" placeholder="MM.DD" style="flex:1;text-align:center;">
     </div>
     <div class="modal-actions">
       <button class="mbtn cancel" id="todo-modal-delete" onclick="deleteTodoFromModal()" style="display:none;color:#c05060;flex:0.8;">삭제</button>
@@ -7882,8 +7881,8 @@ function openTodoModal(editIdx=-1){
   const hasMultiday=!!(existingEndDate&&existingEndDate!==dk);
   multidayArrow.classList.toggle('on',hasMultiday);
   multidayEndRow.style.display=hasMultiday?'flex':'none';
-  startDateInp.value=dk; // 시작일 입력의 초기값 = 이 일정이 속한 현재 date_key(하루짜리든 연속이든 동일)
-  endDateInp.value=existingEndDate||'';
+  startDateInp.value=shortDk(dk); // 표시는 짧게(MM.DD), 실제 값은 modal.dataset.eventStartDate가 원본(YYYY-MM-DD)으로 관리
+  endDateInp.value=existingEndDate?shortDk(existingEndDate):'';
   modal.dataset.eventStartDate=dk;
   modal.dataset.eventEndDate=hasMultiday?existingEndDate:'';
   // 할일/일정 탭 초기화 — 기존 항목의 isEvent 값에 따라, 신규는 항상 '할일' 탭에서 시작
@@ -7900,6 +7899,12 @@ function selectTodoKind(kind,btn){
   document.getElementById('todo-event-time-row').style.display=kind==='event'?'flex':'none';
   if(kind!=='event')document.getElementById('todo-multiday-end-row').style.display='none';
 }
+// dk(YYYY-MM-DD)를 화면 표시용 짧은 포맷(MM.DD)으로 변환 — 저장값(input.value/dataset)은 항상 dk 원본 유지, 표시만 축약
+function shortDk(dk){
+  if(!dk)return '';
+  const parts=dk.split('-');
+  return parts.length===3?`${parts[1]}.${parts[2]}`:dk;
+}
 function toggleTodoMultiday(){
   const arrow=document.getElementById('todo-multiday-arrow');
   const endRow=document.getElementById('todo-multiday-end-row');
@@ -7912,34 +7917,34 @@ function toggleTodoMultiday(){
   }else{
     // 펼칠 때 종료일 기본값 = 현재 선택된 시작일로 세팅, 사용자가 바로 조정하도록
     const modal=document.getElementById('todo-modal');
-    const startDk=document.getElementById('todo-event-start-date').value||modal.dataset.eventStartDate||dateKey(currentDate);
+    const startDk=modal.dataset.eventStartDate||dateKey(currentDate);
     const endInp=document.getElementById('todo-event-end-date');
-    if(!endInp.value)endInp.value=startDk;
-    modal.dataset.eventEndDate=endInp.value;
+    if(!modal.dataset.eventEndDate){endInp.value=shortDk(startDk);modal.dataset.eventEndDate=startDk;}
   }
 }
 // 콘텐츠 등록 모달(cm-start/cm-end)과 동일한 방식 — 공용 openDatePickerModal 재사용.
 // 네이티브 input[type=date]는 iOS/브라우저별 세로정렬·렌더링이 불안정해서, 텍스트+커스텀 피커 방식으로 통일함.
 // 시작일(=이 일정이 속한 날짜) 변경 — 하루짜리 일정도 이 아코디언을 펼치면 날짜를 바꿀 수 있음(별도 "날짜 변경" 버튼 없이 수정모달에서 처리).
+// 진짜 값은 modal.dataset.eventStartDate/eventEndDate(YYYY-MM-DD)에만 저장, input.value는 항상 표시용 축약(MM.DD)만 담음(칸이 좁아 4자리 연도가 넘치는 것 방지)
 function openTodoEventStartDatePicker(){
   const startInp=document.getElementById('todo-event-start-date');
   const modal=document.getElementById('todo-modal');
-  const curVal=startInp.value||modal.dataset.eventStartDate||dateKey(currentDate);
+  const curVal=modal.dataset.eventStartDate||dateKey(currentDate);
   openDatePickerModal(curVal,function(selectedDk){
     const endVal=modal.dataset.eventEndDate;
     if(endVal&&selectedDk>endVal){showToast('시작일은 종료일 이전으로 선택해주세요');return;}
-    startInp.value=selectedDk;
+    startInp.value=shortDk(selectedDk);
     modal.dataset.eventStartDate=selectedDk;
   },'날짜 선택','확인');
 }
 function openTodoEventEndDatePicker(){
   const endInp=document.getElementById('todo-event-end-date');
   const modal=document.getElementById('todo-modal');
-  const startVal=document.getElementById('todo-event-start-date').value||modal.dataset.eventStartDate||dateKey(currentDate);
-  const curVal=endInp.value||startVal;
+  const startVal=modal.dataset.eventStartDate||dateKey(currentDate);
+  const curVal=modal.dataset.eventEndDate||startVal;
   openDatePickerModal(curVal,function(selectedDk){
     if(selectedDk<startVal){showToast('종료일은 시작일 이후로 선택해주세요');return;}
-    endInp.value=selectedDk;
+    endInp.value=shortDk(selectedDk);
     modal.dataset.eventEndDate=selectedDk;
   },'종료일 선택','확인');
 }

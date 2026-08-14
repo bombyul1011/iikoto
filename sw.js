@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260814-26-event-date-edit';
+const CACHE = 'iikoto-v20260814-29-event-date-minwidth-fix';
 const ASSETS = [
   './',
   './index.html'
