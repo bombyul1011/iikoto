@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260814-3-multiday-events';
+const CACHE = 'iikoto-v20260814-13-event-text-click-fix';
 const ASSETS = [
   './',
   './index.html'
