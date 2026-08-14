@@ -211,6 +211,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .event-item:last-child{border-bottom:none;}
 .event-txt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .event-time{font-size:11px;color:var(--ts);flex-shrink:0;font-variant-numeric:tabular-nums;}
+.event-daycount{background:rgba(185,165,230,0.20);color:#8a76b8;padding:2px 7px;border-radius:8px;font-weight:600;}
 .todo-item:last-of-type{border-bottom:none;}
 .todo-item.reorder-active{z-index:5;background:var(--card);box-shadow:0 2px 8px rgba(0,0,0,0.12);border-radius:8px;}
 .todo-item.reorder-shift{transition:transform .12s ease;}
@@ -386,7 +387,12 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .todo-event-sel button.ev-personal.active{background:var(--ev-personal-bg);border-color:var(--ev-personal-border);color:var(--ev-personal-text);}
 .todo-event-sel button.ev-work.active{background:var(--ev-work-bg);border-color:var(--ev-work-border);color:var(--ev-work-text);}
 .todo-event-sel button.ev-etc.active{background:var(--ev-etc-bg);border-color:var(--ev-etc-border);color:var(--ev-etc-text);}
-.todo-event-time-row{display:flex;align-items:center;gap:8px;margin:8px 0 4px;padding:8px 12px;border-radius:10px;border:1px solid var(--card-b);background:var(--card);color:var(--tm);cursor:pointer;}
+.todo-event-time-row{display:flex;align-items:center;gap:8px;margin:8px 0 4px;padding:8px 12px;border-radius:10px;border:1px solid var(--card-b);background:var(--card);color:var(--tm);}
+.todo-multiday-arrow{display:flex;align-items:center;justify-content:center;width:22px;height:22px;flex-shrink:0;cursor:pointer;color:var(--tm);transition:transform .2s;}
+.todo-multiday-arrow.on{transform:rotate(180deg);color:var(--tp);}
+.todo-multiday-end-row{display:flex;align-items:center;gap:8px;padding:0 12px;height:38px;border-radius:10px;border:1px solid var(--card-b);background:var(--card);margin:4px 0;}
+.todo-multiday-lbl{font-size:11.5px;color:var(--ts);flex-shrink:0;}
+.todo-multiday-end-inp{flex:none!important;width:150px!important;height:26px;margin-bottom:0;font-size:12.5px;padding:0 8px;}
 .todo-event-time-inp{flex:1;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--tp);font-variant-numeric:tabular-nums;}
 .todo-event-time-clear{cursor:pointer;font-size:11px;color:var(--tm);padding:2px 4px;}
 /* 할일/일정 책갈피형 탭 — 선택된 쪽이 아래로 살짝 튀어나온 듯 강조되고, 나머지는 뒤로 물러난 톤 */
@@ -501,6 +507,19 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 /* ── CALENDAR ── */
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:0;}
+/* 월간탭 연속일정 bar 레이어 — grid는 그대로 두고 그 위에 절대좌표로 얹음.
+   --cal-row-h: 한 주(day-name 행 제외, 날짜 행만) 높이. --cal-bar-top-offset: 날짜 숫자+배지 아래로 bar가 오도록 하는 여백.
+   --cal-bar-h: bar 1개 높이(겹칠 때 세로로 쌓이는 간격도 이 값). 값 변경 시 이 3개만 조정하면 bar 좌표 전체가 따라 움직임. */
+#monthly-cal .cal-grid-wrap{position:relative;--cal-row-h:72px;--cal-bar-top-offset:46px;--cal-bar-h:14px;}
+#monthly-cal .cal-day{min-height:var(--cal-row-h);height:var(--cal-row-h);}
+#monthly-cal .cal-event-bar-layer{position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;}
+#monthly-cal .cal-event-bar{position:absolute;height:calc(var(--cal-bar-h) - 2px);font-size:8.5px;line-height:calc(var(--cal-bar-h) - 2px);color:#fff;padding:0 4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;pointer-events:auto;box-sizing:border-box;}
+#monthly-cal .cal-event-bar.bar-round-l{border-top-left-radius:7px;border-bottom-left-radius:7px;margin-left:1px;}
+#monthly-cal .cal-event-bar.bar-round-r{border-top-right-radius:7px;border-bottom-right-radius:7px;margin-right:1px;}
+#monthly-cal .cal-event-bar.ev-schedule{background:var(--ev-schedule-text);}
+#monthly-cal .cal-event-bar.ev-personal{background:var(--ev-personal-text);}
+#monthly-cal .cal-event-bar.ev-work{background:var(--ev-work-text);}
+#monthly-cal .cal-event-bar.ev-etc{background:var(--ev-etc-text);}
 .cal-day-name{text-align:center;font-size:10px;color:var(--tm);padding:0 0 10px;}
 .cal-day{display:flex;flex-direction:column;align-items:center;padding:4px 2px 8px;cursor:pointer;position:relative;}
 .cal-num{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--tp);transition:all .15s;}
@@ -1659,10 +1678,15 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <button class="ev-work" onclick="selectTodoEventCat('work',this)"><i class="ti ti-moneybag-heart ico-sz-13" aria-hidden="true"></i> 업무</button>
       <button class="ev-etc" onclick="selectTodoEventCat('etc',this)"><i class="ti ti-calendar-smile ico-sz-13" aria-hidden="true"></i> 기타</button>
     </div>
-    <div class="todo-event-time-row" id="todo-event-time-row" style="display:none;" onclick="openEventTimePicker()">
-      <i class="ti ti-clock ico-sz-13" aria-hidden="true"></i>
-      <span class="todo-event-time-inp" id="todo-event-time-inp" data-value="">시간 선택</span>
+    <div class="todo-event-time-row" id="todo-event-time-row" style="display:none;">
+      <i class="ti ti-clock ico-sz-13" aria-hidden="true" onclick="openEventTimePicker()" style="cursor:pointer;"></i>
+      <span class="todo-event-time-inp" id="todo-event-time-inp" data-value="" onclick="openEventTimePicker()" style="cursor:pointer;">시간 선택</span>
       <span class="todo-event-time-clear" id="todo-event-time-clear" onclick="event.stopPropagation();clearTodoEventTime()" title="시간 지우기" style="display:none;">✕</span>
+      <span class="todo-multiday-arrow" id="todo-multiday-arrow" onclick="toggleTodoMultiday()" title="며칠간 이어지는 일정"><i class="ti ti-chevron-down ico-sz-13" aria-hidden="true"></i></span>
+    </div>
+    <div class="todo-multiday-end-row" id="todo-multiday-end-row" style="display:none;">
+      <span class="todo-multiday-lbl">종료일</span>
+      <input type="date" class="modal-inp todo-multiday-end-inp" id="todo-event-end-date" lang="en-GB" onchange="onTodoEventEndDateChange()">
     </div>
     <div class="modal-actions">
       <button class="mbtn cancel" onclick="closeTodoModal()">취소</button>
@@ -4371,6 +4395,85 @@ function compareTodoOrder(a,b){
   return parseTodoLeadingTime(a.text)-parseTodoLeadingTime(b.text);
 }
 function getTodos(dk){return S.get(S.key('todos',dk))||[];}
+// ── 월간 캘린더 연속일정 bar 좌표 계산 ──
+// weekDates: 그 주의 7개 dk(월~일) 배열. multidayEvents: getActiveMultiDayEvents류로 모은 이번 달 전체 연속일정 목록(중복 제거된 원본, {_startDk,eventEndDate,...}).
+// 반환: 이 주에 걸치는 각 이벤트의 {left,width,row,clipStart,clipEnd,...ev} — left/width는 칸(cell) 단위 정수(0~6, 1~7), row는 겹칠 때 세로 순번(0부터).
+// 겹침 배정은 "실사용상 거의 겹치지 않는다"는 전제로 단순하게: 이미 배정된 row들과 구간이 겹치면 다음 row로.
+function computeWeekBars(weekDates,multidayEvents){
+  const weekStart=weekDates[0],weekEnd=weekDates[6];
+  const barsInWeek=[];
+  multidayEvents.forEach(ev=>{
+    const evStart=ev._startDk,evEnd=ev.eventEndDate;
+    if(evEnd<weekStart||evStart>weekEnd)return; // 이번 주와 전혀 안 겹침
+    const startIdx=weekDates.indexOf(evStart);
+    const endIdx=weekDates.indexOf(evEnd);
+    const left=startIdx>=0?startIdx:0; // 이번 주 이전에 시작했으면 주 맨 앞부터
+    const right=endIdx>=0?endIdx:6;    // 이번 주 이후까지 이어지면 주 맨 끝까지
+    barsInWeek.push({ev,left,width:right-left+1,clipStart:startIdx<0,clipEnd:endIdx<0});
+  });
+  // row 배정 — 시작이 이른 순으로 정렬 후, 기존 row들과 겹치는지 검사해 안 겹치는 첫 row에 배정
+  barsInWeek.sort((a,b)=>a.left-b.left);
+  const rows=[]; // 각 row는 [{left,width}] 배열(그 row에 이미 배정된 bar들의 구간)
+  barsInWeek.forEach(bar=>{
+    let placed=false;
+    for(let r=0;r<rows.length;r++){
+      const overlap=rows[r].some(b=>!(bar.left+bar.width<=b.left||bar.left>=b.left+b.width));
+      if(!overlap){rows[r].push({left:bar.left,width:bar.width});bar.row=r;placed=true;break;}
+    }
+    if(!placed){rows.push([{left:bar.left,width:bar.width}]);bar.row=rows.length-1;}
+  });
+  return barsInWeek;
+}
+// ── 연속일정(며칠간 이어지는 일정) 공용 조회 함수 ──
+// 특정 날짜(dk)를 범위(startDate~eventEndDate)로 품고 있는 연속일정을 전부 찾아 반환.
+// 연속일정 row는 시작일의 date_key에만 저장되므로, 최근 MULTIDAY_LOOKBACK_DAYS일 이내를 거슬러 올라가며 훑는다.
+// 반환 각 항목에 dayIndex(오늘이 며칠차인지, 1부터 시작)와 totalDays(총 며칠짜리인지)를 덧붙여준다.
+const MULTIDAY_LOOKBACK_DAYS=14; // 실사용상 최대 연속일정 길이를 넉넉히 잡은 상한
+function getActiveMultiDayEvents(dk){
+  const target=new Date(dk+'T00:00:00');
+  const result=[];
+  for(let i=0;i<MULTIDAY_LOOKBACK_DAYS;i++){
+    const d=new Date(target);d.setDate(d.getDate()-i);
+    const startDk=dateKey(d);
+    const todos=getTodos(startDk);
+    todos.forEach((t,idx)=>{
+      if(!t.isEvent||!t.eventEndDate)return; // 연속일정이 아니면 스킵(하루짜리는 여기서 제외)
+      if(startDk>dk||t.eventEndDate<dk)return; // 오늘이 범위 밖이면 스킵
+      if(startDk===dk&&t.eventEndDate===dk)return; // 시작=종료(=오늘)면 실질적으로 하루짜리이므로 스킵(방어)
+      const startD=new Date(startDk+'T00:00:00');
+      const endD=new Date(t.eventEndDate+'T00:00:00');
+      const totalDays=Math.round((endD-startD)/86400000)+1;
+      const dayIndex=Math.round((target-startD)/86400000)+1;
+      result.push({...t,_startDk:startDk,_idx:idx,dayIndex,totalDays});
+    });
+  }
+  return result;
+}
+// ── 월간 캘린더 전용: 해당 월(y,mo)에 걸치는 연속일정 원본을 한 번에 모아 반환(중복 제거) ──
+// getActiveMultiDayEvents는 "하루 기준" 조회라 월 전체를 훑으면 같은 이벤트가 여러 날에서 중복 조회됨.
+// 이 함수는 월의 시작~끝(+앞뒤 룩백)만 스캔해 이벤트 원본을 cid 기준으로 1건씩만 모음 — computeWeekBars의 입력으로 사용.
+function getMultiDayEventsForMonth(y,mo){
+  const monthStart=`${y}-${pad(mo+1)}-01`;
+  const daysInMonth=new Date(y,mo+1,0).getDate();
+  const monthEnd=`${y}-${pad(mo+1)}-${pad(daysInMonth)}`;
+  const seen=new Set();
+  const result=[];
+  // 월 시작일 기준으로 최대 MULTIDAY_LOOKBACK_DAYS일 전부터, 월 마지막날까지 시작일 후보를 훑음
+  const scanFrom=new Date(monthStart+'T00:00:00');scanFrom.setDate(scanFrom.getDate()-MULTIDAY_LOOKBACK_DAYS);
+  const scanTo=new Date(monthEnd+'T00:00:00');
+  for(let d=new Date(scanFrom);d<=scanTo;d.setDate(d.getDate()+1)){
+    const startDk=dateKey(d);
+    const todos=getTodos(startDk);
+    todos.forEach((t,idx)=>{
+      if(!t.isEvent||!t.eventEndDate)return;
+      if(t.eventEndDate<monthStart||startDk>monthEnd)return; // 이번 달과 전혀 안 겹치면 제외
+      const key=t.cid||`${startDk}_${idx}`;
+      if(seen.has(key))return;seen.add(key);
+      result.push({...t,_startDk:startDk,_idx:idx});
+    });
+  }
+  return result;
+}
 function saveTodos(dk,v){
   S.set(S.key('todos',dk),v);
   S.set(S.key('todos_pending',dk),true); // 업로드 필요 플래그
@@ -4672,7 +4775,7 @@ async function syncTodosDown(dk){
   if(!rows)return; // 연결 실패(null) — 로컬 유지. 빈 배열은 "서버에 진짜 0개"라는 뜻이라 그대로 반영.
   if(S.get(S.key('todos_pending',dk)))return; // 업로드 대기중인 로컬 수정(미루기 등) 있으면 덮어쓰지 않음
   S.set(S.key('todos',dk),rows.map(function(r){
-    return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null};
+    return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null,eventEndDate:r.event_end_date||null};
   }));
   renderTodos();
 }
@@ -4681,7 +4784,7 @@ async function syncTodosUp(dk){
   if(ensureItemCids(todos))S.set(S.key('todos',dk),todos);
   const delCids=getDelPendingCids('todos',dk);
   const ok=await syncListUpSafe('todos',`date_key=eq.${dk}`,'date_key,client_id',todos,
-    t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,strike_parts:t.strikeParts||[],strike_times:t.strikeTimes||{},completed_at:(t.completedAt!=null?t.completedAt:null),sort_order:(typeof t.sortOrder==='number'?t.sortOrder:null),is_event:!!t.isEvent,event_cat:t.eventCat||null,event_time:t.eventTime||null}),
+    t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,strike_parts:t.strikeParts||[],strike_times:t.strikeTimes||{},completed_at:(t.completedAt!=null?t.completedAt:null),sort_order:(typeof t.sortOrder==='number'?t.sortOrder:null),is_event:!!t.isEvent,event_cat:t.eventCat||null,event_time:t.eventTime||null,event_end_date:t.eventEndDate||null}),
     delCids);
   if(ok)delCids.forEach(cid=>removeDelPending('todos',dk,cid));
   return ok;
@@ -5603,24 +5706,42 @@ function renderEventList(dk,todos){
   const section=document.getElementById('event-section');
   const list=document.getElementById('event-list');
   if(!section||!list)return;
-  const events=todos.map((t,i)=>({...t,_i:i})).filter(t=>t.isEvent);
-  if(!events.length){section.style.display='none';list.innerHTML='';return;}
+  // 하루짜리 일정(오늘 date_key에 저장된 것) — 연속일정(eventEndDate 있는 것)은 여기서 제외하고 아래서 별도 병합
+  const events=todos.map((t,i)=>({...t,_i:i})).filter(t=>t.isEvent&&!t.eventEndDate);
+  // 연속일정 — 오늘이 시작일이든 아니든, 오늘을 범위로 품는 모든 연속일정을 공용 함수로 조회
+  const multiday=getActiveMultiDayEvents(dk);
+  const all=[...events,...multiday];
+  if(!all.length){section.style.display='none';list.innerHTML='';return;}
   section.style.display='block';
-  // 시간 있는 일정은 이른 시간 순, 시간 없는 일정은 뒤로 — 같은 조건끼리는 등록 순서 유지
-  const sorted=[...events].sort((a,b)=>{
+  // 정렬: 시간 있는 하루짜리 → 연속일정(며칠차 오름차순) → 시간 없는 하루짜리
+  const sorted=[...all].sort((a,b)=>{
+    const aM=!!a.eventEndDate,bM=!!b.eventEndDate;
+    if(aM!==bM){
+      // 연속일정은 시간유무와 무관하게 '시간 있는 하루짜리' 바로 다음, '시간 없는 하루짜리'보다는 앞
+      if(!aM&&a.eventTime)return -1;
+      if(!bM&&b.eventTime)return 1;
+      return aM?-1:1;
+    }
+    if(aM&&bM)return a.dayIndex-b.dayIndex;
     if(!!a.eventTime!==!!b.eventTime)return a.eventTime?-1:1;
     if(a.eventTime&&b.eventTime)return a.eventTime.localeCompare(b.eventTime);
     return 0;
   });
   list.innerHTML='';
   sorted.forEach(ev=>{
-    const i=ev._i;
     const ec=getEventCat(ev.eventCat);
     const el=document.createElement('div');
     el.className='event-item';
-    el.onclick=()=>openTodoModal(i);
-    const textHtml=renderTodoTextParts(ev.text,[],i);
-    el.innerHTML=`<i class="ti ${ec.icon}" style="font-size:14px;color:${ec.textColor};flex-shrink:0;" title="${ec.label}" aria-hidden="true"></i><span class="event-txt">${textHtml}</span>${ev.eventTime?`<span class="event-time">${ev.eventTime}</span>`:''}`;
+    // 연속일정은 시작일이 오늘과 다를 수 있으므로, 캘린더 편집 경로(다른 날짜 임시 전환)를 재사용
+    if(ev.eventEndDate){
+      const startDate=new Date(ev._startDk+'T00:00:00');
+      el.onclick=()=>openEventEditFromCalendar(startDate.getDate(),ev._idx,startDate.getFullYear(),startDate.getMonth());
+    }else{
+      el.onclick=()=>openTodoModal(ev._i);
+    }
+    const textHtml=renderTodoTextParts(ev.text,[],ev._i!=null?ev._i:0);
+    const rightBadge=ev.eventEndDate?`<span class="event-time event-daycount">${ev.dayIndex}일차</span>`:(ev.eventTime?`<span class="event-time">${ev.eventTime}</span>`:'');
+    el.innerHTML=`<i class="ti ${ec.icon}" style="font-size:14px;color:${ec.textColor};flex-shrink:0;" title="${ec.label}" aria-hidden="true"></i><span class="event-txt">${textHtml}</span>${rightBadge}`;
     list.appendChild(el);
   });
 }
@@ -7733,6 +7854,17 @@ function openTodoModal(editIdx=-1){
   const evTimeVal=existing?.eventTime||'';
   evTimeInp.dataset.value=evTimeVal;evTimeInp.textContent=evTimeVal||'시간 선택';
   document.getElementById('todo-event-time-clear').style.display=evTimeVal?'block':'none';
+  // 연속일정(며칠간) 초기화 — 기존에 eventEndDate가 있고 시작일과 다르면 화살표 펼침 상태로 복원
+  const multidayArrow=document.getElementById('todo-multiday-arrow');
+  const multidayEndRow=document.getElementById('todo-multiday-end-row');
+  const endDateInp=document.getElementById('todo-event-end-date');
+  const existingEndDate=existing?.eventEndDate||'';
+  const hasMultiday=!!(existingEndDate&&existingEndDate!==dk);
+  multidayArrow.classList.toggle('on',hasMultiday);
+  multidayEndRow.style.display=hasMultiday?'flex':'none';
+  endDateInp.value=existingEndDate||'';
+  endDateInp.min=dk; // 종료일은 시작일(당일) 이전으로 선택 불가
+  modal.dataset.eventEndDate=hasMultiday?existingEndDate:'';
   // 할일/일정 탭 초기화 — 기존 항목의 isEvent 값에 따라, 신규는 항상 '할일' 탭에서 시작
   selectTodoKind(existing?.isEvent?'event':'todo',document.querySelector(`.todo-kind-tabs button.tk-${existing?.isEvent?'event':'todo'}`));
   openModal('todo-modal');setTimeout(()=>document.getElementById('todo-modal-inp').focus(),100);
@@ -7745,6 +7877,28 @@ function selectTodoKind(kind,btn){
   document.getElementById('todo-time-sel').style.display=kind==='todo'?'flex':'none';
   document.getElementById('todo-event-sel').style.display=kind==='event'?'flex':'none';
   document.getElementById('todo-event-time-row').style.display=kind==='event'?'flex':'none';
+  if(kind!=='event')document.getElementById('todo-multiday-end-row').style.display='none';
+}
+function toggleTodoMultiday(){
+  const arrow=document.getElementById('todo-multiday-arrow');
+  const endRow=document.getElementById('todo-multiday-end-row');
+  const on=!arrow.classList.contains('on');
+  arrow.classList.toggle('on',on);
+  endRow.style.display=on?'flex':'none';
+  if(!on){
+    document.getElementById('todo-event-end-date').value='';
+    document.getElementById('todo-modal').dataset.eventEndDate='';
+  }else{
+    // 펼칠 때 종료일 기본값 = 시작일(당일)로 세팅, 사용자가 바로 조정하도록
+    const dk=dateKey(currentDate);
+    const endInp=document.getElementById('todo-event-end-date');
+    if(!endInp.value)endInp.value=dk;
+    document.getElementById('todo-modal').dataset.eventEndDate=endInp.value;
+  }
+}
+function onTodoEventEndDateChange(){
+  const v=document.getElementById('todo-event-end-date').value;
+  document.getElementById('todo-modal').dataset.eventEndDate=v||'';
 }
 function clearTodoEventTime(){
   const inp=document.getElementById('todo-event-time-inp');
@@ -7781,6 +7935,9 @@ function confirmTodo(){
   const isEvent=modal.dataset.kind==='event';
   const eventCat=isEvent?(modal.dataset.eventCat||'schedule'):'';
   const eventTime=isEvent?(document.getElementById('todo-event-time-inp').dataset.value||null):null;
+  // 종료일이 시작일과 같거나 비어있으면 하루짜리 일정으로 취급(eventEndDate:null) — 하위호환 유지
+  const rawEndDate=isEvent?(modal.dataset.eventEndDate||''):'';
+  const eventEndDate=(rawEndDate&&rawEndDate!==dk)?rawEndDate:null;
   if(editIdx>=0&&todos[editIdx]){
     const old=todos[editIdx];
     // 조각(strikeParts)이 있는 투두의 텍스트를 수기 편집하면, 조각 개수/순서가 바뀔 수 있음.
@@ -7809,9 +7966,9 @@ function confirmTodo(){
       if(!newParts.length||newStrikeParts.length<newParts.length)old.done=false;
     }
     old.text=text;old.timeSection=timeSection;
-    old.isEvent=isEvent;old.eventCat=isEvent?eventCat:null;old.eventTime=isEvent?eventTime:null;
+    old.isEvent=isEvent;old.eventCat=isEvent?eventCat:null;old.eventTime=isEvent?eventTime:null;old.eventEndDate=isEvent?eventEndDate:null;
   }
-  else todos.push({text,done:false,created:Date.now(),timeSection,isEvent,eventCat:isEvent?eventCat:null,eventTime:isEvent?eventTime:null,cid:genCid()});
+  else todos.push({text,done:false,created:Date.now(),timeSection,isEvent,eventCat:isEvent?eventCat:null,eventTime:isEvent?eventTime:null,eventEndDate:isEvent?eventEndDate:null,cid:genCid()});
   saveTodos(dk,todos);closeModal('todo-modal');
   // 월간 캘린더의 "이 날에 일정 추가"에서 열린 경우 — currentDate를 원래대로 되돌리고 캘린더/상세를 갱신
   if(modal.dataset.calMode==='1'){
@@ -7820,6 +7977,7 @@ function confirmTodo(){
     if(restoreDate)currentDate=new Date(restoreDate);
     renderCalendar();
     if(_calSelectedDay)renderCalDetail(_calSelectedDay);
+    renderTodos(); // 오늘탭에서 연속일정 편집을 이 경로로 열었을 수도 있으므로 함께 갱신(오늘탭이 아니면 내부에서 안전하게 무시됨)
   }else{
     renderTodos();
   }
@@ -9239,7 +9397,7 @@ async function syncMonthRange(y,mo){
   }
   if(tRows){
     const byDate={};
-    tRows.forEach(r=>{if(r.date_key===RESERVE_DK)return;/* 예비투두 관련 로직은 파일 하단 RESERVE_DK 블록(getReserveTodos 등) 참고 */(byDate[r.date_key]=byDate[r.date_key]||[]).push({text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null});});
+    tRows.forEach(r=>{if(r.date_key===RESERVE_DK)return;/* 예비투두 관련 로직은 파일 하단 RESERVE_DK 블록(getReserveTodos 등) 참고 */(byDate[r.date_key]=byDate[r.date_key]||[]).push({text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null,eventEndDate:r.event_end_date||null});});
     Object.keys(byDate).forEach(dk=>{if(!S.get(S.key('todos_pending',dk)))S.set(S.key('todos',dk),byDate[dk]);});
   }
   if(sRows)sRows.forEach(r=>{if(!S.get(S.key('sleep_pending',r.date_key)))S.set(S.key('sleep',r.date_key),sleepRowToLocal(r));});
@@ -9311,15 +9469,18 @@ function renderCalendar(){
     const dk=`${y}-${pad(mo+1)}-${pad(d)}`;
     const todos=getTodos(dk);
     if(getMemos(dk).length>0||todos.some(t=>t.done)||getSleep(dk).sleep)hasRecord[d]=true;
-    const evs=todos.map((t,idx)=>({...t,_idx:idx})).filter(t=>t.isEvent);
+    // 하루짜리 일정만 배지 대상(연속일정은 eventEndDate가 있으므로 여기서 제외 — 아래 bar 레이어로 별도 렌더)
+    const evs=todos.map((t,idx)=>({...t,_idx:idx})).filter(t=>t.isEvent&&!t.eventEndDate);
     if(evs.length)eventsByDay[d]=evs;
   }
+  const multidayEvents=getMultiDayEventsForMonth(y,mo); // 이 달에 걸치는 연속일정 원본(중복 제거됨)
   let h=`<div style="padding:4px 2px 0;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
       <div class="nav-arr" onclick="calShiftMonth(-1)"><i class="ti ti-chevron-left" style="font-size:10px;color:var(--tm);" aria-hidden="true"></i></div>
       <span style="font-size:15px;font-weight:500;color:var(--tp);">${y}년 ${mo+1}월</span>
       <div class="nav-arr" onclick="calShiftMonth(1)"><i class="ti ti-chevron-right" style="font-size:10px;color:var(--tm);" aria-hidden="true"></i></div>
     </div>
+    <div class="cal-grid-wrap">
     <div class="cal-grid">`;
   ['월','화','수','목','금','토','일'].forEach(d=>h+=`<div class="cal-day-name">${d}</div>`);
   const firstDayRaw=new Date(y,mo,1).getDay();
@@ -9343,7 +9504,38 @@ function renderCalendar(){
     }
     h+=`<div class="${cls}" onclick="calDayClick(${d})"><div class="cal-num">${d}</div>${badges}</div>`;
   }
-  h+=`</div></div>`;
+  // 주 뒤 빈 칸(다음 달 앞부분)도 grid 칸 수를 7의 배수로 맞추기 위해 채움 — bar 좌표 계산에 필요한 완전한 주 단위 유지
+  const totalCells=firstDay+daysInMonth;
+  const trailingBlank=(7-(totalCells%7))%7;
+  for(let i=0;i<trailingBlank;i++)h+=`<div class="cal-day other-month"><div class="cal-num"></div></div>`;
+  h+=`</div>`;
+  // ── 연속일정 bar 레이어 ── 주 단위로 끊어 computeWeekBars로 좌표 계산 후 절대배치
+  const totalWeeks=(firstDay+daysInMonth+trailingBlank)/7;
+  let barsHtml='';
+  for(let w=0;w<totalWeeks;w++){
+    const weekDates=[];
+    for(let c=0;c<7;c++){
+      const cellIdx=w*7+c; // 0-base, grid 전체 기준(앞 공백 포함)
+      const dayNum=cellIdx-firstDay+1;
+      weekDates.push(dayNum>=1&&dayNum<=daysInMonth?`${y}-${pad(mo+1)}-${pad(dayNum)}`:null);
+    }
+    // 이 주가 이전/다음 달로만 이루어져 실제 날짜가 하나도 없으면 스킵
+    if(weekDates.every(dk=>!dk))continue;
+    // computeWeekBars는 dk 문자열 비교(indexOf)로 좌표를 잡으므로, null(다른 달) 칸은 비교 대상에서 제외되도록
+    // 앞뒤 여백 칸은 실제 날짜가 있는 칸들 사이의 상대 위치만 다르면 되니, null을 임의로 있을 수 없는 문자열로 치환해 indexOf 오탐 방지
+    const safeWeekDates=weekDates.map(dk=>dk||'____NONE____');
+    const weekBars=computeWeekBars(safeWeekDates,multidayEvents);
+    if(!weekBars.length)continue;
+    const maxRow=Math.max(...weekBars.map(b=>b.row));
+    weekBars.forEach(bar=>{
+      const ec=getEventCat(bar.ev.eventCat);
+      const title=parseTodoTextParts(bar.ev.text).parts[0]||bar.ev.text;
+      const roundClass=(bar.clipStart?'':' bar-round-l')+(bar.clipEnd?'':' bar-round-r');
+      const startDate=new Date(bar.ev._startDk+'T00:00:00');
+      barsHtml+=`<div class="cal-event-bar ev-${bar.ev.eventCat||'etc'}${roundClass}" style="top:calc(${w} * var(--cal-row-h) + var(--cal-bar-top-offset) + ${bar.row} * var(--cal-bar-h));left:calc(${bar.left} * (100% / 7));width:calc(${bar.width} * (100% / 7));" title="${ec.label}: ${title}" onclick="event.stopPropagation();openEventEditFromCalendar(${startDate.getDate()},${bar.ev._idx},${startDate.getFullYear()},${startDate.getMonth()});">${title}</div>`;
+    });
+  }
+  h+=`<div class="cal-event-bar-layer">${barsHtml}</div></div>`;
   wrap.innerHTML=h;
   if(_calSelectedDay)renderCalDetail(_calSelectedDay);
 }
@@ -9409,8 +9601,11 @@ function openEventFromCalendar(d){
 }
 // 월간 캘린더의 일정 배지를 탭했을 때 — 그 날짜로 currentDate를 임시 전환하고 해당 투두를 수정 모드로 염.
 // openEventFromCalendar와 동일한 currentDate 전환/복원 구조를 재사용하되, editIdx를 넘겨 기존 값을 채워서 연다.
-function openEventEditFromCalendar(d,editIdx){
-  const targetDate=new Date(_calYear,_calMonth,d);
+// year/month를 생략하면 캘린더 탭이 보고 있는 월(_calYear/_calMonth) 기준 — 오늘탭 등 다른 곳에서 호출할 땐 명시적으로 넘겨줌.
+function openEventEditFromCalendar(d,editIdx,year,month){
+  const y=year!=null?year:_calYear;
+  const m=month!=null?month:_calMonth;
+  const targetDate=new Date(y,m,d);
   const restoreDate=currentDate.toISOString();
   currentDate=targetDate;
   openTodoModal(editIdx);
@@ -12331,7 +12526,7 @@ async function forceRestoreDate(dk){
   }
   var trows=await supaFetch('todos?date_key=eq.'+dk+'&order=created');
   if(trows!==null){
-    S.set(S.key('todos',dk),trows.map(function(r){return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null};}));
+    S.set(S.key('todos',dk),trows.map(function(r){return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null,eventEndDate:r.event_end_date||null};}));
   }
   var srows=await supaFetch('sleep?date_key=eq.'+dk);
   if(srows&&srows.length>0){
