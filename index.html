@@ -1,6 +1,13 @@
 <!DOCTYPE html>
 <!-- iikoto v2.6 -->
-<!-- build: 20260815-2-text-scale -->
+<!-- build: 20260815-4-habit-glass-bg-unify -->
+<!-- 20260815-3 → 4: 두 가지 추가 보강.
+  (1) .home-hcard-sub(인사배너 하단, AI가 실시간 생성하는 서술형 문장)를 dow → main으로 재교체. 폰트변수 통합 검토 당시 서브텍스트로 분류했었으나, 실제로는 본문 성격의 긴 문장이라 서브텍스트 크기(12px)로는 유난히 작아 보인다는 피드백으로 정정. 사용처 단일(id="home-greeting-sub")이라 다른 화면 영향 없음.
+  (2) glass 테마에서 .habit-chk2.on(습관체크 원)의 배경색이 다른 배너들의 공용 규칙(--glass-chip-bg, 완료칩/배너 14곳에서 이미 통일되어 쓰이던 유리알 테마 공용 미색 배경)을 안 쓰고 독자적인 하드코딩 값(rgba(255,253,248,0.45))을 쓰고 있던 것을 --glass-chip-bg로 교체. 다른 원형 배지(.wchallenge-day.on)와도 배경 문법이 통일됨. 테두리·아이콘의 습관별 고유색(rgba)은 기능 특성이므로 그대로 유지 — 배경만 통일. -->
+<!-- 20260815-2 → 3: 글자 크기 조절 기능(2 빌드)이 실제로 적용되는 범위를 넓힘 — 지난 톤 통일 세션에서 --main-text-size/--dow-label-size로 안 묶이고 남아있던 "진짜 텍스트" 요소들을 마저 변수로 교체. 아이콘(.ico-*, <i class="ti">), 원형 날짜 배지(.cal-num 등), 수면탭 전용값은 여전히 예외로 유지(손 안 댐).
+  main으로 통합(14px/13px 하드코딩): .rhythm-timebox-v, .rt-del, 이달의플레이리스트 버튼/타이틀, 애플뮤직 버튼, 월표시타이틀(${y}년 ${m}월), .rb-title, .weekly-review-banner-title, .rhythm-save-btn, .quote-chip-inner, .recap-donut-label, 주간(메모/목표) 돌아보기 모달 타이틀 인라인 스타일 3곳
+  dow로 통합(11px 하드코딩): .sp-sub, .stamp-btn, .memo-stamp-sm(내부 아이콘이 자체 폰트크기를 가져서 실질 변화는 없지만 일관성 위해 통일), #home-solar-term-line, .done-quote-chip-inner, .done-comment-chip-inner
+  확인만 하고 안 건드림: .home-hcard-greeting(22px, 인사배너 메인 헤드라인 — 통계 큰 숫자류와 같은 "제목급" 텍스트로 판단해 제외). .home-hcard-time/.home-hcard-sub는 이미 이전 세션에서 dow로 통합되어 있었음. -->
 <!-- 20260815-1 → 2: 설정화면에 '글자 크기' 섹션 신규 추가(작게/기본/크게 3버튼, 독립 섹션). --main-text-size/--dow-label-size 두 변수만 조절(13/11, 14/12, 15/13px), setTextScale()이 documentElement.style.setProperty로 런타임 오버라이드하고 localStorage('textScale', -1/0/1)에 저장. 초기 로드시 플래시 방지용으로 body 최상단에 테마 IIFE와 동일한 패턴의 동기 IIFE 추가해 페인트 전에 값 적용. openSettings()에서 initTextScaleUI() 호출해 현재 선택 버튼에 .on 클래스 표시. 커버리지 한계: 제목류(.date-pill/.vtab/.slabel)·아이콘·달력·통계 큰 숫자·수면탭 시각표기는 이 두 변수를 안 쓰므로 크기 변화 없음(의도됨). -->
 <!-- 20260712-19 → 20: 습관체크(renderDailyHabitCheck) 테마별 재조정 — 지난 빌드에서 light/glass 구분 없이 전 테마에 테두리+아이콘 고유색 스타일을 적용했던 걸 정정. light는 원본(체크시 배경 꽉 채움+흰 아이콘)으로 복원, glass만 새 스타일(테두리+아이콘 고유색, 확대 크기) 유지. 부수 발견: glass의 CSS !important 규칙(.habit-chk2.on svg/i)이 인라인 습관색을 덮어쓰고 있어 실제로는 전부 --tp(테마 텍스트색)로만 보이던 문제 — 해당 규칙 제거해 습관별 고유색이 실제 반영되도록 수정. mono도 테두리와 아이콘 색이 서로 다른 소스(고정 회색 vs --tp)를 쓰던 걸 동일 색(rgba(177,144,162,0.5))으로 통일. -->
 
@@ -104,7 +111,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 #splash{position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;transition:opacity .6s,transform .6s;}
 #splash.hide{opacity:0;transform:scale(1.04);pointer-events:none;}
 .sp-logo{width:200px;height:auto;opacity:0;transform:translateY(14px);animation:fadeUp .7s .2s cubic-bezier(.22,.8,.44,1) forwards;}
-.sp-sub{font-family:'Comfortaa',cursive;font-size:11px;color:var(--tm);letter-spacing:3.5px;text-transform:uppercase;opacity:0;animation:fadeUp .5s .6s ease forwards;}
+.sp-sub{font-family:'Comfortaa',cursive;font-size:var(--dow-label-size);color:var(--tm);letter-spacing:3.5px;text-transform:uppercase;opacity:0;animation:fadeUp .5s .6s ease forwards;}
 .sp-dots{display:flex;gap:7px;margin-top:14px;opacity:0;animation:fadeIn .4s 1.05s ease forwards;}
 .sp-dot{width:6px;height:6px;border-radius:50%;}
 @keyframes fadeUp{to{opacity:1;transform:translateY(0);}}
@@ -235,7 +242,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .report-banner{position:relative;border-radius:16px;padding:1.6px;background:linear-gradient(135deg,rgba(150,215,180,0.95),rgba(235,220,120,0.90),rgba(165,222,188,0.95),rgba(150,215,180,0.95));background-size:300% 300%;animation:bannerShine 4s ease infinite;cursor:pointer;margin-top:10px;margin-bottom:10px;}
 .report-banner-inner{border-radius:14.5px;background:linear-gradient(135deg,rgba(210,244,225,0.85),rgba(248,245,200,0.85),rgba(212,242,222,0.85));padding:13px 17px;display:flex;align-items:center;justify-content:space-between;gap:10px;}
 .report-banner-line{font-size:var(--dow-label-size);font-weight:400;color:rgba(100,140,75,0.80);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.rb-title{font-size:13px;font-weight:700;letter-spacing:0.05em;color:rgba(65,125,70,0.95);}
+.rb-title{font-size:var(--main-text-size);font-weight:700;letter-spacing:0.05em;color:rgba(65,125,70,0.95);}
 .meal-soft{filter:saturate(0.72) brightness(1.02);}
 .quote-soft{filter:saturate(0.78) brightness(1.02);}
 .report-banner-arrow{font-size:17px;color:rgba(80,130,85,0.55);flex-shrink:0;}
@@ -346,7 +353,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .mr-rhythm-item .dot{width:8px;height:8px;border-radius:2px;flex-shrink:0;}
 .mr-rhythm-item .lbl{font-weight:600;width:32px;flex-shrink:0;}
 .mr-rhythm-item .val{color:var(--tm);font-size:var(--dow-label-size);}
-.weekly-review-banner-title{font-size:13px;font-weight:700;color:rgba(65,125,70,0.95);letter-spacing:0.05em;margin-bottom:4px;}
+.weekly-review-banner-title{font-size:var(--main-text-size);font-weight:700;color:rgba(65,125,70,0.95);letter-spacing:0.05em;margin-bottom:4px;}
 .weekly-review-banner-sub{font-size:var(--dow-label-size);color:rgba(100,140,75,0.80);display:flex;align-items:center;justify-content:space-between;}
 @keyframes bannerShine{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
 /* ── TIME SLOT POPUP (시간대 리마인더 팝업) ── */
@@ -438,11 +445,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .undo-toast.on{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto;}
 .undo-btn{font-size:11.5px;color:rgba(255,200,180,.90);font-weight:500;cursor:pointer;}
 .memo-input-row{margin-top:12px;padding-top:11px;border-top:1px solid rgba(255,200,220,0.30);display:flex;gap:7px;align-items:center;}
-.stamp-btn{width:38px;height:38px;background:var(--inp);border:1px solid var(--inp-b);border-radius:11px;padding:0;font-size:11px;color:var(--ts);display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:'DM Sans',sans-serif;flex-shrink:0;}
+.stamp-btn{width:38px;height:38px;background:var(--inp);border:1px solid var(--inp-b);border-radius:11px;padding:0;font-size:var(--dow-label-size);color:var(--ts);display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:'DM Sans',sans-serif;flex-shrink:0;}
 .memo-field{flex:1;height:38px;box-sizing:border-box;background:rgba(255,250,240,.30);border:1.5px dashed rgba(var(--divider-rgb),0.40);border-radius:11px;padding:8px 12px;font-size:16px;color:var(--tp);font-family:'DM Sans',sans-serif;outline:none;resize:none;line-height:1.3;max-height:100px;}
 .memo-field::placeholder{color:var(--tm);font-size:var(--main-text-size);}
 .send-btn{width:38px;height:38px;background:var(--inp);border:1px solid var(--inp-b);border-radius:11px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:var(--tm);}
-.memo-stamp-sm{width:32px;height:32px;background:var(--inp);border:1px solid var(--inp-b);border-radius:9px;padding:0;font-size:11px;color:var(--ts);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+.memo-stamp-sm{width:32px;height:32px;background:var(--inp);border:1px solid var(--inp-b);border-radius:9px;padding:0;font-size:var(--dow-label-size);color:var(--ts);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
 .memo-field-sm{height:32px;min-height:32px;max-height:80px;padding:5px 10px;font-size:14px;line-height:20px;box-sizing:border-box;}
 .memo-field-wrap{position:relative;flex:1;}
 .memo-field-wrap .memo-field{width:100%;display:block;}
@@ -785,13 +792,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rd-month-stat{font-size:var(--dow-label-size);color:var(--ts);text-align:center;margin-top:2px;}
 .rd-quote-section{margin-top:4px;}
 .quote-chip{display:inline-flex;border-radius:14px;padding:1.6px;background:linear-gradient(120deg,rgba(195,180,250,0.95),rgba(255,195,220,0.90),rgba(180,205,250,0.92),rgba(195,180,250,0.95));background-size:300% 300%;animation:bannerShine 5s ease infinite;cursor:pointer;margin-bottom:8px;}
-.quote-chip-inner{border-radius:12.5px;background:linear-gradient(135deg,rgba(210,244,225,0.85),rgba(248,245,200,0.85),rgba(212,242,222,0.85));padding:7px 14px;font-size:13px;font-weight:500;color:#5a8a6a;display:flex;align-items:center;gap:5px;white-space:nowrap;}
+.quote-chip-inner{border-radius:12.5px;background:linear-gradient(135deg,rgba(210,244,225,0.85),rgba(248,245,200,0.85),rgba(212,242,222,0.85));padding:7px 14px;font-size:var(--main-text-size);font-weight:500;color:#5a8a6a;display:flex;align-items:center;gap:5px;white-space:nowrap;}
 [data-theme="glass"] .quote-chip-inner{background:var(--glass-chip-bg);}
 .done-banner-row{display:flex;gap:8px;margin-top:10px;}
 .done-quote-chip{flex:1;display:inline-flex;border-radius:14px;padding:1.6px;background:linear-gradient(120deg,rgba(200,182,245,0.6),rgba(190,205,240,0.55));background-size:300% 300%;animation:bannerShine 5s ease infinite;cursor:pointer;}
-.done-quote-chip-inner{width:100%;border-radius:12.5px;background:linear-gradient(135deg,rgba(240,232,250,0.85),rgba(235,238,248,0.85));padding:7px 10px;font-size:11px;font-weight:500;color:#8878ab;display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;}
+.done-quote-chip-inner{width:100%;border-radius:12.5px;background:linear-gradient(135deg,rgba(240,232,250,0.85),rgba(235,238,248,0.85));padding:7px 10px;font-size:var(--dow-label-size);font-weight:500;color:#8878ab;display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;}
 .done-comment-chip{flex:1;display:inline-flex;border-radius:14px;padding:1.6px;background:linear-gradient(120deg,rgba(215,240,200,0.85),rgba(210,232,190,0.8));background-size:300% 300%;animation:bannerShine 5s ease infinite;cursor:pointer;}
-.done-comment-chip-inner{width:100%;border-radius:12.5px;background:linear-gradient(135deg,rgba(232,246,220,0.85),rgba(238,246,222,0.85));padding:7px 10px;font-size:11px;font-weight:500;color:#7a9552;display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;}
+.done-comment-chip-inner{width:100%;border-radius:12.5px;background:linear-gradient(135deg,rgba(232,246,220,0.85),rgba(238,246,222,0.85));padding:7px 10px;font-size:var(--dow-label-size);font-weight:500;color:#7a9552;display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;}
 [data-theme="glass"] .done-quote-chip-inner,[data-theme="glass"] .done-comment-chip-inner{background:var(--glass-chip-bg);}
 .report-banner.quote-soft{background:linear-gradient(135deg,rgba(195,180,250,0.95),rgba(255,195,220,0.90),rgba(180,205,250,0.92),rgba(195,180,250,0.95));}
 .report-banner.diary-soft{background:linear-gradient(135deg,rgba(245,222,170,0.95),rgba(255,205,210,0.90),rgba(248,230,190,0.92),rgba(245,222,170,0.95));}
@@ -941,7 +948,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="glass"] .goal-section-title{background:linear-gradient(120deg,rgba(250,215,100,0.50),rgba(255,235,170,0.42));color:#8a6c20;border:1.4px solid rgba(250,205,90,0.55);}
 [data-theme="glass"] .mbtn.ok{background:rgba(201,146,110,0.42);color:#6e4a30;}
 [data-theme="glass"] .wchallenge-day.on{background:rgba(255,253,248,0.45)!important;color:var(--tp)!important;border-width:2px;}
-[data-theme="glass"] .habit-chk2.on{background:rgba(255,253,248,0.45)!important;border-width:2px;}
+[data-theme="glass"] .habit-chk2.on{background:var(--glass-chip-bg)!important;border-width:2px;}
 [data-theme="glass"] .home-hcard.morning{background:linear-gradient(135deg,rgba(255,238,200,0.32),rgba(255,220,210,0.28));border-color:rgba(255,210,180,0.40);}
 [data-theme="glass"] .home-hcard.afternoon{background:linear-gradient(135deg,rgba(255,220,235,0.30),rgba(255,235,200,0.26));border-color:rgba(255,200,210,0.38);}
 [data-theme="glass"] .home-hcard.night{background:linear-gradient(135deg,rgba(225,215,250,0.30),rgba(255,210,230,0.26));border-color:rgba(210,195,240,0.38);}
@@ -1022,7 +1029,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .recap-donut-wrap{position:relative;width:88px;height:48px;margin:0 auto 2px;}
 .recap-donut-wrap svg{display:block;}
 .recap-donut-habit-fg{stroke:rgba(150,205,225,0.80);}
-.recap-donut-label{position:absolute;left:0;right:0;bottom:2px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--tp);}
+.recap-donut-label{position:absolute;left:0;right:0;bottom:2px;display:flex;align-items:center;justify-content:center;font-size:var(--main-text-size);font-weight:700;color:var(--tp);}
 .recap-donut-l{font-size:var(--dow-label-size);color:var(--ts);}
 .recap-rhythm-bar-chart{display:flex;height:26px;border-radius:8px;overflow:hidden;margin-bottom:6px;}
 .recap-rhythm-bar-seg{display:flex;align-items:center;justify-content:center;}
@@ -1035,7 +1042,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .recap-content-item .ctime{margin-left:auto;font-size:var(--dow-label-size);color:var(--tm);}
 .home-hcard-time{font-size:var(--dow-label-size);color:var(--tm);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;}
 .home-hcard-greeting{font-size:22px;font-weight:500;color:var(--tp);line-height:1.25;margin-bottom:8px;}
-.home-hcard-sub{font-size:var(--dow-label-size);color:var(--ts);line-height:1.7;min-height:40px;}
+.home-hcard-sub{font-size:var(--main-text-size);color:var(--ts);line-height:1.7;min-height:40px;}
 .home-hcard-divider{height:1px;background:rgba(200,170,160,0.20);margin:12px 0 4px;}
 .home-habit-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
 .home-habit-dot.mint{background:rgba(140,210,200,.85);}
@@ -1086,7 +1093,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rt-row .rt-time{font-size:10px;color:var(--tm);width:78px;flex-shrink:0;font-family:'DM Sans',sans-serif;}
 .rt-row .rt-txt{overflow:hidden;text-overflow:ellipsis;}
 .rt-actions{margin-left:auto;flex-shrink:0;display:flex;align-items:center;gap:6px;}
-.rt-del{flex-shrink:0;color:var(--tm);font-size:14px;line-height:1;padding:0 2px;cursor:pointer;}
+.rt-del{flex-shrink:0;color:var(--tm);font-size:var(--main-text-size);line-height:1;padding:0 2px;cursor:pointer;}
 .rt-edit{flex-shrink:0;color:var(--tm);display:flex;align-items:center;padding:0 2px;cursor:pointer;}
 .rt-finish{flex-shrink:0;font-size:10px;color:var(--acc);border:1px solid rgba(192,112,128,0.40);border-radius:8px;padding:2px 7px;cursor:pointer;}
 .rt-block.ongoing{background-image:repeating-linear-gradient(135deg,rgba(255,255,255,0.35) 0 3px,transparent 3px 6px);}
@@ -1103,7 +1110,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rhythm-time-row{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
 .rhythm-timebox{flex:1;background:var(--card);border:1px solid var(--card-b);border-radius:11px;padding:9px 10px;display:flex;align-items:center;gap:6px;}
 .rhythm-timebox-l{font-size:var(--dow-label-size);color:var(--tm);flex-shrink:0;}
-.rhythm-timebox-v{font-size:14px;font-weight:600;color:var(--tp);font-family:'DM Sans',sans-serif;cursor:pointer;letter-spacing:-.3px;flex:1;}
+.rhythm-timebox-v{font-size:var(--main-text-size);font-weight:600;color:var(--tp);font-family:'DM Sans',sans-serif;cursor:pointer;letter-spacing:-.3px;flex:1;}
 .rhythm-timebox-now{width:18px;height:18px;display:flex;align-items:center;justify-content:center;color:var(--tm);cursor:pointer;flex-shrink:0;}
 .rhythm-arrow{color:var(--tm);font-size:13px;}
 .rhythm-memo-inp{width:100%;background:var(--card);border:1px solid var(--card-b);border-radius:11px;padding:9px 12px;font-size:var(--main-text-size);color:var(--tp);margin-bottom:14px;font-family:'DM Sans',sans-serif;}
@@ -1113,7 +1120,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rhythm-content-picker-swipe .rhythm-content-chip{flex-shrink:0;}
 .rhythm-content-chip{font-size:var(--dow-label-size);color:var(--tp);background:var(--card);border:1px solid var(--card-b);border-radius:9px;padding:6px 10px;cursor:pointer;white-space:nowrap;transition:all .15s;}
 .rhythm-content-chip.sel{border:1.6px solid var(--sel-color,rgba(190,160,230,0.75));background:var(--sel-bg,rgba(190,160,230,0.14));color:var(--tp);font-weight:600;}
-.rhythm-save-btn{width:100%;background:var(--acc);color:#fff;border:none;border-radius:12px;padding:11px 0;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;}
+.rhythm-save-btn{width:100%;background:var(--acc);color:#fff;border:none;border-radius:12px;padding:11px 0;font-size:var(--main-text-size);font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;}
 
 .habit-numbox-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(78px,1fr));gap:8px;margin-bottom:10px;}
 .habit-numbox-card{display:flex;flex-direction:column;align-items:center;background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:14px 8px;}
@@ -1217,7 +1224,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div class="home-hcard-time">
           <span id="home-time"></span>
         </div>
-        <div id="home-solar-term-line" style="font-size:11px;margin:-2px 0 6px;display:none;"></div>
+        <div id="home-solar-term-line" style="font-size:var(--dow-label-size);margin:-2px 0 6px;display:none;"></div>
         <div class="home-hcard-greeting" id="home-greeting">좋은 아침이에요</div>
         <div class="home-hcard-sub" id="home-greeting-sub"></div>
         <div class="home-hcard-divider"></div>
@@ -1598,7 +1605,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   <div class="bsheet" style="max-height:80vh;overflow-y:auto;" onclick="event.stopPropagation()">
     <div class="sheet-handle"></div>
     <div style="padding:0 20px 24px;">
-      <div style="font-size:13px;font-weight:600;color:rgba(80,140,200,0.9);text-align:center;margin-bottom:16px;letter-spacing:0.04em;"><i class="ti ti-sparkles ico-13" aria-hidden="true"></i> 주간메모 돌아보기 <i class="ti ti-sparkles ico-13" aria-hidden="true"></i></div>
+      <div style="font-size:var(--main-text-size);font-weight:600;color:rgba(80,140,200,0.9);text-align:center;margin-bottom:16px;letter-spacing:0.04em;"><i class="ti ti-sparkles ico-13" aria-hidden="true"></i> 주간메모 돌아보기 <i class="ti ti-sparkles ico-13" aria-hidden="true"></i></div>
       <div id="wmr-week-chips" class="month-chips week-chips-4" style="margin-bottom:14px;"></div>
       <div id="weekly-memo-report-content" style="font-size:var(--main-text-size);color:var(--tp);line-height:1.9;"></div>
     </div>
@@ -1635,7 +1642,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   <div class="bsheet" style="max-height:82vh;overflow-y:auto;" onclick="event.stopPropagation()">
     <div class="sheet-handle"></div>
     <div style="padding:0 20px 20px;">
-      <div style="font-size:13px;font-weight:600;color:rgba(80,140,200,0.9);text-align:center;margin-bottom:16px;letter-spacing:0.04em;"><i class="ti ti-sparkles ico-13" aria-hidden="true"></i> 주간 돌아보기 <i class="ti ti-sparkles ico-13" aria-hidden="true"></i></div>
+      <div style="font-size:var(--main-text-size);font-weight:600;color:rgba(80,140,200,0.9);text-align:center;margin-bottom:16px;letter-spacing:0.04em;"><i class="ti ti-sparkles ico-13" aria-hidden="true"></i> 주간 돌아보기 <i class="ti ti-sparkles ico-13" aria-hidden="true"></i></div>
       <div id="wr-week-chips" class="month-chips week-chips-4" style="margin-bottom:14px;"></div>
       <div id="weekly-review-content" style="font-size:var(--main-text-size);color:var(--tp);line-height:1.9;"></div>
     </div>
@@ -1647,7 +1654,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   <div class="bsheet" style="max-height:82vh;overflow-y:auto;" onclick="event.stopPropagation()">
     <div class="sheet-handle"></div>
     <div style="padding:0 20px 20px;">
-      <div style="font-size:13px;font-weight:600;color:rgba(80,140,200,0.9);text-align:center;margin-bottom:16px;letter-spacing:0.04em;"><i class="ti ti-sparkles ico-13" aria-hidden="true"></i> 주간 목표 돌아보기 <i class="ti ti-sparkles ico-13" aria-hidden="true"></i></div>
+      <div style="font-size:var(--main-text-size);font-weight:600;color:rgba(80,140,200,0.9);text-align:center;margin-bottom:16px;letter-spacing:0.04em;"><i class="ti ti-sparkles ico-13" aria-hidden="true"></i> 주간 목표 돌아보기 <i class="ti ti-sparkles ico-13" aria-hidden="true"></i></div>
       <div id="cr-week-chips" class="month-chips week-chips-4" style="margin-bottom:14px;"></div>
       <div id="challenge-review-content" style="font-size:var(--main-text-size);color:var(--tp);line-height:1.9;"></div>
     </div>
@@ -1816,7 +1823,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           <i class="ti ti-copy-off ico-sz-14" aria-hidden="true"></i>중단
         </button>
       </div>
-      <button class="mbtn" id="cm-music-play-btn" onclick="openAppleMusicLink()" style="display:none;flex:1;margin-bottom:0;padding:11px 14px;border-radius:12px;font-size:14px;white-space:nowrap;background:rgba(255,150,180,.16);color:#a8527a;border:1px solid rgba(255,150,180,.40);">
+      <button class="mbtn" id="cm-music-play-btn" onclick="openAppleMusicLink()" style="display:none;flex:1;margin-bottom:0;padding:11px 14px;border-radius:12px;font-size:var(--main-text-size);white-space:nowrap;background:rgba(255,150,180,.16);color:#a8527a;border:1px solid rgba(255,150,180,.40);">
         <i class="ti ti-brand-apple" style="font-size:14px;vertical-align:-2px;margin-right:3px;" aria-hidden="true"></i>애플뮤직
       </button>
     </div>
@@ -1863,7 +1870,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div style="padding:0 20px 20px;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
         <i class="ti ti-disc playlist-disc-spin" style="font-size:20px;color:#8878ab;" aria-hidden="true"></i>
-        <span style="font-size:14px;font-weight:600;color:var(--tp);">이달의 플레이리스트</span>
+        <span style="font-size:var(--main-text-size);font-weight:600;color:var(--tp);">이달의 플레이리스트</span>
       </div>
       <div id="pl-list" style="display:flex;flex-direction:column;gap:6px;"></div>
     </div>
@@ -11349,7 +11356,7 @@ function renderReadingCalView(){
   const weekdays=['일','월','화','수','목','금','토'];
   let html=`<div style="display:flex;align-items:center;justify-content:center;gap:18px;margin:2px 0 6px;">
     <i class="ti ti-chevron-left ico-cal-nav" onclick="rdCalMonthShift(-1)" aria-hidden="true"></i>
-    <div style="font-weight:600;font-size:14px;color:var(--tp);">${y}년 ${String(m+1).padStart(2,'0')}월</div>
+    <div style="font-weight:600;font-size:var(--main-text-size);color:var(--tp);">${y}년 ${String(m+1).padStart(2,'0')}월</div>
     <i class="ti ti-chevron-right ico-cal-nav" onclick="rdCalMonthShift(1)" aria-hidden="true"></i>
   </div>
   <div style="text-align:center;font-size:30px;font-weight:700;color:var(--tp);margin:8px 0 18px;letter-spacing:-.01em;">${totalBooksThisMonth.size}권</div>

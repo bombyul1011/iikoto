@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260815-2-v2.6-text-scale';
+const CACHE = 'iikoto-v20260815-4-v2.6-habit-glass-bg-unify';
 const ASSETS = [
   './',
   './index.html'
