@@ -43,7 +43,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --main-text-size:14px; /* 메인 입력/본문 텍스트 공용 크기 — 할일/일정/메모/식사/주간목표입력/하루한줄입력 전부 이 값 참조. 여기 하나만 바꾸면 전체 적용됨 */
   --dow-label-size:12px; /* 요일(월화수목금토일) 라벨 공용 크기 — 하루한줄/이번주해빗/리듬모아보기 요일 텍스트가 참조. 앞으로 요일 표기가 필요한 곳은 전부 이 변수를 끌어다 쓰기 */
   --sleep-warmgray:#8a8078; /* 수면카드 전용 웜그레이 — 남색 강조색을 제외한 시간표기/아이콘 전부가 참조. CSS 클래스(sleep-*) 7곳 + JS 인라인 스타일 4곳(5376/5405/6192/6197 근처) 동일 색 사용 중 */
-  --sleep-warmgray-strong:rgba(138,128,120,0.92); /* 취침/기상/총수면시간 전용 — sleep-warmgray와 같은 색상, 알파만 살짝 올려 더 짙게. sleep-time-val, sleep-top-num/unit, sleep-collapsed-time/dur 5곳이 참조 */
+  --sleep-warmgray-strong:#6b6259; /* 취침/기상/총수면시간 전용 — sleep-warmgray보다 더 진한 값. sleep-time-val, sleep-top-num/unit, sleep-collapsed-time/dur 5곳이 참조 */
   --bg:linear-gradient(145deg,#fdf0e8 0%,#fef5d4 50%,#fde8f0 100%);
   --tp:#5a4040;--ts:#9a8070;--tm:#c8b0a8;
   --card:rgba(255,250,240,0.75);--card-b:rgba(230,200,140,0.40);
@@ -57,7 +57,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --sheet:linear-gradient(160deg,#fdf3ec,#fef7e8);
   --modal:linear-gradient(145deg,#fdf3ec,#fef7e8);
   --inp:rgba(255,250,240,0.82);--inp-b:rgba(255,210,200,0.42);
-  --pill:rgba(255,250,240,0.82);
   --memo-b:rgba(255,250,240,0.68);--memo-bb:rgba(255,210,200,0.50);
   --sleep-b:rgba(255,250,240,0.60);--sleep-bb:rgba(255,200,180,0.42);
   --sleep-badge-bg:#fffaf5;
@@ -66,7 +65,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --main-text-size:14px;
   --dow-label-size:12px;
   --sleep-warmgray:#8a8078;
-  --sleep-warmgray-strong:rgba(138,128,120,0.92);
+  --sleep-warmgray-strong:#6b6259;
   --bg:linear-gradient(165deg,#f7f4ee 0%,#f3f1ec 55%,#f6f3ee 100%);
   --tp:#5c5650;--ts:#8a8278;--tm:#b8b0a4;
   --card:rgba(255,253,248,0.50);--card-b:rgba(200,175,140,0.55);
@@ -80,7 +79,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --sheet:linear-gradient(160deg,#f8f5ee,#fbf8f1);
   --modal:linear-gradient(145deg,#f8f5ee,#fbf8f1);
   --inp:rgba(255,255,255,0.50);--inp-b:rgba(220,205,180,0.40);
-  --pill:rgba(255,253,248,0.50);
   --memo-b:rgba(255,253,248,0.50);--memo-bb:rgba(240,160,190,0.45);
   --sleep-b:rgba(255,253,248,0.50);--sleep-bb:rgba(95,115,170,0.55);
   --sleep-badge-bg:#fdfbf6;
@@ -118,7 +116,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .topbar-logo{height:32px;width:auto;}
 .topbar-right{display:flex;align-items:center;gap:6px;}
 .date-nav{display:flex;align-items:center;gap:4px;}
-/* 상단 날짜 네비게이터 (예: "2026.8.15.토" 배너) — 배경은 --pill 변수(현재 라이트테마 0.82) */
+/* 상단 날짜 네비게이터 (예: "2026.8.15.토" 배너) — 배경은 하드코딩(현재 0.75), .vtab과 톤 맞춰 조정한 값 */
 .date-pill{background:rgba(255,250,240,0.75);border:1px solid var(--inp-b);border-radius:20px;padding:5px 11px;font-size:12px;color:var(--ts);cursor:pointer;user-select:none;white-space:nowrap;}
 .nav-arr{width:26px;height:26px;background:var(--card);border:1px solid var(--card-b);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
 .nav-arr:active{opacity:.7;}
@@ -454,7 +452,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 /* ── GOAL NOTE ── */
 .goal-wrap{padding:0 2px;margin-bottom:10px;}
-.goal-inp{display:block;width:100%;background:none;border:none;border-bottom:1px dashed rgba(195,175,168,0.38);outline:none;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--tp);padding:7px 4px 5px;line-height:1.5;resize:none;}
+.goal-inp{display:block;width:100%;background:none;border:none;border-bottom:1px dashed rgba(195,175,168,0.38);outline:none;font-family:'DM Sans',sans-serif;font-size:var(--main-text-size);color:var(--tp);padding:7px 4px 5px;line-height:1.5;resize:none;}
 .wchallenge-item{display:flex;flex-direction:column;gap:6px;padding:8px 2px 10px;}
 .wchallenge-inp-row{display:flex;align-items:center;gap:8px;}
 .wchallenge-inp{flex:1;background:none;border:none;border-bottom:1px dashed rgba(195,175,168,0.38);outline:none;font-family:'DM Sans',sans-serif;font-size:var(--main-text-size);color:var(--tp);padding:5px 2px 4px;}
@@ -577,7 +575,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .overlay.on{display:flex;}
 .bsheet{width:100%;max-width:430px;margin:0 auto;background:var(--sheet);border-radius:24px 24px 0 0;padding:0 0 max(24px,env(safe-area-inset-bottom));box-shadow:0 -4px 40px rgba(0,0,0,.12);transform:translateY(100%);transition:transform .28s cubic-bezier(.32,.72,0,1);}
 .overlay.on .bsheet{transform:translateY(0);}
-.sheet-handle{width:36px;height:4px;background:rgba(200,170,160,.38);border-radius:2px;margin:12px auto 16px;}
+.sheet-handle{width:36px;height:4px;background:rgba(195,175,168,.38);border-radius:2px;margin:12px auto 16px;}
 .sheet-title{font-size:13px;font-weight:500;color:var(--ts);padding:0 20px 12px;border-bottom:1px solid var(--div);}
 .sheet-item{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--div);cursor:pointer;font-size:13px;color:var(--tp);}
 .sheet-item:last-child{border-bottom:none;}
@@ -8839,7 +8837,7 @@ function renderGoalNote(containerId,storageKey,readOnly=false){
   function addLine(val){
     const inp=document.createElement('input');
     inp.type='text';inp.className='goal-inp';inp.value=val||'';
-    inp.style.fontSize='13px';inp.autocomplete='off';
+    inp.autocomplete='off';
     if(readOnly){
       inp.readOnly=true;inp.style.opacity='0.55';inp.style.cursor='default';
       wrap.appendChild(inp);return;
