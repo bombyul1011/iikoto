@@ -1,16 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.6 -->
 <!-- build: 20260815-4-habit-glass-bg-unify -->
-<!-- 20260815-3 → 4: 두 가지 추가 보강.
-  (1) .home-hcard-sub(인사배너 하단, AI가 실시간 생성하는 서술형 문장)를 dow → main으로 재교체. 폰트변수 통합 검토 당시 서브텍스트로 분류했었으나, 실제로는 본문 성격의 긴 문장이라 서브텍스트 크기(12px)로는 유난히 작아 보인다는 피드백으로 정정. 사용처 단일(id="home-greeting-sub")이라 다른 화면 영향 없음.
-  (2) glass 테마에서 .habit-chk2.on(습관체크 원)의 배경색이 다른 배너들의 공용 규칙(--glass-chip-bg, 완료칩/배너 14곳에서 이미 통일되어 쓰이던 유리알 테마 공용 미색 배경)을 안 쓰고 독자적인 하드코딩 값(rgba(255,253,248,0.45))을 쓰고 있던 것을 --glass-chip-bg로 교체. 다른 원형 배지(.wchallenge-day.on)와도 배경 문법이 통일됨. 테두리·아이콘의 습관별 고유색(rgba)은 기능 특성이므로 그대로 유지 — 배경만 통일. -->
-<!-- 20260815-2 → 3: 글자 크기 조절 기능(2 빌드)이 실제로 적용되는 범위를 넓힘 — 지난 톤 통일 세션에서 --main-text-size/--dow-label-size로 안 묶이고 남아있던 "진짜 텍스트" 요소들을 마저 변수로 교체. 아이콘(.ico-*, <i class="ti">), 원형 날짜 배지(.cal-num 등), 수면탭 전용값은 여전히 예외로 유지(손 안 댐).
-  main으로 통합(14px/13px 하드코딩): .rhythm-timebox-v, .rt-del, 이달의플레이리스트 버튼/타이틀, 애플뮤직 버튼, 월표시타이틀(${y}년 ${m}월), .rb-title, .weekly-review-banner-title, .rhythm-save-btn, .quote-chip-inner, .recap-donut-label, 주간(메모/목표) 돌아보기 모달 타이틀 인라인 스타일 3곳
-  dow로 통합(11px 하드코딩): .sp-sub, .stamp-btn, .memo-stamp-sm(내부 아이콘이 자체 폰트크기를 가져서 실질 변화는 없지만 일관성 위해 통일), #home-solar-term-line, .done-quote-chip-inner, .done-comment-chip-inner
-  확인만 하고 안 건드림: .home-hcard-greeting(22px, 인사배너 메인 헤드라인 — 통계 큰 숫자류와 같은 "제목급" 텍스트로 판단해 제외). .home-hcard-time/.home-hcard-sub는 이미 이전 세션에서 dow로 통합되어 있었음. -->
-<!-- 20260815-1 → 2: 설정화면에 '글자 크기' 섹션 신규 추가(작게/기본/크게 3버튼, 독립 섹션). --main-text-size/--dow-label-size 두 변수만 조절(13/11, 14/12, 15/13px), setTextScale()이 documentElement.style.setProperty로 런타임 오버라이드하고 localStorage('textScale', -1/0/1)에 저장. 초기 로드시 플래시 방지용으로 body 최상단에 테마 IIFE와 동일한 패턴의 동기 IIFE 추가해 페인트 전에 값 적용. openSettings()에서 initTextScaleUI() 호출해 현재 선택 버튼에 .on 클래스 표시. 커버리지 한계: 제목류(.date-pill/.vtab/.slabel)·아이콘·달력·통계 큰 숫자·수면탭 시각표기는 이 두 변수를 안 쓰므로 크기 변화 없음(의도됨). -->
-<!-- 20260712-19 → 20: 습관체크(renderDailyHabitCheck) 테마별 재조정 — 지난 빌드에서 light/glass 구분 없이 전 테마에 테두리+아이콘 고유색 스타일을 적용했던 걸 정정. light는 원본(체크시 배경 꽉 채움+흰 아이콘)으로 복원, glass만 새 스타일(테두리+아이콘 고유색, 확대 크기) 유지. 부수 발견: glass의 CSS !important 규칙(.habit-chk2.on svg/i)이 인라인 습관색을 덮어쓰고 있어 실제로는 전부 --tp(테마 텍스트색)로만 보이던 문제 — 해당 규칙 제거해 습관별 고유색이 실제 반영되도록 수정. mono도 테두리와 아이콘 색이 서로 다른 소스(고정 회색 vs --tp)를 쓰던 걸 동일 색(rgba(177,144,162,0.5))으로 통일. -->
-
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -55,7 +45,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --graph-track-color:rgba(var(--divider-rgb),0.25); /* 그래프/진행바 공용 기준선·트랙 색 — rd-progress-track(독서 진행바), pace-dot-baseline/hourline(홈탭 활동분포 점그래프 기준선) 3곳이 참조 */
   --divider-rgb:195,175,168; /* 회갈색 구분선/점선 공용 베이스 컬러(RGB만) — 쓸 때는 rgba(var(--divider-rgb), 알파값) 형태로. 알파값은 요소 성격에 따라 자유롭게(0.25~0.55 등), RGB 톤 자체를 바꾸고 싶으면 여기 한 줄만 수정 */
   --bg:linear-gradient(145deg,#fdf0e8 0%,#fef5d4 50%,#fde8f0 100%);
-  --tp:#5a4040;--ts:#9a8070;--tm:#c8b0a8;
+  --tp:#6b5248;--ts:#a3897c;--tm:#d4bcb0;
   --card:rgba(255,250,240,0.75);--card-b:rgba(230,200,140,0.40);
   --card-p:rgba(255,220,235,0.48);--card-pb:rgba(255,200,220,0.66);
   --card-m:rgba(200,240,235,0.42);--card-mb:rgba(160,220,215,0.55);
@@ -138,7 +128,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 /* ── TABS (오늘/주간/월간 상단 뷰 전환탭) ── */
 .view-tabs{display:flex;gap:6px;padding:0 18px 10px;flex-shrink:0;}
 /* 미선택 탭 배경/테두리 — 선택시("vtab.on")는 바로 아래 그라디언트 규칙 적용 */
-.vtab{flex:1;padding:6px 4px;border-radius:12px;font-size:12px;text-align:center;color:var(--tm);border:1px solid rgba(255,220,200,0.35);background:rgba(255,250,240,0.5);cursor:pointer;transition:all .2s;user-select:none;}
+.vtab{flex:1;padding:5px 4px;border-radius:12px;font-size:var(--main-text-size);text-align:center;color:var(--tm);border:1px solid rgba(255,220,200,0.35);background:rgba(255,250,240,0.5);cursor:pointer;transition:all .2s;user-select:none;}
 .vtab.on{
   background-color:transparent;
   border:1.6px solid transparent;
@@ -430,11 +420,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .chk.ts-night.on::after{border-color:rgba(110,80,180,0.9);}
 .todo-txt{flex:1;line-height:1.4;cursor:pointer;}
 .todo-txt.done{text-decoration:line-through;color:var(--tm);}
-.add-btn{display:flex;align-items:center;gap:7px;padding:8px 11px;background:rgba(255,250,240,.30);border:1.5px dashed rgba(var(--divider-rgb),0.40);border-radius:11px;color:var(--tm);font-size:var(--main-text-size);cursor:pointer;margin-top:8px;width:100%;font-family:'DM Sans',sans-serif;}
+.add-btn{display:flex;align-items:center;gap:7px;padding:8px 11px;background:rgba(255,250,240,.30);border:1.5px dashed color-mix(in srgb, var(--tp) 20%, transparent);border-radius:11px;color:var(--tm);font-size:var(--main-text-size);cursor:pointer;margin-top:8px;width:100%;font-family:'DM Sans',sans-serif;}
 
 /* ── MEMO ── */
 .memo-item{display:flex;gap:9px;margin-bottom:8px;align-items:flex-start;position:relative;overflow:hidden;}
-.memo-time{font-size:var(--dow-label-size);color:var(--tm);white-space:nowrap;padding-top:6px;min-width:36px;}
+.memo-time{font-size:var(--dow-label-size);color:var(--ts);white-space:nowrap;padding-top:6px;min-width:36px;}
 .memo-bub{background:rgba(255,190,165,0.06);border:none;border-left:2.5px solid rgba(225,140,120,0.45);border-radius:0 6px 6px 0;padding:6px 10px;font-size:var(--main-text-size);color:var(--tp);line-height:1.4;flex:1;}
 .memo-bub.tod-morning{background:rgba(255,205,170,0.05);border-left-color:rgba(225,145,85,0.58);}
 .memo-bub.tod-afternoon{background:rgba(255,170,180,0.05);border-left-color:rgba(220,105,125,0.58);}
@@ -446,7 +436,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .undo-btn{font-size:11.5px;color:rgba(255,200,180,.90);font-weight:500;cursor:pointer;}
 .memo-input-row{margin-top:12px;padding-top:11px;border-top:1px solid rgba(255,200,220,0.30);display:flex;gap:7px;align-items:center;}
 .stamp-btn{width:38px;height:38px;background:var(--inp);border:1px solid var(--inp-b);border-radius:11px;padding:0;font-size:var(--dow-label-size);color:var(--ts);display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:'DM Sans',sans-serif;flex-shrink:0;}
-.memo-field{flex:1;height:38px;box-sizing:border-box;background:rgba(255,250,240,.30);border:1.5px dashed rgba(var(--divider-rgb),0.40);border-radius:11px;padding:8px 12px;font-size:16px;color:var(--tp);font-family:'DM Sans',sans-serif;outline:none;resize:none;line-height:1.3;max-height:100px;}
+.memo-field{flex:1;height:38px;box-sizing:border-box;background:rgba(255,250,240,.30);border:1.5px dashed color-mix(in srgb, var(--tp) 20%, transparent);border-radius:11px;padding:8px 12px;font-size:16px;color:var(--tp);font-family:'DM Sans',sans-serif;outline:none;resize:none;line-height:1.3;max-height:100px;}
 .memo-field::placeholder{color:var(--tm);font-size:var(--main-text-size);}
 .send-btn{width:38px;height:38px;background:var(--inp);border:1px solid var(--inp-b);border-radius:11px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:var(--tm);}
 .memo-stamp-sm{width:32px;height:32px;background:var(--inp);border:1px solid var(--inp-b);border-radius:9px;padding:0;font-size:var(--dow-label-size);color:var(--ts);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
@@ -466,7 +456,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .wchallenge-item{display:flex;flex-direction:column;gap:6px;padding:8px 2px 10px;}
 .wchallenge-inp-row{display:flex;align-items:center;gap:8px;}
 .wchallenge-inp{flex:1;background:none;border:none;border-bottom:1px dashed rgba(var(--divider-rgb),0.38);outline:none;font-family:'DM Sans',sans-serif;font-size:var(--main-text-size);color:var(--tp);padding:5px 2px 4px;}
-.wchallenge-del{background:none;border:none;color:var(--ts);font-size:16px;cursor:pointer;padding:0 2px;line-height:1;}
+.wchallenge-del{background:none;border:none;color:var(--tm);font-size:16px;cursor:pointer;padding:0 2px;line-height:1;}
 .wchallenge-days{display:flex;gap:5px;padding:2px 0 0 2px;}
 .wchallenge-day{width:26px;height:26px;border-radius:50%;border:1.5px dashed rgba(var(--divider-rgb),0.38);background:none;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:var(--tm);cursor:pointer;transition:all 0.2s;font-family:'DM Sans',sans-serif;letter-spacing:0;}
 .wchallenge-day.on{border-style:solid;color:white;}
@@ -632,7 +622,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .color-themes{display:flex;gap:10px;flex-wrap:wrap;}
 .ctheme-btn{width:52px;height:52px;border-radius:14px;cursor:pointer;border:3px solid transparent;transition:all .15s;display:flex;align-items:center;justify-content:center;font-size:14px;color:transparent;}
 .ctheme-btn.on{border-color:var(--acc);color:white;text-shadow:0 1px 3px rgba(0,0,0,.3);}
-.text-scale-btn.on{border-color:var(--acc);background:var(--acc-soft);color:var(--acc);font-weight:600;}
+.text-scale-ctrl{display:flex;align-items:center;justify-content:center;gap:18px;}
+.text-scale-step{width:40px;height:40px;border-radius:12px;border:1px solid var(--card-b);background:var(--card);color:var(--tp);font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:opacity .15s;}
+.text-scale-step:active{opacity:.7;}
+.text-scale-step:disabled{opacity:.32;pointer-events:none;}
+.text-scale-dots{display:flex;gap:7px;}
+.text-scale-dot{width:7px;height:7px;border-radius:50%;background:rgba(var(--divider-rgb),0.4);transition:background .15s,transform .15s;}
+.text-scale-dot.on{background:var(--acc);transform:scale(1.15);}
 .settings-item{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid rgba(var(--divider-rgb),0.25);}
 .settings-item:last-child{border-bottom:none;}
 .settings-item-lbl{font-size:var(--main-text-size);color:var(--tp);}
@@ -1058,7 +1054,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 /* ── 오늘 해빗 체크박스 (수면박스 색) ── */
 .habit-check-box{background:rgba(255,250,240,0.68);border:1px solid var(--card-b);border-radius:14px;padding:12px 10px 8px;display:flex;flex-wrap:wrap;justify-content:space-around;gap:8px;}
 .habit-check-col{display:flex;flex-direction:column;align-items:center;gap:7px;min-width:42px;}
-.habit-check-name{font-size:var(--dow-label-size);color:var(--tm);text-align:center;}
+.habit-check-name{font-size:var(--dow-label-size);color:var(--tp);text-align:center;}
 .habit-check-foot{width:100%;display:flex;justify-content:flex-end;margin-top:5px;margin-bottom:0;}
 .habit-chk2{width:25px;height:25px;border-radius:50%;border:1.5px dashed rgba(var(--divider-rgb),0.5);background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;}
 .habit-chk2.on{border-style:solid;}
@@ -1899,10 +1895,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div>
       <div class="settings-slbl">글자 크기</div>
       <div class="settings-card">
-        <div class="text-scale-btns" style="display:flex;gap:8px;">
-          <button class="settings-btn-outline text-scale-btn" id="tsc-btn--1" onclick="setTextScale(-1)" style="flex:1;">작게</button>
-          <button class="settings-btn-outline text-scale-btn" id="tsc-btn-0" onclick="setTextScale(0)" style="flex:1;">기본</button>
-          <button class="settings-btn-outline text-scale-btn" id="tsc-btn-1" onclick="setTextScale(1)" style="flex:1;">크게</button>
+        <div class="text-scale-ctrl">
+          <button class="text-scale-step" id="tsc-dec" onclick="stepTextScale(-1)">A-</button>
+          <div class="text-scale-dots" id="tsc-dots">
+            <span class="text-scale-dot" id="tsc-dot--1"></span>
+            <span class="text-scale-dot" id="tsc-dot-0"></span>
+            <span class="text-scale-dot" id="tsc-dot-1"></span>
+          </div>
+          <button class="text-scale-step" id="tsc-inc" onclick="stepTextScale(1)">A+</button>
         </div>
       </div>
     </div>
@@ -5251,17 +5251,25 @@ function setTextScale(step){
   document.documentElement.style.setProperty('--main-text-size',b.main+'px');
   document.documentElement.style.setProperty('--dow-label-size',b.dow+'px');
   S.set('textScale',step);
-  document.querySelectorAll('.text-scale-btn').forEach(btn=>btn.classList.remove('on'));
-  const active=document.getElementById('tsc-btn-'+step);
-  if(active)active.classList.add('on');
+  refreshTextScaleUI(step);
+}
+function stepTextScale(dir){
+  const cur=S.get('textScale')||0;
+  const next=Math.max(-1,Math.min(1,cur+dir));
+  if(next===cur)return;
+  setTextScale(next);
+}
+function refreshTextScaleUI(step){
+  document.querySelectorAll('.text-scale-dot').forEach(dot=>dot.classList.remove('on'));
+  const dot=document.getElementById('tsc-dot-'+step);
+  if(dot)dot.classList.add('on');
+  const dec=document.getElementById('tsc-dec'),inc=document.getElementById('tsc-inc');
+  if(dec)dec.disabled=(step<=-1);
+  if(inc)inc.disabled=(step>=1);
 }
 function initTextScaleUI(){
   const step=S.get('textScale')||0;
-  const active=document.getElementById('tsc-btn-'+step);
-  if(active){
-    document.querySelectorAll('.text-scale-btn').forEach(btn=>btn.classList.remove('on'));
-    active.classList.add('on');
-  }
+  refreshTextScaleUI(step);
 }
 
 // ── SPLASH
