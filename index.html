@@ -44,6 +44,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --dow-label-size:12px; /* 서브텍스트 사이즈 — 요일(월화수목금토일) 라벨에서 시작해 각종 보조 텍스트(날짜/카테고리, 필터탭, 코멘트보기 등)까지 두루 쓰이는 공용 크기. 앞으로 "서브텍스트 사이즈"가 필요한 곳은 전부 이 변수를 끌어다 쓰기 */
   --sleep-warmgray:#8a8078; /* 수면카드 전용 웜그레이 — 남색 강조색을 제외한 시간표기/아이콘 전부가 참조. CSS 클래스(sleep-*) 7곳 + JS 인라인 스타일 4곳(5376/5405/6192/6197 근처) 동일 색 사용 중 */
   --sleep-warmgray-strong:#6b6259; /* 취침/기상/총수면시간 전용 — sleep-warmgray보다 더 진한 값. sleep-time-val, sleep-top-num/unit, sleep-collapsed-time/dur 5곳이 참조 */
+  --graph-track-color:rgba(var(--divider-rgb),0.25); /* 그래프/진행바 공용 기준선·트랙 색 — rd-progress-track(독서 진행바), pace-dot-baseline/hourline(홈탭 활동분포 점그래프 기준선) 3곳이 참조 */
+  --divider-rgb:195,175,168; /* 회갈색 구분선/점선 공용 베이스 컬러(RGB만) — 쓸 때는 rgba(var(--divider-rgb), 알파값) 형태로. 알파값은 요소 성격에 따라 자유롭게(0.25~0.55 등), RGB 톤 자체를 바꾸고 싶으면 여기 한 줄만 수정 */
   --bg:linear-gradient(145deg,#fdf0e8 0%,#fef5d4 50%,#fde8f0 100%);
   --tp:#5a4040;--ts:#9a8070;--tm:#c8b0a8;
   --card:rgba(255,250,240,0.75);--card-b:rgba(230,200,140,0.40);
@@ -51,7 +53,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --card-m:rgba(200,240,235,0.42);--card-mb:rgba(160,220,215,0.55);
   --card-y:rgba(255,240,180,0.52);--card-yb:rgba(240,220,130,0.62);
   --card-s:rgba(200,225,255,0.42);--card-sb:rgba(170,205,250,0.55);
-  --div:rgba(255,200,180,0.22);
   --acc:#c07080;--acc-soft:rgba(192,112,128,0.42);
   --nav:rgba(255,250,240,0.78);--nav-b:rgba(255,210,200,0.42);
   --sheet:linear-gradient(160deg,#fdf3ec,#fef7e8);
@@ -66,6 +67,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --dow-label-size:12px;
   --sleep-warmgray:#8a8078;
   --sleep-warmgray-strong:#6b6259;
+  --graph-track-color:rgba(var(--divider-rgb),0.25);
+  --divider-rgb:195,175,168;
   --bg:linear-gradient(165deg,#f7f4ee 0%,#f3f1ec 55%,#f6f3ee 100%);
   --tp:#5c5650;--ts:#8a8278;--tm:#b8b0a4;
   --card:rgba(255,253,248,0.50);--card-b:rgba(200,175,140,0.55);
@@ -73,7 +76,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --card-m:var(--card);--card-mb:rgba(135,205,195,0.55);
   --card-y:var(--card);--card-yb:rgba(250,215,100,0.62);
   --card-s:var(--card);--card-sb:rgba(150,180,225,0.55);
-  --div:rgba(180,165,145,0.18);
   --acc:#c9926e;--acc-soft:rgba(201,146,110,0.40);
   --nav:rgba(250,246,238,0.80);--nav-b:rgba(225,210,185,0.40);
   --sheet:linear-gradient(160deg,#f8f5ee,#fbf8f1);
@@ -158,9 +160,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .slabel-row .slabel{margin:0;}
 .slabel-search-btn{background:none;border:none;padding:2px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--tm);opacity:.7;}
 .slabel-search-btn:active{opacity:1;}
-.wgoal-add-btn{background:none;border:none;padding:2px;cursor:pointer;color:rgba(195,175,168,0.6);display:flex;align-items:center;justify-content:center;}
-.wgoal-add-btn:active{color:rgba(195,175,168,0.9);}
-.reserve-section-btn{flex:1;padding:7px 0;border-radius:10px;border:1px solid var(--card-b);background:var(--card);font-size:12px;color:var(--tm);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;}
+.wgoal-add-btn{background:none;border:none;padding:2px;cursor:pointer;color:rgba(var(--divider-rgb),0.6);display:flex;align-items:center;justify-content:center;}
+.wgoal-add-btn:active{color:rgba(var(--divider-rgb),0.9);}
+.reserve-section-btn{flex:1;padding:7px 0;border-radius:10px;border:1px solid var(--card-b);background:var(--card);font-size:var(--dow-label-size);color:var(--tm);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;}
 .reserve-section-btn.active{background:var(--acc-soft);color:var(--tp);border-color:var(--acc-soft);font-weight:600;}
 .goal-section-title{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:500;letter-spacing:.04em;background:linear-gradient(120deg,rgba(255,210,230,0.80),rgba(255,230,200,0.70));color:#c07080;border-radius:10px;padding:5px 13px;margin:14px 0 10px 0;border:1px solid rgba(255,185,205,0.55);box-shadow:0 2px 10px rgba(200,120,140,0.12);}
 .nwf-item{display:flex;flex-direction:column;gap:6px;background:var(--card);border:1px solid var(--card-b);border-radius:14px;padding:12px 13px;margin-bottom:9px;box-shadow:0 2px 14px rgba(0,0,0,0.05),inset 0 1px 0 rgba(255,250,240,0.65);}
@@ -212,7 +214,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 /* ── TODO ── */
 .todo-item{display:flex;align-items:center;gap:9px;padding:5px 0;border-bottom:1px solid rgba(240,220,130,0.30);font-size:var(--main-text-size);color:var(--tp);position:relative;overflow:hidden;user-select:none;}
-.event-item{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--div);font-size:var(--main-text-size);color:var(--tp);cursor:pointer;}
+.event-item{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid rgba(var(--divider-rgb),0.30);font-size:var(--main-text-size);color:var(--tp);cursor:pointer;}
 .event-item:last-child{border-bottom:none;}
 .event-txt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .event-time{font-size:11px;color:var(--ts);flex-shrink:0;font-variant-numeric:tabular-nums;}
@@ -248,8 +250,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .pl-item-poster{width:34px;height:34px;border-radius:7px;object-fit:cover;flex-shrink:0;}
 .pl-item-poster-ph{width:34px;height:34px;border-radius:7px;background:rgba(136,120,171,.18);display:flex;align-items:center;justify-content:center;font-size:14px;color:#8878ab;flex-shrink:0;}
 .pl-item-info{flex:1;min-width:0;}
-.pl-item-title{font-size:12.5px;color:var(--tp);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.pl-item-sub{font-size:10px;color:var(--tm);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pl-item-title{font-size:var(--main-text-size);color:var(--tp);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pl-item-sub{font-size:var(--dow-label-size);color:var(--tm);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .pl-item-play{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
 .pl-item-play i{font-size:13px;}
 .pl-item-play.dim{opacity:.35;cursor:default;}
@@ -261,19 +263,19 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .meal-time-btn{flex-shrink:0;width:20px;height:20px;border-radius:50%;border:1.2px solid rgba(160,190,140,0.55);background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgba(95,140,75,0.75);padding:0;}
 .meal-time-btn:active{background:rgba(190,230,205,0.30);}
 .meal-time-tag{font-size:var(--dow-label-size);color:rgba(95,140,75,0.85);font-weight:600;flex-shrink:0;font-variant-numeric:tabular-nums;padding-top:2px;}
-.meal-inp{flex:1;background:none;border:none;border-bottom:1px dashed rgba(195,175,168,0.38);outline:none;font-family:'DM Sans',sans-serif;font-size:var(--main-text-size);color:var(--tp);padding:5px 2px 4px;}
+.meal-inp{flex:1;background:none;border:none;border-bottom:1px dashed rgba(var(--divider-rgb),0.38);outline:none;font-family:'DM Sans',sans-serif;font-size:var(--main-text-size);color:var(--tp);padding:5px 2px 4px;}
 .week-meal-day{margin-bottom:14px;}
 .week-meal-day-label{font-size:12px;font-weight:700;color:var(--ts);margin-bottom:4px;}
 #daily-meal-card{background:rgba(205,222,180,0.38);border-color:rgba(185,208,155,0.50);}
-#daily-meal-card .cal-detail-row{border-bottom-color:rgba(170,198,140,0.25);}
+#daily-meal-card .cal-detail-row{border-bottom-color:rgba(170,198,140,0.30);}
 #daily-meal-card .cal-detail-time{color:rgba(110,148,88,0.80);font-weight:600;font-size:var(--dow-label-size);}
 #daily-meal-card .cal-detail-text{font-size:var(--main-text-size);}
 .wish-round-btn{width:36px;height:36px;flex-shrink:0;border-radius:50%;border:1.4px solid rgba(150,190,165,0.55);background:rgba(190,230,205,0.22);color:rgba(85,135,100,0.85);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .15s;}
 .wish-round-btn:active{background:rgba(190,230,205,0.4);}
 .wish-add-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
-.wish-add-row .meal-inp{border-bottom:1px dashed rgba(195,175,168,0.38);}
+.wish-add-row .meal-inp{border-bottom:1px dashed rgba(var(--divider-rgb),0.38);}
 .wish-add-btn{width:28px;height:28px;border-radius:50%;border:none;background:rgba(150,215,180,0.55);color:rgba(50,95,65,0.9);font-size:15px;line-height:1;flex-shrink:0;cursor:pointer;}
-.wish-item{display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px dashed rgba(195,175,168,0.22);}
+.wish-item{display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px dashed rgba(var(--divider-rgb),0.22);}
 .wish-text{flex:1;font-size:12.5px;color:var(--tp);cursor:pointer;}
 .wish-place-btn{font-size:10.5px;color:rgba(85,135,100,0.9);background:rgba(190,230,205,0.28);border-radius:7px;padding:4px 8px;cursor:pointer;flex-shrink:0;white-space:nowrap;}
 .wish-del-btn{font-size:12px;color:var(--tm);cursor:pointer;padding:2px 4px;flex-shrink:0;}
@@ -290,14 +292,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rdcal-detail-in{animation:rdCalFadeSlide .28s ease;}
 .mr-sec-title{font-size:11px;color:var(--tm);letter-spacing:.10em;text-transform:uppercase;margin-bottom:11px;}
 .mr-ai-empty{font-size:12px;color:var(--tm);text-align:center;padding:6px 0;}
-.memo-search-empty{text-align:center;color:var(--tm);font-size:12px;padding:20px 2px;}
+.memo-search-empty{text-align:center;color:var(--tm);font-size:var(--dow-label-size);padding:20px 2px;}
 /* 설정탭 공용 버튼 — fill(채움)/outline(테두리)/small(축소) 3종, 새 설정 항목에도 재사용 */
 .settings-btn-fill{width:100%;padding:9px;border-radius:10px;border:none;background:var(--acc-soft);color:var(--acc);font-family:'DM Sans',sans-serif;font-size:var(--dow-label-size);font-weight:500;cursor:pointer;}
-.settings-btn-outline{width:100%;padding:9px;border-radius:10px;border:1px solid var(--div);background:transparent;color:var(--tp);font-family:'DM Sans',sans-serif;font-size:var(--dow-label-size);font-weight:500;cursor:pointer;}
-.settings-btn-small{width:100%;padding:7px;border-radius:10px;border:1px solid var(--div);background:transparent;color:var(--tm);font-family:'DM Sans',sans-serif;font-size:var(--dow-label-size);cursor:pointer;}
+.settings-btn-outline{width:100%;padding:9px;border-radius:10px;border:1px solid rgba(var(--divider-rgb),0.40);background:transparent;color:var(--tp);font-family:'DM Sans',sans-serif;font-size:var(--dow-label-size);font-weight:500;cursor:pointer;}
+.settings-btn-small{width:100%;padding:7px;border-radius:10px;border:1px solid rgba(var(--divider-rgb),0.40);background:transparent;color:var(--tm);font-family:'DM Sans',sans-serif;font-size:var(--dow-label-size);cursor:pointer;}
 .settings-key-inp{margin-bottom:0;font-size:var(--dow-label-size);width:100%;font-family:monospace;}
 .cmr-review-icon{color:var(--tm);opacity:0.65;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center;}
-.cmr-review-box{font-size:12px;color:var(--tp);line-height:1.6;background:rgba(210,180,160,0.14);border-radius:10px;padding:9px 11px;margin:0 0 7px 46px;display:none;}
+.cmr-review-box{font-size:var(--dow-label-size);color:var(--tp);line-height:1.6;background:rgba(210,180,160,0.14);border-radius:10px;padding:9px 11px;margin:0 0 7px 46px;display:none;}
 .cmr-review-box.on{display:block;}
 .sheet-loading-msg{text-align:center;color:var(--tm);padding:20px 0;}
 .ico-13{font-size:13px;vertical-align:-1px;}
@@ -362,13 +364,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .tsp-slot{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--acc);margin-bottom:10px;}
 .tsp-msg{font-family:'Bareonbatang',serif;font-size:16px;line-height:1.65;color:var(--tp);font-weight:400;}
 .tsp-sub{font-size:11px;color:var(--tm);margin-top:10px;}
-.tsp-todo-list{margin-top:16px;border-top:1px solid var(--div);padding-top:14px;text-align:left;display:flex;flex-direction:column;gap:8px;}
+.tsp-todo-list{margin-top:16px;border-top:1px solid rgba(var(--divider-rgb),0.25);padding-top:14px;text-align:left;display:flex;flex-direction:column;gap:8px;}
 .tsp-todo-item{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ts);}
 .tsp-todo-dot{width:5px;height:5px;border-radius:50%;background:var(--acc);flex-shrink:0;}
 .tsp-todo-more{font-size:11px;color:var(--tm);padding-left:13px;}
 .tsp-btn{margin-top:16px;width:100%;padding:10px;border-radius:12px;border:none;background:var(--acc-soft);color:var(--acc);font-family:'DM Sans',sans-serif;font-size:12.5px;font-weight:500;cursor:pointer;}
-.tsp-seed-wrap{margin-top:16px;display:flex;align-items:center;gap:6px;border-top:1px solid var(--div);padding-top:14px;}
-.tsp-seed-inp{flex:1;background:none;border:none;border-bottom:1px dashed var(--div);outline:none;font-size:12.5px;color:var(--tp);padding:4px 2px;font-family:'DM Sans',sans-serif;}
+.tsp-seed-wrap{margin-top:16px;display:flex;align-items:center;gap:6px;border-top:1px solid rgba(var(--divider-rgb),0.25);padding-top:14px;}
+.tsp-seed-inp{flex:1;background:none;border:none;border-bottom:1px dashed rgba(var(--divider-rgb),0.38);outline:none;font-size:12.5px;color:var(--tp);padding:4px 2px;font-family:'DM Sans',sans-serif;}
 .tsp-seed-inp::placeholder{color:var(--tm);}
 .tsp-seed-submit{width:26px;height:26px;border-radius:50%;background:var(--acc-soft);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--acc);font-size:13px;cursor:pointer;flex-shrink:0;}
 .todo-time-sel{display:flex;gap:6px;margin:10px 0 4px;}
@@ -420,7 +422,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .chk.ts-night.on::after{border-color:rgba(110,80,180,0.9);}
 .todo-txt{flex:1;line-height:1.4;cursor:pointer;}
 .todo-txt.done{text-decoration:line-through;color:var(--tm);}
-.add-btn{display:flex;align-items:center;gap:7px;padding:8px 11px;background:rgba(255,250,240,.30);border:1.5px dashed rgba(195,175,168,0.40);border-radius:11px;color:var(--tm);font-size:13px;cursor:pointer;margin-top:8px;width:100%;font-family:'DM Sans',sans-serif;}
+.add-btn{display:flex;align-items:center;gap:7px;padding:8px 11px;background:rgba(255,250,240,.30);border:1.5px dashed rgba(var(--divider-rgb),0.40);border-radius:11px;color:var(--tm);font-size:13px;cursor:pointer;margin-top:8px;width:100%;font-family:'DM Sans',sans-serif;}
 
 /* ── MEMO ── */
 .memo-item{display:flex;gap:9px;margin-bottom:8px;align-items:flex-start;position:relative;overflow:hidden;}
@@ -434,9 +436,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .undo-toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%) translateY(16px);background:rgba(60,40,40,.90);color:white;font-size:12px;padding:9px 18px;border-radius:20px;display:flex;align-items:center;gap:10px;opacity:0;transition:all .25s;z-index:10500;pointer-events:none;backdrop-filter:blur(8px);}
 .undo-toast.on{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto;}
 .undo-btn{font-size:11.5px;color:rgba(255,200,180,.90);font-weight:500;cursor:pointer;}
-.memo-input-row{margin-top:12px;padding-top:11px;border-top:1px solid var(--div);display:flex;gap:7px;align-items:center;}
+.memo-input-row{margin-top:12px;padding-top:11px;border-top:1px solid rgba(255,200,220,0.30);display:flex;gap:7px;align-items:center;}
 .stamp-btn{width:38px;height:38px;background:var(--inp);border:1px solid var(--inp-b);border-radius:11px;padding:0;font-size:11px;color:var(--ts);display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:'DM Sans',sans-serif;flex-shrink:0;}
-.memo-field{flex:1;height:38px;box-sizing:border-box;background:rgba(255,250,240,.30);border:1.5px dashed rgba(195,175,168,0.40);border-radius:11px;padding:8px 12px;font-size:16px;color:var(--tp);font-family:'DM Sans',sans-serif;outline:none;resize:none;line-height:1.3;max-height:100px;}
+.memo-field{flex:1;height:38px;box-sizing:border-box;background:rgba(255,250,240,.30);border:1.5px dashed rgba(var(--divider-rgb),0.40);border-radius:11px;padding:8px 12px;font-size:16px;color:var(--tp);font-family:'DM Sans',sans-serif;outline:none;resize:none;line-height:1.3;max-height:100px;}
 .memo-field::placeholder{color:var(--tm);font-size:13px;}
 .send-btn{width:38px;height:38px;background:var(--inp);border:1px solid var(--inp-b);border-radius:11px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:var(--tm);}
 .memo-stamp-sm{width:32px;height:32px;background:var(--inp);border:1px solid var(--inp-b);border-radius:9px;padding:0;font-size:11px;color:var(--ts);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
@@ -452,13 +454,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 /* ── GOAL NOTE ── */
 .goal-wrap{padding:0 2px;margin-bottom:10px;}
-.goal-inp{display:block;width:100%;background:none;border:none;border-bottom:1px dashed rgba(195,175,168,0.38);outline:none;font-family:'DM Sans',sans-serif;font-size:var(--main-text-size);color:var(--tp);padding:7px 4px 5px;line-height:1.5;resize:none;}
+.goal-inp{display:block;width:100%;background:none;border:none;border-bottom:1px dashed rgba(var(--divider-rgb),0.38);outline:none;font-family:'DM Sans',sans-serif;font-size:var(--main-text-size);color:var(--tp);padding:7px 4px 5px;line-height:1.5;resize:none;}
 .wchallenge-item{display:flex;flex-direction:column;gap:6px;padding:8px 2px 10px;}
 .wchallenge-inp-row{display:flex;align-items:center;gap:8px;}
-.wchallenge-inp{flex:1;background:none;border:none;border-bottom:1px dashed rgba(195,175,168,0.38);outline:none;font-family:'DM Sans',sans-serif;font-size:var(--main-text-size);color:var(--tp);padding:5px 2px 4px;}
+.wchallenge-inp{flex:1;background:none;border:none;border-bottom:1px dashed rgba(var(--divider-rgb),0.38);outline:none;font-family:'DM Sans',sans-serif;font-size:var(--main-text-size);color:var(--tp);padding:5px 2px 4px;}
 .wchallenge-del{background:none;border:none;color:var(--ts);font-size:16px;cursor:pointer;padding:0 2px;line-height:1;}
 .wchallenge-days{display:flex;gap:5px;padding:2px 0 0 2px;}
-.wchallenge-day{width:26px;height:26px;border-radius:50%;border:1.5px dashed rgba(195,175,168,0.38);background:none;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:var(--tm);cursor:pointer;transition:all 0.2s;font-family:'DM Sans',sans-serif;letter-spacing:0;}
+.wchallenge-day{width:26px;height:26px;border-radius:50%;border:1.5px dashed rgba(var(--divider-rgb),0.38);background:none;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:var(--tm);cursor:pointer;transition:all 0.2s;font-family:'DM Sans',sans-serif;letter-spacing:0;}
 .wchallenge-day.on{border-style:solid;color:white;}
 .wchallenge-add{display:flex;align-items:center;gap:6px;padding:8px 2px 2px;color:var(--ts);font-size:12px;cursor:pointer;background:none;border:none;font-family:'DM Sans',sans-serif;}
 
@@ -483,7 +485,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .tt-date-scroll::-webkit-scrollbar{display:none;}
 .tt-date-scroll{-ms-overflow-style:none;scrollbar-width:none;}
 .tt-date-inner{display:flex;gap:2px;}
-.tt-cell{width:20px;height:20px;flex-shrink:0;border-radius:4px;background:none;border:0.5px dashed rgba(195,175,168,0.3);box-sizing:border-box;}
+.tt-cell{width:20px;height:20px;flex-shrink:0;border-radius:4px;background:none;border:0.5px dashed rgba(var(--divider-rgb),0.3);box-sizing:border-box;}
 .tt-block{height:20px;border-radius:5px;display:flex;align-items:center;padding:0 6px;font-size:12px;color:var(--tp);flex-shrink:0;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;-webkit-tap-highlight-color:rgba(192,112,128,0.15);user-select:none;}
 .tt-block.drama{background:rgba(255,210,225,.62);}
 .tt-block.book{background:rgba(255,235,160,.62);}
@@ -500,7 +502,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .hm-row{display:flex;align-items:flex-start;gap:6px;margin-bottom:6px;}
 .hm-lbl{width:52px;flex-shrink:0;font-size:var(--dow-label-size);color:var(--ts);padding-top:2px;}
 .hm-dots{display:flex;flex-wrap:wrap;gap:3px;}
-.hm-dot{width:14px;height:14px;border-radius:4px;background:rgba(195,175,168,0.22);}
+.hm-dot{width:14px;height:14px;border-radius:4px;background:rgba(var(--divider-rgb),0.22);}
 .hm-dot.mint{background:rgba(140,210,200,.68);}
 .hm-dot.pink{background:rgba(255,175,200,.62);}
 .hm-dot.sky{background:rgba(155,205,255,.62);}
@@ -546,7 +548,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cal-detail-wrap{background:rgba(255,250,240,.60);border:1px solid rgba(255,255,255,.88);border-radius:16px;padding:14px 15px;margin:8px 0 12px;animation:sd .2s ease;}
 @keyframes sd{from{opacity:0;transform:translateY(-5px);}to{opacity:1;transform:translateY(0);}}
 .cal-detail-date{font-size:11.5px;font-weight:500;color:var(--ts);margin-bottom:10px;}
-.cal-detail-row{display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:1px solid var(--div);}
+.cal-detail-row{display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:1px solid rgba(var(--divider-rgb),0.25);}
 .cal-detail-row:last-child{border-bottom:none;}
 .cal-detail-icon{flex-shrink:0;display:flex;align-items:center;padding-top:1px;}
 .cal-detail-time{font-size:10px;color:var(--tm);white-space:nowrap;padding-top:2px;min-width:34px;}
@@ -556,7 +558,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cal-add-event-btn:active{background:rgba(255,255,255,0.3);}
 
 /* ── STAT BAR ── */
-.stat-bar-wrap{display:flex;align-items:center;justify-content:center;gap:14px;padding:14px 4px 6px;border-top:1px solid var(--div);margin-top:8px;}
+.stat-bar-wrap{display:flex;align-items:center;justify-content:center;gap:14px;padding:14px 4px 6px;border-top:1px solid rgba(var(--divider-rgb),0.25);margin-top:8px;}
 .sbar-item{display:flex;align-items:center;gap:5px;}
 .sbar-item-active{cursor:pointer;}
 .sbar-item-active i,.sbar-item-active .sbar-num{
@@ -575,9 +577,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .overlay.on{display:flex;}
 .bsheet{width:100%;max-width:430px;margin:0 auto;background:var(--sheet);border-radius:24px 24px 0 0;padding:0 0 max(24px,env(safe-area-inset-bottom));box-shadow:0 -4px 40px rgba(0,0,0,.12);transform:translateY(100%);transition:transform .28s cubic-bezier(.32,.72,0,1);}
 .overlay.on .bsheet{transform:translateY(0);}
-.sheet-handle{width:36px;height:4px;background:rgba(195,175,168,.38);border-radius:2px;margin:12px auto 16px;}
-.sheet-title{font-size:var(--main-text-size);font-weight:500;color:var(--ts);padding:0 20px 12px;border-bottom:1px solid var(--div);}
-.sheet-item{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--div);cursor:pointer;font-size:var(--main-text-size);color:var(--tp);}
+.sheet-handle{width:36px;height:4px;background:rgba(var(--divider-rgb),.38);border-radius:2px;margin:12px auto 16px;}
+.sheet-title{font-size:var(--main-text-size);font-weight:500;color:var(--ts);padding:0 20px 12px;border-bottom:1px solid rgba(var(--divider-rgb),0.25);}
+.sheet-item{display:flex;align-items:center;gap:12px;padding:14px 4px;margin:0 16px;border-bottom:1px dashed rgba(var(--divider-rgb),0.20);cursor:pointer;font-size:var(--main-text-size);color:var(--tp);}
+.sheet-item:last-child{border-bottom:none;}
 .sheet-item:last-child{border-bottom:none;}
 .sheet-item.del{color:#c05060;}
 .archive-sheet-textarea:focus{border-color:rgba(150,175,120,0.55);}
@@ -591,15 +594,15 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .modal-inp::placeholder{color:var(--tm);}
 .time-inp{font-size:22px;font-weight:300;text-align:center;letter-spacing:1px;box-sizing:border-box;width:150px;padding:11px 10px;margin:0 auto 12px;display:block;}
 .modal-actions{display:flex;gap:8px;margin-top:8px;}
-.msr-item{padding:9px 4px;border-bottom:1px solid var(--div);cursor:pointer;}
+.msr-item{padding:9px 4px;border-bottom:1px solid rgba(var(--divider-rgb),0.25);cursor:pointer;}
 .msr-item:last-child{border-bottom:none;}
-.msr-date{font-size:12px;color:var(--tm);margin-bottom:3px;}
-.msr-text{font-size:13px;color:var(--tp);line-height:1.5;}
+.msr-date{font-size:var(--dow-label-size);color:var(--tm);margin-bottom:3px;}
+.msr-text{font-size:var(--main-text-size);color:var(--tp);line-height:1.5;}
 .mbtn{flex:1;padding:10px;border-radius:12px;font-size:var(--main-text-size);font-family:'DM Sans',sans-serif;cursor:pointer;border:none;}
 .mbtn.cancel{background:var(--inp);color:var(--tm);border:1px solid var(--inp-b);}
 .mbtn.ok{background:var(--acc-soft);color:var(--acc);font-weight:500;}
 /* ── 독서 완독 확인 — 축하하는 느낌의 반짝이는 테두리 버튼 ── */
-.pg-done-msg{font-size:13.5px;color:var(--tp);text-align:center;margin:6px 0 14px;font-weight:500;}
+.pg-done-msg{font-size:var(--main-text-size);color:var(--tp);text-align:center;margin:6px 0 14px;font-weight:500;}
 .mbtn-done-wrap{flex:1;display:inline-flex;border-radius:12px;padding:1.8px;
   background:linear-gradient(120deg,#ffd28a,#ffb0c8,#c9a8ff,#9fd8ff,#ffd28a);
   background-size:300% 300%;animation:bannerShine 3s ease infinite;cursor:pointer;}
@@ -612,7 +615,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 /* ── SETTINGS ── */
 .settings-ov{position:fixed;inset:0;z-index:8000;background:var(--bg);display:none;flex-direction:column;overflow-y:auto;transform:translateX(100%);transition:transform .3s cubic-bezier(.32,.72,0,1);}
 .settings-ov.on{display:flex;transform:translateX(0);}
-.settings-hdr{padding:max(50px,env(safe-area-inset-top)) 20px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--div);flex-shrink:0;}
+.settings-hdr{padding:max(50px,env(safe-area-inset-top)) 20px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid rgba(var(--divider-rgb),0.25);flex-shrink:0;}
 .settings-back{width:36px;height:36px;background:var(--card);border:1px solid var(--card-b);border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .settings-ttl{font-size:18px;font-weight:500;color:var(--tp);}
 .settings-body{padding:20px;display:flex;flex-direction:column;gap:20px;}
@@ -621,7 +624,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .color-themes{display:flex;gap:10px;flex-wrap:wrap;}
 .ctheme-btn{width:52px;height:52px;border-radius:14px;cursor:pointer;border:3px solid transparent;transition:all .15s;display:flex;align-items:center;justify-content:center;font-size:14px;color:transparent;}
 .ctheme-btn.on{border-color:var(--acc);color:white;text-shadow:0 1px 3px rgba(0,0,0,.3);}
-.settings-item{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--div);}
+.settings-item{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid rgba(var(--divider-rgb),0.25);}
 .settings-item:last-child{border-bottom:none;}
 .settings-item-lbl{font-size:var(--main-text-size);color:var(--tp);}
 .settings-item-val{font-size:var(--dow-label-size);color:var(--tm);}
@@ -630,12 +633,12 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 /* ── PDF MODAL ── */
 .pdf-modal-body{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;}
 .pdf-range-row{display:flex;gap:8px;align-items:center;}
-.pdf-range-lbl{font-size:12px;color:var(--tm);white-space:nowrap;width:36px;}
+.pdf-range-lbl{font-size:var(--dow-label-size);color:var(--tm);white-space:nowrap;width:36px;}
 
 /* ── API SEARCH ── */
 .api-search-wrap{position:relative;}
 .api-results{position:absolute;top:100%;left:0;right:0;z-index:200;background:var(--modal);border:1px solid var(--card-b);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.15);max-height:240px;overflow-y:auto;margin-top:4px;}
-.api-result-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--div);cursor:pointer;}
+.api-result-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid rgba(var(--divider-rgb),0.25);cursor:pointer;}
 .api-result-item:last-child{border-bottom:none;}
 .api-result-poster{width:36px;height:52px;border-radius:6px;object-fit:cover;flex-shrink:0;background:var(--card);}
 .api-result-poster-placeholder{width:36px;height:52px;border-radius:6px;background:var(--card);border:1px solid var(--card-b);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;}
@@ -682,7 +685,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rd-sw-face{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#6a4458;z-index:2;}
 .rd-sw-time{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#6a4458;font-family:'DM Sans',sans-serif;z-index:2;}
 .rd-progress-bar{width:100%;position:relative;margin-bottom:7px;cursor:pointer;padding:5px 0;}
-.rd-progress-track{height:4px;border-radius:3px;background:var(--div);overflow:hidden;position:relative;}
+.rd-progress-track{height:4px;border-radius:3px;background:var(--graph-track-color);overflow:hidden;position:relative;}
 .rd-progress-fill{position:absolute;left:0;top:0;height:100%;border-radius:3px;background:#ffc9da;transition:width .4s ease;}
 .rd-progress-today{position:absolute;top:0;height:100%;background:#ff9ec0;transition:left .4s ease,width .4s ease;}
 .rd-progress-bead{position:absolute;top:50%;width:13px;height:13px;border-radius:50%;transform:translate(-50%,-50%);border:1.6px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.25);background:linear-gradient(270deg,#ffb0c8,#ffd28a,#bdf0c4,#9fd8ff,#c9a8ff,#ffb0c8);background-size:500% 100%;animation:beadRainbow 22s linear infinite;transition:left .4s ease;}
@@ -692,12 +695,12 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .pace-title{font-size:var(--dow-label-size);color:var(--tm);margin-bottom:10px;display:flex;align-items:center;gap:5px;}
 .pace-track-wrap{margin-bottom:8px;}
 .pace-track-lbl{font-size:var(--dow-label-size);color:var(--tm);margin-bottom:3px;display:flex;justify-content:space-between;}
-.pace-track{height:6px;border-radius:3px;background:rgba(195,175,168,0.25);position:relative;overflow:visible;}
+.pace-track{height:6px;border-radius:3px;background:rgba(var(--divider-rgb),0.25);position:relative;overflow:visible;}
 .pace-fill-y{position:absolute;left:0;top:0;height:100%;border-radius:3px;background:rgba(200,190,180,0.55);}
 .pace-fill-t{position:absolute;left:0;top:0;height:100%;border-radius:3px;background:#ffc9da;}
 .pace-bead2{position:absolute;top:50%;width:13px;height:13px;border-radius:50%;transform:translate(-50%,-50%);border:1.6px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.25);
   background:linear-gradient(270deg,#ffb0c8,#ffd28a,#bdf0c4,#9fd8ff,#c9a8ff,#ffb0c8);background-size:500% 100%;animation:beadRainbow 22s linear infinite;}
-.pace-divider{height:1px;background:rgba(195,175,168,0.25);margin:16px 0;}
+.pace-divider{height:1px;background:rgba(var(--divider-rgb),0.25);margin:16px 0;}
 .wave-title{font-size:var(--dow-label-size);color:var(--tm);margin-bottom:12px;display:flex;align-items:center;gap:5px;}
 .wave-row{display:flex;justify-content:center;gap:32px;}
 .wave-col{text-align:center;}
@@ -708,7 +711,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .wave-lbl{font-size:var(--dow-label-size);color:var(--tm);margin-top:8px;}
 /* .pace-title/.wave-title은 이미 12px(=--dow-label-size)로 다른 시간대와 값이 같아 별도 오버라이드 불필요. .pace-track-lbl/.wave-lbl은 오후 페이스카드 전용(다른 곳 미사용)이라 클래스 자체를 변수로 통일함 */
 .wave-habit-pctbar-row{width:76px;margin:8px auto 0;}
-.wave-habit-pctbar-track{height:5px;border-radius:3px;background:rgba(195,175,168,0.15);overflow:hidden;}
+.wave-habit-pctbar-track{height:5px;border-radius:3px;background:rgba(var(--divider-rgb),0.15);overflow:hidden;}
 .wave-habit-pctbar-fill{height:100%;border-radius:3px;transition:width .4s;}
 @keyframes waveMove{0%{transform:translateX(0);}100%{transform:translateX(-50px);}}
 .wave-anim{animation:waveMove 3.5s linear infinite;}
@@ -720,8 +723,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rc-flow i{font-size:28px;}
 .rc-arrow-dot{color:#d4ac85;display:flex;align-items:center;}
 .pace-dot-track{position:relative;margin-top:4px;}
-.pace-dot-baseline{position:absolute;left:0;right:0;height:1px;background:var(--div);}
-.pace-dot-hourline{position:absolute;top:18px;width:1px;height:8px;background:var(--div);}
+.pace-dot-baseline{position:absolute;left:0;right:0;height:1px;background:var(--graph-track-color);}
+.pace-dot-hourline{position:absolute;top:18px;width:1px;height:8px;background:var(--graph-track-color);}
 .pace-dot-hourlabel{position:absolute;top:28px;font-size:9px;color:var(--tm);transform:translateX(-50%);white-space:nowrap;}
 .pace-dot{position:absolute;width:8px;height:8px;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 1px 2px rgba(0,0,0,0.12);}
 /* ── 새벽 전용 활동분포 배너 — 인사카드(dawn 톤: 라벤더~딥퍼플)와 색을 이어받은 별빛 디자인 ── */
@@ -771,11 +774,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 @keyframes beadRainbow{0%{background-position:0% 50%;}100%{background-position:500% 50%;}}
 .pg-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
 .pg-box{flex:1;background:var(--inp);border:1px solid var(--inp-b);border-radius:14px;padding:12px;text-align:center;}
-.pg-box-lbl{font-size:11px;color:var(--tm);margin-bottom:4px;}
+.pg-box-lbl{font-size:var(--dow-label-size);color:var(--tm);margin-bottom:4px;}
 .pg-box-val{font-size:22px;font-weight:600;color:var(--tp);}
 .pg-box-inp{width:100%;background:none;border:none;outline:none;font-size:22px;font-weight:600;color:var(--tp);text-align:center;font-family:'DM Sans',sans-serif;}
 .pg-arrow{font-size:16px;color:var(--tm);flex-shrink:0;}
-.pg-total{font-size:11px;color:var(--tm);text-align:center;margin-bottom:14px;}
+.pg-total{font-size:var(--dow-label-size);color:var(--tm);text-align:center;margin-bottom:14px;}
 .rd-top-sub{font-size:11px;color:var(--tm);}
 .rd-month-stat{font-size:var(--dow-label-size);color:var(--ts);text-align:center;margin-top:2px;}
 .rd-quote-section{margin-top:4px;}
@@ -809,7 +812,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 /* 월간 하루한줄 모아보기 */
 .mr-ai-card{border-radius:16px;padding:15px 15px 13px;margin-bottom:12px;background:linear-gradient(120deg,rgba(190,230,205,0.45),rgba(250,235,170,0.40));border:1px solid rgba(165,215,190,0.55);box-shadow:0 2px 10px rgba(140,180,120,0.10);}
 [data-theme="glass"] .mr-ai-card{background:rgba(255,253,248,0.45);box-shadow:0 2px 12px rgba(150,180,130,0.10);}
-.diary-row{display:flex;align-items:baseline;gap:9px;padding:9px 2px;border-bottom:1px dashed rgba(195,175,168,0.28);}
+.diary-row{display:flex;align-items:baseline;gap:9px;padding:9px 2px;border-bottom:1px dashed rgba(var(--divider-rgb),0.28);}
 .diary-row:last-child{border-bottom:none;}
 .diary-date-chip{flex-shrink:0;font-size:12px;font-weight:500;color:var(--ts);border-radius:8px;padding:3px 7px;min-width:30px;text-align:center;border:1px solid transparent;}
 .diary-date-chip.holiday{color:#c2638a;}
@@ -866,7 +869,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rd-book-meta{font-size:var(--dow-label-size);color:var(--tm);margin-top:3px;}
 .rd-est-line{font-size:var(--dow-label-size);color:rgba(180,130,110,0.85);margin-top:4px;}
 .rd-est-line.dim{color:var(--tm);opacity:0.75;}
-.rd-book-detail{margin-top:10px;padding-top:10px;border-top:1px solid var(--div);display:none;}
+.rd-book-detail{margin-top:10px;padding-top:10px;border-top:1px solid rgba(var(--divider-rgb),0.25);display:none;}
 .rd-book-item.open .rd-book-detail{display:block;}
 .rd-detail-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
 .rd-status-btn{font-size:var(--dow-label-size);padding:5px 10px;border-radius:8px;border:1px solid var(--card-b);background:var(--card);color:var(--ts);cursor:pointer;}
@@ -899,7 +902,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .chaeum-log-meta{font-size:var(--dow-label-size);color:var(--tm);display:flex;align-items:center;gap:6px;}
 .chaeum-log-topic{color:rgba(100,110,45,0.85);font-weight:500;}
 .chaeum-log-title{font-size:var(--main-text-size);color:var(--tp);font-weight:500;margin-top:4px;line-height:1.4;}
-.chaeum-log-comment{font-size:var(--dow-label-size);color:var(--ts);font-style:italic;line-height:1.55;margin-top:7px;padding-top:7px;border-top:1px dashed var(--div);}
+.chaeum-log-comment{font-size:var(--dow-label-size);color:var(--ts);font-style:italic;line-height:1.55;margin-top:7px;padding-top:7px;border-top:1px dashed rgba(var(--divider-rgb),0.28);}
 .chaeum-log-comment-btn{font-size:var(--dow-label-size);color:var(--tm);margin-top:8px;cursor:pointer;display:inline-flex;align-items:center;gap:3px;}
 .chaeum-log-del{position:absolute;top:9px;right:10px;font-size:10px;color:var(--tm);cursor:pointer;padding:4px;}
 .chaeum-log-comment-inp{width:100%;background:var(--inp);border:1px solid var(--inp-b);border-radius:10px;padding:9px 11px;outline:none;resize:none;font-family:'DM Sans',sans-serif;font-size:var(--dow-label-size);color:var(--tp);line-height:1.6;margin-top:8px;}
@@ -946,14 +949,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 
 /* ── DAILY ONE LINE ── */
-.oneline-row{display:flex;align-items:center;gap:0;padding:8px 0;border-bottom:1px solid rgba(195,175,168,0.22);}
+.oneline-row{display:flex;align-items:center;gap:0;padding:8px 0;border-bottom:1px solid rgba(var(--divider-rgb),0.22);}
 .oneline-row:last-child{border-bottom:none;}
 .oneline-day-wrap{display:flex;align-items:center;width:26px;flex-shrink:0;}
 .oneline-day{font-size:var(--dow-label-size);color:var(--ts);font-weight:500;white-space:nowrap;}
 .oneline-today .oneline-day{color:var(--acc);}
 .oneline-divider{
   width:0;border:none;
-  border-left:1px dashed rgba(195,175,168,0.28);
+  border-left:1px dashed rgba(var(--divider-rgb),0.28);
   height:14px;margin:0 10px 0 4px;flex-shrink:0;
 }
 .oneline-inp{flex:1;background:none;border:none;outline:none;font-family:'DM Sans',sans-serif;font-size:var(--main-text-size);color:var(--tp);padding:2px 0;-webkit-appearance:none;}
@@ -1000,17 +1003,17 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   border-color:rgba(110,105,170,0.35);
 }
 .day-recap-card{background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:16px;box-shadow:0 2px 12px rgba(180,140,120,0.06);}
-.day-recap-sec-title{font-size:12px;font-weight:600;color:var(--ts);margin:14px 0 9px;padding-top:12px;border-top:1px solid rgba(195,175,168,0.18);display:flex;align-items:center;gap:5px;}
+.day-recap-sec-title{font-size:12px;font-weight:600;color:var(--ts);margin:14px 0 9px;padding-top:12px;border-top:1px solid rgba(var(--divider-rgb),0.18);display:flex;align-items:center;gap:5px;}
 .day-recap-sec-title:first-child{margin-top:0;padding-top:0;border-top:none;}
 .vow-recap-block{padding:2px 4px;}
 .vow-recap-row{margin-bottom:6px;}
 .vow-recap-label{font-size:11px;color:var(--tm);margin-bottom:5px;letter-spacing:0.02em;}
 .vow-recap-text{font-size:14px;color:var(--tp);line-height:1.5;background:none;border:none;border-left:2.5px solid rgba(225,140,120,0.45);border-radius:0;padding:2px 0 2px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.nutri-menu-row{display:flex;align-items:baseline;gap:8px;padding:5px 0;font-size:13px;color:var(--tp);}
-.nutri-menu-cat{width:32px;flex-shrink:0;font-size:11.5px;color:var(--tm);}
-.nutri-section-label{font-size:11.5px;font-weight:700;color:var(--ts);margin:14px 0 6px;}
-.nutri-analysis-text{font-size:13px;color:var(--tp);line-height:1.65;padding:2px 0;}
-.nutri-empty{font-size:12.5px;color:var(--tm);padding:6px 0;}
+.nutri-menu-row{display:flex;align-items:baseline;gap:8px;padding:5px 0;font-size:var(--main-text-size);color:var(--tp);}
+.nutri-menu-cat{width:32px;flex-shrink:0;font-size:var(--dow-label-size);color:var(--tm);}
+.nutri-section-label{font-size:var(--dow-label-size);font-weight:700;color:var(--ts);margin:14px 0 6px;}
+.nutri-analysis-text{font-size:var(--main-text-size);color:var(--tp);line-height:1.65;padding:2px 0;}
+.nutri-empty{font-size:var(--dow-label-size);color:var(--tm);padding:6px 0;}
 
 .recap-donut-row{display:flex;justify-content:space-around;margin-bottom:2px;padding-bottom:2px;}
 .recap-donut-item{text-align:center;}
@@ -1048,7 +1051,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .habit-check-col{display:flex;flex-direction:column;align-items:center;gap:7px;min-width:42px;}
 .habit-check-name{font-size:12px;color:var(--tm);text-align:center;}
 .habit-check-foot{width:100%;display:flex;justify-content:flex-end;margin-top:5px;margin-bottom:0;}
-.habit-chk2{width:25px;height:25px;border-radius:50%;border:1.5px dashed rgba(195,175,168,0.5);background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;}
+.habit-chk2{width:25px;height:25px;border-radius:50%;border:1.5px dashed rgba(var(--divider-rgb),0.5);background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;}
 .habit-chk2.on{border-style:solid;}
 
 /* ── 주간탭: 전반적으로 타이트한 간격 ── */
@@ -1061,7 +1064,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .hw-daylabels{display:flex;padding-left:58px;padding-right:26px;margin-bottom:5px;}
 .hw-daylabels span{flex:1;text-align:center;font-size:var(--dow-label-size);color:var(--tm);}
 .hw-row{display:flex;align-items:center;gap:0;padding:4px 0;}
-.hw-row+.hw-row{border-top:1px solid rgba(195,175,168,0.22);}
+.hw-row+.hw-row{border-top:1px solid rgba(var(--divider-rgb),0.22);}
 .hw-name{width:58px;flex-shrink:0;font-size:12px;color:var(--ts);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:5px;}
 .hw-name-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
 .hw-dots{flex:1;display:flex;}
@@ -1073,10 +1076,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rhythm-track-datelabel{font-size:12px;font-weight:700;color:var(--tp);margin-bottom:14px;display:flex;justify-content:space-between;align-items:baseline;}
 .rhythm-track-datelabel .w{font-size:12px;font-weight:400;color:var(--tm);}
 .rhythm-track{position:relative;padding-left:46px;margin-bottom:10px;}
-.rt-line{position:absolute;left:30px;top:2px;bottom:2px;width:2px;background:rgba(195,175,168,0.55);border-radius:2px;}
+.rt-line{position:absolute;left:30px;top:2px;bottom:2px;width:2px;background:rgba(var(--divider-rgb),0.55);border-radius:2px;}
 .rt-hourlabel{position:absolute;left:0;width:26px;text-align:right;font-size:10px;color:var(--tm);transform:translateY(-50%);}
 .rt-block{position:absolute;left:24px;width:14px;border-radius:5px;}
-.rt-connector{position:absolute;left:30px;width:1.5px;background:rgba(195,175,168,0.55);}
+.rt-connector{position:absolute;left:30px;width:1.5px;background:rgba(var(--divider-rgb),0.55);}
 .rt-row{position:absolute;left:46px;right:0;display:flex;align-items:center;gap:7px;font-size:12px;color:var(--tp);white-space:nowrap;overflow:hidden;}
 .rt-row .rt-time{font-size:10px;color:var(--tm);width:78px;flex-shrink:0;font-family:'DM Sans',sans-serif;}
 .rt-row .rt-txt{overflow:hidden;text-overflow:ellipsis;}
@@ -1422,7 +1425,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         </button>
       </div>
       <div id="meal-wishlist-panel" style="display:none;margin-bottom:14px;"></div>
-      <div id="wish-placing-hint" style="display:none;font-size:11px;color:rgba(100,140,75,0.85);background:rgba(150,215,180,0.14);border-radius:8px;padding:7px 10px;margin-bottom:10px;text-align:center;cursor:pointer;" onclick="cancelWishPlacing()">넣을 칸을 눌러주세요 · 취소하려면 여기를 누르세요</div>
+      <div id="wish-placing-hint" style="display:none;font-size:var(--dow-label-size);color:rgba(100,140,75,0.85);background:rgba(150,215,180,0.14);border-radius:8px;padding:7px 10px;margin-bottom:10px;text-align:center;cursor:pointer;" onclick="cancelWishPlacing()">넣을 칸을 눌러주세요 · 취소하려면 여기를 누르세요</div>
       <div id="week-meal-scroll" style="max-height:50vh;overflow-y:auto;">
         <div id="week-meal-body"></div>
       </div>
@@ -1594,7 +1597,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div style="padding:0 20px 24px;">
       <div style="font-size:13px;font-weight:600;color:rgba(80,140,200,0.9);text-align:center;margin-bottom:16px;letter-spacing:0.04em;"><i class="ti ti-sparkles ico-13" aria-hidden="true"></i> 주간메모 돌아보기 <i class="ti ti-sparkles ico-13" aria-hidden="true"></i></div>
       <div id="wmr-week-chips" class="month-chips week-chips-4" style="margin-bottom:14px;"></div>
-      <div id="weekly-memo-report-content" style="font-size:13px;color:var(--tp);line-height:1.9;"></div>
+      <div id="weekly-memo-report-content" style="font-size:var(--main-text-size);color:var(--tp);line-height:1.9;"></div>
     </div>
   </div>
 </div>
@@ -1631,7 +1634,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div style="padding:0 20px 20px;">
       <div style="font-size:13px;font-weight:600;color:rgba(80,140,200,0.9);text-align:center;margin-bottom:16px;letter-spacing:0.04em;"><i class="ti ti-sparkles ico-13" aria-hidden="true"></i> 주간 돌아보기 <i class="ti ti-sparkles ico-13" aria-hidden="true"></i></div>
       <div id="wr-week-chips" class="month-chips week-chips-4" style="margin-bottom:14px;"></div>
-      <div id="weekly-review-content" style="font-size:13px;color:var(--tp);line-height:1.9;"></div>
+      <div id="weekly-review-content" style="font-size:var(--main-text-size);color:var(--tp);line-height:1.9;"></div>
     </div>
   </div>
 </div>
@@ -1643,7 +1646,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div style="padding:0 20px 20px;">
       <div style="font-size:13px;font-weight:600;color:rgba(80,140,200,0.9);text-align:center;margin-bottom:16px;letter-spacing:0.04em;"><i class="ti ti-sparkles ico-13" aria-hidden="true"></i> 주간 목표 돌아보기 <i class="ti ti-sparkles ico-13" aria-hidden="true"></i></div>
       <div id="cr-week-chips" class="month-chips week-chips-4" style="margin-bottom:14px;"></div>
-      <div id="challenge-review-content" style="font-size:13px;color:var(--tp);line-height:1.9;"></div>
+      <div id="challenge-review-content" style="font-size:var(--main-text-size);color:var(--tp);line-height:1.9;"></div>
     </div>
   </div>
 </div>
@@ -1730,18 +1733,18 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   <div class="modal" onclick="event.stopPropagation()">
     <div class="modal-title">메모 검색</div>
     <input type="text" class="modal-inp" id="memo-search-inp" placeholder="검색어를 입력하세요" autocomplete="off" oninput="runMemoSearch()">
-    <div onclick="toggleMemoSearchRange()" style="font-size:11.5px;color:var(--tm);cursor:pointer;margin:-4px 2px 8px;display:flex;align-items:center;gap:4px;">
+    <div onclick="toggleMemoSearchRange()" style="font-size:var(--dow-label-size);color:var(--tm);cursor:pointer;margin:-4px 2px 8px;display:flex;align-items:center;gap:4px;">
       <span id="msr-toggle-icon">▸</span> <span id="msr-toggle-label">범위 설정</span>
     </div>
     <div id="msr-range-box" style="display:none;margin-bottom:10px;">
       <div style="display:flex;gap:6px;margin-bottom:8px;">
-        <input type="date" id="msr-start" class="modal-inp" style="margin-bottom:0;font-size:12.5px;" oninput="runMemoSearch()" lang="en-GB">
-        <input type="date" id="msr-end" class="modal-inp" style="margin-bottom:0;font-size:12.5px;" oninput="runMemoSearch()" lang="en-GB">
+        <input type="date" id="msr-start" class="modal-inp" style="margin-bottom:0;font-size:var(--dow-label-size);" oninput="runMemoSearch()" lang="en-GB">
+        <input type="date" id="msr-end" class="modal-inp" style="margin-bottom:0;font-size:var(--dow-label-size);" oninput="runMemoSearch()" lang="en-GB">
       </div>
       <div style="display:flex;gap:6px;">
-        <button class="mbtn" onclick="setMemoSearchRange('thisMonth')" style="flex:1;font-size:11.5px;padding:7px 0;">이번 달</button>
-        <button class="mbtn" onclick="setMemoSearchRange('lastMonth')" style="flex:1;font-size:11.5px;padding:7px 0;">지난 달</button>
-        <button class="mbtn cancel" onclick="setMemoSearchRange('clear')" style="flex:1;font-size:11.5px;padding:7px 0;">초기화</button>
+        <button class="mbtn" onclick="setMemoSearchRange('thisMonth')" style="flex:1;font-size:var(--dow-label-size);padding:7px 0;">이번 달</button>
+        <button class="mbtn" onclick="setMemoSearchRange('lastMonth')" style="flex:1;font-size:var(--dow-label-size);padding:7px 0;">지난 달</button>
+        <button class="mbtn cancel" onclick="setMemoSearchRange('clear')" style="flex:1;font-size:var(--dow-label-size);padding:7px 0;">초기화</button>
       </div>
     </div>
     <div id="memo-search-results" style="max-height:50vh;overflow-y:auto;margin-bottom:12px;"></div>
@@ -1779,7 +1782,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 <div class="modal-ov" id="habit-modal" onclick="closeModal('habit-modal',event)">
   <div class="modal">
     <div class="modal-title">습관 편집</div>
-    <div style="font-size:11px;color:var(--tm);margin-bottom:10px;">한 줄에 하나씩 입력</div>
+    <div style="font-size:var(--dow-label-size);color:var(--tm);margin-bottom:10px;">한 줄에 하나씩 입력</div>
     <textarea class="modal-inp" id="habit-modal-inp" rows="5" style="resize:none;line-height:1.8;" placeholder="운동&#10;독서&#10;영양제&#10;물" autocomplete="off"></textarea>
     <div class="modal-actions">
       <button class="mbtn cancel" onclick="closeModal('habit-modal')">취소</button>
@@ -1797,10 +1800,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     </div>
     <div id="cm-poster-preview" style="display:none;margin-bottom:10px;flex-direction:row;gap:10px;align-items:center;">
       <img id="cm-poster-img" style="width:44px;height:64px;border-radius:8px;object-fit:cover;" src="" alt="">
-      <div><div id="cm-poster-title" style="font-size:12px;color:var(--tp);font-weight:500;"></div><div id="cm-poster-sub" style="font-size:10px;color:var(--tm);margin-top:2px;"></div></div>
+      <div><div id="cm-poster-title" style="font-size:var(--main-text-size);color:var(--tp);font-weight:500;"></div><div id="cm-poster-sub" style="font-size:var(--dow-label-size);color:var(--tm);margin-top:2px;"></div></div>
     </div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
-      <span style="font-size:12px;color:var(--tm);white-space:nowrap;" id="cm-start-label">시작일</span>
+      <span style="font-size:var(--dow-label-size);color:var(--tm);white-space:nowrap;" id="cm-start-label">시작일</span>
       <input type="text" class="modal-inp" id="cm-start" readonly onclick="openContentDatePicker('cm-start')" style="flex:1;margin-bottom:0;cursor:pointer;" placeholder="날짜 선택">
       <div style="display:flex;gap:5px;flex-shrink:0;" id="cm-status-btns">
         <button class="cstatus-btn done" id="cm-done" onclick="toggleCDone()" style="white-space:nowrap;padding:8px 9px;margin-bottom:0;">
@@ -1815,7 +1818,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       </button>
     </div>
     <div class="enddate-row" id="cm-enddate-row">
-      <span style="font-size:12px;color:var(--tm);white-space:nowrap;" id="cm-enddate-label">완료일</span>
+      <span style="font-size:var(--dow-label-size);color:var(--tm);white-space:nowrap;" id="cm-enddate-label">완료일</span>
       <input type="text" class="modal-inp" id="cm-end" readonly onclick="openContentDatePicker('cm-end')" style="flex:1;margin-bottom:0;cursor:pointer;" placeholder="날짜 선택">
     </div>
     <div id="cm-book-unit-row" style="display:none;">
@@ -1826,7 +1829,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <input class="modal-inp" id="cm-total-pages" type="number" inputmode="numeric" placeholder="전체 페이지 수 (선택)" style="margin-top:8px;display:none;">
     </div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;" id="cm-star-row">
-      <span style="font-size:12px;color:var(--tm);white-space:nowrap;">별점</span>
+      <span style="font-size:var(--dow-label-size);color:var(--tm);white-space:nowrap;">별점</span>
       <div id="cm-star-picker" class="cm-star-picker"></div>
       <input type="hidden" id="cm-stars" value="0">
     </div>
@@ -1845,7 +1848,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 <!-- MUSIC GROUP MODAL -->
 <div class="modal-ov" id="music-group-modal" onclick="closeModal('music-group-modal',event)">
   <div class="modal" style="max-width:300px;">
-    <div style="font-size:13px;font-weight:600;color:var(--tp);margin-bottom:10px;">이 날의 음악</div>
+    <div style="font-size:var(--main-text-size);font-weight:600;color:var(--tp);margin-bottom:10px;">이 날의 음악</div>
     <div id="mg-list" style="display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto;"></div>
   </div>
 </div>
@@ -2012,12 +2015,12 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <input type="date" class="modal-inp" id="pdf-end" style="flex:1;margin-bottom:0;" oninput="updatePdfCount()" lang="en-GB">
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
-        <button onclick="setPdfRange('week')" style="flex:1;padding:7px;border-radius:9px;border:1px solid var(--inp-b);background:var(--inp);color:var(--ts);font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer;">이번 주</button>
-        <button onclick="setPdfRange('month')" style="flex:1;padding:7px;border-radius:9px;border:1px solid var(--inp-b);background:var(--inp);color:var(--ts);font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer;">이번 달</button>
-        <button onclick="setPdfRange('3month')" style="flex:1;padding:7px;border-radius:9px;border:1px solid var(--inp-b);background:var(--inp);color:var(--ts);font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer;">최근 3개월</button>
-        <button onclick="setPdfRange('year')" style="flex:1;padding:7px;border-radius:9px;border:1px solid var(--inp-b);background:var(--inp);color:var(--ts);font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer;">올해 전체</button>
+        <button onclick="setPdfRange('week')" style="flex:1;padding:7px;border-radius:9px;border:1px solid var(--inp-b);background:var(--inp);color:var(--ts);font-family:'DM Sans',sans-serif;font-size:var(--dow-label-size);cursor:pointer;">이번 주</button>
+        <button onclick="setPdfRange('month')" style="flex:1;padding:7px;border-radius:9px;border:1px solid var(--inp-b);background:var(--inp);color:var(--ts);font-family:'DM Sans',sans-serif;font-size:var(--dow-label-size);cursor:pointer;">이번 달</button>
+        <button onclick="setPdfRange('3month')" style="flex:1;padding:7px;border-radius:9px;border:1px solid var(--inp-b);background:var(--inp);color:var(--ts);font-family:'DM Sans',sans-serif;font-size:var(--dow-label-size);cursor:pointer;">최근 3개월</button>
+        <button onclick="setPdfRange('year')" style="flex:1;padding:7px;border-radius:9px;border:1px solid var(--inp-b);background:var(--inp);color:var(--ts);font-family:'DM Sans',sans-serif;font-size:var(--dow-label-size);cursor:pointer;">올해 전체</button>
       </div>
-      <div id="pdf-preview-count" style="font-size:11px;color:var(--tm);text-align:center;"></div>
+      <div id="pdf-preview-count" style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;"></div>
     </div>
     <div class="modal-actions" style="flex-direction:column;gap:8px;">
       <button class="mbtn ok" onclick="exportMarkdown()" style="width:100%;">📋 마크다운 복사</button>
@@ -2107,7 +2110,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div class="rd-unit-btn on" id="rd-unit-percent" onclick="setRdUnit('percent')">퍼센트로 기록</div>
         <div class="rd-unit-btn" id="rd-unit-pages" onclick="setRdUnit('pages')">페이지로 기록</div>
       </div>
-      <div id="rd-unit-hint" style="display:none;font-size:11px;color:var(--tm);text-align:center;margin:-2px 0 8px;">추가한 뒤 진행률 막대를 눌러 진행 상황을 기록해요</div>
+      <div id="rd-unit-hint" style="display:none;font-size:var(--dow-label-size);color:var(--tm);text-align:center;margin:-2px 0 8px;">추가한 뒤 진행률 막대를 눌러 진행 상황을 기록해요</div>
       <input class="modal-inp" id="rd-new-total" type="number" inputmode="numeric" placeholder="전체 페이지 수 (선택)" style="margin-top:8px;">
     </div>
     <div class="modal-actions">
@@ -3166,16 +3169,16 @@ function loadContentMonthlyReportContent(){
   el.innerHTML=cats.filter(cat=>byCat[cat].length>0).map(cat=>{
     const meta=CAT_ICON_META[cat];
     const items=byCat[cat].map(c=>{
-      const starsHtml=c.stars>0?`<span style="color:#e0b050;font-size:11px;">${'★'.repeat(c.stars)}</span>`:'';
+      const starsHtml=c.stars>0?`<span style="color:#e0b050;font-size:var(--dow-label-size);">${'★'.repeat(c.stars)}</span>`:'';
       // 음악은 항상 status='done'으로 저장되므로 stopped/watching 조건에 자연히 안 걸림 — 별도 예외 불필요
-      const statusHtml=c.status==='stopped'?`<span style="color:var(--tm);font-size:11px;">중단</span>`:(c.status==='watching'?`<span style="color:var(--tm);font-size:11px;">진행중</span>`:'');
+      const statusHtml=c.status==='stopped'?`<span style="color:var(--tm);font-size:var(--dow-label-size);">중단</span>`:(c.status==='watching'?`<span style="color:var(--tm);font-size:var(--dow-label-size);">진행중</span>`:'');
       const posterHtml=c.poster?`<img src="${c.poster}" style="width:36px;height:36px;border-radius:8px;object-fit:cover;flex-shrink:0;" />`:`<div style="width:36px;height:36px;border-radius:8px;background:${meta.color};flex-shrink:0;display:flex;align-items:center;justify-content:center;"><i class="ti ${meta.icon}" style="font-size:15px;color:#fff;" aria-hidden="true"></i></div>`;
       const reviewId=c.cid||('t'+(c.created||0));
       const reviewIconHtml=c.review?`<span class="cmr-review-icon" onclick="toggleCmrReview('${reviewId}')" title="코멘트 보기"><i class="ti ti-message-circle ico-sz-13" aria-hidden="true"></i></span>`:'';
       const reviewBoxHtml=c.review?`<div class="cmr-review-box" id="cmr-review-${reviewId}">${escapeHtml(c.review)}</div>`:'';
       return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;">
         ${posterHtml}
-        <div style="flex:1;min-width:0;font-size:13px;color:var(--tp);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:5px;">
+        <div style="flex:1;min-width:0;font-size:var(--main-text-size);color:var(--tp);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:5px;">
           <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.title}</span>${reviewIconHtml}
         </div>
         ${(starsHtml||statusHtml)?`<div style="flex-shrink:0;text-align:right;">${starsHtml}${statusHtml}</div>`:''}
@@ -3535,7 +3538,7 @@ function loadWeeklyReviewFor(dk){
   const cacheKey='weekly_summary_'+dk;
   const cached=S.get(cacheKey);
   if(cached){content.innerHTML=cached;return;}
-  content.innerHTML='<div class="sheet-loading-msg">한 주 요약 작성 중이에요.. 🌿<br><span style="font-size:11.5px;opacity:0.7;">약 10-20초 소요돼요</span></div>';
+  content.innerHTML='<div class="sheet-loading-msg">한 주 요약 작성 중이에요.. 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">약 10-20초 소요돼요</span></div>';
   aiCacheGet(cacheKey).then(function(serverHtml){
     if(serverHtml){
       S.set(cacheKey,serverHtml);
@@ -3549,7 +3552,7 @@ function loadWeeklyReviewFor(dk){
       return;
     }
     if(!getClaudeKey()){
-      content.innerHTML='<div class="sheet-loading-msg">아직 준비 중이에요 🌿<br><span style="font-size:11.5px;opacity:0.7;">다른 기기에서 먼저 열어보시면 여기서도 볼 수 있어요</span></div>';
+      content.innerHTML='<div class="sheet-loading-msg">아직 준비 중이에요 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">다른 기기에서 먼저 열어보시면 여기서도 볼 수 있어요</span></div>';
       return;
     }
     makeWeeklySummaryCard().then(function(html){
@@ -3558,7 +3561,7 @@ function loadWeeklyReviewFor(dk){
         aiCacheSet(cacheKey,html,AI_CACHE_TTL.weeklyReport);
         content.innerHTML=html;
       } else {
-        content.innerHTML='<div class="sheet-loading-msg">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:11.5px;opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
+        content.innerHTML='<div class="sheet-loading-msg">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
       }
     });
   });
@@ -6235,14 +6238,14 @@ function _buildMorningRoutineStatGrid(items,doneCount,total){
     const pct=Math.min(100,Math.round(cnt/Math.max(daysInThisMonth,1)*100));
     html+=`<div style="display:flex;align-items:center;gap:8px;">
       <i class="ti ${it.icon}" style="font-size:14px;color:rgb(${it.colorRgb});flex-shrink:0;" aria-hidden="true"></i>
-      <div style="flex:1;height:5px;border-radius:3px;background:rgba(195,175,168,0.15);overflow:hidden;"><div style="width:${pct}%;height:100%;background:rgb(${it.colorRgb});"></div></div>
+      <div style="flex:1;height:5px;border-radius:3px;background:rgba(var(--divider-rgb),0.15);overflow:hidden;"><div style="width:${pct}%;height:100%;background:rgb(${it.colorRgb});"></div></div>
     </div>`;
   });
   // 남는 한 칸: 오늘 기준 총 합산 달성률(체크한 개수/전체 개수) — 색상은 홈탭 리듬배너(.report-banner.rhythm-soft)의 무지개 그라디언트
   const totalPct=total>0?Math.round(doneCount/total*100):0;
   html+=`<div style="display:flex;align-items:center;gap:8px;">
     <i class="ti ti-chart-donut" style="font-size:14px;color:var(--tm);flex-shrink:0;" aria-hidden="true"></i>
-    <div style="flex:1;height:5px;border-radius:3px;background:rgba(195,175,168,0.15);overflow:hidden;"><div style="width:${totalPct}%;height:100%;background:linear-gradient(90deg,rgba(248,192,160,0.95) 0%,rgba(252,215,110,0.95) 25%,rgba(150,205,225,0.95) 50%,rgba(190,160,230,0.95) 75%,rgba(244,177,206,0.95) 100%);"></div></div>
+    <div style="flex:1;height:5px;border-radius:3px;background:rgba(var(--divider-rgb),0.15);overflow:hidden;"><div style="width:${totalPct}%;height:100%;background:linear-gradient(90deg,rgba(248,192,160,0.95) 0%,rgba(252,215,110,0.95) 25%,rgba(150,205,225,0.95) 50%,rgba(190,160,230,0.95) 75%,rgba(244,177,206,0.95) 100%);"></div></div>
   </div>`;
   html+='</div>';
   return html;
@@ -7499,11 +7502,11 @@ function makeHabitMiniCheckRow(){
     const hIcon=getHabitIcon(h.name);
     const rgba=getHabitColor(h.color);
     const badge=document.createElement('div');
-    badge.style.cssText=`width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;background:${checked?rgba:'rgba(195,175,168,0.15)'};`;
+    badge.style.cssText=`width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;background:${checked?rgba:'rgba(var(--divider-rgb),0.15)'};`;
     badge.title=h.name;
     badge.innerHTML=hIcon
-      ?`<i class="ti ${hIcon}" style="font-size:15px;color:${checked?'#fff':'rgba(195,175,168,0.7)'};" aria-hidden="true"></i>`
-      :`<span class="home-habit-dot ${checked?h.color:''}" style="width:9px;height:9px;${checked?'':'background:rgba(195,175,168,0.5);'}"></span>`;
+      ?`<i class="ti ${hIcon}" style="font-size:15px;color:${checked?'#fff':'rgba(var(--divider-rgb),0.7)'};" aria-hidden="true"></i>`
+      :`<span class="home-habit-dot ${checked?h.color:''}" style="width:9px;height:9px;${checked?'':'background:rgba(var(--divider-rgb),0.5);'}"></span>`;
     badge.addEventListener('click',function(){
       toggleHabitCheckWithTime(wk,h.name,dow,dateKey(_ld));
       const fresh=makeHabitMiniCheckRow();
@@ -7716,11 +7719,11 @@ function makeDawnRecapCard(){
 
   html+=`<div class="recap-donut-row">
     <div class="recap-donut-item"><div class="recap-donut-wrap"><svg width="88" height="48" viewBox="0 0 88 48">
-      <path d="M 6 44 A 38 38 0 0 1 82 44" fill="none" stroke="var(--div)" stroke-width="7" stroke-linecap="round"/>
+      <path d="M 6 44 A 38 38 0 0 1 82 44" fill="none" stroke="var(--graph-track-color)" stroke-width="7" stroke-linecap="round"/>
       <path d="M 6 44 A 38 38 0 0 1 82 44" fill="none" class="recap-donut-habit-fg" stroke-width="7" stroke-dasharray="119.4" stroke-dashoffset="${119.4*(1-habitPct/100)}" stroke-linecap="round"/>
     </svg><div class="recap-donut-label">${habitPct}%</div></div><div class="recap-donut-l">습관 달성</div></div>
     <div class="recap-donut-item"><div class="recap-donut-wrap"><svg width="88" height="48" viewBox="0 0 88 48">
-      <path d="M 6 44 A 38 38 0 0 1 82 44" fill="none" stroke="var(--div)" stroke-width="7" stroke-linecap="round"/>
+      <path d="M 6 44 A 38 38 0 0 1 82 44" fill="none" stroke="var(--graph-track-color)" stroke-width="7" stroke-linecap="round"/>
       <path d="M 6 44 A 38 38 0 0 1 82 44" fill="none" stroke="rgba(205,194,182,0.9)" stroke-width="7" stroke-dasharray="119.4" stroke-dashoffset="${119.4*(1-sleepRatio)}" stroke-linecap="round"/>
     </svg><div class="recap-donut-label">${sleepLabel}</div></div><div class="recap-donut-l">수면</div></div>
   </div>`;
@@ -8353,7 +8356,7 @@ function openSeedArchive(){
   if(!results.length){
     resEl.innerHTML='<div class="memo-search-empty">아직 남긴 씨앗이 없어요</div>';
   }else{
-    resEl.innerHTML=results.map(r=>`<div class="msr-item" onclick="jumpToMemoDateFromSeed('${r.dk}')"><div class="msr-date"><i class="ti ti-diamond" style="font-size:11px;color:rgba(120,155,160,0.95);margin-right:3px;" aria-hidden="true"></i>${r.dk}${r.time?' · '+r.time:''}</div><div class="msr-text">${r.text}</div></div>`).join('');
+    resEl.innerHTML=results.map(r=>`<div class="msr-item" onclick="jumpToMemoDateFromSeed('${r.dk}')"><div class="msr-date"><i class="ti ti-diamond" style="font-size:var(--dow-label-size);color:rgba(120,155,160,0.95);margin-right:3px;" aria-hidden="true"></i>${r.dk}${r.time?' · '+r.time:''}</div><div class="msr-text">${r.text}</div></div>`).join('');
   }
   openModal('seed-archive-modal');
 }
@@ -8456,9 +8459,9 @@ async function loadChallengeReviewFor(wk){
     content.innerHTML='<div class="sheet-loading-msg">이 주는 아직 기록된 요약이 없어요 🌿</div>';
     return;
   }
-  content.innerHTML='<div class="sheet-loading-msg">지난주 목표를 돌아보는 중이에요.. 🌿<br><span style="font-size:11.5px;opacity:0.7;">약 10-20초 소요돼요</span></div>';
+  content.innerHTML='<div class="sheet-loading-msg">지난주 목표를 돌아보는 중이에요.. 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">약 10-20초 소요돼요</span></div>';
   if(!getClaudeKey()){
-    content.innerHTML='<div class="sheet-loading-msg">아직 준비 중이에요 🌿<br><span style="font-size:11.5px;opacity:0.7;">다른 기기에서 먼저 열어보시면 여기서도 볼 수 있어요</span></div>';
+    content.innerHTML='<div class="sheet-loading-msg">아직 준비 중이에요 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">다른 기기에서 먼저 열어보시면 여기서도 볼 수 있어요</span></div>';
     return;
   }
   const html=await buildChallengeReviewHtml(wk);
@@ -8467,7 +8470,7 @@ async function loadChallengeReviewFor(wk){
     aiCacheSet(cacheKey,html,AI_CACHE_TTL.weeklyReport);
     content.innerHTML=html;
   }
-  else content.innerHTML='<div class="sheet-loading-msg">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:11.5px;opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
+  else content.innerHTML='<div class="sheet-loading-msg">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
 }
 async function openChallengeReviewSheet(){
   openSheet('challenge-review-sheet');
@@ -8541,11 +8544,11 @@ async function openNextWeekFeedbackSheet(){
   const cacheKey='nextweek_feedback_'+wk;
   const cached=S.get(cacheKey);
   if(cached){content.innerHTML=cached;return;}
-  content.innerHTML='<div class="sheet-loading-msg">다음주 챌린지를 살펴보는 중이에요.. 🌿<br><span style="font-size:11.5px;opacity:0.7;">약 10-20초 소요돼요</span></div>';
+  content.innerHTML='<div class="sheet-loading-msg">다음주 챌린지를 살펴보는 중이에요.. 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">약 10-20초 소요돼요</span></div>';
   const serverHtml=await aiCacheGet(cacheKey);
   if(serverHtml){S.set(cacheKey,serverHtml);content.innerHTML=serverHtml;return;}
   if(!getClaudeKey()){
-    content.innerHTML='<div class="sheet-loading-msg">아직 준비 중이에요 🌿<br><span style="font-size:11.5px;opacity:0.7;">다른 기기에서 먼저 열어보시면 여기서도 볼 수 있어요</span></div>';
+    content.innerHTML='<div class="sheet-loading-msg">아직 준비 중이에요 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">다른 기기에서 먼저 열어보시면 여기서도 볼 수 있어요</span></div>';
     return;
   }
   const html=await buildNextWeekFeedbackHtml(wk);
@@ -8554,7 +8557,7 @@ async function openNextWeekFeedbackSheet(){
     aiCacheSet(cacheKey,html,AI_CACHE_TTL.weeklyReport);
     content.innerHTML=html;
   }
-  else content.innerHTML='<div class="sheet-loading-msg">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:11.5px;opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
+  else content.innerHTML='<div class="sheet-loading-msg">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
 }
 // 주간 미니통계의 메모 아이콘(월요일 하루 동안만 활성화, isReportDay 기준)을 누르면 열리는 시트.
 // 그 주(월~일) 메모를 모두 모아 AI에 넘겨, 이번 주 메모에 드러난 화두/톤을 짧게 정리해줌.
@@ -8586,9 +8589,9 @@ async function loadWeeklyMemoReportFor(wk){
     content.innerHTML='<div class="sheet-loading-msg">이 주는 아직 기록된 요약이 없어요 🌿</div>';
     return;
   }
-  content.innerHTML='<div class="sheet-loading-msg">이번 주 메모를 살펴보는 중이에요.. 🌿<br><span style="font-size:11.5px;opacity:0.7;">약 10-20초 소요돼요</span></div>';
+  content.innerHTML='<div class="sheet-loading-msg">이번 주 메모를 살펴보는 중이에요.. 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">약 10-20초 소요돼요</span></div>';
   if(!getClaudeKey()){
-    content.innerHTML='<div class="sheet-loading-msg">아직 준비 중이에요 🌿<br><span style="font-size:11.5px;opacity:0.7;">다른 기기에서 먼저 열어보시면 여기서도 볼 수 있어요</span></div>';
+    content.innerHTML='<div class="sheet-loading-msg">아직 준비 중이에요 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">다른 기기에서 먼저 열어보시면 여기서도 볼 수 있어요</span></div>';
     return;
   }
   const html=await buildWeeklyMemoReportHtml(wk);
@@ -8597,7 +8600,7 @@ async function loadWeeklyMemoReportFor(wk){
     aiCacheSet(cacheKey,html,AI_CACHE_TTL.weeklyReport);
     content.innerHTML=html;
   }
-  else content.innerHTML='<div class="sheet-loading-msg">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:11.5px;opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
+  else content.innerHTML='<div class="sheet-loading-msg">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
 }
 async function openWeeklyMemoReport(){
   openSheet('weekly-memo-report-sheet');
@@ -9114,7 +9117,7 @@ function openMusicGroupModal(items,mk){
   items.forEach(item=>{
     const row=document.createElement('div');
     row.style.cssText='display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;background:var(--card);border:1px solid var(--card-b);cursor:pointer;';
-    row.innerHTML=`<i class="ti ti-music" style="font-size:14px;color:${getCatColor('music')};flex-shrink:0;" aria-hidden="true"></i><span style="font-size:12.5px;color:var(--tp);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${item.title||''}</span>`;
+    row.innerHTML=`<i class="ti ti-music" style="font-size:14px;color:${getCatColor('music')};flex-shrink:0;" aria-hidden="true"></i><span style="font-size:var(--main-text-size);color:var(--tp);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${item.title||''}</span>`;
     row.addEventListener('click',()=>{closeModal('music-group-modal');openContentModal('music',item,mk);});
     listEl.appendChild(row);
   });
@@ -9186,7 +9189,7 @@ function openPlaylistModal(){
   const listEl=document.getElementById('pl-list');
   const items=getContents(mk).filter(c=>c.cat==='music').sort((a,b)=>(b.created||0)-(a.created||0));
   if(!items.length){
-    listEl.innerHTML='<div style="text-align:center;font-size:12px;color:var(--tm);padding:16px 0;">이번 달 등록된 음악이 없어요</div>';
+    listEl.innerHTML='<div style="text-align:center;font-size:var(--dow-label-size);color:var(--tm);padding:16px 0;">이번 달 등록된 음악이 없어요</div>';
   }else{
     listEl.innerHTML='';
     const musicRgb='136,120,171'; // #8878ab — disc 아이콘과 동일한 라벤더톤
@@ -9459,7 +9462,7 @@ function renderHabitMonthly(){
     }
     const pct=habitLastDay>0?Math.round(checked_cnt/habitLastDay*100):0;
     const pctEl=document.createElement('div');
-    pctEl.style.cssText='font-size:11px;color:var(--tm);margin-top:5px;padding-bottom:8px;border-bottom:1px solid var(--div);width:100%;text-align:right;';
+    pctEl.style.cssText='font-size:11px;color:var(--tm);margin-top:5px;padding-bottom:8px;border-bottom:1px solid rgba(var(--divider-rgb),0.25);width:100%;text-align:right;';
     pctEl.textContent=`${checked_cnt}/${habitLastDay}일 · ${pct}%`;
     const wrap=document.createElement('div');wrap.style.cssText='display:flex;flex-direction:column;flex:1;';
     wrap.appendChild(dots);wrap.appendChild(pctEl);row.appendChild(wrap);el.appendChild(row);
@@ -10303,7 +10306,7 @@ function renderWeeklyHabitBox(){
       const on=!!checks[h.name+'-'+d];
       if(on)cnt++;
       const isToday=d===todayDow;
-      const borderColor=on?rgba:'rgba(195,175,168,0.5)';
+      const borderColor=on?rgba:'rgba(var(--divider-rgb),0.5)';
       const borderWidth=isToday?'2px':'1.3px';
       const bg=on?rgba:'none';
       dotsHtml+='<div class="hw-dot-wrap"><div class="hw-dot" style="background:'+bg+';border-color:'+borderColor+';border-width:'+borderWidth+';"></div></div>';
@@ -11455,7 +11458,7 @@ function renderReadingCalView(){
   </div>
   <div style="text-align:center;font-size:30px;font-weight:700;color:var(--tp);margin:8px 0 18px;letter-spacing:-.01em;">${totalBooksThisMonth.size}권</div>
   <div style="display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:8px;">
-    ${weekdays.map(w=>`<div style="text-align:center;font-size:11px;color:var(--tm);font-weight:500;">${w}</div>`).join('')}
+    ${weekdays.map(w=>`<div style="text-align:center;font-size:var(--dow-label-size);color:var(--tm);font-weight:500;">${w}</div>`).join('')}
   </div>
   <div style="display:grid;grid-template-columns:repeat(7,1fr);row-gap:14px;">`;
   for(let i=0;i<startWeekday;i++)html+='<div></div>';
@@ -11474,7 +11477,7 @@ function renderReadingCalView(){
         ${cids.length>1?`<div style="position:absolute;bottom:-4px;right:-4px;background:rgba(60,40,35,0.85);color:#fff;font-size:9px;font-weight:600;border-radius:7px;min-width:14px;height:14px;display:flex;align-items:center;justify-content:center;padding:0 3px;z-index:2;">${cids.length}</div>`:''}
       </div>`;
     }else{
-      cellInner=`<div style="text-align:center;font-size:11px;color:var(--tm);height:46px;display:flex;align-items:center;justify-content:center;">${d}</div>`;
+      cellInner=`<div style="text-align:center;font-size:var(--dow-label-size);color:var(--tm);height:46px;display:flex;align-items:center;justify-content:center;">${d}</div>`;
     }
     html+=`<div style="cursor:${cids.length?'pointer':'default'};" ${cids.length?`onclick="rdCalDayTap('${dk}')"`:''}>${cellInner}</div>`;
   }
@@ -11507,9 +11510,9 @@ function renderReadingCalDayDetailHtml(dk,dayLogs,bookMap){
     return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;">
       ${posterHtml}
       <div style="flex:1;min-width:0;">
-        <div style="font-size:12.5px;color:var(--tp);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${title}</div>
-        ${author?`<div style="font-size:10.5px;color:var(--tm);margin-top:1px;">${author}</div>`:''}
-        <div style="font-size:11px;color:var(--ts);margin-top:2px;">${metaLine}</div>
+        <div style="font-size:var(--main-text-size);color:var(--tp);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${title}</div>
+        ${author?`<div style="font-size:var(--dow-label-size);color:var(--tm);margin-top:1px;">${author}</div>`:''}
+        <div style="font-size:var(--dow-label-size);color:var(--ts);margin-top:2px;">${metaLine}</div>
       </div>
       ${shareBtn}
     </div>`;
@@ -12353,14 +12356,14 @@ function openReserveSheet(){
 function renderReserveList(){
   const list=document.getElementById('reserve-list');if(!list)return;
   const todos=getReserveTodos();
-  if(!todos.length){list.innerHTML='<div style="font-size:12px;color:var(--tm);text-align:center;padding:12px 0;">비어있어요 — 날짜 미정 할 일을 추가해보세요</div>';return;}
+  if(!todos.length){list.innerHTML='<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:12px 0;">비어있어요 — 날짜 미정 할 일을 추가해보세요</div>';return;}
   list.innerHTML='';
   todos.forEach((t,i)=>{
     const el=document.createElement('div');
     el.className='sheet-item';
-    el.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;';
+    el.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px;';
     el.innerHTML=`<span class="reserve-text" data-i="${i}" style="flex:1;color:var(--tp);cursor:pointer;">${t.text}</span>`
-      +`<button onclick="openReserveMoveModal(${i})" style="background:none;border:1px solid var(--div);border-radius:8px;padding:3px 10px;font-size:11px;color:var(--tm);cursor:pointer;white-space:nowrap;flex-shrink:0;">날짜 지정</button>`
+      +`<button onclick="openReserveMoveModal(${i})" style="background:none;border:1px solid rgba(var(--divider-rgb),0.40);border-radius:8px;padding:3px 10px;font-size:var(--dow-label-size);color:var(--tm);cursor:pointer;white-space:nowrap;flex-shrink:0;">날짜 지정</button>`
       +`<button onclick="deleteReserveTodo(${i})" style="background:none;border:none;padding:4px;cursor:pointer;color:rgba(192,80,96,0.7);flex-shrink:0;"><i class="ti ti-x ico-sz-14" aria-hidden="true"></i></button>`;
     el.querySelector('.reserve-text').addEventListener('click',()=>startEditReserveTodo(i));
     list.appendChild(el);
@@ -12374,7 +12377,7 @@ function startEditReserveTodo(i){
   inp.className='reserve-edit-inp';
   inp.rows=1;
   inp.value=t.text;
-  inp.style.cssText='flex:1;font-size:13px;color:var(--tp);background:transparent;border:none;border-bottom:1px solid var(--acc-soft);font-family:inherit;resize:none;padding:0;';
+  inp.style.cssText='flex:1;font-size:var(--main-text-size);color:var(--tp);background:transparent;border:none;border-bottom:1px solid var(--acc-soft);font-family:inherit;resize:none;padding:0;';
   span.replaceWith(inp);
   inp.focus();
   inp.setSelectionRange(inp.value.length,inp.value.length);
