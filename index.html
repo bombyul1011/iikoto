@@ -84,7 +84,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --sleep-badge-bg:#fdfbf6;
   --glass-chip-bg:rgba(253,251,245,0.95); /* 완료칩/배너 등 14곳에서 반복되던 배경색 통합 */
 }
-[data-theme="glass"] .card,[data-theme="glass"] .sleep-card,[data-theme="glass"] .habit-week-box{border-width:1.4px;box-shadow:0 1.5px 1.5px rgba(255,255,255,0.9) inset,0 -8px 14px -10px rgba(120,110,95,0.15) inset,0 5px 14px rgba(150,140,120,0.08);}
+[data-theme="glass"] .card,[data-theme="glass"] .sleep-card,[data-theme="glass"] .habit-week-box,[data-theme="glass"] .habit-chk2,[data-theme="glass"] .habit-check-box{border-width:1.4px;box-shadow:0 1.5px 1.5px rgba(255,255,255,0.9) inset,0 -8px 14px -10px rgba(120,110,95,0.15) inset,0 5px 14px rgba(150,140,120,0.08);}
 [data-theme="glass"] .sleep-card.collapsed{background:var(--card);border-color:rgba(95,115,170,0.55);}
 [data-theme="glass"] #daily-meal-card{background:rgba(255,253,248,0.45)!important;border-color:rgba(150,195,130,0.55)!important;}
 [data-theme="glass"] .meal-soft{filter:none;}
@@ -1052,11 +1052,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .home-content-info{flex:1;min-width:0;}
 
 /* ── 오늘 해빗 체크박스 (수면박스 색) ── */
-.habit-check-box{background:rgba(255,250,240,0.68);border:1px solid var(--card-b);border-radius:14px;padding:12px 10px 8px;display:flex;flex-wrap:wrap;justify-content:space-around;gap:8px;}
+.habit-check-box{background:var(--card);border:1px solid var(--card-b);border-radius:14px;padding:12px 10px 8px;display:flex;flex-wrap:wrap;justify-content:space-around;gap:8px;}
 .habit-check-col{display:flex;flex-direction:column;align-items:center;gap:7px;min-width:42px;}
 .habit-check-name{font-size:var(--dow-label-size);color:var(--tp);text-align:center;}
 .habit-check-foot{width:100%;display:flex;justify-content:flex-end;margin-top:5px;margin-bottom:0;}
-.habit-chk2{width:25px;height:25px;border-radius:50%;border:1.5px dashed rgba(var(--divider-rgb),0.5);background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;}
+.habit-chk2{width:25px;height:25px;border-radius:50%;border:1.5px dashed var(--card-b);background:var(--card);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;}
 .habit-chk2.on{border-style:solid;}
 
 /* ── 주간탭: 전반적으로 타이트한 간격 ── */
