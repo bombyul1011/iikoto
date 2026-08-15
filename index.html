@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.6 -->
-<!-- build: 20260815-6-border-cleanup -->
+<!-- build: 20260815-8-reserve-cat-sync -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -591,6 +591,16 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .reserve-act-btn{background:none;border:none;padding:5px;cursor:pointer;color:var(--ts);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .reserve-act-btn:active{opacity:.6;}
 .reserve-del-btn{background:none;border:none;padding:5px 2px;cursor:pointer;color:rgba(192,80,96,0.7);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+/* 보관함 카테고리 */
+.cat-select-wrap{position:relative;flex-shrink:0;}
+.cat-dropup{position:absolute;bottom:40px;left:0;display:none;flex-direction:column;gap:4px;background:var(--card);border:1px solid var(--card-b);border-radius:11px;padding:5px;box-shadow:0 4px 16px rgba(0,0,0,0.12);z-index:5;}
+.cat-dropup.on{display:flex;}
+.cat-dropup-opt{width:32px;height:32px;border-radius:8px;border:none;background:transparent;display:flex;align-items:center;justify-content:center;color:var(--ts);font-size:15px;cursor:pointer;}
+.cat-dropup-opt.active{background:var(--acc-soft);color:var(--acc);}
+.item-cat-icon{width:22px;height:22px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;}
+.item-cat-icon.shop{background:rgba(150,190,140,0.18);color:#6a8a5e;}
+.item-cat-icon.watch{background:rgba(140,160,210,0.18);color:#5c6fa8;}
+.item-cat-icon.todo{background:var(--pink-bg);color:var(--pink-text);}
 .sheet-item:last-child{border-bottom:none;}
 .sheet-item:last-child{border-bottom:none;}
 .sheet-item.del{color:#c05060;}
@@ -1502,8 +1512,22 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div class="sheet-handle"></div>
     <div class="sheet-title" style="border-bottom:none;">보관함</div>
     <div class="memo-input-row" style="padding:0 16px 12px;margin-top:0;border-top:none;">
+      <div class="cat-select-wrap">
+        <div class="cat-dropup" id="reserve-cat-dropup">
+          <button class="cat-dropup-opt" data-cat="shop" onclick="setReserveCat('shop')" title="쇼핑"><i class="ti ti-shopping-cart ico-sz-14" aria-hidden="true"></i></button>
+          <button class="cat-dropup-opt" data-cat="watch" onclick="setReserveCat('watch')" title="볼거리"><i class="ti ti-movie ico-sz-14" aria-hidden="true"></i></button>
+          <button class="cat-dropup-opt active" data-cat="todo" onclick="setReserveCat('todo')" title="할일"><i class="ti ti-pin ico-sz-14" aria-hidden="true"></i></button>
+        </div>
+        <button class="send-btn send-btn-sm" id="reserve-cat-btn" onclick="toggleReserveCatDropup()" title="카테고리 선택"><i class="ti ti-pin ico-sz-14" aria-hidden="true"></i></button>
+      </div>
       <textarea class="memo-field memo-field-sm" id="reserve-inp" placeholder="날짜 미정 할 일" rows="1" autocomplete="off" onkeydown="if(event.isComposing||event.keyCode===229)return;if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();addReserveTodo();}"></textarea>
       <button class="send-btn send-btn-sm" onclick="addReserveTodo()" title="추가"><i class="ti ti-arrow-down ico-sz-14" aria-hidden="true"></i></button>
+    </div>
+    <div class="reserve-section-row" id="reserve-filter-row" style="padding:0 16px 10px;display:flex;gap:6px;">
+      <button class="reserve-section-btn active" data-filter="all" onclick="setReserveFilter('all')" style="flex:none;padding:5px 12px;">전체</button>
+      <button class="reserve-section-btn" data-filter="shop" onclick="setReserveFilter('shop')" style="flex:none;padding:5px 10px;"><i class="ti ti-shopping-cart ico-sz-13" aria-hidden="true"></i></button>
+      <button class="reserve-section-btn" data-filter="watch" onclick="setReserveFilter('watch')" style="flex:none;padding:5px 10px;"><i class="ti ti-movie ico-sz-13" aria-hidden="true"></i></button>
+      <button class="reserve-section-btn" data-filter="todo" onclick="setReserveFilter('todo')" style="flex:none;padding:5px 10px;"><i class="ti ti-pin ico-sz-13" aria-hidden="true"></i></button>
     </div>
     <div id="reserve-list"></div>
   </div>
@@ -2226,7 +2250,6 @@ function renderHomeBody(section){
   const isSundayNight2=new Date().getDay()===0&&getSubSection()==='night_2';
   const showWeeklyReviewReadOnly=(new Date().getDay()===0||new Date().getDay()===1)&&!isSundayNight2;
   const isLastDayOfMonth=(()=>{const t=new Date(_ld);t.setDate(_ld.getDate()+1);return t.getDate()===1;})()&&_isLateNightOrDawn;
-  const isMidMonth=_ld.getDate()===15&&_isLateNightOrDawn;
 
   if(section==='morning'){
     // 어제 돌아보기 카드, 운동 체크 배너 모두 제거됨 — 아침 루틴(굿모닝) 카드로 대체
@@ -2267,16 +2290,6 @@ function renderHomeBody(section){
       </div>`;
       rbanner.addEventListener('click',openMonthlyReportSheet);
       body.appendChild(rbanner);
-    } else if(isMidMonth){
-      body.appendChild(makeLabel('🌿 이번 달 중간 소식'));
-      const midBanner=document.createElement('div');
-      midBanner.className='weekly-review-banner';
-      midBanner.innerHTML=`<div class="weekly-review-banner-inner">
-        <div class="weekly-review-banner-title">🌿 이번 달 중간 소식 보기</div>
-        <div class="weekly-review-banner-sub"><span>한 달의 절반, 지금까지의 흐름을 모아봤어요</span><div class="report-banner-arrow" style="display:inline-flex;"><i class="ti ti-chevron-up ico-sz-15" aria-hidden="true"></i></div></div>
-      </div>`;
-      midBanner.addEventListener('click',openMonthlyReportSheet);
-      body.appendChild(midBanner);
     } else if(isSundayNight2){
       appendSundayGenerateBanner(body);
     }
@@ -4807,7 +4820,7 @@ async function syncTodosDown(dk){
   if(!rows)return; // 연결 실패(null) — 로컬 유지. 빈 배열은 "서버에 진짜 0개"라는 뜻이라 그대로 반영.
   if(S.get(S.key('todos_pending',dk)))return; // 업로드 대기중인 로컬 수정(미루기 등) 있으면 덮어쓰지 않음
   S.set(S.key('todos',dk),rows.map(function(r){
-    return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null,eventEndDate:r.event_end_date||null};
+    return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null,eventEndDate:r.event_end_date||null,cat:r.cat||'todo'};
   }));
   renderTodos();
 }
@@ -4816,7 +4829,7 @@ async function syncTodosUp(dk){
   if(ensureItemCids(todos))S.set(S.key('todos',dk),todos);
   const delCids=getDelPendingCids('todos',dk);
   const ok=await syncListUpSafe('todos',`date_key=eq.${dk}`,'date_key,client_id',todos,
-    t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,strike_parts:t.strikeParts||[],strike_times:t.strikeTimes||{},completed_at:(t.completedAt!=null?t.completedAt:null),sort_order:(typeof t.sortOrder==='number'?t.sortOrder:null),is_event:!!t.isEvent,event_cat:t.eventCat||null,event_time:t.eventTime||null,event_end_date:t.eventEndDate||null}),
+    t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,strike_parts:t.strikeParts||[],strike_times:t.strikeTimes||{},completed_at:(t.completedAt!=null?t.completedAt:null),sort_order:(typeof t.sortOrder==='number'?t.sortOrder:null),is_event:!!t.isEvent,event_cat:t.eventCat||null,event_time:t.eventTime||null,event_end_date:t.eventEndDate||null,cat:t.cat||'todo'}),
     delCids);
   if(ok)delCids.forEach(cid=>removeDelPending('todos',dk,cid));
   return ok;
@@ -12282,19 +12295,41 @@ function saveReserveTodos(v){
   updateReserveCountBadge();
 }
 
+let _reserveCat='todo';
+let _reserveFilter='all';
+function toggleReserveCatDropup(){
+  document.getElementById('reserve-cat-dropup').classList.toggle('on');
+}
+function setReserveCat(cat){
+  _reserveCat=cat;
+  const map={shop:'ti-shopping-cart',watch:'ti-movie',todo:'ti-pin'};
+  document.getElementById('reserve-cat-btn').innerHTML=`<i class="ti ${map[cat]} ico-sz-14" aria-hidden="true"></i>`;
+  document.querySelectorAll('#reserve-cat-dropup .cat-dropup-opt').forEach(b=>b.classList.toggle('active',b.dataset.cat===cat));
+  document.getElementById('reserve-cat-dropup').classList.remove('on');
+}
+function setReserveFilter(f){
+  _reserveFilter=f;
+  document.querySelectorAll('#reserve-filter-row .reserve-section-btn').forEach(b=>b.classList.toggle('active',b.dataset.filter===f));
+  renderReserveList();
+}
 function openReserveSheet(){
   renderReserveList();
   openSheet('reserve-sheet');
 }
 function renderReserveList(){
   const list=document.getElementById('reserve-list');if(!list)return;
-  const todos=getReserveTodos();
+  const allTodos=getReserveTodos();
+  const todos=_reserveFilter==='all'?allTodos:allTodos.filter(t=>(t.cat||'todo')===_reserveFilter);
   if(!todos.length){list.innerHTML='<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:12px 0;">비어있어요 — 날짜 미정 할 일을 추가해보세요</div>';return;}
   list.innerHTML='';
-  todos.forEach((t,i)=>{
+  const catIcon={shop:'ti-shopping-cart',watch:'ti-movie',todo:'ti-pin'};
+  todos.forEach((t)=>{
+    const i=allTodos.indexOf(t);
+    const cat=t.cat||'todo';
     const el=document.createElement('div');
     el.className='reserve-item';
-    el.innerHTML=`<span class="reserve-text" data-i="${i}">${t.text}</span>`
+    el.innerHTML=`<div class="item-cat-icon ${cat}"><i class="ti ${catIcon[cat]} ico-sz-12" aria-hidden="true"></i></div>`
+      +`<span class="reserve-text" data-i="${i}">${t.text}</span>`
       +`<button class="reserve-act-btn" onclick="sendReserveToToday(${i})" title="오늘로 보내기"><i class="ti ti-circle-letter-t ico-sz-15" aria-hidden="true"></i></button>`
       +`<button class="reserve-act-btn" onclick="openReserveMoveModal(${i})" title="날짜 지정"><i class="ti ti-calendar-plus ico-sz-15" aria-hidden="true"></i></button>`
       +`<button class="reserve-del-btn" onclick="deleteReserveTodo(${i})" title="삭제"><i class="ti ti-x ico-sz-14" aria-hidden="true"></i></button>`;
@@ -12333,7 +12368,7 @@ function addReserveTodo(){
   const inp=document.getElementById('reserve-inp');
   const text=inp?inp.value.trim():'';if(!text)return;
   const todos=getReserveTodos();
-  todos.push({text,done:false,created:Date.now(),timeSection:'none',cid:genCid()});
+  todos.push({text,done:false,created:Date.now(),timeSection:'none',cid:genCid(),cat:_reserveCat});
   saveReserveTodos(todos);
   if(inp){inp.value='';inp.style.height='';}
   renderReserveList();
