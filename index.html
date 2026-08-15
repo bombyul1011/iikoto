@@ -165,6 +165,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .wgoal-add-btn:active{color:rgba(var(--divider-rgb),0.9);}
 .reserve-section-btn{flex:1;padding:7px 0;border-radius:10px;border:1px solid var(--card-b);background:var(--card);font-size:var(--dow-label-size);color:var(--tm);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;}
 .reserve-section-btn.active{background:var(--acc-soft);color:var(--tp);border-color:var(--acc-soft);font-weight:600;}
+#reserve-filter-row .reserve-section-btn[data-filter="all"].active{background:var(--card);color:var(--tm);border-color:var(--card-b);font-weight:600;}
 #reserve-filter-row .reserve-section-btn[data-filter="shop"].active{background:var(--ev-schedule-bg);color:var(--ev-schedule-text);border-color:var(--ev-schedule-border);}
 #reserve-filter-row .reserve-section-btn[data-filter="watch"].active{background:var(--ev-personal-bg);color:var(--ev-personal-text);border-color:var(--ev-personal-border);}
 #reserve-filter-row .reserve-section-btn[data-filter="todo"].active{background:var(--ev-etc-bg);color:var(--ev-etc-text);border-color:var(--ev-etc-border);}
@@ -592,21 +593,30 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .sheet-item{display:flex;align-items:center;gap:12px;padding:14px 4px;margin:0 16px;border-bottom:1px dashed rgba(var(--divider-rgb),0.20);cursor:pointer;font-size:var(--main-text-size);color:var(--tp);}
 .reserve-item{display:flex;align-items:center;gap:9px;padding:5px 0;margin:0 16px;border-bottom:1px dashed rgba(var(--divider-rgb),0.20);font-size:var(--main-text-size);color:var(--tp);}
 .reserve-item .reserve-text{flex:1;cursor:pointer;padding:5px 0;}
-.reserve-act-btn{background:none;border:none;padding:5px 2px;cursor:pointer;color:var(--ts);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.reserve-act-btn{background:none;border:none;padding:5px 4px;cursor:pointer;color:var(--ts);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .reserve-act-btn:active{opacity:.6;}
 .reserve-del-btn{background:none;border:none;padding:5px 0 5px 2px;cursor:pointer;color:rgba(192,80,96,0.7);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .reserve-item .item-actions{display:flex;gap:0;flex-shrink:0;}
+.send-btn.on{background:var(--acc-soft);border-color:var(--acc);color:var(--acc);}
 /* 보관함 카테고리 */
 .cat-select-wrap{position:relative;flex-shrink:0;}
 .cat-dropup{position:absolute;top:40px;left:0;display:none;flex-direction:column;gap:4px;background:var(--card);border:1px solid var(--card-b);border-radius:11px;padding:5px;box-shadow:0 4px 16px rgba(0,0,0,0.12);z-index:5;}
 .cat-dropup.on{display:flex;}
 .cat-dropup-opt{width:32px;height:32px;border-radius:8px;border:none;background:transparent;display:flex;align-items:center;justify-content:center;color:var(--ts);font-size:15px;cursor:pointer;}
 .cat-dropup-opt.active{background:var(--acc-soft);color:var(--acc);}
+.cat-dropup-opt[data-cat="shop"].active{background:var(--ev-schedule-bg);color:var(--ev-schedule-text);}
+.cat-dropup-opt[data-cat="watch"].active{background:var(--ev-personal-bg);color:var(--ev-personal-text);}
+.cat-dropup-opt[data-cat="todo"].active{background:var(--ev-etc-bg);color:var(--ev-etc-text);}
+.cat-dropup-opt[data-cat="etc"].active{background:var(--ev-work-bg);color:var(--ev-work-text);}
 .item-cat-icon{width:22px;height:22px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;border:none;cursor:pointer;padding:0;-webkit-appearance:none;appearance:none;}
 .item-cat-icon.shop{background:var(--ev-schedule-bg);color:var(--ev-schedule-text);}
 .item-cat-icon.watch{background:var(--ev-personal-bg);color:var(--ev-personal-text);}
 .item-cat-icon.todo{background:var(--ev-etc-bg);color:var(--ev-etc-text);}
 .item-cat-icon.etc{background:var(--ev-work-bg);color:var(--ev-work-text);}
+.cat-color-shop{background:var(--ev-schedule-bg);color:var(--ev-schedule-text);}
+.cat-color-watch{background:var(--ev-personal-bg);color:var(--ev-personal-text);}
+.cat-color-todo{background:var(--ev-etc-bg);color:var(--ev-etc-text);}
+.cat-color-etc{background:var(--ev-work-bg);color:var(--ev-work-text);}
 .sheet-item:last-child{border-bottom:none;}
 .sheet-item:last-child{border-bottom:none;}
 .sheet-item.del{color:#c05060;}
@@ -1525,8 +1535,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           <button class="cat-dropup-opt active" data-cat="todo" onclick="setReserveCat('todo')" title="할일"><i class="ti ti-pin ico-sz-14" aria-hidden="true"></i></button>
           <button class="cat-dropup-opt" data-cat="etc" onclick="setReserveCat('etc')" title="기타"><i class="ti ti-dots ico-sz-14" aria-hidden="true"></i></button>
         </div>
-        <button class="send-btn send-btn-sm" id="reserve-cat-btn" onclick="toggleReserveCatDropup()" title="카테고리 선택"><i class="ti ti-pin ico-sz-14" aria-hidden="true"></i></button>
+        <button class="send-btn send-btn-sm cat-color-todo" id="reserve-cat-btn" onclick="toggleReserveCatDropup()" title="카테고리 선택"><i class="ti ti-pin ico-sz-14" aria-hidden="true"></i></button>
       </div>
+      <button class="send-btn send-btn-sm" id="reserve-reorder-btn" onclick="toggleReserveReorderMode()" title="순서 변경"><i class="ti ti-menu-2 ico-sz-14" aria-hidden="true"></i></button>
       <textarea class="memo-field memo-field-sm" id="reserve-inp" placeholder="날짜 미정 할 일" rows="1" autocomplete="off" onkeydown="if(event.isComposing||event.keyCode===229)return;if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();addReserveTodo();}"></textarea>
       <button class="send-btn send-btn-sm" onclick="addReserveTodo()" title="추가"><i class="ti ti-arrow-down ico-sz-14" aria-hidden="true"></i></button>
     </div>
@@ -6063,7 +6074,9 @@ function attachTodoSwipeMode(el,i,hasMultipleParts){
 // 정렬모드 전용 드래그: 같은 시간대 그룹 내에서만, DOM 재생성 없이 transform으로만 이동.
 // 손 뗄 때 1회만 배열 재정렬 + sortOrder 재기록 + 리렌더링.
 // 항목 높이가 제각각(1줄/2줄 텍스트)이라 고정 높이 분할 대신, 형제 요소들의 실제 좌표를 기준으로 판단한다.
-function attachTodoReorderDrag(el,i,tsGroup){
+function attachTodoReorderDrag(el,i,tsGroup,itemSelector,onDrop){
+  itemSelector=itemSelector||'.todo-item';
+  onDrop=onDrop||applyTodoReorder;
   let sy=0,dragging=false,pid=null,captured=false,curShift=0;
   const handle=el.querySelector('.todo-drag-handle');
   if(!handle)return;
@@ -6072,7 +6085,7 @@ function attachTodoReorderDrag(el,i,tsGroup){
     sy=clientY;dragging=true;captured=false;pid=pointerId;curShift=0;
     el.classList.add('reorder-active');
     const selfRect=el.getBoundingClientRect();
-    siblings=Array.from(document.querySelectorAll(`.todo-item[data-ts-group="${tsGroup}"]`))
+    siblings=Array.from(document.querySelectorAll(tsGroup!=null?`${itemSelector}[data-ts-group="${tsGroup}"]`:itemSelector))
       .filter(s=>s!==el)
       .map(s=>{const r=s.getBoundingClientRect();return {el:s,top:r.top,mid:r.top+r.height/2,height:r.height};})
       .sort((a,b)=>a.top-b.top);
@@ -6112,7 +6125,7 @@ function attachTodoReorderDrag(el,i,tsGroup){
     siblings.forEach(sib=>{sib.el.classList.remove('reorder-shift');sib.el.style.transform='';});
     if(captured&&pid!=null){try{handle.releasePointerCapture(pid);}catch(err){}}
     pid=null;captured=false;
-    if(curShift!==0)applyTodoReorder(i,tsGroup,curShift);
+    if(curShift!==0)onDrop(i,tsGroup,curShift);
     curShift=0;
   };
   handle.addEventListener('pointerup',endDrag);
@@ -6135,6 +6148,19 @@ function applyTodoReorder(idx,tsGroup,shift){
   group.forEach((t,order)=>{todos[t._i].sortOrder=order;});
   saveTodos(dk,todos);
   renderTodos();
+}
+// 보관함 전체 목록 기준 순서 재기록(시간대 그룹 없음, 전체가 하나의 그룹)
+function applyReserveReorder(idx,_g,shift){
+  const todos=getReserveTodos();
+  const curPos=idx;
+  let newPos=curPos+shift;
+  newPos=Math.max(0,Math.min(todos.length-1,newPos));
+  if(newPos===curPos)return;
+  const [moved]=todos.splice(curPos,1);
+  todos.splice(newPos,0,moved);
+  todos.forEach((t,order)=>{t.sortOrder=order;});
+  saveReserveTodos(todos);
+  renderReserveList();
 }
 // 조각모드가 켜진 상태에서, 그 항목 바깥(다른 투두, 체크박스, 다른 UI 등)을 클릭하면 자동으로 조각모드 해제
 document.addEventListener('click',e=>{
@@ -12305,13 +12331,21 @@ function saveReserveTodos(v){
 
 let _reserveCat='todo';
 let _reserveFilter='all';
+let _reserveReorderMode=false;
+function toggleReserveReorderMode(){
+  _reserveReorderMode=!_reserveReorderMode;
+  document.getElementById('reserve-reorder-btn')?.classList.toggle('on',_reserveReorderMode);
+  renderReserveList();
+}
 function toggleReserveCatDropup(){
   document.getElementById('reserve-cat-dropup').classList.toggle('on');
 }
 function setReserveCat(cat){
   _reserveCat=cat;
   const map={shop:'ti-shopping-cart',watch:'ti-movie',todo:'ti-pin',etc:'ti-dots'};
-  document.getElementById('reserve-cat-btn').innerHTML=`<i class="ti ${map[cat]} ico-sz-14" aria-hidden="true"></i>`;
+  const btn=document.getElementById('reserve-cat-btn');
+  btn.innerHTML=`<i class="ti ${map[cat]} ico-sz-14" aria-hidden="true"></i>`;
+  btn.className='send-btn send-btn-sm cat-color-'+cat;
   document.querySelectorAll('#reserve-cat-dropup .cat-dropup-opt').forEach(b=>b.classList.toggle('active',b.dataset.cat===cat));
   document.getElementById('reserve-cat-dropup').classList.remove('on');
 }
@@ -12321,23 +12355,27 @@ function setReserveFilter(f){
   renderReserveList();
 }
 function openReserveSheet(){
-  renderReserveList();
+  setReserveFilter('all');
   openSheet('reserve-sheet');
 }
 function renderReserveList(){
   const list=document.getElementById('reserve-list');if(!list)return;
   const allTodos=getReserveTodos();
-  const todos=_reserveFilter==='all'?allTodos:allTodos.filter(t=>(t.cat||'todo')===_reserveFilter);
+  let todos=_reserveFilter==='all'?allTodos:allTodos.filter(t=>(t.cat||'todo')===_reserveFilter);
+  todos=[...todos].sort((a,b)=>(a.sortOrder!=null?a.sortOrder:9999)-(b.sortOrder!=null?b.sortOrder:9999));
   if(!todos.length){list.innerHTML='<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:12px 0;">비어있어요 — 날짜 미정 할 일을 추가해보세요</div>';return;}
   list.innerHTML='';
   const catIcon={shop:'ti-shopping-cart',watch:'ti-movie',todo:'ti-pin',etc:'ti-dots'};
+  const canReorder=_reserveReorderMode&&_reserveFilter==='all';
   todos.forEach((t)=>{
     const i=allTodos.indexOf(t);
     const cat=t.cat||'todo';
     const el=document.createElement('div');
     el.className='reserve-item';
     el.style.position='relative';
+    const handleHtml=canReorder?`<div class="todo-drag-handle rm-eligible" style="display:flex;"><i class="ti ti-grip-vertical ico-sz-13" aria-hidden="true"></i></div>`:'';
     el.innerHTML=`<button class="item-cat-icon ${cat}" onclick="toggleItemCatDropup(this,${i})" title="카테고리 변경"><i class="ti ${catIcon[cat]} ico-sz-12" aria-hidden="true"></i></button>`
+      +handleHtml
       +`<span class="reserve-text" data-i="${i}">${t.text}</span>`
       +`<div class="item-actions">`
       +`<button class="reserve-act-btn" onclick="sendReserveToToday(${i})" title="오늘로 보내기"><i class="ti ti-circle-letter-t ico-sz-15" aria-hidden="true"></i></button>`
@@ -12345,6 +12383,7 @@ function renderReserveList(){
       +`<button class="reserve-del-btn" onclick="deleteReserveTodo(${i})" title="삭제"><i class="ti ti-x ico-sz-14" aria-hidden="true"></i></button>`
       +`</div>`;
     el.querySelector('.reserve-text').addEventListener('click',()=>startEditReserveTodo(i));
+    if(canReorder)attachTodoReorderDrag(el,i,null,'.reserve-item',applyReserveReorder);
     list.appendChild(el);
   });
 }
