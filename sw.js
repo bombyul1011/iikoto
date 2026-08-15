@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260815-5-pink-acc-unify';
+const CACHE = 'iikoto-v20260815-6-border-cleanup';
 const ASSETS = [
   './',
   './index.html'
