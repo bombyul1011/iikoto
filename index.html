@@ -42,12 +42,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 :root,[data-theme="light"]{
   --bg:linear-gradient(145deg,#fdf0e8 0%,#fef5d4 50%,#fde8f0 100%);
   --tp:#5a4040;--ts:#9a8070;--tm:#c8b0a8;
-  --card:rgba(255,250,240,0.60);--card-b:rgba(255,255,255,0.82);
+  --card:rgba(255,250,240,0.75);--card-b:rgba(230,200,140,0.40);
   --card-p:rgba(255,220,235,0.48);--card-pb:rgba(255,200,220,0.66);
   --card-m:rgba(200,240,235,0.42);--card-mb:rgba(160,220,215,0.55);
   --card-y:rgba(255,240,180,0.52);--card-yb:rgba(240,220,130,0.62);
   --card-s:rgba(200,225,255,0.42);--card-sb:rgba(170,205,250,0.55);
-  --card-e:rgba(255,250,240,0.62);--card-eb:rgba(230,200,140,0.40);
   --div:rgba(255,200,180,0.22);
   --acc:#c07080;--acc-soft:rgba(192,112,128,0.42);
   --nav:rgba(255,250,240,0.78);--nav-b:rgba(255,210,200,0.42);
@@ -62,12 +61,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="glass"]{
   --bg:linear-gradient(165deg,#f7f4ee 0%,#f3f1ec 55%,#f6f3ee 100%);
   --tp:#5c5650;--ts:#8a8278;--tm:#b8b0a4;
-  --card:rgba(255,253,248,0.50);--card-b:rgba(225,215,195,0.55);
+  --card:rgba(255,253,248,0.50);--card-b:rgba(200,175,140,0.55);
   --card-p:var(--card);--card-pb:rgba(240,160,190,0.55);
   --card-m:var(--card);--card-mb:rgba(135,205,195,0.55);
   --card-y:var(--card);--card-yb:rgba(250,215,100,0.62);
   --card-s:var(--card);--card-sb:rgba(150,180,225,0.55);
-  --card-e:var(--card);--card-eb:rgba(200,175,140,0.55);
   --div:rgba(180,165,145,0.18);
   --acc:#c9926e;--acc-soft:rgba(201,146,110,0.40);
   --nav:rgba(250,246,238,0.80);--nav-b:rgba(225,210,185,0.40);
@@ -112,7 +110,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .topbar-logo{height:32px;width:auto;}
 .topbar-right{display:flex;align-items:center;gap:6px;}
 .date-nav{display:flex;align-items:center;gap:4px;}
-.date-pill{background:var(--pill);border:1px solid var(--inp-b);border-radius:20px;padding:5px 11px;font-size:12px;color:var(--ts);cursor:pointer;user-select:none;white-space:nowrap;}
+/* 상단 날짜 네비게이터 (예: "2026.8.15.토" 배너) — 배경은 --pill 변수(현재 라이트테마 0.82) */
+.date-pill{background:rgba(255,250,240,0.75);border:1px solid var(--inp-b);border-radius:20px;padding:5px 11px;font-size:12px;color:var(--ts);cursor:pointer;user-select:none;white-space:nowrap;}
 .nav-arr{width:26px;height:26px;background:var(--card);border:1px solid var(--card-b);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
 .nav-arr:active{opacity:.7;}
 .icon-btn{width:26px;height:26px;background:var(--card);border:1px solid var(--card-b);border-radius:9px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
@@ -120,9 +119,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .reading-icon-btn.sw-active{background:linear-gradient(135deg,#ffd1e2,#ffe6b8,#e6e1f5,#ffd1e2);background-size:300% 300%;animation:bannerShine 3s ease infinite;}
 .icon-btn:active{opacity:.7;}
 
-/* ── TABS ── */
+/* ── TABS (오늘/주간/월간 상단 뷰 전환탭) ── */
 .view-tabs{display:flex;gap:6px;padding:0 18px 10px;flex-shrink:0;}
-.vtab{flex:1;padding:6px 4px;border-radius:12px;font-size:12px;text-align:center;color:var(--tm);border:1px solid rgba(255,220,200,0.35);background:rgba(255,250,240,0.42);cursor:pointer;transition:all .2s;user-select:none;}
+/* 미선택 탭 배경/테두리 — 선택시("vtab.on")는 바로 아래 그라디언트 규칙 적용 */
+.vtab{flex:1;padding:6px 4px;border-radius:12px;font-size:12px;text-align:center;color:var(--tm);border:1px solid rgba(255,220,200,0.35);background:rgba(255,250,240,0.5);cursor:pointer;transition:all .2s;user-select:none;}
 .vtab.on{
   background-color:transparent;
   border:1.6px solid transparent;
@@ -171,7 +171,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .card.m{background:var(--card-m);border-color:var(--card-mb);}
 .card.y{background:var(--card-y);border-color:var(--card-yb);}
 .card.s{background:var(--card-s);border-color:var(--card-sb);}
-.card.e{background:var(--card-e);border-color:var(--card-eb);}
 
 /* ── SLEEP ── */
 .sleep-card{position:relative;border-radius:20px;padding:13px 18px 11px;margin-bottom:14px;overflow:hidden;background:var(--sleep-b);border:1px solid var(--sleep-bb);}
@@ -457,9 +456,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .wchallenge-day.on{border-style:solid;color:white;}
 .wchallenge-add{display:flex;align-items:center;gap:6px;padding:8px 2px 2px;color:rgba(195,175,168,0.7);font-size:12px;cursor:pointer;background:none;border:none;font-family:'DM Sans',sans-serif;}
 
-/* ── WEEK STRIP ── */
+/* ── WEEK STRIP (주간탭 상단 날짜 네비게이터 — 월~일 7칸, "day-btn") ── */
 .week-strip{display:flex;gap:5px;margin-bottom:12px;}
-.day-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 0;border-radius:12px;border:1px solid rgba(255,210,200,.28);background:rgba(255,250,240,.25);cursor:pointer;transition:all .15s;}
+.day-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 0;border-radius:12px;border:1px solid rgba(255,210,200,.28);background:rgba(255,250,240,.5);cursor:pointer;transition:all .15s;}
 .day-btn.today{background:rgba(255,160,180,.16);border-color:rgba(255,140,160,.38);}
 .day-name{font-size:11px;color:var(--tm);}
 .day-num{font-size:15px;color:var(--tp);}
@@ -1281,7 +1280,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div class="slabel-row">
           <div class="slabel">오늘 일정</div>
         </div>
-        <div class="card e" id="event-card">
+        <div class="card" id="event-card">
           <div id="event-list"></div>
         </div>
       </div>
@@ -1329,6 +1328,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <!-- WEEKLY -->
     <div class="view" id="v-weekly">
       <div class="week-strip" id="week-strip"></div>
+      <!-- 주간 목표 카드 — 일반 공용 .card 클래스 사용(id=wchallenge-card). 배경 진하기는 --card 변수(라이트테마 0.60) -->
       <div class="card" id="wchallenge-card" style="padding:14px 15px 10px;margin-bottom:7px;">
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <div class="goal-section-title" id="wchallenge-title" style="margin-top:0;"><i class="ti ti-flag-3" id="wchallenge-icon" class="ico-13" aria-hidden="true"></i> 주간 목표</div>
