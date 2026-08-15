@@ -1,6 +1,7 @@
 <!DOCTYPE html>
-<!-- iikoto v2.4 -->
-<!-- build: 20260712-20-habit-check-theme-split -->
+<!-- iikoto v2.6 -->
+<!-- build: 20260815-2-text-scale -->
+<!-- 20260815-1 → 2: 설정화면에 '글자 크기' 섹션 신규 추가(작게/기본/크게 3버튼, 독립 섹션). --main-text-size/--dow-label-size 두 변수만 조절(13/11, 14/12, 15/13px), setTextScale()이 documentElement.style.setProperty로 런타임 오버라이드하고 localStorage('textScale', -1/0/1)에 저장. 초기 로드시 플래시 방지용으로 body 최상단에 테마 IIFE와 동일한 패턴의 동기 IIFE 추가해 페인트 전에 값 적용. openSettings()에서 initTextScaleUI() 호출해 현재 선택 버튼에 .on 클래스 표시. 커버리지 한계: 제목류(.date-pill/.vtab/.slabel)·아이콘·달력·통계 큰 숫자·수면탭 시각표기는 이 두 변수를 안 쓰므로 크기 변화 없음(의도됨). -->
 <!-- 20260712-19 → 20: 습관체크(renderDailyHabitCheck) 테마별 재조정 — 지난 빌드에서 light/glass 구분 없이 전 테마에 테두리+아이콘 고유색 스타일을 적용했던 걸 정정. light는 원본(체크시 배경 꽉 채움+흰 아이콘)으로 복원, glass만 새 스타일(테두리+아이콘 고유색, 확대 크기) 유지. 부수 발견: glass의 CSS !important 규칙(.habit-chk2.on svg/i)이 인라인 습관색을 덮어쓰고 있어 실제로는 전부 --tp(테마 텍스트색)로만 보이던 문제 — 해당 규칙 제거해 습관별 고유색이 실제 반영되도록 수정. mono도 테두리와 아이콘 색이 서로 다른 소스(고정 회색 vs --tp)를 쓰던 걸 동일 색(rgba(177,144,162,0.5))으로 통일. -->
 
 <html lang="ko">
@@ -624,6 +625,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .color-themes{display:flex;gap:10px;flex-wrap:wrap;}
 .ctheme-btn{width:52px;height:52px;border-radius:14px;cursor:pointer;border:3px solid transparent;transition:all .15s;display:flex;align-items:center;justify-content:center;font-size:14px;color:transparent;}
 .ctheme-btn.on{border-color:var(--acc);color:white;text-shadow:0 1px 3px rgba(0,0,0,.3);}
+.text-scale-btn.on{border-color:var(--acc);background:var(--acc-soft);color:var(--acc);font-weight:600;}
 .settings-item{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid rgba(var(--divider-rgb),0.25);}
 .settings-item:last-child{border-bottom:none;}
 .settings-item-lbl{font-size:var(--main-text-size);color:var(--tp);}
@@ -1159,6 +1161,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 <body>
 <div id="bg-fixed"></div>
 <script>(function(){try{var t=localStorage.getItem('theme');if(t){t=JSON.parse(t);document.documentElement.setAttribute('data-theme',t);var c={light:'#fdf0e8',glass:'#f7f4ee',dark:'#13111e'}[t];var m=document.querySelector('meta[name="theme-color"]');if(m&&c)m.setAttribute('content',c);}}catch(e){}})();</script>
+<script>(function(){try{var s=localStorage.getItem('textScale');s=s?JSON.parse(s):0;var base={'-1':{main:13,dow:11},'0':{main:14,dow:12},'1':{main:15,dow:13}}[String(s)]||{main:14,dow:12};document.documentElement.style.setProperty('--main-text-size',base.main+'px');document.documentElement.style.setProperty('--dow-label-size',base.dow+'px');}catch(e){}})();</script>
 
 <!-- SPLASH -->
 <div id="splash">
@@ -1883,6 +1886,16 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div class="color-themes">
           <div class="ctheme-btn on" id="ct-light" style="background:linear-gradient(135deg,#fdf0e8,#fde8f0)" onclick="setTheme('light',this)">✓</div>
           <div class="ctheme-btn" id="ct-glass" style="background:linear-gradient(135deg,#f7f4ee,#f3f1ec)" onclick="setTheme('glass',this)">✓</div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="settings-slbl">글자 크기</div>
+      <div class="settings-card">
+        <div class="text-scale-btns" style="display:flex;gap:8px;">
+          <button class="settings-btn-outline text-scale-btn" id="tsc-btn--1" onclick="setTextScale(-1)" style="flex:1;">작게</button>
+          <button class="settings-btn-outline text-scale-btn" id="tsc-btn-0" onclick="setTextScale(0)" style="flex:1;">기본</button>
+          <button class="settings-btn-outline text-scale-btn" id="tsc-btn-1" onclick="setTextScale(1)" style="flex:1;">크게</button>
         </div>
       </div>
     </div>
@@ -5222,6 +5235,26 @@ function setTheme(theme,btn){
   // 습관 체크 아이콘 마크업이 테마(글라스 여부)에 따라 렌더링 시점에 분기되므로, 테마 전환 즉시 다시 그려줘야 함
   // (다시 그리지 않으면 이전 테마 기준 DOM이 남아있어, 체크를 한번 더 토글해야만 아이콘이 나타나는 문제가 있었음)
   if(document.getElementById('daily-habit-box'))renderDailyHabitCheck();
+}
+
+// ── TEXT SCALE (작게/기본/크게) — --main-text-size, --dow-label-size 두 변수만 조절. 제목류/아이콘/달력/큰 숫자 등 예외 요소는 적용 안 됨(의도된 한계)
+const TEXT_SCALE_STEPS={'-1':{main:13,dow:11},'0':{main:14,dow:12},'1':{main:15,dow:13}};
+function setTextScale(step){
+  const b=TEXT_SCALE_STEPS[String(step)]||TEXT_SCALE_STEPS['0'];
+  document.documentElement.style.setProperty('--main-text-size',b.main+'px');
+  document.documentElement.style.setProperty('--dow-label-size',b.dow+'px');
+  S.set('textScale',step);
+  document.querySelectorAll('.text-scale-btn').forEach(btn=>btn.classList.remove('on'));
+  const active=document.getElementById('tsc-btn-'+step);
+  if(active)active.classList.add('on');
+}
+function initTextScaleUI(){
+  const step=S.get('textScale')||0;
+  const active=document.getElementById('tsc-btn-'+step);
+  if(active){
+    document.querySelectorAll('.text-scale-btn').forEach(btn=>btn.classList.remove('on'));
+    active.classList.add('on');
+  }
 }
 
 // ── SPLASH
@@ -10597,6 +10630,7 @@ function openSettings(){
   const theme=S.get('theme')||'light';
   document.querySelectorAll('.ctheme-btn').forEach(b=>b.classList.remove('on'));
   const act=document.getElementById('ct-'+theme);if(act)act.classList.add('on');
+  initTextScaleUI();
   const lastUsedEl=document.getElementById('data-recovery-last-used');
   if(lastUsedEl){
     const lastUsed=S.get('data_recovery_last_used');
