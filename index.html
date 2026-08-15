@@ -2266,8 +2266,9 @@ function renderHomeBody(section){
   // 주간리포트 배너: 일요일 22시(night_2)에만 "생성 가능" 배너, 그 외 일~월요일 전체(새벽/아침/오후/저녁)엔 "조회 전용" 배너.
   // 생성과 조회를 완전히 다른 함수(appendSundayGenerateBanner/appendSundayReadOnlyBanner)로 분리해뒀기 때문에,
   // 여기선 "지금이 몇 시인지" 더 따질 필요 없이 이 두 값만 보면 됨.
-  const isSundayNight2=new Date().getDay()===0&&getSubSection()==='night_2';
-  const showWeeklyReviewReadOnly=(new Date().getDay()===0||new Date().getDay()===1)&&!isSundayNight2;
+  const _ldDay=_ld.getDay(); // 논리적 요일(새벽 4시 컷) — 물리적 getDay() 대신 사용, 새벽 0~4시 구간 오작동 방지
+  const isSundayNight2=_ldDay===0&&getSubSection()==='night_2';
+  const showWeeklyReviewReadOnly=(_ldDay===0||_ldDay===1)&&!isSundayNight2;
   const isLastDayOfMonth=(()=>{const t=new Date(_ld);t.setDate(_ld.getDate()+1);return t.getDate()===1;})()&&_isLateNightOrDawn;
 
   if(section==='morning'){
