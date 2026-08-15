@@ -165,6 +165,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .wgoal-add-btn:active{color:rgba(var(--divider-rgb),0.9);}
 .reserve-section-btn{flex:1;padding:7px 0;border-radius:10px;border:1px solid var(--card-b);background:var(--card);font-size:var(--dow-label-size);color:var(--tm);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;}
 .reserve-section-btn.active{background:var(--acc-soft);color:var(--tp);border-color:var(--acc-soft);font-weight:600;}
+#reserve-filter-row .reserve-section-btn[data-filter="shop"].active{background:var(--ev-schedule-bg);color:var(--ev-schedule-text);border-color:var(--ev-schedule-border);}
+#reserve-filter-row .reserve-section-btn[data-filter="watch"].active{background:var(--ev-personal-bg);color:var(--ev-personal-text);border-color:var(--ev-personal-border);}
+#reserve-filter-row .reserve-section-btn[data-filter="todo"].active{background:var(--ev-etc-bg);color:var(--ev-etc-text);border-color:var(--ev-etc-border);}
+#reserve-filter-row .reserve-section-btn[data-filter="etc"].active{background:var(--ev-work-bg);color:var(--ev-work-text);border-color:var(--ev-work-border);}
 .goal-section-title{display:inline-flex;align-items:center;gap:5px;font-size:var(--main-text-size);font-weight:500;letter-spacing:.04em;background:linear-gradient(120deg,rgba(255,210,230,0.80),rgba(255,230,200,0.70));color:#b25a73;border-radius:10px;padding:5px 13px;margin:14px 0 10px 0;border:1px solid rgba(255,185,205,0.55);box-shadow:0 2px 10px rgba(200,120,140,0.12);}
 .nwf-item{display:flex;flex-direction:column;gap:6px;background:var(--card);border:1px solid var(--card-b);border-radius:14px;padding:12px 13px;margin-bottom:9px;box-shadow:0 2px 14px rgba(0,0,0,0.05),inset 0 1px 0 rgba(255,250,240,0.65);}
 .nwf-item-head{display:flex;align-items:center;gap:7px;}
@@ -599,9 +603,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cat-dropup-opt{width:32px;height:32px;border-radius:8px;border:none;background:transparent;display:flex;align-items:center;justify-content:center;color:var(--ts);font-size:15px;cursor:pointer;}
 .cat-dropup-opt.active{background:var(--acc-soft);color:var(--acc);}
 .item-cat-icon{width:22px;height:22px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;border:none;cursor:pointer;padding:0;-webkit-appearance:none;appearance:none;}
-.item-cat-icon.shop{background:rgba(150,190,140,0.18);color:#6a8a5e;}
-.item-cat-icon.watch{background:rgba(140,160,210,0.18);color:#5c6fa8;}
-.item-cat-icon.todo{background:var(--pink-bg);color:var(--pink-text);}
+.item-cat-icon.shop{background:var(--ev-schedule-bg);color:var(--ev-schedule-text);}
+.item-cat-icon.watch{background:var(--ev-personal-bg);color:var(--ev-personal-text);}
+.item-cat-icon.todo{background:var(--ev-etc-bg);color:var(--ev-etc-text);}
+.item-cat-icon.etc{background:var(--ev-work-bg);color:var(--ev-work-text);}
 .sheet-item:last-child{border-bottom:none;}
 .sheet-item:last-child{border-bottom:none;}
 .sheet-item.del{color:#c05060;}
@@ -1518,6 +1523,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           <button class="cat-dropup-opt" data-cat="shop" onclick="setReserveCat('shop')" title="쇼핑"><i class="ti ti-shopping-cart ico-sz-14" aria-hidden="true"></i></button>
           <button class="cat-dropup-opt" data-cat="watch" onclick="setReserveCat('watch')" title="볼거리"><i class="ti ti-movie ico-sz-14" aria-hidden="true"></i></button>
           <button class="cat-dropup-opt active" data-cat="todo" onclick="setReserveCat('todo')" title="할일"><i class="ti ti-pin ico-sz-14" aria-hidden="true"></i></button>
+          <button class="cat-dropup-opt" data-cat="etc" onclick="setReserveCat('etc')" title="기타"><i class="ti ti-dots ico-sz-14" aria-hidden="true"></i></button>
         </div>
         <button class="send-btn send-btn-sm" id="reserve-cat-btn" onclick="toggleReserveCatDropup()" title="카테고리 선택"><i class="ti ti-pin ico-sz-14" aria-hidden="true"></i></button>
       </div>
@@ -1529,6 +1535,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <button class="reserve-section-btn" data-filter="shop" onclick="setReserveFilter('shop')" style="flex:none;padding:5px 10px;"><i class="ti ti-shopping-cart ico-sz-13" aria-hidden="true"></i></button>
       <button class="reserve-section-btn" data-filter="watch" onclick="setReserveFilter('watch')" style="flex:none;padding:5px 10px;"><i class="ti ti-movie ico-sz-13" aria-hidden="true"></i></button>
       <button class="reserve-section-btn" data-filter="todo" onclick="setReserveFilter('todo')" style="flex:none;padding:5px 10px;"><i class="ti ti-pin ico-sz-13" aria-hidden="true"></i></button>
+      <button class="reserve-section-btn" data-filter="etc" onclick="setReserveFilter('etc')" style="flex:none;padding:5px 10px;"><i class="ti ti-dots ico-sz-13" aria-hidden="true"></i></button>
     </div>
     <div id="reserve-list"></div>
   </div>
@@ -12303,7 +12310,7 @@ function toggleReserveCatDropup(){
 }
 function setReserveCat(cat){
   _reserveCat=cat;
-  const map={shop:'ti-shopping-cart',watch:'ti-movie',todo:'ti-pin'};
+  const map={shop:'ti-shopping-cart',watch:'ti-movie',todo:'ti-pin',etc:'ti-dots'};
   document.getElementById('reserve-cat-btn').innerHTML=`<i class="ti ${map[cat]} ico-sz-14" aria-hidden="true"></i>`;
   document.querySelectorAll('#reserve-cat-dropup .cat-dropup-opt').forEach(b=>b.classList.toggle('active',b.dataset.cat===cat));
   document.getElementById('reserve-cat-dropup').classList.remove('on');
@@ -12323,7 +12330,7 @@ function renderReserveList(){
   const todos=_reserveFilter==='all'?allTodos:allTodos.filter(t=>(t.cat||'todo')===_reserveFilter);
   if(!todos.length){list.innerHTML='<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:12px 0;">비어있어요 — 날짜 미정 할 일을 추가해보세요</div>';return;}
   list.innerHTML='';
-  const catIcon={shop:'ti-shopping-cart',watch:'ti-movie',todo:'ti-pin'};
+  const catIcon={shop:'ti-shopping-cart',watch:'ti-movie',todo:'ti-pin',etc:'ti-dots'};
   todos.forEach((t)=>{
     const i=allTodos.indexOf(t);
     const cat=t.cat||'todo';
@@ -12344,7 +12351,7 @@ function renderReserveList(){
 function toggleItemCatDropup(btnEl,i){
   const existing=document.getElementById('item-cat-dropup');
   if(existing){const wasSameBtn=existing.dataset.i==i;existing.remove();if(wasSameBtn)return;}
-  const catIcon={shop:'ti-shopping-cart',watch:'ti-movie',todo:'ti-pin'};
+  const catIcon={shop:'ti-shopping-cart',watch:'ti-movie',todo:'ti-pin',etc:'ti-dots'};
   const dd=document.createElement('div');
   dd.className='cat-dropup on';
   dd.id='item-cat-dropup';
