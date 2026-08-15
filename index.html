@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.6 -->
-<!-- build: 20260815-9-reserve-item-cat-edit -->
+<!-- build: 20260815-10-reserve-final -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -608,11 +608,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cat-dropup-opt[data-cat="watch"].active{background:var(--ev-personal-bg);color:var(--ev-personal-text);}
 .cat-dropup-opt[data-cat="todo"].active{background:var(--ev-etc-bg);color:var(--ev-etc-text);}
 .cat-dropup-opt[data-cat="etc"].active{background:var(--ev-work-bg);color:var(--ev-work-text);}
-.item-cat-icon{width:22px;height:22px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;border:none;cursor:pointer;padding:0;-webkit-appearance:none;appearance:none;}
-.item-cat-icon.shop{background:var(--ev-schedule-bg);color:var(--ev-schedule-text);}
-.item-cat-icon.watch{background:var(--ev-personal-bg);color:var(--ev-personal-text);}
-.item-cat-icon.todo{background:var(--ev-etc-bg);color:var(--ev-etc-text);}
-.item-cat-icon.etc{background:var(--ev-work-bg);color:var(--ev-work-text);}
+.item-cat-icon{width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;border:none;background:none;cursor:pointer;padding:0;-webkit-appearance:none;appearance:none;}
+.item-cat-icon.shop{color:var(--ev-schedule-text);}
+.item-cat-icon.watch{color:var(--ev-personal-text);}
+.item-cat-icon.todo{color:var(--ev-etc-text);}
+.item-cat-icon.etc{color:var(--ev-work-text);}
 .cat-color-shop{background:var(--ev-schedule-bg);color:var(--ev-schedule-text);}
 .cat-color-watch{background:var(--ev-personal-bg);color:var(--ev-personal-text);}
 .cat-color-todo{background:var(--ev-etc-bg);color:var(--ev-etc-text);}
@@ -1532,10 +1532,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div class="cat-dropup" id="reserve-cat-dropup">
           <button class="cat-dropup-opt" data-cat="shop" onclick="setReserveCat('shop')" title="쇼핑"><i class="ti ti-shopping-cart ico-sz-14" aria-hidden="true"></i></button>
           <button class="cat-dropup-opt" data-cat="watch" onclick="setReserveCat('watch')" title="볼거리"><i class="ti ti-movie ico-sz-14" aria-hidden="true"></i></button>
-          <button class="cat-dropup-opt active" data-cat="todo" onclick="setReserveCat('todo')" title="할일"><i class="ti ti-pin ico-sz-14" aria-hidden="true"></i></button>
+          <button class="cat-dropup-opt active" data-cat="todo" onclick="setReserveCat('todo')" title="할일"><i class="ti ti-flag-3 ico-sz-14" aria-hidden="true"></i></button>
           <button class="cat-dropup-opt" data-cat="etc" onclick="setReserveCat('etc')" title="기타"><i class="ti ti-dots ico-sz-14" aria-hidden="true"></i></button>
         </div>
-        <button class="send-btn send-btn-sm cat-color-todo" id="reserve-cat-btn" onclick="toggleReserveCatDropup()" title="카테고리 선택"><i class="ti ti-pin ico-sz-14" aria-hidden="true"></i></button>
+        <button class="send-btn send-btn-sm cat-color-todo" id="reserve-cat-btn" onclick="toggleReserveCatDropup()" title="카테고리 선택"><i class="ti ti-flag-3 ico-sz-14" aria-hidden="true"></i></button>
       </div>
       <textarea class="memo-field memo-field-sm" id="reserve-inp" placeholder="날짜 미정 할 일" rows="1" autocomplete="off" onkeydown="if(event.isComposing||event.keyCode===229)return;if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();addReserveTodo();}"></textarea>
       <button class="send-btn send-btn-sm" onclick="addReserveTodo()" title="추가"><i class="ti ti-arrow-down ico-sz-14" aria-hidden="true"></i></button>
@@ -1544,7 +1544,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <button class="reserve-section-btn active" data-filter="all" onclick="setReserveFilter('all')" style="flex:none;padding:5px 12px;">전체</button>
       <button class="reserve-section-btn" data-filter="shop" onclick="setReserveFilter('shop')" style="flex:none;padding:5px 10px;"><i class="ti ti-shopping-cart ico-sz-13" aria-hidden="true"></i></button>
       <button class="reserve-section-btn" data-filter="watch" onclick="setReserveFilter('watch')" style="flex:none;padding:5px 10px;"><i class="ti ti-movie ico-sz-13" aria-hidden="true"></i></button>
-      <button class="reserve-section-btn" data-filter="todo" onclick="setReserveFilter('todo')" style="flex:none;padding:5px 10px;"><i class="ti ti-pin ico-sz-13" aria-hidden="true"></i></button>
+      <button class="reserve-section-btn" data-filter="todo" onclick="setReserveFilter('todo')" style="flex:none;padding:5px 10px;"><i class="ti ti-flag-3 ico-sz-13" aria-hidden="true"></i></button>
       <button class="reserve-section-btn" data-filter="etc" onclick="setReserveFilter('etc')" style="flex:none;padding:5px 10px;"><i class="ti ti-dots ico-sz-13" aria-hidden="true"></i></button>
       <button class="slabel-search-btn" id="reserve-reorder-btn" onclick="toggleReserveReorderMode()" title="순서 변경" style="margin-left:auto;"><i class="ti ti-menu-2 ico-sz-15" aria-hidden="true"></i></button>
     </div>
@@ -12342,7 +12342,7 @@ function toggleReserveCatDropup(){
 }
 function setReserveCat(cat){
   _reserveCat=cat;
-  const map={shop:'ti-shopping-cart',watch:'ti-movie',todo:'ti-pin',etc:'ti-dots'};
+  const map={shop:'ti-shopping-cart',watch:'ti-movie',todo:'ti-flag-3',etc:'ti-dots'};
   const btn=document.getElementById('reserve-cat-btn');
   btn.innerHTML=`<i class="ti ${map[cat]} ico-sz-14" aria-hidden="true"></i>`;
   btn.className='send-btn send-btn-sm cat-color-'+cat;
@@ -12358,6 +12358,7 @@ function openReserveSheet(){
   _reserveReorderMode=false;
   document.getElementById('reserve-reorder-btn')?.classList.remove('on');
   setReserveFilter('all');
+  setReserveCat('todo');
   openSheet('reserve-sheet');
 }
 function renderReserveList(){
@@ -12367,7 +12368,7 @@ function renderReserveList(){
   todos=[...todos].sort((a,b)=>(a.sortOrder!=null?a.sortOrder:9999)-(b.sortOrder!=null?b.sortOrder:9999));
   if(!todos.length){list.innerHTML='<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:12px 0;">비어있어요 — 날짜 미정 할 일을 추가해보세요</div>';return;}
   list.innerHTML='';
-  const catIcon={shop:'ti-shopping-cart',watch:'ti-movie',todo:'ti-pin',etc:'ti-dots'};
+  const catIcon={shop:'ti-shopping-cart',watch:'ti-movie',todo:'ti-flag-3',etc:'ti-dots'};
   const canReorder=_reserveReorderMode&&_reserveFilter==='all';
   todos.forEach((t)=>{
     const i=allTodos.indexOf(t);
@@ -12377,10 +12378,9 @@ function renderReserveList(){
     el.style.position='relative';
     const handleHtml=canReorder?`<div class="todo-drag-handle rm-eligible" style="display:flex;"><i class="ti ti-grip-vertical ico-sz-13" aria-hidden="true"></i></div>`:'';
     el.innerHTML=handleHtml
-      +`<button class="item-cat-icon ${cat}" onclick="toggleItemCatDropup(this,${i})" title="카테고리 변경"><i class="ti ${catIcon[cat]} ico-sz-12" aria-hidden="true"></i></button>`
+      +`<button class="item-cat-icon ${cat}" onclick="toggleItemCatDropup(this,${i})" title="카테고리 변경"><i class="ti ${catIcon[cat]} ico-sz-15" aria-hidden="true"></i></button>`
       +`<span class="reserve-text" data-i="${i}">${t.text}</span>`
       +`<div class="item-actions">`
-      +`<button class="reserve-act-btn" onclick="sendReserveToToday(${i})" title="오늘로 보내기"><i class="ti ti-circle-letter-t ico-sz-15" aria-hidden="true"></i></button>`
       +`<button class="reserve-act-btn" onclick="openReserveMoveModal(${i})" title="날짜 지정"><i class="ti ti-calendar-plus ico-sz-15" aria-hidden="true"></i></button>`
       +`<button class="reserve-del-btn" onclick="deleteReserveTodo(${i})" title="삭제"><i class="ti ti-x ico-sz-14" aria-hidden="true"></i></button>`
       +`</div>`;
@@ -12392,7 +12392,7 @@ function renderReserveList(){
 function toggleItemCatDropup(btnEl,i){
   const existing=document.getElementById('item-cat-dropup');
   if(existing){const wasSameBtn=existing.dataset.i==i;existing.remove();if(wasSameBtn)return;}
-  const catIcon={shop:'ti-shopping-cart',watch:'ti-movie',todo:'ti-pin',etc:'ti-dots'};
+  const catIcon={shop:'ti-shopping-cart',watch:'ti-movie',todo:'ti-flag-3',etc:'ti-dots'};
   const dd=document.createElement('div');
   dd.className='cat-dropup on';
   dd.id='item-cat-dropup';
@@ -12447,18 +12447,6 @@ function deleteReserveTodo(i){
   const todos=getReserveTodos();
   const t=todos[i];if(t)addDelPending('todos',RESERVE_DK,t.cid);
   todos.splice(i,1);saveReserveTodos(todos);renderReserveList();
-}
-function sendReserveToToday(i){
-  const todos=getReserveTodos();
-  const t=todos[i];if(!t)return;
-  addDelPending('todos',RESERVE_DK,t.cid);
-  todos.splice(i,1);saveReserveTodos(todos);
-  const dk=dateKey(new Date());
-  const newTodo={text:t.text,done:false,created:Date.now(),timeSection:'none',cid:genCid()};
-  const targetTodos=getTodos(dk);targetTodos.push(newTodo);saveTodos(dk,targetTodos);
-  if(dk===dateKey(currentDate))renderTodos();
-  renderReserveList();
-  showToast('오늘 투두에 추가했어요 ✓');
 }
 function openReserveMoveModal(i){
   _reserveMoveIdx=i;_reserveSection='none';

@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260815-8-reserve-cat-sync';
+const CACHE = 'iikoto-v20260815-10-reserve-final';
 const ASSETS = [
   './',
   './index.html'
