@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- iikoto v2.6 -->
-<!-- build: 20260815-8-reserve-cat-sync -->
+<!-- build: 20260815-9-reserve-item-cat-edit -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -588,16 +588,17 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .sheet-item{display:flex;align-items:center;gap:12px;padding:14px 4px;margin:0 16px;border-bottom:1px dashed rgba(var(--divider-rgb),0.20);cursor:pointer;font-size:var(--main-text-size);color:var(--tp);}
 .reserve-item{display:flex;align-items:center;gap:9px;padding:5px 0;margin:0 16px;border-bottom:1px dashed rgba(var(--divider-rgb),0.20);font-size:var(--main-text-size);color:var(--tp);}
 .reserve-item .reserve-text{flex:1;cursor:pointer;padding:5px 0;}
-.reserve-act-btn{background:none;border:none;padding:5px;cursor:pointer;color:var(--ts);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.reserve-act-btn{background:none;border:none;padding:5px 2px;cursor:pointer;color:var(--ts);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .reserve-act-btn:active{opacity:.6;}
-.reserve-del-btn{background:none;border:none;padding:5px 2px;cursor:pointer;color:rgba(192,80,96,0.7);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.reserve-del-btn{background:none;border:none;padding:5px 0 5px 2px;cursor:pointer;color:rgba(192,80,96,0.7);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.reserve-item .item-actions{display:flex;gap:0;flex-shrink:0;}
 /* 보관함 카테고리 */
 .cat-select-wrap{position:relative;flex-shrink:0;}
-.cat-dropup{position:absolute;bottom:40px;left:0;display:none;flex-direction:column;gap:4px;background:var(--card);border:1px solid var(--card-b);border-radius:11px;padding:5px;box-shadow:0 4px 16px rgba(0,0,0,0.12);z-index:5;}
+.cat-dropup{position:absolute;top:40px;left:0;display:none;flex-direction:column;gap:4px;background:var(--card);border:1px solid var(--card-b);border-radius:11px;padding:5px;box-shadow:0 4px 16px rgba(0,0,0,0.12);z-index:5;}
 .cat-dropup.on{display:flex;}
 .cat-dropup-opt{width:32px;height:32px;border-radius:8px;border:none;background:transparent;display:flex;align-items:center;justify-content:center;color:var(--ts);font-size:15px;cursor:pointer;}
 .cat-dropup-opt.active{background:var(--acc-soft);color:var(--acc);}
-.item-cat-icon{width:22px;height:22px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;}
+.item-cat-icon{width:22px;height:22px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;border:none;cursor:pointer;padding:0;-webkit-appearance:none;appearance:none;}
 .item-cat-icon.shop{background:rgba(150,190,140,0.18);color:#6a8a5e;}
 .item-cat-icon.watch{background:rgba(140,160,210,0.18);color:#5c6fa8;}
 .item-cat-icon.todo{background:var(--pink-bg);color:var(--pink-text);}
@@ -12328,14 +12329,35 @@ function renderReserveList(){
     const cat=t.cat||'todo';
     const el=document.createElement('div');
     el.className='reserve-item';
-    el.innerHTML=`<div class="item-cat-icon ${cat}"><i class="ti ${catIcon[cat]} ico-sz-12" aria-hidden="true"></i></div>`
+    el.style.position='relative';
+    el.innerHTML=`<button class="item-cat-icon ${cat}" onclick="toggleItemCatDropup(this,${i})" title="카테고리 변경"><i class="ti ${catIcon[cat]} ico-sz-12" aria-hidden="true"></i></button>`
       +`<span class="reserve-text" data-i="${i}">${t.text}</span>`
+      +`<div class="item-actions">`
       +`<button class="reserve-act-btn" onclick="sendReserveToToday(${i})" title="오늘로 보내기"><i class="ti ti-circle-letter-t ico-sz-15" aria-hidden="true"></i></button>`
       +`<button class="reserve-act-btn" onclick="openReserveMoveModal(${i})" title="날짜 지정"><i class="ti ti-calendar-plus ico-sz-15" aria-hidden="true"></i></button>`
-      +`<button class="reserve-del-btn" onclick="deleteReserveTodo(${i})" title="삭제"><i class="ti ti-x ico-sz-14" aria-hidden="true"></i></button>`;
+      +`<button class="reserve-del-btn" onclick="deleteReserveTodo(${i})" title="삭제"><i class="ti ti-x ico-sz-14" aria-hidden="true"></i></button>`
+      +`</div>`;
     el.querySelector('.reserve-text').addEventListener('click',()=>startEditReserveTodo(i));
     list.appendChild(el);
   });
+}
+function toggleItemCatDropup(btnEl,i){
+  const existing=document.getElementById('item-cat-dropup');
+  if(existing){const wasSameBtn=existing.dataset.i==i;existing.remove();if(wasSameBtn)return;}
+  const catIcon={shop:'ti-shopping-cart',watch:'ti-movie',todo:'ti-pin'};
+  const dd=document.createElement('div');
+  dd.className='cat-dropup on';
+  dd.id='item-cat-dropup';
+  dd.dataset.i=i;
+  dd.style.cssText='position:absolute;top:26px;left:0;';
+  dd.innerHTML=Object.keys(catIcon).map(c=>`<button class="cat-dropup-opt" onclick="event.stopPropagation();setItemCat(${i},'${c}')" title="${c}"><i class="ti ${catIcon[c]} ico-sz-14" aria-hidden="true"></i></button>`).join('');
+  btnEl.parentElement.appendChild(dd);
+  setTimeout(()=>document.addEventListener('click',function h(e){if(!dd.contains(e.target)&&e.target!==btnEl){dd.remove();document.removeEventListener('click',h);}}),0);
+}
+function setItemCat(i,cat){
+  const todos=getReserveTodos();
+  if(todos[i]){todos[i].cat=cat;saveReserveTodos(todos);}
+  renderReserveList();
 }
 function startEditReserveTodo(i){
   const list=document.getElementById('reserve-list');if(!list)return;
