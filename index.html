@@ -12416,7 +12416,7 @@ function startEditReserveTodo(i){
   inp.className='reserve-edit-inp';
   inp.rows=1;
   inp.value=t.text;
-  inp.style.cssText='flex:1;font-size:var(--main-text-size);color:var(--tp);background:transparent;border:none;border-bottom:1px solid var(--acc-soft);font-family:inherit;resize:none;padding:0;';
+  inp.style.cssText='flex:1;font-size:var(--main-text-size);color:var(--tp);background:transparent;border:none;border-bottom:1px solid var(--acc-soft);outline:none;font-family:inherit;resize:none;padding:0;';
   span.replaceWith(inp);
   inp.focus();
   inp.setSelectionRange(inp.value.length,inp.value.length);
