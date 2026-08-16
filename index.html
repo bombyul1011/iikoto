@@ -4666,7 +4666,18 @@ async function syncQuoteUp(cid){
 async function syncQuotesDownAll(){
   const rows=await supaFetch('reading_quotes?order=created');
   if(!rows)return;
-  saveQuotesLocal(rows.map(r=>({cid:r.cid,bookCid:r.book_cid,text:r.text,created:r.created,comment:r.comment||''})));
+  const local=getQuotes();
+  const localByCid={};
+  local.forEach(q=>{localByCid[q.cid]=q;});
+  const merged=rows.map(r=>{
+    if(S.get('quote_pending_'+r.cid)&&localByCid[r.cid])return localByCid[r.cid]; // 업로드 대기중이면 로컬 우선
+    return {cid:r.cid,bookCid:r.book_cid,text:r.text,created:r.created,comment:r.comment||''};
+  });
+  // 서버에 아직 없지만 로컬에 pending중인 신규 문장도 보존
+  local.forEach(q=>{
+    if(S.get('quote_pending_'+q.cid)&&!merged.find(m=>m.cid===q.cid))merged.push(q);
+  });
+  saveQuotesLocal(merged);
   renderRdQuotes();
 }
 function saveBooksLocal(arr){S.set('reading_books',arr);}
@@ -5117,6 +5128,11 @@ async function syncAll(){
     syncHabitsDown(),syncHCDown(wk),syncContentsDown(mk),
     syncGoalDown(S.key('mgoal',monthKey(now))),
     syncWChallengeDown(wk),
+    // 날짜 없는 전역 데이터 — 예전엔 initSync(최초 1회)에만 있어서 앱을 켜둔 채로 오래 쓰면
+    // 다른 기기(모바일 등)에서 바꾼 보관함/독서 내역이 반영 안 되던 버그 수정
+    (S.get(S.key('todos_pending',RESERVE_DK))?Promise.resolve():syncTodosDown(RESERVE_DK)),
+    syncBooksDownAll(),
+    syncQuotesDownAll(),
     ...weekOnelines,
     ...weekRblockDks.map(rdk=>syncRhythmBlocksDown(rdk)),
     ...mroutineDks.map(mdk=>syncMorningRoutineDown(mdk))
