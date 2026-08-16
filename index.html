@@ -10934,7 +10934,7 @@ function renderRdQuotes(){
   const MAX=2;
   const shown=_rdQuoteShowAll?quotes:quotes.slice(0,MAX);
   let html=shown.map(q=>`<div class="rd-quote-item">
-      <div class="rd-quote-text">${q.text}</div>
+      <div class="rd-quote-text" data-cid="${q.cid}" onclick="startEditQuoteText('${q.cid}')" style="cursor:pointer;">${q.text}</div>
       ${q.comment?`<div class="rd-quote-comment" onclick="toggleQuoteCommentEditor('${q.cid}')" style="font-size:var(--dow-label-size);color:#7a9552;margin-top:4px;padding:5px 8px;background:rgba(232,246,220,0.6);border-radius:8px;cursor:pointer;">${q.comment}</div>`:''}
       <div id="qc-editor-${q.cid}" class="qc-editor" style="display:none;margin-top:5px;" onclick="event.stopPropagation();">
         <textarea class="qc-comment-textarea" placeholder="이 문장에 대한 감상을 적어보세요">${q.comment||''}</textarea>
@@ -10944,11 +10944,11 @@ function renderRdQuotes(){
         </div>
       </div>
       <span style="position:absolute;right:8px;bottom:6px;display:flex;align-items:center;gap:3px;">
-        <span onclick="shareQuoteCard('${q.cid}')" title="공유 이미지" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;color:#8878ab;opacity:0.7;">
+        <span onclick="shareQuoteCard('${q.cid}')" title="공유 이미지" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;color:var(--tm);opacity:0.7;">
           <i class="ti ti-share-2 ico-sz-13" aria-hidden="true"></i>
         </span>
-        <span onclick="toggleQuoteCommentEditor('${q.cid}')" title="${q.comment?'코멘트 수정':'코멘트 남기기'}" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;color:${q.comment?'#fff':'#8878ab'};background:${q.comment?'rgba(140,120,180,0.85)':'transparent'};opacity:${q.comment?'1':'0.7'};">
-          <i class="ti ti-message-circle ico-sz-13" aria-hidden="true"></i>
+        <span onclick="toggleQuoteCommentEditor('${q.cid}')" title="${q.comment?'코멘트 수정':'코멘트 남기기'}" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;color:${q.comment?'#7a9552':'var(--tm)'};opacity:${q.comment?'1':'0.7'};">
+          <i class="ti ${q.comment?'ti-message-circle-filled':'ti-message-circle'} ico-sz-13" aria-hidden="true"></i>
         </span>
         <span class="rd-quote-del" onclick="removeQuote('${q.cid}')" style="position:static;font-size:10px;padding:2px;display:inline-flex;align-items:center;justify-content:center;"><i class="ti ti-x ico-sz-13" aria-hidden="true"></i></span>
       </span>
@@ -11009,6 +11009,45 @@ function commitQuoteComment(cid){
   el.style.display='none';
   renderRdQuotes();
 }
+// 문장 원문 인라인 편집 — 투두 보관함(startEditReserveTodo)과 동일 패턴
+// 읽는중 카드(rd-quote-list)와 완독 책 카드(rd-done-quote-list-*) 양쪽에서 다 호출될 수 있어
+// 실제로 이 cid가 어느 목록 DOM에 있는지 찾아서, 편집 완료 후 그 목록에 맞는 렌더 함수를 부름.
+function startEditQuoteText(cid){
+  let listEl=document.getElementById('rd-quote-list');
+  let div=listEl?listEl.querySelector(`.rd-quote-text[data-cid="${cid}"]`):null;
+  let doneBookCid=null;
+  if(!div){
+    const doneList=document.querySelector(`[id^="rd-done-quote-list-"] .rd-quote-text[data-cid="${cid}"]`);
+    if(doneList){
+      div=doneList;
+      listEl=div.closest('[id^="rd-done-quote-list-"]');
+      doneBookCid=listEl?listEl.id.replace('rd-done-quote-list-',''):null;
+    }
+  }
+  if(!div)return;
+  const q=getQuotes().find(x=>x.cid===cid);if(!q)return;
+  const inp=document.createElement('textarea');
+  inp.className='rd-quote-edit-inp';
+  inp.rows=2;
+  inp.value=q.text;
+  inp.style.cssText='width:100%;font-size:var(--main-text-size);color:var(--tp);font-style:italic;line-height:1.55;background:transparent;border:none;border-bottom:1px solid var(--acc-soft);outline:none;font-family:inherit;resize:none;padding:0;';
+  div.replaceWith(inp);
+  inp.focus();
+  inp.setSelectionRange(inp.value.length,inp.value.length);
+  let committed=false;
+  const commit=()=>{
+    if(committed)return;committed=true;
+    const val=inp.value.trim();
+    const cur=getQuotes().find(x=>x.cid===cid);
+    if(cur&&val&&val!==cur.text){upsertQuoteLocal({...cur,text:val});}
+    if(doneBookCid)renderDoneBookQuotes(doneBookCid);else renderRdQuotes();
+  };
+  inp.addEventListener('blur',commit);
+  inp.addEventListener('keydown',e=>{
+    if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();inp.blur();}
+    else if(e.key==='Escape'){committed=true;if(doneBookCid)renderDoneBookQuotes(doneBookCid);else renderRdQuotes();}
+  });
+}
 function saveQuoteSheet(){
   const targetCid=_rdSheetBookCid||(getBooks().find(b=>b.status==='reading')||{}).cid;
   if(targetCid){
@@ -11042,7 +11081,7 @@ function renderDoneBookQuotes(bookCid){
   const quotes=getQuotes().filter(q=>q.bookCid===bookCid).sort((a,b)=>(b.created||0)-(a.created||0));
   if(!quotes.length){listEl.innerHTML='<div class="rd-quote-empty">아직 모은 문장이 없어요</div>';listEl.style.maxHeight='';listEl.style.overflowY='';return;}
   listEl.innerHTML=quotes.map(q=>`<div class="rd-quote-item">
-      <div class="rd-quote-text">${q.text}</div>
+      <div class="rd-quote-text" data-cid="${q.cid}" onclick="event.stopPropagation();startEditQuoteText('${q.cid}')" style="cursor:pointer;">${q.text}</div>
       <div id="qc-editor-${q.cid}" class="qc-editor" style="display:none;margin-top:5px;" onclick="event.stopPropagation();">
         <textarea class="qc-comment-textarea" placeholder="이 문장에 대한 감상을 적어보세요">${q.comment||''}</textarea>
         <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px;">
@@ -11051,11 +11090,11 @@ function renderDoneBookQuotes(bookCid){
         </div>
       </div>
       <span style="position:absolute;right:8px;bottom:6px;display:flex;align-items:center;gap:3px;">
-        <span onclick="event.stopPropagation();shareQuoteCard('${q.cid}')" title="공유 이미지" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:#8878ab;opacity:0.7;">
+        <span onclick="event.stopPropagation();shareQuoteCard('${q.cid}')" title="공유 이미지" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:var(--tm);opacity:0.7;">
           <i class="ti ti-share-2 ico-sz-11" aria-hidden="true"></i>
         </span>
-        <span onclick="event.stopPropagation();toggleQuoteCommentEditor('${q.cid}')" title="${q.comment?'코멘트 수정':'코멘트 남기기'}" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:${q.comment?'#fff':'#8878ab'};background:${q.comment?'rgba(140,120,180,0.85)':'transparent'};opacity:${q.comment?'1':'0.7'};">
-          <i class="ti ti-message-circle ico-sz-11" aria-hidden="true"></i>
+        <span onclick="event.stopPropagation();toggleQuoteCommentEditor('${q.cid}')" title="${q.comment?'코멘트 수정':'코멘트 남기기'}" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:${q.comment?'#7a9552':'var(--tm)'};opacity:${q.comment?'1':'0.7'};">
+          <i class="ti ${q.comment?'ti-message-circle-filled':'ti-message-circle'} ico-sz-11" aria-hidden="true"></i>
         </span>
         <span class="rd-quote-del" onclick="event.stopPropagation();removeQuote('${q.cid}');renderDoneBookQuotes('${bookCid}')" style="position:static;font-size:10px;padding:2px;display:inline-flex;align-items:center;justify-content:center;"><i class="ti ti-x ico-sz-11" aria-hidden="true"></i></span>
       </span>
