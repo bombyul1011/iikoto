@@ -44,6 +44,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --pal-lavender-rgb:210,175,225;--pal-lavender-bg:rgba(210,175,225,0.55);--pal-lavender-border:rgba(160,105,180,0.55);--pal-lavender-text:rgba(130,75,150,0.95);--pal-lavender-solid:rgba(160,105,180,0.88);
   --pal-lime-rgb:200,220,140;--pal-lime-bg:rgba(200,220,140,0.55);--pal-lime-border:rgba(135,165,60,0.55);--pal-lime-text:rgba(95,120,35,0.95);--pal-lime-solid:rgba(135,165,60,0.88);
   --pal-rose-rgb:230,150,150;--pal-rose-bg:rgba(230,150,150,0.52);--pal-rose-border:rgba(205,95,95,0.55);--pal-rose-text:rgba(165,60,60,0.95);--pal-rose-solid:rgba(205,95,95,0.88);
+  --pal-mintlime:rgb(102,160,85); /* 민트+연두 중간톤 — 문장저장/문장코멘트/영양제/인용구칩 4곳 통합용, 2026-08-16 */
+  --pal-mauvepink:rgb(198,116,149); /* 모브핑크 — 다음주목표/glass오늘표시/뮤직재생/glass캘린더오늘 4곳 통합용, 2026-08-16 */
+  --rainbow-done:linear-gradient(120deg,#ffd28a,#ffb0c8,#c9a8ff,#9fd8ff,#ffd28a); /* 완독 축하 버튼 테두리 전용 */
+  --rainbow-bead:linear-gradient(270deg,#ffb0c8,#ffd28a,#bdf0c4,#9fd8ff,#c9a8ff,#ffb0c8); /* 진행바 구슬 애니메이션 — rd-progress-bead/pace-bead2 공용 */
 }
 /* ══ EVENT CATEGORY COLORS — 단일 소스. 값 변경 시 여기만 고치면 JS(EVENT_CATS)·모달버튼·캘린더배지에 모두 반영됨 ══
    2026-08-16: 공용 팔레트(--pal-*) 참조로 전환 — 약속=라벤더, 개인=옐로, 업무=민트, 기타=웜그레이 */
@@ -187,11 +191,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .goal-section-title{display:inline-flex;align-items:center;gap:5px;font-size:var(--main-text-size);font-weight:500;letter-spacing:.04em;background:linear-gradient(120deg,rgba(250,215,100,0.55),rgba(255,235,170,0.48));color:#8a6c20;border-radius:10px;padding:5px 13px;margin:14px 0 10px 0;border:1px solid rgba(250,205,90,0.55);box-shadow:0 2px 10px rgba(200,150,50,0.12);}
 .nwf-item{display:flex;flex-direction:column;gap:6px;background:var(--card);border:1px solid var(--card-b);border-radius:14px;padding:12px 13px;margin-bottom:9px;box-shadow:0 2px 14px rgba(0,0,0,0.05),inset 0 1px 0 rgba(255,250,240,0.65);}
 .nwf-item-head{display:flex;align-items:center;gap:7px;}
-.nwf-item-icon{font-size:14px;color:#c2638a;flex-shrink:0;}
-.nwf-item-goal{font-size:var(--dow-label-size);font-weight:600;color:#c2638a;}
+.nwf-item-icon{font-size:14px;color:var(--pal-mauvepink);flex-shrink:0;}
+.nwf-item-goal{font-size:var(--dow-label-size);font-weight:600;color:var(--pal-mauvepink);}
 .nwf-item-text{font-size:var(--main-text-size);line-height:1.55;color:var(--tp);}
 [data-theme="glass"] .nwf-item{background:rgba(253,251,245,0.92);}
-[data-theme="glass"] .nwf-item-icon,[data-theme="glass"] .nwf-item-goal{color:#c2638a;}
+[data-theme="glass"] .nwf-item-icon,[data-theme="glass"] .nwf-item-goal{color:var(--pal-mauvepink);}
 
 /* ── CARDS ── */
 .card{background:var(--card);border:1px solid var(--card-b);border-radius:18px;padding:14px 15px;margin-bottom:10px;box-shadow:0 2px 20px rgba(0,0,0,0.06),inset 0 1px 0 rgba(255,250,240,0.68);height:auto;min-height:0;}
@@ -268,7 +272,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .playlist-disc-spin{display:inline-block;animation:discSpin 3s linear infinite;}
 .pl-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;background:var(--card);border:1px solid var(--card-b);}
 .pl-item-poster{width:34px;height:34px;border-radius:7px;object-fit:cover;flex-shrink:0;}
-.pl-item-poster-ph{width:34px;height:34px;border-radius:7px;background:rgba(136,120,171,.18);display:flex;align-items:center;justify-content:center;font-size:14px;color:#8878ab;flex-shrink:0;}
+.pl-item-poster-ph{width:34px;height:34px;border-radius:7px;background:rgba(160,105,180,0.18);display:flex;align-items:center;justify-content:center;font-size:14px;color:rgba(160,105,180,0.80);flex-shrink:0;}
 .pl-item-info{flex:1;min-width:0;}
 .pl-item-title{font-size:var(--main-text-size);color:var(--tp);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .pl-item-sub{font-size:var(--dow-label-size);color:var(--tm);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -627,7 +631,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cat-color-etc{background:var(--ev-work-bg);color:var(--ev-work-text);}
 .sheet-item:last-child{border-bottom:none;}
 .sheet-item:last-child{border-bottom:none;}
-.sheet-item.del{color:#c05060;}
+.sheet-item.del{color:var(--pal-rose-text);}
 .archive-sheet-textarea:focus{border-color:rgba(150,175,120,0.55);}
 .qc-comment-textarea{width:100%;box-sizing:border-box;font-size:var(--dow-label-size);padding:6px 8px;border-radius:8px;border:1px solid var(--card-b);background:var(--card);color:var(--tp);resize:none;min-height:44px;font-family:inherit;outline:none;}
 .qc-comment-textarea:focus{border-color:rgba(200,176,168,0.65);}
@@ -649,7 +653,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 /* ── 독서 완독 확인 — 축하하는 느낌의 반짝이는 테두리 버튼 ── */
 .pg-done-msg{font-size:var(--main-text-size);color:var(--tp);text-align:center;margin:6px 0 14px;font-weight:500;}
 .mbtn-done-wrap{flex:1;display:inline-flex;border-radius:12px;padding:1.8px;
-  background:linear-gradient(120deg,#ffd28a,#ffb0c8,#c9a8ff,#9fd8ff,#ffd28a);
+  background:var(--rainbow-done);
   background-size:300% 300%;animation:bannerShine 3s ease infinite;cursor:pointer;}
 .mbtn-done{flex:1;width:100%;padding:9.2px;border-radius:10.5px;border:none;cursor:pointer;
   background:linear-gradient(135deg,rgba(255,250,240,0.95),rgba(255,245,248,0.95));
@@ -740,7 +744,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rd-progress-track{height:4px;border-radius:3px;background:var(--graph-track-color);overflow:hidden;position:relative;}
 .rd-progress-fill{position:absolute;left:0;top:0;height:100%;border-radius:3px;background:#ffc9da;transition:width .4s ease;}
 .rd-progress-today{position:absolute;top:0;height:100%;background:#ff9ec0;transition:left .4s ease,width .4s ease;}
-.rd-progress-bead{position:absolute;top:50%;width:13px;height:13px;border-radius:50%;transform:translate(-50%,-50%);border:1.6px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.25);background:linear-gradient(270deg,#ffb0c8,#ffd28a,#bdf0c4,#9fd8ff,#c9a8ff,#ffb0c8);background-size:500% 100%;animation:beadRainbow 22s linear infinite;transition:left .4s ease;}
+.rd-progress-bead{position:absolute;top:50%;width:13px;height:13px;border-radius:50%;transform:translate(-50%,-50%);border:1.6px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.25);background:var(--rainbow-bead);background-size:500% 100%;animation:beadRainbow 22s linear infinite;transition:left .4s ease;}
 
 /* ── 오후 홈탭: 통계 카드 (오늘vs어제 진행바 + 웨이브게이지 + 리듬비교) ── */
 .pace-card{background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:16px;margin-bottom:10px;}
@@ -751,7 +755,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .pace-fill-y{position:absolute;left:0;top:0;height:100%;border-radius:3px;background:rgba(200,190,180,0.55);}
 .pace-fill-t{position:absolute;left:0;top:0;height:100%;border-radius:3px;background:#ffc9da;}
 .pace-bead2{position:absolute;top:50%;width:13px;height:13px;border-radius:50%;transform:translate(-50%,-50%);border:1.6px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.25);
-  background:linear-gradient(270deg,#ffb0c8,#ffd28a,#bdf0c4,#9fd8ff,#c9a8ff,#ffb0c8);background-size:500% 100%;animation:beadRainbow 22s linear infinite;}
+  background:var(--rainbow-bead);background-size:500% 100%;animation:beadRainbow 22s linear infinite;}
 .pace-divider{height:1px;background:rgba(var(--divider-rgb),0.25);margin:16px 0;}
 .wave-title{font-size:var(--dow-label-size);color:var(--tm);margin-bottom:12px;display:flex;align-items:center;gap:5px;}
 .wave-row{display:flex;justify-content:center;gap:32px;}
@@ -835,13 +839,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rd-month-stat{font-size:var(--dow-label-size);color:var(--ts);text-align:center;margin-top:2px;}
 .rd-quote-section{margin-top:4px;}
 .quote-chip{display:inline-flex;border-radius:14px;padding:1.6px;background:linear-gradient(120deg,rgba(195,180,250,0.95),rgba(255,195,220,0.90),rgba(180,205,250,0.92),rgba(195,180,250,0.95));background-size:300% 300%;animation:bannerShine 5s ease infinite;cursor:pointer;margin-bottom:8px;}
-.quote-chip-inner{border-radius:12.5px;background:linear-gradient(135deg,rgba(210,244,225,0.85),rgba(248,245,200,0.85),rgba(212,242,222,0.85));padding:7px 14px;font-size:var(--main-text-size);font-weight:500;color:#5a8a6a;display:flex;align-items:center;gap:5px;white-space:nowrap;}
+.quote-chip-inner{border-radius:12.5px;background:linear-gradient(135deg,rgba(210,244,225,0.85),rgba(248,245,200,0.85),rgba(212,242,222,0.85));padding:7px 14px;font-size:var(--main-text-size);font-weight:500;color:var(--pal-mintlime);display:flex;align-items:center;gap:5px;white-space:nowrap;}
 [data-theme="glass"] .quote-chip-inner{background:var(--glass-chip-bg);}
 .done-banner-row{display:flex;gap:8px;margin-top:10px;}
 .done-quote-chip{flex:1;display:inline-flex;border-radius:14px;padding:1.6px;background:linear-gradient(120deg,rgba(200,182,245,0.6),rgba(190,205,240,0.55));background-size:300% 300%;animation:bannerShine 5s ease infinite;cursor:pointer;}
-.done-quote-chip-inner{width:100%;border-radius:12.5px;background:linear-gradient(135deg,rgba(240,232,250,0.85),rgba(235,238,248,0.85));padding:7px 10px;font-size:var(--dow-label-size);font-weight:500;color:#8878ab;display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;}
+.done-quote-chip-inner{width:100%;border-radius:12.5px;background:linear-gradient(135deg,rgba(240,232,250,0.85),rgba(235,238,248,0.85));padding:7px 10px;font-size:var(--dow-label-size);font-weight:500;color:rgba(160,105,180,0.80);display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;}
 .done-comment-chip{flex:1;display:inline-flex;border-radius:14px;padding:1.6px;background:linear-gradient(120deg,rgba(215,240,200,0.85),rgba(210,232,190,0.8));background-size:300% 300%;animation:bannerShine 5s ease infinite;cursor:pointer;}
-.done-comment-chip-inner{width:100%;border-radius:12.5px;background:linear-gradient(135deg,rgba(232,246,220,0.85),rgba(238,246,222,0.85));padding:7px 10px;font-size:var(--dow-label-size);font-weight:500;color:#7a9552;display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;}
+.done-comment-chip-inner{width:100%;border-radius:12.5px;background:linear-gradient(135deg,rgba(232,246,220,0.85),rgba(238,246,222,0.85));padding:7px 10px;font-size:var(--dow-label-size);font-weight:500;color:var(--pal-mintlime);display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;}
 [data-theme="glass"] .done-quote-chip-inner,[data-theme="glass"] .done-comment-chip-inner{background:var(--glass-chip-bg);}
 .report-banner.quote-soft{background:linear-gradient(135deg,rgba(195,180,250,0.95),rgba(255,195,220,0.90),rgba(180,205,250,0.92),rgba(195,180,250,0.95));}
 .report-banner.diary-soft{background:linear-gradient(135deg,rgba(245,222,170,0.95),rgba(255,205,210,0.90),rgba(248,230,190,0.92),rgba(245,222,170,0.95));}
@@ -867,9 +871,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .diary-row{display:flex;align-items:baseline;gap:9px;padding:9px 2px;border-bottom:1px dashed rgba(var(--divider-rgb),0.28);}
 .diary-row:last-child{border-bottom:none;}
 .diary-date-chip{flex-shrink:0;font-size:var(--dow-label-size);font-weight:500;color:var(--ts);border-radius:8px;padding:3px 7px;min-width:30px;text-align:center;border:1px solid transparent;}
-.diary-date-chip.holiday{color:#c2638a;}
+.diary-date-chip.holiday{color:var(--pal-mauvepink);}
 .diary-date-chip.today{background:rgba(255,160,180,.16);border-color:rgba(255,140,160,.38);color:var(--acc);font-weight:600;}
-[data-theme="glass"] .diary-date-chip.today{background:rgba(232,164,187,0.18);border-color:rgba(232,164,187,0.40);color:#c97a96;}
+[data-theme="glass"] .diary-date-chip.today{background:rgba(232,164,187,0.18);border-color:rgba(232,164,187,0.40);color:var(--pal-mauvepink);}
 .diary-line-text{flex:1;font-size:var(--main-text-size);color:var(--tp);line-height:1.5;}
 .diary-line-text.empty{color:var(--tm);font-size:var(--dow-label-size);font-style:italic;letter-spacing:2px;}
 .rd-quote-inp{width:100%;background:var(--inp);border:1px solid var(--inp-b);border-radius:12px;padding:12px 14px;outline:none;resize:none;font-family:'DM Sans',sans-serif;font-size:var(--main-text-size);color:var(--tp);line-height:1.6;}
@@ -894,7 +898,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 }
 @keyframes tqFlicker{0%,100%{opacity:0.7;transform:translateX(-50%) scale(1);}50%{opacity:1;transform:translateX(-50%) scale(1.05);}}
 .today-quote-title{
-  font-size:11px;font-weight:500;color:#5a8a6a;letter-spacing:0;
+  font-size:11px;font-weight:500;color:var(--pal-mintlime);letter-spacing:0;
   margin-bottom:8px;position:relative;z-index:1;display:flex;align-items:center;gap:5px;
 }
 .today-quote-title i{font-size:var(--dow-label-size);opacity:0.9;vertical-align:-1px;}
@@ -979,15 +983,15 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   color:rgba(150,108,40,0.95);
 }
 [data-theme="glass"] .day-btn.today{background:rgba(232,164,187,0.18);border-color:rgba(232,164,187,0.40);}
-[data-theme="glass"] .day-btn.today .day-num{color:#c97a96;}
+[data-theme="glass"] .day-btn.today .day-num{color:var(--pal-mauvepink);}
 [data-theme="glass"] .rd-tab.on{background:rgba(232,164,187,0.18);border-color:rgba(232,164,187,0.40);}
-[data-theme="glass"] #nextweek-sheet .goal-section-title{background:linear-gradient(120deg,rgba(248,212,225,0.55),rgba(250,225,235,0.48));color:#c2638a;border:1.4px solid rgba(232,164,187,0.50);}
+[data-theme="glass"] #nextweek-sheet .goal-section-title{background:linear-gradient(120deg,rgba(248,212,225,0.55),rgba(250,225,235,0.48));color:var(--pal-mauvepink);border:1.4px solid rgba(232,164,187,0.50);}
 [data-theme="glass"] .chk.on{background:rgba(250,215,100,0.55);border-color:rgba(250,215,100,0.78);}
-[data-theme="glass"] .cal-day.today .cal-num{background:#e8a4bb;}
-[data-theme="glass"] .cal-day.selected .cal-num{background:rgba(232,164,187,0.24);color:#c97a96;}
+[data-theme="glass"] .cal-day.today .cal-num{background:rgba(198,116,149,0.85);}
+[data-theme="glass"] .cal-day.selected .cal-num{background:rgba(232,164,187,0.24);color:var(--pal-mauvepink);}
 [data-theme="glass"] #monthly-cal .cal-day.has-record .cal-num{background:rgba(200,176,168,0.14);}
-[data-theme="glass"] #monthly-cal .cal-day.today .cal-num{background:#e8a4bb;}
-[data-theme="glass"] #monthly-cal .cal-day.selected .cal-num{background:rgba(232,164,187,0.24);color:#c97a96;}
+[data-theme="glass"] #monthly-cal .cal-day.today .cal-num{background:rgba(198,116,149,0.85);}
+[data-theme="glass"] #monthly-cal .cal-day.selected .cal-num{background:rgba(232,164,187,0.24);color:var(--pal-mauvepink);}
 [data-theme="glass"] .goal-section-title{background:linear-gradient(120deg,rgba(250,215,100,0.50),rgba(255,235,170,0.42));color:#8a6c20;border:1.4px solid rgba(250,205,90,0.55);}
 [data-theme="glass"] .mbtn.ok{background:rgba(201,146,110,0.42);color:#6e4a30;}
 [data-theme="glass"] .wchallenge-day.on{background:rgba(255,253,248,0.45)!important;color:var(--tp)!important;border-width:2px;}
@@ -1245,10 +1249,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           <i class="ti ti-settings-2" style="font-size:16px;color:var(--tm);" aria-hidden="true"></i>
         </div>
         <div class="icon-btn seed-icon-btn" onclick="openChaeum()">
-          <i class="ti ti-clover" style="font-size:17px;color:#6a8a50;" aria-hidden="true"></i>
+          <i class="ti ti-clover" style="font-size:17px;color:var(--pal-mintlime);" aria-hidden="true"></i>
         </div>
         <div class="icon-btn reading-icon-btn" onclick="openReading()">
-          <i class="ti ti-macro" style="font-size:16px;color:#a8527a;" aria-hidden="true"></i>
+          <i class="ti ti-macro" style="font-size:16px;color:var(--pal-mauvepink);" aria-hidden="true"></i>
         </div>
       </div>
     </div>
@@ -1586,7 +1590,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div class="sheet-item" onclick="todoSheetEdit()"><i class="ti ti-edit" style="font-size:18px;color:var(--ts);" aria-hidden="true"></i>수정</div>
     <div class="sheet-item" onclick="todoSheetPostpone('pick')"><i class="ti ti-calendar-repeat" style="font-size:18px;color:var(--ts);" aria-hidden="true"></i>날짜 변경</div>
     <div class="sheet-item" onclick="todoSheetPostpone('tomorrow')"><i class="ti ti-chevrons-right" style="font-size:18px;color:var(--ts);" aria-hidden="true"></i>내일로 미루기</div>
-    <div class="sheet-item del" onclick="todoSheetDelete()"><i class="ti ti-trash" style="font-size:18px;color:#c05060;" aria-hidden="true"></i>삭제</div>
+    <div class="sheet-item del" onclick="todoSheetDelete()"><i class="ti ti-trash" style="font-size:18px;color:var(--pal-rose-text);" aria-hidden="true"></i>삭제</div>
   </div>
 </div>
 
@@ -1596,7 +1600,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div class="sheet-handle"></div>
     <div class="sheet-title" id="event-sheet-title"></div>
     <div class="sheet-item" onclick="eventSheetEdit()"><i class="ti ti-edit" style="font-size:18px;color:var(--ts);" aria-hidden="true"></i>수정</div>
-    <div class="sheet-item del" onclick="eventSheetDelete()"><i class="ti ti-trash" style="font-size:18px;color:#c05060;" aria-hidden="true"></i>삭제</div>
+    <div class="sheet-item del" onclick="eventSheetDelete()"><i class="ti ti-trash" style="font-size:18px;color:var(--pal-rose-text);" aria-hidden="true"></i>삭제</div>
   </div>
 </div>
 
@@ -1618,7 +1622,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div class="sheet-handle"></div>
     <div class="sheet-title">메모 옵션</div>
     <div class="sheet-item" onclick="memoSheetEdit()"><i class="ti ti-edit" style="font-size:18px;color:var(--ts);" aria-hidden="true"></i>수정</div>
-    <div class="sheet-item del" onclick="memoSheetDelete()"><i class="ti ti-trash" style="font-size:18px;color:#c05060;" aria-hidden="true"></i>삭제</div>
+    <div class="sheet-item del" onclick="memoSheetDelete()"><i class="ti ti-trash" style="font-size:18px;color:var(--pal-rose-text);" aria-hidden="true"></i>삭제</div>
   </div>
 </div>
 
@@ -1782,7 +1786,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <input type="text" class="todo-multiday-end-inp" id="todo-event-end-date" readonly onclick="openTodoEventEndDatePicker()" placeholder="MM.DD" style="flex:1;text-align:center;">
     </div>
     <div class="modal-actions">
-      <button class="mbtn cancel" id="todo-modal-delete" onclick="deleteTodoFromModal()" style="display:none;color:#c05060;flex:0.8;">삭제</button>
+      <button class="mbtn cancel" id="todo-modal-delete" onclick="deleteTodoFromModal()" style="display:none;color:var(--pal-rose-text);flex:0.8;">삭제</button>
       <button class="mbtn cancel" onclick="closeTodoModal()">취소</button>
       <button class="mbtn ok" onclick="confirmTodo()">저장</button>
     </div>
@@ -1888,7 +1892,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           <i class="ti ti-copy-off ico-sz-14" aria-hidden="true"></i>중단
         </button>
       </div>
-      <button class="mbtn" id="cm-music-play-btn" onclick="openAppleMusicLink()" style="display:none;flex:1;margin-bottom:0;padding:11px 14px;border-radius:12px;font-size:var(--main-text-size);white-space:nowrap;background:rgba(255,150,180,.16);color:#a8527a;border:1px solid rgba(255,150,180,.40);">
+      <button class="mbtn" id="cm-music-play-btn" onclick="openAppleMusicLink()" style="display:none;flex:1;margin-bottom:0;padding:11px 14px;border-radius:12px;font-size:var(--main-text-size);white-space:nowrap;background:rgba(255,150,180,.16);color:var(--pal-mauvepink);border:1px solid rgba(255,150,180,.40);">
         <i class="ti ti-brand-apple" style="font-size:14px;vertical-align:-2px;margin-right:3px;" aria-hidden="true"></i>애플뮤직
       </button>
     </div>
@@ -1911,10 +1915,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <textarea class="modal-inp" id="cm-review" rows="2" style="resize:none;" placeholder="감상 메모 (선택)" autocomplete="off"></textarea>
     <div class="modal-actions" style="flex-wrap:wrap;gap:8px;">
       <button class="mbtn cancel" onclick="closeModal('content-modal')">취소</button>
-      <button class="mbtn" id="cm-del-btn" onclick="deleteContent()" style="display:none;background:rgba(255,200,210,.55);color:#c05060;border:1px solid rgba(240,170,185,.50);">삭제</button>
+      <button class="mbtn" id="cm-del-btn" onclick="deleteContent()" style="display:none;background:var(--pal-rose-bg);color:var(--pal-rose-text);border:1px solid var(--pal-rose-border);">삭제</button>
       <button class="mbtn ok" onclick="confirmContent()">저장</button>
     </div>
-    <button class="mbtn" id="cm-playlist-btn" onclick="openPlaylistModal()" style="display:none;width:100%;margin-top:8px;background:rgba(136,120,171,.18);color:#8878ab;border:1px solid rgba(136,120,171,.45);">
+    <button class="mbtn" id="cm-playlist-btn" onclick="openPlaylistModal()" style="display:none;width:100%;margin-top:8px;background:rgba(160,105,180,0.18);color:rgba(160,105,180,0.80);border:1px solid rgba(160,105,180,0.45);">
       <i class="ti ti-music-heart" style="font-size:14px;vertical-align:-2px;margin-right:4px;" aria-hidden="true"></i>이달의 플레이리스트
     </button>
   </div>
@@ -1934,7 +1938,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div class="sheet-handle"></div>
     <div style="padding:0 20px 20px;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
-        <i class="ti ti-disc playlist-disc-spin" style="font-size:20px;color:#8878ab;" aria-hidden="true"></i>
+        <i class="ti ti-disc playlist-disc-spin" style="font-size:20px;color:rgba(160,105,180,0.80);" aria-hidden="true"></i>
         <span style="font-size:var(--main-text-size);font-weight:600;color:var(--tp);">이달의 플레이리스트</span>
       </div>
       <div id="pl-list" style="display:flex;flex-direction:column;gap:6px;"></div>
@@ -4191,9 +4195,9 @@ const DEFAULT_HABITS=[{name:'운동',color:'mint'},{name:'독서',color:'pink'},
 // 습관명은 자유 텍스트라 완전 자동매칭엔 한계가 있음 — 이름에 특정 키워드가 포함되면 아이콘을 붙이고, 매칭 안 되면 아이콘 없이 텍스트만 표시
 const HABIT_ICON_RULES=[
   {keywords:['운동','헬스','필라테스','런닝','러닝','조깅'],icon:'ti-run',color:'#c07a4a'},
-  {keywords:['독서','책'],icon:'ti-book',color:'#a8527a'},
+  {keywords:['독서','책'],icon:'ti-book',color:'var(--pal-mauvepink)'},
   {keywords:['일기','다이어리','글쓰기'],icon:'ti-pencil-heart',color:'#5a7a9a'},
-  {keywords:['영양제','비타민','약'],icon:'ti-pill',color:'#6a8a50'}
+  {keywords:['영양제','비타민','약'],icon:'ti-pill',color:'var(--pal-mintlime)'}
 ];
 function getHabitIcon(name){
   if(!name)return null;
@@ -6335,7 +6339,7 @@ function confirmSleepScore(){
   const inp=document.getElementById('sleep-score-inp');
   const num=parseInt(inp.value,10);
   if(isNaN(num)||num<0||num>100){
-    inp.style.borderColor='#c05060';
+    inp.style.borderColor='var(--pal-rose-text)';
     return;
   }
   saveSleepScore(_sleepScoreModalDk,num);
@@ -7108,14 +7112,14 @@ function makePlaylistMiniCard(){
       +'</div>';
     return wrap;
   }
-  const musicRgb='136,120,171'; // disc/재생버튼과 동일한 라벤더톤
+  const musicRgb='160,105,180'; // disc/재생버튼과 동일한 라벤더톤
   const rows=items.map(item=>{
     const coverInner=item.poster
       ?`<img src="${item.poster}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;" alt="">`
       :`<i class="ti ti-music" style="font-size:16px;color:rgba(136,120,171,0.75);" aria-hidden="true"></i>`;
     const hasUrl=!!item.musicUrl;
     return `<div style="display:flex;gap:10px;align-items:center;">
-      <div style="width:40px;height:40px;border-radius:8px;background:rgba(136,120,171,.18);flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden;">${coverInner}</div>
+      <div style="width:40px;height:40px;border-radius:8px;background:rgba(160,105,180,0.18);flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden;">${coverInner}</div>
       <div style="flex:1;min-width:0;">
         <div style="font-size:var(--main-text-size);font-weight:500;color:var(--tp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(item.title||'')}</div>
         ${item.author?`<div style="font-size:var(--dow-label-size);color:var(--ts);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(item.author)}</div>`:''}
@@ -7124,7 +7128,7 @@ function makePlaylistMiniCard(){
     </div>`;
   }).join('<div style="height:10px;"></div>');
   wrap.innerHTML=`${rows}
-    <div style="text-align:right;margin-top:10px;"><span class="reading-nudge" onclick="openPlaylistModalFromHome()" style="cursor:pointer;"><i class="ti ti-disc playlist-disc-spin" style="font-size:12px;vertical-align:-1px;margin-right:3px;color:#8878ab;" aria-hidden="true"></i>이달의 플레이리스트 보기</span></div>`;
+    <div style="text-align:right;margin-top:10px;"><span class="reading-nudge" onclick="openPlaylistModalFromHome()" style="cursor:pointer;"><i class="ti ti-disc playlist-disc-spin" style="font-size:12px;vertical-align:-1px;margin-right:3px;color:rgba(160,105,180,0.80);" aria-hidden="true"></i>이달의 플레이리스트 보기</span></div>`;
   return wrap;
 }
 // 저녁 홈탭에서 이달의 플리 시트를 열 때는 편집 컨텍스트가 없으므로 이번 달 기준으로 직접 채워서 연다
@@ -7145,7 +7149,7 @@ function makeTodayQuoteCard(){
   const wrap=document.createElement('div');wrap.className='today-quote-wrap';
   wrap.innerHTML=`<div class="today-quote-card" onclick="openReading()">
     <div class="today-quote-title"><i class="ti ti-quote" aria-hidden="true"></i>오늘의 문장
-      <span onclick="event.stopPropagation();shareQuoteCard('${q.cid}')" title="공유 이미지" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:#8878ab;opacity:0.7;margin-left:auto;">
+      <span onclick="event.stopPropagation();shareQuoteCard('${q.cid}')" title="공유 이미지" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:rgba(160,105,180,0.80);opacity:0.7;margin-left:auto;">
         <i class="ti ti-share-2 ico-sz-11" aria-hidden="true"></i>
       </span>
     </div>
@@ -9322,7 +9326,7 @@ function openPlaylistModal(){
     listEl.innerHTML='<div style="text-align:center;font-size:var(--dow-label-size);color:var(--tm);padding:16px 0;">이번 달 등록된 음악이 없어요</div>';
   }else{
     listEl.innerHTML='';
-    const musicRgb='136,120,171'; // #8878ab — disc 아이콘과 동일한 라벤더톤
+    const musicRgb='160,105,180'; // #8878ab — disc 아이콘과 동일한 라벤더톤
     items.forEach(item=>{
       const row=document.createElement('div');row.className='pl-item';
       const posterHtml=item.poster?`<img class="pl-item-poster" src="${item.poster}" alt="">`:`<div class="pl-item-poster-ph"><i class="ti ti-music" aria-hidden="true"></i></div>`;
@@ -10968,19 +10972,19 @@ function renderRdQuotes(){
   const shown=_rdQuoteShowAll?quotes:quotes.slice(0,MAX);
   let html=shown.map(q=>`<div class="rd-quote-item">
       <div class="rd-quote-text" data-cid="${q.cid}" onclick="startEditQuoteText('${q.cid}')" style="cursor:pointer;">${q.text}</div>
-      ${q.comment?`<div class="rd-quote-comment" onclick="toggleQuoteCommentEditor('${q.cid}')" style="font-size:var(--dow-label-size);color:#7a9552;margin-top:4px;padding:5px 8px;background:rgba(232,246,220,0.6);border-radius:8px;cursor:pointer;">${q.comment}</div>`:''}
+      ${q.comment?`<div class="rd-quote-comment" onclick="toggleQuoteCommentEditor('${q.cid}')" style="font-size:var(--dow-label-size);color:var(--pal-mintlime);margin-top:4px;padding:5px 8px;background:rgba(102,160,85,0.14);border-radius:8px;cursor:pointer;">${q.comment}</div>`:''}
       <div id="qc-editor-${q.cid}" class="qc-editor" style="display:none;margin-top:5px;" onclick="event.stopPropagation();">
         <textarea class="qc-comment-textarea" placeholder="이 문장에 대한 감상을 적어보세요">${q.comment||''}</textarea>
         <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px;">
           <span onclick="document.getElementById('qc-editor-${q.cid}').style.display='none';" style="font-size:var(--dow-label-size);color:var(--tm);cursor:pointer;padding:3px 8px;">취소</span>
-          <span onclick="commitQuoteComment('${q.cid}')" style="font-size:var(--dow-label-size);color:#6a8a50;cursor:pointer;padding:3px 8px;font-weight:600;">저장</span>
+          <span onclick="commitQuoteComment('${q.cid}')" style="font-size:var(--dow-label-size);color:var(--pal-mintlime);cursor:pointer;padding:3px 8px;font-weight:600;">저장</span>
         </div>
       </div>
       <span style="position:absolute;right:8px;bottom:6px;display:flex;align-items:center;gap:3px;">
         <span onclick="shareQuoteCard('${q.cid}')" title="공유 이미지" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;color:var(--tm);opacity:0.7;">
           <i class="ti ti-share-2 ico-sz-13" aria-hidden="true"></i>
         </span>
-        <span onclick="toggleQuoteCommentEditor('${q.cid}')" title="${q.comment?'코멘트 수정':'코멘트 남기기'}" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;color:${q.comment?'#7a9552':'var(--tm)'};opacity:${q.comment?'1':'0.7'};">
+        <span onclick="toggleQuoteCommentEditor('${q.cid}')" title="${q.comment?'코멘트 수정':'코멘트 남기기'}" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;color:${q.comment?'var(--pal-mintlime)':'var(--tm)'};opacity:${q.comment?'1':'0.7'};">
           <i class="ti ${q.comment?'ti-message-circle-filled':'ti-message-circle'} ico-sz-13" aria-hidden="true"></i>
         </span>
         <span class="rd-quote-del" onclick="removeQuote('${q.cid}')" style="position:static;font-size:10px;padding:2px;display:inline-flex;align-items:center;justify-content:center;"><i class="ti ti-x ico-sz-13" aria-hidden="true"></i></span>
@@ -11119,14 +11123,14 @@ function renderDoneBookQuotes(bookCid){
         <textarea class="qc-comment-textarea" placeholder="이 문장에 대한 감상을 적어보세요">${q.comment||''}</textarea>
         <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px;">
           <span onclick="event.stopPropagation();document.getElementById('qc-editor-${q.cid}').style.display='none';" style="font-size:var(--dow-label-size);color:var(--tm);cursor:pointer;padding:3px 8px;">취소</span>
-          <span onclick="event.stopPropagation();commitDoneQuoteComment('${q.cid}','${bookCid}')" style="font-size:var(--dow-label-size);color:#6a8a50;cursor:pointer;padding:3px 8px;font-weight:600;">저장</span>
+          <span onclick="event.stopPropagation();commitDoneQuoteComment('${q.cid}','${bookCid}')" style="font-size:var(--dow-label-size);color:var(--pal-mintlime);cursor:pointer;padding:3px 8px;font-weight:600;">저장</span>
         </div>
       </div>
       <span style="position:absolute;right:8px;bottom:6px;display:flex;align-items:center;gap:3px;">
         <span onclick="event.stopPropagation();shareQuoteCard('${q.cid}')" title="공유 이미지" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:var(--tm);opacity:0.7;">
           <i class="ti ti-share-2 ico-sz-11" aria-hidden="true"></i>
         </span>
-        <span onclick="event.stopPropagation();toggleQuoteCommentEditor('${q.cid}')" title="${q.comment?'코멘트 수정':'코멘트 남기기'}" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:${q.comment?'#7a9552':'var(--tm)'};opacity:${q.comment?'1':'0.7'};">
+        <span onclick="event.stopPropagation();toggleQuoteCommentEditor('${q.cid}')" title="${q.comment?'코멘트 수정':'코멘트 남기기'}" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:${q.comment?'var(--pal-mintlime)':'var(--tm)'};opacity:${q.comment?'1':'0.7'};">
           <i class="ti ${q.comment?'ti-message-circle-filled':'ti-message-circle'} ico-sz-11" aria-hidden="true"></i>
         </span>
         <span class="rd-quote-del" onclick="event.stopPropagation();removeQuote('${q.cid}');renderDoneBookQuotes('${bookCid}')" style="position:static;font-size:10px;padding:2px;display:inline-flex;align-items:center;justify-content:center;"><i class="ti ti-x ico-sz-11" aria-hidden="true"></i></span>
@@ -11158,7 +11162,7 @@ function renderDoneBookComments(bookCid){
         <textarea class="qc-comment-textarea" placeholder="이 문장에 대한 감상을 적어보세요">${q.comment||''}</textarea>
         <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px;">
           <span onclick="event.stopPropagation();document.getElementById('qc-editor-${q.cid}').style.display='none';" style="font-size:var(--dow-label-size);color:var(--tm);cursor:pointer;padding:3px 8px;">취소</span>
-          <span onclick="event.stopPropagation();commitDoneQuoteComment('${q.cid}','${bookCid}');renderDoneBookComments('${bookCid}')" style="font-size:var(--dow-label-size);color:#6a8a50;cursor:pointer;padding:3px 8px;font-weight:600;">저장</span>
+          <span onclick="event.stopPropagation();commitDoneQuoteComment('${q.cid}','${bookCid}');renderDoneBookComments('${bookCid}')" style="font-size:var(--dow-label-size);color:var(--pal-mintlime);cursor:pointer;padding:3px 8px;font-weight:600;">저장</span>
         </div>
       </div>
     </div>`).join('');
@@ -12835,7 +12839,7 @@ async function forceRestoreAll(){
 async function checkDataIntegrity(){
   S.set('data_recovery_last_used',dateKey(new Date()));
   const statusEl=document.getElementById('integrity-check-status');
-  if(!navigator.onLine){if(statusEl){statusEl.style.color='#c05060';statusEl.textContent='오프라인 상태에선 점검할 수 없어요';}return;}
+  if(!navigator.onLine){if(statusEl){statusEl.style.color='var(--pal-rose-text)';statusEl.textContent='오프라인 상태에선 점검할 수 없어요';}return;}
   if(statusEl){statusEl.style.color='';statusEl.textContent='점검 중이에요...';}
   const dates=[];
   for(let i=13;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);dates.push(dateKey(d));}
@@ -12855,7 +12859,7 @@ async function checkDataIntegrity(){
   }
   if(!statusEl)return;
   if(!mismatches.length){statusEl.style.color='';statusEl.textContent='✓ 최근 14일 데이터가 서로 일치해요';}
-  else{statusEl.style.color='#c05060';statusEl.innerHTML='⚠ 불일치 발견 — 필요시 위 복구 버튼을 눌러보세요<br>'+mismatches.join('<br>');}
+  else{statusEl.style.color='var(--pal-rose-text)';statusEl.innerHTML='⚠ 불일치 발견 — 필요시 위 복구 버튼을 눌러보세요<br>'+mismatches.join('<br>');}
 }
 // ── INIT
 updateDateUI();
