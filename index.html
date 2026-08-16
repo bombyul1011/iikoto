@@ -35,15 +35,15 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
    각 색상은 4종 세트: -rgb(base) / -bg(연한배경,~0.28) / -border(테두리,~0.55) / -text(진한텍스트) / -solid(진한배경+흰글자용)
    값을 바꿀 땐 이 블록만 수정하면 됨(각 코너는 여기 변수를 참조하도록 순차 교체 예정) */
 :root{
-  --pal-warmgray-rgb:170,152,140;--pal-warmgray-bg:rgba(170,152,140,0.28);--pal-warmgray-border:rgba(138,128,120,0.55);--pal-warmgray-text:rgba(107,98,89,0.95);--pal-warmgray-solid:rgba(138,128,120,0.88);
-  --pal-pink-rgb:255,175,200;--pal-pink-bg:rgba(255,175,200,0.22);--pal-pink-border:rgba(255,175,200,0.55);--pal-pink-text:rgba(200,80,120,0.9);--pal-pink-solid:rgba(200,80,120,0.92);
-  --pal-peach-rgb:240,190,140;--pal-peach-bg:rgba(240,190,140,0.28);--pal-peach-border:rgba(210,140,80,0.55);--pal-peach-text:rgba(165,100,45,0.95);--pal-peach-solid:rgba(210,140,80,0.90);
-  --pal-yellow-rgb:255,225,120;--pal-yellow-bg:rgba(255,225,120,0.28);--pal-yellow-border:rgba(235,180,20,0.55);--pal-yellow-text:rgba(170,125,0,0.95);--pal-yellow-solid:rgba(235,180,20,0.90);
-  --pal-mint-rgb:145,210,175;--pal-mint-bg:rgba(145,210,175,0.28);--pal-mint-border:rgba(70,155,110,0.55);--pal-mint-text:rgba(40,120,80,0.95);--pal-mint-solid:rgba(70,155,110,0.88);
-  --pal-sky-rgb:170,208,228;--pal-sky-bg:rgba(170,208,228,0.28);--pal-sky-border:rgba(75,145,180,0.55);--pal-sky-text:rgba(45,105,140,0.95);--pal-sky-solid:rgba(75,145,180,0.88);
-  --pal-lavender-rgb:210,175,225;--pal-lavender-bg:rgba(210,175,225,0.28);--pal-lavender-border:rgba(160,105,180,0.55);--pal-lavender-text:rgba(130,75,150,0.95);--pal-lavender-solid:rgba(160,105,180,0.88);
-  --pal-lime-rgb:200,220,140;--pal-lime-bg:rgba(200,220,140,0.30);--pal-lime-border:rgba(135,165,60,0.55);--pal-lime-text:rgba(95,120,35,0.95);--pal-lime-solid:rgba(135,165,60,0.88);
-  --pal-rose-rgb:230,150,150;--pal-rose-bg:rgba(230,150,150,0.26);--pal-rose-border:rgba(205,95,95,0.55);--pal-rose-text:rgba(165,60,60,0.95);--pal-rose-solid:rgba(205,95,95,0.88);
+  --pal-warmgray-rgb:195,180,168;--pal-warmgray-bg:rgba(195,180,168,0.55);--pal-warmgray-border:rgba(160,148,138,0.55);--pal-warmgray-text:rgba(128,118,108,0.95);--pal-warmgray-solid:rgba(160,148,138,0.88);
+  --pal-pink-rgb:255,175,200;--pal-pink-bg:rgba(255,175,200,0.38);--pal-pink-border:rgba(214,90,140,0.55);--pal-pink-text:rgba(178,60,105,0.9);--pal-pink-solid:rgba(200,80,120,0.92);
+  --pal-peach-rgb:255,190,130;--pal-peach-bg:rgba(255,190,130,0.58);--pal-peach-border:rgba(235,130,50,0.55);--pal-peach-text:rgba(185,90,20,0.95);--pal-peach-solid:rgba(235,130,50,0.90);
+  --pal-yellow-rgb:255,225,120;--pal-yellow-bg:rgba(255,225,120,0.60);--pal-yellow-border:rgba(235,180,20,0.55);--pal-yellow-text:rgba(170,125,0,0.95);--pal-yellow-solid:rgba(235,180,20,0.90);
+  --pal-mint-rgb:145,210,175;--pal-mint-bg:rgba(145,210,175,0.55);--pal-mint-border:rgba(70,155,110,0.55);--pal-mint-text:rgba(40,120,80,0.95);--pal-mint-solid:rgba(70,155,110,0.88);
+  --pal-sky-rgb:170,208,228;--pal-sky-bg:rgba(170,208,228,0.55);--pal-sky-border:rgba(75,145,180,0.55);--pal-sky-text:rgba(45,105,140,0.95);--pal-sky-solid:rgba(75,145,180,0.88);
+  --pal-lavender-rgb:210,175,225;--pal-lavender-bg:rgba(210,175,225,0.55);--pal-lavender-border:rgba(160,105,180,0.55);--pal-lavender-text:rgba(130,75,150,0.95);--pal-lavender-solid:rgba(160,105,180,0.88);
+  --pal-lime-rgb:200,220,140;--pal-lime-bg:rgba(200,220,140,0.55);--pal-lime-border:rgba(135,165,60,0.55);--pal-lime-text:rgba(95,120,35,0.95);--pal-lime-solid:rgba(135,165,60,0.88);
+  --pal-rose-rgb:230,150,150;--pal-rose-bg:rgba(230,150,150,0.52);--pal-rose-border:rgba(205,95,95,0.55);--pal-rose-text:rgba(165,60,60,0.95);--pal-rose-solid:rgba(205,95,95,0.88);
 }
 /* ══ EVENT CATEGORY COLORS — 단일 소스. 값 변경 시 여기만 고치면 JS(EVENT_CATS)·모달버튼·캘린더배지에 모두 반영됨 ══
    2026-08-16: 공용 팔레트(--pal-*) 참조로 전환 — 약속=라벤더, 개인=옐로, 업무=민트, 기타=웜그레이 */
@@ -63,13 +63,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --divider-rgb:195,175,168; /* 회갈색 구분선/점선 공용 베이스 컬러(RGB만) — 쓸 때는 rgba(var(--divider-rgb), 알파값) 형태로. 알파값은 요소 성격에 따라 자유롭게(0.25~0.55 등), RGB 톤 자체를 바꾸고 싶으면 여기 한 줄만 수정 */
   --bg:linear-gradient(145deg,#fdf0e8 0%,#fef5d4 50%,#fde8f0 100%);
   --tp:#6b5248;--ts:#a3897c;--tm:#d4bcb0;
-  --pink-rgb:255,175,200; /* 앱 공통 "포인트 핑크" 베이스(2026-08-15 통일) — 오후투두/보관함배지/메모배너/습관색/주간목표 월요일/드라마카테고리 등에서 재사용. 알파 자유조절은 rgba(var(--pink-rgb), 알파값) 형태로 */
-  --pink-bg:rgba(255,175,200,0.22);--pink-border:rgba(255,175,200,0.55);--pink-text:rgba(200,80,120,0.9); /* 완성형 3종 세트 — 배경/테두리/진한텍스트용, 오후 시간대 버튼 조합이 원본 기준값 */
   --card:rgba(255,250,240,0.75);--card-b:rgba(230,200,140,0.40);
-  --card-p:rgba(255,175,200,0.15);--card-pb:var(--pink-border); /* 메모 배너 — pink-bg보다 더 옅은 농도(0.15)로 별도 조정됨 */
+  --card-p:rgba(var(--pal-pink-rgb),0.15);--card-pb:rgba(var(--pal-pink-rgb),0.32); /* 메모 배너 — pink-bg보다 더 옅은 농도(0.15)로 별도 조정됨, 2026-08-16 공용팔레트 참조로 전환, 테두리는 투두/식사와 동일하게 알파 개별조정 */
   --card-m:rgba(200,240,235,0.42);--card-mb:rgba(160,220,215,0.55);
-  --card-y:rgba(255,240,180,0.52);--card-yb:rgba(240,220,130,0.62);
-  --card-s:rgba(200,225,255,0.42);--card-sb:rgba(170,205,250,0.55);
+  --card-y:rgba(var(--pal-yellow-rgb),0.22);--card-yb:rgba(var(--pal-yellow-rgb),0.32); /* 투두 배너 — 2026-08-16 공용팔레트 참조로 전환, 알파를 기존톤에 맞춰 재조정 */
+  --card-s:rgba(var(--pal-lime-rgb),0.30);--card-sb:rgba(var(--pal-lime-rgb),0.45); /* 식사 배너 — 2026-08-16 연두로 전환(ID셀렉터 #daily-meal-card가 우선 적용되던 문제 해결) */
   --acc:rgb(178,90,115);--acc-soft:rgba(255,175,200,0.20); /* 앱 메인 강조색(확인/저장버튼, 오늘날짜, 체크 등 20+곳) — 2026-08-15 pink-rgb 계열로 재구성, 기존 #c07080 대비 화사하게 */
   --nav:rgba(255,250,240,0.78);--nav-b:rgba(255,210,200,0.42);
   --sheet:linear-gradient(160deg,#fdf3ec,#fef7e8);
@@ -88,9 +86,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --divider-rgb:195,175,168;
   --bg:linear-gradient(165deg,#f7f4ee 0%,#f3f1ec 55%,#f6f3ee 100%);
   --tp:#5c5650;--ts:#8a8278;--tm:#b8b0a4;
-  --pink-rgb:255,175,200;--pink-bg:rgba(255,175,200,0.22);--pink-border:rgba(255,175,200,0.55);--pink-text:rgba(200,80,120,0.9); /* light와 동일값 — glass 전용 포인트 핑크 미분리, 필요시 추후 조정 */
   --card:rgba(255,253,248,0.50);--card-b:rgba(200,175,140,0.55);
-  --card-p:var(--card);--card-pb:var(--pink-border);
+  --card-p:var(--card);--card-pb:var(--pal-pink-border);
   --card-m:var(--card);--card-mb:rgba(135,205,195,0.55);
   --card-y:var(--card);--card-yb:rgba(250,215,100,0.62);
   --card-s:var(--card);--card-sb:rgba(150,180,225,0.55);
@@ -183,9 +180,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .reserve-section-btn{flex:1;padding:7px 0;border-radius:10px;border:1px solid var(--card-b);background:var(--card);font-size:var(--dow-label-size);color:var(--tm);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;}
 .reserve-section-btn.active{background:var(--acc-soft);color:var(--tp);border-color:var(--acc-soft);font-weight:600;}
 #reserve-filter-row .reserve-section-btn[data-filter="all"].active{background:var(--card);color:var(--tm);border-color:var(--card-b);font-weight:600;}
-#reserve-filter-row .reserve-section-btn[data-filter="shop"].active{background:var(--ev-schedule-bg);color:var(--ev-schedule-text);border-color:var(--ev-schedule-border);}
-#reserve-filter-row .reserve-section-btn[data-filter="watch"].active{background:var(--ev-personal-bg);color:var(--ev-personal-text);border-color:var(--ev-personal-border);}
-#reserve-filter-row .reserve-section-btn[data-filter="todo"].active{background:var(--pal-lime-bg);color:var(--pal-lime-text);border-color:var(--pal-lime-border);}
+#reserve-filter-row .reserve-section-btn[data-filter="shop"].active{background:var(--pal-peach-bg);color:var(--pal-peach-text);border-color:var(--pal-peach-border);}
+#reserve-filter-row .reserve-section-btn[data-filter="watch"].active{background:var(--pal-sky-bg);color:var(--pal-sky-text);border-color:var(--pal-sky-border);}
+#reserve-filter-row .reserve-section-btn[data-filter="todo"].active{background:var(--pal-mint-bg);color:var(--pal-mint-text);border-color:var(--pal-mint-border);}
 #reserve-filter-row .reserve-section-btn[data-filter="etc"].active{background:var(--pal-warmgray-bg);color:var(--pal-warmgray-text);border-color:var(--pal-warmgray-border);}
 .goal-section-title{display:inline-flex;align-items:center;gap:5px;font-size:var(--main-text-size);font-weight:500;letter-spacing:.04em;background:linear-gradient(120deg,rgba(250,215,100,0.55),rgba(255,235,170,0.48));color:#8a6c20;border-radius:10px;padding:5px 13px;margin:14px 0 10px 0;border:1px solid rgba(250,205,90,0.55);box-shadow:0 2px 10px rgba(200,150,50,0.12);}
 .nwf-item{display:flex;flex-direction:column;gap:6px;background:var(--card);border:1px solid var(--card-b);border-radius:14px;padding:12px 13px;margin-bottom:9px;box-shadow:0 2px 14px rgba(0,0,0,0.05),inset 0 1px 0 rgba(255,250,240,0.65);}
@@ -289,9 +286,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .meal-inp{flex:1;background:none;border:none;border-bottom:1px dashed rgba(var(--divider-rgb),0.38);outline:none;font-family:'DM Sans',sans-serif;font-size:var(--main-text-size);color:var(--tp);padding:5px 2px 4px;}
 .week-meal-day{margin-bottom:14px;}
 .week-meal-day-label{font-size:var(--dow-label-size);font-weight:700;color:var(--ts);margin-bottom:4px;}
-#daily-meal-card{background:rgba(205,222,180,0.38);border-color:rgba(185,208,155,0.50);}
-#daily-meal-card .cal-detail-row{border-bottom-color:rgba(170,198,140,0.30);}
-#daily-meal-card .cal-detail-time{color:rgba(110,148,88,0.80);font-weight:600;font-size:var(--dow-label-size);}
+#daily-meal-card .cal-detail-row{border-bottom-color:rgba(var(--pal-lime-rgb),0.25);}
+#daily-meal-card .cal-detail-time{color:var(--pal-lime-text);font-weight:600;font-size:var(--dow-label-size);}
 #daily-meal-card .cal-detail-text{font-size:var(--main-text-size);}
 .wish-round-btn{width:36px;height:36px;flex-shrink:0;border-radius:50%;border:1.4px solid rgba(150,190,165,0.55);background:rgba(190,230,205,0.22);color:rgba(85,135,100,0.85);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .15s;}
 .wish-round-btn:active{background:rgba(190,230,205,0.4);}
@@ -435,29 +431,32 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .chk.on{background:var(--acc-soft);border-color:var(--acc);}
 .chk.on::after{content:'';width:7px;height:4px;border-left:1.5px solid white;border-bottom:1.5px solid white;transform:rotate(-45deg) translateY(-1px);}
 .chk.ts-morning{border-color:var(--pal-yellow-border);}
-.chk.ts-morning.on{background:var(--pal-yellow-bg);border-color:var(--pal-yellow-text);}
+.chk.ts-morning.on{background:rgba(255,225,120,0.42);border-color:var(--pal-yellow-text);}
 .chk.ts-morning.on::after{border-color:var(--pal-yellow-text);}
 .chk.ts-afternoon{border-color:var(--pal-rose-border);}
-.chk.ts-afternoon.on{background:var(--pal-rose-bg);border-color:var(--pal-rose-text);}
+.chk.ts-afternoon.on{background:rgba(230,150,150,0.36);border-color:var(--pal-rose-text);}
 .chk.ts-afternoon.on::after{border-color:var(--pal-rose-text);}
 .chk.ts-night{border-color:var(--pal-lavender-border);}
-.chk.ts-night.on{background:var(--pal-lavender-bg);border-color:var(--pal-lavender-text);}
+.chk.ts-night.on{background:rgba(210,175,225,0.38);border-color:var(--pal-lavender-text);}
 .chk.ts-night.on::after{border-color:var(--pal-lavender-text);}
+.chk.ts-none{border-color:var(--pal-warmgray-border);}
+.chk.ts-none.on{background:rgba(195,180,168,0.38);border-color:var(--pal-warmgray-text);}
+.chk.ts-none.on::after{border-color:var(--pal-warmgray-text);}
 .todo-txt{flex:1;line-height:1.4;cursor:pointer;}
 .todo-txt.done{text-decoration:line-through;color:var(--tm);}
 .add-btn{display:flex;align-items:center;gap:7px;padding:0 11px;height:38px;box-sizing:border-box;background:rgba(255,250,240,.30);border:1.5px dashed color-mix(in srgb, var(--tp) 20%, transparent);border-radius:11px;color:var(--tm);font-size:var(--main-text-size);cursor:pointer;margin-top:8px;width:100%;font-family:'DM Sans',sans-serif;}
 .add-btn-row{display:flex;gap:8px;margin-top:8px;}
 .add-btn-half{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 8px;height:38px;box-sizing:border-box;background:rgba(255,250,240,.35);border:1.3px dashed color-mix(in srgb, var(--tp) 22%, transparent);border-radius:10px;color:var(--ts);font-size:calc(var(--main-text-size) - 1px);cursor:pointer;font-family:'DM Sans',sans-serif;position:relative;}
 .add-btn-half:active{opacity:.65;}
-.reserve-count-badge{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:var(--pink-bg);color:var(--ts);font-size:11px;line-height:1;margin-left:2px;}
+.reserve-count-badge{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:var(--pal-pink-bg);color:var(--ts);font-size:11px;line-height:1;margin-left:2px;}
 
 /* ── MEMO ── */
 .memo-item{display:flex;gap:9px;margin-bottom:8px;align-items:flex-start;position:relative;overflow:hidden;}
 .memo-time{font-size:var(--dow-label-size);color:var(--ts);white-space:nowrap;padding-top:6px;min-width:36px;}
 .memo-bub{background:rgba(255,190,165,0.06);border:none;border-left:2.5px solid rgba(225,140,120,0.45);border-radius:0 6px 6px 0;padding:6px 10px;font-size:var(--main-text-size);color:var(--tp);line-height:1.4;flex:1;}
-.memo-bub.tod-morning{background:rgba(255,205,170,0.05);border-left-color:var(--pal-yellow-border);}
-.memo-bub.tod-afternoon{background:rgba(255,170,180,0.05);border-left-color:var(--pal-rose-border);}
-.memo-bub.tod-night{background:rgba(190,150,200,0.06);border-left-color:var(--pal-lavender-border);}
+.memo-bub.tod-morning{background:rgba(255,205,170,0.05);border-left-color:rgba(235,180,20,0.22);}
+.memo-bub.tod-afternoon{background:rgba(255,170,180,0.05);border-left-color:rgba(205,95,95,0.22);}
+.memo-bub.tod-night{background:rgba(190,150,200,0.06);border-left-color:rgba(160,105,180,0.22);}
 .memo-bub.memo-bub-seed{background:rgba(180,205,205,0.08);border-left-color:rgba(120,155,160,0.65);}
 
 .undo-toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%) translateY(16px);background:rgba(60,40,40,.90);color:white;font-size:12px;padding:9px 18px;border-radius:20px;display:flex;align-items:center;gap:10px;opacity:0;transition:all .25s;z-index:10500;pointer-events:none;backdrop-filter:blur(8px);}
@@ -531,14 +530,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .hm-lbl{width:52px;flex-shrink:0;font-size:var(--dow-label-size);color:var(--ts);padding-top:2px;}
 .hm-dots{display:flex;flex-wrap:wrap;gap:3px;}
 .hm-dot{width:14px;height:14px;border-radius:4px;background:rgba(var(--divider-rgb),0.22);}
-.hm-dot.mint{background:rgba(140,210,200,.68);}
-.hm-dot.pink{background:rgba(var(--pink-rgb),.62);}
-.hm-dot.sky{background:rgba(155,205,255,.62);}
-.hm-dot.yellow{background:rgba(250,215,100,.60);}
-.hm-dot.rose{background:rgba(240,140,140,.62);}
-.hm-dot.lavender{background:rgba(185,165,230,.62);}
-.hm-dot.peach{background:rgba(255,185,140,.62);}
-.hm-dot.teal{background:rgba(100,195,185,.62);}
 
 /* ── CALENDAR ── */
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:0;}
@@ -621,14 +612,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cat-dropup.on{display:flex;}
 .cat-dropup-opt{width:32px;height:32px;border-radius:8px;border:none;background:transparent;display:flex;align-items:center;justify-content:center;color:var(--ts);font-size:15px;cursor:pointer;}
 .cat-dropup-opt.active{background:var(--acc-soft);color:var(--acc);}
-.cat-dropup-opt[data-cat="shop"].active{background:var(--ev-schedule-bg);color:var(--ev-schedule-text);}
-.cat-dropup-opt[data-cat="watch"].active{background:var(--ev-personal-bg);color:var(--ev-personal-text);}
-.cat-dropup-opt[data-cat="todo"].active{background:var(--pal-lime-bg);color:var(--pal-lime-text);}
+.cat-dropup-opt[data-cat="shop"].active{background:var(--pal-peach-bg);color:var(--pal-peach-text);}
+.cat-dropup-opt[data-cat="watch"].active{background:var(--pal-sky-bg);color:var(--pal-sky-text);}
+.cat-dropup-opt[data-cat="todo"].active{background:var(--pal-mint-bg);color:var(--pal-mint-text);}
 .cat-dropup-opt[data-cat="etc"].active{background:var(--pal-warmgray-bg);color:var(--pal-warmgray-text);}
 .item-cat-icon{width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;border:none;background:none;cursor:pointer;padding:0;-webkit-appearance:none;appearance:none;}
-.item-cat-icon.shop{color:var(--ev-schedule-text);}
-.item-cat-icon.watch{color:var(--ev-personal-text);}
-.item-cat-icon.todo{color:var(--pal-lime-text);}
+.item-cat-icon.shop{color:var(--pal-peach-text);}
+.item-cat-icon.watch{color:var(--pal-sky-text);}
+.item-cat-icon.todo{color:var(--pal-mint-text);}
 .item-cat-icon.etc{color:var(--pal-warmgray-text);}
 .cat-color-shop{background:var(--ev-schedule-bg);color:var(--ev-schedule-text);}
 .cat-color-watch{background:var(--ev-personal-bg);color:var(--ev-personal-text);}
@@ -719,9 +710,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 /* ══ DARK MODE OVERRIDES ══ */
 [data-theme="glass"] .memo-bub{background:none;border:none;border-left:2.5px solid rgba(180,160,150,0.45);border-radius:0;padding:2px 0 0 10px;}
-[data-theme="glass"] .memo-bub.tod-morning{background:none;border-left-color:var(--pal-yellow-border);}
-[data-theme="glass"] .memo-bub.tod-afternoon{background:none;border-left-color:var(--pal-rose-border);}
-[data-theme="glass"] .memo-bub.tod-night{background:none;border-left-color:var(--pal-lavender-border);}
+[data-theme="glass"] .memo-bub.tod-morning{background:none;border-left-color:rgba(235,180,20,0.22);}
+[data-theme="glass"] .memo-bub.tod-afternoon{background:none;border-left-color:rgba(205,95,95,0.22);}
+[data-theme="glass"] .memo-bub.tod-night{background:none;border-left-color:rgba(160,105,180,0.22);}
 [data-theme="glass"] .memo-bub.memo-bub-seed{background:none;border-left-color:rgba(120,155,160,0.70);}
 [data-theme="glass"] .memo-item{margin-bottom:14px;}
 /* ── READING HUB ── */
@@ -1098,7 +1089,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .home-hcard-divider{height:1px;background:rgba(200,170,160,0.20);margin:12px 0 4px;}
 .home-habit-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
 .home-habit-dot.mint{background:rgba(140,210,200,.85);}
-.home-habit-dot.pink{background:rgba(var(--pink-rgb),.42);}
+.home-habit-dot.pink{background:rgba(var(--pal-pink-rgb),.42);}
 .home-habit-dot.sky{background:rgba(130,190,255,.80);}
 .home-habit-dot.yellow{background:rgba(240,200,80,.80);}
 .home-habit-dot.rose{background:rgba(240,140,140,.80);}
@@ -4210,7 +4201,7 @@ function getHabitIcon(name){
   return rule?rule.icon:null;
 }
 function getHabitIconColor(name,habitColor){
-  if(habitColor)return getHabitColor(habitColor);
+  if(habitColor)return getHabitColorText(habitColor);
   if(!name)return 'var(--tp)';
   const rule=HABIT_ICON_RULES.find(r=>r.keywords.some(k=>name.includes(k)));
   return rule?rule.color:'var(--tp)';
@@ -5810,7 +5801,7 @@ function renderTodos(){
   sorted.forEach((t)=>{
     const i=t._i;
     const ts=t.timeSection||'none';
-    const tsClass=ts!=='none'?` ts-${ts}`:'';
+    const tsClass=` ts-${ts||'none'}`;
     const el=document.createElement('div');el.className='todo-item';
     el.dataset.todoIdx=i;
     el.dataset.tsGroup=ts;
@@ -7628,12 +7619,13 @@ function makeHabitMiniCheckRow(){
   habits.forEach(h=>{
     const checked=!!checks[h.name+'-'+dow];
     const hIcon=getHabitIcon(h.name);
-    const rgba=getHabitColor(h.color);
+    const rgba=getHabitColorSoft(h.color);
+    const rgbaText=getHabitColorText(h.color);
     const badge=document.createElement('div');
     badge.style.cssText=`width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;background:${checked?rgba:'rgba(var(--divider-rgb),0.15)'};`;
     badge.title=h.name;
     badge.innerHTML=hIcon
-      ?`<i class="ti ${hIcon}" style="font-size:15px;color:${checked?'#fff':'rgba(var(--divider-rgb),0.7)'};" aria-hidden="true"></i>`
+      ?`<i class="ti ${hIcon}" style="font-size:15px;color:${checked?rgbaText:'rgba(var(--divider-rgb),0.7)'};" aria-hidden="true"></i>`
       :`<span class="home-habit-dot ${checked?h.color:''}" style="width:9px;height:9px;${checked?'':'background:rgba(var(--divider-rgb),0.5);'}"></span>`;
     badge.addEventListener('click',function(){
       toggleHabitCheckWithTime(wk,h.name,dow,dateKey(_ld));
@@ -8515,6 +8507,10 @@ const WC_COLORS_TEXT=[
   'var(--pal-pink-text)','var(--pal-peach-text)','var(--pal-yellow-text)','var(--pal-mint-text)',
   'var(--pal-sky-text)','var(--pal-lavender-text)','var(--pal-rose-text)'
 ];
+const WC_COLORS_BORDER=[
+  'var(--pal-pink-border)','var(--pal-peach-border)','var(--pal-yellow-border)','var(--pal-mint-border)',
+  'var(--pal-sky-border)','var(--pal-lavender-border)','var(--pal-rose-border)'
+];
 function getWChallenge(wk){return S.get('wchallenge_'+wk)||[];}
 function saveWChallenge(wk,data){S.set('wchallenge_'+wk,data);S.set('wchallenge_pending_'+wk,true);}
 
@@ -8937,7 +8933,7 @@ function renderWeeklyChallenge(wk,containerId){
         const btn=document.createElement('div');btn.className='wchallenge-day'+(checked?' on':'');
         btn.textContent=WC_DAYS[di];
         if(checked)btn.style.background=WC_COLORS[di];
-        if(checked)btn.style.borderColor=WC_COLORS_TEXT[di];
+        if(checked)btn.style.borderColor=WC_COLORS_BORDER[di];
         if(checked)btn.style.color=WC_COLORS_TEXT[di];
         btn.addEventListener('click',()=>{
           items[idx].days[di]=!items[idx].days[di];save();renderItems();
@@ -9117,7 +9113,7 @@ function renderTimetable(){
       const catEl=document.createElement('div');catEl.className='tt-cat-fixed';
       if(tIdx===0){
         const meta=CAT_ICON_META[cat];
-        catEl.innerHTML=meta?`<span style="display:inline-flex;align-items:center;gap:4px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:4px;background:${getCatBarColor(cat)};flex-shrink:0;"><i class="ti ${meta.icon}" style="font-size:9px;color:#fff;" aria-hidden="true"></i></span><span>${CAT_LABELS[cat]}</span></span>`:CAT_LABELS[cat];
+        catEl.innerHTML=meta?`<span style="display:inline-flex;align-items:center;gap:4px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:4px;background:${meta.color};flex-shrink:0;"><i class="ti ${meta.icon}" style="font-size:9px;color:${meta.iconColor};" aria-hidden="true"></i></span><span>${CAT_LABELS[cat]}</span></span>`:CAT_LABELS[cat];
         catEl.addEventListener('click',()=>openContentModal(cat));
       }else{
         catEl.classList.add('tt-cat-sub');
@@ -9592,7 +9588,9 @@ function renderHabitMonthly(){
       const date=new Date(y,mo,d);const wk=weekKey(date);const dow=(date.getDay()+6)%7;
       const checked=getHabitChecks(wk)[`${h.name}-${dow}`];
       if(checked&&d<=habitLastDay)checked_cnt++;
-      const dot=document.createElement('div');dot.className='hm-dot'+(checked?' '+h.color:'');dots.appendChild(dot);
+      const dot=document.createElement('div');dot.className='hm-dot';
+      if(checked){dot.style.background=getHabitColorSoft(h.color);}
+      dots.appendChild(dot);
     }
     const pct=habitLastDay>0?Math.round(checked_cnt/habitLastDay*100):0;
     const pctEl=document.createElement('div');
@@ -10093,18 +10091,18 @@ function recordMealTime(dk,k){
   const now=new Date();
   patchMealField(dk,k,'time',`${pad(now.getHours())}:${pad(now.getMinutes())}`);
 }
-const HABIT_COLOR_RGBA={mint:'var(--pal-mint-solid)',pink:'var(--pal-pink-solid)',sky:'var(--pal-sky-solid)',yellow:'var(--pal-yellow-solid)'};
 const HABIT_COLOR_BG={mint:'var(--pal-mint-bg)',pink:'var(--pal-pink-bg)',sky:'var(--pal-sky-bg)',yellow:'var(--pal-yellow-bg)'};
 const HABIT_COLOR_TEXT={mint:'var(--pal-mint-text)',pink:'var(--pal-pink-text)',sky:'var(--pal-sky-text)',yellow:'var(--pal-yellow-text)'};
-function getHabitColor(colorKey){
-  return HABIT_COLOR_RGBA[colorKey]||'rgba(178,90,115,0.80)';
-}
+const HABIT_COLOR_BORDER={mint:'var(--pal-mint-border)',pink:'var(--pal-pink-border)',sky:'var(--pal-sky-border)',yellow:'var(--pal-yellow-border)'};
 // 배경으로 넓게 깔리는 곳(이번주 해빗현황 도트 등)엔 solid 대신 이 연한톤을 사용 — 파스텔 기조 유지
 function getHabitColorSoft(colorKey){
   return HABIT_COLOR_BG[colorKey]||'rgba(178,90,115,0.20)';
 }
 function getHabitColorText(colorKey){
   return HABIT_COLOR_TEXT[colorKey]||'rgba(178,90,115,0.90)';
+}
+function getHabitColorBorder(colorKey){
+  return HABIT_COLOR_BORDER[colorKey]||'rgba(178,90,115,0.55)';
 }
 // 습관 달성률 가로바용 — 앱 톤(따뜻한 베이지~피치 계열)에 맞춘 은은한 그라디언트.
 // 습관 색상과 무관하게 항상 자연스러운 톤이 나오도록 고정 그라디언트 사용.
@@ -10122,7 +10120,7 @@ function renderDailyHabitCheck(){
   habits.forEach(function(h){
     const key=h.name+'-'+dow;
     const checked=!!checks[key];
-    const rgba=getHabitColor(h.color);
+    const rgba=getHabitColorSoft(h.color);
     const rgbaText=getHabitColorText(h.color);
     const hIcon=getHabitIcon(h.name);
     const isGlass=document.documentElement.dataset.theme==='glass';
@@ -10131,10 +10129,11 @@ function renderDailyHabitCheck(){
         ?'<i class="ti '+hIcon+'" style="font-size:16px;color:'+rgbaText+';display:'+(checked?'block':'none')+';" aria-hidden="true"></i>'
         :'<i class="ti ti-check" style="font-size:15px;color:'+rgbaText+';display:'+(checked?'block':'none')+';" aria-hidden="true"></i>')
       :(hIcon
-        ?'<i class="ti '+hIcon+'" style="font-size:12px;color:#fff;display:'+(checked?'block':'none')+';" aria-hidden="true"></i>'
-        :'<i class="ti ti-check" style="font-size:12px;color:#fff;display:'+(checked?'block':'none')+';" aria-hidden="true"></i>');
+        ?'<i class="ti '+hIcon+'" style="font-size:12px;color:'+rgbaText+';display:'+(checked?'block':'none')+';" aria-hidden="true"></i>'
+        :'<i class="ti ti-check" style="font-size:12px;color:'+rgbaText+';display:'+(checked?'block':'none')+';" aria-hidden="true"></i>');
+    const rgbaBorder=getHabitColorBorder(h.color);
     const col=document.createElement('div');col.className='habit-check-col';
-    const chkStyle=checked?(isGlass?' style="border-color:'+rgbaText+';"':' style="background:'+rgba+';border-color:'+rgba+';"'):'';
+    const chkStyle=checked?(isGlass?' style="border-color:'+rgbaText+';"':' style="background:'+rgba+';border-color:'+rgbaBorder+';"'):'';
     col.innerHTML='<div class="habit-check-name">'+h.name+'</div><div class="habit-chk2'+(checked?' on':'')+'"'+chkStyle+'>'+innerMark+'</div>';
     col.querySelector('.habit-chk2').addEventListener('click',function(){
       toggleHabitCheckWithTime(wk,h.name,dow,dateKey(currentDate));
@@ -10445,13 +10444,14 @@ function renderWeeklyHabitBox(){
   let html='<div class="hw-daylabels">'+dayLabels.map(d=>'<span>'+d+'</span>').join('')+'</div>';
   habits.forEach(function(h){
     const rgbaBg=getHabitColorSoft(h.color);
+    const rgbaBorder=getHabitColorBorder(h.color);
     const rgbaText=getHabitColorText(h.color);
     let cnt=0,dotsHtml='';
     for(let d=0;d<7;d++){
       const on=!!checks[h.name+'-'+d];
       if(on)cnt++;
       const isToday=d===todayDow;
-      const borderColor=on?rgbaText:'rgba(var(--divider-rgb),0.5)';
+      const borderColor=on?rgbaBorder:'rgba(var(--divider-rgb),0.5)';
       const borderWidth=isToday?'2px':'1.3px';
       const bg=on?rgbaBg:'none';
       dotsHtml+='<div class="hw-dot-wrap"><div class="hw-dot" style="background:'+bg+';border-color:'+borderColor+';border-width:'+borderWidth+';"></div></div>';
