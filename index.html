@@ -6167,15 +6167,20 @@ function applyTodoReorder(idx,tsGroup,shift){
   renderTodos();
 }
 // 보관함 전체 목록 기준 순서 재기록(시간대 그룹 없음, 전체가 하나의 그룹)
+// idx는 원본 배열(getReserveTodos) 인덱스로 들어오므로, 화면과 동일하게 sortOrder 기준 정렬한 뒤
+// 그 정렬된 순서 안에서 현재 위치를 다시 찾아야 함(applyTodoReorder와 동일 패턴).
 function applyReserveReorder(idx,_g,shift){
   const todos=getReserveTodos();
-  const curPos=idx;
+  const sorted=todos.map((t,i)=>({...t,_i:i})).sort((a,b)=>(a.sortOrder!=null?a.sortOrder:9999)-(b.sortOrder!=null?b.sortOrder:9999));
+  const curPos=sorted.findIndex(t=>t._i===idx);
+  if(curPos<0)return;
   let newPos=curPos+shift;
-  newPos=Math.max(0,Math.min(todos.length-1,newPos));
+  newPos=Math.max(0,Math.min(sorted.length-1,newPos));
   if(newPos===curPos)return;
-  const [moved]=todos.splice(curPos,1);
-  todos.splice(newPos,0,moved);
-  todos.forEach((t,order)=>{t.sortOrder=order;});
+  const [moved]=sorted.splice(curPos,1);
+  sorted.splice(newPos,0,moved);
+  // 정렬된 순서대로 sortOrder를 1,2,3...으로 재기록(원본 todos 배열 위치에 반영)
+  sorted.forEach((t,order)=>{todos[t._i].sortOrder=order;});
   saveReserveTodos(todos);
   renderReserveList();
 }
