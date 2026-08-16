@@ -3491,7 +3491,7 @@ async function loadMonthlyReportContent(){
 
   const contentsHtml=stats.contentsList.length?`<div class="mr-card">
     <div class="mr-sec-title"><i class="ti ti-stack-2 ico-12" aria-hidden="true"></i> 콘텐츠 기록</div>
-    ${stats.contentsList.map(c=>`<div class="mr-wc-line"><span class="txt"><span style="display:inline-block;width:7px;height:7px;border-radius:2px;background:${getCatBarColor(c.cat)};margin-right:6px;"></span>${c.title}</span><span class="pct" style="color:var(--tm);font-weight:400;">${cStatusLabel(c)}</span></div>`).join('')}
+    ${stats.contentsList.map(c=>`<div class="mr-wc-line"><span class="txt"><span style="display:inline-block;width:7px;height:7px;border-radius:2px;background:${getCatDotColor(c.cat)};margin-right:6px;"></span>${c.title}</span><span class="pct" style="color:var(--tm);font-weight:400;">${cStatusLabel(c)}</span></div>`).join('')}
   </div>` : `<div class="mr-card"><div class="mr-sec-title"><i class="ti ti-stack-2 ico-12" aria-hidden="true"></i> 콘텐츠 기록</div><div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:8px 0;">이 달엔 기록한 콘텐츠가 없어요</div></div>`;
 
   el.innerHTML=`${goalHtml}<div id="mr-ai-slot"></div>${statsHtml}${rhythmHtml}${wcHtml}${contentsHtml}`;
@@ -4185,6 +4185,7 @@ const CAT_ICON_META={
   music:{icon:'ti-music',color:'var(--pal-lime-bg)',iconColor:'var(--pal-lime-text)'}
 };
 const CONTENT_BAR_COLOR={drama:'var(--pal-pink-text)',book:'var(--pal-yellow-text)',movie:'var(--pal-sky-text)',music:'var(--pal-lime-text)'};
+const CONTENT_DOT_COLOR={drama:'var(--pal-pink-border)',book:'var(--pal-yellow-border)',movie:'var(--pal-sky-border)',music:'var(--pal-lime-border)'};
 // 콘텐츠 카테고리 아이콘 배지(파스텔톤, CAT_ICON_META 기반) 색상
 function getCatColor(cat){
   return CAT_ICON_META[cat]?CAT_ICON_META[cat].color:'var(--tm)';
@@ -4192,6 +4193,10 @@ function getCatColor(cat){
 // 콘텐츠 바/점(진한 톤, dawn 리포트 기반) 색상
 function getCatBarColor(cat){
   return CONTENT_BAR_COLOR[cat]||'var(--tm)';
+}
+// 배경 없이 작은 점 단독으로 쓰이는 곳(오늘 본 콘텐츠 도트 등)엔 -text 대신 이 중간톤을 사용 — 월간탭 배지와 밝기 인상을 맞춤
+function getCatDotColor(cat){
+  return CONTENT_DOT_COLOR[cat]||'var(--tm)';
 }
 const HABIT_COLORS=['mint','pink','sky','yellow']; // 4개로 고정(2026-08-16) — 습관이 4개를 넘긴 적이 없어 8색 순환 구조가 불필요했음. 늘어나면 그때 다시 설계.
 const DEFAULT_HABITS=[{name:'운동',color:'mint'},{name:'독서',color:'pink'},{name:'영양제',color:'sky'},{name:'물',color:'yellow'}];
@@ -7881,7 +7886,7 @@ function makeDawnRecapCard(){
     html+=`<div class="day-recap-sec-title"><i class="ti ${RHYTHM_CATS.enjoy.icon}" style="font-size:12px;" aria-hidden="true"></i> 오늘 본 콘텐츠</div>`;
     if(!contentItems.some(c=>c.cat==='독서')){
       const readingLabel=readingMin>0?readingMin+'분':_daysSinceLastReading(dk)+'일째 안읽음';
-      html+=`<div class="recap-content-item"><span class="cdot" style="background:${getCatBarColor('book')};"></span>독서<span class="ctime">${readingLabel}</span></div>`;
+      html+=`<div class="recap-content-item"><span class="cdot" style="background:${getCatDotColor('book')};"></span>독서<span class="ctime">${readingLabel}</span></div>`;
     }
     // 같은 콘텐츠(카테고리+제목)를 여러 번 읽거나 봤을 경우 항목이 중복되지 않도록 병합.
     // 시간(분)은 각 블록의 실제 재생시간을 합산해 표시.
@@ -7900,7 +7905,7 @@ function makeDawnRecapCard(){
     });
     Array.from(mergedContentMap.values()).forEach(c=>{
       const key=catToKey(c.cat);
-      const dotColor=key?getCatBarColor(key):'rgba(190,160,230,0.80)';
+      const dotColor=key?getCatDotColor(key):'rgba(190,160,230,0.55)';
       const durLabel=c.dur>0?`${Math.floor(c.dur/60)}h${c.dur%60?' '+(c.dur%60)+'m':''}`.replace(/^0h /,''):'';
       html+=`<div class="recap-content-item"><span class="cdot" style="background:${dotColor};"></span>${c.cat||'감상'}<span class="ctime">${c.title}${durLabel?' · '+durLabel:''}</span></div>`;
     });
