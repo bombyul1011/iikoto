@@ -35,15 +35,15 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
    각 색상은 4종 세트: -rgb(base) / -bg(연한배경,~0.28) / -border(테두리,~0.55) / -text(진한텍스트) / -solid(진한배경+흰글자용)
    값을 바꿀 땐 이 블록만 수정하면 됨(각 코너는 여기 변수를 참조하도록 순차 교체 예정) */
 :root{
-  --pal-warmgray-rgb:195,180,168;--pal-warmgray-bg:rgba(195,180,168,0.55);--pal-warmgray-border:rgba(160,148,138,0.55);--pal-warmgray-text:rgba(128,118,108,0.95);--pal-warmgray-solid:rgba(160,148,138,0.88);
-  --pal-pink-rgb:255,175,200;--pal-pink-bg:rgba(255,175,200,0.38);--pal-pink-border:rgba(214,90,140,0.55);--pal-pink-text:rgba(178,60,105,0.9);--pal-pink-solid:rgba(200,80,120,0.92);
-  --pal-peach-rgb:255,190,130;--pal-peach-bg:rgba(255,190,130,0.58);--pal-peach-border:rgba(235,130,50,0.55);--pal-peach-text:rgba(185,90,20,0.95);--pal-peach-solid:rgba(235,130,50,0.90);
-  --pal-yellow-rgb:255,225,120;--pal-yellow-bg:rgba(255,225,120,0.60);--pal-yellow-border:rgba(235,180,20,0.55);--pal-yellow-text:rgba(170,125,0,0.95);--pal-yellow-solid:rgba(235,180,20,0.90);
-  --pal-mint-rgb:145,210,175;--pal-mint-bg:rgba(145,210,175,0.55);--pal-mint-border:rgba(70,155,110,0.55);--pal-mint-text:rgba(40,120,80,0.95);--pal-mint-solid:rgba(70,155,110,0.88);
-  --pal-sky-rgb:170,208,228;--pal-sky-bg:rgba(170,208,228,0.55);--pal-sky-border:rgba(75,145,180,0.55);--pal-sky-text:rgba(45,105,140,0.95);--pal-sky-solid:rgba(75,145,180,0.88);
-  --pal-lavender-rgb:210,175,225;--pal-lavender-bg:rgba(210,175,225,0.55);--pal-lavender-border:rgba(160,105,180,0.55);--pal-lavender-text:rgba(130,75,150,0.95);--pal-lavender-solid:rgba(160,105,180,0.88);
-  --pal-lime-rgb:200,220,140;--pal-lime-bg:rgba(200,220,140,0.55);--pal-lime-border:rgba(135,165,60,0.55);--pal-lime-text:rgba(95,120,35,0.95);--pal-lime-solid:rgba(135,165,60,0.88);
-  --pal-rose-rgb:230,150,150;--pal-rose-bg:rgba(230,150,150,0.52);--pal-rose-border:rgba(205,95,95,0.55);--pal-rose-text:rgba(165,60,60,0.95);--pal-rose-solid:rgba(205,95,95,0.88);
+  --pal-warmgray-rgb:195,180,168;--pal-warmgray-bg:rgba(195,180,168,0.55);--pal-warmgray-border:rgba(160,148,138,0.55);--pal-warmgray-text:rgba(128,118,108,0.95);
+  --pal-pink-rgb:255,175,200;--pal-pink-bg:rgba(255,175,200,0.38);--pal-pink-border:rgba(214,90,140,0.55);--pal-pink-text:rgba(178,60,105,0.9);
+  --pal-peach-rgb:255,190,130;--pal-peach-bg:rgba(255,190,130,0.58);--pal-peach-border:rgba(235,130,50,0.55);--pal-peach-text:rgba(185,90,20,0.95);
+  --pal-yellow-rgb:255,225,120;--pal-yellow-bg:rgba(255,225,120,0.60);--pal-yellow-border:rgba(235,180,20,0.55);--pal-yellow-text:rgba(170,125,0,0.95);
+  --pal-mint-rgb:145,210,175;--pal-mint-bg:rgba(145,210,175,0.55);--pal-mint-border:rgba(70,155,110,0.55);--pal-mint-text:rgba(40,120,80,0.95);
+  --pal-sky-rgb:170,208,228;--pal-sky-bg:rgba(170,208,228,0.55);--pal-sky-border:rgba(75,145,180,0.55);--pal-sky-text:rgba(45,105,140,0.95);
+  --pal-lavender-rgb:210,175,225;--pal-lavender-bg:rgba(210,175,225,0.55);--pal-lavender-border:rgba(160,105,180,0.55);--pal-lavender-text:rgba(130,75,150,0.95);
+  --pal-lime-rgb:200,220,140;--pal-lime-bg:rgba(200,220,140,0.55);--pal-lime-border:rgba(135,165,60,0.55);--pal-lime-text:rgba(95,120,35,0.95);
+  --pal-rose-rgb:230,150,150;--pal-rose-bg:rgba(230,150,150,0.52);--pal-rose-border:rgba(205,95,95,0.55);--pal-rose-text:rgba(165,60,60,0.95);
   --pal-mintlime:rgb(102,160,85); /* 민트+연두 중간톤 — 문장저장/문장코멘트/영양제/인용구칩 4곳 통합용, 2026-08-16 */
   --grad-pinkyellow:linear-gradient(120deg,rgba(255,210,230,0.80),rgba(255,230,200,0.70)); /* 핑크-옐로 카드 그라디언트 — reading-icon-btn 기준값, mr-goal-card는 알파만 더 연하게 별도 지정 */
   --grad-mintyellow:linear-gradient(135deg,rgba(210,244,225,0.85),rgba(248,245,200,0.85),rgba(212,242,222,0.85)); /* 민트-옐로 3색 그라디언트 — weekly-review-banner-inner/report-banner-inner/quote-chip-inner 공용, 2026-08-16 통합 */
@@ -55,10 +55,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 /* ══ EVENT CATEGORY COLORS — 단일 소스. 값 변경 시 여기만 고치면 JS(EVENT_CATS)·모달버튼·캘린더배지에 모두 반영됨 ══
    2026-08-16: 공용 팔레트(--pal-*) 참조로 전환 — 약속=라벤더, 개인=옐로, 업무=민트, 기타=웜그레이 */
 :root{
-  --ev-schedule:var(--pal-lavender-solid);--ev-schedule-text:var(--pal-lavender-text);--ev-schedule-bg:var(--pal-lavender-bg);--ev-schedule-border:var(--pal-lavender-border);
-  --ev-personal:var(--pal-yellow-solid);--ev-personal-text:var(--pal-yellow-text);--ev-personal-bg:var(--pal-yellow-bg);--ev-personal-border:var(--pal-yellow-border);
-  --ev-work:var(--pal-mint-solid);--ev-work-text:var(--pal-mint-text);--ev-work-bg:var(--pal-mint-bg);--ev-work-border:var(--pal-mint-border);
-  --ev-etc:var(--pal-warmgray-solid);--ev-etc-text:var(--pal-warmgray-text);--ev-etc-bg:var(--pal-warmgray-bg);--ev-etc-border:var(--pal-warmgray-border);
+  --ev-schedule-text:var(--pal-lavender-text);--ev-schedule-bg:var(--pal-lavender-bg);--ev-schedule-border:var(--pal-lavender-border);
+  --ev-personal-text:var(--pal-yellow-text);--ev-personal-bg:var(--pal-yellow-bg);--ev-personal-border:var(--pal-yellow-border);
+  --ev-work-text:var(--pal-mint-text);--ev-work-bg:var(--pal-mint-bg);--ev-work-border:var(--pal-mint-border);
+  --ev-etc-text:var(--pal-warmgray-text);--ev-etc-bg:var(--pal-warmgray-bg);--ev-etc-border:var(--pal-warmgray-border);
 }
 /* ══ THEME TOKENS ══ */
 :root,[data-theme="light"]{
@@ -1012,7 +1012,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .oneline-row:last-child{border-bottom:none;}
 .oneline-day-wrap{display:flex;align-items:center;width:26px;flex-shrink:0;}
 .oneline-day{font-size:var(--dow-label-size);color:var(--ts);font-weight:500;white-space:nowrap;}
-.oneline-today .oneline-day{color:var(--acc);}
+.oneline-today .oneline-day{color:var(--acc);font-weight:700;}
 .oneline-divider{
   width:0;border:none;
   border-left:1px dashed rgba(var(--divider-rgb),0.28);
@@ -1126,7 +1126,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .hw-row{display:flex;align-items:center;gap:0;padding:4px 0;}
 .hw-row+.hw-row{border-top:1px solid rgba(var(--divider-rgb),0.22);}
 .hw-name{width:58px;flex-shrink:0;font-size:var(--dow-label-size);color:var(--ts);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:5px;}
-.hw-name-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.hw-name-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;border:1px solid rgba(0,0,0,0.06);}
 .hw-dots{flex:1;display:flex;}
 .hw-dot-wrap{flex:1;display:flex;justify-content:center;}
 .hw-dot{width:9px;height:9px;border-radius:50%;border-style:solid;box-sizing:border-box;}
@@ -2382,10 +2382,10 @@ function getRhythmColor(key){
 // 값을 바꿀 땐 그 CSS 블록만 고치면 여기·모달버튼·캘린더배지에 자동 반영됨.
 function _evVar(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim();}
 const EVENT_CATS={
-  schedule:{label:'약속',color:_evVar('--ev-schedule'),textColor:_evVar('--ev-schedule-border'),bg:_evVar('--ev-schedule-bg'),icon:'ti-confetti'},
-  personal:{label:'개인',color:_evVar('--ev-personal'),textColor:_evVar('--ev-personal-border'),bg:_evVar('--ev-personal-bg'),icon:'ti-plant'},
-  work:{label:'업무',color:_evVar('--ev-work'),textColor:_evVar('--ev-work-border'),bg:_evVar('--ev-work-bg'),icon:'ti-moneybag-heart'},
-  etc:{label:'기타',color:_evVar('--ev-etc'),textColor:_evVar('--ev-etc-border'),bg:_evVar('--ev-etc-bg'),icon:'ti-calendar-smile'}
+  schedule:{label:'약속',textColor:_evVar('--ev-schedule-border'),bg:_evVar('--ev-schedule-bg'),icon:'ti-confetti'},
+  personal:{label:'개인',textColor:_evVar('--ev-personal-border'),bg:_evVar('--ev-personal-bg'),icon:'ti-plant'},
+  work:{label:'업무',textColor:_evVar('--ev-work-border'),bg:_evVar('--ev-work-bg'),icon:'ti-moneybag-heart'},
+  etc:{label:'기타',textColor:_evVar('--ev-etc-border'),bg:_evVar('--ev-etc-bg'),icon:'ti-calendar-smile'}
 };
 function getEventCat(key){return EVENT_CATS[key]||EVENT_CATS.etc;}
 function getRhythmBlocks(dk){return S.get(S.key('rblocks',dk))||[];}
@@ -10468,7 +10468,7 @@ function renderWeeklyHabitBox(){
       const bg=on?rgbaBg:'none';
       dotsHtml+='<div class="hw-dot-wrap"><div class="hw-dot" style="background:'+bg+';border-color:'+borderColor+';border-width:'+borderWidth+';"></div></div>';
     }
-    html+='<div class="hw-row"><div class="hw-name"><span class="hw-name-dot" style="background:'+rgbaText+';"></span>'+h.name+'</div><div class="hw-dots">'+dotsHtml+'</div><div class="hw-streak">'+cnt+'/7</div></div>';
+    html+='<div class="hw-row"><div class="hw-name"><span class="hw-name-dot" style="background:'+rgbaBg+';"></span>'+h.name+'</div><div class="hw-dots">'+dotsHtml+'</div><div class="hw-streak">'+cnt+'/7</div></div>';
   });
   el.innerHTML=html;
 }
