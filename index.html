@@ -1371,6 +1371,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="slabel-row">
         <div class="slabel">오늘 할 일</div>
         <div style="display:flex;align-items:center;gap:4px;">
+          <button class="slabel-search-btn" id="todo-night-postpone-btn" onclick="openNightPostponeSheet()" title="오늘 잔여 투두 내일로 미루기" style="display:none;"><i class="ti ti-moon ico-sz-15" aria-hidden="true"></i></button>
           <button class="slabel-search-btn" id="todo-pinned-filter-btn" onclick="toggleTodoPinnedFilter()" title="강조만 보기"><i class="ti ti-bolt ico-sz-15" aria-hidden="true"></i></button>
           <button class="slabel-search-btn" id="todo-reorder-btn" onclick="toggleTodoReorderMode()" title="순서 변경"><i class="ti ti-menu-2 ico-sz-15" aria-hidden="true"></i></button>
         </div>
@@ -1552,6 +1553,18 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 <!-- TODO SHEET -->
 <!-- RESERVE TODO SHEET -->
+<div class="overlay" id="night-postpone-sheet" onclick="closeSheet('night-postpone-sheet',event)">
+  <div class="bsheet" style="max-height:80vh;overflow-y:auto;" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" style="border-bottom:none;">내일로 미룰 항목 선택</div>
+    <div id="night-postpone-list" style="padding:0 16px;"></div>
+    <div class="modal-actions" style="padding:12px 16px 16px;">
+      <button class="mbtn cancel" onclick="closeSheet('night-postpone-sheet')">취소</button>
+      <button class="mbtn ok" onclick="confirmNightPostpone()">선택 항목 미루기</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="reserve-sheet" onclick="closeSheet('reserve-sheet',event)">
   <div class="bsheet" style="max-height:80vh;overflow-y:auto;" onclick="event.stopPropagation()">
     <div class="sheet-handle"></div>
@@ -5867,10 +5880,57 @@ function toggleTodoReorderMode(){
   document.getElementById('todo-reorder-btn')?.classList.toggle('on',_todoReorderMode);
   renderTodos();
 }
+let _nightPostponeChecked=new Set();
+function openNightPostponeSheet(){
+  _nightPostponeChecked=new Set();
+  const dk=dateKey(currentDate),todos=getTodos(dk);
+  const targets=todos.map((t,i)=>({...t,_i:i})).filter(t=>!t.done&&!t.isEvent);
+  const list=document.getElementById('night-postpone-list');
+  if(!targets.length){
+    list.innerHTML='<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:16px 0;">오늘 남은 할 일이 없어요</div>';
+  }else{
+    list.innerHTML=targets.map(t=>
+      `<div class="event-item" style="cursor:pointer;" onclick="toggleNightPostponeCheck(${t._i},this)">`+
+      `<div class="chk" data-idx="${t._i}"></div>`+
+      `<span class="event-txt">${escapeHtml(t.text)}</span>`+
+      `</div>`
+    ).join('');
+  }
+  openSheet('night-postpone-sheet');
+}
+function toggleNightPostponeCheck(idx,rowEl){
+  if(_nightPostponeChecked.has(idx))_nightPostponeChecked.delete(idx);
+  else _nightPostponeChecked.add(idx);
+  rowEl.querySelector('.chk')?.classList.toggle('on',_nightPostponeChecked.has(idx));
+}
+function confirmNightPostpone(){
+  if(!_nightPostponeChecked.size){closeSheet('night-postpone-sheet');return;}
+  const dk=dateKey(currentDate);
+  const tom=new Date(currentDate);tom.setDate(tom.getDate()+1);
+  const tdk=dateKey(tom);
+  // 인덱스가 큰 것부터 처리해야 splice로 인한 인덱스 밀림이 없음
+  const idxs=[...(_nightPostponeChecked)].sort((a,b)=>b-a);
+  let movedCount=0;
+  idxs.forEach(idx=>{
+    const result=relocateTodo(dk,idx,tdk,'move');
+    if(result.success)movedCount++;
+  });
+  closeSheet('night-postpone-sheet');
+  renderTodos();
+  showToast(movedCount?`${movedCount}개를 내일로 옮겼어요`:'옮기지 못했어요');
+}
 function renderTodos(){
   const dk=dateKey(currentDate),todos=getTodos(dk);
   renderEventList(dk,todos);
   updateReserveCountBadge();
+  // 밤 시간대(22:00-23:59)이고 오늘 날짜를 보고 있을 때만 일괄 미루기 아이콘 노출
+  const nightBtn=document.getElementById('todo-night-postpone-btn');
+  if(nightBtn){
+    const h=new Date().getHours();
+    const isNight=h>=22&&h<24;
+    const isTodayView=dk===dateKey(new Date());
+    nightBtn.style.display=(isNight&&isTodayView)?'':'none';
+  }
   const list=document.getElementById('todo-list');if(!list)return;
   list.innerHTML='';
   const sorted=[...todos.map((t,i)=>({...t,_i:i})).filter(t=>!t.isEvent).filter(t=>!_todoPinnedFilter||t.pinned)].sort((a,b)=>{
