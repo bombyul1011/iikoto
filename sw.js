@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260817-5-pinned-color-final';
+const CACHE = 'iikoto-v20260818-1-redeploy';
 const ASSETS = [
   './',
   './index.html'
