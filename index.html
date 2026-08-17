@@ -37,7 +37,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 :root{
   --pal-warmgray-rgb:195,180,168;--pal-warmgray-bg:rgba(195,180,168,0.55);--pal-warmgray-border:rgba(160,148,138,0.55);--pal-warmgray-text:rgba(128,118,108,0.95);
   --pal-pink-rgb:255,175,200;--pal-pink-bg:rgba(255,175,200,0.38);--pal-pink-border:rgba(214,90,140,0.55);--pal-pink-text:rgba(178,60,105,0.9);
-  --pal-peach-rgb:255,190,130;--pal-peach-bg:rgba(255,190,130,0.58);--pal-peach-border:rgba(235,130,50,0.55);--pal-peach-text:rgba(185,90,20,0.95);
+  --pal-orange-rgb:255,190,130;--pal-orange-bg:rgba(255,190,130,0.58);--pal-orange-border:rgba(235,130,50,0.55);--pal-orange-text:rgba(185,90,20,0.95);
   --pal-yellow-rgb:255,225,120;--pal-yellow-bg:rgba(255,225,120,0.60);--pal-yellow-border:rgba(235,180,20,0.55);--pal-yellow-text:rgba(170,125,0,0.95);
   --pal-mint-rgb:145,210,175;--pal-mint-bg:rgba(145,210,175,0.55);--pal-mint-border:rgba(70,155,110,0.55);--pal-mint-text:rgba(40,120,80,0.95);
   --pal-sky-rgb:170,208,228;--pal-sky-bg:rgba(170,208,228,0.55);--pal-sky-border:rgba(75,145,180,0.55);--pal-sky-text:rgba(45,105,140,0.95);
@@ -187,7 +187,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .reserve-section-btn{flex:1;padding:7px 0;border-radius:10px;border:1px solid var(--card-b);background:var(--card);font-size:var(--dow-label-size);color:var(--tm);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;}
 .reserve-section-btn.active{background:var(--pal-pink-bg);color:var(--pal-pink-text);border-color:var(--pal-pink-border);font-weight:600;}
 #reserve-filter-row .reserve-section-btn[data-filter="all"].active{background:var(--card);color:var(--tm);border-color:var(--card-b);font-weight:600;}
-#reserve-filter-row .reserve-section-btn[data-filter="shop"].active{background:var(--pal-peach-bg);color:var(--pal-peach-text);border-color:var(--pal-peach-border);}
+#reserve-filter-row .reserve-section-btn[data-filter="shop"].active{background:var(--pal-orange-bg);color:var(--pal-orange-text);border-color:var(--pal-orange-border);}
 #reserve-filter-row .reserve-section-btn[data-filter="watch"].active{background:var(--pal-sky-bg);color:var(--pal-sky-text);border-color:var(--pal-sky-border);}
 #reserve-filter-row .reserve-section-btn[data-filter="todo"].active{background:var(--pal-mint-bg);color:var(--pal-mint-text);border-color:var(--pal-mint-border);}
 #reserve-filter-row .reserve-section-btn[data-filter="etc"].active{background:var(--pal-warmgray-bg);color:var(--pal-warmgray-text);border-color:var(--pal-warmgray-border);}
@@ -435,6 +435,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .todo-kind-tabs button{flex:1;padding:12px 0;border:none;background:rgba(200,180,170,0.12);color:var(--tm);font-size:var(--dow-label-size);cursor:pointer;font-family:'DM Sans',sans-serif;transition:background .15s,color .15s;display:flex;align-items:center;justify-content:center;gap:5px;}
 .todo-kind-tabs button.active{background:var(--card);color:var(--tp);font-weight:600;}
 .chk{width:16px;height:16px;border-radius:5px;border:1.5px solid rgba(200,160,160,0.55);flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;}
+.todo-pinned-chk{width:16px;height:16px;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:17px;color:var(--pal-orange-border);}
 .chk.on{background:rgba(var(--pal-pink-rgb),0.20);border-color:var(--pal-pink-border);}
 .chk.on::after{content:'';width:7px;height:4px;border-left:1.5px solid white;border-bottom:1.5px solid white;transform:rotate(-45deg) translateY(-1px);}
 .chk.ts-morning{border-color:var(--pal-yellow-border);}
@@ -614,22 +615,23 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .reserve-del-btn{background:none;border:none;padding:5px 0 5px 2px;cursor:pointer;color:var(--tm);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .reserve-item .item-actions{display:flex;gap:0;flex-shrink:0;}
 #reserve-filter-row .slabel-search-btn.on{color:var(--pal-pink-text);opacity:1;}
+#todo-pinned-filter-btn.on{color:var(--pal-orange-border);opacity:1;}
 /* 보관함 카테고리 */
 .cat-select-wrap{position:relative;flex-shrink:0;}
 .cat-dropup{position:absolute;top:40px;left:0;display:none;flex-direction:column;gap:4px;background:var(--card);border:1px solid var(--card-b);border-radius:11px;padding:5px;box-shadow:0 4px 16px rgba(0,0,0,0.12);z-index:5;}
 .cat-dropup.on{display:flex;}
 .cat-dropup-opt{width:32px;height:32px;border-radius:8px;border:none;background:transparent;display:flex;align-items:center;justify-content:center;color:var(--ts);font-size:15px;cursor:pointer;}
 .cat-dropup-opt.active{background:var(--pal-pink-bg);color:var(--pal-pink-text);}
-.cat-dropup-opt[data-cat="shop"].active{background:var(--pal-peach-bg);color:var(--pal-peach-text);}
+.cat-dropup-opt[data-cat="shop"].active{background:var(--pal-orange-bg);color:var(--pal-orange-text);}
 .cat-dropup-opt[data-cat="watch"].active{background:var(--pal-sky-bg);color:var(--pal-sky-text);}
 .cat-dropup-opt[data-cat="todo"].active{background:var(--pal-mint-bg);color:var(--pal-mint-text);}
 .cat-dropup-opt[data-cat="etc"].active{background:var(--pal-warmgray-bg);color:var(--pal-warmgray-text);}
 .item-cat-icon{width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;border:none;background:none;cursor:pointer;padding:0;-webkit-appearance:none;appearance:none;}
-.item-cat-icon.shop{color:var(--pal-peach-border);}
+.item-cat-icon.shop{color:var(--pal-orange-border);}
 .item-cat-icon.watch{color:var(--pal-sky-border);}
 .item-cat-icon.todo{color:var(--pal-mint-border);}
 .item-cat-icon.etc{color:var(--pal-warmgray-border);}
-.cat-color-shop{background:var(--pal-peach-bg);color:var(--pal-peach-text);}
+.cat-color-shop{background:var(--pal-orange-bg);color:var(--pal-orange-text);}
 .cat-color-watch{background:var(--pal-sky-bg);color:var(--pal-sky-text);}
 .cat-color-todo{background:var(--pal-mint-bg);color:var(--pal-mint-text);}
 .cat-color-etc{background:var(--pal-warmgray-bg);color:var(--pal-warmgray-text);}
@@ -644,6 +646,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .modal{width:calc(100% - 48px);max-width:300px;max-height:85vh;overflow-y:auto;background:var(--modal);border:1px solid rgba(255,255,255,.80);border-radius:22px;padding:22px 20px;box-shadow:0 8px 40px rgba(0,0,0,.18);box-sizing:border-box;}
 .modal-title{font-size:var(--main-text-size);font-weight:500;color:var(--ts);margin-bottom:16px;}
 .modal-inp{width:100%;background:var(--inp);border:1px solid var(--inp-b);border-radius:12px;padding:11px 14px;font-size:var(--main-text-size);color:var(--tp);font-family:'DM Sans',sans-serif;outline:none;margin-bottom:12px;}
+.todo-pinned-btn{flex-shrink:0;width:24px;height:24px;background:none;border:none;padding:0;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:19px;color:var(--pal-warmgray-border);transition:all .15s;}
+.todo-pinned-btn.on{color:var(--pal-orange-border);}
 .modal-inp::placeholder{color:var(--tm);}
 .time-inp{font-size:22px;font-weight:300;text-align:center;letter-spacing:1px;box-sizing:border-box;width:150px;padding:11px 10px;margin:0 auto 12px;display:block;}
 .modal-actions{display:flex;gap:8px;margin-top:8px;}
@@ -1103,7 +1107,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .home-habit-dot.yellow{background:rgba(240,200,80,.80);}
 .home-habit-dot.rose{background:rgba(240,140,140,.80);}
 .home-habit-dot.lavender{background:rgba(185,165,230,.80);}
-.home-habit-dot.peach{background:rgba(255,185,140,.80);}
+.home-habit-dot.orange{background:rgba(255,185,140,.80);}
 .home-habit-dot.teal{background:rgba(100,195,185,.80);}
 .home-content-info{flex:1;min-width:0;}
 
@@ -1365,6 +1369,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="slabel-row">
         <div class="slabel">오늘 할 일</div>
         <div style="display:flex;align-items:center;gap:4px;">
+          <button class="slabel-search-btn" id="todo-pinned-filter-btn" onclick="toggleTodoPinnedFilter()" title="강조만 보기"><i class="ti ti-bolt ico-sz-15" aria-hidden="true"></i></button>
           <button class="slabel-search-btn" id="todo-reorder-btn" onclick="toggleTodoReorderMode()" title="순서 변경"><i class="ti ti-menu-2 ico-sz-15" aria-hidden="true"></i></button>
         </div>
       </div>
@@ -1770,7 +1775,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <button class="tk-todo active" onclick="selectTodoKind('todo',this)"><i class="ti ti-checkbox ico-sz-13" aria-hidden="true"></i> 할일</button>
       <button class="tk-event" onclick="selectTodoKind('event',this)"><i class="ti ti-calendar-event ico-sz-13" aria-hidden="true"></i> 일정</button>
     </div>
-    <input type="text" class="modal-inp" id="todo-modal-inp" placeholder="할 일을 입력하세요" autocomplete="off" onkeydown="if(event.isComposing||event.keyCode===229)return;if(event.key==='Enter'){event.preventDefault();confirmTodo();}">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+      <input type="text" class="modal-inp" id="todo-modal-inp" placeholder="할 일을 입력하세요" autocomplete="off" style="flex:1;margin-bottom:0;" onkeydown="if(event.isComposing||event.keyCode===229)return;if(event.key==='Enter'){event.preventDefault();confirmTodo();}">
+      <button type="button" id="todo-pinned-toggle" class="todo-pinned-btn" onclick="toggleTodoPinnedDraft()" title="오늘 안에 강조" aria-label="오늘 안에 강조"><i class="ti ti-bolt-filled" aria-hidden="true"></i></button>
+    </div>
     <div class="todo-time-sel" id="todo-time-sel">
       <button class="ts-morning" onclick="selectTodoTime('morning',this)">오전</button>
       <button class="ts-afternoon" onclick="selectTodoTime('afternoon',this)">오후</button>
@@ -4483,6 +4491,8 @@ function compareTodoOrder(a,b){
   const ta=TODO_TS_ORDER[a.timeSection||'none']??3;
   const tb=TODO_TS_ORDER[b.timeSection||'none']??3;
   if(ta!==tb)return ta-tb;
+  const pa=a.pinned?0:1,pb=b.pinned?0:1;
+  if(pa!==pb)return pa-pb; // 같은 시간대 안에서 강조(볼트) 항목이 최상단
   if(typeof a.sortOrder==='number'&&typeof b.sortOrder==='number')return a.sortOrder-b.sortOrder;
   return parseTodoLeadingTime(a.text)-parseTodoLeadingTime(b.text);
 }
@@ -4878,7 +4888,7 @@ async function syncTodosDown(dk){
   if(!rows)return; // 연결 실패(null) — 로컬 유지. 빈 배열은 "서버에 진짜 0개"라는 뜻이라 그대로 반영.
   if(S.get(S.key('todos_pending',dk)))return; // 업로드 대기중인 로컬 수정(미루기 등) 있으면 덮어쓰지 않음
   S.set(S.key('todos',dk),rows.map(function(r){
-    return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null,eventEndDate:r.event_end_date||null,cat:r.cat||'todo'};
+    return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null,eventEndDate:r.event_end_date||null,cat:r.cat||'todo',pinned:!!r.pinned};
   }));
   renderTodos();
 }
@@ -4887,7 +4897,7 @@ async function syncTodosUp(dk){
   if(ensureItemCids(todos))S.set(S.key('todos',dk),todos);
   const delCids=getDelPendingCids('todos',dk);
   const ok=await syncListUpSafe('todos',`date_key=eq.${dk}`,'date_key,client_id',todos,
-    t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,strike_parts:t.strikeParts||[],strike_times:t.strikeTimes||{},completed_at:(t.completedAt!=null?t.completedAt:null),sort_order:(typeof t.sortOrder==='number'?t.sortOrder:null),is_event:!!t.isEvent,event_cat:t.eventCat||null,event_time:t.eventTime||null,event_end_date:t.eventEndDate||null,cat:t.cat||'todo'}),
+    t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,strike_parts:t.strikeParts||[],strike_times:t.strikeTimes||{},completed_at:(t.completedAt!=null?t.completedAt:null),sort_order:(typeof t.sortOrder==='number'?t.sortOrder:null),is_event:!!t.isEvent,event_cat:t.eventCat||null,event_time:t.eventTime||null,event_end_date:t.eventEndDate||null,cat:t.cat||'todo',pinned:!!t.pinned}),
     delCids);
   if(ok)delCids.forEach(cid=>removeDelPending('todos',dk,cid));
   return ok;
@@ -5801,6 +5811,12 @@ function confirmTime(){
 let _todoSwipeIdx=-1;
 let _eventSheetDk='',_eventSheetCid=''; // 일정 시트 대상 — 인덱스 대신 dk+cid로 저장해 화면 재렌더링에도 안전하게 유지
 let _todoReorderMode=false;
+let _todoPinnedFilter=false;
+function toggleTodoPinnedFilter(){
+  _todoPinnedFilter=!_todoPinnedFilter;
+  document.getElementById('todo-pinned-filter-btn')?.classList.toggle('on',_todoPinnedFilter);
+  renderTodos();
+}
 // 부분완료(조각모드) 기능은 트랙패드 드래그가 브라우저 기본 텍스트선택과 충돌해
 // PC에서 스와이프가 정상 동작하지 않으므로, 터치 지원 기기(모바일)에서만 활성화한다.
 function _isTouchDevice(){
@@ -5818,10 +5834,14 @@ function renderTodos(){
   updateReserveCountBadge();
   const list=document.getElementById('todo-list');if(!list)return;
   list.innerHTML='';
-  const sorted=[...todos.map((t,i)=>({...t,_i:i})).filter(t=>!t.isEvent)].sort((a,b)=>{
+  const sorted=[...todos.map((t,i)=>({...t,_i:i})).filter(t=>!t.isEvent).filter(t=>!_todoPinnedFilter||t.pinned)].sort((a,b)=>{
     if(a.done!==b.done)return a.done?1:-1;
     return compareTodoOrder(a,b);
   });
+  if(_todoPinnedFilter&&!sorted.length){
+    list.innerHTML='<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:12px 0;">강조한 할 일이 없어요</div>';
+    return;
+  }
   sorted.forEach((t)=>{
     const i=t._i;
     const ts=t.timeSection||'none';
@@ -5834,7 +5854,10 @@ function renderTodos(){
     const partModeStyle=_todoPartModeIdx===i?'background:rgba(255,255,255,0.45);border-radius:8px;padding:2px 6px;':'';
     const rmEligible=_todoReorderMode&&!t.done;
     const handleHtml=`<div class="todo-drag-handle${rmEligible?' rm-eligible':''}"><i class="ti ti-grip-vertical ico-sz-13" aria-hidden="true"></i></div>`;
-    el.innerHTML=`${handleHtml}<div class="chk${tsClass}${t.done?' on':''}" onclick="toggleTodo(${i},'${t.cid||''}')"></div><span class="todo-txt${t.done?' done':''}" data-todo-i="${i}" style="${partModeStyle}">${textHtml}</span>`;
+    const chkHtml=(!t.done&&t.pinned)
+      ? `<div class="todo-pinned-chk" onclick="toggleTodo(${i},'${t.cid||''}')"><i class="ti ti-bolt-filled" aria-hidden="true"></i></div>`
+      : `<div class="chk${tsClass}${t.done?' on':''}" onclick="toggleTodo(${i},'${t.cid||''}')"></div>`;
+    el.innerHTML=`${handleHtml}${chkHtml}<span class="todo-txt${t.done?' done':''}" data-todo-i="${i}" style="${partModeStyle}">${textHtml}</span>`;
     const hasMultipleParts=_isTouchDevice()&&parseTodoTextParts(t.text).parts.length>1;
     if(rmEligible){
       attachTodoReorderDrag(el,i,ts);
@@ -8018,6 +8041,10 @@ function openTodoModal(editIdx=-1){
   const activeBtn=document.querySelector(`.todo-time-sel button.ts-${ts}`);
   if(activeBtn)activeBtn.classList.add('active');
   modal.dataset.timeSection=ts;
+  // 강조(볼트) 상태 초기화 — 편집 시 기존값 복원, 신규는 항상 꺼짐
+  const pinned=!!existing?.pinned;
+  modal.dataset.pinned=pinned?'1':'';
+  document.getElementById('todo-pinned-toggle')?.classList.toggle('on',pinned);
   // 일정 카테고리 버튼 초기화 — 항상 유효한 카테고리 하나(기본 schedule)를 유지, '일정 아님' 상태는 없음
   const ec=existing?.isEvent?(existing.eventCat||'schedule'):'schedule';
   document.querySelectorAll('.todo-event-sel button').forEach(b=>b.classList.remove('active'));
@@ -8124,6 +8151,12 @@ function selectTodoTime(ts,btn){
   btn.classList.add('active');
   document.getElementById('todo-modal').dataset.timeSection=ts;
 }
+function toggleTodoPinnedDraft(){
+  const modal=document.getElementById('todo-modal');
+  const on=modal.dataset.pinned==='1';
+  modal.dataset.pinned=on?'':'1';
+  document.getElementById('todo-pinned-toggle')?.classList.toggle('on',!on);
+}
 function selectTodoEventCat(cat,btn){
   document.querySelectorAll('.todo-event-sel button').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
@@ -8162,6 +8195,7 @@ function confirmTodo(){
   const editIdx=modal.dataset.editIdx!==''&&modal.dataset.editIdx!=null?parseInt(modal.dataset.editIdx):-1;
   const timeSection=modal.dataset.timeSection||'none';
   const isEvent=modal.dataset.kind==='event';
+  const pinned=!isEvent&&modal.dataset.pinned==='1'; // 일정에는 강조 개념 없음, 할일에만 적용
   const eventCat=isEvent?(modal.dataset.eventCat||'schedule'):'';
   const eventTime=isEvent?(document.getElementById('todo-event-time-inp').dataset.value||null):null;
   // 시작일(=일정이 속한 date_key) — 아코디언에서 바꾸지 않았다면 modal.dataset.eventStartDate가 원래 dk와 같음
@@ -8176,7 +8210,7 @@ function confirmTodo(){
     todos.splice(editIdx,1);
     saveTodos(dk,todos);
     const targetTodos=getTodos(newDk);
-    targetTodos.push({text,done:old.done||false,created:old.created||Date.now(),timeSection,isEvent:true,eventCat,eventTime,eventEndDate,cid:old.cid,strikeParts:[],strikeTimes:{}});
+    targetTodos.push({text,done:old.done||false,created:old.created||Date.now(),timeSection,isEvent:true,eventCat,eventTime,eventEndDate,cid:old.cid,strikeParts:[],strikeTimes:{},pinned:false});
     saveTodos(newDk,targetTodos);
     closeModal('todo-modal');
     restoreCalModeAndRender(modal,true);
@@ -8212,8 +8246,9 @@ function confirmTodo(){
     }
     old.text=text;old.timeSection=timeSection;
     old.isEvent=isEvent;old.eventCat=isEvent?eventCat:null;old.eventTime=isEvent?eventTime:null;old.eventEndDate=isEvent?eventEndDate:null;
+    old.pinned=pinned;
   }
-  else todos.push({text,done:false,created:Date.now(),timeSection,isEvent,eventCat:isEvent?eventCat:null,eventTime:isEvent?eventTime:null,eventEndDate:isEvent?eventEndDate:null,cid:genCid()});
+  else todos.push({text,done:false,created:Date.now(),timeSection,isEvent,eventCat:isEvent?eventCat:null,eventTime:isEvent?eventTime:null,eventEndDate:isEvent?eventEndDate:null,cid:genCid(),pinned});
   saveTodos(dk,todos);closeModal('todo-modal');
   // 월간 캘린더의 "이 날에 일정 추가"에서 열린 경우 — currentDate를 원래대로 되돌리고 캘린더/상세를 갱신
   // (calMode가 아니면 restoreCalModeAndRender 내부에서 renderTodos만 실행됨)
@@ -8523,7 +8558,7 @@ function jumpToMemoDateFromSeed(dk){
 const WC_DAYS=['M','T','W','T','F','S','S'];
 const WC_COLORS=[
   'var(--pal-pink-bg)', // 월 — 핑크
-  'var(--pal-peach-bg)', // 화 — 피치
+  'var(--pal-orange-bg)', // 화 — 오렌지
   'var(--pal-yellow-bg)', // 수 — 옐로
   'var(--pal-mint-bg)', // 목 — 민트
   'var(--pal-sky-bg)', // 금 — 스카이
@@ -8531,11 +8566,11 @@ const WC_COLORS=[
   'var(--pal-rose-bg)', // 일 — 로즈(팔레트에 라일락 없어 대체)
 ];
 const WC_COLORS_TEXT=[
-  'var(--pal-pink-text)','var(--pal-peach-text)','var(--pal-yellow-text)','var(--pal-mint-text)',
+  'var(--pal-pink-text)','var(--pal-orange-text)','var(--pal-yellow-text)','var(--pal-mint-text)',
   'var(--pal-sky-text)','var(--pal-lavender-text)','var(--pal-rose-text)'
 ];
 const WC_COLORS_BORDER=[
-  'var(--pal-pink-border)','var(--pal-peach-border)','var(--pal-yellow-border)','var(--pal-mint-border)',
+  'var(--pal-pink-border)','var(--pal-orange-border)','var(--pal-yellow-border)','var(--pal-mint-border)',
   'var(--pal-sky-border)','var(--pal-lavender-border)','var(--pal-rose-border)'
 ];
 function getWChallenge(wk){return S.get('wchallenge_'+wk)||[];}
@@ -9670,7 +9705,7 @@ async function syncMonthRange(y,mo){
   }
   if(tRows){
     const byDate={};
-    tRows.forEach(r=>{if(r.date_key===RESERVE_DK)return;/* 예비투두 관련 로직은 파일 하단 RESERVE_DK 블록(getReserveTodos 등) 참고 */(byDate[r.date_key]=byDate[r.date_key]||[]).push({text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null,eventEndDate:r.event_end_date||null});});
+    tRows.forEach(r=>{if(r.date_key===RESERVE_DK)return;/* 예비투두 관련 로직은 파일 하단 RESERVE_DK 블록(getReserveTodos 등) 참고 */(byDate[r.date_key]=byDate[r.date_key]||[]).push({text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null,eventEndDate:r.event_end_date||null,pinned:!!r.pinned});});
     Object.keys(byDate).forEach(dk=>{if(!S.get(S.key('todos_pending',dk)))S.set(S.key('todos',dk),byDate[dk]);});
   }
   if(sRows)sRows.forEach(r=>{if(!S.get(S.key('sleep_pending',r.date_key)))S.set(S.key('sleep',r.date_key),sleepRowToLocal(r));});
@@ -10131,7 +10166,7 @@ function getHabitColorText(colorKey){
 function getHabitColorBorder(colorKey){
   return HABIT_COLOR_BORDER[colorKey]||'var(--pal-pink-border)';
 }
-// 습관 달성률 가로바용 — 앱 톤(따뜻한 베이지~피치 계열)에 맞춘 은은한 그라디언트.
+// 습관 달성률 가로바용 — 앱 톤(따뜻한 베이지~오렌지 계열)에 맞춘 은은한 그라디언트.
 // 습관 색상과 무관하게 항상 자연스러운 톤이 나오도록 고정 그라디언트 사용.
 // G안: 세이지 → 샌드 → 버터, 동일 채도·명도로 톤온톤 연결.
 function _habitPctBarGradient(){
@@ -12811,7 +12846,7 @@ async function forceRestoreDate(dk){
   }
   var trows=await supaFetch('todos?date_key=eq.'+dk+'&order=created');
   if(trows!==null){
-    S.set(S.key('todos',dk),trows.map(function(r){return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null,eventEndDate:r.event_end_date||null};}));
+    S.set(S.key('todos',dk),trows.map(function(r){return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null,eventEndDate:r.event_end_date||null,pinned:!!r.pinned};}));
   }
   var srows=await supaFetch('sleep?date_key=eq.'+dk);
   if(srows&&srows.length>0){
