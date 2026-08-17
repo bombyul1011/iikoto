@@ -243,6 +243,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .todo-item{display:flex;align-items:center;gap:9px;padding:5px 0;border-bottom:1px solid rgba(240,220,130,0.30);font-size:var(--main-text-size);color:var(--tp);position:relative;overflow:hidden;user-select:none;}
 .event-item{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid rgba(var(--divider-rgb),0.30);font-size:var(--main-text-size);color:var(--tp);cursor:pointer;}
 .event-item:last-child{border-bottom:none;}
+.event-item.event-past{opacity:0.45;}
+.event-item.event-past .event-txt{text-decoration:line-through;}
 .event-txt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .event-time{font-size:var(--dow-label-size);color:var(--ts);flex-shrink:0;font-variant-numeric:tabular-nums;}
 .event-daycount{background:rgba(185,165,230,0.20);color:#8a76b8;padding:2px 7px;border-radius:8px;font-weight:600;}
@@ -5899,8 +5901,20 @@ function renderEventList(dk,todos){
   const all=[...events,...multiday];
   if(!all.length){section.style.display='none';list.innerHTML='';return;}
   section.style.display='block';
-  // 정렬: 시간 있는 하루짜리 → 연속일정(며칠차 오름차순) → 시간 없는 하루짜리
+  // 오늘 실제 날짜(자정 기준)일 때만 '완료(지남)' 판정 적용 — 다른 날짜(과거/미래 조회)엔 적용 안 함
+  const isToday=dk===dateKey(new Date());
+  const nowMin=new Date().getHours()*60+new Date().getMinutes();
+  const isPast=(ev)=>{
+    if(!isToday||!ev.eventTime||ev.eventEndDate)return false;
+    const m=ev.eventTime.match(/^(\d{1,2}):(\d{2})$/);
+    if(!m)return false;
+    const evMin=parseInt(m[1],10)*60+parseInt(m[2],10);
+    return nowMin>=evMin+60; // 지정 시간 +60분 지나면 '완료'로 간주
+  };
+  // 정렬: 미완료 먼저(시간 있는 하루짜리 → 연속일정(며칠차 오름차순) → 시간 없는 하루짜리), 완료(지난 시간)는 맨 뒤로 밀림
   const sorted=[...all].sort((a,b)=>{
+    const aP=isPast(a),bP=isPast(b);
+    if(aP!==bP)return aP?1:-1;
     const aM=!!a.eventEndDate,bM=!!b.eventEndDate;
     if(aM!==bM){
       // 연속일정은 시간유무와 무관하게 '시간 있는 하루짜리' 바로 다음, '시간 없는 하루짜리'보다는 앞
@@ -5917,7 +5931,7 @@ function renderEventList(dk,todos){
   sorted.forEach(ev=>{
     const ec=getEventCat(ev.eventCat);
     const el=document.createElement('div');
-    el.className='event-item';
+    el.className='event-item'+(isPast(ev)?' event-past':'');
     // 클릭하면 투두와 동일하게 하단 시트(수정/삭제)를 먼저 염 — 하루짜리는 오늘 dk, 연속일정은 시작일(_startDk) 기준
     const targetDk=ev.eventEndDate?ev._startDk:dk;
     el.onclick=()=>openEventSheet(targetDk,ev.cid,ev.text);
