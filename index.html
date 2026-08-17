@@ -4209,10 +4209,10 @@ const HABIT_COLORS=['mint','pink','sky','yellow']; // 4개로 고정(2026-08-16)
 const DEFAULT_HABITS=[{name:'운동',color:'mint'},{name:'독서',color:'pink'},{name:'영양제',color:'sky'},{name:'물',color:'yellow'}];
 // 습관명은 자유 텍스트라 완전 자동매칭엔 한계가 있음 — 이름에 특정 키워드가 포함되면 아이콘을 붙이고, 매칭 안 되면 아이콘 없이 텍스트만 표시
 const HABIT_ICON_RULES=[
-  {keywords:['운동','헬스','필라테스','런닝','러닝','조깅'],icon:'ti-run',color:'#c07a4a'},
-  {keywords:['독서','책'],icon:'ti-book',color:'var(--pal-mauvepink)'},
-  {keywords:['일기','다이어리','글쓰기'],icon:'ti-pencil-heart',color:'#5a7a9a'},
-  {keywords:['영양제','비타민','약'],icon:'ti-pill',color:'var(--pal-mintlime)'}
+  {keywords:['운동','헬스','필라테스','런닝','러닝','조깅'],icon:'ti-run',color:'var(--pal-mint-border)'},
+  {keywords:['독서','책'],icon:'ti-book',color:'var(--pal-pink-border)'},
+  {keywords:['일기','다이어리','글쓰기'],icon:'ti-pencil-heart',color:'var(--pal-sky-border)'},
+  {keywords:['영양제','비타민','약'],icon:'ti-pill',color:'var(--pal-yellow-border)'}
 ];
 function getHabitIcon(name){
   if(!name)return null;
@@ -4220,10 +4220,10 @@ function getHabitIcon(name){
   return rule?rule.icon:null;
 }
 function getHabitIconColor(name,habitColor){
-  if(habitColor)return getHabitColorText(habitColor);
-  if(!name)return 'var(--tp)';
+  if(habitColor)return getHabitColorBorder(habitColor);
+  if(!name)return 'var(--tm)';
   const rule=HABIT_ICON_RULES.find(r=>r.keywords.some(k=>name.includes(k)));
-  return rule?rule.color:'var(--tp)';
+  return rule?rule.color:'var(--tm)';
 }
 
 // ── STORAGE
@@ -6268,6 +6268,9 @@ function confirmCopyWholeTodo(){
 const AFTERNOON_TODO_GOAL=5,AFTERNOON_HABIT_GOAL=4,AFTERNOON_MORNING_GOAL=4;
 
 // 아침 루틴
+// 이 배너 전용 색 세트 — JS로 rgba/color-mix 동적 조합되는 특성상 공용 --pal-* CSS변수와 자동연동 불가.
+// 2026-08-17 팔레트값으로 교체 시도했다가 롤백: 팔레트 원색이 바뀌어도 이 배너는 안 따라오므로,
+// 오히려 "자동 반영되는 것처럼 보이지만 실제로는 스냅샷"인 상태가 혼란을 줄 수 있어 전용 색으로 명확히 분리 유지.
 const MORNING_ROUTINE_ITEMS=[
   {key:'wake',label:'기상',icon:'ti-sunset-2',colorRgb:'252,215,110'},
   {key:'tea',label:'티타임',icon:'ti-mug',colorRgb:'244,177,206'},
