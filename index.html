@@ -8553,6 +8553,8 @@ function renderMemos(){
     el.appendChild(time);el.appendChild(bub);
     list.appendChild(el);
   });
+  // 내부 스크롤 첫 노출 위치를 하단(가장 최근 메모)으로 고정
+  list.scrollTop=list.scrollHeight;
   setupMemoInlineInput();
   list.scrollTop=0;
 }
