@@ -10486,8 +10486,7 @@ function buildRhythmFormEl(showOngoingList){
       contentPickerHtml=nearbySchedules.length?(
         '<div class="rhythm-content-picker">'+
         nearbySchedules.map(function(s){
-          const full=s.time+' '+s.title;
-          return '<span class="rhythm-content-chip" style="--sel-color:'+selColor+';--sel-bg:'+selBg+';" onclick="pickRhythmContentTitle(\''+full.replace(/'/g,"\\'")+'\',this)">'+full+'</span>';
+          return '<span class="rhythm-content-chip" style="--sel-color:'+selColor+';--sel-bg:'+selBg+';" onclick="pickRhythmContentTitle(\''+s.title.replace(/'/g,"\\'")+'\',this)">'+s.title+'</span>';
         }).join('')+
         '</div>'
       ):'';
