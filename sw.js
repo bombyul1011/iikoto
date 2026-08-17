@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260817-1-color-palette-final';
+const CACHE = 'iikoto-v20260817-2-cal-today-badge';
 const ASSETS = [
   './',
   './index.html'
