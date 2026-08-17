@@ -4850,6 +4850,26 @@ function getOngoingWatchingContents(){
   });
   return result.slice(0,4);
 }
+// 리듬바 "외출" 입력 시, 현재 시각(±60분) 근처에 시간이 지정된 일정을 선택용으로 제공.
+// 15시 일정이면 14시~16시 사이에 외출 블록을 열 때 후보로 뜨는 구조 — 더 일찍/늦게 나가는 경우를 감안한 여유폭.
+// 하루종일(시간 미지정) 일정은 대상에서 제외.
+function getNearbyTimedSchedules(){
+  const now=new Date();
+  const dk=dateKey(now);
+  const nowMin=now.getHours()*60+now.getMinutes();
+  const todos=getTodos(dk);
+  const result=[];
+  todos.forEach(function(t){
+    if(!t.isEvent||!t.eventTime)return;
+    const m=t.eventTime.match(/^(\d{1,2}):(\d{2})$/);
+    if(!m)return;
+    const evMin=parseInt(m[1],10)*60+parseInt(m[2],10);
+    if(Math.abs(evMin-nowMin)>60)return;
+    result.push({time:t.eventTime,title:t.text});
+  });
+  result.sort((a,b)=>a.time.localeCompare(b.time));
+  return result;
+}
 function saveContents(mk,v){
   const prev=S.get(S.key('contents',mk))||[];
   const prevByCid={};
@@ -10457,6 +10477,16 @@ function buildRhythmFormEl(showOngoingList){
         ongoingContents.map(function(c){
           const catLabel=c.cat==='drama'?'드라마':'영화';
           const full=catLabel+' - '+c.title;
+          return '<span class="rhythm-content-chip" style="--sel-color:'+selColor+';--sel-bg:'+selBg+';" onclick="pickRhythmContentTitle(\''+full.replace(/'/g,"\\'")+'\',this)">'+full+'</span>';
+        }).join('')+
+        '</div>'
+      ):'';
+    } else if(_rhythmFormCat==='appointment'){
+      const nearbySchedules=getNearbyTimedSchedules();
+      contentPickerHtml=nearbySchedules.length?(
+        '<div class="rhythm-content-picker">'+
+        nearbySchedules.map(function(s){
+          const full=s.time+' '+s.title;
           return '<span class="rhythm-content-chip" style="--sel-color:'+selColor+';--sel-bg:'+selBg+';" onclick="pickRhythmContentTitle(\''+full.replace(/'/g,"\\'")+'\',this)">'+full+'</span>';
         }).join('')+
         '</div>'
