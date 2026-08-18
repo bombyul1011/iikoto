@@ -934,14 +934,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .chaeum-log-card{background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:16px 17px 4px;}
 .chaeum-log-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;}
 .chaeum-log-title{font-size:15px;font-weight:600;color:var(--tp);display:flex;align-items:center;gap:6px;}
-.chaeum-log-title i{font-size:16px;color:var(--pal-orange-text);}
+.chaeum-log-title i{font-size:16px;color:var(--pal-mint-text);}
 .chaeum-log-goto{font-size:var(--dow-label-size);color:var(--tm);display:flex;align-items:center;gap:2px;cursor:pointer;flex-shrink:0;}
 .chaeum-log-stat{font-size:var(--dow-label-size);color:var(--tm);margin:2px 0 12px;}
 
 .chaeum-log-chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:12px;margin-bottom:14px;border-bottom:1px solid rgba(var(--divider-rgb),0.3);-webkit-overflow-scrolling:touch;}
 .chaeum-log-chips::-webkit-scrollbar{display:none;}
 .chaeum-log-chip{flex-shrink:0;font-size:var(--dow-label-size);color:var(--ts);background:rgba(var(--pal-warmgray-rgb),0.16);border-radius:9px;padding:5px 10px;white-space:nowrap;}
-.chaeum-log-chip.on{background:rgba(var(--pal-orange-rgb),0.30);color:var(--pal-orange-text);font-weight:500;}
+.chaeum-log-chip.on{background:rgba(var(--pal-mint-rgb),0.30);color:var(--pal-mint-text);font-weight:500;}
 
 .chaeum-log-tl{position:relative;padding-left:6px;}
 .chaeum-log-item{position:relative;display:flex;gap:12px;padding:0 0 20px;}
@@ -950,19 +950,28 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .chaeum-log-line-wrap{position:relative;width:8px;flex-shrink:0;display:flex;justify-content:center;}
 .chaeum-log-line-wrap::before{content:'';position:absolute;top:11px;bottom:-20px;width:1px;background:rgba(var(--divider-rgb),0.35);}
 .chaeum-log-item:last-child .chaeum-log-line-wrap::before{display:none;}
-.chaeum-log-dot{width:7px;height:7px;border-radius:50%;background:var(--pal-orange-text);margin-top:5px;flex-shrink:0;z-index:1;}
+.chaeum-log-dot{width:7px;height:7px;border-radius:50%;background:var(--pal-mint-text);margin-top:5px;flex-shrink:0;z-index:1;}
 .chaeum-log-dot.ing{background:transparent;border:1.4px solid var(--tm);}
 .chaeum-log-txt{flex:1;min-width:0;cursor:pointer;}
 .chaeum-log-txt-title{font-size:var(--main-text-size);color:var(--tp);line-height:1.5;}
-.chaeum-log-txt-cat{font-size:10px;color:var(--pal-orange-text);margin-top:3px;}
+.chaeum-log-txt-cat{font-size:10px;color:var(--pal-mint-text);margin-top:3px;}
 
-.chaeum-log-expand{background:rgba(var(--pal-orange-rgb),0.14);border-radius:10px;padding:0 12px;font-size:var(--dow-label-size);color:var(--ts);line-height:1.6;max-height:0;overflow:hidden;opacity:0;transition:max-height .25s ease,opacity .2s ease,margin-top .25s ease,padding .25s ease;}
+.chaeum-log-expand{background:rgba(var(--pal-mint-rgb),0.14);border-radius:10px;padding:0 12px;font-size:var(--dow-label-size);color:var(--ts);line-height:1.6;max-height:0;overflow:hidden;opacity:0;transition:max-height .25s ease,opacity .2s ease,margin-top .25s ease,padding .25s ease;}
 .chaeum-log-expand.open{max-height:260px;opacity:1;margin-top:8px;padding:10px 12px;}
-.chaeum-log-expand-lbl{font-size:10px;color:var(--pal-orange-text);font-weight:500;margin-bottom:3px;}
+.chaeum-log-expand-lbl{font-size:10px;color:var(--pal-mint-text);font-weight:500;margin-bottom:3px;}
 .chaeum-log-expand-comment{margin-top:7px;padding-top:7px;border-top:1px dashed rgba(var(--divider-rgb),0.4);font-style:italic;}
 
 .chaeum-log-more{text-align:center;font-size:var(--dow-label-size);color:var(--tm);padding:6px 0 10px;cursor:pointer;}
 .chaeum-log-loading{font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:16px 0;}
+
+.chaeum-home-banner{position:relative;border-radius:16px;padding:1.5px;background:linear-gradient(135deg,rgba(150,215,180,0.95),rgba(235,220,120,0.90),rgba(165,222,188,0.95),rgba(150,215,180,0.95));background-size:300% 300%;animation:bannerShine 4s ease infinite;cursor:pointer;margin-top:10px;margin-bottom:10px;}
+.chaeum-home-banner-inner{border-radius:14.5px;background:var(--grad-mintyellow);padding:13px 17px;display:flex;align-items:center;gap:12px;}
+.chaeum-home-banner-icon{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,0.55);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px;color:rgba(40,120,80,0.85);}
+.chaeum-home-banner-txt{flex:1;min-width:0;}
+.chaeum-home-banner-app{font-size:9.5px;font-weight:700;letter-spacing:0.08em;color:rgba(65,125,70,0.75);margin-bottom:3px;}
+.chaeum-home-banner-title{font-size:var(--main-text-size);color:rgba(70,90,55,0.92);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.chaeum-home-banner-cat{font-size:var(--dow-label-size);color:rgba(100,140,75,0.80);margin-top:2px;}
+.chaeum-home-banner-arrow{font-size:16px;color:rgba(80,130,85,0.55);flex-shrink:0;}
 .rd-status-btn.active{background:var(--pal-pink-bg);color:var(--pal-pink-text);}
 .rd-del-btn{color:var(--tm);cursor:pointer;margin-left:auto;display:inline-flex;align-items:center;}
 .rd-empty{font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:14px 0;}
@@ -2340,6 +2349,7 @@ function renderHomeBody(section){
     }
     const isNight2=getSubSection()==='night_2';
     if(!isNight2){
+      body.appendChild(makeChaeumHomeBanner());
       body.appendChild(makeHabitMiniCheckRow());
       body.appendChild(makeEveningMiniStatCard());
     }
@@ -6653,6 +6663,44 @@ function _paceTopRhythmCat(dk){
 // 저녁 파트1용 미니통계 카드 — 당일 기록 기준(완료 투두 / 체크 습관 / 오늘의 최다 리듬), 오후 통계카드보다 훨씬 컴팩트하게
 // 저녁 홈탭 — 오늘 활동 분포(점 타임라인) 카드. 내용 없으면 카드 자체를 만들지 않음.
 // ── 채움 진입점 (풀스크린) — 채움로그(별도 앱/DB) 데이터를 읽기 전용으로 불러와 타임라인 표시 ──
+// ── 저녁 홈탭 파트2 채움 배너 — 오늘 최근 학습 1개 미리보기(캐시 우선, 없으면 오늘자 1건만 가볍게 조회) ──
+function makeChaeumHomeBanner(){
+  const wrap=document.createElement('div');
+  wrap.className='chaeum-home-banner';
+  wrap.innerHTML='<div class="chaeum-home-banner-inner"><div class="chaeum-home-banner-txt"><div class="chaeum-home-banner-app">CHAEUMLOG</div><div class="chaeum-home-banner-title">불러오는 중...</div></div></div>';
+  wrap.addEventListener('click',openChaeum);
+  const todayDk=dateKey(getLogicalDate());
+  const cache=S.get('chaeum_home_cache');
+  const cachedToday=cache&&cache.sessions&&cache.sessions.find(s=>s.date_key===todayDk);
+  if(cachedToday){
+    fillChaeumHomeBanner(wrap,cachedToday);
+  }else{
+    fetchChaeumTodaySession(todayDk).then(s=>fillChaeumHomeBanner(wrap,s));
+  }
+  return wrap;
+}
+async function fetchChaeumTodaySession(dk){
+  try{
+    const res=await fetch(CHAEUM_SUPA_URL+'/rest/v1/sessions?select=title,category,status&date_key=eq.'+dk+'&order=created_at.desc&limit=1',{headers:{'apikey':CHAEUM_SUPA_KEY,'Authorization':'Bearer '+CHAEUM_SUPA_KEY}});
+    if(!res.ok)return null;
+    const rows=await res.json();
+    return rows[0]||null;
+  }catch(e){return null;}
+}
+function fillChaeumHomeBanner(wrap,session){
+  const inner=wrap.querySelector('.chaeum-home-banner-inner');
+  if(!inner)return;
+  const titleHtml=session?escapeHtml(session.title||''):'오늘의 채움을 시작해볼까요';
+  const catHtml=session&&session.category?'<div class="chaeum-home-banner-cat">'+escapeHtml(session.category)+'</div>':'';
+  inner.innerHTML=
+    '<div class="chaeum-home-banner-icon"><i class="ti ti-clover" aria-hidden="true"></i></div>'+
+    '<div class="chaeum-home-banner-txt">'+
+      '<div class="chaeum-home-banner-app">CHAEUMLOG</div>'+
+      '<div class="chaeum-home-banner-title">'+titleHtml+'</div>'+
+      catHtml+
+    '</div>'+
+    '<i class="ti ti-chevron-right chaeum-home-banner-arrow" aria-hidden="true"></i>';
+}
 function openChaeum(){
   document.getElementById('chaeum-ov').classList.add('on');
   renderChaeumLog();
@@ -6680,6 +6728,7 @@ async function renderChaeumLog(){
   const slot=document.getElementById('chaeum-log-slot');
   if(!slot)return;
   const [categories,sessions]=await Promise.all([fetchChaeumCategories(),fetchChaeumSessions(8)]);
+  if(sessions!=null)S.set('chaeum_home_cache',{ts:Date.now(),sessions});
   if(sessions==null){
     slot.innerHTML='<div class="chaeum-log-loading">불러오지 못했어요<br><span onclick="window.location.href=\''+CHAEUM_LOG_URL+'\'" style="text-decoration:underline;cursor:pointer;">채움로그에서 확인하기</span></div>';
     return;
