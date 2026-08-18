@@ -6680,6 +6680,7 @@ function _paceTopRhythmCat(dk){
 // 저녁 홈탭 — 오늘 활동 분포(점 타임라인) 카드. 내용 없으면 카드 자체를 만들지 않음.
 // ── 채움 진입점 (풀스크린) — 채움로그(별도 앱/DB) 데이터를 읽기 전용으로 불러와 타임라인 표시 ──
 // ── 저녁 홈탭 파트2 채움 배너 — 오늘 최근 학습 1개 미리보기(캐시 우선, 없으면 오늘자 1건만 가볍게 조회) ──
+const CHAEUM_CACHE_TTL=5*60*1000; // 캐시 유효시간(5분) — 이 안이면 패널을 열 때도 재요청하지 않고 재사용
 function makeChaeumHomeBanner(){
   const wrap=document.createElement('div');
   wrap.className='chaeum-home-banner';
@@ -6687,21 +6688,16 @@ function makeChaeumHomeBanner(){
   wrap.addEventListener('click',openChaeum);
   const todayDk=dateKey(getLogicalDate());
   const cache=S.get('chaeum_home_cache');
-  const cachedToday=cache&&cache.sessions&&cache.sessions.find(s=>s.date_key===todayDk);
-  if(cachedToday){
-    fillChaeumHomeBanner(wrap,cachedToday);
+  const fresh=cache&&(Date.now()-cache.ts<CHAEUM_CACHE_TTL);
+  if(fresh){
+    fillChaeumHomeBanner(wrap,(cache.sessions||[]).find(s=>s.date_key===todayDk)||null);
   }else{
-    fetchChaeumTodaySession(todayDk).then(s=>fillChaeumHomeBanner(wrap,s));
+    fetchChaeumSessions(8).then(sessions=>{
+      if(sessions!=null){S.set('chaeum_home_cache',{ts:Date.now(),sessions});_chaeumSessionsCache=sessions;}
+      fillChaeumHomeBanner(wrap,(sessions||[]).find(s=>s.date_key===todayDk)||null);
+    });
   }
   return wrap;
-}
-async function fetchChaeumTodaySession(dk){
-  try{
-    const res=await fetch(CHAEUM_SUPA_URL+'/rest/v1/sessions?select=title,category,status&date_key=eq.'+dk+'&order=created_at.desc&limit=1',{headers:{'apikey':CHAEUM_SUPA_KEY,'Authorization':'Bearer '+CHAEUM_SUPA_KEY}});
-    if(!res.ok)return null;
-    const rows=await res.json();
-    return rows[0]||null;
-  }catch(e){return null;}
 }
 function fillChaeumHomeBanner(wrap,session){
   const inner=wrap.querySelector('.chaeum-home-banner-inner');
@@ -6744,18 +6740,29 @@ let _chaeumSessionsCache=[];
 async function renderChaeumLog(){
   const slot=document.getElementById('chaeum-log-slot');
   if(!slot)return;
-  const [categories,sessions]=await Promise.all([fetchChaeumCategories(),fetchChaeumSessions(8)]);
-  if(sessions!=null){S.set('chaeum_home_cache',{ts:Date.now(),sessions});_chaeumSessionsCache=sessions;}
+  const cache=S.get('chaeum_home_cache');
+  const fresh=cache&&(Date.now()-cache.ts<CHAEUM_CACHE_TTL);
+  const [categories,sessions]=await Promise.all([
+    fetchChaeumCategories(),
+    fresh?Promise.resolve(cache.sessions):fetchChaeumSessions(8)
+  ]);
+  if(sessions!=null&&!fresh){S.set('chaeum_home_cache',{ts:Date.now(),sessions});}
+  if(sessions!=null)_chaeumSessionsCache=sessions;
   if(sessions==null){
     slot.innerHTML='<div class="chaeum-log-loading">불러오지 못했어요<br><span onclick="window.location.href=\''+CHAEUM_LOG_URL+'\'" style="text-decoration:underline;cursor:pointer;">채움로그에서 확인하기</span></div>';
     return;
   }
-  const totalRes=await fetch(CHAEUM_SUPA_URL+'/rest/v1/sessions?select=id',{headers:{'apikey':CHAEUM_SUPA_KEY,'Authorization':'Bearer '+CHAEUM_SUPA_KEY,'Prefer':'count=exact'}}).catch(()=>null);
   let totalCount=sessions.length;
-  if(totalRes&&totalRes.ok){
-    const cr=totalRes.headers.get('content-range'); // 형식: "0-7/24"
-    const m=cr&&cr.match(/\/(\d+)$/);
-    if(m)totalCount=parseInt(m[1],10);
+  if(fresh&&cache.totalCount!=null){
+    totalCount=cache.totalCount;
+  }else{
+    const totalRes=await fetch(CHAEUM_SUPA_URL+'/rest/v1/sessions?select=id',{headers:{'apikey':CHAEUM_SUPA_KEY,'Authorization':'Bearer '+CHAEUM_SUPA_KEY,'Prefer':'count=exact'}}).catch(()=>null);
+    if(totalRes&&totalRes.ok){
+      const cr=totalRes.headers.get('content-range'); // 형식: "0-7/24"
+      const m=cr&&cr.match(/\/(\d+)$/);
+      if(m)totalCount=parseInt(m[1],10);
+    }
+    S.set('chaeum_home_cache',{ts:Date.now(),sessions,totalCount});
   }
   const chipsHtml=(categories||[]).map(c=>'<div class="chaeum-log-chip">'+escapeHtml(c.name_ko)+'</div>').join('');
   const itemsHtml=sessions.length?sessions.map((s,i)=>{
