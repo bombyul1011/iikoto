@@ -930,6 +930,39 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .chaeum-ov.on{transform:translateX(0);pointer-events:auto;}
 .chaeum-body{padding:16px 18px 30px;display:flex;flex-direction:column;gap:18px;}
 .chaeum-empty{font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:8px 0;}
+
+.chaeum-log-card{background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:16px 17px 4px;}
+.chaeum-log-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;}
+.chaeum-log-title{font-size:15px;font-weight:600;color:var(--tp);display:flex;align-items:center;gap:6px;}
+.chaeum-log-title i{font-size:16px;color:var(--pal-orange-text);}
+.chaeum-log-goto{font-size:var(--dow-label-size);color:var(--tm);display:flex;align-items:center;gap:2px;cursor:pointer;flex-shrink:0;}
+.chaeum-log-stat{font-size:var(--dow-label-size);color:var(--tm);margin:2px 0 12px;}
+
+.chaeum-log-chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:12px;margin-bottom:14px;border-bottom:1px solid rgba(var(--divider-rgb),0.3);-webkit-overflow-scrolling:touch;}
+.chaeum-log-chips::-webkit-scrollbar{display:none;}
+.chaeum-log-chip{flex-shrink:0;font-size:var(--dow-label-size);color:var(--ts);background:rgba(var(--pal-warmgray-rgb),0.16);border-radius:9px;padding:5px 10px;white-space:nowrap;}
+.chaeum-log-chip.on{background:rgba(var(--pal-orange-rgb),0.30);color:var(--pal-orange-text);font-weight:500;}
+
+.chaeum-log-tl{position:relative;padding-left:6px;}
+.chaeum-log-item{position:relative;display:flex;gap:12px;padding:0 0 20px;}
+.chaeum-log-item:last-child{padding-bottom:8px;}
+.chaeum-log-date{width:32px;flex-shrink:0;font-size:10.5px;color:var(--tm);padding-top:1px;font-variant-numeric:tabular-nums;text-align:right;}
+.chaeum-log-line-wrap{position:relative;width:8px;flex-shrink:0;display:flex;justify-content:center;}
+.chaeum-log-line-wrap::before{content:'';position:absolute;top:11px;bottom:-20px;width:1px;background:rgba(var(--divider-rgb),0.35);}
+.chaeum-log-item:last-child .chaeum-log-line-wrap::before{display:none;}
+.chaeum-log-dot{width:7px;height:7px;border-radius:50%;background:var(--pal-orange-text);margin-top:5px;flex-shrink:0;z-index:1;}
+.chaeum-log-dot.ing{background:transparent;border:1.4px solid var(--tm);}
+.chaeum-log-txt{flex:1;min-width:0;cursor:pointer;}
+.chaeum-log-txt-title{font-size:var(--main-text-size);color:var(--tp);line-height:1.5;}
+.chaeum-log-txt-cat{font-size:10px;color:var(--pal-orange-text);margin-top:3px;}
+
+.chaeum-log-expand{background:rgba(var(--pal-orange-rgb),0.14);border-radius:10px;padding:0 12px;font-size:var(--dow-label-size);color:var(--ts);line-height:1.6;max-height:0;overflow:hidden;opacity:0;transition:max-height .25s ease,opacity .2s ease,margin-top .25s ease,padding .25s ease;}
+.chaeum-log-expand.open{max-height:260px;opacity:1;margin-top:8px;padding:10px 12px;}
+.chaeum-log-expand-lbl{font-size:10px;color:var(--pal-orange-text);font-weight:500;margin-bottom:3px;}
+.chaeum-log-expand-comment{margin-top:7px;padding-top:7px;border-top:1px dashed rgba(var(--divider-rgb),0.4);font-style:italic;}
+
+.chaeum-log-more{text-align:center;font-size:var(--dow-label-size);color:var(--tm);padding:6px 0 10px;cursor:pointer;}
+.chaeum-log-loading{font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:16px 0;}
 .rd-status-btn.active{background:var(--pal-pink-bg);color:var(--pal-pink-text);}
 .rd-del-btn{color:var(--tm);cursor:pointer;margin-left:auto;display:inline-flex;align-items:center;}
 .rd-empty{font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:14px 0;}
@@ -2141,7 +2174,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div style="flex:1;"></div>
   </div>
   <div class="chaeum-body">
-    <div class="chaeum-empty">준비 중이에요</div>
+    <div id="chaeum-log-slot"><div class="chaeum-log-loading">불러오는 중...</div></div>
   </div>
 </div>
 
@@ -4149,6 +4182,10 @@ function renderHome(){
 // ── CONSTANTS
 const SUPA_URL='https://vqvpzrxmtpryzhontlxc.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdnB6cnhtdHByeXpob250bHhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTgxMjksImV4cCI6MjA5NjYzNDEyOX0.pbtq1UMPC7ylYM1H2xVa19C1TFlceLmEfEtkz3WK2VI';
+// 채움로그(저녁 학습 기록 자매앱) — 완전 별도 Supabase 프로젝트. iikoto에서는 읽기 전용으로만 조회.
+const CHAEUM_SUPA_URL='https://sqeyoqpchiljvinuqxjf.supabase.co';
+const CHAEUM_SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNxZXlvcXBjaGlsanZpbnVxeGpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5ODY5NTksImV4cCI6MjEwMjU2Mjk1OX0.H_JNNYz7_eguAqds-Wm6cwK926U74aVPaS_XwGRKeB0';
+const CHAEUM_LOG_URL='https://bombyul1011.github.io/chaeumlog/';
 const TMDB_KEY='6c78371ce15bb9d262938a66d5ef256e';
 const KAKAO_KEY='33799426c5377181c89616f5b2154bf0';
 const DAYS=['일','월','화','수','목','금','토'];
@@ -6615,9 +6652,84 @@ function _paceTopRhythmCat(dk){
 }
 // 저녁 파트1용 미니통계 카드 — 당일 기록 기준(완료 투두 / 체크 습관 / 오늘의 최다 리듬), 오후 통계카드보다 훨씬 컴팩트하게
 // 저녁 홈탭 — 오늘 활동 분포(점 타임라인) 카드. 내용 없으면 카드 자체를 만들지 않음.
-// ── 채움 진입점 (풀스크린, 현재는 빈 상태 — 추후 별도 앱 데이터 연동 예정) ──
-function openChaeum(){document.getElementById('chaeum-ov').classList.add('on');}
+// ── 채움 진입점 (풀스크린) — 채움로그(별도 앱/DB) 데이터를 읽기 전용으로 불러와 타임라인 표시 ──
+function openChaeum(){
+  document.getElementById('chaeum-ov').classList.add('on');
+  renderChaeumLog();
+}
 function closeChaeum(){document.getElementById('chaeum-ov').classList.remove('on');}
+async function fetchChaeumCategories(){
+  try{
+    const res=await fetch(CHAEUM_SUPA_URL+'/rest/v1/categories?select=code,name_ko,sort_order&order=sort_order.asc',{headers:{'apikey':CHAEUM_SUPA_KEY,'Authorization':'Bearer '+CHAEUM_SUPA_KEY}});
+    if(!res.ok)return null;
+    return await res.json();
+  }catch(e){return null;}
+}
+async function fetchChaeumSessions(limit){
+  try{
+    const res=await fetch(CHAEUM_SUPA_URL+'/rest/v1/sessions?select=id,date_key,category,title,brief_summary,summary_note,status&order=created_at.desc&limit='+limit,{headers:{'apikey':CHAEUM_SUPA_KEY,'Authorization':'Bearer '+CHAEUM_SUPA_KEY}});
+    if(!res.ok)return null;
+    return await res.json();
+  }catch(e){return null;}
+}
+function chaeumDateShort(dk){
+  const m=(dk||'').match(/^\d{4}-(\d{2})-(\d{2})/);
+  return m?m[1]+'.'+m[2]:(dk||'');
+}
+async function renderChaeumLog(){
+  const slot=document.getElementById('chaeum-log-slot');
+  if(!slot)return;
+  const [categories,sessions]=await Promise.all([fetchChaeumCategories(),fetchChaeumSessions(8)]);
+  if(sessions==null){
+    slot.innerHTML='<div class="chaeum-log-loading">불러오지 못했어요<br><span onclick="window.location.href=\''+CHAEUM_LOG_URL+'\'" style="text-decoration:underline;cursor:pointer;">채움로그에서 확인하기</span></div>';
+    return;
+  }
+  const totalRes=await fetch(CHAEUM_SUPA_URL+'/rest/v1/sessions?select=id',{headers:{'apikey':CHAEUM_SUPA_KEY,'Authorization':'Bearer '+CHAEUM_SUPA_KEY,'Prefer':'count=exact'}}).catch(()=>null);
+  let totalCount=sessions.length;
+  if(totalRes&&totalRes.ok){
+    const cr=totalRes.headers.get('content-range'); // 형식: "0-7/24"
+    const m=cr&&cr.match(/\/(\d+)$/);
+    if(m)totalCount=parseInt(m[1],10);
+  }
+  const chipsHtml=(categories||[]).map(c=>'<div class="chaeum-log-chip">'+escapeHtml(c.name_ko)+'</div>').join('');
+  const itemsHtml=sessions.length?sessions.map((s,i)=>{
+    const summary=s.brief_summary||'';
+    const comment=s.summary_note||'';
+    const hasExpand=summary||comment;
+    return '<div class="chaeum-log-item">'+
+      '<div class="chaeum-log-date">'+chaeumDateShort(s.date_key)+'</div>'+
+      '<div class="chaeum-log-line-wrap"><div class="chaeum-log-dot'+(s.status==='completed'?'':' ing')+'"></div></div>'+
+      '<div class="chaeum-log-txt"'+(hasExpand?' onclick="toggleChaeumExpand(this)"':'')+'>'+
+        '<div class="chaeum-log-txt-title">'+escapeHtml(s.title||'')+'</div>'+
+        '<div class="chaeum-log-txt-cat">'+escapeHtml(s.category||'')+'</div>'+
+        (hasExpand?(
+          '<div class="chaeum-log-expand">'+
+            (summary?'<div class="chaeum-log-expand-lbl">요약</div>'+escapeHtml(summary):'')+
+            (comment?'<div class="chaeum-log-expand-comment">'+escapeHtml(comment)+'</div>':'')+
+          '</div>'
+        ):'')+
+      '</div>'+
+    '</div>';
+  }).join(''):'<div class="chaeum-empty">아직 채움 기록이 없어요</div>';
+  slot.innerHTML=
+    '<div class="chaeum-log-card">'+
+      '<div class="chaeum-log-hdr">'+
+        '<div class="chaeum-log-title"><i class="ti ti-clover" aria-hidden="true"></i>채움 로그</div>'+
+        '<div class="chaeum-log-goto" onclick="window.location.href=\''+CHAEUM_LOG_URL+'\'">채움에서 보기<i class="ti ti-chevron-right" style="font-size:12px;" aria-hidden="true"></i></div>'+
+      '</div>'+
+      '<div class="chaeum-log-stat">총 '+totalCount+'개 세션</div>'+
+      (chipsHtml?'<div class="chaeum-log-chips">'+chipsHtml+'</div>':'')+
+      '<div class="chaeum-log-tl">'+itemsHtml+'</div>'+
+      (sessions.length>=8?'<div class="chaeum-log-more" onclick="window.location.href=\''+CHAEUM_LOG_URL+'\'">더 지난 채움 보기</div>':'')+
+    '</div>';
+}
+function toggleChaeumExpand(el){
+  const exp=el.querySelector('.chaeum-log-expand');
+  if(!exp)return;
+  const wasOpen=exp.classList.contains('open');
+  document.querySelectorAll('#chaeum-log-slot .chaeum-log-expand.open').forEach(e=>e.classList.remove('open'));
+  if(!wasOpen)exp.classList.add('open');
+}
 function makeEveningMiniStatCard(){
   const dk=dateKey(getLogicalDate());
   const doneTodos=_paceCountDoneUntilNow(dk,null);
