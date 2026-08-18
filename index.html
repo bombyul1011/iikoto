@@ -5886,7 +5886,7 @@ function renderTodos(){
   const nightBtn=document.getElementById('todo-night-postpone-btn');
   if(nightBtn){
     const h=new Date().getHours();
-    const isNight=h>=22&&h<24;
+    const isNight=h>=21&&h<24;
     const isTodayView=dk===dateKey(new Date());
     nightBtn.style.display=(isNight&&isTodayView)?'':'none';
   }
