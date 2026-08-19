@@ -84,13 +84,13 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .report-banner-inner i:last-child{margin-left:auto;color:rgba(80,130,85,0.55);font-size:14px;}
 
 /* ── 투두 / 일정 ── */
-.todo-card{height:252px;box-sizing:border-box;overflow:hidden;}
+.todo-card{height:252px;box-sizing:border-box;overflow:hidden;margin-bottom:0!important;}
 .todo-row{display:flex;align-items:center;gap:9px;padding:5px 0;font-size:15px;color:var(--tp);}
 .todo-row .chk{width:15px;height:15px;border-radius:4px;border:1.5px solid rgba(200,160,160,0.5);flex-shrink:0;}
 .todo-row.done{color:var(--tm);text-decoration:line-through;}
 .todo-row.done .chk{background:rgba(var(--pal-mint-rgb),0.5);border-color:transparent;}
 .grid3-right{display:flex;flex-direction:column;gap:6px;height:252px;}
-.event-card{padding:11px 16px;height:104px;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;}
+.event-card{padding:11px 16px;height:104px;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;margin-bottom:0!important;}
 .event-row{display:flex;align-items:center;gap:9px;padding:4px 0;font-size:14px;color:var(--tp);}
 .event-time{color:rgba(75,145,180,1);font-weight:600;font-size:12.5px;width:42px;flex-shrink:0;}
 .event-row.past{color:var(--tm);text-decoration:line-through;opacity:0.6;}
@@ -109,7 +109,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .memo-txt{font-size:14px;color:var(--ts);line-height:1.5;}
 
 /* ── 수면(일정 아래 하프배너)/습관/콘텐츠 ── */
-.sleep-card{border-color:rgba(var(--pal-sky-rgb),0.35)!important;padding:11px 16px;height:142px;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;}
+.sleep-card{border-color:rgba(var(--pal-sky-rgb),0.35)!important;padding:11px 16px;height:142px;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;margin-bottom:0!important;}
 .sleep-hdr{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;flex-shrink:0;}
 .sleep-hdr .card-lbl{margin-bottom:0;}
 .sleep-score-row{display:flex;align-items:baseline;gap:8px;}
@@ -143,13 +143,13 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 /* ── 독서(현재 읽는 책, 식사 카드와 높이 고정 맞춤) ── */
 .quote-card{position:relative;border-radius:15px;padding:1.6px;background:linear-gradient(120deg,rgba(255,170,200,0.9),rgba(255,205,140,0.85),rgba(195,200,245,0.6),rgba(170,235,200,0.85),rgba(255,170,200,0.9));height:150px;box-sizing:border-box;}
 .quote-card-inner{border-radius:13.5px;background:linear-gradient(135deg,#fdeee8,#fdf3e2);padding:12px 20px;height:100%;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden;}
-.quote-card-inner .card-lbl{margin-bottom:0;flex-shrink:0;}
+.quote-card-inner .card-lbl{margin-bottom:0;flex-shrink:0;height:22px;}
 .rd-cur-book{display:flex;gap:15px;align-items:center;flex:1;min-height:0;}
-.rd-cur-cover{width:64px;height:88px;border-radius:7px;background:rgba(200,180,160,0.3);flex-shrink:0;background-size:cover;background-position:center;box-shadow:0 3px 10px rgba(0,0,0,0.12);}
-.rd-cur-info{display:flex;flex-direction:column;justify-content:center;}
-.rd-cur-title{font-size:16px;color:var(--tp);font-weight:600;}
-.rd-cur-author{font-size:13px;color:var(--tm);margin-top:2px;}
-.rd-cur-pct{font-size:12.5px;color:rgba(178,60,105,0.85);margin-top:6px;}
+.rd-cur-cover{width:58px;height:80px;border-radius:7px;background:rgba(200,180,160,0.3);flex-shrink:0;background-size:cover;background-position:center;box-shadow:0 3px 10px rgba(0,0,0,0.12);}
+.rd-cur-info{display:flex;flex-direction:column;justify-content:center;gap:3px;}
+.rd-cur-title{font-size:16px;color:var(--tp);font-weight:600;line-height:1.25;}
+.rd-cur-author{font-size:13px;color:var(--tm);}
+.rd-cur-pct{font-size:12.5px;color:rgba(178,60,105,0.85);}
 
 /* ── 좌하단 플로팅 탭 ── */
 .float-tabs{position:fixed;right:22px;bottom:22px;display:flex;flex-direction:row-reverse;align-items:center;gap:9px;z-index:100;}
