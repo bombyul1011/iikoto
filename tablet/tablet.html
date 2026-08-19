@@ -12,8 +12,8 @@
   /* ══ 공용 폰트 사이즈 체계 ══
      기준: 카드 제목(card-lbl)=--fs-title, 메모 본문(memo-txt)=--fs-body
      나머지는 전부 이 두 값의 배율/보정치로 파생. 전체 폰트를 조절하려면 --fs-title, --fs-body 값만 바꾸면 됨. */
-  --fs-title:15px;      /* 카드 제목(card-lbl), 사이드 타이틀 */
-  --fs-body:14px;       /* 본문 텍스트(메모, 식사 메뉴, 리듬 팝업 라벨 등) */
+  --fs-title:16px;      /* 카드 제목(card-lbl), 사이드 타이틀 */
+  --fs-body:15px;       /* 본문 텍스트(메모, 식사 메뉴, 리듬 팝업 라벨 등) */
   --fs-lg:calc(var(--fs-title) + 2px);    /* 큰 강조(날짜 헤더, 습관 배너 소제목 등) */
   --fs-xl:calc(var(--fs-title) + 8px);    /* 최상위 헤더(월/일) */
   --fs-score:calc(var(--fs-title) + 3px); /* 점수류 큰 숫자(수면점수 등) */
@@ -224,7 +224,8 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .tt-cat-fixed i.dot{width:11px;height:11px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;flex-shrink:0;}
 .tt-track{flex:1;display:flex;gap:1px;height:18px;}
 .tt-cell{flex:1;height:18px;border-radius:4px;background:none;border:0.5px dashed rgba(var(--divider-rgb),0.3);box-sizing:border-box;}
-.tt-block{height:18px;border-radius:5px;display:flex;align-items:center;justify-content:center;padding:0 4px;font-size:var(--fs-xs);color:var(--tp);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;box-sizing:border-box;}
+.tt-block{height:18px;border-radius:5px;display:flex;align-items:center;justify-content:flex-start;padding:0 5px;font-size:var(--fs-xs);color:var(--tp);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;box-sizing:border-box;}
+.tt-block.music{justify-content:center;padding:0;}
 .tt-block.drama{background:var(--pal-pink-bg);}
 .tt-block.book{background:var(--pal-yellow-bg);}
 .tt-block.movie{background:var(--pal-sky-bg);}

@@ -584,7 +584,8 @@ async function renderMonthTimetable(y,mo){
   const CATS=['drama','book','movie','music'];
 
   let headHtml='';
-  for(let i=5;i<=Math.min(daysInMonth,29);i+=5)headHtml+=`<span style="flex:0 0 ${100/daysInMonth*5}%;">${i}</span>`;
+  // tt-cell/tt-block과 폭을 정확히 맞추기 위해 헤더도 1일=1칸(flex:1) 구조로 만들고, 5의 배수일에만 숫자를 표기
+  for(let i=1;i<=daysInMonth;i++)headHtml+=`<span>${i%5===0?i:''}</span>`;
 
   let rowsHtml='';
   CATS.forEach(cat=>{
