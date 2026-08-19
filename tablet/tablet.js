@@ -16,7 +16,7 @@ async function supaFetch(path){
     return await res.json();
   }catch(e){return null;}
 }
-// TODO: 채움로그 연동 미착수 — 오늘탭 카드 추가는 별도 작업으로 진행 예정
+// 채움로그(chaeumlog) — 별도 Supabase 프로젝트, 읽기 전용 연동
 async function chaeumFetch(path){
   try{
     const res=await fetch(CHAEUM_SUPA_URL+'/rest/v1/'+path,{headers:{'apikey':CHAEUM_SUPA_KEY,'Authorization':'Bearer '+CHAEUM_SUPA_KEY}});
@@ -549,6 +549,7 @@ async function loadMonthTab(){
   await renderMonthHabits(y,mo);
   await renderMonthStatBar(y,mo);
   await renderMonthQuotes(y,mo);
+  await renderChaeumLogTablet();
   _rdCalDate=new Date(_monthCalDate);
   await renderReadingCal();
 }
@@ -560,7 +561,7 @@ function renderMonthGoals(row){
   el.innerHTML=lines.map(l=>`<div class="mgoal-row">${escapeHtml(l)}</div>`).join('');
 }
 
-// ── 콘텐츠 타임라인 — 본앱과 동일 원칙: 날짜 1일=22px 고정폭 가로스크롤, 헤더+각 행이 scroll 이벤트로 서로 동기화(스와이프 가능) ──
+// ── 콘텐츠 타임라인 — 전체 폭 한줄(%기반), 스와이프 불필요하게 31일치를 카드 폭에 맞춰 표시 ──
 function isContentCarryOverTablet(c,mk){
   if(c.content_cat==='music')return false;
   if(c.status==='watching')return true;
@@ -581,10 +582,9 @@ async function renderMonthTimetable(y,mo){
   const isSameMonth=mk===monthKeyOf(new Date());
   const daysInMonth=new Date(y,mo+1,0).getDate();
   const CATS=['drama','book','movie','music'];
-  const DAY_W=22; // 본앱과 동일한 1일당 고정 폭(px)
 
   let headHtml='';
-  for(let i=1;i<=31;i++)headHtml+=`<span>${i}</span>`;
+  for(let i=5;i<=Math.min(daysInMonth,29);i+=5)headHtml+=`<span style="flex:0 0 ${100/daysInMonth*5}%;">${i}</span>`;
 
   let rowsHtml='';
   CATS.forEach(cat=>{
@@ -625,37 +625,16 @@ async function renderMonthTimetable(y,mo){
       const catLabel=tIdx===0?`<i class="dot" style="background:${meta.bg};"></i>${meta.label}`:'';
       let barsHtml='';
       trackItems.forEach(c=>{
-        const left=(c.startD-1)*DAY_W;
-        const width=Math.max(DAY_W-2,(c.endD-c.startD+1)*DAY_W-2);
+        const leftPct=((c.startD-1)/daysInMonth*100).toFixed(2);
+        const widthPct=Math.max(2.2,((c.endD-c.startD+1)/daysInMonth*100)).toFixed(2);
         const label=cat==='music'?(c.item.title||'').slice(0,1):escapeHtml(c.item.title||'');
-        barsHtml+=`<div class="tt-bar" style="left:${left}px;width:${width}px;background:${meta.bg.replace('1)','0.6)')};">${label}</div>`;
+        barsHtml+=`<div class="tt-bar" style="left:${leftPct}%;width:${widthPct}%;background:${meta.bg.replace('1)','0.6)')};">${label}</div>`;
       });
-      rowsHtml+=`<div class="tt-row"><div class="tt-cat-fixed">${catLabel}</div><div class="tt-date-scroll" data-tt="1"><div class="tt-date-inner" style="width:${daysInMonth*DAY_W}px;">${barsHtml}</div></div></div>`;
+      rowsHtml+=`<div class="tt-row"><div class="tt-cat-fixed">${catLabel}</div><div class="tt-track">${barsHtml}</div></div>`;
     });
   });
 
-  el.innerHTML=`<div class="tt-head-row"><div class="tt-cat-fixed-sp"></div><div class="tt-head-dates" id="tt-head-dates"><div class="tt-head-dates-inner" style="width:${daysInMonth*DAY_W}px;">${headHtml}</div></div></div><div id="tt-rows">${rowsHtml}</div>`;
-
-  // 스크롤 동기화(본앱과 동일 방식): 헤더+모든 행이 함께 움직임
-  const headDates=document.getElementById('tt-head-dates');
-  const allScrolls=Array.from(el.querySelectorAll('[data-tt]'));
-  function syncScroll(src){
-    const sl=src.scrollLeft;
-    if(headDates)headDates.scrollLeft=sl;
-    allScrolls.forEach(s=>{if(s!==src)s.scrollLeft=sl;});
-  }
-  allScrolls.forEach(s=>s.addEventListener('scroll',()=>syncScroll(s),{passive:true}));
-  if(headDates)headDates.addEventListener('scroll',()=>syncScroll(headDates),{passive:true});
-
-  // 오늘-3일 위치로 초기 스크롤(같은 달일 때만) — 본앱과 동일
-  if(isSameMonth){
-    const targetDay=Math.max(1,todayDay-3);
-    const scrollX=(targetDay-1)*DAY_W;
-    setTimeout(()=>{
-      if(headDates)headDates.scrollLeft=scrollX;
-      allScrolls.forEach(s=>s.scrollLeft=scrollX);
-    },50);
-  }
+  el.innerHTML=`<div class="tt-head-row"><div class="tt-cat-fixed-sp"></div><div class="tt-head-dates">${headHtml}</div></div><div>${rowsHtml}</div>`;
 }
 
 async function renderMonthHabits(y,mo){
@@ -785,6 +764,38 @@ async function renderReadingCal(){
   document.getElementById('rdcal-grid').innerHTML=gridHtml;
 }
 
+
+// ── 채움 로그 타임라인(월간탭, 독서달력 옆) — 이이코토 본앱 chaeum-log-tl 디자인 그대로, 읽기 전용 요약 리스트 ──
+function chaeumDateShort(dk){
+  const m=(dk||'').match(/^\d{4}-(\d{2})-(\d{2})/);
+  return m?m[1]+'.'+m[2]:(dk||'');
+}
+async function renderChaeumLogTablet(){
+  const statEl=document.getElementById('chaeum-log-stat');
+  const tlEl=document.getElementById('chaeum-log-tl');
+  if(!tlEl)return;
+  const sessions=await chaeumFetch('sessions?select=id,date_key,category,title,status&order=created_at.desc&limit=10');
+  if(sessions==null){
+    statEl.textContent='';
+    tlEl.innerHTML='<div class="empty-msg">채움 기록을 불러오지 못했어요</div>';
+    return;
+  }
+  statEl.textContent=`최근 ${sessions.length}개 세션`;
+  if(!sessions.length){
+    tlEl.innerHTML='<div class="empty-msg">아직 채움 기록이 없어요</div>';
+    return;
+  }
+  tlEl.innerHTML=sessions.map(s=>
+    `<div class="chaeum-log-item">`+
+      `<div class="chaeum-log-date">${chaeumDateShort(s.date_key)}</div>`+
+      `<div class="chaeum-log-line-wrap"><div class="chaeum-log-dot${s.status==='completed'?'':' ing'}"></div></div>`+
+      `<div class="chaeum-log-txt">`+
+        `<div class="chaeum-log-txt-title">${escapeHtml(s.title||'')}</div>`+
+        `<div class="chaeum-log-txt-cat">${escapeHtml(s.category||'')}</div>`+
+      `</div>`+
+    `</div>`
+  ).join('');
+}
 
 // ══════════════════════════════════════════════════════════
 // 초기화

@@ -198,7 +198,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .oneline-dow{width:22px;flex-shrink:0;font-weight:600;color:var(--tp);}
 
 /* ── 월간탭 ── */
-.top-row{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;align-items:stretch;}
+.top-row{display:grid;grid-template-columns:1.25fr 1fr;gap:13px;margin-bottom:13px;align-items:stretch;}
 .rdcal-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin:0 0 4px;}
 .rdcal-nav i{font-size:var(--fs-title);color:var(--tm);cursor:pointer;}
 .rdcal-month{font-weight:600;font-size:var(--fs-body);color:var(--tp);}
@@ -206,27 +206,21 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .rdcal-count span{font-size:var(--fs-sm);color:var(--tm);font-weight:400;}
 .rdcal-grid{display:grid;grid-template-columns:repeat(7,1fr);row-gap:9px;}
 .rdcal-dow{text-align:center;font-size:var(--fs-xs);color:var(--tm);font-weight:500;margin-bottom:6px;}
-.rdcal-cover{position:relative;width:28px;height:38px;margin:0 auto;border-radius:4px;background-size:cover;background-position:center;background-color:rgba(200,180,160,0.3);box-shadow:0 1px 3px rgba(0,0,0,0.15);}
-.rdcal-num{text-align:center;font-size:var(--fs-sm);color:var(--tm);height:38px;display:flex;align-items:center;justify-content:center;}
+.rdcal-cover{position:relative;width:34px;height:46px;margin:0 auto;border-radius:5px;background-size:cover;background-position:center;background-color:rgba(200,180,160,0.3);box-shadow:0 1px 3px rgba(0,0,0,0.15);}
+.rdcal-num{text-align:center;font-size:var(--fs-sm);color:var(--tm);height:46px;display:flex;align-items:center;justify-content:center;}
 .mgoal-row{display:flex;align-items:center;gap:7px;padding:3px 0;font-size:var(--fs-sm);color:var(--tp);}
 .mgoal-row::before{content:'';width:4px;height:4px;border-radius:50%;background:rgba(var(--pal-orange-rgb),1);flex-shrink:0;}
 
-/* 콘텐츠 타임라인 — 본앱과 동일한 원칙: 날짜 1일=22px 고정폭, 각 행이 독립 가로스크롤 컨테이너이고 JS로 전부 동기화됨(스와이프 가능) */
-.tt-day-w{--tt-day-w:22px;}
+/* 콘텐츠 타임라인 — 전체 폭 한줄(%기반), 스와이프 없이 31일치가 카드 폭에 그대로 들어감 */
 .tt-head-row{display:flex;margin-bottom:4px;}
 .tt-cat-fixed-sp{width:44px;flex-shrink:0;}
-.tt-head-dates{flex:1;overflow-x:hidden;}
-.tt-head-dates::-webkit-scrollbar{display:none;}
-.tt-head-dates-inner{display:flex;}
-.tt-head-dates-inner span{width:22px;flex-shrink:0;text-align:center;font-size:var(--fs-xs);color:var(--tm);}
+.tt-head-dates{flex:1;display:flex;}
+.tt-head-dates span{flex:1;text-align:center;font-size:var(--fs-xs);color:var(--tm);}
 .tt-row{display:flex;align-items:center;margin-bottom:3px;}
 .tt-cat-fixed{width:44px;flex-shrink:0;font-size:var(--fs-sm);color:var(--ts);display:flex;align-items:center;gap:3px;cursor:default;}
 .tt-cat-fixed i.dot{width:11px;height:11px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;flex-shrink:0;}
-.tt-date-scroll{flex:1;overflow-x:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x;height:17px;}
-.tt-date-scroll::-webkit-scrollbar{display:none;}
-.tt-date-scroll{-ms-overflow-style:none;scrollbar-width:none;}
-.tt-date-inner{position:relative;height:16px;}
-.tt-bar{position:absolute;top:0;height:15px;border-radius:5px;font-size:var(--fs-xs);color:var(--tp);display:flex;align-items:center;padding-left:4px;overflow:hidden;white-space:nowrap;}
+.tt-track{flex:1;position:relative;height:17px;}
+.tt-bar{position:absolute;top:0;height:16px;border-radius:5px;font-size:var(--fs-xs);color:var(--tp);display:flex;align-items:center;padding-left:4px;overflow:hidden;white-space:nowrap;}
 .habit-month-row{display:flex;align-items:center;gap:7px;margin-bottom:5px;}
 .habit-month-lbl{font-size:var(--fs-sm);color:var(--ts);width:36px;flex-shrink:0;}
 .habit-month-dots{display:flex;gap:2px;flex-wrap:wrap;flex:1;}
@@ -237,6 +231,25 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .month-quote-item{display:flex;gap:9px;padding:6px 0;border-left:2px solid rgba(var(--divider-rgb),0.3);padding-left:10px;margin-left:2px;}
 .month-quote-date{font-size:var(--fs-xs);color:var(--tm);flex-shrink:0;width:34px;}
 .month-quote-txt{font-size:var(--fs-body);color:var(--ts);line-height:1.5;}
+
+/* 채움 로그 타임라인 — 이이코토 본앱 chaeum-log-* 디자인 그대로 차용(세로 점+선 타임라인) */
+.chaeum-log-card{display:flex;flex-direction:column;overflow:hidden;}
+.chaeum-log-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;flex-shrink:0;}
+.chaeum-log-hdr .chaeum-log-title{font-size:var(--fs-title);font-weight:600;color:var(--tp);display:flex;align-items:center;gap:6px;margin-bottom:0;}
+.chaeum-log-hdr .chaeum-log-title i{font-size:var(--fs-lg);color:rgba(var(--pal-mint-rgb),1);}
+.chaeum-log-stat{font-size:var(--fs-sm);color:var(--tm);margin:2px 0 10px;flex-shrink:0;}
+.chaeum-log-tl{position:relative;padding-left:2px;overflow-y:auto;flex:1;min-height:0;}
+.chaeum-log-item{position:relative;display:flex;gap:10px;padding:0 0 16px;}
+.chaeum-log-item:last-child{padding-bottom:4px;}
+.chaeum-log-date{width:30px;flex-shrink:0;font-size:var(--fs-xs);color:var(--tm);padding-top:1px;font-variant-numeric:tabular-nums;text-align:right;}
+.chaeum-log-line-wrap{position:relative;width:8px;flex-shrink:0;display:flex;justify-content:center;}
+.chaeum-log-line-wrap::before{content:'';position:absolute;top:11px;bottom:-16px;width:1px;background:rgba(var(--divider-rgb),0.35);}
+.chaeum-log-item:last-child .chaeum-log-line-wrap::before{display:none;}
+.chaeum-log-dot{width:7px;height:7px;border-radius:50%;background:rgba(var(--pal-mint-rgb),1);margin-top:5px;flex-shrink:0;z-index:1;}
+.chaeum-log-dot.ing{background:transparent;border:1.4px solid var(--tm);}
+.chaeum-log-txt{flex:1;min-width:0;}
+.chaeum-log-txt-title{font-size:var(--fs-body);color:var(--tp);line-height:1.5;}
+.chaeum-log-txt-cat{font-size:var(--fs-xs);color:rgba(var(--pal-mint-rgb),1);margin-top:3px;}
 
 /* ── 리포트 오버레이 패널 ── */
 .report-overlay{position:fixed;inset:0;background:rgba(60,45,40,0.35);display:none;align-items:center;justify-content:center;z-index:200;}
@@ -323,8 +336,9 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
           <div class="rdcal-grid" id="rdcal-dows" style="margin-bottom:6px;"></div>
           <div class="rdcal-grid" id="rdcal-grid"></div>
         </div>
-        <div class="card"><div class="card-lbl"><i class="ti ti-chart-bar" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>콘텐츠 타임라인</div><div id="month-tt"></div></div>
+        <div class="card chaeum-log-card"><div class="chaeum-log-hdr"><div class="chaeum-log-title"><i class="ti ti-clover" aria-hidden="true"></i>채움 로그</div></div><div class="chaeum-log-stat" id="chaeum-log-stat"></div><div class="chaeum-log-tl" id="chaeum-log-tl"></div></div>
       </div>
+      <div class="card"><div class="card-lbl"><i class="ti ti-chart-bar" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>콘텐츠 타임라인</div><div id="month-tt"></div></div>
       <div class="card month-quotes-card"><div class="card-lbl"><i class="ti ti-quote" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>이번 달 수집문장</div><div id="month-quotes"></div></div>
       <div class="stat-bar-wrap" id="month-stat-bar"></div>
     </div>
