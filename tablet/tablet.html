@@ -9,8 +9,8 @@
 <style>
 /* ══ 기본 톤 — iikoto 라이트 테마 변수 그대로 ══ */
 :root{
-  --main-text-size:14px;
-  --dow-label-size:12px;
+  --main-text-size:17px;
+  --dow-label-size:15px;
   --divider-rgb:195,175,168;
   --bg:linear-gradient(145deg,#fdf0e8 0%,#fef5d4 50%,#fde8f0 100%);
   --tp:#6b5248;--ts:#a3897c;--tm:#d4bcb0;
@@ -41,104 +41,116 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 #app{position:fixed;inset:0;display:flex;}
 
 /* ── 좌측 사이드(캘린더 + 주간요약) ── */
-.side{width:250px;flex-shrink:0;background:rgba(255,253,248,0.35);border-right:1px solid var(--card-b);padding:20px 16px;overflow-y:auto;}
-.side-title{font-size:12.5px;font-weight:600;color:var(--tp);margin-bottom:12px;display:flex;align-items:center;gap:6px;}
-.side-title i{font-size:14px;}
-.mini-cal{background:var(--card);border:1px solid var(--card-b);border-radius:14px;padding:13px;margin-bottom:16px;}
-.mini-cal-hdr{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--tp);font-weight:600;margin-bottom:9px;}
-.mini-cal-hdr i{font-size:13px;color:var(--tm);cursor:pointer;padding:2px 4px;}
-.mini-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;font-size:10px;text-align:center;color:var(--ts);}
-.mini-cal-grid .dow{color:var(--tm);font-size:9px;padding-bottom:3px;}
-.mini-cal-day{padding:4px 0;border-radius:6px;cursor:pointer;position:relative;}
+.side{width:270px;flex-shrink:0;background:rgba(255,253,248,0.35);border-right:1px solid var(--card-b);padding:22px 18px;overflow-y:auto;}
+.side-title{font-size:15px;font-weight:600;color:var(--tp);margin-bottom:13px;display:flex;align-items:center;gap:6px;}
+.side-title i{font-size:16px;}
+.mini-cal{background:var(--card);border:1px solid var(--card-b);border-radius:14px;padding:14px;margin-bottom:18px;}
+.mini-cal-hdr{display:flex;justify-content:space-between;align-items:center;font-size:14px;color:var(--tp);font-weight:600;margin-bottom:10px;}
+.mini-cal-hdr i{font-size:15px;color:var(--tm);cursor:pointer;padding:2px 4px;}
+.mini-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;font-size:12px;text-align:center;color:var(--ts);}
+.mini-cal-grid .dow{color:var(--tm);font-size:10.5px;padding-bottom:3px;}
+.mini-cal-day{padding:5px 0;border-radius:6px;cursor:pointer;position:relative;}
 .mini-cal-day.today{background:rgba(var(--pal-orange-rgb),0.35);color:var(--pal-orange-text);font-weight:600;}
 .mini-cal-day.sel{background:rgba(var(--pal-mint-rgb),0.45);color:var(--pal-mint-text);font-weight:600;}
-.mini-cal-day.has-dot::after{content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:3px;height:3px;border-radius:50%;background:rgba(var(--pal-sky-rgb),0.9);}
-.side-stat{background:var(--card);border:1px solid var(--card-b);border-radius:12px;padding:10px 12px;margin-bottom:7px;display:flex;align-items:center;gap:8px;}
-.side-stat i{font-size:14px;flex-shrink:0;}
-.side-stat-txt{font-size:10.5px;color:var(--ts);}
-.side-stat-val{font-size:12.5px;color:var(--tp);font-weight:600;}
+.mini-cal-day.has-dot::after{content:'';position:absolute;bottom:1px;left:50%;transform:translateX(-50%);width:3.5px;height:3.5px;border-radius:50%;background:rgba(var(--pal-sky-rgb),0.9);}
+.side-stat{background:var(--card);border:1px solid var(--card-b);border-radius:12px;padding:11px 13px;margin-bottom:8px;display:flex;align-items:center;gap:9px;}
+.side-stat i{font-size:16px;flex-shrink:0;}
+.side-stat-txt{font-size:12px;color:var(--ts);}
+.side-stat-val{font-size:15px;color:var(--tp);font-weight:600;}
 
 /* ── 메인 영역 ── */
-.main-wrap{flex:1;overflow-y:auto;padding:20px 22px 76px;}
-.main-hdr{display:flex;align-items:baseline;margin-bottom:14px;}
-.main-date{font-size:19px;font-weight:600;color:var(--tp);}
-.main-dow{font-size:12.5px;color:var(--tm);margin-left:8px;}
+.main-wrap{flex:1;overflow-y:auto;padding:22px 24px 80px;}
+.main-hdr{display:flex;align-items:baseline;margin-bottom:16px;}
+.main-date{font-size:23px;font-weight:600;color:var(--tp);}
+.main-dow{font-size:15px;color:var(--tm);margin-left:9px;}
 .main-body{display:none;}
 .main-body.on{display:block;}
 
 /* ── 공용 카드 ── */
-.card{background:var(--card);border:1px solid var(--card-b);border-radius:15px;padding:14px 16px;box-shadow:0 2px 14px rgba(0,0,0,0.05);margin-bottom:12px;}
-.card-lbl{font-size:12.5px;font-weight:600;color:var(--tp);margin-bottom:10px;display:flex;align-items:center;gap:6px;}
-.card-lbl i{font-size:13px;}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
-.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px;}
-.empty-msg{font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:10px 0;}
-.loading-msg{font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:16px 0;}
+.card{background:var(--card);border:1px solid var(--card-b);border-radius:15px;padding:16px 18px;box-shadow:0 2px 14px rgba(0,0,0,0.05);margin-bottom:13px;}
+.card-lbl{font-size:15px;font-weight:600;color:var(--tp);margin-bottom:11px;display:flex;align-items:center;gap:7px;}
+.card-lbl i{font-size:16px;}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;}
+.grid3{display:grid;grid-template-columns:1.3fr 1fr;gap:13px;margin-bottom:13px;align-items:stretch;}
+.grid3-right{display:flex;flex-direction:column;gap:13px;}
+.grid4{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin-bottom:13px;}
+.empty-msg{font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:12px 0;}
+.loading-msg{font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:18px 0;}
 
 /* ── 리포트 배너 ── */
-.report-banner{position:relative;border-radius:14px;padding:1.4px;background:linear-gradient(135deg,rgba(150,215,180,0.95),rgba(235,220,120,0.90),rgba(165,222,188,0.95),rgba(150,215,180,0.95));background-size:300% 300%;animation:bannerShine 4s ease infinite;margin-bottom:14px;cursor:pointer;display:none;}
+.report-banner{position:relative;border-radius:14px;padding:1.6px;background:linear-gradient(135deg,rgba(150,215,180,0.95),rgba(235,220,120,0.90),rgba(165,222,188,0.95),rgba(150,215,180,0.95));background-size:300% 300%;animation:bannerShine 4s ease infinite;margin-bottom:16px;cursor:pointer;display:none;}
 .report-banner.on{display:block;}
-.report-banner-inner{border-radius:12.5px;background:var(--grad-mintyellow);padding:10px 15px;display:flex;align-items:center;gap:9px;font-size:12px;color:rgba(70,90,55,0.92);}
-.report-banner-inner i:first-child{color:rgba(65,125,70,0.85);font-size:14px;}
-.report-banner-inner i:last-child{margin-left:auto;color:rgba(80,130,85,0.55);font-size:12px;}
+.report-banner-inner{border-radius:12.5px;background:var(--grad-mintyellow);padding:12px 17px;display:flex;align-items:center;gap:10px;font-size:14.5px;color:rgba(70,90,55,0.92);}
+.report-banner-inner i:first-child{color:rgba(65,125,70,0.85);font-size:16px;}
+.report-banner-inner i:last-child{margin-left:auto;color:rgba(80,130,85,0.55);font-size:14px;}
 
 /* ── 투두 / 일정 ── */
-.todo-row{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px;color:var(--tp);}
-.todo-row .chk{width:13px;height:13px;border-radius:4px;border:1.3px solid rgba(200,160,160,0.5);flex-shrink:0;}
+.todo-card{min-height:100%;}
+.todo-row{display:flex;align-items:center;gap:9px;padding:5px 0;font-size:15px;color:var(--tp);}
+.todo-row .chk{width:15px;height:15px;border-radius:4px;border:1.5px solid rgba(200,160,160,0.5);flex-shrink:0;}
 .todo-row.done{color:var(--tm);text-decoration:line-through;}
 .todo-row.done .chk{background:rgba(var(--pal-mint-rgb),0.5);border-color:transparent;}
-.event-row{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px;color:var(--tp);}
-.event-time{color:rgba(75,145,180,1);font-weight:600;font-size:10.5px;width:36px;flex-shrink:0;}
+.event-card{padding:13px 16px;}
+.event-row{display:flex;align-items:center;gap:9px;padding:4px 0;font-size:14px;color:var(--tp);}
+.event-time{color:rgba(75,145,180,1);font-weight:600;font-size:12.5px;width:42px;flex-shrink:0;}
 .event-row.past{color:var(--tm);text-decoration:line-through;opacity:0.6;}
 
 /* ── 리듬 ── */
-.rhythm-mini{display:flex;gap:3px;height:24px;border-radius:6px;overflow:hidden;margin-bottom:7px;}
+.rhythm-card{cursor:pointer;}
+.rhythm-mini{display:flex;gap:3px;height:28px;border-radius:7px;overflow:hidden;margin-bottom:8px;}
 .rhythm-mini div{flex:1;}
-.rhythm-legend{display:flex;flex-wrap:wrap;gap:4px 9px;font-size:10px;color:var(--ts);}
-.rhythm-legend span{display:inline-flex;align-items:center;gap:3px;}
+.rhythm-legend{display:flex;flex-wrap:wrap;gap:5px 11px;font-size:12px;color:var(--ts);}
+.rhythm-legend span{display:inline-flex;align-items:center;gap:4px;}
 
 /* ── 메모 ── */
-.memo-tl{max-height:150px;overflow-y:auto;}
-.memo-item{display:flex;gap:8px;padding:5px 0;border-left:2px solid rgba(var(--divider-rgb),0.3);padding-left:9px;margin-left:2px;}
-.memo-time{font-size:9.5px;color:var(--tm);flex-shrink:0;width:32px;}
-.memo-txt{font-size:11.5px;color:var(--ts);line-height:1.5;}
+.memo-tl{max-height:170px;overflow-y:auto;}
+.memo-item{display:flex;gap:9px;padding:6px 0;border-left:2px solid rgba(var(--divider-rgb),0.3);padding-left:10px;margin-left:2px;}
+.memo-time{font-size:12px;color:var(--tm);flex-shrink:0;width:38px;}
+.memo-txt{font-size:14px;color:var(--ts);line-height:1.5;}
 
-/* ── 수면/습관/식사/콘텐츠 4카드 ── */
+/* ── 수면(2칸)/습관/콘텐츠 3+1+1카드 ── */
 .sleep-card{border-color:rgba(var(--pal-sky-rgb),0.35)!important;}
-.sleep-score{font-size:18px;font-weight:700;color:var(--tp);}
-.sleep-score-lbl{font-size:9px;color:var(--tm);margin-bottom:8px;}
-.spark{display:flex;align-items:flex-end;gap:3px;height:26px;}
-.spark div{flex:1;background:rgba(var(--pal-sky-rgb),0.5);border-radius:2px 2px 0 0;align-self:flex-end;}
-.spark div.today{background:rgba(var(--pal-sky-rgb),0.95);}
-.spark-lbl{display:flex;justify-content:space-between;font-size:7.5px;color:var(--tm);margin-top:3px;}
+.sleep-score-row{display:flex;align-items:baseline;gap:10px;margin-bottom:10px;}
+.sleep-score{font-size:26px;font-weight:700;color:var(--tp);}
+.sleep-score-lbl{font-size:12px;color:var(--tm);}
+.sleep-spark{display:flex;align-items:flex-end;gap:6px;height:44px;}
+.sleep-spark-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;}
+.sleep-spark-bar{width:100%;border-radius:3px 3px 0 0;background:rgba(var(--pal-sky-rgb),0.45);min-height:3px;}
+.sleep-spark-bar.today{background:rgba(var(--pal-sky-rgb),0.95);}
+.sleep-spark-dow{font-size:10px;color:var(--tm);}
 .habit-card{border-color:rgba(var(--pal-mint-rgb),0.35)!important;}
-.habit-row{display:flex;align-items:center;gap:6px;padding:2px 0;font-size:10.5px;color:var(--ts);}
-.habit-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.habit-row{display:flex;align-items:center;gap:7px;padding:3px 0;font-size:13.5px;color:var(--ts);}
+.habit-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
 .habit-row.done{color:var(--tp);font-weight:500;}
-.habit-check{margin-left:auto;font-size:11px;color:rgba(var(--pal-mint-rgb),1);}
-.meal-card{border-color:rgba(var(--pal-lime-rgb),0.4)!important;}
-.meal-row{padding:3px 0;font-size:10.5px;color:var(--ts);border-bottom:1px dashed rgba(var(--divider-rgb),0.25);}
-.meal-row:last-child{border-bottom:none;}
-.meal-time{color:rgba(120,150,50,1);font-weight:600;font-size:9.5px;margin-right:3px;}
-.meal-label{color:var(--tm);font-size:9.5px;}
+.habit-check{margin-left:auto;font-size:13px;color:rgba(var(--pal-mint-rgb),1);}
 .content-card{border-color:rgba(var(--pal-lavender-rgb),0.4)!important;}
-.content-row{display:flex;align-items:center;gap:7px;padding:4px 0;font-size:10.5px;color:var(--tp);}
-.content-cat{font-size:8.5px;color:rgba(130,75,150,0.85);background:rgba(var(--pal-lavender-rgb),0.25);padding:2px 5px;border-radius:5px;flex-shrink:0;}
+.content-row{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:13.5px;color:var(--tp);}
+.content-cat{font-size:11px;color:rgba(130,75,150,0.85);background:rgba(var(--pal-lavender-rgb),0.25);padding:2px 6px;border-radius:5px;flex-shrink:0;}
+
+/* ── 오늘의 식사(하프 배너, 4끼 2x2) ── */
+.meal-card{border-color:rgba(var(--pal-lime-rgb),0.4)!important;padding:13px 16px;}
+.meal-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;}
+.meal-slot{padding:6px 0;border-top:1px dashed rgba(var(--divider-rgb),0.25);}
+.meal-slot:nth-child(-n+2){border-top:none;}
+.meal-slot.empty{opacity:0.45;}
+.meal-time{color:rgba(120,150,50,1);font-weight:600;font-size:11.5px;margin-right:4px;}
+.meal-label{color:var(--tm);font-size:11.5px;}
+.meal-menu{font-size:13.5px;color:var(--tp);margin-top:2px;line-height:1.35;}
 
 /* ── 독서(현재 읽는 책) ── */
-.quote-card{position:relative;border-radius:15px;padding:1.4px;background:linear-gradient(120deg,rgba(255,170,200,0.9),rgba(255,205,140,0.85),rgba(195,200,245,0.6),rgba(170,235,200,0.85),rgba(255,170,200,0.9));}
-.quote-card-inner{border-radius:13.5px;background:linear-gradient(135deg,#fdeee8,#fdf3e2);padding:14px 16px;height:100%;}
-.rd-cur-book{display:flex;gap:9px;align-items:center;}
-.rd-cur-cover{width:36px;height:50px;border-radius:5px;background:rgba(200,180,160,0.3);flex-shrink:0;background-size:cover;background-position:center;}
-.rd-cur-title{font-size:12px;color:var(--tp);font-weight:600;}
-.rd-cur-author{font-size:10px;color:var(--tm);}
-.rd-cur-pct{font-size:9.5px;color:rgba(178,60,105,0.85);margin-top:2px;}
+.quote-card{position:relative;border-radius:15px;padding:1.6px;background:linear-gradient(120deg,rgba(255,170,200,0.9),rgba(255,205,140,0.85),rgba(195,200,245,0.6),rgba(170,235,200,0.85),rgba(255,170,200,0.9));}
+.quote-card-inner{border-radius:13.5px;background:linear-gradient(135deg,#fdeee8,#fdf3e2);padding:16px 18px;height:100%;}
+.rd-cur-book{display:flex;gap:11px;align-items:center;}
+.rd-cur-cover{width:44px;height:60px;border-radius:6px;background:rgba(200,180,160,0.3);flex-shrink:0;background-size:cover;background-position:center;}
+.rd-cur-title{font-size:15px;color:var(--tp);font-weight:600;}
+.rd-cur-author{font-size:12.5px;color:var(--tm);}
+.rd-cur-pct{font-size:12px;color:rgba(178,60,105,0.85);margin-top:3px;}
 
 /* ── 좌하단 플로팅 탭 ── */
-.float-tabs{position:fixed;left:16px;bottom:16px;display:flex;gap:5px;background:rgba(255,253,248,0.92);border:1px solid var(--card-b);border-radius:14px;padding:5px;box-shadow:0 4px 18px rgba(0,0,0,0.12);z-index:100;}
-.float-tab{padding:8px 14px;border-radius:9px;font-size:11.5px;color:var(--ts);cursor:pointer;display:flex;align-items:center;gap:4px;}
+.float-tabs{position:fixed;left:18px;bottom:18px;display:flex;gap:6px;background:rgba(255,253,248,0.92);border:1px solid var(--card-b);border-radius:15px;padding:6px;box-shadow:0 4px 18px rgba(0,0,0,0.12);z-index:100;}
+.float-tab{padding:10px 17px;border-radius:10px;font-size:14.5px;color:var(--ts);cursor:pointer;display:flex;align-items:center;gap:5px;}
 .float-tab.on{background:rgba(var(--pal-orange-rgb),0.35);color:var(--pal-orange-text);font-weight:600;}
-.float-tab i{font-size:13px;}
+.float-tab i{font-size:16px;}
 
 /* ── 주간탭 ── */
 .wgoal-item{margin-bottom:9px;}
@@ -194,9 +206,21 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 /* ── 리포트 오버레이 패널 ── */
 .report-overlay{position:fixed;inset:0;background:rgba(60,45,40,0.35);display:none;align-items:center;justify-content:center;z-index:200;}
 .report-overlay.on{display:flex;}
-.report-panel{width:520px;max-height:80vh;overflow-y:auto;background:var(--bg);border-radius:18px;padding:22px 24px;box-shadow:0 12px 40px rgba(0,0,0,0.25);position:relative;}
-.report-panel-close{position:absolute;top:14px;right:14px;font-size:18px;color:var(--tm);cursor:pointer;}
-.report-panel-title{font-size:14px;font-weight:600;color:var(--tp);margin-bottom:12px;display:flex;align-items:center;gap:6px;}
+.report-panel{width:560px;max-height:80vh;overflow-y:auto;background:var(--bg);border-radius:18px;padding:24px 26px;box-shadow:0 12px 40px rgba(0,0,0,0.25);position:relative;}
+.report-panel-close{position:absolute;top:16px;right:16px;font-size:20px;color:var(--tm);cursor:pointer;}
+.report-panel-title{font-size:16px;font-weight:600;color:var(--tp);margin-bottom:14px;display:flex;align-items:center;gap:7px;}
+
+/* ── 오늘의 메모 (노란 연한 배경, 본앱 투두배너 톤과 동일) ── */
+.card.y{background:rgba(255,225,120,0.22);border-color:rgba(255,225,120,0.32);}
+
+/* ── 오늘의 리듬 흐름 팝업(주간탭 wrb-flow 스타일 차용) ── */
+.wrb-flow-list{display:flex;flex-direction:column;gap:2px;}
+.wrb-flow-row{display:flex;align-items:center;gap:10px;padding:7px 2px;border-bottom:1px dashed rgba(var(--divider-rgb),0.25);}
+.wrb-flow-row:last-child{border-bottom:none;}
+.wrb-flow-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.wrb-flow-time{font-size:13px;color:var(--ts);font-weight:600;width:110px;flex-shrink:0;}
+.wrb-flow-label{font-size:14.5px;color:var(--tp);}
+.wrb-flow-empty{font-size:14px;color:var(--tm);text-align:center;padding:20px 0;}
 </style>
 </head>
 <body>
@@ -213,19 +237,21 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
     <div class="main-body on" id="tab-today">
       <div class="main-hdr"><span class="main-date" id="today-date"></span><span class="main-dow" id="today-dow"></span></div>
       <div class="report-banner" id="today-report-banner"></div>
-      <div class="grid2">
-        <div class="card"><div class="card-lbl"><i class="ti ti-checklist" style="color:rgba(var(--pal-orange-rgb),1);" aria-hidden="true"></i>오늘 할 일</div><div id="today-todos"></div></div>
-        <div class="card"><div class="card-lbl"><i class="ti ti-map-pin" style="color:var(--rh-appointment);" aria-hidden="true"></i>오늘 일정</div><div id="today-events"></div></div>
+      <div class="grid3">
+        <div class="card todo-card"><div class="card-lbl"><i class="ti ti-checklist" style="color:rgba(var(--pal-orange-rgb),1);" aria-hidden="true"></i>오늘 할 일</div><div id="today-todos"></div></div>
+        <div class="grid3-right">
+          <div class="card event-card"><div class="card-lbl"><i class="ti ti-map-pin" style="color:var(--rh-appointment);" aria-hidden="true"></i>오늘 일정</div><div id="today-events"></div></div>
+          <div class="card meal-card"><div class="card-lbl"><i class="ti ti-soup" style="color:rgba(var(--pal-lime-rgb),1);" aria-hidden="true"></i>오늘의 식사</div><div id="today-meals"></div></div>
+        </div>
       </div>
-      <div class="card"><div class="card-lbl"><i class="ti ti-notes" style="color:rgba(var(--pal-yellow-rgb),1);" aria-hidden="true"></i>오늘의 메모</div><div class="memo-tl" id="today-memos"></div></div>
+      <div class="card y"><div class="card-lbl"><i class="ti ti-notes" style="color:rgba(170,125,0,0.95);" aria-hidden="true"></i>오늘의 메모</div><div class="memo-tl" id="today-memos"></div></div>
       <div class="grid4">
         <div class="card sleep-card"><div class="card-lbl"><i class="ti ti-moon-stars" style="color:rgba(var(--pal-sky-rgb),1);" aria-hidden="true"></i>수면</div><div id="today-sleep"></div></div>
         <div class="card habit-card"><div class="card-lbl" id="today-habit-lbl"><i class="ti ti-target-arrow" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>습관</div><div id="today-habits"></div></div>
-        <div class="card meal-card"><div class="card-lbl"><i class="ti ti-soup" style="color:rgba(var(--pal-lime-rgb),1);" aria-hidden="true"></i>오늘의 식사</div><div id="today-meals"></div></div>
         <div class="card content-card"><div class="card-lbl"><i class="ti ti-device-tv" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>콘텐츠 현황</div><div id="today-contents"></div></div>
       </div>
       <div class="grid2">
-        <div class="card"><div class="card-lbl"><i class="ti ti-activity" style="color:var(--rh-rest);" aria-hidden="true"></i>오늘의 리듬</div><div id="today-rhythm"></div></div>
+        <div class="card rhythm-card" id="today-rhythm-card" onclick="openTodayRhythmFlow()"><div class="card-lbl"><i class="ti ti-activity" style="color:var(--rh-rest);" aria-hidden="true"></i>오늘의 리듬</div><div id="today-rhythm"></div></div>
         <div class="quote-card"><div class="quote-card-inner"><div class="card-lbl"><i class="ti ti-book" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>읽는 중</div><div id="today-reading"></div></div></div>
       </div>
     </div>

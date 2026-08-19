@@ -153,9 +153,14 @@ async function loadTodayTab(){
   document.getElementById('today-date').textContent=`${_selectedDate.getMonth()+1}월 ${_selectedDate.getDate()}일`;
   document.getElementById('today-dow').textContent=DOW[_selectedDate.getDay()]+'요일';
 
-  const [todos,sleepRows,habits,habitChecks,meals,contents,books,rblocks]=await Promise.all([
+  // 수면 7일 스파크라인용 날짜 범위(오늘 포함 최근 7일)
+  const sparkStart=new Date(_selectedDate);sparkStart.setDate(sparkStart.getDate()-6);
+  const sparkStartDk=dateKey(sparkStart);
+
+  const [todos,sleepRows,sleepWeekRows,habits,habitChecks,meals,contents,books,rblocks]=await Promise.all([
     supaFetch(`todos?date_key=eq.${dk}&order=sort_order.asc.nullslast`),
     supaFetch(`sleep?date_key=eq.${dk}`),
+    supaFetch(`sleep?date_key=gte.${sparkStartDk}&date_key=lte.${dk}&select=date_key,score`),
     supaFetch(`habits?order=sort_order.asc`),
     supaFetch(`habit_checks?date_key=eq.${dk}`),
     supaFetch(`meals?date_key=eq.${dk}`),
@@ -166,10 +171,11 @@ async function loadTodayTab(){
 
   renderTodayTodosEvents(todos||[]);
   renderTodayMemos(dk);
-  renderTodaySleep(dk,sleepRows&&sleepRows[0]);
+  renderTodaySleep(dk,sleepRows&&sleepRows[0],sleepWeekRows||[]);
   renderTodayHabits(habits||[],habitChecks||[],dk);
   renderTodayMeals(meals&&meals[0]);
   renderTodayContents(contents||[]);
+  _todayRhythmBlocks=rblocks||[];
   renderTodayRhythm(rblocks||[]);
   renderTodayReading(books&&books[0]);
   renderReportBanner('today-report-banner',_selectedDate);
@@ -206,16 +212,34 @@ async function renderTodayMemos(dk){
   ).join('');
 }
 
-function renderTodaySleep(dk,sleep){
+function renderTodaySleep(dk,sleep,weekRows){
   const el=document.getElementById('today-sleep');
-  if(!sleep||sleep.score==null){el.innerHTML='<div class="empty-msg">기록 없음</div>';return;}
   let durText='';
-  if(sleep.sleep_time&&sleep.wake_time){
+  if(sleep&&sleep.sleep_time&&sleep.wake_time){
     const sv=sleep.sleep_time.split(':').map(Number),wv=sleep.wake_time.split(':').map(Number);
     let mins=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(mins<0)mins+=1440;
     durText=Math.floor(mins/60)+'h '+(mins%60)+'m · ';
   }
-  el.innerHTML=`<div class="sleep-score">${sleep.score}<span style="font-size:10px;color:var(--tm);">점</span></div><div class="sleep-score-lbl">${durText}수면</div>`;
+  const scoreHtml=(sleep&&sleep.score!=null)
+    ?`<div class="sleep-score">${sleep.score}<span style="font-size:12px;color:var(--tm);"> 점</span></div><div class="sleep-score-lbl">${durText}수면</div>`
+    :`<div class="sleep-score" style="color:var(--tm);">-</div><div class="sleep-score-lbl">오늘 기록 없음</div>`;
+
+  // 최근 7일 스코어 맵
+  const scoreByDk={};
+  (weekRows||[]).forEach(r=>{if(r.score!=null)scoreByDk[r.date_key]=r.score;});
+  const days=[];
+  const base=new Date(dk+'T00:00:00');
+  for(let i=6;i>=0;i--){const d=new Date(base);d.setDate(base.getDate()-i);days.push(dateKey(d));}
+  const maxScore=100;
+  const sparkCols=days.map(dayDk=>{
+    const sc=scoreByDk[dayDk];
+    const h=sc!=null?Math.max(6,Math.round(sc/maxScore*44)):3;
+    const isToday=dayDk===dk;
+    const dow=DOW[new Date(dayDk+'T00:00:00').getDay()];
+    return `<div class="sleep-spark-col"><div class="sleep-spark-bar${isToday?' today':''}" style="height:${h}px;" title="${sc!=null?sc+'점':'기록없음'}"></div><div class="sleep-spark-dow">${dow}</div></div>`;
+  }).join('');
+
+  el.innerHTML=`<div class="sleep-score-row">${scoreHtml}</div><div class="sleep-spark">${sparkCols}</div>`;
 }
 
 function renderTodayHabits(habits,checks,dk){
@@ -237,16 +261,16 @@ const MEAL_KEYS=['breakfast','lunch','snack','dinner'];
 const MEAL_LABELS={breakfast:'아침',lunch:'점심',snack:'간식',dinner:'저녁'};
 function renderTodayMeals(meal){
   const el=document.getElementById('today-meals');
-  if(!meal){el.innerHTML='<div class="empty-msg">기록 없음</div>';return;}
-  const items=MEAL_KEYS.map(k=>{
-    if(!meal[k])return null;
-    const t=meal[k+'_time'];
-    return {label:MEAL_LABELS[k],menu:meal[k],time:t||'',sortKey:t||'99:99'};
-  }).filter(Boolean).sort((a,b)=>a.sortKey.localeCompare(b.sortKey));
-  if(!items.length){el.innerHTML='<div class="empty-msg">기록 없음</div>';return;}
-  el.innerHTML=items.map(it=>
-    `<div class="meal-row">${it.time?`<span class="meal-time">${it.time}</span>`:''}<span class="meal-label">${it.label}</span><br>${escapeHtml(it.menu)}</div>`
-  ).join('');
+  // 4끼 자리를 항상 고정으로 잡아두고(2x2), 기록 없는 끼니는 흐리게 표시
+  const html=MEAL_KEYS.map(k=>{
+    const menu=meal&&meal[k];
+    const t=meal&&meal[k+'_time'];
+    if(!menu){
+      return `<div class="meal-slot empty"><span class="meal-label">${MEAL_LABELS[k]}</span><div class="meal-menu" style="color:var(--tm);">기록 없음</div></div>`;
+    }
+    return `<div class="meal-slot">${t?`<span class="meal-time">${t}</span>`:''}<span class="meal-label">${MEAL_LABELS[k]}</span><div class="meal-menu">${escapeHtml(menu)}</div></div>`;
+  }).join('');
+  el.innerHTML=`<div class="meal-grid">${html}</div>`;
 }
 
 function renderTodayContents(items){
@@ -282,6 +306,33 @@ function renderTodayRhythm(blocks){
     return `<span><i class="ti ti-square-filled" style="color:${c.color};" aria-hidden="true"></i>${c.label}</span>`;
   }).join('');
   el.innerHTML=`<div class="rhythm-mini">${barHtml}</div><div class="rhythm-legend">${legendHtml}</div>`;
+}
+
+// ── 오늘의 리듬 클릭 → 시간순 흐름 텍스트 팝업(주간탭 리듬 모아보기 흐름보기와 동일 포맷) ──
+let _todayRhythmBlocks=[];
+function toHHMM(t){
+  if(!t)return'';
+  const m=t.match(/^(\d{1,2}):(\d{2})/);
+  return m?m[0]:t;
+}
+function openTodayRhythmFlow(){
+  const dk=dateKey(_selectedDate);
+  const label=`${_selectedDate.getMonth()+1}월 ${_selectedDate.getDate()}일 리듬 흐름`;
+  document.getElementById('report-panel-title').innerHTML=`<i class="ti ti-activity" aria-hidden="true"></i>${label}`;
+  const bodyEl=document.getElementById('report-panel-body');
+  const blocks=(_todayRhythmBlocks||[]).slice().sort((a,b)=>(a.start_time||'').localeCompare(b.start_time||''));
+  if(!blocks.length){
+    bodyEl.innerHTML='<div class="wrb-flow-empty">이날은 기록된 리듬이 없어요</div>';
+  }else{
+    bodyEl.innerHTML='<div class="wrb-flow-list">'+blocks.map(b=>{
+      const cat=RHYTHM_CATS[b.cat];
+      const color=cat?cat.color:'var(--tm)';
+      const label=(cat?cat.label:b.cat)+(b.text?' · '+escapeHtml(b.text):'');
+      const timeRange=b.end_time?`${toHHMM(b.start_time)}~${toHHMM(b.end_time)}`:`${toHHMM(b.start_time)}~진행중`;
+      return `<div class="wrb-flow-row"><span class="wrb-flow-dot" style="background:${color};"></span><span class="wrb-flow-time">${timeRange}</span><span class="wrb-flow-label">${label}</span></div>`;
+    }).join('')+'</div>';
+  }
+  document.getElementById('report-overlay').classList.add('on');
 }
 
 function renderTodayReading(book){
