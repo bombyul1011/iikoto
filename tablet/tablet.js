@@ -16,6 +16,7 @@ async function supaFetch(path){
     return await res.json();
   }catch(e){return null;}
 }
+// TODO: 채움로그 연동 미착수 — 오늘탭 카드 추가는 별도 작업으로 진행 예정
 async function chaeumFetch(path){
   try{
     const res=await fetch(CHAEUM_SUPA_URL+'/rest/v1/'+path,{headers:{'apikey':CHAEUM_SUPA_KEY,'Authorization':'Bearer '+CHAEUM_SUPA_KEY}});
@@ -82,7 +83,6 @@ async function renderMiniCal(){
   const todayDk=dateKey(new Date());
   const selDk=dateKey(_selectedDate);
   const mk=monthKeyOf(_sideCalDate);
-  const prevMk=monthKeyOf(new Date(y,m-1,1));
   // 기록 있는 날 점 표시용 — 투두/메모 존재 여부만 가볍게 조회
   const [todos,memos]=await Promise.all([
     supaFetch(`todos?date_key=gte.${mk}-01&date_key=lte.${mk}-31&select=date_key`),
@@ -127,20 +127,21 @@ async function renderSideStats(){
   for(let i=0;i<7;i++){const d=new Date(monday);d.setDate(monday.getDate()+i);weekDates.push(dateKey(d));}
   const startDk=weekDates[0],endDk=weekDates[6];
 
+  const weekStartMs=monday.getTime();
+  const weekEndMs=weekStartMs+7*24*60*60*1000-1;
   const [sleepRows,habitRows,quoteRows]=await Promise.all([
     supaFetch(`sleep?date_key=gte.${startDk}&date_key=lte.${endDk}&select=score`),
     supaFetch(`habit_checks?date_key=gte.${startDk}&date_key=lte.${endDk}&select=id`),
-    supaFetch(`reading_quotes?select=id`)
+    supaFetch(`reading_quotes?created=gte.${weekStartMs}&created=lte.${weekEndMs}&select=id`)
   ]);
   const scores=(sleepRows||[]).map(r=>r.score).filter(s=>s!=null);
   const avgSleep=scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):null;
-  const habitDays=new Set((habitRows||[]).map(r=>r.id)).size; // 참고용, 정밀 집계는 주간탭에서
   const quoteCount=(quoteRows||[]).length;
 
   el.innerHTML=`
     <div class="side-stat"><i class="ti ti-moon-stars" style="color:rgba(var(--pal-sky-rgb),1);" aria-hidden="true"></i><div><div class="side-stat-val">${avgSleep!=null?avgSleep+'점':'-'}</div><div class="side-stat-txt">평균 수면 점수</div></div></div>
     <div class="side-stat"><i class="ti ti-flame" style="color:rgba(var(--pal-orange-rgb),1);" aria-hidden="true"></i><div><div class="side-stat-val">${(habitRows||[]).length}회</div><div class="side-stat-txt">이번 주 습관 체크</div></div></div>
-    <div class="side-stat"><i class="ti ti-books" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i><div><div class="side-stat-val">${quoteCount}개</div><div class="side-stat-txt">수집한 문장</div></div></div>
+    <div class="side-stat"><i class="ti ti-books" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i><div><div class="side-stat-val">${quoteCount}개</div><div class="side-stat-txt">이번 주 수집한 문장</div></div></div>
   `;
 }
 
@@ -309,12 +310,27 @@ async function renderReportBanner(elId,forDate){
   if(weeklyRows&&weeklyRows.length){
     el.classList.add('on');
     el.innerHTML=`<div class="report-banner-inner"><i class="ti ti-sparkles" aria-hidden="true"></i>이번 주 리포트가 준비됐어요<i class="ti ti-chevron-right" aria-hidden="true"></i></div>`;
+    el.onclick=()=>openReportPanel('weekly_summary_'+wk,'이번 주 리포트');
   }else if(monthlyRows&&monthlyRows.length){
     el.classList.add('on');
     el.innerHTML=`<div class="report-banner-inner"><i class="ti ti-sparkles" aria-hidden="true"></i>이번 달 리포트가 준비됐어요<i class="ti ti-chevron-right" aria-hidden="true"></i></div>`;
+    el.onclick=()=>openReportPanel('monthly_report_'+mk,'이번 달 리포트');
   }else{
     el.classList.remove('on');
+    el.onclick=null;
   }
+}
+async function openReportPanel(cacheKey,title){
+  document.getElementById('report-panel-title').innerHTML=`<i class="ti ti-sparkles" aria-hidden="true"></i>${title}`;
+  const bodyEl=document.getElementById('report-panel-body');
+  bodyEl.innerHTML='<div class="loading-msg">불러오는 중...</div>';
+  document.getElementById('report-overlay').classList.add('on');
+  const rows=await supaFetch(`ai_cache?cache_key=eq.${cacheKey}&select=content`);
+  const content=rows&&rows[0]&&rows[0].content;
+  bodyEl.innerHTML=content?content:'<div class="empty-msg">내용을 불러오지 못했어요</div>';
+}
+function closeReportPanel(){
+  document.getElementById('report-overlay').classList.remove('on');
 }
 // ══════════════════════════════════════════════════════════
 // 주간탭
