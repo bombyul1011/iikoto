@@ -84,13 +84,13 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .report-banner-inner i:last-child{margin-left:auto;color:rgba(80,130,85,0.55);font-size:14px;}
 
 /* ── 투두 / 일정 ── */
-.todo-card{height:246px;box-sizing:border-box;overflow:hidden;}
+.todo-card{height:252px;box-sizing:border-box;overflow:hidden;}
 .todo-row{display:flex;align-items:center;gap:9px;padding:5px 0;font-size:15px;color:var(--tp);}
 .todo-row .chk{width:15px;height:15px;border-radius:4px;border:1.5px solid rgba(200,160,160,0.5);flex-shrink:0;}
 .todo-row.done{color:var(--tm);text-decoration:line-through;}
 .todo-row.done .chk{background:rgba(var(--pal-mint-rgb),0.5);border-color:transparent;}
-.grid3-right{display:flex;flex-direction:column;gap:8px;height:246px;}
-.event-card{padding:11px 16px;height:105px;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;}
+.grid3-right{display:flex;flex-direction:column;gap:6px;height:252px;}
+.event-card{padding:11px 16px;height:104px;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;}
 .event-row{display:flex;align-items:center;gap:9px;padding:4px 0;font-size:14px;color:var(--tp);}
 .event-time{color:rgba(75,145,180,1);font-weight:600;font-size:12.5px;width:42px;flex-shrink:0;}
 .event-row.past{color:var(--tm);text-decoration:line-through;opacity:0.6;}
@@ -109,13 +109,13 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .memo-txt{font-size:14px;color:var(--ts);line-height:1.5;}
 
 /* ── 수면(일정 아래 하프배너)/습관/콘텐츠 ── */
-.sleep-card{border-color:rgba(var(--pal-sky-rgb),0.35)!important;padding:11px 16px;height:133px;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;}
+.sleep-card{border-color:rgba(var(--pal-sky-rgb),0.35)!important;padding:11px 16px;height:142px;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;}
 .sleep-hdr{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;flex-shrink:0;}
 .sleep-hdr .card-lbl{margin-bottom:0;}
 .sleep-score-row{display:flex;align-items:baseline;gap:8px;}
 .sleep-score{font-size:18px;font-weight:700;color:var(--tp);}
 .sleep-score-lbl{font-size:11.5px;color:var(--tm);}
-.sleep-spark{display:flex;align-items:flex-end;gap:5px;height:52px;flex-shrink:0;}
+.sleep-spark{display:flex;align-items:flex-end;gap:5px;height:58px;flex-shrink:0;}
 .sleep-spark-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;height:100%;justify-content:flex-end;}
 .sleep-spark-bar{width:100%;border-radius:3px 3px 0 0;background:rgba(var(--pal-sky-rgb),0.45);min-height:3px;}
 .sleep-spark-bar.today{background:rgba(var(--pal-sky-rgb),0.95);}
@@ -131,22 +131,25 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .content-cat{font-size:11px;color:rgba(130,75,150,0.85);background:rgba(var(--pal-lavender-rgb),0.25);padding:2px 6px;border-radius:5px;flex-shrink:0;}
 
 /* ── 오늘의 식사(넓은 배너, 4끼 2x2, 높이 고정) ── */
-.meal-card{border-color:rgba(var(--pal-lime-rgb),0.4)!important;padding:14px 18px;height:150px;box-sizing:border-box;overflow:hidden;}
-.meal-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;}
-.meal-slot{padding:4px 0;overflow:hidden;}
+.meal-card{border-color:rgba(var(--pal-lime-rgb),0.4)!important;padding:12px 18px;height:150px;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;}
+.meal-card .card-lbl{margin-bottom:7px;flex-shrink:0;}
+.meal-grid{display:grid;grid-template-columns:1fr 1fr;gap:3px 16px;flex:1;}
+.meal-slot{padding:2px 0;overflow:hidden;}
 .meal-slot.empty{opacity:0.45;}
-.meal-time{color:rgba(120,150,50,1);font-weight:600;font-size:12.5px;margin-right:4px;}
-.meal-label{color:var(--tm);font-size:12.5px;}
-.meal-menu{font-size:14.5px;color:var(--tp);margin-top:3px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.meal-time{color:rgba(120,150,50,1);font-weight:600;font-size:12px;margin-right:4px;}
+.meal-label{color:var(--tm);font-size:12px;}
+.meal-menu{font-size:14px;color:var(--tp);margin-top:2px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
 /* ── 독서(현재 읽는 책, 식사 카드와 높이 고정 맞춤) ── */
 .quote-card{position:relative;border-radius:15px;padding:1.6px;background:linear-gradient(120deg,rgba(255,170,200,0.9),rgba(255,205,140,0.85),rgba(195,200,245,0.6),rgba(170,235,200,0.85),rgba(255,170,200,0.9));height:150px;box-sizing:border-box;}
-.quote-card-inner{border-radius:13.5px;background:linear-gradient(135deg,#fdeee8,#fdf3e2);padding:14px 20px;height:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;overflow:hidden;}
-.rd-cur-book{display:flex;gap:16px;align-items:center;}
-.rd-cur-cover{width:82px;height:112px;border-radius:8px;background:rgba(200,180,160,0.3);flex-shrink:0;background-size:cover;background-position:center;box-shadow:0 3px 10px rgba(0,0,0,0.12);}
-.rd-cur-title{font-size:17px;color:var(--tp);font-weight:600;}
-.rd-cur-author{font-size:13.5px;color:var(--tm);margin-top:2px;}
-.rd-cur-pct{font-size:13px;color:rgba(178,60,105,0.85);margin-top:6px;}
+.quote-card-inner{border-radius:13.5px;background:linear-gradient(135deg,#fdeee8,#fdf3e2);padding:12px 20px;height:100%;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden;}
+.quote-card-inner .card-lbl{margin-bottom:0;flex-shrink:0;}
+.rd-cur-book{display:flex;gap:15px;align-items:center;flex:1;min-height:0;}
+.rd-cur-cover{width:64px;height:88px;border-radius:7px;background:rgba(200,180,160,0.3);flex-shrink:0;background-size:cover;background-position:center;box-shadow:0 3px 10px rgba(0,0,0,0.12);}
+.rd-cur-info{display:flex;flex-direction:column;justify-content:center;}
+.rd-cur-title{font-size:16px;color:var(--tp);font-weight:600;}
+.rd-cur-author{font-size:13px;color:var(--tm);margin-top:2px;}
+.rd-cur-pct{font-size:12.5px;color:rgba(178,60,105,0.85);margin-top:6px;}
 
 /* ── 좌하단 플로팅 탭 ── */
 .float-tabs{position:fixed;right:22px;bottom:22px;display:flex;flex-direction:row-reverse;align-items:center;gap:9px;z-index:100;}

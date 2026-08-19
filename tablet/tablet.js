@@ -250,7 +250,7 @@ function renderTodaySleep(dk,sleep,weekRows){
   const base=new Date(dk+'T00:00:00');
   for(let i=6;i>=0;i--){const d=new Date(base);d.setDate(base.getDate()-i);days.push(dateKey(d));}
   const maxScore=100;
-  const sparkMaxH=36; // 바 최대 높이(px) — sleep-spark(52px) - dow라벨(약16px) 여유
+  const sparkMaxH=42; // 바 최대 높이(px) — sleep-spark(58px) - dow라벨 여유
   const sparkCols=days.map(dayDk=>{
     const sc=scoreByDk[dayDk];
     const h=sc!=null?Math.max(6,Math.round(sc/maxScore*sparkMaxH)):3;
@@ -364,7 +364,7 @@ function renderTodayReading(book){
   const coverStyle=book.poster?`background-image:url('${book.poster}');`:'';
   el.innerHTML=`<div class="rd-cur-book">
     <div class="rd-cur-cover" style="${coverStyle}"></div>
-    <div><div class="rd-cur-title">${escapeHtml(book.title)}</div><div class="rd-cur-author">${escapeHtml(book.author||'')}</div><div class="rd-cur-pct">${pct}% 진행 중</div></div>
+    <div class="rd-cur-info"><div class="rd-cur-title">${escapeHtml(book.title)}</div><div class="rd-cur-author">${escapeHtml(book.author||'')}</div><div class="rd-cur-pct">${pct}% 진행 중</div></div>
   </div>`;
 }
 
