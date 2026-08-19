@@ -250,7 +250,7 @@ function renderTodaySleep(dk,sleep,weekRows){
   const base=new Date(dk+'T00:00:00');
   for(let i=6;i>=0;i--){const d=new Date(base);d.setDate(base.getDate()-i);days.push(dateKey(d));}
   const maxScore=100;
-  const sparkMaxH=42; // 바 최대 높이(px) — sleep-spark(58px) - dow라벨 여유
+  const sparkMaxH=38; // 바 최대 높이(px) — sleep-spark(56px) - dow라벨(~12px) - gap(4px)
   const sparkCols=days.map(dayDk=>{
     const sc=scoreByDk[dayDk];
     const h=sc!=null?Math.max(6,Math.round(sc/maxScore*sparkMaxH)):3;
