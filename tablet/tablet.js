@@ -65,9 +65,27 @@ function switchTab(tab){
   document.querySelectorAll('.float-tab').forEach(el=>el.classList.remove('on'));
   document.getElementById('tab-'+tab).classList.add('on');
   document.getElementById('ft-'+tab).classList.add('on');
+  closeFloatMenu();
   if(tab==='today')loadTodayTab();
   else if(tab==='week')loadWeekTab();
   else if(tab==='month')loadMonthTab();
+}
+
+// ══════════════════════════════════════════════════════════
+// 좌하단 → 우하단 플로팅 원형 버튼 + 탭 메뉴
+// ══════════════════════════════════════════════════════════
+let _floatMenuOpen=false;
+function toggleFloatMenu(){
+  _floatMenuOpen=!_floatMenuOpen;
+  document.getElementById('float-tab-menu').classList.toggle('on',_floatMenuOpen);
+  document.getElementById('float-fab').classList.toggle('open',_floatMenuOpen);
+  document.getElementById('float-fab-icon').className=_floatMenuOpen?'ti ti-x':'ti ti-menu-2';
+}
+function closeFloatMenu(){
+  _floatMenuOpen=false;
+  document.getElementById('float-tab-menu').classList.remove('on');
+  document.getElementById('float-fab').classList.remove('open');
+  document.getElementById('float-fab-icon').className='ti ti-menu-2';
 }
 
 // ══════════════════════════════════════════════════════════
@@ -213,16 +231,17 @@ async function renderTodayMemos(dk){
 }
 
 function renderTodaySleep(dk,sleep,weekRows){
+  const scoreEl=document.getElementById('today-sleep-score');
   const el=document.getElementById('today-sleep');
   let durText='';
   if(sleep&&sleep.sleep_time&&sleep.wake_time){
     const sv=sleep.sleep_time.split(':').map(Number),wv=sleep.wake_time.split(':').map(Number);
     let mins=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(mins<0)mins+=1440;
-    durText=Math.floor(mins/60)+'h '+(mins%60)+'m · ';
+    durText=Math.floor(mins/60)+'h '+(mins%60)+'m';
   }
-  const scoreHtml=(sleep&&sleep.score!=null)
-    ?`<div class="sleep-score">${sleep.score}<span style="font-size:12px;color:var(--tm);"> 점</span></div><div class="sleep-score-lbl">${durText}수면</div>`
-    :`<div class="sleep-score" style="color:var(--tm);">-</div><div class="sleep-score-lbl">오늘 기록 없음</div>`;
+  scoreEl.innerHTML=(sleep&&sleep.score!=null)
+    ?`<div class="sleep-score">${sleep.score}<span style="font-size:12px;color:var(--tm);"> 점</span></div>${durText?`<div class="sleep-score-lbl">${durText}</div>`:''}`
+    :`<div class="sleep-score-lbl">기록 없음</div>`;
 
   // 최근 7일 스코어 맵
   const scoreByDk={};
@@ -239,7 +258,7 @@ function renderTodaySleep(dk,sleep,weekRows){
     return `<div class="sleep-spark-col"><div class="sleep-spark-bar${isToday?' today':''}" style="height:${h}px;" title="${sc!=null?sc+'점':'기록없음'}"></div><div class="sleep-spark-dow">${dow}</div></div>`;
   }).join('');
 
-  el.innerHTML=`<div class="sleep-score-row">${scoreHtml}</div><div class="sleep-spark">${sparkCols}</div>`;
+  el.innerHTML=`<div class="sleep-spark">${sparkCols}</div>`;
 }
 
 function renderTodayHabits(habits,checks,dk){

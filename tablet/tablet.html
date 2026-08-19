@@ -71,7 +71,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .card-lbl{font-size:15px;font-weight:600;color:var(--tp);margin-bottom:11px;display:flex;align-items:center;gap:7px;}
 .card-lbl i{font-size:16px;}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;}
-.grid3{display:grid;grid-template-columns:1.3fr 1fr;gap:13px;margin-bottom:13px;align-items:stretch;}
+.grid3{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;align-items:stretch;}
 .grid3-right{display:flex;flex-direction:column;gap:13px;}
 .grid4{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin-bottom:13px;}
 .empty-msg{font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:12px 0;}
@@ -110,8 +110,10 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 
 /* ── 수면(2칸)/습관/콘텐츠 3+1+1카드 ── */
 .sleep-card{border-color:rgba(var(--pal-sky-rgb),0.35)!important;}
-.sleep-score-row{display:flex;align-items:baseline;gap:10px;margin-bottom:10px;}
-.sleep-score{font-size:26px;font-weight:700;color:var(--tp);}
+.sleep-hdr{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:11px;}
+.sleep-hdr .card-lbl{margin-bottom:0;}
+.sleep-score-row{display:flex;align-items:baseline;gap:8px;}
+.sleep-score{font-size:20px;font-weight:700;color:var(--tp);}
 .sleep-score-lbl{font-size:12px;color:var(--tm);}
 .sleep-spark{display:flex;align-items:flex-end;gap:6px;height:44px;}
 .sleep-spark-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;}
@@ -135,7 +137,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .meal-slot.empty{opacity:0.45;}
 .meal-time{color:rgba(120,150,50,1);font-weight:600;font-size:11.5px;margin-right:4px;}
 .meal-label{color:var(--tm);font-size:11.5px;}
-.meal-menu{font-size:13.5px;color:var(--tp);margin-top:2px;line-height:1.35;}
+.meal-menu{font-size:13.5px;color:var(--tp);margin-top:2px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 
 /* ── 독서(현재 읽는 책) ── */
 .quote-card{position:relative;border-radius:15px;padding:1.6px;background:linear-gradient(120deg,rgba(255,170,200,0.9),rgba(255,205,140,0.85),rgba(195,200,245,0.6),rgba(170,235,200,0.85),rgba(255,170,200,0.9));}
@@ -147,8 +149,12 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .rd-cur-pct{font-size:12px;color:rgba(178,60,105,0.85);margin-top:3px;}
 
 /* ── 좌하단 플로팅 탭 ── */
-.float-tabs{position:fixed;left:18px;bottom:18px;display:flex;gap:6px;background:rgba(255,253,248,0.92);border:1px solid var(--card-b);border-radius:15px;padding:6px;box-shadow:0 4px 18px rgba(0,0,0,0.12);z-index:100;}
-.float-tab{padding:10px 17px;border-radius:10px;font-size:14.5px;color:var(--ts);cursor:pointer;display:flex;align-items:center;gap:5px;}
+.float-tabs{position:fixed;right:22px;bottom:22px;display:flex;flex-direction:row-reverse;align-items:center;gap:9px;z-index:100;}
+.float-fab{width:54px;height:54px;border-radius:50%;background:rgba(var(--pal-orange-rgb),0.85);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.18);flex-shrink:0;transition:transform .15s;}
+.float-fab.open{transform:rotate(90deg);}
+.float-tab-menu{display:flex;flex-direction:row-reverse;align-items:center;gap:7px;max-width:0;overflow:hidden;transition:max-width .25s ease;}
+.float-tab-menu.on{max-width:280px;}
+.float-tab{padding:11px 16px;border-radius:12px;font-size:14.5px;color:var(--ts);cursor:pointer;display:flex;align-items:center;gap:5px;background:rgba(255,253,248,0.92);border:1px solid var(--card-b);box-shadow:0 3px 12px rgba(0,0,0,0.10);white-space:nowrap;flex-shrink:0;}
 .float-tab.on{background:rgba(var(--pal-orange-rgb),0.35);color:var(--pal-orange-text);font-weight:600;}
 .float-tab i{font-size:16px;}
 
@@ -210,8 +216,8 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .report-panel-close{position:absolute;top:16px;right:16px;font-size:20px;color:var(--tm);cursor:pointer;}
 .report-panel-title{font-size:16px;font-weight:600;color:var(--tp);margin-bottom:14px;display:flex;align-items:center;gap:7px;}
 
-/* ── 오늘의 메모 (노란 연한 배경, 본앱 투두배너 톤과 동일) ── */
-.card.y{background:rgba(255,225,120,0.22);border-color:rgba(255,225,120,0.32);}
+/* ── 오늘의 메모 (본앱 메모 배너와 동일한 연핑크) ── */
+.card.p{background:rgba(255,175,200,0.15);border-color:rgba(255,175,200,0.32);}
 
 /* ── 오늘의 리듬 흐름 팝업(주간탭 wrb-flow 스타일 차용) ── */
 .wrb-flow-list{display:flex;flex-direction:column;gap:2px;}
@@ -244,9 +250,9 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
           <div class="card meal-card"><div class="card-lbl"><i class="ti ti-soup" style="color:rgba(var(--pal-lime-rgb),1);" aria-hidden="true"></i>오늘의 식사</div><div id="today-meals"></div></div>
         </div>
       </div>
-      <div class="card y"><div class="card-lbl"><i class="ti ti-notes" style="color:rgba(170,125,0,0.95);" aria-hidden="true"></i>오늘의 메모</div><div class="memo-tl" id="today-memos"></div></div>
+      <div class="card p"><div class="card-lbl"><i class="ti ti-notes" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>오늘의 메모</div><div class="memo-tl" id="today-memos"></div></div>
       <div class="grid4">
-        <div class="card sleep-card"><div class="card-lbl"><i class="ti ti-moon-stars" style="color:rgba(var(--pal-sky-rgb),1);" aria-hidden="true"></i>수면</div><div id="today-sleep"></div></div>
+        <div class="card sleep-card"><div class="sleep-hdr"><div class="card-lbl"><i class="ti ti-moon-stars" style="color:rgba(var(--pal-sky-rgb),1);" aria-hidden="true"></i>수면</div><div class="sleep-score-row" id="today-sleep-score"></div></div><div id="today-sleep"></div></div>
         <div class="card habit-card"><div class="card-lbl" id="today-habit-lbl"><i class="ti ti-target-arrow" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>습관</div><div id="today-habits"></div></div>
         <div class="card content-card"><div class="card-lbl"><i class="ti ti-device-tv" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>콘텐츠 현황</div><div id="today-contents"></div></div>
       </div>
@@ -294,9 +300,12 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 </div>
 
 <div class="float-tabs">
-  <div class="float-tab on" id="ft-today" onclick="switchTab('today')"><i class="ti ti-sun" aria-hidden="true"></i>오늘</div>
-  <div class="float-tab" id="ft-week" onclick="switchTab('week')"><i class="ti ti-calendar-week" aria-hidden="true"></i>주간</div>
-  <div class="float-tab" id="ft-month" onclick="switchTab('month')"><i class="ti ti-calendar" aria-hidden="true"></i>월간</div>
+  <div class="float-fab" id="float-fab" onclick="toggleFloatMenu()"><i class="ti ti-menu-2" id="float-fab-icon" aria-hidden="true"></i></div>
+  <div class="float-tab-menu" id="float-tab-menu">
+    <div class="float-tab" id="ft-month" onclick="switchTab('month')"><i class="ti ti-calendar" aria-hidden="true"></i>월간</div>
+    <div class="float-tab" id="ft-week" onclick="switchTab('week')"><i class="ti ti-calendar-week" aria-hidden="true"></i>주간</div>
+    <div class="float-tab on" id="ft-today" onclick="switchTab('today')"><i class="ti ti-sun" aria-hidden="true"></i>오늘</div>
+  </div>
 </div>
 
 <div class="report-overlay" id="report-overlay" onclick="if(event.target===this)closeReportPanel();">
