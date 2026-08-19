@@ -623,14 +623,34 @@ async function renderMonthTimetable(y,mo){
     const meta=CAT_ICON_META[cat];
     tracks.forEach((trackItems,tIdx)=>{
       const catLabel=tIdx===0?`<i class="dot" style="background:${meta.bg};"></i>${meta.label}`:'';
-      let barsHtml='';
-      trackItems.forEach(c=>{
-        const leftPct=((c.startD-1)/daysInMonth*100).toFixed(2);
-        const widthPct=Math.max(2.2,((c.endD-c.startD+1)/daysInMonth*100)).toFixed(2);
-        const label=cat==='music'?(c.item.title||'').slice(0,1):escapeHtml(c.item.title||'');
-        barsHtml+=`<div class="tt-bar" style="left:${leftPct}%;width:${widthPct}%;background:${meta.bg.replace('1)','0.6)')};">${label}</div>`;
+      // 본앱과 동일하게 커서를 하루씩 진행하며, 콘텐츠 없는 날은 점선 네모칸(tt-cell), 있는 구간은 카테고리색 블록(tt-block)으로 채움
+      // 음악은 같은 시작일끼리 그룹핑해서 2곡 이상이면 곡 제목 대신 숫자 개수로 표시(본앱 동일 규칙)
+      const sortedGroups=cat==='music'
+        ?Object.values(trackItems.reduce((acc,c)=>{(acc[c.startD]=acc[c.startD]||[]).push(c);return acc;},{})).sort((a,b)=>a[0].startD-b[0].startD)
+        :trackItems.slice().sort((a,b)=>a.startD-b.startD).map(c=>[c]);
+      let cellsHtml='';
+      let cursor=1;
+      sortedGroups.forEach(group=>{
+        const c=group[0];
+        const dispStart=Math.max(c.startD,cursor);
+        for(let d=cursor;d<dispStart;d++)cellsHtml+=`<div class="tt-cell"></div>`;
+        const dispEnd=Math.max(c.endD,dispStart);
+        const span=dispEnd-dispStart+1;
+        const isWatching=c.item.status==='watching'&&cat!=='music';
+        const isStopped=c.item.status==='stopped';
+        let label,titleAttr;
+        if(cat==='music'&&group.length>1){
+          label=String(group.length);
+          titleAttr=group.map(g=>g.item.title).join(', ');
+        }else{
+          label=cat==='music'?(c.item.title||'').slice(0,1):escapeHtml(c.item.title||'');
+          titleAttr=(c.item._carried?c.item.title+' (전월부터 이어짐)':c.item.title)+(c.item.status==='stopped'?' · 중단':'');
+        }
+        cellsHtml+=`<div class="tt-block ${cat}${isWatching?' watching':''}${isStopped?' stopped':''}" style="flex:${span} 1 0%;" title="${escapeHtml(titleAttr||'')}">${label}</div>`;
+        cursor=dispEnd+1;
       });
-      rowsHtml+=`<div class="tt-row"><div class="tt-cat-fixed">${catLabel}</div><div class="tt-track">${barsHtml}</div></div>`;
+      for(let d=cursor;d<=daysInMonth;d++)cellsHtml+=`<div class="tt-cell"></div>`;
+      rowsHtml+=`<div class="tt-row"><div class="tt-cat-fixed">${catLabel}</div><div class="tt-track">${cellsHtml}</div></div>`;
     });
   });
 

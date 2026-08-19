@@ -164,6 +164,9 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .rd-cur-author{font-size:var(--fs-body);color:var(--tm);}
 .rd-cur-pct{font-size:var(--fs-sm);color:rgba(178,60,105,0.85);}
 
+/* ── 목표 배너 강조 — 본앱 홈탭 오후 인사카드(home-hcard.afternoon) 스타일 차용 ── */
+.goal-hcard{border-radius:20px;background:linear-gradient(135deg,rgba(255,220,235,0.65),rgba(255,235,200,0.60));border:1px solid rgba(255,200,210,0.50)!important;box-shadow:0 2px 20px rgba(180,140,120,0.08),inset 0 1px 0 rgba(255,250,240,0.62);}
+
 /* ── 좌하단 플로팅 탭 ── */
 .float-tabs{position:fixed;right:22px;bottom:22px;display:flex;flex-direction:row-reverse;align-items:center;gap:9px;z-index:100;}
 .float-fab{width:54px;height:54px;border-radius:50%;background:rgba(var(--pal-orange-rgb),0.85);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.18);flex-shrink:0;transition:transform .15s;}
@@ -198,7 +201,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .oneline-dow{width:22px;flex-shrink:0;font-weight:600;color:var(--tp);}
 
 /* ── 월간탭 ── */
-.top-row{display:grid;grid-template-columns:1.25fr 1fr;gap:13px;margin-bottom:13px;align-items:stretch;}
+.top-row{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;align-items:stretch;}
 .rdcal-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin:0 0 4px;}
 .rdcal-nav i{font-size:var(--fs-title);color:var(--tm);cursor:pointer;}
 .rdcal-month{font-weight:600;font-size:var(--fs-body);color:var(--tp);}
@@ -211,16 +214,23 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .mgoal-row{display:flex;align-items:center;gap:7px;padding:3px 0;font-size:var(--fs-sm);color:var(--tp);}
 .mgoal-row::before{content:'';width:4px;height:4px;border-radius:50%;background:rgba(var(--pal-orange-rgb),1);flex-shrink:0;}
 
-/* 콘텐츠 타임라인 — 전체 폭 한줄(%기반), 스와이프 없이 31일치가 카드 폭에 그대로 들어감 */
+/* 콘텐츠 타임라인 — 본앱과 동일한 시각 스타일(빈 날짜=점선 네모칸, 콘텐츠=카테고리색 둥근 블록), 전체 폭 한줄(%기반) */
 .tt-head-row{display:flex;margin-bottom:4px;}
-.tt-cat-fixed-sp{width:44px;flex-shrink:0;}
+.tt-cat-fixed-sp{width:56px;flex-shrink:0;}
 .tt-head-dates{flex:1;display:flex;}
 .tt-head-dates span{flex:1;text-align:center;font-size:var(--fs-xs);color:var(--tm);}
 .tt-row{display:flex;align-items:center;margin-bottom:3px;}
-.tt-cat-fixed{width:44px;flex-shrink:0;font-size:var(--fs-sm);color:var(--ts);display:flex;align-items:center;gap:3px;cursor:default;}
+.tt-cat-fixed{width:56px;flex-shrink:0;font-size:var(--fs-sm);color:var(--ts);display:flex;align-items:center;gap:4px;cursor:default;white-space:nowrap;}
 .tt-cat-fixed i.dot{width:11px;height:11px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;flex-shrink:0;}
-.tt-track{flex:1;position:relative;height:17px;}
-.tt-bar{position:absolute;top:0;height:16px;border-radius:5px;font-size:var(--fs-xs);color:var(--tp);display:flex;align-items:center;padding-left:4px;overflow:hidden;white-space:nowrap;}
+.tt-track{flex:1;display:flex;gap:1px;height:18px;}
+.tt-cell{flex:1;height:18px;border-radius:4px;background:none;border:0.5px dashed rgba(var(--divider-rgb),0.3);box-sizing:border-box;}
+.tt-block{height:18px;border-radius:5px;display:flex;align-items:center;justify-content:center;padding:0 4px;font-size:var(--fs-xs);color:var(--tp);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;box-sizing:border-box;}
+.tt-block.drama{background:var(--pal-pink-bg);}
+.tt-block.book{background:var(--pal-yellow-bg);}
+.tt-block.movie{background:var(--pal-sky-bg);}
+.tt-block.music{background:var(--pal-lime-bg);}
+.tt-block.watching{background-image:repeating-linear-gradient(45deg,transparent,transparent 6px,rgba(255,255,255,0.45) 6px,rgba(255,255,255,0.45) 10px);opacity:0.85;}
+.tt-block.stopped{filter:saturate(0.45);opacity:0.7;}
 .habit-month-row{display:flex;align-items:center;gap:7px;margin-bottom:5px;}
 .habit-month-lbl{font-size:var(--fs-sm);color:var(--ts);width:36px;flex-shrink:0;}
 .habit-month-dots{display:flex;gap:2px;flex-wrap:wrap;flex:1;}
@@ -309,7 +319,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
       <div class="main-hdr"><span class="main-date" id="week-range"></span></div>
       <div class="report-banner" id="week-report-banner"></div>
       <div class="grid2">
-        <div class="card"><div class="card-lbl"><i class="ti ti-target-arrow" style="color:rgba(var(--pal-orange-rgb),1);" aria-hidden="true"></i>이번 주 목표</div><div id="week-goals"></div></div>
+        <div class="card goal-hcard"><div class="card-lbl"><i class="ti ti-target-arrow" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>이번 주 목표</div><div id="week-goals"></div></div>
         <div class="card"><div class="card-lbl"><i class="ti ti-target-arrow" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>습관 매트릭스</div><div id="week-habit-matrix"></div></div>
       </div>
       <div class="card"><div class="card-lbl"><i class="ti ti-pencil" style="color:rgba(var(--pal-yellow-rgb),1);" aria-hidden="true"></i>하루한줄</div>
@@ -325,7 +335,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
     <div class="main-body" id="tab-month">
       <div class="main-hdr"><span class="main-date" id="month-title"></span></div>
       <div class="grid2">
-        <div class="card"><div class="card-lbl"><i class="ti ti-flag-3" style="color:rgba(var(--pal-orange-rgb),1);" aria-hidden="true"></i>이번 달 목표</div><div id="month-goals"></div></div>
+        <div class="card goal-hcard"><div class="card-lbl"><i class="ti ti-flag-3" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>이번 달 목표</div><div id="month-goals"></div></div>
         <div class="card"><div class="card-lbl"><i class="ti ti-target-arrow" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>습관 모아보기</div><div id="month-habits"></div></div>
       </div>
       <div class="top-row">
