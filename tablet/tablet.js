@@ -250,12 +250,13 @@ function renderTodaySleep(dk,sleep,weekRows){
   const base=new Date(dk+'T00:00:00');
   for(let i=6;i>=0;i--){const d=new Date(base);d.setDate(base.getDate()-i);days.push(dateKey(d));}
   const maxScore=100;
+  const sparkMaxH=36; // 바 최대 높이(px) — sleep-spark(52px) - dow라벨(약16px) 여유
   const sparkCols=days.map(dayDk=>{
     const sc=scoreByDk[dayDk];
-    const hPct=sc!=null?Math.max(8,Math.round(sc/maxScore*100)):4;
+    const h=sc!=null?Math.max(6,Math.round(sc/maxScore*sparkMaxH)):3;
     const isToday=dayDk===dk;
     const dow=DOW[new Date(dayDk+'T00:00:00').getDay()];
-    return `<div class="sleep-spark-col"><div class="sleep-spark-bar-wrap"><div class="sleep-spark-bar${isToday?' today':''}" style="height:${hPct}%;" title="${sc!=null?sc+'점':'기록없음'}"></div></div><div class="sleep-spark-dow">${dow}</div></div>`;
+    return `<div class="sleep-spark-col"><div class="sleep-spark-bar${isToday?' today':''}" style="height:${h}px;" title="${sc!=null?sc+'점':'기록없음'}"></div><div class="sleep-spark-dow">${dow}</div></div>`;
   }).join('');
 
   el.innerHTML=`<div class="sleep-spark">${sparkCols}</div>`;
