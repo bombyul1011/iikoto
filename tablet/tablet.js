@@ -66,7 +66,8 @@ function switchTab(tab){
   document.getElementById('tab-'+tab).classList.add('on');
   document.getElementById('ft-'+tab).classList.add('on');
   closeFloatMenu();
-  if(tab==='today')loadTodayTab();
+  // 오늘탭으로 돌아올 때는 항상 실제 '오늘' 날짜로 재설정(자정을 넘겨도 갱신되도록)
+  if(tab==='today'){_selectedDate=new Date();loadTodayTab();}
   else if(tab==='week')loadWeekTab();
   else if(tab==='month')loadMonthTab();
 }
@@ -424,21 +425,20 @@ async function loadWeekTab(){
   const startDk=weekDates[0],endDk=weekDates[6];
   document.getElementById('week-range').textContent=`${weekDates[0].slice(5).replace('-','.')} - ${weekDates[6].slice(5).replace('-','.')}`;
 
-  const [goalRows,habits,habitChecks,memos,todos,sleepRows,onelineRows,books]=await Promise.all([
+  const [goalRows,habits,habitChecks,memos,todos,sleepRows,onelineRows,contents]=await Promise.all([
     supaFetch(`goal_notes?note_key=eq.wchallenge_${encodeURIComponent(wk)}`),
     supaFetch(`habits?order=sort_order.asc`),
     supaFetch(`habit_checks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
     supaFetch(`memos?date_key=gte.${startDk}&date_key=lte.${endDk}&select=id`),
     supaFetch(`todos?date_key=gte.${startDk}&date_key=lte.${endDk}&select=done`),
-    supaFetch(`sleep?date_key=gte.${startDk}&date_key=lte.${endDk}&select=score`),
+    supaFetch(`sleep?date_key=gte.${startDk}&date_key=lte.${endDk}&select=score,sleep_time,wake_time`),
     supaFetch(`goal_notes?note_key=gte.oneline:${startDk}&note_key=lte.oneline:${endDk}`),
-    supaFetch(`reading_books?status=eq.reading&limit=1`)
+    supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&order=created.desc&limit=100`)
   ]);
 
   renderWeekGoals(goalRows&&goalRows[0]);
   renderWeekHabitMatrix(habits||[],habitChecks||[],weekDates);
-  await renderWeekReading(books&&books[0],startDk,endDk);
-  renderWeekStatBar(memos||[],todos||[],sleepRows||[],habits||[],habitChecks||[]);
+  renderWeekStatBar(memos||[],todos||[],sleepRows||[],habits||[],habitChecks||[],contents||[],startDk,endDk);
   renderWeekOneline(onelineRows||[],weekDates);
   renderReportBanner('week-report-banner',_selectedDate);
 }
@@ -474,45 +474,61 @@ function renderWeekHabitMatrix(habits,checks,weekDates){
   el.innerHTML=html;
 }
 
-async function renderWeekReading(book,startDk,endDk){
-  const el=document.getElementById('week-reading');
-  const logs=await supaFetch(`reading_daily_log?date_key=gte.${startDk}&date_key=lte.${endDk}&select=seconds`);
-  const totalSec=(logs||[]).reduce((sum,l)=>sum+(l.seconds||0),0);
-  const h=Math.floor(totalSec/3600),m=Math.floor((totalSec%3600)/60);
-  const timeText=totalSec>0?`이번 주 독서 ${h}시간 ${m}분`:'이번 주 독서 기록 없음';
-  if(!book){
-    el.innerHTML=`<div class="rd-week-icon"><i class="ti ti-book" aria-hidden="true"></i></div><div><div class="rd-week-txt">읽는 중인 책 없음</div><div class="rd-week-sub">${timeText}</div></div>`;
-    return;
-  }
-  let pct=0;
-  if(book.unit==='percent')pct=book.percent||0;
-  else if(book.total_pages)pct=Math.min(100,Math.round((book.pages/book.total_pages)*100));
-  el.innerHTML=`<div class="rd-week-icon"><i class="ti ti-book" aria-hidden="true"></i></div><div><div class="rd-week-txt">${escapeHtml(book.title)} · ${pct}%</div><div class="rd-week-sub">${timeText}</div></div>`;
-}
-
-function renderWeekStatBar(memos,todos,sleepRows,habits,checks){
+// 이번 주 요약 미니 통계바(박스 없이 심플, 이이코토 본앱 stat-bar-wrap 스타일 차용)
+// 메모/완료투두/습관달성률/콘텐츠완료/평균수면 5항목
+function renderWeekStatBar(memos,todos,sleepRows,habits,checks,contents,startDk,endDk){
   const el=document.getElementById('week-stat-bar');
   const memoCount=memos.length;
   const doneCount=todos.filter(t=>t.done).length;
   const pct=habits.length?Math.round(checks.length/(habits.length*7)*100):0;
+  // 콘텐츠 완료 집계 — 이이코토 본앱 원칙과 동일: music은 완결 개념이 없어 등록일(start_date)을 완료시점으로 대체 처리,
+  // 그 외 카테고리는 완료(done/stopped) 상태이면서 종료일(end_date)이 이번 주 안에 속할 때만 카운트.
+  const cc=(contents||[]).filter(c=>{
+    if(c.content_cat==='music'){
+      return c.start_date&&c.start_date>=startDk&&c.start_date<=endDk;
+    }
+    if(c.status!=='done'&&c.status!=='stopped')return false;
+    if(!c.end_date)return false;
+    return c.end_date>=startDk&&c.end_date<=endDk;
+  }).length;
+  let sleepMin=0,sleepCnt=0;
+  (sleepRows||[]).forEach(s=>{
+    if(s.sleep_time&&s.wake_time){
+      const sv=s.sleep_time.split(':').map(Number),wv=s.wake_time.split(':').map(Number);
+      let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;
+      sleepMin+=m;sleepCnt++;
+    }
+  });
+  const avgSleep=sleepCnt>0?(sleepMin/sleepCnt/60).toFixed(1):'-';
   el.innerHTML=`
-    <div class="stat-bar-item"><i class="ti ti-notes" aria-hidden="true"></i><span class="stat-bar-num">${memoCount}</span></div>
-    <div class="stat-bar-item"><i class="ti ti-checkbox" aria-hidden="true"></i><span class="stat-bar-num">${doneCount}</span></div>
-    <div class="stat-bar-item"><i class="ti ti-chart-donut" aria-hidden="true"></i><span class="stat-bar-num">${pct}%</span></div>
+    <div class="sbar-item"><i class="ti ti-notes" aria-hidden="true"></i><span class="sbar-num">${memoCount}</span></div>
+    <div class="sbar-div"></div>
+    <div class="sbar-item"><i class="ti ti-checkbox" aria-hidden="true"></i><span class="sbar-num">${doneCount}</span></div>
+    <div class="sbar-div"></div>
+    <div class="sbar-item"><i class="ti ti-chart-donut" aria-hidden="true"></i><span class="sbar-num">${pct}%</span></div>
+    <div class="sbar-div"></div>
+    <div class="sbar-item"><i class="ti ti-stack-2" aria-hidden="true"></i><span class="sbar-num">${cc}</span></div>
+    <div class="sbar-div"></div>
+    <div class="sbar-item"><i class="ti ti-moon-stars" aria-hidden="true"></i><span class="sbar-num">${avgSleep}h</span></div>
   `;
 }
 
+// 하루한줄 2열 배치: 왼쪽(월/화/수), 오른쪽(목/금/토/일)
 function renderWeekOneline(rows,weekDates){
-  const el=document.getElementById('week-oneline');
+  const elA=document.getElementById('week-oneline-a');
+  const elB=document.getElementById('week-oneline-b');
   const byDate={};
   rows.forEach(r=>{
     const dk=r.note_key.replace('oneline:','');
     const text=Array.isArray(r.lines)?(r.lines[0]||''):r.lines;
     if(text&&text.trim())byDate[dk]=text;
   });
-  const entries=weekDates.map((dk,i)=>({dow:WC_DOW[i],text:byDate[dk]})).filter(e=>e.text);
-  if(!entries.length){el.innerHTML='<div class="empty-msg">작성된 하루한줄이 없어요</div>';return;}
-  el.innerHTML=entries.map(e=>`<div class="oneline-row"><div class="oneline-dow">${e.dow}</div>${escapeHtml(e.text)}</div>`).join('');
+  const entries=weekDates.map((dk,i)=>({dow:WC_DOW[i],text:byDate[dk]}));
+  const left=entries.slice(0,3).filter(e=>e.text);   // 월화수
+  const right=entries.slice(3,7).filter(e=>e.text);  // 목금토일
+  const rowHtml=e=>`<div class="oneline-row"><div class="oneline-dow">${e.dow}</div>${escapeHtml(e.text)}</div>`;
+  elA.innerHTML=left.length?left.map(rowHtml).join(''):'<div class="empty-msg">기록 없음</div>';
+  elB.innerHTML=right.length?right.map(rowHtml).join(''):'<div class="empty-msg">기록 없음</div>';
 }
 
 // ══════════════════════════════════════════════════════════
@@ -532,6 +548,7 @@ async function loadMonthTab(){
   await renderMonthTimetable(y,mo);
   await renderMonthHabits(y,mo);
   await renderMonthStatBar(y,mo);
+  await renderMonthQuotes(y,mo);
   _rdCalDate=new Date(_monthCalDate);
   await renderReadingCal();
 }
@@ -543,7 +560,7 @@ function renderMonthGoals(row){
   el.innerHTML=lines.map(l=>`<div class="mgoal-row">${escapeHtml(l)}</div>`).join('');
 }
 
-// ── 콘텐츠 타임라인 (실제 tt-row 간트 구조 재현) ──
+// ── 콘텐츠 타임라인 — 본앱과 동일 원칙: 날짜 1일=22px 고정폭 가로스크롤, 헤더+각 행이 scroll 이벤트로 서로 동기화(스와이프 가능) ──
 function isContentCarryOverTablet(c,mk){
   if(c.content_cat==='music')return false;
   if(c.status==='watching')return true;
@@ -564,9 +581,10 @@ async function renderMonthTimetable(y,mo){
   const isSameMonth=mk===monthKeyOf(new Date());
   const daysInMonth=new Date(y,mo+1,0).getDate();
   const CATS=['drama','book','movie','music'];
+  const DAY_W=22; // 본앱과 동일한 1일당 고정 폭(px)
 
   let headHtml='';
-  for(let i=5;i<=Math.min(daysInMonth,29);i+=2)headHtml+=`<span>${i}</span>`;
+  for(let i=1;i<=31;i++)headHtml+=`<span>${i}</span>`;
 
   let rowsHtml='';
   CATS.forEach(cat=>{
@@ -607,16 +625,37 @@ async function renderMonthTimetable(y,mo){
       const catLabel=tIdx===0?`<i class="dot" style="background:${meta.bg};"></i>${meta.label}`:'';
       let barsHtml='';
       trackItems.forEach(c=>{
-        const leftPct=((c.startD-1)/daysInMonth*100).toFixed(1);
-        const widthPct=Math.max(3,((c.endD-c.startD+1)/daysInMonth*100)).toFixed(1);
+        const left=(c.startD-1)*DAY_W;
+        const width=Math.max(DAY_W-2,(c.endD-c.startD+1)*DAY_W-2);
         const label=cat==='music'?(c.item.title||'').slice(0,1):escapeHtml(c.item.title||'');
-        barsHtml+=`<div class="tt-bar" style="left:${leftPct}%;width:${widthPct}%;background:${meta.bg.replace('1)','0.6)')};">${label}</div>`;
+        barsHtml+=`<div class="tt-bar" style="left:${left}px;width:${width}px;background:${meta.bg.replace('1)','0.6)')};">${label}</div>`;
       });
-      rowsHtml+=`<div class="tt-row"><div class="tt-cat-fixed">${catLabel}</div><div class="tt-track">${barsHtml}</div></div>`;
+      rowsHtml+=`<div class="tt-row"><div class="tt-cat-fixed">${catLabel}</div><div class="tt-date-scroll" data-tt="1"><div class="tt-date-inner" style="width:${daysInMonth*DAY_W}px;">${barsHtml}</div></div></div>`;
     });
   });
 
-  el.innerHTML=`<div class="tt-head-row"><div class="tt-cat-fixed-sp"></div><div class="tt-head-dates">${headHtml}</div></div>${rowsHtml}`;
+  el.innerHTML=`<div class="tt-head-row"><div class="tt-cat-fixed-sp"></div><div class="tt-head-dates" id="tt-head-dates"><div class="tt-head-dates-inner" style="width:${daysInMonth*DAY_W}px;">${headHtml}</div></div></div><div id="tt-rows">${rowsHtml}</div>`;
+
+  // 스크롤 동기화(본앱과 동일 방식): 헤더+모든 행이 함께 움직임
+  const headDates=document.getElementById('tt-head-dates');
+  const allScrolls=Array.from(el.querySelectorAll('[data-tt]'));
+  function syncScroll(src){
+    const sl=src.scrollLeft;
+    if(headDates)headDates.scrollLeft=sl;
+    allScrolls.forEach(s=>{if(s!==src)s.scrollLeft=sl;});
+  }
+  allScrolls.forEach(s=>s.addEventListener('scroll',()=>syncScroll(s),{passive:true}));
+  if(headDates)headDates.addEventListener('scroll',()=>syncScroll(headDates),{passive:true});
+
+  // 오늘-3일 위치로 초기 스크롤(같은 달일 때만) — 본앱과 동일
+  if(isSameMonth){
+    const targetDay=Math.max(1,todayDay-3);
+    const scrollX=(targetDay-1)*DAY_W;
+    setTimeout(()=>{
+      if(headDates)headDates.scrollLeft=scrollX;
+      allScrolls.forEach(s=>s.scrollLeft=scrollX);
+    },50);
+  }
 }
 
 async function renderMonthHabits(y,mo){
@@ -641,23 +680,67 @@ async function renderMonthHabits(y,mo){
   }).join('');
 }
 
+// 이번 달 미니 통계바 — 주간탭과 동일 스타일(sbar-item/sbar-div), 박스 없이 심플하게
 async function renderMonthStatBar(y,mo){
   const el=document.getElementById('month-stat-bar');
   const mk=`${y}-${pad(mo+1)}`;
-  const [memos,todos,sleepRows]=await Promise.all([
-    supaFetch(`memos?date_key=gte.${mk}-01&date_key=lte.${mk}-31&select=id`),
-    supaFetch(`todos?date_key=gte.${mk}-01&date_key=lte.${mk}-31&select=done`),
-    supaFetch(`sleep?date_key=gte.${mk}-01&date_key=lte.${mk}-31&select=score`)
+  const startDk=`${mk}-01`,endDk=`${mk}-31`;
+  const [memos,todos,sleepRows,habits,checks,contents]=await Promise.all([
+    supaFetch(`memos?date_key=gte.${startDk}&date_key=lte.${endDk}&select=id`),
+    supaFetch(`todos?date_key=gte.${startDk}&date_key=lte.${endDk}&select=done`),
+    supaFetch(`sleep?date_key=gte.${startDk}&date_key=lte.${endDk}&select=sleep_time,wake_time`),
+    supaFetch(`habits?order=sort_order.asc`),
+    supaFetch(`habit_checks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
+    supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&month_key=eq.${mk}`)
   ]);
   const memoCount=(memos||[]).length;
   const doneCount=(todos||[]).filter(t=>t.done).length;
-  const scores=(sleepRows||[]).map(r=>r.score).filter(s=>s!=null);
-  const avgScore=scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):null;
+  const daysInMonth=new Date(y,mo+1,0).getDate();
+  const habitList=habits||[];
+  const pct=habitList.length?Math.round((checks||[]).length/(habitList.length*daysInMonth)*100):0;
+  // 콘텐츠 완료 집계 — 주간탭과 동일 원칙(music은 등록일 기준, 그 외는 종료일 기준)
+  const cc=(contents||[]).filter(c=>{
+    if(c.content_cat==='music')return c.start_date&&c.start_date>=startDk&&c.start_date<=endDk;
+    if(c.status!=='done'&&c.status!=='stopped')return false;
+    if(!c.end_date)return false;
+    return c.end_date>=startDk&&c.end_date<=endDk;
+  }).length;
+  let sleepMin=0,sleepCnt=0;
+  (sleepRows||[]).forEach(s=>{
+    if(s.sleep_time&&s.wake_time){
+      const sv=s.sleep_time.split(':').map(Number),wv=s.wake_time.split(':').map(Number);
+      let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;
+      sleepMin+=m;sleepCnt++;
+    }
+  });
+  const avgSleep=sleepCnt>0?(sleepMin/sleepCnt/60).toFixed(1):'-';
   el.innerHTML=`
-    <div class="stat-bar-item"><i class="ti ti-notes" aria-hidden="true"></i><span class="stat-bar-num">${memoCount}</span></div>
-    <div class="stat-bar-item"><i class="ti ti-checkbox" aria-hidden="true"></i><span class="stat-bar-num">${doneCount}</span></div>
-    <div class="stat-bar-item"><i class="ti ti-moon-stars" aria-hidden="true"></i><span class="stat-bar-num">${avgScore!=null?avgScore+'점':'-'}</span></div>
+    <div class="sbar-item"><i class="ti ti-notes" aria-hidden="true"></i><span class="sbar-num">${memoCount}</span></div>
+    <div class="sbar-div"></div>
+    <div class="sbar-item"><i class="ti ti-checkbox" aria-hidden="true"></i><span class="sbar-num">${doneCount}</span></div>
+    <div class="sbar-div"></div>
+    <div class="sbar-item"><i class="ti ti-chart-donut" aria-hidden="true"></i><span class="sbar-num">${pct}%</span></div>
+    <div class="sbar-div"></div>
+    <div class="sbar-item"><i class="ti ti-stack-2" aria-hidden="true"></i><span class="sbar-num">${cc}</span></div>
+    <div class="sbar-div"></div>
+    <div class="sbar-item"><i class="ti ti-moon-stars" aria-hidden="true"></i><span class="sbar-num">${avgSleep}h</span></div>
   `;
+}
+
+// 신규: 이번 달 수집한 문장(reading_quotes) — created 타임스탬프 기준
+async function renderMonthQuotes(y,mo){
+  const el=document.getElementById('month-quotes');
+  const mk=`${y}-${pad(mo+1)}`;
+  const startIso=`${mk}-01T00:00:00`;
+  const daysInMonth=new Date(y,mo+1,0).getDate();
+  const endIso=`${mk}-${pad(daysInMonth)}T23:59:59`;
+  const rows=await supaFetch(`reading_quotes?created=gte.${startIso}&created=lte.${endIso}&order=created.asc&select=text,created`);
+  if(!rows||!rows.length){el.innerHTML='<div class="empty-msg">이번 달 수집한 문장이 없어요</div>';return;}
+  el.innerHTML=rows.map(r=>{
+    const d=new Date(r.created);
+    const dateLabel=`${d.getMonth()+1}.${pad(d.getDate())}`;
+    return `<div class="month-quote-item"><div class="month-quote-date">${dateLabel}</div><div class="month-quote-txt">${escapeHtml(r.text||'')}</div></div>`;
+  }).join('');
 }
 
 // ── 독서 달력 (밀리의 서재 스타일, iikoto 원본 구조 그대로) ──
@@ -712,3 +795,17 @@ async function init(){
   await loadTodayTab();
 }
 init();
+
+// 태블릿을 오래 켜둔 채로 자정을 넘기는 경우를 위한 안전장치:
+// 화면이 다시 포그라운드로 돌아왔을 때, 오늘탭을 보고 있고 날짜가 바뀌었으면 자동 갱신
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState!=='visible')return;
+  if(_currentTab!=='today')return;
+  const now=new Date();
+  if(dateKey(now)!==dateKey(_selectedDate)){
+    _selectedDate=now;
+    loadTodayTab();
+    renderMiniCal();
+    renderSideStats();
+  }
+});
