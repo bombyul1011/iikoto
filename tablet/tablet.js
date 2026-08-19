@@ -269,11 +269,11 @@ function renderTodayHabits(habits,checks,dk){
   const el=document.getElementById('today-habits');
   if(!habits.length){el.innerHTML='<div class="empty-msg">등록된 습관 없음</div>';return;}
   const colorMap={mint:'var(--pal-mint-rgb)',pink:'var(--pal-pink-rgb)',sky:'var(--pal-sky-rgb)',yellow:'var(--pal-yellow-rgb)'};
-  el.innerHTML=habits.map(h=>{
+  el.innerHTML=`<div class="habit-grid">${habits.map(h=>{
     const done=checkedNames.has(h.name);
     const c=colorMap[h.color]||'var(--pal-warmgray-rgb)';
     return `<div class="habit-row${done?' done':''}"><div class="habit-dot" style="background:rgba(${c},${done?1:0.35});"></div>${escapeHtml(h.name)}${done?'<i class="ti ti-check habit-check" aria-hidden="true"></i>':''}</div>`;
-  }).join('');
+  }).join('')}</div>`;
 }
 
 const MEAL_KEYS=['breakfast','lunch','snack','dinner'];
