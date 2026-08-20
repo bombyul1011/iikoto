@@ -390,9 +390,9 @@ function renderTodayHabits(habits,checks,dk){
   const colorMap={mint:'var(--pal-mint-rgb)',pink:'var(--pal-pink-rgb)',sky:'var(--pal-sky-rgb)',yellow:'var(--pal-yellow-rgb)'};
   el.innerHTML=`<div class="habit-grid">${habits.map(h=>{
     const done=checkedNames.has(h.name);
-    const c=colorMap[h.color]||'var(--pal-warmgray-rgb)';
+    const c=done?(colorMap[h.color]||'var(--pal-warmgray-rgb)'):'var(--pal-warmgray-rgb)';
     const hIcon=getHabitIcon(h.name);
-    const iconHtml=hIcon?`<i class="ti ${hIcon} habit-row-icon" style="color:rgba(${c},${done?1:0.6});" aria-hidden="true"></i>`:'';
+    const iconHtml=hIcon?`<i class="ti ${hIcon} habit-row-icon" style="color:rgba(${c},${done?1:0.75});" aria-hidden="true"></i>`:'';
     return `<div class="habit-row${done?' done':''}">${iconHtml}${escapeHtml(h.name)}${done?'<i class="ti ti-check habit-check" aria-hidden="true"></i>':''}</div>`;
   }).join('')}</div>`;
 }
@@ -916,7 +916,7 @@ async function renderMonthQuotes(y,mo){
   const startMs=new Date(y,mo,1,0,0,0,0).getTime();
   const daysInMonth=new Date(y,mo+1,0).getDate();
   const endMs=new Date(y,mo,daysInMonth,23,59,59,999).getTime();
-  const rows=await supaFetch(`reading_quotes?created=gte.${startMs}&created=lte.${endMs}&order=created.asc&select=text,created,book_cid,comment`);
+  const rows=await supaFetch(`reading_quotes?created=gte.${startMs}&created=lte.${endMs}&order=created.desc&select=text,created,book_cid,comment`);
   if(!rows||!rows.length){el.innerHTML='<div class="empty-msg">이번 달 수집한 문장이 없어요</div>';return;}
   const bookCids=[...new Set(rows.map(r=>r.book_cid).filter(Boolean))];
   let bookMap={};
@@ -932,6 +932,7 @@ async function renderMonthQuotes(y,mo){
     if(!(key in groupIdx)){groupIdx[key]=groups.length;groups.push({book_cid:r.book_cid,items:[]});}
     groups[groupIdx[key]].items.push(r);
   });
+  // rows가 이미 created desc이므로 각 그룹의 items[0]이 그 책의 최신 문장 -> 그룹 자체도 이미 최신순 순서로 생성됨
   el.innerHTML=groups.map(g=>{
     const b=bookMap[g.book_cid];
     const title=b?.title||'책 미지정';

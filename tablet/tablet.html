@@ -15,6 +15,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css">
 <style>
+@font-face{font-family:'HakgyoansimBareonbatangR';src:url('../fonts/HakgyoansimBareonbatangR.woff2') format('woff2');font-weight:400;font-style:normal;font-display:swap;}
 /* ══ 기본 톤 — iikoto 라이트 테마 변수 그대로 ══ */
 :root{
   /* ══ 공용 폰트 사이즈 체계 ══
@@ -177,9 +178,9 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .sleep-spark-dow{font-size:var(--fs-sm);color:var(--tm);flex-shrink:0;}
 .habit-card{border-color:rgba(var(--pal-mint-rgb),0.35)!important;}
 .habit-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;}
-.habit-row{display:flex;align-items:center;gap:6px;padding:3px 0;font-size:var(--fs-body);color:var(--ts);}
+.habit-row{display:flex;align-items:center;gap:6px;padding:3px 0;font-size:var(--fs-body);color:var(--pal-warmgray-text);}
 .habit-row-icon{font-size:var(--fs-sm);flex-shrink:0;}
-.habit-row.done{color:var(--tp);font-weight:500;}
+.habit-row.done{color:var(--tp);}
 .habit-check{margin-left:auto;font-size:var(--fs-sm);color:rgba(var(--pal-mint-rgb),1);}
 .content-card{border-color:rgba(var(--pal-lavender-rgb),0.4)!important;}
 .content-row{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:var(--fs-body);color:var(--tp);}
@@ -294,8 +295,9 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .mq-book-title{font-size:var(--fs-body);font-weight:600;color:var(--tp);margin-bottom:1px;}
 .mq-book-author{font-size:var(--fs-sm);color:var(--ts);margin-bottom:9px;}
 .mq-quote-list{display:flex;flex-direction:column;gap:7px;}
-.mq-quote-item{font-size:var(--fs-body);line-height:1.6;color:var(--ts);padding-left:9px;border-left:2px solid rgba(var(--divider-rgb),0.35);}
-.mq-quote-comment{font-size:var(--fs-sm);color:var(--tm);margin-top:3px;}
+.mq-quote-item{font-family:'HakgyoansimBareonbatangR',serif;font-size:var(--fs-body);line-height:1.6;color:var(--ts);padding-left:9px;padding-top:7px;border-left:2px solid rgba(var(--divider-rgb),0.35);border-top:1px solid rgba(var(--divider-rgb),0.18);}
+.mq-quote-item:first-child{border-top:none;padding-top:0;}
+.mq-quote-comment{font-family:'DM Sans',sans-serif;font-size:var(--fs-sm);color:var(--tm);margin-top:3px;}
 .month-quote-item{display:flex;gap:9px;padding:6px 0;border-left:2px solid rgba(var(--divider-rgb),0.3);padding-left:10px;margin-left:2px;}
 .month-quote-date{font-size:var(--fs-sm);color:var(--tm);flex-shrink:0;width:34px;}
 .month-quote-txt{font-size:var(--fs-body);color:var(--ts);line-height:1.5;}
