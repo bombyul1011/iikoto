@@ -1273,11 +1273,12 @@ document.addEventListener('visibilitychange',()=>{
 });
 
 // ══════════════════════════════════════════════════════════
-// 화면별 좌우 스와이프 이동 — 오늘/주간/월간/리포트탭에서 날짜·기간 이동
+// 화면별 좌우 스와이프 이동 — 오늘 → 주간 → 월간 → 리포트 순으로 탭 자체를 순환 이동
 // ══════════════════════════════════════════════════════════
 (function setupSwipeNav(){
   const wrap=document.querySelector('.main-wrap');
   if(!wrap)return;
+  const TAB_ORDER=['today','week','month','reports'];
   let startX=0,startY=0,tracking=false;
   const SWIPE_MIN_DIST=60; // 스와이프로 인정할 최소 가로 이동거리(px)
   const SWIPE_MAX_VERTICAL=50; // 이보다 세로로 많이 움직이면 스크롤 의도로 보고 무시
@@ -1292,10 +1293,11 @@ document.addEventListener('visibilitychange',()=>{
     const endX=e.changedTouches[0].clientX,endY=e.changedTouches[0].clientY;
     const dx=endX-startX,dy=endY-startY;
     if(Math.abs(dx)<SWIPE_MIN_DIST||Math.abs(dy)>SWIPE_MAX_VERTICAL)return;
-    const dir=dx<0?1:-1; // 왼쪽으로 스와이프(다음), 오른쪽으로 스와이프(이전)
-    if(_currentTab==='today')shiftSelectedDate(dir);
-    else if(_currentTab==='week')shiftSelectedWeek(dir);
-    else if(_currentTab==='month')shiftSelectedMonth(dir);
-    else if(_currentTab==='reports')shiftReportMonth(dir);
+    const curIdx=TAB_ORDER.indexOf(_currentTab);
+    if(curIdx===-1)return; // 설정탭 등 순환 대상 밖이면 무시
+    const dir=dx<0?1:-1; // 왼쪽으로 스와이프 → 다음 탭, 오른쪽으로 스와이프 → 이전 탭
+    const nextIdx=curIdx+dir;
+    if(nextIdx<0||nextIdx>=TAB_ORDER.length)return; // 양 끝에서는 순환하지 않고 멈춤
+    switchTab(TAB_ORDER[nextIdx]);
   },{passive:true});
 })();
