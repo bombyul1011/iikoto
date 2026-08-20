@@ -21,8 +21,8 @@
   /* ══ 공용 폰트 사이즈 체계 ══
      기준: 카드 제목(card-lbl)=--fs-title, 메모 본문(memo-txt)=--fs-body
      나머지는 전부 이 두 값의 배율/보정치로 파생. 전체 폰트를 조절하려면 --fs-title, --fs-body 값만 바꾸면 됨. */
-  --fs-title:16px;      /* 카드 제목(card-lbl), 사이드 타이틀 */
-  --fs-body:15px;       /* 본문 텍스트(메모, 식사 메뉴, 리듬 팝업 라벨 등) */
+  --fs-title:17px;      /* 카드 제목(card-lbl), 사이드 타이틀 */
+  --fs-body:16px;       /* 본문 텍스트(메모, 식사 메뉴, 리듬 팝업 라벨 등) */
   --fs-lg:calc(var(--fs-title) + 2px);    /* 큰 강조(날짜 헤더, 습관 배너 소제목, 수면점수 등) */
   --fs-xl:calc(var(--fs-title) + 8px);    /* 최상위 헤더(월/일) */
   --fs-sm:calc(var(--fs-body) - 1.5px);   /* 보조 라벨(시간, 카테고리 태그, 요일, 스파크라인 축 등) */
@@ -98,7 +98,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .card-lbl{font-size:var(--fs-title);font-weight:600;color:var(--tp);margin-bottom:11px;display:flex;align-items:center;gap:7px;}
 .card-lbl i{font-size:var(--fs-lg);}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;align-items:stretch;}
-.month-top-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:16px;align-items:stretch;height:270px;}
+.month-top-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:16px;align-items:stretch;min-height:270px;}
 .month-top-left{display:flex;flex-direction:column;gap:13px;height:100%;}
 .month-top-left .card{flex:1;min-height:0;display:flex;flex-direction:column;margin-bottom:0;}
 .month-top-right{min-height:0;height:100%;margin-bottom:0;}
@@ -167,6 +167,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .sleep-card{border-color:rgba(var(--pal-sky-rgb),0.35)!important;padding:11px 16px 10px;flex:142;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;margin-bottom:0!important;}
 .sleep-hdr{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:0;flex-shrink:0;}
 .sleep-hdr .card-lbl{margin-bottom:0;}
+.sleep-time-sub{font-size:var(--fs-sm);color:var(--tm);font-weight:400;margin-left:4px;}
 .sleep-score-row{display:flex;align-items:baseline;gap:8px;}
 .sleep-score{font-size:var(--fs-lg);font-weight:700;color:var(--tp);}
 .sleep-score-lbl{font-size:var(--fs-sm);color:var(--tm);}
@@ -210,7 +211,9 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .rd-cur-pct{font-size:var(--fs-sm);color:rgba(178,60,105,0.85);}
 
 /* ── 목표 배너 강조 — 본앱 홈탭 오후 인사카드(home-hcard.afternoon) 스타일 차용 ── */
-.goal-hcard{border-radius:20px;background:linear-gradient(135deg,rgba(255,220,235,0.65),rgba(255,235,200,0.60));border:1px solid rgba(255,200,210,0.50)!important;box-shadow:0 2px 20px rgba(180,140,120,0.08),inset 0 1px 0 rgba(255,250,240,0.62);}
+.goal-hcard{border-radius:20px;background:linear-gradient(120deg,rgba(250,215,100,0.32),rgba(255,235,170,0.26))!important;border:1px solid rgba(250,205,90,0.55)!important;box-shadow:0 2px 20px rgba(200,150,50,0.12),inset 0 1px 0 rgba(255,250,240,0.62);}
+.goal-hcard .card-lbl{color:#8a6c20;}
+.goal-hcard .card-lbl i{color:#8a6c20!important;}
 
 /* ── 좌하단 플로팅 탭 ── */
 .float-tabs{position:fixed;right:22px;bottom:22px;display:flex;flex-direction:column-reverse;align-items:flex-end;gap:9px;z-index:100;}
@@ -246,6 +249,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 
 /* ── 월간탭 ── */
 .top-row{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;align-items:stretch;}
+.top-row .card:first-child{padding-bottom:10px;}
 .rdcal-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin:0 0 4px;}
 .rdcal-nav i{font-size:var(--fs-title);color:var(--tm);cursor:pointer;}
 .rdcal-month{font-weight:600;font-size:var(--fs-body);color:var(--tp);}
@@ -260,15 +264,17 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 
 /* 콘텐츠 타임라인 — 본앱과 동일한 시각 스타일(빈 날짜=점선 네모칸, 콘텐츠=카테고리색 둥근 블록), 전체 폭 한줄(%기반) */
 .tt-head-row{display:flex;margin-bottom:4px;}
-.tt-cat-fixed-sp{width:74px;flex-shrink:0;}
-.tt-head-dates{flex:1;display:flex;gap:1px;}
-.tt-head-dates span{flex:1;text-align:center;font-size:var(--fs-sm);color:var(--tm);}
+.tt-cat-fixed-sp{width:60px;flex-shrink:0;}
+.tt-head-scroll{flex:1;min-width:0;overflow-x:auto;}
+.tt-head-dates{display:flex;gap:1px;}
+.tt-head-dates span{width:16px;flex-shrink:0;text-align:center;font-size:var(--fs-sm);color:var(--tm);box-sizing:border-box;}
 .tt-row{display:flex;align-items:center;margin-bottom:5px;}
-.tt-cat-fixed{width:74px;flex-shrink:0;font-size:var(--fs-sm);color:var(--ts);display:flex;align-items:center;gap:6px;cursor:default;white-space:nowrap;}
-.tt-cat-badge{width:20px;height:20px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;}
-.tt-track{flex:1;display:flex;gap:1px;height:24px;}
-.tt-cell{flex:1;height:24px;border-radius:5px;background:none;border:0.5px dashed rgba(var(--divider-rgb),0.3);box-sizing:border-box;}
-.tt-block{height:24px;border-radius:6px;display:flex;align-items:center;justify-content:flex-start;padding:0 6px;font-size:var(--fs-body);color:var(--tp);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;box-sizing:border-box;}
+.tt-cat-fixed{width:60px;flex-shrink:0;flex-grow:0;overflow:hidden;font-size:var(--fs-sm);color:var(--ts);display:flex;align-items:center;gap:5px;cursor:default;white-space:nowrap;box-sizing:border-box;}
+.tt-cat-badge{width:17px;height:17px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;}
+.tt-date-scroll{flex:1;min-width:0;overflow-x:auto;}
+.tt-date-inner{display:flex;gap:1px;height:22px;}
+.tt-cell{width:16px;height:22px;flex-shrink:0;border-radius:4px;background:none;border:0.5px dashed rgba(var(--divider-rgb),0.3);box-sizing:border-box;}
+.tt-block{height:22px;flex-shrink:0;border-radius:5px;display:flex;align-items:center;justify-content:flex-start;padding:0 4px;font-size:var(--fs-sm);color:var(--tp);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;box-sizing:border-box;}
 .tt-block.music{justify-content:center;padding:0;}
 .tt-block.drama{background:var(--pal-pink-bg);color:var(--tp);}
 .tt-block.book{background:var(--pal-yellow-bg);color:var(--tp);}
@@ -299,13 +305,29 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .mq-quote-item{font-family:'HakgyoansimBareonbatangR',serif;font-size:var(--fs-body);line-height:1.6;color:var(--ts);padding-left:9px;padding-top:7px;border-left:2px solid rgba(var(--divider-rgb),0.35);border-top:1px solid rgba(var(--divider-rgb),0.18);}
 .mq-quote-item:first-child{border-top:none;padding-top:0;}
 .mq-quote-comment{font-family:'DM Sans',sans-serif;font-size:var(--fs-sm);color:var(--tm);margin-top:3px;}
+/* 오늘 활동 분포 — 본앱 pace-dot 타임라인 그대로 이식 */
+.pace-title{font-size:var(--fs-sm);color:var(--tm);margin-bottom:10px;display:flex;align-items:center;gap:5px;}
+.pace-dot-track{position:relative;margin-top:4px;}
+.pace-dot-baseline{position:absolute;left:0;right:0;height:1px;background:rgba(var(--divider-rgb),0.25);}
+.pace-dot-hourline{position:absolute;top:18px;width:1px;height:8px;background:rgba(var(--divider-rgb),0.25);}
+.pace-dot-hourlabel{position:absolute;top:28px;font-size:9px;color:var(--tm);transform:translateX(-50%);white-space:nowrap;}
+.pace-dot{position:absolute;width:8px;height:8px;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 1px 2px rgba(0,0,0,0.12);}
+.pace-empty{font-size:var(--fs-sm);color:var(--tm);text-align:center;padding:14px 0;}
+/* 습관·콘텐츠현황 — 두 줄 분량 세로 확보, 습관은 한 줄에 고르게 분포 */
+.habit-card-row{min-height:96px;display:flex;flex-direction:column;}
+.habit-card-row .habit-grid{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;flex:1;gap:8px 4px;}
+.habit-card-row .habit-grid .habit-row{flex:1 1 auto;justify-content:center;padding:6px 4px;margin-left:0!important;}
+.content-card-row{min-height:96px;}
+.content-card-row #today-contents{display:flex;flex-wrap:wrap;align-content:flex-start;gap:4px 14px;}
+.content-card-row .content-row{flex:0 0 calc(50% - 7px);min-width:0;padding:5px 0;border-right:none;margin-right:0;}
+.content-card-row .content-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .month-quote-item{display:flex;gap:9px;padding:6px 0;border-left:2px solid rgba(var(--divider-rgb),0.3);padding-left:10px;margin-left:2px;}
 .month-quote-date{font-size:var(--fs-sm);color:var(--tm);flex-shrink:0;width:34px;}
 .month-quote-txt{font-size:var(--fs-body);color:var(--ts);line-height:1.5;}
 
 /* 콘텐츠 모아보기(월별) — 본앱 콘텐츠 모아보기 시트 구조 이식, 독서달력 카드와 높이 맞춰 넘치면 스크롤 */
 .ccol-card{display:flex;flex-direction:column;overflow:hidden;}
-.ccol-scroll{flex:1;min-height:0;overflow-y:auto;}
+.ccol-scroll{flex:1 1 auto;min-height:0;overflow-y:auto;}
 .ccol-sec{margin-bottom:12px;}
 .ccol-sec:last-child{margin-bottom:0;}
 .ccol-sec-title{display:flex;align-items:center;gap:5px;font-size:var(--fs-sm);font-weight:600;color:var(--ts);margin-bottom:6px;}
@@ -442,8 +464,8 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
       <div class="grid3">
         <div class="card todo-card"><div class="card-lbl"><i class="ti ti-list-check" style="color:rgba(var(--pal-orange-rgb),1);" aria-hidden="true"></i>오늘 할 일</div><div id="today-todos"></div></div>
         <div class="grid3-right">
-          <div class="card event-card"><div class="card-lbl"><i class="ti ti-calendar-heart" style="color:var(--rh-appointment);" aria-hidden="true"></i>오늘 일정</div><div id="today-events"></div></div>
-          <div class="card sleep-card"><div class="sleep-hdr"><div class="card-lbl"><i class="ti ti-moon-stars" style="color:rgba(var(--pal-sky-rgb),1);" aria-hidden="true"></i>수면</div><div class="sleep-score-row" id="today-sleep-score"></div></div><div id="today-sleep"></div></div>
+          <div class="card event-card"><div class="card-lbl"><i class="ti ti-calendar-heart" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>오늘 일정</div><div id="today-events"></div></div>
+          <div class="card sleep-card"><div class="sleep-hdr"><div class="card-lbl"><i class="ti ti-moon-stars" style="color:rgba(var(--pal-sky-rgb),1);" aria-hidden="true"></i>수면<span class="sleep-time-sub" id="today-sleep-time-sub"></span></div><div class="sleep-score-row" id="today-sleep-score"></div></div><div id="today-sleep"></div></div>
         </div>
       </div>
       <div class="card p"><div class="card-lbl"><i class="ti ti-pencil-heart" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>오늘의 메모</div><div class="memo-tl" id="today-memos"></div></div>
@@ -451,10 +473,13 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
         <div class="card meal-card"><div class="card-lbl"><i class="ti ti-tools-kitchen-3" style="color:rgba(var(--pal-lime-rgb),1);" aria-hidden="true"></i>오늘의 식사</div><div id="today-meals"></div></div>
         <div class="quote-card"><div class="quote-card-inner"><div class="card-lbl"><i class="ti ti-book" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>오늘의 책</div><div id="today-reading"></div></div></div>
       </div>
-      <div class="grid4">
+      <div class="grid2">
         <div class="card rhythm-card" id="today-rhythm-card" onclick="openTodayRhythmFlow()"><div class="card-lbl"><i class="ti ti-rainbow" style="color:var(--rh-rest);" aria-hidden="true"></i>오늘의 리듬</div><div id="today-rhythm"></div></div>
-        <div class="card habit-card"><div class="card-lbl" id="today-habit-lbl"><i class="ti ti-chart-donut" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>습관</div><div id="today-habits"></div></div>
-        <div class="card content-card"><div class="card-lbl"><i class="ti ti-stack-2" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>콘텐츠 현황</div><div id="today-contents"></div></div>
+        <div class="card"><div class="card-lbl"><i class="ti ti-chart-circles" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>오늘 활동 분포</div><div id="today-pace"></div></div>
+      </div>
+      <div class="grid2">
+        <div class="card habit-card habit-card-row"><div class="card-lbl" id="today-habit-lbl"><i class="ti ti-chart-donut" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>습관</div><div id="today-habits"></div></div>
+        <div class="card content-card content-card-row"><div class="card-lbl"><i class="ti ti-stack-2" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>콘텐츠 현황</div><div id="today-contents"></div></div>
       </div>
     </div>
 

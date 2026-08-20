@@ -264,16 +264,17 @@ async function loadTodayTab(){
   const sparkStart=new Date(_selectedDate);sparkStart.setDate(sparkStart.getDate()-6);
   const sparkStartDk=dateKey(sparkStart);
 
-  const [todos,sleepRows,sleepWeekRows,habits,habitChecks,meals,contents,books,rblocks]=await Promise.all([
+  const [todos,sleepRows,sleepWeekRows,habits,habitChecks,meals,contents,books,rblocks,morningChecks]=await Promise.all([
     supaFetch(`todos?date_key=eq.${dk}&order=created.asc`),
     supaFetch(`sleep?date_key=eq.${dk}`),
     supaFetch(`sleep?date_key=gte.${sparkStartDk}&date_key=lte.${dk}&select=date_key,score`),
     supaFetch(`habits?order=sort_order.asc`),
     supaFetch(`habit_checks?date_key=eq.${dk}`),
     supaFetch(`meals?date_key=eq.${dk}`),
-    supaFetch(`contents?status=eq.watching&order=created.desc&limit=6`),
+    supaFetch(`contents?or=(status.eq.watching,and(status.eq.done,end_date.eq.${dk}))&order=created.desc&limit=6`),
     supaFetch(`reading_books?status=eq.reading&limit=1`),
-    supaFetch(`rhythm_blocks?date_key=eq.${dk}&order=start_time.asc`)
+    supaFetch(`rhythm_blocks?date_key=eq.${dk}&order=start_time.asc`),
+    supaFetch(`morning_routine_checks?date_key=eq.${dk}`)
   ]);
 
   renderTodayTodosEvents(todos||[]);
@@ -285,6 +286,7 @@ async function loadTodayTab(){
   _todayRhythmBlocks=rblocks||[];
   renderTodayRhythm(rblocks||[]);
   renderTodayReading(books&&books[0]);
+  renderTodayPace(todos||[],habits||[],habitChecks||[],morningChecks||[]);
   renderReportBanner('today-report-banner',_selectedDate);
 }
 
@@ -351,12 +353,14 @@ async function renderTodayMemos(dk){
 function renderTodaySleep(dk,sleep,weekRows){
   const scoreEl=document.getElementById('today-sleep-score');
   const el=document.getElementById('today-sleep');
+  const subEl=document.getElementById('today-sleep-time-sub');
   let durText='';
   if(sleep&&sleep.sleep_time&&sleep.wake_time){
     const sv=sleep.sleep_time.split(':').map(Number),wv=sleep.wake_time.split(':').map(Number);
     let mins=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(mins<0)mins+=1440;
     durText=Math.floor(mins/60)+'h '+(mins%60)+'m';
   }
+  if(subEl)subEl.textContent=(sleep&&sleep.sleep_time&&sleep.wake_time)?`${sleep.sleep_time}–${sleep.wake_time}`:'';
   scoreEl.innerHTML=(sleep&&sleep.score!=null)
     ?`<div class="sleep-score">${sleep.score}<span style="font-size:12px;color:var(--tm);"> 점</span></div>${durText?`<div class="sleep-score-lbl">${durText}</div>`:''}`
     :`<div class="sleep-score-lbl">기록 없음</div>`;
@@ -415,11 +419,87 @@ function renderTodayMeals(meal){
 
 function renderTodayContents(items){
   const el=document.getElementById('today-contents');
-  if(!items.length){el.innerHTML='<div class="empty-msg">감상 중인 콘텐츠 없음</div>';return;}
+  if(!items.length){el.innerHTML='<div class="empty-msg">오늘 감상한 콘텐츠 없음</div>';return;}
   el.innerHTML=items.slice(0,4).map(c=>{
     const meta=CAT_ICON_META[c.content_cat]||{label:c.content_cat};
     return `<div class="content-row"><span class="content-cat">${meta.label||''}</span><span class="content-title">${escapeHtml(c.title)}</span></div>`;
   }).join('');
+}
+
+// 오늘 활동 분포 — 본앱 _paceDayEvents/_paceDotTimelineHtml 로직을 Supabase 데이터 기준으로 이식.
+// 새벽 4시 보정은 기존 toDawnAdjustedMin 유틸이 없어 여기서 최소 버전으로 재정의(홈탭 새벽 로직과 별개, 이 그래프 전용).
+const PACE_DOT_COLORS={todo:'#e8a0ac',habit:'#a3c9ae',morning:'#f2cf8e',event:'#b9a5e6'};
+const PACE_DOT_RANGE_START=6*60,PACE_DOT_RANGE_END=24*60;
+function _paceAdjustMin(min){
+  // 0:00~3:59는 전날 24:00~27:59 위치로 밀어서 활동분포 그래프 오른쪽 끝에 붙게 함
+  return min<PACE_DOT_RANGE_START ? min+1440 : min;
+}
+function _paceParseHM(hm){const p=(hm||'').split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);}
+function renderTodayPace(todos,habits,habitChecks,morningChecks){
+  const el=document.getElementById('today-pace');
+  const events=[];
+  (todos||[]).forEach(t=>{
+    if(t.is_event){
+      if(!t.event_time)return;
+      events.push({type:'event',min:_paceAdjustMin(_paceParseHM(t.event_time)),label:t.text||''});
+      return;
+    }
+    const st=t.strike_times||{};
+    const timeEntries=Object.entries(st).filter(([,v])=>typeof v==='number');
+    if(timeEntries.length){
+      timeEntries.forEach(([,ms])=>{
+        const d=new Date(ms);
+        events.push({type:'todo',min:_paceAdjustMin(d.getHours()*60+d.getMinutes()),label:t.text||''});
+      });
+    }else if(t.done&&t.completed_at){
+      const d=new Date(t.completed_at);
+      events.push({type:'todo',min:_paceAdjustMin(d.getHours()*60+d.getMinutes()),label:t.text||''});
+    }
+  });
+  (habitChecks||[]).forEach(hc=>{
+    if(!hc.checked_time)return;
+    events.push({type:'habit',min:_paceAdjustMin(_paceParseHM(hc.checked_time)),label:hc.habit_name||''});
+  });
+  (morningChecks||[]).forEach(mc=>{
+    if(!mc.checked_time)return;
+    events.push({type:'morning',min:_paceAdjustMin(_paceParseHM(mc.checked_time)),label:mc.item_key||''});
+  });
+  if(!events.length){el.innerHTML='<div class="pace-empty">오늘 기록된 활동이 없어요</div>';return;}
+  events.sort((a,b)=>a.min-b.min);
+  const rangeLen=PACE_DOT_RANGE_END-PACE_DOT_RANGE_START;
+  const positioned=events.filter(ev=>ev.min>=PACE_DOT_RANGE_START).map(ev=>({...ev,xPct:Math.min(100,(ev.min-PACE_DOT_RANGE_START)/rangeLen*100)}));
+  if(!positioned.length){el.innerHTML='<div class="pace-empty">오늘 기록된 활동이 없어요</div>';return;}
+  const MIN_GAP_PCT=2.0;
+  const groups=[];
+  positioned.forEach(ev=>{
+    const last=groups[groups.length-1];
+    if(last&&ev.xPct-last.centerX<MIN_GAP_PCT){
+      last.items.push(ev);
+      last.centerX=last.items.reduce((s,it)=>s+it.xPct,0)/last.items.length;
+    }else{
+      groups.push({centerX:ev.xPct,items:[ev]});
+    }
+  });
+  const TRACK_H=42,BASE_Y=18;
+  let dotsHtml='';
+  groups.forEach(gr=>{
+    const n=gr.items.length;
+    gr.items.forEach((ev,idx)=>{
+      const offset=(idx-(n-1)/2)*MIN_GAP_PCT;
+      const x=Math.min(100,Math.max(0,gr.centerX+offset));
+      dotsHtml+=`<div class="pace-dot" style="left:${x}%;top:${BASE_Y}px;background:${PACE_DOT_COLORS[ev.type]};" title="${escapeHtml(ev.label)}"></div>`;
+    });
+  });
+  let hourMarks='';
+  for(let h=PACE_DOT_RANGE_START/60;h<=PACE_DOT_RANGE_END/60;h+=6){
+    const x=(h*60-PACE_DOT_RANGE_START)/rangeLen*100;
+    hourMarks+=`<div class="pace-dot-hourline" style="left:${x}%;"></div><div class="pace-dot-hourlabel" style="left:${x}%;">${h>24?h-24:h}시</div>`;
+  }
+  el.innerHTML=`<div class="pace-dot-track" style="height:${TRACK_H}px;">
+    <div class="pace-dot-baseline" style="top:${BASE_Y}px;"></div>
+    ${hourMarks}
+    ${dotsHtml}
+  </div>`;
 }
 
 function renderTodayRhythm(blocks){
@@ -826,6 +906,7 @@ async function renderMonthTimetable(y,mo){
         for(let d=cursor;d<dispStart;d++)cellsHtml+=`<div class="tt-cell"></div>`;
         const dispEnd=Math.max(c.endD,dispStart);
         const span=dispEnd-dispStart+1;
+        const w=span*16+(span-1)*1;
         const isWatching=c.item.status==='watching'&&cat!=='music';
         const isStopped=c.item.status==='stopped';
         let label,titleAttr;
@@ -836,15 +917,23 @@ async function renderMonthTimetable(y,mo){
           label=cat==='music'?(c.item.title||'').slice(0,1):escapeHtml(c.item.title||'');
           titleAttr=(c.item._carried?c.item.title+' (전월부터 이어짐)':c.item.title)+(c.item.status==='stopped'?' · 중단':'');
         }
-        cellsHtml+=`<div class="tt-block ${cat}${isWatching?' watching':''}${isStopped?' stopped':''}" style="flex:${span} 1 0%;" title="${escapeHtml(titleAttr||'')}">${label}</div>`;
+        cellsHtml+=`<div class="tt-block ${cat}${isWatching?' watching':''}${isStopped?' stopped':''}" style="width:${w}px;min-width:${w}px;" title="${escapeHtml(titleAttr||'')}">${label}</div>`;
         cursor=dispEnd+1;
       });
       for(let d=cursor;d<=daysInMonth;d++)cellsHtml+=`<div class="tt-cell"></div>`;
-      rowsHtml+=`<div class="tt-row"><div class="tt-cat-fixed">${catLabel}</div><div class="tt-track">${cellsHtml}</div></div>`;
+      rowsHtml+=`<div class="tt-row"><div class="tt-cat-fixed">${catLabel}</div><div class="tt-date-scroll" data-tt="1"><div class="tt-date-inner">${cellsHtml}</div></div></div>`;
     });
   });
 
-  el.innerHTML=`<div class="tt-head-row"><div class="tt-cat-fixed-sp"></div><div class="tt-head-dates">${headHtml}</div></div><div>${rowsHtml}</div>`;
+  el.innerHTML=`<div class="tt-head-row"><div class="tt-cat-fixed-sp"></div><div class="tt-head-scroll" data-tt="1"><div class="tt-head-dates">${headHtml}</div></div></div><div>${rowsHtml}</div>`;
+
+  // 여러 행(카테고리별 트랙)과 헤더가 각각 독립 스크롤 컨테이너라 가로 스크롤을 서로 동기화
+  const allScrolls=el.querySelectorAll('[data-tt]');
+  allScrolls.forEach(s=>{
+    s.addEventListener('scroll',()=>{
+      allScrolls.forEach(o=>{if(o!==s)o.scrollLeft=s.scrollLeft;});
+    });
+  });
 }
 
 // 습관명 키워드 매칭 아이콘 규칙 — 본앱(iikoto index.html) HABIT_ICON_RULES와 동일하게 유지
@@ -1021,7 +1110,7 @@ async function renderChaeumLogTablet(){
 // ══════════════════════════════════════════════════════════
 // 설정탭 — 글자 크기 조절(작게/기본/크게 3단계, 본앱과 동일한 textScale 저장 키/step 체계)
 // ══════════════════════════════════════════════════════════
-const FS_STEPS={'-1':{title:15,body:14},'0':{title:16,body:15},'1':{title:17,body:16}};
+const FS_STEPS={'-1':{title:16,body:15},'0':{title:17,body:16},'1':{title:18,body:17}};
 function _loadFsStep(){
   try{
     const raw=localStorage.getItem('textScale');
