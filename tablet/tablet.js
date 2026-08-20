@@ -102,15 +102,6 @@ async function renderMiniCal(){
   const daysInMonth=new Date(y,m+1,0).getDate();
   const todayDk=dateKey(new Date());
   const selDk=dateKey(_selectedDate);
-  const mk=monthKeyOf(_sideCalDate);
-  // 기록 있는 날 점 표시용 — 투두/메모 존재 여부만 가볍게 조회
-  const [todos,memos]=await Promise.all([
-    supaFetch(`todos?date_key=gte.${mk}-01&date_key=lte.${mk}-31&select=date_key`),
-    supaFetch(`memos?date_key=gte.${mk}-01&date_key=lte.${mk}-31&select=date_key`)
-  ]);
-  const hasRecord=new Set();
-  (todos||[]).forEach(t=>hasRecord.add(t.date_key));
-  (memos||[]).forEach(t=>hasRecord.add(t.date_key));
 
   let html=`<div class="mini-cal-hdr"><i class="ti ti-chevron-left" onclick="sideCalShift(-1)" aria-hidden="true"></i><span>${y}년 ${m+1}월</span><i class="ti ti-chevron-right" onclick="sideCalShift(1)" aria-hidden="true"></i></div>
   <div class="mini-cal-grid">${DOW_MON_START.map(d=>`<div class="dow">${d}</div>`).join('')}`;
@@ -120,7 +111,6 @@ async function renderMiniCal(){
     let cls='mini-cal-day';
     if(dk===todayDk)cls+=' today';
     if(dk===selDk)cls+=' sel';
-    if(hasRecord.has(dk))cls+=' has-dot';
     html+=`<div class="${cls}" onclick="selectDate('${dk}')">${d}</div>`;
   }
   html+='</div>';
@@ -130,12 +120,19 @@ function sideCalShift(delta){
   _sideCalDate.setMonth(_sideCalDate.getMonth()+delta);
   renderMiniCal();
 }
+// 사이드바 미니캘린더에서 날짜를 고르면 항상 오늘탭으로 이동해서 그 날짜를 보여줌
 function selectDate(dk){
   _selectedDate=new Date(dk+'T00:00:00');
   renderMiniCal();
-  if(_currentTab==='today')loadTodayTab();
-  else if(_currentTab==='week')loadWeekTab();
-  else if(_currentTab==='month')loadMonthTab();
+  if(_currentTab!=='today'){
+    _currentTab='today';
+    document.querySelectorAll('.main-body').forEach(el=>el.classList.remove('on'));
+    document.querySelectorAll('.float-tab').forEach(el=>el.classList.remove('on'));
+    document.getElementById('tab-today').classList.add('on');
+    document.getElementById('ft-today').classList.add('on');
+    closeFloatMenu();
+  }
+  loadTodayTab();
 }
 
 // ── 사이드바 인사배너 (본앱 홈탭 인사카드 이식) ──

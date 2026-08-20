@@ -54,17 +54,16 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 
 /* ── 좌측 사이드(캘린더 + 주간요약) ── */
 .side{width:270px;flex-shrink:0;background:rgba(255,253,248,0.35);border-right:1px solid var(--card-b);padding:22px 18px;overflow-y:auto;}
-.side-logo-wrap{display:flex;justify-content:center;padding:4px 0 16px;}
-.side-logo{height:28px;width:auto;}
+.side-logo-wrap{display:flex;justify-content:flex-start;padding:4px 0 8px;}
+.side-logo{height:36px;width:auto;}
 .mini-cal{background:var(--card);border:1px solid var(--card-b);border-radius:14px;padding:14px;margin-bottom:18px;}
 .mini-cal-hdr{display:flex;justify-content:space-between;align-items:center;font-size:var(--fs-body);color:var(--tp);font-weight:600;margin-bottom:10px;}
 .mini-cal-hdr i{font-size:var(--fs-title);color:var(--tm);cursor:pointer;padding:2px 4px;}
 .mini-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;font-size:var(--fs-sm);text-align:center;color:var(--ts);}
 .mini-cal-grid .dow{color:var(--tm);font-size:var(--fs-xs);padding-bottom:3px;}
 .mini-cal-day{padding:5px 0;border-radius:6px;cursor:pointer;position:relative;}
-.mini-cal-day.today{background:rgba(var(--pal-orange-rgb),0.35);color:var(--pal-orange-text);font-weight:600;}
-.mini-cal-day.sel{background:rgba(var(--pal-mint-rgb),0.45);color:var(--pal-mint-text);font-weight:600;}
-.mini-cal-day.has-dot::after{content:'';position:absolute;bottom:1px;left:50%;transform:translateX(-50%);width:3.5px;height:3.5px;border-radius:50%;background:rgba(var(--pal-sky-rgb),0.9);}
+.mini-cal-day.today{background:var(--pal-yellow-bg);color:var(--pal-yellow-text);font-weight:600;}
+.mini-cal-day.sel{background:var(--pal-warmgray-bg);color:var(--pal-warmgray-text);font-weight:600;}
 .side-hcard{border-radius:16px;padding:15px 14px 13px;margin-bottom:10px;position:relative;overflow:hidden;box-shadow:0 2px 16px rgba(180,140,120,0.08),inset 0 1px 0 rgba(255,250,240,0.62);}
 .side-hcard.morning{background:linear-gradient(135deg,rgba(255,205,175,0.72),rgba(255,235,180,0.55));border:1px solid rgba(255,200,165,0.55);}
 .side-hcard.afternoon{background:linear-gradient(135deg,rgba(255,220,235,0.65),rgba(255,235,200,0.60));border:1px solid rgba(255,200,210,0.50);}
@@ -94,8 +93,8 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;align-items:stretch;}
 .month-top-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;align-items:stretch;height:250px;}
 .month-top-left{display:flex;flex-direction:column;gap:13px;height:100%;}
-.month-top-left .card{flex:1;min-height:0;display:flex;flex-direction:column;}
-.month-top-right{min-height:0;height:100%;}
+.month-top-left .card{flex:1;min-height:0;display:flex;flex-direction:column;margin-bottom:0;}
+.month-top-right{min-height:0;height:100%;margin-bottom:0;}
 .card.month-compact{padding:14px 16px 12px;}
 .card.month-compact .card-lbl{margin-bottom:8px;}
 .month-goals-box{min-height:calc(var(--fs-sm) * 1.4 * 3 + 6px * 3);display:flex;flex-direction:column;justify-content:center;}
@@ -392,7 +391,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
           <div class="rdcal-grid" id="rdcal-dows" style="margin-bottom:6px;"></div>
           <div class="rdcal-grid" id="rdcal-grid"></div>
         </div>
-        <div class="card ccol-card"><div class="card-lbl"><i class="ti ti-movie" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>콘텐츠 모아보기</div><div id="month-content-collect" class="ccol-scroll"></div></div>
+        <div class="card ccol-card"><div class="card-lbl"><i class="ti ti-stack-2" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>콘텐츠 모아보기</div><div id="month-content-collect" class="ccol-scroll"></div></div>
       </div>
       <div class="card"><div class="card-lbl"><i class="ti ti-chart-bar" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>콘텐츠 타임라인</div><div id="month-tt"></div></div>
       <div class="card month-quotes-card"><div class="card-lbl"><i class="ti ti-quote" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>이번 달 수집문장</div><div id="month-quotes"></div></div>
