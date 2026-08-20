@@ -924,6 +924,14 @@ async function renderReadingCal(){
     }
   }
   document.getElementById('rdcal-grid').innerHTML=gridHtml;
+
+  // 이번 달이 실제로 몇 주짜리인지에 맞춰 top-row 높이를 유동으로 세팅.
+  // 독서달력 고정 부분(카드패딩+라벨+네비+카운트+요일헤더) + 주차수만큼의 grid 높이(46px씩, row-gap 9px)를 합산.
+  const weekRows=Math.ceil((startWeekday+daysInMonth)/7);
+  const RDCAL_FIXED_PART=32+30+22+49+20; // 카드패딩/card-lbl/nav/count/dow헤더 — 실제 렌더 여백과 폰트 기준 고정 추정치
+  const gridHeight=weekRows*46+(weekRows-1)*9;
+  const topRowHeight=RDCAL_FIXED_PART+gridHeight;
+  document.querySelector('.top-row').style.height=topRowHeight+'px';
 }
 
 

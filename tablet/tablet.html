@@ -62,8 +62,8 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .mini-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;font-size:var(--fs-sm);text-align:center;color:var(--ts);}
 .mini-cal-grid .dow{color:var(--tm);font-size:var(--fs-xs);padding-bottom:3px;}
 .mini-cal-day{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;border-radius:6px;cursor:pointer;position:relative;}
-.mini-cal-day.today{background:var(--pal-yellow-bg);color:var(--pal-yellow-text);font-weight:600;}
 .mini-cal-day.sel{background:var(--pal-warmgray-bg);color:var(--pal-warmgray-text);font-weight:600;border-radius:50%;}
+.mini-cal-day.today{background:var(--pal-yellow-bg);color:var(--pal-yellow-text);font-weight:600;border-radius:6px;}
 .side-hcard{border-radius:16px;padding:15px 14px 13px;margin-bottom:10px;position:relative;overflow:hidden;box-shadow:0 2px 16px rgba(180,140,120,0.08),inset 0 1px 0 rgba(255,250,240,0.62);}
 .side-hcard.morning{background:linear-gradient(135deg,rgba(255,205,175,0.72),rgba(255,235,180,0.55));border:1px solid rgba(255,200,165,0.55);}
 .side-hcard.afternoon{background:linear-gradient(135deg,rgba(255,220,235,0.65),rgba(255,235,200,0.60));border:1px solid rgba(255,200,210,0.50);}
@@ -222,7 +222,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .oneline-dow{width:22px;flex-shrink:0;font-weight:600;color:var(--tp);}
 
 /* ── 월간탭 ── */
-.top-row{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;align-items:stretch;height:420px;}
+.top-row{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;align-items:stretch;height:480px;}
 .rdcal-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin:0 0 4px;}
 .rdcal-nav i{font-size:var(--fs-title);color:var(--tm);cursor:pointer;}
 .rdcal-month{font-weight:600;font-size:var(--fs-body);color:var(--tp);}
