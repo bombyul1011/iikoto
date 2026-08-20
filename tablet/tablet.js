@@ -1665,8 +1665,9 @@ async function loadMonthlyReportPage(){
   const prevMk=monthKeyOf(prevMonthDate);
   const prevDim=Math.min(dim,new Date(py,pmo+1,0).getDate());
   const prevStartDk=`${prevMk}-01`,prevEndDk=`${prevMk}-${pad(prevDim)}`;
+  const prevWeeksInMonth=getReportWeeksOfMonth(py,pmo);
 
-  const [monthlyRows,goalRows,todos,memosRows,sleepRows,habits,habitChecksAll,rblocks,prevRblocks,contents,prevContents,wcRowsList,milestoneRows]=await Promise.all([
+  const [monthlyRows,goalRows,todos,memosRows,sleepRows,habits,habitChecksAll,rblocks,prevRblocks,contents,prevContents,wcRowsList,milestoneRows,prevWcRowsList,prevTodos,prevSleepRows,prevHabitChecksAll,trajectoryRows]=await Promise.all([
     supaFetch(`ai_cache?cache_key=eq.monthly_report_${mk}&select=content`),
     supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('mgoal:'+mk)}`),
     supaFetch(`todos?date_key=gte.${startDk}&date_key=lte.${endDk}&select=done,date_key`),
@@ -1679,14 +1680,21 @@ async function loadMonthlyReportPage(){
     supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&order=created.desc&limit=200`),
     supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&order=created.desc&limit=200`),
     Promise.all(weeksInMonth.map(wk=>supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wchallenge_'+wk)}`))),
-    supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent('monthly_milestones_'+mk)}&select=content`)
+    supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent('monthly_milestones_'+mk)}&select=content`),
+    Promise.all(prevWeeksInMonth.map(wk=>supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wchallenge_'+wk)}`))),
+    supaFetch(`todos?date_key=gte.${prevStartDk}&date_key=lte.${prevEndDk}&select=done,date_key`),
+    supaFetch(`sleep?date_key=gte.${prevStartDk}&date_key=lte.${prevEndDk}&select=sleep_time,wake_time,date_key`),
+    supaFetch(`habit_checks?date_key=gte.${prevStartDk}&date_key=lte.${prevEndDk}`),
+    supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent('monthly_trajectory_'+mk)}&select=content`)
   ]);
 
   renderMrpHero(monthlyRows&&monthlyRows[0]);
   renderMrpGoalsAndStats(goalRows&&goalRows[0],todos||[],memosRows||[],sleepRows||[],habits||[],habitChecksAll||[],weeksInMonth.length*7||dim);
-  renderMrpTrajectory(todos||[],sleepRows||[],habits||[],habitChecksAll||[],weeksInMonth);
+  renderMrpTrajectory(mk,todos||[],sleepRows||[],habits||[],habitChecksAll||[],weeksInMonth,
+    {todos:prevTodos||[],sleepRows:prevSleepRows||[],habitChecks:prevHabitChecksAll||[],weeksInMonth:prevWeeksInMonth,habits:habits||[]},
+    trajectoryRows&&trajectoryRows[0]);
   renderMrpRhythm(rblocks||[],prevRblocks||[]);
-  renderMrpMilestones(mk,rblocks||[],prevRblocks||[],weeksInMonth,wcRowsList||[],milestoneRows&&milestoneRows[0]);
+  renderMrpMilestones(mk,rblocks||[],prevRblocks||[],weeksInMonth,wcRowsList||[],milestoneRows&&milestoneRows[0],prevWcRowsList||[]);
   renderMrpWeeklyMissions(weeksInMonth,wcRowsList||[]);
   renderMrpContents(contents||[],startDk,endDk);
   renderMrpReportLinks(weeksInMonth,mk);
@@ -1779,34 +1787,39 @@ function _mrpSparkSvg(values,color){
   const dots=pts.map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="3.2" fill="${color}"/>`).join('');
   return `<svg class="mrp-traj-spark" viewBox="0 0 300 44" preserveAspectRatio="none">${path?`<path d="${path}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`:''}${dots}</svg>`;
 }
-function renderMrpTrajectory(todos,sleepRows,habits,habitChecks,weeksInMonth){
+async function renderMrpTrajectory(mk,todos,sleepRows,habits,habitChecks,weeksInMonth,prevData,cacheRow){
   const el=document.getElementById('mrp-traj');
   if(!weeksInMonth.length){el.innerHTML='<div class="empty-msg">이 달엔 표시할 주차가 없어요</div>';return;}
 
-  const byWeekTodo=weeksInMonth.map(wk=>{
-    const days=getWeekDates(new Date(wk+'T00:00:00'));
-    const inWeek=todos.filter(t=>days.includes(t.date_key));
-    return inWeek.length?Math.round(inWeek.filter(t=>t.done).length/inWeek.length*100):null;
-  });
-  const byWeekSleep=weeksInMonth.map(wk=>{
-    const days=getWeekDates(new Date(wk+'T00:00:00'));
-    const rows=sleepRows.filter(r=>days.includes(r.date_key));
-    const h=parseFloat(avgSleepHoursFromRows(rows));
-    return isNaN(h)?null:h;
-  });
-  const byWeekHabit=weeksInMonth.map(wk=>{
-    const days=getWeekDates(new Date(wk+'T00:00:00'));
-    if(!habits.length)return null;
-    const checks=habitChecks.filter(c=>days.includes(c.date_key));
-    return Math.round(checks.length/(habits.length*7)*100);
-  });
+  const calcWeekly=(todos,sleepRows,habits,habitChecks,weeksInMonth)=>{
+    const byWeekTodo=weeksInMonth.map(wk=>{
+      const days=getWeekDates(new Date(wk+'T00:00:00'));
+      const inWeek=todos.filter(t=>days.includes(t.date_key));
+      return inWeek.length?Math.round(inWeek.filter(t=>t.done).length/inWeek.length*100):null;
+    });
+    const byWeekSleep=weeksInMonth.map(wk=>{
+      const days=getWeekDates(new Date(wk+'T00:00:00'));
+      const rows=sleepRows.filter(r=>days.includes(r.date_key));
+      const h=parseFloat(avgSleepHoursFromRows(rows));
+      return isNaN(h)?null:h;
+    });
+    const byWeekHabit=weeksInMonth.map(wk=>{
+      const days=getWeekDates(new Date(wk+'T00:00:00'));
+      if(!habits.length)return null;
+      const checks=habitChecks.filter(c=>days.includes(c.date_key));
+      return Math.round(checks.length/(habits.length*7)*100);
+    });
+    return {byWeekTodo,byWeekSleep,byWeekHabit};
+  };
+
+  const {byWeekTodo,byWeekSleep,byWeekHabit}=calcWeekly(todos,sleepRows,habits,habitChecks,weeksInMonth);
 
   const rows=[
-    {label:'습관율',values:byWeekHabit,color:'rgba(70,155,110,0.75)',fmt:v=>v+'%'},
-    {label:'평균수면',values:byWeekSleep,color:'rgba(75,145,180,0.75)',fmt:v=>v.toFixed(1)+'h'},
-    {label:'투두완료율',values:byWeekTodo,color:'rgba(235,130,50,0.75)',fmt:v=>v+'%'}
+    {key:'habit',label:'습관율',values:byWeekHabit,color:'rgba(145,210,175,1)',fmt:v=>v+'%'},
+    {key:'sleep',label:'평균수면',values:byWeekSleep,color:'rgba(170,208,228,1)',fmt:v=>v.toFixed(1)+'h'},
+    {key:'todo',label:'투두완료율',values:byWeekTodo,color:'rgba(210,175,225,1)',fmt:v=>v+'%'}
   ];
-  el.innerHTML=rows.map(r=>{
+  const sparkHtml=rows.map(r=>{
     const lastValid=[...r.values].reverse().find(v=>v!=null);
     return `<div class="mrp-traj-row">
       <span class="mrp-traj-lbl">${r.label}</span>
@@ -1814,6 +1827,69 @@ function renderMrpTrajectory(todos,sleepRows,habits,habitChecks,weeksInMonth){
       <span class="mrp-traj-val">${lastValid!=null?r.fmt(lastValid):'-'}</span>
     </div>`;
   }).join('');
+  el.innerHTML=sparkHtml+`<div id="mrp-traj-ai" style="margin-top:14px;"></div>`;
+
+  // ── AI 궤적 분석 ──
+  const aiEl=document.getElementById('mrp-traj-ai');
+  const validWeekCount=(vals)=>vals.filter(v=>v!=null).length;
+  const enoughData=Math.max(validWeekCount(byWeekHabit),validWeekCount(byWeekSleep),validWeekCount(byWeekTodo))>=2;
+  if(!enoughData){aiEl.innerHTML='';return;}
+
+  if(cacheRow&&cacheRow.content){
+    aiEl.innerHTML=`<div class="mrp-traj-ai-text">${escapeHtml(cacheRow.content)}</div>`;
+    return;
+  }
+  const apiKey=getClaudeKey();
+  if(!apiKey){
+    aiEl.innerHTML=`<div class="empty-msg" style="text-align:left;padding:4px 0;">이 달의 궤적 분석은 설정 탭에서 Claude API 키를 추가하면 볼 수 있어요</div>`;
+    return;
+  }
+
+  // 전월 데이터도 같은 방식으로 계산 — 있으면 프롬프트에 "방향성 비교"용으로만 제공(수치는 안 줌, 방향만 서술)
+  let prevDirText='';
+  if(prevData&&prevData.weeksInMonth&&prevData.weeksInMonth.length){
+    const p=calcWeekly(prevData.todos,prevData.sleepRows,prevData.habits,prevData.habitChecks,prevData.weeksInMonth);
+    const dirOf=(vals)=>{
+      const valid=vals.filter(v=>v!=null);
+      if(valid.length<2)return null;
+      return valid[valid.length-1]>valid[0]?'상승':(valid[valid.length-1]<valid[0]?'하락':'유지');
+    };
+    const parts=[];
+    const hd=dirOf(p.byWeekHabit);if(hd)parts.push(`습관율은 ${hd} 흐름`);
+    const sd=dirOf(p.byWeekSleep);if(sd)parts.push(`평균수면은 ${sd} 흐름`);
+    const td=dirOf(p.byWeekTodo);if(td)parts.push(`투두완료율은 ${td} 흐름`);
+    if(parts.length)prevDirText=`전월 방향성(참고용, 방향만): ${parts.join(', ')}`;
+  }
+
+  // 이번 달 방향성도 텍스트로만(구체 수치 없이) 정리해서 넘김 — 프롬프트에서 수치 재진술을 원천 차단
+  const dirOfCur=(vals)=>{
+    const valid=vals.filter(v=>v!=null);
+    if(valid.length<2)return '데이터 부족';
+    return valid[valid.length-1]>valid[0]?'상승':(valid[valid.length-1]<valid[0]?'하락':'유지');
+  };
+  const curDirText=`이 달 방향성: 습관율 ${dirOfCur(byWeekHabit)}, 평균수면 ${dirOfCur(byWeekSleep)}, 투두완료율 ${dirOfCur(byWeekTodo)}`;
+  const dataContext=[curDirText,prevDirText].filter(Boolean).join('\n');
+
+  const sys=`당신은 한 달의 생활 패턴을 해석해주는 담담한 회고 비서예요.
+아래는 이 달의 습관율, 평균수면, 투두완료율이 주차를 거치며 각각 상승/하락/유지 중 어느 방향으로 움직였는지를 나타낸 정보예요(구체적인 수치는 주어지지 않아요).
+이 세 지표가 서로 어떤 관계로 움직였는지 — 무엇을 더 챙기는 대신 무엇을 내줬는지, 어떤 성향의 한 달이었는지 — 짧은 이야기로 풀어주세요.
+- 3~4문장, 전체 120자 내외.
+- 절대 숫자나 퍼센트, 시간 같은 구체적인 수치를 언급하지 마세요. 그래프에 이미 나와 있으니, 당신은 그 움직임이 "무엇을 의미하는지"만 해석하세요.
+- 원인 추정, 지표 간 트레이드오프, 이 달 전체의 성향 위주로 서술하세요.
+- 담담하고 자연스러운 ~어요/~했어요체.
+- 전월 방향성 정보가 함께 주어졌다면, 그 변화도 수치 없이 방향성으로만 마지막에 한 문장 정도 자연스럽게 녹이세요. 주어지지 않았다면 언급하지 마세요.
+- 반드시 JSON 형식으로만 응답하세요: {"text":"..."}
+- 다른 설명이나 마크다운 없이 순수 JSON만 출력하세요.`;
+  const reply=await callClaudeFromTablet(sys,dataContext,400);
+  if(!reply)return;
+  try{
+    const clean=reply.replace(/```json|```/g,'').trim();
+    const parsed=JSON.parse(clean);
+    if(parsed&&parsed.text){
+      await supaUpsertAiCache('monthly_trajectory_'+mk,parsed.text);
+      aiEl.innerHTML=`<div class="mrp-traj-ai-text">${escapeHtml(parsed.text)}</div>`;
+    }
+  }catch(e){/* 파싱 실패 시 조용히 빈 채로 둠 */}
 }
 
 function renderMrpRhythm(rblocks,prevRblocks){
@@ -1860,8 +1936,35 @@ function renderMrpRhythm(rblocks,prevRblocks){
 
 // 이 달의 마디 — 리듬 변화는 순수 계산, 목표/맥락 변화는 Claude API로 문장화해서 monthly_milestones_ 캐시에 저장.
 // 캐시가 있으면 그대로 쓰고, 없고 API 키가 있으면 그 자리에서 1회 생성(아카이브 페이지를 실제로 열었을 때만 생성 — 자동 발행 없음).
-async function renderMrpMilestones(mk,rblocks,prevRblocks,weeksInMonth,wcRowsList,cacheRow){
+async function renderMrpMilestones(mk,rblocks,prevRblocks,weeksInMonth,wcRowsList,cacheRow,prevWcRowsList){
   const el=document.getElementById('mrp-milestones');
+
+  const renderList=(items)=>{
+    if(!items||!items.length){el.innerHTML='';return;}
+    el.innerHTML=`<div class="mrp-milestone-list">`+items.map(t=>`
+      <div class="mrp-milestone">
+        <div class="mrp-milestone-dot" style="background:rgba(var(--pal-lavender-rgb),0.9);"></div>
+        <div class="mrp-milestone-txt">${escapeHtml(t)}</div>
+      </div>`).join('')+`</div>`;
+  };
+
+  // 캐시가 있으면 그대로 표시
+  if(cacheRow&&cacheRow.content){
+    try{
+      const parsed=JSON.parse(cacheRow.content);
+      renderList(Array.isArray(parsed)?parsed:[]);
+    }catch(e){el.innerHTML='';}
+    return;
+  }
+
+  const apiKey=getClaudeKey();
+  if(!apiKey){
+    el.innerHTML=`<div class="empty-msg" style="text-align:left;padding:4px 0;">이 달의 마디 분석은 설정 탭에서 Claude API 키를 추가하면 볼 수 있어요</div>`;
+    return;
+  }
+
+  // 리듬 변화(계산값)는 화면에 직접 보여주지 않고, AI가 목표 텍스트와 엮을 재료로만 넘김.
+  // 전월 기록일수가 너무 적으면(예: 사용 시작 초반) 비교 자체가 왜곡되니 재료에서 제외.
   const durByCat=(blocks)=>{
     const d={};
     blocks.forEach(b=>{
@@ -1875,74 +1978,56 @@ async function renderMrpMilestones(mk,rblocks,prevRblocks,weeksInMonth,wcRowsLis
     return d;
   };
   const cur=durByCat(rblocks),prev=durByCat(prevRblocks);
-  // 전월 기록일수가 너무 적으면(예: 사용 시작 초반) 리듬 마디 계산도 왜곡되니 함께 생략
   const prevRecordedDays=new Set(prevRblocks.map(b=>b.date_key)).size;
   const canCompareRhythm=prevRecordedDays>=7;
-  // 계산 마디: 전월 대비 60분 이상 차이나는 카테고리 중 변화폭이 큰 순으로 최대 2개
-  const rhythmMilestones=canCompareRhythm?Object.keys(cur).map(k=>({k,diff:cur[k]-(prev[k]||0)}))
-    .filter(o=>Math.abs(o.diff)>=60).sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff)).slice(0,2)
+  const rhythmChanges=canCompareRhythm?Object.keys(cur).map(k=>({k,diff:cur[k]-(prev[k]||0)}))
+    .filter(o=>Math.abs(o.diff)>=60).sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff)).slice(0,4)
     .map(o=>{
       const c=RHYTHM_CATS[o.k];if(!c)return null;
-      const dir=o.diff>0?'늘었어요':'줄었어요';
-      return {text:`<b>${c.label} 시간이 ${dir}</b> — 전월 대비 ${_fmtDur(Math.abs(o.diff))}`,date:'',color:o.diff>0?'rgba(var(--pal-rose-border),1)':'var(--pal-mint-border)'};
+      const dir=o.diff>0?'증가':'감소';
+      return `${c.label} ${dir}(전월 대비 약 ${Math.round(Math.abs(o.diff)/60)}시간)`;
     }).filter(Boolean):[];
 
-  const renderList=(items)=>{
-    if(!items.length){el.innerHTML='';return;}
-    el.innerHTML=`<div class="mrp-milestone-list">`+items.map(m=>`
-      <div class="mrp-milestone">
-        <div class="mrp-milestone-dot" style="background:${m.color||'rgba(var(--pal-mint-rgb),0.9)'};"></div>
-        <div><div class="mrp-milestone-txt">${m.text}</div>${m.date?`<div class="mrp-milestone-date">${m.date}</div>`:''}</div>
-      </div>`).join('')+`</div>`;
-  };
-
-  // 캐시가 있으면: 계산 마디 + 저장된 AI 마디를 합쳐서 표시
-  if(cacheRow&&cacheRow.content){
-    try{
-      const aiMilestones=JSON.parse(cacheRow.content); // string[]
-      const aiItems=(Array.isArray(aiMilestones)?aiMilestones:[]).map(t=>({text:escapeHtml(t),date:'',color:'rgba(var(--pal-lavender-rgb),0.9)'}));
-      renderList([...rhythmMilestones,...aiItems]);
-    }catch(e){
-      renderList(rhythmMilestones);
-    }
-    return;
-  }
-
-  // 캐시 없음: 우선 계산 마디만 먼저 보여주고, API 키가 있으면 백그라운드로 AI 마디를 생성해 이어붙임
-  renderList(rhythmMilestones);
-  const apiKey=getClaudeKey();
-  if(!apiKey){
-    if(!rhythmMilestones.length){
-      el.innerHTML=`<div class="empty-msg" style="text-align:left;padding:4px 0;">이 달의 마디 분석은 설정 탭에서 Claude API 키를 추가하면 볼 수 있어요</div>`;
-    }
-    return;
-  }
-
-  // 주간미션 텍스트를 주차 순서로 정리해서 목표가 바뀐 지점이 있는지 AI가 판단하게 함
   const missionByWeek=weeksInMonth.map((wk,idx)=>{
     const row=wcRowsList[idx]&&wcRowsList[idx][0];
     const lines=(row&&Array.isArray(row.lines))?row.lines.filter(l=>l&&l.text&&l.text.trim()).map(l=>l.text):[];
     return lines.length?`${idx+1}주차: ${lines.join(', ')}`:null;
   }).filter(Boolean);
-  if(!missionByWeek.length)return; // AI에 넘길 재료가 없으면 생성 시도조차 하지 않음
+  const prevMissionLines=(prevWcRowsList||[]).flatMap(rows=>{
+    const row=rows&&rows[0];
+    return (row&&Array.isArray(row.lines))?row.lines.filter(l=>l&&l.text&&l.text.trim()).map(l=>l.text):[];
+  });
 
-  const sys=`당신은 한 달의 흐름에서 "뭔가 바뀐 지점"을 짚어주는 짧은 회고 비서예요.
-아래는 이 달의 주차별 목표(주간 미션) 텍스트예요. 주차를 거치며 목표의 방향이나 초점이 눈에 띄게 바뀐 지점이 있다면, 그 변화를 담담하고 짧은 한 문장으로 표현해주세요.
-- 최대 2개까지만, 변화가 뚜렷하지 않으면 0개도 괜찮아요(억지로 만들지 마세요).
-- 각 문장은 25자 내외로 짧게, ~어요/~였어요체.
-- 반드시 JSON 배열 형식으로만 응답하세요. 예: ["탈고에서 산책 습관으로 초점이 옮겨갔어요"]
+  // 리듬 변화도 목표 텍스트도 없으면 AI에 넘길 재료 자체가 없으니 생성 시도조차 하지 않음
+  if(!rhythmChanges.length&&!missionByWeek.length)return;
+
+  const parts=[];
+  if(missionByWeek.length)parts.push(`이 달 주차별 목표(주간 미션):\n${missionByWeek.join('\n')}`);
+  if(prevMissionLines.length)parts.push(`전월 목표: ${prevMissionLines.join(', ')}`);
+  if(rhythmChanges.length)parts.push(`이 달 리듬 시간 변화(전월 대비, 계산된 값):\n${rhythmChanges.join('\n')}`);
+  const dataContext=parts.join('\n\n');
+
+  const sys=`당신은 한 달의 흐름에서 "뭔가 바뀐 지점"을 짚어주는 회고 비서예요.
+아래 자료는 두 종류예요: (1) 주차별 목표/주간미션 텍스트, (2) 리듬(활동 카테고리별) 시간이 전월 대비 어떻게 달라졌는지 계산된 값.
+이 둘을 각각 따로 언급하지 말고, 목표의 방향 전환과 리듬 시간 변화 사이에 실제로 앞뒤가 맞는 관계가 보이면 하나의 문장으로 엮어서 설명해주세요.
+예: "운동 시간이 늘어난 건 목표가 체력 회복으로 방향을 잡으면서였던 것 같아요"처럼, 무엇이 원인이고 무엇이 결과처럼 보이는지 자연스럽게 연결하세요.
+관계가 뚜렷하지 않다면 억지로 엮지 말고, 목표 변화나 리듬 변화 중 더 뚜렷한 쪽 하나만 단독으로 짚어도 좋아요. 둘 다 뚜렷하지 않은 항목은 아예 만들지 마세요.
+- 최대 3개까지만, 정말 짚을 게 없으면 빈 배열도 괜찮아요.
+- 각 문장은 40~60자, 담담하고 자연스러운 ~어요/~였어요체.
+- 문장 안에 분·시간·퍼센트 같은 구체적 수치는 절대 넣지 마세요. 방향과 의미만 담백하게 풀어서 설명하세요.
+- 전월 목표가 함께 주어졌다면, 그 중 최대 1개는 전월과 비교하는 관점으로 써도 좋아요(강제는 아니에요).
+- 반드시 JSON 배열 형식으로만 응답하세요. 예: ["운동 시간이 늘어난 건 목표가 체력 회복으로 방향을 잡으면서였던 것 같아요"]
 - 다른 설명이나 마크다운 없이 순수 JSON 배열만 출력하세요.`;
-  const reply=await callClaudeFromTablet(sys,missionByWeek.join('\n'),300);
+  const reply=await callClaudeFromTablet(sys,dataContext,500);
   if(!reply)return;
   try{
     const clean=reply.replace(/```json|```/g,'').trim();
     const parsed=JSON.parse(clean);
-    if(Array.isArray(parsed)&&parsed.length){
+    if(Array.isArray(parsed)){
       await supaUpsertAiCache('monthly_milestones_'+mk,JSON.stringify(parsed));
-      const aiItems=parsed.map(t=>({text:escapeHtml(t),date:'',color:'rgba(var(--pal-lavender-rgb),0.9)'}));
-      renderList([...rhythmMilestones,...aiItems]);
+      renderList(parsed);
     }
-  }catch(e){/* 파싱 실패 시 계산 마디만 유지 */}
+  }catch(e){/* 파싱 실패 시 빈 채로 둠 */}
 }
 // ai_cache 테이블 upsert — 본앱 aiCacheSet과 동일한 패턴(만료 없이 영구 보관, 그 달 데이터는 확정된 과거라 안 바뀜)
 async function supaUpsertAiCache(cacheKey,content){
