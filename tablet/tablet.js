@@ -271,7 +271,7 @@ async function loadTodayTab(){
     supaFetch(`habits?order=sort_order.asc`),
     supaFetch(`habit_checks?date_key=eq.${dk}`),
     supaFetch(`meals?date_key=eq.${dk}`),
-    supaFetch(`contents?or=(status.eq.watching,and(status.eq.done,end_date.eq.${dk}))&order=created.desc&limit=6`),
+    supaFetch(`contents?or=(status.eq.watching,and(status.eq.done,end_date.eq.${dk}),and(content_cat.eq.music,start_date.eq.${dk}))&order=created.desc&limit=6`),
     supaFetch(`reading_books?status=eq.reading&limit=1`),
     supaFetch(`rhythm_blocks?date_key=eq.${dk}&order=start_time.asc`),
     supaFetch(`morning_routine_checks?date_key=eq.${dk}`)
@@ -785,6 +785,25 @@ async function loadMonthTab(){
   await renderChaeumLogTablet();
   _rdCalDate=new Date(_monthCalDate);
   await renderReadingCal();
+  lockContentCollectToReadingCal();
+}
+
+// 독서달력(top-row 첫 카드)의 실제 렌더링 높이를 콘텐츠모아보기 카드의 절대 상한으로 고정.
+// 콘텐츠모아보기가 아무리 길어져도 이 값을 넘지 못하고 내부 스크롤로만 처리됨.
+function lockContentCollectToReadingCal(){
+  const topRow=document.querySelector('.top-row');
+  if(!topRow)return;
+  const rdCard=topRow.children[0];
+  const ccolCard=document.querySelector('.ccol-card');
+  if(!rdCard||!ccolCard)return;
+  // 이미지 로딩(독서표지)이나 폰트로 레이아웃이 아직 안 굳었을 수 있어 두 프레임 뒤에 측정
+  setTimeout(()=>{
+    const h=rdCard.offsetHeight;
+    if(h>0){
+      ccolCard.style.height=h+'px';
+      ccolCard.style.maxHeight=h+'px';
+    }
+  },50);
 }
 
 function renderMonthGoals(row){
@@ -906,7 +925,7 @@ async function renderMonthTimetable(y,mo){
         for(let d=cursor;d<dispStart;d++)cellsHtml+=`<div class="tt-cell"></div>`;
         const dispEnd=Math.max(c.endD,dispStart);
         const span=dispEnd-dispStart+1;
-        const w=span*16+(span-1)*1;
+        const w=span*22+(span-1)*1.5;
         const isWatching=c.item.status==='watching'&&cat!=='music';
         const isStopped=c.item.status==='stopped';
         let label,titleAttr;
@@ -1038,7 +1057,7 @@ async function renderMonthQuotes(y,mo){
 // ── 독서 달력 (밀리의 서재 스타일, iikoto 원본 구조 그대로) ──
 function rdCalShift(delta){
   _rdCalDate.setMonth(_rdCalDate.getMonth()+delta);
-  renderReadingCal();
+  renderReadingCal().then(lockContentCollectToReadingCal);
 }
 async function renderReadingCal(){
   const y=_rdCalDate.getFullYear(),m=_rdCalDate.getMonth();
