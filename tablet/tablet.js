@@ -1679,9 +1679,9 @@ async function loadMonthlyReportPage(){
     supaFetch(`rhythm_blocks?date_key=gte.${prevStartDk}&date_key=lte.${prevEndDk}`),
     supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&order=created.desc&limit=200`),
     supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&order=created.desc&limit=200`),
-    Promise.all(weeksInMonth.map(wk=>supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wchallenge_'+wk)}`))),
+    Promise.all(weeksInMonth.map(wk=>supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wchallenge_week:'+wk)}`))),
     supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent('monthly_milestones_'+mk)}&select=content`),
-    Promise.all(prevWeeksInMonth.map(wk=>supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wchallenge_'+wk)}`))),
+    Promise.all(prevWeeksInMonth.map(wk=>supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wchallenge_week:'+wk)}`))),
     supaFetch(`todos?date_key=gte.${prevStartDk}&date_key=lte.${prevEndDk}&select=done,date_key`),
     supaFetch(`sleep?date_key=gte.${prevStartDk}&date_key=lte.${prevEndDk}&select=sleep_time,wake_time,date_key`),
     supaFetch(`habit_checks?date_key=gte.${prevStartDk}&date_key=lte.${prevEndDk}`),
@@ -1787,6 +1787,53 @@ function _mrpSparkSvg(values,color){
   const dots=pts.map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="3.2" fill="${color}"/>`).join('');
   return `<svg class="mrp-traj-spark" viewBox="0 0 300 44" preserveAspectRatio="none">${path?`<path d="${path}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`:''}${dots}</svg>`;
 }
+// 세 지표를 하나의 웨이브 그래프에 겹쳐 표시 — 각 지표는 자기 자신의 이번 달 최소~최대 범위 안에서 정규화한
+// "상대적 위치"이며 절대 눈금이 아님(단위가 %/시간으로 서로 다르기 때문). 절대값은 하단 tail-vals에 별도 표기.
+function _mrpWaveSvg(rows,weekCount){
+  const H=110,padTop=8,padBottom=8,plotH=H-padTop-padBottom;
+  const stepX=380/Math.max(1,weekCount-1);
+  const legendHtml=`<div class="mrp-wave-legend">`+rows.map(r=>
+    `<span><i style="background:rgba(${r.color},0.95);"></i>${r.label}</span>`
+  ).join('')+`</div>`;
+
+  let defsHtml='',pathsHtml='',dotsHtml='';
+  const validRows=rows.filter(r=>r.values.some(v=>v!=null));
+  if(!validRows.length){
+    return legendHtml+'<div class="empty-msg" style="text-align:left;padding:8px 0;">이 달엔 표시할 기록이 없어요</div>';
+  }
+  validRows.forEach((r,idx)=>{
+    const valid=r.values.map((v,i)=>({v,i})).filter(o=>o.v!=null);
+    const vs=valid.map(o=>o.v);
+    const min=Math.min(...vs),max=Math.max(...vs);
+    const range=max-min||1;
+    const pts=valid.map(o=>{
+      const x=10+o.i*stepX;
+      const y=padTop+plotH-((o.v-min)/range)*plotH;
+      return [x,y];
+    });
+    if(pts.length<1)return;
+    const gid=`mrpWave${idx}`;
+    defsHtml+=`<linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(${r.color},0.36)"/><stop offset="100%" stop-color="rgba(${r.color},0)"/></linearGradient>`;
+    if(pts.length>1){
+      const linePath=_mrpSmoothPath(pts);
+      const areaPath=`${linePath} L${pts[pts.length-1][0]},${H} L${pts[0][0]},${H} Z`;
+      pathsHtml+=`<path d="${areaPath}" fill="url(#${gid})"/><path d="${linePath}" fill="none" stroke="rgba(${r.color},1)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>`;
+    }
+    const last=pts[pts.length-1];
+    dotsHtml+=`<circle cx="${last[0]}" cy="${last[1]}" r="4.2" fill="rgba(${r.color},1)"/>`;
+  });
+
+  const weekLabels=Array.from({length:weekCount},(_,i)=>`<span>${i+1}주차</span>`).join('');
+  const tailVals=rows.map(r=>{
+    const lastValid=[...r.values].reverse().find(v=>v!=null);
+    return `<div class="mrp-wave-tail-item"><div class="n">${lastValid!=null?r.fmt(lastValid):'-'}</div><div class="l">${r.label}</div></div>`;
+  }).join('');
+
+  return legendHtml+
+    `<div class="mrp-wave-wrap"><svg viewBox="0 0 400 ${H}" preserveAspectRatio="none">${`<defs>${defsHtml}</defs>`}${pathsHtml}${dotsHtml}</svg></div>`+
+    `<div class="mrp-wave-labels">${weekLabels}</div>`+
+    `<div class="mrp-wave-tail">${tailVals}</div>`;
+}
 async function renderMrpTrajectory(mk,todos,sleepRows,habits,habitChecks,weeksInMonth,prevData,cacheRow){
   const el=document.getElementById('mrp-traj');
   if(!weeksInMonth.length){el.innerHTML='<div class="empty-msg">이 달엔 표시할 주차가 없어요</div>';return;}
@@ -1815,19 +1862,11 @@ async function renderMrpTrajectory(mk,todos,sleepRows,habits,habitChecks,weeksIn
   const {byWeekTodo,byWeekSleep,byWeekHabit}=calcWeekly(todos,sleepRows,habits,habitChecks,weeksInMonth);
 
   const rows=[
-    {key:'habit',label:'습관율',values:byWeekHabit,color:'rgba(145,210,175,1)',fmt:v=>v+'%'},
-    {key:'sleep',label:'평균수면',values:byWeekSleep,color:'rgba(170,208,228,1)',fmt:v=>v.toFixed(1)+'h'},
-    {key:'todo',label:'투두완료율',values:byWeekTodo,color:'rgba(210,175,225,1)',fmt:v=>v+'%'}
+    {key:'habit',label:'습관율',values:byWeekHabit,color:'145,210,175',fmt:v=>v+'%'},
+    {key:'sleep',label:'평균수면',values:byWeekSleep,color:'170,208,228',fmt:v=>v.toFixed(1)+'h'},
+    {key:'todo',label:'투두완료율',values:byWeekTodo,color:'210,175,225',fmt:v=>v+'%'}
   ];
-  const sparkHtml=rows.map(r=>{
-    const lastValid=[...r.values].reverse().find(v=>v!=null);
-    return `<div class="mrp-traj-row">
-      <span class="mrp-traj-lbl">${r.label}</span>
-      ${_mrpSparkSvg(r.values,r.color)}
-      <span class="mrp-traj-val">${lastValid!=null?r.fmt(lastValid):'-'}</span>
-    </div>`;
-  }).join('');
-  el.innerHTML=sparkHtml+`<div id="mrp-traj-ai" style="margin-top:14px;"></div>`;
+  el.innerHTML=_mrpWaveSvg(rows,weeksInMonth.length)+`<div id="mrp-traj-ai" style="margin-top:14px;"></div>`;
 
   // ── AI 궤적 분석 ──
   const aiEl=document.getElementById('mrp-traj-ai');
@@ -1998,8 +2037,11 @@ async function renderMrpMilestones(mk,rblocks,prevRblocks,weeksInMonth,wcRowsLis
     return (row&&Array.isArray(row.lines))?row.lines.filter(l=>l&&l.text&&l.text.trim()).map(l=>l.text):[];
   });
 
-  // 리듬 변화도 목표 텍스트도 없으면 AI에 넘길 재료 자체가 없으니 생성 시도조차 하지 않음
-  if(!rhythmChanges.length&&!missionByWeek.length)return;
+  // 리듬 변화도 목표 텍스트도 없으면 AI에 넘길 재료 자체가 없으니 생성하지 않음 — 다만 조용히 끝내지 않고 이유를 안내
+  if(!rhythmChanges.length&&!missionByWeek.length){
+    el.innerHTML=`<div class="empty-msg" style="text-align:left;padding:4px 0;">이 달의 마디를 짚을 만한 자료(목표 변화나 리듬 변화)가 아직 없어요</div>`;
+    return;
+  }
 
   const parts=[];
   if(missionByWeek.length)parts.push(`이 달 주차별 목표(주간 미션):\n${missionByWeek.join('\n')}`);
@@ -2019,15 +2061,23 @@ async function renderMrpMilestones(mk,rblocks,prevRblocks,weeksInMonth,wcRowsLis
 - 반드시 JSON 배열 형식으로만 응답하세요. 예: ["운동 시간이 늘어난 건 목표가 체력 회복으로 방향을 잡으면서였던 것 같아요"]
 - 다른 설명이나 마크다운 없이 순수 JSON 배열만 출력하세요.`;
   const reply=await callClaudeFromTablet(sys,dataContext,500);
-  if(!reply)return;
+  if(!reply){
+    el.innerHTML=`<div class="empty-msg" style="text-align:left;padding:4px 0;">마디 분석을 불러오지 못했어요 — 잠시 후 다시 열어보시면 재시도돼요</div>`;
+    return;
+  }
   try{
     const clean=reply.replace(/```json|```/g,'').trim();
     const parsed=JSON.parse(clean);
-    if(Array.isArray(parsed)){
+    if(Array.isArray(parsed)&&parsed.length){
       await supaUpsertAiCache('monthly_milestones_'+mk,JSON.stringify(parsed));
       renderList(parsed);
+    }else{
+      // 빈 배열은 "정말 짚을 게 없다"는 판단일 수도, 일시적 부실 응답일 수도 있어 캐시하지 않고 다음에 다시 시도되게 둠
+      el.innerHTML=`<div class="empty-msg" style="text-align:left;padding:4px 0;">이 달은 뚜렷하게 짚을 만한 변화는 없었어요</div>`;
     }
-  }catch(e){/* 파싱 실패 시 빈 채로 둠 */}
+  }catch(e){
+    el.innerHTML=`<div class="empty-msg" style="text-align:left;padding:4px 0;">마디 분석 응답을 해석하지 못했어요</div>`;
+  }
 }
 // ai_cache 테이블 upsert — 본앱 aiCacheSet과 동일한 패턴(만료 없이 영구 보관, 그 달 데이터는 확정된 과거라 안 바뀜)
 async function supaUpsertAiCache(cacheKey,content){
