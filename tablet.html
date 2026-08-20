@@ -3,7 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>iikoto — 태블릿</title>
+<title>iikoto_ipad</title>
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="iikoto_ipad">
+<meta name="theme-color" content="#f4f2e8">
+<link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png">
+<link rel="icon" sizes="192x192" href="icons/icon-192.png">
+<link rel="icon" sizes="512x512" href="icons/icon-512.png">
 <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css">
 <style>
@@ -14,11 +22,9 @@
      나머지는 전부 이 두 값의 배율/보정치로 파생. 전체 폰트를 조절하려면 --fs-title, --fs-body 값만 바꾸면 됨. */
   --fs-title:16px;      /* 카드 제목(card-lbl), 사이드 타이틀 */
   --fs-body:15px;       /* 본문 텍스트(메모, 식사 메뉴, 리듬 팝업 라벨 등) */
-  --fs-lg:calc(var(--fs-title) + 2px);    /* 큰 강조(날짜 헤더, 습관 배너 소제목 등) */
+  --fs-lg:calc(var(--fs-title) + 2px);    /* 큰 강조(날짜 헤더, 습관 배너 소제목, 수면점수 등) */
   --fs-xl:calc(var(--fs-title) + 8px);    /* 최상위 헤더(월/일) */
-  --fs-score:calc(var(--fs-title) + 3px); /* 점수류 큰 숫자(수면점수 등) */
-  --fs-sm:calc(var(--fs-body) - 1.5px);   /* 보조 라벨(시간, 카테고리 태그) */
-  --fs-xs:calc(var(--fs-body) - 3px);     /* 최소 라벨(요일, 스파크라인 축) */
+  --fs-sm:calc(var(--fs-body) - 1.5px);   /* 보조 라벨(시간, 카테고리 태그, 요일, 스파크라인 축 등) */
   --fs-tab:calc(var(--fs-title) - 0.5px); /* 플로팅 탭 메뉴 텍스트 */
 
   --main-text-size:17px;
@@ -37,7 +43,7 @@
   --pal-sky-rgb:170,208,228;--pal-sky-bg:rgba(170,208,228,0.55);--pal-sky-border:rgba(75,145,180,0.55);--pal-sky-text:rgba(45,105,140,0.95);
   --pal-lavender-rgb:210,175,225;--pal-lavender-bg:rgba(210,175,225,0.55);--pal-lavender-border:rgba(160,105,180,0.55);--pal-lavender-text:rgba(130,75,150,0.95);
   --pal-lime-rgb:200,220,140;--pal-lime-bg:rgba(200,220,140,0.55);--pal-lime-border:rgba(135,165,60,0.55);--pal-lime-text:rgba(95,120,35,0.95);
-  --pal-rose-rgb:230,150,150;--pal-rose-text:rgba(165,60,60,0.95);
+  --pal-rose-rgb:230,150,150;--pal-rose-bg:rgba(230,150,150,0.52);--pal-rose-border:rgba(205,95,95,0.55);--pal-rose-text:rgba(165,60,60,0.95);
   --grad-mintyellow:linear-gradient(135deg,rgba(210,244,225,0.85),rgba(248,245,200,0.85),rgba(212,242,222,0.85));
 
   /* 리듬 8색 — RHYTHM_CATS 원본과 동일 */
@@ -53,18 +59,17 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 #app{position:fixed;inset:0;display:flex;}
 
 /* ── 좌측 사이드(캘린더 + 주간요약) ── */
-.side{width:270px;flex-shrink:0;background:rgba(255,253,248,0.35);border-right:1px solid var(--card-b);padding:22px 18px;overflow-y:auto;}
-.side-title{font-size:var(--fs-title);font-weight:600;color:var(--tp);margin-bottom:13px;display:flex;align-items:center;gap:6px;}
-.side-title i{font-size:var(--fs-lg);}
+.side{width:270px;flex-shrink:0;background:rgba(255,253,248,0.35);border-right:1px solid var(--card-b);padding:10px 18px 22px;overflow-y:auto;}
+.side-logo-wrap{display:flex;justify-content:flex-start;padding:0 0 6px;}
+.side-logo{height:36px;width:auto;cursor:pointer;}
 .mini-cal{background:var(--card);border:1px solid var(--card-b);border-radius:14px;padding:14px;margin-bottom:18px;}
 .mini-cal-hdr{display:flex;justify-content:space-between;align-items:center;font-size:var(--fs-body);color:var(--tp);font-weight:600;margin-bottom:10px;}
 .mini-cal-hdr i{font-size:var(--fs-title);color:var(--tm);cursor:pointer;padding:2px 4px;}
 .mini-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;font-size:var(--fs-sm);text-align:center;color:var(--ts);}
-.mini-cal-grid .dow{color:var(--tm);font-size:var(--fs-xs);padding-bottom:3px;}
-.mini-cal-day{padding:5px 0;border-radius:6px;cursor:pointer;position:relative;}
-.mini-cal-day.today{background:rgba(var(--pal-orange-rgb),0.35);color:var(--pal-orange-text);font-weight:600;}
-.mini-cal-day.sel{background:rgba(var(--pal-mint-rgb),0.45);color:var(--pal-mint-text);font-weight:600;}
-.mini-cal-day.has-dot::after{content:'';position:absolute;bottom:1px;left:50%;transform:translateX(-50%);width:3.5px;height:3.5px;border-radius:50%;background:rgba(var(--pal-sky-rgb),0.9);}
+.mini-cal-grid .dow{color:var(--tm);font-size:var(--fs-sm);padding-bottom:3px;}
+.mini-cal-day{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;position:relative;}
+.mini-cal-day.sel{background:var(--pal-warmgray-bg);color:var(--pal-warmgray-text);font-weight:600;}
+.mini-cal-day.today{background:var(--pal-yellow-bg);color:var(--pal-yellow-text);font-weight:600;}
 .side-hcard{border-radius:16px;padding:15px 14px 13px;margin-bottom:10px;position:relative;overflow:hidden;box-shadow:0 2px 16px rgba(180,140,120,0.08),inset 0 1px 0 rgba(255,250,240,0.62);}
 .side-hcard.morning{background:linear-gradient(135deg,rgba(255,205,175,0.72),rgba(255,235,180,0.55));border:1px solid rgba(255,200,165,0.55);}
 .side-hcard.afternoon{background:linear-gradient(135deg,rgba(255,220,235,0.65),rgba(255,235,200,0.60));border:1px solid rgba(255,200,210,0.50);}
@@ -73,17 +78,17 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .side-hcard.dawn .side-hcard-time{color:#7a6684;}
 .side-hcard.dawn .side-hcard-greeting{color:#362b3e;}
 .side-hcard.dawn .side-hcard-sub{color:#524555;}
-.side-hcard-time{font-size:var(--fs-xs);color:var(--tm);margin-bottom:4px;}
+.side-hcard-time{font-size:var(--fs-sm);color:var(--tm);margin-bottom:4px;}
 .side-hcard-greeting{font-size:var(--fs-lg);font-weight:500;color:var(--tp);line-height:1.25;margin-bottom:5px;}
 .side-hcard-sub{font-size:var(--fs-sm);color:var(--ts);line-height:1.55;}
 
 /* ── 메인 영역 ── */
 .main-wrap{flex:1;overflow-y:auto;padding:22px 24px 80px;}
-.main-hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:16px;}
-.main-hdr-arrow{font-size:var(--fs-lg);color:var(--tm);cursor:pointer;align-self:center;padding:2px 4px;flex-shrink:0;}
-.main-hdr-arrow:hover{color:var(--tp);}
-.main-date{font-size:var(--fs-xl);font-weight:600;color:var(--tp);}
-.main-dow{font-size:var(--fs-title);color:var(--tm);margin-left:9px;}
+.main-hdr{display:flex;align-items:baseline;gap:9px;margin-bottom:14px;}
+.main-hdr-arrow{font-size:var(--fs-body);color:var(--tm);cursor:pointer;align-self:center;padding:2px 4px;flex-shrink:0;opacity:0.55;transition:opacity .15s;}
+.main-hdr-arrow:hover{opacity:1;color:var(--tp);}
+.main-date{font-size:var(--fs-lg);font-weight:700;color:var(--tp);letter-spacing:-0.02em;font-family:'DM Sans',sans-serif;}
+.main-dow{font-size:var(--fs-sm);color:var(--tm);margin-left:2px;font-weight:500;letter-spacing:0.02em;}
 .main-body{display:none;}
 .main-body.on{display:block;}
 
@@ -92,17 +97,18 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .card-lbl{font-size:var(--fs-title);font-weight:600;color:var(--tp);margin-bottom:11px;display:flex;align-items:center;gap:7px;}
 .card-lbl i{font-size:var(--fs-lg);}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;align-items:stretch;}
-.month-top-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;align-items:stretch;}
-.month-top-left{display:flex;flex-direction:column;gap:13px;}
-.month-top-right{min-height:0;}
+.month-top-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:16px;align-items:stretch;height:270px;}
+.month-top-left{display:flex;flex-direction:column;gap:13px;height:100%;}
+.month-top-left .card{flex:1;min-height:0;display:flex;flex-direction:column;margin-bottom:0;}
+.month-top-right{min-height:0;height:100%;margin-bottom:0;}
 .card.month-compact{padding:14px 16px 12px;}
 .card.month-compact .card-lbl{margin-bottom:8px;}
-.month-goals-box{min-height:calc(var(--fs-sm) * 1.4 * 3 + 6px * 3);display:flex;flex-direction:column;justify-content:center;}
+.month-goals-box{min-height:calc(var(--fs-body) * 1.4 * 3 + 6px * 3);display:flex;flex-direction:column;justify-content:center;}
 .month-compact .habit-numbox-grid{grid-template-columns:repeat(4,1fr);gap:7px;}
 .month-compact .habit-numbox-card{padding:11px 4px;border-radius:12px;}
-.month-compact .habit-numbox-card i{font-size:17px!important;}
+.month-compact .habit-numbox-card .habit-numbox-icon{font-size:var(--fs-lg);}
 .month-compact .habit-numbox-num{font-size:var(--fs-title);margin-top:4px;}
-.month-compact .habit-numbox-name{font-size:var(--fs-xs);}
+.month-compact .habit-numbox-name{font-size:var(--fs-sm);}
 .grid3{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;align-items:stretch;}
 .grid4{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin-bottom:13px;align-items:stretch;}
 .empty-msg{font-size:var(--fs-body);color:var(--tm);text-align:center;padding:12px 0;}
@@ -116,13 +122,13 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .report-banner-inner i:last-child{margin-left:auto;color:rgba(80,130,85,0.55);font-size:var(--fs-body);}
 
 /* ── 투두 / 일정 ── */
-.todo-card{height:252px;box-sizing:border-box;overflow:hidden;margin-bottom:0!important;}
-.todo-row{display:flex;align-items:center;gap:9px;padding:5px 0;font-size:var(--fs-title);color:var(--tp);}
+.todo-card{height:calc(32px + (var(--fs-title) * 1.3 + 11px) + (var(--fs-body) * 1.3 + 10px) * 6);box-sizing:border-box;overflow:hidden;margin-bottom:0!important;}
+.todo-row{display:flex;align-items:center;gap:9px;padding:5px 0;font-size:var(--fs-body);color:var(--tp);}
 .todo-row .chk{width:15px;height:15px;border-radius:4px;border:1.5px solid rgba(200,160,160,0.5);flex-shrink:0;}
 .todo-row.done{color:var(--tm);text-decoration:line-through;}
 .todo-row.done .chk{background:rgba(var(--pal-mint-rgb),0.5);border-color:transparent;}
-.grid3-right{display:flex;flex-direction:column;gap:6px;height:252px;}
-.event-card{padding:11px 16px;height:104px;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;margin-bottom:0!important;}
+.grid3-right{display:flex;flex-direction:column;gap:6px;height:calc(32px + (var(--fs-title) * 1.3 + 11px) + (var(--fs-body) * 1.3 + 10px) * 6);}
+.event-card{padding:11px 16px;flex:104;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;margin-bottom:0!important;}
 .event-row{display:flex;align-items:center;gap:9px;padding:4px 0;font-size:var(--fs-body);color:var(--tp);}
 .event-time{color:rgba(75,145,180,1);font-weight:600;font-size:var(--fs-sm);width:42px;flex-shrink:0;}
 .event-row.past{color:var(--tm);text-decoration:line-through;opacity:0.6;}
@@ -141,31 +147,31 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .memo-txt{font-size:var(--fs-body);color:var(--ts);line-height:1.5;}
 
 /* ── 수면(일정 아래 하프배너)/습관/콘텐츠 ── */
-.sleep-card{border-color:rgba(var(--pal-sky-rgb),0.35)!important;padding:11px 16px 10px;height:142px;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;margin-bottom:0!important;}
+.sleep-card{border-color:rgba(var(--pal-sky-rgb),0.35)!important;padding:11px 16px 10px;flex:142;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;margin-bottom:0!important;}
 .sleep-hdr{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:0;flex-shrink:0;}
 .sleep-hdr .card-lbl{margin-bottom:0;}
 .sleep-score-row{display:flex;align-items:baseline;gap:8px;}
-.sleep-score{font-size:var(--fs-score);font-weight:700;color:var(--tp);}
+.sleep-score{font-size:var(--fs-lg);font-weight:700;color:var(--tp);}
 .sleep-score-lbl{font-size:var(--fs-sm);color:var(--tm);}
 #today-sleep{flex:1;display:flex;flex-direction:column;justify-content:flex-end;min-height:0;}
 .sleep-spark{display:flex;align-items:flex-end;gap:5px;height:56px;flex-shrink:0;}
 .sleep-spark-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;height:100%;}
 .sleep-spark-bar{width:100%;border-radius:3px 3px 0 0;background:rgba(var(--pal-sky-rgb),0.45);min-height:3px;flex-shrink:0;}
 .sleep-spark-bar.today{background:rgba(var(--pal-sky-rgb),0.95);}
-.sleep-spark-dow{font-size:var(--fs-xs);color:var(--tm);flex-shrink:0;}
+.sleep-spark-dow{font-size:var(--fs-sm);color:var(--tm);flex-shrink:0;}
 .habit-card{border-color:rgba(var(--pal-mint-rgb),0.35)!important;}
 .habit-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;}
-.habit-row{display:flex;align-items:center;gap:6px;padding:3px 0;font-size:var(--fs-sm);color:var(--ts);}
+.habit-row{display:flex;align-items:center;gap:6px;padding:3px 0;font-size:var(--fs-body);color:var(--ts);}
 .habit-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
 .habit-row.done{color:var(--tp);font-weight:500;}
 .habit-check{margin-left:auto;font-size:var(--fs-sm);color:rgba(var(--pal-mint-rgb),1);}
 .content-card{border-color:rgba(var(--pal-lavender-rgb),0.4)!important;}
 .content-row{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:var(--fs-body);color:var(--tp);}
-.content-cat{font-size:var(--fs-xs);color:rgba(130,75,150,0.85);background:rgba(var(--pal-lavender-rgb),0.25);padding:2px 6px;border-radius:5px;flex-shrink:0;}
+.content-cat{font-size:var(--fs-sm);color:rgba(130,75,150,0.85);background:rgba(var(--pal-lavender-rgb),0.25);padding:2px 6px;border-radius:5px;flex-shrink:0;}
 .content-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 
-/* ── 오늘의 식사(넓은 배너, 4끼 2x2, 높이 고정) ── */
-.meal-card{border-color:rgba(var(--pal-lime-rgb),0.4)!important;padding:12px 18px;height:150px;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;}
+/* ── 오늘의 식사(넓은 배너, 4끼 2x2, 높이 고정) — 본앱 "오늘 뭐 먹지" 배너 색(연두) 적용, 메모카드(.card.p)와 동일한 알파톤 ── */
+.meal-card{background:rgba(var(--pal-lime-rgb),0.15)!important;border-color:rgba(var(--pal-lime-rgb),0.32)!important;padding:12px 18px;height:150px;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;}
 .meal-card .card-lbl{margin-bottom:7px;flex-shrink:0;}
 .meal-grid{display:grid;grid-template-columns:1fr 1fr;gap:3px 16px;flex:1;}
 .meal-slot{padding:2px 0;overflow:hidden;}
@@ -189,23 +195,22 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .goal-hcard{border-radius:20px;background:linear-gradient(135deg,rgba(255,220,235,0.65),rgba(255,235,200,0.60));border:1px solid rgba(255,200,210,0.50)!important;box-shadow:0 2px 20px rgba(180,140,120,0.08),inset 0 1px 0 rgba(255,250,240,0.62);}
 
 /* ── 좌하단 플로팅 탭 ── */
-.float-tabs{position:fixed;right:22px;bottom:22px;display:flex;flex-direction:row-reverse;align-items:center;gap:9px;z-index:100;}
-.float-fab{width:54px;height:54px;border-radius:50%;background:rgba(var(--pal-orange-rgb),0.85);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.18);flex-shrink:0;transition:transform .15s;}
+.float-tabs{position:fixed;right:22px;bottom:22px;display:flex;flex-direction:column-reverse;align-items:flex-end;gap:9px;z-index:100;}
+.float-fab{width:54px;height:54px;border-radius:50%;background:var(--pal-yellow-border);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.18);flex-shrink:0;transition:transform .15s;}
 .float-fab.open{transform:rotate(90deg);}
-.float-tab-menu{display:flex;flex-direction:row-reverse;align-items:center;gap:7px;max-width:0;overflow:hidden;transition:max-width .25s ease;}
-.float-tab-menu.on{max-width:280px;}
+.float-tab-menu{display:flex;flex-direction:column-reverse;align-items:flex-end;gap:7px;max-height:0;overflow:hidden;transition:max-height .25s ease;}
+.float-tab-menu.on{max-height:280px;}
 .float-tab{padding:11px 16px;border-radius:12px;font-size:var(--fs-tab);color:var(--ts);cursor:pointer;display:flex;align-items:center;gap:5px;background:rgba(255,253,248,0.92);border:1px solid var(--card-b);box-shadow:0 3px 12px rgba(0,0,0,0.10);white-space:nowrap;flex-shrink:0;}
-.float-tab.on{background:rgba(var(--pal-orange-rgb),0.35);color:var(--pal-orange-text);font-weight:600;}
+.float-tab.on{background:var(--pal-yellow-bg);color:var(--pal-yellow-text);font-weight:600;}
 .float-tab i{font-size:var(--fs-lg);}
 
 /* ── 주간탭 ── */
-.wgoal-item{margin-bottom:9px;}
-.wgoal-text{font-size:var(--fs-sm);color:var(--tp);margin-bottom:4px;}
-.wgoal-days{display:flex;gap:4px;}
-.wgoal-day{width:23px;height:21px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:var(--fs-xs);color:var(--tm);background:rgba(255,253,248,0.5);border:1px solid rgba(var(--divider-rgb),0.3);}
-.habit-matrix{display:grid;grid-template-columns:56px repeat(7,1fr);gap:3px;align-items:center;}
-.habit-matrix .hdr{font-size:var(--fs-xs);color:var(--tm);text-align:center;}
-.habit-matrix .rowlbl{font-size:var(--fs-sm);color:var(--ts);}
+.wgoal-item{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;}
+.wgoal-text{font-size:var(--fs-body);color:var(--tp);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.wgoal-days{display:flex;gap:5px;flex-shrink:0;}
+.wgoal-day{width:26px;height:26px;border-radius:50%;border:1.5px dashed rgba(var(--divider-rgb),0.38);background:none;display:flex;align-items:center;justify-content:center;font-size:var(--fs-sm);font-weight:600;color:var(--tm);font-family:'DM Sans',sans-serif;}
+.habit-matrix{display:grid;grid-template-columns:56px repeat(7,1fr);gap:8px 3px;align-items:center;}
+.habit-matrix .rowlbl{font-size:var(--fs-body);color:var(--ts);}
 .habit-matrix .dot{width:14px;height:14px;border-radius:50%;margin:0 auto;background:rgba(200,190,180,0.2);}
 
 /* 이번 주 요약 미니 통계바 — 이이코토 본앱 stat-bar-wrap/sbar-item 스타일 그대로 차용, 박스 없이 심플하게 */
@@ -217,7 +222,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 
 /* 하루한줄 — 좌우 절반(월화수 / 목금토일) 2열 배치 */
 .oneline-2col{display:grid;grid-template-columns:1fr 1fr;gap:0 18px;}
-.oneline-row{display:flex;gap:9px;padding:5px 0;font-size:var(--fs-sm);color:var(--ts);border-bottom:1px dashed rgba(var(--divider-rgb),0.25);}
+.oneline-row{display:flex;gap:9px;padding:5px 0;font-size:var(--fs-body);color:var(--ts);border-bottom:1px dashed rgba(var(--divider-rgb),0.25);}
 .oneline-row:last-child{border-bottom:none;}
 .oneline-dow{width:22px;flex-shrink:0;font-weight:600;color:var(--tp);}
 
@@ -228,29 +233,29 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .rdcal-month{font-weight:600;font-size:var(--fs-body);color:var(--tp);}
 .rdcal-count{text-align:center;font-size:var(--fs-xl);font-weight:700;color:var(--tp);margin:6px 0 14px;letter-spacing:-.01em;}
 .rdcal-count span{font-size:var(--fs-sm);color:var(--tm);font-weight:400;}
-.rdcal-grid{display:grid;grid-template-columns:repeat(7,1fr);row-gap:9px;}
-.rdcal-dow{text-align:center;font-size:var(--fs-xs);color:var(--tm);font-weight:500;margin-bottom:6px;}
+.rdcal-grid{display:grid;grid-template-columns:repeat(7,1fr);row-gap:14px;}
+.rdcal-dow{text-align:center;font-size:var(--fs-sm);color:var(--tm);font-weight:500;margin-bottom:6px;}
 .rdcal-cover{position:relative;width:34px;height:46px;margin:0 auto;border-radius:5px;background-size:cover;background-position:center;background-color:rgba(200,180,160,0.3);box-shadow:0 1px 3px rgba(0,0,0,0.15);}
 .rdcal-num{text-align:center;font-size:var(--fs-sm);color:var(--tm);height:46px;display:flex;align-items:center;justify-content:center;}
-.mgoal-row{display:flex;align-items:center;gap:7px;padding:3px 0;font-size:var(--fs-sm);color:var(--tp);}
+.mgoal-row{display:flex;align-items:center;gap:7px;padding:3px 0;font-size:var(--fs-body);color:var(--tp);}
 .mgoal-row::before{content:'';width:4px;height:4px;border-radius:50%;background:rgba(var(--pal-orange-rgb),1);flex-shrink:0;}
 
 /* 콘텐츠 타임라인 — 본앱과 동일한 시각 스타일(빈 날짜=점선 네모칸, 콘텐츠=카테고리색 둥근 블록), 전체 폭 한줄(%기반) */
 .tt-head-row{display:flex;margin-bottom:4px;}
-.tt-cat-fixed-sp{width:56px;flex-shrink:0;}
+.tt-cat-fixed-sp{width:74px;flex-shrink:0;}
 .tt-head-dates{flex:1;display:flex;gap:1px;}
-.tt-head-dates span{flex:1;text-align:center;font-size:var(--fs-xs);color:var(--tm);}
-.tt-row{display:flex;align-items:center;margin-bottom:3px;}
-.tt-cat-fixed{width:56px;flex-shrink:0;font-size:var(--fs-sm);color:var(--ts);display:flex;align-items:center;gap:4px;cursor:default;white-space:nowrap;}
-.tt-cat-fixed i.dot{width:11px;height:11px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;flex-shrink:0;}
-.tt-track{flex:1;display:flex;gap:1px;height:18px;}
-.tt-cell{flex:1;height:18px;border-radius:4px;background:none;border:0.5px dashed rgba(var(--divider-rgb),0.3);box-sizing:border-box;}
-.tt-block{height:18px;border-radius:5px;display:flex;align-items:center;justify-content:flex-start;padding:0 5px;font-size:var(--fs-xs);color:var(--tp);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;box-sizing:border-box;}
+.tt-head-dates span{flex:1;text-align:center;font-size:var(--fs-sm);color:var(--tm);}
+.tt-row{display:flex;align-items:center;margin-bottom:5px;}
+.tt-cat-fixed{width:74px;flex-shrink:0;font-size:var(--fs-sm);color:var(--ts);display:flex;align-items:center;gap:6px;cursor:default;white-space:nowrap;}
+.tt-cat-badge{width:20px;height:20px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;}
+.tt-track{flex:1;display:flex;gap:1px;height:24px;}
+.tt-cell{flex:1;height:24px;border-radius:5px;background:none;border:0.5px dashed rgba(var(--divider-rgb),0.3);box-sizing:border-box;}
+.tt-block{height:24px;border-radius:6px;display:flex;align-items:center;justify-content:flex-start;padding:0 6px;font-size:var(--fs-body);color:var(--tp);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;box-sizing:border-box;}
 .tt-block.music{justify-content:center;padding:0;}
-.tt-block.drama{background:var(--pal-pink-bg);}
-.tt-block.book{background:var(--pal-yellow-bg);}
-.tt-block.movie{background:var(--pal-sky-bg);}
-.tt-block.music{background:var(--pal-lime-bg);}
+.tt-block.drama{background:var(--pal-pink-bg);color:var(--pal-pink-text);}
+.tt-block.book{background:var(--pal-yellow-bg);color:var(--pal-yellow-text);}
+.tt-block.movie{background:var(--pal-sky-bg);color:var(--pal-sky-text);}
+.tt-block.music{background:var(--pal-lime-bg);color:var(--pal-lime-text);}
 .tt-block.watching{background-image:repeating-linear-gradient(45deg,transparent,transparent 6px,rgba(255,255,255,0.45) 6px,rgba(255,255,255,0.45) 10px);opacity:0.85;}
 .tt-block.stopped{filter:saturate(0.45);opacity:0.7;}
 .habit-month-row{display:flex;align-items:center;gap:7px;margin-bottom:5px;}
@@ -260,12 +265,13 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .habit-numbox-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:10px;}
 .habit-numbox-card{display:flex;flex-direction:column;align-items:center;background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:16px 8px;}
 .habit-numbox-name{font-size:var(--fs-sm);color:var(--tm);margin-bottom:3px;}
+.habit-numbox-icon{font-size:20px;}
 .habit-numbox-num{font-size:var(--fs-xl);font-weight:700;color:var(--tp);font-family:'DM Sans',sans-serif;margin-top:6px;}
 
 /* 신규: 이번달 수집문장 배너 */
 .month-quotes-card{max-height:170px;overflow-y:auto;}
 .month-quote-item{display:flex;gap:9px;padding:6px 0;border-left:2px solid rgba(var(--divider-rgb),0.3);padding-left:10px;margin-left:2px;}
-.month-quote-date{font-size:var(--fs-xs);color:var(--tm);flex-shrink:0;width:34px;}
+.month-quote-date{font-size:var(--fs-sm);color:var(--tm);flex-shrink:0;width:34px;}
 .month-quote-txt{font-size:var(--fs-body);color:var(--ts);line-height:1.5;}
 
 /* 콘텐츠 모아보기(월별) — 본앱 콘텐츠 모아보기 시트 구조 이식, 독서달력 카드와 높이 맞춰 넘치면 스크롤 */
@@ -277,20 +283,19 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .ccol-item{display:flex;align-items:center;gap:9px;padding:5px 0;}
 .ccol-poster{width:30px;height:30px;border-radius:7px;object-fit:cover;flex-shrink:0;}
 .ccol-poster-fallback{width:30px;height:30px;border-radius:7px;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
-.ccol-title{flex:1;min-width:0;font-size:var(--fs-sm);color:var(--tp);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.ccol-status{flex-shrink:0;font-size:var(--fs-xs);color:var(--tm);}
-.ccol-stars{flex-shrink:0;font-size:var(--fs-xs);color:#e0b050;}
+.ccol-title{flex:1;min-width:0;font-size:var(--fs-body);color:var(--tp);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ccol-status{flex-shrink:0;font-size:var(--fs-sm);color:var(--tm);}
+.ccol-stars{flex-shrink:0;font-size:var(--fs-sm);color:#e0b050;}
 
 /* 채움 로그 타임라인 — 이이코토 본앱 chaeum-log-* 디자인 그대로 차용(세로 점+선 타임라인) */
 .chaeum-log-card{display:flex;flex-direction:column;overflow:hidden;}
 .chaeum-log-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;flex-shrink:0;}
 .chaeum-log-hdr .chaeum-log-title{font-size:var(--fs-title);font-weight:600;color:var(--tp);display:flex;align-items:center;gap:6px;margin-bottom:0;}
 .chaeum-log-hdr .chaeum-log-title i{font-size:var(--fs-lg);color:rgba(var(--pal-mint-rgb),1);}
-.chaeum-log-stat{font-size:var(--fs-sm);color:var(--tm);margin:2px 0 10px;flex-shrink:0;}
 .chaeum-log-tl{position:relative;padding-left:2px;overflow-y:auto;flex:1;min-height:0;}
 .chaeum-log-item{position:relative;display:flex;gap:10px;padding:0 0 16px;}
 .chaeum-log-item:last-child{padding-bottom:4px;}
-.chaeum-log-date{width:30px;flex-shrink:0;font-size:var(--fs-xs);color:var(--tm);padding-top:1px;font-variant-numeric:tabular-nums;text-align:right;}
+.chaeum-log-date{width:30px;flex-shrink:0;font-size:var(--fs-sm);color:var(--tm);padding-top:1px;font-variant-numeric:tabular-nums;text-align:right;}
 .chaeum-log-line-wrap{position:relative;width:8px;flex-shrink:0;display:flex;justify-content:center;}
 .chaeum-log-line-wrap::before{content:'';position:absolute;top:11px;bottom:-16px;width:1px;background:rgba(var(--divider-rgb),0.35);}
 .chaeum-log-item:last-child .chaeum-log-line-wrap::before{display:none;}
@@ -298,14 +303,22 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .chaeum-log-dot.ing{background:transparent;border:1.4px solid var(--tm);}
 .chaeum-log-txt{flex:1;min-width:0;}
 .chaeum-log-txt-title{font-size:var(--fs-body);color:var(--tp);line-height:1.5;}
-.chaeum-log-txt-cat{font-size:var(--fs-xs);color:rgba(var(--pal-mint-rgb),1);margin-top:3px;}
+.chaeum-log-txt-cat{font-size:var(--fs-sm);color:rgba(var(--pal-mint-rgb),1);margin-top:3px;}
 
 /* ── 리포트 오버레이 패널 ── */
 .report-overlay{position:fixed;inset:0;background:rgba(60,45,40,0.35);display:none;align-items:center;justify-content:center;z-index:200;}
 .report-overlay.on{display:flex;}
 .report-panel{width:560px;max-height:80vh;overflow-y:auto;background:var(--bg);border-radius:18px;padding:24px 26px;box-shadow:0 12px 40px rgba(0,0,0,0.25);position:relative;}
 .report-panel-close{position:absolute;top:16px;right:16px;font-size:20px;color:var(--tm);cursor:pointer;}
-.report-panel-title{font-size:16px;font-weight:600;color:var(--tp);margin-bottom:14px;display:flex;align-items:center;gap:7px;}
+
+/* ── 설정탭: 글자 크기 조절 ── */
+.fs-setting-list{display:flex;flex-direction:column;gap:14px;}
+.fs-setting-row{display:flex;align-items:center;justify-content:space-between;}
+.fs-setting-label{font-size:var(--fs-body);color:var(--tp);}
+.fs-setting-ctrl{display:flex;align-items:center;gap:8px;}
+.fs-btn{width:38px;height:38px;border-radius:10px;background:rgba(255,253,248,0.92);border:1px solid var(--card-b);display:flex;align-items:center;justify-content:center;font-size:var(--fs-body);color:var(--ts);cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.06);flex-shrink:0;}
+.fs-btn-reset{width:auto;padding:0 12px;font-size:var(--fs-sm);color:var(--tm);white-space:nowrap;}
+.report-panel-title{font-size:var(--fs-title);font-weight:600;color:var(--tp);margin-bottom:14px;display:flex;align-items:center;gap:7px;}
 
 /* ── 오늘의 메모 (본앱 메모 배너와 동일한 연핑크) ── */
 .card.p{background:rgba(255,175,200,0.15);border-color:rgba(255,175,200,0.32);}
@@ -315,15 +328,16 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .wrb-flow-row{display:flex;align-items:center;gap:10px;padding:7px 2px;border-bottom:1px dashed rgba(var(--divider-rgb),0.25);}
 .wrb-flow-row:last-child{border-bottom:none;}
 .wrb-flow-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
-.wrb-flow-time{font-size:13px;color:var(--ts);font-weight:600;width:110px;flex-shrink:0;}
-.wrb-flow-label{font-size:14.5px;color:var(--tp);}
-.wrb-flow-empty{font-size:14px;color:var(--tm);text-align:center;padding:20px 0;}
+.wrb-flow-time{font-size:var(--fs-sm);color:var(--ts);font-weight:600;width:110px;flex-shrink:0;}
+.wrb-flow-label{font-size:var(--fs-body);color:var(--tp);}
+.wrb-flow-empty{font-size:var(--fs-body);color:var(--tm);text-align:center;padding:20px 0;}
 </style>
+<script>(function(){try{var s=localStorage.getItem('textScale');s=s?JSON.parse(s):0;var base={'-1':{title:15,body:14},'0':{title:16,body:15},'1':{title:17,body:16}}[String(s)]||{title:16,body:15};document.documentElement.style.setProperty('--fs-title',base.title+'px');document.documentElement.style.setProperty('--fs-body',base.body+'px');}catch(e){}})();</script>
 </head>
 <body>
 <div id="app">
   <div class="side">
-    <div class="side-title"><i class="ti ti-calendar" aria-hidden="true"></i>날짜 선택</div>
+    <div class="side-logo-wrap"><img class="side-logo" onclick="switchTab('today')" src="data:image/png;base64,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" alt="iikoto"></div>
     <div class="mini-cal" id="mini-cal"></div>
     <div id="side-greeting-card" class="side-hcard morning">
       <div class="side-hcard-time" id="side-greeting-time"></div>
@@ -338,20 +352,20 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
       <div class="main-hdr"><i class="ti ti-chevron-left main-hdr-arrow" onclick="shiftSelectedDate(-1)" aria-hidden="true"></i><span class="main-date" id="today-date"></span><span class="main-dow" id="today-dow"></span><i class="ti ti-chevron-right main-hdr-arrow" onclick="shiftSelectedDate(1)" aria-hidden="true"></i></div>
       <div class="report-banner" id="today-report-banner"></div>
       <div class="grid3">
-        <div class="card todo-card"><div class="card-lbl"><i class="ti ti-checklist" style="color:rgba(var(--pal-orange-rgb),1);" aria-hidden="true"></i>오늘 할 일</div><div id="today-todos"></div></div>
+        <div class="card todo-card"><div class="card-lbl"><i class="ti ti-list-check" style="color:rgba(var(--pal-orange-rgb),1);" aria-hidden="true"></i>오늘 할 일</div><div id="today-todos"></div></div>
         <div class="grid3-right">
-          <div class="card event-card"><div class="card-lbl"><i class="ti ti-map-pin" style="color:var(--rh-appointment);" aria-hidden="true"></i>오늘 일정</div><div id="today-events"></div></div>
+          <div class="card event-card"><div class="card-lbl"><i class="ti ti-calendar-heart" style="color:var(--rh-appointment);" aria-hidden="true"></i>오늘 일정</div><div id="today-events"></div></div>
           <div class="card sleep-card"><div class="sleep-hdr"><div class="card-lbl"><i class="ti ti-moon-stars" style="color:rgba(var(--pal-sky-rgb),1);" aria-hidden="true"></i>수면</div><div class="sleep-score-row" id="today-sleep-score"></div></div><div id="today-sleep"></div></div>
         </div>
       </div>
-      <div class="card p"><div class="card-lbl"><i class="ti ti-notes" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>오늘의 메모</div><div class="memo-tl" id="today-memos"></div></div>
+      <div class="card p"><div class="card-lbl"><i class="ti ti-pencil-heart" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>오늘의 메모</div><div class="memo-tl" id="today-memos"></div></div>
       <div class="grid2">
-        <div class="card meal-card"><div class="card-lbl"><i class="ti ti-soup" style="color:rgba(var(--pal-lime-rgb),1);" aria-hidden="true"></i>오늘의 식사</div><div id="today-meals"></div></div>
-        <div class="quote-card"><div class="quote-card-inner"><div class="card-lbl"><i class="ti ti-book" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>읽는 중</div><div id="today-reading"></div></div></div>
+        <div class="card meal-card"><div class="card-lbl"><i class="ti ti-tools-kitchen-3" style="color:rgba(var(--pal-lime-rgb),1);" aria-hidden="true"></i>오늘의 식사</div><div id="today-meals"></div></div>
+        <div class="quote-card"><div class="quote-card-inner"><div class="card-lbl"><i class="ti ti-book" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>오늘의 책</div><div id="today-reading"></div></div></div>
       </div>
       <div class="grid4">
         <div class="card rhythm-card" id="today-rhythm-card" onclick="openTodayRhythmFlow()"><div class="card-lbl"><i class="ti ti-rainbow" style="color:var(--rh-rest);" aria-hidden="true"></i>오늘의 리듬</div><div id="today-rhythm"></div></div>
-        <div class="card habit-card"><div class="card-lbl" id="today-habit-lbl"><i class="ti ti-target-arrow" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>습관</div><div id="today-habits"></div></div>
+        <div class="card habit-card"><div class="card-lbl" id="today-habit-lbl"><i class="ti ti-chart-donut" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>습관</div><div id="today-habits"></div></div>
         <div class="card content-card"><div class="card-lbl"><i class="ti ti-stack-2" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>콘텐츠 현황</div><div id="today-contents"></div></div>
       </div>
     </div>
@@ -362,7 +376,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
       <div class="report-banner" id="week-report-banner"></div>
       <div class="grid2">
         <div class="card goal-hcard"><div class="card-lbl"><i class="ti ti-flag-3" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>이번 주 목표</div><div id="week-goals"></div></div>
-        <div class="card"><div class="card-lbl"><i class="ti ti-target-arrow" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>습관 매트릭스</div><div id="week-habit-matrix"></div></div>
+        <div class="card"><div class="card-lbl"><i class="ti ti-chart-donut" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>주간 습관 현황</div><div id="week-habit-matrix"></div></div>
       </div>
       <div class="card"><div class="card-lbl"><i class="ti ti-pencil" style="color:rgba(var(--pal-yellow-rgb),1);" aria-hidden="true"></i>하루한줄</div>
         <div class="oneline-2col">
@@ -379,9 +393,9 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
       <div class="month-top-grid">
         <div class="month-top-left">
           <div class="card goal-hcard month-compact"><div class="card-lbl"><i class="ti ti-flag-3" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>이번 달 목표</div><div id="month-goals" class="month-goals-box"></div></div>
-          <div class="card month-compact"><div class="card-lbl"><i class="ti ti-target-arrow" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>습관 모아보기</div><div id="month-habits"></div></div>
+          <div class="card month-compact"><div class="card-lbl"><i class="ti ti-chart-donut" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>습관 모아보기</div><div id="month-habits"></div></div>
         </div>
-        <div class="card chaeum-log-card month-top-right" id="month-top-right"><div class="chaeum-log-hdr"><div class="chaeum-log-title"><i class="ti ti-clover" aria-hidden="true"></i>채움 로그</div></div><div class="chaeum-log-stat" id="chaeum-log-stat"></div><div class="chaeum-log-tl" id="chaeum-log-tl"></div></div>
+        <div class="card chaeum-log-card month-top-right" id="month-top-right"><div class="chaeum-log-hdr"><div class="chaeum-log-title"><i class="ti ti-clover" aria-hidden="true"></i>채움 로그</div></div><div class="chaeum-log-tl" id="chaeum-log-tl"></div></div>
       </div>
       <div class="top-row">
         <div class="card">
@@ -391,11 +405,29 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
           <div class="rdcal-grid" id="rdcal-dows" style="margin-bottom:6px;"></div>
           <div class="rdcal-grid" id="rdcal-grid"></div>
         </div>
-        <div class="card ccol-card"><div class="card-lbl"><i class="ti ti-movie" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>콘텐츠 모아보기</div><div id="month-content-collect" class="ccol-scroll"></div></div>
+        <div class="card ccol-card"><div class="card-lbl"><i class="ti ti-stack-2" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>콘텐츠 모아보기</div><div id="month-content-collect" class="ccol-scroll"></div></div>
       </div>
       <div class="card"><div class="card-lbl"><i class="ti ti-chart-bar" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>콘텐츠 타임라인</div><div id="month-tt"></div></div>
       <div class="card month-quotes-card"><div class="card-lbl"><i class="ti ti-quote" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>이번 달 수집문장</div><div id="month-quotes"></div></div>
       <div class="stat-bar-wrap" id="month-stat-bar"></div>
+    </div>
+
+    <!-- 설정탭 -->
+    <div class="main-body" id="tab-settings">
+      <div class="main-hdr"><span class="main-date">설정</span></div>
+      <div class="card">
+        <div class="card-lbl"><i class="ti ti-text-size" aria-hidden="true"></i>글자 크기</div>
+        <div class="fs-setting-list">
+          <div class="fs-setting-row">
+            <span class="fs-setting-label">전체 글자 크기</span>
+            <div class="fs-setting-ctrl">
+              <div class="fs-btn" onclick="adjustFontSize(-1)"><i class="ti ti-minus" aria-hidden="true"></i></div>
+              <div class="fs-btn fs-btn-reset" onclick="resetFontSize()">기본</div>
+              <div class="fs-btn" onclick="adjustFontSize(1)"><i class="ti ti-plus" aria-hidden="true"></i></div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -403,6 +435,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 <div class="float-tabs">
   <div class="float-fab" id="float-fab" onclick="toggleFloatMenu()"><i class="ti ti-menu-2" id="float-fab-icon" aria-hidden="true"></i></div>
   <div class="float-tab-menu" id="float-tab-menu">
+    <div class="float-tab" id="ft-settings" onclick="switchTab('settings')"><i class="ti ti-settings" aria-hidden="true"></i>설정</div>
     <div class="float-tab" id="ft-month" onclick="switchTab('month')"><i class="ti ti-calendar" aria-hidden="true"></i>월간</div>
     <div class="float-tab" id="ft-week" onclick="switchTab('week')"><i class="ti ti-calendar-week" aria-hidden="true"></i>주간</div>
     <div class="float-tab on" id="ft-today" onclick="switchTab('today')"><i class="ti ti-sun" aria-hidden="true"></i>오늘</div>

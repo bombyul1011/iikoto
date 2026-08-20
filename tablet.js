@@ -31,7 +31,48 @@ function dateKey(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.ge
 function weekKeyOf(d){const m=new Date(d);m.setDate(d.getDate()-((d.getDay()+6)%7));return dateKey(m);}
 function monthKeyOf(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;}
 const DOW=['일','월','화','수','목','금','토'];
+const DOW_MON_START=['월','화','수','목','금','토','일']; // 월요일 시작 캘린더(사이드바 미니캘린더, 독서달력)용
 function escapeHtml(s){const d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML;}
+
+// sleep_time/wake_time 쌍 배열에서 평균 수면시간(시간 단위, 문자열)을 계산 — 오늘/주간/월간탭 공통
+function avgSleepHoursFromRows(sleepRows){
+  let sleepMin=0,sleepCnt=0;
+  (sleepRows||[]).forEach(s=>{
+    if(s.sleep_time&&s.wake_time){
+      const sv=s.sleep_time.split(':').map(Number),wv=s.wake_time.split(':').map(Number);
+      let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;
+      sleepMin+=m;sleepCnt++;
+    }
+  });
+  return sleepCnt>0?(sleepMin/sleepCnt/60).toFixed(1):'-';
+}
+
+// 콘텐츠 완료 집계 공통 규칙 — music은 등록일(start_date) 기준, 그 외는 완료(done/stopped) 상태이면서 종료일(end_date)이 기간 내일 때만 카운트
+function countContentsCompletedInRange(contents,startDk,endDk){
+  return (contents||[]).filter(c=>{
+    if(c.content_cat==='music')return c.start_date&&c.start_date>=startDk&&c.start_date<=endDk;
+    if(c.status!=='done'&&c.status!=='stopped')return false;
+    if(!c.end_date)return false;
+    return c.end_date>=startDk&&c.end_date<=endDk;
+  }).length;
+}
+
+// 주간탭/월간탭 공통 미니 통계바(메모/완료투두/습관%/콘텐츠완결/평균수면) — habitDenominator만 다름(주간:7, 월간:daysInMonth)
+function renderStatBar(elId,{memoCount,doneCount,habitCount,checkCount,habitDenominator,contentCount,avgSleep}){
+  const el=document.getElementById(elId);
+  const pct=habitCount?Math.round(checkCount/(habitCount*habitDenominator)*100):0;
+  el.innerHTML=`
+    <div class="sbar-item"><i class="ti ti-notes" aria-hidden="true"></i><span class="sbar-num">${memoCount}</span></div>
+    <div class="sbar-div"></div>
+    <div class="sbar-item"><i class="ti ti-checkbox" aria-hidden="true"></i><span class="sbar-num">${doneCount}</span></div>
+    <div class="sbar-div"></div>
+    <div class="sbar-item"><i class="ti ti-chart-donut" aria-hidden="true"></i><span class="sbar-num">${pct}%</span></div>
+    <div class="sbar-div"></div>
+    <div class="sbar-item"><i class="ti ti-stack-2" aria-hidden="true"></i><span class="sbar-num">${contentCount}</span></div>
+    <div class="sbar-div"></div>
+    <div class="sbar-item"><i class="ti ti-moon-stars" aria-hidden="true"></i><span class="sbar-num">${avgSleep}h</span></div>
+  `;
+}
 
 // ── 리듬 카테고리 (RHYTHM_CATS 원본과 동일) ──
 const RHYTHM_CATS={
@@ -45,10 +86,10 @@ const RHYTHM_CATS={
   home:{label:'정리',color:'var(--rh-home)',icon:'ti-home'}
 };
 const CAT_ICON_META={
-  drama:{icon:'ti-device-tv',bg:'rgba(var(--pal-pink-rgb),1)',label:'드라마'},
-  book:{icon:'ti-book',bg:'rgba(var(--pal-yellow-rgb),1)',label:'책'},
-  movie:{icon:'ti-movie',bg:'rgba(var(--pal-sky-rgb),1)',label:'영화'},
-  music:{icon:'ti-music',bg:'rgba(var(--pal-lime-rgb),1)',label:'음악'}
+  drama:{icon:'ti-device-tv',bg:'rgba(var(--pal-pink-rgb),1)',iconColor:'#fff',label:'드라마'},
+  book:{icon:'ti-book',bg:'rgba(var(--pal-yellow-rgb),1)',iconColor:'#fff',label:'책'},
+  movie:{icon:'ti-movie',bg:'rgba(var(--pal-sky-rgb),1)',iconColor:'#fff',label:'영화'},
+  music:{icon:'ti-music',bg:'rgba(var(--pal-lime-rgb),1)',iconColor:'#fff',label:'음악'}
 };
 
 // ── 상태 ──
@@ -97,29 +138,19 @@ async function renderMiniCal(){
   const el=document.getElementById('mini-cal');
   const y=_sideCalDate.getFullYear(),m=_sideCalDate.getMonth();
   const first=new Date(y,m,1);
-  const startWeekday=first.getDay();
+  const startWeekday=(first.getDay()+6)%7; // 월요일 시작 기준으로 보정(일요일=0 → 6칸 밀림)
   const daysInMonth=new Date(y,m+1,0).getDate();
   const todayDk=dateKey(new Date());
   const selDk=dateKey(_selectedDate);
-  const mk=monthKeyOf(_sideCalDate);
-  // 기록 있는 날 점 표시용 — 투두/메모 존재 여부만 가볍게 조회
-  const [todos,memos]=await Promise.all([
-    supaFetch(`todos?date_key=gte.${mk}-01&date_key=lte.${mk}-31&select=date_key`),
-    supaFetch(`memos?date_key=gte.${mk}-01&date_key=lte.${mk}-31&select=date_key`)
-  ]);
-  const hasRecord=new Set();
-  (todos||[]).forEach(t=>hasRecord.add(t.date_key));
-  (memos||[]).forEach(t=>hasRecord.add(t.date_key));
 
   let html=`<div class="mini-cal-hdr"><i class="ti ti-chevron-left" onclick="sideCalShift(-1)" aria-hidden="true"></i><span>${y}년 ${m+1}월</span><i class="ti ti-chevron-right" onclick="sideCalShift(1)" aria-hidden="true"></i></div>
-  <div class="mini-cal-grid">${DOW.map(d=>`<div class="dow">${d}</div>`).join('')}`;
+  <div class="mini-cal-grid">${DOW_MON_START.map(d=>`<div class="dow">${d}</div>`).join('')}`;
   for(let i=0;i<startWeekday;i++)html+='<div></div>';
   for(let d=1;d<=daysInMonth;d++){
     const dk=`${y}-${pad(m+1)}-${pad(d)}`;
     let cls='mini-cal-day';
     if(dk===todayDk)cls+=' today';
-    if(dk===selDk)cls+=' sel';
-    if(hasRecord.has(dk))cls+=' has-dot';
+    else if(dk===selDk)cls+=' sel'; // 오늘이 선택된 상태에선 today색을 유지 — sel은 오늘이 아닌 날짜를 골랐을 때만
     html+=`<div class="${cls}" onclick="selectDate('${dk}')">${d}</div>`;
   }
   html+='</div>';
@@ -129,18 +160,24 @@ function sideCalShift(delta){
   _sideCalDate.setMonth(_sideCalDate.getMonth()+delta);
   renderMiniCal();
 }
+// 사이드바 미니캘린더에서 날짜를 고르면 항상 오늘탭으로 이동해서 그 날짜를 보여줌
 function selectDate(dk){
   _selectedDate=new Date(dk+'T00:00:00');
   renderMiniCal();
-  if(_currentTab==='today')loadTodayTab();
-  else if(_currentTab==='week')loadWeekTab();
-  else if(_currentTab==='month')loadMonthTab();
+  if(_currentTab!=='today'){
+    _currentTab='today';
+    document.querySelectorAll('.main-body').forEach(el=>el.classList.remove('on'));
+    document.querySelectorAll('.float-tab').forEach(el=>el.classList.remove('on'));
+    document.getElementById('tab-today').classList.add('on');
+    document.getElementById('ft-today').classList.add('on');
+    closeFloatMenu();
+  }
+  loadTodayTab();
 }
 
 // ── 사이드바 인사배너 (본앱 홈탭 인사카드 이식) ──
 // 태블릿엔 Claude API 키가 없으므로 생성은 하지 않고, 모바일이 생성해 ai_cache에 저장한 문구를 조회만 함.
 // 본앱 getHomeTimeSlot과 동일한 7분류 → 4개 섹션(morning/afternoon/night/dawn) 매핑.
-const HOME_DAYS=['일','월','화','수','목','금','토'];
 function getHomeTimeSlot(){
   const h=new Date().getHours();
   if(h<4)return 'dawn';
@@ -176,7 +213,7 @@ async function renderSideGreeting(){
   card.className='side-hcard '+section;
 
   const now=new Date();
-  if(timeEl)timeEl.textContent=`${HOME_DAYS[now.getDay()]}요일`;
+  if(timeEl)timeEl.textContent=`${DOW[now.getDay()]}요일`;
 
   const pool=SIDE_GREETING_POOL[section]||['좋은 하루예요'];
   if(greetEl)greetEl.textContent=pool[Math.floor(Math.random()*pool.length)];
@@ -369,7 +406,6 @@ function renderTodayRhythm(blocks){
   const cats=Object.keys(durations);
   const barHtml=cats.map(cat=>{
     const c=RHYTHM_CATS[cat];if(!c)return'';
-    const pct=(durations[cat]/total*100).toFixed(1);
     return `<div style="flex:${durations[cat]};background:${c.color};"></div>`;
   }).join('');
   const legendHtml=cats.map(cat=>{
@@ -457,8 +493,10 @@ function closeReportPanel(){
 // ══════════════════════════════════════════════════════════
 // 주간탭
 // ══════════════════════════════════════════════════════════
-const WC_COLORS_RGB=['var(--pal-pink-rgb)','var(--pal-orange-rgb)','var(--pal-yellow-rgb)','var(--pal-mint-rgb)','var(--pal-sky-rgb)','var(--pal-lavender-rgb)','var(--pal-rose-rgb)'];
+const WC_COLORS_BG=['var(--pal-pink-bg)','var(--pal-orange-bg)','var(--pal-yellow-bg)','var(--pal-mint-bg)','var(--pal-sky-bg)','var(--pal-lavender-bg)','var(--pal-rose-bg)'];
 const WC_COLORS_TXT=['var(--pal-pink-text)','var(--pal-orange-text)','var(--pal-yellow-text)','var(--pal-mint-text)','var(--pal-sky-text)','var(--pal-lavender-text)','var(--pal-rose-text)'];
+const WC_COLORS_BORDER=['var(--pal-pink-border)','var(--pal-orange-border)','var(--pal-yellow-border)','var(--pal-mint-border)','var(--pal-sky-border)','var(--pal-lavender-border)','var(--pal-rose-border)'];
+const WC_DAYS=['M','T','W','T','F','S','S']; // 본앱 이니셜 표기(월요일 시작)
 const WC_DOW=['월','화','수','목','금','토','일'];
 
 // ── 상단 화살표: 오늘/주간/월간 탭 공통 날짜 이동 ──
@@ -514,7 +552,7 @@ async function loadWeekTab(){
   const weekDates=getWeekDates(_selectedDate);
   const wk='week:'+weekDates[0];
   const startDk=weekDates[0],endDk=weekDates[6];
-  document.getElementById('week-range').textContent=`${getWeekOfMonthLabel(_selectedDate)} (${weekDates[0].slice(5).replace('-','.')} - ${weekDates[6].slice(5).replace('-','.')})`;
+  document.getElementById('week-range').textContent=getWeekOfMonthLabel(_selectedDate);
 
   const [goalRows,habits,habitChecks,memos,todos,sleepRows,onelineRows,contents]=await Promise.all([
     supaFetch(`goal_notes?note_key=eq.wchallenge_${encodeURIComponent(wk)}`),
@@ -539,9 +577,9 @@ function renderWeekGoals(row){
   const lines=(row&&Array.isArray(row.lines))?row.lines.filter(l=>l&&l.text&&l.text.trim()):[];
   if(!lines.length){el.innerHTML='<div class="empty-msg">등록된 목표가 없어요</div>';return;}
   el.innerHTML=lines.map(item=>{
-    const daysHtml=WC_DOW.map((d,i)=>{
+    const daysHtml=WC_DAYS.map((d,i)=>{
       const on=item.days&&item.days[i];
-      const style=on?`background:rgba(${WC_COLORS_RGB[i]},0.5);color:${WC_COLORS_TXT[i]};`:'';
+      const style=on?`background:${WC_COLORS_BG[i]};border-color:${WC_COLORS_BORDER[i]};color:${WC_COLORS_TXT[i]};border-style:solid;`:'';
       return `<div class="wgoal-day" style="${style}">${d}</div>`;
     }).join('');
     return `<div class="wgoal-item"><div class="wgoal-text">${escapeHtml(item.text)}</div><div class="wgoal-days">${daysHtml}</div></div>`;
@@ -552,7 +590,7 @@ function renderWeekHabitMatrix(habits,checks,weekDates){
   const el=document.getElementById('week-habit-matrix');
   if(!habits.length){el.innerHTML='<div class="empty-msg">등록된 습관 없음</div>';return;}
   const colorMap={mint:'var(--pal-mint-rgb)',pink:'var(--pal-pink-rgb)',sky:'var(--pal-sky-rgb)',yellow:'var(--pal-yellow-rgb)'};
-  let html=`<div class="habit-matrix"><div class="hdr"></div>${WC_DOW.map(d=>`<div class="hdr">${d}</div>`).join('')}`;
+  let html=`<div class="habit-matrix">`;
   habits.forEach(h=>{
     html+=`<div class="rowlbl">${escapeHtml(h.name)}</div>`;
     const c=colorMap[h.color]||'var(--pal-warmgray-rgb)';
@@ -568,40 +606,15 @@ function renderWeekHabitMatrix(habits,checks,weekDates){
 // 이번 주 요약 미니 통계바(박스 없이 심플, 이이코토 본앱 stat-bar-wrap 스타일 차용)
 // 메모/완료투두/습관달성률/콘텐츠완료/평균수면 5항목
 function renderWeekStatBar(memos,todos,sleepRows,habits,checks,contents,startDk,endDk){
-  const el=document.getElementById('week-stat-bar');
-  const memoCount=memos.length;
-  const doneCount=todos.filter(t=>t.done).length;
-  const pct=habits.length?Math.round(checks.length/(habits.length*7)*100):0;
-  // 콘텐츠 완료 집계 — 이이코토 본앱 원칙과 동일: music은 완결 개념이 없어 등록일(start_date)을 완료시점으로 대체 처리,
-  // 그 외 카테고리는 완료(done/stopped) 상태이면서 종료일(end_date)이 이번 주 안에 속할 때만 카운트.
-  const cc=(contents||[]).filter(c=>{
-    if(c.content_cat==='music'){
-      return c.start_date&&c.start_date>=startDk&&c.start_date<=endDk;
-    }
-    if(c.status!=='done'&&c.status!=='stopped')return false;
-    if(!c.end_date)return false;
-    return c.end_date>=startDk&&c.end_date<=endDk;
-  }).length;
-  let sleepMin=0,sleepCnt=0;
-  (sleepRows||[]).forEach(s=>{
-    if(s.sleep_time&&s.wake_time){
-      const sv=s.sleep_time.split(':').map(Number),wv=s.wake_time.split(':').map(Number);
-      let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;
-      sleepMin+=m;sleepCnt++;
-    }
+  renderStatBar('week-stat-bar',{
+    memoCount:memos.length,
+    doneCount:todos.filter(t=>t.done).length,
+    habitCount:habits.length,
+    checkCount:checks.length,
+    habitDenominator:7,
+    contentCount:countContentsCompletedInRange(contents,startDk,endDk),
+    avgSleep:avgSleepHoursFromRows(sleepRows)
   });
-  const avgSleep=sleepCnt>0?(sleepMin/sleepCnt/60).toFixed(1):'-';
-  el.innerHTML=`
-    <div class="sbar-item"><i class="ti ti-notes" aria-hidden="true"></i><span class="sbar-num">${memoCount}</span></div>
-    <div class="sbar-div"></div>
-    <div class="sbar-item"><i class="ti ti-checkbox" aria-hidden="true"></i><span class="sbar-num">${doneCount}</span></div>
-    <div class="sbar-div"></div>
-    <div class="sbar-item"><i class="ti ti-chart-donut" aria-hidden="true"></i><span class="sbar-num">${pct}%</span></div>
-    <div class="sbar-div"></div>
-    <div class="sbar-item"><i class="ti ti-stack-2" aria-hidden="true"></i><span class="sbar-num">${cc}</span></div>
-    <div class="sbar-div"></div>
-    <div class="sbar-item"><i class="ti ti-moon-stars" aria-hidden="true"></i><span class="sbar-num">${avgSleep}h</span></div>
-  `;
 }
 
 // 하루한줄 2열 배치: 왼쪽(월/화/수), 오른쪽(목/금/토/일)
@@ -751,7 +764,7 @@ async function renderMonthTimetable(y,mo){
     if(!tracks.length)tracks.push([]);
     const meta=CAT_ICON_META[cat];
     tracks.forEach((trackItems,tIdx)=>{
-      const catLabel=tIdx===0?`<i class="dot" style="background:${meta.bg};"></i>${meta.label}`:'';
+      const catLabel=tIdx===0?`<span class="tt-cat-badge" style="background:${meta.bg};"><i class="ti ${meta.icon}" style="color:${meta.iconColor};" aria-hidden="true"></i></span>${meta.label}`:'';
       // 본앱과 동일하게 커서를 하루씩 진행하며, 콘텐츠 없는 날은 점선 네모칸(tt-cell), 있는 구간은 카테고리색 블록(tt-block)으로 채움
       // 음악은 같은 시작일끼리 그룹핑해서 2곡 이상이면 곡 제목 대신 숫자 개수로 표시(본앱 동일 규칙)
       const sortedGroups=cat==='music'
@@ -818,7 +831,7 @@ async function renderMonthHabits(y,mo){
     const hIcon=getHabitIcon(h.name);
     const iconColor=getHabitIconColor(h.name,h.color);
     const inner=hIcon
-      ?`<i class="ti ${hIcon}" style="font-size:20px;color:${iconColor};" aria-hidden="true"></i>`
+      ?`<i class="ti ${hIcon} habit-numbox-icon" style="color:${iconColor};" aria-hidden="true"></i>`
       :`<div class="habit-numbox-name">${escapeHtml(h.name)}</div>`;
     return `<div class="habit-numbox-card">${inner}<div class="habit-numbox-num">${count}</div></div>`;
   }).join('')}</div>`;
@@ -826,7 +839,6 @@ async function renderMonthHabits(y,mo){
 
 // 이번 달 미니 통계바 — 주간탭과 동일 스타일(sbar-item/sbar-div), 박스 없이 심플하게
 async function renderMonthStatBar(y,mo){
-  const el=document.getElementById('month-stat-bar');
   const mk=`${y}-${pad(mo+1)}`;
   const startDk=`${mk}-01`,endDk=`${mk}-31`;
   const [memos,todos,sleepRows,habits,checks,contents]=await Promise.all([
@@ -837,38 +849,17 @@ async function renderMonthStatBar(y,mo){
     supaFetch(`habit_checks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
     supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&month_key=eq.${mk}`)
   ]);
-  const memoCount=(memos||[]).length;
-  const doneCount=(todos||[]).filter(t=>t.done).length;
   const daysInMonth=new Date(y,mo+1,0).getDate();
   const habitList=habits||[];
-  const pct=habitList.length?Math.round((checks||[]).length/(habitList.length*daysInMonth)*100):0;
-  // 콘텐츠 완료 집계 — 주간탭과 동일 원칙(music은 등록일 기준, 그 외는 종료일 기준)
-  const cc=(contents||[]).filter(c=>{
-    if(c.content_cat==='music')return c.start_date&&c.start_date>=startDk&&c.start_date<=endDk;
-    if(c.status!=='done'&&c.status!=='stopped')return false;
-    if(!c.end_date)return false;
-    return c.end_date>=startDk&&c.end_date<=endDk;
-  }).length;
-  let sleepMin=0,sleepCnt=0;
-  (sleepRows||[]).forEach(s=>{
-    if(s.sleep_time&&s.wake_time){
-      const sv=s.sleep_time.split(':').map(Number),wv=s.wake_time.split(':').map(Number);
-      let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;
-      sleepMin+=m;sleepCnt++;
-    }
+  renderStatBar('month-stat-bar',{
+    memoCount:(memos||[]).length,
+    doneCount:(todos||[]).filter(t=>t.done).length,
+    habitCount:habitList.length,
+    checkCount:(checks||[]).length,
+    habitDenominator:daysInMonth,
+    contentCount:countContentsCompletedInRange(contents,startDk,endDk),
+    avgSleep:avgSleepHoursFromRows(sleepRows)
   });
-  const avgSleep=sleepCnt>0?(sleepMin/sleepCnt/60).toFixed(1):'-';
-  el.innerHTML=`
-    <div class="sbar-item"><i class="ti ti-notes" aria-hidden="true"></i><span class="sbar-num">${memoCount}</span></div>
-    <div class="sbar-div"></div>
-    <div class="sbar-item"><i class="ti ti-checkbox" aria-hidden="true"></i><span class="sbar-num">${doneCount}</span></div>
-    <div class="sbar-div"></div>
-    <div class="sbar-item"><i class="ti ti-chart-donut" aria-hidden="true"></i><span class="sbar-num">${pct}%</span></div>
-    <div class="sbar-div"></div>
-    <div class="sbar-item"><i class="ti ti-stack-2" aria-hidden="true"></i><span class="sbar-num">${cc}</span></div>
-    <div class="sbar-div"></div>
-    <div class="sbar-item"><i class="ti ti-moon-stars" aria-hidden="true"></i><span class="sbar-num">${avgSleep}h</span></div>
-  `;
 }
 
 // 신규: 이번 달 수집한 문장(reading_quotes) — created 타임스탬프 기준
@@ -896,7 +887,7 @@ async function renderReadingCal(){
   const mk=`${y}-${pad(m+1)}`;
   document.getElementById('rdcal-month').textContent=`${y}년 ${pad(m+1)}월`;
   const first=new Date(y,m,1);
-  const startWeekday=first.getDay();
+  const startWeekday=(first.getDay()+6)%7; // 월요일 시작 기준으로 보정
   const daysInMonth=new Date(y,m+1,0).getDate();
   const [logs,books]=await Promise.all([
     supaFetch(`reading_daily_log?date_key=gte.${mk}-01&date_key=lte.${mk}-31`),
@@ -909,7 +900,7 @@ async function renderReadingCal(){
   Object.values(logsByDate).forEach(list=>list.forEach(r=>totalBooks.add(r.book_cid)));
 
   document.getElementById('rdcal-count').innerHTML=`${totalBooks.size}<span>권</span>`;
-  document.getElementById('rdcal-dows').innerHTML=DOW.map(d=>`<div class="rdcal-dow">${d}</div>`).join('');
+  document.getElementById('rdcal-dows').innerHTML=DOW_MON_START.map(d=>`<div class="rdcal-dow">${d}</div>`).join('');
 
   let gridHtml='';
   for(let i=0;i<startWeekday;i++)gridHtml+='<div></div>';
@@ -935,16 +926,13 @@ function chaeumDateShort(dk){
   return m?m[1]+'.'+m[2]:(dk||'');
 }
 async function renderChaeumLogTablet(){
-  const statEl=document.getElementById('chaeum-log-stat');
   const tlEl=document.getElementById('chaeum-log-tl');
   if(!tlEl)return;
   const sessions=await chaeumFetch('sessions?select=id,date_key,category,title,status&order=created_at.desc&limit=10');
   if(sessions==null){
-    statEl.textContent='';
     tlEl.innerHTML='<div class="empty-msg">채움 기록을 불러오지 못했어요</div>';
     return;
   }
-  statEl.textContent=`최근 ${sessions.length}개 세션`;
   if(!sessions.length){
     tlEl.innerHTML='<div class="empty-msg">아직 채움 기록이 없어요</div>';
     return;
@@ -962,9 +950,42 @@ async function renderChaeumLogTablet(){
 }
 
 // ══════════════════════════════════════════════════════════
+// 설정탭 — 글자 크기 조절(작게/기본/크게 3단계, 본앱과 동일한 textScale 저장 키/step 체계)
+// ══════════════════════════════════════════════════════════
+const FS_STEPS={'-1':{title:15,body:14},'0':{title:16,body:15},'1':{title:17,body:16}};
+function _loadFsStep(){
+  try{
+    const raw=localStorage.getItem('textScale');
+    const n=raw?JSON.parse(raw):0;
+    return(n===-1||n===0||n===1)?n:0;
+  }catch(e){return 0;}
+}
+let _fsStep=_loadFsStep();
+function _applyFontSizes(){
+  const b=FS_STEPS[String(_fsStep)]||FS_STEPS['0'];
+  document.documentElement.style.setProperty('--fs-title',b.title+'px');
+  document.documentElement.style.setProperty('--fs-body',b.body+'px');
+}
+function setFontScale(step){
+  if(step!==-1&&step!==0&&step!==1)return;
+  _fsStep=step;
+  localStorage.setItem('textScale',JSON.stringify(step));
+  _applyFontSizes();
+}
+function adjustFontSize(dir){
+  const next=Math.max(-1,Math.min(1,_fsStep+dir));
+  if(next===_fsStep)return;
+  setFontScale(next);
+}
+function resetFontSize(){
+  setFontScale(0);
+}
+
+// ══════════════════════════════════════════════════════════
 // 초기화
 // ══════════════════════════════════════════════════════════
 async function init(){
+  _applyFontSizes();
   await renderMiniCal();
   scheduleSideGreetingRefresh();
   await loadTodayTab();
