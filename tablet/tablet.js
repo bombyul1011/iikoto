@@ -265,7 +265,7 @@ async function loadTodayTab(){
   const sparkStartDk=dateKey(sparkStart);
 
   const [todos,sleepRows,sleepWeekRows,habits,habitChecks,meals,contents,books,rblocks]=await Promise.all([
-    supaFetch(`todos?date_key=eq.${dk}&order=sort_order.asc.nullslast`),
+    supaFetch(`todos?date_key=eq.${dk}&order=created.asc`),
     supaFetch(`sleep?date_key=eq.${dk}`),
     supaFetch(`sleep?date_key=gte.${sparkStartDk}&date_key=lte.${dk}&select=date_key,score`),
     supaFetch(`habits?order=sort_order.asc`),
@@ -288,8 +288,26 @@ async function loadTodayTab(){
   renderReportBanner('today-report-banner',_selectedDate);
 }
 
+// 본앱과 동일한 투두 정렬 규칙: 미완료 우선 → 시간대(아침/오후/밤/없음) → 강조(pinned) → sort_order → 텍스트 앞머리 시:분
+const TODO_TS_ORDER={morning:0,afternoon:1,night:2,none:3};
+function parseTodoLeadingTime(text){
+  const m=(text||'').match(/^(\d{1,2}):(\d{2})/);
+  return m?parseInt(m[1],10)*60+parseInt(m[2],10):9999;
+}
+function compareTodoOrder(a,b){
+  const ta=TODO_TS_ORDER[a.time_section||'none']??3;
+  const tb=TODO_TS_ORDER[b.time_section||'none']??3;
+  if(ta!==tb)return ta-tb;
+  const pa=a.pinned?0:1,pb=b.pinned?0:1;
+  if(pa!==pb)return pa-pb;
+  if(typeof a.sort_order==='number'&&typeof b.sort_order==='number')return a.sort_order-b.sort_order;
+  return parseTodoLeadingTime(a.text)-parseTodoLeadingTime(b.text);
+}
 function renderTodayTodosEvents(todos){
-  const plainTodos=todos.filter(t=>!t.is_event);
+  const plainTodos=todos.filter(t=>!t.is_event).slice().sort((a,b)=>{
+    if(!!a.done!==!!b.done)return a.done?1:-1;
+    return compareTodoOrder(a,b);
+  });
   const events=todos.filter(t=>t.is_event);
   const todoEl=document.getElementById('today-todos');
   todoEl.innerHTML=plainTodos.length?plainTodos.slice(0,8).map(t=>{
