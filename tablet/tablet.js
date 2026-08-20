@@ -31,6 +31,7 @@ function dateKey(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.ge
 function weekKeyOf(d){const m=new Date(d);m.setDate(d.getDate()-((d.getDay()+6)%7));return dateKey(m);}
 function monthKeyOf(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;}
 const DOW=['일','월','화','수','목','금','토'];
+const DOW_MON_START=['월','화','수','목','금','토','일']; // 월요일 시작 캘린더(사이드바 미니캘린더, 독서달력)용
 function escapeHtml(s){const d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML;}
 
 // ── 리듬 카테고리 (RHYTHM_CATS 원본과 동일) ──
@@ -97,7 +98,7 @@ async function renderMiniCal(){
   const el=document.getElementById('mini-cal');
   const y=_sideCalDate.getFullYear(),m=_sideCalDate.getMonth();
   const first=new Date(y,m,1);
-  const startWeekday=first.getDay();
+  const startWeekday=(first.getDay()+6)%7; // 월요일 시작 기준으로 보정(일요일=0 → 6칸 밀림)
   const daysInMonth=new Date(y,m+1,0).getDate();
   const todayDk=dateKey(new Date());
   const selDk=dateKey(_selectedDate);
@@ -112,7 +113,7 @@ async function renderMiniCal(){
   (memos||[]).forEach(t=>hasRecord.add(t.date_key));
 
   let html=`<div class="mini-cal-hdr"><i class="ti ti-chevron-left" onclick="sideCalShift(-1)" aria-hidden="true"></i><span>${y}년 ${m+1}월</span><i class="ti ti-chevron-right" onclick="sideCalShift(1)" aria-hidden="true"></i></div>
-  <div class="mini-cal-grid">${DOW.map(d=>`<div class="dow">${d}</div>`).join('')}`;
+  <div class="mini-cal-grid">${DOW_MON_START.map(d=>`<div class="dow">${d}</div>`).join('')}`;
   for(let i=0;i<startWeekday;i++)html+='<div></div>';
   for(let d=1;d<=daysInMonth;d++){
     const dk=`${y}-${pad(m+1)}-${pad(d)}`;
@@ -514,7 +515,7 @@ async function loadWeekTab(){
   const weekDates=getWeekDates(_selectedDate);
   const wk='week:'+weekDates[0];
   const startDk=weekDates[0],endDk=weekDates[6];
-  document.getElementById('week-range').textContent=`${getWeekOfMonthLabel(_selectedDate)} (${weekDates[0].slice(5).replace('-','.')} - ${weekDates[6].slice(5).replace('-','.')})`;
+  document.getElementById('week-range').textContent=getWeekOfMonthLabel(_selectedDate);
 
   const [goalRows,habits,habitChecks,memos,todos,sleepRows,onelineRows,contents]=await Promise.all([
     supaFetch(`goal_notes?note_key=eq.wchallenge_${encodeURIComponent(wk)}`),
@@ -896,7 +897,7 @@ async function renderReadingCal(){
   const mk=`${y}-${pad(m+1)}`;
   document.getElementById('rdcal-month').textContent=`${y}년 ${pad(m+1)}월`;
   const first=new Date(y,m,1);
-  const startWeekday=first.getDay();
+  const startWeekday=(first.getDay()+6)%7; // 월요일 시작 기준으로 보정
   const daysInMonth=new Date(y,m+1,0).getDate();
   const [logs,books]=await Promise.all([
     supaFetch(`reading_daily_log?date_key=gte.${mk}-01&date_key=lte.${mk}-31`),
@@ -909,7 +910,7 @@ async function renderReadingCal(){
   Object.values(logsByDate).forEach(list=>list.forEach(r=>totalBooks.add(r.book_cid)));
 
   document.getElementById('rdcal-count').innerHTML=`${totalBooks.size}<span>권</span>`;
-  document.getElementById('rdcal-dows').innerHTML=DOW.map(d=>`<div class="rdcal-dow">${d}</div>`).join('');
+  document.getElementById('rdcal-dows').innerHTML=DOW_MON_START.map(d=>`<div class="rdcal-dow">${d}</div>`).join('');
 
   let gridHtml='';
   for(let i=0;i<startWeekday;i++)gridHtml+='<div></div>';

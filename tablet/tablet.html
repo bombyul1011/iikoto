@@ -79,11 +79,11 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 
 /* ── 메인 영역 ── */
 .main-wrap{flex:1;overflow-y:auto;padding:22px 24px 80px;}
-.main-hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:16px;}
-.main-hdr-arrow{font-size:var(--fs-lg);color:var(--tm);cursor:pointer;align-self:center;padding:2px 4px;flex-shrink:0;}
-.main-hdr-arrow:hover{color:var(--tp);}
-.main-date{font-size:var(--fs-xl);font-weight:600;color:var(--tp);}
-.main-dow{font-size:var(--fs-title);color:var(--tm);margin-left:9px;}
+.main-hdr{display:flex;align-items:baseline;gap:11px;margin-bottom:18px;}
+.main-hdr-arrow{font-size:var(--fs-lg);color:var(--tm);cursor:pointer;align-self:center;padding:2px 4px;flex-shrink:0;opacity:0.55;transition:opacity .15s;}
+.main-hdr-arrow:hover{opacity:1;color:var(--tp);}
+.main-date{font-size:var(--fs-xl);font-weight:700;color:var(--tp);letter-spacing:-0.02em;font-family:'DM Sans',sans-serif;}
+.main-dow{font-size:var(--fs-sm);color:var(--tm);margin-left:2px;font-weight:500;letter-spacing:0.02em;}
 .main-body{display:none;}
 .main-body.on{display:block;}
 
@@ -92,9 +92,10 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .card-lbl{font-size:var(--fs-title);font-weight:600;color:var(--tp);margin-bottom:11px;display:flex;align-items:center;gap:7px;}
 .card-lbl i{font-size:var(--fs-lg);}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;align-items:stretch;}
-.month-top-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;align-items:stretch;}
-.month-top-left{display:flex;flex-direction:column;gap:13px;}
-.month-top-right{min-height:0;}
+.month-top-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;align-items:stretch;height:250px;}
+.month-top-left{display:flex;flex-direction:column;gap:13px;height:100%;}
+.month-top-left .card{flex:1;min-height:0;display:flex;flex-direction:column;}
+.month-top-right{min-height:0;height:100%;}
 .card.month-compact{padding:14px 16px 12px;}
 .card.month-compact .card-lbl{margin-bottom:8px;}
 .month-goals-box{min-height:calc(var(--fs-sm) * 1.4 * 3 + 6px * 3);display:flex;flex-direction:column;justify-content:center;}
