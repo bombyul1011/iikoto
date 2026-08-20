@@ -124,6 +124,7 @@ function switchTab(tab){
   else if(tab==='week')loadWeekTab();
   else if(tab==='month')loadMonthTab();
   else if(tab==='reports')loadReportsTab();
+  else if(tab==='settings')_loadClaudeKeyStatus();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -1320,6 +1321,52 @@ function resetFontSize(){
 }
 
 // ══════════════════════════════════════════════════════════
+// Claude API 키 — 본앱과 동일한 방식(브라우저 localStorage에만 저장, 서버 전송 없음).
+// 월간리포트 "이 달의 마디" 분석에만 사용. 태블릿은 이 하나의 용도로만 씀.
+// ══════════════════════════════════════════════════════════
+function getClaudeKey(){return localStorage.getItem('claude_api_key')||'';}
+function saveClaudeApiKey(){
+  const input=document.getElementById('claude-api-key-input');
+  const statusEl=document.getElementById('api-key-status');
+  const key=(input.value||'').trim();
+  if(!key){
+    localStorage.removeItem('claude_api_key');
+    statusEl.textContent='키를 비워서 저장했어요';
+    statusEl.classList.remove('saved');
+    return;
+  }
+  localStorage.setItem('claude_api_key',key);
+  input.value='';
+  input.placeholder='저장됨 (••••••••)';
+  statusEl.textContent='저장했어요';
+  statusEl.classList.add('saved');
+}
+function _loadClaudeKeyStatus(){
+  const input=document.getElementById('claude-api-key-input');
+  if(!input)return;
+  if(getClaudeKey())input.placeholder='저장됨 (••••••••)';
+}
+// 본앱 callClaude와 동일한 방식(브라우저에서 Anthropic API 직접 호출). 태블릿 전용 용도라 timeout/모델만 그대로 이식.
+async function callClaudeFromTablet(systemPrompt,userContent,maxTokens){
+  const key=getClaudeKey();
+  if(!key)return null;
+  try{
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),30000);
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      signal:controller.signal,
+      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-haiku-4-5',max_tokens:maxTokens||500,system:systemPrompt,messages:[{role:'user',content:userContent}]})
+    });
+    clearTimeout(timer);
+    if(!res.ok)return null;
+    const data=await res.json();
+    return (data.content&&data.content[0]&&data.content[0].text)||null;
+  }catch(e){return null;}
+}
+
+// ══════════════════════════════════════════════════════════
 // 리포트탭 — 월간종합/주간종합/주간습관(챌린지리뷰)/주간메모, 월 단위로 모아보기
 // ══════════════════════════════════════════════════════════
 let _reportMonthDate=new Date();
@@ -1619,25 +1666,27 @@ async function loadMonthlyReportPage(){
   const prevDim=Math.min(dim,new Date(py,pmo+1,0).getDate());
   const prevStartDk=`${prevMk}-01`,prevEndDk=`${prevMk}-${pad(prevDim)}`;
 
-  const [monthlyRows,goalRows,todos,memosRows,sleepRows,habits,habitChecksAll,rblocks,prevRblocks,contents,prevContents,wcRowsList]=await Promise.all([
+  const [monthlyRows,goalRows,todos,memosRows,sleepRows,habits,habitChecksAll,rblocks,prevRblocks,contents,prevContents,wcRowsList,milestoneRows]=await Promise.all([
     supaFetch(`ai_cache?cache_key=eq.monthly_report_${mk}&select=content`),
     supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('mgoal:'+mk)}`),
-    supaFetch(`todos?date_key=gte.${startDk}&date_key=lte.${endDk}&select=done`),
+    supaFetch(`todos?date_key=gte.${startDk}&date_key=lte.${endDk}&select=done,date_key`),
     supaFetch(`memos?date_key=gte.${startDk}&date_key=lte.${endDk}&select=id`),
-    supaFetch(`sleep?date_key=gte.${startDk}&date_key=lte.${endDk}&select=sleep_time,wake_time`),
+    supaFetch(`sleep?date_key=gte.${startDk}&date_key=lte.${endDk}&select=sleep_time,wake_time,date_key`),
     supaFetch(`habits?order=sort_order.asc`),
     supaFetch(`habit_checks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
     supaFetch(`rhythm_blocks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
     supaFetch(`rhythm_blocks?date_key=gte.${prevStartDk}&date_key=lte.${prevEndDk}`),
     supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&order=created.desc&limit=200`),
     supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&order=created.desc&limit=200`),
-    Promise.all(weeksInMonth.map(wk=>supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wchallenge_'+wk)}`)))
+    Promise.all(weeksInMonth.map(wk=>supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wchallenge_'+wk)}`))),
+    supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent('monthly_milestones_'+mk)}&select=content`)
   ]);
 
   renderMrpHero(monthlyRows&&monthlyRows[0]);
-  renderMrpGoals(goalRows&&goalRows[0]);
-  renderMrpStats(todos||[],memosRows||[],sleepRows||[],habits||[],habitChecksAll||[],weeksInMonth.length*7||dim);
+  renderMrpGoalsAndStats(goalRows&&goalRows[0],todos||[],memosRows||[],sleepRows||[],habits||[],habitChecksAll||[],weeksInMonth.length*7||dim);
+  renderMrpTrajectory(todos||[],sleepRows||[],habits||[],habitChecksAll||[],weeksInMonth);
   renderMrpRhythm(rblocks||[],prevRblocks||[]);
+  renderMrpMilestones(mk,rblocks||[],prevRblocks||[],weeksInMonth,wcRowsList||[],milestoneRows&&milestoneRows[0]);
   renderMrpWeeklyMissions(weeksInMonth,wcRowsList||[]);
   renderMrpContents(contents||[],startDk,endDk);
   renderMrpReportLinks(weeksInMonth,mk);
@@ -1649,16 +1698,21 @@ function renderMrpHero(row){
   if(!document.getElementById('mrp-hero-slot')){
     el.innerHTML=`
       <div class="mrp-hero" id="mrp-hero-slot"></div>
-      <div class="mrp-grid2">
+      <div class="mrp-grid2" style="margin-bottom:14px;">
         <div class="mrp-card"><div class="mrp-card-title"><i class="ti ti-flag-3" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>이 달의 목표</div><div id="mrp-goals"></div></div>
         <div class="mrp-card"><div class="mrp-card-title"><i class="ti ti-chart-donut" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>이 달의 숫자</div><div id="mrp-stats"></div></div>
       </div>
-      <div class="mrp-card" style="margin-bottom:14px;"><div class="mrp-card-title"><i class="ti ti-rainbow" style="color:rgba(var(--pal-orange-rgb),1);" aria-hidden="true"></i>이 달의 리듬</div><div id="mrp-rhythm"></div></div>
+      <div class="mrp-card" style="margin-bottom:14px;"><div class="mrp-card-title"><i class="ti ti-chart-line" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>이 달의 궤적</div><div id="mrp-traj"></div></div>
+      <div class="mrp-card" style="margin-bottom:14px;">
+        <div class="mrp-card-title"><i class="ti ti-rainbow" style="color:rgba(var(--pal-orange-rgb),1);" aria-hidden="true"></i>이 달의 리듬</div>
+        <div id="mrp-rhythm"></div>
+        <div id="mrp-milestones" style="margin-top:16px;"></div>
+      </div>
       <div class="mrp-grid2">
         <div class="mrp-card"><div class="mrp-card-title"><i class="ti ti-flag-3" style="color:rgba(210,175,225,1);" aria-hidden="true"></i>주간 미션 모음</div><div id="mrp-missions"></div></div>
-        <div class="mrp-card"><div class="mrp-card-title"><i class="ti ti-stack-2" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>콘텐츠 기록</div><div id="mrp-contents"></div></div>
+        <div class="mrp-card mrp-contents-card"><div class="mrp-card-title"><i class="ti ti-book" style="color:rgba(178,60,105,0.75);" aria-hidden="true"></i>이 달의 콘텐츠</div><div id="mrp-contents"></div></div>
       </div>
-      <div class="mrp-card" style="margin-bottom:0;"><div class="mrp-card-title"><i class="ti ti-sparkles" style="color:var(--pal-lavender-border);" aria-hidden="true"></i>이 달에 발행된 리포트</div><div id="mrp-report-links"></div></div>
+      <div class="mrp-links-wrap"><div id="mrp-report-links"></div></div>
     `;
   }
   const heroEl=document.getElementById('mrp-hero-slot');
@@ -1676,23 +1730,90 @@ function renderMrpHero(row){
   }
 }
 
-function renderMrpGoals(row){
-  const el=document.getElementById('mrp-goals');
-  const lines=(row&&Array.isArray(row.lines))?row.lines.filter(l=>l&&l.text&&l.text.trim()):[];
-  if(!lines.length){el.innerHTML='<div class="empty-msg">등록된 목표가 없어요</div>';return;}
-  el.innerHTML=lines.map(l=>`<div class="mrp-goal-line">${escapeHtml(l.text)}</div>`).join('');
-}
+// 목표(왼쪽)와 숫자(오른쪽)를 반반 배치 — 목표만 두면 배너가 비어 보여 숫자 카드와 짝지음
+function renderMrpGoalsAndStats(goalRow,todos,memos,sleepRows,habits,habitChecks,habitDenominator){
+  const goalsEl=document.getElementById('mrp-goals');
+  // mgoal: 캐시는 wchallenge_(주간챌린지)와 저장 구조가 다름 — lines가 {text,days}[] 객체 배열이 아니라 순수 문자열 배열(string[]).
+  const lines=(goalRow&&Array.isArray(goalRow.lines))?goalRow.lines.filter(l=>l&&typeof l==='string'&&l.trim()):[];
+  goalsEl.innerHTML=lines.length?lines.map(l=>`<div class="mrp-goal-line">${escapeHtml(l)}</div>`).join(''):'<div class="empty-msg">등록된 목표가 없어요</div>';
 
-function renderMrpStats(todos,memos,sleepRows,habits,habitChecks,habitDenominator){
-  const el=document.getElementById('mrp-stats');
+  const statsEl=document.getElementById('mrp-stats');
   const doneTodos=todos.filter(t=>t.done).length;
   const habitPct=habits.length?Math.round(habitChecks.length/(habits.length*habitDenominator)*100):0;
   const avgSleep=avgSleepHoursFromRows(sleepRows);
-  el.innerHTML=`<div class="mrp-stat-row">
+  statsEl.innerHTML=`<div class="mrp-stat-row">
     <div class="mrp-stat"><div class="v">${doneTodos}개</div><div class="l">투두 완료</div></div>
     <div class="mrp-stat"><div class="v">${habitPct}%</div><div class="l">습관 달성률</div></div>
     <div class="mrp-stat"><div class="v">${avgSleep?avgSleep+'h':'-'}</div><div class="l">평균 수면</div></div>
   </div>`;
+}
+
+// 이 달의 궤적 — 주차별 값을 부드러운 곡선(spline)으로 이어 "월 안에서의 오르내림"을 보여줌.
+// 꺾은선(polyline) 대신 Catmull-Rom 기반 3차 베지어로 부드럽게.
+function _mrpSmoothPath(points){
+  if(points.length<2)return '';
+  if(points.length===2)return `M${points[0][0]},${points[0][1]} L${points[1][0]},${points[1][1]}`;
+  let d=`M${points[0][0]},${points[0][1]}`;
+  for(let i=0;i<points.length-1;i++){
+    const p0=points[i===0?0:i-1],p1=points[i],p2=points[i+1],p3=points[i+2===points.length?i+1:i+2];
+    const cp1x=p1[0]+(p2[0]-p0[0])/6,cp1y=p1[1]+(p2[1]-p0[1])/6;
+    const cp2x=p2[0]-(p3[0]-p1[0])/6,cp2y=p2[1]-(p3[1]-p1[1])/6;
+    d+=` C${cp1x},${cp1y} ${cp2x},${cp2y} ${p2[0]},${p2[1]}`;
+  }
+  return d;
+}
+function _mrpSparkSvg(values,color){
+  // values: 주차별 원값 배열(null 허용, 데이터 없는 주는 점을 찍지 않음)
+  const valid=values.map((v,i)=>({v,i})).filter(o=>o.v!=null);
+  if(valid.length<1)return '<span style="font-size:12px;color:var(--tm);">기록 없음</span>';
+  const vs=valid.map(o=>o.v);
+  const min=Math.min(...vs),max=Math.max(...vs);
+  const range=max-min||1;
+  const stepX=280/Math.max(1,values.length-1);
+  const pts=valid.map(o=>{
+    const x=10+o.i*stepX;
+    const y=36-((o.v-min)/range)*28; // 위쪽 여백 8, 아래쪽 여백 8 (44 기준)
+    return [x,y];
+  });
+  const path=pts.length>1?_mrpSmoothPath(pts):'';
+  const dots=pts.map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="3.2" fill="${color}"/>`).join('');
+  return `<svg class="mrp-traj-spark" viewBox="0 0 300 44" preserveAspectRatio="none">${path?`<path d="${path}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`:''}${dots}</svg>`;
+}
+function renderMrpTrajectory(todos,sleepRows,habits,habitChecks,weeksInMonth){
+  const el=document.getElementById('mrp-traj');
+  if(!weeksInMonth.length){el.innerHTML='<div class="empty-msg">이 달엔 표시할 주차가 없어요</div>';return;}
+
+  const byWeekTodo=weeksInMonth.map(wk=>{
+    const days=getWeekDates(new Date(wk+'T00:00:00'));
+    const inWeek=todos.filter(t=>days.includes(t.date_key));
+    return inWeek.length?Math.round(inWeek.filter(t=>t.done).length/inWeek.length*100):null;
+  });
+  const byWeekSleep=weeksInMonth.map(wk=>{
+    const days=getWeekDates(new Date(wk+'T00:00:00'));
+    const rows=sleepRows.filter(r=>days.includes(r.date_key));
+    const h=parseFloat(avgSleepHoursFromRows(rows));
+    return isNaN(h)?null:h;
+  });
+  const byWeekHabit=weeksInMonth.map(wk=>{
+    const days=getWeekDates(new Date(wk+'T00:00:00'));
+    if(!habits.length)return null;
+    const checks=habitChecks.filter(c=>days.includes(c.date_key));
+    return Math.round(checks.length/(habits.length*7)*100);
+  });
+
+  const rows=[
+    {label:'습관율',values:byWeekHabit,color:'rgba(70,155,110,0.75)',fmt:v=>v+'%'},
+    {label:'평균수면',values:byWeekSleep,color:'rgba(75,145,180,0.75)',fmt:v=>v.toFixed(1)+'h'},
+    {label:'투두완료율',values:byWeekTodo,color:'rgba(235,130,50,0.75)',fmt:v=>v+'%'}
+  ];
+  el.innerHTML=rows.map(r=>{
+    const lastValid=[...r.values].reverse().find(v=>v!=null);
+    return `<div class="mrp-traj-row">
+      <span class="mrp-traj-lbl">${r.label}</span>
+      ${_mrpSparkSvg(r.values,r.color)}
+      <span class="mrp-traj-val">${lastValid!=null?r.fmt(lastValid):'-'}</span>
+    </div>`;
+  }).join('');
 }
 
 function renderMrpRhythm(rblocks,prevRblocks){
@@ -1713,6 +1834,11 @@ function renderMrpRhythm(rblocks,prevRblocks){
   const prev=durByCat(prevRblocks);
   if(!cur.total){el.innerHTML='<div class="empty-msg">기록된 리듬이 없어요</div>';return;}
 
+  // 전월 실제 기록일수가 너무 적으면(예: 그 달 사용을 늦게 시작한 경우) "전월 대비"가 왜곡되어 거의 모든 항목이
+  // 폭증/폭감으로 보이는 문제가 있었음 — 전월 기록일수가 7일 미만이면 비교 자체를 생략.
+  const prevRecordedDays=new Set(prevRblocks.map(b=>b.date_key)).size;
+  const showCompare=prevRecordedDays>=7;
+
   const sorted=Object.keys(cur.d).filter(k=>cur.d[k]>0).sort((a,b)=>cur.d[b]-cur.d[a]);
   let barHtml=`<div class="mrp-rhythm-bar">`;
   sorted.forEach(k=>{
@@ -1725,11 +1851,108 @@ function renderMrpRhythm(rblocks,prevRblocks){
   const listHtml=`<div class="mrp-rhythm-list">`+sorted.map(k=>{
     const c=RHYTHM_CATS[k];
     const diff=cur.d[k]-(prev.d[k]||0);
-    const diffTxt=Math.abs(diff)>=60?`<span style="color:${diff>0?'var(--pal-rose-border)':'var(--pal-sky-border)'};">${diff>0?'+':''}${_fmtDur(Math.abs(diff))}</span>`:'';
+    const diffTxt=(showCompare&&Math.abs(diff)>=60)?`<span style="color:${diff>0?'var(--pal-rose-border)':'var(--pal-sky-border)'};">${diff>0?'+':'−'}${_fmtDur(Math.abs(diff))}</span>`:'';
     return `<div class="mrp-rhythm-item"><span class="dot" style="background:${c.color};"></span><span class="lbl">${c.label}</span><span class="val">누계 ${_fmtDur(cur.d[k])}${diffTxt?' · 전월대비 '+diffTxt:''}</span></div>`;
   }).join('')+`</div>`;
 
-  el.innerHTML=barHtml+listHtml;
+  el.innerHTML=barHtml+listHtml+(showCompare?'':'<div class="empty-msg" style="text-align:left;padding:8px 2px 0;">전월 기록이 적어 전월 대비 비교는 생략했어요</div>');
+}
+
+// 이 달의 마디 — 리듬 변화는 순수 계산, 목표/맥락 변화는 Claude API로 문장화해서 monthly_milestones_ 캐시에 저장.
+// 캐시가 있으면 그대로 쓰고, 없고 API 키가 있으면 그 자리에서 1회 생성(아카이브 페이지를 실제로 열었을 때만 생성 — 자동 발행 없음).
+async function renderMrpMilestones(mk,rblocks,prevRblocks,weeksInMonth,wcRowsList,cacheRow){
+  const el=document.getElementById('mrp-milestones');
+  const durByCat=(blocks)=>{
+    const d={};
+    blocks.forEach(b=>{
+      if(!b.start_time||!b.end_time)return;
+      const s=_paceParseHM(b.start_time),e=_paceParseHM(b.end_time);
+      if(isNaN(s)||isNaN(e))return;
+      let dur=e-s;if(dur<0)dur+=1440;
+      if(dur<=0)return;
+      d[b.cat]=(d[b.cat]||0)+dur;
+    });
+    return d;
+  };
+  const cur=durByCat(rblocks),prev=durByCat(prevRblocks);
+  // 전월 기록일수가 너무 적으면(예: 사용 시작 초반) 리듬 마디 계산도 왜곡되니 함께 생략
+  const prevRecordedDays=new Set(prevRblocks.map(b=>b.date_key)).size;
+  const canCompareRhythm=prevRecordedDays>=7;
+  // 계산 마디: 전월 대비 60분 이상 차이나는 카테고리 중 변화폭이 큰 순으로 최대 2개
+  const rhythmMilestones=canCompareRhythm?Object.keys(cur).map(k=>({k,diff:cur[k]-(prev[k]||0)}))
+    .filter(o=>Math.abs(o.diff)>=60).sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff)).slice(0,2)
+    .map(o=>{
+      const c=RHYTHM_CATS[o.k];if(!c)return null;
+      const dir=o.diff>0?'늘었어요':'줄었어요';
+      return {text:`<b>${c.label} 시간이 ${dir}</b> — 전월 대비 ${_fmtDur(Math.abs(o.diff))}`,date:'',color:o.diff>0?'rgba(var(--pal-rose-border),1)':'var(--pal-mint-border)'};
+    }).filter(Boolean):[];
+
+  const renderList=(items)=>{
+    if(!items.length){el.innerHTML='';return;}
+    el.innerHTML=`<div class="mrp-milestone-list">`+items.map(m=>`
+      <div class="mrp-milestone">
+        <div class="mrp-milestone-dot" style="background:${m.color||'rgba(var(--pal-mint-rgb),0.9)'};"></div>
+        <div><div class="mrp-milestone-txt">${m.text}</div>${m.date?`<div class="mrp-milestone-date">${m.date}</div>`:''}</div>
+      </div>`).join('')+`</div>`;
+  };
+
+  // 캐시가 있으면: 계산 마디 + 저장된 AI 마디를 합쳐서 표시
+  if(cacheRow&&cacheRow.content){
+    try{
+      const aiMilestones=JSON.parse(cacheRow.content); // string[]
+      const aiItems=(Array.isArray(aiMilestones)?aiMilestones:[]).map(t=>({text:escapeHtml(t),date:'',color:'rgba(var(--pal-lavender-rgb),0.9)'}));
+      renderList([...rhythmMilestones,...aiItems]);
+    }catch(e){
+      renderList(rhythmMilestones);
+    }
+    return;
+  }
+
+  // 캐시 없음: 우선 계산 마디만 먼저 보여주고, API 키가 있으면 백그라운드로 AI 마디를 생성해 이어붙임
+  renderList(rhythmMilestones);
+  const apiKey=getClaudeKey();
+  if(!apiKey){
+    if(!rhythmMilestones.length){
+      el.innerHTML=`<div class="empty-msg" style="text-align:left;padding:4px 0;">이 달의 마디 분석은 설정 탭에서 Claude API 키를 추가하면 볼 수 있어요</div>`;
+    }
+    return;
+  }
+
+  // 주간미션 텍스트를 주차 순서로 정리해서 목표가 바뀐 지점이 있는지 AI가 판단하게 함
+  const missionByWeek=weeksInMonth.map((wk,idx)=>{
+    const row=wcRowsList[idx]&&wcRowsList[idx][0];
+    const lines=(row&&Array.isArray(row.lines))?row.lines.filter(l=>l&&l.text&&l.text.trim()).map(l=>l.text):[];
+    return lines.length?`${idx+1}주차: ${lines.join(', ')}`:null;
+  }).filter(Boolean);
+  if(!missionByWeek.length)return; // AI에 넘길 재료가 없으면 생성 시도조차 하지 않음
+
+  const sys=`당신은 한 달의 흐름에서 "뭔가 바뀐 지점"을 짚어주는 짧은 회고 비서예요.
+아래는 이 달의 주차별 목표(주간 미션) 텍스트예요. 주차를 거치며 목표의 방향이나 초점이 눈에 띄게 바뀐 지점이 있다면, 그 변화를 담담하고 짧은 한 문장으로 표현해주세요.
+- 최대 2개까지만, 변화가 뚜렷하지 않으면 0개도 괜찮아요(억지로 만들지 마세요).
+- 각 문장은 25자 내외로 짧게, ~어요/~였어요체.
+- 반드시 JSON 배열 형식으로만 응답하세요. 예: ["탈고에서 산책 습관으로 초점이 옮겨갔어요"]
+- 다른 설명이나 마크다운 없이 순수 JSON 배열만 출력하세요.`;
+  const reply=await callClaudeFromTablet(sys,missionByWeek.join('\n'),300);
+  if(!reply)return;
+  try{
+    const clean=reply.replace(/```json|```/g,'').trim();
+    const parsed=JSON.parse(clean);
+    if(Array.isArray(parsed)&&parsed.length){
+      await supaUpsertAiCache('monthly_milestones_'+mk,JSON.stringify(parsed));
+      const aiItems=parsed.map(t=>({text:escapeHtml(t),date:'',color:'rgba(var(--pal-lavender-rgb),0.9)'}));
+      renderList([...rhythmMilestones,...aiItems]);
+    }
+  }catch(e){/* 파싱 실패 시 계산 마디만 유지 */}
+}
+// ai_cache 테이블 upsert — 본앱 aiCacheSet과 동일한 패턴(만료 없이 영구 보관, 그 달 데이터는 확정된 과거라 안 바뀜)
+async function supaUpsertAiCache(cacheKey,content){
+  try{
+    await fetch(SUPA_URL+'/rest/v1/ai_cache',{
+      method:'POST',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},
+      body:JSON.stringify({cache_key:cacheKey,content})
+    });
+  }catch(e){/* 저장 실패해도 화면엔 이미 표시된 상태라 조용히 무시 */}
 }
 
 function renderMrpWeeklyMissions(weeksInMonth,wcRowsList){
@@ -1771,7 +1994,7 @@ function renderMrpReportLinks(weeksInMonth,mk){
   const el=document.getElementById('mrp-report-links');
   const cards=weeksInMonth.map((wk,idx)=>{
     const sundayDk=_mondayToSundayDk(wk);
-    return `<div class="mrp-link-card" onclick="openReportPanel('weekly_summary_${sundayDk}','${idx+1}주차 주간종합 리포트')"><div class="wk">${idx+1}주차 주간종합</div><div class="range">${_weekRangeLabel(wk)}</div></div>`;
+    return `<div class="mrp-link-card" onclick="openReportPanel('weekly_summary_${sundayDk}','${idx+1}주차 주간종합 리포트')"><i class="ti ti-sparkles" style="font-size:12px;color:var(--pal-lavender-border);" aria-hidden="true"></i><span class="wk">${idx+1}주차</span><span class="range">${_weekRangeLabel(wk)}</span></div>`;
   });
   el.innerHTML=cards.length?`<div class="mrp-links-grid">${cards.join('')}</div>`:'<div class="empty-msg">이 달엔 발행된 주간 리포트가 없어요</div>';
 }
