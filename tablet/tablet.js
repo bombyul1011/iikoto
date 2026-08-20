@@ -816,7 +816,7 @@ async function renderMonthHabits(y,mo){
     const hIcon=getHabitIcon(h.name);
     const iconColor=getHabitIconColor(h.name,h.color);
     const inner=hIcon
-      ?`<i class="ti ${hIcon}" style="font-size:20px;color:${iconColor};" aria-hidden="true"></i>`
+      ?`<i class="ti ${hIcon} habit-numbox-icon" style="color:${iconColor};" aria-hidden="true"></i>`
       :`<div class="habit-numbox-name">${escapeHtml(h.name)}</div>`;
     return `<div class="habit-numbox-card">${inner}<div class="habit-numbox-num">${count}</div></div>`;
   }).join('')}</div>`;

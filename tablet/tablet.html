@@ -100,7 +100,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .month-goals-box{min-height:calc(var(--fs-sm) * 1.4 * 3 + 6px * 3);display:flex;flex-direction:column;justify-content:center;}
 .month-compact .habit-numbox-grid{grid-template-columns:repeat(4,1fr);gap:7px;}
 .month-compact .habit-numbox-card{padding:11px 4px;border-radius:12px;}
-.month-compact .habit-numbox-card i{font-size:17px!important;}
+.month-compact .habit-numbox-card .habit-numbox-icon{font-size:var(--fs-lg);}
 .month-compact .habit-numbox-num{font-size:var(--fs-title);margin-top:4px;}
 .month-compact .habit-numbox-name{font-size:var(--fs-xs);}
 .grid3{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;align-items:stretch;}
@@ -260,6 +260,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .habit-numbox-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:10px;}
 .habit-numbox-card{display:flex;flex-direction:column;align-items:center;background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:16px 8px;}
 .habit-numbox-name{font-size:var(--fs-sm);color:var(--tm);margin-bottom:3px;}
+.habit-numbox-icon{font-size:20px;}
 .habit-numbox-num{font-size:var(--fs-xl);font-weight:700;color:var(--tp);font-family:'DM Sans',sans-serif;margin-top:6px;}
 
 /* 신규: 이번달 수집문장 배너 */
@@ -305,7 +306,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .report-overlay.on{display:flex;}
 .report-panel{width:560px;max-height:80vh;overflow-y:auto;background:var(--bg);border-radius:18px;padding:24px 26px;box-shadow:0 12px 40px rgba(0,0,0,0.25);position:relative;}
 .report-panel-close{position:absolute;top:16px;right:16px;font-size:20px;color:var(--tm);cursor:pointer;}
-.report-panel-title{font-size:16px;font-weight:600;color:var(--tp);margin-bottom:14px;display:flex;align-items:center;gap:7px;}
+.report-panel-title{font-size:var(--fs-title);font-weight:600;color:var(--tp);margin-bottom:14px;display:flex;align-items:center;gap:7px;}
 
 /* ── 오늘의 메모 (본앱 메모 배너와 동일한 연핑크) ── */
 .card.p{background:rgba(255,175,200,0.15);border-color:rgba(255,175,200,0.32);}
@@ -315,9 +316,9 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .wrb-flow-row{display:flex;align-items:center;gap:10px;padding:7px 2px;border-bottom:1px dashed rgba(var(--divider-rgb),0.25);}
 .wrb-flow-row:last-child{border-bottom:none;}
 .wrb-flow-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
-.wrb-flow-time{font-size:13px;color:var(--ts);font-weight:600;width:110px;flex-shrink:0;}
-.wrb-flow-label{font-size:14.5px;color:var(--tp);}
-.wrb-flow-empty{font-size:14px;color:var(--tm);text-align:center;padding:20px 0;}
+.wrb-flow-time{font-size:var(--fs-sm);color:var(--ts);font-weight:600;width:110px;flex-shrink:0;}
+.wrb-flow-label{font-size:var(--fs-body);color:var(--tp);}
+.wrb-flow-empty{font-size:var(--fs-body);color:var(--tm);text-align:center;padding:20px 0;}
 </style>
 </head>
 <body>
