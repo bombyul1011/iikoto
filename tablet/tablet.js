@@ -1413,8 +1413,8 @@ document.addEventListener('visibilitychange',()=>{
   const SWIPE_MAX_VERTICAL=50; // 이보다 세로로 많이 움직이면 스크롤 의도로 보고 무시
   wrap.addEventListener('touchstart',e=>{
     if(e.touches.length!==1)return;
-    // 리포트탭의 습관/메모 그리드는 자체 가로 스크롤이 있어, 그 안에서 시작된 터치는 탭 이동 스와이프로 취급하지 않음
-    if(e.target.closest&&e.target.closest('.report-box-grid')){tracking=false;return;}
+    // 리포트탭의 습관/메모 그리드, 콘텐츠 타임라인의 날짜 트랙은 자체 가로 스크롤이 있어, 그 안에서 시작된 터치는 탭 이동 스와이프로 취급하지 않음
+    if(e.target.closest&&e.target.closest('.report-box-grid, .tt-date-scroll, .tt-head-scroll')){tracking=false;return;}
     startX=e.touches[0].clientX;startY=e.touches[0].clientY;tracking=true;
   },{passive:true});
   wrap.addEventListener('touchend',e=>{
