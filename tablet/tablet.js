@@ -132,37 +132,87 @@ function sideCalShift(delta){
 function selectDate(dk){
   _selectedDate=new Date(dk+'T00:00:00');
   renderMiniCal();
-  renderSideStats();
   if(_currentTab==='today')loadTodayTab();
   else if(_currentTab==='week')loadWeekTab();
   else if(_currentTab==='month')loadMonthTab();
 }
 
-async function renderSideStats(){
-  const el=document.getElementById('side-stats');
-  const wk=weekKeyOf(_selectedDate);
-  const weekDates=[];
-  const monday=new Date(wk+'T00:00:00');
-  for(let i=0;i<7;i++){const d=new Date(monday);d.setDate(monday.getDate()+i);weekDates.push(dateKey(d));}
-  const startDk=weekDates[0],endDk=weekDates[6];
-
-  const weekStartMs=monday.getTime();
-  const weekEndMs=weekStartMs+7*24*60*60*1000-1;
-  const [sleepRows,habitRows,quoteRows]=await Promise.all([
-    supaFetch(`sleep?date_key=gte.${startDk}&date_key=lte.${endDk}&select=score`),
-    supaFetch(`habit_checks?date_key=gte.${startDk}&date_key=lte.${endDk}&select=id`),
-    supaFetch(`reading_quotes?created=gte.${weekStartMs}&created=lte.${weekEndMs}&select=id`)
-  ]);
-  const scores=(sleepRows||[]).map(r=>r.score).filter(s=>s!=null);
-  const avgSleep=scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):null;
-  const quoteCount=(quoteRows||[]).length;
-
-  el.innerHTML=`
-    <div class="side-stat"><i class="ti ti-moon-stars" style="color:rgba(var(--pal-sky-rgb),1);" aria-hidden="true"></i><div><div class="side-stat-val">${avgSleep!=null?avgSleep+'점':'-'}</div><div class="side-stat-txt">평균 수면 점수</div></div></div>
-    <div class="side-stat"><i class="ti ti-flame" style="color:rgba(var(--pal-orange-rgb),1);" aria-hidden="true"></i><div><div class="side-stat-val">${(habitRows||[]).length}회</div><div class="side-stat-txt">이번 주 습관 체크</div></div></div>
-    <div class="side-stat"><i class="ti ti-books" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i><div><div class="side-stat-val">${quoteCount}개</div><div class="side-stat-txt">이번 주 수집한 문장</div></div></div>
-  `;
+// ── 사이드바 인사배너 (본앱 홈탭 인사카드 이식) ──
+// 태블릿엔 Claude API 키가 없으므로 생성은 하지 않고, 모바일이 생성해 ai_cache에 저장한 문구를 조회만 함.
+// 본앱 getHomeTimeSlot과 동일한 7분류 → 4개 섹션(morning/afternoon/night/dawn) 매핑.
+const HOME_DAYS=['일','월','화','수','목','금','토'];
+function getHomeTimeSlot(){
+  const h=new Date().getHours();
+  if(h<4)return 'dawn';
+  if(h<9)return 'morning_1';
+  if(h<12)return 'morning_2';
+  if(h<16)return 'afternoon_1';
+  if(h<19)return 'afternoon_2';
+  if(h<22)return 'night_1';
+  return 'night_2';
 }
+function getHomeSection(){
+  const slot=getHomeTimeSlot();
+  if(slot==='dawn')return 'dawn';
+  if(slot==='morning_1'||slot==='morning_2')return 'morning';
+  if(slot==='afternoon_1'||slot==='afternoon_2')return 'afternoon';
+  return 'night';
+}
+const SIDE_GREETING_POOL={
+  morning:['좋은 아침이에요','오늘도 좋은 하루예요','활기찬 하루 보내요','상쾌한 아침이에요'],
+  afternoon:['잘 하고 있어요','오늘도 순항 중이에요','좋은 흐름이에요','한창인 하루예요'],
+  night:['오늘도 수고했어요','오늘 하루도 애쓰셨어요','하루를 잘 마무리해요','편안한 저녁 되세요'],
+  dawn:['오늘 하루도 잘 보내셨어요','하루를 잘 채워내셨어요','오늘도 무사히 지나갔어요','편안한 밤 되세요']
+};
+async function renderSideGreeting(){
+  const card=document.getElementById('side-greeting-card');
+  const timeEl=document.getElementById('side-greeting-time');
+  const greetEl=document.getElementById('side-greeting-text');
+  const subEl=document.getElementById('side-greeting-sub');
+  if(!card)return;
+
+  const section=getHomeSection();
+  const subSec=getHomeTimeSlot();
+  card.className='side-hcard '+section;
+
+  const now=new Date();
+  if(timeEl)timeEl.textContent=`${HOME_DAYS[now.getDay()]}요일`;
+
+  const pool=SIDE_GREETING_POOL[section]||['좋은 하루예요'];
+  if(greetEl)greetEl.textContent=pool[Math.floor(Math.random()*pool.length)];
+
+  if(subEl){
+    const cacheKey=`greeting_${dateKey(now)}_${subSec}`;
+    const rows=await supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent(cacheKey)}&select=content,expires_at`);
+    const row=rows&&rows[0];
+    const valid=row&&(row.expires_at==null||row.expires_at>Date.now());
+    subEl.textContent=valid?row.content:'곧 준비될 거예요';
+  }
+}
+// 다음 시간대 경계(4/9/12/16/19/22/24시)까지 남은 ms 계산 — 그 시점에 정확히 한 번만 갱신.
+// 1분 폴링 대신 이 방식을 쓰면 불필요한 반복 실행 없이 슬롯 전환 시점만 정확히 잡아낼 수 있음.
+const SIDE_GREETING_BOUNDARY_HOURS=[4,9,12,16,19,22,24];
+function _msUntilNextGreetingBoundary(){
+  const now=new Date();
+  const h=now.getHours(),m=now.getMinutes(),s=now.getSeconds(),ms=now.getMilliseconds();
+  const nowMin=h*60+m;
+  let nextH=SIDE_GREETING_BOUNDARY_HOURS.find(b=>b*60>nowMin);
+  if(nextH===undefined)nextH=24+SIDE_GREETING_BOUNDARY_HOURS[0]; // 오늘 마지막 경계(24시) 이후 → 다음날 4시
+  const target=new Date(now);
+  target.setHours(0,0,0,0);
+  target.setTime(target.getTime()+nextH*60*60*1000);
+  return target.getTime()-now.getTime()+500; // 경계 직후로 500ms 여유
+}
+function scheduleSideGreetingRefresh(){
+  renderSideGreeting();
+  const wait=_msUntilNextGreetingBoundary();
+  setTimeout(function tick(){
+    renderSideGreeting();
+    setTimeout(tick,_msUntilNextGreetingBoundary());
+  },wait);
+}
+
+
 
 // ══════════════════════════════════════════════════════════
 // 오늘탭
@@ -658,26 +708,42 @@ async function renderMonthTimetable(y,mo){
   el.innerHTML=`<div class="tt-head-row"><div class="tt-cat-fixed-sp"></div><div class="tt-head-dates">${headHtml}</div></div><div>${rowsHtml}</div>`;
 }
 
+// 습관명 키워드 매칭 아이콘 규칙 — 본앱(iikoto index.html) HABIT_ICON_RULES와 동일하게 유지
+const HABIT_ICON_RULES=[
+  {keywords:['운동','헬스','필라테스','런닝','러닝','조깅'],icon:'ti-run',color:'var(--pal-mint-border)'},
+  {keywords:['독서','책'],icon:'ti-book',color:'var(--pal-pink-border)'},
+  {keywords:['일기','다이어리','글쓰기'],icon:'ti-pencil-heart',color:'var(--pal-sky-border)'},
+  {keywords:['영양제','비타민','약'],icon:'ti-pill',color:'var(--pal-yellow-border)'}
+];
+function getHabitIcon(name){
+  if(!name)return null;
+  const rule=HABIT_ICON_RULES.find(r=>r.keywords.some(k=>name.includes(k)));
+  return rule?rule.icon:null;
+}
+const HABIT_COLOR_BORDER_MAP={mint:'var(--pal-mint-border)',pink:'var(--pal-pink-border)',sky:'var(--pal-sky-border)',yellow:'var(--pal-yellow-border)'};
+function getHabitIconColor(name,habitColor){
+  if(habitColor&&HABIT_COLOR_BORDER_MAP[habitColor])return HABIT_COLOR_BORDER_MAP[habitColor];
+  const rule=HABIT_ICON_RULES.find(r=>name&&r.keywords.some(k=>name.includes(k)));
+  return rule?rule.color:'var(--tm)';
+}
 async function renderMonthHabits(y,mo){
   const el=document.getElementById('month-habits');
   const mk=`${y}-${pad(mo+1)}`;
   const daysInMonth=new Date(y,mo+1,0).getDate();
   const [habits,checks]=await Promise.all([
     supaFetch(`habits?order=sort_order.asc`),
-    supaFetch(`habit_checks?date_key=gte.${mk}-01&date_key=lte.${mk}-31`)
+    supaFetch(`habit_checks?date_key=gte.${mk}-01&date_key=lte.${mk}-${pad(daysInMonth)}`)
   ]);
   if(!habits||!habits.length){el.innerHTML='<div class="empty-msg">등록된 습관 없음</div>';return;}
-  const colorMap={mint:'var(--pal-mint-rgb)',pink:'var(--pal-pink-rgb)',sky:'var(--pal-sky-rgb)',yellow:'var(--pal-yellow-rgb)'};
-  el.innerHTML=habits.map(h=>{
-    const c=colorMap[h.color]||'var(--pal-warmgray-rgb)';
-    let dotsHtml='';
-    for(let d=1;d<=daysInMonth;d++){
-      const dk=`${mk}-${pad(d)}`;
-      const done=(checks||[]).some(ch=>ch.habit_name===h.name&&ch.date_key===dk);
-      dotsHtml+=`<span style="${done?`background:rgba(${c},0.85);`:''}"></span>`;
-    }
-    return `<div class="habit-month-row"><div class="habit-month-lbl">${escapeHtml(h.name)}</div><div class="habit-month-dots">${dotsHtml}</div></div>`;
-  }).join('');
+  el.innerHTML=`<div class="habit-numbox-grid">${habits.map(h=>{
+    const count=(checks||[]).filter(ch=>ch.habit_name===h.name).length;
+    const hIcon=getHabitIcon(h.name);
+    const iconColor=getHabitIconColor(h.name,h.color);
+    const inner=hIcon
+      ?`<i class="ti ${hIcon}" style="font-size:20px;color:${iconColor};" aria-hidden="true"></i>`
+      :`<div class="habit-numbox-name">${escapeHtml(h.name)}</div>`;
+    return `<div class="habit-numbox-card">${inner}<div class="habit-numbox-num">${count}</div></div>`;
+  }).join('')}</div>`;
 }
 
 // 이번 달 미니 통계바 — 주간탭과 동일 스타일(sbar-item/sbar-div), 박스 없이 심플하게
@@ -730,14 +796,13 @@ async function renderMonthStatBar(y,mo){
 // 신규: 이번 달 수집한 문장(reading_quotes) — created 타임스탬프 기준
 async function renderMonthQuotes(y,mo){
   const el=document.getElementById('month-quotes');
-  const mk=`${y}-${pad(mo+1)}`;
-  const startIso=`${mk}-01T00:00:00`;
+  const startMs=new Date(y,mo,1,0,0,0,0).getTime();
   const daysInMonth=new Date(y,mo+1,0).getDate();
-  const endIso=`${mk}-${pad(daysInMonth)}T23:59:59`;
-  const rows=await supaFetch(`reading_quotes?created=gte.${startIso}&created=lte.${endIso}&order=created.asc&select=text,created`);
+  const endMs=new Date(y,mo,daysInMonth,23,59,59,999).getTime();
+  const rows=await supaFetch(`reading_quotes?created=gte.${startMs}&created=lte.${endMs}&order=created.asc&select=text,created`);
   if(!rows||!rows.length){el.innerHTML='<div class="empty-msg">이번 달 수집한 문장이 없어요</div>';return;}
   el.innerHTML=rows.map(r=>{
-    const d=new Date(r.created);
+    const d=new Date(Number(r.created));
     const dateLabel=`${d.getMonth()+1}.${pad(d.getDate())}`;
     return `<div class="month-quote-item"><div class="month-quote-date">${dateLabel}</div><div class="month-quote-txt">${escapeHtml(r.text||'')}</div></div>`;
   }).join('');
@@ -823,7 +888,7 @@ async function renderChaeumLogTablet(){
 // ══════════════════════════════════════════════════════════
 async function init(){
   await renderMiniCal();
-  await renderSideStats();
+  scheduleSideGreetingRefresh();
   await loadTodayTab();
 }
 init();
@@ -832,12 +897,12 @@ init();
 // 화면이 다시 포그라운드로 돌아왔을 때, 오늘탭을 보고 있고 날짜가 바뀌었으면 자동 갱신
 document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState!=='visible')return;
+  renderSideGreeting();
   if(_currentTab!=='today')return;
   const now=new Date();
   if(dateKey(now)!==dateKey(_selectedDate)){
     _selectedDate=now;
     loadTodayTab();
     renderMiniCal();
-    renderSideStats();
   }
 });
