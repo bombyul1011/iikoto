@@ -292,9 +292,13 @@ function renderTodayTodosEvents(todos){
   const plainTodos=todos.filter(t=>!t.is_event);
   const events=todos.filter(t=>t.is_event);
   const todoEl=document.getElementById('today-todos');
-  todoEl.innerHTML=plainTodos.length?plainTodos.slice(0,8).map(t=>
-    `<div class="todo-row${t.done?' done':''}"><div class="chk"></div>${escapeHtml(t.text)}</div>`
-  ).join(''):'<div class="empty-msg">오늘 할 일이 없어요</div>';
+  todoEl.innerHTML=plainTodos.length?plainTodos.slice(0,8).map(t=>{
+    const ts=t.time_section||'none';
+    const chkHtml=(!t.done&&t.pinned)
+      ?`<div class="pinned-ico"><i class="ti ti-bolt-filled" aria-hidden="true"></i></div>`
+      :`<div class="chk ts-${ts}${t.done?' on':''}"></div>`;
+    return `<div class="todo-row${t.done?' done':''}">${chkHtml}${escapeHtml(t.text)}</div>`;
+  }).join(''):'<div class="empty-msg">오늘 할 일이 없어요</div>';
 
   const nowMin=new Date().getHours()*60+new Date().getMinutes();
   const isToday=dateKey(_selectedDate)===dateKey(new Date());
@@ -314,9 +318,16 @@ async function renderTodayMemos(dk){
   const el=document.getElementById('today-memos');
   const memos=await supaFetch(`memos?date_key=eq.${dk}&order=memo_time.asc`);
   if(!memos||!memos.length){el.innerHTML='<div class="empty-msg">오늘 남긴 메모가 없어요</div>';return;}
-  el.innerHTML=memos.map(m=>
-    `<div class="memo-item"><div class="memo-time">${m.memo_time||''}</div><div class="memo-txt">${escapeHtml(m.text)}</div></div>`
-  ).join('');
+  el.innerHTML=memos.map(m=>{
+    const isSeed=m.type==='seed';
+    let todClass='';
+    if(!isSeed&&m.memo_time){
+      const h=parseInt(m.memo_time.split(':')[0],10);
+      todClass=h>=5&&h<12?' tod-morning':h>=12&&h<18?' tod-afternoon':' tod-night';
+    }
+    const timeHtml=isSeed?'<i class="ti ti-seeding seed-ico" aria-hidden="true"></i>':(m.memo_time||'');
+    return `<div class="memo-item${isSeed?' memo-seed':todClass}"><div class="memo-time">${timeHtml}</div><div class="memo-txt">${escapeHtml(m.text)}</div></div>`;
+  }).join('');
 }
 
 function renderTodaySleep(dk,sleep,weekRows){
@@ -460,16 +471,16 @@ function renderTodayReading(book){
 async function renderReportBanner(elId,forDate){
   const el=document.getElementById(elId);
   if(!el)return;
-  const wk=weekKeyOf(forDate);
+  const wkSun=_mondayToSundayDk(weekKeyOf(forDate));
   const mk=monthKeyOf(forDate);
   const [weeklyRows,monthlyRows]=await Promise.all([
-    supaFetch(`ai_cache?cache_key=eq.weekly_summary_${wk}&select=cache_key`),
+    supaFetch(`ai_cache?cache_key=eq.weekly_summary_${wkSun}&select=cache_key`),
     supaFetch(`ai_cache?cache_key=eq.monthly_report_${mk}&select=cache_key`)
   ]);
   if(weeklyRows&&weeklyRows.length){
     el.classList.add('on');
     el.innerHTML=`<div class="report-banner-inner"><i class="ti ti-sparkles" aria-hidden="true"></i>이번 주 리포트가 준비됐어요<i class="ti ti-chevron-right" aria-hidden="true"></i></div>`;
-    el.onclick=()=>openReportPanel('weekly_summary_'+wk,'이번 주 리포트');
+    el.onclick=()=>openReportPanel('weekly_summary_'+wkSun,'이번 주 리포트');
   }else if(monthlyRows&&monthlyRows.length){
     el.classList.add('on');
     el.innerHTML=`<div class="report-banner-inner"><i class="ti ti-sparkles" aria-hidden="true"></i>이번 달 리포트가 준비됐어요<i class="ti ti-chevron-right" aria-hidden="true"></i></div>`;
@@ -486,7 +497,23 @@ async function openReportPanel(cacheKey,title){
   document.getElementById('report-overlay').classList.add('on');
   const rows=await supaFetch(`ai_cache?cache_key=eq.${cacheKey}&select=content`);
   const content=rows&&rows[0]&&rows[0].content;
-  bodyEl.innerHTML=content?content:'<div class="empty-msg">내용을 불러오지 못했어요</div>';
+  if(!content){bodyEl.innerHTML='<div class="empty-msg">내용을 불러오지 못했어요</div>';return;}
+  // monthly_report_ 캐시는 본앱에서 {comment, keywords} JSON으로 저장됨 — 파싱해서 mr-ai-card 스타일로 렌더링.
+  // 그 외(weekly_summary_ 등)는 이미 완성된 HTML 문자열이라 그대로 삽입.
+  if(cacheKey.startsWith('monthly_report_')){
+    try{
+      const report=JSON.parse(content);
+      bodyEl.innerHTML=`<div class="mr-ai-card">
+        <div class="mr-sec-title"><i class="ti ti-sparkles" aria-hidden="true"></i> 이번 달 한눈에</div>
+        <p class="mr-ai-comment">${escapeHtml(report.comment||'')}</p>
+        ${report.keywords&&report.keywords.length?`<div class="mr-tag-cloud">${report.keywords.map(k=>`<span class="mr-tag">${escapeHtml(k)}</span>`).join('')}</div>`:''}
+      </div>`;
+    }catch(e){
+      bodyEl.innerHTML=content;
+    }
+  }else{
+    bodyEl.innerHTML=content;
+  }
 }
 function closeReportPanel(){
   document.getElementById('report-overlay').classList.remove('on');
@@ -966,6 +993,9 @@ function _applyFontSizes(){
   const b=FS_STEPS[String(_fsStep)]||FS_STEPS['0'];
   document.documentElement.style.setProperty('--fs-title',b.title+'px');
   document.documentElement.style.setProperty('--fs-body',b.body+'px');
+  // 본앱에서 생성된 리포트 HTML(메모리포트 등)은 --main-text-size 인라인 스타일을 그대로 갖고 있어,
+  // 이 변수를 --fs-body와 동기화해둬야 태블릿에서도 폰트 크기 조절이 그대로 반영됨.
+  document.documentElement.style.setProperty('--main-text-size',b.body+'px');
 }
 function setFontScale(step){
   if(step!==-1&&step!==0&&step!==1)return;
@@ -1031,6 +1061,13 @@ function _weekNoLabel(wk,weeksInMonth){
   const idx=weeksInMonth.indexOf(wk);
   return (idx+1)+'주차';
 }
+// weeksInMonth는 각 주의 월요일 날짜(예:'2026-08-17'). 리포트 종류별로 본앱이 실제 쓰는 캐시 키 포맷이 다름:
+// - weekly_summary_ : 그 주의 "일요일" 날짜(dateKey, 접두사 없음) — 예: weekly_summary_2026-08-23
+// - challenge_review_ / weekly_memo_report_ : weekKey() 리턴값 그대로(월요일 날짜 + 'week:' 접두사) — 예: challenge_review_week:2026-08-17
+function _mondayToSundayDk(mondayDk){
+  const d=new Date(mondayDk+'T00:00:00');d.setDate(d.getDate()+6);
+  return dateKey(d);
+}
 function shiftReportMonth(delta){
   _reportMonthDate.setMonth(_reportMonthDate.getMonth()+delta);
   loadReportsTab();
@@ -1064,10 +1101,10 @@ async function loadReportsTab(){
 
   const [monthlyRows,...weeklyRowsList]=await Promise.all([
     supaFetch(`ai_cache?cache_key=eq.monthly_report_${mk}&select=cache_key,content,expires_at`),
-    ...weeksInMonth.map(wk=>supaFetch(`ai_cache?cache_key=eq.weekly_summary_${wk}&select=cache_key,content,expires_at`))
+    ...weeksInMonth.map(wk=>supaFetch(`ai_cache?cache_key=eq.weekly_summary_${_mondayToSundayDk(wk)}&select=cache_key,content,expires_at`))
   ]);
-  const habitRowsList=await Promise.all(weeksInMonth.map(wk=>supaFetch(`ai_cache?cache_key=eq.challenge_review_${wk}&select=cache_key,content,expires_at`)));
-  const memoRowsList=await Promise.all(weeksInMonth.map(wk=>supaFetch(`ai_cache?cache_key=eq.weekly_memo_report_${wk}&select=cache_key,content,expires_at`)));
+  const habitRowsList=await Promise.all(weeksInMonth.map(wk=>supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent('challenge_review_week:'+wk)}&select=cache_key,content,expires_at`)));
+  const memoRowsList=await Promise.all(weeksInMonth.map(wk=>supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent('weekly_memo_report_week:'+wk)}&select=cache_key,content,expires_at`)));
 
   renderReportSummaryList(monthlyRows,weeksInMonth,weeklyRowsList,mk);
   renderReportBoxGrid('report-habit-grid',weeksInMonth,habitRowsList,'habit');
@@ -1149,23 +1186,17 @@ function markReportBoxRead(el,cacheKey){
   _updateSideReportBadge();
 }
 async function _updateSideReportBadge(){
-  const badge=document.getElementById('side-report-badge');
-  const txt=document.getElementById('side-report-badge-txt');
-  if(!badge)return;
+  const dot=document.getElementById('side-logo-dot');
+  if(!dot)return;
   const y=new Date().getFullYear(),mo=new Date().getMonth();
   const weeksInMonth=getReportWeeksOfMonth(y,mo);
   const mk=monthKeyOf(new Date());
-  const keys=[`monthly_report_${mk}`,...weeksInMonth.map(wk=>`weekly_summary_${wk}`),...weeksInMonth.map(wk=>`challenge_review_${wk}`),...weeksInMonth.map(wk=>`weekly_memo_report_${wk}`)];
-  const rows=await supaFetch(`ai_cache?cache_key=in.(${keys.join(',')})&select=cache_key`);
+  const keys=[`monthly_report_${mk}`,...weeksInMonth.map(wk=>`weekly_summary_${_mondayToSundayDk(wk)}`),...weeksInMonth.map(wk=>`challenge_review_week:${wk}`),...weeksInMonth.map(wk=>`weekly_memo_report_week:${wk}`)];
+  const rows=await supaFetch(`ai_cache?cache_key=in.(${keys.map(encodeURIComponent).join(',')})&select=cache_key`);
   const existing=(rows||[]).map(r=>r.cache_key);
   const readSet=_loadReadReports();
   const unreadCount=existing.filter(k=>!readSet.has(k)).length;
-  if(unreadCount>0){
-    badge.classList.add('on');
-    txt.textContent=`안 읽은 리포트 ${unreadCount}개`;
-  }else{
-    badge.classList.remove('on');
-  }
+  dot.classList.toggle('on',unreadCount>0);
 }
 
 // ══════════════════════════════════════════════════════════
