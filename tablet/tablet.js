@@ -1690,16 +1690,27 @@ async function loadMonthlyReportPage(){
 
   renderMrpHero(monthlyRows&&monthlyRows[0]);
   renderMrpGoalsAndStats(goalRows&&goalRows[0],todos||[],memosRows||[],sleepRows||[],habits||[],habitChecksAll||[],weeksInMonth.length*7||dim);
+  const heroCommentText=_mrpExtractHeroComment(monthlyRows&&monthlyRows[0]);
   renderMrpTrajectory(mk,todos||[],sleepRows||[],habits||[],habitChecksAll||[],weeksInMonth,
     {todos:prevTodos||[],sleepRows:prevSleepRows||[],habitChecks:prevHabitChecksAll||[],weeksInMonth:prevWeeksInMonth,habits:habits||[]},
-    trajectoryRows&&trajectoryRows[0]);
+    trajectoryRows&&trajectoryRows[0],heroCommentText);
   renderMrpRhythm(rblocks||[],prevRblocks||[]);
-  renderMrpMilestones(mk,rblocks||[],prevRblocks||[],weeksInMonth,wcRowsList||[],milestoneRows&&milestoneRows[0],prevWcRowsList||[]);
+  renderMrpMilestones(mk,rblocks||[],prevRblocks||[],weeksInMonth,wcRowsList||[],milestoneRows&&milestoneRows[0],prevWcRowsList||[],heroCommentText);
   renderMrpWeeklyMissions(weeksInMonth,wcRowsList||[]);
   renderMrpContents(contents||[],startDk,endDk);
   renderMrpReportLinks(weeksInMonth,mk);
 }
 
+// "이 달 한눈에"(monthly_report_ 캐시)에서 순수 코멘트 텍스트만 뽑아옴 — 마디/궤적 AI가 맥락 참고용으로 사용
+function _mrpExtractHeroComment(row){
+  if(!row||!row.content)return '';
+  try{
+    const report=JSON.parse(row.content);
+    return report&&report.comment?report.comment:'';
+  }catch(e){
+    return typeof row.content==='string'?row.content:'';
+  }
+}
 function renderMrpHero(row){
   const el=document.getElementById('mrp-body');
   // 최초 렌더 시 전체 골격을 한 번에 잡고, 이후 각 render 함수가 자기 섹션의 innerHTML만 채움
@@ -1834,7 +1845,7 @@ function _mrpWaveSvg(rows,weekCount){
     `<div class="mrp-wave-labels">${weekLabels}</div>`+
     `<div class="mrp-wave-tail">${tailVals}</div>`;
 }
-async function renderMrpTrajectory(mk,todos,sleepRows,habits,habitChecks,weeksInMonth,prevData,cacheRow){
+async function renderMrpTrajectory(mk,todos,sleepRows,habits,habitChecks,weeksInMonth,prevData,cacheRow,heroComment){
   const el=document.getElementById('mrp-traj');
   if(!weeksInMonth.length){el.innerHTML='<div class="empty-msg">이 달엔 표시할 주차가 없어요</div>';return;}
 
@@ -1907,14 +1918,16 @@ async function renderMrpTrajectory(mk,todos,sleepRows,habits,habitChecks,weeksIn
     return valid[valid.length-1]>valid[0]?'상승':(valid[valid.length-1]<valid[0]?'하락':'유지');
   };
   const curDirText=`이 달 방향성: 습관율 ${dirOfCur(byWeekHabit)}, 평균수면 ${dirOfCur(byWeekSleep)}, 투두완료율 ${dirOfCur(byWeekTodo)}`;
-  const dataContext=[curDirText,prevDirText].filter(Boolean).join('\n');
+  const heroText=heroComment?`이 달 종합 리포트(참고용 맥락, 이미 발행된 코멘트):\n${heroComment}`:'';
+  const dataContext=[curDirText,prevDirText,heroText].filter(Boolean).join('\n\n');
 
   const sys=`당신은 한 달의 생활 패턴을 해석해주는 담담한 회고 비서예요.
-아래는 이 달의 습관율, 평균수면, 투두완료율이 주차를 거치며 각각 상승/하락/유지 중 어느 방향으로 움직였는지를 나타낸 정보예요(구체적인 수치는 주어지지 않아요).
+아래는 이 달의 습관율, 평균수면, 투두완료율이 주차를 거치며 각각 상승/하락/유지 중 어느 방향으로 움직였는지를 나타낸 정보예요(구체적인 수치는 주어지지 않아요). 함께 주어졌다면 이 달의 종합 리포트(이미 발행된 코멘트)도 참고하세요 — 그 안에 담긴 이 달의 사건이나 맥락과 어긋나지 않게, 자연스럽게 이어지도록 서술하세요.
 이 세 지표가 서로 어떤 관계로 움직였는지 — 무엇을 더 챙기는 대신 무엇을 내줬는지, 어떤 성향의 한 달이었는지 — 짧은 이야기로 풀어주세요.
 - 3~4문장, 전체 120자 내외.
 - 절대 숫자나 퍼센트, 시간 같은 구체적인 수치를 언급하지 마세요. 그래프에 이미 나와 있으니, 당신은 그 움직임이 "무엇을 의미하는지"만 해석하세요.
 - 원인 추정, 지표 간 트레이드오프, 이 달 전체의 성향 위주로 서술하세요.
+- 종합 리포트 내용을 그대로 반복하거나 요약하지 말고, 거기 없는 지표 간의 관계만 새롭게 짚으세요.
 - 담담하고 자연스러운 ~어요/~했어요체.
 - 전월 방향성 정보가 함께 주어졌다면, 그 변화도 수치 없이 방향성으로만 마지막에 한 문장 정도 자연스럽게 녹이세요. 주어지지 않았다면 언급하지 마세요.
 - 반드시 JSON 형식으로만 응답하세요: {"text":"..."}
@@ -1975,7 +1988,7 @@ function renderMrpRhythm(rblocks,prevRblocks){
 
 // 이 달의 마디 — 리듬 변화는 순수 계산, 목표/맥락 변화는 Claude API로 문장화해서 monthly_milestones_ 캐시에 저장.
 // 캐시가 있으면 그대로 쓰고, 없고 API 키가 있으면 그 자리에서 1회 생성(아카이브 페이지를 실제로 열었을 때만 생성 — 자동 발행 없음).
-async function renderMrpMilestones(mk,rblocks,prevRblocks,weeksInMonth,wcRowsList,cacheRow,prevWcRowsList){
+async function renderMrpMilestones(mk,rblocks,prevRblocks,weeksInMonth,wcRowsList,cacheRow,prevWcRowsList,heroComment){
   const el=document.getElementById('mrp-milestones');
 
   const renderList=(items)=>{
@@ -2037,8 +2050,8 @@ async function renderMrpMilestones(mk,rblocks,prevRblocks,weeksInMonth,wcRowsLis
     return (row&&Array.isArray(row.lines))?row.lines.filter(l=>l&&l.text&&l.text.trim()).map(l=>l.text):[];
   });
 
-  // 리듬 변화도 목표 텍스트도 없으면 AI에 넘길 재료 자체가 없으니 생성하지 않음 — 다만 조용히 끝내지 않고 이유를 안내
-  if(!rhythmChanges.length&&!missionByWeek.length){
+  // 리듬 변화, 목표 텍스트, 종합 리포트 코멘트 중 아무 재료도 없으면 생성하지 않음 — 다만 조용히 끝내지 않고 이유를 안내
+  if(!rhythmChanges.length&&!missionByWeek.length&&!heroComment){
     el.innerHTML=`<div class="empty-msg" style="text-align:left;padding:4px 0;">이 달의 마디를 짚을 만한 자료(목표 변화나 리듬 변화)가 아직 없어요</div>`;
     return;
   }
@@ -2047,12 +2060,14 @@ async function renderMrpMilestones(mk,rblocks,prevRblocks,weeksInMonth,wcRowsLis
   if(missionByWeek.length)parts.push(`이 달 주차별 목표(주간 미션):\n${missionByWeek.join('\n')}`);
   if(prevMissionLines.length)parts.push(`전월 목표: ${prevMissionLines.join(', ')}`);
   if(rhythmChanges.length)parts.push(`이 달 리듬 시간 변화(전월 대비, 계산된 값):\n${rhythmChanges.join('\n')}`);
+  if(heroComment)parts.push(`이 달 종합 리포트(참고용 맥락, 이미 발행된 코멘트):\n${heroComment}`);
   const dataContext=parts.join('\n\n');
 
   const sys=`당신은 한 달의 흐름에서 "뭔가 바뀐 지점"을 짚어주는 회고 비서예요.
-아래 자료는 두 종류예요: (1) 주차별 목표/주간미션 텍스트, (2) 리듬(활동 카테고리별) 시간이 전월 대비 어떻게 달라졌는지 계산된 값.
-이 둘을 각각 따로 언급하지 말고, 목표의 방향 전환과 리듬 시간 변화 사이에 실제로 앞뒤가 맞는 관계가 보이면 하나의 문장으로 엮어서 설명해주세요.
+아래 자료는 여러 종류예요: (1) 주차별 목표/주간미션 텍스트, (2) 리듬(활동 카테고리별) 시간이 전월 대비 어떻게 달라졌는지 계산된 값, (3) 있다면 이 달의 종합 리포트(이미 발행된 코멘트, 참고용 맥락).
+(1)과 (2)를 각각 따로 언급하지 말고, 목표의 방향 전환과 리듬 시간 변화 사이에 실제로 앞뒤가 맞는 관계가 보이면 하나의 문장으로 엮어서 설명해주세요.
 예: "운동 시간이 늘어난 건 목표가 체력 회복으로 방향을 잡으면서였던 것 같아요"처럼, 무엇이 원인이고 무엇이 결과처럼 보이는지 자연스럽게 연결하세요.
+(3) 종합 리포트가 함께 주어졌다면, 그 안에 담긴 이 달의 사건이나 맥락을 먼저 확인하고 참고해서, 그와 어긋나지 않고 자연스럽게 이어지는 마디를 짚으세요. 종합 리포트 내용을 그대로 반복하지는 마세요.
 관계가 뚜렷하지 않다면 억지로 엮지 말고, 목표 변화나 리듬 변화 중 더 뚜렷한 쪽 하나만 단독으로 짚어도 좋아요. 둘 다 뚜렷하지 않은 항목은 아예 만들지 마세요.
 - 최대 3개까지만, 정말 짚을 게 없으면 빈 배열도 괜찮아요.
 - 각 문장은 40~60자, 담담하고 자연스러운 ~어요/~였어요체.
