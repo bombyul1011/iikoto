@@ -391,7 +391,9 @@ function renderTodayHabits(habits,checks,dk){
   el.innerHTML=`<div class="habit-grid">${habits.map(h=>{
     const done=checkedNames.has(h.name);
     const c=colorMap[h.color]||'var(--pal-warmgray-rgb)';
-    return `<div class="habit-row${done?' done':''}"><div class="habit-dot" style="background:rgba(${c},${done?1:0.35});"></div>${escapeHtml(h.name)}${done?'<i class="ti ti-check habit-check" aria-hidden="true"></i>':''}</div>`;
+    const hIcon=getHabitIcon(h.name);
+    const iconHtml=hIcon?`<i class="ti ${hIcon} habit-row-icon" style="color:rgba(${c},${done?1:0.6});" aria-hidden="true"></i>`:'';
+    return `<div class="habit-row${done?' done':''}"><div class="habit-dot" style="background:rgba(${c},${done?1:0.35});"></div>${iconHtml}${escapeHtml(h.name)}${done?'<i class="ti ti-check habit-check" aria-hidden="true"></i>':''}</div>`;
   }).join('')}</div>`;
 }
 
@@ -530,7 +532,7 @@ async function openReportPanel(cacheKey,title){
       bodyEl.innerHTML=content;
     }
   }else{
-    bodyEl.innerHTML=content;
+    bodyEl.innerHTML=`<div class="mr-ai-comment">${content}</div>`;
   }
 }
 function closeReportPanel(){
@@ -1011,9 +1013,10 @@ function _applyFontSizes(){
   const b=FS_STEPS[String(_fsStep)]||FS_STEPS['0'];
   document.documentElement.style.setProperty('--fs-title',b.title+'px');
   document.documentElement.style.setProperty('--fs-body',b.body+'px');
-  // 본앱에서 생성된 리포트 HTML(메모리포트 등)은 --main-text-size 인라인 스타일을 그대로 갖고 있어,
-  // 이 변수를 --fs-body와 동기화해둬야 태블릿에서도 폰트 크기 조절이 그대로 반영됨.
+  // 본앱에서 생성된 리포트 HTML(메모리포트, 주간종합 등)은 --main-text-size/--dow-label-size 인라인 스타일을
+  // 그대로 갖고 있어, 이 두 변수를 --fs-body/--fs-sm과 동기화해둬야 태블릿에서도 폰트 조절이 반영됨.
   document.documentElement.style.setProperty('--main-text-size',b.body+'px');
+  document.documentElement.style.setProperty('--dow-label-size',(b.body-1.5)+'px');
 }
 function setFontScale(step){
   if(step!==-1&&step!==0&&step!==1)return;
@@ -1138,7 +1141,7 @@ function renderReportSummaryList(monthlyRows,weeksInMonth,weeklyRowsList,mk){
     const cacheKey=monthlyRow.cache_key;
     const read=_isReportRead(cacheKey);
     items.push({cacheKey,kind:'monthly',read,
-      icon:'ti-calendar',iconBg:'rgba(255,225,120,0.55)',iconColor:'rgba(170,125,0,0.95)',
+      icon:'ti-calendar',iconBg:'rgba(255,225,120,0.55)',iconColor:'var(--pal-yellow-border)',
       title:`${mk.slice(5,7).replace(/^0/,'')}월 월간종합 리포트`,sub:`${mk.slice(0,4)}년 ${mk.slice(5,7).replace(/^0/,'')}월 전체 흐름 정리`});
   }
   weeksInMonth.slice().reverse().forEach((wk,i)=>{
@@ -1149,7 +1152,7 @@ function renderReportSummaryList(monthlyRows,weeksInMonth,weeklyRowsList,mk){
     const cacheKey=row.cache_key;
     const read=_isReportRead(cacheKey);
     items.push({cacheKey,kind:'weekly',read,
-      icon:'ti-sparkles',iconBg:'rgba(210,175,225,0.5)',iconColor:'rgba(130,75,150,0.95)',
+      icon:'ti-sparkles',iconBg:'rgba(210,175,225,0.5)',iconColor:'var(--pal-lavender-border)',
       title:`${(idx+1)}주차 주간종합 리포트`,sub:_weekRangeLabel(wk)});
   });
   if(!items.length){el.innerHTML='<div class="empty-msg">이 달엔 아직 발행된 종합 리포트가 없어요</div>';return;}
@@ -1169,12 +1172,26 @@ function openReportFromList(cacheKey,title){
   openReportPanel(cacheKey,title);
   loadReportsTab();
 }
-// 습관/메모 리포트는 분량이 짧아 박스 그리드 안에서 바로 스크롤로 전체를 읽을 수 있게 구성(팝업 없이)
+// HTML 문자열에서 첫 굵은글씨(한줄요약) 블록과 나머지 본문을 분리
+function _parseReportPreview(html){
+  const div=document.createElement('div');
+  div.innerHTML=html;
+  const children=[...div.children];
+  if(!children.length)return{headline:null,bodyText:div.textContent||''};
+  const first=children[0];
+  const isBold=first.style&&(first.style.fontWeight==='600'||first.style.fontWeight==='bold');
+  if(isBold){
+    const headline=first.textContent||'';
+    const rest=children.slice(1).map(c=>c.textContent||'').join(' ').trim();
+    return{headline,bodyText:rest};
+  }
+  return{headline:null,bodyText:div.textContent||''};
+}
 function renderReportBoxGrid(elId,weeksInMonth,rowsList,type){
   const el=document.getElementById(elId);
   const meta=type==='habit'
-    ?{icon:'ti-target-arrow',iconBg:'rgba(145,210,175,0.5)',iconColor:'rgba(40,120,80,0.95)'}
-    :{icon:'ti-notes',iconBg:'rgba(170,208,228,0.5)',iconColor:'rgba(45,105,140,0.95)'};
+    ?{icon:'ti-target-arrow',iconBg:'rgba(145,210,175,0.5)',iconColor:'var(--pal-mint-border)'}
+    :{icon:'ti-notes',iconBg:'rgba(170,208,228,0.5)',iconColor:'var(--pal-sky-border)'};
   if(!weeksInMonth.length){el.innerHTML='<div class="empty-msg">이 달엔 해당 주차가 없어요</div>';return;}
   el.innerHTML=weeksInMonth.slice().reverse().map((wk,i)=>{
     const idx=weeksInMonth.indexOf(wk);
@@ -1186,21 +1203,33 @@ function renderReportBoxGrid(elId,weeksInMonth,rowsList,type){
     }
     const cacheKey=row.cache_key;
     const read=_isReportRead(cacheKey);
-    return `<div class="report-box${read?' read':''}" onclick="markReportBoxRead(this,'${cacheKey}')">
+    const title=`${wkNo}주차 ${type==='habit'?'습관 리뷰':'메모 리포트'}`;
+    const{headline,bodyText}=_parseReportPreview(row.content);
+    const bodyHtml=headline
+      ?`<div class="report-box-body headline-only"><div class="report-box-headline">${escapeHtml(headline)}</div></div>`
+      :`<div class="report-box-body text-preview"><div class="report-box-preview-txt">${escapeHtml(bodyText)}</div></div>`;
+    return `<div class="report-box${read?' read':''}" onclick="openReportBoxDetail('${cacheKey}','${escapeHtml(title)}',this)">
       ${read?'':'<div class="report-box-dot"></div>'}
       <div class="report-box-hdr">
         <div class="report-box-icon" style="background:${meta.iconBg};"><i class="ti ${meta.icon}" style="color:${meta.iconColor};" aria-hidden="true"></i></div>
         <div><div class="report-box-wk">${wkNo}주차</div><div class="report-box-range">${_weekRangeLabel(wk)}</div></div>
       </div>
-      <div class="report-box-body">${row.content}</div>
+      ${bodyHtml}
+      <div class="report-box-ellipsis">···</div>
     </div>`;
   }).join('');
 }
-function markReportBoxRead(el,cacheKey){
+function openReportBoxDetail(cacheKey,title,el){
   _markReportRead(cacheKey);
-  el.classList.add('read');
-  const dot=el.querySelector('.report-box-dot');
-  if(dot)dot.remove();
+  if(el){el.classList.add('read');const dot=el.querySelector('.report-box-dot');if(dot)dot.remove();}
+  document.getElementById('report-panel-title').innerHTML=`<i class="ti ti-sparkles" aria-hidden="true"></i>${title}`;
+  const bodyEl=document.getElementById('report-panel-body');
+  bodyEl.innerHTML='<div class="loading-msg">불러오는 중...</div>';
+  document.getElementById('report-overlay').classList.add('on');
+  supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent(cacheKey)}&select=content`).then(rows=>{
+    const content=rows&&rows[0]&&rows[0].content;
+    bodyEl.innerHTML=content?`<div class="mr-ai-comment">${content}</div>`:'<div class="empty-msg">내용을 불러오지 못했어요</div>';
+  });
   _updateSideReportBadge();
 }
 async function _updateSideReportBadge(){
@@ -1242,3 +1271,31 @@ document.addEventListener('visibilitychange',()=>{
     renderMiniCal();
   }
 });
+
+// ══════════════════════════════════════════════════════════
+// 화면별 좌우 스와이프 이동 — 오늘/주간/월간/리포트탭에서 날짜·기간 이동
+// ══════════════════════════════════════════════════════════
+(function setupSwipeNav(){
+  const wrap=document.querySelector('.main-wrap');
+  if(!wrap)return;
+  let startX=0,startY=0,tracking=false;
+  const SWIPE_MIN_DIST=60; // 스와이프로 인정할 최소 가로 이동거리(px)
+  const SWIPE_MAX_VERTICAL=50; // 이보다 세로로 많이 움직이면 스크롤 의도로 보고 무시
+  wrap.addEventListener('touchstart',e=>{
+    if(e.touches.length!==1)return;
+    // 리포트탭의 습관/메모 그리드는 자체 가로 스크롤이 있어, 그 안에서 시작된 터치는 탭 이동 스와이프로 취급하지 않음
+    if(e.target.closest&&e.target.closest('.report-box-grid')){tracking=false;return;}
+    startX=e.touches[0].clientX;startY=e.touches[0].clientY;tracking=true;
+  },{passive:true});
+  wrap.addEventListener('touchend',e=>{
+    if(!tracking)return;tracking=false;
+    const endX=e.changedTouches[0].clientX,endY=e.changedTouches[0].clientY;
+    const dx=endX-startX,dy=endY-startY;
+    if(Math.abs(dx)<SWIPE_MIN_DIST||Math.abs(dy)>SWIPE_MAX_VERTICAL)return;
+    const dir=dx<0?1:-1; // 왼쪽으로 스와이프(다음), 오른쪽으로 스와이프(이전)
+    if(_currentTab==='today')shiftSelectedDate(dir);
+    else if(_currentTab==='week')shiftSelectedWeek(dir);
+    else if(_currentTab==='month')shiftSelectedMonth(dir);
+    else if(_currentTab==='reports')shiftReportMonth(dir);
+  },{passive:true});
+})();
