@@ -929,7 +929,7 @@ async function renderReadingCal(){
   // 독서달력 고정 부분(카드패딩+라벨+네비+카운트+요일헤더) + 주차수만큼의 grid 높이(46px씩, row-gap 9px)를 합산.
   const weekRows=Math.ceil((startWeekday+daysInMonth)/7);
   const RDCAL_FIXED_PART=32+30+22+49+20; // 카드패딩/card-lbl/nav/count/dow헤더 — 실제 렌더 여백과 폰트 기준 고정 추정치
-  const gridHeight=weekRows*46+(weekRows-1)*9;
+  const gridHeight=weekRows*54+(weekRows-1)*12; // 셀 54px(표지 이미지가 확실히 들어가는 크기) + row-gap 12px
   const topRowHeight=RDCAL_FIXED_PART+gridHeight;
   document.querySelector('.top-row').style.height=topRowHeight+'px';
 }
