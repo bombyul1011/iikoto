@@ -61,9 +61,9 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .mini-cal-hdr i{font-size:var(--fs-title);color:var(--tm);cursor:pointer;padding:2px 4px;}
 .mini-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;font-size:var(--fs-sm);text-align:center;color:var(--ts);}
 .mini-cal-grid .dow{color:var(--tm);font-size:var(--fs-xs);padding-bottom:3px;}
-.mini-cal-day{padding:5px 0;border-radius:6px;cursor:pointer;position:relative;}
+.mini-cal-day{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;border-radius:6px;cursor:pointer;position:relative;}
 .mini-cal-day.today{background:var(--pal-yellow-bg);color:var(--pal-yellow-text);font-weight:600;}
-.mini-cal-day.sel{background:var(--pal-warmgray-bg);color:var(--pal-warmgray-text);font-weight:600;}
+.mini-cal-day.sel{background:var(--pal-warmgray-bg);color:var(--pal-warmgray-text);font-weight:600;border-radius:50%;}
 .side-hcard{border-radius:16px;padding:15px 14px 13px;margin-bottom:10px;position:relative;overflow:hidden;box-shadow:0 2px 16px rgba(180,140,120,0.08),inset 0 1px 0 rgba(255,250,240,0.62);}
 .side-hcard.morning{background:linear-gradient(135deg,rgba(255,205,175,0.72),rgba(255,235,180,0.55));border:1px solid rgba(255,200,165,0.55);}
 .side-hcard.afternoon{background:linear-gradient(135deg,rgba(255,220,235,0.65),rgba(255,235,200,0.60));border:1px solid rgba(255,200,210,0.50);}
@@ -91,13 +91,13 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .card-lbl{font-size:var(--fs-title);font-weight:600;color:var(--tp);margin-bottom:11px;display:flex;align-items:center;gap:7px;}
 .card-lbl i{font-size:var(--fs-lg);}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;align-items:stretch;}
-.month-top-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;align-items:stretch;height:250px;}
+.month-top-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:16px;align-items:stretch;height:270px;}
 .month-top-left{display:flex;flex-direction:column;gap:13px;height:100%;}
 .month-top-left .card{flex:1;min-height:0;display:flex;flex-direction:column;margin-bottom:0;}
 .month-top-right{min-height:0;height:100%;margin-bottom:0;}
 .card.month-compact{padding:14px 16px 12px;}
 .card.month-compact .card-lbl{margin-bottom:8px;}
-.month-goals-box{min-height:calc(var(--fs-sm) * 1.4 * 3 + 6px * 3);display:flex;flex-direction:column;justify-content:center;}
+.month-goals-box{min-height:calc(var(--fs-body) * 1.4 * 3 + 6px * 3);display:flex;flex-direction:column;justify-content:center;}
 .month-compact .habit-numbox-grid{grid-template-columns:repeat(4,1fr);gap:7px;}
 .month-compact .habit-numbox-card{padding:11px 4px;border-radius:12px;}
 .month-compact .habit-numbox-card .habit-numbox-icon{font-size:var(--fs-lg);}
@@ -222,7 +222,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .oneline-dow{width:22px;flex-shrink:0;font-weight:600;color:var(--tp);}
 
 /* ── 월간탭 ── */
-.top-row{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;align-items:stretch;}
+.top-row{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;align-items:stretch;height:420px;}
 .rdcal-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin:0 0 4px;}
 .rdcal-nav i{font-size:var(--fs-title);color:var(--tm);cursor:pointer;}
 .rdcal-month{font-weight:600;font-size:var(--fs-body);color:var(--tp);}
@@ -232,7 +232,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .rdcal-dow{text-align:center;font-size:var(--fs-xs);color:var(--tm);font-weight:500;margin-bottom:6px;}
 .rdcal-cover{position:relative;width:34px;height:46px;margin:0 auto;border-radius:5px;background-size:cover;background-position:center;background-color:rgba(200,180,160,0.3);box-shadow:0 1px 3px rgba(0,0,0,0.15);}
 .rdcal-num{text-align:center;font-size:var(--fs-sm);color:var(--tm);height:46px;display:flex;align-items:center;justify-content:center;}
-.mgoal-row{display:flex;align-items:center;gap:7px;padding:3px 0;font-size:var(--fs-sm);color:var(--tp);}
+.mgoal-row{display:flex;align-items:center;gap:7px;padding:3px 0;font-size:var(--fs-body);color:var(--tp);}
 .mgoal-row::before{content:'';width:4px;height:4px;border-radius:50%;background:rgba(var(--pal-orange-rgb),1);flex-shrink:0;}
 
 /* 콘텐츠 타임라인 — 본앱과 동일한 시각 스타일(빈 날짜=점선 네모칸, 콘텐츠=카테고리색 둥근 블록), 전체 폭 한줄(%기반) */
@@ -272,13 +272,14 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 /* 콘텐츠 모아보기(월별) — 본앱 콘텐츠 모아보기 시트 구조 이식, 독서달력 카드와 높이 맞춰 넘치면 스크롤 */
 .ccol-card{display:flex;flex-direction:column;overflow:hidden;}
 .ccol-scroll{flex:1;min-height:0;overflow-y:auto;}
+.rdcal-card{overflow:hidden;box-sizing:border-box;}
 .ccol-sec{margin-bottom:12px;}
 .ccol-sec:last-child{margin-bottom:0;}
 .ccol-sec-title{display:flex;align-items:center;gap:5px;font-size:var(--fs-sm);font-weight:600;color:var(--ts);margin-bottom:6px;}
 .ccol-item{display:flex;align-items:center;gap:9px;padding:5px 0;}
 .ccol-poster{width:30px;height:30px;border-radius:7px;object-fit:cover;flex-shrink:0;}
 .ccol-poster-fallback{width:30px;height:30px;border-radius:7px;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
-.ccol-title{flex:1;min-width:0;font-size:var(--fs-sm);color:var(--tp);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ccol-title{flex:1;min-width:0;font-size:var(--fs-body);color:var(--tp);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .ccol-status{flex-shrink:0;font-size:var(--fs-xs);color:var(--tm);}
 .ccol-stars{flex-shrink:0;font-size:var(--fs-xs);color:#e0b050;}
 
@@ -385,7 +386,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
         <div class="card chaeum-log-card month-top-right" id="month-top-right"><div class="chaeum-log-hdr"><div class="chaeum-log-title"><i class="ti ti-clover" aria-hidden="true"></i>채움 로그</div></div><div class="chaeum-log-stat" id="chaeum-log-stat"></div><div class="chaeum-log-tl" id="chaeum-log-tl"></div></div>
       </div>
       <div class="top-row">
-        <div class="card">
+        <div class="card rdcal-card">
           <div class="card-lbl"><i class="ti ti-book" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>독서 달력</div>
           <div class="rdcal-nav"><i class="ti ti-chevron-left" onclick="rdCalShift(-1)" aria-hidden="true"></i><div class="rdcal-month" id="rdcal-month"></div><i class="ti ti-chevron-right" onclick="rdCalShift(1)" aria-hidden="true"></i></div>
           <div class="rdcal-count" id="rdcal-count"></div>

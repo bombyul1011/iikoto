@@ -110,7 +110,7 @@ async function renderMiniCal(){
     const dk=`${y}-${pad(m+1)}-${pad(d)}`;
     let cls='mini-cal-day';
     if(dk===todayDk)cls+=' today';
-    if(dk===selDk)cls+=' sel';
+    else if(dk===selDk)cls+=' sel'; // 오늘이 선택된 상태에선 today색을 유지 — sel은 오늘이 아닌 날짜를 골랐을 때만
     html+=`<div class="${cls}" onclick="selectDate('${dk}')">${d}</div>`;
   }
   html+='</div>';
