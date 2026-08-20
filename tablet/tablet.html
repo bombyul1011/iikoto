@@ -178,7 +178,6 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .habit-card{border-color:rgba(var(--pal-mint-rgb),0.35)!important;}
 .habit-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;}
 .habit-row{display:flex;align-items:center;gap:6px;padding:3px 0;font-size:var(--fs-body);color:var(--ts);}
-.habit-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
 .habit-row-icon{font-size:var(--fs-sm);flex-shrink:0;}
 .habit-row.done{color:var(--tp);font-weight:500;}
 .habit-check{margin-left:auto;font-size:var(--fs-sm);color:rgba(var(--pal-mint-rgb),1);}
@@ -286,7 +285,17 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .habit-numbox-num{font-size:var(--fs-xl);font-weight:700;color:var(--tp);font-family:'DM Sans',sans-serif;margin-top:6px;}
 
 /* 신규: 이번달 수집문장 배너 */
-.month-quotes-card{max-height:170px;overflow-y:auto;}
+.month-quotes-card{max-height:270px;overflow-y:auto;}
+.mq-book{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid rgba(var(--divider-rgb),0.25);}
+.mq-book:last-child{border-bottom:none;padding-bottom:2px;}
+.mq-book-cover{width:44px;height:62px;border-radius:5px;object-fit:cover;flex-shrink:0;}
+.mq-book-cover-fallback{width:44px;height:62px;border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--pal-warmgray-bg);color:var(--pal-warmgray-text);font-size:var(--fs-lg);}
+.mq-book-info{flex:1;min-width:0;}
+.mq-book-title{font-size:var(--fs-body);font-weight:600;color:var(--tp);margin-bottom:1px;}
+.mq-book-author{font-size:var(--fs-sm);color:var(--ts);margin-bottom:9px;}
+.mq-quote-list{display:flex;flex-direction:column;gap:7px;}
+.mq-quote-item{font-size:var(--fs-body);line-height:1.6;color:var(--ts);padding-left:9px;border-left:2px solid rgba(var(--divider-rgb),0.35);}
+.mq-quote-comment{font-size:var(--fs-sm);color:var(--tm);margin-top:3px;}
 .month-quote-item{display:flex;gap:9px;padding:6px 0;border-left:2px solid rgba(var(--divider-rgb),0.3);padding-left:10px;margin-left:2px;}
 .month-quote-date{font-size:var(--fs-sm);color:var(--tm);flex-shrink:0;width:34px;}
 .month-quote-txt{font-size:var(--fs-body);color:var(--ts);line-height:1.5;}

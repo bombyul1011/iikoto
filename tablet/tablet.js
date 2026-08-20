@@ -393,7 +393,7 @@ function renderTodayHabits(habits,checks,dk){
     const c=colorMap[h.color]||'var(--pal-warmgray-rgb)';
     const hIcon=getHabitIcon(h.name);
     const iconHtml=hIcon?`<i class="ti ${hIcon} habit-row-icon" style="color:rgba(${c},${done?1:0.6});" aria-hidden="true"></i>`:'';
-    return `<div class="habit-row${done?' done':''}"><div class="habit-dot" style="background:rgba(${c},${done?1:0.35});"></div>${iconHtml}${escapeHtml(h.name)}${done?'<i class="ti ti-check habit-check" aria-hidden="true"></i>':''}</div>`;
+    return `<div class="habit-row${done?' done':''}">${iconHtml}${escapeHtml(h.name)}${done?'<i class="ti ti-check habit-check" aria-hidden="true"></i>':''}</div>`;
   }).join('')}</div>`;
 }
 
@@ -910,18 +910,38 @@ async function renderMonthStatBar(y,mo){
   });
 }
 
-// 신규: 이번 달 수집한 문장(reading_quotes) — created 타임스탬프 기준
+// 신규: 이번 달 수집한 문장(reading_quotes) — created 타임스탬프 기준, 책 단위로 그룹핑
 async function renderMonthQuotes(y,mo){
   const el=document.getElementById('month-quotes');
   const startMs=new Date(y,mo,1,0,0,0,0).getTime();
   const daysInMonth=new Date(y,mo+1,0).getDate();
   const endMs=new Date(y,mo,daysInMonth,23,59,59,999).getTime();
-  const rows=await supaFetch(`reading_quotes?created=gte.${startMs}&created=lte.${endMs}&order=created.asc&select=text,created`);
+  const rows=await supaFetch(`reading_quotes?created=gte.${startMs}&created=lte.${endMs}&order=created.asc&select=text,created,book_cid,comment`);
   if(!rows||!rows.length){el.innerHTML='<div class="empty-msg">이번 달 수집한 문장이 없어요</div>';return;}
-  el.innerHTML=rows.map(r=>{
-    const d=new Date(Number(r.created));
-    const dateLabel=`${d.getMonth()+1}.${pad(d.getDate())}`;
-    return `<div class="month-quote-item"><div class="month-quote-date">${dateLabel}</div><div class="month-quote-txt">${escapeHtml(r.text||'')}</div></div>`;
+  const bookCids=[...new Set(rows.map(r=>r.book_cid).filter(Boolean))];
+  let bookMap={};
+  if(bookCids.length){
+    const cidFilter=bookCids.map(c=>`"${c}"`).join(',');
+    const books=await supaFetch(`reading_books?cid=in.(${cidFilter})&select=cid,title,author,poster`);
+    (books||[]).forEach(b=>{bookMap[b.cid]=b;});
+  }
+  const groups=[];
+  const groupIdx={};
+  rows.forEach(r=>{
+    const key=r.book_cid||'_none';
+    if(!(key in groupIdx)){groupIdx[key]=groups.length;groups.push({book_cid:r.book_cid,items:[]});}
+    groups[groupIdx[key]].items.push(r);
+  });
+  el.innerHTML=groups.map(g=>{
+    const b=bookMap[g.book_cid];
+    const title=b?.title||'책 미지정';
+    const author=b?.author||'';
+    const coverHtml=b?.poster?`<img class="mq-book-cover" src="${b.poster}" alt="">`:`<div class="mq-book-cover-fallback"><i class="ti ti-book" aria-hidden="true"></i></div>`;
+    const quoteItems=g.items.map(r=>{
+      const commentHtml=r.comment?`<div class="mq-quote-comment">${escapeHtml(r.comment)}</div>`:'';
+      return `<div class="mq-quote-item">${escapeHtml(r.text||'')}${commentHtml}</div>`;
+    }).join('');
+    return `<div class="mq-book">${coverHtml}<div class="mq-book-info"><div class="mq-book-title">${escapeHtml(title)}</div>${author?`<div class="mq-book-author">${escapeHtml(author)}</div>`:''}<div class="mq-quote-list">${quoteItems}</div></div></div>`;
   }).join('');
 }
 
