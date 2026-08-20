@@ -11254,13 +11254,13 @@ function renderReadingCalView(){
   const el=document.getElementById('rdcal-view');
   const y=_rdCalDate.getFullYear(),m=_rdCalDate.getMonth();
   const first=new Date(y,m,1);
-  const startWeekday=first.getDay();
+  const startWeekday=(first.getDay()+6)%7; // 월요일 시작(0=월 ... 6=일)
   const daysInMonth=new Date(y,m+1,0).getDate();
   const books=getBooks();
   const bookMap={};books.forEach(b=>bookMap[b.cid]=b);
   const totalBooksThisMonth=new Set();
   Object.values(_rdCalLogsByDate).forEach(list=>list.forEach(r=>totalBooksThisMonth.add(r.book_cid)));
-  const weekdays=['일','월','화','수','목','금','토'];
+  const weekdays=['월','화','수','목','금','토','일'];
   let html=`<div style="display:flex;align-items:center;justify-content:center;gap:18px;margin:2px 0 6px;">
     <i class="ti ti-chevron-left ico-cal-nav" onclick="rdCalMonthShift(-1)" aria-hidden="true"></i>
     <div style="font-weight:600;font-size:var(--main-text-size);color:var(--tp);">${y}년 ${String(m+1).padStart(2,'0')}월</div>
