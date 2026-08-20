@@ -461,6 +461,47 @@ const WC_COLORS_RGB=['var(--pal-pink-rgb)','var(--pal-orange-rgb)','var(--pal-ye
 const WC_COLORS_TXT=['var(--pal-pink-text)','var(--pal-orange-text)','var(--pal-yellow-text)','var(--pal-mint-text)','var(--pal-sky-text)','var(--pal-lavender-text)','var(--pal-rose-text)'];
 const WC_DOW=['월','화','수','목','금','토','일'];
 
+// ── 상단 화살표: 오늘/주간/월간 탭 공통 날짜 이동 ──
+function shiftSelectedDate(delta){
+  const d=new Date(_selectedDate);
+  d.setDate(d.getDate()+delta);
+  _selectedDate=d;
+  _sideCalDate=new Date(d);
+  renderMiniCal();
+  loadTodayTab();
+}
+function shiftSelectedWeek(delta){
+  const d=new Date(_selectedDate);
+  d.setDate(d.getDate()+delta*7);
+  _selectedDate=d;
+  _sideCalDate=new Date(d);
+  renderMiniCal();
+  loadWeekTab();
+}
+function shiftSelectedMonth(delta){
+  const d=new Date(_selectedDate);
+  const day=d.getDate();
+  d.setDate(1); // 말일 넘어가는 오버플로 방지(예: 1/31 +1개월 → 3/3 되는 문제)
+  d.setMonth(d.getMonth()+delta);
+  const lastDay=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();
+  d.setDate(Math.min(day,lastDay));
+  _selectedDate=d;
+  _sideCalDate=new Date(d);
+  renderMiniCal();
+  loadMonthTab();
+}
+// 월요일 시작 기준, baseDate가 속한 주의 월요일이 그 달의 몇 번째 월요일인지로 "N주차" 계산
+function getWeekOfMonthLabel(baseDate){
+  const wk=weekKeyOf(baseDate);
+  const monday=new Date(wk+'T00:00:00');
+  const y=monday.getFullYear(),mo=monday.getMonth();
+  const firstOfMonth=new Date(y,mo,1);
+  const firstMondayOffset=(8-firstOfMonth.getDay())%7; // 그 달 1일 기준 첫 월요일까지 offset(일)
+  const firstMonday=new Date(y,mo,1+firstMondayOffset);
+  const weekNo=Math.round((monday-firstMonday)/(7*24*60*60*1000))+1;
+  return `${mo+1}월 ${weekNo}주차`;
+}
+
 function getWeekDates(baseDate){
   const wk=weekKeyOf(baseDate);
   const monday=new Date(wk+'T00:00:00');
@@ -473,7 +514,7 @@ async function loadWeekTab(){
   const weekDates=getWeekDates(_selectedDate);
   const wk='week:'+weekDates[0];
   const startDk=weekDates[0],endDk=weekDates[6];
-  document.getElementById('week-range').textContent=`${weekDates[0].slice(5).replace('-','.')} - ${weekDates[6].slice(5).replace('-','.')}`;
+  document.getElementById('week-range').textContent=`${getWeekOfMonthLabel(_selectedDate)} (${weekDates[0].slice(5).replace('-','.')} - ${weekDates[6].slice(5).replace('-','.')})`;
 
   const [goalRows,habits,habitChecks,memos,todos,sleepRows,onelineRows,contents]=await Promise.all([
     supaFetch(`goal_notes?note_key=eq.wchallenge_${encodeURIComponent(wk)}`),
@@ -599,6 +640,7 @@ async function loadMonthTab(){
   await renderMonthHabits(y,mo);
   await renderMonthStatBar(y,mo);
   await renderMonthQuotes(y,mo);
+  await renderMonthContentCollect(y,mo);
   await renderChaeumLogTablet();
   _rdCalDate=new Date(_monthCalDate);
   await renderReadingCal();
@@ -617,6 +659,42 @@ function isContentCarryOverTablet(c,mk){
   if(c.status==='watching')return true;
   if((c.status==='done'||c.status==='stopped')&&c.end_date&&c.end_date.slice(0,7)>=mk)return true;
   return false;
+}
+function isContentEndedInMonthTablet(c,targetMk){
+  return (c.end_date||c.start_date||'').slice(0,7)===targetMk;
+}
+// 본앱 computeContentMonthlyList와 동일 규칙: 완결은 종료월에 한 번, 진행중은 오늘이 속한 달에서만 노출
+async function renderMonthContentCollect(y,mo){
+  const el=document.getElementById('month-content-collect');
+  const mk=`${y}-${pad(mo+1)}`;
+  const prevMk=monthKeyOf(new Date(y,mo-1,1));
+  const isSameMonth=mk===monthKeyOf(new Date());
+  const [curRows,prevRows]=await Promise.all([
+    supaFetch(`contents?month_key=eq.${mk}`),
+    supaFetch(`contents?month_key=eq.${prevMk}`)
+  ]);
+  const belongsHere=c=>{
+    if(c.status==='done'||c.status==='stopped')return isContentEndedInMonthTablet(c,mk);
+    return c.status==='watching'&&isSameMonth;
+  };
+  const list=[...(curRows||[]).filter(belongsHere),...(prevRows||[]).filter(belongsHere)];
+  const CATS=['drama','book','movie','music'];
+  const byCat={drama:[],book:[],movie:[],music:[]};
+  list.forEach(c=>{if(byCat[c.content_cat])byCat[c.content_cat].push(c);});
+  const hasAny=CATS.some(cat=>byCat[cat].length>0);
+  if(!hasAny){el.innerHTML='<div class="empty-msg">이 달엔 완료한 콘텐츠가 없어요</div>';return;}
+  el.innerHTML=CATS.filter(cat=>byCat[cat].length>0).map(cat=>{
+    const meta=CAT_ICON_META[cat];
+    const items=byCat[cat].map(c=>{
+      const stars=c.stars>0?`<span class="ccol-stars">${'★'.repeat(c.stars)}</span>`:'';
+      const status=c.status==='stopped'?'<span class="ccol-status">중단</span>':(c.status==='watching'?'<span class="ccol-status">진행중</span>':'');
+      const poster=c.poster
+        ?`<img class="ccol-poster" src="${c.poster}" />`
+        :`<div class="ccol-poster-fallback" style="background:${meta.bg};"><i class="ti ${meta.icon}" style="font-size:13px;color:#fff;" aria-hidden="true"></i></div>`;
+      return `<div class="ccol-item">${poster}<div class="ccol-title">${escapeHtml(c.title||'')}</div>${stars}${status}</div>`;
+    }).join('');
+    return `<div class="ccol-sec"><div class="ccol-sec-title"><i class="ti ${meta.icon}" aria-hidden="true"></i>${meta.label}</div>${items}</div>`;
+  }).join('');
 }
 async function renderMonthTimetable(y,mo){
   const el=document.getElementById('month-tt');
