@@ -111,6 +111,7 @@ function switchTab(tab){
   if(tab==='today'){_selectedDate=new Date();loadTodayTab();}
   else if(tab==='week')loadWeekTab();
   else if(tab==='month')loadMonthTab();
+  else if(tab==='reports')loadReportsTab();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -950,43 +951,221 @@ async function renderChaeumLogTablet(){
 }
 
 // ══════════════════════════════════════════════════════════
-// 설정탭 — 글자 크기 조절(제목/본문/작은글씨), localStorage에 px값 저장
+// 설정탭 — 글자 크기 조절(작게/기본/크게 3단계, 본앱과 동일한 textScale 저장 키/step 체계)
 // ══════════════════════════════════════════════════════════
-const FS_BASE={title:16,body:15,sm:-1.5}; // sm은 body 대비 보정치(calc 기준) 그대로 두고, title/body만 실제 조절
-const FS_STORE_KEY='tablet_fs_offset';
-const FS_MIN=-4,FS_MAX=6;
-function _loadFsOffsets(){
+const FS_STEPS={'-1':{title:15,body:14},'0':{title:16,body:15},'1':{title:17,body:16}};
+function _loadFsStep(){
   try{
-    const raw=localStorage.getItem(FS_STORE_KEY);
-    if(!raw)return{title:0,body:0,sm:0};
-    const parsed=JSON.parse(raw);
-    return{title:parsed.title||0,body:parsed.body||0,sm:parsed.sm||0};
-  }catch(e){return{title:0,body:0,sm:0};}
+    const raw=localStorage.getItem('textScale');
+    const n=raw?JSON.parse(raw):0;
+    return(n===-1||n===0||n===1)?n:0;
+  }catch(e){return 0;}
 }
-let _fsOffsets=_loadFsOffsets();
+let _fsStep=_loadFsStep();
 function _applyFontSizes(){
-  const root=document.documentElement.style;
-  root.setProperty('--fs-title',(FS_BASE.title+_fsOffsets.title)+'px');
-  root.setProperty('--fs-body',(FS_BASE.body+_fsOffsets.body)+'px');
-  // sm은 body 파생값(calc(var(--fs-body) - 1.5px))이 기본이지만, 별도 조절 시엔 body와 무관하게 직접 지정
-  if(_fsOffsets.sm===0){
-    root.removeProperty('--fs-sm-override');
-    root.setProperty('--fs-sm','calc(var(--fs-body) - 1.5px)');
+  const b=FS_STEPS[String(_fsStep)]||FS_STEPS['0'];
+  document.documentElement.style.setProperty('--fs-title',b.title+'px');
+  document.documentElement.style.setProperty('--fs-body',b.body+'px');
+}
+function setFontScale(step){
+  if(step!==-1&&step!==0&&step!==1)return;
+  _fsStep=step;
+  localStorage.setItem('textScale',JSON.stringify(step));
+  _applyFontSizes();
+}
+function adjustFontSize(dir){
+  const next=Math.max(-1,Math.min(1,_fsStep+dir));
+  if(next===_fsStep)return;
+  setFontScale(next);
+}
+function resetFontSize(){
+  setFontScale(0);
+}
+
+// ══════════════════════════════════════════════════════════
+// 리포트탭 — 월간종합/주간종합/주간습관(챌린지리뷰)/주간메모, 월 단위로 모아보기
+// ══════════════════════════════════════════════════════════
+let _reportMonthDate=new Date();
+let _reportFilter='all';
+const REPORT_READ_KEY='tablet_report_read'; // localStorage에 읽은 cache_key 집합 저장
+
+function _loadReadReports(){
+  try{
+    const raw=localStorage.getItem(REPORT_READ_KEY);
+    return raw?new Set(JSON.parse(raw)):new Set();
+  }catch(e){return new Set();}
+}
+function _saveReadReports(set){
+  try{localStorage.setItem(REPORT_READ_KEY,JSON.stringify([...set]));}catch(e){}
+}
+function _markReportRead(cacheKey){
+  const set=_loadReadReports();
+  if(set.has(cacheKey))return;
+  set.add(cacheKey);
+  _saveReadReports(set);
+}
+function _isReportRead(cacheKey){
+  return _loadReadReports().has(cacheKey);
+}
+
+// 본앱과 동일한 "월 소속 주차" 판정: 그 주(월요일 시작)의 목요일이 해당 (y,mo)에 속할 때만 그 달 소속으로 인정.
+// 예: 8/31~9/6 주는 목요일이 9/3이라 9월 소속(월요일만 8월이어도 9월로 잡힘).
+function getReportWeeksOfMonth(y,mo){
+  const dim=new Date(y,mo+1,0).getDate();
+  const weekSet={};
+  for(let d=1;d<=dim;d++){
+    const date=new Date(y,mo,d);
+    const wk=weekKeyOf(date);
+    const wkStart=new Date(wk+'T00:00:00');
+    const wkThu=new Date(wkStart);wkThu.setDate(wkStart.getDate()+3);
+    if(wkThu.getFullYear()===y&&wkThu.getMonth()===mo)weekSet[wk]=true;
+  }
+  return Object.keys(weekSet).sort();
+}
+function _weekRangeLabel(wk){
+  const start=new Date(wk+'T00:00:00');
+  const end=new Date(start);end.setDate(start.getDate()+6);
+  return `${start.getMonth()+1}.${start.getDate()}~${end.getMonth()+1}.${end.getDate()}`;
+}
+function _weekNoLabel(wk,weeksInMonth){
+  const idx=weeksInMonth.indexOf(wk);
+  return (idx+1)+'주차';
+}
+function shiftReportMonth(delta){
+  _reportMonthDate.setMonth(_reportMonthDate.getMonth()+delta);
+  loadReportsTab();
+}
+function setReportFilter(filter){
+  _reportFilter=filter;
+  document.querySelectorAll('.report-filter-chip').forEach(el=>el.classList.toggle('on',el.dataset.filter===filter));
+  document.querySelectorAll('.report-sec').forEach(el=>{
+    const sec=el.dataset.sec;
+    const show=filter==='all'
+      ||(filter==='monthly'&&sec==='summary')
+      ||(filter==='weekly'&&sec==='summary')
+      ||(filter==='habit'&&sec==='habit')
+      ||(filter==='memo'&&sec==='memo');
+    el.classList.toggle('hidden',!show);
+  });
+  // 종합 섹션 내부는 월간/주간 필터에 따라 리스트 아이템 단위로도 걸러줌
+  if(filter==='monthly'||filter==='weekly'){
+    document.querySelectorAll('#report-summary-list [data-kind]').forEach(el=>{
+      el.style.display=(el.dataset.kind===filter)?'':'none';
+    });
   }else{
-    root.setProperty('--fs-sm',(FS_BASE.body-1.5+_fsOffsets.sm)+'px');
+    document.querySelectorAll('#report-summary-list [data-kind]').forEach(el=>{el.style.display='';});
   }
 }
-function adjustFontSize(key,delta){
-  const next=(_fsOffsets[key]||0)+delta;
-  if(next<FS_MIN||next>FS_MAX)return;
-  _fsOffsets[key]=next;
-  localStorage.setItem(FS_STORE_KEY,JSON.stringify(_fsOffsets));
-  _applyFontSizes();
+async function loadReportsTab(){
+  const y=_reportMonthDate.getFullYear(),mo=_reportMonthDate.getMonth();
+  document.getElementById('report-page-title').textContent=`${y}년 ${mo+1}월`;
+  const weeksInMonth=getReportWeeksOfMonth(y,mo);
+  const mk=monthKeyOf(_reportMonthDate);
+
+  const [monthlyRows,...weeklyRowsList]=await Promise.all([
+    supaFetch(`ai_cache?cache_key=eq.monthly_report_${mk}&select=cache_key,content,expires_at`),
+    ...weeksInMonth.map(wk=>supaFetch(`ai_cache?cache_key=eq.weekly_summary_${wk}&select=cache_key,content,expires_at`))
+  ]);
+  const habitRowsList=await Promise.all(weeksInMonth.map(wk=>supaFetch(`ai_cache?cache_key=eq.challenge_review_${wk}&select=cache_key,content,expires_at`)));
+  const memoRowsList=await Promise.all(weeksInMonth.map(wk=>supaFetch(`ai_cache?cache_key=eq.weekly_memo_report_${wk}&select=cache_key,content,expires_at`)));
+
+  renderReportSummaryList(monthlyRows,weeksInMonth,weeklyRowsList,mk);
+  renderReportBoxGrid('report-habit-grid',weeksInMonth,habitRowsList,'habit');
+  renderReportBoxGrid('report-memo-grid',weeksInMonth,memoRowsList,'memo');
+  setReportFilter(_reportFilter);
+  _updateSideReportBadge();
 }
-function resetFontSize(key){
-  _fsOffsets[key]=0;
-  localStorage.setItem(FS_STORE_KEY,JSON.stringify(_fsOffsets));
-  _applyFontSizes();
+function renderReportSummaryList(monthlyRows,weeksInMonth,weeklyRowsList,mk){
+  const el=document.getElementById('report-summary-list');
+  const items=[];
+  const monthlyRow=monthlyRows&&monthlyRows[0];
+  if(monthlyRow){
+    const cacheKey=monthlyRow.cache_key;
+    const read=_isReportRead(cacheKey);
+    items.push({cacheKey,kind:'monthly',read,
+      icon:'ti-calendar',iconBg:'rgba(255,225,120,0.55)',iconColor:'rgba(170,125,0,0.95)',
+      title:`${mk.slice(5,7).replace(/^0/,'')}월 월간종합 리포트`,sub:`${mk.slice(0,4)}년 ${mk.slice(5,7).replace(/^0/,'')}월 전체 흐름 정리`});
+  }
+  weeksInMonth.slice().reverse().forEach((wk,i)=>{
+    const idx=weeksInMonth.indexOf(wk);
+    const rows=weeklyRowsList[idx];
+    const row=rows&&rows[0];
+    if(!row)return;
+    const cacheKey=row.cache_key;
+    const read=_isReportRead(cacheKey);
+    items.push({cacheKey,kind:'weekly',read,
+      icon:'ti-sparkles',iconBg:'rgba(210,175,225,0.5)',iconColor:'rgba(130,75,150,0.95)',
+      title:`${(idx+1)}주차 주간종합 리포트`,sub:_weekRangeLabel(wk)});
+  });
+  if(!items.length){el.innerHTML='<div class="empty-msg">이 달엔 아직 발행된 종합 리포트가 없어요</div>';return;}
+  el.innerHTML=items.map(it=>`
+    <div class="report-list-item${it.read?' read':''}" data-kind="${it.kind}" onclick="openReportFromList('${it.cacheKey}','${escapeHtml(it.title)}')">
+      <div class="report-list-dot"></div>
+      <div class="report-list-icon" style="background:${it.iconBg};"><i class="ti ${it.icon}" style="color:${it.iconColor};" aria-hidden="true"></i></div>
+      <div class="report-list-body">
+        <div class="report-list-title">${escapeHtml(it.title)}</div>
+        <div class="report-list-sub">${escapeHtml(it.sub)}</div>
+      </div>
+      <i class="ti ti-chevron-right" aria-hidden="true"></i>
+    </div>`).join('');
+}
+function openReportFromList(cacheKey,title){
+  _markReportRead(cacheKey);
+  openReportPanel(cacheKey,title);
+  loadReportsTab();
+}
+// 습관/메모 리포트는 분량이 짧아 박스 그리드 안에서 바로 스크롤로 전체를 읽을 수 있게 구성(팝업 없이)
+function renderReportBoxGrid(elId,weeksInMonth,rowsList,type){
+  const el=document.getElementById(elId);
+  const meta=type==='habit'
+    ?{icon:'ti-target-arrow',iconBg:'rgba(145,210,175,0.5)',iconColor:'rgba(40,120,80,0.95)'}
+    :{icon:'ti-notes',iconBg:'rgba(170,208,228,0.5)',iconColor:'rgba(45,105,140,0.95)'};
+  if(!weeksInMonth.length){el.innerHTML='<div class="empty-msg">이 달엔 해당 주차가 없어요</div>';return;}
+  el.innerHTML=weeksInMonth.slice().reverse().map((wk,i)=>{
+    const idx=weeksInMonth.indexOf(wk);
+    const rows=rowsList[idx];
+    const row=rows&&rows[0];
+    const wkNo=idx+1;
+    if(!row||!row.content){
+      return `<div class="report-box empty"><div class="report-box-empty-txt">아직 없어요</div></div>`;
+    }
+    const cacheKey=row.cache_key;
+    const read=_isReportRead(cacheKey);
+    return `<div class="report-box${read?' read':''}" onclick="markReportBoxRead(this,'${cacheKey}')">
+      ${read?'':'<div class="report-box-dot"></div>'}
+      <div class="report-box-hdr">
+        <div class="report-box-icon" style="background:${meta.iconBg};"><i class="ti ${meta.icon}" style="color:${meta.iconColor};" aria-hidden="true"></i></div>
+        <div><div class="report-box-wk">${wkNo}주차</div><div class="report-box-range">${_weekRangeLabel(wk)}</div></div>
+      </div>
+      <div class="report-box-body">${row.content}</div>
+    </div>`;
+  }).join('');
+}
+function markReportBoxRead(el,cacheKey){
+  _markReportRead(cacheKey);
+  el.classList.add('read');
+  const dot=el.querySelector('.report-box-dot');
+  if(dot)dot.remove();
+  _updateSideReportBadge();
+}
+async function _updateSideReportBadge(){
+  const badge=document.getElementById('side-report-badge');
+  const txt=document.getElementById('side-report-badge-txt');
+  if(!badge)return;
+  const y=new Date().getFullYear(),mo=new Date().getMonth();
+  const weeksInMonth=getReportWeeksOfMonth(y,mo);
+  const mk=monthKeyOf(new Date());
+  const keys=[`monthly_report_${mk}`,...weeksInMonth.map(wk=>`weekly_summary_${wk}`),...weeksInMonth.map(wk=>`challenge_review_${wk}`),...weeksInMonth.map(wk=>`weekly_memo_report_${wk}`)];
+  const rows=await supaFetch(`ai_cache?cache_key=in.(${keys.join(',')})&select=cache_key`);
+  const existing=(rows||[]).map(r=>r.cache_key);
+  const readSet=_loadReadReports();
+  const unreadCount=existing.filter(k=>!readSet.has(k)).length;
+  if(unreadCount>0){
+    badge.classList.add('on');
+    txt.textContent=`안 읽은 리포트 ${unreadCount}개`;
+  }else{
+    badge.classList.remove('on');
+  }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -997,6 +1176,7 @@ async function init(){
   await renderMiniCal();
   scheduleSideGreetingRefresh();
   await loadTodayTab();
+  _updateSideReportBadge();
 }
 init();
 
