@@ -74,6 +74,18 @@ function renderStatBar(elId,{memoCount,doneCount,habitCount,checkCount,habitDeno
   `;
 }
 
+// 수면 점수 → 표정 아이콘 매핑 (본앱 SLEEP_SCORE_LEVELS 원본과 동일)
+const SLEEP_SCORE_LEVELS=[
+  {max:50,  key:'verylow',  icon:'ti-mood-angry',      label:'매우낮음'},
+  {max:65,  key:'low',      icon:'ti-mood-sad',        label:'낮음'},
+  {max:78,  key:'normal',   icon:'ti-mood-empty',      label:'보통'},
+  {max:89,  key:'high',     icon:'ti-mood-smile',      label:'높음'},
+  {max:101, key:'veryhigh', icon:'ti-mood-smile-beam', label:'매우높음'}
+];
+function getSleepScoreLevel(score){
+  return SLEEP_SCORE_LEVELS.find(l=>score<=l.max) || SLEEP_SCORE_LEVELS[SLEEP_SCORE_LEVELS.length-1];
+}
+
 // ── 리듬 카테고리 (RHYTHM_CATS 원본과 동일) ──
 const RHYTHM_CATS={
   exercise:{label:'운동',color:'var(--rh-exercise)',icon:'ti-run'},
@@ -682,22 +694,169 @@ async function loadWeekTab(){
   const startDk=weekDates[0],endDk=weekDates[6];
   document.getElementById('week-range').textContent=getWeekOfMonthLabel(_selectedDate);
 
-  const [goalRows,habits,habitChecks,memos,todos,sleepRows,onelineRows,contents]=await Promise.all([
+  // 지난주 대비 계산 시 "오늘이 속한 요일까지"만 비교 대상으로 삼기 위한 범위.
+  // 이번주가 현재 진행 중인 주(오늘이 weekDates 안에 있음)일 때만 절단하고,
+  // 과거/미래 주로 이동한 경우엔 이 로직을 적용하지 않고 7일 전체로 비교한다.
+  const todayDk=dateKey(new Date());
+  const todayIdx=weekDates.indexOf(todayDk);
+  const isCurrentWeek=todayIdx!==-1;
+  const cmpEndDk=isCurrentWeek?todayDk:endDk; // 이번주 비교 종료일(포함)
+  const cmpDayCount=isCurrentWeek?(todayIdx+1):7;
+
+  const lastWeekDates=getWeekDates(new Date(new Date(weekDates[0]+'T00:00:00').getTime()-7*24*60*60*1000));
+  const lastStartDk=lastWeekDates[0];
+  const lastCmpEndDk=isCurrentWeek?lastWeekDates[todayIdx]:lastWeekDates[6];
+
+  const [goalRows,habits,habitChecks,memos,todos,sleepRows,onelineRows,contents,
+    lwMemos,lwTodos,lwSleepRows,lwHabitChecks,lwContents,rblocksThis,rblocksLast]=await Promise.all([
     supaFetch(`goal_notes?note_key=eq.wchallenge_${encodeURIComponent(wk)}`),
     supaFetch(`habits?order=sort_order.asc`),
     supaFetch(`habit_checks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
     supaFetch(`memos?date_key=gte.${startDk}&date_key=lte.${endDk}&select=id`),
     supaFetch(`todos?date_key=gte.${startDk}&date_key=lte.${endDk}&select=done`),
-    supaFetch(`sleep?date_key=gte.${startDk}&date_key=lte.${endDk}&select=score,sleep_time,wake_time`),
+    supaFetch(`sleep?date_key=gte.${startDk}&date_key=lte.${endDk}&select=date_key,score,sleep_time,wake_time`),
     supaFetch(`goal_notes?note_key=gte.oneline:${startDk}&note_key=lte.oneline:${endDk}`),
-    supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&order=created.desc&limit=100`)
+    supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&order=created.desc&limit=100`),
+    // 지난주 대비 비교용(오늘 요일까지로 절단된 범위)
+    supaFetch(`memos?date_key=gte.${lastStartDk}&date_key=lte.${lastCmpEndDk}&select=id`),
+    supaFetch(`todos?date_key=gte.${lastStartDk}&date_key=lte.${lastCmpEndDk}&select=done`),
+    supaFetch(`sleep?date_key=gte.${lastStartDk}&date_key=lte.${lastCmpEndDk}&select=date_key,score,sleep_time,wake_time`),
+    supaFetch(`habit_checks?date_key=gte.${lastStartDk}&date_key=lte.${lastCmpEndDk}`),
+    supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&order=created.desc&limit=100`),
+    // 리듬 흐름 비교용: 이번주(오늘까지)/지난주(7일 전체)
+    supaFetch(`rhythm_blocks?date_key=gte.${startDk}&date_key=lte.${cmpEndDk}`),
+    supaFetch(`rhythm_blocks?date_key=gte.${lastStartDk}&date_key=lte.${lastWeekDates[6]}`)
   ]);
 
   renderWeekGoals(goalRows&&goalRows[0]);
-  renderWeekHabitMatrix(habits||[],habitChecks||[],weekDates);
-  renderWeekStatBar(memos||[],todos||[],sleepRows||[],habits||[],habitChecks||[],contents||[],startDk,endDk);
+  renderWeekSleepRow(sleepRows||[],weekDates,todayDk);   // 도트 껍데기(빈 컨테이너) 먼저 생성
+  renderWeekHabitMatrix(habits||[],habitChecks||[],weekDates); // 그 컨테이너에 습관 도트 채움
+  renderWeekDelta({
+    memos:memos||[],todos:todos||[],sleepRows:sleepRows||[],habits:habits||[],checks:habitChecks||[],contents:contents||[],
+    startDk,endDk:cmpEndDk,cmpDayCount
+  },{
+    memos:lwMemos||[],todos:lwTodos||[],sleepRows:lwSleepRows||[],checks:lwHabitChecks||[],contents:lwContents||[],
+    startDk:lastStartDk,endDk:lastCmpEndDk
+  });
+  renderWeekRhythmFlow(rblocksThis||[],rblocksLast||[],cmpDayCount);
   renderWeekOneline(onelineRows||[],weekDates);
   renderReportBanner('week-report-banner',_selectedDate);
+}
+
+// 이번 주 수면(컨디션) — 요일별 수면점수 표정 + 습관 도트(습관 고유색), 제목줄엔 주간 평균 점수
+function renderWeekSleepRow(sleepRows,weekDates,todayDk){
+  const el=document.getElementById('week-sleep-row');
+  const avgEl=document.getElementById('week-sleep-avg');
+  const byDate={};
+  sleepRows.forEach(r=>{if(r.date_key)byDate[r.date_key]=r;});
+  const scores=sleepRows.map(r=>r.score).filter(s=>s!=null&&!isNaN(s));
+  if(scores.length){
+    const avg=Math.round(scores.reduce((a,b)=>a+b,0)/scores.length);
+    const lv=getSleepScoreLevel(avg);
+    avgEl.innerHTML=`<i class="ti ${lv.icon}" style="color:var(--sleep-warmgray);" aria-hidden="true"></i>평균 ${avg}점`;
+  }else{
+    avgEl.innerHTML='';
+  }
+  el.innerHTML=`<div class="wsleep-grid">`+weekDates.map((dk,i)=>{
+    const r=byDate[dk];
+    const score=r&&r.score!=null&&!isNaN(r.score)?r.score:null;
+    const isToday=dk===todayDk;
+    const isFuture=dk>todayDk;
+    // 기록 없음: 미래는 빈 칸(색만 흐리게), 과거/오늘인데 기록 안 한 날은 옅은 점선 아이콘으로 "미기록"임을 표시
+    const faceHtml=score!=null
+      ?`<i class="ti ${getSleepScoreLevel(score).icon}"></i>`
+      :(isFuture?'':`<i class="ti ti-minus" style="opacity:.3;font-size:20px;" aria-hidden="true"></i>`);
+    return `<div class="wsleep-col${isToday?' wsleep-today':''}"${isFuture?' style="opacity:.35;"':''}>
+      <div class="wsleep-dow">${WC_DOW[i]}</div>
+      <div class="wsleep-face">${faceHtml}</div>
+      <div class="wsleep-hdots" id="wsleep-hdots-${dk}"></div>
+    </div>`;
+  }).join('')+`</div>`;
+}
+
+// 지난주 대비 — 오늘 요일까지로 절단된 동일 범위끼리 비교(주 진행 중엔 항상 마이너스로 왜곡되는 문제 방지)
+function renderWeekDelta(cur,prev){
+  const el=document.getElementById('week-delta');
+  const curDone=cur.todos.filter(t=>t.done).length;
+  const prevDone=prev.todos.filter(t=>t.done).length;
+  const curHabitPct=cur.habits.length?Math.round(cur.checks.length/(cur.habits.length*cur.cmpDayCount)*100):0;
+  const prevDenom=cur.habits.length*(prev.checks.length?cur.cmpDayCount:cur.cmpDayCount); // 습관 목록은 현재 기준 유지
+  const prevHabitPct=cur.habits.length?Math.round(prev.checks.length/(cur.habits.length*cur.cmpDayCount)*100):0;
+  const curContent=countContentsCompletedInRange(cur.contents,cur.startDk,cur.endDk);
+  const prevContent=countContentsCompletedInRange(prev.contents,prev.startDk,prev.endDk);
+  const curSleep=parseFloat(avgSleepHoursFromRows(cur.sleepRows))||0;
+  const prevSleep=parseFloat(avgSleepHoursFromRows(prev.sleepRows))||0;
+
+  const items=[
+    {icon:'ti-notes',cur:cur.memos.length,prev:prev.memos.length,label:'메모',fmt:v=>v},
+    {icon:'ti-checkbox',cur:curDone,prev:prevDone,label:'완료투두',fmt:v=>v},
+    {icon:'ti-chart-donut',cur:curHabitPct,prev:prevHabitPct,label:'습관율',fmt:v=>v+'%'},
+    {icon:'ti-stack-2',cur:curContent,prev:prevContent,label:'콘텐츠',fmt:v=>v},
+    {icon:'ti-moon-stars',cur:curSleep,prev:prevSleep,label:'평균수면',fmt:v=>v+'h'}
+  ];
+
+  el.innerHTML=`<div class="week-delta-grid">`+items.map(it=>{
+    const diff=Math.round((it.cur-it.prev)*10)/10;
+    const dir=diff>0?'up':(diff<0?'down':'flat');
+    const arrow=dir==='up'?'ti-arrow-up':(dir==='down'?'ti-arrow-down':'ti-minus');
+    const sign=diff>0?'+':'';
+    return `<div class="wd-item">
+      <i class="ti ${it.icon} wd-icon" aria-hidden="true"></i>
+      <div class="wd-num">${it.fmt(it.cur)}</div>
+      <div class="wd-delta ${dir}"><i class="ti ${arrow}" style="font-size:12px;"></i>${sign}${it.fmt(diff)}</div>
+    </div>`;
+  }).join('')+`</div>`;
+}
+
+// 리듬 흐름 비교 — 본앱 recap-rhythm-bar-chart를 두 줄(지난주 7일 평균 / 이번주 현재까지)로 이식
+// 본앱 fmtDur과 동일한 형식(N시간 M분 / N시간 / M분)
+function _fmtDur(min){
+  const h=Math.floor(min/60),m=Math.round(min%60);
+  if(h>0&&m>0)return h+'시간 '+m+'분';
+  if(h>0)return h+'시간';
+  return m+'분';
+}
+function renderWeekRhythmFlow(rblocksThis,rblocksLast,cmpDayCount){
+  const el=document.getElementById('week-rhythm-flow');
+  const durByCat=(rblocks)=>{
+    const d={};let total=0;
+    rblocks.forEach(b=>{
+      if(!b.start_time||!b.end_time)return;
+      const s=_paceParseHM(b.start_time),e=_paceParseHM(b.end_time);
+      if(isNaN(s)||isNaN(e))return;
+      let dur=e-s;if(dur<0)dur+=1440;
+      if(dur<=0)return;
+      d[b.cat]=(d[b.cat]||0)+dur;total+=dur;
+    });
+    return {d,total};
+  };
+  const curD=durByCat(rblocksThis);
+  const lastD=durByCat(rblocksLast);
+
+  // 막대는 그 줄의 총합 중 비중이 큰 카테고리부터 이어지도록 시간이 긴 순으로 정렬(들쑥날쑥함 방지)
+  // 상위 4개 세그먼트는 아이콘 옆에 그 줄 기준 일평균 시간을 함께 표기(누계/dayCount)
+  const barRow=(tick,d,total,dayCount)=>{
+    if(total<=0)return `<div class="rf-row"><span class="rf-tick">${tick}</span><div class="rf-bar-chart"></div></div>`;
+    const sorted=Object.keys(d).filter(k=>d[k]>0).sort((a,b)=>d[b]-d[a]);
+    let segs='';
+    sorted.forEach((k,i)=>{
+      const c=RHYTHM_CATS[k];if(!c)return;
+      const pct=d[k]/total*100;
+      const showTime=i<4&&pct>=9; // 상위 4개 + 텍스트가 들어갈 최소 폭 확보되는 경우만 표기
+      const avgMin=d[k]/(dayCount||1);
+      segs+=`<div class="rf-bar-seg" style="width:${pct}%;background:${c.color};"><i class="ti ${c.icon}"></i>${showTime?`<span class="rf-seg-time">${_fmtDur(avgMin)}</span>`:''}</div>`;
+    });
+    return `<div class="rf-row"><span class="rf-tick">${tick}</span><div class="rf-bar-chart">${segs}</div></div>`;
+  };
+
+  const usedCats=new Set([...Object.keys(lastD.d),...Object.keys(curD.d)]);
+  if(!usedCats.size){
+    el.innerHTML='<div class="empty-msg">기록된 리듬이 없어요</div>';
+    return;
+  }
+
+  // 지난주 평균: 7일 기준 일평균 / 이번주 현재: 오늘까지 진행일수(cmpDayCount) 기준 일평균
+  el.innerHTML=barRow('지난주 평균',lastD.d,lastD.total,7)+barRow('이번주 현재',curD.d,curD.total,cmpDayCount);
 }
 
 function renderWeekGoals(row){
@@ -729,21 +888,19 @@ function renderWeekHabitMatrix(habits,checks,weekDates){
   });
   html+='</div>';
   el.innerHTML=html;
-}
 
-// 이번 주 요약 미니 통계바(박스 없이 심플, 이이코토 본앱 stat-bar-wrap 스타일 차용)
-// 메모/완료투두/습관달성률/콘텐츠완료/평균수면 5항목
-function renderWeekStatBar(memos,todos,sleepRows,habits,checks,contents,startDk,endDk){
-  renderStatBar('week-stat-bar',{
-    memoCount:memos.length,
-    doneCount:todos.filter(t=>t.done).length,
-    habitCount:habits.length,
-    checkCount:checks.length,
-    habitDenominator:7,
-    contentCount:countContentsCompletedInRange(contents,startDk,endDk),
-    avgSleep:avgSleepHoursFromRows(sleepRows)
+  // 이번 주 수면 카드의 요일별 습관 도트도 같은 색상 매핑으로 채워 넣음(습관 매트릭스와 색 통일)
+  weekDates.forEach(dk=>{
+    const dotsEl=document.getElementById('wsleep-hdots-'+dk);
+    if(!dotsEl)return;
+    dotsEl.innerHTML=habits.map(h=>{
+      const done=checks.some(ch=>ch.habit_name===h.name&&ch.date_key===dk);
+      const c=colorMap[h.color]||'var(--pal-warmgray-rgb)';
+      return `<span class="wsleep-hdot" style="${done?`background:rgba(${c},1);`:''}"></span>`;
+    }).join('');
   });
 }
+
 
 // 하루한줄 2열 배치: 왼쪽(월/화/수), 오른쪽(목/금/토/일)
 function renderWeekOneline(rows,weekDates){
@@ -756,8 +913,8 @@ function renderWeekOneline(rows,weekDates){
     if(text&&text.trim())byDate[dk]=text;
   });
   const entries=weekDates.map((dk,i)=>({dow:WC_DOW[i],text:byDate[dk]}));
-  const left=entries.slice(0,3).filter(e=>e.text);   // 월화수
-  const right=entries.slice(3,7).filter(e=>e.text);  // 목금토일
+  const left=entries.slice(0,4).filter(e=>e.text);   // 월화수목 — 목요일을 왼쪽으로 올려 왼쪽 4/오른쪽 3, 최대 줄 수를 맞춤
+  const right=entries.slice(4,7).filter(e=>e.text);  // 금토일
   const rowHtml=e=>`<div class="oneline-row"><div class="oneline-dow">${e.dow}</div>${escapeHtml(e.text)}</div>`;
   elA.innerHTML=left.length?left.map(rowHtml).join(''):'<div class="empty-msg">기록 없음</div>';
   elB.innerHTML=right.length?right.map(rowHtml).join(''):'<div class="empty-msg">기록 없음</div>';
@@ -1265,11 +1422,12 @@ async function loadReportsTab(){
 function renderReportSummaryList(monthlyRows,weeksInMonth,weeklyRowsList,mk){
   const el=document.getElementById('report-summary-list');
   const items=[];
+  const mkYear=parseInt(mk.slice(0,4),10),mkMonth=parseInt(mk.slice(5,7),10)-1;
   const monthlyRow=monthlyRows&&monthlyRows[0];
   if(monthlyRow){
     const cacheKey=monthlyRow.cache_key;
     const read=_isReportRead(cacheKey);
-    items.push({cacheKey,kind:'monthly',read,
+    items.push({cacheKey,kind:'monthly',read,year:mkYear,month:mkMonth,
       icon:'ti-calendar',iconBg:'rgba(255,225,120,0.55)',iconColor:'var(--pal-yellow-border)',
       title:`${mk.slice(5,7).replace(/^0/,'')}월 월간종합 리포트`,sub:`${mk.slice(0,4)}년 ${mk.slice(5,7).replace(/^0/,'')}월 전체 흐름 정리`});
   }
@@ -1285,8 +1443,13 @@ function renderReportSummaryList(monthlyRows,weeksInMonth,weeklyRowsList,mk){
       title:`${(idx+1)}주차 주간종합 리포트`,sub:_weekRangeLabel(wk)});
   });
   if(!items.length){el.innerHTML='<div class="empty-msg">이 달엔 아직 발행된 종합 리포트가 없어요</div>';return;}
-  el.innerHTML=items.map(it=>`
-    <div class="report-list-item${it.read?' read':''}" data-kind="${it.kind}" onclick="openReportFromList('${it.cacheKey}','${escapeHtml(it.title)}')">
+  el.innerHTML=items.map(it=>{
+    // 월간종합은 팝업이 아니라 전체페이지(아카이브)로, 나머지(주간종합 등)는 기존처럼 팝업으로 연다.
+    const onclick=it.kind==='monthly'
+      ?`openMonthlyReportPage(${it.year},${it.month})`
+      :`openReportFromList('${it.cacheKey}','${escapeHtml(it.title)}')`;
+    return `
+    <div class="report-list-item${it.read?' read':''}" data-kind="${it.kind}" onclick="${onclick}">
       <div class="report-list-dot"></div>
       <div class="report-list-icon" style="background:${it.iconBg};"><i class="ti ${it.icon}" style="color:${it.iconColor};" aria-hidden="true"></i></div>
       <div class="report-list-body">
@@ -1294,7 +1457,8 @@ function renderReportSummaryList(monthlyRows,weeksInMonth,weeklyRowsList,mk){
         <div class="report-list-sub">${escapeHtml(it.sub)}</div>
       </div>
       <i class="ti ti-chevron-right" aria-hidden="true"></i>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 function openReportFromList(cacheKey,title){
   _markReportRead(cacheKey);
@@ -1400,6 +1564,217 @@ document.addEventListener('visibilitychange',()=>{
     renderMiniCal();
   }
 });
+
+// ══════════════════════════════════════════════════════════
+// 월간리포트 전체페이지 — 리포트탭 "N월 월간종합 리포트" 클릭시에만 진입하는 아카이브 페이지.
+// 팝업이 아니라 사이드바 제외한 전체 영역을 쓰는 신문형 레이아웃(AI 코멘트가 헤드라인, 나머지 섹션이 본문).
+// 플로팅탭 메뉴엔 노출하지 않고, 진입/이탈을 별도 함수로 관리(switchTab의 float-tab 갱신 로직과 분리).
+// ══════════════════════════════════════════════════════════
+let _mrpDate=new Date();
+let _mrpReturnTab='reports';
+function openMonthlyReportPage(y,mo){
+  _mrpReturnTab=_currentTab;
+  _mrpDate=new Date(y,mo,1);
+  _markReportRead(`monthly_report_${monthKeyOf(_mrpDate)}`);
+  document.querySelectorAll('.main-body').forEach(el=>el.classList.remove('on'));
+  document.getElementById('tab-monthly-report').classList.add('on');
+  _currentTab='monthly-report';
+  loadMonthlyReportPage();
+}
+function closeMonthlyReportPage(){
+  document.querySelectorAll('.main-body').forEach(el=>el.classList.remove('on'));
+  document.getElementById('tab-'+_mrpReturnTab).classList.add('on');
+  document.getElementById('ft-'+_mrpReturnTab).classList.add('on');
+  _currentTab=_mrpReturnTab;
+  if(_mrpReturnTab==='reports')loadReportsTab();
+}
+function shiftMonthlyReportPage(delta){
+  _mrpDate.setMonth(_mrpDate.getMonth()+delta);
+  loadMonthlyReportPage();
+}
+// 콘텐츠 카테고리 도트 색상 — CAT_ICON_META의 배경색을 그대로 점 색으로 재사용
+function _mrpCatDotColor(cat){
+  const meta=CAT_ICON_META[cat];
+  return meta?meta.bg:'rgba(var(--pal-warmgray-rgb),0.6)';
+}
+function _mrpStatusLabel(c){
+  if(c.status==='watching')return '진행중';
+  if(c.status==='stopped')return '중단';
+  return '완료';
+}
+async function loadMonthlyReportPage(){
+  const y=_mrpDate.getFullYear(),mo=_mrpDate.getMonth();
+  const mk=monthKeyOf(_mrpDate);
+  document.getElementById('mrp-title').textContent=`${y}년 ${mo+1}월 리포트`;
+
+  const startDk=`${mk}-01`;
+  const dim=new Date(y,mo+1,0).getDate();
+  const endDk=`${mk}-${pad(dim)}`;
+  const weeksInMonth=getReportWeeksOfMonth(y,mo);
+
+  // 전월 동기간(같은 일수)도 함께 가져와 리듬 비교에 사용
+  const prevMonthDate=new Date(y,mo-1,1);
+  const py=prevMonthDate.getFullYear(),pmo=prevMonthDate.getMonth();
+  const prevMk=monthKeyOf(prevMonthDate);
+  const prevDim=Math.min(dim,new Date(py,pmo+1,0).getDate());
+  const prevStartDk=`${prevMk}-01`,prevEndDk=`${prevMk}-${pad(prevDim)}`;
+
+  const [monthlyRows,goalRows,todos,memosRows,sleepRows,habits,habitChecksAll,rblocks,prevRblocks,contents,prevContents,wcRowsList]=await Promise.all([
+    supaFetch(`ai_cache?cache_key=eq.monthly_report_${mk}&select=content`),
+    supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('mgoal:'+mk)}`),
+    supaFetch(`todos?date_key=gte.${startDk}&date_key=lte.${endDk}&select=done`),
+    supaFetch(`memos?date_key=gte.${startDk}&date_key=lte.${endDk}&select=id`),
+    supaFetch(`sleep?date_key=gte.${startDk}&date_key=lte.${endDk}&select=sleep_time,wake_time`),
+    supaFetch(`habits?order=sort_order.asc`),
+    supaFetch(`habit_checks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
+    supaFetch(`rhythm_blocks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
+    supaFetch(`rhythm_blocks?date_key=gte.${prevStartDk}&date_key=lte.${prevEndDk}`),
+    supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&order=created.desc&limit=200`),
+    supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&order=created.desc&limit=200`),
+    Promise.all(weeksInMonth.map(wk=>supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wchallenge_'+wk)}`)))
+  ]);
+
+  renderMrpHero(monthlyRows&&monthlyRows[0]);
+  renderMrpGoals(goalRows&&goalRows[0]);
+  renderMrpStats(todos||[],memosRows||[],sleepRows||[],habits||[],habitChecksAll||[],weeksInMonth.length*7||dim);
+  renderMrpRhythm(rblocks||[],prevRblocks||[]);
+  renderMrpWeeklyMissions(weeksInMonth,wcRowsList||[]);
+  renderMrpContents(contents||[],startDk,endDk);
+  renderMrpReportLinks(weeksInMonth,mk);
+}
+
+function renderMrpHero(row){
+  const el=document.getElementById('mrp-body');
+  // 최초 렌더 시 전체 골격을 한 번에 잡고, 이후 각 render 함수가 자기 섹션의 innerHTML만 채움
+  if(!document.getElementById('mrp-hero-slot')){
+    el.innerHTML=`
+      <div class="mrp-hero" id="mrp-hero-slot"></div>
+      <div class="mrp-grid2">
+        <div class="mrp-card"><div class="mrp-card-title"><i class="ti ti-flag-3" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>이 달의 목표</div><div id="mrp-goals"></div></div>
+        <div class="mrp-card"><div class="mrp-card-title"><i class="ti ti-chart-donut" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>이 달의 숫자</div><div id="mrp-stats"></div></div>
+      </div>
+      <div class="mrp-card" style="margin-bottom:14px;"><div class="mrp-card-title"><i class="ti ti-rainbow" style="color:rgba(var(--pal-orange-rgb),1);" aria-hidden="true"></i>이 달의 리듬</div><div id="mrp-rhythm"></div></div>
+      <div class="mrp-grid2">
+        <div class="mrp-card"><div class="mrp-card-title"><i class="ti ti-flag-3" style="color:rgba(210,175,225,1);" aria-hidden="true"></i>주간 미션 모음</div><div id="mrp-missions"></div></div>
+        <div class="mrp-card"><div class="mrp-card-title"><i class="ti ti-stack-2" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>콘텐츠 기록</div><div id="mrp-contents"></div></div>
+      </div>
+      <div class="mrp-card" style="margin-bottom:0;"><div class="mrp-card-title"><i class="ti ti-sparkles" style="color:var(--pal-lavender-border);" aria-hidden="true"></i>이 달에 발행된 리포트</div><div id="mrp-report-links"></div></div>
+    `;
+  }
+  const heroEl=document.getElementById('mrp-hero-slot');
+  if(!row||!row.content){
+    heroEl.innerHTML=`<div class="mrp-hero-eyebrow"><i class="ti ti-sparkles" aria-hidden="true"></i>이 달 한눈에</div><div class="mrp-hero-comment" style="opacity:.6;">이 달의 종합 리포트가 아직 발행되지 않았어요</div>`;
+    return;
+  }
+  try{
+    const report=JSON.parse(row.content);
+    heroEl.innerHTML=`<div class="mrp-hero-eyebrow"><i class="ti ti-sparkles" aria-hidden="true"></i>이 달 한눈에</div>
+      <div class="mrp-hero-comment">${escapeHtml(report.comment||'')}</div>
+      ${report.keywords&&report.keywords.length?`<div class="mr-tag-cloud">${report.keywords.map(k=>`<span class="mr-tag">${escapeHtml(k)}</span>`).join('')}</div>`:''}`;
+  }catch(e){
+    heroEl.innerHTML=`<div class="mrp-hero-eyebrow"><i class="ti ti-sparkles" aria-hidden="true"></i>이 달 한눈에</div><div class="mrp-hero-comment">${row.content}</div>`;
+  }
+}
+
+function renderMrpGoals(row){
+  const el=document.getElementById('mrp-goals');
+  const lines=(row&&Array.isArray(row.lines))?row.lines.filter(l=>l&&l.text&&l.text.trim()):[];
+  if(!lines.length){el.innerHTML='<div class="empty-msg">등록된 목표가 없어요</div>';return;}
+  el.innerHTML=lines.map(l=>`<div class="mrp-goal-line">${escapeHtml(l.text)}</div>`).join('');
+}
+
+function renderMrpStats(todos,memos,sleepRows,habits,habitChecks,habitDenominator){
+  const el=document.getElementById('mrp-stats');
+  const doneTodos=todos.filter(t=>t.done).length;
+  const habitPct=habits.length?Math.round(habitChecks.length/(habits.length*habitDenominator)*100):0;
+  const avgSleep=avgSleepHoursFromRows(sleepRows);
+  el.innerHTML=`<div class="mrp-stat-row">
+    <div class="mrp-stat"><div class="v">${doneTodos}개</div><div class="l">투두 완료</div></div>
+    <div class="mrp-stat"><div class="v">${habitPct}%</div><div class="l">습관 달성률</div></div>
+    <div class="mrp-stat"><div class="v">${avgSleep?avgSleep+'h':'-'}</div><div class="l">평균 수면</div></div>
+  </div>`;
+}
+
+function renderMrpRhythm(rblocks,prevRblocks){
+  const el=document.getElementById('mrp-rhythm');
+  const durByCat=(blocks)=>{
+    const d={};let total=0;
+    blocks.forEach(b=>{
+      if(!b.start_time||!b.end_time)return;
+      const s=_paceParseHM(b.start_time),e=_paceParseHM(b.end_time);
+      if(isNaN(s)||isNaN(e))return;
+      let dur=e-s;if(dur<0)dur+=1440;
+      if(dur<=0)return;
+      d[b.cat]=(d[b.cat]||0)+dur;total+=dur;
+    });
+    return {d,total};
+  };
+  const cur=durByCat(rblocks);
+  const prev=durByCat(prevRblocks);
+  if(!cur.total){el.innerHTML='<div class="empty-msg">기록된 리듬이 없어요</div>';return;}
+
+  const sorted=Object.keys(cur.d).filter(k=>cur.d[k]>0).sort((a,b)=>cur.d[b]-cur.d[a]);
+  let barHtml=`<div class="mrp-rhythm-bar">`;
+  sorted.forEach(k=>{
+    const c=RHYTHM_CATS[k];if(!c)return;
+    barHtml+=`<div class="mrp-rhythm-seg" style="width:${cur.d[k]/cur.total*100}%;background:${c.color};"><i class="ti ${c.icon}"></i></div>`;
+  });
+  barHtml+=`</div>`;
+
+  // 전월 대비 60분 이상 차이나는 항목만 "누계·전월대비" 형태로 리스트업(본앱 rhythmCompare 임계값 규칙 준용)
+  const listHtml=`<div class="mrp-rhythm-list">`+sorted.map(k=>{
+    const c=RHYTHM_CATS[k];
+    const diff=cur.d[k]-(prev.d[k]||0);
+    const diffTxt=Math.abs(diff)>=60?`<span style="color:${diff>0?'var(--pal-rose-border)':'var(--pal-sky-border)'};">${diff>0?'+':''}${_fmtDur(Math.abs(diff))}</span>`:'';
+    return `<div class="mrp-rhythm-item"><span class="dot" style="background:${c.color};"></span><span class="lbl">${c.label}</span><span class="val">누계 ${_fmtDur(cur.d[k])}${diffTxt?' · 전월대비 '+diffTxt:''}</span></div>`;
+  }).join('')+`</div>`;
+
+  el.innerHTML=barHtml+listHtml;
+}
+
+function renderMrpWeeklyMissions(weeksInMonth,wcRowsList){
+  const el=document.getElementById('mrp-missions');
+  const blocks=weeksInMonth.map((wk,idx)=>{
+    const rows=wcRowsList[idx];
+    const row=rows&&rows[0];
+    const lines=(row&&Array.isArray(row.lines))?row.lines.filter(l=>l&&l.text&&l.text.trim()):[];
+    if(!lines.length)return null;
+    const wkStart=new Date(wk+'T00:00:00');
+    const wkEnd=new Date(wkStart);wkEnd.setDate(wkStart.getDate()+6);
+    const isOngoing=wkEnd>=new Date(new Date().toDateString());
+    const lineHtml=lines.map(l=>{
+      const days=Array.isArray(l.days)?l.days:[];
+      const pct=Math.round(days.filter(Boolean).length/7*100);
+      return `<div class="mrp-wc-line"><span class="txt">${escapeHtml(l.text)}</span><span class="pct">${pct}%</span></div>`;
+    }).join('');
+    return `<div class="mrp-week-block"><div class="mrp-week-head"><span class="wk">${idx+1}주차 · ${_weekRangeLabel(wk)}</span>${isOngoing?'<span class="mrp-week-ongoing">진행중</span>':''}</div>${lineHtml}</div>`;
+  }).filter(Boolean);
+  el.innerHTML=blocks.length?blocks.join(''):'<div class="empty-msg">이 달엔 작성한 주간 미션이 없어요</div>';
+}
+
+function renderMrpContents(contents,startDk,endDk){
+  const el=document.getElementById('mrp-contents');
+  const inRange=contents.filter(c=>{
+    if(c.content_cat==='music')return c.start_date&&c.start_date>=startDk&&c.start_date<=endDk;
+    if(c.status!=='done'&&c.status!=='stopped')return false;
+    return c.end_date&&c.end_date>=startDk&&c.end_date<=endDk;
+  });
+  if(!inRange.length){el.innerHTML='<div class="empty-msg">이 달엔 기록한 콘텐츠가 없어요</div>';return;}
+  el.innerHTML=inRange.slice(0,30).map(c=>`
+    <div class="mrp-content-line">
+      <span style="display:flex;align-items:center;min-width:0;overflow:hidden;"><span class="dot" style="background:${_mrpCatDotColor(c.content_cat)};"></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.title||'')}</span></span>
+      <span class="st">${_mrpStatusLabel(c)}</span>
+    </div>`).join('');
+}
+
+function renderMrpReportLinks(weeksInMonth,mk){
+  const el=document.getElementById('mrp-report-links');
+  const cards=weeksInMonth.map((wk,idx)=>{
+    const sundayDk=_mondayToSundayDk(wk);
+    return `<div class="mrp-link-card" onclick="openReportPanel('weekly_summary_${sundayDk}','${idx+1}주차 주간종합 리포트')"><div class="wk">${idx+1}주차 주간종합</div><div class="range">${_weekRangeLabel(wk)}</div></div>`;
+  });
+  el.innerHTML=cards.length?`<div class="mrp-links-grid">${cards.join('')}</div>`:'<div class="empty-msg">이 달엔 발행된 주간 리포트가 없어요</div>';
+}
 
 // ══════════════════════════════════════════════════════════
 // 화면별 좌우 스와이프 이동 — 오늘 → 주간 → 월간 → 리포트 순으로 탭 자체를 순환 이동

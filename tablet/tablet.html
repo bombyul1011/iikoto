@@ -27,10 +27,13 @@
   --fs-xl:calc(var(--fs-title) + 8px);    /* 최상위 헤더(월/일) */
   --fs-sm:calc(var(--fs-body) - 1.5px);   /* 보조 라벨(시간, 카테고리 태그, 요일, 스파크라인 축 등) */
   --fs-tab:calc(var(--fs-title) - 0.5px); /* 플로팅 탭 메뉴 텍스트 */
+  --fs-body-1:var(--fs-body); /* 이번 달 수집문장 본문 전용 — 다른 곳과 별도로 크기 조절하고 싶을 때 이 값만 수정 */
 
   --main-text-size:17px;
   --dow-label-size:15px;
   --divider-rgb:195,175,168;
+  --graph-track-color:rgba(195,175,168,0.25);
+  --sleep-warmgray:rgba(150,130,115,0.85);
   --bg:linear-gradient(145deg,#fdf0e8 0%,#fef5d4 50%,#fde8f0 100%);
   --tp:#6b5248;--ts:#a3897c;--tm:#d4bcb0;
   --card:rgba(255,250,240,0.78);--card-b:rgba(230,200,140,0.40);
@@ -215,6 +218,42 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .goal-hcard .card-lbl{color:#8a6c20;}
 .goal-hcard .card-lbl i{color:#8a6c20!important;}
 
+/* ── 주간탭: 이번 주 수면(컨디션) 카드 ── */
+.week-sleep-lbl{display:flex;align-items:center;gap:7px;}
+.week-sleep-lbl .sp{flex:1;}
+.week-sleep-avg{font-size:var(--fs-body);font-weight:500;color:var(--ts);display:flex;align-items:center;gap:5px;}
+.week-sleep-avg i{font-size:var(--fs-lg);}
+.wsleep-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
+.wsleep-col{display:flex;flex-direction:column;align-items:center;gap:8px;padding:8px 2px;border-radius:12px;}
+.wsleep-dow{font-size:var(--fs-body);color:var(--ts);font-weight:600;}
+.wsleep-face{font-size:26px;line-height:1;height:30px;display:flex;align-items:center;justify-content:center;font-weight:400;opacity:.8;}
+.wsleep-face i{font-size:26px;font-weight:400;}
+.wsleep-hdots{display:grid;grid-template-columns:repeat(2,1fr);gap:4px;}
+.wsleep-hdot{width:9px;height:9px;border-radius:50%;background:rgba(var(--pal-warmgray-rgb),0.28);}
+.wsleep-today{background:rgba(var(--pal-yellow-rgb),0.28);}
+
+/* ── 주간탭: 지난주 대비 ── */
+.week-delta-card{display:flex;flex-direction:column;}
+.week-delta-card #week-delta{flex:1;display:flex;align-items:center;}
+.week-delta-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;width:100%;}
+.wd-item{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;}
+.wd-icon{font-size:22px;color:var(--tp);opacity:.55;}
+.wd-num{font-size:var(--fs-lg);font-weight:700;color:var(--tp);}
+.wd-delta{font-size:var(--fs-body);font-weight:700;display:flex;align-items:center;gap:2px;justify-content:center;}
+.wd-delta.up{color:var(--pal-rose-border);}
+.wd-delta.down{color:var(--pal-sky-border);}
+.wd-delta.flat{color:var(--ts);}
+
+/* ── 주간탭: 리듬 흐름 비교(본앱 recap-rhythm-bar-chart 2줄 이식 + 상위 4개 평균시간 표기) ── */
+.rf-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.rf-row:last-child{margin-bottom:0;}
+.rf-tick{font-size:var(--fs-body);color:var(--ts);font-weight:500;width:78px;flex-shrink:0;}
+.rf-bar-chart{display:flex;height:32px;border-radius:9px;overflow:hidden;flex:1;background:var(--graph-track-color);}
+.rf-bar-seg{display:flex;align-items:center;justify-content:center;gap:4px;overflow:hidden;padding:0 3px;}
+.rf-bar-seg i{font-size:var(--fs-sm);color:#fff;flex-shrink:0;}
+.rf-seg-time{font-size:11px;color:#fff;font-weight:600;white-space:nowrap;opacity:.95;}
+
+
 /* ── 좌하단 플로팅 탭 ── */
 .float-tabs{position:fixed;right:22px;bottom:22px;display:flex;flex-direction:column-reverse;align-items:flex-end;gap:9px;z-index:100;}
 .float-fab{width:54px;height:54px;border-radius:50%;background:var(--pal-yellow-border);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.18);flex-shrink:0;transition:transform .15s;}
@@ -302,7 +341,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .mq-book-title{font-size:var(--fs-body);font-weight:600;color:var(--tp);margin-bottom:1px;}
 .mq-book-author{font-size:var(--fs-sm);color:var(--ts);margin-bottom:9px;}
 .mq-quote-list{display:flex;flex-direction:column;gap:7px;}
-.mq-quote-item{font-family:'HakgyoansimBareonbatangR',serif;font-size:var(--fs-body);line-height:1.6;color:var(--ts);padding-left:9px;padding-top:7px;border-left:2px solid rgba(var(--divider-rgb),0.35);border-top:1px solid rgba(var(--divider-rgb),0.18);}
+.mq-quote-item{font-family:'HakgyoansimBareonbatangR',serif;font-size:var(--fs-body-1);line-height:1.6;color:var(--ts);padding-left:9px;padding-top:7px;border-left:2px solid rgba(var(--divider-rgb),0.35);border-top:1px solid rgba(var(--divider-rgb),0.18);}
 .mq-quote-item:first-child{border-top:none;padding-top:0;}
 .mq-quote-comment{font-family:'DM Sans',sans-serif;font-size:var(--fs-sm);color:var(--tm);margin-top:3px;}
 /* 오늘 활동 분포 — 본앱 pace-dot 타임라인 그대로 이식 */
@@ -426,9 +465,66 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .mr-sec-title{font-size:var(--fs-sm);color:var(--tm);letter-spacing:.10em;text-transform:uppercase;margin-bottom:11px;}
 .mr-ai-empty{font-size:var(--fs-sm);color:var(--tm);text-align:center;padding:6px 0;}
 .mr-ai-comment{font-size:var(--fs-body);color:var(--tp);line-height:1.9;}
+/* 리포트 패널 본문 — 서버가 내려주는 weekly_summary_ HTML은 원본 안에 자체 폰트 크기가 들어있는 경우가 있어
+   주차마다 크기가 들쑥날쑥해 보였음. 본앱(#weekly-review-content)과 동일하게 컨테이너에서 폰트 크기를 강제 통일. */
+#report-panel-body{font-size:var(--fs-body);color:var(--tp);line-height:1.9;}
+#report-panel-body *{font-size:inherit!important;line-height:inherit!important;}
+#report-panel-body strong,#report-panel-body b{font-size:inherit!important;font-weight:700;}
 .mr-tag-cloud{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;}
 .mr-tag{font-size:var(--fs-sm);padding:5px 11px;border-radius:13px;background:rgba(255,230,200,0.45);border:1px solid rgba(240,210,160,0.5);color:#8a6840;}
 .report-panel-title{font-size:var(--fs-title);font-weight:600;color:var(--tp);margin-bottom:14px;display:flex;align-items:center;gap:7px;}
+
+/* ── 월간리포트 전체페이지(신문형 아카이브) ── */
+.mrp-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;}
+.mrp-close{font-size:22px;color:var(--tm);cursor:pointer;padding:4px 6px;opacity:.7;}
+.mrp-title-nav{display:flex;align-items:center;gap:14px;}
+.mrp-title-nav i{font-size:var(--fs-body);color:var(--tm);cursor:pointer;opacity:.55;padding:2px 4px;}
+.mrp-title{font-size:var(--fs-xl);font-weight:700;color:var(--tp);letter-spacing:-0.02em;font-family:'DM Sans',sans-serif;}
+
+.mrp-hero{border-radius:18px;padding:22px 24px;margin-bottom:16px;background:linear-gradient(120deg,rgba(190,230,205,0.45),rgba(250,235,170,0.40));border:1px solid rgba(165,215,190,0.55);box-shadow:0 2px 10px rgba(140,180,120,0.10);}
+.mrp-hero-eyebrow{font-size:var(--fs-sm);color:var(--tm);letter-spacing:.10em;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+.mrp-hero-comment{font-size:var(--fs-lg);color:var(--tp);line-height:1.75;font-family:'HakgyoansimBareonbatangR',serif;}
+
+.mrp-grid2{display:grid;grid-template-columns:1.1fr 0.9fr;gap:14px;margin-bottom:14px;align-items:start;}
+.mrp-card{background:var(--card);border:1px solid var(--card-b);border-radius:15px;padding:18px 20px;box-shadow:0 2px 14px rgba(0,0,0,0.05);}
+.mrp-card-title{font-size:var(--fs-title);font-weight:600;color:var(--tp);margin-bottom:13px;display:flex;align-items:center;gap:7px;}
+.mrp-card-title i{font-size:var(--fs-lg);}
+
+.mrp-stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.mrp-stat{text-align:center;}
+.mrp-stat .v{font-size:var(--fs-xl);font-weight:700;color:var(--tp);font-family:'DM Sans',sans-serif;}
+.mrp-stat .l{font-size:var(--fs-sm);color:var(--ts);margin-top:4px;}
+
+.mrp-goal-line{font-size:var(--fs-body);color:var(--tp);line-height:1.7;padding:3px 0;}
+
+.mrp-rhythm-bar{display:flex;height:30px;border-radius:9px;overflow:hidden;background:var(--graph-track-color);margin-bottom:12px;}
+.mrp-rhythm-seg{display:flex;align-items:center;justify-content:center;}
+.mrp-rhythm-seg i{font-size:var(--fs-sm);color:#fff;}
+.mrp-rhythm-list{display:flex;flex-direction:column;gap:6px;}
+.mrp-rhythm-item{display:flex;align-items:center;gap:8px;font-size:var(--fs-sm);color:var(--ts);}
+.mrp-rhythm-item .dot{width:8px;height:8px;border-radius:2px;flex-shrink:0;}
+.mrp-rhythm-item .lbl{width:34px;flex-shrink:0;color:var(--tp);font-weight:500;}
+.mrp-rhythm-item .val{color:var(--ts);}
+
+.mrp-week-block{padding:10px 0;border-bottom:1px dashed rgba(var(--divider-rgb),0.25);}
+.mrp-week-block:last-child{border-bottom:none;padding-bottom:0;}
+.mrp-week-head{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.mrp-week-head .wk{font-size:var(--fs-sm);font-weight:600;color:var(--tp);}
+.mrp-week-ongoing{font-size:10.5px;color:var(--pal-rose-border);background:rgba(230,150,150,0.18);border-radius:6px;padding:1px 7px;}
+.mrp-wc-line{display:flex;align-items:center;justify-content:space-between;font-size:var(--fs-sm);color:var(--ts);padding:2px 0;}
+.mrp-wc-line .txt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mrp-wc-line .pct{color:var(--tp);font-weight:600;flex-shrink:0;margin-left:8px;}
+
+.mrp-content-line{display:flex;align-items:center;justify-content:space-between;font-size:var(--fs-body);color:var(--tp);padding:5px 0;border-bottom:1px dashed rgba(var(--divider-rgb),0.2);}
+.mrp-content-line:last-child{border-bottom:none;}
+.mrp-content-line .dot{width:7px;height:7px;border-radius:2px;margin-right:7px;flex-shrink:0;}
+.mrp-content-line .st{color:var(--tm);font-size:var(--fs-sm);flex-shrink:0;margin-left:8px;}
+
+.mrp-links-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
+.mrp-link-card{background:rgba(255,255,255,0.4);border-radius:12px;padding:12px 14px;cursor:pointer;transition:background .15s;}
+.mrp-link-card:hover{background:rgba(255,255,255,0.65);}
+.mrp-link-card .wk{font-size:var(--fs-sm);font-weight:600;color:var(--tp);margin-bottom:2px;}
+.mrp-link-card .range{font-size:11px;color:var(--tm);}
 
 /* ── 오늘의 메모 (본앱 메모 배너와 동일한 연핑크) ── */
 .card.p{background:rgba(255,175,200,0.15);border-color:rgba(255,175,200,0.32);}
@@ -475,7 +571,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
       </div>
       <div class="grid2">
         <div class="card rhythm-card" id="today-rhythm-card" onclick="openTodayRhythmFlow()"><div class="card-lbl"><i class="ti ti-rainbow" style="color:var(--rh-rest);" aria-hidden="true"></i>오늘의 리듬</div><div id="today-rhythm"></div></div>
-        <div class="card"><div class="card-lbl"><i class="ti ti-chart-circles" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>오늘 활동 분포</div><div id="today-pace"></div></div>
+        <div class="card"><div class="card-lbl"><i class="ti ti-chart-circles" style="color:rgba(var(--pal-warmgray-rgb),1);" aria-hidden="true"></i>오늘 활동 분포</div><div id="today-pace"></div></div>
       </div>
       <div class="grid2">
         <div class="card habit-card habit-card-row"><div class="card-lbl" id="today-habit-lbl"><i class="ti ti-chart-donut" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>습관</div><div id="today-habits"></div></div>
@@ -489,15 +585,19 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
       <div class="report-banner" id="week-report-banner"></div>
       <div class="grid2">
         <div class="card goal-hcard"><div class="card-lbl"><i class="ti ti-flag-3" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>이번 주 목표</div><div id="week-goals"></div></div>
-        <div class="card"><div class="card-lbl"><i class="ti ti-chart-donut" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>주간 습관 현황</div><div id="week-habit-matrix"></div></div>
+        <div class="card"><div class="card-lbl week-sleep-lbl"><i class="ti ti-zzz" style="color:rgba(var(--pal-warmgray-rgb),1);" aria-hidden="true"></i>이번 주 수면<span class="sp"></span><span class="week-sleep-avg" id="week-sleep-avg"></span></div><div id="week-sleep-row"></div></div>
       </div>
+      <div class="grid2">
+        <div class="card"><div class="card-lbl"><i class="ti ti-chart-donut" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>주간 습관 현황</div><div id="week-habit-matrix"></div></div>
+        <div class="card week-delta-card"><div class="card-lbl"><i class="ti ti-arrows-diff" style="color:rgba(var(--pal-sky-rgb),1);" aria-hidden="true"></i>지난주 대비</div><div id="week-delta"></div></div>
+      </div>
+      <div class="card"><div class="card-lbl"><i class="ti ti-rainbow" style="color:rgba(var(--pal-orange-rgb),1);" aria-hidden="true"></i>리듬 흐름 비교</div><div id="week-rhythm-flow"></div></div>
       <div class="card"><div class="card-lbl"><i class="ti ti-pencil" style="color:rgba(var(--pal-yellow-rgb),1);" aria-hidden="true"></i>하루한줄</div>
         <div class="oneline-2col">
           <div id="week-oneline-a"></div>
           <div id="week-oneline-b"></div>
         </div>
       </div>
-      <div class="stat-bar-wrap" id="week-stat-bar"></div>
     </div>
 
     <!-- 월간탭 -->
@@ -557,6 +657,20 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
         <div class="report-sec-title"><i class="ti ti-notes" style="color:var(--pal-sky-border);" aria-hidden="true"></i>주간 메모 리포트</div>
         <div class="report-box-grid" id="report-memo-grid"></div>
       </div>
+    </div>
+
+    <!-- 월간리포트 전체페이지(리포트탭에서 "N월 월간종합 리포트" 클릭시에만 진입, 플로팅탭 메뉴엔 노출 안 함) -->
+    <div class="main-body" id="tab-monthly-report">
+      <div class="mrp-hdr">
+        <i class="ti ti-chevron-left mrp-close" onclick="closeMonthlyReportPage()" aria-hidden="true"></i>
+        <div class="mrp-title-nav">
+          <i class="ti ti-chevron-left" onclick="shiftMonthlyReportPage(-1)" aria-hidden="true"></i>
+          <span class="mrp-title" id="mrp-title"></span>
+          <i class="ti ti-chevron-right" onclick="shiftMonthlyReportPage(1)" aria-hidden="true"></i>
+        </div>
+        <span></span>
+      </div>
+      <div id="mrp-body"></div>
     </div>
 
     <!-- 설정탭 -->
