@@ -46,10 +46,10 @@ const RHYTHM_CATS={
   home:{label:'정리',color:'var(--rh-home)',icon:'ti-home'}
 };
 const CAT_ICON_META={
-  drama:{icon:'ti-device-tv',bg:'rgba(var(--pal-pink-rgb),1)',label:'드라마'},
-  book:{icon:'ti-book',bg:'rgba(var(--pal-yellow-rgb),1)',label:'책'},
-  movie:{icon:'ti-movie',bg:'rgba(var(--pal-sky-rgb),1)',label:'영화'},
-  music:{icon:'ti-music',bg:'rgba(var(--pal-lime-rgb),1)',label:'음악'}
+  drama:{icon:'ti-device-tv',bg:'rgba(var(--pal-pink-rgb),1)',iconColor:'#fff',label:'드라마'},
+  book:{icon:'ti-book',bg:'rgba(var(--pal-yellow-rgb),1)',iconColor:'#fff',label:'책'},
+  movie:{icon:'ti-movie',bg:'rgba(var(--pal-sky-rgb),1)',iconColor:'#fff',label:'영화'},
+  music:{icon:'ti-music',bg:'rgba(var(--pal-lime-rgb),1)',iconColor:'#fff',label:'음악'}
 };
 
 // ── 상태 ──
@@ -455,8 +455,10 @@ function closeReportPanel(){
 // ══════════════════════════════════════════════════════════
 // 주간탭
 // ══════════════════════════════════════════════════════════
-const WC_COLORS_RGB=['var(--pal-pink-rgb)','var(--pal-orange-rgb)','var(--pal-yellow-rgb)','var(--pal-mint-rgb)','var(--pal-sky-rgb)','var(--pal-lavender-rgb)','var(--pal-rose-rgb)'];
+const WC_COLORS_BG=['var(--pal-pink-bg)','var(--pal-orange-bg)','var(--pal-yellow-bg)','var(--pal-mint-bg)','var(--pal-sky-bg)','var(--pal-lavender-bg)','var(--pal-rose-bg)'];
 const WC_COLORS_TXT=['var(--pal-pink-text)','var(--pal-orange-text)','var(--pal-yellow-text)','var(--pal-mint-text)','var(--pal-sky-text)','var(--pal-lavender-text)','var(--pal-rose-text)'];
+const WC_COLORS_BORDER=['var(--pal-pink-border)','var(--pal-orange-border)','var(--pal-yellow-border)','var(--pal-mint-border)','var(--pal-sky-border)','var(--pal-lavender-border)','var(--pal-rose-border)'];
+const WC_DAYS=['M','T','W','T','F','S','S']; // 본앱 이니셜 표기(월요일 시작)
 const WC_DOW=['월','화','수','목','금','토','일'];
 
 // ── 상단 화살표: 오늘/주간/월간 탭 공통 날짜 이동 ──
@@ -537,9 +539,9 @@ function renderWeekGoals(row){
   const lines=(row&&Array.isArray(row.lines))?row.lines.filter(l=>l&&l.text&&l.text.trim()):[];
   if(!lines.length){el.innerHTML='<div class="empty-msg">등록된 목표가 없어요</div>';return;}
   el.innerHTML=lines.map(item=>{
-    const daysHtml=WC_DOW.map((d,i)=>{
+    const daysHtml=WC_DAYS.map((d,i)=>{
       const on=item.days&&item.days[i];
-      const style=on?`background:rgba(${WC_COLORS_RGB[i]},0.5);color:${WC_COLORS_TXT[i]};`:'';
+      const style=on?`background:${WC_COLORS_BG[i]};border-color:${WC_COLORS_BORDER[i]};color:${WC_COLORS_TXT[i]};border-style:solid;`:'';
       return `<div class="wgoal-day" style="${style}">${d}</div>`;
     }).join('');
     return `<div class="wgoal-item"><div class="wgoal-text">${escapeHtml(item.text)}</div><div class="wgoal-days">${daysHtml}</div></div>`;
@@ -749,7 +751,7 @@ async function renderMonthTimetable(y,mo){
     if(!tracks.length)tracks.push([]);
     const meta=CAT_ICON_META[cat];
     tracks.forEach((trackItems,tIdx)=>{
-      const catLabel=tIdx===0?`<i class="dot" style="background:${meta.bg};"></i>${meta.label}`:'';
+      const catLabel=tIdx===0?`<span class="tt-cat-badge" style="background:${meta.bg};"><i class="ti ${meta.icon}" style="color:${meta.iconColor};" aria-hidden="true"></i></span>${meta.label}`:'';
       // 본앱과 동일하게 커서를 하루씩 진행하며, 콘텐츠 없는 날은 점선 네모칸(tt-cell), 있는 구간은 카테고리색 블록(tt-block)으로 채움
       // 음악은 같은 시작일끼리 그룹핑해서 2곡 이상이면 곡 제목 대신 숫자 개수로 표시(본앱 동일 규칙)
       const sortedGroups=cat==='music'
@@ -924,14 +926,6 @@ async function renderReadingCal(){
     }
   }
   document.getElementById('rdcal-grid').innerHTML=gridHtml;
-
-  // 이번 달이 실제로 몇 주짜리인지에 맞춰 top-row 높이를 유동으로 세팅.
-  // 독서달력 고정 부분(카드패딩+라벨+네비+카운트+요일헤더) + 주차수만큼의 grid 높이(46px씩, row-gap 9px)를 합산.
-  const weekRows=Math.ceil((startWeekday+daysInMonth)/7);
-  const RDCAL_FIXED_PART=32+30+22+49+20; // 카드패딩/card-lbl/nav/count/dow헤더 — 실제 렌더 여백과 폰트 기준 고정 추정치
-  const gridHeight=weekRows*54+(weekRows-1)*12; // 셀 54px(표지 이미지가 확실히 들어가는 크기) + row-gap 12px
-  const topRowHeight=RDCAL_FIXED_PART+gridHeight;
-  document.querySelector('.top-row').style.height=topRowHeight+'px';
 }
 
 
