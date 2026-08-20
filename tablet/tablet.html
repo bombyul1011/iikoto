@@ -97,10 +97,11 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .month-top-right{min-height:0;}
 .card.month-compact{padding:14px 16px 12px;}
 .card.month-compact .card-lbl{margin-bottom:8px;}
+.month-goals-box{min-height:calc(var(--fs-sm) * 1.4 * 3 + 6px * 3);display:flex;flex-direction:column;justify-content:center;}
 .month-compact .habit-numbox-grid{grid-template-columns:repeat(4,1fr);gap:7px;}
-.month-compact .habit-numbox-card{padding:9px 4px;border-radius:12px;}
-.month-compact .habit-numbox-card i{font-size:16px!important;}
-.month-compact .habit-numbox-num{font-size:var(--fs-title);margin-top:3px;}
+.month-compact .habit-numbox-card{padding:11px 4px;border-radius:12px;}
+.month-compact .habit-numbox-card i{font-size:17px!important;}
+.month-compact .habit-numbox-num{font-size:var(--fs-title);margin-top:4px;}
 .month-compact .habit-numbox-name{font-size:var(--fs-xs);}
 .grid3{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;align-items:stretch;}
 .grid4{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin-bottom:13px;align-items:stretch;}
@@ -161,6 +162,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .content-card{border-color:rgba(var(--pal-lavender-rgb),0.4)!important;}
 .content-row{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:var(--fs-body);color:var(--tp);}
 .content-cat{font-size:var(--fs-xs);color:rgba(130,75,150,0.85);background:rgba(var(--pal-lavender-rgb),0.25);padding:2px 6px;border-radius:5px;flex-shrink:0;}
+.content-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 
 /* ── 오늘의 식사(넓은 배너, 4끼 2x2, 높이 고정) ── */
 .meal-card{border-color:rgba(var(--pal-lime-rgb),0.4)!important;padding:12px 18px;height:150px;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;}
@@ -266,7 +268,9 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .month-quote-date{font-size:var(--fs-xs);color:var(--tm);flex-shrink:0;width:34px;}
 .month-quote-txt{font-size:var(--fs-body);color:var(--ts);line-height:1.5;}
 
-/* 콘텐츠 모아보기(월별) — 본앱 콘텐츠 모아보기 시트 구조 이식 */
+/* 콘텐츠 모아보기(월별) — 본앱 콘텐츠 모아보기 시트 구조 이식, 독서달력 카드와 높이 맞춰 넘치면 스크롤 */
+.ccol-card{display:flex;flex-direction:column;overflow:hidden;}
+.ccol-scroll{flex:1;min-height:0;overflow-y:auto;}
 .ccol-sec{margin-bottom:12px;}
 .ccol-sec:last-child{margin-bottom:0;}
 .ccol-sec-title{display:flex;align-items:center;gap:5px;font-size:var(--fs-sm);font-weight:600;color:var(--ts);margin-bottom:6px;}
@@ -346,9 +350,9 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
         <div class="quote-card"><div class="quote-card-inner"><div class="card-lbl"><i class="ti ti-book" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>읽는 중</div><div id="today-reading"></div></div></div>
       </div>
       <div class="grid4">
-        <div class="card rhythm-card" id="today-rhythm-card" onclick="openTodayRhythmFlow()"><div class="card-lbl"><i class="ti ti-activity" style="color:var(--rh-rest);" aria-hidden="true"></i>오늘의 리듬</div><div id="today-rhythm"></div></div>
+        <div class="card rhythm-card" id="today-rhythm-card" onclick="openTodayRhythmFlow()"><div class="card-lbl"><i class="ti ti-rainbow" style="color:var(--rh-rest);" aria-hidden="true"></i>오늘의 리듬</div><div id="today-rhythm"></div></div>
         <div class="card habit-card"><div class="card-lbl" id="today-habit-lbl"><i class="ti ti-target-arrow" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>습관</div><div id="today-habits"></div></div>
-        <div class="card content-card"><div class="card-lbl"><i class="ti ti-device-tv" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>콘텐츠 현황</div><div id="today-contents"></div></div>
+        <div class="card content-card"><div class="card-lbl"><i class="ti ti-stack-2" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>콘텐츠 현황</div><div id="today-contents"></div></div>
       </div>
     </div>
 
@@ -357,7 +361,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
       <div class="main-hdr"><i class="ti ti-chevron-left main-hdr-arrow" onclick="shiftSelectedWeek(-1)" aria-hidden="true"></i><span class="main-date" id="week-range"></span><i class="ti ti-chevron-right main-hdr-arrow" onclick="shiftSelectedWeek(1)" aria-hidden="true"></i></div>
       <div class="report-banner" id="week-report-banner"></div>
       <div class="grid2">
-        <div class="card goal-hcard"><div class="card-lbl"><i class="ti ti-target-arrow" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>이번 주 목표</div><div id="week-goals"></div></div>
+        <div class="card goal-hcard"><div class="card-lbl"><i class="ti ti-flag-3" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>이번 주 목표</div><div id="week-goals"></div></div>
         <div class="card"><div class="card-lbl"><i class="ti ti-target-arrow" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>습관 매트릭스</div><div id="week-habit-matrix"></div></div>
       </div>
       <div class="card"><div class="card-lbl"><i class="ti ti-pencil" style="color:rgba(var(--pal-yellow-rgb),1);" aria-hidden="true"></i>하루한줄</div>
@@ -374,7 +378,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
       <div class="main-hdr"><i class="ti ti-chevron-left main-hdr-arrow" onclick="shiftSelectedMonth(-1)" aria-hidden="true"></i><span class="main-date" id="month-title"></span><i class="ti ti-chevron-right main-hdr-arrow" onclick="shiftSelectedMonth(1)" aria-hidden="true"></i></div>
       <div class="month-top-grid">
         <div class="month-top-left">
-          <div class="card goal-hcard month-compact"><div class="card-lbl"><i class="ti ti-flag-3" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>이번 달 목표</div><div id="month-goals"></div></div>
+          <div class="card goal-hcard month-compact"><div class="card-lbl"><i class="ti ti-flag-3" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>이번 달 목표</div><div id="month-goals" class="month-goals-box"></div></div>
           <div class="card month-compact"><div class="card-lbl"><i class="ti ti-target-arrow" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>습관 모아보기</div><div id="month-habits"></div></div>
         </div>
         <div class="card chaeum-log-card month-top-right" id="month-top-right"><div class="chaeum-log-hdr"><div class="chaeum-log-title"><i class="ti ti-clover" aria-hidden="true"></i>채움 로그</div></div><div class="chaeum-log-stat" id="chaeum-log-stat"></div><div class="chaeum-log-tl" id="chaeum-log-tl"></div></div>
@@ -387,7 +391,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
           <div class="rdcal-grid" id="rdcal-dows" style="margin-bottom:6px;"></div>
           <div class="rdcal-grid" id="rdcal-grid"></div>
         </div>
-        <div class="card"><div class="card-lbl"><i class="ti ti-movie" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>콘텐츠 모아보기</div><div id="month-content-collect"></div></div>
+        <div class="card ccol-card"><div class="card-lbl"><i class="ti ti-movie" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>콘텐츠 모아보기</div><div id="month-content-collect" class="ccol-scroll"></div></div>
       </div>
       <div class="card"><div class="card-lbl"><i class="ti ti-chart-bar" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>콘텐츠 타임라인</div><div id="month-tt"></div></div>
       <div class="card month-quotes-card"><div class="card-lbl"><i class="ti ti-quote" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>이번 달 수집문장</div><div id="month-quotes"></div></div>

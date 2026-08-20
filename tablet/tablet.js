@@ -349,7 +349,7 @@ function renderTodayContents(items){
   if(!items.length){el.innerHTML='<div class="empty-msg">감상 중인 콘텐츠 없음</div>';return;}
   el.innerHTML=items.slice(0,4).map(c=>{
     const meta=CAT_ICON_META[c.content_cat]||{label:c.content_cat};
-    return `<div class="content-row"><span class="content-cat">${meta.label||''}</span>${escapeHtml(c.title)}</div>`;
+    return `<div class="content-row"><span class="content-cat">${meta.label||''}</span><span class="content-title">${escapeHtml(c.title)}</span></div>`;
   }).join('');
 }
 
