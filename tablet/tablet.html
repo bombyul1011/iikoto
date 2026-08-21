@@ -27,7 +27,7 @@
   --fs-xl:calc(var(--fs-title) + 8px);    /* 최상위 헤더(월/일) */
   --fs-sm:calc(var(--fs-body) - 1.5px);   /* 보조 라벨(시간, 카테고리 태그, 요일, 스파크라인 축 등) */
   --fs-tab:calc(var(--fs-title) - 0.5px); /* 플로팅 탭 메뉴 텍스트 */
-  --fs-body-1:clamp(calc(var(--fs-body) - 4.5px), calc(var(--fs-body) - 2.14px - 0.2vw), calc(var(--fs-body) - 3px)); /* 이번 달 수집문장 본문 전용 — 서체(바른바탕) 특성상 같은 px여도 커 보임. 세로(좁은 화면 ~430px)에선 기존 -3px 유지, 가로(넓은 화면, 아이패드 가로 ~1180px)로 갈수록 상대적으로 더 커 보여서 -4.5px까지 완만히 더 줄어들게. --fs-body 연동이라 설정 폰트 크기 조절에도 같이 반응 */
+  --fs-body-1:clamp(calc(var(--fs-body) - 3.5px), calc(var(--fs-body) - 2.4px - 0.1vw), calc(var(--fs-body) - 3px)); /* 이번 달 수집문장 본문 전용 — 서체(바른바탕) 특성상 같은 px여도 커 보임. 세로(좁은 화면 ~430px)에선 기존 -3px 유지, 가로(아이패드 가로 ~1180px)로 갈수록 살짝만 더 줄어들어 -3.5px까지(과하게 작아지지 않도록 완만하게). --fs-body 연동이라 설정 폰트 크기 조절에도 같이 반응 */
 
   --main-text-size:17px;
   --dow-label-size:15px;
