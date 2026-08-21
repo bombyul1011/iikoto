@@ -28,6 +28,20 @@ async function chaeumFetch(path){
 // ── 날짜 유틸 (iikoto와 동일 규칙) ──
 function pad(n){return String(n).padStart(2,'0');}
 function dateKey(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;}
+// 본앱과 동일한 논리적 하루(새벽 4시 컷) 정렬 기준. 00:00~03:59 기록은 전날 늦은 시간대로 보고 +1440분 밀어서 맨 뒤로 정렬.
+const DAWN_CUTOFF_MIN=4*60;
+function _dawnTimeToMin(t){if(!t)return null;const p=t.split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);}
+function toDawnAdjustedMin(min,cutoffMin){
+  if(min==null)return null;
+  const c=cutoffMin!=null?cutoffMin:DAWN_CUTOFF_MIN;
+  return min<c?min+1440:min;
+}
+function toSortKey(t){
+  if(!t)return 9999;
+  const min=_dawnTimeToMin(t);
+  if(min==null)return 9999;
+  return toDawnAdjustedMin(min);
+}
 function weekKeyOf(d){const m=new Date(d);m.setDate(d.getDate()-((d.getDay()+6)%7));return dateKey(m);}
 function monthKeyOf(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;}
 const DOW=['일','월','화','수','목','금','토'];
@@ -349,8 +363,10 @@ function renderTodayTodosEvents(todos){
 
 async function renderTodayMemos(dk){
   const el=document.getElementById('today-memos');
-  const memos=await supaFetch(`memos?date_key=eq.${dk}&order=memo_time.asc`);
-  if(!memos||!memos.length){el.innerHTML='<div class="empty-msg">오늘 남긴 메모가 없어요</div>';return;}
+  const memosRaw=await supaFetch(`memos?date_key=eq.${dk}&order=memo_time.asc`);
+  if(!memosRaw||!memosRaw.length){el.innerHTML='<div class="empty-msg">오늘 남긴 메모가 없어요</div>';return;}
+  // DB order는 단순 문자열순이라 00:00~03:59 기록이 맨 앞으로 와버림 — 새벽 4시 컷 기준으로 재정렬(본앱과 동일 규칙).
+  const memos=memosRaw.slice().sort((a,b)=>toSortKey(a.memo_time)-toSortKey(b.memo_time));
   el.innerHTML=memos.map(m=>{
     const isSeed=m.type==='seed';
     let todClass='';
@@ -552,7 +568,9 @@ function openTodayRhythmFlow(){
   const label=`${_selectedDate.getMonth()+1}월 ${_selectedDate.getDate()}일 리듬 흐름`;
   document.getElementById('report-panel-title').innerHTML=`<i class="ti ti-activity" aria-hidden="true"></i>${label}`;
   const bodyEl=document.getElementById('report-panel-body');
-  const blocks=(_todayRhythmBlocks||[]).slice().sort((a,b)=>(a.start_time||'').localeCompare(b.start_time||''));
+  // 문자열 비교(localeCompare)는 00:00~03:59대 새벽 기록을 맨 앞으로 보내버림 — 새벽 4시 컷 기준(toSortKey)으로 정렬해야
+  // 수면 등록 전까지의 기록이 "자정 전 날짜의 가장 마지막 기록"으로 온다(본앱 규칙과 동일).
+  const blocks=(_todayRhythmBlocks||[]).slice().sort((a,b)=>toSortKey(a.start_time)-toSortKey(b.start_time));
   if(!blocks.length){
     bodyEl.innerHTML='<div class="wrb-flow-empty">이날은 기록된 리듬이 없어요</div>';
   }else{
@@ -1242,11 +1260,17 @@ async function renderReadingCal(){
   for(let d=1;d<=daysInMonth;d++){
     const dk=`${mk}-${pad(d)}`;
     const dayLogs=logsByDate[dk]||[];
-    const cids=[...new Set(dayLogs.map(r=>r.book_cid))];
+    const cids=[...new Set(dayLogs.slice().reverse().map(r=>r.book_cid))];
     if(cids.length){
+      // 본앱과 동일: 2권 이상이면 표지를 살짝 겹쳐 보여주고(밀리의 서재 방식) 우하단에 권수 뱃지 표시.
       const cover=bookMap[cids[0]]&&bookMap[cids[0]].poster;
-      const coverStyle=cover?`background-image:url('${cover}');`:'';
-      gridHtml+=`<div class="rdcal-cover" style="${coverStyle}"></div>`;
+      const cover2=cids.length>1&&bookMap[cids[1]]&&bookMap[cids[1]].poster;
+      const innerHtml=`<div style="position:relative;width:34px;height:46px;margin:0 auto;">
+        ${cids.length>1?`<div style="position:absolute;top:2px;left:3px;width:34px;height:46px;border-radius:6px;overflow:hidden;background:var(--card);border:1px solid var(--card-b);box-shadow:0 1px 3px rgba(0,0,0,0.15);${cover2?`background-image:url('${cover2}');background-size:cover;background-position:center;`:''}"></div>`:''}
+        <div style="position:absolute;top:0;left:0;width:34px;height:46px;border-radius:6px;overflow:hidden;background:var(--card);border:1px solid var(--card-b);${cids.length>1?'box-shadow:-1px 1px 4px rgba(0,0,0,0.18);':''}${cover?`background-image:url('${cover}');background-size:cover;background-position:center;`:''}"></div>
+        ${cids.length>1?`<div style="position:absolute;bottom:-4px;right:-4px;background:rgba(60,40,35,0.85);color:#fff;font-size:9px;font-weight:600;border-radius:7px;min-width:14px;height:14px;display:flex;align-items:center;justify-content:center;padding:0 3px;z-index:2;">${cids.length}</div>`:''}
+      </div>`;
+      gridHtml+=`<div>${innerHtml}</div>`;
     }else{
       gridHtml+=`<div class="rdcal-num">${d}</div>`;
     }
