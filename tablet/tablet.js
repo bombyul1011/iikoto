@@ -760,7 +760,7 @@ async function loadWeekTab(){
   const lastCmpEndDk=isCurrentWeek?lastWeekDates[todayIdx]:lastWeekDates[6];
 
   const [goalRows,habits,habitChecks,memos,todos,sleepRows,onelineRows,contents,
-    lwMemos,lwTodos,lwSleepRows,lwHabitChecks,lwContents,rblocksThis,rblocksLast]=await Promise.all([
+    lwMemos,lwTodos,lwSleepRows,lwHabitChecks,lwContents,rblocksThis,rblocksLast,recentSleepRows]=await Promise.all([
     supaFetch(`goal_notes?note_key=eq.wchallenge_${encodeURIComponent(wk)}`),
     supaFetch(`habits?order=sort_order.asc`),
     supaFetch(`habit_checks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
@@ -777,11 +777,13 @@ async function loadWeekTab(){
     supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&order=created.desc&limit=100`),
     // 리듬 흐름 비교용: 이번주(오늘까지)/지난주(7일 전체)
     supaFetch(`rhythm_blocks?date_key=gte.${startDk}&date_key=lte.${cmpEndDk}`),
-    supaFetch(`rhythm_blocks?date_key=gte.${lastStartDk}&date_key=lte.${lastWeekDates[6]}`)
+    supaFetch(`rhythm_blocks?date_key=gte.${lastStartDk}&date_key=lte.${lastWeekDates[6]}`),
+    // 이번 주 수면카드 상단 평균(최근 2주 기준, 요일별 편차 완충용)
+    (function(){const e=new Date(_selectedDate<=new Date()?new Date():_selectedDate);const s=new Date(e);s.setDate(e.getDate()-13);return supaFetch(`sleep?date_key=gte.${dateKey(s)}&date_key=lte.${dateKey(e)}&select=date_key,score,sleep_time,wake_time`);})()
   ]);
 
   renderWeekGoals(goalRows&&goalRows[0]);
-  renderWeekSleepRow(sleepRows||[],weekDates,todayDk);   // 도트 껍데기(빈 컨테이너) 먼저 생성
+  renderWeekSleepRow(sleepRows||[],weekDates,todayDk,recentSleepRows||[]);   // 도트 껍데기(빈 컨테이너) 먼저 생성
   renderWeekHabitMatrix(habits||[],habitChecks||[],weekDates); // 그 컨테이너에 습관 도트 채움
   renderWeekDelta({
     memos:memos||[],todos:todos||[],sleepRows:sleepRows||[],habits:habits||[],checks:habitChecks||[],contents:contents||[],
@@ -795,36 +797,76 @@ async function loadWeekTab(){
   renderReportBanner('week-report-banner',_selectedDate);
 }
 
-// 이번 주 수면(컨디션) — 요일별 수면점수 표정 + 습관 도트(습관 고유색), 제목줄엔 주간 평균 점수
-function renderWeekSleepRow(sleepRows,weekDates,todayDk){
+// 이번 주 수면(컨디션) — 요일별 목표수면(7.5h) 달성 링(달성 시 본앱 오늘탭 수면웨이브 그라디언트 연하게, 미달성 시 라벤더) + 하단 평균 취침/기상.
+const SLEEP_GOAL_HOURS=7.5;
+const SLEEP_RING_CIRC=2*Math.PI*15; // r=15 기준 둘레(약 94.2)
+function renderWeekSleepRow(sleepRows,weekDates,todayDk,recentSleepRows){
   const el=document.getElementById('week-sleep-row');
   const avgEl=document.getElementById('week-sleep-avg');
   const byDate={};
   sleepRows.forEach(r=>{if(r.date_key)byDate[r.date_key]=r;});
-  const scores=sleepRows.map(r=>r.score).filter(s=>s!=null&&!isNaN(s));
-  if(scores.length){
-    const avg=Math.round(scores.reduce((a,b)=>a+b,0)/scores.length);
+
+  // 상단 평균 점수: 최근 2주(요일 편차 완충) — getSleepScoreLevel 아이콘 그대로 재사용, 점수는 작게/아이콘은 크게.
+  const recentScores=(recentSleepRows||[]).map(r=>r.score).filter(s=>s!=null&&!isNaN(s));
+  if(recentScores.length){
+    const avg=Math.round(recentScores.reduce((a,b)=>a+b,0)/recentScores.length);
     const lv=getSleepScoreLevel(avg);
-    avgEl.innerHTML=`<i class="ti ${lv.icon}" style="color:var(--sleep-warmgray);" aria-hidden="true"></i>평균 ${avg}점`;
+    avgEl.innerHTML=`<span class="wsleep-avg-num">${avg}점</span><i class="ti ${lv.icon}" style="color:var(--sleep-warmgray);" aria-hidden="true"></i>`;
   }else{
     avgEl.innerHTML='';
   }
+
   el.innerHTML=`<div class="wsleep-grid">`+weekDates.map((dk,i)=>{
     const r=byDate[dk];
-    const score=r&&r.score!=null&&!isNaN(r.score)?r.score:null;
     const isToday=dk===todayDk;
     const isFuture=dk>todayDk;
-    // 기록 없음: 미래는 빈 칸(색만 흐리게), 과거/오늘인데 기록 안 한 날은 옅은 점선 아이콘으로 "미기록"임을 표시
-    const faceHtml=score!=null
-      ?`<i class="ti ${getSleepScoreLevel(score).icon}"></i>`
-      :(isFuture?'':`<i class="ti ti-minus" style="opacity:.3;font-size:20px;" aria-hidden="true"></i>`);
+    let hrs=null;
+    if(r&&r.sleep_time&&r.wake_time){
+      const sv=_dawnTimeToMin(r.sleep_time),wv=_dawnTimeToMin(r.wake_time);
+      let mins=wv-sv;if(mins<0)mins+=1440;
+      hrs=mins/60;
+    }
+    let ringHtml;
+    if(hrs==null){
+      ringHtml=isFuture?'<div class="wsleep-ring-wrap"></div>'
+        :`<div class="wsleep-ring-wrap"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" fill="none" stroke="rgba(var(--divider-rgb),0.2)" stroke-width="4"/></svg><div class="wsleep-ring-hrs"><i class="ti ti-minus" style="font-size:12px;opacity:.4;" aria-hidden="true"></i></div></div>`;
+    }else{
+      const achieved=hrs>=SLEEP_GOAL_HOURS;
+      const pct=Math.min(1,hrs/SLEEP_GOAL_HOURS);
+      const dash=(SLEEP_RING_CIRC*pct).toFixed(1);
+      const gap=(SLEEP_RING_CIRC-dash).toFixed(1);
+      const stroke=achieved?'url(#wsleep-rainbow)':'rgba(204,208,220,0.80)';
+      ringHtml=`<div class="wsleep-ring-wrap"><svg viewBox="0 0 36 36">
+        <circle cx="18" cy="18" r="15" fill="none" stroke="rgba(var(--divider-rgb),0.2)" stroke-width="4"/>
+        <circle cx="18" cy="18" r="15" fill="none" stroke="${stroke}" stroke-width="4" stroke-dasharray="${dash} ${gap}" stroke-linecap="round"/>
+      </svg></div>`;
+    }
     return `<div class="wsleep-col${isToday?' wsleep-today':''}"${isFuture?' style="opacity:.35;"':''}>
       <div class="wsleep-dow">${WC_DOW[i]}</div>
-      <div class="wsleep-face">${faceHtml}</div>
-      <div class="wsleep-hdots" id="wsleep-hdots-${dk}"></div>
+      ${ringHtml}
     </div>`;
   }).join('')+`</div>`;
+
+  // 하단 평균 취침/기상 — 상단 평균 점수와 동일하게 최근 2주 데이터 기준으로 계산.
+  const validRows=(recentSleepRows||[]).filter(r=>r.sleep_time&&r.wake_time);
+  let sleepAvgTxt='–',wakeAvgTxt='–';
+  if(validRows.length){
+    let sSum=0,wSum=0;
+    validRows.forEach(r=>{
+      const sv=toDawnAdjustedMin(_dawnTimeToMin(r.sleep_time),22*60); // 취침시각은 밤~새벽에 걸치므로 22시 컷으로 보정
+      sSum+=sv;
+      wSum+=_dawnTimeToMin(r.wake_time);
+    });
+    sleepAvgTxt=_minToHHMM(Math.round(sSum/validRows.length)%1440);
+    wakeAvgTxt=_minToHHMM(Math.round(wSum/validRows.length)%1440);
+  }
+  el.innerHTML+=`<div class="wsleep-summary">
+    <div class="wsleep-summary-item"><i class="ti ti-moon" aria-hidden="true"></i><span class="wsleep-summary-label">평균 취침</span><span class="wsleep-summary-val">${sleepAvgTxt}</span></div>
+    <div class="wsleep-summary-div"></div>
+    <div class="wsleep-summary-item"><i class="ti ti-sunrise" aria-hidden="true"></i><span class="wsleep-summary-label">평균 기상</span><span class="wsleep-summary-val">${wakeAvgTxt}</span></div>
+  </div>`;
 }
+function _minToHHMM(min){const h=Math.floor(min/60),m=min%60;return pad(h)+':'+pad(m);}
 
 // 지난주 대비 — 오늘 요일까지로 절단된 동일 범위끼리 비교(주 진행 중엔 항상 마이너스로 왜곡되는 문제 방지)
 function renderWeekDelta(cur,prev){
@@ -940,17 +982,6 @@ function renderWeekHabitMatrix(habits,checks,weekDates){
   });
   html+='</div>';
   el.innerHTML=html;
-
-  // 이번 주 수면 카드의 요일별 습관 도트도 같은 색상 매핑으로 채워 넣음(습관 매트릭스와 색 통일)
-  weekDates.forEach(dk=>{
-    const dotsEl=document.getElementById('wsleep-hdots-'+dk);
-    if(!dotsEl)return;
-    dotsEl.innerHTML=habits.map(h=>{
-      const done=checks.some(ch=>ch.habit_name===h.name&&ch.date_key===dk);
-      const c=colorMap[h.color]||'var(--pal-warmgray-rgb)';
-      return `<span class="wsleep-hdot" style="${done?`background:rgba(${c},1);`:''}"></span>`;
-    }).join('');
-  });
 }
 
 
