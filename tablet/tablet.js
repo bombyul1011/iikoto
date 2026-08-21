@@ -797,16 +797,16 @@ async function loadWeekTab(){
   renderReportBanner('week-report-banner',_selectedDate);
 }
 
-// 이번 주 수면(컨디션) — 요일별 목표수면(7.5h) 달성 링(달성 시 본앱 오늘탭 수면웨이브 그라디언트 연하게, 미달성 시 라벤더) + 하단 평균 취침/기상.
+// 이번 주 수면(컨디션) — 요일별 수면점수 표정 아이콘 + 취침/기상 시각(작게), 상단엔 최근 2주 평균 점수, 하단엔 평균 취침/기상.
+// * 웨이브 그래프(취침~기상 리본 + 복합지수 그라데이션) 버전은 구상 마치는 대로 재적용 예정 — SLEEP_GOAL_HOURS/SLEEP_RING_CIRC 등은 그때 재사용.
 const SLEEP_GOAL_HOURS=7.5;
-const SLEEP_RING_CIRC=2*Math.PI*15; // r=15 기준 둘레(약 94.2)
 function renderWeekSleepRow(sleepRows,weekDates,todayDk,recentSleepRows){
   const el=document.getElementById('week-sleep-row');
   const avgEl=document.getElementById('week-sleep-avg');
   const byDate={};
   sleepRows.forEach(r=>{if(r.date_key)byDate[r.date_key]=r;});
 
-  // 상단 평균 점수: 최근 2주(요일 편차 완충) — getSleepScoreLevel 아이콘 그대로 재사용, 점수는 작게/아이콘은 크게.
+  // 상단 평균 점수: 최근 2주(요일 편차 완충) — getSleepScoreLevel 아이콘 그대로 재사용, 제목과 동일 사이즈.
   const recentScores=(recentSleepRows||[]).map(r=>r.score).filter(s=>s!=null&&!isNaN(s));
   if(recentScores.length){
     const avg=Math.round(recentScores.reduce((a,b)=>a+b,0)/recentScores.length);
@@ -818,32 +818,19 @@ function renderWeekSleepRow(sleepRows,weekDates,todayDk,recentSleepRows){
 
   el.innerHTML=`<div class="wsleep-grid">`+weekDates.map((dk,i)=>{
     const r=byDate[dk];
+    const score=r&&r.score!=null&&!isNaN(r.score)?r.score:null;
     const isToday=dk===todayDk;
     const isFuture=dk>todayDk;
-    let hrs=null;
-    if(r&&r.sleep_time&&r.wake_time){
-      const sv=_dawnTimeToMin(r.sleep_time),wv=_dawnTimeToMin(r.wake_time);
-      let mins=wv-sv;if(mins<0)mins+=1440;
-      hrs=mins/60;
-    }
-    let ringHtml;
-    if(hrs==null){
-      ringHtml=isFuture?'<div class="wsleep-ring-wrap"></div>'
-        :`<div class="wsleep-ring-wrap"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" fill="none" stroke="rgba(var(--divider-rgb),0.2)" stroke-width="4"/></svg><div class="wsleep-ring-hrs"><i class="ti ti-minus" style="font-size:12px;opacity:.4;" aria-hidden="true"></i></div></div>`;
-    }else{
-      const achieved=hrs>=SLEEP_GOAL_HOURS;
-      const pct=Math.min(1,hrs/SLEEP_GOAL_HOURS);
-      const dash=(SLEEP_RING_CIRC*pct).toFixed(1);
-      const gap=(SLEEP_RING_CIRC-dash).toFixed(1);
-      const stroke=achieved?'url(#wsleep-rainbow)':'rgba(204,208,220,0.80)';
-      ringHtml=`<div class="wsleep-ring-wrap"><svg viewBox="0 0 36 36">
-        <circle cx="18" cy="18" r="15" fill="none" stroke="rgba(var(--divider-rgb),0.2)" stroke-width="4"/>
-        <circle cx="18" cy="18" r="15" fill="none" stroke="${stroke}" stroke-width="4" stroke-dasharray="${dash} ${gap}" stroke-linecap="round"/>
-      </svg></div>`;
-    }
+    const faceHtml=score!=null
+      ?`<i class="ti ${getSleepScoreLevel(score).icon}"></i>`
+      :(isFuture?'':`<i class="ti ti-minus" style="opacity:.3;font-size:20px;" aria-hidden="true"></i>`);
+    const timeHtml=(r&&r.sleep_time&&r.wake_time)
+      ?`<div class="wsleep-times"><span>${r.sleep_time}</span><span class="wsleep-times-div">·</span><span>${r.wake_time}</span></div>`
+      :`<div class="wsleep-times">&nbsp;</div>`;
     return `<div class="wsleep-col${isToday?' wsleep-today':''}"${isFuture?' style="opacity:.35;"':''}>
       <div class="wsleep-dow">${WC_DOW[i]}</div>
-      ${ringHtml}
+      <div class="wsleep-face">${faceHtml}</div>
+      ${timeHtml}
     </div>`;
   }).join('')+`</div>`;
 
