@@ -797,9 +797,7 @@ async function loadWeekTab(){
   renderReportBanner('week-report-banner',_selectedDate);
 }
 
-// 이번 주 수면(컨디션) — 요일별 수면점수 표정 아이콘 + 취침/기상 시각(작게), 상단엔 최근 2주 평균 점수, 하단엔 평균 취침/기상.
-// * 웨이브 그래프(취침~기상 리본 + 복합지수 그라데이션) 버전은 구상 마치는 대로 재적용 예정 — SLEEP_GOAL_HOURS/SLEEP_RING_CIRC 등은 그때 재사용.
-const SLEEP_GOAL_HOURS=7.5;
+// 이번 주 수면(컨디션) — 요일별 수면점수 표정 아이콘, 상단엔 최근 2주 평균 점수, 하단엔 평균 취침/기상.
 function renderWeekSleepRow(sleepRows,weekDates,todayDk,recentSleepRows){
   const el=document.getElementById('week-sleep-row');
   const avgEl=document.getElementById('week-sleep-avg');
@@ -824,13 +822,9 @@ function renderWeekSleepRow(sleepRows,weekDates,todayDk,recentSleepRows){
     const faceHtml=score!=null
       ?`<i class="ti ${getSleepScoreLevel(score).icon}"></i>`
       :(isFuture?'':`<i class="ti ti-minus" style="opacity:.3;font-size:20px;" aria-hidden="true"></i>`);
-    const timeHtml=(r&&r.sleep_time&&r.wake_time)
-      ?`<div class="wsleep-times"><span>${r.sleep_time}</span><span class="wsleep-times-div">·</span><span>${r.wake_time}</span></div>`
-      :`<div class="wsleep-times">&nbsp;</div>`;
     return `<div class="wsleep-col${isToday?' wsleep-today':''}"${isFuture?' style="opacity:.35;"':''}>
       <div class="wsleep-dow">${WC_DOW[i]}</div>
       <div class="wsleep-face">${faceHtml}</div>
-      ${timeHtml}
     </div>`;
   }).join('')+`</div>`;
 
@@ -1486,10 +1480,6 @@ function _weekRangeLabel(wk){
   const end=new Date(start);end.setDate(start.getDate()+6);
   return `${start.getMonth()+1}.${start.getDate()}~${end.getMonth()+1}.${end.getDate()}`;
 }
-function _weekNoLabel(wk,weeksInMonth){
-  const idx=weeksInMonth.indexOf(wk);
-  return (idx+1)+'주차';
-}
 // weeksInMonth는 각 주의 월요일 날짜(예:'2026-08-17'). 리포트 종류별로 본앱이 실제 쓰는 캐시 키 포맷이 다름:
 // - weekly_summary_ : 그 주의 "일요일" 날짜(dateKey, 접두사 없음) — 예: weekly_summary_2026-08-23
 // - challenge_review_ / weekly_memo_report_ : weekKey() 리턴값 그대로(월요일 날짜 + 'week:' 접두사) — 예: challenge_review_week:2026-08-17
@@ -1856,23 +1846,6 @@ function _mrpSmoothPath(points){
     d+=` C${cp1x},${cp1y} ${cp2x},${cp2y} ${p2[0]},${p2[1]}`;
   }
   return d;
-}
-function _mrpSparkSvg(values,color){
-  // values: 주차별 원값 배열(null 허용, 데이터 없는 주는 점을 찍지 않음)
-  const valid=values.map((v,i)=>({v,i})).filter(o=>o.v!=null);
-  if(valid.length<1)return '<span style="font-size:12px;color:var(--tm);">기록 없음</span>';
-  const vs=valid.map(o=>o.v);
-  const min=Math.min(...vs),max=Math.max(...vs);
-  const range=max-min||1;
-  const stepX=280/Math.max(1,values.length-1);
-  const pts=valid.map(o=>{
-    const x=10+o.i*stepX;
-    const y=36-((o.v-min)/range)*28; // 위쪽 여백 8, 아래쪽 여백 8 (44 기준)
-    return [x,y];
-  });
-  const path=pts.length>1?_mrpSmoothPath(pts):'';
-  const dots=pts.map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="3.2" fill="${color}"/>`).join('');
-  return `<svg class="mrp-traj-spark" viewBox="0 0 300 44" preserveAspectRatio="none">${path?`<path d="${path}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`:''}${dots}</svg>`;
 }
 // 세 지표를 하나의 웨이브 그래프에 겹쳐 표시 — 각 지표는 자기 자신의 이번 달 최소~최대 범위 안에서 정규화한
 // "상대적 위치"이며 절대 눈금이 아님(단위가 %/시간으로 서로 다르기 때문). 절대값은 하단 tail-vals에 별도 표기.
