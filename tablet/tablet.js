@@ -124,6 +124,33 @@ let _currentTab='today';
 let _rdCalDate=new Date();
 
 // ══════════════════════════════════════════════════════════
+// 사이드바 접기/펼치기 (아이패드 미니처럼 화면이 좁을 때 메인 영역을 넓혀줌)
+// ══════════════════════════════════════════════════════════
+const SIDEBAR_COLLAPSE_KEY='tablet_sidebar_collapsed';
+function toggleSidebar(){
+  const side=document.getElementById('side');
+  const btn=document.getElementById('side-toggle-btn');
+  const collapsed=side.classList.toggle('collapsed');
+  btn.classList.toggle('collapsed',collapsed);
+  try{localStorage.setItem(SIDEBAR_COLLAPSE_KEY,collapsed?'1':'0');}catch(e){}
+}
+function initSidebarCollapse(){
+  let collapsed=false;
+  try{collapsed=localStorage.getItem(SIDEBAR_COLLAPSE_KEY)==='1';}catch(e){}
+  if(collapsed){
+    const side=document.getElementById('side');
+    const btn=document.getElementById('side-toggle-btn');
+    side.style.transition='none';
+    btn.style.transition='none';
+    side.classList.add('collapsed');
+    btn.classList.add('collapsed');
+    // 강제 리플로우 후 트랜지션 복구 — 이후 사용자가 토글할 때만 부드럽게 움직이도록
+    void side.offsetWidth;
+    requestAnimationFrame(()=>{side.style.transition='';btn.style.transition='';});
+  }
+}
+
+// ══════════════════════════════════════════════════════════
 // 탭 전환
 // ══════════════════════════════════════════════════════════
 function switchTab(tab){
@@ -239,6 +266,12 @@ async function renderSideGreeting(){
   const section=getHomeSection();
   const subSec=getHomeTimeSlot();
   card.className='side-hcard '+section;
+  // 사이드바 접기 탭도 인사카드와 같은 시간대(section) 톤을 그대로 따라가도록 클래스 동기화.
+  const toggleBtn=document.getElementById('side-toggle-btn');
+  if(toggleBtn){
+    toggleBtn.classList.remove('tod-morning','tod-afternoon','tod-night','tod-dawn');
+    toggleBtn.classList.add('tod-'+section);
+  }
 
   const now=new Date();
   if(timeEl)timeEl.textContent=`${DOW[now.getDay()]}요일`;
@@ -1614,6 +1647,7 @@ async function _updateSideReportBadge(){
 // 초기화
 // ══════════════════════════════════════════════════════════
 async function init(){
+  initSidebarCollapse();
   _applyFontSizes();
   await renderMiniCal();
   scheduleSideGreetingRefresh();
