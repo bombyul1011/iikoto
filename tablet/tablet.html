@@ -27,7 +27,7 @@
   --fs-xl:calc(var(--fs-title) + 8px);    /* 최상위 헤더(월/일) */
   --fs-sm:calc(var(--fs-body) - 1.5px);   /* 보조 라벨(시간, 카테고리 태그, 요일, 스파크라인 축 등) */
   --fs-tab:calc(var(--fs-title) - 0.5px); /* 플로팅 탭 메뉴 텍스트 */
-  --fs-body-1:calc(var(--fs-body) - 3px); /* 이번 달 수집문장 본문 전용 — 서체(바른바탕) 특성상 같은 px여도 커 보여서 -3px. --fs-body 연동이라 설정 폰트 크기 조절에도 같이 반응 */
+  --fs-body-1:clamp(calc(var(--fs-body) - 4.5px), calc(var(--fs-body) - 3px + 0.6vw), calc(var(--fs-body) - 3px)); /* 이번 달 수집문장 본문 전용 — 서체(바른바탕) 특성상 같은 px여도 커 보이는 데다, 좁은 화면(세로 모드 등)에서 줄바꿈이 잦아지며 체감 크기가 더 커지는 문제가 있어 뷰포트 폭에 비례해 미세 조정. 넓은 화면(가로/아이패드 기준폭)에서는 기존 -3px 값 그대로 유지, 좁을수록 최대 -4.5px까지 완만히 작아짐. --fs-body 연동이라 설정 폰트 크기 조절에도 같이 반응 */
 
   --main-text-size:17px;
   --dow-label-size:15px;
@@ -353,7 +353,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .mq-book-title{font-size:var(--fs-body);font-weight:600;color:var(--tp);margin-bottom:1px;}
 .mq-book-author{font-size:var(--fs-sm);color:var(--ts);margin-bottom:9px;}
 .mq-quote-list{display:flex;flex-direction:column;gap:7px;}
-.mq-quote-item{font-family:'HakgyoansimBareonbatangR',serif;font-size:var(--fs-body-1);line-height:1.6;color:var(--ts);padding-left:9px;padding-top:7px;border-left:2px solid rgba(var(--divider-rgb),0.35);border-top:1px solid rgba(var(--divider-rgb),0.18);}
+.mq-quote-item{font-family:'HakgyoansimBareonbatangR',serif;font-size:var(--fs-body-1);line-height:1.5;color:var(--ts);padding-left:9px;padding-top:7px;border-left:2px solid rgba(var(--divider-rgb),0.35);border-top:1px solid rgba(var(--divider-rgb),0.18);}
 .mq-quote-item:first-child{border-top:none;padding-top:0;}
 .mq-quote-comment{font-family:'DM Sans',sans-serif;font-size:var(--fs-sm);color:var(--tm);margin-top:3px;}
 /* 오늘 활동 분포 — 본앱 pace-dot 타임라인 그대로 이식 */
