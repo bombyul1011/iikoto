@@ -61,6 +61,34 @@ function avgSleepHoursFromRows(sleepRows){
   return sleepCnt>0?(sleepMin/sleepCnt/60).toFixed(1):'-';
 }
 
+// 목표 수면시간(2026-08-22 확정, 고정값) — 관련 통계(부족/초과, 달성률 등) 전부 이 상수 기준.
+const SLEEP_GOAL_MIN=7*60+30; // 7시간 30분
+
+// 표준편차(분) 계산 — 취침/기상 규칙성 점수용 공통 유틸
+function _stdDevMin(valuesMin){
+  const valid=valuesMin.filter(v=>v!=null&&!isNaN(v));
+  if(valid.length<2)return null;
+  const mean=valid.reduce((a,b)=>a+b,0)/valid.length;
+  const variance=valid.reduce((a,b)=>a+Math.pow(b-mean,2),0)/valid.length;
+  return Math.sqrt(variance);
+}
+// 수면 규칙성 점수(2026-08-22 확정): 취침/기상 각각의 표준편차(분) 평균을 100점 만점으로 환산.
+// 편차 0분=100점, 계수 1.2 적용(편차 30분≈64점, 60분≈28점, 83분 이상=0점).
+// sleepTimes/wakeTimes는 이미 _dawnTimeToMin(취침은 toDawnAdjustedMin 22시컷 보정)된 분단위 배열이어야 함.
+function calcSleepRegularity(sleepTimesMin,wakeTimesMin){
+  const sleepSd=_stdDevMin(sleepTimesMin);
+  const wakeSd=_stdDevMin(wakeTimesMin);
+  if(sleepSd==null&&wakeSd==null)return null;
+  const avgSd=(sleepSd!=null&&wakeSd!=null)?(sleepSd+wakeSd)/2:(sleepSd!=null?sleepSd:wakeSd);
+  const score=Math.max(0,Math.round(100-Math.min(100,avgSd*1.2)));
+  let label,color;
+  if(score>=85){label='매우 규칙적';color='#4a8f6a';}
+  else if(score>=65){label='규칙적';color='#5a9a7a';}
+  else if(score>=40){label='보통';color='#a3897c';}
+  else{label='불규칙';color='#c0788a';}
+  return {score,label,color,avgSd:Math.round(avgSd)};
+}
+
 // 콘텐츠 완료 집계 공통 규칙 — music은 등록일(start_date) 기준, 그 외는 완료(done/stopped) 상태이면서 종료일(end_date)이 기간 내일 때만 카운트
 function countContentsCompletedInRange(contents,startDk,endDk){
   return (contents||[]).filter(c=>{
@@ -111,14 +139,6 @@ const RHYTHM_CATS={
   enjoy:{label:'감상',color:'var(--rh-enjoy)',icon:'ti-stack-2'},
   home:{label:'정리',color:'var(--rh-home)',icon:'ti-home'}
 };
-// ── 모닝루틴 항목 (본앱 MORNING_ROUTINE_ITEMS와 동일) ──
-const MORNING_ROUTINE_ITEMS=[
-  {key:'wake',label:'기상',icon:'ti-sunset-2',colorRgb:'252,215,110'},
-  {key:'tea',label:'티타임',icon:'ti-mug',colorRgb:'244,177,206'},
-  {key:'audiobook',label:'오디오북',icon:'ti-radio',colorRgb:'216,168,205'},
-  {key:'weight',label:'체중',icon:'ti-scale-outline',colorRgb:'150,205,225'},
-  {key:'pill',label:'영양제',icon:'ti-pill',colorRgb:'205,215,145'}
-];
 
 const CAT_ICON_META={
   drama:{icon:'ti-device-tv',bg:'rgba(var(--pal-pink-rgb),1)',iconColor:'#fff',label:'드라마'},
@@ -784,13 +804,13 @@ async function loadWeekTab(){
   const lastStartDk=lastWeekDates[0];
   const lastCmpEndDk=isCurrentWeek?lastWeekDates[todayIdx]:lastWeekDates[6];
 
-  // 모닝루틴 카드용 최근 7일(캘린더 주와 무관하게 오늘 포함 롤링 7일)
-  const mrEnd=new Date();
-  const mrStart=new Date(mrEnd);mrStart.setDate(mrStart.getDate()-6);
-  const mrEndDk=dateKey(mrEnd),mrStartDk=dateKey(mrStart);
+  // 수면 리포트 카드용 최근 2주(캘린더 주와 무관하게 오늘 포함 롤링 14일)
+  const slEnd=new Date();
+  const slStart=new Date(slEnd);slStart.setDate(slStart.getDate()-13);
+  const slEndDk=dateKey(slEnd),slStartDk=dateKey(slStart);
 
   const [goalRows,habits,habitChecks,memos,todos,sleepRows,onelineRows,contents,
-    lwMemos,lwTodos,lwSleepRows,lwHabitChecks,lwContents,rblocksThis,rblocksLast,morningChecksWeek]=await Promise.all([
+    lwMemos,lwTodos,lwSleepRows,lwHabitChecks,lwContents,rblocksThis,rblocksLast,sleepReportRows]=await Promise.all([
     supaFetch(`goal_notes?note_key=eq.wchallenge_${encodeURIComponent(wk)}`),
     supaFetch(`habits?order=sort_order.asc`),
     supaFetch(`habit_checks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
@@ -808,13 +828,13 @@ async function loadWeekTab(){
     // 리듬 흐름 비교용: 이번주(오늘까지)/지난주(7일 전체)
     supaFetch(`rhythm_blocks?date_key=gte.${startDk}&date_key=lte.${cmpEndDk}`),
     supaFetch(`rhythm_blocks?date_key=gte.${lastStartDk}&date_key=lte.${lastWeekDates[6]}`),
-    // 모닝루틴 최근 7일
-    supaFetch(`morning_routine_checks?date_key=gte.${mrStartDk}&date_key=lte.${mrEndDk}`)
+    // 수면 리포트 최근 2주
+    supaFetch(`sleep?date_key=gte.${slStartDk}&date_key=lte.${slEndDk}&select=date_key,score,sleep_time,wake_time`)
   ]);
 
   renderWeekGoals(goalRows&&goalRows[0]);
   renderWeekHabitMatrix(habits||[],habitChecks||[],weekDates);
-  renderWeekMorningRoutine(morningChecksWeek||[]);
+  renderWeekSleepReport(sleepReportRows||[]);
   renderWeekDelta({
     memos:memos||[],todos:todos||[],sleepRows:sleepRows||[],habits:habits||[],checks:habitChecks||[],contents:contents||[],
     startDk,endDk:cmpEndDk,cmpDayCount
@@ -831,33 +851,74 @@ function _minToHHMM(min){const h=Math.floor(min/60),m=min%60;return pad(h)+':'+p
 
 // 이번 주 모닝루틴 — 오늘 포함 최근 7일 롤링 기준, 항목별 체크 일수를 얇은 막대로 표시(2열 그리드, 본앱 하단 통계그리드와 동일 배치).
 // 달성률 자체보다 "얼마나 루틴화됐는지"를 가볍게 보여주는 용도라 궤도 UI 없이 심플하게.
-function renderWeekMorningRoutine(rows){
-  const el=document.getElementById('week-morning-routine');
+// 이번 주 수면 리포트 — 최근 2주 롤링 기준, 목표(SLEEP_GOAL_MIN) 대비/평균컨디션/달성률/규칙성 4지표 풀와이드 카드.
+function renderWeekSleepReport(rows){
+  const el=document.getElementById('week-sleep-report');
   if(!el)return;
-  const cntByKey={};
-  (rows||[]).forEach(r=>{if(r.item_key)cntByKey[r.item_key]=(cntByKey[r.item_key]||0)+1;});
-  const total=7;
-  let itemsHtml=MORNING_ROUTINE_ITEMS.map(it=>{
-    const cnt=cntByKey[it.key]||0;
-    const pct=Math.round(cnt/total*100);
-    return `<div class="wmroutine-row">
-      <i class="ti ${it.icon}" style="color:rgb(${it.colorRgb});" aria-hidden="true"></i>
-      <span class="wmroutine-label">${it.label}</span>
-      <div class="wmroutine-bar-track"><div class="wmroutine-bar-fill" style="width:${pct}%;background:rgb(${it.colorRgb});"></div></div>
-      <span class="wmroutine-cnt">${cnt}/7</span>
-    </div>`;
-  }).join('');
-  // 남는 한 칸: 전체 합산 달성률(체크 총합/전체 슬롯) — 본앱과 동일하게 무지개 그라디언트
-  const doneTotal=MORNING_ROUTINE_ITEMS.reduce((s,it)=>s+(cntByKey[it.key]||0),0);
-  const slotTotal=MORNING_ROUTINE_ITEMS.length*total;
-  const totalPct=slotTotal>0?Math.round(doneTotal/slotTotal*100):0;
-  itemsHtml+=`<div class="wmroutine-row">
-    <i class="ti ti-chart-donut" style="color:var(--tm);" aria-hidden="true"></i>
-    <span class="wmroutine-label">합산</span>
-    <div class="wmroutine-bar-track"><div class="wmroutine-bar-fill" style="width:${totalPct}%;background:linear-gradient(90deg,rgba(248,192,160,0.95) 0%,rgba(252,215,110,0.95) 25%,rgba(150,205,225,0.95) 50%,rgba(190,160,230,0.95) 75%,rgba(244,177,206,0.95) 100%);"></div></div>
-    <span class="wmroutine-cnt">${totalPct}%</span>
-  </div>`;
-  el.innerHTML=`<div class="wmroutine-grid">${itemsHtml}</div>`;
+  const validSleep=(rows||[]).filter(r=>r.sleep_time&&r.wake_time);
+  const scored=(rows||[]).filter(r=>r.score!=null&&!isNaN(r.score));
+
+  // 평균 수면시간(분) + 목표 대비
+  let avgMin=null;
+  if(validSleep.length){
+    let sum=0;
+    validSleep.forEach(r=>{
+      const sv=r.sleep_time.split(':').map(Number),wv=r.wake_time.split(':').map(Number);
+      let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;
+      sum+=m;
+    });
+    avgMin=Math.round(sum/validSleep.length);
+  }
+  const avgSleepHtml=avgMin!=null?`${Math.floor(avgMin/60)}<span class="unit">시간</span> ${avgMin%60}<span class="unit">분</span>`:'-';
+  const diffMin=avgMin!=null?avgMin-SLEEP_GOAL_MIN:null;
+  const diffHtml=diffMin!=null
+    ?`목표 대비 <b style="color:${diffMin<0?'#c0788a':'#5a9a7a'};">${diffMin>0?'+':''}${diffMin}분</b>`
+    :'데이터 없음';
+
+  // 평균 컨디션
+  const avgScore=scored.length?Math.round(scored.reduce((a,b)=>a+b.score,0)/scored.length):null;
+  const scoreLevel=avgScore!=null?getSleepScoreLevel(avgScore):null;
+
+  // 목표 달성률(목표 이상 잔 날 비율)
+  const goalMetDays=validSleep.filter(r=>{
+    const sv=r.sleep_time.split(':').map(Number),wv=r.wake_time.split(':').map(Number);
+    let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;
+    return m>=SLEEP_GOAL_MIN;
+  }).length;
+  const goalPct=validSleep.length?Math.round(goalMetDays/validSleep.length*100):0;
+
+  // 규칙성 점수
+  const sleepMinArr=validSleep.map(r=>toDawnAdjustedMin(_dawnTimeToMin(r.sleep_time),22*60));
+  const wakeMinArr=validSleep.map(r=>_dawnTimeToMin(r.wake_time));
+  const reg=calcSleepRegularity(sleepMinArr,wakeMinArr);
+
+  el.innerHTML=`<div class="wsleep2-grid">
+    <div class="wsleep2-item">
+      <div class="wsleep2-icon-box" style="background:rgba(190,220,240,0.35);"><i class="ti ti-bed" style="color:rgba(80,130,170,0.9);" aria-hidden="true"></i></div>
+      <div class="wsleep2-label">평균 수면시간</div>
+      <div class="wsleep2-val">${avgSleepHtml}</div>
+      <div class="wsleep2-sub">${diffHtml}</div>
+    </div>
+    <div class="wsleep2-item">
+      <div class="wsleep2-icon-box" style="background:rgba(190,225,205,0.4);"><i class="ti ti-heart" style="color:rgba(90,155,120,0.9);" aria-hidden="true"></i></div>
+      <div class="wsleep2-label">평균 수면 컨디션</div>
+      <div class="wsleep2-val">${avgScore!=null?avgScore:'-'}<span class="unit">${avgScore!=null?'점':''}</span></div>
+      ${scoreLevel?`<div class="wsleep2-badge" style="background:rgba(190,225,205,0.35);color:#4a8f6a;">${scoreLevel.label}</div>`:'<div class="wsleep2-sub">데이터 없음</div>'}
+    </div>
+    <div class="wsleep2-item">
+      <div class="wsleep2-icon-box" style="background:rgba(255,222,170,0.4);"><i class="ti ti-target-arrow" style="color:rgba(200,150,60,0.9);" aria-hidden="true"></i></div>
+      <div class="wsleep2-label">목표 달성률</div>
+      <div class="wsleep2-val">${goalPct}<span class="unit">%</span></div>
+      <div class="wsleep2-sub">${goalMetDays}일 <b>/</b> ${validSleep.length}일</div>
+    </div>
+    <div class="wsleep2-item">
+      <div class="wsleep2-icon-box" style="background:rgba(216,190,225,0.4);"><i class="ti ti-activity" style="color:rgba(150,100,170,0.9);" aria-hidden="true"></i></div>
+      <div class="wsleep2-label">수면 규칙성</div>
+      <div class="wsleep2-val">${reg?reg.score:'-'}<span class="unit">${reg?'점':''}</span></div>
+      ${reg?`<div class="wsleep2-badge" style="background:rgba(216,190,225,0.35);color:${reg.color};">${reg.label}</div>`:'<div class="wsleep2-sub">데이터 없음</div>'}
+    </div>
+  </div>
+  <div class="wsleep2-foot">최근 2주 기준</div>`;
 }
 
 // 지난주 대비 — 오늘 요일까지로 절단된 동일 범위끼리 비교(주 진행 중엔 항상 마이너스로 왜곡되는 문제 방지)
@@ -881,17 +942,16 @@ function renderWeekDelta(cur,prev){
     {icon:'ti-moon-stars',cur:curSleep,prev:prevSleep,label:'평균수면',fmt:v=>v+'h'}
   ];
 
-  el.innerHTML=`<div class="week-delta-grid">`+items.map(it=>{
+  el.innerHTML=items.map(it=>{
     const diff=Math.round((it.cur-it.prev)*10)/10;
     const dir=diff>0?'up':(diff<0?'down':'flat');
     const arrow=dir==='up'?'ti-arrow-up':(dir==='down'?'ti-arrow-down':'ti-minus');
     const sign=diff>0?'+':'';
     return `<div class="wd-item">
-      <i class="ti ${it.icon} wd-icon" aria-hidden="true"></i>
-      <div class="wd-num">${it.fmt(it.cur)}</div>
-      <div class="wd-delta ${dir}"><i class="ti ${arrow}" style="font-size:12px;"></i>${sign}${it.fmt(diff)}</div>
+      <div class="wd-item-top"><i class="ti ${it.icon}" aria-hidden="true"></i><span class="wd-num">${it.fmt(it.cur)}</span></div>
+      <div class="wd-delta ${dir}"><i class="ti ${arrow}" style="font-size:10px;"></i>${sign}${it.fmt(diff)}</div>
     </div>`;
-  }).join('')+`</div>`;
+  }).join('');
 }
 
 // 리듬 흐름 비교 — 본앱 recap-rhythm-bar-chart를 두 줄(지난주 7일 평균 / 이번주 현재까지)로 이식
@@ -1083,10 +1143,17 @@ async function renderMonthContentCollect(y,mo){
       const poster=c.poster
         ?`<img class="ccol-poster" src="${c.poster}" />`
         :`<div class="ccol-poster-fallback" style="background:${meta.bg};"><i class="ti ${meta.icon}" style="font-size:13px;color:#fff;" aria-hidden="true"></i></div>`;
-      return `<div class="ccol-item">${poster}<div class="ccol-title">${escapeHtml(c.title||'')}</div>${stars}${status}</div>`;
+      const reviewId=c.cid||('t'+(c.created||0));
+      const reviewIconHtml=c.review?`<span class="ccol-review-icon" onclick="toggleCcolReview('${reviewId}')" title="코멘트 보기"><i class="ti ti-message-circle" aria-hidden="true"></i></span>`:'';
+      const reviewBoxHtml=c.review?`<div class="ccol-review-box" id="ccol-review-${reviewId}">${escapeHtml(c.review)}</div>`:'';
+      return `<div class="ccol-item">${poster}<div class="ccol-title"><span>${escapeHtml(c.title||'')}</span>${reviewIconHtml}</div>${stars}${status}</div>${reviewBoxHtml}`;
     }).join('');
     return `<div class="ccol-sec"><div class="ccol-sec-title"><i class="ti ${meta.icon}" aria-hidden="true"></i>${meta.label}</div>${items}</div>`;
   }).join('');
+}
+function toggleCcolReview(id){
+  const box=document.getElementById('ccol-review-'+id);
+  if(box)box.classList.toggle('on');
 }
 async function renderMonthTimetable(y,mo){
   const el=document.getElementById('month-tt');
