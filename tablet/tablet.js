@@ -446,8 +446,11 @@ async function loadTodayTab(){
   // 평균 취침/기상용 최근 2주 범위(주간탭과 동일 방식)
   const sleepAvgStart=new Date(_selectedDate);sleepAvgStart.setDate(sleepAvgStart.getDate()-13);
   const sleepAvgStartDk=dateKey(sleepAvgStart);
+  // 독서 스트릭 계산용 최근 90일 범위(reading_daily_log 실제 기록 기반, 그 날짜에 로그가 있으면 "읽은 날")
+  const readingStreakStart=new Date(_selectedDate);readingStreakStart.setDate(readingStreakStart.getDate()-90);
+  const readingStreakStartDk=dateKey(readingStreakStart);
 
-  const [todos,sleepRows,recentSleepRows,habits,habitChecks,meals,contents,books,rblocks,morningChecks]=await Promise.all([
+  const [todos,sleepRows,recentSleepRows,habits,habitChecks,meals,contents,books,rblocks,morningChecks,readingLogRows]=await Promise.all([
     supaFetch(`todos?date_key=eq.${dk}&order=created.asc`),
     supaFetch(`sleep?date_key=eq.${dk}`),
     supaFetch(`sleep?date_key=gte.${sleepAvgStartDk}&date_key=lte.${dk}&select=date_key,score,sleep_time,wake_time`),
@@ -457,7 +460,8 @@ async function loadTodayTab(){
     supaFetch(`contents?or=(status.eq.watching,and(status.eq.done,end_date.eq.${dk}),and(content_cat.eq.music,start_date.eq.${dk}))&order=created.desc&limit=6`),
     supaFetch(`reading_books?status=eq.reading&limit=1`),
     supaFetch(`rhythm_blocks?date_key=eq.${dk}&order=start_time.asc`),
-    supaFetch(`morning_routine_checks?date_key=eq.${dk}`)
+    supaFetch(`morning_routine_checks?date_key=eq.${dk}`),
+    supaFetch(`reading_daily_log?date_key=gte.${readingStreakStartDk}&date_key=lte.${dk}&select=date_key`)
   ]);
 
   renderTodayTodosEvents(todos||[]);
@@ -467,10 +471,11 @@ async function loadTodayTab(){
   renderTodayMeals(meals&&meals[0]);
   renderTodayContents(contents||[]);
   _todayRhythmBlocks=rblocks||[];
+  _todaySleepRow=sleepRows&&sleepRows[0];
+  _todayMealsRow=meals&&meals[0];
   renderTodayRhythm(rblocks||[]);
-  renderTodayReading(books&&books[0]);
+  renderTodayReading(books&&books[0],readingLogRows||[]);
   renderTodayPace(todos||[],habits||[],habitChecks||[],morningChecks||[]);
-  renderReportBanner('today-report-banner',_selectedDate);
 }
 
 // 본앱과 동일한 투두 정렬 규칙: 미완료 우선 → 시간대(아침/오후/밤/없음) → 강조(pinned) → sort_order → 텍스트 앞머리 시:분
@@ -791,69 +796,110 @@ function renderTodayRhythm(blocks){
 
 // ── 오늘의 리듬 클릭 → 시간순 흐름 텍스트 팝업(주간탭 리듬 모아보기 흐름보기와 동일 포맷) ──
 let _todayRhythmBlocks=[];
-function toHHMM(t){
-  if(!t)return'';
-  const m=t.match(/^(\d{1,2}):(\d{2})/);
-  return m?m[0]:t;
+let _todaySleepRow=null;
+let _todayMealsRow=null;
+const RHYTHM_SLEEP_COLOR='rgba(205,194,182,0.88)';
+const RHYTHM_MEAL_COLOR='rgba(130,205,145,0.90)';
+// 본앱 computeRhythmBlocksRaw와 동일 로직(수면/식사/수기 리듬블록을 하나의 흐름으로 합성) — 태블릿용 이식.
+function computeRhythmBlocksRawTablet(sleep,meals,manual){
+  sleep=sleep||{};meals=meals||{};manual=manual||[];
+  const blocks=[];
+  const wakeMin=_dawnTimeToMin(sleep.wake_time),sleepMin=_dawnTimeToMin(sleep.sleep_time);
+  if(wakeMin!=null&&sleepMin!=null&&sleepMin<=wakeMin){
+    blocks.push({start:sleepMin,end:wakeMin,color:RHYTHM_SLEEP_COLOR,label:'수면',kind:'sleep'});
+  }else{
+    if(wakeMin!=null)blocks.push({start:0,end:wakeMin,color:RHYTHM_SLEEP_COLOR,label:'수면',kind:'sleep'});
+    if(sleepMin!=null&&wakeMin==null){
+      blocks.push({start:sleepMin,end:null,color:RHYTHM_SLEEP_COLOR,label:'수면',ongoing:true,kind:'sleep'});
+    }
+  }
+  MEAL_KEYS.forEach(k=>{
+    const t=meals[k+'_time'];
+    if(!t)return;
+    const start=_dawnTimeToMin(t);
+    blocks.push({start,end:Math.min(start+30,1440),color:RHYTHM_MEAL_COLOR,label:'식사 · '+(meals[k]||MEAL_LABELS[k]),kind:'meal'});
+  });
+  let latestManualMin=-1;
+  manual.forEach(b=>{
+    const s=_dawnTimeToMin(b.start_time);if(s==null)return;
+    const e=b.end_time?_dawnTimeToMin(b.end_time):s;
+    const ref=(e!=null&&e>s)?e:s;
+    if(ref>latestManualMin)latestManualMin=ref;
+  });
+  manual.forEach(b=>{
+    const cat=RHYTHM_CATS[b.cat];if(!cat)return;
+    const sMin=_dawnTimeToMin(b.start_time);if(sMin==null)return;
+    const eMin=b.end_time?_dawnTimeToMin(b.end_time):null;
+    const isLateNightNew=sMin<DAWN_CUTOFF_MIN&&latestManualMin>=DAWN_CUTOFF_MIN&&sMin<latestManualMin;
+    let sortKey=sMin;
+    if(isLateNightNew)sortKey+=1440;
+    blocks.push({start:sMin,end:eMin,sortKey,color:cat.color,label:b.text||cat.label,ongoing:!b.end_time,kind:'manual'});
+  });
+  return blocks;
+}
+function toHHMMFromMin(min){
+  const m=((min%1440)+1440)%1440;
+  return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
 }
 function openTodayRhythmFlow(){
   const dk=dateKey(_selectedDate);
   const label=`${_selectedDate.getMonth()+1}월 ${_selectedDate.getDate()}일 리듬 흐름`;
   document.getElementById('report-panel-title').innerHTML=`<i class="ti ti-activity" aria-hidden="true"></i>${label}`;
   const bodyEl=document.getElementById('report-panel-body');
-  // 문자열 비교(localeCompare)는 00:00~03:59대 새벽 기록을 맨 앞으로 보내버림 — 새벽 4시 컷 기준(toSortKey)으로 정렬해야
-  // 수면 등록 전까지의 기록이 "자정 전 날짜의 가장 마지막 기록"으로 온다(본앱 규칙과 동일).
-  const blocks=(_todayRhythmBlocks||[]).slice().sort((a,b)=>toSortKey(a.start_time)-toSortKey(b.start_time));
-  if(!blocks.length){
+  // 본앱 renderRhythmFlowHtml과 동일: 수면/식사/수기 리듬블록을 하나로 합쳐서(computeRhythmBlocksRawTablet) 시간순 정렬.
+  const raw=computeRhythmBlocksRawTablet(_todaySleepRow,_todayMealsRow,_todayRhythmBlocks);
+  const items=raw.map(b=>{
+    let e=b.end,labelEnd=e;
+    if(e!=null&&e<=b.start){labelEnd=e+1440;e=1440;}
+    return Object.assign({},b,{
+      end:e==null?b.start:e,
+      labelEnd:labelEnd==null?b.start:labelEnd,
+      ongoing:b.end==null,
+      sortKey:b.sortKey!=null?b.sortKey:b.start
+    });
+  }).sort((a,b)=>a.sortKey-b.sortKey);
+  if(!items.length){
     bodyEl.innerHTML='<div class="wrb-flow-empty">이날은 기록된 리듬이 없어요</div>';
   }else{
-    bodyEl.innerHTML='<div class="wrb-flow-list">'+blocks.map(b=>{
-      const cat=RHYTHM_CATS[b.cat];
-      const color=cat?cat.color:'var(--tm)';
-      const label=(cat?cat.label:b.cat)+(b.text?' · '+escapeHtml(b.text):'');
-      const timeRange=b.end_time?`${toHHMM(b.start_time)}~${toHHMM(b.end_time)}`:`${toHHMM(b.start_time)}~진행중`;
-      return `<div class="wrb-flow-row"><span class="wrb-flow-dot" style="background:${color};"></span><span class="wrb-flow-time">${timeRange}</span><span class="wrb-flow-label">${label}</span></div>`;
+    bodyEl.innerHTML='<div class="wrb-flow-list">'+items.map(s=>{
+      const displayEnd=s.labelEnd!=null?s.labelEnd:s.end;
+      const timeRange=toHHMMFromMin(s.start)+(s.ongoing?'~진행중':'~'+toHHMMFromMin(displayEnd));
+      return `<div class="wrb-flow-row"><span class="wrb-flow-dot" style="background:${s.color};"></span><span class="wrb-flow-time">${timeRange}</span><span class="wrb-flow-label">${escapeHtml(s.label)}</span></div>`;
     }).join('')+'</div>';
   }
   document.getElementById('report-overlay').classList.add('on');
 }
 
-function renderTodayReading(book){
+function _readingStreakLabel(logRows,fromDk){
+  const readDates=new Set((logRows||[]).map(r=>r.date_key));
+  const hasToday=readDates.has(fromDk);
+  let streak=0;
+  const cur=new Date(fromDk+'T00:00:00');
+  for(let i=0;i<91;i++){
+    const dk=dateKey(cur);
+    const has=readDates.has(dk);
+    if(i===0){streak=1;}
+    else if(has===hasToday){streak++;}
+    else break;
+    cur.setDate(cur.getDate()-1);
+  }
+  return hasToday?`${streak}일째 읽음`:`${streak}일째 안읽음`;
+}
+function renderTodayReading(book,readingLogRows){
   const el=document.getElementById('today-reading');
   if(!book){el.innerHTML='<div class="empty-msg" style="text-align:left;">지금 읽는 책이 없어요</div>';return;}
   let pct=0;
   if(book.unit==='percent')pct=book.percent||0;
   else if(book.total_pages)pct=Math.min(100,Math.round((book.pages/book.total_pages)*100));
   const coverStyle=book.poster?`background-image:url('${book.poster}');`:'';
+  const dk=dateKey(_selectedDate);
+  const streakLabel=_readingStreakLabel(readingLogRows,dk);
   el.innerHTML=`<div class="rd-cur-book">
     <div class="rd-cur-cover" style="${coverStyle}"></div>
-    <div class="rd-cur-info"><div class="rd-cur-title">${escapeHtml(book.title)}</div><div class="rd-cur-author">${escapeHtml(book.author||'')}</div><div class="rd-cur-pct">${pct}% 진행 중</div></div>
+    <div class="rd-cur-info"><div class="rd-cur-title">${escapeHtml(book.title)}</div><div class="rd-cur-author">${escapeHtml(book.author||'')}</div><div class="rd-cur-pct">${pct}% 진행 중<span class="rd-cur-streak">${streakLabel}</span></div></div>
   </div>`;
 }
 
-// ── 리포트 배너 (주/월 캐시가 있으면 노출) ──
-async function renderReportBanner(elId,forDate){
-  const el=document.getElementById(elId);
-  if(!el)return;
-  const wkSun=_mondayToSundayDk(weekKeyOf(forDate));
-  const mk=monthKeyOf(forDate);
-  const [weeklyRows,monthlyRows]=await Promise.all([
-    supaFetch(`ai_cache?cache_key=eq.weekly_summary_${wkSun}&select=cache_key`),
-    supaFetch(`ai_cache?cache_key=eq.monthly_report_${mk}&select=cache_key`)
-  ]);
-  if(weeklyRows&&weeklyRows.length){
-    el.classList.add('on');
-    el.innerHTML=`<div class="report-banner-inner"><i class="ti ti-sparkles" aria-hidden="true"></i>이번 주 리포트가 준비됐어요<i class="ti ti-chevron-right" aria-hidden="true"></i></div>`;
-    el.onclick=()=>openReportPanel('weekly_summary_'+wkSun,'이번 주 리포트');
-  }else if(monthlyRows&&monthlyRows.length){
-    el.classList.add('on');
-    el.innerHTML=`<div class="report-banner-inner"><i class="ti ti-sparkles" aria-hidden="true"></i>이번 달 리포트가 준비됐어요<i class="ti ti-chevron-right" aria-hidden="true"></i></div>`;
-    el.onclick=()=>openReportPanel('monthly_report_'+mk,'이번 달 리포트');
-  }else{
-    el.classList.remove('on');
-    el.onclick=null;
-  }
-}
 async function openReportPanel(cacheKey,title){
   document.getElementById('report-panel-title').innerHTML=`<i class="ti ti-sparkles" aria-hidden="true"></i>${title}`;
   const bodyEl=document.getElementById('report-panel-body');
@@ -1000,7 +1046,6 @@ async function loadWeekTab(){
   });
   renderWeekRhythmFlow(rblocksThis||[],rblocksLast||[],cmpDayCount);
   renderWeekOneline(onelineRows||[],weekDates);
-  renderReportBanner('week-report-banner',_selectedDate);
 }
 
 function _minToHHMM(min){const h=Math.floor(min/60),m=min%60;return pad(h)+':'+pad(m);}

@@ -59,7 +59,6 @@
 *{box-sizing:border-box;margin:0;padding:0;}
 html,body{height:100%;overflow:hidden;}
 body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;background:var(--bg);color:var(--tp);}
-@keyframes bannerShine{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
 
 #app{position:fixed;inset:0;display:flex;}
 
@@ -187,11 +186,6 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .loading-msg{font-size:var(--fs-body);color:var(--tm);text-align:center;padding:18px 0;}
 
 /* ── 리포트 배너 ── */
-.report-banner{position:relative;border-radius:14px;padding:1.6px;background:linear-gradient(135deg,rgba(150,215,180,0.95),rgba(235,220,120,0.90),rgba(165,222,188,0.95),rgba(150,215,180,0.95));background-size:300% 300%;animation:bannerShine 4s ease infinite;margin-bottom:16px;cursor:pointer;display:none;}
-.report-banner.on{display:block;}
-.report-banner-inner{border-radius:12.5px;background:var(--grad-mintyellow);padding:12px 17px;display:flex;align-items:center;gap:10px;font-size:var(--fs-body);color:rgba(70,90,55,0.92);}
-.report-banner-inner i:first-child{color:rgba(65,125,70,0.85);font-size:var(--fs-lg);}
-.report-banner-inner i:last-child{margin-left:auto;color:rgba(80,130,85,0.55);font-size:var(--fs-body);}
 
 /* ── 투두 / 일정 ── */
 .todo-card{height:calc(32px + (var(--fs-title) * 1.3 + 11px) + (var(--fs-body) * 1.3 + 10px) * 6);box-sizing:border-box;overflow:hidden;margin-bottom:0!important;}
@@ -285,7 +279,8 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .rd-cur-info{display:flex;flex-direction:column;justify-content:center;gap:3px;}
 .rd-cur-title{font-size:var(--fs-lg);color:var(--tp);font-weight:600;line-height:1.25;}
 .rd-cur-author{font-size:var(--fs-body);color:var(--tm);}
-.rd-cur-pct{font-size:var(--fs-sm);color:rgba(178,60,105,0.85);}
+.rd-cur-pct{display:flex;align-items:center;justify-content:space-between;font-size:var(--fs-sm);color:rgba(178,60,105,0.85);}
+.rd-cur-streak{font-size:var(--fs-xs);color:var(--tm);}
 
 /* ── 목표 배너 강조 — 본앱 홈탭 오후 인사카드(home-hcard.afternoon) 스타일 차용 ── */
 .goal-hcard{border-radius:20px;background:linear-gradient(120deg,rgba(250,215,100,0.32),rgba(255,235,170,0.26))!important;border:1px solid rgba(250,205,90,0.55)!important;box-shadow:0 2px 20px rgba(200,150,50,0.12),inset 0 1px 0 rgba(255,250,240,0.62);}
@@ -324,7 +319,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .rf-bar-chart{display:flex;height:32px;border-radius:9px;overflow:hidden;flex:1;background:var(--graph-track-color);}
 .rf-bar-seg{display:flex;align-items:center;justify-content:center;gap:4px;overflow:hidden;padding:0 3px;}
 .rf-bar-seg i{font-size:var(--fs-sm);color:#fff;flex-shrink:0;}
-.rf-seg-time{font-size:var(--fs-sm);color:#fff;font-weight:600;white-space:nowrap;opacity:.95;}
+.rf-seg-time{font-size:var(--fs-xs);color:#fff;font-weight:600;white-space:nowrap;opacity:.95;}
 
 
 /* ── 좌하단 플로팅 탭 ── */
@@ -727,7 +722,6 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
     <!-- 오늘탭 -->
     <div class="main-body on" id="tab-today">
       <div class="main-hdr"><i class="ti ti-chevron-left main-hdr-arrow" onclick="shiftSelectedDate(-1)" aria-hidden="true"></i><span class="main-date" id="today-date"></span><span class="main-dow" id="today-dow"></span><i class="ti ti-chevron-right main-hdr-arrow" onclick="shiftSelectedDate(1)" aria-hidden="true"></i></div>
-      <div class="report-banner" id="today-report-banner"></div>
       <div class="grid3">
         <div class="card todo-card"><div class="card-lbl"><i class="ti ti-list-check" style="color:rgba(var(--pal-orange-rgb),1);" aria-hidden="true"></i>오늘 할 일</div><div id="today-todos"></div></div>
         <div class="grid3-right">
@@ -763,7 +757,6 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
     <!-- 주간탭 -->
     <div class="main-body" id="tab-week">
       <div class="main-hdr"><i class="ti ti-chevron-left main-hdr-arrow" onclick="shiftSelectedWeek(-1)" aria-hidden="true"></i><span class="main-date" id="week-range"></span><i class="ti ti-chevron-right main-hdr-arrow" onclick="shiftSelectedWeek(1)" aria-hidden="true"></i></div>
-      <div class="report-banner" id="week-report-banner"></div>
       <div class="grid2">
         <div class="card goal-hcard"><div class="card-lbl"><i class="ti ti-flag-3" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>이번 주 목표</div><div id="week-goals"></div></div>
         <div class="card"><div class="card-lbl"><i class="ti ti-chart-donut" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>주간 습관 현황</div><div id="week-habit-matrix"></div></div>
