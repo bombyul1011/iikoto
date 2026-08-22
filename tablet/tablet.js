@@ -218,6 +218,13 @@ function closeFloatMenu(){
 // 좌측 사이드 (미니 캘린더 + 주간요약)
 // ══════════════════════════════════════════════════════════
 let _sideCalDate=new Date();
+let _sideCalExpanded=false; // 월 라벨 클릭으로 월간 그리드가 펼쳐진 상태인지(기본은 주간뷰만)
+function _mrpCalDayCell(dk,d,todayDk,selDk){
+  let cls='mini-cal-day';
+  if(dk===todayDk)cls+=' today';
+  else if(dk===selDk)cls+=' sel'; // 오늘이 선택된 상태에선 today색을 유지 — sel은 오늘이 아닌 날짜를 골랐을 때만
+  return `<div class="${cls}" onclick="selectDate('${dk}')">${d}</div>`;
+}
 async function renderMiniCal(){
   const el=document.getElementById('mini-cal');
   const y=_sideCalDate.getFullYear(),m=_sideCalDate.getMonth();
@@ -227,18 +234,34 @@ async function renderMiniCal(){
   const todayDk=dateKey(new Date());
   const selDk=dateKey(_selectedDate);
 
-  let html=`<div class="mini-cal-hdr"><i class="ti ti-chevron-left" onclick="sideCalShift(-1)" aria-hidden="true"></i><span>${y}년 ${m+1}월</span><i class="ti ti-chevron-right" onclick="sideCalShift(1)" aria-hidden="true"></i></div>
-  <div class="mini-cal-grid">${DOW_MON_START.map(d=>`<div class="dow">${d}</div>`).join('')}`;
-  for(let i=0;i<startWeekday;i++)html+='<div></div>';
+  // 주간뷰 — 선택된 날짜(_selectedDate)가 속한 주(월~일)를 항상 한 줄로 보여줌. 캘린더 접힘/펼침과 무관하게 기준점 역할.
+  const weekDates=getWeekDates(_selectedDate);
+  const weekRowHtml=weekDates.map(dk=>{
+    const d=parseInt(dk.slice(8,10),10);
+    return _mrpCalDayCell(dk,d,todayDk,selDk);
+  }).join('');
+
+  // 월간 그리드 — 펼쳤을 때만(그리드 자체는 항상 그려두고 CSS max-height로 접음, 펼칠 때 다시 계산할 필요 없게)
+  let monthGridHtml='';
+  for(let i=0;i<startWeekday;i++)monthGridHtml+='<div class="mini-cal-day empty"></div>';
   for(let d=1;d<=daysInMonth;d++){
     const dk=`${y}-${pad(m+1)}-${pad(d)}`;
-    let cls='mini-cal-day';
-    if(dk===todayDk)cls+=' today';
-    else if(dk===selDk)cls+=' sel'; // 오늘이 선택된 상태에선 today색을 유지 — sel은 오늘이 아닌 날짜를 골랐을 때만
-    html+=`<div class="${cls}" onclick="selectDate('${dk}')">${d}</div>`;
+    monthGridHtml+=_mrpCalDayCell(dk,d,todayDk,selDk);
   }
-  html+='</div>';
-  el.innerHTML=html;
+
+  el.innerHTML=`<div class="mini-cal-hdr">
+      <div class="mini-cal-month-toggle${_sideCalExpanded?' expanded':''}" onclick="toggleSideCalExpand()"><span>${y}년 ${m+1}월</span><i class="ti ti-chevron-down expand-arrow" aria-hidden="true"></i></div>
+      <div><i class="ti ti-chevron-left" onclick="sideCalShift(-1)" aria-hidden="true"></i><i class="ti ti-chevron-right" onclick="sideCalShift(1)" aria-hidden="true"></i></div>
+    </div>
+    <div class="mini-cal-dow-row">${DOW_MON_START.map(d=>`<div class="dow">${d}</div>`).join('')}</div>
+    <div class="mini-cal-week-row${_sideCalExpanded?' hidden':''}"><div class="mini-cal-grid">${weekRowHtml}</div></div>
+    <div class="mini-cal-month-grid${_sideCalExpanded?' on':''}"><div>
+      <div class="mini-cal-grid">${monthGridHtml}</div>
+    </div></div>`;
+}
+function toggleSideCalExpand(){
+  _sideCalExpanded=!_sideCalExpanded;
+  renderMiniCal();
 }
 function sideCalShift(delta){
   _sideCalDate.setMonth(_sideCalDate.getMonth()+delta);
@@ -261,7 +284,8 @@ function selectDate(dk){
 
 // ── 사이드바 인사배너 (본앱 홈탭 인사카드 이식) ──
 // 태블릿엔 Claude API 키가 없으므로 생성은 하지 않고, 모바일이 생성해 ai_cache에 저장한 문구를 조회만 함.
-// 본앱 getHomeTimeSlot과 동일한 7분류 → 4개 섹션(morning/afternoon/night/dawn) 매핑.
+// 본앱 getHomeTimeSlot과 동일한 7분류 → 5개 섹션(morning/day/afternoon/night/dawn) 매핑.
+// day(12-16시, 오후1)는 "해 떠있는 낮"으로 afternoon(16-19시, 오후2, 저물녘)과 톤을 구분(2026-08-22 확정).
 function getHomeTimeSlot(){
   const h=new Date().getHours();
   if(h<4)return 'dawn';
@@ -276,12 +300,14 @@ function getHomeSection(){
   const slot=getHomeTimeSlot();
   if(slot==='dawn')return 'dawn';
   if(slot==='morning_1'||slot==='morning_2')return 'morning';
-  if(slot==='afternoon_1'||slot==='afternoon_2')return 'afternoon';
+  if(slot==='afternoon_1')return 'day';
+  if(slot==='afternoon_2')return 'afternoon';
   return 'night';
 }
 const SIDE_GREETING_POOL={
   morning:['좋은 아침이에요','오늘도 좋은 하루예요','활기찬 하루 보내요','상쾌한 아침이에요'],
-  afternoon:['잘 하고 있어요','오늘도 순항 중이에요','좋은 흐름이에요','한창인 하루예요'],
+  day:['한창인 하루예요','오늘도 순항 중이에요','해가 좋은 시간이에요','잘 하고 있어요'],
+  afternoon:['잘 하고 있어요','오늘도 순항 중이에요','좋은 흐름이에요','노을이 예쁜 시간이에요'],
   night:['오늘도 수고했어요','오늘 하루도 애쓰셨어요','하루를 잘 마무리해요','편안한 저녁 되세요'],
   dawn:['오늘 하루도 잘 보내셨어요','하루를 잘 채워내셨어요','오늘도 무사히 지나갔어요','편안한 밤 되세요']
 };
@@ -295,10 +321,15 @@ async function renderSideGreeting(){
   const section=getHomeSection();
   const subSec=getHomeTimeSlot();
   card.className='side-hcard '+section;
-  // 사이드바 접기 탭도 인사카드와 같은 시간대(section) 톤을 그대로 따라가도록 클래스 동기화.
+  // 사이드바 배경 워터마크와 접기 탭 모두 인사카드와 같은 시간대(section) 톤을 그대로 따라가도록 클래스 동기화.
+  const sideEl=document.getElementById('side');
+  if(sideEl){
+    sideEl.classList.remove('tod-morning','tod-day','tod-afternoon','tod-night','tod-dawn');
+    sideEl.classList.add('tod-'+section);
+  }
   const toggleBtn=document.getElementById('side-toggle-btn');
   if(toggleBtn){
-    toggleBtn.classList.remove('tod-morning','tod-afternoon','tod-night','tod-dawn');
+    toggleBtn.classList.remove('tod-morning','tod-day','tod-afternoon','tod-night','tod-dawn');
     toggleBtn.classList.add('tod-'+section);
   }
 
@@ -330,11 +361,47 @@ function _msUntilNextGreetingBoundary(){
   target.setTime(target.getTime()+nextH*60*60*1000);
   return target.getTime()-now.getTime()+500; // 경계 직후로 500ms 여유
 }
+// 사이드바 오늘 진행률 카드 — 항상 "진짜 오늘" 기준(오늘탭에서 다른 날짜를 보고 있어도 무관하게 고정).
+// 도넛은 오늘 할일 완료율, 옆 텍스트에 할일/습관 개수를 함께 표기.
+async function renderSideProgress(){
+  const el=document.getElementById('side-progress');
+  if(!el)return;
+  const todayDk=dateKey(new Date());
+  const [todos,habits,habitChecks]=await Promise.all([
+    supaFetch(`todos?date_key=eq.${todayDk}&select=done`),
+    supaFetch(`habits?order=sort_order.asc`),
+    supaFetch(`habit_checks?date_key=eq.${todayDk}`)
+  ]);
+  const todoList=todos||[];
+  const doneCount=todoList.filter(t=>t.done).length;
+  const totalTodo=todoList.length;
+  const pct=totalTodo?Math.round(doneCount/totalTodo*100):0;
+  const habitCount=(habits||[]).length;
+  const checkedNames=new Set((habitChecks||[]).map(c=>c.habit_name));
+  const habitDone=(habits||[]).filter(h=>checkedNames.has(h.name)).length;
+
+  const r=17,circumference=2*Math.PI*r;
+  const dashOffset=circumference*(1-pct/100);
+  const ringSvg=`<svg width="42" height="42" viewBox="0 0 42 42" class="side-progress-ring">
+    <circle cx="21" cy="21" r="${r}" fill="none" stroke="rgba(145,210,175,0.18)" stroke-width="5"/>
+    <circle cx="21" cy="21" r="${r}" fill="none" stroke="rgba(145,210,175,0.9)" stroke-width="5" stroke-linecap="round" stroke-dasharray="${circumference.toFixed(1)}" stroke-dashoffset="${dashOffset.toFixed(1)}" transform="rotate(-90 21 21)"/>
+    <text x="21" y="25" text-anchor="middle" font-size="11" font-weight="700" fill="var(--tp)" font-family="'DM Sans',sans-serif">${totalTodo?pct+'%':'-'}</text>
+  </svg>`;
+
+  const subMsg=totalTodo===0?'오늘 등록된 할일이 없어요':(pct>=100?'오늘 할일을 모두 마쳤어요':(pct>=50?'잘 하고 있어요':'천천히 시작해봐요'));
+
+  el.innerHTML=`${ringSvg}<div class="side-progress-txt">
+    <div class="side-progress-main">오늘 할일 ${doneCount}/${totalTodo} · 습관 ${habitDone}/${habitCount}</div>
+    <div class="side-progress-sub">${subMsg}</div>
+  </div>`;
+}
 function scheduleSideGreetingRefresh(){
   renderSideGreeting();
+  renderSideProgress();
   const wait=_msUntilNextGreetingBoundary();
   setTimeout(function tick(){
     renderSideGreeting();
+    renderSideProgress();
     setTimeout(tick,_msUntilNextGreetingBoundary());
   },wait);
 }

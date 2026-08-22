@@ -63,11 +63,28 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 #app{position:fixed;inset:0;display:flex;}
 
 /* ── 좌측 사이드(캘린더 + 주간요약) ── */
-.side{width:270px;flex-shrink:0;background:rgba(255,253,248,0.35);border-right:1px solid var(--card-b);padding:10px 18px 22px;overflow-y:auto;transition:width .32s cubic-bezier(.4,0,.2,1),padding .32s cubic-bezier(.4,0,.2,1),opacity .22s ease;}
+.side{width:270px;flex-shrink:0;background:rgba(255,253,248,0.35);border-right:1px solid var(--card-b);padding:10px 18px 22px;overflow-y:auto;transition:width .32s cubic-bezier(.4,0,.2,1),padding .32s cubic-bezier(.4,0,.2,1),opacity .22s ease;position:relative;}
 .side.collapsed{width:0;padding:10px 0 22px;border-right-color:transparent;opacity:0;overflow:hidden;pointer-events:none;}
+/* 시간대별 배경 워터마크 — 인사카드와 같은 톤(tod-*)을 사이드바 전체 배경에 아주 옅게 확장.
+   ::before/::after는 옆 카드들 위로 겹치면 안 되니 z-index:0 고정, 내부 요소는 모두 position:relative로 그 위에. */
+.side::before,.side::after{content:'';position:absolute;border-radius:50%;pointer-events:none;z-index:0;transition:background 0.6s ease;}
+.side::before{top:-60px;right:-70px;width:230px;height:230px;}
+.side::after{bottom:-90px;left:-60px;width:200px;height:200px;}
+.side.tod-morning::before{background:radial-gradient(circle,rgba(255,205,175,0.30),transparent 70%);}
+.side.tod-morning::after{background:radial-gradient(circle,rgba(255,235,180,0.20),transparent 70%);}
+.side.tod-day::before{background:radial-gradient(circle,rgba(var(--pal-sky-rgb),0.28),transparent 70%);}
+.side.tod-day::after{background:radial-gradient(circle,rgba(var(--pal-yellow-rgb),0.20),transparent 70%);}
+.side.tod-afternoon::before{background:radial-gradient(circle,rgba(255,220,235,0.26),transparent 70%);}
+.side.tod-afternoon::after{background:radial-gradient(circle,rgba(255,235,200,0.20),transparent 70%);}
+.side.tod-night::before{background:radial-gradient(circle,rgba(225,215,250,0.28),transparent 70%);}
+.side.tod-night::after{background:radial-gradient(circle,rgba(255,210,230,0.20),transparent 70%);}
+.side.tod-dawn::before{background:radial-gradient(circle,rgba(210,200,235,0.24),transparent 70%);}
+.side.tod-dawn::after{background:radial-gradient(circle,rgba(235,215,235,0.18),transparent 70%);}
+.side>*{position:relative;z-index:1;}
 .main-wrap{transition:padding .32s cubic-bezier(.4,0,.2,1);}
 .side-toggle-btn{position:fixed;top:50%;left:270px;z-index:50;width:20px;height:52px;transform:translate(-1px,-50%);clip-path:path('M0 0 L15 0 Q20 0 20 5 L20 47 Q20 52 15 52 L0 52 Z');display:flex;align-items:center;justify-content:center;cursor:pointer;transition:left .32s cubic-bezier(.4,0,.2,1),background .25s,border-color .25s;background:rgba(210,200,235,0.42);border:1px solid rgba(200,185,225,0.4);}
 .side-toggle-btn.tod-morning{background:linear-gradient(135deg,rgba(255,205,175,0.55),rgba(255,235,180,0.42));border-color:rgba(255,200,165,0.5);}
+.side-toggle-btn.tod-day{background:linear-gradient(135deg,rgba(var(--pal-sky-rgb),0.5),rgba(var(--pal-yellow-rgb),0.38));border-color:rgba(var(--pal-sky-rgb),0.55);}
 .side-toggle-btn.tod-afternoon{background:linear-gradient(135deg,rgba(255,220,235,0.5),rgba(255,235,200,0.45));border-color:rgba(255,200,210,0.45);}
 .side-toggle-btn.tod-night{background:linear-gradient(135deg,rgba(225,215,250,0.5),rgba(255,210,230,0.42));border-color:rgba(210,195,240,0.45);}
 .side-toggle-btn.tod-dawn{background:linear-gradient(135deg,rgba(210,200,235,0.42),rgba(235,215,235,0.38));border-color:rgba(200,185,225,0.4);}
@@ -77,16 +94,40 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .side-toggle-btn.collapsed i{transform:rotate(180deg);}
 .side-logo-wrap{display:flex;align-items:center;gap:6px;padding:0 0 6px;cursor:pointer;}
 .side-logo{height:36px;width:auto;cursor:pointer;}
-.mini-cal{background:var(--card);border:1px solid var(--card-b);border-radius:14px;padding:14px;margin-bottom:18px;}
+.mini-cal{background:var(--card);border:1px solid var(--card-b);border-radius:14px;padding:14px;margin-bottom:12px;}
 .mini-cal-hdr{display:flex;justify-content:space-between;align-items:center;font-size:var(--fs-body);color:var(--tp);font-weight:600;margin-bottom:10px;}
 .mini-cal-hdr i{font-size:var(--fs-title);color:var(--tm);cursor:pointer;padding:2px 4px;}
+/* 월 라벨(예: "8월")을 누르면 주간뷰⇄월간뷰 토글 — 화살표는 펼침 상태에 따라 회전 */
+.mini-cal-month-toggle{display:flex;align-items:center;gap:4px;cursor:pointer;}
+.mini-cal-month-toggle i.expand-arrow{font-size:10px;color:var(--tm);transition:transform 0.25s ease;}
+.mini-cal-month-toggle.expanded i.expand-arrow{transform:rotate(180deg);}
 .mini-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;font-size:var(--fs-sm);text-align:center;color:var(--ts);}
 .mini-cal-grid .dow{color:var(--tm);font-size:var(--fs-sm);padding-bottom:3px;}
+.mini-cal-dow-row{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;color:var(--tm);font-size:var(--fs-sm);text-align:center;}
+/* 요일 헤더는 항상 한 번만 표시하고, 그 아래 주간뷰는 펼침 상태일 때 숨겨서 월간 그리드만 남김 */
+.mini-cal-week-row{transition:opacity 0.2s ease;}
+.mini-cal-week-row.hidden{display:none;}
 .mini-cal-day{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;position:relative;}
 .mini-cal-day.sel{background:var(--pal-warmgray-bg);color:var(--pal-warmgray-text);font-weight:600;}
 .mini-cal-day.today{background:var(--pal-yellow-bg);color:var(--pal-yellow-text);font-weight:600;}
+.mini-cal-day.empty{cursor:default;}
+/* 평소엔 주간뷰(한 줄)만 보이고, 월 라벨을 누르면 그 아래로 월 전체 그리드가 펼쳐지며 주간뷰는 숨겨짐 */
+.mini-cal-month-grid{display:grid;grid-template-rows:0fr;transition:grid-template-rows 0.28s ease;overflow:hidden;}
+.mini-cal-month-grid.on{grid-template-rows:1fr;margin-top:4px;}
+.mini-cal-month-grid>div{overflow:hidden;}
+/* 오늘 진행률 카드 — 작은 도넛 + 텍스트, 캘린더와 인사배너 사이 */
+.side-progress{background:var(--card);border:1px solid var(--card-b);border-radius:14px;padding:10px 12px;margin-bottom:10px;display:flex;align-items:center;gap:12px;}
+.side-progress-ring{flex-shrink:0;}
+.side-progress-txt{flex:1;min-width:0;}
+.side-progress-main{font-size:var(--fs-sm);color:var(--ts);margin-bottom:2px;}
+.side-progress-sub{font-size:11px;color:var(--tm);}
 .side-hcard{border-radius:16px;padding:15px 14px 13px;margin-bottom:10px;position:relative;overflow:hidden;box-shadow:0 2px 16px rgba(180,140,120,0.08),inset 0 1px 0 rgba(255,250,240,0.62);}
 .side-hcard.morning{background:linear-gradient(135deg,rgba(255,205,175,0.72),rgba(255,235,180,0.55));border:1px solid rgba(255,200,165,0.55);}
+/* 낮(12-16시) — 오후(핑크)와 구분되는 "해 떠있는 시간" 톤. 앱 전역에서 이미 쓰는 --pal-sky-rgb/--pal-yellow-rgb를 그대로 가져와 톤 일관성 유지. */
+.side-hcard.day{background:linear-gradient(135deg,rgba(var(--pal-sky-rgb),0.55),rgba(var(--pal-yellow-rgb),0.42));border:1px solid rgba(var(--pal-sky-rgb),0.6);}
+.side-hcard.day .side-hcard-time{color:#5e7a8a;}
+.side-hcard.day .side-hcard-greeting{color:#3d5866;}
+.side-hcard.day .side-hcard-sub{color:#5e7a8a;}
 .side-hcard.afternoon{background:linear-gradient(135deg,rgba(255,220,235,0.65),rgba(255,235,200,0.60));border:1px solid rgba(255,200,210,0.50);}
 .side-hcard.night{background:linear-gradient(135deg,rgba(225,215,250,0.65),rgba(255,210,230,0.55));border:1px solid rgba(210,195,240,0.50);}
 .side-hcard.dawn{background:linear-gradient(135deg,rgba(210,200,235,0.55),rgba(235,215,235,0.50));border:1px solid rgba(200,185,225,0.50);}
@@ -635,6 +676,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
   <div class="side" id="side">
     <div class="side-logo-wrap" onclick="switchTab('reports')"><img class="side-logo" src="data:image/png;base64,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" alt="iikoto"><div class="side-logo-dot" id="side-logo-dot"></div></div>
     <div class="mini-cal" id="mini-cal"></div>
+    <div class="side-progress" id="side-progress"></div>
     <div id="side-greeting-card" class="side-hcard morning">
       <div class="side-hcard-time" id="side-greeting-time"></div>
       <div class="side-hcard-greeting" id="side-greeting-text">좋은 아침이에요</div>
