@@ -2906,11 +2906,23 @@ function renderMrpContents(contents,startDk,endDk){
     return c.end_date&&c.end_date>=startDk&&c.end_date<=endDk;
   });
   if(!inRange.length){el.innerHTML='<div class="empty-msg">이 달엔 기록한 콘텐츠가 없어요</div>';return;}
-  el.innerHTML=inRange.slice(0,30).map(c=>`
-    <div class="mrp-content-line">
-      <span style="display:flex;align-items:center;min-width:0;overflow:hidden;"><span class="dot" style="background:${_mrpCatDotColor(c.content_cat)};"></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.title||'')}</span></span>
-      <span class="st">${_mrpStatusLabel(c)}</span>
-    </div>`).join('');
+  // 카테고리(드라마/책/영화/음악) 순서 고정 그룹핑 — 그룹 내부는 기존처럼 최신순 유지
+  const CAT_ORDER=['drama','book','movie','music'];
+  const groups={};
+  inRange.forEach(c=>{(groups[c.content_cat]=groups[c.content_cat]||[]).push(c);});
+  const html=CAT_ORDER.filter(cat=>groups[cat]&&groups[cat].length).map(cat=>{
+    const meta=CAT_ICON_META[cat]||{icon:'ti-stack-2',bg:'rgba(150,150,150,1)',iconColor:'#fff',label:cat};
+    const lines=groups[cat].slice(0,30).map(c=>`
+      <div class="mrp-content-line">
+        <span style="display:flex;align-items:center;min-width:0;overflow:hidden;"><span class="dot" style="background:${_mrpCatDotColor(c.content_cat)};"></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.title||'')}</span></span>
+        <span class="st">${_mrpStatusLabel(c)}</span>
+      </div>`).join('');
+    return `<div class="mrp-content-group">
+      <div class="mrp-content-group-head"><i class="ti ${meta.icon}" style="color:${meta.bg};" aria-hidden="true"></i><span>${meta.label}</span><span class="mrp-content-group-count">${groups[cat].length}</span></div>
+      ${lines}
+    </div>`;
+  }).join('');
+  el.innerHTML=html;
 }
 
 function renderMrpReportLinks(weeksInMonth,mk){
