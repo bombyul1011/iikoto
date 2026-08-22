@@ -1614,9 +1614,13 @@ function renderReportSummaryList(monthlyRows,weeksInMonth,weeklyRowsList,mk){
   const items=[];
   const mkYear=parseInt(mk.slice(0,4),10),mkMonth=parseInt(mk.slice(5,7),10)-1;
   const monthlyRow=monthlyRows&&monthlyRows[0];
-  if(monthlyRow){
-    const cacheKey=monthlyRow.cache_key;
-    const read=_isReportRead(cacheKey);
+  // 발행된 종합 리포트(캐시)가 없어도, 그 달이 오늘이거나 이미 지난 달이면 리포트 페이지 자체는 열람 가능
+  // (진행 중인 달은 hero만 "이 달이 끝나면 정리해드려요"로 안내, 나머지 카드는 오늘까지 누계로 정상 표시됨).
+  const now=new Date();
+  const isPastOrCurrentMonth=(mkYear<now.getFullYear())||(mkYear===now.getFullYear()&&mkMonth<=now.getMonth());
+  if(monthlyRow||isPastOrCurrentMonth){
+    const cacheKey=monthlyRow?monthlyRow.cache_key:`monthly_report_${mk}`;
+    const read=monthlyRow?_isReportRead(cacheKey):true; // 미발행 상태는 "안 읽음" 배지를 굳이 띄우지 않음
     items.push({cacheKey,kind:'monthly',read,year:mkYear,month:mkMonth,
       icon:'ti-calendar',iconBg:'rgba(255,225,120,0.55)',iconColor:'var(--pal-yellow-border)',
       title:`${mk.slice(5,7).replace(/^0/,'')}월 월간종합 리포트`,sub:`${mk.slice(0,4)}년 ${mk.slice(5,7).replace(/^0/,'')}월 전체 흐름 정리`});
@@ -1799,11 +1803,17 @@ async function loadMonthlyReportPage(){
   document.getElementById('mrp-title').textContent=`${y}년 ${mo+1}월 리포트`;
 
   const startDk=`${mk}-01`;
-  const dim=new Date(y,mo+1,0).getDate();
+  const lastDayOfThisMonth=new Date(y,mo+1,0).getDate();
+  const now=new Date();
+  // 조회 중인 달이 "진행 중인 이번 달"이면, 통계 분모를 월 전체 일수가 아니라 "오늘까지의 경과일수"로 절단.
+  // 그래야 습관률(체크일수/분모)이나 전월 대비 증감률이 아직 지나지 않은 날짜까지 분모에 넣어 왜곡되는 문제를 막을 수 있음(2026-08-22 확정).
+  // 과거(완결된) 달은 기존과 동일하게 그 달 전체 일수를 그대로 사용.
+  const isViewingOngoingMonth=(y===now.getFullYear()&&mo===now.getMonth());
+  const dim=isViewingOngoingMonth?now.getDate():lastDayOfThisMonth;
   const endDk=`${mk}-${pad(dim)}`;
   const weeksInMonth=getReportWeeksOfMonth(y,mo);
 
-  // 전월 동기간(같은 일수)도 함께 가져와 리듬 비교에 사용
+  // 전월 동기간(같은 일수)도 함께 가져와 리듬 비교에 사용 — dim이 절단됐으면 전월도 동일하게 절단된 일수만큼만 비교.
   const prevMonthDate=new Date(y,mo-1,1);
   const py=prevMonthDate.getFullYear(),pmo=prevMonthDate.getMonth();
   const prevMk=monthKeyOf(prevMonthDate);
@@ -1811,7 +1821,7 @@ async function loadMonthlyReportPage(){
   const prevStartDk=`${prevMk}-01`,prevEndDk=`${prevMk}-${pad(prevDim)}`;
   const prevWeeksInMonth=getReportWeeksOfMonth(py,pmo);
 
-  const [monthlyRows,goalRows,todos,memosRows,sleepRows,habits,habitChecksAll,rblocks,prevRblocks,contents,prevContents,wcRowsList,milestoneRows,prevWcRowsList,prevTodos,prevSleepRows,prevHabitChecksAll,trajectoryRows,sleepReportCacheRows,weeklySummaryRowsList,weeklyMemoRowsList]=await Promise.all([
+  const [monthlyRows,goalRows,todos,memosRows,sleepRows,habits,habitChecksAll,rblocks,prevRblocks,contents,prevContents,wcRowsList,milestoneRows,prevWcRowsList,prevTodos,prevSleepRows,prevHabitChecksAll,trajectoryRows,sleepReportCacheRows,weeklySummaryRowsList,weeklyMemoRowsList,prevMemosRows]=await Promise.all([
     supaFetch(`ai_cache?cache_key=eq.monthly_report_${mk}&select=content`),
     supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('mgoal:'+mk)}`),
     supaFetch(`todos?date_key=gte.${startDk}&date_key=lte.${endDk}&select=done,date_key`),
@@ -1833,19 +1843,20 @@ async function loadMonthlyReportPage(){
     supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent('monthly_sleep_'+mk)}&select=content`),
     // 세 프롬프트(궤적/리듬/수면)가 공통 참고자료로 쓸 그 달 주간종합/주간메모 리포트 — 조회는 한 번만, 정제해서 각 함수에 전달
     Promise.all(weeksInMonth.map(wk=>supaFetch(`ai_cache?cache_key=eq.weekly_summary_${_mondayToSundayDk(wk)}&select=content`))),
-    Promise.all(weeksInMonth.map(wk=>supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent('weekly_memo_report_week:'+wk)}&select=content`)))
+    Promise.all(weeksInMonth.map(wk=>supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent('weekly_memo_report_week:'+wk)}&select=content`))),
+    supaFetch(`memos?date_key=gte.${prevStartDk}&date_key=lte.${prevEndDk}&select=id`)
   ]);
 
   // 참고자료 정제: 저장된 HTML 카드에서 태그만 제거한 순수 텍스트로 — 세 프롬프트 공통 재료
   const monthlyRefContext=_mrpBuildRefContext(weeklySummaryRowsList,weeklyMemoRowsList);
 
   renderMrpHero(monthlyRows&&monthlyRows[0]);
-  renderMrpGoalsAndStats(goalRows&&goalRows[0],todos||[],memosRows||[],sleepRows||[],habits||[],habitChecksAll||[],weeksInMonth.length*7||dim,prevTodos||[],prevHabitChecksAll||[],prevSleepRows||[]);
+  renderMrpGoalsAndStats(goalRows&&goalRows[0],todos||[],memosRows||[],sleepRows||[],habits||[],habitChecksAll||[],dim,prevTodos||[],prevHabitChecksAll||[],prevMemosRows||[],prevDim);
   const heroCommentText=_mrpExtractHeroComment(monthlyRows&&monthlyRows[0]);
-  renderMrpTrajectory(mk,todos||[],sleepRows||[],habits||[],habitChecksAll||[],weeksInMonth,
-    {todos:prevTodos||[],sleepRows:prevSleepRows||[],habitChecks:prevHabitChecksAll||[],weeksInMonth:prevWeeksInMonth,habits:habits||[]},
+  renderMrpTrajectory(mk,sleepRows||[],habits||[],habitChecksAll||[],rblocks||[],weeksInMonth,dim,
+    {sleepRows:prevSleepRows||[],habitChecks:prevHabitChecksAll||[],rblocks:prevRblocks||[],weeksInMonth:prevWeeksInMonth,habits:habits||[]},
     trajectoryRows&&trajectoryRows[0],heroCommentText,monthlyRefContext);
-  renderMrpSleep(mk,sleepRows||[],prevSleepRows||[],sleepReportCacheRows&&sleepReportCacheRows[0],monthlyRefContext);
+  renderMrpSleep(mk,sleepRows||[],prevSleepRows||[],sleepReportCacheRows&&sleepReportCacheRows[0],monthlyRefContext,heroCommentText);
   renderMrpRhythm(rblocks||[],prevRblocks||[]);
   renderMrpMilestones(mk,rblocks||[],prevRblocks||[],weeksInMonth,wcRowsList||[],milestoneRows&&milestoneRows[0],prevWcRowsList||[],heroCommentText,monthlyRefContext);
   renderMrpWeeklyMissions(weeksInMonth,wcRowsList||[]);
@@ -1901,7 +1912,7 @@ function renderMrpHero(row){
       <div class="mrp-hero" id="mrp-hero-slot"></div>
       <div class="mrp-grid2" style="margin-bottom:14px;">
         <div class="mrp-card"><div class="mrp-card-title"><i class="ti ti-flag-3" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>이 달의 목표</div><div id="mrp-goals"></div></div>
-        <div class="mrp-card"><div class="mrp-card-title"><i class="ti ti-chart-donut" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>이 달의 숫자</div><div id="mrp-stats"></div></div>
+        <div class="mrp-card mrp-card-vcenter"><div class="mrp-card-title"><i class="ti ti-chart-donut" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>이 달의 숫자</div><div id="mrp-stats"></div></div>
       </div>
       <div class="mrp-card" style="margin-bottom:14px;"><div class="mrp-card-title"><i class="ti ti-chart-line" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>이 달의 궤적</div><div id="mrp-traj"></div></div>
       <div class="mrp-card" style="margin-bottom:14px;"><div class="mrp-card-title"><i class="ti ti-moon-stars" style="color:rgba(150,190,215,1);" aria-hidden="true"></i>이 달의 수면</div><div id="mrp-sleep"></div></div>
@@ -1942,7 +1953,7 @@ function renderMrpHero(row){
 }
 
 // 목표(왼쪽)와 숫자(오른쪽)를 반반 배치 — 목표만 두면 배너가 비어 보여 숫자 카드와 짝지음
-function renderMrpGoalsAndStats(goalRow,todos,memos,sleepRows,habits,habitChecks,habitDenominator,prevTodos,prevHabitChecks,prevSleepRows){
+function renderMrpGoalsAndStats(goalRow,todos,memos,sleepRows,habits,habitChecks,habitDenominator,prevTodos,prevHabitChecks,prevMemos,prevHabitDenominator){
   const goalsEl=document.getElementById('mrp-goals');
   // mgoal: 캐시는 wchallenge_(주간챌린지)와 저장 구조가 다름 — lines가 {text,days}[] 객체 배열이 아니라 순수 문자열 배열(string[]).
   const lines=(goalRow&&Array.isArray(goalRow.lines))?goalRow.lines.filter(l=>l&&typeof l==='string'&&l.trim()):[];
@@ -1950,36 +1961,27 @@ function renderMrpGoalsAndStats(goalRow,todos,memos,sleepRows,habits,habitChecks
 
   const statsEl=document.getElementById('mrp-stats');
   const doneTodos=todos.filter(t=>t.done).length;
+  const memoCount=(memos||[]).length;
   const habitPct=habits.length?Math.round(habitChecks.length/(habits.length*habitDenominator)*100):0;
-  const avgSleep=avgSleepHoursFromRows(sleepRows);
 
-  // 전월 대비(주간탭 wd-item과 동일한 아이콘+숫자+증감 2줄 스타일)
+  // 전월 대비(각 통계 하단에 증감만 짧게) — 전월 분모(prevHabitDenominator)는 이번 달과 별개로, 진행 중인 달이면
+  // 동일하게 "오늘까지의 경과일수"로 절단된 값이 상위(loadMonthlyReportPage)에서 넘어옴(2026-08-22 확정).
   const prevDoneTodos=(prevTodos||[]).filter(t=>t.done).length;
-  const prevHabitPct=habits.length?Math.round((prevHabitChecks||[]).length/(habits.length*habitDenominator)*100):0;
-  const prevAvgSleep=parseFloat(avgSleepHoursFromRows(prevSleepRows))||0;
-  const curAvgSleepNum=parseFloat(avgSleep)||0;
-  const deltaItems=[
-    {icon:'ti-checkbox',cur:doneTodos,prev:prevDoneTodos,fmt:v=>v+'개'},
-    {icon:'ti-chart-donut',cur:habitPct,prev:prevHabitPct,fmt:v=>v+'%'},
-    {icon:'ti-moon-stars',cur:curAvgSleepNum,prev:prevAvgSleep,fmt:v=>v+'h'}
-  ];
-  const deltaHtml=deltaItems.map(it=>{
-    const diff=Math.round((it.cur-it.prev)*10)/10;
+  const prevMemoCount=(prevMemos||[]).length;
+  const prevHabitPct=habits.length?Math.round((prevHabitChecks||[]).length/(habits.length*(prevHabitDenominator||habitDenominator))*100):0;
+  const deltaOf=(cur,prev,fmt)=>{
+    const diff=Math.round((cur-prev)*10)/10;
     const dir=diff>0?'up':(diff<0?'down':'flat');
     const arrow=dir==='up'?'ti-arrow-up':(dir==='down'?'ti-arrow-down':'ti-minus');
     const sign=diff>0?'+':'';
-    return `<div class="wd-item">
-      <div class="wd-item-top"><i class="ti ${it.icon}" aria-hidden="true"></i></div>
-      <div class="wd-delta ${dir}"><i class="ti ${arrow}" style="font-size:10px;"></i>${sign}${it.fmt(diff)}</div>
-    </div>`;
-  }).join('');
+    return `<div class="mrp-stat-delta ${dir}"><i class="ti ${arrow}" style="font-size:10px;"></i>${sign}${fmt(diff)}</div>`;
+  };
 
   statsEl.innerHTML=`<div class="mrp-stat-row">
-    <div class="mrp-stat"><div class="v">${doneTodos}개</div><div class="l">투두 완료</div></div>
-    <div class="mrp-stat"><div class="v">${habitPct}%</div><div class="l">습관 달성률</div></div>
-    <div class="mrp-stat"><div class="v">${avgSleep?avgSleep+'h':'-'}</div><div class="l">평균 수면</div></div>
-  </div>
-  <div class="stat-bar-wrap mrp-stats-delta">${deltaHtml}</div>`;
+    <div class="mrp-stat"><div class="v">${doneTodos}개</div><div class="l">투두 완료</div>${deltaOf(doneTodos,prevDoneTodos,v=>v+'개')}</div>
+    <div class="mrp-stat"><div class="v">${memoCount}개</div><div class="l">메모 작성</div>${deltaOf(memoCount,prevMemoCount,v=>v+'개')}</div>
+    <div class="mrp-stat"><div class="v">${habitPct}%</div><div class="l">습관 달성률</div>${deltaOf(habitPct,prevHabitPct,v=>v+'%')}</div>
+  </div>`;
 }
 
 // 이 달의 궤적 — 주차별 값을 부드러운 곡선(spline)으로 이어 "월 안에서의 오르내림"을 보여줌.
@@ -1998,7 +2000,29 @@ function _mrpSmoothPath(points){
 }
 // 세 지표를 하나의 웨이브 그래프에 겹쳐 표시 — 각 지표는 자기 자신의 이번 달 최소~최대 범위 안에서 정규화한
 // "상대적 위치"이며 절대 눈금이 아님(단위가 %/시간으로 서로 다르기 때문). 절대값은 하단 tail-vals에 별도 표기.
-function _mrpWaveSvg(rows,weekCount){
+// tailOverridesByKey: {key: value|null} — 주어지면 하단 tail 숫자를 "마지막 주차 값" 대신 이 값(보통 월 전체 평균)으로 표시.
+// (2026-08-22: 생활밸런스 100% 절대기준선을 그렸었으나, 지표별 정규화 스케일이 서로 달라 같은 캔버스에 절대값 기준선을
+//  그리면 다른 지표(수면 등)까지 그 높이가 "0 기준"인 것처럼 보이는 착시가 생겨 제거함. 절대 달성 여부는 하단 tail 숫자로 확인.)
+// 주차 라벨을 누르면 그 주차의 세 지표 실제 수치를 라벨 아래에 펼쳐 보여줌(그래프 자체는 정규화된 상대값이라
+// 오독 소지가 있어, 정확한 숫자가 궁금할 때 확인할 수 있게 함, 2026-08-22).
+function _mrpWaveWeekDetailHtml(rows,weekIdx){
+  return rows.map(r=>{
+    const v=r.values[weekIdx];
+    return `<div class="mrp-wave-detail-item"><i style="background:rgba(${r.color},0.95);"></i><span class="l">${r.label}</span><span class="v">${v!=null?r.fmt(v):'기록 없음'}</span></div>`;
+  }).join('');
+}
+function _mrpToggleWeekDetail(weekIdx){
+  const key=String(weekIdx);
+  const target=document.querySelector(`.mrp-wave-detail[data-week="${key}"]`);
+  const willOpen=target&&!target.classList.contains('on');
+  document.querySelectorAll('.mrp-wave-detail').forEach(el=>el.classList.remove('on'));
+  document.querySelectorAll('.mrp-wave-labels span').forEach(el=>el.classList.remove('active'));
+  if(willOpen){
+    target.classList.add('on');
+    document.querySelector(`.mrp-wave-labels span[data-week="${key}"]`).classList.add('active');
+  }
+}
+function _mrpWaveSvg(rows,weekCount,tailOverridesByKey){
   const H=110,padTop=8,padBottom=8,plotH=H-padTop-padBottom;
   const stepX=380/Math.max(1,weekCount-1);
   const legendHtml=`<div class="mrp-wave-legend">`+rows.map(r=>
@@ -2032,59 +2056,118 @@ function _mrpWaveSvg(rows,weekCount){
     dotsHtml+=`<circle cx="${last[0]}" cy="${last[1]}" r="4.2" fill="rgba(${r.color},1)"/>`;
   });
 
-  const weekLabels=Array.from({length:weekCount},(_,i)=>`<span>${i+1}주차</span>`).join('');
+  // 주차 라벨 — 클릭하면 그 주차 바로 아래에 세 지표 실제 수치가 펼쳐짐(아코디언, 한 번에 하나만 열림)
+  const weekLabels=Array.from({length:weekCount},(_,i)=>
+    `<span data-week="${i}" onclick="_mrpToggleWeekDetail(${i})">${i+1}주차</span>`
+  ).join('');
+  const weekDetails=Array.from({length:weekCount},(_,i)=>
+    `<div class="mrp-wave-detail" data-week="${i}">${_mrpWaveWeekDetailHtml(rows,i)}</div>`
+  ).join('');
+
   const tailVals=rows.map(r=>{
-    const lastValid=[...r.values].reverse().find(v=>v!=null);
-    return `<div class="mrp-wave-tail-item"><div class="n">${lastValid!=null?r.fmt(lastValid):'-'}</div><div class="l">${r.label}</div></div>`;
+    const override=tailOverridesByKey&&tailOverridesByKey[r.key];
+    const val=(override!=null)?override:[...r.values].reverse().find(v=>v!=null);
+    return `<div class="mrp-wave-tail-item"><div class="n">${val!=null?r.fmt(val):'-'}</div><div class="l">${r.label}</div></div>`;
   }).join('');
 
   return legendHtml+
     `<div class="mrp-wave-wrap"><svg viewBox="0 0 400 ${H}" preserveAspectRatio="none">${`<defs>${defsHtml}</defs>`}${pathsHtml}${dotsHtml}</svg></div>`+
     `<div class="mrp-wave-labels">${weekLabels}</div>`+
+    weekDetails+
     `<div class="mrp-wave-tail">${tailVals}</div>`;
 }
-async function renderMrpTrajectory(mk,todos,sleepRows,habits,habitChecks,weeksInMonth,prevData,cacheRow,heroComment,refContext){
+// 생활밸런스(업무 대비 개인작업) 목표 비율 — 업무 3시간당 개인작업(책상) 2시간이 이상적이라는 기준(2026-08-22 확정).
+const WORK_NOTE_TARGET_RATIO=2/3;
+async function renderMrpTrajectory(mk,sleepRows,habits,habitChecks,rblocks,weeksInMonth,dim,prevData,cacheRow,heroComment,refContext){
   const el=document.getElementById('mrp-traj');
   if(!weeksInMonth.length){el.innerHTML='<div class="empty-msg">이 달엔 표시할 주차가 없어요</div>';return;}
 
-  const calcWeekly=(todos,sleepRows,habits,habitChecks,weeksInMonth)=>{
-    const byWeekTodo=weeksInMonth.map(wk=>{
-      const days=getWeekDates(new Date(wk+'T00:00:00'));
-      const inWeek=todos.filter(t=>days.includes(t.date_key));
-      return inWeek.length?Math.round(inWeek.filter(t=>t.done).length/inWeek.length*100):null;
+  // rhythm_blocks에서 카테고리별 합산(분) — renderMrpRhythm과 동일 규칙(start/end 파싱, 자정 넘김 보정).
+  // days를 주면 그 날짜들로 필터, 생략하면 rblocks 전체(그 달 전체) 합산.
+  const sumCatMin=(rblocks,cat,days)=>{
+    let sum=0;
+    (rblocks||[]).forEach(b=>{
+      if(b.cat!==cat)return;
+      if(days&&!days.includes(b.date_key))return;
+      if(!b.start_time||!b.end_time)return;
+      const s=_paceParseHM(b.start_time),e=_paceParseHM(b.end_time);
+      if(isNaN(s)||isNaN(e))return;
+      let dur=e-s;if(dur<0)dur+=1440;
+      if(dur>0)sum+=dur;
     });
+    return sum;
+  };
+
+  // weeksInMonth는 그 달에 속하는 모든 주차(목요일 기준)를 담고 있는데, 진행 중인 달이면 아직 지나지 않은
+  // 미래 주차도 포함돼있어 습관율이 "데이터 없음"이 아니라 "체크 0건→0%"로 계산되며 그래프가 미래까지 이어지는
+  // 문제가 있었음 — dim(오늘까지 절단된 일수) 이후 시작하는 주차는 아예 제외(2026-08-22 확정).
+  const validWeeksInMonth=weeksInMonth.filter(wk=>{
+    const wkStartDay=parseInt(wk.slice(8,10),10);
+    const wkMonth=wk.slice(0,7);
+    return wkMonth!==mk||wkStartDay<=dim;
+  });
+  if(!validWeeksInMonth.length){el.innerHTML='<div class="empty-msg">이 달엔 표시할 주차가 없어요</div>';return;}
+
+  const calcWeekly=(sleepRows,habits,habitChecks,rblocks,weeksInMonth)=>{
     const byWeekSleep=weeksInMonth.map(wk=>{
       const days=getWeekDates(new Date(wk+'T00:00:00'));
-      const rows=sleepRows.filter(r=>days.includes(r.date_key));
-      const h=parseFloat(avgSleepHoursFromRows(rows));
-      return isNaN(h)?null:h;
+      const rows=sleepRows.filter(r=>days.includes(r.date_key)&&r.score!=null&&!isNaN(r.score));
+      if(!rows.length)return null;
+      return Math.round(rows.reduce((a,r)=>a+r.score,0)/rows.length);
     });
     const byWeekHabit=weeksInMonth.map(wk=>{
       const days=getWeekDates(new Date(wk+'T00:00:00'));
       if(!habits.length)return null;
       const checks=habitChecks.filter(c=>days.includes(c.date_key));
+      if(!checks.length)return null;
       return Math.round(checks.length/(habits.length*7)*100);
     });
-    return {byWeekTodo,byWeekSleep,byWeekHabit};
+    // 생활밸런스: 그 주 (책상/업무) 실제비율을 목표비율(2/3)로 나눈 달성률(%). 업무기록이 없는 주는 null.
+    const byWeekBalance=weeksInMonth.map(wk=>{
+      const days=getWeekDates(new Date(wk+'T00:00:00'));
+      const workMin=sumCatMin(rblocks,'work',days);
+      const noteMin=sumCatMin(rblocks,'note',days);
+      if(!workMin)return null;
+      return Math.round((noteMin/workMin)/WORK_NOTE_TARGET_RATIO*100);
+    });
+    return {byWeekSleep,byWeekHabit,byWeekBalance};
   };
 
-  const {byWeekTodo,byWeekSleep,byWeekHabit}=calcWeekly(todos,sleepRows,habits,habitChecks,weeksInMonth);
+  const {byWeekSleep,byWeekHabit,byWeekBalance}=calcWeekly(sleepRows,habits,habitChecks,rblocks,validWeeksInMonth);
 
   const rows=[
     {key:'habit',label:'습관율',values:byWeekHabit,color:'145,210,175',fmt:v=>v+'%'},
-    {key:'sleep',label:'평균수면',values:byWeekSleep,color:'170,208,228',fmt:v=>v.toFixed(1)+'h'},
-    {key:'todo',label:'투두완료율',values:byWeekTodo,color:'210,175,225',fmt:v=>v+'%'}
+    {key:'sleep',label:'평균수면컨디션',values:byWeekSleep,color:'170,208,228',fmt:v=>v+'점'},
+    {key:'balance',label:'생활밸런스',values:byWeekBalance,color:'210,175,225',fmt:v=>v+'%'}
   ];
-  el.innerHTML=_mrpWaveSvg(rows,weeksInMonth.length)+`<div id="mrp-traj-ai" style="margin-top:14px;"></div>`;
+
+  // 하단 tail 요약값 — 그래프는 주차별 오르내림이지만, tail 숫자만큼은 "이 달 전체 평균"으로 다시 계산해
+  // 다른 카드(이달의 수면/습관 달성률)와 값이 일치하도록 함(2026-08-22, 마지막 주차 값 표시 문제 수정).
+  // 수면 지표는 시간이 아니라 컨디션 점수 기준(2026-08-22, 시간과 컨디션이 항상 같이 움직이지 않아 해석에 혼선이 있어 변경).
+  const scoredSleepRows=sleepRows.filter(r=>r.score!=null&&!isNaN(r.score));
+  const monthAvgSleep=scoredSleepRows.length?Math.round(scoredSleepRows.reduce((a,r)=>a+r.score,0)/scoredSleepRows.length):null;
+  const monthAvgHabit=habits.length?Math.round(habitChecks.length/(habits.length*dim)*100):null;
+  const monthWorkMin=sumCatMin(rblocks,'work');
+  const monthNoteMin=sumCatMin(rblocks,'note');
+  const monthAvgBalance=monthWorkMin?Math.round((monthNoteMin/monthWorkMin)/WORK_NOTE_TARGET_RATIO*100):null;
+  const tailOverridesByKey={habit:monthAvgHabit,sleep:monthAvgSleep,balance:monthAvgBalance};
+
+  el.innerHTML=_mrpWaveSvg(rows,validWeeksInMonth.length,tailOverridesByKey)+`<div id="mrp-traj-ai" style="margin-top:14px;"></div>`;
 
   // ── AI 궤적 분석 ──
   const aiEl=document.getElementById('mrp-traj-ai');
   const validWeekCount=(vals)=>vals.filter(v=>v!=null).length;
-  const enoughData=Math.max(validWeekCount(byWeekHabit),validWeekCount(byWeekSleep),validWeekCount(byWeekTodo))>=2;
+  const enoughData=Math.max(validWeekCount(byWeekHabit),validWeekCount(byWeekSleep),validWeekCount(byWeekBalance))>=2;
   if(!enoughData){aiEl.innerHTML='';return;}
 
   if(cacheRow&&cacheRow.content){
     aiEl.innerHTML=`<div class="mrp-traj-ai-text">${escapeHtml(cacheRow.content)}</div>`;
+    return;
+  }
+  // 이 달의 종합 리포트(본앱 hero)가 아직 발행되지 않았으면 궤적 분석도 생성하지 않음(시점 제한, 시간 기준 아님) —
+  // 본앱에서 월간종합을 받아온 이후에만 태블릿 쪽 세 AI 카드(궤적/리듬/수면)가 순차적으로 생성 가능해짐.
+  if(!heroComment){
+    aiEl.innerHTML=`<div class="empty-msg" style="text-align:left;padding:4px 0;">이 달의 종합 리포트가 발행되면 궤적 분석도 볼 수 있어요</div>`;
     return;
   }
   const apiKey=getClaudeKey();
@@ -2096,7 +2179,7 @@ async function renderMrpTrajectory(mk,todos,sleepRows,habits,habitChecks,weeksIn
   // 전월 데이터도 같은 방식으로 계산 — 있으면 프롬프트에 "방향성 비교"용으로만 제공(수치는 안 줌, 방향만 서술)
   let prevDirText='';
   if(prevData&&prevData.weeksInMonth&&prevData.weeksInMonth.length){
-    const p=calcWeekly(prevData.todos,prevData.sleepRows,prevData.habits,prevData.habitChecks,prevData.weeksInMonth);
+    const p=calcWeekly(prevData.sleepRows,prevData.habits,prevData.habitChecks,prevData.rblocks,prevData.weeksInMonth);
     const dirOf=(vals)=>{
       const valid=vals.filter(v=>v!=null);
       if(valid.length<2)return null;
@@ -2104,8 +2187,8 @@ async function renderMrpTrajectory(mk,todos,sleepRows,habits,habitChecks,weeksIn
     };
     const parts=[];
     const hd=dirOf(p.byWeekHabit);if(hd)parts.push(`습관율은 ${hd} 흐름`);
-    const sd=dirOf(p.byWeekSleep);if(sd)parts.push(`평균수면은 ${sd} 흐름`);
-    const td=dirOf(p.byWeekTodo);if(td)parts.push(`투두완료율은 ${td} 흐름`);
+    const sd=dirOf(p.byWeekSleep);if(sd)parts.push(`평균수면컨디션은 ${sd} 흐름`);
+    const bd=dirOf(p.byWeekBalance);if(bd)parts.push(`생활밸런스는 ${bd} 흐름`);
     if(parts.length)prevDirText=`전월 방향성(참고용, 방향만): ${parts.join(', ')}`;
   }
 
@@ -2115,12 +2198,12 @@ async function renderMrpTrajectory(mk,todos,sleepRows,habits,habitChecks,weeksIn
     if(valid.length<2)return '데이터 부족';
     return valid[valid.length-1]>valid[0]?'상승':(valid[valid.length-1]<valid[0]?'하락':'유지');
   };
-  const curDirText=`이 달 방향성: 습관율 ${dirOfCur(byWeekHabit)}, 평균수면 ${dirOfCur(byWeekSleep)}, 투두완료율 ${dirOfCur(byWeekTodo)}`;
+  const curDirText=`이 달 방향성: 습관율 ${dirOfCur(byWeekHabit)}, 평균수면컨디션 ${dirOfCur(byWeekSleep)}, 생활밸런스 ${dirOfCur(byWeekBalance)}`;
   const heroText=heroComment?`이 달 종합 리포트(참고용 맥락, 이미 발행된 코멘트):\n${heroComment}`:'';
   const dataContext=[curDirText,prevDirText,heroText,refContext].filter(Boolean).join('\n\n');
 
   const sys=`당신은 한 달의 생활 패턴을 해석해주는 담담한 회고 비서예요.
-아래는 이 달의 습관율, 평균수면, 투두완료율이 주차를 거치며 각각 상승/하락/유지 중 어느 방향으로 움직였는지를 나타낸 정보예요(구체적인 수치는 주어지지 않아요). 함께 주어졌다면 이 달의 종합 리포트(이미 발행된 코멘트)와 주차별 참고자료(주간종합/주간메모)도 참고하세요 — 그 안에 담긴 이 달의 사건이나 맥락과 어긋나지 않게, 자연스럽게 이어지도록 서술하세요.
+아래는 이 달의 습관율, 평균수면컨디션, 생활밸런스가 주차를 거치며 각각 상승/하락/유지 중 어느 방향으로 움직였는지를 나타낸 정보예요(구체적인 수치는 주어지지 않아요). "평균수면컨디션"은 수면시간이 아니라 기상 후 기록한 컨디션 점수의 평균이에요 — 잔 시간과 컨디션이 항상 같이 움직이지 않을 수 있다는 점을 감안해서 해석하세요. "생활밸런스"는 업무 시간 대비 개인작업(책상) 시간의 비율이 이상적인 기준(업무 3시간당 개인작업 2시간)을 얼마나 채웠는지를 나타내는 지표예요 — 100%에 가까울수록 일과 자기계발 시간의 밸런스를 잘 지킨 주, 낮을수록 업무에 밀려 개인 시간을 내주지 못한 주예요. 함께 주어졌다면 이 달의 종합 리포트(이미 발행된 코멘트)와 주차별 참고자료(주간종합/주간메모)도 참고하세요 — 그 안에 담긴 이 달의 사건이나 맥락과 어긋나지 않게, 자연스럽게 이어지도록 서술하세요.
 이 세 지표가 서로 어떤 관계로 움직였는지 — 무엇을 더 챙기는 대신 무엇을 내줬는지, 어떤 성향의 한 달이었는지 — 짧은 이야기로 풀어주세요.
 - 3~4문장, 전체 120자 내외.
 - 절대 숫자나 퍼센트, 시간 같은 구체적인 수치를 언급하지 마세요. 그래프에 이미 나와 있으니, 당신은 그 움직임이 "무엇을 의미하는지"만 해석하세요.
@@ -2145,7 +2228,7 @@ ${MRP_COMMON_RULES}
 
 // 이 달의 수면 — 상단(분포 도넛+지난달 대비), 중단(숫자 요약), 하단(AI 분석: 취침시간대별 컨디션 포함).
 // 도넛 중앙은 이 달 평균 컨디션에 대응하는 표정 아이콘(getSleepScoreLevel 재사용).
-async function renderMrpSleep(mk,sleepRows,prevSleepRows,cacheRow,refContext){
+async function renderMrpSleep(mk,sleepRows,prevSleepRows,cacheRow,refContext,heroComment){
   const el=document.getElementById('mrp-sleep');
   const validCur=(sleepRows||[]).filter(r=>r.sleep_time&&r.wake_time);
   const validPrev=(prevSleepRows||[]).filter(r=>r.sleep_time&&r.wake_time);
@@ -2240,6 +2323,11 @@ async function renderMrpSleep(mk,sleepRows,prevSleepRows,cacheRow,refContext){
   const aiEl=document.getElementById('mrp-sleep-ai');
   if(cacheRow&&cacheRow.content){
     aiEl.innerHTML=`<div class="mrsl-ai-text">${escapeHtml(cacheRow.content)}</div>`;
+    return;
+  }
+  // 이 달의 종합 리포트(본앱 hero)가 아직 발행되지 않았으면 수면 분석도 생성하지 않음(시점 제한)
+  if(!heroComment){
+    aiEl.innerHTML=`<div class="empty-msg" style="text-align:left;padding:4px 0;">이 달의 종합 리포트가 발행되면 수면 분석도 볼 수 있어요</div>`;
     return;
   }
   const apiKey=getClaudeKey();
@@ -2337,13 +2425,16 @@ function renderMrpRhythm(rblocks,prevRblocks){
   });
   barHtml+=`</div>`;
 
-  // 누계와 일평균(본앱 기준: 실제 기록일수로 나눔)을 두 줄로 분리 — 한 줄로 길게 이어지던 것을 공간 절약을 위해 개행
+  // 누계와 일평균을 한 줄에, 2열 그리드로 배치(공간 절약)
+  // 전월 대비는 "+3시간 20분"처럼 풀어쓰면 한 줄이 너무 길어져 "-39H"처럼 반올림 시간 단위로 축약.
+  // 색상은 이달의 숫자 카드(mrp-stat-delta)와 동일한 up/down 팔레트 재사용.
   const listHtml=`<div class="mrp-rhythm-list">`+sorted.map(k=>{
     const c=RHYTHM_CATS[k];
     const diff=cur.d[k]-(prev.d[k]||0);
-    const diffTxt=(showCompare&&Math.abs(diff)>=60)?`<span style="color:${diff>0?'var(--pal-rose-border)':'var(--pal-sky-border)'};">${diff>0?'+':'−'}${_fmtDur(Math.abs(diff))}</span>`:'';
+    const diffH=Math.round(diff/60);
+    const diffTxt=(showCompare&&Math.abs(diff)>=60)?` · <span class="mrp-rhythm-delta ${diff>0?'up':'down'}">${diff>0?'+':'−'}${Math.abs(diffH)}H</span>`:'';
     const avgMin=cur.d[k]/(cur.dayCount[k]||1);
-    return `<div class="mrp-rhythm-item"><span class="dot" style="background:${c.color};"></span><span class="lbl">${c.label}</span><span class="val">누계 ${_fmtDur(cur.d[k])}<br>일평균 ${_fmtDur(avgMin)}${diffTxt?' · 전월대비 '+diffTxt:''}</span></div>`;
+    return `<div class="mrp-rhythm-item"><span class="dot" style="background:${c.color};"></span><span class="lbl">${c.label}</span><span class="val">${_fmtDur(cur.d[k])} · 일${_fmtDur(avgMin)}${diffTxt}</span></div>`;
   }).join('')+`</div>`;
 
   el.innerHTML=barHtml+listHtml+(showCompare?'':'<div class="empty-msg" style="text-align:left;padding:8px 2px 0;">전월 기록이 적어 전월 대비 비교는 생략했어요</div>');
@@ -2368,6 +2459,9 @@ async function renderMrpMilestones(mk,rblocks,prevRblocks,weeksInMonth,wcRowsLis
     }catch(e){renderText(cacheRow.content);}
     return;
   }
+
+  // 이 달의 종합 리포트(본앱 hero)가 아직 발행되지 않았으면 리듬 분석도 생성하지 않음(시점 제한)
+  if(!heroComment){el.innerHTML='';return;}
 
   const apiKey=getClaudeKey();
   if(!apiKey){el.innerHTML='';return;}
