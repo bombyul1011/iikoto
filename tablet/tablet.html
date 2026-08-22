@@ -239,8 +239,8 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .wd-item{display:flex;flex-direction:column;align-items:center;gap:3px;}
 .wd-item-top{display:flex;align-items:center;gap:5px;}
 .wd-item-top i{font-size:var(--fs-body);color:var(--tm);}
-.wd-num{font-size:var(--fs-sm);font-weight:700;color:var(--tp);font-family:'DM Sans',sans-serif;}
-.wd-delta{font-size:11.5px;font-weight:600;display:flex;align-items:center;gap:1px;font-family:'DM Sans',sans-serif;}
+.wd-num{font-size:var(--fs-body);font-weight:400;color:var(--ts);font-family:'DM Sans',sans-serif;}
+.wd-delta{font-size:11.5px;font-weight:400;display:flex;align-items:center;gap:1px;font-family:'DM Sans',sans-serif;}
 .wd-delta.up{color:#b4708a;}
 .wd-delta.down{color:#6a95b5;}
 .wd-delta.flat{color:var(--tm);}
@@ -518,11 +518,11 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .mrp-rhythm-bar{display:flex;height:30px;border-radius:9px;overflow:hidden;background:var(--graph-track-color);margin-bottom:12px;}
 .mrp-rhythm-seg{display:flex;align-items:center;justify-content:center;}
 .mrp-rhythm-seg i{font-size:var(--fs-sm);color:#fff;}
-.mrp-rhythm-list{display:flex;flex-direction:column;gap:6px;}
-.mrp-rhythm-item{display:flex;align-items:center;gap:8px;font-size:var(--fs-sm);color:var(--ts);}
-.mrp-rhythm-item .dot{width:8px;height:8px;border-radius:2px;flex-shrink:0;}
-.mrp-rhythm-item .lbl{width:34px;flex-shrink:0;color:var(--tp);font-weight:500;}
-.mrp-rhythm-item .val{color:var(--ts);}
+.mrp-rhythm-list{display:flex;flex-direction:column;gap:9px;}
+.mrp-rhythm-item{display:flex;align-items:flex-start;gap:8px;font-size:var(--fs-sm);color:var(--ts);}
+.mrp-rhythm-item .dot{width:8px;height:8px;border-radius:2px;flex-shrink:0;margin-top:4px;}
+.mrp-rhythm-item .lbl{width:34px;flex-shrink:0;color:var(--tp);font-weight:500;padding-top:1px;}
+.mrp-rhythm-item .val{color:var(--ts);line-height:1.55;}
 
 /* 이 달의 궤적 — 주차별 스파크라인(부드러운 곡선) */
 .mrp-traj-row{display:flex;align-items:center;gap:16px;margin-bottom:16px;}
@@ -541,15 +541,38 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .mrp-wave-tail-item .n{font-size:var(--fs-lg);font-weight:700;color:var(--tp);}
 .mrp-wave-tail-item .l{font-size:11px;color:var(--ts);margin-top:2px;}
 
-/* 이 달의 마디 — 리듬 카드 하단에 이어붙는 변화 지점 타임라인(계산 마디 + AI 마디 공용) */
-.mrp-milestone-list{display:flex;flex-direction:column;gap:10px;padding-top:14px;border-top:1px dashed rgba(var(--divider-rgb),0.25);}
-.mrp-milestone{display:flex;gap:12px;align-items:flex-start;}
-.mrp-milestone-dot{width:8px;height:8px;border-radius:50%;margin-top:6px;flex-shrink:0;}
-.mrp-milestone-txt{font-size:var(--fs-sm);color:var(--tp);line-height:1.55;}
-.mrp-milestone-txt b{font-weight:600;}
+/* 이 달의 수면 카드 */
+.mrsl-top{display:grid;grid-template-columns:1fr 1fr;gap:18px;padding-bottom:16px;}
+.mrsl-top-item{display:flex;flex-direction:column;align-items:center;}
+.mrsl-top-label{font-size:var(--fs-sm);color:var(--ts);margin-bottom:10px;font-weight:600;}
+.mrsl-donut-wrap{display:flex;align-items:center;gap:16px;}
+.mrsl-donut-box{position:relative;width:96px;height:96px;flex-shrink:0;}
+.mrsl-donut-box svg{width:100%;height:100%;transform:rotate(-90deg);}
+.mrsl-donut-center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;}
+.mrsl-donut-center i{font-size:26px;}
+.mrsl-legend{display:flex;flex-direction:column;gap:8px;}
+.mrsl-legend-row{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ts);white-space:nowrap;}
+.mrsl-legend-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.mrsl-legend-val{color:var(--tp);font-weight:700;font-family:'DM Sans',sans-serif;}
+.mrsl-cmp{display:flex;flex-direction:column;gap:9px;justify-content:center;}
+.mrsl-cmp-row{display:flex;align-items:center;gap:8px;}
+.mrsl-cmp-label{font-size:12.5px;color:var(--ts);width:64px;flex-shrink:0;}
+.mrsl-cmp-val{font-size:13.5px;font-weight:700;font-family:'DM Sans',sans-serif;display:flex;align-items:center;gap:2px;}
+.mrsl-cmp-val.up{color:#5a9a7a;}
+.mrsl-cmp-val.down{color:#c0788a;}
+.mrsl-cmp-val.flat{color:var(--tm);}
+.mrsl-stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding-top:16px;border-top:1px solid rgba(var(--divider-rgb),0.25);}
+.mrsl-stat{text-align:center;}
+.mrsl-stat .v{font-size:var(--fs-xl);font-weight:700;color:var(--tp);font-family:'DM Sans',sans-serif;}
+.mrsl-stat .l{font-size:var(--fs-sm);color:var(--ts);margin-top:4px;}
+.mrsl-ai-text{font-size:var(--fs-sm);color:var(--tp);line-height:1.65;padding-top:14px;margin-top:14px;border-top:1px dashed rgba(var(--divider-rgb),0.25);font-family:'HakgyoansimBareonbatangR',serif;}
+
+/* 이 달의 리듬 분석 — 리듬 카드 하단에 이어붙는 AI 해석 텍스트(기존 마디 리스트에서 텍스트형으로 전환) */
+.mrp-rhythm-ai-text{font-size:var(--fs-sm);color:var(--tp);line-height:1.65;padding-top:14px;border-top:1px dashed rgba(var(--divider-rgb),0.25);font-family:'HakgyoansimBareonbatangR',serif;}
 
 .mrp-week-block{padding:10px 0;border-bottom:1px dashed rgba(var(--divider-rgb),0.25);}
 .mrp-week-block:last-child{border-bottom:none;padding-bottom:0;}
+#mrp-missions{max-height:300px;overflow-y:auto;}
 .mrp-week-head{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
 .mrp-week-head .wk{font-size:var(--fs-sm);font-weight:600;color:var(--tp);}
 .mrp-week-ongoing{font-size:10.5px;color:var(--pal-rose-border);background:rgba(230,150,150,0.18);border-radius:6px;padding:1px 7px;}
@@ -563,6 +586,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .mrp-content-line .st{color:var(--tm);font-size:var(--fs-sm);flex-shrink:0;margin-left:8px;}
 /* 콘텐츠 카드만 다른 카드들과 톤을 다르게 — 통계가 아니라 감상 기록이라는 인상 */
 .mrp-contents-card{background:linear-gradient(135deg,#fdeee8,#fdf3e2)!important;border-color:rgba(230,200,180,0.4)!important;}
+#mrp-contents{max-height:300px;overflow-y:auto;}
 
 /* 발행된 리포트 — 카드 그리드 대신 칩으로 축소, 맨 아래 보조 인덱스 역할 */
 .mrp-links-wrap{margin-top:14px;}
@@ -736,7 +760,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
       </div>
       <div class="card">
         <div class="card-lbl"><i class="ti ti-key" aria-hidden="true"></i>Claude API 키</div>
-        <div class="api-key-desc">월간리포트의 "이 달의 마디" 분석에 사용돼요. 브라우저에만 저장되고 서버로 전송되지 않아요.</div>
+        <div class="api-key-desc">월간리포트의 "이 달의 리듬", "이 달의 수면" 분석에 사용돼요. 브라우저에만 저장되고 서버로 전송되지 않아요.</div>
         <div class="api-key-row">
           <input type="password" id="claude-api-key-input" class="api-key-input" placeholder="sk-ant-..." autocomplete="off">
           <div class="fs-btn" onclick="saveClaudeApiKey()"><i class="ti ti-check" aria-hidden="true"></i></div>

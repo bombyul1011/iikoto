@@ -1811,12 +1811,12 @@ async function loadMonthlyReportPage(){
   const prevStartDk=`${prevMk}-01`,prevEndDk=`${prevMk}-${pad(prevDim)}`;
   const prevWeeksInMonth=getReportWeeksOfMonth(py,pmo);
 
-  const [monthlyRows,goalRows,todos,memosRows,sleepRows,habits,habitChecksAll,rblocks,prevRblocks,contents,prevContents,wcRowsList,milestoneRows,prevWcRowsList,prevTodos,prevSleepRows,prevHabitChecksAll,trajectoryRows]=await Promise.all([
+  const [monthlyRows,goalRows,todos,memosRows,sleepRows,habits,habitChecksAll,rblocks,prevRblocks,contents,prevContents,wcRowsList,milestoneRows,prevWcRowsList,prevTodos,prevSleepRows,prevHabitChecksAll,trajectoryRows,sleepReportCacheRows,weeklySummaryRowsList,weeklyMemoRowsList]=await Promise.all([
     supaFetch(`ai_cache?cache_key=eq.monthly_report_${mk}&select=content`),
     supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('mgoal:'+mk)}`),
     supaFetch(`todos?date_key=gte.${startDk}&date_key=lte.${endDk}&select=done,date_key`),
     supaFetch(`memos?date_key=gte.${startDk}&date_key=lte.${endDk}&select=id`),
-    supaFetch(`sleep?date_key=gte.${startDk}&date_key=lte.${endDk}&select=sleep_time,wake_time,date_key`),
+    supaFetch(`sleep?date_key=gte.${startDk}&date_key=lte.${endDk}&select=score,sleep_time,wake_time,date_key`),
     supaFetch(`habits?order=sort_order.asc`),
     supaFetch(`habit_checks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
     supaFetch(`rhythm_blocks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
@@ -1827,22 +1827,60 @@ async function loadMonthlyReportPage(){
     supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent('monthly_milestones_'+mk)}&select=content`),
     Promise.all(prevWeeksInMonth.map(wk=>supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wchallenge_week:'+wk)}`))),
     supaFetch(`todos?date_key=gte.${prevStartDk}&date_key=lte.${prevEndDk}&select=done,date_key`),
-    supaFetch(`sleep?date_key=gte.${prevStartDk}&date_key=lte.${prevEndDk}&select=sleep_time,wake_time,date_key`),
+    supaFetch(`sleep?date_key=gte.${prevStartDk}&date_key=lte.${prevEndDk}&select=score,sleep_time,wake_time,date_key`),
     supaFetch(`habit_checks?date_key=gte.${prevStartDk}&date_key=lte.${prevEndDk}`),
-    supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent('monthly_trajectory_'+mk)}&select=content`)
+    supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent('monthly_trajectory_'+mk)}&select=content`),
+    supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent('monthly_sleep_'+mk)}&select=content`),
+    // 세 프롬프트(궤적/리듬/수면)가 공통 참고자료로 쓸 그 달 주간종합/주간메모 리포트 — 조회는 한 번만, 정제해서 각 함수에 전달
+    Promise.all(weeksInMonth.map(wk=>supaFetch(`ai_cache?cache_key=eq.weekly_summary_${_mondayToSundayDk(wk)}&select=content`))),
+    Promise.all(weeksInMonth.map(wk=>supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent('weekly_memo_report_week:'+wk)}&select=content`)))
   ]);
 
+  // 참고자료 정제: 저장된 HTML 카드에서 태그만 제거한 순수 텍스트로 — 세 프롬프트 공통 재료
+  const monthlyRefContext=_mrpBuildRefContext(weeklySummaryRowsList,weeklyMemoRowsList);
+
   renderMrpHero(monthlyRows&&monthlyRows[0]);
-  renderMrpGoalsAndStats(goalRows&&goalRows[0],todos||[],memosRows||[],sleepRows||[],habits||[],habitChecksAll||[],weeksInMonth.length*7||dim);
+  renderMrpGoalsAndStats(goalRows&&goalRows[0],todos||[],memosRows||[],sleepRows||[],habits||[],habitChecksAll||[],weeksInMonth.length*7||dim,prevTodos||[],prevHabitChecksAll||[],prevSleepRows||[]);
   const heroCommentText=_mrpExtractHeroComment(monthlyRows&&monthlyRows[0]);
   renderMrpTrajectory(mk,todos||[],sleepRows||[],habits||[],habitChecksAll||[],weeksInMonth,
     {todos:prevTodos||[],sleepRows:prevSleepRows||[],habitChecks:prevHabitChecksAll||[],weeksInMonth:prevWeeksInMonth,habits:habits||[]},
-    trajectoryRows&&trajectoryRows[0],heroCommentText);
+    trajectoryRows&&trajectoryRows[0],heroCommentText,monthlyRefContext);
+  renderMrpSleep(mk,sleepRows||[],prevSleepRows||[],sleepReportCacheRows&&sleepReportCacheRows[0],monthlyRefContext);
   renderMrpRhythm(rblocks||[],prevRblocks||[]);
-  renderMrpMilestones(mk,rblocks||[],prevRblocks||[],weeksInMonth,wcRowsList||[],milestoneRows&&milestoneRows[0],prevWcRowsList||[],heroCommentText);
+  renderMrpMilestones(mk,rblocks||[],prevRblocks||[],weeksInMonth,wcRowsList||[],milestoneRows&&milestoneRows[0],prevWcRowsList||[],heroCommentText,monthlyRefContext);
   renderMrpWeeklyMissions(weeksInMonth,wcRowsList||[]);
   renderMrpContents(contents||[],startDk,endDk);
   renderMrpReportLinks(weeksInMonth,mk);
+}
+
+// 세 프롬프트(궤적/리듬/수면) 공통 규칙 — 숫자 재진술 금지, 부정적 어휘 금지, 긍정적·진취적 톤(2026-08-22 확정)
+const MRP_COMMON_RULES=`- 이미 화면에 숫자/그래프로 보이는 수치를 그대로 나열하거나 재진술하지 마세요. 해석과 의미 위주로 서술하세요.
+- 부정적이거나 질책하는 어휘는 쓰지 마세요("부족했다", "못했다", "나빴다" 같은 표현 대신 담백한 사실 서술이나 긍정적 관점으로 풀어주세요).
+- 앞으로 더 나아갈 수 있다는 진취적이고 긍정적인 방향으로 서술하세요.`;
+
+// HTML 카드 문자열에서 태그만 제거해 순수 텍스트로(과도한 공백 정리 포함) — weekly_summary_/weekly_memo_report_ 공용
+function _stripHtmlToText(html){
+  if(!html)return '';
+  return html.replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/\s+/g,' ').trim();
+}
+// 그 달 주차별 weekly_summary_(주간종합)와 weekly_memo_report_week:(주간메모) 캐시를 정제해 하나의 참고 텍스트로 묶음.
+// 궤적/리듬/수면 세 프롬프트가 이 결과를 공통으로 재사용(캐시 조회는 loadMonthlyReportPage에서 1회만 수행).
+function _mrpBuildRefContext(weeklySummaryRowsList,weeklyMemoRowsList){
+  const summaries=(weeklySummaryRowsList||[]).map((rows,i)=>{
+    const row=rows&&rows[0];
+    if(!row||!row.content)return null;
+    const txt=_stripHtmlToText(row.content);
+    return txt?`${i+1}주차 주간종합: ${txt}`:null;
+  }).filter(Boolean);
+  const memos=(weeklyMemoRowsList||[]).map((rows,i)=>{
+    const row=rows&&rows[0];
+    if(!row||!row.content)return null;
+    const txt=_stripHtmlToText(row.content);
+    return txt?`${i+1}주차 메모요약: ${txt}`:null;
+  }).filter(Boolean);
+  const parts=[...summaries,...memos];
+  if(!parts.length)return '';
+  return `이 달 주차별 참고자료(이미 발행된 주간 리포트들, 맥락 참고용 — 여기 담긴 숫자를 그대로 재진술하지 말 것):\n${parts.join('\n')}`;
 }
 
 // "이 달 한눈에"(monthly_report_ 캐시)에서 순수 코멘트 텍스트만 뽑아옴 — 마디/궤적 AI가 맥락 참고용으로 사용
@@ -1866,6 +1904,7 @@ function renderMrpHero(row){
         <div class="mrp-card"><div class="mrp-card-title"><i class="ti ti-chart-donut" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>이 달의 숫자</div><div id="mrp-stats"></div></div>
       </div>
       <div class="mrp-card" style="margin-bottom:14px;"><div class="mrp-card-title"><i class="ti ti-chart-line" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>이 달의 궤적</div><div id="mrp-traj"></div></div>
+      <div class="mrp-card" style="margin-bottom:14px;"><div class="mrp-card-title"><i class="ti ti-moon-stars" style="color:rgba(150,190,215,1);" aria-hidden="true"></i>이 달의 수면</div><div id="mrp-sleep"></div></div>
       <div class="mrp-card" style="margin-bottom:14px;">
         <div class="mrp-card-title"><i class="ti ti-rainbow" style="color:rgba(var(--pal-orange-rgb),1);" aria-hidden="true"></i>이 달의 리듬</div>
         <div id="mrp-rhythm"></div>
@@ -1879,6 +1918,15 @@ function renderMrpHero(row){
     `;
   }
   const heroEl=document.getElementById('mrp-hero-slot');
+  const now=new Date();
+  const lastDateOfThisMonth=new Date(_mrpDate.getFullYear(),_mrpDate.getMonth()+1,0).getDate();
+  const isLastDayEvening=now.getDate()===lastDateOfThisMonth&&_mrpDate.getMonth()===now.getMonth()&&_mrpDate.getFullYear()===now.getFullYear()&&(now.getHours()>=19||now.getHours()<6);
+  const isThisMonth=(_mrpDate.getFullYear()===now.getFullYear()&&_mrpDate.getMonth()===now.getMonth());
+  const isOngoingMonth=isThisMonth&&!isLastDayEvening;
+  if(isOngoingMonth){
+    heroEl.innerHTML=`<div class="mrp-hero-eyebrow"><i class="ti ti-sparkles" aria-hidden="true"></i>이 달 한눈에</div><div class="mrp-hero-comment" style="opacity:.6;">이 달이 끝나면 정리해드려요</div>`;
+    return;
+  }
   if(!row||!row.content){
     heroEl.innerHTML=`<div class="mrp-hero-eyebrow"><i class="ti ti-sparkles" aria-hidden="true"></i>이 달 한눈에</div><div class="mrp-hero-comment" style="opacity:.6;">이 달의 종합 리포트가 아직 발행되지 않았어요</div>`;
     return;
@@ -1894,7 +1942,7 @@ function renderMrpHero(row){
 }
 
 // 목표(왼쪽)와 숫자(오른쪽)를 반반 배치 — 목표만 두면 배너가 비어 보여 숫자 카드와 짝지음
-function renderMrpGoalsAndStats(goalRow,todos,memos,sleepRows,habits,habitChecks,habitDenominator){
+function renderMrpGoalsAndStats(goalRow,todos,memos,sleepRows,habits,habitChecks,habitDenominator,prevTodos,prevHabitChecks,prevSleepRows){
   const goalsEl=document.getElementById('mrp-goals');
   // mgoal: 캐시는 wchallenge_(주간챌린지)와 저장 구조가 다름 — lines가 {text,days}[] 객체 배열이 아니라 순수 문자열 배열(string[]).
   const lines=(goalRow&&Array.isArray(goalRow.lines))?goalRow.lines.filter(l=>l&&typeof l==='string'&&l.trim()):[];
@@ -1904,11 +1952,34 @@ function renderMrpGoalsAndStats(goalRow,todos,memos,sleepRows,habits,habitChecks
   const doneTodos=todos.filter(t=>t.done).length;
   const habitPct=habits.length?Math.round(habitChecks.length/(habits.length*habitDenominator)*100):0;
   const avgSleep=avgSleepHoursFromRows(sleepRows);
+
+  // 전월 대비(주간탭 wd-item과 동일한 아이콘+숫자+증감 2줄 스타일)
+  const prevDoneTodos=(prevTodos||[]).filter(t=>t.done).length;
+  const prevHabitPct=habits.length?Math.round((prevHabitChecks||[]).length/(habits.length*habitDenominator)*100):0;
+  const prevAvgSleep=parseFloat(avgSleepHoursFromRows(prevSleepRows))||0;
+  const curAvgSleepNum=parseFloat(avgSleep)||0;
+  const deltaItems=[
+    {icon:'ti-checkbox',cur:doneTodos,prev:prevDoneTodos,fmt:v=>v+'개'},
+    {icon:'ti-chart-donut',cur:habitPct,prev:prevHabitPct,fmt:v=>v+'%'},
+    {icon:'ti-moon-stars',cur:curAvgSleepNum,prev:prevAvgSleep,fmt:v=>v+'h'}
+  ];
+  const deltaHtml=deltaItems.map(it=>{
+    const diff=Math.round((it.cur-it.prev)*10)/10;
+    const dir=diff>0?'up':(diff<0?'down':'flat');
+    const arrow=dir==='up'?'ti-arrow-up':(dir==='down'?'ti-arrow-down':'ti-minus');
+    const sign=diff>0?'+':'';
+    return `<div class="wd-item">
+      <div class="wd-item-top"><i class="ti ${it.icon}" aria-hidden="true"></i></div>
+      <div class="wd-delta ${dir}"><i class="ti ${arrow}" style="font-size:10px;"></i>${sign}${it.fmt(diff)}</div>
+    </div>`;
+  }).join('');
+
   statsEl.innerHTML=`<div class="mrp-stat-row">
     <div class="mrp-stat"><div class="v">${doneTodos}개</div><div class="l">투두 완료</div></div>
     <div class="mrp-stat"><div class="v">${habitPct}%</div><div class="l">습관 달성률</div></div>
     <div class="mrp-stat"><div class="v">${avgSleep?avgSleep+'h':'-'}</div><div class="l">평균 수면</div></div>
-  </div>`;
+  </div>
+  <div class="stat-bar-wrap mrp-stats-delta">${deltaHtml}</div>`;
 }
 
 // 이 달의 궤적 — 주차별 값을 부드러운 곡선(spline)으로 이어 "월 안에서의 오르내림"을 보여줌.
@@ -1972,7 +2043,7 @@ function _mrpWaveSvg(rows,weekCount){
     `<div class="mrp-wave-labels">${weekLabels}</div>`+
     `<div class="mrp-wave-tail">${tailVals}</div>`;
 }
-async function renderMrpTrajectory(mk,todos,sleepRows,habits,habitChecks,weeksInMonth,prevData,cacheRow,heroComment){
+async function renderMrpTrajectory(mk,todos,sleepRows,habits,habitChecks,weeksInMonth,prevData,cacheRow,heroComment,refContext){
   const el=document.getElementById('mrp-traj');
   if(!weeksInMonth.length){el.innerHTML='<div class="empty-msg">이 달엔 표시할 주차가 없어요</div>';return;}
 
@@ -2046,17 +2117,18 @@ async function renderMrpTrajectory(mk,todos,sleepRows,habits,habitChecks,weeksIn
   };
   const curDirText=`이 달 방향성: 습관율 ${dirOfCur(byWeekHabit)}, 평균수면 ${dirOfCur(byWeekSleep)}, 투두완료율 ${dirOfCur(byWeekTodo)}`;
   const heroText=heroComment?`이 달 종합 리포트(참고용 맥락, 이미 발행된 코멘트):\n${heroComment}`:'';
-  const dataContext=[curDirText,prevDirText,heroText].filter(Boolean).join('\n\n');
+  const dataContext=[curDirText,prevDirText,heroText,refContext].filter(Boolean).join('\n\n');
 
   const sys=`당신은 한 달의 생활 패턴을 해석해주는 담담한 회고 비서예요.
-아래는 이 달의 습관율, 평균수면, 투두완료율이 주차를 거치며 각각 상승/하락/유지 중 어느 방향으로 움직였는지를 나타낸 정보예요(구체적인 수치는 주어지지 않아요). 함께 주어졌다면 이 달의 종합 리포트(이미 발행된 코멘트)도 참고하세요 — 그 안에 담긴 이 달의 사건이나 맥락과 어긋나지 않게, 자연스럽게 이어지도록 서술하세요.
+아래는 이 달의 습관율, 평균수면, 투두완료율이 주차를 거치며 각각 상승/하락/유지 중 어느 방향으로 움직였는지를 나타낸 정보예요(구체적인 수치는 주어지지 않아요). 함께 주어졌다면 이 달의 종합 리포트(이미 발행된 코멘트)와 주차별 참고자료(주간종합/주간메모)도 참고하세요 — 그 안에 담긴 이 달의 사건이나 맥락과 어긋나지 않게, 자연스럽게 이어지도록 서술하세요.
 이 세 지표가 서로 어떤 관계로 움직였는지 — 무엇을 더 챙기는 대신 무엇을 내줬는지, 어떤 성향의 한 달이었는지 — 짧은 이야기로 풀어주세요.
 - 3~4문장, 전체 120자 내외.
 - 절대 숫자나 퍼센트, 시간 같은 구체적인 수치를 언급하지 마세요. 그래프에 이미 나와 있으니, 당신은 그 움직임이 "무엇을 의미하는지"만 해석하세요.
 - 원인 추정, 지표 간 트레이드오프, 이 달 전체의 성향 위주로 서술하세요.
-- 종합 리포트 내용을 그대로 반복하거나 요약하지 말고, 거기 없는 지표 간의 관계만 새롭게 짚으세요.
+- 종합 리포트나 참고자료 내용을 그대로 반복하거나 요약하지 말고, 거기 없는 지표 간의 관계만 새롭게 짚으세요.
 - 담담하고 자연스러운 ~어요/~했어요체.
 - 전월 방향성 정보가 함께 주어졌다면, 그 변화도 수치 없이 방향성으로만 마지막에 한 문장 정도 자연스럽게 녹이세요. 주어지지 않았다면 언급하지 마세요.
+${MRP_COMMON_RULES}
 - 반드시 JSON 형식으로만 응답하세요: {"text":"..."}
 - 다른 설명이나 마크다운 없이 순수 JSON만 출력하세요.`;
   const reply=await callClaudeFromTablet(sys,dataContext,400);
@@ -2071,10 +2143,169 @@ async function renderMrpTrajectory(mk,todos,sleepRows,habits,habitChecks,weeksIn
   }catch(e){/* 파싱 실패 시 조용히 빈 채로 둠 */}
 }
 
+// 이 달의 수면 — 상단(분포 도넛+지난달 대비), 중단(숫자 요약), 하단(AI 분석: 취침시간대별 컨디션 포함).
+// 도넛 중앙은 이 달 평균 컨디션에 대응하는 표정 아이콘(getSleepScoreLevel 재사용).
+async function renderMrpSleep(mk,sleepRows,prevSleepRows,cacheRow,refContext){
+  const el=document.getElementById('mrp-sleep');
+  const validCur=(sleepRows||[]).filter(r=>r.sleep_time&&r.wake_time);
+  const validPrev=(prevSleepRows||[]).filter(r=>r.sleep_time&&r.wake_time);
+
+  if(!validCur.length){el.innerHTML='<div class="empty-msg">이 달엔 기록된 수면이 없어요</div>';return;}
+
+  const durMinOf=(r)=>{
+    const sv=r.sleep_time.split(':').map(Number),wv=r.wake_time.split(':').map(Number);
+    let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;
+    return m;
+  };
+
+  // 분포 4구간
+  const buckets=[
+    {key:'u5',label:'5시간 미만',min:0,max:300,color:'rgba(255,205,150,0.85)'},
+    {key:'5to6',label:'5~6시간',min:300,max:360,color:'rgba(190,225,205,0.85)'},
+    {key:'6to7',label:'6~7시간',min:360,max:420,color:'rgba(150,190,215,0.85)'},
+    {key:'o7',label:'7시간 이상',min:420,max:100000,color:'rgba(216,190,225,0.85)'}
+  ];
+  const counts=buckets.map(b=>validCur.filter(r=>{const m=durMinOf(r);return m>=b.min&&m<b.max;}).length);
+  const total=validCur.length;
+  let cum=0,donutSegs='';
+  const circ=2*Math.PI*42;
+  const order=[3,2,1,0];
+  order.forEach(i=>{
+    const b=buckets[i];const c=counts[i];
+    const len=total>0?(c/total*circ):0;
+    donutSegs+=`<circle cx="50" cy="50" r="42" fill="none" stroke="${b.color}" stroke-width="13" stroke-dasharray="${len.toFixed(2)} ${(circ-len).toFixed(2)}" stroke-dashoffset="${-cum.toFixed(2)}" stroke-linecap="round"/>`;
+    cum+=len;
+  });
+
+  const scoredCur=validCur.filter(r=>r.score!=null&&!isNaN(r.score));
+  const avgScore=scoredCur.length?Math.round(scoredCur.reduce((a,b)=>a+b.score,0)/scoredCur.length):null;
+  const scoreLevel=avgScore!=null?getSleepScoreLevel(avgScore):null;
+
+  const avgMin=Math.round(validCur.reduce((a,r)=>a+durMinOf(r),0)/validCur.length);
+
+  const sleepMinArr=validCur.map(r=>toDawnAdjustedMin(_dawnTimeToMin(r.sleep_time),22*60));
+  const wakeMinArr=validCur.map(r=>_dawnTimeToMin(r.wake_time));
+  const reg=calcSleepRegularity(sleepMinArr,wakeMinArr);
+
+  let cmpHtml='<div class="empty-msg" style="text-align:left;">전월 기록이 적어 비교를 생략했어요</div>';
+  if(validPrev.length>=7){
+    const prevAvgMin=Math.round(validPrev.reduce((a,r)=>a+durMinOf(r),0)/validPrev.length);
+    const prevSleepMinArr=validPrev.map(r=>toDawnAdjustedMin(_dawnTimeToMin(r.sleep_time),22*60));
+    const prevWakeMinArr=validPrev.map(r=>_dawnTimeToMin(r.wake_time));
+    const prevReg=calcSleepRegularity(prevSleepMinArr,prevWakeMinArr);
+    const prevScored=validPrev.filter(r=>r.score!=null&&!isNaN(r.score));
+    const prevAvgScore=prevScored.length?Math.round(prevScored.reduce((a,b)=>a+b.score,0)/prevScored.length):null;
+
+    const mkCmpRow=(label,curV,prevV,unit)=>{
+      if(curV==null||prevV==null)return `<div class="mrsl-cmp-row"><span class="mrsl-cmp-label">${label}</span><span class="mrsl-cmp-val flat">데이터 부족</span></div>`;
+      const diff=curV-prevV;
+      const dir=diff>0?'up':(diff<0?'down':'flat');
+      const arrow=dir==='up'?'ti-arrow-up':(dir==='down'?'ti-arrow-down':'ti-minus');
+      const sign=diff>0?'+':'';
+      return `<div class="mrsl-cmp-row"><span class="mrsl-cmp-label">${label}</span><span class="mrsl-cmp-val ${dir}"><i class="ti ${arrow}" style="font-size:11px;"></i>${sign}${diff}${unit}</span></div>`;
+    };
+    cmpHtml=mkCmpRow('수면시간',avgMin,prevAvgMin,'분')
+      +mkCmpRow('규칙성',reg?reg.score:null,prevReg?prevReg.score:null,'점')
+      +mkCmpRow('컨디션',avgScore,prevAvgScore,'점');
+  }
+
+  el.innerHTML=`<div class="mrsl-top">
+    <div class="mrsl-top-item">
+      <div class="mrsl-top-label">수면시간 분포</div>
+      <div class="mrsl-donut-wrap">
+        <div class="mrsl-donut-box">
+          <svg viewBox="0 0 100 100">${donutSegs}</svg>
+          <div class="mrsl-donut-center">${scoreLevel?`<i class="ti ${scoreLevel.icon}" style="color:rgba(150,190,215,0.9);" aria-hidden="true"></i>`:''}</div>
+        </div>
+        <div class="mrsl-legend">
+          <div class="mrsl-legend-row"><span class="mrsl-legend-dot" style="background:${buckets[3].color};"></span>7시간 이상 <span class="mrsl-legend-val">${counts[3]}일</span></div>
+          <div class="mrsl-legend-row"><span class="mrsl-legend-dot" style="background:${buckets[2].color};"></span>6~7시간 <span class="mrsl-legend-val">${counts[2]}일</span></div>
+          <div class="mrsl-legend-row"><span class="mrsl-legend-dot" style="background:${buckets[1].color};"></span>5~6시간 <span class="mrsl-legend-val">${counts[1]}일</span></div>
+          <div class="mrsl-legend-row"><span class="mrsl-legend-dot" style="background:${buckets[0].color};"></span>5시간 미만 <span class="mrsl-legend-val">${counts[0]}일</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="mrsl-top-item">
+      <div class="mrsl-top-label">지난달 대비</div>
+      <div class="mrsl-cmp">${cmpHtml}</div>
+    </div>
+  </div>
+  <div class="mrsl-stat-row">
+    <div class="mrsl-stat"><div class="v">${Math.floor(avgMin/60)}.${Math.round((avgMin%60)/60*10)}h</div><div class="l">평균 수면</div></div>
+    <div class="mrsl-stat"><div class="v">${avgScore!=null?avgScore+'점':'-'}</div><div class="l">평균 컨디션</div></div>
+    <div class="mrsl-stat"><div class="v">${reg?reg.score+'점':'-'}</div><div class="l">규칙성</div></div>
+  </div>
+  <div id="mrp-sleep-ai" style="margin-top:0;"></div>`;
+
+  const aiEl=document.getElementById('mrp-sleep-ai');
+  if(cacheRow&&cacheRow.content){
+    aiEl.innerHTML=`<div class="mrsl-ai-text">${escapeHtml(cacheRow.content)}</div>`;
+    return;
+  }
+  const apiKey=getClaudeKey();
+  if(!apiKey){
+    aiEl.innerHTML=`<div class="empty-msg" style="text-align:left;padding:4px 0;">이 달의 수면 분석은 설정 탭에서 Claude API 키를 추가하면 볼 수 있어요</div>`;
+    return;
+  }
+  if(scoredCur.length<5){
+    aiEl.innerHTML=`<div class="empty-msg" style="text-align:left;padding:4px 0;">컨디션 기록이 더 쌓이면 분석을 볼 수 있어요</div>`;
+    return;
+  }
+
+  // 취침시간대별 평균 컨디션(00시 이전 / 00~01시 / 01시 이후) — 각 구간 2건 이상일 때만 포함
+  const scoredWithSleep=scoredCur.filter(r=>r.sleep_time);
+  const bandScores={'00시 이전':[],'00~01시':[],'01시 이후':[]};
+  scoredWithSleep.forEach(r=>{
+    const hh=parseInt(r.sleep_time.split(':')[0],10);
+    let band;
+    if(hh>=1&&hh<4)band='01시 이후';
+    else if(hh===0)band='00~01시';
+    else band='00시 이전'; // 22,23시대(자정 전)
+    bandScores[band].push(r.score);
+  });
+  const bandText=Object.keys(bandScores).filter(k=>bandScores[k].length>=2).map(k=>{
+    const avg=Math.round(bandScores[k].reduce((a,b)=>a+b,0)/bandScores[k].length);
+    return `${k} 취침 평균컨디션 ${avg}점(${bandScores[k].length}일)`;
+  });
+
+  const dataContext=[
+    `이 달 평균 수면시간: ${Math.floor(avgMin/60)}시간 ${avgMin%60}분(목표 7시간30분 대비 ${avgMin-SLEEP_GOAL_MIN>=0?'+':''}${avgMin-SLEEP_GOAL_MIN}분)`,
+    avgScore!=null?`이 달 평균 수면 컨디션: ${avgScore}점`:'',
+    reg?`이 달 수면 규칙성: ${reg.score}점(${reg.label})`:'',
+    bandText.length?`취침시간대별 평균 컨디션(참고, 표본이 적을 수 있음):\n${bandText.join('\n')}`:'',
+    refContext
+  ].filter(Boolean).join('\n');
+
+  const sys=`당신은 한 달의 수면을 담담하게 짚어주는 회고 비서예요.
+아래는 이 달의 평균 수면시간(목표 대비), 평균 컨디션, 규칙성 점수, 있다면 취침시간대별 평균 컨디션 정보, 그리고 이 달 주차별 참고자료(주간종합/주간메모 리포트)예요.
+이 데이터를 바탕으로 이 달의 수면이 어떤 흐름이었는지, 특히 몇 시간을 잤는지보다 언제 잠들었는지가 컨디션에 어떻게 작용했는지를 중심으로 해석해주세요.
+참고자료가 함께 주어졌다면, 그 안에 담긴 이 달의 실제 생활(일과 사건, 감정선)과 수면 패턴을 연결지어 — 수면이 그 달의 생활에 어떤 영향을 미쳤을지, 또는 그 달의 생활이 수면에 어떻게 반영됐는지 — 자연스럽게 짚어주세요. 참고자료에 근거가 없는 연결은 추측해서 만들지 마세요.
+- 4~5문장, 전체 180자 내외.
+- 주어진 수치는 참고만 하고, 그대로 나열하지 마세요. 각주가 아니라 해석과 의미 위주로 서술하세요.
+- 취침시간대별 컨디션 정보가 함께 주어졌다면, 이걸 핵심 소재로 삼아 "몇 시에 잠들었을 때 컨디션이 더 좋았는지"를 자연스럽게 짚어주세요. 다만 이건 상관관계일 뿐 인과관계로 단정하지 말고, "~한 경향이 있었다" 정도로 담백하게 표현하세요.
+- 취침시간대별 정보가 주어지지 않았다면 이 부분은 언급하지 말고, 수면시간/컨디션/규칙성 중심으로만 해석하세요.
+- 담담하고 자연스러운 ~어요/~했어요체.
+${MRP_COMMON_RULES}
+- 반드시 JSON 형식으로만 응답하세요: {"text":"..."}
+- 다른 설명이나 마크다운 없이 순수 JSON만 출력하세요.`;
+
+  aiEl.innerHTML=`<div class="empty-msg" style="text-align:left;padding:4px 0;">수면 분석을 불러오는 중...</div>`;
+  const reply=await callClaudeFromTablet(sys,dataContext,400);
+  if(!reply){aiEl.innerHTML='';return;}
+  try{
+    const clean=reply.replace(/```json|```/g,'').trim();
+    const parsed=JSON.parse(clean);
+    if(parsed&&parsed.text){
+      await supaUpsertAiCache('monthly_sleep_'+mk,parsed.text);
+      aiEl.innerHTML=`<div class="mrsl-ai-text">${escapeHtml(parsed.text)}</div>`;
+    }else{aiEl.innerHTML='';}
+  }catch(e){aiEl.innerHTML='';}
+}
+
 function renderMrpRhythm(rblocks,prevRblocks){
   const el=document.getElementById('mrp-rhythm');
   const durByCat=(blocks)=>{
-    const d={};let total=0;
+    const d={};let total=0;const dayCount={};const daysSeen={};
     blocks.forEach(b=>{
       if(!b.start_time||!b.end_time)return;
       const s=_paceParseHM(b.start_time),e=_paceParseHM(b.end_time);
@@ -2082,8 +2313,12 @@ function renderMrpRhythm(rblocks,prevRblocks){
       let dur=e-s;if(dur<0)dur+=1440;
       if(dur<=0)return;
       d[b.cat]=(d[b.cat]||0)+dur;total+=dur;
+      // 본앱 월간리포트와 동일 기준: 일평균의 분모는 "그 카테고리가 실제로 기록된 날짜 수"(전체 월 일수 아님)
+      daysSeen[b.cat]=daysSeen[b.cat]||new Set();
+      daysSeen[b.cat].add(b.date_key);
     });
-    return {d,total};
+    Object.keys(daysSeen).forEach(k=>{dayCount[k]=daysSeen[k].size;});
+    return {d,total,dayCount};
   };
   const cur=durByCat(rblocks);
   const prev=durByCat(prevRblocks);
@@ -2102,124 +2337,111 @@ function renderMrpRhythm(rblocks,prevRblocks){
   });
   barHtml+=`</div>`;
 
-  // 전월 대비 60분 이상 차이나는 항목만 "누계·전월대비" 형태로 리스트업(본앱 rhythmCompare 임계값 규칙 준용)
+  // 누계와 일평균(본앱 기준: 실제 기록일수로 나눔)을 두 줄로 분리 — 한 줄로 길게 이어지던 것을 공간 절약을 위해 개행
   const listHtml=`<div class="mrp-rhythm-list">`+sorted.map(k=>{
     const c=RHYTHM_CATS[k];
     const diff=cur.d[k]-(prev.d[k]||0);
     const diffTxt=(showCompare&&Math.abs(diff)>=60)?`<span style="color:${diff>0?'var(--pal-rose-border)':'var(--pal-sky-border)'};">${diff>0?'+':'−'}${_fmtDur(Math.abs(diff))}</span>`:'';
-    return `<div class="mrp-rhythm-item"><span class="dot" style="background:${c.color};"></span><span class="lbl">${c.label}</span><span class="val">누계 ${_fmtDur(cur.d[k])}${diffTxt?' · 전월대비 '+diffTxt:''}</span></div>`;
+    const avgMin=cur.d[k]/(cur.dayCount[k]||1);
+    return `<div class="mrp-rhythm-item"><span class="dot" style="background:${c.color};"></span><span class="lbl">${c.label}</span><span class="val">누계 ${_fmtDur(cur.d[k])}<br>일평균 ${_fmtDur(avgMin)}${diffTxt?' · 전월대비 '+diffTxt:''}</span></div>`;
   }).join('')+`</div>`;
 
   el.innerHTML=barHtml+listHtml+(showCompare?'':'<div class="empty-msg" style="text-align:left;padding:8px 2px 0;">전월 기록이 적어 전월 대비 비교는 생략했어요</div>');
 }
 
-// 이 달의 마디 — 리듬 변화는 순수 계산, 목표/맥락 변화는 Claude API로 문장화해서 monthly_milestones_ 캐시에 저장.
+// 이 달의 리듬 분석 — 순수하게 카테고리별 시간 배분(리듬)의 이야기만 다룸. 목표/미션 연결이나 "마디(전환점)" 개념은
+// 다루지 않음(이전엔 "마디"로 목표×리듬을 엮었으나, 각 프롬프트가 겹치지 않게 역할을 분리하며 리듬 전용으로 재정의함, 2026-08-22).
 // 캐시가 있으면 그대로 쓰고, 없고 API 키가 있으면 그 자리에서 1회 생성(아카이브 페이지를 실제로 열었을 때만 생성 — 자동 발행 없음).
-async function renderMrpMilestones(mk,rblocks,prevRblocks,weeksInMonth,wcRowsList,cacheRow,prevWcRowsList,heroComment){
+async function renderMrpMilestones(mk,rblocks,prevRblocks,weeksInMonth,wcRowsList,cacheRow,prevWcRowsList,heroComment,refContext){
   const el=document.getElementById('mrp-milestones');
 
-  const renderList=(items)=>{
-    if(!items||!items.length){el.innerHTML='';return;}
-    el.innerHTML=`<div class="mrp-milestone-list">`+items.map(t=>`
-      <div class="mrp-milestone">
-        <div class="mrp-milestone-dot" style="background:rgba(var(--pal-lavender-rgb),0.9);"></div>
-        <div class="mrp-milestone-txt">${escapeHtml(t)}</div>
-      </div>`).join('')+`</div>`;
+  const renderText=(text)=>{
+    if(!text){el.innerHTML='';return;}
+    el.innerHTML=`<div class="mrp-rhythm-ai-text">${escapeHtml(text)}</div>`;
   };
 
   // 캐시가 있으면 그대로 표시
   if(cacheRow&&cacheRow.content){
     try{
       const parsed=JSON.parse(cacheRow.content);
-      renderList(Array.isArray(parsed)?parsed:[]);
-    }catch(e){el.innerHTML='';}
+      renderText(typeof parsed==='string'?parsed:(parsed&&parsed.text)||'');
+    }catch(e){renderText(cacheRow.content);}
     return;
   }
 
   const apiKey=getClaudeKey();
-  if(!apiKey){
-    el.innerHTML=`<div class="empty-msg" style="text-align:left;padding:4px 0;">이 달의 마디 분석은 설정 탭에서 Claude API 키를 추가하면 볼 수 있어요</div>`;
-    return;
-  }
+  if(!apiKey){el.innerHTML='';return;}
 
-  // 리듬 변화(계산값)는 화면에 직접 보여주지 않고, AI가 목표 텍스트와 엮을 재료로만 넘김.
-  // 전월 기록일수가 너무 적으면(예: 사용 시작 초반) 비교 자체가 왜곡되니 재료에서 제외.
+  // 카테고리별 누계 시간(분) 재계산 — renderMrpRhythm과 동일 규칙
   const durByCat=(blocks)=>{
-    const d={};
-    blocks.forEach(b=>{
+    const d={};let total=0;
+    (blocks||[]).forEach(b=>{
       if(!b.start_time||!b.end_time)return;
       const s=_paceParseHM(b.start_time),e=_paceParseHM(b.end_time);
       if(isNaN(s)||isNaN(e))return;
       let dur=e-s;if(dur<0)dur+=1440;
       if(dur<=0)return;
-      d[b.cat]=(d[b.cat]||0)+dur;
+      d[b.cat]=(d[b.cat]||0)+dur;total+=dur;
     });
-    return d;
+    return {d,total};
   };
-  const cur=durByCat(rblocks),prev=durByCat(prevRblocks);
-  const prevRecordedDays=new Set(prevRblocks.map(b=>b.date_key)).size;
-  const canCompareRhythm=prevRecordedDays>=7;
-  const rhythmChanges=canCompareRhythm?Object.keys(cur).map(k=>({k,diff:cur[k]-(prev[k]||0)}))
-    .filter(o=>Math.abs(o.diff)>=60).sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff)).slice(0,4)
-    .map(o=>{
-      const c=RHYTHM_CATS[o.k];if(!c)return null;
-      const dir=o.diff>0?'증가':'감소';
-      return `${c.label} ${dir}(전월 대비 약 ${Math.round(Math.abs(o.diff)/60)}시간)`;
-    }).filter(Boolean):[];
+  const cur=durByCat(rblocks);
+  const prev=durByCat(prevRblocks);
+  if(!cur.total){el.innerHTML='';return;}
 
-  const missionByWeek=weeksInMonth.map((wk,idx)=>{
-    const row=wcRowsList[idx]&&wcRowsList[idx][0];
+  const sorted=Object.keys(cur.d).filter(k=>cur.d[k]>0).sort((a,b)=>cur.d[b]-cur.d[a]);
+  const rankText=sorted.map((k,i)=>{
+    const c=RHYTHM_CATS[k];if(!c)return null;
+    return `${i+1}위 ${c.label} ${_fmtDur(cur.d[k])}`;
+  }).filter(Boolean).join(', ');
+
+  const prevRecordedDays=new Set((prevRblocks||[]).map(b=>b.date_key)).size;
+  const showCompare=prevRecordedDays>=7;
+  let compareText='';
+  if(showCompare){
+    const diffs=sorted.map(k=>{
+      const c=RHYTHM_CATS[k];if(!c)return null;
+      const diff=cur.d[k]-(prev.d[k]||0);
+      if(Math.abs(diff)<60)return null;
+      return `${c.label} ${diff>0?'+':'−'}${_fmtDur(Math.abs(diff))}`;
+    }).filter(Boolean);
+    if(diffs.length)compareText=`전월 대비 변화(60분 이상만): ${diffs.join(', ')}`;
+  }
+
+  const missionByWeek=(weeksInMonth||[]).map((wk,idx)=>{
+    const row=wcRowsList&&wcRowsList[idx]&&wcRowsList[idx][0];
     const lines=(row&&Array.isArray(row.lines))?row.lines.filter(l=>l&&l.text&&l.text.trim()).map(l=>l.text):[];
     return lines.length?`${idx+1}주차: ${lines.join(', ')}`:null;
   }).filter(Boolean);
-  const prevMissionLines=(prevWcRowsList||[]).flatMap(rows=>{
-    const row=rows&&rows[0];
-    return (row&&Array.isArray(row.lines))?row.lines.filter(l=>l&&l.text&&l.text.trim()).map(l=>l.text):[];
-  });
+  const missionText=missionByWeek.length?`이 달 주차별 목표(주간 미션, 참고용):\n${missionByWeek.join('\n')}`:'';
 
-  // 리듬 변화, 목표 텍스트, 종합 리포트 코멘트 중 아무 재료도 없으면 생성하지 않음 — 다만 조용히 끝내지 않고 이유를 안내
-  if(!rhythmChanges.length&&!missionByWeek.length&&!heroComment){
-    el.innerHTML=`<div class="empty-msg" style="text-align:left;padding:4px 0;">이 달의 마디를 짚을 만한 자료(목표 변화나 리듬 변화)가 아직 없어요</div>`;
-    return;
-  }
+  const dataContext=[`이 달 카테고리별 시간 순위(누계): ${rankText}`,compareText,missionText,refContext].filter(Boolean).join('\n');
 
-  const parts=[];
-  if(missionByWeek.length)parts.push(`이 달 주차별 목표(주간 미션):\n${missionByWeek.join('\n')}`);
-  if(prevMissionLines.length)parts.push(`전월 목표: ${prevMissionLines.join(', ')}`);
-  if(rhythmChanges.length)parts.push(`이 달 리듬 시간 변화(전월 대비, 계산된 값):\n${rhythmChanges.join('\n')}`);
-  if(heroComment)parts.push(`이 달 종합 리포트(참고용 맥락, 이미 발행된 코멘트):\n${heroComment}`);
-  const dataContext=parts.join('\n\n');
+  const sys=`당신은 한 달의 시간 사용(리듬)을 담담하게 짚어주는 회고 비서예요.
+${RHYTHM_CAT_GUIDE}
+아래는 이 달에 어떤 활동 카테고리에 얼마나 시간을 썼는지 순위와, 있다면 전월 대비 60분 이상 달라진 항목, 그리고 이 달의 목표나 주간 미션이 담긴 참고자료예요.
+이 달의 시간 배분이 어떤 성향이었는지 — 무엇에 시간을 많이 내줬고 무엇이 뒤로 밀렸는지, 카테고리 간 균형이 어땠는지 — 짧은 이야기로 풀어주세요.
+참고자료에 이 달의 목표나 미션이 나타나 있다면, 그 목표를 몰라서는 안 될 배경으로만 인지하고 있어도 좋아요 — 이 달의 리듬(시간 배분)이 그 목표를 향한 노력으로 자연스럽게 읽힌다면 가볍게 한 문장 정도 녹여도 좋지만, 억지로 리듬과 목표를 매번 연결지으려 하지 마세요. 이 프롬프트의 중심은 어디까지나 리듬이에요.
+- 3~4문장, 전체 120자 내외.
+- 절대 구체적인 시간·분·퍼센트 수치를 그대로 나열하지 마세요. 이미 그래프로 보여지고 있으니, 당신은 그 배분이 "무엇을 의미하는지"만 해석하세요.
+- 습관, 투두 등 리듬 외의 다른 지표는 언급하지 마세요. 순수하게 시간을 어디에 썼는지의 이야기를 중심에 두세요.
+- 담담하고 자연스러운 ~어요/~했어요체.
+- 전월 대비 변화가 함께 주어졌다면, 그 변화도 수치 없이 방향과 의미로만 한 문장 정도 자연스럽게 녹이세요. 주어지지 않았다면 언급하지 마세요.
+${MRP_COMMON_RULES}
+- 반드시 JSON 형식으로만 응답하세요: {"text":"..."}
+- 다른 설명이나 마크다운 없이 순수 JSON만 출력하세요.`;
 
-  const sys=`당신은 한 달의 흐름에서 "뭔가 바뀐 지점"을 짚어주는 회고 비서예요.
-아래 자료는 여러 종류예요: (1) 주차별 목표/주간미션 텍스트, (2) 리듬(활동 카테고리별) 시간이 전월 대비 어떻게 달라졌는지 계산된 값, (3) 있다면 이 달의 종합 리포트(이미 발행된 코멘트, 참고용 맥락).
-(1)과 (2)를 각각 따로 언급하지 말고, 목표의 방향 전환과 리듬 시간 변화 사이에 실제로 앞뒤가 맞는 관계가 보이면 하나의 문장으로 엮어서 설명해주세요.
-예: "운동 시간이 늘어난 건 목표가 체력 회복으로 방향을 잡으면서였던 것 같아요"처럼, 무엇이 원인이고 무엇이 결과처럼 보이는지 자연스럽게 연결하세요.
-(3) 종합 리포트가 함께 주어졌다면, 그 안에 담긴 이 달의 사건이나 맥락을 먼저 확인하고 참고해서, 그와 어긋나지 않고 자연스럽게 이어지는 마디를 짚으세요. 종합 리포트 내용을 그대로 반복하지는 마세요.
-관계가 뚜렷하지 않다면 억지로 엮지 말고, 목표 변화나 리듬 변화 중 더 뚜렷한 쪽 하나만 단독으로 짚어도 좋아요. 둘 다 뚜렷하지 않은 항목은 아예 만들지 마세요.
-- 최대 3개까지만, 정말 짚을 게 없으면 빈 배열도 괜찮아요.
-- 각 문장은 40~60자, 담담하고 자연스러운 ~어요/~였어요체.
-- 문장 안에 분·시간·퍼센트 같은 구체적 수치는 절대 넣지 마세요. 방향과 의미만 담백하게 풀어서 설명하세요.
-- 전월 목표가 함께 주어졌다면, 그 중 최대 1개는 전월과 비교하는 관점으로 써도 좋아요(강제는 아니에요).
-- 반드시 JSON 배열 형식으로만 응답하세요. 예: ["운동 시간이 늘어난 건 목표가 체력 회복으로 방향을 잡으면서였던 것 같아요"]
-- 다른 설명이나 마크다운 없이 순수 JSON 배열만 출력하세요.`;
-  const reply=await callClaudeFromTablet(sys,dataContext,500);
-  if(!reply){
-    el.innerHTML=`<div class="empty-msg" style="text-align:left;padding:4px 0;">마디 분석을 불러오지 못했어요 — 잠시 후 다시 열어보시면 재시도돼요</div>`;
-    return;
-  }
+  el.innerHTML=`<div class="empty-msg" style="text-align:left;padding:4px 0;">리듬 분석을 불러오는 중...</div>`;
+  const reply=await callClaudeFromTablet(sys,dataContext,400);
+  if(!reply){el.innerHTML='';return;}
   try{
     const clean=reply.replace(/```json|```/g,'').trim();
     const parsed=JSON.parse(clean);
-    if(Array.isArray(parsed)&&parsed.length){
-      await supaUpsertAiCache('monthly_milestones_'+mk,JSON.stringify(parsed));
-      renderList(parsed);
-    }else{
-      // 빈 배열은 "정말 짚을 게 없다"는 판단일 수도, 일시적 부실 응답일 수도 있어 캐시하지 않고 다음에 다시 시도되게 둠
-      el.innerHTML=`<div class="empty-msg" style="text-align:left;padding:4px 0;">이 달은 뚜렷하게 짚을 만한 변화는 없었어요</div>`;
-    }
-  }catch(e){
-    el.innerHTML=`<div class="empty-msg" style="text-align:left;padding:4px 0;">마디 분석 응답을 해석하지 못했어요</div>`;
-  }
+    if(parsed&&parsed.text){
+      await supaUpsertAiCache('monthly_milestones_'+mk,parsed.text);
+      renderText(parsed.text);
+    }else{el.innerHTML='';}
+  }catch(e){el.innerHTML='';}
 }
 // ai_cache 테이블 upsert — 본앱 aiCacheSet과 동일한 패턴(만료 없이 영구 보관, 그 달 데이터는 확정된 과거라 안 바뀜)
 async function supaUpsertAiCache(cacheKey,content){
