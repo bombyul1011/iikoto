@@ -153,13 +153,16 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .card-lbl{font-size:var(--fs-title);font-weight:600;color:var(--tp);margin-bottom:11px;display:flex;align-items:center;gap:7px;}
 .card-lbl i{font-size:var(--fs-lg);}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;align-items:stretch;}
-.month-top-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:16px;align-items:stretch;min-height:270px;}
+/* 목표(3줄 기준)+습관 카드 왼쪽 세로 스택과, 오른쪽 채움로그(스크롤)의 기준 높이를 명확히 고정.
+   이전엔 min-height라 채움로그 내용이 길어지면 grid 전체가 늘어나며 옆의 목표/습관 카드까지 함께 커지는 문제가 있었음
+   — height로 고정해 왼쪽 두 카드는 항상 이 높이 안에서 반반 나눠 갖고, 채움로그는 그 안에서 스크롤(2026-08-22 확정). */
+.month-top-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:16px;align-items:stretch;height:270px;}
 .month-top-left{display:flex;flex-direction:column;gap:13px;height:100%;}
-.month-top-left .card{flex:1;min-height:0;display:flex;flex-direction:column;margin-bottom:0;}
+.month-top-left .card{flex:1;min-height:0;display:flex;flex-direction:column;margin-bottom:0;overflow:hidden;}
 .month-top-right{min-height:0;height:100%;margin-bottom:0;}
 .card.month-compact{padding:14px 16px 12px;}
-.card.month-compact .card-lbl{margin-bottom:8px;}
-.month-goals-box{min-height:calc(var(--fs-body) * 1.4 * 3 + 6px * 3);display:flex;flex-direction:column;justify-content:center;}
+.card.month-compact .card-lbl{margin-bottom:8px;flex-shrink:0;}
+.month-goals-box{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;justify-content:center;}
 .month-compact .habit-numbox-grid{grid-template-columns:repeat(4,1fr);gap:7px;}
 .month-compact .habit-numbox-card{padding:11px 4px;border-radius:12px;}
 .month-compact .habit-numbox-card .habit-numbox-icon{font-size:var(--fs-lg);}
@@ -719,7 +722,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
         <div class="card goal-hcard"><div class="card-lbl"><i class="ti ti-flag-3" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>이번 주 목표</div><div id="week-goals"></div></div>
         <div class="card"><div class="card-lbl"><i class="ti ti-chart-donut" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>주간 습관 현황</div><div id="week-habit-matrix"></div></div>
       </div>
-      <div class="card"><div class="card-lbl"><i class="ti ti-moon-stars" style="color:rgba(var(--pal-sky-rgb),1);" aria-hidden="true"></i>이번 주 수면 리포트</div><div id="week-sleep-report"></div></div>
+      <div class="card"><div class="card-lbl"><i class="ti ti-moon-stars" style="color:rgba(var(--pal-sky-rgb),1);" aria-hidden="true"></i>수면 리포트</div><div id="week-sleep-report"></div></div>
       <div class="card"><div class="card-lbl"><i class="ti ti-rainbow" style="color:rgba(var(--pal-orange-rgb),1);" aria-hidden="true"></i>리듬 흐름 비교</div><div id="week-rhythm-flow"></div></div>
       <div class="card"><div class="card-lbl"><i class="ti ti-pencil" style="color:rgba(var(--pal-yellow-rgb),1);" aria-hidden="true"></i>하루한줄</div>
         <div class="oneline-2col">
@@ -736,7 +739,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
       <div class="month-top-grid">
         <div class="month-top-left">
           <div class="card goal-hcard month-compact"><div class="card-lbl"><i class="ti ti-flag-3" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>이번 달 목표</div><div id="month-goals" class="month-goals-box"></div></div>
-          <div class="card month-compact"><div class="card-lbl"><i class="ti ti-chart-donut" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>습관 모아보기</div><div id="month-habits"></div></div>
+          <div class="card month-compact" style="overflow:hidden;"><div class="card-lbl"><i class="ti ti-chart-donut" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>습관 모아보기</div><div id="month-habits" style="flex:1;min-height:0;overflow-y:auto;"></div></div>
         </div>
         <div class="card chaeum-log-card month-top-right" id="month-top-right"><div class="chaeum-log-hdr"><div class="chaeum-log-title"><i class="ti ti-clover" aria-hidden="true"></i>채움 로그</div></div><div class="chaeum-log-tl" id="chaeum-log-tl"></div></div>
       </div>
