@@ -2527,11 +2527,18 @@ async function renderMrpMilestones(mk,rblocks,prevRblocks,weeksInMonth,wcRowsLis
     return;
   }
 
-  // 이 달의 종합 리포트(본앱 hero)가 아직 발행되지 않았으면 리듬 분석도 생성하지 않음(시점 제한)
-  if(!heroComment){el.innerHTML='';return;}
+  // 이 달의 종합 리포트(본앱 hero)가 아직 발행되지 않았으면 리듬 분석도 생성하지 않음(시점 제한) —
+  // 궤적/수면 카드와 동일하게 빈 화면 대신 안내 문구를 보여줌(2026-08-22, 안내문구 누락 수정).
+  if(!heroComment){
+    el.innerHTML=`<div class="empty-msg" style="text-align:left;padding:4px 0;">이 달의 종합 리포트가 발행되면 리듬 분석도 볼 수 있어요</div>`;
+    return;
+  }
 
   const apiKey=getClaudeKey();
-  if(!apiKey){el.innerHTML='';return;}
+  if(!apiKey){
+    el.innerHTML=`<div class="empty-msg" style="text-align:left;padding:4px 0;">이 달의 리듬 분석은 설정 탭에서 Claude API 키를 추가하면 볼 수 있어요</div>`;
+    return;
+  }
 
   // 카테고리별 누계 시간(분) 재계산 — renderMrpRhythm과 동일 규칙
   const durByCat=(blocks)=>{
