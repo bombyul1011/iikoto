@@ -1607,7 +1607,9 @@ async function callClaudeFromTablet(systemPrompt,userContent,maxTokens){
 // ══════════════════════════════════════════════════════════
 let _reportMonthDate=new Date();
 let _reportFilter='all';
-const REPORT_READ_KEY='tablet_report_read'; // localStorage에 읽은 cache_key 집합 저장
+const REPORT_READ_KEY='tablet_report_read'; // localStorage에 읽은 cache_key 집합 저장(빠른 표시용 로컬 캐시)
+const REPORT_READ_PREFIX='report_read:'; // Supabase ai_cache에 저장할 때 쓰는 키 접두어(서버 동기화용)
+let _readReportsServerSynced=false; // 이번 세션에서 서버 목록을 이미 한 번 받아왔는지
 
 function _loadReadReports(){
   try{
@@ -1618,11 +1620,26 @@ function _loadReadReports(){
 function _saveReadReports(set){
   try{localStorage.setItem(REPORT_READ_KEY,JSON.stringify([...set]));}catch(e){}
 }
+// PWA를 재설치하면 localStorage가 초기화돼 이미 읽었던 리포트가 다시 "안읽음"으로 뜨는 문제가 있었음 —
+// Supabase ai_cache에 report_read:{cacheKey} 형태로도 저장해두고, 앱 진입 시 그 목록을 한 번 받아와
+// 로컬 Set과 합쳐두면 기기가 바뀌어도(재설치, 다른 기기) 읽음 상태가 유지됨(2026-08-22 확정).
+async function _syncReadReportsFromServer(){
+  if(_readReportsServerSynced)return; // 세션당 한 번만 — 매 탭 진입마다 전체 목록을 다시 받을 필요는 없음
+  try{
+    const rows=await supaFetch(`ai_cache?cache_key=like.${encodeURIComponent(REPORT_READ_PREFIX)}*&select=cache_key`);
+    const serverSet=_loadReadReports();
+    (rows||[]).forEach(r=>serverSet.add(r.cache_key.slice(REPORT_READ_PREFIX.length)));
+    _saveReadReports(serverSet);
+    _readReportsServerSynced=true;
+  }catch(e){/* 서버 동기화 실패해도 로컬 캐시만으로 계속 동작 */}
+}
 function _markReportRead(cacheKey){
   const set=_loadReadReports();
   if(set.has(cacheKey))return;
   set.add(cacheKey);
   _saveReadReports(set);
+  // 서버에도 기록 — 응답을 기다리지 않고 화면은 로컬 캐시로 즉시 갱신(fire-and-forget)
+  supaUpsertAiCache(REPORT_READ_PREFIX+cacheKey,'1').catch(()=>{});
 }
 function _isReportRead(cacheKey){
   return _loadReadReports().has(cacheKey);
@@ -1680,6 +1697,7 @@ function setReportFilter(filter){
   }
 }
 async function loadReportsTab(){
+  await _syncReadReportsFromServer();
   const y=_reportMonthDate.getFullYear(),mo=_reportMonthDate.getMonth();
   document.getElementById('report-page-title').textContent=`${y}년 ${mo+1}월`;
   const weeksInMonth=getReportWeeksOfMonth(y,mo);
@@ -1811,6 +1829,7 @@ function openReportBoxDetail(cacheKey,title,el){
 async function _updateSideReportBadge(){
   const dot=document.getElementById('side-logo-dot');
   if(!dot)return;
+  await _syncReadReportsFromServer();
   const y=new Date().getFullYear(),mo=new Date().getMonth();
   const weeksInMonth=getReportWeeksOfMonth(y,mo);
   const mk=monthKeyOf(new Date());
