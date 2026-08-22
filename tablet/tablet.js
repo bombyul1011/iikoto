@@ -111,6 +111,15 @@ const RHYTHM_CATS={
   enjoy:{label:'감상',color:'var(--rh-enjoy)',icon:'ti-stack-2'},
   home:{label:'정리',color:'var(--rh-home)',icon:'ti-home'}
 };
+// ── 모닝루틴 항목 (본앱 MORNING_ROUTINE_ITEMS와 동일) ──
+const MORNING_ROUTINE_ITEMS=[
+  {key:'wake',label:'기상',icon:'ti-sunset-2',colorRgb:'252,215,110'},
+  {key:'tea',label:'티타임',icon:'ti-mug',colorRgb:'244,177,206'},
+  {key:'audiobook',label:'오디오북',icon:'ti-radio',colorRgb:'216,168,205'},
+  {key:'weight',label:'체중',icon:'ti-scale-outline',colorRgb:'150,205,225'},
+  {key:'pill',label:'영양제',icon:'ti-pill',colorRgb:'205,215,145'}
+];
+
 const CAT_ICON_META={
   drama:{icon:'ti-device-tv',bg:'rgba(var(--pal-pink-rgb),1)',iconColor:'#fff',label:'드라마'},
   book:{icon:'ti-book',bg:'rgba(var(--pal-yellow-rgb),1)',iconColor:'#fff',label:'책'},
@@ -775,8 +784,13 @@ async function loadWeekTab(){
   const lastStartDk=lastWeekDates[0];
   const lastCmpEndDk=isCurrentWeek?lastWeekDates[todayIdx]:lastWeekDates[6];
 
+  // 모닝루틴 카드용 최근 7일(캘린더 주와 무관하게 오늘 포함 롤링 7일)
+  const mrEnd=new Date();
+  const mrStart=new Date(mrEnd);mrStart.setDate(mrStart.getDate()-6);
+  const mrEndDk=dateKey(mrEnd),mrStartDk=dateKey(mrStart);
+
   const [goalRows,habits,habitChecks,memos,todos,sleepRows,onelineRows,contents,
-    lwMemos,lwTodos,lwSleepRows,lwHabitChecks,lwContents,rblocksThis,rblocksLast]=await Promise.all([
+    lwMemos,lwTodos,lwSleepRows,lwHabitChecks,lwContents,rblocksThis,rblocksLast,morningChecksWeek]=await Promise.all([
     supaFetch(`goal_notes?note_key=eq.wchallenge_${encodeURIComponent(wk)}`),
     supaFetch(`habits?order=sort_order.asc`),
     supaFetch(`habit_checks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
@@ -793,11 +807,14 @@ async function loadWeekTab(){
     supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&order=created.desc&limit=100`),
     // 리듬 흐름 비교용: 이번주(오늘까지)/지난주(7일 전체)
     supaFetch(`rhythm_blocks?date_key=gte.${startDk}&date_key=lte.${cmpEndDk}`),
-    supaFetch(`rhythm_blocks?date_key=gte.${lastStartDk}&date_key=lte.${lastWeekDates[6]}`)
+    supaFetch(`rhythm_blocks?date_key=gte.${lastStartDk}&date_key=lte.${lastWeekDates[6]}`),
+    // 모닝루틴 최근 7일
+    supaFetch(`morning_routine_checks?date_key=gte.${mrStartDk}&date_key=lte.${mrEndDk}`)
   ]);
 
   renderWeekGoals(goalRows&&goalRows[0]);
   renderWeekHabitMatrix(habits||[],habitChecks||[],weekDates);
+  renderWeekMorningRoutine(morningChecksWeek||[]);
   renderWeekDelta({
     memos:memos||[],todos:todos||[],sleepRows:sleepRows||[],habits:habits||[],checks:habitChecks||[],contents:contents||[],
     startDk,endDk:cmpEndDk,cmpDayCount
@@ -811,6 +828,26 @@ async function loadWeekTab(){
 }
 
 function _minToHHMM(min){const h=Math.floor(min/60),m=min%60;return pad(h)+':'+pad(m);}
+
+// 이번 주 모닝루틴 — 오늘 포함 최근 7일 롤링 기준, 항목별 체크 일수를 얇은 막대로 표시.
+// 달성률 자체보다 "얼마나 루틴화됐는지"를 가볍게 보여주는 용도라 궤도 UI 없이 심플하게.
+function renderWeekMorningRoutine(rows){
+  const el=document.getElementById('week-morning-routine');
+  if(!el)return;
+  const cntByKey={};
+  (rows||[]).forEach(r=>{if(r.item_key)cntByKey[r.item_key]=(cntByKey[r.item_key]||0)+1;});
+  const total=7;
+  el.innerHTML=MORNING_ROUTINE_ITEMS.map(it=>{
+    const cnt=cntByKey[it.key]||0;
+    const pct=Math.round(cnt/total*100);
+    return `<div class="wmroutine-row">
+      <i class="ti ${it.icon}" style="color:rgb(${it.colorRgb});" aria-hidden="true"></i>
+      <span class="wmroutine-label">${it.label}</span>
+      <div class="wmroutine-bar-track"><div class="wmroutine-bar-fill" style="width:${pct}%;background:rgb(${it.colorRgb});"></div></div>
+      <span class="wmroutine-cnt">${cnt}/7</span>
+    </div>`;
+  }).join('');
+}
 
 // 지난주 대비 — 오늘 요일까지로 절단된 동일 범위끼리 비교(주 진행 중엔 항상 마이너스로 왜곡되는 문제 방지)
 function renderWeekDelta(cur,prev){
