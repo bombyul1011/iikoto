@@ -478,11 +478,15 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 /* ── 리포트 페이지 ── */
 .report-page-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:10px;}
 .report-page-monthnav{display:flex;align-items:center;gap:10px;}
+.report-page-monthnav.hidden{display:none;}
 .report-page-monthnav i{font-size:var(--fs-title);color:var(--ts);cursor:pointer;}
 .report-page-title{font-size:var(--fs-xl);font-weight:700;color:var(--tp);letter-spacing:-0.02em;}
-.report-page-filters{display:flex;gap:6px;flex-wrap:wrap;}
+.report-page-filters{display:flex;align-items:center;gap:6px;flex-wrap:wrap;position:sticky;top:0;z-index:5;margin-left:auto;padding:6px 0;}
 .report-filter-chip{padding:6px 12px;border-radius:9px;background:rgba(255,253,248,0.8);border:1px solid var(--card-b);color:var(--ts);font-size:var(--fs-sm);cursor:pointer;white-space:nowrap;}
 .report-filter-chip.on{background:var(--pal-yellow-bg);border-color:var(--pal-yellow-border);color:var(--pal-yellow-text);font-weight:600;}
+.report-filter-home{width:32px;height:32px;border-radius:9px;background:rgba(255,253,248,0.8);border:1px solid var(--card-b);color:var(--ts);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+.report-filter-home i{font-size:var(--fs-title);}
+.report-filter-home:hover{background:var(--pal-yellow-bg);border-color:var(--pal-yellow-border);color:var(--pal-yellow-text);}
 .report-page-sub{font-size:var(--fs-sm);color:var(--tm);margin-bottom:20px;}
 .report-sec-title{font-size:var(--fs-title);font-weight:600;color:var(--ts);margin-bottom:9px;display:flex;align-items:center;gap:6px;}
 .report-sec{margin-bottom:24px;}
@@ -500,6 +504,10 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .report-list-sub{font-size:var(--fs-sm);color:var(--ts);margin-top:2px;}
 .report-list-item>i{font-size:var(--fs-sm);color:var(--tm);flex-shrink:0;}
 
+.report-box-year-stack{display:block;width:100%;}
+.report-box-month-row{width:100%;margin-bottom:16px;}
+.report-box-month-row:last-child{margin-bottom:0;}
+.report-box-month-label{font-size:var(--fs-sm);font-weight:600;color:var(--tm);margin-bottom:7px;padding-left:2px;}
 .report-box-grid{display:flex;gap:9px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x proximity;}
 .report-box{padding:13px 14px;border-radius:12px;background:var(--card);border:1px solid var(--card-b);position:relative;height:210px;flex:0 0 calc((100% - 27px) / 4);box-sizing:border-box;display:flex;flex-direction:column;cursor:pointer;scroll-snap-align:start;}
 .report-box.read{opacity:0.78;}
@@ -761,20 +769,20 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
     <!-- 리포트탭 -->
     <div class="main-body" id="tab-reports">
       <div class="report-page-hdr">
-        <div class="report-page-monthnav">
+        <div class="report-page-monthnav" id="report-month-nav">
           <i class="ti ti-chevron-left" onclick="shiftReportMonth(-1)" aria-hidden="true"></i>
           <span class="report-page-title" id="report-page-title"></span>
           <i class="ti ti-chevron-right" onclick="shiftReportMonth(1)" aria-hidden="true"></i>
         </div>
         <div class="report-page-filters" id="report-page-filters">
-          <div class="report-filter-chip on" data-filter="all" onclick="setReportFilter('all')">전체</div>
           <div class="report-filter-chip" data-filter="monthly" onclick="setReportFilter('monthly')">월간종합</div>
           <div class="report-filter-chip" data-filter="weekly" onclick="setReportFilter('weekly')">주간종합</div>
           <div class="report-filter-chip" data-filter="habit" onclick="setReportFilter('habit')">습관</div>
           <div class="report-filter-chip" data-filter="memo" onclick="setReportFilter('memo')">메모</div>
+          <div class="report-filter-home" onclick="goToReportsHome()" title="이번 달 전체보기"><i class="ti ti-calendar" aria-hidden="true"></i></div>
         </div>
       </div>
-      <div class="report-page-sub">이 달에 발행된 리포트를 모아봤어요</div>
+      <div class="report-page-sub" id="report-page-sub">이 달에 발행된 리포트를 모아봤어요</div>
 
       <div class="report-sec" id="report-sec-summary" data-sec="summary">
         <div class="report-sec-title"><i class="ti ti-sparkles" style="color:var(--pal-yellow-border);" aria-hidden="true"></i>종합 리포트</div>

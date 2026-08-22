@@ -220,7 +220,7 @@ function switchTab(tab){
   if(tab==='today'){_selectedDate=new Date();loadTodayTab();}
   else if(tab==='week')loadWeekTab();
   else if(tab==='month')loadMonthTab();
-  else if(tab==='reports')loadReportsTab();
+  else if(tab==='reports'){resetReportsView();loadReportsTab();}
   else if(tab==='settings')_loadClaudeKeyStatus();
 }
 
@@ -1606,7 +1606,7 @@ async function callClaudeFromTablet(systemPrompt,userContent,maxTokens){
 // 리포트탭 — 월간종합/주간종합/주간습관(챌린지리뷰)/주간메모, 월 단위로 모아보기
 // ══════════════════════════════════════════════════════════
 let _reportMonthDate=new Date();
-let _reportFilter='all';
+let _reportFilter=null;
 const REPORT_READ_KEY='tablet_report_read'; // localStorage에 읽은 cache_key 집합 저장(빠른 표시용 로컬 캐시)
 const REPORT_READ_PREFIX='report_read:'; // Supabase ai_cache에 저장할 때 쓰는 키 접두어(서버 동기화용)
 let _readReportsServerSynced=false; // 이번 세션에서 서버 목록을 이미 한 번 받아왔는지
@@ -1675,29 +1675,67 @@ function shiftReportMonth(delta){
   _reportMonthDate.setMonth(_reportMonthDate.getMonth()+delta);
   loadReportsTab();
 }
+// 로고 클릭 등으로 리포트탭에 재진입할 때 — 어떤 페이지를 보고 있었든 무조건 이번 달 전체보기로 리셋
+function resetReportsView(){
+  _reportMonthDate=new Date();
+  _reportFilter=null;
+  document.querySelectorAll('.report-filter-chip').forEach(el=>el.classList.remove('on'));
+}
+// 필터칩 옆 달력 아이콘 — 리포트탭 안에서 어느 화면을 보고 있든 이번 달 전체보기(메인)로 복귀
+function goToReportsHome(){
+  resetReportsView();
+  loadReportsTab();
+}
+// 연간모드(습관/메모 박스, 주간종합 리스트)에서 쓰는 "월 정보 포함" 라벨 — 예: "8월 3주차"
+function _weekLabelWithMonth(wk,wkNo){
+  const start=new Date(wk+'T00:00:00');
+  return `${start.getMonth()+1}월 ${wkNo}주차`;
+}
+// 그 주(wk, 월요일 날짜)가 속한 달 안에서 몇 번째 주인지 — getReportWeeksOfMonth와 동일한 "목요일 소속" 규칙 사용
+function _weekNoInMonth(wk){
+  const start=new Date(wk+'T00:00:00');
+  const wkThu=new Date(start);wkThu.setDate(start.getDate()+3);
+  const weeks=getReportWeeksOfMonth(wkThu.getFullYear(),wkThu.getMonth());
+  const idx=weeks.indexOf(wk);
+  return idx>=0?idx+1:1;
+}
 function setReportFilter(filter){
-  _reportFilter=filter;
-  document.querySelectorAll('.report-filter-chip').forEach(el=>el.classList.toggle('on',el.dataset.filter===filter));
+  // 같은 필터를 다시 누르면 해제(월 전체보기로 복귀), 아니면 해당 필터의 연간모아보기로 전환
+  _reportFilter=(_reportFilter===filter)?null:filter;
+  document.querySelectorAll('.report-filter-chip').forEach(el=>el.classList.toggle('on',el.dataset.filter===_reportFilter));
+  loadReportsTab();
+}
+function _allWeeksOfYear(y){
+  let weeks=[];
+  for(let mo=0;mo<12;mo++)weeks=weeks.concat(getReportWeeksOfMonth(y,mo));
+  return [...new Set(weeks)].sort();
+}
+async function loadReportsTab(){
+  await _syncReadReportsFromServer();
+  const filter=_reportFilter;
+  // 필터가 지정돼 있으면(월간종합/주간종합/습관/메모 중 하나 클릭) 해당 섹션만 연간으로 모아보기,
+  // 필터 없음(초기 진입/월 이동 직후)이면 기존처럼 그 달 전체를 보여줌.
   document.querySelectorAll('.report-sec').forEach(el=>{
     const sec=el.dataset.sec;
-    const show=filter==='all'
-      ||(filter==='monthly'&&sec==='summary')
-      ||(filter==='weekly'&&sec==='summary')
+    const show=!filter
+      ||((filter==='monthly'||filter==='weekly')&&sec==='summary')
       ||(filter==='habit'&&sec==='habit')
       ||(filter==='memo'&&sec==='memo');
     el.classList.toggle('hidden',!show);
   });
-  // 종합 섹션 내부는 월간/주간 필터에 따라 리스트 아이템 단위로도 걸러줌
-  if(filter==='monthly'||filter==='weekly'){
-    document.querySelectorAll('#report-summary-list [data-kind]').forEach(el=>{
-      el.style.display=(el.dataset.kind===filter)?'':'none';
-    });
+  const subEl=document.getElementById('report-page-sub');
+  if(!filter){
+    document.getElementById('report-month-nav').classList.remove('hidden');
+    if(subEl)subEl.textContent='이 달에 발행된 리포트를 모아봤어요';
+    await _loadReportsMonthly();
   }else{
-    document.querySelectorAll('#report-summary-list [data-kind]').forEach(el=>{el.style.display='';});
+    document.getElementById('report-month-nav').classList.add('hidden');
+    if(subEl)subEl.textContent='올해 발행된 리포트를 모아봤어요';
+    await _loadReportsYearly(filter);
   }
+  _updateSideReportBadge();
 }
-async function loadReportsTab(){
-  await _syncReadReportsFromServer();
+async function _loadReportsMonthly(){
   const y=_reportMonthDate.getFullYear(),mo=_reportMonthDate.getMonth();
   document.getElementById('report-page-title').textContent=`${y}년 ${mo+1}월`;
   const weeksInMonth=getReportWeeksOfMonth(y,mo);
@@ -1710,28 +1748,55 @@ async function loadReportsTab(){
   const habitRowsList=await Promise.all(weeksInMonth.map(wk=>supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent('challenge_review_week:'+wk)}&select=cache_key,content,expires_at`)));
   const memoRowsList=await Promise.all(weeksInMonth.map(wk=>supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent('weekly_memo_report_week:'+wk)}&select=cache_key,content,expires_at`)));
 
-  renderReportSummaryList(monthlyRows,weeksInMonth,weeklyRowsList,mk);
-  renderReportBoxGrid('report-habit-grid',weeksInMonth,habitRowsList,'habit');
-  renderReportBoxGrid('report-memo-grid',weeksInMonth,memoRowsList,'memo');
-  setReportFilter(_reportFilter);
-  _updateSideReportBadge();
+  renderReportSummaryList(monthlyRows,weeksInMonth,weeklyRowsList,mk,false);
+  renderReportBoxGrid('report-habit-grid',weeksInMonth,habitRowsList,'habit',false);
+  renderReportBoxGrid('report-memo-grid',weeksInMonth,memoRowsList,'memo',false);
 }
-function renderReportSummaryList(monthlyRows,weeksInMonth,weeklyRowsList,mk){
+// filter별로 그 해에 필요한 캐시만 IN 쿼리 1방으로 모아옴 (연간모드 — 콜 수를 최소화)
+async function _loadReportsYearly(filter){
+  const y=_reportMonthDate.getFullYear();
+  document.getElementById('report-page-title').textContent=`${y}년 전체`;
+  const weeksInYear=_allWeeksOfYear(y);
+
+  if(filter==='weekly'){
+    const sundayKeys=weeksInYear.map(wk=>'weekly_summary_'+_mondayToSundayDk(wk));
+    const rows=sundayKeys.length?await supaFetch(`ai_cache?cache_key=in.(${sundayKeys.join(',')})&select=cache_key,content,expires_at`):[];
+    const rowsByKey={};(rows||[]).forEach(r=>{rowsByKey[r.cache_key]=r;});
+    const weeklyRowsList=weeksInYear.map(wk=>{const r=rowsByKey['weekly_summary_'+_mondayToSundayDk(wk)];return r?[r]:[];});
+    renderReportSummaryList(null,weeksInYear,weeklyRowsList,null,true);
+  }else if(filter==='monthly'){
+    const mkKeys=[];for(let mo=0;mo<12;mo++)mkKeys.push(`monthly_report_${y}-${pad(mo+1)}`);
+    const rows=await supaFetch(`ai_cache?cache_key=in.(${mkKeys.join(',')})&select=cache_key,content,expires_at`);
+    renderReportMonthlyYearList(rows||[],y);
+  }else{
+    // habit / memo — 주차별 캐시를 IN 쿼리 1방으로
+    const prefix=filter==='habit'?'challenge_review_week:':'weekly_memo_report_week:';
+    const keys=weeksInYear.map(wk=>encodeURIComponent(prefix+wk));
+    const rows=keys.length?await supaFetch(`ai_cache?cache_key=in.(${keys.join(',')})&select=cache_key,content,expires_at`):[];
+    const rowsByKey={};(rows||[]).forEach(r=>{rowsByKey[decodeURIComponent(r.cache_key)]=r;});
+    const rowsList=weeksInYear.map(wk=>{const r=rowsByKey[prefix+wk];return r?[r]:[];});
+    renderReportBoxGrid(filter==='habit'?'report-habit-grid':'report-memo-grid',weeksInYear,rowsList,filter,true);
+  }
+}
+function renderReportSummaryList(monthlyRows,weeksInMonth,weeklyRowsList,mk,isYearly){
   const el=document.getElementById('report-summary-list');
   const items=[];
-  const mkYear=parseInt(mk.slice(0,4),10),mkMonth=parseInt(mk.slice(5,7),10)-1;
-  const monthlyRow=monthlyRows&&monthlyRows[0];
-  // 발행된 종합 리포트(캐시)가 없어도, 그 달이 오늘이거나 이미 지난 달이면 리포트 페이지 자체는 열람 가능
-  // (진행 중인 달은 hero만 "이 달이 끝나면 정리해드려요"로 안내, 나머지 카드는 오늘까지 누계로 정상 표시됨).
-  const now=new Date();
-  const isPastOrCurrentMonth=(mkYear<now.getFullYear())||(mkYear===now.getFullYear()&&mkMonth<=now.getMonth());
-  if(monthlyRow||isPastOrCurrentMonth){
-    const cacheKey=monthlyRow?monthlyRow.cache_key:`monthly_report_${mk}`;
-    const read=monthlyRow?_isReportRead(cacheKey):true; // 미발행 상태는 "안 읽음" 배지를 굳이 띄우지 않음
-    items.push({cacheKey,kind:'monthly',read,year:mkYear,month:mkMonth,
-      icon:'ti-calendar',iconBg:'rgba(255,225,120,0.55)',iconColor:'var(--pal-yellow-border)',
-      title:`${mk.slice(5,7).replace(/^0/,'')}월 월간종합 리포트`,sub:`${mk.slice(0,4)}년 ${mk.slice(5,7).replace(/^0/,'')}월 전체 흐름 정리`});
+  if(!isYearly){
+    const mkYear=parseInt(mk.slice(0,4),10),mkMonth=parseInt(mk.slice(5,7),10)-1;
+    const monthlyRow=monthlyRows&&monthlyRows[0];
+    // 발행된 종합 리포트(캐시)가 없어도, 그 달이 오늘이거나 이미 지난 달이면 리포트 페이지 자체는 열람 가능
+    // (진행 중인 달은 hero만 "이 달이 끝나면 정리해드려요"로 안내, 나머지 카드는 오늘까지 누계로 정상 표시됨).
+    const now=new Date();
+    const isPastOrCurrentMonth=(mkYear<now.getFullYear())||(mkYear===now.getFullYear()&&mkMonth<=now.getMonth());
+    if(monthlyRow||isPastOrCurrentMonth){
+      const cacheKey=monthlyRow?monthlyRow.cache_key:`monthly_report_${mk}`;
+      const read=monthlyRow?_isReportRead(cacheKey):true; // 미발행 상태는 "안 읽음" 배지를 굳이 띄우지 않음
+      items.push({cacheKey,kind:'monthly',read,year:mkYear,month:mkMonth,
+        icon:'ti-calendar',iconBg:'rgba(255,225,120,0.55)',iconColor:'var(--pal-yellow-border)',
+        title:`${mk.slice(5,7).replace(/^0/,'')}월 월간종합 리포트`,sub:`${mk.slice(0,4)}년 ${mk.slice(5,7).replace(/^0/,'')}월 전체 흐름 정리`});
+    }
   }
+  // 연간모드에선 "N주차"가 월을 넘나들며 의미 없어지므로 "8월 3주차" 형태로 월 표기를 붙임
   weeksInMonth.slice().reverse().forEach((wk,i)=>{
     const idx=weeksInMonth.indexOf(wk);
     const rows=weeklyRowsList[idx];
@@ -1739,11 +1804,12 @@ function renderReportSummaryList(monthlyRows,weeksInMonth,weeklyRowsList,mk){
     if(!row)return;
     const cacheKey=row.cache_key;
     const read=_isReportRead(cacheKey);
+    const title=isYearly?`${_weekLabelWithMonth(wk,_weekNoInMonth(wk))} 주간종합 리포트`:`${(idx+1)}주차 주간종합 리포트`;
     items.push({cacheKey,kind:'weekly',read,
       icon:'ti-sparkles',iconBg:'rgba(210,175,225,0.5)',iconColor:'var(--pal-lavender-border)',
-      title:`${(idx+1)}주차 주간종합 리포트`,sub:_weekRangeLabel(wk)});
+      title,sub:_weekRangeLabel(wk)});
   });
-  if(!items.length){el.innerHTML='<div class="empty-msg">이 달엔 아직 발행된 종합 리포트가 없어요</div>';return;}
+  if(!items.length){el.innerHTML=`<div class="empty-msg">${isYearly?'올해 아직 발행된 주간종합 리포트가 없어요':'이 달엔 아직 발행된 종합 리포트가 없어요'}</div>`;return;}
   el.innerHTML=items.map(it=>{
     // 월간종합은 팝업이 아니라 전체페이지(아카이브)로, 나머지(주간종합 등)는 기존처럼 팝업으로 연다.
     const onclick=it.kind==='monthly'
@@ -1760,6 +1826,34 @@ function renderReportSummaryList(monthlyRows,weeksInMonth,weeklyRowsList,mk){
       <i class="ti ti-chevron-right" aria-hidden="true"></i>
     </div>`;
   }).join('');
+}
+// 월간종합 필터의 연간모드 — 그 해 발행된 월간 리포트만 최신월 순으로 나열
+function renderReportMonthlyYearList(rows,y){
+  const el=document.getElementById('report-summary-list');
+  const rowsByKey={};(rows||[]).forEach(r=>{rowsByKey[r.cache_key]=r;});
+  const now=new Date();
+  const items=[];
+  for(let mo=11;mo>=0;mo--){
+    const mk=`${y}-${pad(mo+1)}`;
+    const isPastOrCurrentMonth=(y<now.getFullYear())||(y===now.getFullYear()&&mo<=now.getMonth());
+    const row=rowsByKey[`monthly_report_${mk}`];
+    if(!row&&!isPastOrCurrentMonth)continue; // 아직 오지 않은 미래 달은 건너뜀
+    const cacheKey=row?row.cache_key:`monthly_report_${mk}`;
+    const read=row?_isReportRead(cacheKey):true;
+    items.push({cacheKey,read,year:y,month:mo,
+      title:`${mo+1}월 월간종합 리포트`,sub:`${y}년 ${mo+1}월 전체 흐름 정리`});
+  }
+  if(!items.length){el.innerHTML='<div class="empty-msg">올해 아직 발행된 월간종합 리포트가 없어요</div>';return;}
+  el.innerHTML=items.map(it=>`
+    <div class="report-list-item${it.read?' read':''}" data-kind="monthly" onclick="openMonthlyReportPage(${it.year},${it.month})">
+      <div class="report-list-dot"></div>
+      <div class="report-list-icon" style="background:rgba(255,225,120,0.55);"><i class="ti ti-calendar" style="color:var(--pal-yellow-border);" aria-hidden="true"></i></div>
+      <div class="report-list-body">
+        <div class="report-list-title">${escapeHtml(it.title)}</div>
+        <div class="report-list-sub">${escapeHtml(it.sub)}</div>
+      </div>
+      <i class="ti ti-chevron-right" aria-hidden="true"></i>
+    </div>`).join('');
 }
 function openReportFromList(cacheKey,title){
   _markReportRead(cacheKey);
@@ -1781,35 +1875,65 @@ function _parseReportPreview(html){
   }
   return{headline:null,bodyText:div.textContent||''};
 }
-function renderReportBoxGrid(elId,weeksInMonth,rowsList,type){
+function _reportBoxCardHtml(wk,row,type,meta,wkLabel){
+  if(!row||!row.content){
+    return `<div class="report-box empty"><div class="report-box-empty-txt">아직 없어요</div></div>`;
+  }
+  const cacheKey=row.cache_key;
+  const read=_isReportRead(cacheKey);
+  const title=`${wkLabel} ${type==='habit'?'습관 리뷰':'메모 리포트'}`;
+  const{headline,bodyText}=_parseReportPreview(row.content);
+  const bodyHtml=headline
+    ?`<div class="report-box-body headline-only"><div class="report-box-headline">${escapeHtml(headline)}</div></div>`
+    :`<div class="report-box-body text-preview"><div class="report-box-preview-txt">${escapeHtml(bodyText)}</div></div>`;
+  return `<div class="report-box${read?' read':''}" onclick="openReportBoxDetail('${cacheKey}','${escapeHtml(title)}',this)">
+    ${read?'':'<div class="report-box-dot"></div>'}
+    <div class="report-box-hdr">
+      <div class="report-box-icon" style="background:${meta.iconBg};"><i class="ti ${meta.icon}" style="color:${meta.iconColor};" aria-hidden="true"></i></div>
+      <div><div class="report-box-wk">${wkLabel}</div><div class="report-box-range">${_weekRangeLabel(wk)}</div></div>
+    </div>
+    ${bodyHtml}
+    <div class="report-box-ellipsis">···</div>
+  </div>`;
+}
+function renderReportBoxGrid(elId,weeksInMonth,rowsList,type,isYearly){
   const el=document.getElementById(elId);
+  el.classList.toggle('report-box-grid',!isYearly);
+  el.classList.toggle('report-box-year-stack',!!isYearly);
   const meta=type==='habit'
     ?{icon:'ti-target-arrow',iconBg:'rgba(145,210,175,0.5)',iconColor:'var(--pal-mint-border)'}
     :{icon:'ti-notes',iconBg:'rgba(170,208,228,0.5)',iconColor:'var(--pal-sky-border)'};
-  if(!weeksInMonth.length){el.innerHTML='<div class="empty-msg">이 달엔 해당 주차가 없어요</div>';return;}
-  el.innerHTML=weeksInMonth.slice().reverse().map((wk,i)=>{
-    const idx=weeksInMonth.indexOf(wk);
-    const rows=rowsList[idx];
-    const row=rows&&rows[0];
-    const wkNo=idx+1;
-    if(!row||!row.content){
-      return `<div class="report-box empty"><div class="report-box-empty-txt">아직 없어요</div></div>`;
-    }
-    const cacheKey=row.cache_key;
-    const read=_isReportRead(cacheKey);
-    const title=`${wkNo}주차 ${type==='habit'?'습관 리뷰':'메모 리포트'}`;
-    const{headline,bodyText}=_parseReportPreview(row.content);
-    const bodyHtml=headline
-      ?`<div class="report-box-body headline-only"><div class="report-box-headline">${escapeHtml(headline)}</div></div>`
-      :`<div class="report-box-body text-preview"><div class="report-box-preview-txt">${escapeHtml(bodyText)}</div></div>`;
-    return `<div class="report-box${read?' read':''}" onclick="openReportBoxDetail('${cacheKey}','${escapeHtml(title)}',this)">
-      ${read?'':'<div class="report-box-dot"></div>'}
-      <div class="report-box-hdr">
-        <div class="report-box-icon" style="background:${meta.iconBg};"><i class="ti ${meta.icon}" style="color:${meta.iconColor};" aria-hidden="true"></i></div>
-        <div><div class="report-box-wk">${wkNo}주차</div><div class="report-box-range">${_weekRangeLabel(wk)}</div></div>
-      </div>
-      ${bodyHtml}
-      <div class="report-box-ellipsis">···</div>
+  if(!weeksInMonth.length){el.innerHTML=`<div class="empty-msg">${isYearly?'올해 해당 주차가 없어요':'이 달엔 해당 주차가 없어요'}</div>`;return;}
+  // 연간모드는 빈 주차 칸까지 다 그리면 52칸으로 늘어나 지저분해지므로, 실제로 발행된 것만 모아 보여줌
+  let entries=weeksInMonth.map((wk,idx)=>({wk,row:(rowsList[idx]&&rowsList[idx][0])||null}));
+  if(isYearly)entries=entries.filter(e=>e.row&&e.row.content);
+  if(isYearly&&!entries.length){el.innerHTML=`<div class="empty-msg">올해 발행된 ${type==='habit'?'습관 리뷰':'메모 리포트'}가 없어요</div>`;return;}
+
+  if(!isYearly){
+    // 단일 월 뷰 — 기존처럼 한 줄 가로 스와이프
+    el.innerHTML=entries.slice().reverse().map(({wk,row})=>{
+      const wkNo=weeksInMonth.indexOf(wk)+1;
+      return _reportBoxCardHtml(wk,row,type,meta,`${wkNo}주차`);
+    }).join('');
+    return;
+  }
+  // 연간모드 — 월별로 줄을 나눠 최신월부터 세로로 쌓고, 각 월 줄 안에서만 가로 스와이프
+  const byMonth={}; // 'YYYY-MM' -> [{wk,row}]
+  entries.forEach(({wk,row})=>{
+    const start=new Date(wk+'T00:00:00');
+    const mk=`${start.getFullYear()}-${pad(start.getMonth()+1)}`;
+    (byMonth[mk]=byMonth[mk]||[]).push({wk,row});
+  });
+  const monthKeys=Object.keys(byMonth).sort().reverse();
+  el.innerHTML=monthKeys.map(mk=>{
+    const moNum=parseInt(mk.slice(5,7),10);
+    const cards=byMonth[mk].slice().reverse().map(({wk,row})=>{
+      const wkNo=_weekNoInMonth(wk);
+      return _reportBoxCardHtml(wk,row,type,meta,`${moNum}월 ${wkNo}주차`);
+    }).join('');
+    return `<div class="report-box-month-row">
+      <div class="report-box-month-label">${moNum}월 모음</div>
+      <div class="report-box-grid">${cards}</div>
     </div>`;
   }).join('');
 }
