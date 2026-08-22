@@ -434,6 +434,39 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .ccol-review-box{font-size:var(--fs-sm);color:var(--tp);line-height:1.6;background:rgba(210,180,160,0.14);border-radius:10px;padding:9px 11px;margin:0 0 6px 45px;display:none;}
 .ccol-review-box.on{display:block;}
 
+/* 콘텐츠 아카이브(그리드형) — 독서달력/콘텐츠모아보기 아래 전체 폭, 한 줄 3개 고정 후 스크롤 */
+.cgrid-card{display:flex;flex-direction:column;}
+.cgrid-hdr{margin-bottom:10px;}
+.cgrid-title-row{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;}
+.cgrid-hdr-actions{display:flex;align-items:center;gap:8px;}
+.cgrid-year-toggle{font-size:16px;color:var(--tm);cursor:pointer;opacity:0.55;transition:opacity 0.15s,color 0.15s;}
+.cgrid-year-toggle:hover{opacity:0.85;}
+.cgrid-year-toggle.on{color:var(--pal-yellow-text);opacity:1;}
+.cgrid-filters{display:flex;gap:5px;flex-wrap:wrap;}
+.cgrid-chip{width:28px;height:28px;border-radius:7px;background:rgba(255,253,248,0.8);border:1px solid var(--card-b);color:var(--ts);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.cgrid-chip.on{background:var(--pal-yellow-bg);border-color:var(--pal-yellow-border);color:var(--pal-yellow-text);}
+.cgrid-scroll{max-height:420px;overflow-y:auto;padding-right:2px;}
+.cgrid-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
+.cgrid-item{display:flex;flex-direction:column;gap:5px;cursor:pointer;}
+.cgrid-thumb-wrap{position:relative;width:100%;aspect-ratio:1/1;border-radius:9px;overflow:hidden;background:var(--card-b);border:3px solid transparent;}
+.cgrid-item.active .cgrid-thumb-wrap{border-color:var(--pal-yellow-border);}
+.cgrid-thumb{width:100%;height:100%;object-fit:cover;display:block;}
+.cgrid-thumb-fallback{width:100%;height:100%;display:flex;align-items:center;justify-content:center;}
+.cgrid-thumb-fallback i{font-size:22px;color:#fff;}
+.cgrid-status-dot{position:absolute;top:6px;right:6px;font-size:10px;padding:2px 6px;border-radius:6px;background:rgba(var(--pal-mint-rgb),0.85);color:#fff;font-weight:600;}
+.cgrid-thumb-icons{position:absolute;bottom:6px;right:6px;display:flex;gap:4px;}
+.cgrid-thumb-icons i{font-size:12px;color:#fff;background:rgba(0,0,0,0.4);border-radius:5px;padding:3px;}
+.cgrid-title{font-size:var(--fs-sm);color:var(--ts);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
+.cgrid-detail-row-wrap{grid-column:1/-1;display:none;}
+.cgrid-detail-row-wrap.on{display:block;}
+.cgrid-detail{padding:10px 12px;font-size:var(--fs-sm);color:var(--tp);line-height:1.6;background:rgba(210,180,160,0.14);border-radius:11px;}
+.cgrid-detail-row{display:flex;align-items:center;justify-content:space-between;gap:6px;color:var(--tm);}
+.cgrid-detail-row-date{display:flex;align-items:center;gap:6px;}
+.cgrid-detail-stars{color:#e0b050;}
+.cgrid-detail-review{margin-top:6px;color:var(--tp);}
+.cgrid-section-label{grid-column:1/-1;font-size:var(--fs-sm);font-weight:600;color:var(--tm);margin:12px 0 2px;}
+.cgrid-section-label:first-child{margin-top:0;}
+
 /* 채움 로그 타임라인 — 이이코토 본앱 chaeum-log-* 디자인 그대로 차용(세로 점+선 타임라인) */
 .chaeum-log-card{display:flex;flex-direction:column;overflow:hidden;}
 .chaeum-log-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;flex-shrink:0;}
@@ -484,9 +517,6 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .report-page-filters{display:flex;align-items:center;gap:6px;flex-wrap:wrap;position:sticky;top:0;z-index:5;margin-left:auto;padding:6px 0;}
 .report-filter-chip{padding:6px 12px;border-radius:9px;background:rgba(255,253,248,0.8);border:1px solid var(--card-b);color:var(--ts);font-size:var(--fs-sm);cursor:pointer;white-space:nowrap;}
 .report-filter-chip.on{background:var(--pal-yellow-bg);border-color:var(--pal-yellow-border);color:var(--pal-yellow-text);font-weight:600;}
-.report-filter-home{width:32px;height:32px;border-radius:9px;background:rgba(255,253,248,0.8);border:1px solid var(--card-b);color:var(--ts);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
-.report-filter-home i{font-size:var(--fs-title);}
-.report-filter-home:hover{background:var(--pal-yellow-bg);border-color:var(--pal-yellow-border);color:var(--pal-yellow-text);}
 .report-page-sub{font-size:var(--fs-sm);color:var(--tm);margin-bottom:20px;}
 .report-sec-title{font-size:var(--fs-title);font-weight:600;color:var(--ts);margin-bottom:9px;display:flex;align-items:center;gap:6px;}
 .report-sec{margin-bottom:24px;}
@@ -759,7 +789,24 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
           <div class="rdcal-grid" id="rdcal-dows" style="margin-bottom:6px;"></div>
           <div class="rdcal-grid" id="rdcal-grid"></div>
         </div>
-        <div class="card ccol-card"><div class="card-lbl"><i class="ti ti-stack-2" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>콘텐츠 모아보기</div><div id="month-content-collect" class="ccol-scroll"></div></div>
+        <div class="card cgrid-card">
+          <div class="cgrid-hdr">
+            <div class="cgrid-title-row">
+              <div class="card-lbl" style="margin-bottom:0;"><i class="ti ti-stack-2" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>콘텐츠 모아보기</div>
+              <div class="cgrid-hdr-actions">
+                <div class="cgrid-filters" id="cgrid-filters">
+                  <div class="cgrid-chip on" data-cat="all" onclick="setCgridFilter('all')" title="전체"><i class="ti ti-stack-2" aria-hidden="true"></i></div>
+                  <div class="cgrid-chip" data-cat="book" onclick="setCgridFilter('book')" title="도서"><i class="ti ti-book" aria-hidden="true"></i></div>
+                  <div class="cgrid-chip" data-cat="drama" onclick="setCgridFilter('drama')" title="드라마"><i class="ti ti-device-tv" aria-hidden="true"></i></div>
+                  <div class="cgrid-chip" data-cat="movie" onclick="setCgridFilter('movie')" title="영화"><i class="ti ti-movie" aria-hidden="true"></i></div>
+                  <div class="cgrid-chip" data-cat="music" onclick="setCgridFilter('music')" title="음악"><i class="ti ti-music" aria-hidden="true"></i></div>
+                </div>
+                <i class="ti ti-calendar-stats cgrid-year-toggle" id="cgrid-year-toggle" onclick="toggleCgridYearMode()" title="연간모아보기" aria-hidden="true"></i>
+              </div>
+            </div>
+          </div>
+          <div class="cgrid-scroll" id="month-content-grid"></div>
+        </div>
       </div>
       <div class="card"><div class="card-lbl"><i class="ti ti-chart-bar" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>콘텐츠 타임라인</div><div id="month-tt"></div></div>
       <div class="card month-quotes-card"><div class="card-lbl"><i class="ti ti-quote" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>이번 달 수집문장</div><div id="month-quotes"></div></div>
@@ -779,7 +826,6 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
           <div class="report-filter-chip" data-filter="weekly" onclick="setReportFilter('weekly')">주간종합</div>
           <div class="report-filter-chip" data-filter="habit" onclick="setReportFilter('habit')">습관</div>
           <div class="report-filter-chip" data-filter="memo" onclick="setReportFilter('memo')">메모</div>
-          <div class="report-filter-home" onclick="goToReportsHome()" title="이번 달 전체보기"><i class="ti ti-calendar" aria-hidden="true"></i></div>
         </div>
       </div>
       <div class="report-page-sub" id="report-page-sub">이 달에 발행된 리포트를 모아봤어요</div>

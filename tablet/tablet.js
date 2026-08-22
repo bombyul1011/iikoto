@@ -1162,7 +1162,7 @@ async function loadMonthTab(){
   await renderMonthHabits(y,mo);
   await renderMonthStatBar(y,mo);
   await renderMonthQuotes(y,mo);
-  await renderMonthContentCollect(y,mo);
+  await renderMonthContentGrid(y,mo);
   await renderChaeumLogTablet();
   _rdCalDate=new Date(_monthCalDate);
   await renderReadingCal();
@@ -1243,6 +1243,111 @@ async function renderMonthContentCollect(y,mo){
 function toggleCcolReview(id){
   const box=document.getElementById('ccol-review-'+id);
   if(box)box.classList.toggle('on');
+}
+// ── 콘텐츠 아카이브(그리드형) ──
+let _cgridFilter='all';
+let _cgridContents=[]; // 현재 달(또는 연간) 콘텐츠 원본 캐시(필터 전환 시 재조회 없이 재사용)
+let _cgridYearMode=false;
+function setCgridFilter(cat){
+  _cgridFilter=cat;
+  document.querySelectorAll('.cgrid-chip').forEach(el=>el.classList.toggle('on',el.dataset.cat===cat));
+  _renderCgridFromCache();
+}
+// 제목 옆 "연간모아보기" 토글 — 켜면 그 순간 보고 있던 연도 전체를, 끄면 다시 이번 월로 복귀
+async function toggleCgridYearMode(){
+  _cgridYearMode=!_cgridYearMode;
+  document.getElementById('cgrid-year-toggle').classList.toggle('on',_cgridYearMode);
+  if(_cgridYearMode){
+    await _loadCgridYearly(_monthCalDate.getFullYear());
+  }else{
+    await renderMonthContentGrid(_monthCalDate.getFullYear(),_monthCalDate.getMonth());
+  }
+}
+async function _loadCgridYearly(y){
+  const rows=await supaFetch(`contents?month_key=like.${y}-*`);
+  const belongsHere=c=>{
+    if(c.status==='done'||c.status==='stopped')return true;
+    return c.status==='watching'&&y===new Date().getFullYear();
+  };
+  _cgridContents=(rows||[]).filter(belongsHere).sort((a,b)=>(b.created||0)-(a.created||0));
+  _cgridFilter='all';
+  document.querySelectorAll('.cgrid-chip').forEach(el=>el.classList.toggle('on',el.dataset.cat==='all'));
+  _renderCgridFromCache();
+}
+async function renderMonthContentGrid(y,mo){
+  const mk=`${y}-${pad(mo+1)}`;
+  const prevMk=monthKeyOf(new Date(y,mo-1,1));
+  const isSameMonth=mk===monthKeyOf(new Date());
+  _cgridFilter='all';
+  _cgridYearMode=false;
+  const yearToggleEl=document.getElementById('cgrid-year-toggle');
+  if(yearToggleEl)yearToggleEl.classList.remove('on');
+  document.querySelectorAll('.cgrid-chip').forEach(el=>el.classList.toggle('on',el.dataset.cat==='all'));
+  const [curRows,prevRows]=await Promise.all([
+    supaFetch(`contents?month_key=eq.${mk}`),
+    supaFetch(`contents?month_key=eq.${prevMk}`)
+  ]);
+  const belongsHere=c=>{
+    if(c.status==='done'||c.status==='stopped')return isContentEndedInMonthTablet(c,mk);
+    return c.status==='watching'&&isSameMonth;
+  };
+  _cgridContents=[...(curRows||[]).filter(belongsHere),...(prevRows||[]).filter(belongsHere)]
+    .sort((a,b)=>(b.created||0)-(a.created||0));
+  _renderCgridFromCache();
+}
+function _renderCgridFromCache(){
+  const el=document.getElementById('month-content-grid');
+  if(!el)return;
+  const list=_cgridFilter==='all'?_cgridContents:_cgridContents.filter(c=>c.content_cat===_cgridFilter);
+  _cgridActiveId=null;
+  if(!list.length){el.innerHTML='<div class="empty-msg">이 달엔 해당하는 콘텐츠가 없어요</div>';return;}
+  el.innerHTML=`<div class="cgrid-grid" id="cgrid-grid-inner">${_cgridRowsHtml(list)}</div>`;
+}
+// 3개씩 행 단위로 렌더 — 펼침 영역을 그 행 바로 뒤에 3칸 전체폭으로 삽입하기 위해 행 경계를 알아야 함
+function _cgridRowsHtml(list){
+  let html='';
+  for(let i=0;i<list.length;i+=3){
+    const row=list.slice(i,i+3);
+    html+=row.map(c=>_cgridItemHtml(c)).join('');
+    const activeInRow=row.find(c=>c.id===_cgridActiveId);
+    html+=`<div class="cgrid-detail-row-wrap${activeInRow?' on':''}" id="cgrid-detail-wrap-${i}">${activeInRow?_cgridDetailHtml(activeInRow):''}</div>`;
+  }
+  return html;
+}
+let _cgridActiveId=null;
+function _cgridPeriodLabel(c){
+  const s=c.start_date,e=c.end_date;
+  if(s&&e&&s!==e)return `${s.slice(5).replace('-','.')}~${e.slice(5).replace('-','.')}`;
+  return (e||s||'').slice(5).replace('-','.');
+}
+function _cgridDetailHtml(c){
+  const period=_cgridPeriodLabel(c);
+  const stars=c.stars>0?`<span class="cgrid-detail-stars">${'★'.repeat(c.stars)}</span>`:'';
+  const reviewHtml=c.review?`<div class="cgrid-detail-review">${escapeHtml(c.review)}</div>`:'';
+  const topRow=(period||stars)?`<div class="cgrid-detail-row"><span class="cgrid-detail-row-date">${period?`<i class="ti ti-calendar" style="font-size:12px;" aria-hidden="true"></i>${period}`:''}</span>${stars}</div>`:'';
+  return `<div class="cgrid-detail">${topRow}${reviewHtml}</div>`;
+}
+function _cgridItemHtml(c){
+  const meta=CAT_ICON_META[c.content_cat]||{icon:'ti-stack-2',bg:'rgba(150,150,150,1)'};
+  const thumb=c.poster
+    ?`<img class="cgrid-thumb" src="${c.poster}" />`
+    :`<div class="cgrid-thumb-fallback" style="background:${meta.bg};"><i class="ti ${meta.icon}" aria-hidden="true"></i></div>`;
+  const statusDot=c.status==='watching'?'<span class="cgrid-status-dot">진행중</span>':'';
+  const icons=[];
+  if(c.stars>0)icons.push('<i class="ti ti-star" aria-hidden="true"></i>');
+  if(c.review)icons.push('<i class="ti ti-message-circle" aria-hidden="true"></i>');
+  const thumbIcons=icons.length?`<div class="cgrid-thumb-icons">${icons.join('')}</div>`:'';
+  const active=c.id===_cgridActiveId;
+  return `<div class="cgrid-item${active?' active':''}" data-cid="${c.id}" onclick="toggleCgridDetail('${c.id}')">
+    <div class="cgrid-thumb-wrap">${thumb}${statusDot}${thumbIcons}</div>
+    <div class="cgrid-title">${escapeHtml(c.title||'')}</div>
+  </div>`;
+}
+function toggleCgridDetail(id){
+  _cgridActiveId=(_cgridActiveId===id)?null:id;
+  const list=_cgridFilter==='all'?_cgridContents:_cgridContents.filter(c=>c.content_cat===_cgridFilter);
+  const el=document.getElementById('cgrid-grid-inner');
+  if(el)el.innerHTML=_cgridRowsHtml(list);
 }
 async function renderMonthTimetable(y,mo){
   const el=document.getElementById('month-tt');
@@ -1680,11 +1785,6 @@ function resetReportsView(){
   _reportMonthDate=new Date();
   _reportFilter=null;
   document.querySelectorAll('.report-filter-chip').forEach(el=>el.classList.remove('on'));
-}
-// 필터칩 옆 달력 아이콘 — 리포트탭 안에서 어느 화면을 보고 있든 이번 달 전체보기(메인)로 복귀
-function goToReportsHome(){
-  resetReportsView();
-  loadReportsTab();
 }
 // 연간모드(습관/메모 박스, 주간종합 리스트)에서 쓰는 "월 정보 포함" 라벨 — 예: "8월 3주차"
 function _weekLabelWithMonth(wk,wkNo){
