@@ -538,6 +538,8 @@ async function renderTodayMemos(dk){
     const timeHtml=isSeed?'<i class="ti ti-seeding seed-ico" aria-hidden="true"></i>':(m.memo_time||'');
     return `<div class="memo-item${isSeed?' memo-seed':todClass}"><div class="memo-time">${timeHtml}</div><div class="memo-txt">${escapeHtml(m.text)}</div></div>`;
   }).join('');
+  // 정렬 순서는 그대로(시간순) 두고, 첫 화면 노출은 최신(마지막) 메모가 보이도록 스크롤을 맨 아래로
+  el.scrollTop=el.scrollHeight;
 }
 // ── 오늘의 메모 카드 — 검색 ──
 function toggleMemoSearch(){
