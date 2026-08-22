@@ -139,6 +139,8 @@ const RHYTHM_CATS={
   enjoy:{label:'감상',color:'var(--rh-enjoy)',icon:'ti-stack-2'},
   home:{label:'정리',color:'var(--rh-home)',icon:'ti-home'}
 };
+// 리듬 카테고리별 의미 가이드 — 월간리포트 리듬 AI 분석 프롬프트에서 라벨만으론 모호한 카테고리를 짧게 설명(2026-08-22, 정의 누락 수정).
+const RHYTHM_CAT_GUIDE=`카테고리 의미: 운동(신체 활동), 휴식(수면 외 쉼), 단장(씻기·꾸미기 등 자기관리), 업무(일), 외출(이동·약속), 책상(독립적인 개인 작업·자기계발), 감상(영화·책 등 콘텐츠 소비), 정리(청소·집안일).`;
 
 const CAT_ICON_META={
   drama:{icon:'ti-device-tv',bg:'rgba(var(--pal-pink-rgb),1)',iconColor:'#fff',label:'드라마'},
