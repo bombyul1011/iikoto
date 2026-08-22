@@ -3434,7 +3434,7 @@ async function loadMonthlyGoalReportContent(){
     comment=await buildMonthlyGoalCommentText(weeks);
     if(comment){
       S.set(cacheKey,comment);
-      aiCacheSet(cacheKey,comment,AI_CACHE_TTL.monthlyReport);
+      aiCacheSet(cacheKey,comment);
     }
   }
   if(comment){
@@ -3559,7 +3559,7 @@ async function loadMonthlyReportContent(){
     report=await generateMonthlyReportAI(mk,stats);
     if(report){
       S.set(cacheKey,report);
-      aiCacheSet(cacheKey,JSON.stringify(report),AI_CACHE_TTL.monthlyReport);
+      aiCacheSet(cacheKey,JSON.stringify(report));
     }
   }
   // 그 사이에 다른 달로 넘어갔으면 적용하지 않음
@@ -3654,7 +3654,7 @@ function loadWeeklyReviewFor(dk){
     makeWeeklySummaryCard().then(function(html){
       if(html&&!html.includes('__ERR__')){
         S.set(cacheKey,html);
-        aiCacheSet(cacheKey,html,AI_CACHE_TTL.weeklyReport);
+        aiCacheSet(cacheKey,html);
         content.innerHTML=html;
       } else {
         content.innerHTML='<div class="sheet-loading-msg">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
@@ -4112,7 +4112,7 @@ ${GREETING_OUTPUT_RULE}
       subEl.textContent=text;
       _greetingCache={text,subSection:subSec,fetchedAt:Date.now()};
       _bcSet(subSec+'_greeting',_greetingCache);
-      aiCacheSet('greeting_'+dateKey(new Date())+'_'+subSec,text,AI_CACHE_TTL.short);
+      aiCacheSet('greeting_'+dateKey(new Date())+'_'+subSec,text);
     } else {
       const wStr=weather?weather.icon+' '+weather.temp+'° · ':'';
       const defaults={morning:wStr+'오늘 하루도 잘 부탁해요 🌿',afternoon:wStr+'오늘도 잘 해내고 있어요 ✨',night:wStr+'오늘 하루 고생 많았어요 🌙',dawn:'오늘도 하루를 잘 채워내셨어요. 편안한 밤 되세요.'};
@@ -4438,28 +4438,15 @@ async function supaUpsert(path,onConflict,body){
 }
 // ── AI 캐시 (서버 공유) ──
 // 목적: API 키가 있는 기기(주로 모바일)가 생성한 AI 문구를, 키가 없는 기기(주로 PC)도 그대로 볼 수 있게 서버에 저장.
-// 만료된 항목은 여기서 지우지 않고 조회 시점에 expires_at 비교로 무시만 함 — 정리는 별도로 월 1회 정도 수동 실행.
-// ttlMs가 null이면 만료 없음(월간 리포트용).
+// 용량이 매우 작아(텍스트 위주, 무료 플랜 500MB 기준 수십 년치 여유) 만료/삭제 로직 없이 영구 보관.
 async function aiCacheGet(cacheKey){
-  const rows=await supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent(cacheKey)}&select=content,expires_at`);
+  const rows=await supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent(cacheKey)}&select=content`);
   if(!rows||!rows.length)return null;
-  const row=rows[0];
-  if(row.expires_at!=null&&row.expires_at<Date.now())return null; // 만료됨 — 없는 것으로 취급
-  return row.content;
+  return rows[0].content;
 }
-async function aiCacheSet(cacheKey,content,ttlMs){
-  const expiresAt=ttlMs==null?null:Date.now()+ttlMs;
-  await supaUpsert('ai_cache','cache_key',[{cache_key:cacheKey,content,expires_at:expiresAt}]);
+async function aiCacheSet(cacheKey,content){
+  await supaUpsert('ai_cache','cache_key',[{cache_key:cacheKey,content}]);
 }
-// 확정(선택)되지 않아 더 이상 쓸모없어진 캐시를 지울 때 사용
-async function aiCacheDelete(cacheKey){
-  await supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent(cacheKey)}`,'DELETE');
-}
-const AI_CACHE_TTL={
-  short:14*24*60*60*1000,   // 2주 — 인사말, 오후코멘트, 새벽리뷰, 다음주제안 등 일반 캐시
-  weeklyReport:30*24*60*60*1000, // 한 달 — 주간 리포트
-  monthlyReport:null        // 만료 없음 — 월간 리포트(영구 보관)
-};
 // ── 배열형(하루/월 단위 여러 행) 동기화: DELETE 후 POST가 아니라
 // upsert(추가/수정) + 로컬에서 사라진 항목만 개별 삭제로 처리.
 // 이렇게 하면 두 요청 사이에 서버가 통째로 비는 순간이 없어서
@@ -7467,7 +7454,7 @@ async function _fetchNutriComment(dk){
   _nutriCommentCache[dk]=parsed;
   const raw=JSON.stringify(parsed);
   _bcSet('nutricomment_'+dk,raw);
-  aiCacheSet('nutricomment_'+dk,raw,AI_CACHE_TTL.short);
+  aiCacheSet('nutricomment_'+dk,raw);
   return parsed;
 }
 function makeNutriCommentBanner(){
@@ -8371,7 +8358,7 @@ async function loadChallengeReviewFor(wk){
   const html=await buildChallengeReviewHtml(wk);
   if(html){
     S.set(cacheKey,html);
-    aiCacheSet(cacheKey,html,AI_CACHE_TTL.weeklyReport);
+    aiCacheSet(cacheKey,html);
     content.innerHTML=html;
   }
   else content.innerHTML='<div class="sheet-loading-msg">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
@@ -8466,7 +8453,7 @@ async function openNextWeekFeedbackSheet(){
   const html=await buildNextWeekFeedbackHtml(wk);
   if(html){
     S.set(cacheKey,html);
-    aiCacheSet(cacheKey,html,AI_CACHE_TTL.weeklyReport);
+    aiCacheSet(cacheKey,html);
     content.innerHTML=html;
   }
   else content.innerHTML='<div class="sheet-loading-msg">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
@@ -8509,7 +8496,7 @@ async function loadWeeklyMemoReportFor(wk){
   const html=await buildWeeklyMemoReportHtml(wk);
   if(html){
     S.set(cacheKey,html);
-    aiCacheSet(cacheKey,html,AI_CACHE_TTL.weeklyReport);
+    aiCacheSet(cacheKey,html);
     content.innerHTML=html;
   }
   else content.innerHTML='<div class="sheet-loading-msg">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
