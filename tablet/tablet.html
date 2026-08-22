@@ -235,6 +235,12 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .goal-hcard .card-lbl i{color:#8a6c20!important;}
 
 /* ── 주간탭: 지난주 대비 ── */
+.wmroutine-row{display:flex;align-items:center;gap:8px;padding:6px 0;}
+.wmroutine-row i{font-size:var(--fs-sm);flex-shrink:0;}
+.wmroutine-label{font-size:var(--fs-sm);color:var(--tm);width:52px;flex-shrink:0;}
+.wmroutine-bar-track{flex:1;height:6px;border-radius:3px;background:rgba(var(--divider-rgb),0.15);overflow:hidden;}
+.wmroutine-bar-fill{height:100%;border-radius:3px;}
+.wmroutine-cnt{font-size:var(--fs-sm);color:var(--ts);font-family:'DM Sans',sans-serif;width:28px;text-align:right;flex-shrink:0;}
 .week-delta-card{display:flex;flex-direction:column;}
 .week-delta-card #week-delta{flex:1;display:flex;align-items:center;}
 .week-delta-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;width:100%;}
@@ -618,7 +624,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
       </div>
       <div class="grid2">
         <div class="card"><div class="card-lbl"><i class="ti ti-chart-donut" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>주간 습관 현황</div><div id="week-habit-matrix"></div></div>
-        <div class="card"><!-- 자리 비워둠(추후 배너 예정) --></div>
+        <div class="card"><div class="card-lbl"><i class="ti ti-apple" style="color:#e0a050;" aria-hidden="true"></i>모닝 루틴 현황</div><div id="week-morning-routine"></div></div>
       </div>
       <div class="card"><div class="card-lbl"><i class="ti ti-rainbow" style="color:rgba(var(--pal-orange-rgb),1);" aria-hidden="true"></i>리듬 흐름 비교</div><div id="week-rhythm-flow"></div></div>
       <div class="card"><div class="card-lbl"><i class="ti ti-pencil" style="color:rgba(var(--pal-yellow-rgb),1);" aria-hidden="true"></i>하루한줄</div>
