@@ -534,6 +534,38 @@ async function renderTodayMemos(dk){
     return `<div class="memo-item${isSeed?' memo-seed':todClass}"><div class="memo-time">${timeHtml}</div><div class="memo-txt">${escapeHtml(m.text)}</div></div>`;
   }).join('');
 }
+// ── 오늘의 메모 카드 — 검색 ──
+function toggleMemoSearch(){
+  const box=document.getElementById('memo-search-box');
+  const toggle=document.getElementById('memo-search-toggle');
+  const on=box.classList.toggle('on');
+  toggle.classList.toggle('on',on);
+  if(on){
+    document.getElementById('memo-search-input').focus();
+  }else{
+    document.getElementById('memo-search-input').value='';
+    document.getElementById('memo-search-results').innerHTML='';
+  }
+}
+let _memoSearchTimer=null;
+function onMemoSearchInput(){
+  clearTimeout(_memoSearchTimer);
+  const q=document.getElementById('memo-search-input').value.trim();
+  const resultsEl=document.getElementById('memo-search-results');
+  if(!q){resultsEl.innerHTML='';return;}
+  _memoSearchTimer=setTimeout(()=>_runMemoSearch(q),300);
+}
+async function _runMemoSearch(q){
+  const resultsEl=document.getElementById('memo-search-results');
+  resultsEl.innerHTML='<div class="memo-search-empty">검색 중...</div>';
+  const encoded=encodeURIComponent(q.replace(/[%*]/g,''));
+  const rows=await supaFetch(`memos?text=ilike.*${encoded}*&order=date_key.desc,memo_time.desc&limit=50`);
+  if(!rows||!rows.length){resultsEl.innerHTML='<div class="memo-search-empty">검색 결과가 없어요</div>';return;}
+  resultsEl.innerHTML=rows.map(m=>{
+    const dateLabel=m.date_key?`${m.date_key.slice(5,7)}.${m.date_key.slice(8,10)}${m.memo_time?' · '+m.memo_time:''}`:'';
+    return `<div class="memo-search-result-item"><div class="memo-search-result-date">${dateLabel}</div><div class="memo-search-result-txt">${escapeHtml(m.text)}</div></div>`;
+  }).join('');
+}
 
 function renderTodaySleep(dk,sleep,recentSleepRows){
   const scoreEl=document.getElementById('today-sleep-score');
@@ -1205,45 +1237,6 @@ function isContentEndedInMonthTablet(c,targetMk){
   return (c.end_date||c.start_date||'').slice(0,7)===targetMk;
 }
 // 본앱 computeContentMonthlyList와 동일 규칙: 완결은 종료월에 한 번, 진행중은 오늘이 속한 달에서만 노출
-async function renderMonthContentCollect(y,mo){
-  const el=document.getElementById('month-content-collect');
-  const mk=`${y}-${pad(mo+1)}`;
-  const prevMk=monthKeyOf(new Date(y,mo-1,1));
-  const isSameMonth=mk===monthKeyOf(new Date());
-  const [curRows,prevRows]=await Promise.all([
-    supaFetch(`contents?month_key=eq.${mk}`),
-    supaFetch(`contents?month_key=eq.${prevMk}`)
-  ]);
-  const belongsHere=c=>{
-    if(c.status==='done'||c.status==='stopped')return isContentEndedInMonthTablet(c,mk);
-    return c.status==='watching'&&isSameMonth;
-  };
-  const list=[...(curRows||[]).filter(belongsHere),...(prevRows||[]).filter(belongsHere)];
-  const CATS=['drama','book','movie','music'];
-  const byCat={drama:[],book:[],movie:[],music:[]};
-  list.forEach(c=>{if(byCat[c.content_cat])byCat[c.content_cat].push(c);});
-  const hasAny=CATS.some(cat=>byCat[cat].length>0);
-  if(!hasAny){el.innerHTML='<div class="empty-msg">이 달엔 완료한 콘텐츠가 없어요</div>';return;}
-  el.innerHTML=CATS.filter(cat=>byCat[cat].length>0).map(cat=>{
-    const meta=CAT_ICON_META[cat];
-    const items=byCat[cat].map(c=>{
-      const stars=c.stars>0?`<span class="ccol-stars">${'★'.repeat(c.stars)}</span>`:'';
-      const status=c.status==='stopped'?'<span class="ccol-status">중단</span>':(c.status==='watching'?'<span class="ccol-status">진행중</span>':'');
-      const poster=c.poster
-        ?`<img class="ccol-poster" src="${c.poster}" />`
-        :`<div class="ccol-poster-fallback" style="background:${meta.bg};"><i class="ti ${meta.icon}" style="font-size:13px;color:#fff;" aria-hidden="true"></i></div>`;
-      const reviewId=c.cid||('t'+(c.created||0));
-      const reviewIconHtml=c.review?`<span class="ccol-review-icon" onclick="toggleCcolReview('${reviewId}')" title="코멘트 보기"><i class="ti ti-message-circle" aria-hidden="true"></i></span>`:'';
-      const reviewBoxHtml=c.review?`<div class="ccol-review-box" id="ccol-review-${reviewId}">${escapeHtml(c.review)}</div>`:'';
-      return `<div class="ccol-item">${poster}<div class="ccol-title"><span>${escapeHtml(c.title||'')}</span>${reviewIconHtml}</div>${stars}${status}</div>${reviewBoxHtml}`;
-    }).join('');
-    return `<div class="ccol-sec"><div class="ccol-sec-title"><i class="ti ${meta.icon}" aria-hidden="true"></i>${meta.label}</div>${items}</div>`;
-  }).join('');
-}
-function toggleCcolReview(id){
-  const box=document.getElementById('ccol-review-'+id);
-  if(box)box.classList.toggle('on');
-}
 // ── 콘텐츠 아카이브(그리드형) ──
 let _cgridFilter='all';
 let _cgridContents=[]; // 현재 달(또는 연간) 콘텐츠 원본 캐시(필터 전환 시 재조회 없이 재사용)

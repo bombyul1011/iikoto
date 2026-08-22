@@ -26,6 +26,7 @@
   --fs-lg:calc(var(--fs-title) + 2px);    /* 큰 강조(날짜 헤더, 습관 배너 소제목, 수면점수 등) */
   --fs-xl:calc(var(--fs-title) + 8px);    /* 최상위 헤더(월/일) */
   --fs-sm:calc(var(--fs-body) - 1.5px);   /* 보조 라벨(시간, 카테고리 태그, 요일, 스파크라인 축 등) */
+  --fs-xs:calc(var(--fs-sm) - 1.5px);   /* 더 작은 보조 라벨(그래프 축, 배지, 사이드바 서브텍스트 등) */
   --fs-tab:calc(var(--fs-title) - 0.5px); /* 플로팅 탭 메뉴 텍스트 */
   --fs-body-1:calc(var(--fs-body) - 1.5px); /* 이번 달 수집문장 본문 전용 — 서체(바른바탕) 특성상 같은 px여도 커 보여서 보정. 화면폭별 clamp 조정을 시도했으나 가로(아이패드 등 넓은 화면)에서 계속 과하게 작아진다는 피드백으로 원래의 고정값으로 되돌림. --fs-body 연동이라 설정 폰트 크기 조절에도 같이 반응 */
 
@@ -120,7 +121,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .side-progress-ring{flex-shrink:0;}
 .side-progress-txt{flex:1;min-width:0;}
 .side-progress-main{font-size:var(--fs-sm);color:var(--ts);margin-bottom:2px;}
-.side-progress-sub{font-size:11px;color:var(--tm);}
+.side-progress-sub{font-size:var(--fs-xs);color:var(--tm);}
 .side-hcard{border-radius:16px;padding:15px 14px 13px;margin-bottom:10px;position:relative;overflow:hidden;box-shadow:0 2px 16px rgba(180,140,120,0.08),inset 0 1px 0 rgba(255,250,240,0.62);}
 .side-hcard.morning{background:linear-gradient(135deg,rgba(255,205,175,0.72),rgba(255,235,180,0.55));border:1px solid rgba(255,200,165,0.55);}
 /* 낮(12-16시) — 오후(핑크)와 구분되는 "해 떠있는 시간" 톤. 앱 전역에서 이미 쓰는 --pal-sky-rgb/--pal-yellow-rgb를 그대로 가져와 톤 일관성 유지. */
@@ -151,6 +152,19 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 /* ── 공용 카드 ── */
 .card{background:var(--card);border:1px solid var(--card-b);border-radius:15px;padding:16px 18px;box-shadow:0 2px 14px rgba(0,0,0,0.05);margin-bottom:13px;}
 .card-lbl{font-size:var(--fs-title);font-weight:600;color:var(--tp);margin-bottom:11px;display:flex;align-items:center;gap:7px;}
+.card-lbl-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;}
+.memo-search-toggle{font-size:16px;color:var(--tm);cursor:pointer;opacity:0.55;transition:opacity 0.15s,color 0.15s;}
+.memo-search-toggle:hover{opacity:0.85;}
+.memo-search-toggle.on{color:var(--pal-yellow-text);opacity:1;}
+.memo-search-box{display:none;margin-bottom:12px;}
+.memo-search-box.on{display:block;}
+.memo-search-input{width:100%;background:rgba(255,255,255,0.5);border:1px solid rgba(var(--divider-rgb),0.35);border-radius:10px;padding:9px 12px;font-size:var(--fs-body);color:var(--tp);font-family:'DM Sans',sans-serif;outline:none;box-sizing:border-box;}
+.memo-search-results{margin-top:8px;max-height:280px;overflow-y:auto;}
+.memo-search-result-item{padding:9px 2px;border-bottom:1px solid rgba(var(--divider-rgb),0.25);}
+.memo-search-result-item:last-child{border-bottom:none;}
+.memo-search-result-date{font-size:var(--fs-sm);color:var(--tm);margin-bottom:3px;}
+.memo-search-result-txt{font-size:var(--fs-body);color:var(--tp);line-height:1.55;white-space:pre-wrap;}
+.memo-search-empty{font-size:var(--fs-sm);color:var(--tm);padding:10px 2px;}
 .card-lbl i{font-size:var(--fs-lg);}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;align-items:stretch;}
 /* 목표(3줄 기준)+습관 카드 왼쪽 세로 스택과, 오른쪽 채움로그(스크롤)의 기준 높이를 명확히 고정.
@@ -297,10 +311,10 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .wsleep2-icon-box i{font-size:18px;}
 .wsleep2-label{font-size:var(--fs-sm);color:var(--ts);margin-bottom:5px;}
 .wsleep2-val{font-size:20px;font-weight:700;font-family:'DM Sans',sans-serif;color:var(--tp);line-height:1.15;}
-.wsleep2-val .unit{font-size:12px;font-weight:500;color:var(--ts);}
-.wsleep2-sub{margin-top:8px;font-size:12px;color:var(--ts);background:rgba(210,180,160,0.14);border-radius:9px;padding:3px 8px;white-space:nowrap;}
+.wsleep2-val .unit{font-size:var(--fs-xs);font-weight:500;color:var(--ts);}
+.wsleep2-sub{margin-top:8px;font-size:var(--fs-xs);color:var(--ts);background:rgba(210,180,160,0.14);border-radius:9px;padding:3px 8px;white-space:nowrap;}
 .wsleep2-sub b{color:var(--tp);font-weight:700;}
-.wsleep2-badge{margin-top:8px;font-size:12px;font-weight:600;border-radius:20px;padding:3px 10px;}
+.wsleep2-badge{margin-top:8px;font-size:var(--fs-xs);font-weight:600;border-radius:20px;padding:3px 10px;}
 .wsleep2-foot{margin-top:13px;text-align:center;font-size:11.5px;color:var(--tm);}
 
 /* ── 주간탭: 리듬 흐름 비교(본앱 recap-rhythm-bar-chart 2줄 이식 + 상위 4개 평균시간 표기) ── */
@@ -310,7 +324,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .rf-bar-chart{display:flex;height:32px;border-radius:9px;overflow:hidden;flex:1;background:var(--graph-track-color);}
 .rf-bar-seg{display:flex;align-items:center;justify-content:center;gap:4px;overflow:hidden;padding:0 3px;}
 .rf-bar-seg i{font-size:var(--fs-sm);color:#fff;flex-shrink:0;}
-.rf-seg-time{font-size:11px;color:#fff;font-weight:600;white-space:nowrap;opacity:.95;}
+.rf-seg-time{font-size:var(--fs-sm);color:#fff;font-weight:600;white-space:nowrap;opacity:.95;}
 
 
 /* ── 좌하단 플로팅 탭 ── */
@@ -416,23 +430,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .content-card-row .content-row{flex:0 0 calc(50% - 7px);min-width:0;padding:5px 0;border-right:none;margin-right:0;}
 .content-card-row .content-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
-/* 콘텐츠 모아보기(월별) — 본앱 콘텐츠 모아보기 시트 구조 이식, 독서달력 카드와 높이 맞춰 넘치면 스크롤 */
-.ccol-card{display:flex;flex-direction:column;overflow:hidden;}
-.ccol-scroll{flex:1 1 auto;min-height:0;overflow-y:auto;}
-.ccol-sec{margin-bottom:12px;}
-.ccol-sec:last-child{margin-bottom:0;}
-.ccol-sec-title{display:flex;align-items:center;gap:5px;font-size:var(--fs-sm);font-weight:600;color:var(--ts);margin-bottom:6px;}
-.ccol-item{display:flex;align-items:center;gap:9px;padding:5px 0;}
-.ccol-poster{width:30px;height:30px;border-radius:7px;object-fit:cover;flex-shrink:0;}
-.ccol-poster-fallback{width:30px;height:30px;border-radius:7px;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
-.ccol-title{flex:1;min-width:0;font-size:var(--fs-body);color:var(--tp);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:5px;}
-.ccol-title>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.ccol-status{flex-shrink:0;font-size:var(--fs-sm);color:var(--tm);}
-.ccol-stars{flex-shrink:0;font-size:var(--fs-sm);color:#e0b050;}
-.ccol-review-icon{color:var(--tm);opacity:0.65;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center;}
-.ccol-review-icon i{font-size:var(--fs-sm);}
-.ccol-review-box{font-size:var(--fs-sm);color:var(--tp);line-height:1.6;background:rgba(210,180,160,0.14);border-radius:10px;padding:9px 11px;margin:0 0 6px 45px;display:none;}
-.ccol-review-box.on{display:block;}
+/* 콘텐츠 모아보기(월별, 리스트형) — 그리드형(.cgrid-*)으로 대체됨, 아래 죽은 CSS 전체 제거됨
 
 /* 콘텐츠 아카이브(그리드형) — 독서달력/콘텐츠모아보기 아래 전체 폭, 한 줄 3개 고정 후 스크롤 */
 .cgrid-card{display:flex;flex-direction:column;}
@@ -628,7 +626,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .mrp-wave-legend i{width:9px;height:9px;border-radius:50%;display:inline-block;}
 .mrp-wave-wrap{position:relative;height:110px;}
 .mrp-wave-wrap svg{width:100%;height:100%;}
-.mrp-wave-labels{display:flex;justify-content:space-between;font-size:11px;color:var(--tm);margin-top:6px;padding:0 4px;}
+.mrp-wave-labels{display:flex;justify-content:space-between;font-size:var(--fs-xs);color:var(--tm);margin-top:6px;padding:0 4px;}
 .mrp-wave-labels span{cursor:pointer;padding:3px 7px;border-radius:8px;transition:background 0.15s,color 0.15s;}
 .mrp-wave-labels span.active{background:rgba(var(--pal-mint-rgb),0.16);color:var(--tp);font-weight:600;}
 .mrp-wave-detail{display:none;margin-top:8px;padding:11px 13px;background:rgba(var(--pal-mint-rgb),0.08);border-radius:11px;gap:9px;}
@@ -640,7 +638,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .mrp-wave-tail{display:flex;justify-content:space-between;margin-top:12px;padding-top:12px;border-top:1px dashed rgba(var(--divider-rgb),0.22);}
 .mrp-wave-tail-item{text-align:center;}
 .mrp-wave-tail-item .n{font-size:var(--fs-lg);font-weight:700;color:var(--tp);}
-.mrp-wave-tail-item .l{font-size:11px;color:var(--ts);margin-top:2px;}
+.mrp-wave-tail-item .l{font-size:var(--fs-xs);color:var(--ts);margin-top:2px;}
 
 /* 이 달의 수면 카드 */
 .mrsl-top{display:grid;grid-template-columns:1fr 1fr;gap:18px;padding-bottom:16px;}
@@ -737,7 +735,17 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
           <div class="card sleep-card"><div class="sleep-hdr"><div class="card-lbl"><i class="ti ti-moon-stars" style="color:rgba(var(--pal-sky-rgb),1);" aria-hidden="true"></i>수면<span class="sleep-time-sub" id="today-sleep-time-sub"></span></div><div class="sleep-score-row" id="today-sleep-score"></div></div><div id="today-sleep"></div></div>
         </div>
       </div>
-      <div class="card p"><div class="card-lbl"><i class="ti ti-pencil-heart" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>오늘의 메모</div><div class="memo-tl" id="today-memos"></div></div>
+      <div class="card p">
+        <div class="card-lbl-row">
+          <div class="card-lbl" style="margin-bottom:0;"><i class="ti ti-pencil-heart" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>오늘의 메모</div>
+          <i class="ti ti-search memo-search-toggle" id="memo-search-toggle" onclick="toggleMemoSearch()" title="메모 검색" aria-hidden="true"></i>
+        </div>
+        <div class="memo-search-box" id="memo-search-box">
+          <input type="text" class="memo-search-input" id="memo-search-input" placeholder="메모 검색" oninput="onMemoSearchInput()" />
+          <div class="memo-search-results" id="memo-search-results"></div>
+        </div>
+        <div class="memo-tl" id="today-memos"></div>
+      </div>
       <div class="grid2">
         <div class="card meal-card"><div class="card-lbl"><i class="ti ti-tools-kitchen-3" style="color:rgba(var(--pal-lime-rgb),1);" aria-hidden="true"></i>오늘의 식사</div><div id="today-meals"></div></div>
         <div class="quote-card"><div class="quote-card-inner"><div class="card-lbl"><i class="ti ti-book" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>오늘의 책</div><div id="today-reading"></div></div></div>
