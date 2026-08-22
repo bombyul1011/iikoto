@@ -327,7 +327,7 @@ async function loadTodayTab(){
   const [todos,sleepRows,recentSleepRows,habits,habitChecks,meals,contents,books,rblocks,morningChecks]=await Promise.all([
     supaFetch(`todos?date_key=eq.${dk}&order=created.asc`),
     supaFetch(`sleep?date_key=eq.${dk}`),
-    supaFetch(`sleep?date_key=gte.${sleepAvgStartDk}&date_key=lte.${dk}&select=date_key,sleep_time,wake_time`),
+    supaFetch(`sleep?date_key=gte.${sleepAvgStartDk}&date_key=lte.${dk}&select=date_key,score,sleep_time,wake_time`),
     supaFetch(`habits?order=sort_order.asc`),
     supaFetch(`habit_checks?date_key=eq.${dk}`),
     supaFetch(`meals?date_key=eq.${dk}`),
@@ -441,7 +441,21 @@ function renderTodaySleep(dk,sleep,recentSleepRows){
     wakeAvgTxt=_minToHHMM(Math.round(wSum/validRows.length)%1440);
   }
 
-  el.innerHTML=`<div class="sleep-summary" id="today-sleep-summary">
+  // 최근 7일 컨디션 아이콘 — 주간탭(wsleep-face)과 동일 로직, 요일 표기는 기존 오늘탭 스타일 유지
+  const scoreByDk={};
+  (recentSleepRows||[]).forEach(r=>{if(r.score!=null)scoreByDk[r.date_key]=r.score;});
+  const days=[];
+  const base=new Date(dk+'T00:00:00');
+  for(let i=6;i>=0;i--){const d=new Date(base);d.setDate(base.getDate()-i);days.push(dateKey(d));}
+  const weekCols=days.map(dayDk=>{
+    const sc=scoreByDk[dayDk];
+    const isToday=dayDk===dk;
+    const dow=DOW[new Date(dayDk+'T00:00:00').getDay()];
+    const faceHtml=sc!=null?`<i class="ti ${getSleepScoreLevel(sc).icon}"></i>`:`<i class="ti ti-minus" style="opacity:.3;" aria-hidden="true"></i>`;
+    return `<div class="sleep-week-col"><div class="sleep-spark-dow${isToday?' today':''}">${dow}</div><div class="sleep-week-face">${faceHtml}</div></div>`;
+  }).join('');
+
+  el.innerHTML=`<div class="sleep-week-grid">${weekCols}</div><div class="sleep-summary" id="today-sleep-summary">
     <div class="sleep-summary-item"><i class="ti ti-moon" aria-hidden="true"></i><span class="sleep-summary-label">평균 취침</span><span class="sleep-summary-val">${sleepAvgTxt}</span></div>
     <div class="sleep-summary-div"></div>
     <div class="sleep-summary-item"><i class="ti ti-sunrise" aria-hidden="true"></i><span class="sleep-summary-label">평균 기상</span><span class="sleep-summary-val">${wakeAvgTxt}</span></div>
@@ -762,7 +776,7 @@ async function loadWeekTab(){
   const lastCmpEndDk=isCurrentWeek?lastWeekDates[todayIdx]:lastWeekDates[6];
 
   const [goalRows,habits,habitChecks,memos,todos,sleepRows,onelineRows,contents,
-    lwMemos,lwTodos,lwSleepRows,lwHabitChecks,lwContents,rblocksThis,rblocksLast,recentSleepRows]=await Promise.all([
+    lwMemos,lwTodos,lwSleepRows,lwHabitChecks,lwContents,rblocksThis,rblocksLast]=await Promise.all([
     supaFetch(`goal_notes?note_key=eq.wchallenge_${encodeURIComponent(wk)}`),
     supaFetch(`habits?order=sort_order.asc`),
     supaFetch(`habit_checks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
@@ -779,14 +793,11 @@ async function loadWeekTab(){
     supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&order=created.desc&limit=100`),
     // 리듬 흐름 비교용: 이번주(오늘까지)/지난주(7일 전체)
     supaFetch(`rhythm_blocks?date_key=gte.${startDk}&date_key=lte.${cmpEndDk}`),
-    supaFetch(`rhythm_blocks?date_key=gte.${lastStartDk}&date_key=lte.${lastWeekDates[6]}`),
-    // 이번 주 수면카드 상단 평균(최근 2주 기준, 요일별 편차 완충용)
-    (function(){const e=new Date(_selectedDate<=new Date()?new Date():_selectedDate);const s=new Date(e);s.setDate(e.getDate()-13);return supaFetch(`sleep?date_key=gte.${dateKey(s)}&date_key=lte.${dateKey(e)}&select=date_key,score,sleep_time,wake_time`);})()
+    supaFetch(`rhythm_blocks?date_key=gte.${lastStartDk}&date_key=lte.${lastWeekDates[6]}`)
   ]);
 
   renderWeekGoals(goalRows&&goalRows[0]);
-  renderWeekSleepRow(sleepRows||[],weekDates,todayDk,recentSleepRows||[]);   // 도트 껍데기(빈 컨테이너) 먼저 생성
-  renderWeekHabitMatrix(habits||[],habitChecks||[],weekDates); // 그 컨테이너에 습관 도트 채움
+  renderWeekHabitMatrix(habits||[],habitChecks||[],weekDates);
   renderWeekDelta({
     memos:memos||[],todos:todos||[],sleepRows:sleepRows||[],habits:habits||[],checks:habitChecks||[],contents:contents||[],
     startDk,endDk:cmpEndDk,cmpDayCount
@@ -799,56 +810,6 @@ async function loadWeekTab(){
   renderReportBanner('week-report-banner',_selectedDate);
 }
 
-// 이번 주 수면(컨디션) — 요일별 수면점수 표정 아이콘, 상단엔 최근 2주 평균 점수, 하단엔 평균 취침/기상.
-function renderWeekSleepRow(sleepRows,weekDates,todayDk,recentSleepRows){
-  const el=document.getElementById('week-sleep-row');
-  const avgEl=document.getElementById('week-sleep-avg');
-  const byDate={};
-  sleepRows.forEach(r=>{if(r.date_key)byDate[r.date_key]=r;});
-
-  // 상단 평균 점수: 최근 2주(요일 편차 완충) — getSleepScoreLevel 아이콘 그대로 재사용, 제목과 동일 사이즈.
-  const recentScores=(recentSleepRows||[]).map(r=>r.score).filter(s=>s!=null&&!isNaN(s));
-  if(recentScores.length){
-    const avg=Math.round(recentScores.reduce((a,b)=>a+b,0)/recentScores.length);
-    const lv=getSleepScoreLevel(avg);
-    avgEl.innerHTML=`<span class="wsleep-avg-num">${avg}점</span><i class="ti ${lv.icon}" style="color:var(--sleep-warmgray);" aria-hidden="true"></i>`;
-  }else{
-    avgEl.innerHTML='';
-  }
-
-  el.innerHTML=`<div class="wsleep-grid">`+weekDates.map((dk,i)=>{
-    const r=byDate[dk];
-    const score=r&&r.score!=null&&!isNaN(r.score)?r.score:null;
-    const isToday=dk===todayDk;
-    const isFuture=dk>todayDk;
-    const faceHtml=score!=null
-      ?`<i class="ti ${getSleepScoreLevel(score).icon}"></i>`
-      :(isFuture?'':`<i class="ti ti-minus" style="opacity:.3;font-size:20px;" aria-hidden="true"></i>`);
-    return `<div class="wsleep-col${isToday?' wsleep-today':''}"${isFuture?' style="opacity:.35;"':''}>
-      <div class="wsleep-dow">${WC_DOW[i]}</div>
-      <div class="wsleep-face">${faceHtml}</div>
-    </div>`;
-  }).join('')+`</div>`;
-
-  // 하단 평균 취침/기상 — 상단 평균 점수와 동일하게 최근 2주 데이터 기준으로 계산.
-  const validRows=(recentSleepRows||[]).filter(r=>r.sleep_time&&r.wake_time);
-  let sleepAvgTxt='–',wakeAvgTxt='–';
-  if(validRows.length){
-    let sSum=0,wSum=0;
-    validRows.forEach(r=>{
-      const sv=toDawnAdjustedMin(_dawnTimeToMin(r.sleep_time),22*60); // 취침시각은 밤~새벽에 걸치므로 22시 컷으로 보정
-      sSum+=sv;
-      wSum+=_dawnTimeToMin(r.wake_time);
-    });
-    sleepAvgTxt=_minToHHMM(Math.round(sSum/validRows.length)%1440);
-    wakeAvgTxt=_minToHHMM(Math.round(wSum/validRows.length)%1440);
-  }
-  el.innerHTML+=`<div class="wsleep-summary">
-    <div class="wsleep-summary-item"><i class="ti ti-moon" aria-hidden="true"></i><span class="wsleep-summary-label">평균 취침</span><span class="wsleep-summary-val">${sleepAvgTxt}</span></div>
-    <div class="wsleep-summary-div"></div>
-    <div class="wsleep-summary-item"><i class="ti ti-sunrise" aria-hidden="true"></i><span class="wsleep-summary-label">평균 기상</span><span class="wsleep-summary-val">${wakeAvgTxt}</span></div>
-  </div>`;
-}
 function _minToHHMM(min){const h=Math.floor(min/60),m=min%60;return pad(h)+':'+pad(m);}
 
 // 지난주 대비 — 오늘 요일까지로 절단된 동일 범위끼리 비교(주 진행 중엔 항상 마이너스로 왜곡되는 문제 방지)

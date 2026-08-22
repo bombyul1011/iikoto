@@ -191,6 +191,11 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .sleep-summary-label{font-size:var(--fs-sm);color:var(--tm);white-space:nowrap;}
 .sleep-summary-val{font-size:var(--fs-body);font-weight:600;color:var(--tp);margin-left:auto;font-family:'DM Sans',sans-serif;white-space:nowrap;}
 .sleep-summary-div{width:1px;background:rgba(var(--divider-rgb),0.35);flex-shrink:0;}
+.sleep-week-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;flex-shrink:0;margin-bottom:8px;}
+.sleep-week-col{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0;}
+.sleep-week-col .sleep-spark-dow{font-size:var(--fs-sm);color:var(--tm);}
+.sleep-week-face{font-size:var(--fs-lg);line-height:1;height:var(--fs-xl);display:flex;align-items:center;justify-content:center;font-weight:400;opacity:.8;}
+.sleep-week-face i{font-size:var(--fs-lg);font-weight:400;}
 .habit-card{border-color:rgba(var(--pal-mint-rgb),0.35)!important;}
 .habit-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;}
 .habit-grid .habit-row:nth-child(2n){margin-left:-6px;}
@@ -229,31 +234,12 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .goal-hcard .card-lbl{color:#8a6c20;}
 .goal-hcard .card-lbl i{color:#8a6c20!important;}
 
-/* ── 주간탭: 이번 주 수면(컨디션) 카드 ── */
-.week-sleep-lbl{display:flex;align-items:center;gap:7px;}
-.week-sleep-lbl .sp{flex:1;}
-.week-sleep-avg{font-size:var(--fs-title);font-weight:600;color:var(--tp);display:flex;align-items:center;gap:5px;}
-.week-sleep-avg i{font-size:var(--fs-title);}
-.wsleep-avg-num{font-size:var(--fs-title);}
-.wsleep-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
-.wsleep-col{display:flex;flex-direction:column;align-items:center;gap:5px;padding:4px 2px;border-radius:12px;}
-.wsleep-dow{font-size:var(--fs-body);color:var(--ts);font-weight:600;}
-.wsleep-face{font-size:24px;line-height:1;height:28px;display:flex;align-items:center;justify-content:center;font-weight:400;opacity:.8;}
-.wsleep-face i{font-size:24px;font-weight:400;}
-.wsleep-summary{display:flex;gap:8px;border-top:1px solid rgba(var(--divider-rgb),0.3);padding-top:11px;margin-top:10px;}
-.wsleep-summary-item{flex:1;display:flex;align-items:center;gap:7px;}
-.wsleep-summary-item i{font-size:15px;color:var(--tm);}
-.wsleep-summary-label{font-size:var(--fs-sm);color:var(--tm);}
-.wsleep-summary-val{font-size:var(--fs-body);font-weight:600;color:var(--tp);margin-left:auto;font-family:'DM Sans',sans-serif;}
-.wsleep-summary-div{width:1px;background:rgba(var(--divider-rgb),0.35);}
-.wsleep-today{background:rgba(var(--pal-yellow-rgb),0.28);}
-
 /* ── 주간탭: 지난주 대비 ── */
 .week-delta-card{display:flex;flex-direction:column;}
 .week-delta-card #week-delta{flex:1;display:flex;align-items:center;}
 .week-delta-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;width:100%;}
 .wd-item{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;}
-.wd-icon{font-size:22px;color:var(--tp);opacity:.55;}
+.wd-icon{font-size:var(--fs-xl);color:var(--tp);opacity:.55;}
 .wd-num{font-size:var(--fs-lg);font-weight:700;color:var(--tp);}
 .wd-delta{font-size:var(--fs-body);font-weight:700;display:flex;align-items:center;gap:2px;justify-content:center;}
 .wd-delta.up{color:var(--pal-rose-border);}
@@ -628,11 +614,11 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
       <div class="report-banner" id="week-report-banner"></div>
       <div class="grid2">
         <div class="card goal-hcard"><div class="card-lbl"><i class="ti ti-flag-3" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>이번 주 목표</div><div id="week-goals"></div></div>
-        <div class="card"><div class="card-lbl week-sleep-lbl"><i class="ti ti-zzz" style="color:rgba(var(--pal-warmgray-rgb),1);" aria-hidden="true"></i>이번 주 수면<span class="sp"></span><span class="week-sleep-avg" id="week-sleep-avg"></span></div><div id="week-sleep-row"></div></div>
+        <div class="card week-delta-card"><div class="card-lbl"><i class="ti ti-arrows-diff" style="color:rgba(var(--pal-sky-rgb),1);" aria-hidden="true"></i>지난주 대비</div><div id="week-delta"></div></div>
       </div>
       <div class="grid2">
         <div class="card"><div class="card-lbl"><i class="ti ti-chart-donut" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>주간 습관 현황</div><div id="week-habit-matrix"></div></div>
-        <div class="card week-delta-card"><div class="card-lbl"><i class="ti ti-arrows-diff" style="color:rgba(var(--pal-sky-rgb),1);" aria-hidden="true"></i>지난주 대비</div><div id="week-delta"></div></div>
+        <div class="card"><!-- 자리 비워둠(추후 배너 예정) --></div>
       </div>
       <div class="card"><div class="card-lbl"><i class="ti ti-rainbow" style="color:rgba(var(--pal-orange-rgb),1);" aria-hidden="true"></i>리듬 흐름 비교</div><div id="week-rhythm-flow"></div></div>
       <div class="card"><div class="card-lbl"><i class="ti ti-pencil" style="color:rgba(var(--pal-yellow-rgb),1);" aria-hidden="true"></i>하루한줄</div>
