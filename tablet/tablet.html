@@ -235,12 +235,13 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .goal-hcard .card-lbl i{color:#8a6c20!important;}
 
 /* ── 주간탭: 지난주 대비 ── */
-.wmroutine-row{display:flex;align-items:center;gap:8px;padding:6px 0;}
+.wmroutine-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;}
+.wmroutine-row{display:flex;align-items:center;gap:7px;}
 .wmroutine-row i{font-size:var(--fs-sm);flex-shrink:0;}
-.wmroutine-label{font-size:var(--fs-sm);color:var(--tm);width:52px;flex-shrink:0;}
-.wmroutine-bar-track{flex:1;height:6px;border-radius:3px;background:rgba(var(--divider-rgb),0.15);overflow:hidden;}
+.wmroutine-label{font-size:var(--fs-sm);color:var(--tm);width:48px;flex-shrink:0;}
+.wmroutine-bar-track{flex:1;height:5px;border-radius:3px;background:rgba(var(--divider-rgb),0.15);overflow:hidden;}
 .wmroutine-bar-fill{height:100%;border-radius:3px;}
-.wmroutine-cnt{font-size:var(--fs-sm);color:var(--ts);font-family:'DM Sans',sans-serif;width:28px;text-align:right;flex-shrink:0;}
+.wmroutine-cnt{font-size:var(--fs-sm);color:var(--ts);font-family:'DM Sans',sans-serif;width:26px;text-align:right;flex-shrink:0;}
 .week-delta-card{display:flex;flex-direction:column;}
 .week-delta-card #week-delta{flex:1;display:flex;align-items:center;}
 .week-delta-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;width:100%;}

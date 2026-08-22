@@ -829,7 +829,7 @@ async function loadWeekTab(){
 
 function _minToHHMM(min){const h=Math.floor(min/60),m=min%60;return pad(h)+':'+pad(m);}
 
-// 이번 주 모닝루틴 — 오늘 포함 최근 7일 롤링 기준, 항목별 체크 일수를 얇은 막대로 표시.
+// 이번 주 모닝루틴 — 오늘 포함 최근 7일 롤링 기준, 항목별 체크 일수를 얇은 막대로 표시(2열 그리드, 본앱 하단 통계그리드와 동일 배치).
 // 달성률 자체보다 "얼마나 루틴화됐는지"를 가볍게 보여주는 용도라 궤도 UI 없이 심플하게.
 function renderWeekMorningRoutine(rows){
   const el=document.getElementById('week-morning-routine');
@@ -837,7 +837,7 @@ function renderWeekMorningRoutine(rows){
   const cntByKey={};
   (rows||[]).forEach(r=>{if(r.item_key)cntByKey[r.item_key]=(cntByKey[r.item_key]||0)+1;});
   const total=7;
-  el.innerHTML=MORNING_ROUTINE_ITEMS.map(it=>{
+  let itemsHtml=MORNING_ROUTINE_ITEMS.map(it=>{
     const cnt=cntByKey[it.key]||0;
     const pct=Math.round(cnt/total*100);
     return `<div class="wmroutine-row">
@@ -847,6 +847,17 @@ function renderWeekMorningRoutine(rows){
       <span class="wmroutine-cnt">${cnt}/7</span>
     </div>`;
   }).join('');
+  // 남는 한 칸: 전체 합산 달성률(체크 총합/전체 슬롯) — 본앱과 동일하게 무지개 그라디언트
+  const doneTotal=MORNING_ROUTINE_ITEMS.reduce((s,it)=>s+(cntByKey[it.key]||0),0);
+  const slotTotal=MORNING_ROUTINE_ITEMS.length*total;
+  const totalPct=slotTotal>0?Math.round(doneTotal/slotTotal*100):0;
+  itemsHtml+=`<div class="wmroutine-row">
+    <i class="ti ti-chart-donut" style="color:var(--tm);" aria-hidden="true"></i>
+    <span class="wmroutine-label">합산</span>
+    <div class="wmroutine-bar-track"><div class="wmroutine-bar-fill" style="width:${totalPct}%;background:linear-gradient(90deg,rgba(248,192,160,0.95) 0%,rgba(252,215,110,0.95) 25%,rgba(150,205,225,0.95) 50%,rgba(190,160,230,0.95) 75%,rgba(244,177,206,0.95) 100%);"></div></div>
+    <span class="wmroutine-cnt">${totalPct}%</span>
+  </div>`;
+  el.innerHTML=`<div class="wmroutine-grid">${itemsHtml}</div>`;
 }
 
 // 지난주 대비 — 오늘 요일까지로 절단된 동일 범위끼리 비교(주 진행 중엔 항상 마이너스로 왜곡되는 문제 방지)
