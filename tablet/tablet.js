@@ -128,6 +128,31 @@ function getSleepScoreLevel(score){
   return SLEEP_SCORE_LEVELS.find(l=>score<=l.max) || SLEEP_SCORE_LEVELS[SLEEP_SCORE_LEVELS.length-1];
 }
 
+// sleep 테이블 row 하나의 수면시간(분) — sleep_time~wake_time, 자정 넘김 자동 보정.
+function _sleepDurMinOf(r){
+  const sv=r.sleep_time.split(':').map(Number),wv=r.wake_time.split(':').map(Number);
+  let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;
+  return m;
+}
+// sleep rows에서 평균 컨디션 점수만 계산(sleep_time/wake_time 유무와 무관, score만 있으면 됨) —
+// 궤적 카드처럼 수면시간이 아닌 컨디션만 필요한 곳에서 사용.
+function _avgSleepScoreOf(rows){
+  const scored=(rows||[]).filter(r=>r.score!=null&&!isNaN(r.score));
+  return scored.length?Math.round(scored.reduce((a,r)=>a+r.score,0)/scored.length):null;
+}
+// sleep rows 배열 하나에서 평균 수면시간/평균 컨디션/규칙성을 한 번에 계산 — 주간(renderWeekSleepReport)과
+// 월간(renderMrpSleep) 리포트에 거의 동일한 로직이 각각 중복돼 있던 것을 통합(2026-08-22).
+// validRows: sleep_time/wake_time이 있는 유효 기록만 걸러서 넘겨야 함(호출부에서 필터링).
+function _sleepStatsOf(validRows){
+  if(!validRows.length)return {avgMin:null,avgScore:null,reg:null,validCount:0};
+  const avgMin=Math.round(validRows.reduce((a,r)=>a+_sleepDurMinOf(r),0)/validRows.length);
+  const avgScore=_avgSleepScoreOf(validRows);
+  const sleepMinArr=validRows.map(r=>toDawnAdjustedMin(_dawnTimeToMin(r.sleep_time),22*60));
+  const wakeMinArr=validRows.map(r=>_dawnTimeToMin(r.wake_time));
+  const reg=calcSleepRegularity(sleepMinArr,wakeMinArr);
+  return {avgMin,avgScore,reg,validCount:validRows.length};
+}
+
 // ── 리듬 카테고리 (RHYTHM_CATS 원본과 동일) ──
 const RHYTHM_CATS={
   exercise:{label:'운동',color:'var(--rh-exercise)',icon:'ti-run'},
@@ -610,7 +635,36 @@ function _paceAdjustMin(min){
   // 0:00~3:59는 전날 24:00~27:59 위치로 밀어서 활동분포 그래프 오른쪽 끝에 붙게 함
   return min<PACE_DOT_RANGE_START ? min+1440 : min;
 }
+// habit_checks를 "날짜+습관명" 조합 기준으로 중복 제거해서 세는 통합 헬퍼.
+// 정상 흐름에선 하루에 같은 습관을 두 번 체크할 UI 자체가 없지만(renderTodayHabits는 ON/OFF 토글),
+// 네트워크 재시도나 동시 클릭 등으로 실수로 중복 삽입되면 length 기준 집계는 100%를 넘는 왜곡된 비율을 만들 수 있어
+// 모든 습관 카운트 계산을 이 고유매칭 방식으로 통일함(2026-08-22, 봄이님 결정).
+function _uniqueHabitCheckCount(checks){
+  return new Set((checks||[]).map(c=>c.date_key+'|'+c.habit_name)).size;
+}
 function _paceParseHM(hm){const p=(hm||'').split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);}
+// rhythm_blocks에서 start_time/end_time을 분 단위로 파싱해 카테고리별로 합산(자정 넘김 자동 보정) — 공통 헬퍼.
+// 기존에 renderWeekRhythmFlow/renderMrpTrajectory/renderMrpMilestones 세 곳에 거의 동일한 로직이 각각
+// 로컬 함수로 중복 정의돼 있던 것을 하나로 통합함(2026-08-22). renderMrpRhythm은 카테고리별 dayCount(일평균 분모)까지
+// 추가로 계산하는 별도 요구사항이 있어 이 헬퍼로 흡수하지 않고 그대로 둠.
+// days를 주면 그 날짜(date_key)들만 필터링, 생략하면 전달된 blocks 전체를 사용.
+function _rhythmDurByCat(rblocks,days){
+  const d={};let total=0;
+  (rblocks||[]).forEach(b=>{
+    if(days&&!days.includes(b.date_key))return;
+    if(!b.start_time||!b.end_time)return;
+    const s=_paceParseHM(b.start_time),e=_paceParseHM(b.end_time);
+    if(isNaN(s)||isNaN(e))return;
+    let dur=e-s;if(dur<0)dur+=1440;
+    if(dur<=0)return;
+    d[b.cat]=(d[b.cat]||0)+dur;total+=dur;
+  });
+  return {d,total};
+}
+// 특정 카테고리 하나만의 합산 분(分) — 생활밸런스(업무/책상 비율) 계산처럼 카테고리 하나만 필요할 때.
+function _rhythmSumCatMin(rblocks,cat,days){
+  return _rhythmDurByCat(rblocks,days).d[cat]||0;
+}
 function renderTodayPace(todos,habits,habitChecks,morningChecks){
   const el=document.getElementById('today-pace');
   const events=[];
@@ -894,9 +948,10 @@ async function loadWeekTab(){
     supaFetch(`sleep?date_key=gte.${lastStartDk}&date_key=lte.${lastCmpEndDk}&select=date_key,score,sleep_time,wake_time`),
     supaFetch(`habit_checks?date_key=gte.${lastStartDk}&date_key=lte.${lastCmpEndDk}`),
     supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&order=created.desc&limit=100`),
-    // 리듬 흐름 비교용: 이번주(오늘까지)/지난주(7일 전체)
+    // 리듬 흐름 비교용: 이번주(오늘까지)/지난주(동일 요일까지) — 일평균 분모는 둘 다 고정(cmpDayCount)이라
+    // 지난주도 7일 전체가 아니라 같은 요일수까지만 봐야 공정한 비교가 됨(2026-08-22 확정, 봄이님 판단).
     supaFetch(`rhythm_blocks?date_key=gte.${startDk}&date_key=lte.${cmpEndDk}`),
-    supaFetch(`rhythm_blocks?date_key=gte.${lastStartDk}&date_key=lte.${lastWeekDates[6]}`),
+    supaFetch(`rhythm_blocks?date_key=gte.${lastStartDk}&date_key=lte.${lastCmpEndDk}`),
     // 수면 리포트 최근 2주
     supaFetch(`sleep?date_key=gte.${slStartDk}&date_key=lte.${slEndDk}&select=date_key,score,sleep_time,wake_time`)
   ]);
@@ -925,41 +980,19 @@ function renderWeekSleepReport(rows){
   const el=document.getElementById('week-sleep-report');
   if(!el)return;
   const validSleep=(rows||[]).filter(r=>r.sleep_time&&r.wake_time);
-  const scored=(rows||[]).filter(r=>r.score!=null&&!isNaN(r.score));
+  const {avgMin,avgScore,reg}=_sleepStatsOf(validSleep);
 
-  // 평균 수면시간(분) + 목표 대비
-  let avgMin=null;
-  if(validSleep.length){
-    let sum=0;
-    validSleep.forEach(r=>{
-      const sv=r.sleep_time.split(':').map(Number),wv=r.wake_time.split(':').map(Number);
-      let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;
-      sum+=m;
-    });
-    avgMin=Math.round(sum/validSleep.length);
-  }
   const avgSleepHtml=avgMin!=null?`${Math.floor(avgMin/60)}<span class="unit">시간</span> ${avgMin%60}<span class="unit">분</span>`:'-';
   const diffMin=avgMin!=null?avgMin-SLEEP_GOAL_MIN:null;
   const diffHtml=diffMin!=null
     ?`목표 대비 <b style="color:${diffMin<0?'#c0788a':'#5a9a7a'};">${diffMin>0?'+':''}${diffMin}분</b>`
     :'데이터 없음';
 
-  // 평균 컨디션
-  const avgScore=scored.length?Math.round(scored.reduce((a,b)=>a+b.score,0)/scored.length):null;
   const scoreLevel=avgScore!=null?getSleepScoreLevel(avgScore):null;
 
   // 목표 달성률(목표 이상 잔 날 비율)
-  const goalMetDays=validSleep.filter(r=>{
-    const sv=r.sleep_time.split(':').map(Number),wv=r.wake_time.split(':').map(Number);
-    let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;
-    return m>=SLEEP_GOAL_MIN;
-  }).length;
+  const goalMetDays=validSleep.filter(r=>_sleepDurMinOf(r)>=SLEEP_GOAL_MIN).length;
   const goalPct=validSleep.length?Math.round(goalMetDays/validSleep.length*100):0;
-
-  // 규칙성 점수
-  const sleepMinArr=validSleep.map(r=>toDawnAdjustedMin(_dawnTimeToMin(r.sleep_time),22*60));
-  const wakeMinArr=validSleep.map(r=>_dawnTimeToMin(r.wake_time));
-  const reg=calcSleepRegularity(sleepMinArr,wakeMinArr);
 
   el.innerHTML=`<div class="wsleep2-grid">
     <div class="wsleep2-item">
@@ -995,9 +1028,8 @@ function renderWeekDelta(cur,prev){
   const el=document.getElementById('week-delta');
   const curDone=cur.todos.filter(t=>t.done).length;
   const prevDone=prev.todos.filter(t=>t.done).length;
-  const curHabitPct=cur.habits.length?Math.round(cur.checks.length/(cur.habits.length*cur.cmpDayCount)*100):0;
-  const prevDenom=cur.habits.length*(prev.checks.length?cur.cmpDayCount:cur.cmpDayCount); // 습관 목록은 현재 기준 유지
-  const prevHabitPct=cur.habits.length?Math.round(prev.checks.length/(cur.habits.length*cur.cmpDayCount)*100):0;
+  const curHabitPct=cur.habits.length?Math.round(_uniqueHabitCheckCount(cur.checks)/(cur.habits.length*cur.cmpDayCount)*100):0;
+  const prevHabitPct=cur.habits.length?Math.round(_uniqueHabitCheckCount(prev.checks)/(cur.habits.length*cur.cmpDayCount)*100):0;
   const curContent=countContentsCompletedInRange(cur.contents,cur.startDk,cur.endDk);
   const prevContent=countContentsCompletedInRange(prev.contents,prev.startDk,prev.endDk);
   const curSleep=parseFloat(avgSleepHoursFromRows(cur.sleepRows))||0;
@@ -1033,20 +1065,8 @@ function _fmtDur(min){
 }
 function renderWeekRhythmFlow(rblocksThis,rblocksLast,cmpDayCount){
   const el=document.getElementById('week-rhythm-flow');
-  const durByCat=(rblocks)=>{
-    const d={};let total=0;
-    rblocks.forEach(b=>{
-      if(!b.start_time||!b.end_time)return;
-      const s=_paceParseHM(b.start_time),e=_paceParseHM(b.end_time);
-      if(isNaN(s)||isNaN(e))return;
-      let dur=e-s;if(dur<0)dur+=1440;
-      if(dur<=0)return;
-      d[b.cat]=(d[b.cat]||0)+dur;total+=dur;
-    });
-    return {d,total};
-  };
-  const curD=durByCat(rblocksThis);
-  const lastD=durByCat(rblocksLast);
+  const curD=_rhythmDurByCat(rblocksThis);
+  const lastD=_rhythmDurByCat(rblocksLast);
 
   // 막대는 그 줄의 총합 중 비중이 큰 카테고리부터 이어지도록 시간이 긴 순으로 정렬(들쑥날쑥함 방지)
   // 상위 4개 세그먼트는 아이콘 옆에 그 줄 기준 일평균 시간을 함께 표기(누계/dayCount)
@@ -1070,8 +1090,8 @@ function renderWeekRhythmFlow(rblocksThis,rblocksLast,cmpDayCount){
     return;
   }
 
-  // 지난주 평균: 7일 기준 일평균 / 이번주 현재: 오늘까지 진행일수(cmpDayCount) 기준 일평균
-  el.innerHTML=barRow('지난주 평균',lastD.d,lastD.total,7)+barRow('이번주 현재',curD.d,curD.total,cmpDayCount);
+  // 지난주 평균/이번주 현재 모두 동일 진행일수(cmpDayCount) 기준 일평균 — 과거 완결 주끼리 비교할 땐 cmpDayCount가 7이라 기존과 동일.
+  el.innerHTML=barRow('지난주 평균',lastD.d,lastD.total,cmpDayCount)+barRow('이번주 현재',curD.d,curD.total,cmpDayCount);
 }
 
 function renderWeekGoals(row){
@@ -1379,7 +1399,7 @@ async function renderMonthStatBar(y,mo){
     memoCount:(memos||[]).length,
     doneCount:(todos||[]).filter(t=>t.done).length,
     habitCount:habitList.length,
-    checkCount:(checks||[]).length,
+    checkCount:_uniqueHabitCheckCount(checks),
     habitDenominator:daysInMonth,
     contentCount:countContentsCompletedInRange(contents,startDk,endDk),
     avgSleep:avgSleepHoursFromRows(sleepRows)
@@ -2031,13 +2051,13 @@ function renderMrpGoalsAndStats(goalRow,todos,memos,sleepRows,habits,habitChecks
   const statsEl=document.getElementById('mrp-stats');
   const doneTodos=todos.filter(t=>t.done).length;
   const memoCount=(memos||[]).length;
-  const habitPct=habits.length?Math.round(habitChecks.length/(habits.length*habitDenominator)*100):0;
+  const habitPct=habits.length?Math.round(_uniqueHabitCheckCount(habitChecks)/(habits.length*habitDenominator)*100):0;
 
   // 전월 대비(각 통계 하단에 증감만 짧게) — 전월 분모(prevHabitDenominator)는 이번 달과 별개로, 진행 중인 달이면
   // 동일하게 "오늘까지의 경과일수"로 절단된 값이 상위(loadMonthlyReportPage)에서 넘어옴(2026-08-22 확정).
   const prevDoneTodos=(prevTodos||[]).filter(t=>t.done).length;
   const prevMemoCount=(prevMemos||[]).length;
-  const prevHabitPct=habits.length?Math.round((prevHabitChecks||[]).length/(habits.length*(prevHabitDenominator||habitDenominator))*100):0;
+  const prevHabitPct=habits.length?Math.round(_uniqueHabitCheckCount(prevHabitChecks)/(habits.length*(prevHabitDenominator||habitDenominator))*100):0;
   const deltaOf=(cur,prev,fmt)=>{
     const diff=Math.round((cur-prev)*10)/10;
     const dir=diff>0?'up':(diff<0?'down':'flat');
@@ -2151,22 +2171,6 @@ async function renderMrpTrajectory(mk,sleepRows,habits,habitChecks,rblocks,weeks
   const el=document.getElementById('mrp-traj');
   if(!weeksInMonth.length){el.innerHTML='<div class="empty-msg">이 달엔 표시할 주차가 없어요</div>';return;}
 
-  // rhythm_blocks에서 카테고리별 합산(분) — renderMrpRhythm과 동일 규칙(start/end 파싱, 자정 넘김 보정).
-  // days를 주면 그 날짜들로 필터, 생략하면 rblocks 전체(그 달 전체) 합산.
-  const sumCatMin=(rblocks,cat,days)=>{
-    let sum=0;
-    (rblocks||[]).forEach(b=>{
-      if(b.cat!==cat)return;
-      if(days&&!days.includes(b.date_key))return;
-      if(!b.start_time||!b.end_time)return;
-      const s=_paceParseHM(b.start_time),e=_paceParseHM(b.end_time);
-      if(isNaN(s)||isNaN(e))return;
-      let dur=e-s;if(dur<0)dur+=1440;
-      if(dur>0)sum+=dur;
-    });
-    return sum;
-  };
-
   // weeksInMonth는 그 달에 속하는 모든 주차(목요일 기준)를 담고 있는데, 진행 중인 달이면 아직 지나지 않은
   // 미래 주차도 포함돼있어 습관율이 "데이터 없음"이 아니라 "체크 0건→0%"로 계산되며 그래프가 미래까지 이어지는
   // 문제가 있었음 — dim(오늘까지 절단된 일수) 이후 시작하는 주차는 아예 제외(2026-08-22 확정).
@@ -2189,13 +2193,13 @@ async function renderMrpTrajectory(mk,sleepRows,habits,habitChecks,rblocks,weeks
       if(!habits.length)return null;
       const checks=habitChecks.filter(c=>days.includes(c.date_key));
       if(!checks.length)return null;
-      return Math.round(checks.length/(habits.length*7)*100);
+      return Math.round(_uniqueHabitCheckCount(checks)/(habits.length*7)*100);
     });
     // 생활밸런스: 그 주 (책상/업무) 실제비율을 목표비율(2/3)로 나눈 달성률(%). 업무기록이 없는 주는 null.
     const byWeekBalance=weeksInMonth.map(wk=>{
       const days=getWeekDates(new Date(wk+'T00:00:00'));
-      const workMin=sumCatMin(rblocks,'work',days);
-      const noteMin=sumCatMin(rblocks,'note',days);
+      const workMin=_rhythmSumCatMin(rblocks,'work',days);
+      const noteMin=_rhythmSumCatMin(rblocks,'note',days);
       if(!workMin)return null;
       return Math.round((noteMin/workMin)/WORK_NOTE_TARGET_RATIO*100);
     });
@@ -2213,11 +2217,10 @@ async function renderMrpTrajectory(mk,sleepRows,habits,habitChecks,rblocks,weeks
   // 하단 tail 요약값 — 그래프는 주차별 오르내림이지만, tail 숫자만큼은 "이 달 전체 평균"으로 다시 계산해
   // 다른 카드(이달의 수면/습관 달성률)와 값이 일치하도록 함(2026-08-22, 마지막 주차 값 표시 문제 수정).
   // 수면 지표는 시간이 아니라 컨디션 점수 기준(2026-08-22, 시간과 컨디션이 항상 같이 움직이지 않아 해석에 혼선이 있어 변경).
-  const scoredSleepRows=sleepRows.filter(r=>r.score!=null&&!isNaN(r.score));
-  const monthAvgSleep=scoredSleepRows.length?Math.round(scoredSleepRows.reduce((a,r)=>a+r.score,0)/scoredSleepRows.length):null;
-  const monthAvgHabit=habits.length?Math.round(habitChecks.length/(habits.length*dim)*100):null;
-  const monthWorkMin=sumCatMin(rblocks,'work');
-  const monthNoteMin=sumCatMin(rblocks,'note');
+  const monthAvgSleep=_avgSleepScoreOf(sleepRows);
+  const monthAvgHabit=habits.length?Math.round(_uniqueHabitCheckCount(habitChecks)/(habits.length*dim)*100):null;
+  const monthWorkMin=_rhythmSumCatMin(rblocks,'work');
+  const monthNoteMin=_rhythmSumCatMin(rblocks,'note');
   const monthAvgBalance=monthWorkMin?Math.round((monthNoteMin/monthWorkMin)/WORK_NOTE_TARGET_RATIO*100):null;
   const tailOverridesByKey={habit:monthAvgHabit,sleep:monthAvgSleep,balance:monthAvgBalance};
 
@@ -2304,12 +2307,6 @@ async function renderMrpSleep(mk,sleepRows,prevSleepRows,cacheRow,refContext,her
 
   if(!validCur.length){el.innerHTML='<div class="empty-msg">이 달엔 기록된 수면이 없어요</div>';return;}
 
-  const durMinOf=(r)=>{
-    const sv=r.sleep_time.split(':').map(Number),wv=r.wake_time.split(':').map(Number);
-    let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;
-    return m;
-  };
-
   // 분포 4구간
   const buckets=[
     {key:'u5',label:'5시간 미만',min:0,max:300,color:'rgba(255,205,150,0.85)'},
@@ -2317,7 +2314,7 @@ async function renderMrpSleep(mk,sleepRows,prevSleepRows,cacheRow,refContext,her
     {key:'6to7',label:'6~7시간',min:360,max:420,color:'rgba(150,190,215,0.85)'},
     {key:'o7',label:'7시간 이상',min:420,max:100000,color:'rgba(216,190,225,0.85)'}
   ];
-  const counts=buckets.map(b=>validCur.filter(r=>{const m=durMinOf(r);return m>=b.min&&m<b.max;}).length);
+  const counts=buckets.map(b=>validCur.filter(r=>{const m=_sleepDurMinOf(r);return m>=b.min&&m<b.max;}).length);
   const total=validCur.length;
   let cum=0,donutSegs='';
   const circ=2*Math.PI*42;
@@ -2329,24 +2326,12 @@ async function renderMrpSleep(mk,sleepRows,prevSleepRows,cacheRow,refContext,her
     cum+=len;
   });
 
-  const scoredCur=validCur.filter(r=>r.score!=null&&!isNaN(r.score));
-  const avgScore=scoredCur.length?Math.round(scoredCur.reduce((a,b)=>a+b.score,0)/scoredCur.length):null;
+  const {avgMin,avgScore,reg}=_sleepStatsOf(validCur);
   const scoreLevel=avgScore!=null?getSleepScoreLevel(avgScore):null;
-
-  const avgMin=Math.round(validCur.reduce((a,r)=>a+durMinOf(r),0)/validCur.length);
-
-  const sleepMinArr=validCur.map(r=>toDawnAdjustedMin(_dawnTimeToMin(r.sleep_time),22*60));
-  const wakeMinArr=validCur.map(r=>_dawnTimeToMin(r.wake_time));
-  const reg=calcSleepRegularity(sleepMinArr,wakeMinArr);
 
   let cmpHtml='<div class="empty-msg" style="text-align:left;">전월 기록이 적어 비교를 생략했어요</div>';
   if(validPrev.length>=7){
-    const prevAvgMin=Math.round(validPrev.reduce((a,r)=>a+durMinOf(r),0)/validPrev.length);
-    const prevSleepMinArr=validPrev.map(r=>toDawnAdjustedMin(_dawnTimeToMin(r.sleep_time),22*60));
-    const prevWakeMinArr=validPrev.map(r=>_dawnTimeToMin(r.wake_time));
-    const prevReg=calcSleepRegularity(prevSleepMinArr,prevWakeMinArr);
-    const prevScored=validPrev.filter(r=>r.score!=null&&!isNaN(r.score));
-    const prevAvgScore=prevScored.length?Math.round(prevScored.reduce((a,b)=>a+b.score,0)/prevScored.length):null;
+    const prevStats=_sleepStatsOf(validPrev);
 
     const mkCmpRow=(label,curV,prevV,unit)=>{
       if(curV==null||prevV==null)return `<div class="mrsl-cmp-row"><span class="mrsl-cmp-label">${label}</span><span class="mrsl-cmp-val flat">데이터 부족</span></div>`;
@@ -2356,9 +2341,9 @@ async function renderMrpSleep(mk,sleepRows,prevSleepRows,cacheRow,refContext,her
       const sign=diff>0?'+':'';
       return `<div class="mrsl-cmp-row"><span class="mrsl-cmp-label">${label}</span><span class="mrsl-cmp-val ${dir}"><i class="ti ${arrow}" style="font-size:11px;"></i>${sign}${diff}${unit}</span></div>`;
     };
-    cmpHtml=mkCmpRow('수면시간',avgMin,prevAvgMin,'분')
-      +mkCmpRow('규칙성',reg?reg.score:null,prevReg?prevReg.score:null,'점')
-      +mkCmpRow('컨디션',avgScore,prevAvgScore,'점');
+    cmpHtml=mkCmpRow('수면시간',avgMin,prevStats.avgMin,'분')
+      +mkCmpRow('규칙성',reg?reg.score:null,prevStats.reg?prevStats.reg.score:null,'점')
+      +mkCmpRow('컨디션',avgScore,prevStats.avgScore,'점');
   }
 
   el.innerHTML=`<div class="mrsl-top">
@@ -2543,20 +2528,8 @@ async function renderMrpMilestones(mk,rblocks,prevRblocks,weeksInMonth,wcRowsLis
   }
 
   // 카테고리별 누계 시간(분) 재계산 — renderMrpRhythm과 동일 규칙
-  const durByCat=(blocks)=>{
-    const d={};let total=0;
-    (blocks||[]).forEach(b=>{
-      if(!b.start_time||!b.end_time)return;
-      const s=_paceParseHM(b.start_time),e=_paceParseHM(b.end_time);
-      if(isNaN(s)||isNaN(e))return;
-      let dur=e-s;if(dur<0)dur+=1440;
-      if(dur<=0)return;
-      d[b.cat]=(d[b.cat]||0)+dur;total+=dur;
-    });
-    return {d,total};
-  };
-  const cur=durByCat(rblocks);
-  const prev=durByCat(prevRblocks);
+  const cur=_rhythmDurByCat(rblocks);
+  const prev=_rhythmDurByCat(prevRblocks);
   if(!cur.total){el.innerHTML='';return;}
 
   const sorted=Object.keys(cur.d).filter(k=>cur.d[k]>0).sort((a,b)=>cur.d[b]-cur.d[a]);
