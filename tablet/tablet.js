@@ -1095,7 +1095,7 @@ function renderWeekSleepReport(rows){
       <div class="wsleep2-icon-box" style="background:rgba(255,222,170,0.4);"><i class="ti ti-target-arrow" style="color:rgba(200,150,60,0.9);" aria-hidden="true"></i></div>
       <div class="wsleep2-label">목표 달성률</div>
       <div class="wsleep2-val">${goalPct}<span class="unit">%</span></div>
-      <div class="wsleep2-sub">목표 7시간30분 기준</div>
+      <div class="wsleep2-sub">7시간 30분 기준</div>
     </div>
     <div class="wsleep2-item">
       <div class="wsleep2-icon-box" style="background:rgba(216,190,225,0.4);"><i class="ti ti-activity" style="color:rgba(150,100,170,0.9);" aria-hidden="true"></i></div>
