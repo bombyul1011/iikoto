@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260818-2-chaeum-removed';
+const CACHE = 'iikoto-v20260823-nextweek-suggest';
 const ASSETS = [
   './',
   './index.html'

@@ -192,6 +192,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .nwf-item-text{font-size:var(--main-text-size);line-height:1.55;color:var(--tp);}
 [data-theme="glass"] .nwf-item{background:rgba(253,251,245,0.92);}
 [data-theme="glass"] .nwf-item-icon,[data-theme="glass"] .nwf-item-goal{color:var(--pal-mauvepink);}
+.nwf-adopt-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px;padding-top:9px;border-top:1px dashed var(--card-b);}
+.nwf-goal-preview{font-size:var(--dow-label-size);color:var(--tp);opacity:0.75;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.nwf-adopt-btn{flex-shrink:0;font-size:var(--dow-label-size);font-weight:600;color:var(--pal-mauvepink);background:rgba(232,164,187,0.12);border:1px solid rgba(232,164,187,0.45);border-radius:20px;padding:6px 13px;cursor:pointer;white-space:nowrap;}
+.nwf-adopt-btn:active{opacity:0.7;}
+.nwf-adopt-btn.adopted{color:var(--tp);opacity:0.55;background:transparent;border-color:var(--card-b);cursor:default;}
 
 /* ── CARDS ── */
 .card{background:var(--card);border:1px solid var(--card-b);border-radius:18px;padding:14px 15px;margin-bottom:10px;box-shadow:0 2px 20px rgba(0,0,0,0.06),inset 0 1px 0 rgba(255,250,240,0.68);height:auto;min-height:0;}
@@ -1725,7 +1730,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   <div class="bsheet" style="max-height:80vh;overflow-y:auto;" onclick="event.stopPropagation()">
     <div class="sheet-handle"></div>
     <div style="padding:0 20px 24px;">
-      <div class="goal-section-title" style="margin-top:0;">◉ 다음주 챌린지 점검하기</div>
+      <div class="goal-section-title" style="margin-top:0;">◉ 다음주 목표 제안받기</div>
       <div id="nextweek-feedback-content"></div>
     </div>
   </div>
@@ -8308,7 +8313,7 @@ function setupNextWeekFeedbackToggle(){
   if(isSundayEvening){
     titleEl.className='report-banner rhythm-soft';
     titleEl.style.margin='0 0 12px';
-    titleEl.innerHTML='<div class="report-banner-inner" style="justify-content:flex-start;gap:5px;"><div class="report-banner-line" style="white-space:nowrap;"><i class="ti ti-flag-heart ico-inline-13" aria-hidden="true"></i>다음주 챌린지 점검하기</div></div>';
+    titleEl.innerHTML='<div class="report-banner-inner" style="justify-content:flex-start;gap:5px;"><div class="report-banner-line" style="white-space:nowrap;"><i class="ti ti-flag-heart ico-inline-13" aria-hidden="true"></i>다음주 목표 제안받기</div></div>';
     titleEl.style.cursor='pointer';
     titleEl.onclick=openNextWeekFeedbackSheet;
   }else{
@@ -8432,31 +8437,53 @@ ${RHYTHM_CAT_GUIDE}
   const bodyHtml=rest.map(l=>`<div style="margin:8px 0;">${l.trim()}</div>`).join('');
   return headlineHtml+bodyHtml;
 }
-// 일요일 19시 이후 nextweek-sheet 타이틀 배너를 누르면 열리는 점검 시트.
-// 다음 주 챌린지 입력값 + 최근 몇 주 챌린지 이력을 함께 넘겨서, AI가 알아서
-// "비슷한 유형 목표가 반복+저조했으면 개선 팁, 처음이거나 잘 됐으면 가벼운 격려"로 자동 분기하게 함.
-// 카테고리 판단(운동=헬스장/홈트/걷기 등)도 사람이 미리 나누지 않고 AI 판단에 맡김.
+// 일요일 19시 이후 nextweek-sheet 타이틀 배너를 누르면 열리는 확장 목표 제안 시트.
+// (구) "다음주 챌린지 점검하기"를 대체 — 사용자가 입력한 목표에 코멘트만 달던 방식에서,
+// 이번주 리듬+메모+최근 8주 챌린지 이력을 종합해 AI가 먼저 2~3개 목표 후보를 제안하는 방식으로 변경.
+// 이미 다음주 챌린지를 입력해뒀어도 무관하게 항상 제안하며, 채택 시 기존 목록에 "추가"만 됨(덮어쓰지 않음).
 async function openNextWeekFeedbackSheet(){
   openSheet('nextweek-feedback-sheet');
   const wk=nextWeekKey();
   const content=document.getElementById('nextweek-feedback-content');
-  const cacheKey='nextweek_feedback_'+wk;
+  const cacheKey='nextweek_suggest_'+wk;
   const cached=S.get(cacheKey);
-  if(cached){content.innerHTML=cached;return;}
-  content.innerHTML='<div class="sheet-loading-msg">다음주 챌린지를 살펴보는 중이에요.. 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">약 10-20초 소요돼요</span></div>';
+  if(cached){content.innerHTML=cached;bindNextWeekSuggestButtons(wk);return;}
+  content.innerHTML='<div class="sheet-loading-msg">다음주를 위한 목표를 살펴보는 중이에요.. 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">약 10-20초 소요돼요</span></div>';
   const serverHtml=await aiCacheGet(cacheKey);
-  if(serverHtml){S.set(cacheKey,serverHtml);content.innerHTML=serverHtml;return;}
+  if(serverHtml){S.set(cacheKey,serverHtml);content.innerHTML=serverHtml;bindNextWeekSuggestButtons(wk);return;}
   if(!getClaudeKey()){
     content.innerHTML='<div class="sheet-loading-msg">아직 준비 중이에요 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">다른 기기에서 먼저 열어보시면 여기서도 볼 수 있어요</span></div>';
     return;
   }
-  const html=await buildNextWeekFeedbackHtml(wk);
+  const html=await buildNextWeekSuggestHtml(wk);
   if(html){
     S.set(cacheKey,html);
     aiCacheSet(cacheKey,html);
     content.innerHTML=html;
+    bindNextWeekSuggestButtons(wk);
   }
   else content.innerHTML='<div class="sheet-loading-msg">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
+}
+// 제안 카드의 "이걸로 정하기" 버튼 클릭 시 — 기존 다음주 챌린지 목록에 추가(덮어쓰지 않음).
+// 캐시된 HTML을 innerHTML로 꽂은 뒤라 버튼에 이벤트가 없으므로, 렌더 직후 매번 다시 바인딩.
+function bindNextWeekSuggestButtons(wk){
+  const wrap=document.getElementById('nextweek-feedback-content');
+  if(!wrap)return;
+  wrap.querySelectorAll('.nwf-adopt-btn').forEach(btn=>{
+    btn.onclick=()=>{
+      if(btn.dataset.adopted==='1')return; // 중복 클릭 방지
+      const text=btn.dataset.goalText;
+      if(!text)return;
+      const existing=getWChallenge(wk);
+      saveWChallenge(wk,[...existing,{text,days:[false,false,false,false,false,false,false]}]);
+      btn.dataset.adopted='1';
+      btn.textContent='추가됨';
+      btn.classList.add('adopted');
+      // 다음주 챌린지 준비 화면(nextweek-challenge-wrap)이 같은 시트 아래 깔려있으므로 반영해둠 —
+      // 점검 시트를 닫고 돌아갔을 때 바로 보이도록.
+      renderWeeklyChallenge(wk,'nextweek-challenge-wrap');
+    };
+  });
 }
 // 주간 미니통계의 메모 아이콘(월요일 하루 동안만 활성화, isReportDay 기준)을 누르면 열리는 시트.
 // 그 주(월~일) 메모를 모두 모아 AI에 넘겨, 이번 주 메모에 드러난 화두/톤을 짧게 정리해줌.
@@ -8609,6 +8636,127 @@ async function buildNextWeekFeedbackHtml(wk){
     const text=m?m[3].trim():l.trim();
     const icon=CAT_ICON[cat]||'ti-sparkles';
     return `<div class="nwf-item"><div class="nwf-item-head"><i class="ti ${icon} nwf-item-icon" aria-hidden="true"></i><span class="nwf-item-goal">${escapeHtml(goalText)}</span></div><span class="nwf-item-text">${text}</span></div>`;
+  }).join('');
+}
+
+// ── 다음 주 확장 목표 제안 (구 "챌린지 점검" 대체) ──
+// 이번주 리듬(카테고리별 시간+전주 대비 변화), 이번주 메모(요일별 샘플), 최근 8주 챌린지 이력(텍스트+체크+본인 주석 원문)을
+// 함께 넘겨 AI가 2~3개의 새 목표 후보를 제안. 사용자가 이미 입력해둔 다음주 챌린지 유무와 무관하게 항상 제안하며,
+// 채택 시 기존 목록에 추가되는 방식(덮어쓰지 않음)이라 여기선 순수 제안 생성만 담당.
+async function buildNextWeekSuggestHtml(wk){
+  const key=getClaudeKey();
+  if(!key)return '<div class="sheet-loading-msg">설정에서 Claude API 키를 입력하면 분석을 받을 수 있어요</div>';
+
+  const evenSample=(arr,n)=>{
+    if(arr.length<=n)return arr;
+    const result=[];
+    for(let i=0;i<n;i++){
+      const idx=Math.round(i*(arr.length-1)/(n-1));
+      result.push(arr[idx]);
+    }
+    return [...new Set(result)];
+  };
+
+  // 이번주(월~일, 방금 끝난 주) 리듬+메모 수집 — makeWeeklySummaryCard와 동일 기준으로 "그 주 일요일" 역산
+  const sundayDk=_thisWeekSundayDk();
+  const now=new Date(sundayDk+'T00:00:00');
+  const weekStart=new Date(now);weekStart.setDate(now.getDate()-6);
+
+  const allMemosWithDay=[];
+  const rhythmDurThis={};
+  for(let i=0;i<7;i++){
+    const d=new Date(weekStart);d.setDate(weekStart.getDate()+i);
+    const dk=dateKey(d);
+    const dayName=_HOME_DAYS[d.getDay()]+'요일';
+    const memos=getMemos(dk);
+    const dayTexts=memos.map(m=>m.type==='seed'?`[씨앗] ${m.text}`:m.text).filter(Boolean);
+    evenSample(dayTexts,8).forEach(t=>allMemosWithDay.push(`${dayName}: ${t}`));
+    getRhythmBlocks(dk).forEach(b=>{
+      const cat=RHYTHM_CATS[b.cat];if(!cat)return;
+      const s=b.start?parseInt(b.start.split(':')[0],10)*60+parseInt(b.start.split(':')[1],10):null;
+      const e=b.end?parseInt(b.end.split(':')[0],10)*60+parseInt(b.end.split(':')[1],10):null;
+      if(s==null||e==null)return;
+      let dur=e-s;if(dur<0)dur+=1440;
+      rhythmDurThis[b.cat]=(rhythmDurThis[b.cat]||0)+dur;
+    });
+  }
+  const rhythmText=Object.keys(RHYTHM_CATS).map(k=>{
+    const min=rhythmDurThis[k]||0;
+    if(min<10)return null;
+    const h=(min/60).toFixed(1).replace(/\.0$/,'');
+    return `${RHYTHM_CATS[k].label} ${h}시간`;
+  }).filter(Boolean).join(', ');
+
+  // 최근 8주 챌린지 이력 — 텍스트(괄호 속 본인 주석 포함 원문 그대로)+체크일수, 최근 주가 위로 오게
+  const historyLines=[];
+  for(let i=1;i<=8;i++){
+    const d=new Date();d.setDate(d.getDate()-7*i);
+    const pastWk=weekKey(d);
+    const pastItems=getWChallenge(pastWk).filter(it=>it.text&&it.text.trim());
+    pastItems.forEach(it=>historyLines.push(`"${it.text}" — ${it.days.filter(Boolean).length}/7일 체크`));
+  }
+  // 이미 입력해둔 다음주 챌린지(있다면) — 덮어쓰지 않고 참고만 하도록 별도로 전달
+  const alreadySet=getWChallenge(wk).filter(it=>it.text&&it.text.trim());
+  const alreadySetText=alreadySet.map(it=>`"${it.text}"`).join(', ');
+
+  const dataContext=[
+    getUserProfileContext(),
+    rhythmText?`지난 한 주간 리듬 기록(카테고리별 누적 시간):\n${rhythmText}`:'지난 한 주 리듬 기록 부족',
+    allMemosWithDay.length?`지난 한 주간 메모(요일별로 시간대 고르게 샘플링):\n${allMemosWithDay.join('\n')}`:'지난 한 주 메모 없음',
+    historyLines.length?`최근 몇 주간의 챌린지 이력(텍스트에 남긴 본인 메모 포함, 원문 그대로):\n${historyLines.join('\n')}`:'과거 챌린지 이력 없음(처음 시작)',
+    alreadySetText?`사용자가 이미 다음 주 챌린지로 입력해둔 목표(참고만 — 여기 제안은 이걸 대체하지 않고 추가되는 것):\n${alreadySetText}`:null
+  ].filter(Boolean).join('\n\n');
+
+  const sys=`당신은 따뜻한 생활 코치예요. 지난 한 주간의 리듬 기록과 메모, 그리고 최근 몇 주간의 챌린지 이력을 참고해서,
+다음 주에 시도해볼 만한 새로운 목표 후보를 2~3개 제안해요.
+
+${RHYTHM_CAT_GUIDE}
+
+**핵심 판단 방식:**
+1. 행동 변화(리듬 기록)와 본인 언급(메모)이 함께 나타나는 지점을 우선적으로 살펴보세요. 예를 들어 특정 활동이 늘거나 줄었고, 메모에서도 그와 관련된 언급이 반복된다면 그게 가장 근거가 뚜렷한 제안 후보예요.
+2. 최근 챌린지 이력도 함께 보세요. 특히 목표 텍스트에 사용자가 직접 남긴 괄호 메모나 정황(예: 중단 사유, 톤 변화)이 있다면 그걸 가장 중요한 단서로 삼으세요. 최근 저조했거나 중단된 흐름이 있다면, 무작정 강도를 올리는 제안 대신 지금 상황에 맞게 문턱을 낮춘 제안을 하세요. 반대로 꾸준히 잘 되고 있는 흐름이라면 한 단계 확장하는 제안을 해도 좋아요.
+3. 최근 8주 이력과 문자 그대로 겹치는 제안은 하지 마세요. 다만 같은 결을 잇되 강도나 접근 방식을 조정한 제안(예: 이전이 "헬스장 가기"였다면 "밥먹고 5분 걷기")은 괜찮습니다.
+4. 서로 다른 영역에서 2~3개를 고르게 제안하세요(같은 주제로 쏠리지 않게). 단, 최근 흐름상 특정 주제(예: 몸 상태, 컨디션 관리)가 명백히 우선순위가 높아 보인다면 그 주제를 하나는 반드시 포함하세요.
+
+**절대 원칙:**
+- "실패", "부족", "아쉽다" 같은 부정적 평가 금지.
+- 과거 기록을 세세하게 거론하지 마세요(정확한 날짜, 체크 횟수를 콕 집어 말하지 않기). "최근 며칠 어려움이 있었던 것 같아요" 정도로 뭉뚱그려 언급하는 수준까지만.
+- 근거 없이 지어내지 마세요. 데이터에서 실제로 확인되는 흐름만 근거로 삼으세요.
+- 반드시 ~해요, ~이에요, ~어요 체의 정감있는 존댓말만 사용. 반말 절대 금지. 이름 호칭 없음.
+- 이모지, 마크다운 기호 사용 금지.
+
+**출력 형식(반드시 준수):**
+각 제안마다 정확히 다음 형식의 한 줄로 시작하세요:
+[카테고리] 제목 :: 근거와 제안 이유(1~2문장) :: 실제 챌린지 문구
+
+카테고리는 다음 중 성격에 가장 가까운 것 하나만 골라 대괄호 안에 그대로 쓰세요: 운동, 식사, 수면, 공부, 업무, 마음가짐, 습관, 취미
+세 번째 필드(실제 챌린지 문구)는 다음 주 챌린지 목록에 그대로 등록될 짧고 명확한 문장이어야 해요(코멘트 없이 행동 자체만).
+예:
+[운동] 문턱 낮춰 다시 시작 :: 최근 며칠 운동 흐름이 잠시 끊겼던 것 같아요. 다시 습관을 만드는 시기엔 강도보다 재진입 자체가 중요할 수 있어요 :: 밥먹고 5분 걷기
+
+제안 개수만큼(2~3줄) 줄을 만드세요. 각 제안은 한 줄(문단) 안에서만 내용을 이어가고 다음 줄로 넘어가면 안 돼요.`;
+
+  const reply=await callClaude(sys,[{role:'user',content:dataContext}],700);
+  if(!reply||reply.startsWith('__ERR__'))return null;
+
+  const CAT_ICON2={
+    '운동':'ti-run','식사':'ti-salad','수면':'ti-moon','공부':'ti-book',
+    '업무':'ti-briefcase','마음가짐':'ti-heart','습관':'ti-repeat','취미':'ti-stack-2'
+  };
+  const lines=reply.trim().split('\n').filter(l=>l.trim());
+  return lines.map(l=>{
+    const m=l.trim().match(/^\[(.+?)\]\s*(.+?)\s*::\s*(.+?)\s*::\s*(.+)$/);
+    if(!m)return '';
+    const cat=m[1].trim(),title=m[2].trim(),reason=m[3].trim(),goalText=m[4].trim();
+    const icon=CAT_ICON2[cat]||'ti-sparkles';
+    return `<div class="nwf-item">
+      <div class="nwf-item-head"><i class="ti ${icon} nwf-item-icon" aria-hidden="true"></i><span class="nwf-item-goal">${escapeHtml(title)}</span></div>
+      <span class="nwf-item-text">${escapeHtml(reason)}</span>
+      <div class="nwf-adopt-row">
+        <span class="nwf-goal-preview">${escapeHtml(goalText)}</span>
+        <button type="button" class="nwf-adopt-btn" data-goal-text="${escapeHtml(goalText)}">이걸로 정하기</button>
+      </div>
+    </div>`;
   }).join('');
 }
 
