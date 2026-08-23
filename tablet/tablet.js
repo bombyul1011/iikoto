@@ -395,7 +395,7 @@ async function renderSideProgress(){
   if(!el)return;
   const todayDk=dateKey(new Date());
   const [todos,habits,habitChecks]=await Promise.all([
-    supaFetch(`todos?date_key=eq.${todayDk}&select=done`),
+    supaFetch(`todos?date_key=eq.${todayDk}&is_event=eq.false&select=done`),
     supaFetch(`habits?order=sort_order.asc`),
     supaFetch(`habit_checks?date_key=eq.${todayDk}`)
   ]);
@@ -1069,9 +1069,14 @@ function renderWeekSleepReport(rows){
 
   const scoreLevel=avgScore!=null?getSleepScoreLevel(avgScore):null;
 
-  // 목표 달성률(목표 이상 잔 날 비율)
-  const goalMetDays=validSleep.filter(r=>_sleepDurMinOf(r)>=SLEEP_GOAL_MIN).length;
-  const goalPct=validSleep.length?Math.round(goalMetDays/validSleep.length*100):0;
+  // 목표 달성률 — 목표 대비 근접도 평균(초과 수면은 100%로 인정, 부족한 만큼만 감점)
+  const goalPct=validSleep.length
+    ?Math.round(validSleep.reduce((sum,r)=>{
+        const durMin=_sleepDurMinOf(r);
+        const pct=durMin>=SLEEP_GOAL_MIN?100:Math.max(0,100-(SLEEP_GOAL_MIN-durMin)/SLEEP_GOAL_MIN*100);
+        return sum+pct;
+      },0)/validSleep.length)
+    :0;
 
   el.innerHTML=`<div class="wsleep2-grid">
     <div class="wsleep2-item">
@@ -1090,7 +1095,7 @@ function renderWeekSleepReport(rows){
       <div class="wsleep2-icon-box" style="background:rgba(255,222,170,0.4);"><i class="ti ti-target-arrow" style="color:rgba(200,150,60,0.9);" aria-hidden="true"></i></div>
       <div class="wsleep2-label">목표 달성률</div>
       <div class="wsleep2-val">${goalPct}<span class="unit">%</span></div>
-      <div class="wsleep2-sub">${goalMetDays}일 <b>/</b> ${validSleep.length}일</div>
+      <div class="wsleep2-sub">목표 7시간30분 기준</div>
     </div>
     <div class="wsleep2-item">
       <div class="wsleep2-icon-box" style="background:rgba(216,190,225,0.4);"><i class="ti ti-activity" style="color:rgba(150,100,170,0.9);" aria-hidden="true"></i></div>
