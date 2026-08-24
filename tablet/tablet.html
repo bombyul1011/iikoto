@@ -166,6 +166,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .memo-search-empty{font-size:var(--fs-sm);color:var(--tm);padding:10px 2px;}
 .card-lbl i{font-size:var(--fs-lg);}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;align-items:stretch;}
+.grid2>.card{min-width:0;}
 /* 목표(3줄 기준)+습관 카드 왼쪽 세로 스택과, 오른쪽 채움로그(스크롤)의 기준 높이를 명확히 고정.
    이전엔 min-height라 채움로그 내용이 길어지면 grid 전체가 늘어나며 옆의 목표/습관 카드까지 함께 커지는 문제가 있었음
    — height로 고정해 왼쪽 두 카드는 항상 이 높이 안에서 반반 나눠 갖고, 채움로그는 그 안에서 스크롤(2026-08-22 확정). */
@@ -579,8 +580,8 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .mrp-hero-comment{font-size:var(--fs-body);color:var(--tp);line-height:1.75;font-family:'HakgyoansimBareonbatangR',serif;}
 
 .mrp-grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch;}
-.mrp-grid2 .mrp-card{height:100%;box-sizing:border-box;}
-.mrp-card{background:var(--card);border:1px solid var(--card-b);border-radius:15px;padding:18px 20px;box-shadow:0 2px 14px rgba(0,0,0,0.05);}
+.mrp-grid2 .mrp-card{height:100%;box-sizing:border-box;min-width:0;}
+.mrp-card{background:var(--card);border:1px solid var(--card-b);border-radius:15px;padding:18px 20px;box-shadow:0 2px 14px rgba(0,0,0,0.05);min-width:0;}
 .mrp-card-title{font-size:var(--fs-title);font-weight:600;color:var(--tp);margin-bottom:13px;display:flex;align-items:center;gap:7px;}
 .mrp-card-title i{font-size:var(--fs-lg);}
 /* 옆 카드(이 달의 목표)와 높이를 맞출 때, 내용이 한 줄뿐이라 제목 바로 아래로 쏠려 보이는 카드용 —
@@ -606,7 +607,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .mrp-rhythm-item{display:flex;align-items:center;gap:7px;font-size:var(--fs-sm);color:var(--ts);min-width:0;}
 .mrp-rhythm-item .dot{width:8px;height:8px;border-radius:2px;flex-shrink:0;}
 .mrp-rhythm-item .lbl{width:34px;flex-shrink:0;color:var(--tp);font-weight:500;}
-.mrp-rhythm-item .val{color:var(--ts);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.mrp-rhythm-item .val{color:var(--ts);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1;}
 .mrp-rhythm-delta{font-weight:600;}
 .mrp-rhythm-delta.up{color:#b4708a;}
 .mrp-rhythm-delta.down{color:#6a95b5;}
