@@ -336,7 +336,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .wgoal-item{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;}
 .wgoal-text{font-size:var(--fs-body);color:var(--tp);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .wgoal-days{display:flex;gap:5px;flex-shrink:0;}
-.wgoal-day{width:26px;height:26px;border-radius:50%;border:1.5px dashed rgba(var(--divider-rgb),0.38);background:none;display:flex;align-items:center;justify-content:center;font-size:var(--fs-sm);font-weight:600;color:var(--tm);font-family:'DM Sans',sans-serif;}
+.wgoal-day{width:26px;height:26px;border-radius:50%;border:1.5px dashed rgba(var(--divider-rgb),0.38);background:none;display:flex;align-items:center;justify-content:center;font-size:var(--fs-sm);font-weight:600;color:var(--tm);font-family:'DM Sans',sans-serif;flex-shrink:0;}
 .habit-matrix{display:grid;grid-template-columns:56px repeat(7,1fr);gap:8px 3px;align-items:center;}
 .habit-matrix .rowlbl{font-size:var(--fs-body);color:var(--ts);}
 .habit-matrix .dot{width:14px;height:14px;border-radius:50%;margin:0 auto;background:rgba(200,190,180,0.2);}
@@ -366,6 +366,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .rdcal-dow{text-align:center;font-size:var(--fs-sm);color:var(--tm);font-weight:500;margin-bottom:6px;}
 .rdcal-num{text-align:center;font-size:var(--fs-sm);color:var(--tm);height:46px;display:flex;align-items:center;justify-content:center;}
 .mgoal-row{display:flex;align-items:center;gap:7px;padding:3px 0;font-size:var(--fs-body);color:var(--tp);}
+.mgoal-row span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .mgoal-row::before{content:'';width:4px;height:4px;border-radius:50%;background:rgba(var(--pal-orange-rgb),1);flex-shrink:0;}
 
 /* 콘텐츠 타임라인 — 본앱과 동일한 시각 스타일(빈 날짜=점선 네모칸, 콘텐츠=카테고리색 둥근 블록), 전체 폭 한줄(%기반) */
@@ -596,7 +597,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .mrp-stat-delta.down{color:#6a95b5;}
 .mrp-stat-delta.flat{color:var(--tm);}
 
-.mrp-goal-line{font-size:var(--fs-body);color:var(--tp);line-height:1.7;padding:3px 0;}
+.mrp-goal-line{font-size:var(--fs-body);color:var(--tp);line-height:1.7;padding:3px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 
 .mrp-rhythm-bar{display:flex;height:30px;border-radius:9px;overflow:hidden;background:var(--graph-track-color);margin-bottom:12px;}
 .mrp-rhythm-seg{display:flex;align-items:center;justify-content:center;}

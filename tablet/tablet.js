@@ -1275,7 +1275,7 @@ function renderMonthGoals(row){
   const el=document.getElementById('month-goals');
   const lines=(row&&Array.isArray(row.lines))?row.lines.filter(l=>l&&l.trim()):[];
   if(!lines.length){el.innerHTML='<div class="empty-msg">등록된 목표가 없어요</div>';return;}
-  el.innerHTML=lines.map(l=>`<div class="mgoal-row">${escapeHtml(l)}</div>`).join('');
+  el.innerHTML=lines.map(l=>`<div class="mgoal-row"><span>${escapeHtml(l)}</span></div>`).join('');
 }
 
 // ── 콘텐츠 타임라인 — 전체 폭 한줄(%기반), 스와이프 불필요하게 31일치를 카드 폭에 맞춰 표시 ──
