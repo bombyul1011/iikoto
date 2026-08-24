@@ -3616,7 +3616,7 @@ function renderWeekReviewChips(activeDk,readOnly){
     wrap.appendChild(chip);
   });
 }
-// 순수 조회 — 캐시에 있으면 보여주고, 없으면 "아직 없어요" 안내만. 절대 생성하지 않음.
+// 순수 조회 — 캐시에 있으면 보여주고, 없으면 "아직 없어요" 안내만(단, 월요일+지난주 한정으로 놓친 생성을 만회할 보조 버튼 표시).
 function loadWeeklyReviewReadOnly(dk){
   renderWeekReviewChips(dk,true);
   const content=document.getElementById('weekly-review-content');
@@ -3628,6 +3628,15 @@ function loadWeeklyReviewReadOnly(dk){
     if(serverHtml){
       S.set(cacheKey,serverHtml);
       content.innerHTML=serverHtml;
+      return;
+    }
+    // 유예 조건: 오늘이 월요일이고, 지금 보고 있는 주차(dk)가 바로 그 "지난주"(_thisWeekSundayDk 기준)일 때만.
+    // 화요일이 되거나, 2주전 이상 더 예전 주차면 이 버튼 없이 기존처럼 안내만 뜸(설계 원칙 그대로 유지).
+    const canMakeUp=(new Date().getDay()===1)&&(dk===_thisWeekSundayDk());
+    if(canMakeUp){
+      content.innerHTML='<div class="sheet-loading-msg">이 주는 아직 기록된 요약이 없어요 🌿<br><span id="wr-makeup-btn" style="display:inline-block;margin-top:10px;font-size:var(--dow-label-size);color:var(--pal-mauvepink);opacity:0.8;text-decoration:underline;cursor:pointer;">놓친 주간요약 만들기</span></div>';
+      const btn=document.getElementById('wr-makeup-btn');
+      if(btn)btn.onclick=()=>loadWeeklyReviewFor(dk);
     }else{
       content.innerHTML='<div class="sheet-loading-msg">이 주는 아직 기록된 요약이 없어요 🌿</div>';
     }
