@@ -1815,11 +1815,38 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div id="wcal-month-label" style="font-weight:600;font-size:var(--main-text-size);color:var(--tp);"></div>
         <i class="ti ti-chevron-right ico-cal-nav" onclick="wcalMonthShift(1)" aria-hidden="true"></i>
       </div>
-      <div class="wcal-filter-chips" id="wcal-filter-chips"></div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="wcal-filter-chips" id="wcal-filter-chips" style="flex:1;"></div>
+        <button class="slabel-search-btn" onclick="openWcalAddSheet()" title="감상 기록 추가" style="flex-shrink:0;"><i class="ti ti-plus ico-sz-14" aria-hidden="true"></i></button>
+      </div>
       <div class="wcal-weekday-row"><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span><span>일</span></div>
       <div class="wcal-grid" id="wcal-grid"></div>
       <div class="wcal-legend" id="wcal-legend"></div>
       <div id="wcal-detail"></div>
+    </div>
+  </div>
+</div>
+
+<!-- WATCH CALENDAR ADD SHEET (드라마/책 대상 — 리듬 기록이나 등록 기간이 못 잡아낸 감상일을 수동으로 보충) -->
+<div class="overlay" id="wcal-add-sheet" style="z-index:8600;" onclick="closeSheet('wcal-add-sheet',event)">
+  <div class="bsheet" style="max-height:85vh;overflow-y:auto;" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div style="padding:0 20px 24px;">
+      <div class="goal-section-title" style="margin-top:0;"><i class="ti ti-plus ico-13" aria-hidden="true"></i> 감상 기록 추가</div>
+      <div id="wcal-add-step1">
+        <div style="font-size:var(--dow-label-size);color:var(--ts);margin:8px 0 10px;">어떤 콘텐츠를 추가할까요? (드라마·책만 지원)</div>
+        <input type="text" id="wcal-add-search" placeholder="제목 검색" oninput="renderWcalAddList(this.value)" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--card-b);background:var(--card);color:var(--tp);font-size:var(--main-text-size);margin-bottom:12px;">
+        <div id="wcal-add-list"></div>
+      </div>
+      <div id="wcal-add-step2" style="display:none;">
+        <div id="wcal-add-selected-info" style="display:flex;align-items:center;gap:10px;margin:8px 0 14px;"></div>
+        <div style="font-size:var(--dow-label-size);color:var(--ts);margin-bottom:8px;">어느 날짜에 추가할까요?</div>
+        <input type="date" id="wcal-add-date-input" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--card-b);background:var(--card);color:var(--tp);font-size:var(--main-text-size);margin-bottom:14px;">
+        <div style="display:flex;gap:8px;">
+          <button onclick="wcalAddBackToStep1()" style="flex:1;padding:11px;border-radius:12px;border:1px solid var(--card-b);background:var(--card);color:var(--ts);font-size:var(--main-text-size);font-weight:600;">뒤로</button>
+          <button onclick="wcalAddConfirm()" style="flex:1;padding:11px;border-radius:12px;border:none;background:var(--pal-mauvepink);color:#fff;font-size:var(--main-text-size);font-weight:600;">추가하기</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -11551,17 +11578,22 @@ let _wcalDate=new Date();
 let _wcalFilter='all';
 let _wcalByDate={}; // 이번 달 집계 캐시: {dk: [{cat,title,poster}, ...]}
 let _wcalSelectedDk=null;
+// 서버의 수동 추가분을 먼저 내려받고, 그 결과와 무관하게 로컬 데이터로 즉시 1차 렌더(체감 속도용) — 공통 로직이라 헬퍼로 뽑음
+function _wcalRefresh(){
+  syncWcalManualDown(monthKey(_wcalDate)).then(loadAndRenderWatchCal);
+  loadAndRenderWatchCal();
+}
 function openWatchCalendarSheet(){
   _wcalDate=new Date();
   _wcalFilter='all';
   _wcalSelectedDk=null;
   openSheet('watch-cal-sheet');
-  loadAndRenderWatchCal();
+  _wcalRefresh();
 }
 function wcalMonthShift(delta){
   _wcalDate.setMonth(_wcalDate.getMonth()+delta);
   _wcalSelectedDk=null;
-  loadAndRenderWatchCal();
+  _wcalRefresh();
 }
 function wcalSetFilter(cat){
   _wcalFilter=cat;
@@ -11596,6 +11628,18 @@ function loadAndRenderWatchCal(){
   getContents(mk).filter(c=>c.cat==='music'&&c.startDate).forEach(c=>{
     push(c.startDate,{cat:'music',title:c.title,poster:c.poster});
   });
+  // 영화 — 극장 관람 등 리듬 기록 없이 콘텐츠탭에만 등록되는 경우가 잦아, 리듬 블록으로 한 번도 안 잡힌 영화는
+  // contents의 종료일(없으면 시작일)로 폴백. 리듬 기록이 있는 영화는 그 실제 감상일이 더 정확하므로 폴백 대상에서 제외.
+  const moviesCapturedByRhythm=new Set();
+  Object.values(_wcalByDate).forEach(list=>list.forEach(it=>{if(it.cat==='movie')moviesCapturedByRhythm.add(it.title);}));
+  getContents(mk).filter(c=>c.cat==='movie').forEach(c=>{
+    if(moviesCapturedByRhythm.has(c.title))return;
+    const fallbackDk=c.endDate||c.startDate;
+    if(fallbackDk&&fallbackDk.slice(0,7)===mk)push(fallbackDk,{cat:'movie',title:c.title});
+  });
+
+  // 수동 추가분(드라마/책) — 자동 수집(리듬 기록)이 못 잡는 사각지대(오디오북 미등록, TV 감상탭 미입력 등) 보충용
+  getWcalManual(mk).forEach(it=>push(it.dk,{cat:it.cat,title:it.title}));
 
   // 포스터 매칭 — 드라마/영화/책은 같은 제목의 콘텐츠 항목(이번 달+전월, 진행중 포함)에서 poster를 찾아 붙임
   const posterByTitle={};
@@ -11621,10 +11665,6 @@ function loadAndRenderWatchCal(){
   renderWatchCalGrid();
   renderWatchCalLegend();
   renderWatchCalDetail();
-  console.log('[wcal debug]',JSON.parse(JSON.stringify(_wcalByDate)));
-  // 임시 화면 디버그 — 맥 없이도 확인 가능하도록 각 날짜별 항목 개수를 화면에 직접 표시
-  const dbgEl=document.getElementById('wcal-debug')||(()=>{const d=document.createElement('div');d.id='wcal-debug';d.style.cssText='margin-top:14px;padding:10px;background:#fff8;border:1px dashed #c00;border-radius:8px;font-size:11px;color:#333;white-space:pre-wrap;max-height:200px;overflow-y:auto;';document.getElementById('wcal-detail').insertAdjacentElement('afterend',d);return d;})();
-  dbgEl.textContent='[디버그] 날짜별 항목 수\n'+Object.keys(_wcalByDate).sort().map(dk=>`${dk}: ${_wcalByDate[dk].length}개 → ${_wcalByDate[dk].map(it=>it.cat+':'+it.title).join(' / ')}`).join('\n');
 }
 function renderWatchCalHeader(){
   const el=document.getElementById('wcal-month-label');
@@ -11643,6 +11683,12 @@ function _wcalSwatch(it){
   const m=WCAL_CAT_META[it.cat];
   if(it.poster)return `<img src="${it.poster}" alt="">`;
   return `<div class="wcal-cat-fallback" style="background:${m.color};"><i class="ti ${m.icon}" aria-hidden="true"></i></div>`;
+}
+// 32x44 고정 크기 포스터(또는 카테고리색 폴백) — 하단 상세 목록과 추가시트 검색 목록에서 공통으로 씀
+function _wcalPosterThumbHtml(cat,poster){
+  const m=WCAL_CAT_META[cat];
+  if(poster)return `<img src="${poster}" style="width:32px;height:44px;border-radius:5px;object-fit:cover;flex-shrink:0;" />`;
+  return `<div style="width:32px;height:44px;border-radius:5px;background:var(--card2);flex-shrink:0;display:flex;align-items:center;justify-content:center;"><i class="ti ${m.icon} ico-13" style="color:var(--tm);" aria-hidden="true"></i></div>`;
 }
 // 1개=꽉 채움 / 2개=위아래 반반 / 3개=위 하나 크게+아래 좌우 둘 / 4개=2x2, 5개~=+N — 찌그러뜨리지 않고 각 조각도 object-fit:cover로 중앙 크롭
 function _wcalBuildThumb(items){
@@ -11684,7 +11730,7 @@ function renderWatchCalDetail(){
   const dispDate=parseInt(_wcalSelectedDk.slice(5,7),10)+'월 '+parseInt(_wcalSelectedDk.slice(8,10),10)+'일';
   const rows=items.map(it=>{
     const m=WCAL_CAT_META[it.cat];
-    const posterHtml=it.poster?`<img src="${it.poster}" style="width:32px;height:44px;border-radius:5px;object-fit:cover;flex-shrink:0;" />`:`<div style="width:32px;height:44px;border-radius:5px;background:var(--card2);flex-shrink:0;display:flex;align-items:center;justify-content:center;"><i class="ti ${m.icon} ico-13" style="color:var(--tm);" aria-hidden="true"></i></div>`;
+    const posterHtml=_wcalPosterThumbHtml(it.cat,it.poster);
     return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;">
       ${posterHtml}
       <div style="flex:1;min-width:0;">
@@ -11702,6 +11748,91 @@ function wcalSelectDay(dk){
   _wcalSelectedDk=(_wcalSelectedDk===dk)?null:dk;
   renderWatchCalGrid();
   renderWatchCalDetail();
+}
+
+// ── 감상 기록 수동 추가 (드라마/책 한정 — 오디오북처럼 독서 등록을 안 했거나, TV를 보면서 감상탭을 안 눌렀을 때 보충용) ──
+// 저장 위치: 새 테이블 없이 goal_notes를 wchallenge와 동일한 범용 저장소 패턴으로 재사용.
+// key: 'wcal_manual_YYYY-MM', lines: [{cat,title,dk}, ...] — 월별로 나눠 저장해 한 항목이 비대해지지 않게 함.
+function getWcalManual(mk){return S.get('wcal_manual_'+mk)||[];}
+function saveWcalManual(mk,data){S.set('wcal_manual_'+mk,data);S.set('wcal_manual_pending_'+mk,true);}
+async function syncWcalManualDown(mk){
+  const key='wcal_manual_'+mk;
+  const pendingKey='wcal_manual_pending_'+mk;
+  if(S.get(pendingKey)){
+    await supaUpsert('goal_notes','note_key',[{note_key:key,lines:S.get(key)||[]}]);
+    S.set(pendingKey,false);
+    return;
+  }
+  const rows=await supaFetch(`goal_notes?note_key=eq.${encodeURIComponent(key)}`);
+  if(!rows)return;
+  if(!rows.length){
+    const local=S.get(key);
+    if(local&&local.length)await supaUpsert('goal_notes','note_key',[{note_key:key,lines:local}]);
+    return;
+  }
+  S.set(key,rows[0].lines);
+}
+
+let _wcalAddSelected=null; // {cat,title,poster}
+function openWcalAddSheet(){
+  _wcalAddSelected=null;
+  document.getElementById('wcal-add-search').value='';
+  document.getElementById('wcal-add-step1').style.display='';
+  document.getElementById('wcal-add-step2').style.display='none';
+  renderWcalAddList('');
+  openSheet('wcal-add-sheet');
+}
+// 음악 제외 — 드라마/책만 대상. 등록 기간이나 진행 상태와 무관하게 전체 목록에서 검색.
+function renderWcalAddList(query){
+  const el=document.getElementById('wcal-add-list');if(!el)return;
+  const q=(query||'').trim().toLowerCase();
+  const months=new Set();
+  const now=new Date();
+  for(let i=0;i<12;i++)months.add(monthKey(new Date(now.getFullYear(),now.getMonth()-i,1)));
+  const all=[];
+  months.forEach(mk=>getContents(mk).forEach(c=>{if((c.cat==='drama'||c.cat==='book')&&c.title)all.push(c);}));
+  const seen=new Set();
+  const uniq=all.filter(c=>{const k=c.cat+'|'+c.title;if(seen.has(k))return false;seen.add(k);return true;});
+  const filtered=q?uniq.filter(c=>c.title.toLowerCase().includes(q)):uniq;
+  if(!filtered.length){el.innerHTML='<div style="text-align:center;color:var(--tm);padding:20px 0;font-size:var(--dow-label-size);">검색 결과가 없어요</div>';return;}
+  el.innerHTML=filtered.slice(0,30).map(c=>{
+    const m=WCAL_CAT_META[c.cat];
+    const posterHtml=_wcalPosterThumbHtml(c.cat,c.poster);
+    return `<div onclick="wcalAddPick('${c.cat}','${c.title.replace(/'/g,"\\'")}','${(c.poster||'').replace(/'/g,"\\'")}')" style="display:flex;align-items:center;gap:10px;padding:8px 4px;cursor:pointer;border-bottom:1px solid var(--card-b);">
+      ${posterHtml}
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:var(--main-text-size);color:var(--tp);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.title)}</div>
+        <div style="font-size:var(--dow-label-size);color:var(--ts);margin-top:2px;">${m.label}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function wcalAddPick(cat,title,poster){
+  _wcalAddSelected={cat,title,poster:poster||null};
+  const posterHtml=_wcalPosterThumbHtml(cat,poster);
+  document.getElementById('wcal-add-selected-info').innerHTML=`${posterHtml}<div style="font-size:var(--main-text-size);color:var(--tp);font-weight:600;">${escapeHtml(title)}</div>`;
+  document.getElementById('wcal-add-date-input').value=_wcalSelectedDk||dateKey(new Date());
+  document.getElementById('wcal-add-step1').style.display='none';
+  document.getElementById('wcal-add-step2').style.display='';
+}
+function wcalAddBackToStep1(){
+  document.getElementById('wcal-add-step1').style.display='';
+  document.getElementById('wcal-add-step2').style.display='none';
+}
+function wcalAddConfirm(){
+  if(!_wcalAddSelected)return;
+  const dk=document.getElementById('wcal-add-date-input').value;
+  if(!dk)return;
+  const mk=dk.slice(0,7);
+  const list=getWcalManual(mk);
+  const exists=list.some(it=>it.cat===_wcalAddSelected.cat&&it.title===_wcalAddSelected.title&&it.dk===dk);
+  if(!exists){
+    list.push({cat:_wcalAddSelected.cat,title:_wcalAddSelected.title,dk});
+    saveWcalManual(mk,list);
+    syncWcalManualDown(mk);
+  }
+  closeSheet('wcal-add-sheet');
+  if(mk===monthKey(_wcalDate))loadAndRenderWatchCal();
 }
 // ── 독서 공유카드 (투명 PNG) ──
 // 원칙: canvas는 처음부터 끝까지 완전 투명 배경 하나만 그린다.
