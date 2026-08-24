@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260824-weekly-makeup';
+const CACHE = 'iikoto-v20260825-2-wcal-split-fix';
 const ASSETS = [
   './',
   './index.html'
