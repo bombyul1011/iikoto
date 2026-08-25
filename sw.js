@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260825-14-content-timeline-title';
+const CACHE = 'iikoto-v20260825-22-archive-default-grid';
 const ASSETS = [
   './',
   './index.html'

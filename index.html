@@ -356,9 +356,17 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cmr-review-box{margin:0 0 7px 46px;display:none;}
 .cmr-review-box.on{display:block;}
 /* 코멘트 상세 헤더 — 날짜 + 별점, 리스트형/그리드형 공통 */
-.cmr-detail-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;font-size:var(--dow-label-size);}
+.cmr-detail-head{display:flex;align-items:center;gap:8px;margin-bottom:7px;font-size:var(--dow-label-size);}
+.cmr-detail-head .cwatch-btn{margin-left:auto;}
 .cmr-detail-date{color:var(--tm);font-weight:600;font-variant-numeric:tabular-nums;}
 .cmr-detail-stars{color:#e0b050;letter-spacing:1px;}
+.cmr-progress-bar{display:flex;align-items:center;gap:8px;margin-bottom:7px;cursor:pointer;padding:3px 0;}
+.cmr-progress-track{flex:1;height:4px;border-radius:3px;background:var(--graph-track-color);overflow:hidden;}
+.cmr-progress-fill{height:100%;border-radius:3px;background:#ffc9da;transition:width .3s ease;}
+.cmr-progress-label{font-size:10px;color:var(--tm);white-space:nowrap;flex-shrink:0;}
+.cwatch-btn{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;color:var(--pal-mauvepink);background:rgba(255,150,180,0.14);border:1px solid rgba(255,150,180,0.40);border-radius:8px;padding:3px 8px;cursor:pointer;flex-shrink:0;}
+.cwatch-btn.active{background:linear-gradient(135deg,#ffd1e2,#ffe6b8,#e6e1f5,#ffd1e2);background-size:300% 300%;animation:bannerShine 3s ease infinite;color:#8a5a70;}
+.cwatch-btn i{font-size:11px;}
 /* 완결 총평 — 테두리 있는 배너, 시작에 이탤릭 "Comment :" 프리픽스 */
 .cmr-review-final{font-size:var(--dow-label-size);color:var(--tp);line-height:1.6;background:rgba(210,180,160,0.14);border:1px solid rgba(210,180,160,0.35);border-radius:10px;padding:9px 11px;}
 /* flat — 바깥 컨테이너(.cgrid-detail 등)가 이미 같은 톤의 카드 배경일 때 안쪽 이중 배너 방지 */
@@ -997,6 +1005,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .content-hub-body{padding:16px 18px 30px;display:flex;flex-direction:column;gap:18px;}
 .wcal-note-icon{color:var(--tm);opacity:0.65;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center;}
 .wcal-note-icon.has{opacity:1;color:var(--pal-mauvepink);}
+.wcal-status-badge{font-size:9.5px;font-weight:600;border-radius:6px;padding:2px 7px;flex-shrink:0;white-space:nowrap;}
+.wcal-status-badge.watching{color:#a07820;background:rgba(250,215,100,0.25);}
+.wcal-status-badge.done{color:var(--tm);background:rgba(var(--divider-rgb),0.18);}
 .wcal-note-display{font-size:var(--dow-label-size);color:var(--tp);line-height:1.6;background:rgba(210,180,160,0.14);border-radius:10px;padding:9px 11px;margin-top:8px;cursor:pointer;}
 .ch-month-banner-row{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;}
 .ch-month-banner-row::-webkit-scrollbar{display:none;}
@@ -1041,8 +1052,12 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .ch-tlB-note-date{font-size:10.5px;color:var(--tm);font-weight:600;white-space:nowrap;padding-top:1px;min-width:34px;}
 .ch-tlB-note-text{font-size:var(--dow-label-size);color:var(--tp);line-height:1.5;flex:1;}
 .wcal-new-picker-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px;}
-.wcal-new-picker-item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:18px 10px;border-radius:14px;background:var(--card);border:1px solid var(--card-b);cursor:pointer;font-size:var(--main-text-size);color:var(--tp);font-weight:500;}
-.wcal-new-picker-item i{font-size:22px;color:var(--pal-mauvepink);}
+.wcal-new-picker-item{display:flex;align-items:center;justify-content:center;gap:6px;padding:14px 10px;border-radius:14px;background:var(--card);border:1px solid var(--card-b);cursor:pointer;font-size:var(--main-text-size);color:var(--tp);font-weight:500;}
+.wcal-new-picker-item i{font-size:18px;color:var(--pal-mauvepink);}
+.watch-picker-item{display:flex;align-items:center;gap:10px;padding:8px 0;cursor:pointer;}
+.watch-picker-item-poster{width:36px;height:36px;border-radius:8px;object-fit:cover;flex-shrink:0;}
+.watch-picker-item-poster-ph{width:36px;height:36px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;}
+.watch-picker-item-title{flex:1;min-width:0;font-size:var(--main-text-size);color:var(--tp);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .wcal-rainbow-wrap{position:relative;border-radius:18px;padding:1.5px;background:linear-gradient(120deg,rgba(255,190,180,0.55),rgba(255,225,150,0.55),rgba(180,225,190,0.55),rgba(170,200,240,0.55),rgba(210,180,230,0.55));background-size:300% 300%;animation:bannerShine 6s ease infinite;}
 .wcal-rainbow-inner{border-radius:16.5px;background:var(--card);padding:14px 12px 10px;}
 .rd-status-btn.active{background:var(--pal-pink-bg);color:var(--pal-pink-text);}
@@ -1804,22 +1819,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   </div>
 </div>
 
-<!-- CONTENT NEW PICKER SHEET (콘텐츠 허브 + 버튼 — 카테고리 선택 후 등록 폼으로 연결) -->
-<div class="overlay" id="wcal-new-picker-sheet" style="z-index:8600;" onclick="closeSheet('wcal-new-picker-sheet',event)">
-  <div class="bsheet" onclick="event.stopPropagation()">
-    <div class="sheet-handle"></div>
-    <div style="padding:6px 20px 20px;">
-      <div class="goal-section-title" style="margin-top:0;">어떤 콘텐츠를 등록할까요?</div>
-      <div class="wcal-new-picker-grid">
-        <div class="wcal-new-picker-item" onclick="wcalPickNewContentCat('drama')"><i class="ti ti-device-tv" aria-hidden="true"></i>드라마</div>
-        <div class="wcal-new-picker-item" onclick="wcalPickNewContentCat('movie')"><i class="ti ti-movie" aria-hidden="true"></i>영화</div>
-        <div class="wcal-new-picker-item" onclick="wcalPickNewContentCat('book')"><i class="ti ti-book" aria-hidden="true"></i>책</div>
-        <div class="wcal-new-picker-item" onclick="wcalPickNewContentCat('music')"><i class="ti ti-music" aria-hidden="true"></i>음악</div>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- CONTENT NOTE TIMELINE SHEET (일자별 감상 코멘트 모아보기 — 읽기 전용, 콘텐츠 허브 내에서만 진입) -->
 <div class="overlay" id="content-note-timeline-sheet" style="z-index:8600;" onclick="closeSheet('content-note-timeline-sheet',event)">
   <div class="bsheet" style="max-height:85vh;overflow-y:auto;" onclick="event.stopPropagation()">
@@ -2011,7 +2010,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     </div>
     <div id="cm-poster-preview" style="display:none;margin-bottom:10px;flex-direction:row;gap:10px;align-items:center;">
       <img id="cm-poster-img" style="width:44px;height:64px;border-radius:8px;object-fit:cover;" src="" alt="">
-      <div><div id="cm-poster-title" style="font-size:var(--main-text-size);color:var(--tp);font-weight:500;"></div><div id="cm-poster-sub" style="font-size:var(--dow-label-size);color:var(--tm);margin-top:2px;"></div></div>
+      <div style="flex:1;min-width:0;"><div id="cm-poster-title" style="font-size:var(--main-text-size);color:var(--tp);font-weight:500;"></div><div id="cm-poster-sub" style="font-size:var(--dow-label-size);color:var(--tm);margin-top:2px;"></div></div>
+      <div id="cm-progress-hint" style="display:none;font-size:var(--dow-label-size);color:var(--tm);white-space:nowrap;flex-shrink:0;"></div>
     </div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
       <span style="font-size:var(--dow-label-size);color:var(--tm);white-space:nowrap;" id="cm-start-label">시작일</span>
@@ -2053,6 +2053,47 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <button class="mbtn" id="cm-playlist-btn" onclick="openPlaylistModal()" style="display:none;width:100%;margin-top:8px;background:rgba(160,105,180,0.18);color:rgba(160,105,180,0.80);border:1px solid rgba(160,105,180,0.45);">
       <i class="ti ti-music-heart" style="font-size:14px;vertical-align:-2px;margin-right:4px;" aria-hidden="true"></i>이달의 플레이리스트
     </button>
+  </div>
+</div>
+
+<!-- CONTENT PROGRESS MODAL (드라마 회차 / 영화 러닝타임 진행률 입력) -->
+<div class="modal-ov" id="content-progress-modal" onclick="closeModal('content-progress-modal',event)">
+  <div class="modal" style="max-width:300px;" onclick="event.stopPropagation()">
+    <div class="modal-title" id="cpg-title">진행률 입력</div>
+    <div style="font-size:var(--dow-label-size);color:var(--tm);margin-bottom:10px;" id="cpg-sub"></div>
+    <input class="modal-inp" id="cpg-inp" type="number" inputmode="numeric" placeholder="0">
+    <div class="modal-actions">
+      <button class="mbtn cancel" onclick="closeModal('content-progress-modal')">취소</button>
+      <button class="mbtn ok" onclick="confirmContentProgress()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- WATCH PICKER SHEET (시청 시작 — 진행중 드라마/영화 중 선택, 없으면 새로 등록) -->
+<div class="overlay" id="watch-picker-sheet" style="z-index:8600;" onclick="closeSheet('watch-picker-sheet',event)">
+  <div class="bsheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div style="padding:6px 20px 20px;">
+      <div class="goal-section-title" style="margin-top:0;">어떤 작품을 보시나요?</div>
+      <div id="watch-picker-list"></div>
+      <div class="wcal-new-picker-item" onclick="closeSheet('watch-picker-sheet');openWatchNewContentPicker();" style="margin-top:8px;">
+        <i class="ti ti-plus" aria-hidden="true"></i>새로 등록하고 시작
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- WATCH NEW CONTENT CAT PICKER (시청 시작 중 새 등록 선택 시 드라마/영화만) -->
+<div class="overlay" id="watch-new-cat-sheet" style="z-index:8700;" onclick="closeSheet('watch-new-cat-sheet',event)">
+  <div class="bsheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div style="padding:6px 20px 20px;">
+      <div class="goal-section-title" style="margin-top:0;">어떤 콘텐츠를 등록할까요?</div>
+      <div class="wcal-new-picker-grid">
+        <div class="wcal-new-picker-item" onclick="watchPickNewContentCat('drama')"><i class="ti ti-device-tv" aria-hidden="true"></i>드라마</div>
+        <div class="wcal-new-picker-item" onclick="watchPickNewContentCat('movie')"><i class="ti ti-movie" aria-hidden="true"></i>영화</div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -2268,11 +2309,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div class="settings-back" style="width:30px;height:30px;" onclick="openContentNoteTimeline()" title="코멘트 모아보기">
       <i class="ti ti-timeline" style="font-size:15px;color:var(--ts);" aria-hidden="true"></i>
     </div>
-    <div class="settings-back" style="width:30px;height:30px;" onclick="openWcalNewContentPicker()" title="새 콘텐츠 등록">
-      <i class="ti ti-plus" style="font-size:15px;color:var(--ts);" aria-hidden="true"></i>
-    </div>
   </div>
   <div class="content-hub-body" id="content-hub-body">
+    <div id="cwatch-main-card"></div>
     <div class="wcal-rainbow-wrap">
       <div class="wcal-rainbow-inner">
         <div style="display:flex;align-items:center;justify-content:center;gap:18px;margin:2px 0 6px;">
@@ -2290,7 +2329,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
     <div class="slabel" style="margin-top:14px;display:flex;align-items:center;justify-content:space-between;">
       <span>월별 아카이브</span>
-      <i class="ti ti-grid-dots cgrid-mode-toggle" id="ch-archive-grid-toggle" onclick="chToggleArchiveGridMode()" title="그리드로 보기" aria-hidden="true"></i>
+      <i class="ti ti-grid-dots cgrid-mode-toggle on" id="ch-archive-grid-toggle" onclick="chToggleArchiveGridMode()" title="리스트로 보기" aria-hidden="true"></i>
     </div>
     <div class="ch-month-banner-row" id="ch-month-banner-row"></div>
     <div id="ch-month-archive-grid"></div>
@@ -3355,7 +3394,22 @@ function _cmrPeriodLabel(c){
 function _cmrDetailBodyHtml(c,wcalNotes,flat,showHead){
   const dispDate=_cmrPeriodLabel(c);
   const starsHtml=c.stars>0?`<span class="cmr-detail-stars">${'★'.repeat(c.stars)}</span>`:'';
-  const headHtml=showHead&&(dispDate||starsHtml)?`<div class="cmr-detail-head">${dispDate?`<span class="cmr-detail-date"><i class="ti ti-calendar" style="font-size:11px;" aria-hidden="true"></i> ${dispDate}</span>`:'<span></span>'}${starsHtml}</div>`:'';
+  // 시청 시작/정지 — 진행중(watching) 상태의 드라마/영화만, 그리드 상세에서만(showHead 전용). 음악·책은 대상 아님(책은 독서코너 스톱워치가 별도로 있음).
+  const canWatch=showHead&&c.status==='watching'&&(c.cat==='drama'||c.cat==='movie');
+  const isWatchingNow=canWatch&&_cswRunning&&_cswCid===c.cid;
+  const watchBtnHtml=canWatch?`<span class="cwatch-btn${isWatchingNow?' active':''}" onclick="event.stopPropagation();toggleContentStopwatch('${c.cid}')"><i class="ti ${isWatchingNow?'ti-player-stop-filled':'ti-player-play-filled'}" aria-hidden="true"></i>${isWatchingNow?'':'시청 시작'}<span class="cwatch-time" id="cwatch-time-${c.cid}" style="display:${isWatchingNow?'inline':'none'};"></span></span>`:'';
+  const headHtml=showHead&&(dispDate||starsHtml||watchBtnHtml)?`<div class="cmr-detail-head">${dispDate?`<span class="cmr-detail-date"><i class="ti ti-calendar" style="font-size:11px;" aria-hidden="true"></i> ${dispDate}</span>`:'<span></span>'}${starsHtml}${watchBtnHtml}</div>`:'';
+  // 진행률 바 — 드라마(회차)/영화(러닝타임분) 중 총량을 입력해둔 항목만, 그리드 상세에서만(showHead 전용)
+  let progressHtml='';
+  if(showHead&&(c.cat==='drama'||c.cat==='movie')&&c.totalUnit){
+    const cur=Math.min(c.currentUnit||0,c.totalUnit);
+    const pct=Math.round((cur/c.totalUnit)*100);
+    const unitLabel=c.cat==='drama'?'화':'분';
+    progressHtml=`<div class="cmr-progress-bar" onclick="event.stopPropagation();openContentProgressModal('${c.cid}')">
+      <div class="cmr-progress-track"><div class="cmr-progress-fill" style="width:${pct}%;"></div></div>
+      <div class="cmr-progress-label">${cur}/${c.totalUnit}${unitLabel}</div>
+    </div>`;
+  }
   const finalPartHtml=c.review?`<div class="cmr-review-final${flat?' flat':''}"><span class="cmr-review-final-lbl">Comment :</span> ${escapeHtml(c.review)}</div>`:'';
   const notesPartHtml=wcalNotes.length?`<div class="cmr-review-notes${c.review?' with-final':''}">
     <div class="cmr-review-notes-lbl">Timeline</div>
@@ -3366,7 +3420,7 @@ function _cmrDetailBodyHtml(c,wcalNotes,flat,showHead){
       }).join('')}
     </div>
   </div>`:'';
-  return headHtml+finalPartHtml+notesPartHtml;
+  return headHtml+progressHtml+finalPartHtml+notesPartHtml;
 }
 // 카테고리별 리스트형(제목+별점+코멘트 아이콘, 한 줄씩) — 드라마/영화/책의 기본 표시 형태
 function renderContentByCatHtml(byCat){
@@ -3400,16 +3454,22 @@ function renderContentByCatHtml(byCat){
   }).join('');
   return listHtml+renderMusicGridHtml(byCat.music);
 }
-// 카테고리별 그리드형 — 음악(항상 그리드)과 드라마/영화/책(토글 시 그리드)이 공유하는 렌더러.
-// 예전엔 음악 전용/콘텐츠 전용으로 거의 동일한 로직이 중복돼 있던 것을 통합(2026-08-25).
-const CGRID_COLS=5; // 화면이 좁으면 CSS에서 4열로 줄어듦(auto-fit 미사용, 반응형 필요시 조정)
-let _gridActiveCid=null;
+// 음악 그리드 — 개별 mr-card 배너(리스트형 뷰에서 사용). 그리드 뷰 전용 통합 배너는 renderMusicGridSection 참고.
 function renderMusicGridHtml(musicList){
   if(!musicList||!musicList.length)return '';
   return `<div class="mr-card" style="margin-bottom:10px;">
     <div class="mr-sec-title"><i class="ti ${CAT_ICON_META.music.icon} ico-12" aria-hidden="true"></i> ${CONTENT_CAT_LABEL.music}</div>
     <div class="cgrid-grid" id="content-grid-inner-music">${_cgridRowsHtml(musicList,'music')}</div>
   </div>`;
+}
+// 카테고리별 그리드형 — 음악(항상 그리드)과 드라마/영화/책(토글 시 그리드)이 공유하는 렌더러.
+// 예전엔 음악 전용/콘텐츠 전용으로 거의 동일한 로직이 중복돼 있던 것을 통합(2026-08-25).
+const CGRID_COLS=5; // 화면이 좁으면 CSS에서 4열로 줄어듦(auto-fit 미사용, 반응형 필요시 조정)
+let _gridActiveCid=null;
+function renderMusicGridSection(musicList){
+  if(!musicList||!musicList.length)return '';
+  return `<div class="mr-sec-title" style="margin-top:14px;"><i class="ti ${CAT_ICON_META.music.icon} ico-12" aria-hidden="true"></i> ${CONTENT_CAT_LABEL.music}</div>
+    <div class="cgrid-grid" id="content-grid-inner-music">${_cgridRowsHtml(musicList,'music')}</div>`;
 }
 function _cgridRowsHtml(list,cat){
   let html='';
@@ -3456,14 +3516,12 @@ function renderContentAsGridHtml(byCat){
   const hasAny=cats.some(cat=>byCat[cat].length>0);
   if(!hasAny&&!byCat.music.length)return '<div style="text-align:center;color:var(--tm);padding:24px 0;">이 달엔 완료한 콘텐츠가 없어요</div>';
   _gridActiveCid=null;
-  const sectionsHtml=cats.filter(cat=>byCat[cat].length>0).map(cat=>{
+  const sectionsHtml=cats.filter(cat=>byCat[cat].length>0).map((cat,i)=>{
     const meta=CAT_ICON_META[cat];
-    return `<div class="mr-card" style="margin-bottom:10px;">
-      <div class="mr-sec-title"><i class="ti ${meta.icon} ico-12" aria-hidden="true"></i> ${CONTENT_CAT_LABEL[cat]}</div>
-      <div class="cgrid-grid" id="content-grid-inner-${cat}">${_cgridRowsHtml(byCat[cat],cat)}</div>
-    </div>`;
+    return `<div class="mr-sec-title" style="margin-top:${i===0?'0':'14px'};"><i class="ti ${meta.icon} ico-12" aria-hidden="true"></i> ${CONTENT_CAT_LABEL[cat]}</div>
+      <div class="cgrid-grid" id="content-grid-inner-${cat}">${_cgridRowsHtml(byCat[cat],cat)}</div>`;
   }).join('');
-  return sectionsHtml+renderMusicGridHtml(byCat.music);
+  return `<div class="mr-card" style="margin-bottom:10px;">${sectionsHtml}${renderMusicGridSection(byCat.music)}</div>`;
 }
 function toggleCmrReview(id){
   const box=document.getElementById('cmr-review-'+id);
@@ -5072,7 +5130,7 @@ function saveContents(mk,v){
   const now=Date.now();
   v.forEach(it=>{
     const p=it.cid?prevByCid[it.cid]:null;
-    const isSame=p&&p.status===it.status&&p.startDate===it.startDate&&p.endDate===it.endDate&&p.review===it.review&&p.stars===it.stars&&p.title===it.title;
+    const isSame=p&&p.status===it.status&&p.startDate===it.startDate&&p.endDate===it.endDate&&p.review===it.review&&p.stars===it.stars&&p.title===it.title&&p.totalUnit===it.totalUnit&&p.currentUnit===it.currentUnit;
     if(!isSame)it.updatedAt=now;
     else if(p&&p.updatedAt)it.updatedAt=p.updatedAt;
   });
@@ -5291,7 +5349,7 @@ async function syncContentsDownRaw(mk){
       const matched=localNoCidByKey[key];
       if(matched){l=matched;delete localNoCidByKey[key];}
     }
-    const serverItem={cat:r.content_cat,title:r.title,startDate:r.start_date||(r.start_day?mk+'-'+pad(r.start_day):null),endDate:r.end_date||(r.end_day?mk+'-'+pad(r.end_day):null),status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',musicUrl:r.music_url||null,created:r.created,cid,updatedAt:r.updated_at};
+    const serverItem={cat:r.content_cat,title:r.title,startDate:r.start_date||(r.start_day?mk+'-'+pad(r.start_day):null),endDate:r.end_date||(r.end_day?mk+'-'+pad(r.end_day):null),status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',musicUrl:r.music_url||null,totalUnit:r.total_unit||null,currentUnit:r.current_unit||null,created:r.created,cid,updatedAt:r.updated_at};
     if(!l){merged.push(serverItem);return;}
     // 로컬/서버 둘 다 있으면 updated_at(서버) vs 로컬수정시각 비교, 서버가 더 최신이거나 로컬에 수정시각 기록이 없으면 서버값 채택
     const localTs=l.updatedAt?new Date(l.updatedAt).getTime():0;
@@ -5317,7 +5375,7 @@ async function syncContentsUp(mk){
   if(ensureItemCids(c))S.set(S.key('contents',mk),c);
   const delCids=getDelPendingCids('contents',mk);
   const ok=await syncListUpSafe('contents',`month_key=eq.${mk}`,'month_key,client_id',c,
-    it=>({month_key:mk,content_cat:it.cat,title:it.title,start_date:it.startDate,end_date:it.endDate,status:it.status,review:it.review||'',stars:it.stars||0,poster:it.poster||null,author:it.author||'',music_url:it.musicUrl||null,created:it.created,client_id:it.cid}),
+    it=>({month_key:mk,content_cat:it.cat,title:it.title,start_date:it.startDate,end_date:it.endDate,status:it.status,review:it.review||'',stars:it.stars||0,poster:it.poster||null,author:it.author||'',music_url:it.musicUrl||null,total_unit:it.totalUnit||null,current_unit:it.currentUnit||null,created:it.created,client_id:it.cid}),
     delCids);
   if(ok)delCids.forEach(cid=>removeDelPending('contents',mk,cid));
   return ok;
@@ -8986,6 +9044,7 @@ let _contentSubmitting=false;
 let _selectedPoster=null;
 let _selectedAuthor=null;
 let _selectedMusicUrl=null;
+let _selectedTotalUnit=null; // TMDB 상세 조회로 자동 확인된 드라마 총회차/영화 총러닝타임(분)
 let _apiTimer=null;
 
 function renderTimetable(){
@@ -9207,8 +9266,8 @@ function openMusicGroupModal(items,mk){
   });
   openModal('music-group-modal');
 }
-function openContentModal(cat,item=null,mk=null){
-  _contentCtx={cat,item,mk:mk||calMonthKey(),mode:item?'edit':'add'};
+function openContentModal(cat,item=null,mk=null,onSaved=null){
+  _contentCtx={cat,item,mk:mk||calMonthKey(),mode:item?'edit':'add',onSaved};
   document.getElementById('cm-title').value=item?.title||'';
   _selectedPoster=null;_selectedAuthor=null;_selectedMusicUrl=item?.musicUrl||null;
   const pp=document.getElementById('cm-poster-preview');
@@ -9254,6 +9313,10 @@ function openContentModal(cat,item=null,mk=null){
       document.getElementById('cm-total-pages').value=linkedBook?.totalPages||'';
     }
   }
+  // 드라마(회차)/영화(러닝타임분) — TMDB 상세 조회로 자동 확인, 수기 입력 없음.
+  // 수정(edit) 모드에서 기존에 저장된 값이 있으면 그대로 힌트로 표시하고, 검색해서 새로 선택하면 자동으로 덮어씀.
+  _selectedTotalUnit=item?.totalUnit||null;
+  renderCmProgressHint();
   openModal('content-modal');setTimeout(()=>document.getElementById('cm-title').focus(),100);
 }
 let _cmUnit='percent';
@@ -9339,7 +9402,13 @@ function confirmContent(){
   const poster=_selectedPoster||(_contentCtx.item&&_contentCtx.item.poster)||null;
   const author=_selectedAuthor||(_contentCtx.item&&_contentCtx.item.author)||'';
   const musicUrl=_contentCtx.cat==='music'?(_selectedMusicUrl||(_contentCtx.item&&_contentCtx.item.musicUrl)||null):null;
-  _selectedPoster=null;_selectedAuthor=null;_selectedMusicUrl=null;
+  // 드라마(회차)/영화(러닝타임분) 총량 — TMDB 자동 확인값(_selectedTotalUnit) 사용. 기존 진행분(currentUnit)은 유지하되 새 총량보다 크면 총량에 맞춰 보정
+  let totalUnit=null,currentUnit=_contentCtx.item?.currentUnit||null;
+  if(_contentCtx.cat==='drama'||_contentCtx.cat==='movie'){
+    totalUnit=_selectedTotalUnit||null;
+    if(totalUnit&&currentUnit&&currentUnit>totalUnit)currentUnit=totalUnit;
+  }
+  _selectedPoster=null;_selectedAuthor=null;_selectedMusicUrl=null;_selectedTotalUnit=null;
   const newMk=startDate.slice(0,7); // 시작한 달 = 저장 버킷
   const oldMk=_contentCtx.mk;
   if(_contentCtx.mode==='edit'&&_contentCtx.item){
@@ -9348,7 +9417,7 @@ function confirmContent(){
     const idx=_contentCtx.item.cid
       ?oldContents.findIndex(c=>c.cid===_contentCtx.item.cid)
       :oldContents.findIndex(c=>c.created===_contentCtx.item.created);
-    const updated=idx>=0?{...oldContents[idx],title,startDate,endDate,status,review,stars,poster,author,musicUrl}:null;
+    const updated=idx>=0?{...oldContents[idx],title,startDate,endDate,status,review,stars,poster,author,musicUrl,totalUnit,currentUnit}:null;
     if(idx>=0){
       if(newMk===oldMk){
         oldContents[idx]=updated;
@@ -9365,8 +9434,10 @@ function confirmContent(){
     }
   } else {
     const contents=getContents(newMk);
-    contents.push({cat:_contentCtx.cat,title,startDate,endDate,status,review,stars,poster,author,musicUrl,created:Date.now(),cid:genCid()});
+    const newCid=genCid();
+    contents.push({cat:_contentCtx.cat,title,startDate,endDate,status,review,stars,poster,author,musicUrl,totalUnit,currentUnit,created:Date.now(),cid:newCid});
     saveContents(newMk,contents);
+    if(_contentCtx.onSaved){const cb=_contentCtx.onSaved;_contentCtx.onSaved=null;setTimeout(()=>cb(newCid),0);}
   }
   closeModal('content-modal');renderTimetable();
   if(_contentCtx.cat==='book'){
@@ -9376,6 +9447,254 @@ function confirmContent(){
   }
   setTimeout(()=>{_contentSubmitting=false;},500);
 }
+// cid로 실제 저장 버킷(month_key)을 찾음 — 콘텐츠는 시작월에 저장되지만, 화면엔 진행중 이월분이 섞여 보일 수 있어
+// 현재 보고 있는 달(mk)과 그 전월 둘 다 뒤짐(computeContentMonthlyList와 동일한 탐색 범위).
+function _findContentByCidNearMk(cid,mk){
+  const [y,m]=mk.split('-').map(Number);
+  const prevMk=monthKey(new Date(y,m-2,1));
+  for(const searchMk of [mk,prevMk]){
+    const list=getContents(searchMk);
+    const idx=list.findIndex(c=>c.cid===cid);
+    if(idx>=0)return{mk:searchMk,list,idx};
+  }
+  return null;
+}
+let _cpgCid=null;
+// watchedNow: 스톱워치를 방금 정지해서 자동으로 열린 경우, 그동안 본 화/분(드라마는 화 단위 환산 불가하므로 영화만 자동 가산 — 드라마는 방영 회차 단위라 시간으로 환산할 수 없어 수동 입력 유지)
+function openContentProgressModal(cid,watchedNow){
+  const found=_findContentByCidNearMk(cid,_chArchiveMk||monthKey(new Date()));
+  if(!found)return;
+  const c=found.list[found.idx];
+  _cpgCid=cid;
+  const unitLabel=c.cat==='drama'?'화':'분';
+  document.getElementById('cpg-title').textContent=escapeHtml(c.title||'')+' 진행률';
+  document.getElementById('cpg-sub').textContent=c.totalUnit?`전체 ${c.totalUnit}${unitLabel} 중 지금까지 본 ${unitLabel}수를 입력하세요`:`지금까지 본 ${unitLabel}수를 입력하세요 (전체 ${unitLabel}수는 아직 미입력)`;
+  const inp=document.getElementById('cpg-inp');
+  // 영화는 방금 시청한 분을 자동으로 더해서 미리 채움(수정 가능). 드라마는 시간이 곧 회차가 아니므로 자동 가산하지 않음.
+  const base=c.currentUnit||0;
+  inp.value=(watchedNow&&c.cat==='movie')?Math.min(base+watchedNow,c.totalUnit||(base+watchedNow)):base;
+  inp.max=c.totalUnit||'';
+  openModal('content-progress-modal');
+  setTimeout(()=>{inp.focus();inp.select();},100);
+}
+function confirmContentProgress(){
+  if(!_cpgCid)return;
+  const found=_findContentByCidNearMk(_cpgCid,_chArchiveMk||monthKey(new Date()));
+  if(!found)return;
+  const val=parseInt(document.getElementById('cpg-inp').value,10);
+  if(isNaN(val))return;
+  const c=found.list[found.idx];
+  c.currentUnit=Math.max(0,Math.min(val,c.totalUnit||val));
+  saveContents(found.mk,found.list);
+  closeModal('content-progress-modal');
+  _cpgCid=null;
+  if(_chArchiveMk)chExpandMonth(_chArchiveMk);
+}
+// ── 시청 스톱워치 (드라마/영화 전용, 독서 스톱워치와 완전히 분리된 별개 상태) ──
+// 진행중 콘텐츠 그리드 상세의 "시청 시작" 버튼에서 시작. 정지 시 리듬 블록 자동 생성 + 진행률 모달 오픈까지 독서와 동일한 흐름.
+const CSW_PERSIST_KEY='iikoto_content_sw_start';
+let _cswSeconds=0,_cswRunning=false,_cswInterval=null,_cswStartTs=0,_cswCid=null,_cswCat=null,_cswTitle=null,_cswMk=null;
+// ── 시청 시작 선택 시트 — 진행중 드라마/영화 중 골라 스톱워치 시작, 없으면 새로 등록 후 바로 시작 ──
+function _getOngoingWatchingWithCid(){
+  const now=new Date();
+  const mk=monthKey(now);
+  const prevMk=monthKey(new Date(now.getFullYear(),now.getMonth()-1,1));
+  const seen=new Set();
+  const result=[];
+  [prevMk,mk].forEach(function(m){
+    getContents(m).forEach(function(c){
+      if(c.status!=='watching')return;
+      if(c.cat!=='drama'&&c.cat!=='movie')return;
+      const dedupeKey=c.cid||c.title;
+      if(seen.has(dedupeKey))return;
+      seen.add(dedupeKey);
+      result.push({...c,_mk:m});
+    });
+  });
+  return result;
+}
+function openWatchPicker(){
+  const list=_getOngoingWatchingWithCid();
+  const listEl=document.getElementById('watch-picker-list');
+  if(!list.length){
+    listEl.innerHTML='<div style="text-align:center;color:var(--tm);font-size:var(--dow-label-size);padding:10px 0;">진행중인 드라마·영화가 없어요</div>';
+  }else{
+    listEl.innerHTML=list.filter(c=>c.cid).map(c=>{
+      const meta=CAT_ICON_META[c.cat];
+      const posterHtml=c.poster?`<img class="watch-picker-item-poster" src="${c.poster}" alt="">`:`<div class="watch-picker-item-poster-ph" style="background:${meta.color};"><i class="ti ${meta.icon}" aria-hidden="true"></i></div>`;
+      return `<div class="watch-picker-item" onclick="closeSheet('watch-picker-sheet');toggleContentStopwatch('${c.cid}','${c._mk}');">
+        ${posterHtml}<div class="watch-picker-item-title">${escapeHtml(c.title||'')}</div>
+      </div>`;
+    }).join('');
+  }
+  openSheet('watch-picker-sheet');
+}
+function openWatchNewContentPicker(){openSheet('watch-new-cat-sheet');}
+// 콘텐츠 코너 메인 상단 카드 — 독서코너 rd-top과 같은 급으로 상시 노출. 재생 중이면 실시간 경과시간+정지, 아니면 시작 유도.
+function renderCwatchMainCard(){
+  const el=document.getElementById('cwatch-main-card');if(!el)return;
+  if(_cswRunning&&_cswCid){
+    const found=_findContentByCidNearMk(_cswCid,_chArchiveMk||monthKey(new Date()));
+    const c=found?found.list[found.idx]:null;
+    const meta=CAT_ICON_META[_cswCat]||CAT_ICON_META.drama;
+    const posterHtml=c&&c.poster?`<img class="rd-top-cover" src="${c.poster}" style="width:52px;height:76px;">`:`<div class="rd-top-cover" style="width:52px;height:76px;background:${meta.color};display:flex;align-items:center;justify-content:center;"><i class="ti ${meta.icon}" style="font-size:22px;color:#fff;" aria-hidden="true"></i></div>`;
+    let progressHtml='';
+    if(c&&c.totalUnit){
+      const cur=Math.min(c.currentUnit||0,c.totalUnit);
+      const pct=Math.round((cur/c.totalUnit)*100);
+      const unitLabel=c.cat==='drama'?'화':'분';
+      progressHtml=`<div class="rd-progress-bar" onclick="event.stopPropagation();openContentProgressModal('${c.cid}')">
+        <div class="rd-progress-track"><div class="rd-progress-fill" style="width:${pct}%;"></div></div>
+        <div class="rd-progress-bead" style="left:${pct}%;"></div>
+      </div>
+      <div class="rd-top-sub" style="margin-top:-4px;text-align:right;">${cur}/${c.totalUnit}${unitLabel}</div>`;
+    }
+    el.innerHTML=`<div class="rd-top" style="margin-bottom:14px;">
+      <div class="rd-top-inner">
+        <div class="rd-top-main">
+          ${posterHtml}
+          <div style="flex:1;min-width:0;">
+            <div class="rd-top-title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(_cswTitle||'')}</div>
+            <div class="rd-top-sub">시청 중</div>
+          </div>
+          <div class="rd-top-sw">${cswRingSvg(_cswCid,found?found.mk:monthKey(new Date()),true)}</div>
+        </div>
+        ${progressHtml}
+      </div>
+    </div>`;
+    updateContentStopwatchDisplay();
+  }else{
+    const ongoing=_getOngoingWatchingWithCid().filter(c=>c.cid);
+    if(!ongoing.length){
+      el.innerHTML=`<div class="rd-top" style="margin-bottom:14px;" onclick="openWatchPicker()">
+        <div class="rd-top-inner" style="cursor:pointer;">
+          <div class="rd-top-title" style="color:var(--tm);">지금 보고 있는 작품이 없어요</div>
+          <div class="rd-top-sub">눌러서 시청을 시작해보세요</div>
+        </div>
+      </div>`;
+    }else if(ongoing.length===1){
+      const c=ongoing[0];
+      const meta=CAT_ICON_META[c.cat];
+      const posterHtml=c.poster?`<img class="rd-top-cover" src="${c.poster}" style="width:52px;height:76px;">`:`<div class="rd-top-cover" style="width:52px;height:76px;background:${meta.color};display:flex;align-items:center;justify-content:center;"><i class="ti ${meta.icon}" style="font-size:22px;color:#fff;" aria-hidden="true"></i></div>`;
+      let progressHtml='';
+      if(c.totalUnit){
+        const cur=Math.min(c.currentUnit||0,c.totalUnit);
+        const pct=Math.round((cur/c.totalUnit)*100);
+        const unitLabel=c.cat==='drama'?'화':'분';
+        progressHtml=`<div class="rd-progress-bar" onclick="event.stopPropagation();openContentProgressModal('${c.cid}')">
+          <div class="rd-progress-track"><div class="rd-progress-fill" style="width:${pct}%;"></div></div>
+          <div class="rd-progress-bead" style="left:${pct}%;"></div>
+        </div>
+        <div class="rd-top-sub" style="margin-top:-4px;text-align:right;">${cur}/${c.totalUnit}${unitLabel}</div>`;
+      }
+      el.innerHTML=`<div class="rd-top" style="margin-bottom:14px;">
+        <div class="rd-top-inner">
+          <div class="rd-top-main">
+            ${posterHtml}
+            <div style="flex:1;min-width:0;">
+              <div class="rd-top-title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.title||'')}</div>
+              <div class="rd-top-sub">눌러서 시청을 시작해보세요</div>
+            </div>
+            <div class="rd-top-sw">${cswRingSvg(c.cid,c._mk,false)}</div>
+          </div>
+          ${progressHtml}
+        </div>
+      </div>`;
+    }else{
+      const two=ongoing.slice(0,2);
+      const postersHtml=two.map(c=>{
+        const meta=CAT_ICON_META[c.cat];
+        const inner=c.poster?`<img class="rd-top-cover" src="${c.poster}" style="width:100%;height:100%;">`:`<div class="rd-top-cover" style="width:100%;height:100%;background:${meta.color};display:flex;align-items:center;justify-content:center;"><i class="ti ${meta.icon}" style="font-size:22px;color:#fff;" aria-hidden="true"></i></div>`;
+        return `<div style="position:relative;flex:1;aspect-ratio:52/76;border-radius:10px;overflow:hidden;cursor:pointer;" onclick="toggleContentStopwatch('${c.cid}','${c._mk}')">
+          ${inner}
+          <div class="cwatch-btn" style="position:absolute;bottom:6px;right:6px;padding:5px 6px;"><i class="ti ti-player-play-filled" aria-hidden="true"></i></div>
+        </div>`;
+      }).join('');
+      el.innerHTML=`<div class="rd-top" style="margin-bottom:14px;">
+        <div class="rd-top-inner">
+          <div class="rd-top-title" style="color:var(--tm);margin-bottom:10px;">눌러서 시청을 시작해보세요</div>
+          <div style="display:flex;gap:10px;">${postersHtml}</div>
+        </div>
+      </div>`;
+    }
+  }
+}
+function watchPickNewContentCat(cat){
+  closeSheet('watch-new-cat-sheet');
+  openContentModal(cat,null,monthKey(new Date()),function(newCid){toggleContentStopwatch(newCid,monthKey(new Date()));});
+}
+function toggleContentStopwatch(cid,knownMk){
+  if(_cswRunning&&_cswCid===cid){stopContentStopwatch();return;}
+  if(_cswRunning&&_cswCid!==cid)return; // 다른 작품이 이미 재생 중이면 무시(동시에 하나만)
+  const found=knownMk?{mk:knownMk,list:getContents(knownMk),idx:getContents(knownMk).findIndex(c=>c.cid===cid)}:_findContentByCidNearMk(cid,_chArchiveMk||monthKey(new Date()));
+  if(!found||found.idx<0)return;
+  const c=found.list[found.idx];
+  _cswRunning=true;_cswCid=cid;_cswCat=c.cat;_cswTitle=c.title||'';_cswMk=found.mk;
+  _cswStartTs=Date.now();
+  try{localStorage.setItem(CSW_PERSIST_KEY,JSON.stringify({startTs:_cswStartTs,cid,cat:c.cat,title:c.title||'',mk:found.mk}));}catch(e){}
+  _cswInterval=setInterval(updateContentStopwatchDisplay,1000);
+  if(_chArchiveMk)chExpandMonth(_chArchiveMk);
+  renderCwatchMainCard();
+}
+function stopContentStopwatch(){
+  if(!_cswRunning)return;
+  const endTs=Date.now();
+  const startTs=_cswStartTs,cid=_cswCid,mk=_cswMk,cat=_cswCat,title=_cswTitle;
+  clearInterval(_cswInterval);
+  try{localStorage.removeItem(CSW_PERSIST_KEY);}catch(e){}
+  _cswRunning=false;_cswSeconds=0;_cswStartTs=0;_cswCid=null;_cswCat=null;_cswTitle=null;_cswMk=null;
+  autoLogWatchRhythm(startTs,endTs,cid,mk,cat,title);
+  if(_chArchiveMk)chExpandMonth(_chArchiveMk);
+  renderCwatchMainCard();
+  const minutesWatched=Math.round((endTs-startTs)/60000);
+  if(minutesWatched>0)openContentProgressModal(cid,minutesWatched);
+}
+function updateContentStopwatchDisplay(){
+  if(!_cswRunning)return;
+  _cswSeconds=Math.floor((Date.now()-_cswStartTs)/1000);
+  const m=Math.floor(_cswSeconds/60),s=_cswSeconds%60;
+  const timeStr=String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+  const el=document.getElementById('cwatch-time-'+_cswCid);
+  if(el)el.textContent=' '+timeStr;
+  const cswTimeEl=document.getElementById('csw-time');
+  if(cswTimeEl)cswTimeEl.textContent=timeStr;
+}
+// 시청 시간을 '감상' 카테고리 리듬 블록으로 자동 기록 — autoLogReadingRhythm과 동일한 규칙(1분 미만은 실수로 켰다 끈 경우로 보고 기록 안 함)
+function autoLogWatchRhythm(startTs,endTs,cid,mk,cat,title){
+  if(!startTs||!endTs||endTs-startTs<60000)return;
+  const minToHHMM=function(mins){mins=((mins%1440)+1440)%1440;const h=Math.floor(mins/60),m=mins%60;return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');};
+  const startD=new Date(startTs),endD=new Date(endTs);
+  const dk=dateKey(getLogicalDate(startTs));
+  const startMin=startD.getHours()*60+startD.getMinutes();
+  let endMin=endD.getHours()*60+endD.getMinutes();
+  if(dateKey(getLogicalDate(endTs))!==dk)endMin+=1440;
+  // 독서(autoLogReadingRhythm)와 동일하게, 전역 상태 대신 저장 직전 실시간 조회로 카테고리/제목을 확정 —
+  // 인자로 넘어온 cat/title이 있으면 우선 쓰되(정지 직후 호출 시 이미 초기화된 전역변수를 참조하는 문제 방지),
+  // 없으면 cid+mk로 콘텐츠를 재조회해 한 번 더 보정.
+  let finalCat=cat,finalTitle=title;
+  if((!finalCat||!finalTitle)&&cid&&mk){
+    const found=_findContentByCidNearMk(cid,mk);
+    if(found){finalCat=found.list[found.idx].cat;finalTitle=found.list[found.idx].title;}
+  }
+  const catLabel=finalCat==='drama'?'드라마':'영화';
+  const text=finalTitle?(catLabel+' - '+finalTitle):catLabel;
+  const blocks=getRhythmBlocks(dk);
+  blocks.push({cat:'enjoy',start:minToHHMM(startMin),end:minToHHMM(endMin),text:text,created:Date.now(),cid:genCid()});
+  saveRhythmBlocks(dk,blocks);
+}
+// 새로고침·앱 재시작으로 메모리 상태가 초기화돼도, 진행 중이던 시청은 이어서 표시(독서 스톱워치의 restoreStopwatchFromStorage와 동일 패턴)
+(function restoreContentStopwatchFromStorage(){
+  try{
+    const raw=localStorage.getItem(CSW_PERSIST_KEY);
+    if(!raw)return;
+    const saved=JSON.parse(raw);
+    if(!saved||!saved.startTs)return;
+    _cswStartTs=saved.startTs;_cswCid=saved.cid;_cswCat=saved.cat;_cswTitle=saved.title||'';_cswMk=saved.mk||null;
+    _cswSeconds=Math.floor((Date.now()-_cswStartTs)/1000);
+    _cswRunning=true;
+    _cswInterval=setInterval(updateContentStopwatchDisplay,1000);
+  }catch(e){}
+})();
 function stableCidFromTitle(title){
   let h=0;
   for(let i=0;i<title.length;i++){h=(h*31+title.charCodeAt(i))|0;}
@@ -9491,31 +9810,72 @@ async function searchTMDB(q,cat,el){
     const div=document.createElement('div');div.className='api-result-item';
     div.innerHTML=poster?`<img class="api-result-poster" src="${poster}" alt="">`:`<div class="api-result-poster-placeholder">🎬</div>`;
     div.innerHTML+=`<div class="api-result-info"><div class="api-result-title">${title}</div><div class="api-result-sub">${date}</div></div>`;
-    div.addEventListener('click',()=>selectApiResult(title,poster,date,''));el.appendChild(div);
+    div.addEventListener('click',()=>selectApiResult(title,poster,date,'',null,{tmdbId:item.id,tmdbType:type}));el.appendChild(div);
   });
 }
 async function searchKakaoBook(q,el){
   const url=`https://dapi.kakao.com/v3/search/book?query=${encodeURIComponent(q)}&size=6`;
-  const res=await fetch(url,{headers:{'Authorization':`KakaoAK ${KAKAO_KEY}`}});
-  const data=await res.json();const results=(data.documents||[]).slice(0,6);
-  if(!results.length){el.innerHTML='<div class="api-loading">결과 없음</div>';return;}
-  el.innerHTML='';
-  results.forEach(item=>{
-    const title=item.title||'';const author=(item.authors||[]).join(', ');const poster=item.thumbnail||null;
-    const div=document.createElement('div');div.className='api-result-item';
-    div.innerHTML=poster?`<img class="api-result-poster" src="${poster}" alt="">`:`<div class="api-result-poster-placeholder">📚</div>`;
-    div.innerHTML+=`<div class="api-result-info"><div class="api-result-title">${title}</div><div class="api-result-sub">${author}</div></div>`;
-    div.addEventListener('click',()=>selectApiResult(title,poster,author,item.publisher||''));el.appendChild(div);
-  });
+  try{
+    const res=await fetch(url,{headers:{'Authorization':`KakaoAK ${KAKAO_KEY}`}});
+    if(!res.ok){
+      const errBody=await res.text();
+      console.error('카카오 책 검색 실패',res.status,errBody);
+      el.innerHTML=`<div class="api-loading">검색 실패 (${res.status}) — 잠시 후 다시 시도해주세요</div>`;
+      return;
+    }
+    const data=await res.json();const results=(data.documents||[]).slice(0,6);
+    if(!results.length){el.innerHTML='<div class="api-loading">결과 없음</div>';return;}
+    el.innerHTML='';
+    results.forEach(item=>{
+      const title=item.title||'';const author=(item.authors||[]).join(', ');const poster=item.thumbnail||null;
+      const div=document.createElement('div');div.className='api-result-item';
+      div.innerHTML=poster?`<img class="api-result-poster" src="${poster}" alt="">`:`<div class="api-result-poster-placeholder">📚</div>`;
+      div.innerHTML+=`<div class="api-result-info"><div class="api-result-title">${title}</div><div class="api-result-sub">${author}</div></div>`;
+      div.addEventListener('click',()=>selectApiResult(title,poster,author,item.publisher||''));el.appendChild(div);
+    });
+  }catch(e){
+    console.error('카카오 책 검색 네트워크 오류',e);
+    el.innerHTML='<div class="api-loading">검색 중 오류가 발생했어요</div>';
+  }
 }
-function selectApiResult(title,poster,sub1,sub2,musicUrl){
+function selectApiResult(title,poster,sub1,sub2,musicUrl,tmdbMeta){
   document.getElementById('cm-title').value=title;hideApiResults();
   _selectedPoster=poster;_selectedAuthor=sub1||'';_selectedMusicUrl=musicUrl||null;
+  _selectedTotalUnit=null;
   const preview=document.getElementById('cm-poster-preview');
   if(preview){
     if(poster){preview.style.display='flex';document.getElementById('cm-poster-img').src=poster;document.getElementById('cm-poster-title').textContent=title;document.getElementById('cm-poster-sub').textContent=sub1+(sub2?' · '+sub2:'');}
     else preview.style.display='none';
   }
+  if(tmdbMeta&&tmdbMeta.tmdbId)fetchTmdbTotalUnit(tmdbMeta.tmdbId,tmdbMeta.tmdbType);
+}
+// TMDB 상세 엔드포인트로 총 회차(tv)/총 러닝타임분(movie)을 가져옴 — 검색 결과 클릭 직후 1회만 호출.
+// 검색 엔드포인트엔 이 정보가 없어 상세 조회가 별도로 필요함(TMDB 자체 제약, /search가 아닌 /tv 또는 /movie 단건 조회 필요).
+async function fetchTmdbTotalUnit(id,type){
+  try{
+    const url=`https://api.themoviedb.org/3/${type}/${id}?api_key=${TMDB_KEY}&language=ko-KR`;
+    const res=await fetch(url);
+    if(!res.ok)return;
+    const data=await res.json();
+    const totalUnit=type==='tv'?(data.number_of_episodes||null):(data.runtime||null);
+    if(!totalUnit)return;
+    _selectedTotalUnit=totalUnit;
+    renderCmProgressHint();
+  }catch(e){
+    console.error('TMDB 상세 조회 실패',e);
+  }
+}
+// 자동으로 채워진 총량을 등록 폼에 조용히 표시(입력창은 없음 — 수기 입력 대신 완전 자동)
+function renderCmProgressHint(){
+  const el=document.getElementById('cm-progress-hint');if(!el)return;
+  const cat=_contentCtx.cat;
+  const showProgress=cat==='drama'||cat==='movie';
+  if(!showProgress||!_selectedTotalUnit){el.style.display='none';el.textContent='';return;}
+  const unitLabel=cat==='drama'?'화':'분';
+  el.style.display='block';
+  el.textContent=`총 ${_selectedTotalUnit}${unitLabel}`;
+  const preview=document.getElementById('cm-poster-preview');
+  if(preview&&preview.style.display==='none')preview.style.display='flex';
 }
 function hideApiResults(){const el=document.getElementById('api-results');if(el)el.style.display='none';}
 
@@ -10765,21 +11125,16 @@ function openContentHub(){
   _wcalDate=new Date();
   _wcalFilter='all';
   _wcalSelectedDk=null;
-  _wcalCollapsed=false;
+  _wcalCollapsed=true;
   document.getElementById('content-hub-ov').classList.add('on');
-  document.getElementById('wcal-grid').style.display='';
-  document.getElementById('wcal-week-row').style.display='none';
+  document.getElementById('wcal-grid').style.display='none';
+  document.getElementById('wcal-week-row').style.display='';
   _wcalRefresh();
   renderChHubMonthBanners();
   chExpandMonth(monthKey(new Date())); // 당월을 기본으로 펼쳐서 시작
+  renderCwatchMainCard();
 }
 function closeContentHub(){document.getElementById('content-hub-ov').classList.remove('on');}
-// 콘텐츠 허브 + 버튼 — 카테고리만 먼저 고르면 콘텐츠탭의 실제 등록 폼(openContentModal, TMDB/카카오/iTunes 검색 포함)으로 바로 연결됨.
-function openWcalNewContentPicker(){openSheet('wcal-new-picker-sheet');}
-function wcalPickNewContentCat(cat){
-  closeSheet('wcal-new-picker-sheet');
-  openContentModal(cat,null,monthKey(_wcalDate));
-}
 
 // ── 독서/씨앗/설정/콘텐츠 코너 엣지 스와이프 뒤로가기 ──
 (function(){
@@ -10847,6 +11202,26 @@ function swRingSvg(){
     </svg>
     <div class="rd-sw-face" id="rd-sw-face"><i class="ti ti-player-play" style="font-size:20px;" aria-hidden="true"></i></div>
     <div class="rd-sw-time" id="rd-sw-time" style="display:none;">00:00</div>
+  </div>`;
+}
+// 시청 스톱워치용 원형 링 — swRingSvg와 동일한 디자인, id/onclick만 시청 전용으로 분리(독서 스톱워치와 동시에 떠도 충돌 없게)
+function cswRingSvg(cid,mk,running){
+  return `<div class="rd-sw-ring-wrap${running?' spinning':''}" id="csw-ring-wrap" onclick="toggleContentStopwatch('${cid}','${mk}')">
+    <div class="rd-sw-bg"></div>
+    <svg class="rd-sw-ring-svg" width="76" height="76" viewBox="0 0 76 76">
+      <defs>
+        <linearGradient id="cswSwGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#ff9ec0"/>
+          <stop offset="30%" stop-color="#ffcf86"/>
+          <stop offset="60%" stop-color="#8fe3c0"/>
+          <stop offset="100%" stop-color="#9cc8ff"/>
+        </linearGradient>
+      </defs>
+      <circle cx="38" cy="38" r="32" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="4.5"/>
+      <circle id="csw-ring" cx="38" cy="38" r="32" fill="none" stroke="url(#cswSwGrad)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="${RD_SW_C}" stroke-dashoffset="${RD_SW_C}"/>
+    </svg>
+    <div class="rd-sw-face" id="csw-face" style="display:${running?'none':'flex'};"><i class="ti ti-player-play" style="font-size:20px;" aria-hidden="true"></i></div>
+    <div class="rd-sw-time" id="csw-time" style="display:${running?'flex':'none'};">00:00</div>
   </div>`;
 }
 function renderRdTop(){
@@ -11317,6 +11692,12 @@ async function searchKakaoBookWish(q){
   try{
     const url=`https://dapi.kakao.com/v3/search/book?query=${encodeURIComponent(q)}&size=6`;
     const res=await fetch(url,{headers:{'Authorization':`KakaoAK ${KAKAO_KEY}`}});
+    if(!res.ok){
+      const errBody=await res.text();
+      console.error('카카오 책 검색(찜) 실패',res.status,errBody);
+      resultsEl.innerHTML=`<div class="api-loading">검색 실패 (${res.status}) — 직접 입력해주세요</div>`;
+      return;
+    }
     const data=await res.json();const results=(data.documents||[]).slice(0,6);
     if(!results.length){resultsEl.innerHTML='<div class="api-loading">결과 없음 — 직접 입력해주세요</div>';return;}
     resultsEl.innerHTML='';
@@ -11605,14 +11986,14 @@ function loadAndRenderWatchCal(){
   // 수동 추가분(드라마/책) — 자동 수집(리듬 기록)이 못 잡는 사각지대(오디오북 미등록, TV 감상탭 미입력 등) 보충용
   getWcalManual(mk).forEach(it=>push(it.dk,{cat:it.cat,title:it.title}));
 
-  // 포스터 매칭 — 드라마/영화/책은 같은 제목의 콘텐츠 항목(이번 달+전월, 진행중 포함)에서 poster를 찾아 붙임
+  // 포스터/상태 매칭 — 드라마/영화/책은 같은 제목의 콘텐츠 항목(이번 달+전월, 진행중 포함)에서 poster/status를 찾아 붙임
   // cid도 함께 매칭해 붙임 — 콘텐츠탭 등록 원본과 연결해야 일자별 코멘트(cid 기준)를 저장할 수 있음
-  const posterByTitle={},cidByTitle={};
+  const posterByTitle={},cidByTitle={},statusByTitle={};
   [...getContents(mk),...getContents(prevMk)].forEach(c=>{
-    if(c.cat!=='music'&&c.title){posterByTitle[c.title]=c.poster||null;cidByTitle[c.title]=c.cid||null;}
+    if(c.cat!=='music'&&c.title){posterByTitle[c.title]=c.poster||null;cidByTitle[c.title]=c.cid||null;statusByTitle[c.title]=c.status||null;}
   });
   Object.values(_wcalByDate).forEach(list=>list.forEach(it=>{
-    if(it.cat!=='music'){it.poster=posterByTitle[it.title]||null;it.cid=cidByTitle[it.title]||null;}
+    if(it.cat!=='music'){it.poster=posterByTitle[it.title]||null;it.cid=cidByTitle[it.title]||null;it.status=statusByTitle[it.title]||null;}
   }));
 
   // 한 날짜에 같은 제목이 여러 세션(리듬 블록)으로 중복 등록됐을 수 있으므로 날짜별로 제목+카테고리 기준 유일화
@@ -11725,6 +12106,7 @@ function renderWatchCalDetail(){
     const posterHtml=_wcalPosterThumbHtml(it.cat,it.poster);
     const hasNote=it.cid&&!!getWcalNoteFor(it.cid,dk);
     const noteBtnHtml=it.cid?`<span class="wcal-note-icon${hasNote?' has':''}" onclick="openWcalNoteInput('${it.cid}','${dk}',${idx})" title="코멘트"><i class="ti ti-message-circle ico-sz-13" aria-hidden="true"></i></span>`:'';
+    const statusBadgeHtml=it.status==='watching'?'<span class="wcal-status-badge watching">진행중</span>':(it.status==='done'?'<span class="wcal-status-badge done">완결</span>':'');
     const noteRowHtml=`<div id="wcal-note-row-${idx}"></div>`;
     return `<div style="padding:7px 0;">
       <div style="display:flex;align-items:center;gap:10px;">
@@ -11733,6 +12115,7 @@ function renderWatchCalDetail(){
           <div style="font-size:var(--main-text-size);color:var(--tp);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(it.title)}</div>
           <div style="font-size:var(--dow-label-size);color:var(--ts);margin-top:2px;">${m.label}</div>
         </div>
+        ${statusBadgeHtml}
         ${noteBtnHtml}
       </div>
       ${noteRowHtml}
@@ -11868,11 +12251,14 @@ function renderChHubMonthBanners(){
 }
 // 선택된 달의 콘텐츠 목록(월간 카테고리별 집계) — renderContentByCatHtml이 각 항목 코멘트 아이콘에 완결 총평+감상 중 메모를 함께 보여줌
 // 음악은 항상 그리드, 드라마/영화/책은 리스트↔그리드 토글(_chArchiveGridMode)
-let _chArchiveGridMode=false;
+let _chArchiveGridMode=true;
 function chToggleArchiveGridMode(){
   _chArchiveGridMode=!_chArchiveGridMode;
   const btn=document.getElementById('ch-archive-grid-toggle');
-  if(btn)btn.classList.toggle('on',_chArchiveGridMode);
+  if(btn){
+    btn.classList.toggle('on',_chArchiveGridMode);
+    btn.title=_chArchiveGridMode?'리스트로 보기':'그리드로 보기';
+  }
   chExpandMonth(_chArchiveMk);
 }
 function chExpandMonth(mk){
@@ -12844,6 +13230,7 @@ function updateStopwatchDisplay(){
 }
 document.addEventListener('visibilitychange',function(){
   if(!document.hidden&&_swRunning)updateStopwatchDisplay(); // 화면 복귀 즉시 정확한 시간으로 보정
+  if(!document.hidden&&_cswRunning)updateContentStopwatchDisplay();
 });
 
 // ── 예비 투두 ──
