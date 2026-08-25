@@ -197,6 +197,41 @@ function toggleSidebar(){
   const collapsed=side.classList.toggle('collapsed');
   btn.classList.toggle('collapsed',collapsed);
   try{localStorage.setItem(SIDEBAR_COLLAPSE_KEY,collapsed?'1':'0');}catch(e){}
+  syncTopRowHeightDuringTransition(side);
+}
+// 사이드바 width 트랜지션 진행 중(및 종료 시) top-row(감상 달력 / 콘텐츠 모아보기) 두 카드의
+// 세로 길이를 JS로 직접 동기화. grid의 align-items:stretch만으로는 wcal-grid(aspect-ratio 기반,
+// 폭 변화 → 높이 변화)와 cgrid-scroll(flex:1, 부모 높이를 그대로 따라감) 사이 리플로우 타이밍이
+// 어긋나 접었을 때 콘텐츠 모아보기가 늘어난 높이를 못 따라오는 문제가 있어, rAF로 매 프레임
+// wcal-card 실측 높이를 cgrid-card에 강제로 맞춰준다.
+function syncTopRowHeightDuringTransition(side){
+  const rows=document.querySelectorAll('.top-row');
+  if(!rows.length)return;
+  const startTs=performance.now();
+  const DURATION=380; // 사이드바 width transition(.32s)보다 살짝 여유
+  function step(){
+    let stillGoing=false;
+    rows.forEach(row=>{
+      const wcal=row.querySelector('.wcal-card');
+      const cgrid=row.querySelector('.cgrid-card');
+      if(!wcal||!cgrid)return;
+      const h=wcal.getBoundingClientRect().height;
+      if(h>0){
+        cgrid.style.height=h+'px';
+      }
+    });
+    if(performance.now()-startTs<DURATION){
+      stillGoing=true;
+      requestAnimationFrame(step);
+    }else{
+      // 트랜지션 종료 후 인라인 높이를 제거해 다시 grid stretch(정상 동작)에 맡김
+      rows.forEach(row=>{
+        const cgrid=row.querySelector('.cgrid-card');
+        if(cgrid)cgrid.style.height='';
+      });
+    }
+  }
+  requestAnimationFrame(step);
 }
 function initSidebarCollapse(){
   let collapsed=false;
