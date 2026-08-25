@@ -357,8 +357,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cmr-review-icon{color:var(--tm);opacity:0.65;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center;}
 .cmr-review-box{margin:0 0 7px 46px;display:none;}
 .cmr-review-box.on{display:block;}
+/* 코멘트 상세 헤더 — 날짜 + 별점, 리스트형/그리드형 공통 */
+.cmr-detail-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;font-size:var(--dow-label-size);}
+.cmr-detail-date{color:var(--tm);font-weight:600;font-variant-numeric:tabular-nums;}
+.cmr-detail-stars{color:#e0b050;letter-spacing:1px;}
 /* 완결 총평 — 테두리 있는 배너, 시작에 이탤릭 "Comment :" 프리픽스 */
 .cmr-review-final{font-size:var(--dow-label-size);color:var(--tp);line-height:1.6;background:rgba(210,180,160,0.14);border:1px solid rgba(210,180,160,0.35);border-radius:10px;padding:9px 11px;}
+/* flat — 바깥 컨테이너(.cgrid-detail 등)가 이미 같은 톤의 카드 배경일 때 안쪽 이중 배너 방지 */
+.cmr-review-final.flat{background:transparent;border:none;border-radius:0;padding:0;}
 .cmr-review-final-lbl{font-style:italic;font-family:'DM Sans',sans-serif;font-weight:700;color:var(--pal-mauvepink);margin-right:2px;}
 /* 감상 중 메모 — Timeline 라벨 + 세로 점선(노트 스타일)으로 날짜와 메모 구분 */
 .cmr-review-notes{margin-top:0;}
@@ -3345,18 +3351,24 @@ function getWcalNotesByCid(cid){
   return all.filter(n=>n.cid===cid).sort((a,b)=>(b.dk||'').localeCompare(a.dk||''));
 }
 // 완결 총평(review)과 감상 중 메모(wcal_note)를 함께 담은 코멘트 본문 — 리스트형/그리드형 detail이 공통으로 씀
-function _cmrDetailBodyHtml(c,wcalNotes){
-  const finalPartHtml=c.review?`<div class="cmr-review-final"><span class="cmr-review-final-lbl">Comment :</span> ${escapeHtml(c.review)}</div>`:'';
+// flat=true면 완결 총평 안쪽 박스 스타일을 없앰(그리드형처럼 바깥이 이미 카드 배경일 때 이중 배너 방지)
+// showHead=true면 상단에 날짜+별점 헤더를 붙임(그리드형 전용 — 리스트형은 줄에 별점이 이미 있어 생략)
+function _cmrDetailBodyHtml(c,wcalNotes,flat,showHead){
+  const dk=c.endDate||c.startDate||'';
+  const dispDate=dk?`${parseInt(dk.slice(5,7),10)}.${parseInt(dk.slice(8,10),10)}`:'';
+  const starsHtml=c.stars>0?`<span class="cmr-detail-stars">${'★'.repeat(c.stars)}</span>`:'';
+  const headHtml=showHead&&(dispDate||starsHtml)?`<div class="cmr-detail-head">${dispDate?`<span class="cmr-detail-date">${dispDate}</span>`:'<span></span>'}${starsHtml}</div>`:'';
+  const finalPartHtml=c.review?`<div class="cmr-review-final${flat?' flat':''}"><span class="cmr-review-final-lbl">Comment :</span> ${escapeHtml(c.review)}</div>`:'';
   const notesPartHtml=wcalNotes.length?`<div class="cmr-review-notes${c.review?' with-final':''}">
     <div class="cmr-review-notes-lbl">Timeline</div>
     <div class="cmr-review-notes-tl">
       ${wcalNotes.map(n=>{
-        const dispDate=n.dk?(parseInt(n.dk.slice(5,7),10)+'/'+parseInt(n.dk.slice(8,10),10)):'';
-        return `<div class="cmr-review-note-item"><span class="cmr-review-note-date">${dispDate}</span><span class="cmr-review-note-text">${escapeHtml(n.text||'')}</span></div>`;
+        const nDispDate=n.dk?(parseInt(n.dk.slice(5,7),10)+'/'+parseInt(n.dk.slice(8,10),10)):'';
+        return `<div class="cmr-review-note-item"><span class="cmr-review-note-date">${nDispDate}</span><span class="cmr-review-note-text">${escapeHtml(n.text||'')}</span></div>`;
       }).join('')}
     </div>
   </div>`:'';
-  return finalPartHtml+notesPartHtml;
+  return headHtml+finalPartHtml+notesPartHtml;
 }
 // 카테고리별 리스트형(제목+별점+코멘트 아이콘, 한 줄씩) — 드라마/영화/책의 기본 표시 형태
 function renderContentByCatHtml(byCat){
@@ -3429,7 +3441,7 @@ function _musicGridItemHtml(c){
 function _musicGridDetailHtml(c){
   const wcalNotes=c.cid?getWcalNotesByCid(c.cid):[];
   if(!c.review&&!wcalNotes.length)return '';
-  return `<div class="cgrid-detail">${_cmrDetailBodyHtml(c,wcalNotes)}</div>`;
+  return `<div class="cgrid-detail">${_cmrDetailBodyHtml(c,wcalNotes,true,true)}</div>`;
 }
 function toggleMusicGridDetail(id){
   _musicGridActiveCid=(_musicGridActiveCid===id)?null:id;
