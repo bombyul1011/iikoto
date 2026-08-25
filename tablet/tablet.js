@@ -177,7 +177,7 @@ const CAT_ICON_META={
 // ── 상태 ──
 let _selectedDate=new Date();
 let _currentTab='today';
-let _rdCalDate=new Date();
+let _wcalDate=new Date();
 
 // ══════════════════════════════════════════════════════════
 // 사이드바 접기/펼치기 (아이패드 미니처럼 화면이 좁을 때 메인 영역을 넓혀줌)
@@ -450,18 +450,20 @@ async function loadTodayTab(){
   const readingStreakStart=new Date(_selectedDate);readingStreakStart.setDate(readingStreakStart.getDate()-90);
   const readingStreakStartDk=dateKey(readingStreakStart);
 
-  const [todos,sleepRows,recentSleepRows,habits,habitChecks,meals,contents,books,rblocks,morningChecks,readingLogRows]=await Promise.all([
+  const [todos,sleepRows,recentSleepRows,habits,habitChecks,meals,contents,books,rblocks,morningChecks,readingLogRows,todayNoteRows,todayManualRows]=await Promise.all([
     supaFetch(`todos?date_key=eq.${dk}&order=created.asc`),
     supaFetch(`sleep?date_key=eq.${dk}`),
     supaFetch(`sleep?date_key=gte.${sleepAvgStartDk}&date_key=lte.${dk}&select=date_key,score,sleep_time,wake_time`),
     supaFetch(`habits?order=sort_order.asc`),
     supaFetch(`habit_checks?date_key=eq.${dk}`),
     supaFetch(`meals?date_key=eq.${dk}`),
-    supaFetch(`contents?or=(status.eq.watching,and(status.eq.done,end_date.eq.${dk}),and(content_cat.eq.music,start_date.eq.${dk}))&order=created.desc&limit=6`),
+    supaFetch(`contents?or=(status.eq.watching,and(status.eq.done,end_date.eq.${dk}),start_date.eq.${dk})&order=created.desc&limit=10`),
     supaFetch(`reading_books?status=eq.reading&limit=1`),
     supaFetch(`rhythm_blocks?date_key=eq.${dk}&order=start_time.asc`),
     supaFetch(`morning_routine_checks?date_key=eq.${dk}`),
-    supaFetch(`reading_daily_log?date_key=gte.${readingStreakStartDk}&date_key=lte.${dk}&select=date_key`)
+    supaFetch(`reading_daily_log?date_key=gte.${readingStreakStartDk}&date_key=lte.${dk}&select=date_key`),
+    supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wcal_note_'+dk.slice(0,7))}`),
+    supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wcal_manual_'+dk.slice(0,7))}`)
   ]);
 
   renderTodayTodosEvents(todos||[]);
@@ -469,12 +471,14 @@ async function loadTodayTab(){
   renderTodaySleep(dk,sleepRows&&sleepRows[0],recentSleepRows||[]);
   renderTodayHabits(habits||[],habitChecks||[],dk);
   renderTodayMeals(meals&&meals[0]);
-  renderTodayContents(contents||[]);
+  const todayNotes=((todayNoteRows&&todayNoteRows[0]&&todayNoteRows[0].lines)||[]).filter(n=>n.dk===dk);
+  renderTodayContents(contents||[],todayNotes);
   _todayRhythmBlocks=rblocks||[];
   _todaySleepRow=sleepRows&&sleepRows[0];
   _todayMealsRow=meals&&meals[0];
   renderTodayRhythm(rblocks||[]);
-  renderTodayReading(books&&books[0],readingLogRows||[]);
+  const todayManual=((todayManualRows&&todayManualRows[0]&&todayManualRows[0].lines)||[]).filter(it=>it.dk===dk);
+  renderTodayReading(dk,rblocks||[],contents||[],todayManual,books&&books[0],readingLogRows||[]);
   renderTodayPace(todos||[],habits||[],habitChecks||[],morningChecks||[]);
 }
 
@@ -657,12 +661,16 @@ function renderTodayMeals(meal){
   el.innerHTML=`<div class="meal-grid">${html}</div>`;
 }
 
-function renderTodayContents(items){
+function renderTodayContents(items,todayNotes){
   const el=document.getElementById('today-contents');
+  items=items||[];
+  const dk=dateKey(_selectedDate);
   if(!items.length){el.innerHTML='<div class="empty-msg">오늘 감상한 콘텐츠 없음</div>';return;}
   el.innerHTML=items.slice(0,4).map(c=>{
     const meta=CAT_ICON_META[c.content_cat]||{label:c.content_cat};
-    return `<div class="content-row"><span class="content-cat">${meta.label||''}</span><span class="content-title">${escapeHtml(c.title)}</span></div>`;
+    const finalBadge=(c.status==='done'&&c.end_date===dk)?'<span class="content-final-badge">완결</span>':'';
+    const progressBadge=(c.status==='watching')?'<span class="content-progress-badge">진행중</span>':'';
+    return `<div class="content-row"><span class="content-cat">${meta.label||''}</span><span class="content-title">${escapeHtml(c.title)}</span>${finalBadge}${progressBadge}</div>`;
   }).join('');
 }
 
@@ -872,34 +880,61 @@ function openTodayRhythmFlow(){
   document.getElementById('report-overlay').classList.add('on');
 }
 
-function _readingStreakLabel(logRows,fromDk){
-  const readDates=new Set((logRows||[]).map(r=>r.date_key));
-  const hasToday=readDates.has(fromDk);
-  let streak=0;
-  const cur=new Date(fromDk+'T00:00:00');
-  for(let i=0;i<91;i++){
-    const dk=dateKey(cur);
-    const has=readDates.has(dk);
-    if(i===0){streak=1;}
-    else if(has===hasToday){streak++;}
-    else break;
-    cur.setDate(cur.getDate()-1);
+// 오늘의 감상 — "오늘 진행중 상태"가 아니라 감상달력과 동일한 기준(오늘 날짜에 실제로 감상 기록이 찍힌 항목:
+// 드라마/영화/책은 rhythm_blocks, 음악은 contents.start_date, 그 외 수동추가분은 wcal_manual)으로 수집.
+// 최근 것부터 최대 2개까지 절반씩 나눠 보여주고, 3개 이상이면 존재감 낮은 작은 배지(+N)로만 표시.
+function _todayReadingItemHtml(item,book,readingLogRows){
+  const meta=WCAL_CAT_META[item.cat]||{icon:'ti-stack-2',color:'rgba(150,150,150,1)',label:''};
+  const coverStyle=item.poster?`background-image:url('${item.poster}');`:`background:${meta.color};`;
+  const coverIcon=item.poster?'':`<i class="ti ${meta.icon}" style="color:#fff;font-size:16px;" aria-hidden="true"></i>`;
+  let subLine='';
+  if(item.cat==='book'&&book&&book.title===item.title){
+    let pct=0;
+    if(book.unit==='percent')pct=book.percent||0;
+    else if(book.total_pages)pct=Math.min(100,Math.round((book.pages/book.total_pages)*100));
+    subLine=`${pct}%`;
+  }else{
+    subLine=meta.label||'';
   }
-  return hasToday?`${streak}일째 읽음`:`${streak}일째 안읽음`;
-}
-function renderTodayReading(book,readingLogRows){
-  const el=document.getElementById('today-reading');
-  if(!book){el.innerHTML='<div class="empty-msg" style="text-align:left;">지금 읽는 책이 없어요</div>';return;}
-  let pct=0;
-  if(book.unit==='percent')pct=book.percent||0;
-  else if(book.total_pages)pct=Math.min(100,Math.round((book.pages/book.total_pages)*100));
-  const coverStyle=book.poster?`background-image:url('${book.poster}');`:'';
-  const dk=dateKey(_selectedDate);
-  const streakLabel=_readingStreakLabel(readingLogRows,dk);
-  el.innerHTML=`<div class="rd-cur-book">
-    <div class="rd-cur-cover" style="${coverStyle}"></div>
-    <div class="rd-cur-info"><div class="rd-cur-title">${escapeHtml(book.title)}</div><div class="rd-cur-author">${escapeHtml(book.author||'')}</div><div class="rd-cur-pct">${pct}% 진행 중<span class="rd-cur-streak">${streakLabel}</span></div></div>
+  return `<div class="rd-cur-book-sm">
+    <div class="rd-cur-cover-sm" style="${coverStyle}display:flex;align-items:center;justify-content:center;">${coverIcon}</div>
+    <div class="rd-cur-info-sm"><div class="rd-cur-title-sm">${escapeHtml(item.title||'')}</div><div class="rd-cur-pct-sm">${subLine}</div></div>
   </div>`;
+}
+function renderTodayReading(dk,rblocks,contents,manualItems,book,readingLogRows){
+  const el=document.getElementById('today-reading');
+  const items=[];
+  const seen=new Set();
+  const push=(cat,title,poster)=>{
+    const key=cat+'|'+title;
+    if(seen.has(key)||!title)return;
+    seen.add(key);
+    items.push({cat,title,poster:poster||null});
+  };
+  (rblocks||[]).forEach(b=>{
+    if(b.cat!=='enjoy'||!b.text)return;
+    if(b.text.startsWith('드라마 - '))push('drama',b.text.slice(6));
+    else if(b.text.startsWith('독서 - '))push('book',b.text.slice(5));
+  });
+  (contents||[]).filter(c=>c.content_cat==='music'&&c.start_date===dk).forEach(c=>push('music',c.title,c.poster));
+  // 영화는 리듬 기록 유무와 무관하게 contents 하나만 기준으로 판단 — 하루짜리(당일 시작~종료), 기간형(진행중이면
+  // 시작일~오늘 사이), 콘텐츠탭에만 등록된 경우까지 모두 이 하나의 규칙으로 포섭(2026-08-25 단순화).
+  (contents||[]).filter(c=>c.content_cat==='movie').forEach(c=>{
+    const isToday=(c.status==='watching'&&c.start_date&&c.start_date<=dk)||c.start_date===dk||c.end_date===dk;
+    if(isToday)push('movie',c.title,c.poster);
+  });
+  (manualItems||[]).forEach(it=>push(it.cat,it.title));
+  // 포스터 매칭 — 드라마/책은 오늘 넘어온 contents 목록에서 같은 제목의 poster를 찾아 붙임(영화는 위에서 이미 직접 매칭됨)
+  const posterByTitle={};
+  (contents||[]).forEach(c=>{if(c.content_cat!=='music'&&c.title)posterByTitle[c.title]=c.poster||null;});
+  items.forEach(it=>{if(it.cat!=='music'&&!it.poster)it.poster=posterByTitle[it.title]||null;});
+
+  const shown=items.slice(0,2);
+  if(!shown.length){el.innerHTML='<div class="empty-msg" style="text-align:left;">오늘 감상한 콘텐츠가 없어요</div>';return;}
+  const moreCount=items.length-shown.length;
+  const moreBadge=moreCount>0?`<span class="rd-cur-more-tiny">+${moreCount}</span>`:'';
+  const itemsHtml=shown.map(it=>_todayReadingItemHtml(it,book,readingLogRows)).join('');
+  el.innerHTML=`<div class="rd-cur-row">${itemsHtml}</div>${moreBadge}`;
 }
 
 async function openReportPanel(cacheKey,title){
@@ -1013,7 +1048,8 @@ async function loadWeekTab(){
   const slEndDk=dateKey(slEnd),slStartDk=dateKey(slStart);
 
   const [goalRows,habits,habitChecks,memos,todos,sleepRows,onelineRows,contents,
-    lwMemos,lwTodos,lwSleepRows,lwHabitChecks,lwContents,rblocksThis,rblocksLast,sleepReportRows]=await Promise.all([
+    lwMemos,lwTodos,lwSleepRows,lwHabitChecks,lwContents,rblocksThis,rblocksLast,sleepReportRows,
+    wcalStripRblocks,wcalStripContents,wcalNoteRowsA,wcalNoteRowsB]=await Promise.all([
     supaFetch(`goal_notes?note_key=eq.wchallenge_${encodeURIComponent(wk)}`),
     supaFetch(`habits?order=sort_order.asc`),
     supaFetch(`habit_checks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
@@ -1033,7 +1069,13 @@ async function loadWeekTab(){
     supaFetch(`rhythm_blocks?date_key=gte.${startDk}&date_key=lte.${cmpEndDk}`),
     supaFetch(`rhythm_blocks?date_key=gte.${lastStartDk}&date_key=lte.${lastCmpEndDk}`),
     // 수면 리포트 최근 2주
-    supaFetch(`sleep?date_key=gte.${slStartDk}&date_key=lte.${slEndDk}&select=date_key,score,sleep_time,wake_time`)
+    supaFetch(`sleep?date_key=gte.${slStartDk}&date_key=lte.${slEndDk}&select=date_key,score,sleep_time,wake_time`),
+    // 이번 주 감상 스트립(월~일 전체) — 리듬 흐름 비교와 달리 오늘까지 절단하지 않고 7일 전체를 봄
+    supaFetch(`rhythm_blocks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
+    supaFetch(`contents?month_key=in.(${monthKeyOf(new Date(startDk+'T00:00:00'))},${monthKeyOf(new Date(endDk+'T00:00:00'))})`),
+    // 이번 주 코멘트 타임라인용 감상 메모(월 경계를 넘을 수 있어 두 달치 모두 조회 후 주간 범위로 필터링)
+    supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wcal_note_'+monthKeyOf(new Date(startDk+'T00:00:00')))}`),
+    supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wcal_note_'+monthKeyOf(new Date(endDk+'T00:00:00')))}`)
   ]);
 
   renderWeekGoals(goalRows&&goalRows[0]);
@@ -1048,6 +1090,8 @@ async function loadWeekTab(){
   });
   renderWeekRhythmFlow(rblocksThis||[],rblocksLast||[],cmpDayCount);
   renderWeekOneline(onelineRows||[],weekDates);
+  renderWeekWatchStrip(weekDates,wcalStripRblocks||[],wcalStripContents||[]);
+  renderWeekNoteTimeline(weekDates,wcalStripContents||[],wcalNoteRowsA,wcalNoteRowsB);
 }
 
 function _minToHHMM(min){const h=Math.floor(min/60),m=min%60;return pad(h)+':'+pad(m);}
@@ -1228,6 +1272,115 @@ function renderWeekOneline(rows,weekDates){
   elB.innerHTML=right.length?right.map(rowHtml).join(''):'<div class="empty-msg">기록 없음</div>';
 }
 
+// 이번 주 감상 스트립 — 월간탭 감상달력과 같은 데이터 소스(rhythm_blocks+contents)를 그 주(월~일) 범위로 재사용.
+// 요일 7칸에 그 날 감상한 콘텐츠 포스터(또는 카테고리 폴백)를 표시, 여러 개면 겹쳐서 조합. 칸을 누르면 아래에 정방형 포스터+제목+진행중여부 간단 상세.
+let _weekWatchByDate={};
+let _weekWatchSelectedDk=null;
+function renderWeekWatchStrip(weekDates,rblocks,contents){
+  const el=document.getElementById('week-watch-strip');
+  if(!el)return;
+  _weekWatchByDate={};
+  _weekWatchSelectedDk=null;
+  const push=(dk,item)=>{if(!_weekWatchByDate[dk])_weekWatchByDate[dk]=[];_weekWatchByDate[dk].push(item);};
+  (rblocks||[]).forEach(b=>{
+    if(b.cat!=='enjoy'||!b.text)return;
+    let cat=null,title=null;
+    if(b.text.startsWith('드라마 - ')){cat='drama';title=b.text.slice(6);}
+    else if(b.text.startsWith('독서 - ')){cat='book';title=b.text.slice(5);}
+    if(!cat)return;
+    push(b.date_key,{cat,title,status:null});
+  });
+  (contents||[]).filter(c=>c.content_cat==='music'&&c.start_date).forEach(c=>{
+    if(weekDates.includes(c.start_date))push(c.start_date,{cat:'music',title:c.title,poster:c.poster,status:c.status});
+  });
+  // 영화는 리듬 기록 유무와 무관하게 contents 하나만 기준(시작일)으로 판단(2026-08-25 단순화, 감상달력과 동일 규칙).
+  (contents||[]).filter(c=>c.content_cat==='movie'&&c.start_date).forEach(c=>{
+    if(weekDates.includes(c.start_date))push(c.start_date,{cat:'movie',title:c.title,poster:c.poster,status:c.status});
+  });
+  const posterByTitle={},statusByTitle={};
+  (contents||[]).forEach(c=>{if(c.content_cat!=='music'&&c.title){posterByTitle[c.title]=c.poster||null;statusByTitle[c.title]=c.status||null;}});
+  Object.values(_weekWatchByDate).forEach(list=>list.forEach(it=>{
+    if(it.cat!=='music'){it.poster=posterByTitle[it.title]||null;if(it.status==null)it.status=statusByTitle[it.title]||null;}
+  }));
+  Object.keys(_weekWatchByDate).forEach(dk=>{
+    const seen=new Set();
+    _weekWatchByDate[dk]=_weekWatchByDate[dk].filter(it=>{const key=it.cat+'|'+it.title;if(seen.has(key))return false;seen.add(key);return true;});
+  });
+  const hasAny=Object.keys(_weekWatchByDate).length>0;
+  if(!hasAny){el.innerHTML='<div class="empty-msg">이번 주엔 기록된 감상이 없어요</div>';renderWeekWatchDetail();return;}
+  const today=dateKey(new Date());
+  el.innerHTML=weekDates.map((dk,i)=>{
+    const items=_weekWatchByDate[dk]||[];
+    const dayNum=parseInt(dk.slice(8,10),10);
+    const isToday=dk===today;
+    if(!items.length)return `<div class="wcal-week-cell${isToday?' today':''}"><div class="wcal-date-plain">${dayNum}</div></div>`;
+    return `<div class="wcal-week-cell${isToday?' today':''}"><div class="wcal-thumb" onclick="weekWatchSelectDay('${dk}')">${_wcalBuildThumb(items)}</div></div>`;
+  }).join('');
+  renderWeekWatchDetail();
+}
+function weekWatchSelectDay(dk){
+  _weekWatchSelectedDk=(_weekWatchSelectedDk===dk)?null:dk;
+  renderWeekWatchDetail();
+}
+// 감상 미선택 상태에서 존재감 없이 띄우는 감성 문구 — 렌더될 때마다 랜덤으로 하나 고름.
+const WEEK_WATCH_EMPTY_PHRASES=[
+  '좋은 작품 하나가 오늘을 완성해줄 거예요',
+  '이번 주, 어떤 이야기들을 만났나요',
+  '스쳐간 장면들이 여기 남아있어요',
+  '하루의 끝에 남는 건 결국 좋은 이야기 하나',
+  '그날의 감상을 다시 꺼내보세요',
+  'A good story completes the day',
+  "Where the week's stories live",
+  'Every scene leaves a little trace',
+  'Some stories stay with us'
+];
+// 정방형 포스터+제목+진행중/완결 여부만 간단히, 최대 2개까지 — 코멘트 카드와 세로 길이를 맞추기 위해 딱 이 정도 정보량으로 고정.
+function renderWeekWatchDetail(){
+  const el=document.getElementById('week-watch-detail');
+  if(!el)return;
+  if(!_weekWatchSelectedDk){
+    const phrase=WEEK_WATCH_EMPTY_PHRASES[Math.floor(Math.random()*WEEK_WATCH_EMPTY_PHRASES.length)];
+    el.innerHTML=`<div class="week-watch-empty-phrase">${escapeHtml(phrase)}</div>`;
+    return;
+  }
+  const items=(_weekWatchByDate[_weekWatchSelectedDk]||[]).slice(0,2);
+  if(!items.length){
+    const phrase=WEEK_WATCH_EMPTY_PHRASES[Math.floor(Math.random()*WEEK_WATCH_EMPTY_PHRASES.length)];
+    el.innerHTML=`<div class="week-watch-empty-phrase">${escapeHtml(phrase)}</div>`;
+    return;
+  }
+  el.innerHTML=items.map(it=>{
+    const m=WCAL_CAT_META[it.cat]||{icon:'ti-stack-2',color:'rgba(150,150,150,1)'};
+    const thumb=it.poster
+      ?`<img src="${it.poster}" class="week-watch-detail-thumb" />`
+      :`<div class="week-watch-detail-thumb" style="background:${m.color};display:flex;align-items:center;justify-content:center;"><i class="ti ${m.icon}" style="color:#fff;" aria-hidden="true"></i></div>`;
+    const statusTag=it.status==='watching'?'<span class="week-watch-detail-status">진행중</span>':(it.status==='done'?'<span class="week-watch-detail-status done">완결</span>':'');
+    return `<div class="week-watch-detail-item">${thumb}<span class="week-watch-detail-title">${escapeHtml(it.title||'')}</span>${statusTag}</div>`;
+  }).join('');
+}
+
+// 이번 주 코멘트 타임라인 — 그 주(월~일)에 완결된 리뷰와 남긴 감상 메모를 날짜순으로. 코멘트 모아보기와 같은 렌더 로직(_chRenderNoteTimelineByDate) 재사용.
+function renderWeekNoteTimeline(weekDates,contents,noteRowsA,noteRowsB){
+  const el=document.getElementById('week-note-timeline');
+  if(!el)return;
+  const finals=[];
+  (contents||[]).forEach(c=>{
+    if(c.review&&c.review.trim()){
+      const dk=c.end_date||c.start_date||'';
+      if(weekDates.includes(dk))finals.push({cid:c.client_id,cat:c.content_cat,title:c.title,poster:c.poster||null,stars:c.stars||0,review:c.review||'',dk});
+    }
+  });
+  const notes=[];
+  const posterByCid={};
+  (contents||[]).forEach(c=>{if(c.client_id)posterByCid[c.client_id]=c.poster||null;});
+  [noteRowsA,noteRowsB].forEach(rows=>{
+    const lines=(rows&&rows[0]&&Array.isArray(rows[0].lines))?rows[0].lines:[];
+    lines.forEach(n=>{if(weekDates.includes(n.dk))notes.push({...n,poster:n.cid?(posterByCid[n.cid]||null):null});});
+  });
+  if(!finals.length&&!notes.length){el.innerHTML='<div class="ch-note-tl-empty">이번 주엔 남긴 코멘트가 없어요</div>';return;}
+  el.innerHTML=_chRenderNoteTimelineByDate(finals,notes);
+}
+
 // ══════════════════════════════════════════════════════════
 // 월간탭
 // ══════════════════════════════════════════════════════════
@@ -1248,18 +1401,19 @@ async function loadMonthTab(){
   await renderMonthQuotes(y,mo);
   await renderMonthContentGrid(y,mo);
   await renderChaeumLogTablet();
-  _rdCalDate=new Date(_monthCalDate);
-  await renderReadingCal();
+  _wcalDate=new Date(_monthCalDate);
+  _wcalSelectedDk=null;
+  await renderWatchCal();
   lockContentCollectToReadingCal();
 }
 
-// 독서달력(top-row 첫 카드)의 실제 렌더링 높이를 콘텐츠모아보기 카드의 절대 상한으로 고정.
+// 감상달력(top-row 첫 카드)의 실제 렌더링 높이를 콘텐츠모아보기 카드의 절대 상한으로 고정.
 // 콘텐츠모아보기가 아무리 길어져도 이 값을 넘지 못하고 내부 스크롤로만 처리됨.
 function lockContentCollectToReadingCal(){
   const topRow=document.querySelector('.top-row');
   if(!topRow)return;
   const rdCard=topRow.children[0];
-  const ccolCard=document.querySelector('.ccol-card');
+  const ccolCard=document.querySelector('.cgrid-card');
   if(!rdCard||!ccolCard)return;
   // 이미지 로딩(독서표지)이나 폰트로 레이아웃이 아직 안 굳었을 수 있어 두 프레임 뒤에 측정
   setTimeout(()=>{
@@ -1310,6 +1464,8 @@ async function toggleCgridYearMode(){
 }
 async function _loadCgridYearly(y){
   const rows=await supaFetch(`contents?month_key=like.${y}-*`);
+  const months=[];for(let mo=1;mo<=12;mo++)months.push(`${y}-${pad(mo)}`);
+  await _loadCgridNotesForMonths(months);
   const belongsHere=c=>{
     if(c.status==='done'||c.status==='stopped')return true;
     return c.status==='watching'&&y===new Date().getFullYear();
@@ -1332,6 +1488,7 @@ async function renderMonthContentGrid(y,mo){
     supaFetch(`contents?month_key=eq.${mk}`),
     supaFetch(`contents?month_key=eq.${prevMk}`)
   ]);
+  await _loadCgridNotesForMonths([mk,prevMk]);
   const belongsHere=c=>{
     if(c.status==='done'||c.status==='stopped')return isContentEndedInMonthTablet(c,mk);
     return c.status==='watching'&&isSameMonth;
@@ -1360,17 +1517,42 @@ function _cgridRowsHtml(list){
   return html;
 }
 let _cgridActiveId=null;
+// 감상 메모(goal_notes, note_key='wcal_note_YYYY-MM', lines:[{cid,dk,title,cat,text,time,updatedAt}]) — cid별로 모아 캐시.
+let _cgridNotesByCid={};
+async function _loadCgridNotesForMonths(months){
+  const rows=await Promise.all(months.map(mk=>supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wcal_note_'+mk)}`)));
+  _cgridNotesByCid={};
+  rows.forEach(r=>{
+    const lines=(r&&r[0]&&Array.isArray(r[0].lines))?r[0].lines:[];
+    lines.forEach(n=>{
+      if(!n.cid)return;
+      (_cgridNotesByCid[n.cid]=_cgridNotesByCid[n.cid]||[]).push(n);
+    });
+  });
+  Object.values(_cgridNotesByCid).forEach(list=>list.sort((a,b)=>(b.dk||'').localeCompare(a.dk||'')));
+}
 function _cgridPeriodLabel(c){
   const s=c.start_date,e=c.end_date;
   if(s&&e&&s!==e)return `${s.slice(5).replace('-','.')}~${e.slice(5).replace('-','.')}`;
   return (e||s||'').slice(5).replace('-','.');
 }
+// 본앱 _cmrDetailBodyHtml과 동일한 구조 — 완결 총평(Comment)과 감상 메모(Timeline)를 함께 표시
 function _cgridDetailHtml(c){
   const period=_cgridPeriodLabel(c);
   const stars=c.stars>0?`<span class="cgrid-detail-stars">${'★'.repeat(c.stars)}</span>`:'';
-  const reviewHtml=c.review?`<div class="cgrid-detail-review">${escapeHtml(c.review)}</div>`:'';
   const topRow=(period||stars)?`<div class="cgrid-detail-row"><span class="cgrid-detail-row-date">${period?`<i class="ti ti-calendar" style="font-size:12px;" aria-hidden="true"></i>${period}`:''}</span>${stars}</div>`:'';
-  return `<div class="cgrid-detail">${topRow}${reviewHtml}</div>`;
+  const finalHtml=c.review?`<div class="cgrid-detail-final"><span class="cgrid-detail-final-lbl">Comment :</span> ${escapeHtml(c.review)}</div>`:'';
+  const notes=_cgridNotesByCid[c.client_id]||[];
+  const notesHtml=notes.length?`<div class="cgrid-detail-notes${c.review?' with-final':''}">
+    <div class="cgrid-detail-notes-lbl">Timeline</div>
+    <div class="cgrid-detail-notes-tl">
+      ${notes.map(n=>{
+        const dispDate=n.dk?(parseInt(n.dk.slice(5,7),10)+'/'+parseInt(n.dk.slice(8,10),10)):'';
+        return `<div class="cgrid-detail-note-item"><span class="cgrid-detail-note-date">${dispDate}</span><span>${escapeHtml(n.text||'')}</span></div>`;
+      }).join('')}
+    </div>
+  </div>`:'';
+  return `<div class="cgrid-detail">${topRow}${finalHtml}${notesHtml}</div>`;
 }
 function _cgridItemHtml(c){
   const meta=CAT_ICON_META[c.content_cat]||{icon:'ti-stack-2',bg:'rgba(150,150,150,1)'};
@@ -1380,7 +1562,7 @@ function _cgridItemHtml(c){
   const statusDot=c.status==='watching'?'<span class="cgrid-status-dot">진행중</span>':'';
   const icons=[];
   if(c.stars>0)icons.push('<i class="ti ti-star" aria-hidden="true"></i>');
-  if(c.review)icons.push('<i class="ti ti-message-circle" aria-hidden="true"></i>');
+  if(c.review||(_cgridNotesByCid[c.client_id]&&_cgridNotesByCid[c.client_id].length))icons.push('<i class="ti ti-message-circle" aria-hidden="true"></i>');
   const thumbIcons=icons.length?`<div class="cgrid-thumb-icons">${icons.join('')}</div>`:'';
   const active=c.id===_cgridActiveId;
   return `<div class="cgrid-item${active?' active':''}" data-cid="${c.id}" onclick="toggleCgridDetail('${c.id}')">
@@ -1592,52 +1774,143 @@ async function renderMonthQuotes(y,mo){
   }).join('');
 }
 
-// ── 독서 달력 (밀리의 서재 스타일, iikoto 원본 구조 그대로) ──
-function rdCalShift(delta){
-  _rdCalDate.setMonth(_rdCalDate.getMonth()+delta);
-  renderReadingCal().then(lockContentCollectToReadingCal);
+// ── 감상 달력 (본앱 wcal 구조 이식, 조회 전용 — 월 이동만 가능, 등록/코멘트작성 없음) ──
+const WCAL_CAT_META={
+  drama:{label:'드라마',icon:'ti-device-tv',color:'rgba(var(--pal-pink-rgb),1)'},
+  movie:{label:'영화',icon:'ti-movie',color:'rgba(var(--pal-sky-rgb),1)'},
+  book:{label:'책',icon:'ti-book',color:'rgba(var(--pal-yellow-rgb),1)'},
+  music:{label:'음악',icon:'ti-music',color:'rgba(var(--pal-lime-rgb),1)'}
+};
+let _wcalFilter='all';
+let _wcalByDate={};
+let _wcalSelectedDk=null;
+function wcalMonthShift(delta){
+  _wcalDate.setMonth(_wcalDate.getMonth()+delta);
+  _wcalSelectedDk=null;
+  renderWatchCal().then(lockContentCollectToReadingCal);
 }
-async function renderReadingCal(){
-  const y=_rdCalDate.getFullYear(),m=_rdCalDate.getMonth();
+function wcalSetFilter(cat){
+  _wcalFilter=cat;
+  renderWatchCalGrid();
+  renderWcalFilterChips();
+  renderWatchCalDetail();
+}
+// 드라마/영화/책은 rhythm_blocks(cat='enjoy', text="드라마 - 제목" 등)의 date_key가 감상일.
+// 음악은 리듬 기록이 없어 contents(content_cat='music')의 start_date(=등록일)를 그 날의 기록으로 사용.
+async function renderWatchCal(){
+  const y=_wcalDate.getFullYear(),m=_wcalDate.getMonth();
   const mk=`${y}-${pad(m+1)}`;
-  document.getElementById('rdcal-month').textContent=`${y}년 ${pad(m+1)}월`;
-  const first=new Date(y,m,1);
-  const startWeekday=(first.getDay()+6)%7; // 월요일 시작 기준으로 보정
-  const daysInMonth=new Date(y,m+1,0).getDate();
-  const [logs,books]=await Promise.all([
-    supaFetch(`reading_daily_log?date_key=gte.${mk}-01&date_key=lte.${mk}-31`),
-    supaFetch(`reading_books?select=cid,title,poster`)
+  const prevMk=monthKeyOf(new Date(y,m-1,1));
+  document.getElementById('wcal-month-label').textContent=`${y}년 ${pad(m+1)}월`;
+  _wcalByDate={};
+  const push=(dk,item)=>{if(!_wcalByDate[dk])_wcalByDate[dk]=[];_wcalByDate[dk].push(item);};
+
+  const [rblocks,curContents,prevContents,manualRows]=await Promise.all([
+    supaFetch(`rhythm_blocks?date_key=gte.${mk}-01&date_key=lte.${mk}-31`),
+    supaFetch(`contents?month_key=eq.${mk}`),
+    supaFetch(`contents?month_key=eq.${prevMk}`),
+    supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wcal_manual_'+mk)}`)
   ]);
-  const bookMap={};(books||[]).forEach(b=>bookMap[b.cid]=b);
-  const logsByDate={};
-  (logs||[]).forEach(r=>{if(!logsByDate[r.date_key])logsByDate[r.date_key]=[];logsByDate[r.date_key].push(r);});
-  const totalBooks=new Set();
-  Object.values(logsByDate).forEach(list=>list.forEach(r=>totalBooks.add(r.book_cid)));
 
-  document.getElementById('rdcal-count').innerHTML=`${totalBooks.size}<span>권</span>`;
-  document.getElementById('rdcal-dows').innerHTML=DOW_MON_START.map(d=>`<div class="rdcal-dow">${d}</div>`).join('');
+  (rblocks||[]).forEach(b=>{
+    if(b.cat!=='enjoy'||!b.text)return;
+    let cat=null,title=null;
+    if(b.text.startsWith('드라마 - ')){cat='drama';title=b.text.slice(6);}
+    else if(b.text.startsWith('독서 - ')){cat='book';title=b.text.slice(5);}
+    if(!cat)return;
+    push(b.date_key,{cat,title});
+  });
+  const contents=curContents||[];
+  contents.filter(c=>c.content_cat==='music'&&c.start_date).forEach(c=>{
+    push(c.start_date,{cat:'music',title:c.title,poster:c.poster,cid:c.client_id||null});
+  });
+  // 영화는 리듬 기록 유무와 무관하게 contents 하나만 기준으로 판단(2026-08-25 단순화, 오늘의 감상과 동일 규칙).
+  // 달력엔 시작일 하루에만 찍음 — 하루짜리든 기간형이든 "언제부터 봤는지"가 감상 시작 지점으로 가장 명확한 기준.
+  contents.filter(c=>c.content_cat==='movie'&&c.start_date).forEach(c=>{
+    push(c.start_date,{cat:'movie',title:c.title,poster:c.poster,cid:c.client_id||null});
+  });
+  // 수동 추가분(드라마/책) — 자동 수집(리듬 기록)이 못 잡는 사각지대(오디오북 미등록, TV 감상탭 미입력 등) 보충용
+  const manualLines=(manualRows&&manualRows[0]&&Array.isArray(manualRows[0].lines))?manualRows[0].lines:[];
+  manualLines.forEach(it=>push(it.dk,{cat:it.cat,title:it.title}));
 
-  let gridHtml='';
-  for(let i=0;i<startWeekday;i++)gridHtml+='<div></div>';
+  const posterByTitle={},cidByTitle={};
+  [...contents,...(prevContents||[])].forEach(c=>{
+    if(c.content_cat!=='music'&&c.title){posterByTitle[c.title]=c.poster||null;cidByTitle[c.title]=c.client_id||null;}
+  });
+  Object.values(_wcalByDate).forEach(list=>list.forEach(it=>{
+    if(it.cat!=='music'){it.poster=posterByTitle[it.title]||null;it.cid=cidByTitle[it.title]||null;}
+  }));
+
+  Object.keys(_wcalByDate).forEach(dk=>{
+    const seen=new Set();
+    _wcalByDate[dk]=_wcalByDate[dk].filter(it=>{
+      const key=it.cat+'|'+it.title;
+      if(seen.has(key))return false;
+      seen.add(key);return true;
+    });
+  });
+
+  renderWcalFilterChips();
+  document.getElementById('wcal-weekday-row').innerHTML=DOW_MON_START.map(d=>`<span>${d}</span>`).join('');
+  renderWatchCalGrid();
+  renderWatchCalDetail();
+}
+function renderWcalFilterChips(){
+  const el=document.getElementById('wcal-filter-chips');if(!el)return;
+  const cats=[{key:'all',label:'전체',icon:'ti-apps'},...Object.keys(WCAL_CAT_META).map(k=>({key:k,label:WCAL_CAT_META[k].label,icon:WCAL_CAT_META[k].icon}))];
+  el.innerHTML=cats.map(c=>`<div class="wcal-filter-chip${c.key===_wcalFilter?' on':''}" data-cat="${c.key}" onclick="wcalSetFilter('${c.key}')"><i class="ti ${c.icon}" aria-hidden="true" style="font-size:12px;margin-right:3px;"></i>${c.label}</div>`).join('');
+}
+function _wcalFilteredItems(dk){
+  const items=_wcalByDate[dk]||[];
+  return _wcalFilter==='all'?items:items.filter(it=>it.cat===_wcalFilter);
+}
+function _wcalSwatch(it){
+  const m=WCAL_CAT_META[it.cat];
+  if(it.poster)return `<img src="${it.poster}" alt="">`;
+  return `<div class="wcal-cat-fallback" style="background:${m.color};"><i class="ti ${m.icon}" aria-hidden="true"></i></div>`;
+}
+function _wcalBuildThumb(items){
+  const n=items.length;
+  if(n===1)return _wcalSwatch(items[0]);
+  if(n===2)return `<div class="wcal-split2">${items.slice(0,2).map(_wcalSwatch).join('')}</div>`;
+  if(n===3)return `<div class="wcal-split3">${_wcalSwatch(items[0])}<div class="wcal-split3-bottom">${items.slice(1,3).map(_wcalSwatch).join('')}</div></div>`;
+  return `<div class="wcal-split4">${items.slice(0,4).map(_wcalSwatch).join('')}</div>${n>4?`<div class="wcal-more">+${n-4}</div>`:''}`;
+}
+function renderWatchCalGrid(){
+  const el=document.getElementById('wcal-grid');if(!el)return;
+  const y=_wcalDate.getFullYear(),m=_wcalDate.getMonth();
+  const first=new Date(y,m,1);
+  const startWeekday=(first.getDay()+6)%7;
+  const daysInMonth=new Date(y,m+1,0).getDate();
+  let html='';
+  for(let i=0;i<startWeekday;i++)html+='<div class="wcal-cell"></div>';
   for(let d=1;d<=daysInMonth;d++){
-    const dk=`${mk}-${pad(d)}`;
-    const dayLogs=logsByDate[dk]||[];
-    const cids=[...new Set(dayLogs.slice().reverse().map(r=>r.book_cid))];
-    if(cids.length){
-      // 본앱과 동일: 2권 이상이면 표지를 살짝 겹쳐 보여주고(밀리의 서재 방식) 우하단에 권수 뱃지 표시.
-      const cover=bookMap[cids[0]]&&bookMap[cids[0]].poster;
-      const cover2=cids.length>1&&bookMap[cids[1]]&&bookMap[cids[1]].poster;
-      const innerHtml=`<div style="position:relative;width:34px;height:46px;margin:0 auto;">
-        ${cids.length>1?`<div style="position:absolute;top:2px;left:3px;width:34px;height:46px;border-radius:6px;overflow:hidden;background:var(--card);border:1px solid var(--card-b);box-shadow:0 1px 3px rgba(0,0,0,0.15);${cover2?`background-image:url('${cover2}');background-size:cover;background-position:center;`:''}"></div>`:''}
-        <div style="position:absolute;top:0;left:0;width:34px;height:46px;border-radius:6px;overflow:hidden;background:var(--card);border:1px solid var(--card-b);${cids.length>1?'box-shadow:-1px 1px 4px rgba(0,0,0,0.18);':''}${cover?`background-image:url('${cover}');background-size:cover;background-position:center;`:''}"></div>
-        ${cids.length>1?`<div style="position:absolute;bottom:-4px;right:-4px;background:rgba(60,40,35,0.85);color:#fff;font-size:9px;font-weight:600;border-radius:7px;min-width:14px;height:14px;display:flex;align-items:center;justify-content:center;padding:0 3px;z-index:2;">${cids.length}</div>`:''}
-      </div>`;
-      gridHtml+=`<div>${innerHtml}</div>`;
-    }else{
-      gridHtml+=`<div class="rdcal-num">${d}</div>`;
-    }
+    const dk=`${y}-${pad(m+1)}-${pad(d)}`;
+    const items=_wcalFilteredItems(dk);
+    if(!items.length){html+=`<div class="wcal-cell"><div class="wcal-date-plain">${d}</div></div>`;continue;}
+    const sel=dk===_wcalSelectedDk?' selected':'';
+    html+=`<div class="wcal-cell"><div class="wcal-thumb${sel}" onclick="wcalSelectDay('${dk}')">${_wcalBuildThumb(items)}</div></div>`;
   }
-  document.getElementById('rdcal-grid').innerHTML=gridHtml;
+  el.innerHTML=html;
+}
+function wcalSelectDay(dk){
+  _wcalSelectedDk=(_wcalSelectedDk===dk)?null:dk;
+  renderWatchCalGrid();
+  renderWatchCalDetail();
+}
+// 하단 상세 — 선택한 날짜의 감상 목록(포스터+제목+카테고리), 조회 전용
+function renderWatchCalDetail(){
+  const el=document.getElementById('wcal-detail');if(!el)return;
+  if(!_wcalSelectedDk){el.innerHTML='';return;}
+  const items=_wcalFilteredItems(_wcalSelectedDk);
+  if(!items.length){el.innerHTML='';return;}
+  el.innerHTML=`<div style="margin-top:10px;">${items.map(it=>{
+    const m=WCAL_CAT_META[it.cat];
+    const thumb=it.poster
+      ?`<img src="${it.poster}" style="width:32px;height:44px;border-radius:5px;object-fit:cover;flex-shrink:0;" />`
+      :`<div style="width:32px;height:44px;border-radius:5px;background:var(--card);flex-shrink:0;display:flex;align-items:center;justify-content:center;"><i class="ti ${m.icon}" style="color:var(--tm);font-size:13px;" aria-hidden="true"></i></div>`;
+    return `<div class="wcal-detail-item">${thumb}<span class="wcal-detail-title">${escapeHtml(it.title||'')}</span><span class="wcal-detail-cat">${m.label}</span></div>`;
+  }).join('')}</div>`;
 }
 
 
@@ -1749,6 +2022,20 @@ async function callClaudeFromTablet(systemPrompt,userContent,maxTokens){
     if(!res.ok)return null;
     const data=await res.json();
     return (data.content&&data.content[0]&&data.content[0].text)||null;
+  }catch(e){return null;}
+}
+
+// 월간리포트 AI 분석 3종(이 달의 궤적/수면/리듬) 공용: Claude 호출 → ```json 코드펜스 제거 →
+// JSON.parse → {text} 추출 → ai_cache에 저장까지 처리. 실패 시 null 반환(호출부에서 UI 처리).
+async function callClaudeForJsonText(sys,dataContext,cacheKey){
+  const reply=await callClaudeFromTablet(sys,dataContext,400);
+  if(!reply)return null;
+  try{
+    const clean=reply.replace(/```json|```/g,'').trim();
+    const parsed=JSON.parse(clean);
+    if(!parsed||!parsed.text)return null;
+    await supaUpsertAiCache(cacheKey,parsed.text);
+    return parsed.text;
   }catch(e){return null;}
 }
 
@@ -2574,16 +2861,9 @@ async function renderMrpTrajectory(mk,sleepRows,habits,habitChecks,rblocks,weeks
 ${MRP_COMMON_RULES}
 - 반드시 JSON 형식으로만 응답하세요: {"text":"..."}
 - 다른 설명이나 마크다운 없이 순수 JSON만 출력하세요.`;
-  const reply=await callClaudeFromTablet(sys,dataContext,400);
-  if(!reply)return;
-  try{
-    const clean=reply.replace(/```json|```/g,'').trim();
-    const parsed=JSON.parse(clean);
-    if(parsed&&parsed.text){
-      await supaUpsertAiCache('monthly_trajectory_'+mk,parsed.text);
-      aiEl.innerHTML=`<div class="mrp-traj-ai-text">${escapeHtml(parsed.text)}</div>`;
-    }
-  }catch(e){/* 파싱 실패 시 조용히 빈 채로 둠 */}
+  const text=await callClaudeForJsonText(sys,dataContext,'monthly_trajectory_'+mk);
+  if(text)aiEl.innerHTML=`<div class="mrp-traj-ai-text">${escapeHtml(text)}</div>`;
+  /* 실패 시 조용히 빈 채로 둠 */
 }
 
 // 이 달의 수면 — 상단(분포 도넛+지난달 대비), 중단(숫자 요약), 하단(AI 분석: 취침시간대별 컨디션 포함).
@@ -2720,16 +3000,8 @@ ${MRP_COMMON_RULES}
 - 다른 설명이나 마크다운 없이 순수 JSON만 출력하세요.`;
 
   aiEl.innerHTML=`<div class="empty-msg" style="text-align:left;padding:4px 0;">수면 분석을 불러오는 중...</div>`;
-  const reply=await callClaudeFromTablet(sys,dataContext,400);
-  if(!reply){aiEl.innerHTML='';return;}
-  try{
-    const clean=reply.replace(/```json|```/g,'').trim();
-    const parsed=JSON.parse(clean);
-    if(parsed&&parsed.text){
-      await supaUpsertAiCache('monthly_sleep_'+mk,parsed.text);
-      aiEl.innerHTML=`<div class="mrsl-ai-text">${escapeHtml(parsed.text)}</div>`;
-    }else{aiEl.innerHTML='';}
-  }catch(e){aiEl.innerHTML='';}
+  const text=await callClaudeForJsonText(sys,dataContext,'monthly_sleep_'+mk);
+  aiEl.innerHTML=text?`<div class="mrsl-ai-text">${escapeHtml(text)}</div>`:'';
 }
 
 function renderMrpRhythm(rblocks,prevRblocks){
@@ -2863,16 +3135,8 @@ ${MRP_COMMON_RULES}
 - 다른 설명이나 마크다운 없이 순수 JSON만 출력하세요.`;
 
   el.innerHTML=`<div class="empty-msg" style="text-align:left;padding:4px 0;">리듬 분석을 불러오는 중...</div>`;
-  const reply=await callClaudeFromTablet(sys,dataContext,400);
-  if(!reply){el.innerHTML='';return;}
-  try{
-    const clean=reply.replace(/```json|```/g,'').trim();
-    const parsed=JSON.parse(clean);
-    if(parsed&&parsed.text){
-      await supaUpsertAiCache('monthly_milestones_'+mk,parsed.text);
-      renderText(parsed.text);
-    }else{el.innerHTML='';}
-  }catch(e){el.innerHTML='';}
+  const text=await callClaudeForJsonText(sys,dataContext,'monthly_milestones_'+mk);
+  if(text)renderText(text);else el.innerHTML='';
 }
 // ai_cache 테이블 upsert — 본앱 aiCacheSet과 동일한 패턴(만료 없이 영구 보관, 그 달 데이터는 확정된 과거라 안 바뀜)
 async function supaUpsertAiCache(cacheKey,content){
@@ -2970,3 +3234,164 @@ function renderMrpReportLinks(weeksInMonth,mk){
     switchTab(TAB_ORDER[nextIdx]);
   },{passive:true});
 })();
+
+// ══════════════════════════════════════════════════════════
+// 코멘트 모아보기(타임라인, 읽기 전용) — 본앱 로직 이식, supaFetch 기반으로 재작성
+// 완결 코멘트(contents.review+stars)와 감상 메모(goal_notes: wcal_note_YYYY-MM)를 함께 모아 보여줌.
+// ══════════════════════════════════════════════════════════
+let _chNoteTimelineMonths=6; // 최근 몇 개월치를 모아볼지
+let _chNoteTimelineView='date';
+let _cgridMode='grid'; // 'grid'(콘텐츠 모아보기) | 'timeline'(코멘트 모아보기) — 제목을 눌러 전환
+function toggleCgridMode(){
+  _cgridMode=_cgridMode==='grid'?'timeline':'grid';
+  const isTl=_cgridMode==='timeline';
+  document.getElementById('cgrid-title-text').textContent=isTl?'코멘트 모아보기':'콘텐츠 모아보기';
+  document.getElementById('cgrid-title-icon').className=`ti ${isTl?'ti-timeline':'ti-stack-2'}`;
+  document.getElementById('cgrid-hdr-actions').style.display=isTl?'none':'';
+  document.getElementById('note-tl-subtabs').style.display=isTl?'':'none';
+  document.getElementById('month-content-grid').style.display=isTl?'none':'';
+  document.getElementById('content-note-timeline-list').style.display=isTl?'':'none';
+  if(isTl)renderContentNoteTimeline();
+}
+function switchNoteTimelineView(btn,view){
+  _chNoteTimelineView=view;
+  document.querySelectorAll('#note-tl-subtabs .rd-tab').forEach(t=>t.classList.remove('on'));
+  btn.classList.add('on');
+  renderContentNoteTimeline();
+}
+// 최근 N개월치의 완결 콘텐츠(review 또는 stars가 있는 것)와 감상 메모를 함께 수집
+async function _chCollectNoteSource(){
+  const now=new Date();
+  const months=[];
+  for(let i=0;i<_chNoteTimelineMonths;i++)months.push(monthKeyOf(new Date(now.getFullYear(),now.getMonth()-i,1)));
+  const [contentRows,noteRows]=await Promise.all([
+    Promise.all(months.map(mk=>supaFetch(`contents?month_key=eq.${mk}`))),
+    Promise.all(months.map(mk=>supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wcal_note_'+mk)}`)))
+  ]);
+  const finals=[]; // {cid,cat,title,poster,stars,review,dk}
+  const notes=[]; // {cid,cat,title,dk,text,time,updatedAt}
+  const posterByCid={};
+  contentRows.forEach(rows=>(rows||[]).forEach(c=>{
+    if(c.client_id)posterByCid[c.client_id]=c.poster||null;
+    if(c.review&&c.review.trim()){
+      finals.push({cid:c.client_id,cat:c.content_cat,title:c.title,poster:c.poster||null,stars:c.stars||0,review:c.review||'',dk:c.end_date||c.start_date||''});
+    }
+  }));
+  noteRows.forEach(r=>{
+    const lines=(r&&r[0]&&Array.isArray(r[0].lines))?r[0].lines:[];
+    notes.push(...lines);
+  });
+  notes.forEach(n=>{n.poster=n.cid?(posterByCid[n.cid]||null):null;});
+  return {finals,notes};
+}
+async function renderContentNoteTimeline(){
+  const el=document.getElementById('content-note-timeline-list');if(!el)return;
+  el.innerHTML='<div class="loading-msg">불러오는 중...</div>';
+  const {finals,notes}=await _chCollectNoteSource();
+  if(!finals.length&&!notes.length){el.innerHTML='<div class="ch-note-tl-empty">아직 남긴 코멘트가 없어요</div>';return;}
+  el.innerHTML=_chNoteTimelineView==='work'?_chRenderNoteTimelineByWork(finals,notes):_chRenderNoteTimelineByDate(finals,notes);
+}
+// 날짜순 뷰 — 날짜별로 묶어 최신순 정렬, 완결 카드 먼저 + 감상 메모는 곁가지로
+function _chRenderNoteTimelineByDate(finals,notes){
+  const byDate={};
+  const push=(dk,item)=>{if(!dk)return;if(!byDate[dk])byDate[dk]=[];byDate[dk].push(item);};
+  finals.forEach(f=>push(f.dk,{...f,__type:'final'}));
+  notes.forEach(n=>push(n.dk,{...n,__type:'note'}));
+  const dks=Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
+  return dks.map(dk=>{
+    const dispDate=parseInt(dk.slice(5,7),10)+'월 '+parseInt(dk.slice(8,10),10)+'일';
+    const items=byDate[dk].slice().sort((a,b)=>(a.time||'').localeCompare(b.time||''));
+    const showTime=items.length>1;
+    const rowsHtml=items.map(it=>it.__type==='final'?_chFinalRowHtml(it):_chNoteRowHtml(it,showTime)).join('');
+    return `<div class="ch-tlA-day">
+      <div class="ch-tlA-day-date">${dispDate}</div>
+      ${rowsHtml}
+    </div>`;
+  }).join('');
+}
+// 작품별 뷰 — cid 기준으로 묶음
+function _chRenderNoteTimelineByWork(finals,notes){
+  const groups={};
+  finals.forEach(f=>{
+    if(!f.cid)return;
+    groups[f.cid]=groups[f.cid]||{cat:f.cat,title:f.title,poster:f.poster,final:null,notes:[]};
+    groups[f.cid].final=f;
+  });
+  notes.forEach(n=>{
+    if(!n.cid)return;
+    groups[n.cid]=groups[n.cid]||{cat:n.cat,title:n.title,poster:n.poster||null,final:null,notes:[]};
+    if(!groups[n.cid].poster)groups[n.cid].poster=n.poster||null;
+    groups[n.cid].notes.push(n);
+  });
+  const cids=Object.keys(groups).sort((a,b)=>{
+    const la=groups[a].notes.concat(groups[a].final?[groups[a].final]:[]).map(x=>x.dk||x.updatedAt||0).sort().pop()||'';
+    const lb=groups[b].notes.concat(groups[b].final?[groups[b].final]:[]).map(x=>x.dk||x.updatedAt||0).sort().pop()||'';
+    return String(lb).localeCompare(String(la));
+  });
+  return cids.map(cid=>{
+    const g=groups[cid];
+    const m=WCAL_CAT_META[g.cat]||{label:''};
+    const posterHtml=_wcalPosterThumbHtml(g.cat,g.poster);
+    const finalHtml=g.final?
+      `<div class="ch-tlB-final-row">${g.final.stars>0?`<div class="ch-tlB-stars">${'★'.repeat(g.final.stars)}${'☆'.repeat(5-g.final.stars)}</div>`:''}</div>
+       ${g.final.review?`<div class="ch-tlB-final-text">${escapeHtml(g.final.review)}</div>`:''}`
+      :'';
+    const progressBadgeHtml=g.final?'':'<span class="ch-tlB-progress-badge">진행중</span>';
+    const notesSorted=g.notes.slice().sort((a,b)=>(b.dk||'').localeCompare(a.dk||''));
+    const notesHtml=notesSorted.length?`<div class="ch-tlB-notes">${notesSorted.map(n=>{
+      const dispDate=n.dk?(parseInt(n.dk.slice(5,7),10)+'/'+parseInt(n.dk.slice(8,10),10)):'';
+      return `<div class="ch-tlB-note-item"><div class="ch-tlB-note-date">${dispDate}</div><div class="ch-tlB-note-text">${escapeHtml(n.text||'')}</div></div>`;
+    }).join('')}</div>`:'';
+    return `<div class="ch-tlB-card">
+      <div class="ch-tlB-top">
+        ${posterHtml}
+        <div class="ch-tlB-body">
+          <div class="ch-tlB-title-row"><div class="ch-tlB-title">${escapeHtml(g.title||'')}</div><div class="ch-tlB-cat">${m.label}</div>${progressBadgeHtml}</div>
+          ${finalHtml}
+        </div>
+      </div>
+      ${notesHtml}
+    </div>`;
+  }).join('');
+}
+function _wcalPosterThumbHtml(cat,poster){
+  const m=WCAL_CAT_META[cat]||{icon:'ti-stack-2'};
+  if(poster)return `<img src="${poster}" style="width:32px;height:44px;border-radius:5px;object-fit:cover;flex-shrink:0;" />`;
+  return `<div style="width:32px;height:44px;border-radius:5px;background:var(--card);flex-shrink:0;display:flex;align-items:center;justify-content:center;"><i class="ti ${m.icon}" style="color:var(--tm);font-size:13px;" aria-hidden="true"></i></div>`;
+}
+function _chFinalRowHtml(f){
+  const posterHtml=`<img class="ch-tlA-poster" src="${f.poster||''}" style="${f.poster?'':'background:var(--card);'}" alt="">`;
+  return `<div class="ch-tlA-row">
+    <div class="ch-tlA-dot final"></div>
+    <div class="ch-tlA-content">
+      ${posterHtml}
+      <div class="ch-tlA-main">
+        <div class="ch-tlA-title-row">
+          <span class="ch-tlA-badge-final">완</span>
+          <span class="ch-tlA-title">${escapeHtml(f.title||'')}</span>
+          ${f.stars>0?`<span class="ch-tlA-stars">${'★'.repeat(f.stars)}${'☆'.repeat(5-f.stars)}</span>`:''}
+        </div>
+        ${f.review?`<div class="ch-tlA-text">${escapeHtml(f.review)}</div>`:''}
+      </div>
+    </div>
+  </div>`;
+}
+function _chNoteRowHtml(n,showTime){
+  const posterHtml=`<img class="ch-tlA-poster" src="${n.poster||''}" style="${n.poster?'':'background:var(--card);'}" alt="">`;
+  const m=WCAL_CAT_META[n.cat]||{label:''};
+  const timeHtml=(showTime&&n.time)?`<span class="ch-tlA-time">${n.time}</span>`:'';
+  return `<div class="ch-tlA-row">
+    <div class="ch-tlA-dot"></div>
+    <div class="ch-tlA-content">
+      ${posterHtml}
+      <div class="ch-tlA-main">
+        <div class="ch-tlA-title-row">
+          ${timeHtml}
+          <span class="ch-tlA-title">${escapeHtml(n.title||'')}</span>
+          <span class="ch-tlA-cat-tag">${m.label}</span>
+        </div>
+        <div class="ch-tlA-text">${escapeHtml(n.text||'')}</div>
+      </div>
+    </div>
+  </div>`;
+}
