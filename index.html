@@ -367,11 +367,29 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cmr-review-notes{margin-top:0;}
 .cmr-review-notes.with-final{margin-top:10px;}
 .cmr-review-notes-lbl{font-style:italic;font-family:'DM Sans',sans-serif;font-size:10.5px;color:var(--tm);font-weight:700;margin-bottom:6px;letter-spacing:0.02em;}
-.cmr-review-notes-tl{position:relative;padding-left:12px;border-left:1px dashed rgba(var(--divider-rgb),0.5);}
-.cmr-review-note-item{font-size:var(--dow-label-size);color:var(--ts);line-height:1.6;margin-bottom:6px;}
-.cmr-review-note-item:last-child{margin-bottom:0;}
-.cmr-review-note-date{display:block;color:var(--tm);font-weight:600;font-variant-numeric:tabular-nums;font-size:10.5px;margin-bottom:1px;}
-.cmr-review-note-text{color:var(--tp);}
+.cmr-review-notes-tl{display:flex;flex-direction:column;gap:8px;}
+.cmr-review-note-item{display:flex;gap:10px;align-items:flex-start;font-size:var(--dow-label-size);color:var(--ts);line-height:1.5;}
+.cmr-review-note-date{flex-shrink:0;width:32px;text-align:right;color:var(--tm);font-weight:600;font-variant-numeric:tabular-nums;font-size:10.5px;padding-right:9px;border-right:1px dashed rgba(var(--divider-rgb),0.5);align-self:stretch;display:flex;align-items:flex-start;justify-content:flex-end;padding-top:1px;}
+.cmr-review-note-text{flex:1;min-width:0;color:var(--tp);}
+
+/* 콘텐츠 모아보기 — 그리드형(음악 기본, 드라마/영화/책은 토글) — 정사각 썸네일 + 배지, 탭하면 그 줄 아래로 코멘트 펼침 */
+.cgrid-mode-toggle{font-size:15px;color:var(--tm);cursor:pointer;opacity:0.6;flex-shrink:0;}
+.cgrid-mode-toggle.on{color:var(--pal-mauvepink);opacity:1;}
+.cgrid-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px;}
+@media (max-width:360px){.cgrid-grid{grid-template-columns:repeat(4,minmax(0,1fr));}}
+.cgrid-item{display:flex;flex-direction:column;gap:5px;cursor:pointer;}
+.cgrid-thumb-wrap{position:relative;width:100%;aspect-ratio:1/1;border-radius:9px;overflow:hidden;background:var(--card2);border:2px solid transparent;}
+.cgrid-item.active .cgrid-thumb-wrap{border-color:var(--pal-mauvepink);}
+.cgrid-thumb{width:100%;height:100%;object-fit:cover;display:block;}
+.cgrid-thumb-fallback{width:100%;height:100%;display:flex;align-items:center;justify-content:center;}
+.cgrid-thumb-fallback i{font-size:20px;color:#fff;}
+.cgrid-status-dot{position:absolute;top:5px;right:5px;font-size:9px;padding:2px 5px;border-radius:6px;background:rgba(140,175,150,0.85);color:#fff;font-weight:600;}
+.cgrid-thumb-icons{position:absolute;bottom:5px;right:5px;display:flex;gap:3px;}
+.cgrid-thumb-icons i{font-size:10px;color:#fff;background:rgba(0,0,0,0.45);border-radius:5px;padding:3px;}
+.cgrid-title{font-size:10.5px;color:var(--ts);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
+.cgrid-detail-row-wrap{grid-column:1/-1;display:none;}
+.cgrid-detail-row-wrap.on{display:block;margin:2px 0 4px;}
+.cgrid-detail{padding:10px 11px;font-size:var(--dow-label-size);color:var(--tp);line-height:1.6;background:rgba(210,180,160,0.14);border:1px solid rgba(210,180,160,0.35);border-radius:11px;}
 .sheet-loading-msg{text-align:center;color:var(--tm);padding:20px 0;}
 .ico-13{font-size:13px;vertical-align:-1px;}
 .ico-12{font-size:12px;vertical-align:-1px;}
@@ -715,8 +733,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="glass"] .mbtn-done{background:rgba(40,36,30,0.85);color:#f0d090;}
 
 /* ── SETTINGS ── */
-.settings-ov{position:fixed;inset:0;z-index:8000;background:var(--bg);display:none;flex-direction:column;overflow-y:auto;transform:translateX(100%);transition:transform .3s cubic-bezier(.32,.72,0,1);}
-.settings-ov.on{display:flex;transform:translateX(0);}
+.settings-ov{position:fixed;inset:0 auto 0 auto;left:50%;transform:translateX(calc(-50% + 100%));width:100%;max-width:430px;z-index:8000;background:var(--bg);display:none;flex-direction:column;overflow-y:auto;transition:transform .3s cubic-bezier(.32,.72,0,1);}
+.settings-ov.on{display:flex;transform:translateX(-50%);}
 .settings-hdr{padding:max(50px,env(safe-area-inset-top)) 20px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid rgba(var(--divider-rgb),0.25);flex-shrink:0;}
 .settings-back{width:36px;height:36px;background:var(--card);border:1px solid var(--card-b);border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .settings-ttl{font-size:18px;font-weight:500;color:var(--tp);}
@@ -773,9 +791,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="glass"] .memo-bub.memo-bub-seed{background:none;border-left-color:rgba(120,155,160,0.22);}
 [data-theme="glass"] .memo-item{margin-bottom:14px;}
 /* ── READING HUB ── */
-.reading-ov{position:fixed;inset:0;z-index:8000;background:var(--bg);display:flex;flex-direction:column;overflow-y:auto;transform:translateX(100%);transition:transform .3s cubic-bezier(.32,.72,0,1);pointer-events:none;}
+.reading-ov{position:fixed;inset:0 auto 0 auto;left:50%;transform:translateX(calc(-50% + 100%));width:100%;max-width:430px;z-index:8000;background:var(--bg);display:flex;flex-direction:column;overflow-y:auto;transition:transform .3s cubic-bezier(.32,.72,0,1);pointer-events:none;}
 .reading-ov .settings-hdr{position:sticky;top:0;z-index:10;background:var(--bg);}
-.reading-ov.on{transform:translateX(0);pointer-events:auto;}
+.reading-ov.on{transform:translateX(-50%);pointer-events:auto;}
 .reading-body{padding:16px 18px 30px;display:flex;flex-direction:column;gap:18px;}
 .rd-top{position:relative;border-radius:20px;padding:1.8px;background:linear-gradient(120deg,rgba(255,170,200,0.95),rgba(255,205,140,0.92),rgba(195,200,245,0.65),rgba(170,235,200,0.92),rgba(255,170,200,0.95));background-size:300% 300%;animation:bannerShine 10s ease infinite;}
 .rd-top-inner{border-radius:18.5px;background:linear-gradient(135deg,#fdeee8,#fdf3e2);padding:16px 16px 18px;box-shadow:0 2px 2px rgba(255,255,255,0.7) inset,0 -10px 18px -14px rgba(0,0,0,0.10) inset,0 6px 20px rgba(120,100,90,0.14);}
@@ -975,9 +993,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rd-detail-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
 .rd-status-btn{font-size:var(--dow-label-size);padding:5px 10px;border-radius:8px;border:1px solid var(--card-b);background:var(--card);color:var(--ts);cursor:pointer;}
 /* ── 콘텐츠 허브 (독서 코너와 동일 톤) — 콘텐츠 전용 진입구, 향후 UI 작업 예정 ── */
-.content-hub-ov{position:fixed;inset:0;z-index:8000;background:var(--bg);display:flex;flex-direction:column;overflow-y:auto;transform:translateX(100%);transition:transform .3s cubic-bezier(.32,.72,0,1);pointer-events:none;}
+.content-hub-ov{position:fixed;inset:0 auto 0 auto;left:50%;transform:translateX(calc(-50% + 100%));width:100%;max-width:430px;z-index:8000;background:var(--bg);display:flex;flex-direction:column;overflow-y:auto;transition:transform .3s cubic-bezier(.32,.72,0,1);pointer-events:none;}
 .content-hub-ov .settings-hdr{position:sticky;top:0;z-index:10;background:var(--bg);}
-.content-hub-ov.on{transform:translateX(0);pointer-events:auto;}
+.content-hub-ov.on{transform:translateX(-50%);pointer-events:auto;}
 .content-hub-body{padding:16px 18px 30px;display:flex;flex-direction:column;gap:18px;}
 .wcal-note-icon{color:var(--tm);opacity:0.65;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center;}
 .wcal-note-icon.has{opacity:1;color:var(--pal-mauvepink);}
@@ -1016,10 +1034,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .ch-tlB-title-row{display:flex;align-items:center;gap:6px;margin-bottom:3px;}
 .ch-tlB-title{font-size:15px;font-weight:600;color:var(--tp);}
 .ch-tlB-cat{font-size:10px;color:var(--tm);background:rgba(0,0,0,0.04);border-radius:5px;padding:2px 6px;flex-shrink:0;}
+.ch-tlB-progress-badge{font-size:9.5px;font-weight:600;color:#fff;background:rgba(140,175,150,0.85);border-radius:5px;padding:2px 6px;flex-shrink:0;}
 .ch-tlB-final-row{display:flex;align-items:center;gap:6px;margin-bottom:4px;}
 .ch-tlB-stars{font-size:11px;color:#e0a339;}
 .ch-tlB-final-text{font-size:var(--dow-label-size);color:var(--ts);line-height:1.55;}
-.ch-tlB-empty-final{font-size:11.5px;color:var(--tm);font-style:italic;}
 .ch-tlB-notes{margin-top:10px;padding-top:10px;border-top:1px dashed rgba(var(--divider-rgb),0.4);display:flex;flex-direction:column;gap:8px;}
 .ch-tlB-note-item{display:flex;gap:8px;}
 .ch-tlB-note-date{font-size:10.5px;color:var(--tm);font-weight:600;white-space:nowrap;padding-top:1px;min-width:34px;}
@@ -1803,7 +1821,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   <div class="bsheet" style="max-height:85vh;overflow-y:auto;" onclick="event.stopPropagation()">
     <div class="sheet-handle"></div>
     <div style="padding:0 20px 24px;">
-      <div class="goal-section-title" style="margin-top:0;"><i class="ti ti-movie ico-13" aria-hidden="true"></i> 콘텐츠 모아보기</div>
+      <div class="goal-section-title" style="margin-top:0;display:flex;align-items:center;justify-content:space-between;">
+        <span><i class="ti ti-movie ico-13" aria-hidden="true"></i> 콘텐츠 모아보기</span>
+        <i class="ti ti-grid-dots cgrid-mode-toggle" id="cmr-grid-toggle" onclick="toggleCmrGridMode()" title="그리드로 보기" aria-hidden="true"></i>
+      </div>
       <div class="month-chips" id="cmr-month-chips" style="margin:10px 0 14px;"></div>
       <div id="cmr-content"></div>
     </div>
@@ -2318,7 +2339,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     </div>
     <div id="wcal-detail"></div>
 
-    <div class="slabel" style="margin-top:14px;">월별 아카이브</div>
+    <div class="slabel" style="margin-top:14px;display:flex;align-items:center;justify-content:space-between;">
+      <span>월별 아카이브</span>
+      <i class="ti ti-grid-dots cgrid-mode-toggle" id="ch-archive-grid-toggle" onclick="chToggleArchiveGridMode()" title="그리드로 보기" aria-hidden="true"></i>
+    </div>
     <div class="ch-month-banner-row" id="ch-month-banner-row"></div>
     <div id="ch-month-archive-grid"></div>
   </div>
@@ -3384,11 +3408,26 @@ function getWcalNotesByCid(cid){
   months.forEach(mk=>all=all.concat(getWcalNotes(mk)));
   return all.filter(n=>n.cid===cid).sort((a,b)=>(b.dk||'').localeCompare(a.dk||''));
 }
+// 완결 총평(review)과 감상 중 메모(wcal_note)를 함께 담은 코멘트 본문 — 리스트형/그리드형 detail이 공통으로 씀
+function _cmrDetailBodyHtml(c,wcalNotes){
+  const finalPartHtml=c.review?`<div class="cmr-review-final"><span class="cmr-review-final-lbl">Comment :</span> ${escapeHtml(c.review)}</div>`:'';
+  const notesPartHtml=wcalNotes.length?`<div class="cmr-review-notes${c.review?' with-final':''}">
+    <div class="cmr-review-notes-lbl">Timeline</div>
+    <div class="cmr-review-notes-tl">
+      ${wcalNotes.map(n=>{
+        const dispDate=n.dk?(parseInt(n.dk.slice(5,7),10)+'/'+parseInt(n.dk.slice(8,10),10)):'';
+        return `<div class="cmr-review-note-item"><span class="cmr-review-note-date">${dispDate}</span><span class="cmr-review-note-text">${escapeHtml(n.text||'')}</span></div>`;
+      }).join('')}
+    </div>
+  </div>`:'';
+  return finalPartHtml+notesPartHtml;
+}
+// 카테고리별 리스트형(제목+별점+코멘트 아이콘, 한 줄씩) — 드라마/영화/책의 기본 표시 형태
 function renderContentByCatHtml(byCat){
-  const cats=['drama','book','movie','music'];
+  const cats=['drama','book','movie'];
   const hasAny=cats.some(cat=>byCat[cat].length>0);
-  if(!hasAny)return '<div style="text-align:center;color:var(--tm);padding:24px 0;">이 달엔 완료한 콘텐츠가 없어요</div>';
-  return cats.filter(cat=>byCat[cat].length>0).map(cat=>{
+  if(!hasAny&&!byCat.music.length)return '<div style="text-align:center;color:var(--tm);padding:24px 0;">이 달엔 완료한 콘텐츠가 없어요</div>';
+  const listHtml=cats.filter(cat=>byCat[cat].length>0).map(cat=>{
     const meta=CAT_ICON_META[cat];
     const items=byCat[cat].map(c=>{
       const starsHtml=c.stars>0?`<span style="color:#e0b050;font-size:var(--dow-label-size);">${'★'.repeat(c.stars)}</span>`:'';
@@ -3399,18 +3438,7 @@ function renderContentByCatHtml(byCat){
       const wcalNotes=c.cid?getWcalNotesByCid(c.cid):[];
       const hasReviewContent=!!(c.review||wcalNotes.length);
       const reviewIconHtml=hasReviewContent?`<span class="cmr-review-icon" onclick="toggleCmrReview('${reviewId}')" title="코멘트 보기"><i class="ti ti-message-circle ico-sz-13" aria-hidden="true"></i></span>`:'';
-      // 완결 총평(review)과 감상 중 메모(wcal_note)를 한 박스 안에 구분해서 — 총평 먼저(Comment: 프리픽스), 메모는 그 아래 세로 점선 타임라인 형태로
-      const finalPartHtml=c.review?`<div class="cmr-review-final"><span class="cmr-review-final-lbl">Comment :</span> ${escapeHtml(c.review)}</div>`:'';
-      const notesPartHtml=wcalNotes.length?`<div class="cmr-review-notes${c.review?' with-final':''}">
-        <div class="cmr-review-notes-lbl">Timeline</div>
-        <div class="cmr-review-notes-tl">
-          ${wcalNotes.map(n=>{
-            const dispDate=n.dk?(parseInt(n.dk.slice(5,7),10)+'/'+parseInt(n.dk.slice(8,10),10)):'';
-            return `<div class="cmr-review-note-item"><span class="cmr-review-note-date">${dispDate}</span><span class="cmr-review-note-text">${escapeHtml(n.text||'')}</span></div>`;
-          }).join('')}
-        </div>
-      </div>`:'';
-      const reviewBoxHtml=hasReviewContent?`<div class="cmr-review-box" id="cmr-review-${reviewId}">${finalPartHtml}${notesPartHtml}</div>`:'';
+      const reviewBoxHtml=hasReviewContent?`<div class="cmr-review-box" id="cmr-review-${reviewId}">${_cmrDetailBodyHtml(c,wcalNotes)}</div>`:'';
       return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;">
         ${posterHtml}
         <div style="flex:1;min-width:0;font-size:var(--main-text-size);color:var(--tp);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:5px;">
@@ -3424,10 +3452,118 @@ function renderContentByCatHtml(byCat){
       ${items}
     </div>`;
   }).join('');
+  return listHtml+renderMusicGridHtml(byCat.music);
+}
+// 음악 그리드형 — 정사각 썸네일 4~5개씩, 별점/코멘트는 오버레이 배지로만 표시, 탭하면 그 줄 아래로 코멘트가 펼쳐짐
+const MUSIC_GRID_COLS=5; // 화면이 좁으면 CSS에서 4열로 줄어듦(auto-fit 미사용, 반응형 필요시 조정)
+let _musicGridActiveCid=null;
+function renderMusicGridHtml(musicList){
+  if(!musicList||!musicList.length)return '';
+  _musicGridList=musicList;
+  return `<div class="mr-card" style="margin-bottom:10px;">
+    <div class="mr-sec-title"><i class="ti ${CAT_ICON_META.music.icon} ico-12" aria-hidden="true"></i> ${CONTENT_CAT_LABEL.music}</div>
+    <div class="cgrid-grid" id="music-grid-inner">${_musicGridRowsHtml(musicList)}</div>
+  </div>`;
+}
+let _musicGridList=[];
+function _musicGridRowsHtml(list){
+  let html='';
+  for(let i=0;i<list.length;i+=MUSIC_GRID_COLS){
+    const row=list.slice(i,i+MUSIC_GRID_COLS);
+    html+=row.map(c=>_musicGridItemHtml(c)).join('');
+    const activeInRow=row.find(c=>(c.cid||('t'+(c.created||0)))===_musicGridActiveCid);
+    html+=`<div class="cgrid-detail-row-wrap${activeInRow?' on':''}">${activeInRow?_musicGridDetailHtml(activeInRow):''}</div>`;
+  }
+  return html;
+}
+function _musicGridItemHtml(c){
+  const id=c.cid||('t'+(c.created||0));
+  const thumb=c.poster?`<img class="cgrid-thumb" src="${c.poster}" />`:`<div class="cgrid-thumb-fallback" style="background:${CAT_ICON_META.music.color};"><i class="ti ${CAT_ICON_META.music.icon}" aria-hidden="true"></i></div>`;
+  const icons=[];
+  if(c.stars>0)icons.push('<i class="ti ti-star" aria-hidden="true"></i>');
+  const wcalNotes=c.cid?getWcalNotesByCid(c.cid):[];
+  if(c.review||wcalNotes.length)icons.push('<i class="ti ti-message-circle" aria-hidden="true"></i>');
+  const thumbIcons=icons.length?`<div class="cgrid-thumb-icons">${icons.join('')}</div>`:'';
+  const active=id===_musicGridActiveCid;
+  return `<div class="cgrid-item${active?' active':''}" onclick="toggleMusicGridDetail('${id}')">
+    <div class="cgrid-thumb-wrap">${thumb}${thumbIcons}</div>
+    <div class="cgrid-title">${escapeHtml(c.title||'')}</div>
+  </div>`;
+}
+function _musicGridDetailHtml(c){
+  const wcalNotes=c.cid?getWcalNotesByCid(c.cid):[];
+  if(!c.review&&!wcalNotes.length)return '';
+  return `<div class="cgrid-detail">${_cmrDetailBodyHtml(c,wcalNotes)}</div>`;
+}
+function toggleMusicGridDetail(id){
+  _musicGridActiveCid=(_musicGridActiveCid===id)?null:id;
+  const el=document.getElementById('music-grid-inner');
+  if(el)el.innerHTML=_musicGridRowsHtml(_musicGridList);
+}
+// 카테고리별 그리드형 — 드라마/영화/책도 음악과 동일한 정사각 썸네일 그리드로. 탭 인터랙션은 리스트형과 동일하게 코멘트 펼침.
+let _contentGridActiveCid=null;
+let _contentGridList=[]; // {cat,items:[...]}[] — 카테고리 구분을 유지한 채 순서대로
+function renderContentAsGridHtml(byCat){
+  const cats=['drama','book','movie'];
+  const hasAny=cats.some(cat=>byCat[cat].length>0);
+  if(!hasAny&&!byCat.music.length)return '<div style="text-align:center;color:var(--tm);padding:24px 0;">이 달엔 완료한 콘텐츠가 없어요</div>';
+  _contentGridActiveCid=null;
+  const sectionsHtml=cats.filter(cat=>byCat[cat].length>0).map(cat=>{
+    const meta=CAT_ICON_META[cat];
+    return `<div class="mr-card" style="margin-bottom:10px;">
+      <div class="mr-sec-title"><i class="ti ${meta.icon} ico-12" aria-hidden="true"></i> ${CONTENT_CAT_LABEL[cat]}</div>
+      <div class="cgrid-grid" id="content-grid-inner-${cat}">${_contentGridRowsHtml(byCat[cat],cat)}</div>
+    </div>`;
+  }).join('');
+  return sectionsHtml+renderMusicGridHtml(byCat.music);
+}
+function _contentGridRowsHtml(list,cat){
+  let html='';
+  for(let i=0;i<list.length;i+=MUSIC_GRID_COLS){
+    const row=list.slice(i,i+MUSIC_GRID_COLS);
+    html+=row.map(c=>_contentGridItemHtml(c,cat)).join('');
+    const activeInRow=row.find(c=>(c.cid||('t'+(c.created||0)))===_contentGridActiveCid);
+    html+=`<div class="cgrid-detail-row-wrap${activeInRow?' on':''}">${activeInRow?_musicGridDetailHtml(activeInRow):''}</div>`;
+  }
+  return html;
+}
+function _contentGridItemHtml(c,cat){
+  const meta=CAT_ICON_META[cat];
+  const id=c.cid||('t'+(c.created||0));
+  const thumb=c.poster?`<img class="cgrid-thumb" src="${c.poster}" />`:`<div class="cgrid-thumb-fallback" style="background:${meta.color};"><i class="ti ${meta.icon}" aria-hidden="true"></i></div>`;
+  const statusDot=c.status==='watching'?'<span class="cgrid-status-dot">진행중</span>':'';
+  const icons=[];
+  if(c.stars>0)icons.push('<i class="ti ti-star" aria-hidden="true"></i>');
+  const wcalNotes=c.cid?getWcalNotesByCid(c.cid):[];
+  if(c.review||wcalNotes.length)icons.push('<i class="ti ti-message-circle" aria-hidden="true"></i>');
+  const thumbIcons=icons.length?`<div class="cgrid-thumb-icons">${icons.join('')}</div>`:'';
+  const active=id===_contentGridActiveCid;
+  return `<div class="cgrid-item${active?' active':''}" onclick="toggleContentGridDetail('${id}','${cat}')">
+    <div class="cgrid-thumb-wrap">${thumb}${statusDot}${thumbIcons}</div>
+    <div class="cgrid-title">${escapeHtml(c.title||'')}</div>
+  </div>`;
+}
+function toggleContentGridDetail(id,cat){
+  _contentGridActiveCid=(_contentGridActiveCid===id)?null:id;
+  document.querySelectorAll('[id^="content-grid-inner-"]').forEach(el=>{
+    const c=el.id.replace('content-grid-inner-','');
+    const list=_cmrByCatCache?_cmrByCatCache[c]:[];
+    if(list)el.innerHTML=_contentGridRowsHtml(list,c);
+  });
+}
+let _cmrByCatCache=null; // 그리드 토글 갱신 시 재조회 없이 쓰기 위한 캐시 — loadContentMonthlyReportContent에서 채움
+let _cmrGridMode=false; // 리스트형(기본) / 그리드형 토글 상태
+function toggleCmrGridMode(){
+  _cmrGridMode=!_cmrGridMode;
+  const btn=document.getElementById('cmr-grid-toggle');
+  if(btn)btn.classList.toggle('on',_cmrGridMode);
+  loadContentMonthlyReportContent();
 }
 function loadContentMonthlyReportContent(){
   const el=document.getElementById('cmr-content');if(!el)return;
-  el.innerHTML=renderContentByCatHtml(computeContentMonthlyByCat(_cmrYear,_cmrMonth));
+  const byCat=computeContentMonthlyByCat(_cmrYear,_cmrMonth);
+  _cmrByCatCache=byCat;
+  el.innerHTML=_cmrGridMode?renderContentAsGridHtml(byCat):renderContentByCatHtml(byCat);
 }
 function toggleCmrReview(id){
   const box=document.getElementById('cmr-review-'+id);
@@ -11835,12 +11971,23 @@ function renderChHubMonthBanners(){
 // 선택된 달의 콘텐츠를 카테고리별로 — 콘텐츠 모아보기 시트와 동일한 마크업(renderContentByCatHtml) 재사용
 // 선택된 달의 콘텐츠 목록(월간탭과 동일) + 그 달의 코멘트(완결 총평+감상 중 메모, 작품별 타임라인과 동일한 방식)를 함께 보여줌
 // 선택된 달의 콘텐츠 목록 — 월간탭 콘텐츠 모아보기와 동일(renderContentByCatHtml이 각 항목 코멘트 아이콘에 총평+감상 중 메모를 함께 보여줌)
+// 선택된 달의 콘텐츠 목록 — 월간탭 콘텐츠 모아보기와 동일(renderContentByCatHtml이 각 항목 코멘트 아이콘에 총평+감상 중 메모를 함께 보여줌)
+// 음악은 항상 그리드, 드라마/영화/책은 리스트↔그리드 토글(_chArchiveGridMode) — 콘텐츠 모아보기 시트의 토글과는 독립적인 상태
+let _chArchiveGridMode=false;
+function chToggleArchiveGridMode(){
+  _chArchiveGridMode=!_chArchiveGridMode;
+  const btn=document.getElementById('ch-archive-grid-toggle');
+  if(btn)btn.classList.toggle('on',_chArchiveGridMode);
+  chExpandMonth(_chArchiveMk);
+}
 function chExpandMonth(mk){
   _chArchiveMk=mk;
   renderChHubMonthBanners();
   const el=document.getElementById('ch-month-archive-grid');if(!el)return;
   const [y,mo]=mk.split('-').map(Number);
-  el.innerHTML=renderContentByCatHtml(computeContentMonthlyByCat(y,mo-1));
+  const byCat=computeContentMonthlyByCat(y,mo-1);
+  _cmrByCatCache=byCat; // 그리드 모드의 코멘트 토글 갱신이 이 캐시를 참조함
+  el.innerHTML=_chArchiveGridMode?renderContentAsGridHtml(byCat):renderContentByCatHtml(byCat);
 }
 
 // ── 콘텐츠 허브 — 코멘트 모아보기(타임라인, 읽기 전용) — 독서코너의 독서달력 진입구와 동일한 위치의 헤더 아이콘으로 진입 ──
@@ -11932,7 +12079,8 @@ function _chRenderNoteTimelineByWork(finals,notes){
     const finalHtml=g.final?
       `<div class="ch-tlB-final-row">${g.final.stars>0?`<div class="ch-tlB-stars">${'★'.repeat(g.final.stars)}${'☆'.repeat(5-g.final.stars)}</div>`:''}</div>
        ${g.final.review?`<div class="ch-tlB-final-text">${escapeHtml(g.final.review)}</div>`:''}`
-      :`<div class="ch-tlB-empty-final">아직 완결 전 — 총평은 다 보고 나서</div>`;
+      :'';
+    const progressBadgeHtml=g.final?'':'<span class="ch-tlB-progress-badge">진행중</span>';
     const notesSorted=g.notes.slice().sort((a,b)=>(b.dk||'').localeCompare(a.dk||''));
     const notesHtml=notesSorted.length?`<div class="ch-tlB-notes">${notesSorted.map(n=>{
       const dispDate=n.dk?(parseInt(n.dk.slice(5,7),10)+'/'+parseInt(n.dk.slice(8,10),10)):'';
@@ -11942,7 +12090,7 @@ function _chRenderNoteTimelineByWork(finals,notes){
       <div class="ch-tlB-top">
         ${posterHtml}
         <div class="ch-tlB-body">
-          <div class="ch-tlB-title-row"><div class="ch-tlB-title">${escapeHtml(g.title||'')}</div><div class="ch-tlB-cat">${m.label}</div></div>
+          <div class="ch-tlB-title-row"><div class="ch-tlB-title">${escapeHtml(g.title||'')}</div><div class="ch-tlB-cat">${m.label}</div>${progressBadgeHtml}</div>
           ${finalHtml}
         </div>
       </div>
