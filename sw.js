@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260825-6-content-hub';
+const CACHE = 'iikoto-v20260825-7-content-cleanup';
 const ASSETS = [
   './',
   './index.html'
