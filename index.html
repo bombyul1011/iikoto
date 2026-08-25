@@ -110,7 +110,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="glass"] .card,[data-theme="glass"] .sleep-card,[data-theme="glass"] .habit-week-box,[data-theme="glass"] .habit-chk2,[data-theme="glass"] .habit-check-box{border-width:1.4px;box-shadow:0 1.5px 1.5px rgba(255,255,255,0.9) inset,0 -8px 14px -10px rgba(120,110,95,0.15) inset,0 5px 14px rgba(150,140,120,0.08);}
 [data-theme="glass"] .sleep-card.collapsed{background:var(--card);border-color:rgba(95,115,170,0.55);}
 [data-theme="glass"] #daily-meal-card{background:rgba(255,253,248,0.45)!important;border-color:rgba(150,195,130,0.55)!important;}
-[data-theme="glass"] .meal-soft{filter:none;}
 [data-theme="glass"] .rd-top-inner{background:rgba(253,251,245,0.92);}
 [data-theme="glass"] .quote-soft{filter:none;}
 
@@ -292,7 +291,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .report-banner-inner{border-radius:14.5px;background:var(--grad-mintyellow);padding:13px 17px;display:flex;align-items:center;justify-content:space-between;gap:10px;}
 .report-banner-line{font-size:var(--dow-label-size);font-weight:400;color:rgba(100,140,75,0.80);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .rb-title{font-size:var(--main-text-size);font-weight:700;letter-spacing:0.05em;color:rgba(65,125,70,0.95);}
-.meal-soft{filter:saturate(0.72) brightness(1.02);}
 .quote-soft{filter:saturate(0.78) brightness(1.02);}
 .report-banner-arrow{font-size:17px;color:rgba(80,130,85,0.55);flex-shrink:0;}
 .meal-row{display:flex;align-items:center;gap:4px;padding:8px 2px;}
@@ -397,7 +395,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .ico-13{font-size:13px;vertical-align:-1px;}
 .ico-12{font-size:12px;vertical-align:-1px;}
 /* 정렬 보정 없이 크기만 지정하는 순수 아이콘 유틸 (단독 배치되는 아이콘용) */
-.ico-sz-10{font-size:10px;}
 .ico-sz-11{font-size:11px;}
 .ico-sz-13{font-size:13px;}
 .ico-sz-14{font-size:14px;}
@@ -425,7 +422,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .mr-week-anchor:last-child{margin-bottom:0;}
 .mr-week-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
 .mr-week-head .wk{font-size:var(--dow-label-size);font-weight:600;color:var(--tp);}
-.mr-week-head .rng{font-size:var(--dow-label-size);color:var(--tm);}
 .mr-week-ongoing{font-size:var(--dow-label-size);color:#a07820;background:rgba(250,215,100,0.25);border-radius:6px;padding:2px 7px;font-weight:500;}
 .mr-wc-line{display:flex;align-items:baseline;gap:8px;padding:4px 0;}
 .mr-wc-line .txt{flex:1;font-size:var(--dow-label-size);color:var(--tp);line-height:1.5;}
@@ -704,7 +700,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .sheet-item:last-child{border-bottom:none;}
 .sheet-item:last-child{border-bottom:none;}
 .sheet-item.del{color:var(--pal-rose-text);}
-.archive-sheet-textarea:focus{border-color:rgba(150,175,120,0.55);}
 .qc-comment-textarea{width:100%;box-sizing:border-box;font-size:var(--dow-label-size);padding:6px 8px;border-radius:8px;border:1px solid var(--card-b);background:var(--card);color:var(--tp);resize:none;min-height:44px;font-family:inherit;outline:none;}
 .qc-comment-textarea:focus{border-color:rgba(200,176,168,0.65);}
 .modal-ov{position:fixed;inset:0;background:rgba(60,40,35,.22);z-index:9999;display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px);}
@@ -1087,7 +1082,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="glass"] .home-hcard.morning{background:linear-gradient(135deg,rgba(255,238,200,0.32),rgba(255,220,210,0.28));border-color:rgba(255,210,180,0.40);}
 [data-theme="glass"] .home-hcard.afternoon{background:linear-gradient(135deg,rgba(255,220,235,0.30),rgba(255,235,200,0.26));border-color:rgba(255,200,210,0.38);}
 [data-theme="glass"] .home-hcard.night{background:linear-gradient(135deg,rgba(225,215,250,0.30),rgba(255,210,230,0.26));border-color:rgba(210,195,240,0.38);}
-[data-theme="glass"] .report-banner.meal-soft .report-banner-inner{background:var(--glass-chip-bg)!important;}
 [data-theme="glass"] .report-banner.nutri-soft .report-banner-inner{background:var(--glass-chip-bg)!important;}
 [data-theme="glass"] .report-banner.quote-soft .report-banner-inner{background:var(--glass-chip-bg)!important;}
 
@@ -1184,10 +1178,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .home-habit-dot.pink{background:rgba(var(--pal-pink-rgb),.42);}
 .home-habit-dot.sky{background:rgba(130,190,255,.80);}
 .home-habit-dot.yellow{background:rgba(240,200,80,.80);}
-.home-habit-dot.rose{background:rgba(240,140,140,.80);}
-.home-habit-dot.lavender{background:rgba(185,165,230,.80);}
-.home-habit-dot.orange{background:rgba(255,185,140,.80);}
-.home-habit-dot.teal{background:rgba(100,195,185,.80);}
 .home-content-info{flex:1;min-width:0;}
 
 /* ── 오늘 해빗 체크박스 (수면박스 색) ── */
@@ -3350,14 +3340,21 @@ function getWcalNotesByCid(cid){
   months.forEach(mk=>all=all.concat(getWcalNotes(mk)));
   return all.filter(n=>n.cid===cid).sort((a,b)=>(b.dk||'').localeCompare(a.dk||''));
 }
+// 시작~종료 기간 라벨 — 태블릿 아카이브 앱과 동일 규칙(2026-08-25 참고 반영)
+// 시작/종료가 다르면 범위로, 같으면(음악처럼 하루짜리) 단일 날짜만
+function _cmrPeriodLabel(c){
+  const s=c.startDate,e=c.endDate;
+  if(s&&e&&s!==e)return `${parseInt(s.slice(5,7),10)}.${parseInt(s.slice(8,10),10)}~${parseInt(e.slice(5,7),10)}.${parseInt(e.slice(8,10),10)}`;
+  const single=e||s||'';
+  return single?`${parseInt(single.slice(5,7),10)}.${parseInt(single.slice(8,10),10)}`:'';
+}
 // 완결 총평(review)과 감상 중 메모(wcal_note)를 함께 담은 코멘트 본문 — 리스트형/그리드형 detail이 공통으로 씀
 // flat=true면 완결 총평 안쪽 박스 스타일을 없앰(그리드형처럼 바깥이 이미 카드 배경일 때 이중 배너 방지)
-// showHead=true면 상단에 날짜+별점 헤더를 붙임(그리드형 전용 — 리스트형은 줄에 별점이 이미 있어 생략)
+// showHead=true면 상단에 기간+별점 헤더를 붙임(그리드형 전용 — 리스트형은 줄에 별점이 이미 있어 생략)
 function _cmrDetailBodyHtml(c,wcalNotes,flat,showHead){
-  const dk=c.endDate||c.startDate||'';
-  const dispDate=dk?`${parseInt(dk.slice(5,7),10)}.${parseInt(dk.slice(8,10),10)}`:'';
+  const dispDate=_cmrPeriodLabel(c);
   const starsHtml=c.stars>0?`<span class="cmr-detail-stars">${'★'.repeat(c.stars)}</span>`:'';
-  const headHtml=showHead&&(dispDate||starsHtml)?`<div class="cmr-detail-head">${dispDate?`<span class="cmr-detail-date">${dispDate}</span>`:'<span></span>'}${starsHtml}</div>`:'';
+  const headHtml=showHead&&(dispDate||starsHtml)?`<div class="cmr-detail-head">${dispDate?`<span class="cmr-detail-date"><i class="ti ti-calendar" style="font-size:11px;" aria-hidden="true"></i> ${dispDate}</span>`:'<span></span>'}${starsHtml}</div>`:'';
   const finalPartHtml=c.review?`<div class="cmr-review-final${flat?' flat':''}"><span class="cmr-review-final-lbl">Comment :</span> ${escapeHtml(c.review)}</div>`:'';
   const notesPartHtml=wcalNotes.length?`<div class="cmr-review-notes${c.review?' with-final':''}">
     <div class="cmr-review-notes-lbl">Timeline</div>
@@ -3402,102 +3399,70 @@ function renderContentByCatHtml(byCat){
   }).join('');
   return listHtml+renderMusicGridHtml(byCat.music);
 }
-// 음악 그리드형 — 정사각 썸네일 4~5개씩, 별점/코멘트는 오버레이 배지로만 표시, 탭하면 그 줄 아래로 코멘트가 펼쳐짐
-const MUSIC_GRID_COLS=5; // 화면이 좁으면 CSS에서 4열로 줄어듦(auto-fit 미사용, 반응형 필요시 조정)
-let _musicGridActiveCid=null;
+// 카테고리별 그리드형 — 음악(항상 그리드)과 드라마/영화/책(토글 시 그리드)이 공유하는 렌더러.
+// 예전엔 음악 전용/콘텐츠 전용으로 거의 동일한 로직이 중복돼 있던 것을 통합(2026-08-25).
+const CGRID_COLS=5; // 화면이 좁으면 CSS에서 4열로 줄어듦(auto-fit 미사용, 반응형 필요시 조정)
+let _gridActiveCid=null;
 function renderMusicGridHtml(musicList){
   if(!musicList||!musicList.length)return '';
-  _musicGridList=musicList;
   return `<div class="mr-card" style="margin-bottom:10px;">
     <div class="mr-sec-title"><i class="ti ${CAT_ICON_META.music.icon} ico-12" aria-hidden="true"></i> ${CONTENT_CAT_LABEL.music}</div>
-    <div class="cgrid-grid" id="music-grid-inner">${_musicGridRowsHtml(musicList)}</div>
+    <div class="cgrid-grid" id="content-grid-inner-music">${_cgridRowsHtml(musicList,'music')}</div>
   </div>`;
 }
-let _musicGridList=[];
-function _musicGridRowsHtml(list){
+function _cgridRowsHtml(list,cat){
   let html='';
-  for(let i=0;i<list.length;i+=MUSIC_GRID_COLS){
-    const row=list.slice(i,i+MUSIC_GRID_COLS);
-    html+=row.map(c=>_musicGridItemHtml(c)).join('');
-    const activeInRow=row.find(c=>(c.cid||('t'+(c.created||0)))===_musicGridActiveCid);
-    html+=`<div class="cgrid-detail-row-wrap${activeInRow?' on':''}">${activeInRow?_musicGridDetailHtml(activeInRow):''}</div>`;
+  for(let i=0;i<list.length;i+=CGRID_COLS){
+    const row=list.slice(i,i+CGRID_COLS);
+    html+=row.map(c=>_cgridItemHtml(c,cat)).join('');
+    const activeInRow=row.find(c=>(c.cid||('t'+(c.created||0)))===_gridActiveCid);
+    html+=`<div class="cgrid-detail-row-wrap${activeInRow?' on':''}">${activeInRow?_cgridDetailHtml(activeInRow):''}</div>`;
   }
   return html;
 }
-function _musicGridItemHtml(c){
-  const id=c.cid||('t'+(c.created||0));
-  const thumb=c.poster?`<img class="cgrid-thumb" src="${c.poster}" />`:`<div class="cgrid-thumb-fallback" style="background:${CAT_ICON_META.music.color};"><i class="ti ${CAT_ICON_META.music.icon}" aria-hidden="true"></i></div>`;
-  const icons=[];
-  if(c.stars>0)icons.push('<i class="ti ti-star" aria-hidden="true"></i>');
-  const wcalNotes=c.cid?getWcalNotesByCid(c.cid):[];
-  if(c.review||wcalNotes.length)icons.push('<i class="ti ti-message-circle" aria-hidden="true"></i>');
-  const thumbIcons=icons.length?`<div class="cgrid-thumb-icons">${icons.join('')}</div>`:'';
-  const active=id===_musicGridActiveCid;
-  return `<div class="cgrid-item${active?' active':''}" onclick="toggleMusicGridDetail('${id}')">
-    <div class="cgrid-thumb-wrap">${thumb}${thumbIcons}</div>
-    <div class="cgrid-title">${escapeHtml(c.title||'')}</div>
-  </div>`;
-}
-function _musicGridDetailHtml(c){
-  const wcalNotes=c.cid?getWcalNotesByCid(c.cid):[];
-  if(!c.review&&!wcalNotes.length)return '';
-  return `<div class="cgrid-detail">${_cmrDetailBodyHtml(c,wcalNotes,true,true)}</div>`;
-}
-function toggleMusicGridDetail(id){
-  _musicGridActiveCid=(_musicGridActiveCid===id)?null:id;
-  const el=document.getElementById('music-grid-inner');
-  if(el)el.innerHTML=_musicGridRowsHtml(_musicGridList);
-}
-// 카테고리별 그리드형 — 드라마/영화/책도 음악과 동일한 정사각 썸네일 그리드로. 탭 인터랙션은 리스트형과 동일하게 코멘트 펼침.
-let _contentGridActiveCid=null;
-let _contentGridList=[]; // {cat,items:[...]}[] — 카테고리 구분을 유지한 채 순서대로
-function renderContentAsGridHtml(byCat){
-  const cats=['drama','book','movie'];
-  const hasAny=cats.some(cat=>byCat[cat].length>0);
-  if(!hasAny&&!byCat.music.length)return '<div style="text-align:center;color:var(--tm);padding:24px 0;">이 달엔 완료한 콘텐츠가 없어요</div>';
-  _contentGridActiveCid=null;
-  const sectionsHtml=cats.filter(cat=>byCat[cat].length>0).map(cat=>{
-    const meta=CAT_ICON_META[cat];
-    return `<div class="mr-card" style="margin-bottom:10px;">
-      <div class="mr-sec-title"><i class="ti ${meta.icon} ico-12" aria-hidden="true"></i> ${CONTENT_CAT_LABEL[cat]}</div>
-      <div class="cgrid-grid" id="content-grid-inner-${cat}">${_contentGridRowsHtml(byCat[cat],cat)}</div>
-    </div>`;
-  }).join('');
-  return sectionsHtml+renderMusicGridHtml(byCat.music);
-}
-function _contentGridRowsHtml(list,cat){
-  let html='';
-  for(let i=0;i<list.length;i+=MUSIC_GRID_COLS){
-    const row=list.slice(i,i+MUSIC_GRID_COLS);
-    html+=row.map(c=>_contentGridItemHtml(c,cat)).join('');
-    const activeInRow=row.find(c=>(c.cid||('t'+(c.created||0)))===_contentGridActiveCid);
-    html+=`<div class="cgrid-detail-row-wrap${activeInRow?' on':''}">${activeInRow?_musicGridDetailHtml(activeInRow):''}</div>`;
-  }
-  return html;
-}
-function _contentGridItemHtml(c,cat){
+function _cgridItemHtml(c,cat){
   const meta=CAT_ICON_META[cat];
   const id=c.cid||('t'+(c.created||0));
   const thumb=c.poster?`<img class="cgrid-thumb" src="${c.poster}" />`:`<div class="cgrid-thumb-fallback" style="background:${meta.color};"><i class="ti ${meta.icon}" aria-hidden="true"></i></div>`;
-  const statusDot=c.status==='watching'?'<span class="cgrid-status-dot">진행중</span>':'';
+  const statusDot=cat!=='music'&&c.status==='watching'?'<span class="cgrid-status-dot">진행중</span>':'';
   const icons=[];
   if(c.stars>0)icons.push('<i class="ti ti-star" aria-hidden="true"></i>');
   const wcalNotes=c.cid?getWcalNotesByCid(c.cid):[];
   if(c.review||wcalNotes.length)icons.push('<i class="ti ti-message-circle" aria-hidden="true"></i>');
   const thumbIcons=icons.length?`<div class="cgrid-thumb-icons">${icons.join('')}</div>`:'';
-  const active=id===_contentGridActiveCid;
-  return `<div class="cgrid-item${active?' active':''}" onclick="toggleContentGridDetail('${id}','${cat}')">
+  const active=id===_gridActiveCid;
+  return `<div class="cgrid-item${active?' active':''}" onclick="toggleCgridDetail('${id}')">
     <div class="cgrid-thumb-wrap">${thumb}${statusDot}${thumbIcons}</div>
     <div class="cgrid-title">${escapeHtml(c.title||'')}</div>
   </div>`;
 }
-function toggleContentGridDetail(id,cat){
-  _contentGridActiveCid=(_contentGridActiveCid===id)?null:id;
+function _cgridDetailHtml(c){
+  const wcalNotes=c.cid?getWcalNotesByCid(c.cid):[];
+  return `<div class="cgrid-detail">${_cmrDetailBodyHtml(c,wcalNotes,true,true)}</div>`;
+}
+// 그리드 항목 탭 — 활성 id만 바꾸고, 화면에 있는 모든 카테고리 그리드를 캐시 기준으로 다시 그림
+function toggleCgridDetail(id){
+  _gridActiveCid=(_gridActiveCid===id)?null:id;
   document.querySelectorAll('[id^="content-grid-inner-"]').forEach(el=>{
-    const c=el.id.replace('content-grid-inner-','');
-    const list=_cmrByCatCache?_cmrByCatCache[c]:[];
-    if(list)el.innerHTML=_contentGridRowsHtml(list,c);
+    const cat=el.id.replace('content-grid-inner-','');
+    const list=_cmrByCatCache?_cmrByCatCache[cat]:null;
+    if(list)el.innerHTML=_cgridRowsHtml(list,cat);
   });
+}
+// 카테고리별 그리드형 — 드라마/영화/책도 음악과 동일한 정사각 썸네일 그리드로. 탭 인터랙션은 리스트형과 동일하게 코멘트 펼침.
+function renderContentAsGridHtml(byCat){
+  const cats=['drama','book','movie'];
+  const hasAny=cats.some(cat=>byCat[cat].length>0);
+  if(!hasAny&&!byCat.music.length)return '<div style="text-align:center;color:var(--tm);padding:24px 0;">이 달엔 완료한 콘텐츠가 없어요</div>';
+  _gridActiveCid=null;
+  const sectionsHtml=cats.filter(cat=>byCat[cat].length>0).map(cat=>{
+    const meta=CAT_ICON_META[cat];
+    return `<div class="mr-card" style="margin-bottom:10px;">
+      <div class="mr-sec-title"><i class="ti ${meta.icon} ico-12" aria-hidden="true"></i> ${CONTENT_CAT_LABEL[cat]}</div>
+      <div class="cgrid-grid" id="content-grid-inner-${cat}">${_cgridRowsHtml(byCat[cat],cat)}</div>
+    </div>`;
+  }).join('');
+  return sectionsHtml+renderMusicGridHtml(byCat.music);
 }
 function toggleCmrReview(id){
   const box=document.getElementById('cmr-review-'+id);
@@ -11772,7 +11737,7 @@ function renderWatchCalDetail(){
       ${noteRowHtml}
     </div>`;
   }).join('');
-  el.innerHTML=`<div class="mr-card" style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--card-b);">
+  el.innerHTML=`<div class="mr-card" style="margin-top:16px;padding-top:14px;border:none;border-top:1px dashed var(--card-b);border-radius:0;background:transparent;">
     <div class="mr-sec-title" style="margin-bottom:6px;">${dispDate} — ${items.length}개</div>
     ${rows}
   </div>`;
@@ -11948,7 +11913,7 @@ function _chCollectNoteSource(months){
   months.forEach(mk=>{
     getContents(mk).forEach(c=>{
       if(c.cid)posterByCid[c.cid]=c.poster||null;
-      if((c.review&&c.review.trim())||c.stars>0){
+      if(c.review&&c.review.trim()){
         finals.push({cid:c.cid,cat:c.cat,title:c.title,poster:c.poster||null,stars:c.stars||0,review:c.review||'',dk:c.endDate||c.startDate||''});
       }
     });
