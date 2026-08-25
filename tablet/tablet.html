@@ -366,7 +366,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .oneline-dow{width:22px;flex-shrink:0;font-weight:600;color:var(--tp);}
 
 /* ── 월간탭 ── */
-.top-row{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;align-items:start;}
+.top-row{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;align-items:stretch;}
 .top-row .card{box-sizing:border-box;margin-bottom:0;}
 .rdcal-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin:0 0 4px;}
 .rdcal-nav i{font-size:var(--fs-title);color:var(--tm);cursor:pointer;}
@@ -389,6 +389,10 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .wcal-weekday-row{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:6px;}
 .wcal-weekday-row span{text-align:center;font-size:var(--fs-sm);color:var(--tm);font-weight:600;}
 .wcal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;}
+.wcal-month-summary{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:16px;margin-top:auto;padding-top:10px;border-top:1px solid rgba(var(--divider-rgb),0.25);font-size:var(--fs-sm);color:var(--tm);}
+.wcal-summary-item{display:inline-flex;align-items:center;gap:5px;font-weight:500;color:var(--ts);}
+.wcal-summary-item i{font-size:var(--fs-sm);color:var(--tm);}
+.wcal-summary-empty{font-size:var(--fs-xs);color:var(--tm);opacity:0.6;}
 .wcal-cell{aspect-ratio:2/3;position:relative;display:flex;align-items:center;justify-content:center;}
 .wcal-date-plain{font-size:var(--fs-sm);color:var(--tm);font-weight:500;}
 .wcal-thumb{position:relative;width:100%;height:100%;border-radius:8px;overflow:hidden;background:var(--card);}
@@ -534,15 +538,22 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 
 /* 콘텐츠 아카이브(그리드형) — 독서달력/콘텐츠모아보기 아래 전체 폭, 한 줄 3개 고정 후 스크롤 */
 .cgrid-card{display:flex;flex-direction:column;}
+.wcal-card{display:flex;flex-direction:column;}
 .cgrid-hdr{margin-bottom:10px;}
 .cgrid-title-row{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;}
 .cgrid-hdr-actions{display:flex;align-items:center;gap:8px;}
 .cgrid-year-toggle{font-size:16px;color:var(--tm);cursor:pointer;opacity:0.55;transition:opacity 0.15s,color 0.15s;}
 .cgrid-year-toggle:hover{opacity:0.85;}
 .cgrid-year-toggle.on{color:var(--pal-yellow-text);opacity:1;}
-.cgrid-filters{display:flex;gap:5px;flex-wrap:wrap;}
-.cgrid-chip{width:28px;height:28px;border-radius:7px;background:rgba(255,253,248,0.8);border:1px solid var(--card-b);color:var(--ts);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
-.cgrid-chip.on{background:var(--pal-yellow-bg);border-color:var(--pal-yellow-border);color:var(--pal-yellow-text);}
+.cgrid-filters{display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+.cgrid-status-chip{display:inline-flex;align-items:center;justify-content:center;gap:4px;height:28px;min-width:28px;box-sizing:border-box;font-size:var(--fs-xs);font-weight:600;color:var(--ts);background:rgba(255,253,248,0.8);border:1px solid var(--card-b);border-radius:7px;padding:0 8px;cursor:pointer;}
+.cgrid-status-chip i{font-size:11px;}
+.cgrid-status-chip.status-watching{color:#7a7168;background:rgba(200,190,178,0.35);border-color:transparent;}
+.cgrid-status-chip.status-done{color:#8a6c20;background:rgba(255,205,90,0.35);border-color:transparent;}
+.cgrid-status-chip.cat-book{color:var(--pal-yellow-text);background:rgba(var(--pal-yellow-rgb),0.35);border-color:transparent;}
+.cgrid-status-chip.cat-drama{color:var(--pal-pink-text);background:rgba(var(--pal-pink-rgb),0.35);border-color:transparent;}
+.cgrid-status-chip.cat-movie{color:var(--pal-sky-text);background:rgba(var(--pal-sky-rgb),0.35);border-color:transparent;}
+.cgrid-status-chip.cat-music{color:var(--pal-lime-text);background:rgba(var(--pal-lime-rgb),0.35);border-color:transparent;}
 .cgrid-scroll{flex:1;min-height:0;overflow-y:auto;padding-right:2px;}
 .cgrid-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
 .cgrid-item{display:flex;flex-direction:column;gap:5px;cursor:pointer;}
@@ -903,6 +914,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
           <div class="wcal-filter-chips" id="wcal-filter-chips"></div>
           <div class="wcal-weekday-row" id="wcal-weekday-row"></div>
           <div class="wcal-grid" id="wcal-grid"></div>
+          <div class="wcal-month-summary" id="wcal-month-summary"></div>
         </div>
         <div class="card cgrid-card">
           <div class="cgrid-hdr">
@@ -910,11 +922,8 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
               <div class="card-lbl cgrid-title-toggle" style="margin-bottom:0;" onclick="toggleCgridMode()"><i class="ti ti-stack-2" id="cgrid-title-icon" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i><span id="cgrid-title-text">콘텐츠 모아보기</span></div>
               <div class="cgrid-hdr-actions" id="cgrid-hdr-actions">
                 <div class="cgrid-filters" id="cgrid-filters">
-                  <div class="cgrid-chip on" data-cat="all" onclick="setCgridFilter('all')" title="전체"><i class="ti ti-stack-2" aria-hidden="true"></i></div>
-                  <div class="cgrid-chip" data-cat="book" onclick="setCgridFilter('book')" title="도서"><i class="ti ti-book" aria-hidden="true"></i></div>
-                  <div class="cgrid-chip" data-cat="drama" onclick="setCgridFilter('drama')" title="드라마"><i class="ti ti-device-tv" aria-hidden="true"></i></div>
-                  <div class="cgrid-chip" data-cat="movie" onclick="setCgridFilter('movie')" title="영화"><i class="ti ti-movie" aria-hidden="true"></i></div>
-                  <div class="cgrid-chip" data-cat="music" onclick="setCgridFilter('music')" title="음악"><i class="ti ti-music" aria-hidden="true"></i></div>
+                  <div class="cgrid-status-chip status-all" id="cgrid-status-chip" onclick="cycleCgridStatusFilter()"><i class="ti ti-apps" aria-hidden="true"></i></div>
+                  <div class="cgrid-status-chip cat-all" id="cgrid-cat-chip" onclick="cycleCgridFilter()"><i class="ti ti-stack-2" aria-hidden="true"></i></div>
                 </div>
                 <i class="ti ti-calendar-stats cgrid-year-toggle" id="cgrid-year-toggle" onclick="toggleCgridYearMode()" title="연간모아보기" aria-hidden="true"></i>
               </div>

@@ -1463,12 +1463,44 @@ function isContentEndedInMonthTablet(c,targetMk){
 // 본앱 computeContentMonthlyList와 동일 규칙: 완결은 종료월에 한 번, 진행중은 오늘이 속한 달에서만 노출
 // ── 콘텐츠 아카이브(그리드형) ──
 let _cgridFilter='all';
+let _cgridStatusFilter='all'; // 'all'|'watching'|'done' — 카테고리 필터와 별개 축, AND로 함께 적용
 let _cgridContents=[]; // 현재 달(또는 연간) 콘텐츠 원본 캐시(필터 전환 시 재조회 없이 재사용)
 let _cgridYearMode=false;
-function setCgridFilter(cat){
-  _cgridFilter=cat;
-  document.querySelectorAll('.cgrid-chip').forEach(el=>el.classList.toggle('on',el.dataset.cat===cat));
+// 카테고리 필터 칩도 상태필터와 동일한 순환 배지 방식 — 탭할 때마다 전체→도서→드라마→영화→음악→전체 순환.
+const CGRID_CAT_CYCLE=['all','book','drama','movie','music'];
+const CGRID_CAT_META={
+  all:{label:'전체',icon:'ti-stack-2'},
+  book:{label:'도서',icon:'ti-book'},
+  drama:{label:'드라마',icon:'ti-device-tv'},
+  movie:{label:'영화',icon:'ti-movie'},
+  music:{label:'음악',icon:'ti-music'}
+};
+function cycleCgridFilter(){
+  const idx=CGRID_CAT_CYCLE.indexOf(_cgridFilter);
+  _cgridFilter=CGRID_CAT_CYCLE[(idx+1)%CGRID_CAT_CYCLE.length];
+  _updateCgridFilterChipUI();
   _renderCgridFromCache();
+}
+function _updateCgridFilterChipUI(){
+  const el=document.getElementById('cgrid-cat-chip');if(!el)return;
+  const meta=CGRID_CAT_META[_cgridFilter];
+  el.className=`cgrid-status-chip cat-${_cgridFilter}`;
+  el.innerHTML=`<i class="ti ${meta.icon}" aria-hidden="true"></i>${_cgridFilter==='all'?'':meta.label}`;
+}
+// 상태필터 칩 하나를 탭할 때마다 전체→진행중→완결→전체 순환. 칩 자체가 현재 상태를 표시(라벨+색)하는 토글 배지.
+const CGRID_STATUS_CYCLE=['all','watching','done'];
+const CGRID_STATUS_META={all:{label:'전체',icon:'ti-apps'},watching:{label:'진행중',icon:'ti-player-play'},done:{label:'완결',icon:'ti-check'}};
+function cycleCgridStatusFilter(){
+  const idx=CGRID_STATUS_CYCLE.indexOf(_cgridStatusFilter);
+  _cgridStatusFilter=CGRID_STATUS_CYCLE[(idx+1)%CGRID_STATUS_CYCLE.length];
+  _updateCgridStatusChipUI();
+  _renderCgridFromCache();
+}
+function _updateCgridStatusChipUI(){
+  const el=document.getElementById('cgrid-status-chip');if(!el)return;
+  const meta=CGRID_STATUS_META[_cgridStatusFilter];
+  el.className=`cgrid-status-chip status-${_cgridStatusFilter}`;
+  el.innerHTML=`<i class="ti ${meta.icon}" aria-hidden="true"></i>${_cgridStatusFilter==='all'?'':meta.label}`;
 }
 // 제목 옆 "연간모아보기" 토글 — 켜면 그 순간 보고 있던 연도 전체를, 끄면 다시 이번 월로 복귀
 async function toggleCgridYearMode(){
@@ -1490,7 +1522,9 @@ async function _loadCgridYearly(y){
   };
   _cgridContents=(rows||[]).filter(belongsHere).sort((a,b)=>(b.created||0)-(a.created||0));
   _cgridFilter='all';
-  document.querySelectorAll('.cgrid-chip').forEach(el=>el.classList.toggle('on',el.dataset.cat==='all'));
+  _cgridStatusFilter='all';
+  _updateCgridFilterChipUI();
+  _updateCgridStatusChipUI();
   _renderCgridFromCache();
 }
 async function renderMonthContentGrid(y,mo){
@@ -1498,10 +1532,12 @@ async function renderMonthContentGrid(y,mo){
   const prevMk=monthKeyOf(new Date(y,mo-1,1));
   const isSameMonth=mk===monthKeyOf(new Date());
   _cgridFilter='all';
+  _cgridStatusFilter='all';
   _cgridYearMode=false;
   const yearToggleEl=document.getElementById('cgrid-year-toggle');
   if(yearToggleEl)yearToggleEl.classList.remove('on');
-  document.querySelectorAll('.cgrid-chip').forEach(el=>el.classList.toggle('on',el.dataset.cat==='all'));
+  _updateCgridFilterChipUI();
+  _updateCgridStatusChipUI();
   const [curRows,prevRows]=await Promise.all([
     supaFetch(`contents?month_key=eq.${mk}`),
     supaFetch(`contents?month_key=eq.${prevMk}`)
@@ -1515,10 +1551,17 @@ async function renderMonthContentGrid(y,mo){
     .sort((a,b)=>(b.created||0)-(a.created||0));
   _renderCgridFromCache();
 }
+// 카테고리+상태 필터를 함께 적용 — _renderCgridFromCache/toggleCgridDetail에서 공용
+function _cgridFilteredList(){
+  let list=_cgridFilter==='all'?_cgridContents:_cgridContents.filter(c=>c.content_cat===_cgridFilter);
+  if(_cgridStatusFilter==='watching')list=list.filter(c=>c.status==='watching');
+  else if(_cgridStatusFilter==='done')list=list.filter(c=>c.status==='done'||c.status==='stopped');
+  return list;
+}
 function _renderCgridFromCache(){
   const el=document.getElementById('month-content-grid');
   if(!el)return;
-  const list=_cgridFilter==='all'?_cgridContents:_cgridContents.filter(c=>c.content_cat===_cgridFilter);
+  const list=_cgridFilteredList();
   _cgridActiveId=null;
   if(!list.length){el.innerHTML='<div class="empty-msg">이 달엔 해당하는 콘텐츠가 없어요</div>';return;}
   el.innerHTML=`<div class="cgrid-grid" id="cgrid-grid-inner">${_cgridRowsHtml(list)}</div>`;
@@ -1590,9 +1633,8 @@ function _cgridItemHtml(c){
 }
 function toggleCgridDetail(id){
   _cgridActiveId=(_cgridActiveId===id)?null:id;
-  const list=_cgridFilter==='all'?_cgridContents:_cgridContents.filter(c=>c.content_cat===_cgridFilter);
   const el=document.getElementById('cgrid-grid-inner');
-  if(el)el.innerHTML=_cgridRowsHtml(list);
+  if(el)el.innerHTML=_cgridRowsHtml(_cgridFilteredList());
 }
 async function renderMonthTimetable(y,mo){
   const el=document.getElementById('month-tt');
@@ -1868,6 +1910,25 @@ async function renderWatchCal(){
   renderWcalFilterChips();
   document.getElementById('wcal-weekday-row').innerHTML=DOW_MON_START.map(d=>`<span>${d}</span>`).join('');
   renderWatchCalGrid();
+  renderWcalMonthSummary(contents,prevContents||[],mk);
+}
+// 감상달력 하단 — 이 달의 카테고리별 진행중+완결 누계(작품 단위, 중복 없음). 콘텐츠그리드(renderMonthContentGrid)와 동일한 belongsHere 기준.
+// 음악은 진행중/완결 개념이 없어 등록 건수를 그대로 완결로 집계.
+function renderWcalMonthSummary(curContents,prevContents,mk){
+  const el=document.getElementById('wcal-month-summary');if(!el)return;
+  const isSameMonth=mk===monthKeyOf(new Date());
+  const belongsHere=c=>{
+    if(c.content_cat==='music')return true; // 등록 건수를 그대로 완결로 카운트
+    if(c.status==='done'||c.status==='stopped')return isContentEndedInMonthTablet(c,mk);
+    return c.status==='watching'&&isSameMonth;
+  };
+  const list=[...curContents,...prevContents].filter(belongsHere);
+  const counts={drama:0,movie:0,book:0,music:0};
+  list.forEach(c=>{if(counts[c.content_cat]!==undefined)counts[c.content_cat]++;});
+  const parts=Object.keys(WCAL_CAT_META)
+    .filter(k=>counts[k]>0)
+    .map(k=>`<span class="wcal-summary-item"><i class="ti ${WCAL_CAT_META[k].icon}" aria-hidden="true"></i>${counts[k]}</span>`);
+  el.innerHTML=parts.length?parts.join(''):'<div class="wcal-summary-empty">이 달엔 기록된 감상이 없어요</div>';
 }
 function renderWcalFilterChips(){
   const el=document.getElementById('wcal-filter-chips');if(!el)return;
