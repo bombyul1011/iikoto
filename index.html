@@ -202,7 +202,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .wcal-filter-chips{display:flex;gap:6px;margin-bottom:14px;overflow-x:auto;}
 .wcal-filter-chip{flex-shrink:0;font-size:12px;font-weight:600;padding:6px 12px;border-radius:16px;border:1px solid var(--card-b);color:var(--ts);background:var(--card);cursor:pointer;}
 .wcal-filter-chip.on{color:#fff;border-color:transparent;}
-.wcal-filter-chip.on[data-cat="all"]{background:var(--pal-mauvepink);}
+.wcal-filter-chip.on[data-cat="all"]{background:rgba(180,165,150,0.55);color:var(--tp);}
 .wcal-filter-chip.on[data-cat="drama"]{background:rgba(var(--pal-pink-rgb),1);}
 .wcal-filter-chip.on[data-cat="movie"]{background:rgba(var(--pal-sky-rgb),1);}
 .wcal-filter-chip.on[data-cat="book"]{background:rgba(var(--pal-yellow-rgb),1);color:#7a5c00;}
@@ -974,8 +974,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .ch-month-banner-row::-webkit-scrollbar{display:none;}
 .ch-month-banner-chip{flex-shrink:0;font-size:var(--main-text-size);font-weight:500;color:var(--tp);background:var(--card);border:1px solid var(--card-b);border-radius:12px;padding:10px 16px;cursor:pointer;white-space:nowrap;}
 .ch-month-banner-chip.on{background:rgba(255,160,180,.16);border-color:rgba(255,140,160,.38);color:var(--tp);font-weight:700;}
-.ch-archive-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px;}
-.ch-archive-poster{width:100%;aspect-ratio:2/3;border-radius:8px;object-fit:cover;cursor:pointer;background:var(--card2);}
 .ch-note-tl-empty{font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:20px 0;}
 
 /* 코멘트 모아보기 — 날짜순 뷰(시안 A): 완결 코멘트는 카드, 감상 메모는 곁가지 */
@@ -2295,11 +2293,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   <div class="content-hub-body" id="content-hub-body">
     <div class="wcal-rainbow-wrap">
       <div class="wcal-rainbow-inner">
-        <div style="display:flex;align-items:center;justify-content:center;gap:18px;margin:2px 0 6px;position:relative;">
+        <div style="display:flex;align-items:center;justify-content:center;gap:18px;margin:2px 0 6px;">
           <i class="ti ti-chevron-left ico-cal-nav" onclick="wcalMonthShift(-1)" aria-hidden="true"></i>
-          <div id="wcal-month-label" style="font-weight:600;font-size:var(--main-text-size);color:var(--tp);"></div>
+          <div id="wcal-month-label" style="font-weight:600;font-size:var(--main-text-size);color:var(--tp);cursor:pointer;" onclick="wcalToggleCollapse()"></div>
           <i class="ti ti-chevron-right ico-cal-nav" onclick="wcalMonthShift(1)" aria-hidden="true"></i>
-          <i class="ti ti-chevron-up" id="wcal-collapse-btn" onclick="wcalToggleCollapse()" style="position:absolute;right:0;font-size:15px;color:var(--tm);cursor:pointer;" aria-hidden="true"></i>
         </div>
         <div class="wcal-filter-chips" id="wcal-filter-chips"></div>
         <div class="wcal-weekday-row"><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span><span>일</span></div>
@@ -3365,16 +3362,12 @@ function renderCmrMonthChips(){
   renderMonthChipsGeneric('cmr-month-chips',_cmrYear,_cmrMonth,m=>{_cmrMonth=m;renderCmrMonthChips();loadContentMonthlyReportContent();});
 }
 const CONTENT_CAT_LABEL={drama:'드라마',book:'책',movie:'영화',music:'음악'};
-function loadContentMonthlyReportContent(){
-  const el=document.getElementById('cmr-content');if(!el)return;
-  const byCat=computeContentMonthlyByCat(_cmrYear,_cmrMonth);
+// 카테고리별 콘텐츠 카드 마크업 — 콘텐츠 모아보기 시트와 콘텐츠 허브의 월별 아카이브가 함께 씀(동일한 톤 유지)
+function renderContentByCatHtml(byCat){
   const cats=['drama','book','movie','music'];
   const hasAny=cats.some(cat=>byCat[cat].length>0);
-  if(!hasAny){
-    el.innerHTML='<div style="text-align:center;color:var(--tm);padding:24px 0;">이 달엔 완료한 콘텐츠가 없어요</div>';
-    return;
-  }
-  el.innerHTML=cats.filter(cat=>byCat[cat].length>0).map(cat=>{
+  if(!hasAny)return '<div style="text-align:center;color:var(--tm);padding:24px 0;">이 달엔 완료한 콘텐츠가 없어요</div>';
+  return cats.filter(cat=>byCat[cat].length>0).map(cat=>{
     const meta=CAT_ICON_META[cat];
     const items=byCat[cat].map(c=>{
       const starsHtml=c.stars>0?`<span style="color:#e0b050;font-size:var(--dow-label-size);">${'★'.repeat(c.stars)}</span>`:'';
@@ -3397,6 +3390,10 @@ function loadContentMonthlyReportContent(){
       ${items}
     </div>`;
   }).join('');
+}
+function loadContentMonthlyReportContent(){
+  const el=document.getElementById('cmr-content');if(!el)return;
+  el.innerHTML=renderContentByCatHtml(computeContentMonthlyByCat(_cmrYear,_cmrMonth));
 }
 function toggleCmrReview(id){
   const box=document.getElementById('cmr-review-'+id);
@@ -10703,8 +10700,6 @@ function openContentHub(){
   document.getElementById('content-hub-ov').classList.add('on');
   document.getElementById('wcal-grid').style.display='';
   document.getElementById('wcal-week-row').style.display='none';
-  const btn=document.getElementById('wcal-collapse-btn');
-  if(btn)btn.className='ti ti-chevron-up';
   _wcalRefresh();
   renderChHubMonthBanners();
   chExpandMonth(monthKey(new Date())); // 당월을 기본으로 펼쳐서 시작
@@ -11570,7 +11565,7 @@ function loadAndRenderWatchCal(){
 }
 function renderWatchCalHeader(){
   const el=document.getElementById('wcal-month-label');
-  if(el)el.textContent=`${_wcalDate.getFullYear()}년 ${String(_wcalDate.getMonth()+1).padStart(2,'0')}월`;
+  if(el)el.innerHTML=`${_wcalDate.getFullYear()}년 ${String(_wcalDate.getMonth()+1).padStart(2,'0')}월 <i class="ti ${_wcalCollapsed?'ti-chevron-down':'ti-chevron-up'}" style="font-size:12px;color:var(--tm);vertical-align:middle;" aria-hidden="true"></i>`;
 }
 function renderWcalFilterChips(){
   const el=document.getElementById('wcal-filter-chips');if(!el)return;
@@ -11617,13 +11612,12 @@ function renderWatchCalGrid(){
   }
   el.innerHTML=html;
 }
-// 달력 접기/펼치기 — 접으면 이번 주(오늘 기준 월~일) 7칸만 한 줄로, 펼치면 월 전체 그리드
+// 달력 접기/펼치기 — 월 라벨 텍스트를 눌러 토글, 접으면 이번 주(오늘 기준 월~일) 7칸만 한 줄로
 function wcalToggleCollapse(){
   _wcalCollapsed=!_wcalCollapsed;
   document.getElementById('wcal-grid').style.display=_wcalCollapsed?'none':'';
   document.getElementById('wcal-week-row').style.display=_wcalCollapsed?'':'none';
-  const btn=document.getElementById('wcal-collapse-btn');
-  if(btn)btn.className='ti '+(_wcalCollapsed?'ti-chevron-down':'ti-chevron-up');
+  renderWatchCalHeader(); // 라벨에 붙는 펼침/접힘 화살표 갱신
   if(_wcalCollapsed)renderWatchCalWeekRow();
 }
 // 접힌 상태의 주간 뷰 — 오늘이 속한 주(월~일) 7칸, 월 그리드와 같은 포스터 조합 로직(_wcalBuildThumb) 재사용
@@ -11744,7 +11738,7 @@ function saveWcalNote(cid,dk,idx){
   const i=list.findIndex(n=>n.cid===cid&&n.dk===dk);
   const now=new Date();
   const time=i>=0&&list[i].time?list[i].time:(String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')); // 최초 작성 시각 고정 — 수정해도 바뀌지 않음
-  const entry={cid,dk,title:item?item.title:'',cat:item?item.cat:'',poster:item?item.poster:null,text,time,updatedAt:Date.now()};
+  const entry={cid,dk,title:item?item.title:'',cat:item?item.cat:'',text,time,updatedAt:Date.now()}; // poster는 저장 안 함 — contents가 원본, 표시할 때 cid로 항상 최신 값을 조회
   if(i>=0)list[i]=entry;else list.push(entry);
   saveWcalNotes(mk,list);
   if(navigator.onLine)syncWcalNotesDown(mk);
@@ -11804,21 +11798,13 @@ function renderChHubMonthBanners(){
   }
   el.innerHTML=html;
 }
-// 선택된 달의 콘텐츠 포스터를 작게 그리드로 — 음악 제외(음악은 포스터 개념이 약해 캘린더/모아보기에서만 다룸)
-let _chArchiveItems=[];
+// 선택된 달의 콘텐츠를 카테고리별로 — 콘텐츠 모아보기 시트와 동일한 마크업(renderContentByCatHtml) 재사용
 function chExpandMonth(mk){
   _chArchiveMk=mk;
   renderChHubMonthBanners();
   const el=document.getElementById('ch-month-archive-grid');if(!el)return;
-  _chArchiveItems=getContents(mk).filter(c=>c.cat!=='music'&&c.poster);
-  if(!_chArchiveItems.length){el.innerHTML='<div class="ch-note-tl-empty">이 달엔 등록된 콘텐츠가 없어요</div>';return;}
-  el.innerHTML=`<div class="ch-archive-grid">${_chArchiveItems.map((c,i)=>
-    `<img class="ch-archive-poster" src="${c.poster}" alt="${escapeHtml(c.title||'')}" onclick="chOpenArchiveItem(${i})">`
-  ).join('')}</div>`;
-}
-function chOpenArchiveItem(i){
-  const c=_chArchiveItems[i];if(!c)return;
-  openContentModal(c.cat,c,_chArchiveMk);
+  const [y,mo]=mk.split('-').map(Number);
+  el.innerHTML=renderContentByCatHtml(computeContentMonthlyByCat(y,mo-1));
 }
 
 // ── 콘텐츠 허브 — 코멘트 모아보기(타임라인, 읽기 전용) — 독서코너의 독서달력 진입구와 동일한 위치의 헤더 아이콘으로 진입 ──
@@ -11843,15 +11829,18 @@ function _chCollectNoteSource(){
   const months=[];
   for(let i=0;i<_chNoteTimelineMonths;i++)months.push(monthKey(new Date(now.getFullYear(),now.getMonth()-i,1)));
   const finals=[]; // {cid,cat,title,poster,stars,review,dk}
-  const notes=[]; // {cid,cat,title,dk,text,updatedAt}
+  const notes=[]; // {cid,cat,title,dk,text,updatedAt} — poster는 저장 안 하므로 아래서 cid로 항상 최신 값을 붙임
+  const posterByCid={};
   months.forEach(mk=>{
     getContents(mk).forEach(c=>{
+      if(c.cid)posterByCid[c.cid]=c.poster||null;
       if((c.review&&c.review.trim())||c.stars>0){
         finals.push({cid:c.cid,cat:c.cat,title:c.title,poster:c.poster||null,stars:c.stars||0,review:c.review||'',dk:c.endDate||c.startDate||''});
       }
     });
     notes.push(...getWcalNotes(mk));
   });
+  notes.forEach(n=>{n.poster=n.cid?(posterByCid[n.cid]||null):null;});
   return {finals,notes};
 }
 function renderContentNoteTimeline(){
