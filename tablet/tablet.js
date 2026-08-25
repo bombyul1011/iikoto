@@ -901,6 +901,10 @@ function _todayReadingItemHtml(item,book,readingLogRows){
     if(book.unit==='percent')pct=book.percent||0;
     else if(book.total_pages)pct=Math.min(100,Math.round((book.pages/book.total_pages)*100));
     subLine=`${pct}%`;
+  }else if((item.cat==='drama'||item.cat==='movie')&&item.totalUnit){
+    // 본앱에서 TMDB로 자동 채운 total_unit(드라마=총화수,영화=총러닝타임분)/current_unit(진행분)으로 % 계산. 책과 동일 형식으로 통일.
+    const pct=Math.min(100,Math.round(((item.currentUnit||0)/item.totalUnit)*100));
+    subLine=`${pct}%`;
   }else{
     subLine=meta.label||'';
   }
@@ -932,10 +936,22 @@ function renderTodayReading(dk,rblocks,contents,manualItems,book,readingLogRows)
     if(isToday)push('movie',c.title,c.poster);
   });
   (manualItems||[]).forEach(it=>push(it.cat,it.title));
-  // 포스터 매칭 — 드라마/책은 오늘 넘어온 contents 목록에서 같은 제목의 poster를 찾아 붙임(영화는 위에서 이미 직접 매칭됨)
+  // 포스터/진행률 매칭 — 드라마/영화는 오늘 넘어온 contents 목록에서 같은 제목의 poster·total_unit·current_unit을 찾아 붙임
   const posterByTitle={};
-  (contents||[]).forEach(c=>{if(c.content_cat!=='music'&&c.title)posterByTitle[c.title]=c.poster||null;});
-  items.forEach(it=>{if(it.cat!=='music'&&!it.poster)it.poster=posterByTitle[it.title]||null;});
+  const unitByTitle={};
+  (contents||[]).forEach(c=>{
+    if(c.content_cat==='music'||!c.title)return;
+    posterByTitle[c.title]=c.poster||null;
+    if(c.total_unit)unitByTitle[c.title]={totalUnit:c.total_unit,currentUnit:c.current_unit||0};
+  });
+  items.forEach(it=>{
+    if(it.cat==='music')return;
+    if(!it.poster)it.poster=posterByTitle[it.title]||null;
+    if((it.cat==='drama'||it.cat==='movie')&&unitByTitle[it.title]){
+      it.totalUnit=unitByTitle[it.title].totalUnit;
+      it.currentUnit=unitByTitle[it.title].currentUnit;
+    }
+  });
 
   const shown=items.slice(0,2);
   if(!shown.length){el.innerHTML='<div class="empty-msg" style="text-align:left;">오늘 감상한 콘텐츠가 없어요</div>';return;}
