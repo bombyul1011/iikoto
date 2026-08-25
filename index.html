@@ -958,63 +958,24 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rd-book-item.open .rd-book-detail{display:block;}
 .rd-detail-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
 .rd-status-btn{font-size:var(--dow-label-size);padding:5px 10px;border-radius:8px;border:1px solid var(--card-b);background:var(--card);color:var(--ts);cursor:pointer;}
-/* ── 채움 코너 (독서 코너와 동일 톤) ── */
-.chaeum-ov{position:fixed;inset:0;z-index:8000;background:var(--bg);display:flex;flex-direction:column;overflow-y:auto;transform:translateX(100%);transition:transform .3s cubic-bezier(.32,.72,0,1);pointer-events:none;}
-.chaeum-ov .settings-hdr{position:sticky;top:0;z-index:10;background:var(--bg);}
-.chaeum-ov.on{transform:translateX(0);pointer-events:auto;}
-.chaeum-body{padding:16px 18px 30px;display:flex;flex-direction:column;gap:18px;}
-.chaeum-empty{font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:8px 0;}
-
-.chaeum-log-card{background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:16px 17px 4px;}
-.chaeum-log-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;}
-.chaeum-log-title{font-size:15px;font-weight:600;color:var(--tp);display:flex;align-items:center;gap:6px;}
-.chaeum-log-title i{font-size:16px;color:var(--pal-mint-text);}
-.chaeum-log-goto{font-size:var(--dow-label-size);color:var(--tm);display:flex;align-items:center;gap:2px;cursor:pointer;flex-shrink:0;}
-.chaeum-log-stat{font-size:var(--dow-label-size);color:var(--tm);margin:2px 0 12px;}
-
-.chaeum-log-chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:12px;margin-bottom:14px;border-bottom:1px solid rgba(var(--divider-rgb),0.3);-webkit-overflow-scrolling:touch;}
-.chaeum-log-chips::-webkit-scrollbar{display:none;}
-.chaeum-log-chip{flex-shrink:0;font-size:var(--dow-label-size);color:var(--ts);background:rgba(var(--pal-warmgray-rgb),0.16);border-radius:9px;padding:5px 10px;white-space:nowrap;}
-.chaeum-log-chip.on{background:rgba(var(--pal-mint-rgb),0.30);color:var(--pal-mint-text);font-weight:500;}
-
-.chaeum-log-tl{position:relative;padding-left:6px;}
-.chaeum-log-item{position:relative;display:flex;gap:12px;padding:0 0 20px;}
-.chaeum-log-item:last-child{padding-bottom:8px;}
-.chaeum-log-date{width:32px;flex-shrink:0;font-size:10.5px;color:var(--tm);padding-top:1px;font-variant-numeric:tabular-nums;text-align:right;}
-.chaeum-log-line-wrap{position:relative;width:8px;flex-shrink:0;display:flex;justify-content:center;}
-.chaeum-log-line-wrap::before{content:'';position:absolute;top:11px;bottom:-20px;width:1px;background:rgba(var(--divider-rgb),0.35);}
-.chaeum-log-item:last-child .chaeum-log-line-wrap::before{display:none;}
-.chaeum-log-dot{width:7px;height:7px;border-radius:50%;background:var(--pal-mint-text);margin-top:5px;flex-shrink:0;z-index:1;}
-.chaeum-log-dot.ing{background:transparent;border:1.4px solid var(--tm);}
-.chaeum-log-txt{flex:1;min-width:0;cursor:pointer;}
-.chaeum-log-txt-title{font-size:var(--main-text-size);color:var(--tp);line-height:1.5;}
-.chaeum-log-txt-cat{font-size:10px;color:var(--pal-mint-text);margin-top:3px;}
-
-#chaeum-detail-sheet{z-index:8100;}
-.chaeum-detail-hdr{padding:8px 0 4px;}
-.chaeum-detail-cat{font-size:var(--dow-label-size);color:var(--pal-mint-text);margin-bottom:6px;}
-.chaeum-detail-title{font-size:17px;font-weight:600;color:var(--tp);line-height:1.45;margin-bottom:10px;}
-.chaeum-detail-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;}
-.chaeum-detail-tag{font-size:var(--dow-label-size);color:var(--ts);background:rgba(var(--pal-warmgray-rgb),0.18);border-radius:8px;padding:4px 9px;}
-.chaeum-detail-sec{margin-top:16px;}
-.chaeum-detail-sec-lbl{font-size:11px;color:var(--pal-mint-text);font-weight:600;letter-spacing:0.03em;margin-bottom:7px;}
-.chaeum-detail-summary{font-size:var(--main-text-size);color:var(--tp);line-height:1.7;}
-.chaeum-detail-outline{list-style:none;padding:0;margin:0;}
-.chaeum-detail-outline li{font-size:var(--main-text-size);color:var(--ts);line-height:1.9;padding-left:20px;position:relative;}
-.chaeum-detail-outline li::before{content:'';position:absolute;left:4px;top:11px;width:5px;height:5px;border-radius:50%;background:rgba(var(--pal-mint-rgb),0.75);}
-.chaeum-detail-comment{background:rgba(var(--pal-mint-rgb),0.12);border-radius:12px;padding:13px 14px;font-size:var(--main-text-size);color:var(--ts);line-height:1.7;font-style:italic;}
-
-.chaeum-log-more{text-align:center;font-size:var(--dow-label-size);color:var(--tm);padding:6px 0 10px;cursor:pointer;}
-.chaeum-log-loading{font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:16px 0;}
-
-.chaeum-home-banner{position:relative;border-radius:16px;padding:1.5px;background:linear-gradient(135deg,rgba(150,215,180,0.95),rgba(235,220,120,0.90),rgba(165,222,188,0.95),rgba(150,215,180,0.95));background-size:300% 300%;animation:bannerShine 4s ease infinite;cursor:pointer;margin-top:10px;margin-bottom:10px;}
-.chaeum-home-banner-inner{border-radius:14.5px;background:var(--grad-mintyellow);padding:13px 17px;display:flex;align-items:center;gap:12px;}
-.chaeum-home-banner-icon{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,0.55);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px;color:rgba(40,120,80,0.85);}
-.chaeum-home-banner-txt{flex:1;min-width:0;}
-.chaeum-home-banner-app{font-size:9.5px;font-weight:500;letter-spacing:0.08em;color:rgba(65,125,70,0.75);margin-bottom:3px;}
-.chaeum-home-banner-title{font-size:var(--main-text-size);color:rgba(70,90,55,0.92);font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.chaeum-home-banner-cat{font-size:var(--dow-label-size);color:rgba(100,140,75,0.80);margin-top:2px;}
-.chaeum-home-banner-arrow{font-size:16px;color:rgba(80,130,85,0.55);flex-shrink:0;}
+/* ── 콘텐츠 허브 (독서 코너와 동일 톤) — 콘텐츠 전용 진입구, 향후 UI 작업 예정 ── */
+.content-hub-ov{position:fixed;inset:0;z-index:8000;background:var(--bg);display:flex;flex-direction:column;overflow-y:auto;transform:translateX(100%);transition:transform .3s cubic-bezier(.32,.72,0,1);pointer-events:none;}
+.content-hub-ov .settings-hdr{position:sticky;top:0;z-index:10;background:var(--bg);}
+.content-hub-ov.on{transform:translateX(0);pointer-events:auto;}
+.content-hub-body{padding:16px 18px 30px;display:flex;flex-direction:column;gap:18px;overflow-y:auto;flex:1;}
+.wcal-note-icon{color:var(--tm);opacity:0.6;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center;padding:4px;}
+.wcal-note-icon.has{opacity:1;color:var(--pal-mauvepink);}
+.wcal-note-display{font-size:var(--dow-label-size);color:var(--tp);line-height:1.6;background:rgba(210,180,160,0.14);border-radius:10px;padding:9px 11px;margin-top:8px;cursor:pointer;}
+.ch-month-banner-row{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;}
+.ch-month-banner-row::-webkit-scrollbar{display:none;}
+.ch-month-banner-chip{flex-shrink:0;font-size:var(--main-text-size);font-weight:500;color:var(--tp);background:var(--card);border:1px solid var(--card-b);border-radius:12px;padding:10px 16px;cursor:pointer;white-space:nowrap;}
+.ch-note-tl-item{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid rgba(var(--divider-rgb),0.25);}
+.ch-note-tl-item:last-child{border-bottom:none;}
+.ch-note-tl-date{width:52px;flex-shrink:0;font-size:var(--dow-label-size);color:var(--tm);padding-top:1px;}
+.ch-note-tl-title{font-size:var(--main-text-size);color:var(--tp);font-weight:500;}
+.ch-note-tl-cat{font-size:10px;color:var(--ts);font-weight:400;margin-left:4px;}
+.ch-note-tl-text{font-size:var(--dow-label-size);color:var(--ts);line-height:1.6;margin-top:4px;}
+.ch-note-tl-empty{font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:20px 0;}
 .rd-status-btn.active{background:var(--pal-pink-bg);color:var(--pal-pink-text);}
 .rd-del-btn{color:var(--tm);cursor:pointer;margin-left:auto;display:inline-flex;align-items:center;}
 .rd-empty{font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:14px 0;}
@@ -1301,7 +1262,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div class="icon-btn" onclick="openSettings()">
           <i class="ti ti-settings-2" style="font-size:16px;color:var(--tm);" aria-hidden="true"></i>
         </div>
-        <div class="icon-btn seed-icon-btn" onclick="openChaeum()">
+        <div class="icon-btn seed-icon-btn" onclick="openContentHub()">
           <i class="ti ti-clover" style="font-size:17px;color:var(--pal-mintlime);" aria-hidden="true"></i>
         </div>
         <div class="icon-btn reading-icon-btn" onclick="openReading()">
@@ -1492,7 +1453,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div class="slabel">콘텐츠 기록</div>
         <div style="display:flex;gap:6px;">
           <button class="slabel-search-btn" onclick="openContentMonthlyReportSheet()" title="콘텐츠 모아보기"><i class="ti ti-calendar-event ico-sz-14" aria-hidden="true"></i></button>
-          <button class="slabel-search-btn" onclick="openWatchCalendarSheet()" title="감상 캘린더"><i class="ti ti-calendar-heart ico-sz-14" aria-hidden="true"></i></button>
         </div>
       </div>
       <div class="card" style="padding:14px 10px;">
@@ -1598,13 +1558,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 <!-- TODO SHEET -->
 <!-- RESERVE TODO SHEET -->
-<div class="overlay" id="chaeum-detail-sheet" onclick="closeSheet('chaeum-detail-sheet',event)">
-  <div class="bsheet" style="max-height:82vh;overflow-y:auto;" onclick="event.stopPropagation()">
-    <div class="sheet-handle"></div>
-    <div id="chaeum-detail-body" style="padding:4px 18px 28px;"></div>
-  </div>
-</div>
-
 <div class="overlay" id="night-postpone-sheet" onclick="closeSheet('night-postpone-sheet',event)">
   <div class="bsheet" style="max-height:80vh;overflow-y:auto;" onclick="event.stopPropagation()">
     <div class="sheet-handle"></div>
@@ -1804,29 +1757,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   </div>
 </div>
 
-<!-- WATCH CALENDAR SHEET (감상 캘린더 — 실제로 본 날짜에 포스터를 꽂는 달력형 뷰, 콘텐츠 모아보기와 별도 기능) -->
-<div class="overlay" id="watch-cal-sheet" onclick="closeSheet('watch-cal-sheet',event)">
-  <div class="bsheet" style="max-height:85vh;overflow-y:auto;" onclick="event.stopPropagation()">
-    <div class="sheet-handle"></div>
-    <div style="padding:0 20px 24px;">
-      <div class="goal-section-title" style="margin-top:0;"><i class="ti ti-calendar-heart ico-13" aria-hidden="true"></i> 감상 캘린더</div>
-      <div style="display:flex;align-items:center;justify-content:center;gap:18px;margin:10px 0 6px;">
-        <i class="ti ti-chevron-left ico-cal-nav" onclick="wcalMonthShift(-1)" aria-hidden="true"></i>
-        <div id="wcal-month-label" style="font-weight:600;font-size:var(--main-text-size);color:var(--tp);"></div>
-        <i class="ti ti-chevron-right ico-cal-nav" onclick="wcalMonthShift(1)" aria-hidden="true"></i>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <div class="wcal-filter-chips" id="wcal-filter-chips" style="flex:1;"></div>
-        <button class="slabel-search-btn" onclick="openWcalAddSheet()" title="감상 기록 추가" style="flex-shrink:0;"><i class="ti ti-plus ico-sz-14" aria-hidden="true"></i></button>
-      </div>
-      <div class="wcal-weekday-row"><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span><span>일</span></div>
-      <div class="wcal-grid" id="wcal-grid"></div>
-      <div class="wcal-legend" id="wcal-legend"></div>
-      <div id="wcal-detail"></div>
-    </div>
-  </div>
-</div>
-
 <!-- WATCH CALENDAR ADD SHEET (드라마/책 대상 — 리듬 기록이나 등록 기간이 못 잡아낸 감상일을 수동으로 보충) -->
 <div class="overlay" id="wcal-add-sheet" style="z-index:8600;" onclick="closeSheet('wcal-add-sheet',event)">
   <div class="bsheet" style="max-height:85vh;overflow-y:auto;" onclick="event.stopPropagation()">
@@ -1847,6 +1777,17 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           <button onclick="wcalAddConfirm()" style="flex:1;padding:11px;border-radius:12px;border:none;background:var(--pal-mauvepink);color:#fff;font-size:var(--main-text-size);font-weight:600;">추가하기</button>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- CONTENT NOTE TIMELINE SHEET (일자별 감상 코멘트 모아보기 — 읽기 전용, 콘텐츠 허브 내에서만 진입) -->
+<div class="overlay" id="content-note-timeline-sheet" onclick="closeSheet('content-note-timeline-sheet',event)">
+  <div class="bsheet" style="max-height:85vh;overflow-y:auto;" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div style="padding:0 20px 24px;">
+      <div class="goal-section-title" style="margin-top:0;"><i class="ti ti-timeline ico-13" aria-hidden="true"></i> 코멘트 모아보기</div>
+      <div id="content-note-timeline-list"></div>
     </div>
   </div>
 </div>
@@ -2274,16 +2215,38 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   </div>
 </div>
 
-<div class="chaeum-ov" id="chaeum-ov">
+<!-- CONTENT HUB (콘텐츠 전용 진입구) — 감상 캘린더가 메인, 최근 본 콘텐츠/월별 아카이브는 독서코너 톤 차용 -->
+<div class="content-hub-ov" id="content-hub-ov">
   <div class="settings-hdr" style="padding-top:max(20px,env(safe-area-inset-top));">
-    <div class="settings-back" onclick="closeChaeum()">
+    <div class="settings-back" onclick="closeContentHub()">
       <i class="ti ti-chevron-left" style="font-size:16px;color:var(--ts);" aria-hidden="true"></i>
     </div>
-    <span class="settings-ttl">채움</span>
+    <span class="settings-ttl">콘텐츠</span>
     <div style="flex:1;"></div>
+    <div class="settings-back" style="width:30px;height:30px;" onclick="openContentNoteTimeline()" title="코멘트 모아보기">
+      <i class="ti ti-timeline" style="font-size:15px;color:var(--ts);" aria-hidden="true"></i>
+    </div>
+    <div class="settings-back" style="width:30px;height:30px;" onclick="openWcalAddSheet()" title="감상 기록 추가">
+      <i class="ti ti-plus" style="font-size:15px;color:var(--ts);" aria-hidden="true"></i>
+    </div>
   </div>
-  <div class="chaeum-body">
-    <div id="chaeum-log-slot"><div class="chaeum-log-loading">불러오는 중...</div></div>
+  <div class="content-hub-body" id="content-hub-body">
+    <div style="display:flex;align-items:center;justify-content:center;gap:18px;margin:2px 0 6px;">
+      <i class="ti ti-chevron-left ico-cal-nav" onclick="wcalMonthShift(-1)" aria-hidden="true"></i>
+      <div id="wcal-month-label" style="font-weight:600;font-size:var(--main-text-size);color:var(--tp);"></div>
+      <i class="ti ti-chevron-right ico-cal-nav" onclick="wcalMonthShift(1)" aria-hidden="true"></i>
+    </div>
+    <div class="wcal-filter-chips" id="wcal-filter-chips"></div>
+    <div class="wcal-weekday-row"><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span><span>일</span></div>
+    <div class="wcal-grid" id="wcal-grid"></div>
+    <div class="wcal-legend" id="wcal-legend"></div>
+    <div id="wcal-detail"></div>
+
+    <div class="slabel" style="margin-top:18px;">최근 본 콘텐츠</div>
+    <div class="rd-cover-row" id="ch-recent-row"></div>
+
+    <div class="slabel" style="margin-top:14px;">월별 아카이브</div>
+    <div class="ch-month-banner-row" id="ch-month-banner-row"></div>
   </div>
 </div>
 
@@ -2449,7 +2412,7 @@ function renderHomeBody(section){
     }
     const isNight2=getSubSection()==='night_2';
     if(!isNight2){
-      body.appendChild(makeChaeumHomeBanner());
+      // 채움 홈배너: 저녁 홈탭 전용으로 재정비 예정(추후 추가)
       body.appendChild(makeHabitMiniCheckRow());
       body.appendChild(makeEveningMiniStatCard());
     }
@@ -4301,10 +4264,6 @@ function renderHome(){
 // ── CONSTANTS
 const SUPA_URL='https://vqvpzrxmtpryzhontlxc.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdnB6cnhtdHByeXpob250bHhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTgxMjksImV4cCI6MjA5NjYzNDEyOX0.pbtq1UMPC7ylYM1H2xVa19C1TFlceLmEfEtkz3WK2VI';
-// 채움로그(저녁 학습 기록 자매앱) — 완전 별도 Supabase 프로젝트. iikoto에서는 읽기 전용으로만 조회.
-const CHAEUM_SUPA_URL='https://sqeyoqpchiljvinuqxjf.supabase.co';
-const CHAEUM_SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNxZXlvcXBjaGlsanZpbnVxeGpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5ODY5NTksImV4cCI6MjEwMjU2Mjk1OX0.H_JNNYz7_eguAqds-Wm6cwK926U74aVPaS_XwGRKeB0';
-const CHAEUM_LOG_URL='https://bombyul1011.github.io/chaeumlog/';
 const TMDB_KEY='6c78371ce15bb9d262938a66d5ef256e';
 const KAKAO_KEY='33799426c5377181c89616f5b2154bf0';
 const DAYS=['일','월','화','수','목','금','토'];
@@ -6758,149 +6717,6 @@ function _paceTopRhythmCat(dk){
 }
 // 저녁 파트1용 미니통계 카드 — 당일 기록 기준(완료 투두 / 체크 습관 / 오늘의 최다 리듬), 오후 통계카드보다 훨씬 컴팩트하게
 // 저녁 홈탭 — 오늘 활동 분포(점 타임라인) 카드. 내용 없으면 카드 자체를 만들지 않음.
-// ── 채움 진입점 (풀스크린) — 채움로그(별도 앱/DB) 데이터를 읽기 전용으로 불러와 타임라인 표시 ──
-// ── 저녁 홈탭 파트2 채움 배너 — 오늘 최근 학습 1개 미리보기(캐시 우선, 없으면 오늘자 1건만 가볍게 조회) ──
-const CHAEUM_CACHE_TTL=5*60*1000; // 캐시 유효시간(5분) — 이 안이면 패널을 열 때도 재요청하지 않고 재사용
-function makeChaeumHomeBanner(){
-  const wrap=document.createElement('div');
-  wrap.className='chaeum-home-banner';
-  wrap.innerHTML='<div class="chaeum-home-banner-inner"><div class="chaeum-home-banner-txt"><div class="chaeum-home-banner-app">CHAEUMLOG</div><div class="chaeum-home-banner-title">불러오는 중...</div></div></div>';
-  wrap.addEventListener('click',openChaeum);
-  const todayDk=dateKey(getLogicalDate());
-  const cache=S.get('chaeum_home_cache');
-  const fresh=cache&&(Date.now()-cache.ts<CHAEUM_CACHE_TTL);
-  if(fresh){
-    fillChaeumHomeBanner(wrap,(cache.sessions||[]).find(s=>s.date_key===todayDk)||null);
-  }else{
-    fetchChaeumSessions(8).then(sessions=>{
-      if(sessions!=null){S.set('chaeum_home_cache',{ts:Date.now(),sessions});_chaeumSessionsCache=sessions;}
-      fillChaeumHomeBanner(wrap,(sessions||[]).find(s=>s.date_key===todayDk)||null);
-    });
-  }
-  return wrap;
-}
-function fillChaeumHomeBanner(wrap,session){
-  const inner=wrap.querySelector('.chaeum-home-banner-inner');
-  if(!inner)return;
-  const titleHtml=session?escapeHtml(session.title||''):'오늘의 채움을 시작해볼까요';
-  const catHtml=session&&session.category?'<div class="chaeum-home-banner-cat">'+escapeHtml(session.category)+'</div>':'';
-  inner.innerHTML=
-    '<div class="chaeum-home-banner-icon"><i class="ti ti-clover" aria-hidden="true"></i></div>'+
-    '<div class="chaeum-home-banner-txt">'+
-      '<div class="chaeum-home-banner-app">CHAEUMLOG</div>'+
-      '<div class="chaeum-home-banner-title">'+titleHtml+'</div>'+
-      catHtml+
-    '</div>'+
-    '<i class="ti ti-chevron-right chaeum-home-banner-arrow" aria-hidden="true"></i>';
-}
-function openChaeum(){
-  document.getElementById('chaeum-ov').classList.add('on');
-  renderChaeumLog();
-}
-function closeChaeum(){document.getElementById('chaeum-ov').classList.remove('on');}
-async function fetchChaeumCategories(){
-  try{
-    const res=await fetch(CHAEUM_SUPA_URL+'/rest/v1/categories?select=code,name_ko,sort_order&order=sort_order.asc',{headers:{'apikey':CHAEUM_SUPA_KEY,'Authorization':'Bearer '+CHAEUM_SUPA_KEY}});
-    if(!res.ok)return null;
-    return await res.json();
-  }catch(e){return null;}
-}
-async function fetchChaeumSessions(limit){
-  try{
-    const res=await fetch(CHAEUM_SUPA_URL+'/rest/v1/sessions?select=id,date_key,category,title,brief_summary,summary_note,outline,tags,status&order=created_at.desc&limit='+limit,{headers:{'apikey':CHAEUM_SUPA_KEY,'Authorization':'Bearer '+CHAEUM_SUPA_KEY}});
-    if(!res.ok)return null;
-    return await res.json();
-  }catch(e){return null;}
-}
-function chaeumDateShort(dk){
-  const m=(dk||'').match(/^\d{4}-(\d{2})-(\d{2})/);
-  return m?m[1]+'.'+m[2]:(dk||'');
-}
-let _chaeumSessionsCache=[];
-async function renderChaeumLog(){
-  const slot=document.getElementById('chaeum-log-slot');
-  if(!slot)return;
-  const cache=S.get('chaeum_home_cache');
-  const fresh=cache&&(Date.now()-cache.ts<CHAEUM_CACHE_TTL);
-  const [categories,sessions]=await Promise.all([
-    fetchChaeumCategories(),
-    fresh?Promise.resolve(cache.sessions):fetchChaeumSessions(8)
-  ]);
-  if(sessions!=null&&!fresh){S.set('chaeum_home_cache',{ts:Date.now(),sessions});}
-  if(sessions!=null)_chaeumSessionsCache=sessions;
-  if(sessions==null){
-    slot.innerHTML='<div class="chaeum-log-loading">불러오지 못했어요<br><span onclick="window.location.href=\''+CHAEUM_LOG_URL+'\'" style="text-decoration:underline;cursor:pointer;">채움로그에서 확인하기</span></div>';
-    return;
-  }
-  let totalCount=sessions.length;
-  if(fresh&&cache.totalCount!=null){
-    totalCount=cache.totalCount;
-  }else{
-    const totalRes=await fetch(CHAEUM_SUPA_URL+'/rest/v1/sessions?select=id',{headers:{'apikey':CHAEUM_SUPA_KEY,'Authorization':'Bearer '+CHAEUM_SUPA_KEY,'Prefer':'count=exact'}}).catch(()=>null);
-    if(totalRes&&totalRes.ok){
-      const cr=totalRes.headers.get('content-range'); // 형식: "0-7/24"
-      const m=cr&&cr.match(/\/(\d+)$/);
-      if(m)totalCount=parseInt(m[1],10);
-    }
-    S.set('chaeum_home_cache',{ts:Date.now(),sessions,totalCount});
-  }
-  const chipsHtml=(categories||[]).map(c=>'<div class="chaeum-log-chip">'+escapeHtml(c.name_ko)+'</div>').join('');
-  const itemsHtml=sessions.length?sessions.map((s,i)=>{
-    return '<div class="chaeum-log-item">'+
-      '<div class="chaeum-log-date">'+chaeumDateShort(s.date_key)+'</div>'+
-      '<div class="chaeum-log-line-wrap"><div class="chaeum-log-dot'+(s.status==='completed'?'':' ing')+'"></div></div>'+
-      '<div class="chaeum-log-txt" onclick="openChaeumDetail('+i+')">'+
-        '<div class="chaeum-log-txt-title">'+escapeHtml(s.title||'')+'</div>'+
-        '<div class="chaeum-log-txt-cat">'+escapeHtml(s.category||'')+'</div>'+
-      '</div>'+
-    '</div>';
-  }).join(''):'<div class="chaeum-empty">아직 채움 기록이 없어요</div>';
-  slot.innerHTML=
-    '<div class="chaeum-log-card">'+
-      '<div class="chaeum-log-hdr">'+
-        '<div class="chaeum-log-title"><i class="ti ti-clover" aria-hidden="true"></i>채움 로그</div>'+
-        '<div class="chaeum-log-goto" onclick="window.location.href=\''+CHAEUM_LOG_URL+'\'">채움에서 보기<i class="ti ti-chevron-right" style="font-size:12px;" aria-hidden="true"></i></div>'+
-      '</div>'+
-      '<div class="chaeum-log-stat">총 '+totalCount+'개 세션</div>'+
-      (chipsHtml?'<div class="chaeum-log-chips">'+chipsHtml+'</div>':'')+
-      '<div class="chaeum-log-tl">'+itemsHtml+'</div>'+
-      (sessions.length>=8?'<div class="chaeum-log-more" onclick="window.location.href=\''+CHAEUM_LOG_URL+'\'">더 지난 채움 보기</div>':'')+
-    '</div>';
-}
-// 타임라인 항목 클릭 시 상세(요약/태그/목차/코멘트)를 바텀시트로 표시 — 인라인 아코디언 대신, 정보량이 많아 시트가 더 적합
-function openChaeumDetail(idx){
-  const s=_chaeumSessionsCache[idx];
-  if(!s)return;
-  const body=document.getElementById('chaeum-detail-body');
-  if(!body)return;
-  const tags=Array.isArray(s.tags)?s.tags:[];
-  const outline=Array.isArray(s.outline)?s.outline:[];
-  body.innerHTML=
-    '<div class="chaeum-detail-hdr">'+
-      '<div class="chaeum-detail-cat">'+escapeHtml(s.category||'')+'</div>'+
-      '<div class="chaeum-detail-title">'+escapeHtml(s.title||'')+'</div>'+
-      (tags.length?'<div class="chaeum-detail-tags">'+tags.map(t=>'<div class="chaeum-detail-tag">'+escapeHtml(t)+'</div>').join('')+'</div>':'')+
-    '</div>'+
-    (s.brief_summary?(
-      '<div class="chaeum-detail-sec">'+
-        '<div class="chaeum-detail-sec-lbl">요약</div>'+
-        '<div class="chaeum-detail-summary">'+escapeHtml(s.brief_summary)+'</div>'+
-      '</div>'
-    ):'')+
-    (outline.length?(
-      '<div class="chaeum-detail-sec">'+
-        '<div class="chaeum-detail-sec-lbl">그날 다룬 흐름</div>'+
-        '<ul class="chaeum-detail-outline">'+outline.map(o=>'<li>'+escapeHtml((o&&o.text)||'')+'</li>').join('')+'</ul>'+
-      '</div>'
-    ):'')+
-    (s.summary_note?(
-      '<div class="chaeum-detail-sec">'+
-        '<div class="chaeum-detail-sec-lbl">코멘트</div>'+
-        '<div class="chaeum-detail-comment">'+escapeHtml(s.summary_note)+'</div>'+
-      '</div>'
-    ):'');
-  openSheet('chaeum-detail-sheet');
-}
 function makeEveningMiniStatCard(){
   const dk=dateKey(getLogicalDate());
   const doneTodos=_paceCountDoneUntilNow(dk,null);
@@ -10812,12 +10628,24 @@ function openReading(){
   document.getElementById('reading-ov').classList.add('on');
 }
 function closeReading(){document.getElementById('reading-ov').classList.remove('on');}
+// ── 콘텐츠 허브 진입점 (풀스크린) — 감상 캘린더/콘텐츠 모아보기 등 콘텐츠 전용 기능 확장 예정 ──
+// ── 콘텐츠 허브 진입점 (풀스크린) — 감상 캘린더가 메인, 최근 콘텐츠/월별 아카이브는 독서코너 톤 차용 ──
+function openContentHub(){
+  _wcalDate=new Date();
+  _wcalFilter='all';
+  _wcalSelectedDk=null;
+  document.getElementById('content-hub-ov').classList.add('on');
+  _wcalRefresh();
+  renderChHubRecent();
+  renderChHubMonthBanners();
+}
+function closeContentHub(){document.getElementById('content-hub-ov').classList.remove('on');}
 
-// ── 독서/씨앗/설정/채움 코너 엣지 스와이프 뒤로가기 ──
+// ── 독서/씨앗/설정/콘텐츠 코너 엣지 스와이프 뒤로가기 ──
 (function(){
   let sx=null,sy=null,active=false;
   document.addEventListener('touchstart',function(e){
-    const ov=document.querySelector('.reading-ov.on,.settings-ov.on,.chaeum-ov.on');
+    const ov=document.querySelector('.reading-ov.on,.settings-ov.on,.content-hub-ov.on');
     if(!ov){active=false;return;}
     if(document.querySelector('.overlay.on,.modal-ov.on')){active=false;return;} // 시트/모달 열려있으면 무시
     const t=e.touches[0];
@@ -10830,11 +10658,11 @@ function closeReading(){document.getElementById('reading-ov').classList.remove('
     const t=e.changedTouches[0];
     const dx=t.clientX-sx,dy=t.clientY-sy;
     if(dx>80&&Math.abs(dy)<60){
-      const ov=document.querySelector('.reading-ov.on,.settings-ov.on,.chaeum-ov.on');
+      const ov=document.querySelector('.reading-ov.on,.settings-ov.on,.content-hub-ov.on');
       if(!ov)return;
       if(ov.id==='reading-ov')closeReading();
       else if(ov.id==='settings-ov')closeSettings();
-      else if(ov.id==='chaeum-ov')closeChaeum();
+      else if(ov.id==='content-hub-ov')closeContentHub();
     }
   },{passive:true});
 })();
@@ -11580,15 +11408,9 @@ let _wcalByDate={}; // 이번 달 집계 캐시: {dk: [{cat,title,poster}, ...]}
 let _wcalSelectedDk=null;
 // 서버의 수동 추가분을 먼저 내려받고, 그 결과와 무관하게 로컬 데이터로 즉시 1차 렌더(체감 속도용) — 공통 로직이라 헬퍼로 뽑음
 function _wcalRefresh(){
-  syncWcalManualDown(monthKey(_wcalDate)).then(loadAndRenderWatchCal);
+  const mk=monthKey(_wcalDate);
+  Promise.all([syncWcalManualDown(mk),syncWcalNotesDown(mk)]).then(loadAndRenderWatchCal);
   loadAndRenderWatchCal();
-}
-function openWatchCalendarSheet(){
-  _wcalDate=new Date();
-  _wcalFilter='all';
-  _wcalSelectedDk=null;
-  openSheet('watch-cal-sheet');
-  _wcalRefresh();
 }
 function wcalMonthShift(delta){
   _wcalDate.setMonth(_wcalDate.getMonth()+delta);
@@ -11626,7 +11448,7 @@ function loadAndRenderWatchCal(){
   }
   // 음악 — contents(등록=감상일) 이번 달분
   getContents(mk).filter(c=>c.cat==='music'&&c.startDate).forEach(c=>{
-    push(c.startDate,{cat:'music',title:c.title,poster:c.poster});
+    push(c.startDate,{cat:'music',title:c.title,poster:c.poster,cid:c.cid||null});
   });
   // 영화 — 극장 관람 등 리듬 기록 없이 콘텐츠탭에만 등록되는 경우가 잦아, 리듬 블록으로 한 번도 안 잡힌 영화는
   // contents의 종료일(없으면 시작일)로 폴백. 리듬 기록이 있는 영화는 그 실제 감상일이 더 정확하므로 폴백 대상에서 제외.
@@ -11642,12 +11464,13 @@ function loadAndRenderWatchCal(){
   getWcalManual(mk).forEach(it=>push(it.dk,{cat:it.cat,title:it.title}));
 
   // 포스터 매칭 — 드라마/영화/책은 같은 제목의 콘텐츠 항목(이번 달+전월, 진행중 포함)에서 poster를 찾아 붙임
-  const posterByTitle={};
+  // cid도 함께 매칭해 붙임 — 콘텐츠탭 등록 원본과 연결해야 일자별 코멘트(cid 기준)를 저장할 수 있음
+  const posterByTitle={},cidByTitle={};
   [...getContents(mk),...getContents(prevMk)].forEach(c=>{
-    if(c.cat!=='music'&&c.title)posterByTitle[c.title]=c.poster||null;
+    if(c.cat!=='music'&&c.title){posterByTitle[c.title]=c.poster||null;cidByTitle[c.title]=c.cid||null;}
   });
   Object.values(_wcalByDate).forEach(list=>list.forEach(it=>{
-    if(it.cat!=='music')it.poster=posterByTitle[it.title]||null;
+    if(it.cat!=='music'){it.poster=posterByTitle[it.title]||null;it.cid=cidByTitle[it.title]||null;}
   }));
 
   // 한 날짜에 같은 제목이 여러 세션(리듬 블록)으로 중복 등록됐을 수 있으므로 날짜별로 제목+카테고리 기준 유일화
@@ -11722,32 +11545,117 @@ function renderWatchCalLegend(){
   ).join('');
 }
 // 하단 상세 — 독서달력 renderReadingCalDayDetailHtml과 동일한 mr-card/mr-sec-title 톤(포스터+제목+메타 한 줄)
+// 각 항목에 코멘트 아이콘 노출 — cid가 있는 항목만 코멘트 작성 가능(콘텐츠탭 등록 원본 기준으로만 연결)
 function renderWatchCalDetail(){
   const el=document.getElementById('wcal-detail');if(!el)return;
   if(!_wcalSelectedDk){el.innerHTML='';return;}
   const items=_wcalFilteredItems(_wcalSelectedDk);
   if(!items.length){el.innerHTML='';return;}
   const dispDate=parseInt(_wcalSelectedDk.slice(5,7),10)+'월 '+parseInt(_wcalSelectedDk.slice(8,10),10)+'일';
-  const rows=items.map(it=>{
+  const dk=_wcalSelectedDk;
+  const rows=items.map((it,idx)=>{
     const m=WCAL_CAT_META[it.cat];
     const posterHtml=_wcalPosterThumbHtml(it.cat,it.poster);
-    return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;">
-      ${posterHtml}
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:var(--main-text-size);color:var(--tp);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(it.title)}</div>
-        <div style="font-size:var(--dow-label-size);color:var(--ts);margin-top:2px;">${m.label}</div>
+    const hasNote=it.cid&&!!getWcalNoteFor(it.cid,dk);
+    const noteBtnHtml=it.cid?`<span class="wcal-note-icon${hasNote?' has':''}" onclick="openWcalNoteInput('${it.cid}','${dk}',${idx})" title="코멘트"><i class="ti ti-message-2 ico-sz-13" aria-hidden="true"></i></span>`:'';
+    const noteRowHtml=`<div id="wcal-note-row-${idx}"></div>`;
+    return `<div style="padding:7px 0;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        ${posterHtml}
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:var(--main-text-size);color:var(--tp);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(it.title)}</div>
+          <div style="font-size:var(--dow-label-size);color:var(--ts);margin-top:2px;">${m.label}</div>
+        </div>
+        ${noteBtnHtml}
       </div>
+      ${noteRowHtml}
     </div>`;
   }).join('');
   el.innerHTML=`<div class="mr-card" style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--card-b);">
     <div class="mr-sec-title" style="margin-bottom:6px;">${dispDate} — ${items.length}개</div>
     ${rows}
   </div>`;
+  // 기존에 작성된 코멘트가 있으면 접힌 상태로 미리 보여줌
+  items.forEach((it,idx)=>{
+    if(!it.cid)return;
+    const note=getWcalNoteFor(it.cid,dk);
+    if(note)renderWcalNoteRow(idx,it.cid,dk,note,false);
+  });
 }
 function wcalSelectDay(dk){
   _wcalSelectedDk=(_wcalSelectedDk===dk)?null:dk;
   renderWatchCalGrid();
   renderWatchCalDetail();
+}
+
+// ── 일자별 감상 코멘트 (콘텐츠탭 등록 원본의 cid 기준으로만 연결 — 별점/총평(contents.review)과는 별개의 가벼운 기록) ──
+// 저장 위치: 새 테이블 없이 goal_notes를 wchallenge/wcal_manual과 동일한 범용 저장소 패턴으로 재사용.
+// key: 'wcal_note_YYYY-MM', lines: [{cid,dk,title,cat,text,updatedAt}, ...] — 월별로 나눠 저장, 개수 제한 없음(하루 여러 개 가능).
+function getWcalNotes(mk){return S.get('wcal_note_'+mk)||[];}
+function saveWcalNotes(mk,data){S.set('wcal_note_'+mk,data);S.set('wcal_note_pending_'+mk,true);}
+async function syncWcalNotesDown(mk){
+  const key='wcal_note_'+mk;
+  const pendingKey='wcal_note_pending_'+mk;
+  if(S.get(pendingKey)){
+    await supaUpsert('goal_notes','note_key',[{note_key:key,lines:S.get(key)||[]}]);
+    S.set(pendingKey,false);
+    return;
+  }
+  const rows=await supaFetch(`goal_notes?note_key=eq.${encodeURIComponent(key)}`);
+  if(!rows)return;
+  if(!rows.length){
+    const local=S.get(key);
+    if(local&&local.length)await supaUpsert('goal_notes','note_key',[{note_key:key,lines:local}]);
+    return;
+  }
+  S.set(key,rows[0].lines);
+}
+// 특정 cid+날짜에 남긴 코멘트 하나 조회(같은 cid+날짜는 1개로 취급 — 그날 감상에 대한 메모는 계속 이어 써서 수정하는 형태)
+function getWcalNoteFor(cid,dk){
+  const mk=dk.slice(0,7);
+  return getWcalNotes(mk).find(n=>n.cid===cid&&n.dk===dk)||null;
+}
+// 코멘트 입력창을 해당 항목 자리에 펼침(작성/수정 겸용) — 이미 있으면 기존 텍스트를 채워 수정 모드로 시작
+function openWcalNoteInput(cid,dk,idx){
+  const existing=getWcalNoteFor(cid,dk);
+  const rowEl=document.getElementById('wcal-note-row-'+idx);
+  if(!rowEl)return;
+  rowEl.innerHTML=`<div style="margin-top:8px;">
+    <textarea id="wcal-note-inp-${idx}" class="rhythm-memo-inp" style="margin-bottom:8px;min-height:44px;" placeholder="오늘 본 것에서 인상적이었던 순간을 가볍게 남겨보세요">${escapeHtml(existing?existing.text:'')}</textarea>
+    <div style="display:flex;gap:8px;">
+      <button onclick="saveWcalNote('${cid}','${dk}',${idx})" style="flex:1;padding:9px;border-radius:10px;border:none;background:var(--pal-mauvepink);color:#fff;font-size:var(--dow-label-size);font-weight:600;">저장</button>
+      ${existing?`<button onclick="deleteWcalNote('${cid}','${dk}',${idx})" style="padding:9px 14px;border-radius:10px;border:1px solid var(--card-b);background:var(--card);color:var(--ts);font-size:var(--dow-label-size);">삭제</button>`:''}
+    </div>
+  </div>`;
+}
+function saveWcalNote(cid,dk,idx){
+  const inp=document.getElementById('wcal-note-inp-'+idx);
+  if(!inp)return;
+  const text=inp.value.trim();
+  if(!text)return;
+  const mk=dk.slice(0,7);
+  const list=getWcalNotes(mk);
+  const item=(_wcalByDate[dk]||[]).find(it=>it.cid===cid);
+  const i=list.findIndex(n=>n.cid===cid&&n.dk===dk);
+  const entry={cid,dk,title:item?item.title:'',cat:item?item.cat:'',text,updatedAt:Date.now()};
+  if(i>=0)list[i]=entry;else list.push(entry);
+  saveWcalNotes(mk,list);
+  if(navigator.onLine)syncWcalNotesDown(mk);
+  renderWcalNoteRow(idx,cid,dk,entry,false);
+}
+function deleteWcalNote(cid,dk,idx){
+  const mk=dk.slice(0,7);
+  const list=getWcalNotes(mk).filter(n=>!(n.cid===cid&&n.dk===dk));
+  saveWcalNotes(mk,list);
+  if(navigator.onLine)syncWcalNotesDown(mk);
+  const rowEl=document.getElementById('wcal-note-row-'+idx);
+  if(rowEl)rowEl.innerHTML='';
+}
+// 저장 완료 후 읽기 모드로 접어서 보여줌(다시 탭하면 openWcalNoteInput으로 수정 모드 재진입)
+function renderWcalNoteRow(idx,cid,dk,note,editing){
+  const rowEl=document.getElementById('wcal-note-row-'+idx);
+  if(!rowEl)return;
+  rowEl.innerHTML=`<div class="wcal-note-display" onclick="openWcalNoteInput('${cid}','${dk}',${idx})">${escapeHtml(note.text)}</div>`;
 }
 
 // ── 감상 기록 수동 추가 (드라마/책 한정 — 오디오북처럼 독서 등록을 안 했거나, TV를 보면서 감상탭을 안 눌렀을 때 보충용) ──
@@ -11771,6 +11679,72 @@ async function syncWcalManualDown(mk){
     return;
   }
   S.set(key,rows[0].lines);
+}
+
+// ── 콘텐츠 허브 — 최근 본 콘텐츠 5개 (독서코너 rd-cover-row 패턴 차용) ──
+function renderChHubRecent(){
+  const el=document.getElementById('ch-recent-row');if(!el)return;
+  const now=new Date();
+  const months=[monthKey(now),monthKey(new Date(now.getFullYear(),now.getMonth()-1,1))];
+  let all=[];
+  months.forEach(mk=>all=all.concat(getContents(mk)));
+  const covers=all.filter(c=>c.poster).sort((a,b)=>(b.created||0)-(a.created||0)).slice(0,5);
+  const slots=5;
+  let html='';
+  for(let i=0;i<slots;i++){
+    if(covers[i])html+=`<img class="rd-cover" src="${covers[i].poster}" alt="${escapeHtml(covers[i].title||'')}">`;
+    else html+='<div class="rd-cover rd-cover-empty"></div>';
+  }
+  el.innerHTML=html;
+}
+// ── 콘텐츠 허브 — 월별 아카이브 배너(가로 스크롤) — 탭하면 해당 월의 감상 캘린더로 바로 이동 ──
+function renderChHubMonthBanners(){
+  const el=document.getElementById('ch-month-banner-row');if(!el)return;
+  const now=new Date();
+  let html='';
+  for(let i=0;i<12;i++){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const mk=monthKey(d);
+    const label=(d.getMonth()+1)+'월';
+    html+=`<div class="ch-month-banner-chip" onclick="chJumpToMonth('${mk}')">${label}</div>`;
+  }
+  el.innerHTML=html;
+}
+function chJumpToMonth(mk){
+  const [y,m]=mk.split('-').map(Number);
+  _wcalDate=new Date(y,m-1,1);
+  _wcalSelectedDk=null;
+  _wcalRefresh();
+  document.getElementById('content-hub-body').scrollTo({top:0,behavior:'smooth'});
+}
+
+// ── 콘텐츠 허브 — 코멘트 모아보기(타임라인, 읽기 전용) — 독서코너의 독서달력 진입구와 동일한 위치의 헤더 아이콘으로 진입 ──
+let _chNoteTimelineMonths=6; // 최근 몇 개월치를 모아볼지
+function openContentNoteTimeline(){
+  openSheet('content-note-timeline-sheet');
+  renderContentNoteTimeline();
+}
+function renderContentNoteTimeline(){
+  const el=document.getElementById('content-note-timeline-list');if(!el)return;
+  const now=new Date();
+  let all=[];
+  for(let i=0;i<_chNoteTimelineMonths;i++){
+    const mk=monthKey(new Date(now.getFullYear(),now.getMonth()-i,1));
+    all=all.concat(getWcalNotes(mk));
+  }
+  all.sort((a,b)=>(b.dk||'').localeCompare(a.dk||'')||(b.updatedAt||0)-(a.updatedAt||0));
+  if(!all.length){el.innerHTML='<div class="ch-note-tl-empty">아직 남긴 코멘트가 없어요</div>';return;}
+  el.innerHTML=all.map(n=>{
+    const m=WCAL_CAT_META[n.cat]||{label:''};
+    const dispDate=n.dk?(parseInt(n.dk.slice(5,7),10)+'월 '+parseInt(n.dk.slice(8,10),10)+'일'):'';
+    return `<div class="ch-note-tl-item">
+      <div class="ch-note-tl-date">${dispDate}</div>
+      <div class="ch-note-tl-body">
+        <div class="ch-note-tl-title">${escapeHtml(n.title||'')} <span class="ch-note-tl-cat">${m.label}</span></div>
+        <div class="ch-note-tl-text">${escapeHtml(n.text||'')}</div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 let _wcalAddSelected=null; // {cat,title,poster}
