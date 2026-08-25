@@ -788,8 +788,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="glass"] .memo-bub.memo-bub-seed{background:none;border-left-color:rgba(120,155,160,0.22);}
 [data-theme="glass"] .memo-item{margin-bottom:14px;}
 /* ── READING HUB ── */
-.reading-ov{position:fixed;inset:0;margin:0 auto;max-width:430px;z-index:8000;background:var(--bg);display:none;flex-direction:column;overflow-y:auto;}
-.reading-ov .settings-hdr{position:sticky;top:0;z-index:10;background:var(--bg);}
+.reading-ov{position:fixed;inset:0;margin:0 auto;max-width:430px;z-index:8000;background:var(--bg);background-attachment:fixed;display:none;flex-direction:column;overflow-y:auto;}
+.reading-ov .settings-hdr{position:sticky;top:0;z-index:10;background:var(--bg);background-attachment:fixed;border-bottom:none;}
 .reading-ov.on{display:flex;}
 .reading-body{padding:16px 18px 30px;display:flex;flex-direction:column;gap:18px;}
 .rd-top{position:relative;border-radius:20px;padding:1.8px;background:linear-gradient(120deg,rgba(255,170,200,0.95),rgba(255,205,140,0.92),rgba(195,200,245,0.65),rgba(170,235,200,0.92),rgba(255,170,200,0.95));background-size:300% 300%;animation:bannerShine 10s ease infinite;}
@@ -990,8 +990,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rd-detail-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
 .rd-status-btn{font-size:var(--dow-label-size);padding:5px 10px;border-radius:8px;border:1px solid var(--card-b);background:var(--card);color:var(--ts);cursor:pointer;}
 /* ── 콘텐츠 허브 (독서 코너와 동일 톤) — 콘텐츠 전용 진입구, 향후 UI 작업 예정 ── */
-.content-hub-ov{position:fixed;inset:0;margin:0 auto;max-width:430px;z-index:8000;background:var(--bg);display:none;flex-direction:column;overflow-y:auto;}
-.content-hub-ov .settings-hdr{position:sticky;top:0;z-index:10;background:var(--bg);}
+.content-hub-ov{position:fixed;inset:0;margin:0 auto;max-width:430px;z-index:8000;background:var(--bg);background-attachment:fixed;display:none;flex-direction:column;overflow-y:auto;}
+.content-hub-ov .settings-hdr{position:sticky;top:0;z-index:10;background:var(--bg);background-attachment:fixed;border-bottom:none;}
 .content-hub-ov.on{display:flex;}
 .content-hub-body{padding:16px 18px 30px;display:flex;flex-direction:column;gap:18px;}
 .wcal-note-icon{color:var(--tm);opacity:0.65;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center;}
