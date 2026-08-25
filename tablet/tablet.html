@@ -391,8 +391,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .wcal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;}
 .wcal-cell{aspect-ratio:2/3;position:relative;display:flex;align-items:center;justify-content:center;}
 .wcal-date-plain{font-size:var(--fs-sm);color:var(--tm);font-weight:500;}
-.wcal-thumb{position:relative;width:100%;height:100%;border-radius:8px;overflow:hidden;cursor:pointer;background:var(--card);}
-.wcal-thumb.selected{box-shadow:inset 0 0 0 2px rgba(214,90,140,0.8);}
+.wcal-thumb{position:relative;width:100%;height:100%;border-radius:8px;overflow:hidden;background:var(--card);}
 .wcal-split2{position:absolute;inset:0;display:grid;grid-template-rows:1fr 1fr;gap:1px;}
 .wcal-split2>*,.wcal-split3>*,.wcal-split3-bottom>*,.wcal-split4>*{min-width:0;min-height:0;overflow:hidden;}
 .wcal-split3{position:absolute;inset:0;display:grid;grid-template-rows:1fr 1fr;gap:1px;min-height:0;}
@@ -405,10 +404,6 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .wcal-week-row{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;}
 .wcal-week-cell{aspect-ratio:2/3;position:relative;display:flex;align-items:center;justify-content:center;}
 .wcal-week-cell.today .wcal-date-plain{color:rgba(214,90,140,0.8);font-weight:700;}
-.wcal-detail-item{display:flex;align-items:center;gap:9px;padding:6px 0;border-bottom:1px dashed rgba(var(--divider-rgb),0.25);}
-.wcal-detail-item:last-child{border-bottom:none;}
-.wcal-detail-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-body);color:var(--tp);}
-.wcal-detail-cat{font-size:var(--fs-sm);color:var(--tm);flex-shrink:0;}
 /* ── 콘텐츠 모아보기 헤더 코멘트 모아보기 진입 아이콘 ── */
 .cgrid-note-tl-toggle{font-size:14px;color:var(--tm);cursor:pointer;margin-left:6px;}
 .cgrid-title-toggle{cursor:pointer;user-select:none;}
@@ -441,7 +436,6 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .ch-tlB-title-row{display:flex;align-items:center;gap:6px;margin-bottom:3px;}
 .ch-tlB-title{font-size:15px;font-weight:600;color:var(--tp);}
 .ch-tlB-cat{font-size:10px;color:var(--tm);background:rgba(0,0,0,0.04);border-radius:5px;padding:2px 6px;flex-shrink:0;}
-.ch-tlB-progress-badge{font-size:9.5px;font-weight:600;color:#fff;background:rgba(140,175,150,0.85);border-radius:5px;padding:2px 6px;flex-shrink:0;}
 .ch-tlB-final-row{display:flex;align-items:center;gap:6px;margin-bottom:4px;}
 .ch-tlB-stars{font-size:11px;color:#e0a339;}
 .ch-tlB-final-text{font-size:var(--fs-sm);color:var(--ts);line-height:1.55;}
@@ -469,8 +463,10 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .week-watch-detail-item{display:flex;align-items:center;gap:8px;padding:5px 0;}
 .week-watch-detail-thumb{width:32px;height:32px;border-radius:6px;object-fit:cover;flex-shrink:0;}
 .week-watch-detail-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-sm);color:var(--tp);}
-.week-watch-detail-status{font-size:9.5px;font-weight:600;color:#7a7168;background:rgba(200,190,178,0.35);border-radius:5px;padding:2px 6px;flex-shrink:0;}
-.week-watch-detail-status.done{color:#8a6c20;background:rgba(255,205,90,0.35);}
+/* 콘텐츠(드라마/영화/책/음악) 진행중·완결 공용 배지 — 오늘의 감상, 주간 감상 상세, 월간 콘텐츠그리드, 코멘트 작품별뷰에서 재사용 */
+.status-badge{font-size:9.5px;font-weight:600;color:#7a7168;background:rgba(200,190,178,0.35);border-radius:5px;padding:2px 6px;flex-shrink:0;}
+.status-badge.done{color:#8a6c20;background:rgba(255,205,90,0.35);}
+.status-badge.dot{position:absolute;top:6px;right:6px;}
 #week-watch-detail{min-height:20px;margin-top:6px;}
 .week-watch-empty-phrase{text-align:center;font-size:var(--fs-xs);color:var(--tm);opacity:0.55;font-style:italic;padding:14px 10px 0;line-height:1.5;}
 #week-note-timeline{max-height:190px;overflow-y:auto;padding-right:2px;}
@@ -533,8 +529,6 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .content-card-row #today-contents{display:flex;flex-wrap:wrap;align-content:flex-start;gap:4px 14px;}
 .content-card-row .content-row{flex:0 0 calc(50% - 7px);min-width:0;padding:5px 0;border-right:none;margin-right:0;}
 .content-card-row .content-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.content-final-badge{font-size:9.5px;font-weight:600;color:#8a6c20;background:rgba(255,205,90,0.35);border-radius:5px;padding:2px 6px;flex-shrink:0;}
-.content-progress-badge{font-size:9.5px;font-weight:600;color:#7a7168;background:rgba(200,190,178,0.35);border-radius:5px;padding:2px 6px;flex-shrink:0;}
 
 /* 콘텐츠 모아보기(월별, 리스트형) — 그리드형(.cgrid-*)으로 대체됨, 아래 죽은 CSS 전체 제거됨
 
@@ -557,7 +551,6 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .cgrid-thumb{width:100%;height:100%;object-fit:cover;display:block;}
 .cgrid-thumb-fallback{width:100%;height:100%;display:flex;align-items:center;justify-content:center;}
 .cgrid-thumb-fallback i{font-size:22px;color:#fff;}
-.cgrid-status-dot{position:absolute;top:6px;right:6px;font-size:10px;padding:2px 6px;border-radius:6px;background:rgba(var(--pal-mint-rgb),0.85);color:#fff;font-weight:600;}
 .cgrid-thumb-icons{position:absolute;bottom:6px;right:6px;display:flex;gap:4px;}
 .cgrid-thumb-icons i{font-size:12px;color:#fff;background:rgba(0,0,0,0.4);border-radius:5px;padding:3px;}
 .cgrid-title{font-size:var(--fs-sm);color:var(--ts);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
@@ -910,7 +903,6 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
           <div class="wcal-filter-chips" id="wcal-filter-chips"></div>
           <div class="wcal-weekday-row" id="wcal-weekday-row"></div>
           <div class="wcal-grid" id="wcal-grid"></div>
-          <div id="wcal-detail"></div>
         </div>
         <div class="card cgrid-card">
           <div class="cgrid-hdr">

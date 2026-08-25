@@ -44,6 +44,14 @@ function toSortKey(t){
 }
 function weekKeyOf(d){const m=new Date(d);m.setDate(d.getDate()-((d.getDay()+6)%7));return dateKey(m);}
 function monthKeyOf(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;}
+// 주(월~일)의 소속 월 — 본앱(iikoto)과 동일하게 ISO 8601 방식: 그 주의 목요일이 속한 달을 그 주의 소속 월로 본다.
+// 8/31~9/6 같은 월 경계 주는 월요일이 8월이어도 목요일(9/3)이 9월이라 9월 소속으로 계산.
+// baseDate로 아무 날짜나 넘겨도 됨(주 안의 어느 요일이든 같은 결과) — 내부에서 그 주의 월요일을 구하고 +3일로 목요일을 잡음.
+function weekMonthKey(baseDate){
+  const monday=new Date(weekKeyOf(baseDate)+'T00:00:00');
+  const thu=new Date(monday);thu.setDate(monday.getDate()+3);
+  return monthKeyOf(thu);
+}
 const DOW=['일','월','화','수','목','금','토'];
 const DOW_MON_START=['월','화','수','목','금','토','일']; // 월요일 시작 캘린더(사이드바 미니캘린더, 독서달력)용
 function escapeHtml(s){const d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML;}
@@ -668,8 +676,8 @@ function renderTodayContents(items,todayNotes){
   if(!items.length){el.innerHTML='<div class="empty-msg">오늘 감상한 콘텐츠 없음</div>';return;}
   el.innerHTML=items.slice(0,4).map(c=>{
     const meta=CAT_ICON_META[c.content_cat]||{label:c.content_cat};
-    const finalBadge=(c.status==='done'&&c.end_date===dk)?'<span class="content-final-badge">완결</span>':'';
-    const progressBadge=(c.status==='watching')?'<span class="content-progress-badge">진행중</span>':'';
+    const finalBadge=(c.status==='done'&&c.end_date===dk)?'<span class="status-badge done">완결</span>':'';
+    const progressBadge=(c.status==='watching')?'<span class="status-badge">진행중</span>':'';
     return `<div class="content-row"><span class="content-cat">${meta.label||''}</span><span class="content-title">${escapeHtml(c.title)}</span>${finalBadge}${progressBadge}</div>`;
   }).join('');
 }
@@ -1003,15 +1011,13 @@ function shiftSelectedMonth(delta){
   renderMiniCal();
   loadMonthTab();
 }
-// 월요일 시작 기준, baseDate가 속한 주의 월요일이 그 달의 몇 번째 월요일인지로 "N주차" 계산
+// 목요일(ISO 8601) 기준 소속 월 + 그 달 안에서 몇 번째 주인지로 "N주차" 계산(weekMonthKey/getReportWeeksOfMonth와 동일 규칙, 본앱과 통일)
 function getWeekOfMonthLabel(baseDate){
-  const wk=weekKeyOf(baseDate);
-  const monday=new Date(wk+'T00:00:00');
-  const y=monday.getFullYear(),mo=monday.getMonth();
-  const firstOfMonth=new Date(y,mo,1);
-  const firstMondayOffset=(8-firstOfMonth.getDay())%7; // 그 달 1일 기준 첫 월요일까지 offset(일)
-  const firstMonday=new Date(y,mo,1+firstMondayOffset);
-  const weekNo=Math.round((monday-firstMonday)/(7*24*60*60*1000))+1;
+  const monday=new Date(weekKeyOf(baseDate)+'T00:00:00');
+  const mk=weekMonthKey(baseDate);
+  const [y,mo0]=mk.split('-').map(Number);
+  const mo=mo0-1;
+  const weekNo=_weekNoInMonth(dateKey(monday));
   return `${mo+1}월 ${weekNo}주차`;
 }
 
@@ -1047,6 +1053,11 @@ async function loadWeekTab(){
   const slStart=new Date(slEnd);slStart.setDate(slStart.getDate()-13);
   const slEndDk=dateKey(slEnd),slStartDk=dateKey(slStart);
 
+  // 이번 주(월~일)가 걸치는 저장 월(들) — contents/wcal_note는 날짜 기준 월별 시트라, 주가 두 달에 걸치면
+  // 데이터 누락 없이 양쪽 다 읽어야 함. "이 주가 어느 달 소속인가"(라벨 표시용)와는 다른 개념 — 그건 weekMonthKey(목요일 기준) 사용.
+  const spanStartMk=monthKeyOf(new Date(startDk+'T00:00:00'));
+  const spanEndMk=monthKeyOf(new Date(endDk+'T00:00:00'));
+
   const [goalRows,habits,habitChecks,memos,todos,sleepRows,onelineRows,contents,
     lwMemos,lwTodos,lwSleepRows,lwHabitChecks,lwContents,rblocksThis,rblocksLast,sleepReportRows,
     wcalStripRblocks,wcalStripContents,wcalNoteRowsA,wcalNoteRowsB]=await Promise.all([
@@ -1072,10 +1083,11 @@ async function loadWeekTab(){
     supaFetch(`sleep?date_key=gte.${slStartDk}&date_key=lte.${slEndDk}&select=date_key,score,sleep_time,wake_time`),
     // 이번 주 감상 스트립(월~일 전체) — 리듬 흐름 비교와 달리 오늘까지 절단하지 않고 7일 전체를 봄
     supaFetch(`rhythm_blocks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
-    supaFetch(`contents?month_key=in.(${monthKeyOf(new Date(startDk+'T00:00:00'))},${monthKeyOf(new Date(endDk+'T00:00:00'))})`),
-    // 이번 주 코멘트 타임라인용 감상 메모(월 경계를 넘을 수 있어 두 달치 모두 조회 후 주간 범위로 필터링)
-    supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wcal_note_'+monthKeyOf(new Date(startDk+'T00:00:00')))}`),
-    supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wcal_note_'+monthKeyOf(new Date(endDk+'T00:00:00')))}`)
+    supaFetch(`contents?month_key=in.(${spanStartMk},${spanEndMk})`),
+    // 이번 주 코멘트 타임라인용 감상 메모(월 경계를 넘을 수 있어 두 달치 모두 조회 후 주간 범위로 필터링).
+    // 시작월=종료월(대부분의 주)이면 같은 로우를 두 번 받게 되는데, 중복 제거는 renderWeekNoteTimeline에서 처리.
+    supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wcal_note_'+spanStartMk)}`),
+    supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wcal_note_'+spanEndMk)}`)
   ]);
 
   renderWeekGoals(goalRows&&goalRows[0]);
@@ -1354,7 +1366,7 @@ function renderWeekWatchDetail(){
     const thumb=it.poster
       ?`<img src="${it.poster}" class="week-watch-detail-thumb" />`
       :`<div class="week-watch-detail-thumb" style="background:${m.color};display:flex;align-items:center;justify-content:center;"><i class="ti ${m.icon}" style="color:#fff;" aria-hidden="true"></i></div>`;
-    const statusTag=it.status==='watching'?'<span class="week-watch-detail-status">진행중</span>':(it.status==='done'?'<span class="week-watch-detail-status done">완결</span>':'');
+    const statusTag=it.status==='watching'?'<span class="status-badge">진행중</span>':(it.status==='done'?'<span class="status-badge done">완결</span>':'');
     return `<div class="week-watch-detail-item">${thumb}<span class="week-watch-detail-title">${escapeHtml(it.title||'')}</span>${statusTag}</div>`;
   }).join('');
 }
@@ -1371,11 +1383,18 @@ function renderWeekNoteTimeline(weekDates,contents,noteRowsA,noteRowsB){
     }
   });
   const notes=[];
+  const seenNoteKeys=new Set();
   const posterByCid={};
   (contents||[]).forEach(c=>{if(c.client_id)posterByCid[c.client_id]=c.poster||null;});
   [noteRowsA,noteRowsB].forEach(rows=>{
     const lines=(rows&&rows[0]&&Array.isArray(rows[0].lines))?rows[0].lines:[];
-    lines.forEach(n=>{if(weekDates.includes(n.dk))notes.push({...n,poster:n.cid?(posterByCid[n.cid]||null):null});});
+    lines.forEach(n=>{
+      if(!weekDates.includes(n.dk))return;
+      const key=(n.cid||'')+'|'+n.dk+'|'+(n.text||'')+'|'+(n.updatedAt||'');
+      if(seenNoteKeys.has(key))return; // 시작월=종료월인 주는 A/B가 같은 로우라 여기서 걸러짐
+      seenNoteKeys.add(key);
+      notes.push({...n,poster:n.cid?(posterByCid[n.cid]||null):null});
+    });
   });
   if(!finals.length&&!notes.length){el.innerHTML='<div class="ch-note-tl-empty">이번 주엔 남긴 코멘트가 없어요</div>';return;}
   el.innerHTML=_chRenderNoteTimelineByDate(finals,notes);
@@ -1402,7 +1421,6 @@ async function loadMonthTab(){
   await renderMonthContentGrid(y,mo);
   await renderChaeumLogTablet();
   _wcalDate=new Date(_monthCalDate);
-  _wcalSelectedDk=null;
   await renderWatchCal();
   lockContentCollectToReadingCal();
 }
@@ -1559,7 +1577,7 @@ function _cgridItemHtml(c){
   const thumb=c.poster
     ?`<img class="cgrid-thumb" src="${c.poster}" />`
     :`<div class="cgrid-thumb-fallback" style="background:${meta.bg};"><i class="ti ${meta.icon}" aria-hidden="true"></i></div>`;
-  const statusDot=c.status==='watching'?'<span class="cgrid-status-dot">진행중</span>':'';
+  const statusDot=c.status==='watching'?'<span class="status-badge dot">진행중</span>':'';
   const icons=[];
   if(c.stars>0)icons.push('<i class="ti ti-star" aria-hidden="true"></i>');
   if(c.review||(_cgridNotesByCid[c.client_id]&&_cgridNotesByCid[c.client_id].length))icons.push('<i class="ti ti-message-circle" aria-hidden="true"></i>');
@@ -1783,17 +1801,14 @@ const WCAL_CAT_META={
 };
 let _wcalFilter='all';
 let _wcalByDate={};
-let _wcalSelectedDk=null;
 function wcalMonthShift(delta){
   _wcalDate.setMonth(_wcalDate.getMonth()+delta);
-  _wcalSelectedDk=null;
   renderWatchCal().then(lockContentCollectToReadingCal);
 }
 function wcalSetFilter(cat){
   _wcalFilter=cat;
   renderWatchCalGrid();
   renderWcalFilterChips();
-  renderWatchCalDetail();
 }
 // 드라마/영화/책은 rhythm_blocks(cat='enjoy', text="드라마 - 제목" 등)의 date_key가 감상일.
 // 음악은 리듬 기록이 없어 contents(content_cat='music')의 start_date(=등록일)를 그 날의 기록으로 사용.
@@ -1853,7 +1868,6 @@ async function renderWatchCal(){
   renderWcalFilterChips();
   document.getElementById('wcal-weekday-row').innerHTML=DOW_MON_START.map(d=>`<span>${d}</span>`).join('');
   renderWatchCalGrid();
-  renderWatchCalDetail();
 }
 function renderWcalFilterChips(){
   const el=document.getElementById('wcal-filter-chips');if(!el)return;
@@ -1888,29 +1902,9 @@ function renderWatchCalGrid(){
     const dk=`${y}-${pad(m+1)}-${pad(d)}`;
     const items=_wcalFilteredItems(dk);
     if(!items.length){html+=`<div class="wcal-cell"><div class="wcal-date-plain">${d}</div></div>`;continue;}
-    const sel=dk===_wcalSelectedDk?' selected':'';
-    html+=`<div class="wcal-cell"><div class="wcal-thumb${sel}" onclick="wcalSelectDay('${dk}')">${_wcalBuildThumb(items)}</div></div>`;
+    html+=`<div class="wcal-cell"><div class="wcal-thumb">${_wcalBuildThumb(items)}</div></div>`;
   }
   el.innerHTML=html;
-}
-function wcalSelectDay(dk){
-  _wcalSelectedDk=(_wcalSelectedDk===dk)?null:dk;
-  renderWatchCalGrid();
-  renderWatchCalDetail();
-}
-// 하단 상세 — 선택한 날짜의 감상 목록(포스터+제목+카테고리), 조회 전용
-function renderWatchCalDetail(){
-  const el=document.getElementById('wcal-detail');if(!el)return;
-  if(!_wcalSelectedDk){el.innerHTML='';return;}
-  const items=_wcalFilteredItems(_wcalSelectedDk);
-  if(!items.length){el.innerHTML='';return;}
-  el.innerHTML=`<div style="margin-top:10px;">${items.map(it=>{
-    const m=WCAL_CAT_META[it.cat];
-    const thumb=it.poster
-      ?`<img src="${it.poster}" style="width:32px;height:44px;border-radius:5px;object-fit:cover;flex-shrink:0;" />`
-      :`<div style="width:32px;height:44px;border-radius:5px;background:var(--card);flex-shrink:0;display:flex;align-items:center;justify-content:center;"><i class="ti ${m.icon}" style="color:var(--tm);font-size:13px;" aria-hidden="true"></i></div>`;
-    return `<div class="wcal-detail-item">${thumb}<span class="wcal-detail-title">${escapeHtml(it.title||'')}</span><span class="wcal-detail-cat">${m.label}</span></div>`;
-  }).join('')}</div>`;
 }
 
 
@@ -2082,17 +2076,15 @@ function _isReportRead(cacheKey){
   return _loadReadReports().has(cacheKey);
 }
 
-// 본앱과 동일한 "월 소속 주차" 판정: 그 주(월요일 시작)의 목요일이 해당 (y,mo)에 속할 때만 그 달 소속으로 인정.
+// 본앱과 동일한 "월 소속 주차" 판정: weekMonthKey(그 주 목요일 기준)와 동일 규칙.
 // 예: 8/31~9/6 주는 목요일이 9/3이라 9월 소속(월요일만 8월이어도 9월로 잡힘).
 function getReportWeeksOfMonth(y,mo){
+  const mk=`${y}-${pad(mo+1)}`;
   const dim=new Date(y,mo+1,0).getDate();
   const weekSet={};
   for(let d=1;d<=dim;d++){
     const date=new Date(y,mo,d);
-    const wk=weekKeyOf(date);
-    const wkStart=new Date(wk+'T00:00:00');
-    const wkThu=new Date(wkStart);wkThu.setDate(wkStart.getDate()+3);
-    if(wkThu.getFullYear()===y&&wkThu.getMonth()===mo)weekSet[wk]=true;
+    if(weekMonthKey(date)===mk)weekSet[weekKeyOf(date)]=true;
   }
   return Object.keys(weekSet).sort();
 }
@@ -2119,15 +2111,18 @@ function resetReportsView(){
   document.querySelectorAll('.report-filter-chip').forEach(el=>el.classList.remove('on'));
 }
 // 연간모드(습관/메모 박스, 주간종합 리스트)에서 쓰는 "월 정보 포함" 라벨 — 예: "8월 3주차"
+// 월 숫자도 wkNo와 같은 기준(목요일 소속)이어야 앞뒤가 맞음 — 월경계 주에서 월요일 월을 쓰면 wkNo와 불일치했던 버그 수정.
 function _weekLabelWithMonth(wk,wkNo){
-  const start=new Date(wk+'T00:00:00');
-  return `${start.getMonth()+1}월 ${wkNo}주차`;
+  const mk=weekMonthKey(new Date(wk+'T00:00:00'));
+  const mo=Number(mk.split('-')[1]);
+  return `${mo}월 ${wkNo}주차`;
 }
-// 그 주(wk, 월요일 날짜)가 속한 달 안에서 몇 번째 주인지 — getReportWeeksOfMonth와 동일한 "목요일 소속" 규칙 사용
+// 그 주(wk, 월요일 날짜)가 속한 달 안에서 몇 번째 주인지 — weekMonthKey와 동일한 "목요일 소속" 규칙 사용
 function _weekNoInMonth(wk){
   const start=new Date(wk+'T00:00:00');
-  const wkThu=new Date(start);wkThu.setDate(start.getDate()+3);
-  const weeks=getReportWeeksOfMonth(wkThu.getFullYear(),wkThu.getMonth());
+  const mk=weekMonthKey(start);
+  const [y,mo0]=mk.split('-').map(Number);
+  const weeks=getReportWeeksOfMonth(y,mo0-1);
   const idx=weeks.indexOf(wk);
   return idx>=0?idx+1:1;
 }
@@ -2349,11 +2344,12 @@ function renderReportBoxGrid(elId,weeksInMonth,rowsList,type,isYearly){
     }).join('');
     return;
   }
-  // 연간모드 — 월별로 줄을 나눠 최신월부터 세로로 쌓고, 각 월 줄 안에서만 가로 스와이프
+  // 연간모드 — 월별로 줄을 나눠 최신월부터 세로로 쌓고, 각 월 줄 안에서만 가로 스와이프.
+  // 그룹핑 기준도 weekMonthKey(목요일 소속)로 통일 — 월요일 기준으로 묶으면 월경계 주가 wkNo(목요일 기준)와
+  // 다른 달에 표시되는 모순이 생김(예: 8/31 주가 "8월 모음"에 묶이는데 라벨은 "9월 1주차"로 나오는 버그).
   const byMonth={}; // 'YYYY-MM' -> [{wk,row}]
   entries.forEach(({wk,row})=>{
-    const start=new Date(wk+'T00:00:00');
-    const mk=`${start.getFullYear()}-${pad(start.getMonth()+1)}`;
+    const mk=weekMonthKey(new Date(wk+'T00:00:00'));
     (byMonth[mk]=byMonth[mk]||[]).push({wk,row});
   });
   const monthKeys=Object.keys(byMonth).sort().reverse();
@@ -3336,7 +3332,7 @@ function _chRenderNoteTimelineByWork(finals,notes){
       `<div class="ch-tlB-final-row">${g.final.stars>0?`<div class="ch-tlB-stars">${'★'.repeat(g.final.stars)}${'☆'.repeat(5-g.final.stars)}</div>`:''}</div>
        ${g.final.review?`<div class="ch-tlB-final-text">${escapeHtml(g.final.review)}</div>`:''}`
       :'';
-    const progressBadgeHtml=g.final?'':'<span class="ch-tlB-progress-badge">진행중</span>';
+    const progressBadgeHtml=g.final?'':'<span class="status-badge">진행중</span>';
     const notesSorted=g.notes.slice().sort((a,b)=>(b.dk||'').localeCompare(a.dk||''));
     const notesHtml=notesSorted.length?`<div class="ch-tlB-notes">${notesSorted.map(n=>{
       const dispDate=n.dk?(parseInt(n.dk.slice(5,7),10)+'/'+parseInt(n.dk.slice(8,10),10)):'';
