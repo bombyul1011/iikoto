@@ -360,6 +360,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cmr-review-icon{color:var(--tm);opacity:0.65;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center;}
 .cmr-review-box{font-size:var(--dow-label-size);color:var(--tp);line-height:1.6;background:rgba(210,180,160,0.14);border-radius:10px;padding:9px 11px;margin:0 0 7px 46px;display:none;}
 .cmr-review-box.on{display:block;}
+.cmr-review-final{}
+.cmr-review-notes{margin-top:0;}
+.cmr-review-notes.with-final{margin-top:9px;padding-top:9px;border-top:1px dashed rgba(var(--divider-rgb),0.4);}
+.cmr-review-notes-lbl{font-size:10.5px;color:var(--tm);font-weight:600;margin-bottom:5px;}
+.cmr-review-note-item{font-size:var(--dow-label-size);color:var(--ts);line-height:1.6;margin-bottom:4px;}
+.cmr-review-note-item:last-child{margin-bottom:0;}
+.cmr-review-note-date{color:var(--tm);font-weight:600;margin-right:6px;font-variant-numeric:tabular-nums;}
 .sheet-loading-msg{text-align:center;color:var(--tm);padding:20px 0;}
 .ico-13{font-size:13px;vertical-align:-1px;}
 .ico-12{font-size:12px;vertical-align:-1px;}
@@ -3363,6 +3370,15 @@ function renderCmrMonthChips(){
 }
 const CONTENT_CAT_LABEL={drama:'드라마',book:'책',movie:'영화',music:'음악'};
 // 카테고리별 콘텐츠 카드 마크업 — 콘텐츠 모아보기 시트와 콘텐츠 허브의 월별 아카이브가 함께 씀(동일한 톤 유지)
+// 특정 cid로 남긴 감상 중 메모를 최근 여러 달에 걸쳐 모아옴(정주행처럼 몇 달째 이어지는 경우 대비)
+function getWcalNotesByCid(cid){
+  const now=new Date();
+  const months=[];
+  for(let i=0;i<_chNoteTimelineMonths;i++)months.push(monthKey(new Date(now.getFullYear(),now.getMonth()-i,1)));
+  let all=[];
+  months.forEach(mk=>all=all.concat(getWcalNotes(mk)));
+  return all.filter(n=>n.cid===cid).sort((a,b)=>(b.dk||'').localeCompare(a.dk||''));
+}
 function renderContentByCatHtml(byCat){
   const cats=['drama','book','movie','music'];
   const hasAny=cats.some(cat=>byCat[cat].length>0);
@@ -3375,8 +3391,19 @@ function renderContentByCatHtml(byCat){
       const statusHtml=c.status==='stopped'?`<span style="color:var(--tm);font-size:var(--dow-label-size);">중단</span>`:(c.status==='watching'?`<span style="color:var(--tm);font-size:var(--dow-label-size);">진행중</span>`:'');
       const posterHtml=c.poster?`<img src="${c.poster}" style="width:36px;height:36px;border-radius:8px;object-fit:cover;flex-shrink:0;" />`:`<div style="width:36px;height:36px;border-radius:8px;background:${meta.color};flex-shrink:0;display:flex;align-items:center;justify-content:center;"><i class="ti ${meta.icon}" style="font-size:15px;color:#fff;" aria-hidden="true"></i></div>`;
       const reviewId=c.cid||('t'+(c.created||0));
-      const reviewIconHtml=c.review?`<span class="cmr-review-icon" onclick="toggleCmrReview('${reviewId}')" title="코멘트 보기"><i class="ti ti-message-circle ico-sz-13" aria-hidden="true"></i></span>`:'';
-      const reviewBoxHtml=c.review?`<div class="cmr-review-box" id="cmr-review-${reviewId}">${escapeHtml(c.review)}</div>`:'';
+      const wcalNotes=c.cid?getWcalNotesByCid(c.cid):[];
+      const hasReviewContent=!!(c.review||wcalNotes.length);
+      const reviewIconHtml=hasReviewContent?`<span class="cmr-review-icon" onclick="toggleCmrReview('${reviewId}')" title="코멘트 보기"><i class="ti ti-message-circle ico-sz-13" aria-hidden="true"></i></span>`:'';
+      // 완결 총평(review)과 감상 중 메모(wcal_note)를 한 박스 안에 구분해서 — 총평 먼저, 메모는 그 아래 얇은 구분선+라벨로
+      const finalPartHtml=c.review?`<div class="cmr-review-final">${escapeHtml(c.review)}</div>`:'';
+      const notesPartHtml=wcalNotes.length?`<div class="cmr-review-notes${c.review?' with-final':''}">
+        <div class="cmr-review-notes-lbl">감상 중 메모</div>
+        ${wcalNotes.map(n=>{
+          const dispDate=n.dk?(parseInt(n.dk.slice(5,7),10)+'/'+parseInt(n.dk.slice(8,10),10)):'';
+          return `<div class="cmr-review-note-item"><span class="cmr-review-note-date">${dispDate}</span>${escapeHtml(n.text||'')}</div>`;
+        }).join('')}
+      </div>`:'';
+      const reviewBoxHtml=hasReviewContent?`<div class="cmr-review-box" id="cmr-review-${reviewId}">${finalPartHtml}${notesPartHtml}</div>`:'';
       return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;">
         ${posterHtml}
         <div style="flex:1;min-width:0;font-size:var(--main-text-size);color:var(--tp);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:5px;">
