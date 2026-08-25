@@ -963,7 +963,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .content-hub-ov .settings-hdr{position:sticky;top:0;z-index:10;background:var(--bg);}
 .content-hub-ov.on{transform:translateX(0);pointer-events:auto;}
 .content-hub-body{padding:16px 18px 30px;display:flex;flex-direction:column;gap:18px;}
-.wcal-note-icon{color:var(--tm);opacity:0.6;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center;padding:4px;}
+.wcal-note-icon{color:var(--tm);opacity:0.65;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center;}
 .wcal-note-icon.has{opacity:1;color:var(--pal-mauvepink);}
 .wcal-note-display{font-size:var(--dow-label-size);color:var(--tp);line-height:1.6;background:rgba(210,180,160,0.14);border-radius:10px;padding:9px 11px;margin-top:8px;cursor:pointer;}
 .ch-month-banner-row{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;}
@@ -972,21 +972,25 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .ch-note-tl-empty{font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:20px 0;}
 
 /* 코멘트 모아보기 — 날짜순 뷰(시안 A): 완결 코멘트는 카드, 감상 메모는 곁가지 */
-.ch-tlA-day{position:relative;margin-bottom:18px;}
-.ch-tlA-day-hdr{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
-.ch-tlA-day-date{font-size:12px;font-weight:700;color:var(--ts);letter-spacing:0.02em;}
-.ch-tlA-day-line{flex:1;height:1px;background:rgba(var(--divider-rgb),0.35);}
-.ch-tlA-final{display:flex;gap:11px;background:var(--card);border:1px solid var(--card-b);border-radius:14px;padding:12px 13px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,0.03);}
-.ch-tlA-final-poster{width:40px;height:56px;border-radius:7px;object-fit:cover;flex-shrink:0;}
-.ch-tlA-final-body{flex:1;min-width:0;}
-.ch-tlA-final-top{display:flex;align-items:center;gap:6px;margin-bottom:2px;}
-.ch-tlA-final-title{font-size:var(--main-text-size);font-weight:600;color:var(--tp);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.ch-tlA-final-badge{font-size:9.5px;font-weight:700;color:#fff;background:var(--pal-mauvepink);border-radius:5px;padding:2px 6px;flex-shrink:0;letter-spacing:0.02em;}
-.ch-tlA-final-stars{font-size:11px;color:#e0a339;margin-bottom:4px;}
-.ch-tlA-final-text{font-size:var(--dow-label-size);color:var(--ts);line-height:1.55;}
-/* 감상 메모 카드 — 완결 카드와 동일한 형태로 대등하게, 완결이 아니므로 배지/별점만 없음(제목 자리에 카테고리만 옅게) */
-.ch-tlA-final-note{background:rgba(0,0,0,0.015);}
-.ch-tlA-note-badge{font-size:9.5px;font-weight:600;color:var(--tm);background:rgba(0,0,0,0.05);border-radius:5px;padding:2px 6px;flex-shrink:0;}
+/* 날짜순 뷰 — 채움로그 타임라인 톤 참고: 왼쪽 세로선+점, 정사각형 포스터, 점 색으로 완결/메모 구분 */
+.ch-tlA-day{margin-bottom:4px;}
+.ch-tlA-day-date{font-size:11px;font-weight:700;color:var(--tm);letter-spacing:0.04em;padding:14px 0 8px 24px;}
+.ch-tlA-day:first-child .ch-tlA-day-date{padding-top:0;}
+.ch-tlA-row{position:relative;display:flex;gap:11px;padding:0 0 16px 24px;}
+.ch-tlA-row::before{content:'';position:absolute;left:4px;top:6px;bottom:-4px;width:1px;background:rgba(var(--divider-rgb),0.4);}
+.ch-tlA-row:last-child::before{display:none;}
+.ch-tlA-dot{position:absolute;left:0;top:5px;width:9px;height:9px;border-radius:50%;background:rgba(140,175,150,0.85);flex-shrink:0;}
+.ch-tlA-dot.final{background:#e0a339;}
+.ch-tlA-content{flex:1;min-width:0;display:flex;gap:9px;align-items:flex-start;}
+.ch-tlA-poster{width:36px;height:36px;border-radius:8px;object-fit:cover;flex-shrink:0;}
+.ch-tlA-main{flex:1;min-width:0;}
+.ch-tlA-title-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.ch-tlA-title{font-size:var(--main-text-size);font-weight:600;color:var(--tp);}
+.ch-tlA-stars{font-size:11px;color:#e0a339;letter-spacing:-0.5px;}
+.ch-tlA-badge-final{font-size:9px;font-weight:700;color:#fff;background:#e0a339;border-radius:5px;width:15px;height:15px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;}
+.ch-tlA-cat-tag{font-size:9.5px;color:var(--tm);background:rgba(0,0,0,0.04);border-radius:5px;padding:1px 5px;flex-shrink:0;}
+.ch-tlA-time{font-size:10px;color:var(--tm);font-variant-numeric:tabular-nums;flex-shrink:0;}
+.ch-tlA-text{font-size:var(--dow-label-size);color:var(--ts);line-height:1.55;margin-top:4px;}
 
 /* 코멘트 모아보기 — 작품별 뷰(시안 B): 작품 카드 안에 완결 총평 + 감상 메모들이 접혀 들어감 */
 .ch-tlB-card{background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:14px 15px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,0.03);}
@@ -1778,7 +1782,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 </div>
 
 <!-- CONTENT MONTHLY REPORT SHEET (콘텐츠 전용 아카이브, 월간리포트와 독립 — 종료일 기준 집계) -->
-<div class="overlay" id="content-monthly-report-sheet" onclick="closeSheet('content-monthly-report-sheet',event)">
+<div class="overlay" id="content-monthly-report-sheet" style="z-index:8600;" onclick="closeSheet('content-monthly-report-sheet',event)">
   <div class="bsheet" style="max-height:85vh;overflow-y:auto;" onclick="event.stopPropagation()">
     <div class="sheet-handle"></div>
     <div style="padding:0 20px 24px;">
@@ -3339,9 +3343,9 @@ function computeContentMonthlyByCat(y,mo){
   return byCat;
 }
 let _cmrYear=null,_cmrMonth=null;
-function openContentMonthlyReportSheet(){
+function openContentMonthlyReportSheet(year,month){
   const now=new Date();
-  _cmrYear=now.getFullYear();_cmrMonth=now.getMonth();
+  _cmrYear=year!=null?year:now.getFullYear();_cmrMonth=month!=null?month:now.getMonth();
   renderCmrMonthChips();
   loadContentMonthlyReportContent();
   openSheet('content-monthly-report-sheet');
@@ -11619,7 +11623,7 @@ function renderWatchCalDetail(){
     const m=WCAL_CAT_META[it.cat];
     const posterHtml=_wcalPosterThumbHtml(it.cat,it.poster);
     const hasNote=it.cid&&!!getWcalNoteFor(it.cid,dk);
-    const noteBtnHtml=it.cid?`<span class="wcal-note-icon${hasNote?' has':''}" onclick="openWcalNoteInput('${it.cid}','${dk}',${idx})" title="코멘트"><i class="ti ti-message-2 ico-sz-13" aria-hidden="true"></i></span>`:'';
+    const noteBtnHtml=it.cid?`<span class="wcal-note-icon${hasNote?' has':''}" onclick="openWcalNoteInput('${it.cid}','${dk}',${idx})" title="코멘트"><i class="ti ti-message-circle ico-sz-13" aria-hidden="true"></i></span>`:'';
     const noteRowHtml=`<div id="wcal-note-row-${idx}"></div>`;
     return `<div style="padding:7px 0;">
       <div style="display:flex;align-items:center;gap:10px;">
@@ -11699,7 +11703,9 @@ function saveWcalNote(cid,dk,idx){
   const list=getWcalNotes(mk);
   const item=(_wcalByDate[dk]||[]).find(it=>it.cid===cid);
   const i=list.findIndex(n=>n.cid===cid&&n.dk===dk);
-  const entry={cid,dk,title:item?item.title:'',cat:item?item.cat:'',poster:item?item.poster:null,text,updatedAt:Date.now()};
+  const now=new Date();
+  const time=i>=0&&list[i].time?list[i].time:(String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')); // 최초 작성 시각 고정 — 수정해도 바뀌지 않음
+  const entry={cid,dk,title:item?item.title:'',cat:item?item.cat:'',poster:item?item.poster:null,text,time,updatedAt:Date.now()};
   if(i>=0)list[i]=entry;else list.push(entry);
   saveWcalNotes(mk,list);
   if(navigator.onLine)syncWcalNotesDown(mk);
@@ -11760,24 +11766,17 @@ function renderChHubRecent(){
   el.innerHTML=html;
 }
 // ── 콘텐츠 허브 — 월별 아카이브 배너(가로 스크롤) — 탭하면 해당 월의 감상 캘린더로 바로 이동 ──
+// 월별 아카이브 배너 — 해당 월의 콘텐츠 모아보기(카테고리별 타임라인, 월간탭과 동일한 기능)를 바로 엶
 function renderChHubMonthBanners(){
   const el=document.getElementById('ch-month-banner-row');if(!el)return;
   const now=new Date();
   let html='';
   for(let i=0;i<12;i++){
     const d=new Date(now.getFullYear(),now.getMonth()-i,1);
-    const mk=monthKey(d);
     const label=(d.getMonth()+1)+'월';
-    html+=`<div class="ch-month-banner-chip" onclick="chJumpToMonth('${mk}')">${label}</div>`;
+    html+=`<div class="ch-month-banner-chip" onclick="openContentMonthlyReportSheet(${d.getFullYear()},${d.getMonth()})">${label}</div>`;
   }
   el.innerHTML=html;
-}
-function chJumpToMonth(mk){
-  const [y,m]=mk.split('-').map(Number);
-  _wcalDate=new Date(y,m-1,1);
-  _wcalSelectedDk=null;
-  _wcalRefresh();
-  document.getElementById('content-hub-ov').scrollTo({top:0,behavior:'smooth'});
 }
 
 // ── 콘텐츠 허브 — 코멘트 모아보기(타임라인, 읽기 전용) — 독서코너의 독서달력 진입구와 동일한 위치의 헤더 아이콘으로 진입 ──
@@ -11820,20 +11819,21 @@ function renderContentNoteTimeline(){
   el.innerHTML=_chNoteTimelineView==='work'?_chRenderNoteTimelineByWork(finals,notes):_chRenderNoteTimelineByDate(finals,notes);
 }
 // 날짜순 뷰 — 날짜별로 묶어 최신순 정렬, 완결 카드 먼저 + 감상 메모는 곁가지로
+// 날짜순 뷰 — 채움로그 타임라인 톤(세로선+점) 참고: 완결/감상 메모 모두 대등한 라인 위에, 점 색으로만 구분
 function _chRenderNoteTimelineByDate(finals,notes){
   const byDate={};
-  const push=(dk,item)=>{if(!dk)return;if(!byDate[dk])byDate[dk]={finals:[],notes:[]};byDate[dk][item.__type].push(item);};
-  finals.forEach(f=>push(f.dk,{...f,__type:'finals'}));
-  notes.forEach(n=>push(n.dk,{...n,__type:'notes'}));
+  const push=(dk,item)=>{if(!dk)return;if(!byDate[dk])byDate[dk]=[];byDate[dk].push(item);};
+  finals.forEach(f=>push(f.dk,{...f,__type:'final'}));
+  notes.forEach(n=>push(n.dk,{...n,__type:'note'}));
   const dks=Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
   return dks.map(dk=>{
     const dispDate=parseInt(dk.slice(5,7),10)+'월 '+parseInt(dk.slice(8,10),10)+'일';
-    const day=byDate[dk];
-    const finalHtml=day.finals.map(f=>_chFinalCardHtml(f)).join('');
-    const noteHtml=day.notes.map(n=>_chNoteRowHtml(n)).join('');
+    const items=byDate[dk].slice().sort((a,b)=>(a.time||'').localeCompare(b.time||'')); // 시간 있는 메모는 그 시각 순으로
+    const showTime=items.length>1; // 그날 항목이 여러 개일 때만 시간 노출
+    const rowsHtml=items.map(it=>it.__type==='final'?_chFinalRowHtml(it):_chNoteRowHtml(it,showTime)).join('');
     return `<div class="ch-tlA-day">
-      <div class="ch-tlA-day-hdr"><div class="ch-tlA-day-date">${dispDate}</div><div class="ch-tlA-day-line"></div></div>
-      ${finalHtml}${noteHtml}
+      <div class="ch-tlA-day-date">${dispDate}</div>
+      ${rowsHtml}
     </div>`;
   }).join('');
 }
@@ -11880,25 +11880,42 @@ function _chRenderNoteTimelineByWork(finals,notes){
     </div>`;
   }).join('');
 }
-function _chFinalCardHtml(f){
-  const posterHtml=`<img class="ch-tlA-final-poster" src="${f.poster||''}" style="${f.poster?'':'background:var(--card2);'}" alt="">`;
-  return `<div class="ch-tlA-final">
-    ${posterHtml}
-    <div class="ch-tlA-final-body">
-      <div class="ch-tlA-final-top"><div class="ch-tlA-final-title">${escapeHtml(f.title||'')}</div><div class="ch-tlA-final-badge">완결</div></div>
-      ${f.stars>0?`<div class="ch-tlA-final-stars">${'★'.repeat(f.stars)}${'☆'.repeat(5-f.stars)}</div>`:''}
-      ${f.review?`<div class="ch-tlA-final-text">${escapeHtml(f.review)}</div>`:''}
+// 날짜순 뷰의 완결 항목 — 정사각형(1:1) 포스터 작게, 완 배지+제목+별점 한 줄
+function _chFinalRowHtml(f){
+  const posterHtml=`<img class="ch-tlA-poster" src="${f.poster||''}" style="${f.poster?'':'background:var(--card2);'}" alt="">`;
+  return `<div class="ch-tlA-row">
+    <div class="ch-tlA-dot final"></div>
+    <div class="ch-tlA-content">
+      ${posterHtml}
+      <div class="ch-tlA-main">
+        <div class="ch-tlA-title-row">
+          <span class="ch-tlA-badge-final">완</span>
+          <span class="ch-tlA-title">${escapeHtml(f.title||'')}</span>
+          ${f.stars>0?`<span class="ch-tlA-stars">${'★'.repeat(f.stars)}${'☆'.repeat(5-f.stars)}</span>`:''}
+        </div>
+        ${f.review?`<div class="ch-tlA-text">${escapeHtml(f.review)}</div>`:''}
+      </div>
     </div>
   </div>`;
 }
-function _chNoteRowHtml(n){
-  const posterHtml=`<img class="ch-tlA-final-poster" src="${n.poster||''}" style="${n.poster?'':'background:var(--card2);'}" alt="">`;
+// 날짜순 뷰의 감상 메모 — 완결과 동일한 구조(정사각형 포스터, 한 줄 타이틀), 배지 대신 카테고리 태그만
+// showTime: 그날 항목이 여러 개일 때만 작성 시각을 곁들여 순서를 짚어줌
+function _chNoteRowHtml(n,showTime){
+  const posterHtml=`<img class="ch-tlA-poster" src="${n.poster||''}" style="${n.poster?'':'background:var(--card2);'}" alt="">`;
   const m=WCAL_CAT_META[n.cat]||{label:''};
-  return `<div class="ch-tlA-final ch-tlA-final-note">
-    ${posterHtml}
-    <div class="ch-tlA-final-body">
-      <div class="ch-tlA-final-top"><div class="ch-tlA-final-title">${escapeHtml(n.title||'')}</div><div class="ch-tlA-note-badge">${m.label}</div></div>
-      <div class="ch-tlA-final-text">${escapeHtml(n.text||'')}</div>
+  const timeHtml=(showTime&&n.time)?`<span class="ch-tlA-time">${n.time}</span>`:'';
+  return `<div class="ch-tlA-row">
+    <div class="ch-tlA-dot"></div>
+    <div class="ch-tlA-content">
+      ${posterHtml}
+      <div class="ch-tlA-main">
+        <div class="ch-tlA-title-row">
+          ${timeHtml}
+          <span class="ch-tlA-title">${escapeHtml(n.title||'')}</span>
+          <span class="ch-tlA-cat-tag">${m.label}</span>
+        </div>
+        <div class="ch-tlA-text">${escapeHtml(n.text||'')}</div>
+      </div>
     </div>
   </div>`;
 }
