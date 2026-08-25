@@ -210,6 +210,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .wcal-weekday-row{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:6px;}
 .wcal-weekday-row span{text-align:center;font-size:var(--dow-label-size);color:var(--tm);font-weight:600;}
 .wcal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;}
+/* 접힌 상태 — 이번 주 7칸만 한 줄 (wcal-grid와 동일한 셀/썸네일 스타일 재사용, 레이아웃만 1행) */
+.wcal-week-row{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;}
+.wcal-week-cell{aspect-ratio:2/3;position:relative;display:flex;align-items:center;justify-content:center;}
+.wcal-week-cell.today .wcal-date-plain{color:var(--pal-mauvepink);font-weight:700;}
 .wcal-cell{aspect-ratio:2/3;position:relative;display:flex;align-items:center;justify-content:center;}
 .wcal-date-plain{font-size:var(--dow-label-size);color:var(--tm);font-weight:500;}
 .wcal-thumb{position:relative;width:100%;height:100%;border-radius:8px;overflow:hidden;cursor:pointer;background:var(--card2);}
@@ -969,6 +973,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .ch-month-banner-row{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;}
 .ch-month-banner-row::-webkit-scrollbar{display:none;}
 .ch-month-banner-chip{flex-shrink:0;font-size:var(--main-text-size);font-weight:500;color:var(--tp);background:var(--card);border:1px solid var(--card-b);border-radius:12px;padding:10px 16px;cursor:pointer;white-space:nowrap;}
+.ch-month-banner-chip.on{background:rgba(255,160,180,.16);border-color:rgba(255,140,160,.38);color:var(--tp);font-weight:700;}
+.ch-archive-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px;}
+.ch-archive-poster{width:100%;aspect-ratio:2/3;border-radius:8px;object-fit:cover;cursor:pointer;background:var(--card2);}
 .ch-note-tl-empty{font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:20px 0;}
 
 /* 코멘트 모아보기 — 날짜순 뷰(시안 A): 완결 코멘트는 카드, 감상 메모는 곁가지 */
@@ -2288,24 +2295,23 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   <div class="content-hub-body" id="content-hub-body">
     <div class="wcal-rainbow-wrap">
       <div class="wcal-rainbow-inner">
-        <div style="display:flex;align-items:center;justify-content:center;gap:18px;margin:2px 0 6px;">
+        <div style="display:flex;align-items:center;justify-content:center;gap:18px;margin:2px 0 6px;position:relative;">
           <i class="ti ti-chevron-left ico-cal-nav" onclick="wcalMonthShift(-1)" aria-hidden="true"></i>
           <div id="wcal-month-label" style="font-weight:600;font-size:var(--main-text-size);color:var(--tp);"></div>
           <i class="ti ti-chevron-right ico-cal-nav" onclick="wcalMonthShift(1)" aria-hidden="true"></i>
+          <i class="ti ti-chevron-up" id="wcal-collapse-btn" onclick="wcalToggleCollapse()" style="position:absolute;right:0;font-size:15px;color:var(--tm);cursor:pointer;" aria-hidden="true"></i>
         </div>
         <div class="wcal-filter-chips" id="wcal-filter-chips"></div>
         <div class="wcal-weekday-row"><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span><span>일</span></div>
         <div class="wcal-grid" id="wcal-grid"></div>
-        <div class="wcal-legend" id="wcal-legend"></div>
+        <div class="wcal-week-row" id="wcal-week-row" style="display:none;"></div>
       </div>
     </div>
     <div id="wcal-detail"></div>
 
-    <div class="slabel" style="margin-top:18px;">최근 본 콘텐츠</div>
-    <div class="rd-cover-row" id="ch-recent-row"></div>
-
     <div class="slabel" style="margin-top:14px;">월별 아카이브</div>
     <div class="ch-month-banner-row" id="ch-month-banner-row"></div>
+    <div id="ch-month-archive-grid"></div>
   </div>
 </div>
 
@@ -10693,10 +10699,15 @@ function openContentHub(){
   _wcalDate=new Date();
   _wcalFilter='all';
   _wcalSelectedDk=null;
+  _wcalCollapsed=false;
   document.getElementById('content-hub-ov').classList.add('on');
+  document.getElementById('wcal-grid').style.display='';
+  document.getElementById('wcal-week-row').style.display='none';
+  const btn=document.getElementById('wcal-collapse-btn');
+  if(btn)btn.className='ti ti-chevron-up';
   _wcalRefresh();
-  renderChHubRecent();
   renderChHubMonthBanners();
+  chExpandMonth(monthKey(new Date())); // 당월을 기본으로 펼쳐서 시작
 }
 function closeContentHub(){document.getElementById('content-hub-ov').classList.remove('on');}
 // 콘텐츠 허브 + 버튼 — 기존 등록분 검색(openWcalAddSheet)이 아니라 완전히 새로운 작품을 등록하는 흐름.
@@ -11472,6 +11483,7 @@ let _wcalDate=new Date();
 let _wcalFilter='all';
 let _wcalByDate={}; // 이번 달 집계 캐시: {dk: [{cat,title,poster}, ...]}
 let _wcalSelectedDk=null;
+let _wcalCollapsed=false; // 달력 접기/펼치기 — 접으면 이번 주 7칸만, 펼치면 월 전체 그리드
 // 서버의 수동 추가분을 먼저 내려받고, 그 결과와 무관하게 로컬 데이터로 즉시 1차 렌더(체감 속도용) — 공통 로직이라 헬퍼로 뽑음
 function _wcalRefresh(){
   const mk=monthKey(_wcalDate);
@@ -11481,6 +11493,7 @@ function _wcalRefresh(){
 function wcalMonthShift(delta){
   _wcalDate.setMonth(_wcalDate.getMonth()+delta);
   _wcalSelectedDk=null;
+  if(_wcalCollapsed)wcalToggleCollapse(); // 다른 달로 이동하면 '이번 주' 개념이 어긋나므로 자동으로 펼침 상태로 복귀
   _wcalRefresh();
 }
 function wcalSetFilter(cat){
@@ -11552,7 +11565,7 @@ function loadAndRenderWatchCal(){
   renderWatchCalHeader();
   renderWcalFilterChips();
   renderWatchCalGrid();
-  renderWatchCalLegend();
+  renderWatchCalWeekRow();
   renderWatchCalDetail();
 }
 function renderWatchCalHeader(){
@@ -11604,11 +11617,37 @@ function renderWatchCalGrid(){
   }
   el.innerHTML=html;
 }
-function renderWatchCalLegend(){
-  const el=document.getElementById('wcal-legend');if(!el)return;
-  el.innerHTML=Object.values(WCAL_CAT_META).map(m=>
-    `<div class="wcal-legend-item"><div class="wcal-legend-dot" style="background:${m.color};"></div>${m.label}</div>`
-  ).join('');
+// 달력 접기/펼치기 — 접으면 이번 주(오늘 기준 월~일) 7칸만 한 줄로, 펼치면 월 전체 그리드
+function wcalToggleCollapse(){
+  _wcalCollapsed=!_wcalCollapsed;
+  document.getElementById('wcal-grid').style.display=_wcalCollapsed?'none':'';
+  document.getElementById('wcal-week-row').style.display=_wcalCollapsed?'':'none';
+  const btn=document.getElementById('wcal-collapse-btn');
+  if(btn)btn.className='ti '+(_wcalCollapsed?'ti-chevron-down':'ti-chevron-up');
+  if(_wcalCollapsed)renderWatchCalWeekRow();
+}
+// 접힌 상태의 주간 뷰 — 오늘이 속한 주(월~일) 7칸, 월 그리드와 같은 포스터 조합 로직(_wcalBuildThumb) 재사용
+function renderWatchCalWeekRow(){
+  const el=document.getElementById('wcal-week-row');if(!el)return;
+  if(!_wcalCollapsed){el.innerHTML='';return;}
+  const today=new Date();
+  const dow=(today.getDay()+6)%7; // 월요일 시작 기준 요일 인덱스
+  const monday=new Date(today);monday.setDate(today.getDate()-dow);
+  let html='';
+  for(let i=0;i<7;i++){
+    const d=new Date(monday);d.setDate(monday.getDate()+i);
+    const dk=dateKey(d);
+    const items=_wcalFilteredItems(dk);
+    const isToday=dateKey(today)===dk;
+    const sel=dk===_wcalSelectedDk?' selected':'';
+    const dayNum=d.getDate();
+    if(!items.length){
+      html+=`<div class="wcal-week-cell${isToday?' today':''}"><div class="wcal-date-plain">${dayNum}</div></div>`;
+    }else{
+      html+=`<div class="wcal-week-cell${isToday?' today':''}"><div class="wcal-thumb${sel}" onclick="wcalSelectDay('${dk}')">${_wcalBuildThumb(items)}</div></div>`;
+    }
+  }
+  el.innerHTML=html;
 }
 // 하단 상세 — 독서달력 renderReadingCalDayDetailHtml과 동일한 mr-card/mr-sec-title 톤(포스터+제목+메타 한 줄)
 // 각 항목에 코멘트 아이콘 노출 — cid가 있는 항목만 코멘트 작성 가능(콘텐츠탭 등록 원본 기준으로만 연결)
@@ -11749,34 +11788,37 @@ async function syncWcalManualDown(mk){
   S.set(key,rows[0].lines);
 }
 
-// ── 콘텐츠 허브 — 최근 본 콘텐츠 5개 (독서코너 rd-cover-row 패턴 차용) ──
-function renderChHubRecent(){
-  const el=document.getElementById('ch-recent-row');if(!el)return;
-  const now=new Date();
-  const months=[monthKey(now),monthKey(new Date(now.getFullYear(),now.getMonth()-1,1))];
-  let all=[];
-  months.forEach(mk=>all=all.concat(getContents(mk)));
-  const covers=all.filter(c=>c.poster).sort((a,b)=>(b.created||0)-(a.created||0)).slice(0,5);
-  const slots=5;
-  let html='';
-  for(let i=0;i<slots;i++){
-    if(covers[i])html+=`<img class="rd-cover" src="${covers[i].poster}" alt="${escapeHtml(covers[i].title||'')}">`;
-    else html+='<div class="rd-cover rd-cover-empty"></div>';
-  }
-  el.innerHTML=html;
-}
-// ── 콘텐츠 허브 — 월별 아카이브 배너(가로 스크롤) — 탭하면 해당 월의 감상 캘린더로 바로 이동 ──
-// 월별 아카이브 배너 — 해당 월의 콘텐츠 모아보기(카테고리별 타임라인, 월간탭과 동일한 기능)를 바로 엶
+// ── 콘텐츠 허브 — 월별 아카이브 (가로 스크롤 월 칩 + 선택된 달의 포스터 그리드가 그 자리 아래로 펼쳐짐) ──
+// 클릭식 아코디언이 아니라, 항상 하나의 달이 펼쳐져 있는 상태(열 때는 당월) — 다른 칩을 누르면 펼쳐진 내용만 바뀜
+let _chArchiveMk=null;
 function renderChHubMonthBanners(){
   const el=document.getElementById('ch-month-banner-row');if(!el)return;
   const now=new Date();
   let html='';
   for(let i=0;i<12;i++){
     const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const mk=monthKey(d);
     const label=(d.getMonth()+1)+'월';
-    html+=`<div class="ch-month-banner-chip" onclick="openContentMonthlyReportSheet(${d.getFullYear()},${d.getMonth()})">${label}</div>`;
+    const on=mk===_chArchiveMk?' on':'';
+    html+=`<div class="ch-month-banner-chip${on}" onclick="chExpandMonth('${mk}')">${label}</div>`;
   }
   el.innerHTML=html;
+}
+// 선택된 달의 콘텐츠 포스터를 작게 그리드로 — 음악 제외(음악은 포스터 개념이 약해 캘린더/모아보기에서만 다룸)
+let _chArchiveItems=[];
+function chExpandMonth(mk){
+  _chArchiveMk=mk;
+  renderChHubMonthBanners();
+  const el=document.getElementById('ch-month-archive-grid');if(!el)return;
+  _chArchiveItems=getContents(mk).filter(c=>c.cat!=='music'&&c.poster);
+  if(!_chArchiveItems.length){el.innerHTML='<div class="ch-note-tl-empty">이 달엔 등록된 콘텐츠가 없어요</div>';return;}
+  el.innerHTML=`<div class="ch-archive-grid">${_chArchiveItems.map((c,i)=>
+    `<img class="ch-archive-poster" src="${c.poster}" alt="${escapeHtml(c.title||'')}" onclick="chOpenArchiveItem(${i})">`
+  ).join('')}</div>`;
+}
+function chOpenArchiveItem(i){
+  const c=_chArchiveItems[i];if(!c)return;
+  openContentModal(c.cat,c,_chArchiveMk);
 }
 
 // ── 콘텐츠 허브 — 코멘트 모아보기(타임라인, 읽기 전용) — 독서코너의 독서달력 진입구와 동일한 위치의 헤더 아이콘으로 진입 ──
