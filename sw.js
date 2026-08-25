@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260825-12-dead-css-cleanup';
+const CACHE = 'iikoto-v20260825-14-content-timeline-title';
 const ASSETS = [
   './',
   './index.html'
