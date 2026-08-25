@@ -11565,7 +11565,7 @@ function loadAndRenderWatchCal(){
 }
 function renderWatchCalHeader(){
   const el=document.getElementById('wcal-month-label');
-  if(el)el.innerHTML=`${_wcalDate.getFullYear()}년 ${String(_wcalDate.getMonth()+1).padStart(2,'0')}월 <i class="ti ${_wcalCollapsed?'ti-chevron-down':'ti-chevron-up'}" style="font-size:12px;color:var(--tm);vertical-align:middle;" aria-hidden="true"></i>`;
+  if(el)el.textContent=`${_wcalDate.getFullYear()}년 ${String(_wcalDate.getMonth()+1).padStart(2,'0')}월`;
 }
 function renderWcalFilterChips(){
   const el=document.getElementById('wcal-filter-chips');if(!el)return;
@@ -11799,12 +11799,17 @@ function renderChHubMonthBanners(){
   el.innerHTML=html;
 }
 // 선택된 달의 콘텐츠를 카테고리별로 — 콘텐츠 모아보기 시트와 동일한 마크업(renderContentByCatHtml) 재사용
+// 선택된 달의 콘텐츠 목록(월간탭과 동일) + 그 달의 코멘트(완결 총평+감상 중 메모, 작품별 타임라인과 동일한 방식)를 함께 보여줌
 function chExpandMonth(mk){
   _chArchiveMk=mk;
   renderChHubMonthBanners();
   const el=document.getElementById('ch-month-archive-grid');if(!el)return;
   const [y,mo]=mk.split('-').map(Number);
-  el.innerHTML=renderContentByCatHtml(computeContentMonthlyByCat(y,mo-1));
+  const listHtml=renderContentByCatHtml(computeContentMonthlyByCat(y,mo-1));
+  const {finals,notes}=_chCollectNoteSource([mk]);
+  const noteHtml=(finals.length||notes.length)?
+    `<div class="slabel" style="margin-top:14px;">이 달의 코멘트</div>${_chRenderNoteTimelineByWork(finals,notes)}`:'';
+  el.innerHTML=listHtml+noteHtml;
 }
 
 // ── 콘텐츠 허브 — 코멘트 모아보기(타임라인, 읽기 전용) — 독서코너의 독서달력 진입구와 동일한 위치의 헤더 아이콘으로 진입 ──
@@ -11824,10 +11829,12 @@ function switchNoteTimelineView(btn,view){
   renderContentNoteTimeline();
 }
 // 최근 N개월치의 완결 콘텐츠(review 또는 stars가 있는 것)와 감상 메모를 함께 수집
-function _chCollectNoteSource(){
-  const now=new Date();
-  const months=[];
-  for(let i=0;i<_chNoteTimelineMonths;i++)months.push(monthKey(new Date(now.getFullYear(),now.getMonth()-i,1)));
+function _chCollectNoteSource(months){
+  if(!months){
+    const now=new Date();
+    months=[];
+    for(let i=0;i<_chNoteTimelineMonths;i++)months.push(monthKey(new Date(now.getFullYear(),now.getMonth()-i,1)));
+  }
   const finals=[]; // {cid,cat,title,poster,stars,review,dk}
   const notes=[]; // {cid,cat,title,dk,text,updatedAt} — poster는 저장 안 하므로 아래서 cid로 항상 최신 값을 붙임
   const posterByCid={};
@@ -11878,7 +11885,8 @@ function _chRenderNoteTimelineByWork(finals,notes){
   });
   notes.forEach(n=>{
     if(!n.cid)return;
-    groups[n.cid]=groups[n.cid]||{cat:n.cat,title:n.title,poster:null,final:null,notes:[]};
+    groups[n.cid]=groups[n.cid]||{cat:n.cat,title:n.title,poster:n.poster||null,final:null,notes:[]};
+    if(!groups[n.cid].poster)groups[n.cid].poster=n.poster||null; // finals에 없던(=완결 전) 작품도 메모 쪽 최신 poster로 채움
     groups[n.cid].notes.push(n);
   });
   const cids=Object.keys(groups).sort((a,b)=>{
