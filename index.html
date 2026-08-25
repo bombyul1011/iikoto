@@ -984,13 +984,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .ch-tlA-final-badge{font-size:9.5px;font-weight:700;color:#fff;background:var(--pal-mauvepink);border-radius:5px;padding:2px 6px;flex-shrink:0;letter-spacing:0.02em;}
 .ch-tlA-final-stars{font-size:11px;color:#e0a339;margin-bottom:4px;}
 .ch-tlA-final-text{font-size:var(--dow-label-size);color:var(--ts);line-height:1.55;}
-.ch-tlA-note{display:flex;gap:9px;padding:6px 2px 6px 4px;margin-left:6px;border-left:2px solid rgba(var(--pal-pink-rgb,255,140,160),0.35);}
-.ch-tlA-note-dot-wrap{width:6px;display:flex;justify-content:center;flex-shrink:0;margin-left:-5px;margin-top:5px;}
-.ch-tlA-note-dot{width:6px;height:6px;border-radius:50%;background:var(--pal-mauvepink);}
-.ch-tlA-note-body{flex:1;min-width:0;}
-.ch-tlA-note-title{font-size:11.5px;color:var(--ts);font-weight:600;margin-bottom:2px;}
-.ch-tlA-note-title .cat{font-weight:400;color:var(--tm);margin-left:3px;}
-.ch-tlA-note-text{font-size:var(--dow-label-size);color:var(--tp);line-height:1.55;background:rgba(255,180,195,0.10);border-radius:0 8px 8px 8px;padding:7px 10px;}
+/* 감상 메모 카드 — 완결 카드와 동일한 형태로 대등하게, 완결이 아니므로 배지/별점만 없음(제목 자리에 카테고리만 옅게) */
+.ch-tlA-final-note{background:rgba(0,0,0,0.015);}
+.ch-tlA-note-badge{font-size:9.5px;font-weight:600;color:var(--tm);background:rgba(0,0,0,0.05);border-radius:5px;padding:2px 6px;flex-shrink:0;}
 
 /* 코멘트 모아보기 — 작품별 뷰(시안 B): 작품 카드 안에 완결 총평 + 감상 메모들이 접혀 들어감 */
 .ch-tlB-card{background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:14px 15px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,0.03);}
@@ -1837,13 +1833,12 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 <div class="overlay" id="content-note-timeline-sheet" style="z-index:8600;" onclick="closeSheet('content-note-timeline-sheet',event)">
   <div class="bsheet" style="max-height:85vh;overflow-y:auto;" onclick="event.stopPropagation()">
     <div class="sheet-handle"></div>
-    <div style="padding:0 20px 24px;">
-      <div class="goal-section-title" style="margin-top:0;"><i class="ti ti-timeline ico-13" aria-hidden="true"></i> 코멘트 모아보기</div>
-      <div class="rd-tabs" style="margin:10px 0 12px;">
+    <div style="padding:8px 20px 24px;">
+      <div class="rd-tabs" style="margin-top:0;">
         <div class="rd-tab on" data-view="date" onclick="switchNoteTimelineView(this,'date')">날짜순</div>
         <div class="rd-tab" data-view="work" onclick="switchNoteTimelineView(this,'work')">작품별</div>
       </div>
-      <div id="content-note-timeline-list"></div>
+      <div id="content-note-timeline-list" style="margin-top:12px;"></div>
     </div>
   </div>
 </div>
@@ -11704,7 +11699,7 @@ function saveWcalNote(cid,dk,idx){
   const list=getWcalNotes(mk);
   const item=(_wcalByDate[dk]||[]).find(it=>it.cid===cid);
   const i=list.findIndex(n=>n.cid===cid&&n.dk===dk);
-  const entry={cid,dk,title:item?item.title:'',cat:item?item.cat:'',text,updatedAt:Date.now()};
+  const entry={cid,dk,title:item?item.title:'',cat:item?item.cat:'',poster:item?item.poster:null,text,updatedAt:Date.now()};
   if(i>=0)list[i]=entry;else list.push(entry);
   saveWcalNotes(mk,list);
   if(navigator.onLine)syncWcalNotesDown(mk);
@@ -11897,12 +11892,13 @@ function _chFinalCardHtml(f){
   </div>`;
 }
 function _chNoteRowHtml(n){
+  const posterHtml=`<img class="ch-tlA-final-poster" src="${n.poster||''}" style="${n.poster?'':'background:var(--card2);'}" alt="">`;
   const m=WCAL_CAT_META[n.cat]||{label:''};
-  return `<div class="ch-tlA-note">
-    <div class="ch-tlA-note-dot-wrap"><div class="ch-tlA-note-dot"></div></div>
-    <div class="ch-tlA-note-body">
-      <div class="ch-tlA-note-title">${escapeHtml(n.title||'')} <span class="cat">${m.label}</span></div>
-      <div class="ch-tlA-note-text">${escapeHtml(n.text||'')}</div>
+  return `<div class="ch-tlA-final ch-tlA-final-note">
+    ${posterHtml}
+    <div class="ch-tlA-final-body">
+      <div class="ch-tlA-final-top"><div class="ch-tlA-final-title">${escapeHtml(n.title||'')}</div><div class="ch-tlA-note-badge">${m.label}</div></div>
+      <div class="ch-tlA-final-text">${escapeHtml(n.text||'')}</div>
     </div>
   </div>`;
 }
