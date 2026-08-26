@@ -838,10 +838,17 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
    3) 월간탭 상단 그리드의 고정 height(270px)는 세로에서 내용을 잘라버리므로 auto로 해제.
    ══════════════════════════════════════════════════════════ */
 @media (max-width:760px){
+  /* ══════════════════════════════════════════════════════
+     공통 레이아웃 골격
+     ══════════════════════════════════════════════════════ */
   #app{flex-direction:column;}
+  .main-wrap{padding:16px 14px 76px;}
+  .main-hdr{margin-bottom:12px;}
+  .float-tabs{right:14px;bottom:14px;}
 
-  /* 사이드바 → 상단 가로 스트립. 기존 width 트랜지션/접힘 클래스는 가로 전용이라 여기선 무시하고
-     항상 이 스트립 형태로 고정 표시(공간을 거의 안 먹으니 "접힌 상태"가 곧 기본 표시 상태). */
+  /* ── 사이드바 → 상단 가로 스트립 ──
+     기존 width 트랜지션/접힘 클래스는 가로 전용이라 여기선 무시하고 항상 이 스트립 형태로 고정 표시
+     (공간을 거의 안 먹으니 "접힌 상태"가 곧 기본 표시 상태). */
   .side{
     width:auto;height:auto;flex-shrink:0;
     display:flex;align-items:center;gap:10px;
@@ -853,6 +860,9 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
   .side::before,.side::after{display:none;} /* 워터마크 원형 장식은 좁은 스트립에서 자리만 차지하니 생략 */
   .side-logo-wrap{padding:0;flex-shrink:0;}
   .side-logo{height:26px;}
+  .side-toggle-btn{display:none;} /* 가로 전용 사이드바 접기 버튼 — 세로에선 아래 mobile-cal-expand-btn이 대체 */
+  .side-progress,#side-greeting-card{display:none;} /* 진행률/인사카드는 상단 스트립에서 생략 */
+
   /* 미니캘린더: 월 라벨/화살표/펼치기 아이콘은 숨기고 요일행+주간 한 줄만 스트립에 노출 */
   .mini-cal{flex:1;min-width:0;background:none;border:none;padding:0;margin-bottom:0;}
   .mini-cal-hdr{display:none;}
@@ -861,8 +871,6 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
   .mini-cal-week-row .mini-cal-grid{grid-template-columns:repeat(7,32px);gap:4px;}
   .mini-cal-day{height:32px;font-size:var(--fs-xs);}
   .mini-cal-month-grid{display:none;} /* 월간 그리드는 스트립에 안 그림 — 펼치기 오버레이 전용 */
-  .side-progress,#side-greeting-card{display:none;} /* 진행률/인사카드는 상단 스트립에서 생략 */
-  .side-toggle-btn{display:none;} /* 가로 전용 사이드바 접기 버튼 — 세로에선 아래 mobile-cal-expand-btn이 대체 */
 
   /* 미니캘린더 펼치기 — 스트립엔 없는 "월 라벨/월간그리드"를 오버레이로 보고 싶을 때 쓰는 버튼(HTML에 추가) */
   .mobile-cal-expand-btn{display:flex;flex-shrink:0;width:30px;height:30px;border-radius:9px;align-items:center;justify-content:center;background:var(--card);border:1px solid var(--card-b);color:var(--tm);font-size:15px;cursor:pointer;}
@@ -874,19 +882,18 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
   .mobile-cal-overlay .mini-cal-week-row{display:none;} /* 오버레이는 항상 월간 그리드만 보여줌 */
   .mobile-cal-overlay .mini-cal-month-grid{display:grid!important;grid-template-rows:1fr!important;overflow:visible;}
 
-  .main-wrap{padding:16px 14px 76px;}
-  .main-hdr{margin-bottom:12px;}
-
-  /* 2단 배너 전부 1열 스택 — 값은 그대로 두고 컬럼 수만 줄임 */
+  /* 2단 배너 전부 1열 스택 — 값은 그대로 두고 컬럼 수만 줄임. 아래 각 탭 섹션에서 이 클래스를 쓰는
+     요소(#today-rhythm-pace-row 등)에 order만 추가로 매기고, grid-template-columns는 여기서 이미 처리되므로 중복 지정하지 않음. */
   .grid2,.grid3,.top-row,.month-top-grid,.mrp-grid2,.mrsl-top{
     grid-template-columns:1fr!important;
     height:auto!important; /* month-top-grid의 고정 270px 해제 — 세로에서 내용 잘림 방지 */
   }
-  .grid3-right{display:flex;flex-direction:column;gap:13px;}
   .month-top-left{height:auto;}
-  .month-top-left .card{flex:none;}
+  .month-top-left .card{flex:none;} /* 고정 높이(.month-top-grid) 기준으로 반반 나눠 갖던 flex:1을 해제, 세로에선 내용 높이만큼만 */
 
-  /* ── 오늘탭 세로 전용 재배치 ──
+  /* ══════════════════════════════════════════════════════
+     오늘탭
+     ══════════════════════════════════════════════════════
      .main-body.on일 때만(=오늘탭이 실제로 활성 탭일 때만) flex로 바꿔야 탭 전환이 정상 동작함.
      #tab-today{display:flex}처럼 .on과 무관하게 걸면 다른 탭으로 이동해도 이 탭이 계속 보이는 문제가 생김.
      자식 블록 단위(각 id 부여된 grid2/grid3/card)에 order를 매겨 순서만 재배치.
@@ -894,67 +901,74 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
      콘텐츠현황은 오늘의 감상과 내용이 겹쳐 세로에서는 제거. */
   #tab-today.on{display:flex;flex-direction:column;}
   #tab-today>.main-hdr{order:0;}
+
   /* .grid3(할일+일정+수면)는 grid를 그대로 유지 — 내부 두 칸(.todo-card/.grid3-right)이 원래
      서로 같은 calc() 고정 높이 공식을 공유하는 구조라, 부모를 flex로 바꾸면 그 관계가 깨져
      "수면 배너가 투두 길이만큼 늘어나는" 부작용이 생겼음(실제로 발생했던 문제). 1열 그리드로만 전환. */
-  #tab-today>.grid3{order:1;grid-template-columns:1fr;}
+  #tab-today>.grid3{order:1;}
   #tab-today>.grid3>.todo-card{order:1;height:auto!important;max-height:220px;} /* 투두 — 세로 길이를 가로 대비 2/3 정도로 축소, 넘치면 내부 스크롤 */
   #tab-today>.grid3>.todo-card #today-todos{max-height:170px;overflow-y:auto;} /* 카드 패딩/제목 줄을 뺀 실제 목록 스크롤 영역 */
-  #tab-today>.grid3>.grid3-right{order:2;height:auto!important;} /* 일정+수면 — 원래 계획대로 자기 내용 높이만큼만, 수면 카드는 그대로 둠 */
+  #tab-today>.grid3>.grid3-right{order:2;height:auto!important;gap:13px;} /* 일정+수면 — 원래 계획대로 자기 내용 높이만큼만, 수면 카드는 그대로 둠 */
+
   #today-memo-card{order:2;}
   #today-meal-reading-row{order:3;display:contents;} /* 이 grid2 자체는 레이아웃에서 사라지고, 자식(식사/감상) 각각이 #tab-today의 flex 자식으로 승격되어 개별 order를 가짐 */
   #today-meal-reading-row>.meal-card{order:3;}
   #today-meal-reading-row>.quote-card{order:8;} /* 오늘의 감상 — 최하단 */
-  #today-rhythm-pace-row{order:4;grid-template-columns:1fr;}
-  #today-habit-content-row{order:5;grid-template-columns:1fr;}
+  #today-rhythm-pace-row{order:4;} /* grid-template-columns:1fr는 위 공통 .grid2 규칙에서 이미 적용됨 */
+  #today-habit-content-row{order:5;}
   #today-content-card{display:none;} /* 콘텐츠 현황 — 오늘의 감상과 내용 겹쳐 세로에서 생략 */
 
   /* 오늘 일정 — 일정이 없으면 카드 자체를 숨김(가로에서는 항상 노출 유지) */
   #today-event-card.no-events{display:none;}
 
-  /* ── 주간탭: 수면 리포트 4열 → 2x2 ──
-     라벨(예: "평균 수면 컨디션")이 4글자 이상이라 4열 좁은 폭에선 세로로 쪼개짐 — 2열이면 폭이 2배로 늘어 해결.
-     기존 세로 구분선(:not(:first-child)::before)은 4열 기준이라 2x2에선 3번째 칸(다음 줄 시작)에도 그려져 어색함 —
-     세로에서는 구분선 없이 위아래 여백으로만 구분. */
+  /* ══════════════════════════════════════════════════════
+     주간탭
+     ══════════════════════════════════════════════════════ */
+  /* 수면 리포트 4열 → 2x2 — 라벨(예: "평균 수면 컨디션")이 4글자 이상이라 4열 좁은 폭에선 세로로 쪼개짐,
+     2열이면 폭이 2배로 늘어 해결. 기존 세로 구분선(:not(:first-child)::before)은 4열 기준이라 2x2에선
+     3번째 칸(다음 줄 시작)에도 그려져 어색함 — 세로에서는 구분선 없이 위아래 여백으로만 구분. */
   .wsleep2-grid{grid-template-columns:repeat(2,1fr)!important;row-gap:18px;}
   .wsleep2-item::before,.wsleep2-item:not(:first-child)::before{display:none;}
 
-  /* ── 주간탭: 이번 주 감상+코멘트 → 탭 전환 카드 하나로 ──
-     가로용 두 카드(#week-watch-note-row)는 숨기고, 같은 데이터를 공유하는 세로 전용 통합 카드(#week-watch-note-mobile)만 노출.
+  /* 이번 주 감상+코멘트 → 탭 전환 카드 하나로 — 가로용 두 카드(#week-watch-note-row)는 숨기고,
+     같은 데이터를 공유하는 세로 전용 통합 카드(#week-watch-note-mobile)만 노출.
      렌더 함수(renderWeekWatchStrip 등)는 이미 두 타겟(-m 접미사) 모두에 채우도록 되어 있어 별도 처리 불필요. */
   #week-watch-note-row{display:none;}
   #week-watch-note-mobile{display:block;}
 
-  /* ── 주간탭: 하루한줄 — 요일별 한 줄로(2열 월~목/금~일 나눔을 풀어 1열로 순서대로) ── */
+  /* 하루한줄 — 요일별 한 줄로(2열 월~목/금~일 나눔을 풀어 1열로 순서대로) */
   .oneline-2col{grid-template-columns:1fr!important;}
 
-  /* ── 월간탭: 콘텐츠 모아보기 — 썸네일 2줄까지만 보이게 세로 길이를 제한, 나머지는 내부 스크롤 ──
+  /* ══════════════════════════════════════════════════════
+     월간탭
+     ══════════════════════════════════════════════════════ */
+  /* 콘텐츠 모아보기 — 썸네일 2줄까지만 보이게 세로 길이를 제한, 나머지는 내부 스크롤.
      3열 그리드에서 한 줄 높이 ≈ 썸네일(정사각형, 화면폭 기준) + 제목 한 줄 + 행간(gap). 화면폭에 따라 유동적이라
      vw 기반으로 근사 계산 — 오차가 있어도 overflow-y:auto가 안전망이라 내용이 잘리지 않음. */
   #month-content-grid.cgrid-scroll{max-height:calc(2 * (28vw + 5px + 1.3em) + 10px);overflow-y:auto;}
 
-  /* ── 월간탭: 콘텐츠 타임라인 — 카테고리 라벨 텍스트 숨기고 아이콘 배지만 남김 ── */
+  /* 콘텐츠 타임라인 — 카테고리 라벨 텍스트 숨기고 아이콘 배지만 남김 */
   .tt-cat-fixed,.tt-cat-fixed-sp{width:26px;}
   .tt-cat-label-txt{display:none;}
 
-  /* ── 월간탭: 이번 달 수집문장 — 책 표지 포스터 숨기고 텍스트 공간 확보 ── */
+  /* 이번 달 수집문장 — 책 표지 포스터 숨기고 텍스트 공간 확보 */
   .mq-book-cover,.mq-book-cover-fallback{display:none;}
 
-  /* ── 월간탭: 채움로그 카드 숨김(월간탭 상단 그리드는 이미 위쪽 규칙으로 1열이라, 이 카드만 빼면
-     남은 목표+습관 카드가 자연스럽게 세로로 쌓임) ── */
+  /* 채움로그 카드 숨김(월간탭 상단 그리드는 위 공통 규칙으로 이미 1열이라, 이 카드만 빼면
+     남은 목표+습관 카드가 자연스럽게 세로로 쌓임) */
   #month-top-right{display:none;}
 
-  /* ── 리포트탭 월간종합: "이 달 한눈에" 절반 정도로 접는 토글 ──
-     folded 상태에서는 max-height로 절반쯤만 보이게 자르고 하단에 그라데이션 페이드 + 버튼 회전으로 접힘/펼침 표시.
-     펼치면(folded 클래스 제거) max-height를 넉넉히 풀어 전체 노출. */
+  /* ══════════════════════════════════════════════════════
+     리포트탭 — 월간종합
+     ══════════════════════════════════════════════════════
+     "이 달 한눈에" 절반 정도로 접는 토글. folded 상태에서는 max-height로 절반쯤만 보이게 자르고
+     하단에 그라데이션 페이드 + 버튼 회전으로 접힘/펼침 표시. 펼치면(folded 클래스 제거) max-height를 넉넉히 풀어 전체 노출. */
   .mrp-hero{position:relative;padding-right:44px;}
   .mrp-hero-fold-btn{display:flex;position:absolute;top:20px;right:20px;width:26px;height:26px;border-radius:50%;align-items:center;justify-content:center;background:rgba(255,255,255,0.5);color:var(--tm);font-size:14px;cursor:pointer;transition:transform .2s ease;}
   .mrp-hero-fold-btn.open{transform:rotate(180deg);}
   .mrp-hero.folded #mrp-hero-body{max-height:9.5em;overflow:hidden;position:relative;} /* 코멘트 line-height 1.75em 기준 약 5~6줄 분량 */
   .mrp-hero.folded #mrp-hero-body::after{content:'';position:absolute;left:0;right:0;bottom:0;height:1.6em;background:linear-gradient(rgba(220,240,225,0),rgba(235,240,205,0.85));}
   .mrp-hero:not(.folded) #mrp-hero-body{max-height:none;}
-
-  .float-tabs{right:14px;bottom:14px;}
 }
 
 </style>
