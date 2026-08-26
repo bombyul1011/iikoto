@@ -1090,14 +1090,20 @@ async function loadWeekTab(){
   const slStart=new Date(slEnd);slStart.setDate(slStart.getDate()-13);
   const slEndDk=dateKey(slEnd),slStartDk=dateKey(slStart);
 
-  // 이번 주(월~일)가 걸치는 저장 월(들) — contents/wcal_note는 날짜 기준 월별 시트라, 주가 두 달에 걸치면
-  // 데이터 누락 없이 양쪽 다 읽어야 함. "이 주가 어느 달 소속인가"(라벨 표시용)와는 다른 개념 — 그건 weekMonthKey(목요일 기준) 사용.
-  const spanStartMk=monthKeyOf(new Date(startDk+'T00:00:00'));
-  const spanEndMk=monthKeyOf(new Date(endDk+'T00:00:00'));
+  // 이번 주 키워드 카드용 롤링 7일(오늘 제외) — 캘린더 주(월~일)와 무관하게 항상 "어제부터 7일 전까지".
+  // 이번 주가 아직 하루이틀밖에 안 지났을 때 캘린더 주 기준으로 자르면 표본이 너무 적어지는 문제를 피하기 위함(2026-08-26 확정).
+  const kwEnd=new Date();kwEnd.setDate(kwEnd.getDate()-1);
+  const kwStart=new Date();kwStart.setDate(kwStart.getDate()-7);
+  const kwStartDk=dateKey(kwStart),kwEndDk=dateKey(kwEnd);
+
+  // 이번 주 독서 스트릭용 — 연속 일수가 여러 주에 걸쳐 이어질 수 있어 이번 주 범위만으론 부족하지만,
+  // 한 책을 90일씩 읽는 경우는 드물어 30일 롤링 정도면 스트릭 계산에 충분함(2026-08-26 축소 확정).
+  const rdStreakStart=new Date();rdStreakStart.setDate(rdStreakStart.getDate()-30);
+  const rdStreakStartDk=dateKey(rdStreakStart);
 
   const [goalRows,habits,habitChecks,memos,todos,sleepRows,onelineRows,contents,
     lwMemos,lwTodos,lwSleepRows,lwHabitChecks,rblocksFull,sleepReportRows,
-    rblocksLast,wcalStripContents,wcalNoteRowsA,wcalNoteRowsB]=await Promise.all([
+    rblocksLast,weekMemoTexts,readingBook,readingLogRows]=await Promise.all([
     supaFetch(`goal_notes?note_key=eq.wchallenge_${encodeURIComponent(wk)}`),
     supaFetch(`habits?order=sort_order.asc`),
     supaFetch(`habit_checks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
@@ -1121,11 +1127,11 @@ async function loadWeekTab(){
     // 수면 리포트 최근 2주
     supaFetch(`sleep?date_key=gte.${slStartDk}&date_key=lte.${slEndDk}&select=date_key,score,sleep_time,wake_time`),
     supaFetch(`rhythm_blocks?date_key=gte.${lastStartDk}&date_key=lte.${lastCmpEndDk}`),
-    supaFetch(`contents?month_key=in.(${spanStartMk},${spanEndMk})`),
-    // 이번 주 코멘트 타임라인용 감상 메모(월 경계를 넘을 수 있어 두 달치 모두 조회 후 주간 범위로 필터링).
-    // 시작월=종료월(대부분의 주)이면 같은 로우를 두 번 받게 되는데, 중복 제거는 renderWeekNoteTimeline에서 처리.
-    supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wcal_note_'+spanStartMk)}`),
-    supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wcal_note_'+spanEndMk)}`)
+    // 이번 주 키워드용 메모 원문 — 롤링 7일(오늘 제외, kwStartDk~kwEndDk)
+    supaFetch(`memos?date_key=gte.${kwStartDk}&date_key=lte.${kwEndDk}&select=date_key,text`),
+    // 이번 주 독서용 — 현재 읽고 있는 책 1권 + 스트릭 계산용 최근 90일 독서 기록
+    supaFetch(`reading_books?status=eq.reading&limit=1`),
+    supaFetch(`reading_daily_log?date_key=gte.${rdStreakStartDk}&select=date_key`)
   ]);
 
   const rblocksThis=(rblocksFull||[]).filter(b=>b.date_key<=cmpEndDk);
@@ -1142,8 +1148,8 @@ async function loadWeekTab(){
   });
   renderWeekRhythmFlow(rblocksThis||[],rblocksLast||[],cmpDayCount);
   renderWeekOneline(onelineRows||[],weekDates);
-  renderWeekWatchStrip(weekDates,rblocksFull||[],wcalStripContents||[]);
-  renderWeekNoteTimeline(weekDates,wcalStripContents||[],wcalNoteRowsA,wcalNoteRowsB);
+  renderWeekKeywords(weekMemoTexts||[]);
+  renderWeekReading(readingBook&&readingBook[0],readingLogRows||[]);
 }
 
 function _minToHHMM(min){const h=Math.floor(min/60),m=min%60;return pad(h)+':'+pad(m);}
@@ -1330,133 +1336,139 @@ function renderWeekOneline(rows,weekDates){
   elB.innerHTML=right.length?right.map(rowHtml).join(''):'<div class="empty-msg">기록 없음</div>';
 }
 
-// 이번 주 감상 스트립 — 월간탭 감상달력과 같은 데이터 소스(rhythm_blocks+contents)를 그 주(월~일) 범위로 재사용.
-// 요일 7칸에 그 날 감상한 콘텐츠 포스터(또는 카테고리 폴백)를 표시, 여러 개면 겹쳐서 조합. 칸을 누르면 아래에 정방형 포스터+제목+진행중여부 간단 상세.
-let _weekWatchByDate={};
-let _weekWatchSelectedDk=null;
-function renderWeekWatchStrip(weekDates,rblocks,contents){
-  const el=document.getElementById('week-watch-strip');
-  const elM=document.getElementById('week-watch-strip-m'); // 세로(모바일) 통합 탭 카드 안의 동일 스트립
-  if(!el&&!elM)return;
-  _weekWatchByDate={};
-  _weekWatchSelectedDk=null;
-  const push=(dk,item)=>{if(!_weekWatchByDate[dk])_weekWatchByDate[dk]=[];_weekWatchByDate[dk].push(item);};
-  (rblocks||[]).forEach(b=>{
-    if(b.cat!=='enjoy'||!b.text)return;
-    let cat=null,title=null;
-    if(b.text.startsWith('드라마 - ')){cat='drama';title=b.text.slice(6);}
-    else if(b.text.startsWith('독서 - ')){cat='book';title=b.text.slice(5);}
-    if(!cat)return;
-    push(b.date_key,{cat,title,status:null});
-  });
-  (contents||[]).filter(c=>c.content_cat==='music'&&c.start_date).forEach(c=>{
-    if(weekDates.includes(c.start_date))push(c.start_date,{cat:'music',title:c.title,poster:c.poster,status:c.status});
-  });
-  // 영화는 리듬 기록 유무와 무관하게 contents 하나만 기준(시작일)으로 판단(2026-08-25 단순화, 감상달력과 동일 규칙).
-  (contents||[]).filter(c=>c.content_cat==='movie'&&c.start_date).forEach(c=>{
-    if(weekDates.includes(c.start_date))push(c.start_date,{cat:'movie',title:c.title,poster:c.poster,status:c.status});
-  });
-  const posterByTitle={},statusByTitle={};
-  (contents||[]).forEach(c=>{if(c.content_cat!=='music'&&c.title){posterByTitle[c.title]=c.poster||null;statusByTitle[c.title]=c.status||null;}});
-  Object.values(_weekWatchByDate).forEach(list=>list.forEach(it=>{
-    if(it.cat!=='music'){it.poster=posterByTitle[it.title]||null;if(it.status==null)it.status=statusByTitle[it.title]||null;}
-  }));
-  Object.keys(_weekWatchByDate).forEach(dk=>{
-    const seen=new Set();
-    _weekWatchByDate[dk]=_weekWatchByDate[dk].filter(it=>{const key=it.cat+'|'+it.title;if(seen.has(key))return false;seen.add(key);return true;});
-  });
-  const hasAny=Object.keys(_weekWatchByDate).length>0;
-  const setHtml=html=>{if(el)el.innerHTML=html;if(elM)elM.innerHTML=html;};
-  if(!hasAny){setHtml('<div class="empty-msg">이번 주엔 기록된 감상이 없어요</div>');renderWeekWatchDetail();return;}
-  const today=dateKey(new Date());
-  const stripHtml=weekDates.map((dk,i)=>{
-    const items=_weekWatchByDate[dk]||[];
-    const dayNum=parseInt(dk.slice(8,10),10);
-    const isToday=dk===today;
-    if(!items.length)return `<div class="wcal-week-cell${isToday?' today':''}"><div class="wcal-date-plain">${dayNum}</div></div>`;
-    return `<div class="wcal-week-cell${isToday?' today':''}"><div class="wcal-thumb" onclick="weekWatchSelectDay('${dk}')">${_wcalBuildThumb(items)}</div></div>`;
-  }).join('');
-  setHtml(stripHtml);
-  renderWeekWatchDetail();
-}
-function weekWatchSelectDay(dk){
-  _weekWatchSelectedDk=(_weekWatchSelectedDk===dk)?null:dk;
-  renderWeekWatchDetail();
-}
-// 세로(모바일) 전용 — "이번 주 감상"/"이번 주 코멘트" 통합 탭 카드의 패널 전환. 가로에선 이 카드 자체가 숨겨져 있어 호출되지 않음.
-function switchWeekWatchNoteTab(tabEl,which){
-  document.querySelectorAll('#week-watch-note-mobile .rd-tab').forEach(t=>t.classList.toggle('on',t===tabEl));
-  document.getElementById('week-watch-note-panel-watch').style.display=which==='watch'?'':'none';
-  document.getElementById('week-watch-note-panel-note').style.display=which==='note'?'':'none';
-}
-// 감상 미선택 상태에서 존재감 없이 띄우는 감성 문구 — 렌더될 때마다 랜덤으로 하나 고름.
-const WEEK_WATCH_EMPTY_PHRASES=[
-  '좋은 작품 하나가 오늘을 완성해줄 거예요',
-  '이번 주, 어떤 이야기들을 만났나요',
-  '스쳐간 장면들이 여기 남아있어요',
-  '하루의 끝에 남는 건 결국 좋은 이야기 하나',
-  '그날의 감상을 다시 꺼내보세요',
-  'A good story completes the day',
-  "Where the week's stories live",
-  'Every scene leaves a little trace',
-  'Some stories stay with us'
+// 이번 주 키워드 — 그 주(오늘 제외 최근 7일)에 남긴 메모 원문에서 자주 등장한 단어 상위 5개를 뽑아 태그로 표시.
+// AI 요약이 아니라 순수 프론트엔드 빈도 집계라 매일 갱신해도 비용 부담이 없음(2026-08-26, 진단용 키워드_test.html로 검증 후 확정).
+// 완벽한 형태소 분석이 아닌 규칙 기반 근사치 — "감 잡기용" 정도의 정확도를 목표로 함.
+const WEEK_KW_STOPWORDS=new Set([
+  '오늘','내일','어제','그리고','그런데','근데','너무','정말','진짜','조금','약간','다시','이제','그냥','아직',
+  '했다','했어','했음','한다','하다','해야','해서','하고','했는데','같다','같아','같음','있다','있어','있음',
+  '없다','없어','없음','되다','됐다','됐어','것','거','수','때','것같다','이거','저거','그거','우리','나는',
+  '내가','나도','그래서','하지만','그리고나서','좀','약간의','매우','아주','완전','진짜로','이렇게','저렇게',
+  '그렇게','하는','하는데','한테','에서','으로','에게','까지','부터','이랑','랑','한','할','하며','했지만',
+  '아침','오후','저녁','새벽','점심','밤','낮' // 매일 습관처럼 시간대로 문장을 시작해 키워드로서 의미 없음
+]);
+// 접속부사류 — 조사 제거 규칙보다 먼저 원본 형태로 걸러야 함. 예: "그래도"가 조사 "도"만 벗겨지면
+// "그래"라는 의미 없는 조각이 남아버림(2026-08-26 실사용 데이터에서 발견, 순서를 먼저로 확정).
+const WEEK_KW_CONJUNCTIONS=new Set([
+  '그래도','그래서','그러니까','그러므로','그치만','그렇지만','그럼에도','그런데도','근데도',
+  '하지만','그러나','따라서','또한','게다가','더군다나','아무튼','어쨌든','아무래도','어차피',
+  '그러면','그럼','그리하여','그러다가','그러다','그렇다면','한편'
+]);
+const WEEK_KW_PARTICLE_SUFFIXES=[
+  '으로부터','에서부터','까지도','하고는','한테서','이라는','라는','이라도','라도',
+  '에서는','에게는','으로는','에는','에도','엔','에서','에게','으로','까지','부터','마저','조차','밖에',
+  '이랑','랑','와','과','도','만','만큼','처럼','같이','보다',
+  '이라','라','인데','였는데','했는데','한데',
+  '을','를','이','가','은','는','의','에'
 ];
-// 정방형 포스터+제목+진행중/완결 여부만 간단히, 최대 2개까지 — 코멘트 카드와 세로 길이를 맞추기 위해 딱 이 정도 정보량으로 고정.
-function renderWeekWatchDetail(){
-  const el=document.getElementById('week-watch-detail');
-  const elM=document.getElementById('week-watch-detail-m');
-  if(!el&&!elM)return;
-  const setHtml=html=>{if(el)el.innerHTML=html;if(elM)elM.innerHTML=html;};
-  if(!_weekWatchSelectedDk){
-    const phrase=WEEK_WATCH_EMPTY_PHRASES[Math.floor(Math.random()*WEEK_WATCH_EMPTY_PHRASES.length)];
-    setHtml(`<div class="week-watch-empty-phrase">${escapeHtml(phrase)}</div>`);
-    return;
+const WEEK_KW_VERB_ENDING_RE=/(했다|했어|했음|한다|하다가|하다|해서|하고|했는데|되다|됐다|됐어|있다|있어|없다|없어|같다|같아|같음|이다|였다|였음|였다가|해봤다|해봤어|해봄|해야지|해야겠다|해야겠어|한대|한대요|했네|했네요|하네|하네요|이네|이네요|다네|다네요)$/;
+function _weekKwStripParticle(w){
+  for(const suf of WEEK_KW_PARTICLE_SUFFIXES){
+    if(w.length>suf.length+1&&w.endsWith(suf))return w.slice(0,-suf.length);
   }
-  const items=(_weekWatchByDate[_weekWatchSelectedDk]||[]).slice(0,2);
-  if(!items.length){
-    const phrase=WEEK_WATCH_EMPTY_PHRASES[Math.floor(Math.random()*WEEK_WATCH_EMPTY_PHRASES.length)];
-    setHtml(`<div class="week-watch-empty-phrase">${escapeHtml(phrase)}</div>`);
-    return;
-  }
-  setHtml(items.map(it=>{
-    const m=WCAL_CAT_META[it.cat]||{icon:'ti-stack-2',color:'rgba(150,150,150,1)'};
-    const thumb=it.poster
-      ?`<img src="${it.poster}" class="week-watch-detail-thumb" />`
-      :`<div class="week-watch-detail-thumb" style="background:${m.color};display:flex;align-items:center;justify-content:center;"><i class="ti ${m.icon}" style="color:#fff;" aria-hidden="true"></i></div>`;
-    const statusTag=it.status==='watching'?'<span class="status-badge">진행중</span>':(it.status==='done'?'<span class="status-badge done">완결</span>':'');
-    return `<div class="week-watch-detail-item">${thumb}<span class="week-watch-detail-title">${escapeHtml(it.title||'')}</span>${statusTag}</div>`;
-  }).join(''));
+  return w;
+}
+function _weekKwTokenize(text){
+  const words=(text||'')
+    .replace(/[.,!?~^;:()\[\]"'‘’“”·…]/g,' ')
+    .split(/\s+/)
+    .map(w=>w.trim())
+    .filter(w=>w.length>=2);
+  return words.map(w=>{
+    if(WEEK_KW_CONJUNCTIONS.has(w))return null; // 접속부사는 조사 제거 전에 원본 형태로 먼저 제외
+    if(WEEK_KW_VERB_ENDING_RE.test(w))return null; // 동사/형용사류 어미로 끝나면 명사 후보 아님
+    return _weekKwStripParticle(w);
+  }).filter(Boolean)
+    .filter(w=>w.length>=2)
+    .filter(w=>!WEEK_KW_STOPWORDS.has(w))
+    .filter(w=>!/^\d+$/.test(w));
+}
+// 워드클라우드처럼 불규칙하게 배치 — 완전 랜덤 좌표는 겹침 검사가 비싸고 실패율이 높아,
+// 카드 영역을 단어 개수만큼 칸으로 나눈 뒤 각 칸 안에서만 무작위 오프셋을 주는 방식(카드형 배치가 자연스럽게 불규칙해 보임).
+// 빈도 1위일수록 글자 크기를 크게, 팔레트 색상을 순환시켜 단조롭지 않게 함.
+const WEEK_KW_COLORS=['var(--pal-pink-text)','var(--pal-orange-text)','var(--pal-mint-text)','var(--pal-sky-text)','var(--pal-lavender-text)'];
+function renderWeekKeywords(memoRows){
+  const el=document.getElementById('week-keywords');
+  if(!el)return;
+  // 쿼리 자체가 이미 "오늘 제외 롤링 7일"(kwStartDk~kwEndDk) 범위라 여기서 추가 필터링 불필요.
+  const rows=memoRows||[];
+  if(!rows.length){el.innerHTML='<div class="empty-msg">최근 메모가 없어요</div>';return;}
+  const allText=rows.map(m=>m.text||'').join(' ');
+  const tokens=_weekKwTokenize(allText);
+  const freq={};
+  tokens.forEach(t=>{freq[t]=(freq[t]||0)+1;});
+  const top=Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  if(!top.length){el.innerHTML='<div class="empty-msg">추출된 키워드가 없어요</div>';return;}
+
+  const maxCnt=top[0][1],minCnt=top[top.length-1][1];
+  const n=top.length;
+  // 카드 영역(퍼센트 기준)을 단어 개수에 맞는 대략적인 격자로 나눠 각 칸 중심 근처에 배치 — 5개 기준 2행 배치가 자연스러움.
+  const gridCols=n<=2?n:Math.ceil(n/2);
+  const gridRows=n<=2?1:2;
+  const cellW=100/gridCols,cellH=100/gridRows;
+  const wordsHtml=top.map(([w,c],i)=>{
+    // 빈도 비례 폰트 크기(가장 잦은 단어가 가장 크게) — 1~5개뿐이라 빈도差가 작아도 시각적으로 티나게 범위를 넉넉히 잡음.
+    const ratio=maxCnt===minCnt?1:(c-minCnt)/(maxCnt-minCnt);
+    const fontSize=18+ratio*16; // 18px~34px
+    const col=i%gridCols,row=Math.floor(i/gridCols);
+    // 칸 중심 기준 무작위 오프셋(카드형 배치가 자연스럽게 불규칙해 보이도록). 카드 가장자리에서 텍스트가
+    // 잘리지 않도록 전체 범위를 12%~88%로 한 번 더 clamp — 특히 폰트가 큰 1위 단어가 가장자리에 걸리는 걸 방지.
+    const rawCx=col*cellW+cellW/2+(Math.random()-0.5)*cellW*0.5;
+    const rawCy=row*cellH+cellH/2+(Math.random()-0.5)*cellH*0.45;
+    const cx=Math.min(88,Math.max(12,rawCx));
+    const cy=Math.min(85,Math.max(15,rawCy));
+    const rotate=(Math.random()-0.5)*24; // -12deg~12deg
+    const color=WEEK_KW_COLORS[i%WEEK_KW_COLORS.length];
+    return `<div class="week-kw-word" style="left:${cx}%;top:${cy}%;font-size:${fontSize}px;color:${color};transform:translate(-50%,-50%) rotate(${rotate}deg);">${escapeHtml(w)}<span class="week-kw-cnt">${c}</span></div>`;
+  }).join('');
+  el.innerHTML=`<div class="week-kw-cloud">${wordsHtml}</div>`;
 }
 
-// 이번 주 코멘트 타임라인 — 그 주(월~일)에 완결된 리뷰와 남긴 감상 메모를 날짜순으로. 코멘트 모아보기와 같은 렌더 로직(_chRenderNoteTimelineByDate) 재사용.
-function renderWeekNoteTimeline(weekDates,contents,noteRowsA,noteRowsB){
-  const el=document.getElementById('week-note-timeline');
-  const elM=document.getElementById('week-note-timeline-m');
-  if(!el&&!elM)return;
-  const setHtml=html=>{if(el)el.innerHTML=html;if(elM)elM.innerHTML=html;};
-  const finals=[];
-  (contents||[]).forEach(c=>{
-    if(c.review&&c.review.trim()){
-      const dk=c.end_date||c.start_date||'';
-      if(weekDates.includes(dk))finals.push({cid:c.client_id,cat:c.content_cat,title:c.title,poster:c.poster||null,stars:c.stars||0,review:c.review||'',dk});
-    }
-  });
-  const notes=[];
-  const seenNoteKeys=new Set();
-  const posterByCid={};
-  (contents||[]).forEach(c=>{if(c.client_id)posterByCid[c.client_id]=c.poster||null;});
-  [noteRowsA,noteRowsB].forEach(rows=>{
-    const lines=(rows&&rows[0]&&Array.isArray(rows[0].lines))?rows[0].lines:[];
-    lines.forEach(n=>{
-      if(!weekDates.includes(n.dk))return;
-      const key=(n.cid||'')+'|'+n.dk+'|'+(n.text||'')+'|'+(n.updatedAt||'');
-      if(seenNoteKeys.has(key))return; // 시작월=종료월인 주는 A/B가 같은 로우라 여기서 걸러짐
-      seenNoteKeys.add(key);
-      notes.push({...n,poster:n.cid?(posterByCid[n.cid]||null):null});
-    });
-  });
-  if(!finals.length&&!notes.length){setHtml('<div class="ch-note-tl-empty">이번 주엔 남긴 코멘트가 없어요</div>');return;}
-  setHtml(_chRenderNoteTimelineByDate(finals,notes));
+// 이번 주 독서 — 이이코토 본앱 rd-top-*/rd-progress-* 스타일 그대로 이식(2026-08-26).
+// 현재 읽고 있는 책의 표지+진행률 바(무지개 구슬 포함)와, reading_daily_log 기준 연속 독서일(스트릭)을 함께 보여줌.
+// 스트릭 계산은 본앱 getReadingStreak()과 동일한 로직(어제부터 거슬러 올라가며 기록이 끊기는 지점까지 카운트)을
+// reading_daily_log(서버 기준 실제 독서 로그) 데이터로 재구현.
+function _readingStreakOf(logRows){
+  const dates=new Set((logRows||[]).map(r=>r.date_key));
+  let streak=0;
+  const cur=new Date();
+  for(let i=0;i<dates.size+1;i++){
+    const dk=dateKey(cur);
+    if(dates.has(dk)){streak++;cur.setDate(cur.getDate()-1);}
+    else break;
+  }
+  return streak;
+}
+function renderWeekReading(book,streakLogRows){
+  const el=document.getElementById('week-reading');
+  if(!el)return;
+  if(!book){
+    el.innerHTML=`<div class="week-reading-inner"><div class="week-reading-title" style="color:var(--tm);">지금 읽는 책이 없어요</div></div>`;
+    return;
+  }
+  let pct=0;
+  if(book.unit==='percent')pct=book.percent||0;
+  else if(book.total_pages)pct=Math.min(100,Math.round((book.pages/book.total_pages)*100));
+  const coverHtml=book.poster
+    ?`<img class="week-reading-cover" src="${book.poster}" alt="">`
+    :`<div class="week-reading-cover-empty"></div>`;
+  const streak=_readingStreakOf(streakLogRows);
+  const streakText=streak>0?`연속 <b>${streak}일째</b> 읽고 있어요`:'오늘부터 다시 시작해볼까요?';
+  el.innerHTML=`<div class="week-reading-inner">
+    <div class="week-reading-main">
+      ${coverHtml}
+      <div class="week-reading-info">
+        <div class="week-reading-title">${escapeHtml(book.title||'')}</div>
+        <div class="week-reading-author">${escapeHtml(book.author||'')}</div>
+      </div>
+      <div class="week-reading-pct-num">${pct}%</div>
+    </div>
+    <div class="week-reading-progress-bar">
+      <div class="week-reading-progress-track"><div class="week-reading-progress-fill" style="width:${pct}%;"></div></div>
+      <div class="week-reading-progress-bead" style="left:${pct}%;"></div>
+    </div>
+    <div class="week-reading-streak">${streakText}</div>
+  </div>`;
 }
 
 // ══════════════════════════════════════════════════════════

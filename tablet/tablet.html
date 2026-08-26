@@ -55,6 +55,7 @@
   --rh-exercise:rgba(234,187,190,0.85);--rh-rest:rgba(190,225,205,0.75);--rh-groom:rgba(255,217,138,0.82);
   --rh-work:rgba(204,208,220,0.80);--rh-appointment:rgba(168,212,232,0.75);--rh-note:rgba(240,187,158,0.82);
   --rh-enjoy:rgba(216,168,205,0.80);--rh-home:rgba(210,224,160,0.82);
+  --rainbow-bead:linear-gradient(270deg,#ffb0c8,#ffd28a,#bdf0c4,#9fd8ff,#c9a8ff,#ffb0c8); /* 이이코토 본앱 진행바 구슬 애니메이션 색상 그대로 이식 */
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 html,body{height:100%;overflow:hidden;}
@@ -95,7 +96,6 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 /* 세로(모바일) 전용 요소 — 가로(기본) 화면에서는 항상 숨김. 실제 노출은 세로 미디어쿼리에서만 재정의. */
 .mobile-cal-expand-btn{display:none;}
 .mobile-cal-overlay{display:none;}
-#week-watch-note-mobile{display:none;} /* 세로(모바일) 전용 이번 주 감상+코멘트 통합 탭 카드 — 가로에서는 기존 두 카드(#week-watch-note-row)를 그대로 사용 */
 .mrp-hero-fold-btn{display:none;} /* "이 달 한눈에" 접기 버튼 — 세로(모바일)에서만 노출, 가로에서는 항상 전체 펼침 */
 .side-logo-wrap{display:flex;align-items:center;gap:6px;padding:0 0 6px;cursor:pointer;}
 .side-logo{height:36px;width:auto;cursor:pointer;}
@@ -410,9 +410,6 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .wcal-more{position:absolute;bottom:2px;right:2px;background:rgba(0,0,0,0.55);color:#fff;font-size:9px;font-weight:700;border-radius:6px;padding:1px 4px;z-index:3;}
 .wcal-cat-fallback{width:100%;height:100%;display:flex;align-items:center;justify-content:center;}
 .wcal-cat-fallback i{color:#fff;font-size:13px;}
-.wcal-week-row{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;}
-.wcal-week-cell{aspect-ratio:2/3;position:relative;display:flex;align-items:center;justify-content:center;}
-.wcal-week-cell.today .wcal-date-plain{color:rgba(214,90,140,0.8);font-weight:700;}
 /* ── 콘텐츠 모아보기 헤더 코멘트 모아보기 진입 아이콘 ── */
 .cgrid-note-tl-toggle{font-size:14px;color:var(--tm);cursor:pointer;margin-left:6px;}
 .cgrid-title-toggle{cursor:pointer;user-select:none;}
@@ -461,24 +458,30 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .cgrid-detail-notes-tl{display:flex;flex-direction:column;gap:8px;}
 .cgrid-detail-note-item{display:flex;gap:10px;align-items:flex-start;font-size:var(--fs-sm);color:var(--ts);line-height:1.5;}
 .cgrid-detail-note-date{color:var(--tm);font-weight:600;font-variant-numeric:tabular-nums;flex-shrink:0;}
-/* ── 주간탭 "이번 주 감상" / "이번 주 코멘트" 절반배너 — 세로 길이 고정, 코멘트쪽만 내부 스크롤 ── */
-.week-note-tl .ch-tlA-day-date{padding-left:16px;}
-.week-note-tl .ch-tlA-row{padding-left:16px;gap:8px;}
-.week-note-tl .ch-tlA-row::before{left:3px;}
-.week-note-tl .ch-tlA-dot{left:0;width:7px;height:7px;}
-.week-note-tl .ch-tlA-poster{width:28px;height:28px;}
-.week-note-tl .ch-tlA-title{font-size:var(--fs-sm);}
-.week-note-tl .ch-tlA-text{font-size:var(--fs-xs);}
-.week-watch-detail-item{display:flex;align-items:center;gap:8px;padding:5px 0;}
-.week-watch-detail-thumb{width:32px;height:32px;border-radius:6px;object-fit:cover;flex-shrink:0;}
-.week-watch-detail-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-sm);color:var(--tp);}
-/* 콘텐츠(드라마/영화/책/음악) 진행중·완결 공용 배지 — 오늘의 감상, 주간 감상 상세, 월간 콘텐츠그리드, 코멘트 작품별뷰에서 재사용 */
+/* ── 주간탭 "이번 주 키워드" / "이번 주 독서" ── */
+.week-kw-cloud{position:relative;width:100%;height:110px;} /* 옆 카드(이번 주 독서) 콘텐츠 실측 높이에 맞춰 축소 — 두 카드는 .grid2 align-items:stretch로 항상 같은 높이를 맞추므로, 이 값이 곧 카드 전체 길이를 좌우함(2026-08-26) */
+.week-kw-word{position:absolute;font-weight:700;white-space:nowrap;line-height:1;transform-origin:center;cursor:default;}
+.week-kw-word .week-kw-cnt{font-size:0.5em;font-weight:600;opacity:0.7;margin-left:3px;vertical-align:super;}
+/* ── 주간탭 "이번 주 독서" — 본앱 rd-top-*/rd-progress-* 스타일 그대로 이식(2026-08-26) ── */
+.week-reading-inner{border-radius:14px;background:linear-gradient(135deg,#fdeee8,#fdf3e2);padding:14px 16px 16px;}
+.week-reading-main{display:flex;align-items:center;gap:11px;margin-bottom:12px;}
+.week-reading-cover{width:48px;height:70px;border-radius:8px;object-fit:cover;flex-shrink:0;box-shadow:0 3px 10px rgba(0,0,0,0.16);background-size:cover;background-position:center;}
+.week-reading-cover-empty{width:48px;height:70px;border-radius:8px;flex-shrink:0;border:1.4px dashed var(--card-b);}
+.week-reading-info{flex:1;min-width:0;}
+.week-reading-title{font-size:var(--fs-body);font-weight:600;color:var(--tp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.week-reading-author{font-size:var(--fs-sm);color:var(--ts);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.week-reading-pct-num{font-size:var(--fs-lg);font-weight:700;color:var(--tp);font-family:'DM Sans',sans-serif;flex-shrink:0;}
+.week-reading-progress-bar{width:100%;position:relative;padding:5px 0;}
+.week-reading-progress-track{height:4px;border-radius:3px;background:var(--graph-track-color);overflow:hidden;position:relative;}
+.week-reading-progress-fill{position:absolute;left:0;top:0;height:100%;border-radius:3px;background:#ffc9da;transition:width .4s ease;}
+.week-reading-progress-bead{position:absolute;top:50%;width:12px;height:12px;border-radius:50%;transform:translate(-50%,-50%);border:1.6px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.25);background:var(--rainbow-bead);background-size:500% 100%;animation:beadRainbow 22s linear infinite;transition:left .4s ease;}
+.week-reading-streak{text-align:center;font-size:var(--fs-sm);color:var(--ts);margin-top:8px;}
+.week-reading-streak b{color:rgba(214,90,140,0.85);font-weight:700;}
+@keyframes beadRainbow{0%{background-position:0% 50%;}100%{background-position:500% 50%;}}
+/* 콘텐츠(드라마/영화/책/음악) 진행중·완결 공용 배지 — 오늘의 감상, 월간 콘텐츠그리드, 코멘트 작품별뷰에서 재사용 */
 .status-badge{font-size:9.5px;font-weight:600;color:#7a7168;background:rgba(200,190,178,0.35);border-radius:5px;padding:2px 6px;flex-shrink:0;}
 .status-badge.done{color:#8a6c20;background:rgba(255,205,90,0.35);}
 .status-badge.dot{position:absolute;top:6px;right:6px;}
-#week-watch-detail{min-height:20px;margin-top:6px;}
-.week-watch-empty-phrase{text-align:center;font-size:var(--fs-xs);color:var(--tm);opacity:0.55;font-style:italic;padding:14px 10px 0;line-height:1.5;}
-#week-note-timeline{max-height:190px;overflow-y:auto;padding-right:2px;}
 .mgoal-row span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .mgoal-row::before{content:'';width:4px;height:4px;border-radius:50%;background:rgba(var(--pal-orange-rgb),1);flex-shrink:0;}
 
@@ -930,12 +933,6 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
   .wsleep2-grid{grid-template-columns:repeat(2,1fr)!important;row-gap:18px;}
   .wsleep2-item::before,.wsleep2-item:not(:first-child)::before{display:none;}
 
-  /* 이번 주 감상+코멘트 → 탭 전환 카드 하나로 — 가로용 두 카드(#week-watch-note-row)는 숨기고,
-     같은 데이터를 공유하는 세로 전용 통합 카드(#week-watch-note-mobile)만 노출.
-     렌더 함수(renderWeekWatchStrip 등)는 이미 두 타겟(-m 접미사) 모두에 채우도록 되어 있어 별도 처리 불필요. */
-  #week-watch-note-row{display:none;}
-  #week-watch-note-mobile{display:block;}
-
   /* 하루한줄 — 요일별 한 줄로(2열 월~목/금~일 나눔을 풀어 1열로 순서대로) */
   .oneline-2col{grid-template-columns:1fr!important;}
 
@@ -1042,24 +1039,9 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
       </div>
       <div class="card"><div class="card-lbl"><i class="ti ti-moon-stars" style="color:rgba(var(--pal-sky-rgb),1);" aria-hidden="true"></i>수면 리포트</div><div id="week-sleep-report"></div></div>
       <div class="card"><div class="card-lbl"><i class="ti ti-rainbow" style="color:rgba(var(--pal-orange-rgb),1);" aria-hidden="true"></i>리듬 흐름 비교</div><div id="week-rhythm-flow"></div></div>
-      <div class="grid2" id="week-watch-note-row">
-        <div class="card"><div class="card-lbl"><i class="ti ti-movie" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>이번 주 감상</div><div class="wcal-week-row" id="week-watch-strip"></div><div id="week-watch-detail"></div></div>
-        <div class="card"><div class="card-lbl"><i class="ti ti-timeline" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>이번 주 코멘트</div><div id="week-note-timeline" class="week-note-tl"></div></div>
-      </div>
-      <!-- 세로(모바일) 전용: 위 두 카드(감상/코멘트)를 탭 전환 카드 하나로 합침 — 같은 #week-watch-strip 등 id를 그대로
-           재사용해 렌더 함수는 손대지 않고, 탭으로 감상/코멘트 패널만 번갈아 보여줌(가로에서는 이 카드 자체를 숨김). -->
-      <div class="card" id="week-watch-note-mobile">
-        <div class="rd-tabs" style="margin-bottom:12px;">
-          <div class="rd-tab on" data-wwn="watch" onclick="switchWeekWatchNoteTab(this,'watch')"><i class="ti ti-movie" aria-hidden="true"></i> 이번 주 감상</div>
-          <div class="rd-tab" data-wwn="note" onclick="switchWeekWatchNoteTab(this,'note')"><i class="ti ti-timeline" aria-hidden="true"></i> 이번 주 코멘트</div>
-        </div>
-        <div id="week-watch-note-panel-watch">
-          <div class="wcal-week-row" id="week-watch-strip-m"></div>
-          <div id="week-watch-detail-m"></div>
-        </div>
-        <div id="week-watch-note-panel-note" style="display:none;">
-          <div id="week-note-timeline-m" class="week-note-tl"></div>
-        </div>
+      <div class="grid2" id="week-keywords-reading-row">
+        <div class="card"><div class="card-lbl"><i class="ti ti-hash" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>이번 주 키워드</div><div id="week-keywords"></div></div>
+        <div class="card"><div class="card-lbl"><i class="ti ti-book" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>이번 주 독서</div><div id="week-reading"></div></div>
       </div>
       <div class="card"><div class="card-lbl"><i class="ti ti-pencil" style="color:rgba(var(--pal-yellow-rgb),1);" aria-hidden="true"></i>하루한줄</div>
         <div class="oneline-2col">
