@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260826-01-chaeum-banner';
+const CACHE = 'iikoto-v2.7-archive-split-content-corner';
 const ASSETS = [
   './',
   './index.html'
