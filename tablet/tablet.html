@@ -59,6 +59,7 @@
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 html,body{height:100%;overflow:hidden;}
+html{min-height:calc(100% + env(safe-area-inset-top));background:var(--bg);} /* 노치 위쪽까지 앱 배경색을 채움 — 본앱(이이코토)과 동일한 처리. 가로(PC/아이패드)에선 safe-area-inset-top이 0이라 영향 없음 */
 body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;background:var(--bg);color:var(--tp);-webkit-text-size-adjust:100%;text-size-adjust:100%;}
 
 #app{position:fixed;inset:0;display:flex;}
@@ -855,11 +856,11 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
   .side{
     width:auto;height:auto;flex-shrink:0;
     display:flex;align-items:center;gap:10px;
-    padding:8px 12px;overflow:visible;
+    padding:max(8px,env(safe-area-inset-top)) 12px 8px;overflow:visible;
     border-right:none;border-bottom:1px solid var(--card-b);
     opacity:1;pointer-events:auto;transition:none;
   }
-  .side.collapsed{width:auto;height:auto;padding:8px 12px;opacity:1;overflow:visible;pointer-events:auto;}
+  .side.collapsed{width:auto;height:auto;padding:max(8px,env(safe-area-inset-top)) 12px 8px;opacity:1;overflow:visible;pointer-events:auto;}
   .side::before,.side::after{display:none;} /* 워터마크 원형 장식은 좁은 스트립에서 자리만 차지하니 생략 */
   .side-logo-wrap{padding:0;flex-shrink:0;}
   .side-logo{height:26px;}
@@ -879,7 +880,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
   .mobile-cal-expand-btn{display:flex;flex-shrink:0;width:30px;height:30px;border-radius:9px;align-items:center;justify-content:center;background:var(--card);border:1px solid var(--card-b);color:var(--tm);font-size:15px;cursor:pointer;}
   .mobile-cal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.28);z-index:200;align-items:flex-start;justify-content:center;padding-top:60px;}
   .mobile-cal-overlay.on{display:flex;}
-  .mobile-cal-overlay .mini-cal{flex:none;background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:16px;width:min(340px,88vw);box-shadow:0 12px 40px rgba(0,0,0,0.22);}
+  .mobile-cal-overlay .mini-cal{flex:none;background:#fdf9f0;border:1px solid var(--card-b);border-radius:16px;padding:16px;width:min(340px,88vw);box-shadow:0 12px 40px rgba(0,0,0,0.22);} /* 화면 전체를 덮는 모달이라 --card(78% 불투명)를 그대로 쓰면 뒤 요소가 비쳐 보임 — 완전 불투명 색으로 별도 지정 */
   .mobile-cal-overlay .mini-cal-hdr{display:flex;}
   .mobile-cal-overlay .mini-cal-dow-row{display:grid;}
   .mobile-cal-overlay .mini-cal-week-row{display:none;} /* 오버레이는 항상 월간 그리드만 보여줌 */
