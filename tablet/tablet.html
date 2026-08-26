@@ -58,9 +58,8 @@
   --rainbow-bead:linear-gradient(270deg,#ffb0c8,#ffd28a,#bdf0c4,#9fd8ff,#c9a8ff,#ffb0c8); /* 이이코토 본앱 진행바 구슬 애니메이션 색상 그대로 이식 */
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-html,body{height:100%;overflow:hidden;}
-html{min-height:calc(100% + env(safe-area-inset-top));background:var(--bg);} /* 노치 위쪽까지 앱 배경색을 채움 — 본앱(이이코토)과 동일한 처리. 가로(PC/아이패드)에선 safe-area-inset-top이 0이라 영향 없음 */
-body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;background:var(--bg);color:var(--tp);-webkit-text-size-adjust:100%;text-size-adjust:100%;}
+html{height:100%;min-height:calc(100% + env(safe-area-inset-top));background:var(--bg);} /* overflow:hidden을 여기 걸지 않아야 늘어난 min-height 영역(노치 위 배경)이 실제로 노출됨 — 본앱과 동일 구조, 스크롤 잠금은 body에서 담당 */
+body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;background:var(--bg);color:var(--tp);-webkit-text-size-adjust:100%;text-size-adjust:100%;}
 
 #app{position:fixed;inset:0;display:flex;}
 
@@ -845,7 +844,10 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
   /* ══════════════════════════════════════════════════════
      공통 레이아웃 골격
      ══════════════════════════════════════════════════════ */
-  #app{flex-direction:column;}
+  /* #app이 position:fixed;inset:0(뷰포트 절대 좌표 0,0부터)이라 노치 영역까지 그대로 덮어써서,
+     html에 배경을 확장해도 그 위를 #app이 가려 안 보이는 문제가 있었음 — top을 안전영역만큼
+     내려서 노치 위쪽은 html 배경(위에서 지정한 --bg)이 그대로 비치도록 함(2026-08-26). */
+  #app{flex-direction:column;top:env(safe-area-inset-top);}
   .main-wrap{padding:16px 14px 76px;}
   .main-hdr{margin-bottom:12px;}
   .float-tabs{right:14px;bottom:14px;}
