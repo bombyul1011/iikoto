@@ -864,7 +864,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     display:flex;align-items:center;gap:10px;
     padding:max(8px,env(safe-area-inset-top)) 12px 8px;overflow:visible;
     background:transparent; /* 기본(가로) CSS의 반투명 단색이 뒤의 --bg 그라데이션과 겹쳐 색이 튀어 보이던 문제 — 완전 투명으로 바꿔 배경이 그대로 이어지게 함 */
-    border-right:none;border-bottom:1px solid var(--card-b);
+    border-right:none;border-bottom:1px solid rgba(230,200,140,0.16); /* 기본 --card-b(0.40)보다 더 옅게 — 구분선이 존재감 없이 은은하게만 남도록 */
     opacity:1;pointer-events:auto;transition:none;
   }
   .side.collapsed{width:auto;height:auto;padding:max(8px,env(safe-area-inset-top)) 12px 8px;background:transparent;opacity:1;overflow:visible;pointer-events:auto;}
