@@ -2507,6 +2507,7 @@ function renderHomeBody(section){
     if(!isNight2){
       body.appendChild(makeHabitMiniCheckRow());
       body.appendChild(makeEveningMiniStatCard());
+      body.appendChild(makeChaeumBanner());
     }
     body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getLogicalDate()));},'rhythm-soft',12.5,dateKey(getLogicalDate())));
     // 일요일 다음 주 챌린지 준비 배너는 홈탭에서 제거 — 주간탭 "이번 주도 화이팅" 카드로 흡수됨
@@ -4473,6 +4474,20 @@ const CAT_ICON_META={
 };
 const CONTENT_BAR_COLOR={drama:'var(--pal-pink-text)',book:'var(--pal-yellow-text)',movie:'var(--pal-sky-text)',music:'var(--pal-lime-text)'};
 const CONTENT_DOT_COLOR={drama:'var(--pal-pink-border)',book:'var(--pal-yellow-border)',movie:'var(--pal-sky-border)',music:'var(--pal-lime-border)'};
+// 채움로그(별도 프로젝트) — 읽기 전용 조회만 수행
+const CHAEUM_SUPA_URL='https://sqeyoqpchiljvinuqxjf.supabase.co';
+const CHAEUM_SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNxZXlvcXBjaGlsanZpbnVxeGpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5ODY5NTksImV4cCI6MjEwMjU2Mjk1OX0.H_JNNYz7_eguAqds-Wm6cwK926U74aVPaS_XwGRKeB0';
+const CHAEUM_CAT_META={
+  '시사':{icon:'ti-news',color:'#DEB07E'},
+  '예술':{icon:'ti-palette',color:'#CA8080'},
+  '역사':{icon:'ti-hourglass',color:'#C2B9A9'},
+  '음악':{icon:'ti-music',color:'#B198C7'},
+  '영화':{icon:'ti-movie',color:'#8FB5D1'},
+  '건축':{icon:'ti-building',color:'#7E8DBE'},
+  '기타':{icon:'ti-tag',color:'#9AA79B'}
+};
+// 채움로그 앱톤(세이지 그린 계열) — 배너 전용 색상
+const CHAEUM_TONE={bg:'#F3EFE6',paper:'#F7F4EC',card:'#FDFBF6',sage:'#A6A583',line:'#E4DCC9',ink:'#5C5648',subInk:'#8A8270',muted:'#B5AC98'};
 // 콘텐츠 카테고리 아이콘 배지(파스텔톤, CAT_ICON_META 기반) 색상
 function getCatColor(cat){
   return CAT_ICON_META[cat]?CAT_ICON_META[cat].color:'var(--tm)';
@@ -6927,6 +6942,121 @@ function makeEveningMiniStatCard(){
     +`<span style="display:flex;align-items:center;gap:5px;"><i class="ti ti-notes" style="font-size:15px;color:rgba(190,150,30,0.9);" aria-hidden="true"></i><span style="font-size:15px;font-weight:500;color:var(--tp);">${memoCount}</span></span>`
     +(topRhythm?`<span style="display:flex;align-items:center;"><i class="ti ${topRhythm.icon}" style="font-size:15px;color:${topRhythm.color};" aria-hidden="true"></i></span>`:'');
   return wrap;
+}
+// ── 채움로그 연동 배너 (읽기 전용 조회만 수행) ──
+async function fetchChaeumInProgress(){
+  try{
+    const res=await fetch(`${CHAEUM_SUPA_URL}/rest/v1/sessions?status=eq.in_progress&order=created_at.desc&limit=1`,{
+      headers:{'apikey':CHAEUM_SUPA_KEY,'Authorization':`Bearer ${CHAEUM_SUPA_KEY}`}
+    });
+    if(!res.ok)return null;
+    const rows=await res.json();
+    return rows[0]||null;
+  }catch(err){
+    console.error('채움로그 조회 실패',err);
+    return null;
+  }
+}
+async function fetchChaeumTimeline(limit){
+  try{
+    const res=await fetch(`${CHAEUM_SUPA_URL}/rest/v1/sessions?order=created_at.desc&limit=${limit||30}`,{
+      headers:{'apikey':CHAEUM_SUPA_KEY,'Authorization':`Bearer ${CHAEUM_SUPA_KEY}`}
+    });
+    if(!res.ok)return [];
+    return await res.json();
+  }catch(err){
+    console.error('채움로그 타임라인 조회 실패',err);
+    return [];
+  }
+}
+function makeChaeumBanner(){
+  const wrap=document.createElement('div');wrap.id='chaeum-banner-wrap';
+  wrap.style.cssText=`background:${CHAEUM_TONE.bg};border:1px solid ${CHAEUM_TONE.line};border-radius:16px;padding:16px;margin-bottom:10px;`;
+  wrap.innerHTML=`<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+      <i class="ti ti-leaf" style="font-size:14px;color:${CHAEUM_TONE.sage};" aria-hidden="true"></i>
+      <span style="font-size:var(--main-text-size);font-weight:600;color:${CHAEUM_TONE.ink};flex:1;">채움로그</span>
+    </div>
+    <div id="chaeum-banner-body" style="cursor:pointer;" onclick="openChaeumTimelineSheet()">
+      <div style="display:flex;align-items:center;gap:7px;">
+        <span style="font-size:var(--main-text-size);color:${CHAEUM_TONE.muted};">불러오는 중…</span>
+      </div>
+    </div>`;
+  fetchChaeumInProgress().then(row=>{
+    const body=document.getElementById('chaeum-banner-body');
+    if(!body)return;
+    if(!row){
+      body.innerHTML=`<div style="display:flex;align-items:center;gap:7px;">
+        <i class="ti ti-leaf" style="font-size:13px;flex-shrink:0;color:${CHAEUM_TONE.muted};" aria-hidden="true"></i>
+        <span style="font-size:var(--main-text-size);color:${CHAEUM_TONE.muted};">채움로그를 시작해보세요</span>
+      </div>`;
+      return;
+    }
+    const meta=CHAEUM_CAT_META[row.category]||{icon:'ti-tag',color:CHAEUM_TONE.sage};
+    body.innerHTML=`<div style="display:flex;gap:10px;align-items:center;">
+      <div style="width:36px;height:36px;border-radius:9px;background:${meta.color}22;flex-shrink:0;display:flex;align-items:center;justify-content:center;">
+        <i class="ti ${meta.icon}" style="font-size:16px;color:${meta.color};" aria-hidden="true"></i>
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:var(--main-text-size);font-weight:500;color:${CHAEUM_TONE.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(row.short_title||row.title||'')}</div>
+        <div style="font-size:var(--dow-label-size);color:${CHAEUM_TONE.subInk};">${escapeHtml(row.category||'')} · 진행중</div>
+      </div>
+    </div>`;
+  });
+  return wrap;
+}
+function openChaeumTimelineSheet(){
+  let sheet=document.getElementById('chaeum-timeline-modal');
+  if(!sheet){
+    sheet=document.createElement('div');
+    sheet.className='overlay';sheet.id='chaeum-timeline-modal';
+    sheet.setAttribute('onclick',"closeSheet('chaeum-timeline-modal',event)");
+    sheet.innerHTML=`<div class="bsheet" style="max-height:80vh;overflow-y:auto;background:${CHAEUM_TONE.paper||CHAEUM_TONE.bg};" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <div style="padding:0 20px 20px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+          <i class="ti ti-leaf" style="font-size:20px;color:${CHAEUM_TONE.sage};" aria-hidden="true"></i>
+          <span style="font-size:var(--main-text-size);font-weight:600;color:${CHAEUM_TONE.ink};flex:1;">채움로그 타임라인</span>
+        </div>
+        <div id="chaeum-timeline-list" style="display:flex;flex-direction:column;gap:2px;">불러오는 중…</div>
+      </div>
+    </div>`;
+    document.body.appendChild(sheet);
+  }
+  openSheet('chaeum-timeline-modal');
+  fetchChaeumTimeline(30).then(rows=>{
+    const list=document.getElementById('chaeum-timeline-list');
+    if(!list)return;
+    if(!rows.length){
+      list.innerHTML=`<div style="color:${CHAEUM_TONE.muted};padding:10px 0;font-size:var(--main-text-size);">아직 채운 기록이 없어요</div>`;
+      return;
+    }
+    list.innerHTML=rows.map((row,idx)=>{
+      const meta=CHAEUM_CAT_META[row.category]||{icon:'ti-tag',color:CHAEUM_TONE.sage};
+      const inProgress=row.status==='in_progress';
+      const hasSummary=!!row.brief_summary;
+      return `<div style="padding:9px 0;border-bottom:1px solid ${CHAEUM_TONE.line};">
+        <div style="display:flex;gap:10px;align-items:flex-start;${hasSummary?'cursor:pointer;':''}" ${hasSummary?`onclick="toggleChaeumSummary(${idx})"`:''}>
+          <div style="width:32px;height:32px;border-radius:8px;background:${meta.color}22;flex-shrink:0;display:flex;align-items:center;justify-content:center;margin-top:1px;">
+            <i class="ti ${meta.icon}" style="font-size:14px;color:${meta.color};" aria-hidden="true"></i>
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:var(--main-text-size);font-weight:500;color:${CHAEUM_TONE.ink};">${escapeHtml(row.short_title||row.title||'')}${inProgress?` <span style="font-size:var(--dow-label-size);color:${CHAEUM_TONE.sage};">· 진행중</span>`:''}</div>
+            <div style="font-size:var(--dow-label-size);color:${CHAEUM_TONE.subInk};margin-top:2px;">${escapeHtml(row.date_key||'')} · ${escapeHtml(row.category||'')}</div>
+          </div>
+          ${hasSummary?`<i id="chaeum-sum-chevron-${idx}" class="ti ti-chevron-down" style="font-size:14px;color:${CHAEUM_TONE.muted};flex-shrink:0;margin-top:4px;transition:transform .2s;" aria-hidden="true"></i>`:''}
+        </div>
+        ${hasSummary?`<div id="chaeum-sum-${idx}" style="display:none;font-size:var(--dow-label-size);color:${CHAEUM_TONE.subInk};margin-top:6px;margin-left:42px;line-height:1.5;">${escapeHtml(row.brief_summary)}</div>`:''}
+      </div>`;
+    }).join('');
+  });
+}
+function toggleChaeumSummary(idx){
+  const box=document.getElementById(`chaeum-sum-${idx}`);
+  const chevron=document.getElementById(`chaeum-sum-chevron-${idx}`);
+  if(!box)return;
+  const open=box.style.display==='block';
+  box.style.display=open?'none':'block';
+  if(chevron)chevron.style.transform=open?'rotate(0deg)':'rotate(180deg)';
 }
 // 저녁 파트1용 이달의 플리 미니카드 — 최근 등록 2건, 앨범커버+제목/가수+재생버튼, 하단에 전체보기 연결
 function makePlaylistMiniCard(){
