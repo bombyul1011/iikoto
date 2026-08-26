@@ -61,7 +61,8 @@
 html{height:100%;min-height:calc(100% + env(safe-area-inset-top));background:var(--bg);} /* overflow:hidden을 여기 걸지 않아야 늘어난 min-height 영역(노치 위 배경)이 실제로 노출됨 — 본앱과 동일 구조, 스크롤 잠금은 body에서 담당 */
 body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;background:var(--bg);color:var(--tp);-webkit-text-size-adjust:100%;text-size-adjust:100%;}
 
-#app{position:fixed;inset:0;display:flex;}
+#bg-fixed{position:fixed;inset:0;z-index:0;background:var(--bg);} /* 본앱과 동일한 고정 배경 레이어 — 노치를 포함한 뷰포트 전체를 항상 채워, #app이 relative로 바뀌는 세로 모드에서도 노치 위쪽이 비지 않도록 보장 */
+#app{position:fixed;inset:0;display:flex;z-index:1;}
 
 /* ── 좌측 사이드(캘린더 + 주간요약) ── */
 .side{width:270px;flex-shrink:0;background:rgba(255,253,248,0.35);border-right:1px solid var(--card-b);padding:10px 18px 22px;overflow-y:auto;transition:width .32s cubic-bezier(.4,0,.2,1),padding .32s cubic-bezier(.4,0,.2,1),opacity .22s ease;position:relative;}
@@ -847,7 +848,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   /* #app이 position:fixed;inset:0(뷰포트 절대 좌표 0,0부터)이라 노치 영역까지 그대로 덮어써서,
      html에 배경을 확장해도 그 위를 #app이 가려 안 보이는 문제가 있었음 — top을 안전영역만큼
      내려서 노치 위쪽은 html 배경(위에서 지정한 --bg)이 그대로 비치도록 함(2026-08-26). */
-  #app{flex-direction:column;top:env(safe-area-inset-top);}
+  /* fixed;inset:0 + top:env(...) 조합은 iOS Safari에서 노치 위 배경 노출이 기대만큼 안 되는 경우가 있어,
+     본앱과 동일하게 position:relative + 실제 높이(100dvh, 노치 제외한 동적 뷰포트 높이) 방식으로 교체(2026-08-26).
+     body가 이미 overflow:hidden으로 스크롤을 막고 있어 fixed가 아니어도 문제 없음. */
+  #app{position:relative;z-index:1;height:100vh;height:-webkit-fill-available;height:100dvh;flex-direction:column;}
   .main-wrap{padding:16px 14px 76px;}
   .main-hdr{margin-bottom:12px;}
   .float-tabs{right:14px;bottom:14px;}
@@ -975,6 +979,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 <script>(function(){try{var s=localStorage.getItem('textScale');s=s?JSON.parse(s):0;var base={'-1':{title:15,body:14},'0':{title:16,body:15},'1':{title:17,body:16}}[String(s)]||{title:16,body:15};document.documentElement.style.setProperty('--fs-title',base.title+'px');document.documentElement.style.setProperty('--fs-body',base.body+'px');document.documentElement.style.setProperty('--main-text-size',base.body+'px');document.documentElement.style.setProperty('--dow-label-size',(base.body-1.5)+'px');}catch(e){}})();</script>
 </head>
 <body>
+<div id="bg-fixed"></div>
 <div id="app">
   <div class="side-toggle-btn" id="side-toggle-btn" onclick="toggleSidebar()"><i class="ti ti-chevron-left" aria-hidden="true"></i></div>
   <div class="side" id="side">
