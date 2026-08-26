@@ -11754,15 +11754,16 @@ function renderBookList(){
   }).join('');
 }
 function toggleBookDetail(cid){_rdOpenCid=_rdOpenCid===cid?null:cid;_rdDoneQuoteBookCid=null;renderBookList();}
-function setBookStatus(cid,status){
+function setBookStatus(cid,status,review){
   const book=getBooks().find(b=>b.cid===cid);if(!book)return;
   book.status=status;
   if(status==='done')book.completedAt=dateKey(new Date());
+  if(review){book.stars=review.stars||0;book.review=review.review||'';}
   upsertBookLocal(book);
-  if(book.linkedContent&&book.contentMk)syncReadingBookToContent(book,status);
+  if(book.linkedContent&&book.contentMk)syncReadingBookToContent(book,status,review);
   renderReadingHub();
 }
-function syncReadingBookToContent(book,bookStatus){
+function syncReadingBookToContent(book,bookStatus,review){
   const STATUS_MAP={reading:'watching',done:'done',paused:'stopped'};
   const cStatus=STATUS_MAP[bookStatus];if(!cStatus)return;
   const mk=book.contentMk;
@@ -11776,6 +11777,10 @@ function syncReadingBookToContent(book,bookStatus){
     item.endDate=item.endDate||dateKey(new Date());
   }
   item.status=cStatus;
+  if(review){
+    if(review.stars)item.stars=review.stars;
+    if(review.review)item.review=review.review;
+  }
   contents[idx]=item;
   saveContents(mk,contents);
   renderTimetable();
@@ -13296,7 +13301,14 @@ function confirmProgress(){
     const actionsEl=document.getElementById('pg-modal-actions');
     if(confirmEl&&actionsEl){
       confirmEl.style.display='block';
-      confirmEl.innerHTML=`<div class="pg-done-msg">다 읽으셨나요?</div>`;
+      confirmEl.innerHTML=`<div class="pg-done-msg">다 읽으셨나요?</div>
+        <div style="display:flex;gap:8px;align-items:center;margin:10px 0 8px;">
+          <span style="font-size:var(--dow-label-size);color:var(--tm);white-space:nowrap;">별점</span>
+          <div id="pg-done-star-picker" class="cm-star-picker"></div>
+          <input type="hidden" id="pg-done-stars" value="0">
+        </div>
+        <textarea class="modal-inp" id="pg-done-review" rows="2" style="resize:none;" placeholder="감상 메모 (선택)" autocomplete="off"></textarea>`;
+      renderPgDoneStarPicker(0);
       actionsEl.innerHTML=`<button class="mbtn cancel" onclick="closeModal('progress-modal')">나중에</button>
         <div class="mbtn-done-wrap" onclick="confirmReadingProgressDone()"><button class="mbtn-done"><i class="ti ti-sparkles ico-sz-14" aria-hidden="true"></i> 완독</button></div>`;
     }
@@ -13304,12 +13316,27 @@ function confirmProgress(){
   }
   closeModal('progress-modal');
 }
+function renderPgDoneStarPicker(val){
+  const el=document.getElementById('pg-done-star-picker');if(!el)return;
+  el.innerHTML=[1,2,3,4,5].map(n=>`<svg class="cm-star${n<=val?' on':''}" data-val="${n}" onclick="setPgDoneStars(${n})" width="19" height="19" viewBox="0 0 18 18" fill="${n<=val?'currentColor':'none'}" stroke="currentColor" stroke-width="1"><polygon points="9,1.3 11.3,6.3 16.8,7 12.7,10.6 13.8,16.1 9,13.3 4.2,16.1 5.3,10.6 1.2,7 6.7,6.3"/></svg>`).join('');
+}
+function setPgDoneStars(n){
+  const inp=document.getElementById('pg-done-stars');
+  const cur=parseInt(inp.value)||0;
+  const next=cur===n?0:n;
+  inp.value=next;
+  renderPgDoneStarPicker(next);
+}
 function confirmReadingProgressDone(){
   const cid=_pgDoneConfirmCid;
   _pgDoneConfirmCid=null;
+  if(!cid){closeModal('progress-modal');return;}
+  const starsEl=document.getElementById('pg-done-stars');
+  const reviewEl=document.getElementById('pg-done-review');
+  const stars=starsEl?(parseInt(starsEl.value)||0):0;
+  const review=reviewEl?reviewEl.value.trim():'';
   closeModal('progress-modal');
-  if(!cid)return;
-  setBookStatus(cid,'done'); // 상태전환 공용 경로 — 콘텐츠 연동(syncReadingBookToContent)까지 함께 처리됨
+  setBookStatus(cid,'done',{stars,review}); // 상태전환 공용 경로 — 콘텐츠 연동(syncReadingBookToContent)까지 함께 처리됨
 }
 function toggleStopwatch(){
   const wrap=document.getElementById('rd-sw-ring-wrap');
