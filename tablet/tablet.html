@@ -887,22 +887,27 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
   .month-top-left .card{flex:none;}
 
   /* ── 오늘탭 세로 전용 재배치 ──
-     #tab-today를 세로 flex로 만들어 자식 블록 단위(각 id 부여된 grid2/grid3/card)에 order를 매김.
+     .main-body.on일 때만(=오늘탭이 실제로 활성 탭일 때만) flex로 바꿔야 탭 전환이 정상 동작함.
+     #tab-today{display:flex}처럼 .on과 무관하게 걸면 다른 탭으로 이동해도 이 탭이 계속 보이는 문제가 생김.
+     자식 블록 단위(각 id 부여된 grid2/grid3/card)에 order를 매겨 순서만 재배치.
      세로 목표 순서: 할일 → 일정 → 수면 → 메모 → 식사 → 리듬 → 분포 → 습관 → 감상(최하단)
      콘텐츠현황은 오늘의 감상과 내용이 겹쳐 세로에서는 제거. */
-  #tab-today{display:flex;flex-direction:column;}
+  #tab-today.on{display:flex;flex-direction:column;}
   #tab-today>.main-hdr{order:0;}
-  #tab-today>.grid3{order:1;display:flex;flex-direction:column;gap:13px;} /* 할일→일정→수면 순서 그대로 세로 스택 */
+  /* .grid3(할일+일정+수면)는 grid를 그대로 유지 — 내부 두 칸(.todo-card/.grid3-right)이 원래
+     서로 같은 calc() 고정 높이 공식을 공유하는 구조라, 부모를 flex로 바꾸면 그 관계가 깨져
+     "수면 배너가 투두 길이만큼 늘어나는" 부작용이 생겼음(실제로 발생했던 문제). 1열 그리드로만 전환. */
+  #tab-today>.grid3{order:1;grid-template-columns:1fr;}
+  #tab-today>.grid3>.todo-card{order:1;height:auto!important;max-height:220px;} /* 투두 — 세로 길이를 가로 대비 2/3 정도로 축소, 넘치면 내부 스크롤 */
+  #tab-today>.grid3>.todo-card #today-todos{max-height:170px;overflow-y:auto;} /* 카드 패딩/제목 줄을 뺀 실제 목록 스크롤 영역 */
+  #tab-today>.grid3>.grid3-right{order:2;height:auto!important;} /* 일정+수면 — 원래 계획대로 자기 내용 높이만큼만, 수면 카드는 그대로 둠 */
   #today-memo-card{order:2;}
   #today-meal-reading-row{order:3;display:contents;} /* 이 grid2 자체는 레이아웃에서 사라지고, 자식(식사/감상) 각각이 #tab-today의 flex 자식으로 승격되어 개별 order를 가짐 */
   #today-meal-reading-row>.meal-card{order:3;}
   #today-meal-reading-row>.quote-card{order:8;} /* 오늘의 감상 — 최하단 */
-  #today-rhythm-pace-row{order:4;display:flex;flex-direction:column;gap:13px;} /* 리듬+분포 */
-  #today-habit-content-row{order:5;display:flex;flex-direction:column;gap:13px;} /* 습관(+콘텐츠현황은 숨김) */
+  #today-rhythm-pace-row{order:4;grid-template-columns:1fr;}
+  #today-habit-content-row{order:5;grid-template-columns:1fr;}
   #today-content-card{display:none;} /* 콘텐츠 현황 — 오늘의 감상과 내용 겹쳐 세로에서 생략 */
-
-  /* 투두리스트 — 세로 길이를 가로 대비 2/3 정도로 축소, 넘치는 항목은 내부 스크롤 */
-  .todo-card #today-todos{max-height:220px;overflow-y:auto;}
 
   /* 오늘 일정 — 일정이 없으면 카드 자체를 숨김(가로에서는 항상 노출 유지) */
   #today-event-card.no-events{display:none;}
@@ -945,7 +950,7 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
   .mrp-hero{position:relative;padding-right:44px;}
   .mrp-hero-fold-btn{display:flex;position:absolute;top:20px;right:20px;width:26px;height:26px;border-radius:50%;align-items:center;justify-content:center;background:rgba(255,255,255,0.5);color:var(--tm);font-size:14px;cursor:pointer;transition:transform .2s ease;}
   .mrp-hero-fold-btn.open{transform:rotate(180deg);}
-  .mrp-hero.folded #mrp-hero-body{max-height:2.6em;overflow:hidden;position:relative;}
+  .mrp-hero.folded #mrp-hero-body{max-height:9.5em;overflow:hidden;position:relative;} /* 코멘트 line-height 1.75em 기준 약 5~6줄 분량 */
   .mrp-hero.folded #mrp-hero-body::after{content:'';position:absolute;left:0;right:0;bottom:0;height:1.6em;background:linear-gradient(rgba(220,240,225,0),rgba(235,240,205,0.85));}
   .mrp-hero:not(.folded) #mrp-hero-body{max-height:none;}
 
