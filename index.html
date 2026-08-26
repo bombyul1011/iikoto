@@ -1022,7 +1022,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .ch-note-tl-empty{font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:20px 0;}
 
 /* 코멘트 모아보기 — 날짜순 뷰(시안 A): 완결 코멘트는 카드, 감상 메모는 곁가지 */
-/* 날짜순 뷰 — 채움로그 타임라인 톤 참고: 왼쪽 세로선+점, 정사각형 포스터, 점 색으로 완결/메모 구분 */
+/* 날짜순 뷰 — 왼쪽 세로선+점, 정사각형 포스터, 점 색으로 완결/메모 구분 */
 .ch-tlA-day{margin-bottom:4px;}
 .ch-tlA-day-date{font-size:11px;font-weight:700;color:var(--tm);letter-spacing:0.04em;padding:14px 0 8px 24px;}
 .ch-tlA-day:first-child .ch-tlA-day-date{padding-top:0;}
@@ -2505,7 +2505,6 @@ function renderHomeBody(section){
     }
     const isNight2=getSubSection()==='night_2';
     if(!isNight2){
-      // 채움 홈배너: 저녁 홈탭 전용으로 재정비 예정(추후 추가)
       body.appendChild(makeHabitMiniCheckRow());
       body.appendChild(makeEveningMiniStatCard());
     }
@@ -12329,7 +12328,7 @@ function renderContentNoteTimeline(){
   el.innerHTML=_chNoteTimelineView==='work'?_chRenderNoteTimelineByWork(finals,notes):_chRenderNoteTimelineByDate(finals,notes);
 }
 // 날짜순 뷰 — 날짜별로 묶어 최신순 정렬, 완결 카드 먼저 + 감상 메모는 곁가지로
-// 날짜순 뷰 — 채움로그 타임라인 톤(세로선+점) 참고: 완결/감상 메모 모두 대등한 라인 위에, 점 색으로만 구분
+// 날짜순 뷰 — 완결/감상 메모 모두 대등한 라인 위에, 점 색으로만 구분
 function _chRenderNoteTimelineByDate(finals,notes){
   const byDate={};
   const push=(dk,item)=>{if(!dk)return;if(!byDate[dk])byDate[dk]=[];byDate[dk].push(item);};
