@@ -537,8 +537,8 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 /* 콘텐츠 모아보기(월별, 리스트형) — 그리드형(.cgrid-*)으로 대체됨, 아래 죽은 CSS 전체 제거됨
 
 /* 콘텐츠 아카이브(그리드형) — 독서달력/콘텐츠모아보기 아래 전체 폭, 한 줄 3개 고정 후 스크롤 */
-.cgrid-card{display:flex;flex-direction:column;}
-.wcal-card{display:flex;flex-direction:column;}
+.cgrid-card{display:flex;flex-direction:column;min-height:0;}
+.wcal-card{display:flex;flex-direction:column;min-height:0;}
 .cgrid-hdr{margin-bottom:10px;}
 .cgrid-title-row{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;}
 .cgrid-hdr-actions{display:flex;align-items:center;gap:8px;}
@@ -823,6 +823,67 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .wrb-flow-time{font-size:var(--fs-sm);color:var(--ts);font-weight:600;width:110px;flex-shrink:0;}
 .wrb-flow-label{font-size:var(--fs-body);color:var(--tp);}
 .wrb-flow-empty{font-size:var(--fs-body);color:var(--tm);text-align:center;padding:20px 0;}
+
+/* ══════════════════════════════════════════════════════════
+   ── 세로 화면(모바일) 대응 ──
+   가로(PC/아이패드) 레이아웃은 위 스타일 그대로 유지하고, 세로로 좁을 때만 아래로 덮어씀.
+   1) 좌측 고정 사이드바(270px) → 화면 상단의 얇은 가로 스트립(요일+주간 한 줄)으로 전환.
+      미니캘린더의 월간뷰/진행률/인사카드는 숨기고, 펼치기 아이콘을 누르면 그 부분만 오버레이로 띄움.
+   2) 모든 2단 그리드 배너(오늘/주간/월간탭, 월간리포트) → 1열로 세로 스택.
+   3) 월간탭 상단 그리드의 고정 height(270px)는 세로에서 내용을 잘라버리므로 auto로 해제.
+   ══════════════════════════════════════════════════════════ */
+@media (max-width:760px){
+  #app{flex-direction:column;}
+
+  /* 사이드바 → 상단 가로 스트립. 기존 width 트랜지션/접힘 클래스는 가로 전용이라 여기선 무시하고
+     항상 이 스트립 형태로 고정 표시(공간을 거의 안 먹으니 "접힌 상태"가 곧 기본 표시 상태). */
+  .side{
+    width:auto;height:auto;flex-shrink:0;
+    display:flex;align-items:center;gap:10px;
+    padding:8px 12px;overflow:visible;
+    border-right:none;border-bottom:1px solid var(--card-b);
+    opacity:1;pointer-events:auto;transition:none;
+  }
+  .side.collapsed{width:auto;height:auto;padding:8px 12px;opacity:1;overflow:visible;pointer-events:auto;}
+  .side::before,.side::after{display:none;} /* 워터마크 원형 장식은 좁은 스트립에서 자리만 차지하니 생략 */
+  .side-logo-wrap{padding:0;flex-shrink:0;}
+  .side-logo{height:26px;}
+  /* 미니캘린더: 월 라벨/화살표/펼치기 아이콘은 숨기고 요일행+주간 한 줄만 스트립에 노출 */
+  .mini-cal{flex:1;min-width:0;background:none;border:none;padding:0;margin-bottom:0;}
+  .mini-cal-hdr{display:none;}
+  .mini-cal-dow-row{display:none;} /* 스트립이 좁아 요일 라벨은 생략, 필요하면 펼침 오버레이에서 확인 */
+  .mini-cal-week-row{overflow-x:auto;}
+  .mini-cal-week-row .mini-cal-grid{grid-template-columns:repeat(7,32px);gap:4px;}
+  .mini-cal-day{height:32px;font-size:var(--fs-xs);}
+  .mini-cal-month-grid{display:none;} /* 월간 그리드는 스트립에 안 그림 — 펼치기 오버레이 전용 */
+  .side-progress,#side-greeting-card{display:none;} /* 진행률/인사카드는 상단 스트립에서 생략 */
+  .side-toggle-btn{display:none;} /* 가로 전용 사이드바 접기 버튼 — 세로에선 아래 mobile-cal-expand-btn이 대체 */
+
+  /* 미니캘린더 펼치기 — 스트립엔 없는 "월 라벨/월간그리드"를 오버레이로 보고 싶을 때 쓰는 버튼(HTML에 추가) */
+  .mobile-cal-expand-btn{display:flex;flex-shrink:0;width:30px;height:30px;border-radius:9px;align-items:center;justify-content:center;background:var(--card);border:1px solid var(--card-b);color:var(--tm);font-size:15px;cursor:pointer;}
+  .mobile-cal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.28);z-index:200;align-items:flex-start;justify-content:center;padding-top:60px;}
+  .mobile-cal-overlay.on{display:flex;}
+  .mobile-cal-overlay .mini-cal{flex:none;background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:16px;width:min(340px,88vw);box-shadow:0 12px 40px rgba(0,0,0,0.22);}
+  .mobile-cal-overlay .mini-cal-hdr{display:flex;}
+  .mobile-cal-overlay .mini-cal-dow-row{display:grid;}
+  .mobile-cal-overlay .mini-cal-week-row{display:none;} /* 오버레이는 항상 월간 그리드만 보여줌 */
+  .mobile-cal-overlay .mini-cal-month-grid{display:grid!important;grid-template-rows:1fr!important;overflow:visible;}
+
+  .main-wrap{padding:16px 14px 76px;}
+  .main-hdr{margin-bottom:12px;}
+
+  /* 2단 배너 전부 1열 스택 — 값은 그대로 두고 컬럼 수만 줄임 */
+  .grid2,.grid3,.top-row,.month-top-grid,.mrp-grid2,.mrsl-top{
+    grid-template-columns:1fr!important;
+    height:auto!important; /* month-top-grid의 고정 270px 해제 — 세로에서 내용 잘림 방지 */
+  }
+  .grid3-right{display:flex;flex-direction:column;gap:13px;}
+  .month-top-left{height:auto;}
+  .month-top-left .card{flex:none;}
+
+  .float-tabs{right:14px;bottom:14px;}
+}
+
 </style>
 <script>(function(){try{var s=localStorage.getItem('textScale');s=s?JSON.parse(s):0;var base={'-1':{title:15,body:14},'0':{title:16,body:15},'1':{title:17,body:16}}[String(s)]||{title:16,body:15};document.documentElement.style.setProperty('--fs-title',base.title+'px');document.documentElement.style.setProperty('--fs-body',base.body+'px');document.documentElement.style.setProperty('--main-text-size',base.body+'px');document.documentElement.style.setProperty('--dow-label-size',(base.body-1.5)+'px');}catch(e){}})();</script>
 </head>
@@ -832,12 +893,21 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
   <div class="side" id="side">
     <div class="side-logo-wrap" onclick="switchTab('reports')"><img class="side-logo" src="data:image/png;base64,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" alt="iikoto"><div class="side-logo-dot" id="side-logo-dot"></div></div>
     <div class="mini-cal" id="mini-cal"></div>
+    <div class="mobile-cal-expand-btn" onclick="openMobileCalOverlay()" title="달력 펼치기"><i class="ti ti-calendar-stats" aria-hidden="true"></i></div>
     <div class="side-progress" id="side-progress"></div>
     <div id="side-greeting-card" class="side-hcard morning">
       <div class="side-hcard-time" id="side-greeting-time"></div>
       <div class="side-hcard-greeting" id="side-greeting-text">좋은 아침이에요</div>
       <div class="side-hcard-sub" id="side-greeting-sub">잠깐만요...</div>
     </div>
+  </div>
+
+  <!-- 세로(모바일) 전용: 상단 스트립엔 요일/주간 한 줄만 보이므로, 월 라벨과 월간 그리드를
+       보고 싶을 때 펼치는 오버레이. renderMiniCal이 이미 그린 #mini-cal의 mini-cal-hdr/월간그리드를
+       그대로 복제해서 보여주는 게 아니라, 별도 인스턴스를 만들어 CSS로만 노출 범위를 다르게 함
+       (미디어쿼리에서 .mobile-cal-overlay .mini-cal-hdr 등은 표시, 스트립 쪽은 숨김). -->
+  <div class="mobile-cal-overlay" id="mobile-cal-overlay" onclick="if(event.target===this)closeMobileCalOverlay();">
+    <div class="mini-cal" id="mini-cal-overlay-inner"></div>
   </div>
 
   <div class="main-wrap">

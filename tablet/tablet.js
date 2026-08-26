@@ -197,42 +197,11 @@ function toggleSidebar(){
   const collapsed=side.classList.toggle('collapsed');
   btn.classList.toggle('collapsed',collapsed);
   try{localStorage.setItem(SIDEBAR_COLLAPSE_KEY,collapsed?'1':'0');}catch(e){}
-  syncTopRowHeightDuringTransition(side);
 }
-// 사이드바 width 트랜지션 진행 중(및 종료 시) top-row(감상 달력 / 콘텐츠 모아보기) 두 카드의
-// 세로 길이를 JS로 직접 동기화. grid의 align-items:stretch만으로는 wcal-grid(aspect-ratio 기반,
-// 폭 변화 → 높이 변화)와 cgrid-scroll(flex:1, 부모 높이를 그대로 따라감) 사이 리플로우 타이밍이
-// 어긋나 접었을 때 콘텐츠 모아보기가 늘어난 높이를 못 따라오는 문제가 있어, rAF로 매 프레임
-// wcal-card 실측 높이를 cgrid-card에 강제로 맞춰준다.
-function syncTopRowHeightDuringTransition(side){
-  const rows=document.querySelectorAll('.top-row');
-  if(!rows.length)return;
-  const startTs=performance.now();
-  const DURATION=380; // 사이드바 width transition(.32s)보다 살짝 여유
-  function step(){
-    let stillGoing=false;
-    rows.forEach(row=>{
-      const wcal=row.querySelector('.wcal-card');
-      const cgrid=row.querySelector('.cgrid-card');
-      if(!wcal||!cgrid)return;
-      const h=wcal.getBoundingClientRect().height;
-      if(h>0){
-        cgrid.style.height=h+'px';
-      }
-    });
-    if(performance.now()-startTs<DURATION){
-      stillGoing=true;
-      requestAnimationFrame(step);
-    }else{
-      // 트랜지션 종료 후 인라인 높이를 제거해 다시 grid stretch(정상 동작)에 맡김
-      rows.forEach(row=>{
-        const cgrid=row.querySelector('.cgrid-card');
-        if(cgrid)cgrid.style.height='';
-      });
-    }
-  }
-  requestAnimationFrame(step);
-}
+// top-row(감상 달력 / 콘텐츠 모아보기) 두 카드의 세로 길이는 더 이상 JS로 재서 맞추지 않는다.
+// .top-row{align-items:stretch}에 .wcal-card/.cgrid-card{min-height:0}만 더해주면
+// grid stretch가 두 카드 높이를 항상 wcal-card 기준으로 동기화해준다 — 사이드바
+// 트랜지션 중에도 매 프레임 리플로우로 자동 반영되므로 별도 rAF 동기화가 필요 없다.
 function initSidebarCollapse(){
   let collapsed=false;
   try{collapsed=localStorage.getItem(SIDEBAR_COLLAPSE_KEY)==='1';}catch(e){}
@@ -296,7 +265,6 @@ function _mrpCalDayCell(dk,d,todayDk,selDk){
   return `<div class="${cls}" onclick="selectDate('${dk}')">${d}</div>`;
 }
 async function renderMiniCal(){
-  const el=document.getElementById('mini-cal');
   const y=_sideCalDate.getFullYear(),m=_sideCalDate.getMonth();
   const first=new Date(y,m,1);
   const startWeekday=(first.getDay()+6)%7; // 월요일 시작 기준으로 보정(일요일=0 → 6칸 밀림)
@@ -319,7 +287,7 @@ async function renderMiniCal(){
     monthGridHtml+=_mrpCalDayCell(dk,d,todayDk,selDk);
   }
 
-  el.innerHTML=`<div class="mini-cal-hdr">
+  const html=`<div class="mini-cal-hdr">
       <div class="mini-cal-month-toggle${_sideCalExpanded?' expanded':''}" onclick="toggleSideCalExpand()"><span>${y}년 ${m+1}월</span><i class="ti ti-chevron-down expand-arrow" aria-hidden="true"></i></div>
       <div><i class="ti ti-chevron-left" onclick="sideCalShift(-1)" aria-hidden="true"></i><i class="ti ti-chevron-right" onclick="sideCalShift(1)" aria-hidden="true"></i></div>
     </div>
@@ -328,6 +296,12 @@ async function renderMiniCal(){
     <div class="mini-cal-month-grid${_sideCalExpanded?' on':''}"><div>
       <div class="mini-cal-grid">${monthGridHtml}</div>
     </div></div>`;
+  // 데스크탑/태블릿 사이드바용(#mini-cal)과, 세로(모바일) 상단 스트립에서 펼치는 오버레이용
+  // (#mini-cal-overlay-inner) 둘 다 같은 마크업을 공유 — 후자는 CSS로 월간뷰만 노출.
+  const el=document.getElementById('mini-cal');
+  if(el)el.innerHTML=html;
+  const elOverlay=document.getElementById('mini-cal-overlay-inner');
+  if(elOverlay)elOverlay.innerHTML=html;
 }
 function toggleSideCalExpand(){
   _sideCalExpanded=!_sideCalExpanded;
@@ -337,10 +311,19 @@ function sideCalShift(delta){
   _sideCalDate.setMonth(_sideCalDate.getMonth()+delta);
   renderMiniCal();
 }
+// 세로(모바일) 전용 — 상단 스트립엔 요일/주간 한 줄만 보이므로, 월 라벨·월간 그리드를
+// 보고 싶을 때 오버레이로 펼쳐서 보여줌. 가로 화면에선 버튼 자체가 숨겨져 있어 호출되지 않음.
+function openMobileCalOverlay(){
+  document.getElementById('mobile-cal-overlay').classList.add('on');
+}
+function closeMobileCalOverlay(){
+  document.getElementById('mobile-cal-overlay').classList.remove('on');
+}
 // 사이드바 미니캘린더에서 날짜를 고르면 항상 오늘탭으로 이동해서 그 날짜를 보여줌
 function selectDate(dk){
   _selectedDate=new Date(dk+'T00:00:00');
   renderMiniCal();
+  closeMobileCalOverlay(); // 세로 모드 오버레이에서 날짜를 골랐으면 자동으로 닫아줌(가로에선 오버레이가 안 열려 있으니 무해)
   if(_currentTab!=='today'){
     _currentTab='today';
     document.querySelectorAll('.main-body').forEach(el=>el.classList.remove('on'));
@@ -1110,8 +1093,8 @@ async function loadWeekTab(){
   const spanEndMk=monthKeyOf(new Date(endDk+'T00:00:00'));
 
   const [goalRows,habits,habitChecks,memos,todos,sleepRows,onelineRows,contents,
-    lwMemos,lwTodos,lwSleepRows,lwHabitChecks,lwContents,rblocksThis,rblocksLast,sleepReportRows,
-    wcalStripRblocks,wcalStripContents,wcalNoteRowsA,wcalNoteRowsB]=await Promise.all([
+    lwMemos,lwTodos,lwSleepRows,lwHabitChecks,rblocksFull,sleepReportRows,
+    rblocksLast,wcalStripContents,wcalNoteRowsA,wcalNoteRowsB]=await Promise.all([
     supaFetch(`goal_notes?note_key=eq.wchallenge_${encodeURIComponent(wk)}`),
     supaFetch(`habits?order=sort_order.asc`),
     supaFetch(`habit_checks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
@@ -1119,27 +1102,30 @@ async function loadWeekTab(){
     supaFetch(`todos?date_key=gte.${startDk}&date_key=lte.${endDk}&select=done`),
     supaFetch(`sleep?date_key=gte.${startDk}&date_key=lte.${endDk}&select=date_key,score,sleep_time,wake_time`),
     supaFetch(`goal_notes?note_key=gte.oneline:${startDk}&note_key=lte.oneline:${endDk}`),
+    // 콘텐츠는 이번주/지난주가 항상 동일한 쿼리(status/카테고리 조건만 있고 날짜 범위가 없음)라
+    // renderWeekDelta 안에서 countContentsCompletedInRange(contents,startDk,endDk)로 각자 날짜만
+    // 다르게 필터링함 — 한 번만 조회해서 cur/prev 양쪽에 같은 배열을 넘기면 됨(구 lwContents 제거).
     supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&order=created.desc&limit=100`),
     // 지난주 대비 비교용(오늘 요일까지로 절단된 범위)
     supaFetch(`memos?date_key=gte.${lastStartDk}&date_key=lte.${lastCmpEndDk}&select=id`),
     supaFetch(`todos?date_key=gte.${lastStartDk}&date_key=lte.${lastCmpEndDk}&select=done`),
     supaFetch(`sleep?date_key=gte.${lastStartDk}&date_key=lte.${lastCmpEndDk}&select=date_key,score,sleep_time,wake_time`),
     supaFetch(`habit_checks?date_key=gte.${lastStartDk}&date_key=lte.${lastCmpEndDk}`),
-    supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&order=created.desc&limit=100`),
-    // 리듬 흐름 비교용: 이번주(오늘까지)/지난주(동일 요일까지) — 일평균 분모는 둘 다 고정(cmpDayCount)이라
-    // 지난주도 7일 전체가 아니라 같은 요일수까지만 봐야 공정한 비교가 됨(2026-08-22 확정, 봄이님 판단).
-    supaFetch(`rhythm_blocks?date_key=gte.${startDk}&date_key=lte.${cmpEndDk}`),
-    supaFetch(`rhythm_blocks?date_key=gte.${lastStartDk}&date_key=lte.${lastCmpEndDk}`),
+    // 이번 주 리듬 블록(월~일 7일 전체) — "리듬 흐름 비교용(오늘까지 절단)"과 "감상 스트립용(7일 전체)"이
+    // 예전엔 각각 따로 조회됐으나, 절단 범위가 7일 전체의 부분집합이라 한 번만 가져와 흐름 비교 쪽은
+    // cmpEndDk 기준으로 아래에서 JS로 잘라 쓰고, 감상 스트립은 이 전체 배열을 그대로 씀.
+    supaFetch(`rhythm_blocks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
     // 수면 리포트 최근 2주
     supaFetch(`sleep?date_key=gte.${slStartDk}&date_key=lte.${slEndDk}&select=date_key,score,sleep_time,wake_time`),
-    // 이번 주 감상 스트립(월~일 전체) — 리듬 흐름 비교와 달리 오늘까지 절단하지 않고 7일 전체를 봄
-    supaFetch(`rhythm_blocks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
+    supaFetch(`rhythm_blocks?date_key=gte.${lastStartDk}&date_key=lte.${lastCmpEndDk}`),
     supaFetch(`contents?month_key=in.(${spanStartMk},${spanEndMk})`),
     // 이번 주 코멘트 타임라인용 감상 메모(월 경계를 넘을 수 있어 두 달치 모두 조회 후 주간 범위로 필터링).
     // 시작월=종료월(대부분의 주)이면 같은 로우를 두 번 받게 되는데, 중복 제거는 renderWeekNoteTimeline에서 처리.
     supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wcal_note_'+spanStartMk)}`),
     supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wcal_note_'+spanEndMk)}`)
   ]);
+
+  const rblocksThis=(rblocksFull||[]).filter(b=>b.date_key<=cmpEndDk);
 
   renderWeekGoals(goalRows&&goalRows[0]);
   renderWeekHabitMatrix(habits||[],habitChecks||[],weekDates);
@@ -1148,12 +1134,12 @@ async function loadWeekTab(){
     memos:memos||[],todos:todos||[],sleepRows:sleepRows||[],habits:habits||[],checks:habitChecks||[],contents:contents||[],
     startDk,endDk:cmpEndDk,cmpDayCount
   },{
-    memos:lwMemos||[],todos:lwTodos||[],sleepRows:lwSleepRows||[],checks:lwHabitChecks||[],contents:lwContents||[],
+    memos:lwMemos||[],todos:lwTodos||[],sleepRows:lwSleepRows||[],checks:lwHabitChecks||[],contents:contents||[],
     startDk:lastStartDk,endDk:lastCmpEndDk
   });
   renderWeekRhythmFlow(rblocksThis||[],rblocksLast||[],cmpDayCount);
   renderWeekOneline(onelineRows||[],weekDates);
-  renderWeekWatchStrip(weekDates,wcalStripRblocks||[],wcalStripContents||[]);
+  renderWeekWatchStrip(weekDates,rblocksFull||[],wcalStripContents||[]);
   renderWeekNoteTimeline(weekDates,wcalStripContents||[],wcalNoteRowsA,wcalNoteRowsB);
 }
 
@@ -1460,39 +1446,36 @@ async function loadMonthTab(){
   const y=_monthCalDate.getFullYear(),mo=_monthCalDate.getMonth();
   document.getElementById('month-title').textContent=`${y}년 ${mo+1}월`;
   const mk=monthKeyOf(_monthCalDate);
-
-  const [goalRows]=await Promise.all([
-    supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('mgoal:'+mk)}`)
-  ]);
-  renderMonthGoals(goalRows&&goalRows[0]);
-  await renderMonthTimetable(y,mo);
-  await renderMonthHabits(y,mo);
-  await renderMonthStatBar(y,mo);
-  await renderMonthQuotes(y,mo);
-  await renderMonthContentGrid(y,mo);
-  await renderChaeumLogTablet();
+  const prevMk=monthKeyOf(new Date(y,mo-1,1));
   _wcalDate=new Date(_monthCalDate);
-  await renderWatchCal();
-  lockContentCollectToReadingCal();
-}
 
-// 감상달력(top-row 첫 카드)의 실제 렌더링 높이를 콘텐츠모아보기 카드의 절대 상한으로 고정.
-// 콘텐츠모아보기가 아무리 길어져도 이 값을 넘지 못하고 내부 스크롤로만 처리됨.
-function lockContentCollectToReadingCal(){
-  const topRow=document.querySelector('.top-row');
-  if(!topRow)return;
-  const rdCard=topRow.children[0];
-  const ccolCard=document.querySelector('.cgrid-card');
-  if(!rdCard||!ccolCard)return;
-  // 이미지 로딩(독서표지)이나 폰트로 레이아웃이 아직 안 굳었을 수 있어 두 프레임 뒤에 측정
-  setTimeout(()=>{
-    const h=rdCard.offsetHeight;
-    if(h>0){
-      ccolCard.style.height=h+'px';
-      ccolCard.style.maxHeight=h+'px';
-    }
-  },50);
+  // 감상달력/콘텐츠모아보기/콘텐츠타임라인 세 배너가 공통으로 쓰는 당월·전월 contents,
+  // 습관모아보기/월통계바가 공통으로 쓰는 습관목록+체크기록을 각각 한 번만 조회해서 공유
+  // — 예전엔 각 함수가 자기 몫만큼 동일한 쿼리를 따로 날려 중복 요청했음.
+  const [goalRows,curContents,prevContents,habitsList,habitChecksMonth]=await Promise.all([
+    supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('mgoal:'+mk)}`),
+    supaFetch(`contents?month_key=eq.${mk}`),
+    supaFetch(`contents?month_key=eq.${prevMk}`),
+    supaFetch(`habits?order=sort_order.asc`),
+    supaFetch(`habit_checks?date_key=gte.${mk}-01&date_key=lte.${mk}-31`)
+  ]);
+  const contentsData={cur:curContents||[],prev:prevContents||[]};
+  const habitsData={habits:habitsList||[],checks:habitChecksMonth||[]};
+  renderMonthGoals(goalRows&&goalRows[0]);
+
+  // 서로 의존관계 없는 배너 렌더는 병렬로 처리
+  await Promise.all([
+    renderMonthTimetable(y,mo,contentsData),
+    renderMonthHabits(y,mo,habitsData),
+    renderMonthStatBar(y,mo,habitsData),
+    renderMonthQuotes(y,mo),
+    renderMonthContentGrid(y,mo,contentsData),
+    renderChaeumLogTablet(),
+    renderWatchCal(contentsData)
+  ]);
 }
+// 콘텐츠모아보기 카드 높이를 감상달력에 맞추는 것은 CSS(.top-row stretch + min-height:0)가
+// 전담한다 — JS로 별도 측정/고정하지 않는다. (구 lockContentCollectToReadingCal 제거됨)
 
 function renderMonthGoals(row){
   const el=document.getElementById('month-goals');
@@ -1578,7 +1561,7 @@ async function _loadCgridYearly(y){
   _updateCgridStatusChipUI();
   _renderCgridFromCache();
 }
-async function renderMonthContentGrid(y,mo){
+async function renderMonthContentGrid(y,mo,contentsData){
   const mk=`${y}-${pad(mo+1)}`;
   const prevMk=monthKeyOf(new Date(y,mo-1,1));
   const isSameMonth=mk===monthKeyOf(new Date());
@@ -1589,10 +1572,8 @@ async function renderMonthContentGrid(y,mo){
   if(yearToggleEl)yearToggleEl.classList.remove('on');
   _updateCgridFilterChipUI();
   _updateCgridStatusChipUI();
-  const [curRows,prevRows]=await Promise.all([
-    supaFetch(`contents?month_key=eq.${mk}`),
-    supaFetch(`contents?month_key=eq.${prevMk}`)
-  ]);
+  const curRows=contentsData?contentsData.cur:await supaFetch(`contents?month_key=eq.${mk}`);
+  const prevRows=contentsData?contentsData.prev:await supaFetch(`contents?month_key=eq.${prevMk}`);
   await _loadCgridNotesForMonths([mk,prevMk]);
   const belongsHere=c=>{
     if(c.status==='done'||c.status==='stopped')return isContentEndedInMonthTablet(c,mk);
@@ -1687,18 +1668,14 @@ function toggleCgridDetail(id){
   const el=document.getElementById('cgrid-grid-inner');
   if(el)el.innerHTML=_cgridRowsHtml(_cgridFilteredList());
 }
-async function renderMonthTimetable(y,mo){
+async function renderMonthTimetable(y,mo,contentsData){
   const el=document.getElementById('month-tt');
   const mk=`${y}-${pad(mo+1)}`;
-  const prevD=new Date(y,mo-1,1);
-  const prevMk=monthKeyOf(prevD);
-  const [curRows,prevRows]=await Promise.all([
-    supaFetch(`contents?month_key=eq.${mk}`),
-    supaFetch(`contents?month_key=eq.${prevMk}`)
-  ]);
-  const contents=curRows||[],prevContents=prevRows||[];
-  const todayDay=new Date().getDate();
   const isSameMonth=mk===monthKeyOf(new Date());
+  const prevMk=monthKeyOf(new Date(y,mo-1,1));
+  const contents=contentsData?contentsData.cur:(await supaFetch(`contents?month_key=eq.${mk}`))||[];
+  const prevContents=contentsData?contentsData.prev:(await supaFetch(`contents?month_key=eq.${prevMk}`))||[];
+  const todayDay=new Date().getDate();
   const daysInMonth=new Date(y,mo+1,0).getDate();
   const CATS=['drama','book','movie','music'];
 
@@ -1804,14 +1781,12 @@ function getHabitIconColor(name,habitColor){
   const rule=HABIT_ICON_RULES.find(r=>name&&r.keywords.some(k=>name.includes(k)));
   return rule?rule.color:'var(--tm)';
 }
-async function renderMonthHabits(y,mo){
+async function renderMonthHabits(y,mo,habitsData){
   const el=document.getElementById('month-habits');
   const mk=`${y}-${pad(mo+1)}`;
   const daysInMonth=new Date(y,mo+1,0).getDate();
-  const [habits,checks]=await Promise.all([
-    supaFetch(`habits?order=sort_order.asc`),
-    supaFetch(`habit_checks?date_key=gte.${mk}-01&date_key=lte.${mk}-${pad(daysInMonth)}`)
-  ]);
+  const habits=habitsData?habitsData.habits:(await supaFetch(`habits?order=sort_order.asc`))||[];
+  const checks=habitsData?habitsData.checks:(await supaFetch(`habit_checks?date_key=gte.${mk}-01&date_key=lte.${mk}-${pad(daysInMonth)}`))||[];
   if(!habits||!habits.length){el.innerHTML='<div class="empty-msg">등록된 습관 없음</div>';return;}
   el.innerHTML=`<div class="habit-numbox-grid">${habits.map(h=>{
     const count=(checks||[]).filter(ch=>ch.habit_name===h.name).length;
@@ -1825,17 +1800,17 @@ async function renderMonthHabits(y,mo){
 }
 
 // 이번 달 미니 통계바 — 주간탭과 동일 스타일(sbar-item/sbar-div), 박스 없이 심플하게
-async function renderMonthStatBar(y,mo){
+async function renderMonthStatBar(y,mo,habitsData){
   const mk=`${y}-${pad(mo+1)}`;
   const startDk=`${mk}-01`,endDk=`${mk}-31`;
-  const [memos,todos,sleepRows,habits,checks,contents]=await Promise.all([
+  const [memos,todos,sleepRows,contents]=await Promise.all([
     supaFetch(`memos?date_key=gte.${startDk}&date_key=lte.${endDk}&select=id`),
     supaFetch(`todos?date_key=gte.${startDk}&date_key=lte.${endDk}&select=done`),
     supaFetch(`sleep?date_key=gte.${startDk}&date_key=lte.${endDk}&select=sleep_time,wake_time`),
-    supaFetch(`habits?order=sort_order.asc`),
-    supaFetch(`habit_checks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
     supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&month_key=eq.${mk}`)
   ]);
+  const habits=habitsData?habitsData.habits:(await supaFetch(`habits?order=sort_order.asc`))||[];
+  const checks=habitsData?habitsData.checks:(await supaFetch(`habit_checks?date_key=gte.${startDk}&date_key=lte.${endDk}`))||[];
   const daysInMonth=new Date(y,mo+1,0).getDate();
   const habitList=habits||[];
   renderStatBar('month-stat-bar',{
@@ -1896,7 +1871,7 @@ let _wcalFilter='all';
 let _wcalByDate={};
 function wcalMonthShift(delta){
   _wcalDate.setMonth(_wcalDate.getMonth()+delta);
-  renderWatchCal().then(lockContentCollectToReadingCal);
+  renderWatchCal();
 }
 function wcalSetFilter(cat){
   _wcalFilter=cat;
@@ -1905,7 +1880,7 @@ function wcalSetFilter(cat){
 }
 // 드라마/영화/책은 rhythm_blocks(cat='enjoy', text="드라마 - 제목" 등)의 date_key가 감상일.
 // 음악은 리듬 기록이 없어 contents(content_cat='music')의 start_date(=등록일)를 그 날의 기록으로 사용.
-async function renderWatchCal(){
+async function renderWatchCal(contentsData){
   const y=_wcalDate.getFullYear(),m=_wcalDate.getMonth();
   const mk=`${y}-${pad(m+1)}`;
   const prevMk=monthKeyOf(new Date(y,m-1,1));
@@ -1913,10 +1888,11 @@ async function renderWatchCal(){
   _wcalByDate={};
   const push=(dk,item)=>{if(!_wcalByDate[dk])_wcalByDate[dk]=[];_wcalByDate[dk].push(item);};
 
+  // loadMonthTab에서 이미 조회한 당월/전월 contents가 있으면 재사용, 없으면(월 이동 등 단독 호출) 직접 조회
   const [rblocks,curContents,prevContents,manualRows]=await Promise.all([
     supaFetch(`rhythm_blocks?date_key=gte.${mk}-01&date_key=lte.${mk}-31`),
-    supaFetch(`contents?month_key=eq.${mk}`),
-    supaFetch(`contents?month_key=eq.${prevMk}`),
+    contentsData?Promise.resolve(contentsData.cur):supaFetch(`contents?month_key=eq.${mk}`),
+    contentsData?Promise.resolve(contentsData.prev):supaFetch(`contents?month_key=eq.${prevMk}`),
     supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wcal_manual_'+mk)}`)
   ]);
 
@@ -2593,7 +2569,7 @@ async function loadMonthlyReportPage(){
   const prevStartDk=`${prevMk}-01`,prevEndDk=`${prevMk}-${pad(prevDim)}`;
   const prevWeeksInMonth=getReportWeeksOfMonth(py,pmo);
 
-  const [monthlyRows,goalRows,todos,memosRows,sleepRows,habits,habitChecksAll,rblocks,prevRblocks,contents,prevContents,wcRowsList,milestoneRows,prevWcRowsList,prevTodos,prevSleepRows,prevHabitChecksAll,trajectoryRows,sleepReportCacheRows,weeklySummaryRowsList,weeklyMemoRowsList,prevMemosRows]=await Promise.all([
+  const [monthlyRows,goalRows,todos,memosRows,sleepRows,habits,habitChecksAll,rblocks,prevRblocks,contents,wcRowsList,milestoneRows,prevWcRowsList,prevTodos,prevSleepRows,prevHabitChecksAll,trajectoryRows,sleepReportCacheRows,weeklySummaryRowsList,weeklyMemoRowsList,prevMemosRows]=await Promise.all([
     supaFetch(`ai_cache?cache_key=eq.monthly_report_${mk}&select=content`),
     supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('mgoal:'+mk)}`),
     supaFetch(`todos?date_key=gte.${startDk}&date_key=lte.${endDk}&select=done,date_key`),
@@ -2603,7 +2579,8 @@ async function loadMonthlyReportPage(){
     supaFetch(`habit_checks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
     supaFetch(`rhythm_blocks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
     supaFetch(`rhythm_blocks?date_key=gte.${prevStartDk}&date_key=lte.${prevEndDk}`),
-    supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&order=created.desc&limit=200`),
+    // 이달의 콘텐츠(renderMrpContents)에만 쓰이는 데이터 — 이전엔 동일 쿼리를 prevContents로
+    // 한 번 더 조회했으나 실제로 어디서도 쓰이지 않는 죽은 변수였음(제거).
     supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&order=created.desc&limit=200`),
     Promise.all(weeksInMonth.map(wk=>supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wchallenge_week:'+wk)}`))),
     supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent('monthly_milestones_'+mk)}&select=content`),
