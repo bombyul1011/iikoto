@@ -472,11 +472,8 @@ async function loadTodayTab(){
   // 평균 취침/기상용 최근 2주 범위(주간탭과 동일 방식)
   const sleepAvgStart=new Date(_selectedDate);sleepAvgStart.setDate(sleepAvgStart.getDate()-13);
   const sleepAvgStartDk=dateKey(sleepAvgStart);
-  // 독서 스트릭 계산용 최근 90일 범위(reading_daily_log 실제 기록 기반, 그 날짜에 로그가 있으면 "읽은 날")
-  const readingStreakStart=new Date(_selectedDate);readingStreakStart.setDate(readingStreakStart.getDate()-90);
-  const readingStreakStartDk=dateKey(readingStreakStart);
 
-  const [todos,sleepRows,recentSleepRows,habits,habitChecks,meals,contents,books,rblocks,morningChecks,readingLogRows,todayNoteRows,todayManualRows]=await Promise.all([
+  const [todos,sleepRows,recentSleepRows,habits,habitChecks,meals,contents,rblocks,morningChecks,todayNoteRows,todayManualRows]=await Promise.all([
     supaFetch(`todos?date_key=eq.${dk}&order=created.asc`),
     supaFetch(`sleep?date_key=eq.${dk}`),
     supaFetch(`sleep?date_key=gte.${sleepAvgStartDk}&date_key=lte.${dk}&select=date_key,score,sleep_time,wake_time`),
@@ -484,10 +481,8 @@ async function loadTodayTab(){
     supaFetch(`habit_checks?date_key=eq.${dk}`),
     supaFetch(`meals?date_key=eq.${dk}`),
     supaFetch(`contents?or=(status.eq.watching,and(status.eq.done,end_date.eq.${dk}),start_date.eq.${dk})&order=created.desc&limit=10`),
-    supaFetch(`reading_books?status=eq.reading&limit=1`),
     supaFetch(`rhythm_blocks?date_key=eq.${dk}&order=start_time.asc`),
     supaFetch(`morning_routine_checks?date_key=eq.${dk}`),
-    supaFetch(`reading_daily_log?date_key=gte.${readingStreakStartDk}&date_key=lte.${dk}&select=date_key`),
     supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wcal_note_'+dk.slice(0,7))}`),
     supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wcal_manual_'+dk.slice(0,7))}`)
   ]);
@@ -504,7 +499,7 @@ async function loadTodayTab(){
   _todayMealsRow=meals&&meals[0];
   renderTodayRhythm(rblocks||[]);
   const todayManual=((todayManualRows&&todayManualRows[0]&&todayManualRows[0].lines)||[]).filter(it=>it.dk===dk);
-  renderTodayReading(dk,rblocks||[],contents||[],todayManual,books&&books[0],readingLogRows||[]);
+  renderTodayReading(dk,rblocks||[],contents||[],todayManual);
   renderTodayPace(todos||[],habits||[],habitChecks||[],morningChecks||[]);
 }
 
@@ -912,29 +907,20 @@ function openTodayRhythmFlow(){
 // 오늘의 감상 — "오늘 진행중 상태"가 아니라 감상달력과 동일한 기준(오늘 날짜에 실제로 감상 기록이 찍힌 항목:
 // 드라마/영화/책은 rhythm_blocks, 음악은 contents.start_date, 그 외 수동추가분은 wcal_manual)으로 수집.
 // 최근 것부터 최대 2개까지 절반씩 나눠 보여주고, 3개 이상이면 존재감 낮은 작은 배지(+N)로만 표시.
-function _todayReadingItemHtml(item,book,readingLogRows){
+function _todayReadingItemHtml(item){
   const meta=WCAL_CAT_META[item.cat]||{icon:'ti-stack-2',color:'rgba(150,150,150,1)',label:''};
   const coverStyle=item.poster?`background-image:url('${item.poster}');`:`background:${meta.color};`;
   const coverIcon=item.poster?'':`<i class="ti ${meta.icon}" style="color:#fff;font-size:16px;" aria-hidden="true"></i>`;
-  let subLine='';
-  if(item.cat==='book'&&book&&book.title===item.title){
-    let pct=0;
-    if(book.unit==='percent')pct=book.percent||0;
-    else if(book.total_pages)pct=Math.min(100,Math.round((book.pages/book.total_pages)*100));
-    subLine=`${pct}%`;
-  }else if((item.cat==='drama'||item.cat==='movie')&&item.totalUnit){
-    // 본앱에서 TMDB로 자동 채운 total_unit(드라마=총화수,영화=총러닝타임분)/current_unit(진행분)으로 % 계산. 책과 동일 형식으로 통일.
-    const pct=Math.min(100,Math.round(((item.currentUnit||0)/item.totalUnit)*100));
-    subLine=`${pct}%`;
-  }else{
-    subLine=meta.label||'';
-  }
+  // 드라마/독서/영화 모두 "오늘 이만큼 봤어요"를 시간으로 통일 표기(2026-08-27) — 퍼센트 진행률은
+  // 감상달력·콘텐츠 모아보기 등 다른 곳에서 이미 볼 수 있어 여기서는 시간이 더 직관적이라는 판단.
+  // durationMin이 없는 경우(리듬 기록도 없고 완결 러닝타임도 없는 영화, 음악 등)는 기존처럼 카테고리 라벨만.
+  const subLine=item.durationMin?_fmtDur(item.durationMin):(meta.label||'');
   return `<div class="rd-cur-book-sm">
     <div class="rd-cur-cover-sm" style="${coverStyle}display:flex;align-items:center;justify-content:center;">${coverIcon}</div>
     <div class="rd-cur-info-sm"><div class="rd-cur-title-sm">${escapeHtml(item.title||'')}</div><div class="rd-cur-pct-sm">${subLine}</div></div>
   </div>`;
 }
-function renderTodayReading(dk,rblocks,contents,manualItems,book,readingLogRows){
+function renderTodayReading(dk,rblocks,contents,manualItems){
   const el=document.getElementById('today-reading');
   const items=[];
   const seen=new Set();
@@ -944,10 +930,20 @@ function renderTodayReading(dk,rblocks,contents,manualItems,book,readingLogRows)
     seen.add(key);
     items.push({cat,title,poster:poster||null});
   };
+  // 드라마/독서는 오늘 기록된 리듬 블록(시작~종료 시각)을 같은 제목끼리 합산해 "오늘 실제로 쓴 시간"을 구함.
+  // 하루에 나눠서 여러 번 기록해도(오전에 좀 보고 저녁에 이어보고) 전부 더해서 하나의 총 시간으로 보여줌.
+  const durMinByKey={};
   (rblocks||[]).forEach(b=>{
-    if(b.cat!=='enjoy'||!b.text)return;
-    if(b.text.startsWith('드라마 - '))push('drama',b.text.slice(6));
-    else if(b.text.startsWith('독서 - '))push('book',b.text.slice(5));
+    if(b.cat!=='enjoy'||!b.text||!b.start_time||!b.end_time)return;
+    let cat=null,title=null;
+    if(b.text.startsWith('드라마 - ')){cat='drama';title=b.text.slice(6);}
+    else if(b.text.startsWith('독서 - ')){cat='book';title=b.text.slice(5);}
+    else return;
+    const s=_paceParseHM(b.start_time),e=_paceParseHM(b.end_time);
+    let mins=e-s;if(mins<0)mins+=1440;
+    const key=cat+'|'+title;
+    durMinByKey[key]=(durMinByKey[key]||0)+mins;
+    push(cat,title);
   });
   (contents||[]).filter(c=>c.content_cat==='music'&&c.start_date===dk).forEach(c=>push('music',c.title,c.poster));
   // 영화는 리듬 기록 유무와 무관하게 contents 하나만 기준으로 판단 — 하루짜리(당일 시작~종료), 기간형(진행중이면
@@ -955,22 +951,35 @@ function renderTodayReading(dk,rblocks,contents,manualItems,book,readingLogRows)
   (contents||[]).filter(c=>c.content_cat==='movie').forEach(c=>{
     const isToday=(c.status==='watching'&&c.start_date&&c.start_date<=dk)||c.start_date===dk||c.end_date===dk;
     if(isToday)push('movie',c.title,c.poster);
+    // 영화도 같은 날 리듬 블록에 기록이 있으면(나눠 보기 등) 그 시간을 우선 사용할 수 있도록 같은 방식으로 합산.
+    // 리듬 블록 텍스트가 영화 제목과 일치하는 수기 기록이 있는 경우만 해당(드물지만 대비).
+  });
+  (rblocks||[]).forEach(b=>{
+    if(b.cat!=='enjoy'||!b.text||!b.start_time||!b.end_time)return;
+    if(!b.text.startsWith('영화 - '))return;
+    const title=b.text.slice(5);
+    const s=_paceParseHM(b.start_time),e=_paceParseHM(b.end_time);
+    let mins=e-s;if(mins<0)mins+=1440;
+    const key='movie|'+title;
+    durMinByKey[key]=(durMinByKey[key]||0)+mins;
   });
   (manualItems||[]).forEach(it=>push(it.cat,it.title));
-  // 포스터/진행률 매칭 — 드라마/영화는 오늘 넘어온 contents 목록에서 같은 제목의 poster·total_unit·current_unit을 찾아 붙임
-  const posterByTitle={};
-  const unitByTitle={};
+  // 포스터/상태 매칭 — 오늘 넘어온 contents 목록에서 같은 제목의 poster·status·total_unit(영화 완결 러닝타임)을 찾아 붙임
+  const posterByTitle={},statusByTitle={},totalUnitByTitle={};
   (contents||[]).forEach(c=>{
     if(c.content_cat==='music'||!c.title)return;
     posterByTitle[c.title]=c.poster||null;
-    if(c.total_unit)unitByTitle[c.title]={totalUnit:c.total_unit,currentUnit:c.current_unit||0};
+    statusByTitle[c.title]=c.status||null;
+    if(c.total_unit)totalUnitByTitle[c.title]=c.total_unit;
   });
   items.forEach(it=>{
     if(it.cat==='music')return;
     if(!it.poster)it.poster=posterByTitle[it.title]||null;
-    if((it.cat==='drama'||it.cat==='movie')&&unitByTitle[it.title]){
-      it.totalUnit=unitByTitle[it.title].totalUnit;
-      it.currentUnit=unitByTitle[it.title].currentUnit;
+    const key=it.cat+'|'+it.title;
+    if(durMinByKey[key]){
+      it.durationMin=durMinByKey[key]; // 드라마/독서/(리듬기록 있는)영화 — 오늘 실제로 쓴 시간
+    }else if(it.cat==='movie'&&statusByTitle[it.title]==='done'&&totalUnitByTitle[it.title]){
+      it.durationMin=totalUnitByTitle[it.title]; // 완결 영화 — 리듬 기록이 없으면 러닝타임(total_unit=분)을 그대로 감상시간으로
     }
   });
 
@@ -978,7 +987,7 @@ function renderTodayReading(dk,rblocks,contents,manualItems,book,readingLogRows)
   if(!shown.length){el.innerHTML='<div class="empty-msg" style="text-align:left;">오늘 감상한 콘텐츠가 없어요</div>';return;}
   const moreCount=items.length-shown.length;
   const moreBadge=moreCount>0?`<span class="rd-cur-more-tiny">+${moreCount}</span>`:'';
-  const itemsHtml=shown.map(it=>_todayReadingItemHtml(it,book,readingLogRows)).join('');
+  const itemsHtml=shown.map(it=>_todayReadingItemHtml(it)).join('');
   el.innerHTML=`<div class="rd-cur-row">${itemsHtml}</div>${moreBadge}`;
 }
 
@@ -1114,7 +1123,10 @@ async function loadWeekTab(){
     // 콘텐츠는 이번주/지난주가 항상 동일한 쿼리(status/카테고리 조건만 있고 날짜 범위가 없음)라
     // renderWeekDelta 안에서 countContentsCompletedInRange(contents,startDk,endDk)로 각자 날짜만
     // 다르게 필터링함 — 한 번만 조회해서 cur/prev 양쪽에 같은 배열을 넘기면 됨(구 lwContents 제거).
-    supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&order=created.desc&limit=100`),
+    // 이번 주 독서 카드(진행중/완독 책 판별)에도 이 같은 배열을 재사용 — 책만 watching 상태도 포함하도록
+    // 조건을 넓혀서, 별도 쿼리 없이 여기서 표지/제목/상태를 모두 가져옴(2026-08-27, reading_books는
+    // 진행률 %만 보조로 사용 — contents엔 페이지/퍼센트 필드가 없어 그래프 계산은 여전히 reading_books가 필요).
+    supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music,and(content_cat.eq.book,status.eq.watching))&order=created.desc&limit=100`),
     // 지난주 대비 비교용(오늘 요일까지로 절단된 범위)
     supaFetch(`memos?date_key=gte.${lastStartDk}&date_key=lte.${lastCmpEndDk}&select=id`),
     supaFetch(`todos?date_key=gte.${lastStartDk}&date_key=lte.${lastCmpEndDk}&select=done`),
@@ -1149,7 +1161,7 @@ async function loadWeekTab(){
   renderWeekRhythmFlow(rblocksThis||[],rblocksLast||[],cmpDayCount);
   renderWeekOneline(onelineRows||[],weekDates);
   renderWeekKeywords(weekMemoTexts||[]);
-  renderWeekReading(readingBook&&readingBook[0],readingLogRows||[]);
+  renderWeekReading(contents||[],readingBook&&readingBook[0],readingLogRows||[],startDk,endDk);
 }
 
 function _minToHHMM(min){const h=Math.floor(min/60),m=min%60;return pad(h)+':'+pad(m);}
@@ -1439,24 +1451,73 @@ function _readingStreakOf(logRows){
   }
   return streak;
 }
-function renderWeekReading(book,streakLogRows){
+function renderWeekReading(contents,book,streakLogRows,startDk,endDk){
   const el=document.getElementById('week-reading');
   if(!el)return;
-  if(!book){
+  // 이번 주 완독한 책 — contents(content_cat='book')에서 done/stopped이고 종료일이 이번 주 범위인 것.
+  // reading_books는 진행중 책 1권만 가져오는 별도 쿼리라 완독작은 여기 contents로만 판별(2026-08-27, 별도 쿼리 추가 없이 기존 델타용 배열 재사용).
+  const doneThisWeek=(contents||[]).find(c=>c.content_cat==='book'&&(c.status==='done'||c.status==='stopped')&&c.end_date&&c.end_date>=startDk&&c.end_date<=endDk);
+
+  if(!book&&!doneThisWeek){
     el.innerHTML=`<div class="week-reading-inner"><div class="week-reading-title" style="color:var(--tm);">지금 읽는 책이 없어요</div></div>`;
     return;
   }
+
   let pct=0;
-  if(book.unit==='percent')pct=book.percent||0;
-  else if(book.total_pages)pct=Math.min(100,Math.round((book.pages/book.total_pages)*100));
-  const coverHtml=book.poster
-    ?`<img class="week-reading-cover" src="${book.poster}" alt="">`
-    :`<div class="week-reading-cover-empty"></div>`;
+  if(book){
+    if(book.unit==='percent')pct=book.percent||0;
+    else if(book.total_pages)pct=Math.min(100,Math.round((book.pages/book.total_pages)*100));
+  }
   const streak=_readingStreakOf(streakLogRows);
   const streakText=streak>0?`연속 <b>${streak}일째</b> 읽고 있어요`:'오늘부터 다시 시작해볼까요?';
+
+  const bookCoverHtml=(b,badge)=>{
+    const cover=b.poster
+      ?`<img class="week-reading-cover" src="${b.poster}" alt="">`
+      :`<div class="week-reading-cover-empty"></div>`;
+    return `<div class="week-reading-cover-wrap">${cover}${badge?`<span class="week-reading-badge${badge==='완독'?' done':''}">${badge}</span>`:''}</div>`;
+  };
+
+  // 진행중+완독 두 권이 함께 있는 주 — 표지 두 개를 나란히, 완독 쪽엔 배지만(그래프 없음). 진행률 그래프는 진행중 책 기준으로만 아래에 표시.
+  if(book&&doneThisWeek){
+    el.innerHTML=`<div class="week-reading-inner">
+      <div class="week-reading-main week-reading-main-dual">
+        ${bookCoverHtml(doneThisWeek,'완독')}
+        ${bookCoverHtml(book,'진행중')}
+        <div class="week-reading-info">
+          <div class="week-reading-title">${escapeHtml(book.title||'')}</div>
+          <div class="week-reading-author">${escapeHtml(book.author||'')}</div>
+        </div>
+        <div class="week-reading-pct-num">${pct}%</div>
+      </div>
+      <div class="week-reading-progress-bar">
+        <div class="week-reading-progress-track"><div class="week-reading-progress-fill" style="width:${pct}%;"></div></div>
+        <div class="week-reading-progress-bead" style="left:${pct}%;"></div>
+      </div>
+      <div class="week-reading-streak">${streakText}</div>
+    </div>`;
+    return;
+  }
+
+  // 완독 직후라 진행중인 책이 아직 없는 경우 — 완독 책만 배지로 보여주고, 그래프 대신 축하 문구로 대체.
+  if(!book&&doneThisWeek){
+    el.innerHTML=`<div class="week-reading-inner">
+      <div class="week-reading-main">
+        ${bookCoverHtml(doneThisWeek,'완독')}
+        <div class="week-reading-info">
+          <div class="week-reading-title">${escapeHtml(doneThisWeek.title||'')}</div>
+          <div class="week-reading-author">${escapeHtml(doneThisWeek.author||'')}</div>
+        </div>
+      </div>
+      <div class="week-reading-streak">이번 주 한 권 완독했어요 🎉</div>
+    </div>`;
+    return;
+  }
+
+  // 진행중인 책만 있는 일반적인 경우
   el.innerHTML=`<div class="week-reading-inner">
     <div class="week-reading-main">
-      ${coverHtml}
+      ${bookCoverHtml(book,null)}
       <div class="week-reading-info">
         <div class="week-reading-title">${escapeHtml(book.title||'')}</div>
         <div class="week-reading-author">${escapeHtml(book.author||'')}</div>
