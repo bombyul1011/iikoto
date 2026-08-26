@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v20260825-22-archive-default-grid';
+const CACHE = 'iikoto-v20260826-01-chaeum-banner';
 const ASSETS = [
   './',
   './index.html'
