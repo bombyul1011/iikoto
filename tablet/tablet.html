@@ -92,6 +92,11 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
 .side-toggle-btn:hover i{opacity:1;}
 .side-toggle-btn.collapsed{left:0;}
 .side-toggle-btn.collapsed i{transform:rotate(180deg);}
+/* 세로(모바일) 전용 요소 — 가로(기본) 화면에서는 항상 숨김. 실제 노출은 세로 미디어쿼리에서만 재정의. */
+.mobile-cal-expand-btn{display:none;}
+.mobile-cal-overlay{display:none;}
+#week-watch-note-mobile{display:none;} /* 세로(모바일) 전용 이번 주 감상+코멘트 통합 탭 카드 — 가로에서는 기존 두 카드(#week-watch-note-row)를 그대로 사용 */
+.mrp-hero-fold-btn{display:none;} /* "이 달 한눈에" 접기 버튼 — 세로(모바일)에서만 노출, 가로에서는 항상 전체 펼침 */
 .side-logo-wrap{display:flex;align-items:center;gap:6px;padding:0 0 6px;cursor:pointer;}
 .side-logo{height:36px;width:auto;cursor:pointer;}
 .mini-cal{background:var(--card);border:1px solid var(--card-b);border-radius:14px;padding:14px;margin-bottom:12px;}
@@ -881,6 +886,69 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
   .month-top-left{height:auto;}
   .month-top-left .card{flex:none;}
 
+  /* ── 오늘탭 세로 전용 재배치 ──
+     #tab-today를 세로 flex로 만들어 자식 블록 단위(각 id 부여된 grid2/grid3/card)에 order를 매김.
+     세로 목표 순서: 할일 → 일정 → 수면 → 메모 → 식사 → 리듬 → 분포 → 습관 → 감상(최하단)
+     콘텐츠현황은 오늘의 감상과 내용이 겹쳐 세로에서는 제거. */
+  #tab-today{display:flex;flex-direction:column;}
+  #tab-today>.main-hdr{order:0;}
+  #tab-today>.grid3{order:1;display:flex;flex-direction:column;gap:13px;} /* 할일→일정→수면 순서 그대로 세로 스택 */
+  #today-memo-card{order:2;}
+  #today-meal-reading-row{order:3;display:contents;} /* 이 grid2 자체는 레이아웃에서 사라지고, 자식(식사/감상) 각각이 #tab-today의 flex 자식으로 승격되어 개별 order를 가짐 */
+  #today-meal-reading-row>.meal-card{order:3;}
+  #today-meal-reading-row>.quote-card{order:8;} /* 오늘의 감상 — 최하단 */
+  #today-rhythm-pace-row{order:4;display:flex;flex-direction:column;gap:13px;} /* 리듬+분포 */
+  #today-habit-content-row{order:5;display:flex;flex-direction:column;gap:13px;} /* 습관(+콘텐츠현황은 숨김) */
+  #today-content-card{display:none;} /* 콘텐츠 현황 — 오늘의 감상과 내용 겹쳐 세로에서 생략 */
+
+  /* 투두리스트 — 세로 길이를 가로 대비 2/3 정도로 축소, 넘치는 항목은 내부 스크롤 */
+  .todo-card #today-todos{max-height:220px;overflow-y:auto;}
+
+  /* 오늘 일정 — 일정이 없으면 카드 자체를 숨김(가로에서는 항상 노출 유지) */
+  #today-event-card.no-events{display:none;}
+
+  /* ── 주간탭: 수면 리포트 4열 → 2x2 ──
+     라벨(예: "평균 수면 컨디션")이 4글자 이상이라 4열 좁은 폭에선 세로로 쪼개짐 — 2열이면 폭이 2배로 늘어 해결.
+     기존 세로 구분선(:not(:first-child)::before)은 4열 기준이라 2x2에선 3번째 칸(다음 줄 시작)에도 그려져 어색함 —
+     세로에서는 구분선 없이 위아래 여백으로만 구분. */
+  .wsleep2-grid{grid-template-columns:repeat(2,1fr)!important;row-gap:18px;}
+  .wsleep2-item::before,.wsleep2-item:not(:first-child)::before{display:none;}
+
+  /* ── 주간탭: 이번 주 감상+코멘트 → 탭 전환 카드 하나로 ──
+     가로용 두 카드(#week-watch-note-row)는 숨기고, 같은 데이터를 공유하는 세로 전용 통합 카드(#week-watch-note-mobile)만 노출.
+     렌더 함수(renderWeekWatchStrip 등)는 이미 두 타겟(-m 접미사) 모두에 채우도록 되어 있어 별도 처리 불필요. */
+  #week-watch-note-row{display:none;}
+  #week-watch-note-mobile{display:block;}
+
+  /* ── 주간탭: 하루한줄 — 요일별 한 줄로(2열 월~목/금~일 나눔을 풀어 1열로 순서대로) ── */
+  .oneline-2col{grid-template-columns:1fr!important;}
+
+  /* ── 월간탭: 콘텐츠 모아보기 — 썸네일 2줄까지만 보이게 세로 길이를 제한, 나머지는 내부 스크롤 ──
+     3열 그리드에서 한 줄 높이 ≈ 썸네일(정사각형, 화면폭 기준) + 제목 한 줄 + 행간(gap). 화면폭에 따라 유동적이라
+     vw 기반으로 근사 계산 — 오차가 있어도 overflow-y:auto가 안전망이라 내용이 잘리지 않음. */
+  #month-content-grid.cgrid-scroll{max-height:calc(2 * (28vw + 5px + 1.3em) + 10px);overflow-y:auto;}
+
+  /* ── 월간탭: 콘텐츠 타임라인 — 카테고리 라벨 텍스트 숨기고 아이콘 배지만 남김 ── */
+  .tt-cat-fixed,.tt-cat-fixed-sp{width:26px;}
+  .tt-cat-label-txt{display:none;}
+
+  /* ── 월간탭: 이번 달 수집문장 — 책 표지 포스터 숨기고 텍스트 공간 확보 ── */
+  .mq-book-cover,.mq-book-cover-fallback{display:none;}
+
+  /* ── 월간탭: 채움로그 카드 숨김(월간탭 상단 그리드는 이미 위쪽 규칙으로 1열이라, 이 카드만 빼면
+     남은 목표+습관 카드가 자연스럽게 세로로 쌓임) ── */
+  #month-top-right{display:none;}
+
+  /* ── 리포트탭 월간종합: "이 달 한눈에" 절반 정도로 접는 토글 ──
+     folded 상태에서는 max-height로 절반쯤만 보이게 자르고 하단에 그라데이션 페이드 + 버튼 회전으로 접힘/펼침 표시.
+     펼치면(folded 클래스 제거) max-height를 넉넉히 풀어 전체 노출. */
+  .mrp-hero{position:relative;padding-right:44px;}
+  .mrp-hero-fold-btn{display:flex;position:absolute;top:20px;right:20px;width:26px;height:26px;border-radius:50%;align-items:center;justify-content:center;background:rgba(255,255,255,0.5);color:var(--tm);font-size:14px;cursor:pointer;transition:transform .2s ease;}
+  .mrp-hero-fold-btn.open{transform:rotate(180deg);}
+  .mrp-hero.folded #mrp-hero-body{max-height:2.6em;overflow:hidden;position:relative;}
+  .mrp-hero.folded #mrp-hero-body::after{content:'';position:absolute;left:0;right:0;bottom:0;height:1.6em;background:linear-gradient(rgba(220,240,225,0),rgba(235,240,205,0.85));}
+  .mrp-hero:not(.folded) #mrp-hero-body{max-height:none;}
+
   .float-tabs{right:14px;bottom:14px;}
 }
 
@@ -917,11 +985,11 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
       <div class="grid3">
         <div class="card todo-card"><div class="card-lbl"><i class="ti ti-list-check" style="color:rgba(var(--pal-orange-rgb),1);" aria-hidden="true"></i>오늘 할 일</div><div id="today-todos"></div></div>
         <div class="grid3-right">
-          <div class="card event-card"><div class="card-lbl"><i class="ti ti-calendar-heart" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>오늘 일정</div><div id="today-events"></div></div>
+          <div class="card event-card" id="today-event-card"><div class="card-lbl"><i class="ti ti-calendar-heart" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>오늘 일정</div><div id="today-events"></div></div>
           <div class="card sleep-card"><div class="sleep-hdr"><div class="card-lbl"><i class="ti ti-moon-stars" style="color:rgba(var(--pal-sky-rgb),1);" aria-hidden="true"></i>수면<span class="sleep-time-sub" id="today-sleep-time-sub"></span></div><div class="sleep-score-row" id="today-sleep-score"></div></div><div id="today-sleep"></div></div>
         </div>
       </div>
-      <div class="card p">
+      <div class="card p" id="today-memo-card">
         <div class="card-lbl-row">
           <div class="card-lbl" style="margin-bottom:0;"><i class="ti ti-pencil-heart" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>오늘의 메모</div>
           <i class="ti ti-search memo-search-toggle" id="memo-search-toggle" onclick="toggleMemoSearch()" title="메모 검색" aria-hidden="true"></i>
@@ -932,17 +1000,17 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
         </div>
         <div class="memo-tl" id="today-memos"></div>
       </div>
-      <div class="grid2">
+      <div class="grid2" id="today-meal-reading-row">
         <div class="card meal-card"><div class="card-lbl"><i class="ti ti-tools-kitchen-3" style="color:rgba(var(--pal-lime-rgb),1);" aria-hidden="true"></i>오늘의 식사</div><div id="today-meals"></div></div>
         <div class="quote-card"><div class="quote-card-inner"><div class="card-lbl"><i class="ti ti-movie" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>오늘의 감상</div><div id="today-reading"></div></div></div>
       </div>
-      <div class="grid2">
+      <div class="grid2" id="today-rhythm-pace-row">
         <div class="card rhythm-card" id="today-rhythm-card" onclick="openTodayRhythmFlow()"><div class="card-lbl"><i class="ti ti-rainbow" style="color:var(--rh-rest);" aria-hidden="true"></i>오늘의 리듬</div><div id="today-rhythm"></div></div>
         <div class="card"><div class="card-lbl"><i class="ti ti-chart-circles" style="color:rgba(var(--pal-warmgray-rgb),1);" aria-hidden="true"></i>오늘 활동 분포</div><div id="today-pace"></div></div>
       </div>
-      <div class="grid2">
+      <div class="grid2" id="today-habit-content-row">
         <div class="card habit-card habit-card-row"><div class="card-lbl" id="today-habit-lbl"><i class="ti ti-chart-donut" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>습관</div><div id="today-habits"></div></div>
-        <div class="card content-card content-card-row"><div class="card-lbl"><i class="ti ti-stack-2" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>콘텐츠 현황</div><div id="today-contents"></div></div>
+        <div class="card content-card content-card-row" id="today-content-card"><div class="card-lbl"><i class="ti ti-stack-2" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>콘텐츠 현황</div><div id="today-contents"></div></div>
       </div>
     </div>
 
@@ -955,9 +1023,24 @@ body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;backgro
       </div>
       <div class="card"><div class="card-lbl"><i class="ti ti-moon-stars" style="color:rgba(var(--pal-sky-rgb),1);" aria-hidden="true"></i>수면 리포트</div><div id="week-sleep-report"></div></div>
       <div class="card"><div class="card-lbl"><i class="ti ti-rainbow" style="color:rgba(var(--pal-orange-rgb),1);" aria-hidden="true"></i>리듬 흐름 비교</div><div id="week-rhythm-flow"></div></div>
-      <div class="grid2">
+      <div class="grid2" id="week-watch-note-row">
         <div class="card"><div class="card-lbl"><i class="ti ti-movie" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>이번 주 감상</div><div class="wcal-week-row" id="week-watch-strip"></div><div id="week-watch-detail"></div></div>
         <div class="card"><div class="card-lbl"><i class="ti ti-timeline" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>이번 주 코멘트</div><div id="week-note-timeline" class="week-note-tl"></div></div>
+      </div>
+      <!-- 세로(모바일) 전용: 위 두 카드(감상/코멘트)를 탭 전환 카드 하나로 합침 — 같은 #week-watch-strip 등 id를 그대로
+           재사용해 렌더 함수는 손대지 않고, 탭으로 감상/코멘트 패널만 번갈아 보여줌(가로에서는 이 카드 자체를 숨김). -->
+      <div class="card" id="week-watch-note-mobile">
+        <div class="rd-tabs" style="margin-bottom:12px;">
+          <div class="rd-tab on" data-wwn="watch" onclick="switchWeekWatchNoteTab(this,'watch')"><i class="ti ti-movie" aria-hidden="true"></i> 이번 주 감상</div>
+          <div class="rd-tab" data-wwn="note" onclick="switchWeekWatchNoteTab(this,'note')"><i class="ti ti-timeline" aria-hidden="true"></i> 이번 주 코멘트</div>
+        </div>
+        <div id="week-watch-note-panel-watch">
+          <div class="wcal-week-row" id="week-watch-strip-m"></div>
+          <div id="week-watch-detail-m"></div>
+        </div>
+        <div id="week-watch-note-panel-note" style="display:none;">
+          <div id="week-note-timeline-m" class="week-note-tl"></div>
+        </div>
       </div>
       <div class="card"><div class="card-lbl"><i class="ti ti-pencil" style="color:rgba(var(--pal-yellow-rgb),1);" aria-hidden="true"></i>하루한줄</div>
         <div class="oneline-2col">

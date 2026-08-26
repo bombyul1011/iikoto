@@ -541,7 +541,10 @@ function renderTodayTodosEvents(todos){
   const nowMin=new Date().getHours()*60+new Date().getMinutes();
   const isToday=dateKey(_selectedDate)===dateKey(new Date());
   const evEl=document.getElementById('today-events');
+  const evCardEl=document.getElementById('today-event-card');
   const sorted=events.slice().sort((a,b)=>(a.event_time||'99:99').localeCompare(b.event_time||'99:99'));
+  // 세로(모바일) 화면에서 "일정이 없으면 카드 자체를 숨김" 처리용 — 가로에서는 이 클래스를 무시하고 항상 노출.
+  if(evCardEl)evCardEl.classList.toggle('no-events',sorted.length===0);
   evEl.innerHTML=sorted.length?sorted.map(e=>{
     let isPast=false;
     if(isToday&&e.event_time){
@@ -1245,8 +1248,14 @@ function renderWeekRhythmFlow(rblocksThis,rblocksLast,cmpDayCount){
   const curD=_rhythmDurByCat(rblocksThis);
   const lastD=_rhythmDurByCat(rblocksLast);
 
+  // 세로(모바일) 화면은 막대 폭이 좁아 시간 텍스트가 겹치기 쉬워, 표기 개수를 4개→3개, 최소 비중도 9%→13%로 더 보수적으로 잡음.
+  // 매 렌더 시점의 실제 뷰포트 폭을 그때그때 확인 — 리사이즈 이벤트까지 구독할 필요는 없음(이 앱은 로드 시 뷰포트가 사실상 고정).
+  const isNarrow=window.innerWidth<=760;
+  const maxTimeCount=isNarrow?3:4;
+  const minPctForTime=isNarrow?13:9;
+
   // 막대는 그 줄의 총합 중 비중이 큰 카테고리부터 이어지도록 시간이 긴 순으로 정렬(들쑥날쑥함 방지)
-  // 상위 4개 세그먼트는 아이콘 옆에 그 줄 기준 일평균 시간을 함께 표기(누계/dayCount)
+  // 상위 N개 세그먼트는 아이콘 옆에 그 줄 기준 일평균 시간을 함께 표기(누계/dayCount)
   const barRow=(tick,d,total,dayCount)=>{
     if(total<=0)return `<div class="rf-row"><span class="rf-tick">${tick}</span><div class="rf-bar-chart"></div></div>`;
     const sorted=Object.keys(d).filter(k=>d[k]>0).sort((a,b)=>d[b]-d[a]);
@@ -1254,7 +1263,7 @@ function renderWeekRhythmFlow(rblocksThis,rblocksLast,cmpDayCount){
     sorted.forEach((k,i)=>{
       const c=RHYTHM_CATS[k];if(!c)return;
       const pct=d[k]/total*100;
-      const showTime=i<4&&pct>=9; // 상위 4개 + 텍스트가 들어갈 최소 폭 확보되는 경우만 표기
+      const showTime=i<maxTimeCount&&pct>=minPctForTime; // 상위 N개 + 텍스트가 들어갈 최소 폭 확보되는 경우만 표기
       const avgMin=d[k]/(dayCount||1);
       segs+=`<div class="rf-bar-seg" style="width:${pct}%;background:${c.color};"><i class="ti ${c.icon}"></i>${showTime?`<span class="rf-seg-time">${_fmtDur(avgMin)}</span>`:''}</div>`;
     });
@@ -1327,7 +1336,8 @@ let _weekWatchByDate={};
 let _weekWatchSelectedDk=null;
 function renderWeekWatchStrip(weekDates,rblocks,contents){
   const el=document.getElementById('week-watch-strip');
-  if(!el)return;
+  const elM=document.getElementById('week-watch-strip-m'); // 세로(모바일) 통합 탭 카드 안의 동일 스트립
+  if(!el&&!elM)return;
   _weekWatchByDate={};
   _weekWatchSelectedDk=null;
   const push=(dk,item)=>{if(!_weekWatchByDate[dk])_weekWatchByDate[dk]=[];_weekWatchByDate[dk].push(item);};
@@ -1356,20 +1366,28 @@ function renderWeekWatchStrip(weekDates,rblocks,contents){
     _weekWatchByDate[dk]=_weekWatchByDate[dk].filter(it=>{const key=it.cat+'|'+it.title;if(seen.has(key))return false;seen.add(key);return true;});
   });
   const hasAny=Object.keys(_weekWatchByDate).length>0;
-  if(!hasAny){el.innerHTML='<div class="empty-msg">이번 주엔 기록된 감상이 없어요</div>';renderWeekWatchDetail();return;}
+  const setHtml=html=>{if(el)el.innerHTML=html;if(elM)elM.innerHTML=html;};
+  if(!hasAny){setHtml('<div class="empty-msg">이번 주엔 기록된 감상이 없어요</div>');renderWeekWatchDetail();return;}
   const today=dateKey(new Date());
-  el.innerHTML=weekDates.map((dk,i)=>{
+  const stripHtml=weekDates.map((dk,i)=>{
     const items=_weekWatchByDate[dk]||[];
     const dayNum=parseInt(dk.slice(8,10),10);
     const isToday=dk===today;
     if(!items.length)return `<div class="wcal-week-cell${isToday?' today':''}"><div class="wcal-date-plain">${dayNum}</div></div>`;
     return `<div class="wcal-week-cell${isToday?' today':''}"><div class="wcal-thumb" onclick="weekWatchSelectDay('${dk}')">${_wcalBuildThumb(items)}</div></div>`;
   }).join('');
+  setHtml(stripHtml);
   renderWeekWatchDetail();
 }
 function weekWatchSelectDay(dk){
   _weekWatchSelectedDk=(_weekWatchSelectedDk===dk)?null:dk;
   renderWeekWatchDetail();
+}
+// 세로(모바일) 전용 — "이번 주 감상"/"이번 주 코멘트" 통합 탭 카드의 패널 전환. 가로에선 이 카드 자체가 숨겨져 있어 호출되지 않음.
+function switchWeekWatchNoteTab(tabEl,which){
+  document.querySelectorAll('#week-watch-note-mobile .rd-tab').forEach(t=>t.classList.toggle('on',t===tabEl));
+  document.getElementById('week-watch-note-panel-watch').style.display=which==='watch'?'':'none';
+  document.getElementById('week-watch-note-panel-note').style.display=which==='note'?'':'none';
 }
 // 감상 미선택 상태에서 존재감 없이 띄우는 감성 문구 — 렌더될 때마다 랜덤으로 하나 고름.
 const WEEK_WATCH_EMPTY_PHRASES=[
@@ -1386,32 +1404,36 @@ const WEEK_WATCH_EMPTY_PHRASES=[
 // 정방형 포스터+제목+진행중/완결 여부만 간단히, 최대 2개까지 — 코멘트 카드와 세로 길이를 맞추기 위해 딱 이 정도 정보량으로 고정.
 function renderWeekWatchDetail(){
   const el=document.getElementById('week-watch-detail');
-  if(!el)return;
+  const elM=document.getElementById('week-watch-detail-m');
+  if(!el&&!elM)return;
+  const setHtml=html=>{if(el)el.innerHTML=html;if(elM)elM.innerHTML=html;};
   if(!_weekWatchSelectedDk){
     const phrase=WEEK_WATCH_EMPTY_PHRASES[Math.floor(Math.random()*WEEK_WATCH_EMPTY_PHRASES.length)];
-    el.innerHTML=`<div class="week-watch-empty-phrase">${escapeHtml(phrase)}</div>`;
+    setHtml(`<div class="week-watch-empty-phrase">${escapeHtml(phrase)}</div>`);
     return;
   }
   const items=(_weekWatchByDate[_weekWatchSelectedDk]||[]).slice(0,2);
   if(!items.length){
     const phrase=WEEK_WATCH_EMPTY_PHRASES[Math.floor(Math.random()*WEEK_WATCH_EMPTY_PHRASES.length)];
-    el.innerHTML=`<div class="week-watch-empty-phrase">${escapeHtml(phrase)}</div>`;
+    setHtml(`<div class="week-watch-empty-phrase">${escapeHtml(phrase)}</div>`);
     return;
   }
-  el.innerHTML=items.map(it=>{
+  setHtml(items.map(it=>{
     const m=WCAL_CAT_META[it.cat]||{icon:'ti-stack-2',color:'rgba(150,150,150,1)'};
     const thumb=it.poster
       ?`<img src="${it.poster}" class="week-watch-detail-thumb" />`
       :`<div class="week-watch-detail-thumb" style="background:${m.color};display:flex;align-items:center;justify-content:center;"><i class="ti ${m.icon}" style="color:#fff;" aria-hidden="true"></i></div>`;
     const statusTag=it.status==='watching'?'<span class="status-badge">진행중</span>':(it.status==='done'?'<span class="status-badge done">완결</span>':'');
     return `<div class="week-watch-detail-item">${thumb}<span class="week-watch-detail-title">${escapeHtml(it.title||'')}</span>${statusTag}</div>`;
-  }).join('');
+  }).join(''));
 }
 
 // 이번 주 코멘트 타임라인 — 그 주(월~일)에 완결된 리뷰와 남긴 감상 메모를 날짜순으로. 코멘트 모아보기와 같은 렌더 로직(_chRenderNoteTimelineByDate) 재사용.
 function renderWeekNoteTimeline(weekDates,contents,noteRowsA,noteRowsB){
   const el=document.getElementById('week-note-timeline');
-  if(!el)return;
+  const elM=document.getElementById('week-note-timeline-m');
+  if(!el&&!elM)return;
+  const setHtml=html=>{if(el)el.innerHTML=html;if(elM)elM.innerHTML=html;};
   const finals=[];
   (contents||[]).forEach(c=>{
     if(c.review&&c.review.trim()){
@@ -1433,8 +1455,8 @@ function renderWeekNoteTimeline(weekDates,contents,noteRowsA,noteRowsB){
       notes.push({...n,poster:n.cid?(posterByCid[n.cid]||null):null});
     });
   });
-  if(!finals.length&&!notes.length){el.innerHTML='<div class="ch-note-tl-empty">이번 주엔 남긴 코멘트가 없어요</div>';return;}
-  el.innerHTML=_chRenderNoteTimelineByDate(finals,notes);
+  if(!finals.length&&!notes.length){setHtml('<div class="ch-note-tl-empty">이번 주엔 남긴 코멘트가 없어요</div>');return;}
+  setHtml(_chRenderNoteTimelineByDate(finals,notes));
 }
 
 // ══════════════════════════════════════════════════════════
@@ -1719,7 +1741,7 @@ async function renderMonthTimetable(y,mo,contentsData){
     if(!tracks.length)tracks.push([]);
     const meta=CAT_ICON_META[cat];
     tracks.forEach((trackItems,tIdx)=>{
-      const catLabel=tIdx===0?`<span class="tt-cat-badge" style="background:${meta.bg};"><i class="ti ${meta.icon}" style="color:${meta.iconColor};" aria-hidden="true"></i></span>${meta.label}`:'';
+      const catLabel=tIdx===0?`<span class="tt-cat-badge" style="background:${meta.bg};"><i class="ti ${meta.icon}" style="color:${meta.iconColor};" aria-hidden="true"></i></span><span class="tt-cat-label-txt">${meta.label}</span>`:'';
       // 본앱과 동일하게 커서를 하루씩 진행하며, 콘텐츠 없는 날은 점선 네모칸(tt-cell), 있는 구간은 카테고리색 블록(tt-block)으로 채움
       // 음악은 같은 시작일끼리 그룹핑해서 2곡 이상이면 곡 제목 대신 숫자 개수로 표시(본앱 동일 규칙)
       const sortedGroups=cat==='music'
@@ -2653,12 +2675,25 @@ function _mrpExtractHeroComment(row){
     return typeof row.content==='string'?row.content:'';
   }
 }
+// 세로(모바일) 화면 전용 — "이 달 한눈에" 카드를 절반 정도만 보이게 접었다가 펼치는 토글.
+// 가로에서는 CSS가 이 버튼과 접힘 상태를 모두 무시하도록 되어 있어 클릭돼도 시각적 영향이 없음.
+function toggleMrpHeroFold(){
+  const slot=document.getElementById('mrp-hero-slot');
+  const btn=document.getElementById('mrp-hero-fold-btn');
+  if(!slot)return;
+  const collapsed=slot.classList.toggle('folded');
+  if(btn)btn.classList.toggle('open',!collapsed);
+}
 function renderMrpHero(row){
   const el=document.getElementById('mrp-body');
   // 최초 렌더 시 전체 골격을 한 번에 잡고, 이후 각 render 함수가 자기 섹션의 innerHTML만 채움
   if(!document.getElementById('mrp-hero-slot')){
     el.innerHTML=`
-      <div class="mrp-hero" id="mrp-hero-slot"></div>
+      <div class="mrp-hero folded" id="mrp-hero-slot">
+        <div class="mrp-hero-eyebrow"><i class="ti ti-sparkles" aria-hidden="true"></i>이 달 한눈에</div>
+        <i class="ti ti-chevron-down mrp-hero-fold-btn" id="mrp-hero-fold-btn" onclick="toggleMrpHeroFold()" title="펼치기/접기" aria-hidden="true"></i>
+        <div id="mrp-hero-body"></div>
+      </div>
       <div class="mrp-grid2" style="margin-bottom:14px;">
         <div class="mrp-card"><div class="mrp-card-title"><i class="ti ti-flag-3" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>이 달의 목표</div><div id="mrp-goals"></div></div>
         <div class="mrp-card mrp-card-vcenter"><div class="mrp-card-title"><i class="ti ti-chart-donut" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>이 달의 숫자</div><div id="mrp-stats"></div></div>
@@ -2677,27 +2712,26 @@ function renderMrpHero(row){
       <div class="mrp-links-wrap"><div id="mrp-report-links"></div></div>
     `;
   }
-  const heroEl=document.getElementById('mrp-hero-slot');
+  const heroEl=document.getElementById('mrp-hero-body');
   const now=new Date();
   const lastDateOfThisMonth=new Date(_mrpDate.getFullYear(),_mrpDate.getMonth()+1,0).getDate();
   const isLastDayEvening=now.getDate()===lastDateOfThisMonth&&_mrpDate.getMonth()===now.getMonth()&&_mrpDate.getFullYear()===now.getFullYear()&&(now.getHours()>=19||now.getHours()<6);
   const isThisMonth=(_mrpDate.getFullYear()===now.getFullYear()&&_mrpDate.getMonth()===now.getMonth());
   const isOngoingMonth=isThisMonth&&!isLastDayEvening;
   if(isOngoingMonth){
-    heroEl.innerHTML=`<div class="mrp-hero-eyebrow"><i class="ti ti-sparkles" aria-hidden="true"></i>이 달 한눈에</div><div class="mrp-hero-comment" style="opacity:.6;">이 달이 끝나면 정리해드려요</div>`;
+    heroEl.innerHTML=`<div class="mrp-hero-comment" style="opacity:.6;">이 달이 끝나면 정리해드려요</div>`;
     return;
   }
   if(!row||!row.content){
-    heroEl.innerHTML=`<div class="mrp-hero-eyebrow"><i class="ti ti-sparkles" aria-hidden="true"></i>이 달 한눈에</div><div class="mrp-hero-comment" style="opacity:.6;">이 달의 종합 리포트가 아직 발행되지 않았어요</div>`;
+    heroEl.innerHTML=`<div class="mrp-hero-comment" style="opacity:.6;">이 달의 종합 리포트가 아직 발행되지 않았어요</div>`;
     return;
   }
   try{
     const report=JSON.parse(row.content);
-    heroEl.innerHTML=`<div class="mrp-hero-eyebrow"><i class="ti ti-sparkles" aria-hidden="true"></i>이 달 한눈에</div>
-      <div class="mrp-hero-comment">${escapeHtml(report.comment||'')}</div>
+    heroEl.innerHTML=`<div class="mrp-hero-comment">${escapeHtml(report.comment||'')}</div>
       ${report.keywords&&report.keywords.length?`<div class="mr-tag-cloud">${report.keywords.map(k=>`<span class="mr-tag">${escapeHtml(k)}</span>`).join('')}</div>`:''}`;
   }catch(e){
-    heroEl.innerHTML=`<div class="mrp-hero-eyebrow"><i class="ti ti-sparkles" aria-hidden="true"></i>이 달 한눈에</div><div class="mrp-hero-comment">${row.content}</div>`;
+    heroEl.innerHTML=`<div class="mrp-hero-comment">${row.content}</div>`;
   }
 }
 
