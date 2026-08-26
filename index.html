@@ -2506,8 +2506,9 @@ function renderHomeBody(section){
     const isNight2=getSubSection()==='night_2';
     if(!isNight2){
       body.appendChild(makeHabitMiniCheckRow());
-      body.appendChild(makeEveningMiniStatCard());
       body.appendChild(makeChaeumBanner());
+      body.appendChild(makeLabel('이달의 플리'));
+      body.appendChild(makePlaylistMiniCard());
     }
     body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getLogicalDate()));},'rhythm-soft',12.5,dateKey(getLogicalDate())));
     // 일요일 다음 주 챌린지 준비 배너는 홈탭에서 제거 — 주간탭 "이번 주도 화이팅" 카드로 흡수됨
@@ -2522,8 +2523,7 @@ function renderHomeBody(section){
       body.appendChild(makeLabel('밀도의 숲'));
       body.appendChild(makeMonthlyHeatmapCard());
     }else{
-      body.appendChild(makeLabel('이달의 플리'));
-      body.appendChild(makePlaylistMiniCard());
+      body.appendChild(makeEveningMiniStatCard());
     }
     if(showWeeklyReviewReadOnly)appendSundayReadOnlyBanner(body);
   }
