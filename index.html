@@ -9623,19 +9623,31 @@ function renderCwatchMainCard(){
       </div>`;
     }else{
       const two=ongoing.slice(0,2);
-      const postersHtml=two.map(c=>{
+      const halvesHtml=two.map(c=>{
         const meta=CAT_ICON_META[c.cat];
-        const inner=c.poster?`<img class="rd-top-cover" src="${c.poster}" style="width:80px;height:80px;object-fit:cover;">`:`<div class="rd-top-cover" style="width:80px;height:80px;background:${meta.color};display:flex;align-items:center;justify-content:center;"><i class="ti ${meta.icon}" style="font-size:26px;color:#fff;" aria-hidden="true"></i></div>`;
-        return `<div style="display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;" onclick="toggleContentStopwatch('${c.cid}','${c._mk}')">
-          <div style="position:relative;width:80px;height:80px;border-radius:12px;overflow:hidden;">
-            ${inner}
+        const posterHtml=c.poster?`<img class="rd-top-cover" src="${c.poster}" style="width:44px;height:64px;object-fit:cover;">`:`<div class="rd-top-cover" style="width:44px;height:64px;background:${meta.color};display:flex;align-items:center;justify-content:center;"><i class="ti ${meta.icon}" style="font-size:18px;color:#fff;" aria-hidden="true"></i></div>`;
+        let progressHtml='';
+        if(c.totalUnit){
+          const cur=Math.min(c.currentUnit||0,c.totalUnit);
+          const pct=Math.round((cur/c.totalUnit)*100);
+          const unitLabel=c.cat==='drama'?'화':'분';
+          progressHtml=`<div class="rd-progress-bar" style="margin-top:6px;" onclick="event.stopPropagation();openContentProgressModal('${c.cid}')">
+            <div class="rd-progress-track"><div class="rd-progress-fill" style="width:${pct}%;"></div></div>
+            <div class="rd-progress-bead" style="left:${pct}%;"></div>
           </div>
-          <div style="width:80px;font-size:var(--dow-label-size);color:var(--tp);text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.title||'')}</div>
+          <div class="rd-top-sub" style="margin-top:-4px;">${cur}/${c.totalUnit}${unitLabel}</div>`;
+        }
+        return `<div style="flex:1;min-width:0;display:flex;gap:10px;cursor:pointer;" onclick="toggleContentStopwatch('${c.cid}','${c._mk}')">
+          ${posterHtml}
+          <div style="flex:1;min-width:0;">
+            <div class="rd-top-title" style="font-size:var(--main-text-size);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.title||'')}</div>
+            ${progressHtml||'<div class="rd-top-sub">눌러서 시청을 시작해보세요</div>'}
+          </div>
         </div>`;
       }).join('');
       el.innerHTML=`<div class="rd-top" style="margin-bottom:14px;">
         <div class="rd-top-inner">
-          <div style="display:flex;gap:20px;justify-content:center;">${postersHtml}</div>
+          <div style="display:flex;gap:16px;">${halvesHtml}</div>
         </div>
       </div>`;
     }
