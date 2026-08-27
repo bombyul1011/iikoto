@@ -769,11 +769,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .settings-item-val{font-size:var(--dow-label-size);color:var(--tm);}
 
 
-/* ── PDF MODAL ── */
-.pdf-modal-body{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;}
-.pdf-range-row{display:flex;gap:8px;align-items:center;}
-.pdf-range-lbl{font-size:var(--dow-label-size);color:var(--tm);white-space:nowrap;width:36px;}
-
 /* ── API SEARCH ── */
 .api-search-wrap{position:relative;}
 .api-results{position:absolute;top:100%;left:0;right:0;z-index:200;background:var(--modal);border:1px solid var(--card-b);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.15);max-height:240px;overflow-y:auto;margin-top:4px;}
@@ -2138,7 +2133,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="settings-slbl">백업</div>
       <div class="settings-card">
         <div class="settings-item" onclick="downloadFullJSONBackup()" style="cursor:pointer;"><span class="settings-item-lbl"><i class="ti ti-download ico-inline-15tp" aria-hidden="true"></i>전체 데이터 백업 (JSON)</span><i class="ti ti-chevron-right sub-tm-13" aria-hidden="true"></i></div>
-        <div class="settings-item" onclick="openMarkdownBackup()" style="cursor:pointer;"><span class="settings-item-lbl"><i class="ti ti-file-text ico-inline-15tp" aria-hidden="true"></i>일기 백업 (마크다운)</span><i class="ti ti-chevron-right sub-tm-13" aria-hidden="true"></i></div>
       </div>
     </div>
     <div>
@@ -2205,35 +2199,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 <div class="tsp-overlay" id="tsp-overlay" onclick="if(event.target===this)closeTimeSlotPopup();">
   <div class="tsp-box" id="tsp-box"></div>
 </div>
-<!-- MARKDOWN BACKUP MODAL -->
-<div class="modal-ov" id="pdf-modal" onclick="closeModal('pdf-modal',event)">
-  <div class="modal" style="max-width:340px;">
-    <div class="modal-title">일기 백업 내보내기</div>
-    <div class="pdf-modal-body">
-      <div class="pdf-range-row">
-        <span class="pdf-range-lbl">시작</span>
-        <input type="date" class="modal-inp" id="pdf-start" style="flex:1;margin-bottom:0;" oninput="updatePdfCount()" lang="en-GB">
-      </div>
-      <div class="pdf-range-row">
-        <span class="pdf-range-lbl">종료</span>
-        <input type="date" class="modal-inp" id="pdf-end" style="flex:1;margin-bottom:0;" oninput="updatePdfCount()" lang="en-GB">
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;">
-        <button onclick="setPdfRange('week')" style="flex:1;padding:7px;border-radius:9px;border:1px solid var(--inp-b);background:var(--inp);color:var(--ts);font-family:'DM Sans',sans-serif;font-size:var(--dow-label-size);cursor:pointer;">이번 주</button>
-        <button onclick="setPdfRange('month')" style="flex:1;padding:7px;border-radius:9px;border:1px solid var(--inp-b);background:var(--inp);color:var(--ts);font-family:'DM Sans',sans-serif;font-size:var(--dow-label-size);cursor:pointer;">이번 달</button>
-        <button onclick="setPdfRange('3month')" style="flex:1;padding:7px;border-radius:9px;border:1px solid var(--inp-b);background:var(--inp);color:var(--ts);font-family:'DM Sans',sans-serif;font-size:var(--dow-label-size);cursor:pointer;">최근 3개월</button>
-        <button onclick="setPdfRange('year')" style="flex:1;padding:7px;border-radius:9px;border:1px solid var(--inp-b);background:var(--inp);color:var(--ts);font-family:'DM Sans',sans-serif;font-size:var(--dow-label-size);cursor:pointer;">올해 전체</button>
-      </div>
-      <div id="pdf-preview-count" style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;"></div>
-    </div>
-    <div class="modal-actions" style="flex-direction:column;gap:8px;">
-      <button class="mbtn ok" onclick="exportMarkdown()" style="width:100%;">📋 마크다운 복사</button>
-      <button class="mbtn ok" onclick="exportMarkdownDownload()" style="width:100%;background:rgba(100,180,200,0.35);color:#3a7080;">⬇️ 텍스트 파일 저장</button>
-      <button class="mbtn cancel" onclick="closeModal('pdf-modal')" style="width:100%;">취소</button>
-    </div>
-  </div>
+
 </div></div>
-<div id="pdf-content" style="display:none;"></div>
 
 <!-- READING HUB -->
 <div class="reading-ov" id="reading-ov">
@@ -2377,6 +2344,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       </div>
     </div>
     <div class="pg-total" id="pg-total"></div>
+    <textarea class="modal-inp" id="pg-note-inp" rows="2" style="resize:none;margin-top:8px;" placeholder="감상 메모 (선택)" autocomplete="off"></textarea>
     <div id="pg-done-confirm" style="display:none;"></div>
     <div class="modal-actions" id="pg-modal-actions">
       <button class="mbtn cancel" onclick="closeModal('progress-modal')">취소</button>
@@ -9223,11 +9191,9 @@ function renderTimetable(){
           block.title=(item._carried?item.title+' (전월부터 이어짐)':item.title)+(item.status==='stopped'?' · 중단':'');
           if(!item._carried){
             block.addEventListener('click',()=>openContentModal(cat,item,mk));
-            block.addEventListener('contextmenu',e=>{e.preventDefault();openContentDiscuss(item.title,cat,item.stars||0,item.review||'');});
             block.style.cursor='pointer';
           }else{
             block.addEventListener('click',()=>openContentModal(cat,item,prevMk));
-            block.addEventListener('contextmenu',e=>{e.preventDefault();openContentDiscuss(item.title,cat,item.stars||0,item.review||'');});
             block.style.cursor='pointer';
           }
         }
@@ -9531,7 +9497,21 @@ function openContentProgressModal(cid,watchedNow){
   openModal('content-progress-modal');
   setTimeout(()=>{inp.focus();inp.select();},100);
 }
-// 진행률 저장 + (입력했다면) 감상 메모까지 한 번에 — wcal_note 데이터를 그대로 재사용, 모달 전용이라 idx/DOM row 없이 직접 push
+// 감상 메모 저장 공용 헬퍼 — 콘텐츠/독서 양쪽에서 동일 저장소(wcal_note)를 씀.
+// cat: 콘텐츠 카테고리('movie'|'drama'|'book' 등) — 책도 여기 합류해 코멘트 모아보기 타임라인에 함께 노출됨(독서코너 자체엔 별도 노출 안 함).
+function pushWcalNote(cid,title,cat,text){
+  const trimmed=(text||'').trim();
+  if(!trimmed)return;
+  const dk=dateKey(getLogicalDate());
+  const mk=dk.slice(0,7);
+  const list=getWcalNotes(mk);
+  const now=new Date();
+  const time=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  list.push({cid,dk,title:title||'',cat:cat||'',text:trimmed,time,updatedAt:Date.now()});
+  saveWcalNotes(mk,list);
+  if(navigator.onLine)syncWcalNotesDown(mk);
+}
+// 진행률 저장 + (입력했다면) 감상 메모까지 한 번에
 function confirmContentProgress(){
   if(!_cpgCid)return;
   const found=_findContentByCidNearMk(_cpgCid,_chArchiveMk||monthKey(new Date()));
@@ -9541,17 +9521,7 @@ function confirmContentProgress(){
   const c=found.list[found.idx];
   c.currentUnit=Math.max(0,Math.min(val,c.totalUnit||val));
   saveContents(found.mk,found.list);
-  const noteText=(document.getElementById('cpg-note-inp')?.value||'').trim();
-  if(noteText){
-    const dk=dateKey(getLogicalDate());
-    const mk=dk.slice(0,7);
-    const list=getWcalNotes(mk);
-    const now=new Date();
-    const time=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
-    list.push({cid:_cpgCid,dk,title:c.title||'',cat:c.cat||'',text:noteText,time,updatedAt:Date.now()});
-    saveWcalNotes(mk,list);
-    if(navigator.onLine)syncWcalNotesDown(mk);
-  }
+  pushWcalNote(_cpgCid,c.title,c.cat,document.getElementById('cpg-note-inp')?.value);
   closeModal('content-progress-modal');
   _cpgCid=null;
   chExpandMonth(_chArchiveMk||found.mk);
@@ -9770,36 +9740,34 @@ function stableCidFromTitle(title){
   for(let i=0;i<title.length;i++){h=(h*31+title.charCodeAt(i))|0;}
   return 'ct_'+Math.abs(h).toString(36);
 }
+// 콘텐츠 타임라인(cat='book' 항목)의 상태 변경을 독서코너 reading_books에 반영.
+// status: 'done'|'stopped'|그 외(진행중) → book.status: 'done'|'paused'|'reading'
 function syncContentToReadingBook(title,status,poster,author,mk,unit,totalPages){
+  const STATUS_MAP={done:'done',stopped:'paused'};
+  const bookStatus=STATUS_MAP[status]||'reading';
   const books=getBooks();
   let book=books.find(b=>b.title===title);
-  const fixedCid=stableCidFromTitle(title);
   const finalUnit=unit||'percent';
   const finalTotalPages=finalUnit==='pages'?(totalPages||null):null;
-  if(status==='done'){
-    if(book){book.status='done';book.linkedContent=true;book.contentMk=mk;book.contentTitle=title;book.completedAt=book.completedAt||dateKey(new Date());if(poster)book.poster=poster;if(author)book.author=author;book.unit=finalUnit;book.totalPages=finalTotalPages;upsertBookLocal(book);}
-    else{
-      book={cid:fixedCid,title,status:'done',unit:finalUnit,pages:0,totalPages:finalTotalPages,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:dateKey(new Date()),linkedContent:true,contentMk:mk,contentTitle:title,poster:poster||null,author:author||''};
-      upsertBookLocal(book);
-    }
-  } else if(status==='stopped'){
-    if(book){book.status='paused';book.linkedContent=true;book.contentMk=mk;book.contentTitle=title;if(poster)book.poster=poster;if(author)book.author=author;book.unit=finalUnit;book.totalPages=finalTotalPages;upsertBookLocal(book);}
-    else{
-      book={cid:fixedCid,title,status:'paused',unit:finalUnit,pages:0,totalPages:finalTotalPages,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:null,linkedContent:true,contentMk:mk,contentTitle:title,poster:poster||null,author:author||''};
-      upsertBookLocal(book);
-    }
+
+  if(!book){
+    book={
+      cid:stableCidFromTitle(title),title,status:bookStatus,
+      unit:finalUnit,pages:0,totalPages:finalTotalPages,percent:0,seconds:0,
+      todayDate:null,todayStart:0,created:Date.now(),
+      completedAt:bookStatus==='done'?dateKey(new Date()):null,
+      linkedContent:true,contentMk:mk,contentTitle:title,
+      poster:poster||null,author:author||''
+    };
   } else {
-    if(!book){
-      book={cid:fixedCid,title,status:'reading',unit:finalUnit,pages:0,totalPages:finalTotalPages,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:null,linkedContent:true,contentMk:mk,contentTitle:title,poster:poster||null,author:author||''};
-      upsertBookLocal(book);
-    } else {
-      book.linkedContent=true;book.contentMk=mk;book.contentTitle=title;
-      if(book.status!=='reading')book.status='reading';
-      if(poster)book.poster=poster;if(author)book.author=author;
-      book.unit=finalUnit;book.totalPages=finalTotalPages;
-      upsertBookLocal(book);
-    }
+    book.status=bookStatus;
+    book.linkedContent=true;book.contentMk=mk;book.contentTitle=title;
+    if(bookStatus==='done')book.completedAt=book.completedAt||dateKey(new Date());
+    if(poster)book.poster=poster;
+    if(author)book.author=author;
+    book.unit=finalUnit;book.totalPages=finalTotalPages;
   }
+  upsertBookLocal(book);
 }
 function deleteContent(){
   if(!_contentCtx.item)return;
@@ -11829,6 +11797,8 @@ function openProgressModal(seconds){
   document.getElementById('pg-end-inp').value=_pgStartVal;
   const totalEl=document.getElementById('pg-total');
   totalEl.textContent=(_pgUnit==='pages'&&book.totalPages)?`총 ${book.totalPages}페이지`:'';
+  const noteEl=document.getElementById('pg-note-inp');
+  if(noteEl)noteEl.value='';
   // 완독확인 UI가 이전 열람에서 떠 있던 상태로 남지 않도록 저장버튼 초기 상태로 리셋
   const confirmEl=document.getElementById('pg-done-confirm');
   const actionsEl=document.getElementById('pg-modal-actions');
@@ -13217,6 +13187,7 @@ function confirmProgress(){
   const _amountRead=Math.max(0,endVal-_pgStartVal);
   logReadingDaily(book,today,_amountRead,_pgSeconds,_pgUnit,book.percent,book.pages);
   markReadingActivityToday();
+  pushWcalNote(book.cid,book.contentTitle||book.title,'book',document.getElementById('pg-note-inp')?.value);
   // 독서 습관체크는 스톱워치 종료 시점(autoLogReadingRhythm)에서만 처리 —
   // 진행바를 직접 클릭해 페이지/퍼센트만 입력한 경우는 습관체크하지 않음.
   _swSeconds=0;
@@ -13505,199 +13476,6 @@ function confirmReserveMove(){
   renderReserveList();
   showToast(val+' 투두에 추가했어요 ✓');
 }
-// ── MARKDOWN BACKUP
-
-function setPdfRange(type){
-  const now=new Date();
-  const y=now.getFullYear(),mo=now.getMonth();
-  if(type==='week'){
-    // 이번 주 월~일
-    const dow=(now.getDay()+6)%7;
-    const mon=new Date(now);mon.setDate(now.getDate()-dow);
-    const sun=new Date(mon);sun.setDate(mon.getDate()+6);
-    document.getElementById('pdf-start').value=dateKey(mon);
-    document.getElementById('pdf-end').value=dateKey(sun);
-  } else if(type==='month'){
-    const s=new Date(y,mo,1),e=new Date(y,mo+1,0);
-    document.getElementById('pdf-start').value=dateKey(s);
-    document.getElementById('pdf-end').value=dateKey(e);
-  } else if(type==='3month'){
-    const s=new Date(y,mo-2,1),e=new Date(y,mo+1,0);
-    document.getElementById('pdf-start').value=dateKey(s);
-    document.getElementById('pdf-end').value=dateKey(e);
-  } else if(type==='year'){
-    document.getElementById('pdf-start').value=`${y}-01-01`;
-    document.getElementById('pdf-end').value=`${y}-12-31`;
-  }
-  updatePdfCount();
-}
-
-function updatePdfCount(){
-  const start=document.getElementById('pdf-start').value;
-  const end=document.getElementById('pdf-end').value;
-  if(!start||!end)return;
-  const s=new Date(start),e=new Date(end);
-  let total=0,days=0;
-  for(let d=new Date(s);d<=e;d.setDate(d.getDate()+1)){
-    const dk=dateKey(d);
-    const memos=getMemos(dk);
-    const todos=getTodos(dk);
-    const sl=getSleep(dk);
-    const ol=getDailyOneLine(dk);
-    if(memos.length||todos.length||sl.sleep||ol){days++;total+=memos.length;}
-  }
-  const el=document.getElementById('pdf-preview-count');
-  if(el)el.textContent=`총 ${days}일 · 메모 ${total}개`;
-}
-
-const DAY_NAMES_KO=['일','월','화','수','목','금','토'];
-const WEEK_DAY_LABELS=['M','T','W','T','F','S','S'];
-const CAT_SYMBOLS={drama:'▷',book:'▤',movie:'◈',music:'♩'};
-
-function buildMarkdownText(start,end){
-  const s=new Date(start),e=new Date(end);
-
-  // 주차 계산
-  const monDate=new Date(s);
-  const dowS=(s.getDay()+6)%7;
-  monDate.setDate(s.getDate()-dowS);
-  const sunDate=new Date(monDate);sunDate.setDate(monDate.getDate()+6);
-
-  const fmtDate=(d)=>`${d.getMonth()+1}/${d.getDate()}`;
-  const weekNum=Math.ceil((s.getDate()+new Date(s.getFullYear(),s.getMonth(),1).getDay())/7);
-
-  let md='';
-  md+=`━━━━━━━━━━━━━━━━━━━━\n`;
-  md+=`✦ iikoto 주간 기록\n`;
-  md+=`${s.getFullYear()}년 ${s.getMonth()+1}월 ${weekNum}주차 (${fmtDate(s)} ${DAY_NAMES_KO[s.getDay()]} ~ ${fmtDate(e)} ${DAY_NAMES_KO[e.getDay()]})\n`;
-  md+=`━━━━━━━━━━━━━━━━━━━━\n`;
-
-  // 이번 주 목표
-  const wk=weekKey(s);
-  const challenges=getWChallenge(wk).filter(c=>c.text&&c.text.trim());
-  if(challenges.length){
-    md+=`✦ 이번 주 목표\n`;
-    challenges.forEach(c=>{
-      const dayStr=WEEK_DAY_LABELS.map((l,i)=>c.days[i]?'●':'○').join(' ');
-      md+=`· ${c.text.padEnd(20)} ${dayStr}\n`;
-    });
-  }
-
-  // 날짜별 기록
-  for(let d=new Date(s);d<=e;d.setDate(d.getDate()+1)){
-    const dk=dateKey(d);
-    const memos=getMemos(dk);
-    const todos=getTodos(dk);
-    const sl=getSleep(dk);
-    const ol=getDailyOneLine(dk);
-    if(!memos.length&&!todos.length&&!sl.sleep&&!sl.wake&&!ol)continue;
-
-    md+=`────────────────────\n`;
-    // 날짜 형식 260615
-    const yy=String(d.getFullYear()).slice(2);
-    const mm=String(d.getMonth()+1).padStart(2,'0');
-    const dd=String(d.getDate()).padStart(2,'0');
-    md+=`☽ ${DAY_NAMES_KO[d.getDay()]}요일 ${d.getMonth()+1}/${d.getDate()}   ${yy}${mm}${dd}\n`;
-
-    // 하루 한 줄 — 날짜 바로 아래
-    if(ol){
-      md+=`❛ ${ol} ❜\n`;
-    }
-
-    // 수면
-    if(sl.sleep||sl.wake){
-      let dur='';
-      if(sl.sleep&&sl.wake){
-        const sv=sl.sleep.split(':').map(Number),wv=sl.wake.split(':').map(Number);
-        let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;
-        dur=` · ${Math.floor(m/60)}h ${m%60}m`;
-      }
-      md+=`수면  ${sl.sleep||'--'} 취침 · ${sl.wake||'--'} 기상${dur}\n`;
-    }
-
-    // 투두
-    if(todos.length){
-      md+=`- - - - - - - -\n`;
-      md+=`□ 투두\n`;
-      const sorted=[...todos].sort((a,b)=>(TODO_TS_ORDER[a.timeSection||'none']??3)-(TODO_TS_ORDER[b.timeSection||'none']??3));
-      sorted.forEach(t=>{md+=`${t.done?'✓':'○'} ${t.text}\n`;});
-    }
-
-    // 메모
-    if(memos.length){
-      md+=`- - - - - - - -\n`;
-      md+=`✎ 메모\n`;
-      memos.forEach(m=>{
-        if(!m.text)return;
-        md+=m.time?`${m.time}  ${m.text}\n`:`${m.text}\n`;
-      });
-    }
-
-    md+=`\n`;
-  }
-
-  // 습관
-  const habits=getHabits();
-  if(habits.length){
-    md+=`━━━━━━━━━━━━━━━━━━━━\n`;
-    md+=`◉ 이번 주 습관\n`;
-    const checks=getHabitChecks(wk);
-    habits.forEach(h=>{
-      const dots=[0,1,2,3,4,5,6].map(i=>checks[h.name+'-'+i]?'●':'○').join(' ');
-      md+=`${h.name.padEnd(8)} ${dots}\n`;
-    });
-  }
-
-  // 콘텐츠
-  const mk=monthKey(s);
-  const contents=getContents(mk).filter(c=>c.cat!=='music');
-  const music=getContents(mk).filter(c=>c.cat==='music');
-  if(contents.length||music.length){
-    md+=`━━━━━━━━━━━━━━━━━━━━\n`;
-    md+=`◈ 이번 달 콘텐츠\n`;
-    contents.forEach(c=>{
-      const sym=CAT_SYMBOLS[c.cat]||'·';
-      const stars=c.stars?` ${'★'.repeat(c.stars)}${'☆'.repeat(5-c.stars)}`:'';
-      const status=c.status==='watching'?' (보는 중)':'';
-      md+=`${sym} ${c.title}${stars}${status}\n`;
-    });
-    if(music.length){
-      music.forEach(c=>{md+=`♩ ${c.title}\n`;});
-    }
-  }
-
-  md+=`━━━━━━━━━━━━━━━━━━━━`;
-  return md.trim();
-}
-
-function exportMarkdown(){
-  const start=document.getElementById('pdf-start').value;
-  const end=document.getElementById('pdf-end').value;
-  if(!start||!end){showToast('기간을 선택해주세요');return;}
-  const md=buildMarkdownText(start,end);
-  if(navigator.clipboard){
-    navigator.clipboard.writeText(md).then(()=>{
-      closeModal('pdf-modal');
-      showToast('클립보드에 복사됐어요 ✓');
-    });
-  }
-}
-
-function exportMarkdownDownload(){
-  const start=document.getElementById('pdf-start').value;
-  const end=document.getElementById('pdf-end').value;
-  if(!start||!end){showToast('기간을 선택해주세요');return;}
-  const md=buildMarkdownText(start,end);
-  const blob=new Blob([md],{type:'text/plain;charset=utf-8'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url;a.download=`iikoto-${start}-${end}.txt`;
-  document.body.appendChild(a);a.click();
-  document.body.removeChild(a);URL.revokeObjectURL(url);
-  closeModal('pdf-modal');
-  showToast('파일이 저장됐어요 ↓');
-}
-
 
 // ── HOME
 const DAYS_KO=['일','월','화','수','목','금','토'];
