@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.9-book-progress';
+const CACHE = 'iikoto-v2.10-progress-watching-only';
 const ASSETS = [
   './',
   './index.html'

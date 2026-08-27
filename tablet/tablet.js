@@ -1814,10 +1814,11 @@ function _cgridDetailHtml(c){
   const period=_cgridPeriodLabel(c);
   const stars=c.stars>0?`<span class="cgrid-detail-stars">${'★'.repeat(c.stars)}</span>`:'';
   const topRow=(period||stars)?`<div class="cgrid-detail-row"><span class="cgrid-detail-row-date">${period?`<i class="ti ti-calendar" style="font-size:12px;" aria-hidden="true"></i>${period}`:''}</span>${stars}</div>`:'';
-  // 진행률 바 — 드라마(회차)/영화(러닝타임분)는 총량(total_unit) 입력분만, 독서는 진행중(watching)인
-  // 책만 reading_books(pages/total_pages 또는 percent, unit 컬럼으로 방식 구분)를 참조.
+  // 진행률 바 — 드라마/영화 모두 진행중(watching)일 때만 표시. 완결 시엔 회차/러닝타임을 끝까지
+  // 갱신했다는 보장이 없어(특히 영화는 애초에 회차 개념이 없어 current_unit이 항상 0으로 남음) 완결
+  // 콘텐츠에 0%로 잘못 노출되는 문제가 있었음 — 독서와 동일 기준으로 통일(2026-08-27).
   let progressHtml='';
-  if((c.content_cat==='drama'||c.content_cat==='movie')&&c.total_unit){
+  if((c.content_cat==='drama'||c.content_cat==='movie')&&c.status==='watching'&&c.total_unit){
     const cur=Math.min(c.current_unit||0,c.total_unit);
     const pct=Math.round((cur/c.total_unit)*100);
     const unitLabel=c.content_cat==='drama'?'화':'분';
