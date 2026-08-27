@@ -9983,17 +9983,18 @@ async function searchKakaoBook(q,el){
     el.innerHTML='';
     results.forEach(item=>{
       const title=item.title||'';const author=(item.authors||[]).join(', ');const poster=item.thumbnail||null;
+      const pageCount=item.page||null; // 카카오 책 검색 API 제공 필드. 출판사 미등록 도서는 0/누락 가능 — 그 경우 수동 입력 폴백
       const div=document.createElement('div');div.className='api-result-item';
       div.innerHTML=poster?`<img class="api-result-poster" src="${poster}" alt="">`:`<div class="api-result-poster-placeholder">📚</div>`;
       div.innerHTML+=`<div class="api-result-info"><div class="api-result-title">${title}</div><div class="api-result-sub">${author}</div></div>`;
-      div.addEventListener('click',()=>selectApiResult(title,poster,author,item.publisher||''));el.appendChild(div);
+      div.addEventListener('click',()=>selectApiResult(title,poster,author,item.publisher||'',null,null,pageCount));el.appendChild(div);
     });
   }catch(e){
     console.error('카카오 책 검색 네트워크 오류',e);
     el.innerHTML='<div class="api-loading">검색 중 오류가 발생했어요</div>';
   }
 }
-function selectApiResult(title,poster,sub1,sub2,musicUrl,tmdbMeta){
+function selectApiResult(title,poster,sub1,sub2,musicUrl,tmdbMeta,bookPageCount){
   document.getElementById('cm-title').value=title;hideApiResults();
   _selectedPoster=poster;_selectedAuthor=sub1||'';_selectedMusicUrl=musicUrl||null;
   _selectedTotalUnit=null;
@@ -10003,6 +10004,11 @@ function selectApiResult(title,poster,sub1,sub2,musicUrl,tmdbMeta){
     else preview.style.display='none';
   }
   if(tmdbMeta&&tmdbMeta.tmdbId)fetchTmdbTotalUnit(tmdbMeta.tmdbId,tmdbMeta.tmdbType);
+  // 카카오 책 검색 결과의 page 필드 — 0/누락이면 자동 채움 skip, cm-total-pages 수동 입력 폴백 유지
+  if(bookPageCount){
+    const totalPagesInput=document.getElementById('cm-total-pages');
+    if(totalPagesInput)totalPagesInput.value=bookPageCount;
+  }
 }
 // TMDB 상세 엔드포인트로 총 회차(tv)/총 러닝타임분(movie)을 가져옴 — 검색 결과 클릭 직후 1회만 호출.
 // 검색 엔드포인트엔 이 정보가 없어 상세 조회가 별도로 필요함(TMDB 자체 제약, /search가 아닌 /tv 또는 /movie 단건 조회 필요).
