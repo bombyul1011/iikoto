@@ -1154,7 +1154,8 @@ async function loadWeekTab(){
 
   const [goalRows,habits,habitChecks,memos,todos,sleepRows,onelineRows,contents,
     lwMemos,lwTodos,lwSleepRows,lwHabitChecks,rblocksFull,sleepReportRows,
-    rblocksLast,weekMemoTexts,weekOnelineTexts,readingBook,readingLogRows]=await Promise.all([
+    rblocksLast,weekMemoTexts,weekOnelineTexts,readingBook,readingLogRows,
+    rdaThisWeek,rdaLastWeek,readingBooksAll]=await Promise.all([
     supaFetch(`goal_notes?note_key=eq.wchallenge_${encodeURIComponent(wk)}`),
     supaFetch(`habits?order=sort_order.asc`),
     supaFetch(`habit_checks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
@@ -1188,7 +1189,11 @@ async function loadWeekTab(){
     supaFetch(`goal_notes?note_key=gte.oneline:${kwStartDk}&note_key=lte.oneline:${kwEndDk}`),
     // 이번 주 독서용 — 현재 읽고 있는 책 1권 + 스트릭 계산용 최근 90일 독서 기록
     supaFetch(`reading_books?status=eq.reading&limit=1`),
-    supaFetch(`reading_daily_log?date_key=gte.${rdStreakStartDk}&select=date_key`)
+    supaFetch(`reading_daily_log?date_key=gte.${rdStreakStartDk}&select=date_key`),
+    // 이번 주 독서 활동(탭 전환용) — 이번 주/지난주 각각의 독서 로그(권별 진행량 계산용) + 전체 책 목록(제목/저자/표지 조회용, 병렬 진행 포함)
+    supaFetch(`reading_daily_log?date_key=gte.${startDk}&date_key=lte.${cmpEndDk}&order=date_key.asc`),
+    supaFetch(`reading_daily_log?date_key=gte.${lastStartDk}&date_key=lte.${lastCmpEndDk}&order=date_key.asc`),
+    supaFetch(`reading_books?select=cid,title,author,poster,unit,total_pages,status`)
   ]);
 
   const rblocksThis=(rblocksFull||[]).filter(b=>b.date_key<=cmpEndDk);
@@ -1207,6 +1212,7 @@ async function loadWeekTab(){
   renderWeekOneline(onelineRows||[],weekDates);
   renderWeekKeywords(weekMemoTexts||[],weekOnelineTexts||[]);
   renderWeekReading(contents||[],readingBook&&readingBook[0],readingLogRows||[],startDk,endDk);
+  renderWeekReadingActivity(rdaThisWeek||[],rdaLastWeek||[],readingBooksAll||[],contents||[],startDk,cmpEndDk,lastStartDk,lastCmpEndDk);
 }
 
 function _minToHHMM(min){const h=Math.floor(min/60),m=min%60;return pad(h)+':'+pad(m);}
@@ -1600,6 +1606,76 @@ function renderWeekReading(contents,book,streakLogRows,startDk,endDk){
       <div class="week-reading-progress-bead" style="left:${pct}%;"></div>
     </div>
     <div class="week-reading-streak">${streakText}</div>
+  </div>`;
+}
+
+// 이번 주 독서 활동(탭 전환용) — "지금 읽는 책 1권" 스냅샷과 달리, 이번 주에 실제 기록이 있었던
+// 모든 책(병렬 독서 포함)의 주간 진행량을 권별로 보여주고, 완독 권수·활동일수를 지난주와 비교.
+// 페이지 단위 책은 total_pages가 있어야 %로 환산 가능 — 없는 책(초기 등록 누락분)은 "기록됨"만 표시하고
+// 완독/활동일 집계에는 포함하되, 진행률 델타 계산에서만 제외(2026-08-28).
+function _wraStatsOf(logRows,booksByCid){
+  // 책별로 이번 범위 내 첫/마지막 기록의 percent_after를 비교해 진행폭 산출.
+  const byBook={};
+  (logRows||[]).forEach(r=>{
+    if(!byBook[r.book_cid])byBook[r.book_cid]=[];
+    byBook[r.book_cid].push(r);
+  });
+  const activeDays=new Set((logRows||[]).map(r=>r.date_key)).size;
+  const rows=Object.keys(byBook).map(cid=>{
+    const logs=byBook[cid].sort((a,b)=>a.date_key<b.date_key?-1:1);
+    const book=booksByCid[cid]||{};
+    let deltaPct=null;
+    if(book.unit==='percent'){
+      // amount_read를 그날의 증가폭으로 기록해뒀다는 전제 하에 합산(로그 1건이든 여러 건이든 동일 로직).
+      deltaPct=logs.reduce((s,r)=>s+(r.amount_read||0),0);
+    }else if(book.unit==='pages'&&book.total_pages){
+      const pagesRead=logs.reduce((s,r)=>s+(r.amount_read||0),0);
+      deltaPct=Math.round((pagesRead/book.total_pages)*100);
+    }
+    return {cid,title:book.title||'',deltaPct,noTotal:book.unit==='pages'&&!book.total_pages};
+  });
+  return {rows,activeDays};
+}
+function toggleWeekReadingView(){
+  const a=document.getElementById('week-reading'),b=document.getElementById('week-reading-activity'),txt=document.getElementById('week-reading-title-text');
+  if(!a||!b)return;
+  const showActivity=a.style.display!=='none';
+  a.style.display=showActivity?'none':'';
+  b.style.display=showActivity?'':'none';
+  if(txt)txt.textContent=showActivity?'이번 주 활동':'이번 주 독서';
+}
+function renderWeekReadingActivity(logsThis,logsLast,booksAll,contents,startDk,endDk,lastStartDk,lastEndDk){
+  const el=document.getElementById('week-reading-activity');
+  if(!el)return;
+  const booksByCid={};
+  (booksAll||[]).forEach(b=>{booksByCid[b.cid]=b;});
+
+  const {rows,activeDays}=_wraStatsOf(logsThis,booksByCid);
+  const {activeDays:activeDaysLast}=_wraStatsOf(logsLast,booksByCid);
+
+  const doneThis=(contents||[]).filter(c=>c.content_cat==='book'&&(c.status==='done'||c.status==='stopped')&&c.end_date&&c.end_date>=startDk&&c.end_date<=endDk);
+  const doneLast=(contents||[]).filter(c=>c.content_cat==='book'&&(c.status==='done'||c.status==='stopped')&&c.end_date&&c.end_date>=lastStartDk&&c.end_date<=lastEndDk);
+
+  const doneCidSet=new Set(doneThis.map(c=>c.client_id));
+  const listRows=rows.filter(r=>!doneCidSet.has(r.cid));
+
+  const rowsHtml=listRows.length?listRows.map(r=>{
+    if(r.noTotal)return `<div class="wra-row"><span class="wra-row-title">${escapeHtml(r.title)}</span><span class="wra-row-flag">기록됨</span></div>`;
+    return `<div class="wra-row"><span class="wra-row-title">${escapeHtml(r.title)}</span><span class="wra-row-delta">+${r.deltaPct}%</span></div>`;
+  }).join(''):'';
+  const doneRowsHtml=doneThis.map(c=>`<div class="wra-row"><span class="wra-row-title">${escapeHtml(c.title||'')}</span><span class="wra-row-badge">완독</span></div>`).join('');
+  const bodyHtml=(rowsHtml+doneRowsHtml)||`<div class="wra-empty">이번 주엔 독서 기록이 없어요</div>`;
+
+  const deltaDone=doneThis.length-doneLast.length;
+  const deltaDays=activeDays-activeDaysLast;
+  const deltaHtml=(d)=>d>0?`<span class="wra-stat-delta up">+${d}</span>`:d<0?`<span class="wra-stat-delta down">${d}</span>`:`<span class="wra-stat-delta flat">-</span>`;
+
+  el.innerHTML=`<div class="week-reading-inner">
+    <div class="wra-list">${bodyHtml}</div>
+    <div class="wra-summary">
+      <div class="wra-stat"><div class="wra-stat-num">${doneThis.length}</div><div class="wra-stat-lbl">완독</div>${deltaHtml(deltaDone)}</div>
+      <div class="wra-stat"><div class="wra-stat-num">${activeDays}</div><div class="wra-stat-lbl">활동일</div>${deltaHtml(deltaDays)}</div>
+    </div>
   </div>`;
 }
 

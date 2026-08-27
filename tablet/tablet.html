@@ -487,6 +487,27 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .week-reading-progress-bead{position:absolute;top:50%;width:12px;height:12px;border-radius:50%;transform:translate(-50%,-50%);border:1.6px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.25);background:var(--rainbow-bead);background-size:500% 100%;animation:beadRainbow 22s linear infinite;transition:left .4s ease;}
 .week-reading-streak{text-align:center;font-size:var(--fs-sm);color:var(--ts);margin-top:8px;}
 .week-reading-streak b{color:rgba(214,90,140,0.85);font-weight:700;}
+
+/* 이번 주 독서 카드 제목을 탭 전환 버튼으로 사용 — 클릭 시 "진행중" ⇄ "이번 주 활동" 뷰 전환 */
+.week-reading-title-toggle{cursor:pointer;user-select:none;display:flex;align-items:center;}
+.week-reading-toggle-icon{margin-left:auto;font-size:15px;color:var(--tm);}
+
+/* 이번 주 독서 활동 — 권별 진행 리스트 + 완독/활동일 요약 + 지난주 대비 델타 */
+.wra-list{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;}
+.wra-row{display:flex;align-items:center;gap:8px;font-size:var(--fs-sm);}
+.wra-row-title{flex:1;min-width:0;color:var(--tp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.wra-row-delta{flex-shrink:0;font-weight:700;color:rgba(214,90,140,0.85);font-family:'DM Sans',sans-serif;}
+.wra-row-badge{flex-shrink:0;font-size:10px;font-weight:700;color:#8a6c20;background:rgba(255,225,150,0.7);border-radius:6px;padding:2px 6px;}
+.wra-row-flag{flex-shrink:0;font-size:10px;color:var(--tm);}
+.wra-empty{text-align:center;font-size:var(--fs-sm);color:var(--tm);padding:10px 0;}
+.wra-summary{display:flex;gap:10px;border-top:1px solid var(--card-b);padding-top:10px;}
+.wra-stat{flex:1;text-align:center;}
+.wra-stat-num{font-size:var(--fs-lg);font-weight:700;color:var(--tp);font-family:'DM Sans',sans-serif;}
+.wra-stat-lbl{font-size:10.5px;color:var(--tm);margin-top:2px;}
+.wra-stat-delta{font-size:10.5px;margin-top:2px;font-weight:600;}
+.wra-stat-delta.up{color:rgba(214,90,140,0.85);}
+.wra-stat-delta.down{color:var(--tm);}
+.wra-stat-delta.flat{color:var(--tm);}
 @keyframes beadRainbow{0%{background-position:0% 50%;}100%{background-position:500% 50%;}}
 /* 콘텐츠(드라마/영화/책/음악) 진행중·완결 공용 배지 — 오늘의 감상, 월간 콘텐츠그리드, 코멘트 작품별뷰에서 재사용 */
 .status-badge{font-size:9.5px;font-weight:600;color:#7a7168;background:rgba(200,190,178,0.35);border-radius:5px;padding:2px 6px;flex-shrink:0;}
@@ -1121,7 +1142,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="card"><div class="card-lbl"><i class="ti ti-rainbow" style="color:rgba(var(--pal-orange-rgb),1);" aria-hidden="true"></i>리듬 흐름 비교</div><div id="week-rhythm-flow"></div></div>
       <div class="grid2" id="week-keywords-reading-row">
         <div class="card"><div class="card-lbl"><i class="ti ti-hash" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>주간 키워드</div><div id="week-keywords"></div></div>
-        <div class="card"><div class="card-lbl"><i class="ti ti-book" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>이번 주 독서</div><div id="week-reading"></div></div>
+        <div class="card">
+          <div class="card-lbl week-reading-title-toggle" id="week-reading-title-toggle" onclick="toggleWeekReadingView()"><i class="ti ti-book" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i><span id="week-reading-title-text">이번 주 독서</span><i class="ti ti-switch-horizontal week-reading-toggle-icon" aria-hidden="true"></i></div>
+          <div id="week-reading"></div>
+          <div id="week-reading-activity" style="display:none;"></div>
+        </div>
       </div>
       <div class="card"><div class="card-lbl"><i class="ti ti-pencil" style="color:rgba(var(--pal-yellow-rgb),1);" aria-hidden="true"></i>하루한줄</div>
         <div class="oneline-2col">
