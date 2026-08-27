@@ -1100,10 +1100,10 @@ async function loadWeekTab(){
   const slStart=new Date(slEnd);slStart.setDate(slStart.getDate()-13);
   const slEndDk=dateKey(slEnd),slStartDk=dateKey(slStart);
 
-  // 이번 주 키워드 카드용 롤링 7일(오늘 제외) — 캘린더 주(월~일)와 무관하게 항상 "어제부터 7일 전까지".
-  // 이번 주가 아직 하루이틀밖에 안 지났을 때 캘린더 주 기준으로 자르면 표본이 너무 적어지는 문제를 피하기 위함(2026-08-26 확정).
+  // 이번 주 키워드 카드용 롤링 2주(오늘 제외) — 캘린더 주(월~일)와 무관하게 항상 "어제부터 14일 전까지".
+  // 처음엔 7일로 시작했으나 표본이 너무 적어 실사용 중 2주로 확장(2026-08-27).
   const kwEnd=new Date();kwEnd.setDate(kwEnd.getDate()-1);
-  const kwStart=new Date();kwStart.setDate(kwStart.getDate()-7);
+  const kwStart=new Date();kwStart.setDate(kwStart.getDate()-14);
   const kwStartDk=dateKey(kwStart),kwEndDk=dateKey(kwEnd);
 
   // 이번 주 독서 스트릭용 — 연속 일수가 여러 주에 걸쳐 이어질 수 있어 이번 주 범위만으론 부족하지만,
@@ -1140,9 +1140,9 @@ async function loadWeekTab(){
     // 수면 리포트 최근 2주
     supaFetch(`sleep?date_key=gte.${slStartDk}&date_key=lte.${slEndDk}&select=date_key,score,sleep_time,wake_time`),
     supaFetch(`rhythm_blocks?date_key=gte.${lastStartDk}&date_key=lte.${lastCmpEndDk}`),
-    // 이번 주 키워드용 메모 원문 — 롤링 7일(오늘 제외, kwStartDk~kwEndDk)
+    // 주간 키워드용 메모 원문 — 롤링 2주(오늘 제외, kwStartDk~kwEndDk)
     supaFetch(`memos?date_key=gte.${kwStartDk}&date_key=lte.${kwEndDk}&select=date_key,text`),
-    // 이번 주 키워드 카드에 하루한줄도 메모와 같은 역할로 포함 — 같은 롤링 7일(오늘 제외) 범위로 별도 조회.
+    // 주간 키워드 카드에 하루한줄도 메모와 같은 역할로 포함 — 같은 롤링 2주(오늘 제외) 범위로 별도 조회.
     // 캘린더 주 범위(onelineRows, 하루한줄 배너용)와는 범위가 달라 재사용하지 않음(2026-08-27).
     supaFetch(`goal_notes?note_key=gte.oneline:${kwStartDk}&note_key=lte.oneline:${kwEndDk}`),
     // 이번 주 독서용 — 현재 읽고 있는 책 1권 + 스트릭 계산용 최근 90일 독서 기록
@@ -1352,7 +1352,7 @@ function renderWeekOneline(rows,weekDates){
   elB.innerHTML=right.length?right.map(rowHtml).join(''):'<div class="empty-msg">기록 없음</div>';
 }
 
-// 이번 주 키워드 — 그 주(오늘 제외 최근 7일)에 남긴 메모 원문에서 자주 등장한 단어 상위 5개를 뽑아 태그로 표시.
+// 주간 키워드 — 최근 2주(오늘 제외)에 남긴 메모+하루한줄 원문에서 자주 등장한 단어 상위 6개를 뽑아 워드클라우드로 표시.
 // AI 요약이 아니라 순수 프론트엔드 빈도 집계라 매일 갱신해도 비용 부담이 없음(2026-08-26, 진단용 키워드_test.html로 검증 후 확정).
 // 완벽한 형태소 분석이 아닌 규칙 기반 근사치 — "감 잡기용" 정도의 정확도를 목표로 함.
 const WEEK_KW_STOPWORDS=new Set([
@@ -1364,7 +1364,8 @@ const WEEK_KW_STOPWORDS=new Set([
   '아침','오후','저녁','새벽','점심','밤','낮', // 매일 습관처럼 시간대로 문장을 시작해 키워드로서 의미 없음
   '이번주','지난주','다음주','이번달','지난달','다음달','오늘부터','요즘','최근', // 시간대와 같은 이유로 매번 습관적으로 붙는 기간 표현
   '많이','조금씩','살짝','잠깐','잠시','계속','자꾸','거의','늘','항상','가끔','종종','벌써','이미','아마',
-  '일찍','한번','한번씩','다시한번','좀더','조금더', // 빈도부사/횟수표현 — 문장 어디에나 붙는 습관적 수식어(2026-08-27 추가)
+  '일찍','한번','한번씩','다시한번','좀더','조금더', // 빈도부사/횟수표현 — 문장 어디에나 붙는 습관적 수식어
+  '하루','하루씩','하루하루','매일','매번','주말','평일','요일','시간','분','초','시','일주일','한달','한주', // 시간 단위 표현 — 아침/오후 등과 같은 이유로 의미 없음
   '되게','엄청','완전히','확실히','일단','우선','제법','꽤','상당히' // 문장 어디에나 습관적으로 붙어 키워드로서 의미 없는 부사류(2026-08-27 추가)
 ]);
 // 접속부사류 — 조사 제거 규칙보다 먼저 원본 형태로 걸러야 함. 예: "그래도"가 조사 "도"만 벗겨지면
@@ -1412,7 +1413,7 @@ const WEEK_KW_COLORS=['var(--pal-pink-text)','var(--pal-orange-text)','var(--pal
 function renderWeekKeywords(memoRows,onelineRows){
   const el=document.getElementById('week-keywords');
   if(!el)return;
-  // 쿼리 자체가 이미 "오늘 제외 롤링 7일"(kwStartDk~kwEndDk) 범위라 여기서 추가 필터링 불필요.
+  // 쿼리 자체가 이미 "오늘 제외 롤링 2주"(kwStartDk~kwEndDk) 범위라 여기서 추가 필터링 불필요.
   const memoText=(memoRows||[]).map(m=>m.text||'').join(' ');
   // 하루한줄도 메모와 같은 역할로 집계에 포함 — goal_notes는 note_key당 lines 배열 구조라 첫 줄만 사용(renderWeekOneline과 동일 파싱).
   const onelineText=(onelineRows||[]).map(r=>Array.isArray(r.lines)?(r.lines[0]||''):(r.lines||'')).join(' ');
