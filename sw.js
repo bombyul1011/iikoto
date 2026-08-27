@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.8-01-redeploy';
+const CACHE = 'iikoto-v2.9-book-progress';
 const ASSETS = [
   './',
   './index.html'

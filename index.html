@@ -3349,7 +3349,7 @@ function _cmrDetailBodyHtml(c,wcalNotes,flat,showHead){
   const isWatchingNow=canWatch&&_cswRunning&&_cswCid===c.cid;
   const watchBtnHtml=canWatch?`<span class="cwatch-btn${isWatchingNow?' active':''}" onclick="event.stopPropagation();toggleContentStopwatch('${c.cid}')"><i class="ti ${isWatchingNow?'ti-player-stop-filled':'ti-player-play-filled'}" aria-hidden="true"></i>${isWatchingNow?'시청중':'시청 시작'}</span>`:'';
   const headHtml=showHead&&(dispDate||starsHtml||watchBtnHtml)?`<div class="cmr-detail-head">${dispDate?`<span class="cmr-detail-date"><i class="ti ti-calendar" style="font-size:11px;" aria-hidden="true"></i> ${dispDate}</span>`:'<span></span>'}${starsHtml}${watchBtnHtml}</div>`:'';
-  // 진행률 바 — 드라마(회차)/영화(러닝타임분) 중 총량을 입력해둔 항목만, 그리드 상세에서만(showHead 전용)
+  // 진행률 바 — 드라마(회차)/영화(러닝타임분) 중 총량을 입력해둔 항목, 또는 책(페이지/퍼센트, reading_books 연동)만, 그리드 상세에서만(showHead 전용)
   let progressHtml='';
   if(showHead&&(c.cat==='drama'||c.cat==='movie')&&c.totalUnit){
     const cur=Math.min(c.currentUnit||0,c.totalUnit);
@@ -3359,6 +3359,23 @@ function _cmrDetailBodyHtml(c,wcalNotes,flat,showHead){
       <div class="cmr-progress-track"><div class="cmr-progress-fill" style="width:${pct}%;"></div></div>
       <div class="cmr-progress-label">${cur}/${c.totalUnit}${unitLabel}</div>
     </div>`;
+  }else if(showHead&&c.cat==='book'){
+    // 책은 contents 테이블에 진행률이 없으므로 linkedContent로 연결된 reading_books 항목을 찾아 표시
+    const book=getBooks().find(b=>b.linkedContent&&b.contentMk===c.mk&&(b.contentTitle||b.title)===c.title);
+    if(book&&book.unit==='percent'){
+      const pct=Math.min(100,Math.round(book.percent||0));
+      progressHtml=`<div class="cmr-progress-bar">
+        <div class="cmr-progress-track"><div class="cmr-progress-fill" style="width:${pct}%;"></div></div>
+        <div class="cmr-progress-label">${pct}%</div>
+      </div>`;
+    }else if(book&&book.totalPages){
+      const cur=Math.min(book.pages||0,book.totalPages);
+      const pct=Math.round((cur/book.totalPages)*100);
+      progressHtml=`<div class="cmr-progress-bar">
+        <div class="cmr-progress-track"><div class="cmr-progress-fill" style="width:${pct}%;"></div></div>
+        <div class="cmr-progress-label">${cur}/${book.totalPages}페이지</div>
+      </div>`;
+    }
   }
   const finalPartHtml=c.review?`<div class="cmr-review-final${flat?' flat':''}"><span class="cmr-review-final-lbl">Comment :</span> ${escapeHtml(c.review)}</div>`:'';
   const notesPartHtml=wcalNotes.length?`<div class="cmr-review-notes${c.review?' with-final':''}">
