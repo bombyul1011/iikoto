@@ -1748,6 +1748,7 @@ async function renderMonthContentGrid(y,mo,contentsData){
   };
   _cgridContents=[...(curRows||[]).filter(belongsHere),...(prevRows||[]).filter(belongsHere)]
     .sort((a,b)=>(b.created||0)-(a.created||0));
+  await _loadCgridBookProgress(_cgridContents);
   _renderCgridFromCache();
 }
 // 카테고리+상태 필터를 함께 적용 — _renderCgridFromCache/toggleCgridDetail에서 공용
@@ -1779,6 +1780,17 @@ function _cgridRowsHtml(list){
 let _cgridActiveId=null;
 // 감상 메모(goal_notes, note_key='wcal_note_YYYY-MM', lines:[{cid,dk,title,cat,text,time,updatedAt}]) — cid별로 모아 캐시.
 let _cgridNotesByCid={};
+// 독서 진행률(reading_books.pages/total_pages 또는 percent) — 진행중(watching) 책만 대상.
+// contents 테이블엔 페이지/퍼센트 필드가 없어 reading_books를 client_id(=book.cid) 기준으로 별도 조회.
+let _cgridBookProgressByCid={};
+async function _loadCgridBookProgress(list){
+  const cids=[...new Set((list||[]).filter(c=>c.content_cat==='book'&&c.status==='watching'&&c.client_id).map(c=>c.client_id))];
+  _cgridBookProgressByCid={};
+  if(!cids.length)return;
+  const cidFilter=cids.map(c=>`"${c}"`).join(',');
+  const rows=await supaFetch(`reading_books?cid=in.(${cidFilter})&select=cid,pages,total_pages,unit,percent`);
+  (rows||[]).forEach(r=>{_cgridBookProgressByCid[r.cid]=r;});
+}
 async function _loadCgridNotesForMonths(months){
   const rows=await Promise.all(months.map(mk=>supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wcal_note_'+mk)}`)));
   _cgridNotesByCid={};
@@ -1796,11 +1808,42 @@ function _cgridPeriodLabel(c){
   if(s&&e&&s!==e)return `${s.slice(5).replace('-','.')}~${e.slice(5).replace('-','.')}`;
   return (e||s||'').slice(5).replace('-','.');
 }
-// 본앱 _cmrDetailBodyHtml과 동일한 구조 — 완결 총평(Comment)과 감상 메모(Timeline)를 함께 표시
+// 본앱 _cmrDetailBodyHtml과 동일한 구조 — 진행률 바, 완결 총평(Comment), 감상 메모(Timeline)를 함께 표시.
+// (본앱의 "시청 시작" 스톱워치 버튼은 태블릿 상세뷰 성격상 제외.)
 function _cgridDetailHtml(c){
   const period=_cgridPeriodLabel(c);
   const stars=c.stars>0?`<span class="cgrid-detail-stars">${'★'.repeat(c.stars)}</span>`:'';
   const topRow=(period||stars)?`<div class="cgrid-detail-row"><span class="cgrid-detail-row-date">${period?`<i class="ti ti-calendar" style="font-size:12px;" aria-hidden="true"></i>${period}`:''}</span>${stars}</div>`:'';
+  // 진행률 바 — 드라마(회차)/영화(러닝타임분)는 총량(total_unit) 입력분만, 독서는 진행중(watching)인
+  // 책만 reading_books(pages/total_pages 또는 percent, unit 컬럼으로 방식 구분)를 참조.
+  let progressHtml='';
+  if((c.content_cat==='drama'||c.content_cat==='movie')&&c.total_unit){
+    const cur=Math.min(c.current_unit||0,c.total_unit);
+    const pct=Math.round((cur/c.total_unit)*100);
+    const unitLabel=c.content_cat==='drama'?'화':'분';
+    progressHtml=`<div class="cgrid-progress-bar">
+      <div class="cgrid-progress-track"><div class="cgrid-progress-fill" style="width:${pct}%;"></div></div>
+      <div class="cgrid-progress-label">${cur}/${c.total_unit}${unitLabel}</div>
+    </div>`;
+  }else if(c.content_cat==='book'&&c.status==='watching'){
+    const book=_cgridBookProgressByCid[c.client_id];
+    if(book){
+      if(book.unit==='percent'){
+        const pct=Math.round(Math.min(book.percent||0,100));
+        progressHtml=`<div class="cgrid-progress-bar">
+          <div class="cgrid-progress-track"><div class="cgrid-progress-fill" style="width:${pct}%;"></div></div>
+          <div class="cgrid-progress-label">${pct}%</div>
+        </div>`;
+      }else if(book.total_pages){
+        const cur=Math.min(book.pages||0,book.total_pages);
+        const pct=Math.round((cur/book.total_pages)*100);
+        progressHtml=`<div class="cgrid-progress-bar">
+          <div class="cgrid-progress-track"><div class="cgrid-progress-fill" style="width:${pct}%;"></div></div>
+          <div class="cgrid-progress-label">${cur}/${book.total_pages}쪽</div>
+        </div>`;
+      }
+    }
+  }
   const finalHtml=c.review?`<div class="cgrid-detail-final"><span class="cgrid-detail-final-lbl">Comment :</span> ${escapeHtml(c.review)}</div>`:'';
   const notes=_cgridNotesByCid[c.client_id]||[];
   const notesHtml=notes.length?`<div class="cgrid-detail-notes${c.review?' with-final':''}">
@@ -1812,7 +1855,7 @@ function _cgridDetailHtml(c){
       }).join('')}
     </div>
   </div>`:'';
-  return `<div class="cgrid-detail">${topRow}${finalHtml}${notesHtml}</div>`;
+  return `<div class="cgrid-detail">${topRow}${progressHtml}${finalHtml}${notesHtml}</div>`;
 }
 function _cgridItemHtml(c){
   const meta=CAT_ICON_META[c.content_cat]||{icon:'ti-stack-2',bg:'rgba(150,150,150,1)'};
@@ -1997,13 +2040,13 @@ async function renderMonthStatBar(y,mo,habitsData){
 // 음악은 애초에 시간 데이터가 없어 집계에서 제외.
 // 월간리포트 "이 달의 콘텐츠"(renderMrpContents)가 쓰는 계산 헬퍼.
 function _calcWatchTimeByCat(rblocks,contents){
-  // enjoy 블록을 텍스트 접두어로 드라마/영화/독서 재분류 후 작품별로 합산(하루에 나눠봐도 합쳐짐).
-  const durByTitle={drama:{},movie:{},book:{}};
+  // enjoy 블록을 텍스트 접두어로 드라마/독서 재분류 후 작품별로 합산(하루에 나눠봐도 합쳐짐).
+  // 영화는 리듬 기록을 참조하지 않고 항상 러닝타임(total_unit) 고정 집계 — 아래 movie 섹션 참고.
+  const durByTitle={drama:{},book:{}};
   (rblocks||[]).forEach(b=>{
     if(b.cat!=='enjoy'||!b.text||!b.start_time||!b.end_time)return;
     let cat=null,title=null;
     if(b.text.startsWith('드라마 - ')){cat='drama';title=b.text.slice(6);}
-    else if(b.text.startsWith('영화 - ')){cat='movie';title=b.text.slice(5);}
     else if(b.text.startsWith('독서 - ')){cat='book';title=b.text.slice(5);}
     else return;
     const s=_paceParseHM(b.start_time),e=_paceParseHM(b.end_time);
@@ -2018,27 +2061,20 @@ function _calcWatchTimeByCat(rblocks,contents){
   let bookMin=0;
   Object.values(durByTitle.book).forEach(m=>{bookMin+=m;});
 
-  // 영화 — 이번 달 대상 영화 목록(드라마/독서와 달리 리듬 기록이 아예 없는 작품도 total_unit으로
-  // 잡아야 하므로, 리듬 블록이 아니라 contents.content_cat==='movie'를 기준으로 작품 목록을 만든다.
-  let movieMin=0,movieMeasuredCount=0,movieEstimatedCount=0;
+  // 영화 — 리듬 기록 유무로 실측/추정을 나누던 방식은 월 필터가 조금만 어긋나도 다른 달 러닝타임이
+  // 새어 들어가는 버그를 반복적으로 만들어(2026-08-27), 완결된 영화는 항상 total_unit(러닝타임)만
+  // 더하는 방식으로 단순화. 완결편수(_mrpContentsInRange)와 동일하게 done 상태만 집계 대상으로 삼음.
+  let movieMin=0;
   const movieTitlesSeen=new Set();
-  (contents||[]).filter(c=>c.content_cat==='movie'&&c.title).forEach(c=>{
+  (contents||[]).filter(c=>c.content_cat==='movie'&&c.title&&c.status==='done'&&c.total_unit).forEach(c=>{
     if(movieTitlesSeen.has(c.title))return; // 같은 제목 중복 등록 방지(재감상 등은 현재 구조상 구분 안 함)
     movieTitlesSeen.add(c.title);
-    const measured=durByTitle.movie[c.title];
-    if(measured){
-      movieMin+=measured;
-      movieMeasuredCount++;
-    }else if(c.status==='done'&&c.total_unit){
-      movieMin+=c.total_unit;
-      movieEstimatedCount++;
-    }
+    movieMin+=c.total_unit;
   });
 
   return {
     drama:dramaMin,movie:movieMin,book:bookMin,
-    total:dramaMin+movieMin+bookMin,
-    movieMeasuredCount,movieEstimatedCount
+    total:dramaMin+movieMin+bookMin
   };
 }
 
@@ -3494,16 +3530,14 @@ function renderMrpWeeklyMissions(weeksInMonth,wcRowsList){
   el.innerHTML=blocks.length?blocks.join(''):'<div class="empty-msg">이 달엔 작성한 주간 미션이 없어요</div>';
 }
 
-// 이 달의 콘텐츠 — 전월대비 뷰. 수면 카드(renderMrpSleep)의 "지난달 대비" 비교 UI(mkCmpRow)를
-// 그대로 이식 — 카테고리별(드라마/영화/독서)로 이번 달 vs 지난달 감상 시간을 증감 표시.
-// 음악은 시간 데이터가 없어 제외.
 // 이 달의 콘텐츠 — 전월대비 뷰(A안). 제목 옆에 이미 이번 달 총 시간이 노출되므로 여기선 총량 증감만 짧게,
-// 그 아래 ①카테고리별 시간 미니바+증감 ②완결 편수 비교(목록 뷰와 동일한 월 범위 판정 결과를 그대로 받음).
+// 그 아래 ①카테고리별 시간 미니바+증감 ②완결 편수 비교. 시간·편수 모두 동일 기준(_mrpContentsInRange,
+// end_date 기준 월 범위)으로 걸러진 inRange/inRangePrev를 그대로 재사용 — 영화는 러닝타임 고정 집계.
 // 음악은 시청시간 데이터가 없어 시간 비교에서는 제외하고, 편수 비교에는 포함.
-function renderMrpContentsCmp(t,prevRblocks,prevContentsForTime,inRange,inRangePrev){
+function renderMrpContentsCmp(t,prevRblocks,inRangePrev,inRange){
   const el=document.getElementById('mrp-contents-cmp');
   if(!el)return;
-  const prevT=_calcWatchTimeByCat(prevRblocks||[],prevContentsForTime||[]);
+  const prevT=_calcWatchTimeByCat(prevRblocks||[],inRangePrev||[]);
   if(prevT.total<=0&&t.total<=0){
     el.innerHTML='<div class="empty-msg" style="text-align:left;">이 달·지난달 모두 감상 기록이 없어요</div>';
     return;
@@ -3530,16 +3564,13 @@ function renderMrpContentsCmp(t,prevRblocks,prevContentsForTime,inRange,inRangeP
     const dir=diff>0?'up':(diff<0?'down':'flat');
     const arrow=dir==='up'?'ti-arrow-up':(dir==='down'?'ti-arrow-down':'ti-minus');
     const sign=diff>0?'+':(diff<0?'-':'');
-    const prevPct=Math.round(r.prev/maxMin*100);
-    const curPct=Math.round(r.cur/maxMin*100);
-    const prevBarHtml=`<div class="mrp-cc-track-bar mrp-cc-track-bar-prev" style="width:${prevPct}%;"></div>`;
-    const curBarHtml=`<div class="mrp-cc-track-bar mrp-cc-track-bar-cur" style="width:${curPct}%;background:${r.color};"></div>`;
-    // 두 값을 한눈에 비교할 수 있도록, 더 짧은 막대를 나중에 그려 항상 위(z-순서상 위)로 오게 함
-    const barsHtml=r.cur<=r.prev?prevBarHtml+curBarHtml:curBarHtml+prevBarHtml;
     return `<div class="mrp-cc-row">
-      <span class="mrp-cc-row-label"><i class="ti ${r.icon}" style="color:${r.color};font-size:14px;margin-right:4px;" aria-hidden="true"></i>${r.label}</span>
-      <div class="mrp-cc-track">${barsHtml}</div>
-      <span class="mrp-cc-row-val ${dir}"><i class="ti ${arrow}" style="font-size:11px;" aria-hidden="true"></i>${sign}${_fmtDur(Math.abs(diff))}</span>
+      <span class="mrp-cc-row-label"><i class="ti ${r.icon}" style="color:${r.color};font-size:13px;margin-right:4px;" aria-hidden="true"></i>${r.label}</span>
+      <div class="mrp-cc-bars">
+        <div class="mrp-cc-bar-track"><div class="mrp-cc-bar mrp-cc-bar-cur" style="width:${Math.round(r.cur/maxMin*100)}%;background:${r.color};"></div></div>
+        <div class="mrp-cc-bar-track"><div class="mrp-cc-bar mrp-cc-bar-prev" style="width:${Math.round(r.prev/maxMin*100)}%;"></div></div>
+      </div>
+      <span class="mrp-cc-row-val ${dir}"><i class="ti ${arrow}" style="font-size:10px;" aria-hidden="true"></i>${sign}${_fmtDur(Math.abs(diff))}</span>
     </div>`;
   };
   const timeSectionHtml=timeRows.length?`
@@ -3589,9 +3620,10 @@ function _mrpContentsInRange(contents,startDk,endDk){
 function renderMrpContents(contents,startDk,endDk,rblocks,prevContents,prevRblocks,prevStartDk,prevEndDk){
   const el=document.getElementById('mrp-contents');
   const inRange=_mrpContentsInRange(contents,startDk,endDk);
-  // 탭 행(카드 제목 옆) 총 감상 시간 — _calcWatchTimeByCat은 완결 여부와 무관하게 이번 달 등록된 movie
-  // 전체를 기준으로 실측/러닝타임 fallback을 판단하므로, inRange(완결·정지만) 대신 contents 전체를 넘김.
-  const t=_calcWatchTimeByCat(rblocks||[],contents||[]);
+  // 탭 행(카드 제목 옆) 총 감상 시간 — 드라마/독서는 리듬 기록, 영화는 러닝타임(total_unit) 고정 집계.
+  // 영화의 월 소속은 완결편수와 동일하게 end_date 기준(_mrpContentsInRange)이라 inRange를 그대로 재사용 —
+  // 등록월(month_key) 기준 별도 필터를 쓰던 예전 방식은 두 기준이 어긋나는 버그를 반복적으로 만들어 폐기(2026-08-27).
+  const t=_calcWatchTimeByCat(rblocks||[],inRange);
   const totalEl=document.getElementById('mrp-contents-total');
   if(totalEl)totalEl.textContent=t.total>0?_fmtDur(t.total):'';
   // 카드 진입/월 이동 시 뷰는 항상 '목록'으로 리셋 — 제목·표시 상태를 함께 맞춤
@@ -3601,9 +3633,9 @@ function renderMrpContents(contents,startDk,endDk,rblocks,prevContents,prevRbloc
   document.getElementById('mrp-contents').style.display='';
   const cmpElToggle=document.getElementById('mrp-contents-cmp');
   if(cmpElToggle)cmpElToggle.style.display='none';
-  // 전월대비 뷰 — 완결 편수는 목록 뷰와 동일한 월 범위 판정(_mrpContentsInRange)을 그대로 재사용
+  // 전월대비 뷰 — 완결 편수·시간 계산 모두 동일한 월 범위 판정(_mrpContentsInRange, end_date 기준) 하나로 통일.
   const inRangePrev=(prevStartDk&&prevEndDk)?_mrpContentsInRange(prevContents,prevStartDk,prevEndDk):[];
-  renderMrpContentsCmp(t,prevRblocks,prevContents,inRange,inRangePrev);
+  renderMrpContentsCmp(t,prevRblocks,inRangePrev,inRange);
   if(!inRange.length){el.innerHTML='<div class="empty-msg">이 달엔 기록한 콘텐츠가 없어요</div>';return;}
   // 카테고리(드라마/책/영화/음악) 순서 고정 그룹핑 — 그룹 내부는 기존처럼 최신순 유지
   const CAT_ORDER=['drama','book','movie','music'];

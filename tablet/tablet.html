@@ -451,7 +451,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .ch-tlB-note-item{display:flex;gap:8px;}
 .ch-tlB-note-date{font-size:10.5px;color:var(--tm);font-weight:600;white-space:nowrap;padding-top:1px;min-width:34px;}
 .ch-tlB-note-text{font-size:var(--fs-sm);color:var(--tp);line-height:1.5;flex:1;}
-/* ── 콘텐츠 모아보기 상세(review+감상메모) — 본앱 cmr-review-* 구조 그대로 이식 ── */
+/* ── 콘텐츠 모아보기 상세(진행률+review+감상메모) — 본앱 cmr-progress-*/cmr-review-* 구조 그대로 이식 ── */
+.cgrid-progress-bar{display:flex;align-items:center;gap:8px;margin-bottom:7px;padding:3px 0;}
+.cgrid-progress-track{flex:1;height:4px;border-radius:3px;background:var(--graph-track-color);overflow:hidden;}
+.cgrid-progress-fill{height:100%;border-radius:3px;background:#ffc9da;}
+.cgrid-progress-label{font-size:10px;color:var(--tm);white-space:nowrap;flex-shrink:0;}
 .cgrid-detail-final{font-size:var(--fs-sm);color:var(--tp);line-height:1.6;}
 .cgrid-detail-final-lbl{font-style:italic;font-family:'DM Sans',sans-serif;font-weight:700;color:rgba(214,90,140,0.8);margin-right:2px;}
 .cgrid-detail-notes{margin-top:0;}
@@ -459,7 +463,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cgrid-detail-notes-lbl{font-style:italic;font-family:'DM Sans',sans-serif;font-size:10.5px;color:var(--tm);font-weight:700;margin-bottom:6px;letter-spacing:0.02em;}
 .cgrid-detail-notes-tl{display:flex;flex-direction:column;gap:8px;}
 .cgrid-detail-note-item{display:flex;gap:10px;align-items:flex-start;font-size:var(--fs-sm);color:var(--ts);line-height:1.5;}
-.cgrid-detail-note-date{color:var(--tm);font-weight:600;font-variant-numeric:tabular-nums;flex-shrink:0;}
+.cgrid-detail-note-date{flex-shrink:0;width:32px;text-align:right;color:var(--tm);font-weight:600;font-variant-numeric:tabular-nums;font-size:10.5px;padding-right:9px;border-right:1px dashed rgba(var(--divider-rgb),0.5);align-self:stretch;display:flex;align-items:flex-start;justify-content:flex-end;padding-top:1px;}
 /* ── 주간탭 "주간 키워드" / "이번 주 독서" ── */
 .week-kw-cloud{position:relative;width:100%;height:110px;} /* 옆 카드(이번 주 독서) 콘텐츠 실측 높이에 맞춰 축소 — 두 카드는 .grid2 align-items:stretch로 항상 같은 높이를 맞추므로, 이 값이 곧 카드 전체 길이를 좌우함(2026-08-26) */
 .week-kw-word{position:absolute;font-weight:700;white-space:nowrap;line-height:1;transform-origin:center;cursor:default;}
@@ -574,7 +578,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cgrid-status-chip.cat-movie{color:var(--pal-sky-text);background:rgba(var(--pal-sky-rgb),0.35);border-color:transparent;}
 .cgrid-status-chip.cat-music{color:var(--pal-lime-text);background:rgba(var(--pal-lime-rgb),0.35);border-color:transparent;}
 .cgrid-scroll{flex:1;min-height:0;overflow-y:auto;padding-right:2px;}
-#month-content-grid{display:flex;flex-direction:column;justify-content:center;}
+#month-content-grid{display:flex;flex-direction:column;justify-content:flex-start;}
 .cgrid-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
 .cgrid-item{display:flex;flex-direction:column;gap:5px;cursor:pointer;}
 .cgrid-thumb-wrap{position:relative;width:100%;max-width:140px;aspect-ratio:1/1;border-radius:9px;overflow:hidden;background:var(--card-b);border:3px solid transparent;margin:0 auto;}
@@ -726,8 +730,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .mrp-contents-title-row{cursor:pointer;user-select:none;}
 .mrp-contents-title-row:active{opacity:0.7;}
 
-/* 이 달의 콘텐츠 — 전월대비 뷰(A안, 겹쳐진 단일 트랙). 폰트는 다른 리포트 배너(mrp-goal-line 등)와 동일하게
-   --fs-* 공용 변수 사용 — 라벨/값=--fs-sm(보조 라벨과 동급), 섹션 소제목=--fs-body(카드 본문과 동급).
+/* 이 달의 콘텐츠 — 전월대비 뷰(A안, 카테고리당 얇은 두 줄 바). 폰트는 다른 리포트 배너(mrp-goal-line 등)와
+   동일하게 --fs-* 공용 변수 사용 — 라벨/값=--fs-sm(보조 라벨과 동급), 섹션 소제목=--fs-body(카드 본문과 동급).
    상단 총 증감시간(headline)만 카드 폭이 늘어나지 않도록 한 단계 작은 --fs-sm 유지. */
 .mrp-cc-headline{display:flex;justify-content:flex-end;margin-bottom:2px;}
 .mrp-cc-headline-diff{font-size:var(--fs-sm);font-weight:700;font-family:'DM Sans',sans-serif;display:flex;align-items:center;gap:2px;}
@@ -735,16 +739,16 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .mrp-cc-headline-diff.down{color:#c0788a;}
 .mrp-cc-headline-diff.flat{color:var(--tm);}
 .mrp-cc-sec-title{font-size:var(--fs-body);color:var(--ts);font-weight:600;margin:12px 0 4px;}
-.mrp-cc-row{display:flex;align-items:center;gap:8px;padding:6px 0;}
-.mrp-cc-row-label{font-size:var(--fs-sm);color:var(--tp);display:flex;align-items:center;flex-shrink:0;white-space:nowrap;min-width:44px;}
-.mrp-cc-row-val{font-size:var(--fs-sm);font-weight:700;font-family:'DM Sans',sans-serif;display:flex;align-items:center;gap:2px;flex-shrink:0;min-width:64px;justify-content:flex-end;}
+.mrp-cc-row{display:flex;align-items:center;gap:8px;padding:4px 0;}
+.mrp-cc-row-label{font-size:var(--fs-sm);color:var(--tp);display:flex;align-items:center;flex-shrink:0;white-space:nowrap;width:66px;}
+.mrp-cc-bars{flex:1;display:flex;flex-direction:column;gap:3px;min-width:0;}
+.mrp-cc-bar-track{width:100%;height:6px;border-radius:4px;background:var(--graph-track-color);overflow:hidden;}
+.mrp-cc-bar{height:100%;border-radius:4px;}
+.mrp-cc-bar-prev{background:var(--tm);opacity:0.55;}
+.mrp-cc-row-val{font-size:var(--fs-sm);font-weight:700;font-family:'DM Sans',sans-serif;display:flex;align-items:center;gap:2px;flex-shrink:0;width:88px;white-space:nowrap;justify-content:flex-end;}
 .mrp-cc-row-val.up{color:#5a9a7a;}
 .mrp-cc-row-val.down{color:#c0788a;}
 .mrp-cc-row-val.flat{color:var(--tm);}
-.mrp-cc-track{flex:1;position:relative;height:8px;border-radius:4px;background:var(--graph-track-color);min-width:0;}
-.mrp-cc-track-bar{position:absolute;left:0;top:0;height:100%;border-radius:4px;}
-.mrp-cc-track-bar-prev{background:var(--tm);opacity:0.55;}
-.mrp-cc-track-bar-cur{opacity:0.96;}
 .mrp-cc-legend{display:flex;gap:14px;font-size:var(--fs-sm);color:var(--tm);margin-top:10px;}
 .mrp-cc-legend span{display:flex;align-items:center;gap:4px;}
 .mrp-cc-legend-dot{display:inline-block;width:8px;height:8px;border-radius:2px;}
