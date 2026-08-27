@@ -1479,7 +1479,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="slabel-row">
         <div class="slabel">메모</div>
         <div style="display:flex;align-items:center;gap:4px;">
-          <button class="slabel-search-btn" onclick="openSearch()" title="메모 검색"><i class="ti ti-search ico-sz-14" aria-hidden="true"></i></button>
           <button class="slabel-search-btn" onclick="openSeedArchive()" title="씨앗 모아보기"><i class="ti ti-seeding ico-sz-14" aria-hidden="true"></i></button>
         </div>
       </div>
@@ -1945,31 +1944,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 <!-- DATE MODAL -->
 
-<!-- MEMO SEARCH MODAL -->
-<div class="modal-ov" id="memo-search-modal" onclick="closeModal('memo-search-modal',event)">
-  <div class="modal" onclick="event.stopPropagation()">
-    <div class="modal-title">메모 검색</div>
-    <input type="text" class="modal-inp" id="memo-search-inp" placeholder="검색어를 입력하세요" autocomplete="off" oninput="runMemoSearch()">
-    <div onclick="toggleMemoSearchRange()" style="font-size:var(--dow-label-size);color:var(--tm);cursor:pointer;margin:-4px 2px 8px;display:flex;align-items:center;gap:4px;">
-      <span id="msr-toggle-icon">▸</span> <span id="msr-toggle-label">범위 설정</span>
-    </div>
-    <div id="msr-range-box" style="display:none;margin-bottom:10px;">
-      <div style="display:flex;gap:6px;margin-bottom:8px;">
-        <input type="date" id="msr-start" class="modal-inp" style="margin-bottom:0;font-size:var(--dow-label-size);" oninput="runMemoSearch()" lang="en-GB">
-        <input type="date" id="msr-end" class="modal-inp" style="margin-bottom:0;font-size:var(--dow-label-size);" oninput="runMemoSearch()" lang="en-GB">
-      </div>
-      <div style="display:flex;gap:6px;">
-        <button class="mbtn" onclick="setMemoSearchRange('thisMonth')" style="flex:1;font-size:var(--dow-label-size);padding:7px 0;">이번 달</button>
-        <button class="mbtn" onclick="setMemoSearchRange('lastMonth')" style="flex:1;font-size:var(--dow-label-size);padding:7px 0;">지난 달</button>
-        <button class="mbtn cancel" onclick="setMemoSearchRange('clear')" style="flex:1;font-size:var(--dow-label-size);padding:7px 0;">초기화</button>
-      </div>
-    </div>
-    <div id="memo-search-results" style="max-height:50vh;overflow-y:auto;margin-bottom:12px;"></div>
-    <div class="modal-actions">
-      <button class="mbtn cancel" onclick="closeModal('memo-search-modal')" style="flex:1;">닫기</button>
-    </div>
-  </div>
-</div>
 
 <!-- SEED ARCHIVE MODAL -->
 <div class="modal-ov" id="seed-archive-modal" onclick="closeModal('seed-archive-modal',event)">
@@ -3539,16 +3513,20 @@ function toggleCmrReview(id){
 // ── 월 선택 칩 공용 렌더러 (주간목표 모아보기, 콘텐츠 모아보기 등에서 공유) ──
 // wrapId: 칩을 그릴 컨테이너 id / curYear,curMonth: 현재 활성화된 (year, 0-based month)
 // onSelect(m): 칩 클릭 시 호출되는 콜백(0-based month 전달) — 상태 갱신+재렌더+콘텐츠 로드는 콜백 쪽 책임
+// (2026-08: 과거 무제한→최근 3개월로 축소. 그 이전 달은 아카이브앱에서 조회)
 function renderMonthChipsGeneric(wrapId,curYear,curMonth,onSelect){
   const wrap=document.getElementById(wrapId);if(!wrap)return;
   const now=new Date();
+  const monthsAgo=(y,m)=>(now.getFullYear()-y)*12+(now.getMonth()-m); // 이번 달 기준 몇 개월 전인지(0=이번 달)
   wrap.innerHTML='';
   for(let m=0;m<12;m++){
     const future=curYear>now.getFullYear()||(curYear===now.getFullYear()&&m>now.getMonth());
+    const tooOld=monthsAgo(curYear,m)>=3; // 최근 3개월(이번 달 포함) 밖이면 잠금
+    const disabled=future||tooOld;
     const chip=document.createElement('div');
-    chip.className='m-chip'+(m===curMonth?' active':'')+(future?' disabled':'');
+    chip.className='m-chip'+(m===curMonth?' active':'')+(disabled?' disabled':'');
     chip.textContent=(m+1)+'월';
-    if(!future)chip.addEventListener('click',()=>onSelect(m));
+    if(!disabled)chip.addEventListener('click',()=>onSelect(m));
     wrap.appendChild(chip);
   }
   const activeChip=wrap.querySelector('.m-chip.active');
@@ -3821,26 +3799,27 @@ async function loadMonthlyReportContent(){
   }
 }
 
-// 최근 4주(지난주~4주전) weekKey('week:YYYY-MM-DD', 월요일 기준) 목록.
+// 최근 2주(지난주~2주전) weekKey('week:YYYY-MM-DD', 월요일 기준) 목록.
 // challenge_review_, weekly_memo_report_ 둘 다 이 형식을 캐시 키로 쓰므로 공유해서 사용.
+// (2026-08: 4주→2주로 축소. 그 이전 회차는 아카이브앱에서 조회)
 function _recentWeekKeys(){
   const out=[];
-  for(let i=1;i<=4;i++){
+  for(let i=1;i<=2;i++){
     const d=new Date();d.setDate(d.getDate()-7*i);
     out.push(weekKey(d));
   }
-  return out; // [지난주, 2주전, 3주전, 4주전]
+  return out; // [지난주, 2주전]
 }
-// 최근 4주(이번주 포함) 일요일 논리일 날짜키 목록 — weekly_summary 캐시 키와 1:1 대응.
+// 최근 2주(이번주 포함) 일요일 논리일 날짜키 목록 — weekly_summary 캐시 키와 1:1 대응.
 function _recentWeekSundays(){
   const base=_thisWeekSundayDk();
   const baseDate=new Date(base+'T00:00:00');
   const out=[];
-  for(let i=0;i<4;i++){
+  for(let i=0;i<2;i++){
     const d=new Date(baseDate);d.setDate(baseDate.getDate()-7*i);
     out.push(dateKey(d));
   }
-  return out; // [이번주 일요일, 1주전, 2주전, 3주전]
+  return out; // [이번주 일요일, 1주전]
 }
 // 칩 렌더링 — readOnly=true면 클릭 시 조회만(생성 경로 없음), false면 기존처럼 이번주 캐시 없을 시 생성 시도.
 // 라벨: 배열 0번(가장 최근 일요일)이 "지난주"이고 이후 2주전/3주전/4주전 순.
@@ -8395,70 +8374,6 @@ function undoMemo(){
   memos.splice(_deletedMemo.idx,0,_deletedMemo.memo);
   saveMemos(_deletedMemo.dk,memos);_deletedMemo=null;
   document.getElementById('undo-toast').classList.remove('on');renderMemos();
-}
-function openSearch(){
-  openModal('memo-search-modal');
-  const inp=document.getElementById('memo-search-inp');
-  inp.value='';
-  document.getElementById('msr-start').value='';
-  document.getElementById('msr-end').value='';
-  document.getElementById('msr-range-box').style.display='none';
-  document.getElementById('msr-toggle-icon').textContent='▸';
-  document.getElementById('memo-search-results').innerHTML='<div class="memo-search-empty">검색어를 입력하세요</div>';
-  setTimeout(()=>inp.focus(),150);
-}
-function toggleMemoSearchRange(){
-  const box=document.getElementById('msr-range-box');
-  const icon=document.getElementById('msr-toggle-icon');
-  const open=box.style.display==='none';
-  box.style.display=open?'block':'none';
-  icon.textContent=open?'▾':'▸';
-}
-function setMemoSearchRange(type){
-  const now=new Date();
-  const sEl=document.getElementById('msr-start'),eEl=document.getElementById('msr-end');
-  if(type==='clear'){sEl.value='';eEl.value='';}
-  else if(type==='thisMonth'){
-    sEl.value=`${now.getFullYear()}-${pad(now.getMonth()+1)}-01`;
-    eEl.value=dateKey(now);
-  } else if(type==='lastMonth'){
-    const lm=new Date(now.getFullYear(),now.getMonth()-1,1);
-    const lmEnd=new Date(now.getFullYear(),now.getMonth(),0);
-    sEl.value=`${lm.getFullYear()}-${pad(lm.getMonth()+1)}-01`;
-    eEl.value=dateKey(lmEnd);
-  }
-  runMemoSearch();
-}
-function runMemoSearch(){
-  const q=document.getElementById('memo-search-inp').value.trim();
-  const startD=document.getElementById('msr-start').value;
-  const endD=document.getElementById('msr-end').value;
-  const resEl=document.getElementById('memo-search-results');
-  if(!q){resEl.innerHTML='<div class="memo-search-empty">검색어를 입력하세요</div>';return;}
-  const results=[];
-  for(let i=0;i<localStorage.length;i++){
-    const k=localStorage.key(i);
-    if(!k||!k.startsWith('memos:'))continue;
-    const dk=k.slice('memos:'.length);
-    if(startD&&dk<startD)continue;
-    if(endD&&dk>endD)continue;
-    getMemos(dk).forEach(m=>{
-      if((m.text||'').includes(q))results.push({dk,time:m.time||'',text:m.text||''});
-    });
-  }
-  results.sort((a,b)=>(b.dk+(b.time||'')).localeCompare(a.dk+(a.time||'')));
-  if(!results.length){resEl.innerHTML='<div class="memo-search-empty">검색 결과가 없어요</div>';return;}
-  resEl.innerHTML=results.map(r=>`<div class="msr-item" onclick="jumpToMemoDate('${r.dk}')"><div class="msr-date">${r.dk}${r.time?' · '+r.time:''}</div><div class="msr-text">${r.text}</div></div>`).join('');
-}
-function jumpToMemoDate(dk){
-  closeModal('memo-search-modal');
-  const parts=dk.split('-').map(Number);
-  currentDate=new Date(parts[0],parts[1]-1,parts[2]);
-  updateDateUI();
-  document.querySelectorAll('.vtab').forEach(t=>t.classList.toggle('on',t.dataset.v==='daily'));
-  document.querySelectorAll('.view').forEach(vw=>vw.classList.toggle('on',vw.id==='v-daily'));
-  document.querySelector('.scroll').scrollTop=0;
-  loadDaily();
 }
 function openSeedArchive(){
   const resEl=document.getElementById('seed-archive-results');
