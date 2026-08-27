@@ -2788,7 +2788,7 @@ async function loadMonthlyReportPage(){
   const prevStartDk=`${prevMk}-01`,prevEndDk=`${prevMk}-${pad(prevDim)}`;
   const prevWeeksInMonth=getReportWeeksOfMonth(py,pmo);
 
-  const [monthlyRows,goalRows,todos,memosRows,sleepRows,habits,habitChecksAll,rblocks,prevRblocks,contents,prevContents,wcRowsList,milestoneRows,prevWcRowsList,prevTodos,prevSleepRows,prevHabitChecksAll,trajectoryRows,sleepReportCacheRows,weeklySummaryRowsList,weeklyMemoRowsList,prevMemosRows]=await Promise.all([
+  const [monthlyRows,goalRows,todos,memosRows,sleepRows,habits,habitChecksAll,rblocks,prevRblocks,contents,wcRowsList,milestoneRows,prevWcRowsList,prevTodos,prevSleepRows,prevHabitChecksAll,trajectoryRows,sleepReportCacheRows,weeklySummaryRowsList,weeklyMemoRowsList,prevMemosRows]=await Promise.all([
     supaFetch(`ai_cache?cache_key=eq.monthly_report_${mk}&select=content`),
     supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('mgoal:'+mk)}`),
     supaFetch(`todos?date_key=gte.${startDk}&date_key=lte.${endDk}&select=done,date_key`),
@@ -2798,10 +2798,11 @@ async function loadMonthlyReportPage(){
     supaFetch(`habit_checks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
     supaFetch(`rhythm_blocks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
     supaFetch(`rhythm_blocks?date_key=gte.${prevStartDk}&date_key=lte.${prevEndDk}`),
-    // 이달의 콘텐츠(renderMrpContents) 전용 데이터 — 이번 달 목록/시간 집계용 contents와
-    // 전월대비(renderMrpContentsCmp) 비교용 전월 contents를 함께 조회.
+    // 이달의 콘텐츠(renderMrpContents) 전용 데이터 — done/stopped/music 전체(최근 200개)를 한 번만 가져와
+    // 이번 달·전월 양쪽에서 공유. month_key(등록월)로 나눠 가져오면 진행중이다가 그 달에 완결된(등록은
+    // 이전 달) 콘텐츠가 누락돼 완결편수가 본앱(종료월 기준 집계) 기준과 어긋남(2026-08-27 수정) —
+    // 이제 _mrpContentsInRange가 이 동일 원본을 이번 달/전월 각자의 startDk~endDk로 나눠 필터링.
     supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&order=created.desc&limit=200`),
-    supaFetch(`contents?month_key=eq.${prevMk}`),
     Promise.all(weeksInMonth.map(wk=>supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wchallenge_week:'+wk)}`))),
     supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent('monthly_milestones_'+mk)}&select=content`),
     Promise.all(prevWeeksInMonth.map(wk=>supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wchallenge_week:'+wk)}`))),
@@ -2829,7 +2830,7 @@ async function loadMonthlyReportPage(){
   renderMrpRhythm(rblocks||[],prevRblocks||[]);
   renderMrpMilestones(mk,rblocks||[],prevRblocks||[],weeksInMonth,wcRowsList||[],milestoneRows&&milestoneRows[0],prevWcRowsList||[],heroCommentText,monthlyRefContext);
   renderMrpWeeklyMissions(weeksInMonth,wcRowsList||[]);
-  renderMrpContents(contents||[],startDk,endDk,rblocks||[],prevContents||[],prevRblocks||[]);
+  renderMrpContents(contents||[],startDk,endDk,rblocks||[],contents||[],prevRblocks||[],prevStartDk,prevEndDk);
   renderMrpReportLinks(weeksInMonth,mk);
 }
 
@@ -2906,12 +2907,9 @@ function renderMrpHero(row){
       <div class="mrp-grid2">
         <div class="mrp-card"><div class="mrp-card-title"><i class="ti ti-flag-3" style="color:rgba(210,175,225,1);" aria-hidden="true"></i>주간 미션 모음</div><div id="mrp-missions"></div></div>
         <div class="mrp-card mrp-contents-card">
-          <div class="mrp-card-title-row">
-            <div class="mrp-card-title"><i class="ti ti-book" style="color:rgba(178,60,105,0.75);" aria-hidden="true"></i>이 달의 콘텐츠</div>
-            <div class="rd-tabs mrp-contents-tabs" id="mrp-contents-tabs">
-              <div class="rd-tab on" data-view="list" onclick="switchMrpContentsView(this,'list')">목록</div>
-              <div class="rd-tab" data-view="cmp" onclick="switchMrpContentsView(this,'cmp')">전월대비</div>
-            </div>
+          <div class="mrp-card-title-row mrp-contents-title-row" id="mrp-contents-title-row" onclick="toggleMrpContentsView()">
+            <div class="mrp-card-title"><i class="ti ti-book" id="mrp-contents-title-icon" style="color:rgba(178,60,105,0.75);" aria-hidden="true"></i><span id="mrp-contents-title-text">이 달의 콘텐츠</span></div>
+            <span class="mrp-card-title-total" id="mrp-contents-total"></span>
           </div>
           <div id="mrp-contents"></div>
           <div id="mrp-contents-cmp" style="display:none;"></div>
@@ -3499,51 +3497,113 @@ function renderMrpWeeklyMissions(weeksInMonth,wcRowsList){
 // 이 달의 콘텐츠 — 전월대비 뷰. 수면 카드(renderMrpSleep)의 "지난달 대비" 비교 UI(mkCmpRow)를
 // 그대로 이식 — 카테고리별(드라마/영화/독서)로 이번 달 vs 지난달 감상 시간을 증감 표시.
 // 음악은 시간 데이터가 없어 제외.
-function renderMrpContentsCmp(t,prevContents,prevRblocks){
+// 이 달의 콘텐츠 — 전월대비 뷰(A안). 제목 옆에 이미 이번 달 총 시간이 노출되므로 여기선 총량 증감만 짧게,
+// 그 아래 ①카테고리별 시간 미니바+증감 ②완결 편수 비교(목록 뷰와 동일한 월 범위 판정 결과를 그대로 받음).
+// 음악은 시청시간 데이터가 없어 시간 비교에서는 제외하고, 편수 비교에는 포함.
+function renderMrpContentsCmp(t,prevRblocks,prevContentsForTime,inRange,inRangePrev){
   const el=document.getElementById('mrp-contents-cmp');
   if(!el)return;
-  const prevT=_calcWatchTimeByCat(prevRblocks||[],prevContents||[]);
-  if(prevT.total<=0){
-    el.innerHTML='<div class="empty-msg" style="text-align:left;">지난달 기록이 없어 비교를 생략했어요</div>';
+  const prevT=_calcWatchTimeByCat(prevRblocks||[],prevContentsForTime||[]);
+  if(prevT.total<=0&&t.total<=0){
+    el.innerHTML='<div class="empty-msg" style="text-align:left;">이 달·지난달 모두 감상 기록이 없어요</div>';
     return;
   }
-  const mkCmpRow=(label,icon,color,curMin,prevMin)=>{
-    const diff=curMin-prevMin;
-    const dir=diff>0?'up':(diff<0?'down':'flat');
-    const arrow=dir==='up'?'ti-arrow-up':(dir==='down'?'ti-arrow-down':'ti-minus');
-    const sign=diff>0?'+':(diff<0?'-':'');
-    return `<div class="mrsl-cmp-row">
-      <span class="mrsl-cmp-label"><i class="ti ${icon}" style="color:${color};font-size:13px;margin-right:4px;" aria-hidden="true"></i>${label}</span>
-      <span class="mrsl-cmp-val ${dir}"><i class="ti ${arrow}" style="font-size:11px;"></i>${sign}${_fmtDur(Math.abs(diff))}</span>
-    </div>`;
-  };
-  const rows=[
+  // ① 총 시청시간 증감(제목 옆 총 시간과 중복되므로 큰 숫자 없이 증감만, 위로 바싹 붙임)
+  const totalDiff=t.total-prevT.total;
+  const totalDir=totalDiff>0?'up':(totalDiff<0?'down':'flat');
+  const totalArrow=totalDir==='up'?'ti-arrow-up':(totalDir==='down'?'ti-arrow-down':'ti-minus');
+  const totalSign=totalDiff>0?'+':(totalDiff<0?'-':'');
+  const headlineHtml=prevT.total>0?`
+    <div class="mrp-cc-headline">
+      <span class="mrp-cc-headline-diff ${totalDir}"><i class="ti ${totalArrow}" style="font-size:12px;" aria-hidden="true"></i>${totalSign}${_fmtDur(Math.abs(totalDiff))}</span>
+    </div>`:'';
+  // ② 카테고리별 시간 미니바 + 증감(음악 제외 — 시간 데이터 없음)
+  const CATS=[
     {cat:'drama',label:'드라마',icon:'ti-device-tv',color:'rgba(var(--pal-pink-rgb),1)',cur:t.drama,prev:prevT.drama},
     {cat:'movie',label:'영화',icon:'ti-movie',color:'rgba(var(--pal-sky-rgb),1)',cur:t.movie,prev:prevT.movie},
     {cat:'book',label:'독서',icon:'ti-book',color:'rgba(var(--pal-yellow-rgb),1)',cur:t.book,prev:prevT.book}
-  ].filter(r=>r.cur>0||r.prev>0);
-  if(!rows.length){el.innerHTML='<div class="empty-msg" style="text-align:left;">이 달·지난달 모두 감상 기록이 없어요</div>';return;}
-  el.innerHTML=rows.map(r=>mkCmpRow(r.label,r.icon,r.color,r.cur,r.prev)).join('');
+  ];
+  const timeRows=CATS.filter(r=>r.cur>0||r.prev>0);
+  const maxMin=Math.max(1,...timeRows.map(r=>Math.max(r.cur,r.prev)));
+  const mkBarRow=(r)=>{
+    const diff=r.cur-r.prev;
+    const dir=diff>0?'up':(diff<0?'down':'flat');
+    const arrow=dir==='up'?'ti-arrow-up':(dir==='down'?'ti-arrow-down':'ti-minus');
+    const sign=diff>0?'+':(diff<0?'-':'');
+    const prevPct=Math.round(r.prev/maxMin*100);
+    const curPct=Math.round(r.cur/maxMin*100);
+    const prevBarHtml=`<div class="mrp-cc-track-bar mrp-cc-track-bar-prev" style="width:${prevPct}%;"></div>`;
+    const curBarHtml=`<div class="mrp-cc-track-bar mrp-cc-track-bar-cur" style="width:${curPct}%;background:${r.color};"></div>`;
+    // 두 값을 한눈에 비교할 수 있도록, 더 짧은 막대를 나중에 그려 항상 위(z-순서상 위)로 오게 함
+    const barsHtml=r.cur<=r.prev?prevBarHtml+curBarHtml:curBarHtml+prevBarHtml;
+    return `<div class="mrp-cc-row">
+      <span class="mrp-cc-row-label"><i class="ti ${r.icon}" style="color:${r.color};font-size:14px;margin-right:4px;" aria-hidden="true"></i>${r.label}</span>
+      <div class="mrp-cc-track">${barsHtml}</div>
+      <span class="mrp-cc-row-val ${dir}"><i class="ti ${arrow}" style="font-size:11px;" aria-hidden="true"></i>${sign}${_fmtDur(Math.abs(diff))}</span>
+    </div>`;
+  };
+  const timeSectionHtml=timeRows.length?`
+    <div class="mrp-cc-sec-title">감상 시간</div>
+    ${timeRows.map(mkBarRow).join('')}
+    <div class="mrp-cc-legend"><span><i class="mrp-cc-legend-dot cur"></i>이번 달</span><span><i class="mrp-cc-legend-dot prev"></i>지난달</span></div>`:'';
+  // ③ 완결 편수 비교 — renderMrpContents 목록 뷰가 이미 월 범위로 판정해둔 inRange/inRangePrev를 그대로 셈(로직 이중화 방지).
+  // 카테고리별 단위: 드라마=편, 영화=편, 독서=권, 음악=곡
+  const countCat=(list,cat)=>(list||[]).filter(c=>c.content_cat===cat).length;
+  const CAT_META4=[
+    {cat:'drama',label:'드라마',icon:'ti-device-tv',color:'rgba(var(--pal-pink-rgb),1)',unit:'편'},
+    {cat:'movie',label:'영화',icon:'ti-movie',color:'rgba(var(--pal-sky-rgb),1)',unit:'편'},
+    {cat:'book',label:'독서',icon:'ti-book',color:'rgba(var(--pal-yellow-rgb),1)',unit:'권'},
+    {cat:'music',label:'음악',icon:'ti-music',color:'rgba(210,175,225,1)',unit:'곡'}
+  ];
+  const countRows=CAT_META4.map(m=>({...m,cur:countCat(inRange,m.cat),prev:countCat(inRangePrev,m.cat)})).filter(r=>r.cur>0||r.prev>0);
+  const countSectionHtml=countRows.length?`
+    <div class="mrp-cc-sec-title">완결 편수</div>
+    <div class="mrp-cc-count-grid">
+      ${countRows.map(r=>{
+        const diff=r.cur-r.prev;
+        const dir=diff>0?'up':(diff<0?'down':'flat');
+        const sign=diff>0?'+':(diff<0?'-':'');
+        return `<div class="mrp-cc-count-cell">
+          <i class="ti ${r.icon}" style="color:${r.color};font-size:14px;" aria-hidden="true"></i>
+          <span class="mrp-cc-count-label">${r.label}</span>
+          <span class="mrp-cc-count-val">${r.cur}${r.unit}</span>
+          <span class="mrp-cc-count-diff ${dir}">${diff!==0?sign+Math.abs(diff):'-'}</span>
+        </div>`;
+      }).join('')}
+    </div>`:'';
+  if(prevT.total<=0){
+    el.innerHTML=headlineHtml+timeSectionHtml+countSectionHtml+'<div class="empty-msg" style="text-align:left;margin-top:8px;">지난달 기록이 적어 시간 비교는 참고용이에요</div>';
+    return;
+  }
+  el.innerHTML=headlineHtml+timeSectionHtml+countSectionHtml;
 }
 
-function renderMrpContents(contents,startDk,endDk,rblocks,prevContents,prevRblocks){
-  const el=document.getElementById('mrp-contents');
-  const inRange=contents.filter(c=>{
+// 완결(또는 등록) 여부를 월 범위로 판정 — renderMrpContents 목록 뷰와 renderMrpContentsCmp 편수 비교가 공유
+function _mrpContentsInRange(contents,startDk,endDk){
+  return (contents||[]).filter(c=>{
     if(c.content_cat==='music')return c.start_date&&c.start_date>=startDk&&c.start_date<=endDk;
     if(c.status!=='done'&&c.status!=='stopped')return false;
     return c.end_date&&c.end_date>=startDk&&c.end_date<=endDk;
   });
+}
+function renderMrpContents(contents,startDk,endDk,rblocks,prevContents,prevRblocks,prevStartDk,prevEndDk){
+  const el=document.getElementById('mrp-contents');
+  const inRange=_mrpContentsInRange(contents,startDk,endDk);
   // 탭 행(카드 제목 옆) 총 감상 시간 — _calcWatchTimeByCat은 완결 여부와 무관하게 이번 달 등록된 movie
   // 전체를 기준으로 실측/러닝타임 fallback을 판단하므로, inRange(완결·정지만) 대신 contents 전체를 넘김.
   const t=_calcWatchTimeByCat(rblocks||[],contents||[]);
-  const tabsEl=document.getElementById('mrp-contents-tabs');
-  if(tabsEl){
-    const existing=tabsEl.querySelector('.mrp-card-title-total');
-    if(existing)existing.remove();
-    if(t.total>0)tabsEl.insertAdjacentHTML('afterbegin',`<span class="mrp-card-title-total">${_fmtDur(t.total)}</span>`);
-  }
-  // 전월대비 뷰 — 수면 카드(renderMrpSleep)의 mkCmpRow 패턴을 그대로 재사용.
-  renderMrpContentsCmp(t,prevContents,prevRblocks);
+  const totalEl=document.getElementById('mrp-contents-total');
+  if(totalEl)totalEl.textContent=t.total>0?_fmtDur(t.total):'';
+  // 카드 진입/월 이동 시 뷰는 항상 '목록'으로 리셋 — 제목·표시 상태를 함께 맞춤
+  _mrpContentsView='list';
+  const titleTextEl=document.getElementById('mrp-contents-title-text');
+  if(titleTextEl)titleTextEl.textContent='이 달의 콘텐츠';
+  document.getElementById('mrp-contents').style.display='';
+  const cmpElToggle=document.getElementById('mrp-contents-cmp');
+  if(cmpElToggle)cmpElToggle.style.display='none';
+  // 전월대비 뷰 — 완결 편수는 목록 뷰와 동일한 월 범위 판정(_mrpContentsInRange)을 그대로 재사용
+  const inRangePrev=(prevStartDk&&prevEndDk)?_mrpContentsInRange(prevContents,prevStartDk,prevEndDk):[];
+  renderMrpContentsCmp(t,prevRblocks,prevContents,inRange,inRangePrev);
   if(!inRange.length){el.innerHTML='<div class="empty-msg">이 달엔 기록한 콘텐츠가 없어요</div>';return;}
   // 카테고리(드라마/책/영화/음악) 순서 고정 그룹핑 — 그룹 내부는 기존처럼 최신순 유지
   const CAT_ORDER=['drama','book','movie','music'];
@@ -3577,12 +3637,14 @@ function renderMrpReportLinks(weeksInMonth,mk){
   el.innerHTML=cards.length?`<div class="mrp-links-grid">${cards.join('')}</div>`:'<div class="empty-msg">이 달엔 발행된 주간 리포트가 없어요</div>';
 }
 
-// 이 달의 콘텐츠 카드 — 목록/전월대비 탭 전환(기존 note-tl-subtabs와 동일 패턴)
-function switchMrpContentsView(btn,view){
-  document.querySelectorAll('#mrp-contents-tabs .rd-tab').forEach(t=>t.classList.remove('on'));
-  btn.classList.add('on');
-  document.getElementById('mrp-contents').style.display=view==='list'?'':'none';
-  document.getElementById('mrp-contents-cmp').style.display=view==='cmp'?'':'none';
+// 이 달의 콘텐츠 카드 — 목록/전월대비 뷰 전환. 별도 배너 없이 카드 제목("이 달의 콘텐츠"/"전월 대비 감상 시간") 클릭으로 토글.
+let _mrpContentsView='list';
+function toggleMrpContentsView(){
+  _mrpContentsView=_mrpContentsView==='list'?'cmp':'list';
+  const titleTextEl=document.getElementById('mrp-contents-title-text');
+  if(titleTextEl)titleTextEl.textContent=_mrpContentsView==='list'?'이 달의 콘텐츠':'전월 대비 감상 시간';
+  document.getElementById('mrp-contents').style.display=_mrpContentsView==='list'?'':'none';
+  document.getElementById('mrp-contents-cmp').style.display=_mrpContentsView==='cmp'?'':'none';
 }
 
 // ══════════════════════════════════════════════════════════
