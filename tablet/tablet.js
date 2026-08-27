@@ -1191,8 +1191,8 @@ async function loadWeekTab(){
     supaFetch(`reading_books?status=eq.reading&limit=1`),
     supaFetch(`reading_daily_log?date_key=gte.${rdStreakStartDk}&select=date_key`),
     // 이번 주 독서 활동(탭 전환용) — 이번 주/지난주 각각의 독서 로그(권별 진행량 계산용) + 전체 책 목록(제목/저자/표지 조회용, 병렬 진행 포함)
-    supaFetch(`reading_daily_log?date_key=gte.${startDk}&date_key=lte.${cmpEndDk}&order=date_key.asc`),
-    supaFetch(`reading_daily_log?date_key=gte.${lastStartDk}&date_key=lte.${lastCmpEndDk}&order=date_key.asc`),
+    supaFetch(`reading_daily_log?date_key=gte.${startDk}&date_key=lte.${cmpEndDk}&select=date_key,book_cid,unit,amount_read,seconds&order=date_key.asc`),
+    supaFetch(`reading_daily_log?date_key=gte.${lastStartDk}&date_key=lte.${lastCmpEndDk}&select=date_key,book_cid,unit,amount_read,seconds&order=date_key.asc`),
     supaFetch(`reading_books?select=cid,title,author,poster,unit,total_pages,status`)
   ]);
 
@@ -1621,6 +1621,7 @@ function _wraStatsOf(logRows,booksByCid){
     byBook[r.book_cid].push(r);
   });
   const activeDays=new Set((logRows||[]).map(r=>r.date_key)).size;
+  const totalSeconds=(logRows||[]).reduce((s,r)=>s+(r.seconds||0),0);
   const rows=Object.keys(byBook).map(cid=>{
     const logs=byBook[cid].sort((a,b)=>a.date_key<b.date_key?-1:1);
     const book=booksByCid[cid]||{};
@@ -1634,7 +1635,7 @@ function _wraStatsOf(logRows,booksByCid){
     }
     return {cid,title:book.title||'',deltaPct,noTotal:book.unit==='pages'&&!book.total_pages};
   });
-  return {rows,activeDays};
+  return {rows,activeDays,totalSeconds};
 }
 function toggleWeekReadingView(){
   const a=document.getElementById('week-reading'),b=document.getElementById('week-reading-activity'),txt=document.getElementById('week-reading-title-text');
@@ -1650,30 +1651,39 @@ function renderWeekReadingActivity(logsThis,logsLast,booksAll,contents,startDk,e
   const booksByCid={};
   (booksAll||[]).forEach(b=>{booksByCid[b.cid]=b;});
 
-  const {rows,activeDays}=_wraStatsOf(logsThis,booksByCid);
-  const {activeDays:activeDaysLast}=_wraStatsOf(logsLast,booksByCid);
+  const {rows,activeDays,totalSeconds}=_wraStatsOf(logsThis,booksByCid);
+  const {rows:rowsLast,activeDays:activeDaysLast,totalSeconds:totalSecondsLast}=_wraStatsOf(logsLast,booksByCid);
 
   const doneThis=(contents||[]).filter(c=>c.content_cat==='book'&&(c.status==='done'||c.status==='stopped')&&c.end_date&&c.end_date>=startDk&&c.end_date<=endDk);
-  const doneLast=(contents||[]).filter(c=>c.content_cat==='book'&&(c.status==='done'||c.status==='stopped')&&c.end_date&&c.end_date>=lastStartDk&&c.end_date<=lastEndDk);
+  // reading_books.cid와 contents.client_id는 서로 다른 ID 체계라(2026-08-28 확인) 직접 매칭 불가 —
+  // 제목 기준으로 완독 여부를 판별해 진행 리스트와 중복 표기되지 않도록 함.
+  const doneTitleSet=new Set(doneThis.map(c=>c.title));
 
-  const doneCidSet=new Set(doneThis.map(c=>c.client_id));
-  const listRows=rows.filter(r=>!doneCidSet.has(r.cid));
+  const sumPct=(rs)=>rs.reduce((s,r)=>s+(r.noTotal?0:(r.deltaPct||0)),0);
+  const totalThis=sumPct(rows),totalLast=sumPct(rowsLast);
 
-  const rowsHtml=listRows.length?listRows.map(r=>{
-    if(r.noTotal)return `<div class="wra-row"><span class="wra-row-title">${escapeHtml(r.title)}</span><span class="wra-row-flag">기록됨</span></div>`;
-    return `<div class="wra-row"><span class="wra-row-title">${escapeHtml(r.title)}</span><span class="wra-row-delta">+${r.deltaPct}%</span></div>`;
+  const rowsHtml=rows.length?rows.map(r=>{
+    const isDone=doneTitleSet.has(r.title);
+    const badge=isDone?`<span class="wra-row-badge">완독</span>`:'';
+    if(r.noTotal)return `<div class="wra-row"><span class="wra-row-title">${escapeHtml(r.title)}</span>${badge}<span class="wra-row-flag">기록됨</span></div>`;
+    return `<div class="wra-row"><span class="wra-row-title">${escapeHtml(r.title)}</span>${badge}<span class="wra-row-delta">+${r.deltaPct}%</span></div>`;
   }).join(''):'';
-  const doneRowsHtml=doneThis.map(c=>`<div class="wra-row"><span class="wra-row-title">${escapeHtml(c.title||'')}</span><span class="wra-row-badge">완독</span></div>`).join('');
-  const bodyHtml=(rowsHtml+doneRowsHtml)||`<div class="wra-empty">이번 주엔 독서 기록이 없어요</div>`;
+  // 진행 로그가 아예 없이 완독만 된 책(예: 지난주 전에 다 읽고 이번 주에 상태만 done으로 바뀐 경우) 별도 표기
+  const doneOnlyHtml=doneThis.filter(c=>!rows.some(r=>r.title===c.title)).map(c=>`<div class="wra-row"><span class="wra-row-title">${escapeHtml(c.title||'')}</span><span class="wra-row-badge">완독</span></div>`).join('');
+  const bodyHtml=(rowsHtml+doneOnlyHtml)||`<div class="wra-empty">이번 주엔 독서 기록이 없어요</div>`;
 
-  const deltaDone=doneThis.length-doneLast.length;
   const deltaDays=activeDays-activeDaysLast;
-  const deltaHtml=(d)=>d>0?`<span class="wra-stat-delta up">+${d}</span>`:d<0?`<span class="wra-stat-delta down">${d}</span>`:`<span class="wra-stat-delta flat">-</span>`;
+  const deltaPctTotal=totalThis-totalLast;
+  const deltaSeconds=totalSeconds-totalSecondsLast;
+  const deltaHtml=(d,suffix='')=>d>0?`<span class="wra-stat-delta up">+${d}${suffix}</span>`:d<0?`<span class="wra-stat-delta down">${d}${suffix}</span>`:`<span class="wra-stat-delta flat">-</span>`;
+  const fmtHM=(sec)=>{const h=Math.floor(sec/3600),m=Math.round((sec%3600)/60);return h>0?`${h}시간${m>0?' '+m+'분':''}`:`${m}분`;};
+  const deltaMinHtml=(dSec)=>{const dm=Math.round(dSec/60);return deltaHtml(dm,'분');};
 
   el.innerHTML=`<div class="week-reading-inner">
     <div class="wra-list">${bodyHtml}</div>
     <div class="wra-summary">
-      <div class="wra-stat"><div class="wra-stat-num">${doneThis.length}</div><div class="wra-stat-lbl">완독</div>${deltaHtml(deltaDone)}</div>
+      <div class="wra-stat"><div class="wra-stat-num">${totalThis}%</div><div class="wra-stat-lbl">진행량</div>${deltaHtml(deltaPctTotal,'%')}</div>
+      <div class="wra-stat"><div class="wra-stat-num">${fmtHM(totalSeconds)}</div><div class="wra-stat-lbl">독서시간</div>${deltaMinHtml(deltaSeconds)}</div>
       <div class="wra-stat"><div class="wra-stat-num">${activeDays}</div><div class="wra-stat-lbl">활동일</div>${deltaHtml(deltaDays)}</div>
     </div>
   </div>`;

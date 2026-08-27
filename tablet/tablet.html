@@ -502,7 +502,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .wra-empty{text-align:center;font-size:var(--fs-sm);color:var(--tm);padding:10px 0;}
 .wra-summary{display:flex;gap:10px;border-top:1px solid var(--card-b);padding-top:10px;}
 .wra-stat{flex:1;text-align:center;}
-.wra-stat-num{font-size:var(--fs-lg);font-weight:700;color:var(--tp);font-family:'DM Sans',sans-serif;}
+.wra-stat-num{font-size:var(--fs-lg);font-weight:700;color:var(--tp);font-family:'DM Sans',sans-serif;white-space:nowrap;}
+.wra-summary .wra-stat:nth-child(2) .wra-stat-num{font-size:var(--fs-body);}
 .wra-stat-lbl{font-size:10.5px;color:var(--tm);margin-top:2px;}
 .wra-stat-delta{font-size:10.5px;margin-top:2px;font-weight:600;}
 .wra-stat-delta.up{color:rgba(214,90,140,0.85);}
