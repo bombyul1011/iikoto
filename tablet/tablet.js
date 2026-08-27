@@ -199,10 +199,51 @@ function toggleSidebar(){
   btn.classList.toggle('collapsed',collapsed);
   try{localStorage.setItem(SIDEBAR_COLLAPSE_KEY,collapsed?'1':'0');}catch(e){}
 }
-// top-row(감상 달력 / 콘텐츠 모아보기) 두 카드의 세로 길이는 더 이상 JS로 재서 맞추지 않는다.
-// .top-row{align-items:stretch}에 .wcal-card/.cgrid-card{min-height:0}만 더해주면
-// grid stretch가 두 카드 높이를 항상 wcal-card 기준으로 동기화해준다 — 사이드바
-// 트랜지션 중에도 매 프레임 리플로우로 자동 반영되므로 별도 rAF 동기화가 필요 없다.
+// ══════════════════════════════════════════════════════════
+// top-row(감상 달력 / 콘텐츠 모아보기) 높이 동기화
+// ──────────────────────────────────────────────────────────
+// 과거 시도 1(JS로 매번 측정+고정)과 시도 2(CSS grid align-items:stretch에 위임)가
+// 번갈아 재발했던 이유:
+//   - CSS stretch만으로는 "감상 달력 높이에 맞춰 콘텐츠 모아보기를 자르고 스크롤"이 불가능함.
+//     stretch는 두 칸을 "더 큰 쪽" 기준으로 서로 늘릴 뿐, 어느 한쪽에 상한을 주지 못한다.
+//     콘텐츠 모아보기는 항목 수가 달마다 달라 원래도 감상 달력보다 쉽게 길어지므로,
+//     stretch 하에서는 감상 달력이 오히려 콘텐츠 쪽 길이를 따라가며 "무한정 길어짐" 현상으로 보였음.
+//   - 예전 JS 동기화는 사이드바 접기/펼치기 트랜지션(0.32s) 중 한 번만 측정해서 반영이 어긋났음.
+// 이번 구현은 ResizeObserver로 wcal-card의 실제 렌더 높이를 프레임 단위로 계속 관찰하다가
+// 바뀔 때마다 cgrid-card 높이에 그대로 반영한다 — 사이드바 트랜지션 중에도, 폰트 크기 변경으로
+// 주차 행 수가 바뀌어도, 달이 바뀌어 주차 수(4~6주)가 바뀌어도 항상 자동으로 따라간다.
+// 모바일(≤760px)에서는 .top-row가 1열 스택으로 바뀌어 높이를 맞출 필요가 없으므로 개입하지 않는다.
+let _cgridHeightRO=null;
+function syncCgridHeightToWcal(){
+  const wcal=document.querySelector('.wcal-card');
+  const cgrid=document.querySelector('.cgrid-card');
+  if(!wcal||!cgrid)return;
+  const isDesktop=window.matchMedia('(min-width:761px)').matches;
+  if(!isDesktop){
+    cgrid.style.height='';
+    return;
+  }
+  const h=wcal.getBoundingClientRect().height;
+  if(h>0)cgrid.style.height=h+'px';
+}
+function initCgridHeightSync(){
+  const wcal=document.querySelector('.wcal-card');
+  if(!wcal)return;
+  if(_cgridHeightRO)_cgridHeightRO.disconnect();
+  _cgridHeightRO=new ResizeObserver(()=>syncCgridHeightToWcal());
+  _cgridHeightRO.observe(wcal);
+  // ResizeObserver 자체가 wcal-card 폭이 바뀌는 매 프레임마다(aspect-ratio로 셀이 커지고 작아지는
+  // 진행 과정 포함) 콜백을 태우므로 트랜지션 도중에도 이미 실시간으로 계속 따라간다.
+  // transitionend는 트랜지션이 끝난 마지막 프레임까지 오차 없이 딱 맞추기 위한 보정용 안전망일 뿐.
+  const side=document.getElementById('side');
+  if(side){
+    side.addEventListener('transitionend',(e)=>{
+      if(e.propertyName==='width')syncCgridHeightToWcal();
+    });
+  }
+  syncCgridHeightToWcal();
+}
+window.addEventListener('resize',()=>{if(_cgridHeightRO)syncCgridHeightToWcal();});
 function initSidebarCollapse(){
   let collapsed=false;
   try{collapsed=localStorage.getItem(SIDEBAR_COLLAPSE_KEY)==='1';}catch(e){}
@@ -232,7 +273,7 @@ function switchTab(tab){
   // 오늘탭으로 돌아올 때는 항상 실제 '오늘' 날짜로 재설정(자정을 넘겨도 갱신되도록)
   if(tab==='today'){_selectedDate=new Date();loadTodayTab();}
   else if(tab==='week')loadWeekTab();
-  else if(tab==='month')loadMonthTab();
+  else if(tab==='month'){loadMonthTab();initCgridHeightSync();}
   else if(tab==='reports'){resetReportsView();loadReportsTab();}
   else if(tab==='settings')_loadClaudeKeyStatus();
 }
@@ -1598,9 +1639,10 @@ async function loadMonthTab(){
     renderChaeumLogTablet(),
     renderWatchCal(contentsData)
   ]);
+  // 감상 달력(wcal-card) 렌더가 끝나 실제 높이가 확정된 직후 한 번 더 동기화 —
+  // ResizeObserver도 이후 변화를 계속 잡아주지만, 최초 렌더 프레임에서 한 박자 밀리는 걸 방지.
+  syncCgridHeightToWcal();
 }
-// 콘텐츠모아보기 카드 높이를 감상달력에 맞추는 것은 CSS(.top-row stretch + min-height:0)가
-// 전담한다 — JS로 별도 측정/고정하지 않는다. (구 lockContentCollectToReadingCal 제거됨)
 
 function renderMonthGoals(row){
   const el=document.getElementById('month-goals');
@@ -1994,9 +2036,10 @@ const WCAL_CAT_META={
 };
 let _wcalFilter='all';
 let _wcalByDate={};
-function wcalMonthShift(delta){
+async function wcalMonthShift(delta){
   _wcalDate.setMonth(_wcalDate.getMonth()+delta);
-  renderWatchCal();
+  await renderWatchCal();
+  syncCgridHeightToWcal(); // 주차 수(4~6주)가 달마다 달라 감상 달력 높이가 바뀌므로 즉시 재동기화
 }
 function wcalSetFilter(cat){
   _wcalFilter=cat;

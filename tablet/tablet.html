@@ -373,7 +373,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .oneline-dow{width:22px;flex-shrink:0;font-weight:600;color:var(--tp);}
 
 /* ── 월간탭 ── */
-.top-row{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;align-items:stretch;}
+.top-row{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;align-items:start;}
 .top-row .card{box-sizing:border-box;margin-bottom:0;}
 .rdcal-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin:0 0 4px;}
 .rdcal-nav i{font-size:var(--fs-title);color:var(--tm);cursor:pointer;}
@@ -551,7 +551,12 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 /* 콘텐츠 모아보기(월별, 리스트형) — 그리드형(.cgrid-*)으로 대체됨, 아래 죽은 CSS 전체 제거됨
 
 /* 콘텐츠 아카이브(그리드형) — 독서달력/콘텐츠모아보기 아래 전체 폭, 한 줄 3개 고정 후 스크롤 */
-.cgrid-card{display:flex;flex-direction:column;min-height:0;}
+/* 높이 동기화: wcal-card는 자기 콘텐츠(주차 수)만큼 자연스러운 높이를 가짐.
+   cgrid-card는 JS(syncCgridHeightToWcal, ResizeObserver 기반)가 wcal-card의 실측 높이를
+   .cgrid-card.style.height로 그대로 박아넣고, 그 안의 .cgrid-scroll(flex:1;min-height:0)이
+   넘치는 만큼만 내부 스크롤한다. overflow:hidden은 height가 JS로 세팅되기 전(초기 렌더/로딩 중)
+   카드가 콘텐츠 양만큼 순간적으로 길어졌다가 줄어드는 깜빡임을 막기 위한 안전장치. */
+.cgrid-card{display:flex;flex-direction:column;min-height:0;overflow:hidden;}
 .wcal-card{display:flex;flex-direction:column;min-height:0;}
 .cgrid-hdr{margin-bottom:10px;}
 .cgrid-title-row{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;}
@@ -952,9 +957,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   /* ══════════════════════════════════════════════════════
      월간탭
      ══════════════════════════════════════════════════════ */
-  /* 콘텐츠 모아보기 — 썸네일 2줄까지만 보이게 세로 길이를 제한, 나머지는 내부 스크롤.
+  /* 콘텐츠 모아보기 — 세로(모바일)에서는 .top-row가 1열 스택이 되어 감상 달력과 높이를 맞출 필요가
+     없어짐(desktop 전용 JS 동기화 대상에서도 제외됨, syncCgridHeightToWcal 참고). 대신 썸네일 2줄까지만
+     보이게 자체적으로 세로 길이를 제한하고 나머지는 내부 스크롤.
      3열 그리드에서 한 줄 높이 ≈ 썸네일(정사각형, 화면폭 기준) + 제목 한 줄 + 행간(gap). 화면폭에 따라 유동적이라
-     vw 기반으로 근사 계산 — 오차가 있어도 overflow-y:auto가 안전망이라 내용이 잘리지 않음. */
+     vw 기반으로 근사 계산 — 오차가 있어도 overflow-y:auto가 안전망이라 내용이 잘리지 않음.
+     cgrid-card의 desktop overflow:hidden은 세로 미디어쿼리에서 해제해 카드 자체는 내용 높이만큼 자연스럽게 늘어나게 함. */
+  .cgrid-card{overflow:visible!important;}
   #month-content-grid.cgrid-scroll{max-height:calc(2 * (28vw + 5px + 1.3em) + 10px);overflow-y:auto;}
 
   /* 콘텐츠 타임라인 — 카테고리 라벨 텍스트 숨기고 아이콘 배지만 남김 */
