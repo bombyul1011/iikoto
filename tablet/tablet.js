@@ -1377,10 +1377,12 @@ const WEEK_KW_PARTICLE_SUFFIXES=[
   '이라','라','인데','였는데','했는데','한데',
   '을','를','이','가','은','는','의','에'
 ];
-const WEEK_KW_VERB_ENDING_RE=/(했다|했어|했음|한다|하다가|하다|해서|하고|했는데|되다|됐다|됐어|있다|있어|없다|없어|같다|같아|같음|이다|였다|였음|였다가|해봤다|해봤어|해봄|해야지|해야겠다|해야겠어|한대|한대요|했네|했네요|하네|하네요|이네|이네요|다네|다네요)$/;
+const WEEK_KW_VERB_ENDING_RE=/(했다|했어|했음|한다|하다가|하다|해서|하고|했는데|되다|됐다|됐어|있다|있어|없다|없어|같다|같아|같음|이다|였다|였음|였다가|해봤다|해봤어|해봄|해야지|해야겠다|해야겠어|한대|한대요|했네|했네요|하네|하네요|이네|이네요|다네|다네요|겠다|좋겠다|좋겠어|좋겠네|좋다|좋아|좋네)$/;
 function _weekKwStripParticle(w){
   for(const suf of WEEK_KW_PARTICLE_SUFFIXES){
-    if(w.length>suf.length+1&&w.endsWith(suf))return w.slice(0,-suf.length);
+    // 조사를 떼고 남는 부분이 최소 1글자만 되면 됨(예: "잠이"→"잠"). 기존엔 +1을 잘못 걸어 2글자 이상만
+    // 허용하는 바람에 "잠","밥","꿈" 같은 1글자 명사+조사가 안 벗겨지는 문제가 있었음(2026-08-27 수정).
+    if(w.length>suf.length&&w.endsWith(suf))return w.slice(0,-suf.length);
   }
   return w;
 }
