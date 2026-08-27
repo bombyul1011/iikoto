@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.7-archive-split-content-corner';
+const CACHE = 'iikoto-v2.7-01-redeploy';
 const ASSETS = [
   './',
   './index.html'
