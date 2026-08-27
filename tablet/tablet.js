@@ -1813,7 +1813,17 @@ function _cgridPeriodLabel(c){
 function _cgridDetailHtml(c){
   const period=_cgridPeriodLabel(c);
   const stars=c.stars>0?`<span class="cgrid-detail-stars">${'★'.repeat(c.stars)}</span>`:'';
-  const topRow=(period||stars)?`<div class="cgrid-detail-row"><span class="cgrid-detail-row-date">${period?`<i class="ti ti-calendar" style="font-size:12px;" aria-hidden="true"></i>${period}`:''}</span>${stars}</div>`:'';
+  const isMusic=c.content_cat==='music';
+  // 재생 — 음악만, music_url이 등록돼 있을 때만. 본앱 _cmrDetailBodyHtml의 musicPlayBtnHtml과 동일 로직/스타일.
+  const musicPlayBtnHtml=isMusic&&c.music_url?`<span class="pl-item-play music-play-btn" style="background:rgba(160,105,180,.18);border:1px solid rgba(160,105,180,.45);" onclick="event.stopPropagation();window.location.href='${c.music_url.replace(/'/g,"\\'")}'"><i class="ti ti-player-play-filled" style="color:rgba(160,105,180,1);" aria-hidden="true"></i></span>`:'';
+  // 음악 상세 헤더는 좌측 가수명 / 우측 날짜+재생버튼 구조(요청 반영, 2026-08-27). 그 외 카테고리는 기존 날짜+별점 구조 유지.
+  const artistDetailHtml=isMusic&&c.author?`<span class="cgrid-detail-artist">${escapeHtml(c.author)}</span>`:'';
+  const dateWithPlayHtml=`<span class="cgrid-detail-date-play">${period?`<span class="cgrid-detail-row-date"><i class="ti ti-calendar" style="font-size:12px;" aria-hidden="true"></i>${period}</span>`:''}${musicPlayBtnHtml}</span>`;
+  const topRow=isMusic
+    ?((artistDetailHtml||period||musicPlayBtnHtml)?`<div class="cgrid-detail-row">${artistDetailHtml||'<span></span>'}${dateWithPlayHtml}</div>`:'')
+    :((period||stars)?`<div class="cgrid-detail-row"><span class="cgrid-detail-row-date">${period?`<i class="ti ti-calendar" style="font-size:12px;" aria-hidden="true"></i>${period}`:''}</span>${stars}</div>`:'');
+  // 음악 — 앨범명/발매연도, 가수명 아래 별도 줄로 표시.
+  const musicMetaHtml=isMusic&&(c.album||c.release_year)?`<div class="cgrid-detail-music-meta">${escapeHtml(c.album||'')}${c.album&&c.release_year?' · ':''}${c.release_year||''}</div>`:'';
   // 진행률 바 — 드라마/영화 모두 진행중(watching)일 때만 표시. 완결 시엔 회차/러닝타임을 끝까지
   // 갱신했다는 보장이 없어(특히 영화는 애초에 회차 개념이 없어 current_unit이 항상 0으로 남음) 완결
   // 콘텐츠에 0%로 잘못 노출되는 문제가 있었음 — 독서와 동일 기준으로 통일(2026-08-27).
@@ -1856,7 +1866,7 @@ function _cgridDetailHtml(c){
       }).join('')}
     </div>
   </div>`:'';
-  return `<div class="cgrid-detail">${topRow}${progressHtml}${finalHtml}${notesHtml}</div>`;
+  return `<div class="cgrid-detail">${topRow}${musicMetaHtml}${progressHtml}${finalHtml}${notesHtml}</div>`;
 }
 function _cgridItemHtml(c){
   const meta=CAT_ICON_META[c.content_cat]||{icon:'ti-stack-2',bg:'rgba(150,150,150,1)'};

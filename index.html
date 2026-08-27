@@ -302,12 +302,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cm-star-picker{display:flex;gap:3px;flex:1;}
 @keyframes discSpin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
 .playlist-disc-spin{display:inline-block;animation:discSpin 3s linear infinite;}
-.pl-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;background:var(--card);border:1px solid var(--card-b);}
-.pl-item-poster{width:34px;height:34px;border-radius:7px;object-fit:cover;flex-shrink:0;}
-.pl-item-poster-ph{width:34px;height:34px;border-radius:7px;background:rgba(160,105,180,0.18);display:flex;align-items:center;justify-content:center;font-size:14px;color:rgba(160,105,180,0.80);flex-shrink:0;}
-.pl-item-info{flex:1;min-width:0;}
-.pl-item-title{font-size:var(--main-text-size);color:var(--tp);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.pl-item-sub{font-size:var(--dow-label-size);color:var(--tm);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .pl-item-play{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
 .pl-item-play i{font-size:13px;}
 .pl-item-play.dim{opacity:.35;cursor:default;}
@@ -359,6 +353,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 /* 코멘트 상세 헤더 — 날짜 + 별점, 리스트형/그리드형 공통 */
 .cmr-detail-head{display:flex;align-items:center;gap:8px;margin-bottom:7px;font-size:var(--dow-label-size);}
 .cmr-detail-head .cwatch-btn{margin-left:auto;}
+.cmr-detail-head .music-play-btn{margin-left:auto;}
+.cmr-music-meta{display:flex;flex-direction:column;gap:1px;}
 .cmr-detail-date{color:var(--tm);font-weight:600;font-variant-numeric:tabular-nums;}
 .cmr-detail-stars{color:#e0b050;letter-spacing:1px;}
 .cmr-progress-bar{display:flex;align-items:center;gap:8px;margin-bottom:7px;cursor:pointer;padding:3px 0;}
@@ -2026,9 +2022,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <button class="mbtn" id="cm-del-btn" onclick="deleteContent()" style="display:none;background:var(--pal-rose-bg);color:var(--pal-rose-text);border:1px solid var(--pal-rose-border);">삭제</button>
       <button class="mbtn ok" onclick="confirmContent()">저장</button>
     </div>
-    <button class="mbtn" id="cm-playlist-btn" onclick="openPlaylistModal()" style="display:none;width:100%;margin-top:8px;background:rgba(160,105,180,0.18);color:rgba(160,105,180,0.80);border:1px solid rgba(160,105,180,0.45);">
-      <i class="ti ti-music-heart" style="font-size:14px;vertical-align:-2px;margin-right:4px;" aria-hidden="true"></i>이달의 플레이리스트
-    </button>
   </div>
 </div>
 
@@ -2079,20 +2072,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   <div class="modal" style="max-width:300px;">
     <div style="font-size:var(--main-text-size);font-weight:600;color:var(--tp);margin-bottom:10px;">이 날의 음악</div>
     <div id="mg-list" style="display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto;"></div>
-  </div>
-</div>
-
-<!-- PLAYLIST MODAL -->
-<div class="overlay" id="playlist-modal" onclick="closeSheet('playlist-modal',event)">
-  <div class="bsheet" style="max-height:80vh;overflow-y:auto;" onclick="event.stopPropagation()">
-    <div class="sheet-handle"></div>
-    <div style="padding:0 20px 20px;">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
-        <i class="ti ti-disc playlist-disc-spin" style="font-size:20px;color:rgba(160,105,180,0.80);" aria-hidden="true"></i>
-        <span style="font-size:var(--main-text-size);font-weight:600;color:var(--tp);">이달의 플레이리스트</span>
-      </div>
-      <div id="pl-list" style="display:flex;flex-direction:column;gap:6px;"></div>
-    </div>
   </div>
 </div>
 
@@ -2450,7 +2429,7 @@ function renderHomeBody(section){
     if(!isNight2){
       body.appendChild(makeHabitMiniCheckRow());
       body.appendChild(makeChaeumBanner());
-      body.appendChild(makeLabel('이달의 플리'));
+      body.appendChild(makeLabel('저녁 플리'));
       body.appendChild(makePlaylistMiniCard());
     }
     body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getLogicalDate()));},'rhythm-soft',12.5,dateKey(getLogicalDate())));
@@ -3348,7 +3327,16 @@ function _cmrDetailBodyHtml(c,wcalNotes,flat,showHead){
   const canWatch=showHead&&c.status==='watching'&&(c.cat==='drama'||c.cat==='movie');
   const isWatchingNow=canWatch&&_cswRunning&&_cswCid===c.cid;
   const watchBtnHtml=canWatch?`<span class="cwatch-btn${isWatchingNow?' active':''}" onclick="event.stopPropagation();toggleContentStopwatch('${c.cid}')"><i class="ti ${isWatchingNow?'ti-player-stop-filled':'ti-player-play-filled'}" aria-hidden="true"></i>${isWatchingNow?'시청중':'시청 시작'}</span>`:'';
-  const headHtml=showHead&&(dispDate||starsHtml||watchBtnHtml)?`<div class="cmr-detail-head">${dispDate?`<span class="cmr-detail-date"><i class="ti ti-calendar" style="font-size:11px;" aria-hidden="true"></i> ${dispDate}</span>`:'<span></span>'}${starsHtml}${watchBtnHtml}</div>`:'';
+  // 재생 — 음악만, musicUrl이 등록돼 있을 때만(그리드 상세에서만). 날짜/별점 등 다른 정보가 없는 자리라 오른쪽 정렬(music-play-btn 클래스, margin-left:auto).
+  const musicPlayBtnHtml=showHead&&c.cat==='music'&&c.musicUrl?`<span class="pl-item-play music-play-btn" style="background:rgba(160,105,180,.18);border:1px solid rgba(160,105,180,.45);" onclick="event.stopPropagation();window.location.href='${c.musicUrl.replace(/'/g,"\\'")}'"><i class="ti ti-player-play-filled" style="color:rgba(160,105,180,1);" aria-hidden="true"></i></span>`:'';
+  // 음악 메타 — 아티스트명(위) / 앨범명 · 연도(아래) 두 줄로 표기(제목은 위 썸네일 라벨에 이미 있어 중복 생략). 그리드 상세에서만.
+  const musicAlbumYearParts=[];
+  if(showHead&&c.cat==='music'){
+    if(c.album)musicAlbumYearParts.push(escapeHtml(c.album));
+    if(c.releaseYear)musicAlbumYearParts.push(c.releaseYear);
+  }
+  const musicMetaHtml=(showHead&&c.cat==='music'&&(c.author||musicAlbumYearParts.length))?`<div class="cmr-music-meta">${c.author?`<div class="cmr-detail-date">${escapeHtml(c.author)}</div>`:''}${musicAlbumYearParts.length?`<div class="cmr-detail-date" style="opacity:.72;">${musicAlbumYearParts.join(' · ')}</div>`:''}</div>`:'';
+  const headHtml=showHead&&(dispDate||starsHtml||watchBtnHtml||musicPlayBtnHtml||musicMetaHtml)?`<div class="cmr-detail-head">${musicMetaHtml||(dispDate?`<span class="cmr-detail-date"><i class="ti ti-calendar" style="font-size:11px;" aria-hidden="true"></i> ${dispDate}</span>`:'<span></span>')}${starsHtml}${watchBtnHtml}${musicPlayBtnHtml}</div>`:'';
   // 진행률 바 — 진행중인 항목에만 필요: 드라마/영화(watching)는 회차/러닝타임 총량 입력된 경우, 책(reading)은 reading_books 연동된 경우. 완결/중단 콘텐츠는 노출 안 함.
   let progressHtml='';
   if(showHead&&(c.cat==='drama'||c.cat==='movie')&&c.status==='watching'&&c.totalUnit){
@@ -5068,6 +5056,12 @@ function getContents(mk){
   if(changed)S.set(S.key('contents',mk),arr);
   return arr;
 }
+// Supabase에서 cat=music만 서버 필터링으로 직접 조회 — 저녁 플리(전체 기간 랜덤) 등 월 경계 없는 조회용
+async function fetchAllMusicContents(){
+  const rows=await supaFetch(`contents?content_cat=eq.music&order=created`);
+  if(!rows)return [];
+  return rows.map(r=>({cat:r.content_cat,title:r.title,startDate:r.start_date,endDate:r.end_date,status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',musicUrl:r.music_url||null,album:r.album||null,releaseYear:r.release_year||null,created:r.created,cid:r.client_id}));
+}
 // 리듬바 "감상" 입력 시 진행중 드라마/영화를 제목 선택용으로 제공.
 // 책은 독서 스톱워치가 종료 시점에 감상 리듬을 자동 기록하므로 여기서는 제외.
 // 월 경계에 걸쳐 이번 달로 넘어온 콘텐츠도 놓치지 않도록 이번달+지난달 두 달치를 합쳐서 조회.
@@ -5335,7 +5329,7 @@ async function syncContentsDownRaw(mk){
       const matched=localNoCidByKey[key];
       if(matched){l=matched;delete localNoCidByKey[key];}
     }
-    const serverItem={cat:r.content_cat,title:r.title,startDate:r.start_date||(r.start_day?mk+'-'+pad(r.start_day):null),endDate:r.end_date||(r.end_day?mk+'-'+pad(r.end_day):null),status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',musicUrl:r.music_url||null,totalUnit:r.total_unit||null,currentUnit:r.current_unit||null,created:r.created,cid,updatedAt:r.updated_at};
+    const serverItem={cat:r.content_cat,title:r.title,startDate:r.start_date||(r.start_day?mk+'-'+pad(r.start_day):null),endDate:r.end_date||(r.end_day?mk+'-'+pad(r.end_day):null),status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',musicUrl:r.music_url||null,album:r.album||null,releaseYear:r.release_year||null,totalUnit:r.total_unit||null,currentUnit:r.current_unit||null,created:r.created,cid,updatedAt:r.updated_at};
     if(!l){merged.push(serverItem);return;}
     // 로컬/서버 둘 다 있으면 updated_at(서버) vs 로컬수정시각 비교, 서버가 더 최신이거나 로컬에 수정시각 기록이 없으면 서버값 채택
     const localTs=l.updatedAt?new Date(l.updatedAt).getTime():0;
@@ -5361,7 +5355,7 @@ async function syncContentsUp(mk){
   if(ensureItemCids(c))S.set(S.key('contents',mk),c);
   const delCids=getDelPendingCids('contents',mk);
   const ok=await syncListUpSafe('contents',`month_key=eq.${mk}`,'month_key,client_id',c,
-    it=>({month_key:mk,content_cat:it.cat,title:it.title,start_date:it.startDate,end_date:it.endDate,status:it.status,review:it.review||'',stars:it.stars||0,poster:it.poster||null,author:it.author||'',music_url:it.musicUrl||null,total_unit:it.totalUnit||null,current_unit:it.currentUnit||null,created:it.created,client_id:it.cid}),
+    it=>({month_key:mk,content_cat:it.cat,title:it.title,start_date:it.startDate,end_date:it.endDate,status:it.status,review:it.review||'',stars:it.stars||0,poster:it.poster||null,author:it.author||'',music_url:it.musicUrl||null,album:it.album||null,release_year:it.releaseYear||null,total_unit:it.totalUnit||null,current_unit:it.currentUnit||null,created:it.created,client_id:it.cid}),
     delCids);
   if(ok)delCids.forEach(cid=>removeDelPending('contents',mk,cid));
   return ok;
@@ -7023,41 +7017,47 @@ function toggleChaeumSummary(idx){
   box.style.display=open?'none':'block';
   if(chevron)chevron.style.transform=open?'rotate(0deg)':'rotate(180deg)';
 }
-// 저녁 파트1용 이달의 플리 미니카드 — 최근 등록 2건, 앨범커버+제목/가수+재생버튼, 하단에 전체보기 연결
+// 저녁 파트1용 저녁 플리 미니카드 — 전체 기간 등록된 음악(cat=music) 중 매일 하나씩 랜덤으로(날짜 기준 시드 고정, 하루 동안 유지) 노출.
+// Supabase에서 content_cat=eq.music으로 직접 필터링해 조회 — 로컬 월별 스캔 없이 단순하게.
 function makePlaylistMiniCard(){
-  const mk=monthKey(getLogicalDate());
-  const items=getContents(mk).filter(c=>c.cat==='music').sort((a,b)=>(b.created||0)-(a.created||0)).slice(0,2);
   const wrap=document.createElement('div');wrap.className='pace-card';
-  if(!items.length){
-    wrap.innerHTML='<div class="home-content-info" style="display:flex;align-items:center;gap:7px;">'
-      +'<i class="ti ti-music" style="font-size:13px;flex-shrink:0;color:var(--tm);" aria-hidden="true"></i>'
-      +'<span class="home-content-title" style="color:var(--tm);">이번 달엔 아직 등록된 음악이 없어요</span>'
-      +'</div>';
-    return wrap;
-  }
-  const musicRgb='160,105,180'; // disc/재생버튼과 동일한 라벤더톤
-  const rows=items.map(item=>{
+  wrap.innerHTML='<div class="home-content-info" style="display:flex;align-items:center;gap:7px;">'
+    +'<i class="ti ti-music" style="font-size:13px;flex-shrink:0;color:var(--tm);" aria-hidden="true"></i>'
+    +'<span class="home-content-title" style="color:var(--tm);">불러오는 중...</span>'
+    +'</div>';
+  fetchAllMusicContents().then(allMusic=>{
+    if(!allMusic.length){
+      wrap.innerHTML='<div class="home-content-info" style="display:flex;align-items:center;gap:7px;">'
+        +'<i class="ti ti-music" style="font-size:13px;flex-shrink:0;color:var(--tm);" aria-hidden="true"></i>'
+        +'<span class="home-content-title" style="color:var(--tm);">아직 등록된 음악이 없어요</span>'
+        +'</div>';
+      return;
+    }
+    // 날짜 문자열을 시드로 한 결정적 랜덤 — 같은 날엔 계속 같은 곡, 자정 지나면 다음 곡
+    const dk=dateKey(getLogicalDate());
+    let seed=0;for(let i=0;i<dk.length;i++)seed=(seed*31+dk.charCodeAt(i))|0;
+    const idx=Math.abs(seed)%allMusic.length;
+    const item=allMusic[idx];
+    const musicRgb='160,105,180';
     const coverInner=item.poster
       ?`<img src="${item.poster}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;" alt="">`
       :`<i class="ti ti-music" style="font-size:16px;color:rgba(136,120,171,0.75);" aria-hidden="true"></i>`;
     const hasUrl=!!item.musicUrl;
-    return `<div style="display:flex;gap:10px;align-items:center;">
-      <div style="width:40px;height:40px;border-radius:8px;background:rgba(160,105,180,0.18);flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden;">${coverInner}</div>
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:var(--main-text-size);font-weight:500;color:var(--tp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(item.title||'')}</div>
-        ${item.author?`<div style="font-size:var(--dow-label-size);color:var(--ts);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(item.author)}</div>`:''}
-      </div>
-      <div class="pl-item-play${hasUrl?'':' dim'}" style="background:rgba(${musicRgb},.18);border:1px solid rgba(${musicRgb},.45);flex-shrink:0;" ${hasUrl?`onclick="window.location.href='${item.musicUrl.replace(/'/g,"\\'")}'"`:''}><i class="ti ti-player-play-filled" style="color:rgba(${musicRgb},1);" aria-hidden="true"></i></div>
-    </div>`;
-  }).join('<div style="height:10px;"></div>');
-  wrap.innerHTML=`${rows}
-    <div style="text-align:right;margin-top:10px;"><span class="reading-nudge" onclick="openPlaylistModalFromHome()" style="cursor:pointer;"><i class="ti ti-disc playlist-disc-spin" style="font-size:12px;vertical-align:-1px;margin-right:3px;color:rgba(160,105,180,0.80);" aria-hidden="true"></i>이달의 플레이리스트 보기</span></div>`;
+    wrap.innerHTML=`<div style="display:flex;gap:10px;align-items:center;">
+        <div style="width:40px;height:40px;border-radius:8px;background:rgba(160,105,180,0.18);flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden;">${coverInner}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:var(--main-text-size);font-weight:500;color:var(--tp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(item.title||'')}</div>
+          ${item.author?`<div style="font-size:var(--dow-label-size);color:var(--ts);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(item.author)}</div>`:''}
+        </div>
+        <div class="pl-item-play${hasUrl?'':' dim'}" style="background:rgba(${musicRgb},.18);border:1px solid rgba(${musicRgb},.45);flex-shrink:0;" ${hasUrl?`onclick="window.location.href='${item.musicUrl.replace(/'/g,"\\'")}'"`:''}><i class="ti ti-player-play-filled" style="color:rgba(${musicRgb},1);" aria-hidden="true"></i></div>
+      </div>`;
+  }).catch(()=>{
+    wrap.innerHTML='<div class="home-content-info" style="display:flex;align-items:center;gap:7px;">'
+      +'<i class="ti ti-music" style="font-size:13px;flex-shrink:0;color:var(--tm);" aria-hidden="true"></i>'
+      +'<span class="home-content-title" style="color:var(--tm);">불러오지 못했어요</span>'
+      +'</div>';
+  });
   return wrap;
-}
-// 저녁 홈탭에서 이달의 플리 시트를 열 때는 편집 컨텍스트가 없으므로 이번 달 기준으로 직접 채워서 연다
-function openPlaylistModalFromHome(){
-  _contentCtx=_contentCtx||{};_contentCtx.mk=monthKey(getLogicalDate());
-  openPlaylistModal();
 }
 // 저녁 파트1용 독서 카드 B — 표지(또는 대체 아이콘)+진행바 포함, 넛지 문구는 우측 정렬로 기존 A와 동일 스타일
 function makeTodayQuoteCard(){
@@ -9081,6 +9081,8 @@ let _contentSubmitting=false;
 let _selectedPoster=null;
 let _selectedAuthor=null;
 let _selectedMusicUrl=null;
+let _selectedAlbum=null;
+let _selectedReleaseYear=null;
 let _selectedTotalUnit=null; // TMDB 상세 조회로 자동 확인된 드라마 총회차/영화 총러닝타임(분)
 let _apiTimer=null;
 
@@ -9305,6 +9307,7 @@ function openContentModal(cat,item=null,mk=null,onSaved=null){
   _contentCtx={cat,item,mk:mk||calMonthKey(),mode:item?'edit':'add',onSaved};
   document.getElementById('cm-title').value=item?.title||'';
   _selectedPoster=null;_selectedAuthor=null;_selectedMusicUrl=item?.musicUrl||null;
+  _selectedAlbum=item?.album||null;_selectedReleaseYear=item?.releaseYear||null;
   const pp=document.getElementById('cm-poster-preview');
   if(pp){
     if(item?.poster){
@@ -9331,12 +9334,10 @@ function openContentModal(cat,item=null,mk=null,onSaved=null){
   const isBook=cat==='book';
   const statusBtns=document.getElementById('cm-status-btns');
   const playBtn=document.getElementById('cm-music-play-btn');
-  const playlistBtn=document.getElementById('cm-playlist-btn');
   const startLabel=document.getElementById('cm-start-label');
   if(startLabel)startLabel.style.display=isMusic?'none':'inline';
   if(statusBtns)statusBtns.style.display=isMusic?'none':'flex';
   if(playBtn)playBtn.style.display=(isMusic&&_selectedMusicUrl)?'block':'none';
-  if(playlistBtn)playlistBtn.style.display=(isMusic&&!item)?'block':'none';
   // 책: 독서코너와 동일하게 페이지/퍼센트 기록 방식 선택 — 콘텐츠탭 등록 시에도 함께 반영되도록 연동
   const bookUnitRow=document.getElementById('cm-book-unit-row');
   if(bookUnitRow){
@@ -9363,29 +9364,6 @@ function setCmUnit(u){
 }
 function openAppleMusicLink(){
   if(_selectedMusicUrl)window.location.href=_selectedMusicUrl;
-}
-// 이번 달 등록된 음악을 최신 등록순으로 모아 보여주는 팝업. 새 곡 추가 기능 없이 감상/재생 전용.
-function openPlaylistModal(){
-  const mk=_contentCtx?.mk||calMonthKey();
-  closeModal('content-modal'); // 등록 팝업을 먼저 닫아야 바텀시트가 겹쳐 보이지 않음
-  const listEl=document.getElementById('pl-list');
-  const items=getContents(mk).filter(c=>c.cat==='music').sort((a,b)=>(b.created||0)-(a.created||0));
-  if(!items.length){
-    listEl.innerHTML='<div style="text-align:center;font-size:var(--dow-label-size);color:var(--tm);padding:16px 0;">이번 달 등록된 음악이 없어요</div>';
-  }else{
-    listEl.innerHTML='';
-    const musicRgb='160,105,180'; // #8878ab — disc 아이콘과 동일한 라벤더톤
-    items.forEach(item=>{
-      const row=document.createElement('div');row.className='pl-item';
-      const posterHtml=item.poster?`<img class="pl-item-poster" src="${item.poster}" alt="">`:`<div class="pl-item-poster-ph"><i class="ti ti-music" aria-hidden="true"></i></div>`;
-      const hasUrl=!!item.musicUrl;
-      const playStyle=`background:rgba(${musicRgb},.18);border:1px solid rgba(${musicRgb},.45);`;
-      row.innerHTML=`${posterHtml}<div class="pl-item-info"><div class="pl-item-title">${escapeHtml(item.title||'')}</div>${item.author?`<div class="pl-item-sub">${escapeHtml(item.author)}</div>`:''}</div>
-        <div class="pl-item-play${hasUrl?'':' dim'}" style="${playStyle}" ${hasUrl?`onclick="window.location.href='${item.musicUrl.replace(/'/g,"\\'")}'"`:''}><i class="ti ti-player-play-filled" style="color:rgba(${musicRgb},1);" aria-hidden="true"></i></div>`;
-      listEl.appendChild(row);
-    });
-  }
-  openSheet('playlist-modal');
 }
 function setCStatus(status){
   _contentCtx.status=status;
@@ -9437,13 +9415,15 @@ function confirmContent(){
   const poster=_selectedPoster||(_contentCtx.item&&_contentCtx.item.poster)||null;
   const author=_selectedAuthor||(_contentCtx.item&&_contentCtx.item.author)||'';
   const musicUrl=_contentCtx.cat==='music'?(_selectedMusicUrl||(_contentCtx.item&&_contentCtx.item.musicUrl)||null):null;
+  const album=_contentCtx.cat==='music'?(_selectedAlbum||(_contentCtx.item&&_contentCtx.item.album)||null):null;
+  const releaseYear=_contentCtx.cat==='music'?(_selectedReleaseYear||(_contentCtx.item&&_contentCtx.item.releaseYear)||null):null;
   // 드라마(회차)/영화(러닝타임분) 총량 — TMDB 자동 확인값(_selectedTotalUnit) 사용. 기존 진행분(currentUnit)은 유지하되 새 총량보다 크면 총량에 맞춰 보정
   let totalUnit=null,currentUnit=_contentCtx.item?.currentUnit||null;
   if(_contentCtx.cat==='drama'||_contentCtx.cat==='movie'){
     totalUnit=_selectedTotalUnit||null;
     if(totalUnit&&currentUnit&&currentUnit>totalUnit)currentUnit=totalUnit;
   }
-  _selectedPoster=null;_selectedAuthor=null;_selectedMusicUrl=null;_selectedTotalUnit=null;
+  _selectedPoster=null;_selectedAuthor=null;_selectedMusicUrl=null;_selectedTotalUnit=null;_selectedAlbum=null;_selectedReleaseYear=null;
   const newMk=startDate.slice(0,7); // 시작한 달 = 저장 버킷
   const oldMk=_contentCtx.mk;
   if(_contentCtx.mode==='edit'&&_contentCtx.item){
@@ -9452,7 +9432,7 @@ function confirmContent(){
     const idx=_contentCtx.item.cid
       ?oldContents.findIndex(c=>c.cid===_contentCtx.item.cid)
       :oldContents.findIndex(c=>c.created===_contentCtx.item.created);
-    const updated=idx>=0?{...oldContents[idx],title,startDate,endDate,status,review,stars,poster,author,musicUrl,totalUnit,currentUnit}:null;
+    const updated=idx>=0?{...oldContents[idx],title,startDate,endDate,status,review,stars,poster,author,musicUrl,album,releaseYear,totalUnit,currentUnit}:null;
     if(idx>=0){
       if(newMk===oldMk){
         oldContents[idx]=updated;
@@ -9470,7 +9450,7 @@ function confirmContent(){
   } else {
     const contents=getContents(newMk);
     const newCid=genCid();
-    contents.push({cat:_contentCtx.cat,title,startDate,endDate,status,review,stars,poster,author,musicUrl,totalUnit,currentUnit,created:Date.now(),cid:newCid});
+    contents.push({cat:_contentCtx.cat,title,startDate,endDate,status,review,stars,poster,author,musicUrl,album,releaseYear,totalUnit,currentUnit,created:Date.now(),cid:newCid});
     saveContents(newMk,contents);
     if(_contentCtx.onSaved){const cb=_contentCtx.onSaved;_contentCtx.onSaved=null;setTimeout(()=>cb(newCid),0);}
   }
@@ -9837,11 +9817,12 @@ function searchITunes(q,el){
         const title=item.trackName||'';
         const artist=item.artistName||'';
         const date=(item.releaseDate||'').slice(0,4);
+        const album=item.collectionName||'';
         const poster=item.artworkUrl100||null;
         const div=document.createElement('div');div.className='api-result-item';
         div.innerHTML=poster?`<img class="api-result-poster" src="${poster}" alt="">`:`<div class="api-result-poster-placeholder">♩</div>`;
         div.innerHTML+=`<div class="api-result-info"><div class="api-result-title">${title}</div><div class="api-result-sub">${artist}${date?' · '+date:''}</div></div>`;
-        div.addEventListener('click',()=>selectApiResult(title,poster,artist,date,item.trackViewUrl||null));el.appendChild(div);
+        div.addEventListener('click',()=>selectApiResult(title,poster,artist,date,item.trackViewUrl||null,null,album));el.appendChild(div);
       });
       resolve();
     };
@@ -9894,9 +9875,12 @@ async function searchKakaoBook(q,el){
     el.innerHTML='<div class="api-loading">검색 중 오류가 발생했어요</div>';
   }
 }
-function selectApiResult(title,poster,sub1,sub2,musicUrl,tmdbMeta){
+function selectApiResult(title,poster,sub1,sub2,musicUrl,tmdbMeta,album){
   document.getElementById('cm-title').value=title;hideApiResults();
   _selectedPoster=poster;_selectedAuthor=sub1||'';_selectedMusicUrl=musicUrl||null;
+  // album/releaseYear는 음악 검색(searchITunes)에서만 의미 있는 값 — 책(sub2=출판사)·영화(sub2='') 오염 방지
+  _selectedAlbum=(_contentCtx.cat==='music')?(album||null):null;
+  _selectedReleaseYear=(_contentCtx.cat==='music')?(sub2||null):null;
   _selectedTotalUnit=null;
   const preview=document.getElementById('cm-poster-preview');
   if(preview){
