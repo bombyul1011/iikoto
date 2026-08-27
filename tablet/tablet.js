@@ -1087,6 +1087,13 @@ function shiftSelectedWeek(delta){
   renderMiniCal();
   loadWeekTab();
 }
+function goToCurrentWeek(){
+  const d=new Date();
+  _selectedDate=d;
+  _sideCalDate=new Date(d);
+  renderMiniCal();
+  loadWeekTab();
+}
 function shiftSelectedMonth(delta){
   const d=new Date(_selectedDate);
   const day=d.getDate();

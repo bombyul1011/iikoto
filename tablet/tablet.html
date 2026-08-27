@@ -150,6 +150,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .main-hdr{display:flex;align-items:baseline;gap:9px;margin-bottom:14px;}
 .main-hdr-arrow{font-size:var(--fs-body);color:var(--tm);cursor:pointer;align-self:center;padding:2px 4px;flex-shrink:0;opacity:0.55;transition:opacity .15s;}
 .main-hdr-arrow:hover{opacity:1;color:var(--tp);}
+.main-date-jump{cursor:pointer;}
+.main-date-jump:active{opacity:0.7;}
 .main-date{font-size:var(--fs-lg);font-weight:700;color:var(--tp);letter-spacing:-0.02em;font-family:'DM Sans',sans-serif;}
 .main-dow{font-size:var(--fs-sm);color:var(--tm);margin-left:2px;font-weight:500;letter-spacing:0.02em;}
 .main-body{display:none;}
@@ -504,8 +506,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .wra-stat{flex:1;text-align:center;}
 .wra-stat-num{font-size:var(--fs-lg);font-weight:700;color:var(--tp);font-family:'DM Sans',sans-serif;white-space:nowrap;}
 .wra-summary .wra-stat:nth-child(2) .wra-stat-num{font-size:var(--fs-body);}
-.wra-stat-lbl{font-size:10.5px;color:var(--tm);margin-top:2px;}
-.wra-stat-delta{font-size:10.5px;margin-top:2px;font-weight:600;}
+.wra-stat-lbl{font-size:var(--fs-sm);color:var(--tm);margin-top:2px;}
+.wra-stat-delta{font-size:var(--fs-sm);margin-top:2px;font-weight:600;}
 .wra-stat-delta.up{color:rgba(214,90,140,0.85);}
 .wra-stat-delta.down{color:var(--tm);}
 .wra-stat-delta.flat{color:var(--tm);}
@@ -1134,7 +1136,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
     <!-- 주간탭 -->
     <div class="main-body" id="tab-week">
-      <div class="main-hdr"><i class="ti ti-chevron-left main-hdr-arrow" onclick="shiftSelectedWeek(-1)" aria-hidden="true"></i><span class="main-date" id="week-range"></span><i class="ti ti-chevron-right main-hdr-arrow" onclick="shiftSelectedWeek(1)" aria-hidden="true"></i></div>
+      <div class="main-hdr"><i class="ti ti-chevron-left main-hdr-arrow" onclick="shiftSelectedWeek(-1)" aria-hidden="true"></i><span class="main-date main-date-jump" id="week-range" onclick="goToCurrentWeek()"></span><i class="ti ti-chevron-right main-hdr-arrow" onclick="shiftSelectedWeek(1)" aria-hidden="true"></i></div>
       <div class="grid2">
         <div class="card goal-hcard"><div class="card-lbl"><i class="ti ti-flag-3" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>이번 주 목표</div><div id="week-goals"></div></div>
         <div class="card"><div class="card-lbl"><i class="ti ti-chart-donut" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>주간 습관 현황</div><div id="week-habit-matrix"></div></div>
