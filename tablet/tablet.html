@@ -717,6 +717,12 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .mrp-card{background:var(--card);border:1px solid var(--card-b);border-radius:15px;padding:18px 20px;box-shadow:0 2px 14px rgba(0,0,0,0.05);min-width:0;}
 .mrp-card-title{font-size:var(--fs-title);font-weight:600;color:var(--tp);margin-bottom:13px;display:flex;align-items:center;gap:7px;}
 .mrp-card-title i{font-size:var(--fs-lg);}
+.mrp-card-title-total{font-size:var(--fs-sm);font-weight:600;color:var(--ts);}
+/* 카드 제목과 탭(rd-tabs)을 한 줄에 좌우로 배치 — 이 달의 콘텐츠 카드처럼 제목 옆에 탭 전환이 필요한 경우 */
+.mrp-card-title-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:13px;}
+.mrp-card-title-row .mrp-card-title{margin-bottom:0;}
+.mrp-contents-tabs{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.mrp-contents-tabs .rd-tab{flex:none;padding:5px 10px;font-size:var(--fs-xs);}
 /* 옆 카드(이 달의 목표)와 높이를 맞출 때, 내용이 한 줄뿐이라 제목 바로 아래로 쏠려 보이는 카드용 —
    제목은 그대로 위에 두고, 그 아래 남는 공간의 세로 중앙에 내용을 배치(2026-08-22, 이 달의 숫자 카드에 적용). */
 .mrp-card-vcenter{display:flex;flex-direction:column;}
@@ -790,6 +796,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .mrsl-cmp-val.up{color:#5a9a7a;}
 .mrsl-cmp-val.down{color:#c0788a;}
 .mrsl-cmp-val.flat{color:var(--tm);}
+/* 이 달의 콘텐츠 전월대비 뷰 — mrsl-cmp 패턴 재사용, 라벨에 카테고리 아이콘이 들어가 폭만 살짝 넓힘 */
+#mrp-contents-cmp{display:flex;flex-direction:column;gap:11px;padding:4px 0;}
+#mrp-contents-cmp .mrsl-cmp-row{justify-content:space-between;}
+#mrp-contents-cmp .mrsl-cmp-label{width:auto;display:flex;align-items:center;font-size:var(--fs-sm);}
+#mrp-contents-cmp .mrsl-cmp-val{font-size:var(--fs-sm);}
 .mrsl-stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding-top:16px;border-top:1px solid rgba(var(--divider-rgb),0.25);}
 .mrsl-stat{text-align:center;}
 .mrsl-stat .v{font-size:var(--fs-xl);font-weight:700;color:var(--tp);font-family:'DM Sans',sans-serif;}
@@ -809,15 +820,20 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .mrp-wc-line .txt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .mrp-wc-line .pct{color:var(--tp);font-weight:600;flex-shrink:0;margin-left:8px;}
 
-.mrp-content-line{display:flex;align-items:center;justify-content:space-between;font-size:var(--fs-body);color:var(--tp);padding:5px 0;border-bottom:1px dashed rgba(var(--divider-rgb),0.2);}
-.mrp-content-line:last-child{border-bottom:none;}
+.mrp-content-line{display:flex;align-items:center;justify-content:space-between;font-size:var(--fs-body);color:var(--tp);padding:5px 0;}
 .mrp-content-line .dot{width:7px;height:7px;border-radius:2px;margin-right:7px;flex-shrink:0;}
 .mrp-content-line .st{color:var(--tm);font-size:var(--fs-sm);flex-shrink:0;margin-left:8px;}
-.mrp-content-group{margin-bottom:10px;}
+/* 항목 사이 점선은 없애고, 카테고리 그룹이 바뀌는 경계에만 구분선 — 그룹 위쪽에 선을 주고 첫 그룹은 제외 */
+.mrp-content-group{margin-bottom:10px;padding-top:10px;border-top:1px dashed rgba(var(--divider-rgb),0.2);}
+.mrp-content-group:first-child{padding-top:0;border-top:none;}
 .mrp-content-group:last-child{margin-bottom:0;}
 .mrp-content-group-head{display:flex;align-items:center;gap:5px;font-size:var(--fs-sm);font-weight:600;color:var(--ts);padding:4px 0;}
 .mrp-content-group-head i{font-size:13px;}
 .mrp-content-group-count{color:var(--tm);font-weight:400;margin-left:2px;}
+.mrp-content-group-time-wrap{display:flex;align-items:center;gap:7px;margin-left:auto;}
+.mrp-content-group-time-bar-wrap{width:52px;height:5px;border-radius:3px;background:var(--graph-track-color);overflow:hidden;flex-shrink:0;}
+.mrp-content-group-time-bar{height:100%;border-radius:3px;}
+.mrp-content-group-time-val{font-size:var(--fs-sm);color:var(--ts);font-weight:400;white-space:nowrap;}
 .mrp-content-group .mrp-content-line{padding-left:2px;}
 /* 콘텐츠 카드만 다른 카드들과 톤을 다르게 — 통계가 아니라 감상 기록이라는 인상 */
 .mrp-contents-card{background:linear-gradient(135deg,#fdeee8,#fdf3e2)!important;border-color:rgba(230,200,180,0.4)!important;}

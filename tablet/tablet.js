@@ -1991,6 +1991,57 @@ async function renderMonthStatBar(y,mo,habitsData){
   });
 }
 
+// 이 달의 감상 시간 계산 — 드라마/독서는 리듬(enjoy) 기록만 합산, 영화는 작품 단위로 "이번 달 리듬 기록이
+// 하나라도 있으면 실측 합산, 전혀 없으면(등록만 하고 감상 타이머를 안 쓴 경우) 완결 러닝타임(total_unit)을
+// 그 한 번만 대체 가산" — 오늘탭(renderTodayReading)의 fallback 판단 기준을 월 단위로 그대로 확장한 것.
+// 음악은 애초에 시간 데이터가 없어 집계에서 제외.
+// 월간리포트 "이 달의 콘텐츠"(renderMrpContents)가 쓰는 계산 헬퍼.
+function _calcWatchTimeByCat(rblocks,contents){
+  // enjoy 블록을 텍스트 접두어로 드라마/영화/독서 재분류 후 작품별로 합산(하루에 나눠봐도 합쳐짐).
+  const durByTitle={drama:{},movie:{},book:{}};
+  (rblocks||[]).forEach(b=>{
+    if(b.cat!=='enjoy'||!b.text||!b.start_time||!b.end_time)return;
+    let cat=null,title=null;
+    if(b.text.startsWith('드라마 - ')){cat='drama';title=b.text.slice(6);}
+    else if(b.text.startsWith('영화 - ')){cat='movie';title=b.text.slice(5);}
+    else if(b.text.startsWith('독서 - ')){cat='book';title=b.text.slice(5);}
+    else return;
+    const s=_paceParseHM(b.start_time),e=_paceParseHM(b.end_time);
+    if(isNaN(s)||isNaN(e))return;
+    let mins=e-s;if(mins<0)mins+=1440;
+    if(mins<=0)return;
+    durByTitle[cat][title]=(durByTitle[cat][title]||0)+mins;
+  });
+
+  let dramaMin=0;
+  Object.values(durByTitle.drama).forEach(m=>{dramaMin+=m;});
+  let bookMin=0;
+  Object.values(durByTitle.book).forEach(m=>{bookMin+=m;});
+
+  // 영화 — 이번 달 대상 영화 목록(드라마/독서와 달리 리듬 기록이 아예 없는 작품도 total_unit으로
+  // 잡아야 하므로, 리듬 블록이 아니라 contents.content_cat==='movie'를 기준으로 작품 목록을 만든다.
+  let movieMin=0,movieMeasuredCount=0,movieEstimatedCount=0;
+  const movieTitlesSeen=new Set();
+  (contents||[]).filter(c=>c.content_cat==='movie'&&c.title).forEach(c=>{
+    if(movieTitlesSeen.has(c.title))return; // 같은 제목 중복 등록 방지(재감상 등은 현재 구조상 구분 안 함)
+    movieTitlesSeen.add(c.title);
+    const measured=durByTitle.movie[c.title];
+    if(measured){
+      movieMin+=measured;
+      movieMeasuredCount++;
+    }else if(c.status==='done'&&c.total_unit){
+      movieMin+=c.total_unit;
+      movieEstimatedCount++;
+    }
+  });
+
+  return {
+    drama:dramaMin,movie:movieMin,book:bookMin,
+    total:dramaMin+movieMin+bookMin,
+    movieMeasuredCount,movieEstimatedCount
+  };
+}
+
 // 신규: 이번 달 수집한 문장(reading_quotes) — created 타임스탬프 기준, 책 단위로 그룹핑
 async function renderMonthQuotes(y,mo){
   const el=document.getElementById('month-quotes');
@@ -2737,7 +2788,7 @@ async function loadMonthlyReportPage(){
   const prevStartDk=`${prevMk}-01`,prevEndDk=`${prevMk}-${pad(prevDim)}`;
   const prevWeeksInMonth=getReportWeeksOfMonth(py,pmo);
 
-  const [monthlyRows,goalRows,todos,memosRows,sleepRows,habits,habitChecksAll,rblocks,prevRblocks,contents,wcRowsList,milestoneRows,prevWcRowsList,prevTodos,prevSleepRows,prevHabitChecksAll,trajectoryRows,sleepReportCacheRows,weeklySummaryRowsList,weeklyMemoRowsList,prevMemosRows]=await Promise.all([
+  const [monthlyRows,goalRows,todos,memosRows,sleepRows,habits,habitChecksAll,rblocks,prevRblocks,contents,prevContents,wcRowsList,milestoneRows,prevWcRowsList,prevTodos,prevSleepRows,prevHabitChecksAll,trajectoryRows,sleepReportCacheRows,weeklySummaryRowsList,weeklyMemoRowsList,prevMemosRows]=await Promise.all([
     supaFetch(`ai_cache?cache_key=eq.monthly_report_${mk}&select=content`),
     supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('mgoal:'+mk)}`),
     supaFetch(`todos?date_key=gte.${startDk}&date_key=lte.${endDk}&select=done,date_key`),
@@ -2747,9 +2798,10 @@ async function loadMonthlyReportPage(){
     supaFetch(`habit_checks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
     supaFetch(`rhythm_blocks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
     supaFetch(`rhythm_blocks?date_key=gte.${prevStartDk}&date_key=lte.${prevEndDk}`),
-    // 이달의 콘텐츠(renderMrpContents)에만 쓰이는 데이터 — 이전엔 동일 쿼리를 prevContents로
-    // 한 번 더 조회했으나 실제로 어디서도 쓰이지 않는 죽은 변수였음(제거).
+    // 이달의 콘텐츠(renderMrpContents) 전용 데이터 — 이번 달 목록/시간 집계용 contents와
+    // 전월대비(renderMrpContentsCmp) 비교용 전월 contents를 함께 조회.
     supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&order=created.desc&limit=200`),
+    supaFetch(`contents?month_key=eq.${prevMk}`),
     Promise.all(weeksInMonth.map(wk=>supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wchallenge_week:'+wk)}`))),
     supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent('monthly_milestones_'+mk)}&select=content`),
     Promise.all(prevWeeksInMonth.map(wk=>supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wchallenge_week:'+wk)}`))),
@@ -2777,7 +2829,7 @@ async function loadMonthlyReportPage(){
   renderMrpRhythm(rblocks||[],prevRblocks||[]);
   renderMrpMilestones(mk,rblocks||[],prevRblocks||[],weeksInMonth,wcRowsList||[],milestoneRows&&milestoneRows[0],prevWcRowsList||[],heroCommentText,monthlyRefContext);
   renderMrpWeeklyMissions(weeksInMonth,wcRowsList||[]);
-  renderMrpContents(contents||[],startDk,endDk);
+  renderMrpContents(contents||[],startDk,endDk,rblocks||[],prevContents||[],prevRblocks||[]);
   renderMrpReportLinks(weeksInMonth,mk);
 }
 
@@ -2853,7 +2905,17 @@ function renderMrpHero(row){
       </div>
       <div class="mrp-grid2">
         <div class="mrp-card"><div class="mrp-card-title"><i class="ti ti-flag-3" style="color:rgba(210,175,225,1);" aria-hidden="true"></i>주간 미션 모음</div><div id="mrp-missions"></div></div>
-        <div class="mrp-card mrp-contents-card"><div class="mrp-card-title"><i class="ti ti-book" style="color:rgba(178,60,105,0.75);" aria-hidden="true"></i>이 달의 콘텐츠</div><div id="mrp-contents"></div></div>
+        <div class="mrp-card mrp-contents-card">
+          <div class="mrp-card-title-row">
+            <div class="mrp-card-title"><i class="ti ti-book" style="color:rgba(178,60,105,0.75);" aria-hidden="true"></i>이 달의 콘텐츠</div>
+            <div class="rd-tabs mrp-contents-tabs" id="mrp-contents-tabs">
+              <div class="rd-tab on" data-view="list" onclick="switchMrpContentsView(this,'list')">목록</div>
+              <div class="rd-tab" data-view="cmp" onclick="switchMrpContentsView(this,'cmp')">전월대비</div>
+            </div>
+          </div>
+          <div id="mrp-contents"></div>
+          <div id="mrp-contents-cmp" style="display:none;"></div>
+        </div>
       </div>
       <div class="mrp-links-wrap"><div id="mrp-report-links"></div></div>
     `;
@@ -3434,18 +3496,61 @@ function renderMrpWeeklyMissions(weeksInMonth,wcRowsList){
   el.innerHTML=blocks.length?blocks.join(''):'<div class="empty-msg">이 달엔 작성한 주간 미션이 없어요</div>';
 }
 
-function renderMrpContents(contents,startDk,endDk){
+// 이 달의 콘텐츠 — 전월대비 뷰. 수면 카드(renderMrpSleep)의 "지난달 대비" 비교 UI(mkCmpRow)를
+// 그대로 이식 — 카테고리별(드라마/영화/독서)로 이번 달 vs 지난달 감상 시간을 증감 표시.
+// 음악은 시간 데이터가 없어 제외.
+function renderMrpContentsCmp(t,prevContents,prevRblocks){
+  const el=document.getElementById('mrp-contents-cmp');
+  if(!el)return;
+  const prevT=_calcWatchTimeByCat(prevRblocks||[],prevContents||[]);
+  if(prevT.total<=0){
+    el.innerHTML='<div class="empty-msg" style="text-align:left;">지난달 기록이 없어 비교를 생략했어요</div>';
+    return;
+  }
+  const mkCmpRow=(label,icon,color,curMin,prevMin)=>{
+    const diff=curMin-prevMin;
+    const dir=diff>0?'up':(diff<0?'down':'flat');
+    const arrow=dir==='up'?'ti-arrow-up':(dir==='down'?'ti-arrow-down':'ti-minus');
+    const sign=diff>0?'+':(diff<0?'-':'');
+    return `<div class="mrsl-cmp-row">
+      <span class="mrsl-cmp-label"><i class="ti ${icon}" style="color:${color};font-size:13px;margin-right:4px;" aria-hidden="true"></i>${label}</span>
+      <span class="mrsl-cmp-val ${dir}"><i class="ti ${arrow}" style="font-size:11px;"></i>${sign}${_fmtDur(Math.abs(diff))}</span>
+    </div>`;
+  };
+  const rows=[
+    {cat:'drama',label:'드라마',icon:'ti-device-tv',color:'rgba(var(--pal-pink-rgb),1)',cur:t.drama,prev:prevT.drama},
+    {cat:'movie',label:'영화',icon:'ti-movie',color:'rgba(var(--pal-sky-rgb),1)',cur:t.movie,prev:prevT.movie},
+    {cat:'book',label:'독서',icon:'ti-book',color:'rgba(var(--pal-yellow-rgb),1)',cur:t.book,prev:prevT.book}
+  ].filter(r=>r.cur>0||r.prev>0);
+  if(!rows.length){el.innerHTML='<div class="empty-msg" style="text-align:left;">이 달·지난달 모두 감상 기록이 없어요</div>';return;}
+  el.innerHTML=rows.map(r=>mkCmpRow(r.label,r.icon,r.color,r.cur,r.prev)).join('');
+}
+
+function renderMrpContents(contents,startDk,endDk,rblocks,prevContents,prevRblocks){
   const el=document.getElementById('mrp-contents');
   const inRange=contents.filter(c=>{
     if(c.content_cat==='music')return c.start_date&&c.start_date>=startDk&&c.start_date<=endDk;
     if(c.status!=='done'&&c.status!=='stopped')return false;
     return c.end_date&&c.end_date>=startDk&&c.end_date<=endDk;
   });
+  // 탭 행(카드 제목 옆) 총 감상 시간 — _calcWatchTimeByCat은 완결 여부와 무관하게 이번 달 등록된 movie
+  // 전체를 기준으로 실측/러닝타임 fallback을 판단하므로, inRange(완결·정지만) 대신 contents 전체를 넘김.
+  const t=_calcWatchTimeByCat(rblocks||[],contents||[]);
+  const tabsEl=document.getElementById('mrp-contents-tabs');
+  if(tabsEl){
+    const existing=tabsEl.querySelector('.mrp-card-title-total');
+    if(existing)existing.remove();
+    if(t.total>0)tabsEl.insertAdjacentHTML('afterbegin',`<span class="mrp-card-title-total">${_fmtDur(t.total)}</span>`);
+  }
+  // 전월대비 뷰 — 수면 카드(renderMrpSleep)의 mkCmpRow 패턴을 그대로 재사용.
+  renderMrpContentsCmp(t,prevContents,prevRblocks);
   if(!inRange.length){el.innerHTML='<div class="empty-msg">이 달엔 기록한 콘텐츠가 없어요</div>';return;}
   // 카테고리(드라마/책/영화/음악) 순서 고정 그룹핑 — 그룹 내부는 기존처럼 최신순 유지
   const CAT_ORDER=['drama','book','movie','music'];
   const groups={};
   inRange.forEach(c=>{(groups[c.content_cat]=groups[c.content_cat]||[]).push(c);});
+  const timeByCat={drama:t.drama,movie:t.movie,book:t.book};
+  const maxCatMin=Math.max(t.drama,t.movie,t.book,1); // 그룹간 미니바 길이를 서로 비교 가능하게 같은 축(최댓값) 기준으로 정규화
   const html=CAT_ORDER.filter(cat=>groups[cat]&&groups[cat].length).map(cat=>{
     const meta=CAT_ICON_META[cat]||{icon:'ti-stack-2',bg:'rgba(150,150,150,1)',iconColor:'#fff',label:cat};
     const lines=groups[cat].slice(0,30).map(c=>`
@@ -3453,8 +3558,10 @@ function renderMrpContents(contents,startDk,endDk){
         <span style="display:flex;align-items:center;min-width:0;overflow:hidden;"><span class="dot" style="background:${_mrpCatDotColor(c.content_cat)};"></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.title||'')}</span></span>
         <span class="st">${_mrpStatusLabel(c)}</span>
       </div>`).join('');
+    const catMin=timeByCat[cat]||0;
+    const timeHtml=catMin>0?`<div class="mrp-content-group-time-wrap"><div class="mrp-content-group-time-bar-wrap"><div class="mrp-content-group-time-bar" style="width:${Math.round(catMin/maxCatMin*100)}%;background:${meta.bg};"></div></div><span class="mrp-content-group-time-val">${_fmtDur(catMin)}</span></div>`:'';
     return `<div class="mrp-content-group">
-      <div class="mrp-content-group-head"><i class="ti ${meta.icon}" style="color:${meta.bg};" aria-hidden="true"></i><span>${meta.label}</span><span class="mrp-content-group-count">${groups[cat].length}</span></div>
+      <div class="mrp-content-group-head"><i class="ti ${meta.icon}" style="color:${meta.bg};" aria-hidden="true"></i><span>${meta.label}</span><span class="mrp-content-group-count">${groups[cat].length}</span>${timeHtml}</div>
       ${lines}
     </div>`;
   }).join('');
@@ -3468,6 +3575,14 @@ function renderMrpReportLinks(weeksInMonth,mk){
     return `<div class="mrp-link-card" onclick="openReportPanel('weekly_summary_${sundayDk}','${idx+1}주차 주간종합 리포트')"><i class="ti ti-sparkles" style="font-size:12px;color:var(--pal-lavender-border);" aria-hidden="true"></i><span class="wk">${idx+1}주차</span><span class="range">${_weekRangeLabel(wk)}</span></div>`;
   });
   el.innerHTML=cards.length?`<div class="mrp-links-grid">${cards.join('')}</div>`:'<div class="empty-msg">이 달엔 발행된 주간 리포트가 없어요</div>';
+}
+
+// 이 달의 콘텐츠 카드 — 목록/전월대비 탭 전환(기존 note-tl-subtabs와 동일 패턴)
+function switchMrpContentsView(btn,view){
+  document.querySelectorAll('#mrp-contents-tabs .rd-tab').forEach(t=>t.classList.remove('on'));
+  btn.classList.add('on');
+  document.getElementById('mrp-contents').style.display=view==='list'?'':'none';
+  document.getElementById('mrp-contents-cmp').style.display=view==='cmp'?'':'none';
 }
 
 // ══════════════════════════════════════════════════════════
