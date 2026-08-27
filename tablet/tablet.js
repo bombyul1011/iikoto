@@ -1113,7 +1113,7 @@ async function loadWeekTab(){
 
   const [goalRows,habits,habitChecks,memos,todos,sleepRows,onelineRows,contents,
     lwMemos,lwTodos,lwSleepRows,lwHabitChecks,rblocksFull,sleepReportRows,
-    rblocksLast,weekMemoTexts,readingBook,readingLogRows]=await Promise.all([
+    rblocksLast,weekMemoTexts,weekOnelineTexts,readingBook,readingLogRows]=await Promise.all([
     supaFetch(`goal_notes?note_key=eq.wchallenge_${encodeURIComponent(wk)}`),
     supaFetch(`habits?order=sort_order.asc`),
     supaFetch(`habit_checks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
@@ -1142,6 +1142,9 @@ async function loadWeekTab(){
     supaFetch(`rhythm_blocks?date_key=gte.${lastStartDk}&date_key=lte.${lastCmpEndDk}`),
     // 이번 주 키워드용 메모 원문 — 롤링 7일(오늘 제외, kwStartDk~kwEndDk)
     supaFetch(`memos?date_key=gte.${kwStartDk}&date_key=lte.${kwEndDk}&select=date_key,text`),
+    // 이번 주 키워드 카드에 하루한줄도 메모와 같은 역할로 포함 — 같은 롤링 7일(오늘 제외) 범위로 별도 조회.
+    // 캘린더 주 범위(onelineRows, 하루한줄 배너용)와는 범위가 달라 재사용하지 않음(2026-08-27).
+    supaFetch(`goal_notes?note_key=gte.oneline:${kwStartDk}&note_key=lte.oneline:${kwEndDk}`),
     // 이번 주 독서용 — 현재 읽고 있는 책 1권 + 스트릭 계산용 최근 90일 독서 기록
     supaFetch(`reading_books?status=eq.reading&limit=1`),
     supaFetch(`reading_daily_log?date_key=gte.${rdStreakStartDk}&select=date_key`)
@@ -1161,7 +1164,7 @@ async function loadWeekTab(){
   });
   renderWeekRhythmFlow(rblocksThis||[],rblocksLast||[],cmpDayCount);
   renderWeekOneline(onelineRows||[],weekDates);
-  renderWeekKeywords(weekMemoTexts||[]);
+  renderWeekKeywords(weekMemoTexts||[],weekOnelineTexts||[]);
   renderWeekReading(contents||[],readingBook&&readingBook[0],readingLogRows||[],startDk,endDk);
 }
 
@@ -1361,6 +1364,7 @@ const WEEK_KW_STOPWORDS=new Set([
   '아침','오후','저녁','새벽','점심','밤','낮', // 매일 습관처럼 시간대로 문장을 시작해 키워드로서 의미 없음
   '이번주','지난주','다음주','이번달','지난달','다음달','오늘부터','요즘','최근', // 시간대와 같은 이유로 매번 습관적으로 붙는 기간 표현
   '많이','조금씩','살짝','잠깐','잠시','계속','자꾸','거의','늘','항상','가끔','종종','벌써','이미','아마',
+  '일찍','한번','한번씩','다시한번','좀더','조금더', // 빈도부사/횟수표현 — 문장 어디에나 붙는 습관적 수식어(2026-08-27 추가)
   '되게','엄청','완전히','확실히','일단','우선','제법','꽤','상당히' // 문장 어디에나 습관적으로 붙어 키워드로서 의미 없는 부사류(2026-08-27 추가)
 ]);
 // 접속부사류 — 조사 제거 규칙보다 먼저 원본 형태로 걸러야 함. 예: "그래도"가 조사 "도"만 벗겨지면
@@ -1405,13 +1409,15 @@ function _weekKwTokenize(text){
 // 카드 영역을 단어 개수만큼 칸으로 나눈 뒤 각 칸 안에서만 무작위 오프셋을 주는 방식(카드형 배치가 자연스럽게 불규칙해 보임).
 // 빈도 1위일수록 글자 크기를 크게, 팔레트 색상을 순환시켜 단조롭지 않게 함.
 const WEEK_KW_COLORS=['var(--pal-pink-text)','var(--pal-orange-text)','var(--pal-mint-text)','var(--pal-sky-text)','var(--pal-lavender-text)'];
-function renderWeekKeywords(memoRows){
+function renderWeekKeywords(memoRows,onelineRows){
   const el=document.getElementById('week-keywords');
   if(!el)return;
   // 쿼리 자체가 이미 "오늘 제외 롤링 7일"(kwStartDk~kwEndDk) 범위라 여기서 추가 필터링 불필요.
-  const rows=memoRows||[];
-  if(!rows.length){el.innerHTML='<div class="empty-msg">최근 메모가 없어요</div>';return;}
-  const allText=rows.map(m=>m.text||'').join(' ');
+  const memoText=(memoRows||[]).map(m=>m.text||'').join(' ');
+  // 하루한줄도 메모와 같은 역할로 집계에 포함 — goal_notes는 note_key당 lines 배열 구조라 첫 줄만 사용(renderWeekOneline과 동일 파싱).
+  const onelineText=(onelineRows||[]).map(r=>Array.isArray(r.lines)?(r.lines[0]||''):(r.lines||'')).join(' ');
+  const allText=(memoText+' '+onelineText).trim();
+  if(!allText){el.innerHTML='<div class="empty-msg">최근 메모가 없어요</div>';return;}
   const tokens=_weekKwTokenize(allText);
   const freq={};
   tokens.forEach(t=>{freq[t]=(freq[t]||0)+1;});
