@@ -4444,27 +4444,7 @@ function renderYrHabitTab(ctx){
   el.innerHTML=`<div class="habit-flow">${rowsHtml}</div>`;
 
   renderYrHabitScore(ctx,habitStats);
-  renderYrHabitLineChart(ctx,habitStats);
   renderYrHabitInsights(ctx,habitStats);
-}
-
-// 습관별 월간 달성률 라인차트 — 흐름표(히트맵)와 같은 기간, 습관 고유색(h.color)으로 구분.
-// 히트맵이 공백/패턴 파악용이라면 이쪽은 "오르는지 내리는지"를 직접 비교하는 용도.
-function renderYrHabitLineChart(ctx,habitStats){
-  const el=document.getElementById('yr-habit-linechart');
-  if(!el)return;
-  if(ctx.elapsedMonths<2){el.innerHTML='';return;}
-  const series=ctx.habits.map((h,i)=>({
-    values:habitStats[i].seq,
-    color:YR_HABIT_COLOR_MAP[h.color]||'var(--tm)',
-    label:h.name
-  }));
-  const xLabels=Array.from({length:ctx.elapsedMonths},(_,m)=>`${m+1}월`);
-  el.innerHTML=`
-    <div class="card">
-      <div class="card-lbl">습관별 월간 달성률 추이</div>
-      ${_yrLineChartHTML(series,xLabels,{height:140,scale:'zero'})}
-    </div>`;
 }
 
 // 전체 평균 달성률 큰 숫자 + 가장 안정적인(표준편차 최소) 습관 — 습관탭 인트로 아래 첫 배너
@@ -4533,7 +4513,7 @@ function renderYrHabitInsights(ctx,habitStats){
         <div class="habit-insight-tag">NEEDS CARE</div>
         <div class="habit-insight-number">${needsCare.overallPct}<span>%</span></div>
         <div class="habit-insight-title">${escapeHtml(needsCare.name)}</div>
-        <p>가장 낮은 달성률이에요. 유지력과 비교해 어느 정도 거리감인지 아래에서 볼 수 있어요.</p>
+        <p>${ctx.habits.length}개 습관 중 가장 낮은 달성률이에요. 조금 더 관심이 필요해 보여요.</p>
         ${careSpark}
       </div>
     </div>`;
@@ -4542,6 +4522,109 @@ function renderYrHabitInsights(ctx,habitStats){
 // ══════════════════════════════════════════════════════════
 // 콘텐츠 — 분기(Q1~Q4)별 소비량, 전분기 대비
 // ══════════════════════════════════════════════════════════
+
+// rhythm_blocks에서 드라마/독서/영화 감상시간(분)을 월별로 집계 — renderTodayReading(오늘탭)과 동일 기준:
+// cat==='enjoy'이고 텍스트가 "드라마 - "/"독서 - "/"영화 - "로 시작하는 블록만 대상, start~end 차이를 합산.
+// 영화는 오늘탭과 동일한 이중 규칙 적용 — 리듬 기록이 있으면 그 시간 우선, 없으면(리듬 기록 없이 콘텐츠탭에만
+// 등록·완결한 영화) contents.total_unit(러닝타임, 분)을 종료월(end_date 기준)에 대체로 카운트.
+// 음악은 감상시간 개념이 없어(등록일만 존재) 애초에 제외 — 기존 콘텐츠 비교 전반의 규칙과 동일.
+function _yrContentMinutesByMonth(rblocks,contents,mk){
+  const sums={drama:0,book:0,movie:0};
+  const movieTitlesWithRhythm=new Set();
+  (rblocks||[]).forEach(b=>{
+    if(b.cat!=='enjoy'||!b.text||!b.start_time||!b.end_time)return;
+    if(!b.date_key||!b.date_key.startsWith(mk))return;
+    let cat=null;
+    if(b.text.startsWith('드라마 - '))cat='drama';
+    else if(b.text.startsWith('독서 - '))cat='book';
+    else if(b.text.startsWith('영화 - ')){cat='movie';movieTitlesWithRhythm.add(b.text.slice(5));}
+    else return;
+    const s=_paceParseHM(b.start_time),e=_paceParseHM(b.end_time);
+    let mins=e-s;if(mins<0)mins+=1440;
+    sums[cat]+=mins;
+  });
+  // 완결 영화 중 이 달에 종료됐고, 같은 달 리듬 기록이 없는 것만 러닝타임으로 대체(오늘탭과 동일 우선순위)
+  (contents||[]).forEach(c=>{
+    if(c.content_cat!=='movie'||c.status!=='done'||!c.total_unit)return;
+    if(!c.end_date||!c.end_date.startsWith(mk))return;
+    if(movieTitlesWithRhythm.has(c.title))return;
+    sums.movie+=c.total_unit;
+  });
+  return sums;
+}
+
+const YR_CONTENT_TIME_CATS=[
+  {key:'book',label:'책',color:'rgba(var(--pal-yellow-rgb),0.85)'},
+  {key:'drama',label:'드라마',color:'rgba(var(--pal-pink-rgb),0.85)'},
+  {key:'movie',label:'영화',color:'rgba(var(--pal-sky-rgb),0.85)'}
+];
+
+// 이번달 / 지난달 / 그 이전 평균(전전월~시작월) — 3줄 고정, 개월이 아무리 쌓여도 화면 폭이 늘지 않음.
+// "지난달과 비교해 지금 뭘 더 보고 있나"를 즉시 보여주는 목적이라 라인차트 대신 가로 비중 막대 선택(2026-08).
+function renderYrContentTimeCompare(ctx){
+  const el=document.getElementById('yr-content-time-compare');
+  if(!el)return;
+  const curM=ctx.elapsedMonths-1; // 0-indexed 이번 달
+  if(curM<0){el.innerHTML='';return;}
+
+  const mkOf=m=>`${ctx.y}-${pad(m+1)}`;
+  const curSums=_yrContentMinutesByMonth(ctx.rblocks,ctx.contents,mkOf(curM));
+  const prevSums=curM>=1?_yrContentMinutesByMonth(ctx.rblocks,ctx.contents,mkOf(curM-1)):null;
+
+  let earlierSums=null;
+  if(curM>=2){
+    earlierSums={drama:0,book:0,movie:0};
+    let monthCount=0;
+    for(let m=0;m<=curM-2;m++){
+      const s=_yrContentMinutesByMonth(ctx.rblocks,ctx.contents,mkOf(m));
+      YR_CONTENT_TIME_CATS.forEach(({key})=>{earlierSums[key]+=s[key];});
+      monthCount++;
+    }
+    if(monthCount>0)YR_CONTENT_TIME_CATS.forEach(({key})=>{earlierSums[key]=earlierSums[key]/monthCount;});
+  }
+
+  const rowOf=(label,sums,sub)=>{
+    if(!sums)return '';
+    const total=YR_CONTENT_TIME_CATS.reduce((s,{key})=>s+sums[key],0);
+    if(!total)return `<div class="yr-ctc-row"><div class="yr-ctc-row-lbl">${label}${sub?`<span class="yr-ctc-row-sub">${sub}</span>`:''}</div><div class="yr-ctc-empty">기록 없음</div></div>`;
+    const segsHtml=YR_CONTENT_TIME_CATS.map(({key,color})=>{
+      const pct=Math.round(sums[key]/total*100);
+      return pct>0?`<div class="yr-ctc-seg" style="width:${pct}%;background:${color};"></div>`:'';
+    }).join('');
+    return `<div class="yr-ctc-row">
+      <div class="yr-ctc-row-lbl">${label}${sub?`<span class="yr-ctc-row-sub">${sub}</span>`:''}</div>
+      <div class="yr-ctc-bar">${segsHtml}</div>
+    </div>`;
+  };
+
+  const rowsHtml=[
+    rowOf('이번달',curSums),
+    prevSums?rowOf('지난달',prevSums):'',
+    earlierSums?rowOf('이전 평균',earlierSums,`${curM-1}개월 평균`):''
+  ].join('');
+
+  const legendHtml=YR_CONTENT_TIME_CATS.map(({label,color})=>
+    `<div class="chart-legend-item"><span class="chart-legend-dot" style="background:${color}"></span>${label}</div>`
+  ).join('');
+
+  // 이번달·지난달·이전평균 전부 감상시간 0이면 빈 상태 문구로 대체
+  const allEmpty=YR_CONTENT_TIME_CATS.every(({key})=>!curSums[key])
+    &&(!prevSums||YR_CONTENT_TIME_CATS.every(({key})=>!prevSums[key]))
+    &&(!earlierSums||YR_CONTENT_TIME_CATS.every(({key})=>!earlierSums[key]));
+  if(allEmpty){
+    el.innerHTML='<div class="empty-msg">감상 시간 기록이 부족해요</div>';
+    return;
+  }
+
+  el.innerHTML=`
+    <div class="bento-item bento-full">
+      <div class="bento-lbl">월별 콘텐츠 시간 비중</div>
+      <div class="bento-sub" style="margin-top:0;margin-bottom:12px;">책·드라마·영화에 쓴 시간의 비중을 비교해요.</div>
+      <div class="yr-ctc-wrap">${rowsHtml}</div>
+      <div class="chart-legend" style="margin-top:10px;">${legendHtml}</div>
+    </div>`;
+}
+
 function renderYrContentTab(ctx){
   const inRange=_mrpContentsInRange(ctx.contents,`${ctx.y}-01-01`,`${ctx.y}-12-31`);
   const totalCount=countContentsCompletedInRange(ctx.contents,`${ctx.y}-01-01`,`${ctx.y}-12-31`);
@@ -4549,117 +4632,11 @@ function renderYrContentTab(ctx){
   const introSubEl=document.getElementById('yr-content-intro-sub');
   if(introSubEl)introSubEl.textContent=`누적 ${totalCount}개의 콘텐츠, 그 흐름을 분석합니다.`;
 
-  const el=document.getElementById('yr-content-quarters');
-  const curMonth=(ctx.elapsedMonths-1);
-  const quarters=listQuartersUpTo(ctx.y,curMonth);
-
-  const countsByQ=quarters.map(({q,isFuture})=>{
-    if(isFuture)return null;
-    const {startMonth,endMonth}=quarterRangeOf(ctx.y,q);
-    const sDk=`${ctx.y}-${pad(startMonth+1)}-01`;
-    const eDk=`${ctx.y}-${pad(endMonth+1)}-${pad(new Date(ctx.y,endMonth+1,0).getDate())}`;
-    return countContentsCompletedInRange(ctx.contents,sDk,eDk);
-  });
-
-  const cardsHtml=quarters.map(({q,isFuture,isCurrent},i)=>{
-    const range=quarterRangeOf(ctx.y,q).label;
-    const cnt=countsByQ[i];
-    if(isFuture)return `<div class="q-card empty future"><div class="q-card-name">${range}</div><div class="q-card-val">–</div><div class="q-card-note">진행 예정</div></div>`;
-    if(cnt===null)return `<div class="q-card empty"><div class="q-card-name">${range}</div><div class="q-card-val">–</div><div class="q-card-note">기록 없음</div></div>`;
-    const prevCnt=i>0?countsByQ[i-1]:null;
-    let noteHtml=cnt===0?'기록 없음':'';
-    if(prevCnt!=null&&cnt>0){
-      const diff=cnt-prevCnt;
-      noteHtml=diff===0?'전분기와 동일':`<span class="${diff>0?'up':'down'}">전분기 대비 ${diff>0?'+':''}${diff}개</span>`;
-    }
-    return `<div class="q-card${isCurrent?' active':''}">
-      <div class="q-card-name">${range}</div>
-      <div class="q-card-val">${cnt}<span>개</span></div>
-      <div class="q-card-note">${noteHtml}</div>
-    </div>`;
-  }).join('');
-
-  el.innerHTML=cardsHtml;
-  renderYrContentRatingStats(ctx,inRange);
-  renderYrContentHighlight(ctx,inRange);
+  renderYrContentTimeCompare(ctx);
   renderYrContentCumul(ctx,inRange);
-  renderYrContentInsight(ctx,quarters,countsByQ);
 }
 
 // 평점/코멘트 요약 — contents 테이블의 실제 필드(stars: 0~5 별점, review: 완결 총평 텍스트) 기준.
-// _cgridItemHtml/_cgridDetailHtml(월간탭 콘텐츠그리드)과 동일한 필드를 그대로 참조.
-function renderYrContentRatingStats(ctx,inRange){
-  const el=document.getElementById('yr-content-rating');
-  if(!el)return;
-  if(!inRange.length){el.innerHTML='';return;}
-  const rated=inRange.filter(c=>c.stars>0);
-  const reviewed=inRange.filter(c=>c.review);
-  const avgStars=rated.length?(rated.reduce((s,c)=>s+c.stars,0)/rated.length):null;
-  const reviewPct=Math.round(reviewed.length/inRange.length*100);
-  const topRated=rated.length?rated.slice().sort((a,b)=>b.stars-a.stars)[0]:null;
-
-  el.innerHTML=`
-    <div class="bento-grid-3">
-      <div class="bento-item"><div class="bento-lbl"><i class="ti ti-stack-2" style="color:var(--pal-pink-text)" aria-hidden="true"></i>총 감상량</div><div class="bento-val">${inRange.length}<span>개</span></div></div>
-      <div class="bento-item"><div class="bento-lbl"><i class="ti ti-message-circle" style="color:var(--pal-sky-text)" aria-hidden="true"></i>코멘트 남긴 비율</div><div class="bento-val">${reviewPct}<span>%</span></div><div class="bento-sub">${inRange.length}개 중 ${reviewed.length}개에 기록 남김</div></div>
-      <div class="bento-item"><div class="bento-lbl"><i class="ti ti-star" style="color:#e0a339" aria-hidden="true"></i>평균 평점 (평점 남긴 것)</div><div class="bento-val">${avgStars!=null?avgStars.toFixed(1):'-'}<span>/5.0</span></div>${topRated?`<div class="bento-sub">'${escapeHtml(topRated.title||'')}' 최고점</div>`:''}</div>
-    </div>`;
-}
-
-// 콘텐츠 하이라이트 3카드 — 가장 오랜 기간 본 것(기간 최대) / 가장 몰입해서 본 것(당일 감상, 평점순) / 가장 높은 평점.
-// music은 시청기간 개념이 없어(등록일만 존재) 하이라이트 후보에서 제외.
-function renderYrContentHighlight(ctx,inRange){
-  const el=document.getElementById('yr-content-highlight');
-  if(!el)return;
-  const candidates=inRange.filter(c=>c.content_cat!=='music'&&c.start_date&&c.end_date);
-  if(!candidates.length){el.innerHTML='';return;}
-
-  const withSpan=candidates.map(c=>{
-    const days=Math.max(1,Math.round((new Date(c.end_date)-new Date(c.start_date))/86400000)+1);
-    return {...c,days};
-  });
-  const longest=withSpan.slice().sort((a,b)=>b.days-a.days)[0];
-  // 가장 몰입해서 본 것 — 당일(1일) 감상 중 평점이 가장 높은 것. 당일 감상이 없으면 스킵.
-  const sameDayRated=withSpan.filter(c=>c.days===1&&c.stars>0).sort((a,b)=>b.stars-a.stars);
-  const mostImmersive=sameDayRated[0]||null;
-  const topRated=candidates.filter(c=>c.stars>0).slice().sort((a,b)=>b.stars-a.stars)[0]||null;
-
-  const catLabel=cat=>CAT_ICON_META[cat]?.label||cat;
-  const fmtRange=(s,e)=>{
-    const s2=s.slice(5).replace('-','/'),e2=e.slice(5).replace('-','/');
-    return s===e?s2:`${s2}~${e2}`;
-  };
-
-  const cards=[];
-  if(longest){
-    cards.push(`<div class="hl-card">
-      <div class="hl-badge" style="color:var(--pal-sky-text); background:rgba(var(--pal-sky-rgb), 0.3);">가장 오랜 기간 본</div>
-      <div class="hl-title">${escapeHtml(longest.title||'')}</div>
-      <div class="hl-desc">${catLabel(longest.content_cat)} · ${fmtRange(longest.start_date,longest.end_date)}, ${longest.days}일간 완독</div>
-    </div>`);
-  }
-  if(mostImmersive){
-    cards.push(`<div class="hl-card">
-      <div class="hl-badge" style="color:var(--pal-pink-text); background:rgba(var(--pal-pink-rgb), 0.3);">가장 몰입해서 본</div>
-      <div class="hl-title">${escapeHtml(mostImmersive.title||'')}</div>
-      <div class="hl-desc">${catLabel(mostImmersive.content_cat)} · 당일 감상, ${mostImmersive.stars}점 평가</div>
-    </div>`);
-  }
-  if(topRated){
-    cards.push(`<div class="hl-card">
-      <div class="hl-badge" style="color:var(--pal-yellow-text); background:rgba(var(--pal-yellow-rgb), 0.5);">가장 높은 평점</div>
-      <div class="hl-title">${escapeHtml(topRated.title||'')}</div>
-      <div class="hl-desc">${catLabel(topRated.content_cat)} · ${topRated.stars}점${topRated.review?', 코멘트도 남김':''}</div>
-    </div>`);
-  }
-  if(!cards.length){el.innerHTML='';return;}
-
-  el.innerHTML=`
-    <div class="bento-lbl">이 기간의 콘텐츠 하이라이트</div>
-    <div class="bento-sub" style="margin-top:0;">감상 속도와 평점을 바탕으로 특별했던 콘텐츠를 꼽았어요.</div>
-    <div class="hl-grid">${cards.join('')}</div>`;
-}
-
 // 카테고리별 누적 감상량 — 드라마/도서/영화 3개 장편 카테고리만 비교(음악은 소비 단위가 달라 제외, 전체요약의 방침과 동일)
 function renderYrContentCumul(ctx,inRange){
   const el=document.getElementById('yr-content-cumul');
@@ -4680,38 +4657,6 @@ function renderYrContentCumul(ctx,inRange){
   el.innerHTML=`
     <div class="bento-lbl">카테고리별 누적 감상량</div>
     <div class="cumul-list">${rowsHtml}</div>`;
-}
-
-// 콘텐츠탭 인사이트 — 룰 기반. 분기 증감 + 코멘트 비율을 함께 반영.
-function renderYrContentInsight(ctx,quarters,countsByQ){
-  const el=document.getElementById('yr-content-insight');
-  if(!el)return;
-  const validIdx=countsByQ.map((c,i)=>({c,i})).filter(x=>x.c!==null);
-  const inRange=_mrpContentsInRange(ctx.contents,`${ctx.y}-01-01`,`${ctx.y}-12-31`);
-  if(validIdx.length<2&&!inRange.length){el.innerHTML='';return;}
-
-  let observeHtml='';
-  if(validIdx.length>=2){
-    const last=validIdx[validIdx.length-1],prev=validIdx[validIdx.length-2];
-    const diff=last.c-prev.c;
-    const lastLabel=quarterRangeOf(ctx.y,quarters[last.i].q).label;
-    const prevLabel=quarterRangeOf(ctx.y,quarters[prev.i].q).label;
-    const dirText=diff>0?`${prevLabel}에서 ${lastLabel}로 넘어오며 콘텐츠 소비량이 ${prev.c}개→${last.c}개로 늘었어요.`
-      :diff<0?`${prevLabel}보다 ${lastLabel}에 콘텐츠 소비량이 다소 줄었어요.`
-      :`${prevLabel}과 ${lastLabel} 소비량이 비슷하게 유지됐어요.`;
-    observeHtml=`<div class="insight-box tone-observe"><i class="ti ti-chart-line"></i><div><strong>추세:</strong> ${dirText}</div></div>`;
-  }
-
-  let suggestHtml='';
-  const reviewed=inRange.filter(c=>c.review).length;
-  if(inRange.length>0){
-    const reviewPct=Math.round(reviewed/inRange.length*100);
-    if(reviewPct<50){
-      const unreviewedMusic=inRange.filter(c=>c.content_cat==='music'&&!c.stars).length;
-      suggestHtml=`<div class="insight-box tone-suggest"><i class="ti ti-bulb"></i><div><strong>제안:</strong> ${inRange.length}개 중 ${reviewed}개(${reviewPct}%)에만 코멘트를 남겼어요. 감상 직후 별점만이라도 먼저 매겨두면 나중에 되짚기가 훨씬 쉬워질 거예요.${unreviewedMusic?` 평점이 비어있는 음악 ${unreviewedMusic}곡부터 가볍게 시작해보는 것도 방법이에요.`:''}</div></div>`;
-    }
-  }
-  el.innerHTML=observeHtml+suggestHtml;
 }
 
 // ══════════════════════════════════════════════════════════

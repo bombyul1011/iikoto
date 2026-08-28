@@ -1454,8 +1454,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .insight-box.tone-alert{border-style:solid; border-color:rgba(var(--pal-rose-rgb),0.5); background:rgba(var(--pal-rose-rgb),0.08);}
 .insight-box.tone-alert i{color:var(--pal-rose-text);}
 .insight-box.tone-alert strong{color:var(--pal-rose-text);}
-/* 분기 비교 카드 (콘텐츠탭) */
-.quarter-compare-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:10px;}
+/* 분기 카드 (전체요약 콘텐츠 요약카드에서 축소판으로 사용) */
 .q-card{border:1px solid var(--card-b); border-radius:14px; padding:13px 10px; text-align:center; background:rgba(255,253,248,0.6);}
 .q-card.active{border-color:rgba(var(--pal-pink-rgb),0.6); background:rgba(var(--pal-pink-rgb),0.12);}
 .q-card.empty:not(.active){opacity:0.55;}
@@ -1463,18 +1462,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .q-card-name{font-size:var(--fs-body); font-weight:700; color:var(--tp);}
 .q-card-val{font-size:var(--fs-lg); font-weight:700; color:var(--tp); font-family:'DM Sans',sans-serif; margin-top:8px;}
 .q-card-val span{font-size:var(--fs-xs); font-weight:500; color:var(--ts);}
-.q-card-note{font-size:var(--fs-xs); color:var(--tm); margin-top:4px;}
-.q-card-note.up{color:rgba(178,60,105,0.85); font-weight:600;}
-.q-card-note.down{color:rgba(75,145,180,0.9); font-weight:600;}
 /* 월 그래프의 미래 개월 자리 */
 .gb-group.future{opacity:0.35;}
 .gb-group.future .gb-bars{border-bottom:1px dashed rgba(var(--divider-rgb),0.4);}
-/* 콘텐츠탭: 하이라이트 3카드 (목업엔 있었으나 이식 시 누락됐던 부분, 이번에 추가) */
-.hl-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:10px;}
-.hl-card{background:rgba(255,255,255,0.5);border:1px solid rgba(var(--divider-rgb),0.2);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:8px;}
-.hl-badge{font-size:13px;font-weight:700;padding:4px 8px;border-radius:8px;width:fit-content;}
-.hl-title{font-size:14px;font-weight:700;color:var(--tp);line-height:1.4;word-break:keep-all;}
-.hl-desc{font-size:13px;color:var(--ts);line-height:1.4;}
 /* 콘텐츠탭: 카테고리별 누적 감상량 막대 (목업엔 있었으나 이식 시 누락됐던 부분, 이번에 추가) */
 .cumul-list{display:flex;flex-direction:column;gap:12px;}
 .cumul-row{display:flex;align-items:center;gap:12px;}
@@ -1577,6 +1567,15 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .chart-legend{display:flex;justify-content:center;gap:14px;margin-top:16px;flex-wrap:wrap;}
 .chart-legend-item{display:flex;align-items:center;gap:5px;font-size:13px;color:var(--ts);}
 .chart-legend-dot{width:8px;height:8px;border-radius:3px;}
+
+/* 콘텐츠탭: 월별 콘텐츠 시간 비중(이번달/지난달/이전평균 3줄 고정 가로막대) */
+.yr-ctc-wrap{display:flex;flex-direction:column;gap:12px;}
+.yr-ctc-row{display:flex;align-items:center;gap:12px;}
+.yr-ctc-row-lbl{flex-shrink:0;width:64px;font-size:13px;font-weight:600;color:var(--tp);}
+.yr-ctc-row-sub{display:block;font-size:10.5px;font-weight:500;color:var(--tm);margin-top:1px;}
+.yr-ctc-bar{flex:1;display:flex;height:20px;border-radius:8px;overflow:hidden;background:rgba(var(--divider-rgb),0.15);}
+.yr-ctc-seg{height:100%;transition:width .3s ease;}
+.yr-ctc-empty{flex:1;font-size:12px;color:var(--tm);}
 
 /* 수면탭: 수면시간 분포 도넛 범례 (donut-stat-wrap과 짝, 색상 도트만 별도) */
 .db-legend{display:flex;justify-content:center;gap:16px;margin-top:16px;font-size:13px;color:var(--ts);font-weight:600;}
@@ -1804,7 +1803,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
             </div>
             <div id="yr-habit-body"></div>
           </div>
-          <div id="yr-habit-linechart" style="margin-top:13px;"></div>
           <div id="yr-habit-insights"></div>
         </div>
 
@@ -1815,15 +1813,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
             <div class="tab-intro-title">영감이 되는 활자와 영상,<br>어떻게 쌓이고 있을까요?</div>
             <div class="tab-intro-sub" id="yr-content-intro-sub"></div>
           </div>
-          <div id="yr-content-rating"></div>
-          <div class="bento-item bento-full" id="yr-content-highlight"></div>
+          <div id="yr-content-gallery"></div>
+          <div id="yr-content-time-compare"></div>
           <div class="bento-item bento-full" id="yr-content-cumul"></div>
-          <div class="bento-item bento-full">
-            <div class="bento-lbl">분기별 콘텐츠 소비량</div>
-            <div class="bento-sub" style="margin-top:0;">누적 기준 비교예요. 아직 기록이 없는 분기는 흐리게 표시돼요.</div>
-            <div class="quarter-compare-grid" id="yr-content-quarters"></div>
-          </div>
-          <div class="bento-item bento-full" id="yr-content-insight"></div>
         </div>
 
         <!-- 리듬 -->
