@@ -1188,16 +1188,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .yr-kw-grid{display:flex;flex-direction:column;gap:10px;padding:6px 0;}
 .yr-kw-grid-row{display:flex;justify-content:center;align-items:baseline;gap:14px;flex-wrap:wrap;}
 .yr-kw-grid-word{font-weight:700;white-space:nowrap;line-height:1;}
-/* 전체요약: 클리어한 할 일 / 남긴 메모 2단 카드 (목업엔 있었으나 이식 시 누락됐던 부분, 이번에 추가) */
-.yr-half-row{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;}
-.yr-half-card{padding:16px 17px;}
-.yr-half-icon{width:34px;height:34px;border-radius:11px;display:flex;align-items:center;justify-content:center;margin-bottom:10px;}
-.yr-half-icon i{font-size:15px;color:#fff;}
-.yr-half-num{font-size:32px;font-weight:700;color:var(--tp);font-family:'DM Sans',sans-serif;letter-spacing:-.05em;}
-.yr-half-num span{font-size:13px;font-weight:500;color:var(--ts);margin-left:3px;}
-.yr-half-lbl{font-size:13px;color:var(--ts);margin-top:2px;margin-bottom:8px;}
-.yr-busiest-note{font-size:12px;color:var(--ts);margin-top:8px;display:flex;align-items:center;gap:5px;}
-.yr-busiest-note i{color:var(--pal-orange-border);}
 .yr-hero{min-height:0!important;
     padding:20px 20px 18px!important;}
 .yr-hero-line{font-size:19px!important;}
@@ -1233,6 +1223,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .yr-sum-sleep-val{font-size:20px;font-weight:700;color:var(--tp);font-family:'DM Sans',sans-serif;}
 .yr-sum-sleep-val .unit{font-size:11px;font-weight:500;color:var(--ts);}
 .yr-sum-sleep-val.small{font-size:16px;}
+/* 수면 요약카드 하단 — 수면시간 분포 도넛(수면탭에서 이동, 상단 2칸 여백 채움용) */
+.yr-sum-sleep-dist{display:flex;align-items:center;gap:14px;margin-top:14px;padding-top:14px;border-top:1px solid rgba(var(--divider-rgb),0.25);}
+.yr-sum-sleep-dist .mrsl-legend{gap:5px;}
+.yr-sum-sleep-dist .mrsl-legend-row{font-size:11.5px;}
 
 /* intro */
 .habit-intro{padding:8px 2px 22px;}
@@ -1400,6 +1394,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .habit-insight p{margin-top:5px;
   font-size:13px;
   color:var(--ts);}
+.habit-spark{display:block;width:100%;height:26px;margin-top:10px;position:relative;z-index:1;}
 /* compare */
 .habit-compare{padding:19px 20px!important;}
 .habit-compare-line{display:grid;
@@ -1809,6 +1804,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
             </div>
             <div id="yr-habit-body"></div>
           </div>
+          <div id="yr-habit-linechart" style="margin-top:13px;"></div>
           <div id="yr-habit-insights"></div>
         </div>
 

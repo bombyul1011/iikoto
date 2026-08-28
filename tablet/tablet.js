@@ -4158,24 +4158,6 @@ function renderYrHero(ctx){
   const contentCount=countContentsCompletedInRange(ctx.contents,`${ctx.y}-01-01`,`${ctx.y}-12-31`);
   const totalRecords=doneTodos+memoCount+contentCount;
 
-  // 월별 최다 기록 — "N월에 가장 바빴어요/기록이 많았어요" 문구용 (목업 원본 기능)
-  const busiestMonth=(rows,dateKeyOf)=>{
-    const byMonth={};
-    rows.forEach(r=>{
-      const dk=dateKeyOf(r);
-      if(!dk)return;
-      const mk=dk.slice(0,7);
-      byMonth[mk]=(byMonth[mk]||0)+1;
-    });
-    const entries=Object.entries(byMonth);
-    if(!entries.length)return null;
-    const [topMk,topCnt]=entries.sort((a,b)=>b[1]-a[1])[0];
-    return {month:parseInt(topMk.slice(5,7),10),count:topCnt};
-  };
-  const doneTodoRows=ctx.todos.filter(t=>t.done);
-  const busiestTodo=busiestMonth(doneTodoRows,t=>t.date_key);
-  const busiestMemo=busiestMonth(ctx.memos,m=>m.date_key);
-
   el.innerHTML=`
     <div class="yr-hero-kw-row">
       <div class="yr-hero">
@@ -4192,20 +4174,6 @@ function renderYrHero(ctx){
       <div class="card">
         <div class="card-lbl"><i class="ti ti-hash" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>올해의 키워드</div>
         <div id="yr-kw-cloud"></div>
-      </div>
-    </div>
-    <div class="yr-half-row">
-      <div class="card yr-half-card">
-        <div class="yr-half-icon" style="background:rgba(var(--pal-orange-rgb),1);"><i class="ti ti-list-check" aria-hidden="true"></i></div>
-        <div class="yr-half-num">${doneTodos}<span>개</span></div>
-        <div class="yr-half-lbl">클리어한 할 일</div>
-        ${busiestTodo?`<div class="yr-busiest-note"><i class="ti ti-flame" aria-hidden="true"></i> ${busiestTodo.month}월에 가장 바빴어요 — ${busiestTodo.count}개</div>`:''}
-      </div>
-      <div class="card yr-half-card">
-        <div class="yr-half-icon" style="background:rgba(178,60,105,0.8);"><i class="ti ti-pencil-heart" aria-hidden="true"></i></div>
-        <div class="yr-half-num">${memoCount}<span>개</span></div>
-        <div class="yr-half-lbl">남긴 메모</div>
-        ${busiestMemo?`<div class="yr-busiest-note"><i class="ti ti-flame" aria-hidden="true"></i> ${busiestMemo.month}월에 기록이 가장 많았어요 — ${busiestMemo.count}개</div>`:''}
       </div>
     </div>
     <div class="yr-sum-grid" id="yr-metric-grid"></div>
@@ -4358,7 +4326,7 @@ function renderYrMetricGrid(ctx){
     return `<div class="r9-item"><div class="r9-icon" style="background:${c.color};"><i class="ti ${c.icon}"></i></div><div class="r9-val">${_fmtDur(avgMin)}</div><div class="r9-lbl">${c.label}</div></div>`;
   }).join('');
 
-  // 수면 — 좌: 총수면시간 평균, 우: 취침·기상 평균 시각
+  // 수면 — 좌: 총수면시간 평균, 우: 취침·기상 평균 시각, 하단: 수면시간 분포 도넛(수면탭에서 이동)
   const validSleepRows=ctx.sleepRows.filter(r=>r.sleep_time&&r.wake_time);
   const sleepStats=validSleepRows.length?_sleepStatsOf(validSleepRows):null;
   const avgSleepHtml=sleepStats?`${Math.floor(sleepStats.avgMin/60)}<span class="unit">시간</span> ${sleepStats.avgMin%60}<span class="unit">분</span>`:'-';
@@ -4368,6 +4336,23 @@ function renderYrMetricGrid(ctx){
     const wakeMins=validSleepRows.map(r=>_dawnTimeToMin(r.wake_time)).filter(v=>v!=null);
     if(sleepMins.length)avgSleepTimeHtml=_yrMinToHHMM(sleepMins.reduce((a,b)=>a+b,0)/sleepMins.length);
     if(wakeMins.length)avgWakeTimeHtml=_yrMinToHHMM(wakeMins.reduce((a,b)=>a+b,0)/wakeMins.length);
+  }
+  let sleepDistHtml='';
+  if(validSleepRows.length){
+    const {buckets,counts,total:distTotal}=_yrSleepDurationBuckets(validSleepRows);
+    const circ=2*Math.PI*32;let cum=0;
+    const order=[3,2,1,0];
+    let donutSegs='';
+    order.forEach(i=>{
+      const b=buckets[i];const len=distTotal?(counts[i]/distTotal*circ):0;
+      donutSegs+=`<circle cx="40" cy="40" r="32" fill="none" stroke="${b.color}" stroke-width="10" stroke-dasharray="${len.toFixed(2)} ${(circ-len).toFixed(2)}" stroke-dashoffset="${-cum.toFixed(2)}" stroke-linecap="round"/>`;
+      cum+=len;
+    });
+    sleepDistHtml=`
+      <div class="yr-sum-sleep-dist">
+        <div class="mrsl-donut-box" style="width:64px;height:64px;"><svg viewBox="0 0 80 80">${donutSegs}</svg></div>
+        <div class="mrsl-legend">${buckets.map((b,i)=>`<div class="mrsl-legend-row"><span class="mrsl-legend-dot" style="background:${b.color};"></span>${b.label} <span class="mrsl-legend-val">${counts[i]}일</span></div>`).join('')}</div>
+      </div>`;
   }
 
   el.innerHTML=`
@@ -4392,6 +4377,7 @@ function renderYrMetricGrid(ctx){
         <div class="yr-sum-sleep-item"><div class="yr-sum-sleep-lbl">총 수면시간 평균</div><div class="yr-sum-sleep-val">${avgSleepHtml}</div></div>
         <div class="yr-sum-sleep-item"><div class="yr-sum-sleep-lbl">평균 취침 · 기상</div><div class="yr-sum-sleep-val small">${avgSleepTimeHtml} – ${avgWakeTimeHtml}</div></div>
       </div>
+      ${sleepDistHtml}
     </div>`;
 }
 
@@ -4458,7 +4444,27 @@ function renderYrHabitTab(ctx){
   el.innerHTML=`<div class="habit-flow">${rowsHtml}</div>`;
 
   renderYrHabitScore(ctx,habitStats);
+  renderYrHabitLineChart(ctx,habitStats);
   renderYrHabitInsights(ctx,habitStats);
+}
+
+// 습관별 월간 달성률 라인차트 — 흐름표(히트맵)와 같은 기간, 습관 고유색(h.color)으로 구분.
+// 히트맵이 공백/패턴 파악용이라면 이쪽은 "오르는지 내리는지"를 직접 비교하는 용도.
+function renderYrHabitLineChart(ctx,habitStats){
+  const el=document.getElementById('yr-habit-linechart');
+  if(!el)return;
+  if(ctx.elapsedMonths<2){el.innerHTML='';return;}
+  const series=ctx.habits.map((h,i)=>({
+    values:habitStats[i].seq,
+    color:YR_HABIT_COLOR_MAP[h.color]||'var(--tm)',
+    label:h.name
+  }));
+  const xLabels=Array.from({length:ctx.elapsedMonths},(_,m)=>`${m+1}월`);
+  el.innerHTML=`
+    <div class="card">
+      <div class="card-lbl">습관별 월간 달성률 추이</div>
+      ${_yrLineChartHTML(series,xLabels,{height:140,scale:'zero'})}
+    </div>`;
 }
 
 // 전체 평균 달성률 큰 숫자 + 가장 안정적인(표준편차 최소) 습관 — 습관탭 인트로 아래 첫 배너
@@ -4487,6 +4493,18 @@ function renderYrHabitScore(ctx,habitStats){
     </div>`;
 }
 
+// 미니 스파크라인 — 축/범례 없이 값 배열만으로 작은 SVG 라인을 그림(카드 안에 끼워 넣는 용도).
+// _yrLineChartHTML은 범례/x라벨까지 포함된 풀사이즈 차트라 이 용도엔 무거워서 별도로 가볍게 작성.
+function _yrSparklineSVG(values,color){
+  const valid=values.filter(v=>v!=null);
+  if(valid.length<2)return '';
+  const max=Math.max(...valid),min=Math.min(...valid),range=(max-min)||1;
+  const xStep=100/(values.length-1);
+  const pts=values.map((v,i)=>v==null?null:{x:i*xStep,y:30-((v-min)/range*24+3)}).filter(Boolean);
+  const ptsStr=pts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  return `<svg class="habit-spark" viewBox="0 0 100 30" preserveAspectRatio="none"><polyline points="${ptsStr}" fill="none" stroke="${color}" stroke-width="2.5" vector-effect="non-scaling-stroke"/></svg>`;
+}
+
 // BEST FLOW(가장 크게 오른 습관) / NEEDS CARE(가장 낮은 습관) 2단 카드 — 12개월 흐름표 아래
 function renderYrHabitInsights(ctx,habitStats){
   const el=document.getElementById('yr-habit-insights');
@@ -4499,6 +4517,8 @@ function renderYrHabitInsights(ctx,habitStats){
   const lastMonthNum=ctx.elapsedMonths;
   const firstMonthPct=bestFlow.activeSeq[0]||0;
   const lastMonthPct=bestFlow.activeSeq[bestFlow.activeSeq.length-1]||0;
+  const bestSpark=_yrSparklineSVG(bestFlow.activeSeq,'#4a8f6a');
+  const careSpark=_yrSparklineSVG(needsCare.activeSeq,'#c08a2e');
 
   el.innerHTML=`
     <div class="habit-insights">
@@ -4507,12 +4527,14 @@ function renderYrHabitInsights(ctx,habitStats){
         <div class="habit-insight-number">${bestFlow.delta>=0?'+':''}${bestFlow.delta}<span>%</span></div>
         <div class="habit-insight-title">${escapeHtml(bestFlow.name)}</div>
         <p>${firstMonthNum}월 ${firstMonthPct}%에서 ${lastMonthNum}월 ${lastMonthPct}%로, 가장 크게 ${bestFlow.delta>=0?'올랐어요':'변화했어요'}.</p>
+        ${bestSpark}
       </div>
       <div class="habit-insight yellow">
         <div class="habit-insight-tag">NEEDS CARE</div>
         <div class="habit-insight-number">${needsCare.overallPct}<span>%</span></div>
         <div class="habit-insight-title">${escapeHtml(needsCare.name)}</div>
         <p>가장 낮은 달성률이에요. 유지력과 비교해 어느 정도 거리감인지 아래에서 볼 수 있어요.</p>
+        ${careSpark}
       </div>
     </div>`;
 }
@@ -4939,44 +4961,25 @@ function renderYrSleepTab(ctx){
 
   renderYrSleepComboChart(ctx,validRows);
 
-  const {buckets,counts,total:distTotal}=_yrSleepDurationBuckets(validRows);
   const core=_yrCoreWindowStat(validRows);
-  const circ=2*Math.PI*42;let cum=0;
-  const order=[3,2,1,0];
-  let donutSegs='';
-  order.forEach(i=>{
-    const b=buckets[i];const len=distTotal?(counts[i]/distTotal*circ):0;
-    donutSegs+=`<circle cx="50" cy="50" r="42" fill="none" stroke="${b.color}" stroke-width="13" stroke-dasharray="${len.toFixed(2)} ${(circ-len).toFixed(2)}" stroke-dashoffset="${-cum.toFixed(2)}" stroke-linecap="round"/>`;
-    cum+=len;
-  });
-
   const coreCirc=2*Math.PI*40;
   const coreComment=_yrCoreVsDurationComment(core.pct,validRows.length);
 
   document.getElementById('yr-sleep-distribution').innerHTML=`
-    <div class="mrsl-half-grid">
-      <div class="mrsl-half-card">
-        <div class="mrsl-half-title">수면시간 분포</div>
-        <div class="mrsl-donut-wrap" style="margin-top:10px;">
-          <div class="mrsl-donut-box" style="width:76px;height:76px;"><svg viewBox="0 0 100 100">${donutSegs}</svg></div>
-          <div class="mrsl-legend">${buckets.map((b,i)=>`<div class="mrsl-legend-row"><span class="mrsl-legend-dot" style="background:${b.color};"></span>${b.label} <span class="mrsl-legend-val">${counts[i]}일</span></div>`).join('')}</div>
+    <div class="mrsl-half-card">
+      <div class="mrsl-half-title">코어 구간 점유율</div>
+      <div class="donut-stat-wrap" style="margin-top:10px;gap:10px;">
+        <div class="donut-svg-box" style="width:76px;height:76px;">
+          <svg viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="40" fill="none" stroke="var(--graph-track-color)" stroke-width="12"></circle>
+            <circle cx="50" cy="50" r="40" fill="none" stroke="var(--pal-sky-text)" stroke-width="12" stroke-dasharray="${(core.pct/100*coreCirc).toFixed(2)} ${coreCirc.toFixed(2)}" stroke-dashoffset="0"></circle>
+          </svg>
+          <div class="donut-svg-center"><b>${core.pct}<span style="font-size:12px;">%</span></b></div>
         </div>
-      </div>
-      <div class="mrsl-half-card">
-        <div class="mrsl-half-title">코어 구간 점유율</div>
-        <div class="donut-stat-wrap" style="margin-top:10px;gap:10px;">
-          <div class="donut-svg-box" style="width:76px;height:76px;">
-            <svg viewBox="0 0 100 100">
-              <circle cx="50" cy="50" r="40" fill="none" stroke="var(--graph-track-color)" stroke-width="12"></circle>
-              <circle cx="50" cy="50" r="40" fill="none" stroke="var(--pal-sky-text)" stroke-width="12" stroke-dasharray="${(core.pct/100*coreCirc).toFixed(2)} ${coreCirc.toFixed(2)}" stroke-dashoffset="0"></circle>
-            </svg>
-            <div class="donut-svg-center"><b>${core.pct}<span style="font-size:12px;">%</span></b></div>
-          </div>
-          <div style="flex:1;">
-            <div style="display:flex;gap:8px;flex-direction:column;">
-              <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--tp);font-weight:600;"><span style="width:10px;height:10px;border-radius:50%;background:var(--pal-sky-text);"></span>사수 ${core.inCore}일</div>
-              <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--tm);font-weight:600;"><span style="width:10px;height:10px;border-radius:50%;background:var(--graph-track-color);"></span>이탈 ${core.outCore}일</div>
-            </div>
+        <div style="flex:1;">
+          <div style="display:flex;gap:8px;flex-direction:column;">
+            <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--tp);font-weight:600;"><span style="width:10px;height:10px;border-radius:50%;background:var(--pal-sky-text);"></span>사수 ${core.inCore}일</div>
+            <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--tm);font-weight:600;"><span style="width:10px;height:10px;border-radius:50%;background:var(--graph-track-color);"></span>이탈 ${core.outCore}일</div>
           </div>
         </div>
       </div>
