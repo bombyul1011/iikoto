@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.17-music-meta-two-lines';
+const CACHE = 'iikoto-v2.18-quote-ocr';
 const ASSETS = [
   './',
   './index.html'

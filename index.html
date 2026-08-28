@@ -910,6 +910,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .quote-chip-inner{border-radius:12.5px;background:var(--grad-mintyellow);padding:7px 14px;font-size:var(--main-text-size);font-weight:500;color:var(--pal-mintlime);display:flex;align-items:center;gap:5px;white-space:nowrap;}
 [data-theme="glass"] .quote-chip-inner{background:var(--glass-chip-bg);}
 .done-banner-row{display:flex;gap:8px;margin-top:10px;}
+.rd-quote-ocr-row{display:flex;gap:8px;margin-top:10px;}
+.rd-quote-ocr-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:9px 10px;border-radius:12px;background:var(--pal-input-bg,rgba(0,0,0,0.04));font-size:var(--dow-label-size);font-weight:500;color:var(--pal-sub,rgba(0,0,0,0.55));cursor:pointer;}
+.rd-quote-ocr-status{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:var(--dow-label-size);color:var(--pal-sub,rgba(0,0,0,0.5));}
+.rd-quote-ocr-status .spin{animation:ocrSpin 0.8s linear infinite;}
+@keyframes ocrSpin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
 .done-quote-chip{flex:1;display:inline-flex;border-radius:14px;padding:1.6px;background:linear-gradient(120deg,rgba(200,182,245,0.6),rgba(190,205,240,0.55));background-size:300% 300%;animation:bannerShine 5s ease infinite;cursor:pointer;}
 .done-quote-chip-inner{width:100%;border-radius:12.5px;background:linear-gradient(135deg,rgba(240,232,250,0.85),rgba(235,238,248,0.85));padding:7px 10px;font-size:var(--dow-label-size);font-weight:500;color:rgba(160,105,180,0.80);display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;}
 .done-comment-chip{flex:1;display:inline-flex;border-radius:14px;padding:1.6px;background:linear-gradient(120deg,rgba(215,240,200,0.85),rgba(210,232,190,0.8));background-size:300% 300%;animation:bannerShine 5s ease infinite;cursor:pointer;}
@@ -2300,6 +2305,19 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         </div>
       </div>
       <textarea class="rd-quote-inp" id="rd-quote-inp" rows="4" placeholder="마음에 남는 문장을 적어보세요"></textarea>
+      <div class="rd-quote-ocr-row">
+        <div class="rd-quote-ocr-btn" id="rd-quote-ocr-camera-btn" onclick="document.getElementById('rd-quote-ocr-camera-input').click()">
+          <i class="ti ti-camera ico-14" aria-hidden="true"></i> 촬영해서 담기
+        </div>
+        <div class="rd-quote-ocr-btn" id="rd-quote-ocr-gallery-btn" onclick="document.getElementById('rd-quote-ocr-gallery-input').click()">
+          <i class="ti ti-photo ico-14" aria-hidden="true"></i> 사진에서 담기
+        </div>
+      </div>
+      <input type="file" accept="image/*" capture="environment" id="rd-quote-ocr-camera-input" style="display:none;" onchange="handleQuoteOcrFile(this.files[0])">
+      <input type="file" accept="image/*" id="rd-quote-ocr-gallery-input" style="display:none;" onchange="handleQuoteOcrFile(this.files[0])">
+      <div class="rd-quote-ocr-status" id="rd-quote-ocr-status" style="display:none;">
+        <i class="ti ti-loader-2 ico-14 spin" aria-hidden="true"></i> 텍스트 추출 중...
+      </div>
     </div>
   </div>
 </div>
@@ -9888,6 +9906,47 @@ function selectApiResult(title,poster,sub1,sub2,musicUrl,tmdbMeta,album){
     else preview.style.display='none';
   }
   if(tmdbMeta&&tmdbMeta.tmdbId)fetchTmdbTotalUnit(tmdbMeta.tmdbId,tmdbMeta.tmdbType);
+}
+const OCR_PROXY_URL='https://ocr-prox.faith-003.workers.dev/';
+// 문장 수집 — 카메라/갤러리로 찍은 종이책 사진에서 텍스트만 추출해 입력창에 채움.
+// 이미지는 base64로 인코딩해 Worker로 보내고 응답(텍스트)만 받음 — 이미지 자체는 클라이언트/서버 어디에도 저장하지 않음.
+async function handleQuoteOcrFile(file){
+  if(!file)return;
+  const statusEl=document.getElementById('rd-quote-ocr-status');
+  const inp=document.getElementById('rd-quote-inp');
+  if(statusEl)statusEl.style.display='flex';
+  try{
+    const base64=await fileToBase64(file);
+    const res=await fetch(OCR_PROXY_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({imageBase64:base64})
+    });
+    if(!res.ok)throw new Error('OCR 서버 응답 오류');
+    const data=await res.json();
+    if(data.error)throw new Error(data.error);
+    if(data.text&&inp){
+      // 기존 입력 내용이 있으면 줄바꿈 후 이어붙이고, 없으면 그대로 채움 — 두 경우 모두 수정 가능한 상태 유지
+      inp.value=inp.value.trim()?inp.value.trim()+'\n'+data.text:data.text;
+      inp.focus();
+    }
+  }catch(e){
+    console.error('문장 수집 OCR 실패',e);
+    alert('사진에서 텍스트를 읽어오지 못했어요. 다시 시도해주세요.');
+  }finally{
+    if(statusEl)statusEl.style.display='none';
+    // 같은 파일을 다시 선택해도 change 이벤트가 발생하도록 입력값 초기화
+    document.getElementById('rd-quote-ocr-camera-input').value='';
+    document.getElementById('rd-quote-ocr-gallery-input').value='';
+  }
+}
+function fileToBase64(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(reader.result);
+    reader.onerror=reject;
+    reader.readAsDataURL(file);
+  });
 }
 const ALADIN_PROXY_URL='https://aladin-book-proxy.faith-003.workers.dev/';
 // 카카오 책 검색 결과의 isbn으로 알라딘 프록시(Cloudflare Worker)를 조회해 페이지 수를 targetInputId에 채움.
