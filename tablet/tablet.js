@@ -4208,7 +4208,7 @@ function renderYrHero(ctx){
         ${busiestMemo?`<div class="yr-busiest-note"><i class="ti ti-flame" aria-hidden="true"></i> ${busiestMemo.month}월에 기록이 가장 많았어요 — ${busiestMemo.count}개</div>`:''}
       </div>
     </div>
-    <div class="yr-metric-grid" id="yr-metric-grid"></div>
+    <div class="yr-sum-grid" id="yr-metric-grid"></div>
     <div class="bento-item bento-full" style="margin-top:13px;" id="yr-quarterly-reflection"></div>`;
 
   renderYrKeywordCloud(ctx);
@@ -4285,49 +4285,113 @@ function renderYrKeywordCloud(ctx){
 }
 
 // 4분할 지표그리드(습관/콘텐츠/리듬/채움로그) — 클릭 시 해당 서브탭으로 이동
+// ── 습관별(카테고리 없음, 습관 자체가 4개 구분) 누적 달성률 계산 — 전체요약 요약카드용 독립 헬퍼.
+// renderYrHabitTab의 habitStats 계산과 동일 기준(습관별 최초 기록월부터, 월간 달성률 평균)이지만
+// 전체요약이 습관탭보다 먼저 렌더링되므로 별도로 값만 가볍게 계산.
+function _yrHabitOverallStats(ctx){
+  if(!ctx.habits.length)return {avgPct:0,perHabit:[]};
+  const byMonth={};
+  for(let m=0;m<ctx.elapsedMonths;m++){
+    const mk=`${ctx.y}-${pad(m+1)}`;
+    const daysInMonth=new Date(ctx.y,m+1,0).getDate();
+    const checksInMonth=ctx.habitChecks.filter(c=>c.date_key&&c.date_key.startsWith(mk));
+    byMonth[m]={};
+    ctx.habits.forEach(h=>{
+      const cnt=checksInMonth.filter(c=>c.habit_name===h.name).length;
+      byMonth[m][h.name]=Math.round(cnt/daysInMonth*100);
+    });
+  }
+  const firstCheckMonthOf=h=>{
+    const checks=ctx.habitChecks.filter(c=>c.habit_name===h.name&&c.date_key);
+    if(!checks.length)return 0;
+    const earliestDk=checks.map(c=>c.date_key).sort()[0];
+    const mo=parseInt(earliestDk.slice(5,7),10)-1;
+    return Math.min(mo,ctx.elapsedMonths-1);
+  };
+  const perHabit=ctx.habits.map(h=>{
+    const seq=Array.from({length:ctx.elapsedMonths},(_,m)=>byMonth[m][h.name]||0);
+    const startMonth=firstCheckMonthOf(h);
+    const activeSeq=seq.slice(startMonth);
+    const overallPct=activeSeq.length?Math.round(activeSeq.reduce((a,b)=>a+b,0)/activeSeq.length):0;
+    return {name:h.name,color:h.color,overallPct};
+  });
+  const avgPct=perHabit.length?Math.round(perHabit.reduce((s,h)=>s+h.overallPct,0)/perHabit.length):0;
+  return {avgPct,perHabit};
+}
+
+const YR_HABIT_COLOR_MAP={mint:'var(--pal-mint-text)',pink:'var(--pal-pink-text)',sky:'var(--pal-sky-text)',yellow:'var(--pal-yellow-text)'};
+
 function renderYrMetricGrid(ctx){
   const el=document.getElementById('yr-metric-grid');
-  const habitAvgPct=ctx.habits.length
-    ?Math.round(_uniqueHabitCheckCount(ctx.habitChecks)/(ctx.habits.length*Math.ceil((new Date()-new Date(`${ctx.y}-01-01`))/86400000))*100)
-    :0;
-  const contentCount=countContentsCompletedInRange(ctx.contents,`${ctx.y}-01-01`,`${ctx.y}-12-31`);
+  if(!el)return;
+
+  // 습관 — 전체평균 숫자(좌) + 습관별 4행(우)
+  const {avgPct:habitAvgPct,perHabit}=_yrHabitOverallStats(ctx);
+  const habitRowsHtml=perHabit.map(h=>{
+    const color=YR_HABIT_COLOR_MAP[h.color]||'var(--tm)';
+    return `<div class="yr-sum-habit-row"><span class="yr-sum-habit-dot" style="background:${color};"></span><span class="yr-sum-habit-name">${escapeHtml(h.name)}</span><span class="yr-sum-habit-pct">${h.overallPct}%</span></div>`;
+  }).join('');
+
+  // 콘텐츠 — 분기별 q-card 축소판(기존 renderYrContentTab의 분기 카드와 동일 계산)
+  const curMonth=ctx.elapsedMonths-1;
+  const quarters=listQuartersUpTo(ctx.y,curMonth);
+  const countsByQ=quarters.map(({q,isFuture})=>{
+    if(isFuture)return null;
+    const {startMonth,endMonth}=quarterRangeOf(ctx.y,q);
+    const sDk=`${ctx.y}-${pad(startMonth+1)}-01`;
+    const eDk=`${ctx.y}-${pad(endMonth+1)}-${pad(new Date(ctx.y,endMonth+1,0).getDate())}`;
+    return countContentsCompletedInRange(ctx.contents,sDk,eDk);
+  });
+  const contentCardsHtml=quarters.map(({q,isFuture,isCurrent},i)=>{
+    const range=quarterRangeOf(ctx.y,q).label;
+    const cnt=countsByQ[i];
+    if(isFuture)return `<div class="q-card compact empty future"><div class="q-card-name">${range}</div><div class="q-card-val">–</div></div>`;
+    if(cnt===null)return `<div class="q-card compact empty"><div class="q-card-name">${range}</div><div class="q-card-val">–</div></div>`;
+    return `<div class="q-card compact${isCurrent?' active':''}"><div class="q-card-name">${range}</div><div class="q-card-val">${cnt}<span>개</span></div></div>`;
+  }).join('');
+
+  // 리듬 — 8대 카테고리 아이콘+시간 그리드(renderYrRhythm9Grid와 동일 계산)
   const {d:rhythmD,dayCount:rhythmDayCount}=_rhythmDurByCatWithDays(ctx.rblocks);
-  const rhythmTop=Object.entries(rhythmD).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  const rhythmItemsHtml=Object.entries(RHYTHM_CATS).map(([k,c])=>{
+    const catDays=rhythmDayCount[k]||0;
+    const avgMin=catDays?Math.round((rhythmD[k]||0)/catDays):0;
+    return `<div class="r9-item"><div class="r9-icon" style="background:${c.color};"><i class="ti ${c.icon}"></i></div><div class="r9-val">${_fmtDur(avgMin)}</div><div class="r9-lbl">${c.label}</div></div>`;
+  }).join('');
+
+  // 수면 — 좌: 총수면시간 평균, 우: 취침·기상 평균 시각
+  const validSleepRows=ctx.sleepRows.filter(r=>r.sleep_time&&r.wake_time);
+  const sleepStats=validSleepRows.length?_sleepStatsOf(validSleepRows):null;
+  const avgSleepHtml=sleepStats?`${Math.floor(sleepStats.avgMin/60)}<span class="unit">시간</span> ${sleepStats.avgMin%60}<span class="unit">분</span>`:'-';
+  let avgSleepTimeHtml='-',avgWakeTimeHtml='-';
+  if(validSleepRows.length){
+    const sleepMins=validSleepRows.map(r=>toDawnAdjustedMin(_dawnTimeToMin(r.sleep_time),22*60)).filter(v=>v!=null);
+    const wakeMins=validSleepRows.map(r=>_dawnTimeToMin(r.wake_time)).filter(v=>v!=null);
+    if(sleepMins.length)avgSleepTimeHtml=_yrMinToHHMM(sleepMins.reduce((a,b)=>a+b,0)/sleepMins.length);
+    if(wakeMins.length)avgWakeTimeHtml=_yrMinToHHMM(wakeMins.reduce((a,b)=>a+b,0)/wakeMins.length);
+  }
 
   el.innerHTML=`
-    <div class="card yr-metric-card compact" onclick="switchYrView(document.querySelector('[data-view=habit]'),'habit')">
-      <div class="yr-metric-left">
-        <div class="yr-metric-icon" style="background:rgba(var(--pal-mint-rgb),1);"><i class="ti ti-chart-donut" aria-hidden="true"></i></div>
-        <div class="yr-metric-label">습관 평균 달성률</div>
-      </div>
-      <div class="yr-metric-right"><div class="yr-metric-num">${habitAvgPct}<span>%</span></div></div>
-    </div>
-    <div class="card yr-metric-card compact" onclick="switchYrView(document.querySelector('[data-view=content]'),'content')">
-      <div class="yr-metric-left">
-        <div class="yr-metric-icon" style="background:rgba(214,90,140,0.8);"><i class="ti ti-stack-2" aria-hidden="true"></i></div>
-        <div class="yr-metric-label">총 감상 콘텐츠</div>
-      </div>
-      <div class="yr-metric-right"><div class="yr-metric-num">${contentCount}<span>개</span></div></div>
-    </div>
-    <div class="card yr-metric-card compact" onclick="switchYrView(document.querySelector('[data-view=rhythm]'),'rhythm')">
-      <div class="yr-metric-left">
-        <div class="yr-metric-icon" style="background:rgba(var(--pal-orange-rgb),0.9);"><i class="ti ti-rainbow" aria-hidden="true"></i></div>
-        <div class="yr-metric-label">리듬 상위3 · 일평균</div>
-      </div>
-      <div class="yr-metric-right">
-        <div class="yr-rhythm-top3">${rhythmTop.map(([k,min])=>{
-          const c=RHYTHM_CATS[k];if(!c)return'';
-          const catDays=rhythmDayCount[k]||1;
-          return `<div class="yr-rhythm-top3-row"><span class="yr-rhythm-top3-dot" style="background:${c.color};"></span><span class="yr-rhythm-top3-name">${c.label}</span><span class="yr-rhythm-top3-time">${_fmtDur(Math.round(min/catDays))}</span></div>`;
-        }).join('')}</div>
+    <div class="card yr-sum-banner" onclick="switchYrView(document.querySelector('[data-view=habit]'),'habit')">
+      <div class="yr-sum-banner-hdr"><i class="ti ti-chart-donut" aria-hidden="true"></i>습관</div>
+      <div class="yr-sum-habit-split">
+        <div class="yr-sum-habit-avg"><div class="yr-sum-habit-avg-num">${habitAvgPct}<span>%</span></div><div class="yr-sum-habit-avg-lbl">전체 평균</div></div>
+        <div class="yr-sum-habit-list">${habitRowsHtml}</div>
       </div>
     </div>
-    <div class="card yr-metric-card compact" onclick="switchYrView(document.querySelector('[data-view=chaeum]'),'chaeum')">
-      <div class="yr-metric-left">
-        <div class="yr-metric-icon" style="background:rgba(var(--pal-lavender-rgb),0.95);"><i class="ti ti-clover" aria-hidden="true"></i></div>
-        <div class="yr-metric-label">채움로그</div>
+    <div class="card yr-sum-banner" onclick="switchYrView(document.querySelector('[data-view=content]'),'content')">
+      <div class="yr-sum-banner-hdr"><i class="ti ti-stack-2" aria-hidden="true"></i>콘텐츠 · 분기별 소비량</div>
+      <div class="yr-sum-content-quarters">${contentCardsHtml}</div>
+    </div>
+    <div class="card yr-sum-banner" onclick="switchYrView(document.querySelector('[data-view=rhythm]'),'rhythm')">
+      <div class="yr-sum-banner-hdr"><i class="ti ti-rainbow" aria-hidden="true"></i>리듬 · 8대 카테고리 일평균</div>
+      <div class="rhythm-9grid">${rhythmItemsHtml}</div>
+    </div>
+    <div class="card yr-sum-banner" onclick="switchYrView(document.querySelector('[data-view=sleep]'),'sleep')">
+      <div class="yr-sum-banner-hdr"><i class="ti ti-moon-stars" aria-hidden="true"></i>수면</div>
+      <div class="yr-sum-sleep-split">
+        <div class="yr-sum-sleep-item"><div class="yr-sum-sleep-lbl">총 수면시간 평균</div><div class="yr-sum-sleep-val">${avgSleepHtml}</div></div>
+        <div class="yr-sum-sleep-item"><div class="yr-sum-sleep-lbl">평균 취침 · 기상</div><div class="yr-sum-sleep-val small">${avgSleepTimeHtml} – ${avgWakeTimeHtml}</div></div>
       </div>
-      <div class="yr-metric-right"><div class="yr-metric-num">${(ctx.chaeumRows||[]).length}<span>회</span></div></div>
     </div>`;
 }
 

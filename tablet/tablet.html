@@ -1098,26 +1098,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .yr-hero{border-radius:20px;background:linear-gradient(120deg,rgba(250,215,100,0.28),rgba(255,235,170,0.22));border:1px solid rgba(250,205,90,0.5);box-shadow:0 2px 20px rgba(200,150,50,0.10),inset 0 1px 0 rgba(255,250,240,0.6);padding:20px 22px;margin-bottom:14px;}
 .yr-hero-line{font-size:var(--fs-lg);font-weight:600;color:#7a5c20;line-height:1.5;margin-bottom:10px;}
 .yr-hero-line b{font-weight:700;color:#8a6c20;}
-/* 4분할 지표 그리드 */
-.yr-metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;}
-.yr-metric-card{cursor:pointer;transition:transform .15s;}
-.yr-metric-card:active{transform:scale(0.98);}
-.yr-metric-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
-.yr-metric-icon{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.yr-metric-icon i{font-size:16px;color:#fff;}
-.yr-metric-num{font-size:var(--fs-xl);font-weight:700;color:var(--tp);font-family:'DM Sans',sans-serif;}
-.yr-metric-num span{font-size:var(--fs-sm);font-weight:500;color:var(--ts);}
-.yr-metric-label{font-size:var(--fs-sm);color:var(--ts);margin-top:2px;}
 /* 전체요약 - 콘텐츠 지표카드(도넛 오른쪽 배열, 4카테고리 2x2) */
-.yr-metric-card.compact{padding:14px 16px 12px;}
-.yr-metric-card.compact .yr-metric-top{margin-bottom:6px;}
 .yr-spark.compact{height:18px;margin-top:6px;}
-/* 리듬카드(전체요약) - 상위3 시간표기 */
-.yr-rhythm-top3{display:flex;flex-direction:column;gap:5px;margin-top:8px;}
-.yr-rhythm-top3-row{display:flex;align-items:center;gap:7px;font-size:var(--fs-xs);color:var(--ts);white-space:nowrap;}
-.yr-rhythm-top3-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
-.yr-rhythm-top3-name{width:32px;flex-shrink:0;font-weight:600;color:var(--tp);}
-.yr-rhythm-top3-time{margin-left:auto;color:var(--tm);flex-shrink:0;}
 /* 키워드 요약문장 */
 .yr-kw-summary{font-size:var(--fs-sm);color:var(--ts);line-height:1.6;margin-top:10px;padding-top:10px;border-top:1px dashed rgba(var(--divider-rgb),0.3);}
 .mrsl-half-card{border:1px solid var(--card-b);border-radius:14px;padding:14px;background:rgba(255,253,248,0.5);}
@@ -1216,35 +1198,42 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .yr-half-lbl{font-size:13px;color:var(--ts);margin-top:2px;margin-bottom:8px;}
 .yr-busiest-note{font-size:12px;color:var(--ts);margin-top:8px;display:flex;align-items:center;gap:5px;}
 .yr-busiest-note i{color:var(--pal-orange-border);}
-/* ---------- "STATS" becomes vertical index ---------- */
-.yr-metric-grid{display:grid!important;
-  grid-template-columns:1fr!important;
-  gap:0!important;
-  border-top:1px solid var(--border,#e4e0d8);}
-.yr-metric-card{min-height:64px!important;
-  display:flex!important;
-  align-items:center!important;
-  justify-content:space-between!important;
-  gap:12px!important;
-  border:0!important;
-  border-bottom:1px solid var(--border,#e4e0d8)!important;
-  border-radius:0!important;
-  box-shadow:none!important;
-  padding:14px 4px!important;
-  background:transparent!important;}
-.yr-metric-card:last-child{border-bottom:0!important;}
-.yr-metric-left{display:flex!important;align-items:center!important;gap:12px!important;min-width:0!important;flex-shrink:1!important;}
-.yr-metric-icon{width:36px!important;height:36px!important;
-  border-radius:11px!important;flex-shrink:0!important;}
-.yr-metric-label{font-size:14px!important;font-weight:600!important;color:var(--tp)!important;margin-top:0!important;line-height:1.3!important;}
-.yr-metric-right{flex-shrink:0!important;text-align:right!important;}
-.yr-metric-num{font-size:22px!important;
-  letter-spacing:-.04em!important;
-  white-space:nowrap!important;}
 .yr-hero{min-height:0!important;
     padding:20px 20px 18px!important;}
 .yr-hero-line{font-size:19px!important;}
 .yr-hero:before{width:160px;height:160px;}
+
+/* 전체요약 — 파트별 요약카드 4개 (습관/콘텐츠/리듬/수면, 2026-08 재구성: 세로진입구 목록 대체) */
+.yr-sum-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;}
+.yr-sum-banner{cursor:pointer;transition:transform .15s;}
+.yr-sum-banner:active{transform:scale(0.98);}
+.yr-sum-banner-hdr{display:flex;align-items:center;gap:7px;font-size:14px;font-weight:700;color:var(--tp);margin-bottom:12px;}
+.yr-sum-banner-hdr i{font-size:16px;color:var(--pal-orange-border,#e07b22);}
+/* 습관 요약카드 — 좌: 전체평균 숫자, 우: 습관별 4행 */
+.yr-sum-habit-split{display:flex;gap:16px;align-items:center;}
+.yr-sum-habit-avg{flex-shrink:0;text-align:center;padding-right:16px;border-right:1px solid rgba(var(--divider-rgb),0.25);}
+.yr-sum-habit-avg-num{font-size:30px;font-weight:700;color:var(--tp);font-family:'DM Sans',sans-serif;letter-spacing:-.04em;}
+.yr-sum-habit-avg-num span{font-size:14px;font-weight:500;color:var(--ts);}
+.yr-sum-habit-avg-lbl{font-size:11.5px;color:var(--ts);margin-top:3px;white-space:nowrap;}
+.yr-sum-habit-list{flex:1;display:flex;flex-direction:column;gap:7px;min-width:0;}
+.yr-sum-habit-row{display:flex;align-items:center;gap:7px;font-size:13px;}
+.yr-sum-habit-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.yr-sum-habit-name{color:var(--tp);font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.yr-sum-habit-pct{color:var(--ts);font-weight:600;flex-shrink:0;}
+/* 콘텐츠 요약카드 — 분기 4칸(q-card 축소판) */
+.yr-sum-content-quarters{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.q-card.compact{padding:10px 6px;}
+.q-card.compact .q-card-name{font-size:11.5px;}
+.q-card.compact .q-card-val{font-size:16px;margin-top:5px;}
+/* 수면 요약카드 — 좌우 1:1(총수면시간 / 취침·기상) */
+.yr-sum-sleep-split{display:grid;grid-template-columns:1fr 1fr;}
+.yr-sum-sleep-item{text-align:center;padding:0 8px;position:relative;}
+.yr-sum-sleep-item:last-child::before{content:'';position:absolute;left:0;top:4px;bottom:4px;width:1px;background:rgba(var(--divider-rgb),0.3);}
+.yr-sum-sleep-lbl{font-size:12px;color:var(--ts);margin-bottom:6px;}
+.yr-sum-sleep-val{font-size:20px;font-weight:700;color:var(--tp);font-family:'DM Sans',sans-serif;}
+.yr-sum-sleep-val .unit{font-size:11px;font-weight:500;color:var(--ts);}
+.yr-sum-sleep-val.small{font-size:16px;}
+
 /* intro */
 .habit-intro{padding:8px 2px 22px;}
 .habit-intro-kicker{font-size:13px;
