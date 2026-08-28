@@ -12702,6 +12702,8 @@ async function _drawQuoteBody(ctx,layout,q,book,textColor,subColor,isWhite,fontS
   const {tx0,contentW,align}=layout;
   let ty=layout.ty;
   const lineH=Math.round(fs*1.6);
+  // 줄바꿈 폭 측정은 실제 본문 폰트가 적용된 상태에서 이뤄져야 함 — 인용부호(64px) 등 다른 font 설정이 남아있으면 측정이 틀어짐
+  ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
   const lines=_shareWrapText(ctx,q.text,contentW);
   if(quoteMark){
     ctx.save();
@@ -12780,6 +12782,7 @@ async function _drawQuoteBody(ctx,layout,q,book,textColor,subColor,isWhite,fontS
 // 코멘트/footer 블록 높이를 미리 계산(가변 카드 높이용) — _drawQuoteBody와 동일한 규칙을 따름
 function _measureQuoteBody(ctx,contentW,q,fs,quoteMark,showComment,showInfo){
   const lineH=Math.round(fs*1.6);
+  ctx.font='400 '+fs+'px Bareonbatang, serif';
   const lines=_shareWrapText(ctx,q.text,contentW);
   let h=lines.length*lineH;
   if(quoteMark)h+=76;
