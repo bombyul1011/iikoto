@@ -4017,12 +4017,10 @@ function _chNoteRowHtml(n,showTime){
 //
 // 신규로 만든 것 (연간탭에만 필요, 이 파일에 정의):
 //   quarterKeyOf, quarterRangeOf, quarterLabel  — 분기 개념(기존 앱엔 없었음)
-//   _yrDayTypeOf                                — 하루 유형 분류(업무/휴식/약속/혼합)
 //   _yrCoreWindowStat                           — 코어 회복구간(23~02시) 점유율
 //   _yrSleepDurationBuckets                     — 수면시간 4구간 분포
 //   _yrCoreVsDurationComment                    — 코어구간×수면시간, 룰 기반 3~4단계 코멘트(비-API)
-//   _yrLineChartHTML                            — 라인차트 공통 빌더(좌표계산+SVG+범례를 한 곳에 통합,
-//                                                  분기라인/요일유형라인/월별수면라인 3곳이 재사용)
+//   _yrLineChartHTML                            — 라인차트 공통 빌더(좌표계산+SVG+범례를 한 곳에 통합)
 // ══════════════════════════════════════════════════════════
 
 // ── 분기 유틸 (기존 monthKeyOf/weekKeyOf와 동일한 스타일로 신규 추가) ──
@@ -4397,7 +4395,6 @@ function renderYrHabitTab(ctx){
 
   renderYrHabitScore(ctx,habitStats);
   renderYrHabitInsights(ctx,habitStats);
-  renderYrHabitCompare(ctx);
 }
 
 // 전체 평균 달성률 큰 숫자 + 가장 안정적인(표준편차 최소) 습관 — 습관탭 인트로 아래 첫 배너
@@ -4456,62 +4453,6 @@ function renderYrHabitInsights(ctx,habitStats){
     </div>`;
 }
 
-// 달성률(체크일수/전체일수) vs 유지력(주 최소 1회 실천한 주의 비율) — 두 지표를 나란히 비교
-// 분모(전체일수) 시작점은 1/1이 아니라 실제 습관 기록이 시작된 날짜부터 — 1~5월처럼 기록 자체가
-// 없는 기간을 분모에 넣으면 달성률이 실제보다 낮게 나옴(습관탭 흐름표 계산과 동일한 원칙).
-function renderYrHabitCompare(ctx){
-  const el=document.getElementById('yr-habit-compare-body');
-  const checkDates=ctx.habitChecks.map(c=>c.date_key).filter(Boolean).sort();
-  const startDk=checkDates.length?checkDates[0]:`${ctx.y}-01-01`;
-  const endDk=dateKey(new Date());
-  const totalDays=Math.max(1,Math.ceil((new Date(endDk)-new Date(startDk))/86400000)+1);
-
-  const achievedPct=ctx.habits.length
-    ?Math.round(_uniqueHabitCheckCount(ctx.habitChecks)/(ctx.habits.length*totalDays)*100)
-    :0;
-
-  // 유지력 — ISO 주차별로 그 주에 하나라도 체크가 있었는지(습관 전체 기준)를 집계
-  const weekSet=new Set();
-  const checkedWeekSet=new Set();
-  for(let i=0;i<totalDays;i++){
-    const d=new Date(startDk);d.setDate(d.getDate()+i);
-    const wk=weekKeyOf(d);
-    weekSet.add(wk);
-  }
-  ctx.habitChecks.forEach(c=>{
-    if(!c.date_key)return;
-    checkedWeekSet.add(weekKeyOf(new Date(c.date_key)));
-  });
-  const sustainPct=weekSet.size?Math.round([...weekSet].filter(w=>checkedWeekSet.has(w)).length/weekSet.size*100):0;
-
-  el.innerHTML=`
-    <div class="habit-compare-line">
-      <div class="compare-label">달성률</div>
-      <div class="compare-bar"><span style="width:${achievedPct}%"></span></div>
-      <strong>${achievedPct}%</strong>
-    </div>
-    <div class="habit-compare-line muted">
-      <div class="compare-label">유지력</div>
-      <div class="compare-bar"><span style="width:${sustainPct}%"></span></div>
-      <strong>${sustainPct}%</strong>
-    </div>
-    <p class="habit-footnote">유지력은 '한 주에 최소 한 번 이상 실천한 주의 비율'이에요. 매일 하진 못해도 완전히 놓지 않은 주가 ${sustainPct}%였다는 뜻이라, 달성률(${achievedPct}%)보다 실제 습관과의 거리감이 더 잘 보여요.</p>`;
-
-  renderYrHabitInsight(ctx,achievedPct,sustainPct);
-}
-
-// 습관탭 인사이트 — 룰 기반(비-API). 가장 낮은 유지력 습관을 찾아 문장에 대입.
-function renderYrHabitInsight(ctx,achievedPct,sustainPct){
-  const el=document.getElementById('yr-habit-insight');
-  if(!ctx.habits.length){el.innerHTML='';return;}
-  const gap=sustainPct-achievedPct;
-  const tone=gap>=20?'tone-suggest':'tone-observe';
-  const gapText=gap>=20
-    ?`${ctx.habits.length}개 습관을 동시에 챙기려다 보니 평균 달성률이 낮게 나온 것으로 보여요. 완전히 놓지 않는 것부터 목표로 낮춰보면 좋을 것 같아요.`
-    :'달성률과 유지력의 차이가 크지 않아요. 꾸준히 이어가고 있는 편이에요.';
-  el.innerHTML=`<div class="insight-box ${tone}"><i class="ti ti-bulb"></i><div><strong>제안:</strong> ${gapText}</div></div>`;
-}
-
 // ══════════════════════════════════════════════════════════
 // 콘텐츠 — 분기(Q1~Q4)별 소비량, 전분기 대비
 // ══════════════════════════════════════════════════════════
@@ -4556,7 +4497,6 @@ function renderYrContentTab(ctx){
   renderYrContentRatingStats(ctx,inRange);
   renderYrContentHighlight(ctx,inRange);
   renderYrContentCumul(ctx,inRange);
-  renderYrContentMonthlyFlow(ctx);
   renderYrContentInsight(ctx,quarters,countsByQ);
 }
 
@@ -4656,36 +4596,6 @@ function renderYrContentCumul(ctx,inRange){
     <div class="cumul-list">${rowsHtml}</div>`;
 }
 
-// 월별 카테고리 소비 추이(도서·드라마·영화 그룹바) — 시작일(start_date) 기준, 장편 콘텐츠만 비교(목업 원본과 동일 기준)
-function renderYrContentMonthlyFlow(ctx){
-  const el=document.getElementById('yr-content-monthly-flow');
-  if(!el)return;
-  const cats=['book','drama','movie'];
-  const monthly=[];
-  for(let m=0;m<ctx.elapsedMonths;m++){
-    const mk=`${ctx.y}-${pad(m+1)}`;
-    const inMonth=ctx.contents.filter(c=>c.start_date&&c.start_date.startsWith(mk));
-    monthly.push(cats.map(cat=>inMonth.filter(c=>c.content_cat===cat).length));
-  }
-  const maxVal=Math.max(...monthly.flat(),1);
-  if(maxVal<=1&&monthly.every(row=>row.every(v=>v===0))){el.innerHTML='';return;}
-
-  const groupsHtml=monthly.map((counts,m)=>{
-    const barsHtml=cats.map((cat,i)=>{
-      const pct=Math.round(counts[i]/maxVal*100);
-      return `<div class="gb-bar" style="height:${pct}%; background:${CAT_ICON_META[cat].bg};"></div>`;
-    }).join('');
-    return `<div class="gb-group"><div class="gb-bars">${barsHtml}</div><div class="gb-label">${m+1}월</div></div>`;
-  }).join('');
-  const legendHtml=cats.map(cat=>`<div class="chart-legend-item"><span class="chart-legend-dot" style="background:${CAT_ICON_META[cat].bg}"></span>${CAT_ICON_META[cat].label}</div>`).join('');
-
-  el.innerHTML=`
-    <div class="bento-lbl">월별 카테고리 소비 추이 (도서·드라마·영화)</div>
-    <div class="bento-sub" style="margin-top:0;">시작일 기준, 장편 콘텐츠만 놓고 비교해요. 데이터가 쌓이는 만큼 오른쪽으로 이어져요.</div>
-    <div class="grouped-bar-wrap">${groupsHtml}</div>
-    <div class="chart-legend">${legendHtml}</div>`;
-}
-
 // 콘텐츠탭 인사이트 — 룰 기반. 분기 증감 + 코멘트 비율을 함께 반영.
 function renderYrContentInsight(ctx,quarters,countsByQ){
   const el=document.getElementById('yr-content-insight');
@@ -4719,17 +4629,8 @@ function renderYrContentInsight(ctx,quarters,countsByQ){
 }
 
 // ══════════════════════════════════════════════════════════
-// 리듬 — 목업 순서 그대로: 표준하루밸런스 → 평일vs주말 → 하루유형별비중 →
-//        8대카테고리그리드 → 핵심리듬4가지 월별흐름 → 분기별 라인 → 요일유형별 라인
+// 리듬 — 표준하루밸런스 → 평일vs주말 → 8대카테고리그리드 → 핵심리듬4가지 월별흐름
 // ══════════════════════════════════════════════════════════
-const YR_DAY_TYPE_THRESHOLD=0.4;
-function _yrDayTypeOf(dayBlocks){
-  const {d,total}=_rhythmDurByCat(dayBlocks);
-  if(!total)return null;
-  const topCat=Object.keys(d).sort((a,b)=>d[b]-d[a])[0];
-  const topRatio=d[topCat]/total;
-  return topRatio>=YR_DAY_TYPE_THRESHOLD?topCat:'mixed';
-}
 function _yrIsWeekend(dateKeyStr){
   const dow=new Date(dateKeyStr+'T00:00:00').getDay();
   return dow===0||dow===6;
@@ -4782,11 +4683,8 @@ function _yrDailyAvgByCat(byDate,dateList,cat){
 function renderYrRhythmTab(ctx){
   renderYrRhythmStandardDay(ctx);
   renderYrRhythmWeekdayCompare(ctx);
-  renderYrDayType(ctx);
   renderYrRhythm9Grid(ctx);
   renderYrRhythmMonthlyFlow(ctx);
-  renderYrRhythmQuarterLine(ctx);
-  renderYrRhythmWeekdayLine(ctx);
 }
 
 // 표준 하루 밸런스 — 누적 평균 기준 상위 5개 카테고리를 24시간 막대로. 기존 timeline-24h-bar(월간탭) 재사용.
@@ -4866,70 +4764,6 @@ function renderYrRhythmWeekdayCompare(ctx){
     </div>`;
 }
 
-function renderYrDayType(ctx){
-  const byDate=_yrGroupByDate(ctx.rblocks);
-
-  const typeCounts={};
-  const typeDates={}; // 유형별 날짜 목록 — 평일/주말 패턴 계산용
-  Object.entries(byDate).forEach(([dk,dayBlocks])=>{
-    const type=_yrDayTypeOf(dayBlocks);
-    if(!type)return;
-    typeCounts[type]=(typeCounts[type]||0)+1;
-    (typeDates[type]=typeDates[type]||[]).push(dk);
-  });
-
-  const el=document.getElementById('yr-daytype-body');
-  const totalDaysAll=Object.values(typeCounts).reduce((a,b)=>a+b,0);
-  if(!totalDaysAll){el.innerHTML='<div class="empty-msg">기록된 리듬이 없어요</div>';return;}
-
-  // 상위 4개 유형만 그래프/범례에 포함 — 나머지는 "기타"로 묶지 않고 그냥 제외(비중이 작아 의미 없음)
-  const sortedAll=Object.keys(typeCounts).sort((a,b)=>typeCounts[b]-typeCounts[a]);
-  const sorted=sortedAll.slice(0,4);
-  const totalDays=sorted.reduce((s,k)=>s+typeCounts[k],0);
-
-  const legendHtml=sorted.map(k=>{
-    const meta=k==='mixed'?{label:'혼합형',color:'rgba(180,180,180,0.7)'}:RHYTHM_CATS[k];
-    if(!meta)return '';
-    return `<div class="mrsl-legend-row"><span class="mrsl-legend-dot" style="background:${meta.color};"></span>${meta.label}중심날 <span class="mrsl-legend-val">${typeCounts[k]}일</span></div>`;
-  }).join('');
-
-  // 도넛 stroke-dasharray는 기존 renderMrpSleep 도넛 계산 방식(circ, cum) 그대로 재사용
-  const circ=2*Math.PI*42;let cum=0;
-  const segsHtml=sorted.map(k=>{
-    const meta=k==='mixed'?{color:'rgba(180,180,180,0.55)'}:RHYTHM_CATS[k];
-    const len=typeCounts[k]/totalDays*circ;
-    const seg=`<circle cx="50" cy="50" r="42" fill="none" stroke="${meta.color}" stroke-width="13" stroke-dasharray="${len.toFixed(2)} ${(circ-len).toFixed(2)}" stroke-dashoffset="${-cum.toFixed(2)}" stroke-linecap="round"/>`;
-    cum+=len;
-    return seg;
-  }).join('');
-
-  const topType=sorted[0];
-  const topLabel=topType==='mixed'?'혼합형':RHYTHM_CATS[topType].label+'중심날';
-  const mixedCount=typeCounts['mixed']||0;
-
-  // 가장 흔한 유형의 평일/주말 분포 — 도넛 옆 여백에 "이 유형이 언제 주로 나타나는지" 요약
-  const topDates=typeDates[topType]||[];
-  const topWeekdayCount=topDates.filter(dk=>!_yrIsWeekend(dk)).length;
-  const topWeekendCount=topDates.length-topWeekdayCount;
-  const patternText=topWeekdayCount>=topWeekendCount
-    ?`평일에 더 자주 나타나요 (평일 ${topWeekdayCount}일 · 주말 ${topWeekendCount}일)`
-    :`주말에 더 자주 나타나요 (주말 ${topWeekendCount}일 · 평일 ${topWeekdayCount}일)`;
-
-  el.innerHTML=`
-    <div class="mrsl-donut-wrap">
-      <div class="mrsl-donut-box" style="width:88px;height:88px;"><svg viewBox="0 0 100 100">${segsHtml}</svg></div>
-      <div class="mrsl-legend">${legendHtml}</div>
-      <div class="daytype-pattern-note">
-        <div class="daytype-pattern-lbl">${topLabel} 패턴</div>
-        <div class="daytype-pattern-text">${patternText}</div>
-      </div>
-    </div>
-    <div class="insight-box tone-observe" style="margin-top:14px;">
-      <i class="ti ti-info-circle"></i>
-      <div><strong>추세:</strong> ${topLabel}이 ${typeCounts[topType]}일로 가장 많았${mixedCount?`고, 특정 카테고리 하나가 두드러지지 않는 혼합형도 ${mixedCount}일이었어요`:'어요'}.</div>
-    </div>`;
-}
-
 // 8대 카테고리 일평균 밸런스 — RHYTHM_CATS 8개 전부, 아이콘/색 그대로 재사용.
 // 일평균의 분모는 카테고리별 실제 발생일수(월간리포트와 동일 기준) — 전체 기록일수로 나누면
 // 어쩌다 한 번 한 활동이 실제보다 훨씬 낮게 희석되어 보이는 문제가 있었음.
@@ -4984,66 +4818,6 @@ function renderYrRhythmMonthlyFlow(ctx){
       <i class="ti ti-chart-line"></i>
       <div><strong>추세:</strong> ${risingText}</div>
     </div>`;
-}
-
-// 분기별 리듬 변화 라인차트 — 완결된 분기까지만, 상위 3개 카테고리
-function renderYrRhythmQuarterLine(ctx){
-  const el=document.getElementById('yr-rhythm-quarter-line');
-  if(!el)return;
-  const curMonth=ctx.elapsedMonths-1;
-  const quarters=listQuartersUpTo(ctx.y,curMonth).filter(q=>!q.isFuture);
-  if(quarters.length<2){el.innerHTML='<div class="empty-msg">분기 비교는 2개 분기 이상 데이터가 쌓이면 표시돼요</div>';return;}
-
-  const {d:totalByCat}=_rhythmDurByCat(ctx.rblocks);
-  const top3=Object.entries(totalByCat).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k])=>k);
-
-  const qData=quarters.map(({q})=>{
-    const {startMonth,endMonth}=quarterRangeOf(ctx.y,q);
-    const blocksInQ=ctx.rblocks.filter(b=>{
-      if(!b.date_key)return false;
-      const mo=parseInt(b.date_key.slice(5,7),10)-1;
-      return mo>=startMonth&&mo<=Math.min(endMonth,curMonth);
-    });
-    const daysInQ=new Set(blocksInQ.map(b=>b.date_key)).size||1;
-    const {d}=_rhythmDurByCat(blocksInQ);
-    return top3.reduce((acc,k)=>{acc[k]=(d[k]||0)/daysInQ;return acc;},{});
-  });
-
-  const series=top3.map(k=>({values:qData.map(qd=>qd[k]),color:RHYTHM_CATS[k].color,label:RHYTHM_CATS[k].label}));
-  const xLabels=quarters.map(({q,isCurrent})=>`${quarterRangeOf(ctx.y,q).label.slice(0,2)}분기${isCurrent?' (진행중)':''}`);
-  const xLabelOpacity=quarters.map(({isCurrent})=>isCurrent?1:0.6);
-  el.innerHTML=_yrLineChartHTML(series,xLabels,{height:150,xLabelOpacity});
-}
-
-// 요일 유형별(평일 vs 주말) 업무 비중 누적 추이 — 월별로 평일평균/주말평균을 나눠 라인 2개
-function renderYrRhythmWeekdayLine(ctx){
-  const el=document.getElementById('yr-rhythm-weekday-line');
-  if(!el)return;
-  if(ctx.elapsedMonths<2){el.innerHTML='<div class="empty-msg">2개월 이상 쌓이면 표시돼요</div>';return;}
-
-  const monthly=_yrByMonth(ctx,blocksInMonth=>{
-    const byDate=_yrGroupByDate(blocksInMonth);
-    const {weekday:wdDates,weekend:weDates}=_yrSplitWeekdayWeekend(Object.keys(byDate));
-    return {
-      wdAvg:_yrDailyAvgByCat(byDate,wdDates,'work'),
-      weAvg:_yrDailyAvgByCat(byDate,weDates,'work')
-    };
-  });
-
-  const n=monthly.length;
-  const firstDiff=monthly[0].weAvg-monthly[0].wdAvg;
-  const lastDiff=monthly[n-1].weAvg-monthly[n-1].wdAvg;
-  const reversed=firstDiff<=0&&lastDiff>0;
-  const insightHtml=reversed
-    ?`<div class="insight-box tone-alert" style="margin-top:12px;"><i class="ti ti-alert-circle"></i><div><strong>주의:</strong> 주말 업무 비중이 평일보다 더 가파르게 늘고 있어요. 초반엔 평일이 더 높았지만 최근엔 역전됐어요. 이 흐름이 이어지는지 지켜볼 필요가 있어요.</div></div>`
-    :`<div class="insight-box tone-observe" style="margin-top:12px;"><i class="ti ti-calendar-stats"></i><div><strong>추세:</strong> 평일과 주말의 업무 비중 흐름을 비교해봤어요.</div></div>`;
-
-  const series=[
-    {values:monthly.map(m=>m.wdAvg),color:'rgba(160,160,160,0.9)',label:'평일 업무 비중'},
-    {values:monthly.map(m=>m.weAvg),color:'var(--pal-lavender-text)',label:'주말 업무 비중'}
-  ];
-  const xLabels=monthly.map((_,i)=>`${i+1}월`);
-  el.innerHTML=_yrLineChartHTML(series,xLabels,{height:130,insightHtml});
 }
 
 // ══════════════════════════════════════════════════════════
@@ -5149,7 +4923,6 @@ function renderYrSleepTab(ctx){
     </div>`;
 
   renderYrSleepWeekdayRange(ctx,validRows);
-  renderYrSleepMonthlyLine(ctx,validRows);
 }
 
 // 월별 수면시간 및 컨디션 상관관계 콤보차트 — 기존 renderMrpSleep의 combo-* 구조 그대로 재사용
@@ -5243,57 +5016,18 @@ function renderYrSleepWeekdayRange(ctx,validRows){
   const earliestLabel=sorted.length?YR_DOW_LABELS[sorted[0].dow]:'-';
   const latestLabel=sorted.length?YR_DOW_LABELS[sorted[sorted.length-1].dow]:'-';
 
-  // 평일 vs 주말 비교
-  const wdRows=validRows.filter(r=>r.date_key&&!_yrIsWeekend(r.date_key));
-  const weRows=validRows.filter(r=>r.date_key&&_yrIsWeekend(r.date_key));
-  const wdStats=wdRows.length?_sleepStatsOf(wdRows):null;
-  const weStats=weRows.length?_sleepStatsOf(weRows):null;
-  const wdSleepAvg=avg(wdRows.map(r=>toDawnAdjustedMin(_dawnTimeToMin(r.sleep_time),22*60)).filter(v=>v!=null));
-  const weSleepAvg=avg(weRows.map(r=>toDawnAdjustedMin(_dawnTimeToMin(r.sleep_time),22*60)).filter(v=>v!=null));
-  const wdWakeAvg=avg(wdRows.map(r=>_dawnTimeToMin(r.wake_time)).filter(v=>v!=null));
-  const weWakeAvg=avg(weRows.map(r=>_dawnTimeToMin(r.wake_time)).filter(v=>v!=null));
-
-  const cmpHtml=(wdStats&&weStats)?`
-    <div class="mrsl-cmp" style="margin-top:16px;padding-top:14px;border-top:1px solid rgba(var(--divider-rgb),0.25);">
-      <div class="mrsl-cmp-label" style="margin-bottom:2px;">평일 vs 주말</div>
-      <div class="mrsl-cmp-row"><span>취침 시각</span><span class="mrsl-cmp-val ${weSleepAvg>wdSleepAvg?'up':'down'}">평일 ${_yrMinToHHMM(wdSleepAvg)} → 주말 ${_yrMinToHHMM(weSleepAvg)}</span></div>
-      <div class="mrsl-cmp-row"><span>기상 시각</span><span class="mrsl-cmp-val ${weWakeAvg>wdWakeAvg?'up':'down'}">평일 ${_yrMinToHHMM(wdWakeAvg)} → 주말 ${_yrMinToHHMM(weWakeAvg)}</span></div>
-      <div class="mrsl-cmp-row"><span>평균 수면시간</span><span class="mrsl-cmp-val flat">평일 ${(wdStats.avgMin/60).toFixed(1)}h · 주말 ${(weStats.avgMin/60).toFixed(1)}h</span></div>
-    </div>`:'';
-
   el.innerHTML=`
     <div class="sleep-range-wrap">
       ${rowsHtml}
       <div class="range-axis"><span>00:00</span><span>02:00</span><span>04:00</span><span>06:00</span><span>08:00</span><span>10:00</span></div>
     </div>
-    <div class="bento-sub" style="margin-top:14px;">전체 평균 취침 ${_yrMinToHHMM(allSleepAvg)} · 기상 ${_yrMinToHHMM(allWakeAvg)} · ${earliestLabel}요일이 가장 이르고, ${latestLabel}요일이 가장 늦어요</div>
-    ${cmpHtml}`;
+    <div class="bento-sub" style="margin-top:14px;">전체 평균 취침 ${_yrMinToHHMM(allSleepAvg)} · 기상 ${_yrMinToHHMM(allWakeAvg)} · ${earliestLabel}요일이 가장 이르고, ${latestLabel}요일이 가장 늦어요</div>`;
 
   // 마지막 인사이트(제안) — 요일별 취침시각 편차 기반
   const insightEl=document.getElementById('yr-sleep-final-insight');
   if(insightEl){
     insightEl.innerHTML=`<div class="insight-box tone-suggest"><i class="ti ti-bulb"></i><div><strong>제안:</strong> ${earliestLabel}요일엔 상대적으로 일찍 잠들지만 ${latestLabel}요일엔 더 늦어져요. 취침 시각이 가장 늦은 요일 전날부터 조금씩 당겨보면 도움이 될 것 같아요.</div></div>`;
   }
-}
-
-// 월별 평균 수면시간 누적 추이 — 리듬탭 라인차트와 동일한 SVG 패턴
-function renderYrSleepMonthlyLine(ctx,validRows){
-  const el=document.getElementById('yr-sleep-monthly-line');
-  if(!el)return;
-  const monthly=_yrByMonth(ctx,rowsInMonth=>rowsInMonth.length?_sleepStatsOf(rowsInMonth).avgMin:null,validRows);
-  const valid=monthly.filter(v=>v!=null);
-  if(valid.length<2){el.innerHTML='';return;}
-
-  const series=[{values:monthly,color:'var(--pal-sky-text)'}];
-  const xLabels=monthly.map((v,i)=>`${i+1}월${v!=null?` · ${(v/60).toFixed(1)}h`:''}`);
-  const chartHtml=_yrLineChartHTML(series,xLabels,{height:120,legend:false,scale:'minmax'});
-
-  el.innerHTML=`
-    <div class="bento-item bento-full">
-      <div class="bento-lbl">월별 평균 수면시간 누적 추이</div>
-      <div class="bento-sub" style="margin-top:0;">개월이 쌓일수록 오른쪽으로 이어져요.</div>
-      ${chartHtml}
-    </div>`;
 }
 
 // ══════════════════════════════════════════════════════════
