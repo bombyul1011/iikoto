@@ -4520,8 +4520,80 @@ function renderYrHabitInsights(ctx,habitStats){
 }
 
 // ══════════════════════════════════════════════════════════
-// 콘텐츠 — 분기(Q1~Q4)별 소비량, 전분기 대비
+// 콘텐츠 — 갤러리(완결 콘텐츠 포스터 모음), 분기(Q1~Q4)별 소비량, 전분기 대비
 // ══════════════════════════════════════════════════════════
+
+// 연간탭 전용 갤러리 상태 — 월간탭 cgrid(_cgridActiveId 등)와 완전히 분리(동시에 열려있을 때 서로 간섭 방지).
+let _yrCgridActiveId=null;
+let _yrCgridList=[];
+
+// 갤러리 카드 1개 — 월간탭 cgrid와 같은 CSS 클래스 재사용, 로직만 연간탭 전용으로 새로 작성(가볍게: 진행률·메모 타임라인 없음, 완결작만 다루므로).
+function _yrCgridItemHtml(c){
+  const meta=CAT_ICON_META[c.content_cat]||{icon:'ti-stack-2',bg:'rgba(150,150,150,1)'};
+  const thumb=c.poster
+    ?`<img class="cgrid-thumb" src="${c.poster}" />`
+    :`<div class="cgrid-thumb-fallback" style="background:${meta.bg};"><i class="ti ${meta.icon}" aria-hidden="true"></i></div>`;
+  const icons=[];
+  if(c.stars>0)icons.push('<i class="ti ti-star" aria-hidden="true"></i>');
+  if(c.review)icons.push('<i class="ti ti-message-circle" aria-hidden="true"></i>');
+  const thumbIcons=icons.length?`<div class="cgrid-thumb-icons">${icons.join('')}</div>`:'';
+  const active=c.id===_yrCgridActiveId;
+  return `<div class="cgrid-item${active?' active':''}" data-cid="${c.id}" onclick="toggleYrCgridDetail('${c.id}')">
+    <div class="cgrid-thumb-wrap">${thumb}${thumbIcons}</div>
+    <div class="cgrid-title">${escapeHtml(c.title||'')}</div>
+  </div>`;
+}
+
+// 갤러리 상세 — 완결작 전용(진행중 상태·진행률바·감상메모 타임라인 없음). 기간+별점, 완결 총평만.
+function _yrCgridDetailHtml(c){
+  const period=_cgridPeriodLabel(c);
+  const stars=c.stars>0?`<span class="cgrid-detail-stars">${'★'.repeat(c.stars)}</span>`:'';
+  const topRow=(period||stars)?`<div class="cgrid-detail-row"><span class="cgrid-detail-row-date">${period?`<i class="ti ti-calendar" style="font-size:12px;" aria-hidden="true"></i>${period}`:''}</span>${stars}</div>`:'';
+  const finalHtml=c.review?`<div class="cgrid-detail-final"><span class="cgrid-detail-final-lbl">Comment :</span> ${escapeHtml(c.review)}</div>`:'';
+  return `<div class="cgrid-detail">${topRow}${finalHtml}</div>`;
+}
+
+// 3개씩 행 단위 렌더 — 월간탭 _cgridRowsHtml과 동일 패턴(펼침 영역을 해당 행 바로 뒤에 3칸 전체폭으로 삽입)
+function _yrCgridRowsHtml(list){
+  let html='';
+  for(let i=0;i<list.length;i+=3){
+    const row=list.slice(i,i+3);
+    html+=row.map(c=>_yrCgridItemHtml(c)).join('');
+    const activeInRow=row.find(c=>c.id===_yrCgridActiveId);
+    html+=`<div class="cgrid-detail-row-wrap${activeInRow?' on':''}" id="yr-cgrid-detail-wrap-${i}">${activeInRow?_yrCgridDetailHtml(activeInRow):''}</div>`;
+  }
+  return html;
+}
+function toggleYrCgridDetail(id){
+  _yrCgridActiveId=(_yrCgridActiveId===id)?null:id;
+  const el=document.getElementById('yr-cgrid-grid-inner');
+  if(el)el.innerHTML=_yrCgridRowsHtml(_yrCgridList);
+}
+
+// 올해 완결된 콘텐츠(book/drama/movie, done/stopped)를 최근 종료순으로 최대 15개 — 무한정 늘어나지 않게 상한.
+// music은 시청기간 개념이 없어(등록일만 존재) 기존 콘텐츠 비교 전반과 동일하게 제외.
+function renderYrContentGallery(ctx){
+  const el=document.getElementById('yr-content-gallery');
+  if(!el)return;
+  const startDk=`${ctx.y}-01-01`,endDk=`${ctx.y}-12-31`;
+  const completed=(ctx.contents||[]).filter(c=>
+    c.content_cat!=='music'
+    &&(c.status==='done'||c.status==='stopped')
+    &&c.end_date&&c.end_date>=startDk&&c.end_date<=endDk
+  ).sort((a,b)=>(b.end_date||'').localeCompare(a.end_date||''));
+
+  if(!completed.length){el.innerHTML='';return;}
+
+  _yrCgridList=completed.slice(0,15);
+  _yrCgridActiveId=null;
+
+  el.innerHTML=`
+    <div class="bento-item bento-full">
+      <div class="bento-lbl">올해의 감상 아카이브</div>
+      <div class="bento-sub" style="margin-top:0;margin-bottom:12px;">완결한 콘텐츠를 최근 순으로 모아봤어요. 눌러보면 평점과 총평을 볼 수 있어요.</div>
+      <div class="cgrid-grid" id="yr-cgrid-grid-inner">${_yrCgridRowsHtml(_yrCgridList)}</div>
+    </div>`;
+}
 
 // rhythm_blocks에서 드라마/독서/영화 감상시간(분)을 월별로 집계 — renderTodayReading(오늘탭)과 동일 기준:
 // cat==='enjoy'이고 텍스트가 "드라마 - "/"독서 - "/"영화 - "로 시작하는 블록만 대상, start~end 차이를 합산.
@@ -4632,6 +4704,7 @@ function renderYrContentTab(ctx){
   const introSubEl=document.getElementById('yr-content-intro-sub');
   if(introSubEl)introSubEl.textContent=`누적 ${totalCount}개의 콘텐츠, 그 흐름을 분석합니다.`;
 
+  renderYrContentGallery(ctx);
   renderYrContentTimeCompare(ctx);
   renderYrContentCumul(ctx,inRange);
 }
