@@ -4074,13 +4074,11 @@ async function loadYearlyTab(){
     sleepRows:sleepRows||[],habits:habits||[],habitChecks:habitChecks||[],rblocks:rblocks||[],
     contents:contents||[],quarterlyCache:goalRows||[],chaeumRows:chaeumRows||[]};
 
-  // 상단 페이지 라벨, 습관탭 인트로 텍스트(연도/누적개월) — 정적 마크업의 빈 span을 채움
+  // 상단 페이지 라벨, 습관탭 인트로 텍스트(연도) — 정적 마크업의 빈 span을 채움
   const periodEl=document.getElementById('yr-period-label');
   if(periodEl)periodEl.textContent=`${y}.01 ~ 누계 (${elapsedMonths}개월)`;
   const habitYearEl=document.getElementById('yr-habit-year');
   if(habitYearEl)habitYearEl.textContent=y;
-  const habitMonthEl=document.getElementById('yr-habit-month-count');
-  if(habitMonthEl)habitMonthEl.textContent=elapsedMonths;
   const contentYearEl=document.getElementById('yr-content-year');
   if(contentYearEl)contentYearEl.textContent=y;
 
@@ -4157,8 +4155,8 @@ function renderYrQuarterlyReflection(ctx){
   el.innerHTML=`<div class="insight-box tone-reflect"><i class="ti ti-quote"></i><div><strong>올해를 돌아보며:</strong> ${text}</div></div>`;
 }
 
-// 키워드 클라우드 — renderWeekKeywords와 완전히 동일한 방식(_weekKwTokenize, WEEK_KW_COLORS 재사용),
-// 대상 범위만 최근 2주 → 연 누적으로 확장.
+// 키워드 클라우드 — renderWeekKeywords와 완전히 동일한 방식(_weekKwTokenize, WEEK_KW_COLORS, week-kw-cloud 배치 재사용),
+// 대상 범위만 최근 2주 → 연 누적으로 확장. 개수도 주간탭과 동일하게 6개로 통일(2026-08).
 function renderYrKeywordCloud(ctx){
   const el=document.getElementById('yr-kw-cloud');
   const memoText=ctx.memos.map(m=>m.text||'').join(' ');
@@ -4168,32 +4166,29 @@ function renderYrKeywordCloud(ctx){
   const tokens=_weekKwTokenize(allText);
   const freq={};
   tokens.forEach(t=>{freq[t]=(freq[t]||0)+1;});
-  const top=Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,8); // 연간은 표본이 크니 6→8개로 확장
+  const top=Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,6);
   if(!top.length){el.innerHTML='<div class="empty-msg">추출된 키워드가 없어요</div>';return;}
 
   const maxCnt=top[0][1],minCnt=top[top.length-1][1];
-  // 3-2-3 배치 — 무작위 클라우드 대신 정렬된 3줄 구성(1행 3개·2행 2개·3행 3개)으로 배너 높이를 줄임.
-  // 8개 미만이면 뒤 행부터 순서대로 채움(예: 5개면 3-2, 3개면 3만).
-  const rowSizes=[3,2,3];
-  const rows=[];
-  let idx=0;
-  for(const size of rowSizes){
-    if(idx>=top.length)break;
-    rows.push(top.slice(idx,idx+size));
-    idx+=size;
-  }
-  const rowsHtml=rows.map(rowWords=>{
-    const wordsHtml=rowWords.map(([w,c])=>{
-      const ratio=maxCnt===minCnt?1:(c-minCnt)/(maxCnt-minCnt);
-      const fontSize=14+ratio*10; // 정렬 배치라 겹침 걱정 없이 14~24px
-      const colorIdx=top.findIndex(([tw,tc])=>tw===w&&tc===c);
-      const color=WEEK_KW_COLORS[colorIdx%WEEK_KW_COLORS.length];
-      return `<span class="yr-kw-grid-word" style="font-size:${fontSize}px;color:${color};">${escapeHtml(w)}<span class="week-kw-cnt">${c}</span></span>`;
-    }).join('');
-    return `<div class="yr-kw-grid-row">${wordsHtml}</div>`;
+  const n=top.length;
+  // 주간탭 renderWeekKeywords와 동일한 격자+무작위 오프셋 배치 — 카드형으로 자연스럽게 불규칙해 보이도록.
+  const gridCols=n<=2?n:Math.ceil(n/2);
+  const gridRows=n<=2?1:2;
+  const cellW=100/gridCols,cellH=100/gridRows;
+  const wordsHtml=top.map(([w,c],i)=>{
+    const ratio=maxCnt===minCnt?1:(c-minCnt)/(maxCnt-minCnt);
+    const fontSize=18+ratio*16; // 18px~34px
+    const col=i%gridCols,row=Math.floor(i/gridCols);
+    const rawCx=col*cellW+cellW/2+(Math.random()-0.5)*cellW*0.5;
+    const rawCy=row*cellH+cellH/2+(Math.random()-0.5)*cellH*0.45;
+    const cx=Math.min(88,Math.max(12,rawCx));
+    const cy=Math.min(85,Math.max(15,rawCy));
+    const rotate=(Math.random()-0.5)*24;
+    const color=WEEK_KW_COLORS[i%WEEK_KW_COLORS.length];
+    return `<div class="week-kw-word" style="left:${cx}%;top:${cy}%;font-size:${fontSize}px;color:${color};transform:translate(-50%,-50%) rotate(${rotate}deg);">${escapeHtml(w)}<span class="week-kw-cnt">${c}</span></div>`;
   }).join('');
 
-  el.innerHTML=`<div class="yr-kw-grid">${rowsHtml}</div>
+  el.innerHTML=`<div class="week-kw-cloud">${wordsHtml}</div>
     <div class="yr-kw-summary"><i class="ti ti-quote" aria-hidden="true"></i> ${top[0][1]?escapeHtml(top[0][0]):''}${top[1]?', '+escapeHtml(top[1][0]):''}${top[2]?', '+escapeHtml(top[2][0]):''} 같은 단어가 자주 등장했어요.</div>`;
 }
 
@@ -4232,7 +4227,8 @@ function _yrHabitOverallStats(ctx){
   return {avgPct,perHabit};
 }
 
-const YR_HABIT_COLOR_MAP={mint:'var(--pal-mint-text)',pink:'var(--pal-pink-text)',sky:'var(--pal-sky-text)',yellow:'var(--pal-yellow-text)'};
+// 습관 4색 — 앱 전역 관례(오늘탭/주간탭 colorMap)와 동일하게 -rgb 변수 + rgba()로 통일(2026-08, 기존엔 -text 변수를 직접 써서 톤이 미묘하게 달랐음).
+const YR_HABIT_COLOR_MAP={mint:'rgba(var(--pal-mint-rgb),1)',pink:'rgba(var(--pal-pink-rgb),1)',sky:'rgba(var(--pal-sky-rgb),1)',yellow:'rgba(var(--pal-yellow-rgb),1)'};
 
 function renderYrMetricGrid(ctx){
   const el=document.getElementById('yr-metric-grid');
@@ -4262,6 +4258,31 @@ function renderYrMetricGrid(ctx){
     if(cnt===null)return `<div class="q-card compact empty"><div class="q-card-name">${range}</div><div class="q-card-val">–</div></div>`;
     return `<div class="q-card compact${isCurrent?' active':''}"><div class="q-card-name">${range}</div><div class="q-card-val">${cnt}<span>개</span></div></div>`;
   }).join('');
+  // 배너 길이를 늘리지 않고 하단 여백에 "현재 분기 누적량"만 텍스트 한 줄로(2026-08) — 카드 4칸이 이미 분기별 총량을 보여주므로,
+  // 지금 서 있는 분기에 카테고리별로 뭘 얼마나 봤는지(드라마/영화/책/음악)를 짧게 짚어주는 용도.
+  const curQIdx=quarters.findIndex(q=>q.isCurrent);
+  let contentNoteHtml='';
+  if(curQIdx>=0){
+    const curQRange=quarterRangeOf(ctx.y,quarters[curQIdx].q).label;
+    const {startMonth,endMonth}=quarterRangeOf(ctx.y,quarters[curQIdx].q);
+    const sDk=`${ctx.y}-${pad(startMonth+1)}-01`;
+    const eDk=`${ctx.y}-${pad(endMonth+1)}-${pad(new Date(ctx.y,endMonth+1,0).getDate())}`;
+    // countContentsCompletedInRange와 동일 판정(음악은 start_date=등록일, 나머지는 end_date=완결일)을 카테고리별로.
+    const curQContents=(ctx.contents||[]).filter(c=>
+      c.content_cat==='music'
+        ?(c.start_date&&c.start_date>=sDk&&c.start_date<=eDk)
+        :((c.status==='done'||c.status==='stopped')&&c.end_date&&c.end_date>=sDk&&c.end_date<=eDk)
+    );
+    const catUnitLabel={drama:'편',movie:'편',book:'권',music:'곡'};
+    const catOrder=['drama','movie','book','music'];
+    const catParts=catOrder
+      .map(cat=>({cat,cnt:curQContents.filter(c=>c.content_cat===cat).length}))
+      .filter(({cnt})=>cnt>0)
+      .map(({cat,cnt})=>`${CAT_ICON_META[cat].label} <b>${cnt}${catUnitLabel[cat]}</b>`);
+    contentNoteHtml=catParts.length
+      ?`<div class="yr-sum-content-note">이번 분기(${curQRange}) ${catParts.join(', ')} 감상했어요.</div>`
+      :`<div class="yr-sum-content-note">이번 분기(${curQRange})엔 아직 감상 기록이 없어요.</div>`;
+  }
 
   // 리듬 — 8대 카테고리 아이콘+시간 그리드(renderYrRhythm9Grid와 동일 계산)
   const {d:rhythmD,dayCount:rhythmDayCount}=_rhythmDurByCatWithDays(ctx.rblocks);
@@ -4311,6 +4332,7 @@ function renderYrMetricGrid(ctx){
     <div class="card yr-sum-banner" onclick="switchYrView(document.querySelector('[data-view=content]'),'content')">
       <div class="yr-sum-banner-hdr"><i class="ti ti-stack-2" aria-hidden="true"></i>콘텐츠 · 분기별 소비량</div>
       <div class="yr-sum-content-quarters">${contentCardsHtml}</div>
+      ${contentNoteHtml}
     </div>
     <div class="card yr-sum-banner" onclick="switchYrView(document.querySelector('[data-view=rhythm]'),'rhythm')">
       <div class="yr-sum-banner-hdr"><i class="ti ti-rainbow" aria-hidden="true"></i>리듬 · 8대 카테고리 일평균</div>
@@ -4469,7 +4491,8 @@ function renderYrHabitInsights(ctx,habitStats){
 
 // 연간탭 전용 갤러리 상태 — 월간탭 cgrid(_cgridActiveId 등)와 완전히 분리(동시에 열려있을 때 서로 간섭 방지).
 let _yrCgridActiveId=null;
-let _yrCgridList=[];
+let _yrCgridList=[]; // 필터 이전 전체 완결 목록(전체 수량 표시·필터 재계산에 사용)
+let _yrCgridCatFilter='all'; // 'all'|'drama'|'book'|'movie' — 월간탭 wcal-filter-chip과 동일한 카테고리 필터 패턴
 
 // 갤러리 카드 1개 — 월간탭 cgrid와 같은 CSS 클래스 재사용, 로직만 연간탭 전용으로 새로 작성(가볍게: 진행률·메모 타임라인 없음, 완결작만 다루므로).
 function _yrCgridItemHtml(c){
@@ -4497,11 +4520,11 @@ function _yrCgridDetailHtml(c){
   return `<div class="cgrid-detail">${topRow}${finalHtml}</div>`;
 }
 
-// 3개씩 행 단위 렌더 — 월간탭 _cgridRowsHtml과 동일 패턴(펼침 영역을 해당 행 바로 뒤에 3칸 전체폭으로 삽입)
+// 4개씩 행 단위 렌더(2026-08: 3→4로 변경, 배너 폭 안에서 한 줄에 4개씩 보이도록) — 월간탭 _cgridRowsHtml과 동일 패턴(펼침 영역을 해당 행 바로 뒤에 4칸 전체폭으로 삽입)
 function _yrCgridRowsHtml(list){
   let html='';
-  for(let i=0;i<list.length;i+=3){
-    const row=list.slice(i,i+3);
+  for(let i=0;i<list.length;i+=4){
+    const row=list.slice(i,i+4);
     html+=row.map(c=>_yrCgridItemHtml(c)).join('');
     const activeInRow=row.find(c=>c.id===_yrCgridActiveId);
     html+=`<div class="cgrid-detail-row-wrap${activeInRow?' on':''}" id="yr-cgrid-detail-wrap-${i}">${activeInRow?_yrCgridDetailHtml(activeInRow):''}</div>`;
@@ -4511,11 +4534,34 @@ function _yrCgridRowsHtml(list){
 function toggleYrCgridDetail(id){
   _yrCgridActiveId=(_yrCgridActiveId===id)?null:id;
   const el=document.getElementById('yr-cgrid-grid-inner');
-  if(el)el.innerHTML=_yrCgridRowsHtml(_yrCgridList);
+  if(el)el.innerHTML=_yrCgridRowsHtml(_yrCgridFilteredList());
 }
 
-// 올해 완결된 콘텐츠(book/drama/movie, done/stopped)를 최근 종료순으로 최대 15개 — 무한정 늘어나지 않게 상한.
-// music은 시청기간 개념이 없어(등록일만 존재) 기존 콘텐츠 비교 전반과 동일하게 제외.
+// 카테고리 필터칩 — 월간탭 renderWcalFilterChips와 동일 패턴(전체+카테고리별, CAT_ICON_META 재사용).
+// 음악은 갤러리 대상에서 애초에 제외(감상기간 개념 없음, renderYrContentGallery 방침과 동일)라 필터에도 넣지 않음.
+const YR_CGRID_FILTER_CATS=['drama','book','movie'];
+function renderYrCgridFilterChips(){
+  const el=document.getElementById('yr-cgrid-filter-chips');
+  if(!el)return;
+  const chips=[{key:'all',label:'전체',icon:'ti-apps'},...YR_CGRID_FILTER_CATS.map(k=>({key:k,label:CAT_ICON_META[k].label,icon:CAT_ICON_META[k].icon}))];
+  el.innerHTML=chips.map(c=>`<div class="wcal-filter-chip${c.key===_yrCgridCatFilter?' on':''}" data-cat="${c.key}" onclick="yrCgridSetFilter('${c.key}')"><i class="ti ${c.icon}" aria-hidden="true" style="font-size:12px;margin-right:3px;"></i>${c.label}</div>`).join('');
+}
+function _yrCgridFilteredList(){
+  return _yrCgridCatFilter==='all'?_yrCgridList:_yrCgridList.filter(c=>c.content_cat===_yrCgridCatFilter);
+}
+function yrCgridSetFilter(cat){
+  _yrCgridCatFilter=cat;
+  _yrCgridActiveId=null; // 필터 전환 시 펼쳐진 상세는 접어서 행 인덱스 꼬임 방지
+  renderYrCgridFilterChips();
+  const gridEl=document.getElementById('yr-cgrid-grid-inner');
+  if(gridEl)gridEl.innerHTML=_yrCgridRowsHtml(_yrCgridFilteredList());
+  const countEl=document.getElementById('yr-cgrid-count');
+  if(countEl)countEl.textContent=_yrCgridFilteredList().length;
+}
+
+// 올해 완결된 콘텐츠(book/drama/movie, done/stopped)를 최근 종료순으로 전부 — 배너 높이를 고정하고
+// 내부 스크롤을 넣어(2026-08) 개수 제한 없이 다 보여줌. 음악은 시청기간 개념이 없어(등록일만 존재)
+// 기존 콘텐츠 비교 전반과 동일하게 제외.
 function renderYrContentGallery(ctx){
   const el=document.getElementById('yr-content-gallery');
   if(!el)return;
@@ -4528,16 +4574,25 @@ function renderYrContentGallery(ctx){
 
   if(!completed.length){el.innerHTML='';return;}
 
-  _yrCgridList=completed.slice(0,15);
+  _yrCgridList=completed;
   _yrCgridActiveId=null;
+  _yrCgridCatFilter='all';
 
   el.innerHTML=`
     <div class="bento-item bento-full">
-      <div class="bento-lbl">올해의 감상 아카이브</div>
-      <div class="bento-sub" style="margin-top:0;margin-bottom:12px;">완결한 콘텐츠를 최근 순으로 모아봤어요. 눌러보면 평점과 총평을 볼 수 있어요.</div>
-      <div class="cgrid-grid" id="yr-cgrid-grid-inner">${_yrCgridRowsHtml(_yrCgridList)}</div>
+      <div class="bento-lbl-row">
+        <div class="bento-lbl">올해의 감상 아카이브</div>
+        <div class="yr-cgrid-count-tag"><span id="yr-cgrid-count">${completed.length}</span>개</div>
+      </div>
+      <div class="bento-sub" style="margin-top:0;margin-bottom:10px;">완결한 콘텐츠를 최근 순으로 모아봤어요. 눌러보면 평점과 총평을 볼 수 있어요.</div>
+      <div class="wcal-filter-chips" id="yr-cgrid-filter-chips"></div>
+      <div class="yr-cgrid-scroll">
+        <div class="cgrid-grid yr-cgrid-grid-4col" id="yr-cgrid-grid-inner">${_yrCgridRowsHtml(_yrCgridList)}</div>
+      </div>
     </div>`;
+  renderYrCgridFilterChips();
 }
+
 
 // rhythm_blocks에서 드라마/독서/영화 감상시간(분)을 월별로 집계 — renderTodayReading(오늘탭)과 동일 기준:
 // cat==='enjoy'이고 텍스트가 "드라마 - "/"독서 - "/"영화 - "로 시작하는 블록만 대상, start~end 차이를 합산.

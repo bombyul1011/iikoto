@@ -1132,12 +1132,12 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   box-shadow:none!important;
   background:var(--card,#fffdf9)!important;}
 .yr-hero-top{position:relative;z-index:1;}
-.yr-hero-period{font-size:13px;letter-spacing:.12em;font-weight:700;color:var(--tm);text-transform:uppercase;margin-bottom:10px;}
+.yr-hero-period{font-size:var(--fs-sm);letter-spacing:.12em;font-weight:700;color:var(--tm);text-transform:uppercase;margin-bottom:10px;}
 .yr-hero-num{font-size:44px!important;font-weight:800!important;letter-spacing:-.075em;color:var(--ink,#2d2c29);}
-.yr-hero-num-unit{font-size:17px!important;font-weight:600;color:var(--ts);margin-left:3px;}
+.yr-hero-num-unit{font-size:var(--fs-body)!important;font-weight:600;color:var(--ts);margin-left:3px;}
 .yr-hero-tags{display:flex;flex-wrap:wrap;gap:8px;position:relative;z-index:1;}
-.yr-hero-tag{display:flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;color:var(--tp);background:rgba(255,255,255,0.65);border:1px solid var(--border,#e4e0d8);border-radius:20px;padding:6px 12px;}
-.yr-hero-tag i{font-size:13px;color:var(--pal-orange-border,#e07b22);}
+.yr-hero-tag{display:flex;align-items:center;gap:5px;font-size:var(--fs-sm);font-weight:600;color:var(--tp);background:rgba(255,255,255,0.65);border:1px solid var(--border,#e4e0d8);border-radius:20px;padding:6px 12px;}
+.yr-hero-tag i{font-size:var(--fs-body);color:var(--pal-orange-border,#e07b22);}
 .yr-hero:before{content:"";
   position:absolute;
   width:250px;height:250px;
@@ -1157,7 +1157,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .yr-hero-line{position:relative!important;
   z-index:1;
   max-width:600px!important;
-  font-size:15px!important;
+  font-size:var(--fs-body)!important;
   line-height:1.5!important;
   letter-spacing:-.02em!important;
   font-weight:500!important;
@@ -1166,7 +1166,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 /* ---------- SECTION HEADERS ---------- */
 .card-lbl{letter-spacing:.02em!important;
   text-transform:none!important;
-  font-size:13px!important;
+  font-size:var(--fs-title)!important;
   font-weight:650!important;}
 .week-kw-cloud{height:170px!important;
   margin:0!important;
@@ -1181,49 +1181,48 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .yr-hero-kw-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch;margin-bottom:14px;}
 .yr-hero-kw-row .yr-hero,
 .yr-hero-kw-row .card{margin-bottom:0;height:100%;}
-/* 전체요약: 올해의 키워드 — 3-2-3 정렬 그리드(기존 무작위 클라우드 대신, 배너 높이 절약) */
-.yr-kw-grid{display:flex;flex-direction:column;gap:10px;padding:6px 0;}
-.yr-kw-grid-row{display:flex;justify-content:center;align-items:baseline;gap:14px;flex-wrap:wrap;}
-.yr-kw-grid-word{font-weight:700;white-space:nowrap;line-height:1;}
+/* 전체요약: 올해의 키워드 — 주간탭 week-kw-cloud 스타일 재사용(무작위 카드형 배치), 6개로 축소(2026-08) */
 .yr-hero{min-height:0!important;
     padding:20px 20px 18px!important;}
-.yr-hero-line{font-size:19px!important;}
+.yr-hero-line{font-size:var(--fs-lg)!important;}
 .yr-hero:before{width:160px;height:160px;}
 
 /* 전체요약 — 파트별 요약카드 4개 (습관/콘텐츠/리듬/수면, 2026-08 재구성: 세로진입구 목록 대체) */
 .yr-sum-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;}
 .yr-sum-banner{cursor:pointer;transition:transform .15s;}
 .yr-sum-banner:active{transform:scale(0.98);}
-.yr-sum-banner-hdr{display:flex;align-items:center;gap:7px;font-size:14px;font-weight:700;color:var(--tp);margin-bottom:12px;}
-.yr-sum-banner-hdr i{font-size:16px;color:var(--pal-orange-border,#e07b22);}
+.yr-sum-banner-hdr{display:flex;align-items:center;gap:7px;font-size:var(--fs-title);font-weight:700;color:var(--tp);margin-bottom:12px;}
+.yr-sum-banner-hdr i{font-size:var(--fs-lg);color:var(--pal-orange-border,#e07b22);}
 /* 습관 요약카드 — 좌: 전체평균 숫자, 우: 습관별 4행 */
 .yr-sum-habit-split{display:flex;gap:16px;align-items:center;}
 .yr-sum-habit-avg{flex-shrink:0;text-align:center;padding-right:16px;border-right:1px solid rgba(var(--divider-rgb),0.25);}
 .yr-sum-habit-avg-num{font-size:30px;font-weight:700;color:var(--tp);font-family:'DM Sans',sans-serif;letter-spacing:-.04em;}
-.yr-sum-habit-avg-num span{font-size:14px;font-weight:500;color:var(--ts);}
-.yr-sum-habit-avg-lbl{font-size:11.5px;color:var(--ts);margin-top:3px;white-space:nowrap;}
+.yr-sum-habit-avg-num span{font-size:var(--fs-sm);font-weight:500;color:var(--ts);}
+.yr-sum-habit-avg-lbl{font-size:var(--fs-xs);color:var(--ts);margin-top:3px;white-space:nowrap;}
 .yr-sum-habit-list{flex:1;display:flex;flex-direction:column;gap:7px;min-width:0;}
-.yr-sum-habit-row{display:flex;align-items:center;gap:7px;font-size:13px;}
+.yr-sum-habit-row{display:flex;align-items:center;gap:7px;font-size:var(--fs-sm);}
 .yr-sum-habit-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
 .yr-sum-habit-name{color:var(--tp);font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .yr-sum-habit-pct{color:var(--ts);font-weight:600;flex-shrink:0;}
-/* 콘텐츠 요약카드 — 분기 4칸(q-card 축소판) */
+/* 콘텐츠 요약카드 — 분기 4칸(q-card 축소판) + 하단 현재분기 누적량 한 줄(2026-08) */
 .yr-sum-content-quarters{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
 .q-card.compact{padding:10px 6px;}
-.q-card.compact .q-card-name{font-size:11.5px;}
-.q-card.compact .q-card-val{font-size:16px;margin-top:5px;}
+.q-card.compact .q-card-name{font-size:var(--fs-xs);}
+.q-card.compact .q-card-val{font-size:var(--fs-body);margin-top:5px;}
+.yr-sum-content-note{font-size:var(--fs-sm);color:var(--ts);margin-top:10px;padding-top:10px;border-top:1px dashed rgba(var(--divider-rgb),0.3);}
+.yr-sum-content-note b{color:var(--tp);font-weight:700;}
 /* 수면 요약카드 — 좌우 1:1(총수면시간 / 취침·기상) */
 .yr-sum-sleep-split{display:grid;grid-template-columns:1fr 1fr;}
 .yr-sum-sleep-item{text-align:center;padding:0 8px;position:relative;}
 .yr-sum-sleep-item:last-child::before{content:'';position:absolute;left:0;top:4px;bottom:4px;width:1px;background:rgba(var(--divider-rgb),0.3);}
-.yr-sum-sleep-lbl{font-size:12px;color:var(--ts);margin-bottom:6px;}
+.yr-sum-sleep-lbl{font-size:var(--fs-sm);color:var(--ts);margin-bottom:6px;}
 .yr-sum-sleep-val{font-size:20px;font-weight:700;color:var(--tp);font-family:'DM Sans',sans-serif;}
-.yr-sum-sleep-val .unit{font-size:11px;font-weight:500;color:var(--ts);}
-.yr-sum-sleep-val.small{font-size:16px;}
+.yr-sum-sleep-val .unit{font-size:var(--fs-xs);font-weight:500;color:var(--ts);}
+.yr-sum-sleep-val.small{font-size:var(--fs-lg);}
 /* 수면 요약카드 하단 — 수면시간 분포 도넛(수면탭에서 이동, 상단 2칸 여백 채움용) */
 .yr-sum-sleep-dist{display:flex;align-items:center;gap:14px;margin-top:14px;padding-top:14px;border-top:1px solid rgba(var(--divider-rgb),0.25);}
 .yr-sum-sleep-dist .mrsl-legend{gap:5px;}
-.yr-sum-sleep-dist .mrsl-legend-row{font-size:11.5px;}
+.yr-sum-sleep-dist .mrsl-legend-row{font-size:var(--fs-xs);}
 
 /* intro */
 .habit-intro{padding:8px 2px 22px;}
@@ -1462,6 +1461,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 /* 월 그래프의 미래 개월 자리 */
 .gb-group.future{opacity:0.35;}
 .gb-group.future .gb-bars{border-bottom:1px dashed rgba(var(--divider-rgb),0.4);}
+/* 콘텐츠탭: 올해의 감상 아카이브 — 라벨 옆 전체수량 배지, 필터칩, 4열 그리드 + 높이 고정 스크롤(2026-08) */
+.bento-lbl-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.bento-lbl-row .bento-lbl{margin-bottom:0;}
+.yr-cgrid-count-tag{font-size:var(--fs-xs);font-weight:700;color:var(--ts);background:rgba(var(--divider-rgb),0.12);border-radius:12px;padding:3px 10px;}
+.yr-cgrid-count-tag span{color:var(--tp);font-size:var(--fs-sm);}
+.yr-cgrid-scroll{max-height:420px;overflow-y:auto;margin-top:4px;padding-right:2px;}
+.yr-cgrid-grid-4col{grid-template-columns:repeat(4,minmax(0,1fr));}
+.yr-cgrid-grid-4col .cgrid-thumb-wrap{max-width:100px;}
 /* 콘텐츠탭: 카테고리별 누적 감상량 막대 (목업엔 있었으나 이식 시 누락됐던 부분, 이번에 추가) */
 .cumul-list{display:flex;flex-direction:column;gap:12px;}
 .cumul-row{display:flex;align-items:center;gap:12px;}
@@ -1784,7 +1791,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div class="yr-view" id="view-habit">
           <div class="habit-intro">
             <div class="habit-intro-kicker">HABIT / <span id="yr-habit-year"></span></div>
-            <div class="habit-intro-title">누적 <span id="yr-habit-month-count"></span>개월 동안 <b>습관은<br>얼마나 이어졌을까요?</b></div>
+            <div class="habit-intro-title">한 해 동안 <b>습관은<br>얼마나 이어졌을까요?</b></div>
             <div class="habit-intro-sub">달성률을 한 줄의 흐름으로 연결해, 어떤 습관이 살아 있고 어디서 흔들렸는지 한눈에 볼 수 있어요.</div>
           </div>
           <div id="yr-habit-score"></div>
