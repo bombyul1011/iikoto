@@ -4733,28 +4733,10 @@ function renderYrContentCumul(ctx,inRange){
 }
 
 // ══════════════════════════════════════════════════════════
-// 리듬 — 표준하루밸런스 → 평일vs주말 → 8대카테고리그리드 → 핵심리듬4가지 월별흐름
+// 리듬 — 표준하루밸런스 → 8대카테고리그리드 → 핵심리듬 월별흐름 → 늘고/줄어든 리듬
 // ══════════════════════════════════════════════════════════
-function _yrIsWeekend(dateKeyStr){
-  const dow=new Date(dateKeyStr+'T00:00:00').getDay();
-  return dow===0||dow===6;
-}
 
 // ── 연간탭 공용 그룹핑 헬퍼 (2026-08 정리: 리듬/수면 렌더 함수들에 흩어져 있던 반복 로직 통합) ──
-
-// rows를 date_key별로 묶는다. rblocks/sleepRows 등 date_key 필드를 가진 배열이면 공통 사용 가능.
-function _yrGroupByDate(rows){
-  const byDate={};
-  (rows||[]).forEach(r=>{if(r.date_key)(byDate[r.date_key]=byDate[r.date_key]||[]).push(r);});
-  return byDate;
-}
-
-// date_key 배열을 평일/주말로 분리.
-function _yrSplitWeekdayWeekend(dateKeys){
-  const weekday=[],weekend=[];
-  (dateKeys||[]).forEach(dk=>(_yrIsWeekend(dk)?weekend:weekday).push(dk));
-  return {weekday,weekend};
-}
 
 // ctx.rblocks를 연초~elapsedMonths까지 월별로 순회하며 각 달의 rows를 콜백에 넘긴다.
 // 반환값은 콜백 결과를 모은 배열(길이=elapsedMonths) — 월별 라인차트/막대차트 데이터 조립에 공용 사용.
@@ -4770,25 +4752,11 @@ function _yrByMonth(ctx,mapFn,rowsOverride){
   return out;
 }
 
-// 날짜 목록에서 카테고리별 일평균(합계÷날짜수)을 구한다 — 평일/주말 비교, 요일유형 라인 등에서 공용 사용.
-// byDate: _yrGroupByDate 결과. cat을 주면 그 카테고리 하나의 평균값(숫자)만, 안 주면 카테고리별 평균 맵을 반환.
-function _yrDailyAvgByCat(byDate,dateList,cat){
-  if(!dateList.length)return cat?0:{};
-  const agg={};
-  dateList.forEach(dk=>{
-    const {d}=_rhythmDurByCat(byDate[dk]);
-    Object.entries(d).forEach(([k,v])=>{agg[k]=(agg[k]||0)+v;});
-  });
-  if(cat)return (agg[cat]||0)/dateList.length;
-  const avg={};
-  Object.keys(agg).forEach(k=>{avg[k]=agg[k]/dateList.length;});
-  return avg;
-}
 function renderYrRhythmTab(ctx){
   renderYrRhythmStandardDay(ctx);
-  renderYrRhythmWeekdayCompare(ctx);
   renderYrRhythm9Grid(ctx);
   renderYrRhythmMonthlyFlow(ctx);
+  renderYrRhythmChangeInsights(ctx);
 }
 
 // 표준 하루 밸런스 — 누적 평균 기준 상위 5개 카테고리를 24시간 막대로. 기존 timeline-24h-bar(월간탭) 재사용.
@@ -4817,57 +4785,6 @@ function renderYrRhythmStandardDay(ctx){
     <div class="chart-legend" style="margin-top:14px;">${legendHtml}</div>`;
 }
 
-// 평일 vs 주말 리듬 비교 — 상위 4개 카테고리의 일평균 비교, wkc-* 클래스(목업 신규) 사용.
-function renderYrRhythmWeekdayCompare(ctx){
-  const el=document.getElementById('yr-rhythm-weekday-compare');
-  if(!el)return;
-  const byDate=_yrGroupByDate(ctx.rblocks);
-  const dates=Object.keys(byDate);
-  if(!dates.length){el.innerHTML='<div class="empty-msg">기록된 리듬이 없어요</div>';return;}
-  const {weekday:weekdayDates,weekend:weekendDates}=_yrSplitWeekdayWeekend(dates);
-
-  const wdAvgByCat=_yrDailyAvgByCat(byDate,weekdayDates);
-  const weAvgByCat=_yrDailyAvgByCat(byDate,weekendDates);
-  const topCats=Object.keys(RHYTHM_CATS).filter(k=>(wdAvgByCat[k]||0)+(weAvgByCat[k]||0)>0)
-    .sort((a,b)=>((wdAvgByCat[b]||0)+(weAvgByCat[b]||0))-((wdAvgByCat[a]||0)+(weAvgByCat[a]||0))).slice(0,4);
-  if(!topCats.length){el.innerHTML='<div class="empty-msg">기록된 리듬이 없어요</div>';return;}
-
-  const maxVal=Math.max(...topCats.map(k=>Math.max(wdAvgByCat[k]||0,weAvgByCat[k]||0)))||1;
-
-  const rowsHtml=topCats.map(k=>{
-    const c=RHYTHM_CATS[k];
-    const wdAvg=wdAvgByCat[k]||0,weAvg=weAvgByCat[k]||0;
-    const wdPct=Math.round(wdAvg/maxVal*100),wePct=Math.round(weAvg/maxVal*100);
-    const diffPct=wdAvg?Math.round((weAvg-wdAvg)/wdAvg*100):0;
-    const diffColor=diffPct>0?'var(--pal-sky-text)':diffPct<0?'var(--pal-mint-text)':'var(--tm)';
-    return `<div class="wkc-row">
-      <div class="wkc-lbl">${c.label}</div>
-      <div class="wkc-bars"><div class="wkc-bar-pair">
-        <div class="wkc-bar" style="height:${wdPct}%;background:${c.color};opacity:.45;"></div>
-        <div class="wkc-bar" style="height:${wePct}%;background:${c.color};"></div>
-      </div></div>
-      <div class="wkc-val" style="color:${diffColor};">${diffPct>0?'+':''}${diffPct}%p</div>
-    </div>`;
-  }).join('');
-
-  // 인사이트 — 업무·약속 등 '활동성' 카테고리가 주말에 더 크면 주의 톤
-  const workDiff=weekdayDates.length&&weekendDates.length?(weAvgByCat['work']||0)-(wdAvgByCat['work']||0):0;
-  const commentText=workDiff>0
-    ?'흔히 주말엔 쉰다고 생각하지만, 업무와 약속이 평일보다 더 많이 잡히고 있어요. 온전히 쉬는 시간을 의식적으로 확보할 필요가 있어 보여요.'
-    :'평일과 주말의 활동 패턴이 비교적 균형 잡혀 있어요.';
-
-  el.innerHTML=`
-    <div class="wkc-wrap">${rowsHtml}</div>
-    <div class="db-legend">
-      <div><span class="db-legend-dot" style="background:rgba(180,180,180,0.4);"></span>평일</div>
-      <div><span class="db-legend-dot" style="background:rgba(180,180,180,1);"></span>주말</div>
-    </div>
-    <div class="insight-box tone-observe">
-      <i class="ti ti-calendar-stats"></i>
-      <div><strong>추세:</strong> ${commentText}</div>
-    </div>`;
-}
-
 // 8대 카테고리 일평균 밸런스 — RHYTHM_CATS 8개 전부, 아이콘/색 그대로 재사용.
 // 일평균의 분모는 카테고리별 실제 발생일수(월간리포트와 동일 기준) — 전체 기록일수로 나누면
 // 어쩌다 한 번 한 활동이 실제보다 훨씬 낮게 희석되어 보이는 문제가 있었음.
@@ -4891,7 +4808,8 @@ function renderYrRhythmMonthlyFlow(ctx){
   if(!el)return;
   if(!ctx.rblocks.length){el.innerHTML='<div class="empty-msg">기록된 리듬이 없어요</div>';return;}
   const {d:totalByCat}=_rhythmDurByCat(ctx.rblocks);
-  const top4=Object.entries(totalByCat).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([k])=>k);
+  // 외출(appointment)은 이동·약속처럼 예외적 성격이라 이 배너의 top4 후보에서만 제외(수면·식사가 별도 관리되는 것과 같은 맥락, 2026-08).
+  const top4=Object.entries(totalByCat).filter(([k])=>k!=='appointment').sort((a,b)=>b[1]-a[1]).slice(0,4).map(([k])=>k);
 
   const byMonth=_yrByMonth(ctx,blocksInMonth=>_rhythmDurByCat(blocksInMonth).d);
 
@@ -4921,6 +4839,60 @@ function renderYrRhythmMonthlyFlow(ctx){
     <div class="insight-box tone-observe" style="margin-top:14px;">
       <i class="ti ti-chart-line"></i>
       <div><strong>추세:</strong> ${risingText}</div>
+    </div>`;
+}
+
+// 가장 늘어난 리듬 / 가장 줄어든 리듬 — 습관탭 BEST FLOW/NEEDS CARE와 동일 원칙(전월 대비 아님, 시작달 대비
+// 최근달 증감). 연간탭은 전체 흐름을 다루는 자리이고 전월 비교는 월간리포트의 역할이라 그 기준을 그대로 따름(2026-08).
+// 외출(appointment)은 이동·약속 성격이라 후보에서 제외(renderYrRhythmMonthlyFlow의 top4 선정과 동일 방침).
+function renderYrRhythmChangeInsights(ctx){
+  const el=document.getElementById('yr-rhythm-change-insights');
+  if(!el)return;
+  if(ctx.elapsedMonths<2||!ctx.rblocks.length){el.innerHTML='';return;}
+
+  const byMonth=_yrByMonth(ctx,blocksInMonth=>_rhythmDurByCat(blocksInMonth).d);
+  const cats=Object.keys(RHYTHM_CATS).filter(k=>k!=='appointment');
+
+  const stats=cats.map(k=>{
+    const seq=byMonth.map(d=>d[k]||0);
+    const firstIdx=seq.findIndex(v=>v>0);
+    if(firstIdx===-1)return null; // 기록이 아예 없는 카테고리는 후보에서 제외
+    const activeSeq=seq.slice(firstIdx);
+    const delta=activeSeq.length>=2?activeSeq[activeSeq.length-1]-activeSeq[0]:0;
+    return {key:k,label:RHYTHM_CATS[k].label,icon:RHYTHM_CATS[k].icon,color:RHYTHM_CATS[k].color,activeSeq,firstIdx,delta};
+  }).filter(Boolean);
+
+  if(stats.length<2){el.innerHTML='';return;} // 비교할 카테고리가 1개 이하면 의미 없어 생략
+
+  const grown=[...stats].sort((a,b)=>b.delta-a.delta)[0];
+  const shrunk=[...stats].sort((a,b)=>a.delta-b.delta)[0];
+  if(grown.key===shrunk.key){el.innerHTML='';return;} // 카테고리가 1개뿐이라 같은 게 뽑히는 경우 방지
+
+  const fmtDelta=mins=>{
+    const sign=mins>=0?'+':'-';
+    const abs=Math.abs(mins);
+    return abs<60?`${sign}${abs}분`:`${sign}${_fmtDur(abs)}`;
+  };
+  const grownSpark=_yrSparklineSVG(grown.activeSeq,'#4a8f6a');
+  const shrunkSpark=_yrSparklineSVG(shrunk.activeSeq,'#c08a2e');
+  const firstMonthLabel=idx=>`${idx+1}월`;
+
+  el.innerHTML=`
+    <div class="habit-insights">
+      <div class="habit-insight mint">
+        <div class="habit-insight-tag">GROWING</div>
+        <div class="habit-insight-number">${fmtDelta(grown.delta)}</div>
+        <div class="habit-insight-title"><i class="ti ${grown.icon}" style="color:${grown.color};margin-right:4px;" aria-hidden="true"></i>${escapeHtml(grown.label)}</div>
+        <p>${firstMonthLabel(grown.firstIdx)}부터 지금까지 가장 크게 늘어난 리듬이에요.</p>
+        ${grownSpark}
+      </div>
+      <div class="habit-insight yellow">
+        <div class="habit-insight-tag">SHRINKING</div>
+        <div class="habit-insight-number">${fmtDelta(shrunk.delta)}</div>
+        <div class="habit-insight-title"><i class="ti ${shrunk.icon}" style="color:${shrunk.color};margin-right:4px;" aria-hidden="true"></i>${escapeHtml(shrunk.label)}</div>
+        <p>${firstMonthLabel(shrunk.firstIdx)}부터 지금까지 가장 크게 줄어든 리듬이에요.</p>
+        ${shrunkSpark}
+      </div>
     </div>`;
 }
 
@@ -4977,8 +4949,6 @@ function renderYrSleepTab(ctx){
       <div class="bento-item"><div class="bento-lbl">목표 달성률</div><div class="bento-val">${goalPct}<span>%</span></div></div>
     </div>`;
 
-  renderYrSleepComboChart(ctx,validRows);
-
   const core=_yrCoreWindowStat(validRows);
   const coreCirc=2*Math.PI*40;
   const coreComment=_yrCoreVsDurationComment(core.pct,validRows.length);
@@ -5007,112 +4977,189 @@ function renderYrSleepTab(ctx){
       <div><strong>추세:</strong> 취침 시각으로 보면 ${validRows.length}일 중 ${core.inCore}일(${core.pct}%)이 코어 회복 구간(23:00~02:00) 안에 들어왔어요.${coreComment?' '+coreComment:''}</div>
     </div>`;
 
-  renderYrSleepWeekdayRange(ctx,validRows);
+  renderYrSleepQuarterTime(ctx,validRows);
+  renderYrSleepConditionFlow(ctx,validRows);
+  renderYrSleepConditionTrace(ctx,validRows);
 }
 
-// 월별 수면시간 및 컨디션 상관관계 콤보차트 — 기존 renderMrpSleep의 combo-* 구조 그대로 재사용
-function renderYrSleepComboChart(ctx,validRows){
-  const el=document.getElementById('yr-sleep-combo');
+// 분기별 평균 취침·기상 시각 — 완결된 분기까지만(진행중 분기는 그 시점까지 데이터로 계산해 포함).
+// 총 수면시간은 이미 상단 요약(전체 평균)에서 다루므로 여기선 시각의 변화에만 집중.
+function renderYrSleepQuarterTime(ctx,validRows){
+  const el=document.getElementById('yr-sleep-quarter-time');
   if(!el)return;
-  const monthly=_yrByMonth(ctx,rowsInMonth=>rowsInMonth.length?_sleepStatsOf(rowsInMonth):null,validRows);
-  const maxMin=Math.max(...monthly.filter(Boolean).map(s=>s.avgMin))||1;
-  const barsHtml=monthly.map((s,i)=>{
-    if(!s)return `<div class="c-bar-col"><div class="c-val">-</div><div class="c-bar" style="height:0%"></div></div>`;
-    const pct=Math.round(s.avgMin/maxMin*100);
-    const h=Math.floor(s.avgMin/60),mm=Math.round((s.avgMin%60)/60*10);
-    return `<div class="c-bar-col"><div class="c-val">${h}.${mm}h</div><div class="c-bar" style="height:${pct}%"></div></div>`;
+  const curMonth=ctx.elapsedMonths-1;
+  const quarters=listQuartersUpTo(ctx.y,curMonth);
+  if(quarters.length<1){el.innerHTML='';return;}
+
+  const cardsHtml=quarters.map(({q,isFuture})=>{
+    const range=quarterRangeOf(ctx.y,q).label;
+    if(isFuture)return `<div class="ysqt-card empty"><div class="ysqt-range">${range}</div><div class="ysqt-empty">–</div></div>`;
+    const {startMonth,endMonth}=quarterRangeOf(ctx.y,q);
+    const sDk=`${ctx.y}-${pad(startMonth+1)}-01`;
+    const eDk=`${ctx.y}-${pad(Math.min(endMonth,curMonth)+1)}-${pad(new Date(ctx.y,Math.min(endMonth,curMonth)+1,0).getDate())}`;
+    const rowsInQ=validRows.filter(r=>r.date_key&&r.date_key>=sDk&&r.date_key<=eDk);
+    if(!rowsInQ.length)return `<div class="ysqt-card empty"><div class="ysqt-range">${range}</div><div class="ysqt-empty">기록 없음</div></div>`;
+
+    const sleepMins=rowsInQ.map(r=>toDawnAdjustedMin(_dawnTimeToMin(r.sleep_time),22*60)).filter(v=>v!=null);
+    const wakeMins=rowsInQ.map(r=>_dawnTimeToMin(r.wake_time)).filter(v=>v!=null);
+    const sleepAvg=sleepMins.length?sleepMins.reduce((a,b)=>a+b,0)/sleepMins.length:null;
+    const wakeAvg=wakeMins.length?wakeMins.reduce((a,b)=>a+b,0)/wakeMins.length:null;
+
+    // 24시간 축 위 점 — 22시~다음날14시 범위(16시간 폭)로 그려 취침·기상이 한 화면에 자연스럽게 들어오게 함.
+    const axisStart=22*60,axisSpan=16*60; // 22:00 시작, 16시간 폭(22:00~14:00)
+    const posOf=min=>{
+      if(min==null)return null;
+      const adjusted=min>=axisStart?min-axisStart:min+(1440-axisStart);
+      return Math.min(100,Math.max(0,adjusted/axisSpan*100));
+    };
+    const sleepPos=posOf(sleepAvg),wakePos=posOf(wakeAvg);
+    const dotsHtml=(sleepPos!=null?`<div class="ysqt-dot sleep" style="left:${sleepPos}%;"></div>`:'')
+      +(wakePos!=null?`<div class="ysqt-dot wake" style="left:${wakePos}%;"></div>`:'');
+
+    return `<div class="ysqt-card">
+      <div class="ysqt-range">${range}</div>
+      <div class="ysqt-axis">${dotsHtml}</div>
+      <div class="ysqt-times">
+        <span class="ysqt-time sleep">${sleepAvg!=null?_yrMinToHHMM(sleepAvg):'-'}</span>
+        <span class="ysqt-time wake">${wakeAvg!=null?_yrMinToHHMM(wakeAvg):'-'}</span>
+      </div>
+    </div>`;
   }).join('');
-  const scoredMonths=monthly.map((s,i)=>({s,i})).filter(x=>x.s&&x.s.avgScore!=null);
-  const n=monthly.length;
-  const colWidth=n?100/n:100;
-  const dotsHtml=scoredMonths.map(({s,i})=>{
-    const left=(i+0.5)*colWidth;
-    const top=100-Math.min(90,(s.avgScore/100*90));
-    return `<div class="combo-dot" style="left:${left}%;top:${top}%;"></div>`;
-  }).join('');
-  const labelsHtml=monthly.map((_,i)=>`<span>${i+1}월</span>`).join('');
-  const scoreRangeText=scoredMonths.length>=2
-    ?`${scoredMonths[0].s.avgScore}점→${scoredMonths[scoredMonths.length-1].s.avgScore}점`
-    :(scoredMonths.length===1?`${scoredMonths[0].s.avgScore}점`:'-');
 
   el.innerHTML=`
     <div class="bento-item bento-full">
-      <div class="bento-lbl">월별 수면 시간 및 컨디션 상관관계</div>
-      <div class="bento-sub" style="margin-top:0;">막대는 평균 수면 시간을, 점은 평균 컨디션 점수를 나타냅니다.</div>
-      <div class="combo-wrap">
-        <div class="combo-bars">${barsHtml}</div>
-        ${dotsHtml}
-        <div class="combo-labels">${labelsHtml}</div>
-      </div>
-      <div class="chart-legend" style="margin-top:10px;">
-        <div class="chart-legend-item"><span class="chart-legend-dot" style="background:rgba(var(--pal-sky-rgb),0.5)"></span>수면 시간</div>
-        <div class="chart-legend-item"><span class="chart-legend-dot" style="background:var(--pal-orange-border); border-radius:50%;"></span>컨디션 점수 (${scoreRangeText})</div>
+      <div class="bento-lbl">분기별 취침 · 기상 시각</div>
+      <div class="bento-sub" style="margin-top:0;margin-bottom:12px;">분기가 바뀌며 잠들고 일어나는 시각이 어떻게 움직였는지예요.</div>
+      <div class="ysqt-grid">${cardsHtml}</div>
+      <div class="chart-legend" style="margin-top:12px;">
+        <div class="chart-legend-item"><span class="chart-legend-dot" style="background:var(--pal-lavender-text);border-radius:50%;"></span>취침</div>
+        <div class="chart-legend-item"><span class="chart-legend-dot" style="background:var(--pal-orange-border);border-radius:50%;"></span>기상</div>
       </div>
     </div>`;
 }
 
-const YR_DOW_LABELS=['일','월','화','수','목','금','토'];
+// 월별 수면 컨디션 흐름 — 컨디션 점수(sleep.score)만 단독으로. 콤보차트(수면시간+컨디션 결합, 삭제됨)와
+// 달리 컨디션 자체의 흐름에만 집중. 라인차트 대신 막대(앱 톤 유지 원칙)로 표현.
+function renderYrSleepConditionFlow(ctx,validRows){
+  const el=document.getElementById('yr-sleep-condition-flow');
+  if(!el)return;
+  const scoredRows=validRows.filter(r=>r.score!=null&&!isNaN(r.score));
+  if(scoredRows.length<2){el.innerHTML='';return;}
+
+  const monthly=_yrByMonth(ctx,rowsInMonth=>{
+    const scored=rowsInMonth.filter(r=>r.score!=null&&!isNaN(r.score));
+    return scored.length?Math.round(scored.reduce((a,r)=>a+r.score,0)/scored.length):null;
+  },scoredRows);
+
+  const validMonthly=monthly.filter(v=>v!=null);
+  if(validMonthly.length<2){el.innerHTML='';return;}
+
+  const maxScore=Math.max(...validMonthly,1);
+  const barsHtml=monthly.map((v,i)=>{
+    if(v==null)return `<div class="c-bar-col"><div class="c-val">-</div><div class="c-bar" style="height:0%"></div></div>`;
+    const pct=Math.round(v/maxScore*100);
+    return `<div class="c-bar-col"><div class="c-val">${v}점</div><div class="c-bar" style="height:${pct}%;background:rgba(190,225,205,0.75);"></div></div>`;
+  }).join('');
+  const labelsHtml=monthly.map((_,i)=>`<span>${i+1}월</span>`).join('');
+
+  el.innerHTML=`
+    <div class="bento-item bento-full">
+      <div class="bento-lbl">월별 수면 컨디션 흐름</div>
+      <div class="bento-sub" style="margin-top:0;">그달의 평균 컨디션 점수예요.</div>
+      <div class="combo-wrap" style="height:120px;">
+        <div class="combo-bars">${barsHtml}</div>
+        <div class="combo-labels">${labelsHtml}</div>
+      </div>
+    </div>`;
+}
+
+// 컨디션 낮은 날, 전날엔 뭘 했나 — 컨디션 하위 30%인 날들의 "전날"(date_key-1) 리듬을 나머지 날들의
+// 전날 리듬과 비교해 가장 크게 차이나는 카테고리를 찾음. 표본이 적으면(하위군 10일 미만) 생략.
+// 방향: "그날 낮에 뭘 했길래 컨디션이 나빴는지"가 아니라 "잠들기 전날 낮에 뭘 했길래 다음날 컨디션이
+// 나빴는지"를 보는 것 — sleep.date_key는 기상일 기준이라 그 전날이 실제로 깨어있던 낮 시간대(2026-08 확인).
+function renderYrSleepConditionTrace(ctx,validRows){
+  const el=document.getElementById('yr-sleep-condition-trace');
+  if(!el)return;
+  const scoredRows=validRows.filter(r=>r.score!=null&&!isNaN(r.score)&&r.date_key);
+  if(scoredRows.length<20){el.innerHTML='';return;} // 표본 부족 — 하위 30%를 나눠도 의미있는 비교가 안 됨
+
+  const sorted=[...scoredRows].sort((a,b)=>a.score-b.score);
+  const lowCount=Math.max(10,Math.round(sorted.length*0.3));
+  if(lowCount>=sorted.length){el.innerHTML='';return;}
+  const lowDates=new Set(sorted.slice(0,lowCount).map(r=>r.date_key));
+  const restDates=new Set(sorted.slice(lowCount).map(r=>r.date_key));
+
+  const prevDateKeyOf=dk=>{
+    const d=new Date(dk+'T00:00:00');
+    d.setDate(d.getDate()-1);
+    return dateKey(d);
+  };
+  const lowPrevDates=new Set([...lowDates].map(prevDateKeyOf));
+  const restPrevDates=new Set([...restDates].map(prevDateKeyOf));
+
+  const avgByCat=(prevDateSet)=>{
+    const byDate={};
+    ctx.rblocks.forEach(b=>{
+      if(!b.date_key||!prevDateSet.has(b.date_key))return;
+      (byDate[b.date_key]=byDate[b.date_key]||[]).push(b);
+    });
+    const dateList=Object.keys(byDate);
+    if(!dateList.length)return {};
+    const agg={};
+    dateList.forEach(dk=>{
+      const {d}=_rhythmDurByCat(byDate[dk]);
+      Object.entries(d).forEach(([k,v])=>{agg[k]=(agg[k]||0)+v;});
+    });
+    const avg={};
+    Object.keys(agg).forEach(k=>{avg[k]=agg[k]/dateList.length;});
+    return avg;
+  };
+
+  const lowAvg=avgByCat(lowPrevDates);
+  const restAvg=avgByCat(restPrevDates);
+  const cats=Object.keys(RHYTHM_CATS).filter(k=>k!=='appointment'); // 외출 제외(리듬탭과 동일 방침)
+
+  const diffs=cats.map(k=>({
+    key:k,label:RHYTHM_CATS[k].label,icon:RHYTHM_CATS[k].icon,color:RHYTHM_CATS[k].color,
+    low:lowAvg[k]||0,rest:restAvg[k]||0,diff:(lowAvg[k]||0)-(restAvg[k]||0)
+  })).filter(x=>x.low>0||x.rest>0);
+
+  if(diffs.length<2){el.innerHTML='';return;}
+
+  const top=[...diffs].sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff))[0];
+  if(Math.abs(top.diff)<10){ // 가장 큰 차이가 10분 미만이면 유의미한 흔적 없음으로 판단
+    el.innerHTML=`
+      <div class="bento-item bento-full">
+        <div class="bento-lbl">컨디션 낮은 날, 전날엔 뭘 했을까</div>
+        <div class="insight-box tone-observe" style="margin-top:8px;"><i class="ti ti-search"></i><div><strong>관찰:</strong> 컨디션이 낮았던 날의 전날 리듬에서 뚜렷한 공통 패턴은 아직 보이지 않아요.</div></div>
+      </div>`;
+    return;
+  }
+
+  const moreOrLess=top.diff>0?'더 많았어요':'더 적었어요';
+  const diffAbsText=_fmtDur(Math.round(Math.abs(top.diff)));
+
+  el.innerHTML=`
+    <div class="bento-item bento-full">
+      <div class="bento-lbl">컨디션 낮은 날, 전날엔 뭘 했을까</div>
+      <div class="bento-sub" style="margin-top:0;margin-bottom:10px;">컨디션이 낮았던 날의 전날과, 그 외 날의 전날 리듬을 비교했어요.</div>
+      <div class="yr-ctrace-row">
+        <div class="yr-ctrace-icon" style="background:${top.color};"><i class="ti ${top.icon}" aria-hidden="true"></i></div>
+        <div class="yr-ctrace-body">
+          <div class="yr-ctrace-title">${escapeHtml(top.label)}</div>
+          <div class="yr-ctrace-desc">컨디션이 낮았던 날 전날엔 평소보다 ${diffAbsText} ${moreOrLess}</div>
+        </div>
+      </div>
+      <div class="insight-box tone-observe" style="margin-top:12px;">
+        <i class="ti ti-search"></i>
+        <div><strong>관찰:</strong> 컨디션 하위 ${lowCount}일의 전날과 나머지 날의 전날을 비교했을 때, ${escapeHtml(top.label)} 시간의 차이가 가장 뚜렷했어요. 이게 직접적인 원인이라 단정할 순 없지만, 다음에 컨디션이 떨어질 때 참고할 만한 단서예요.</div>
+      </div>
+    </div>`;
+}
+
 function _yrMinToHHMM(min){
   const m=Math.round(((min%1440)+1440)%1440); // 평균 계산으로 소수분이 들어올 수 있어 반올림 후 시:분 분리
   return `${pad(Math.floor(m/60))}:${pad(m%60)}`;
-}
-// 요일별 평균 취침·기상 시각 + 평일vs주말 비교 — 기존 sleep-range-wrap, mrsl-cmp 클래스 재사용.
-// 평균 계산과 그래프 표시는 좌표계가 다름:
-//  - 평균 계산: 23시와 새벽1시처럼 자정을 넘나드는 시각을 정확히 평균내려면 24시 넘김 보정이 필요
-//    (보정 없이 그냥 평균내면 엉뚱한 값이 나옴) — _sleepStatsOf와 동일한 22시 cutoff 재사용.
-//  - 그래프 막대: 표시 범위가 00:00~10:00 고정이라, 보정된 평균값이 이 범위를 벗어나면(00시 이전 취침)
-//    막대 시작점만 0%로 눌러서 그림. 텍스트로 보여주는 시:분은 항상 정확한 값 그대로.
-function renderYrSleepWeekdayRange(ctx,validRows){
-  const el=document.getElementById('yr-sleep-weekday-range');
-  if(!el)return;
-  const byDow=Array.from({length:7},()=>({sleep:[],wake:[]}));
-  validRows.forEach(r=>{
-    if(!r.date_key)return;
-    const dow=new Date(r.date_key+'T00:00:00').getDay();
-    const sMin=_dawnTimeToMin(r.sleep_time),wMin=_dawnTimeToMin(r.wake_time);
-    if(sMin!=null)byDow[dow].sleep.push(toDawnAdjustedMin(sMin,22*60)); // 22시 cutoff로 보정 — 평균이 정확해짐
-    if(wMin!=null)byDow[dow].wake.push(wMin);
-  });
-  const avg=(arr)=>arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:null;
-  const dowStats=byDow.map((d,i)=>({dow:i,sleepAvg:avg(d.sleep),wakeAvg:avg(d.wake)}));
-  if(!dowStats.some(d=>d.sleepAvg!=null)){el.innerHTML='<div class="empty-msg">요일별 데이터가 부족해요</div>';return;}
-
-  // 표시 범위 00:00~10:00(0~600분, 목업 원본과 동일)
-  const rangeMin=0,rangeMax=600;
-  const order=[1,2,3,4,5,6,0]; // 월~일 순서
-  const rowsHtml=order.map(dow=>{
-    const d=dowStats[dow];
-    const isWeekend=dow===0||dow===6;
-    if(d.sleepAvg==null||d.wakeAvg==null)return `<div class="range-row"><div class="range-lbl">${YR_DOW_LABELS[dow]}</div><div class="range-track"></div><div class="range-val">-</div></div>`;
-    // 그래프 좌표만 별도 클램프: 보정된 취침평균이 22시 cutoff를 넘겨(00시 이전) 1440~ 대로 잡히면 0%로 고정.
-    // 00시 이후(0~600분대)는 실제 위치 그대로.
-    const sleepClamped=d.sleepAvg%1440;
-    const sleepPct=sleepClamped>rangeMax?0:Math.min(100,Math.max(0,(sleepClamped-rangeMin)/(rangeMax-rangeMin)*100));
-    const wakePct=Math.min(100,Math.max(0,(d.wakeAvg-rangeMin)/(rangeMax-rangeMin)*100));
-    const leftPct=sleepPct,rightPct=Math.max(0,100-wakePct);
-    const colorStyle=isWeekend?'background:rgba(var(--pal-rose-rgb),0.85);':'';
-    const lblStyle=isWeekend?'color:var(--pal-rose-text);font-weight:600;':'';
-    return `<div class="range-row"><div class="range-lbl" style="${lblStyle}">${YR_DOW_LABELS[dow]}</div><div class="range-track"><div class="range-fill" style="left:${leftPct.toFixed(1)}%;right:${rightPct.toFixed(1)}%;${colorStyle}"></div></div><div class="range-val" style="${lblStyle}">${_yrMinToHHMM(d.sleepAvg)} - ${_yrMinToHHMM(d.wakeAvg)}</div></div>`;
-  }).join('');
-
-  const allSleepAvg=avg(dowStats.filter(d=>d.sleepAvg!=null).map(d=>d.sleepAvg));
-  const allWakeAvg=avg(dowStats.filter(d=>d.wakeAvg!=null).map(d=>d.wakeAvg));
-  const sorted=dowStats.filter(d=>d.sleepAvg!=null).sort((a,b)=>a.sleepAvg-b.sleepAvg);
-  const earliestLabel=sorted.length?YR_DOW_LABELS[sorted[0].dow]:'-';
-  const latestLabel=sorted.length?YR_DOW_LABELS[sorted[sorted.length-1].dow]:'-';
-
-  el.innerHTML=`
-    <div class="sleep-range-wrap">
-      ${rowsHtml}
-      <div class="range-axis"><span>00:00</span><span>02:00</span><span>04:00</span><span>06:00</span><span>08:00</span><span>10:00</span></div>
-    </div>
-    <div class="bento-sub" style="margin-top:14px;">전체 평균 취침 ${_yrMinToHHMM(allSleepAvg)} · 기상 ${_yrMinToHHMM(allWakeAvg)} · ${earliestLabel}요일이 가장 이르고, ${latestLabel}요일이 가장 늦어요</div>`;
-
-  // 마지막 인사이트(제안) — 요일별 취침시각 편차 기반
-  const insightEl=document.getElementById('yr-sleep-final-insight');
-  if(insightEl){
-    insightEl.innerHTML=`<div class="insight-box tone-suggest"><i class="ti ti-bulb"></i><div><strong>제안:</strong> ${earliestLabel}요일엔 상대적으로 일찍 잠들지만 ${latestLabel}요일엔 더 늦어져요. 취침 시각이 가장 늦은 요일 전날부터 조금씩 당겨보면 도움이 될 것 같아요.</div></div>`;
-  }
 }
 
 // ══════════════════════════════════════════════════════════

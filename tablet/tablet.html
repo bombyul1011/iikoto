@@ -1535,15 +1535,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .r-sm-bar{width:14px;border-radius:3px 3px 1px 1px;}
 .r-sm-lbl{font-size:12px;color:var(--tm);}
 
-/* 평일vs주말 나란히 막대비교 (리듬탭) */
-.wkc-wrap{display:grid;grid-template-columns:1fr 1fr;gap:14px 16px;margin:16px 0 10px;}
-.wkc-row{background:rgba(255,255,255,0.5);border:1px solid rgba(var(--divider-rgb),0.2);border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:10px;}
-.wkc-lbl{width:34px;font-size:13px;font-weight:650;color:var(--tp);flex-shrink:0;}
-.wkc-bars{flex:1;height:44px;display:flex;align-items:flex-end;}
-.wkc-bar-pair{display:flex;align-items:flex-end;gap:4px;height:100%;width:40px;}
-.wkc-bar{flex:1;border-radius:5px 5px 2px 2px;min-height:4px;}
-.wkc-val{width:46px;font-size:13px;font-weight:700;text-align:right;flex-shrink:0;}
-
 /* 수면탭: 요일별 취침·기상 범위 바 */
 .sleep-range-wrap{margin-top:16px;display:flex;flex-direction:column;gap:10px;}
 .range-row{display:flex;align-items:center;gap:10px;}
@@ -1577,9 +1568,28 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .yr-ctc-seg{height:100%;transition:width .3s ease;}
 .yr-ctc-empty{flex:1;font-size:12px;color:var(--tm);}
 
-/* 수면탭: 수면시간 분포 도넛 범례 (donut-stat-wrap과 짝, 색상 도트만 별도) */
-.db-legend{display:flex;justify-content:center;gap:16px;margin-top:16px;font-size:13px;color:var(--ts);font-weight:600;}
-.db-legend-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle;border:1px solid rgba(var(--divider-rgb),0.3);}
+/* 수면탭: 분기별 취침·기상 시각 (4칸 카드, 22시~다음날14시 축 위 점 2개) */
+.ysqt-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+.ysqt-card{border:1px solid var(--card-b);border-radius:14px;padding:12px 8px;background:rgba(255,253,248,0.6);}
+.ysqt-card.empty{opacity:0.5;}
+.ysqt-range{font-size:11.5px;font-weight:700;color:var(--tp);text-align:center;margin-bottom:10px;}
+.ysqt-empty{font-size:12px;color:var(--tm);text-align:center;padding:14px 0;}
+.ysqt-axis{position:relative;height:6px;border-radius:3px;background:rgba(var(--divider-rgb),0.2);margin-bottom:10px;}
+.ysqt-dot{position:absolute;top:50%;width:11px;height:11px;border-radius:50%;transform:translate(-50%,-50%);border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.15);}
+.ysqt-dot.sleep{background:var(--pal-lavender-text);}
+.ysqt-dot.wake{background:var(--pal-orange-border);}
+.ysqt-times{display:flex;flex-direction:column;gap:3px;align-items:center;}
+.ysqt-time{font-size:12px;font-weight:600;}
+.ysqt-time.sleep{color:var(--pal-lavender-text);}
+.ysqt-time.wake{color:var(--pal-orange-border);}
+
+/* 수면탭: 컨디션 낮은 날 전날 리듬 흔적 (교차분석 하이라이트) */
+.yr-ctrace-row{display:flex;align-items:center;gap:12px;}
+.yr-ctrace-icon{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.yr-ctrace-icon i{font-size:18px;color:#fff;}
+.yr-ctrace-title{font-size:14px;font-weight:700;color:var(--tp);}
+.yr-ctrace-desc{font-size:13px;color:var(--ts);margin-top:2px;}
+
 </style>
 <script>(function(){try{var s=localStorage.getItem('textScale');s=s?JSON.parse(s):0;var base={'-1':{title:15,body:14},'0':{title:16,body:15},'1':{title:17,body:16}}[String(s)]||{title:16,body:15};document.documentElement.style.setProperty('--fs-title',base.title+'px');document.documentElement.style.setProperty('--fs-body',base.body+'px');document.documentElement.style.setProperty('--main-text-size',base.body+'px');document.documentElement.style.setProperty('--dow-label-size',(base.body-1.5)+'px');}catch(e){}})();</script>
 </head>
@@ -1831,12 +1841,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           </div>
 
           <div class="bento-item bento-full">
-            <div class="bento-lbl">평일 vs 주말 리듬 비교</div>
-            <div class="bento-sub" style="margin-top:0;margin-bottom:12px;">일평균 기준 상위 카테고리를 비교해요.</div>
-            <div id="yr-rhythm-weekday-compare"></div>
-          </div>
-
-          <div class="bento-item bento-full">
             <div class="bento-lbl">8대 카테고리 일평균 밸런스</div>
             <div id="yr-rhythm-9grid"></div>
           </div>
@@ -1846,6 +1850,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
             <div class="bento-sub" style="margin-top:0;">가장 많은 시간을 할애한 리듬들의 월별 변화예요. 개월이 늘어날수록 오른쪽으로 이어져요.</div>
             <div id="yr-rhythm-monthly-flow"></div>
           </div>
+
+          <div id="yr-rhythm-change-insights"></div>
         </div>
 
         <!-- 수면 -->
@@ -1855,13 +1861,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
             <div class="tab-intro-title">더 나은 내일을 위한<br><b>수면의 질 변화</b></div>
           </div>
           <div id="yr-sleep-summary"></div>
-          <div id="yr-sleep-combo"></div>
+          <div id="yr-sleep-quarter-time"></div>
           <div class="bento-item bento-full" id="yr-sleep-distribution"></div>
-          <div class="bento-item bento-full">
-            <div class="bento-lbl">요일별 평균 취침 · 기상 시각</div>
-            <div id="yr-sleep-weekday-range"></div>
-          </div>
-          <div class="bento-item bento-full" id="yr-sleep-final-insight"></div>
+          <div id="yr-sleep-condition-flow"></div>
+          <div id="yr-sleep-condition-trace"></div>
         </div>
 
         <!-- 채움로그 -->
