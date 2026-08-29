@@ -6228,9 +6228,12 @@ function renderTodos(){
 }
 // 투두 텍스트 맨 앞의 "HH:MM " 표기를 시간표 항목으로 인식 — 봄이님의 기존 입력 습관(고정 규칙)을 그대로 파싱.
 const SCHEDULE_TIME_RE=/^(\d{1,2}):(\d{2})\s+(.+)/;
+// dk가 오늘이면 현재 분(0~1439), 아니면 null — 시간표/일정 배너 여러 곳에서 반복되던 "오늘인지+현재분" 계산을 통일.
+function _nowMinIfToday(dk){
+  return dk===dateKey(new Date())?(new Date().getHours()*60+new Date().getMinutes()):null;
+}
 function parseScheduleTodos(dk,todos){
-  const isToday=dk===dateKey(new Date());
-  const nowMin=isToday?(new Date().getHours()*60+new Date().getMinutes()):null;
+  const nowMin=_nowMinIfToday(dk);
   const items=[];
   todos.forEach((t,i)=>{
     if(t.isEvent)return;
@@ -6257,7 +6260,7 @@ function renderScheduleDonut(dk){
   const wrap=document.getElementById('schedule-donut');
   if(!wrap)return;
   const raw=computeRhythmBlocksRaw(dk);
-  const nowMin=dk===dateKey(new Date())?(new Date().getHours()*60+new Date().getMinutes()):null;
+  const nowMin=_nowMinIfToday(dk);
   let circles='<circle cx="29" cy="29" r="23" fill="none" stroke="var(--empty-bg)" stroke-width="13"/>';
   raw.forEach(function(b){
     let s=b.start,e=b.end;
@@ -6271,12 +6274,14 @@ function renderScheduleDonut(dk){
   wrap.innerHTML=`<svg viewBox="0 0 58 58">${circles}</svg>`;
 }
 // 시간표 리스트 — 텍스트만 노출, 체크박스는 기존 .chk/toggleTodo() 그대로 재사용(별도 저장/토글 로직 없음).
+// items는 parseScheduleTodos가 이미 "미완료 중 가장 가까운 것 최상단" 순으로 정렬해 반환하므로,
+// 맨 앞의 미완료 항목(0번 인덱스)만 진행중(current)으로 강조 — 매 항목마다 배열을 다시 훑을 필요 없음.
 function renderScheduleList(dk,items){
   const list=document.getElementById('schedule-list');
   if(!list)return;
   list.innerHTML='';
   items.forEach(function(it,idx){
-    const isNext=!it.done&&idx===items.findIndex(x=>!x.done);
+    const isNext=idx===0&&!it.done;
     const el=document.createElement('div');
     el.className='rt-item'+(it.done?' done':'')+(isNext?' current':'');
     el.innerHTML=`<div class="chk${it.done?' on':''}" onclick="toggleTodo(${it.i},'${it.cid||''}')"></div><div class="rt-time">${it.time}</div><div class="rt-text" onclick="openTodoSheet(${it.i})">${escapeHtml(it.label)}</div>`;
@@ -6285,7 +6290,7 @@ function renderScheduleList(dk,items){
 }
 // 오늘 일정 / 오늘의 시간표 — 같은 자리(event-section)에서 교차 노출. 둘 다 있는 날에만 제목 옆 전환 아이콘 노출.
 // 둘 다 있는 날 자동 선노출 기준 — 각자 카테고리에서 가장 가까운(아직 안 지난) 항목의 시각끼리 비교, 더 가까운 쪽 선노출.
-// 사용자가 제목을 탭해 수동 전환하면 그 값을 세션 동안 유지(재계산하지 않음) — 탭 재진입(currentDate 변경) 시에만 자동판단으로 리셋.
+// 사용자가 제목을 탭해 수동 전환하면 그 값을 세션 동안 유지(재계산하지 않음) — 오늘탭 재진입(loadDaily) 또는 조회 날짜 변경 시에만 자동판단으로 리셋.
 let _todayBannerMode=null;
 let _todayBannerModeDk=null;
 function _nextUpcomingMin(nowMin,mins){
@@ -6320,8 +6325,7 @@ function renderEventList(dk,todos){
   else if(_todayBannerMode)mode=_todayBannerMode; // 사용자가 이미 수동 전환한 경우 그대로 유지
   else{
     // 최초 노출: 각자 카테고리에서 가장 가까운(아직 안 지난) 항목 시각끼리 비교, 더 가까운 쪽. 둘 다 없으면(다 지났으면) 일정 선노출.
-    const isToday=dk===dateKey(new Date());
-    const nowMin=isToday?(new Date().getHours()*60+new Date().getMinutes()):0;
+    const nowMin=_nowMinIfToday(dk)??0;
     const eventMins=all.filter(ev=>!ev.eventEndDate&&ev.eventTime).map(ev=>{
       const m=ev.eventTime.match(/^(\d{1,2}):(\d{2})$/);return m?parseInt(m[1],10)*60+parseInt(m[2],10):null;
     }).filter(m=>m!=null);
@@ -10725,6 +10729,7 @@ function renderDailyHabitCheck(){
 }
 function loadDaily(){
   _sleepCollapseOverride=null; // 오늘탭 재진입(다시 누르기 포함) 시 사용자가 펼쳐뒀던 상태를 초기화 — 시간대 기준 자동판단으로 되돌아감
+  _todayBannerMode=null; // 오늘탭 재진입(다시 누르기 포함) 시 일정/시간표 수동전환 기록도 초기화 — 자동판단으로 되돌아감
   loadSleep();renderTodos();renderMemos();renderTodayMeal();renderDailyHabitCheck();
   const dk=dateKey(currentDate);
   ensureDateSynced(dk).then(fetched=>{if(fetched){loadSleep();renderTodos();renderMemos();renderTodayMeal();renderDailyHabitCheck();}});

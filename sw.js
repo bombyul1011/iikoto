@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.24-schedule-autoselect';
+const CACHE = 'iikoto-v2.26-schedule-cleanup';
 const ASSETS = [
   './',
   './index.html'
