@@ -516,7 +516,7 @@ async function loadTodayTab(){
   const sleepAvgStart=new Date(_selectedDate);sleepAvgStart.setDate(sleepAvgStart.getDate()-13);
   const sleepAvgStartDk=dateKey(sleepAvgStart);
 
-  const [todos,sleepRows,recentSleepRows,habits,habitChecks,meals,contents,rblocks,morningChecks,todayNoteRows,todayManualRows]=await Promise.all([
+  const [todos,sleepRows,recentSleepRows,habits,habitChecks,meals,contents,rblocks,morningChecks,todayManualRows]=await Promise.all([
     supaFetch(`todos?date_key=eq.${dk}&order=created.asc`),
     supaFetch(`sleep?date_key=eq.${dk}`),
     supaFetch(`sleep?date_key=gte.${sleepAvgStartDk}&date_key=lte.${dk}&select=date_key,score,sleep_time,wake_time`),
@@ -526,7 +526,6 @@ async function loadTodayTab(){
     supaFetch(`contents?or=(status.eq.watching,and(status.eq.done,end_date.eq.${dk}),start_date.eq.${dk})&order=created.desc&limit=10`),
     supaFetch(`rhythm_blocks?date_key=eq.${dk}&order=start_time.asc`),
     supaFetch(`morning_routine_checks?date_key=eq.${dk}`),
-    supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wcal_note_'+dk.slice(0,7))}`),
     supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wcal_manual_'+dk.slice(0,7))}`)
   ]);
 
@@ -535,8 +534,7 @@ async function loadTodayTab(){
   renderTodaySleep(dk,sleepRows&&sleepRows[0],recentSleepRows||[]);
   renderTodayHabits(habits||[],habitChecks||[],dk);
   renderTodayMeals(meals&&meals[0]);
-  const todayNotes=((todayNoteRows&&todayNoteRows[0]&&todayNoteRows[0].lines)||[]).filter(n=>n.dk===dk);
-  renderTodayContents(contents||[],todayNotes);
+  renderTodayContents(contents||[]);
   _todayRhythmBlocks=rblocks||[];
   _todaySleepRow=sleepRows&&sleepRows[0];
   _todayMealsRow=meals&&meals[0];
@@ -728,7 +726,7 @@ function renderTodayMeals(meal){
   el.innerHTML=`<div class="meal-grid">${html}</div>`;
 }
 
-function renderTodayContents(items,todayNotes){
+function renderTodayContents(items){
   const el=document.getElementById('today-contents');
   items=items||[];
   const dk=dateKey(_selectedDate);
@@ -1183,8 +1181,8 @@ async function loadWeekTab(){
 
   const [goalRows,habits,habitChecks,memos,todos,sleepRows,onelineRows,contents,
     lwMemos,lwTodos,lwSleepRows,lwHabitChecks,rblocksFull,sleepReportRows,
-    rblocksLast,weekMemoTexts,weekOnelineTexts,readingBook,readingLogRows,
-    rdaThisWeek,rdaLastWeek,readingBooksAll]=await Promise.all([
+    rblocksLast,weekMemoTexts,weekOnelineTexts,readingLogRows,
+    rdaThisWeek,rdaLastWeek]=await Promise.all([
     supaFetch(`goal_notes?note_key=eq.wchallenge_${encodeURIComponent(wk)}`),
     supaFetch(`habits?order=sort_order.asc`),
     supaFetch(`habit_checks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
@@ -1196,8 +1194,8 @@ async function loadWeekTab(){
     // renderWeekDelta 안에서 countContentsCompletedInRange(contents,startDk,endDk)로 각자 날짜만
     // 다르게 필터링함 — 한 번만 조회해서 cur/prev 양쪽에 같은 배열을 넘기면 됨(구 lwContents 제거).
     // 이번 주 독서 카드(진행중/완독 책 판별)에도 이 같은 배열을 재사용 — 책만 watching 상태도 포함하도록
-    // 조건을 넓혀서, 별도 쿼리 없이 여기서 표지/제목/상태를 모두 가져옴(2026-08-27, reading_books는
-    // 진행률 %만 보조로 사용 — contents엔 페이지/퍼센트 필드가 없어 그래프 계산은 여전히 reading_books가 필요).
+    // 조건을 넓혀서, 별도 쿼리 없이 여기서 표지/제목/상태를 모두 가져옴. 책 진행률(total_unit/current_unit/unit_label)도
+    // contents에 통합됐으므로(2026-08-29 본앱 통합) 더 이상 reading_books 보조 조회가 필요 없음.
     supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music,and(content_cat.eq.book,status.eq.watching))&order=created.desc&limit=100`),
     // 지난주 대비 비교용(오늘 요일까지로 절단된 범위)
     supaFetch(`memos?date_key=gte.${lastStartDk}&date_key=lte.${lastCmpEndDk}&select=id`),
@@ -1216,14 +1214,16 @@ async function loadWeekTab(){
     // 주간 키워드 카드에 하루한줄도 메모와 같은 역할로 포함 — 같은 롤링 2주(오늘 제외) 범위로 별도 조회.
     // 캘린더 주 범위(onelineRows, 하루한줄 배너용)와는 범위가 달라 재사용하지 않음(2026-08-27).
     supaFetch(`goal_notes?note_key=gte.oneline:${kwStartDk}&note_key=lte.oneline:${kwEndDk}`),
-    // 이번 주 독서용 — 현재 읽고 있는 책 1권 + 스트릭 계산용 최근 90일 독서 기록
-    supaFetch(`reading_books?status=eq.reading&limit=1`),
+    // 이번 주 독서용 — 스트릭 계산은 여전히 reading_daily_log 기준(현재 읽는 책 자체는 위 contents에서 파생)
     supaFetch(`reading_daily_log?date_key=gte.${rdStreakStartDk}&select=date_key`),
-    // 이번 주 독서 활동(탭 전환용) — 이번 주/지난주 각각의 독서 로그(권별 진행량 계산용) + 전체 책 목록(제목/저자/표지 조회용, 병렬 진행 포함)
+    // 이번 주 독서 활동(탭 전환용) — 이번 주/지난주 각각의 독서 로그(권별 진행량 계산용)
     supaFetch(`reading_daily_log?date_key=gte.${startDk}&date_key=lte.${cmpEndDk}&select=date_key,book_cid,unit,amount_read,seconds&order=date_key.asc`),
-    supaFetch(`reading_daily_log?date_key=gte.${lastStartDk}&date_key=lte.${lastCmpEndDk}&select=date_key,book_cid,unit,amount_read,seconds&order=date_key.asc`),
-    supaFetch(`reading_books?select=cid,title,author,poster,unit,total_pages,status`)
+    supaFetch(`reading_daily_log?date_key=gte.${lastStartDk}&date_key=lte.${lastCmpEndDk}&select=date_key,book_cid,unit,amount_read,seconds&order=date_key.asc`)
   ]);
+  // 현재 읽는 책 1권 + 전체 책 목록 — 이제 contents(content_cat='book')에서 직접 파생(2026-08-29, reading_books 제거로 별도 쿼리 불필요)
+  const weekBooks=(contents||[]).filter(c=>c.content_cat==='book');
+  const readingBook=weekBooks.find(c=>c.status==='watching');
+  const readingBooksAll=weekBooks;
 
   const rblocksThis=(rblocksFull||[]).filter(b=>b.date_key<=cmpEndDk);
 
@@ -1240,7 +1240,7 @@ async function loadWeekTab(){
   renderWeekRhythmFlow(rblocksThis||[],rblocksLast||[],cmpDayCount);
   renderWeekOneline(onelineRows||[],weekDates);
   renderWeekKeywords(weekMemoTexts||[],weekOnelineTexts||[]);
-  renderWeekReading(contents||[],readingBook&&readingBook[0],readingLogRows||[],startDk,endDk);
+  renderWeekReading(contents||[],readingBook,readingLogRows||[],startDk,endDk);
   renderWeekReadingActivity(rdaThisWeek||[],rdaLastWeek||[],readingBooksAll||[],contents||[],startDk,cmpEndDk,lastStartDk,lastCmpEndDk);
 }
 
@@ -1562,7 +1562,7 @@ function renderWeekReading(contents,book,streakLogRows,startDk,endDk){
   const el=document.getElementById('week-reading');
   if(!el)return;
   // 이번 주 완독한 책 — contents(content_cat='book')에서 done/stopped이고 종료일이 이번 주 범위인 것.
-  // reading_books는 진행중 책 1권만 가져오는 별도 쿼리라 완독작은 여기 contents로만 판별(2026-08-27, 별도 쿼리 추가 없이 기존 델타용 배열 재사용).
+  // 2026-08-29 통합 이후 book(진행중 1권)도 이 contents 배열에서 파생되므로 완독작 판별도 동일 배열로 처리.
   const doneThisWeek=(contents||[]).find(c=>c.content_cat==='book'&&(c.status==='done'||c.status==='stopped')&&c.end_date&&c.end_date>=startDk&&c.end_date<=endDk);
 
   if(!book&&!doneThisWeek){
@@ -1572,8 +1572,9 @@ function renderWeekReading(contents,book,streakLogRows,startDk,endDk){
 
   let pct=0;
   if(book){
-    if(book.unit==='percent')pct=book.percent||0;
-    else if(book.total_pages)pct=Math.min(100,Math.round((book.pages/book.total_pages)*100));
+    // 2026-08-29 통합: book은 이제 contents 로우(unit_label/current_unit/total_unit)
+    if(book.unit_label==='percent')pct=book.current_unit||0;
+    else if(book.total_unit)pct=Math.min(100,Math.round((book.current_unit/book.total_unit)*100));
   }
   const streak=_readingStreakOf(streakLogRows);
   const streakText=streak>0?`연속 <b>${streak}일째</b> 읽고 있어요`:'오늘부터 다시 시작해볼까요?';
@@ -1656,14 +1657,15 @@ function _wraStatsOf(logRows,booksByCid){
     const logs=byBook[cid].sort((a,b)=>a.date_key<b.date_key?-1:1);
     const book=booksByCid[cid]||{};
     let deltaPct=null;
-    if(book.unit==='percent'){
+    // 2026-08-29 통합: book은 이제 contents 로우(unit_label/total_unit)
+    if(book.unit_label==='percent'){
       // amount_read를 그날의 증가폭으로 기록해뒀다는 전제 하에 합산(로그 1건이든 여러 건이든 동일 로직).
       deltaPct=logs.reduce((s,r)=>s+(r.amount_read||0),0);
-    }else if(book.unit==='pages'&&book.total_pages){
+    }else if(book.unit_label==='pages'&&book.total_unit){
       const pagesRead=logs.reduce((s,r)=>s+(r.amount_read||0),0);
-      deltaPct=Math.round((pagesRead/book.total_pages)*100);
+      deltaPct=Math.round((pagesRead/book.total_unit)*100);
     }
-    return {cid,title:book.title||'',deltaPct,noTotal:book.unit==='pages'&&!book.total_pages};
+    return {cid,title:book.title||'',deltaPct,noTotal:book.unit_label==='pages'&&!book.total_unit};
   });
   return {rows,activeDays,totalSeconds};
 }
@@ -1679,27 +1681,28 @@ function renderWeekReadingActivity(logsThis,logsLast,booksAll,contents,startDk,e
   const el=document.getElementById('week-reading-activity');
   if(!el)return;
   const booksByCid={};
-  (booksAll||[]).forEach(b=>{booksByCid[b.cid]=b;});
+  // 2026-08-29 통합: book은 이제 contents 로우이므로 client_id가 곧 cid
+  (booksAll||[]).forEach(b=>{booksByCid[b.client_id]=b;});
 
   const {rows,activeDays,totalSeconds}=_wraStatsOf(logsThis,booksByCid);
   const {rows:rowsLast,activeDays:activeDaysLast,totalSeconds:totalSecondsLast}=_wraStatsOf(logsLast,booksByCid);
 
   const doneThis=(contents||[]).filter(c=>c.content_cat==='book'&&(c.status==='done'||c.status==='stopped')&&c.end_date&&c.end_date>=startDk&&c.end_date<=endDk);
-  // reading_books.cid와 contents.client_id는 서로 다른 ID 체계라(2026-08-28 확인) 직접 매칭 불가 —
-  // 제목 기준으로 완독 여부를 판별해 진행 리스트와 중복 표기되지 않도록 함.
-  const doneTitleSet=new Set(doneThis.map(c=>c.title));
+  // 2026-08-29 통합 이후 book_cid(reading_daily_log)와 contents.client_id가 동일한 ID 체계이므로
+  // cid로 직접 매칭 가능 — 예전 title 매칭 우회(동명이서 오매칭 리스크 있었음)를 제거.
+  const doneCidSet=new Set(doneThis.map(c=>c.client_id));
 
   const sumPct=(rs)=>rs.reduce((s,r)=>s+(r.noTotal?0:(r.deltaPct||0)),0);
   const totalThis=sumPct(rows),totalLast=sumPct(rowsLast);
 
   const rowsHtml=rows.length?rows.map(r=>{
-    const isDone=doneTitleSet.has(r.title);
+    const isDone=doneCidSet.has(r.cid);
     const badge=isDone?`<span class="wra-row-badge">완독</span>`:'';
     if(r.noTotal)return `<div class="wra-row"><span class="wra-row-title">${escapeHtml(r.title)}</span>${badge}<span class="wra-row-flag">기록됨</span></div>`;
     return `<div class="wra-row"><span class="wra-row-title">${escapeHtml(r.title)}</span>${badge}<span class="wra-row-delta">+${r.deltaPct}%</span></div>`;
   }).join(''):'';
   // 진행 로그가 아예 없이 완독만 된 책(예: 지난주 전에 다 읽고 이번 주에 상태만 done으로 바뀐 경우) 별도 표기
-  const doneOnlyHtml=doneThis.filter(c=>!rows.some(r=>r.title===c.title)).map(c=>`<div class="wra-row"><span class="wra-row-title">${escapeHtml(c.title||'')}</span><span class="wra-row-badge">완독</span></div>`).join('');
+  const doneOnlyHtml=doneThis.filter(c=>!rows.some(r=>r.cid===c.client_id)).map(c=>`<div class="wra-row"><span class="wra-row-title">${escapeHtml(c.title||'')}</span><span class="wra-row-badge">완독</span></div>`).join('');
   const bodyHtml=(rowsHtml+doneOnlyHtml)||`<div class="wra-empty">이번 주엔 독서 기록이 없어요</div>`;
 
   const deltaDays=activeDays-activeDaysLast;
@@ -1831,8 +1834,6 @@ async function toggleCgridYearMode(){
 }
 async function _loadCgridYearly(y){
   const rows=await supaFetch(`contents?month_key=like.${y}-*`);
-  const months=[];for(let mo=1;mo<=12;mo++)months.push(`${y}-${pad(mo)}`);
-  await _loadCgridNotesForMonths(months);
   const belongsHere=c=>{
     if(c.status==='done'||c.status==='stopped')return true;
     return c.status==='watching'&&y===new Date().getFullYear();
@@ -1857,14 +1858,12 @@ async function renderMonthContentGrid(y,mo,contentsData){
   _updateCgridStatusChipUI();
   const curRows=contentsData?contentsData.cur:await supaFetch(`contents?month_key=eq.${mk}`);
   const prevRows=contentsData?contentsData.prev:await supaFetch(`contents?month_key=eq.${prevMk}`);
-  await _loadCgridNotesForMonths([mk,prevMk]);
   const belongsHere=c=>{
     if(c.status==='done'||c.status==='stopped')return isContentEndedInMonthTablet(c,mk);
     return c.status==='watching'&&isSameMonth;
   };
   _cgridContents=[...(curRows||[]).filter(belongsHere),...(prevRows||[]).filter(belongsHere)]
     .sort((a,b)=>(b.created||0)-(a.created||0));
-  await _loadCgridBookProgress(_cgridContents);
   _renderCgridFromCache();
 }
 // 카테고리+상태 필터를 함께 적용 — _renderCgridFromCache/toggleCgridDetail에서 공용
@@ -1894,31 +1893,6 @@ function _cgridRowsHtml(list){
   return html;
 }
 let _cgridActiveId=null;
-// 감상 메모(goal_notes, note_key='wcal_note_YYYY-MM', lines:[{cid,dk,title,cat,text,time,updatedAt}]) — cid별로 모아 캐시.
-let _cgridNotesByCid={};
-// 독서 진행률(reading_books.pages/total_pages 또는 percent) — 진행중(watching) 책만 대상.
-// contents 테이블엔 페이지/퍼센트 필드가 없어 reading_books를 client_id(=book.cid) 기준으로 별도 조회.
-let _cgridBookProgressByCid={};
-async function _loadCgridBookProgress(list){
-  const cids=[...new Set((list||[]).filter(c=>c.content_cat==='book'&&c.status==='watching'&&c.client_id).map(c=>c.client_id))];
-  _cgridBookProgressByCid={};
-  if(!cids.length)return;
-  const cidFilter=cids.map(c=>`"${c}"`).join(',');
-  const rows=await supaFetch(`reading_books?cid=in.(${cidFilter})&select=cid,pages,total_pages,unit,percent`);
-  (rows||[]).forEach(r=>{_cgridBookProgressByCid[r.cid]=r;});
-}
-async function _loadCgridNotesForMonths(months){
-  const rows=await Promise.all(months.map(mk=>supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wcal_note_'+mk)}`)));
-  _cgridNotesByCid={};
-  rows.forEach(r=>{
-    const lines=(r&&r[0]&&Array.isArray(r[0].lines))?r[0].lines:[];
-    lines.forEach(n=>{
-      if(!n.cid)return;
-      (_cgridNotesByCid[n.cid]=_cgridNotesByCid[n.cid]||[]).push(n);
-    });
-  });
-  Object.values(_cgridNotesByCid).forEach(list=>list.sort((a,b)=>(b.dk||'').localeCompare(a.dk||'')));
-}
 function _cgridPeriodLabel(c){
   const s=c.start_date,e=c.end_date;
   if(s&&e&&s!==e)return `${s.slice(5).replace('-','.')}~${e.slice(5).replace('-','.')}`;
@@ -1953,26 +1927,25 @@ function _cgridDetailHtml(c){
       <div class="cgrid-progress-label">${cur}/${c.total_unit}${unitLabel}</div>
     </div>`;
   }else if(c.content_cat==='book'&&c.status==='watching'){
-    const book=_cgridBookProgressByCid[c.client_id];
-    if(book){
-      if(book.unit==='percent'){
-        const pct=Math.round(Math.min(book.percent||0,100));
-        progressHtml=`<div class="cgrid-progress-bar">
-          <div class="cgrid-progress-track"><div class="cgrid-progress-fill" style="width:${pct}%;"></div></div>
-          <div class="cgrid-progress-label">${pct}%</div>
-        </div>`;
-      }else if(book.total_pages){
-        const cur=Math.min(book.pages||0,book.total_pages);
-        const pct=Math.round((cur/book.total_pages)*100);
-        progressHtml=`<div class="cgrid-progress-bar">
-          <div class="cgrid-progress-track"><div class="cgrid-progress-fill" style="width:${pct}%;"></div></div>
-          <div class="cgrid-progress-label">${cur}/${book.total_pages}쪽</div>
-        </div>`;
-      }
+    // 2026-08-29 통합: 책 진행률도 이제 c 자체(total_unit/current_unit/unit_label)에 있음 — drama/movie와 동일 패턴.
+    if(c.unit_label==='percent'&&c.current_unit!=null){
+      const pct=Math.round(Math.min(c.current_unit||0,100));
+      progressHtml=`<div class="cgrid-progress-bar">
+        <div class="cgrid-progress-track"><div class="cgrid-progress-fill" style="width:${pct}%;"></div></div>
+        <div class="cgrid-progress-label">${pct}%</div>
+      </div>`;
+    }else if(c.unit_label==='pages'&&c.total_unit){
+      const cur=Math.min(c.current_unit||0,c.total_unit);
+      const pct=Math.round((cur/c.total_unit)*100);
+      progressHtml=`<div class="cgrid-progress-bar">
+        <div class="cgrid-progress-track"><div class="cgrid-progress-fill" style="width:${pct}%;"></div></div>
+        <div class="cgrid-progress-label">${cur}/${c.total_unit}쪽</div>
+      </div>`;
     }
   }
   const finalHtml=c.review?`<div class="cgrid-detail-final"><span class="cgrid-detail-final-lbl">Comment :</span> ${escapeHtml(c.review)}</div>`:'';
-  const notes=_cgridNotesByCid[c.client_id]||[];
+  // 2026-08-29 통합: 감상 메모도 이제 c.notes[]에 직접 있음 — 별도 goal_notes 조회/cid 매칭 불필요.
+  const notes=(c.notes||[]).slice().sort((a,b)=>(b.dk||'').localeCompare(a.dk||''));
   const notesHtml=notes.length?`<div class="cgrid-detail-notes${c.review?' with-final':''}">
     <div class="cgrid-detail-notes-lbl">Timeline</div>
     <div class="cgrid-detail-notes-tl">
@@ -1992,7 +1965,7 @@ function _cgridItemHtml(c){
   const statusDot=c.status==='watching'?'<span class="status-badge dot">진행중</span>':'';
   const icons=[];
   if(c.stars>0)icons.push('<i class="ti ti-star" aria-hidden="true"></i>');
-  if(c.review||(_cgridNotesByCid[c.client_id]&&_cgridNotesByCid[c.client_id].length))icons.push('<i class="ti ti-message-circle" aria-hidden="true"></i>');
+  if(c.review||(c.notes&&c.notes.length))icons.push('<i class="ti ti-message-circle" aria-hidden="true"></i>');
   const thumbIcons=icons.length?`<div class="cgrid-thumb-icons">${icons.join('')}</div>`:'';
   const active=c.id===_cgridActiveId;
   return `<div class="cgrid-item${active?' active':''}" data-cid="${c.id}" onclick="toggleCgridDetail('${c.id}')">
@@ -2205,7 +2178,8 @@ function _calcWatchTimeByCat(rblocks,contents){
   };
 }
 
-// 신규: 이번 달 수집한 문장(reading_quotes) — created 타임스탬프 기준, 책 단위로 그룹핑
+// 이번 달 수집한 문장(reading_quotes) — created 타임스탬프 기준, 책 단위로 그룹핑.
+// book_cid는 2026-08-29 본앱 통합 이후 contents.client_id와 동일한 ID 체계이므로 contents에서 직접 조회.
 async function renderMonthQuotes(y,mo){
   const el=document.getElementById('month-quotes');
   const startMs=new Date(y,mo,1,0,0,0,0).getTime();
@@ -2217,8 +2191,8 @@ async function renderMonthQuotes(y,mo){
   let bookMap={};
   if(bookCids.length){
     const cidFilter=bookCids.map(c=>`"${c}"`).join(',');
-    const books=await supaFetch(`reading_books?cid=in.(${cidFilter})&select=cid,title,author,poster`);
-    (books||[]).forEach(b=>{bookMap[b.cid]=b;});
+    const books=await supaFetch(`contents?client_id=in.(${cidFilter})&content_cat=eq.book&select=client_id,title,author,poster`);
+    (books||[]).forEach(b=>{bookMap[b.client_id]={cid:b.client_id,title:b.title,author:b.author,poster:b.poster};});
   }
   const groups=[];
   const groupIdx={};
@@ -3870,7 +3844,7 @@ function toggleMrpContentsView(){
 
 // ══════════════════════════════════════════════════════════
 // 코멘트 모아보기(타임라인, 읽기 전용) — 본앱 로직 이식, supaFetch 기반으로 재작성
-// 완결 코멘트(contents.review+stars)와 감상 메모(goal_notes: wcal_note_YYYY-MM)를 함께 모아 보여줌.
+// 완결 코멘트(contents.review+stars)와 감상 메모(contents.notes[], 2026-08-29 통합)를 함께 모아 보여줌.
 // ══════════════════════════════════════════════════════════
 let _chNoteTimelineMonths=6; // 최근 몇 개월치를 모아볼지
 let _chNoteTimelineView='date';
@@ -3897,24 +3871,16 @@ async function _chCollectNoteSource(){
   const now=new Date();
   const months=[];
   for(let i=0;i<_chNoteTimelineMonths;i++)months.push(monthKeyOf(new Date(now.getFullYear(),now.getMonth()-i,1)));
-  const [contentRows,noteRows]=await Promise.all([
-    Promise.all(months.map(mk=>supaFetch(`contents?month_key=eq.${mk}`))),
-    Promise.all(months.map(mk=>supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wcal_note_'+mk)}`)))
-  ]);
+  const contentRows=await Promise.all(months.map(mk=>supaFetch(`contents?month_key=eq.${mk}`)));
   const finals=[]; // {cid,cat,title,poster,stars,review,dk}
   const notes=[]; // {cid,cat,title,dk,text,time,updatedAt}
-  const posterByCid={};
+  // 2026-08-29 통합: 감상 메모는 이제 contents.notes[]에 직접 있음 — 별도 goal_notes 조회/cid 매칭(_resolveBookNoteCids) 불필요.
   contentRows.forEach(rows=>(rows||[]).forEach(c=>{
-    if(c.client_id)posterByCid[c.client_id]=c.poster||null;
     if(c.review&&c.review.trim()){
       finals.push({cid:c.client_id,cat:c.content_cat,title:c.title,poster:c.poster||null,stars:c.stars||0,review:c.review||'',dk:c.end_date||c.start_date||''});
     }
+    (c.notes||[]).forEach(n=>notes.push({...n,cid:c.client_id,cat:c.content_cat,poster:c.poster||null}));
   }));
-  noteRows.forEach(r=>{
-    const lines=(r&&r[0]&&Array.isArray(r[0].lines))?r[0].lines:[];
-    notes.push(...lines);
-  });
-  notes.forEach(n=>{n.poster=n.cid?(posterByCid[n.cid]||null):null;});
   return {finals,notes};
 }
 async function renderContentNoteTimeline(){
