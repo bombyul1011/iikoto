@@ -1228,10 +1228,12 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .yr-sum-sleep-val{font-size:20px;font-weight:700;color:var(--tp);font-family:'DM Sans',sans-serif;}
 .yr-sum-sleep-val .unit{font-size:var(--fs-xs);font-weight:500;color:var(--ts);}
 .yr-sum-sleep-val.small{font-size:var(--fs-lg);}
-/* 수면 요약카드 하단 — 수면시간 분포 도넛(수면탭에서 이동, 상단 2칸 여백 채움용) */
-.yr-sum-sleep-dist{display:flex;align-items:center;gap:14px;margin-top:14px;padding-top:14px;border-top:1px solid rgba(var(--divider-rgb),0.25);}
-.yr-sum-sleep-dist .mrsl-legend{gap:5px;}
-.yr-sum-sleep-dist .mrsl-legend-row{font-size:var(--fs-xs);}
+/* 수면 요약카드 하단 — 수면시간 분포 도넛(수면탭에서 이동, 상단 2칸 여백 채움용). 도넛 크기를 기본(96px)보다
+   키워 배너 여백을 채움(2026-08, 이전엔 64px로 줄여놔서 아래쪽이 휑했음). */
+.yr-sum-sleep-dist{display:flex;align-items:center;gap:16px;margin-top:14px;padding-top:14px;border-top:1px solid rgba(var(--divider-rgb),0.25);}
+.yr-sum-sleep-dist .mrsl-donut-box{width:108px;height:108px;}
+.yr-sum-sleep-dist .mrsl-legend{gap:7px;}
+.yr-sum-sleep-dist .mrsl-legend-row{font-size:var(--fs-sm);}
 
 /* intro */
 .habit-intro{padding:8px 2px 22px;}
@@ -1802,7 +1804,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           <div class="yr-tab-chip" data-view="content" onclick="switchYrView(this,'content')"><i class="ti ti-stack-2" aria-hidden="true"></i>콘텐츠</div>
           <div class="yr-tab-chip" data-view="rhythm" onclick="switchYrView(this,'rhythm')"><i class="ti ti-rainbow" aria-hidden="true"></i>리듬</div>
           <div class="yr-tab-chip" data-view="sleep" onclick="switchYrView(this,'sleep')"><i class="ti ti-moon-stars" aria-hidden="true"></i>수면</div>
-          <div class="yr-tab-chip" data-view="chaeum" onclick="switchYrView(this,'chaeum')"><i class="ti ti-clover" aria-hidden="true"></i>채움로그</div>
         </div>
 
         <!-- 전체요약 -->
@@ -1814,7 +1815,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div class="yr-view" id="view-habit">
           <div class="habit-intro">
             <div class="habit-intro-kicker">HABIT / <span id="yr-habit-year"></span></div>
-            <div class="habit-intro-title">한 해 동안 <b>습관은<br>얼마나 이어졌을까요?</b></div>
+            <div class="habit-intro-title">한 해 동안 <b>습관</b>은<br>얼마나 이어졌을까요?</div>
             <div class="habit-intro-sub">달성률을 한 줄의 흐름으로 연결해, 어떤 습관이 살아 있고 어디서 흔들렸는지 한눈에 볼 수 있어요.</div>
           </div>
           <div id="yr-habit-score"></div>
@@ -1837,7 +1838,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div class="yr-view" id="view-content">
           <div class="tab-intro">
             <div class="tab-intro-kicker">CONTENT LOG / <span id="yr-content-year"></span></div>
-            <div class="tab-intro-title">영감이 되는 활자와 영상,<br>어떻게 쌓이고 있을까요?</div>
+            <div class="tab-intro-title">영감이 되는 <b>활자와 영상</b>,<br>어떻게 쌓이고 있을까요?</div>
             <div class="tab-intro-sub" id="yr-content-intro-sub"></div>
           </div>
           <div id="yr-content-gallery"></div>
@@ -1875,7 +1876,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div class="yr-view" id="view-sleep">
           <div class="tab-intro">
             <div class="tab-intro-kicker">SLEEP QUALITY</div>
-            <div class="tab-intro-title">더 나은 내일을 위한<br><b>수면의 질 변화</b></div>
+            <div class="tab-intro-title">더 나은 내일을 위한<br><b>수면의 질</b> 변화</div>
           </div>
           <div id="yr-sleep-summary"></div>
           <div id="yr-sleep-quarter-time"></div>
@@ -1884,17 +1885,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           <div id="yr-sleep-condition-trace"></div>
         </div>
 
-        <!-- 채움로그 -->
-        <div class="yr-view" id="view-chaeum">
-          <div class="tab-intro">
-            <div class="tab-intro-kicker">LEARNING & RECORDS</div>
-            <div class="tab-intro-title">나를 채우는 배움과 기록</div>
-          </div>
-          <div class="bento-item bento-full" style="padding:24px 28px;">
-            <div class="bento-lbl" style="margin-bottom:18px;">채움로그 인덱스</div>
-            <div id="yr-chaeum-body"></div>
-          </div>
-        </div>
       </div>
     </div>
 

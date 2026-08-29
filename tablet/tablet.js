@@ -3836,6 +3836,38 @@ function toggleMrpContentsView(){
 })();
 
 // ══════════════════════════════════════════════════════════
+// 연간탭 내부 서브뷰(요약→습관→콘텐츠→리듬→수면) 좌우 스와이프 전환 — 위 setupSwipeNav와 동일 패턴,
+// 대상만 상단 탭이 아니라 .yr-tab-chip 순서로. 연간탭이 열려있을 때만 동작(2026-08).
+// ══════════════════════════════════════════════════════════
+(function setupYrSwipeNav(){
+  const wrap=document.getElementById('tab-yearly');
+  if(!wrap)return;
+  let startX=0,startY=0,tracking=false;
+  const SWIPE_MIN_DIST=60;
+  const SWIPE_MAX_VERTICAL=50;
+  wrap.addEventListener('touchstart',e=>{
+    if(e.touches.length!==1||_currentTab!=='yearly'){tracking=false;return;}
+    // 감상 아카이브 갤러리, 코멘트 타임라인처럼 자체 가로 스크롤이 있는 영역은 뷰 전환 스와이프로 취급하지 않음
+    if(e.target.closest&&e.target.closest('.yr-cgrid-scroll')){tracking=false;return;}
+    startX=e.touches[0].clientX;startY=e.touches[0].clientY;tracking=true;
+  },{passive:true});
+  wrap.addEventListener('touchend',e=>{
+    if(!tracking)return;tracking=false;
+    const endX=e.changedTouches[0].clientX,endY=e.changedTouches[0].clientY;
+    const dx=endX-startX,dy=endY-startY;
+    if(Math.abs(dx)<SWIPE_MIN_DIST||Math.abs(dy)>SWIPE_MAX_VERTICAL)return;
+    const chips=Array.from(document.querySelectorAll('.yr-tab-chip'));
+    const curIdx=chips.findIndex(c=>c.classList.contains('on'));
+    if(curIdx===-1)return;
+    const dir=dx<0?1:-1; // 왼쪽으로 스와이프 → 다음 뷰, 오른쪽으로 스와이프 → 이전 뷰
+    const nextIdx=curIdx+dir;
+    if(nextIdx<0||nextIdx>=chips.length)return; // 양 끝에서는 순환하지 않고 멈춤
+    const nextChip=chips[nextIdx];
+    switchYrView(nextChip,nextChip.dataset.view);
+  },{passive:true});
+})();
+
+// ══════════════════════════════════════════════════════════
 // 코멘트 모아보기(타임라인, 읽기 전용) — 본앱 로직 이식, supaFetch 기반으로 재작성
 // 완결 코멘트(contents.review+stars)와 감상 메모(goal_notes: wcal_note_YYYY-MM)를 함께 모아 보여줌.
 // ══════════════════════════════════════════════════════════
@@ -4066,7 +4098,7 @@ async function loadYearlyTab(){
   const endDk=dateKey(now.getFullYear()===y?now:new Date(y,11,31));
   const elapsedMonths=(now.getFullYear()===y?now.getMonth():11)+1;
 
-  const [todos,memos,onelineRows,sleepRows,habits,habitChecks,rblocks,contents,goalRows,chaeumRows]=await Promise.all([
+  const [todos,memos,onelineRows,sleepRows,habits,habitChecks,rblocks,contents,goalRows]=await Promise.all([
     supaFetch(`todos?date_key=gte.${startDk}&date_key=lte.${endDk}&select=done,date_key`),
     supaFetch(`memos?date_key=gte.${startDk}&date_key=lte.${endDk}&select=id,text`),
     // 하루한줄(goal_notes, note_key='oneline:YYYY-MM-DD') — renderWeekKeywords와 동일하게 메모와 합쳐 집계
@@ -4076,14 +4108,12 @@ async function loadYearlyTab(){
     supaFetch(`habit_checks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
     supaFetch(`rhythm_blocks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
     supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&order=created.desc&limit=500`),
-    supaFetch(`ai_cache?cache_key=like.quarterly_summary_${y}*&select=cache_key,content`),
-    // 채움로그는 별도 Supabase 프로젝트(chaeumFetch) — 전체요약 카드의 "총 학습수량"과 채움로그탭이 같은 목록을 재사용
-    chaeumFetch(`sessions?date_key=gte.${y}-01-01&date_key=lte.${y}-12-31&select=id,date_key,category,title,status&order=date_key.desc`)
+    supaFetch(`ai_cache?cache_key=like.quarterly_summary_${y}*&select=cache_key,content`)
   ]);
 
   const ctx={y,elapsedMonths,todos:todos||[],memos:memos||[],onelineRows:onelineRows||[],
     sleepRows:sleepRows||[],habits:habits||[],habitChecks:habitChecks||[],rblocks:rblocks||[],
-    contents:contents||[],quarterlyCache:goalRows||[],chaeumRows:chaeumRows||[]};
+    contents:contents||[],quarterlyCache:goalRows||[]};
 
   // 상단 페이지 라벨, 습관탭 인트로 텍스트(연도) — 정적 마크업의 빈 span을 채움
   const periodEl=document.getElementById('yr-period-label');
@@ -4099,7 +4129,6 @@ async function loadYearlyTab(){
   renderYrContentTab(ctx);
   renderYrRhythmTab(ctx);
   renderYrSleepTab(ctx);
-  renderYrChaeumTab(ctx);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -4324,10 +4353,11 @@ function renderYrMetricGrid(ctx){
       donutSegs+=`<circle cx="40" cy="40" r="32" fill="none" stroke="${b.color}" stroke-width="10" stroke-dasharray="${len.toFixed(2)} ${(circ-len).toFixed(2)}" stroke-dashoffset="${-cum.toFixed(2)}" stroke-linecap="round"/>`;
       cum+=len;
     });
+    // 시간대별 분배는 일수 대신 퍼센트로(2026-08) — 도넛 자체가 이미 비율을 보여주니 범례도 같은 단위로 맞춤.
     sleepDistHtml=`
       <div class="yr-sum-sleep-dist">
-        <div class="mrsl-donut-box" style="width:64px;height:64px;"><svg viewBox="0 0 80 80">${donutSegs}</svg></div>
-        <div class="mrsl-legend">${buckets.map((b,i)=>`<div class="mrsl-legend-row"><span class="mrsl-legend-dot" style="background:${b.color};"></span>${b.label} <span class="mrsl-legend-val">${counts[i]}일</span></div>`).join('')}</div>
+        <div class="mrsl-donut-box"><svg viewBox="0 0 80 80">${donutSegs}</svg></div>
+        <div class="mrsl-legend">${buckets.map((b,i)=>`<div class="mrsl-legend-row"><span class="mrsl-legend-dot" style="background:${b.color};"></span>${b.label} <span class="mrsl-legend-val">${distTotal?Math.round(counts[i]/distTotal*100):0}%</span></div>`).join('')}</div>
       </div>`;
   }
 
@@ -5280,33 +5310,4 @@ function renderYrSleepConditionTrace(ctx,validRows){
 function _yrMinToHHMM(min){
   const m=Math.round(((min%1440)+1440)%1440); // 평균 계산으로 소수분이 들어올 수 있어 반올림 후 시:분 분리
   return `${pad(Math.floor(m/60))}:${pad(m%60)}`;
-}
-
-// ══════════════════════════════════════════════════════════
-// 채움로그 — 기존 renderChaeumLogTablet과 동일한 테이블/필드(sessions: date_key,category,title,status),
-// 기존 chaeum-log-* 클래스 그대로 재사용(index-* 신규 클래스 대신). 월 그룹 헤더만 연간탭 전용으로 추가.
-// 목록 자체는 loadYearlyTab에서 이미 조회해둔 ctx.chaeumRows를 재사용(전체요약 카드의 "총 학습수량"과 중복 조회 방지).
-// ══════════════════════════════════════════════════════════
-function renderYrChaeumTab(ctx){
-  const el=document.getElementById('yr-chaeum-body');
-  const rows=ctx.chaeumRows;
-  if(!rows||!rows.length){el.innerHTML='<div class="empty-msg">채움로그 기록이 없어요</div>';return;}
-  const byMonth={};
-  rows.forEach(r=>{
-    const mk=r.date_key.slice(0,7);
-    (byMonth[mk]=byMonth[mk]||[]).push(r);
-  });
-  el.innerHTML=`<div class="chaeum-log-tl">${Object.keys(byMonth).sort().reverse().map(mk=>{
-    const items=byMonth[mk];
-    const monthNum=parseInt(mk.slice(5,7),10);
-    return `<div class="index-month-hdr">${monthNum}월 (${items.length}회)</div>`+items.map(r=>`
-      <div class="chaeum-log-item">
-        <div class="chaeum-log-date">${chaeumDateShort(r.date_key)}</div>
-        <div class="chaeum-log-line-wrap"><div class="chaeum-log-dot${r.status==='completed'?'':' ing'}"></div></div>
-        <div class="chaeum-log-txt">
-          <div class="chaeum-log-txt-title">${escapeHtml(r.title||'')}</div>
-          <div class="chaeum-log-txt-cat">${escapeHtml(r.category||'')}</div>
-        </div>
-      </div>`).join('');
-  }).join('')}</div>`;
 }
