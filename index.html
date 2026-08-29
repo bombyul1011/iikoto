@@ -9474,9 +9474,10 @@ function _starIconClass(val,n){
   return 'ti-star';
 }
 function renderStarPickerHtml(val,onClickExpr){
-  // onClickExpr: 각 별 클릭시 실행할 함수 호출 문자열의 앞부분. 별 번호(n)가 마지막 인자로 붙어 완성됨.
-  // 예: onClickExpr="setStarValue('cm-star-picker','cm-stars'" → 별 3번 클릭 시 "setStarValue('cm-star-picker','cm-stars',3)" 실행
-  return [1,2,3,4,5].map(n=>`<i class="ti ${_starIconClass(val,n)} cm-star${val>=n-0.5?' on':''}" data-val="${n}" onclick="${onClickExpr}(${n})" aria-hidden="true"></i>`).join('');
+  // onClickExpr: 각 별 클릭시 실행할 전체 함수 호출문의 앞부분(여는 괄호까지 포함, 마지막 인자 자리만 비움).
+  // 예: onClickExpr="setCmStars(" → 별 3번 클릭 시 "setCmStars(3)" 실행
+  //     onClickExpr="setStarValue('cm-star-picker','cm-stars'," → "setStarValue('cm-star-picker','cm-stars',3)" 실행
+  return [1,2,3,4,5].map(n=>`<i class="ti ${_starIconClass(val,n)} cm-star${val>=n-0.5?' on':''}" data-val="${n}" onclick="${onClickExpr}${n})" aria-hidden="true"></i>`).join('');
 }
 function nextStarValue(cur,n){
   if(cur>=n)return n-0.5; // 이미 그 별까지 꽉 찬 상태 → 반쪽으로
