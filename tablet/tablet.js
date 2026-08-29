@@ -4230,10 +4230,16 @@ function _yrHabitOverallStats(ctx){
     const mo=parseInt(earliestDk.slice(5,7),10)-1;
     return Math.min(mo,ctx.elapsedMonths-1);
   };
-  // seq는 12개월 전체를 담되(트랙 그래프용), 통계 계산(activeSeq)은 startMonth 이후만 사용.
+  // 앱 출시 첫 달(6월, index 5)은 월 중순 시작이라 반달치 데이터라 통계 왜곡 요인 — 전체통계(activeSeq)에서
+  // 완전히 제외. 트랙 그래프(seq)에는 그대로 남겨 시각적으로는 계속 보이게 함(2027-01, 봄이님 결정).
+  // TODO: 다음 해로 넘어가면(연간탭이 calendar-year로 리셋되는 시점) 이 하드코딩 제거할 것 — 그때는
+  // 새해 첫 달부터가 정상적인 전체 기록 달이 됨.
+  const FIRST_LAUNCH_MONTH_IDX=5; // 6월(0-indexed)
+  // seq는 12개월 전체를 담되(트랙 그래프용), 통계 계산(activeSeq)은 startMonth 이후 + 출시 첫 달(반달치) 제외.
   const habitStats=ctx.habits.map(h=>{
     const seq=Array.from({length:ctx.elapsedMonths},(_,m)=>byMonth[m][h.name]||0);
-    const startMonth=firstCheckMonthOf(h);
+    let startMonth=firstCheckMonthOf(h);
+    if(startMonth<=FIRST_LAUNCH_MONTH_IDX)startMonth=FIRST_LAUNCH_MONTH_IDX+1;
     const activeSeq=seq.slice(startMonth);
     const overallPct=activeSeq.length?Math.round(activeSeq.reduce((a,b)=>a+b,0)/activeSeq.length):0;
     const mean=activeSeq.length?activeSeq.reduce((a,b)=>a+b,0)/activeSeq.length:0;
