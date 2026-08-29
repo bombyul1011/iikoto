@@ -13249,7 +13249,14 @@ function confirmProgress(){
   const _amountRead=Math.max(0,endVal-_pgStartVal);
   logReadingDaily(book,today,_amountRead,_pgSeconds,_pgUnit,book.percent,book.pages);
   markReadingActivityToday();
-  pushWcalNote(book.cid,book.contentTitle||book.title,'book',document.getElementById('pg-note-inp')?.value);
+  // 감상 메모는 콘텐츠 코너 달력/월별 아카이브가 contents 테이블의 cid로 찾아 표시하므로,
+  // book.cid가 아니라 연결된 콘텐츠 항목의 cid를 넘겨야 함(book과 contents는 cid가 서로 다름 — contentMk+title로 매칭됨).
+  let _wcalNoteCid=book.cid;
+  if(book.linkedContent&&book.contentMk){
+    const linkedItem=getContents(book.contentMk).find(c=>c.cat==='book'&&c.title===(book.contentTitle||book.title));
+    if(linkedItem&&linkedItem.cid)_wcalNoteCid=linkedItem.cid;
+  }
+  pushWcalNote(_wcalNoteCid,book.contentTitle||book.title,'book',document.getElementById('pg-note-inp')?.value);
   // 독서 습관체크는 스톱워치 종료 시점(autoLogReadingRhythm)에서만 처리 —
   // 진행바를 직접 클릭해 페이지/퍼센트만 입력한 경우는 습관체크하지 않음.
   _swSeconds=0;
