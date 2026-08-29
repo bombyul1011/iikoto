@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.22-schedule-banner';
+const CACHE = 'iikoto-v2.24-schedule-autoselect';
 const ASSETS = [
   './',
   './index.html'

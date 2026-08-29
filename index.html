@@ -516,7 +516,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rt-item{display:flex;align-items:center;gap:7px;flex-shrink:0;}
 .rt-item .chk{margin:0;}
 .rt-time{font-size:var(--dow-label-size);color:var(--ts);font-variant-numeric:tabular-nums;flex-shrink:0;width:34px;}
-.rt-text{font-size:var(--dow-label-size);color:var(--tp);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;}
+.rt-text{font-size:var(--dow-label-size);color:var(--tp);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;cursor:pointer;}
 .rt-item.done .rt-text{color:var(--tm);text-decoration:line-through;text-decoration-color:var(--tm);text-decoration-thickness:1px;}
 .rt-item.current .rt-time,.rt-item.current .rt-text{color:var(--tp);font-weight:600;}
 .rt-item.current{background:rgba(var(--pal-pink-rgb),0.12);border-radius:8px;margin:-2px -4px;padding:2px 4px;}
@@ -6193,7 +6193,7 @@ function renderTodos(){
   }
   const list=document.getElementById('todo-list');if(!list)return;
   list.innerHTML='';
-  const sorted=[...todos.map((t,i)=>({...t,_i:i})).filter(t=>!t.isEvent).filter(t=>!_todoPinnedFilter||t.pinned)].sort((a,b)=>{
+  const sorted=[...todos.map((t,i)=>({...t,_i:i})).filter(t=>!t.isEvent).filter(t=>!SCHEDULE_TIME_RE.test(t.text)).filter(t=>!_todoPinnedFilter||t.pinned)].sort((a,b)=>{
     if(a.done!==b.done)return a.done?1:-1;
     return compareTodoOrder(a,b);
   });
@@ -6279,12 +6279,19 @@ function renderScheduleList(dk,items){
     const isNext=!it.done&&idx===items.findIndex(x=>!x.done);
     const el=document.createElement('div');
     el.className='rt-item'+(it.done?' done':'')+(isNext?' current':'');
-    el.innerHTML=`<div class="chk${it.done?' on':''}" onclick="toggleTodo(${it.i},'${it.cid||''}')"></div><div class="rt-time">${it.time}</div><div class="rt-text">${escapeHtml(it.label)}</div>`;
+    el.innerHTML=`<div class="chk${it.done?' on':''}" onclick="toggleTodo(${it.i},'${it.cid||''}')"></div><div class="rt-time">${it.time}</div><div class="rt-text" onclick="openTodoSheet(${it.i})">${escapeHtml(it.label)}</div>`;
     list.appendChild(el);
   });
 }
 // 오늘 일정 / 오늘의 시간표 — 같은 자리(event-section)에서 교차 노출. 둘 다 있는 날에만 제목 옆 전환 아이콘 노출.
-let _todayBannerMode='event';
+// 둘 다 있는 날 자동 선노출 기준 — 각자 카테고리에서 가장 가까운(아직 안 지난) 항목의 시각끼리 비교, 더 가까운 쪽 선노출.
+// 사용자가 제목을 탭해 수동 전환하면 그 값을 세션 동안 유지(재계산하지 않음) — 탭 재진입(currentDate 변경) 시에만 자동판단으로 리셋.
+let _todayBannerMode=null;
+let _todayBannerModeDk=null;
+function _nextUpcomingMin(nowMin,mins){
+  const upcoming=mins.filter(m=>m>=nowMin);
+  return upcoming.length?Math.min(...upcoming):null;
+}
 function toggleTodayBannerMode(){
   _todayBannerMode=_todayBannerMode==='event'?'schedule':'event';
   renderTodos();
@@ -6305,8 +6312,24 @@ function renderEventList(dk,todos){
   const hasEvent=all.length>0,hasSchedule=scheduleItems.length>0;
   if(!hasEvent&&!hasSchedule){section.style.display='none';list.innerHTML='';if(scheduleBody)scheduleBody.style.display='none';return;}
   section.style.display='block';
-  // 하나만 있으면 그걸로 고정, 둘 다 있으면 현재 모드(_todayBannerMode) 따름
-  const mode=(!hasEvent)?'schedule':(!hasSchedule)?'event':_todayBannerMode;
+  // 날짜가 바뀌어 다시 보는 화면이면(다른 날짜 조회 후 복귀 등) 수동 전환 기록을 리셋 — 매 조회마다 새로 자동판단
+  if(_todayBannerModeDk!==dk){_todayBannerMode=null;_todayBannerModeDk=dk;}
+  let mode;
+  if(!hasEvent)mode='schedule';
+  else if(!hasSchedule)mode='event';
+  else if(_todayBannerMode)mode=_todayBannerMode; // 사용자가 이미 수동 전환한 경우 그대로 유지
+  else{
+    // 최초 노출: 각자 카테고리에서 가장 가까운(아직 안 지난) 항목 시각끼리 비교, 더 가까운 쪽. 둘 다 없으면(다 지났으면) 일정 선노출.
+    const isToday=dk===dateKey(new Date());
+    const nowMin=isToday?(new Date().getHours()*60+new Date().getMinutes()):0;
+    const eventMins=all.filter(ev=>!ev.eventEndDate&&ev.eventTime).map(ev=>{
+      const m=ev.eventTime.match(/^(\d{1,2}):(\d{2})$/);return m?parseInt(m[1],10)*60+parseInt(m[2],10):null;
+    }).filter(m=>m!=null);
+    const scheduleMins=scheduleItems.filter(it=>!it.done).map(it=>it.min);
+    const nextEvent=_nextUpcomingMin(nowMin,eventMins);
+    const nextSchedule=_nextUpcomingMin(nowMin,scheduleMins);
+    mode=(nextSchedule!=null&&(nextEvent==null||nextSchedule<nextEvent))?'schedule':'event';
+  }
   const showSwitch=hasEvent&&hasSchedule;
   if(label)label.innerHTML=(mode==='event'?'오늘 일정':'오늘의 흐름')+(showSwitch?' <i class="ti ti-switch-horizontal" aria-hidden="true"></i>':'');
   if(mode==='schedule'){
