@@ -670,8 +670,8 @@ function renderTodaySleep(dk,sleep,recentSleepRows){
       sSum+=sv;
       wSum+=_dawnTimeToMin(r.wake_time);
     });
-    sleepAvgTxt=_minToHHMM(Math.round(sSum/validRows.length)%1440);
-    wakeAvgTxt=_minToHHMM(Math.round(wSum/validRows.length)%1440);
+    sleepAvgTxt=_minToHHMM(sSum/validRows.length);
+    wakeAvgTxt=_minToHHMM(wSum/validRows.length);
   }
 
   // 최근 7일 컨디션 아이콘 — 주간탭(wsleep-face)과 동일 로직, 요일 표기는 기존 오늘탭 스타일 유지
@@ -1244,7 +1244,8 @@ async function loadWeekTab(){
   renderWeekReadingActivity(rdaThisWeek||[],rdaLastWeek||[],readingBooksAll||[],contents||[],startDk,cmpEndDk,lastStartDk,lastCmpEndDk);
 }
 
-function _minToHHMM(min){const h=Math.floor(min/60),m=min%60;return pad(h)+':'+pad(m);}
+// 반올림·음수/1440초과 정규화까지 포함 — 평균 계산 등 소수분·범위 밖 값이 들어올 수 있는 모든 호출부에서 안전하게 사용(2026-08, 기존엔 연간탭에 _yrMinToHHMM으로 중복 존재했음).
+function _minToHHMM(min){const m=Math.round(((min%1440)+1440)%1440);return pad(Math.floor(m/60))+':'+pad(m%60);}
 
 // 이번 주 모닝루틴 — 오늘 포함 최근 7일 롤링 기준, 항목별 체크 일수를 얇은 막대로 표시(2열 그리드, 본앱 하단 통계그리드와 동일 배치).
 // 달성률 자체보다 "얼마나 루틴화됐는지"를 가볍게 보여주는 용도라 궤도 UI 없이 심플하게.
@@ -4236,8 +4237,13 @@ function renderYrKeywordCloud(ctx){
 // ── 습관별(카테고리 없음, 습관 자체가 4개 구분) 누적 달성률 계산 — 전체요약 요약카드용 독립 헬퍼.
 // renderYrHabitTab의 habitStats 계산과 동일 기준(습관별 최초 기록월부터, 월간 달성률 평균)이지만
 // 전체요약이 습관탭보다 먼저 렌더링되므로 별도로 값만 가볍게 계산.
+// 습관별 월간 흐름 통계 — 요약탭(전체평균/습관별 %)과 습관탭 본문(흐름표/편차/증감)이 동일한 월별 집계
+// 로직을 각자 중복 계산하고 있었던 것을 하나로 통합(2026-08). habitStats에 필요한 모든 필드(seq/stdev/delta
+// 포함)를 여기서 한 번에 만들고, 요약탭은 이 중 overallPct/avgPct만 골라 쓰면 됨.
+// ctx당 1회만 계산되도록 ctx 자체에 캐시(요약탭→습관탭 순으로 이 턴 안에서 두 번 불릴 때 재계산 방지).
 function _yrHabitOverallStats(ctx){
-  if(!ctx.habits.length)return {avgPct:0,perHabit:[]};
+  if(ctx._habitStatsCache)return ctx._habitStatsCache;
+  if(!ctx.habits.length)return {avgPct:0,perHabit:[],habitStats:[]};
   const byMonth={};
   for(let m=0;m<ctx.elapsedMonths;m++){
     const mk=`${ctx.y}-${pad(m+1)}`;
@@ -4249,6 +4255,8 @@ function _yrHabitOverallStats(ctx){
       byMonth[m][h.name]=Math.round(cnt/daysInMonth*100);
     });
   }
+  // 습관별 "실제 기록이 시작된 달" — 앱을 6월 중순부터 쓰기 시작해 1~5월은 기록 자체가 없는데
+  // 이걸 0%로 계산에 포함시키면 평균/편차/증감이 왜곡됨. 습관별 최초 체크 기록월부터만 계산.
   const firstCheckMonthOf=h=>{
     const checks=ctx.habitChecks.filter(c=>c.habit_name===h.name&&c.date_key);
     if(!checks.length)return 0;
@@ -4256,15 +4264,23 @@ function _yrHabitOverallStats(ctx){
     const mo=parseInt(earliestDk.slice(5,7),10)-1;
     return Math.min(mo,ctx.elapsedMonths-1);
   };
-  const perHabit=ctx.habits.map(h=>{
+  // seq는 12개월 전체를 담되(트랙 그래프용), 통계 계산(activeSeq)은 startMonth 이후만 사용.
+  const habitStats=ctx.habits.map(h=>{
     const seq=Array.from({length:ctx.elapsedMonths},(_,m)=>byMonth[m][h.name]||0);
     const startMonth=firstCheckMonthOf(h);
     const activeSeq=seq.slice(startMonth);
     const overallPct=activeSeq.length?Math.round(activeSeq.reduce((a,b)=>a+b,0)/activeSeq.length):0;
-    return {name:h.name,color:h.color,overallPct};
+    const mean=activeSeq.length?activeSeq.reduce((a,b)=>a+b,0)/activeSeq.length:0;
+    const variance=activeSeq.length?activeSeq.reduce((a,b)=>a+(b-mean)**2,0)/activeSeq.length:0;
+    const stdev=Math.sqrt(variance);
+    const delta=activeSeq.length>=2?activeSeq[activeSeq.length-1]-activeSeq[0]:0; // 실제 시작달 대비 최근달 증감(BEST FLOW용)
+    return {name:h.name,color:h.color,seq,startMonth,activeSeq,overallPct,stdev,delta};
   });
+  const perHabit=habitStats.map(({name,color,overallPct})=>({name,color,overallPct}));
   const avgPct=perHabit.length?Math.round(perHabit.reduce((s,h)=>s+h.overallPct,0)/perHabit.length):0;
-  return {avgPct,perHabit};
+  const result={avgPct,perHabit,habitStats};
+  ctx._habitStatsCache=result;
+  return result;
 }
 
 // 습관 4색 — 앱 전역 관례(오늘탭/주간탭 colorMap)와 동일하게 -rgb 변수 + rgba()로 통일(2026-08, 기존엔 -text 변수를 직접 써서 톤이 미묘하게 달랐음).
@@ -4339,8 +4355,8 @@ function renderYrMetricGrid(ctx){
   if(validSleepRows.length){
     const sleepMins=validSleepRows.map(r=>toDawnAdjustedMin(_dawnTimeToMin(r.sleep_time),22*60)).filter(v=>v!=null);
     const wakeMins=validSleepRows.map(r=>_dawnTimeToMin(r.wake_time)).filter(v=>v!=null);
-    if(sleepMins.length)avgSleepTimeHtml=_yrMinToHHMM(sleepMins.reduce((a,b)=>a+b,0)/sleepMins.length);
-    if(wakeMins.length)avgWakeTimeHtml=_yrMinToHHMM(wakeMins.reduce((a,b)=>a+b,0)/wakeMins.length);
+    if(sleepMins.length)avgSleepTimeHtml=_minToHHMM(sleepMins.reduce((a,b)=>a+b,0)/sleepMins.length);
+    if(wakeMins.length)avgWakeTimeHtml=_minToHHMM(wakeMins.reduce((a,b)=>a+b,0)/wakeMins.length);
   }
   let sleepDistHtml='';
   if(validSleepRows.length){
@@ -4395,42 +4411,8 @@ function renderYrHabitTab(ctx){
   const el=document.getElementById('yr-habit-body');
   if(!ctx.habits.length){el.innerHTML='<div class="empty-msg">등록된 습관이 없어요</div>';return;}
 
-  // 월별 습관 체크 집계 — 기존 _uniqueHabitCheckCount를 월 단위로 나눠 재사용
-  const byMonth={};
-  for(let m=0;m<ctx.elapsedMonths;m++){
-    const mk=`${ctx.y}-${pad(m+1)}`;
-    const daysInMonth=new Date(ctx.y,m+1,0).getDate();
-    const checksInMonth=ctx.habitChecks.filter(c=>c.date_key&&c.date_key.startsWith(mk));
-    byMonth[m]={};
-    ctx.habits.forEach(h=>{
-      const cnt=checksInMonth.filter(c=>c.habit_name===h.name).length;
-      byMonth[m][h.name]=Math.round(cnt/daysInMonth*100);
-    });
-  }
-
-  // 습관별 "실제 기록이 시작된 달" — 앱을 6월 중순부터 쓰기 시작해 1~5월은 기록 자체가 없는데
-  // 이걸 0%로 계산에 포함시키면 평균/편차/증감이 왜곡됨. 습관별 최초 체크 기록월부터만 계산.
-  const firstCheckMonthOf=h=>{
-    const checks=ctx.habitChecks.filter(c=>c.habit_name===h.name&&c.date_key);
-    if(!checks.length)return 0;
-    const earliestDk=checks.map(c=>c.date_key).sort()[0];
-    const mo=parseInt(earliestDk.slice(5,7),10)-1;
-    return Math.min(mo,ctx.elapsedMonths-1);
-  };
-
-  // 습관별 월간 달성률 시퀀스(있는 개월만) — 편차/최다상승/최저달성 계산에 재사용.
-  // seq는 12개월 전체를 담되(트랙 그래프용), 통계 계산(activeSeq)은 startMonth 이후만 사용.
-  const habitStats=ctx.habits.map(h=>{
-    const seq=Array.from({length:ctx.elapsedMonths},(_,m)=>byMonth[m][h.name]||0);
-    const startMonth=firstCheckMonthOf(h);
-    const activeSeq=seq.slice(startMonth);
-    const overallPct=activeSeq.length?Math.round(activeSeq.reduce((a,b)=>a+b,0)/activeSeq.length):0;
-    const mean=activeSeq.length?activeSeq.reduce((a,b)=>a+b,0)/activeSeq.length:0;
-    const variance=activeSeq.length?activeSeq.reduce((a,b)=>a+(b-mean)**2,0)/activeSeq.length:0;
-    const stdev=Math.sqrt(variance);
-    const delta=activeSeq.length>=2?activeSeq[activeSeq.length-1]-activeSeq[0]:0; // 실제 시작달 대비 최근달 증감(BEST FLOW용)
-    return {name:h.name,seq,startMonth,activeSeq,overallPct,stdev,delta};
-  });
+  // 월별 집계·통계는 _yrHabitOverallStats에서 한 번만 계산(요약탭과 공유, 2026-08 중복 제거)
+  const {habitStats}=_yrHabitOverallStats(ctx);
 
   const rowsHtml=ctx.habits.map((h,i)=>{
     const {seq,overallPct}=habitStats[i];
@@ -5120,8 +5102,8 @@ function renderYrSleepQuarterTime(ctx,validRows){
       <div class="ysqt-range">${range}</div>
       <div class="ysqt-axis">${dotsHtml}</div>
       <div class="ysqt-times">
-        <span class="ysqt-time sleep">${sleepAvg!=null?_yrMinToHHMM(sleepAvg):'-'}</span>
-        <span class="ysqt-time wake">${wakeAvg!=null?_yrMinToHHMM(wakeAvg):'-'}</span>
+        <span class="ysqt-time sleep">${sleepAvg!=null?_minToHHMM(sleepAvg):'-'}</span>
+        <span class="ysqt-time wake">${wakeAvg!=null?_minToHHMM(wakeAvg):'-'}</span>
       </div>
     </div>`;
   }).join('');
@@ -5270,7 +5252,7 @@ function renderYrSleepConditionTrace(ctx,validRows){
       descText=`전날 평균 ${_fmtDur(Math.round(f.low))} <span class="yr-ctrace-diff">(평소보다 ${f.diff>0?'+':''}${_fmtDur(Math.round(Math.abs(f.diff)))})</span> — 평소보다 ${moreOrLess}`;
     }else if(f.type==='time'){
       const laterOrEarlier=f.diff>0?'늦음':'이름';
-      descText=`평균 ${_yrMinToHHMM(f.low)} <span class="yr-ctrace-diff">(평소보다 ${_fmtDur(Math.round(Math.abs(f.diff)))} ${laterOrEarlier})</span>`;
+      descText=`평균 ${_minToHHMM(f.low)} <span class="yr-ctrace-diff">(평소보다 ${_fmtDur(Math.round(Math.abs(f.diff)))} ${laterOrEarlier})</span>`;
     }else{
       const higherOrLower=f.diff>0?'높음':'낮음';
       descText=`평균 ${Math.round(f.low)}점 <span class="yr-ctrace-diff">(평소보다 ${f.diff>0?'+':''}${Math.round(f.diff)}점 ${higherOrLower})</span>`;
@@ -5305,9 +5287,4 @@ function renderYrSleepConditionTrace(ctx,validRows){
         <div><strong>관찰:</strong> ${observeText} 하나가 직접적인 원인이라 단정할 순 없지만, 여러 요인이 겹쳐 나타난다는 점은 참고할 만해요.</div>
       </div>
     </div>`;
-}
-
-function _yrMinToHHMM(min){
-  const m=Math.round(((min%1440)+1440)%1440); // 평균 계산으로 소수분이 들어올 수 있어 반올림 후 시:분 분리
-  return `${pad(Math.floor(m/60))}:${pad(m%60)}`;
 }
