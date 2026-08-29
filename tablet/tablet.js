@@ -4531,10 +4531,11 @@ function _yrCgridDetailHtml(c){
 }
 
 // 4개씩 행 단위 렌더(2026-08: 3→4로 변경, 배너 폭 안에서 한 줄에 4개씩 보이도록) — 월간탭 _cgridRowsHtml과 동일 패턴(펼침 영역을 해당 행 바로 뒤에 4칸 전체폭으로 삽입)
+// 5개씩 행 단위 렌더(2026-08: 4→5로 변경, 연말결산 성격상 한눈에 더 많이 훑어보도록) — 월간탭 _cgridRowsHtml과 동일 패턴(펼침 영역을 해당 행 바로 뒤에 5칸 전체폭으로 삽입)
 function _yrCgridRowsHtml(list){
   let html='';
-  for(let i=0;i<list.length;i+=4){
-    const row=list.slice(i,i+4);
+  for(let i=0;i<list.length;i+=5){
+    const row=list.slice(i,i+5);
     html+=row.map(c=>_yrCgridItemHtml(c)).join('');
     const activeInRow=row.find(c=>c.id===_yrCgridActiveId);
     html+=`<div class="cgrid-detail-row-wrap${activeInRow?' on':''}" id="yr-cgrid-detail-wrap-${i}">${activeInRow?_yrCgridDetailHtml(activeInRow):''}</div>`;
@@ -4601,7 +4602,7 @@ function renderYrContentGallery(ctx){
       <div class="bento-sub" style="margin-top:0;margin-bottom:10px;">완결한 콘텐츠를 최근 순으로 모아봤어요. 눌러보면 평점과 총평을 볼 수 있어요.</div>
       <div class="wcal-filter-chips" id="yr-cgrid-filter-chips"></div>
       <div class="yr-cgrid-scroll">
-        <div class="cgrid-grid yr-cgrid-grid-4col" id="yr-cgrid-grid-inner">${_yrCgridRowsHtml(_yrCgridList)}</div>
+        <div class="cgrid-grid yr-cgrid-grid-5col" id="yr-cgrid-grid-inner">${_yrCgridRowsHtml(_yrCgridList)}</div>
       </div>
     </div>`;
   renderYrCgridFilterChips();
@@ -4961,11 +4962,26 @@ function _yrCoreWindowStat(validRows){
 }
 // 룰 기반 3~4단계 코멘트(비-API) — 코어구간 사수율 구간에 따라 표현 강도만 다르게.
 // 실제 상관계수 계산 없이 흉내: ≥85% 뚜렷하게 / 70~84% 안정적인 편 / 55~69% 약한 경향 / <55%(또는 표본부족) 상관관계 언급 생략
-function _yrCoreVsDurationComment(corePct,sampleSize){
+// 룰 기반 코멘트(비-API) — 코어구간 사수율에 수면 규칙성 점수를 더해 교차 판단.
+// 코어구간(언제 잤는지)만으론 "이른 시각에 잤다"까지만 알 수 있고, 매일 그 시각이 들쭉날쭉했는지는
+// 규칙성 점수가 있어야 판단 가능해 함께 반영(2026-08). 실제 상관계수 계산 없이 두 지표의 조합만으로 표현 강도를 다르게.
+function _yrCoreVsDurationComment(corePct,sampleSize,reg){
   if(sampleSize<20)return null; // 표본 부족 — 분포 사실만 서술, 상관관계는 언급하지 않음
-  if(corePct>=85)return '사수율이 매우 높아요. 이 구간을 지킨 날일수록 수면시간도 뚜렷하게 안정적으로 이어졌어요.';
-  if(corePct>=70)return '사수율이 높은 편이라, 이 구간을 지킨 날일수록 수면시간도 안정적으로 이어지는 편이었어요.';
-  if(corePct>=55)return '이 구간을 지킨 날일수록 수면시간이 조금 더 안정적인 경향이 있었어요.';
+  const regScore=reg?reg.score:null;
+  if(corePct>=85){
+    if(regScore!=null&&regScore>=65)return '사수율도 규칙성도 모두 높아요. 이 구간을 지킨 날일수록 수면시간도 뚜렷하게 안정적으로 이어졌어요.';
+    if(regScore!=null&&regScore<40)return '사수율은 높지만 취침·기상 시각 자체는 들쭉날쭉한 편이라, 코어구간을 지킨 날에도 리듬이 완전히 안정적이진 않았어요.';
+    return '사수율이 매우 높아요. 이 구간을 지킨 날일수록 수면시간도 뚜렷하게 안정적으로 이어졌어요.';
+  }
+  if(corePct>=70){
+    if(regScore!=null&&regScore>=65)return '사수율이 높은 편이고 규칙성도 함께 좋아서, 전반적으로 안정적인 수면 리듬을 유지했어요.';
+    return '사수율이 높은 편이라, 이 구간을 지킨 날일수록 수면시간도 안정적으로 이어지는 편이었어요.';
+  }
+  if(corePct>=55){
+    if(regScore!=null&&regScore<40)return '이 구간을 지킨 날일수록 수면시간이 조금 더 안정적인 경향이 있었지만, 취침·기상 시각 자체의 편차는 큰 편이었어요.';
+    return '이 구간을 지킨 날일수록 수면시간이 조금 더 안정적인 경향이 있었어요.';
+  }
+  if(regScore!=null&&regScore>=65)return '코어구간 사수율은 낮은 편이지만, 취침·기상 시각 자체는 비교적 일정하게 유지했어요.';
   return null;
 }
 function renderYrSleepTab(ctx){
@@ -4988,7 +5004,7 @@ function renderYrSleepTab(ctx){
 
   const core=_yrCoreWindowStat(validRows);
   const coreCirc=2*Math.PI*40;
-  const coreComment=_yrCoreVsDurationComment(core.pct,validRows.length);
+  const coreComment=_yrCoreVsDurationComment(core.pct,validRows.length,reg);
 
   // 수면 규칙성 — 취침/기상 시각의 표준편차를 100점 만점으로 환산(calcSleepRegularity, 주간/월간 리포트와 동일 계산).
   // 코어구간(언제 잤는지) 옆에 나란히 두어 "얼마나 일정하게 잤는지"를 함께 보여줌(2026-08, 여백 채움 겸 신규 배너).

@@ -997,10 +997,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   }
   .month-top-left{height:auto;}
   .month-top-left .card{flex:none;} /* 고정 높이(.month-top-grid) 기준으로 반반 나눠 갖던 flex:1을 해제, 세로에선 내용 높이만큼만 */
-  /* 연간탭 — 전체요약/리듬/수면/갤러리의 소형 4칸 그리드는 세로 폭에서 2칸으로(2026-08, 4칸 그대로면 셀이 너무 좁아져 숫자·라벨이 눌려 보임) */
-  .yr-sum-content-quarters,.rhythm-9grid,.ysqt-grid,.yr-cgrid-grid-4col{
+  /* 연간탭 — 전체요약/리듬/수면의 소형 4칸 그리드는 세로 폭에서 2칸으로(2026-08, 4칸 그대로면 셀이 너무 좁아져 숫자·라벨이 눌려 보임) */
+  .yr-sum-content-quarters,.rhythm-9grid,.ysqt-grid{
     grid-template-columns:repeat(2,1fr)!important;
   }
+  /* 감상 아카이브(포스터 그리드)는 기본 CSS(.yr-cgrid-grid-5col의 min-width:0 + width:100%)만으로
+     화면이 좁아지면 포스터 크기 자체가 유동적으로 줄어들어 5칸을 그대로 유지해도 넘치지 않음(2026-08) —
+     별도 열 수 축소 불필요. */
   .yr-sum-sleep-split .yr-sum-sleep-item:last-child::before{display:none;} /* 좌우 분리선 — 1열 스택에서는 의미 없어져 숨김 */
 
   /* ══════════════════════════════════════════════════════
@@ -1467,14 +1470,16 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 /* 월 그래프의 미래 개월 자리 */
 .gb-group.future{opacity:0.35;}
 .gb-group.future .gb-bars{border-bottom:1px dashed rgba(var(--divider-rgb),0.4);}
-/* 콘텐츠탭: 올해의 감상 아카이브 — 라벨 옆 전체수량 배지, 필터칩, 4열 그리드 + 높이 고정 스크롤(2026-08) */
+/* 콘텐츠탭: 올해의 감상 아카이브 — 라벨 옆 전체수량 배지, 필터칩, 5열 그리드 + 높이 고정 스크롤(2026-08, 4→5로 확대) */
 .bento-lbl-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
 .bento-lbl-row .bento-lbl{margin-bottom:0;}
 .yr-cgrid-count-tag{font-size:var(--fs-xs);font-weight:700;color:var(--ts);background:rgba(var(--divider-rgb),0.12);border-radius:12px;padding:3px 10px;}
 .yr-cgrid-count-tag span{color:var(--tp);font-size:var(--fs-sm);}
-.yr-cgrid-scroll{max-height:420px;overflow-y:auto;margin-top:4px;padding-right:2px;}
-.yr-cgrid-grid-4col{grid-template-columns:repeat(4,minmax(0,1fr));}
-.yr-cgrid-grid-4col .cgrid-thumb-wrap{max-width:100px;}
+.yr-cgrid-scroll{max-height:420px;overflow-y:auto;overflow-x:hidden;margin-top:4px;padding-right:2px;}
+.yr-cgrid-grid-5col{grid-template-columns:repeat(5,minmax(0,1fr));}
+.yr-cgrid-grid-5col .cgrid-item{min-width:0;align-items:center;} /* min-width:0 — 포스터 고정폭(100px) 때문에 grid item이 수축을 거부해 화면이 좁아지면 가로 스크롤이 생기던 문제 방지. align-items — 포스터와 하단 제목을 같은 중심축으로 정렬(2026-08) */
+.yr-cgrid-grid-5col .cgrid-thumb-wrap{width:100%;max-width:100px;}
+.yr-cgrid-grid-5col .cgrid-title{width:100%;max-width:100px;text-align:center;}
 /* 콘텐츠탭: 카테고리별 누적 감상량 막대 (목업엔 있었으나 이식 시 누락됐던 부분, 이번에 추가) */
 .cumul-list{display:flex;flex-direction:column;gap:12px;}
 .cumul-row{display:flex;align-items:center;gap:12px;}
