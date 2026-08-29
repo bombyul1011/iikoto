@@ -28,6 +28,17 @@ async function chaeumFetch(path){
 
 // ── 날짜 유틸 (iikoto와 동일 규칙) ──
 function pad(n){return String(n).padStart(2,'0');}
+// ── 별점 표시 헬퍼 (본앱과 동일 — 0.5단위, tabler 아이콘 기반. 읽기전용이라 표시만 필요, 클릭 위젯 없음) ──
+function _starIconClass(val,n){
+  if(val>=n)return 'ti-star-filled';
+  if(val>=n-0.5)return 'ti-star-half-filled';
+  return 'ti-star';
+}
+function renderStarDisplayHtml(stars,sizeClass){
+  if(!stars||stars<=0)return '';
+  const cls=sizeClass?` ${sizeClass}`:'';
+  return [1,2,3,4,5].map(n=>`<i class="ti ${_starIconClass(stars,n)}${cls}" aria-hidden="true"></i>`).join('');
+}
 function dateKey(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;}
 // 본앱과 동일한 논리적 하루(새벽 4시 컷) 정렬 기준. 00:00~03:59 기록은 전날 늦은 시간대로 보고 +1440분 밀어서 맨 뒤로 정렬.
 const DAWN_CUTOFF_MIN=4*60;
@@ -1945,7 +1956,7 @@ function _cgridPeriodLabel(c){
 // (본앱의 "시청 시작" 스톱워치 버튼은 태블릿 상세뷰 성격상 제외.)
 function _cgridDetailHtml(c){
   const period=_cgridPeriodLabel(c);
-  const stars=c.stars>0?`<span class="cgrid-detail-stars">${'★'.repeat(c.stars)}</span>`:'';
+  const stars=c.stars>0?`<span class="cgrid-detail-stars">${renderStarDisplayHtml(c.stars)}</span>`:'';
   const isMusic=c.content_cat==='music';
   // 재생 — 음악만, music_url이 등록돼 있을 때만. 본앱 _cmrDetailBodyHtml의 musicPlayBtnHtml과 동일 로직/스타일.
   const musicPlayBtnHtml=isMusic&&c.music_url?`<span class="pl-item-play music-play-btn" style="background:rgba(160,105,180,.18);border:1px solid rgba(160,105,180,.45);" onclick="event.stopPropagation();window.location.href='${c.music_url.replace(/'/g,"\\'")}'"><i class="ti ti-player-play-filled" style="color:rgba(160,105,180,1);" aria-hidden="true"></i></span>`:'';
@@ -3975,7 +3986,7 @@ function _chRenderNoteTimelineByWork(finals,notes){
     const m=WCAL_CAT_META[g.cat]||{label:''};
     const posterHtml=_wcalPosterThumbHtml(g.cat,g.poster);
     const finalHtml=g.final?
-      `<div class="ch-tlB-final-row">${g.final.stars>0?`<div class="ch-tlB-stars">${'★'.repeat(g.final.stars)}${'☆'.repeat(5-g.final.stars)}</div>`:''}</div>
+      `<div class="ch-tlB-final-row">${g.final.stars>0?`<div class="ch-tlB-stars">${renderStarDisplayHtml(g.final.stars)}</div>`:''}</div>
        ${g.final.review?`<div class="ch-tlB-final-text">${escapeHtml(g.final.review)}</div>`:''}`
       :'';
     const progressBadgeHtml=g.final?'':'<span class="status-badge">진행중</span>';
@@ -4011,7 +4022,7 @@ function _chFinalRowHtml(f){
         <div class="ch-tlA-title-row">
           <span class="ch-tlA-badge-final">완</span>
           <span class="ch-tlA-title">${escapeHtml(f.title||'')}</span>
-          ${f.stars>0?`<span class="ch-tlA-stars">${'★'.repeat(f.stars)}${'☆'.repeat(5-f.stars)}</span>`:''}
+          ${f.stars>0?`<span class="ch-tlA-stars">${renderStarDisplayHtml(f.stars)}</span>`:''}
         </div>
         ${f.review?`<div class="ch-tlA-text">${escapeHtml(f.review)}</div>`:''}
       </div>
@@ -4552,7 +4563,7 @@ function _yrCgridItemHtml(c){
 // 갤러리 상세 — 완결작 전용(진행중 상태·진행률바·감상메모 타임라인 없음). 기간+별점, 완결 총평만.
 function _yrCgridDetailHtml(c){
   const period=_cgridPeriodLabel(c);
-  const stars=c.stars>0?`<span class="cgrid-detail-stars">${'★'.repeat(c.stars)}</span>`:'';
+  const stars=c.stars>0?`<span class="cgrid-detail-stars">${renderStarDisplayHtml(c.stars)}</span>`:'';
   const topRow=(period||stars)?`<div class="cgrid-detail-row"><span class="cgrid-detail-row-date">${period?`<i class="ti ti-calendar" style="font-size:12px;" aria-hidden="true"></i>${period}`:''}</span>${stars}</div>`:'';
   const finalHtml=c.review?`<div class="cgrid-detail-final"><span class="cgrid-detail-final-lbl">Comment :</span> ${escapeHtml(c.review)}</div>`:'';
   return `<div class="cgrid-detail">${topRow}${finalHtml}</div>`;
