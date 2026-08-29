@@ -275,6 +275,7 @@ function switchTab(tab){
   else if(tab==='week')loadWeekTab();
   else if(tab==='month'){loadMonthTab();initCgridHeightSync();}
   else if(tab==='reports'){resetReportsView();loadReportsTab();}
+  else if(tab==='yearly')loadYearlyTab();
   else if(tab==='settings')_loadClaudeKeyStatus();
 }
 
@@ -4016,24 +4017,18 @@ function _chNoteRowHtml(n,showTime){
 //   SLEEP_GOAL_MIN, SLEEP_SCORE_LEVELS
 //
 // 신규로 만든 것 (연간탭에만 필요, 이 파일에 정의):
-//   quarterKeyOf, quarterRangeOf, quarterLabel  — 분기 개념(기존 앱엔 없었음)
+//   quarterRangeOf                              — 분기 개념(기존 앱엔 없었음)
 //   _yrCoreWindowStat                           — 코어 회복구간(23~02시) 점유율
 //   _yrSleepDurationBuckets                     — 수면시간 4구간 분포
 //   _yrCoreVsDurationComment                    — 코어구간×수면시간, 룰 기반 3~4단계 코멘트(비-API)
-//   _yrLineChartHTML                            — 라인차트 공통 빌더(좌표계산+SVG+범례를 한 곳에 통합)
 // ══════════════════════════════════════════════════════════
 
 // ── 분기 유틸 (기존 monthKeyOf/weekKeyOf와 동일한 스타일로 신규 추가) ──
-function quarterKeyOf(d){
-  const q=Math.floor(d.getMonth()/3)+1;
-  return `${d.getFullYear()}-Q${q}`;
-}
 function quarterRangeOf(y,q){
   // q: 1~4. 반환: {startMonth(0-index), endMonth(0-index), label}
   const startMonth=(q-1)*3;
   return {startMonth,endMonth:startMonth+2,label:`${startMonth+1}~${startMonth+3}월`};
 }
-function quarterLabel(y,q){return quarterRangeOf(y,q).label;}
 // 연초부터 지금까지 존재하는 분기 목록(미래 분기는 제외) — 분기 카드 렌더링에 사용
 function listQuartersUpTo(y,mo){
   const curQ=Math.floor(mo/3)+1;
@@ -4042,64 +4037,14 @@ function listQuartersUpTo(y,mo){
   return qs;
 }
 
-// ── 연간탭 진입/이탈 (기존 switchTab 패턴과 동일하게) ──
+// ── 연간탭 진입/이탈 — switchTab('yearly')를 그대로 사용(기존 openYearlyTab 중복 제거, 2026-08) ──
 let _yrDate=new Date();
-function openYearlyTab(){
-  document.querySelectorAll('.main-body').forEach(el=>el.classList.remove('on'));
-  document.querySelectorAll('.float-tab').forEach(el=>el.classList.remove('on'));
-  document.getElementById('tab-yearly').classList.add('on');
-  document.getElementById('ft-yearly').classList.add('on');
-  closeFloatMenu();
-  _currentTab='yearly';
-  loadYearlyTab();
-}
 function switchYrView(chipEl,view){
   document.querySelectorAll('.yr-tab-chip').forEach(c=>c.classList.remove('on'));
   document.querySelectorAll('.yr-view').forEach(v=>v.classList.remove('on'));
   chipEl.classList.add('on');
   document.getElementById('view-'+view).classList.add('on');
   window.scrollTo({top:0,behavior:'smooth'});
-}
-
-// ── 라인차트 공통 빌더 ──
-// series: [{values:[num|null,...], color, label?}], xLabels: string[] (values와 같은 길이)
-// opts: {height=140, dotR=3.2, legend=true, insightHtml='',
-//        scale='zero'|'minmax'} — 'zero': 0 기준(리듬·업무비중처럼 0에 가까운 값도 흔한 지표),
-//        'minmax': 최소~최대 기준으로 확대(수면시간처럼 값이 좁은 범위에 몰려있어 변화폭을 강조해야 하는 지표)
-// 반환: yr-linechart-wrap ~ 범례 ~ 인사이트박스까지 완성된 HTML 문자열
-// (분기별 리듬 라인 / 요일유형 업무비중 라인 / 월별 수면시간 라인이 공통으로 사용)
-function _yrLineChartHTML(series,xLabels,opts={}){
-  const {height=140,dotR=3.2,legend=true,insightHtml='',xLabelOpacity=null,scale='zero'}=opts;
-  const n=xLabels.length;
-  const xStep=n>1?300/(n-1):300;
-  const allVals=series.flatMap(s=>s.values.filter(v=>v!=null));
-  if(!allVals.length)return '<div class="empty-msg">표시할 데이터가 부족해요</div>';
-  const maxVal=Math.max(...allVals)||1;
-  const minVal=Math.min(...allVals);
-  const range=(maxVal-minVal)||1;
-  const yOf=(v)=>scale==='minmax'?100-((v-minVal)/range*80+10):100-Math.min(95,(v/maxVal*90));
-
-  let svgParts='';
-  series.forEach(s=>{
-    const pts=s.values.map((v,i)=>v==null?null:{x:i*xStep,y:yOf(v)}).filter(Boolean);
-    if(pts.length<2)return;
-    const ptsStr=pts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-    svgParts+=`<polyline points="${ptsStr}" fill="none" stroke="${s.color}" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`;
-    pts.forEach(p=>{svgParts+=`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${dotR}" fill="${s.color}"/>`;});
-  });
-
-  const xLabelsHtml=xLabels.map((l,i)=>`<span${xLabelOpacity&&xLabelOpacity[i]!==1?` style="opacity:${xLabelOpacity[i]};"`:''}>${l}</span>`).join('');
-  const legendHtml=(legend&&series.some(s=>s.label))
-    ?`<div class="yr-line-legend">${series.filter(s=>s.label).map(s=>`<div class="yr-line-legend-item"><span class="yr-line-legend-swatch" style="background:${s.color};"></span>${s.label}</div>`).join('')}</div>`
-    :'';
-
-  return `
-    <div class="yr-linechart-wrap" style="height:${height}px;">
-      <div class="yr-linechart-grid"></div>
-      <svg class="yr-linechart-svg" viewBox="0 0 300 100" preserveAspectRatio="none">${svgParts}</svg>
-      <div class="yr-linechart-xlabels">${xLabelsHtml}</div>
-    </div>
-    ${legendHtml}${insightHtml}`;
 }
 
 // ── 데이터 로드 (기존 loadMonthlyReportPage와 동일하게 Promise.all 병렬 조회) ──
@@ -4473,8 +4418,7 @@ function renderYrHabitScore(ctx,habitStats){
     </div>`;
 }
 
-// 미니 스파크라인 — 축/범례 없이 값 배열만으로 작은 SVG 라인을 그림(카드 안에 끼워 넣는 용도).
-// _yrLineChartHTML은 범례/x라벨까지 포함된 풀사이즈 차트라 이 용도엔 무거워서 별도로 가볍게 작성.
+// 미니 스파크라인 — 축/범례 없이 값 배열만으로 작은 SVG 라인을 그림(카드 안에 끼워 넣는 용도, 가볍게 별도 작성).
 function _yrSparklineSVG(values,color){
   const valid=values.filter(v=>v!=null);
   if(valid.length<2)return '';
@@ -4845,21 +4789,38 @@ function renderYrRhythmMonthlyFlow(ctx){
 // 가장 늘어난 리듬 / 가장 줄어든 리듬 — 습관탭 BEST FLOW/NEEDS CARE와 동일 원칙(전월 대비 아님, 시작달 대비
 // 최근달 증감). 연간탭은 전체 흐름을 다루는 자리이고 전월 비교는 월간리포트의 역할이라 그 기준을 그대로 따름(2026-08).
 // 외출(appointment)은 이동·약속 성격이라 후보에서 제외(renderYrRhythmMonthlyFlow의 top4 선정과 동일 방침).
+// 2026-08 수정: 월 총합(분) 그대로 비교하면 "그 달에 며칠 기록했는지"에 따라 착시가 생김(기록을 늦게 시작한 달은
+// 총합 자체가 작게 나와 증감폭이 실제보다 과장됨). 일평균(그 카테고리가 실제 기록된 날 기준)으로 바꾸고,
+// "시간이 늘었다"와 "빈도(기록일수)가 늘었다"를 구분할 수 있도록 기록일수 변화도 함께 계산해 문구에 반영.
 function renderYrRhythmChangeInsights(ctx){
   const el=document.getElementById('yr-rhythm-change-insights');
   if(!el)return;
   if(ctx.elapsedMonths<2||!ctx.rblocks.length){el.innerHTML='';return;}
 
-  const byMonth=_yrByMonth(ctx,blocksInMonth=>_rhythmDurByCat(blocksInMonth).d);
+  // 월별로 {avgMin(그 카테고리가 기록된 날 기준 일평균), days(그 카테고리가 실제 기록된 일수)}를 함께 계산
+  const byMonth=_yrByMonth(ctx,blocksInMonth=>{
+    const {d,dayCount}=_rhythmDurByCatWithDays(blocksInMonth);
+    const out={};
+    Object.keys(d).forEach(k=>{out[k]={avgMin:Math.round(d[k]/dayCount[k]),days:dayCount[k]};});
+    return out;
+  });
   const cats=Object.keys(RHYTHM_CATS).filter(k=>k!=='appointment');
 
   const stats=cats.map(k=>{
-    const seq=byMonth.map(d=>d[k]||0);
-    const firstIdx=seq.findIndex(v=>v>0);
+    const seq=byMonth.map(m=>m[k]?m[k].avgMin:null); // 기록 없는 달은 null(0으로 두면 "그 달엔 0분씩 했다"는 것과 헷갈림)
+    const daysSeq=byMonth.map(m=>m[k]?m[k].days:0);
+    const firstIdx=seq.findIndex(v=>v!=null);
     if(firstIdx===-1)return null; // 기록이 아예 없는 카테고리는 후보에서 제외
     const activeSeq=seq.slice(firstIdx);
-    const delta=activeSeq.length>=2?activeSeq[activeSeq.length-1]-activeSeq[0]:0;
-    return {key:k,label:RHYTHM_CATS[k].label,icon:RHYTHM_CATS[k].icon,color:RHYTHM_CATS[k].color,activeSeq,firstIdx,delta};
+    const activeDaysSeq=daysSeq.slice(firstIdx);
+    const validActive=activeSeq.filter(v=>v!=null);
+    if(validActive.length<2)return null; // 비교할 달이 1개뿐이면 증감 의미 없음
+    const firstAvg=validActive[0],lastAvg=validActive[validActive.length-1];
+    const delta=lastAvg-firstAvg; // 일평균 기준 증감(분)
+    const firstDays=activeDaysSeq[0],lastDays=activeDaysSeq[activeDaysSeq.length-1];
+    const daysDelta=lastDays-firstDays; // 기록일수 증감(빈도 변화 참고용)
+    return {key:k,label:RHYTHM_CATS[k].label,icon:RHYTHM_CATS[k].icon,color:RHYTHM_CATS[k].color,
+      activeSeq,firstIdx,delta,firstDays,lastDays,daysDelta};
   }).filter(Boolean);
 
   if(stats.length<2){el.innerHTML='';return;} // 비교할 카테고리가 1개 이하면 의미 없어 생략
@@ -4873,6 +4834,13 @@ function renderYrRhythmChangeInsights(ctx){
     const abs=Math.abs(mins);
     return abs<60?`${sign}${abs}분`:`${sign}${_fmtDur(abs)}`;
   };
+  // 빈도(기록일수) 변화가 함께 뚜렷할 때만 문구에 덧붙임 — 하루평균은 비슷한데 기록하는 날 자체가
+  // 늘거나(예: 주1회→주3회) 줄었다면, "시간이 늘었다"보다 "더 자주/덜 자주 하게 됐다"는 설명이 더 정확함.
+  const freqNote=daysDelta=>{
+    if(daysDelta>=3)return ` 그만큼 기록하는 날도 늘었어요(+${daysDelta}일).`;
+    if(daysDelta<=-3)return ` 기록하는 날 자체도 줄었어요(${daysDelta}일).`;
+    return '';
+  };
   const grownSpark=_yrSparklineSVG(grown.activeSeq,'#4a8f6a');
   const shrunkSpark=_yrSparklineSVG(shrunk.activeSeq,'#c08a2e');
   const firstMonthLabel=idx=>`${idx+1}월`;
@@ -4881,16 +4849,16 @@ function renderYrRhythmChangeInsights(ctx){
     <div class="habit-insights">
       <div class="habit-insight mint">
         <div class="habit-insight-tag">GROWING</div>
-        <div class="habit-insight-number">${fmtDelta(grown.delta)}</div>
+        <div class="habit-insight-number">${fmtDelta(grown.delta)}<span> /일</span></div>
         <div class="habit-insight-title"><i class="ti ${grown.icon}" style="color:${grown.color};margin-right:4px;" aria-hidden="true"></i>${escapeHtml(grown.label)}</div>
-        <p>${firstMonthLabel(grown.firstIdx)}부터 지금까지 가장 크게 늘어난 리듬이에요.</p>
+        <p>${firstMonthLabel(grown.firstIdx)}부터 지금까지 하루 평균이 가장 크게 늘어난 리듬이에요.${freqNote(grown.daysDelta)}</p>
         ${grownSpark}
       </div>
       <div class="habit-insight yellow">
         <div class="habit-insight-tag">SHRINKING</div>
-        <div class="habit-insight-number">${fmtDelta(shrunk.delta)}</div>
+        <div class="habit-insight-number">${fmtDelta(shrunk.delta)}<span> /일</span></div>
         <div class="habit-insight-title"><i class="ti ${shrunk.icon}" style="color:${shrunk.color};margin-right:4px;" aria-hidden="true"></i>${escapeHtml(shrunk.label)}</div>
-        <p>${firstMonthLabel(shrunk.firstIdx)}부터 지금까지 가장 크게 줄어든 리듬이에요.</p>
+        <p>${firstMonthLabel(shrunk.firstIdx)}부터 지금까지 하루 평균이 가장 크게 줄어든 리듬이에요.${freqNote(shrunk.daysDelta)}</p>
         ${shrunkSpark}
       </div>
     </div>`;
