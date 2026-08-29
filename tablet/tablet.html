@@ -1142,7 +1142,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   padding:26px 26px 24px!important;
   display:flex!important;
   flex-direction:column!important;
-  justify-content:flex-end!important;
+  justify-content:space-between!important;
   gap:20px!important;
   position:relative!important;
   overflow:hidden!important;
@@ -1151,8 +1151,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   background:var(--card,#fffdf9)!important;}
 .yr-hero-top{position:relative;z-index:1;}
 .yr-hero-period{font-size:var(--fs-sm);letter-spacing:.12em;font-weight:700;color:var(--tm);text-transform:uppercase;margin-bottom:10px;}
-.yr-hero-num{font-size:44px!important;font-weight:800!important;letter-spacing:-.075em;color:var(--ink,#2d2c29);}
-.yr-hero-num-unit{font-size:var(--fs-body)!important;font-weight:600;color:var(--ts);margin-left:3px;}
+/* 숫자·단위는 요약탭 습관 전체평균(.habit-score-number/span)과 동일 사이즈로 통일(2026-08) */
+.yr-hero-num{font-size:52px!important;font-weight:750!important;letter-spacing:-.08em;line-height:1;color:var(--ink,#2d2c29);}
+.yr-hero-num-unit{font-size:17px!important;font-weight:600;color:var(--ts);margin-left:4px;letter-spacing:0;}
+.yr-hero-line-num{display:flex;align-items:baseline;gap:0;margin-top:4px;}
 .yr-hero-tags{display:flex;flex-wrap:wrap;gap:8px;position:relative;z-index:1;}
 .yr-hero-tag{display:flex;align-items:center;gap:5px;font-size:var(--fs-sm);font-weight:600;color:var(--tp);background:rgba(255,255,255,0.65);border:1px solid var(--border,#e4e0d8);border-radius:20px;padding:6px 12px;}
 .yr-hero-tag i{font-size:var(--fs-body);color:var(--pal-orange-border,#e07b22);}
@@ -1180,7 +1182,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   letter-spacing:-.02em!important;
   font-weight:500!important;
   color:var(--ts)!important;}
-.yr-hero-line b{font-size:1.2em!important;}
+.yr-hero-line b:not(.yr-hero-num){font-size:1.2em!important;}
 /* ---------- SECTION HEADERS ---------- */
 .card-lbl{letter-spacing:.02em!important;
   text-transform:none!important;
@@ -1239,9 +1241,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .yr-sum-sleep-val.small{font-size:var(--fs-lg);}
 /* 수면 요약카드 하단 — 수면시간 분포 도넛(수면탭에서 이동, 상단 2칸 여백 채움용). 도넛 크기를 기본(96px)보다
    키워 배너 여백을 채움(2026-08, 이전엔 64px로 줄여놔서 아래쪽이 휑했음). */
-.yr-sum-sleep-dist{display:flex;align-items:center;gap:16px;margin-top:14px;padding-top:14px;border-top:1px solid rgba(var(--divider-rgb),0.25);}
-.yr-sum-sleep-dist .mrsl-donut-box{width:108px;height:108px;}
-.yr-sum-sleep-dist .mrsl-legend{gap:7px;}
+.yr-sum-sleep-dist{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:14px;padding-top:14px;border-top:1px solid rgba(var(--divider-rgb),0.25);}
+.yr-sum-sleep-dist .mrsl-donut-box{width:108px;height:108px;flex-shrink:0;}
+.yr-sum-sleep-dist .mrsl-legend{gap:7px;align-items:flex-end;}
 .yr-sum-sleep-dist .mrsl-legend-row{font-size:var(--fs-sm);}
 
 /* intro */

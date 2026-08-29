@@ -176,6 +176,14 @@ const RHYTHM_CATS={
 // 리듬 카테고리별 의미 가이드 — 월간리포트 리듬 AI 분석 프롬프트에서 라벨만으론 모호한 카테고리를 짧게 설명(2026-08-22, 정의 누락 수정).
 const RHYTHM_CAT_GUIDE=`카테고리 의미: 운동(신체 활동), 휴식(수면 외 쉼), 단장(씻기·꾸미기 등 자기관리), 업무(일), 외출(이동·약속), 책상(독립적인 개인 작업·자기계발), 감상(영화·책 등 콘텐츠 소비), 정리(청소·집안일).`;
 
+// 앱 출시 첫 달(6월, 0-indexed=5) — 월 중순 시작이라 반달치 데이터라 연간탭 통계 비교에서 왜곡 요인.
+// 습관탭 전체통계(_yrHabitOverallStats)와 리듬탭 GROWING/SHRINKING(renderYrRhythmChangeInsights) 양쪽에서
+// "시작달(비교 기준점)로 6월을 쓰지 않기" 위해 공유(2027-01, 봄이님 결정). 트랙 그래프 등 시각적 표시에는
+// 계속 6월이 남아있고, 오직 통계 계산의 시작점에서만 제외됨.
+// TODO: 다음 해로 넘어가면(연간탭이 calendar-year로 리셋되는 시점) 이 하드코딩 제거할 것 — 그때는
+// 새해 첫 달부터가 정상적인 전체 기록 달이 됨.
+const YR_FIRST_LAUNCH_MONTH_IDX=5;
+
 const CAT_ICON_META={
   drama:{icon:'ti-device-tv',bg:'rgba(var(--pal-pink-rgb),1)',iconColor:'#fff',label:'드라마'},
   book:{icon:'ti-book',bg:'rgba(var(--pal-yellow-rgb),1)',iconColor:'#fff',label:'책'},
@@ -4151,7 +4159,8 @@ function renderYrHero(ctx){
       <div class="yr-hero">
         <div class="yr-hero-top">
           <div class="yr-hero-period">${ctx.y} · 누적 ${ctx.elapsedMonths}개월째</div>
-          <div class="yr-hero-line">올해 누적 <b class="yr-hero-num">${totalRecords}</b><span class="yr-hero-num-unit">개</span>의 기록을 남겼어요</div>
+          <div class="yr-hero-line">올해 누적</div>
+          <div class="yr-hero-line yr-hero-line-num"><b class="yr-hero-num">${totalRecords}</b><span class="yr-hero-num-unit">개</span>의 기록을 남겼어요</div>
         </div>
         <div class="yr-hero-tags">
           <span class="yr-hero-tag"><i class="ti ti-checkbox" aria-hidden="true"></i>할 일 ${doneTodos}개 완료</span>
@@ -4268,16 +4277,13 @@ function _yrHabitOverallStats(ctx){
     const mo=parseInt(earliestDk.slice(5,7),10)-1;
     return Math.min(mo,ctx.elapsedMonths-1);
   };
-  // 앱 출시 첫 달(6월, index 5)은 월 중순 시작이라 반달치 데이터라 통계 왜곡 요인 — 전체통계(activeSeq)에서
-  // 완전히 제외. 트랙 그래프(seq)에는 그대로 남겨 시각적으로는 계속 보이게 함(2027-01, 봄이님 결정).
-  // TODO: 다음 해로 넘어가면(연간탭이 calendar-year로 리셋되는 시점) 이 하드코딩 제거할 것 — 그때는
-  // 새해 첫 달부터가 정상적인 전체 기록 달이 됨.
-  const FIRST_LAUNCH_MONTH_IDX=5; // 6월(0-indexed)
+  // 앱 출시 첫 달(6월, 반달치)은 전체통계(activeSeq)에서 완전히 제외 — 트랙 그래프(seq)에는 그대로
+  // 남겨 시각적으로는 계속 보이게 함(2027-01, 봄이님 결정). 기준값은 YR_FIRST_LAUNCH_MONTH_IDX 참고.
   // seq는 12개월 전체를 담되(트랙 그래프용), 통계 계산(activeSeq)은 startMonth 이후 + 출시 첫 달(반달치) 제외.
   const habitStats=ctx.habits.map(h=>{
     const seq=Array.from({length:ctx.elapsedMonths},(_,m)=>byMonth[m][h.name]||0);
     let startMonth=firstCheckMonthOf(h);
-    if(startMonth<=FIRST_LAUNCH_MONTH_IDX)startMonth=FIRST_LAUNCH_MONTH_IDX+1;
+    if(startMonth<=YR_FIRST_LAUNCH_MONTH_IDX)startMonth=YR_FIRST_LAUNCH_MONTH_IDX+1;
     const activeSeq=seq.slice(startMonth);
     const overallPct=activeSeq.length?Math.round(activeSeq.reduce((a,b)=>a+b,0)/activeSeq.length):0;
     const mean=activeSeq.length?activeSeq.reduce((a,b)=>a+b,0)/activeSeq.length:0;
@@ -5043,8 +5049,12 @@ function renderYrRhythmChangeInsights(ctx){
   const stats=cats.map(k=>{
     const seq=byMonth.map(m=>m[k]?m[k].avgMin:null); // 기록 없는 달은 null(0으로 두면 "그 달엔 0분씩 했다"는 것과 헷갈림)
     const daysSeq=byMonth.map(m=>m[k]?m[k].days:0);
-    const firstIdx=seq.findIndex(v=>v!=null);
+    let firstIdx=seq.findIndex(v=>v!=null);
     if(firstIdx===-1)return null; // 기록이 아예 없는 카테고리는 후보에서 제외
+    // 앱 출시 첫 달(6월, 반달치)은 표본이 적어 우연히 튄 값이 "추세의 시작점"으로 오인될 수 있어
+    // 비교 기준점에서 제외 — 습관탭 전체통계와 동일 원칙(2027-01, 봄이님 결정). YR_FIRST_LAUNCH_MONTH_IDX 참고.
+    if(firstIdx<=YR_FIRST_LAUNCH_MONTH_IDX)firstIdx=YR_FIRST_LAUNCH_MONTH_IDX+1;
+    if(firstIdx>=seq.length)return null; // 7월 이후 데이터가 아직 없으면(예: 6월까지만 경과) 후보에서 제외
     const activeSeq=seq.slice(firstIdx);
     const activeDaysSeq=daysSeq.slice(firstIdx);
     const validActive=activeSeq.filter(v=>v!=null);
