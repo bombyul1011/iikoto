@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.26-schedule-cleanup';
+const CACHE = 'iikoto-v2.27-event-cleanup';
 const ASSETS = [
   './',
   './index.html'

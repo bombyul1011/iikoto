@@ -6232,6 +6232,12 @@ const SCHEDULE_TIME_RE=/^(\d{1,2}):(\d{2})\s+(.+)/;
 function _nowMinIfToday(dk){
   return dk===dateKey(new Date())?(new Date().getHours()*60+new Date().getMinutes()):null;
 }
+// "HH:MM" 형식 일정/투두 시각 문자열 → 분(0~1439) 변환. 매치 실패 시 null — toMin(_dawnTimeToMin)과 달리
+// 형식이 보장 안 된 자유입력(eventTime 등)에도 안전하게 쓰기 위한 버전.
+function _parseHHMM(t){
+  const m=(t||'').match(/^(\d{1,2}):(\d{2})$/);
+  return m?parseInt(m[1],10)*60+parseInt(m[2],10):null;
+}
 function parseScheduleTodos(dk,todos){
   const nowMin=_nowMinIfToday(dk);
   const items=[];
@@ -6326,9 +6332,7 @@ function renderEventList(dk,todos){
   else{
     // 최초 노출: 각자 카테고리에서 가장 가까운(아직 안 지난) 항목 시각끼리 비교, 더 가까운 쪽. 둘 다 없으면(다 지났으면) 일정 선노출.
     const nowMin=_nowMinIfToday(dk)??0;
-    const eventMins=all.filter(ev=>!ev.eventEndDate&&ev.eventTime).map(ev=>{
-      const m=ev.eventTime.match(/^(\d{1,2}):(\d{2})$/);return m?parseInt(m[1],10)*60+parseInt(m[2],10):null;
-    }).filter(m=>m!=null);
+    const eventMins=all.filter(ev=>!ev.eventEndDate&&ev.eventTime).map(ev=>_parseHHMM(ev.eventTime)).filter(m=>m!=null);
     const scheduleMins=scheduleItems.filter(it=>!it.done).map(it=>it.min);
     const nextEvent=_nextUpcomingMin(nowMin,eventMins);
     const nextSchedule=_nextUpcomingMin(nowMin,scheduleMins);
@@ -6346,14 +6350,12 @@ function renderEventList(dk,todos){
   list.style.display='';
   if(scheduleBody)scheduleBody.style.display='none';
   // 오늘 실제 날짜(자정 기준)일 때만 '완료(지남)' 판정 적용 — 다른 날짜(과거/미래 조회)엔 적용 안 함
-  const isToday=dk===dateKey(new Date());
-  const nowMin=new Date().getHours()*60+new Date().getMinutes();
+  const nowMinToday=_nowMinIfToday(dk);
   const isPast=(ev)=>{
-    if(!isToday||!ev.eventTime||ev.eventEndDate)return false;
-    const m=ev.eventTime.match(/^(\d{1,2}):(\d{2})$/);
-    if(!m)return false;
-    const evMin=parseInt(m[1],10)*60+parseInt(m[2],10);
-    return nowMin>=evMin+60; // 지정 시간 +60분 지나면 '완료'로 간주
+    if(nowMinToday==null||!ev.eventTime||ev.eventEndDate)return false;
+    const evMin=_parseHHMM(ev.eventTime);
+    if(evMin==null)return false;
+    return nowMinToday>=evMin+60; // 지정 시간 +60분 지나면 '완료'로 간주
   };
   // 정렬: 미완료 먼저(시간 있는 하루짜리 → 연속일정(며칠차 오름차순) → 시간 없는 하루짜리), 완료(지난 시간)는 맨 뒤로 밀림
   const sorted=[...all].sort((a,b)=>{
