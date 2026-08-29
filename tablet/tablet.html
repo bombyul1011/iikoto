@@ -990,12 +990,18 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
   /* 2단 배너 전부 1열 스택 — 값은 그대로 두고 컬럼 수만 줄임. 아래 각 탭 섹션에서 이 클래스를 쓰는
      요소(#today-rhythm-pace-row 등)에 order만 추가로 매기고, grid-template-columns는 여기서 이미 처리되므로 중복 지정하지 않음. */
-  .grid2,.grid3,.top-row,.month-top-grid,.mrp-grid2,.mrsl-top{
+  .grid2,.grid3,.top-row,.month-top-grid,.mrp-grid2,.mrsl-top,
+  .yr-hero-kw-row,.yr-sum-grid,.yr-sum-sleep-split,.yr-sleep-half-row{
     grid-template-columns:1fr!important;
     height:auto!important; /* month-top-grid의 고정 270px 해제 — 세로에서 내용 잘림 방지 */
   }
   .month-top-left{height:auto;}
   .month-top-left .card{flex:none;} /* 고정 높이(.month-top-grid) 기준으로 반반 나눠 갖던 flex:1을 해제, 세로에선 내용 높이만큼만 */
+  /* 연간탭 — 전체요약/리듬/수면/갤러리의 소형 4칸 그리드는 세로 폭에서 2칸으로(2026-08, 4칸 그대로면 셀이 너무 좁아져 숫자·라벨이 눌려 보임) */
+  .yr-sum-content-quarters,.rhythm-9grid,.ysqt-grid,.yr-cgrid-grid-4col{
+    grid-template-columns:repeat(2,1fr)!important;
+  }
+  .yr-sum-sleep-split .yr-sum-sleep-item:last-child::before{display:none;} /* 좌우 분리선 — 1열 스택에서는 의미 없어져 숨김 */
 
   /* ══════════════════════════════════════════════════════
      오늘탭
@@ -1559,6 +1565,18 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .yr-ctc-bar{flex:1;display:flex;height:20px;border-radius:8px;overflow:hidden;background:rgba(var(--divider-rgb),0.15);}
 .yr-ctc-seg{height:100%;transition:width .3s ease;}
 .yr-ctc-empty{flex:1;font-size:12px;color:var(--tm);}
+
+/* 수면탭: 코어 구간 점유율 + 수면 규칙성 — 1:1 반반 배치(2026-08, 기존엔 절반 카드 하나만 전체폭에 놓여 오른쪽이 텅 비어 보였음) */
+.yr-sleep-half-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:stretch;}
+.yr-sleep-half-row .mrsl-half-card{height:100%;}
+/* 수면 규칙성 카드 — 코어구간(도넛)과 다른 리듬을 주기 위해 큰 점수 숫자 + 등급 배지 형태로 */
+.yr-reg-score-row{display:flex;align-items:baseline;gap:8px;margin-top:10px;}
+.yr-reg-score-num{font-size:32px;font-weight:800;font-family:'DM Sans',sans-serif;letter-spacing:-.03em;line-height:1;}
+.yr-reg-score-num span{font-size:14px;font-weight:600;margin-left:1px;}
+.yr-reg-badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:12px;color:#fff;white-space:nowrap;}
+.yr-reg-detail{display:flex;flex-direction:column;gap:5px;margin-top:12px;}
+.yr-reg-detail-row{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--tm);}
+.yr-reg-detail-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
 
 /* 수면탭: 분기별 취침·기상 시각 (4칸 카드, 22시~다음날14시 축 위 점 2개) */
 .ysqt-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}

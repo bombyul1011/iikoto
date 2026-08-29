@@ -4049,6 +4049,17 @@ function switchYrView(chipEl,view){
 
 // ── 데이터 로드 (기존 loadMonthlyReportPage와 동일하게 Promise.all 병렬 조회) ──
 async function loadYearlyTab(){
+  // 다른 탭(오늘/주간/월간)에 갔다가 돌아왔을 때 마지막으로 보던 서브뷰(습관/콘텐츠 등)가 아니라
+  // 항상 전체요약부터 보이게 리셋 — switchYrView와 동일한 방식으로 chip/view의 on 상태를 되돌림(2026-08).
+  const summaryChip=document.querySelector('.yr-tab-chip[data-view="summary"]');
+  if(summaryChip){
+    document.querySelectorAll('.yr-tab-chip').forEach(c=>c.classList.remove('on'));
+    document.querySelectorAll('.yr-view').forEach(v=>v.classList.remove('on'));
+    summaryChip.classList.add('on');
+    document.getElementById('view-summary').classList.add('on');
+  }
+  window.scrollTo({top:0});
+
   const y=_yrDate.getFullYear();
   const now=new Date();
   const startDk=`${y}-01-01`;
@@ -4263,7 +4274,6 @@ function renderYrMetricGrid(ctx){
   const curQIdx=quarters.findIndex(q=>q.isCurrent);
   let contentNoteHtml='';
   if(curQIdx>=0){
-    const curQRange=quarterRangeOf(ctx.y,quarters[curQIdx].q).label;
     const {startMonth,endMonth}=quarterRangeOf(ctx.y,quarters[curQIdx].q);
     const sDk=`${ctx.y}-${pad(startMonth+1)}-01`;
     const eDk=`${ctx.y}-${pad(endMonth+1)}-${pad(new Date(ctx.y,endMonth+1,0).getDate())}`;
@@ -4280,8 +4290,8 @@ function renderYrMetricGrid(ctx){
       .filter(({cnt})=>cnt>0)
       .map(({cat,cnt})=>`${CAT_ICON_META[cat].label} <b>${cnt}${catUnitLabel[cat]}</b>`);
     contentNoteHtml=catParts.length
-      ?`<div class="yr-sum-content-note">이번 분기(${curQRange}) ${catParts.join(', ')} 감상했어요.</div>`
-      :`<div class="yr-sum-content-note">이번 분기(${curQRange})엔 아직 감상 기록이 없어요.</div>`;
+      ?`<div class="yr-sum-content-note">이번 분기 ${catParts.join(', ')} 감상했어요.</div>`
+      :`<div class="yr-sum-content-note">이번 분기엔 아직 감상 기록이 없어요.</div>`;
   }
 
   // 리듬 — 8대 카테고리 아이콘+시간 그리드(renderYrRhythm9Grid와 동일 계산)
@@ -4539,7 +4549,7 @@ function toggleYrCgridDetail(id){
 
 // 카테고리 필터칩 — 월간탭 renderWcalFilterChips와 동일 패턴(전체+카테고리별, CAT_ICON_META 재사용).
 // 음악은 갤러리 대상에서 애초에 제외(감상기간 개념 없음, renderYrContentGallery 방침과 동일)라 필터에도 넣지 않음.
-const YR_CGRID_FILTER_CATS=['drama','book','movie'];
+const YR_CGRID_FILTER_CATS=['drama','book','movie','music'];
 function renderYrCgridFilterChips(){
   const el=document.getElementById('yr-cgrid-filter-chips');
   if(!el)return;
@@ -4559,18 +4569,22 @@ function yrCgridSetFilter(cat){
   if(countEl)countEl.textContent=_yrCgridFilteredList().length;
 }
 
-// 올해 완결된 콘텐츠(book/drama/movie, done/stopped)를 최근 종료순으로 전부 — 배너 높이를 고정하고
-// 내부 스크롤을 넣어(2026-08) 개수 제한 없이 다 보여줌. 음악은 시청기간 개념이 없어(등록일만 존재)
-// 기존 콘텐츠 비교 전반과 동일하게 제외.
+// 올해 완결된 콘텐츠(book/drama/movie, done/stopped) + 올해 등록된 음악을 최근순으로 전부 — 배너 높이를
+// 고정하고 내부 스크롤을 넣어(2026-08) 개수 제한 없이 다 보여줌. 연말결산 성격의 배너라 음악도 포함(2026-08):
+// 음악은 완결 개념이 없어(등록일만 존재) 다른 콘텐츠 비교 전반에서는 계속 제외하지만, 이 아카이브만은
+// countContentsCompletedInRange와 동일하게 등록일(start_date) 기준으로 넣음 — 정렬용 날짜도 그 기준을 따름.
 function renderYrContentGallery(ctx){
   const el=document.getElementById('yr-content-gallery');
   if(!el)return;
   const startDk=`${ctx.y}-01-01`,endDk=`${ctx.y}-12-31`;
-  const completed=(ctx.contents||[]).filter(c=>
-    c.content_cat!=='music'
-    &&(c.status==='done'||c.status==='stopped')
-    &&c.end_date&&c.end_date>=startDk&&c.end_date<=endDk
-  ).sort((a,b)=>(b.end_date||'').localeCompare(a.end_date||''));
+  const completed=(ctx.contents||[]).filter(c=>{
+    if(c.content_cat==='music')return c.start_date&&c.start_date>=startDk&&c.start_date<=endDk;
+    return(c.status==='done'||c.status==='stopped')&&c.end_date&&c.end_date>=startDk&&c.end_date<=endDk;
+  }).sort((a,b)=>{
+    const aDate=a.content_cat==='music'?a.start_date:a.end_date;
+    const bDate=b.content_cat==='music'?b.start_date:b.end_date;
+    return (bDate||'').localeCompare(aDate||'');
+  });
 
   if(!completed.length){el.innerHTML='';return;}
 
@@ -4958,7 +4972,7 @@ function renderYrSleepTab(ctx){
   const validRows=ctx.sleepRows.filter(r=>r.sleep_time&&r.wake_time);
   if(!validRows.length){document.getElementById('yr-sleep-summary').innerHTML='<div class="empty-msg">기록된 수면이 없어요</div>';return;}
 
-  const {avgMin,avgScore}=_sleepStatsOf(validRows);
+  const {avgMin,avgScore,reg}=_sleepStatsOf(validRows);
   const goalPct=Math.round(validRows.reduce((sum,r)=>{
     const durMin=_sleepDurMinOf(r);
     const pct=durMin>=SLEEP_GOAL_MIN?100:Math.max(0,100-(SLEEP_GOAL_MIN-durMin)/SLEEP_GOAL_MIN*100);
@@ -4976,24 +4990,41 @@ function renderYrSleepTab(ctx){
   const coreCirc=2*Math.PI*40;
   const coreComment=_yrCoreVsDurationComment(core.pct,validRows.length);
 
-  document.getElementById('yr-sleep-distribution').innerHTML=`
+  // 수면 규칙성 — 취침/기상 시각의 표준편차를 100점 만점으로 환산(calcSleepRegularity, 주간/월간 리포트와 동일 계산).
+  // 코어구간(언제 잤는지) 옆에 나란히 두어 "얼마나 일정하게 잤는지"를 함께 보여줌(2026-08, 여백 채움 겸 신규 배너).
+  const regHtml=reg?`
     <div class="mrsl-half-card">
-      <div class="mrsl-half-title">코어 구간 점유율</div>
-      <div class="donut-stat-wrap" style="margin-top:10px;gap:10px;">
-        <div class="donut-svg-box" style="width:76px;height:76px;">
-          <svg viewBox="0 0 100 100">
-            <circle cx="50" cy="50" r="40" fill="none" stroke="var(--graph-track-color)" stroke-width="12"></circle>
-            <circle cx="50" cy="50" r="40" fill="none" stroke="var(--pal-sky-text)" stroke-width="12" stroke-dasharray="${(core.pct/100*coreCirc).toFixed(2)} ${coreCirc.toFixed(2)}" stroke-dashoffset="0"></circle>
-          </svg>
-          <div class="donut-svg-center"><b>${core.pct}<span style="font-size:12px;">%</span></b></div>
-        </div>
-        <div style="flex:1;">
-          <div style="display:flex;gap:8px;flex-direction:column;">
-            <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--tp);font-weight:600;"><span style="width:10px;height:10px;border-radius:50%;background:var(--pal-sky-text);"></span>사수 ${core.inCore}일</div>
-            <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--tm);font-weight:600;"><span style="width:10px;height:10px;border-radius:50%;background:var(--graph-track-color);"></span>이탈 ${core.outCore}일</div>
+      <div class="mrsl-half-title">수면 규칙성</div>
+      <div class="yr-reg-score-row">
+        <div class="yr-reg-score-num" style="color:${reg.color};">${reg.score}<span>점</span></div>
+        <div class="yr-reg-badge" style="background:${reg.color};">${reg.label}</div>
+      </div>
+      <div class="yr-reg-detail">
+        <div class="yr-reg-detail-row"><span class="yr-reg-detail-dot" style="background:var(--pal-lavender-text);"></span>취침·기상 평균 편차 ±${reg.avgSd}분</div>
+      </div>
+    </div>`:'<div class="mrsl-half-card"><div class="mrsl-half-title">수면 규칙성</div><div class="empty-msg" style="padding:20px 0;">계산할 데이터가 부족해요</div></div>';
+
+  document.getElementById('yr-sleep-distribution').innerHTML=`
+    <div class="yr-sleep-half-row">
+      <div class="mrsl-half-card">
+        <div class="mrsl-half-title">코어 구간 점유율</div>
+        <div class="donut-stat-wrap" style="margin-top:10px;gap:10px;">
+          <div class="donut-svg-box" style="width:76px;height:76px;">
+            <svg viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="40" fill="none" stroke="var(--graph-track-color)" stroke-width="12"></circle>
+              <circle cx="50" cy="50" r="40" fill="none" stroke="var(--pal-sky-text)" stroke-width="12" stroke-dasharray="${(core.pct/100*coreCirc).toFixed(2)} ${coreCirc.toFixed(2)}" stroke-dashoffset="0"></circle>
+            </svg>
+            <div class="donut-svg-center"><b>${core.pct}<span style="font-size:12px;">%</span></b></div>
+          </div>
+          <div style="flex:1;">
+            <div style="display:flex;gap:8px;flex-direction:column;">
+              <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--tp);font-weight:600;"><span style="width:10px;height:10px;border-radius:50%;background:var(--pal-sky-text);"></span>사수 ${core.inCore}일</div>
+              <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--tm);font-weight:600;"><span style="width:10px;height:10px;border-radius:50%;background:var(--graph-track-color);"></span>이탈 ${core.outCore}일</div>
+            </div>
           </div>
         </div>
       </div>
+      ${regHtml}
     </div>
     <div class="insight-box tone-observe" style="margin-top:16px;">
       <i class="ti ti-moon-stars"></i>
