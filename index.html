@@ -307,7 +307,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .pl-item-play{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
 .pl-item-play i{font-size:13px;}
 .pl-item-play.dim{opacity:.35;cursor:default;}
-.cm-star{color:rgba(200,180,160,0.45);cursor:pointer;transition:transform .1s;}
+.cm-star{color:rgba(200,180,160,0.45);cursor:pointer;transition:transform .1s;font-size:19px;line-height:1;}
 .cm-star:active{transform:scale(0.85);}
 .cm-star.on{color:rgba(250,190,80,0.95);}
 .meal-time-inp.mt-empty:not(:focus){color:transparent;}
@@ -3353,7 +3353,7 @@ function _cmrPeriodLabel(c){
 // showHead=true면 상단에 기간+별점 헤더를 붙임(그리드형 전용 — 리스트형은 줄에 별점이 이미 있어 생략)
 function _cmrDetailBodyHtml(c,wcalNotes,flat,showHead){
   const dispDate=_cmrPeriodLabel(c);
-  const starsHtml=c.stars>0?`<span class="cmr-detail-stars">${'★'.repeat(c.stars)}</span>`:'';
+  const starsHtml=c.stars>0?`<span class="cmr-detail-stars">${renderStarDisplayHtml(c.stars)}</span>`:'';
   // 시청 시작/정지 — 진행중(watching) 상태의 드라마/영화만, 그리드 상세에서만(showHead 전용). 음악·책은 대상 아님(책은 독서코너 스톱워치가 별도로 있음).
   const canWatch=showHead&&c.status==='watching'&&(c.cat==='drama'||c.cat==='movie');
   const isWatchingNow=canWatch&&_cswRunning&&_cswCid===c.cid;
@@ -3415,7 +3415,7 @@ function renderContentByCatHtml(byCat){
   const listHtml=cats.filter(cat=>byCat[cat].length>0).map(cat=>{
     const meta=CAT_ICON_META[cat];
     const items=byCat[cat].map(c=>{
-      const starsHtml=c.stars>0?`<span style="color:#e0b050;font-size:var(--dow-label-size);">${'★'.repeat(c.stars)}</span>`:'';
+      const starsHtml=c.stars>0?`<span style="color:#e0b050;font-size:var(--dow-label-size);">${renderStarDisplayHtml(c.stars)}</span>`:'';
       // 음악은 항상 status='done'으로 저장되므로 stopped/watching 조건에 자연히 안 걸림 — 별도 예외 불필요
       const statusHtml=c.status==='stopped'?`<span style="color:var(--tm);font-size:var(--dow-label-size);">중단</span>`:(c.status==='watching'?`<span style="color:var(--tm);font-size:var(--dow-label-size);">진행중</span>`:'');
       const posterHtml=c.poster?`<img src="${c.poster}" style="width:36px;height:36px;border-radius:8px;object-fit:cover;flex-shrink:0;" />`:`<div style="width:36px;height:36px;border-radius:8px;background:${meta.color};flex-shrink:0;display:flex;align-items:center;justify-content:center;"><i class="ti ${meta.icon}" style="font-size:15px;color:#fff;" aria-hidden="true"></i></div>`;
@@ -9466,18 +9466,45 @@ function renderTimetable(){
     }).join('')+'</div>';
   }
 }
-function renderCmStarPicker(val){
-  const el=document.getElementById('cm-star-picker');if(!el)return;
-  el.innerHTML=[1,2,3,4,5].map(n=>`<svg class="cm-star${n<=val?' on':''}" data-val="${n}" onclick="setCmStars(${n})" width="19" height="19" viewBox="0 0 18 18" fill="${n<=val?'currentColor':'none'}" stroke="currentColor" stroke-width="1"><polygon points="9,1.3 11.3,6.3 16.8,7 12.7,10.6 13.8,16.1 9,13.3 4.2,16.1 5.3,10.6 1.2,7 6.7,6.3"/></svg>`).join('');
+// ── 별점 위젯 공용 헬퍼 (0.5단위, tabler 아이콘 기반) ──
+// 규칙: 빈 별 클릭 → 그 지점까지 꽉 채움. 이미 꽉 찬 그 별을 다시 클릭 → 반쪽. 반쪽인 그 별을 다시 클릭 → 다시 꽉 참(순환, 0으로는 안 꺼짐).
+function _starIconClass(val,n){
+  if(val>=n)return 'ti-star-filled';
+  if(val>=n-0.5)return 'ti-star-half-filled';
+  return 'ti-star';
 }
-function setCmStars(n){
-  const inp=document.getElementById('cm-stars');
-  const cur=parseInt(inp.value)||0;
-  const next=cur===n?0:n; // 같은 별 다시 탭하면 취소
+function renderStarPickerHtml(val,onClickExpr){
+  // onClickExpr: 각 별 클릭시 실행할 함수 호출 문자열의 앞부분. 별 번호(n)가 마지막 인자로 붙어 완성됨.
+  // 예: onClickExpr="setStarValue('cm-star-picker','cm-stars'" → 별 3번 클릭 시 "setStarValue('cm-star-picker','cm-stars',3)" 실행
+  return [1,2,3,4,5].map(n=>`<i class="ti ${_starIconClass(val,n)} cm-star${val>=n-0.5?' on':''}" data-val="${n}" onclick="${onClickExpr}(${n})" aria-hidden="true"></i>`).join('');
+}
+function nextStarValue(cur,n){
+  if(cur>=n)return n-0.5; // 이미 그 별까지 꽉 찬 상태 → 반쪽으로
+  if(cur>=n-0.5)return n; // 반쪽 상태 → 다시 꽉 참으로 순환
+  return n; // 빈 별 → 그 지점까지 꽉 채움
+}
+// 별점 표시(읽기 전용) — 0.5단위 반영. 채워진 개수만큼 filled, 나머지는 outline.
+function renderStarDisplayHtml(stars,sizeClass){
+  if(!stars||stars<=0)return '';
+  const cls=sizeClass?` ${sizeClass}`:'';
+  return [1,2,3,4,5].map(n=>`<i class="ti ${_starIconClass(stars,n)}${cls}" aria-hidden="true"></i>`).join('');
+}
+// 별점 위젯 공용 렌더/클릭 — pickerElId(별 목록 표시 컨테이너)·valueElId(hidden input) 쌍으로 어떤 위젯 인스턴스든 동일하게 처리.
+// 콘텐츠 등록모달(cm-star-picker/cm-stars), 독서 완독배너(pg-done-star-picker/pg-done-stars),
+// 콘텐츠 완료배너(cpg-done-star-picker/cpg-done-stars) 3곳이 공유.
+function renderStarPicker(pickerElId,valueElId,val){
+  const el=document.getElementById(pickerElId);if(!el)return;
+  el.innerHTML=renderStarPickerHtml(val,`setStarValue('${pickerElId}','${valueElId}',`);
+}
+function setStarValue(pickerElId,valueElId,n){
+  const inp=document.getElementById(valueElId);if(!inp)return;
+  const cur=parseFloat(inp.value)||0;
+  const next=nextStarValue(cur,n);
   inp.value=next;
-  renderCmStarPicker(next);
+  renderStarPicker(pickerElId,valueElId,next);
 }
 function openMusicGroupModal(items,mk){
+
   const listEl=document.getElementById('mg-list');
   listEl.innerHTML='';
   items.forEach(item=>{
@@ -9510,7 +9537,7 @@ function openContentModal(cat,item=null,mk=null,onSaved=null){
   document.getElementById('cm-end').value=item?(item.endDate||''):'';
   document.getElementById('cm-review').value=item?.review||'';
   document.getElementById('cm-stars').value=item?.stars||0;
-  renderCmStarPicker(item?.stars||0);
+  renderStarPicker('cm-star-picker','cm-stars',item?.stars||0);
   document.getElementById('cm-del-btn').style.display=item?'block':'none';
   const status=item?.status||'watching';
   setCStatus(status);
@@ -9597,7 +9624,7 @@ function confirmContent(){
   }
   // 음악은 '듣는 데 며칠씩 걸리는' 개념이 아니므로 완료/중단 상태여도 endDate는 항상 null로 유지.
   const review=document.getElementById('cm-review').value.trim();
-  const stars=parseInt(document.getElementById('cm-stars').value)||0;
+  const stars=parseFloat(document.getElementById('cm-stars').value)||0;
   const poster=_selectedPoster||(_contentCtx.item&&_contentCtx.item.poster)||null;
   const author=_selectedAuthor||(_contentCtx.item&&_contentCtx.item.author)||'';
   const musicUrl=_contentCtx.cat==='music'?(_selectedMusicUrl||(_contentCtx.item&&_contentCtx.item.musicUrl)||null):null;
@@ -9737,7 +9764,7 @@ function confirmContentProgress(){
           <input type="hidden" id="cpg-done-stars" value="0">
         </div>
         <textarea class="modal-inp" id="cpg-done-review" rows="2" style="resize:none;" placeholder="감상 메모 (선택)" autocomplete="off"></textarea>`;
-      renderCpgDoneStarPicker(0);
+      renderStarPicker('cpg-done-star-picker','cpg-done-stars',0);
       actionsEl.innerHTML=`<button class="mbtn cancel" onclick="closeModal('content-progress-modal')">나중에</button>
         <div class="mbtn-done-wrap" onclick="confirmContentProgressDone()"><button class="mbtn-done"><i class="ti ti-sparkles ico-sz-14" aria-hidden="true"></i> 완료</button></div>`;
     }
@@ -9746,17 +9773,6 @@ function confirmContentProgress(){
   closeModal('content-progress-modal');
   _cpgCid=null;
   chExpandMonth(_chArchiveMk||found.mk);
-}
-function renderCpgDoneStarPicker(val){
-  const el=document.getElementById('cpg-done-star-picker');if(!el)return;
-  el.innerHTML=[1,2,3,4,5].map(n=>`<svg class="cm-star${n<=val?' on':''}" data-val="${n}" onclick="setCpgDoneStars(${n})" width="19" height="19" viewBox="0 0 18 18" fill="${n<=val?'currentColor':'none'}" stroke="currentColor" stroke-width="1"><polygon points="9,1.3 11.3,6.3 16.8,7 12.7,10.6 13.8,16.1 9,13.3 4.2,16.1 5.3,10.6 1.2,7 6.7,6.3"/></svg>`).join('');
-}
-function setCpgDoneStars(n){
-  const inp=document.getElementById('cpg-done-stars');
-  const cur=parseInt(inp.value)||0;
-  const next=cur===n?0:n;
-  inp.value=next;
-  renderCpgDoneStarPicker(next);
 }
 // 완료 확정 — 콘텐츠 상태를 done으로 전환하고 별점/감상을 반영. 저장되면 월간 콘텐츠 타임라인/허브에도
 // status==='done' 분기를 통해 그대로 반영됨(독서코너 완독이 서재 목록에 반영되는 것과 동일 구조).
@@ -9771,7 +9787,7 @@ function confirmContentProgressDone(){
   const c=found.list[found.idx];
   const starsEl=document.getElementById('cpg-done-stars');
   const reviewEl=document.getElementById('cpg-done-review');
-  const stars=starsEl?(parseInt(starsEl.value)||0):0;
+  const stars=starsEl?(parseFloat(starsEl.value)||0):0;
   const review=reviewEl?reviewEl.value.trim():'';
   c.status='done';
   c.endDate=dateKey(getLogicalDate());
@@ -12632,7 +12648,7 @@ function _chRenderNoteTimelineByWork(finals,notes){
     const m=WCAL_CAT_META[g.cat]||{label:''};
     const posterHtml=_wcalPosterThumbHtml(g.cat,g.poster);
     const finalHtml=g.final?
-      `<div class="ch-tlB-final-row">${g.final.stars>0?`<div class="ch-tlB-stars">${'★'.repeat(g.final.stars)}${'☆'.repeat(5-g.final.stars)}</div>`:''}</div>
+      `<div class="ch-tlB-final-row">${g.final.stars>0?`<div class="ch-tlB-stars">${renderStarDisplayHtml(g.final.stars)}</div>`:''}</div>
        ${g.final.review?`<div class="ch-tlB-final-text">${escapeHtml(g.final.review)}</div>`:''}`
       :'';
     const progressBadgeHtml=g.final?'':'<span class="ch-tlB-progress-badge">진행중</span>';
@@ -12664,7 +12680,7 @@ function _chFinalRowHtml(f){
         <div class="ch-tlA-title-row">
           <span class="ch-tlA-badge-final">완</span>
           <span class="ch-tlA-title">${escapeHtml(f.title||'')}</span>
-          ${f.stars>0?`<span class="ch-tlA-stars">${'★'.repeat(f.stars)}${'☆'.repeat(5-f.stars)}</span>`:''}
+          ${f.stars>0?`<span class="ch-tlA-stars">${renderStarDisplayHtml(f.stars)}</span>`:''}
         </div>
         ${f.review?`<div class="ch-tlA-text">${escapeHtml(f.review)}</div>`:''}
       </div>
@@ -13439,7 +13455,7 @@ function confirmProgress(){
           <input type="hidden" id="pg-done-stars" value="0">
         </div>
         <textarea class="modal-inp" id="pg-done-review" rows="2" style="resize:none;" placeholder="감상 메모 (선택)" autocomplete="off"></textarea>`;
-      renderPgDoneStarPicker(0);
+      renderStarPicker('pg-done-star-picker','pg-done-stars',0);
       actionsEl.innerHTML=`<button class="mbtn cancel" onclick="closeModal('progress-modal')">나중에</button>
         <div class="mbtn-done-wrap" onclick="confirmReadingProgressDone()"><button class="mbtn-done"><i class="ti ti-sparkles ico-sz-14" aria-hidden="true"></i> 완독</button></div>`;
     }
@@ -13447,24 +13463,13 @@ function confirmProgress(){
   }
   closeModal('progress-modal');
 }
-function renderPgDoneStarPicker(val){
-  const el=document.getElementById('pg-done-star-picker');if(!el)return;
-  el.innerHTML=[1,2,3,4,5].map(n=>`<svg class="cm-star${n<=val?' on':''}" data-val="${n}" onclick="setPgDoneStars(${n})" width="19" height="19" viewBox="0 0 18 18" fill="${n<=val?'currentColor':'none'}" stroke="currentColor" stroke-width="1"><polygon points="9,1.3 11.3,6.3 16.8,7 12.7,10.6 13.8,16.1 9,13.3 4.2,16.1 5.3,10.6 1.2,7 6.7,6.3"/></svg>`).join('');
-}
-function setPgDoneStars(n){
-  const inp=document.getElementById('pg-done-stars');
-  const cur=parseInt(inp.value)||0;
-  const next=cur===n?0:n;
-  inp.value=next;
-  renderPgDoneStarPicker(next);
-}
 function confirmReadingProgressDone(){
   const cid=_pgDoneConfirmCid;
   _pgDoneConfirmCid=null;
   if(!cid){closeModal('progress-modal');return;}
   const starsEl=document.getElementById('pg-done-stars');
   const reviewEl=document.getElementById('pg-done-review');
-  const stars=starsEl?(parseInt(starsEl.value)||0):0;
+  const stars=starsEl?(parseFloat(starsEl.value)||0):0;
   const review=reviewEl?reviewEl.value.trim():'';
   closeModal('progress-modal');
   setBookStatus(cid,'done',{stars,review}); // 상태전환 공용 경로 — 콘텐츠 연동(syncReadingBookToContent)까지 함께 처리됨
