@@ -1583,12 +1583,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .ysqt-time.sleep{color:var(--pal-lavender-text);}
 .ysqt-time.wake{color:var(--pal-orange-border);}
 
-/* 수면탭: 컨디션 낮은 날 전날 리듬 흔적 (교차분석 하이라이트) */
+/* 수면탭: 컨디션 낮은 날 전날의 공통점 (복합요인 리스트, 2026-08 재설계 — 단일원인 단정 대신 여러 요인 동시 나열) */
+.yr-ctrace-list{display:flex;flex-direction:column;gap:14px;}
 .yr-ctrace-row{display:flex;align-items:center;gap:12px;}
 .yr-ctrace-icon{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .yr-ctrace-icon i{font-size:18px;color:#fff;}
 .yr-ctrace-title{font-size:14px;font-weight:700;color:var(--tp);}
 .yr-ctrace-desc{font-size:13px;color:var(--ts);margin-top:2px;}
+.yr-ctrace-diff{color:var(--pal-rose-text);font-weight:600;}
 
 </style>
 <script>(function(){try{var s=localStorage.getItem('textScale');s=s?JSON.parse(s):0;var base={'-1':{title:15,body:14},'0':{title:16,body:15},'1':{title:17,body:16}}[String(s)]||{title:16,body:15};document.documentElement.style.setProperty('--fs-title',base.title+'px');document.documentElement.style.setProperty('--fs-body',base.body+'px');document.documentElement.style.setProperty('--main-text-size',base.body+'px');document.documentElement.style.setProperty('--dow-label-size',(base.body-1.5)+'px');}catch(e){}})();</script>

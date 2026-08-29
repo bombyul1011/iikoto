@@ -5073,10 +5073,10 @@ function renderYrSleepConditionFlow(ctx,validRows){
     </div>`;
 }
 
-// 컨디션 낮은 날, 전날엔 뭘 했나 — 컨디션 하위 30%인 날들의 "전날"(date_key-1) 리듬을 나머지 날들의
-// 전날 리듬과 비교해 가장 크게 차이나는 카테고리를 찾음. 표본이 적으면(하위군 10일 미만) 생략.
-// 방향: "그날 낮에 뭘 했길래 컨디션이 나빴는지"가 아니라 "잠들기 전날 낮에 뭘 했길래 다음날 컨디션이
-// 나빴는지"를 보는 것 — sleep.date_key는 기상일 기준이라 그 전날이 실제로 깨어있던 낮 시간대(2026-08 확인).
+// 컨디션 낮은 날, 전날의 공통점 — 단일 원인으로 단정하지 않고 여러 요인(업무·외출·휴식시간, 취침시각,
+// 전날 컨디션)을 동시에 계산해 유의미하게 차이나는 것만 전부 나열. 하나만 골라 "이것 때문"이라고 말하는 건
+// 성급한 단정이라는 피드백 반영(2026-08) — 복합 요인을 있는 그대로 보여주는 게 정직하다는 원칙.
+// 대상 날짜는 "전날"(date_key-1) — sleep.date_key는 기상일 기준이라 그 전날이 실제로 깨어있던 낮 시간대.
 function renderYrSleepConditionTrace(ctx,validRows){
   const el=document.getElementById('yr-sleep-condition-trace');
   if(!el)return;
@@ -5086,17 +5086,20 @@ function renderYrSleepConditionTrace(ctx,validRows){
   const sorted=[...scoredRows].sort((a,b)=>a.score-b.score);
   const lowCount=Math.max(10,Math.round(sorted.length*0.3));
   if(lowCount>=sorted.length){el.innerHTML='';return;}
-  const lowDates=new Set(sorted.slice(0,lowCount).map(r=>r.date_key));
-  const restDates=new Set(sorted.slice(lowCount).map(r=>r.date_key));
+  const lowRows=sorted.slice(0,lowCount),restRows=sorted.slice(lowCount);
+  const lowDates=new Set(lowRows.map(r=>r.date_key));
+  const restDates=new Set(restRows.map(r=>r.date_key));
 
   const prevDateKeyOf=dk=>{
     const d=new Date(dk+'T00:00:00');
     d.setDate(d.getDate()-1);
     return dateKey(d);
   };
-  const lowPrevDates=new Set([...lowDates].map(prevDateKeyOf));
-  const restPrevDates=new Set([...restDates].map(prevDateKeyOf));
+  const lowPrevDates=[...lowDates].map(prevDateKeyOf);
+  const restPrevDates=[...restDates].map(prevDateKeyOf);
+  const lowPrevSet=new Set(lowPrevDates),restPrevSet=new Set(restPrevDates);
 
+  // 요인1~3: 업무/외출/휴식 — 전날 rblocks 카테고리별 일평균(분)
   const avgByCat=(prevDateSet)=>{
     const byDate={};
     ctx.rblocks.forEach(b=>{
@@ -5114,45 +5117,92 @@ function renderYrSleepConditionTrace(ctx,validRows){
     Object.keys(agg).forEach(k=>{avg[k]=agg[k]/dateList.length;});
     return avg;
   };
+  const lowCatAvg=avgByCat(lowPrevSet),restCatAvg=avgByCat(restPrevSet);
 
-  const lowAvg=avgByCat(lowPrevDates);
-  const restAvg=avgByCat(restPrevDates);
-  const cats=Object.keys(RHYTHM_CATS).filter(k=>k!=='appointment'); // 외출 제외(리듬탭과 동일 방침)
+  // 요인4: 취침시각 — 전날 밤 취침시각(22시 cutoff 보정). 전날 자체가 sleep row로 존재해야 계산 가능
+  // (연속된 이틀치 sleep 기록이 필요 — 전날에 기록이 없으면 그 날짜는 자연히 제외됨).
+  const sleepByDk={};
+  validRows.forEach(r=>{if(r.date_key&&r.sleep_time)sleepByDk[r.date_key]=toDawnAdjustedMin(_dawnTimeToMin(r.sleep_time),22*60);});
+  const avgSleepTimeOf=dateList=>{
+    const vals=dateList.map(dk=>sleepByDk[dk]).filter(v=>v!=null);
+    return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null;
+  };
+  const lowSleepTimeAvg=avgSleepTimeOf(lowPrevDates),restSleepTimeAvg=avgSleepTimeOf(restPrevDates);
 
-  const diffs=cats.map(k=>({
-    key:k,label:RHYTHM_CATS[k].label,icon:RHYTHM_CATS[k].icon,color:RHYTHM_CATS[k].color,
-    low:lowAvg[k]||0,rest:restAvg[k]||0,diff:(lowAvg[k]||0)-(restAvg[k]||0)
-  })).filter(x=>x.low>0||x.rest>0);
+  // 요인5: 전날 컨디션 — 전날 자체의 sleep.score(컨디션 자기상관 — 컨디션 저하가 며칠 이어지는지)
+  const scoreByDk={};
+  scoredRows.forEach(r=>{scoreByDk[r.date_key]=r.score;});
+  const avgScoreOf=dateList=>{
+    const vals=dateList.map(dk=>scoreByDk[dk]).filter(v=>v!=null);
+    return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null;
+  };
+  const lowPrevScoreAvg=avgScoreOf(lowPrevDates),restPrevScoreAvg=avgScoreOf(restPrevDates);
 
-  if(diffs.length<2){el.innerHTML='';return;}
+  // 5개 요인을 같은 형식으로 모아서 유의미한 차이(임계값 이상)만 필터링, 차이가 큰 순으로 정렬
+  const factors=[];
+  ['work','appointment','rest'].forEach(k=>{
+    const low=lowCatAvg[k]||0,rest=restCatAvg[k]||0;
+    if(low===0&&rest===0)return;
+    factors.push({type:'duration',key:k,label:RHYTHM_CATS[k].label,icon:RHYTHM_CATS[k].icon,color:RHYTHM_CATS[k].color,diff:low-rest,low,rest,thresholdMin:10});
+  });
+  if(lowSleepTimeAvg!=null&&restSleepTimeAvg!=null){
+    factors.push({type:'time',key:'sleeptime',label:'취침시각',icon:'ti-moon',color:'var(--pal-lavender-text)',diff:lowSleepTimeAvg-restSleepTimeAvg,low:lowSleepTimeAvg,rest:restSleepTimeAvg,thresholdMin:15});
+  }
+  if(lowPrevScoreAvg!=null&&restPrevScoreAvg!=null){
+    factors.push({type:'score',key:'prevscore',label:'전날 컨디션',icon:'ti-mood-empty',color:'var(--pal-sky-text)',diff:lowPrevScoreAvg-restPrevScoreAvg,low:lowPrevScoreAvg,rest:restPrevScoreAvg,thresholdMin:8});
+  }
 
-  const top=[...diffs].sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff))[0];
-  if(Math.abs(top.diff)<10){ // 가장 큰 차이가 10분 미만이면 유의미한 흔적 없음으로 판단
+  const significant=factors.filter(f=>Math.abs(f.diff)>=f.thresholdMin).sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff));
+
+  if(!significant.length){
     el.innerHTML=`
       <div class="bento-item bento-full">
-        <div class="bento-lbl">컨디션 낮은 날, 전날엔 뭘 했을까</div>
-        <div class="insight-box tone-observe" style="margin-top:8px;"><i class="ti ti-search"></i><div><strong>관찰:</strong> 컨디션이 낮았던 날의 전날 리듬에서 뚜렷한 공통 패턴은 아직 보이지 않아요.</div></div>
+        <div class="bento-lbl">컨디션 낮은 날, 전날의 공통점</div>
+        <div class="insight-box tone-observe" style="margin-top:8px;"><i class="ti ti-search"></i><div><strong>관찰:</strong> 컨디션이 낮았던 날의 전날에서 뚜렷한 공통점은 아직 보이지 않아요.</div></div>
       </div>`;
     return;
   }
 
-  const moreOrLess=top.diff>0?'더 많았어요':'더 적었어요';
-  const diffAbsText=_fmtDur(Math.round(Math.abs(top.diff)));
+  const rowsHtml=significant.map(f=>{
+    let descText;
+    if(f.type==='duration'){
+      const moreOrLess=f.diff>0?'더 많았어요':'더 적었어요';
+      descText=`전날 평균 ${_fmtDur(Math.round(f.low))} <span class="yr-ctrace-diff">(평소보다 ${f.diff>0?'+':''}${_fmtDur(Math.round(Math.abs(f.diff)))})</span> — 평소보다 ${moreOrLess}`;
+    }else if(f.type==='time'){
+      const laterOrEarlier=f.diff>0?'늦음':'이름';
+      descText=`평균 ${_yrMinToHHMM(f.low)} <span class="yr-ctrace-diff">(평소보다 ${_fmtDur(Math.round(Math.abs(f.diff)))} ${laterOrEarlier})</span>`;
+    }else{
+      const higherOrLower=f.diff>0?'높음':'낮음';
+      descText=`평균 ${Math.round(f.low)}점 <span class="yr-ctrace-diff">(평소보다 ${f.diff>0?'+':''}${Math.round(f.diff)}점 ${higherOrLower})</span>`;
+    }
+    return `<div class="yr-ctrace-row">
+      <div class="yr-ctrace-icon" style="background:${f.color};"><i class="ti ${f.icon}" aria-hidden="true"></i></div>
+      <div class="yr-ctrace-body">
+        <div class="yr-ctrace-title">${escapeHtml(f.label)}</div>
+        <div class="yr-ctrace-desc">${descText}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // 관찰 문장 — 걸린 요인 조합에 따라 톤만 다르게(비-API, 템플릿 조합)
+  const hitKeys=new Set(significant.map(f=>f.key));
+  let observeText;
+  if((hitKeys.has('work')||hitKeys.has('appointment'))&&hitKeys.has('sleeptime')){
+    observeText='활동(업무·외출)이 길었던 날일수록 취침도 늦어지는 경향이 함께 나타났어요.';
+  }else if(hitKeys.has('prevscore')){
+    observeText='컨디션이 하루이틀 이어서 낮게 나타나는 흐름도 보여요.';
+  }else{
+    observeText='컨디션이 낮았던 날의 전날엔 몇 가지 특징이 함께 나타났어요.';
+  }
 
   el.innerHTML=`
     <div class="bento-item bento-full">
-      <div class="bento-lbl">컨디션 낮은 날, 전날엔 뭘 했을까</div>
-      <div class="bento-sub" style="margin-top:0;margin-bottom:10px;">컨디션이 낮았던 날의 전날과, 그 외 날의 전날 리듬을 비교했어요.</div>
-      <div class="yr-ctrace-row">
-        <div class="yr-ctrace-icon" style="background:${top.color};"><i class="ti ${top.icon}" aria-hidden="true"></i></div>
-        <div class="yr-ctrace-body">
-          <div class="yr-ctrace-title">${escapeHtml(top.label)}</div>
-          <div class="yr-ctrace-desc">컨디션이 낮았던 날 전날엔 평소보다 ${diffAbsText} ${moreOrLess}</div>
-        </div>
-      </div>
+      <div class="bento-lbl">컨디션 낮은 날, 전날의 공통점</div>
+      <div class="bento-sub" style="margin-top:0;margin-bottom:12px;">컨디션 하위 ${lowCount}일의 전날을, 그 외 날의 전날과 비교했어요.</div>
+      <div class="yr-ctrace-list">${rowsHtml}</div>
       <div class="insight-box tone-observe" style="margin-top:12px;">
         <i class="ti ti-search"></i>
-        <div><strong>관찰:</strong> 컨디션 하위 ${lowCount}일의 전날과 나머지 날의 전날을 비교했을 때, ${escapeHtml(top.label)} 시간의 차이가 가장 뚜렷했어요. 이게 직접적인 원인이라 단정할 순 없지만, 다음에 컨디션이 떨어질 때 참고할 만한 단서예요.</div>
+        <div><strong>관찰:</strong> ${observeText} 하나가 직접적인 원인이라 단정할 순 없지만, 여러 요인이 겹쳐 나타난다는 점은 참고할 만해요.</div>
       </div>
     </div>`;
 }
