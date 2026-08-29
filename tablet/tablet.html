@@ -1001,9 +1001,18 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   .yr-sum-content-quarters,.rhythm-9grid,.ysqt-grid{
     grid-template-columns:repeat(2,1fr)!important;
   }
-  /* 감상 아카이브(포스터 그리드)는 기본 CSS(.yr-cgrid-grid-5col의 min-width:0 + width:100%)만으로
-     화면이 좁아지면 포스터 크기 자체가 유동적으로 줄어들어 5칸을 그대로 유지해도 넘치지 않음(2026-08) —
+  /* 감상 아카이브(포스터 그리드)는 기본 CSS(.yr-cgrid-grid-4col의 min-width:0 + width:100%)만으로
+     화면이 좁아지면 포스터 크기 자체가 유동적으로 줄어들어 4칸을 그대로 유지해도 넘치지 않음(2026-08) —
      별도 열 수 축소 불필요. */
+  /* 콘텐츠탭 상단 1:1 분할(아카이브+월별 그리드)은 세로 폭에서 1열 스택으로(2026-08) — 반반이면 각 칸이 너무 좁아짐 */
+  .yr-content-toprow{flex-direction:column;}
+  .bento-half{margin-bottom:14px;}
+  /* 월별 감상 그리드 — 세로(모바일)에서는 .yr-content-toprow가 1열 스택이 되어 아카이브와 높이를 맞출
+     필요가 없어짐(desktop 전용 JS 동기화 대상에서도 제외됨, syncYrContentHeight 참고). overflow:hidden도
+     해제해 카드 자체가 내용 높이만큼 자연스럽게 늘어나게 함 — 월간탭 .cgrid-card와 동일 패턴.
+     월그리드는 12칸 고정이라 스크롤 자체가 필요 없어 별도 max-height 처리 불필요.
+     아카이브는 데스크탑과 동일하게 자체 max-height(420px)를 그대로 유지(별도 재지정 불필요). */
+  .yr-mgrid-card{overflow:visible!important;}
   .yr-sum-sleep-split .yr-sum-sleep-item:last-child::before{display:none;} /* 좌우 분리선 — 1열 스택에서는 의미 없어져 숨김 */
 
   /* ══════════════════════════════════════════════════════
@@ -1472,16 +1481,70 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 /* 월 그래프의 미래 개월 자리 */
 .gb-group.future{opacity:0.35;}
 .gb-group.future .gb-bars{border-bottom:1px dashed rgba(var(--divider-rgb),0.4);}
-/* 콘텐츠탭: 올해의 감상 아카이브 — 라벨 옆 전체수량 배지, 필터칩, 5열 그리드 + 높이 고정 스크롤(2026-08, 4→5로 확대) */
+/* 콘텐츠탭: 올해의 감상 아카이브 — 라벨 옆 전체수량 배지, 필터칩, 4열 그리드 + 높이 고정 스크롤(2026-08, 4→5→4: 한 줄 4개로 축소해 옆에 월별 그리드 배너를 위한 공간 확보) */
 .bento-lbl-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
 .bento-lbl-row .bento-lbl{margin-bottom:0;}
 .yr-cgrid-count-tag{font-size:var(--fs-xs);font-weight:700;color:var(--ts);background:rgba(var(--divider-rgb),0.12);border-radius:12px;padding:3px 10px;}
 .yr-cgrid-count-tag span{color:var(--tp);font-size:var(--fs-sm);}
+.yr-cgrid-grid-4col{grid-template-columns:repeat(4,minmax(0,1fr));}
+.yr-cgrid-grid-4col .cgrid-item{min-width:0;align-items:center;} /* min-width:0 — 포스터 고정폭(100px) 때문에 grid item이 수축을 거부해 화면이 좁아지면 가로 스크롤이 생기던 문제 방지. align-items — 포스터와 하단 제목을 같은 중심축으로 정렬(2026-08) */
+.yr-cgrid-grid-4col .cgrid-thumb-wrap{width:100%;max-width:100px;}
+.yr-cgrid-grid-4col .cgrid-title{width:100%;max-width:100px;text-align:center;}
+
+/* 콘텐츠탭: 올해의 감상 아카이브 + 월별 감상 그리드 1:1 분할, 높이 동기화(2026-08) — 월간탭
+   감상달력(.wcal-card)/콘텐츠모아보기(.cgrid-card) 패턴을 그대로 이식하되 핵심 차이 하나 반영:
+   월간탭 wcal-card(기준)는 애초에 내부 스크롤이 없는 카드라 자연 높이=콘텐츠 높이가 그대로 성립했지만,
+   아카이브(기준)는 자체적으로 개수가 많아지므로 자기 스스로 상한(max-height:420px)을 가진 스크롤 영역을
+   품은 채로 "그 상태의 전체 카드 높이"가 기준이 됨 — 그래서 .yr-cgrid-scroll은 flex:1이 아니라 고정
+   max-height(스스로 상한을 정함), 카드 자체는 JS height 강제 없이 자연 높이(스크롤 포함 높이까지만).
+   .yr-mgrid-card(월그리드)는 JS(syncYrContentHeight, ResizeObserver 기반)가 기준 카드의 실측 높이를
+   .style.height로 그대로 박아넣음 — 월그리드는 항상 12칸 고정이라 내부 스크롤 없이 꽉 채워 보여줌. */
+.yr-content-toprow{display:flex;gap:14px;align-items:start;margin-bottom:14px;}
+.yr-content-toprow>div{flex:1 1 0;min-width:0;}
+.bento-half{flex:1 1 0;min-width:0;margin-bottom:0;}
+.yr-cgrid-refcard{display:flex;flex-direction:column;min-height:0;}
+.yr-mgrid-card{display:flex;flex-direction:column;min-height:0;overflow:hidden;}
 .yr-cgrid-scroll{max-height:420px;overflow-y:auto;overflow-x:hidden;margin-top:4px;padding-right:2px;}
-.yr-cgrid-grid-5col{grid-template-columns:repeat(5,minmax(0,1fr));}
-.yr-cgrid-grid-5col .cgrid-item{min-width:0;align-items:center;} /* min-width:0 — 포스터 고정폭(100px) 때문에 grid item이 수축을 거부해 화면이 좁아지면 가로 스크롤이 생기던 문제 방지. align-items — 포스터와 하단 제목을 같은 중심축으로 정렬(2026-08) */
-.yr-cgrid-grid-5col .cgrid-thumb-wrap{width:100%;max-width:100px;}
-.yr-cgrid-grid-5col .cgrid-title{width:100%;max-width:100px;text-align:center;}
+.yr-mgrid-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;margin-top:4px;padding-right:2px;}
+
+/* 콘텐츠탭: 월별 감상 그리드 — 연력 스타일 3x4(한 줄 4개) 타일. 배경은 월별 고정 파스텔색(다채로움을 위해
+   앱 기존 팔레트 12색을 월마다 고정 배정), 총 감상 개수는 타일 정중앙에 크게. 클릭 시 아카이브와 동일하게
+   클릭한 달이 속한 행 바로 아래에 그 달 목록이 펼쳐짐 — 탭 전환이 아니라 인라인 확장(2026-08, 3열→4열로
+   한눈에 더 잘 들어오게 변경).
+   목록은 그리드형이 아닌 목록형(작은 정사각 포스터+제목 한 줄) — 항목 클릭 시 그 항목 바로 아래에
+   상세(별점/총평)가 펼쳐짐, 아카이브의 카드형 그리드와는 다른 압축된 표현(2026-08). */
+.yr-mgrid-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.yr-mgrid-tile{position:relative;aspect-ratio:1/1;border-radius:16px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border:2px solid transparent;transition:border-color .2s,transform .15s;}
+.yr-mgrid-tile.active{border-color:var(--pal-yellow-border);transform:scale(0.97);}
+.yr-mgrid-tile.empty{background:rgba(var(--divider-rgb),0.08);cursor:default;}
+.yr-mgrid-tile.future{opacity:0.35;background:rgba(var(--divider-rgb),0.06);cursor:default;}
+.yr-mgrid-month{font-size:var(--fs-xs);font-weight:700;color:var(--tp);opacity:0.7;}
+.yr-mgrid-count{font-size:24px;font-weight:700;color:var(--tp);font-family:'DM Sans',sans-serif;line-height:1;}
+.yr-mgrid-count-empty{font-size:var(--fs-lg);font-weight:700;color:var(--tm);}
+.yr-mgrid-row-wrap{grid-column:1 / -1;display:none;}
+.yr-mgrid-row-wrap.on{display:block;margin:4px 0 6px;}
+.yr-mgrid-detail-title{font-size:var(--fs-sm);font-weight:700;color:var(--tp);margin-bottom:10px;}
+.yr-mgrid-list{display:flex;flex-direction:column;gap:2px;}
+.yr-mgrid-list-item+.yr-mgrid-list-item{border-top:1px solid rgba(var(--divider-rgb),0.18);}
+.yr-mgrid-list-row{display:flex;align-items:center;gap:10px;padding:8px 4px;cursor:pointer;}
+.yr-mgrid-list-row.active{background:rgba(var(--pal-yellow-rgb),0.12);border-radius:10px;}
+.yr-mgrid-list-thumb{width:34px;height:34px;border-radius:7px;object-fit:cover;flex-shrink:0;display:block;}
+.yr-mgrid-list-thumb-fallback{display:flex;align-items:center;justify-content:center;}
+.yr-mgrid-list-thumb-fallback i{font-size:14px;color:#fff;}
+.yr-mgrid-list-title{flex:1;min-width:0;font-size:var(--fs-sm);color:var(--tp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.yr-mgrid-list-icons{flex-shrink:0;display:flex;gap:4px;color:var(--tm);font-size:11px;}
+
+/* 콘텐츠탭: 월별 감상 그리드 하단 — 4열x3행 타일이 아카이브보다 낮게 차서 남는 공간에 카테고리별
+   총감상량을 텍스트로만 채움(2026-08). 별도 카드 배경 없이 심플한 텍스트 목록. */
+.yr-mgrid-catsum{margin-top:6px;}
+.yr-mgrid-catsum-title{font-size:var(--fs-xs);font-weight:700;color:var(--tm);margin-bottom:10px;letter-spacing:0.02em;}
+.yr-mgrid-catsum-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0;font-size:var(--fs-sm);}
+.yr-mgrid-catsum-label{display:flex;align-items:center;gap:6px;color:var(--tp);}
+.yr-mgrid-catsum-label i{font-size:14px;}
+.yr-mgrid-catsum-val{color:var(--ts);font-weight:600;font-family:'DM Sans',sans-serif;}
+.yr-mgrid-list-detail-wrap{display:none;padding:0 4px 10px;}
+.yr-mgrid-list-detail-wrap.on{display:block;}
+
 /* 콘텐츠탭: 카테고리별 누적 감상량 막대 (목업엔 있었으나 이식 시 누락됐던 부분, 이번에 추가) */
 .cumul-list{display:flex;flex-direction:column;gap:12px;}
 .cumul-row{display:flex;align-items:center;gap:12px;}
@@ -1841,7 +1904,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
             <div class="tab-intro-title">영감이 되는 <b>활자와 영상</b>,<br>어떻게 쌓이고 있을까요?</div>
             <div class="tab-intro-sub" id="yr-content-intro-sub"></div>
           </div>
-          <div id="yr-content-gallery"></div>
+          <div class="yr-content-toprow">
+            <div id="yr-content-gallery"></div>
+            <div id="yr-content-monthgrid"></div>
+          </div>
           <div id="yr-content-time-compare"></div>
           <div class="bento-item bento-full" id="yr-content-cumul"></div>
         </div>

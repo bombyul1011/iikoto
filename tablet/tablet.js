@@ -244,6 +244,41 @@ function initCgridHeightSync(){
   syncCgridHeightToWcal();
 }
 window.addEventListener('resize',()=>{if(_cgridHeightRO)syncCgridHeightToWcal();});
+
+// ══════════════════════════════════════════════════════════
+// 연간탭 콘텐츠 — 올해의 감상 아카이브(기준) / 월별 감상 그리드(따라감) 높이 동기화
+// syncCgridHeightToWcal/initCgridHeightSync(월간탭)와 완전히 동일한 패턴 — 기준 카드는 자연 높이,
+// 따라가는 카드는 ResizeObserver로 실측 높이를 실시간 반영, transitionend는 사이드바 트랜지션 종료 보정용.
+// ══════════════════════════════════════════════════════════
+let _yrContentHeightRO=null;
+function syncYrContentHeight(){
+  const ref=document.querySelector('.yr-cgrid-refcard');
+  const follow=document.querySelector('.yr-mgrid-card');
+  if(!ref||!follow)return;
+  const isDesktop=window.matchMedia('(min-width:761px)').matches;
+  if(!isDesktop){
+    follow.style.height='';
+    return;
+  }
+  const h=ref.getBoundingClientRect().height;
+  if(h>0)follow.style.height=h+'px';
+}
+function initYrContentHeightSync(){
+  const ref=document.querySelector('.yr-cgrid-refcard');
+  if(!ref)return;
+  if(_yrContentHeightRO)_yrContentHeightRO.disconnect();
+  _yrContentHeightRO=new ResizeObserver(()=>syncYrContentHeight());
+  _yrContentHeightRO.observe(ref);
+  const side=document.getElementById('side');
+  if(side){
+    side.addEventListener('transitionend',(e)=>{
+      if(e.propertyName==='width')syncYrContentHeight();
+    });
+  }
+  syncYrContentHeight();
+}
+window.addEventListener('resize',()=>{if(_yrContentHeightRO)syncYrContentHeight();});
+
 function initSidebarCollapse(){
   let collapsed=false;
   try{collapsed=localStorage.getItem(SIDEBAR_COLLAPSE_KEY)==='1';}catch(e){}
@@ -4044,6 +4079,9 @@ function switchYrView(chipEl,view){
   chipEl.classList.add('on');
   document.getElementById('view-'+view).classList.add('on');
   window.scrollTo({top:0,behavior:'smooth'});
+  // 콘텐츠뷰는 숨겨진 상태(display:none)에서는 아카이브 실측 높이가 0으로 잡히므로,
+  // 뷰가 실제로 보이게 된 직후 한 번 더 동기화(2026-08, 서브탭 전환 시 월그리드 높이가 안 맞던 문제 수정).
+  if(view==='content')requestAnimationFrame(()=>syncYrContentHeight());
 }
 
 // ── 데이터 로드 (기존 loadMonthlyReportPage와 동일하게 Promise.all 병렬 조회) ──
@@ -4514,12 +4552,12 @@ function _yrCgridDetailHtml(c){
   return `<div class="cgrid-detail">${topRow}${finalHtml}</div>`;
 }
 
-// 4개씩 행 단위 렌더(2026-08: 3→4로 변경, 배너 폭 안에서 한 줄에 4개씩 보이도록) — 월간탭 _cgridRowsHtml과 동일 패턴(펼침 영역을 해당 행 바로 뒤에 4칸 전체폭으로 삽입)
-// 5개씩 행 단위 렌더(2026-08: 4→5로 변경, 연말결산 성격상 한눈에 더 많이 훑어보도록) — 월간탭 _cgridRowsHtml과 동일 패턴(펼침 영역을 해당 행 바로 뒤에 5칸 전체폭으로 삽입)
+// 4개씩 행 단위 렌더(2026-08: 3→4→5→4, 최종적으로 4로 축소 — 옆에 월별 그리드 배너를 위한 공간 확보) —
+// 월간탭 _cgridRowsHtml과 동일 패턴(펼침 영역을 해당 행 바로 뒤에 4칸 전체폭으로 삽입)
 function _yrCgridRowsHtml(list){
   let html='';
-  for(let i=0;i<list.length;i+=5){
-    const row=list.slice(i,i+5);
+  for(let i=0;i<list.length;i+=4){
+    const row=list.slice(i,i+4);
     html+=row.map(c=>_yrCgridItemHtml(c)).join('');
     const activeInRow=row.find(c=>c.id===_yrCgridActiveId);
     html+=`<div class="cgrid-detail-row-wrap${activeInRow?' on':''}" id="yr-cgrid-detail-wrap-${i}">${activeInRow?_yrCgridDetailHtml(activeInRow):''}</div>`;
@@ -4571,14 +4609,17 @@ function renderYrContentGallery(ctx){
     return (bDate||'').localeCompare(aDate||'');
   });
 
-  if(!completed.length){el.innerHTML='';return;}
+  if(!completed.length){
+    el.innerHTML=`<div class="bento-item bento-half yr-cgrid-refcard"><div class="bento-lbl">올해의 감상 아카이브</div><div class="empty-msg">아직 완결한 콘텐츠가 없어요</div></div>`;
+    return;
+  }
 
   _yrCgridList=completed;
   _yrCgridActiveId=null;
   _yrCgridCatFilter='all';
 
   el.innerHTML=`
-    <div class="bento-item bento-full">
+    <div class="bento-item bento-half yr-cgrid-refcard">
       <div class="bento-lbl-row">
         <div class="bento-lbl">올해의 감상 아카이브</div>
         <div class="yr-cgrid-count-tag"><span id="yr-cgrid-count">${completed.length}</span>개</div>
@@ -4586,12 +4627,150 @@ function renderYrContentGallery(ctx){
       <div class="bento-sub" style="margin-top:0;margin-bottom:10px;">완결한 콘텐츠를 최근 순으로 모아봤어요. 눌러보면 평점과 총평을 볼 수 있어요.</div>
       <div class="wcal-filter-chips" id="yr-cgrid-filter-chips"></div>
       <div class="yr-cgrid-scroll">
-        <div class="cgrid-grid yr-cgrid-grid-5col" id="yr-cgrid-grid-inner">${_yrCgridRowsHtml(_yrCgridList)}</div>
+        <div class="cgrid-grid yr-cgrid-grid-4col" id="yr-cgrid-grid-inner">${_yrCgridRowsHtml(_yrCgridList)}</div>
       </div>
     </div>`;
   renderYrCgridFilterChips();
 }
 
+// ══════════════════════════════════════════════════════════
+// 콘텐츠탭 — 월별 감상 그리드 (연력 스타일 3x4 타일, 아카이브 배너 옆 1:1 분할)
+// 각 달 타일: 그 달 완결/등록 콘텐츠 총 개수를 중앙에 크게 표시, 배경은 월별 고정 파스텔색(12색, 앱 내
+// 기존 팔레트 재사용 — 리듬 8색 우선 + 팔레트에서 4색 보충)으로 다채롭게. 클릭하면 아카이브 배너와 동일한
+// 패턴으로, 클릭한 달이 속한 행 바로 아래에 그 달의 목록(포스터+제목)이 펼쳐짐(2026-08).
+// 높이는 아카이브(.yr-cgrid-refcard)를 기준 카드로 삼아 initCgridHeightSync가 실시간 동기화 — 별도 로직 없음.
+// ══════════════════════════════════════════════════════════
+
+// 월별 고정 파스텔 12색 — 리듬 8색(RHYTHM_CATS 순서, 앱에서 가장 많이 쓰이는 팔레트)을 우선 사용하고,
+// 리듬 8색과 톤이 겹치지 않는 --pal-* 4색(warmgray/lavender/rose/pink)으로 나머지를 보충해 12개월에 1:1 고정 배정.
+// 콘텐츠 카테고리(3~4종)로는 색이 다양해지지 않아서 "그 달"에 색을 고정 배정하는 방식을 택함(2026-08).
+const YR_MGRID_MONTH_COLORS=[
+  'var(--rh-exercise)','var(--rh-rest)','var(--rh-groom)','var(--rh-work)',
+  'var(--rh-appointment)','var(--rh-note)','var(--rh-enjoy)','var(--rh-home)',
+  'rgba(var(--pal-warmgray-rgb),0.75)','rgba(var(--pal-lavender-rgb),0.75)',
+  'rgba(var(--pal-rose-rgb),0.75)','rgba(var(--pal-pink-rgb),0.75)'
+];
+const YR_MGRID_COLS=4; // 한 줄 4개(1~4/5~8/9~12) — 펼침 삽입 위치 계산에도 사용
+
+// 월 타일 하나 — 배경은 월별 고정 파스텔색, 총 개수는 타일 정중앙에 크게.
+function _yrMonthGridTileHtml(m,monthItems,isFuture){
+  const color=YR_MGRID_MONTH_COLORS[m];
+  if(isFuture)return `<div class="yr-mgrid-tile future"><div class="yr-mgrid-month">${m+1}월</div></div>`;
+  if(!monthItems.length)return `<div class="yr-mgrid-tile empty"><div class="yr-mgrid-month">${m+1}월</div><div class="yr-mgrid-count-empty">-</div></div>`;
+  const active=_yrMonthGridActiveM===m;
+  return `<div class="yr-mgrid-tile${active?' active':''}" style="background:${color};" onclick="toggleYrMonthGrid(${m})">
+    <div class="yr-mgrid-month">${m+1}월</div>
+    <div class="yr-mgrid-count">${monthItems.length}</div>
+  </div>`;
+}
+
+// 그 달 목록 아이템 — 그리드형이 아닌 목록형(작은 정사각 포스터+제목 한 줄), 클릭 시 그 항목 바로 아래 상세(별점/총평) 펼침(2026-08).
+let _yrMonthGridItemActiveId=null;
+function _yrMgridItemHtml(c){
+  const meta=CAT_ICON_META[c.content_cat]||{icon:'ti-stack-2',bg:'rgba(150,150,150,1)'};
+  const thumb=c.poster
+    ?`<img class="yr-mgrid-list-thumb" src="${c.poster}" />`
+    :`<div class="yr-mgrid-list-thumb yr-mgrid-list-thumb-fallback" style="background:${meta.bg};"><i class="ti ${meta.icon}" aria-hidden="true"></i></div>`;
+  const icons=[];
+  if(c.stars>0)icons.push('<i class="ti ti-star" aria-hidden="true"></i>');
+  if(c.review)icons.push('<i class="ti ti-message-circle" aria-hidden="true"></i>');
+  const active=c.id===_yrMonthGridItemActiveId;
+  return `<div class="yr-mgrid-list-item">
+    <div class="yr-mgrid-list-row${active?' active':''}" onclick="_yrMgridToggleItem('${c.id}')">
+      ${thumb}
+      <div class="yr-mgrid-list-title">${escapeHtml(c.title||'')}</div>
+      <div class="yr-mgrid-list-icons">${icons.join('')}</div>
+    </div>
+    <div class="yr-mgrid-list-detail-wrap${active?' on':''}">${active?_yrCgridDetailHtml(c):''}</div>
+  </div>`;
+}
+function _yrMgridToggleItem(id){
+  _yrMonthGridItemActiveId=(_yrMonthGridItemActiveId===id)?null:id;
+  _yrMgridRenderExpandedRow();
+}
+// 클릭한 달이 속한 행(row) 바로 아래에 그 달의 목록을 렌더 — 아카이브의 _yrCgridRowsHtml과 동일 패턴(탭 전환 아님).
+function _yrMgridRenderExpandedRow(){
+  const rowIdx=_yrMonthGridActiveM==null?null:Math.floor(_yrMonthGridActiveM/YR_MGRID_COLS)*YR_MGRID_COLS;
+  const wrapEl=rowIdx==null?null:document.getElementById('yr-mgrid-row-wrap-'+rowIdx);
+  if(!wrapEl)return;
+  if(_yrMonthGridActiveM==null||!_yrMonthGridData[_yrMonthGridActiveM]){wrapEl.innerHTML='';wrapEl.classList.remove('on');return;}
+  const {items}=_yrMonthGridData[_yrMonthGridActiveM];
+  wrapEl.classList.add('on');
+  wrapEl.innerHTML=`
+    <div class="yr-mgrid-detail-title">${_yrMonthGridActiveM+1}월 감상 목록</div>
+    <div class="yr-mgrid-list">${items.map(c=>_yrMgridItemHtml(c)).join('')}</div>`;
+}
+// 월 타일 클릭 — 아카이브와 동일하게 그리드 자체는 그대로 두고, 클릭한 달이 속한 행 바로 아래에 목록을 펼침(탭 전환 아님).
+// 배너 높이는 initCgridHeightSync가 아카이브(.yr-cgrid-refcard) 실측 높이를 그대로 따라가므로 여기선 건드리지 않음.
+function toggleYrMonthGrid(m){
+  const prevActive=_yrMonthGridActiveM;
+  _yrMonthGridActiveM=(_yrMonthGridActiveM===m)?null:m;
+  _yrMonthGridItemActiveId=null;
+  const gridEl=document.getElementById('yr-mgrid-grid');
+  if(gridEl)gridEl.innerHTML=_yrMgridGridHtml();
+  _yrMgridRenderExpandedRow();
+}
+function _yrMgridGridHtml(){
+  let html='';
+  for(let m=0;m<12;m+=YR_MGRID_COLS){
+    const rowMonths=Array.from({length:YR_MGRID_COLS},(_,k)=>m+k).filter(mm=>mm<12);
+    html+=rowMonths.map(mm=>_yrMonthGridTileHtml(mm,_yrMonthGridData[mm]?_yrMonthGridData[mm].items:[],!_yrMonthGridData[mm])).join('');
+    const activeInRow=rowMonths.includes(_yrMonthGridActiveM);
+    html+=`<div class="yr-mgrid-row-wrap${activeInRow?' on':''}" id="yr-mgrid-row-wrap-${m}"></div>`;
+  }
+  return html;
+}
+
+// 카테고리별 총감상량 텍스트 — 월그리드 하단 남는 공간에 배치. 드라마/영화/책은 시간(분→시간 표기),
+// 음악은 시간 데이터가 없어 곡 수로 표기(기존 콘텐츠 비교 전반의 방침과 동일).
+const YR_MGRID_SUMMARY_CATS=[
+  {key:'drama',label:'드라마',icon:'ti-device-tv',color:'rgba(var(--pal-pink-rgb),1)'},
+  {key:'movie',label:'영화',icon:'ti-movie',color:'rgba(var(--pal-sky-rgb),1)'},
+  {key:'book',label:'독서',icon:'ti-book',color:'rgba(var(--pal-yellow-rgb),1)'},
+  {key:'music',label:'음악',icon:'ti-music',color:'rgba(var(--pal-lime-rgb),1)'}
+];
+function _yrMgridCatSummaryHtml(ctx){
+  const startDk=`${ctx.y}-01-01`,endDk=`${ctx.y}-12-31`;
+  const inRange=_mrpContentsInRange(ctx.contents,startDk,endDk);
+  const t=_calcWatchTimeByCat(ctx.rblocks||[],inRange);
+  const musicCount=inRange.filter(c=>c.content_cat==='music').length;
+  const rowsHtml=YR_MGRID_SUMMARY_CATS.map(({key,label,icon,color})=>{
+    const valText=key==='music'?`${musicCount}곡`:(t[key]>0?_fmtDur(t[key]):'0분');
+    return `<div class="yr-mgrid-catsum-row">
+      <span class="yr-mgrid-catsum-label"><i class="ti ${icon}" style="color:${color};" aria-hidden="true"></i>${label}</span>
+      <span class="yr-mgrid-catsum-val">${valText}</span>
+    </div>`;
+  }).join('');
+  return `<div class="yr-mgrid-catsum"><div class="yr-mgrid-catsum-title">카테고리별 총 감상량</div>${rowsHtml}</div>`;
+}
+
+function renderYrContentMonthGrid(ctx){
+  const el=document.getElementById('yr-content-monthgrid');
+  if(!el)return;
+  const monthlyByM=Array.from({length:12},()=>[]);
+  (ctx.contents||[]).forEach(c=>{
+    let mk=null;
+    if(c.content_cat==='music'){if(c.start_date)mk=c.start_date.slice(0,7);}
+    else if((c.status==='done'||c.status==='stopped')&&c.end_date)mk=c.end_date.slice(0,7);
+    if(!mk||!mk.startsWith(String(ctx.y)))return;
+    const m=parseInt(mk.slice(5,7),10)-1;
+    monthlyByM[m].push(c);
+  });
+  _yrMonthGridData=monthlyByM.map((items,m)=>m>=ctx.elapsedMonths?null:{items});
+  _yrMonthGridActiveM=null;
+  _yrMonthGridItemActiveId=null;
+
+  el.innerHTML=`
+    <div class="bento-item bento-half yr-mgrid-card">
+      <div class="bento-lbl">월별 감상 그리드</div>
+      <div class="bento-sub" style="margin-top:0;margin-bottom:10px;">달마다 얼마나 감상했는지 한눈에 볼 수 있어요. 눌러보면 그 달 목록이 나와요.</div>
+      <div class="yr-mgrid-scroll">
+        <div class="yr-mgrid-grid" id="yr-mgrid-grid">${_yrMgridGridHtml()}</div>
+        ${_yrMgridCatSummaryHtml(ctx)}
+      </div>
+    </div>`;
+  initYrContentHeightSync();
+}
 
 // rhythm_blocks에서 드라마/독서/영화 감상시간(분)을 월별로 집계 — renderTodayReading(오늘탭)과 동일 기준:
 // cat==='enjoy'이고 텍스트가 "드라마 - "/"독서 - "/"영화 - "로 시작하는 블록만 대상, start~end 차이를 합산.
@@ -4703,6 +4882,7 @@ function renderYrContentTab(ctx){
   if(introSubEl)introSubEl.textContent=`누적 ${totalCount}개의 콘텐츠, 그 흐름을 분석합니다.`;
 
   renderYrContentGallery(ctx);
+  renderYrContentMonthGrid(ctx);
   renderYrContentTimeCompare(ctx);
   renderYrContentCumul(ctx,inRange);
 }
