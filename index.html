@@ -2060,7 +2060,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div style="font-size:var(--dow-label-size);color:var(--tm);margin-bottom:10px;" id="cpg-sub"></div>
     <input class="modal-inp" id="cpg-inp" type="number" inputmode="numeric" placeholder="0">
     <textarea id="cpg-note-inp" class="rhythm-memo-inp" style="margin-top:8px;min-height:44px;" placeholder="오늘 본 것에서 인상적이었던 순간을 가볍게 남겨보세요 (선택)"></textarea>
-    <div class="modal-actions">
+    <div id="cpg-done-confirm" style="display:none;"></div>
+    <div class="modal-actions" id="cpg-modal-actions">
       <button class="mbtn cancel" onclick="closeModal('content-progress-modal')">취소</button>
       <button class="mbtn ok" onclick="confirmContentProgress()">저장</button>
     </div>
@@ -9679,6 +9680,15 @@ function openContentProgressModal(cid,watchedNow){
   inp.max=c.totalUnit||'';
   const noteInp=document.getElementById('cpg-note-inp');
   if(noteInp)noteInp.value='';
+  // 완료확인 UI가 이전 열람에서 떠 있던 상태로 남지 않도록 저장버튼 초기 상태로 리셋
+  const confirmEl=document.getElementById('cpg-done-confirm');
+  const actionsEl=document.getElementById('cpg-modal-actions');
+  if(confirmEl){confirmEl.style.display='none';confirmEl.innerHTML='';}
+  if(actionsEl){
+    actionsEl.innerHTML=`<button class="mbtn cancel" onclick="closeModal('content-progress-modal')">취소</button>
+      <button class="mbtn ok" onclick="confirmContentProgress()">저장</button>`;
+  }
+  _cpgDoneConfirmCid=null;_cpgDoneConfirmMk=null;
   openModal('content-progress-modal');
   setTimeout(()=>{inp.focus();inp.select();},100);
 }
@@ -9698,6 +9708,7 @@ function pushContentNote(cid,title,cat,text){
   saveContents(found.mk,found.list);
 }
 // 진행률 저장 + (입력했다면) 감상 메모까지 한 번에
+let _cpgDoneConfirmCid=null,_cpgDoneConfirmMk=null;
 function confirmContentProgress(){
   if(!_cpgCid)return;
   const found=_findContentByCidNearMk(_cpgCid,_chArchiveMk||monthKey(new Date()));
@@ -9708,8 +9719,65 @@ function confirmContentProgress(){
   c.currentUnit=Math.max(0,Math.min(val,c.totalUnit||val));
   saveContents(found.mk,found.list);
   pushContentNote(_cpgCid,c.title,c.cat,document.getElementById('cpg-note-inp')?.value);
+  // 진행률이 사실상 다 본 지점에 도달하면(currentUnit이 totalUnit 이상) 완료로 넘어갈지
+  // 모달 안에서 바로 물어봄 — 독서코너의 완독 확인 흐름과 동일. totalUnit 미입력 시엔 판정 불가하므로 노출 안 함.
+  const reachedDone=c.totalUnit&&c.currentUnit>=c.totalUnit;
+  if(reachedDone&&c.status==='watching'){
+    _cpgDoneConfirmCid=c.cid;
+    _cpgDoneConfirmMk=found.mk;
+    const confirmEl=document.getElementById('cpg-done-confirm');
+    const actionsEl=document.getElementById('cpg-modal-actions');
+    if(confirmEl&&actionsEl){
+      const doneLabel=c.cat==='drama'?'다 보셨나요?':'다 보셨나요?';
+      confirmEl.style.display='block';
+      confirmEl.innerHTML=`<div class="pg-done-msg">${doneLabel}</div>
+        <div style="display:flex;gap:8px;align-items:center;margin:10px 0 8px;">
+          <span style="font-size:var(--dow-label-size);color:var(--tm);white-space:nowrap;">별점</span>
+          <div id="cpg-done-star-picker" class="cm-star-picker"></div>
+          <input type="hidden" id="cpg-done-stars" value="0">
+        </div>
+        <textarea class="modal-inp" id="cpg-done-review" rows="2" style="resize:none;" placeholder="감상 메모 (선택)" autocomplete="off"></textarea>`;
+      renderCpgDoneStarPicker(0);
+      actionsEl.innerHTML=`<button class="mbtn cancel" onclick="closeModal('content-progress-modal')">나중에</button>
+        <div class="mbtn-done-wrap" onclick="confirmContentProgressDone()"><button class="mbtn-done"><i class="ti ti-sparkles ico-sz-14" aria-hidden="true"></i> 완료</button></div>`;
+    }
+    return;
+  }
   closeModal('content-progress-modal');
   _cpgCid=null;
+  chExpandMonth(_chArchiveMk||found.mk);
+}
+function renderCpgDoneStarPicker(val){
+  const el=document.getElementById('cpg-done-star-picker');if(!el)return;
+  el.innerHTML=[1,2,3,4,5].map(n=>`<svg class="cm-star${n<=val?' on':''}" data-val="${n}" onclick="setCpgDoneStars(${n})" width="19" height="19" viewBox="0 0 18 18" fill="${n<=val?'currentColor':'none'}" stroke="currentColor" stroke-width="1"><polygon points="9,1.3 11.3,6.3 16.8,7 12.7,10.6 13.8,16.1 9,13.3 4.2,16.1 5.3,10.6 1.2,7 6.7,6.3"/></svg>`).join('');
+}
+function setCpgDoneStars(n){
+  const inp=document.getElementById('cpg-done-stars');
+  const cur=parseInt(inp.value)||0;
+  const next=cur===n?0:n;
+  inp.value=next;
+  renderCpgDoneStarPicker(next);
+}
+// 완료 확정 — 콘텐츠 상태를 done으로 전환하고 별점/감상을 반영. 저장되면 월간 콘텐츠 타임라인/허브에도
+// status==='done' 분기를 통해 그대로 반영됨(독서코너 완독이 서재 목록에 반영되는 것과 동일 구조).
+function confirmContentProgressDone(){
+  const cid=_cpgDoneConfirmCid,mk=_cpgDoneConfirmMk;
+  _cpgDoneConfirmCid=null;_cpgDoneConfirmMk=null;
+  if(!cid||!mk){closeModal('content-progress-modal');_cpgCid=null;return;}
+  const found=_findContentByCidNearMk(cid,mk);
+  closeModal('content-progress-modal');
+  _cpgCid=null;
+  if(!found)return;
+  const c=found.list[found.idx];
+  const starsEl=document.getElementById('cpg-done-stars');
+  const reviewEl=document.getElementById('cpg-done-review');
+  const stars=starsEl?(parseInt(starsEl.value)||0):0;
+  const review=reviewEl?reviewEl.value.trim():'';
+  c.status='done';
+  c.endDate=dateKey(getLogicalDate());
+  if(stars)c.stars=stars;
+  if(review)c.review=review;
+  saveContents(found.mk,found.list);
   chExpandMonth(_chArchiveMk||found.mk);
 }
 // ── 시청 등록 (드라마/영화 전용) ──
