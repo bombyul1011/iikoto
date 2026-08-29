@@ -3317,15 +3317,6 @@ function computeContentMonthlyByCat(y,mo){
 }
 const CONTENT_CAT_LABEL={drama:'드라마',book:'책',movie:'영화',music:'음악'};
 // 카테고리별 콘텐츠 카드 마크업 — 콘텐츠 허브의 월별 아카이브가 씀(리스트형/그리드형 공통 톤)
-// 특정 cid로 남긴 감상 중 메모를 최근 여러 달에 걸쳐 모아옴(정주행처럼 몇 달째 이어지는 경우 대비)
-function getWcalNotesByCid(cid){
-  const now=new Date();
-  const months=[];
-  for(let i=0;i<_chNoteTimelineMonths;i++)months.push(monthKey(new Date(now.getFullYear(),now.getMonth()-i,1)));
-  let all=[];
-  months.forEach(mk=>all=all.concat(getWcalNotes(mk)));
-  return all.filter(n=>n.cid===cid).sort((a,b)=>(b.dk||'').localeCompare(a.dk||''));
-}
 // 시작~종료 기간 라벨 — 태블릿 아카이브 앱과 동일 규칙(2026-08-25 참고 반영)
 // 시작/종료가 다르면 범위로, 같으면(음악처럼 하루짜리) 단일 날짜만
 function _cmrPeriodLabel(c){
@@ -3365,20 +3356,19 @@ function _cmrDetailBodyHtml(c,wcalNotes,flat,showHead){
       <div class="cmr-progress-label">${cur}/${c.totalUnit}${unitLabel}</div>
     </div>`;
   }else if(showHead&&c.cat==='book'&&c.status==='watching'){
-    // 책은 contents 테이블에 진행률이 없으므로 linkedContent로 연결된 reading_books 항목을 찾아 표시. status==='reading'인 책만(완독/중단 제외).
-    const book=getBooks().find(b=>b.linkedContent&&b.contentMk===c.mk&&(b.contentTitle||b.title)===c.title&&b.status==='reading');
-    if(book&&book.unit==='percent'){
-      const pct=Math.min(100,Math.round(book.percent||0));
+    // 통합 이후(2026-08-29) 책 진행률도 contents 항목 자체(totalUnit/currentUnit/unitLabel)에 있음 — drama/movie와 동일 패턴.
+    if(c.unitLabel==='percent'&&c.currentUnit!=null){
+      const pct=Math.min(100,Math.round(c.currentUnit||0));
       progressHtml=`<div class="cmr-progress-bar">
         <div class="cmr-progress-track"><div class="cmr-progress-fill" style="width:${pct}%;"></div></div>
         <div class="cmr-progress-label">${pct}%</div>
       </div>`;
-    }else if(book&&book.totalPages){
-      const cur=Math.min(book.pages||0,book.totalPages);
-      const pct=Math.round((cur/book.totalPages)*100);
+    }else if(c.unitLabel==='pages'&&c.totalUnit){
+      const cur=Math.min(c.currentUnit||0,c.totalUnit);
+      const pct=Math.round((cur/c.totalUnit)*100);
       progressHtml=`<div class="cmr-progress-bar">
         <div class="cmr-progress-track"><div class="cmr-progress-fill" style="width:${pct}%;"></div></div>
-        <div class="cmr-progress-label">${cur}/${book.totalPages}페이지</div>
+        <div class="cmr-progress-label">${cur}/${c.totalUnit}페이지</div>
       </div>`;
     }
   }
@@ -3407,7 +3397,7 @@ function renderContentByCatHtml(byCat){
       const statusHtml=c.status==='stopped'?`<span style="color:var(--tm);font-size:var(--dow-label-size);">중단</span>`:(c.status==='watching'?`<span style="color:var(--tm);font-size:var(--dow-label-size);">진행중</span>`:'');
       const posterHtml=c.poster?`<img src="${c.poster}" style="width:36px;height:36px;border-radius:8px;object-fit:cover;flex-shrink:0;" />`:`<div style="width:36px;height:36px;border-radius:8px;background:${meta.color};flex-shrink:0;display:flex;align-items:center;justify-content:center;"><i class="ti ${meta.icon}" style="font-size:15px;color:#fff;" aria-hidden="true"></i></div>`;
       const reviewId=c.cid||('t'+(c.created||0));
-      const wcalNotes=c.cid?getWcalNotesByCid(c.cid):[];
+      const wcalNotes=(c.notes||[]).slice().sort((a,b)=>(b.dk||'').localeCompare(a.dk||''));
       const hasReviewContent=!!(c.review||wcalNotes.length);
       const reviewIconHtml=hasReviewContent?`<span class="cmr-review-icon" onclick="toggleCmrReview('${reviewId}')" title="코멘트 보기"><i class="ti ti-message-circle ico-sz-13" aria-hidden="true"></i></span>`:'';
       const reviewBoxHtml=hasReviewContent?`<div class="cmr-review-box" id="cmr-review-${reviewId}">${_cmrDetailBodyHtml(c,wcalNotes)}</div>`:'';
@@ -3460,8 +3450,7 @@ function _cgridItemHtml(c,cat){
   const statusDot=cat!=='music'&&c.status==='watching'?'<span class="cgrid-status-dot">진행중</span>':'';
   const icons=[];
   if(c.stars>0)icons.push('<i class="ti ti-star" aria-hidden="true"></i>');
-  const wcalNotes=c.cid?getWcalNotesByCid(c.cid):[];
-  if(c.review||wcalNotes.length)icons.push('<i class="ti ti-message-circle" aria-hidden="true"></i>');
+  if(c.review||(c.notes&&c.notes.length))icons.push('<i class="ti ti-message-circle" aria-hidden="true"></i>');
   const thumbIcons=icons.length?`<div class="cgrid-thumb-icons">${icons.join('')}</div>`:'';
   const active=id===_gridActiveCid;
   return `<div class="cgrid-item${active?' active':''}" onclick="toggleCgridDetail('${id}')">
@@ -3470,7 +3459,7 @@ function _cgridItemHtml(c,cat){
   </div>`;
 }
 function _cgridDetailHtml(c){
-  const wcalNotes=c.cid?getWcalNotesByCid(c.cid):[];
+  const wcalNotes=(c.notes||[]).slice().sort((a,b)=>(b.dk||'').localeCompare(a.dk||''));
   return `<div class="cgrid-detail">${_cmrDetailBodyHtml(c,wcalNotes,true,true)}</div>`;
 }
 // 그리드 항목 탭 — 활성 id만 바꾸고, 화면에 있는 모든 카테고리 그리드를 캐시 기준으로 다시 그림
@@ -4919,7 +4908,56 @@ function patchMealField(dk,key,field,value){
   autoSync('meals_field',dk);
   if(dk===dateKey(currentDate))renderTodayMeal();
 }
-function getBooks(){return S.get('reading_books')||[];}
+// ── 독서(reading_books) → contents 통합 어댑터 (2026-08-29) ──
+// book은 이제 별도 테이블이 아니라 contents의 cat='book' 항목. 기존 37곳 호출부가 기대하는
+// book shape({cid,title,status:'reading'|'done'|'paused',pages,totalPages,seconds,unit,percent,
+// todayDate,todayStart,poster,author,created,completedAt,linkedContent,contentMk,contentTitle})는
+// 최대한 그대로 유지해 호출부 변경을 최소화한다.
+// status 매핑: contents.status('watching'|'done'|'stopped') ↔ book.status('reading'|'done'|'paused')
+const _BOOK_STATUS_TO_CONTENT={reading:'watching',done:'done',paused:'stopped'};
+const _CONTENT_STATUS_TO_BOOK={watching:'reading',done:'done',stopped:'paused'};
+// todayStart/todayDate(오늘 읽은 양 계산용)는 drama/movie 시청 스톱워치의 시작시각 관리와 동일하게
+// 서버에 남기지 않는 세션성 로컬 값 — 메모리 캐시로만 관리(자정 지나면 자연히 today_date 불일치로 무효화됨).
+let _bookTodayMap={}; // {cid: {todayDate, todayStart}}
+const _BOOK_SCAN_MONTHS=24; // 서재(완독 목록)가 계속 누적되므로 넉넉히 2년치 스캔
+function _bookContentToShape(c,mk){
+  const todaySnap=_bookTodayMap[c.cid];
+  const useToday=todaySnap&&todaySnap.todayDate===dateKey(getLogicalDate());
+  return {
+    cid:c.cid,title:c.title,
+    status:_CONTENT_STATUS_TO_BOOK[c.status]||'reading',
+    unit:c.unitLabel||'pages',
+    pages:c.unitLabel==='pages'?(c.currentUnit||0):0,
+    totalPages:c.unitLabel==='pages'?(c.totalUnit||null):null,
+    percent:c.unitLabel==='percent'?(c.currentUnit||0):0,
+    seconds:c.readSeconds||0,
+    todayDate:useToday?todaySnap.todayDate:null,
+    todayStart:useToday?todaySnap.todayStart:0,
+    poster:c.poster||null,author:c.author||'',
+    created:c.created,completedAt:c.status==='done'?(c.endDate||null):null,
+    linkedContent:true,contentMk:mk,contentTitle:c.title
+  };
+}
+// 최근 _BOOK_SCAN_MONTHS개월의 book 카테고리 항목을 모아 book shape 배열로 리턴.
+// renderReadingHub 등 한 렌더 사이클에서 여러 하위 함수가 반복 호출하므로 짧게 메모이제이션
+// (saveContents/upsertBookLocal 등 contents가 바뀌는 모든 지점에서 _booksCache=null로 무효화됨).
+let _booksCache=null;
+function getBooks(){
+  if(_booksCache)return _booksCache;
+  const now=new Date();
+  const result=[];
+  const seen=new Set();
+  for(let i=0;i<_BOOK_SCAN_MONTHS;i++){
+    const mk=monthKey(new Date(now.getFullYear(),now.getMonth()-i,1));
+    getContents(mk).forEach(c=>{
+      if(c.cat!=='book'||!c.cid||seen.has(c.cid))return;
+      seen.add(c.cid);
+      result.push(_bookContentToShape(c,mk));
+    });
+  }
+  _booksCache=result;
+  return result;
+}
 function getQuotes(){return S.get('reading_quotes')||[];}
 function saveQuotesLocal(arr){S.set('reading_quotes',arr);}
 function upsertQuoteLocal(q){
@@ -4961,55 +4999,52 @@ async function syncQuotesDownAll(){
   saveQuotesLocal(merged);
   renderRdQuotes();
 }
-function saveBooksLocal(arr){S.set('reading_books',arr);}
+// book shape를 다시 contents 필드로 되돌려 저장. cid로 항목을 찾아 반영하고, 없으면(완전 신규 책) 새 contents 항목 생성.
 function upsertBookLocal(book){
-  const arr=getBooks();
-  const i=arr.findIndex(b=>b.cid===book.cid);
-  if(i>=0)arr[i]=book;else arr.push(book);
-  saveBooksLocal(arr);
-  S.set('reading_pending_'+book.cid,true);
-  autoSync('reading_book',book.cid);
+  if(book.todayDate)_bookTodayMap[book.cid]={todayDate:book.todayDate,todayStart:book.todayStart||0};
+  const now=new Date();
+  const found=_findContentByCidNearMkInRange(book.cid,_BOOK_SCAN_MONTHS);
+  const targetMk=book.contentMk||(found?found.mk:monthKey(now));
+  const list=getContents(targetMk);
+  let item=found?found.list[found.idx]:list.find(c=>c.cid===book.cid);
+  if(!item){
+    item={cid:book.cid,cat:'book',title:book.contentTitle||book.title,status:_BOOK_STATUS_TO_CONTENT[book.status]||'watching',
+      startDate:dateKey(now),poster:book.poster||null,author:book.author||'',review:'',stars:0,notes:[],created:book.created||Date.now()};
+    list.push(item);
+  }
+  const newStatus=_BOOK_STATUS_TO_CONTENT[book.status]||item.status;
+  if(newStatus==='watching')item.endDate=null;
+  else if(item.status!=='watching'||item.endDate==null)item.endDate=item.endDate||dateKey(now); // watching→done/stopped 전환 시에만 종료일 채움, 이미 종료된 건 유지
+  item.status=newStatus;
+  item.unitLabel=book.unit||'pages';
+  item.currentUnit=book.unit==='pages'?(book.pages||0):(book.percent||0);
+  item.totalUnit=book.unit==='pages'?(book.totalPages||null):100;
+  item.readSeconds=book.seconds||0;
+  if(book.poster)item.poster=book.poster;
+  if(book.author)item.author=book.author;
+  if(book.stars)item.stars=book.stars;
+  if(book.review)item.review=book.review;
+  if(book.status==='done'&&!item.endDate)item.endDate=book.completedAt||dateKey(now);
+  saveContents(found?found.mk:targetMk,found?found.list:list);
+}
+// _findContentByCidNearMk는 최근 2개월만 보므로, 서재 전체(완독 포함 넉넉한 범위)를 찾을 때 쓰는 확장판.
+function _findContentByCidNearMkInRange(cid,monthsBack){
+  const now=new Date();
+  for(let i=0;i<monthsBack;i++){
+    const mk=monthKey(new Date(now.getFullYear(),now.getMonth()-i,1));
+    const list=getContents(mk);
+    const idx=list.findIndex(c=>c.cid===cid);
+    if(idx>=0)return{mk,list,idx};
+  }
+  return null;
 }
 function deleteBookLocal(cid){
-  saveBooksLocal(getBooks().filter(b=>b.cid!==cid));
-  supaFetch(`reading_books?cid=eq.${cid}`,'DELETE');
-}
-async function syncBookUp(cid){
-  const book=getBooks().find(b=>b.cid===cid);
-  if(!book)return;
-  await supaUpsert('reading_books','cid',[{
-    cid:book.cid,title:book.title,status:book.status,pages:book.pages||0,
-    total_pages:book.totalPages||null,seconds:book.seconds||0,unit:book.unit||'pages',percent:book.percent||0,
-    today_date:book.todayDate||null,today_start:book.todayStart||0,
-    poster:book.poster||null,author:book.author||'',
-    created:book.created,completed_at:book.completedAt||null,
-    linked_content:!!book.linkedContent,content_mk:book.contentMk||null,content_title:book.contentTitle||null
-  }]);
-  S.set('reading_pending_'+cid,false);
-}
-async function syncBooksDownAll(){
-  const rows=await supaFetch('reading_books?order=created');
-  if(!rows)return;
-  const local=getBooks();
-  const localByCid={};
-  local.forEach(b=>{localByCid[b.cid]=b;});
-  const merged=rows.map(r=>{
-    if(S.get('reading_pending_'+r.cid)&&localByCid[r.cid])return localByCid[r.cid]; // 업로드 대기중이면 로컬 우선
-    return {
-      cid:r.cid,title:r.title,status:r.status,pages:r.pages||0,
-      totalPages:r.total_pages||null,seconds:r.seconds||0,unit:r.unit||'pages',percent:r.percent||0,
-      todayDate:r.today_date||null,todayStart:r.today_start||0,
-      poster:r.poster||null,author:r.author||'',
-      created:r.created,completedAt:r.completed_at||null,
-      linkedContent:!!r.linked_content,contentMk:r.content_mk||null,contentTitle:r.content_title||null
-    };
-  });
-  // 서버에 아직 없지만 로컬에 pending중인 신규 책도 보존
-  local.forEach(b=>{
-    if(S.get('reading_pending_'+b.cid)&&!merged.find(m=>m.cid===b.cid))merged.push(b);
-  });
-  saveBooksLocal(merged);
-  renderReadingHub();
+  const found=_findContentByCidNearMkInRange(cid,_BOOK_SCAN_MONTHS);
+  if(!found)return;
+  addDelPending('contents',found.mk,cid);
+  found.list.splice(found.idx,1);
+  saveContents(found.mk,found.list);
+  delete _bookTodayMap[cid];
 }
 function markReadingActivityToday(){
   const key='reading_dates';
@@ -5077,7 +5112,7 @@ function getContents(mk){
 async function fetchAllMusicContents(){
   const rows=await supaFetch(`contents?content_cat=eq.music&order=created`);
   if(!rows)return [];
-  return rows.map(r=>({cat:r.content_cat,title:r.title,startDate:r.start_date,endDate:r.end_date,status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',musicUrl:r.music_url||null,album:r.album||null,releaseYear:r.release_year||null,created:r.created,cid:r.client_id}));
+  return rows.map(r=>({cat:r.content_cat,title:r.title,startDate:r.start_date,endDate:r.end_date,status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',musicUrl:r.music_url||null,album:r.album||null,releaseYear:r.release_year||null,notes:r.notes||[],created:r.created,cid:r.client_id}));
 }
 // 리듬바 "감상" 입력 시 진행중 드라마/영화를 제목 선택용으로 제공.
 // 책은 독서 스톱워치가 종료 시점에 감상 리듬을 자동 기록하므로 여기서는 제외.
@@ -5127,12 +5162,13 @@ function saveContents(mk,v){
   const now=Date.now();
   v.forEach(it=>{
     const p=it.cid?prevByCid[it.cid]:null;
-    const isSame=p&&p.status===it.status&&p.startDate===it.startDate&&p.endDate===it.endDate&&p.review===it.review&&p.stars===it.stars&&p.title===it.title&&p.totalUnit===it.totalUnit&&p.currentUnit===it.currentUnit;
+    const isSame=p&&p.status===it.status&&p.startDate===it.startDate&&p.endDate===it.endDate&&p.review===it.review&&p.stars===it.stars&&p.title===it.title&&p.totalUnit===it.totalUnit&&p.currentUnit===it.currentUnit&&p.unitLabel===it.unitLabel&&p.readSeconds===it.readSeconds&&JSON.stringify(p.notes||[])===JSON.stringify(it.notes||[]);
     if(!isSame)it.updatedAt=now;
     else if(p&&p.updatedAt)it.updatedAt=p.updatedAt;
   });
   S.set(S.key('contents',mk),v);
   S.set(S.key('contents_pending',mk),true);
+  _booksCache=null; // getBooks() 메모이제이션 무효화 — contents가 바뀌면 book 목록도 바뀔 수 있으므로
   // contents 동기화(Up/Down)는 mk별로 직렬화 — runContentsSyncLocked 큐를 통해서만 실행
   runContentsSyncLocked(mk,()=>autoSync('contents',mk));
 }
@@ -5346,7 +5382,7 @@ async function syncContentsDownRaw(mk){
       const matched=localNoCidByKey[key];
       if(matched){l=matched;delete localNoCidByKey[key];}
     }
-    const serverItem={cat:r.content_cat,title:r.title,startDate:r.start_date||(r.start_day?mk+'-'+pad(r.start_day):null),endDate:r.end_date||(r.end_day?mk+'-'+pad(r.end_day):null),status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',musicUrl:r.music_url||null,album:r.album||null,releaseYear:r.release_year||null,totalUnit:r.total_unit||null,currentUnit:r.current_unit||null,created:r.created,cid,updatedAt:r.updated_at};
+    const serverItem={cat:r.content_cat,title:r.title,startDate:r.start_date||(r.start_day?mk+'-'+pad(r.start_day):null),endDate:r.end_date||(r.end_day?mk+'-'+pad(r.end_day):null),status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',musicUrl:r.music_url||null,album:r.album||null,releaseYear:r.release_year||null,totalUnit:r.total_unit||null,currentUnit:r.current_unit||null,notes:r.notes||[],unitLabel:r.unit_label||null,readSeconds:r.read_seconds||0,created:r.created,cid,updatedAt:r.updated_at};
     if(!l){merged.push(serverItem);return;}
     // 로컬/서버 둘 다 있으면 updated_at(서버) vs 로컬수정시각 비교, 서버가 더 최신이거나 로컬에 수정시각 기록이 없으면 서버값 채택
     const localTs=l.updatedAt?new Date(l.updatedAt).getTime():0;
@@ -5372,15 +5408,14 @@ async function syncContentsUp(mk){
   if(ensureItemCids(c))S.set(S.key('contents',mk),c);
   const delCids=getDelPendingCids('contents',mk);
   const ok=await syncListUpSafe('contents',`month_key=eq.${mk}`,'month_key,client_id',c,
-    it=>({month_key:mk,content_cat:it.cat,title:it.title,start_date:it.startDate,end_date:it.endDate,status:it.status,review:it.review||'',stars:it.stars||0,poster:it.poster||null,author:it.author||'',music_url:it.musicUrl||null,album:it.album||null,release_year:it.releaseYear||null,total_unit:it.totalUnit||null,current_unit:it.currentUnit||null,created:it.created,client_id:it.cid}),
+    it=>({month_key:mk,content_cat:it.cat,title:it.title,start_date:it.startDate,end_date:it.endDate,status:it.status,review:it.review||'',stars:it.stars||0,poster:it.poster||null,author:it.author||'',music_url:it.musicUrl||null,album:it.album||null,release_year:it.releaseYear||null,total_unit:it.totalUnit||null,current_unit:it.currentUnit||null,notes:it.notes||[],unit_label:it.unitLabel||null,read_seconds:it.readSeconds||0,created:it.created,client_id:it.cid}),
     delCids);
   if(ok)delCids.forEach(cid=>removeDelPending('contents',mk,cid));
   return ok;
 }
 async function autoSync(type,key){
   if(!navigator.onLine)return;
-  if(type==='reading_book'){await syncBookUp(key);}
-  else if(type==='reading_quote'){await syncQuoteUp(key);}
+  if(type==='reading_quote'){await syncQuoteUp(key);}
   else if(type==='todos'){if(await syncTodosUp(key))S.set(S.key('todos_pending',key),false);}
   else if(type==='memos'){if(await syncMemosUp(key))S.set(S.key('memos_pending',key),false);}
   else if(type==='sleep'){await syncSleepUp(key);S.set(S.key('sleep_pending',key),false);}
@@ -5436,7 +5471,9 @@ async function syncAll(){
     // 날짜 없는 전역 데이터 — 예전엔 initSync(최초 1회)에만 있어서 앱을 켜둔 채로 오래 쓰면
     // 다른 기기(모바일 등)에서 바꾼 보관함/독서 내역이 반영 안 되던 버그 수정
     (S.get(S.key('todos_pending',RESERVE_DK))?Promise.resolve():syncTodosDown(RESERVE_DK)),
-    syncBooksDownAll(),
+    // 책은 이제 contents(cat='book')로 통합되어 syncContentsDown(mk)가 이미 이번 달치를 받아오지만,
+    // 서재(완독 목록)는 여러 달에 걸쳐 쌓이므로 최근 몇 달치를 추가로 받아 최신 상태 반영.
+    ...Array.from({length:5},(_, i)=>i+1).map(i=>syncContentsDown(monthKey(new Date(now.getFullYear(),now.getMonth()-i,1)))),
     syncQuotesDownAll(),
     ...weekOnelines,
     ...weekRblockDks.map(rdk=>syncRhythmBlocksDown(rdk)),
@@ -9360,7 +9397,7 @@ function openContentModal(cat,item=null,mk=null,onSaved=null){
   if(bookUnitRow){
     bookUnitRow.style.display=isBook?'block':'none';
     if(isBook){
-      const linkedBook=getBooks().find(b=>b.title===(item?.title||''));
+      const linkedBook=item?.cid?getBooks().find(b=>b.cid===item.cid):null;
       const initialUnit=linkedBook?.unit||'percent';
       setCmUnit(initialUnit);
       document.getElementById('cm-total-pages').value=linkedBook?.totalPages||'';
@@ -9443,6 +9480,7 @@ function confirmContent(){
   _selectedPoster=null;_selectedAuthor=null;_selectedMusicUrl=null;_selectedTotalUnit=null;_selectedAlbum=null;_selectedReleaseYear=null;
   const newMk=startDate.slice(0,7); // 시작한 달 = 저장 버킷
   const oldMk=_contentCtx.mk;
+  let savedCid=null;
   if(_contentCtx.mode==='edit'&&_contentCtx.item){
     const oldContents=getContents(oldMk);
     // cid가 있으면 cid로, 없는 옛 데이터(cid 도입 이전)는 created로 폴백 매칭
@@ -9451,6 +9489,7 @@ function confirmContent(){
       :oldContents.findIndex(c=>c.created===_contentCtx.item.created);
     const updated=idx>=0?{...oldContents[idx],title,startDate,endDate,status,review,stars,poster,author,musicUrl,album,releaseYear,totalUnit,currentUnit}:null;
     if(idx>=0){
+      savedCid=oldContents[idx].cid;
       if(newMk===oldMk){
         oldContents[idx]=updated;
         saveContents(oldMk,oldContents);
@@ -9467,15 +9506,16 @@ function confirmContent(){
   } else {
     const contents=getContents(newMk);
     const newCid=genCid();
+    savedCid=newCid;
     contents.push({cat:_contentCtx.cat,title,startDate,endDate,status,review,stars,poster,author,musicUrl,album,releaseYear,totalUnit,currentUnit,created:Date.now(),cid:newCid});
     saveContents(newMk,contents);
     if(_contentCtx.onSaved){const cb=_contentCtx.onSaved;_contentCtx.onSaved=null;setTimeout(()=>cb(newCid),0);}
   }
   closeModal('content-modal');renderTimetable();
-  if(_contentCtx.cat==='book'){
+  if(_contentCtx.cat==='book'&&savedCid){
     const bookUnit=_cmUnit||'percent';
     const bookTotalPages=bookUnit==='pages'?(parseInt(document.getElementById('cm-total-pages').value,10)||null):null;
-    syncContentToReadingBook(title,status,poster,author,newMk,bookUnit,bookTotalPages);
+    syncContentToReadingBook(savedCid,title,status,poster,author,newMk,bookUnit,bookTotalPages);
   }
   setTimeout(()=>{_contentSubmitting=false;},500);
 }
@@ -9511,19 +9551,20 @@ function openContentProgressModal(cid,watchedNow){
   openModal('content-progress-modal');
   setTimeout(()=>{inp.focus();inp.select();},100);
 }
-// 감상 메모 저장 공용 헬퍼 — 콘텐츠/독서 양쪽에서 동일 저장소(wcal_note)를 씀.
+// 감상 메모 저장 공용 헬퍼 — contents 항목 자체의 notes[] 배열에 직접 저장(구 goal_notes/wcal_note 방식에서 통합, 2026-08-29).
 // cat: 콘텐츠 카테고리('movie'|'drama'|'book' 등) — 책도 여기 합류해 코멘트 모아보기 타임라인에 함께 노출됨(독서코너 자체엔 별도 노출 안 함).
-function pushWcalNote(cid,title,cat,text){
+function pushContentNote(cid,title,cat,text){
   const trimmed=(text||'').trim();
   if(!trimmed)return;
+  const found=_findContentByCidNearMk(cid,_chArchiveMk||monthKey(new Date()));
+  if(!found)return;
+  const c=found.list[found.idx];
   const dk=dateKey(getLogicalDate());
-  const mk=dk.slice(0,7);
-  const list=getWcalNotes(mk);
   const now=new Date();
   const time=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
-  list.push({cid,dk,title:title||'',cat:cat||'',text:trimmed,time,updatedAt:Date.now()});
-  saveWcalNotes(mk,list);
-  if(navigator.onLine)syncWcalNotesDown(mk);
+  if(!c.notes)c.notes=[];
+  c.notes.push({dk,title:title||c.title||'',cat:cat||c.cat||'',text:trimmed,time,updatedAt:Date.now()});
+  saveContents(found.mk,found.list);
 }
 // 진행률 저장 + (입력했다면) 감상 메모까지 한 번에
 function confirmContentProgress(){
@@ -9535,7 +9576,7 @@ function confirmContentProgress(){
   const c=found.list[found.idx];
   c.currentUnit=Math.max(0,Math.min(val,c.totalUnit||val));
   saveContents(found.mk,found.list);
-  pushWcalNote(_cpgCid,c.title,c.cat,document.getElementById('cpg-note-inp')?.value);
+  pushContentNote(_cpgCid,c.title,c.cat,document.getElementById('cpg-note-inp')?.value);
   closeModal('content-progress-modal');
   _cpgCid=null;
   chExpandMonth(_chArchiveMk||found.mk);
@@ -9749,39 +9790,27 @@ function stopContentStopwatch(){
     document.querySelectorAll('.seed-icon-btn').forEach(el=>el.classList.add('cwatch-active'));
   }catch(e){}
 })();
-function stableCidFromTitle(title){
-  let h=0;
-  for(let i=0;i<title.length;i++){h=(h*31+title.charCodeAt(i))|0;}
-  return 'ct_'+Math.abs(h).toString(36);
-}
-// 콘텐츠 타임라인(cat='book' 항목)의 상태 변경을 독서코너 reading_books에 반영.
+// 콘텐츠 등록/수정(cat='book') 직후 독서코너 진행률 초기값을 세팅. 이제 book이 곧 contents 항목이므로
+// cid로 직접 찾아 반영 — title 매칭을 없애 연결 끊김 버그 클래스를 원천 차단(2026-08-29).
 // status: 'done'|'stopped'|그 외(진행중) → book.status: 'done'|'paused'|'reading'
-function syncContentToReadingBook(title,status,poster,author,mk,unit,totalPages){
+function syncContentToReadingBook(cid,title,status,poster,author,mk,unit,totalPages){
   const STATUS_MAP={done:'done',stopped:'paused'};
   const bookStatus=STATUS_MAP[status]||'reading';
-  const books=getBooks();
-  let book=books.find(b=>b.title===title);
+  const found=_findContentByCidNearMkInRange(cid,_BOOK_SCAN_MONTHS);
+  if(!found)return; // 방금 저장한 콘텐츠가 아직 로컬에 없을 리 없지만, 방어적으로 스킵
+  const c=found.list[found.idx];
   const finalUnit=unit||'percent';
-  const finalTotalPages=finalUnit==='pages'?(totalPages||null):null;
-
-  if(!book){
-    book={
-      cid:stableCidFromTitle(title),title,status:bookStatus,
-      unit:finalUnit,pages:0,totalPages:finalTotalPages,percent:0,seconds:0,
-      todayDate:null,todayStart:0,created:Date.now(),
-      completedAt:bookStatus==='done'?dateKey(new Date()):null,
-      linkedContent:true,contentMk:mk,contentTitle:title,
-      poster:poster||null,author:author||''
-    };
-  } else {
-    book.status=bookStatus;
-    book.linkedContent=true;book.contentMk=mk;book.contentTitle=title;
-    if(bookStatus==='done')book.completedAt=book.completedAt||dateKey(new Date());
-    if(poster)book.poster=poster;
-    if(author)book.author=author;
-    book.unit=finalUnit;book.totalPages=finalTotalPages;
-  }
-  upsertBookLocal(book);
+  // 이미 진행 중이던 책이면 기존 진행률(currentUnit/readSeconds)은 보존하고 상태/메타만 갱신.
+  // 신규거나 단위가 바뀌면 currentUnit을 리셋(기존 upsertBookLocal 신규 생성 로직과 동일한 취지).
+  if(c.unitLabel!==finalUnit){c.currentUnit=0;}
+  c.status=STATUS_MAP[status]||'watching';
+  c.unitLabel=finalUnit;
+  c.totalUnit=finalUnit==='pages'?(totalPages||null):100;
+  if(!c.readSeconds)c.readSeconds=0;
+  if(poster)c.poster=poster;
+  if(author)c.author=author;
+  if(bookStatus==='done'&&!c.endDate)c.endDate=dateKey(new Date());
+  saveContents(found.mk,found.list);
 }
 function deleteContent(){
   if(!_contentCtx.item)return;
@@ -9794,11 +9823,7 @@ function deleteContent(){
     const deletedItem=contents[idx];
     addDelPending('contents',mk,deletedItem.cid);
     contents.splice(idx,1);
-    // book 카테고리면 독서코너에 연결된 책도 함께 삭제
-    if(deletedItem.cat==='book'){
-      const book=getBooks().find(b=>b.linkedContent&&b.contentMk===mk&&(b.contentTitle||b.title)===deletedItem.title);
-      if(book)deleteBookLocal(book.cid);
-    }
+    // book 카테고리도 이 항목 자체가 book이므로(2026-08-29 통합) 별도 삭제 불필요 — contents.splice로 이미 끝남
   }
   saveContents(mk,contents);closeModal('content-modal');renderTimetable();
 }
@@ -11209,22 +11234,10 @@ const RD_SW_C=2*Math.PI*32;
 // 이 값이 남아있으면 경과시간을 그대로 이어서 복원한다(백그라운드 전환은 메모리가 유지돼
 // 원래도 문제없었지만, 새로고침·앱 재시작은 메모리 변수가 초기화되어 별도 보존이 필요했음).
 const SW_PERSIST_KEY='iikoto_reading_sw_start';
-function backfillReadingLinks(){
-  // 주의: 여기서는 "아직 독서코너와 연결되지 않은" 콘텐츠 book 항목만 최초 연결한다.
-  // 이미 linkedContent=true인 책은 절대 건드리지 않음 — 그렇지 않으면 독서코너에서
-  // 방금 바꾼 상태(setBookStatus)를 여기서 콘텐츠의 예전/다른 상태값으로 역전파해
-  // 되돌려버리는 문제가 생김(독서코너 진입할 때마다 상태가 리셋되던 원인).
-  const now=new Date();
-  for(let i=0;i<6;i++){
-    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
-    const mk=monthKey(d);
-    getContents(mk).filter(c=>c.cat==='book').forEach(c=>{
-      const already=getBooks().find(b=>b.title===c.title&&b.linkedContent);
-      if(already)return; // 이미 연결된 책은 스킵 — 상태 역전파 방지
-      syncContentToReadingBook(c.title,c.status,c.poster,c.author,mk);
-    });
-  }
-}
+// (2026-08-29 통합 이후 불필요해짐) book이 이제 별도 테이블 없이 contents(cat='book') 자체이므로
+// "아직 연결 안 된 콘텐츠 book 항목"이라는 개념이 사라짐 — getBooks()가 모든 book 콘텐츠를 자동으로 포함.
+// 호출부(openReading)는 그대로 두되 함수 자체는 no-op으로 유지(하위 호환).
+function backfillReadingLinks(){}
 // ══ 씨앗 코너 ══
 function openReading(){
   _rdTab='reading';
@@ -11639,11 +11652,10 @@ function estimateRemainingReadingSessions(book,sessionCount){
   return {sessions,ready:true,remainingSessions};
 }
 // book에 연결된 contents 항목(startDate/endDate)을 찾아 읽는중="며칠째", 다읽음="며칠간" 문구를 만듦.
-// 연결정보(linkedContent)가 없는 책(옛날에 위시 없이 바로 등록된 경우 등)은 null 반환 — 표시 생략.
+// 통합 이후(2026-08-29) book은 항상 contents 항목이므로 cid로 직접 찾음.
 function getBookDurationLabel(book){
-  if(!book.linkedContent||!book.contentMk)return null;
-  const contents=getContents(book.contentMk);
-  const item=contents.find(c=>c.cat==='book'&&c.title===(book.contentTitle||book.title));
+  const found=_findContentByCidNearMkInRange(book.cid,_BOOK_SCAN_MONTHS);
+  const item=found?found.list[found.idx]:null;
   if(!item||!item.startDate)return null;
   const start=new Date(item.startDate+'T00:00:00');
   if(book.status==='reading'){
@@ -11719,48 +11731,15 @@ function setBookStatus(cid,status,review){
   book.status=status;
   if(status==='done')book.completedAt=dateKey(new Date());
   if(review){book.stars=review.stars||0;book.review=review.review||'';}
-  upsertBookLocal(book);
-  if(book.linkedContent&&book.contentMk)syncReadingBookToContent(book,status,review);
+  upsertBookLocal(book); // book이 곧 contents 항목이므로 이 호출 하나로 contents 반영까지 끝남(2026-08-29, 구 syncReadingBookToContent 제거)
   renderReadingHub();
-}
-function syncReadingBookToContent(book,bookStatus,review){
-  const STATUS_MAP={reading:'watching',done:'done',paused:'stopped'};
-  const cStatus=STATUS_MAP[bookStatus];if(!cStatus)return;
-  const mk=book.contentMk;
-  const contents=getContents(mk);
-  const idx=contents.findIndex(c=>c.cat==='book'&&c.title===(book.contentTitle||book.title));
-  if(idx<0)return;
-  const item=contents[idx];
-  if(cStatus==='watching'){
-    item.endDate=null;
-  } else {
-    item.endDate=item.endDate||dateKey(new Date());
-  }
-  item.status=cStatus;
-  if(review){
-    if(review.stars)item.stars=review.stars;
-    if(review.review)item.review=review.review;
-  }
-  contents[idx]=item;
-  saveContents(mk,contents);
   renderTimetable();
 }
 function removeBook(cid){
   if(_rdOpenCid===cid)_rdOpenCid=null;
-  const book=getBooks().find(b=>b.cid===cid);
-  if(book&&book.linkedContent&&book.contentMk){
-    const mk=book.contentMk;
-    const contents=getContents(mk);
-    const idx=contents.findIndex(c=>c.cat==='book'&&c.title===(book.contentTitle||book.title));
-    if(idx>=0){
-      addDelPending('contents',mk,contents[idx].cid);
-      contents.splice(idx,1);
-      saveContents(mk,contents);
-      renderTimetable();
-    }
-  }
-  deleteBookLocal(cid);
+  deleteBookLocal(cid); // book이 곧 contents 항목이므로 이 호출 하나로 contents 삭제까지 끝남(2026-08-29)
   renderReadingHub(); // 아카이브 리스트뿐 아니라 상단(진행중 표시/커버 등)까지 즉시 갱신
+  renderTimetable();
 }
 let _rdNewUnit='percent';
 function setRdUnit(u){
@@ -11832,11 +11811,12 @@ function confirmAddBook(){
   const status='reading';
   const today=dateKey(new Date());
   const mk=monthKey(new Date());
-  const book={cid:genCid(),title,status,unit:_rdNewUnit,pages:0,totalPages:total,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:null,poster:_rdNewPoster||null,author:_rdNewAuthor||''};
+  const sharedCid=genCid(); // book과 contents가 하나의 항목이므로 cid를 반드시 공유해야 함(2026-08-29 통합 — 예전엔 여기서 cid가 서로 달라 연결이 끊기는 버그가 있었음)
+  const book={cid:sharedCid,title,status,unit:_rdNewUnit,pages:0,totalPages:total,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:null,poster:_rdNewPoster||null,author:_rdNewAuthor||''};
   // 콘텐츠 타임테이블에도 자동 등록 (쌍방 연동)
   book.linkedContent=true;book.contentMk=mk;book.contentTitle=title;
   const contents=getContents(mk);
-  contents.push({cat:'book',title,startDate:today,endDate:null,status:'watching',review:'',stars:0,poster:book.poster,author:book.author,created:Date.now(),cid:genCid()});
+  contents.push({cat:'book',title,startDate:today,endDate:null,status:'watching',review:'',stars:0,poster:book.poster,author:book.author,created:Date.now(),cid:sharedCid});
   saveContents(mk,contents);
   upsertBookLocal(book);
   _rdNewPoster=null;_rdNewAuthor='';
@@ -12040,7 +12020,10 @@ let _wcalCollapsed=false; // 달력 접기/펼치기 — 접으면 이번 주 7�
 // 서버의 수동 추가분을 먼저 내려받고, 그 결과와 무관하게 로컬 데이터로 즉시 1차 렌더(체감 속도용) — 공통 로직이라 헬퍼로 뽑음
 function _wcalRefresh(){
   const mk=monthKey(_wcalDate);
-  Promise.all([syncWcalManualDown(mk),syncWcalNotesDown(mk)]).then(loadAndRenderWatchCal);
+  const prevMk=monthKey(new Date(_wcalDate.getFullYear(),_wcalDate.getMonth()-1,1));
+  // 감상 메모가 contents.notes[]로 통합되어(2026-08-29) 서버 반영을 위해 contents도 함께 내려받음.
+  // 정주행 등으로 지난달에 걸친 항목의 메모도 있을 수 있어 이전 달도 함께.
+  Promise.all([syncWcalManualDown(mk),syncContentsDown(mk),syncContentsDown(prevMk)]).then(loadAndRenderWatchCal);
   loadAndRenderWatchCal();
 }
 function wcalMonthShift(delta){
@@ -12248,31 +12231,14 @@ function wcalSelectDay(dk){
 }
 
 // ── 일자별 감상 코멘트 (콘텐츠탭 등록 원본의 cid 기준으로만 연결 — 별점/총평(contents.review)과는 별개의 가벼운 기록) ──
-// 저장 위치: 새 테이블 없이 goal_notes를 wchallenge/wcal_manual과 동일한 범용 저장소 패턴으로 재사용.
-// key: 'wcal_note_YYYY-MM', lines: [{cid,dk,title,cat,text,updatedAt}, ...] — 월별로 나눠 저장, 개수 제한 없음(하루 여러 개 가능).
-function getWcalNotes(mk){return S.get('wcal_note_'+mk)||[];}
-function saveWcalNotes(mk,data){S.set('wcal_note_'+mk,data);S.set('wcal_note_pending_'+mk,true);}
-async function syncWcalNotesDown(mk){
-  const key='wcal_note_'+mk;
-  const pendingKey='wcal_note_pending_'+mk;
-  if(S.get(pendingKey)){
-    await supaUpsert('goal_notes','note_key',[{note_key:key,lines:S.get(key)||[]}]);
-    S.set(pendingKey,false);
-    return;
-  }
-  const rows=await supaFetch(`goal_notes?note_key=eq.${encodeURIComponent(key)}`);
-  if(!rows)return;
-  if(!rows.length){
-    const local=S.get(key);
-    if(local&&local.length)await supaUpsert('goal_notes','note_key',[{note_key:key,lines:local}]);
-    return;
-  }
-  S.set(key,rows[0].lines);
-}
+// 저장 위치: contents 항목 자체의 notes[] 배열(구 goal_notes/wcal_note 월별 저장소에서 통합, 2026-08-29).
+// note 형태: {dk,title,cat,text,time,updatedAt} — cid는 소속된 contents 항목으로 이미 결정되므로 note 자체엔 저장 안 함.
 // 특정 cid+날짜에 남긴 코멘트 하나 조회(같은 cid+날짜는 1개로 취급 — 그날 감상에 대한 메모는 계속 이어 써서 수정하는 형태)
 function getWcalNoteFor(cid,dk){
-  const mk=dk.slice(0,7);
-  return getWcalNotes(mk).find(n=>n.cid===cid&&n.dk===dk)||null;
+  const found=_findContentByCidNearMk(cid,dk.slice(0,7));
+  if(!found)return null;
+  const c=found.list[found.idx];
+  return (c.notes||[]).find(n=>n.dk===dk)||null;
 }
 // 코멘트 입력창을 해당 항목 자리에 펼침(작성/수정 겸용) — 이미 있으면 기존 텍스트를 채워 수정 모드로 시작
 function openWcalNoteInput(cid,dk,idx){
@@ -12292,23 +12258,25 @@ function saveWcalNote(cid,dk,idx){
   if(!inp)return;
   const text=inp.value.trim();
   if(!text)return;
-  const mk=dk.slice(0,7);
-  const list=getWcalNotes(mk);
+  const found=_findContentByCidNearMk(cid,dk.slice(0,7));
+  if(!found)return;
+  const c=found.list[found.idx];
+  if(!c.notes)c.notes=[];
   const item=(_wcalByDate[dk]||[]).find(it=>it.cid===cid);
-  const i=list.findIndex(n=>n.cid===cid&&n.dk===dk);
+  const i=c.notes.findIndex(n=>n.dk===dk);
   const now=new Date();
-  const time=i>=0&&list[i].time?list[i].time:(String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')); // 최초 작성 시각 고정 — 수정해도 바뀌지 않음
-  const entry={cid,dk,title:item?item.title:'',cat:item?item.cat:'',text,time,updatedAt:Date.now()}; // poster는 저장 안 함 — contents가 원본, 표시할 때 cid로 항상 최신 값을 조회
-  if(i>=0)list[i]=entry;else list.push(entry);
-  saveWcalNotes(mk,list);
-  if(navigator.onLine)syncWcalNotesDown(mk);
+  const time=i>=0&&c.notes[i].time?c.notes[i].time:(String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')); // 최초 작성 시각 고정 — 수정해도 바뀌지 않음
+  const entry={dk,title:item?item.title:c.title,cat:item?item.cat:c.cat,text,time,updatedAt:Date.now()}; // poster는 저장 안 함 — contents가 원본, 표시할 때 항상 최신 값을 조회
+  if(i>=0)c.notes[i]=entry;else c.notes.push(entry);
+  saveContents(found.mk,found.list);
   renderWcalNoteRow(idx,cid,dk,entry,false);
 }
 function deleteWcalNote(cid,dk,idx){
-  const mk=dk.slice(0,7);
-  const list=getWcalNotes(mk).filter(n=>!(n.cid===cid&&n.dk===dk));
-  saveWcalNotes(mk,list);
-  if(navigator.onLine)syncWcalNotesDown(mk);
+  const found=_findContentByCidNearMk(cid,dk.slice(0,7));
+  if(!found)return;
+  const c=found.list[found.idx];
+  c.notes=(c.notes||[]).filter(n=>n.dk!==dk);
+  saveContents(found.mk,found.list);
   const rowEl=document.getElementById('wcal-note-row-'+idx);
   if(rowEl)rowEl.innerHTML='';
 }
@@ -12404,18 +12372,15 @@ function _chCollectNoteSource(months){
     for(let i=0;i<_chNoteTimelineMonths;i++)months.push(monthKey(new Date(now.getFullYear(),now.getMonth()-i,1)));
   }
   const finals=[]; // {cid,cat,title,poster,stars,review,dk}
-  const notes=[]; // {cid,cat,title,dk,text,updatedAt} — poster는 저장 안 하므로 아래서 cid로 항상 최신 값을 붙임
-  const posterByCid={};
+  const notes=[]; // {cid,cat,title,dk,text,updatedAt} — poster는 저장 안 하므로 소속 contents 항목의 값을 붙임
   months.forEach(mk=>{
     getContents(mk).forEach(c=>{
-      if(c.cid)posterByCid[c.cid]=c.poster||null;
       if(c.review&&c.review.trim()){
         finals.push({cid:c.cid,cat:c.cat,title:c.title,poster:c.poster||null,stars:c.stars||0,review:c.review||'',dk:c.endDate||c.startDate||''});
       }
+      (c.notes||[]).forEach(n=>notes.push({...n,cid:c.cid,poster:c.poster||null}));
     });
-    notes.push(...getWcalNotes(mk));
   });
-  notes.forEach(n=>{n.poster=n.cid?(posterByCid[n.cid]||null):null;});
   return {finals,notes};
 }
 function renderContentNoteTimeline(){
@@ -13249,14 +13214,8 @@ function confirmProgress(){
   const _amountRead=Math.max(0,endVal-_pgStartVal);
   logReadingDaily(book,today,_amountRead,_pgSeconds,_pgUnit,book.percent,book.pages);
   markReadingActivityToday();
-  // 감상 메모는 콘텐츠 코너 달력/월별 아카이브가 contents 테이블의 cid로 찾아 표시하므로,
-  // book.cid가 아니라 연결된 콘텐츠 항목의 cid를 넘겨야 함(book과 contents는 cid가 서로 다름 — contentMk+title로 매칭됨).
-  let _wcalNoteCid=book.cid;
-  if(book.linkedContent&&book.contentMk){
-    const linkedItem=getContents(book.contentMk).find(c=>c.cat==='book'&&c.title===(book.contentTitle||book.title));
-    if(linkedItem&&linkedItem.cid)_wcalNoteCid=linkedItem.cid;
-  }
-  pushWcalNote(_wcalNoteCid,book.contentTitle||book.title,'book',document.getElementById('pg-note-inp')?.value);
+  // 통합 이후(2026-08-29) book.cid가 곧 연결된 contents 항목의 cid이므로 별도 매칭 불필요.
+  pushContentNote(book.cid,book.contentTitle||book.title,'book',document.getElementById('pg-note-inp')?.value);
   // 독서 습관체크는 스톱워치 종료 시점(autoLogReadingRhythm)에서만 처리 —
   // 진행바를 직접 클릭해 페이지/퍼센트만 입력한 경우는 습관체크하지 않음.
   _swSeconds=0;
@@ -13726,9 +13685,11 @@ async function initSync(){
   }
   await syncGoalDown('wishlist:meal');
   await syncGoalDown('reading_dates');
-  await syncBooksDownAll();
-  for(const b of getBooks()){
-    if(S.get('reading_pending_'+b.cid))await syncBookUp(b.cid);
+  // 책은 contents(cat='book')로 통합됨 — 서재가 여러 달에 걸쳐 있으므로 최근 여러 달치를 다운로드.
+  // pending 업로드는 saveContents가 이미 자체적으로 처리(contents_pending)하므로 별도 루프 불필요.
+  {
+    const nowB=new Date();
+    for(let i=0;i<6;i++){await syncContentsDown(monthKey(new Date(nowB.getFullYear(),nowB.getMonth()-i,1)));}
   }
   await syncQuotesDownAll();
   const pendDel=S.get('quote_delpending_list')||[];
