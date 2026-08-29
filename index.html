@@ -71,6 +71,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --bg:linear-gradient(145deg,#fdf0e8 0%,#fef5d4 50%,#fde8f0 100%);
   --tp:#6b5248;--ts:#a3897c;--tm:#d4bcb0;
   --card:rgba(255,250,240,0.75);--card-b:rgba(230,200,140,0.40);
+  --empty-bg:rgba(210,190,175,0.20); /* 오늘의 시간표 도넛 — 리듬 기록 없는 빈 시간 구간 배경 */
   --card-p:rgba(var(--pal-pink-rgb),0.15);--card-pb:rgba(var(--pal-pink-rgb),0.32); /* 메모 배너 — pink-bg보다 더 옅은 농도(0.15)로 별도 조정됨, 2026-08-16 공용팔레트 참조로 전환, 테두리는 투두/식사와 동일하게 알파 개별조정 */
   --card-m:rgba(200,240,235,0.42);--card-mb:rgba(160,220,215,0.55);
   --card-y:rgba(var(--pal-yellow-rgb),0.22);--card-yb:rgba(var(--pal-yellow-rgb),0.32); /* 투두 배너 — 2026-08-16 공용팔레트 참조로 전환, 알파를 기존톤에 맞춰 재조정 */
@@ -94,6 +95,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --bg:linear-gradient(165deg,#f7f4ee 0%,#f3f1ec 55%,#f6f3ee 100%);
   --tp:#5c5650;--ts:#8a8278;--tm:#b8b0a4;
   --card:rgba(255,253,248,0.50);--card-b:rgba(200,175,140,0.55);
+  --empty-bg:rgba(200,175,140,0.16); /* 오늘의 시간표 도넛 — 리듬 기록 없는 빈 시간 구간 배경 */
   --card-p:var(--card);--card-pb:var(--pal-pink-border);
   --card-m:var(--card);--card-mb:rgba(135,205,195,0.55);
   --card-y:var(--card);--card-yb:rgba(250,215,100,0.62);
@@ -504,6 +506,22 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .todo-kind-tabs button{flex:1;padding:12px 0;border:none;background:rgba(200,180,170,0.12);color:var(--tm);font-size:var(--dow-label-size);cursor:pointer;font-family:'DM Sans',sans-serif;transition:background .15s,color .15s;display:flex;align-items:center;justify-content:center;gap:5px;}
 .todo-kind-tabs button.active{background:var(--card);color:var(--tp);font-weight:600;}
 .chk{width:16px;height:16px;border-radius:5px;border:1.5px solid rgba(200,160,160,0.55);flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;}
+/* 오늘의 시간표 배너 — 도넛(실제 리듬 기록)+시간표(투두 HH:MM) 리스트. 체크박스는 .chk 그대로 재사용. */
+.rt-body{display:flex;gap:12px;}
+.rt-donut{flex-shrink:0;width:58px;height:58px;position:relative;}
+.rt-donut svg{width:100%;height:100%;transform:rotate(-90deg);}
+.rt-list{flex:1;min-width:0;height:58px;overflow-y:auto;display:flex;flex-direction:column;gap:5px;padding-right:2px;scrollbar-width:thin;}
+.rt-list::-webkit-scrollbar{width:3px;}
+.rt-list::-webkit-scrollbar-thumb{background:var(--card-b);border-radius:3px;}
+.rt-item{display:flex;align-items:center;gap:7px;flex-shrink:0;}
+.rt-item .chk{margin:0;}
+.rt-time{font-size:var(--dow-label-size);color:var(--ts);font-variant-numeric:tabular-nums;flex-shrink:0;width:34px;}
+.rt-text{font-size:var(--dow-label-size);color:var(--tp);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;}
+.rt-item.done .rt-text{color:var(--tm);text-decoration:line-through;text-decoration-color:var(--tm);text-decoration-thickness:1px;}
+.rt-item.current .rt-time,.rt-item.current .rt-text{color:var(--tp);font-weight:600;}
+.rt-item.current{background:rgba(var(--pal-pink-rgb),0.12);border-radius:8px;margin:-2px -4px;padding:2px 4px;}
+#event-section-label{cursor:pointer;display:inline-flex;align-items:center;gap:4px;}
+#event-section-label i{font-size:12px;opacity:.6;}
 .todo-pinned-chk{width:16px;height:16px;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:17px;color:var(--pal-orange-border);}
 .chk.on{background:rgba(var(--pal-pink-rgb),0.20);border-color:var(--pal-pink-border);}
 .chk.on::after{content:'';width:7px;height:4px;border-left:1.5px solid white;border-bottom:1.5px solid white;transform:rotate(-45deg) translateY(-1px);}
@@ -1448,10 +1466,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       </div>
       <div id="event-section" style="display:none;">
         <div class="slabel-row">
-          <div class="slabel">오늘 일정</div>
+          <div class="slabel" id="event-section-label" onclick="toggleTodayBannerMode()">오늘 일정</div>
         </div>
         <div class="card" id="event-card">
           <div id="event-list"></div>
+          <div class="rt-body" id="schedule-body" style="display:none;">
+            <div class="rt-donut" id="schedule-donut"></div>
+            <div class="rt-list" id="schedule-list"></div>
+          </div>
         </div>
       </div>
       <div class="slabel-row">
@@ -6204,18 +6226,98 @@ function renderTodos(){
     list.appendChild(el);
   });
 }
-// 오늘 일정 배너 — 체크박스 없이 아이콘(카테고리)-일정명-시간(오른쪽 끝) 배치. 일정이 하나도 없으면 섹션 자체를 숨김.
+// 투두 텍스트 맨 앞의 "HH:MM " 표기를 시간표 항목으로 인식 — 봄이님의 기존 입력 습관(고정 규칙)을 그대로 파싱.
+const SCHEDULE_TIME_RE=/^(\d{1,2}):(\d{2})\s+(.+)/;
+function parseScheduleTodos(dk,todos){
+  const isToday=dk===dateKey(new Date());
+  const nowMin=isToday?(new Date().getHours()*60+new Date().getMinutes()):null;
+  const items=[];
+  todos.forEach((t,i)=>{
+    if(t.isEvent)return;
+    const m=(t.text||'').match(SCHEDULE_TIME_RE);
+    if(!m)return;
+    const hh=parseInt(m[1],10),mm=parseInt(m[2],10);
+    if(hh>23||mm>59)return;
+    items.push({i:i,cid:t.cid,time:m[1].padStart(2,'0')+':'+m[2],min:hh*60+mm,label:m[3],done:t.done});
+  });
+  // 미완료 중 현재 시각에 가장 가까운(다음/진행중) 항목이 최상단, 그다음 나머지 미완료, 완료는 맨 뒤
+  items.sort((a,b)=>{
+    if(a.done!==b.done)return a.done?1:-1;
+    if(!a.done&&nowMin!=null){
+      const da=a.min>=nowMin?a.min-nowMin:1440+(a.min-nowMin);
+      const db=b.min>=nowMin?b.min-nowMin:1440+(b.min-nowMin);
+      return da-db;
+    }
+    return a.min-b.min;
+  });
+  return items;
+}
+// 오늘의 시간표 도넛 — 실제 리듬 기록(computeRhythmBlocksRaw) 그대로 시각화. 빈 시간은 배경(웜그레이 톤)으로 남김.
+function renderScheduleDonut(dk){
+  const wrap=document.getElementById('schedule-donut');
+  if(!wrap)return;
+  const raw=computeRhythmBlocksRaw(dk);
+  const nowMin=dk===dateKey(new Date())?(new Date().getHours()*60+new Date().getMinutes()):null;
+  let circles='<circle cx="29" cy="29" r="23" fill="none" stroke="var(--empty-bg)" stroke-width="13"/>';
+  raw.forEach(function(b){
+    let s=b.start,e=b.end;
+    if(e==null)e=(nowMin!=null&&nowMin>s)?nowMin:s+1; // 진행중 블록은 현재 시각까지, 정보 없으면 최소폭
+    if(e<=s)e=s+1; // 자정 넘김 등 역전 방지(당일 도넛에서는 다음날로 안 넘기고 그 자리에서 끝냄)
+    if(e>1440)e=1440;
+    const length=Math.max((e-s)/1440*360,0.5);
+    const offset=-(s/1440*360);
+    circles+=`<circle cx="29" cy="29" r="23" fill="none" stroke="${b.color}" stroke-width="13" pathLength="360" style="stroke-dasharray:${length} 360;stroke-dashoffset:${offset}"/>`;
+  });
+  wrap.innerHTML=`<svg viewBox="0 0 58 58">${circles}</svg>`;
+}
+// 시간표 리스트 — 텍스트만 노출, 체크박스는 기존 .chk/toggleTodo() 그대로 재사용(별도 저장/토글 로직 없음).
+function renderScheduleList(dk,items){
+  const list=document.getElementById('schedule-list');
+  if(!list)return;
+  list.innerHTML='';
+  items.forEach(function(it,idx){
+    const isNext=!it.done&&idx===items.findIndex(x=>!x.done);
+    const el=document.createElement('div');
+    el.className='rt-item'+(it.done?' done':'')+(isNext?' current':'');
+    el.innerHTML=`<div class="chk${it.done?' on':''}" onclick="toggleTodo(${it.i},'${it.cid||''}')"></div><div class="rt-time">${it.time}</div><div class="rt-text">${escapeHtml(it.label)}</div>`;
+    list.appendChild(el);
+  });
+}
+// 오늘 일정 / 오늘의 시간표 — 같은 자리(event-section)에서 교차 노출. 둘 다 있는 날에만 제목 옆 전환 아이콘 노출.
+let _todayBannerMode='event';
+function toggleTodayBannerMode(){
+  _todayBannerMode=_todayBannerMode==='event'?'schedule':'event';
+  renderTodos();
+}
+// 오늘 일정 배너 — 체크박스 없이 아이콘(카테고리)-일정명-시간(오른쪽 끝) 배치. 일정도 시간표도 없으면 섹션 자체를 숨김.
 function renderEventList(dk,todos){
   const section=document.getElementById('event-section');
   const list=document.getElementById('event-list');
+  const label=document.getElementById('event-section-label');
+  const scheduleBody=document.getElementById('schedule-body');
   if(!section||!list)return;
   // 하루짜리 일정(오늘 date_key에 저장된 것) — 연속일정(eventEndDate 있는 것)은 여기서 제외하고 아래서 별도 병합
   const events=todos.filter(t=>t.isEvent&&!t.eventEndDate);
   // 연속일정 — 오늘이 시작일이든 아니든, 오늘을 범위로 품는 모든 연속일정을 공용 함수로 조회
   const multiday=getActiveMultiDayEvents(dk);
   const all=[...events,...multiday];
-  if(!all.length){section.style.display='none';list.innerHTML='';return;}
+  const scheduleItems=parseScheduleTodos(dk,todos);
+  const hasEvent=all.length>0,hasSchedule=scheduleItems.length>0;
+  if(!hasEvent&&!hasSchedule){section.style.display='none';list.innerHTML='';if(scheduleBody)scheduleBody.style.display='none';return;}
   section.style.display='block';
+  // 하나만 있으면 그걸로 고정, 둘 다 있으면 현재 모드(_todayBannerMode) 따름
+  const mode=(!hasEvent)?'schedule':(!hasSchedule)?'event':_todayBannerMode;
+  const showSwitch=hasEvent&&hasSchedule;
+  if(label)label.innerHTML=(mode==='event'?'오늘 일정':'오늘의 흐름')+(showSwitch?' <i class="ti ti-switch-horizontal" aria-hidden="true"></i>':'');
+  if(mode==='schedule'){
+    list.innerHTML='';list.style.display='none';
+    if(scheduleBody)scheduleBody.style.display='flex';
+    renderScheduleDonut(dk);
+    renderScheduleList(dk,scheduleItems);
+    return;
+  }
+  list.style.display='';
+  if(scheduleBody)scheduleBody.style.display='none';
   // 오늘 실제 날짜(자정 기준)일 때만 '완료(지남)' 판정 적용 — 다른 날짜(과거/미래 조회)엔 적용 안 함
   const isToday=dk===dateKey(new Date());
   const nowMin=new Date().getHours()*60+new Date().getMinutes();
