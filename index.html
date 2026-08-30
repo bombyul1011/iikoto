@@ -2431,7 +2431,7 @@ function renderHomeBody(section){
     }
     body.appendChild(makeMorningRoutineCard());
     body.appendChild(makeHabitStreakRow());
-    body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getLogicalDate()));},'rhythm-soft',12.5,dateKey(getLogicalDate())));
+    body.appendChild(makeTodayRhythmBanner());
     if(!isMorning2){
       body.appendChild(makeRecentContentsCard());
     }
@@ -2439,7 +2439,7 @@ function renderHomeBody(section){
   } else if(section==='afternoon'){
     body.appendChild(makeAfternoonPaceCard());
     refreshAfternoonPaceCard();
-    body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getLogicalDate()));},'rhythm-soft',12.5,dateKey(getLogicalDate())));
+    body.appendChild(makeTodayRhythmBanner());
     if(showWeeklyReviewReadOnly)appendSundayReadOnlyBanner(body);
   } else if(section==='dawn'){
     const dawnDk=dateKey(getLogicalDate());
@@ -2447,7 +2447,7 @@ function renderHomeBody(section){
     if(paceBanner)body.appendChild(paceBanner);
     body.appendChild(makeDawnRecapCard());
     body.appendChild(makeLabel('오늘의 리듬'));
-    body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getLogicalDate()));},'rhythm-soft',12.5,dateKey(getLogicalDate())));
+    body.appendChild(makeTodayRhythmBanner());
     if(showWeeklyReviewReadOnly)appendSundayReadOnlyBanner(body);
   } else {
     // 저녁 공통 틀: [그날의 특수 배너] → 링 → 리듬배너 → (브리핑) → 독서카드
@@ -2472,7 +2472,7 @@ function renderHomeBody(section){
       body.appendChild(makeLabel('저녁 플리'));
       body.appendChild(makePlaylistMiniCard());
     }
-    body.appendChild(makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dateKey(getLogicalDate()));},'rhythm-soft',12.5,dateKey(getLogicalDate())));
+    body.appendChild(makeTodayRhythmBanner());
     // 일요일 다음 주 챌린지 준비 배너는 홈탭에서 제거 — 주간탭 "이번 주도 화이팅" 카드로 흡수됨
     if(!isSundayNight2&&!showWeeklyReviewReadOnly){
       // "오늘 마무리" 브리핑은 통합카드(상단 인삿말)가 흡수함
@@ -2970,6 +2970,11 @@ function makeRhythmBanner(lineText,builderFn,extraClass,fontSize,dk){
   b.addEventListener('click',function(){openHomeDetailSheet(lineText,builderFn);});
   return b;
 }
+// 홈탭 4개 시간대(아침/오후/새벽/저녁) 모두 "오늘의 리듬 기록" 배너를 동일한 인자로 붙이므로 공용 헬퍼로 통일(2026-08-30).
+function makeTodayRhythmBanner(){
+  const dk=dateKey(getLogicalDate());
+  return makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dk);},'rhythm-soft',12.5,dk);
+}
 function openHomeDetailSheet(title,builderFn){
   const titleEl=document.getElementById('home-detail-sheet-title');
   if(titleEl)titleEl.textContent=title;
@@ -3019,7 +3024,7 @@ function _bcSet(subSec,val){
 // 앱 시작 시 오늘 캐시 복원
 let _greetingCache=null;
 function _initBriefingCache(){
-  const subSec=getGreetingSubSection();
+  const subSec=getSubSection();
   const gc=_bcGet(subSec+'_greeting');
   if(gc){_greetingCache=gc;}
 }
@@ -3029,7 +3034,7 @@ function _initBriefingCache(){
 // "잠들고 일어나야 하루가 시작된다"는 생활 개념과 맞춰, 새벽(dawn)이 하루의 끝에 오도록 배치.
 // 이 값은 홈탭이 그때그때 어떤 카드/배너를 보여줄지 정하는 화면 판정 전용이며,
 // 기록이 어느 날짜에 소속되는지는 별개 개념(DAWN_CUTOFF_MIN/getLogicalDate, 아래쪽 데이터 유틸 섹션 참고).
-// getSection/getSubSection/getGreetingSubSection은 모두 이 함수에서 파생되므로 서로 어긋날 수 없음.
+// getSection/getSubSection은 모두 이 함수에서 파생되므로 서로 어긋날 수 없음(getGreetingSubSection은 getSubSection과 완전 중복이라 2026-08-30 통합·제거).
 function getHomeTimeSlot(){
   const h=new Date().getHours();
   if(h<4)return 'dawn';
@@ -3041,9 +3046,6 @@ function getHomeTimeSlot(){
   return 'night_2';
 }
 function getSubSection(){
-  return getHomeTimeSlot();
-}
-function getGreetingSubSection(){
   return getHomeTimeSlot();
 }
 _initBriefingCache();
@@ -4166,7 +4168,7 @@ async function fetchHomeWeather(section){
   }
 
   // 인사 캐시 유효하면 바로 표시 (sub-section 기준, dawn 포함 7분류)
-  const subSec=getGreetingSubSection();
+  const subSec=getSubSection();
   if(_greetingCache&&_greetingCache.subSection===subSec){
     if(subEl)subEl.textContent=_greetingCache.text;
     return;
@@ -10289,6 +10291,11 @@ function renderHabitMonthly(){
   const today=new Date();
   const isCurMonth=(y===today.getFullYear()&&mo===today.getMonth());
   const habitLastDay=isCurMonth?today.getDate():dim;
+  // 이 렌더 호출 안에서만 쓰는 임시 캐시 — 한 달엔 주(week)가 4~5개뿐이라 습관 수만큼 반복해도 매번 새로 읽을 필요 없음.
+  // localStorage 자체(S.get의 원본)는 동기화(syncHCDown 등)가 갱신하므로, 다음 renderHabitMonthly 호출 때는
+  // 이 캐시가 비어있는 상태로 다시 시작해 항상 최신값을 읽음 — 동기화 반영 지연 없음.
+  const wkChecksCache={};
+  const getWkChecks=wk=>wkChecksCache[wk]||(wkChecksCache[wk]=getHabitChecks(wk));
   habits.forEach(h=>{
     const row=document.createElement('div');row.className='hm-row';
     const lbl=document.createElement('span');lbl.className='hm-lbl';
@@ -10299,7 +10306,7 @@ function renderHabitMonthly(){
     let checked_cnt=0;
     for(let d=1;d<=dim;d++){
       const date=new Date(y,mo,d);const wk=weekKey(date);const dow=(date.getDay()+6)%7;
-      const checked=getHabitChecks(wk)[`${h.name}-${dow}`];
+      const checked=getWkChecks(wk)[`${h.name}-${dow}`];
       if(checked&&d<=habitLastDay)checked_cnt++;
       const dot=document.createElement('div');dot.className='hm-dot';
       if(checked){dot.style.background=getHabitColorSoft(h.color);}
@@ -13566,9 +13573,9 @@ function toggleStopwatch(){
 }
 // 스톱워치 종료 시 독서 시간을 '감상' 카테고리 리듬 블록으로 자동 기록
 // 1분 미만은 실수로 켰다 끈 경우일 수 있어 기록하지 않음
+// minToHHMM은 콘텐츠 시청 스톱워치 쪽(파일 하단)에 정의된 전역 함수를 그대로 재사용(중복 정의 제거, 2026-08-30)
 function autoLogReadingRhythm(startTs,endTs){
   if(!startTs||!endTs||endTs-startTs<60000)return;
-  const minToHHMM=function(mins){mins=((mins%1440)+1440)%1440;const h=Math.floor(mins/60),m=mins%60;return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');};
   const startD=new Date(startTs),endD=new Date(endTs);
   const dk=dateKey(getLogicalDate(startTs));
   const startMin=startD.getHours()*60+startD.getMinutes();

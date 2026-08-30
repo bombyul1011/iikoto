@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.28-timetable';
+const CACHE = 'iikoto-v2.29-habit-timetable-fixes';
 const ASSETS = [
   './',
   './index.html'
