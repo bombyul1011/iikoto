@@ -613,8 +613,46 @@ function compareTodoOrder(a,b){
   if(typeof a.sort_order==='number'&&typeof b.sort_order==='number')return a.sort_order-b.sort_order;
   return parseTodoLeadingTime(a.text)-parseTodoLeadingTime(b.text);
 }
+// 본앱 SCHEDULE_TIME_RE와 동일 — 투두 텍스트 맨 앞이 "HH:MM 텍스트" 형식이면 타임테이블 항목으로 분류.
+const SCHEDULE_TIME_RE=/^(\d{1,2}):(\d{2})\s+(.+)/;
+// 본앱 parseScheduleTodos와 동일 로직(체크박스 토글 없는 읽기전용이라 done만 반영, i/cid는 불필요).
+function parseTabletScheduleTodos(todos){
+  const nowMin=new Date().getHours()*60+new Date().getMinutes();
+  const items=[];
+  todos.forEach(t=>{
+    const m=(t.text||'').match(SCHEDULE_TIME_RE);
+    if(!m)return;
+    const hh=parseInt(m[1],10),mm=parseInt(m[2],10);
+    if(hh>23||mm>59)return;
+    items.push({time:m[1].padStart(2,'0')+':'+m[2],min:hh*60+mm,label:m[3],done:t.done});
+  });
+  items.sort((a,b)=>{
+    if(a.done!==b.done)return a.done?1:-1;
+    if(!a.done){
+      const da=a.min>=nowMin?a.min-nowMin:1440+(a.min-nowMin);
+      const db=b.min>=nowMin?b.min-nowMin:1440+(b.min-nowMin);
+      return da-db;
+    }
+    return a.min-b.min;
+  });
+  return items;
+}
+// 오늘 일정 ↔ 타임테이블 전환 — 본앱과 동일 방식(제목 클릭), 리듬 도넛/바 없이 리스트만.
+let _tabletEventMode=null; // null=자동판단, 'event'|'schedule'=사용자가 수동전환한 값(날짜 이동 시 리셋)
+let _tabletEventModeDk=null;
+function toggleTabletEventMode(){
+  const curShowsSchedule=document.getElementById('today-timetable').style.display!=='none';
+  _tabletEventMode=curShowsSchedule?'event':'schedule';
+  renderTodayTodosEvents(_todayTodosCache||[]);
+}
+let _todayTodosCache=[];
 function renderTodayTodosEvents(todos){
-  const plainTodos=todos.filter(t=>!t.is_event).slice().sort((a,b)=>{
+  _todayTodosCache=todos;
+  // 날짜가 바뀌어 다시 보는 화면이면(다른 날짜 조회 후 복귀 등) 수동 전환 기록을 리셋 — 매 조회마다 새로 자동판단
+  const _dk=dateKey(_selectedDate);
+  if(_tabletEventModeDk!==_dk){_tabletEventMode=null;_tabletEventModeDk=_dk;}
+  const scheduleItems=parseTabletScheduleTodos(todos.filter(t=>!t.is_event));
+  const plainTodos=todos.filter(t=>!t.is_event&&!SCHEDULE_TIME_RE.test(t.text||'')).slice().sort((a,b)=>{
     if(!!a.done!==!!b.done)return a.done?1:-1;
     return compareTodoOrder(a,b);
   });
@@ -631,10 +669,39 @@ function renderTodayTodosEvents(todos){
   const nowMin=new Date().getHours()*60+new Date().getMinutes();
   const isToday=dateKey(_selectedDate)===dateKey(new Date());
   const evEl=document.getElementById('today-events');
+  const ttEl=document.getElementById('today-timetable');
+  const labelEl=document.getElementById('today-event-label');
   const evCardEl=document.getElementById('today-event-card');
   const sorted=events.slice().sort((a,b)=>(a.event_time||'99:99').localeCompare(b.event_time||'99:99'));
-  // 세로(모바일) 화면에서 "일정이 없으면 카드 자체를 숨김" 처리용 — 가로에서는 이 클래스를 무시하고 항상 노출.
-  if(evCardEl)evCardEl.classList.toggle('no-events',sorted.length===0);
+  const hasEvent=sorted.length>0,hasSchedule=scheduleItems.length>0;
+  // 세로(모바일) 화면에서 "일정도 시간표도 없으면 카드 자체를 숨김" 처리용 — 가로에서는 이 클래스를 무시하고 항상 노출.
+  if(evCardEl)evCardEl.classList.toggle('no-events',!hasEvent&&!hasSchedule);
+  let mode;
+  if(!hasEvent)mode='schedule';
+  else if(!hasSchedule)mode='event';
+  else if(_tabletEventMode)mode=_tabletEventMode;
+  else{
+    // 최초 노출: 각자 카테고리에서 가장 가까운(아직 안 지난) 항목 시각끼리 비교, 더 가까운 쪽. 둘 다 없으면(다 지났으면) 일정 선노출.
+    const nextUpcoming=(mins)=>{const up=mins.filter(m=>m>=nowMin);return up.length?Math.min(...up):null;};
+    const eventMins=isToday?sorted.filter(e=>e.event_time).map(e=>{const m=e.event_time.match(/^(\d{1,2}):(\d{2})/);return m?parseInt(m[1],10)*60+parseInt(m[2],10):null;}).filter(m=>m!=null):[];
+    const scheduleMins=isToday?scheduleItems.filter(it=>!it.done).map(it=>it.min):[];
+    const nextEvent=nextUpcoming(eventMins),nextSchedule=nextUpcoming(scheduleMins);
+    mode=(nextSchedule!=null&&(nextEvent==null||nextSchedule<nextEvent))?'schedule':'event';
+  }
+  const showSwitch=hasEvent&&hasSchedule;
+  if(labelEl)labelEl.innerHTML=`<i class="ti ti-calendar-heart" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>${mode==='event'?'오늘 일정':'타임테이블'}${showSwitch?' <i class="ti ti-switch-horizontal" aria-hidden="true"></i>':''}`;
+  if(mode==='schedule'){
+    evEl.style.display='none';
+    if(ttEl){
+      ttEl.style.display='block';
+      ttEl.innerHTML=scheduleItems.length?scheduleItems.map(it=>{
+        return `<div class="event-row${it.done?' past':''}"><span class="event-time">${it.time}</span>${escapeHtml(it.label)}</div>`;
+      }).join(''):'<div class="empty-msg">오늘 등록된 시간표가 없어요</div>';
+    }
+    return;
+  }
+  evEl.style.display='';
+  if(ttEl)ttEl.style.display='none';
   evEl.innerHTML=sorted.length?sorted.map(e=>{
     let isPast=false;
     if(isToday&&e.event_time){

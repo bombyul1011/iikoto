@@ -1708,7 +1708,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="grid3">
         <div class="card todo-card"><div class="card-lbl"><i class="ti ti-list-check" style="color:rgba(var(--pal-orange-rgb),1);" aria-hidden="true"></i>오늘 할 일</div><div id="today-todos"></div></div>
         <div class="grid3-right">
-          <div class="card event-card" id="today-event-card"><div class="card-lbl"><i class="ti ti-calendar-heart" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>오늘 일정</div><div id="today-events"></div></div>
+          <div class="card event-card" id="today-event-card"><div class="card-lbl" id="today-event-label" onclick="toggleTabletEventMode()"><i class="ti ti-calendar-heart" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>오늘 일정</div><div id="today-events"></div><div id="today-timetable" style="display:none;"></div></div>
           <div class="card sleep-card"><div class="sleep-hdr"><div class="card-lbl"><i class="ti ti-moon-stars" style="color:rgba(var(--pal-sky-rgb),1);" aria-hidden="true"></i>수면<span class="sleep-time-sub" id="today-sleep-time-sub"></span></div><div class="sleep-score-row" id="today-sleep-score"></div></div><div id="today-sleep"></div></div>
         </div>
       </div>
