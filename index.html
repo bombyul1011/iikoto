@@ -1,6 +1,6 @@
 <!DOCTYPE html>
-<!-- build: 20260830-01 -->
-<!-- iikoto v2.29-habit-timetable-fixes -->
+<!-- build: 20260830-02 -->
+<!-- iikoto v2.30-schedule-fixes -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -509,16 +509,16 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rt-body{display:flex;gap:12px;}
 .rt-donut{flex-shrink:0;width:58px;height:58px;position:relative;}
 .rt-donut svg{width:100%;height:100%;transform:rotate(-90deg);}
-.rt-list{flex:1;min-width:0;height:58px;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:5px;padding:0 4px 0 4px;margin:0 -4px;scrollbar-width:thin;}
+.rt-list{flex:1;min-width:0;height:58px;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:5px;scrollbar-width:thin;}
 .rt-list::-webkit-scrollbar{width:3px;}
 .rt-list::-webkit-scrollbar-thumb{background:var(--card-b);border-radius:3px;}
-.rt-item{display:flex;align-items:center;gap:7px;flex-shrink:0;}
+.rt-item{display:flex;align-items:center;gap:7px;flex-shrink:0;padding:2px 4px;}
 .rt-item .chk{margin:0;border-radius:50%;}
 .rt-time{font-size:var(--main-text-size);color:var(--ts);font-variant-numeric:tabular-nums;flex-shrink:0;width:34px;}
 .rt-text{font-size:var(--main-text-size);color:var(--tp);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;cursor:pointer;}
 .rt-item.done .rt-text{color:var(--tm);text-decoration:line-through;text-decoration-color:var(--tm);text-decoration-thickness:1px;}
 .rt-item.current .rt-time,.rt-item.current .rt-text{color:var(--tp);}
-.rt-item.current{background:rgba(var(--pal-pink-rgb),0.12);border-radius:18px;padding:2px 4px;}
+.rt-item.current{background:rgba(var(--pal-pink-rgb),0.12);border-radius:18px;}
 #event-section-label{cursor:pointer;display:inline-flex;align-items:center;gap:4px;}
 #event-section-label i{font-size:12px;opacity:.6;}
 .todo-pinned-chk{width:16px;height:16px;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:17px;color:var(--pal-orange-border);}
@@ -6280,7 +6280,13 @@ function renderScheduleDonut(dk){
   const raw=computeRhythmBlocksRaw(dk);
   const nowMin=_nowMinIfToday(dk);
   let circles='<circle cx="29" cy="29" r="23" fill="none" stroke="var(--empty-bg)" stroke-width="13"/>';
-  raw.forEach(function(b){
+  // 겹치는 구간에서 짧은 시간대가 위로 오도록, 긴 구간부터 먼저 그리고 짧은 구간을 나중에(위에) 그림
+  const sorted=raw.slice().sort(function(a,b){
+    const da=(a.end==null?((nowMin!=null&&nowMin>a.start)?nowMin:a.start+1):a.end)-a.start;
+    const db=(b.end==null?((nowMin!=null&&nowMin>b.start)?nowMin:b.start+1):b.end)-b.start;
+    return db-da; // 긴 구간 먼저(아래), 짧은 구간 나중(위)
+  });
+  sorted.forEach(function(b){
     let s=b.start,e=b.end;
     if(e==null)e=(nowMin!=null&&nowMin>s)?nowMin:s+1; // 진행중 블록은 현재 시각까지, 정보 없으면 최소폭
     if(e<=s)e=s+1; // 자정 넘김 등 역전 방지(당일 도넛에서는 다음날로 안 넘기고 그 자리에서 끝냄)
