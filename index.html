@@ -1,7 +1,6 @@
 <!DOCTYPE html>
-<!-- build: 20260826-02 -->
-<!-- iikoto v2.7 -->
-<!-- build: 20260815-10-reserve-final -->
+<!-- build: 20260830-01 -->
+<!-- iikoto v2.29-habit-timetable-fixes -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -2375,7 +2374,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 <script>
 
 // 일요일 0시~월요일 24시 구간(일요일 전체+월요일 전체)에 노출되는 "주간 돌아보기" 배너/시트가 참조할 "그 주 일요일" 날짜키.
-// 그중 생성 가능한 시점은 일요일 22시(night_2)뿐이고 나머지는 모두 조회 전용(appendSundayReadOnlyBanner 참고).
+// 생성 가능한 시점은 일요일 22시(night_2)뿐. 그 외 시점의 조회는 아카이브앱으로 분리됨.
 // getLogicalDate()는 새벽 4시 컷이라 월요일 저녁(19~24시)엔 그냥 "월요일"을 반환해버려서,
 // 이 구간에서 곧이곧대로 쓰면 일요일 밤에 만들어둔 weekly_summary_ 캐시를 못 찾는 문제가 생김.
 // 그래서 "화~토요일(2~6)"이면 오늘, "일요일(0)"이면 오늘, "월요일(1)"이면 하루 전으로 보정.
@@ -2387,6 +2386,28 @@ function _thisWeekSundayDk(){
   return dateKey(d);
 }
 // 일요일 22시(생성 시점) 전용 배너 — 클릭 시 없으면 새로 생성(openWeeklyReviewSheet).
+// 월요일 한정 — 지난주(그 주 일요일) 요약이 아직 없으면(=일요일 22시 생성을 놓친 경우) 조용히 생성.
+// 화면에 배너를 띄우지 않고, 완료 시 토스트로만 알림(조회는 아카이브앱). 중복 실행 방지용 플래그 포함.
+let _backfillInFlight=false;
+async function maybeBackfillWeeklyReview(){
+  if(_backfillInFlight)return;
+  const dk=_thisWeekSundayDk();
+  const cacheKey='weekly_summary_'+dk;
+  if(S.get(cacheKey))return; // 이미 있음(정상 생성됨) — 아무 일도 하지 않음
+  if(!getClaudeKey())return; // 생성 불가 환경이면 조용히 스킵
+  _backfillInFlight=true;
+  try{
+    const serverHtml=await aiCacheGet(cacheKey);
+    if(serverHtml){S.set(cacheKey,serverHtml);return;} // 다른 기기에서 이미 생성된 경우 — 토스트 없이 조용히 캐싱만
+    const html=await makeWeeklySummaryCard();
+    if(html&&!html.includes('__ERR__')){
+      S.set(cacheKey,html);
+      aiCacheSet(cacheKey,html);
+      showToast('지난주 요약이 준비됐어요 🌿');
+    }
+  }catch(e){}
+  finally{_backfillInFlight=false;}
+}
 function appendSundayGenerateBanner(body){
   const banner=document.createElement('div');
   banner.className='weekly-review-banner';
@@ -2397,17 +2418,6 @@ function appendSundayGenerateBanner(body){
   banner.addEventListener('click',openWeeklyReviewSheet);
   body.appendChild(banner);
 }
-// 그 외 노출 구간(새벽~월요일 종일) 전용 배너 — 클릭해도 조회만(openWeeklyReviewSheetReadOnly), 절대 생성하지 않음.
-function appendSundayReadOnlyBanner(body){
-  const banner=document.createElement('div');
-  banner.className='weekly-review-banner';
-  banner.innerHTML=`<div class="weekly-review-banner-inner">
-    <div class="weekly-review-banner-title"><i class="ti ti-sparkles ico-13" aria-hidden="true"></i> 주간 돌아보기 <i class="ti ti-sparkles ico-13" aria-hidden="true"></i></div>
-    <div class="weekly-review-banner-sub"><span>지난 한주간의 나는 어땠을까요?</span><span style="font-size:15px;opacity:0.6;"><i class="ti ti-chevron-up" aria-hidden="true"></i></span></div>
-  </div>`;
-  banner.addEventListener('click',openWeeklyReviewSheetReadOnly);
-  body.appendChild(banner);
-}
 function renderHomeBody(section){
   const body=document.getElementById('home-body');
   if(!body)return;
@@ -2415,13 +2425,13 @@ function renderHomeBody(section){
   const _ld=getLogicalDate();
   const _lh=new Date().getHours();
   const _isLateNightOrDawn=_lh>=22||_lh<6; // 기간별 리포트(월간 중간·말일) 전용 — 파트2(22시)+새벽에만 노출
-  // 주간리포트 배너: 일요일 22시(night_2)에만 "생성 가능" 배너, 그 외 일~월요일 전체(새벽/아침/오후/저녁)엔 "조회 전용" 배너.
-  // 생성과 조회를 완전히 다른 함수(appendSundayGenerateBanner/appendSundayReadOnlyBanner)로 분리해뒀기 때문에,
-  // 여기선 "지금이 몇 시인지" 더 따질 필요 없이 이 두 값만 보면 됨.
+  // 주간리포트 배너: 일요일 22시(night_2)에만 "생성 가능" 배너. 그 외 시점은 노출 없음(조회는 아카이브앱으로 분리됨).
   const _ldDay=_ld.getDay(); // 논리적 요일(새벽 4시 컷) — 물리적 getDay() 대신 사용, 새벽 0~4시 구간 오작동 방지
   const isSundayNight2=_ldDay===0&&getSubSection()==='night_2';
-  const showWeeklyReviewReadOnly=(_ldDay===0||_ldDay===1)&&!isSundayNight2;
   const isLastDayOfMonth=(()=>{const t=new Date(_ld);t.setDate(_ld.getDate()+1);return t.getDate()===1;})()&&_isLateNightOrDawn;
+  // 월요일 한정 놓친 주간요약 보완 — 일요일 22시(생성 시점)를 놓쳐서 지난주 캐시가 없으면
+  // 배너 없이 조용히 백그라운드 생성 후 토스트만 알림. 화면엔 아무것도 띄우지 않음(조회는 아카이브앱에서).
+  if(_ldDay===1)maybeBackfillWeeklyReview();
 
   if(section==='morning'){
     // 어제 돌아보기 카드, 운동 체크 배너 모두 제거됨 — 아침 루틴(굿모닝) 카드로 대체
@@ -2435,12 +2445,10 @@ function renderHomeBody(section){
     if(!isMorning2){
       body.appendChild(makeRecentContentsCard());
     }
-    if(showWeeklyReviewReadOnly)appendSundayReadOnlyBanner(body);
   } else if(section==='afternoon'){
     body.appendChild(makeAfternoonPaceCard());
     refreshAfternoonPaceCard();
     body.appendChild(makeTodayRhythmBanner());
-    if(showWeeklyReviewReadOnly)appendSundayReadOnlyBanner(body);
   } else if(section==='dawn'){
     const dawnDk=dateKey(getLogicalDate());
     const paceBanner=makeDawnPaceBanner(dawnDk);
@@ -2448,7 +2456,6 @@ function renderHomeBody(section){
     body.appendChild(makeDawnRecapCard());
     body.appendChild(makeLabel('오늘의 리듬'));
     body.appendChild(makeTodayRhythmBanner());
-    if(showWeeklyReviewReadOnly)appendSundayReadOnlyBanner(body);
   } else {
     // 저녁 공통 틀: [그날의 특수 배너] → 링 → 리듬배너 → (브리핑) → 독서카드
     // 네 갈래(말일/일요일/수요일/평일) 모두 이 순서를 그대로 따름 — 특수 배너만 가변
@@ -2474,7 +2481,7 @@ function renderHomeBody(section){
     }
     body.appendChild(makeTodayRhythmBanner());
     // 일요일 다음 주 챌린지 준비 배너는 홈탭에서 제거 — 주간탭 "이번 주도 화이팅" 카드로 흡수됨
-    if(!isSundayNight2&&!showWeeklyReviewReadOnly){
+    if(!isSundayNight2){
       // "오늘 마무리" 브리핑은 통합카드(상단 인삿말)가 흡수함
     }
     if(isNight2){
@@ -2487,7 +2494,6 @@ function renderHomeBody(section){
     }else{
       body.appendChild(makeEveningMiniStatCard());
     }
-    if(showWeeklyReviewReadOnly)appendSundayReadOnlyBanner(body);
   }
 }
 
@@ -3834,9 +3840,9 @@ function _recentWeekSundays(){
   }
   return out; // [이번주 일요일, 1주전]
 }
-// 칩 렌더링 — readOnly=true면 클릭 시 조회만(생성 경로 없음), false면 기존처럼 이번주 캐시 없을 시 생성 시도.
+// 칩 렌더링 — 클릭 시 이번주 캐시 없으면 생성 시도(loadWeeklyReviewFor).
 // 라벨: 배열 0번(가장 최근 일요일)이 "지난주"이고 이후 2주전/3주전/4주전 순.
-function renderWeekReviewChips(activeDk,readOnly){
+function renderWeekReviewChips(activeDk){
   const wrap=document.getElementById('wr-week-chips');if(!wrap)return;
   const weeks=_recentWeekSundays();
   wrap.innerHTML='';
@@ -3844,34 +3850,8 @@ function renderWeekReviewChips(activeDk,readOnly){
     const chip=document.createElement('div');
     chip.className='m-chip'+(dk===activeDk?' active':'');
     chip.textContent=i===0?'지난주':(i+1)+'주전';
-    chip.addEventListener('click',()=>readOnly?loadWeeklyReviewReadOnly(dk):loadWeeklyReviewFor(dk));
+    chip.addEventListener('click',()=>loadWeeklyReviewFor(dk));
     wrap.appendChild(chip);
-  });
-}
-// 순수 조회 — 캐시에 있으면 보여주고, 없으면 "아직 없어요" 안내만(단, 월요일+지난주 한정으로 놓친 생성을 만회할 보조 버튼 표시).
-function loadWeeklyReviewReadOnly(dk){
-  renderWeekReviewChips(dk,true);
-  const content=document.getElementById('weekly-review-content');
-  const cacheKey='weekly_summary_'+dk;
-  const cached=S.get(cacheKey);
-  if(cached){content.innerHTML=cached;return;}
-  content.innerHTML='<div class="sheet-loading-msg">불러오는 중이에요...</div>';
-  aiCacheGet(cacheKey).then(function(serverHtml){
-    if(serverHtml){
-      S.set(cacheKey,serverHtml);
-      content.innerHTML=serverHtml;
-      return;
-    }
-    // 유예 조건: 오늘이 월요일이고, 지금 보고 있는 주차(dk)가 바로 그 "지난주"(_thisWeekSundayDk 기준)일 때만.
-    // 화요일이 되거나, 2주전 이상 더 예전 주차면 이 버튼 없이 기존처럼 안내만 뜸(설계 원칙 그대로 유지).
-    const canMakeUp=(new Date().getDay()===1)&&(dk===_thisWeekSundayDk());
-    if(canMakeUp){
-      content.innerHTML='<div class="sheet-loading-msg">이 주는 아직 기록된 요약이 없어요 🌿<br><span id="wr-makeup-btn" style="display:inline-block;margin-top:10px;font-size:var(--dow-label-size);color:var(--pal-mauvepink);opacity:0.8;text-decoration:underline;cursor:pointer;">놓친 주간요약 만들기</span></div>';
-      const btn=document.getElementById('wr-makeup-btn');
-      if(btn)btn.onclick=()=>loadWeeklyReviewFor(dk);
-    }else{
-      content.innerHTML='<div class="sheet-loading-msg">이 주는 아직 기록된 요약이 없어요 🌿</div>';
-    }
   });
 }
 function loadWeeklyReviewFor(dk){
@@ -3912,14 +3892,6 @@ function openWeeklyReviewSheet(){
   openSheet('weekly-review-sheet');
   loadWeeklyReviewFor(_thisWeekSundayDk());
 }
-// 조회 전용 진입점 — 일요일 22시(생성 시점) 외의 모든 노출 구간(일요일 0~22시/월요일 종일)에서 씀.
-// 캐시 조회만 하고 생성 경로(makeWeeklySummaryCard)를 아예 타지 않으므로,
-// "지금이 생성해도 되는 시점인가"를 따질 필요가 원천적으로 없음 — 재생성 우려 자체가 없는 구조.
-function openWeeklyReviewSheetReadOnly(){
-  openSheet('weekly-review-sheet');
-  loadWeeklyReviewReadOnly(_thisWeekSundayDk());
-}
-
 async function makeWeeklySummaryCard(){
   // 하루치 메모 중 N개를 시간대 전체에 고르게 펼쳐서 뽑기 (아침 루틴 멘트로만 쏠리는 것 방지)
   const evenSample=(arr,n)=>{
