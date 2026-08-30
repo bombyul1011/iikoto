@@ -8166,6 +8166,7 @@ function selectTodoKind(kind,btn){
   document.getElementById('todo-time-sel').style.display=kind==='todo'?'flex':'none';
   document.getElementById('todo-event-sel').style.display=kind==='event'?'flex':'none';
   document.getElementById('todo-event-time-row').style.display=kind==='event'?'flex':'none';
+  document.getElementById('todo-pinned-toggle').style.display=kind==='todo'?'flex':'none';
   if(kind!=='event')document.getElementById('todo-multiday-end-row').style.display='none';
 }
 // dk(YYYY-MM-DD)를 화면 표시용 짧은 포맷(MM.DD)으로 변환 — 저장값(input.value/dataset)은 항상 dk 원본 유지, 표시만 축약
