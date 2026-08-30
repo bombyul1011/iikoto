@@ -6340,7 +6340,7 @@ function renderEventList(dk,todos){
     mode=(nextSchedule!=null&&(nextEvent==null||nextSchedule<nextEvent))?'schedule':'event';
   }
   const showSwitch=hasEvent&&hasSchedule;
-  if(label)label.innerHTML=(mode==='event'?'오늘 일정':'오늘의 흐름')+(showSwitch?' <i class="ti ti-switch-horizontal" aria-hidden="true"></i>':'');
+  if(label)label.innerHTML=(mode==='event'?'오늘 일정':'타임테이블')+(showSwitch?' <i class="ti ti-switch-horizontal" aria-hidden="true"></i>':'');
   if(mode==='schedule'){
     list.innerHTML='';list.style.display='none';
     if(scheduleBody)scheduleBody.style.display='flex';
