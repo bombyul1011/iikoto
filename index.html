@@ -9745,7 +9745,6 @@ function openContentProgressModal(cid,watchedNow){
   }
   _cpgDoneConfirmCid=null;_cpgDoneConfirmMk=null;
   openModal('content-progress-modal');
-  setTimeout(()=>{inp.focus();inp.select();},100);
 }
 // 감상 메모 저장 공용 헬퍼 — contents 항목 자체의 notes[] 배열에 직접 저장(구 goal_notes/wcal_note 방식에서 통합, 2026-08-29).
 // cat: 콘텐츠 카테고리('movie'|'drama'|'book' 등) — 책도 여기 합류해 코멘트 모아보기 타임라인에 함께 노출됨(독서코너 자체엔 별도 노출 안 함).
