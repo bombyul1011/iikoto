@@ -4695,7 +4695,9 @@ async function supaUpsert(path,onConflict,body){
 }
 // ── AI 캐시 (서버 공유) ──
 // 목적: API 키가 있는 기기(주로 모바일)가 생성한 AI 문구를, 키가 없는 기기(주로 PC)도 그대로 볼 수 있게 서버에 저장.
-// 용량이 매우 작아(텍스트 위주, 무료 플랜 500MB 기준 수십 년치 여유) 만료/삭제 로직 없이 영구 보관.
+// 용량이 매우 작아(텍스트 위주, 무료 플랜 500MB 기준 수십 년치 여유) 리포트류(weekly/monthly/nutricomment 등)는 만료/삭제 없이 영구 보관.
+// 단, greeting_*(홈탭 인사카드)만은 예외 — 그날 그 시간대(subSection)에만 조회되고 이후 다시 읽히지 않는 순수 캐시라
+// 오래된 것을 남겨둘 이유가 없음(아래 cleanupOldGreetingCache 참고, 2026-08-30).
 async function aiCacheGet(cacheKey){
   const rows=await supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent(cacheKey)}&select=content`);
   if(!rows||!rows.length)return null;
@@ -4703,6 +4705,19 @@ async function aiCacheGet(cacheKey){
 }
 async function aiCacheSet(cacheKey,content){
   await supaUpsert('ai_cache','cache_key',[{cache_key:cacheKey,content}]);
+}
+// 3일 지난 greeting_* 캐시 정리 — 앱 시작(스플래시) 시점에 호출.
+// 매번 서버에 삭제 요청을 보내지 않도록, 로컬에 마지막 정리 시각을 남겨 7일에 한 번만 실제로 실행.
+// (매일 돌리든 일주일에 한 번 돌리든 최종적으로 남는 데이터는 동일 — 실행 빈도만 낮춰 서버 부담을 줄임)
+const GREETING_CLEANUP_INTERVAL_MS=7*24*60*60*1000;
+const GREETING_CLEANUP_KEEP_DAYS=3;
+async function cleanupOldGreetingCache(){
+  if(!navigator.onLine)return;
+  const last=S.get('greeting_cleanup_last')||0;
+  if(Date.now()-last<GREETING_CLEANUP_INTERVAL_MS)return;
+  const cutoff=new Date();cutoff.setDate(cutoff.getDate()-GREETING_CLEANUP_KEEP_DAYS);
+  const res=await supaFetch(`ai_cache?cache_key=like.greeting_*&created_at=lt.${cutoff.toISOString()}`,'DELETE');
+  if(res!==null)S.set('greeting_cleanup_last',Date.now()); // 실패 시 다음 시작 때 다시 시도하도록 시각 갱신 안 함
 }
 // ── 배열형(하루/월 단위 여러 행) 동기화: DELETE 후 POST가 아니라
 // upsert(추가/수정) + 로컬에서 사라진 항목만 개별 삭제로 처리.
@@ -13887,7 +13902,10 @@ loadDaily();
 })();
 // 최초 로드 시엔 로컬 캐시만으로 그려지므로(completedAt 등 최신 서버값 반영 전),
 // online/visibilitychange 이벤트를 기다리지 않고 여기서 한 번 동기화를 실행해 최신 상태로 맞춘다.
-if(navigator.onLine)syncAll();
+if(navigator.onLine){
+  syncAll();
+  cleanupOldGreetingCache(); // fire-and-forget — 실패해도 다음 앱 시작 때 재시도되므로 await로 초기화를 막지 않음
+}
 
 // Service Worker 등록 (오프라인 지원)
 if('serviceWorker' in navigator){
