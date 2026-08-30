@@ -70,7 +70,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --bg:linear-gradient(145deg,#fdf0e8 0%,#fef5d4 50%,#fde8f0 100%);
   --tp:#6b5248;--ts:#a3897c;--tm:#d4bcb0;
   --card:rgba(255,250,240,0.75);--card-b:rgba(230,200,140,0.40);
-  --empty-bg:rgba(210,190,175,0.20); /* 타임테이블 도넛 — 리듬 기록 없는 빈 시간 구간 배경 */
+  --empty-bg:rgba(210,190,175,0.20); /* 시간표 도넛 — 리듬 기록 없는 빈 시간 구간 배경 */
   --card-p:rgba(var(--pal-pink-rgb),0.15);--card-pb:rgba(var(--pal-pink-rgb),0.32); /* 메모 배너 — pink-bg보다 더 옅은 농도(0.15)로 별도 조정됨, 2026-08-16 공용팔레트 참조로 전환, 테두리는 투두/식사와 동일하게 알파 개별조정 */
   --card-m:rgba(200,240,235,0.42);--card-mb:rgba(160,220,215,0.55);
   --card-y:rgba(var(--pal-yellow-rgb),0.22);--card-yb:rgba(var(--pal-yellow-rgb),0.32); /* 투두 배너 — 2026-08-16 공용팔레트 참조로 전환, 알파를 기존톤에 맞춰 재조정 */
@@ -94,7 +94,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --bg:linear-gradient(165deg,#f7f4ee 0%,#f3f1ec 55%,#f6f3ee 100%);
   --tp:#5c5650;--ts:#8a8278;--tm:#b8b0a4;
   --card:rgba(255,253,248,0.50);--card-b:rgba(200,175,140,0.55);
-  --empty-bg:rgba(200,175,140,0.16); /* 타임테이블 도넛 — 리듬 기록 없는 빈 시간 구간 배경 */
+  --empty-bg:rgba(200,175,140,0.16); /* 시간표 도넛 — 리듬 기록 없는 빈 시간 구간 배경 */
   --card-p:var(--card);--card-pb:var(--pal-pink-border);
   --card-m:var(--card);--card-mb:rgba(135,205,195,0.55);
   --card-y:var(--card);--card-yb:rgba(250,215,100,0.62);
@@ -505,11 +505,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .todo-kind-tabs button{flex:1;padding:12px 0;border:none;background:rgba(200,180,170,0.12);color:var(--tm);font-size:var(--dow-label-size);cursor:pointer;font-family:'DM Sans',sans-serif;transition:background .15s,color .15s;display:flex;align-items:center;justify-content:center;gap:5px;}
 .todo-kind-tabs button.active{background:var(--card);color:var(--tp);font-weight:600;}
 .chk{width:16px;height:16px;border-radius:5px;border:1.5px solid rgba(200,160,160,0.55);flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;}
-/* 타임테이블 배너 — 도넛(실제 리듬 기록)+시간표(투두 HH:MM) 리스트. 체크박스는 .chk 그대로 재사용. */
+/* 시간표 배너 — 도넛(실제 리듬 기록)+할일(투두 HH:MM) 리스트. 체크박스는 .chk 그대로 재사용. */
 .rt-body{display:flex;gap:12px;}
 .rt-donut{flex-shrink:0;width:58px;height:58px;position:relative;}
 .rt-donut svg{width:100%;height:100%;transform:rotate(-90deg);}
-.rt-list{flex:1;min-width:0;height:58px;overflow-y:auto;display:flex;flex-direction:column;gap:5px;padding-right:2px;scrollbar-width:thin;}
+.rt-list{flex:1;min-width:0;height:58px;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:5px;padding:0 4px 0 4px;margin:0 -4px;scrollbar-width:thin;}
 .rt-list::-webkit-scrollbar{width:3px;}
 .rt-list::-webkit-scrollbar-thumb{background:var(--card-b);border-radius:3px;}
 .rt-item{display:flex;align-items:center;gap:7px;flex-shrink:0;}
@@ -518,7 +518,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rt-text{font-size:var(--main-text-size);color:var(--tp);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;cursor:pointer;}
 .rt-item.done .rt-text{color:var(--tm);text-decoration:line-through;text-decoration-color:var(--tm);text-decoration-thickness:1px;}
 .rt-item.current .rt-time,.rt-item.current .rt-text{color:var(--tp);}
-.rt-item.current{background:rgba(var(--pal-pink-rgb),0.12);border-radius:12px;margin:-2px -4px;padding:2px 4px;}
+.rt-item.current{background:rgba(var(--pal-pink-rgb),0.12);border-radius:18px;padding:2px 4px;}
 #event-section-label{cursor:pointer;display:inline-flex;align-items:center;gap:4px;}
 #event-section-label i{font-size:12px;opacity:.6;}
 .todo-pinned-chk{width:16px;height:16px;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:17px;color:var(--pal-orange-border);}
@@ -602,7 +602,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .tt-cat-fixed{width:60px;flex-shrink:0;font-size:var(--dow-label-size);color:var(--ts);cursor:pointer;padding-right:4px;-webkit-tap-highlight-color:rgba(var(--pal-pink-rgb),0.20);user-select:none;}
 .tt-cat-fixed span span:last-child{text-decoration:underline dotted;text-decoration-color:rgba(150,130,120,0.35);text-underline-offset:2px;}
 .tt-cat-fixed.tt-cat-sub{cursor:default;text-decoration:none;opacity:0.35;}
-.tt-date-scroll{flex:1;overflow-x:auto;-webkit-overflow-scrolling:touch;cursor:pointer;touch-action:pan-x;}
+.tt-date-scroll{flex:1;overflow-x:hidden;touch-action:pan-y;}
 .tt-date-scroll::-webkit-scrollbar{display:none;}
 .tt-date-scroll{-ms-overflow-style:none;scrollbar-width:none;}
 .tt-date-inner{display:flex;gap:2px;}
@@ -6273,7 +6273,7 @@ function parseScheduleTodos(dk,todos){
   });
   return items;
 }
-// 타임테이블 도넛 — 실제 리듬 기록(computeRhythmBlocksRaw) 그대로 시각화. 빈 시간은 배경(웜그레이 톤)으로 남김.
+// 시간표 도넛 — 실제 리듬 기록(computeRhythmBlocksRaw) 그대로 시각화. 빈 시간은 배경(웜그레이 톤)으로 남김.
 function renderScheduleDonut(dk){
   const wrap=document.getElementById('schedule-donut');
   if(!wrap)return;
@@ -6306,7 +6306,7 @@ function renderScheduleList(dk,items){
     list.appendChild(el);
   });
 }
-// 오늘 일정 / 타임테이블 — 같은 자리(event-section)에서 교차 노출. 둘 다 있는 날에만 제목 옆 전환 아이콘 노출.
+// 오늘 일정 / 시간표 — 같은 자리(event-section)에서 교차 노출. 둘 다 있는 날에만 제목 옆 전환 아이콘 노출.
 // 둘 다 있는 날 자동 선노출 기준 — 각자 카테고리에서 가장 가까운(아직 안 지난) 항목의 시각끼리 비교, 더 가까운 쪽 선노출.
 // 사용자가 제목을 탭해 수동 전환하면 그 값을 세션 동안 유지(재계산하지 않음) — 오늘탭 재진입(loadDaily) 또는 조회 날짜 변경 시에만 자동판단으로 리셋.
 let _todayBannerMode=null;
@@ -6351,7 +6351,7 @@ function renderEventList(dk,todos){
     mode=(nextSchedule!=null&&(nextEvent==null||nextSchedule<nextEvent))?'schedule':'event';
   }
   const showSwitch=hasEvent&&hasSchedule;
-  if(label)label.innerHTML=(mode==='event'?'오늘 일정':'타임테이블')+(showSwitch?' <i class="ti ti-switch-horizontal" aria-hidden="true"></i>':'');
+  if(label)label.innerHTML=(mode==='event'?'오늘 일정':'시간표')+(showSwitch?' <i class="ti ti-switch-horizontal" aria-hidden="true"></i>':'');
   if(mode==='schedule'){
     list.innerHTML='';list.style.display='none';
     if(scheduleBody)scheduleBody.style.display='flex';
