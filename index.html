@@ -2057,7 +2057,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   <div class="modal" style="max-width:300px;" onclick="event.stopPropagation()">
     <div class="modal-title" id="cpg-title">진행률 입력</div>
     <div style="font-size:var(--dow-label-size);color:var(--tm);margin-bottom:10px;" id="cpg-sub"></div>
-    <input class="modal-inp" id="cpg-inp" type="number" inputmode="numeric" placeholder="0">
+    <input class="modal-inp" id="cpg-inp" type="number" inputmode="numeric" placeholder="0" onfocus="this.value=''">
     <textarea id="cpg-note-inp" class="rhythm-memo-inp" style="margin-top:8px;min-height:44px;" placeholder="오늘 본 것에서 인상적이었던 순간을 가볍게 남겨보세요 (선택)"></textarea>
     <div id="cpg-done-confirm" style="display:none;"></div>
     <div class="modal-actions" id="cpg-modal-actions">
