@@ -274,7 +274,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .event-item.event-past{opacity:0.45;}
 .event-item.event-past .event-txt{text-decoration:line-through;}
 .event-txt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.event-time{font-size:var(--dow-label-size);color:var(--ts);flex-shrink:0;font-variant-numeric:tabular-nums;}
+.event-time{font-size:var(--main-text-size);color:var(--ts);flex-shrink:0;font-variant-numeric:tabular-nums;}
 .event-daycount{background:rgba(185,165,230,0.20);color:#8a76b8;padding:2px 7px;border-radius:8px;font-weight:600;}
 .todo-item:last-of-type{border-bottom:none;}
 .todo-item.reorder-active{z-index:5;background:var(--card);box-shadow:0 2px 8px rgba(0,0,0,0.12);border-radius:8px;}
@@ -8196,9 +8196,14 @@ function openTodoEventStartDatePicker(){
   const curVal=modal.dataset.eventStartDate||dateKey(currentDate);
   openDatePickerModal(curVal,function(selectedDk){
     const endVal=modal.dataset.eventEndDate;
-    if(endVal&&selectedDk>endVal){showToast('시작일은 종료일 이전으로 선택해주세요');return;}
     startInp.value=shortDk(selectedDk);
     modal.dataset.eventStartDate=selectedDk;
+    // 종료일이 시작일보다 앞서게 되면(=일정을 뒤로 미룸) 종료일도 시작일과 같은 날로 함께 이동
+    if(endVal&&selectedDk>endVal){
+      const endInp=document.getElementById('todo-event-end-date');
+      endInp.value=shortDk(selectedDk);
+      modal.dataset.eventEndDate=selectedDk;
+    }
   },'날짜 선택','확인');
 }
 function openTodoEventEndDatePicker(){
