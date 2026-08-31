@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.32-vertical-order';
+const CACHE = 'iikoto-v2.33-revert-ipad';
 const ASSETS = [
   './',
   './index.html'
