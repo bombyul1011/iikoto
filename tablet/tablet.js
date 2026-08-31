@@ -1652,12 +1652,13 @@ function renderWeekKeywords(memoRows,onelineRows){
     const ratio=maxCnt===minCnt?1:(c-minCnt)/(maxCnt-minCnt);
     const fontSize=18+ratio*16; // 18px~34px
     const col=i%gridCols,row=Math.floor(i/gridCols);
-    // 칸 중심 기준 무작위 오프셋(카드형 배치가 자연스럽게 불규칙해 보이도록). 카드 가장자리에서 텍스트가
-    // 잘리지 않도록 전체 범위를 12%~88%로 한 번 더 clamp — 특히 폰트가 큰 1위 단어가 가장자리에 걸리는 걸 방지.
-    const rawCx=col*cellW+cellW/2+(Math.random()-0.5)*cellW*0.5;
-    const rawCy=row*cellH+cellH/2+(Math.random()-0.5)*cellH*0.45;
-    const cx=Math.min(88,Math.max(12,rawCx));
-    const cy=Math.min(85,Math.max(15,rawCy));
+    // 칸 중심 기준 무작위 오프셋(카드형 배치가 자연스럽게 불규칙해 보이도록). 카드가 이제 flex:1로 옆 독서카드
+    // 높이를 그대로 따라가고 overflow:hidden도 걸려있어 넘칠 걱정이 없으므로, 세로 범위를 10%~90%까지 넓게 써서
+    // 카드 하단 여백이 비어 보이지 않도록 함(2026-08-31, 사용자 피드백: 하단 공간을 못 쓰는 것 같다).
+    const rawCx=col*cellW+cellW/2+(Math.random()-0.5)*cellW*0.45;
+    const rawCy=row*cellH+cellH/2+(Math.random()-0.5)*cellH*0.7;
+    const cx=Math.min(85,Math.max(15,rawCx));
+    const cy=Math.min(90,Math.max(10,rawCy));
     const rotate=(Math.random()-0.5)*24; // -12deg~12deg
     const color=WEEK_KW_COLORS[i%WEEK_KW_COLORS.length];
     return `<div class="week-kw-word" style="left:${cx}%;top:${cy}%;font-size:${fontSize}px;color:${color};transform:translate(-50%,-50%) rotate(${rotate}deg);">${escapeHtml(w)}<span class="week-kw-cnt">${c}</span></div>`;
@@ -2611,35 +2612,46 @@ let _readReportsServerSynced=false; // 이번 세션에서 서버 목록을 이�
 function _loadReadReports(){
   try{
     const raw=localStorage.getItem(REPORT_READ_KEY);
-    return raw?new Set(JSON.parse(raw)):new Set();
-  }catch(e){return new Set();}
+    if(!raw)return{};
+    const parsed=JSON.parse(raw);
+    // 구버전(배열) 데이터 마이그레이션 — {cacheKey:'1'}로 변환해 "버전 무관 읽음"으로 유지(과거 읽음은 존중하되, 이후 재발행분부터 새 로직 적용)
+    if(Array.isArray(parsed)){const map={};parsed.forEach(k=>{map[k]='1';});return map;}
+    return parsed&&typeof parsed==='object'?parsed:{};
+  }catch(e){return{};}
 }
-function _saveReadReports(set){
-  try{localStorage.setItem(REPORT_READ_KEY,JSON.stringify([...set]));}catch(e){}
+function _saveReadReports(map){
+  try{localStorage.setItem(REPORT_READ_KEY,JSON.stringify(map));}catch(e){}
 }
 // PWA를 재설치하면 localStorage가 초기화돼 이미 읽었던 리포트가 다시 "안읽음"으로 뜨는 문제가 있었음 —
 // Supabase ai_cache에 report_read:{cacheKey} 형태로도 저장해두고, 앱 진입 시 그 목록을 한 번 받아와
 // 로컬 Set과 합쳐두면 기기가 바뀌어도(재설치, 다른 기기) 읽음 상태가 유지됨(2026-08-22 확정).
+// content 필드에 읽은 시점의 리포트 created_at을 저장 — 같은 cache_key라도 이후 재발행(created_at 갱신)되면
+// 다시 "안읽음"으로 판정되도록 함(2026-08-31: 예전엔 키 이름만 보고 판정해 재발행된 리포트가 도트 없이 묻히는 문제가 있었음).
 async function _syncReadReportsFromServer(){
   if(_readReportsServerSynced)return; // 세션당 한 번만 — 매 탭 진입마다 전체 목록을 다시 받을 필요는 없음
   try{
-    const rows=await supaFetch(`ai_cache?cache_key=like.${encodeURIComponent(REPORT_READ_PREFIX)}*&select=cache_key`);
-    const serverSet=_loadReadReports();
-    (rows||[]).forEach(r=>serverSet.add(r.cache_key.slice(REPORT_READ_PREFIX.length)));
-    _saveReadReports(serverSet);
+    const rows=await supaFetch(`ai_cache?cache_key=like.${encodeURIComponent(REPORT_READ_PREFIX)}*&select=cache_key,content`);
+    const serverMap=_loadReadReports();
+    (rows||[]).forEach(r=>{serverMap[r.cache_key.slice(REPORT_READ_PREFIX.length)]=r.content||'1';});
+    _saveReadReports(serverMap);
     _readReportsServerSynced=true;
   }catch(e){/* 서버 동기화 실패해도 로컬 캐시만으로 계속 동작 */}
 }
-function _markReportRead(cacheKey){
-  const set=_loadReadReports();
-  if(set.has(cacheKey))return;
-  set.add(cacheKey);
-  _saveReadReports(set);
+function _markReportRead(cacheKey,createdAt){
+  const versionTag=createdAt||'1';
+  const map=_loadReadReports();
+  if(map[cacheKey]===versionTag)return;
+  map[cacheKey]=versionTag;
+  _saveReadReports(map);
   // 서버에도 기록 — 응답을 기다리지 않고 화면은 로컬 캐시로 즉시 갱신(fire-and-forget)
-  supaUpsertAiCache(REPORT_READ_PREFIX+cacheKey,'1').catch(()=>{});
+  supaUpsertAiCache(REPORT_READ_PREFIX+cacheKey,versionTag).catch(()=>{});
 }
-function _isReportRead(cacheKey){
-  return _loadReadReports().has(cacheKey);
+// createdAt을 넘기면 "그 버전을 읽었는지"까지 확인, 넘기지 않으면 기존처럼 "키가 한 번이라도 읽힌 적 있는지"만 확인(하위호환).
+function _isReportRead(cacheKey,createdAt){
+  const map=_loadReadReports();
+  if(!(cacheKey in map))return false;
+  if(!createdAt)return true;
+  return map[cacheKey]===createdAt;
 }
 
 // 본앱과 동일한 "월 소속 주차" 판정: weekMonthKey(그 주 목요일 기준)와 동일 규칙.
@@ -2735,11 +2747,11 @@ async function _loadReportsMonthly(){
   const mk=monthKeyOf(_reportMonthDate);
 
   const [monthlyRows,...weeklyRowsList]=await Promise.all([
-    supaFetch(`ai_cache?cache_key=eq.monthly_report_${mk}&select=cache_key,content,expires_at`),
-    ...weeksInMonth.map(wk=>supaFetch(`ai_cache?cache_key=eq.weekly_summary_${_mondayToSundayDk(wk)}&select=cache_key,content,expires_at`))
+    supaFetch(`ai_cache?cache_key=eq.monthly_report_${mk}&select=cache_key,content,expires_at,created_at`),
+    ...weeksInMonth.map(wk=>supaFetch(`ai_cache?cache_key=eq.weekly_summary_${_mondayToSundayDk(wk)}&select=cache_key,content,expires_at,created_at`))
   ]);
-  const habitRowsList=await Promise.all(weeksInMonth.map(wk=>supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent('challenge_review_week:'+wk)}&select=cache_key,content,expires_at`)));
-  const memoRowsList=await Promise.all(weeksInMonth.map(wk=>supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent('weekly_memo_report_week:'+wk)}&select=cache_key,content,expires_at`)));
+  const habitRowsList=await Promise.all(weeksInMonth.map(wk=>supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent('challenge_review_week:'+wk)}&select=cache_key,content,expires_at,created_at`)));
+  const memoRowsList=await Promise.all(weeksInMonth.map(wk=>supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent('weekly_memo_report_week:'+wk)}&select=cache_key,content,expires_at,created_at`)));
 
   renderReportSummaryList(monthlyRows,weeksInMonth,weeklyRowsList,mk,false);
   renderReportBoxGrid('report-habit-grid',weeksInMonth,habitRowsList,'habit',false);
@@ -2753,19 +2765,19 @@ async function _loadReportsYearly(filter){
 
   if(filter==='weekly'){
     const sundayKeys=weeksInYear.map(wk=>'weekly_summary_'+_mondayToSundayDk(wk));
-    const rows=sundayKeys.length?await supaFetch(`ai_cache?cache_key=in.(${sundayKeys.join(',')})&select=cache_key,content,expires_at`):[];
+    const rows=sundayKeys.length?await supaFetch(`ai_cache?cache_key=in.(${sundayKeys.join(',')})&select=cache_key,content,expires_at,created_at`):[];
     const rowsByKey={};(rows||[]).forEach(r=>{rowsByKey[r.cache_key]=r;});
     const weeklyRowsList=weeksInYear.map(wk=>{const r=rowsByKey['weekly_summary_'+_mondayToSundayDk(wk)];return r?[r]:[];});
     renderReportSummaryList(null,weeksInYear,weeklyRowsList,null,true);
   }else if(filter==='monthly'){
     const mkKeys=[];for(let mo=0;mo<12;mo++)mkKeys.push(`monthly_report_${y}-${pad(mo+1)}`);
-    const rows=await supaFetch(`ai_cache?cache_key=in.(${mkKeys.join(',')})&select=cache_key,content,expires_at`);
+    const rows=await supaFetch(`ai_cache?cache_key=in.(${mkKeys.join(',')})&select=cache_key,content,expires_at,created_at`);
     renderReportMonthlyYearList(rows||[],y);
   }else{
     // habit / memo — 주차별 캐시를 IN 쿼리 1방으로
     const prefix=filter==='habit'?'challenge_review_week:':'weekly_memo_report_week:';
     const keys=weeksInYear.map(wk=>encodeURIComponent(prefix+wk));
-    const rows=keys.length?await supaFetch(`ai_cache?cache_key=in.(${keys.join(',')})&select=cache_key,content,expires_at`):[];
+    const rows=keys.length?await supaFetch(`ai_cache?cache_key=in.(${keys.join(',')})&select=cache_key,content,expires_at,created_at`):[];
     const rowsByKey={};(rows||[]).forEach(r=>{rowsByKey[decodeURIComponent(r.cache_key)]=r;});
     const rowsList=weeksInYear.map(wk=>{const r=rowsByKey[prefix+wk];return r?[r]:[];});
     renderReportBoxGrid(filter==='habit'?'report-habit-grid':'report-memo-grid',weeksInYear,rowsList,filter,true);
@@ -2783,8 +2795,9 @@ function renderReportSummaryList(monthlyRows,weeksInMonth,weeklyRowsList,mk,isYe
     const isPastOrCurrentMonth=(mkYear<now.getFullYear())||(mkYear===now.getFullYear()&&mkMonth<=now.getMonth());
     if(monthlyRow||isPastOrCurrentMonth){
       const cacheKey=monthlyRow?monthlyRow.cache_key:`monthly_report_${mk}`;
-      const read=monthlyRow?_isReportRead(cacheKey):true; // 미발행 상태는 "안 읽음" 배지를 굳이 띄우지 않음
-      items.push({cacheKey,kind:'monthly',read,year:mkYear,month:mkMonth,
+      const createdAt=monthlyRow?monthlyRow.created_at:null;
+      const read=monthlyRow?_isReportRead(cacheKey,createdAt):true; // 미발행 상태는 "안 읽음" 배지를 굳이 띄우지 않음
+      items.push({cacheKey,createdAt,kind:'monthly',read,year:mkYear,month:mkMonth,
         icon:'ti-calendar',iconBg:'rgba(255,225,120,0.55)',iconColor:'var(--pal-yellow-border)',
         title:`${mk.slice(5,7).replace(/^0/,'')}월 월간종합 리포트`,sub:`${mk.slice(0,4)}년 ${mk.slice(5,7).replace(/^0/,'')}월 전체 흐름 정리`});
     }
@@ -2796,9 +2809,9 @@ function renderReportSummaryList(monthlyRows,weeksInMonth,weeklyRowsList,mk,isYe
     const row=rows&&rows[0];
     if(!row)return;
     const cacheKey=row.cache_key;
-    const read=_isReportRead(cacheKey);
+    const read=_isReportRead(cacheKey,row.created_at);
     const title=isYearly?`${_weekLabelWithMonth(wk,_weekNoInMonth(wk))} 주간종합 리포트`:`${(idx+1)}주차 주간종합 리포트`;
-    items.push({cacheKey,kind:'weekly',read,
+    items.push({cacheKey,createdAt:row.created_at,kind:'weekly',read,
       icon:'ti-sparkles',iconBg:'rgba(210,175,225,0.5)',iconColor:'var(--pal-lavender-border)',
       title,sub:_weekRangeLabel(wk)});
   });
@@ -2807,7 +2820,7 @@ function renderReportSummaryList(monthlyRows,weeksInMonth,weeklyRowsList,mk,isYe
     // 월간종합은 팝업이 아니라 전체페이지(아카이브)로, 나머지(주간종합 등)는 기존처럼 팝업으로 연다.
     const onclick=it.kind==='monthly'
       ?`openMonthlyReportPage(${it.year},${it.month})`
-      :`openReportFromList('${it.cacheKey}','${escapeHtml(it.title)}')`;
+      :`openReportFromList('${it.cacheKey}','${escapeHtml(it.title)}','${it.createdAt||''}')`;
     return `
     <div class="report-list-item${it.read?' read':''}" data-kind="${it.kind}" onclick="${onclick}">
       <div class="report-list-dot"></div>
@@ -2832,7 +2845,8 @@ function renderReportMonthlyYearList(rows,y){
     const row=rowsByKey[`monthly_report_${mk}`];
     if(!row&&!isPastOrCurrentMonth)continue; // 아직 오지 않은 미래 달은 건너뜀
     const cacheKey=row?row.cache_key:`monthly_report_${mk}`;
-    const read=row?_isReportRead(cacheKey):true;
+    const createdAt=row?row.created_at:null;
+    const read=row?_isReportRead(cacheKey,createdAt):true;
     items.push({cacheKey,read,year:y,month:mo,
       title:`${mo+1}월 월간종합 리포트`,sub:`${y}년 ${mo+1}월 전체 흐름 정리`});
   }
@@ -2848,8 +2862,8 @@ function renderReportMonthlyYearList(rows,y){
       <i class="ti ti-chevron-right" aria-hidden="true"></i>
     </div>`).join('');
 }
-function openReportFromList(cacheKey,title){
-  _markReportRead(cacheKey);
+function openReportFromList(cacheKey,title,createdAt){
+  _markReportRead(cacheKey,createdAt||null);
   openReportPanel(cacheKey,title);
   loadReportsTab();
 }
@@ -2873,13 +2887,13 @@ function _reportBoxCardHtml(wk,row,type,meta,wkLabel){
     return `<div class="report-box empty"><div class="report-box-empty-txt">아직 없어요</div></div>`;
   }
   const cacheKey=row.cache_key;
-  const read=_isReportRead(cacheKey);
+  const read=_isReportRead(cacheKey,row.created_at);
   const title=`${wkLabel} ${type==='habit'?'습관 리뷰':'메모 리포트'}`;
   const{headline,bodyText}=_parseReportPreview(row.content);
   const bodyHtml=headline
     ?`<div class="report-box-body headline-only"><div class="report-box-headline">${escapeHtml(headline)}</div></div>`
     :`<div class="report-box-body text-preview"><div class="report-box-preview-txt">${escapeHtml(bodyText)}</div></div>`;
-  return `<div class="report-box${read?' read':''}" onclick="openReportBoxDetail('${cacheKey}','${escapeHtml(title)}',this)">
+  return `<div class="report-box${read?' read':''}" onclick="openReportBoxDetail('${cacheKey}','${escapeHtml(title)}',this,'${row.created_at||''}')">
     ${read?'':'<div class="report-box-dot"></div>'}
     <div class="report-box-hdr">
       <div class="report-box-icon" style="background:${meta.iconBg};"><i class="ti ${meta.icon}" style="color:${meta.iconColor};" aria-hidden="true"></i></div>
@@ -2931,8 +2945,8 @@ function renderReportBoxGrid(elId,weeksInMonth,rowsList,type,isYearly){
     </div>`;
   }).join('');
 }
-function openReportBoxDetail(cacheKey,title,el){
-  _markReportRead(cacheKey);
+function openReportBoxDetail(cacheKey,title,el,createdAt){
+  _markReportRead(cacheKey,createdAt||null);
   if(el){el.classList.add('read');const dot=el.querySelector('.report-box-dot');if(dot)dot.remove();}
   document.getElementById('report-panel-title').innerHTML=`<i class="ti ti-sparkles" aria-hidden="true"></i>${title}`;
   const bodyEl=document.getElementById('report-panel-body');
@@ -2952,10 +2966,12 @@ async function _updateSideReportBadge(){
   const weeksInMonth=getReportWeeksOfMonth(y,mo);
   const mk=monthKeyOf(new Date());
   const keys=[`monthly_report_${mk}`,...weeksInMonth.map(wk=>`weekly_summary_${_mondayToSundayDk(wk)}`),...weeksInMonth.map(wk=>`challenge_review_week:${wk}`),...weeksInMonth.map(wk=>`weekly_memo_report_week:${wk}`)];
-  const rows=await supaFetch(`ai_cache?cache_key=in.(${keys.map(encodeURIComponent).join(',')})&select=cache_key`);
-  const existing=(rows||[]).map(r=>r.cache_key);
-  const readSet=_loadReadReports();
-  const unreadCount=existing.filter(k=>!readSet.has(k)).length;
+  const rows=await supaFetch(`ai_cache?cache_key=in.(${keys.map(encodeURIComponent).join(',')})&select=cache_key,created_at`);
+  const readMap=_loadReadReports();
+  // 키가 존재하는지가 아니라, 그 키의 "현재 버전(created_at)"이 읽은 버전과 같은지로 판정.
+  // 같은 cache_key가 재발행(예: 아카이브앱이 추가 리포트 작업을 하며 upsert)돼도 created_at이 갱신되므로
+  // 예전에 그 키를 읽은 기록이 있어도 새 버전은 다시 "안읽음"으로 잡힘(2026-08-31 구조 개선).
+  const unreadCount=(rows||[]).filter(r=>readMap[r.cache_key]!==r.created_at).length;
   dot.classList.toggle('on',unreadCount>0);
 }
 
@@ -2996,7 +3012,12 @@ let _mrpReturnTab='reports';
 function openMonthlyReportPage(y,mo){
   _mrpReturnTab=_currentTab;
   _mrpDate=new Date(y,mo,1);
-  _markReportRead(`monthly_report_${monthKeyOf(_mrpDate)}`);
+  const mk=monthKeyOf(_mrpDate);
+  supaFetch(`ai_cache?cache_key=eq.monthly_report_${mk}&select=created_at`).then(rows=>{
+    const createdAt=rows&&rows[0]&&rows[0].created_at;
+    _markReportRead(`monthly_report_${mk}`,createdAt||null);
+    _updateSideReportBadge();
+  });
   document.querySelectorAll('.main-body').forEach(el=>el.classList.remove('on'));
   document.getElementById('tab-monthly-report').classList.add('on');
   _currentTab='monthly-report';
