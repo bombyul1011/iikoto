@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.30-schedule-fixes';
+const CACHE = 'iikoto-v2.31-ipad-sidebar';
 const ASSETS = [
   './',
   './index.html'
