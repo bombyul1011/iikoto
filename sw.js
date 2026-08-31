@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.31-ipad-sidebar';
+const CACHE = 'iikoto-v2.32-vertical-order';
 const ASSETS = [
   './',
   './index.html'

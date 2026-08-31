@@ -1,6 +1,6 @@
 <!DOCTYPE html>
-<!-- build: 20260830-02 -->
-<!-- iikoto v2.30-schedule-fixes -->
+<!-- build: 20260831-01 -->
+<!-- iikoto v2.32-vertical-order -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -1395,6 +1395,35 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   /* 해빗 라벨을 뭐먹지와 시작선 맞추려 slabel-row로 감쌌더니 margin이 0으로 눌림 — 세로 화면에선 원래 여백 복원 */
   .ipad-grid-half-side .slabel-row .slabel{margin:14px 0 7px 2px;}
   .ipad-only-label{display:none;} /* 아이패드에서만 쓰는 시작선 맞춤용 라벨(예: "주간 목표") — 세로에선 불필요, 카드 안 자체 타이틀로 대체됨 */
+
+  /* 월간탭 세로 순서 복원 — 어제(index_46.html) 기준 실측 텀값 그대로 적용.
+     당시 월간탭엔 #v-monthly 전용 규칙이 없어 전부 기본 클래스값 사용: .card{margin-bottom:10px}, .slabel{margin:14px 0 7px}, .report-banner{margin-top/bottom:10px}
+     단, 콘텐츠 타임라인 라벨만 인라인 margin-top:20px 예외 */
+  #v-monthly.on{display:flex;flex-direction:column;}
+  #v-monthly>.ipad-grid-half-group{display:contents;}
+  #m-sec-goal{order:1;}
+  #m-sec-cal{order:2;margin-top:10px;} /* 목표(.card margin-bottom 10px) → 달력 */
+  #m-sec-habit{order:3;margin-top:14px;} /* 달력 → 해빗라벨(.slabel margin-top 14px) */
+  #m-sec-timeline-label{order:4;margin:20px 0 7px 2px;} /* 해빗카드(.card margin-bottom 10px는 카드 안에서 소모) → 콘텐츠 타임라인 라벨: 어제와 동일하게 20px 예외 유지 */
+  #m-sec-timeline{order:5;}
+  #tt-complete-stats{order:6;}
+  #m-sec-banners{order:7;margin-top:24px;} /* 콘텐츠카드(margin-bottom 10px) + 해빗라벨(margin-top 14px) = 24px, 어제와 동일 */
+  #m-sec-banners .report-banner+.report-banner{margin-top:8px;} /* 하루한줄→리포트 배너 간격만 요청대로 좁힘(어제는 10px+10px=20px였으나 봄이님 요청으로 축소) */
+
+  /* 주간탭 — 어제 #v-weekly 전용 규칙 그대로 이식: .slabel{margin-top:11px;margin-bottom:6px}, .card{margin-bottom:7px}, .report-banner{margin-top:14px} */
+  #v-weekly.on{display:flex;flex-direction:column;}
+  #v-weekly>.ipad-grid-half-group{display:contents;}
+  #v-weekly .slabel{margin-top:11px;margin-bottom:6px;}
+  #v-weekly .card{margin-bottom:7px;}
+  #v-weekly .report-banner{margin-top:14px;}
+  #w-sec-habit{display:contents;}
+  #week-strip{order:0;}
+  #w-sec-goal{order:1;}
+  #weekly-stat-bar{order:2;margin-top:11px;} /* 목표카드(margin-bottom 7px는 카드 내부 소모) → 통계바: 라벨과 동일한 표준 텀(11px) */
+  #w-sec-oneline{order:3;} /* 라벨 자체가 위 #v-weekly .slabel 규칙(margin-top:11px)을 그대로 받음 */
+  #w-sec-rhythm{order:4;}
+  #w-habit-label{order:5;margin-top:11px!important;} /* 인라인 margin-top:0을 덮어써서 표준 텀(11px) 적용 */
+  #weekly-habit-box{order:6;}
 }
 </style>
 </head>
@@ -1614,7 +1643,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div class="view" id="v-weekly">
       <div class="week-strip" id="week-strip"></div>
       <div class="ipad-grid-half-group" style="margin-top:0;">
-        <div class="ipad-grid-half-side">
+        <div class="ipad-grid-half-side" id="w-sec-goal">
           <!-- 아이패드 전용 — 해빗 쪽 라벨과 완전히 동일한 구조(.slabel 단독)로 맞춤. 카드 안의 노란 타이틀은 그대로 유지 -->
           <div class="slabel ipad-only-label" style="margin-top:0;">주간 목표</div>
           <!-- 주간 목표 카드 — 일반 공용 .card 클래스 사용(id=wchallenge-card). 배경 진하기는 --card 변수(라이트테마 0.60) -->
@@ -1626,20 +1655,20 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
             <div class="goal-wrap" id="weekly-goal-wrap"></div>
           </div>
         </div>
-        <div class="ipad-grid-half-side">
-          <div class="slabel" style="margin-top:0;">이번주 해빗</div>
+        <div class="ipad-grid-half-side" id="w-sec-habit">
+          <div class="slabel" id="w-habit-label" style="margin-top:0;">이번주 해빗</div>
           <div class="habit-week-box" id="weekly-habit-box"></div>
           <div id="weekly-stat-bar" style="display:flex;justify-content:center;"></div>
         </div>
       </div>
       <div class="ipad-grid-half-group">
-        <div class="ipad-grid-half-side">
+        <div class="ipad-grid-half-side" id="w-sec-oneline">
           <div class="slabel">하루 한 줄</div>
           <div class="card" id="daily-oneline-card">
             <div id="daily-oneline-list"></div>
           </div>
         </div>
-        <div class="ipad-grid-half-side">
+        <div class="ipad-grid-half-side" id="w-sec-rhythm">
           <div class="slabel">리듬 모아보기</div>
           <div class="card" id="weekly-rhythm-bars"></div>
         </div>
@@ -1649,13 +1678,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <!-- MONTHLY -->
     <div class="view" id="v-monthly">
       <div class="ipad-grid-half-group" style="margin-top:0;">
-        <div class="ipad-grid-half-side">
+        <div class="ipad-grid-half-side" id="m-sec-goal">
           <div class="card" id="monthly-goal-card" style="padding:14px 15px 10px;margin-bottom:10px;">
             <div class="goal-section-title" id="monthly-goal-title" style="margin-top:0;"><i class="ti ti-flag-3 ico-13" aria-hidden="true"></i> 이번 달 목표</div>
             <div class="goal-wrap" id="monthly-goal-wrap"></div>
           </div>
         </div>
-        <div class="ipad-grid-half-side">
+        <div class="ipad-grid-half-side" id="m-sec-banners">
           <div class="report-banner diary-soft" onclick="openDiaryMonthSheet()">
             <div class="report-banner-inner">
               <div class="report-banner-line">✦ <span class="rb-title" id="diary-banner-month-lbl">6월의 하루한줄</span></div>
@@ -1671,19 +1700,19 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         </div>
       </div>
       <div class="ipad-grid-half-group">
-        <div class="ipad-grid-half-side">
+        <div class="ipad-grid-half-side" id="m-sec-cal">
           <div class="slabel ipad-only-label" style="margin-top:0;visibility:hidden;">달력</div>
           <div id="monthly-cal"></div>
           <div id="cal-detail"></div>
           <div id="monthly-stat-bar"></div>
         </div>
-        <div class="ipad-grid-half-side">
+        <div class="ipad-grid-half-side" id="m-sec-habit">
           <div class="slabel" style="margin-top:0;">해빗 모아보기</div>
           <div class="card"><div id="habit-monthly"></div></div>
         </div>
       </div>
-      <div class="slabel" style="margin-top:20px;">콘텐츠 타임라인</div>
-      <div class="card" style="padding:14px 10px;">
+      <div class="slabel" style="margin-top:20px;" id="m-sec-timeline-label">콘텐츠 타임라인</div>
+      <div class="card" id="m-sec-timeline" style="padding:14px 10px;">
         <div class="tt-head-row" id="tt-head-row">
           <div class="tt-head-spacer"></div>
           <div class="tt-head-dates" id="tt-head-dates">
@@ -5705,8 +5734,8 @@ async function syncAll(){
     ...mroutineDks.map(mdk=>syncMorningRoutineDown(mdk))
   ]);
   loadDaily();
-  if(document.getElementById('v-weekly')&&document.getElementById('v-weekly').classList.contains('on'))loadWeekly();
-  if(document.getElementById('v-monthly')&&document.getElementById('v-monthly').classList.contains('on'))loadMonthly();
+  refreshIfTabOpen('v-weekly',loadWeekly);
+  refreshIfTabOpen('v-monthly',loadMonthly);
   if(_rhythmTrackEl&&document.body.contains(_rhythmTrackEl))refreshRhythmTrack();
   // loadDaily()가 다시 그리지 못하는 새벽 리캡 카드(어제 투두/습관/수면 요약 등)를 최신 데이터로 교체
   const oldDawnCard=document.getElementById('dawn-recap-card');
@@ -5909,6 +5938,11 @@ setTimeout(()=>{
 },2200);
 
 // ── DATE NAV
+// 특정 탭이 현재 열려있을 때만 해당 로드 함수를 다시 호출 — 데이터/날짜가 바뀐 뒤 열린 탭만 갱신할 때 공용으로 사용
+function refreshIfTabOpen(viewId,loadFn){
+  const el=document.getElementById(viewId);
+  if(el&&el.classList.contains('on')&&typeof loadFn==='function')loadFn();
+}
 function updateDateUI(){
   const d=currentDate;
   const el=document.getElementById('js-date');
@@ -5921,6 +5955,8 @@ function updateDateUI(){
     nxt.style.pointerEvents=over?'none':'auto';
   }
   if(typeof loadDaily==='function')loadDaily();
+  // 월간탭이 열려있는 상태면 네비게이터 이동을 즉시 반영 (다시 탭 클릭 안 해도 되게)
+  refreshIfTabOpen('v-monthly',loadMonthly);
 }
 function shiftDay(n){
   const d=new Date(currentDate);d.setDate(d.getDate()+n);
@@ -11410,7 +11446,7 @@ function renderWeeklyHabitBox(){
   el.innerHTML=html;
 }
 function loadMonthly(){
-  const _ld0=new Date();
+  const _ld0=currentDate; // 날짜 네비게이터가 가리키는 날짜 기준으로 월간탭 진입 (기존: 항상 오늘 기준)
   _calYear=_ld0.getFullYear();_calMonth=_ld0.getMonth();
   _calSelectedDay=null;
   const _cdEl0=document.getElementById('cal-detail');if(_cdEl0)_cdEl0.innerHTML='';
@@ -14243,8 +14279,8 @@ async function initSync(){
     await syncTodosDown(RESERVE_DK);
   }
   loadDaily();
-  if(document.getElementById('v-weekly')&&document.getElementById('v-weekly').classList.contains('on'))loadWeekly();
-  if(document.getElementById('v-monthly')&&document.getElementById('v-monthly').classList.contains('on'))loadMonthly();
+  refreshIfTabOpen('v-weekly',loadWeekly);
+  refreshIfTabOpen('v-monthly',loadMonthly);
 }
 setTimeout(initSync, 500);
 setTimeout(maybeShowTimeSlotPopup, 2400);
