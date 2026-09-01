@@ -2574,7 +2574,7 @@ async function syncRhythmBlocksUp(dk){
   if(ensureItemCids(blocks))S.set(S.key('rblocks',dk),blocks);
   const delCids=getDelPendingCids('rblocks',dk);
   const ok=await syncListUpSafe('rhythm_blocks',`date_key=eq.${dk}`,'date_key,client_id',blocks,
-    b=>({date_key:dk,cat:b.cat,start_time:b.start,end_time:b.end,text:b.text||'',created:b.created||Date.now(),client_id:b.cid,auto_closed:!!b.autoClosed}),
+    b=>({date_key:dk,cat:b.cat,start_time:b.start,end_time:b.end,text:b.text||'',created:b.created||Date.now(),client_id:b.cid,auto_closed:!!b.autoClosed,content_cid:b.contentCid||null}),
     delCids);
   if(ok)delCids.forEach(cid=>removeDelPending('rblocks',dk,cid));
   return ok;
@@ -2583,7 +2583,7 @@ async function syncRhythmBlocksDown(dk){
   const rows=await supaFetch('rhythm_blocks?date_key=eq.'+dk+'&order=created');
   if(!rows)return; // 연결 실패 — 로컬 유지
   if(S.get(S.key('rblocks_pending',dk)))return; // 업로드 대기중인 로컬 수정 있으면 덮어쓰지 않음
-  S.set(S.key('rblocks',dk),rows.map(function(r){return {cat:r.cat,start:r.start_time,end:r.end_time,text:r.text||'',created:r.created,cid:r.client_id||genCid(),autoClosed:!!r.auto_closed};}));
+  S.set(S.key('rblocks',dk),rows.map(function(r){return {cat:r.cat,start:r.start_time,end:r.end_time,text:r.text||'',created:r.created,cid:r.client_id||genCid(),autoClosed:!!r.auto_closed,contentCid:r.content_cid||null};}));
 }
 let _rhythmTrackEl=null,_rhythmDk=null,_rhythmFormOpen=false,_rhythmFormCat=null,_rhythmFormStart='',_rhythmFormEnd='',_rhythmFormText='',_rhythmEditIdx=null,_rhythmSubmitting=false;
 // 홈탭 트랙과 주간탭 리듬바 양쪽에서 폼이 열려있을 수 있으므로, 저장/취소/편집 시 둘 다 안전하게 갱신.
@@ -10012,7 +10012,7 @@ function toggleContentStopwatch(cid,knownMk){
   const catLabel=c.cat==='drama'?'드라마':'영화';
   const blockCid=genCid();
   const blocks=getRhythmBlocks(dk);
-  blocks.push({cat:'enjoy',start:minToHHMM(startMin),end:'',text:c.title?(catLabel+' - '+c.title):catLabel,created:Date.now(),cid:blockCid});
+  blocks.push({cat:'enjoy',start:minToHHMM(startMin),end:'',text:c.title?(catLabel+' - '+c.title):catLabel,created:Date.now(),cid:blockCid,contentCid:cid});
   saveRhythmBlocks(dk,blocks);
   _cswBlockCid=blockCid;
   try{localStorage.setItem(CSW_PERSIST_KEY,JSON.stringify({startTs:_cswStartTs,cid,cat:c.cat,title:c.title||'',mk:found.mk,blockCid,dk}));}catch(e){}
@@ -13599,7 +13599,7 @@ function autoLogReadingRhythm(startTs,endTs){
   const book=getBooks().find(b=>b.status==='reading');
   const text=book&&book.title?('독서 - '+book.title):'독서';
   const blocks=getRhythmBlocks(dk);
-  blocks.push({cat:'enjoy',start:minToHHMM(startMin),end:minToHHMM(endMin),text:text,created:Date.now(),cid:genCid()});
+  blocks.push({cat:'enjoy',start:minToHHMM(startMin),end:minToHHMM(endMin),text:text,created:Date.now(),cid:genCid(),contentCid:book?book.cid:null});
   saveRhythmBlocks(dk,blocks);
   checkHabitDirect('독서',dk,minToHHMM(startMin)); // 스톱워치 독서 활동은 카테고리(감상)와 무관하게 '독서' 습관을 직접 체크, 시작시각 기준
 }
@@ -13830,7 +13830,7 @@ async function forceRestoreDate(dk){
   }
   var rbrows=await supaFetch('rhythm_blocks?date_key=eq.'+dk+'&order=created');
   if(rbrows&&rbrows.length>0){
-    S.set(S.key('rblocks',dk),rbrows.map(function(r){return {cat:r.cat,start:r.start_time,end:r.end_time,text:r.text||'',created:r.created,cid:r.client_id||genCid()};}));
+    S.set(S.key('rblocks',dk),rbrows.map(function(r){return {cat:r.cat,start:r.start_time,end:r.end_time,text:r.text||'',created:r.created,cid:r.client_id||genCid(),contentCid:r.content_cid||null};}));
   }
 }
 async function forceRestoreAll(){
