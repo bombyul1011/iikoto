@@ -1,8 +1,9 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.34-content-cid';
+const CACHE = 'iikoto-v2.35-split-app-js';
 const ASSETS = [
   './',
-  './index.html'
+  './index.html',
+  './app.js'
 ];
 
 // 설치 — 핵심 파일 캐시
