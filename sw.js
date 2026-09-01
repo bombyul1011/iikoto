@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.35-split-app-js';
+const CACHE = 'iikoto-v2.36-schedule-sort-fix';
 const ASSETS = [
   './',
   './index.html',
