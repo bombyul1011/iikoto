@@ -627,12 +627,14 @@ function parseTabletScheduleTodos(todos){
     if(hh>23||mm>59)return;
     items.push({time:m[1].padStart(2,'0')+':'+m[2],min:hh*60+mm,label:m[3],done:t.done});
   });
+  // 정렬 우선순위: ①지연(시각이 이미 지났는데 미완료 — 가장 급함) → ②아직 안 온 시각(가까운 순) → ③완료(맨 뒤).
+  // 본앱(index.html) 2026-09-01 수정과 동일 — 기존엔 지난 시각도 "다음날 것"으로 계산해 지연 항목이 뒤로 밀리는 버그가 있었음.
   items.sort((a,b)=>{
     if(a.done!==b.done)return a.done?1:-1;
     if(!a.done){
-      const da=a.min>=nowMin?a.min-nowMin:1440+(a.min-nowMin);
-      const db=b.min>=nowMin?b.min-nowMin:1440+(b.min-nowMin);
-      return da-db;
+      const aOverdue=a.min<nowMin,bOverdue=b.min<nowMin;
+      if(aOverdue!==bOverdue)return aOverdue?-1:1;
+      return a.min-b.min;
     }
     return a.min-b.min;
   });

@@ -3901,12 +3901,15 @@ function parseScheduleTodos(dk,todos){
     items.push({i:i,cid:t.cid,time:m[1].padStart(2,'0')+':'+m[2],min:hh*60+mm,label:m[3],done:t.done});
   });
   // 미완료 중 현재 시각에 가장 가까운(다음/진행중) 항목이 최상단, 그다음 나머지 미완료, 완료는 맨 뒤
+  // 정렬 우선순위: ①지연(시각이 이미 지났는데 미완료 — 가장 급함) → ②아직 안 온 시각(가까운 순) → ③완료(맨 뒤).
+  // 기존엔 지난 시각도 "다음날 것"으로 계산해 남은 시간이 커져버려, 정작 제일 급한 지연 항목이 뒤로 밀리는 문제가 있었음(2026-09-01).
   items.sort((a,b)=>{
     if(a.done!==b.done)return a.done?1:-1;
     if(!a.done&&nowMin!=null){
-      const da=a.min>=nowMin?a.min-nowMin:1440+(a.min-nowMin);
-      const db=b.min>=nowMin?b.min-nowMin:1440+(b.min-nowMin);
-      return da-db;
+      const aOverdue=a.min<nowMin,bOverdue=b.min<nowMin;
+      if(aOverdue!==bOverdue)return aOverdue?-1:1; // 지연된 쪽이 항상 먼저
+      if(aOverdue&&bOverdue)return a.min-b.min; // 둘 다 지연이면 더 오래 지난(이른 시각) 것 먼저
+      return a.min-b.min; // 둘 다 아직 안 왔으면 가까운 시각 먼저
     }
     return a.min-b.min;
   });
