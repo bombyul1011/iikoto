@@ -3606,6 +3606,7 @@ function renderSleepAvgMarkers(AXIS_MIN,SVG_W,toAxisMin,sv){
     compareEl.style.display='none';
   }
 }
+// ── 취침/기상 시간 입력 공용 유틸 (마스킹, 지금시각 세팅, 시각 모달) ──
 function maskTimeInput(el){
   let digits=el.value.replace(/[^0-9]/g,'').slice(0,4);
   if(digits.length>=3){
@@ -3638,6 +3639,7 @@ function openTimeModal(t){
   openModal('time-modal');
 }
 let _memoSubmitting=false;
+// ── 씨앗 메모(새벽 팝업용 인라인 입력) ──
 function openMemoModal(){
   const inp=document.getElementById('memo-modal-inp');
   if(inp)inp.value='';
@@ -8531,6 +8533,7 @@ function tabularTimeHtml(str){
   if(!str)return'';
   return str.split('').map(c=>`<span style="display:inline-block;width:${c===':'?'0.32em':'0.62em'};text-align:center;">${c}</span>`).join('');
 }
+// ── 오늘탭 마무리: 뭐먹지/해빗 카드 렌더 ──
 function renderTodayMeal(){
   const el=document.getElementById('daily-meal-card');if(!el)return;
   const dk=dateKey(currentDate);
@@ -8610,6 +8613,7 @@ function renderDailyHabitCheck(){
     el.appendChild(col);
   });
 }
+// ── 오늘탭 전체 로드 진입점 + 주간탭용 리듬바 계산 ──
 function loadDaily(){
   _sleepCollapseOverride=null; // 오늘탭 재진입(다시 누르기 포함) 시 사용자가 펼쳐뒀던 상태를 초기화 — 시간대 기준 자동판단으로 되돌아감
   _todayBannerMode=null; // 오늘탭 재진입(다시 누르기 포함) 시 일정/시간표 수동전환 기록도 초기화 — 자동판단으로 되돌아감
@@ -8900,6 +8904,7 @@ function buildRhythmFormEl(showOngoingList){
   }
   return wrap;
 }
+// ── 주간탭 전체 로드 진입점 ──
 function loadWeekly(){
   buildWeekStrip();
   setupWeeklyChallengeToggle();
@@ -8936,6 +8941,7 @@ function renderWeeklyHabitBox(){
   });
   el.innerHTML=html;
 }
+// ── 월간탭 전체 로드 진입점 ──
 function loadMonthly(){
   const _ld0=currentDate; // 날짜 네비게이터가 가리키는 날짜 기준으로 월간탭 진입 (기존: 항상 오늘 기준)
   _calYear=_ld0.getFullYear();_calMonth=_ld0.getMonth();
