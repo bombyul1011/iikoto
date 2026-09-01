@@ -877,6 +877,31 @@ function _uniqueHabitCheckCount(checks){
   return new Set((checks||[]).map(c=>c.date_key+'|'+c.habit_name)).size;
 }
 function _paceParseHM(hm){const p=(hm||'').split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);}
+// enjoy 리듬블록(cat='enjoy')에서 콘텐츠 카테고리/제목을 식별하는 공통 파서 — 2026-08-31 이후 생성된 블록엔
+// content_cid(contents.client_id 참조)가 있어 그걸로 정확히 매칭하고, 그 이전 구버전 블록(content_cid 없음)은
+// 텍스트 접두어("드라마 - "/"독서 - "/"영화 - ") 파싱으로 폴백함(하위호환). 제목이 같은 작품이 둘 이상이거나
+// 제목이 수정된 경우, content_cid 매칭 쪽이 텍스트 매칭보다 항상 정확함.
+// contentsByCid: {client_id: contentRow} 맵 — 호출부에서 미리 만들어 넘김(매 블록마다 배열 탐색 방지).
+// 반환: {cat, title} 또는 식별 불가 시 null.
+function _parseEnjoyBlock(b,contentsByCid){
+  if(!b||b.cat!=='enjoy'||!b.text)return null;
+  if(b.content_cid&&contentsByCid&&contentsByCid[b.content_cid]){
+    const c=contentsByCid[b.content_cid];
+    if(c.content_cat==='drama'||c.content_cat==='book'||c.content_cat==='movie'){
+      return {cat:c.content_cat,title:c.title||''};
+    }
+  }
+  if(b.text.startsWith('드라마 - '))return {cat:'drama',title:b.text.slice(6)};
+  if(b.text.startsWith('독서 - '))return {cat:'book',title:b.text.slice(5)};
+  if(b.text.startsWith('영화 - '))return {cat:'movie',title:b.text.slice(5)};
+  return null;
+}
+// contents 배열 → {client_id: row} 맵. 위 파서에 넘길 때 공용으로 사용.
+function _contentsByCidMap(contents){
+  const m={};
+  (contents||[]).forEach(c=>{if(c.client_id)m[c.client_id]=c;});
+  return m;
+}
 // rhythm_blocks에서 start_time/end_time을 분 단위로 파싱해 카테고리별로 합산(자정 넘김 자동 보정) — 공통 헬퍼.
 // 기존에 renderWeekRhythmFlow/renderMrpTrajectory/renderMrpMilestones 세 곳에 거의 동일한 로직이 각각
 // 로컬 함수로 중복 정의돼 있던 것을 하나로 통합함(2026-08-22). renderMrpRhythm은 카테고리별 dayCount(일평균 분모)까지
@@ -1114,20 +1139,21 @@ function renderTodayReading(dk,rblocks,contents,manualItems){
     seen.add(key);
     items.push({cat,title,poster:poster||null});
   };
-  // 드라마/독서는 오늘 기록된 리듬 블록(시작~종료 시각)을 같은 제목끼리 합산해 "오늘 실제로 쓴 시간"을 구함.
+  const contentsByCid=_contentsByCidMap(contents);
+  // 드라마/독서/영화는 오늘 기록된 리듬 블록(시작~종료 시각)을 같은 작품끼리 합산해 "오늘 실제로 쓴 시간"을 구함.
   // 하루에 나눠서 여러 번 기록해도(오전에 좀 보고 저녁에 이어보고) 전부 더해서 하나의 총 시간으로 보여줌.
+  // content_cid가 있으면 정확히 매칭, 없는 구버전 블록은 텍스트 파싱으로 폴백(_parseEnjoyBlock 참고).
   const durMinByKey={};
   (rblocks||[]).forEach(b=>{
-    if(b.cat!=='enjoy'||!b.text||!b.start_time||!b.end_time)return;
-    let cat=null,title=null;
-    if(b.text.startsWith('드라마 - ')){cat='drama';title=b.text.slice(6);}
-    else if(b.text.startsWith('독서 - ')){cat='book';title=b.text.slice(5);}
-    else return;
+    if(!b.start_time||!b.end_time)return;
+    const parsed=_parseEnjoyBlock(b,contentsByCid);
+    if(!parsed)return;
+    const {cat,title}=parsed;
     const s=_paceParseHM(b.start_time),e=_paceParseHM(b.end_time);
     let mins=e-s;if(mins<0)mins+=1440;
     const key=cat+'|'+title;
     durMinByKey[key]=(durMinByKey[key]||0)+mins;
-    push(cat,title);
+    if(cat==='drama'||cat==='book')push(cat,title);
   });
   (contents||[]).filter(c=>c.content_cat==='music'&&c.start_date===dk).forEach(c=>push('music',c.title,c.poster));
   // 영화는 리듬 기록 유무와 무관하게 contents 하나만 기준으로 판단 — 하루짜리(당일 시작~종료), 기간형(진행중이면
@@ -1135,17 +1161,7 @@ function renderTodayReading(dk,rblocks,contents,manualItems){
   (contents||[]).filter(c=>c.content_cat==='movie').forEach(c=>{
     const isToday=(c.status==='watching'&&c.start_date&&c.start_date<=dk)||c.start_date===dk||c.end_date===dk;
     if(isToday)push('movie',c.title,c.poster);
-    // 영화도 같은 날 리듬 블록에 기록이 있으면(나눠 보기 등) 그 시간을 우선 사용할 수 있도록 같은 방식으로 합산.
-    // 리듬 블록 텍스트가 영화 제목과 일치하는 수기 기록이 있는 경우만 해당(드물지만 대비).
-  });
-  (rblocks||[]).forEach(b=>{
-    if(b.cat!=='enjoy'||!b.text||!b.start_time||!b.end_time)return;
-    if(!b.text.startsWith('영화 - '))return;
-    const title=b.text.slice(5);
-    const s=_paceParseHM(b.start_time),e=_paceParseHM(b.end_time);
-    let mins=e-s;if(mins<0)mins+=1440;
-    const key='movie|'+title;
-    durMinByKey[key]=(durMinByKey[key]||0)+mins;
+    // 영화도 같은 날 리듬 블록에 기록이 있으면(나눠 보기 등) 그 시간을 위 durMinByKey에서 그대로 가져다 씀.
   });
   (manualItems||[]).forEach(it=>push(it.cat,it.title));
   // 포스터/상태 매칭 — 오늘 넘어온 contents 목록에서 같은 제목의 poster·status·total_unit(영화 완결 러닝타임)을 찾아 붙임
@@ -1686,7 +1702,7 @@ function renderWeekReading(contents,book,streakLogRows,startDk,endDk){
   if(!el)return;
   // 이번 주 완독한 책 — contents(content_cat='book')에서 done/stopped이고 종료일이 이번 주 범위인 것.
   // 2026-08-29 통합 이후 book(진행중 1권)도 이 contents 배열에서 파생되므로 완독작 판별도 동일 배열로 처리.
-  const doneThisWeek=(contents||[]).find(c=>c.content_cat==='book'&&(c.status==='done'||c.status==='stopped')&&c.end_date&&c.end_date>=startDk&&c.end_date<=endDk);
+  const doneThisWeek=(contents||[]).find(c=>c.content_cat==='book'&&_isContentFinished(c)&&c.end_date&&c.end_date>=startDk&&c.end_date<=endDk);
 
   if(!book&&!doneThisWeek){
     el.innerHTML=`<div class="week-reading-inner"><div class="week-reading-title" style="color:var(--tm);">지금 읽는 책이 없어요</div></div>`;
@@ -1810,7 +1826,7 @@ function renderWeekReadingActivity(logsThis,logsLast,booksAll,contents,startDk,e
   const {rows,activeDays,totalSeconds}=_wraStatsOf(logsThis,booksByCid);
   const {rows:rowsLast,activeDays:activeDaysLast,totalSeconds:totalSecondsLast}=_wraStatsOf(logsLast,booksByCid);
 
-  const doneThis=(contents||[]).filter(c=>c.content_cat==='book'&&(c.status==='done'||c.status==='stopped')&&c.end_date&&c.end_date>=startDk&&c.end_date<=endDk);
+  const doneThis=(contents||[]).filter(c=>c.content_cat==='book'&&_isContentFinished(c)&&c.end_date&&c.end_date>=startDk&&c.end_date<=endDk);
   // 2026-08-29 통합 이후 book_cid(reading_daily_log)와 contents.client_id가 동일한 ID 체계이므로
   // cid로 직접 매칭 가능 — 예전 title 매칭 우회(동명이서 오매칭 리스크 있었음)를 제거.
   const doneCidSet=new Set(doneThis.map(c=>c.client_id));
@@ -1894,10 +1910,13 @@ function renderMonthGoals(row){
 }
 
 // ── 콘텐츠 타임라인 — 전체 폭 한줄(%기반), 스와이프 불필요하게 31일치를 카드 폭에 맞춰 표시 ──
+// 콘텐츠 완결 여부 판정(done 또는 stopped) — 6곳에 흩어져 있던 동일 조건을 통합(2026-08-31).
+// 음악은 이 판정 대상이 아님(진행/완결 개념 자체가 없음, 항상 등록일만 사용).
+function _isContentFinished(c){return c.status==='done'||c.status==='stopped';}
 function isContentCarryOverTablet(c,mk){
   if(c.content_cat==='music')return false;
   if(c.status==='watching')return true;
-  if((c.status==='done'||c.status==='stopped')&&c.end_date&&c.end_date.slice(0,7)>=mk)return true;
+  if(_isContentFinished(c)&&c.end_date&&c.end_date.slice(0,7)>=mk)return true;
   return false;
 }
 function isContentEndedInMonthTablet(c,targetMk){
@@ -1958,7 +1977,7 @@ async function toggleCgridYearMode(){
 async function _loadCgridYearly(y){
   const rows=await supaFetch(`contents?month_key=like.${y}-*`);
   const belongsHere=c=>{
-    if(c.status==='done'||c.status==='stopped')return true;
+    if(_isContentFinished(c))return true;
     return c.status==='watching'&&y===new Date().getFullYear();
   };
   _cgridContents=(rows||[]).filter(belongsHere).sort((a,b)=>(b.created||0)-(a.created||0));
@@ -1982,7 +2001,7 @@ async function renderMonthContentGrid(y,mo,contentsData){
   const curRows=contentsData?contentsData.cur:await supaFetch(`contents?month_key=eq.${mk}`);
   const prevRows=contentsData?contentsData.prev:await supaFetch(`contents?month_key=eq.${prevMk}`);
   const belongsHere=c=>{
-    if(c.status==='done'||c.status==='stopped')return isContentEndedInMonthTablet(c,mk);
+    if(_isContentFinished(c))return isContentEndedInMonthTablet(c,mk);
     return c.status==='watching'&&isSameMonth;
   };
   _cgridContents=[...(curRows||[]).filter(belongsHere),...(prevRows||[]).filter(belongsHere)]
@@ -1993,7 +2012,7 @@ async function renderMonthContentGrid(y,mo,contentsData){
 function _cgridFilteredList(){
   let list=_cgridFilter==='all'?_cgridContents:_cgridContents.filter(c=>c.content_cat===_cgridFilter);
   if(_cgridStatusFilter==='watching')list=list.filter(c=>c.status==='watching');
-  else if(_cgridStatusFilter==='done')list=list.filter(c=>c.status==='done'||c.status==='stopped');
+  else if(_cgridStatusFilter==='done')list=list.filter(c=>_isContentFinished(c));
   return list;
 }
 function _renderCgridFromCache(){
@@ -2142,7 +2161,7 @@ async function renderMonthTimetable(y,mo,contentsData){
         let placed=false;
         for(let i=0;i<trackEnds.length;i++){
           const prevItem=tracks[i][tracks[i].length-1].item;
-          const prevDone=prevItem.status==='done'||prevItem.status==='stopped';
+          const prevDone=_isContentFinished(prevItem);
           const canFollow=prevDone?(c.startD>=trackEnds[i]):(c.startD>trackEnds[i]);
           if(canFollow){trackEnds[i]=c.endD;tracks[i].push(c);placed=true;break;}
         }
@@ -2262,16 +2281,18 @@ async function renderMonthStatBar(y,mo,habitsData){
 // 그 한 번만 대체 가산" — 오늘탭(renderTodayReading)의 fallback 판단 기준을 월 단위로 그대로 확장한 것.
 // 음악은 애초에 시간 데이터가 없어 집계에서 제외.
 // 월간리포트 "이 달의 콘텐츠"(renderMrpContents)가 쓰는 계산 헬퍼.
-function _calcWatchTimeByCat(rblocks,contents){
-  // enjoy 블록을 텍스트 접두어로 드라마/독서 재분류 후 작품별로 합산(하루에 나눠봐도 합쳐짐).
+function _calcWatchTimeByCat(rblocks,contents,allContents){
+  // enjoy 블록을 content_cid(우선) 또는 텍스트 접두어(폴백)로 드라마/독서 재분류 후 작품별로 합산(하루에 나눠봐도 합쳐짐).
+  // content_cid 매칭은 allContents(월 범위로 좁히기 전 전체 목록)를 우선 사용 — inRange(contents)만 쓰면 진행중이라
+  // 아직 종료 안 된 작품의 리듬 블록이 매칭 실패해 텍스트 폴백으로 새는 경우가 생김. allContents 생략 시 contents로 매칭.
   // 영화는 리듬 기록을 참조하지 않고 항상 러닝타임(total_unit) 고정 집계 — 아래 movie 섹션 참고.
+  const contentsByCid=_contentsByCidMap(allContents||contents);
   const durByTitle={drama:{},book:{}};
   (rblocks||[]).forEach(b=>{
-    if(b.cat!=='enjoy'||!b.text||!b.start_time||!b.end_time)return;
-    let cat=null,title=null;
-    if(b.text.startsWith('드라마 - ')){cat='drama';title=b.text.slice(6);}
-    else if(b.text.startsWith('독서 - ')){cat='book';title=b.text.slice(5);}
-    else return;
+    if(!b.start_time||!b.end_time)return;
+    const parsed=_parseEnjoyBlock(b,contentsByCid);
+    if(!parsed||(parsed.cat!=='drama'&&parsed.cat!=='book'))return;
+    const {cat,title}=parsed;
     const s=_paceParseHM(b.start_time),e=_paceParseHM(b.end_time);
     if(isNaN(s)||isNaN(e))return;
     let mins=e-s;if(mins<0)mins+=1440;
@@ -2357,7 +2378,8 @@ function wcalSetFilter(cat){
   renderWatchCalGrid();
   renderWcalFilterChips();
 }
-// 드라마/영화/책은 rhythm_blocks(cat='enjoy', text="드라마 - 제목" 등)의 date_key가 감상일.
+// 드라마/영화/책은 rhythm_blocks(cat='enjoy')의 date_key가 감상일 — content_cid가 있으면 그 작품을 바로 매칭하고,
+// 없는 구버전 블록은 텍스트 접두어("드라마 - 제목" 등) 파싱으로 폴백함(_parseEnjoyBlock 참고).
 // 음악은 리듬 기록이 없어 contents(content_cat='music')의 start_date(=등록일)를 그 날의 기록으로 사용.
 async function renderWatchCal(contentsData){
   const y=_wcalDate.getFullYear(),m=_wcalDate.getMonth();
@@ -2375,15 +2397,14 @@ async function renderWatchCal(contentsData){
     supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wcal_manual_'+mk)}`)
   ]);
 
-  (rblocks||[]).forEach(b=>{
-    if(b.cat!=='enjoy'||!b.text)return;
-    let cat=null,title=null;
-    if(b.text.startsWith('드라마 - ')){cat='drama';title=b.text.slice(6);}
-    else if(b.text.startsWith('독서 - ')){cat='book';title=b.text.slice(5);}
-    if(!cat)return;
-    push(b.date_key,{cat,title});
-  });
   const contents=curContents||[];
+  // content_cid 매칭은 당월+전월 합쳐서 조회 — 월 경계에 걸쳐 시작된 작품의 리듬 블록도 놓치지 않기 위함.
+  const contentsByCid=_contentsByCidMap([...contents,...(prevContents||[])]);
+  (rblocks||[]).forEach(b=>{
+    const parsed=_parseEnjoyBlock(b,contentsByCid);
+    if(!parsed||(parsed.cat!=='drama'&&parsed.cat!=='book'))return;
+    push(b.date_key,{cat:parsed.cat,title:parsed.title});
+  });
   contents.filter(c=>c.content_cat==='music'&&c.start_date).forEach(c=>{
     push(c.start_date,{cat:'music',title:c.title,poster:c.poster,cid:c.client_id||null});
   });
@@ -2396,12 +2417,14 @@ async function renderWatchCal(contentsData){
   const manualLines=(manualRows&&manualRows[0]&&Array.isArray(manualRows[0].lines))?manualRows[0].lines:[];
   manualLines.forEach(it=>push(it.dk,{cat:it.cat,title:it.title}));
 
+  // 제목 역매칭은 어디까지나 폴백 — cid/poster가 이미 붙어있는 항목(음악·영화·content_cid 매칭된 드라마/독서)은 건너뜀.
+  // 남는 건 구버전 텍스트 파싱으로 들어온 항목(cid 없음)뿐이라, 동명이작 위험이 있는 지점이 이 폴백으로 국한됨.
   const posterByTitle={},cidByTitle={};
   [...contents,...(prevContents||[])].forEach(c=>{
     if(c.content_cat!=='music'&&c.title){posterByTitle[c.title]=c.poster||null;cidByTitle[c.title]=c.client_id||null;}
   });
   Object.values(_wcalByDate).forEach(list=>list.forEach(it=>{
-    if(it.cat!=='music'){it.poster=posterByTitle[it.title]||null;it.cid=cidByTitle[it.title]||null;}
+    if(it.cat!=='music'&&!it.cid){it.poster=posterByTitle[it.title]||null;it.cid=cidByTitle[it.title]||null;}
   }));
 
   Object.keys(_wcalByDate).forEach(dk=>{
@@ -2425,7 +2448,7 @@ function renderWcalMonthSummary(curContents,prevContents,mk){
   const isSameMonth=mk===monthKeyOf(new Date());
   const belongsHere=c=>{
     if(c.content_cat==='music')return true; // 등록 건수를 그대로 완결로 카운트
-    if(c.status==='done'||c.status==='stopped')return isContentEndedInMonthTablet(c,mk);
+    if(_isContentFinished(c))return isContentEndedInMonthTablet(c,mk);
     return c.status==='watching'&&isSameMonth;
   };
   const list=[...curContents,...prevContents].filter(belongsHere);
@@ -3778,10 +3801,10 @@ function renderMrpWeeklyMissions(weeksInMonth,wcRowsList){
 // 그 아래 ①카테고리별 시간 미니바+증감 ②완결 편수 비교. 시간·편수 모두 동일 기준(_mrpContentsInRange,
 // end_date 기준 월 범위)으로 걸러진 inRange/inRangePrev를 그대로 재사용 — 영화는 러닝타임 고정 집계.
 // 음악은 시청시간 데이터가 없어 시간 비교에서는 제외하고, 편수 비교에는 포함.
-function renderMrpContentsCmp(t,prevRblocks,inRangePrev,inRange){
+function renderMrpContentsCmp(t,prevRblocks,inRangePrev,inRange,prevContents){
   const el=document.getElementById('mrp-contents-cmp');
   if(!el)return;
-  const prevT=_calcWatchTimeByCat(prevRblocks||[],inRangePrev||[]);
+  const prevT=_calcWatchTimeByCat(prevRblocks||[],inRangePrev||[],prevContents);
   if(prevT.total<=0&&t.total<=0){
     el.innerHTML='<div class="empty-msg" style="text-align:left;">이 달·지난달 모두 감상 기록이 없어요</div>';
     return;
@@ -3857,7 +3880,7 @@ function renderMrpContentsCmp(t,prevRblocks,inRangePrev,inRange){
 function _mrpContentsInRange(contents,startDk,endDk){
   return (contents||[]).filter(c=>{
     if(c.content_cat==='music')return c.start_date&&c.start_date>=startDk&&c.start_date<=endDk;
-    if(c.status!=='done'&&c.status!=='stopped')return false;
+    if(!_isContentFinished(c))return false;
     return c.end_date&&c.end_date>=startDk&&c.end_date<=endDk;
   });
 }
@@ -3867,7 +3890,7 @@ function renderMrpContents(contents,startDk,endDk,rblocks,prevContents,prevRbloc
   // 탭 행(카드 제목 옆) 총 감상 시간 — 드라마/독서는 리듬 기록, 영화는 러닝타임(total_unit) 고정 집계.
   // 영화의 월 소속은 완결편수와 동일하게 end_date 기준(_mrpContentsInRange)이라 inRange를 그대로 재사용 —
   // 등록월(month_key) 기준 별도 필터를 쓰던 예전 방식은 두 기준이 어긋나는 버그를 반복적으로 만들어 폐기(2026-08-27).
-  const t=_calcWatchTimeByCat(rblocks||[],inRange);
+  const t=_calcWatchTimeByCat(rblocks||[],inRange,contents);
   const totalEl=document.getElementById('mrp-contents-total');
   if(totalEl)totalEl.textContent=t.total>0?_fmtDur(t.total):'';
   // 카드 진입/월 이동 시 뷰는 항상 '목록'으로 리셋 — 제목·표시 상태를 함께 맞춤
@@ -3879,7 +3902,7 @@ function renderMrpContents(contents,startDk,endDk,rblocks,prevContents,prevRbloc
   if(cmpElToggle)cmpElToggle.style.display='none';
   // 전월대비 뷰 — 완결 편수·시간 계산 모두 동일한 월 범위 판정(_mrpContentsInRange, end_date 기준) 하나로 통일.
   const inRangePrev=(prevStartDk&&prevEndDk)?_mrpContentsInRange(prevContents,prevStartDk,prevEndDk):[];
-  renderMrpContentsCmp(t,prevRblocks,inRangePrev,inRange);
+  renderMrpContentsCmp(t,prevRblocks,inRangePrev,inRange,prevContents);
   if(!inRange.length){el.innerHTML='<div class="empty-msg">이 달엔 기록한 콘텐츠가 없어요</div>';return;}
   // 카테고리(드라마/책/영화/음악) 순서 고정 그룹핑 — 그룹 내부는 기존처럼 최신순 유지
   const CAT_ORDER=['drama','book','movie','music'];
@@ -4442,7 +4465,7 @@ function renderYrMetricGrid(ctx){
     const curQContents=(ctx.contents||[]).filter(c=>
       c.content_cat==='music'
         ?(c.start_date&&c.start_date>=sDk&&c.start_date<=eDk)
-        :((c.status==='done'||c.status==='stopped')&&c.end_date&&c.end_date>=sDk&&c.end_date<=eDk)
+        :((_isContentFinished(c))&&c.end_date&&c.end_date>=sDk&&c.end_date<=eDk)
     );
     const catUnitLabel={drama:'편',movie:'편',book:'권',music:'곡'};
     const catOrder=['drama','movie','book','music'];
@@ -4708,7 +4731,7 @@ function renderYrContentGallery(ctx){
   const startDk=`${ctx.y}-01-01`,endDk=`${ctx.y}-12-31`;
   const completed=(ctx.contents||[]).filter(c=>{
     if(c.content_cat==='music')return c.start_date&&c.start_date>=startDk&&c.start_date<=endDk;
-    return(c.status==='done'||c.status==='stopped')&&c.end_date&&c.end_date>=startDk&&c.end_date<=endDk;
+    return(_isContentFinished(c))&&c.end_date&&c.end_date>=startDk&&c.end_date<=endDk;
   }).sort((a,b)=>{
     const aDate=a.content_cat==='music'?a.start_date:a.end_date;
     const bDate=b.content_cat==='music'?b.start_date:b.end_date;
@@ -4838,7 +4861,7 @@ const YR_MGRID_SUMMARY_CATS=[
 function _yrMgridCatSummaryHtml(ctx){
   const startDk=`${ctx.y}-01-01`,endDk=`${ctx.y}-12-31`;
   const inRange=_mrpContentsInRange(ctx.contents,startDk,endDk);
-  const t=_calcWatchTimeByCat(ctx.rblocks||[],inRange);
+  const t=_calcWatchTimeByCat(ctx.rblocks||[],inRange,ctx.contents);
   const musicCount=inRange.filter(c=>c.content_cat==='music').length;
   const rowsHtml=YR_MGRID_SUMMARY_CATS.map(({key,label,icon,color})=>{
     const valText=key==='music'?`${musicCount}곡`:(t[key]>0?_fmtDur(t[key]):'0분');
@@ -4857,7 +4880,7 @@ function renderYrContentMonthGrid(ctx){
   (ctx.contents||[]).forEach(c=>{
     let mk=null;
     if(c.content_cat==='music'){if(c.start_date)mk=c.start_date.slice(0,7);}
-    else if((c.status==='done'||c.status==='stopped')&&c.end_date)mk=c.end_date.slice(0,7);
+    else if((_isContentFinished(c))&&c.end_date)mk=c.end_date.slice(0,7);
     if(!mk||!mk.startsWith(String(ctx.y)))return;
     const m=parseInt(mk.slice(5,7),10)-1;
     monthlyByM[m].push(c);
@@ -4879,21 +4902,21 @@ function renderYrContentMonthGrid(ctx){
 }
 
 // rhythm_blocks에서 드라마/독서/영화 감상시간(분)을 월별로 집계 — renderTodayReading(오늘탭)과 동일 기준:
-// cat==='enjoy'이고 텍스트가 "드라마 - "/"독서 - "/"영화 - "로 시작하는 블록만 대상, start~end 차이를 합산.
+// cat==='enjoy' 블록을 content_cid(우선) 또는 텍스트 접두어(폴백)로 식별해 start~end 차이를 합산(_parseEnjoyBlock).
 // 영화는 오늘탭과 동일한 이중 규칙 적용 — 리듬 기록이 있으면 그 시간 우선, 없으면(리듬 기록 없이 콘텐츠탭에만
 // 등록·완결한 영화) contents.total_unit(러닝타임, 분)을 종료월(end_date 기준)에 대체로 카운트.
 // 음악은 감상시간 개념이 없어(등록일만 존재) 애초에 제외 — 기존 콘텐츠 비교 전반의 규칙과 동일.
 function _yrContentMinutesByMonth(rblocks,contents,mk){
   const sums={drama:0,book:0,movie:0};
   const movieTitlesWithRhythm=new Set();
+  const contentsByCid=_contentsByCidMap(contents);
   (rblocks||[]).forEach(b=>{
-    if(b.cat!=='enjoy'||!b.text||!b.start_time||!b.end_time)return;
+    if(!b.start_time||!b.end_time)return;
     if(!b.date_key||!b.date_key.startsWith(mk))return;
-    let cat=null;
-    if(b.text.startsWith('드라마 - '))cat='drama';
-    else if(b.text.startsWith('독서 - '))cat='book';
-    else if(b.text.startsWith('영화 - ')){cat='movie';movieTitlesWithRhythm.add(b.text.slice(5));}
-    else return;
+    const parsed=_parseEnjoyBlock(b,contentsByCid);
+    if(!parsed)return;
+    const {cat,title}=parsed;
+    if(cat==='movie')movieTitlesWithRhythm.add(title);
     const s=_paceParseHM(b.start_time),e=_paceParseHM(b.end_time);
     let mins=e-s;if(mins<0)mins+=1440;
     sums[cat]+=mins;
