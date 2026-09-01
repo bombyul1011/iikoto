@@ -682,12 +682,19 @@ function renderTodayTodosEvents(todos){
   else if(!hasSchedule)mode='event';
   else if(_tabletEventMode)mode=_tabletEventMode;
   else{
-    // 최초 노출: 각자 카테고리에서 가장 가까운(아직 안 지난) 항목 시각끼리 비교, 더 가까운 쪽. 둘 다 없으면(다 지났으면) 일정 선노출.
-    const nextUpcoming=(mins)=>{const up=mins.filter(m=>m>=nowMin);return up.length?Math.min(...up):null;};
-    const eventMins=isToday?sorted.filter(e=>e.event_time).map(e=>{const m=e.event_time.match(/^(\d{1,2}):(\d{2})/);return m?parseInt(m[1],10)*60+parseInt(m[2],10):null;}).filter(m=>m!=null):[];
-    const scheduleMins=isToday?scheduleItems.filter(it=>!it.done).map(it=>it.min):[];
-    const nextEvent=nextUpcoming(eventMins),nextSchedule=nextUpcoming(scheduleMins);
-    mode=(nextSchedule!=null&&(nextEvent==null||nextSchedule<nextEvent))?'schedule':'event';
+    // 지연 감지 우선: 시각이 이미 지났는데 아직 체크 안 된 시간표 항목이 하나라도 있으면, 그 일이 밀리고 있을
+    // 가능성이 있으므로 무조건 시간표를 먼저 보여줌 — 본앱(index.html) 2026-09-01 개선과 동일 로직.
+    // 지연 항목이 없으면 기존처럼 "각자 카테고리에서 가장 가까운(아직 안 지난) 항목 시각끼리 비교, 더 가까운 쪽" 규칙 적용.
+    const hasOverdueSchedule=isToday&&scheduleItems.some(it=>!it.done&&it.min<nowMin);
+    if(hasOverdueSchedule){
+      mode='schedule';
+    }else{
+      const nextUpcoming=(mins)=>{const up=mins.filter(m=>m>=nowMin);return up.length?Math.min(...up):null;};
+      const eventMins=isToday?sorted.filter(e=>e.event_time).map(e=>{const m=e.event_time.match(/^(\d{1,2}):(\d{2})/);return m?parseInt(m[1],10)*60+parseInt(m[2],10):null;}).filter(m=>m!=null):[];
+      const scheduleMins=isToday?scheduleItems.filter(it=>!it.done).map(it=>it.min):[];
+      const nextEvent=nextUpcoming(eventMins),nextSchedule=nextUpcoming(scheduleMins);
+      mode=(nextSchedule!=null&&(nextEvent==null||nextSchedule<nextEvent))?'schedule':'event';
+    }
   }
   const showSwitch=hasEvent&&hasSchedule;
   if(labelEl)labelEl.innerHTML=`<i class="ti ti-calendar-heart" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>${mode==='event'?'오늘 일정':'타임테이블'}${showSwitch?' <i class="ti ti-switch-horizontal" aria-hidden="true"></i>':''}`;
