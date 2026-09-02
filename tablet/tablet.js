@@ -3252,7 +3252,7 @@ function renderMrpHero(row){
         <div id="mrp-hero-body"></div>
       </div>
       <div class="mrp-grid2" style="margin-bottom:14px;">
-        <div class="mrp-card"><div class="mrp-card-title"><i class="ti ti-flag-3" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>이 달의 목표</div><div id="mrp-goals"></div></div>
+        <div class="mrp-card"><div class="mrp-card-title"><i class="ti ti-flag-3" style="color:rgba(var(--pal-pink-text-rgb),0.85);" aria-hidden="true"></i>이 달의 목표</div><div id="mrp-goals"></div></div>
         <div class="mrp-card mrp-card-vcenter"><div class="mrp-card-title"><i class="ti ti-chart-donut" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>이 달의 숫자</div><div id="mrp-stats"></div></div>
       </div>
       <div class="mrp-card" style="margin-bottom:14px;"><div class="mrp-card-title"><i class="ti ti-chart-line" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>이 달의 궤적</div><div id="mrp-traj"></div></div>
@@ -3266,7 +3266,7 @@ function renderMrpHero(row){
         <div class="mrp-card"><div class="mrp-card-title"><i class="ti ti-flag-3" style="color:rgba(210,175,225,1);" aria-hidden="true"></i>주간 미션 모음</div><div id="mrp-missions"></div></div>
         <div class="mrp-card mrp-contents-card">
           <div class="mrp-card-title-row mrp-contents-title-row" id="mrp-contents-title-row" onclick="toggleMrpContentsView()">
-            <div class="mrp-card-title"><i class="ti ti-book" id="mrp-contents-title-icon" style="color:rgba(178,60,105,0.75);" aria-hidden="true"></i><span id="mrp-contents-title-text">이 달의 콘텐츠</span></div>
+            <div class="mrp-card-title"><i class="ti ti-book" id="mrp-contents-title-icon" style="color:rgba(var(--pal-pink-text-rgb),0.75);" aria-hidden="true"></i><span id="mrp-contents-title-text">이 달의 콘텐츠</span></div>
             <span class="mrp-card-title-total" id="mrp-contents-total"></span>
           </div>
           <div id="mrp-contents"></div>
@@ -4347,7 +4347,7 @@ function renderYrHero(ctx){
         </div>
       </div>
       <div class="card">
-        <div class="card-lbl"><i class="ti ti-hash" style="color:rgba(178,60,105,0.85);" aria-hidden="true"></i>올해의 키워드</div>
+        <div class="card-lbl"><i class="ti ti-hash" style="color:rgba(var(--pal-pink-text-rgb),0.85);" aria-hidden="true"></i>올해의 키워드</div>
         <div id="yr-kw-cloud"></div>
       </div>
     </div>
@@ -4832,7 +4832,7 @@ const YR_MGRID_MONTH_COLORS=[
   'var(--rh-exercise)','var(--rh-rest)','var(--rh-groom)','var(--rh-work)',
   'var(--rh-appointment)','var(--rh-note)','var(--rh-enjoy)','var(--rh-home)',
   'rgba(var(--pal-warmgray-rgb),0.75)','rgba(var(--pal-lavender-rgb),0.75)',
-  'rgba(var(--pal-rose-rgb),0.75)','rgba(var(--pal-pink-rgb),0.75)'
+  'rgba(var(--pal-rose-rgb),0.75)','rgba(var(--pal-pink-text-rgb),0.75)'
 ];
 const YR_MGRID_COLS=4; // 한 줄 4개(1~4/5~8/9~12) — 펼침 삽입 위치 계산에도 사용
 
@@ -4988,7 +4988,7 @@ function _yrContentMinutesByMonth(rblocks,contents,mk){
 
 const YR_CONTENT_TIME_CATS=[
   {key:'book',label:'책',color:'rgba(var(--pal-yellow-rgb),0.85)'},
-  {key:'drama',label:'드라마',color:'rgba(var(--pal-pink-rgb),0.85)'},
+  {key:'drama',label:'드라마',color:'rgba(var(--pal-pink-text-rgb),0.85)'},
   {key:'movie',label:'영화',color:'rgba(var(--pal-sky-rgb),0.85)'}
 ];
 
