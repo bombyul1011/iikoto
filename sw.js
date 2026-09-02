@@ -1,9 +1,8 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.36-schedule-sort-fix';
+const CACHE = 'iikoto-v2.35-airing-tone';
 const ASSETS = [
   './',
-  './index.html',
-  './app.js'
+  './index.html'
 ];
 
 // 설치 — 핵심 파일 캐시
