@@ -7631,7 +7631,7 @@ function renderCwatchMainCard(){
       </div>
       <div class="rd-top-sub" style="margin-top:-4px;text-align:right;">${cur}/${c.totalUnit}${unitLabel}</div>`;
     }
-    el.innerHTML=`<div class="rd-top" style="margin-bottom:14px;">
+    el.innerHTML=`<div class="rd-top playing" style="margin-bottom:14px;">
       <div class="rd-top-inner">
         <div class="rd-top-main">
           ${posterHtml}
@@ -9430,6 +9430,7 @@ function cswRingSvg(cid,mk,running){
 }
 function renderRdTop(){
   const el=document.getElementById('rd-top');if(!el)return;
+  el.classList.toggle('playing',_swRunning);
   const books=getBooks();
   const cur=books.find(b=>b.status==='reading');
   if(cur){
@@ -11372,6 +11373,7 @@ function toggleStopwatch(){
     timeEl.style.display='flex';
     _swInterval=setInterval(updateStopwatchDisplay,1000);
     if(homeBtn)homeBtn.classList.add('sw-active');
+    document.getElementById('rd-top')?.classList.add('playing');
   }else{
     _swRunning=false;
     try{localStorage.removeItem(SW_PERSIST_KEY);}catch(e){}
@@ -11382,6 +11384,7 @@ function toggleStopwatch(){
     document.getElementById('rd-sw-time').textContent='00:00';
     document.getElementById('rd-sw-ring').setAttribute('stroke-dashoffset',RD_SW_C);
     if(homeBtn)homeBtn.classList.remove('sw-active');
+    document.getElementById('rd-top')?.classList.remove('playing');
     const seconds=_swSeconds;
     _swSeconds=0;
     autoLogReadingRhythm(_swStartTs,Date.now());
