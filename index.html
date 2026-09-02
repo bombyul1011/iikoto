@@ -63,6 +63,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 :root,[data-theme="light"]{
   --main-text-size:14px; /* 메인 입력/본문 텍스트 공용 크기 — 할일/일정/메모/식사/주간목표입력/하루한줄입력 전부 이 값 참조. 여기 하나만 바꾸면 전체 적용됨 */
   --dow-label-size:12px; /* 서브텍스트 사이즈 — 요일(월화수목금토일) 라벨에서 시작해 각종 보조 텍스트(날짜/카테고리, 필터탭, 코멘트보기 등)까지 두루 쓰이는 공용 크기. 앞으로 "서브텍스트 사이즈"가 필요한 곳은 전부 이 변수를 끌어다 쓰기 */
+  --dow-label-size-2:11px; /* dow-label-size 파생 실험용 — 현재는 월간캘린더 연속일정 바(.cal-event-bar) 폰트 사이즈 테스트 전용 */
   --sleep-warmgray:#8a8078; /* 수면카드 전용 웜그레이 — 남색 강조색을 제외한 시간표기/아이콘 전부가 참조. CSS 클래스(sleep-*) 7곳 + JS 인라인 스타일 4곳(5376/5405/6192/6197 근처) 동일 색 사용 중 */
   --sleep-warmgray-strong:#6b6259; /* 취침/기상/총수면시간 전용 — sleep-warmgray보다 더 진한 값. sleep-time-val, sleep-top-num/unit, sleep-collapsed-time/dur 5곳이 참조 */
   --graph-track-color:rgba(var(--divider-rgb),0.25); /* 그래프/진행바 공용 기준선·트랙 색 — rd-progress-track(독서 진행바), pace-dot-baseline/hourline(홈탭 활동분포 점그래프 기준선) 3곳이 참조 */
@@ -87,6 +88,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="glass"]{
   --main-text-size:14px;
   --dow-label-size:12px;
+  --dow-label-size-2:11px;
   --sleep-warmgray:#8a8078;
   --sleep-warmgray-strong:#6b6259;
   --graph-track-color:rgba(var(--divider-rgb),0.25);
@@ -638,7 +640,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cal-day-name-row{margin-bottom:0;}
 /* 월간탭 연속일정 bar — 각 날짜 칸이 자기 몫의 "조각"만 그리는 방식(칸 폭 100%로 딱 맞음, 절대 밀리거나 클릭 영역이 어긋나지 않음).
    시작조각=왼쪽 둥근모서리+텍스트, 중간조각=사각형 빈 막대, 끝조각=오른쪽 둥근모서리. 옆 칸과 이어붙어 하나의 막대처럼 보임. */
-#monthly-cal .cal-event-bar{display:block;width:calc(100% + 2px);margin-left:-1px;margin-right:-1px;height:13px;line-height:13px;font-size:var(--dow-label-size);color:#fff;padding:0 4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;text-align:left;cursor:pointer;box-sizing:border-box;margin-top:1px;margin-bottom:1px;}
+#monthly-cal .cal-event-bar{display:block;width:calc(100% + 2px);margin-left:-1px;margin-right:-1px;height:13px;line-height:13px;font-size:var(--dow-label-size-2);color:#fff;padding:0 4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;text-align:left;cursor:pointer;box-sizing:border-box;margin-top:1px;margin-bottom:1px;}
 #monthly-cal .cal-event-bar.bar-round-l{border-top-left-radius:4px;border-bottom-left-radius:4px;}
 #monthly-cal .cal-event-bar.bar-round-r{border-top-right-radius:4px;border-bottom-right-radius:4px;}
 #monthly-cal .cal-event-bar.ev-schedule{background:rgba(130,75,150,0.70);}
@@ -656,7 +658,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 #monthly-cal .cal-day.today .cal-num{background:rgba(205,95,95,0.65);color:#fff;}
 #monthly-cal .cal-day.selected .cal-num{background:rgba(230,150,150,0.24);color:rgba(180,90,90,0.90);}
 #monthly-cal .cal-day.today.selected .cal-num{background:rgba(230,150,150,0.30)!important;color:rgba(180,90,90,0.90)!important;border:none!important;}
-#monthly-cal .cal-event-badge{font-size:9px;line-height:1;padding:2.5px 3px 2px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;align-self:stretch;box-sizing:border-box;margin-bottom:1px;text-align:center;}
+#monthly-cal .cal-event-badge{font-size:var(--dow-label-size-2);line-height:1;padding:2.5px 3px 2px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;align-self:stretch;box-sizing:border-box;margin-bottom:1px;text-align:center;}
 #monthly-cal .cal-event-badge.ev-schedule{color:var(--ev-schedule-text);background:var(--ev-schedule-bg);}
 #monthly-cal .cal-event-badge.ev-personal{color:var(--ev-personal-text);background:var(--ev-personal-bg);}
 #monthly-cal .cal-event-badge.ev-work{color:var(--ev-work-text);background:var(--ev-work-bg);}
