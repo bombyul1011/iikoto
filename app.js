@@ -7096,34 +7096,25 @@ function renderTimetable(){
         }
         const dispEnd=Math.max(endD,dispStart);
         const span=dispEnd-dispStart+1,w=span*20+(span-1)*2;
-        // 방영중으로 표시해둔 드라마(isAiring)는 상태(보는중/완료/중단) 무관하게 항상 통짜 막대 대신
-        // 점선(미감상)+네모(실제 감상일) 트랙으로 렌더링 — 실제 시청 밀도를 한눈에 구분하기 위함
-        const useAiringTrack=cat==='drama'&&item.isAiring&&!item._carried;
-        if(useAiringTrack){
+        // 방영중으로 표시해둔 드라마(isAiring)는 상태(보는중/완료/중단) 무관하게 하나로 이어진 막대는 유지하되
+        // 실제 감상일만 진한 톤, 안 본 날은 옅은 톤으로 — 완결작과 같은 "쭉 이어진 형태" 언어를 유지하면서 밀도 구분
+        const useAiringTone=cat==='drama'&&item.isAiring&&!item._carried;
+        if(useAiringTone){
           const watchedDays=new Set(getWatchedDaysInMonth(item.title,mk));
           const track=document.createElement('div');
-          track.className='tt-airing-track';
-          track.style.cssText=`width:${w}px;min-width:${w}px;position:relative;display:flex;`;
+          track.className='tt-block drama tt-airing-tone';
+          track.style.cssText=`width:${w}px;min-width:${w}px;position:relative;padding:0;overflow:hidden;display:flex;`;
           track.title=item.title+(item.status==='stopped'?' · 중단':'');
           for(let d=dispStart;d<=dispEnd;d++){
-            const cell=document.createElement('div');
-            cell.className='tt-airing-cell';
-            const watched=watchedDays.has(d);
-            let joinNext=false;
-            if(watched){
-              cell.classList.add('watched');
-              // 연속된 감상일끼리는 이어진 블록처럼 보이도록 인접 칸 쪽 모서리를 각지게, 사이 간격도 없앰
-              const prevWatched=watchedDays.has(d-1)&&d>dispStart;
-              joinNext=watchedDays.has(d+1)&&d<dispEnd;
-              if(prevWatched)cell.classList.add('join-prev');
-              if(joinNext)cell.classList.add('join-next');
-            }
-            if(d===dispStart){
-              const lbl=document.createElement('span');lbl.className='tt-airing-label';lbl.textContent=item.title;
-              cell.appendChild(lbl);
-            }
-            cell.style.marginRight=(joinNext||d===dispEnd)?'0':'2px';
-            track.appendChild(cell);
+            const seg=document.createElement('div');
+            seg.className='tt-airing-seg'+(watchedDays.has(d)?' watched':'');
+            track.appendChild(seg);
+          }
+          const lbl=document.createElement('span');lbl.className='tt-airing-tone-label';lbl.textContent=item.title;
+          track.appendChild(lbl);
+          if(isWatching){
+            const stripe=document.createElement('div');stripe.className='tt-airing-live-stripe';
+            track.appendChild(stripe);
           }
           if(item.status==='stopped')track.style.filter='saturate(0.45)';
           track.addEventListener('click',()=>openContentModal(cat,item,mk));
