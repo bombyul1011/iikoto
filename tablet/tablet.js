@@ -301,16 +301,23 @@ window.addEventListener('resize',()=>{if(_yrContentHeightRO)syncYrContentHeight(
 
 // 라이트/글라스 두 테마만 지원 — 본앱(index.html)의 data-theme 토글을 최소 구성으로 이식.
 // 저장은 localStorage 하나(ARCHIVE_THEME_KEY)로 통일, 미저장 시 기본값 'light'.
+// 설정탭의 라이트/글라스 두 버튼에서 직접 선택하는 방식(자주 바꾸는 설정이 아니라 별도 토글 버튼 없이 설정 안에만 둠).
 function initArchiveTheme(){
   let t='light';
   try{t=localStorage.getItem(ARCHIVE_THEME_KEY)||'light';}catch(e){}
   document.documentElement.setAttribute('data-theme',t);
+  _updateThemeOptBtns(t);
 }
-function toggleArchiveTheme(){
-  const cur=document.documentElement.getAttribute('data-theme')==='glass'?'glass':'light';
-  const next=cur==='glass'?'light':'glass';
-  document.documentElement.setAttribute('data-theme',next);
-  try{localStorage.setItem(ARCHIVE_THEME_KEY,next);}catch(e){}
+function setArchiveTheme(theme){
+  document.documentElement.setAttribute('data-theme',theme);
+  try{localStorage.setItem(ARCHIVE_THEME_KEY,theme);}catch(e){}
+  _updateThemeOptBtns(theme);
+}
+function _updateThemeOptBtns(theme){
+  const light=document.getElementById('theme-opt-light');
+  const glass=document.getElementById('theme-opt-glass');
+  if(light)light.classList.toggle('on',theme==='light');
+  if(glass)glass.classList.toggle('on',theme==='glass');
 }
 function initSidebarCollapse(){
   let collapsed=false;
@@ -4572,23 +4579,23 @@ function renderYrMetricGrid(ctx){
   }
 
   el.innerHTML=`
-    <div class="card yr-sum-banner" onclick="switchYrView(document.querySelector('[data-view=habit]'),'habit')">
+    <div class="card yr-sum-banner" data-banner="habit" onclick="switchYrView(document.querySelector('[data-view=habit]'),'habit')">
       <div class="yr-sum-banner-hdr"><i class="ti ti-chart-donut" aria-hidden="true"></i>습관</div>
       <div class="yr-sum-habit-split">
         <div class="yr-sum-habit-avg"><div class="yr-sum-habit-avg-num">${habitAvgPct}<span>%</span></div><div class="yr-sum-habit-avg-lbl">전체 평균</div></div>
         <div class="yr-sum-habit-list">${habitRowsHtml}</div>
       </div>
     </div>
-    <div class="card yr-sum-banner" onclick="switchYrView(document.querySelector('[data-view=content]'),'content')">
+    <div class="card yr-sum-banner" data-banner="content" onclick="switchYrView(document.querySelector('[data-view=content]'),'content')">
       <div class="yr-sum-banner-hdr"><i class="ti ti-stack-2" aria-hidden="true"></i>콘텐츠 · 분기별 소비량</div>
       <div class="yr-sum-content-quarters">${contentCardsHtml}</div>
       ${contentNoteHtml}
     </div>
-    <div class="card yr-sum-banner" onclick="switchYrView(document.querySelector('[data-view=rhythm]'),'rhythm')">
+    <div class="card yr-sum-banner" data-banner="rhythm" onclick="switchYrView(document.querySelector('[data-view=rhythm]'),'rhythm')">
       <div class="yr-sum-banner-hdr"><i class="ti ti-rainbow" aria-hidden="true"></i>리듬 · 8대 카테고리 일평균</div>
       <div class="rhythm-9grid">${rhythmItemsHtml}</div>
     </div>
-    <div class="card yr-sum-banner" onclick="switchYrView(document.querySelector('[data-view=sleep]'),'sleep')">
+    <div class="card yr-sum-banner" data-banner="sleep" onclick="switchYrView(document.querySelector('[data-view=sleep]'),'sleep')">
       <div class="yr-sum-banner-hdr"><i class="ti ti-moon-stars" aria-hidden="true"></i>수면</div>
       <div class="yr-sum-sleep-split">
         <div class="yr-sum-sleep-item"><div class="yr-sum-sleep-lbl">총 수면시간 평균</div><div class="yr-sum-sleep-val">${avgSleepHtml}</div></div>
