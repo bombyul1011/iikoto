@@ -569,6 +569,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .memo-seed-toggle{position:absolute;right:5px;top:0;bottom:0;margin:auto;height:22px;width:22px;background:none;border:none;padding:0;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--tm);opacity:0.23;transition:opacity .15s,color .15s;}
 .memo-seed-toggle i{font-size:17px;line-height:0;}
 .memo-seed-toggle.on{opacity:1;color:rgba(120,155,160,0.95);}
+.cm-airing-toggle{position:relative;flex-shrink:0;width:22px;height:22px;background:none;border:none;padding:0;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--tm);opacity:0.23;transition:opacity .15s,color .15s;}
+.cm-airing-toggle .cat-sq{width:15px;height:15px;border:1.4px solid currentColor;border-radius:3px;display:flex;align-items:center;justify-content:center;}
+.cm-airing-toggle .cat-sq::before{content:'';width:1.4px;height:9px;background:currentColor;border-radius:1px;}
+.cm-airing-toggle.on{opacity:1;color:rgba(120,155,160,0.95);}
 .send-btn-sm{width:32px;height:32px;border-radius:9px;}
 .seed-icon-btn{background:linear-gradient(120deg,rgba(185,215,140,0.75),rgba(210,230,165,0.65));border:1px solid rgba(145,185,80,0.45);box-shadow:0 2px 10px rgba(110,155,55,0.10);}
 [data-theme="glass"] .seed-icon-btn{background:linear-gradient(120deg,rgba(185,215,140,0.40),rgba(210,230,165,0.32));border:1.4px solid rgba(145,185,80,0.35);}
@@ -612,6 +616,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .tt-block.book{background:var(--pal-yellow-bg);}
 .tt-block.movie{background:var(--pal-sky-bg);}
 .tt-block.music{background:var(--pal-lime-bg);justify-content:center;padding:0;}
+.tt-airing-track{height:20px;}
+.tt-airing-cell{width:20px;height:20px;flex-shrink:0;border-radius:4px;background:none;border:0.5px dashed rgba(var(--divider-rgb),0.35);box-sizing:border-box;position:relative;}
+.tt-airing-cell.watched{border:1.4px solid var(--pal-pink-text);background:var(--pal-pink-bg);}
+.tt-airing-label{position:absolute;left:24px;top:0;height:20px;display:flex;align-items:center;font-size:var(--dow-label-size);color:var(--tp);white-space:nowrap;pointer-events:none;}
 .tt-head-row{display:flex;align-items:center;margin-bottom:4px;}
 .tt-head-spacer{width:60px;flex-shrink:0;}
 .tt-head-dates{flex:1;overflow-x:hidden;}
@@ -2015,7 +2023,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     </div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
       <span style="font-size:var(--dow-label-size);color:var(--tm);white-space:nowrap;" id="cm-start-label">시작일</span>
-      <input type="text" class="modal-inp" id="cm-start" readonly onclick="openContentDatePicker('cm-start')" style="flex:1;margin-bottom:0;cursor:pointer;" placeholder="날짜 선택">
+      <div style="position:relative;flex:1;">
+        <input type="text" class="modal-inp" id="cm-start" readonly onclick="openContentDatePicker('cm-start')" style="width:100%;margin-bottom:0;cursor:pointer;padding-right:30px;" placeholder="날짜 선택">
+        <button type="button" class="cm-airing-toggle" id="cm-airing-toggle" onclick="toggleCmAiring()" title="방영중 작품으로 표시"><span class="cat-sq"></span></button>
+      </div>
       <div style="display:flex;gap:5px;flex-shrink:0;" id="cm-status-btns">
         <button class="cstatus-btn done" id="cm-done" onclick="toggleCDone()" style="white-space:nowrap;padding:8px 9px;margin-bottom:0;">
           <i class="ti ti-circle-check ico-sz-14" aria-hidden="true"></i>완료

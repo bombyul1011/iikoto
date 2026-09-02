@@ -798,6 +798,19 @@ async function renderDiaryMonthSheet(){
 // 콘텐츠 완결 판정 — 2종. 조회/렌더링용은 콘텐츠 객체를 받고, 등록 모달의 저장 직전 로직처럼
 // 아직 객체가 아닌 상태 문자열만 있는 지점은 문자열 버전을 씀. 9곳에 흩어져 있던 동일 조건을 통합(2026-08-31).
 // 음악은 이 판정 대상이 아님(진행/완결 개념 자체가 없음, 항상 status 없이 등록일만 사용).
+// 방영중으로 표시해둔 콘텐츠(주로 드라마)의 완료 후 타임라인 렌더링용 — 해당 월(mk) 안에서
+// 리듬 블록("드라마 - {title}" 텍스트매칭, loadAndRenderWatchCal과 동일 규칙)에 실제로 잡힌 감상일(day 숫자)만 추출.
+function getWatchedDaysInMonth(title,mk){
+  const [y,m]=mk.split('-').map(Number);
+  const daysInMonth=new Date(y,m,0).getDate();
+  const days=[];
+  for(let d=1;d<=daysInMonth;d++){
+    const dk=`${mk}-${String(d).padStart(2,'0')}`;
+    const hit=getRhythmBlocks(dk).some(b=>b.cat==='enjoy'&&b.text&&b.text.startsWith('드라마 - ')&&b.text.slice(6)===title);
+    if(hit)days.push(d);
+  }
+  return days;
+}
 function isContentFinished(c){return c.status==='done'||c.status==='stopped';}
 function isFinishedStatus(status){return status==='done'||status==='stopped';}
 // 콘텐츠가 이번 달(mk)로 이월되는지 판정하는 공통 조건.
@@ -3036,7 +3049,7 @@ async function syncContentsDownRaw(mk){
       const matched=localNoCidByKey[key];
       if(matched){l=matched;delete localNoCidByKey[key];}
     }
-    const serverItem={cat:r.content_cat,title:r.title,startDate:r.start_date||(r.start_day?mk+'-'+pad(r.start_day):null),endDate:r.end_date||(r.end_day?mk+'-'+pad(r.end_day):null),status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',musicUrl:r.music_url||null,album:r.album||null,releaseYear:r.release_year||null,totalUnit:r.total_unit||null,currentUnit:r.current_unit||null,notes:r.notes||[],unitLabel:r.unit_label||null,readSeconds:r.read_seconds||0,created:r.created,cid,updatedAt:r.updated_at};
+    const serverItem={cat:r.content_cat,title:r.title,startDate:r.start_date||(r.start_day?mk+'-'+pad(r.start_day):null),endDate:r.end_date||(r.end_day?mk+'-'+pad(r.end_day):null),status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',musicUrl:r.music_url||null,album:r.album||null,releaseYear:r.release_year||null,totalUnit:r.total_unit||null,currentUnit:r.current_unit||null,notes:r.notes||[],unitLabel:r.unit_label||null,readSeconds:r.read_seconds||0,isAiring:!!r.is_airing,created:r.created,cid,updatedAt:r.updated_at};
     if(!l){merged.push(serverItem);return;}
     // 로컬/서버 둘 다 있으면 updated_at(서버) vs 로컬수정시각 비교, 서버가 더 최신이거나 로컬에 수정시각 기록이 없으면 서버값 채택
     const localTs=l.updatedAt?new Date(l.updatedAt).getTime():0;
@@ -3062,7 +3075,7 @@ async function syncContentsUp(mk){
   if(ensureItemCids(c))S.set(S.key('contents',mk),c);
   const delCids=getDelPendingCids('contents',mk);
   const ok=await syncListUpSafe('contents',`month_key=eq.${mk}`,'month_key,client_id',c,
-    it=>({month_key:mk,content_cat:it.cat,title:it.title,start_date:it.startDate,end_date:it.endDate,status:it.status,review:it.review||'',stars:it.stars||0,poster:it.poster||null,author:it.author||'',music_url:it.musicUrl||null,album:it.album||null,release_year:it.releaseYear||null,total_unit:it.totalUnit||null,current_unit:it.currentUnit||null,notes:it.notes||[],unit_label:it.unitLabel||null,read_seconds:it.readSeconds||0,created:it.created,client_id:it.cid}),
+    it=>({month_key:mk,content_cat:it.cat,title:it.title,start_date:it.startDate,end_date:it.endDate,status:it.status,review:it.review||'',stars:it.stars||0,poster:it.poster||null,author:it.author||'',music_url:it.musicUrl||null,album:it.album||null,release_year:it.releaseYear||null,total_unit:it.totalUnit||null,current_unit:it.currentUnit||null,notes:it.notes||[],unit_label:it.unitLabel||null,read_seconds:it.readSeconds||0,is_airing:!!it.isAiring,created:it.created,client_id:it.cid}),
     delCids);
   if(ok)delCids.forEach(cid=>removeDelPending('contents',mk,cid));
   return ok;
@@ -7083,6 +7096,35 @@ function renderTimetable(){
         }
         const dispEnd=Math.max(endD,dispStart);
         const span=dispEnd-dispStart+1,w=span*20+(span-1)*2;
+        // 방영중으로 표시해뒀던 드라마가 완료/중단된 경우 — 통짜 막대 대신 점선(미감상)+네모(실제 감상일) 트랙으로 렌더링
+        const useAiringTrack=cat==='drama'&&item.isAiring&&isContentFinished(item)&&!item._carried;
+        if(useAiringTrack){
+          const watchedDays=new Set(getWatchedDaysInMonth(item.title,mk));
+          const track=document.createElement('div');
+          track.className='tt-airing-track';
+          track.style.cssText=`width:${w}px;min-width:${w}px;position:relative;display:flex;gap:2px;`;
+          track.title=item.title+(item.status==='stopped'?' · 중단':'');
+          let titleShown=false;
+          for(let d=dispStart;d<=dispEnd;d++){
+            const cell=document.createElement('div');
+            cell.className='tt-airing-cell';
+            if(watchedDays.has(d)){
+              cell.classList.add('watched');
+              if(!titleShown){
+                const lbl=document.createElement('span');lbl.className='tt-airing-label';lbl.textContent=item.title;
+                cell.appendChild(lbl);
+                titleShown=true;
+              }
+            }
+            track.appendChild(cell);
+          }
+          if(item.status==='stopped')track.style.filter='saturate(0.45)';
+          track.addEventListener('click',()=>openContentModal(cat,item,mk));
+          track.style.cursor='pointer';
+          inner.appendChild(track);
+          cursor=dispEnd+1;
+          return;
+        }
         const block=document.createElement('div');block.className=`tt-block ${cat}`;
         block.style.cssText=`width:${w}px;min-width:${w}px;position:relative;`;
         if(isWatching){
@@ -7274,7 +7316,20 @@ function openContentModal(cat,item=null,mk=null,onSaved=null){
   // 수정(edit) 모드에서 기존에 저장된 값이 있으면 그대로 힌트로 표시하고, 검색해서 새로 선택하면 자동으로 덮어씀.
   _selectedTotalUnit=item?.totalUnit||null;
   renderCmProgressHint();
+  // 방영중 표시 토글 — 드라마만 해당(등록 시 미리 켜두면 완료 시점에 점선+네모 타임라인으로 전환됨)
+  _cmAiringOn=!!(item?.isAiring);
+  const airingBtn=document.getElementById('cm-airing-toggle');
+  if(airingBtn){
+    airingBtn.style.display=(cat==='drama')?'flex':'none';
+    airingBtn.classList.toggle('on',_cmAiringOn);
+  }
   openModal('content-modal');setTimeout(()=>document.getElementById('cm-title').focus(),100);
+}
+let _cmAiringOn=false;
+function toggleCmAiring(){
+  _cmAiringOn=!_cmAiringOn;
+  const btn=document.getElementById('cm-airing-toggle');
+  if(btn)btn.classList.toggle('on',_cmAiringOn);
 }
 let _cmUnit='percent';
 function setCmUnit(u){
@@ -7344,7 +7399,9 @@ function confirmContent(){
     totalUnit=_selectedTotalUnit||null;
     if(totalUnit&&currentUnit&&currentUnit>totalUnit)currentUnit=totalUnit;
   }
-  _selectedPoster=null;_selectedAuthor=null;_selectedMusicUrl=null;_selectedTotalUnit=null;_selectedAlbum=null;_selectedReleaseYear=null;
+  // 방영중 표시 토글 — 드라마만 저장(다른 카테고리는 항상 false로 고정, 완료 버튼 누르는 시점의 렌더링 분기에만 사용됨)
+  const isAiring=_contentCtx.cat==='drama'?_cmAiringOn:false;
+  _selectedPoster=null;_selectedAuthor=null;_selectedMusicUrl=null;_selectedTotalUnit=null;_selectedAlbum=null;_selectedReleaseYear=null;_cmAiringOn=false;
   const newMk=startDate.slice(0,7); // 시작한 달 = 저장 버킷
   const oldMk=_contentCtx.mk;
   let savedCid=null;
@@ -7354,7 +7411,7 @@ function confirmContent(){
     const idx=_contentCtx.item.cid
       ?oldContents.findIndex(c=>c.cid===_contentCtx.item.cid)
       :oldContents.findIndex(c=>c.created===_contentCtx.item.created);
-    const updated=idx>=0?{...oldContents[idx],title,startDate,endDate,status,review,stars,poster,author,musicUrl,album,releaseYear,totalUnit,currentUnit}:null;
+    const updated=idx>=0?{...oldContents[idx],title,startDate,endDate,status,review,stars,poster,author,musicUrl,album,releaseYear,totalUnit,currentUnit,isAiring}:null;
     if(idx>=0){
       savedCid=oldContents[idx].cid;
       if(newMk===oldMk){
@@ -7374,7 +7431,7 @@ function confirmContent(){
     const contents=getContents(newMk);
     const newCid=genCid();
     savedCid=newCid;
-    contents.push({cat:_contentCtx.cat,title,startDate,endDate,status,review,stars,poster,author,musicUrl,album,releaseYear,totalUnit,currentUnit,created:Date.now(),cid:newCid});
+    contents.push({cat:_contentCtx.cat,title,startDate,endDate,status,review,stars,poster,author,musicUrl,album,releaseYear,totalUnit,currentUnit,isAiring,created:Date.now(),cid:newCid});
     saveContents(newMk,contents);
     if(_contentCtx.onSaved){const cb=_contentCtx.onSaved;_contentCtx.onSaved=null;setTimeout(()=>cb(newCid),0);}
   }
