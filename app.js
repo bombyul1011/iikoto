@@ -7103,24 +7103,26 @@ function renderTimetable(){
           const watchedDays=new Set(getWatchedDaysInMonth(item.title,mk));
           const track=document.createElement('div');
           track.className='tt-airing-track';
-          track.style.cssText=`width:${w}px;min-width:${w}px;position:relative;display:flex;gap:2px;`;
+          track.style.cssText=`width:${w}px;min-width:${w}px;position:relative;display:flex;`;
           track.title=item.title+(item.status==='stopped'?' · 중단':'');
           for(let d=dispStart;d<=dispEnd;d++){
             const cell=document.createElement('div');
             cell.className='tt-airing-cell';
             const watched=watchedDays.has(d);
+            let joinNext=false;
             if(watched){
               cell.classList.add('watched');
-              // 연속된 감상일끼리는 이어진 블록처럼 보이도록 인접 칸 쪽 모서리를 각지게, gap도 없앰
+              // 연속된 감상일끼리는 이어진 블록처럼 보이도록 인접 칸 쪽 모서리를 각지게, 사이 간격도 없앰
               const prevWatched=watchedDays.has(d-1)&&d>dispStart;
-              const nextWatched=watchedDays.has(d+1)&&d<dispEnd;
+              joinNext=watchedDays.has(d+1)&&d<dispEnd;
               if(prevWatched)cell.classList.add('join-prev');
-              if(nextWatched)cell.classList.add('join-next');
+              if(joinNext)cell.classList.add('join-next');
             }
             if(d===dispStart){
               const lbl=document.createElement('span');lbl.className='tt-airing-label';lbl.textContent=item.title;
               cell.appendChild(lbl);
             }
+            cell.style.marginRight=(joinNext||d===dispEnd)?'0':'2px';
             track.appendChild(cell);
           }
           if(item.status==='stopped')track.style.filter='saturate(0.45)';
