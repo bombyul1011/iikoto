@@ -543,6 +543,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .tt-block.music{background:var(--pal-lime-bg);color:var(--tp);}
 .tt-block.watching{background-image:repeating-linear-gradient(45deg,transparent,transparent 6px,rgba(255,255,255,0.45) 6px,rgba(255,255,255,0.45) 10px);opacity:0.85;}
 .tt-block.stopped{filter:saturate(0.45);opacity:0.7;}
+.tt-block.tt-airing-tone{background:none!important;padding:0;position:relative;}
+.tt-airing-seg{flex:1;height:100%;background:rgba(var(--pal-pink-rgb),0.09);}
+.tt-airing-seg.watched{background:var(--pal-pink-bg);}
+.tt-airing-tone-label{position:absolute;left:5px;top:0;height:23px;display:flex;align-items:center;font-size:var(--fs-sm);color:var(--tp);white-space:nowrap;pointer-events:none;z-index:2;overflow:hidden;text-overflow:ellipsis;max-width:calc(100% - 10px);}
+.tt-airing-live-stripe{position:absolute;inset:0;pointer-events:none;z-index:1;background-image:repeating-linear-gradient(45deg,transparent,transparent 6px,rgba(255,255,255,0.55) 6px,rgba(255,255,255,0.55) 10px);}
 .habit-month-dots{display:flex;gap:2px;flex-wrap:wrap;flex:1;}
 .habit-month-dots span{width:8px;height:8px;border-radius:2px;background:rgba(200,190,180,0.2);}
 .habit-numbox-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:10px;}

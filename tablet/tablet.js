@@ -2140,6 +2140,24 @@ async function renderMonthTimetable(y,mo,contentsData){
   const daysInMonth=new Date(y,mo+1,0).getDate();
   const CATS=['drama','book','movie','music'];
 
+  // 방영중 표시(is_airing)된 드라마의 톤다운 트랙 렌더링을 위해, 이번 달 범위 rhythm_blocks를 한 번만 조회해
+  // 제목별 실제 감상일(day 숫자) 셋을 만들어둠. is_airing 항목이 하나도 없으면 조회 자체를 생략.
+  const hasAiring=[...contents,...prevContents].some(c=>c.content_cat==='drama'&&c.is_airing);
+  let watchedDaysByTitle=null;
+  if(hasAiring){
+    const startDk=`${mk}-01`,endDk=`${mk}-31`;
+    const rblocks=(await supaFetch(`rhythm_blocks?date_key=gte.${startDk}&date_key=lte.${endDk}&cat=eq.enjoy`))||[];
+    const cidMap=_contentsByCidMap([...contents,...prevContents]);
+    watchedDaysByTitle={};
+    rblocks.forEach(b=>{
+      const parsed=_parseEnjoyBlock(b,cidMap);
+      if(!parsed||parsed.cat!=='drama')return;
+      const day=parseInt((b.date_key||'').slice(8,10),10);
+      if(!day)return;
+      (watchedDaysByTitle[parsed.title]=watchedDaysByTitle[parsed.title]||new Set()).add(day);
+    });
+  }
+
   let headHtml='';
   // tt-cell/tt-block과 폭을 정확히 맞추기 위해 헤더도 1일=1칸(flex:1) 구조로 만들고, 5의 배수일에만 숫자를 표기
   for(let i=1;i<=daysInMonth;i++)headHtml+=`<span>${i%5===0?i:''}</span>`;
@@ -2197,6 +2215,19 @@ async function renderMonthTimetable(y,mo,contentsData){
         const w=span*22+(span-1)*1.5;
         const isWatching=c.item.status==='watching'&&cat!=='music';
         const isStopped=c.item.status==='stopped';
+        const isAiringTone=cat==='drama'&&c.item.is_airing&&!c.item._carried;
+        if(isAiringTone){
+          const watchedDays=(watchedDaysByTitle&&watchedDaysByTitle[c.item.title])||new Set();
+          const titleAttr=(c.item.title||'')+(isStopped?' · 중단':'');
+          let segsHtml='';
+          for(let d=dispStart;d<=dispEnd;d++){
+            segsHtml+=`<div class="tt-airing-seg${watchedDays.has(d)?' watched':''}"></div>`;
+          }
+          const stripe=isWatching?'<div class="tt-airing-live-stripe"></div>':'';
+          cellsHtml+=`<div class="tt-block drama tt-airing-tone${isStopped?' stopped':''}" style="width:${w}px;min-width:${w}px;" title="${escapeHtml(titleAttr)}"><span class="tt-airing-tone-label">${escapeHtml(c.item.title||'')}</span>${stripe}${segsHtml}</div>`;
+          cursor=dispEnd+1;
+          return;
+        }
         let label,titleAttr;
         if(cat==='music'&&group.length>1){
           label=String(group.length);
