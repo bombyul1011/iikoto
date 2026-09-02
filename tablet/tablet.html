@@ -39,6 +39,8 @@
   --bg:linear-gradient(145deg,#fdf0e8 0%,#fef5d4 50%,#fde8f0 100%);
   --tp:#6b5248;--ts:#a3897c;--tm:#d4bcb0;
   --card:rgba(255,250,240,0.78);--card-b:rgba(230,200,140,0.40);
+  --card-border-alpha:0.35; /* 습관/콘텐츠/식사/수면 등 카테고리별 카드 테두리가 공통으로 참조하는 alpha — 글라스 테마에서만 이 값을 올려 재정의 */
+  --glass-chip-bg:rgba(255,253,248,0.45); /* 글라스 테마에서 칩/배지류 배경으로 쓰는 반투명 흰색 — 라이트 테마에선 미사용 */
 
   /* 8색 공용 팔레트 — iikoto 원본과 동일 */
   --pal-warmgray-rgb:195,180,168;--pal-warmgray-bg:rgba(195,180,168,0.55);--pal-warmgray-border:rgba(160,148,138,0.55);--pal-warmgray-text:rgba(128,118,108,0.95);
@@ -58,6 +60,25 @@
   --rh-enjoy:rgba(216,168,205,0.80);--rh-home:rgba(210,224,160,0.82);
   --rainbow-bead:linear-gradient(270deg,#ffb0c8,#ffd28a,#bdf0c4,#9fd8ff,#c9a8ff,#ffb0c8); /* 이이코토 본앱 진행바 구슬 애니메이션 색상 그대로 이식 */
 }
+/* ══ 글라스 테마 — 본앱(index.html)의 유리질감 테마를 최소 변수 중심으로 이식.
+   본앱은 컴포넌트별 개별 규칙이 55개+였지만, 이 앱은 카드/칩류가 이미 --card, --card-b,
+   rgba(var(--pal-X-rgb), alpha) 공용 패턴을 쓰고 있어 핵심 변수 몇 개만 재정의해도 대부분 따라옴.
+   나머지(오늘 표시, 큰 배너류)만 아래에서 소수의 개별 규칙으로 보강. ══ */
+[data-theme="glass"]{
+  --card:rgba(255,253,248,0.45);
+  --card-b:rgba(230,200,140,0.55);
+  --card-border-alpha:0.6;
+  --glass-chip-bg:rgba(255,253,248,0.55);
+}
+[data-theme="glass"] .card,[data-theme="glass"] .todo-card,[data-theme="glass"] .event-card,[data-theme="glass"] .sleep-card,[data-theme="glass"] .habit-card,[data-theme="glass"] .content-card,[data-theme="glass"] .meal-card,[data-theme="glass"] .rhythm-card,[data-theme="glass"] .quote-card-inner,[data-theme="glass"] .side-hcard{
+  border-width:1.4px;box-shadow:0 1.5px 1.5px rgba(255,255,255,0.9) inset,0 -8px 14px -10px rgba(120,110,95,0.15) inset,0 5px 14px rgba(150,140,120,0.08);
+}
+[data-theme="glass"] .status-badge,[data-theme="glass"] .tt-cat-badge,[data-theme="glass"] .wsleep2-badge,[data-theme="glass"] .yr-reg-badge{background:var(--glass-chip-bg)!important;}
+[data-theme="glass"] .cal-day.today .cal-num,[data-theme="glass"] #monthly-cal .cal-day.today .cal-num{background:rgba(205,95,95,0.65);color:#fff;}
+[data-theme="glass"] .cal-day.selected .cal-num,[data-theme="glass"] #monthly-cal .cal-day.selected .cal-num{background:rgba(232,164,187,0.24);color:var(--pal-pink-text);}
+[data-theme="glass"] .yr-sum-banner,[data-theme="glass"] .goal-hcard{background:linear-gradient(120deg,rgba(250,215,100,0.32),rgba(255,235,170,0.26))!important;}
+[data-theme="glass"] .quote-card{background:linear-gradient(120deg,rgba(255,170,200,0.55),rgba(255,205,140,0.5),rgba(195,200,245,0.4),rgba(170,235,200,0.5),rgba(255,170,200,0.55));}
+
 *{box-sizing:border-box;margin:0;padding:0;}
 html{height:100%;min-height:calc(100% + env(safe-area-inset-top));background:var(--bg);} /* overflow:hidden을 여기 걸지 않아야 늘어난 min-height 영역(노치 위 배경)이 실제로 노출됨 — 본앱과 동일 구조, 스크롤 잠금은 body에서 담당 */
 body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;background:var(--bg);color:var(--tp);-webkit-text-size-adjust:100%;text-size-adjust:100%;}
@@ -86,6 +107,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .side>*{position:relative;z-index:1;}
 .main-wrap{transition:padding .32s cubic-bezier(.4,0,.2,1);}
 .side-toggle-btn{position:fixed;top:50%;left:270px;z-index:50;width:20px;height:52px;transform:translate(-1px,-50%);clip-path:path('M0 0 L15 0 Q20 0 20 5 L20 47 Q20 52 15 52 L0 52 Z');display:flex;align-items:center;justify-content:center;cursor:pointer;transition:left .32s cubic-bezier(.4,0,.2,1),background .25s,border-color .25s;background:rgba(210,200,235,0.42);border:1px solid rgba(200,185,225,0.4);}
+.theme-toggle-btn{position:fixed;top:16px;right:16px;z-index:60;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;background:var(--card);border:1px solid var(--card-b);color:var(--tp);font-size:16px;}
+[data-theme="glass"] .theme-toggle-btn{box-shadow:0 1.5px 1.5px rgba(255,255,255,0.9) inset,0 3px 10px rgba(150,140,120,0.12);}
 .side-toggle-btn.tod-morning{background:linear-gradient(135deg,rgba(255,205,175,0.55),rgba(255,235,180,0.42));border-color:rgba(255,200,165,0.5);}
 .side-toggle-btn.tod-day{background:linear-gradient(135deg,rgba(var(--pal-sky-rgb),0.5),rgba(var(--pal-yellow-rgb),0.38));border-color:rgba(var(--pal-sky-rgb),0.55);}
 .side-toggle-btn.tod-afternoon{background:linear-gradient(135deg,rgba(255,220,235,0.5),rgba(255,235,200,0.45));border-color:rgba(255,200,210,0.45);}
@@ -242,7 +265,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .memo-time .seed-ico{font-size:13px;color:rgba(120,155,160,0.95);}
 
 /* ── 수면(일정 아래 하프배너)/습관/콘텐츠 ── */
-.sleep-card{border-color:rgba(var(--pal-sky-rgb),0.35)!important;padding:11px 16px 10px;flex:142;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;margin-bottom:0!important;}
+.sleep-card{border-color:rgba(var(--pal-sky-rgb),var(--card-border-alpha))!important;padding:11px 16px 10px;flex:142;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;margin-bottom:0!important;}
 .sleep-hdr{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:0;flex-shrink:0;}
 .sleep-hdr .card-lbl{margin-bottom:0;}
 .sleep-time-sub{font-size:var(--fs-sm);color:var(--tm);font-weight:400;margin-left:4px;}
@@ -261,20 +284,20 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .sleep-week-col .sleep-spark-dow{font-size:var(--fs-sm);color:var(--tm);}
 .sleep-week-face{font-size:var(--fs-lg);line-height:1;height:var(--fs-xl);display:flex;align-items:center;justify-content:center;font-weight:400;opacity:.8;}
 .sleep-week-face i{font-size:var(--fs-lg);font-weight:400;}
-.habit-card{border-color:rgba(var(--pal-mint-rgb),0.35)!important;}
+.habit-card{border-color:rgba(var(--pal-mint-rgb),var(--card-border-alpha))!important;}
 .habit-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;}
 .habit-grid .habit-row:nth-child(2n){margin-left:-6px;}
 .habit-row{display:flex;align-items:center;gap:6px;padding:3px 0;font-size:var(--fs-body);color:var(--pal-warmgray-text);}
 .habit-row-icon{font-size:var(--fs-sm);flex-shrink:0;}
 .habit-row.done{color:var(--tp);}
 .habit-check{margin-left:auto;font-size:var(--fs-sm);color:rgba(var(--pal-mint-rgb),1);}
-.content-card{border-color:rgba(var(--pal-lavender-rgb),0.4)!important;}
+.content-card{border-color:rgba(var(--pal-lavender-rgb),var(--card-border-alpha))!important;}
 .content-row{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:var(--fs-body);color:var(--tp);}
 .content-cat{font-size:var(--fs-sm);color:rgba(130,75,150,0.85);background:rgba(var(--pal-lavender-rgb),0.25);padding:2px 6px;border-radius:5px;flex-shrink:0;}
 .content-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 
 /* ── 오늘의 식사(넓은 배너, 4끼 2x2, 높이 고정) — 본앱 "오늘 뭐 먹지" 배너 색(연두) 적용, 메모카드(.card.p)와 동일한 알파톤 ── */
-.meal-card{background:rgba(var(--pal-lime-rgb),0.15)!important;border-color:rgba(var(--pal-lime-rgb),0.32)!important;padding:12px 18px;height:150px;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;}
+.meal-card{background:rgba(var(--pal-lime-rgb),0.15)!important;border-color:rgba(var(--pal-lime-rgb),var(--card-border-alpha))!important;padding:12px 18px;height:150px;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;}
 .meal-card .card-lbl{margin-bottom:7px;flex-shrink:0;}
 .meal-grid{display:grid;grid-template-columns:1fr 1fr;gap:3px 16px;flex:1;}
 .meal-slot{padding:2px 0;overflow:hidden;}
@@ -1692,6 +1715,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 <div id="bg-fixed"></div>
 <div id="app">
   <div class="side-toggle-btn" id="side-toggle-btn" onclick="toggleSidebar()"><i class="ti ti-chevron-left" aria-hidden="true"></i></div>
+  <div class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleArchiveTheme()" title="테마 전환"><i class="ti ti-sparkles" aria-hidden="true"></i></div>
   <div class="side" id="side">
     <div class="side-logo-wrap" onclick="switchTab('reports')"><img class="side-logo" src="data:image/png;base64,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" alt="iikoto"><div class="side-logo-dot" id="side-logo-dot"></div></div>
     <div class="mini-cal" id="mini-cal"></div>

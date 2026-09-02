@@ -211,6 +211,7 @@ let _wcalDate=new Date();
 // 사이드바 접기/펼치기 (아이패드 미니처럼 화면이 좁을 때 메인 영역을 넓혀줌)
 // ══════════════════════════════════════════════════════════
 const SIDEBAR_COLLAPSE_KEY='tablet_sidebar_collapsed';
+const ARCHIVE_THEME_KEY='tablet_theme';
 function toggleSidebar(){
   const side=document.getElementById('side');
   const btn=document.getElementById('side-toggle-btn');
@@ -298,6 +299,19 @@ function initYrContentHeightSync(){
 }
 window.addEventListener('resize',()=>{if(_yrContentHeightRO)syncYrContentHeight();});
 
+// 라이트/글라스 두 테마만 지원 — 본앱(index.html)의 data-theme 토글을 최소 구성으로 이식.
+// 저장은 localStorage 하나(ARCHIVE_THEME_KEY)로 통일, 미저장 시 기본값 'light'.
+function initArchiveTheme(){
+  let t='light';
+  try{t=localStorage.getItem(ARCHIVE_THEME_KEY)||'light';}catch(e){}
+  document.documentElement.setAttribute('data-theme',t);
+}
+function toggleArchiveTheme(){
+  const cur=document.documentElement.getAttribute('data-theme')==='glass'?'glass':'light';
+  const next=cur==='glass'?'light':'glass';
+  document.documentElement.setAttribute('data-theme',next);
+  try{localStorage.setItem(ARCHIVE_THEME_KEY,next);}catch(e){}
+}
 function initSidebarCollapse(){
   let collapsed=false;
   try{collapsed=localStorage.getItem(SIDEBAR_COLLAPSE_KEY)==='1';}catch(e){}
@@ -3042,6 +3056,7 @@ async function _updateSideReportBadge(){
 // 초기화
 // ══════════════════════════════════════════════════════════
 async function init(){
+  initArchiveTheme();
   initSidebarCollapse();
   _applyFontSizes();
   await renderMiniCal();
