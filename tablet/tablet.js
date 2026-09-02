@@ -4849,7 +4849,7 @@ function _yrMonthGridTileHtml(m,monthItems,isFuture){
   if(isFuture)return `<div class="yr-mgrid-tile future"><div class="yr-mgrid-month">${m+1}월</div></div>`;
   if(!monthItems.length)return `<div class="yr-mgrid-tile empty"><div class="yr-mgrid-month">${m+1}월</div><div class="yr-mgrid-count-empty">-</div></div>`;
   const active=_yrMonthGridActiveM===m;
-  return `<div class="yr-mgrid-tile${active?' active':''}" style="background:${color};" onclick="toggleYrMonthGrid(${m})">
+  return `<div class="yr-mgrid-tile${active?' active':''}" style="border-color:${color};" onclick="toggleYrMonthGrid(${m})">
     <div class="yr-mgrid-month">${m+1}월</div>
     <div class="yr-mgrid-count">${monthItems.length}</div>
   </div>`;
@@ -4995,7 +4995,7 @@ function _yrContentMinutesByMonth(rblocks,contents,mk){
 
 const YR_CONTENT_TIME_CATS=[
   {key:'book',label:'책',color:'rgba(var(--pal-yellow-rgb),0.85)'},
-  {key:'drama',label:'드라마',color:'rgba(var(--pal-pink-text-rgb),0.85)'},
+  {key:'drama',label:'드라마',color:'rgba(var(--pal-pink-rgb),0.85)'},
   {key:'movie',label:'영화',color:'rgba(var(--pal-sky-rgb),0.85)'}
 ];
 
