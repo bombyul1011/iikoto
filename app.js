@@ -7096,8 +7096,9 @@ function renderTimetable(){
         }
         const dispEnd=Math.max(endD,dispStart);
         const span=dispEnd-dispStart+1,w=span*20+(span-1)*2;
-        // 방영중으로 표시해뒀던 드라마가 완료/중단된 경우 — 통짜 막대 대신 점선(미감상)+네모(실제 감상일) 트랙으로 렌더링
-        const useAiringTrack=cat==='drama'&&item.isAiring&&isContentFinished(item)&&!item._carried;
+        // 방영중으로 표시해둔 드라마(isAiring)는 상태(보는중/완료/중단) 무관하게 항상 통짜 막대 대신
+        // 점선(미감상)+네모(실제 감상일) 트랙으로 렌더링 — 실제 시청 밀도를 한눈에 구분하기 위함
+        const useAiringTrack=cat==='drama'&&item.isAiring&&!item._carried;
         if(useAiringTrack){
           const watchedDays=new Set(getWatchedDaysInMonth(item.title,mk));
           const track=document.createElement('div');
