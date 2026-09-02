@@ -7108,7 +7108,15 @@ function renderTimetable(){
           for(let d=dispStart;d<=dispEnd;d++){
             const cell=document.createElement('div');
             cell.className='tt-airing-cell';
-            if(watchedDays.has(d))cell.classList.add('watched');
+            const watched=watchedDays.has(d);
+            if(watched){
+              cell.classList.add('watched');
+              // 연속된 감상일끼리는 이어진 블록처럼 보이도록 인접 칸 쪽 모서리를 각지게, gap도 없앰
+              const prevWatched=watchedDays.has(d-1)&&d>dispStart;
+              const nextWatched=watchedDays.has(d+1)&&d<dispEnd;
+              if(prevWatched)cell.classList.add('join-prev');
+              if(nextWatched)cell.classList.add('join-next');
+            }
             if(d===dispStart){
               const lbl=document.createElement('span');lbl.className='tt-airing-label';lbl.textContent=item.title;
               cell.appendChild(lbl);
