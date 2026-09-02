@@ -638,7 +638,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cal-day-name-row{margin-bottom:0;}
 /* 월간탭 연속일정 bar — 각 날짜 칸이 자기 몫의 "조각"만 그리는 방식(칸 폭 100%로 딱 맞음, 절대 밀리거나 클릭 영역이 어긋나지 않음).
    시작조각=왼쪽 둥근모서리+텍스트, 중간조각=사각형 빈 막대, 끝조각=오른쪽 둥근모서리. 옆 칸과 이어붙어 하나의 막대처럼 보임. */
-#monthly-cal .cal-event-bar{display:block;width:calc(100% + 2px);margin-left:-1px;margin-right:-1px;height:13px;line-height:13px;font-size:8.5px;color:#fff;padding:0 4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;text-align:left;cursor:pointer;box-sizing:border-box;margin-top:1px;margin-bottom:1px;}
+#monthly-cal .cal-event-bar{display:block;width:calc(100% + 2px);margin-left:-1px;margin-right:-1px;height:13px;line-height:13px;font-size:var(--dow-label-size);color:#fff;padding:0 4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;text-align:left;cursor:pointer;box-sizing:border-box;margin-top:1px;margin-bottom:1px;}
 #monthly-cal .cal-event-bar.bar-round-l{border-top-left-radius:4px;border-bottom-left-radius:4px;}
 #monthly-cal .cal-event-bar.bar-round-r{border-top-right-radius:4px;border-bottom-right-radius:4px;}
 #monthly-cal .cal-event-bar.ev-schedule{background:rgba(130,75,150,0.70);}
