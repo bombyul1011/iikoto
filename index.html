@@ -569,9 +569,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .memo-seed-toggle{position:absolute;right:5px;top:0;bottom:0;margin:auto;height:22px;width:22px;background:none;border:none;padding:0;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--tm);opacity:0.23;transition:opacity .15s,color .15s;}
 .memo-seed-toggle i{font-size:17px;line-height:0;}
 .memo-seed-toggle.on{opacity:1;color:rgba(120,155,160,0.95);}
-.cm-airing-toggle{position:relative;flex-shrink:0;width:22px;height:22px;background:none;border:none;padding:0;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--tm);opacity:0.23;transition:opacity .15s,color .15s;}
-.cm-airing-toggle .cat-sq{width:15px;height:15px;border:1.4px solid currentColor;border-radius:3px;display:flex;align-items:center;justify-content:center;}
-.cm-airing-toggle .cat-sq::before{content:'';width:1.4px;height:9px;background:currentColor;border-radius:1px;}
+.cm-airing-toggle{position:absolute;right:6px;top:0;bottom:0;margin:auto;height:24px;width:24px;background:none;border:none;padding:0;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--tm);opacity:0.25;transition:opacity .15s,color .15s;}
+.cm-airing-toggle i{font-size:16px;line-height:0;}
 .cm-airing-toggle.on{opacity:1;color:rgba(120,155,160,0.95);}
 .send-btn-sm{width:32px;height:32px;border-radius:9px;}
 .seed-icon-btn{background:linear-gradient(120deg,rgba(185,215,140,0.75),rgba(210,230,165,0.65));border:1px solid rgba(145,185,80,0.45);box-shadow:0 2px 10px rgba(110,155,55,0.10);}
@@ -606,7 +605,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .tt-cat-fixed{width:60px;flex-shrink:0;font-size:var(--dow-label-size);color:var(--ts);cursor:pointer;padding-right:4px;-webkit-tap-highlight-color:rgba(var(--pal-pink-rgb),0.20);user-select:none;}
 .tt-cat-fixed span span:last-child{text-decoration:underline dotted;text-decoration-color:rgba(150,130,120,0.35);text-underline-offset:2px;}
 .tt-cat-fixed.tt-cat-sub{cursor:default;text-decoration:none;opacity:0.35;}
-.tt-date-scroll{flex:1;overflow-x:hidden;touch-action:pan-y;}
+.tt-date-scroll{flex:1;overflow-x:auto;touch-action:pan-x;}
 .tt-date-scroll::-webkit-scrollbar{display:none;}
 .tt-date-scroll{-ms-overflow-style:none;scrollbar-width:none;}
 .tt-date-inner{display:flex;gap:2px;}
@@ -2012,8 +2011,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 <!-- CONTENT MODAL -->
 <div class="modal-ov" id="content-modal" onclick="closeModal('content-modal',event)">
   <div class="modal" style="max-width:340px;">
-    <div class="api-search-wrap">
-      <input type="text" class="modal-inp" id="cm-title" placeholder="제목 검색..." autocomplete="off" oninput="apiSearchDebounce(this.value)" onblur="setTimeout(()=>hideApiResults(),200)">
+    <div class="api-search-wrap" style="position:relative;">
+      <input type="text" class="modal-inp" id="cm-title" placeholder="제목 검색..." autocomplete="off" oninput="apiSearchDebounce(this.value)" onblur="setTimeout(()=>hideApiResults(),200)" style="padding-right:36px;">
+      <button type="button" class="cm-airing-toggle" id="cm-airing-toggle" onclick="toggleCmAiring()" title="방영중 작품으로 표시"><i class="ti ti-player-play" aria-hidden="true"></i></button>
       <div class="api-results" id="api-results" style="display:none;"></div>
     </div>
     <div id="cm-poster-preview" style="display:none;margin-bottom:10px;flex-direction:row;gap:10px;align-items:center;">
@@ -2023,10 +2023,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     </div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
       <span style="font-size:var(--dow-label-size);color:var(--tm);white-space:nowrap;" id="cm-start-label">시작일</span>
-      <div style="position:relative;flex:1;">
-        <input type="text" class="modal-inp" id="cm-start" readonly onclick="openContentDatePicker('cm-start')" style="width:100%;margin-bottom:0;cursor:pointer;padding-right:30px;" placeholder="날짜 선택">
-        <button type="button" class="cm-airing-toggle" id="cm-airing-toggle" onclick="toggleCmAiring()" title="방영중 작품으로 표시"><span class="cat-sq"></span></button>
-      </div>
+      <input type="text" class="modal-inp" id="cm-start" readonly onclick="openContentDatePicker('cm-start')" style="flex:1;margin-bottom:0;cursor:pointer;" placeholder="날짜 선택">
       <div style="display:flex;gap:5px;flex-shrink:0;" id="cm-status-btns">
         <button class="cstatus-btn done" id="cm-done" onclick="toggleCDone()" style="white-space:nowrap;padding:8px 9px;margin-bottom:0;">
           <i class="ti ti-circle-check ico-sz-14" aria-hidden="true"></i>완료
