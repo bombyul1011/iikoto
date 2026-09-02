@@ -74,12 +74,16 @@
 [data-theme="glass"] .card,[data-theme="glass"] .todo-card,[data-theme="glass"] .event-card,[data-theme="glass"] .sleep-card,[data-theme="glass"] .habit-card,[data-theme="glass"] .content-card,[data-theme="glass"] .meal-card,[data-theme="glass"] .rhythm-card,[data-theme="glass"] .quote-card-inner,[data-theme="glass"] .side-hcard,[data-theme="glass"] .mrsl-half-card,[data-theme="glass"] .q-card,[data-theme="glass"] .r-sm-card,[data-theme="glass"] .ysqt-card{
   border-width:1.4px;box-shadow:0 1.5px 1.5px rgba(255,255,255,0.9) inset,0 -8px 14px -10px rgba(120,110,95,0.15) inset,0 5px 14px rgba(150,140,120,0.08);
 }
-[data-theme="glass"] .mr-ai-card{background:rgba(255,253,248,0.45);box-shadow:0 2px 12px rgba(150,180,130,0.10);}
+[data-theme="glass"] .mr-ai-card,[data-theme="glass"] .mrp-hero{background:rgba(255,253,248,0.45);box-shadow:0 2px 12px rgba(150,180,130,0.10);}
 [data-theme="glass"] .mrp-contents-card{background:linear-gradient(135deg,rgba(253,238,232,0.55),rgba(253,243,226,0.5))!important;}
+[data-theme="glass"] .meal-card{background:rgba(var(--pal-lime-rgb),0.18)!important;}
+[data-theme="glass"] .goal-hcard{background:rgba(255,253,248,0.5)!important;border:1.4px solid rgba(230,175,60,0.65)!important;box-shadow:0 1.5px 1.5px rgba(255,255,255,0.9) inset,0 2px 14px rgba(200,150,50,0.12);}
 [data-theme="glass"] .status-badge,[data-theme="glass"] .tt-cat-badge,[data-theme="glass"] .wsleep2-badge,[data-theme="glass"] .yr-reg-badge{background:var(--glass-chip-bg)!important;}
 [data-theme="glass"] .cal-day.today .cal-num,[data-theme="glass"] #monthly-cal .cal-day.today .cal-num{background:rgba(205,95,95,0.65);color:#fff;}
 [data-theme="glass"] .cal-day.selected .cal-num,[data-theme="glass"] #monthly-cal .cal-day.selected .cal-num{background:rgba(232,164,187,0.24);color:var(--pal-pink-text);}
 [data-theme="glass"] .quote-card{background:linear-gradient(120deg,rgba(255,170,200,0.55),rgba(255,205,140,0.5),rgba(195,200,245,0.4),rgba(170,235,200,0.5),rgba(255,170,200,0.55));}
+[data-theme="glass"] .quote-card-inner{background:rgba(255,253,248,0.5);}
+[data-theme="glass"] .card.p{background:rgba(255,253,248,0.45)!important;border-color:rgba(var(--pal-pink-rgb),0.4)!important;}
 
 *{box-sizing:border-box;margin:0;padding:0;}
 html{height:100%;min-height:calc(100% + env(safe-area-inset-top));background:var(--bg);} /* overflow:hidden을 여기 걸지 않아야 늘어난 min-height 영역(노치 위 배경)이 실제로 노출됨 — 본앱과 동일 구조, 스크롤 잠금은 body에서 담당 */
