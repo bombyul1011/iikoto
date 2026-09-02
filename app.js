@@ -8236,7 +8236,12 @@ function renderCalendar(){
     const todos=getTodos(dk);
     if(getMemos(dk).length>0||todos.some(t=>t.done)||getSleep(dk).sleep)hasRecord[d]=true;
     // 하루짜리 일정만 배지 대상(연속일정은 eventEndDate가 있으므로 여기서 제외 — 아래 bar로 별도 렌더)
-    const evs=todos.filter(t=>t.isEvent&&!t.eventEndDate);
+    // 같은 날 여러 일정이 있으면 시간순으로 표기(시간 있는 일정 먼저, 없는 일정은 뒤로)
+    const evs=todos.filter(t=>t.isEvent&&!t.eventEndDate).sort((a,b)=>{
+      if(!!a.eventTime!==!!b.eventTime)return a.eventTime?-1:1;
+      if(a.eventTime&&b.eventTime)return a.eventTime.localeCompare(b.eventTime);
+      return 0;
+    });
     if(evs.length)eventsByDay[d]=evs;
   }
   const multidayEvents=getMultiDayEventsForMonth(y,mo); // 이 달에 걸치는 연속일정 원본(중복 제거됨)
