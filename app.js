@@ -7105,17 +7105,13 @@ function renderTimetable(){
           track.className='tt-airing-track';
           track.style.cssText=`width:${w}px;min-width:${w}px;position:relative;display:flex;gap:2px;`;
           track.title=item.title+(item.status==='stopped'?' · 중단':'');
-          let titleShown=false;
           for(let d=dispStart;d<=dispEnd;d++){
             const cell=document.createElement('div');
             cell.className='tt-airing-cell';
-            if(watchedDays.has(d)){
-              cell.classList.add('watched');
-              if(!titleShown){
-                const lbl=document.createElement('span');lbl.className='tt-airing-label';lbl.textContent=item.title;
-                cell.appendChild(lbl);
-                titleShown=true;
-              }
+            if(watchedDays.has(d))cell.classList.add('watched');
+            if(d===dispStart){
+              const lbl=document.createElement('span');lbl.className='tt-airing-label';lbl.textContent=item.title;
+              cell.appendChild(lbl);
             }
             track.appendChild(cell);
           }
