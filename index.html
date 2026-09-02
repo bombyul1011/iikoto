@@ -20,7 +20,7 @@
 <style>
 /* ═══════════════════════════════════════
    IIKOTO — CSS
-   순서: reset → tokens → layout → components → dark/mint
+   순서: reset → tokens → layout → components → glass
 ═══════════════════════════════════════ */
 
 /* ── RESET ── */
@@ -1342,7 +1342,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 </head>
 <body>
 <div id="bg-fixed"></div>
-<script>(function(){try{var t=localStorage.getItem('theme');if(t){t=JSON.parse(t);document.documentElement.setAttribute('data-theme',t);var c={light:'#fdf0e8',glass:'#f7f4ee',dark:'#13111e'}[t];var m=document.querySelector('meta[name="theme-color"]');if(m&&c)m.setAttribute('content',c);}}catch(e){}})();</script>
+<script>(function(){try{var t=localStorage.getItem('theme');if(t){t=JSON.parse(t);document.documentElement.setAttribute('data-theme',t);var c={light:'#fdf0e8',glass:'#f7f4ee'}[t];var m=document.querySelector('meta[name="theme-color"]');if(m&&c)m.setAttribute('content',c);}}catch(e){}})();</script>
 <script>(function(){try{var s=localStorage.getItem('textScale');s=s?JSON.parse(s):0;var base={'-1':{main:13,dow:11},'0':{main:14,dow:12},'1':{main:15,dow:13}}[String(s)]||{main:14,dow:12};document.documentElement.style.setProperty('--main-text-size',base.main+'px');document.documentElement.style.setProperty('--dow-label-size',base.dow+'px');}catch(e){}})();</script>
 
 <!-- SPLASH -->
