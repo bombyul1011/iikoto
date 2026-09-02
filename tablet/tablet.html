@@ -1708,12 +1708,17 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   border-width:1.4px;box-shadow:0 1.5px 1.5px rgba(255,255,255,0.9) inset,0 -8px 14px -10px rgba(120,110,95,0.15) inset,0 5px 14px rgba(150,140,120,0.08);
 }
 [data-theme="glass"] .mr-ai-card,[data-theme="glass"] .mrp-hero{background:rgba(255,253,248,0.45)!important;box-shadow:0 2px 12px rgba(150,180,130,0.10);}
-[data-theme="glass"] .mrp-contents-card{background:var(--card)!important;}
 [data-theme="glass"] .goal-hcard{background:rgba(255,253,248,0.5)!important;border:1.4px solid rgba(230,175,60,0.65)!important;box-shadow:0 1.5px 1.5px rgba(255,255,255,0.9) inset,0 2px 14px rgba(200,150,50,0.12);}
+/* 아래 두 카드는 라이트에서 자체 색(라임/피치)을 !important로 하드코딩해서 갖고 있어,
+   글라스에서 var(--card)로 재오버라이드하지 않으면 라이트 색이 그대로 새어나옴 —
+   다른 평범한 배너와 같은 무색 유리질감으로 맞추는 목적의 필수 오버라이드(삭제 금지). */
 [data-theme="glass"] .meal-card{background:var(--card)!important;}
+[data-theme="glass"] .mrp-contents-card{background:var(--card)!important;}
 [data-theme="glass"] .status-badge,[data-theme="glass"] .tt-cat-badge,[data-theme="glass"] .wsleep2-badge,[data-theme="glass"] .yr-reg-badge{background:var(--glass-chip-bg)!important;}
 [data-theme="glass"] .cal-day.today .cal-num,[data-theme="glass"] #monthly-cal .cal-day.today .cal-num{background:rgba(205,95,95,0.65);color:#fff;}
 [data-theme="glass"] .cal-day.selected .cal-num,[data-theme="glass"] #monthly-cal .cal-day.selected .cal-num{background:rgba(232,164,187,0.24);color:var(--pal-pink-text);}
+/* 오늘의 감상 — 무지개 그라디언트는 유지하되 라이트보다 확실히 연하게(그라디언트 알파를 낮추고
+   뒤판 알파를 라이트의 --card(0.78)에 가깝게 올려 톤을 눌러줌). 색을 빼는 게 아니라 옅게 만드는 카드. */
 [data-theme="glass"] .quote-card-inner{background:linear-gradient(120deg,rgba(255,170,200,0.035),rgba(255,205,140,0.035),rgba(195,200,245,0.03),rgba(170,235,200,0.035),rgba(255,170,200,0.035)),rgba(255,253,248,0.82)!important;}
 [data-theme="glass"] .card.p{background:rgba(255,253,248,0.45)!important;border-color:rgba(var(--pal-pink-rgb),0.4)!important;}
 </style>
