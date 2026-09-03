@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.35-airing-tone';
+const CACHE = 'iikoto-v2.36-watch-start-fix';
 const ASSETS = [
   './',
   './index.html'

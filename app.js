@@ -7705,7 +7705,7 @@ function renderCwatchMainCard(){
     }
     el.innerHTML=`<div class="rd-top" style="margin-bottom:14px;">
       <div class="rd-top-inner">
-        <div class="rd-top-main" style="cursor:pointer;" onclick="selectPendingWatch('${c.cid}','${c._mk}')">
+        <div class="rd-top-main" style="cursor:pointer;" onclick="toggleContentStopwatch('${c.cid}','${c._mk}')">
           ${posterHtml}
           <div style="flex:1;min-width:0;">
             <div class="rd-top-title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.title||'')}</div>
