@@ -7098,13 +7098,14 @@ function renderTimetable(){
         const span=dispEnd-dispStart+1,w=span*20+(span-1)*2;
         // 방영중으로 표시해둔 드라마(isAiring)는 상태(보는중/완료/중단) 무관하게 하나로 이어진 막대는 유지하되
         // 실제 감상일만 진한 톤, 안 본 날은 옅은 톤으로 — 완결작과 같은 "쭉 이어진 형태" 언어를 유지하면서 밀도 구분
-        const useAiringTone=cat==='drama'&&item.isAiring&&!item._carried;
+        // 전월부터 이어진(_carried) 경우에도 이 톤을 유지 — 이월 여부와 무관하게 방영중 상태 자체가 기준(2026-09-03 수정)
+        const useAiringTone=cat==='drama'&&item.isAiring;
         if(useAiringTone){
           const watchedDays=new Set(getWatchedDaysInMonth(item.title,mk));
           const track=document.createElement('div');
           track.className='tt-block drama tt-airing-tone';
           track.style.cssText=`width:${w}px;min-width:${w}px;position:relative;padding:0;overflow:hidden;display:flex;`;
-          track.title=item.title+(item.status==='stopped'?' · 중단':'');
+          track.title=(item._carried?item.title+' (전월부터 이어짐)':item.title)+(item.status==='stopped'?' · 중단':'');
           for(let d=dispStart;d<=dispEnd;d++){
             const seg=document.createElement('div');
             seg.className='tt-airing-seg'+(watchedDays.has(d)?' watched':'');
@@ -7117,7 +7118,7 @@ function renderTimetable(){
             track.appendChild(stripe);
           }
           if(item.status==='stopped')track.style.filter='saturate(0.45)';
-          track.addEventListener('click',()=>openContentModal(cat,item,mk));
+          track.addEventListener('click',()=>openContentModal(cat,item,item._carried?prevMk:mk));
           track.style.cursor='pointer';
           inner.appendChild(track);
           cursor=dispEnd+1;

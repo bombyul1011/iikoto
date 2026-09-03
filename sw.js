@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.37-watch-btn-restore';
+const CACHE = 'iikoto-v2.38-airing-carry-fix';
 const ASSETS = [
   './',
   './index.html'
