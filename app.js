@@ -1328,10 +1328,13 @@ async function loadMonthlyGoalReportContent(){
       aiCacheSet(cacheKey,comment);
     }
   }
+  // 그 사이에 다른 달로 넘어갔으면 적용하지 않음 (loadMonthlyReportContent와 동일한 stale-response 가드)
+  if(`${_mgrYear}-${pad(_mgrMonth+1)}`!==mk)return;
+  const slot2=document.getElementById('mgr-ai-slot');if(!slot2)return;
   if(comment){
-    slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles ico-12" aria-hidden="true"></i> 이번 달 목표 총평</div><div style="font-size:var(--main-text-size);color:var(--tp);line-height:1.7;padding:2px 0;">${comment}</div></div>`;
+    slot2.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles ico-12" aria-hidden="true"></i> 이번 달 목표 총평</div><div style="font-size:var(--main-text-size);color:var(--tp);line-height:1.7;padding:2px 0;">${comment}</div></div>`;
   }else{
-    slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles ico-12" aria-hidden="true"></i> 이번 달 목표 총평</div><div class="mr-ai-empty">${getClaudeKey()?'잠시 후 다시 시도해주세요':'설정에서 Claude API 키를 입력하면 분석을 받을 수 있어요'}</div></div>`;
+    slot2.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles ico-12" aria-hidden="true"></i> 이번 달 목표 총평</div><div class="mr-ai-empty">${getClaudeKey()?'잠시 후 다시 시도해주세요':'설정에서 Claude API 키를 입력하면 분석을 받을 수 있어요'}</div></div>`;
   }
 }
 // 이번 달 챌린지 주차들의 원본 목표 텍스트(카테고리 판단용)와, 이미 생성된 주간 코멘트(challenge_review_,
@@ -1839,7 +1842,9 @@ async function fetchHomeWeather(section){
     rblocks.forEach(b=>{
       if(!b.cat||!RHYTHM_CATS[b.cat])return;
       if(b.start==null||b.end==null)return;
-      const dur=Math.max(0,b.end-b.start);
+      const s=toMin(b.start),e=toMin(b.end);
+      if(s==null||e==null)return;
+      const dur=Math.max(0,(e>s?e-s:(1440-s+e)));
       durByCat[b.cat]=(durByCat[b.cat]||0)+dur;
     });
     const top=Object.entries(durByCat).sort((a,b)=>b[1]-a[1])[0];
@@ -2060,7 +2065,15 @@ function renderHome(){
     greetEl.textContent=pool[Math.floor(Math.random()*pool.length)];
   }
   const subEl=document.getElementById('home-greeting-sub');
-  if(subEl)subEl.textContent='잠깐만요...'; // section별로 다를 필요 없는 공통 로딩 문구 — 이후 fetchHomeWeather가 실제 내용으로 교체
+  // 캐시된 인사말이 있으면 로딩 문구 없이 바로 표시(깜빡임 방지), 없을 때만 로딩 문구
+  if(subEl){
+    const subSec=getSubSection();
+    if(_greetingCache&&_greetingCache.subSection===subSec){
+      subEl.textContent=_greetingCache.text;
+    }else{
+      subEl.textContent='잠깐만요...';
+    }
+  }
   renderHomeBody(section);
   fetchHomeWeather(section);
   const readingBtn=document.querySelector('.reading-icon-btn');
@@ -9514,7 +9527,7 @@ function saveUserProfile(){
   if(!inp)return;
   const val=inp.value.trim();
   if(val){S.set('user_profile',val);showToast('저장됐어요 ✓');}
-  else{S.remove('user_profile');showToast('삭제됐어요');}
+  else{try{localStorage.removeItem('user_profile');}catch(e){}showToast('삭제됐어요');}
 }
 function clearClaudeKey(){
   try{
