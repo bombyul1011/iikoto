@@ -419,7 +419,10 @@ function closeFloatMenu(){
     hoveredTab=null;
   }
 
+  fab.addEventListener('contextmenu',e=>e.preventDefault()); // iOS 롱프레스 시 뜨는 텍스트선택/복사 팝업 차단
+
   fab.addEventListener('pointerdown',e=>{
+    e.preventDefault();
     startX=e.clientX;startY=e.clientY;isLongPress=false;hoveredTab=null;
     pointerId=e.pointerId;
     clearTimeout(pressTimer);

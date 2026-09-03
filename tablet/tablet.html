@@ -362,9 +362,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 /* ── 좌하단 플로팅 탭 ── */
 .float-tabs{position:fixed;right:22px;bottom:22px;display:flex;flex-direction:column-reverse;align-items:flex-end;gap:9px;z-index:100;}
-.float-fab{width:54px;height:54px;border-radius:50%;background:var(--pal-yellow-border);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.18);flex-shrink:0;transition:transform .15s;}
+.float-fab{width:54px;height:54px;border-radius:50%;background:var(--pal-yellow-border);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.18);flex-shrink:0;transition:transform .15s;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;}
 .float-fab.open{transform:rotate(90deg);}
-.float-tab-menu{display:flex;flex-direction:column-reverse;align-items:flex-end;gap:7px;max-height:0;overflow:hidden;transition:max-height .25s ease;}
+.float-tab-menu{display:flex;flex-direction:column-reverse;align-items:flex-end;gap:7px;max-height:0;overflow:hidden;transition:max-height .25s ease;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
 .float-tab-menu.on{max-height:340px;}
 .float-tab{padding:11px 16px;border-radius:12px;font-size:var(--fs-tab);color:var(--ts);cursor:pointer;display:flex;align-items:center;gap:5px;background:rgba(255,253,248,0.92);border:1px solid var(--card-b);box-shadow:0 3px 12px rgba(0,0,0,0.10);white-space:nowrap;flex-shrink:0;}
 .float-tab.on{background:var(--pal-yellow-bg);color:var(--pal-yellow-text);font-weight:600;}
