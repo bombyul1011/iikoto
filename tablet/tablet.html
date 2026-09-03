@@ -296,11 +296,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .mflow-row-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .mflow-row-time{font-size:var(--fs-xs);color:var(--tm);flex-shrink:0;}
 /* 주간탭 이번주 아침 흐름 — 6칸 한 줄 그리드 */
-.wk-mflow-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:3px;}
-.wk-mflow-cell{text-align:center;padding:4px 1px;}
+.wk-mflow-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;}
+.wk-mflow-cell{text-align:center;padding:6px 2px;border-radius:9px;}
 .wk-mflow-cell i{font-size:16px;}
 .wk-mflow-cell-label{font-size:var(--fs-xs);color:var(--tp);margin-top:3px;}
 .wk-mflow-cell-stat{font-size:9.5px;color:var(--tm);line-height:1.3;}
+/* 라이트 테마 기본 — 선택 개념이 없는 통계 배너라 본앱 mf-card의 "선택됨(on)" 상태 색을 항상 적용 */
+.wk-mflow-cell{background:rgba(var(--wk-mflow-rgb),0.16);}
+[data-theme="glass"] .wk-mflow-cell{background:transparent;}
 
 /* ── 오늘의 식사(넓은 배너, 4끼 2x2, 높이 고정) — 본앱 "오늘 뭐 먹지" 배너 색(연두) 적용, 메모카드(.card.p)와 동일한 알파톤 ── */
 .meal-card{background:rgba(var(--pal-lime-rgb),0.15)!important;border-color:rgba(var(--pal-lime-rgb),var(--card-border-alpha))!important;padding:12px 18px;height:150px;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;}
@@ -1062,8 +1065,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
      .main-body.on일 때만(=오늘탭이 실제로 활성 탭일 때만) flex로 바꿔야 탭 전환이 정상 동작함.
      #tab-today{display:flex}처럼 .on과 무관하게 걸면 다른 탭으로 이동해도 이 탭이 계속 보이는 문제가 생김.
      자식 블록 단위(각 id 부여된 grid2/grid3/card)에 order를 매겨 순서만 재배치.
-     세로 목표 순서: 할일 → 일정 → 수면 → 메모 → 식사 → 리듬 → 분포 → 습관 → 감상(최하단)
-     오늘의 모닝플로우는 오늘의 감상과 내용이 겹쳐 세로에서는 제거. */
+     세로 목표 순서: 할일 → 일정 → 수면 → 메모 → 식사 → 리듬 → 분포 → 습관 → 모닝플로우 → 감상(최하단) */
   #tab-today.on{display:flex;flex-direction:column;}
   #tab-today>.main-hdr{order:0;}
 
@@ -1080,8 +1082,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   #today-meal-reading-row>.meal-card{order:3;}
   #today-meal-reading-row>.quote-card{order:8;} /* 오늘의 감상 — 최하단 */
   #today-rhythm-pace-row{order:4;} /* grid-template-columns:1fr는 위 공통 .grid2 규칙에서 이미 적용됨 */
-  #today-habit-content-row{order:5;}
-  #today-mflow-card{display:none;} /* 오늘의 모닝플로우 — 오늘의 감상과 내용 겹쳐 세로에서 생략 */
+  #today-habit-content-row{order:5;display:contents;} /* meal-reading-row와 동일 패턴 — 자식(습관/모닝플로우) 각각 개별 order로 승격 */
+  #today-habit-content-row>.habit-card{order:5;}
+  #today-habit-content-row>.mflow-card{order:6;} /* 오늘의 모닝플로우 — 습관 바로 아래, 감상(최하단) 위 */
 
   /* 오늘 일정 — 일정이 없으면 카드 자체를 숨김(가로에서는 항상 노출 유지) */
   #today-event-card.no-events{display:none;}

@@ -1004,7 +1004,7 @@ function renderTodayMflow(row){
     const p=picks[c.key];
     return p&&(p.status==='running'||p.status==='done');
   });
-  if(!activeCards.length){el.innerHTML='<div class="empty-msg">오늘 아침을 아직 채우지 않았어요</div>';return;}
+  if(!activeCards.length){el.innerHTML='<div class="empty-msg">아직 아침 플로우가 시작되지 않았어요</div>';return;}
   el.innerHTML=activeCards.map(c=>{
     const p=picks[c.key];
     const sub=_mflowSubLabel(c.key,p,flow);
@@ -1739,7 +1739,7 @@ function renderWeekMflow(rows){
   });
   el.innerHTML=`<div class="wk-mflow-grid">${MFLOW_CARDS.map(c=>{
     const s=stats[c.key];
-    return `<div class="wk-mflow-cell"><i class="ti ${c.icon}" style="color:rgb(${c.colorRgb});" aria-hidden="true"></i><div class="wk-mflow-cell-label">${c.label}</div><div class="wk-mflow-cell-stat">${s.count}회<br>${_mflowDurationLabel(s.minutes)}</div></div>`;
+    return `<div class="wk-mflow-cell" style="--wk-mflow-rgb:${c.colorRgb};"><i class="ti ${c.icon}" style="color:rgb(${c.colorRgb});" aria-hidden="true"></i><div class="wk-mflow-cell-label">${c.label}</div><div class="wk-mflow-cell-stat">${s.count}회<br>${_mflowDurationLabel(s.minutes)}</div></div>`;
   }).join('')}</div>`;
 }
 
