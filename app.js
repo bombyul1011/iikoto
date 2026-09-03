@@ -61,12 +61,16 @@ function renderHomeBody(section){
   if(_ldDay===1)maybeBackfillWeeklyReview();
 
   if(section==='morning'){
-    // 어제 돌아보기 카드, 운동 체크 배너 모두 제거됨 — 아침 루틴(굿모닝) 카드로 대체
+    // 아침 루틴(굿모닝) 카드 — 파트1: 선택배너만, 파트2: 선택배너 + 어제/오늘 리뷰 배너 나란히(2026-09-03 아침홈탭 정식 이식)
     const isMorning2=getSubSection()==='morning_2';
     if(isMorning2){
       body.appendChild(makeNutriCommentBanner());
     }
-    body.appendChild(makeMorningRoutineCard());
+    body.appendChild(makeMorningFlowCard());
+    if(isMorning2){
+      const mfPart2=makeMorningFlowPart2Card();
+      if(mfPart2)body.appendChild(mfPart2);
+    }
     body.appendChild(makeHabitStreakRow());
     body.appendChild(makeTodayRhythmBanner());
     if(!isMorning2){
@@ -3100,7 +3104,7 @@ async function autoSync(type,key){
   }
   else if(type==='contents'){if(await syncContentsUp(key))S.set(S.key('contents_pending',key),false);}
   else if(type==='rblocks'){if(await syncRhythmBlocksUp(key))S.set(S.key('rblocks_pending',key),false);}
-  else if(type==='mroutine')syncMorningRoutineUp(key);
+  else if(type==='mflow')syncMorningFlowUp(key);
   else if(type==='rdlog'){if(await syncReadingDailyLogUp(key))S.set(S.key('rdlog_pending',key),false);}
 }
 async function syncAll(){
@@ -3125,10 +3129,10 @@ async function syncAll(){
   // 이번 주 리듬블록(가로바용) 날짜키
   const weekRblockDks=[];
   for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);weekRblockDks.push(dateKey(d));}
-  // 이번 달 1일~오늘까지 아침루틴 날짜키 (누계 통계 정확성을 위해 이번 달 전체)
-  const mroutineDks=[];
+  // 굿모닝(모닝 플로우)은 그날의 선택+상태만 다루는 가벼운 데이터라 이번 달 전체가 아니라 최근 2일(오늘+어제, 파트2 회고용)만 동기화.
+  const mflowDks=[];
   const todayDate=now.getDate();
-  for(let d=1;d<=todayDate;d++){mroutineDks.push(mk+'-'+pad(d));}
+  for(let i=0;i<2;i++){const d=new Date(now);d.setDate(now.getDate()-i);mflowDks.push(dateKey(d));}
   // Down (Supabase → 로컬)
   await Promise.all([
     syncTodosDown(dk),syncMemosDown(dk),syncSleepDown(dk),syncMealsDown(dk),
@@ -3144,7 +3148,7 @@ async function syncAll(){
     syncQuotesDownAll(),
     ...weekOnelines,
     ...weekRblockDks.map(rdk=>syncRhythmBlocksDown(rdk)),
-    ...mroutineDks.map(mdk=>syncMorningRoutineDown(mdk))
+    ...mflowDks.map(mdk=>syncMorningFlowDown(mdk))
   ]);
   loadDaily();
   refreshIfTabOpen('v-weekly',loadWeekly);
@@ -4451,75 +4455,436 @@ function confirmCopyWholeTodo(){
 // ── 오후 파트: 오늘vs어제 진행바 + 목표대비 웨이브게이지 + 리듬 비교 통합 카드
 const AFTERNOON_TODO_GOAL=5,AFTERNOON_HABIT_GOAL=4,AFTERNOON_MORNING_GOAL=4;
 
-// 아침 루틴
-// 이 배너 전용 색 세트 — JS로 rgba/color-mix 동적 조합되는 특성상 공용 --pal-* CSS변수와 자동연동 불가.
-// 2026-08-17 팔레트값으로 교체 시도했다가 롤백: 팔레트 원색이 바뀌어도 이 배너는 안 따라오므로,
-// 오히려 "자동 반영되는 것처럼 보이지만 실제로는 스냅샷"인 상태가 혼란을 줄 수 있어 전용 색으로 명확히 분리 유지.
-const MORNING_ROUTINE_ITEMS=[
-  {key:'wake',label:'기상',icon:'ti-sunset-2',colorRgb:'252,215,110'},
-  {key:'tea',label:'티타임',icon:'ti-mug',colorRgb:'244,177,206'},
-  {key:'audiobook',label:'오디오북',icon:'ti-radio',colorRgb:'216,168,205'},
-  {key:'weight',label:'체중',icon:'ti-scale-outline',colorRgb:'150,205,225'},
-  {key:'pill',label:'영양제',icon:'ti-pill',colorRgb:'205,215,145'}
+// ══════════════════════════════════════════════════════════
+// 굿모닝(모닝 플로우)
+// 카드 6개(휴식/운동/감상/책상/정리/기타) 중 복수선택 → "선택 완료"(원형 체크)를 눌러야 시작목록으로 확정 → 카드별 시작/종료(=리듬블록 자동 등록) → 파트2에 어제 회고+오늘 일정 미리보기.
+// 감상(독서/콘텐츠)·책상(일기/노트정리/개인작업)·기타(업무/외출/자유입력)는 같은 패턴 — 탭 후 서브선택 칩.
+// 서버 테이블: morning_flow_picks(date_key, picks jsonb, etc jsonb).
+// ══════════════════════════════════════════════════════════
+const MORNING_FLOW_CARDS=[
+  {key:'rest',label:'휴식',icon:'ti-cup',colorRgb:'244,177,206',rhythmCat:'rest'},
+  {key:'exercise',label:'운동',icon:'ti-run',colorRgb:'150,205,225',rhythmCat:'exercise'},
+  {key:'enjoy',label:'감상',icon:'ti-stack-2',colorRgb:'216,168,205',rhythmCat:'enjoy'}, // 서브선택(독서/콘텐츠) 필요 — 기타와 동일 패턴
+  {key:'desk',label:'책상',icon:'ti-desk',colorRgb:'240,187,158',rhythmCat:'note'}, // 서브선택(일기/노트정리/개인작업) 필요
+  {key:'clean',label:'정리',icon:'ti-sparkles',colorRgb:'252,215,110',rhythmCat:'home'},
+  {key:'etc',label:'기타',icon:'ti-dots',colorRgb:'195,180,168',rhythmCat:null} // 서브선택(업무/외출/자유입력)에 따라 카테고리가 갈림
 ];
-function getMorningRoutineChecks(dk){return S.get('mroutine_'+dk)||{};}
-function toggleMorningRoutineCheck(key){
-  const dk=dateKey(getLogicalDate());
-  const checks=getMorningRoutineChecks(dk);
-  if(checks[key]){
-    delete checks[key];
-  }else{
-    const maxOrder=Math.max(0,...MORNING_ROUTINE_ITEMS.map(it=>checks[it.key]?.order||0));
-    const now=new Date();
-    checks[key]={order:maxOrder+1,time:pad(now.getHours())+':'+pad(now.getMinutes())};
-  }
-  S.set('mroutine_'+dk,checks);
-  autoSync('mroutine',dk);
-  const fresh=makeMorningRoutineCard();
-  const old=document.getElementById('morning-routine-card');
-  if(old)old.replaceWith(fresh);
+const MORNING_FLOW_ENJOY_SUB=[
+  {key:'read',label:'독서',icon:'ti-book'},
+  {key:'content',label:'콘텐츠',icon:'ti-device-tv'}
+];
+const MORNING_FLOW_DESK_SUB=[
+  {key:'diary',label:'일기'},
+  {key:'notes',label:'노트정리'},
+  {key:'work_personal',label:'개인작업'}
+];
+const MORNING_FLOW_ETC_SUB=[
+  {key:'work',label:'업무',rhythmCat:'work'},
+  {key:'appointment',label:'외출',rhythmCat:'appointment'},
+  {key:'free',label:'자유입력',rhythmCat:null} // 리듬 연동 없음, 텍스트만 로컬+서버 기록
+];
+// 오늘의 문구 — 선택 전/선택 후 두 세트, 날짜 기준 시드로 같은 날엔 같은 문구가 나오도록 고정(선택 전→후 전환 시 톤만 바뀜).
+const MORNING_FLOW_PHRASES_BEFORE=[
+  '오늘도 좋은 기운으로 하루를 열어봐요.','오늘의 아침을 나답게 시작해보세요.','좋아하는 일로 오늘을 시작해볼까요?',
+  '오늘은 어떤 하루를 만들어볼까요?','기분 좋은 시작이 하루를 바꿔요.','오늘도 나에게 맞는 아침을 골라보세요.',
+  '새로운 하루, 무엇부터 시작해볼까요?','오늘의 에너지를 어디에 써볼까요?','하고 싶은 것부터 하나씩 시작해봐요.',
+  '오늘도 나만의 리듬으로 시작해요.','가볍게 시작해도, 힘차게 시작해도 좋아요.','오늘 아침에는 무엇을 해볼까요?',
+  '좋은 하루를 위한 첫 시간을 골라보세요.','오늘의 시작을 내가 골라볼까요?','움직여도 좋고, 쉬어도 좋은 아침이에요.',
+  '오늘은 어떤 아침을 만들어볼까요?','내가 원하는 모습으로 오늘을 열어보세요.','오늘의 첫 시간을 기분 좋게 채워봐요.',
+  '오늘도 하고 싶은 것부터 시작해요.','새로운 하루가 시작됐어요. 무엇을 해볼까요?'
+];
+const MORNING_FLOW_PHRASES_AFTER=[
+  '좋은 시작이에요, 천천히 채워가봐요.','오늘 아침도 나답게 흘러가고 있어요.','하나씩, 편안하게 이어가봐요.',
+  '좋은 선택이에요, 오늘도 잘 하고 있어요.','이 흐름대로 편안하게 이어가봐요.','오늘의 리듬이 시작됐어요.',
+  '지금 이 시간이 하루를 가볍게 만들어줄 거예요.','마음가는 대로, 편하게 이어가봐요.','좋은 아침이 만들어지고 있어요.',
+  '오늘도 나만의 속도로 가봐요.'
+];
+function _mfPhraseIndex(dk,len){
+  let sum=0;for(let i=0;i<dk.length;i++)sum+=dk.charCodeAt(i);
+  return sum%len;
 }
-async function syncMorningRoutineUp(dk){
-  const checks=getMorningRoutineChecks(dk);
-  const rows=Object.keys(checks).map(key=>({date_key:dk,item_key:key,checked_order:checks[key].order||1,checked_time:checks[key].time||null,client_id:dk+'_'+key}));
-  // 이 날짜의 서버 데이터를 로컬 상태로 완전히 맞춤: 남은 것 upsert, 로컬에서 해제된 항목은 삭제
-  if(rows.length){
-    const ok=await supaUpsert('morning_routine_checks','date_key,item_key',rows);
-    if(!ok)return false;
-  }
-  const allKeys=MORNING_ROUTINE_ITEMS.map(it=>it.key);
-  const uncheckedKeys=allKeys.filter(k=>!checks[k]);
-  for(const k of uncheckedKeys){
-    const res=await supaFetch(`morning_routine_checks?date_key=eq.${dk}&item_key=eq.${k}`,'DELETE');
-    if(res===null)return false;
-  }
-  return true;
+// HH:MM 두 시각의 분단위 소요시간 — 자정을 넘긴 경우(예: 23:50~00:10)도 고려해 종료가 시작보다 이르면 24시간을 더함.
+function _mfDurationMin(startStr,endStr){
+  const [sh,sm]=startStr.split(':').map(Number);
+  const [eh,em]=endStr.split(':').map(Number);
+  let startMin=sh*60+sm,endMin=eh*60+em;
+  if(endMin<startMin)endMin+=1440;
+  return endMin-startMin;
 }
-async function syncMorningRoutineDown(dk){
-  const rows=await supaFetch(`morning_routine_checks?date_key=eq.${dk}`);
+function getMorningFlow(dk){return S.get('mflow_'+dk)||{picks:{},etc:{},enjoy:{},desk:{},confirmed:false};}
+// pending 플래그: Up이 아직 서버에 반영 안 된 로컬 변경사항이 있으면 syncMorningFlowDown이 그 날짜를 덮어쓰지 않도록 방지
+// (기존엔 autoSync가 완료를 기다리지 않고 fire-and-forget이라, 새로고침 시 syncAll의 Down이 먼저 실행되며 방금 로컬에 저장한 진행상태를 서버의 옛 데이터로 되돌리는 버그가 있었음 — 2026-09-03 수정)
+function saveMorningFlow(dk,data){S.set('mflow_'+dk,data);S.set(S.key('mflow_pending',dk),true);autoSync('mflow',dk);}
+async function syncMorningFlowUp(dk){
+  const flow=getMorningFlow(dk);
+  const etcPayload={...(flow.etc||{})};
+  if(flow.enjoy)etcPayload._enjoy=flow.enjoy;
+  if(flow.desk)etcPayload._desk=flow.desk;
+  const ok=await supaUpsert('morning_flow_picks','date_key',[{date_key:dk,picks:flow.picks||{},etc:etcPayload}]);
+  if(ok)S.set(S.key('mflow_pending',dk),false);
+  return !!ok;
+}
+async function syncMorningFlowDown(dk){
+  if(S.get(S.key('mflow_pending',dk)))return; // 아직 업로드 안 된 로컬 변경사항이 있으면 서버값으로 덮어쓰지 않음
+  const rows=await supaFetch(`morning_flow_picks?date_key=eq.${dk}`);
   if(!rows)return;
   if(!rows.length){
-    // 서버에 없고 로컬에 체크가 있으면(오프라인에서 체크한 경우) 업로드 시도
-    const local=getMorningRoutineChecks(dk);
-    if(Object.keys(local).length)await syncMorningRoutineUp(dk);
+    const local=getMorningFlow(dk);
+    if(Object.keys(local.picks||{}).length)await syncMorningFlowUp(dk);
     return;
   }
-  const checks={};
-  rows.forEach(r=>{checks[r.item_key]={order:r.checked_order,time:r.checked_time||null};});
-  S.set('mroutine_'+dk,checks);
+  const r=rows[0];
+  const etcRaw=r.etc||{};
+  const enjoy=etcRaw._enjoy||{};
+  const desk=etcRaw._desk||{};
+  const etc={...etcRaw};delete etc._enjoy;delete etc._desk;
+  S.set('mflow_'+dk,{picks:r.picks||{},etc,enjoy,desk,confirmed:Object.keys(r.picks||{}).length>0});
 }
-function _mroutineMonthCount(key){
-  // 이번 달 며칠 체크했는지 — 로컬 캐시 스캔 (앱 로드 시 syncMorningRoutineDown으로 최신화됨)
-  const now=getLogicalDate();
-  const mk=monthKey(now);
-  let cnt=0;
-  const daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
-  for(let d=1;d<=daysInMonth;d++){
-    const dk=mk+'-'+pad(d);
-    const checks=S.get('mroutine_'+dk);
-    if(checks&&checks[key])cnt++;
+// 카드 선택 토글(그리드 화면 전용) — 이미 confirmed 상태에서는 이 함수가 호출될 일이 없음(그리드 자체가 안 보이므로).
+function toggleMorningFlowPick(key){
+  const dk=dateKey(getLogicalDate());
+  const flow=getMorningFlow(dk);
+  if(flow.picks[key]){
+    delete flow.picks[key];
+    if(key==='etc')delete flow.etc;
+    if(key==='enjoy')delete flow.enjoy;
+    if(key==='desk')delete flow.desk;
+  }else{
+    flow.picks[key]={status:'idle'}; // idle → running → done. 자정 넘어 11:59까지 idle이면 통계 미반영(집계 시점에 자연히 제외).
   }
-  return cnt;
+  saveMorningFlow(dk,flow);
+  refreshMorningFlowCard();
+}
+// 그리드에서 카드를 몇 개 골랐든, 원형 체크를 눌러야 시작목록 화면으로 확정 전환(카드 하나만 눌러도 즉시 넘어가던 문제 수정 — 복수선택을 마칠 시간을 줌).
+function confirmMorningFlowPicks(){
+  const dk=dateKey(getLogicalDate());
+  const flow=getMorningFlow(dk);
+  if(!Object.keys(flow.picks).length)return; // 하나도 안 고른 상태로는 확정 불가
+  flow.confirmed=true;
+  saveMorningFlow(dk,flow);
+  refreshMorningFlowCard();
+}
+// 확정 화면에서 다시 그리드로 돌아가 선택을 바꾸고 싶을 때 — 이미 시작(running)된 카드가 있으면 되돌리기 불가(먼저 종료해야 함).
+function unconfirmMorningFlowPicks(){
+  const dk=dateKey(getLogicalDate());
+  const flow=getMorningFlow(dk);
+  const hasRunning=Object.values(flow.picks).some(p=>p.status==='running');
+  if(hasRunning)return;
+  flow.confirmed=false;
+  saveMorningFlow(dk,flow);
+  refreshMorningFlowCard();
+}
+function selectMorningFlowEnjoySub(subKey){
+  const dk=dateKey(getLogicalDate());
+  const flow=getMorningFlow(dk);
+  if(!flow.picks.enjoy)return;
+  flow.enjoy={sub:subKey};
+  saveMorningFlow(dk,flow);
+  refreshMorningFlowCard();
+}
+function selectMorningFlowDeskSub(subKey){
+  const dk=dateKey(getLogicalDate());
+  const flow=getMorningFlow(dk);
+  if(!flow.picks.desk)return;
+  flow.desk={sub:subKey};
+  saveMorningFlow(dk,flow);
+  refreshMorningFlowCard();
+}
+function selectMorningFlowEtcSub(subKey){
+  const dk=dateKey(getLogicalDate());
+  const flow=getMorningFlow(dk);
+  if(!flow.picks.etc)return;
+  flow.etc={sub:subKey,text:flow.etc?.text||''};
+  saveMorningFlow(dk,flow);
+  refreshMorningFlowCard();
+}
+function submitMorningFlowEtcFreeText(){
+  const dk=dateKey(getLogicalDate());
+  const inp=document.getElementById('mf-etc-free-inp');
+  if(!inp)return;
+  const text=inp.value.trim();
+  if(!text)return;
+  const flow=getMorningFlow(dk);
+  if(!flow.etc||flow.etc.sub!=='free')return;
+  flow.etc.text=text;
+  flow.picks.etc.status='done'; // 자유입력은 시작/종료 없이 입력 즉시 완료 처리
+  saveMorningFlow(dk,flow);
+  refreshMorningFlowCard();
+}
+// 카드 시작 — 독서/콘텐츠는 진행중 목록이 여러 개면 먼저 고르게(콘텐츠 코너의 선택 시트 패턴 재사용).
+function startMorningFlowCard(key){
+  if(key==='enjoy'){
+    const dk=dateKey(getLogicalDate());
+    const sub=getMorningFlow(dk).enjoy?.sub;
+    if(sub==='read'){
+      const ongoing=_getOngoingReadingWithCid();
+      if(ongoing.length>1){openMfPickerSheet('read',ongoing.map(b=>({cid:b.cid,title:b.title,poster:b.poster})));return;}
+      if(ongoing.length===1){_startMorningFlowRhythm('enjoy',ongoing[0].cid);return;}
+      openAddBookModal();return;
+    }
+    if(sub==='content'){
+      const ongoing=_getOngoingWatchingWithCid().filter(c=>c.cid);
+      if(ongoing.length>1){openMfPickerSheet('content',ongoing.map(c=>({cid:c.cid,title:c.title,poster:c.poster,mk:c._mk})));return;}
+      if(ongoing.length===1){_startMorningFlowRhythm('enjoy',ongoing[0].cid,ongoing[0]._mk);return;}
+      openWatchNewContentPicker();return;
+    }
+    return; // 서브선택 안 한 상태면 아무것도 하지 않음
+  }
+  if(key==='etc'){
+    const dk=dateKey(getLogicalDate());
+    const flow=getMorningFlow(dk);
+    const sub=flow.etc?.sub;
+    if(sub==='free')return; // 자유입력은 시작 버튼 자체가 없음(submitMorningFlowEtcFreeText로 즉시 완료)
+    if(sub==='work'||sub==='appointment'){_startMorningFlowRhythm('etc',null,null,sub);return;}
+    return;
+  }
+  if(key==='desk'){
+    const dk=dateKey(getLogicalDate());
+    const sub=getMorningFlow(dk).desk?.sub;
+    if(!sub)return; // 서브선택(일기/노트정리/개인작업) 안 한 상태면 아무것도 하지 않음
+    _startMorningFlowRhythm('desk',null,null,sub);
+    return;
+  }
+  _startMorningFlowRhythm(key);
+}
+// 독서/콘텐츠 진행중 목록이 여럿일 때 굿모닝 전용 미니 선택 시트.
+function openMfPickerSheet(kind,list){
+  const listEl=document.getElementById('mf-picker-list');
+  listEl.innerHTML=list.map(item=>{
+    const poster=item.poster?`<img class="watch-picker-item-poster" src="${item.poster}" alt="">`:`<div class="watch-picker-item-poster-ph"><i class="ti ${kind==='read'?'ti-book':'ti-device-tv'}" aria-hidden="true"></i></div>`;
+    return `<div class="watch-picker-item" onclick="closeSheet('mf-picker-sheet');_startMorningFlowRhythm('enjoy','${item.cid}','${item.mk||''}');">
+      ${poster}<div class="watch-picker-item-title">${escapeHtml(item.title||'')}</div>
+    </div>`;
+  }).join('');
+  openSheet('mf-picker-sheet');
+}
+// 실제 리듬블록 시작 등록 — key: 카드종류, targetCid: 감상(독서/콘텐츠)일 때 대상 cid, mk: 콘텐츠 월키, subKey: 기타(업무/외출)·책상(일기/노트정리/개인작업) 서브선택 공용.
+// 리듬탭에서 수동 등록 시 호출되는 autoCheckHabitFromRhythm(운동→습관 자동체크)를 여기서도 동일하게 호출해야 습관탭과 연동됨.
+function _startMorningFlowRhythm(key,targetCid,mk,subKey){
+  const dk=dateKey(getLogicalDate());
+  const flow=getMorningFlow(dk);
+  if(!flow.picks[key])return;
+  if(key==='enjoy'){
+    const sub=flow.enjoy?.sub;
+    const now=Date.now();
+    const startStr=minToHHMM(new Date(now).getHours()*60+new Date(now).getMinutes());
+    // 독서/콘텐츠 스톱워치가 각자 리듬블록 시작을 처리하지만, 굿모닝 카드 화면에 표시할 시작 시각은 별도로 여기서 직접 기록(2026-09-03: 다른 카드와 동일하게 시간 표기 통일).
+    if(sub==='read'){toggleStopwatch(targetCid);flow.picks[key]={status:'running',cid:targetCid,startTs:now,startStr};saveMorningFlow(dk,flow);refreshMorningFlowCard();refreshRhythmTrack();return;}
+    if(sub==='content'){toggleContentStopwatch(targetCid,mk);flow.picks[key]={status:'running',cid:targetCid,mk,startTs:now,startStr};saveMorningFlow(dk,flow);refreshMorningFlowCard();refreshRhythmTrack();return;}
+    return;
+  }
+  // 휴식/운동/정리/기타(업무·외출)/책상(일기·노트정리·개인작업) — 리듬블록을 end 없이 직접 생성해두고 종료 시 채우는 방식(콘텐츠 시청 스톱워치와 동일 패턴).
+  const card=MORNING_FLOW_CARDS.find(c=>c.key===key);
+  const rhythmCat=key==='etc'?(subKey==='work'?'work':'appointment'):card.rhythmCat;
+  const deskLabelMap={diary:'일기',notes:'노트정리',work_personal:'개인작업'};
+  const label=key==='etc'?(subKey==='work'?'업무':'외출'):key==='desk'?deskLabelMap[subKey]:card.label;
+  const now=Date.now();
+  const startMin=new Date(now).getHours()*60+new Date(now).getMinutes();
+  const startStr=minToHHMM(startMin);
+  const blockCid=genCid();
+  const blocks=getRhythmBlocks(dk);
+  blocks.push({cat:rhythmCat,start:startStr,end:'',text:label,created:now,cid:blockCid});
+  saveRhythmBlocks(dk,blocks);
+  autoSync('rblocks',dk);
+  autoCheckHabitFromRhythm(rhythmCat,dk,startStr); // 운동→습관 자동체크 등, 리듬탭 수동등록과 동일하게 연동
+  if(key==='desk'&&subKey==='diary')checkHabitDirect('일기',dk,startStr); // 리듬탭에서 note+"일기" 텍스트일 때 자동체크되던 것과 동일하게 연동
+  flow.picks[key]={status:'running',blockCid,startTs:now,startStr,subKey:subKey||null};
+  saveMorningFlow(dk,flow);
+  refreshMorningFlowCard();
+  refreshRhythmTrack();
+}
+// 카드 종료 — 독서/콘텐츠는 각자의 종료 로직(진행률 모달까지)을 그대로 재사용, 나머지는 리듬블록 end만 채움.
+function endMorningFlowCard(key){
+  const dk=dateKey(getLogicalDate());
+  const flow=getMorningFlow(dk);
+  const pick=flow.picks[key];
+  if(!pick||pick.status!=='running')return;
+  if(key==='enjoy'){
+    const sub=flow.enjoy?.sub;
+    const now=Date.now();
+    const endStr=minToHHMM(new Date(now).getHours()*60+new Date(now).getMinutes());
+    // 1분 미만 자동삭제 로직 완전 제거(2026-09-03) — 몇 초든 시작~종료 구간을 그대로 기록, 다른 카테고리와 동일 규칙.
+    if(sub==='read'){toggleStopwatch();flow.picks[key]={status:'done',cid:pick.cid,startStr:pick.startStr,endStr};saveMorningFlow(dk,flow);refreshMorningFlowCard();refreshRhythmTrack();return;}
+    if(sub==='content'){stopContentStopwatch();flow.picks[key]={status:'done',cid:pick.cid,mk:pick.mk,startStr:pick.startStr,endStr};saveMorningFlow(dk,flow);refreshMorningFlowCard();refreshRhythmTrack();return;}
+    return;
+  }
+  const now=Date.now();
+  const blocks=getRhythmBlocks(dk);
+  const idx=blocks.findIndex(b=>b.cid===pick.blockCid);
+  let endStr=null;
+  if(idx>=0){
+    const endD=new Date(now);
+    let endMin=endD.getHours()*60+endD.getMinutes();
+    if(dateKey(getLogicalDate(now))!==dk)endMin+=1440;
+    endStr=minToHHMM(endMin%1440);
+    blocks[idx].end=endStr;
+    saveRhythmBlocks(dk,blocks);
+    autoSync('rblocks',dk);
+  }
+  flow.picks[key]={status:'done',blockCid:pick.blockCid,subKey:pick.subKey,startStr:pick.startStr,endStr};
+  saveMorningFlow(dk,flow);
+  refreshMorningFlowCard();
+  refreshRhythmTrack();
+}
+function refreshMorningFlowCard(){
+  const old=document.getElementById('morning-flow-card');
+  if(!old)return;
+  old.replaceWith(makeMorningFlowCard());
+}
+// 어제 mflow 기록 기반 회고 한 줄 — done 상태인 카드만 반영(시작만 하고 안 끝낸 카드는 드문 예외로 간주, 별도 표기 없이 제외).
+function _mfYesterdayRecapLine(){
+  const y=new Date(getLogicalDate());y.setDate(y.getDate()-1);
+  const ydk=dateKey(y);
+  const flow=getMorningFlow(ydk);
+  const doneLabels=[];
+  MORNING_FLOW_CARDS.forEach(c=>{
+    const p=flow.picks[c.key];
+    if(!p||p.status!=='done')return;
+    if(c.key==='etc'){
+      if(flow.etc?.sub==='work')doneLabels.push('업무');
+      else if(flow.etc?.sub==='appointment')doneLabels.push('외출');
+      // 자유입력은 리듬 연동이 없어 회고 문장에서도 제외(카드 자체가 통계용이 아님)
+    }else if(c.key==='enjoy'){
+      if(flow.enjoy?.sub==='read')doneLabels.push('독서');
+      else if(flow.enjoy?.sub==='content')doneLabels.push('콘텐츠');
+    }else if(c.key==='desk'){
+      const deskLabelMap={diary:'일기',notes:'노트정리',work_personal:'개인작업'};
+      if(flow.desk?.sub)doneLabels.push(deskLabelMap[flow.desk.sub]);
+    }else{
+      doneLabels.push(c.label);
+    }
+  });
+  if(!doneLabels.length)return null;
+  return '어제는 '+doneLabels.join('와 ')+'으로 아침을 열었어요';
+}
+// 오늘 첫 일정/타임테이블 한 줄 — 투두는 제외(오전 인사카드가 이미 다룸), events/timetable만 참고.
+// 오늘 일정+시간표(투두 앞 "HH:MM " 표기) 중 가장 이른 항목 한 줄 — 투두 일반 항목은 제외(오전 인사카드가 이미 다룸), 일정/시간표만 참고.
+function _mfTodayPreviewLine(){
+  const dk=dateKey(getLogicalDate());
+  const todos=getTodos(dk)||[];
+  const events=todos.filter(t=>t.isEvent&&t.eventTime).map(t=>({time:t.eventTime,label:t.text}));
+  const scheduleItems=parseScheduleTodos(dk,todos).map(it=>({time:it.time,label:it.label}));
+  const all=[...events,...scheduleItems];
+  if(!all.length)return null;
+  const sorted=all.sort((a,b)=>(a.time||'').localeCompare(b.time||''));
+  const first=sorted[0];
+  return '오늘은 '+first.time+' '+first.label+'이 있어요';
+}
+// 서브선택 대기 행(기타/감상/책상 공통) — 카테고리명 옆에 서브선택 칩을 나란히 배치하는 동일 마크업을 재사용(2026-09-03 정리).
+function _mfSubPickRowHtml(c,label,subList,handlerName,wrap){
+  return `<div class="mf-start-row">
+      <div class="mf-start-icon" style="background:rgba(${c.colorRgb},0.18);"><i class="ti ${c.icon}" style="font-size:17px;color:rgb(${c.colorRgb});" aria-hidden="true"></i></div>
+      <div class="mf-label" style="flex:0 0 auto;">${label}</div>
+    <div class="mf-etc-chips" style="margin-top:0;flex:1;justify-content:flex-end;${wrap?'flex-wrap:wrap;':''}">${subList.map(s=>`<div class="mf-etc-chip" onclick="${handlerName}('${s.key}')">${s.label}</div>`).join('')}</div>
+  </div>`;
+}
+function makeMorningFlowCard(){
+  const dk=dateKey(getLogicalDate());
+  const flow=getMorningFlow(dk);
+  const pickedKeys=Object.keys(flow.picks);
+  const hasPicks=pickedKeys.length>0;
+  // 선택한 카드 중 하나라도 시작/완료(running·done) 흔적이 있어야 시작목록을 보여줌.
+  // 전부 idle(취소/미시작)이면 "선택 다시 고르기" 같은 별도 액션 없이 그냥 그리드로 되돌아가 바로 다시 고를 수 있게 함(2026-09-03).
+  const hasProgress=Object.values(flow.picks).some(p=>p.status==='running'||p.status==='done');
+  const showStartList=hasPicks&&flow.confirmed&&hasProgress;
+  const phraseIdx=_mfPhraseIndex(dk,showStartList?MORNING_FLOW_PHRASES_AFTER.length:MORNING_FLOW_PHRASES_BEFORE.length);
+  const phrase=showStartList?MORNING_FLOW_PHRASES_AFTER[phraseIdx]:MORNING_FLOW_PHRASES_BEFORE[phraseIdx];
+
+  const hero=document.createElement('div');
+  hero.className='mf-hero';
+  hero.id='morning-flow-card';
+
+  const dateLabel=(dk.split('-')[1]|0)+'월 '+(dk.split('-')[2]|0)+'일';
+  const confirmCircleHtml=!showStartList
+    ?`<div class="mf-confirm-circle${hasPicks?' on':' disabled'}" onclick="confirmMorningFlowPicks()" title="선택 완료"><i class="ti ti-check" aria-hidden="true"></i></div>`
+    :'';
+  let bodyHtml=`<div class="mf-hero-inner">
+    <div class="mf-hero-top-row">
+      <div class="mf-hero-date">${dateLabel}</div>
+      ${confirmCircleHtml}
+    </div>
+    <div class="mf-hero-line${showStartList?' picked':''}">${phrase}</div>`;
+
+  if(!showStartList){
+    bodyHtml+=`<div class="mf-grid">${MORNING_FLOW_CARDS.map(c=>{
+      const isOn=!!flow.picks[c.key];
+      return `<div class="mf-card${isOn?' on':''}" onclick="toggleMorningFlowPick('${c.key}')">
+        <i class="ti ${c.icon} mf-card-icon" style="color:${isOn?`rgb(${c.colorRgb})`:'var(--tm)'};" aria-hidden="true"></i>
+        <span class="mf-card-label">${c.label}</span>
+      </div>`;
+    }).join('')}</div>`;
+  }else{
+    bodyHtml+=`<div class="mf-start-list">${MORNING_FLOW_CARDS.filter(c=>flow.picks[c.key]).map(c=>{
+      const pick=flow.picks[c.key];
+      const isEtc=c.key==='etc';
+      const isEnjoy=c.key==='enjoy';
+      const isDesk=c.key==='desk';
+      const etcSub=flow.etc?.sub;
+      const enjoySub=flow.enjoy?.sub;
+      const deskSub=flow.desk?.sub;
+      // 서브선택이 필요한 카드(기타/감상/책상)인데 아직 안 고른 경우 — 칩만 노출, 시작 행 자체는 아직 안 그림
+      if(isEtc&&!etcSub)return _mfSubPickRowHtml(c,'기타',MORNING_FLOW_ETC_SUB,'selectMorningFlowEtcSub',false);
+      if(isEnjoy&&!enjoySub)return _mfSubPickRowHtml(c,'감상',MORNING_FLOW_ENJOY_SUB,'selectMorningFlowEnjoySub',false);
+      if(isDesk&&!deskSub)return _mfSubPickRowHtml(c,'책상',MORNING_FLOW_DESK_SUB,'selectMorningFlowDeskSub',true);
+      if(isEtc&&etcSub==='free'){
+        const savedText=flow.etc?.text||'';
+        const isDone=pick.status==='done';
+        return `<div class="mf-start-row" style="flex-direction:column;align-items:stretch;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div class="mf-start-icon" style="background:rgba(${c.colorRgb},0.18);"><i class="ti ti-pencil" style="font-size:17px;color:rgb(${c.colorRgb});" aria-hidden="true"></i></div>
+            <div class="mf-label">기타 · 자유입력</div>
+          </div>
+          ${isDone
+            ?`<div class="mf-status" style="margin-top:6px;">${escapeHtml(savedText)}</div>`
+            :`<div style="display:flex;gap:6px;margin-top:8px;"><input id="mf-etc-free-inp" class="modal-inp" style="margin-bottom:0;flex:1;" placeholder="예: 병원 다녀옴" value="${escapeHtml(savedText)}"><button class="mf-start-btn" style="border-color:rgba(${c.colorRgb},0.6);color:rgb(${c.colorRgb});" onclick="submitMorningFlowEtcFreeText()">저장</button></div>`}
+        </div>`;
+      }
+      const deskLabelMap={diary:'일기',notes:'노트정리',work_personal:'개인작업'};
+      const label=isEtc?(etcSub==='work'?'업무':'외출'):isEnjoy?(enjoySub==='read'?'독서':'콘텐츠'):isDesk?deskLabelMap[deskSub]:c.label;
+      const icon=isEtc?(etcSub==='work'?'ti-keyboard':'ti-bus'):isEnjoy?(MORNING_FLOW_ENJOY_SUB.find(s=>s.key===enjoySub)?.icon||c.icon):c.icon;
+      let statusText='시작 전',btnText='시작',btnOn=false;
+      if(pick.status==='running'){
+        statusText=pick.startStr?`${pick.startStr}부터 진행중`:'진행중';
+        btnText='종료';btnOn=true;
+      }else if(pick.status==='done'){
+        if(pick.startStr&&pick.endStr){
+          const durMin=_mfDurationMin(pick.startStr,pick.endStr);
+          statusText=`${pick.startStr}-${pick.endStr} · ${durMin}분`;
+        }else{
+          statusText='완료';
+        }
+      }
+      const btnHtml=pick.status==='done'
+        ?`<i class="ti ti-check" style="font-size:16px;color:rgb(${c.colorRgb});" aria-hidden="true"></i>`
+        :`<button class="mf-start-btn${btnOn?' running':''}" style="${btnOn?`background:rgb(${c.colorRgb});`:`border-color:rgba(${c.colorRgb},0.6);color:rgb(${c.colorRgb});`}" onclick="${btnOn?`endMorningFlowCard('${c.key}')`:`startMorningFlowCard('${c.key}')`}">${btnText}</button>`;
+      return `<div class="mf-start-row">
+        <div class="mf-start-icon" style="background:rgba(${c.colorRgb},0.18);"><i class="ti ${icon}" style="font-size:17px;color:rgb(${c.colorRgb});" aria-hidden="true"></i></div>
+        <div style="flex:1;"><div class="mf-label">${label}</div><div class="mf-status">${statusText}</div></div>
+        ${btnHtml}
+      </div>`;
+    }).join('')}</div>`;
+    const hasRunning=Object.values(flow.picks).some(p=>p.status==='running');
+    if(!hasRunning){
+      bodyHtml+=`<div class="mf-unconfirm-link" onclick="unconfirmMorningFlowPicks()">선택 다시 고르기</div>`;
+    }
+  }
+  bodyHtml+='</div>';
+  hero.innerHTML=bodyHtml;
+  return hero;
+}
+// 파트2 — 어제 회고 + 오늘 일정 미리보기, 한 문단으로 자연스럽게(2026-09-03 시안 확정: 카드는 있되 구분선 없이 심플하게).
+function makeMorningFlowPart2Card(){
+  const yesterdayLine=_mfYesterdayRecapLine();
+  const todayLine=_mfTodayPreviewLine();
+  if(!yesterdayLine&&!todayLine)return null;
+  const card=document.createElement('div');
+  card.className='mf-part2';
+  card.id='morning-flow-part2-card';
+  let html='';
+  if(yesterdayLine)html+=`<div>${escapeHtml(yesterdayLine)}</div>`;
+  if(todayLine)html+=`<div class="mf-p2-today">${escapeHtml(todayLine)}</div>`;
+  card.innerHTML=html;
+  return card;
 }
 function renderSleepScoreBadge(dk){
   const score=getSleepScore(dk);
@@ -4551,98 +4916,7 @@ function confirmSleepScore(){
   }
   saveSleepScore(_sleepScoreModalDk,num);
   closeModal('sleep-score-modal');
-  const card=document.getElementById('morning-routine-card');
-  if(card){
-    const fresh=makeMorningRoutineCard();
-    card.replaceWith(fresh);
-  }
   renderSleepAvgScoreBadge();
-}
-// 하단 개별 항목 달성 그래프 + 남는 한 칸에 총 합산 달성률 막대(홈탭 리듬배너 무지개 그라디언트 재사용).
-function _buildMorningRoutineStatGrid(items,doneCount,total){
-  let html='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;margin-top:14px;">';
-  const now=getLogicalDate();
-  const daysInThisMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
-  items.forEach(it=>{
-    const cnt=_mroutineMonthCount(it.key);
-    const pct=Math.min(100,Math.round(cnt/Math.max(daysInThisMonth,1)*100));
-    html+=`<div style="display:flex;align-items:center;gap:8px;">
-      <i class="ti ${it.icon}" style="font-size:14px;color:rgb(${it.colorRgb});flex-shrink:0;" aria-hidden="true"></i>
-      <div style="flex:1;height:5px;border-radius:3px;background:rgba(var(--divider-rgb),0.15);overflow:hidden;"><div style="width:${pct}%;height:100%;background:rgb(${it.colorRgb});"></div></div>
-    </div>`;
-  });
-  // 남는 한 칸: 오늘 기준 총 합산 달성률(체크한 개수/전체 개수) — 색상은 홈탭 리듬배너(.report-banner.rhythm-soft)의 무지개 그라디언트
-  const totalPct=total>0?Math.round(doneCount/total*100):0;
-  html+=`<div style="display:flex;align-items:center;gap:8px;">
-    <i class="ti ti-chart-donut" style="font-size:14px;color:var(--tm);flex-shrink:0;" aria-hidden="true"></i>
-    <div style="flex:1;height:5px;border-radius:3px;background:rgba(var(--divider-rgb),0.15);overflow:hidden;"><div style="width:${totalPct}%;height:100%;background:linear-gradient(90deg,rgba(248,192,160,0.95) 0%,rgba(252,215,110,0.95) 25%,rgba(150,205,225,0.95) 50%,rgba(190,160,230,0.95) 75%,rgba(244,177,206,0.95) 100%);"></div></div>
-  </div>`;
-  html+='</div>';
-  return html;
-}
-function makeMorningRoutineCard(){
-  const dk=dateKey(getLogicalDate());
-  const checks=getMorningRoutineChecks(dk);
-  const doneItems=MORNING_ROUTINE_ITEMS.filter(it=>checks[it.key]).sort((a,b)=>(checks[a.key].order||0)-(checks[b.key].order||0));
-  const pendingItems=MORNING_ROUTINE_ITEMS.filter(it=>!checks[it.key]);
-  const orderedItems=[...doneItems,...pendingItems]; // 체크한 순서대로 왼쪽부터, 나머지는 원래 순서로 뒤에
-  const doneCount=doneItems.length;
-  const total=MORNING_ROUTINE_ITEMS.length;
-
-  const card=document.createElement('div');
-  card.className='pace-card';
-  card.id='morning-routine-card';
-
-  // 반원 궤도 위 지점들 — 중심(160,cy), 반지름 100의 반원(160°~20°, 140도)을 항목 개수만큼 균등 분배
-  const cx=160,cy=100,r=100;
-  const n=MORNING_ROUTINE_ITEMS.length;
-  const startAngle=160,endAngle=20;
-  const step=n>1?(startAngle-endAngle)/(n-1):0;
-  const angles=Array.from({length:n},(_,i)=>startAngle-i*step);
-  const positions=angles.map(deg=>{
-    const rad=deg*Math.PI/180;
-    return {x:cx+r*Math.cos(rad),y:cy-r*Math.sin(rad)};
-  });
-
-  let svg=`<svg width="100%" height="${cy+2}" viewBox="0 0 320 ${cy+2}" style="overflow:visible;">`;
-  svg+=`<defs><linearGradient id="mrGrad" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#ffcba3"/><stop offset="100%" stop-color="#ffc2d6"/></linearGradient></defs>`;
-  // 배경 점선은 실제 아이콘 각도(160°~20°)보다 안쪽에서 시작/끝나도록 해 원 뒤로 완전히 가려지게 함
-  const bgStartAngle=145, bgEndAngle=35;
-  const bgStart={x:cx+r*Math.cos(bgStartAngle*Math.PI/180),y:cy-r*Math.sin(bgStartAngle*Math.PI/180)};
-  const bgEnd={x:cx+r*Math.cos(bgEndAngle*Math.PI/180),y:cy-r*Math.sin(bgEndAngle*Math.PI/180)};
-  svg+=`<path d="M${bgStart.x},${bgStart.y} A${r},${r} 0 0,1 ${bgEnd.x},${bgEnd.y}" fill="none" stroke="rgba(205,185,165,0.38)" stroke-width="1.5" stroke-dasharray="1 6"/>`;
-  for(let i=0;i<positions.length-1;i++){
-    const a=positions[i],b=positions[i+1];
-    // 진행선도 배경 점선과 정확히 같은 원(cx,cy,r) 위의 호(arc)로 그려서 곡률을 일치시킴
-    const segDone=!!checks[orderedItems[i].key]&&!!checks[orderedItems[i+1].key];
-    if(segDone){
-      svg+=`<path d="M${a.x},${a.y} A${r},${r} 0 0,1 ${b.x},${b.y}" fill="none" stroke="url(#mrGrad)" stroke-width="3" stroke-linecap="round"/>`;
-    }
-  }
-  svg+=`</svg>`;
-
-  let iconsHtml='';
-  orderedItems.forEach((it,i)=>{
-    const pos=positions[i];
-    const isDone=!!checks[it.key];
-    const size=34;
-    const iconSize=15;
-    iconsHtml+=`<div onclick="toggleMorningRoutineCheck('${it.key}')" style="position:absolute;left:${pos.x/320*100}%;top:${pos.y}px;width:${size}px;height:${size}px;border-radius:50%;display:flex;align-items:center;justify-content:center;transform:translate(-50%,-50%);cursor:pointer;transition:all .3s cubic-bezier(.34,1.4,.64,1);${
-      isDone
-        ? `background:color-mix(in srgb, rgb(${it.colorRgb}) 22%, #fdf8f2);border:1.5px solid rgba(${it.colorRgb},0.85);box-shadow:0 2px 8px rgba(${it.colorRgb},0.30);`
-        : `background:#fdf8f2;border:1px solid rgba(210,195,180,0.30);`
-    }">
-      <i class="ti ${it.icon}" style="font-size:${iconSize}px;color:${isDone?`rgb(${it.colorRgb})`:'rgba(180,165,155,0.5)'};" aria-hidden="true"></i>
-    </div>`;
-  });
-
-  card.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-      <div class="pace-title" style="margin-bottom:0;"><i class="ti ti-apple" style="font-size:13px;color:#e0a050;" aria-hidden="true"></i> 굿모닝</div>
-      ${renderSleepScoreBadge(dk)}
-    </div>
-    <div style="position:relative;height:102px;">${svg}${iconsHtml}</div>
-    ${_buildMorningRoutineStatGrid(MORNING_ROUTINE_ITEMS,doneCount,total)}`;
-  return card;
 }
 
 // 완료 개수 카운트 — 조각 단위. 조각이 있는 투두는 완료된 조각 수만큼, 조각 없는 투두는 done이면 1개로 센다.
@@ -4708,15 +4982,24 @@ function _paceHabitAvgPctByDow(baseDk,weeks){
   if(!pcts.length)return {pct:0,weeksUsed:0};
   return {pct:Math.round(pcts.reduce((a,b)=>a+b,0)/pcts.length),weeksUsed:pcts.length};
 }
-// 오늘 진행도 가로바에 아침루틴 체크도 합산하기 위한 헬퍼.
-function _paceMorningRoutineCheckedCount(dk,nowMinLimit){
-  const checks=getMorningRoutineChecks(dk);
-  return MORNING_ROUTINE_ITEMS.filter(it=>{
-    const c=checks[it.key];
-    if(!c)return false;
-    if(nowMinLimit==null)return true; // 하루 전체 기준(지난주 물채우기 등)
-    if(!c.time)return false; // 시각 기록 없는 과거 체크는 시각 비교 불가하므로 제외
-    return _dawnTimeToMin(c.time)<=nowMinLimit;
+// 오늘 진행도 가로바에 굿모닝(모닝 플로우) 진행 카드 수도 합산하기 위한 헬퍼.
+// nowMinLimit 기준 시각 비교는 카드별 시작시각(startTs, 등록된 리듬블록 기준)으로 판단 — 감상(독서/콘텐츠)은 리듬블록 자체에 시각이 있어 getRhythmBlocks로 별도 확인.
+function _paceMorningFlowStartedCount(dk,nowMinLimit){
+  const flow=getMorningFlow(dk);
+  const blocks=nowMinLimit!=null?getRhythmBlocks(dk):null;
+  return MORNING_FLOW_CARDS.filter(c=>{
+    const p=flow.picks[c.key];
+    if(!p||p.status==='idle')return false; // 시작 안 한 카드는 통계 미반영
+    if(nowMinLimit==null)return true;
+    if(c.key==='enjoy'){
+      const block=blocks.find(b=>b.contentCid===p.cid&&b.cat==='enjoy');
+      if(!block)return false;
+      const startMin=parseInt(block.start.split(':')[0],10)*60+parseInt(block.start.split(':')[1],10);
+      return startMin<=nowMinLimit;
+    }
+    if(!p.startTs)return false;
+    const startD=new Date(p.startTs);
+    return (startD.getHours()*60+startD.getMinutes())<=nowMinLimit;
   }).length;
 }
 function _paceTopRhythmCat(dk){
@@ -5124,12 +5407,22 @@ function _paceDayEvents(dk){
     const p=times[key].split(':');
     events.push({type:'habit',min:_paceAdjustMin(parseInt(p[0],10)*60+parseInt(p[1],10)),label:h.name});
   });
-  const mchecks=getMorningRoutineChecks(dk);
-  MORNING_ROUTINE_ITEMS.forEach(it=>{
-    const c=mchecks[it.key];
-    if(!c||!c.time)return;
-    const p=c.time.split(':');
-    events.push({type:'morning',min:_paceAdjustMin(parseInt(p[0],10)*60+parseInt(p[1],10)),label:it.label});
+  const mflow=getMorningFlow(dk);
+  const mflowBlocks=getRhythmBlocks(dk);
+  MORNING_FLOW_CARDS.forEach(c=>{
+    const p=mflow.picks[c.key];
+    if(!p||p.status==='idle')return;
+    let min=null;
+    if(c.key==='enjoy'){
+      const block=mflowBlocks.find(b=>b.contentCid===p.cid&&b.cat==='enjoy');
+      if(block){const sp=block.start.split(':');min=parseInt(sp[0],10)*60+parseInt(sp[1],10);}
+    }else if(p.startTs){
+      const d=new Date(p.startTs);min=d.getHours()*60+d.getMinutes();
+    }
+    if(min==null)return;
+    const deskLabelMap={diary:'일기',notes:'노트정리',work_personal:'개인작업'};
+    const label=c.key==='etc'?(mflow.etc?.sub==='work'?'업무':'외출'):c.key==='enjoy'?(mflow.enjoy?.sub==='read'?'독서':'콘텐츠'):c.key==='desk'?(deskLabelMap[mflow.desk?.sub]||'책상'):c.label;
+    events.push({type:'morning',min:_paceAdjustMin(min),label});
   });
   return events;
 }
@@ -5243,16 +5536,18 @@ function makeAfternoonPaceCard(){
 
   const todayHabit=_paceHabitCheckedCount(todayDk,nowMin);
   const yestHabit=_paceHabitCheckedCount(yestDk,nowMin);
-  const todayMorning=_paceMorningRoutineCheckedCount(todayDk,nowMin);
-  const yestMorning=_paceMorningRoutineCheckedCount(yestDk,nowMin);
+  const todayMorning=_paceMorningFlowStartedCount(todayDk,nowMin);
+  const yestMorning=_paceMorningFlowStartedCount(yestDk,nowMin);
   const HABIT_TOTAL=getHabits().length||1;
-  const MORNING_TOTAL=MORNING_ROUTINE_ITEMS.length;
+  // 굿모닝은 매일 선택 개수가 유동적(0~6개)이라 고정 분모가 없음 — 오늘/어제 각자 그날 선택한 카드 수를 분모로 사용.
+  const todayMorningTotal=Object.keys(getMorningFlow(todayDk).picks).length;
+  const yestMorningTotal=Object.keys(getMorningFlow(yestDk).picks).length;
 
-  // 오늘 진행도 가로바 — 투두뿐 아니라 습관/아침루틴까지 포함해 하루 전체 활동을 반영
+  // 오늘 진행도 가로바 — 투두뿐 아니라 습관/굿모닝까지 포함해 하루 전체 활동을 반영
   const todayBarDone=todayDone+todayHabit+todayMorning;
-  const todayBarTotal=todayTotal+HABIT_TOTAL+MORNING_TOTAL;
+  const todayBarTotal=todayTotal+HABIT_TOTAL+todayMorningTotal;
   const yestBarDone=yestDone+yestHabit+yestMorning;
-  const yestBarTotal=yestTotal+HABIT_TOTAL+MORNING_TOTAL;
+  const yestBarTotal=yestTotal+HABIT_TOTAL+yestMorningTotal;
 
   // 지난 [요일] 평균 — 오늘과 같은 요일로 거슬러 올라간 최근 4주(오늘 제외) 평균.
   // 습관은 활성 습관 수 변동을 percent 기준으로 흡수하기 위해 별도 헬퍼(_paceHabitAvgPctByDow) 사용.
@@ -5261,7 +5556,7 @@ function makeAfternoonPaceCard(){
     const d=new Date(now);d.setDate(now.getDate()-7*i);
     const dk=dateKey(d);
     sameDowTodoSum+=_paceCountDoneUntilNow(dk,null);
-    sameDowMorningSum+=_paceMorningRoutineCheckedCount(dk,null);
+    sameDowMorningSum+=_paceMorningFlowStartedCount(dk,null);
     sameDowWeeksUsed++;
   }
   const lastDowTodoDone=sameDowWeeksUsed?Math.round(sameDowTodoSum/sameDowWeeksUsed):0;
@@ -7614,24 +7909,35 @@ function openWatchNewContentPicker(){openSheet('watch-new-cat-sheet');}
 // 콘텐츠 코너 메인 상단 카드 — 독서코너 rd-top과 같은 급으로 상시 노출. 재생 중이면 실시간 경과시간+정지, 아니면 시작 유도.
 // 시작 전 상태는 두 단계: ①포스터 탭 → 그 작품 하나만 남기고 "시작" 버튼이 있는 확인 배너로 전환, ②버튼을 눌러야 실제 스톱워치 시작.
 // 포스터 자체엔 onclick으로 바로 시작을 걸지 않아 실수 탭·연타로 인한 리듬 블록 중복 생성을 원천 차단(2026-09-01).
+// 포스터/진행률바 HTML은 아래 두 헬퍼로 통일 — 시청중·선택됨·단일·병렬 4가지 상태가 각자 따로 만들던 동일 마크업을 하나로 묶음(2026-09-03 리팩터).
+function _cswPosterHtml(c,size){
+  size=size||52;
+  const meta=CAT_ICON_META[c.cat]||CAT_ICON_META.drama;
+  return c.poster
+    ?`<img class="rd-top-cover" src="${c.poster}" style="width:${size}px;height:${Math.round(size*76/52)}px;object-fit:cover;">`
+    :`<div class="rd-top-cover" style="width:${size}px;height:${Math.round(size*76/52)}px;background:${meta.color};display:flex;align-items:center;justify-content:center;"><i class="ti ${meta.icon}" style="font-size:22px;color:#fff;" aria-hidden="true"></i></div>`;
+}
+// 진행률 데이터(totalUnit)가 없으면 null — 독서코너 _rdProgressBarHtml과 동일 규칙(2026-09-03).
+function _cswProgressBarHtml(c,compact){
+  if(!c||!c.totalUnit)return null;
+  const cur=Math.min(c.currentUnit||0,c.totalUnit);
+  const pct=Math.round((cur/c.totalUnit)*100);
+  const unitLabel=c.cat==='drama'?'화':'분';
+  const barMargin=compact?'margin-top:6px;':'';
+  const subAlign=compact?'':'text-align:right;';
+  return `<div class="rd-progress-bar" style="${barMargin}" onclick="event.stopPropagation();openContentProgressModal('${c.cid}')">
+      <div class="rd-progress-track"><div class="rd-progress-fill" style="width:${pct}%;"></div></div>
+      <div class="rd-progress-bead" style="left:${pct}%;"></div>
+    </div>
+    <div class="rd-top-sub" style="margin-top:-4px;${subAlign}">${cur}/${c.totalUnit}${unitLabel}</div>`;
+}
 function renderCwatchMainCard(){
   const el=document.getElementById('cwatch-main-card');if(!el)return;
   if(_cswRunning&&_cswCid){
     const found=_findContentByCidNearMk(_cswCid,_chArchiveMk||monthKey(new Date()));
     const c=found?found.list[found.idx]:null;
-    const meta=CAT_ICON_META[_cswCat]||CAT_ICON_META.drama;
-    const posterHtml=c&&c.poster?`<img class="rd-top-cover" src="${c.poster}" style="width:52px;height:76px;">`:`<div class="rd-top-cover" style="width:52px;height:76px;background:${meta.color};display:flex;align-items:center;justify-content:center;"><i class="ti ${meta.icon}" style="font-size:22px;color:#fff;" aria-hidden="true"></i></div>`;
-    let progressHtml='';
-    if(c&&c.totalUnit){
-      const cur=Math.min(c.currentUnit||0,c.totalUnit);
-      const pct=Math.round((cur/c.totalUnit)*100);
-      const unitLabel=c.cat==='drama'?'화':'분';
-      progressHtml=`<div class="rd-progress-bar" onclick="event.stopPropagation();openContentProgressModal('${c.cid}')">
-        <div class="rd-progress-track"><div class="rd-progress-fill" style="width:${pct}%;"></div></div>
-        <div class="rd-progress-bead" style="left:${pct}%;"></div>
-      </div>
-      <div class="rd-top-sub" style="margin-top:-4px;text-align:right;">${cur}/${c.totalUnit}${unitLabel}</div>`;
-    }
+    const posterHtml=c?_cswPosterHtml(c):_cswPosterHtml({cat:_cswCat||'drama'});
+    const progressHtml=_cswProgressBarHtml(c)||'';
     el.innerHTML=`<div class="rd-top playing" style="margin-bottom:14px;">
       <div class="rd-top-inner">
         <div class="rd-top-main">
@@ -7653,23 +7959,11 @@ function renderCwatchMainCard(){
     const found=_findContentByCidNearMk(_cswPendingCid,_cswPendingMk||_chArchiveMk||monthKey(new Date()));
     const c=found?found.list[found.idx]:null;
     if(!c){_cswPendingCid=null;_cswPendingMk=null;renderCwatchMainCard();return;}
-    const meta=CAT_ICON_META[c.cat];
-    const posterHtml=c.poster?`<img class="rd-top-cover" src="${c.poster}" style="width:52px;height:76px;">`:`<div class="rd-top-cover" style="width:52px;height:76px;background:${meta.color};display:flex;align-items:center;justify-content:center;"><i class="ti ${meta.icon}" style="font-size:22px;color:#fff;" aria-hidden="true"></i></div>`;
-    let progressHtml='';
-    if(c.totalUnit){
-      const cur=Math.min(c.currentUnit||0,c.totalUnit);
-      const pct=Math.round((cur/c.totalUnit)*100);
-      const unitLabel=c.cat==='drama'?'화':'분';
-      progressHtml=`<div class="rd-progress-bar" onclick="event.stopPropagation();openContentProgressModal('${c.cid}')">
-        <div class="rd-progress-track"><div class="rd-progress-fill" style="width:${pct}%;"></div></div>
-        <div class="rd-progress-bead" style="left:${pct}%;"></div>
-      </div>
-      <div class="rd-top-sub" style="margin-top:-4px;text-align:right;">${cur}/${c.totalUnit}${unitLabel}</div>`;
-    }
+    const progressHtml=_cswProgressBarHtml(c)||'';
     el.innerHTML=`<div class="rd-top" style="margin-bottom:14px;">
       <div class="rd-top-inner">
         <div class="rd-top-main">
-          ${posterHtml}
+          ${_cswPosterHtml(c)}
           <div style="flex:1;min-width:0;">
             <div class="rd-top-title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.title||'')}</div>
             <div class="rd-top-sub">재생 버튼을 눌러 시작하세요</div>
@@ -7691,23 +7985,11 @@ function renderCwatchMainCard(){
     </div>`;
   }else if(ongoing.length===1){
     const c=ongoing[0];
-    const meta=CAT_ICON_META[c.cat];
-    const posterHtml=c.poster?`<img class="rd-top-cover" src="${c.poster}" style="width:52px;height:76px;">`:`<div class="rd-top-cover" style="width:52px;height:76px;background:${meta.color};display:flex;align-items:center;justify-content:center;"><i class="ti ${meta.icon}" style="font-size:22px;color:#fff;" aria-hidden="true"></i></div>`;
-    let progressHtml='';
-    if(c.totalUnit){
-      const cur=Math.min(c.currentUnit||0,c.totalUnit);
-      const pct=Math.round((cur/c.totalUnit)*100);
-      const unitLabel=c.cat==='drama'?'화':'분';
-      progressHtml=`<div class="rd-progress-bar" onclick="event.stopPropagation();openContentProgressModal('${c.cid}')">
-        <div class="rd-progress-track"><div class="rd-progress-fill" style="width:${pct}%;"></div></div>
-        <div class="rd-progress-bead" style="left:${pct}%;"></div>
-      </div>
-      <div class="rd-top-sub" style="margin-top:-4px;text-align:right;">${cur}/${c.totalUnit}${unitLabel}</div>`;
-    }
+    const progressHtml=_cswProgressBarHtml(c)||'';
     el.innerHTML=`<div class="rd-top" style="margin-bottom:14px;">
       <div class="rd-top-inner">
         <div class="rd-top-main">
-          ${posterHtml}
+          ${_cswPosterHtml(c)}
           <div style="flex:1;min-width:0;">
             <div class="rd-top-title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.title||'')}</div>
             <div class="rd-top-sub">시청 시작 전</div>
@@ -7720,21 +8002,9 @@ function renderCwatchMainCard(){
   }else{
     const two=ongoing.slice(0,2);
     const halvesHtml=two.map(c=>{
-      const meta=CAT_ICON_META[c.cat];
-      const posterHtml=c.poster?`<img class="rd-top-cover" src="${c.poster}" style="width:52px;height:76px;object-fit:cover;">`:`<div class="rd-top-cover" style="width:52px;height:76px;background:${meta.color};display:flex;align-items:center;justify-content:center;"><i class="ti ${meta.icon}" style="font-size:22px;color:#fff;" aria-hidden="true"></i></div>`;
-      let progressHtml='';
-      if(c.totalUnit){
-        const cur=Math.min(c.currentUnit||0,c.totalUnit);
-        const pct=Math.round((cur/c.totalUnit)*100);
-        const unitLabel=c.cat==='drama'?'화':'분';
-        progressHtml=`<div class="rd-progress-bar" style="margin-top:6px;" onclick="event.stopPropagation();openContentProgressModal('${c.cid}')">
-          <div class="rd-progress-track"><div class="rd-progress-fill" style="width:${pct}%;"></div></div>
-          <div class="rd-progress-bead" style="left:${pct}%;"></div>
-        </div>
-        <div class="rd-top-sub" style="margin-top:-4px;">${cur}/${c.totalUnit}${unitLabel}</div>`;
-      }
+      const progressHtml=_cswProgressBarHtml(c,true);
       return `<div style="flex:1;min-width:0;display:flex;gap:8px;cursor:pointer;" onclick="selectPendingWatch('${c.cid}','${c._mk}')">
-        ${posterHtml}
+        ${_cswPosterHtml(c)}
         <div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;">
           <div class="rd-top-title" style="font-size:var(--main-text-size);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.title||'')}</div>
           ${progressHtml||'<div class="rd-top-sub">눌러서 시청을 시작해보세요</div>'}
@@ -7792,20 +8062,17 @@ function stopContentStopwatch(){
   try{localStorage.removeItem(CSW_PERSIST_KEY);}catch(e){}
   _cswRunning=false;_cswStartTs=0;_cswCid=null;_cswCat=null;_cswTitle=null;_cswMk=null;_cswBlockCid=null;
   document.querySelectorAll('.seed-icon-btn').forEach(el=>el.classList.remove('cwatch-active'));
-  // 시작 시 만들어둔 블록을 cid로 찾아 end만 채움 — 1분 미만이면 실수로 켰다 끈 것으로 보고 블록 자체를 삭제(독서 스톱워치와 동일 규칙)
+  // 시작 시 만들어둔 블록을 cid로 찾아 end만 채움(2026-09-03: 1분 미만 삭제 로직 제거, 다른 카테고리와 동일 규칙)
   const dk=dateKey(getLogicalDate(startTs));
   const blocks=getRhythmBlocks(dk);
   const idx=blocks.findIndex(b=>b.cid===blockCid);
   const minutesWatched=Math.round((endTs-startTs)/60000);
+  // 1분 미만 자동삭제 로직 완전 제거(2026-09-03) — 몇 초든 시작~종료 구간을 그대로 기록, 다른 카테고리와 동일 규칙.
   if(idx>=0){
-    if(endTs-startTs<60000){
-      blocks.splice(idx,1);
-    }else{
-      const endD=new Date(endTs);
-      let endMin=endD.getHours()*60+endD.getMinutes();
-      if(dateKey(getLogicalDate(endTs))!==dk)endMin+=1440;
-      blocks[idx].end=minToHHMM(endMin);
-    }
+    const endD=new Date(endTs);
+    let endMin=endD.getHours()*60+endD.getMinutes();
+    if(dateKey(getLogicalDate(endTs))!==dk)endMin+=1440;
+    blocks[idx].end=minToHHMM(endMin);
     saveRhythmBlocks(dk,blocks);
   }
   if(_chArchiveMk)chExpandMonth(_chArchiveMk);
@@ -9315,7 +9582,7 @@ let _rdOpenCid=null;
 let _rdDoneQuoteBookCid=null;
 let _rdDoneCommentBookCid=null;
 let _rdSheetBookCid=null;
-let _swSeconds=0,_swRunning=false,_swInterval=null,_swStartTs=0;
+let _swSeconds=0,_swRunning=false,_swInterval=null,_swStartTs=0,_swBookCid=null,_swBlockCid=null;
 const RD_SW_C=2*Math.PI*32;
 // 스톱워치 시작시각을 localStorage에 영속화 — 새로고침/앱 완전종료 후 재시작해도
 // 이 값이 남아있으면 경과시간을 그대로 이어서 복원한다(백그라운드 전환은 메모리가 유지돼
@@ -9334,7 +9601,17 @@ function openReading(){
   renderReadingHub();
   document.getElementById('reading-ov').classList.add('on');
 }
-function closeReading(){document.getElementById('reading-ov').classList.remove('on');}
+function closeReading(){
+  document.getElementById('reading-ov').classList.remove('on');
+  _rdPendingCid=null; // 코너를 나가면 선택 상태 초기화 — 다시 들어오면 병렬 카드가 미선택 상태로 시작(2026-09-03)
+}
+// 코너 상단 "독서" 라벨 탭 — 나갔다 들어오지 않아도 바로 선택 초기화(2026-09-03). 스톱워치 진행중일 땐 무의미하므로 무시.
+function resetReadingSelection(){
+  if(_swRunning)return;
+  _rdPendingCid=null;
+  renderRdTop();
+  renderRdQuotes();
+}
 // ══════════════════════════════════════════════════════════
 // ██ 콘텐츠 허브 (2/2 — 나머지는 시청등록~시청시작시트 부근) — 진입점~코멘트모아보기 ██
 // ══════════════════════════════════════════════════════════
@@ -9352,7 +9629,16 @@ function openContentHub(){
   chExpandMonth(monthKey(new Date())); // 당월을 기본으로 펼쳐서 시작
   renderCwatchMainCard();
 }
-function closeContentHub(){document.getElementById('content-hub-ov').classList.remove('on');}
+function closeContentHub(){
+  document.getElementById('content-hub-ov').classList.remove('on');
+  _cswPendingCid=null;_cswPendingMk=null; // 코너를 나가면 선택 상태 초기화 — 다시 들어오면 병렬 카드가 미선택 상태로 시작(2026-09-03)
+}
+// 코너 상단 "콘텐츠" 라벨 탭 — 나갔다 들어오지 않아도 바로 선택 초기화(2026-09-03). 스톱워치 진행중일 땐 무의미하므로 무시.
+function resetContentWatchSelection(){
+  if(_cswRunning)return;
+  _cswPendingCid=null;_cswPendingMk=null;
+  renderCwatchMainCard();
+}
 
 // ── 독서/씨앗/설정/콘텐츠 코너 엣지 스와이프 뒤로가기 ──
 (function(){
@@ -9390,21 +9676,18 @@ function renderReadingHub(){
 }
 function restoreStopwatchUI(){
   // 탭 이동 등으로 renderReadingHub가 재호출되어 스톱워치 DOM이 새로 그려져도
-  // _swRunning이 true면(시간 계속 흐르는 중) 화면 상태를 즉시 이어서 복원
+  // _swRunning이 true면(시간 계속 흐르는 중) 화면 상태를 즉시 이어서 복원.
+  // renderRdTop()이 _swRunning+_swBookCid를 보고 이미 재생 중 카드를 그려주므로, 여기선 홈버튼 표시만 처리.
   const homeBtn=document.querySelector('.reading-icon-btn');
   if(homeBtn)homeBtn.classList.toggle('sw-active',_swRunning);
   if(!_swRunning)return;
-  const wrap=document.getElementById('rd-sw-ring-wrap');
-  const face=document.getElementById('rd-sw-face');
   const timeEl=document.getElementById('rd-sw-time');
-  if(!wrap||!face||!timeEl)return;
-  wrap.classList.add('spinning');
-  face.style.display='none';
-  timeEl.style.display='flex';
+  if(!timeEl)return;
   updateStopwatchDisplay();
 }
-function swRingSvg(){
-  return `<div class="rd-sw-ring-wrap" id="rd-sw-ring-wrap" onclick="toggleStopwatch()">
+// running=true(이미 이 책으로 스톱워치가 도는 중)면 시작 즉시 재생 상태로 그림 — restoreStopwatchUI가 다시 덧씌움.
+function swRingSvg(cid,running){
+  return `<div class="rd-sw-ring-wrap${running?' spinning':''}" id="rd-sw-ring-wrap" onclick="toggleStopwatch('${cid}')">
     <div class="rd-sw-bg"></div>
     <svg class="rd-sw-ring-svg" width="76" height="76" viewBox="0 0 76 76">
       <defs>
@@ -9418,8 +9701,8 @@ function swRingSvg(){
       <circle cx="38" cy="38" r="32" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="4.5"/>
       <circle id="rd-sw-ring" cx="38" cy="38" r="32" fill="none" stroke="url(#rdSwGrad)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="${RD_SW_C}" stroke-dashoffset="${RD_SW_C}"/>
     </svg>
-    <div class="rd-sw-face" id="rd-sw-face"><i class="ti ti-player-play" style="font-size:20px;" aria-hidden="true"></i></div>
-    <div class="rd-sw-time" id="rd-sw-time" style="display:none;">00:00</div>
+    <div class="rd-sw-face" id="rd-sw-face" style="${running?'display:none;':''}"><i class="ti ti-player-play" style="font-size:20px;" aria-hidden="true"></i></div>
+    <div class="rd-sw-time" id="rd-sw-time" style="display:${running?'flex':'none'};">00:00</div>
   </div>`;
 }
 // 시청 스톱워치용 원형 링 — swRingSvg와 동일한 디자인, id/onclick만 시청 전용으로 분리(독서 스톱워치와 동시에 떠도 충돌 없게)
@@ -9430,44 +9713,103 @@ function cswRingSvg(cid,mk,running){
     <div class="rd-sw-face"><i class="ti ${running?'ti-player-stop-filled':'ti-player-play'}" style="font-size:20px;" aria-hidden="true"></i></div>
   </div>`;
 }
+// 진행중(status==='reading') 책 목록 — 콘텐츠의 _getOngoingWatchingWithCid와 동일한 역할.
+function _getOngoingReadingWithCid(){
+  return getBooks().filter(b=>b.status==='reading'&&b.cid);
+}
+// 진행률 바 + 오늘 읽은 구간 표시 — 여러 책에서 반복 쓰이므로 분리(2026-09-03, 병렬독서 지원 리팩터).
+// 진행률 데이터(퍼센트 단위이거나 총 페이지가 있음)가 없으면 null 반환 — 콘텐츠 코너(totalUnit 없으면 문구 폴백)와 동일한 규칙.
+function _rdProgressBarHtml(book){
+  const hasData=book.unit==='percent'||!!book.totalPages;
+  if(!hasData)return null;
+  let pct=book.unit==='percent'?(book.percent||0):Math.min(100,Math.round((book.pages/book.totalPages)*100));
+  const today=dateKey(new Date());
+  let todayPct=pct;
+  if(book.todayDate===today){
+    todayPct=book.unit==='percent'?(book.todayStart||0):(book.totalPages?Math.min(100,Math.round((book.todayStart||0)/book.totalPages*100)):pct);
+  }
+  todayPct=Math.min(todayPct,pct);
+  return `<div class="rd-progress-bar" onclick="event.stopPropagation();openProgressModal('${book.cid}',0)">
+    <div class="rd-progress-track">
+      <div class="rd-progress-fill" style="width:${pct}%;"></div>
+      <div class="rd-progress-today" style="left:${todayPct}%;width:${Math.max(0,pct-todayPct)}%;"></div>
+    </div>
+    <div class="rd-progress-bead" style="left:${pct}%;"></div>
+  </div>`;
+}
+// 책 하나가 진행중 스톱워치 대상일 때의 메인 카드 — 1권만 있을 때, 또는 2권+ 중 하나를 선택한 뒤 공통으로 사용.
+function _rdTopSingleHtml(book,running){
+  const cover=book.poster?`<img class="rd-top-cover" src="${book.poster}" alt="">`:`<div class="rd-top-cover-empty"></div>`;
+  const progressHtml=_rdProgressBarHtml(book);
+  return `<div class="rd-top-inner">
+      <div class="rd-top-main">
+        ${cover}
+        <div class="rd-top-info">
+          <div class="rd-top-title">${book.title}</div>
+          <div class="rd-top-author">${book.author||''}</div>
+        </div>
+        <div class="rd-top-sw">${swRingSvg(book.cid,running)}</div>
+      </div>
+      ${progressHtml||''}
+    </div>`;
+}
+// 진행중 책 선택 단계 — 콘텐츠의 selectPendingWatch와 동일한 역할, 실수 탭으로 스톱워치가 바로 시작되지 않도록 함.
+let _rdPendingCid=null;
+function selectPendingRead(cid){
+  _rdPendingCid=cid;
+  renderRdTop();
+  renderRdQuotes(); // 병렬독서 중 선택 대상이 바뀌면 문장수집도 그 책 기준으로 갱신(2026-09-03)
+}
+// 지금 화면(rd-top)에 표시 중인 "선택된 책" 하나를 반환 — 문장수집 등 다른 영역도 이 기준을 그대로 따름.
+// 우선순위: 스톱워치 진행중인 책 > 방금 선택(pending)한 책 > 진행중인 책이 1권뿐이면 그 책 > 없음(2권 이상인데 아직 선택 안 함).
+function _rdSelectedBook(){
+  if(_swRunning&&_swBookCid){
+    const book=getBooks().find(b=>b.cid===_swBookCid);
+    if(book)return book;
+  }
+  if(_rdPendingCid){
+    const book=getBooks().find(b=>b.cid===_rdPendingCid);
+    if(book)return book;
+  }
+  const ongoing=_getOngoingReadingWithCid();
+  if(ongoing.length===1)return ongoing[0];
+  return null;
+}
 function renderRdTop(){
   const el=document.getElementById('rd-top');if(!el)return;
   el.classList.toggle('playing',_swRunning);
-  const books=getBooks();
-  const cur=books.find(b=>b.status==='reading');
-  if(cur){
-    let pct=0;
-    if(cur.unit==='percent')pct=cur.percent||0;
-    else if(cur.totalPages)pct=Math.min(100,Math.round((cur.pages/cur.totalPages)*100));
-    const today=dateKey(new Date());
-    let todayPct=pct;
-    if(cur.todayDate===today){
-      todayPct=cur.unit==='percent'?(cur.todayStart||0):(cur.totalPages?Math.min(100,Math.round((cur.todayStart||0)/cur.totalPages*100)):pct);
-    }
-    todayPct=Math.min(todayPct,pct);
-    const cover=cur.poster?`<img class="rd-top-cover" src="${cur.poster}" alt="">`:`<div class="rd-top-cover-empty"></div>`;
-    el.innerHTML=`<div class="rd-top-inner">
-        <div class="rd-top-main">
-          ${cover}
-          <div class="rd-top-info">
-            <div class="rd-top-title">${cur.title}</div>
-            <div class="rd-top-author">${cur.author||''}</div>
-          </div>
-          <div class="rd-top-sw">${swRingSvg()}</div>
-        </div>
-        <div class="rd-progress-bar" onclick="openProgressModal(0)">
-          <div class="rd-progress-track">
-            <div class="rd-progress-fill" style="width:${pct}%;"></div>
-            <div class="rd-progress-today" style="left:${todayPct}%;width:${Math.max(0,pct-todayPct)}%;"></div>
-          </div>
-          <div class="rd-progress-bead" style="left:${pct}%;"></div>
-        </div>
-      </div>`;
-  }else{
+  if(_swRunning&&_swBookCid){
+    const book=getBooks().find(b=>b.cid===_swBookCid);
+    if(book){el.innerHTML=_rdTopSingleHtml(book,true);return;}
+  }
+  if(_rdPendingCid){
+    const book=getBooks().find(b=>b.cid===_rdPendingCid);
+    if(!book){_rdPendingCid=null;renderRdTop();return;}
+    el.innerHTML=_rdTopSingleHtml(book,false);
+    return;
+  }
+  const ongoing=_getOngoingReadingWithCid();
+  if(!ongoing.length){
     el.innerHTML=`<div class="rd-top-inner">
       <div class="rd-top-title" style="color:var(--tm);">지금 읽는 책이 없어요</div>
       <div class="rd-top-sub">+ 버튼으로 책을 추가해보세요</div>
     </div>`;
+  }else if(ongoing.length===1){
+    el.innerHTML=_rdTopSingleHtml(ongoing[0],false);
+  }else{
+    const two=ongoing.slice(0,2);
+    const halvesHtml=two.map(book=>{
+      const cover=book.poster?`<img class="rd-top-cover" src="${book.poster}" alt="">`:`<div class="rd-top-cover-empty"></div>`;
+      const progressHtml=_rdProgressBarHtml(book);
+      return `<div style="flex:1;min-width:0;display:flex;gap:8px;cursor:pointer;" onclick="selectPendingRead('${book.cid}')">
+        ${cover}
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;">
+          <div class="rd-top-title" style="font-size:var(--main-text-size);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${book.title}</div>
+          ${progressHtml||'<div class="rd-top-sub">눌러서 읽기를 시작해보세요</div>'}
+        </div>
+      </div>`;
+    }).join('');
+    el.innerHTML=`<div class="rd-top-inner"><div style="display:flex;gap:16px;">${halvesHtml}</div></div>`;
   }
 }
 function renderRdStreak(){
@@ -9479,7 +9821,7 @@ let _rdQuoteShowAll=false;
 function renderRdQuotes(){
   const listEl=document.getElementById('rd-quote-list');if(!listEl)return;
   const foldEl=document.getElementById('rd-quote-fold');
-  const cur=getBooks().find(b=>b.status==='reading');
+  const cur=_rdSelectedBook();
   if(!cur){listEl.innerHTML='';listEl.style.maxHeight='';listEl.style.overflowY='';if(foldEl)foldEl.style.display='none';return;}
   const quotes=getQuotes().filter(q=>q.bookCid===cur.cid).sort((a,b)=>(b.created||0)-(a.created||0));
   if(!quotes.length){listEl.innerHTML='<div class="rd-quote-empty">아직 모은 문장이 없어요</div>';listEl.style.maxHeight='';listEl.style.overflowY='';if(foldEl)foldEl.style.display='none';return;}
@@ -9526,7 +9868,7 @@ function openQuoteSheetCheck(bookCid){
     openSheet('quote-sheet');
     return;
   }
-  const cur=getBooks().find(b=>b.status==='reading');
+  const cur=_rdSelectedBook();
   if(!cur){openAddBookModal();return;}
   _rdSheetBookCid=cur.cid;
   document.getElementById('rd-quote-inp').value='';
@@ -9919,8 +10261,9 @@ function confirmAddBook(){
 // ══════════════════════════════════════════════════════════
 // ── 진행률 입력 모달
 let _pgBookCid=null,_pgUnit='pages',_pgSeconds=0,_pgStartVal=0;
-function openProgressModal(seconds){
-  const book=getBooks().find(b=>b.status==='reading');
+// cid: 병렬독서 지원(2026-09-03)으로 어느 책의 진행률인지 항상 명시. 진행바 직접 클릭(0초)도 cid를 함께 넘김.
+function openProgressModal(cid,seconds){
+  const book=getBooks().find(b=>b.cid===cid);
   if(!book){if(seconds>0){_swSeconds=0;}openAddBookModal();return;}
   _pgBookCid=book.cid;_pgSeconds=seconds||0;_pgUnit=book.unit||'pages';
   _pgStartVal=_pgUnit==='percent'?(book.percent||0):(book.pages||0);
@@ -11361,55 +11704,81 @@ function confirmReadingProgressDone(){
   closeModal('progress-modal');
   setBookStatus(cid,'done',{stars,review}); // 상태전환 공용 경로 — 콘텐츠 연동(syncReadingBookToContent)까지 함께 처리됨
 }
-function toggleStopwatch(){
+// cid: 시작 시 반드시 전달(어느 책인지 명시) — 종료 호출(재생 중 다시 탭)은 인자 없이도 _swBookCid로 식별.
+// 리듬블록 등록 규칙 통일(2026-09-03): 콘텐츠 시청 스톱워치(toggleContentStopwatch)와 동일하게
+// "시작하는 순간 end:''인 리듬블록을 바로 생성 → 종료 시 그 블록의 end만 채움" 방식으로 변경.
+// 기존엔 종료 시점에만(그것도 60초 이상일 때만) autoLogReadingRhythm이 블록을 새로 만드는 별도 구조라
+// 다른 카테고리와 리듬 등록 조건이 달랐음(60초 미만이면 애초에 블록이 생성된 적이 없어 "삭제할 것도 없는" 상태) — 이 차이를 없앰.
+// 1분 미만 자동삭제 로직은 전체 카테고리에서 완전히 제거(2026-09-03) — 몇 초든 시작~종료 구간을 그대로 기록.
+function toggleStopwatch(cid){
   const wrap=document.getElementById('rd-sw-ring-wrap');
   const face=document.getElementById('rd-sw-face');
   const timeEl=document.getElementById('rd-sw-time');
   const homeBtn=document.querySelector('.reading-icon-btn');
+  // wrap/face/timeEl은 독서 코너 화면(reading-ov)이 열려있을 때만 존재 — 홈탭(굿모닝 카드)에서 호출될 수도 있으므로 전부 옵셔널 체이닝으로 방어(2026-09-03).
   if(!_swRunning){
+    if(!cid)return; // 시작인데 어느 책인지 모르면 아무것도 하지 않음(방어)
     _swRunning=true;
+    _swBookCid=cid;
     _swStartTs=Date.now()-_swSeconds*1000;
-    try{localStorage.setItem(SW_PERSIST_KEY,String(_swStartTs));}catch(e){}
-    wrap.classList.add('spinning');
-    face.style.display='none';
-    timeEl.style.display='flex';
+    // 시작과 동시에 리듬블록 등록(다른 카테고리와 동일 규칙)
+    const dk=dateKey(getLogicalDate(_swStartTs));
+    const startMin=new Date(_swStartTs).getHours()*60+new Date(_swStartTs).getMinutes();
+    const book=getBooks().find(b=>b.cid===cid);
+    const text=book&&book.title?('독서 - '+book.title):'독서';
+    _swBlockCid=genCid();
+    const blocks=getRhythmBlocks(dk);
+    blocks.push({cat:'enjoy',start:minToHHMM(startMin),end:'',text:text,created:Date.now(),cid:_swBlockCid,contentCid:cid});
+    saveRhythmBlocks(dk,blocks);
+    autoSync('rblocks',dk);
+    checkHabitDirect('독서',dk,minToHHMM(startMin)); // 스톱워치 독서 활동은 카테고리(감상)와 무관하게 '독서' 습관을 직접 체크, 시작시각 기준
+    try{localStorage.setItem(SW_PERSIST_KEY,JSON.stringify({startTs:_swStartTs,cid:_swBookCid,blockCid:_swBlockCid,dk}));}catch(e){}
+    if(_rdPendingCid===cid){_rdPendingCid=null;} // pending 카드에서 재생 링으로 시작한 경우 pending 상태 정리
+    wrap?.classList.add('spinning');
+    if(face)face.style.display='none';
+    if(timeEl)timeEl.style.display='flex';
     _swInterval=setInterval(updateStopwatchDisplay,1000);
     if(homeBtn)homeBtn.classList.add('sw-active');
     document.getElementById('rd-top')?.classList.add('playing');
   }else{
     _swRunning=false;
+    const finishedCid=_swBookCid;
+    const blockCid=_swBlockCid;
+    const startTs=_swStartTs;
+    _swBookCid=null;
+    _swBlockCid=null;
     try{localStorage.removeItem(SW_PERSIST_KEY);}catch(e){}
-    wrap.classList.remove('spinning');
-    face.style.display='';
-    timeEl.style.display='none';
+    wrap?.classList.remove('spinning');
+    if(face)face.style.display='';
+    if(timeEl)timeEl.style.display='none';
     clearInterval(_swInterval);
-    document.getElementById('rd-sw-time').textContent='00:00';
-    document.getElementById('rd-sw-ring').setAttribute('stroke-dashoffset',RD_SW_C);
+    if(document.getElementById('rd-sw-time'))document.getElementById('rd-sw-time').textContent='00:00';
+    document.getElementById('rd-sw-ring')?.setAttribute('stroke-dashoffset',RD_SW_C);
     if(homeBtn)homeBtn.classList.remove('sw-active');
     document.getElementById('rd-top')?.classList.remove('playing');
     const seconds=_swSeconds;
     _swSeconds=0;
-    autoLogReadingRhythm(_swStartTs,Date.now());
-    if(seconds>0)openProgressModal(seconds);
+    autoLogReadingRhythm(blockCid,startTs,Date.now());
+    renderRdTop();
+    renderRdQuotes(); // 스톱워치 종료로 선택 대상이 바뀌므로(1권이면 그 책, 2권 이상이면 재선택 대기) 문장수집도 함께 갱신
+    if(seconds>0)openProgressModal(finishedCid,seconds);
   }
 }
-// 스톱워치 종료 시 독서 시간을 '감상' 카테고리 리듬 블록으로 자동 기록
-// 1분 미만은 실수로 켰다 끈 경우일 수 있어 기록하지 않음
+// 시작 시 생성해둔 리듬블록(blockCid)을 찾아 end만 채움 — 다른 카테고리(운동/휴식 등)와 동일 규칙, 1분 미만 삭제 로직 없음.
 // minToHHMM은 콘텐츠 시청 스톱워치 쪽(파일 하단)에 정의된 전역 함수를 그대로 재사용(중복 정의 제거, 2026-08-30)
-function autoLogReadingRhythm(startTs,endTs){
-  if(!startTs||!endTs||endTs-startTs<60000)return;
-  const startD=new Date(startTs),endD=new Date(endTs);
+function autoLogReadingRhythm(blockCid,startTs,endTs){
+  if(!blockCid||!startTs||!endTs)return;
   const dk=dateKey(getLogicalDate(startTs));
-  const startMin=startD.getHours()*60+startD.getMinutes();
+  const blocks=getRhythmBlocks(dk);
+  const idx=blocks.findIndex(b=>b.cid===blockCid);
+  if(idx<0)return;
+  const endD=new Date(endTs);
   let endMin=endD.getHours()*60+endD.getMinutes();
   // 자정을 넘겨 끝난 경우, 같은 논리적 하루(리듬 4시 기준) 안이면 24시를 더해 이어지도록 표시
   if(dateKey(getLogicalDate(endTs))!==dk)endMin+=1440;
-  const book=getBooks().find(b=>b.status==='reading');
-  const text=book&&book.title?('독서 - '+book.title):'독서';
-  const blocks=getRhythmBlocks(dk);
-  blocks.push({cat:'enjoy',start:minToHHMM(startMin),end:minToHHMM(endMin),text:text,created:Date.now(),cid:genCid(),contentCid:book?book.cid:null});
+  blocks[idx].end=minToHHMM(endMin%1440);
   saveRhythmBlocks(dk,blocks);
-  checkHabitDirect('독서',dk,minToHHMM(startMin)); // 스톱워치 독서 활동은 카테고리(감상)와 무관하게 '독서' 습관을 직접 체크, 시작시각 기준
+  autoSync('rblocks',dk);
 }
 function updateStopwatchDisplay(){
   // 실제 경과시간(시작시각 기준)으로 재계산 — 화면이 꺼져 setInterval이 멈췄다 재개되어도
@@ -11697,12 +12066,14 @@ loadDaily();
 // 경과시간을 계산해 스톱워치를 다시 돌아가는 상태로 되살린다.
 (function restoreStopwatchFromStorage(){
   try{
-    const saved=localStorage.getItem(SW_PERSIST_KEY);
-    if(!saved)return;
-    const startTs=parseInt(saved,10);
-    if(!startTs||isNaN(startTs))return;
-    _swStartTs=startTs;
-    _swSeconds=Math.floor((Date.now()-startTs)/1000);
+    const raw=localStorage.getItem(SW_PERSIST_KEY);
+    if(!raw)return;
+    const saved=JSON.parse(raw);
+    if(!saved||!saved.startTs)return;
+    _swStartTs=saved.startTs;
+    _swBookCid=saved.cid||null;
+    _swBlockCid=saved.blockCid||null;
+    _swSeconds=Math.floor((Date.now()-_swStartTs)/1000);
     _swRunning=true;
     _swInterval=setInterval(updateStopwatchDisplay,1000);
   }catch(e){}
@@ -11776,13 +12147,12 @@ async function initSync(){
   }
   // 습관 / 습관체크 — 항상 동기화 (이전엔 syncAll에만 있어서 PC 사파리 등 새 탭에서 누락되던 버그)
   await syncHabitsDown();
-  // 아침 루틴 — 이번 달 1일~오늘까지 전체 다운로드 (누계 통계 정확성을 위해 매번 최신화)
+  // 굿모닝(모닝 플로우) — 최근 2일(오늘+어제, 파트2 회고용)만 다운로드
   {
-    const mk0forRoutine=monthKey(new Date());
-    const todayD=new Date().getDate();
-    const mroutineTasks=[];
-    for(let d=1;d<=todayD;d++){mroutineTasks.push(syncMorningRoutineDown(mk0forRoutine+'-'+pad(d)));}
-    await Promise.all(mroutineTasks);
+    const mflowTasks=[];
+    const nowD=new Date();
+    for(let i=0;i<2;i++){const d=new Date(nowD);d.setDate(nowD.getDate()-i);mflowTasks.push(syncMorningFlowDown(dateKey(d)));}
+    await Promise.all(mflowTasks);
   }
   await syncGoalDown('wishlist:meal');
   await syncGoalDown('reading_dates');

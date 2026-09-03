@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.38-airing-carry-fix';
+const CACHE = 'iikoto-v2.45-code-cleanup';
 const ASSETS = [
   './',
   './index.html'
