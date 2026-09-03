@@ -7705,12 +7705,13 @@ function renderCwatchMainCard(){
     }
     el.innerHTML=`<div class="rd-top" style="margin-bottom:14px;">
       <div class="rd-top-inner">
-        <div class="rd-top-main" style="cursor:pointer;" onclick="toggleContentStopwatch('${c.cid}','${c._mk}')">
+        <div class="rd-top-main">
           ${posterHtml}
           <div style="flex:1;min-width:0;">
             <div class="rd-top-title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.title||'')}</div>
-            <div class="rd-top-sub">눌러서 시청을 시작해보세요</div>
+            <div class="rd-top-sub">시청 시작 전</div>
           </div>
+          <div class="rd-top-sw">${cswRingSvg(c.cid,c._mk,false)}</div>
         </div>
         ${progressHtml}
       </div>
