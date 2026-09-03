@@ -177,6 +177,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 /* ── 공용 카드 ── */
 .card{background:var(--card);border:1px solid var(--card-b);border-radius:15px;padding:16px 18px;box-shadow:0 2px 14px rgba(0,0,0,0.05);margin-bottom:13px;}
 .card-lbl{font-size:var(--fs-title);font-weight:600;color:var(--tp);margin-bottom:11px;display:flex;align-items:center;gap:7px;}
+/* 오늘탭 "오늘 일정" 카드 — 일정/타임테이블 둘 다 있을 때만 표시되는 전환 아이콘을 라벨 오른쪽 끝으로 정렬(이번 주 독서와 동일 패턴) */
+#today-event-label .ti-switch-horizontal{margin-left:auto;font-size:15px;color:var(--tm);}
 .card-lbl-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;}
 .memo-search-toggle{font-size:16px;color:var(--tm);cursor:pointer;opacity:0.55;transition:opacity 0.15s,color 0.15s;}
 .memo-search-toggle:hover{opacity:0.85;}
@@ -215,7 +217,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 /* ── 리포트 배너 ── */
 
 /* ── 투두 / 일정 ── */
-.todo-card{height:calc(32px + (var(--fs-title) * 1.3 + 11px) + (var(--fs-body) * 1.3 + 10px) * 6);box-sizing:border-box;overflow:hidden;margin-bottom:0!important;display:flex;flex-direction:column;}
+/* 오늘 할일(왼쪽) 기준 높이 계산식 — grid2로 옆의 오늘 일정 카드가 이 높이를 그대로 따라감(align-items:stretch).
+   6줄 → 7줄로 한 줄분 여유를 둬서, 오늘 일정/타임테이블이 두 줄이 되는 경우가 잦은 점을 감안해 아랫줄까지 잘리지 않고 보이도록 함(2026-09-03).
+   .grid3-right도 동일 계산식을 참조하므로 반드시 같은 줄 수로 함께 맞출 것. */
+.todo-card{height:calc(32px + (var(--fs-title) * 1.3 + 11px) + (var(--fs-body) * 1.3 + 10px) * 7);box-sizing:border-box;overflow:hidden;margin-bottom:0!important;display:flex;flex-direction:column;}
 .todo-card .card-lbl{flex-shrink:0;}
 .todo-card #today-todos{flex:1;min-height:0;overflow-y:auto;}
 .todo-row{display:flex;align-items:center;gap:9px;padding:5px 0;font-size:var(--fs-body);color:var(--tp);}
@@ -232,7 +237,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .todo-row.done .chk.ts-night{background:rgba(210,175,225,0.38);border-color:transparent;}
 .todo-row.done .chk.ts-none{background:rgba(195,180,168,0.38);border-color:transparent;}
 .todo-row .pinned-ico{width:15px;height:15px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--pal-orange-border);}
-.grid3-right{display:flex;flex-direction:column;gap:6px;height:calc(32px + (var(--fs-title) * 1.3 + 11px) + (var(--fs-body) * 1.3 + 10px) * 6);}
+.grid3-right{display:flex;flex-direction:column;gap:6px;height:calc(32px + (var(--fs-title) * 1.3 + 11px) + (var(--fs-body) * 1.3 + 10px) * 7);}
 .event-card{padding:11px 16px;flex:104;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;margin-bottom:0!important;}
 #today-events,#today-timetable{flex:1;min-height:0;overflow-y:auto;}
 .event-row{display:flex;align-items:center;gap:9px;padding:4px 0;font-size:var(--fs-body);color:var(--tp);}
@@ -518,6 +523,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 /* 이번 주 독서 카드 제목을 탭 전환 버튼으로 사용 — 클릭 시 "진행중" ⇄ "이번 주 활동" 뷰 전환 */
 .week-reading-title-toggle{cursor:pointer;user-select:none;display:flex;align-items:center;}
 .week-reading-toggle-icon{margin-left:auto;font-size:15px;color:var(--tm);}
+.cgrid-toggle-icon{font-size:15px;color:var(--tm);margin-left:2px;}
 
 /* 이번 주 독서 활동 — 권별 진행 리스트 + 완독/활동일 요약 + 지난주 대비 델타 */
 .wra-list{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;}
@@ -1844,7 +1850,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div class="card cgrid-card">
           <div class="cgrid-hdr">
             <div class="cgrid-title-row">
-              <div class="card-lbl cgrid-title-toggle" style="margin-bottom:0;" onclick="toggleCgridMode()"><i class="ti ti-stack-2" id="cgrid-title-icon" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i><span id="cgrid-title-text">콘텐츠 모아보기</span></div>
+              <div class="card-lbl cgrid-title-toggle" style="margin-bottom:0;" onclick="toggleCgridMode()"><i class="ti ti-stack-2" id="cgrid-title-icon" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i><span id="cgrid-title-text">콘텐츠 모아보기</span><i class="ti ti-switch-horizontal cgrid-toggle-icon" aria-hidden="true"></i></div>
               <div class="cgrid-hdr-actions" id="cgrid-hdr-actions">
                 <div class="cgrid-filters" id="cgrid-filters">
                   <div class="cgrid-status-chip status-all" id="cgrid-status-chip" onclick="cycleCgridStatusFilter()"><i class="ti ti-apps" aria-hidden="true"></i></div>

@@ -4110,12 +4110,12 @@ function toggleMrpContentsView(){
 }
 
 // ══════════════════════════════════════════════════════════
-// 화면별 좌우 스와이프 이동 — 오늘 → 주간 → 월간 → 리포트 순으로 탭 자체를 순환 이동
+// 화면별 좌우 스와이프 이동 — 오늘 → 주간 → 월간 → 통계 → 연간 순으로 탭 자체를 순환 이동
 // ══════════════════════════════════════════════════════════
 (function setupSwipeNav(){
   const wrap=document.querySelector('.main-wrap');
   if(!wrap)return;
-  const TAB_ORDER=['today','week','month','reports'];
+  const TAB_ORDER=['today','week','month','reports','yearly'];
   let startX=0,startY=0,tracking=false;
   const SWIPE_MIN_DIST=60; // 스와이프로 인정할 최소 가로 이동거리(px)
   const SWIPE_MAX_VERTICAL=50; // 이보다 세로로 많이 움직이면 스크롤 의도로 보고 무시
