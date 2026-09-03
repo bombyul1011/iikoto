@@ -2236,10 +2236,11 @@ async function renderMonthTimetable(y,mo,contentsData){
         const w=span*22+(span-1)*1.5;
         const isWatching=c.item.status==='watching'&&cat!=='music';
         const isStopped=c.item.status==='stopped';
-        const isAiringTone=cat==='drama'&&c.item.is_airing&&!c.item._carried;
+        // 전월부터 이어진(_carried) 경우에도 방영중 톤 유지 — 이월 여부와 무관하게 is_airing이 기준(2026-09-03, 본앱 수정과 동일 적용)
+        const isAiringTone=cat==='drama'&&c.item.is_airing;
         if(isAiringTone){
           const watchedDays=(watchedDaysByTitle&&watchedDaysByTitle[c.item.title])||new Set();
-          const titleAttr=(c.item.title||'')+(isStopped?' · 중단':'');
+          const titleAttr=(c.item._carried?c.item.title+' (전월부터 이어짐)':c.item.title)+(isStopped?' · 중단':'');
           let segsHtml='';
           for(let d=dispStart;d<=dispEnd;d++){
             segsHtml+=`<div class="tt-airing-seg${watchedDays.has(d)?' watched':''}"></div>`;
