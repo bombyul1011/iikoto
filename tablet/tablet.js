@@ -701,7 +701,7 @@ async function loadTodayTab(){
     supaFetch(`meals?date_key=eq.${dk}`),
     supaFetch(`contents?or=(status.eq.watching,and(status.eq.done,end_date.eq.${dk}),start_date.eq.${dk})&order=created.desc&limit=10`),
     supaFetch(`rhythm_blocks?date_key=eq.${dk}&order=start_time.asc`),
-    supaFetch(`morning_routine_checks?date_key=eq.${dk}`),
+    supaFetch(`morning_flow_picks?date_key=eq.${dk}`),
     supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wcal_manual_'+dk.slice(0,7))}`)
   ]);
 
@@ -710,14 +710,14 @@ async function loadTodayTab(){
   renderTodaySleep(dk,sleepRows&&sleepRows[0],recentSleepRows||[]);
   renderTodayHabits(habits||[],habitChecks||[],dk);
   renderTodayMeals(meals&&meals[0]);
-  renderTodayContents(contents||[]);
+  renderTodayMflow((morningChecks&&morningChecks[0])||null);
   _todayRhythmBlocks=rblocks||[];
   _todaySleepRow=sleepRows&&sleepRows[0];
   _todayMealsRow=meals&&meals[0];
   renderTodayRhythm(rblocks||[]);
   const todayManual=((todayManualRows&&todayManualRows[0]&&todayManualRows[0].lines)||[]).filter(it=>it.dk===dk);
   renderTodayReading(dk,rblocks||[],contents||[],todayManual);
-  renderTodayPace(todos||[],habits||[],habitChecks||[],morningChecks||[]);
+  renderTodayPace(todos||[],habits||[],habitChecks||[],(morningChecks&&morningChecks[0])||null);
 }
 
 // 본앱과 동일한 투두 정렬 규칙: 미완료 우선 → 시간대(아침/오후/밤/없음) → 강조(pinned) → sort_order → 텍스트 앞머리 시:분
@@ -978,16 +978,39 @@ function renderTodayMeals(meal){
   el.innerHTML=`<div class="meal-grid">${html}</div>`;
 }
 
-function renderTodayContents(items){
-  const el=document.getElementById('today-contents');
-  items=items||[];
-  const dk=dateKey(_selectedDate);
-  if(!items.length){el.innerHTML='<div class="empty-msg">오늘 감상한 콘텐츠 없음</div>';return;}
-  el.innerHTML=items.slice(0,4).map(c=>{
-    const meta=CAT_ICON_META[c.content_cat]||{label:c.content_cat};
-    const finalBadge=(c.status==='done'&&c.end_date===dk)?'<span class="status-badge done">완결</span>':'';
-    const progressBadge=(c.status==='watching')?'<span class="status-badge">진행중</span>':'';
-    return `<div class="content-row"><span class="content-cat">${meta.label||''}</span><span class="content-title">${escapeHtml(c.title)}</span>${finalBadge}${progressBadge}</div>`;
+// 본앱 MORNING_FLOW_CARDS/서브 정의 그대로 이식(색상·라벨 통일 목적, 로직은 본앱이 원본)
+const MFLOW_CARDS=[
+  {key:'rest',label:'휴식',icon:'ti-cup',colorRgb:'244,177,206'},
+  {key:'exercise',label:'운동',icon:'ti-run',colorRgb:'150,205,225'},
+  {key:'enjoy',label:'감상',icon:'ti-stack-2',colorRgb:'216,168,205'},
+  {key:'desk',label:'책상',icon:'ti-desk',colorRgb:'240,187,158'},
+  {key:'clean',label:'정리',icon:'ti-sparkles',colorRgb:'252,215,110'},
+  {key:'etc',label:'기타',icon:'ti-dots',colorRgb:'195,180,168'}
+];
+const MFLOW_ENJOY_SUB_LABEL={read:'독서',content:'콘텐츠'};
+const MFLOW_DESK_SUB_LABEL={diary:'일기',notes:'노트정리',work_personal:'개인작업'};
+const MFLOW_ETC_SUB_LABEL={work:'업무',appointment:'외출',free:'자유입력'};
+function _mflowSubLabel(key,pick,flow){
+  if(key==='enjoy')return MFLOW_ENJOY_SUB_LABEL[flow&&flow.enjoy&&flow.enjoy.sub]||'';
+  if(key==='desk')return MFLOW_DESK_SUB_LABEL[pick&&pick.subKey]||'';
+  if(key==='etc')return MFLOW_ETC_SUB_LABEL[pick&&pick.subKey]||'';
+  return '';
+}
+function renderTodayMflow(row){
+  const el=document.getElementById('today-mflow');
+  const flow=(row&&row.picks)?row:null;
+  const picks=(flow&&flow.picks)||{};
+  const activeCards=MFLOW_CARDS.filter(c=>{
+    const p=picks[c.key];
+    return p&&(p.status==='running'||p.status==='done');
+  });
+  if(!activeCards.length){el.innerHTML='<div class="empty-msg">오늘 아침을 아직 채우지 않았어요</div>';return;}
+  el.innerHTML=activeCards.map(c=>{
+    const p=picks[c.key];
+    const sub=_mflowSubLabel(c.key,p,flow);
+    const label=sub?`${c.label} · ${sub}`:c.label;
+    const timeStr=p.status==='running'?`${p.startStr||''} ~ 진행중`:`${p.startStr||''} ~ ${p.endStr||''}`;
+    return `<div class="mflow-row"><i class="ti ${c.icon} mflow-row-icon" style="color:rgb(${c.colorRgb});" aria-hidden="true"></i><span class="mflow-row-label">${escapeHtml(label)}</span><span class="mflow-row-time">${timeStr}</span></div>`;
   }).join('');
 }
 
@@ -1075,7 +1098,7 @@ function _rhythmDurByCatWithDays(rblocks,days){
 function _rhythmSumCatMin(rblocks,cat,days){
   return _rhythmDurByCat(rblocks,days).d[cat]||0;
 }
-function renderTodayPace(todos,habits,habitChecks,morningChecks){
+function renderTodayPace(todos,habits,habitChecks,morningFlowRow){
   const el=document.getElementById('today-pace');
   const events=[];
   (todos||[]).forEach(t=>{
@@ -1100,9 +1123,13 @@ function renderTodayPace(todos,habits,habitChecks,morningChecks){
     if(!hc.checked_time)return;
     events.push({type:'habit',min:_paceAdjustMin(_paceParseHM(hc.checked_time)),label:hc.habit_name||''});
   });
-  (morningChecks||[]).forEach(mc=>{
-    if(!mc.checked_time)return;
-    events.push({type:'morning',min:_paceAdjustMin(_paceParseHM(mc.checked_time)),label:mc.item_key||''});
+  const mflowPicks=(morningFlowRow&&morningFlowRow.picks)||{};
+  Object.entries(mflowPicks).forEach(([key,p])=>{
+    if(!p||!p.startStr)return;
+    const card=MFLOW_CARDS.find(c=>c.key===key);
+    const sub=_mflowSubLabel(key,p,morningFlowRow);
+    const label=card?(sub?`${card.label} · ${sub}`:card.label):key;
+    events.push({type:'morning',min:_paceAdjustMin(_paceParseHM(p.startStr)),label});
   });
   if(!events.length){el.innerHTML='<div class="pace-empty">오늘 기록된 활동이 없어요</div>';return;}
   events.sort((a,b)=>a.min-b.min);
@@ -1450,7 +1477,7 @@ async function loadWeekTab(){
   const [goalRows,habits,habitChecks,memos,todos,sleepRows,onelineRows,contents,
     lwMemos,lwTodos,lwSleepRows,lwHabitChecks,rblocksFull,sleepReportRows,
     rblocksLast,weekMemoTexts,weekOnelineTexts,readingLogRows,
-    rdaThisWeek,rdaLastWeek]=await Promise.all([
+    rdaThisWeek,rdaLastWeek,weekMflowRows]=await Promise.all([
     supaFetch(`goal_notes?note_key=eq.wchallenge_${encodeURIComponent(wk)}`),
     supaFetch(`habits?order=sort_order.asc`),
     supaFetch(`habit_checks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
@@ -1486,7 +1513,9 @@ async function loadWeekTab(){
     supaFetch(`reading_daily_log?date_key=gte.${rdStreakStartDk}&select=date_key`),
     // 이번 주 독서 활동(탭 전환용) — 이번 주/지난주 각각의 독서 로그(권별 진행량 계산용)
     supaFetch(`reading_daily_log?date_key=gte.${startDk}&date_key=lte.${cmpEndDk}&select=date_key,book_cid,unit,amount_read,seconds&order=date_key.asc`),
-    supaFetch(`reading_daily_log?date_key=gte.${lastStartDk}&date_key=lte.${lastCmpEndDk}&select=date_key,book_cid,unit,amount_read,seconds&order=date_key.asc`)
+    supaFetch(`reading_daily_log?date_key=gte.${lastStartDk}&date_key=lte.${lastCmpEndDk}&select=date_key,book_cid,unit,amount_read,seconds&order=date_key.asc`),
+    // 이번주 아침 흐름 배너용 — 캘린더 주(월~일) 범위 morning_flow_picks 전체
+    supaFetch(`morning_flow_picks?date_key=gte.${startDk}&date_key=lte.${endDk}`)
   ]);
   // 현재 읽는 책 1권 + 전체 책 목록 — 이제 contents(content_cat='book')에서 직접 파생(2026-08-29, reading_books 제거로 별도 쿼리 불필요)
   const weekBooks=(contents||[]).filter(c=>c.content_cat==='book');
@@ -1506,6 +1535,7 @@ async function loadWeekTab(){
     startDk:lastStartDk,endDk:lastCmpEndDk
   });
   renderWeekRhythmFlow(rblocksThis||[],rblocksLast||[],cmpDayCount);
+  renderWeekMflow(weekMflowRows||[]);
   renderWeekOneline(onelineRows||[],weekDates);
   renderWeekKeywords(weekMemoTexts||[],weekOnelineTexts||[]);
   renderWeekReading(contents||[],readingBook,readingLogRows||[],startDk,endDk);
@@ -1678,6 +1708,40 @@ function renderWeekHabitMatrix(habits,checks,weekDates){
   el.innerHTML=html;
 }
 
+
+// 이번주 아침 흐름 — 6칸 한 줄 그리드. 누적횟수는 running+done 전부, 누적시간은 done만(_mfDurationMin과 동일 방식).
+function _mflowDurationMin(startStr,endStr){
+  if(!startStr||!endStr)return 0;
+  const [sh,sm]=startStr.split(':').map(Number);
+  const [eh,em]=endStr.split(':').map(Number);
+  let startMin=sh*60+sm,endMin=eh*60+em;
+  if(endMin<startMin)endMin+=1440;
+  return endMin-startMin;
+}
+function _mflowDurationLabel(min){
+  if(min<=0)return '0분';
+  const h=Math.floor(min/60),m=min%60;
+  if(h&&m)return `${h}시간 ${m}분`;
+  if(h)return `${h}시간`;
+  return `${m}분`;
+}
+function renderWeekMflow(rows){
+  const el=document.getElementById('week-mflow');
+  const stats={};
+  MFLOW_CARDS.forEach(c=>{stats[c.key]={count:0,minutes:0};});
+  (rows||[]).forEach(row=>{
+    const picks=row.picks||{};
+    Object.entries(picks).forEach(([key,p])=>{
+      if(!p||!stats[key])return;
+      if(p.status==='running'||p.status==='done')stats[key].count++;
+      if(p.status==='done')stats[key].minutes+=_mflowDurationMin(p.startStr,p.endStr);
+    });
+  });
+  el.innerHTML=`<div class="wk-mflow-grid">${MFLOW_CARDS.map(c=>{
+    const s=stats[c.key];
+    return `<div class="wk-mflow-cell"><i class="ti ${c.icon}" style="color:rgb(${c.colorRgb});" aria-hidden="true"></i><div class="wk-mflow-cell-label">${c.label}</div><div class="wk-mflow-cell-stat">${s.count}회<br>${_mflowDurationLabel(s.minutes)}</div></div>`;
+  }).join('')}</div>`;
+}
 
 // 하루한줄 2열 배치: 왼쪽(월/화/수), 오른쪽(목/금/토/일)
 function renderWeekOneline(rows,weekDates){
