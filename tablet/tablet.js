@@ -373,6 +373,103 @@ function closeFloatMenu(){
 }
 
 // ══════════════════════════════════════════════════════════
+// 플로팅 FAB — 짧은 탭: 기존 펼침/닫힘 / 길게 누름: 누른 채 이동→하이라이트→손 떼면 이동
+// ══════════════════════════════════════════════════════════
+(function initFloatFabGesture(){
+  const LONGPRESS_MS=380;   // 이 시간 이상 누르고 있으면 롱프레스로 판정
+  const MOVE_CANCEL_PX=10;  // 롱프레스 판정 전 이 거리 이상 움직이면 탭으로 취급하지 않음(스크롤 등과 충돌 방지)
+  const fab=document.getElementById('float-fab');
+  if(!fab)return;
+
+  let pressTimer=null,startX=0,startY=0,isLongPress=false,hoveredTab=null,pointerId=null;
+
+  function clearHoverStyles(){
+    document.querySelectorAll('.float-tab.drag-hover').forEach(el=>el.classList.remove('drag-hover'));
+  }
+
+  function tabElAt(x,y){
+    // 메뉴가 펼쳐진 상태에서 현재 좌표 아래 있는 .float-tab 요소를 찾음(드래그 중이라 pointer capture 상태이므로 elementFromPoint 사용)
+    const el=document.elementFromPoint(x,y);
+    if(!el)return null;
+    return el.closest('.float-tab');
+  }
+
+  function beginLongPress(){
+    isLongPress=true;
+    fab.classList.add('longpress');
+    if(navigator.vibrate)navigator.vibrate(12); // 지원 기기에서만 짧은 촉각 피드백, 미지원이어도 무해
+    _floatMenuOpen=true;
+    document.getElementById('float-tab-menu').classList.add('on');
+    document.getElementById('float-fab').classList.add('open');
+    document.getElementById('float-fab-icon').className='ti ti-x';
+  }
+
+  function endGesture(clientX,clientY){
+    fab.classList.remove('longpress');
+    clearHoverStyles();
+    if(isLongPress){
+      const el=(clientX!=null)?tabElAt(clientX,clientY):hoveredTab;
+      if(el&&el.dataset.tab){
+        switchTab(el.dataset.tab); // 손을 뗀 지점의 탭으로 스무스하게 전환(switchTab이 알아서 closeFloatMenu까지 처리)
+      }else{
+        closeFloatMenu();
+      }
+    }
+    isLongPress=false;
+    hoveredTab=null;
+  }
+
+  fab.addEventListener('pointerdown',e=>{
+    startX=e.clientX;startY=e.clientY;isLongPress=false;hoveredTab=null;
+    pointerId=e.pointerId;
+    clearTimeout(pressTimer);
+    pressTimer=setTimeout(()=>{
+      beginLongPress();
+      try{fab.setPointerCapture(pointerId);}catch(err){}
+    },LONGPRESS_MS);
+  });
+
+  fab.addEventListener('pointermove',e=>{
+    if(!isLongPress){
+      const dx=e.clientX-startX,dy=e.clientY-startY;
+      if(Math.hypot(dx,dy)>MOVE_CANCEL_PX)clearTimeout(pressTimer); // 롱프레스 되기 전에 손가락이 많이 움직이면 취소(스크롤 의도로 간주)
+      return;
+    }
+    const el=tabElAt(e.clientX,e.clientY);
+    if(el!==hoveredTab){
+      clearHoverStyles();
+      hoveredTab=el;
+      if(el)el.classList.add('drag-hover');
+    }
+  });
+
+  function onUp(e){
+    clearTimeout(pressTimer);
+    if(isLongPress){
+      try{fab.releasePointerCapture(pointerId);}catch(err){}
+      endGesture(e.clientX,e.clientY);
+    }else{
+      // 짧은 탭 — 기존 토글 동작 유지
+      toggleFloatMenu();
+    }
+  }
+  fab.addEventListener('pointerup',onUp);
+  fab.addEventListener('pointercancel',()=>{
+    clearTimeout(pressTimer);
+    fab.classList.remove('longpress');
+    clearHoverStyles();
+    if(isLongPress)closeFloatMenu();
+    isLongPress=false;hoveredTab=null;
+  });
+
+  // 메뉴가 펼쳐진 상태에서 항목을 일반 클릭(탭)하는 경우 — 기존 onclick 방식을 위임 리스너로 대체
+  document.getElementById('float-tab-menu').addEventListener('click',e=>{
+    const el=e.target.closest('.float-tab');
+    if(el&&el.dataset.tab)switchTab(el.dataset.tab);
+  });
+})();
+
+// ══════════════════════════════════════════════════════════
 // 좌측 사이드 (미니 캘린더 + 주간요약)
 // ══════════════════════════════════════════════════════════
 let _sideCalDate=new Date();

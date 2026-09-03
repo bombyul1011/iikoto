@@ -369,6 +369,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .float-tab{padding:11px 16px;border-radius:12px;font-size:var(--fs-tab);color:var(--ts);cursor:pointer;display:flex;align-items:center;gap:5px;background:rgba(255,253,248,0.92);border:1px solid var(--card-b);box-shadow:0 3px 12px rgba(0,0,0,0.10);white-space:nowrap;flex-shrink:0;}
 .float-tab.on{background:var(--pal-yellow-bg);color:var(--pal-yellow-text);font-weight:600;}
 .float-tab i{font-size:var(--fs-lg);}
+/* 롱프레스 드래그 중 손가락이 위치한 항목 하이라이트 — 스무스 전환용 트랜지션 포함 */
+.float-tab.drag-hover{background:var(--pal-pink-bg);color:var(--pal-pink-text);transform:scale(1.06) translateX(-4px);box-shadow:0 4px 16px rgba(0,0,0,0.16);}
+.float-tab{transition:background .15s ease,transform .15s ease,box-shadow .15s ease,color .15s ease;}
+.float-fab.longpress{transform:scale(1.08);}
 
 /* ── 주간탭 ── */
 .wgoal-item{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;}
@@ -2053,14 +2057,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 </div>
 
 <div class="float-tabs">
-  <div class="float-fab" id="float-fab" onclick="toggleFloatMenu()"><i class="ti ti-menu-2" id="float-fab-icon" aria-hidden="true"></i></div>
+  <div class="float-fab" id="float-fab"><i class="ti ti-menu-2" id="float-fab-icon" aria-hidden="true"></i></div>
   <div class="float-tab-menu" id="float-tab-menu">
-    <div class="float-tab on" id="ft-today" onclick="switchTab('today')"><i class="ti ti-sun" aria-hidden="true"></i>오늘</div>
-    <div class="float-tab" id="ft-week" onclick="switchTab('week')"><i class="ti ti-calendar-week" aria-hidden="true"></i>주간</div>
-    <div class="float-tab" id="ft-month" onclick="switchTab('month')"><i class="ti ti-calendar" aria-hidden="true"></i>월간</div>
-    <div class="float-tab" id="ft-settings" onclick="switchTab('settings')"><i class="ti ti-settings" aria-hidden="true"></i>설정</div>
-    <div class="float-tab" id="ft-reports" onclick="switchTab('reports')"><i class="ti ti-sparkles" aria-hidden="true"></i>리포트</div>
-    <div class="float-tab" id="ft-yearly" onclick="switchTab('yearly')"><i class="ti ti-calendar-stats" aria-hidden="true"></i>연간</div>
+    <div class="float-tab on" id="ft-today" data-tab="today"><i class="ti ti-sun" aria-hidden="true"></i>오늘</div>
+    <div class="float-tab" id="ft-week" data-tab="week"><i class="ti ti-calendar-week" aria-hidden="true"></i>주간</div>
+    <div class="float-tab" id="ft-month" data-tab="month"><i class="ti ti-calendar" aria-hidden="true"></i>월간</div>
+    <div class="float-tab" id="ft-reports" data-tab="reports"><i class="ti ti-sparkles" aria-hidden="true"></i>통계</div>
+    <div class="float-tab" id="ft-yearly" data-tab="yearly"><i class="ti ti-calendar-stats" aria-hidden="true"></i>연간</div>
+    <div class="float-tab" id="ft-settings" data-tab="settings"><i class="ti ti-settings" aria-hidden="true"></i>설정</div>
   </div>
 </div>
 
