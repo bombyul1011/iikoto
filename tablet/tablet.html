@@ -291,16 +291,17 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .habit-row.done{color:var(--tp);}
 .habit-check{margin-left:auto;font-size:var(--fs-sm);color:rgba(var(--pal-mint-rgb),1);}
 .mflow-card{border-color:rgba(195,180,168,var(--card-border-alpha))!important;}
-.mflow-row{display:flex;align-items:center;gap:6px;padding:4px 0;font-size:var(--fs-sm);color:var(--tp);}
-.mflow-row-icon{font-size:13px;flex-shrink:0;}
+.mflow-row{display:flex;align-items:center;gap:6px;padding:3px 0;font-size:var(--fs-body);color:var(--tp);}
+.mflow-row-icon{font-size:var(--fs-sm);flex-shrink:0;}
 .mflow-row-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.mflow-row-time{font-size:var(--fs-xs);color:var(--tm);flex-shrink:0;}
+.mflow-row-time{font-size:var(--fs-sm);color:var(--tm);flex-shrink:0;}
 /* 주간탭 이번주 아침 흐름 — 6칸 한 줄 그리드 */
 .wk-mflow-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;}
 .wk-mflow-cell{text-align:center;padding:6px 2px;border-radius:9px;}
-.wk-mflow-cell i{font-size:16px;}
-.wk-mflow-cell-label{font-size:var(--fs-xs);color:var(--tp);margin-top:3px;}
-.wk-mflow-cell-stat{font-size:9.5px;color:var(--tm);line-height:1.3;}
+.wk-mflow-cell i{font-size:var(--fs-lg);}
+.wk-mflow-cell-label{font-size:var(--fs-sm);color:var(--tp);margin-top:3px;}
+.wk-mflow-cell-count{font-size:var(--fs-lg);font-weight:700;color:var(--tp);font-family:'DM Sans',sans-serif;margin-top:2px;}
+.wk-mflow-cell-time{font-size:var(--fs-xs);color:var(--tm);}
 /* 라이트 테마 기본 — 선택 개념이 없는 통계 배너라 본앱 mf-card의 "선택됨(on)" 상태 색을 항상 적용 */
 .wk-mflow-cell{background:rgba(var(--wk-mflow-rgb),0.16);}
 [data-theme="glass"] .wk-mflow-cell{background:transparent;}

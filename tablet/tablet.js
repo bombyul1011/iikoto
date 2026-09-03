@@ -1341,7 +1341,7 @@ function renderTodayReading(dk,rblocks,contents,manualItems){
   });
 
   const shown=items.slice(0,2);
-  if(!shown.length){el.innerHTML='<div class="empty-msg" style="text-align:left;">오늘 감상한 콘텐츠가 없어요</div>';return;}
+  if(!shown.length){el.innerHTML='<div class="empty-msg">오늘 감상한 콘텐츠가 없어요</div>';return;}
   const moreCount=items.length-shown.length;
   const moreBadge=moreCount>0?`<span class="rd-cur-more-tiny">+${moreCount}</span>`:'';
   const itemsHtml=shown.map(it=>_todayReadingItemHtml(it)).join('');
@@ -1739,7 +1739,7 @@ function renderWeekMflow(rows){
   });
   el.innerHTML=`<div class="wk-mflow-grid">${MFLOW_CARDS.map(c=>{
     const s=stats[c.key];
-    return `<div class="wk-mflow-cell" style="--wk-mflow-rgb:${c.colorRgb};"><i class="ti ${c.icon}" style="color:rgb(${c.colorRgb});" aria-hidden="true"></i><div class="wk-mflow-cell-label">${c.label}</div><div class="wk-mflow-cell-stat">${s.count}회<br>${_mflowDurationLabel(s.minutes)}</div></div>`;
+    return `<div class="wk-mflow-cell" style="--wk-mflow-rgb:${c.colorRgb};"><i class="ti ${c.icon}" style="color:rgb(${c.colorRgb});" aria-hidden="true"></i><div class="wk-mflow-cell-label">${c.label}</div><div class="wk-mflow-cell-count">${s.count}<span style="font-size:var(--fs-xs);font-weight:400;">회</span></div><div class="wk-mflow-cell-time">${_mflowDurationLabel(s.minutes)}</div></div>`;
   }).join('')}</div>`;
 }
 
