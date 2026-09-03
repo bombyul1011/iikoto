@@ -1739,7 +1739,7 @@ function renderWeekMflow(rows){
   });
   el.innerHTML=`<div class="wk-mflow-grid">${MFLOW_CARDS.map(c=>{
     const s=stats[c.key];
-    return `<div class="wk-mflow-cell" style="--wk-mflow-rgb:${c.colorRgb};"><i class="ti ${c.icon}" style="color:rgb(${c.colorRgb});" aria-hidden="true"></i><div class="wk-mflow-cell-label">${c.label}</div><div class="wk-mflow-cell-count">${s.count}<span style="font-size:var(--fs-xs);font-weight:400;">회</span></div><div class="wk-mflow-cell-time">${_mflowDurationLabel(s.minutes)}</div></div>`;
+    return `<div class="wk-mflow-cell" style="--wk-mflow-rgb:${c.colorRgb};"><i class="ti ${c.icon}" style="color:rgb(${c.colorRgb});" aria-hidden="true"></i><div class="wk-mflow-cell-label">${c.label}</div><div class="wk-mflow-cell-count">${s.count}</div><div class="wk-mflow-cell-time">${_mflowDurationLabel(s.minutes)}</div></div>`;
   }).join('')}</div>`;
 }
 
