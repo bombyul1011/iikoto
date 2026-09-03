@@ -102,6 +102,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .main-wrap{transition:padding .32s cubic-bezier(.4,0,.2,1);}
 .side-toggle-btn{position:fixed;top:50%;left:270px;z-index:50;width:20px;height:52px;transform:translate(-1px,-50%);clip-path:path('M0 0 L15 0 Q20 0 20 5 L20 47 Q20 52 15 52 L0 52 Z');display:flex;align-items:center;justify-content:center;cursor:pointer;transition:left .32s cubic-bezier(.4,0,.2,1),background .25s,border-color .25s;background:rgba(210,200,235,0.42);border:1px solid rgba(200,185,225,0.4);}
 .theme-opt-btn.on{background:var(--pal-pink-bg);border-color:var(--pal-pink-border);color:var(--pal-pink-text);}
+.theme-opt-btn{width:auto;padding:0 22px;white-space:nowrap;}
 .side-toggle-btn.tod-morning{background:linear-gradient(135deg,rgba(255,205,175,0.55),rgba(255,235,180,0.42));border-color:rgba(255,200,165,0.5);}
 .side-toggle-btn.tod-day{background:linear-gradient(135deg,rgba(var(--pal-sky-rgb),0.5),rgba(var(--pal-yellow-rgb),0.38));border-color:rgba(var(--pal-sky-rgb),0.55);}
 .side-toggle-btn.tod-afternoon{background:linear-gradient(135deg,rgba(255,220,235,0.5),rgba(255,235,200,0.45));border-color:rgba(255,200,210,0.45);}
@@ -1709,6 +1710,12 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 }
 [data-theme="glass"] .mr-ai-card,[data-theme="glass"] .mrp-hero{background:rgba(255,253,248,0.45)!important;box-shadow:0 2px 12px rgba(150,180,130,0.10);}
 [data-theme="glass"] .goal-hcard{background:rgba(255,253,248,0.5)!important;border:1.4px solid rgba(230,175,60,0.65)!important;box-shadow:0 1.5px 1.5px rgba(255,255,255,0.9) inset,0 2px 14px rgba(200,150,50,0.12);}
+/* Best Flow/Growing(mint), Needs Care/Shrinking(yellow) — 습관코너·리듬코너 공용.
+   테두리만 색으로 구분하고 내부는 다른 배너와 동일하게 통일 */
+[data-theme="glass"] .habit-insight{background:var(--card)!important;}
+[data-theme="glass"] .habit-insight.mint{border:1.4px solid rgba(var(--pal-mint-rgb),0.55)!important;}
+[data-theme="glass"] .habit-insight.yellow{border:1.4px solid rgba(var(--pal-yellow-rgb),0.6)!important;}
+[data-theme="glass"] .habit-insight:after{background:rgba(255,255,255,0.35);}
 /* 아래 두 카드는 라이트에서 자체 색(라임/피치)을 !important로 하드코딩해서 갖고 있어,
    글라스에서 var(--card)로 재오버라이드하지 않으면 라이트 색이 그대로 새어나옴 —
    다른 평범한 배너와 같은 무색 유리질감으로 맞추는 목적의 필수 오버라이드(삭제 금지). */
@@ -1717,9 +1724,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="glass"] .status-badge,[data-theme="glass"] .tt-cat-badge,[data-theme="glass"] .wsleep2-badge,[data-theme="glass"] .yr-reg-badge{background:var(--glass-chip-bg)!important;}
 [data-theme="glass"] .cal-day.today .cal-num,[data-theme="glass"] #monthly-cal .cal-day.today .cal-num{background:rgba(205,95,95,0.65);color:#fff;}
 [data-theme="glass"] .cal-day.selected .cal-num,[data-theme="glass"] #monthly-cal .cal-day.selected .cal-num{background:rgba(232,164,187,0.24);color:var(--pal-pink-text);}
-/* 오늘의 감상 — 무지개 그라디언트는 유지하되 라이트보다 확실히 연하게(그라디언트 알파를 낮추고
-   뒤판 알파를 라이트의 --card(0.78)에 가깝게 올려 톤을 눌러줌). 색을 빼는 게 아니라 옅게 만드는 카드. */
-[data-theme="glass"] .quote-card-inner{background:linear-gradient(120deg,rgba(255,170,200,0.035),rgba(255,205,140,0.035),rgba(195,200,245,0.03),rgba(170,235,200,0.035),rgba(255,170,200,0.035)),rgba(255,253,248,0.82)!important;}
+/* 오늘의 감상 — 테두리는 무지개 유지, 내부는 색을 완전히 빼야 함(연하게가 아니라 제거).
+   var(--card)는 alpha 0.45라 뒤 무지개 테두리가 비쳐 보여 오히려 진해 보이므로,
+   불투명에 가까운 흰 배경으로 확실히 가림 */
+[data-theme="glass"] .quote-card-inner{background:rgba(255,253,248,0.95)!important;}
 [data-theme="glass"] .card.p{background:rgba(255,253,248,0.45)!important;border-color:rgba(var(--pal-pink-rgb),0.4)!important;}
 </style>
 <script>(function(){try{var s=localStorage.getItem('textScale');s=s?JSON.parse(s):0;var base={'-1':{title:15,body:14},'0':{title:16,body:15},'1':{title:17,body:16}}[String(s)]||{title:16,body:15};document.documentElement.style.setProperty('--fs-title',base.title+'px');document.documentElement.style.setProperty('--fs-body',base.body+'px');document.documentElement.style.setProperty('--main-text-size',base.body+'px');document.documentElement.style.setProperty('--dow-label-size',(base.body-1.5)+'px');}catch(e){}})();</script>
