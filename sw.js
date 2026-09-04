@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.38-perf-cleanup';
+const CACHE = 'iikoto-v2.47-mflow-part2-time-aware';
 const ASSETS = [
   './',
   './index.html'

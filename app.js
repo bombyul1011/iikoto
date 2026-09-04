@@ -357,10 +357,30 @@ function finishRhythmBlock(idx){
   const blocks=getRhythmBlocks(_rhythmDk);
   if(!blocks[idx])return;
   const n=new Date();
-  blocks[idx].end=pad(n.getHours())+':'+pad(n.getMinutes());
+  const endStr=pad(n.getHours())+':'+pad(n.getMinutes());
+  blocks[idx].end=endStr;
   delete blocks[idx].autoClosed; // 사용자가 직접 종료했으므로 자동종료 표시를 지워 이후 취침시각 재수정에 영향받지 않게 확정
   saveRhythmBlocks(_rhythmDk,blocks);
+  syncMorningFlowOnRhythmBlockEnd(_rhythmDk,blocks[idx].cid,endStr); // 모닝플로우로 시작한 블록이면 picks도 done으로 동기화
   refreshRhythmTrack();
+}
+// 리듬바에서 블록을 직접 종료했을 때, 그 블록이 모닝플로우 카드로 시작된 것이면(blockCid 매칭)
+// 모닝플로우 쪽 status도 done으로 함께 갱신 — 오전 홈탭이 지나가버려 모닝플로우 화면에서 종료를 못 누르는
+// 경우(예: 외출이 오전 내내 안 끝남) 리듬바에서 종료해도 월간 카운트/통계에 정상 반영되도록.
+// (2026-09-04 추가 — 이게 없으면 리듬바 종료는 rhythm_blocks만 갱신하고 모닝플로우 picks는 영원히
+//  running으로 붕 떠서, "시작만 하고 종료 안 하면 미시작 취급" 정책과 어긋나는 상태가 됨)
+function syncMorningFlowOnRhythmBlockEnd(dk,blockCid,endStr){
+  if(!blockCid)return;
+  const flow=getMorningFlow(dk);
+  let changed=false;
+  Object.keys(flow.picks).forEach(key=>{
+    const p=flow.picks[key];
+    if(p&&p.status==='running'&&p.blockCid===blockCid){
+      flow.picks[key]={...p,status:'done',endStr};
+      changed=true;
+    }
+  });
+  if(changed){saveMorningFlow(dk,flow);if(document.querySelector('.mf-hero'))refreshMorningFlowCard();}
 }
 function deleteRhythmBlock(idx){
   const blocks=getRhythmBlocks(_rhythmDk);
@@ -4552,7 +4572,9 @@ function _mfDurationMin(startStr,endStr){
   return endMin-startMin;
 }
 function getMorningFlow(dk){return S.get('mflow_'+dk)||{picks:{},etc:{},enjoy:{},desk:{},confirmed:false};}
-// 이번 달(1일~오늘) 로컬에 저장된 mflow_YYYY-MM-DD 전부를 훑어 카드별(key) 누적 선택 횟수 집계 — 그리드 카드 하단 표시용.
+// 이번 달(1일~오늘) 로컬에 저장된 mflow_YYYY-MM-DD 전부를 훑어 카드별(key) 누적 "완료" 횟수 집계 — 그리드 카드 하단 표시용.
+// status가 done인 것만 카운트(시작만 하고 종료 안 한 running/idle은 미반영 — 정해둔 정책과 통일. 2026-09-04 수정,
+// 이전엔 picks에 키가 있기만 하면(status 무관) 카운트해 정책과 어긋나 있었음)
 function getMorningFlowMonthCounts(mk){
   const counts={};
   MORNING_FLOW_CARDS.forEach(c=>counts[c.key]=0);
@@ -4561,20 +4583,26 @@ function getMorningFlowMonthCounts(mk){
     if(!k||!k.startsWith('mflow_')||!k.startsWith('mflow_'+mk))continue;
     const flow=S.get(k);
     if(!flow||!flow.picks)continue;
-    Object.keys(flow.picks).forEach(pk=>{if(counts[pk]!==undefined)counts[pk]++;});
+    Object.keys(flow.picks).forEach(pk=>{if(counts[pk]!==undefined&&flow.picks[pk]?.status==='done')counts[pk]++;});
   }
   return counts;
 }
-// pending 플래그: Up이 아직 서버에 반영 안 된 로컬 변경사항이 있으면 syncMorningFlowDown이 그 날짜를 덮어쓰지 않도록 방지
-// (기존엔 autoSync가 완료를 기다리지 않고 fire-and-forget이라, 새로고침 시 syncAll의 Down이 먼저 실행되며 방금 로컬에 저장한 진행상태를 서버의 옛 데이터로 되돌리는 버그가 있었음 — 2026-09-03 수정)
-function saveMorningFlow(dk,data){S.set('mflow_'+dk,data);S.set(S.key('mflow_pending',dk),true);autoSync('mflow',dk);}
+// pending 플래그 + 시각(client_ts) 이중 방어: Up이 아직 서버에 반영 안 됐거나(pending),
+// 서버 값이 로컬 변경 시각보다 오래됐으면(client_ts 비교) syncMorningFlowDown이 그 날짜를 덮어쓰지 않도록 방지.
+// (기존엔 pending 플래그 하나만 믿었는데, "Up 완료 콜백은 왔지만 그 직후 다른 이벤트로 Down이 곧바로 재실행되며
+// 아직 실제로 반영 안 된/네트워크 지연된 옛 서버 스냅샷을 다시 끌어와 로컬 running 상태를 덮어쓰는" 레이스 컨디션이 있었음
+// — 화면 on/off가 잦은 외출 중(visibilitychange가 자주 발생) 특히 잘 재현됨. 2026-09-04 수정)
+function saveMorningFlow(dk,data){data._localTs=Date.now();S.set('mflow_'+dk,data);S.set(S.key('mflow_pending',dk),true);autoSync('mflow',dk);}
 async function syncMorningFlowUp(dk){
   const flow=getMorningFlow(dk);
   const etcPayload={...(flow.etc||{})};
   if(flow.enjoy)etcPayload._enjoy=flow.enjoy;
   if(flow.desk)etcPayload._desk=flow.desk;
-  const ok=await supaUpsert('morning_flow_picks','date_key',[{date_key:dk,picks:flow.picks||{},etc:etcPayload}]);
-  if(ok)S.set(S.key('mflow_pending',dk),false);
+  const clientTs=flow._localTs||Date.now();
+  const ok=await supaUpsert('morning_flow_picks','date_key',[{date_key:dk,picks:flow.picks||{},etc:etcPayload,client_ts:clientTs}]);
+  // 업로드 도중(await 대기 중) 그 사이 다른 로컬 변경이 또 들어와 _localTs가 갱신됐을 수 있으므로,
+  // "지금 올린 시각과 현재 로컬 시각이 같을 때만" pending 해제 — 아니면 그 사이의 새 변경분이 아직 안 올라간 것으로 간주.
+  if(ok){const cur=getMorningFlow(dk);if((cur._localTs||0)<=clientTs)S.set(S.key('mflow_pending',dk),false);}
   return !!ok;
 }
 async function syncMorningFlowDown(dk){
@@ -4587,11 +4615,15 @@ async function syncMorningFlowDown(dk){
     return;
   }
   const r=rows[0];
+  const local=getMorningFlow(dk);
+  // 서버 client_ts가 로컬 _localTs보다 오래됐거나 같으면(=로컬이 더 최신이거나 동시) 덮어쓰지 않음.
+  // 서버에 client_ts가 없는 옛 레코드(마이그레이션 이전)는 0으로 취급해 항상 로컬 우선.
+  if((r.client_ts||0)<=(local._localTs||0)&&(local._localTs||0)>0)return;
   const etcRaw=r.etc||{};
   const enjoy=etcRaw._enjoy||{};
   const desk=etcRaw._desk||{};
   const etc={...etcRaw};delete etc._enjoy;delete etc._desk;
-  S.set('mflow_'+dk,{picks:r.picks||{},etc,enjoy,desk,confirmed:Object.keys(r.picks||{}).length>0});
+  S.set('mflow_'+dk,{picks:r.picks||{},etc,enjoy,desk,confirmed:Object.keys(r.picks||{}).length>0,_localTs:r.client_ts||Date.now()});
 }
 // 카드 선택 토글(그리드 화면 전용) — 이미 confirmed 상태에서는 이 함수가 호출될 일이 없음(그리드 자체가 안 보이므로).
 function toggleMorningFlowPick(key){
@@ -4821,6 +4853,8 @@ function _mfYesterdayRecapLine(){
   return '어제는 '+doneLabels.join('와 ')+'으로 아침을 열었어요';
 }
 // 오늘 일정+시간표(투두 앞 "HH:MM " 표기) 중 가장 이른 항목 한 줄 — 투두 일반 항목은 제외(오전 인사카드가 이미 다룸), 일정/시간표만 참고.
+// 오늘 남은 일정 중 지금 시각과 가장 가까운(=아직 안 지난 것 중 가장 이른) 항목을 보여줌 — 하루 중 첫 일정 고정 표시였던 이전 방식 대신
+// 시간대를 따라가도록 수정(2026-09-04). 지난 일정은 후보에서 제외하고, 남은 일정이 하나도 없으면 "오늘 남은 일정은 n개예요"로 폴백.
 function _mfTodayPreviewLine(){
   const dk=dateKey(getLogicalDate());
   const todos=getTodos(dk)||[];
@@ -4828,9 +4862,17 @@ function _mfTodayPreviewLine(){
   const scheduleItems=parseScheduleTodos(dk,todos).map(it=>({time:it.time,label:it.label}));
   const all=[...events,...scheduleItems];
   if(!all.length)return null;
-  const sorted=all.sort((a,b)=>(a.time||'').localeCompare(b.time||''));
-  const first=sorted[0];
-  return '오늘은 '+first.time+' '+first.label+'이 있어요';
+  const now=new Date();
+  const nowMin=now.getHours()*60+now.getMinutes();
+  const withMin=all.map(it=>{
+    const [h,m]=(it.time||'').split(':').map(Number);
+    return {...it,min:(isNaN(h)||isNaN(m))?null:h*60+m};
+  });
+  const upcoming=withMin.filter(it=>it.min!=null&&it.min>=nowMin).sort((a,b)=>a.min-b.min);
+  if(upcoming.length)return '오늘은 '+upcoming[0].time+' '+upcoming[0].label+'이 있어요';
+  const remainCount=withMin.filter(it=>it.min==null||it.min>=nowMin).length||withMin.length; // 시각 파싱 실패 항목은 지난 것으로 단정하지 않고 남은 것에 포함
+  if(remainCount===0)return null; // 전부 지났으면 배너 자체를 숨김(yesterdayLine만 있으면 그것만 표시)
+  return '오늘 남은 일정은 '+remainCount+'개예요';
 }
 // 서브선택 대기 행(기타/감상/책상 공통) — 카테고리명 옆에 서브선택 칩을 나란히 배치하는 동일 마크업을 재사용(2026-09-03 정리).
 function _mfSubPickRowHtml(c,label,subList,handlerName,wrap){
