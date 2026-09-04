@@ -3964,15 +3964,15 @@ async function _uploadMemoPhotoToR2(blob,dk,cid,ext){
 }
 async function _deletePhotoFromR2(photoUrl){
   const key=photoUrl.split('/photo/')[1];
-  if(!key){console.warn('[R2삭제] key 추출 실패, photoUrl:',photoUrl);return;}
-  console.log('[R2삭제] 시도 key:',key,'| 원본 photoUrl:',photoUrl);
+  if(!key)return;
   const res=await fetch(`${PHOTO_PROXY_BASE}/upload/${key}`,{
     method:'DELETE',
     headers:{'X-Upload-Secret':PHOTO_UPLOAD_SECRET}
   });
-  const body=await res.text().catch(()=>'');
-  console.log('[R2삭제] 응답:',res.status,body);
-  if(!res.ok)throw new Error(`R2 삭제 실패: ${res.status} ${body}`);
+  if(!res.ok){
+    const detail=await res.text().catch(()=>'');
+    throw new Error(`R2 삭제 실패: ${res.status} ${detail}`);
+  }
 }
 // R2 삭제 실패 시(오프라인, Worker 일시 장애, 시크릿 미설정 등) 조용히 유실되지 않도록
 // 로컬(localStorage)에 대기열로 남겨두고, 앱 시작 시와 online 복귀 시 자동 재시도.
@@ -5455,16 +5455,22 @@ function _paceAfternoonTimelineItems(dk){
     const st=t.strikeTimes||{};
     const timeEntries=Object.entries(st).filter(([,v])=>typeof v==='number');
     if(timeEntries.length){
-      const {parts}=parseTodoTextParts(t.text);
+      const {prefix,parts,hasPrefix}=parseTodoTextParts(t.text);
+      // 조각 텍스트만으로는 어떤 상위 항목(업무/취미 등)에 속한 조각인지 구분이 안 돼
+      // 접두어(카테고리)가 있으면 "접두어 · 조각" 형태로 함께 표기.
       timeEntries.forEach(([idxStr,ms])=>{
         const d=new Date(ms);const min=d.getHours()*60+d.getMinutes();
         if(min<AFTERNOON_TL_START||min>AFTERNOON_TL_END)return;
-        items.push({type:'todo',min,time:minToHHMM(min),label:parts[parseInt(idxStr,10)]||t.text||'',icon:'ti-check'});
+        const partText=parts[parseInt(idxStr,10)]||t.text||'';
+        const label=hasPrefix&&prefix?prefix+' · '+partText:partText;
+        items.push({type:'todo',min,time:minToHHMM(min),label,icon:'ti-check'});
       });
     }else if(t.done&&t.completedAt){
       const d=new Date(t.completedAt);const min=d.getHours()*60+d.getMinutes();
       if(min<AFTERNOON_TL_START||min>AFTERNOON_TL_END)return;
-      items.push({type:'todo',min,time:minToHHMM(min),label:t.text||'',icon:'ti-check'});
+      const {prefix,hasPrefix,parts}=parseTodoTextParts(t.text);
+      const label=hasPrefix&&prefix?prefix+' · '+(parts.join(' / ')||t.text||''):(t.text||'');
+      items.push({type:'todo',min,time:minToHHMM(min),label,icon:'ti-check'});
     }
   });
   // 리듬 — 외출(appointment) 제외, 시작 시각만
@@ -6979,6 +6985,40 @@ function jumpToMemoDateFromSeed(dk){
   document.querySelectorAll('.view').forEach(vw=>vw.classList.toggle('on',vw.id==='v-daily'));
   document.querySelector('.scroll').scrollTop=0;
   loadDaily();
+}
+// 사진메모 모아보기 — seed 모아보기(openSeedArchive)와 동일한 방식으로 localStorage 전체를 훑어
+// 사진이 첨부된 메모만 모아 최신순 그리드로 보여줌. 썸네일은 오늘탭 목록과 동일하게
+// placeholder→로드완료 페이드인 방식으로 깜빡임 없이 표시.
+function openPhotoArchive(){
+  const resEl=document.getElementById('photo-archive-results');
+  const results=[];
+  for(let i=0;i<localStorage.length;i++){
+    const k=localStorage.key(i);
+    if(!k||!k.startsWith('memos:'))continue;
+    const dk=k.slice('memos:'.length);
+    getMemos(dk).forEach(m=>{
+      const src=m.photoUrl||m.photoLocalUrl;
+      if(src)results.push({dk,time:m.time||'',text:m.text||'',src});
+    });
+  }
+  results.sort((a,b)=>(b.dk+(b.time||'')).localeCompare(a.dk+(a.time||'')));
+  if(!results.length){
+    resEl.innerHTML='<div class="photo-archive-empty">아직 사진메모가 없어요</div>';
+  }else{
+    resEl.innerHTML=results.map((r,i)=>`<div class="photo-archive-thumb" onclick="openPhotoArchiveItem(${i})">
+      <div class="photo-archive-thumb-ph"><i class="ti ti-photo" aria-hidden="true"></i></div>
+      <img src="${r.src}" alt="" loading="lazy" onload="this.classList.add('loaded');this.previousElementSibling.classList.add('hide');" onerror="this.previousElementSibling.classList.add('hide');">
+    </div>`).join('');
+    _photoArchiveResults=results;
+  }
+  openModal('photo-archive-modal');
+}
+let _photoArchiveResults=[];
+function openPhotoArchiveItem(i){
+  const r=_photoArchiveResults[i];if(!r)return;
+  const d=new Date(r.dk+'T00:00:00');
+  const meta=`${d.getMonth()+1}월 ${d.getDate()}일 ${_HOME_DAYS[d.getDay()]}요일 · ${r.time||''}`;
+  openPhotoViewer(r.src,r.text,meta);
 }
 
 // ══════════════════════════════════════════════════════════

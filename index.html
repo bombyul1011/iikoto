@@ -573,14 +573,25 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 .photo-viewer-ov{position:fixed;inset:0;background:rgba(30,20,18,.82);z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;}
 .photo-viewer-ov.on{display:flex;}
-.photo-viewer-card{width:100%;max-width:340px;background:linear-gradient(160deg,#fdf3ec,#fef7e8);border-radius:20px;overflow:hidden;box-shadow:0 12px 48px rgba(0,0,0,.30);max-height:88vh;display:flex;flex-direction:column;}
-.photo-viewer-img-wrap{position:relative;width:100%;background:#000;}
-.photo-viewer-img{width:100%;max-height:60vh;display:block;object-fit:contain;background:#000;}
-.photo-viewer-meta{padding:14px 18px 18px;}
-.photo-viewer-date{font-size:12px;color:var(--ts);letter-spacing:.06em;margin-bottom:6px;}
-.photo-viewer-text{color:var(--tp);font-size:var(--main-text-size);line-height:1.6;}
+.photo-viewer-card{width:100%;max-width:340px;background:linear-gradient(160deg,#fdf3ec,#fef7e8);border-radius:20px;overflow:hidden;box-shadow:0 12px 48px rgba(0,0,0,.30);max-height:88vh;display:flex;flex-direction:column;padding:16px;}
+/* 폴라로이드 프레임 — 사진+텍스트를 흰 카드 하나로 감싸고 살짝 기울여 손으로 놓은 듯한 느낌 */
+.photo-viewer-frame{position:relative;width:100%;background:#fffdf9;border-radius:6px;padding:12px 12px 18px;box-shadow:0 3px 14px rgba(107,82,72,0.16);transform:rotate(-0.6deg);overflow-y:auto;}
+.photo-viewer-img-wrap{position:relative;width:100%;border-radius:3px;overflow:hidden;background:#000;}
+.photo-viewer-img{width:100%;max-height:52vh;display:block;object-fit:contain;background:#000;}
+.photo-viewer-meta{padding-top:12px;text-align:center;}
+.photo-viewer-date{font-size:11px;color:var(--ts);letter-spacing:.04em;margin-bottom:3px;}
+.photo-viewer-text{color:var(--tp);font-size:13px;line-height:1.5;font-family:'Comfortaa',cursive;}
 .photo-viewer-text:empty::before{content:'';}
-.photo-viewer-close{position:absolute;top:14px;right:14px;width:30px;height:30px;border-radius:20px;background:rgba(30,20,18,0.45);border:none;display:flex;align-items:center;justify-content:center;color:#fdf3ec;cursor:pointer;z-index:2;}
+.photo-viewer-close{position:absolute;top:10px;right:10px;width:26px;height:26px;border-radius:14px;background:rgba(30,20,18,0.45);border:none;display:flex;align-items:center;justify-content:center;color:#fdf3ec;cursor:pointer;z-index:2;}
+
+/* 사진메모 모아보기 — 그리드 */
+.photo-archive-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;}
+.photo-archive-thumb{aspect-ratio:1;border-radius:6px;overflow:hidden;background:var(--card2,rgba(210,190,175,0.20));cursor:pointer;position:relative;}
+.photo-archive-thumb img{width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .25s ease;}
+.photo-archive-thumb img.loaded{opacity:1;}
+.photo-archive-thumb-ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--tm);font-size:18px;transition:opacity .2s ease;}
+.photo-archive-thumb-ph.hide{opacity:0;pointer-events:none;}
+.photo-archive-empty{font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:24px 0;}
 
 .undo-toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%) translateY(16px);background:rgba(60,40,40,.90);color:white;font-size:12px;padding:9px 18px;border-radius:20px;display:flex;align-items:center;gap:10px;opacity:0;transition:all .25s;z-index:10500;pointer-events:none;backdrop-filter:blur(8px);}
 .undo-toast.on{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto;}
@@ -1608,6 +1619,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="slabel-row">
         <span class="slabel">메모</span>
         <div style="display:flex;align-items:center;gap:4px;">
+          <button class="slabel-search-btn" onclick="openPhotoArchive()" title="사진메모 모아보기"><i class="ti ti-photo ico-sz-14" aria-hidden="true"></i></button>
           <button class="slabel-search-btn" onclick="openSeedArchive()" title="씨앗 모아보기"><i class="ti ti-seeding ico-sz-14" aria-hidden="true"></i></button>
         </div>
       </div>
@@ -2093,6 +2105,17 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   </div>
 </div>
 
+<!-- PHOTO ARCHIVE MODAL (사진메모 모아보기 — 그리드) -->
+<div class="modal-ov" id="photo-archive-modal" onclick="closeModal('photo-archive-modal',event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-title">사진메모 모아보기</div>
+    <div id="photo-archive-results" class="photo-archive-grid" style="max-height:60vh;overflow-y:auto;margin-bottom:12px;"></div>
+    <div class="modal-actions">
+      <button class="mbtn cancel" onclick="closeModal('photo-archive-modal')" style="flex:1;">닫기</button>
+    </div>
+  </div>
+</div>
+
 <!-- MEMO EDIT MODAL -->
 <div class="modal-ov" id="memo-edit-modal" onclick="closeModal('memo-edit-modal',event)">
   <div class="modal">
@@ -2123,16 +2146,18 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   </div>
 </div>
 
-<!-- MEMO PHOTO VIEWER (사진 메모 크게보기) -->
+<!-- MEMO PHOTO VIEWER (사진 메모 크게보기) — 폴라로이드 프레임 -->
 <div class="photo-viewer-ov" id="photo-viewer-ov" onclick="closePhotoViewer(event)">
   <div class="photo-viewer-card" onclick="event.stopPropagation()">
-    <div class="photo-viewer-img-wrap">
-      <button class="photo-viewer-close" onclick="closePhotoViewer(event)" aria-label="닫기"><i class="ti ti-x" aria-hidden="true"></i></button>
-      <img class="photo-viewer-img" id="photo-viewer-img" src="" alt="">
-    </div>
-    <div class="photo-viewer-meta">
-      <div class="photo-viewer-date" id="photo-viewer-date"></div>
-      <div class="photo-viewer-text" id="photo-viewer-text"></div>
+    <div class="photo-viewer-frame">
+      <div class="photo-viewer-img-wrap">
+        <button class="photo-viewer-close" onclick="closePhotoViewer(event)" aria-label="닫기"><i class="ti ti-x" aria-hidden="true"></i></button>
+        <img class="photo-viewer-img" id="photo-viewer-img" src="" alt="">
+      </div>
+      <div class="photo-viewer-meta">
+        <div class="photo-viewer-date" id="photo-viewer-date"></div>
+        <div class="photo-viewer-text" id="photo-viewer-text"></div>
+      </div>
     </div>
   </div>
 </div>

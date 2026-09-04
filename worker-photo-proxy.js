@@ -49,16 +49,11 @@ export default {
       if (!key || key.includes('..')) {
         return new Response('bad key', { status: 400, headers: cors });
       }
-      console.log('[삭제 요청] key:', key);
-      const existedBefore = await env.PHOTO_BUCKET.head(key);
-      console.log('[삭제 전 존재여부]', existedBefore ? '있음' : '없음(=이미 없거나 key불일치)');
       await env.PHOTO_BUCKET.delete(key);
-      const existedAfter = await env.PHOTO_BUCKET.head(key);
-      console.log('[삭제 후 존재여부]', existedAfter ? '여전히 있음(삭제실패)' : '없음(삭제성공)');
       // 조회용 엣지 캐시에도 같은 URL로 남아있을 수 있어 함께 무효화
       const photoUrl = new URL(`/photo/${key}`, url.origin);
       await caches.default.delete(new Request(photoUrl.toString()));
-      return new Response(JSON.stringify({ ok: true, key, existedBefore: !!existedBefore, existedAfter: !!existedAfter }), {
+      return new Response(JSON.stringify({ ok: true, key }), {
         headers: { ...cors, 'Content-Type': 'application/json' }
       });
     }
