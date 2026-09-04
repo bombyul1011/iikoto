@@ -2689,7 +2689,7 @@ async function renderWatchCal(contentsData){
 function renderWcalMonthSummary(curContents,prevContents,mk){
   const el=document.getElementById('wcal-month-summary');if(!el)return;
   const belongsHere=c=>{
-    if(c.content_cat==='music')return true; // 등록 건수를 그대로 완결로 카운트
+    if(c.content_cat==='music')return c.start_date&&c.start_date.slice(0,7)===mk; // 등록월(mk)과 일치할 때만 카운트
     return _isContentFinished(c)&&isContentEndedInMonthTablet(c,mk);
   };
   const list=[...curContents,...prevContents].filter(belongsHere);
