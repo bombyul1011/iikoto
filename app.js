@@ -77,8 +77,7 @@ function renderHomeBody(section){
       body.appendChild(makeRecentContentsCard());
     }
   } else if(section==='afternoon'){
-    body.appendChild(makeAfternoonPaceCard());
-    refreshAfternoonPaceCard();
+    body.appendChild(makeAfternoonHomeCard());
     body.appendChild(makeTodayRhythmBanner());
   } else if(section==='dawn'){
     const dawnDk=dateKey(getLogicalDate());
@@ -4508,9 +4507,6 @@ function confirmCopyWholeTodo(){
   showToast(result.message);
   renderTodos();
 }
-// ── 오후 파트: 오늘vs어제 진행바 + 목표대비 웨이브게이지 + 리듬 비교 통합 카드
-const AFTERNOON_TODO_GOAL=5,AFTERNOON_HABIT_GOAL=4,AFTERNOON_MORNING_GOAL=4;
-
 // ══════════════════════════════════════════════════════════
 // 굿모닝(모닝 플로우)
 // 카드 6개(휴식/운동/감상/책상/정리/기타) 중 복수선택 → "선택 완료"(원형 체크)를 눌러야 시작목록으로 확정 → 카드별 시작/종료(=리듬블록 자동 등록) → 파트2에 어제 회고+오늘 일정 미리보기.
@@ -4572,9 +4568,7 @@ function _mfDurationMin(startStr,endStr){
   return endMin-startMin;
 }
 function getMorningFlow(dk){return S.get('mflow_'+dk)||{picks:{},etc:{},enjoy:{},desk:{},confirmed:false};}
-// 이번 달(1일~오늘) 로컬에 저장된 mflow_YYYY-MM-DD 전부를 훑어 카드별(key) 누적 "완료" 횟수 집계 — 그리드 카드 하단 표시용.
-// status가 done인 것만 카운트(시작만 하고 종료 안 한 running/idle은 미반영 — 정해둔 정책과 통일. 2026-09-04 수정,
-// 이전엔 picks에 키가 있기만 하면(status 무관) 카운트해 정책과 어긋나 있었음)
+// 이번 달(1일~오늘) 로컬에 저장된 mflow_YYYY-MM-DD 전부를 훑어 카드별(key) 누적 선택 횟수 집계 — 그리드 카드 하단 표시용.
 function getMorningFlowMonthCounts(mk){
   const counts={};
   MORNING_FLOW_CARDS.forEach(c=>counts[c.key]=0);
@@ -4587,11 +4581,8 @@ function getMorningFlowMonthCounts(mk){
   }
   return counts;
 }
-// pending 플래그 + 시각(client_ts) 이중 방어: Up이 아직 서버에 반영 안 됐거나(pending),
-// 서버 값이 로컬 변경 시각보다 오래됐으면(client_ts 비교) syncMorningFlowDown이 그 날짜를 덮어쓰지 않도록 방지.
-// (기존엔 pending 플래그 하나만 믿었는데, "Up 완료 콜백은 왔지만 그 직후 다른 이벤트로 Down이 곧바로 재실행되며
-// 아직 실제로 반영 안 된/네트워크 지연된 옛 서버 스냅샷을 다시 끌어와 로컬 running 상태를 덮어쓰는" 레이스 컨디션이 있었음
-// — 화면 on/off가 잦은 외출 중(visibilitychange가 자주 발생) 특히 잘 재현됨. 2026-09-04 수정)
+// pending 플래그: Up이 아직 서버에 반영 안 된 로컬 변경사항이 있으면 syncMorningFlowDown이 그 날짜를 덮어쓰지 않도록 방지
+// (기존엔 autoSync가 완료를 기다리지 않고 fire-and-forget이라, 새로고침 시 syncAll의 Down이 먼저 실행되며 방금 로컬에 저장한 진행상태를 서버의 옛 데이터로 되돌리는 버그가 있었음 — 2026-09-03 수정)
 function saveMorningFlow(dk,data){data._localTs=Date.now();S.set('mflow_'+dk,data);S.set(S.key('mflow_pending',dk),true);autoSync('mflow',dk);}
 async function syncMorningFlowUp(dk){
   const flow=getMorningFlow(dk);
@@ -4853,8 +4844,6 @@ function _mfYesterdayRecapLine(){
   return '어제는 '+doneLabels.join('와 ')+'으로 아침을 열었어요';
 }
 // 오늘 일정+시간표(투두 앞 "HH:MM " 표기) 중 가장 이른 항목 한 줄 — 투두 일반 항목은 제외(오전 인사카드가 이미 다룸), 일정/시간표만 참고.
-// 오늘 남은 일정 중 지금 시각과 가장 가까운(=아직 안 지난 것 중 가장 이른) 항목을 보여줌 — 하루 중 첫 일정 고정 표시였던 이전 방식 대신
-// 시간대를 따라가도록 수정(2026-09-04). 지난 일정은 후보에서 제외하고, 남은 일정이 하나도 없으면 "오늘 남은 일정은 n개예요"로 폴백.
 function _mfTodayPreviewLine(){
   const dk=dateKey(getLogicalDate());
   const todos=getTodos(dk)||[];
@@ -4862,17 +4851,9 @@ function _mfTodayPreviewLine(){
   const scheduleItems=parseScheduleTodos(dk,todos).map(it=>({time:it.time,label:it.label}));
   const all=[...events,...scheduleItems];
   if(!all.length)return null;
-  const now=new Date();
-  const nowMin=now.getHours()*60+now.getMinutes();
-  const withMin=all.map(it=>{
-    const [h,m]=(it.time||'').split(':').map(Number);
-    return {...it,min:(isNaN(h)||isNaN(m))?null:h*60+m};
-  });
-  const upcoming=withMin.filter(it=>it.min!=null&&it.min>=nowMin).sort((a,b)=>a.min-b.min);
-  if(upcoming.length)return '오늘은 '+upcoming[0].time+' '+upcoming[0].label+'이 있어요';
-  const remainCount=withMin.filter(it=>it.min==null||it.min>=nowMin).length||withMin.length; // 시각 파싱 실패 항목은 지난 것으로 단정하지 않고 남은 것에 포함
-  if(remainCount===0)return null; // 전부 지났으면 배너 자체를 숨김(yesterdayLine만 있으면 그것만 표시)
-  return '오늘 남은 일정은 '+remainCount+'개예요';
+  const sorted=all.sort((a,b)=>(a.time||'').localeCompare(b.time||''));
+  const first=sorted[0];
+  return '오늘은 '+first.time+' '+first.label+'이 있어요';
 }
 // 서브선택 대기 행(기타/감상/책상 공통) — 카테고리명 옆에 서브선택 칩을 나란히 배치하는 동일 마크업을 재사용(2026-09-03 정리).
 function _mfSubPickRowHtml(c,label,subList,handlerName,wrap){
@@ -5078,49 +5059,6 @@ function _paceHabitCheckedCount(dk,nowMinLimit){
     return _dawnTimeToMin(t)<=nowMinLimit;
   }).length;
 }
-// 특정 날짜(dk) 기준 습관 체크율(%) — 활성 습관이 없으면 null(달성률 계산 불가로 평균에서 제외).
-function _paceHabitPctForDk(dk){
-  const wk=weekKey(new Date(dk+'T00:00:00'));
-  const dow=(new Date(dk+'T00:00:00').getDay()+6)%7;
-  const habits=getHabits();
-  if(!habits.length)return null;
-  const checks=getHabitChecks(wk);
-  const doneCnt=habits.filter(h=>checks[h.name+'-'+dow]).length;
-  return Math.round(doneCnt/habits.length*100);
-}
-// baseDk 기준 같은 요일로 거슬러 올라간 최근 N주(오늘 제외)의 습관 체크율 평균(%).
-// 데이터 없는 주(습관 자체가 없던 시기 등)는 평균 계산에서 제외 — { pct, weeksUsed } 반환.
-function _paceHabitAvgPctByDow(baseDk,weeks){
-  const pcts=[];
-  for(let i=1;i<=weeks;i++){
-    const d=new Date(baseDk+'T00:00:00');
-    d.setDate(d.getDate()-7*i);
-    const pct=_paceHabitPctForDk(dateKey(d));
-    if(pct!=null)pcts.push(pct);
-  }
-  if(!pcts.length)return {pct:0,weeksUsed:0};
-  return {pct:Math.round(pcts.reduce((a,b)=>a+b,0)/pcts.length),weeksUsed:pcts.length};
-}
-// 오늘 진행도 가로바에 굿모닝(모닝 플로우) 진행 카드 수도 합산하기 위한 헬퍼.
-// nowMinLimit 기준 시각 비교는 카드별 시작시각(startTs, 등록된 리듬블록 기준)으로 판단 — 감상(독서/콘텐츠)은 리듬블록 자체에 시각이 있어 getRhythmBlocks로 별도 확인.
-function _paceMorningFlowStartedCount(dk,nowMinLimit){
-  const flow=getMorningFlow(dk);
-  const blocks=nowMinLimit!=null?getRhythmBlocks(dk):null;
-  return MORNING_FLOW_CARDS.filter(c=>{
-    const p=flow.picks[c.key];
-    if(!p||p.status==='idle')return false; // 시작 안 한 카드는 통계 미반영
-    if(nowMinLimit==null)return true;
-    if(c.key==='enjoy'){
-      const block=blocks.find(b=>b.contentCid===p.cid&&b.cat==='enjoy');
-      if(!block)return false;
-      const startMin=parseInt(block.start.split(':')[0],10)*60+parseInt(block.start.split(':')[1],10);
-      return startMin<=nowMinLimit;
-    }
-    if(!p.startTs)return false;
-    const startD=new Date(p.startTs);
-    return (startD.getHours()*60+startD.getMinutes())<=nowMinLimit;
-  }).length;
-}
 function _paceTopRhythmCat(dk){
   const blocks=getRhythmBlocks(dk);
   const dur={};
@@ -5152,6 +5090,224 @@ function _paceTopRhythmCat(dk){
   if(RHYTHM_CATS[top])return {key:top,icon:RHYTHM_CATS[top].icon,color:RHYTHM_CATS[top].color,label:RHYTHM_CATS[top].label,memo};
   if(top==='_meal')return {key:top,icon:'ti-tools-kitchen-3',color:RHYTHM_MEAL_COLOR,label:'식사',memo};
   return null;
+}
+
+// ══════════════════════════════════════════════════════════
+// 오후 홈탭 "오늘의 흐름" 카드 (2026-09-04 개편 — 기존 무거운 오후 통계카드를 대체)
+// 12~19시 가로 타임라인(식사/할일완료/일정/리듬 4종 마커, 외출 리듬은 일정과 중복 잦아 제외)
+// + 완료개수·평소(최근7일)비교 + 오후 남은 할일(탭 이동) + 최근7일 인사이트 한 줄
+// ══════════════════════════════════════════════════════════
+const AFTERNOON_TL_START=12*60,AFTERNOON_TL_END=19*60;
+// 카테고리별(수면 제외) 당일 소요시간(분) 맵 — _paceTopRhythmCat과 동일 집계 로직을 재사용해 별도 함수로 분리.
+function _paceCatDurations(dk){
+  const blocks=getRhythmBlocks(dk);
+  const dur={};
+  const isToday=dk===dateKey(getLogicalDate());
+  const nowMin=isToday?(new Date().getHours()*60+new Date().getMinutes()):null;
+  blocks.forEach(b=>{
+    if(b.cat==='_sleep')return;
+    const s=_dawnTimeToMin(b.start);
+    if(s==null)return;
+    let e;
+    if(b.end)e=_dawnTimeToMin(b.end);
+    else if(isToday&&nowMin!=null)e=nowMin;
+    else return;
+    let d=e-s;if(d<0)d+=1440;
+    dur[b.cat]=(dur[b.cat]||0)+d;
+  });
+  return dur;
+}
+// 오늘 vs 최근 7일(오늘 제외) 비교 특징 문구 — 우선순위: ①최고/최저 기록 ②동률 ③카테고리 최다(업무·외출·운동 등) ④연속기록 ⑤기본(최다리듬 해석).
+// 하나만 골라 반환. 캐시 없이 매 렌더 시 로컬 데이터로 즉시 계산(가벼운 연산이라 실시간 반영).
+function _paceWeekInsight(dk){
+  const totals=[]; // 최근 7일(오늘 제외) 하루 총 완료량
+  for(let i=1;i<=7;i++){
+    const d=new Date(dk+'T00:00:00');d.setDate(d.getDate()-i);
+    totals.push(_paceCountDoneUntilNow(dateKey(d),null));
+  }
+  const todayTotal=_paceCountDoneUntilNow(dk,null);
+  const maxPast=totals.length?Math.max(...totals):0;
+  const minPast=totals.length?Math.min(...totals):0;
+
+  if(todayTotal>maxPast&&todayTotal>0){
+    return {icon:'ti-sparkles',text:'최근 7일 중 오늘이 가장 활발한 하루예요'};
+  }
+  if(todayTotal===maxPast&&todayTotal>0){
+    return {icon:'ti-flame',text:'최근 7일 중 최고 기록과 동률이에요'};
+  }
+  if(todayTotal<minPast||(todayTotal===0&&minPast===0)){
+    return {icon:'ti-droplet',text:'오늘은 조금 여유로운 흐름이에요'};
+  }
+  // 카테고리 최다 — 오늘의 카테고리별 소요시간이 최근 7일 중 최댓값이면 언급(외출 제외)
+  const CAT_PHRASE={work:'업무',exercise:'운동',home:'정리',rest:'휴식',note:'책상',enjoy:'감상',groom:'단장'};
+  const todayDur=_paceCatDurations(dk);
+  for(const cat of Object.keys(CAT_PHRASE)){
+    const todayVal=todayDur[cat]||0;
+    if(todayVal<=0)continue;
+    let isMax=true;
+    for(let i=1;i<=7;i++){
+      const d=new Date(dk+'T00:00:00');d.setDate(d.getDate()-i);
+      const pastVal=(_paceCatDurations(dateKey(d))[cat])||0;
+      if(pastVal>todayVal){isMax=false;break;}
+    }
+    if(isMax)return {icon:'ti-sparkles',text:`이번 주 들어 ${CAT_PHRASE[cat]} 시간이 가장 긴 날이에요`};
+  }
+  // 연속 기록 — 최근 며칠 연속으로 어제보다 같거나 많았는지(느슨한 스트릭)
+  let streak=0;
+  let prev=todayTotal;
+  for(let i=0;i<totals.length;i++){
+    if(totals[i]<=prev){streak++;prev=totals[i];}else break;
+  }
+  if(streak>=3)return {icon:'ti-bolt',text:`${streak}일 연속 평소보다 활발하게 보내고 있어요`};
+
+  // 기본 — 최다 리듬 해석
+  const top=_paceTopRhythmCat(dk);
+  if(top){
+    const LABEL_PHRASE={work:'업무를 중심으로',exercise:'움직이는 시간이',home:'정리하는 시간이',rest:'여유로운 흐름이',note:'책상에 앉아있는 시간이',enjoy:'감상하는 시간이',groom:'단장하는 시간이',_meal:'식사가'};
+    const phrase=LABEL_PHRASE[top.key]||`${top.label}이`;
+    return {icon:'ti-droplet',text:`오늘은 ${phrase} 많은 하루예요`};
+  }
+  return {icon:'ti-droplet',text:'아직 하루의 흐름이 만들어지는 중이에요'};
+}
+// 오늘 남은 오후 할 일(시간대 파트 기준) 개수 — timeSection==='afternoon', 미완료만(일정 제외).
+function _paceAfternoonRemainCount(dk){
+  const todos=getTodos(dk);
+  return todos.filter(t=>!t.isEvent&&!t.done&&t.timeSection==='afternoon').length;
+}
+// 타임라인에 얹을 이벤트 수집 — 식사/할일완료/일정/리듬(외출 제외) 4종, 12~19시 범위만.
+// 리듬은 시작 시각(순간)만 점으로 표시하고, 지속시간(면적)은 쓰지 않음(리듬탭과의 시각 언어 차별화).
+function _paceAfternoonTimelineItems(dk){
+  const items=[];
+  // 식사
+  const meals=getMeals(dk);
+  MEAL_KEYS.forEach(k=>{
+    const t=meals[k+'_time'];
+    if(!t)return;
+    const m=t.split(':');const min=parseInt(m[0],10)*60+parseInt(m[1],10);
+    if(min<AFTERNOON_TL_START||min>AFTERNOON_TL_END)return;
+    items.push({type:'meal',min,time:t,label:(MEAL_LABELS[k]||'식사')+(meals[k]?' · '+meals[k]:''),icon:'ti-tools-kitchen-3'});
+  });
+  // 할일 완료 + 일정(시간표 포함)
+  getTodos(dk).forEach(t=>{
+    if(t.isEvent){
+      if(!t.eventTime)return;
+      const m=t.eventTime.split(':');const min=parseInt(m[0],10)*60+parseInt(m[1],10);
+      if(min<AFTERNOON_TL_START||min>AFTERNOON_TL_END)return;
+      const {parts}=parseTodoTextParts(t.text);
+      items.push({type:'event',min,time:t.eventTime,label:parts[0]||t.text||'',icon:'ti-calendar-event'});
+      return;
+    }
+    const st=t.strikeTimes||{};
+    const timeEntries=Object.entries(st).filter(([,v])=>typeof v==='number');
+    if(timeEntries.length){
+      const {parts}=parseTodoTextParts(t.text);
+      timeEntries.forEach(([idxStr,ms])=>{
+        const d=new Date(ms);const min=d.getHours()*60+d.getMinutes();
+        if(min<AFTERNOON_TL_START||min>AFTERNOON_TL_END)return;
+        items.push({type:'todo',min,time:minToHHMM(min),label:parts[parseInt(idxStr,10)]||t.text||'',icon:'ti-check'});
+      });
+    }else if(t.done&&t.completedAt){
+      const d=new Date(t.completedAt);const min=d.getHours()*60+d.getMinutes();
+      if(min<AFTERNOON_TL_START||min>AFTERNOON_TL_END)return;
+      items.push({type:'todo',min,time:minToHHMM(min),label:t.text||'',icon:'ti-check'});
+    }
+  });
+  // 리듬 — 외출(appointment) 제외, 시작 시각만
+  getRhythmBlocks(dk).forEach(b=>{
+    if(b.cat==='_sleep'||b.cat==='appointment')return;
+    const cat=RHYTHM_CATS[b.cat];if(!cat)return;
+    const min=_dawnTimeToMin(b.start);
+    if(min==null||min<AFTERNOON_TL_START||min>AFTERNOON_TL_END)return;
+    items.push({type:'rhythm',min,time:b.start,label:(b.text&&b.text.trim())||cat.label+' 시작',icon:cat.icon});
+  });
+  items.sort((a,b)=>a.min-b.min);
+  return items;
+}
+const AFTERNOON_TL_COLORVAR={meal:'--src-meal',todo:'--src-todo',event:'--src-event',rhythm:'--src-rhythm'};
+const AFTERNOON_TL_TEXTVAR={meal:'--src-meal-text',todo:'--src-todo-text',event:'--src-event-text',rhythm:'--src-rhythm-text'};
+function makeAfternoonHomeCard(){
+  const dk=dateKey(getLogicalDate());
+  const now=new Date();
+  const nowMin=Math.min(Math.max(now.getHours()*60+now.getMinutes(),AFTERNOON_TL_START),AFTERNOON_TL_END);
+  const nowPct=(nowMin-AFTERNOON_TL_START)/(AFTERNOON_TL_END-AFTERNOON_TL_START)*100;
+
+  const items=_paceAfternoonTimelineItems(dk);
+  const todayDone=_paceCountDoneUntilNow(dk,null);
+  // 최근 7일(오늘 제외) 같은 "지금 시각까지" 평균 — 하루 중간 시점 비교의 공정성을 위해 nowMin 기준 절단 평균 사용.
+  const curNowMin=now.getHours()*60+now.getMinutes();
+  let sum=0,cnt=0;
+  for(let i=1;i<=7;i++){
+    const d=new Date(dk+'T00:00:00');d.setDate(d.getDate()-i);
+    sum+=_paceCountDoneUntilNow(dateKey(d),curNowMin);cnt++;
+  }
+  const avg=cnt?Math.round(sum/cnt):0;
+  const delta=todayDone-avg;
+  const deltaHtml=delta>0?`평소보다 +${delta}`:delta<0?`평소보다 ${delta}`:'평소와 비슷해요';
+  const deltaColorHtml=delta<0
+    ?'background:rgba(var(--pal-warmgray-rgb),0.28);color:var(--pal-warmgray-text);'
+    :'';
+
+  const insight=_paceWeekInsight(dk);
+  const remainCount=_paceAfternoonRemainCount(dk);
+
+  const card=document.createElement('div');
+  card.className='pace-card';card.id='afternoon-home-card';
+
+  let markersHtml='';
+  items.forEach(it=>{
+    const pct=Math.min(100,Math.max(0,(it.min-AFTERNOON_TL_START)/(AFTERNOON_TL_END-AFTERNOON_TL_START)*100));
+    markersHtml+=`<div class="htl-marker" style="left:${pct}%;--mk-color:var(${AFTERNOON_TL_COLORVAR[it.type]});" title="${escapeHtml(it.time+' '+it.label)}"></div>`;
+  });
+
+  let listHtml='';
+  items.forEach(it=>{
+    listHtml+=`<div class="htl-list-row">
+      <span class="htl-list-time">${it.time}</span>
+      <span class="htl-list-dot" style="background:var(${AFTERNOON_TL_COLORVAR[it.type]});"></span>
+      <i class="ti ${it.icon} htl-list-icon" style="color:var(${AFTERNOON_TL_TEXTVAR[it.type]});" aria-hidden="true"></i>
+      <span class="htl-list-text${it.type==='event'?' emph':''}">${escapeHtml(it.label)}</span>
+    </div>`;
+  });
+
+  card.innerHTML=`<div class="pace-title"><i class="ti ti-clock ico-sz-13" aria-hidden="true"></i> 오늘의 흐름</div>
+    <div class="htl-track-wrap">
+      <div class="htl-track">
+        <div class="htl-fill" style="width:${nowPct}%;"></div>
+        ${markersHtml}
+        <div class="htl-now" style="left:${nowPct}%;"></div>
+      </div>
+      <div class="htl-labels">
+        <span style="left:0%;">12시</span>
+        <span style="left:14.3%;">13시</span>
+        <span style="left:28.6%;">14시</span>
+        <span style="left:42.9%;">15시</span>
+        <span style="left:57.1%;">16시</span>
+        <span style="left:71.4%;">17시</span>
+        <span style="left:85.7%;">18시</span>
+        <span style="left:100%;">19시</span>
+      </div>
+    </div>
+    ${items.length?`<div class="htl-legend">
+      <span class="htl-legend-item"><span class="htl-legend-dot" style="background:var(--src-event);"></span>일정</span>
+      <span class="htl-legend-item"><span class="htl-legend-dot" style="background:var(--src-todo);"></span>할일</span>
+      <span class="htl-legend-item"><span class="htl-legend-dot" style="background:var(--src-meal);"></span>식사</span>
+      <span class="htl-legend-item"><span class="htl-legend-dot" style="background:var(--src-rhythm);"></span>리듬</span>
+    </div>
+    <div class="htl-list">${listHtml}</div>`:''}
+    <div class="pace-divider"></div>
+    <div class="pace-summary">
+      <span class="pace-summary-num">${todayDone}개</span><span class="pace-summary-sub">완료</span>
+      <span class="pace-summary-delta" style="${deltaColorHtml}">${deltaHtml}</span>
+    </div>
+    <div class="pace-remain-pill" onclick="switchToTab('daily')">
+      <div class="pace-remain-label"><i class="ti ti-list-check" aria-hidden="true"></i> 오후에 남은 할 일</div>
+      <div style="display:flex;align-items:center;gap:4px;">
+        <div class="pace-remain-num">${remainCount}개</div>
+        <i class="ti ti-chevron-right" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i>
+      </div>
+    </div>
+    <div class="pace-insight"><i class="ti ${insight.icon}" aria-hidden="true"></i>${insight.text}</div>`;
+  return card;
 }
 // 저녁 파트1용 미니통계 카드 — 당일 기록 기준(완료 투두 / 체크 습관 / 오늘의 최다 리듬), 오후 통계카드보다 훨씬 컴팩트하게
 // 저녁 홈탭 — 오늘 활동 분포(점 타임라인) 카드. 내용 없으면 카드 자체를 만들지 않음.
@@ -5433,28 +5589,6 @@ function makeRecentContentsCard(){
   return card;
 }
 
-// 오후 통계 카드는 로컬 캐시에 없는 과거 날짜(어제/지난주) 데이터가 필요할 수 있어
-// 렌더링 직후 해당 날짜들을 서버에서 새로 받아와 카드를 다시 그림 (completed_at 등 최신값 반영)
-async function refreshAfternoonPaceCard(){
-  const now=new Date();
-  const todayDk=dateKey(now);
-  const yestD=new Date(now);yestD.setDate(now.getDate()-1);
-  const lastWeekD=new Date(now);lastWeekD.setDate(now.getDate()-7);
-  const doRefresh=()=>{
-    const old=document.getElementById('afternoon-pace-card');
-    if(old&&old.parentNode){
-      const fresh=makeAfternoonPaceCard();
-      old.replaceWith(fresh);
-    }
-  };
-  // 각 sync를 개별적으로 안전하게 실행 - 하나가 실패/에러여도 나머지와 최종 갱신에 영향 없도록
-  await Promise.allSettled([
-    syncTodosDown(todayDk),
-    syncTodosDown(dateKey(yestD)),
-    syncTodosDown(dateKey(lastWeekD))
-  ]);
-  doRefresh();
-}
 // 오늘 이전 날짜의 nextweek_suggest 캐시 자동 삭제 (누적 방지)
 (function(){
   try{
@@ -5544,8 +5678,7 @@ function _paceDayEvents(dk){
   return events;
 }
 // 오늘 하루 활동 시각 분포 — 이벤트 수집→좌표변환→겹침 그룹핑까지의 공통 계산.
-// 낮 시간대(점 스타일)와 새벽 시간대(별빛 스타일)가 이 결과를 그대로 공유하고,
-// 각자 마크업/색상만 다르게 렌더링(_paceDotTimelineHtml/makeDawnPaceBanner)한다.
+// 새벽 시간대(별빛 스타일, makeDawnPaceBanner)가 이 결과를 사용한다.
 function _paceDotGroups(dk,rangeStart,rangeEnd){
   const rangeLen=rangeEnd-rangeStart;
   const events=_paceDayEvents(dk)
@@ -5575,33 +5708,8 @@ function _paceHourMarksHtml(rangeStart,rangeEnd,lineClass,labelClass){
   }
   return hourMarks;
 }
-// 오늘 하루 활동 시각 분포를 작은 점 타임라인(HTML)으로 렌더링.
-// 활동이 거의 없는 0~6시는 제외하고 6~24시 구간만 넓게 표시.
-// 겹치는 시각대는 그룹으로 묶어 시간순으로 좌우에 살짝씩 벌려 배치(가로 분산).
-const PACE_DOT_COLORS={todo:'#e8a0ac',habit:'#a3c9ae',morning:'#f2cf8e',event:'#b9a5e6'};
 const PACE_DOT_RANGE_START=6*60; // 06:00
 const PACE_DOT_RANGE_END=24*60; // 24:00
-function _paceDotTimelineHtml(dk){
-  const TRACK_H=42,BASE_Y=18;
-  const g=_paceDotGroups(dk,PACE_DOT_RANGE_START,PACE_DOT_RANGE_END);
-  if(!g)return '';
-  let dotsHtml='';
-  g.groups.forEach(gr=>{
-    const n=gr.items.length;
-    gr.items.forEach((ev,idx)=>{
-      const offset=(idx-(n-1)/2)*g.MIN_GAP_PCT;
-      const x=Math.min(100,Math.max(0,gr.centerX+offset));
-      dotsHtml+=`<div class="pace-dot" style="left:${x}%;top:${BASE_Y}px;background:${PACE_DOT_COLORS[ev.type]};" title="${escapeHtml(ev.label)}"></div>`;
-    });
-  });
-  const hourMarks=_paceHourMarksHtml(PACE_DOT_RANGE_START,PACE_DOT_RANGE_END,'pace-dot-hourline','pace-dot-hourlabel');
-  return `<div class="pace-title"><i class="ti ti-chart-circles ico-sz-13" aria-hidden="true"></i> 오늘 활동 분포</div>
-    <div class="pace-dot-track" style="height:${TRACK_H}px;">
-      <div class="pace-dot-baseline" style="top:${BASE_Y}px;"></div>
-      ${hourMarks}
-      ${dotsHtml}
-    </div>`;
-}
 
 // 새벽 전용 별빛 활동분포 배너 — 인사카드(dawn 톤) 바로 아래 독립 배너로 노출.
 // 계산(_paceDotGroups)은 낮 버전과 공유하고, 렌더링(별빛 스타일)만 다름.
@@ -5636,130 +5744,6 @@ function makeDawnPaceBanner(dk){
 }
 
 
-function makeAfternoonPaceCard(){
-  const now=new Date();
-  const nowMin=now.getHours()*60+now.getMinutes();
-  const todayDk=dateKey(now);
-  const yestD=new Date(now);yestD.setDate(now.getDate()-1);
-  const yestDk=dateKey(yestD);
-  const lastWeekD=new Date(now);lastWeekD.setDate(now.getDate()-7);
-  const lastWeekDk=dateKey(lastWeekD); // 최다 리듬 카테고리 비교용으로는 직전 1주 그대로 사용
-  const HABIT_AVG_WEEKS=4;
-
-  const todayDone=_paceCountDoneUntilNow(todayDk,nowMin);
-  const yestDone=_paceCountDoneUntilNow(yestDk,nowMin);
-  const todayTotal=Math.max(getTodos(todayDk).length,1);
-  const yestTotal=Math.max(getTodos(yestDk).length,1);
-
-  const todayHabit=_paceHabitCheckedCount(todayDk,nowMin);
-  const yestHabit=_paceHabitCheckedCount(yestDk,nowMin);
-  const todayMorning=_paceMorningFlowStartedCount(todayDk,nowMin);
-  const yestMorning=_paceMorningFlowStartedCount(yestDk,nowMin);
-  const HABIT_TOTAL=getHabits().length||1;
-  // 굿모닝은 매일 선택 개수가 유동적(0~6개)이라 고정 분모가 없음 — 오늘/어제 각자 그날 선택한 카드 수를 분모로 사용.
-  const todayMorningTotal=Object.keys(getMorningFlow(todayDk).picks).length;
-  const yestMorningTotal=Object.keys(getMorningFlow(yestDk).picks).length;
-
-  // 오늘 진행도 가로바 — 투두뿐 아니라 습관/굿모닝까지 포함해 하루 전체 활동을 반영
-  const todayBarDone=todayDone+todayHabit+todayMorning;
-  const todayBarTotal=todayTotal+HABIT_TOTAL+todayMorningTotal;
-  const yestBarDone=yestDone+yestHabit+yestMorning;
-  const yestBarTotal=yestTotal+HABIT_TOTAL+yestMorningTotal;
-
-  // 지난 [요일] 평균 — 오늘과 같은 요일로 거슬러 올라간 최근 4주(오늘 제외) 평균.
-  // 습관은 활성 습관 수 변동을 percent 기준으로 흡수하기 위해 별도 헬퍼(_paceHabitAvgPctByDow) 사용.
-  let sameDowTodoSum=0,sameDowMorningSum=0,sameDowWeeksUsed=0;
-  for(let i=1;i<=HABIT_AVG_WEEKS;i++){
-    const d=new Date(now);d.setDate(now.getDate()-7*i);
-    const dk=dateKey(d);
-    sameDowTodoSum+=_paceCountDoneUntilNow(dk,null);
-    sameDowMorningSum+=_paceMorningFlowStartedCount(dk,null);
-    sameDowWeeksUsed++;
-  }
-  const lastDowTodoDone=sameDowWeeksUsed?Math.round(sameDowTodoSum/sameDowWeeksUsed):0;
-  const lastDowMorning=sameDowWeeksUsed?Math.round(sameDowMorningSum/sameDowWeeksUsed):0;
-  const lastDowHabitAvg=_paceHabitAvgPctByDow(todayDk,HABIT_AVG_WEEKS); // {pct, weeksUsed}
-  const todayHabitPct=HABIT_TOTAL>0?Math.round(todayHabit/HABIT_TOTAL*100):0;
-
-  const todaySum=Math.min(todayDone,AFTERNOON_TODO_GOAL)+Math.min(todayHabit,AFTERNOON_HABIT_GOAL)+Math.min(todayMorning,AFTERNOON_MORNING_GOAL);
-  // 평균 물방울의 습관 기여분은 퍼센트를 다시 개수 스케일(AFTERNOON_HABIT_GOAL 기준)로 환산해 기존 물방울 채움 로직과 맞춤.
-  const lastDowHabitAsCount=lastDowHabitAvg.pct/100*AFTERNOON_HABIT_GOAL;
-  const lastWeekSum=Math.min(lastDowTodoDone,AFTERNOON_TODO_GOAL)+Math.min(lastDowHabitAsCount,AFTERNOON_HABIT_GOAL)+Math.min(lastDowMorning,AFTERNOON_MORNING_GOAL);
-  const goalTotal=AFTERNOON_TODO_GOAL+AFTERNOON_HABIT_GOAL+AFTERNOON_MORNING_GOAL;
-
-  const lastWeekTop=_paceTopRhythmCat(lastWeekDk);
-  const todayTop=_paceTopRhythmCat(todayDk);
-
-  const card=document.createElement('div');card.className='pace-card';card.id='afternoon-pace-card';
-
-  let html='';
-  html+=`<div class="pace-title"><i class="ti ti-clock ico-sz-13" aria-hidden="true"></i> 오늘 진행도</div>`;
-  html+=`<div class="pace-track-wrap"><div class="pace-track-lbl"><span>어제</span><span>${yestBarDone}개</span></div>
-    <div class="pace-track"><div class="pace-fill-y" style="width:${yestBarDone/yestBarTotal*100}%;"></div></div></div>`;
-  html+=`<div class="pace-track-wrap" style="margin-bottom:0;"><div class="pace-track-lbl"><span>오늘</span><span>${todayBarDone}개</span></div>
-    <div class="pace-track"><div class="pace-fill-t" style="width:${todayBarDone/todayBarTotal*100}%;"></div><div class="pace-bead2" style="left:${todayBarDone/todayBarTotal*100}%;"></div></div></div>`;
-
-  const habitBarGrad=_habitPctBarGradient();
-  const habitPctBarHtml=pct=>`<div class="wave-habit-pctbar-row">
-    <div class="wave-habit-pctbar-track"><div class="wave-habit-pctbar-fill" style="width:${pct}%;background:${habitBarGrad};"></div></div>
-  </div>`;
-
-  html+=`<div class="pace-divider"></div>`;
-  const DOW_LABELS=['월','화','수','목','금','토','일'];
-  const todayDowLabel=DOW_LABELS[(now.getDay()+6)%7];
-  html+=`<div class="wave-title"><i class="ti ti-droplet ico-sz-13" aria-hidden="true"></i> 지난 ${todayDowLabel}요일과 오늘</div>`;
-  html+=`<div class="wave-row">
-    <div class="wave-col"><div class="wave-wrap"><svg class="wave-svg" viewBox="0 0 90 90">
-      <defs><clipPath id="paceClipLast"><circle cx="45" cy="45" r="40"/></clipPath></defs>
-      <circle cx="45" cy="45" r="40" fill="rgba(150,130,110,0.06)"/>
-      <g clip-path="url(#paceClipLast)"><path class="wave-anim" d="M0,${90-lastWeekSum/goalTotal*80} Q12.5,${90-lastWeekSum/goalTotal*80-6} 25,${90-lastWeekSum/goalTotal*80} T50,${90-lastWeekSum/goalTotal*80} T75,${90-lastWeekSum/goalTotal*80} T100,${90-lastWeekSum/goalTotal*80} T125,${90-lastWeekSum/goalTotal*80} T150,${90-lastWeekSum/goalTotal*80} V90 H0 Z" fill="rgba(190,180,172,0.85)"/></g>
-      <circle cx="45" cy="45" r="40" fill="none" stroke="var(--card-b)" stroke-width="1.5"/>
-    </svg><div class="wave-center"><div class="n">${Math.round(lastWeekSum)}</div></div></div>
-    <div class="wave-lbl">${habitPctBarHtml(lastDowHabitAvg.pct)}</div></div>
-    <div class="wave-col"><div class="wave-wrap"><svg class="wave-svg" viewBox="0 0 90 90">
-      <defs><clipPath id="paceClipToday"><circle cx="45" cy="45" r="40"/></clipPath>
-      <linearGradient id="paceWaterGrad" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#eafbff"/><stop offset="45%" stop-color="#c3ecf7"/><stop offset="100%" stop-color="#8fd8ec"/>
-      </linearGradient></defs>
-      <circle cx="45" cy="45" r="40" fill="rgba(150,130,110,0.06)"/>
-      <g clip-path="url(#paceClipToday)"><path class="wave-anim" d="M0,${90-todaySum/goalTotal*80} Q12.5,${90-todaySum/goalTotal*80-6} 25,${90-todaySum/goalTotal*80} T50,${90-todaySum/goalTotal*80} T75,${90-todaySum/goalTotal*80} T100,${90-todaySum/goalTotal*80} T125,${90-todaySum/goalTotal*80} T150,${90-todaySum/goalTotal*80} V90 H0 Z" fill="url(#paceWaterGrad)" opacity="0.95"/></g>
-      <circle cx="45" cy="45" r="40" fill="none" stroke="var(--card-b)" stroke-width="1.5"/>
-    </svg><div class="wave-center"><div class="n">${todaySum}</div></div></div>
-    <div class="wave-lbl">${habitPctBarHtml(todayHabitPct)}</div></div>
-  </div>`;
-
-  if(lastWeekTop&&todayTop){
-    html+=`<div class="pace-divider"></div>`;
-    const lastColor='rgba(160,150,140,0.85)';
-    const todayColor=todayTop.color;
-    html+=`<div class="rc-flow">
-      <div class="rc-flow-icon-box"><i class="ti ${lastWeekTop.icon}" style="color:${lastColor};"></i></div>
-      <span class="rc-arrow-dot"><svg width="56" height="10" viewBox="0 0 56 10">
-        <circle cx="4" cy="5" r="1.8" fill="#fff" opacity="0.9"/>
-        <circle cx="16" cy="5" r="1.8" fill="${todayColor}" opacity="0.35"/>
-        <circle cx="28" cy="5" r="1.8" fill="${todayColor}" opacity="0.55"/>
-        <circle cx="40" cy="5" r="1.8" fill="${todayColor}" opacity="0.75"/>
-        <circle cx="52" cy="5" r="2.2" fill="${todayColor}" opacity="0.95"/>
-      </svg></span>
-      <div class="rc-flow-icon-box"><i class="ti ${todayTop.icon}" style="color:${todayColor};"></i></div>
-    </div>`;
-    html+=`<div class="rc-flow-memo-row">
-      <div class="rc-flow-memo">${escapeHtml(lastWeekTop.memo||lastWeekTop.label)}</div>
-      <div class="rc-flow-memo-spacer"></div>
-      <div class="rc-flow-memo">${escapeHtml(todayTop.memo||todayTop.label)}</div>
-      </div>`;
-  }else if(!todayTop){
-    html+=`<div class="pace-divider"></div>`;
-    html+=`<div style="text-align:center;font-size:var(--dow-label-size);color:var(--tm);padding:4px 0;"><i class="ti ti-hourglass-empty" style="font-size:14px;margin-right:4px;vertical-align:-2px;" aria-hidden="true"></i>아직 본격적인 활동이 시작되지 않았어요</div>`;
-  }
-
-  const dotTimelineInner=_paceDotTimelineHtml(todayDk);
-  if(dotTimelineInner)html+='<div class="pace-divider"></div>'+dotTimelineInner;
-
-  card.innerHTML=html;
-
-  return card;
-}
 // [안전화] 렌더링 시점(sorted 배열)과 클릭 처리 시점 사이에 백그라운드 동기화 등으로
 // 원본 todos 배열 순서/개수가 바뀌면 인덱스 i가 엉뚱한 항목을 가리킬 수 있음.
 // expectedCid가 주어졌는데 todos[i]와 cid가 다르면(동기화 등으로 인덱스가 어긋난 경우)
@@ -9004,12 +8988,6 @@ function getHabitColorText(colorKey){
 }
 function getHabitColorBorder(colorKey){
   return HABIT_COLOR_BORDER[colorKey]||'var(--pal-pink-border)';
-}
-// 습관 달성률 가로바용 — 앱 톤(따뜻한 베이지~오렌지 계열)에 맞춘 은은한 그라디언트.
-// 습관 색상과 무관하게 항상 자연스러운 톤이 나오도록 고정 그라디언트 사용.
-// G안: 세이지 → 샌드 → 버터, 동일 채도·명도로 톤온톤 연결.
-function _habitPctBarGradient(){
-  return 'linear-gradient(90deg,#b8ceb4 0%,#d4cfa8 50%,#e8ce8f 100%)';
 }
 function renderDailyHabitCheck(){
   const el=document.getElementById('daily-habit-box');if(!el)return;

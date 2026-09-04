@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.47-mflow-part2-time-aware';
+const CACHE = 'iikoto-v2.48-afternoon-flow-merged';
 const ASSETS = [
   './',
   './index.html'
