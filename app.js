@@ -3845,7 +3845,12 @@ function _resizeImageToWebp(file,maxDim){
       const canvas=document.createElement('canvas');
       canvas.width=w;canvas.height=h;
       canvas.getContext('2d').drawImage(img,0,0,w,h);
-      canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('resize failed')),'image/webp',0.82);
+      // Safari(iOS/macOS)는 canvas.toBlob의 image/webp를 지원하지 않고 조용히 무손실 PNG로
+      // 폴백해버려 용량이 크게 부풀어짐 — WebP 인코딩 성공 여부를 실제로 확인해 실패 시 JPEG로 재시도.
+      canvas.toBlob(blob=>{
+        if(blob&&blob.type==='image/webp'){resolve({blob,ext:'webp'});return;}
+        canvas.toBlob(jblob=>jblob?resolve({blob:jblob,ext:'jpg'}):reject(new Error('resize failed')),'image/jpeg',0.82);
+      },'image/webp',0.82);
     };
     img.onerror=reject;
     reader.readAsDataURL(file);
@@ -3856,9 +3861,9 @@ async function handleMemoPhotoSelect(ev){
   ev.target.value='';
   if(!file)return;
   try{
-    const blob=await _resizeImageToWebp(file,1000);
+    const {blob,ext}=await _resizeImageToWebp(file,1000);
     const localUrl=URL.createObjectURL(blob);
-    _memoPendingPhoto={blob,localUrl};
+    _memoPendingPhoto={blob,ext,localUrl};
     renderMemoPhotoPreview();
   }catch(err){
     console.error('사진 처리 실패',err);
@@ -3887,8 +3892,8 @@ function clearMemoPhotoPreview(){
 // 업로드 대기열 — 현재는 메모리 배열(새로고침 시 소실). R2 연동 확정 시 IndexedDB로 교체해
 // 앱 재시작/오프라인 지속 상태에서도 대기열이 유지되도록 영속화 예정(오늘은 프론트 뼈대만).
 const _memoPhotoUploadQueue=[];
-function queueMemoPhotoUpload(dk,cid,blob){
-  _memoPhotoUploadQueue.push({dk,cid,blob});
+function queueMemoPhotoUpload(dk,cid,blob,ext){
+  _memoPhotoUploadQueue.push({dk,cid,blob,ext});
   // 업로드 완료 전까지 photo_url이 아직 null인 스냅샷으로 syncMemosDown이 로컬을 덮어쓰지 않도록
   // pending 플래그를 계속 세워둠(레이스 컨디션 방지) — 실제 해제는 업로드 성공 후 saveMemos에서.
   S.set(S.key('memos_pending',dk),true);
@@ -3898,7 +3903,7 @@ async function processMemoPhotoUploadQueue(){
   while(_memoPhotoUploadQueue.length){
     const job=_memoPhotoUploadQueue[0];
     try{
-      const url=await _uploadMemoPhotoToR2(job.blob,job.dk,job.cid);
+      const url=await _uploadMemoPhotoToR2(job.blob,job.dk,job.cid,job.ext);
       const memos=getMemos(job.dk);
       const m=memos.find(x=>x.cid===job.cid);
       if(m){m.photoUrl=url;m.photoStatus='synced';delete m.photoBlob;delete m.photoLocalUrl;}
@@ -3921,13 +3926,16 @@ window.addEventListener('online',processMemoPhotoUploadQueue);
 // 사진 업로드용 Worker 엔드포인트 — 아래 두 값을 봄이님의 실제 Worker URL / Secret으로 채워주세요.
 const PHOTO_PROXY_BASE='https://iikoto-photo-proxy.faith-003.workers.dev';
 const PHOTO_UPLOAD_SECRET='twinkle77*';
-async function _uploadMemoPhotoToR2(blob,dk,cid){
+async function _uploadMemoPhotoToR2(blob,dk,cid,ext){
   // 키에 '/'를 넣으면 URL 인코딩(%2F) 처리가 프록시/브라우저 환경별로 갈릴 수 있어
   // 안전하게 슬래시 없는 평평한 키로 구성 (날짜는 언더스코어로 접두)
-  const key=`${dk.replace(/-/g,'')}_${cid}.webp`;
+  // 확장자는 실제 인코딩 성공한 포맷(webp 또는 Safari 폴백 jpg)을 그대로 반영
+  const safeExt=ext||'webp';
+  const contentType=safeExt==='jpg'?'image/jpeg':'image/webp';
+  const key=`${dk.replace(/-/g,'')}_${cid}.${safeExt}`;
   const res=await fetch(`${PHOTO_PROXY_BASE}/upload/${key}`,{
     method:'POST',
-    headers:{'Content-Type':'image/webp','X-Upload-Secret':PHOTO_UPLOAD_SECRET},
+    headers:{'Content-Type':contentType,'X-Upload-Secret':PHOTO_UPLOAD_SECRET},
     body:blob
   });
   if(!res.ok){
@@ -3998,7 +4006,7 @@ function submitMemoInline(){
   memos.push(item);
   if(photo)S.set(S.key('memos_pending',dk),true); // saveMemos의 autoSync가 photo_url=null인 채로 먼저 나가지 않도록 선점
   saveMemos(dk,memos);
-  if(photo)queueMemoPhotoUpload(dk,item.cid,photo.blob);
+  if(photo)queueMemoPhotoUpload(dk,item.cid,photo.blob,photo.ext);
   if(inp){inp.value='';inp.style.height='';}
   clearMemoPhotoPreview();
   // 씨앗 토글은 한 건만 적용되고 자동 해제
@@ -6806,7 +6814,13 @@ function renderMemos(){
     if(hasPhoto){
       const thumbSrc=m.photoUrl||m.photoLocalUrl;
       const img=document.createElement('img');
-      img.className='memo-photo-thumb';img.src=thumbSrc;img.alt='';
+      img.className='memo-photo-thumb';img.alt='';
+      // 로컬 blob은 즉시 표시(지연 없음), 원격 R2 URL만 로드 완료 후 부드럽게 페이드인
+      // — 캐시된 이미지는 onload가 동기적으로 이미 지나버릴 수 있어 complete 체크로 보완
+      img.onload=()=>img.classList.add('loaded');
+      img.src=thumbSrc;
+      if(m.photoLocalUrl&&!m.photoUrl)img.classList.add('loaded');
+      if(img.complete)img.classList.add('loaded');
       img.addEventListener('click',e=>{
         e.stopPropagation();
         const meta=`${currentDate.getMonth()+1}월 ${currentDate.getDate()}일 ${_HOME_DAYS[currentDate.getDay()]}요일 · ${m.time||''}`;

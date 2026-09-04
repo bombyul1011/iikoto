@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.57-photo-secret-sync';
+const CACHE = 'iikoto-v2.60-wheel-align-icon-tone-fix';
 const ASSETS = [
   './',
   './index.html'
