@@ -3964,12 +3964,15 @@ async function _uploadMemoPhotoToR2(blob,dk,cid,ext){
 }
 async function _deletePhotoFromR2(photoUrl){
   const key=photoUrl.split('/photo/')[1];
-  if(!key)return;
+  if(!key){console.warn('[R2삭제] key 추출 실패, photoUrl:',photoUrl);return;}
+  console.log('[R2삭제] 시도 key:',key,'| 원본 photoUrl:',photoUrl);
   const res=await fetch(`${PHOTO_PROXY_BASE}/upload/${key}`,{
     method:'DELETE',
     headers:{'X-Upload-Secret':PHOTO_UPLOAD_SECRET}
   });
-  if(!res.ok)throw new Error(`R2 삭제 실패: ${res.status}`);
+  const body=await res.text().catch(()=>'');
+  console.log('[R2삭제] 응답:',res.status,body);
+  if(!res.ok)throw new Error(`R2 삭제 실패: ${res.status} ${body}`);
 }
 // R2 삭제 실패 시(오프라인, Worker 일시 장애, 시크릿 미설정 등) 조용히 유실되지 않도록
 // 로컬(localStorage)에 대기열로 남겨두고, 앱 시작 시와 online 복귀 시 자동 재시도.
