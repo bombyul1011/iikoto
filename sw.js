@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.82-event-work-color-final';
+const CACHE = 'iikoto-v2.83-remove-wgoal-archive';
 const ASSETS = [
   './',
   './index.html'
