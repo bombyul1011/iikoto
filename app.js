@@ -4664,6 +4664,16 @@ function submitMorningFlowEtcFreeText(){
   saveMorningFlow(dk,flow);
   refreshMorningFlowCard();
 }
+// 외출 칩(근처 일정) 또는 텍스트 입력으로 제목을 정하고 곧바로 리듬블록 시작 — 기존 리듬탭 외출 칩 연동(getNearbyTimedSchedules)과 동일한 소스 재사용.
+function pickMorningFlowAppointment(title){
+  if(!title)return;
+  const dk=dateKey(getLogicalDate());
+  const flow=getMorningFlow(dk);
+  if(!flow.etc||flow.etc.sub!=='appointment')return;
+  flow.etc.title=title;
+  saveMorningFlow(dk,flow);
+  _startMorningFlowRhythm('etc',null,null,'appointment');
+}
 // 카드 시작 — 독서/콘텐츠는 진행중 목록이 여러 개면 먼저 고르게(콘텐츠 코너의 선택 시트 패턴 재사용).
 function startMorningFlowCard(key){
   if(key==='enjoy'){
@@ -4688,8 +4698,8 @@ function startMorningFlowCard(key){
     const flow=getMorningFlow(dk);
     const sub=flow.etc?.sub;
     if(sub==='free')return; // 자유입력은 시작 버튼 자체가 없음(submitMorningFlowEtcFreeText로 즉시 완료)
-    if(sub==='work'||sub==='appointment'){_startMorningFlowRhythm('etc',null,null,sub);return;}
-    return;
+    if(sub==='work'){_startMorningFlowRhythm('etc',null,null,sub);return;}
+    return; // 외출은 칩/텍스트 선택 UI(mf-start-row)에서 pickMorningFlowAppointment로 직접 시작됨
   }
   if(key==='desk'){
     const dk=dateKey(getLogicalDate());
@@ -4730,7 +4740,7 @@ function _startMorningFlowRhythm(key,targetCid,mk,subKey){
   const card=MORNING_FLOW_CARDS.find(c=>c.key===key);
   const rhythmCat=key==='etc'?(subKey==='work'?'work':'appointment'):card.rhythmCat;
   const deskLabelMap={diary:'일기',notes:'노트정리',work_personal:'개인작업'};
-  const label=key==='etc'?(subKey==='work'?'업무':'외출'):key==='desk'?deskLabelMap[subKey]:card.label;
+  const label=key==='etc'?(subKey==='work'?'업무':(flow.etc?.title||'외출')):key==='desk'?deskLabelMap[subKey]:card.label;
   const now=Date.now();
   const startMin=new Date(now).getHours()*60+new Date(now).getMinutes();
   const startStr=minToHHMM(startMin);
@@ -4894,8 +4904,20 @@ function makeMorningFlowCard(){
             :`<div style="display:flex;gap:6px;margin-top:8px;"><input id="mf-etc-free-inp" class="modal-inp" style="margin-bottom:0;flex:1;" placeholder="예: 병원 다녀옴" value="${escapeHtml(savedText)}"><button class="mf-start-btn" style="border-color:rgba(${c.colorRgb},0.6);color:rgb(${c.colorRgb});" onclick="submitMorningFlowEtcFreeText()">저장</button></div>`}
         </div>`;
       }
+      if(isEtc&&etcSub==='appointment'&&!flow.etc?.title&&pick.status==='idle'){
+        const nearby=getNearbyTimedSchedules();
+        const chipsHtml=nearby.length?`<div class="rhythm-content-picker">${nearby.map(s=>`<span class="rhythm-content-chip" onclick="pickMorningFlowAppointment('${s.title.replace(/'/g,"\\'")}')">${escapeHtml(s.title)}</span>`).join('')}</div>`:'';
+        return `<div class="mf-start-row" style="flex-direction:column;align-items:stretch;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div class="mf-start-icon" style="background:rgba(${c.colorRgb},0.18);"><i class="ti ti-bus" style="font-size:17px;color:rgb(${c.colorRgb});" aria-hidden="true"></i></div>
+            <div class="mf-label">기타 · 외출</div>
+          </div>
+          ${chipsHtml}
+          <div style="display:flex;gap:6px;margin-top:8px;"><input id="mf-appointment-inp" class="modal-inp" style="margin-bottom:0;flex:1;" placeholder="예: 병원" value=""><button class="mf-start-btn" style="border-color:rgba(${c.colorRgb},0.6);color:rgb(${c.colorRgb});" onclick="pickMorningFlowAppointment(document.getElementById('mf-appointment-inp').value.trim())">시작</button></div>
+        </div>`;
+      }
       const deskLabelMap={diary:'일기',notes:'노트정리',work_personal:'개인작업'};
-      const label=isEtc?(etcSub==='work'?'업무':'외출'):isEnjoy?(enjoySub==='read'?'독서':'콘텐츠'):isDesk?deskLabelMap[deskSub]:c.label;
+      const label=isEtc?(etcSub==='work'?'업무':(flow.etc?.title||'외출')):isEnjoy?(enjoySub==='read'?'독서':'콘텐츠'):isDesk?deskLabelMap[deskSub]:c.label;
       const icon=isEtc?(etcSub==='work'?'ti-keyboard':'ti-bus'):isEnjoy?(MORNING_FLOW_ENJOY_SUB.find(s=>s.key===enjoySub)?.icon||c.icon):c.icon;
       let statusText='시작 전',btnText='시작',btnOn=false;
       if(pick.status==='running'){
