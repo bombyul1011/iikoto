@@ -73,9 +73,6 @@ function renderHomeBody(section){
     }
     body.appendChild(makeHabitStreakRow());
     body.appendChild(makeTodayRhythmBanner());
-    if(!isMorning2){
-      body.appendChild(makeRecentContentsCard());
-    }
   } else if(section==='afternoon'){
     body.appendChild(makeAfternoonHomeCard());
     body.appendChild(makeTodayRhythmBanner());
@@ -3506,56 +3503,111 @@ function renderSleepAvgMarkers(avg){
   if(compareEl){compareEl.textContent=avg.compareText;compareEl.style.display='';}
 }
 // ── 시간 휠 피커 공용 유틸 (취침/기상/리듬/메모/일정/식사/메모수정 7곳 공유) ──
-// 단순화된 구조: 매번 위/가운데/아래 딱 3개만 다시 그림 — 가운데(2번째 자식)가 항상 선택값이라는 게
-// DOM 구조로 보장되므로, translateY 이동거리 계산이 어긋나 하이라이트와 선택값이 밀리는 문제가 원천 차단됨.
+// [2026-09-05 재작성] 값 전체(시 24개/분 60개)를 한번만 DOM에 렌더해두고 translateY로만 스크롤.
+// 손을 뗄 때 속도(velocity) 기반 관성 + 40px 그리드 스냅 — 네이티브 iOS 피커 방식.
+// 매 프레임(rAF) 위치를 계산해 가운데 항목에만 sel, 그 위아래에만 near를 갱신하므로
+// 이전처럼 손 뗄 때 DOM을 통째로 다시 그리며 끊기는 지점이 없음.
 const TW_ITEM_H=40;
-let _twDragState=null;
-function _twRenderThree(trackId,values,curIdx,fmt){
+const TW_VISIBLE_PAD=1; // 위아래 여백용 빈 칸(가운데 정렬을 위해 값 배열 앞뒤에 1개씩)
+function _twBuildTrack(trackId,values,fmt){
   const t=document.getElementById(trackId);
   t.innerHTML='';
+  t._twValues=values;
   t._twFmt=fmt;
-  [curIdx-1,curIdx,curIdx+1].forEach((idx,pos)=>{
-    const el=document.createElement('div');
-    const inRange=idx>=0&&idx<values.length;
-    el.className='tw-item'+(pos===1?' sel':' near');
-    el.textContent=inRange?fmt(values[idx]):'';
-    t.appendChild(el);
+  const frag=document.createDocumentFragment();
+  for(let i=0;i<TW_VISIBLE_PAD;i++)frag.appendChild(_twMakeItem(''));
+  values.forEach(v=>frag.appendChild(_twMakeItem(fmt(v))));
+  for(let i=0;i<TW_VISIBLE_PAD;i++)frag.appendChild(_twMakeItem(''));
+  t.appendChild(frag);
+  t._twItems=Array.from(t.children);
+}
+function _twMakeItem(text){
+  const el=document.createElement('div');
+  el.className='tw-item';
+  el.textContent=text;
+  return el;
+}
+// idx(값 배열 기준, 소수 가능)에 맞춰 트랙을 이동시키고 sel/near 클래스를 갱신
+function _twApplyIdx(track,idx){
+  const clamped=Math.max(0,Math.min(track._twValues.length-1,idx));
+  track.style.transform=`translateY(${-clamped*TW_ITEM_H}px)`;
+  const nearestInt=Math.round(clamped);
+  track._twItems.forEach((el,pos)=>{
+    const valueIdx=pos-TW_VISIBLE_PAD;
+    el.className='tw-item'+(valueIdx===nearestInt?' sel':(Math.abs(valueIdx-nearestInt)===1?' near':''));
   });
-  t.dataset.curIdx=curIdx;
+  track.dataset.curIdx=nearestInt;
+  return nearestInt;
 }
 function _twSyncInput(hourTrackId,minTrackId,targetInpId){
-  const hEl=document.querySelector(`#${hourTrackId} .sel`),mEl=document.querySelector(`#${minTrackId} .sel`);
-  if(hEl&&mEl)document.getElementById(targetInpId).value=hEl.textContent+':'+mEl.textContent;
+  const hT=document.getElementById(hourTrackId),mT=document.getElementById(minTrackId);
+  const inp=document.getElementById(targetInpId);
+  if(hT&&mT&&inp)inp.value=hT._twFmt(hT._twValues[hT.dataset.curIdx])+':'+mT._twFmt(mT._twValues[mT.dataset.curIdx]);
 }
-function _twAttach(trackId,values,onSelect){
+// 관성 스크롤 — 마지막 몇 개 이동 샘플로 속도 계산 후 감속시키며 40px 그리드에 스냅
+function _twMomentum(track,velocity,onSettle){
+  const friction=0.94,minVelocity=0.02;
+  let v=velocity;
+  let idx=parseFloat(track.dataset.rawIdx||track.dataset.curIdx);
+  function step(){
+    if(Math.abs(v)<minVelocity){
+      const settled=Math.round(idx);
+      _twSnap(track,settled,onSettle);
+      return;
+    }
+    idx-=v/TW_ITEM_H;
+    v*=friction;
+    const clamped=Math.max(0,Math.min(track._twValues.length-1,idx));
+    if(clamped!==idx){idx=clamped;v=0;} // 끝에 닿으면 즉시 정지 후 스냅
+    track.dataset.rawIdx=idx;
+    _twApplyIdx(track,idx);
+    track._twRaf=requestAnimationFrame(step);
+  }
+  track._twRaf=requestAnimationFrame(step);
+}
+function _twSnap(track,targetIdx,onSettle){
+  track.style.transition='transform .18s cubic-bezier(.25,.8,.4,1)';
+  const settled=_twApplyIdx(track,targetIdx);
+  track.dataset.rawIdx=settled;
+  const clearTransition=()=>{track.style.transition='';track.removeEventListener('transitionend',clearTransition);};
+  track.addEventListener('transitionend',clearTransition);
+  onSettle();
+}
+function _twAttach(trackId,onSelect){
   const track=document.getElementById(trackId),col=track.parentElement;
   if(col.dataset.twBound)return;
   col.dataset.twBound='1';
-  function curIdx(){return parseInt(track.dataset.curIdx,10);}
+  let dragging=false,startY=0,startIdx=0,lastY=0,lastT=0,velocity=0;
   function start(y){
-    _twDragState={track,values,startY:y,startIdx:curIdx(),moved:0};
+    if(track._twRaf)cancelAnimationFrame(track._twRaf);
     track.style.transition='none';
+    dragging=true;
+    startY=lastY=y;
+    lastT=performance.now();
+    velocity=0;
+    startIdx=parseFloat(track.dataset.rawIdx||track.dataset.curIdx);
   }
   function move(y){
-    if(!_twDragState||_twDragState.track!==track)return;
-    const delta=y-_twDragState.startY;
-    _twDragState.moved=delta;
-    track.style.transform=`translateY(${delta}px)`;
+    if(!dragging)return;
+    const now=performance.now();
+    const dt=Math.max(1,now-lastT);
+    velocity=(y-lastY)/dt*16.67; // 프레임당 이동량으로 정규화
+    lastY=y;lastT=now;
+    const delta=y-startY;
+    const idx=startIdx-delta/TW_ITEM_H;
+    track.dataset.rawIdx=idx;
+    _twApplyIdx(track,idx);
   }
   function end(){
-    if(!_twDragState||_twDragState.track!==track)return;
-    const steps=Math.round(_twDragState.moved/TW_ITEM_H);
-    const newIdx=Math.max(0,Math.min(values.length-1,_twDragState.startIdx-steps));
-    track.style.transition='';
-    track.style.transform='';
-    _twDragState=null;
-    _twRenderThree(trackId,values,newIdx,track._twFmt);
-    onSelect();
+    if(!dragging)return;
+    dragging=false;
+    _twMomentum(track,velocity,onSelect);
   }
   col.addEventListener('touchstart',e=>start(e.touches[0].clientY),{passive:true});
-  col.addEventListener('touchmove',e=>move(e.touches[0].clientY),{passive:true});
+  col.addEventListener('touchmove',e=>{move(e.touches[0].clientY);},{passive:true});
   col.addEventListener('touchend',end);
   col.addEventListener('mousedown',e=>{
+    e.preventDefault();
     start(e.clientY);
     const mm=ev=>move(ev.clientY),mu=()=>{end();document.removeEventListener('mousemove',mm);document.removeEventListener('mouseup',mu);};
     document.addEventListener('mousemove',mm);document.addEventListener('mouseup',mu);
@@ -3569,12 +3621,17 @@ function _renderTimeWheelFor(hourTrackId,minTrackId,inpId){
   const h=m?Math.min(23,parseInt(m[1],10)):n.getHours();
   const mi=m?Math.min(59,parseInt(m[2],10)):n.getMinutes();
   const hours=[...Array(24).keys()],mins=[...Array(60).keys()];
+  const hourTrack=document.getElementById(hourTrackId),minTrack=document.getElementById(minTrackId);
   const sync=()=>_twSyncInput(hourTrackId,minTrackId,inpId);
-  _twRenderThree(hourTrackId,hours,h,v=>pad(v));
-  _twRenderThree(minTrackId,mins,mi,v=>pad(v));
+  _twBuildTrack(hourTrackId,hours,v=>pad(v));
+  _twBuildTrack(minTrackId,mins,v=>pad(v));
+  hourTrack.style.transition='none';minTrack.style.transition='none';
+  _twApplyIdx(hourTrack,h);
+  _twApplyIdx(minTrack,mi);
+  hourTrack.dataset.rawIdx=h;minTrack.dataset.rawIdx=mi;
   sync();
-  _twAttach(hourTrackId,hours,sync);
-  _twAttach(minTrackId,mins,sync);
+  _twAttach(hourTrackId,sync);
+  _twAttach(minTrackId,sync);
 }
 function renderTimeWheel(){
   _renderTimeWheelFor('tw-hour-track','tw-min-track','time-inp');
@@ -4960,7 +5017,7 @@ function makeMorningFlowCard(){
     bodyHtml+=`<div class="mf-grid">${MORNING_FLOW_CARDS.map(c=>{
       const isOn=!!flow.picks[c.key];
       const cnt=monthCounts[c.key]||0;
-      return `<div class="mf-card${isOn?' on':''}" onclick="toggleMorningFlowPick('${c.key}')" style="${isOn?`background:rgb(${c.colorRgb});border-color:rgb(${c.colorRgb});`:''}">
+      return `<div class="mf-card${isOn?' on':''}" onclick="toggleMorningFlowPick('${c.key}')" style="${isOn?`background:rgba(${c.colorRgb},0.82);border-color:rgba(${c.colorRgb},0.82);`:''}">
         <i class="ti ${c.icon} mf-card-icon" style="color:${isOn?'#fff':`rgb(${c.colorRgb})`};" aria-hidden="true"></i>
         <span class="mf-card-label" style="${isOn?'color:#fff;':''}">${c.label}</span>
         <span class="mf-card-count" style="${isOn?'color:rgba(255,255,255,0.85);':''}">${cnt}</span>
