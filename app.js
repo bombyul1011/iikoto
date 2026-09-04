@@ -3920,7 +3920,7 @@ async function processMemoPhotoUploadQueue(){
 window.addEventListener('online',processMemoPhotoUploadQueue);
 // 사진 업로드용 Worker 엔드포인트 — 아래 두 값을 봄이님의 실제 Worker URL / Secret으로 채워주세요.
 const PHOTO_PROXY_BASE='https://iikoto-photo-proxy.faith-003.workers.dev';
-const PHOTO_UPLOAD_SECRET='851011';
+const PHOTO_UPLOAD_SECRET='twinkle77*';
 async function _uploadMemoPhotoToR2(blob,dk,cid){
   // 키에 '/'를 넣으면 URL 인코딩(%2F) 처리가 프록시/브라우저 환경별로 갈릴 수 있어
   // 안전하게 슬래시 없는 평평한 키로 구성 (날짜는 언더스코어로 접두)
