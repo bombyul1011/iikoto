@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.48-afternoon-flow-merged';
+const CACHE = 'iikoto-v2.49-rhythm-track-fill';
 const ASSETS = [
   './',
   './index.html'

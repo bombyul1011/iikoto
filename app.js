@@ -524,9 +524,11 @@ function buildDailyRhythmTrack(dk){
     return Math.round(H1+(m-NIGHT_END)/(1440-NIGHT_END)*H2);
   };
 
-  let html='<div class="rt-line"></div>';
-  [0,6,12,18,24].forEach(function(h){
-    html+='<div class="rt-hourlabel" data-h="'+h+'" style="top:'+toY(h*60)+'px;">'+String(h).padStart(2,'0')+'</div>';
+  // 시간 눈금 — 0~8시 압축구간은 눈금을 생략(그 구간엔 보통 수면만 있어 8시부터 표기해도 충분)하고 8시부터 2시간 간격으로.
+  let html='';
+  [8,10,12,14,16,18,20,22,24].forEach(function(h){
+    const y=toY(h*60);
+    html+='<div class="rt-gridline" style="top:'+y+'px;"></div><div class="rt-hourlabel" data-h="'+h+'" style="top:'+y+'px;">'+String(h).padStart(2,'0')+'</div>';
   });
 
   // 블록 통합 목록: 수면(자동) + 식사(자동,30분) + 수기 블록 — 공통 함수 computeRhythmBlocksRaw로 통일
@@ -552,40 +554,41 @@ function buildDailyRhythmTrack(dk){
     return ka-kb;
   });
 
-  const MIN_GAP=22;let lastY=-999;
-  blocks.forEach(function(bk,bi){
-    if(bk.noLabel)return; // 텍스트 없는 블록은 라벨 공간을 차지하지 않음
-    bk.anchorY=toY(bk.sortKey!=null?bk.sortKey:bk.start);
-    let y=bk.anchorY;
-    if(y<lastY+MIN_GAP)y=lastY+MIN_GAP;
-    bk.labelY=y;lastY=y;
-  });
-  const trackHeight=Math.max(TOTAL_H+10,lastY+24);
-
-  // 짧은 블록(끼어든 활동)이 긴 블록(외출/업무) 위로 보이도록 지속시간 내림차순 정렬
+  // 짧은 블록(끼어든 활동)이 긴 블록(외출/업무) 위로 보이도록 지속시간 내림차순 정렬 — 렌더 순서(z-index)에 그대로 반영.
   const blocksSorted=blocks.slice().sort(function(a,b){
     const durA=(a.end!=null&&a.start!=null)?a.end-a.start:1440;
     const durB=(b.end!=null&&b.start!=null)?b.end-b.start:1440;
-    return durB-durA; // 긴 것 먼저 → 낮은 z-index → 뒤로
+    return durB-durA; // 긴 것 먼저 → 낮은 z-index → 뒤로, 짧은 것 나중 → 높은 z-index → 앞으로
   });
+  let maxBottom=TOTAL_H;
   blocksSorted.forEach(function(bk,bi){
     const offset=(bk.sortKey!=null)?(bk.sortKey-bk.start):0; // 자정 넘김 보정값(+1440 또는 0)
     const by=toY(bk.start+offset);
     const stubEnd=bk.end!=null?bk.end:(isToday?(function(){const n=new Date();return n.getHours()*60+n.getMinutes();})():Math.min(bk.start+20,1440));
-    const bh=Math.max(toY(stubEnd+offset)-by,8);
-    html+='<div class="rt-block'+(bk.ongoing?' ongoing':'')+'" style="top:'+by+'px;height:'+bh+'px;background-color:'+bk.color+';z-index:'+(10+bi)+';"></div>';
-    if(bk.noLabel)return; // 전날 이어짐 블록은 색상바만, 텍스트줄/연결선 없음
-    if(Math.abs(bk.labelY-bk.anchorY)>4){
-      const top=Math.min(bk.labelY,bk.anchorY)+3,h=Math.abs(bk.labelY-bk.anchorY);
-      html+='<div class="rt-connector" style="top:'+top+'px;height:'+h+'px;"></div>';
+    const bh=Math.max(toY(stubEnd+offset)-by,16); // 라벨 텍스트가 최소한은 들어갈 높이 확보
+    if(by+bh>maxBottom)maxBottom=by+bh;
+    html+='<div class="rt-fill'+(bk.ongoing?' ongoing':'')+'" style="top:'+by+'px;height:'+bh+'px;background-color:'+bk.color+';z-index:'+(10+bi)+';">';
+    if(!bk.noLabel){
+      const iconHtml=bk.icon?'<i class="ti ti-tools-kitchen-3" aria-hidden="true"></i>':'';
+      html+='<span class="rt-fill-label">'+iconHtml+escapeHtml(bk.label)+'</span>';
+      const delBtn=bk.manualIdx!=null?'<span class="rt-del" onclick="event.stopPropagation();deleteRhythmBlock('+bk.manualIdx+')">×</span>':'';
+      const editBtn=bk.manualIdx!=null?'<span class="rt-edit" onclick="event.stopPropagation();openRhythmEditForm('+bk.manualIdx+')"><i class="ti ti-pencil ico-sz-11" aria-hidden="true"></i></span>':'';
+      const finishBtn=(bk.ongoing&&bk.manualIdx!=null)?'<span class="rt-finish" onclick="event.stopPropagation();finishRhythmBlock('+bk.manualIdx+')">종료</span>':'';
+      const actions=(finishBtn||editBtn||delBtn)?'<span class="rt-fill-actions">'+finishBtn+editBtn+delBtn+'</span>':'';
+      if(actions)html+=actions;
     }
-    const delBtn=bk.manualIdx!=null?'<span class="rt-del" onclick="deleteRhythmBlock('+bk.manualIdx+')">×</span>':'';
-    const editBtn=bk.manualIdx!=null?'<span class="rt-edit" onclick="openRhythmEditForm('+bk.manualIdx+')"><i class="ti ti-pencil ico-sz-11" aria-hidden="true"></i></span>':'';
-    const finishBtn=(bk.ongoing&&bk.manualIdx!=null)?'<span class="rt-finish" onclick="finishRhythmBlock('+bk.manualIdx+')">종료</span>':'';
-    const actions=(finishBtn||editBtn||delBtn)?'<span class="rt-actions">'+finishBtn+editBtn+delBtn+'</span>':'';
-    html+='<div class="rt-row" style="top:'+bk.labelY+'px;"><span class="rt-time">'+bk.time+'</span><span class="rt-txt">'+bk.label+'</span>'+actions+'</div>';
+    html+='</div>';
   });
 
+  // 현재시각 — 선+원 마커만(텍스트 라벨 없이 양옆 시간눈금으로 직관적으로 파악)
+  if(isToday){
+    const nowMin=new Date().getHours()*60+new Date().getMinutes();
+    const nowY=toY(nowMin);
+    html+='<div class="rt-now-line" style="top:'+nowY+'px;"></div><div class="rt-now-dot" style="top:'+nowY+'px;"></div>';
+    if(nowY>maxBottom)maxBottom=nowY;
+  }
+
+  const trackHeight=Math.max(TOTAL_H+10,maxBottom+10);
   wrap.style.height=trackHeight+'px';
   wrap.innerHTML=blocks.length?html:'';
   if(!blocks.length){
