@@ -3687,25 +3687,22 @@ function renderSleepAvgMarkers(avg){
   if(compareEl){compareEl.textContent=avg.compareText;compareEl.style.display='';}
 }
 // ── 시간 휠 피커 공용 유틸 (취침/기상/리듬/메모/일정/식사/메모수정 7곳 공유) ──
-const TW_ITEM_H=40,TW_CENTER=1;
+// 단순화된 구조: 매번 위/가운데/아래 딱 3개만 다시 그림 — 가운데(2번째 자식)가 항상 선택값이라는 게
+// DOM 구조로 보장되므로, translateY 이동거리 계산이 어긋나 하이라이트와 선택값이 밀리는 문제가 원천 차단됨.
+const TW_ITEM_H=40;
 let _twDragState=null;
-function _twBuildCol(trackId,values,selIndex,fmt){
+function _twRenderThree(trackId,values,curIdx,fmt){
   const t=document.getElementById(trackId);
   t.innerHTML='';
-  values.forEach(v=>{
+  t._twFmt=fmt;
+  [curIdx-1,curIdx,curIdx+1].forEach((idx,pos)=>{
     const el=document.createElement('div');
-    el.className='tw-item';
-    el.textContent=fmt(v);
+    const inRange=idx>=0&&idx<values.length;
+    el.className='tw-item'+(pos===1?' sel':' near');
+    el.textContent=inRange?fmt(values[idx]):'';
     t.appendChild(el);
   });
-  _twSetSel(t,selIndex);
-}
-function _twSetSel(t,i){
-  [...t.children].forEach(c=>c.className='tw-item');
-  if(t.children[i-1])t.children[i-1].className='tw-item near';
-  if(t.children[i+1])t.children[i+1].className='tw-item near';
-  if(t.children[i])t.children[i].className='tw-item sel';
-  t.style.transform=`translateY(${-(i-TW_CENTER)*TW_ITEM_H}px)`;
+  t.dataset.curIdx=curIdx;
 }
 function _twSyncInput(hourTrackId,minTrackId,targetInpId){
   const hEl=document.querySelector(`#${hourTrackId} .sel`),mEl=document.querySelector(`#${minTrackId} .sel`);
@@ -3715,31 +3712,33 @@ function _twAttach(trackId,values,onSelect){
   const track=document.getElementById(trackId),col=track.parentElement;
   if(col.dataset.twBound)return;
   col.dataset.twBound='1';
+  function curIdx(){return parseInt(track.dataset.curIdx,10);}
   function start(y){
-    const idx=[...track.children].findIndex(e=>e.className==='tw-item sel');
-    _twDragState={track,values,startY:y,startIdx:idx};
+    _twDragState={track,values,startY:y,startIdx:curIdx(),moved:0};
     track.style.transition='none';
   }
   function move(y){
     if(!_twDragState||_twDragState.track!==track)return;
-    const d=(y-_twDragState.startY)/TW_ITEM_H;
-    track.style.transform=`translateY(${-(_twDragState.startIdx-d-TW_CENTER)*TW_ITEM_H}px)`;
+    const delta=y-_twDragState.startY;
+    _twDragState.moved=delta;
+    track.style.transform=`translateY(${delta}px)`;
   }
-  function end(y){
+  function end(){
     if(!_twDragState||_twDragState.track!==track)return;
-    track.style.transition='transform .22s cubic-bezier(.25,.9,.35,1)';
-    const d=(y-_twDragState.startY)/TW_ITEM_H;
-    const idx=Math.max(0,Math.min(values.length-1,Math.round(_twDragState.startIdx-d)));
-    _twSetSel(track,idx);
-    onSelect();
+    const steps=Math.round(_twDragState.moved/TW_ITEM_H);
+    const newIdx=Math.max(0,Math.min(values.length-1,_twDragState.startIdx-steps));
+    track.style.transition='';
+    track.style.transform='';
     _twDragState=null;
+    _twRenderThree(trackId,values,newIdx,track._twFmt);
+    onSelect();
   }
   col.addEventListener('touchstart',e=>start(e.touches[0].clientY),{passive:true});
   col.addEventListener('touchmove',e=>move(e.touches[0].clientY),{passive:true});
-  col.addEventListener('touchend',e=>end(e.changedTouches[0].clientY));
+  col.addEventListener('touchend',end);
   col.addEventListener('mousedown',e=>{
     start(e.clientY);
-    const mm=ev=>move(ev.clientY),mu=ev=>{end(ev.clientY);document.removeEventListener('mousemove',mm);document.removeEventListener('mouseup',mu);};
+    const mm=ev=>move(ev.clientY),mu=()=>{end();document.removeEventListener('mousemove',mm);document.removeEventListener('mouseup',mu);};
     document.addEventListener('mousemove',mm);document.addEventListener('mouseup',mu);
   });
 }
@@ -3752,8 +3751,8 @@ function _renderTimeWheelFor(hourTrackId,minTrackId,inpId){
   const mi=m?Math.min(59,parseInt(m[2],10)):n.getMinutes();
   const hours=[...Array(24).keys()],mins=[...Array(60).keys()];
   const sync=()=>_twSyncInput(hourTrackId,minTrackId,inpId);
-  _twBuildCol(hourTrackId,hours,h,v=>pad(v));
-  _twBuildCol(minTrackId,mins,mi,v=>pad(v));
+  _twRenderThree(hourTrackId,hours,h,v=>pad(v));
+  _twRenderThree(minTrackId,mins,mi,v=>pad(v));
   sync();
   _twAttach(hourTrackId,hours,sync);
   _twAttach(minTrackId,mins,sync);

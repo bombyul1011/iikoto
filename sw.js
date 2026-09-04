@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.60-wheel-align-icon-tone-fix';
+const CACHE = 'iikoto-v2.63-rhythm-track-alpha-fontsize';
 const ASSETS = [
   './',
   './index.html'
