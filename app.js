@@ -3943,6 +3943,15 @@ async function _uploadMemoPhotoToR2(blob,dk,cid,ext){
   }
   return `${PHOTO_PROXY_BASE}/photo/${key}`;
 }
+async function _deletePhotoFromR2(photoUrl){
+  const key=photoUrl.split('/photo/')[1];
+  if(!key)return;
+  const res=await fetch(`${PHOTO_PROXY_BASE}/upload/${key}`,{
+    method:'DELETE',
+    headers:{'X-Upload-Secret':PHOTO_UPLOAD_SECRET}
+  });
+  if(!res.ok)throw new Error(`R2 삭제 실패: ${res.status}`);
+}
 function openPhotoViewer(url,text,meta){
   document.getElementById('photo-viewer-img').src=url;
   document.getElementById('photo-viewer-text').textContent=text||'';
@@ -6813,13 +6822,8 @@ function renderMemos(){
     if(hasPhoto){
       const thumbSrc=m.photoUrl||m.photoLocalUrl;
       const img=document.createElement('img');
-      img.className='memo-photo-thumb';img.alt='';
-      // 로컬 blob은 즉시 표시(지연 없음), 원격 R2 URL만 로드 완료 후 부드럽게 페이드인
-      // — 캐시된 이미지는 onload가 동기적으로 이미 지나버릴 수 있어 complete 체크로 보완
-      img.onload=()=>img.classList.add('loaded');
+      img.className='memo-photo-thumb';img.alt='';img.loading='lazy';
       img.src=thumbSrc;
-      if(m.photoLocalUrl&&!m.photoUrl)img.classList.add('loaded');
-      if(img.complete)img.classList.add('loaded');
       img.addEventListener('click',e=>{
         e.stopPropagation();
         const meta=`${currentDate.getMonth()+1}월 ${currentDate.getDate()}일 ${_HOME_DAYS[currentDate.getDay()]}요일 · ${m.time||''}`;
@@ -6871,7 +6875,14 @@ function confirmMemoEdit(){
 function showUndo(){
   clearTimeout(_undoTimer);
   const t=document.getElementById('undo-toast');t.classList.add('on');
-  _undoTimer=setTimeout(()=>{t.classList.remove('on');_deletedMemo=null;},4000);
+  _undoTimer=setTimeout(()=>{
+    t.classList.remove('on');
+    // 실행취소 유예시간(4초)이 지나 삭제가 확정된 시점 — 사진이 있던 메모라면 R2 원본도 함께 정리
+    if(_deletedMemo&&_deletedMemo.memo&&_deletedMemo.memo.photoUrl){
+      _deletePhotoFromR2(_deletedMemo.memo.photoUrl).catch(err=>console.error('R2 사진 삭제 실패',err));
+    }
+    _deletedMemo=null;
+  },4000);
 }
 function undoMemo(){
   if(!_deletedMemo)return;

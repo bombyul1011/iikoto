@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.63-rhythm-track-alpha-fontsize';
+const CACHE = 'iikoto-v2.65-photo-loading-simplify';
 const ASSETS = [
   './',
   './index.html'
