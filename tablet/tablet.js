@@ -2684,15 +2684,13 @@ async function renderWatchCal(contentsData){
   renderWatchCalGrid();
   renderWcalMonthSummary(contents,prevContents||[],mk);
 }
-// 감상달력 하단 — 이 달의 카테고리별 진행중+완결 누계(작품 단위, 중복 없음). 콘텐츠그리드(renderMonthContentGrid)와 동일한 belongsHere 기준.
-// 음악은 진행중/완결 개념이 없어 등록 건수를 그대로 완결로 집계.
+// 감상달력 하단 — 이 달의 카테고리별 완결 누계(작품 단위, 중복 없음). countContentsCompletedInRange와 동일 기준(완결/종료월 only, 진행중 미포함).
+// 음악은 완결 개념이 없어 등록 건수를 그대로 완결로 집계.
 function renderWcalMonthSummary(curContents,prevContents,mk){
   const el=document.getElementById('wcal-month-summary');if(!el)return;
-  const isSameMonth=mk===monthKeyOf(new Date());
   const belongsHere=c=>{
     if(c.content_cat==='music')return true; // 등록 건수를 그대로 완결로 카운트
-    if(_isContentFinished(c))return isContentEndedInMonthTablet(c,mk);
-    return c.status==='watching'&&isSameMonth;
+    return _isContentFinished(c)&&isContentEndedInMonthTablet(c,mk);
   };
   const list=[...curContents,...prevContents].filter(belongsHere);
   const counts={drama:0,movie:0,book:0,music:0};
