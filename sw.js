@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.53-r2-photo-upload';
+const CACHE = 'iikoto-v2.56-photo-upload-diagnostics';
 const ASSETS = [
   './',
   './index.html'

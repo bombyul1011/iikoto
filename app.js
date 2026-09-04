@@ -2944,7 +2944,11 @@ async function syncMemosUp(dk){
     m=>({date_key:dk,memo_time:m.time,text:m.text,created:m.created,client_id:m.cid,type:m.type||null,photo_url:m.photoUrl||null}),
     delCids);
   if(ok)delCids.forEach(cid=>removeDelPending('memos',dk,cid));
-  return ok;
+  // 이 날짜에 아직 R2 업로드가 끝나지 않은 사진(pending_upload)이 있으면, 방금 photo_url=null로
+  // 서버에 올라간 스냅샷을 syncMemosDown이 그대로 되받아 로컬 사진을 지워버리는 레이스를 막기 위해
+  // pending 해제를 보류 — 업로드 완료 후 재저장될 때 다시 syncMemosUp이 돌며 정상 해제됨.
+  const stillUploading=memos.some(m=>m.photoStatus==='pending_upload');
+  return ok&&!stillUploading;
 }
 async function syncSleepDown(dk){
   const rows=await supaFetch(`sleep?date_key=eq.${dk}`);
@@ -3810,13 +3814,11 @@ function confirmMemo(){
   const text=inp?inp.value.trim():'';
   if(!text)return;
   _memoSubmitting=true;
-  const stampBtn=document.getElementById('memo-stamp-btn');
   const n=new Date();
-  const stamp=(stampBtn&&stampBtn.dataset.stamp)||`${pad(n.getHours())}:${pad(n.getMinutes())}`;
+  const stamp=`${pad(n.getHours())}:${pad(n.getMinutes())}`;
   const dk=dateKey(currentDate),memos=getMemos(dk);
   memos.push({text,time:stamp,created:Date.now(),cid:genCid()});
   saveMemos(dk,memos);
-  if(stampBtn){delete stampBtn.dataset.stamp;stampBtn.title='';}
   closeModal('memo-modal');
   renderMemos();
   setTimeout(()=>{_memoSubmitting=false;},500);
@@ -3887,6 +3889,9 @@ function clearMemoPhotoPreview(){
 const _memoPhotoUploadQueue=[];
 function queueMemoPhotoUpload(dk,cid,blob){
   _memoPhotoUploadQueue.push({dk,cid,blob});
+  // 업로드 완료 전까지 photo_url이 아직 null인 스냅샷으로 syncMemosDown이 로컬을 덮어쓰지 않도록
+  // pending 플래그를 계속 세워둠(레이스 컨디션 방지) — 실제 해제는 업로드 성공 후 saveMemos에서.
+  S.set(S.key('memos_pending',dk),true);
   if(navigator.onLine)processMemoPhotoUploadQueue();
 }
 async function processMemoPhotoUploadQueue(){
@@ -3902,6 +3907,12 @@ async function processMemoPhotoUploadQueue(){
       renderMemos();
     }catch(err){
       console.error('사진 업로드 실패, 재시도 대기',err);
+      // 진단을 위해 실패한 메모에 에러 상태를 남겨 화면에서도 바로 확인 가능하게 함
+      const memos=getMemos(job.dk);
+      const m=memos.find(x=>x.cid===job.cid);
+      if(m){m.photoStatus='upload_failed';m.photoErrorMsg=String(err.message||err);}
+      saveMemos(job.dk,memos);
+      renderMemos();
       break;
     }
   }
@@ -3911,18 +3922,24 @@ window.addEventListener('online',processMemoPhotoUploadQueue);
 const PHOTO_PROXY_BASE='https://iikoto-photo-proxy.faith-003.workers.dev';
 const PHOTO_UPLOAD_SECRET='851011';
 async function _uploadMemoPhotoToR2(blob,dk,cid){
-  const key=`${dk}/${cid}.webp`;
-  const res=await fetch(`${PHOTO_PROXY_BASE}/upload/${encodeURIComponent(key)}`,{
+  // 키에 '/'를 넣으면 URL 인코딩(%2F) 처리가 프록시/브라우저 환경별로 갈릴 수 있어
+  // 안전하게 슬래시 없는 평평한 키로 구성 (날짜는 언더스코어로 접두)
+  const key=`${dk.replace(/-/g,'')}_${cid}.webp`;
+  const res=await fetch(`${PHOTO_PROXY_BASE}/upload/${key}`,{
     method:'POST',
     headers:{'Content-Type':'image/webp','X-Upload-Secret':PHOTO_UPLOAD_SECRET},
     body:blob
   });
-  if(!res.ok)throw new Error('R2 업로드 실패: '+res.status);
-  return `${PHOTO_PROXY_BASE}/photo/${encodeURIComponent(key)}`;
+  if(!res.ok){
+    const detail=await res.text().catch(()=>'');
+    throw new Error(`R2 업로드 실패: ${res.status} ${detail}`);
+  }
+  return `${PHOTO_PROXY_BASE}/photo/${key}`;
 }
-function openPhotoViewer(url,text){
+function openPhotoViewer(url,text,meta){
   document.getElementById('photo-viewer-img').src=url;
   document.getElementById('photo-viewer-text').textContent=text||'';
+  document.getElementById('photo-viewer-date').textContent=meta||'';
   document.getElementById('photo-viewer-ov').classList.add('on');
 }
 function closePhotoViewer(ev){
@@ -3969,9 +3986,8 @@ function submitMemoInline(){
   const photo=_memoPendingPhoto;
   if(!text&&!photo)return;
   _memoSubmitting=true;
-  const stampBtn=document.getElementById('memo-stamp-btn');
   const n=new Date();
-  const stamp=(stampBtn&&stampBtn.dataset.stamp)||`${pad(n.getHours())}:${pad(n.getMinutes())}`;
+  const stamp=`${pad(n.getHours())}:${pad(n.getMinutes())}`;
   const dk=dateKey(currentDate),memos=getMemos(dk);
   const item={text,time:stamp,created:Date.now(),cid:genCid()};
   if(_memoSeedOn)item.type='seed';
@@ -3980,9 +3996,9 @@ function submitMemoInline(){
     item.photoStatus='pending_upload';
   }
   memos.push(item);
+  if(photo)S.set(S.key('memos_pending',dk),true); // saveMemos의 autoSync가 photo_url=null인 채로 먼저 나가지 않도록 선점
   saveMemos(dk,memos);
   if(photo)queueMemoPhotoUpload(dk,item.cid,photo.blob);
-  if(stampBtn){delete stampBtn.dataset.stamp;stampBtn.title='';}
   if(inp){inp.value='';inp.style.height='';}
   clearMemoPhotoPreview();
   // 씨앗 토글은 한 건만 적용되고 자동 해제
@@ -3992,15 +4008,6 @@ function submitMemoInline(){
   renderMemos();
   setTimeout(()=>{_memoSubmitting=false;},500);
 }
-function openMemoTimePicker(){
-  _sleepTarget='memo';
-  const stampBtn=document.getElementById('memo-stamp-btn');
-  const n=new Date();
-  const current=(stampBtn&&stampBtn.dataset.stamp)||`${pad(n.getHours())}:${pad(n.getMinutes())}`;
-  document.getElementById('time-inp').value=current;
-  openModal('time-modal');
-  renderTimeWheel();
-}
 function padTime(v){
   if(!v)return v;
   const m=v.match(/^(\d{1,2}):(\d{1,2})$/);
@@ -4009,13 +4016,6 @@ function padTime(v){
 }
 function confirmTime(){
   const v=padTime(document.getElementById('time-inp').value);if(!v)return;
-  if(_sleepTarget==='memo'){
-    const stampBtn=document.getElementById('memo-stamp-btn');
-    if(stampBtn){stampBtn.dataset.stamp=v;stampBtn.title=v;}
-    closeModal('time-modal');
-    openMemoModal();
-    return;
-  }
   if(_sleepTarget==='rblock-start'){_rhythmFormStart=v;closeModal('time-modal');refreshRhythmTrack();return;}
   if(_sleepTarget==='rblock-end'){_rhythmFormEnd=v;closeModal('time-modal');refreshRhythmTrack();return;}
   if(_sleepTarget==='event'){
@@ -6807,8 +6807,13 @@ function renderMemos(){
       const thumbSrc=m.photoUrl||m.photoLocalUrl;
       const img=document.createElement('img');
       img.className='memo-photo-thumb';img.src=thumbSrc;img.alt='';
-      img.addEventListener('click',e=>{e.stopPropagation();openPhotoViewer(thumbSrc,m.text||'');});
-      const txt=document.createElement('span');txt.className='memo-photo-text';txt.textContent=m.text||'';
+      img.addEventListener('click',e=>{
+        e.stopPropagation();
+        const meta=`${currentDate.getMonth()+1}월 ${currentDate.getDate()}일 ${_HOME_DAYS[currentDate.getDay()]}요일 · ${m.time||''}`;
+        openPhotoViewer(thumbSrc,m.text||'',meta);
+      });
+      const txt=document.createElement('span');txt.className='memo-photo-text';
+      txt.textContent=m.photoStatus==='upload_failed'?`⚠︎ 업로드 실패: ${m.photoErrorMsg||''}`:(m.text||'');
       bub.appendChild(img);bub.appendChild(txt);
       bub.addEventListener('click',()=>{_memoSwipeIdx=i;openSheet('memo-sheet');});
     }else{
