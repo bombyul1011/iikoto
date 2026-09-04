@@ -994,14 +994,14 @@ function renderTodayMeals(meal){
   el.innerHTML=`<div class="meal-grid">${html}</div>`;
 }
 
-// 본앱 MORNING_FLOW_CARDS/서브 정의 그대로 이식(색상·라벨 통일 목적, 로직은 본앱이 원본)
+// 본앱 MORNING_FLOW_CARDS 이식 — 확정 rgb값 대신 팔레트 CSS 변수 참조로 통일(2026-09-04, 본앱이 팔레트 일관성 위해 변경한 방식을 그대로 따름).
 const MFLOW_CARDS=[
-  {key:'rest',label:'휴식',icon:'ti-cup',colorRgb:'244,177,206'},
-  {key:'exercise',label:'운동',icon:'ti-run',colorRgb:'150,205,225'},
-  {key:'enjoy',label:'감상',icon:'ti-stack-2',colorRgb:'216,168,205'},
-  {key:'desk',label:'책상',icon:'ti-desk',colorRgb:'240,187,158'},
-  {key:'clean',label:'정리',icon:'ti-sparkles',colorRgb:'252,215,110'},
-  {key:'etc',label:'기타',icon:'ti-dots',colorRgb:'195,180,168'}
+  {key:'rest',label:'휴식',icon:'ti-cup',colorRgb:'var(--pal-pink-rgb)',rhythmCat:'rest'},
+  {key:'exercise',label:'운동',icon:'ti-run',colorRgb:'var(--pal-sky-rgb)',rhythmCat:'exercise'},
+  {key:'enjoy',label:'감상',icon:'ti-stack-2',colorRgb:'var(--pal-lavender-rgb)',rhythmCat:'enjoy'},
+  {key:'desk',label:'책상',icon:'ti-desk',colorRgb:'var(--pal-yellow-rgb)',rhythmCat:'note'},
+  {key:'clean',label:'정리',icon:'ti-sparkles',colorRgb:'var(--pal-lime-rgb)',rhythmCat:'home'},
+  {key:'etc',label:'기타',icon:'ti-dots',colorRgb:'var(--pal-warmgray-rgb)',rhythmCat:null}
 ];
 const MFLOW_ENJOY_SUB_LABEL={read:'독서',content:'콘텐츠'};
 const MFLOW_DESK_SUB_LABEL={diary:'일기',notes:'노트정리',work_personal:'개인작업'};

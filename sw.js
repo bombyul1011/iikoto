@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.70-photo-viewer-font-fix';
+const CACHE = 'iikoto-v2.76-morningflow-css-var-refs';
 const ASSETS = [
   './',
   './index.html'

@@ -134,10 +134,10 @@ function makeLabel(txt){
 const RHYTHM_CATS={
   exercise:{label:'운동',color:'rgba(234,187,190,0.85)',icon:'ti-run'},
   rest:{label:'휴식',color:'rgba(190,225,205,0.75)',icon:'ti-armchair'},
-  groom:{label:'단장',color:'rgba(255,217,138,0.82)',icon:'ti-mood-spark'},
+  groom:{label:'단장',color:'rgba(240,187,158,0.82)',icon:'ti-mood-spark'},
   work:{label:'업무',color:'rgba(204,208,220,0.80)',icon:'ti-keyboard'},
   appointment:{label:'외출',color:'rgba(168,212,232,0.75)',icon:'ti-bus'},
-  note:{label:'책상',color:'rgba(240,187,158,0.82)',icon:'ti-desk'},
+  note:{label:'책상',color:'rgba(255,217,138,0.82)',icon:'ti-desk'},
   enjoy:{label:'감상',color:'rgba(216,168,205,0.80)',icon:'ti-stack-2'},
   home:{label:'정리',color:'rgba(210,224,160,0.82)',icon:'ti-home'}
 };
@@ -571,9 +571,11 @@ function buildDailyRhythmTrack(dk){
     if(!bk.noLabel){
       const iconHtml=bk.icon?'<i class="ti ti-tools-kitchen-3" aria-hidden="true"></i>':'';
       html+='<span class="rt-fill-label">'+iconHtml+escapeHtml(bk.label)+'</span>';
-      const delBtn=bk.manualIdx!=null?'<span class="rt-del" onclick="event.stopPropagation();deleteRhythmBlock('+bk.manualIdx+')">×</span>':'';
-      const editBtn=bk.manualIdx!=null?'<span class="rt-edit" onclick="event.stopPropagation();openRhythmEditForm('+bk.manualIdx+')"><i class="ti ti-pencil ico-sz-11" aria-hidden="true"></i></span>':'';
-      const finishBtn=(bk.ongoing&&bk.manualIdx!=null)?'<span class="rt-finish" onclick="event.stopPropagation();finishRhythmBlock('+bk.manualIdx+')">종료</span>':'';
+      const timeRangeHtml=(!bk.ongoing&&bk.start!=null&&bk.end!=null)?'<span class="rt-fill-time">'+minToHHMM(bk.start)+'-'+minToHHMM(bk.end)+'</span>':'';
+      if(timeRangeHtml)html+=timeRangeHtml;
+      const delBtn=bk.manualIdx!=null?'<span class="rt-del" onclick="event.stopPropagation();deleteRhythmBlock('+bk.manualIdx+')"><i class="ti ti-x ico-sz-13" aria-hidden="true"></i></span>':'';
+      const editBtn=bk.manualIdx!=null?'<span class="rt-edit" onclick="event.stopPropagation();openRhythmEditForm('+bk.manualIdx+')"><i class="ti ti-pencil ico-sz-13" aria-hidden="true"></i></span>':'';
+      const finishBtn=(bk.ongoing&&bk.manualIdx!=null)?'<span class="rt-finish" onclick="event.stopPropagation();finishRhythmBlock('+bk.manualIdx+')"><i class="ti ti-player-stop ico-sz-13" aria-hidden="true"></i></span>':'';
       const actions=(finishBtn||editBtn||delBtn)?'<span class="rt-fill-actions">'+finishBtn+editBtn+delBtn+'</span>':'';
       if(actions)html+=actions;
     }
@@ -4758,12 +4760,12 @@ function confirmCopyWholeTodo(){
 // 서버 테이블: morning_flow_picks(date_key, picks jsonb, etc jsonb).
 // ══════════════════════════════════════════════════════════
 const MORNING_FLOW_CARDS=[
-  {key:'rest',label:'휴식',icon:'ti-cup',colorRgb:'244,177,206',rhythmCat:'rest'},
-  {key:'exercise',label:'운동',icon:'ti-run',colorRgb:'150,205,225',rhythmCat:'exercise'},
-  {key:'enjoy',label:'감상',icon:'ti-stack-2',colorRgb:'216,168,205',rhythmCat:'enjoy'}, // 서브선택(독서/콘텐츠) 필요 — 기타와 동일 패턴
-  {key:'desk',label:'책상',icon:'ti-desk',colorRgb:'240,187,158',rhythmCat:'note'}, // 서브선택(일기/노트정리/개인작업) 필요
-  {key:'clean',label:'정리',icon:'ti-sparkles',colorRgb:'252,215,110',rhythmCat:'home'},
-  {key:'etc',label:'기타',icon:'ti-dots',colorRgb:'195,180,168',rhythmCat:null} // 서브선택(업무/외출/자유입력)에 따라 카테고리가 갈림
+  {key:'rest',label:'휴식',icon:'ti-cup',colorRgb:'var(--pal-pink-rgb)',rhythmCat:'rest'},
+  {key:'exercise',label:'운동',icon:'ti-run',colorRgb:'var(--pal-sky-rgb)',rhythmCat:'exercise'},
+  {key:'enjoy',label:'감상',icon:'ti-stack-2',colorRgb:'var(--pal-lavender-rgb)',rhythmCat:'enjoy'}, // 서브선택(독서/콘텐츠) 필요 — 기타와 동일 패턴
+  {key:'desk',label:'책상',icon:'ti-desk',colorRgb:'var(--pal-yellow-rgb)',rhythmCat:'note'}, // 서브선택(일기/노트정리/개인작업) 필요
+  {key:'clean',label:'정리',icon:'ti-sparkles',colorRgb:'var(--pal-lime-rgb)',rhythmCat:'home'},
+  {key:'etc',label:'기타',icon:'ti-dots',colorRgb:'var(--pal-warmgray-rgb)',rhythmCat:null} // 서브선택(업무/외출/자유입력)에 따라 카테고리가 갈림
 ];
 const MORNING_FLOW_ENJOY_SUB=[
   {key:'read',label:'독서',icon:'ti-book'},
@@ -9579,7 +9581,7 @@ function buildRhythmFormEl(showOngoingList){
       const ongoingWrap=document.createElement('div');ongoingWrap.className='rhythm-track-ongoing';
       ongoingWrap.innerHTML=ongoingBlocks.map(function(b){
         const cat=RHYTHM_CATS[b.cat];if(!cat)return '';
-        return '<div class="rt-row"><span class="rt-time">'+b.start+'~</span><span class="rt-txt">'+cat.label+(b.text&&b.text.trim()?' — '+b.text.trim():'')+'</span><span class="rt-actions"><span class="rt-finish" onclick="finishRhythmBlock('+b.idx+')">종료</span></span></div>';
+        return '<div class="rt-row"><span class="rt-time">'+b.start+'~</span><span class="rt-txt">'+cat.label+(b.text&&b.text.trim()?' — '+b.text.trim():'')+'</span><span class="rt-actions"><span class="rt-finish" onclick="finishRhythmBlock('+b.idx+')"><i class="ti ti-player-stop ico-sz-13" aria-hidden="true"></i></span></span></div>';
       }).join('');
       wrap.appendChild(ongoingWrap);
     }

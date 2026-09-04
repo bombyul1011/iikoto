@@ -1316,7 +1316,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .recap-donut-l{font-size:var(--dow-label-size);color:var(--ts);}
 .recap-rhythm-bar-chart{display:flex;height:26px;border-radius:8px;overflow:hidden;margin-bottom:6px;}
 .recap-rhythm-bar-seg{display:flex;align-items:center;justify-content:center;}
-.recap-rhythm-bar-seg i{font-size:11px;color:#fff;}
+.recap-rhythm-bar-seg i{font-size:var(--dow-label-size-2);color:#fff;}
 .recap-rhythm-chip-legend{display:flex;flex-wrap:wrap;gap:6px 10px;}
 .recap-rhythm-chip-legend span{font-size:var(--dow-label-size);color:var(--ts);display:flex;align-items:center;gap:3px;}
 .recap-rhythm-chip-legend .dot{width:7px;height:7px;border-radius:2px;display:inline-block;}
@@ -1370,14 +1370,15 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rt-fill{position:absolute;left:44px;right:0;border-radius:4px;display:flex;align-items:center;justify-content:space-between;padding:0 8px;box-sizing:border-box;overflow:hidden;}
 .rt-fill::before{content:'';position:absolute;inset:0;background:rgba(255,250,240,0.22);border-radius:4px;pointer-events:none;}
 .rt-fill-label{position:relative;font-size:var(--dow-label-size);font-weight:500;color:var(--tp);display:flex;align-items:center;gap:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1;}
+.rt-fill-time{position:relative;flex-shrink:0;font-size:var(--dow-label-size-3);color:var(--tp);font-variant-numeric:tabular-nums;font-family:'DM Sans',sans-serif;margin-left:6px;}
 .rt-fill-actions{position:relative;flex-shrink:0;display:flex;align-items:center;gap:5px;padding-left:6px;}
 .rt-fill.ongoing{background-image:repeating-linear-gradient(135deg,rgba(255,255,255,0.35) 0 3px,transparent 3px 6px);}
 /* 현재시각 — 선+원 마커만(라벨 없이 양옆 시간눈금으로 직관 파악) */
 .rt-now-line{position:absolute;left:44px;right:0;height:2px;border-radius:1px;background:linear-gradient(90deg,rgba(235,180,20,0.9),rgba(255,205,110,0.75));z-index:20;}
 .rt-now-dot{position:absolute;left:44px;width:12px;height:12px;border-radius:50%;background:#fffefa;border:3px solid rgba(235,180,20,0.9);transform:translate(-50%,-50%);z-index:21;}
-.rt-del{flex-shrink:0;color:var(--tp);font-size:var(--main-text-size);line-height:1;padding:0 2px;cursor:pointer;opacity:0.75;}
+.rt-del{flex-shrink:0;color:var(--tp);display:flex;align-items:center;line-height:1;padding:0 2px;cursor:pointer;opacity:0.75;}
 .rt-edit{flex-shrink:0;color:var(--tp);display:flex;align-items:center;padding:0 2px;cursor:pointer;opacity:0.75;}
-.rt-finish{flex-shrink:0;font-size:var(--dow-label-size-3);color:var(--pal-pink-text);border:1px solid var(--pal-pink-border);border-radius:8px;padding:2px 7px;cursor:pointer;}
+.rt-finish{flex-shrink:0;color:var(--pal-pink-text);display:flex;align-items:center;padding:0 2px;cursor:pointer;opacity:0.75;}
 .rhythm-track-legend{display:flex;flex-wrap:nowrap;gap:4px;margin-top:8px;}
 .rhythm-legend-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0;}
 .rhythm-legend-dot{width:100%;aspect-ratio:1;max-width:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .15s;}
@@ -1439,7 +1440,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .wrb-flow-empty{font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:6px 0;}
 .rhythm-track-ongoing{margin-bottom:8px;}
 .rhythm-track-ongoing .rt-row{display:flex;align-items:center;gap:7px;font-size:var(--dow-label-size);color:var(--tp);padding:5px 0;white-space:normal;}
-.rhythm-track-ongoing .rt-row .rt-time{font-size:10px;color:var(--tm);width:60px;flex-shrink:0;font-family:'DM Sans',sans-serif;}
+.rhythm-track-ongoing .rt-row .rt-time{font-size:var(--dow-label-size-3);color:var(--tm);width:60px;flex-shrink:0;font-family:'DM Sans',sans-serif;}
 .rhythm-track-ongoing .rt-row .rt-txt{overflow:hidden;text-overflow:ellipsis;flex:1;}
 .rhythm-track-ongoing .rt-row .rt-actions{margin-left:auto;flex-shrink:0;display:flex;align-items:center;gap:6px;}
 [data-theme="glass"] .wrb-track{background:rgba(190,180,160,0.30);}
