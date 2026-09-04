@@ -4863,7 +4863,7 @@ function makeMorningFlowCard(){
       const isOn=!!flow.picks[c.key];
       const cnt=monthCounts[c.key]||0;
       return `<div class="mf-card${isOn?' on':''}" onclick="toggleMorningFlowPick('${c.key}')" style="${isOn?`background:rgb(${c.colorRgb});border-color:rgb(${c.colorRgb});`:''}">
-        <i class="ti ${c.icon} mf-card-icon" style="color:${isOn?'#fff':'var(--tm)'};" aria-hidden="true"></i>
+        <i class="ti ${c.icon} mf-card-icon" style="color:${isOn?'#fff':`rgb(${c.colorRgb})`};" aria-hidden="true"></i>
         <span class="mf-card-label" style="${isOn?'color:#fff;':''}">${c.label}</span>
         <span class="mf-card-count" style="${isOn?'color:rgba(255,255,255,0.85);':''}">${cnt}</span>
       </div>`;
