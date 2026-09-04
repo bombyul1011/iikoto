@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.85-afternoon-tl-parens';
+const CACHE = 'iikoto-v2.86-timetable-comment-cleanup';
 const ASSETS = [
   './',
   './index.html'

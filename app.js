@@ -3047,7 +3047,7 @@ function syncOnTabEnter(){
 }
 
 // ══════════════════════════════════════════════════════════
-// ██ 오늘탭 (1/4 — 나머지는 MEMO, HABIT~TIMETABLE, 예비투두 부근) ██
+// ██ 오늘탭 (1/4 — 나머지는 MEMO, HABIT~CONTENT TIMELINE, 예비투두 부근) ██
 // ══════════════════════════════════════════════════════════
 // ── TIME SLOT POPUP (시간대 리마인더 팝업) ──
 // 공용 열기/닫기. innerHtml만 넘기면 .tsp-box 안을 채우고 오버레이를 켠다.
@@ -3343,7 +3343,7 @@ document.querySelectorAll('.vtab').forEach(b=>b.addEventListener('click',()=>{
 })();
 
 // ══════════════════════════════════════════════════════════
-// ██ 오늘탭 (2/4 — 나머지는 시간대팝업, HABIT~TIMETABLE, 예비투두 부근) ██
+// ██ 오늘탭 (2/4 — 나머지는 시간대팝업, HABIT~CONTENT TIMELINE, 예비투두 부근) ██
 // ══════════════════════════════════════════════════════════
 // ── SLEEP
 let _sleepTarget='';
@@ -6655,7 +6655,7 @@ function openTodoDatePickerSheet(todoIdx){
   },'날짜 변경','이동');
 }
 // ══════════════════════════════════════════════════════════
-// ██ 오늘탭 (3/4 — 나머지는 시간대팝업, SLEEP~아침파트2, HABIT~TIMETABLE, 예비투두 부근) ██
+// ██ 오늘탭 (3/4 — 나머지는 시간대팝업, SLEEP~아침파트2, HABIT~CONTENT TIMELINE, 예비투두 부근) ██
 // ══════════════════════════════════════════════════════════
 // ── MEMO
 let _deletedMemo=null,_undoTimer=null,_memoSwipeIdx=-1;
@@ -7502,7 +7502,7 @@ function buildWeekStrip(){
 }
 
 // ══════════════════════════════════════════════════════════
-// ██ 오늘탭 (4/4 — 나머지는 시간대팝업, SLEEP~아침파트2, MEMO, 예비투두 부근) — HABIT/TIMETABLE ██
+// ██ 오늘탭 (4/4 — 나머지는 시간대팝업, SLEEP~아침파트2, MEMO, 예비투두 부근) — HABIT/CONTENT TIMELINE ██
 // ══════════════════════════════════════════════════════════
 // ── HABIT
 function openHabitModal(){
@@ -7518,7 +7518,7 @@ function confirmHabit(){
   saveHabits(newH);closeModal('habit-modal');renderHabitMonthly();renderDailyHabitCheck();
 }
 
-// ── TIMETABLE
+// ── CONTENT TIMELINE
 let _contentCtx={};
 let _contentSubmitting=false;
 let _selectedPoster=null;
@@ -12023,7 +12023,7 @@ document.addEventListener('visibilitychange',function(){
   if(!document.hidden&&_swRunning)updateStopwatchDisplay(); // 화면 복귀 즉시 정확한 시간으로 보정 (독서 전용 — 콘텐츠 시청은 초단위 표시가 없어 보정 불필요)
 });
 
-// ── 오늘탭 소속(예비 투두) — 나머지는 시간대팝업/SLEEP~아침파트2/MEMO/HABIT~TIMETABLE 부근 ──
+// ── 오늘탭 소속(예비 투두) — 나머지는 시간대팝업/SLEEP~아침파트2/MEMO/HABIT~CONTENT TIMELINE 부근 ──
 // ── 예비 투두 ──
 const RESERVE_DK='reserve';
 let _reserveMoveIdx=-1,_reserveSection='none';
