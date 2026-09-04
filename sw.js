@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.49-rhythm-track-fill';
+const CACHE = 'iikoto-v2.51-memo-edit-time-wheel';
 const ASSETS = [
   './',
   './index.html'

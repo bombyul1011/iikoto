@@ -288,9 +288,9 @@ function setRhythmNow(which){
 }
 function openRhythmTimeModal(which){
   _sleepTarget='rblock-'+which;
-  document.getElementById('time-modal-title').textContent=which==='start'?'시작 시간':'끝 시간';
   document.getElementById('time-inp').value=which==='start'?_rhythmFormStart:_rhythmFormEnd;
   openModal('time-modal');
+  renderTimeWheel();
 }
 function saveRhythmBlock(){
   if(_rhythmSubmitting)return;
@@ -3682,6 +3682,88 @@ function renderSleepAvgMarkers(avg){
   mEnd.style.left=avg.endPct+'%';mEnd.style.display='';
   if(compareEl){compareEl.textContent=avg.compareText;compareEl.style.display='';}
 }
+// ── 시간 휠 피커 공용 유틸 (취침/기상/리듬/메모/일정/식사/메모수정 7곳 공유) ──
+const TW_ITEM_H=40,TW_CENTER=1;
+let _twDragState=null;
+function _twBuildCol(trackId,values,selIndex,fmt){
+  const t=document.getElementById(trackId);
+  t.innerHTML='';
+  values.forEach(v=>{
+    const el=document.createElement('div');
+    el.className='tw-item';
+    el.textContent=fmt(v);
+    t.appendChild(el);
+  });
+  _twSetSel(t,selIndex);
+}
+function _twSetSel(t,i){
+  [...t.children].forEach(c=>c.className='tw-item');
+  if(t.children[i-1])t.children[i-1].className='tw-item near';
+  if(t.children[i+1])t.children[i+1].className='tw-item near';
+  if(t.children[i])t.children[i].className='tw-item sel';
+  t.style.transform=`translateY(${-(i-TW_CENTER)*TW_ITEM_H}px)`;
+}
+function _twSyncInput(hourTrackId,minTrackId,targetInpId){
+  const hEl=document.querySelector(`#${hourTrackId} .sel`),mEl=document.querySelector(`#${minTrackId} .sel`);
+  if(hEl&&mEl)document.getElementById(targetInpId).value=hEl.textContent+':'+mEl.textContent;
+}
+function _twAttach(trackId,values,onSelect){
+  const track=document.getElementById(trackId),col=track.parentElement;
+  if(col.dataset.twBound)return;
+  col.dataset.twBound='1';
+  function start(y){
+    const idx=[...track.children].findIndex(e=>e.className==='tw-item sel');
+    _twDragState={track,values,startY:y,startIdx:idx};
+    track.style.transition='none';
+  }
+  function move(y){
+    if(!_twDragState||_twDragState.track!==track)return;
+    const d=(y-_twDragState.startY)/TW_ITEM_H;
+    track.style.transform=`translateY(${-(_twDragState.startIdx-d-TW_CENTER)*TW_ITEM_H}px)`;
+  }
+  function end(y){
+    if(!_twDragState||_twDragState.track!==track)return;
+    track.style.transition='transform .22s cubic-bezier(.25,.9,.35,1)';
+    const d=(y-_twDragState.startY)/TW_ITEM_H;
+    const idx=Math.max(0,Math.min(values.length-1,Math.round(_twDragState.startIdx-d)));
+    _twSetSel(track,idx);
+    onSelect();
+    _twDragState=null;
+  }
+  col.addEventListener('touchstart',e=>start(e.touches[0].clientY),{passive:true});
+  col.addEventListener('touchmove',e=>move(e.touches[0].clientY),{passive:true});
+  col.addEventListener('touchend',e=>end(e.changedTouches[0].clientY));
+  col.addEventListener('mousedown',e=>{
+    start(e.clientY);
+    const mm=ev=>move(ev.clientY),mu=ev=>{end(ev.clientY);document.removeEventListener('mousemove',mm);document.removeEventListener('mouseup',mu);};
+    document.addEventListener('mousemove',mm);document.addEventListener('mouseup',mu);
+  });
+}
+// 공용 휠 렌더러 — hourTrackId/minTrackId/inpId를 넘기면 어떤 시간 인풋에도 붙일 수 있음
+function _renderTimeWheelFor(hourTrackId,minTrackId,inpId){
+  const cur=document.getElementById(inpId).value||'';
+  const m=cur.match(/^(\d{1,2}):(\d{1,2})$/);
+  const n=new Date();
+  const h=m?Math.min(23,parseInt(m[1],10)):n.getHours();
+  const mi=m?Math.min(59,parseInt(m[2],10)):n.getMinutes();
+  const hours=[...Array(24).keys()],mins=[...Array(60).keys()];
+  const sync=()=>_twSyncInput(hourTrackId,minTrackId,inpId);
+  _twBuildCol(hourTrackId,hours,h,v=>pad(v));
+  _twBuildCol(minTrackId,mins,mi,v=>pad(v));
+  sync();
+  _twAttach(hourTrackId,hours,sync);
+  _twAttach(minTrackId,mins,sync);
+}
+function renderTimeWheel(){
+  _renderTimeWheelFor('tw-hour-track','tw-min-track','time-inp');
+}
+function openMemoEditTimePicker(){
+  openModal('memo-edit-time-modal');
+  _renderTimeWheelFor('tw2-hour-track','tw2-min-track','memo-edit-time-inp');
+}
+function confirmMemoEditTime(){
+  closeModal('memo-edit-time-modal');
+}
 // ── 취침/기상 시간 입력 공용 유틸 (마스킹, 지금시각 세팅, 시각 모달) ──
 function maskTimeInput(el){
   let digits=el.value.replace(/[^0-9]/g,'').slice(0,4);
@@ -3710,9 +3792,9 @@ function setNow(t){
 function openTimeModal(t){
   _sleepTarget=t;
   const dk=dateKey(currentDate),d=getSleep(dk);
-  document.getElementById('time-modal-title').textContent=t==='sleep'?'취침 시간':'기상 시간';
   document.getElementById('time-inp').value=t==='sleep'?(d.sleep||''):(d.wake||'');
   openModal('time-modal');
+  renderTimeWheel();
 }
 let _memoSubmitting=false;
 // ── 씨앗 메모(새벽 팝업용 인라인 입력) ──
@@ -3804,9 +3886,9 @@ function openMemoTimePicker(){
   const stampBtn=document.getElementById('memo-stamp-btn');
   const n=new Date();
   const current=(stampBtn&&stampBtn.dataset.stamp)||`${pad(n.getHours())}:${pad(n.getMinutes())}`;
-  document.getElementById('time-modal-title').textContent='메모 시간';
   document.getElementById('time-inp').value=current;
   openModal('time-modal');
+  renderTimeWheel();
 }
 function padTime(v){
   if(!v)return v;
@@ -6315,9 +6397,9 @@ function openEventTimePicker(){
   const inp=document.getElementById('todo-event-time-inp');
   const n=new Date();
   const current=inp.dataset.value||`${pad(n.getHours())}:${pad(n.getMinutes())}`;
-  document.getElementById('time-modal-title').textContent='일정 시간';
   document.getElementById('time-inp').value=current;
   openModal('time-modal');
+  renderTimeWheel();
 }
 function selectTodoTime(ts,btn){
   document.querySelectorAll('.todo-time-sel button').forEach(b=>b.classList.remove('active'));
@@ -9512,9 +9594,9 @@ function openMealTimePicker(dk,k){
   const tEl=document.getElementById(`wm-${dk}-${k}-time`);
   const n=new Date();
   const current=(tEl&&tEl.dataset.value)||`${pad(n.getHours())}:${pad(n.getMinutes())}`;
-  document.getElementById('time-modal-title').textContent=(MEAL_LABELS[k]||'식사')+' 시간';
   document.getElementById('time-inp').value=current;
   openModal('time-modal');
+  renderTimeWheel();
 }
 // 시간 입력 직후 ✕ 지우기 버튼과 빈값 스타일이 재진입 없이 바로 반영되도록 meal-time-group만 다시 그림.
 function refreshMealTimeGroup(dk,k,tVal){

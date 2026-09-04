@@ -743,6 +743,18 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .modal{width:calc(100% - 48px);max-width:300px;max-height:85vh;overflow-y:auto;background:var(--modal);border:1px solid rgba(255,255,255,.80);border-radius:22px;padding:22px 20px;box-shadow:0 8px 40px rgba(0,0,0,.18);box-sizing:border-box;}
 .modal-title{font-size:var(--main-text-size);font-weight:500;color:var(--ts);margin-bottom:16px;}
 .modal-inp{width:100%;background:var(--inp);border:1px solid var(--inp-b);border-radius:12px;padding:11px 14px;font-size:var(--main-text-size);color:var(--tp);font-family:'DM Sans',sans-serif;outline:none;margin-bottom:12px;}
+.time-wheel-modal{padding:16px 18px 18px;display:flex;flex-direction:column;align-items:center;}
+.tw-wrap{position:relative;display:flex;align-items:center;gap:2px;margin-bottom:14px;}
+.tw-col{position:relative;width:50px;height:120px;overflow:hidden;}
+.tw-track{position:absolute;left:0;right:0;top:40px;transition:transform .22s cubic-bezier(.25,.9,.35,1);}
+.tw-item{height:40px;display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--tm);font-variant-numeric:tabular-nums;transition:color .15s,font-size .15s,font-weight .15s;}
+.tw-item.near{color:var(--ts);font-size:19px;}
+.tw-item.sel{color:var(--tp);font-size:22px;font-weight:600;}
+.tw-colon{font-size:18px;color:var(--ts);font-weight:600;padding-bottom:1px;}
+.tw-hl{position:absolute;left:2px;right:2px;top:40px;height:40px;background:var(--inp);border-radius:10px;pointer-events:none;}
+.tw-fade-top,.tw-fade-bottom{position:absolute;left:0;right:0;height:34px;pointer-events:none;z-index:2;}
+.tw-fade-top{top:0;background:linear-gradient(180deg,var(--modal) 10%,rgba(0,0,0,0));}
+.tw-fade-bottom{bottom:0;background:linear-gradient(0deg,var(--modal) 10%,rgba(0,0,0,0));}
 .todo-pinned-btn{flex-shrink:0;width:24px;height:24px;background:none;border:none;padding:0;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:19px;color:var(--pal-warmgray-border);transition:all .15s;}
 .todo-pinned-btn.on{color:var(--pal-orange-border);}
 .modal-inp::placeholder{color:var(--tm);}
@@ -1957,9 +1969,15 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 <!-- TIME MODAL -->
 <div class="modal-ov" id="time-modal" onclick="closeModal('time-modal',event)">
-  <div class="modal" style="max-width:220px;">
-    <div class="modal-title" id="time-modal-title" style="text-align:center;">취침 시간</div>
-    <input type="text" inputmode="numeric" maxlength="5" placeholder="00:00" class="modal-inp time-inp" id="time-inp" oninput="maskTimeInput(this)">
+  <div class="modal time-wheel-modal" style="max-width:180px;" onclick="event.stopPropagation()">
+    <input type="hidden" id="time-inp" value="">
+    <div class="tw-wrap">
+      <div class="tw-fade-top"></div>
+      <div class="tw-fade-bottom"></div>
+      <div class="tw-col"><div class="tw-hl"></div><div class="tw-track" id="tw-hour-track"></div></div>
+      <div class="tw-colon">:</div>
+      <div class="tw-col"><div class="tw-hl"></div><div class="tw-track" id="tw-min-track"></div></div>
+    </div>
     <div class="modal-actions">
       <button class="mbtn cancel" onclick="closeModal('time-modal')">취소</button>
       <button class="mbtn ok" onclick="confirmTime()">저장</button>
@@ -2051,11 +2069,28 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 <div class="modal-ov" id="memo-edit-modal" onclick="closeModal('memo-edit-modal',event)">
   <div class="modal">
     <div class="modal-title">메모 수정</div>
-    <input type="text" inputmode="numeric" maxlength="5" placeholder="00:00" class="modal-inp time-inp" id="memo-edit-time-inp" oninput="maskTimeInput(this)">
+    <input type="text" class="modal-inp time-inp" id="memo-edit-time-inp" placeholder="00:00" readonly onclick="openMemoEditTimePicker()">
     <textarea class="modal-inp" id="memo-edit-inp" rows="4" style="resize:none;line-height:1.6;" autocomplete="off"></textarea>
     <div class="modal-actions">
       <button class="mbtn cancel" onclick="closeModal('memo-edit-modal')">취소</button>
       <button class="mbtn ok" onclick="confirmMemoEdit()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- MEMO EDIT TIME WHEEL MODAL (memo-edit-time-inp 전용, 공용 #time-modal과 별개 — 상위 모달 위에 겹쳐 떠야 해서 분리) -->
+<div class="modal-ov" id="memo-edit-time-modal" onclick="closeModal('memo-edit-time-modal',event)">
+  <div class="modal time-wheel-modal" style="max-width:180px;" onclick="event.stopPropagation()">
+    <div class="tw-wrap">
+      <div class="tw-fade-top"></div>
+      <div class="tw-fade-bottom"></div>
+      <div class="tw-col"><div class="tw-hl"></div><div class="tw-track" id="tw2-hour-track"></div></div>
+      <div class="tw-colon">:</div>
+      <div class="tw-col"><div class="tw-hl"></div><div class="tw-track" id="tw2-min-track"></div></div>
+    </div>
+    <div class="modal-actions">
+      <button class="mbtn cancel" onclick="closeModal('memo-edit-time-modal')">취소</button>
+      <button class="mbtn ok" onclick="confirmMemoEditTime()">저장</button>
     </div>
   </div>
 </div>
