@@ -2234,24 +2234,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       </div>
     </div>
     <div>
-      <div class="settings-card mr-accordion" id="data-recovery-accordion">
-        <div class="settings-slbl mr-accordion-toggle" onclick="this.closest('.mr-accordion').classList.toggle('open')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;margin-bottom:0;">
-          <span>데이터 복구</span>
-          <span class="mr-accordion-arrow">›</span>
-        </div>
-        <div class="mr-accordion-body">
-          <div id="data-recovery-last-used" style="font-size:var(--dow-label-size);color:var(--tm);padding-top:12px;"></div>
-          <div class="settings-item" style="flex-direction:column;gap:8px;align-items:flex-start;padding-top:12px;">
-            <span style="font-size:var(--dow-label-size);color:var(--tm);">Supabase에서 최근 14일 데이터 강제 복구</span>
-            <button onclick="forceRestoreAll()" class="settings-btn-outline">데이터 복구하기</button>
-          </div>
-          <div class="settings-item" style="flex-direction:column;gap:8px;align-items:flex-start;padding-top:12px;">
-            <span style="font-size:var(--dow-label-size);color:var(--tm);">최근 14일 로컬↔Supabase 개수 비교 (오늘 날짜는 동기화 전이라 다를 수 있어요)</span>
-            <button onclick="checkDataIntegrity()" class="settings-btn-outline">데이터 무결성 점검</button>
-            <div id="integrity-check-status" style="font-size:var(--dow-label-size);color:var(--tm);line-height:1.6;"></div>
-          </div>
-        </div>
-      </div>
       <div class="settings-slbl">앱 정보</div>
       <div class="settings-card">
         <div class="settings-item"><span class="settings-item-lbl">버전</span><span class="settings-item-val">2.7</span></div>

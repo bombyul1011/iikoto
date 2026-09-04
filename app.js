@@ -144,6 +144,12 @@ const RHYTHM_CATS={
 };
 const RHYTHM_SLEEP_COLOR='rgba(205,194,182,0.88)';
 const RHYTHM_MEAL_COLOR='rgba(130,205,145,0.90)';
+// 다음주 코멘트/제안 카드의 카테고리→아이콘 매핑 공용 베이스. 제안 카드(NEXT_WEEK_SUGGEST_CAT_ICON)만 '취미' 아이콘이 추가로 필요해 확장해 사용.
+const NEXT_WEEK_CAT_ICON={
+  '운동':'ti-run','식사':'ti-salad','수면':'ti-moon','공부':'ti-book',
+  '업무':'ti-briefcase','마음가짐':'ti-heart','습관':'ti-repeat'
+};
+const NEXT_WEEK_SUGGEST_CAT_ICON={...NEXT_WEEK_CAT_ICON,'취미':'ti-stack-2'};
 // 리듬 카테고리 분류 설명 — AI 프롬프트에서 시간 사용 데이터를 다룰 때 카테고리 오분류(예: 업무↔책상, 휴식↔감상)를 줄이기 위해 공통으로 붙이는 한 줄 설명.
 const RHYTHM_CAT_GUIDE='(카테고리 참고: 운동=홈트/헬스장/러닝 등, 휴식=낮잠/멍때리기/게임 등 목적 없이 흘려보내는 시간, 단장=기상 후 스트레칭·씻기·스킨케어 등 몸을 준비하는 루틴이나 취침 전 씻고 정돈하는 루틴, 그리고 다음날/다음 일정을 위해 미리 손 써두는 시간(여행 짐 챙기기, 다음날 식사 미리 준비해두기 등)까지 포함 — 지금 당장이 아니라 다가올 시간을 위해 준비하는 행위 전반(휴식과 구분됨), 업무=주로 노트북으로 하는 작업(가끔 외근 포함), 외출=지인과의 약속이나 혼자 가는 카페/산책 등, 책상=일기·공부·앱 정비·노트정리 등 책상에서 하는 작업, 감상=드라마·독서·영화, 정리=청소·빨래 등 집안 정리)';
 function getRhythmColor(key){
@@ -843,11 +849,12 @@ function getContentsForReport(mk){
     return (a.startDate||'').localeCompare(b.startDate||'');
   });
 }
-function computeMonthStats(y,mo,endDay){
-  const dim=new Date(y,mo+1,0).getDate();
-  const lastDay=endDay?Math.min(endDay,dim):dim;
-  let memos=0,doneTodos=0,totalTodos=0,hc=0,ht=0,sleepMin=0,sleepCnt=0;
+// 한 달(y-mo, 1일~lastDay)치 기본 통계(투두/습관/수면/리듬시간)를 계산하는 공용 코어.
+// light=true면 이번달 전용 계산(메모/원라인/주간챌린지/콘텐츠/rhythmDayCount)은 건너뛰고
+// 전월 비교에 필요한 최소 항목(rhythmDur, todoPct, habitPct, avgSleep)만 반환.
+function computeRawStatsForRange(y,mo,lastDay,light){
   const habits=getHabits();
+  let memos=0,doneTodos=0,totalTodos=0,hc=0,ht=0,sleepMin=0,sleepCnt=0;
   const allMemoTexts=[];
   const onelineTexts=[];
   const weekSet={};
@@ -855,29 +862,38 @@ function computeMonthStats(y,mo,endDay){
   const rhythmDayCount={};
   for(let d=1;d<=lastDay;d++){
     const dk=`${y}-${pad(mo+1)}-${pad(d)}`;
-    const dayMemos=getMemos(dk);
-    memos+=dayMemos.length;
-    dayMemos.forEach(m=>{if(m.text)allMemoTexts.push(m.text);});
-    const ol=getDailyOneLine(dk);
-    if(ol&&ol.trim())onelineTexts.push(`${d}일: ${ol.trim()}`);
+    if(!light){
+      const dayMemos=getMemos(dk);
+      memos+=dayMemos.length;
+      dayMemos.forEach(m=>{if(m.text)allMemoTexts.push(m.text);});
+      const ol=getDailyOneLine(dk);
+      if(ol&&ol.trim())onelineTexts.push(`${d}일: ${ol.trim()}`);
+    }
     const dayTodos=getTodos(dk);
     totalTodos+=dayTodos.length;doneTodos+=dayTodos.filter(t=>t.done).length;
     const sl=getSleep(dk);
     if(sl.sleep&&sl.wake){const sv=sl.sleep.split(':').map(Number),wv=sl.wake.split(':').map(Number);let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;sleepMin+=m;sleepCnt++;}
-    const date=new Date(y,mo,d);const wk=weekKey(date);
-    weekSet[wk]=true;
+    const date=new Date(y,mo,d);
+    if(!light){const wk=weekKey(date);weekSet[wk]=true;}
     const dow=(date.getDay()+6)%7;
-    const checks=getHabitChecks(wk);
+    const checks=getHabitChecks(weekKey(date));
     habits.forEach(h=>{ht++;if(checks[`${h.name}-${dow}`])hc++;});
     const dd=getDayCategoryDurations(dk);
     Object.keys(dd).forEach(function(k){
       rhythmDur[k]=(rhythmDur[k]||0)+dd[k];
-      if(dd[k]>0)rhythmDayCount[k]=(rhythmDayCount[k]||0)+1;
+      if(!light&&dd[k]>0)rhythmDayCount[k]=(rhythmDayCount[k]||0)+1;
     });
   }
   const habitPct=ht>0?Math.round(hc/ht*100):0;
   const todoPct=totalTodos>0?Math.round(doneTodos/totalTodos*100):0;
   const avgSleep=sleepCnt>0?(sleepMin/sleepCnt/60).toFixed(1):null;
+  return {memos,doneTodos,totalTodos,todoPct,habitPct,avgSleep,allMemoTexts,onelineTexts,weekSet,rhythmDur,rhythmDayCount,habits};
+}
+function computeMonthStats(y,mo,endDay){
+  const dim=new Date(y,mo+1,0).getDate();
+  const lastDay=endDay?Math.min(endDay,dim):dim;
+  const cur=computeRawStatsForRange(y,mo,lastDay,false);
+  const {memos,doneTodos,totalTodos,todoPct,habitPct,avgSleep,allMemoTexts,onelineTexts,weekSet,rhythmDur,rhythmDayCount}=cur;
   const weeks=Object.keys(weekSet).sort();
   const wcByWeek=weeks.map(wk=>{
     const items=getWChallenge(wk).filter(c=>c.text&&c.text.trim());
@@ -894,24 +910,12 @@ function computeMonthStats(y,mo,endDay){
   // 전월 같은 일수 구간의 카테고리별 시간 + 투두완료율/습관달성률/평균수면을 가볍게 뽑아 비교
   const prevMonthDate=new Date(y,mo-1,1);
   const py=prevMonthDate.getFullYear(),pmo=prevMonthDate.getMonth();
-  const prevDur={};
-  let prevDoneTodos=0,prevTotalTodos=0,prevSleepMin=0,prevSleepCnt=0,prevHc=0,prevHt=0;
-  for(let d=1;d<=lastDay;d++){
-    const pdk=`${py}-${pad(pmo+1)}-${pad(d)}`;
-    const dd=getDayCategoryDurations(pdk);
-    Object.keys(dd).forEach(function(k){prevDur[k]=(prevDur[k]||0)+dd[k];});
-    const pTodos=getTodos(pdk);
-    prevTotalTodos+=pTodos.length;prevDoneTodos+=pTodos.filter(t=>t.done).length;
-    const psl=getSleep(pdk);
-    if(psl.sleep&&psl.wake){const sv=psl.sleep.split(':').map(Number),wv=psl.wake.split(':').map(Number);let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;prevSleepMin+=m;prevSleepCnt++;}
-    const pdate=new Date(py,pmo,d);const pwk=weekKey(pdate);
-    const pdow=(pdate.getDay()+6)%7;
-    const pchecks=getHabitChecks(pwk);
-    habits.forEach(h=>{prevHt++;if(pchecks[`${h.name}-${pdow}`])prevHc++;});
-  }
-  const prevTodoPct=prevTotalTodos>0?Math.round(prevDoneTodos/prevTotalTodos*100):null;
-  const prevHabitPct=prevHt>0?Math.round(prevHc/prevHt*100):null;
-  const prevAvgSleep=prevSleepCnt>0?(prevSleepMin/prevSleepCnt/60).toFixed(1):null;
+  const prev=computeRawStatsForRange(py,pmo,lastDay,true);
+  const prevDur=prev.rhythmDur;
+  const prevHt=lastDay*prev.habits.length;
+  const prevTodoPct=prev.totalTodos>0?prev.todoPct:null;
+  const prevHabitPct=prevHt>0?prev.habitPct:null;
+  const prevAvgSleep=prev.avgSleep;
   // 의미 있는 변화만 텍스트로(투두완료율/습관달성률 10%p 이상, 수면 0.5시간 이상 차이)
   const monthCompareLines=[];
   if(prevTodoPct!=null&&Math.abs(todoPct-prevTodoPct)>=10)monthCompareLines.push(`투두 완료율 전월 ${prevTodoPct}% → 이번달 ${todoPct}%`);
@@ -2252,6 +2256,14 @@ function getLogicalDate(ts){
 const DAWN_CUTOFF_MIN=4*60; // 04:00 — getLogicalDate()와 동일한 기준
 function _dawnTimeToMin(t){if(!t)return null;const p=t.split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);}
 const toMin=_dawnTimeToMin;
+// 수면 그래프 축 전용 시각→분 변환 — 정오(720분) 이후 값은 "그 전날 밤"으로 보고 음수로 뒤집음.
+// (예: 23:30 취침 → -30, 07:00 기상 → 420 — 자정을 가로지르는 취침~기상 구간을 하나의 축 위에 표시하기 위함)
+// [t[0],t[1]] 형태(시,분 배열)를 받음 — HH:MM 문자열은 .split(':').map(Number)로 변환 후 전달.
+function sleepAxisMin(t){
+  let mm=t[0]*60+t[1];
+  if(mm>=720)mm-=1440;
+  return mm;
+}
 // cutoffMin 생략 시 DAWN_CUTOFF_MIN(4시) 기준.
 // - 일반 활동(투두/습관/리듬블록 정렬 등): 기본값 그대로 사용
 // - 취침시각처럼 밤 11시~새벽에 넓게 걸치는 특수 케이스: cutoffMin을 더 늦게(예: 12시) 넘겨서 호출
@@ -2303,7 +2315,7 @@ async function ensureDateSynced(dk){
   if(diffDays<=29&&diffDays>=-6)return false; // 30일 윈도우 안 — initSync/syncAll이 이미 처리
   if(_oldDateSynced[dk])return false; // 이번 세션에 이미 시도함
   _oldDateSynced[dk]=true;
-  await forceRestoreDate(dk);
+  await Promise.all([syncTodosDown(dk),syncMemosDown(dk),syncSleepDown(dk),syncMealsDown(dk),syncRhythmBlocksDown(dk)]);
   return true;
 }
 async function supaFetch(path,method='GET',body=null){
@@ -2418,6 +2430,9 @@ function getTodos(dk){return S.get(S.key('todos',dk))||[];}
 // weekDates: 그 주의 7개 dk(월~일) 배열. multidayEvents: getActiveMultiDayEvents류로 모은 이번 달 전체 연속일정 목록(중복 제거된 원본, {_startDk,eventEndDate,...}).
 // 반환: 이 주에 걸치는 각 이벤트의 {left,width,row,clipStart,clipEnd,...ev} — left/width는 칸(cell) 단위 정수(0~6, 1~7), row는 겹칠 때 세로 순번(0부터).
 // 겹침 배정은 "실사용상 거의 겹치지 않는다"는 전제로 단순하게: 이미 배정된 row들과 구간이 겹치면 다음 row로.
+// weekDates에서 "그 달에 속하지 않는 빈 칸"을 표시하는 센티널 — 문자열 대소비교(weekStart/weekEnd, indexOf)에서
+// 절대 실제 날짜와 겹치지 않도록 사전으로 정렬 시 가장 뒤에 오는 문자열로 고정.
+const EMPTY_CAL_CELL='____NONE____';
 function computeWeekBars(weekDates,multidayEvents){
   const weekStart=weekDates[0],weekEnd=weekDates[6];
   const barsInWeek=[];
@@ -2499,7 +2514,7 @@ function saveTodos(dk,v){
   autoSync('todos',dk); // 온라인이면 즉시 업로드
 }
 function getMemos(dk){return S.get(S.key('memos',dk))||[];}
-// memos 서버 row → 로컬 저장 포맷 변환 (down/월간프리페치/강제복구 3곳 공통 사용)
+// memos 서버 row → 로컬 저장 포맷 변환 (down/월간프리페치 공통 사용)
 function memoRowToLocal(r){return {time:r.memo_time,text:r.text,created:r.created,cid:r.client_id||genCid(),type:r.type||undefined};}
 function saveMemos(dk,v){
   S.set(S.key('memos',dk),v);
@@ -2508,7 +2523,7 @@ function saveMemos(dk,v){
 }
 function getSleep(dk){return S.get(S.key('sleep',dk))||{};}
 function saveSleepData(dk,v){S.set(S.key('sleep',dk),v);S.set(S.key('sleep_pending',dk),true);autoSync('sleep',dk);}
-// sleep 서버 row → 로컬 저장 포맷 변환 (down/월간프리페치/강제복구 3곳 공통 사용)
+// sleep 서버 row → 로컬 저장 포맷 변환 (down/월간프리페치 공통 사용)
 function sleepRowToLocal(r){return {sleep:r.sleep_time,wake:r.wake_time,score:r.score};}
 function getSleepScore(dk){const d=getSleep(dk);return d.score!=null?d.score:null;}
 function saveSleepScore(dk,score){
@@ -3312,7 +3327,6 @@ function applyThemeColorMeta(theme){
 }
 (function initTheme(){
   let t=S.get('theme')||'light';
-  if(t==='dark'||t==='mono'){t='light';S.set('theme','light');} // 다크모드/모노테마 폐지 - 기존에 켜져있던 경우 라이트로 이전
   S.set('theme',t);
   document.documentElement.setAttribute('data-theme',t);
   applyThemeColorMeta(t);
@@ -3329,9 +3343,11 @@ function setTheme(theme,btn){
 }
 
 // ── TEXT SCALE (작게/기본/크게) — --main-text-size, --dow-label-size 두 변수만 조절. 제목류/아이콘/달력/큰 숫자 등 예외 요소는 적용 안 됨(의도된 한계)
-const TEXT_SCALE_STEPS={'-1':{main:13,dow:11},'0':{main:14,dow:12},'1':{main:15,dow:13}};
+// 키는 숫자 리터럴로 선언하지만 JS 객체는 내부적으로 모두 문자열 키로 저장되므로,
+// 아래 조회부에서 TEXT_SCALE_STEPS[step]처럼 숫자를 그대로 넣어도 자동 변환되어 안전하게 조회됨(String() 변환 불필요).
+const TEXT_SCALE_STEPS={[-1]:{main:13,dow:11},[0]:{main:14,dow:12},[1]:{main:15,dow:13}};
 function setTextScale(step){
-  const b=TEXT_SCALE_STEPS[String(step)]||TEXT_SCALE_STEPS['0'];
+  const b=TEXT_SCALE_STEPS[step]||TEXT_SCALE_STEPS[0];
   document.documentElement.style.setProperty('--main-text-size',b.main+'px');
   document.documentElement.style.setProperty('--dow-label-size',b.dow+'px');
   S.set('textScale',step);
@@ -3549,6 +3565,43 @@ function renderSleepCollapsedRow(s,w){
   }
   applySleepCollapseState();
 }
+// ── 수면 그래프 좌표 계산(순수 함수, DOM 접근 없음) ──
+// 취침(s)·기상(w) 시각(HH:MM 문자열, 없으면 null/'--:--')을 받아 그래프에 필요한 모든 값을 계산해 반환.
+// 다른 화면(예: 월간 리포트 미니 그래프)에서도 이 함수만 가져다 쓰면 동일한 좌표 계산을 재사용할 수 있음.
+// 반환: {state:'empty'|'sleep-only'|'full', startPct, endPct, durationLabel, avg:{...}|null}
+//   - startPct/endPct: 축(00:00~08:00, 480분) 기준 0~100 사이 퍼센트 위치
+//   - avg: 최근 14일 평균과 비교한 좌표+비교문구. 표본이 3개 미만이면 null.
+const SLEEP_AXIS_MIN=480; // 00:00~08:00 추천 구간(분)
+function computeSleepAxisLayout(s,w){
+  if(!s||s==='--:--')return {state:'empty'};
+  const sv=s.split(':').map(Number);
+  const toPct=(t)=>{
+    const px=Math.max(0,Math.min(SLEEP_AXIS_MIN,sleepAxisMin(t)));
+    return px/SLEEP_AXIS_MIN*100;
+  };
+  const startPct=toPct(sv);
+  if(!w||w==='--:--')return {state:'sleep-only',startPct};
+
+  const wv=w.split(':').map(Number);
+  let durMin=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(durMin<0)durMin+=1440;
+  const durationLabel=Math.floor(durMin/60)+'h'+(durMin%60?' '+(durMin%60)+'m':'');
+  let endPct=toPct(wv);
+  if(endPct<startPct)endPct=startPct;
+
+  // 최근 14일 평균 취침/기상과 비교(표본 3개 미만이면 비교 안 함)
+  let avg=null;
+  const avgWindow=getAvgSleepWindow(14);
+  if(avgWindow&&avgWindow.sampleCount>=3){
+    const avgSleepArr=[Math.floor(avgWindow.sleepMin/60)%24,Math.round(avgWindow.sleepMin%60)];
+    const avgWakeArr=[Math.floor(avgWindow.wakeMin/60)%24,Math.round(avgWindow.wakeMin%60)];
+    const diff=Math.round(sleepAxisMin(sv)-sleepAxisMin(avgSleepArr)); // 양수=오늘이 더 늦게, 음수=더 빠르게
+    let compareText;
+    if(Math.abs(diff)<3)compareText='평소와 비슷하게 잠들었어요';
+    else compareText='평균보다 '+Math.abs(diff)+'분 '+(diff>0?'늦게':'빠르게')+' 잠들었어요';
+    avg={startPct:toPct(avgSleepArr),endPct:toPct(avgWakeArr),compareText};
+  }
+  return {state:'full',startPct,endPct,durationLabel,avg};
+}
 function calcSleep(s,w){
   const numEl=document.getElementById('sleep-dur-num'),unitEl=document.getElementById('sleep-dur-unit');
   const clipRect=document.getElementById('sleep-clip-rect');
@@ -3558,7 +3611,10 @@ function calcSleep(s,w){
   if(!numEl)return;
   const mStart0=document.getElementById('sleep-avg-marker-start'),mEnd0=document.getElementById('sleep-avg-marker-end');
   const compareEl0=document.getElementById('sleep-avg-compare');
-  if(!s||s==='--:--'){
+
+  const layout=computeSleepAxisLayout(s,w);
+
+  if(layout.state==='empty'){
     numEl.textContent='--';unitEl.textContent='';
     if(clipRect)clipRect.setAttribute('width','0');
     if(badgeStart)badgeStart.style.display='none';
@@ -3568,73 +3624,41 @@ function calcSleep(s,w){
     if(compareEl0)compareEl0.style.display='none';
     return;
   }
-  const AXIS_MIN=480,SVG_W=340;
-  const toAxisMin=(t)=>{ // 정오 이후 값은 "그 전날 밤"으로 보고 축 이전(음수) 취급
-    let mm=t[0]*60+t[1];
-    if(mm>=720)mm-=1440;
-    return mm;
-  };
-  const sv=s.split(':').map(Number);
-  let startPx=(toAxisMin(sv)/AXIS_MIN)*SVG_W;
-  startPx=Math.max(0,Math.min(SVG_W,startPx));
-  if(badgeStart){badgeStart.style.left=(startPx/SVG_W*100)+'%';badgeStart.style.display='';}
 
-  if(!w||w==='--:--'){
+  const SVG_W=340;
+  const startPx=layout.startPct/100*SVG_W;
+  if(badgeStart){badgeStart.style.left=layout.startPct+'%';badgeStart.style.display='';}
+
+  if(layout.state==='sleep-only'){
     // 취침만 입력된 상태 — 시작 아이콘만 표시, 바는 아직 채우지 않고 종료 배지도 숨김
     numEl.textContent='--';unitEl.textContent='';
     if(clipRect)clipRect.setAttribute('width','0');
     if(badgeEnd)badgeEnd.style.display='none';
     return;
   }
-  const wv=w.split(':').map(Number);
-  let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;
-  numEl.textContent=Math.floor(m/60)+'h'+(m%60?' '+(m%60)+'m':'');
-  unitEl.textContent='';
 
-  // 00:00~08:00(480분) 추천 구간 축에, 취침·기상 시각을 각각 독립적으로 매핑
-  let endPx=(toAxisMin(wv)/AXIS_MIN)*SVG_W;
-  endPx=Math.max(0,Math.min(SVG_W,endPx));
-  if(endPx<startPx)endPx=startPx;
+  numEl.textContent=layout.durationLabel;
+  unitEl.textContent='';
+  const endPx=layout.endPct/100*SVG_W;
 
   if(clipRect){clipRect.setAttribute('x',startPx);clipRect.setAttribute('width',Math.max(0,endPx-startPx));}
   const grad=document.getElementById('sleepWaveGrad');
   if(grad){grad.setAttribute('x1',startPx);grad.setAttribute('x2',Math.max(startPx+1,endPx));}
-  if(badgeEnd){badgeEnd.style.left=(endPx/SVG_W*100)+'%';badgeEnd.style.display='';}
-  renderSleepAvgMarkers(AXIS_MIN,SVG_W,toAxisMin,sv);
+  if(badgeEnd){badgeEnd.style.left=layout.endPct+'%';badgeEnd.style.display='';}
+  renderSleepAvgMarkers(layout.avg);
 }
-function renderSleepAvgMarkers(AXIS_MIN,SVG_W,toAxisMin,sv){
+function renderSleepAvgMarkers(avg){
   const mStart=document.getElementById('sleep-avg-marker-start'),mEnd=document.getElementById('sleep-avg-marker-end');
   const compareEl=document.getElementById('sleep-avg-compare');
   if(!mStart||!mEnd)return;
-  const avg=getAvgSleepWindow(14);
-  if(!avg||avg.sampleCount<3){
+  if(!avg){
     mStart.style.display='none';mEnd.style.display='none';
     if(compareEl)compareEl.style.display='none';
     return;
   }
-  const avgSleepArr=[Math.floor(avg.sleepMin/60)%24,Math.round(avg.sleepMin%60)];
-  const avgWakeArr=[Math.floor(avg.wakeMin/60)%24,Math.round(avg.wakeMin%60)];
-  let avgStartPx=(toAxisMin(avgSleepArr)/AXIS_MIN)*SVG_W;
-  avgStartPx=Math.max(0,Math.min(SVG_W,avgStartPx));
-  let avgEndPx=(toAxisMin(avgWakeArr)/AXIS_MIN)*SVG_W;
-  avgEndPx=Math.max(0,Math.min(SVG_W,avgEndPx));
-  mStart.style.left=(avgStartPx/SVG_W*100)+'%';mStart.style.display='';
-  mEnd.style.left=(avgEndPx/SVG_W*100)+'%';mEnd.style.display='';
-  if(compareEl&&sv){
-    let todayMin=toAxisMin(sv);
-    let avgMin=toAxisMin(avgSleepArr);
-    let diff=Math.round(todayMin-avgMin); // 양수=오늘이 더 늦게, 음수=오늘이 더 빠르게
-    if(Math.abs(diff)<3){
-      compareEl.textContent='평소와 비슷하게 잠들었어요';
-    }else{
-      const absMin=Math.abs(diff);
-      const word=diff>0?'늦게':'빠르게';
-      compareEl.textContent='평균보다 '+absMin+'분 '+word+' 잠들었어요';
-    }
-    compareEl.style.display='';
-  }else if(compareEl){
-    compareEl.style.display='none';
-  }
+  mStart.style.left=avg.startPct+'%';mStart.style.display='';
+  mEnd.style.left=avg.endPct+'%';mEnd.style.display='';
+  if(compareEl){compareEl.textContent=avg.compareText;compareEl.style.display='';}
 }
 // ── 취침/기상 시간 입력 공용 유틸 (마스킹, 지금시각 세팅, 시각 모달) ──
 function maskTimeInput(el){
@@ -4382,38 +4406,37 @@ function attachTodoReorderDrag(el,i,tsGroup,itemSelector,onDrop){
   handle.addEventListener('pointercancel',endDrag);
 }
 // 같은 시간대 그룹 내에서 idx 항목을 shift칸 이동시키고 sortOrder를 재기록
-function applyTodoReorder(idx,tsGroup,shift){
-  const dk=dateKey(currentDate),todos=getTodos(dk);
-  // 현재 화면 표시 순서와 동일한 기준으로, 이 그룹(미완료+같은 시간대)만 추출
-  const group=todos.map((t,i)=>({...t,_i:i})).filter(t=>!t.done&&(t.timeSection||'none')===tsGroup)
-    .sort(compareTodoOrder);
+// 리스트 순서 변경(위/아래 이동) 공용 헬퍼 — "정렬된 배열에서 현재 위치 찾기 → shift만큼 이동 →
+// 그룹 내 순서대로 sortOrder 재기록"까지 공통 처리. applyTodoReorder/applyReserveReorder가
+// 그룹 필터링(filterFn)과 정렬 기준(sortFn)만 다르고 거의 동일한 구조였던 것을 통합.
+// filterFn: (item)=>boolean — 재정렬 대상 그룹만 추림(그룹 없으면 null로 전체 대상)
+// sortFn: (a,b)=>number — 화면 표시와 동일한 정렬 기준
+// 반환: 재정렬이 실제로 일어났으면 true(호출부가 save+render 수행), 아니면 false
+function reorderListItems(items,idx,shift,filterFn,sortFn){
+  const tagged=items.map((t,i)=>({...t,_i:i}));
+  const group=(filterFn?tagged.filter(filterFn):tagged).sort(sortFn);
   const curPos=group.findIndex(t=>t._i===idx);
-  if(curPos<0)return;
+  if(curPos<0)return false;
   let newPos=curPos+shift;
   newPos=Math.max(0,Math.min(group.length-1,newPos));
-  if(newPos===curPos)return;
+  if(newPos===curPos)return false;
   const [moved]=group.splice(curPos,1);
   group.splice(newPos,0,moved);
-  // 그룹 내 순서대로 sortOrder를 1,2,3...으로 재기록
-  group.forEach((t,order)=>{todos[t._i].sortOrder=order;});
+  group.forEach((t,order)=>{items[t._i].sortOrder=order;});
+  return true;
+}
+function applyTodoReorder(idx,tsGroup,shift){
+  const dk=dateKey(currentDate),todos=getTodos(dk);
+  const changed=reorderListItems(todos,idx,shift,t=>!t.done&&(t.timeSection||'none')===tsGroup,compareTodoOrder);
+  if(!changed)return;
   saveTodos(dk,todos);
   renderTodos();
 }
 // 보관함 전체 목록 기준 순서 재기록(시간대 그룹 없음, 전체가 하나의 그룹)
-// idx는 원본 배열(getReserveTodos) 인덱스로 들어오므로, 화면과 동일하게 sortOrder 기준 정렬한 뒤
-// 그 정렬된 순서 안에서 현재 위치를 다시 찾아야 함(applyTodoReorder와 동일 패턴).
 function applyReserveReorder(idx,_g,shift){
   const todos=getReserveTodos();
-  const sorted=todos.map((t,i)=>({...t,_i:i})).sort((a,b)=>(a.sortOrder!=null?a.sortOrder:9999)-(b.sortOrder!=null?b.sortOrder:9999));
-  const curPos=sorted.findIndex(t=>t._i===idx);
-  if(curPos<0)return;
-  let newPos=curPos+shift;
-  newPos=Math.max(0,Math.min(sorted.length-1,newPos));
-  if(newPos===curPos)return;
-  const [moved]=sorted.splice(curPos,1);
-  sorted.splice(newPos,0,moved);
-  // 정렬된 순서대로 sortOrder를 1,2,3...으로 재기록(원본 todos 배열 위치에 반영)
-  sorted.forEach((t,order)=>{todos[t._i].sortOrder=order;});
+  const changed=reorderListItems(todos,idx,shift,null,(a,b)=>(a.sortOrder!=null?a.sortOrder:9999)-(b.sortOrder!=null?b.sortOrder:9999));
+  if(!changed)return;
   saveReserveTodos(todos);
   renderReserveList();
 }
@@ -4511,9 +4534,14 @@ const MORNING_FLOW_PHRASES_AFTER=[
   '고른 것부터 하나씩 시작해봐요.','오늘 아침도 내가 원하는 모습으로.','오늘의 첫 장면을 골랐어요.',
   '오늘의 시작이 조금 더 선명해졌어요.'
 ];
+// 날짜(dk) 문자열을 시드로 한 결정적 해시 — 같은 날엔 항상 같은 값, len으로 나눈 나머지를 인덱스로 사용.
+// 오버플로우 없는 부호 없는 32비트 해시(>>>0) 방식으로 통일.
+function dateSeedIndex(dk,len){
+  let seed=0;for(let i=0;i<dk.length;i++)seed=(seed*31+dk.charCodeAt(i))>>>0;
+  return seed%len;
+}
 function _mfPhraseIndex(dk,len){
-  let sum=0;for(let i=0;i<dk.length;i++)sum+=dk.charCodeAt(i);
-  return sum%len;
+  return dateSeedIndex(dk,len);
 }
 // HH:MM 두 시각의 분단위 소요시간 — 자정을 넘긴 경우(예: 23:50~00:10)도 고려해 종료가 시작보다 이르면 24시간을 더함.
 function _mfDurationMin(startStr,endStr){
@@ -4769,7 +4797,6 @@ function _mfYesterdayRecapLine(){
   if(!doneLabels.length)return null;
   return '어제는 '+doneLabels.join('와 ')+'으로 아침을 열었어요';
 }
-// 오늘 첫 일정/타임테이블 한 줄 — 투두는 제외(오전 인사카드가 이미 다룸), events/timetable만 참고.
 // 오늘 일정+시간표(투두 앞 "HH:MM " 표기) 중 가장 이른 항목 한 줄 — 투두 일반 항목은 제외(오전 인사카드가 이미 다룸), 일정/시간표만 참고.
 function _mfTodayPreviewLine(){
   const dk=dateKey(getLogicalDate());
@@ -5196,8 +5223,7 @@ function makePlaylistMiniCard(){
     }
     // 날짜 문자열을 시드로 한 결정적 랜덤 — 같은 날엔 계속 같은 곡, 자정 지나면 다음 곡
     const dk=dateKey(getLogicalDate());
-    let seed=0;for(let i=0;i<dk.length;i++)seed=(seed*31+dk.charCodeAt(i))|0;
-    const idx=Math.abs(seed)%allMusic.length;
+    const idx=dateSeedIndex(dk,allMusic.length);
     const item=allMusic[idx];
     const musicRgb='160,105,180';
     const coverInner=item.poster
@@ -5226,8 +5252,7 @@ function makeTodayQuoteCard(){
   if(!quotes.length)return null;
   // 그날 하루 동안은 같은 문장이 나오도록, 날짜 기반 시드로 고정 선택
   const dk=dateKey(getLogicalDate());
-  let seed=0;for(let i=0;i<dk.length;i++)seed=(seed*31+dk.charCodeAt(i))>>>0;
-  const idx=seed%quotes.length;
+  const idx=dateSeedIndex(dk,quotes.length);
   const q=quotes[idx];
   const book=getBooks().find(b=>b.cid===q.bookCid);
   const wrap=document.createElement('div');wrap.className='today-quote-wrap';
@@ -6965,17 +6990,13 @@ async function buildNextWeekFeedbackHtml(wk){
   const reply=await callClaude(sys,[{role:'user',content:dataContext}],700);
   if(!reply||reply.startsWith('__ERR__'))return null;
 
-  const CAT_ICON={
-    '운동':'ti-run','식사':'ti-salad','수면':'ti-moon','공부':'ti-book',
-    '업무':'ti-briefcase','마음가짐':'ti-heart','습관':'ti-repeat'
-  };
   const lines=reply.trim().split('\n').filter(l=>l.trim());
   return lines.map((l,idx)=>{
     const m=l.trim().match(/^\[(.+?)\]\s*(.+?)\s*::\s*(.+)$/);
     const cat=m?m[1].trim():'';
     const goalText=m?m[2].trim():(items[idx]?items[idx].text:'');
     const text=m?m[3].trim():l.trim();
-    const icon=CAT_ICON[cat]||'ti-sparkles';
+    const icon=NEXT_WEEK_CAT_ICON[cat]||'ti-sparkles';
     return `<div class="nwf-item"><div class="nwf-item-head"><i class="ti ${icon} nwf-item-icon" aria-hidden="true"></i><span class="nwf-item-goal">${escapeHtml(goalText)}</span></div><span class="nwf-item-text">${text}</span></div>`;
   }).join('');
 }
@@ -7080,16 +7101,12 @@ ${RHYTHM_CAT_GUIDE}
   const reply=await callClaude(sys,[{role:'user',content:dataContext}],700);
   if(!reply||reply.startsWith('__ERR__'))return null;
 
-  const CAT_ICON2={
-    '운동':'ti-run','식사':'ti-salad','수면':'ti-moon','공부':'ti-book',
-    '업무':'ti-briefcase','마음가짐':'ti-heart','습관':'ti-repeat','취미':'ti-stack-2'
-  };
   const lines=reply.trim().split('\n').filter(l=>l.trim());
   return lines.map(l=>{
     const m=l.trim().match(/^\[(.+?)\]\s*(.+?)\s*::\s*(.+?)\s*::\s*(.+)$/);
     if(!m)return '';
     const cat=m[1].trim(),title=m[2].trim(),reason=m[3].trim(),goalText=m[4].trim();
-    const icon=CAT_ICON2[cat]||'ti-sparkles';
+    const icon=NEXT_WEEK_SUGGEST_CAT_ICON[cat]||'ti-sparkles';
     return `<div class="nwf-item">
       <div class="nwf-item-head"><i class="ti ${icon} nwf-item-icon" aria-hidden="true"></i><span class="nwf-item-goal">${escapeHtml(title)}</span></div>
       <span class="nwf-item-text">${escapeHtml(reason)}</span>
@@ -7313,10 +7330,10 @@ function renderTimetable(){
   const isSameMonth=mk===monthKey(new Date());
   const daysInMonth=new Date(_calYear,_calMonth+1,0).getDate();
 
-  // 헤더
+  // 헤더 — 실제 그 달 일수만큼만 그림(31일 고정 시 2월 등에서 막대 없는 빈 눈금이 남는 문제 수정)
   if(headInner){
     headInner.innerHTML='';
-    for(let i=1;i<=31;i++){
+    for(let i=1;i<=daysInMonth;i++){
       const s=document.createElement('span');s.textContent=i;headInner.appendChild(s);
     }
   }
@@ -7347,7 +7364,7 @@ function renderTimetable(){
         const eMonth=eStr.slice(0,7);
         endD=eMonth===mk?Math.max(parseInt(eStr.slice(8,10),10)||startD,startD):daysInMonth;
       }
-      endD=Math.min(Math.max(endD,startD),31);
+      endD=Math.min(Math.max(endD,startD),daysInMonth);
       return {item,startD,endD,isWatching};
     }).sort((a,b)=>a.startD-b.startD);
 
@@ -7713,10 +7730,7 @@ function confirmContent(){
   let savedCid=null;
   if(_contentCtx.mode==='edit'&&_contentCtx.item){
     const oldContents=getContents(oldMk);
-    // cid가 있으면 cid로, 없는 옛 데이터(cid 도입 이전)는 created로 폴백 매칭
-    const idx=_contentCtx.item.cid
-      ?oldContents.findIndex(c=>c.cid===_contentCtx.item.cid)
-      :oldContents.findIndex(c=>c.created===_contentCtx.item.created);
+    const idx=oldContents.findIndex(c=>c.cid===_contentCtx.item.cid);
     const updated=idx>=0?{...oldContents[idx],title,startDate,endDate,status,review,stars,poster,author,musicUrl,album,releaseYear,totalUnit,currentUnit,isAiring}:null;
     if(idx>=0){
       savedCid=oldContents[idx].cid;
@@ -8150,10 +8164,7 @@ function deleteRhythmBlocksByContentCid(cid,startDate,endDate){
 function deleteContent(){
   if(!_contentCtx.item)return;
   const mk=_contentCtx.mk,contents=getContents(mk);
-  // cid가 있으면 cid로, 없는 옛 데이터(cid 도입 이전)는 created로 폴백 매칭
-  const idx=_contentCtx.item.cid
-    ?contents.findIndex(c=>c.cid===_contentCtx.item.cid)
-    :contents.findIndex(c=>c.created===_contentCtx.item.created);
+  const idx=contents.findIndex(c=>c.cid===_contentCtx.item.cid);
   if(idx>=0){
     const deletedItem=contents[idx];
     addDelPending('contents',mk,deletedItem.cid);
@@ -8541,7 +8552,7 @@ function renderCalendar(){
       weekDates.push(dayNum>=1&&dayNum<=daysInMonth?`${y}-${pad(mo+1)}-${pad(dayNum)}`:null);
     }
     if(weekDates.every(dk=>!dk)){weekBarsAll.push([]);continue;}
-    const safeWeekDates=weekDates.map(dk=>dk||'____NONE____');
+    const safeWeekDates=weekDates.map(dk=>dk||EMPTY_CAL_CELL);
     weekBarsAll.push(computeWeekBars(safeWeekDates,multidayEvents));
   }
   // 총 슬롯 수(배지+bar 합쳐서 실제 보이는 줄) 상한 — 셀 높이를 넘지 않도록 2줄까지만 텍스트로, 나머지는 "+n개"
@@ -8867,7 +8878,7 @@ function renderDailyOneLineWeek(){
 }
 // ── TODO DRAG
 // ══════════════════════════════════════════════════════════
-// ██ 초기화 (1/2 — 나머지는 파일 끝 HOME/강제복구/INIT/마이그레이션) ██
+// ██ 초기화 (1/2 — 나머지는 파일 끝 HOME/INIT/마이그레이션) ██
 // ══════════════════════════════════════════════════════════
 // ── LOAD
 function tabularTimeHtml(str){
@@ -9548,16 +9559,6 @@ function openSettings(){
   document.querySelectorAll('.ctheme-btn').forEach(b=>b.classList.remove('on'));
   const act=document.getElementById('ct-'+theme);if(act)act.classList.add('on');
   initTextScaleUI();
-  const lastUsedEl=document.getElementById('data-recovery-last-used');
-  if(lastUsedEl){
-    const lastUsed=S.get('data_recovery_last_used');
-    if(lastUsed){
-      const days=Math.floor((new Date()-new Date(lastUsed+'T00:00:00'))/86400000);
-      lastUsedEl.textContent=days>=30?`마지막 사용: ${lastUsed} (${days}일 전 — 오래 안 썼다면 정리를 고려해보세요)`:`마지막 사용: ${lastUsed}`;
-    }else{
-      lastUsedEl.textContent='아직 사용한 적 없어요';
-    }
-  }
   document.getElementById('settings-ov').classList.add('on');
 }
 function closeSettings(){document.getElementById('settings-ov').classList.remove('on');}
@@ -9600,16 +9601,11 @@ const RD_SW_C=2*Math.PI*32;
 // 이 값이 남아있으면 경과시간을 그대로 이어서 복원한다(백그라운드 전환은 메모리가 유지돼
 // 원래도 문제없었지만, 새로고침·앱 재시작은 메모리 변수가 초기화되어 별도 보존이 필요했음).
 const SW_PERSIST_KEY='iikoto_reading_sw_start';
-// (2026-08-29 통합 이후 불필요해짐) book이 이제 별도 테이블 없이 contents(cat='book') 자체이므로
-// "아직 연결 안 된 콘텐츠 book 항목"이라는 개념이 사라짐 — getBooks()가 모든 book 콘텐츠를 자동으로 포함.
-// 호출부(openReading)는 그대로 두되 함수 자체는 no-op으로 유지(하위 호환).
-function backfillReadingLinks(){}
 // ══ 씨앗 코너 ══
 function openReading(){
   _rdTab='reading';
   _rdQuoteShowAll=false;
   document.querySelectorAll('.rd-tab').forEach(t=>t.classList.toggle('on',t.dataset.status==='reading'));
-  backfillReadingLinks();
   renderReadingHub();
   document.getElementById('reading-ov').classList.add('on');
 }
@@ -10063,13 +10059,25 @@ function switchReadingTab(btn,status){
 }
 // 리듬 블록(감상 카테고리, text에 "독서 - 책제목" 형식으로 자동 기록됨)을 세어 이 책을 읽은 세션(회차) 수를 계산.
 // 병렬독서 시에도 책 제목으로 구분되므로 책별로 독립적으로 정확함.
-function countReadingSessionsForBook(title){
+// book(cid 포함)을 넘기면 해당 책의 startDate부터 오늘까지만 훑어 불필요한 조회를 줄임.
+// book을 못 찾거나 cid가 없으면 기존처럼 365일 상한으로 폴백.
+function countReadingSessionsForBook(book){
+  const title=typeof book==='string'?book:book&&book.title;
   if(!title)return 0;
   const target='독서 - '+title;
   let count=0;
-  // 오늘부터 최대 365일 전까지 훑되, 데이터 없으면 자연히 일찍 멈춤(무한 루프 방지용 상한)
   const today=new Date();
-  for(let i=0;i<365;i++){
+  let maxDays=365;
+  if(book&&typeof book==='object'&&book.cid){
+    const found=_findContentByCidNearMkInRange(book.cid,_BOOK_SCAN_MONTHS);
+    const item=found?found.list[found.idx]:null;
+    if(item&&item.startDate){
+      const start=new Date(item.startDate+'T00:00:00');
+      const daysSinceStart=Math.floor((new Date(dateKey(today)+'T00:00:00')-start)/86400000)+1;
+      if(daysSinceStart>0)maxDays=Math.min(365,daysSinceStart);
+    }
+  }
+  for(let i=0;i<maxDays;i++){
     const d=new Date(today);d.setDate(today.getDate()-i);
     const dk=dateKey(d);
     const blocks=getRhythmBlocks(dk);
@@ -10081,7 +10089,7 @@ function countReadingSessionsForBook(title){
 // sessionCount를 이미 계산해둔 경우 재계산 없이 그대로 전달 가능(호출부 중복 연산 방지).
 function estimateRemainingReadingSessions(book,sessionCount){
   if(!book||book.status!=='reading')return null;
-  const sessions=sessionCount!=null?sessionCount:countReadingSessionsForBook(book.title);
+  const sessions=sessionCount!=null?sessionCount:countReadingSessionsForBook(book);
   if(sessions<3)return {sessions,ready:false};
   let currentAmt,totalAmt;
   if(book.unit==='percent'){
@@ -10122,7 +10130,7 @@ function renderBookList(){
     const sub=b.status==='done'?'':(b.unit==='percent'?`${b.percent||0}%`:(b.totalPages?`${b.pages}/${b.totalPages}페이지`:`${b.pages||0}페이지`));
     const timeStr=b.seconds?`${Math.floor(b.seconds/60)}분`:'';
     const durLabel=getBookDurationLabel(b);
-    const sessionCount=b.status==='reading'?countReadingSessionsForBook(b.title):0;
+    const sessionCount=b.status==='reading'?countReadingSessionsForBook(b):0;
     const sessionStr=sessionCount>0?`${sessionCount}회차`:'';
     const metaStr=[sub,timeStr,durLabel,sessionStr].filter(Boolean).join(' · ');
     const est=b.status==='reading'?estimateRemainingReadingSessions(b,sessionCount):null;
@@ -11982,94 +11990,13 @@ function confirmReserveMove(){
 }
 
 // ══════════════════════════════════════════════════════════
-// ██ 초기화 (2/2 — 나머지는 LOAD 부근) — HOME 재진입/강제복구/INIT/마이그레이션 ██
+// ██ 초기화 (2/2 — 나머지는 LOAD 부근) — HOME 재진입/INIT/마이그레이션 ██
 // ══════════════════════════════════════════════════════════
 // ── HOME
 const DAYS_KO=['일','월','화','수','목','금','토'];
 
 
 
-// ── 강제 복구
-async function forceRestoreDate(dk){
-  var mrows=await supaFetch('memos?date_key=eq.'+dk+'&order=created');
-  if(mrows!==null){
-    S.set(S.key('memos',dk),mrows.map(memoRowToLocal));
-  }
-  var trows=await supaFetch('todos?date_key=eq.'+dk+'&order=created');
-  if(trows!==null){
-    S.set(S.key('todos',dk),trows.map(function(r){return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null,eventEndDate:r.event_end_date||null,pinned:!!r.pinned};}));
-  }
-  var srows=await supaFetch('sleep?date_key=eq.'+dk);
-  if(srows&&srows.length>0){
-    S.set(S.key('sleep',dk),sleepRowToLocal(srows[0]));
-  }
-  var mlrows=await supaFetch('meals?date_key=eq.'+dk);
-  if(mlrows&&mlrows.length>0){
-    var mlPend=S.get(S.key('meals_fields_pending',dk))||[];
-    var mlServer=mealRowToLocal(mlrows[0]);
-    if(!mlPend.length){
-      S.set(S.key('meals',dk),mlServer);
-    }else{
-      // Up 단계에서 아직 못 올라간 필드가 있다면(예: 일시적 네트워크 실패) 그 필드는 로컬 유지.
-      var mlLocal=getMeals(dk);
-      var mlMerged=Object.assign({},mlServer);
-      mlPend.forEach(function(col){mlMerged[col]=mlLocal[col];});
-      S.set(S.key('meals',dk),mlMerged);
-    }
-  }
-  var rbrows=await supaFetch('rhythm_blocks?date_key=eq.'+dk+'&order=created');
-  if(rbrows&&rbrows.length>0){
-    S.set(S.key('rblocks',dk),rbrows.map(function(r){return {cat:r.cat,start:r.start_time,end:r.end_time,text:r.text||'',created:r.created,cid:r.client_id||genCid(),contentCid:r.content_cid||null};}));
-  }
-}
-async function forceRestoreAll(){
-  S.set('data_recovery_last_used',dateKey(new Date()));
-  showToast('복구 시작...');
-  window._restoring = true;
-  var dates = [];
-  for(var i = 13; i >= 0; i--){
-    var d = new Date(); d.setDate(d.getDate() - i);
-    dates.push(dateKey(d));
-  }
-  var restored = 0;
-  for(var i = 0; i < dates.length; i++){
-    var dk = dates[i];
-    var before = getTodos(dk).length + getMemos(dk).length;
-    await forceRestoreDate(dk);
-    var after = getTodos(dk).length + getMemos(dk).length;
-    if(after > before) restored++;
-    S.set(S.key('todos_pending', dk), false);
-    S.set(S.key('memos_pending', dk), false);
-  }
-  window._restoring = false;
-  loadDaily();
-  showToast('복구 완료 ✓ ' + restored + '일치 데이터 복원됨');
-}
-async function checkDataIntegrity(){
-  S.set('data_recovery_last_used',dateKey(new Date()));
-  const statusEl=document.getElementById('integrity-check-status');
-  if(!navigator.onLine){if(statusEl){statusEl.style.color='var(--pal-rose-text)';statusEl.textContent='오프라인 상태에선 점검할 수 없어요';}return;}
-  if(statusEl){statusEl.style.color='';statusEl.textContent='점검 중이에요...';}
-  const dates=[];
-  for(let i=13;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);dates.push(dateKey(d));}
-  const todayDk=dateKey(new Date());
-  const mismatches=[];
-  for(const dk of dates){
-    const localT=getTodos(dk).length,localM=getMemos(dk).length,localR=getRhythmBlocks(dk).length;
-    const [remT,remM,remR]=await Promise.all([
-      supaFetch(`todos?date_key=eq.${dk}&select=client_id`),
-      supaFetch(`memos?date_key=eq.${dk}&select=client_id`),
-      supaFetch(`rhythm_blocks?date_key=eq.${dk}&select=client_id`)
-    ]);
-    if(dk===todayDk)continue; // 오늘은 동기화 진행중일 수 있어 제외
-    if(remT!==null&&remT.length!==localT)mismatches.push(`${dk} 투두 (로컬 ${localT} / 서버 ${remT.length})`);
-    if(remM!==null&&remM.length!==localM)mismatches.push(`${dk} 메모 (로컬 ${localM} / 서버 ${remM.length})`);
-    if(remR!==null&&remR.length!==localR)mismatches.push(`${dk} 리듬 (로컬 ${localR} / 서버 ${remR.length})`);
-  }
-  if(!statusEl)return;
-  if(!mismatches.length){statusEl.style.color='';statusEl.textContent='✓ 최근 14일 데이터가 서로 일치해요';}
-  else{statusEl.style.color='var(--pal-rose-text)';statusEl.innerHTML='⚠ 불일치 발견 — 필요시 위 복구 버튼을 눌러보세요<br>'+mismatches.join('<br>');}
-}
 // ── INIT
 updateDateUI();
 loadDaily();
@@ -12196,10 +12123,12 @@ async function initSync(){
     var od=new Date(mon);od.setDate(mon.getDate()+i);
     await syncGoalDown(S.key('oneline',dateKey(od)));
   }
-  // Up 하지 않은 날짜만 Supabase → 로컬 복원
+  // Up 하지 않은 날짜만 Supabase → 로컬 복원 (pending 체크는 각 syncXDown 내부에서 처리)
   for(var i=0;i<dates.length;i++){
     var dk=dates[i];
-    if(!uploadedDates[dk])await forceRestoreDate(dk);
+    if(!uploadedDates[dk]){
+      await Promise.all([syncTodosDown(dk),syncMemosDown(dk),syncSleepDown(dk),syncMealsDown(dk),syncRhythmBlocksDown(dk)]);
+    }
   }
   // 미래 날짜 Down
   for(var i=0;i<futureDates.length;i++){
@@ -12225,23 +12154,4 @@ async function initSync(){
 setTimeout(initSync, 500);
 setTimeout(maybeShowTimeSlotPopup, 2400);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(maybeShowTimeSlotPopup,400);});
-
-// ── contents 테이블 client_id 마이그레이션 (1회성)
-// Supabase에 contents.client_id 컬럼 + (month_key,client_id) 유니크 제약을 추가한 뒤,
-// 기존에 client_id가 없던 로컬 콘텐츠를 다시 업로드해서 채워줌.
-// 성공한 달만 완료 처리하고, 실패한 달은 다음 접속 때 다시 시도함.
-async function migrateContentsClientIds(){
-  if(!navigator.onLine)return;
-  try{
-    const done=S.get('contents_cid_migrated_months')||[];
-    const keys=Object.keys(localStorage).filter(k=>k.startsWith('contents:'));
-    for(const k of keys){
-      const mk=k.split(':')[1];
-      if(!mk||done.includes(mk))continue;
-      const ok=await runContentsSyncLocked(mk,()=>syncContentsUp(mk));
-      if(ok){done.push(mk);S.set('contents_cid_migrated_months',done);}
-    }
-  }catch(e){}
-}
-setTimeout(migrateContentsClientIds, 2000);
 
