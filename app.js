@@ -7016,6 +7016,7 @@ function openPhotoArchive(){
 let _photoArchiveResults=[];
 function openPhotoArchiveItem(i){
   const r=_photoArchiveResults[i];if(!r)return;
+  closeModal('photo-archive-modal'); // 그리드 모달을 먼저 닫아야 photo-viewer가 그 뒤에 겹쳐 보이지 않음
   const d=new Date(r.dk+'T00:00:00');
   const meta=`${d.getMonth()+1}월 ${d.getDate()}일 ${_HOME_DAYS[d.getDay()]}요일 · ${r.time||''}`;
   openPhotoViewer(r.src,r.text,meta);
