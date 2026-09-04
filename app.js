@@ -849,7 +849,7 @@ function isContentFinished(c){return c.status==='done'||c.status==='stopped';}
 function isFinishedStatus(status){return status==='done'||status==='stopped';}
 // 콘텐츠가 이번 달(mk)로 이월되는지 판정하는 공통 조건.
 // 진행중(watching)이거나, 완료/중단됐어도 종료월이 이번 달 이후면 이월 대상.
-// getContentsForReport(리포트)와 renderTimetable(타임테이블) 양쪽에서 각자 재구현되던 로직을 통일.
+// getContentsForReport(리포트)와 renderContentTimeline(콘텐츠 타임라인) 양쪽에서 각자 재구현되던 로직을 통일.
 function isContentCarryOver(c,mk){
   if(c.cat==='music')return false; // 음악은 등록일=완료일 개념이라 이월 대상이 아님(status가 항상 'watching'으로 저장되는 것과 무관하게 항상 false)
   if(c.status==='watching')return true;
@@ -4017,6 +4017,8 @@ function renderTodos(){
 }
 // 투두 텍스트 맨 앞의 "HH:MM " 표기를 시간표 항목으로 인식 — 봄이님의 기존 입력 습관(고정 규칙)을 그대로 파싱.
 const SCHEDULE_TIME_RE=/^(\d{1,2}):(\d{2})\s+(.+)/;
+// 시간표 라벨 표기 시 괄호( ) 안 내용은 부가설명으로 보고 제외 — 예: "헬스장 출석률 높이기(주3회 목표)" -> "헬스장 출석률 높이기"
+function stripScheduleParens(text){return (text||'').replace(/\([^)]*\)/g,'').replace(/\s+/g,' ').trim();}
 // dk가 오늘이면 현재 분(0~1439), 아니면 null — 시간표/일정 배너 여러 곳에서 반복되던 "오늘인지+현재분" 계산을 통일.
 function _nowMinIfToday(dk){
   return dk===dateKey(new Date())?(new Date().getHours()*60+new Date().getMinutes()):null;
@@ -5277,7 +5279,10 @@ function _paceAfternoonTimelineItems(dk){
       const d=new Date(t.completedAt);const min=d.getHours()*60+d.getMinutes();
       if(min<AFTERNOON_TL_START||min>AFTERNOON_TL_END)return;
       const {prefix,hasPrefix,parts}=parseTodoTextParts(t.text);
-      const label=hasPrefix&&prefix?prefix+' · '+(parts.join(' / ')||t.text||''):(t.text||'');
+      let label=hasPrefix&&prefix?prefix+' · '+(parts.join(' / ')||t.text||''):(t.text||'');
+      // 시간표(HH:MM 접두어) 형식으로 쓴 투두면 괄호( ) 안 부가설명은 제외하고 표기
+      const scheduleM=(t.scheduleOrigText||t.text||'').match(SCHEDULE_TIME_RE);
+      if(scheduleM)label=stripScheduleParens(hasPrefix&&prefix?prefix+' · '+scheduleM[3]:scheduleM[3]);
       items.push({type:'todo',min,time:minToHHMM(min),label,icon:'ti-check'});
     }
   });
@@ -7524,15 +7529,15 @@ let _selectedReleaseYear=null;
 let _selectedTotalUnit=null; // TMDB 상세 조회로 자동 확인된 드라마 총회차/영화 총러닝타임(분)
 let _apiTimer=null;
 
-function renderTimetable(){
+function renderContentTimeline(){
   const mk=calMonthKey();
   const prevDateObj=new Date(_calYear,_calMonth-1,1);
   const prevMk=monthKey(prevDateObj);
   const contents=getContents(mk);
   const prevContents=getContents(prevMk);
-  const headInner=document.getElementById('tt-head-inner');
-  const headDates=document.getElementById('tt-head-dates');
-  const rowsEl=document.getElementById('tt-rows');
+  const headInner=document.getElementById('ctl-head-inner');
+  const headDates=document.getElementById('ctl-head-dates');
+  const rowsEl=document.getElementById('ctl-rows');
   if(!rowsEl)return;
   const todayDay=new Date().getDate();
   const isSameMonth=mk===monthKey(new Date());
@@ -7599,18 +7604,18 @@ function renderTimetable(){
     if(!tracks.length)tracks.push([]);
 
     tracks.forEach((trackItems,tIdx)=>{
-      const row=document.createElement('div');row.className='tt-row';
-      const catEl=document.createElement('div');catEl.className='tt-cat-fixed';
+      const row=document.createElement('div');row.className='ctl-row';
+      const catEl=document.createElement('div');catEl.className='ctl-cat-fixed';
       if(tIdx===0){
         const meta=CAT_ICON_META[cat];
         catEl.innerHTML=meta?`<span style="display:inline-flex;align-items:center;gap:4px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:4px;background:${meta.color};flex-shrink:0;"><i class="ti ${meta.icon}" style="font-size:9px;color:${meta.iconColor};" aria-hidden="true"></i></span><span>${CAT_LABELS[cat]}</span></span>`:CAT_LABELS[cat];
         catEl.addEventListener('click',()=>openContentModal(cat));
       }else{
-        catEl.classList.add('tt-cat-sub');
+        catEl.classList.add('ctl-cat-sub');
       }
-      const scroll=document.createElement('div');scroll.className='tt-date-scroll';
+      const scroll=document.createElement('div');scroll.className='ctl-date-scroll';
       scroll.setAttribute('data-tt','1');
-      const inner=document.createElement('div');inner.className='tt-date-inner';
+      const inner=document.createElement('div');inner.className='ctl-date-inner';
       // 트랙 내 아이템을 시작일 순으로 순회하며, 표시시작일을 max(실제 startD, 커서)로 보정.
       // 겹치지 않으면 항상 자기 startD 그대로 사용되므로 기존 동작과 완전히 동일하게 흘러가고,
       // 겹칠 때만(예: 완독 종료일=다음 항목 시작일) 자동으로 뒤로 밀려 폭이 줄어들며 자연스럽게 이어붙음.
@@ -7623,7 +7628,7 @@ function renderTimetable(){
         const dispStart=Math.max(startD,cursor);
         if(dispStart>cursor){
           for(let d=cursor;d<dispStart;d++){
-            const cell=document.createElement('div');cell.className='tt-cell';inner.appendChild(cell);
+            const cell=document.createElement('div');cell.className='ctl-cell';inner.appendChild(cell);
           }
         }
         const dispEnd=Math.max(endD,dispStart);
@@ -7635,18 +7640,18 @@ function renderTimetable(){
         if(useAiringTone){
           const watchedDays=new Set(getWatchedDaysInMonth(item.title,mk));
           const track=document.createElement('div');
-          track.className='tt-block drama tt-airing-tone';
+          track.className='ctl-block drama ctl-airing-tone';
           track.style.cssText=`width:${w}px;min-width:${w}px;position:relative;padding:0;overflow:hidden;display:flex;`;
           track.title=(item._carried?item.title+' (전월부터 이어짐)':item.title)+(item.status==='stopped'?' · 중단':'');
           for(let d=dispStart;d<=dispEnd;d++){
             const seg=document.createElement('div');
-            seg.className='tt-airing-seg'+(watchedDays.has(d)?' watched':'');
+            seg.className='ctl-airing-seg'+(watchedDays.has(d)?' watched':'');
             track.appendChild(seg);
           }
-          const lbl=document.createElement('span');lbl.className='tt-airing-tone-label';lbl.textContent=item.title;
+          const lbl=document.createElement('span');lbl.className='ctl-airing-tone-label';lbl.textContent=item.title;
           track.appendChild(lbl);
           if(isWatching){
-            const stripe=document.createElement('div');stripe.className='tt-airing-live-stripe';
+            const stripe=document.createElement('div');stripe.className='ctl-airing-live-stripe';
             track.appendChild(stripe);
           }
           if(item.status==='stopped')track.style.filter='saturate(0.45)';
@@ -7656,7 +7661,7 @@ function renderTimetable(){
           cursor=dispEnd+1;
           return;
         }
-        const block=document.createElement('div');block.className=`tt-block ${cat}`;
+        const block=document.createElement('div');block.className=`ctl-block ${cat}`;
         block.style.cssText=`width:${w}px;min-width:${w}px;position:relative;`;
         if(isWatching){
           block.style.backgroundImage=`repeating-linear-gradient(45deg,transparent,transparent 6px,rgba(255,255,255,0.45) 6px,rgba(255,255,255,0.45) 10px)`;
@@ -7687,7 +7692,7 @@ function renderTimetable(){
       });
       if(cursor<=31){
         for(let d=cursor;d<=31;d++){
-          const cell=document.createElement('div');cell.className='tt-cell';inner.appendChild(cell);
+          const cell=document.createElement('div');cell.className='ctl-cell';inner.appendChild(cell);
         }
       }
       scroll.appendChild(inner);row.appendChild(catEl);row.appendChild(scroll);rowsEl.appendChild(row);
@@ -7717,7 +7722,7 @@ function renderTimetable(){
   // 완결 기준은 종료일(endDate)의 월 = 이번 달(mk). 전월에 시작해 이번 달에 끝난 것도 포함,
   // 반대로 이번 달에 시작했어도 다음 달 이후에 끝나면 이번 달 완결에서 제외(carry 로직과 동일 기준).
   // music은 완결 개념이 없는 카테고리라 대신 "이번 달 기록 수량"(시작일=이번달 기준)으로 집계.
-  const statsEl=document.getElementById('tt-complete-stats');
+  const statsEl=document.getElementById('ctl-complete-stats');
   if(statsEl){
     const allForStats=[...contents,...prevContents];
     const seen=new Set();
@@ -7963,7 +7968,7 @@ function confirmContent(){
     saveContents(newMk,contents);
     if(_contentCtx.onSaved){const cb=_contentCtx.onSaved;_contentCtx.onSaved=null;setTimeout(()=>cb(newCid),0);}
   }
-  closeModal('content-modal');renderTimetable();
+  closeModal('content-modal');renderContentTimeline();
   if(_contentCtx.cat==='book'&&savedCid){
     const bookUnit=_cmUnit||'percent';
     const bookTotalPages=bookUnit==='pages'?(parseInt(document.getElementById('cm-total-pages').value,10)||null):null;
@@ -8380,7 +8385,7 @@ function deleteContent(){
     if(deletedItem.cid)deleteRhythmBlocksByContentCid(deletedItem.cid,deletedItem.startDate,deletedItem.endDate);
     // book 카테고리도 이 항목 자체가 book이므로(2026-08-29 통합) 별도 삭제 불필요 — contents.splice로 이미 끝남
   }
-  saveContents(mk,contents);closeModal('content-modal');renderTimetable();
+  saveContents(mk,contents);closeModal('content-modal');renderContentTimeline();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -8710,7 +8715,7 @@ function calShiftMonth(n){
   _calSelectedDay=null;
   const el=document.getElementById('cal-detail');if(el)el.innerHTML='';
   renderCalendar();
-  renderTimetable();
+  renderContentTimeline();
   renderHabitMonthly();
   renderMonthlyStatBar();
   renderGoalNote('monthly-goal-wrap',S.key('mgoal',calMonthKey()),isCalPastMonth());
@@ -8718,7 +8723,7 @@ function calShiftMonth(n){
   const sy=_calYear,smo=_calMonth;
   syncMonthRange(sy,smo).then(fetched=>{
     if(fetched&&_calYear===sy&&_calMonth===smo){
-      renderCalendar();renderTimetable();renderHabitMonthly();renderMonthlyStatBar();
+      renderCalendar();renderContentTimeline();renderHabitMonthly();renderMonthlyStatBar();
       renderGoalNote('monthly-goal-wrap',S.key('mgoal',calMonthKey()),isCalPastMonth());
       if(_calSelectedDay)renderCalDetail(_calSelectedDay);
     }
@@ -9501,7 +9506,7 @@ function loadMonthly(){
   _calYear=_ld0.getFullYear();_calMonth=_ld0.getMonth();
   _calSelectedDay=null;
   const _cdEl0=document.getElementById('cal-detail');if(_cdEl0)_cdEl0.innerHTML='';
-  renderTimetable();renderHabitMonthly();
+  renderContentTimeline();renderHabitMonthly();
   renderGoalNote('monthly-goal-wrap',S.key('mgoal',calMonthKey()),isCalPastMonth());
   updateMonthlyGoalTitle();
   renderCalendar();renderMonthlyStatBar();
@@ -9513,7 +9518,7 @@ function loadMonthly(){
   });
   syncMonthRange(sy,smo).then(fetched=>{
     if(fetched&&_calYear===sy&&_calMonth===smo){
-      renderCalendar();renderTimetable();renderHabitMonthly();renderMonthlyStatBar();
+      renderCalendar();renderContentTimeline();renderHabitMonthly();renderMonthlyStatBar();
       renderGoalNote('monthly-goal-wrap',S.key('mgoal',calMonthKey()),isCalPastMonth());
     }
   });
@@ -10388,13 +10393,13 @@ function setBookStatus(cid,status,review){
   if(review){book.stars=review.stars||0;book.review=review.review||'';}
   upsertBookLocal(book); // book이 곧 contents 항목이므로 이 호출 하나로 contents 반영까지 끝남(2026-08-29, 구 syncReadingBookToContent 제거)
   renderReadingHub();
-  renderTimetable();
+  renderContentTimeline();
 }
 function removeBook(cid){
   if(_rdOpenCid===cid)_rdOpenCid=null;
   deleteBookLocal(cid); // book이 곧 contents 항목이므로 이 호출 하나로 contents 삭제까지 끝남(2026-08-29)
   renderReadingHub(); // 아카이브 리스트뿐 아니라 상단(진행중 표시/커버 등)까지 즉시 갱신
-  renderTimetable();
+  renderContentTimeline();
 }
 let _rdNewUnit='percent';
 function setRdUnit(u){

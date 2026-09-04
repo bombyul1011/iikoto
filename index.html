@@ -634,31 +634,31 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .habit-edit-btn:active{opacity:1;}
 
 /* ── TIMETABLE ── */
-.tt-row{display:flex;align-items:center;margin-bottom:3px;gap:0;}
-.tt-cat-fixed{width:60px;flex-shrink:0;font-size:var(--dow-label-size);color:var(--ts);cursor:pointer;padding-right:4px;-webkit-tap-highlight-color:rgba(var(--pal-pink-rgb),0.20);user-select:none;}
-.tt-cat-fixed span span:last-child{text-decoration:underline dotted;text-decoration-color:rgba(150,130,120,0.35);text-underline-offset:2px;}
-.tt-cat-fixed.tt-cat-sub{cursor:default;text-decoration:none;opacity:0.35;}
-.tt-date-scroll{flex:1;overflow-x:auto;touch-action:pan-x;}
-.tt-date-scroll::-webkit-scrollbar{display:none;}
-.tt-date-scroll{-ms-overflow-style:none;scrollbar-width:none;}
-.tt-date-inner{display:flex;gap:2px;}
-.tt-cell{width:20px;height:20px;flex-shrink:0;border-radius:4px;background:none;border:0.5px dashed rgba(var(--divider-rgb),0.3);box-sizing:border-box;}
-.tt-block{height:20px;border-radius:5px;display:flex;align-items:center;padding:0 6px;font-size:var(--dow-label-size);color:var(--tp);flex-shrink:0;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;-webkit-tap-highlight-color:rgba(var(--pal-pink-rgb),0.20);user-select:none;}
-.tt-block.drama{background:var(--pal-pink-bg);}
-.tt-block.book{background:var(--pal-yellow-bg);}
-.tt-block.movie{background:var(--pal-sky-bg);}
-.tt-block.music{background:var(--pal-lime-bg);justify-content:center;padding:0;}
-.tt-airing-tone{background:none!important;}
-.tt-airing-seg{flex:1;height:100%;background:rgba(var(--pal-pink-rgb),0.09);}
-.tt-airing-seg.watched{background:var(--pal-pink-bg);}
-.tt-airing-tone-label{position:absolute;left:6px;top:0;height:20px;display:flex;align-items:center;font-size:var(--dow-label-size);color:var(--tp);white-space:nowrap;pointer-events:none;z-index:2;overflow:hidden;text-overflow:ellipsis;max-width:calc(100% - 12px);}
-.tt-airing-live-stripe{position:absolute;inset:0;pointer-events:none;z-index:1;background-image:repeating-linear-gradient(45deg,transparent,transparent 6px,rgba(255,255,255,0.55) 6px,rgba(255,255,255,0.55) 10px);}
-.tt-head-row{display:flex;align-items:center;margin-bottom:4px;}
-.tt-head-spacer{width:60px;flex-shrink:0;}
-.tt-head-dates{flex:1;overflow-x:hidden;}
-.tt-head-dates::-webkit-scrollbar{display:none;}
-.tt-head-dates-inner{display:flex;gap:2px;}
-.tt-head-dates-inner span{width:20px;flex-shrink:0;font-size:10px;color:var(--tm);text-align:center;display:block;}
+.ctl-row{display:flex;align-items:center;margin-bottom:3px;gap:0;}
+.ctl-cat-fixed{width:60px;flex-shrink:0;font-size:var(--dow-label-size);color:var(--ts);cursor:pointer;padding-right:4px;-webkit-tap-highlight-color:rgba(var(--pal-pink-rgb),0.20);user-select:none;}
+.ctl-cat-fixed span span:last-child{text-decoration:underline dotted;text-decoration-color:rgba(150,130,120,0.35);text-underline-offset:2px;}
+.ctl-cat-fixed.ctl-cat-sub{cursor:default;text-decoration:none;opacity:0.35;}
+.ctl-date-scroll{flex:1;overflow-x:auto;touch-action:pan-x;}
+.ctl-date-scroll::-webkit-scrollbar{display:none;}
+.ctl-date-scroll{-ms-overflow-style:none;scrollbar-width:none;}
+.ctl-date-inner{display:flex;gap:2px;}
+.ctl-cell{width:20px;height:20px;flex-shrink:0;border-radius:4px;background:none;border:0.5px dashed rgba(var(--divider-rgb),0.3);box-sizing:border-box;}
+.ctl-block{height:20px;border-radius:5px;display:flex;align-items:center;padding:0 6px;font-size:var(--dow-label-size);color:var(--tp);flex-shrink:0;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;-webkit-tap-highlight-color:rgba(var(--pal-pink-rgb),0.20);user-select:none;}
+.ctl-block.drama{background:var(--pal-pink-bg);}
+.ctl-block.book{background:var(--pal-yellow-bg);}
+.ctl-block.movie{background:var(--pal-sky-bg);}
+.ctl-block.music{background:var(--pal-lime-bg);justify-content:center;padding:0;}
+.ctl-airing-tone{background:none!important;}
+.ctl-airing-seg{flex:1;height:100%;background:rgba(var(--pal-pink-rgb),0.09);}
+.ctl-airing-seg.watched{background:var(--pal-pink-bg);}
+.ctl-airing-tone-label{position:absolute;left:6px;top:0;height:20px;display:flex;align-items:center;font-size:var(--dow-label-size);color:var(--tp);white-space:nowrap;pointer-events:none;z-index:2;overflow:hidden;text-overflow:ellipsis;max-width:calc(100% - 12px);}
+.ctl-airing-live-stripe{position:absolute;inset:0;pointer-events:none;z-index:1;background-image:repeating-linear-gradient(45deg,transparent,transparent 6px,rgba(255,255,255,0.55) 6px,rgba(255,255,255,0.55) 10px);}
+.ctl-head-row{display:flex;align-items:center;margin-bottom:4px;}
+.ctl-head-spacer{width:60px;flex-shrink:0;}
+.ctl-head-dates{flex:1;overflow-x:hidden;}
+.ctl-head-dates::-webkit-scrollbar{display:none;}
+.ctl-head-dates-inner{display:flex;gap:2px;}
+.ctl-head-dates-inner span{width:20px;flex-shrink:0;font-size:10px;color:var(--tm);text-align:center;display:block;}
 
 /* ── HABIT MONTHLY ── */
 .hm-row{display:flex;align-items:flex-start;gap:6px;margin-bottom:6px;}
@@ -1672,16 +1672,16 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div id="monthly-stat-bar"></div>
       <div class="slabel" style="margin-top:20px;">콘텐츠 타임라인</div>
       <div class="card" style="padding:14px 10px;">
-        <div class="tt-head-row" id="tt-head-row">
-          <div class="tt-head-spacer"></div>
-          <div class="tt-head-dates" id="tt-head-dates">
-            <div class="tt-head-dates-inner" id="tt-head-inner"></div>
+        <div class="ctl-head-row" id="ctl-head-row">
+          <div class="ctl-head-spacer"></div>
+          <div class="ctl-head-dates" id="ctl-head-dates">
+            <div class="ctl-head-dates-inner" id="ctl-head-inner"></div>
           </div>
         </div>
-        <div id="tt-rows"></div>
+        <div id="ctl-rows"></div>
 
       </div>
-      <div id="tt-complete-stats"></div>
+      <div id="ctl-complete-stats"></div>
       <div class="slabel">해빗 모아보기</div>
       <div class="card"><div id="habit-monthly"></div></div>
       <div class="report-banner diary-soft" onclick="openDiaryMonthSheet()">

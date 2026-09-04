@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.83-remove-wgoal-archive';
+const CACHE = 'iikoto-v2.85-afternoon-tl-parens';
 const ASSETS = [
   './',
   './index.html'
