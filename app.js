@@ -3827,6 +3827,9 @@ function confirmMemo(){
 // compositionstart/compositionend로 조합 상태를 직접 추적해 이중으로 확인.
 let _memoInlineComposing=false;
 // ── 메모 사진 첨부 (한 장씩, 오프라인 큐잉 지원) ──
+// ⚠︎ 이 블록이 호출하는 R2 업로드/조회/삭제 API는 별도 파일 worker-photo-proxy.js가 담당
+// (Cloudflare Worker, GitHub 저장소 밖에 따로 배포됨). 이 파일만 고쳐서는 실제 동작이 안 바뀌니
+// 관련 버그 수정 시 그 파일도 함께 요청할 것.
 let _memoPendingPhoto=null;
 function triggerMemoPhotoPick(){
   document.getElementById('memo-photo-file-inp').click();
@@ -3952,6 +3955,27 @@ async function _deletePhotoFromR2(photoUrl){
   });
   if(!res.ok)throw new Error(`R2 삭제 실패: ${res.status}`);
 }
+// R2 삭제 실패 시(오프라인, Worker 일시 장애, 시크릿 미설정 등) 조용히 유실되지 않도록
+// 로컬(localStorage)에 대기열로 남겨두고, 앱 시작 시와 online 복귀 시 자동 재시도.
+// 이미 삭제된 키를 다시 지워도 Worker는 정상 응답하므로(존재하지 않는 R2 객체 delete는 무해) 중복 재시도는 안전함.
+const R2_DEL_QUEUE_KEY='photo_r2_delpending_list';
+function _queuePhotoR2Delete(photoUrl){
+  if(!photoUrl)return;
+  const list=S.get(R2_DEL_QUEUE_KEY)||[];
+  if(!list.includes(photoUrl)){list.push(photoUrl);S.set(R2_DEL_QUEUE_KEY,list);}
+}
+async function processPhotoR2DeleteQueue(){
+  if(!navigator.onLine)return;
+  const list=S.get(R2_DEL_QUEUE_KEY)||[];
+  if(!list.length)return;
+  const remaining=[];
+  for(const url of list){
+    try{await _deletePhotoFromR2(url);}
+    catch(err){console.error('R2 사진 삭제 재시도 실패',err);remaining.push(url);}
+  }
+  S.set(R2_DEL_QUEUE_KEY,remaining);
+}
+window.addEventListener('online',processPhotoR2DeleteQueue);
 function openPhotoViewer(url,text,meta){
   document.getElementById('photo-viewer-img').src=url;
   document.getElementById('photo-viewer-text').textContent=text||'';
@@ -6797,9 +6821,16 @@ function openTodoDatePickerSheet(todoIdx){
 // ══════════════════════════════════════════════════════════
 // ── MEMO
 let _deletedMemo=null,_undoTimer=null,_memoSwipeIdx=-1;
+// 사진메모 깜빡임 방지 — sync 루틴들이 짧은 시간에 renderMemos()를 여러 번 호출해도
+// 실제 내용(memos 배열)이 바뀌지 않았으면 재렌더(=<img src> 재할당으로 인한 깜빡임)를 스킵.
+// 내용이 같은지는 가벼운 직렬화 비교로 판단(리스트가 크지 않아 비용 무시 가능한 단순 접근).
+let _lastRenderedMemosDk=null,_lastRenderedMemosSig=null;
 function renderMemos(){
   const dk=dateKey(currentDate),memos=getMemos(dk);
   const list=document.getElementById('memo-list');if(!list)return;
+  const sig=dk+'|'+JSON.stringify(memos.map(m=>[m.cid,m.time,m.text,m.photoUrl,m.photoLocalUrl,m.photoStatus,m.photoErrorMsg]));
+  if(dk===_lastRenderedMemosDk&&sig===_lastRenderedMemosSig)return; // 내용 동일 — 깜빡임만 유발하므로 스킵
+  _lastRenderedMemosDk=dk;_lastRenderedMemosSig=sig;
   list.innerHTML='';
   // time(HH:MM) 기준 오름차순 정렬, 원본 배열 인덱스는 그대로 유지해서 수정/삭제가 정확한 항목을 가리키게 함
   // 새벽 시각은 "전날 자정 넘어 쓴 기록"으로 보고 정렬상 맨 뒤로 보냄(표시는 그대로 00:30 등 실제 시간).
@@ -6821,9 +6852,16 @@ function renderMemos(){
     bub.style.cursor='pointer';
     if(hasPhoto){
       const thumbSrc=m.photoUrl||m.photoLocalUrl;
+      // 완전 로딩 전엔 사진 아이콘만 보여주고, onload 시점에만 이미지를 페이드인 — 깜빡임 대신 자연스러운 등장
+      const wrap=document.createElement('div');wrap.className='memo-photo-wrap';
+      const ph=document.createElement('div');ph.className='memo-photo-placeholder';
+      ph.innerHTML='<i class="ti ti-photo" aria-hidden="true"></i>';
       const img=document.createElement('img');
       img.className='memo-photo-thumb';img.alt='';img.loading='lazy';
+      img.addEventListener('load',()=>{img.classList.add('loaded');ph.classList.add('hide');},{once:true});
+      img.addEventListener('error',()=>{ph.classList.add('hide');},{once:true});
       img.src=thumbSrc;
+      wrap.appendChild(ph);wrap.appendChild(img);
       img.addEventListener('click',e=>{
         e.stopPropagation();
         const meta=`${currentDate.getMonth()+1}월 ${currentDate.getDate()}일 ${_HOME_DAYS[currentDate.getDay()]}요일 · ${m.time||''}`;
@@ -6831,7 +6869,7 @@ function renderMemos(){
       });
       const txt=document.createElement('span');txt.className='memo-photo-text';
       txt.textContent=m.photoStatus==='upload_failed'?`⚠︎ 업로드 실패: ${m.photoErrorMsg||''}`:(m.text||'');
-      bub.appendChild(img);bub.appendChild(txt);
+      bub.appendChild(wrap);bub.appendChild(txt);
       bub.addEventListener('click',()=>{_memoSwipeIdx=i;openSheet('memo-sheet');});
     }else{
       bub.innerHTML=m.text||'';
@@ -6877,9 +6915,11 @@ function showUndo(){
   const t=document.getElementById('undo-toast');t.classList.add('on');
   _undoTimer=setTimeout(()=>{
     t.classList.remove('on');
-    // 실행취소 유예시간(4초)이 지나 삭제가 확정된 시점 — 사진이 있던 메모라면 R2 원본도 함께 정리
+    // 실행취소 유예시간(4초)이 지나 삭제가 확정된 시점 — 사진이 있던 메모라면 R2 원본도 함께 정리.
+    // 실패하면(오프라인/Worker 장애 등) 대기열에 남겨 다음 접속 때 자동 재시도.
     if(_deletedMemo&&_deletedMemo.memo&&_deletedMemo.memo.photoUrl){
-      _deletePhotoFromR2(_deletedMemo.memo.photoUrl).catch(err=>console.error('R2 사진 삭제 실패',err));
+      const purl=_deletedMemo.memo.photoUrl;
+      _deletePhotoFromR2(purl).catch(err=>{console.error('R2 사진 삭제 실패, 재시도 대기',err);_queuePhotoR2Delete(purl);});
     }
     _deletedMemo=null;
   },4000);
@@ -12316,6 +12356,7 @@ loadDaily();
 if(navigator.onLine){
   syncAll();
   cleanupOldGreetingCache(); // fire-and-forget — 실패해도 다음 앱 시작 때 재시도되므로 await로 초기화를 막지 않음
+  processPhotoR2DeleteQueue(); // 지난 세션에서 R2 삭제가 실패해 대기열에 남은 사진이 있으면 재시도
 }
 
 // Service Worker 등록 (오프라인 지원)

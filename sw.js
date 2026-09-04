@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.65-photo-loading-simplify';
+const CACHE = 'iikoto-v2.66-photo-flicker-fix';
 const ASSETS = [
   './',
   './index.html'

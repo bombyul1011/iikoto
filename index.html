@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <!-- build: 20260904-03 -->
 <!-- iikoto v2.49-rhythm-track-fill -->
+<!-- 사진 업로드/조회/삭제는 별도 파일 worker-photo-proxy.js(Cloudflare Worker)가 담당 — 여기 수정만으로는 반영 안 됨, 필요시 그 파일도 함께 요청할 것 -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -558,7 +559,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .memo-bub.memo-bub-seed{background:rgba(180,205,205,0.08);border-left-color:rgba(120,155,160,0.22);}
 
 .memo-bub-photo{display:flex;gap:8px;align-items:flex-start;padding:6px 8px 6px 10px;}
-.memo-photo-thumb{width:52px;height:52px;border-radius:8px;object-fit:cover;flex-shrink:0;cursor:pointer;background:var(--card2,rgba(210,190,175,0.20));}
+.memo-photo-wrap{position:relative;width:52px;height:52px;border-radius:8px;flex-shrink:0;overflow:hidden;background:var(--card2,rgba(210,190,175,0.20));}
+.memo-photo-thumb{position:absolute;inset:0;width:52px;height:52px;border-radius:8px;object-fit:cover;cursor:pointer;opacity:0;transition:opacity 0.25s ease;}
+.memo-photo-thumb.loaded{opacity:1;}
+.memo-photo-placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--tm);font-size:20px;transition:opacity 0.2s ease;}
+.memo-photo-placeholder.hide{opacity:0;pointer-events:none;}
 .memo-bub-photo .memo-photo-text{font-size:var(--main-text-size);color:var(--tp);line-height:1.4;flex:1;padding-top:1px;}
 .memo-bub-photo .memo-photo-text:empty::before{content:'사진';color:var(--tm);}
 
