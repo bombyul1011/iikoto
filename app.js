@@ -4552,6 +4552,19 @@ function _mfDurationMin(startStr,endStr){
   return endMin-startMin;
 }
 function getMorningFlow(dk){return S.get('mflow_'+dk)||{picks:{},etc:{},enjoy:{},desk:{},confirmed:false};}
+// 이번 달(1일~오늘) 로컬에 저장된 mflow_YYYY-MM-DD 전부를 훑어 카드별(key) 누적 선택 횟수 집계 — 그리드 카드 하단 표시용.
+function getMorningFlowMonthCounts(mk){
+  const counts={};
+  MORNING_FLOW_CARDS.forEach(c=>counts[c.key]=0);
+  for(let i=0;i<localStorage.length;i++){
+    const k=localStorage.key(i);
+    if(!k||!k.startsWith('mflow_')||!k.startsWith('mflow_'+mk))continue;
+    const flow=S.get(k);
+    if(!flow||!flow.picks)continue;
+    Object.keys(flow.picks).forEach(pk=>{if(counts[pk]!==undefined)counts[pk]++;});
+  }
+  return counts;
+}
 // pending 플래그: Up이 아직 서버에 반영 안 된 로컬 변경사항이 있으면 syncMorningFlowDown이 그 날짜를 덮어쓰지 않도록 방지
 // (기존엔 autoSync가 완료를 기다리지 않고 fire-and-forget이라, 새로고침 시 syncAll의 Down이 먼저 실행되며 방금 로컬에 저장한 진행상태를 서버의 옛 데이터로 되돌리는 버그가 있었음 — 2026-09-03 수정)
 function saveMorningFlow(dk,data){S.set('mflow_'+dk,data);S.set(S.key('mflow_pending',dk),true);autoSync('mflow',dk);}
@@ -4844,11 +4857,15 @@ function makeMorningFlowCard(){
     <div class="mf-hero-line${showStartList?' picked':''}">${phrase}</div>`;
 
   if(!showStartList){
+    const mk=dk.slice(0,7);
+    const monthCounts=getMorningFlowMonthCounts(mk);
     bodyHtml+=`<div class="mf-grid">${MORNING_FLOW_CARDS.map(c=>{
       const isOn=!!flow.picks[c.key];
-      return `<div class="mf-card${isOn?' on':''}" onclick="toggleMorningFlowPick('${c.key}')">
-        <i class="ti ${c.icon} mf-card-icon" style="color:${isOn?`rgb(${c.colorRgb})`:'var(--tm)'};" aria-hidden="true"></i>
-        <span class="mf-card-label">${c.label}</span>
+      const cnt=monthCounts[c.key]||0;
+      return `<div class="mf-card${isOn?' on':''}" onclick="toggleMorningFlowPick('${c.key}')" style="${isOn?`background:rgb(${c.colorRgb});border-color:rgb(${c.colorRgb});`:''}">
+        <i class="ti ${c.icon} mf-card-icon" style="color:${isOn?'#fff':'var(--tm)'};" aria-hidden="true"></i>
+        <span class="mf-card-label" style="${isOn?'color:#fff;':''}">${c.label}</span>
+        <span class="mf-card-count" style="${isOn?'color:rgba(255,255,255,0.85);':''}">${cnt}</span>
       </div>`;
     }).join('')}</div>`;
   }else{
