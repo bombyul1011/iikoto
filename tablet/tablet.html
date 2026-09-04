@@ -51,13 +51,11 @@
   --pal-sky-rgb:170,208,228;--pal-sky-bg:rgba(170,208,228,0.55);--pal-sky-border:rgba(75,145,180,0.55);--pal-sky-text:rgba(45,105,140,0.95);
   --pal-lavender-rgb:210,175,225;--pal-lavender-bg:rgba(210,175,225,0.55);--pal-lavender-border:rgba(160,105,180,0.55);--pal-lavender-text:rgba(130,75,150,0.95);
   --pal-lime-rgb:200,220,140;--pal-lime-bg:rgba(200,220,140,0.55);--pal-lime-border:rgba(135,165,60,0.55);--pal-lime-text:rgba(95,120,35,0.95);
-  --pal-rose-rgb:230,150,150;--pal-rose-bg:rgba(230,150,150,0.52);--pal-rose-border:rgba(205,95,95,0.55);--pal-rose-text:rgba(165,60,60,0.95);
+  --pal-rose-rgb:230,126,126;--pal-rose-bg:rgba(230,126,126,0.52);--pal-rose-border:rgba(205,95,95,0.55);--pal-rose-text:rgba(165,60,60,0.95);
+  --pal-green-rgb:95,175,130;--pal-green-bg:rgba(95,175,130,0.55);--pal-green-border:rgba(50,130,85,0.55);--pal-green-text:rgba(25,100,60,0.95);
   --grad-mintyellow:linear-gradient(135deg,rgba(210,244,225,0.85),rgba(248,245,200,0.85),rgba(212,242,222,0.85));
 
   /* 리듬 8색 — RHYTHM_CATS 원본과 동일 */
-  --rh-exercise:rgba(234,187,190,0.85);--rh-rest:rgba(190,225,205,0.75);--rh-groom:rgba(240,187,158,0.82);
-  --rh-work:rgba(204,208,220,0.80);--rh-appointment:rgba(168,212,232,0.75);--rh-note:rgba(255,217,138,0.82);
-  --rh-enjoy:rgba(216,168,205,0.80);--rh-home:rgba(210,224,160,0.82);
   --rainbow-bead:linear-gradient(270deg,#ffb0c8,#ffd28a,#bdf0c4,#9fd8ff,#c9a8ff,#ffb0c8); /* 이이코토 본앱 진행바 구슬 애니메이션 색상 그대로 이식 */
 }
 /* ══ 글라스 테마 — 본앱(index.html)의 유리질감 테마를 최소 변수 중심으로 이식.
@@ -1836,7 +1834,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div class="quote-card"><div class="quote-card-inner"><div class="card-lbl"><i class="ti ti-movie" style="color:rgba(var(--pal-pink-text-rgb),0.85);" aria-hidden="true"></i>오늘의 감상</div><div id="today-reading"></div></div></div>
       </div>
       <div class="grid2" id="today-rhythm-pace-row">
-        <div class="card rhythm-card" id="today-rhythm-card" onclick="openTodayRhythmFlow()"><div class="card-lbl"><i class="ti ti-rainbow" style="color:var(--rh-rest);" aria-hidden="true"></i>오늘의 리듬</div><div id="today-rhythm"></div></div>
+        <div class="card rhythm-card" id="today-rhythm-card" onclick="openTodayRhythmFlow()"><div class="card-lbl"><i class="ti ti-rainbow" style="color:rgba(var(--pal-mint-rgb),0.55);" aria-hidden="true"></i>오늘의 리듬</div><div id="today-rhythm"></div></div>
         <div class="card"><div class="card-lbl"><i class="ti ti-chart-circles" style="color:rgba(var(--pal-warmgray-rgb),1);" aria-hidden="true"></i>오늘 활동 분포</div><div id="today-pace"></div></div>
       </div>
       <div class="grid2" id="today-habit-content-row">

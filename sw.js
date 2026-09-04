@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.76-morningflow-css-var-refs';
+const CACHE = 'iikoto-v2.82-event-work-color-final';
 const ASSETS = [
   './',
   './index.html'

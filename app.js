@@ -132,17 +132,17 @@ function makeLabel(txt){
   d.className='slabel';d.textContent=txt;return d;
 }
 const RHYTHM_CATS={
-  exercise:{label:'운동',color:'rgba(234,187,190,0.85)',icon:'ti-run'},
-  rest:{label:'휴식',color:'rgba(190,225,205,0.75)',icon:'ti-armchair'},
-  groom:{label:'단장',color:'rgba(240,187,158,0.82)',icon:'ti-mood-spark'},
-  work:{label:'업무',color:'rgba(204,208,220,0.80)',icon:'ti-keyboard'},
-  appointment:{label:'외출',color:'rgba(168,212,232,0.75)',icon:'ti-bus'},
-  note:{label:'책상',color:'rgba(255,217,138,0.82)',icon:'ti-desk'},
-  enjoy:{label:'감상',color:'rgba(216,168,205,0.80)',icon:'ti-stack-2'},
-  home:{label:'정리',color:'rgba(210,224,160,0.82)',icon:'ti-home'}
+  exercise:{label:'운동',color:'rgba(var(--pal-pink-rgb),0.80)',icon:'ti-run'},
+  rest:{label:'휴식',color:'rgba(var(--pal-mint-rgb),0.55)',icon:'ti-armchair'},
+  groom:{label:'단장',color:'rgba(var(--pal-orange-rgb),0.82)',icon:'ti-mood-spark'},
+  work:{label:'업무',color:'rgba(var(--pal-sky-rgb),0.30)',icon:'ti-keyboard'}, // 업무 존재감 낮추기 위해 알파만 낮춤(채도는 원색 그대로), 2026-09-04
+  appointment:{label:'외출',color:'rgba(var(--pal-rose-rgb),0.25)',icon:'ti-bus'}, // 알파만 낮춤(채도는 원색 그대로), 외출도 지속시간이 길어 존재감 조절, 2026-09-04
+  note:{label:'책상',color:'rgba(var(--pal-yellow-rgb),0.82)',icon:'ti-desk'},
+  enjoy:{label:'감상',color:'rgba(var(--pal-lavender-rgb),0.80)',icon:'ti-stack-2'},
+  home:{label:'정리',color:'rgba(var(--pal-lime-rgb),0.82)',icon:'ti-home'}
 };
-const RHYTHM_SLEEP_COLOR='rgba(205,194,182,0.88)';
-const RHYTHM_MEAL_COLOR='rgba(130,205,145,0.90)';
+const RHYTHM_SLEEP_COLOR='rgba(var(--pal-warmgray-rgb),0.30)'; // 알파만 낮춤(채도는 원색 그대로), 2026-09-04
+const RHYTHM_MEAL_COLOR='rgba(var(--pal-green-rgb),0.90)';
 // 다음주 코멘트/제안 카드의 카테고리→아이콘 매핑 공용 베이스. 제안 카드(NEXT_WEEK_SUGGEST_CAT_ICON)만 '취미' 아이콘이 추가로 필요해 확장해 사용.
 const NEXT_WEEK_CAT_ICON={
   '운동':'ti-run','식사':'ti-salad','수면':'ti-moon','공부':'ti-book',
@@ -4760,8 +4760,8 @@ function confirmCopyWholeTodo(){
 // 서버 테이블: morning_flow_picks(date_key, picks jsonb, etc jsonb).
 // ══════════════════════════════════════════════════════════
 const MORNING_FLOW_CARDS=[
-  {key:'rest',label:'휴식',icon:'ti-cup',colorRgb:'var(--pal-pink-rgb)',rhythmCat:'rest'},
-  {key:'exercise',label:'운동',icon:'ti-run',colorRgb:'var(--pal-sky-rgb)',rhythmCat:'exercise'},
+  {key:'rest',label:'휴식',icon:'ti-cup',colorRgb:'var(--pal-mint-rgb)',rhythmCat:'rest'},
+  {key:'exercise',label:'운동',icon:'ti-run',colorRgb:'var(--pal-pink-rgb)',rhythmCat:'exercise'},
   {key:'enjoy',label:'감상',icon:'ti-stack-2',colorRgb:'var(--pal-lavender-rgb)',rhythmCat:'enjoy'}, // 서브선택(독서/콘텐츠) 필요 — 기타와 동일 패턴
   {key:'desk',label:'책상',icon:'ti-desk',colorRgb:'var(--pal-yellow-rgb)',rhythmCat:'note'}, // 서브선택(일기/노트정리/개인작업) 필요
   {key:'clean',label:'정리',icon:'ti-sparkles',colorRgb:'var(--pal-lime-rgb)',rhythmCat:'home'},

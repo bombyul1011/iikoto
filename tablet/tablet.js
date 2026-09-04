@@ -175,14 +175,14 @@ function _sleepStatsOf(validRows){
 
 // ── 리듬 카테고리 (RHYTHM_CATS 원본과 동일) ──
 const RHYTHM_CATS={
-  exercise:{label:'운동',color:'var(--rh-exercise)',icon:'ti-run'},
-  rest:{label:'휴식',color:'var(--rh-rest)',icon:'ti-armchair'},
-  groom:{label:'단장',color:'var(--rh-groom)',icon:'ti-mood-spark'},
-  work:{label:'업무',color:'var(--rh-work)',icon:'ti-keyboard'},
-  appointment:{label:'외출',color:'var(--rh-appointment)',icon:'ti-bus'},
-  note:{label:'책상',color:'var(--rh-note)',icon:'ti-desk'},
-  enjoy:{label:'감상',color:'var(--rh-enjoy)',icon:'ti-stack-2'},
-  home:{label:'정리',color:'var(--rh-home)',icon:'ti-home'}
+  exercise:{label:'운동',color:'rgba(var(--pal-pink-rgb),0.80)',icon:'ti-run'},
+  rest:{label:'휴식',color:'rgba(var(--pal-mint-rgb),0.55)',icon:'ti-armchair'},
+  groom:{label:'단장',color:'rgba(var(--pal-orange-rgb),0.82)',icon:'ti-mood-spark'},
+  work:{label:'업무',color:'rgba(var(--pal-sky-rgb),0.30)',icon:'ti-keyboard'},
+  appointment:{label:'외출',color:'rgba(var(--pal-rose-rgb),0.25)',icon:'ti-bus'},
+  note:{label:'책상',color:'rgba(var(--pal-yellow-rgb),0.82)',icon:'ti-desk'},
+  enjoy:{label:'감상',color:'rgba(var(--pal-lavender-rgb),0.80)',icon:'ti-stack-2'},
+  home:{label:'정리',color:'rgba(var(--pal-lime-rgb),0.82)',icon:'ti-home'}
 };
 // 리듬 카테고리별 의미 가이드 — 월간리포트 리듬 AI 분석 프롬프트에서 라벨만으론 모호한 카테고리를 짧게 설명(2026-08-22, 정의 누락 수정).
 const RHYTHM_CAT_GUIDE=`카테고리 의미: 운동(신체 활동), 휴식(수면 외 쉼), 단장(씻기·꾸미기 등 자기관리), 업무(일), 외출(이동·약속), 책상(독립적인 개인 작업·자기계발), 감상(영화·책 등 콘텐츠 소비), 정리(청소·집안일).`;
@@ -996,8 +996,8 @@ function renderTodayMeals(meal){
 
 // 본앱 MORNING_FLOW_CARDS 이식 — 확정 rgb값 대신 팔레트 CSS 변수 참조로 통일(2026-09-04, 본앱이 팔레트 일관성 위해 변경한 방식을 그대로 따름).
 const MFLOW_CARDS=[
-  {key:'rest',label:'휴식',icon:'ti-cup',colorRgb:'var(--pal-pink-rgb)',rhythmCat:'rest'},
-  {key:'exercise',label:'운동',icon:'ti-run',colorRgb:'var(--pal-sky-rgb)',rhythmCat:'exercise'},
+  {key:'rest',label:'휴식',icon:'ti-cup',colorRgb:'var(--pal-mint-rgb)',rhythmCat:'rest'},
+  {key:'exercise',label:'운동',icon:'ti-run',colorRgb:'var(--pal-pink-rgb)',rhythmCat:'exercise'},
   {key:'enjoy',label:'감상',icon:'ti-stack-2',colorRgb:'var(--pal-lavender-rgb)',rhythmCat:'enjoy'},
   {key:'desk',label:'책상',icon:'ti-desk',colorRgb:'var(--pal-yellow-rgb)',rhythmCat:'note'},
   {key:'clean',label:'정리',icon:'ti-sparkles',colorRgb:'var(--pal-lime-rgb)',rhythmCat:'home'},
@@ -1247,8 +1247,8 @@ function renderTodayRhythm(blocks){
 let _todayRhythmBlocks=[];
 let _todaySleepRow=null;
 let _todayMealsRow=null;
-const RHYTHM_SLEEP_COLOR='rgba(205,194,182,0.88)';
-const RHYTHM_MEAL_COLOR='rgba(130,205,145,0.90)';
+const RHYTHM_SLEEP_COLOR='rgba(var(--pal-warmgray-rgb),0.30)';
+const RHYTHM_MEAL_COLOR='rgba(var(--pal-green-rgb),0.90)';
 // 본앱 computeRhythmBlocksRaw와 동일 로직(수면/식사/수기 리듬블록을 하나의 흐름으로 합성) — 태블릿용 이식.
 function computeRhythmBlocksRawTablet(sleep,meals,manual){
   sleep=sleep||{};meals=meals||{};manual=manual||[];
@@ -5018,8 +5018,8 @@ function renderYrContentGallery(ctx){
 // 리듬 8색과 톤이 겹치지 않는 --pal-* 4색(warmgray/lavender/rose/pink)으로 나머지를 보충해 12개월에 1:1 고정 배정.
 // 콘텐츠 카테고리(3~4종)로는 색이 다양해지지 않아서 "그 달"에 색을 고정 배정하는 방식을 택함(2026-08).
 const YR_MGRID_MONTH_COLORS=[
-  'var(--rh-exercise)','var(--rh-rest)','var(--rh-groom)','var(--rh-work)',
-  'var(--rh-appointment)','var(--rh-note)','var(--rh-enjoy)','var(--rh-home)',
+  'rgba(var(--pal-pink-rgb),0.80)','rgba(var(--pal-mint-rgb),0.55)','rgba(var(--pal-orange-rgb),0.82)','rgba(var(--pal-sky-rgb),0.30)',
+  'rgba(var(--pal-rose-rgb),0.25)','rgba(var(--pal-yellow-rgb),0.82)','rgba(var(--pal-lavender-rgb),0.80)','rgba(var(--pal-lime-rgb),0.82)',
   'rgba(var(--pal-warmgray-rgb),0.75)','rgba(var(--pal-lavender-rgb),0.75)',
   'rgba(var(--pal-rose-rgb),0.75)','rgba(var(--pal-pink-text-rgb),0.75)'
 ];

@@ -44,7 +44,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --pal-sky-rgb:170,208,228;--pal-sky-bg:rgba(170,208,228,0.55);--pal-sky-border:rgba(75,145,180,0.55);--pal-sky-text:rgba(45,105,140,0.95);
   --pal-lavender-rgb:210,175,225;--pal-lavender-bg:rgba(210,175,225,0.55);--pal-lavender-border:rgba(160,105,180,0.55);--pal-lavender-text:rgba(130,75,150,0.95);
   --pal-lime-rgb:200,220,140;--pal-lime-bg:rgba(200,220,140,0.55);--pal-lime-border:rgba(135,165,60,0.55);--pal-lime-text:rgba(95,120,35,0.95);
-  --pal-rose-rgb:230,150,150;--pal-rose-bg:rgba(230,150,150,0.52);--pal-rose-border:rgba(205,95,95,0.55);--pal-rose-text:rgba(165,60,60,0.95);
+  --pal-rose-rgb:230,126,126;--pal-rose-bg:rgba(230,126,126,0.52);--pal-rose-border:rgba(205,95,95,0.55);--pal-rose-text:rgba(165,60,60,0.95); /* 2026-09-04 채도 x1.3 강화 — 외출용으로 칙칙하지 않게 */
+  --pal-green-rgb:95,175,130;--pal-green-bg:rgba(95,175,130,0.55);--pal-green-border:rgba(50,130,85,0.55);--pal-green-text:rgba(25,100,60,0.95); /* 청록빛 그린 — mint(민트그린)와 구분되는 진한 톤, 2026-09-04 리듬 식사색 전용으로 추가 */
   --pal-mintlime:rgb(102,160,85); /* 민트+연두 중간톤 — 문장저장/문장코멘트/영양제/인용구칩 4곳 통합용, 2026-08-16 */
   --grad-pinkyellow:linear-gradient(120deg,rgba(255,210,230,0.80),rgba(255,230,200,0.70)); /* 핑크-옐로 카드 그라디언트 — reading-icon-btn 기준값, mr-goal-card는 알파만 더 연하게 별도 지정 */
   --grad-mintyellow:linear-gradient(135deg,rgba(210,244,225,0.85),rgba(248,245,200,0.85),rgba(212,242,222,0.85)); /* 민트-옐로 3색 그라디언트 — weekly-review-banner-inner/report-banner-inner/quote-chip-inner 공용, 2026-08-16 통합 */
@@ -57,7 +58,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 :root{
   --ev-schedule-text:var(--pal-lavender-text);--ev-schedule-bg:var(--pal-lavender-bg);--ev-schedule-border:var(--pal-lavender-border);
   --ev-personal-text:var(--pal-yellow-text);--ev-personal-bg:var(--pal-yellow-bg);--ev-personal-border:var(--pal-yellow-border);
-  --ev-work-text:var(--pal-mint-text);--ev-work-bg:var(--pal-mint-bg);--ev-work-border:var(--pal-mint-border);
+  --ev-work-text:var(--pal-sky-text);--ev-work-bg:var(--pal-sky-bg);--ev-work-border:var(--pal-sky-border);
   --ev-etc-text:var(--pal-warmgray-text);--ev-etc-bg:var(--pal-warmgray-bg);--ev-etc-border:var(--pal-warmgray-border);
 }
 /* ══ THEME TOKENS ══ */
@@ -682,9 +683,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 #monthly-cal .cal-event-bar{display:flex;align-items:center;width:calc(100% + 2px);margin-left:-1px;margin-right:-1px;height:13px;line-height:1;font-size:var(--dow-label-size-3);color:#fff;padding:0 4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;text-align:left;cursor:pointer;box-sizing:border-box;margin-top:1px;margin-bottom:1px;}
 #monthly-cal .cal-event-bar.bar-round-l{border-top-left-radius:4px;border-bottom-left-radius:4px;}
 #monthly-cal .cal-event-bar.bar-round-r{border-top-right-radius:4px;border-bottom-right-radius:4px;}
-#monthly-cal .cal-event-bar.ev-schedule{background:rgba(130,75,150,0.70);}
+#monthly-cal .cal-event-bar.ev-schedule{background:rgba(161,120,176,0.80);} /* lavender 반전 +25% 밝게, 2026-09-04 */
 #monthly-cal .cal-event-bar.ev-personal{background:rgba(235,180,20,0.80);}
-#monthly-cal .cal-event-bar.ev-work{background:rgba(40,120,80,0.60);}
+#monthly-cal .cal-event-bar.ev-work{background:rgba(98,142,169,0.85);} /* mint→sky 교체 +25% 밝게, 2026-09-04 */
 #monthly-cal .cal-event-bar.ev-etc{background:rgba(128,118,108,0.60);}
 .cal-day-name{text-align:center;font-size:10px;color:var(--tm);padding:0 0 10px;}
 .cal-day{display:flex;flex-direction:column;align-items:center;padding:4px 2px 8px;cursor:pointer;position:relative;}
