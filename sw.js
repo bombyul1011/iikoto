@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.67-delete-fetch-fix';
+const CACHE = 'iikoto-v2.68-photo-viewer-polaroid';
 const ASSETS = [
   './',
   './index.html'

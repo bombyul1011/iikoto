@@ -574,14 +574,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .photo-viewer-ov{position:fixed;inset:0;background:rgba(30,20,18,.82);z-index:10001;display:none;align-items:center;justify-content:center;padding:20px;}
 .photo-viewer-ov.on{display:flex;}
 /* 바깥 카드 배경 없이 폴라로이드 프레임이 바로 어두운 오버레이 위에 뜨는 구조 */
-.photo-viewer-card{width:100%;max-width:340px;max-height:88vh;display:flex;flex-direction:column;}
+.photo-viewer-card{width:100%;max-width:330px;max-height:88vh;display:flex;flex-direction:column;}
 /* 폴라로이드 프레임 — 사진+날짜+텍스트를 흰 카드 하나로 감싸고 살짝 기울여 손으로 놓은 듯한 느낌 */
 .photo-viewer-frame{position:relative;width:100%;background:#fffdf9;border-radius:6px;padding:12px 12px 18px;box-shadow:0 8px 28px rgba(0,0,0,0.35);transform:rotate(-0.6deg);overflow-y:auto;}
-.photo-viewer-img-wrap{position:relative;width:100%;height:52vh;border-radius:3px;overflow:hidden;background:#000;}
+.photo-viewer-img-wrap{position:relative;width:100%;height:42vh;border-radius:3px;overflow:hidden;background:#000;}
 .photo-viewer-img{width:100%;height:100%;display:block;object-fit:cover;background:#000;}
 .photo-viewer-meta{padding-top:12px;text-align:center;}
-.photo-viewer-date{font-size:11px;color:var(--ts);letter-spacing:.04em;margin-bottom:8px;}
-.photo-viewer-text{color:var(--tp);font-family:'Bareonbatang',serif;font-size:14px;font-weight:400;line-height:1.65;}
+.photo-viewer-date{font-size:var(--dow-label-size-2);color:var(--ts);letter-spacing:.04em;margin-bottom:8px;}
+.photo-viewer-text{color:var(--tp);font-family:'Bareonbatang',serif;font-size:13px;font-weight:400;line-height:1.65;word-break:keep-all;}
 .photo-viewer-text:empty::before{content:'';}
 .photo-viewer-close{position:absolute;top:10px;right:10px;width:26px;height:26px;border-radius:14px;background:rgba(30,20,18,0.45);border:none;display:flex;align-items:center;justify-content:center;color:#fdf3ec;cursor:pointer;z-index:2;}
 
