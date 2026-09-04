@@ -3454,7 +3454,7 @@ document.querySelectorAll('.vtab').forEach(b=>b.addEventListener('click',()=>{
 // 캘린더(.cal-day, .cal-grid)는 클릭 선택 외 별도 제스처가 없어 예외적으로 스와이프 허용.
 (function(){
   const TAB_ORDER=['daily','weekly','monthly'];
-  const SWIPE_EXCLUDE_SELECTOR='.card,.pace-card,.report-banner,.weekly-review-banner,.wrb-wrap,textarea,input,.todo-part,.habit-check-box,.recipe,.rhythm-track,.rhythm-add-form';
+  const SWIPE_EXCLUDE_SELECTOR='.card,.pace-card,.report-banner,.weekly-review-banner,.wrb-wrap,textarea,input,.todo-part,.habit-check-box,.recipe,.rhythm-track,.rhythm-add-form,.mf-hero';
   let startX=0,startY=0,startedInExcluded=false,tracking=false;
   function isInExcludedArea(target){
     // 캘린더 그리드 안쪽은 예외 허용(스와이프 가능) — 별도 제스처가 없으므로.
@@ -4824,8 +4824,7 @@ function makeMorningFlowCard(){
   const hasPicks=pickedKeys.length>0;
   // 선택한 카드 중 하나라도 시작/완료(running·done) 흔적이 있어야 시작목록을 보여줌.
   // 전부 idle(취소/미시작)이면 "선택 다시 고르기" 같은 별도 액션 없이 그냥 그리드로 되돌아가 바로 다시 고를 수 있게 함(2026-09-03).
-  const hasProgress=Object.values(flow.picks).some(p=>p.status==='running'||p.status==='done');
-  const showStartList=hasPicks&&flow.confirmed&&hasProgress;
+  const showStartList=hasPicks&&flow.confirmed;
   const phraseIdx=_mfPhraseIndex(dk,showStartList?MORNING_FLOW_PHRASES_AFTER.length:MORNING_FLOW_PHRASES_BEFORE.length);
   const phrase=showStartList?MORNING_FLOW_PHRASES_AFTER[phraseIdx]:MORNING_FLOW_PHRASES_BEFORE[phraseIdx];
 
