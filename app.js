@@ -3834,6 +3834,10 @@ let _memoPendingPhoto=null;
 function triggerMemoPhotoPick(){
   document.getElementById('memo-photo-file-inp').click();
 }
+// 사진메모 썸네일은 52px로 작게 표시되고 뷰어에서도 화면 크기 이상 키울 일이 없어
+// 640px면 충분히 선명함 — 이전 1000px/quality0.82는 목표 용량(80~150KB)보다 커서 축소.
+// 그래도 사진에 따라(디테일 많은 사진 등) 커질 수 있어 1차 결과가 200KB를 넘으면
+// quality를 한 단계 낮춰 재인코딩하는 안전장치를 둠(최대 2회 추가 시도).
 function _resizeImageToWebp(file,maxDim){
   return new Promise((resolve,reject)=>{
     const img=new Image();
@@ -3847,12 +3851,24 @@ function _resizeImageToWebp(file,maxDim){
       const canvas=document.createElement('canvas');
       canvas.width=w;canvas.height=h;
       canvas.getContext('2d').drawImage(img,0,0,w,h);
-      // Safari(iOS/macOS)는 canvas.toBlob의 image/webp를 지원하지 않고 조용히 무손실 PNG로
-      // 폴백해버려 용량이 크게 부풀어짐 — WebP 인코딩 성공 여부를 실제로 확인해 실패 시 JPEG로 재시도.
-      canvas.toBlob(blob=>{
-        if(blob&&blob.type==='image/webp'){resolve({blob,ext:'webp'});return;}
-        canvas.toBlob(jblob=>jblob?resolve({blob:jblob,ext:'jpg'}):reject(new Error('resize failed')),'image/jpeg',0.82);
-      },'image/webp',0.82);
+      const qualities=[0.72,0.55,0.4]; // 1차 시도 후 200KB 초과 시 순서대로 낮춰 재시도
+      const tryEncode=(qIdx)=>{
+        const q=qualities[qIdx];
+        // Safari(iOS/macOS)는 canvas.toBlob의 image/webp를 지원하지 않고 조용히 무손실 PNG로
+        // 폴백해버려 용량이 크게 부풀어짐 — WebP 인코딩 성공 여부를 실제로 확인해 실패 시 JPEG로 재시도.
+        canvas.toBlob(blob=>{
+          if(blob&&blob.type==='image/webp'){
+            if(blob.size>200*1024&&qIdx<qualities.length-1){tryEncode(qIdx+1);return;}
+            resolve({blob,ext:'webp'});return;
+          }
+          canvas.toBlob(jblob=>{
+            if(!jblob){reject(new Error('resize failed'));return;}
+            if(jblob.size>200*1024&&qIdx<qualities.length-1){tryEncode(qIdx+1);return;}
+            resolve({blob:jblob,ext:'jpg'});
+          },'image/jpeg',q);
+        },'image/webp',q);
+      };
+      tryEncode(0);
     };
     img.onerror=reject;
     reader.readAsDataURL(file);
@@ -3863,7 +3879,7 @@ async function handleMemoPhotoSelect(ev){
   ev.target.value='';
   if(!file)return;
   try{
-    const {blob,ext}=await _resizeImageToWebp(file,1000);
+    const {blob,ext}=await _resizeImageToWebp(file,640);
     const localUrl=URL.createObjectURL(blob);
     _memoPendingPhoto={blob,ext,localUrl};
     renderMemoPhotoPreview();
