@@ -3767,21 +3767,7 @@ function openMemoEditTimePicker(){
 function confirmMemoEditTime(){
   closeModal('memo-edit-time-modal');
 }
-// ── 취침/기상 시간 입력 공용 유틸 (마스킹, 지금시각 세팅, 시각 모달) ──
-function maskTimeInput(el){
-  let digits=el.value.replace(/[^0-9]/g,'').slice(0,4);
-  if(digits.length>=3){
-    let hh=digits.slice(0,2),mm=digits.slice(2,4);
-    if(parseInt(hh,10)>23)hh='23';
-    if(mm.length===2&&parseInt(mm,10)>59)mm='59';
-    el.value=hh+':'+mm;
-  }else if(digits.length>=1){
-    if(digits.length===2&&parseInt(digits,10)>23)digits='23';
-    el.value=digits;
-  }else{
-    el.value='';
-  }
-}
+// ── 취침/기상 시간 입력 공용 유틸 (지금시각 세팅, 시각 모달) ──
 function setNow(t){
   const n=new Date(),v=`${pad(n.getHours())}:${pad(n.getMinutes())}`;
   const dk=dateKey(currentDate),d=getSleep(dk);
@@ -3941,7 +3927,7 @@ async function processMemoPhotoUploadQueue(){
   }
 }
 window.addEventListener('online',processMemoPhotoUploadQueue);
-// 사진 업로드용 Worker 엔드포인트 — 아래 두 값을 봄이님의 실제 Worker URL / Secret으로 채워주세요.
+// 사진 업로드용 Worker 엔드포인트
 const PHOTO_PROXY_BASE='https://iikoto-photo-proxy.faith-003.workers.dev';
 const PHOTO_UPLOAD_SECRET='twinkle77*';
 async function _uploadMemoPhotoToR2(blob,dk,cid,ext){
@@ -3995,7 +3981,10 @@ async function processPhotoR2DeleteQueue(){
   S.set(R2_DEL_QUEUE_KEY,remaining);
 }
 window.addEventListener('online',processPhotoR2DeleteQueue);
-function openPhotoViewer(url,text,meta){
+// Bareonbatang 로딩을 먼저 기다린 뒤 텍스트를 채워서, 기본 폰트로 잠깐 그려졌다가
+// 바뀌는 깜빡임(FOUT)을 없앤다 — openTimeSlotPopup과 동일한 방식.
+async function openPhotoViewer(url,text,meta){
+  await _ensureBareonbatangLoaded();
   document.getElementById('photo-viewer-img').src=url;
   document.getElementById('photo-viewer-text').textContent=text||'';
   document.getElementById('photo-viewer-date').textContent=meta||'';

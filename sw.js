@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.68-photo-viewer-polaroid';
+const CACHE = 'iikoto-v2.70-photo-viewer-font-fix';
 const ASSETS = [
   './',
   './index.html'
