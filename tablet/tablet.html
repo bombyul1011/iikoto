@@ -253,6 +253,27 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 /* ── 메모 ── */
 .memo-tl{max-height:170px;overflow-y:auto;}
+/* 사진메모 — 본앱 .memo-bub-photo 스타일 그대로 이식 */
+.memo-txt-photo{display:flex;gap:8px;align-items:flex-start;}
+.memo-photo-wrap{position:relative;width:52px;height:52px;border-radius:8px;flex-shrink:0;overflow:hidden;background:rgba(210,190,175,0.20);}
+.memo-photo-thumb{position:absolute;inset:0;width:52px;height:52px;border-radius:8px;object-fit:cover;cursor:pointer;opacity:0;transition:opacity 0.25s ease;}
+.memo-photo-thumb.loaded{opacity:1;}
+.memo-photo-thumb-static{cursor:default;}
+.memo-photo-placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--tm);font-size:20px;transition:opacity 0.2s ease;}
+.memo-photo-placeholder.hide{opacity:0;pointer-events:none;}
+.memo-photo-text{font-size:var(--fs-body);color:var(--ts);line-height:1.4;flex:1;padding-top:1px;}
+.memo-photo-text:empty::before{content:'사진';color:var(--tm);}
+/* 사진메모 뷰어 — 본앱 photo-viewer 폴라로이드 톤 이식(조회 전용, 아카이브라 삭제/스와이프 없음) */
+.pv-ov{position:fixed;inset:0;background:rgba(30,20,18,.82);z-index:10001;display:none;align-items:center;justify-content:center;padding:20px;}
+.pv-ov.on{display:flex;}
+.pv-card{width:100%;max-width:330px;max-height:88vh;}
+.pv-frame{position:relative;width:100%;background:#fffdf9;border-radius:6px;padding:12px 12px 18px;box-shadow:0 8px 28px rgba(0,0,0,0.35);transform:rotate(-0.6deg);max-height:88vh;overflow-y:auto;box-sizing:border-box;}
+.pv-img-wrap{position:relative;width:100%;height:42vh;border-radius:3px;overflow:hidden;background:#000;}
+.pv-img{width:100%;height:100%;display:block;object-fit:cover;}
+.pv-meta{padding-top:12px;text-align:center;}
+.pv-date{font-size:var(--fs-sm);color:var(--ts);letter-spacing:.04em;margin-bottom:8px;}
+.pv-text{color:var(--tp);font-size:var(--fs-body);line-height:1.65;word-break:keep-all;}
+.pv-close{position:absolute;top:10px;right:10px;width:26px;height:26px;border-radius:14px;background:rgba(30,20,18,0.45);border:none;display:flex;align-items:center;justify-content:center;color:#fdf3ec;cursor:pointer;z-index:2;}
 .memo-item{display:flex;gap:9px;padding:6px 0;border-left:2px solid rgba(var(--divider-rgb),0.3);padding-left:10px;margin-left:2px;}
 .memo-time{font-size:var(--fs-sm);color:var(--tm);flex-shrink:0;width:38px;}
 .memo-txt{font-size:var(--fs-body);color:var(--ts);line-height:1.5;}
@@ -302,6 +323,16 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .wk-mflow-cell-label{font-size:var(--fs-sm);color:var(--tp);margin-top:3px;}
 .wk-mflow-cell-count{font-size:var(--fs-lg);font-weight:700;color:var(--tp);font-family:'DM Sans',sans-serif;margin-top:2px;}
 .wk-mflow-cell-time{font-size:var(--fs-xs);color:var(--tm);}
+/* 이번주 사진 기록 — 요일(월~일) 7칸 그리드. 사진 없는 요일은 빈 칸으로 자리만 유지. */
+.wk-photo-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;}
+.wk-photo-cell{position:relative;aspect-ratio:1/1;border-radius:9px;overflow:hidden;background:rgba(210,190,175,0.20);cursor:pointer;}
+.wk-photo-cell-empty{cursor:default;background:rgba(210,190,175,0.10);border:1px dashed rgba(var(--divider-rgb),0.3);display:flex;align-items:flex-end;justify-content:center;}
+.wk-photo-cell img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .25s ease;}
+.wk-photo-cell img.loaded{opacity:1;}
+.wk-photo-thumb-ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--tm);font-size:18px;transition:opacity .2s ease;}
+.wk-photo-thumb-ph.hide{opacity:0;pointer-events:none;}
+.wk-photo-cell-dow{position:relative;font-size:var(--fs-xs);font-weight:600;color:var(--tm);padding:2px 0 3px;}
+.wk-photo-cell:not(.wk-photo-cell-empty) .wk-photo-cell-dow{position:absolute;left:4px;bottom:4px;color:#fff;background:rgba(0,0,0,0.35);border-radius:4px;padding:1px 5px;z-index:1;}
 /* 라이트 테마 기본 — 선택 개념이 없는 통계 배너라 본앱 mf-card의 "선택됨(on)" 상태 색을 항상 적용 */
 .wk-mflow-cell{background:rgba(var(--wk-mflow-rgb),0.16);}
 [data-theme="glass"] .wk-mflow-cell{background:transparent;}
@@ -411,6 +442,12 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .oneline-row{display:flex;gap:9px;padding:5px 0;font-size:var(--fs-body);color:var(--ts);border-bottom:1px dashed rgba(var(--divider-rgb),0.25);}
 .oneline-row:last-child{border-bottom:none;}
 .oneline-dow{width:22px;flex-shrink:0;font-weight:600;color:var(--tp);}
+.oneline-row-empty{color:var(--tm);}
+/* 하루한줄 — 절반너비 배너(옆 카드와 grid2), 요일 7줄 세로 스크롤, 오늘 행 강조 */
+.oneline-half-card{display:flex;flex-direction:column;}
+.oneline-half-scroll{max-height:118px;overflow-y:auto;}
+.oneline-row-today{background:rgba(var(--pal-yellow-rgb),0.12);border-radius:6px;padding-left:6px;margin-left:-6px;}
+.oneline-row-today .oneline-dow{color:rgba(var(--pal-yellow-rgb),1);}
 
 /* ── 월간탭 ── */
 .top-row{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;align-items:start;}
@@ -504,11 +541,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cgrid-detail-notes-tl{display:flex;flex-direction:column;gap:8px;}
 .cgrid-detail-note-item{display:flex;gap:10px;align-items:flex-start;font-size:var(--fs-sm);color:var(--ts);line-height:1.5;}
 .cgrid-detail-note-date{flex-shrink:0;width:32px;text-align:right;color:var(--tm);font-weight:600;font-variant-numeric:tabular-nums;font-size:10.5px;padding-right:9px;border-right:1px dashed rgba(var(--divider-rgb),0.5);align-self:stretch;display:flex;align-items:flex-start;justify-content:flex-end;padding-top:1px;}
-/* ── 주간탭 "주간 키워드" / "이번 주 독서" ── */
-.week-kw-card{display:flex;flex-direction:column;}
-.week-kw-card .card-lbl{flex-shrink:0;}
-#week-keywords{display:flex;flex-direction:column;flex:1;min-height:0;} /* .week-kw-cloud의 flex:1이 실제로 적용되려면 직계 부모도 flex 컨테이너여야 함 — 이 래퍼가 빠져있으면 flex:1이 무시되고 min-height만 적용돼 카드 상단에 쏠려 보임(2026-08-31) */
-.week-kw-cloud{position:relative;width:100%;flex:1;min-height:90px;overflow:hidden;} /* 옆 카드(이번 주 독서)와 같은 grid2 align-items:stretch로 늘어난 부모(.week-kw-card) 높이를 flex:1로 그대로 채움 — 고정 px값 대신 자동으로 독서카드 높이를 따라가도록 구조 변경(2026-08-31). overflow:hidden으로 무작위 배치된 단어가 넘쳐도 카드 자체 길이가 늘어나지 않게 고정. */
+/* ── "올해의 키워드"(연간탭) 워드클라우드 배치 — 주간탭 "주간 키워드"에서 쓰던 클래스를 그대로 이식해 사용 중 ── */
+.week-kw-cloud{position:relative;width:100%;min-height:90px;overflow:hidden;}
 .week-kw-word{position:absolute;font-weight:700;white-space:nowrap;line-height:1;transform-origin:center;cursor:default;}
 .week-kw-word .week-kw-cnt{font-size:0.5em;font-weight:600;opacity:0.7;margin-left:3px;vertical-align:super;}
 /* ── 주간탭 "이번 주 독서" — 본앱 rd-top-*/rd-progress-* 스타일 그대로 이식(2026-08-26) ── */
@@ -1820,19 +1854,17 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       </div>
       <div class="card"><div class="card-lbl"><i class="ti ti-moon-stars" style="color:rgba(var(--pal-sky-rgb),1);" aria-hidden="true"></i>수면 리포트</div><div id="week-sleep-report"></div></div>
       <div class="card"><div class="card-lbl"><i class="ti ti-rainbow" style="color:rgba(var(--pal-orange-rgb),1);" aria-hidden="true"></i>리듬 흐름 비교</div><div id="week-rhythm-flow"></div></div>
-      <div class="grid2" id="week-keywords-reading-row">
-        <div class="card week-kw-card"><div class="card-lbl"><i class="ti ti-hash" style="color:rgba(var(--pal-pink-text-rgb),0.85);" aria-hidden="true"></i>주간 키워드</div><div id="week-keywords"></div></div>
+      <div class="card"><div class="card-lbl"><i class="ti ti-sun" style="color:rgba(255,190,130,1);" aria-hidden="true"></i>이번주 아침 흐름</div><div id="week-mflow"></div></div>
+      <div class="card"><div class="card-lbl"><i class="ti ti-photo" style="color:rgba(var(--pal-sky-rgb),1);" aria-hidden="true"></i>이번주 사진 기록</div><div id="week-photos"></div></div>
+      <div class="grid2" id="week-reading-oneline-row">
         <div class="card">
           <div class="card-lbl week-reading-title-toggle" id="week-reading-title-toggle" onclick="toggleWeekReadingView()"><i class="ti ti-book" style="color:rgba(var(--pal-pink-text-rgb),0.85);" aria-hidden="true"></i><span id="week-reading-title-text">이번 주 독서</span><i class="ti ti-switch-horizontal week-reading-toggle-icon" aria-hidden="true"></i></div>
           <div id="week-reading"></div>
           <div id="week-reading-activity" style="display:none;"></div>
         </div>
-      </div>
-      <div class="card"><div class="card-lbl"><i class="ti ti-sun" style="color:rgba(255,190,130,1);" aria-hidden="true"></i>이번주 아침 흐름</div><div id="week-mflow"></div></div>
-      <div class="card"><div class="card-lbl"><i class="ti ti-pencil" style="color:rgba(var(--pal-yellow-rgb),1);" aria-hidden="true"></i>하루한줄</div>
-        <div class="oneline-2col">
-          <div id="week-oneline-a"></div>
-          <div id="week-oneline-b"></div>
+        <div class="card oneline-half-card">
+          <div class="card-lbl"><i class="ti ti-pencil" style="color:rgba(var(--pal-yellow-rgb),1);" aria-hidden="true"></i>하루한줄</div>
+          <div class="oneline-half-scroll" id="week-oneline-half"></div>
         </div>
       </div>
       <div class="stat-bar-wrap wd-bar-wrap" id="week-delta"></div>
@@ -2089,6 +2121,16 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <i class="ti ti-x report-panel-close" onclick="closeReportPanel()" aria-hidden="true"></i>
     <div class="report-panel-title" id="report-panel-title"></div>
     <div id="report-panel-body"></div>
+  </div>
+</div>
+
+<div class="pv-ov" id="pv-ov" onclick="if(event.target===this)closePhotoViewerArchive();">
+  <div class="pv-card">
+    <div class="pv-frame">
+      <button class="pv-close" onclick="closePhotoViewerArchive()" aria-label="닫기"><i class="ti ti-x" aria-hidden="true"></i></button>
+      <div class="pv-img-wrap"><img class="pv-img" id="pv-img" src="" alt=""></div>
+      <div class="pv-meta"><div class="pv-date" id="pv-date"></div><div class="pv-text" id="pv-text"></div></div>
+    </div>
   </div>
 </div>
 

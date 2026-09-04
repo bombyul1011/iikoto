@@ -710,10 +710,10 @@ async function loadTodayTab(){
   renderTodaySleep(dk,sleepRows&&sleepRows[0],recentSleepRows||[]);
   renderTodayHabits(habits||[],habitChecks||[],dk);
   renderTodayMeals(meals&&meals[0]);
-  renderTodayMflow((morningChecks&&morningChecks[0])||null);
   _todayRhythmBlocks=rblocks||[];
   _todaySleepRow=sleepRows&&sleepRows[0];
   _todayMealsRow=meals&&meals[0];
+  renderTodayMflow((morningChecks&&morningChecks[0])||null,rblocks||[],contents||[]);
   renderTodayRhythm(rblocks||[]);
   const todayManual=((todayManualRows&&todayManualRows[0]&&todayManualRows[0].lines)||[]).filter(it=>it.dk===dk);
   renderTodayReading(dk,rblocks||[],contents||[],todayManual);
@@ -843,6 +843,17 @@ function renderTodayTodosEvents(todos){
   }).join(''):'<div class="empty-msg">오늘 일정이 없어요</div>';
 }
 
+// ── 사진메모 뷰어(조회 전용) — 본앱 openPhotoViewer와 동일 톤(폴라로이드), 아카이브는 삭제/스와이프 없이 보기만 ──
+function openPhotoViewerArchive(src,text,dk,time){
+  document.getElementById('pv-img').src=src;
+  document.getElementById('pv-text').textContent=text||'';
+  const d=new Date(dk+'T00:00:00');
+  document.getElementById('pv-date').textContent=`${d.getMonth()+1}월 ${d.getDate()}일 ${DOW[d.getDay()]}요일 · ${time||''}`;
+  document.getElementById('pv-ov').classList.add('on');
+}
+function closePhotoViewerArchive(){
+  document.getElementById('pv-ov').classList.remove('on');
+}
 async function renderTodayMemos(dk){
   const el=document.getElementById('today-memos');
   const memosRaw=await supaFetch(`memos?date_key=eq.${dk}&order=memo_time.asc`);
@@ -857,6 +868,11 @@ async function renderTodayMemos(dk){
       todClass=h>=5&&h<12?' tod-morning':h>=12&&h<18?' tod-afternoon':' tod-night';
     }
     const timeHtml=isSeed?'<i class="ti ti-seeding seed-ico" aria-hidden="true"></i>':(m.memo_time||'');
+    // 사진메모 — 본앱 renderMemos와 동일 조건(photo_url 존재)·마크업(52px 썸네일+텍스트, placeholder→로드 시 페이드인, 텍스트 없으면 "사진")
+    if(m.photo_url){
+      const txt=escapeHtml(m.text||'');
+      return `<div class="memo-item${isSeed?' memo-seed':todClass}"><div class="memo-time">${timeHtml}</div><div class="memo-txt memo-txt-photo"><div class="memo-photo-wrap"><div class="memo-photo-placeholder"><i class="ti ti-photo" aria-hidden="true"></i></div><img class="memo-photo-thumb memo-photo-thumb-static" src="${m.photo_url}" alt="" loading="lazy" onload="this.classList.add('loaded');this.previousElementSibling.classList.add('hide');" onerror="this.previousElementSibling.classList.add('hide');"></div><span class="memo-photo-text">${txt}</span></div></div>`;
+    }
     return `<div class="memo-item${isSeed?' memo-seed':todClass}"><div class="memo-time">${timeHtml}</div><div class="memo-txt">${escapeHtml(m.text)}</div></div>`;
   }).join('');
   // 정렬 순서는 그대로(시간순) 두고, 첫 화면 노출은 최신(마지막) 메모가 보이도록 스크롤을 맨 아래로
@@ -990,16 +1006,47 @@ const MFLOW_CARDS=[
 const MFLOW_ENJOY_SUB_LABEL={read:'독서',content:'콘텐츠'};
 const MFLOW_DESK_SUB_LABEL={diary:'일기',notes:'노트정리',work_personal:'개인작업'};
 const MFLOW_ETC_SUB_LABEL={work:'업무',appointment:'외출',free:'자유입력'};
-function _mflowSubLabel(key,pick,flow){
-  if(key==='enjoy')return MFLOW_ENJOY_SUB_LABEL[flow&&flow.enjoy&&flow.enjoy.sub]||'';
-  if(key==='desk')return MFLOW_DESK_SUB_LABEL[pick&&pick.subKey]||'';
-  if(key==='etc')return MFLOW_ETC_SUB_LABEL[pick&&pick.subKey]||'';
+// row.etc는 서버 컬럼 구조 그대로: {sub,text,_enjoy:{sub},_desk:{sub},title} — pick(picks[key]) 안에는 subKey가 없음(2026-09-04 발견, 실데이터 확인).
+function _mflowSubLabel(key,pick,etcCol){
+  if(key==='enjoy')return MFLOW_ENJOY_SUB_LABEL[etcCol&&etcCol._enjoy&&etcCol._enjoy.sub]||'';
+  if(key==='desk')return MFLOW_DESK_SUB_LABEL[etcCol&&etcCol._desk&&etcCol._desk.sub]||'';
+  if(key==='etc')return MFLOW_ETC_SUB_LABEL[etcCol&&etcCol.sub]||'';
   return '';
 }
-function renderTodayMflow(row){
+// 세부텍스트 — 본앱은 모닝플로우 시작 시 리듬블록을 직접 생성(end 없이)하고 종료 시 채우는 방식이라,
+// 실제 "무엇을 했는지"는 picks 자체가 아니라 연동된 rhythm_blocks.text(휴식/운동/정리/책상/기타) 또는
+// contents 테이블(감상 — picks.enjoy.cid로 매칭), 혹은 자유입력(etc.sub==='free'일 때 etc.text)에 있음.
+// blockCid가 없는 과거 데이터도 있어 client_id 매칭이 안 되면 cat+start_time으로 한 번 더 시도(2026-09-04).
+const MFLOW_KEY_TO_RHYTHM_CAT={rest:'rest',exercise:'exercise',clean:'clean'};
+function _mflowDetailText(key,pick,etcCol,rblocksByClientId,rblocksByCatStart,contentsByCid){
+  if(key==='enjoy'){
+    const c=pick&&pick.cid&&contentsByCid[pick.cid];
+    return c?c.title:'';
+  }
+  if(key==='etc'&&etcCol&&etcCol.sub==='free')return (etcCol&&etcCol.text)||'';
+  if(key==='etc'&&(etcCol&&etcCol.title))return etcCol.title; // appointment(외출) 세부텍스트는 etc.title에 직접 저장되는 경우도 있음
+  if(pick&&pick.blockCid&&rblocksByClientId[pick.blockCid]){
+    return rblocksByClientId[pick.blockCid].text||'';
+  }
+  if(pick&&pick.startStr){
+    const cat=key==='etc'?((etcCol&&etcCol.sub)==='work'?'work':'appointment'):key==='desk'?'note':(MFLOW_KEY_TO_RHYTHM_CAT[key]||key);
+    const b=rblocksByCatStart[cat+'|'+pick.startStr];
+    if(b)return b.text||'';
+  }
+  return '';
+}
+function renderTodayMflow(row,rblocks,contents){
   const el=document.getElementById('today-mflow');
-  const flow=(row&&row.picks)?row:null;
-  const picks=(flow&&flow.picks)||{};
+  const picks=(row&&row.picks)||{};
+  const etcCol=(row&&row.etc)||{};
+  const rblocksByClientId={};
+  const rblocksByCatStart={};
+  (rblocks||[]).forEach(b=>{
+    if(b.client_id)rblocksByClientId[b.client_id]=b;
+    if(b.cat&&b.start_time)rblocksByCatStart[b.cat+'|'+b.start_time]=b;
+  });
+  const contentsByCid={};
+  (contents||[]).forEach(c=>{if(c.cid)contentsByCid[c.cid]=c;});
   const activeCards=MFLOW_CARDS.filter(c=>{
     const p=picks[c.key];
     return p&&(p.status==='running'||p.status==='done');
@@ -1007,8 +1054,10 @@ function renderTodayMflow(row){
   if(!activeCards.length){el.innerHTML='<div class="empty-msg">아직 아침 플로우가 시작되지 않았어요</div>';return;}
   el.innerHTML=activeCards.map(c=>{
     const p=picks[c.key];
-    const sub=_mflowSubLabel(c.key,p,flow);
-    const label=sub?`${c.label} · ${sub}`:c.label;
+    const sub=_mflowSubLabel(c.key,p,etcCol);
+    const detail=_mflowDetailText(c.key,p,etcCol,rblocksByClientId,rblocksByCatStart,contentsByCid);
+    let label=sub||c.label;
+    if(detail)label+=` · ${detail}`;
     const timeStr=p.status==='running'?`${p.startStr||''} ~ 진행중`:`${p.startStr||''} ~ ${p.endStr||''}`;
     return `<div class="mflow-row"><i class="ti ${c.icon} mflow-row-icon" style="color:rgb(${c.colorRgb});" aria-hidden="true"></i><span class="mflow-row-label">${escapeHtml(label)}</span><span class="mflow-row-time">${timeStr}</span></div>`;
   }).join('');
@@ -1127,7 +1176,7 @@ function renderTodayPace(todos,habits,habitChecks,morningFlowRow){
   Object.entries(mflowPicks).forEach(([key,p])=>{
     if(!p||!p.startStr)return;
     const card=MFLOW_CARDS.find(c=>c.key===key);
-    const sub=_mflowSubLabel(key,p,morningFlowRow);
+    const sub=_mflowSubLabel(key,p,(morningFlowRow&&morningFlowRow.etc)||{});
     const label=card?(sub?`${card.label} · ${sub}`:card.label):key;
     events.push({type:'morning',min:_paceAdjustMin(_paceParseHM(p.startStr)),label});
   });
@@ -1463,12 +1512,6 @@ async function loadWeekTab(){
   const slStart=new Date(slEnd);slStart.setDate(slStart.getDate()-13);
   const slEndDk=dateKey(slEnd),slStartDk=dateKey(slStart);
 
-  // 이번 주 키워드 카드용 롤링 2주(오늘 제외) — 캘린더 주(월~일)와 무관하게 항상 "어제부터 14일 전까지".
-  // 처음엔 7일로 시작했으나 표본이 너무 적어 실사용 중 2주로 확장(2026-08-27).
-  const kwEnd=new Date();kwEnd.setDate(kwEnd.getDate()-1);
-  const kwStart=new Date();kwStart.setDate(kwStart.getDate()-14);
-  const kwStartDk=dateKey(kwStart),kwEndDk=dateKey(kwEnd);
-
   // 이번 주 독서 스트릭용 — 연속 일수가 여러 주에 걸쳐 이어질 수 있어 이번 주 범위만으론 부족하지만,
   // 한 책을 90일씩 읽는 경우는 드물어 30일 롤링 정도면 스트릭 계산에 충분함(2026-08-26 축소 확정).
   const rdStreakStart=new Date();rdStreakStart.setDate(rdStreakStart.getDate()-30);
@@ -1476,8 +1519,8 @@ async function loadWeekTab(){
 
   const [goalRows,habits,habitChecks,memos,todos,sleepRows,onelineRows,contents,
     lwMemos,lwTodos,lwSleepRows,lwHabitChecks,rblocksFull,sleepReportRows,
-    rblocksLast,weekMemoTexts,weekOnelineTexts,readingLogRows,
-    rdaThisWeek,rdaLastWeek,weekMflowRows]=await Promise.all([
+    rblocksLast,readingLogRows,
+    rdaThisWeek,rdaLastWeek,weekMflowRows,weekPhotoRows]=await Promise.all([
     supaFetch(`goal_notes?note_key=eq.wchallenge_${encodeURIComponent(wk)}`),
     supaFetch(`habits?order=sort_order.asc`),
     supaFetch(`habit_checks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
@@ -1504,18 +1547,15 @@ async function loadWeekTab(){
     // 수면 리포트 최근 2주
     supaFetch(`sleep?date_key=gte.${slStartDk}&date_key=lte.${slEndDk}&select=date_key,score,sleep_time,wake_time`),
     supaFetch(`rhythm_blocks?date_key=gte.${lastStartDk}&date_key=lte.${lastCmpEndDk}`),
-    // 주간 키워드용 메모 원문 — 롤링 2주(오늘 제외, kwStartDk~kwEndDk)
-    supaFetch(`memos?date_key=gte.${kwStartDk}&date_key=lte.${kwEndDk}&select=date_key,text`),
-    // 주간 키워드 카드에 하루한줄도 메모와 같은 역할로 포함 — 같은 롤링 2주(오늘 제외) 범위로 별도 조회.
-    // 캘린더 주 범위(onelineRows, 하루한줄 배너용)와는 범위가 달라 재사용하지 않음(2026-08-27).
-    supaFetch(`goal_notes?note_key=gte.oneline:${kwStartDk}&note_key=lte.oneline:${kwEndDk}`),
     // 이번 주 독서용 — 스트릭 계산은 여전히 reading_daily_log 기준(현재 읽는 책 자체는 위 contents에서 파생)
     supaFetch(`reading_daily_log?date_key=gte.${rdStreakStartDk}&select=date_key`),
     // 이번 주 독서 활동(탭 전환용) — 이번 주/지난주 각각의 독서 로그(권별 진행량 계산용)
     supaFetch(`reading_daily_log?date_key=gte.${startDk}&date_key=lte.${cmpEndDk}&select=date_key,book_cid,unit,amount_read,seconds&order=date_key.asc`),
     supaFetch(`reading_daily_log?date_key=gte.${lastStartDk}&date_key=lte.${lastCmpEndDk}&select=date_key,book_cid,unit,amount_read,seconds&order=date_key.asc`),
     // 이번주 아침 흐름 배너용 — 캘린더 주(월~일) 범위 morning_flow_picks 전체
-    supaFetch(`morning_flow_picks?date_key=gte.${startDk}&date_key=lte.${endDk}`)
+    supaFetch(`morning_flow_picks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
+    // 이번주 사진 기록 필름스트립용 — 캘린더 주(월~일) 범위 사진메모(photo_url 있는 것만)
+    supaFetch(`memos?date_key=gte.${startDk}&date_key=lte.${endDk}&photo_url=not.is.null&order=date_key.asc,memo_time.asc`)
   ]);
   // 현재 읽는 책 1권 + 전체 책 목록 — 이제 contents(content_cat='book')에서 직접 파생(2026-08-29, reading_books 제거로 별도 쿼리 불필요)
   const weekBooks=(contents||[]).filter(c=>c.content_cat==='book');
@@ -1536,8 +1576,8 @@ async function loadWeekTab(){
   });
   renderWeekRhythmFlow(rblocksThis||[],rblocksLast||[],cmpDayCount);
   renderWeekMflow(weekMflowRows||[]);
+  renderWeekPhotos(weekPhotoRows||[],weekDates);
   renderWeekOneline(onelineRows||[],weekDates);
-  renderWeekKeywords(weekMemoTexts||[],weekOnelineTexts||[]);
   renderWeekReading(contents||[],readingBook,readingLogRows||[],startDk,endDk);
   renderWeekReadingActivity(rdaThisWeek||[],rdaLastWeek||[],readingBooksAll||[],contents||[],startDk,cmpEndDk,lastStartDk,lastCmpEndDk);
 }
@@ -1743,22 +1783,36 @@ function renderWeekMflow(rows){
   }).join('')}</div>`;
 }
 
-// 하루한줄 2열 배치: 왼쪽(월/화/수), 오른쪽(목/금/토/일)
+// 이번주 사진 기록 — 요일(월~일) 7칸 그리드. 하루에 여러 장이면 최신 1장만 대표로, 사진 없는 요일은 빈 칸.
+function renderWeekPhotos(rows,weekDates){
+  const el=document.getElementById('week-photos');
+  const byDate={};
+  (rows||[]).forEach(m=>{
+    const prev=byDate[m.date_key];
+    if(!prev||(m.memo_time||'')>=(prev.memo_time||''))byDate[m.date_key]=m; // 같은 날짜 중 가장 늦은 시각(최신) 1장
+  });
+  const cells=weekDates.map((dk,i)=>({dk,dow:WC_DOW[i],m:byDate[dk]}));
+  el.innerHTML=`<div class="wk-photo-grid">${cells.map(c=>{
+    if(!c.m)return `<div class="wk-photo-cell wk-photo-cell-empty"><span class="wk-photo-cell-dow">${c.dow}</span></div>`;
+    const txt=escapeHtml(c.m.text||'');
+    return `<div class="wk-photo-cell" onclick="openPhotoViewerArchive('${c.m.photo_url}','${txt.replace(/'/g,"\\'")}','${c.dk}','${c.m.memo_time||''}')"><div class="wk-photo-thumb-ph"><i class="ti ti-photo" aria-hidden="true"></i></div><img src="${c.m.photo_url}" alt="" loading="lazy" onload="this.classList.add('loaded');this.previousElementSibling.classList.add('hide');" onerror="this.previousElementSibling.classList.add('hide');"><span class="wk-photo-cell-dow">${c.dow}</span></div>`;
+  }).join('')}</div>`;
+}
+
+// 하루한줄 — 절반너비 카드, 요일 전체를 세로 스크롤 리스트로. 초기 진입 시 오늘 요일이 보이는 위치로 스크롤.
 function renderWeekOneline(rows,weekDates){
-  const elA=document.getElementById('week-oneline-a');
-  const elB=document.getElementById('week-oneline-b');
+  const el=document.getElementById('week-oneline-half');
   const byDate={};
   rows.forEach(r=>{
     const dk=r.note_key.replace('oneline:','');
     const text=Array.isArray(r.lines)?(r.lines[0]||''):r.lines;
     if(text&&text.trim())byDate[dk]=text;
   });
-  const entries=weekDates.map((dk,i)=>({dow:WC_DOW[i],text:byDate[dk]}));
-  const left=entries.slice(0,4).filter(e=>e.text);   // 월화수목 — 목요일을 왼쪽으로 올려 왼쪽 4/오른쪽 3, 최대 줄 수를 맞춤
-  const right=entries.slice(4,7).filter(e=>e.text);  // 금토일
-  const rowHtml=e=>`<div class="oneline-row"><div class="oneline-dow">${e.dow}</div>${escapeHtml(e.text)}</div>`;
-  elA.innerHTML=left.length?left.map(rowHtml).join(''):'<div class="empty-msg">기록 없음</div>';
-  elB.innerHTML=right.length?right.map(rowHtml).join(''):'<div class="empty-msg">기록 없음</div>';
+  const todayDk=dateKey(new Date());
+  const entries=weekDates.map((dk,i)=>({dk,dow:WC_DOW[i],text:byDate[dk]||'',isToday:dk===todayDk}));
+  el.innerHTML=entries.map(e=>`<div class="oneline-row${e.isToday?' oneline-row-today':''}" id="${e.isToday?'week-oneline-today':''}"><div class="oneline-dow">${e.dow}</div>${e.text?escapeHtml(e.text):'<span class="oneline-row-empty">기록 없음</span>'}</div>`).join('');
+  const todayRow=document.getElementById('week-oneline-today');
+  if(todayRow)todayRow.scrollIntoView({block:'center'});
 }
 
 // 주간 키워드 — 최근 2주(오늘 제외)에 남긴 메모+하루한줄 원문에서 자주 등장한 단어 상위 6개를 뽑아 워드클라우드로 표시.
@@ -1836,45 +1890,8 @@ function _weekKwTokenize(text){
 // 카드 영역을 단어 개수만큼 칸으로 나눈 뒤 각 칸 안에서만 무작위 오프셋을 주는 방식(카드형 배치가 자연스럽게 불규칙해 보임).
 // 빈도 1위일수록 글자 크기를 크게, 팔레트 색상을 순환시켜 단조롭지 않게 함.
 const WEEK_KW_COLORS=['var(--pal-pink-text)','var(--pal-orange-text)','var(--pal-mint-text)','var(--pal-sky-text)','var(--pal-lavender-text)'];
-function renderWeekKeywords(memoRows,onelineRows){
-  const el=document.getElementById('week-keywords');
-  if(!el)return;
-  // 쿼리 자체가 이미 "오늘 제외 롤링 2주"(kwStartDk~kwEndDk) 범위라 여기서 추가 필터링 불필요.
-  const memoText=(memoRows||[]).map(m=>m.text||'').join(' ');
-  // 하루한줄도 메모와 같은 역할로 집계에 포함 — goal_notes는 note_key당 lines 배열 구조라 첫 줄만 사용(renderWeekOneline과 동일 파싱).
-  const onelineText=(onelineRows||[]).map(r=>Array.isArray(r.lines)?(r.lines[0]||''):(r.lines||'')).join(' ');
-  const allText=(memoText+' '+onelineText).trim();
-  if(!allText){el.innerHTML='<div class="empty-msg">최근 메모가 없어요</div>';return;}
-  const tokens=_weekKwTokenize(allText);
-  const freq={};
-  tokens.forEach(t=>{freq[t]=(freq[t]||0)+1;});
-  const top=Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,6);
-  if(!top.length){el.innerHTML='<div class="empty-msg">추출된 키워드가 없어요</div>';return;}
-
-  const maxCnt=top[0][1],minCnt=top[top.length-1][1];
-  const n=top.length;
-  // 카드 영역(퍼센트 기준)을 단어 개수에 맞는 대략적인 격자로 나눠 각 칸 중심 근처에 배치 — 5개 기준 2행 배치가 자연스러움.
-  const gridCols=n<=2?n:Math.ceil(n/2);
-  const gridRows=n<=2?1:2;
-  const cellW=100/gridCols,cellH=100/gridRows;
-  const wordsHtml=top.map(([w,c],i)=>{
-    // 빈도 비례 폰트 크기(가장 잦은 단어가 가장 크게) — 1~5개뿐이라 빈도差가 작아도 시각적으로 티나게 범위를 넉넉히 잡음.
-    const ratio=maxCnt===minCnt?1:(c-minCnt)/(maxCnt-minCnt);
-    const fontSize=18+ratio*16; // 18px~34px
-    const col=i%gridCols,row=Math.floor(i/gridCols);
-    // 칸 중심 기준 무작위 오프셋(카드형 배치가 자연스럽게 불규칙해 보이도록). 카드가 이제 flex:1로 옆 독서카드
-    // 높이를 그대로 따라가고 overflow:hidden도 걸려있어 넘칠 걱정이 없으므로, 세로 범위를 10%~90%까지 넓게 써서
-    // 카드 하단 여백이 비어 보이지 않도록 함(2026-08-31, 사용자 피드백: 하단 공간을 못 쓰는 것 같다).
-    const rawCx=col*cellW+cellW/2+(Math.random()-0.5)*cellW*0.45;
-    const rawCy=row*cellH+cellH/2+(Math.random()-0.5)*cellH*0.7;
-    const cx=Math.min(85,Math.max(15,rawCx));
-    const cy=Math.min(90,Math.max(10,rawCy));
-    const rotate=(Math.random()-0.5)*24; // -12deg~12deg
-    const color=WEEK_KW_COLORS[i%WEEK_KW_COLORS.length];
-    return `<div class="week-kw-word" style="left:${cx}%;top:${cy}%;font-size:${fontSize}px;color:${color};transform:translate(-50%,-50%) rotate(${rotate}deg);">${escapeHtml(w)}<span class="week-kw-cnt">${c}</span></div>`;
-  }).join('');
-  el.innerHTML=`<div class="week-kw-cloud">${wordsHtml}</div>`;
-}
+// renderWeekKeywords(주간탭 "주간 키워드" 카드용)는 2026-09-04 주간탭 정리로 제거됨.
+// 아래 토크나이저·색상 상수는 연간탭 renderYrKeywordCloud("올해의 키워드")가 그대로 재사용하므로 유지.
 
 // 이번 주 독서 — 이이코토 본앱 rd-top-*/rd-progress-* 스타일 그대로 이식(2026-08-26).
 // 현재 읽고 있는 책의 표지+진행률 바(무지개 구슬 포함)와, reading_daily_log 기준 연속 독서일(스트릭)을 함께 보여줌.
