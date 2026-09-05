@@ -1804,12 +1804,24 @@ function renderWeekPhotos(rows,weekDates){
 }
 
 // 하루한줄 — 절반너비 카드, 요일 전체를 세로 스크롤 리스트로. 초기 진입 시 오늘 요일이 보이는 위치로 스크롤.
+// 바른바탕체 로딩 깜빡임(FOUT) 방지 — 폰트 로딩 완료를 기다린 뒤에야 텍스트를 채움
+let _bareonbatangLoaded=false;
+async function _ensureBareonbatangLoaded(){
+  if(_bareonbatangLoaded)return;
+  try{
+    await document.fonts.load('400 40px HakgyoansimBareonbatangR');
+    _bareonbatangLoaded=true;
+  }catch(e){}
+}
+
 // 오늘탭 날짜 네비게이터 줄 — 당일 하루한줄만 형광펜 스타일로 표시(읽기전용, 없으면 빈 채로 숨김)
-function renderTodayOnelineHl(row){
+async function renderTodayOnelineHl(row){
   const el=document.getElementById('today-oneline-hl');
   if(!el)return;
   const text=row?(Array.isArray(row.lines)?(row.lines[0]||''):row.lines):'';
-  el.textContent=text&&text.trim()?text:'';
+  if(!text||!text.trim()){el.textContent='';return;}
+  await _ensureBareonbatangLoaded();
+  el.textContent=text;
 }
 
 function renderWeekOneline(rows,weekDates){
@@ -2584,7 +2596,10 @@ async function renderMonthQuotes(y,mo){
   const startMs=new Date(y,mo,1,0,0,0,0).getTime();
   const daysInMonth=new Date(y,mo+1,0).getDate();
   const endMs=new Date(y,mo,daysInMonth,23,59,59,999).getTime();
-  const rows=await supaFetch(`reading_quotes?created=gte.${startMs}&created=lte.${endMs}&order=created.desc&select=text,created,book_cid,comment`);
+  const [rows]=await Promise.all([
+    supaFetch(`reading_quotes?created=gte.${startMs}&created=lte.${endMs}&order=created.desc&select=text,created,book_cid,comment`),
+    _ensureBareonbatangLoaded()
+  ]);
   if(!rows||!rows.length){el.innerHTML='<div class="empty-msg">이번 달 수집한 문장이 없어요</div>';return;}
   const bookCids=[...new Set(rows.map(r=>r.book_cid).filter(Boolean))];
   let bookMap={};
@@ -3440,7 +3455,7 @@ function toggleMrpHeroFold(){
   const collapsed=slot.classList.toggle('folded');
   if(btn)btn.classList.toggle('open',!collapsed);
 }
-function renderMrpHero(row){
+async function renderMrpHero(row){
   const el=document.getElementById('mrp-body');
   // 최초 렌더 시 전체 골격을 한 번에 잡고, 이후 각 render 함수가 자기 섹션의 innerHTML만 채움
   if(!document.getElementById('mrp-hero-slot')){
@@ -3491,9 +3506,11 @@ function renderMrpHero(row){
   }
   try{
     const report=JSON.parse(row.content);
+    await _ensureBareonbatangLoaded();
     heroEl.innerHTML=`<div class="mrp-hero-comment">${escapeHtml(report.comment||'')}</div>
       ${report.keywords&&report.keywords.length?`<div class="mr-tag-cloud">${report.keywords.map(k=>`<span class="mr-tag">${escapeHtml(k)}</span>`).join('')}</div>`:''}`;
   }catch(e){
+    await _ensureBareonbatangLoaded();
     heroEl.innerHTML=`<div class="mrp-hero-comment">${row.content}</div>`;
   }
 }
@@ -3690,6 +3707,7 @@ async function renderMrpTrajectory(mk,sleepRows,habits,habitChecks,rblocks,weeks
   if(!enoughData){aiEl.innerHTML='';return;}
 
   if(cacheRow&&cacheRow.content){
+    await _ensureBareonbatangLoaded();
     aiEl.innerHTML=`<div class="mrp-traj-ai-text">${escapeHtml(cacheRow.content)}</div>`;
     return;
   }
@@ -3744,7 +3762,10 @@ ${MRP_COMMON_RULES}
 - 반드시 JSON 형식으로만 응답하세요: {"text":"..."}
 - 다른 설명이나 마크다운 없이 순수 JSON만 출력하세요.`;
   const text=await callClaudeForJsonText(sys,dataContext,'monthly_trajectory_'+mk);
-  if(text)aiEl.innerHTML=`<div class="mrp-traj-ai-text">${escapeHtml(text)}</div>`;
+  if(text){
+    await _ensureBareonbatangLoaded();
+    aiEl.innerHTML=`<div class="mrp-traj-ai-text">${escapeHtml(text)}</div>`;
+  }
   /* 실패 시 조용히 빈 채로 둠 */
 }
 
@@ -3826,6 +3847,7 @@ async function renderMrpSleep(mk,sleepRows,prevSleepRows,cacheRow,refContext,her
 
   const aiEl=document.getElementById('mrp-sleep-ai');
   if(cacheRow&&cacheRow.content){
+    await _ensureBareonbatangLoaded();
     aiEl.innerHTML=`<div class="mrsl-ai-text">${escapeHtml(cacheRow.content)}</div>`;
     return;
   }
@@ -3883,6 +3905,7 @@ ${MRP_COMMON_RULES}
 
   aiEl.innerHTML=`<div class="empty-msg" style="text-align:left;padding:4px 0;">수면 분석을 불러오는 중...</div>`;
   const text=await callClaudeForJsonText(sys,dataContext,'monthly_sleep_'+mk);
+  if(text)await _ensureBareonbatangLoaded();
   aiEl.innerHTML=text?`<div class="mrsl-ai-text">${escapeHtml(text)}</div>`:'';
 }
 
@@ -3942,8 +3965,9 @@ function renderMrpRhythm(rblocks,prevRblocks){
 async function renderMrpMilestones(mk,rblocks,prevRblocks,weeksInMonth,wcRowsList,cacheRow,prevWcRowsList,heroComment,refContext){
   const el=document.getElementById('mrp-milestones');
 
-  const renderText=(text)=>{
+  const renderText=async(text)=>{
     if(!text){el.innerHTML='';return;}
+    await _ensureBareonbatangLoaded();
     el.innerHTML=`<div class="mrp-rhythm-ai-text">${escapeHtml(text)}</div>`;
   };
 
