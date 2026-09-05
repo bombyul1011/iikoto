@@ -4709,6 +4709,10 @@ function _mfBlockFor(dk,blockCid){
   if(!blockCid)return null;
   return getRhythmBlocks(dk).find(b=>b.cid===blockCid)||null;
 }
+// 감상 칩(독서/콘텐츠 여러 개 중 고르기) 표기용 — 6자 넘으면 5자+…로 축약(2026-09-05).
+function _mfShortTitle(title){
+  return title.length>6?title.slice(0,5)+'…':title;
+}
 // 이번 달(1일~오늘) 로컬에 저장된 mflow_YYYY-MM-DD 전부를 훑어 카드별(key) 누적 선택 횟수 집계 — 그리드 카드 하단 표시용.
 function getMorningFlowMonthCounts(mk){
   const counts={};
@@ -4799,6 +4803,16 @@ function selectMorningFlowEnjoySub(subKey){
   saveMorningFlow(dk,flow);
   refreshMorningFlowCard();
 }
+// 감상(독서/콘텐츠) 대상이 여러 개일 때 칩으로 하나를 고름 — 책상/기타의 "종류 선택" 칩과 동일한 2단계 구조.
+// 여기선 대상만 확정하고 저장, 실제 시작은 이어서 뜨는 "시작" 버튼(startMorningFlowCard)에서 함.
+function pickMorningFlowEnjoyTarget(cid,mk){
+  const dk=dateKey(getLogicalDate());
+  const flow=getMorningFlow(dk);
+  if(!flow.picks.enjoy||!flow.enjoy?.sub)return;
+  flow.enjoy={...flow.enjoy,targetCid:cid,targetMk:mk||''};
+  saveMorningFlow(dk,flow);
+  refreshMorningFlowCard();
+}
 function selectMorningFlowDeskSub(subKey){
   const dk=dateKey(getLogicalDate());
   const flow=getMorningFlow(dk);
@@ -4838,22 +4852,24 @@ function pickMorningFlowAppointment(title){
   saveMorningFlow(dk,flow);
   _startMorningFlowRhythm('etc',null,null,'appointment');
 }
-// 카드 시작 — 독서/콘텐츠는 진행중 목록이 여러 개면 먼저 고르게(콘텐츠 코너의 선택 시트 패턴 재사용).
+// 카드 시작 — 대상(어떤 책/작품)이 이미 정해졌으면(flow.enjoy.targetCid) 그걸로 바로 시작.
+// 진행중이 1개뿐이면 렌더링 단계에서 자동으로 targetCid가 채워져 있고, 2개 이상이면 칩으로 먼저 고른 뒤 여기 도달함.
+// 0개면 신규 등록 화면으로 보냄.
 function startMorningFlowCard(key){
   if(key==='enjoy'){
     const dk=dateKey(getLogicalDate());
-    const sub=getMorningFlow(dk).enjoy?.sub;
+    const flow=getMorningFlow(dk);
+    const sub=flow.enjoy?.sub;
+    if(flow.enjoy?.targetCid){_startMorningFlowRhythm('enjoy',flow.enjoy.targetCid,flow.enjoy.targetMk||null);return;}
     if(sub==='read'){
       const ongoing=_getOngoingReadingWithCid();
-      if(ongoing.length>1){openMfPickerSheet('read',ongoing.map(b=>({cid:b.cid,title:b.title,poster:b.poster})));return;}
-      if(ongoing.length===1){_startMorningFlowRhythm('enjoy',ongoing[0].cid);return;}
-      openAddBookModal();return;
+      if(ongoing.length===0)openAddBookModal();
+      return;
     }
     if(sub==='content'){
       const ongoing=_getOngoingWatchingWithCid().filter(c=>c.cid);
-      if(ongoing.length>1){openMfPickerSheet('content',ongoing.map(c=>({cid:c.cid,title:c.title,poster:c.poster,mk:c._mk})));return;}
-      if(ongoing.length===1){_startMorningFlowRhythm('enjoy',ongoing[0].cid,ongoing[0]._mk);return;}
-      openWatchNewContentPicker();return;
+      if(ongoing.length===0)openWatchNewContentPicker();
+      return;
     }
     return; // 서브선택 안 한 상태면 아무것도 하지 않음
   }
@@ -4873,17 +4889,6 @@ function startMorningFlowCard(key){
     return;
   }
   _startMorningFlowRhythm(key);
-}
-// 독서/콘텐츠 진행중 목록이 여럿일 때 굿모닝 전용 미니 선택 시트.
-function openMfPickerSheet(kind,list){
-  const listEl=document.getElementById('mf-picker-list');
-  listEl.innerHTML=list.map(item=>{
-    const poster=item.poster?`<img class="watch-picker-item-poster" src="${item.poster}" alt="">`:`<div class="watch-picker-item-poster-ph"><i class="ti ${kind==='read'?'ti-book':'ti-device-tv'}" aria-hidden="true"></i></div>`;
-    return `<div class="watch-picker-item" onclick="closeSheet('mf-picker-sheet');_startMorningFlowRhythm('enjoy','${item.cid}','${item.mk||''}');">
-      ${poster}<div class="watch-picker-item-title">${escapeHtml(item.title||'')}</div>
-    </div>`;
-  }).join('');
-  openSheet('mf-picker-sheet');
 }
 // 실제 리듬블록 시작 등록 — key: 카드종류, targetCid: 감상(독서/콘텐츠)일 때 대상 cid, mk: 콘텐츠 월키, subKey: 기타(업무/외출)·책상(일기/노트정리/개인작업) 서브선택 공용.
 // 리듬탭에서 수동 등록 시 호출되는 autoCheckHabitFromRhythm(운동→습관 자동체크)를 여기서도 동일하게 호출해야 습관탭과 연동됨.
@@ -5066,6 +5071,34 @@ function makeMorningFlowCard(showRecap){
       if(isEtc&&!etcSub)return _mfSubPickRowHtml(c,'기타',MORNING_FLOW_ETC_SUB,'selectMorningFlowEtcSub',false);
       if(isEnjoy&&!enjoySub)return _mfSubPickRowHtml(c,'감상',MORNING_FLOW_ENJOY_SUB,'selectMorningFlowEnjoySub',false);
       if(isDesk&&!deskSub)return _mfSubPickRowHtml(c,'책상',MORNING_FLOW_DESK_SUB,'selectMorningFlowDeskSub',true);
+      // 감상(독서/콘텐츠) 서브선택은 끝났지만 아직 대상(어떤 책/작품)을 안 고른 상태 —
+      // 책상/기타와 동일하게 "칩으로 대상만 먼저 고르고 → 시작 행이 뜨면 시작 버튼을 누르는" 2단계 구조로 통일(2026-09-05).
+      // 3개 이상이면 줄바꿈 대신 가로 스와이프(rhythm-content-picker-swipe, 리듬탭에서 쓰던 것과 동일 패턴).
+      if(isEnjoy&&enjoySub&&pick.status==='idle'&&!flow.enjoy?.targetCid){
+        const ongoing=enjoySub==='read'?_getOngoingReadingWithCid():_getOngoingWatchingWithCid().filter(c2=>c2.cid);
+        if(ongoing.length>1){
+          const wrapClass=ongoing.length>2?'rhythm-content-picker rhythm-content-picker-swipe':'rhythm-content-picker';
+          const chipsHtml=`<div class="${wrapClass}">${ongoing.map(item=>{
+            const mkArg=enjoySub==='content'?(item._mk||''):'';
+            const shortTitle=_mfShortTitle(item.title||'');
+            return `<span class="rhythm-content-chip" onclick="pickMorningFlowEnjoyTarget('${item.cid}','${mkArg}')">${escapeHtml(shortTitle)}</span>`;
+          }).join('')}</div>`;
+          return `<div class="mf-start-row" style="flex-direction:column;align-items:stretch;">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <div class="mf-start-icon" style="background:rgba(${c.colorRgb},0.18);"><i class="ti ${enjoySub==='read'?'ti-book':'ti-device-tv'}" style="font-size:17px;color:rgb(${c.colorRgb});" aria-hidden="true"></i></div>
+              <div class="mf-label">감상 · ${enjoySub==='read'?'독서':'콘텐츠'}</div>
+            </div>
+            ${chipsHtml}
+          </div>`;
+        }
+        if(ongoing.length===0){
+          // 진행중인 게 아예 없으면 기존과 동일하게 신규 등록 화면으로 안내하는 시작 행을 보여줌(아래 공용 시작 행 렌더로 자연 진행).
+        }else if(ongoing.length===1){
+          // 1개뿐이면 고를 필요 없이 바로 그 항목을 대상으로 확정(칩 자체를 생략).
+          flow.enjoy={...flow.enjoy,targetCid:ongoing[0].cid,targetMk:enjoySub==='content'?(ongoing[0]._mk||''):''};
+          saveMorningFlow(dk,flow);
+        }
+      }
       if(isEtc&&etcSub==='free'){
         const savedText=flow.etc?.text||'';
         const isDone=pick.status==='done';
@@ -5087,8 +5120,7 @@ function makeMorningFlowCard(showRecap){
             <div class="mf-start-icon" style="background:rgba(${c.colorRgb},0.18);"><i class="ti ti-bus" style="font-size:17px;color:rgb(${c.colorRgb});" aria-hidden="true"></i></div>
             <div class="mf-label">기타 · 외출</div>
           </div>
-          ${chipsHtml}
-          <div style="display:flex;gap:6px;margin-top:8px;"><input id="mf-appointment-inp" class="modal-inp" style="margin-bottom:0;flex:1;" placeholder="예: 병원" value=""><button class="mf-start-btn" style="border-color:rgba(${c.colorRgb},0.6);color:rgb(${c.colorRgb});" onclick="pickMorningFlowAppointment(document.getElementById('mf-appointment-inp').value.trim())">시작</button></div>
+          ${chipsHtml}          <div style="display:flex;gap:6px;margin-top:8px;"><input id="mf-appointment-inp" class="modal-inp" style="margin-bottom:0;flex:1;" placeholder="예: 병원" value=""><button class="mf-start-btn" style="border-color:rgba(${c.colorRgb},0.6);color:rgb(${c.colorRgb});" onclick="pickMorningFlowAppointment(document.getElementById('mf-appointment-inp').value.trim())">시작</button></div>
         </div>`;
       }
       const deskLabelMap={diary:'일기',notes:'노트정리',work_personal:'개인작업'};
