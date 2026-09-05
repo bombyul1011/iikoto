@@ -467,7 +467,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .oneline-row-today{background:rgba(var(--pal-yellow-rgb),0.12);border-radius:6px;padding-left:6px;margin-left:-6px;}
 .oneline-row-today .oneline-dow{color:rgba(var(--pal-yellow-rgb),1);}
 /* 오늘탭 날짜 네비게이터 줄 — 하루한줄을 형광펜 밑줄 느낌으로 오른쪽에 배치 */
-.today-oneline-hl{margin-left:auto;font-size:var(--fs-sm);color:var(--tp);font-family:'DM Sans',sans-serif;background:linear-gradient(rgba(var(--pal-yellow-rgb),0.55) 0 100%) no-repeat;background-size:100% 46%;background-position:0 78%;padding:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:55%;}
+.today-oneline-hl{margin-left:auto;font-size:var(--fs-lg);font-family:'HakgyoansimBareonbatangR',serif;color:var(--tp);background:linear-gradient(rgba(var(--pal-yellow-rgb),0.55) 0 100%) no-repeat;background-size:100% 46%;background-position:0 78%;padding:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:55%;}
 .today-oneline-hl:empty{display:none;}
 
 /* ── 월간탭 ── */
@@ -1048,6 +1048,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
      body가 이미 overflow:hidden으로 스크롤을 막고 있어 fixed가 아니어도 문제 없음. */
   #app{position:relative;z-index:1;height:100vh;height:-webkit-fill-available;height:100dvh;flex-direction:column;}
   .main-wrap{padding:16px 14px 76px;}
+  .today-oneline-hl{display:none;}
   .main-hdr{margin-bottom:12px;}
   .float-tabs{right:14px;bottom:14px;}
 
