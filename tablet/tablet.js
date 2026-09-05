@@ -918,6 +918,7 @@ function _rhythmSumCatMin(rblocks,cat,days){
 // ── 리듬 합성 유틸(수면/식사/수기 리듬블록을 하나의 흐름으로) — renderTimelineTrack이 계속 사용 ──
 const RHYTHM_SLEEP_COLOR='rgba(var(--pal-warmgray-rgb),0.30)';
 const RHYTHM_MEAL_COLOR='rgba(var(--pal-green-rgb),0.90)';
+const RHYTHM_MEAL_ICON='ti-tools-kitchen-2';
 // 본앱 computeRhythmBlocksRaw와 동일 로직(수면/식사/수기 리듬블록을 하나의 흐름으로 합성) — 태블릿용 이식.
 function computeRhythmBlocksRawTablet(sleep,meals,manual){
   sleep=sleep||{};meals=meals||{};manual=manual||[];
@@ -935,7 +936,7 @@ function computeRhythmBlocksRawTablet(sleep,meals,manual){
     const t=meals[k+'_time'];
     if(!t)return;
     const start=_dawnTimeToMin(t);
-    blocks.push({start,end:Math.min(start+30,1440),color:RHYTHM_MEAL_COLOR,label:'식사 · '+(meals[k]||MEAL_LABELS[k]),kind:'meal'});
+    blocks.push({start,end:Math.min(start+30,1440),color:RHYTHM_MEAL_COLOR,label:meals[k]||MEAL_LABELS[k],icon:RHYTHM_MEAL_ICON,kind:'meal'});
   });
   let latestManualMin=-1;
   manual.forEach(b=>{
@@ -951,7 +952,7 @@ function computeRhythmBlocksRawTablet(sleep,meals,manual){
     const isLateNightNew=sMin<DAWN_CUTOFF_MIN&&latestManualMin>=DAWN_CUTOFF_MIN&&sMin<latestManualMin;
     let sortKey=sMin;
     if(isLateNightNew)sortKey+=1440;
-    blocks.push({start:sMin,end:eMin,sortKey,color:cat.color,label:b.text||cat.label,ongoing:!b.end_time,kind:'manual',cid:b.client_id});
+    blocks.push({start:sMin,end:eMin,sortKey,color:cat.color,label:b.text||cat.label,icon:cat.icon,ongoing:!b.end_time,kind:'manual',cid:b.client_id});
   });
   return blocks;
 }
@@ -5996,7 +5997,8 @@ function renderTimelineTrack(dk,todos,sleep,meals,rblocks,mflowCidSet,totalHOver
     const labelFix=labelTopFix[bi];
     const marginStyle=labelFix?` style="margin-top:${labelFix}px;"`:'';
     const timeHtml=(!bk.ongoing&&bk.start!=null&&bk.end!=null)?`<span class="tl-fill-time"${marginStyle}>${toHHMMFromMin(bk.start)}-${toHHMMFromMin(bk.end)}</span>`:'';
-    const labelHtml=`<span class="tl-fill-label"${marginStyle}>${escapeHtml(bk.label)}</span>`;
+    const iconHtml=bk.icon?`<i class="ti ${bk.icon} tl-fill-icon" aria-hidden="true"></i>`:'';
+    const labelHtml=`<span class="tl-fill-label"${marginStyle}>${iconHtml}${escapeHtml(bk.label)}</span>`;
     axisHtml+=`<div class="tl-fill${isShort?' tl-fill-short':''}" style="top:${by}px;height:${bh}px;background-color:${bk.color};z-index:${10+bi};">${labelHtml}${timeHtml}</div>`;
     const isMflow=bk.cid&&mflowCidSet.has(bk.cid);
     if(isMflow)mflowMarkers.push({by});
