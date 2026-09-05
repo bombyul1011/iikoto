@@ -425,7 +425,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
    이 탭에서만 사이드바 펼침 상태를 감지해 좌우 반반 대신 세로 스택으로 전환 — 폭에 여유를 둠. */
 #side:not(.collapsed) ~ .main-wrap .tl-half-wrap{flex-direction:column;}
 #side:not(.collapsed) ~ .main-wrap .tl-half{width:100%;}
-#side:not(.collapsed) ~ .main-wrap .tl-track-card{max-height:520px!important;}
+#side:not(.collapsed) ~ .main-wrap .tl-track-card{max-height:520px!important;overflow-y:auto!important;}
+/* 사이드바 펼침 시에도 세로모드와 동일하게 오늘 일정/타임테이블을 한 배너 + 라벨 클릭 전환으로 통합 */
+#side:not(.collapsed) ~ .main-wrap #tl-side-row{display:block;}
+#side:not(.collapsed) ~ .main-wrap #tl-event-card,
+#side:not(.collapsed) ~ .main-wrap #tl-timetable-card{display:none;margin-bottom:0!important;}
+#side:not(.collapsed) ~ .main-wrap #tl-event-card.on,
+#side:not(.collapsed) ~ .main-wrap #tl-timetable-card.on{display:flex;}
 .tl-half{flex:1;min-width:0;}
 
 /* ── 좌측 상단 배너 2개(수면/습관) — 1:1 비율, 타임라인트랙 위에만, 얇게 ── */
@@ -464,6 +470,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .tl-track-card{background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:20px 22px 26px;position:relative;}
 .tl-grid{position:relative;display:flex;gap:6px;}
 .tl-axis-col{position:relative;flex:6;min-width:0;padding-left:46px;}
+/* 07시 이후 기상 시 07시~기상시각 구간을 텍스트/시간 없이 웜그레이만 연하게 채움 — 축 왼쪽 눈금열은 침범하지 않도록 좌측 시작을 살짝 안쪽으로 */
+.tl-sleep-fill{position:absolute;left:46px;right:0;background:rgba(var(--pal-warmgray-rgb),0.16);border-radius:6px;z-index:1;pointer-events:none;}
 .tl-mflow-lane{position:relative;width:22px;flex-shrink:0;}
 .tl-todo-col{flex:4;min-width:0;position:relative;padding-left:8px;}
 .tl-gridline{position:absolute;left:46px;right:0;height:1px;background:rgba(var(--divider-rgb),0.18);}
@@ -1179,8 +1187,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
      순서: 상단 배너(수면/습관) → 리듬트랙 → 일정/타임테이블 → 메모 → 할일 → 감상/비교. */
   .tl-half-wrap{flex-direction:column;gap:14px;}
   .tl-half{width:100%;}
-  .tl-track-card{max-height:420px!important;} /* 세로 스택에서는 우측 실측 동기화를 하지 않으므로(JS에서 스킵) 고정 상한 + 내부 스크롤 */
+  .tl-track-card{max-height:420px!important;overflow-y:auto!important;} /* 세로 스택에서는 우측 실측 동기화를 하지 않으므로(JS에서 스킵) 고정 상한 + 내부 스크롤 */
   .tl-top-banners{margin-bottom:10px;}
+  /* 오늘 일정/타임테이블 — 가로에서는 나란히 두 카드, 세로에서는 한 배너로 합쳐 라벨 클릭으로 전환(toggleTimelineEventMode).
+     기본은 둘 다 표시 안 함(display:none) 상태에서 .on이 붙은 쪽만 노출. */
+  #tl-side-row{display:block;}
+  #tl-event-card,#tl-timetable-card{display:none;margin-bottom:0!important;}
+  #tl-event-card.on,#tl-timetable-card.on{display:flex;}
+  #tl-event-label .ti-switch-horizontal,#tl-timetable-label .ti-switch-horizontal{margin-left:auto;font-size:15px;color:var(--tm);}
 
   /* ══════════════════════════════════════════════════════
      주간탭
@@ -1895,13 +1909,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         </div>
         <!-- 우측 절반 -->
         <div class="tl-half tl-half-right">
-          <div class="tl-side-row">
-            <div class="card event-card">
-              <div class="card-lbl"><i class="ti ti-calendar-heart" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>오늘 일정</div>
+          <div class="tl-side-row" id="tl-side-row">
+            <div class="card event-card" id="tl-event-card">
+              <div class="card-lbl" id="tl-event-label" onclick="toggleTimelineEventMode()"><i class="ti ti-calendar-heart" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>오늘 일정</div>
               <div class="tl-side-list" id="tl-events"></div>
             </div>
-            <div class="card event-card">
-              <div class="card-lbl"><i class="ti ti-table" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>타임테이블</div>
+            <div class="card event-card" id="tl-timetable-card">
+              <div class="card-lbl" id="tl-timetable-label" onclick="toggleTimelineEventMode()"><i class="ti ti-table" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>타임테이블</div>
               <div class="tl-side-list" id="tl-timetable"></div>
             </div>
           </div>

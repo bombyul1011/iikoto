@@ -5626,7 +5626,9 @@ function syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,mflowCidSet){
     const bannersH=(bannersEl?bannersEl.offsetHeight:0)+12; // 배너와 트랙카드 사이 margin-bottom(12px) 포함
     const targetH=Math.max(rightEl.offsetHeight-cardPadding-bannersH,400);
     renderTimelineTrack(dk,todos||[],sleep,mealsRow,rblocks||[],mflowCidSet,targetH);
-    trackCardEl.style.maxHeight=(rightEl.offsetHeight-bannersH)+'px';
+    // 카드 외곽 높이(max-height)는 컨텐츠 높이(targetH)에 패딩을 더한 값이어야 우측과 정확히 맞음 —
+    // 이전에는 패딩을 빼지 않고 rightEl 전체 높이를 그대로 넣어 트랙 카드가 우측보다 패딩만큼 더 커 보였음.
+    trackCardEl.style.maxHeight=(targetH+cardPadding)+'px';
     trackCardEl.style.overflowY='auto';
   };
   // 1차: 두 프레임 뒤(레이아웃이 한 번 더 안정된 시점)에 측정
@@ -5816,6 +5818,24 @@ function renderTimelineTodos(todos){
 }
 
 // ── 우측 상단: 오늘 일정 + 타임테이블을 토글 없이 나란히 동시 렌더(tl-events / tl-timetable) ──
+// 일정 ↔ 타임테이블 전환(좁은 화면 전용: 세로모드/사이드바 펼침) — 넓은 화면에서는 CSS가 둘 다 항상 보이게 하므로
+// 이 상태는 좁은 화면에서만 의미가 있음. null=자동판단, 'event'|'schedule'=사용자가 수동전환한 값(날짜 이동 시 리셋).
+let _tlEventMode=null;
+let _tlEventModeDk=null;
+function toggleTimelineEventMode(){
+  const evCard=document.getElementById('tl-event-card');
+  const curShowsEvent=evCard&&evCard.classList.contains('on');
+  _tlEventMode=curShowsEvent?'schedule':'event';
+  _applyTimelineEventMode();
+}
+function _applyTimelineEventMode(){
+  const evCard=document.getElementById('tl-event-card');
+  const ttCard=document.getElementById('tl-timetable-card');
+  if(!evCard||!ttCard)return;
+  const mode=_tlEventMode||'event';
+  evCard.classList.toggle('on',mode==='event');
+  ttCard.classList.toggle('on',mode==='schedule');
+}
 function renderTimelineEventsAndSchedule(todos){
   const isToday=dateKey(_selectedDate)===dateKey(new Date());
   const nowMin=new Date().getHours()*60+new Date().getMinutes();
@@ -5841,6 +5861,34 @@ function renderTimelineEventsAndSchedule(todos){
       return `<div class="event-row${it.done?' past':''}"><span class="event-time">${it.time}</span>${escapeHtml(it.label)}</div>`;
     }).join(''):'<div class="empty-msg">오늘 등록된 시간표가 없어요</div>';
   }
+
+  // 좁은 화면(세로모드/사이드바 펼침) 전용 — 어느 쪽을 먼저 보여줄지 자동판단 + 전환 아이콘 표시.
+  // 날짜가 바뀌었으면 수동전환 기록을 리셋해서 다시 자동판단하게 함(오늘탭 원래 로직과 동일한 방식).
+  const dk=dateKey(_selectedDate);
+  if(_tlEventModeDk!==dk){_tlEventMode=null;_tlEventModeDk=dk;}
+  const hasEvent=sorted.length>0,hasSchedule=scheduleItems.length>0;
+  if(!_tlEventMode){
+    if(!hasEvent)_tlEventMode='schedule';
+    else if(!hasSchedule)_tlEventMode='event';
+    else{
+      const hasOverdueSchedule=isToday&&scheduleItems.some(it=>!it.done&&it.min<nowMin);
+      if(hasOverdueSchedule)_tlEventMode='schedule';
+      else{
+        const nextUpcoming=(mins)=>{const up=mins.filter(m=>m>=nowMin);return up.length?Math.min(...up):null;};
+        const eventMins=isToday?sorted.filter(e=>e.event_time).map(e=>{const m=e.event_time.match(/^(\d{1,2}):(\d{2})/);return m?parseInt(m[1],10)*60+parseInt(m[2],10):null;}).filter(m=>m!=null):[];
+        const scheduleMins=isToday?scheduleItems.filter(it=>!it.done).map(it=>it.min):[];
+        const nextEvent=nextUpcoming(eventMins),nextSchedule=nextUpcoming(scheduleMins);
+        _tlEventMode=(nextSchedule!=null&&(nextEvent==null||nextSchedule<nextEvent))?'schedule':'event';
+      }
+    }
+  }
+  const showSwitch=hasEvent&&hasSchedule;
+  const evLabelEl=document.getElementById('tl-event-label');
+  const ttLabelEl=document.getElementById('tl-timetable-label');
+  const switchIconHtml=showSwitch?' <i class="ti ti-switch-horizontal" aria-hidden="true"></i>':'';
+  if(evLabelEl)evLabelEl.innerHTML=`<i class="ti ti-calendar-heart" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>오늘 일정${switchIconHtml}`;
+  if(ttLabelEl)ttLabelEl.innerHTML=`<i class="ti ti-table" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>타임테이블${switchIconHtml}`;
+  _applyTimelineEventMode();
 }
 
 // 0~6시: 본앱보다 더 강하게 압축(전체 높이의 1/14 정도만 사용) — 사용자 요청으로 체감상 더 좁게.
@@ -5897,6 +5945,18 @@ function renderTimelineTrack(dk,todos,sleep,meals,rblocks,mflowCidSet,totalHOver
     const y=_tlTimeToY(min,TOTAL_H);
     const label=String(h>24?h-24:h).padStart(2,'0');
     axisHtml+=`<div class="tl-gridline" style="top:${y}px;"></div><div class="tl-hourlabel" style="top:${y}px;">${label}</div>`;
+  }
+
+  // 기상이 07시 이후일 경우, 07시~기상시각 구간을 텍스트/시간 표기 없이 웜그레이 배경만 연하게 채워
+  // "아직 자고 있었다"는 느낌만 은은하게 남김(수면배너가 이미 취침~기상 정보를 보여주므로 여기선 색상만).
+  let sleepFillHtml='';
+  const wakeMin=sleep&&sleep.wake_time?_dawnTimeToMin(sleep.wake_time):null;
+  if(wakeMin!=null&&wakeMin>420){
+    const fillTop=_tlTimeToY(420,TOTAL_H);
+    const fillBottom=_tlTimeToY(Math.min(wakeMin,1440),TOTAL_H);
+    if(fillBottom>fillTop){
+      sleepFillHtml=`<div class="tl-sleep-fill" style="top:${fillTop}px;height:${fillBottom-fillTop}px;"></div>`;
+    }
   }
 
   // 리듬 막대 — 겹침 처리 없이 각자 실제 시간 위치에 그대로 렌더(막대 자체는 겹쳐도 되고, 라벨도 원칙적으로 제자리).
@@ -6010,5 +6070,5 @@ function renderTimelineTrack(dk,todos,sleep,meals,rblocks,mflowCidSet,totalHOver
 
   const trackHeight=Math.max(TOTAL_H+14+10,maxBottom+10); // +14는 _tlTimeToY의 07시 이전 압축 여백(PRE_COMPRESS_H)
   gridEl.style.height=trackHeight+'px';
-  gridEl.innerHTML=`<div class="tl-axis-col" style="height:${trackHeight}px;">${axisHtml}</div><div class="tl-mflow-lane" style="height:${trackHeight}px;">${mflowLaneHtml}</div><div class="tl-todo-col" style="height:${trackHeight}px;">${todoHtml||'<div class="tl-empty" style="padding:12px 0;font-size:var(--fs-sm);">등록된 시간표가 없어요</div>'}</div>`;
+  gridEl.innerHTML=`<div class="tl-axis-col" style="height:${trackHeight}px;">${sleepFillHtml}${axisHtml}</div><div class="tl-mflow-lane" style="height:${trackHeight}px;">${mflowLaneHtml}</div><div class="tl-todo-col" style="height:${trackHeight}px;">${todoHtml||'<div class="tl-empty" style="padding:12px 0;font-size:var(--fs-sm);">등록된 시간표가 없어요</div>'}</div>`;
 }
