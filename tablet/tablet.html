@@ -484,12 +484,16 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .tl-fill.tl-fill-short{align-items:center;}
 .tl-fill.ongoing{background-image:repeating-linear-gradient(45deg,transparent,transparent 6px,rgba(255,255,255,0.45) 6px,rgba(255,255,255,0.45) 10px);}
 .tl-fill::before{content:'';position:absolute;inset:0;background:rgba(255,250,240,0.22);border-radius:6px;pointer-events:none;}
+.tl-fill-text{position:relative;display:flex;align-items:center;justify-content:space-between;gap:4px;min-width:0;flex:1;width:100%;}
+.tl-fill.tl-fill-two-line .tl-fill-text{flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:2px;}
 .tl-fill-label{position:relative;font-size:var(--fs-sm);font-weight:500;color:var(--tp);display:flex;align-items:center;gap:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1;}
+.tl-fill.tl-fill-two-line .tl-fill-label{width:100%;}
 .tl-fill-icon{flex-shrink:0;font-size:12px;opacity:0.75;}
 /* 모닝플로우 배지 — 리듬축과 완전히 분리된 별도 세로 레인(tl-mflow-lane)에 고정. 막대와 절대 겹치지 않음. */
 .tl-mflow-badge{position:absolute;left:2px;width:18px;height:18px;border-radius:50%;background:rgba(var(--pal-orange-rgb),0.9);display:flex;align-items:center;justify-content:center;transform:translateY(-2px);}
 .tl-mflow-badge i{font-size:11px;color:#fff;}
 .tl-fill-time{position:relative;flex-shrink:0;font-size:var(--fs-xs);color:var(--tp);font-variant-numeric:tabular-nums;font-family:'DM Sans',sans-serif;margin-left:4px;}
+.tl-fill.tl-fill-two-line .tl-fill-time{margin-left:0;}
 .tl-now-line{position:absolute;left:36px;right:0;height:2px;border-radius:1px;background:linear-gradient(90deg,rgba(235,180,20,0.9),rgba(255,205,110,0.75));z-index:20;}
 .tl-now-dot{position:absolute;left:36px;width:12px;height:12px;border-radius:50%;background:#fffefa;border:3px solid rgba(235,180,20,0.9);transform:translate(-50%,-50%);z-index:21;}
 /* 오른쪽 컬럼(일정+시간표+완료투두 통합) — 겹치면 러프하게 아래로 밀려남(JS에서 계산), 스타일은 단순 리스트 */

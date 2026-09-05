@@ -6006,29 +6006,33 @@ function renderTimelineTrack(dk,todos,sleep,meals,rblocks,mflowCidSet,totalHOver
     const stubEnd=bk.end!=null?bk.end:(isToday?nowMin:Math.min(bk.start+20,1440));
     const bh=Math.max(_tlTimeToY(stubEnd+offset,TOTAL_H)-by,22);
     const durMin=(bk.end!=null&&bk.start!=null)?(stubEnd-bk.start):9999;
-    return {bk,bi,by,bh,durMin,isShort:durMin<=60};
+    // 두 줄(라벨+시간) 표기 가능 여부 — 두 줄 높이(라벨줄+시간줄+상하 패딩) 이상 확보될 때만.
+    const canTwoLine=bh>=52;
+    return {bk,bi,by,bh,durMin,isShort:durMin<=60,canTwoLine};
   });
   renderBlocks.forEach(r=>{if(r.by+r.bh>maxBottom)maxBottom=r.by+r.bh;});
   // 라벨 top 보정 — 짧은 블록의 top이 긴 블록의 top 근처(라벨 높이 이내)에 겹치면, 긴 블록 라벨만 짧은 블록 아래로 내림.
+  // labelBand는 긴 블록이 두 줄 모드면 그만큼 커진 실제 텍스트 높이를 기준으로 함.
   const labelTopFix={};
   renderBlocks.forEach(short=>{
     if(!short.isShort)return;
     renderBlocks.forEach(long=>{
       if(long===short||long.isShort)return;
-      const labelBand=26; // 라벨 한 줄이 차지하는 대략적 높이
+      const labelBand=long.canTwoLine?52:26; // 라벨(+시간) 텍스트가 차지하는 대략적 높이
       if(short.by>=long.by&&short.by<long.by+labelBand){
         labelTopFix[long.bi]=Math.max(labelTopFix[long.bi]||0,short.by+short.bh-long.by);
       }
     });
   });
   renderBlocks.forEach(r=>{
-    const {bk,bi,by,bh,isShort}=r;
+    const {bk,bi,by,bh,isShort,canTwoLine}=r;
     const labelFix=labelTopFix[bi];
     const marginStyle=labelFix?` style="margin-top:${labelFix}px;"`:'';
-    const timeHtml=(!bk.ongoing&&bk.start!=null&&bk.end!=null)?`<span class="tl-fill-time"${marginStyle}>${toHHMMFromMin(bk.start)}-${toHHMMFromMin(bk.end)}</span>`:'';
+    const timeHtml=(!bk.ongoing&&bk.start!=null&&bk.end!=null)?`<span class="tl-fill-time">${toHHMMFromMin(bk.start)}-${toHHMMFromMin(bk.end)}</span>`:'';
     const iconHtml=bk.icon?`<i class="ti ${bk.icon} tl-fill-icon" aria-hidden="true"></i>`:'';
-    const labelHtml=`<span class="tl-fill-label"${marginStyle}>${iconHtml}${escapeHtml(bk.label)}</span>`;
-    axisHtml+=`<div class="tl-fill${isShort?' tl-fill-short':''}${bk.ongoing?' ongoing':''}" style="top:${by}px;height:${bh}px;background-color:${bk.color};z-index:${10+bi};">${labelHtml}${timeHtml}</div>`;
+    const labelHtml=`<span class="tl-fill-label">${iconHtml}${escapeHtml(bk.label)}</span>`;
+    const textWrapHtml=`<div class="tl-fill-text"${marginStyle}>${labelHtml}${timeHtml}</div>`;
+    axisHtml+=`<div class="tl-fill${isShort?' tl-fill-short':''}${canTwoLine?' tl-fill-two-line':''}${bk.ongoing?' ongoing':''}" style="top:${by}px;height:${bh}px;background-color:${bk.color};z-index:${10+bi};">${textWrapHtml}</div>`;
     const isMflow=bk.cid&&mflowCidSet.has(bk.cid);
     if(isMflow)mflowMarkers.push({by});
   });
