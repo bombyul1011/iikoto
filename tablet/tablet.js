@@ -800,7 +800,7 @@ function renderTodoPartsRow(t){
   const chkHtml=(!allDone&&!t.done&&t.pinned)
     ?`<div class="pinned-ico"><i class="ti ti-bolt-filled" aria-hidden="true"></i></div>`
     :`<div class="chk ts-${ts}${allDone||t.done?' on':''}"></div>`;
-  return `<div class="todo-row-parts${allDone||t.done?' done':''}">${chkHtml}<div class="todo-parts-body"><span class="todo-parts-scope">${escapeHtml(parsed.scope)}</span>${partsHtml}</div></div>`;
+  return `<div class="todo-row-parts${allDone||t.done?' done':''}">${chkHtml}<div class="todo-parts-body"><span class="todo-parts-scope">${escapeHtml(parsed.scope)} &gt;</span>${partsHtml}</div></div>`;
 }
 
 function renderTodayTodosEvents(todos){
