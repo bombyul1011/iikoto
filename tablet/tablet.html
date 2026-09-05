@@ -469,24 +469,23 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .tl-compare-text{font-size:var(--fs-body);color:var(--tp);line-height:1.4;}
 .tl-track-card{background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:20px 22px 26px;position:relative;}
 .tl-grid{position:relative;display:flex;gap:6px;}
-.tl-axis-col{position:relative;flex:6;min-width:0;padding-left:46px;}
+.tl-axis-col{position:relative;flex:6;min-width:0;padding-left:36px;}
 /* 07시 이후 기상 시 07시~기상시각 구간을 텍스트/시간 없이 웜그레이만 연하게 채움 — 축 왼쪽 눈금열은 침범하지 않도록 좌측 시작을 살짝 안쪽으로 */
-.tl-sleep-fill{position:absolute;left:46px;right:0;background:rgba(var(--pal-warmgray-rgb),0.16);border-radius:6px;z-index:1;pointer-events:none;}
+.tl-sleep-fill{position:absolute;left:36px;right:0;background:rgba(var(--pal-warmgray-rgb),0.16);border-radius:6px;z-index:1;pointer-events:none;}
 .tl-mflow-lane{position:relative;width:22px;flex-shrink:0;}
 .tl-todo-col{flex:4;min-width:0;position:relative;padding-left:8px;}
-.tl-gridline{position:absolute;left:46px;right:0;height:1px;background:rgba(var(--divider-rgb),0.18);}
-.tl-hourlabel{position:absolute;left:0;width:32px;text-align:right;font-size:var(--fs-xs);color:var(--tm);transform:translateY(-50%);font-family:'DM Sans',sans-serif;}
-.tl-fill{position:absolute;left:46px;right:0;border-radius:6px;display:flex;align-items:flex-start;justify-content:space-between;padding:6px 10px;box-sizing:border-box;overflow:hidden;}
+.tl-gridline{position:absolute;left:36px;right:0;height:1px;background:rgba(var(--divider-rgb),0.18);}
+.tl-hourlabel{position:absolute;left:0;width:26px;text-align:right;font-size:var(--fs-xs);color:var(--tm);transform:translateY(-50%);font-family:'DM Sans',sans-serif;}
+.tl-fill{position:absolute;left:36px;right:0;border-radius:6px;display:flex;align-items:flex-start;justify-content:space-between;padding:6px 10px;box-sizing:border-box;overflow:hidden;}
 .tl-fill.tl-fill-short{align-items:center;}
 .tl-fill::before{content:'';position:absolute;inset:0;background:rgba(255,250,240,0.22);border-radius:6px;pointer-events:none;}
 .tl-fill-label{position:relative;font-size:var(--fs-sm);font-weight:500;color:var(--tp);display:flex;align-items:center;gap:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1;}
 /* 모닝플로우 배지 — 리듬축과 완전히 분리된 별도 세로 레인(tl-mflow-lane)에 고정. 막대와 절대 겹치지 않음. */
 .tl-mflow-badge{position:absolute;left:2px;width:18px;height:18px;border-radius:50%;background:rgba(var(--pal-orange-rgb),0.9);display:flex;align-items:center;justify-content:center;transform:translateY(-2px);}
 .tl-mflow-badge i{font-size:11px;color:#fff;}
-.tl-fill-sub{position:relative;font-size:var(--fs-xs);color:var(--ts);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-left:6px;}
 .tl-fill-time{position:relative;flex-shrink:0;font-size:var(--fs-xs);color:var(--tp);font-variant-numeric:tabular-nums;font-family:'DM Sans',sans-serif;margin-left:6px;}
-.tl-now-line{position:absolute;left:46px;right:0;height:2px;border-radius:1px;background:linear-gradient(90deg,rgba(235,180,20,0.9),rgba(255,205,110,0.75));z-index:20;}
-.tl-now-dot{position:absolute;left:46px;width:12px;height:12px;border-radius:50%;background:#fffefa;border:3px solid rgba(235,180,20,0.9);transform:translate(-50%,-50%);z-index:21;}
+.tl-now-line{position:absolute;left:36px;right:0;height:2px;border-radius:1px;background:linear-gradient(90deg,rgba(235,180,20,0.9),rgba(255,205,110,0.75));z-index:20;}
+.tl-now-dot{position:absolute;left:36px;width:12px;height:12px;border-radius:50%;background:#fffefa;border:3px solid rgba(235,180,20,0.9);transform:translate(-50%,-50%);z-index:21;}
 /* 오른쪽 컬럼(일정+시간표+완료투두 통합) — 겹치면 러프하게 아래로 밀려남(JS에서 계산), 스타일은 단순 리스트 */
 .tl-todo-item{position:absolute;left:0;right:0;display:flex;align-items:flex-start;gap:6px;font-size:var(--fs-sm);color:var(--tp);}
 .tl-todo-marker{flex-shrink:0;margin-top:1px;width:15px;height:15px;display:flex;align-items:center;justify-content:center;}
@@ -1195,6 +1194,17 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   #tl-event-card,#tl-timetable-card{display:none;margin-bottom:0!important;}
   #tl-event-card.on,#tl-timetable-card.on{display:flex;}
   #tl-event-label .ti-switch-horizontal,#tl-timetable-label .ti-switch-horizontal{margin-left:auto;font-size:15px;color:var(--tm);}
+
+  /* 습관배너 — 세로 폭이 좁아지면 아이콘 4개가 space-between 고정폭 대신 폭에 맞춰 줄바꿈되도록 wrap 허용 */
+  .tl-habit-banner{height:auto;min-height:44px;flex-wrap:wrap;}
+  .tl-habit-banner .habit-grid{flex-wrap:wrap;gap:10px 16px;justify-content:flex-start;}
+
+  /* 수면배너 — 세로에서는 아이콘+총 수면시간(dur)만 남기고 점수·취침/기상 시각은 숨김 */
+  .tl-sleep-banner #tl-sleep-score,
+  .tl-sleep-banner .tl-sleep-time{display:none;}
+  .tl-sleep-banner .tl-sleep-mid{position:static;transform:none;margin:0 auto;}
+  .tl-sleep-banner .tl-sleep-row{justify-content:center;}
+  .tl-sleep-banner .tl-sleep-dur{margin-left:8px;}
 
   /* ══════════════════════════════════════════════════════
      주간탭

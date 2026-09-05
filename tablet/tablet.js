@@ -150,6 +150,7 @@ function getSleepScoreLevel(score){
 
 // sleep 테이블 row 하나의 수면시간(분) — sleep_time~wake_time, 자정 넘김 자동 보정.
 function _sleepDurMinOf(r){
+  if(!r||!r.sleep_time||!r.wake_time)return null;
   const sv=r.sleep_time.split(':').map(Number),wv=r.wake_time.split(':').map(Number);
   let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;
   return m;
@@ -838,31 +839,6 @@ const MFLOW_CARDS=[
   {key:'clean',label:'정리',icon:'ti-sparkles',colorRgb:'var(--pal-lime-rgb)',rhythmCat:'home'},
   {key:'etc',label:'기타',icon:'ti-dots',colorRgb:'var(--pal-warmgray-rgb)',rhythmCat:null}
 ];
-const MFLOW_ENJOY_SUB_LABEL={read:'독서',content:'콘텐츠'};
-const MFLOW_DESK_SUB_LABEL={diary:'일기',notes:'노트정리',work_personal:'개인작업'};
-// [본앱 2026-09-05 구조변경] 시각(startStr/endStr)은 더 이상 picks에 직접 저장되지 않고, picks[key].blockCid로
-// rhythm_blocks를 조회해 그때그때 읽어옴. subKey도 이제 picks[key].subKey에 직접 저장됨(desk/etc 공용).
-// 다만 etc._enjoy/_desk/.sub 같은 구버전 위치(2026-09-04 이전 데이터)도 폴백으로 계속 지원.
-function _mflowSubKey(key,pick,etcCol){
-  if(pick&&pick.subKey)return pick.subKey; // 신규: picks[key].subKey가 최신 소스
-  if(key==='enjoy')return (etcCol&&etcCol._enjoy&&etcCol._enjoy.sub)||'';
-  if(key==='desk')return (etcCol&&etcCol._desk&&etcCol._desk.sub)||'';
-  if(key==='etc')return (etcCol&&etcCol.sub)||'';
-  return '';
-}
-// 본앱 규칙: enjoy/desk/etc는 sub가 카드 라벨 자체를 대체함(칩선택 없는 rest/exercise/clean은 카드 라벨 그대로).
-function _mflowLabel(c,key,subKey,etcCol){
-  if(key==='enjoy')return MFLOW_ENJOY_SUB_LABEL[subKey]||c.label;
-  if(key==='desk')return MFLOW_DESK_SUB_LABEL[subKey]||c.label;
-  if(key==='etc'){
-    if(subKey==='work')return '업무';
-    if(subKey==='appointment')return (etcCol&&etcCol.title)||'외출';
-    if(subKey==='free')return '기타 · 자유입력';
-    return c.label;
-  }
-  return c.label; // rest, exercise, clean — 칩선택 없음, 중복 방지를 위해 서브라벨 붙이지 않음
-}
-
 
 // habit_checks를 "날짜+습관명" 조합 기준으로 중복 제거해서 세는 통합 헬퍼.
 // 네트워크 재시도나 동시 클릭 등으로 실수로 중복 삽입되면 length 기준 집계는 100%를 넘는 왜곡된 비율을 만들 수 있어
@@ -5697,12 +5673,6 @@ function _tlRhythmCatDurations(rblocks){
   });
   return dur;
 }
-function _tlSleepDurMin(sleepRow){
-  if(!sleepRow||!sleepRow.sleep_time||!sleepRow.wake_time)return null;
-  const s=_dawnTimeToMin(sleepRow.sleep_time),w=_dawnTimeToMin(sleepRow.wake_time);
-  let m=w-s;if(m<0)m+=1440;
-  return m;
-}
 async function renderTimelineCompareCard(dk,todayTodos,todaySleep,todayRblocks,todayHabits,todayHabitChecks){
   const el=document.getElementById('tl-compare');
   if(!el)return;
@@ -5748,8 +5718,8 @@ async function renderTimelineCompareCard(dk,todayTodos,todaySleep,todayRblocks,t
   }
 
   // ② 수면시간 — 지난 4주 같은 요일 평균 대비 차이(분) 클수록 점수 높음
-  const todaySleepMin=_tlSleepDurMin(todaySleep);
-  const sameWeekdaySleepMins=sameWeekdayDks.map(d=>_tlSleepDurMin(sleepByDk[d])).filter(m=>m!=null);
+  const todaySleepMin=_sleepDurMinOf(todaySleep);
+  const sameWeekdaySleepMins=sameWeekdayDks.map(d=>_sleepDurMinOf(sleepByDk[d])).filter(m=>m!=null);
   if(todaySleepMin!=null&&sameWeekdaySleepMins.length){
     const avgSleep=sameWeekdaySleepMins.reduce((a,b)=>a+b,0)/sameWeekdaySleepMins.length;
     const diff=todaySleepMin-avgSleep;
@@ -5923,15 +5893,12 @@ function renderTimelineTrack(dk,todos,sleep,meals,rblocks,mflowCidSet,totalHOver
   // 자정을 넘겨 끝나는 활동(예: 23:00~02:07)은 그 하루(dk)의 일과 전체이므로 24시에서 잘라내지 않고,
   // 실제 종료시각까지(다음날 새벽이면 +1440분한 절대값으로) 그대로 이어서 그린다. 다음날 화면에는 이
   // 활동이 다시 나타나지 않음(computeRhythmBlocksRawTablet은 dk 데이터만 다루므로 자연히 하루에 한 번만 등장).
-  let blocks=computeRhythmBlocksRawTablet(sleep,meals,rblocks).filter(bk=>bk.kind!=='sleep').map(bk=>{
+  const blocks=computeRhythmBlocksRawTablet(sleep,meals,rblocks).filter(bk=>bk.kind!=='sleep').map(bk=>{
     let eMin=bk.end;
     if(eMin!=null&&eMin<=bk.start)eMin+=1440;
     return Object.assign({},bk,{end:eMin});
   });
-  blocks.sort((a,b)=>{
-    const ka=a.sortKey!=null?a.sortKey:a.start,kb=b.sortKey!=null?b.sortKey:b.start;
-    return ka-kb;
-  });
+  // 렌더 순서는 지속시간 내림차순(긴 블록을 먼저 그려 짧은 블록이 위에 얹히게)만 필요하므로 여기서 바로 정렬.
   const blocksSorted=blocks.slice().sort((a,b)=>{
     const durA=(a.end!=null&&a.start!=null)?a.end-a.start:1440;
     const durB=(b.end!=null&&b.start!=null)?b.end-b.start:1440;
