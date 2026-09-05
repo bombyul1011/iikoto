@@ -345,6 +345,8 @@ function switchTab(tab){
   document.getElementById('tab-'+tab).classList.add('on');
   document.getElementById('ft-'+tab).classList.add('on');
   document.getElementById('tab-'+tab).scrollTop=0;
+  const mainWrap=document.querySelector('.main-wrap');
+  if(mainWrap)mainWrap.scrollTop=0;
   closeFloatMenu();
   // 오늘탭으로 돌아올 때는 항상 실제 '오늘' 날짜로 재설정(자정을 넘겨도 갱신되도록)
   if(tab==='today'){_selectedDate=new Date();loadTodayTab();}
