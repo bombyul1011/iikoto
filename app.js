@@ -61,16 +61,12 @@ function renderHomeBody(section){
   if(_ldDay===1)maybeBackfillWeeklyReview();
 
   if(section==='morning'){
-    // 아침 루틴(굿모닝) 카드 — 파트1: 선택배너만, 파트2: 선택배너 + 어제/오늘 리뷰 배너 나란히(2026-09-03 아침홈탭 정식 이식)
+    // 아침 루틴(굿모닝) 카드 — 파트1: 선택배너만, 파트2: 선택배너(+어제/오늘 흐름코멘트 내장)
     const isMorning2=getSubSection()==='morning_2';
     if(isMorning2){
       body.appendChild(makeNutriCommentBanner());
     }
-    body.appendChild(makeMorningFlowCard());
-    if(isMorning2){
-      const mfPart2=makeMorningFlowPart2Card();
-      if(mfPart2)body.appendChild(mfPart2);
-    }
+    body.appendChild(makeMorningFlowCard(isMorning2));
     body.appendChild(makeHabitStreakRow());
     body.appendChild(makeTodayRhythmBanner());
   } else if(section==='afternoon'){
@@ -372,7 +368,7 @@ function syncMorningFlowOnRhythmBlockEnd(dk,blockCid,endStr){
   Object.keys(flow.picks).forEach(key=>{
     const p=flow.picks[key];
     if(p&&p.status==='running'&&p.blockCid===blockCid){
-      flow.picks[key]={...p,status:'done',endStr};
+      flow.picks[key]={...p,status:'done'}; // 종료 시각은 리듬블록에 이미 기록됨 — 여기선 status만 done으로 전환
       changed=true;
     }
   });
@@ -384,7 +380,22 @@ function deleteRhythmBlock(idx){
   if(b)addDelPending('rblocks',_rhythmDk,b.cid);
   blocks.splice(idx,1);
   saveRhythmBlocks(_rhythmDk,blocks);
+  if(b)syncMorningFlowOnRhythmBlockDelete(_rhythmDk,b.cid); // 모닝플로우로 시작된 블록을 리듬탭에서 지운 경우 — "하려다가 안 한 것"으로 보고 pick도 idle로 되돌림
   refreshRhythmTrack();
+}
+// 리듬탭에서 블록을 직접 삭제했을 때, 그 블록이 모닝플로우 카드로 시작된 것이면(blockCid 매칭)
+// 해당 pick을 통째로 지워 미시작(idle) 상태로 되돌림 — "등록한 리듬을 지운다 = 하려다가 안 했다"는 정책(2026-09-05).
+function syncMorningFlowOnRhythmBlockDelete(dk,blockCid){
+  if(!blockCid)return;
+  const flow=getMorningFlow(dk);
+  let changed=false;
+  Object.keys(flow.picks).forEach(key=>{
+    if(flow.picks[key]&&flow.picks[key].blockCid===blockCid){
+      delete flow.picks[key];
+      changed=true;
+    }
+  });
+  if(changed){saveMorningFlow(dk,flow);if(document.querySelector('.mf-hero'))refreshMorningFlowCard();}
 }
 
 // ══════════════════════════════════════════════════════════
@@ -4690,6 +4701,14 @@ function _mfDurationMin(startStr,endStr){
   return endMin-startMin;
 }
 function getMorningFlow(dk){return S.get('mflow_'+dk)||{picks:{},etc:{},enjoy:{},desk:{},confirmed:false};}
+// [2026-09-05] 모닝플로우 카드의 시작/종료 시각은 더 이상 flow.picks에 별도 저장하지 않고
+// 항상 연결된 리듬블록(blockCid)에서 직접 읽어옴 — 리듬탭에서 시간을 수정해도 즉시 반영되고,
+// "복제된 값이 원본과 어긋나는" 불일치가 구조적으로 사라짐.
+// 블록이 삭제된 경우(null 리턴) 호출부에서 해당 pick을 idle로 되돌리는 처리를 함께 함.
+function _mfBlockFor(dk,blockCid){
+  if(!blockCid)return null;
+  return getRhythmBlocks(dk).find(b=>b.cid===blockCid)||null;
+}
 // 이번 달(1일~오늘) 로컬에 저장된 mflow_YYYY-MM-DD 전부를 훑어 카드별(key) 누적 선택 횟수 집계 — 그리드 카드 하단 표시용.
 function getMorningFlowMonthCounts(mk){
   const counts={};
@@ -4875,10 +4894,10 @@ function _startMorningFlowRhythm(key,targetCid,mk,subKey){
   if(key==='enjoy'){
     const sub=flow.enjoy?.sub;
     const now=Date.now();
-    const startStr=minToHHMM(new Date(now).getHours()*60+new Date(now).getMinutes());
-    // 독서/콘텐츠 스톱워치가 각자 리듬블록 시작을 처리하지만, 굿모닝 카드 화면에 표시할 시작 시각은 별도로 여기서 직접 기록(2026-09-03: 다른 카드와 동일하게 시간 표기 통일).
-    if(sub==='read'){toggleStopwatch(targetCid);flow.picks[key]={status:'running',cid:targetCid,startTs:now,startStr};saveMorningFlow(dk,flow);refreshMorningFlowCard();refreshRhythmTrack();return;}
-    if(sub==='content'){toggleContentStopwatch(targetCid,mk);flow.picks[key]={status:'running',cid:targetCid,mk,startTs:now,startStr};saveMorningFlow(dk,flow);refreshMorningFlowCard();refreshRhythmTrack();return;}
+    // 독서/콘텐츠 스톱워치가 리듬블록 생성까지 전담 — 그 블록의 cid(_swBlockCid/_cswBlockCid)만 받아서
+    // 연결고리로 저장. 시작 시각은 더 이상 여기서 복제하지 않고, 화면 표시 시 그 블록에서 직접 읽음.
+    if(sub==='read'){toggleStopwatch(targetCid);flow.picks[key]={status:'running',cid:targetCid,blockCid:_swBlockCid,startTs:now};saveMorningFlow(dk,flow);refreshMorningFlowCard();refreshRhythmTrack();return;}
+    if(sub==='content'){toggleContentStopwatch(targetCid,mk);flow.picks[key]={status:'running',cid:targetCid,mk,blockCid:_cswBlockCid,startTs:now};saveMorningFlow(dk,flow);refreshMorningFlowCard();refreshRhythmTrack();return;}
     return;
   }
   // 휴식/운동/정리/기타(업무·외출)/책상(일기·노트정리·개인작업) — 리듬블록을 end 없이 직접 생성해두고 종료 시 채우는 방식(콘텐츠 시청 스톱워치와 동일 패턴).
@@ -4896,12 +4915,14 @@ function _startMorningFlowRhythm(key,targetCid,mk,subKey){
   autoSync('rblocks',dk);
   autoCheckHabitFromRhythm(rhythmCat,dk,startStr); // 운동→습관 자동체크 등, 리듬탭 수동등록과 동일하게 연동
   if(key==='desk'&&subKey==='diary')checkHabitDirect('일기',dk,startStr); // 리듬탭에서 note+"일기" 텍스트일 때 자동체크되던 것과 동일하게 연동
-  flow.picks[key]={status:'running',blockCid,startTs:now,startStr,subKey:subKey||null};
+  flow.picks[key]={status:'running',blockCid,startTs:now,subKey:subKey||null};
   saveMorningFlow(dk,flow);
   refreshMorningFlowCard();
   refreshRhythmTrack();
 }
 // 카드 종료 — 독서/콘텐츠는 각자의 종료 로직(진행률 모달까지)을 그대로 재사용, 나머지는 리듬블록 end만 채움.
+// 시각(startStr/endStr)은 더 이상 여기서 저장하지 않음 — status와 연결고리(blockCid/cid)만 남기고,
+// 실제 시:분 표시는 화면 렌더 시점에 리듬블록을 조회해서 채움(_mfBlockFor).
 function endMorningFlowCard(key){
   const dk=dateKey(getLogicalDate());
   const flow=getMorningFlow(dk);
@@ -4909,27 +4930,23 @@ function endMorningFlowCard(key){
   if(!pick||pick.status!=='running')return;
   if(key==='enjoy'){
     const sub=flow.enjoy?.sub;
-    const now=Date.now();
-    const endStr=minToHHMM(new Date(now).getHours()*60+new Date(now).getMinutes());
     // 1분 미만 자동삭제 로직 완전 제거(2026-09-03) — 몇 초든 시작~종료 구간을 그대로 기록, 다른 카테고리와 동일 규칙.
-    if(sub==='read'){toggleStopwatch();flow.picks[key]={status:'done',cid:pick.cid,startStr:pick.startStr,endStr};saveMorningFlow(dk,flow);refreshMorningFlowCard();refreshRhythmTrack();return;}
-    if(sub==='content'){stopContentStopwatch();flow.picks[key]={status:'done',cid:pick.cid,mk:pick.mk,startStr:pick.startStr,endStr};saveMorningFlow(dk,flow);refreshMorningFlowCard();refreshRhythmTrack();return;}
+    if(sub==='read'){toggleStopwatch();flow.picks[key]={status:'done',cid:pick.cid,blockCid:pick.blockCid};saveMorningFlow(dk,flow);refreshMorningFlowCard();refreshRhythmTrack();return;}
+    if(sub==='content'){stopContentStopwatch();flow.picks[key]={status:'done',cid:pick.cid,mk:pick.mk,blockCid:pick.blockCid};saveMorningFlow(dk,flow);refreshMorningFlowCard();refreshRhythmTrack();return;}
     return;
   }
   const now=Date.now();
   const blocks=getRhythmBlocks(dk);
   const idx=blocks.findIndex(b=>b.cid===pick.blockCid);
-  let endStr=null;
   if(idx>=0){
     const endD=new Date(now);
     let endMin=endD.getHours()*60+endD.getMinutes();
     if(dateKey(getLogicalDate(now))!==dk)endMin+=1440;
-    endStr=minToHHMM(endMin%1440);
-    blocks[idx].end=endStr;
+    blocks[idx].end=minToHHMM(endMin%1440);
     saveRhythmBlocks(dk,blocks);
     autoSync('rblocks',dk);
   }
-  flow.picks[key]={status:'done',blockCid:pick.blockCid,subKey:pick.subKey,startStr:pick.startStr,endStr};
+  flow.picks[key]={status:'done',blockCid:pick.blockCid,subKey:pick.subKey};
   saveMorningFlow(dk,flow);
   refreshMorningFlowCard();
   refreshRhythmTrack();
@@ -4937,7 +4954,8 @@ function endMorningFlowCard(key){
 function refreshMorningFlowCard(){
   const old=document.getElementById('morning-flow-card');
   if(!old)return;
-  old.replaceWith(makeMorningFlowCard());
+  const isMorning2=getSubSection()==='morning_2';
+  old.replaceWith(makeMorningFlowCard(isMorning2));
 }
 // 어제 mflow 기록 기반 회고 한 줄 — done 상태인 카드만 반영(시작만 하고 안 끝낸 카드는 드문 예외로 간주, 별도 표기 없이 제외).
 function _mfYesterdayRecapLine(){
@@ -4985,9 +5003,21 @@ function _mfSubPickRowHtml(c,label,subList,handlerName,wrap){
     <div class="mf-etc-chips" style="margin-top:0;flex:1;justify-content:flex-end;${wrap?'flex-wrap:wrap;':''}">${subList.map(s=>`<div class="mf-etc-chip" onclick="${handlerName}('${s.key}')">${s.label}</div>`).join('')}</div>
   </div>`;
 }
-function makeMorningFlowCard(){
+function makeMorningFlowCard(showRecap){
   const dk=dateKey(getLogicalDate());
   const flow=getMorningFlow(dk);
+  // [2026-09-05] 리듬탭에서 blockCid로 연결된 리듬블록을 직접 지워버린 경우 — "하려다가 안 한 것"으로 보고
+  // 해당 pick을 통째로 지워 idle(미시작) 상태로 되돌림. 화면을 그리기 전에 한 번에 정리해두면
+  // 아래 렌더링 로직에서 매번 삭제 여부를 따로 신경 쓸 필요가 없어짐.
+  let _flowPruned=false;
+  Object.keys(flow.picks).forEach(key=>{
+    const p=flow.picks[key];
+    if(p&&p.blockCid&&(p.status==='running'||p.status==='done')&&!_mfBlockFor(dk,p.blockCid)){
+      delete flow.picks[key];
+      _flowPruned=true;
+    }
+  });
+  if(_flowPruned)saveMorningFlow(dk,flow);
   const pickedKeys=Object.keys(flow.picks);
   const hasPicks=pickedKeys.length>0;
   // 선택한 카드 중 하나라도 시작/완료(running·done) 흔적이 있어야 시작목록을 보여줌.
@@ -5064,14 +5094,16 @@ function makeMorningFlowCard(){
       const deskLabelMap={diary:'일기',notes:'노트정리',work_personal:'개인작업'};
       const label=isEtc?(etcSub==='work'?'업무':(flow.etc?.title||'외출')):isEnjoy?(enjoySub==='read'?'독서':'콘텐츠'):isDesk?deskLabelMap[deskSub]:c.label;
       const icon=isEtc?(etcSub==='work'?'ti-keyboard':'ti-bus'):isEnjoy?(MORNING_FLOW_ENJOY_SUB.find(s=>s.key===enjoySub)?.icon||c.icon):c.icon;
+      // 시각은 저장값이 아니라 연결된 리듬블록(blockCid)에서 그때그때 읽음 — 리듬탭에서 시간을 고치면 바로 반영됨.
+      const linkedBlock=_mfBlockFor(dk,pick.blockCid);
       let statusText='시작 전',btnText='시작',btnOn=false;
       if(pick.status==='running'){
-        statusText=pick.startStr?`${pick.startStr}부터 진행중`:'진행중';
+        statusText=linkedBlock&&linkedBlock.start?`${linkedBlock.start}부터 진행중`:'진행중';
         btnText='종료';btnOn=true;
       }else if(pick.status==='done'){
-        if(pick.startStr&&pick.endStr){
-          const durMin=_mfDurationMin(pick.startStr,pick.endStr);
-          statusText=`${pick.startStr}-${pick.endStr} · ${durMin}분`;
+        if(linkedBlock&&linkedBlock.start&&linkedBlock.end){
+          const durMin=_mfDurationMin(linkedBlock.start,linkedBlock.end);
+          statusText=`${linkedBlock.start}-${linkedBlock.end} · ${durMin}분`;
         }else{
           statusText='완료';
         }
@@ -5091,22 +5123,18 @@ function makeMorningFlowCard(){
     }
   }
   bodyHtml+='</div>';
+  if(showRecap){
+    const yesterdayLine=_mfYesterdayRecapLine();
+    const todayLine=_mfTodayPreviewLine();
+    if(yesterdayLine||todayLine){
+      bodyHtml+='<div class="mf-hero-recap">';
+      if(yesterdayLine)bodyHtml+=`<div>${escapeHtml(yesterdayLine)}</div>`;
+      if(todayLine)bodyHtml+=`<div class="mf-p2-today">${escapeHtml(todayLine)}</div>`;
+      bodyHtml+='</div>';
+    }
+  }
   hero.innerHTML=bodyHtml;
   return hero;
-}
-// 파트2 — 어제 회고 + 오늘 일정 미리보기, 한 문단으로 자연스럽게(2026-09-03 시안 확정: 카드는 있되 구분선 없이 심플하게).
-function makeMorningFlowPart2Card(){
-  const yesterdayLine=_mfYesterdayRecapLine();
-  const todayLine=_mfTodayPreviewLine();
-  if(!yesterdayLine&&!todayLine)return null;
-  const card=document.createElement('div');
-  card.className='mf-part2';
-  card.id='morning-flow-part2-card';
-  let html='';
-  if(yesterdayLine)html+=`<div>${escapeHtml(yesterdayLine)}</div>`;
-  if(todayLine)html+=`<div class="mf-p2-today">${escapeHtml(todayLine)}</div>`;
-  card.innerHTML=html;
-  return card;
 }
 function renderSleepScoreBadge(dk){
   const score=getSleepScore(dk);
