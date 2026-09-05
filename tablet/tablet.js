@@ -920,7 +920,8 @@ const RHYTHM_SLEEP_COLOR='rgba(var(--pal-warmgray-rgb),0.30)';
 const RHYTHM_MEAL_COLOR='rgba(var(--pal-green-rgb),0.90)';
 const RHYTHM_MEAL_ICON='ti-tools-kitchen-2';
 // 본앱 computeRhythmBlocksRaw와 동일 로직(수면/식사/수기 리듬블록을 하나의 흐름으로 합성) — 태블릿용 이식.
-function computeRhythmBlocksRawTablet(sleep,meals,manual){
+// contentsByCid: {client_id: contents row} — 감상(enjoy) 블록의 콘텐츠 카테고리별 아이콘 치환에 사용(선택).
+function computeRhythmBlocksRawTablet(sleep,meals,manual,contentsByCid){
   sleep=sleep||{};meals=meals||{};manual=manual||[];
   const blocks=[];
   const wakeMin=_dawnTimeToMin(sleep.wake_time),sleepMin=_dawnTimeToMin(sleep.sleep_time);
@@ -952,7 +953,17 @@ function computeRhythmBlocksRawTablet(sleep,meals,manual){
     const isLateNightNew=sMin<DAWN_CUTOFF_MIN&&latestManualMin>=DAWN_CUTOFF_MIN&&sMin<latestManualMin;
     let sortKey=sMin;
     if(isLateNightNew)sortKey+=1440;
-    blocks.push({start:sMin,end:eMin,sortKey,color:cat.color,label:b.text||cat.label,icon:cat.icon,ongoing:!b.end_time,kind:'manual',cid:b.client_id});
+    // 감상(enjoy) 블록은 카테고리 공통 아이콘 대신, 콘텐츠 종류(드라마/영화/책)별 지정 아이콘으로 대체 —
+    // 분류는 이미 텍스트(제목)에 담겨 있으니 아이콘만 종류를 알려주는 용도(CAT_ICON_META 재사용, 월간탭과 동일).
+    let icon=cat.icon,label=b.text||cat.label;
+    if(b.cat==='enjoy'){
+      const parsed=_parseEnjoyBlock(b,contentsByCid);
+      if(parsed){
+        icon=(CAT_ICON_META[parsed.cat]&&CAT_ICON_META[parsed.cat].icon)||icon;
+        label=parsed.title||label;
+      }
+    }
+    blocks.push({start:sMin,end:eMin,sortKey,color:cat.color,label,icon,ongoing:!b.end_time,kind:'manual',cid:b.client_id});
   });
   return blocks;
 }
@@ -5569,14 +5580,14 @@ async function loadTimelineTab(){
   // 좌측 상단 — 수면배너 + 습관배너(아이콘만)
   renderTimelineSleepBanner(sleep);
   renderTimelineHabitBanner(habits||[],habitChecks||[]);
-  renderTimelineTrack(dk,todos||[],sleep,mealsRow,rblocks||[],mflowCidSet);
+  renderTimelineTrack(dk,todos||[],sleep,mealsRow,rblocks||[],mflowCidSet,undefined,contents||[]);
   renderTimelineCompareCard(dk,todos||[],sleep,rblocks||[],habits||[],habitChecks||[]);
 
   // 좌우 높이 동기화 — 오른쪽 영역(도넛~감상/습관까지) 실제 렌더 높이를 측정해, 그 값을 트랙 전체 높이(TOTAL_H)로
   // 다시 사용해 트랙을 재렌더링. 이렇게 하면 0~24시 전체가 스크롤 없이 오른쪽 높이 안에 정확히 들어맞는다.
   // (기존에는 트랙을 고정 900px로 그린 뒤 컨테이너만 잘라서 스크롤을 만들었는데, 그러면 24시가 항상 스크롤 밖으로
   // 밀려나 있었음 — 트랙 콘텐츠 자체를 오른쪽 실측 높이 기준으로 다시 그리는 방식으로 수정.)
-  syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,mflowCidSet);
+  syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,mflowCidSet,contents||[]);
 }
 
 // 좌우 높이 동기화를 별도 함수로 분리 — 첫 탭 진입 시 폰트/레이아웃이 아직 자리잡기 전에 offsetHeight를 측정해
@@ -5585,7 +5596,7 @@ async function loadTimelineTab(){
 let _isFirstTimelineLoad=true; // 앱 최초 로딩 시에는 사이드바 캘린더/인사배너 등 다른 초기화가 동시에 돌면서
 // 레이아웃이 계속 바뀌는 중이라 rAF 두 번만으로는 최종 높이가 잡히기 전에 측정되는 경우가 있어, 이 경우에만
 // 넉넉한 지연을 둔 추가 재동기화를 한 번 더 건다(재방문 시에는 이미 안정적이라 불필요).
-function syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,mflowCidSet){
+function syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,mflowCidSet,contents){
   const doSync=()=>{
     const sideEl=document.getElementById('side');
     const sidebarOpen=sideEl&&!sideEl.classList.contains('collapsed');
@@ -5614,7 +5625,7 @@ function syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,mflowCidSet){
     const bannersEl=document.querySelector('.tl-top-banners');
     const bannersH=(bannersEl?bannersEl.offsetHeight:0)+12; // 배너와 트랙카드 사이 margin-bottom(12px) 포함
     const targetH=Math.max(rightEl.offsetHeight-cardPadding-bannersH,400);
-    renderTimelineTrack(dk,todos||[],sleep,mealsRow,rblocks||[],mflowCidSet,targetH);
+    renderTimelineTrack(dk,todos||[],sleep,mealsRow,rblocks||[],mflowCidSet,targetH,contents||[]);
     // 카드 외곽 높이(max-height)는 컨텐츠 높이(targetH)에 패딩을 더한 값이어야 우측과 정확히 맞음 —
     // 이전에는 패딩을 빼지 않고 rightEl 전체 높이를 그대로 넣어 트랙 카드가 우측보다 패딩만큼 더 커 보였음.
     trackCardEl.style.maxHeight=(targetH+cardPadding)+'px';
@@ -5920,11 +5931,12 @@ function _tlTimeToY(min,TOTAL_H){
 
 // 좌측 리듬트랙 — 리듬 막대(rt-fill 스타일) + 일정(도트+점선) + 시간표/완료투두를 같은 세로축에 정렬해 함께 렌더.
 // 스크롤 없이 전체 24시간을 다 보여주는 고정 높이(TOTAL_H) — 우측 카드 분량과 균형은 추후 조정 예정.
-function renderTimelineTrack(dk,todos,sleep,meals,rblocks,mflowCidSet,totalHOverride){
+function renderTimelineTrack(dk,todos,sleep,meals,rblocks,mflowCidSet,totalHOverride,contents){
   mflowCidSet=mflowCidSet||new Set();
   const gridEl=document.getElementById('tl-track-grid');
   const TOTAL_H=totalHOverride||900;
   const isToday=dk===dateKey(new Date());
+  const contentsByCid=_contentsByCidMap(contents||[]);
 
   // 본앱과 동일: 그 날짜(dk)에 저장된 데이터만 사용. "전날 것을 오늘 화면에 끌어와 추가로 보여주는" 방식은
   // 쓰지 않음 — 논리적 하루(자정을 넘겨도 아직 안 잤으면 전날의 연장) 개념상, 자정 넘겨 이어지는 활동은
@@ -5933,7 +5945,7 @@ function renderTimelineTrack(dk,todos,sleep,meals,rblocks,mflowCidSet,totalHOver
   // 자정을 넘겨 끝나는 활동(예: 23:00~02:07)은 그 하루(dk)의 일과 전체이므로 24시에서 잘라내지 않고,
   // 실제 종료시각까지(다음날 새벽이면 +1440분한 절대값으로) 그대로 이어서 그린다. 다음날 화면에는 이
   // 활동이 다시 나타나지 않음(computeRhythmBlocksRawTablet은 dk 데이터만 다루므로 자연히 하루에 한 번만 등장).
-  const blocks=computeRhythmBlocksRawTablet(sleep,meals,rblocks).filter(bk=>bk.kind!=='sleep').map(bk=>{
+  const blocks=computeRhythmBlocksRawTablet(sleep,meals,rblocks,contentsByCid).filter(bk=>bk.kind!=='sleep').map(bk=>{
     let eMin=bk.end;
     if(eMin!=null&&eMin<=bk.start)eMin+=1440;
     return Object.assign({},bk,{end:eMin});
@@ -5999,7 +6011,7 @@ function renderTimelineTrack(dk,todos,sleep,meals,rblocks,mflowCidSet,totalHOver
     const timeHtml=(!bk.ongoing&&bk.start!=null&&bk.end!=null)?`<span class="tl-fill-time"${marginStyle}>${toHHMMFromMin(bk.start)}-${toHHMMFromMin(bk.end)}</span>`:'';
     const iconHtml=bk.icon?`<i class="ti ${bk.icon} tl-fill-icon" aria-hidden="true"></i>`:'';
     const labelHtml=`<span class="tl-fill-label"${marginStyle}>${iconHtml}${escapeHtml(bk.label)}</span>`;
-    axisHtml+=`<div class="tl-fill${isShort?' tl-fill-short':''}" style="top:${by}px;height:${bh}px;background-color:${bk.color};z-index:${10+bi};">${labelHtml}${timeHtml}</div>`;
+    axisHtml+=`<div class="tl-fill${isShort?' tl-fill-short':''}${bk.ongoing?' ongoing':''}" style="top:${by}px;height:${bh}px;background-color:${bk.color};z-index:${10+bi};">${labelHtml}${timeHtml}</div>`;
     const isMflow=bk.cid&&mflowCidSet.has(bk.cid);
     if(isMflow)mflowMarkers.push({by});
   });
