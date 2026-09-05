@@ -774,6 +774,35 @@ function toggleTabletEventMode(){
   renderTodayTodosEvents(_todayTodosCache||[]);
 }
 let _todayTodosCache=[];
+// 조각조각모드 파싱 — "범위 > 조각1 / 조각2 / 조각3" 형태, strike_parts에 완료된 조각 인덱스가 담김
+function parseTodoParts(t){
+  const raw=t.text||'';
+  const arrowIdx=raw.indexOf('>');
+  if(arrowIdx<0)return null;
+  const scope=raw.slice(0,arrowIdx).trim();
+  const partsStr=raw.slice(arrowIdx+1);
+  if(!partsStr.includes('/'))return null;
+  const parts=partsStr.split('/').map(s=>s.trim()).filter(Boolean);
+  if(parts.length<2)return null;
+  const strikeSet=new Set((t.strike_parts||[]).map(n=>Number(n)));
+  return {scope,parts,strikeSet};
+}
+
+function renderTodoPartsRow(t){
+  const parsed=parseTodoParts(t);
+  if(!parsed)return null;
+  const ts=t.time_section||'none';
+  const allDone=parsed.parts.length>0&&parsed.parts.every((_,i)=>parsed.strikeSet.has(i));
+  const partsHtml=parsed.parts.map((p,i)=>{
+    const on=parsed.strikeSet.has(i)||t.done;
+    return `${i>0?'<span class="todo-parts-sep">/</span>':''}<span class="todo-part${on?' on':''}">${escapeHtml(p)}</span>`;
+  }).join('');
+  const chkHtml=(!allDone&&!t.done&&t.pinned)
+    ?`<div class="pinned-ico"><i class="ti ti-bolt-filled" aria-hidden="true"></i></div>`
+    :`<div class="chk ts-${ts}${allDone||t.done?' on':''}"></div>`;
+  return `<div class="todo-row-parts${allDone||t.done?' done':''}">${chkHtml}<div class="todo-parts-body"><span class="todo-parts-scope">${escapeHtml(parsed.scope)}</span>${partsHtml}</div></div>`;
+}
+
 function renderTodayTodosEvents(todos){
   _todayTodosCache=todos;
   // 날짜가 바뀌어 다시 보는 화면이면(다른 날짜 조회 후 복귀 등) 수동 전환 기록을 리셋 — 매 조회마다 새로 자동판단
@@ -787,6 +816,8 @@ function renderTodayTodosEvents(todos){
   const events=todos.filter(t=>t.is_event);
   const todoEl=document.getElementById('today-todos');
   todoEl.innerHTML=plainTodos.length?plainTodos.slice(0,8).map(t=>{
+    const partsRow=renderTodoPartsRow(t);
+    if(partsRow)return partsRow;
     const ts=t.time_section||'none';
     const chkHtml=(!t.done&&t.pinned)
       ?`<div class="pinned-ico"><i class="ti ti-bolt-filled" aria-hidden="true"></i></div>`

@@ -254,7 +254,23 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .todo-row.done .chk.ts-afternoon{background:rgba(230,150,150,0.36);border-color:transparent;}
 .todo-row.done .chk.ts-night{background:rgba(var(--pal-lavender-rgb),0.38);border-color:transparent;}
 .todo-row.done .chk.ts-none{background:rgba(var(--pal-warmgray-rgb),0.38);border-color:transparent;}
-.todo-row .pinned-ico{width:15px;height:15px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--pal-orange-border);}
+/* 조각조각모드 — 범위 안 개별 조각의 완료여부를 부분 취소선으로 표시(읽기전용) */
+.todo-row-parts{display:flex;align-items:flex-start;gap:9px;padding:5px 0;font-size:var(--fs-body);color:var(--tp);}
+.todo-row-parts .chk{width:15px;height:15px;border-radius:4px;border:1.5px solid rgba(200,160,160,0.5);flex-shrink:0;margin-top:2px;}
+.todo-row-parts .chk.ts-morning{border-color:var(--pal-yellow-border);}
+.todo-row-parts .chk.ts-afternoon{border-color:var(--pal-rose-border);}
+.todo-row-parts .chk.ts-night{border-color:var(--pal-lavender-border);}
+.todo-row-parts .chk.ts-none{border-color:var(--pal-warmgray-border);}
+.todo-row-parts.done .chk.ts-morning{background:rgba(var(--pal-yellow-rgb),0.42);border-color:transparent;}
+.todo-row-parts.done .chk.ts-afternoon{background:rgba(230,150,150,0.36);border-color:transparent;}
+.todo-row-parts.done .chk.ts-night{background:rgba(var(--pal-lavender-rgb),0.38);border-color:transparent;}
+.todo-row-parts.done .chk.ts-none{background:rgba(var(--pal-warmgray-rgb),0.38);border-color:transparent;}
+.todo-row-parts.done .chk{background:rgba(var(--pal-mint-rgb),0.5);border-color:transparent;}
+.todo-parts-body{display:flex;flex-wrap:wrap;align-items:baseline;gap:0;min-width:0;}
+.todo-parts-scope{margin-right:2px;}
+.todo-parts-sep{color:var(--tm);margin:0 4px;}
+.todo-part{color:var(--tp);}
+.todo-part.on{color:var(--tm);text-decoration:line-through;}
 .grid3-right{display:flex;flex-direction:column;gap:6px;height:calc(32px + (var(--fs-title) * 1.3 + 11px) + (var(--fs-body) * 1.3 + 10px) * 7);}
 .event-card{padding:11px 16px;flex:104;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;margin-bottom:0!important;}
 #today-events,#today-timetable{flex:1;min-height:0;overflow-y:auto;}
