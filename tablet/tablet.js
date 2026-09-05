@@ -6006,8 +6006,10 @@ function renderTimelineTrack(dk,todos,sleep,meals,rblocks,mflowCidSet,totalHOver
     const stubEnd=bk.end!=null?bk.end:(isToday?nowMin:Math.min(bk.start+20,1440));
     const bh=Math.max(_tlTimeToY(stubEnd+offset,TOTAL_H)-by,22);
     const durMin=(bk.end!=null&&bk.start!=null)?(stubEnd-bk.start):9999;
-    // 두 줄(라벨+시간) 표기 가능 여부 — 지속시간 50분 이상일 때만(분 기준이라 화면 스케일 변화에 안전).
-    const canTwoLine=durMin>=50;
+    // 두 줄(라벨+시간) 표기 가능 여부 — TOTAL_H가 날짜마다 우측 컬럼 높이에 맞춰 변동되므로,
+    // 분(durMin) 고정값이 아니라 실제 렌더 높이(bh) 기준으로 판정해야 정확함. 두 줄 모드는
+    // 상단 패딩을 줄여(tl-fill-two-line) 공간을 조금 더 확보했으므로 임계값도 소폭 낮춤.
+    const canTwoLine=bh>=46;
     return {bk,bi,by,bh,durMin,isShort:durMin<=60,canTwoLine};
   });
   renderBlocks.forEach(r=>{if(r.by+r.bh>maxBottom)maxBottom=r.by+r.bh;});
@@ -6018,7 +6020,7 @@ function renderTimelineTrack(dk,todos,sleep,meals,rblocks,mflowCidSet,totalHOver
     if(!short.isShort)return;
     renderBlocks.forEach(long=>{
       if(long===short||long.isShort)return;
-      const labelBand=long.canTwoLine?52:26; // 라벨(+시간) 텍스트가 차지하는 대략적 높이
+      const labelBand=long.canTwoLine?46:26; // 라벨(+시간) 텍스트가 차지하는 대략적 높이
       if(short.by>=long.by&&short.by<long.by+labelBand){
         labelTopFix[long.bi]=Math.max(labelTopFix[long.bi]||0,short.by+short.bh-long.by);
       }
