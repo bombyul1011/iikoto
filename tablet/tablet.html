@@ -36,6 +36,8 @@
   --divider-rgb:195,175,168;
   --graph-track-color:rgba(195,175,168,0.25);
   --sleep-warmgray:rgba(150,130,115,0.85);
+  --sleep-warmgray-strong:#6b6259; /* 본앱과 동일 — 취침/기상/총수면시간 텍스트 전용 */
+  --sleep-b:rgba(255,250,240,0.60);--sleep-bb:rgba(255,200,180,0.42); /* 본앱 라이트 테마 수면배너 배경/보더 그대로 이식 */
   --bg:linear-gradient(145deg,#fdf0e8 0%,#fef5d4 50%,#fde8f0 100%);
   --tp:#6b5248;--ts:#a3897c;--tm:#d4bcb0;
   --card-rgb:255,250,240;--card:rgba(255,250,240,0.78);--card-b-rgb:230,200,140;--card-b:rgba(230,200,140,0.40);
@@ -88,6 +90,7 @@
   --card-b-rgb:230,200,140;--card-b:rgba(230,200,140,0.55);
   --card-border-alpha:0.6;
   --glass-chip-bg:rgba(255,253,248,0.55);
+  --sleep-b:rgba(255,253,248,0.50);--sleep-bb:rgba(95,115,170,0.55); /* 본앱 글라스 테마 수면배너 배경/보더 그대로 이식 */
 }
 .yr-sum-banner[data-banner="content"]{border-color:rgba(var(--pal-pink-rgb),0.5)!important;}
 
@@ -463,25 +466,34 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 #side:not(.collapsed) ~ .main-wrap .tl-half{width:100%;}
 #side:not(.collapsed) ~ .main-wrap .tl-track-card{max-height:520px!important;}
 .tl-half{flex:1;min-width:0;}
-.tl-donut-row{display:flex;gap:14px;margin-bottom:14px;align-items:stretch;}
-.tl-donut-row .tl-donut-card-h{flex:1;min-width:0;display:flex;flex-direction:column;}
-.tl-donut-row .tl-donut-card-h #tl-donut{flex:1;display:flex;align-items:center;}
-.tl-donut-row .event-card{flex:1;min-width:0;display:flex;flex-direction:column;}
-.tl-donut-row .event-card #today-events,.tl-donut-row .event-card #today-timetable{flex:1;}
-/* 습관 카드를 2열x2행 아이콘 그리드로 — 기존 .habit-card-row .habit-grid(flex-wrap)를 grid로 오버라이드하고
-   텍스트는 숨겨 아이콘만 정사각형 타일로 표시(완료 여부는 색상+체크로 구분, 기존 habit-row 마크업 그대로 재사용). */
-/* 습관 카드 — 배경 없이 가벼운 텍스트라인처럼, 아이콘만 2열x2행으로 나열(감상 배너와 높이를 맞추기 위함) */
-/* 습관 카드 — 배경 없이 가벼운 텍스트라인처럼, 아이콘만 2열x2행으로 나열. 카드 안에서 세로 중앙정렬되고,
-   완료 체크는 아이콘 위치를 밀지 않도록 절대배치 배지로 겹쳐서 표시(항목 위치 자체는 완료여부와 무관하게 고정). */
-#today-habits{height:100%;display:flex;align-items:center;}
-.tl-habit-2x2 .habit-grid{display:grid!important;grid-template-columns:1fr 1fr;grid-auto-rows:1fr;gap:10px 6px;width:100%;align-content:center;}
-.tl-habit-2x2 .habit-row{flex:none!important;justify-content:center!important;align-items:center;background:none!important;padding:0!important;position:relative;color:transparent!important;font-size:0!important;}
-.tl-habit-2x2 .habit-row-icon{font-size:22px;}
-.tl-habit-2x2 .habit-check{display:none!important;}
-.tl-habit-2x2.habit-card-row{height:150px;box-sizing:border-box;}
-/* 오늘 할 일 카드 — 5개 정도만 보이도록 높이 축소(스크롤은 내부에서). margin-bottom:0!important(원본 grid3 레이아웃용)을
+
+/* ── 좌측 상단 배너 2개(수면/습관) — 1:1 비율, 타임라인트랙 위에만, 얇게 ── */
+.tl-top-banners{display:flex;gap:10px;margin-bottom:12px;align-items:stretch;}
+.tl-top-banners>*{flex:1;min-width:0;}
+/* 수면배너 — 본앱 sleep-card.collapsed 상태를 그대로 이식(펼침 상태 없음). 얇게: 세로 패딩 최소화. */
+.tl-sleep-banner{border-radius:16px;padding:4px 14px;cursor:default;background:linear-gradient(120deg,rgba(95,115,170,0.08) 0%,rgba(156,143,192,0.07) 100%);border:1px solid rgba(110,120,175,0.20);display:flex;align-items:center;height:44px;box-sizing:border-box;}
+[data-theme="glass"] .tl-sleep-banner{background:var(--card);border-color:rgba(95,115,170,0.55);}
+.tl-sleep-row{display:flex;align-items:center;gap:8px;position:relative;width:100%;}
+#tl-sleep-score{color:var(--sleep-warmgray);display:inline-flex;width:18px;height:18px;align-items:center;justify-content:center;flex-shrink:0;}
+.tl-sleep-mid{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;align-items:center;gap:6px;white-space:nowrap;}
+.tl-sleep-icon{font-size:14px;color:var(--sleep-warmgray);}
+.tl-sleep-time{font-size:13px;color:var(--sleep-warmgray-strong);font-variant-numeric:tabular-nums;font-weight:500;}
+.tl-sleep-dur{font-size:13px;color:var(--sleep-warmgray-strong);flex-shrink:0;margin-left:auto;}
+/* 습관배너 — 제목 없이 아이콘 4개만, 수면배너와 동일 높이로 나란히 */
+.tl-habit-banner{border-radius:16px;padding:4px 14px;background:var(--card);border:1px solid var(--card-b);height:44px;box-sizing:border-box;display:flex;align-items:center;}
+.tl-habit-banner .habit-grid{display:flex!important;align-items:center;justify-content:space-evenly;width:100%;gap:6px;}
+.tl-habit-banner .habit-row{flex:none!important;background:none!important;padding:0!important;color:transparent!important;font-size:0!important;}
+.tl-habit-banner .habit-row-icon{font-size:19px;}
+.tl-habit-banner .habit-check{display:none!important;}
+
+/* ── 우측: 오늘 일정 + 타임테이블을 나란히(토글 없이 동시 표시), 본문 2줄 높이+스크롤, 서로 높이 통일 ── */
+.tl-side-row{display:flex;gap:14px;margin-bottom:14px;align-items:stretch;}
+.tl-side-row>.card{flex:1;min-width:0;display:flex;flex-direction:column;margin-bottom:0!important;}
+.tl-side-row .card-lbl{flex-shrink:0;}
+.tl-side-list{flex:1;min-height:0;overflow-y:auto;font-size:var(--fs-body);max-height:3.4em;} /* 본문 2줄 분량 — .event-row가 참조하는 --fs-body 기준 em이라 글자크기 설정에도 비례해서 따라감 */
+/* 오늘 할 일 카드 — 4개 정도만 보이도록 높이 축소(스크롤은 내부에서). margin-bottom:0!important(원본 grid3 레이아웃용)을
    세로 스택 구조에서는 되살려서 아래 감상/습관 줄과 붙지 않게 함. */
-.tl-todo-card-sm{max-height:220px;overflow-y:auto;margin-bottom:13px!important;}
+.tl-todo-card-sm{max-height:178px;overflow-y:auto;margin-bottom:13px!important;}
 .tl-track-card{background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:20px 22px 26px;position:relative;}
 .tl-grid{position:relative;display:flex;gap:6px;}
 .tl-axis-col{position:relative;flex:6;min-width:0;padding-left:46px;}
@@ -510,16 +522,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .tl-todo-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .tl-todo-time{font-size:var(--fs-xs);color:var(--tm);font-family:'DM Sans',sans-serif;}
 .tl-empty{font-size:var(--fs-body);color:var(--tm);text-align:center;padding:40px 0;}
-/* 새 도넛(수면/업무/휴식/기타 단순화) — 가로형: 도넛+중앙표정 / 옆에 범례 텍스트 */
-.tl-donut-inner{display:flex;align-items:center;gap:12px;width:100%;}
-.tl-donut-svg-wrap{position:relative;flex-shrink:0;width:72px;height:72px;}
-.tl-donut-svg{display:block;}
-.tl-donut-face{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--tp);}
-.tl-donut-legend{display:flex;flex-direction:column;gap:6px;flex:1;min-width:0;}
-.tl-donut-legend-row{display:flex;align-items:center;justify-content:space-between;font-size:var(--fs-sm);color:var(--tp);}
-.tl-donut-legend-lbl{display:flex;align-items:center;gap:6px;}
-.tl-donut-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
-.tl-donut-val{font-family:'DM Sans',sans-serif;color:var(--ts);font-size:var(--fs-xs);}
 .float-tabs{position:fixed;right:22px;bottom:22px;display:flex;flex-direction:column-reverse;align-items:flex-end;gap:9px;z-index:100;}
 .float-fab{width:54px;height:54px;border-radius:50%;background:var(--pal-yellow-border);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.18);flex-shrink:0;transition:transform .15s;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;}
 .float-fab.open{transform:rotate(90deg);}
@@ -1964,28 +1966,43 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       -->
     </div>
 
-    <!-- 타임라인탭(실험용) — 오늘탭 카드(today-* id)를 그대로 재사용. 좌: 하루한줄+리듬세로바(일정도트)+시간표/완료투두,
-         우: 새 도넛(수면/업무/휴식/기타)+교차배너 → 메모 → 투두배너 → 감상+해빗. 구성 확정 후 오늘탭 자리로 이식 예정. -->
+    <!-- 타임라인탭(실험용) — 오늘탭 카드(today-* id)를 그대로 재사용. 좌: 상단 수면/습관 배너(1:1)+하루한줄+
+         리듬세로바(일정도트, 07시부터)+시간표/완료투두, 우: 오늘일정+타임테이블(나란히) → 메모 → 투두배너(4개분) → 감상.
+         구성 확정 후 오늘탭 자리로 이식 예정. -->
     <div class="main-body" id="tab-timeline">
       <div class="main-hdr"><i class="ti ti-chevron-left main-hdr-arrow" onclick="shiftTimelineDate(-1)" aria-hidden="true"></i><span class="main-date" id="tl-date"></span><span class="main-dow" id="tl-dow"></span><i class="ti ti-chevron-right main-hdr-arrow" onclick="shiftTimelineDate(1)" aria-hidden="true"></i><span class="today-oneline-hl" id="today-oneline-hl"></span></div>
       <div class="tl-half-wrap">
         <!-- 좌측 절반 -->
         <div class="tl-half tl-half-left">
+          <div class="tl-top-banners">
+            <div class="tl-sleep-banner" id="tl-sleep-banner">
+              <div class="tl-sleep-row">
+                <span id="tl-sleep-score"></span>
+                <span class="tl-sleep-mid">
+                  <i class="ti ti-moon-stars tl-sleep-icon" aria-hidden="true"></i>
+                  <span class="tl-sleep-time" id="tl-sleep-sleep">--:--</span>
+                  <i class="ti ti-sun tl-sleep-icon" aria-hidden="true"></i>
+                  <span class="tl-sleep-time" id="tl-sleep-wake">--:--</span>
+                </span>
+                <span class="tl-sleep-dur" id="tl-sleep-dur"></span>
+              </div>
+            </div>
+            <div class="tl-habit-banner" id="tl-habit-banner"><div id="tl-habits"></div></div>
+          </div>
           <div class="tl-track-card">
             <div class="tl-grid" id="tl-track-grid"></div>
           </div>
         </div>
         <!-- 우측 절반 -->
         <div class="tl-half tl-half-right">
-          <div class="tl-donut-row">
-            <div class="card tl-donut-card-h">
-              <div class="card-lbl"><i class="ti ti-chart-donut-2" style="color:rgba(var(--pal-warmgray-rgb),1);" aria-hidden="true"></i>오늘 요약</div>
-              <div id="tl-donut"></div>
+          <div class="tl-side-row">
+            <div class="card event-card">
+              <div class="card-lbl"><i class="ti ti-calendar-heart" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>오늘 일정</div>
+              <div class="tl-side-list" id="tl-events"></div>
             </div>
-            <div class="card event-card" id="today-event-card">
-              <div class="card-lbl" id="today-event-label" onclick="toggleTabletEventMode()"><i class="ti ti-calendar-heart" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>오늘 일정</div>
-              <div id="today-events"></div>
-              <div id="today-timetable" style="display:none;"></div>
+            <div class="card event-card">
+              <div class="card-lbl"><i class="ti ti-table" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>타임테이블</div>
+              <div class="tl-side-list" id="tl-timetable"></div>
             </div>
           </div>
           <div class="card p" id="today-memo-card">
@@ -2002,7 +2019,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           <div class="card todo-card tl-todo-card-sm"><div class="card-lbl"><i class="ti ti-list-check" style="color:rgba(var(--pal-orange-rgb),1);" aria-hidden="true"></i>오늘 할 일</div><div id="today-todos"></div></div>
           <div class="grid2" id="today-habit-content-row">
             <div class="quote-card"><div class="quote-card-inner tl-quote-inner"><div class="card-lbl"><i class="ti ti-movie" style="color:rgba(var(--pal-pink-text-rgb),0.85);" aria-hidden="true"></i>오늘의 감상</div><div id="today-reading"></div></div></div>
-            <div class="card habit-card habit-card-row tl-habit-2x2"><div class="card-lbl" id="today-habit-lbl"><i class="ti ti-chart-donut" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>습관</div><div id="today-habits"></div></div>
+            <div></div>
           </div>
         </div>
       </div>

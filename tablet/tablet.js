@@ -5980,11 +5980,12 @@ async function loadTimelineTab(){
   const sleep=sleepRows&&sleepRows[0];
   const mealsRow=meals&&meals[0];
 
-  // 우측 카드들 — 오늘탭 렌더 함수 그대로 재사용(today-* id)
+  // 우측 카드들 — 오늘탭 렌더 함수 그대로 재사용(today-todos/today-memos/today-reading id 공유).
+  // 단, 일정/타임테이블은 토글이 아니라 나란히 동시 노출해야 해서 renderTodayTodosEvents 대신 전용 함수 사용.
   renderTodayOnelineHl(onelineRows&&onelineRows[0]);
-  renderTodayTodosEvents(todos||[]);
+  renderTimelineTodos(todos||[]);
+  renderTimelineEventsAndSchedule(todos||[]);
   renderTodayMemos(dk);
-  renderTodayHabits(habits||[],habitChecks||[],dk);
   const todayManual=((todayManualRows&&todayManualRows[0]&&todayManualRows[0].lines)||[]).filter(it=>it.dk===dk);
   renderTodayReading(dk,rblocks||[],contents||[],todayManual);
 
@@ -5995,8 +5996,9 @@ async function loadTimelineTab(){
     Object.values(mflowRow.picks).forEach(p=>{if(p&&p.blockCid)mflowCidSet.add(p.blockCid);});
   }
 
-  // 좌측 — 새로 만드는 부분: 도넛 + 리듬트랙(+시간표/완료투두 결합)
-  renderTimelineDonut(sleep,rblocks||[]);
+  // 좌측 상단 — 수면배너 + 습관배너(아이콘만)
+  renderTimelineSleepBanner(sleep);
+  renderTimelineHabitBanner(habits||[],habitChecks||[]);
   renderTimelineTrack(dk,todos||[],sleep,mealsRow,rblocks||[],mflowCidSet);
 
   // 좌우 높이 동기화 — 오른쪽 영역(도넛~감상/습관까지) 실제 렌더 높이를 측정해, 그 값을 트랙 전체 높이(TOTAL_H)로
@@ -6013,82 +6015,117 @@ async function loadTimelineTab(){
     const trackCardEl=document.querySelector('.tl-track-card');
     if(rightEl&&trackCardEl){
       const cardPadding=46; // .tl-track-card의 상하 padding(20px+26px) 근사값
-      const targetH=Math.max(rightEl.offsetHeight-cardPadding,400);
+      // 우측 전체 높이(일정/타임테이블+메모+할일+감상)에 맞춰 트랙 높이 결정 — 좌측 상단 배너(수면+습관)는 트랙 밖에
+      // 별도로 있으므로 그 높이만큼 빼서 트랙 카드 자체의 목표 높이를 우측과 맞춤.
+      const bannersEl=document.querySelector('.tl-top-banners');
+      const bannersH=(bannersEl?bannersEl.offsetHeight:0)+12; // 배너와 트랙카드 사이 margin-bottom(12px) 포함
+      const targetH=Math.max(rightEl.offsetHeight-cardPadding-bannersH,400);
       renderTimelineTrack(dk,todos||[],sleep,mealsRow,rblocks||[],mflowCidSet,targetH);
-      trackCardEl.style.maxHeight=rightEl.offsetHeight+'px';
+      trackCardEl.style.maxHeight=(rightEl.offsetHeight-bannersH)+'px';
       trackCardEl.style.overflowY='auto';
     }
   });
 }
 
-// ── 도넛(우측 상단) — 수면/업무/휴식/기타 4개로 단순화. 실데이터는 오늘의 리듬(rhythm_blocks)+수면에서 계산.
-const TL_DONUT_GROUPS={
-  sleep:{label:'수면',color:'rgba(var(--pal-warmgray-rgb),0.85)'},
-  work:{label:'업무',color:'rgba(var(--pal-sky-rgb),0.85)'},
-  rest:{label:'휴식',color:'rgba(var(--pal-mint-rgb),0.85)'},
-  etc:{label:'기타',color:'rgba(var(--pal-yellow-rgb),0.85)'}
-};
-function renderTimelineDonut(sleep,rblocks){
-  const el=document.getElementById('tl-donut');
-  const groupMin={sleep:0,work:0,rest:0,etc:0};
-  if(sleep&&sleep.sleep_time&&sleep.wake_time){
-    const s=_dawnTimeToMin(sleep.sleep_time),w=_dawnTimeToMin(sleep.wake_time);
-    let mins=w-s;if(mins<0)mins+=1440;
-    groupMin.sleep=mins;
+// ── 좌측 상단 수면배너 — 본앱 sleep-card.collapsed 상태(sleep-collapsed-row)를 그대로 이식.
+// 점수 얼굴 아이콘은 본앱과 동일하게 getSleepScoreLevel(score).icon을 그대로 사용(오늘탭 평균비교 배지는 없음 — 얼굴 아이콘만 필요).
+function renderTimelineSleepBanner(sleep){
+  const scoreEl=document.getElementById('tl-sleep-score');
+  const sEl=document.getElementById('tl-sleep-sleep'),wEl=document.getElementById('tl-sleep-wake'),dEl=document.getElementById('tl-sleep-dur');
+  const s=sleep&&sleep.sleep_time,w=sleep&&sleep.wake_time;
+  if(scoreEl){
+    scoreEl.innerHTML=(sleep&&sleep.score!=null)
+      ?`<i class="ti ${getSleepScoreLevel(sleep.score).icon}" style="color:var(--sleep-warmgray);" aria-hidden="true"></i>`
+      :`<i class="ti ti-moon" style="opacity:.35;color:var(--sleep-warmgray);" aria-hidden="true"></i>`;
   }
-  rblocks.forEach(b=>{
-    if(!b.start_time||!b.end_time)return;
-    const sv=b.start_time.split(':').map(Number),ev=b.end_time.split(':').map(Number);
-    let mins=(ev[0]*60+ev[1])-(sv[0]*60+sv[1]);if(mins<0)mins+=1440;
-    if(b.cat==='work')groupMin.work+=mins;
-    else if(b.cat==='rest')groupMin.rest+=mins;
-    else groupMin.etc+=mins;
+  if(sEl)sEl.textContent=s||'--:--';
+  if(wEl)wEl.textContent=w||'--:--';
+  if(dEl){
+    if(s&&w){
+      const sv=_dawnTimeToMin(s),wv=_dawnTimeToMin(w);
+      let m=wv-sv;if(m<0)m+=1440;
+      dEl.textContent=Math.floor(m/60)+'h'+(m%60?' '+(m%60)+'m':'');
+    }else{
+      dEl.textContent='';
+    }
+  }
+}
+
+// ── 좌측 상단 습관배너 — 제목 없이 아이콘만, 체크된 것만 색이 들어옴(오늘탭 habit-row 마크업 재사용, 텍스트만 숨김).
+function renderTimelineHabitBanner(habits,checks){
+  const el=document.getElementById('tl-habits');
+  if(!habits.length){el.innerHTML='<div class="empty-msg">등록된 습관 없음</div>';return;}
+  const checkedNames=new Set(checks.map(c=>c.habit_name));
+  const colorMap={mint:'var(--pal-mint-rgb)',pink:'var(--pal-pink-rgb)',sky:'var(--pal-sky-rgb)',yellow:'var(--pal-yellow-rgb)'};
+  el.innerHTML=`<div class="habit-grid">${habits.map(h=>{
+    const done=checkedNames.has(h.name);
+    const c=done?(colorMap[h.color]||'var(--pal-warmgray-rgb)'):'var(--pal-warmgray-rgb)';
+    const hIcon=getHabitIcon(h.name);
+    const iconHtml=hIcon?`<i class="ti ${hIcon} habit-row-icon" style="color:rgba(${c},${done?1:0.35});" aria-hidden="true"></i>`:'';
+    return `<div class="habit-row${done?' done':''}">${iconHtml}</div>`;
+  }).join('')}</div>`;
+}
+
+// ── 우측 상단: 오늘 할 일(today-todos, 오늘탭과 동일 렌더 로직이지만 이벤트/일정 계산 없이 순수 투두만) ──
+function renderTimelineTodos(todos){
+  const plainTodos=todos.filter(t=>!t.is_event&&!SCHEDULE_TIME_RE.test(t.text||'')).slice().sort((a,b)=>{
+    if(!!a.done!==!!b.done)return a.done?1:-1;
+    return compareTodoOrder(a,b);
   });
-  const total=groupMin.sleep+groupMin.work+groupMin.rest+groupMin.etc;
-  if(!total){el.innerHTML='<div class="empty-msg">오늘 기록된 리듬이 없어요</div>';return;}
+  const todoEl=document.getElementById('today-todos');
+  todoEl.innerHTML=plainTodos.length?plainTodos.slice(0,8).map(t=>{
+    const partsRow=renderTodoPartsRow(t);
+    if(partsRow)return partsRow;
+    const ts=t.time_section||'none';
+    const chkHtml=(!t.done&&t.pinned)
+      ?`<div class="pinned-ico"><i class="ti ti-bolt-filled" aria-hidden="true"></i></div>`
+      :`<div class="chk ts-${ts}${t.done?' on':''}"></div>`;
+    return `<div class="todo-row${t.done?' done':''}">${chkHtml}${escapeHtml(t.text)}</div>`;
+  }).join(''):'<div class="empty-msg">오늘 할 일이 없어요</div>';
+}
 
-  const R=28,CX=36,CY=36,STROKE=10;
-  const circumference=2*Math.PI*R;
-  let offset=0;
-  const keys=['sleep','work','rest','etc'];
-  const arcs=keys.map(k=>{
-    const val=groupMin[k];
-    if(!val)return'';
-    const frac=val/total;
-    const len=circumference*frac;
-    const dasharray=`${len} ${circumference-len}`;
-    const dashoffset=-offset;
-    offset+=len;
-    return `<circle cx="${CX}" cy="${CY}" r="${R}" fill="none" stroke="${TL_DONUT_GROUPS[k].color}" stroke-width="${STROKE}" stroke-dasharray="${dasharray}" stroke-dashoffset="${dashoffset}" transform="rotate(-90 ${CX} ${CY})"></circle>`;
-  }).join('');
-  const svg=`<svg class="tl-donut-svg" width="72" height="72" viewBox="0 0 72 72">${arcs}</svg>`;
+// ── 우측 상단: 오늘 일정 + 타임테이블을 토글 없이 나란히 동시 렌더(tl-events / tl-timetable) ──
+function renderTimelineEventsAndSchedule(todos){
+  const isToday=dateKey(_tlDate)===dateKey(new Date());
+  const nowMin=new Date().getHours()*60+new Date().getMinutes();
+  const scheduleItems=parseTabletScheduleTodos(todos.filter(t=>!t.is_event));
+  const events=todos.filter(t=>t.is_event);
+  const sorted=events.slice().sort((a,b)=>(a.event_time||'99:99').localeCompare(b.event_time||'99:99'));
 
-  // 중앙 표정 — 오늘탭 수면점수 표정 아이콘(getSleepScoreLevel)을 그대로 재사용
-  const faceHtml=(sleep&&sleep.score!=null)
-    ?`<i class="ti ${getSleepScoreLevel(sleep.score).icon}" aria-hidden="true"></i>`
-    :`<i class="ti ti-moon" style="opacity:.35;" aria-hidden="true"></i>`;
+  const evEl=document.getElementById('tl-events');
+  if(evEl){
+    evEl.innerHTML=sorted.length?sorted.map(e=>{
+      let isPast=false;
+      if(isToday&&e.event_time){
+        const m=e.event_time.match(/^(\d{1,2}):(\d{2})/);
+        if(m){const evMin=parseInt(m[1],10)*60+parseInt(m[2],10);isPast=nowMin>=evMin+60;}
+      }
+      return `<div class="event-row${isPast?' past':''}"><span class="event-time">${e.event_time||''}</span>${escapeHtml(e.text)}</div>`;
+    }).join(''):'<div class="empty-msg">오늘 일정이 없어요</div>';
+  }
 
-  const legendHtml=keys.filter(k=>groupMin[k]>0).map(k=>{
-    const g=TL_DONUT_GROUPS[k];
-    const h=Math.floor(groupMin[k]/60),m=groupMin[k]%60;
-    const valText=h>0?`${h}h ${m}m`:`${m}m`;
-    return `<div class="tl-donut-legend-row"><span class="tl-donut-legend-lbl"><span class="tl-donut-dot" style="background:${g.color};"></span>${g.label}</span><span class="tl-donut-val">${valText}</span></div>`;
-  }).join('');
-  el.innerHTML=`<div class="tl-donut-inner"><div class="tl-donut-svg-wrap">${svg}<div class="tl-donut-face">${faceHtml}</div></div><div class="tl-donut-legend">${legendHtml}</div></div>`;
+  const ttEl=document.getElementById('tl-timetable');
+  if(ttEl){
+    ttEl.innerHTML=scheduleItems.length?scheduleItems.map(it=>{
+      return `<div class="event-row${it.done?' past':''}"><span class="event-time">${it.time}</span>${escapeHtml(it.label)}</div>`;
+    }).join(''):'<div class="empty-msg">오늘 등록된 시간표가 없어요</div>';
+  }
 }
 
 // 0~6시: 본앱보다 더 강하게 압축(전체 높이의 1/14 정도만 사용) — 사용자 요청으로 체감상 더 좁게.
 // 6~8시: 압축 없이 정상 비율(다른 2시간 구간과 동일한 시간당 높이) — 다만 시각 눈금은 8시부터만 표기.
 // 8~24시: 정상 비율.
+// 수면배너가 상단에 별도로 생겨 취침~기상 구간을 이미 보여주므로, 트랙 자체는 07시를 시작점(y=0)으로 표기.
+// 다만 07시 이전(자정 넘김 새벽 활동 등)이 실제로 있을 수 있어 완전히 잘라내지는 않고, 07시 위쪽으로 아주 살짝만
+// 압축된 여백 구간을 남겨 그 활동들이 표시는 되게 하되(트랙 시작 지점 바로 위, 눈금 라벨 없음) 시각적 비중은 최소화.
 function _tlTimeToY(min,TOTAL_H){
-  const COMPRESSED_END=420; // 7시(분) — 사용자 요청으로 0~8시에서 0~7시로 축소
-  const COMPRESS_RATIO=1/42; // 압축 절대높이를 기존(약 32px)보다 널널하게(약 50px) 재조정
-  const compressedH=TOTAL_H*COMPRESS_RATIO*(COMPRESSED_END/1440)*8; // 압축구간이 차지하는 실제 픽셀 높이
-  const normalPerMin=(TOTAL_H-compressedH)/(1440-COMPRESSED_END); // 6시~24시(정상구간) 분당 높이
-  if(min>1440)return Math.round(TOTAL_H+(min-1440)*normalPerMin);
-  const m=Math.min(min,1440);
-  if(m<=COMPRESSED_END)return Math.round(m/COMPRESSED_END*compressedH);
-  return Math.round(compressedH+(m-COMPRESSED_END)*normalPerMin);
+  const DAY_START=420; // 07:00(분) — 트랙의 실질적 시작점(y=0)
+  const PRE_COMPRESS_H=26; // 07시 이전 구간이 차지하는 고정 여백(px) — 눈금 없이 아주 얇게만
+  const normalPerMin=TOTAL_H/(1440-DAY_START); // 07시~24시(정상구간) 분당 높이
+  if(min>=DAY_START)return Math.round(PRE_COMPRESS_H+(min-DAY_START)*normalPerMin);
+  if(min>1440)return Math.round(PRE_COMPRESS_H+TOTAL_H+(min-1440)*normalPerMin); // 자정 넘겨 이어지는 활동(절대값 1440+)
+  // 0~07시(min<DAY_START) 구간 — PRE_COMPRESS_H 안에 압축해서 표시
+  return Math.round(min/DAY_START*PRE_COMPRESS_H);
 }
 
 // 좌측 리듬트랙 — 리듬 막대(rt-fill 스타일) + 일정(도트+점선) + 시간표/완료투두를 같은 세로축에 정렬해 함께 렌더.
@@ -6121,11 +6158,9 @@ function renderTimelineTrack(dk,todos,sleep,meals,rblocks,mflowCidSet,totalHOver
     return durB-durA;
   });
 
-  // 눈금 — 8시부터 2시간 간격, 압축구간 시작점 표시를 위해 0시만 추가로 하나 더 찍음.
+  // 눈금 — 07시부터 2시간 간격으로 24시까지(수면배너가 취침~기상을 이미 보여주므로 0~7시는 눈금 없이 압축 여백만).
   let axisHtml='';
-  const zeroY=_tlTimeToY(0,TOTAL_H);
-  axisHtml+=`<div class="tl-gridline" style="top:${zeroY}px;"></div><div class="tl-hourlabel" style="top:${zeroY}px;">00</div>`;
-  for(let h=8;h<=24;h+=2){
+  for(let h=7;h<=24;h+=2){
     const y=_tlTimeToY(h*60,TOTAL_H);
     axisHtml+=`<div class="tl-gridline" style="top:${y}px;"></div><div class="tl-hourlabel" style="top:${y}px;">${String(h).padStart(2,'0')}</div>`;
   }
@@ -6239,7 +6274,7 @@ function renderTimelineTrack(dk,todos,sleep,meals,rblocks,mflowCidSet,totalHOver
     todoHtml+=`<div class="tl-todo-item${doneCls}" style="top:${it.y}px;"><span class="tl-todo-marker">${markerHtml}</span><div class="tl-todo-body"><div class="tl-todo-text">${escapeHtml(it.label)}</div><span class="tl-todo-time">${it.timeText}</span></div></div>`;
   });
 
-  const trackHeight=Math.max(TOTAL_H+10,maxBottom+10);
+  const trackHeight=Math.max(TOTAL_H+26+10,maxBottom+10); // +26은 _tlTimeToY의 07시 이전 압축 여백(PRE_COMPRESS_H)
   gridEl.style.height=trackHeight+'px';
   gridEl.innerHTML=`<div class="tl-axis-col" style="height:${trackHeight}px;">${axisHtml}</div><div class="tl-mflow-lane" style="height:${trackHeight}px;">${mflowLaneHtml}</div><div class="tl-todo-col" style="height:${trackHeight}px;">${todoHtml||'<div class="tl-empty" style="padding:12px 0;font-size:var(--fs-sm);">등록된 시간표가 없어요</div>'}</div>`;
 }
