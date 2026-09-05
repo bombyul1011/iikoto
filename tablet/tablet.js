@@ -721,7 +721,7 @@ async function loadTodayTab(){
   renderTodayRhythm(rblocks||[]);
   const todayManual=((todayManualRows&&todayManualRows[0]&&todayManualRows[0].lines)||[]).filter(it=>it.dk===dk);
   renderTodayReading(dk,rblocks||[],contents||[],todayManual);
-  renderTodayPace(todos||[],habits||[],habitChecks||[],(morningChecks&&morningChecks[0])||null);
+  renderTodayPace(todos||[],habits||[],habitChecks||[],(morningChecks&&morningChecks[0])||null,rblocks||[]);
 }
 
 // 본앱과 동일한 투두 정렬 규칙: 미완료 우선 → 시간대(아침/오후/밤/없음) → 강조(pinned) → sort_order → 텍스트 앞머리 시:분
@@ -1040,45 +1040,59 @@ const MFLOW_CARDS=[
 ];
 const MFLOW_ENJOY_SUB_LABEL={read:'독서',content:'콘텐츠'};
 const MFLOW_DESK_SUB_LABEL={diary:'일기',notes:'노트정리',work_personal:'개인작업'};
-const MFLOW_ETC_SUB_LABEL={work:'업무',appointment:'외출',free:'자유입력'};
-// row.etc는 서버 컬럼 구조 그대로: {sub,text,_enjoy:{sub},_desk:{sub},title} — pick(picks[key]) 안에는 subKey가 없음(2026-09-04 발견, 실데이터 확인).
-function _mflowSubLabel(key,pick,etcCol){
-  if(key==='enjoy')return MFLOW_ENJOY_SUB_LABEL[etcCol&&etcCol._enjoy&&etcCol._enjoy.sub]||'';
-  if(key==='desk')return MFLOW_DESK_SUB_LABEL[etcCol&&etcCol._desk&&etcCol._desk.sub]||'';
-  if(key==='etc')return MFLOW_ETC_SUB_LABEL[etcCol&&etcCol.sub]||'';
+// [본앱 2026-09-05 구조변경] 시각(startStr/endStr)은 더 이상 picks에 직접 저장되지 않고, picks[key].blockCid로
+// rhythm_blocks를 조회해 그때그때 읽어옴. subKey도 이제 picks[key].subKey에 직접 저장됨(desk/etc 공용).
+// 다만 etc._enjoy/_desk/.sub 같은 구버전 위치(2026-09-04 이전 데이터)도 폴백으로 계속 지원.
+function _mflowSubKey(key,pick,etcCol){
+  if(pick&&pick.subKey)return pick.subKey; // 신규: picks[key].subKey가 최신 소스
+  if(key==='enjoy')return (etcCol&&etcCol._enjoy&&etcCol._enjoy.sub)||'';
+  if(key==='desk')return (etcCol&&etcCol._desk&&etcCol._desk.sub)||'';
+  if(key==='etc')return (etcCol&&etcCol.sub)||'';
   return '';
 }
-// 세부텍스트 — 본앱은 모닝플로우 시작 시 리듬블록을 직접 생성(end 없이)하고 종료 시 채우는 방식이라,
-// 실제 "무엇을 했는지"는 picks 자체가 아니라 연동된 rhythm_blocks.text(휴식/운동/정리/책상/기타) 또는
-// contents 테이블(감상 — picks.enjoy.cid로 매칭), 혹은 자유입력(etc.sub==='free'일 때 etc.text)에 있음.
-// blockCid가 없는 과거 데이터도 있어 client_id 매칭이 안 되면 cat+start_time으로 한 번 더 시도(2026-09-04).
-const MFLOW_KEY_TO_RHYTHM_CAT={rest:'rest',exercise:'exercise',clean:'clean'};
-function _mflowDetailText(key,pick,etcCol,rblocksByClientId,rblocksByCatStart,contentsByCid){
+// 본앱 규칙: enjoy/desk/etc는 sub가 카드 라벨 자체를 대체함(칩선택 없는 rest/exercise/clean은 카드 라벨 그대로).
+function _mflowLabel(c,key,subKey,etcCol){
+  if(key==='enjoy')return MFLOW_ENJOY_SUB_LABEL[subKey]||c.label;
+  if(key==='desk')return MFLOW_DESK_SUB_LABEL[subKey]||c.label;
+  if(key==='etc'){
+    if(subKey==='work')return '업무';
+    if(subKey==='appointment')return (etcCol&&etcCol.title)||'외출';
+    if(subKey==='free')return '기타 · 자유입력';
+    return c.label;
+  }
+  return c.label; // rest, exercise, clean — 칩선택 없음, 중복 방지를 위해 서브라벨 붙이지 않음
+}
+// 세부텍스트(괄호 참고용) — 칩선택이 있는 카테고리(enjoy/desk/etc)에서만 필요. 라벨과 동일한 문자열이면 중복이라 생략.
+// enjoy는 contents 테이블에서 작품 제목, 나머지는 연동된 rhythm_blocks.text.
+function _mflowDetailText(key,subKey,pick,label,rblocksByCid,rblocksByClientId,contentsByCid){
+  if(subKey==='free')return ''; // 자유입력은 텍스트 자체가 라벨 위치에 이미 없음(별도 표기 불필요, 리듬 연동도 없음)
+  let text='';
   if(key==='enjoy'){
     const c=pick&&pick.cid&&contentsByCid[pick.cid];
-    return c?c.title:'';
+    text=c?c.title:'';
+  }else{
+    const b=(pick&&pick.blockCid&&(rblocksByCid[pick.blockCid]||rblocksByClientId[pick.blockCid]))||null;
+    text=b?(b.text||''):'';
   }
-  if(key==='etc'&&etcCol&&etcCol.sub==='free')return (etcCol&&etcCol.text)||'';
-  if(key==='etc'&&(etcCol&&etcCol.title))return etcCol.title; // appointment(외출) 세부텍스트는 etc.title에 직접 저장되는 경우도 있음
-  if(pick&&pick.blockCid&&rblocksByClientId[pick.blockCid]){
-    return rblocksByClientId[pick.blockCid].text||'';
-  }
-  if(pick&&pick.startStr){
-    const cat=key==='etc'?((etcCol&&etcCol.sub)==='work'?'work':'appointment'):key==='desk'?'note':(MFLOW_KEY_TO_RHYTHM_CAT[key]||key);
-    const b=rblocksByCatStart[cat+'|'+pick.startStr];
-    if(b)return b.text||'';
-  }
+  if(!text||text===label)return ''; // 칩선택 없는 카테고리에서 라벨과 중복되는 경우 방지
+  return text;
+}
+// 연동된 리듬블록에서 시간을 읽어옴(신규 구조). 옛 구조(startStr/endStr 직접 저장)는 폴백.
+function _mflowTimeStr(pick,rblocksByCid,rblocksByClientId){
+  const b=(pick&&pick.blockCid&&(rblocksByCid[pick.blockCid]||rblocksByClientId[pick.blockCid]))||null;
+  if(b&&b.start_time)return pick.status==='running'?`${b.start_time} ~ 진행중`:`${b.start_time} ~ ${b.end_time||''}`;
+  if(pick&&pick.startStr)return pick.status==='running'?`${pick.startStr} ~ 진행중`:`${pick.startStr} ~ ${pick.endStr||''}`;
   return '';
 }
 function renderTodayMflow(row,rblocks,contents){
   const el=document.getElementById('today-mflow');
   const picks=(row&&row.picks)||{};
   const etcCol=(row&&row.etc)||{};
+  const rblocksByCid={};
   const rblocksByClientId={};
-  const rblocksByCatStart={};
   (rblocks||[]).forEach(b=>{
-    if(b.client_id)rblocksByClientId[b.client_id]=b;
-    if(b.cat&&b.start_time)rblocksByCatStart[b.cat+'|'+b.start_time]=b;
+    if(b.cid)rblocksByCid[b.cid]=b; // 신규: rhythm_blocks의 로컬 cid(=blockCid)로 매칭
+    if(b.client_id)rblocksByClientId[b.client_id]=b; // 구버전 폴백
   });
   const contentsByCid={};
   (contents||[]).forEach(c=>{if(c.cid)contentsByCid[c.cid]=c;});
@@ -1089,14 +1103,15 @@ function renderTodayMflow(row,rblocks,contents){
   if(!activeCards.length){el.innerHTML='<div class="empty-msg">아직 아침 플로우가 시작되지 않았어요</div>';return;}
   el.innerHTML=activeCards.map(c=>{
     const p=picks[c.key];
-    const sub=_mflowSubLabel(c.key,p,etcCol);
-    const detail=_mflowDetailText(c.key,p,etcCol,rblocksByClientId,rblocksByCatStart,contentsByCid);
-    let label=sub||c.label;
-    if(detail)label+=` · ${detail}`;
-    const timeStr=p.status==='running'?`${p.startStr||''} ~ 진행중`:`${p.startStr||''} ~ ${p.endStr||''}`;
-    return `<div class="mflow-row"><i class="ti ${c.icon} mflow-row-icon" style="color:rgb(${c.colorRgb});" aria-hidden="true"></i><span class="mflow-row-label">${escapeHtml(label)}</span><span class="mflow-row-time">${timeStr}</span></div>`;
+    const subKey=_mflowSubKey(c.key,p,etcCol);
+    const label=_mflowLabel(c,c.key,subKey,etcCol);
+    const detail=_mflowDetailText(c.key,subKey,p,label,rblocksByCid,rblocksByClientId,contentsByCid);
+    const fullLabel=detail?`${label} · ${detail}`:label;
+    const timeStr=_mflowTimeStr(p,rblocksByCid,rblocksByClientId);
+    return `<div class="mflow-row"><i class="ti ${c.icon} mflow-row-icon" style="color:rgb(${c.colorRgb});" aria-hidden="true"></i><span class="mflow-row-label">${escapeHtml(fullLabel)}</span><span class="mflow-row-time">${timeStr}</span></div>`;
   }).join('');
 }
+
 
 // 오늘 활동 분포 — 본앱 _paceDayEvents/_paceDotTimelineHtml 로직을 Supabase 데이터 기준으로 이식.
 // 새벽 4시 보정은 기존 toDawnAdjustedMin 유틸이 없어 여기서 최소 버전으로 재정의(홈탭 새벽 로직과 별개, 이 그래프 전용).
@@ -1182,7 +1197,7 @@ function _rhythmDurByCatWithDays(rblocks,days){
 function _rhythmSumCatMin(rblocks,cat,days){
   return _rhythmDurByCat(rblocks,days).d[cat]||0;
 }
-function renderTodayPace(todos,habits,habitChecks,morningFlowRow){
+function renderTodayPace(todos,habits,habitChecks,morningFlowRow,rblocks){
   const el=document.getElementById('today-pace');
   const events=[];
   (todos||[]).forEach(t=>{
@@ -1208,12 +1223,22 @@ function renderTodayPace(todos,habits,habitChecks,morningFlowRow){
     events.push({type:'habit',min:_paceAdjustMin(_paceParseHM(hc.checked_time)),label:hc.habit_name||''});
   });
   const mflowPicks=(morningFlowRow&&morningFlowRow.picks)||{};
+  const mflowEtcCol=(morningFlowRow&&morningFlowRow.etc)||{};
+  const rblocksByCid={};
+  const rblocksByClientId={};
+  (rblocks||[]).forEach(b=>{
+    if(b.cid)rblocksByCid[b.cid]=b;
+    if(b.client_id)rblocksByClientId[b.client_id]=b;
+  });
   Object.entries(mflowPicks).forEach(([key,p])=>{
-    if(!p||!p.startStr)return;
+    if(!p)return;
     const card=MFLOW_CARDS.find(c=>c.key===key);
-    const sub=_mflowSubLabel(key,p,(morningFlowRow&&morningFlowRow.etc)||{});
-    const label=card?(sub?`${card.label} · ${sub}`:card.label):key;
-    events.push({type:'morning',min:_paceAdjustMin(_paceParseHM(p.startStr)),label});
+    const subKey=_mflowSubKey(key,p,mflowEtcCol);
+    const label=card?_mflowLabel(card,key,subKey,mflowEtcCol):key;
+    const b=(p.blockCid&&(rblocksByCid[p.blockCid]||rblocksByClientId[p.blockCid]))||null;
+    const startHM=b&&b.start_time?b.start_time:p.startStr;
+    if(!startHM)return; // 자유입력처럼 리듬 연동이 없는 항목은 활동분포에 포함하지 않음
+    events.push({type:'morning',min:_paceAdjustMin(_paceParseHM(startHM)),label});
   });
   if(!events.length){el.innerHTML='<div class="pace-empty">오늘 기록된 활동이 없어요</div>';return;}
   events.sort((a,b)=>a.min-b.min);
@@ -1610,7 +1635,7 @@ async function loadWeekTab(){
     startDk:lastStartDk,endDk:lastCmpEndDk
   });
   renderWeekRhythmFlow(rblocksThis||[],rblocksLast||[],cmpDayCount);
-  renderWeekMflow(weekMflowRows||[]);
+  renderWeekMflow(weekMflowRows||[],rblocksFull||[]);
   renderWeekPhotos(weekPhotoRows||[],weekDates);
   renderWeekOneline(onelineRows||[],weekDates);
   renderWeekReading(contents||[],readingBook,readingLogRows||[],startDk,endDk);
@@ -1800,16 +1825,27 @@ function _mflowDurationLabel(min){
   if(h)return `${h}시간`;
   return `${m}분`;
 }
-function renderWeekMflow(rows){
+function renderWeekMflow(rows,rblocks){
   const el=document.getElementById('week-mflow');
   const stats={};
   MFLOW_CARDS.forEach(c=>{stats[c.key]={count:0,minutes:0};});
+  const rblocksByCid={};
+  const rblocksByClientId={};
+  (rblocks||[]).forEach(b=>{
+    if(b.cid)rblocksByCid[b.cid]=b;
+    if(b.client_id)rblocksByClientId[b.client_id]=b;
+  });
   (rows||[]).forEach(row=>{
     const picks=row.picks||{};
     Object.entries(picks).forEach(([key,p])=>{
       if(!p||!stats[key])return;
       if(p.status==='running'||p.status==='done')stats[key].count++;
-      if(p.status==='done')stats[key].minutes+=_mflowDurationMin(p.startStr,p.endStr);
+      if(p.status!=='done')return;
+      // [본앱 2026-09-05 구조변경] 시각은 picks에 직접 없고 blockCid로 rhythm_blocks를 조회해야 함.
+      // 옛 구조(startStr/endStr 직접 저장)는 폴백으로 계속 지원. 자유입력(blockCid 없음)은 시간 취합 제외.
+      const b=(p.blockCid&&(rblocksByCid[p.blockCid]||rblocksByClientId[p.blockCid]))||null;
+      if(b&&b.start_time&&b.end_time)stats[key].minutes+=_mflowDurationMin(b.start_time,b.end_time);
+      else if(p.startStr&&p.endStr)stats[key].minutes+=_mflowDurationMin(p.startStr,p.endStr);
     });
   });
   el.innerHTML=`<div class="wk-mflow-grid">${MFLOW_CARDS.map(c=>{
