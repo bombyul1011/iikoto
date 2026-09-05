@@ -6006,8 +6006,8 @@ function renderTimelineTrack(dk,todos,sleep,meals,rblocks,mflowCidSet,totalHOver
     const stubEnd=bk.end!=null?bk.end:(isToday?nowMin:Math.min(bk.start+20,1440));
     const bh=Math.max(_tlTimeToY(stubEnd+offset,TOTAL_H)-by,22);
     const durMin=(bk.end!=null&&bk.start!=null)?(stubEnd-bk.start):9999;
-    // 두 줄(라벨+시간) 표기 가능 여부 — 두 줄 높이(라벨줄+시간줄+상하 패딩) 이상 확보될 때만.
-    const canTwoLine=bh>=52;
+    // 두 줄(라벨+시간) 표기 가능 여부 — 지속시간 50분 이상일 때만(분 기준이라 화면 스케일 변화에 안전).
+    const canTwoLine=durMin>=50;
     return {bk,bi,by,bh,durMin,isShort:durMin<=60,canTwoLine};
   });
   renderBlocks.forEach(r=>{if(r.by+r.bh>maxBottom)maxBottom=r.by+r.bh;});
