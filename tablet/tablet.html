@@ -466,6 +466,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .oneline-half-scroll{max-height:118px;overflow-y:auto;}
 .oneline-row-today{background:rgba(var(--pal-yellow-rgb),0.12);border-radius:6px;padding-left:6px;margin-left:-6px;}
 .oneline-row-today .oneline-dow{color:rgba(var(--pal-yellow-rgb),1);}
+/* 오늘탭 날짜 네비게이터 줄 — 하루한줄을 형광펜 밑줄 느낌으로 오른쪽에 배치 */
+.today-oneline-hl{margin-left:auto;font-size:var(--fs-sm);color:var(--tp);font-family:'DM Sans',sans-serif;background:linear-gradient(rgba(var(--pal-yellow-rgb),0.55) 0 100%) no-repeat;background-size:100% 46%;background-position:0 78%;padding:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:55%;}
+.today-oneline-hl:empty{display:none;}
 
 /* ── 월간탭 ── */
 .top-row{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;align-items:start;}
@@ -1830,7 +1833,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   <div class="main-wrap">
     <!-- 오늘탭 -->
     <div class="main-body on" id="tab-today">
-      <div class="main-hdr"><i class="ti ti-chevron-left main-hdr-arrow" onclick="shiftSelectedDate(-1)" aria-hidden="true"></i><span class="main-date" id="today-date"></span><span class="main-dow" id="today-dow"></span><i class="ti ti-chevron-right main-hdr-arrow" onclick="shiftSelectedDate(1)" aria-hidden="true"></i></div>
+      <div class="main-hdr"><i class="ti ti-chevron-left main-hdr-arrow" onclick="shiftSelectedDate(-1)" aria-hidden="true"></i><span class="main-date" id="today-date"></span><span class="main-dow" id="today-dow"></span><i class="ti ti-chevron-right main-hdr-arrow" onclick="shiftSelectedDate(1)" aria-hidden="true"></i><span class="today-oneline-hl" id="today-oneline-hl"></span></div>
       <div class="grid3">
         <div class="card todo-card"><div class="card-lbl"><i class="ti ti-list-check" style="color:rgba(var(--pal-orange-rgb),1);" aria-hidden="true"></i>오늘 할 일</div><div id="today-todos"></div></div>
         <div class="grid3-right">

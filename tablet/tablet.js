@@ -694,7 +694,7 @@ async function loadTodayTab(){
   const sleepAvgStart=new Date(_selectedDate);sleepAvgStart.setDate(sleepAvgStart.getDate()-13);
   const sleepAvgStartDk=dateKey(sleepAvgStart);
 
-  const [todos,sleepRows,recentSleepRows,habits,habitChecks,meals,contents,rblocks,morningChecks,todayManualRows]=await Promise.all([
+  const [todos,sleepRows,recentSleepRows,habits,habitChecks,meals,contents,rblocks,morningChecks,todayManualRows,onelineRows]=await Promise.all([
     supaFetch(`todos?date_key=eq.${dk}&order=created.asc`),
     supaFetch(`sleep?date_key=eq.${dk}`),
     supaFetch(`sleep?date_key=gte.${sleepAvgStartDk}&date_key=lte.${dk}&select=date_key,score,sleep_time,wake_time`),
@@ -704,8 +704,10 @@ async function loadTodayTab(){
     supaFetch(`contents?or=(status.eq.watching,and(status.eq.done,end_date.eq.${dk}),start_date.eq.${dk})&order=created.desc&limit=10`),
     supaFetch(`rhythm_blocks?date_key=eq.${dk}&order=start_time.asc`),
     supaFetch(`morning_flow_picks?date_key=eq.${dk}`),
-    supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wcal_manual_'+dk.slice(0,7))}`)
+    supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wcal_manual_'+dk.slice(0,7))}`),
+    supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('oneline:'+dk)}`)
   ]);
+  renderTodayOnelineHl(onelineRows&&onelineRows[0]);
 
   renderTodayTodosEvents(todos||[]);
   renderTodayMemos(dk);
@@ -1802,6 +1804,14 @@ function renderWeekPhotos(rows,weekDates){
 }
 
 // 하루한줄 — 절반너비 카드, 요일 전체를 세로 스크롤 리스트로. 초기 진입 시 오늘 요일이 보이는 위치로 스크롤.
+// 오늘탭 날짜 네비게이터 줄 — 당일 하루한줄만 형광펜 스타일로 표시(읽기전용, 없으면 빈 채로 숨김)
+function renderTodayOnelineHl(row){
+  const el=document.getElementById('today-oneline-hl');
+  if(!el)return;
+  const text=row?(Array.isArray(row.lines)?(row.lines[0]||''):row.lines):'';
+  el.textContent=text&&text.trim()?text:'';
+}
+
 function renderWeekOneline(rows,weekDates){
   const el=document.getElementById('week-oneline-half');
   const byDate={};
