@@ -5598,6 +5598,9 @@ async function loadTimelineTab(){
 // 좌우 높이 동기화를 별도 함수로 분리 — 첫 탭 진입 시 폰트/레이아웃이 아직 자리잡기 전에 offsetHeight를 측정해
 // 실제보다 낮게 나오는 문제(재방문 시에만 정확해지던 현상)를 보정하기 위해, 두 프레임 뒤에 측정하고
 // 웹폰트 로딩 완료 후에도 한 번 더 재동기화한다.
+let _isFirstTimelineLoad=true; // 앱 최초 로딩 시에는 사이드바 캘린더/인사배너 등 다른 초기화가 동시에 돌면서
+// 레이아웃이 계속 바뀌는 중이라 rAF 두 번만으로는 최종 높이가 잡히기 전에 측정되는 경우가 있어, 이 경우에만
+// 넉넉한 지연을 둔 추가 재동기화를 한 번 더 건다(재방문 시에는 이미 안정적이라 불필요).
 function syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,mflowCidSet){
   const doSync=()=>{
     const sideEl=document.getElementById('side');
@@ -5621,6 +5624,11 @@ function syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,mflowCidSet){
   // 2차: 웹폰트 로딩이 늦게 끝나 카드 높이가 뒤늦게 바뀌는 경우를 대비한 재동기화
   if(document.fonts&&document.fonts.ready){
     document.fonts.ready.then(()=>requestAnimationFrame(doSync));
+  }
+  // 3차: 최초 로딩에서만 — 다른 초기화(사이드바 캘린더 렌더 등)까지 다 끝난 뒤 최종적으로 한 번 더 재확인
+  if(_isFirstTimelineLoad){
+    _isFirstTimelineLoad=false;
+    setTimeout(doSync,400);
   }
 }
 
@@ -5663,7 +5671,7 @@ function renderTimelineHabitBanner(habits,checks){
   }).join('')}</div>`;
 }
 
-// ── 감상 옆: 오늘의 비교 카드 — 어제 / 지난 4주 같은 요일 평균과 비교해 가장 특징적인 지표 하나만 골라 한 줄로 표시.
+// ── 감상 옆: 오늘 vs 어제·지난달 비교 카드 — 두 줄로, 서로 다른 지표에서 가장 특징적인 것 2개를 뽑아 보여줌.
 // 본앱 오후홈탭에 곧 추가될 예정인 동일 컨셉의 아카이브 버전(우선순위 규칙은 독립 설계 — _paceWeekInsight와는
 // 비교 기준(최근7일 vs 어제/같은요일)이 달라 그대로 이식하지 않음).
 const TL_COMPARE_CAT_PHRASE={work:'업무',exercise:'운동',home:'정리',rest:'휴식',note:'책상',enjoy:'감상',groom:'단장'};
@@ -5713,64 +5721,69 @@ async function renderTimelineCompareCard(dk,todayTodos,todaySleep,todayRblocks,t
   };
   const todosByDk=byDk(pastTodos),rblocksByDk=byDk(pastRblocks),habitChecksByDk=byDk(pastHabitChecks);
   const sleepByDk={};(pastSleep||[]).forEach(s=>{sleepByDk[s.date_key]=s;});
+  const dowLabel=DOW[baseDate.getDay()]+'요일';
 
+  const candidates=[]; // {score, icon, text} — score가 클수록 특징적, 상위 2개만 채택
+
+  // ① 할일 완료 — 어제·지난4주 평균 대비 초과량이 클수록 점수 높음
   const countDoneTodos=(todos)=>(todos||[]).filter(t=>t.done).length;
   const todayDoneCount=countDoneTodos(todayTodos);
   const yesterdayDoneCount=countDoneTodos(todosByDk[yesterdayDk]);
-  const sameWeekdayDoneCounts=sameWeekdayDks.map(d=>countDoneTodos(todosByDk[d])).filter(n=>n!=null);
-  const sameWeekdayAvgDone=sameWeekdayDoneCounts.length?sameWeekdayDoneCounts.reduce((a,b)=>a+b,0)/sameWeekdayDoneCounts.length:null;
-
-  // ① 할일 완료 — 어제보다 많고, 지난 4주 같은 요일 평균보다도 많으면 "가장 활발"
-  if(todayDoneCount>0&&todayDoneCount>yesterdayDoneCount&&(sameWeekdayAvgDone==null||todayDoneCount>sameWeekdayAvgDone)){
-    el.innerHTML=_tlCompareHtml('ti-sparkles',`할 일 완료가 어제·지난 4주 ${DOW[baseDate.getDay()]}요일 평균보다 많은 하루예요`);
-    return;
+  const sameWeekdayDoneCounts=sameWeekdayDks.map(d=>countDoneTodos(todosByDk[d]));
+  const sameWeekdayAvgDone=sameWeekdayDoneCounts.length?sameWeekdayDoneCounts.reduce((a,b)=>a+b,0)/sameWeekdayDoneCounts.length:0;
+  if(todayDoneCount>0&&todayDoneCount>yesterdayDoneCount&&todayDoneCount>sameWeekdayAvgDone){
+    candidates.push({score:(todayDoneCount-yesterdayDoneCount)+(todayDoneCount-sameWeekdayAvgDone),icon:'ti-sparkles',text:`할 일 완료, 어제·${dowLabel} 평균보다 많아요`});
   }
 
-  // ② 수면시간 — 지난 4주 같은 요일 평균 대비 ±1시간 이상 차이
+  // ② 수면시간 — 지난 4주 같은 요일 평균 대비 차이(분) 클수록 점수 높음
   const todaySleepMin=_tlSleepDurMin(todaySleep);
   const sameWeekdaySleepMins=sameWeekdayDks.map(d=>_tlSleepDurMin(sleepByDk[d])).filter(m=>m!=null);
   if(todaySleepMin!=null&&sameWeekdaySleepMins.length){
     const avgSleep=sameWeekdaySleepMins.reduce((a,b)=>a+b,0)/sameWeekdaySleepMins.length;
     const diff=todaySleepMin-avgSleep;
-    if(Math.abs(diff)>=60){
+    if(Math.abs(diff)>=45){
       const h=Math.round(Math.abs(diff)/60*10)/10;
-      el.innerHTML=_tlCompareHtml('ti-moon-stars',`지난 4주 ${DOW[baseDate.getDay()]}요일 평균보다 ${h}시간 ${diff>0?'더 잤어요':'적게 잤어요'}`);
-      return;
+      candidates.push({score:Math.abs(diff),icon:'ti-moon-stars',text:`${dowLabel} 평균보다 ${h}시간 ${diff>0?'더 잤어요':'적게 잤어요'}`});
     }
   }
 
-  // ③ 리듬 카테고리 — 오늘 특정 카테고리 시간이 어제·지난4주 평균보다 뚜렷이 김(20분 이상 차이)
+  // ③ 리듬 카테고리 — 어제·지난4주 평균보다 가장 크게 초과한 카테고리 하나(20분 이상 차이일 때만 후보)
   const todayCatDur=_tlRhythmCatDurations(todayRblocks);
   const yesterdayCatDur=_tlRhythmCatDurations(rblocksByDk[yesterdayDk]);
+  let bestCat=null,bestCatScore=0;
   for(const cat of Object.keys(TL_COMPARE_CAT_PHRASE)){
     const todayVal=todayCatDur[cat]||0;
     if(todayVal<=0)continue;
     const yVal=yesterdayCatDur[cat]||0;
     const sameWeekdayVals=sameWeekdayDks.map(d=>(_tlRhythmCatDurations(rblocksByDk[d])[cat])||0);
     const avgVal=sameWeekdayVals.length?sameWeekdayVals.reduce((a,b)=>a+b,0)/sameWeekdayVals.length:0;
-    if(todayVal>=yVal+20&&todayVal>=avgVal+20){
-      el.innerHTML=_tlCompareHtml('ti-flame',`어제·지난 4주 ${DOW[baseDate.getDay()]}요일보다 ${TL_COMPARE_CAT_PHRASE[cat]} 시간이 긴 하루예요`);
-      return;
-    }
+    const margin=Math.min(todayVal-yVal,todayVal-avgVal);
+    if(margin>=20&&margin>bestCatScore){bestCatScore=margin;bestCat=cat;}
+  }
+  if(bestCat){
+    candidates.push({score:bestCatScore,icon:'ti-flame',text:`어제·${dowLabel}보다 ${TL_COMPARE_CAT_PHRASE[bestCat]} 시간이 길어요`});
   }
 
   // ④ 습관 — 오늘 달성 개수가 어제보다 많음
   const todayHabitDone=new Set((todayHabitChecks||[]).map(c=>c.habit_name)).size;
   const yesterdayHabitDone=new Set((habitChecksByDk[yesterdayDk]||[]).map(c=>c.habit_name)).size;
   if(todayHabitDone>0&&todayHabitDone>yesterdayHabitDone){
-    el.innerHTML=_tlCompareHtml('ti-target-arrow','어제보다 습관을 더 챙긴 하루예요');
-    return;
+    candidates.push({score:(todayHabitDone-yesterdayHabitDone)*10,icon:'ti-target-arrow',text:'어제보다 습관을 더 챙겼어요'});
   }
 
-  // ⑤ 기본값 — 오늘 vs 지난 4주 평균 총 활동시간(수면 제외)으로 여유/알참 판단
+  // ⑤ 기본값(항상 채워지는 여유/알참 판단) — 다른 후보가 부족할 때 두 번째 줄을 채우는 안전망
   const todayTotalActive=Object.values(todayCatDur).reduce((a,b)=>a+b,0);
   const sameWeekdayTotals=sameWeekdayDks.map(d=>Object.values(_tlRhythmCatDurations(rblocksByDk[d])).reduce((a,b)=>a+b,0));
   const avgTotal=sameWeekdayTotals.length?sameWeekdayTotals.reduce((a,b)=>a+b,0)/sameWeekdayTotals.length:null;
   if(avgTotal!=null&&todayTotalActive<avgTotal*0.7){
-    el.innerHTML=_tlCompareHtml('ti-droplet','지난 4주보다 여유로운 흐름이에요');
+    candidates.push({score:1,icon:'ti-droplet',text:`${dowLabel} 평균보다 여유로운 흐름이에요`});
   }else{
-    el.innerHTML=_tlCompareHtml('ti-droplet','평소와 비슷한 흐름으로 흘러가고 있어요');
+    candidates.push({score:0.5,icon:'ti-droplet',text:'평소와 비슷한 흐름으로 흘러가고 있어요'});
   }
+
+  candidates.sort((a,b)=>b.score-a.score);
+  const picked=candidates.slice(0,2);
+  el.innerHTML=picked.map(c=>_tlCompareHtml(c.icon,c.text)).join('');
 }
 function _tlCompareHtml(icon,text){
   return `<div class="tl-compare-row"><i class="ti ${icon} tl-compare-icon" aria-hidden="true"></i><span class="tl-compare-text">${escapeHtml(text)}</span></div>`;

@@ -341,9 +341,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="glass"] .wk-mflow-cell{background:transparent;}
 
 /* ── 독서(현재 읽는 책, 식사 카드와 높이 고정 맞춤) ── */
-.quote-card{position:relative;border-radius:15px;padding:1.6px;background:linear-gradient(120deg,rgba(255,170,200,0.9),rgba(255,205,140,0.85),rgba(195,200,245,0.6),rgba(170,235,200,0.85),rgba(255,170,200,0.9));height:150px;box-sizing:border-box;}
-.quote-card-inner{border-radius:13.5px;background:linear-gradient(120deg,rgba(255,170,200,0.16),rgba(255,205,140,0.16),rgba(195,200,245,0.14),rgba(170,235,200,0.16),rgba(255,170,200,0.16)),var(--card);padding:12px 20px;height:100%;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden;}
-.quote-card-inner .card-lbl{margin-bottom:0;flex-shrink:0;height:22px;}
+/* 오늘의 메모 — 레인보우 그라디언트 테두리(기존 감상 카드 스타일 이식). 단일 div 구조라 ::before로 테두리만 그라디언트 처리. */
+.tl-memo-rainbow{position:relative;background:linear-gradient(120deg,rgba(255,170,200,0.16),rgba(255,205,140,0.16),rgba(195,200,245,0.14),rgba(170,235,200,0.16),rgba(255,170,200,0.16)),var(--card);border:1.6px solid transparent;background-clip:padding-box,border-box;background-origin:padding-box,border-box;}
+.tl-memo-rainbow::before{content:'';position:absolute;inset:-1.6px;border-radius:inherit;padding:1.6px;background:linear-gradient(120deg,rgba(255,170,200,0.9),rgba(255,205,140,0.85),rgba(195,200,245,0.6),rgba(170,235,200,0.85),rgba(255,170,200,0.9));-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;z-index:0;}
+.tl-memo-rainbow>*{position:relative;z-index:1;}
+[data-theme="glass"] .tl-memo-rainbow{background:rgba(255,253,248,0.95);}
+
+/* 감상/비교 하단 두 카드 — 일반 배너 스타일(할일 카드와 동일 톤), 나란히 배치되어 grid2 stretch로 높이를 서로 맞춤 */
+.tl-bottom-card{min-height:104px;}
 .rd-cur-book{display:flex;gap:15px;align-items:center;height:104px;}
 .rd-cur-cover{width:58px;height:80px;border-radius:7px;background:rgba(200,180,160,0.3);flex-shrink:0;background-size:cover;background-position:center;box-shadow:0 3px 10px rgba(0,0,0,0.12);}
 .rd-cur-info{display:flex;flex-direction:column;justify-content:center;gap:3px;}
@@ -435,11 +440,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .tl-sleep-time{font-size:13px;color:var(--sleep-warmgray-strong);font-variant-numeric:tabular-nums;font-weight:500;}
 .tl-sleep-dur{font-size:13px;color:var(--sleep-warmgray-strong);flex-shrink:0;margin-left:auto;}
 /* 습관배너 — 제목 없이 아이콘 4개만, 수면배너와 동일 높이로 나란히 */
-.tl-habit-banner{border-radius:16px;padding:4px 16px;background:var(--card);border:1px solid var(--card-b);height:44px;box-sizing:border-box;display:flex;align-items:center;gap:10px;}
+.tl-habit-banner{border-radius:16px;padding:4px 18px;background:var(--card);border:1px solid var(--card-b);height:44px;box-sizing:border-box;display:flex;align-items:center;gap:14px;}
 .tl-habit-banner-lbl{font-family:'DM Sans',sans-serif;font-size:var(--fs-xs);font-weight:500;letter-spacing:.06em;color:var(--ts);flex-shrink:0;text-transform:uppercase;}
-.tl-habit-banner .habit-grid{display:flex!important;align-items:center;justify-content:space-evenly;flex:1;min-width:0;gap:14px;}
+.tl-habit-banner .habit-grid{display:flex!important;align-items:center;justify-content:center;flex:1;min-width:0;gap:22px;}
 .tl-habit-banner .habit-row{flex:none!important;background:none!important;padding:0!important;color:transparent!important;font-size:0!important;}
-.tl-habit-banner .habit-row-icon{font-size:19px;}
+.tl-habit-banner .habit-row-icon{font-size:20px;}
 .tl-habit-banner .habit-check{display:none!important;}
 
 /* ── 우측: 오늘 일정 + 타임테이블을 나란히(토글 없이 동시 표시), 본문 2줄 높이+스크롤, 서로 높이 통일 ── */
@@ -451,7 +456,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
    세로 스택 구조에서는 되살려서 아래 감상/비교 줄과 붙지 않게 함. */
 .tl-todo-card-sm{max-height:178px;overflow-y:auto;margin-bottom:13px!important;}
 /* 오늘의 비교 카드 — 감상 카드(quote-card-inner)와 같은 톤, 아이콘+한 줄 문구 */
-.tl-compare-row{display:flex;align-items:center;gap:9px;height:100%;padding:2px 0;}
+.tl-compare-row{display:flex;align-items:center;gap:9px;padding:5px 0;}
+.tl-compare-row+.tl-compare-row{border-top:1px solid rgba(var(--divider-rgb),0.18);}
 .tl-compare-icon{font-size:20px;color:rgba(var(--pal-sky-rgb),1);flex-shrink:0;}
 .tl-compare-text{font-size:var(--fs-body);color:var(--tp);line-height:1.4;}
 .tl-track-card{background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:20px 22px 26px;position:relative;}
@@ -1889,7 +1895,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
               <div class="tl-side-list" id="tl-timetable"></div>
             </div>
           </div>
-          <div class="card p" id="today-memo-card">
+          <div class="card tl-memo-rainbow" id="today-memo-card">
             <div class="card-lbl-row">
               <div class="card-lbl" style="margin-bottom:0;"><i class="ti ti-pencil-heart" style="color:rgba(var(--pal-pink-text-rgb),0.85);" aria-hidden="true"></i>오늘의 메모</div>
               <i class="ti ti-search memo-search-toggle" id="memo-search-toggle" onclick="toggleMemoSearch()" title="메모 검색" aria-hidden="true"></i>
@@ -1902,8 +1908,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           </div>
           <div class="card todo-card tl-todo-card-sm"><div class="card-lbl"><i class="ti ti-list-check" style="color:rgba(var(--pal-orange-rgb),1);" aria-hidden="true"></i>오늘 할 일</div><div id="today-todos"></div></div>
           <div class="grid2" id="tl-quote-compare-row">
-            <div class="quote-card"><div class="quote-card-inner tl-quote-inner"><div class="card-lbl"><i class="ti ti-movie" style="color:rgba(var(--pal-pink-text-rgb),0.85);" aria-hidden="true"></i>오늘의 감상</div><div id="today-reading"></div></div></div>
-            <div class="quote-card"><div class="quote-card-inner tl-quote-inner"><div class="card-lbl"><i class="ti ti-chart-line" style="color:rgba(var(--pal-sky-rgb),1);" aria-hidden="true"></i>오늘의 비교</div><div id="tl-compare"></div></div></div>
+            <div class="card tl-bottom-card"><div class="card-lbl"><i class="ti ti-movie" style="color:rgba(var(--pal-pink-text-rgb),0.85);" aria-hidden="true"></i>오늘의 감상</div><div id="today-reading"></div></div>
+            <div class="card tl-bottom-card"><div class="card-lbl"><i class="ti ti-scale" style="color:rgba(var(--pal-sky-rgb),1);" aria-hidden="true"></i>오늘 vs 어제·지난달</div><div id="tl-compare"></div></div>
           </div>
         </div>
       </div>
@@ -2171,12 +2177,12 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 <div class="float-tabs">
   <div class="float-fab" id="float-fab"><i class="ti ti-menu-2" id="float-fab-icon" aria-hidden="true"></i></div>
   <div class="float-tab-menu" id="float-tab-menu">
+    <div class="float-tab on" id="ft-today" data-tab="today"><i class="ti ti-sun" aria-hidden="true"></i>오늘</div>
     <div class="float-tab" id="ft-week" data-tab="week"><i class="ti ti-calendar-week" aria-hidden="true"></i>주간</div>
     <div class="float-tab" id="ft-month" data-tab="month"><i class="ti ti-calendar" aria-hidden="true"></i>월간</div>
     <div class="float-tab" id="ft-reports" data-tab="reports"><i class="ti ti-sparkles" aria-hidden="true"></i>통계</div>
     <div class="float-tab" id="ft-yearly" data-tab="yearly"><i class="ti ti-calendar-stats" aria-hidden="true"></i>연간</div>
     <div class="float-tab" id="ft-settings" data-tab="settings"><i class="ti ti-settings" aria-hidden="true"></i>설정</div>
-    <div class="float-tab on" id="ft-today" data-tab="today"><i class="ti ti-sun" aria-hidden="true"></i>오늘</div>
   </div>
 </div>
 
