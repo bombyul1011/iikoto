@@ -42,6 +42,16 @@ function renderStarDisplayHtml(stars,sizeClass){
 function dateKey(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;}
 // 본앱과 동일한 논리적 하루(새벽 4시 컷) 정렬 기준. 00:00~03:59 기록은 전날 늦은 시간대로 보고 +1440분 밀어서 맨 뒤로 정렬.
 const DAWN_CUTOFF_MIN=4*60;
+// 오늘탭이 보여줄 "논리적 오늘" 날짜. 자정을 넘겨도 04:00 이전이고 아직 잠들기 전이면 전날 그대로 유지.
+function logicalTodayDate(){
+  const now=new Date();
+  if(now.getHours()*60+now.getMinutes()<DAWN_CUTOFF_MIN){
+    const d=new Date(now);
+    d.setDate(d.getDate()-1);
+    return d;
+  }
+  return now;
+}
 function _dawnTimeToMin(t){if(!t)return null;const p=t.split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);}
 function toDawnAdjustedMin(min,cutoffMin){
   if(min==null)return null;
@@ -204,7 +214,7 @@ const CAT_ICON_META={
 };
 
 // ── 상태 ──
-let _selectedDate=new Date();
+let _selectedDate=logicalTodayDate();
 let _currentTab='today';
 let _wcalDate=new Date();
 
@@ -352,8 +362,8 @@ function switchTab(tab){
   const mainWrap=document.querySelector('.main-wrap');
   if(mainWrap)mainWrap.scrollTop=0;
   closeFloatMenu();
-  // 오늘탭으로 돌아올 때는 항상 실제 '오늘' 날짜로 재설정(자정을 넘겨도 갱신되도록)
-  if(tab==='today'){_selectedDate=new Date();loadTimelineTab();}
+  // 오늘탭으로 돌아올 때는 논리적 오늘 날짜로 재설정(04시 이전엔 자정을 넘겨도 전날 유지)
+  if(tab==='today'){_selectedDate=logicalTodayDate();loadTimelineTab();}
   else if(tab==='week')loadWeekTab();
   else if(tab==='month'){loadMonthTab();initCgridHeightSync();}
   else if(tab==='reports'){resetReportsView();loadReportsTab();}
@@ -5861,8 +5871,9 @@ function _applyTimelineEventMode(){
   ttCard.classList.toggle('on',mode==='schedule');
 }
 function renderTimelineEventsAndSchedule(todos){
-  const isToday=dateKey(_selectedDate)===dateKey(new Date());
-  const nowMin=new Date().getHours()*60+new Date().getMinutes();
+  const isToday=dateKey(_selectedDate)===dateKey(logicalTodayDate());
+  let nowMin=new Date().getHours()*60+new Date().getMinutes();
+  if(isToday&&nowMin<DAWN_CUTOFF_MIN)nowMin+=1440;
   const scheduleItems=parseTabletScheduleTodos(todos.filter(t=>!t.is_event));
   const events=todos.filter(t=>t.is_event);
   const sorted=events.slice().sort((a,b)=>(a.event_time||'99:99').localeCompare(b.event_time||'99:99'));
@@ -5938,7 +5949,7 @@ function renderTimelineTrack(dk,todos,sleep,meals,rblocks,mflowCidSet,totalHOver
   mflowCidSet=mflowCidSet||new Set();
   const gridEl=document.getElementById('tl-track-grid');
   const TOTAL_H=totalHOverride||900;
-  const isToday=dk===dateKey(new Date());
+  const isToday=dk===dateKey(logicalTodayDate());
   const contentsByCid=_contentsByCidMap(contents||[]);
 
   // 본앱과 동일: 그 날짜(dk)에 저장된 데이터만 사용. "전날 것을 오늘 화면에 끌어와 추가로 보여주는" 방식은
@@ -5984,7 +5995,10 @@ function renderTimelineTrack(dk,todos,sleep,meals,rblocks,mflowCidSet,totalHOver
   // 리듬 막대 — 겹침 처리 없이 각자 실제 시간 위치에 그대로 렌더(막대 자체는 겹쳐도 되고, 라벨도 원칙적으로 제자리).
   // 예외: 짧은 블록(식사 등)이 긴 블록 시작 지점과 겹칠 때만, 긴 블록의 라벨을 짧은 블록 아래로 밀어서 텍스트 가림을 방지.
   let maxBottom=_tlTimeToY(1560,TOTAL_H); // 01시(다음날) 눈금까지는 항상 보이도록 최소 하한을 잡음
-  const nowMin=new Date().getHours()*60+new Date().getMinutes();
+  // 트랙 전체가 "확장 좌표계"(자정 넘김을 +1440으로 표현)를 쓰므로, 실제 시계 시각도 같은 좌표계로 변환해야 함.
+  // 자정~04시(DAWN_CUTOFF_MIN) 사이는 논리적 하루상 전날의 연장 구간이므로 +1440 보정.
+  let nowMin=new Date().getHours()*60+new Date().getMinutes();
+  if(nowMin<DAWN_CUTOFF_MIN)nowMin+=1440;
   const mflowMarkers=[]; // {by} — 모닝플로우 배지는 축 컬럼과 완전히 분리된 별도 세로 레인에 표시
   const renderBlocks=blocksSorted.map((bk,bi)=>{
     const offset=(bk.sortKey!=null)?(bk.sortKey-bk.start):0;
