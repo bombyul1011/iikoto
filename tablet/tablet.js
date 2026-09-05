@@ -5717,66 +5717,93 @@ async function renderTimelineCompareCard(dk,todayTodos,todaySleep,todayRblocks,t
   const sleepByDk={};(pastSleep||[]).forEach(s=>{sleepByDk[s.date_key]=s;});
   const dowLabel=DOW[baseDate.getDay()]+'요일';
 
-  const candidates=[]; // {score, icon, text} — score가 클수록 특징적, 상위 2개만 채택
+  const candidatesYesterday=[]; // {score, icon, text} — "어제 대비" 후보만
+  const candidatesAvg=[]; // {score, icon, text} — "같은요일 평균 대비" 후보만
 
-  // ① 할일 완료 — 어제·지난4주 평균 대비 초과량이 클수록 점수 높음
+  // ① 할일 완료 — 어제 대비 / 같은요일 평균 대비 각각 판단
   const countDoneTodos=(todos)=>(todos||[]).filter(t=>t.done).length;
   const todayDoneCount=countDoneTodos(todayTodos);
   const yesterdayDoneCount=countDoneTodos(todosByDk[yesterdayDk]);
   const sameWeekdayDoneCounts=sameWeekdayDks.map(d=>countDoneTodos(todosByDk[d]));
   const sameWeekdayAvgDone=sameWeekdayDoneCounts.length?sameWeekdayDoneCounts.reduce((a,b)=>a+b,0)/sameWeekdayDoneCounts.length:0;
-  if(todayDoneCount>0&&todayDoneCount>yesterdayDoneCount&&todayDoneCount>sameWeekdayAvgDone){
-    candidates.push({score:(todayDoneCount-yesterdayDoneCount)+(todayDoneCount-sameWeekdayAvgDone),icon:'ti-sparkles',text:`할 일 완료, 어제·${dowLabel} 평균보다 많아요`});
+  if(todayDoneCount>0&&todayDoneCount>yesterdayDoneCount){
+    candidatesYesterday.push({score:todayDoneCount-yesterdayDoneCount,icon:'ti-sparkles',text:'어제보다 할 일을 더 완료했어요'});
+  }
+  if(todayDoneCount>0&&todayDoneCount>sameWeekdayAvgDone){
+    candidatesAvg.push({score:todayDoneCount-sameWeekdayAvgDone,icon:'ti-sparkles',text:`${dowLabel} 평균보다 할 일을 더 완료했어요`});
   }
 
-  // ② 수면시간 — 지난 4주 같은 요일 평균 대비 차이(분) 클수록 점수 높음
+  // ② 수면시간 — 어제 대비 / 같은요일 평균 대비 각각 판단
   const todaySleepMin=_sleepDurMinOf(todaySleep);
+  const yesterdaySleepMin=_sleepDurMinOf(sleepByDk[yesterdayDk]);
+  if(todaySleepMin!=null&&yesterdaySleepMin!=null){
+    const diff=todaySleepMin-yesterdaySleepMin;
+    if(Math.abs(diff)>=45){
+      const h=Math.round(Math.abs(diff)/60*10)/10;
+      candidatesYesterday.push({score:Math.abs(diff),icon:'ti-moon-stars',text:`어제보다 ${h}시간 ${diff>0?'더 잤어요':'적게 잤어요'}`});
+    }
+  }
   const sameWeekdaySleepMins=sameWeekdayDks.map(d=>_sleepDurMinOf(sleepByDk[d])).filter(m=>m!=null);
   if(todaySleepMin!=null&&sameWeekdaySleepMins.length){
     const avgSleep=sameWeekdaySleepMins.reduce((a,b)=>a+b,0)/sameWeekdaySleepMins.length;
     const diff=todaySleepMin-avgSleep;
     if(Math.abs(diff)>=45){
       const h=Math.round(Math.abs(diff)/60*10)/10;
-      candidates.push({score:Math.abs(diff),icon:'ti-moon-stars',text:`${dowLabel} 평균보다 ${h}시간 ${diff>0?'더 잤어요':'적게 잤어요'}`});
+      candidatesAvg.push({score:Math.abs(diff),icon:'ti-moon-stars',text:`${dowLabel} 평균보다 ${h}시간 ${diff>0?'더 잤어요':'적게 잤어요'}`});
     }
   }
 
-  // ③ 리듬 카테고리 — 어제·지난4주 평균보다 가장 크게 초과한 카테고리 하나(20분 이상 차이일 때만 후보)
+  // ③ 리듬 카테고리 — 어제 대비 / 같은요일 평균 대비 각각 가장 크게 초과한 카테고리(20분 이상 차이일 때만 후보)
   const todayCatDur=_tlRhythmCatDurations(todayRblocks);
   const yesterdayCatDur=_tlRhythmCatDurations(rblocksByDk[yesterdayDk]);
-  let bestCat=null,bestCatScore=0;
+  let bestCatY=null,bestCatYScore=0;
+  let bestCatAvg=null,bestCatAvgScore=0;
   for(const cat of Object.keys(TL_COMPARE_CAT_PHRASE)){
     const todayVal=todayCatDur[cat]||0;
     if(todayVal<=0)continue;
     const yVal=yesterdayCatDur[cat]||0;
+    const marginY=todayVal-yVal;
+    if(marginY>=20&&marginY>bestCatYScore){bestCatYScore=marginY;bestCatY=cat;}
     const sameWeekdayVals=sameWeekdayDks.map(d=>(_tlRhythmCatDurations(rblocksByDk[d])[cat])||0);
     const avgVal=sameWeekdayVals.length?sameWeekdayVals.reduce((a,b)=>a+b,0)/sameWeekdayVals.length:0;
-    const margin=Math.min(todayVal-yVal,todayVal-avgVal);
-    if(margin>=20&&margin>bestCatScore){bestCatScore=margin;bestCat=cat;}
+    const marginAvg=todayVal-avgVal;
+    if(marginAvg>=20&&marginAvg>bestCatAvgScore){bestCatAvgScore=marginAvg;bestCatAvg=cat;}
   }
-  if(bestCat){
-    candidates.push({score:bestCatScore,icon:'ti-flame',text:`어제·${dowLabel}보다 ${TL_COMPARE_CAT_PHRASE[bestCat]} 시간이 길어요`});
+  if(bestCatY){
+    candidatesYesterday.push({score:bestCatYScore,icon:'ti-flame',text:`어제보다 ${TL_COMPARE_CAT_PHRASE[bestCatY]} 시간이 길어요`});
+  }
+  if(bestCatAvg){
+    candidatesAvg.push({score:bestCatAvgScore,icon:'ti-flame',text:`${dowLabel} 평균보다 ${TL_COMPARE_CAT_PHRASE[bestCatAvg]} 시간이 길어요`});
   }
 
-  // ④ 습관 — 오늘 달성 개수가 어제보다 많음
+  // ④ 습관 — 어제 대비 / 같은요일 평균 대비 각각 판단
   const todayHabitDone=new Set((todayHabitChecks||[]).map(c=>c.habit_name)).size;
   const yesterdayHabitDone=new Set((habitChecksByDk[yesterdayDk]||[]).map(c=>c.habit_name)).size;
   if(todayHabitDone>0&&todayHabitDone>yesterdayHabitDone){
-    candidates.push({score:(todayHabitDone-yesterdayHabitDone)*10,icon:'ti-target-arrow',text:'어제보다 습관을 더 챙겼어요'});
+    candidatesYesterday.push({score:(todayHabitDone-yesterdayHabitDone)*10,icon:'ti-target-arrow',text:'어제보다 습관을 더 챙겼어요'});
+  }
+  const sameWeekdayHabitCounts=sameWeekdayDks.map(d=>new Set((habitChecksByDk[d]||[]).map(c=>c.habit_name)).size);
+  const sameWeekdayAvgHabit=sameWeekdayHabitCounts.length?sameWeekdayHabitCounts.reduce((a,b)=>a+b,0)/sameWeekdayHabitCounts.length:0;
+  if(todayHabitDone>0&&todayHabitDone>sameWeekdayAvgHabit){
+    candidatesAvg.push({score:(todayHabitDone-sameWeekdayAvgHabit)*10,icon:'ti-target-arrow',text:`${dowLabel} 평균보다 습관을 더 챙겼어요`});
   }
 
-  // ⑤ 기본값(항상 채워지는 여유/알참 판단) — 다른 후보가 부족할 때 두 번째 줄을 채우는 안전망
+  // ⑤ 기본값(항상 채워지는 여유/알참 판단) — 평균 그룹이 비었을 때만 안전망으로 채움(어제 그룹은 위 후보로 대개 채워짐)
   const todayTotalActive=Object.values(todayCatDur).reduce((a,b)=>a+b,0);
   const sameWeekdayTotals=sameWeekdayDks.map(d=>Object.values(_tlRhythmCatDurations(rblocksByDk[d])).reduce((a,b)=>a+b,0));
   const avgTotal=sameWeekdayTotals.length?sameWeekdayTotals.reduce((a,b)=>a+b,0)/sameWeekdayTotals.length:null;
   if(avgTotal!=null&&todayTotalActive<avgTotal*0.7){
-    candidates.push({score:1,icon:'ti-droplet',text:`${dowLabel} 평균보다 여유로운 흐름이에요`});
+    candidatesAvg.push({score:1,icon:'ti-droplet',text:`${dowLabel} 평균보다 여유로운 흐름이에요`});
   }else{
-    candidates.push({score:0.5,icon:'ti-droplet',text:'평소와 비슷한 흐름으로 흘러가고 있어요'});
+    candidatesAvg.push({score:0.5,icon:'ti-droplet',text:'평소와 비슷한 흐름으로 흘러가고 있어요'});
+  }
+  if(!candidatesYesterday.length){
+    candidatesYesterday.push({score:0.5,icon:'ti-droplet',text:'어제와 비슷한 흐름으로 흘러가고 있어요'});
   }
 
-  candidates.sort((a,b)=>b.score-a.score);
-  const picked=candidates.slice(0,2);
+  candidatesYesterday.sort((a,b)=>b.score-a.score);
+  candidatesAvg.sort((a,b)=>b.score-a.score);
+  const picked=[candidatesYesterday[0],candidatesAvg[0]];
   el.innerHTML=picked.map(c=>_tlCompareHtml(c.icon,c.text)).join('');
 }
 function _tlCompareHtml(icon,text){
