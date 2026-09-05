@@ -5631,15 +5631,18 @@ function syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,mflowCidSet,con
     trackCardEl.style.maxHeight=(targetH+cardPadding)+'px';
     trackCardEl.style.overflowY='auto';
   };
-  // 1차: 두 프레임 뒤(레이아웃이 한 번 더 안정된 시점)에 측정
+  // 1차: 두 프레임 뒤(레이아웃이 한 번 더 안정된 시점)에 측정 — 모든 로드에 항상 필요.
   requestAnimationFrame(()=>requestAnimationFrame(doSync));
-  // 2차: 웹폰트 로딩이 늦게 끝나 카드 높이가 뒤늦게 바뀌는 경우를 대비한 재동기화
-  if(document.fonts&&document.fonts.ready){
-    document.fonts.ready.then(()=>requestAnimationFrame(doSync));
-  }
-  // 3차: 최초 로딩에서만 — 다른 초기화(사이드바 캘린더 렌더 등)까지 다 끝난 뒤 최종적으로 한 번 더 재확인
+  // 2차/3차 재동기화(웹폰트 로딩 대기, 400ms 지연 재확인)는 앱 최초 로딩 때만 필요한 보정 —
+  // 이후 날짜 이동이나 탭 재방문 시에는 폰트도 이미 로드돼 있고 레이아웃도 안정적이라 1차만으로 충분한데,
+  // 이전엔 매번 걸려서 renderTimelineTrack(및 그 안의 computeRhythmBlocksRawTablet)이 불필요하게 추가 실행됐음.
   if(_isFirstTimelineLoad){
     _isFirstTimelineLoad=false;
+    // 웹폰트 로딩이 늦게 끝나 카드 높이가 뒤늦게 바뀌는 경우를 대비한 재동기화
+    if(document.fonts&&document.fonts.ready){
+      document.fonts.ready.then(()=>requestAnimationFrame(doSync));
+    }
+    // 다른 초기화(사이드바 캘린더 렌더 등)까지 다 끝난 뒤 최종적으로 한 번 더 재확인
     setTimeout(doSync,400);
   }
 }
