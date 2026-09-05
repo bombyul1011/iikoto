@@ -5588,12 +5588,24 @@ function syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,mflowCidSet){
   const doSync=()=>{
     const sideEl=document.getElementById('side');
     const sidebarOpen=sideEl&&!sideEl.classList.contains('collapsed');
-    // 세로모드(760px 이하)에서는 CSS가 좌우 반반 대신 세로 스택으로 전환하므로(위 미디어쿼리 참고),
-    // 우측 실측 동기화 자체가 무의미해 건너뛰고 .tl-track-card의 고정 max-height(CSS 지정)+내부 스크롤에 맡긴다.
-    const isNarrow=window.innerWidth<=760;
-    if(sidebarOpen||isNarrow)return;
-    const rightEl=document.querySelector('.tl-half-right');
     const trackCardEl=document.querySelector('.tl-track-card');
+    // 세로모드(760px 이하) 또는 사이드바 펼침으로 좌측 폭이 좁아지는 경우: 우측 실측 동기화 대신
+    // .tl-track-card의 고정 max-height(CSS 지정)+내부 스크롤에 맡기고, 대신 스크롤 위치를 현재시각이
+    // 카드 중앙에 오도록 맞춰준다(트랙 자체 높이는 기본 TOTAL_H=900 그대로 렌더됨).
+    const isNarrow=window.innerWidth<=760;
+    if(sidebarOpen||isNarrow){
+      if(trackCardEl){
+        requestAnimationFrame(()=>{
+          const nowDot=trackCardEl.querySelector('.tl-now-dot');
+          if(nowDot){
+            const targetTop=nowDot.offsetTop-(trackCardEl.clientHeight/2);
+            trackCardEl.scrollTop=Math.max(targetTop,0);
+          }
+        });
+      }
+      return;
+    }
+    const rightEl=document.querySelector('.tl-half-right');
     if(!rightEl||!trackCardEl)return;
     const cardPadding=46; // .tl-track-card의 상하 padding(20px+26px) 근사값
     // 우측 전체 높이(일정/타임테이블+메모+할일+감상)에 맞춰 트랙 높이 결정 — 좌측 상단 배너(수면+습관)는 트랙 밖에
