@@ -1134,6 +1134,13 @@ function goToCurrentWeek(){
   renderMiniCal();
   loadWeekTab();
 }
+function jumpTimelineToToday(){
+  const d=new Date();
+  _selectedDate=d;
+  _sideCalDate=new Date(d);
+  renderMiniCal();
+  loadTimelineTab();
+}
 function shiftSelectedMonth(delta){
   const d=new Date(_selectedDate);
   const day=d.getDate();
@@ -5605,7 +5612,10 @@ function syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,mflowCidSet){
   const doSync=()=>{
     const sideEl=document.getElementById('side');
     const sidebarOpen=sideEl&&!sideEl.classList.contains('collapsed');
-    if(sidebarOpen)return;
+    // 세로모드(760px 이하)에서는 CSS가 좌우 반반 대신 세로 스택으로 전환하므로(위 미디어쿼리 참고),
+    // 우측 실측 동기화 자체가 무의미해 건너뛰고 .tl-track-card의 고정 max-height(CSS 지정)+내부 스크롤에 맡긴다.
+    const isNarrow=window.innerWidth<=760;
+    if(sidebarOpen||isNarrow)return;
     const rightEl=document.querySelector('.tl-half-right');
     const trackCardEl=document.querySelector('.tl-track-card');
     if(!rightEl||!trackCardEl)return;
@@ -5841,8 +5851,9 @@ function renderTimelineEventsAndSchedule(todos){
 // 압축된 여백 구간을 남겨 그 활동들이 표시는 되게 하되(트랙 시작 지점 바로 위, 눈금 라벨 없음) 시각적 비중은 최소화.
 function _tlTimeToY(min,TOTAL_H){
   const DAY_START=420; // 07:00(분) — 트랙의 실질적 시작점(y=0)
-  const PRE_COMPRESS_H=26; // 07시 이전 구간이 차지하는 고정 여백(px) — 눈금 없이 아주 얇게만
-  const normalPerMin=TOTAL_H/(1440-DAY_START); // 07시~24시(정상구간) 분당 높이
+  const PRE_COMPRESS_H=14; // 07시 이전 구간이 차지하는 고정 여백(px) — 07시 시작점을 조금 더 위로 당김(기존 26px)
+  const SCALE=0.93; // 시간대별 간격을 아주 살짝 줄여서(기존 대비 93%) 07~24시 전체가 TOTAL_H 안에 확실히 들어오게 함
+  const normalPerMin=(TOTAL_H/(1440-DAY_START))*SCALE; // 07시~24시(정상구간) 분당 높이
   if(min>=DAY_START)return Math.round(PRE_COMPRESS_H+(min-DAY_START)*normalPerMin);
   if(min>1440)return Math.round(PRE_COMPRESS_H+TOTAL_H+(min-1440)*normalPerMin); // 자정 넘겨 이어지는 활동(절대값 1440+)
   // 0~07시(min<DAY_START) 구간 — PRE_COMPRESS_H 안에 압축해서 표시
@@ -5997,7 +6008,7 @@ function renderTimelineTrack(dk,todos,sleep,meals,rblocks,mflowCidSet,totalHOver
     todoHtml+=`<div class="tl-todo-item${doneCls}" style="top:${it.y}px;"><span class="tl-todo-marker">${markerHtml}</span><div class="tl-todo-body"><div class="tl-todo-text">${escapeHtml(it.label)}</div><span class="tl-todo-time">${it.timeText}</span></div></div>`;
   });
 
-  const trackHeight=Math.max(TOTAL_H+26+10,maxBottom+10); // +26은 _tlTimeToY의 07시 이전 압축 여백(PRE_COMPRESS_H)
+  const trackHeight=Math.max(TOTAL_H+14+10,maxBottom+10); // +14는 _tlTimeToY의 07시 이전 압축 여백(PRE_COMPRESS_H)
   gridEl.style.height=trackHeight+'px';
   gridEl.innerHTML=`<div class="tl-axis-col" style="height:${trackHeight}px;">${axisHtml}</div><div class="tl-mflow-lane" style="height:${trackHeight}px;">${mflowLaneHtml}</div><div class="tl-todo-col" style="height:${trackHeight}px;">${todoHtml||'<div class="tl-empty" style="padding:12px 0;font-size:var(--fs-sm);">등록된 시간표가 없어요</div>'}</div>`;
 }

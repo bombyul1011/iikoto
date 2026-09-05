@@ -342,10 +342,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 /* ── 독서(현재 읽는 책, 식사 카드와 높이 고정 맞춤) ── */
 /* 오늘의 메모 — 레인보우 그라디언트 테두리(기존 감상 카드 스타일 이식). 단일 div 구조라 ::before로 테두리만 그라디언트 처리. */
-.tl-memo-rainbow{position:relative;background:linear-gradient(120deg,rgba(255,170,200,0.16),rgba(255,205,140,0.16),rgba(195,200,245,0.14),rgba(170,235,200,0.16),rgba(255,170,200,0.16)),var(--card);border:1.6px solid transparent;background-clip:padding-box,border-box;background-origin:padding-box,border-box;}
+.tl-memo-rainbow.card{background:linear-gradient(120deg,rgba(255,170,200,0.16),rgba(255,205,140,0.16),rgba(195,200,245,0.14),rgba(170,235,200,0.16),rgba(255,170,200,0.16)),var(--card);}
+.tl-memo-rainbow{position:relative;border:1.6px solid transparent;background-clip:padding-box,border-box;background-origin:padding-box,border-box;}
 .tl-memo-rainbow::before{content:'';position:absolute;inset:-1.6px;border-radius:inherit;padding:1.6px;background:linear-gradient(120deg,rgba(255,170,200,0.9),rgba(255,205,140,0.85),rgba(195,200,245,0.6),rgba(170,235,200,0.85),rgba(255,170,200,0.9));-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;z-index:0;}
 .tl-memo-rainbow>*{position:relative;z-index:1;}
-[data-theme="glass"] .tl-memo-rainbow{background:rgba(255,253,248,0.95);}
+[data-theme="glass"] .tl-memo-rainbow.card{background:rgba(255,253,248,0.95);}
 
 /* 감상/비교 하단 두 카드 — 일반 배너 스타일(할일 카드와 동일 톤), 나란히 배치되어 grid2 stretch로 높이를 서로 맞춤 */
 .tl-bottom-card{min-height:104px;}
@@ -440,9 +441,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .tl-sleep-time{font-size:13px;color:var(--sleep-warmgray-strong);font-variant-numeric:tabular-nums;font-weight:500;}
 .tl-sleep-dur{font-size:13px;color:var(--sleep-warmgray-strong);flex-shrink:0;margin-left:auto;}
 /* 습관배너 — 제목 없이 아이콘 4개만, 수면배너와 동일 높이로 나란히 */
-.tl-habit-banner{border-radius:16px;padding:4px 18px;background:var(--card);border:1px solid var(--card-b);height:44px;box-sizing:border-box;display:flex;align-items:center;gap:14px;}
+.tl-habit-banner{border-radius:16px;padding:4px 18px;background:var(--card);border:1px solid var(--card-b);height:44px;box-sizing:border-box;display:flex;align-items:center;gap:16px;}
 .tl-habit-banner-lbl{font-family:'DM Sans',sans-serif;font-size:var(--fs-xs);font-weight:500;letter-spacing:.06em;color:var(--ts);flex-shrink:0;text-transform:uppercase;}
-.tl-habit-banner .habit-grid{display:flex!important;align-items:center;justify-content:center;flex:1;min-width:0;gap:22px;}
+.tl-habit-banner .habit-grid{display:flex!important;align-items:center;justify-content:space-between;flex:1;min-width:0;gap:26px;}
 .tl-habit-banner .habit-row{flex:none!important;background:none!important;padding:0!important;color:transparent!important;font-size:0!important;}
 .tl-habit-banner .habit-row-icon{font-size:20px;}
 .tl-habit-banner .habit-check{display:none!important;}
@@ -1173,6 +1174,15 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   .yr-sum-sleep-split .yr-sum-sleep-item:last-child::before{display:none;} /* 좌우 분리선 — 1열 스택에서는 의미 없어져 숨김 */
 
   /* ══════════════════════════════════════════════════════
+     오늘탭 — 좌우 반반(리듬트랙 / 일정·메모·할일 등)을 세로 스택으로 전환.
+     사이드바 펼침 시와 동일한 원리(가용 폭 부족 → flex-direction:column)를 세로모드 전체에도 적용.
+     순서: 상단 배너(수면/습관) → 리듬트랙 → 일정/타임테이블 → 메모 → 할일 → 감상/비교. */
+  .tl-half-wrap{flex-direction:column;gap:14px;}
+  .tl-half{width:100%;}
+  .tl-track-card{max-height:420px!important;} /* 세로 스택에서는 우측 실측 동기화를 하지 않으므로(JS에서 스킵) 고정 상한 + 내부 스크롤 */
+  .tl-top-banners{margin-bottom:10px;}
+
+  /* ══════════════════════════════════════════════════════
      주간탭
      ══════════════════════════════════════════════════════ */
   /* 수면 리포트 4열 → 2x2 — 라벨(예: "평균 수면 컨디션")이 4글자 이상이라 4열 좁은 폭에선 세로로 쪼개짐,
@@ -1860,7 +1870,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <!-- 오늘탭 — 리듬 세로바 기반 타임라인 구조. 좌: 상단 수면/습관 배너(1:1)+하루한줄+
          리듬세로바(일정도트, 07시부터)+시간표/완료투두, 우: 오늘일정+타임테이블(나란히) → 메모 → 투두배너(4개분) → 감상/비교. -->
     <div class="main-body on" id="tab-today">
-      <div class="main-hdr"><i class="ti ti-chevron-left main-hdr-arrow" onclick="shiftTimelineDate(-1)" aria-hidden="true"></i><span class="main-date" id="tl-date"></span><span class="main-dow" id="tl-dow"></span><i class="ti ti-chevron-right main-hdr-arrow" onclick="shiftTimelineDate(1)" aria-hidden="true"></i><span class="today-oneline-hl" id="today-oneline-hl"></span></div>
+      <div class="main-hdr"><i class="ti ti-chevron-left main-hdr-arrow" onclick="shiftTimelineDate(-1)" aria-hidden="true"></i><span class="main-date main-date-jump" id="tl-date" onclick="jumpTimelineToToday()"></span><span class="main-dow main-date-jump" id="tl-dow" onclick="jumpTimelineToToday()"></span><i class="ti ti-chevron-right main-hdr-arrow" onclick="shiftTimelineDate(1)" aria-hidden="true"></i><span class="today-oneline-hl" id="today-oneline-hl"></span></div>
       <div class="tl-half-wrap">
         <!-- 좌측 절반 -->
         <div class="tl-half tl-half-left">
