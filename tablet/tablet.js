@@ -51,7 +51,9 @@ function _habitCheckCountOf(h,checksArr){
 // 본앱에서 앞으로 발생하는 온오프 변경이 정확히 반영됨.
 function _habitPeriods(h){
   if(h.periods&&h.periods.length)return h.periods;
-  if(h.created_at_key)return [{start:h.created_at_key,end:h.archived_at||null}]; // 구버전 데이터 폴백
+  // [2026-09-06 폴백 보강] start(created_at_key) 없이 end(archived_at)만 있는 경우도 놓치지 않도록 —
+  // 둘 중 하나라도 있으면 폴백 구간을 만든다(둘 다 없어야만 "구간 정보 없음"으로 처리).
+  if(h.created_at_key||h.archived_at)return [{start:h.created_at_key||null,end:h.archived_at||null}];
   return [];
 }
 function _isHabitCurrentlyOn(h){

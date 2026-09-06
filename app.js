@@ -8850,7 +8850,9 @@ function hideApiResults(){const el=document.getElementById('api-results');if(el)
 // 각 활성 구간이 독립적으로 누적 보존되도록 함. 구버전 createdAt/archivedAt만 있는 습관은 폴백으로 처리.
 function _habitPeriods(h){
   if(h.periods&&h.periods.length)return h.periods;
-  if(h.createdAt)return [{start:h.createdAt,end:h.archivedAt||null}]; // 구버전 데이터 폴백(마이그레이션 전)
+  // [2026-09-06 폴백 보강] createdAt(start)이 없어도 archivedAt(end)만 있는 경우를 놓치면
+  // "구간 정보 없음"으로 오판되어 무조건 활성 처리됨 — start 없이 end만 있어도 폴백 구간을 만든다.
+  if(h.createdAt||h.archivedAt)return [{start:h.createdAt||null,end:h.archivedAt||null}];
   return [];
 }
 function _isHabitActiveOn(h,dk){
