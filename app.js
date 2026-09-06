@@ -8856,7 +8856,10 @@ function _habitPeriods(h){
 function _isHabitActiveOn(h,dk){
   const periods=_habitPeriods(h);
   if(!periods.length)return true; // 구간 정보가 아예 없으면(아주 오래된 데이터) 항상 활성으로 간주
-  return periods.some(p=>(!p.start||dk>=p.start)&&(!p.end||dk<=p.end));
+  // [2026-09-06 경계 수정] end에는 "비활성화한 당일"(_applyHabitToggle에서 today로 기록)이 저장되므로,
+  // end 당일부터는 비활성으로 쳐야 함 — dk<p.end (당일 미포함)로 판정. 이전엔 dk<=p.end라 종료 당일까지
+  // 활성으로 잘못 포함되어(달성률 분모/월간 캘린더 모두) 비활성화 당일 하루가 통계에 남아있었음.
+  return periods.some(p=>(!p.start||dk>=p.start)&&(!p.end||dk<p.end));
 }
 function renderHabitMonthly(){
   const habits=getActiveHabits(),y=_calYear,mo=_calMonth; // 2026-09-06: archive(목록에서 제외)한 습관은 월간에서도 노출 안 함
