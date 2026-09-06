@@ -77,41 +77,39 @@ function renderHomeBody(section){
     body.appendChild(makeLabel('오늘의 리듬'));
     body.appendChild(makeTodayRhythmBanner());
   } else {
-    // 저녁 공통 틀: [그날의 특수 배너] → 링 → 리듬배너 → (브리핑) → 독서카드
-    // 네 갈래(말일/일요일/수요일/평일) 모두 이 순서를 그대로 따름 — 특수 배너만 가변
-    if(isLastDayOfMonth){
-      body.appendChild(makeLabel('🌿 이번 달 누계'));
-      const rbanner=document.createElement('div');
-      rbanner.className='weekly-review-banner';
-      rbanner.innerHTML=`<div class="weekly-review-banner-inner">
-        <div class="weekly-review-banner-title">🌿 이번 달 누계 보기</div>
-        <div class="weekly-review-banner-sub"><span>한 달 동안의 기록을 모아봤어요</span><div class="report-banner-arrow" style="display:inline-flex;"><i class="ti ti-chevron-up ico-sz-15" aria-hidden="true"></i></div></div>
-      </div>`;
-      rbanner.addEventListener('click',openMonthlyReportSheet);
-      body.appendChild(rbanner);
-    } else if(isSundayNight2){
-      appendSundayGenerateBanner(body);
+    // 저녁 공통 틀(파트1): [그날의 특수 배너] → 링 → 리듬배너 → (브리핑) → 독서카드
+    // 저녁 파트2(2026-09-06 개편): 인사카드 → 오늘의 독서 → 오늘의 문장 → (리포트 있는 날) 리포트 배너 → 오늘의 리듬기록
+    function appendReportBannerIfAny(){
+      if(isLastDayOfMonth){
+        body.appendChild(makeLabel('🌿 이번 달 누계'));
+        const rbanner=document.createElement('div');
+        rbanner.className='weekly-review-banner';
+        rbanner.innerHTML=`<div class="weekly-review-banner-inner">
+          <div class="weekly-review-banner-title">🌿 이번 달 누계 보기</div>
+          <div class="weekly-review-banner-sub"><span>한 달 동안의 기록을 모아봤어요</span><div class="report-banner-arrow" style="display:inline-flex;"><i class="ti ti-chevron-up ico-sz-15" aria-hidden="true"></i></div></div>
+        </div>`;
+        rbanner.addEventListener('click',openMonthlyReportSheet);
+        body.appendChild(rbanner);
+      } else if(isSundayNight2){
+        appendSundayGenerateBanner(body);
+      }
     }
     const isNight2=getSubSection()==='night_2';
-    if(!isNight2){
-      body.appendChild(makeHabitMiniCheckRow());
-      body.appendChild(makeChaeumBanner());
-      body.appendChild(makeLabel('저녁 플리'));
-      body.appendChild(makePlaylistMiniCard());
-    }
-    body.appendChild(makeTodayRhythmBanner());
-    // 일요일 다음 주 챌린지 준비 배너는 홈탭에서 제거 — 주간탭 "이번 주도 화이팅" 카드로 흡수됨
-    if(!isSundayNight2){
-      // "오늘 마무리" 브리핑은 통합카드(상단 인삿말)가 흡수함
-    }
+    if(!isNight2)appendReportBannerIfAny(); // 파트1은 원래 순서(맨 앞) 그대로 유지 — 건드리지 않음
     if(isNight2){
       body.appendChild(makeLabel('오늘의 독서'));
       body.appendChild(makeBookCardWithCover());
       const quoteCard=makeTodayQuoteCard();
       if(quoteCard)body.appendChild(quoteCard);
-      body.appendChild(makeLabel('밀도의 숲'));
-      body.appendChild(makeMonthlyHeatmapCard());
+      appendReportBannerIfAny(); // 파트2 개편(2026-09-06): 문장 다음, 리듬기록 이전으로 이동
+      body.appendChild(makeTodayRhythmBanner());
     }else{
+      body.appendChild(makeHabitMiniCheckRow());
+      body.appendChild(makeChaeumBanner());
+      body.appendChild(makeLabel('저녁 플리'));
+      body.appendChild(makePlaylistMiniCard());
+      body.appendChild(makeTodayRhythmBanner());
+      // "오늘 마무리" 브리핑은 통합카드(상단 인삿말)가 흡수함
       body.appendChild(makeEveningMiniStatCard());
     }
   }
@@ -5965,6 +5963,30 @@ function getBookProgressPct(book){
   if(book.unit==='pages')return book.totalPages?Math.max(0,Math.min(100,Math.round(book.pages/book.totalPages*100))):0;
   return book.percent||0;
 }
+// 날짜(dk) 문자열을 시드로 한 0~1 사이 의사난수 — 같은 날엔 항상 같은 값(하루종일 문구 고정),
+// 다음날엔 자연스럽게 다른 값이 나옴. 암호학적 용도 아님, 단순 문구 로테이션용.
+function _seededRandomByDk(dk){
+  let h=0;
+  for(let i=0;i<dk.length;i++){h=(h*31+dk.charCodeAt(i))|0;}
+  return (Math.abs(h)%1000)/1000;
+}
+// 독서카드 하단 문구 — 상황(스트릭/미독일수/완독률/예상잔여회차)별 후보를 모아 날짜시드로 하나 고정 선택.
+// 병렬독서 대비 "독서" 활동 전체 기준(특정 책이 아님)의 스트릭/미독일수를 사용.
+function _getBookNudgeText(book,pct){
+  const dk=dateKey(getLogicalDate());
+  const streak=getReadingActivityStreak(dk);
+  const idleDays=_daysSinceLastReading(dk);
+  const sessionCount=countReadingSessionsForBook(book);
+  const est=estimateRemainingReadingSessions(book,sessionCount);
+  const candidates=[];
+  if(streak>=2)candidates.push(`독서 ${streak}일째 이어가는 중이에요`);
+  if(streak===0&&idleDays>=2)candidates.push(`독서를 안 한 지 ${idleDays}일째예요`);
+  if(pct>0&&pct<100)candidates.push(`완독까지 ${100-pct}% 남았어요`);
+  if(est&&est.ready)candidates.push(`완독까지 약 ${est.remainingSessions}회 더 예상돼요`);
+  candidates.push('잠들기 전 15분 독서 어떠세요?'); // 위 조건에 하나도 안 걸리는 경우(막 시작한 책 등) 대비 기본 문구
+  const idx=Math.floor(_seededRandomByDk(dk+'|'+(book.cid||book.title))*candidates.length);
+  return candidates[idx];
+}
 function makeBookCardWithCover(){
   const book=getBooks().find(b=>b.status==='reading');
   const wrap=document.createElement('div');wrap.className='pace-card';
@@ -5981,13 +6003,14 @@ function makeBookCardWithCover(){
   const coverInner=book.poster
     ?`<img src="${book.poster}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;" alt="">`
     :`<i class="ti ti-book-2" style="font-size:20px;color:rgba(190,150,30,0.7);" aria-hidden="true"></i>`;
+  const nudgeText=_getBookNudgeText(book,pct);
   wrap.innerHTML=`<div style="display:flex;gap:12px;">
     <div style="width:52px;height:74px;border-radius:8px;background:linear-gradient(135deg,rgba(255,220,120,.6),rgba(255,200,150,.5));flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden;">${coverInner}</div>
     <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:6px;min-width:0;">
       <div style="font-size:var(--main-text-size);font-weight:500;color:var(--tp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${book.title}</div>
       ${book.author?`<div style="font-size:var(--dow-label-size);color:var(--ts);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${book.author}</div>`:''}
       <div style="width:100%;height:4px;border-radius:2px;background:rgba(200,176,168,0.2);overflow:hidden;"><div style="width:${pct}%;height:100%;background:rgba(255,200,110,0.85);"></div></div>
-      <div style="text-align:right;"><span class="reading-nudge" onclick="openReading()" style="cursor:pointer;">잠들기 전 15분 독서 어떠세요?</span></div>
+      <div style="text-align:right;"><span class="reading-nudge" onclick="openReading()" style="cursor:pointer;">${nudgeText}</span></div>
     </div>
   </div>`;
   return wrap;
@@ -6267,17 +6290,6 @@ function refreshDotTimelineCard(){
   if(fresh)old.replaceWith(fresh);
   else old.remove();
 }
-function getDayRecordDensity(dk){
-  const memos=getMemos(dk).length;
-  const doneTodos=getTodos(dk).filter(t=>t.done).length;
-  const habits=getHabits();
-  const wk=weekKey(new Date(dk+'T00:00:00'));
-  const dow=(new Date(dk+'T00:00:00').getDay()+6)%7;
-  const checks=getHabitChecks(wk);
-  let habitChecked=0;
-  habits.forEach(h=>{if(checks[h.id+'-'+dow])habitChecked++;});
-  return memos+doneTodos+habitChecked;
-}
 function makeHabitMiniCheckRow(){
   const wrap=document.createElement('div');
   wrap.style.cssText='display:flex;justify-content:space-around;padding:6px 4px;margin-bottom:10px;';
@@ -6307,6 +6319,21 @@ function makeHabitMiniCheckRow(){
     wrap.appendChild(badge);
   });
   return wrap;
+}
+// 오늘(dk) 포함, 끊기지 않고 연속으로 독서 기록(감상 카테고리, 텍스트가 "독서"로 시작)이 있었던 날수.
+// 오늘 아직 안 읽었으면 어제부터 거슬러 셈(오늘 하루 공백만으로 스트릭이 0이 되지 않도록).
+// 책 단위가 아니라 "독서" 활동 전체 기준 — 여러 책을 병렬로 읽어도 하루에 하나만 읽었으면 스트릭 유지.
+function getReadingActivityStreak(dk){
+  const hasReadingOn=x=>getRhythmBlocks(x).some(b=>b.cat==='enjoy'&&b.text&&b.text.startsWith('독서'));
+  let cur=new Date(dk+'T00:00:00');
+  if(!hasReadingOn(dateKey(cur)))cur.setDate(cur.getDate()-1);
+  let streak=0;
+  for(let i=0;i<365;i++){
+    const ck=dateKey(cur);
+    if(hasReadingOn(ck)){streak++;cur.setDate(cur.getDate()-1);}
+    else break;
+  }
+  return streak;
 }
 // 주어진 날짜(dk)로부터 과거로 거슬러 올라가며 독서 기록(감상 카테고리, 텍스트가 "독서"로 시작)이
 // 마지막으로 있었던 날까지 며칠 지났는지 계산. 최대 90일까지만 탐색(그 이상은 사실상 의미 없어 상한).
@@ -6455,60 +6482,6 @@ function makeDawnRecapCard(){
 
   card.innerHTML=html;
   wrap.appendChild(card);
-  return wrap;
-}
-function makeMonthlyHeatmapCard(){
-  const card=document.createElement('div');
-  card.className='card forest-density-card';
-  const now=new Date();
-  const y=now.getFullYear(),mo=now.getMonth();
-  const today=now.getDate();
-  const densities=[];
-  for(let d=1;d<=today;d++){
-    const dk=`${y}-${pad(mo+1)}-${pad(d)}`;
-    densities.push({d,dk,cnt:getDayRecordDensity(dk)});
-  }
-  const maxCnt=Math.max(1,...densities.map(x=>x.cnt));
-  // 밀도 5단계: 씨앗 - 새싹 - 잎 - 작은나무 - 큰나무 (그 달의 최대 기록량 대비 상대적 비율 기준)
-  const STAGES=[
-    {icon:'ti-growth',color:'rgba(212,207,118,0.75)'},
-    {icon:'ti-leaf',color:'rgba(195,210,120,0.8)'},
-    {icon:'ti-flower',color:'rgba(160,195,95,0.85)'},
-    {icon:'ti-christmas-tree',color:'rgba(120,175,75,0.9)'},
-    {icon:'ti-trees',color:'rgba(75,150,55,0.95)'}
-  ];
-  function stageFor(cnt){
-    if(cnt===0)return null;
-    const ratio=cnt/maxCnt;
-    const idx=Math.min(4,Math.floor(ratio*5));
-    return STAGES[idx];
-  }
-  let cells='';
-  densities.forEach(x=>{
-    const st=stageFor(x.cnt);
-    const inner=st?`<i class="ti ${st.icon}" style="font-size:13px;color:#fff;" aria-hidden="true"></i>`:'';
-    const bg=st?st.color:'rgba(200,176,168,0.08)';
-    const varAttr=st?`--cell-color:${st.color};`:'';
-    cells+=`<div class="heatmap-cell${st?'':' empty'}" onclick="openHomeDetailSheet('${mo+1}월 ${x.d}일',function(){return makeDaySummaryEl('${x.dk}');})" title="${x.d}일 · 기록 ${x.cnt}개" style="background:${bg};${varAttr}">${inner}</div>`;
-  });
-  card.innerHTML=`<div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:7px;">
-      <span style="font-size:var(--dow-label-size);color:var(--tm);">${mo+1}월</span>
-    </div>
-    <div class="heatmap-grid">${cells}</div>
-    <div style="display:flex;justify-content:flex-end;align-items:center;gap:5px;margin-top:6px;">
-      <i class="ti ti-growth" style="font-size:11px;color:rgba(212,207,118,0.9);" aria-hidden="true"></i>
-      <i class="ti ti-leaf" style="font-size:11px;color:rgba(195,210,120,0.9);" aria-hidden="true"></i>
-      <i class="ti ti-flower" style="font-size:11px;color:rgba(160,195,95,0.9);" aria-hidden="true"></i>
-      <i class="ti ti-christmas-tree" style="font-size:11px;color:rgba(120,175,75,0.9);" aria-hidden="true"></i>
-      <i class="ti ti-trees" style="font-size:11px;color:rgba(75,150,55,0.95);" aria-hidden="true"></i>
-    </div>`;
-  return card;
-}
-// 밀도의 숲 상세 — 월간탭과 동일한 buildDayDetailHtml 재사용(습관 체크는 통일 시 제외, 월간탭 항목 기준).
-function makeDaySummaryEl(dk){
-  ensureDateSynced(dk);
-  const wrap=document.createElement('div');
-  wrap.innerHTML=buildDayDetailHtml(dk);
   return wrap;
 }
 // calMode(월간탭에서 다른 날짜를 임시로 열어 편집 중)였다면 원래 날짜로 복원하고 관련 화면을 다시 그림.
@@ -9110,8 +9083,7 @@ function calDayClick(d){
   renderCalendar();
   if(!_calSelectedDay){const el=document.getElementById('cal-detail');if(el)el.innerHTML='';}
 }
-// 하루 상세 HTML 생성 — 월간탭(renderCalDetail)과 밀도의 숲(makeDaySummaryEl)이 공유.
-// 습관 체크는 밀도의 숲에는 없던 항목이라 통일 시 제외(월간탭 항목 기준으로 통일).
+// 하루 상세 HTML 생성 — 월간탭(renderCalDetail)에서 사용. [2026-09-06] 밀도의 숲 기능 완전 제거로 공유 대상이던 makeDaySummaryEl도 함께 삭제됨.
 function buildDayDetailHtml(dk){
   const allMemos=getMemos(dk);const todos=getTodos(dk);const doneTodos=todos.filter(t=>t.done);const sleep=getSleep(dk);
   const meals=getMeals(dk);

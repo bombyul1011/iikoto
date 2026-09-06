@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.15-rhythm-track-tweaks';
+const CACHE = 'iikoto-v2.17-evening2-reorder-book-nudge';
 const ASSETS = [
   './',
   './index.html'
