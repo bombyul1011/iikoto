@@ -498,17 +498,20 @@ function closeFloatMenu(){
 }
 
 // ══════════════════════════════════════════════════════════
-// 플로팅 FAB — 짧은 탭: 기존 펼침/닫힘 / 길게 누름: 누른 채 이동→하이라이트→손 떼면 이동
+// 플로팅 FAB — 짧은 탭: 기존 펼침/닫힘 / 길게 누름: 손가락 이동량만큼 메뉴 항목들이
+// 실시간으로 같이 슬라이드(룰렛/슬롯 릴 느낌)되고, 기준선에 가장 가까운 항목이 강조됨.
+// 손을 떼면 그 항목의 원래 자리로 스냅(짧은 transition)된 뒤 해당 탭으로 전환.
+// [2026-09-06] 이전엔 하이라이트만 순간 전환되는 방식이었으나, 항목 자체가 눈에 보이게
+// 이동하는 편이 "돌아가는" 느낌에 더 가깝다는 피드백에 따라 변경.
 // ══════════════════════════════════════════════════════════
 (function initFloatFabGesture(){
   const LONGPRESS_MS=380;   // 이 시간 이상 누르고 있으면 롱프레스로 판정
   const MOVE_CANCEL_PX=10;  // 롱프레스 판정 전 이 거리 이상 움직이면 탭으로 취급하지 않음(스크롤 등과 충돌 방지)
-  const ITEM_STEP_PX=42;    // 이 정도 세로 이동마다 한 칸씩 이동 — 실측 후 감도 튜닝 지점(작을수록 예민)
   const fab=document.getElementById('float-fab');
   if(!fab)return;
 
   let pressTimer=null,startX=0,startY=0,isLongPress=false,pointerId=null;
-  let tabOrder=[],baseIndex=0,curIndex=0;
+  let tabOrder=[],baseIndex=0,curIndex=0,itemStep=51; // itemStep은 실측 간격(px)으로 매 롱프레스 시작 시 갱신
 
   function clearHoverStyles(){
     document.querySelectorAll('.float-tab.drag-hover').forEach(el=>el.classList.remove('drag-hover'));
@@ -517,6 +520,28 @@ function closeFloatMenu(){
   function refreshTabOrder(){
     // 펼칠 때마다 다시 읽어 항목 추가/순서변경에도 안전하게 대응(DOM 순서 = 실제 노출 순서)
     tabOrder=Array.from(document.querySelectorAll('#float-tab-menu .float-tab'));
+    // 실제 항목 간 간격(margin/gap 포함)을 화면에서 직접 측정 — 하드코딩 값이 CSS 변경에 밀리지 않도록 함
+    if(tabOrder.length>=2){
+      const b0=tabOrder[0].getBoundingClientRect(),b1=tabOrder[1].getBoundingClientRect();
+      const measured=Math.abs(b0.top-b1.top);
+      if(measured>10)itemStep=measured;
+    }
+  }
+
+  function setReelOffset(px){
+    // column-reverse 구조라 DOM상 마지막 항목(오늘)이 화면 맨 아래(버튼 바로 위)에 위치.
+    // px(양수)만큼 전체를 아래로, 음수면 위로 이동 — 손가락을 위로 올리면(dy>0) 릴이 위로 흘러가는 느낌을 주기 위해 부호를 반전해서 적용.
+    tabOrder.forEach(el=>{el.style.transform=`translateY(${px}px)`;});
+  }
+
+  function snapReelBack(){
+    tabOrder.forEach(el=>{
+      el.style.transition='transform .22s cubic-bezier(.2,.8,.3,1)';
+      el.style.transform='translateY(0)';
+    });
+    setTimeout(()=>{
+      tabOrder.forEach(el=>{el.style.transition='';});
+    },230);
   }
 
   function applyHighlight(idx){
@@ -536,6 +561,7 @@ function closeFloatMenu(){
     document.getElementById('float-fab').classList.add('open');
     document.getElementById('float-fab-icon').className='ti ti-x';
     refreshTabOrder();
+    tabOrder.forEach(el=>{el.style.transition='';el.style.transform='translateY(0)';}); // 이전 잔여 transform 초기화
     baseIndex=Math.max(0,tabOrder.findIndex(el=>el.dataset.tab===_currentTab));
     curIndex=baseIndex;
     startY=clientY;
@@ -545,6 +571,7 @@ function closeFloatMenu(){
   function endGesture(){
     fab.classList.remove('longpress');
     clearHoverStyles();
+    snapReelBack();
     if(isLongPress){
       const el=tabOrder[curIndex];
       if(el&&el.dataset.tab){
@@ -575,12 +602,15 @@ function closeFloatMenu(){
       if(Math.hypot(dx,dy)>MOVE_CANCEL_PX)clearTimeout(pressTimer); // 롱프레스 되기 전에 손가락이 많이 움직이면 취소(스크롤 의도로 간주)
       return;
     }
-    // 위로 움직이면(clientY 감소) 메뉴 위쪽 항목으로, 아래로 움직이면 아래쪽(버튼에 가까운) 항목으로 이동.
-    // 정확히 그 항목 위에 손가락이 있지 않아도, 이동거리만으로 한 칸씩 넘어가는 "휠" 방식.
+    // 손가락을 위로 올릴수록(dy 양수) 릴이 손가락을 따라 위로 흘러가 보이도록 -dy를 오프셋으로 적용.
+    // 한 칸을 완전히 넘기기 전까지는(0~itemStep 사이) 오프셋이 연속적으로 남아 있어 "돌아가는 중" 시각효과가 생기고,
+    // 정수 칸을 넘긴 나머지(rem)만 표시해 릴이 무한히 밀려나지 않고 한 칸씩 자연스럽게 순환하는 느낌을 줌.
     const dy=startY-e.clientY;
-    const steps=Math.round(dy/ITEM_STEP_PX);
+    const steps=Math.floor(dy/itemStep);
+    const rem=dy-steps*itemStep; // 0~itemStep 범위의 "진행 중" 오프셋
     const idx=Math.min(tabOrder.length-1,Math.max(0,baseIndex+steps));
     applyHighlight(idx);
+    setReelOffset(-rem);
   });
 
   function onUp(e){
@@ -598,6 +628,7 @@ function closeFloatMenu(){
     clearTimeout(pressTimer);
     fab.classList.remove('longpress');
     clearHoverStyles();
+    snapReelBack();
     if(isLongPress)closeFloatMenu();
     isLongPress=false;
   });
