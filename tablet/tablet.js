@@ -194,20 +194,40 @@ function countContentsCompletedInRange(contents,startDk,endDk){
 // [2026-09-06] habitDenominator의 의미를 "일수"에서 "활성 습관-일수 총합"(_activeHabitDayCount)으로 변경.
 // 이전엔 habitCount*habitDenominator로 분모를 만들었으나, 이러면 archive/월중 신규습관을 반영 못 함 —
 // 이제 호출부가 이미 정확한 분모를 계산해 넘기므로 여기선 곱셈 없이 그대로 사용.
-function renderStatBar(elId,{memoCount,doneCount,checkCount,habitDenominator,contentCount,avgSleep}){
+// 주간탭/월간탭 공통 미니 통계바(메모/완료투두/습관%/콘텐츠완결/평균수면) — renderWeekDelta와 동일 원칙:
+// cur/prev 각각 {memos,todos,sleepRows,contents,habits,checks,startDk,endDk}를 받아 증감 화살표까지 표시.
+// habits는 cur에만 필요(활성습관 분모 계산용, prev 습관율은 cur.habits 기준으로 prev 기간만 다시 판정).
+function renderStatBar(elId,cur,prev){
   const el=document.getElementById(elId);
-  const pct=habitDenominator?Math.round(checkCount/habitDenominator*100):0;
-  el.innerHTML=`
-    <div class="sbar-item"><i class="ti ti-notes" aria-hidden="true"></i><span class="sbar-num">${memoCount}</span></div>
-    <div class="sbar-div"></div>
-    <div class="sbar-item"><i class="ti ti-checkbox" aria-hidden="true"></i><span class="sbar-num">${doneCount}</span></div>
-    <div class="sbar-div"></div>
-    <div class="sbar-item"><i class="ti ti-chart-donut" aria-hidden="true"></i><span class="sbar-num">${pct}%</span></div>
-    <div class="sbar-div"></div>
-    <div class="sbar-item"><i class="ti ti-stack-2" aria-hidden="true"></i><span class="sbar-num">${contentCount}</span></div>
-    <div class="sbar-div"></div>
-    <div class="sbar-item"><i class="ti ti-moon-stars" aria-hidden="true"></i><span class="sbar-num">${avgSleep}h</span></div>
-  `;
+  const curActiveDays=_activeHabitDayCount(cur.habits,cur.startDk,cur.endDk);
+  const prevActiveDays=_activeHabitDayCount(cur.habits,prev.startDk,prev.endDk);
+  const curHabitPct=curActiveDays?Math.round(_uniqueHabitCheckCount(cur.checks)/curActiveDays*100):0;
+  const prevHabitPct=prevActiveDays?Math.round(_uniqueHabitCheckCount(prev.checks)/prevActiveDays*100):0;
+  const curDone=(cur.todos||[]).filter(t=>t.done).length;
+  const prevDone=(prev.todos||[]).filter(t=>t.done).length;
+  const curContent=countContentsCompletedInRange(cur.contents,cur.startDk,cur.endDk);
+  const prevContent=countContentsCompletedInRange(prev.contents,prev.startDk,prev.endDk);
+  const curSleep=parseFloat(avgSleepHoursFromRows(cur.sleepRows))||0;
+  const prevSleep=parseFloat(avgSleepHoursFromRows(prev.sleepRows))||0;
+
+  const items=[
+    {icon:'ti-notes',cur:(cur.memos||[]).length,prev:(prev.memos||[]).length,fmt:v=>v},
+    {icon:'ti-checkbox',cur:curDone,prev:prevDone,fmt:v=>v},
+    {icon:'ti-chart-donut',cur:curHabitPct,prev:prevHabitPct,fmt:v=>v+'%'},
+    {icon:'ti-stack-2',cur:curContent,prev:prevContent,fmt:v=>v},
+    {icon:'ti-moon-stars',cur:curSleep,prev:prevSleep,fmt:v=>v+'h'}
+  ];
+
+  el.innerHTML=items.map(it=>{
+    const diff=Math.round((it.cur-it.prev)*10)/10;
+    const dir=diff>0?'up':(diff<0?'down':'flat');
+    const arrow=dir==='up'?'ti-arrow-up':(dir==='down'?'ti-arrow-down':'ti-minus');
+    const sign=diff>0?'+':'';
+    return `<div class="wd-item">
+      <div class="wd-item-top"><i class="ti ${it.icon}" aria-hidden="true"></i><span class="wd-num">${it.fmt(it.cur)}</span></div>
+      <div class="wd-delta ${dir}"><i class="ti ${arrow}" style="font-size:10px;"></i>${sign}${it.fmt(diff)}</div>
+    </div>`;
+  }).join('');
 }
 
 // 수면 점수 → 표정 아이콘 매핑 (본앱 SLEEP_SCORE_LEVELS 원본과 동일)
@@ -2280,32 +2300,51 @@ async function renderMonthHabits(y,mo,habitsData){
   }).join('')}</div>`;
 }
 
-// 이번 달 미니 통계바 — 주간탭과 동일 스타일(sbar-item/sbar-div), 박스 없이 심플하게
+// 이번 달 미니 통계바 — 주간탭(renderWeekDelta)과 동일 원칙: 전월 대비 증감을 "오늘과 같은 날짜까지"만 잘라서 비교.
+// 당월이 진행 중(오늘이 이 달 안)이면 이번달/전달 모두 1일~오늘 날짜(day)까지만 반영. 과거 달을 보고 있으면 절단 없이 해당 달 전체 vs 전달 전체.
 async function renderMonthStatBar(y,mo,habitsData){
   const mk=`${y}-${pad(mo+1)}`;
-  const startDk=`${mk}-01`,endDk=`${mk}-31`;
-  const [memos,todos,sleepRows,contents]=await Promise.all([
-    supaFetch(`memos?date_key=gte.${startDk}&date_key=lte.${endDk}&select=id`),
-    supaFetch(`todos?date_key=gte.${startDk}&date_key=lte.${endDk}&select=done`),
-    supaFetch(`sleep?date_key=gte.${startDk}&date_key=lte.${endDk}&select=sleep_time,wake_time`),
-    supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&month_key=eq.${mk}`)
-  ]);
-  const habitsRaw=habitsData?habitsData.habits:(await supaFetch(`habits?order=sort_order.asc`))||[];
-  const habits=_getActiveHabitsOnly(habitsRaw); // archive된 습관은 이 달 통계에서 제외
-  const checks=habitsData?habitsData.checks:(await supaFetch(`habit_checks?date_key=gte.${startDk}&date_key=lte.${endDk}`))||[];
   const daysInMonth=new Date(y,mo+1,0).getDate();
   const realEndDk=`${mk}-${pad(daysInMonth)}`;
-  // 당월이 진행 중이면(오늘이 이 달 안이면) "오늘까지"만 분모에 반영 — 기존 미니통계바 원칙과 동일하게 유지.
   const today=new Date();
   const isCurMonth=(y===today.getFullYear()&&mo===today.getMonth());
-  const habitEndDk=isCurMonth?dateKey(today):realEndDk;
+  const cmpEndDk=isCurMonth?dateKey(today):realEndDk; // 이번 달 비교 종료일(포함)
+  const startDk=`${mk}-01`;
+
+  // 전월 범위 — 같은 "일(day)"까지만 절단(예: 이번달 9/1~9/6이면 전달도 8/1~8/6).
+  // 전달 일수가 더 적어 그 날짜가 없는 경우(예: 이번달 3/1~3/31→전달 2월)는 전달 말일로 클램프.
+  const prevMonthDate=new Date(y,mo-1,1);
+  const py=prevMonthDate.getFullYear(),pmo=prevMonthDate.getMonth();
+  const pmk=`${py}-${pad(pmo+1)}`;
+  const daysInPrevMonth=new Date(py,pmo+1,0).getDate();
+  const todayDay=isCurMonth?today.getDate():daysInMonth;
+  const prevCmpDay=Math.min(todayDay,daysInPrevMonth);
+  const prevStartDk=`${pmk}-01`,prevCmpEndDk=`${pmk}-${pad(prevCmpDay)}`;
+
+  const [memos,todos,sleepRows,contents,habitsRaw0,checks,
+    prevMemos,prevTodos,prevSleepRows,prevContents,prevChecks]=await Promise.all([
+    supaFetch(`memos?date_key=gte.${startDk}&date_key=lte.${cmpEndDk}&select=id`),
+    supaFetch(`todos?date_key=gte.${startDk}&date_key=lte.${cmpEndDk}&select=done`),
+    supaFetch(`sleep?date_key=gte.${startDk}&date_key=lte.${cmpEndDk}&select=sleep_time,wake_time`),
+    supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&month_key=eq.${mk}`),
+    habitsData?Promise.resolve(habitsData.habits):supaFetch(`habits?order=sort_order.asc`),
+    // habitsData.checks는 이 달 1일~31일 전체 범위라, cmpEndDk(오늘까지)로 절단해야 하므로 항상 새로 조회.
+    supaFetch(`habit_checks?date_key=gte.${startDk}&date_key=lte.${cmpEndDk}`),
+    // 전월 대비 비교용(오늘과 같은 날짜까지로 절단된 범위)
+    supaFetch(`memos?date_key=gte.${prevStartDk}&date_key=lte.${prevCmpEndDk}&select=id`),
+    supaFetch(`todos?date_key=gte.${prevStartDk}&date_key=lte.${prevCmpEndDk}&select=done`),
+    supaFetch(`sleep?date_key=gte.${prevStartDk}&date_key=lte.${prevCmpEndDk}&select=sleep_time,wake_time`),
+    supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&month_key=eq.${pmk}`),
+    supaFetch(`habit_checks?date_key=gte.${prevStartDk}&date_key=lte.${prevCmpEndDk}`)
+  ]);
+  const habits=_getActiveHabitsOnly(habitsRaw0||[]); // archive된 습관은 이 달 통계에서 제외
+
   renderStatBar('month-stat-bar',{
-    memoCount:(memos||[]).length,
-    doneCount:(todos||[]).filter(t=>t.done).length,
-    checkCount:_uniqueHabitCheckCount(checks),
-    habitDenominator:_activeHabitDayCount(habits,startDk,habitEndDk),
-    contentCount:countContentsCompletedInRange(contents,startDk,endDk),
-    avgSleep:avgSleepHoursFromRows(sleepRows)
+    memos:memos||[],todos:todos||[],sleepRows:sleepRows||[],contents:contents||[],
+    habits,checks:checks||[],startDk,endDk:cmpEndDk
+  },{
+    memos:prevMemos||[],todos:prevTodos||[],sleepRows:prevSleepRows||[],contents:prevContents||[],
+    checks:prevChecks||[],startDk:prevStartDk,endDk:prevCmpEndDk
   });
 }
 

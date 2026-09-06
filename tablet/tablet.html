@@ -447,13 +447,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 #tl-sleep-score{color:var(--sleep-warmgray);display:inline-flex;width:18px;height:18px;align-items:center;justify-content:center;flex-shrink:0;}
 .tl-sleep-mid{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;align-items:center;gap:6px;white-space:nowrap;}
 .tl-sleep-icon{font-size:14px;color:var(--sleep-warmgray);}
+.tl-sleep-dash{color:var(--sleep-warmgray);font-size:12px;opacity:.7;}
 .tl-sleep-time{font-size:13px;color:var(--sleep-warmgray-strong);font-variant-numeric:tabular-nums;font-weight:500;}
 .tl-sleep-dur{font-size:13px;color:var(--sleep-warmgray-strong);flex-shrink:0;margin-left:auto;}
 /* 습관배너 — 제목 없이 아이콘 4개만, 수면배너와 동일 높이로 나란히 */
 .tl-habit-banner{border-radius:16px;padding:4px 18px;background:var(--card);border:1px solid var(--card-b);height:44px;box-sizing:border-box;display:flex;align-items:center;gap:16px;}
 .tl-habit-banner #tl-habits{flex:1;min-width:0;}
 .tl-habit-banner-lbl{font-family:'DM Sans',sans-serif;font-size:var(--fs-xs);font-weight:500;letter-spacing:.06em;color:var(--ts);flex-shrink:0;text-transform:uppercase;}
-.tl-habit-banner .habit-grid{display:flex!important;align-items:center;justify-content:space-between;flex:1;min-width:0;gap:26px;}
+.tl-habit-banner .habit-grid{display:flex!important;align-items:center;justify-content:space-between;flex:1;min-width:0;}
 .tl-habit-banner .habit-row{flex:none!important;background:none!important;padding:0!important;color:transparent!important;font-size:0!important;}
 .tl-habit-banner .habit-row-icon{font-size:20px;}
 .tl-habit-banner .habit-check{display:none!important;}
@@ -1924,9 +1925,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
               <div class="tl-sleep-row">
                 <span id="tl-sleep-score"></span>
                 <span class="tl-sleep-mid">
-                  <i class="ti ti-moon-stars tl-sleep-icon" aria-hidden="true"></i>
                   <span class="tl-sleep-time" id="tl-sleep-sleep">--:--</span>
-                  <i class="ti ti-sun tl-sleep-icon" aria-hidden="true"></i>
+                  <span class="tl-sleep-dash">－</span>
                   <span class="tl-sleep-time" id="tl-sleep-wake">--:--</span>
                 </span>
                 <span class="tl-sleep-dur" id="tl-sleep-dur"></span>
@@ -2037,7 +2037,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       </div>
       <div class="card"><div class="card-lbl"><i class="ti ti-chart-bar" style="color:rgba(var(--pal-lavender-rgb),1);" aria-hidden="true"></i>콘텐츠 타임라인</div><div id="month-tt"></div></div>
       <div class="card month-quotes-card"><div class="card-lbl"><i class="ti ti-quote" style="color:rgba(var(--pal-pink-text-rgb),0.85);" aria-hidden="true"></i>이번 달 수집문장</div><div id="month-quotes"></div></div>
-      <div class="stat-bar-wrap" id="month-stat-bar"></div>
+      <div class="stat-bar-wrap wd-bar-wrap" id="month-stat-bar"></div>
     </div>
 
     <!-- 리포트탭 -->
