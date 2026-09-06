@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.10-periods-fix';
+const CACHE = 'iikoto-v2.11-habit-sync-fix';
 const ASSETS = [
   './',
   './index.html'

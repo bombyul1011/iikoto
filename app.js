@@ -2985,7 +2985,7 @@ async function syncHabitsDown(){
     if(r.habit_id)h.id=r.habit_id;
     if(r.custom)h.custom=true;
     if(r.periods&&r.periods.length)h.periods=r.periods;
-    else if(r.created_at_key)h.periods=[{start:r.created_at_key,end:r.archived_at||null}]; // 구버전 폴백
+    else if(r.created_at_key||r.archived_at)h.periods=[{start:r.created_at_key||null,end:r.archived_at||null}]; // 구버전 폴백(archived_at만 있어도 처리 — 2026-09-06 영양제 케이스 재발 방지)
     return h;
   }));
 }
