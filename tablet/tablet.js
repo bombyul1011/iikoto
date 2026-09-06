@@ -5706,6 +5706,7 @@ function syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,mflowCidSet,con
     const isNarrow=window.innerWidth<=760;
     if(sidebarOpen||isNarrow){
       if(trackCardEl){
+        trackCardEl.classList.add('tl-ready'); // 이 분기는 재렌더가 없으므로(TOTAL_H 그대로) 바로 노출
         requestAnimationFrame(()=>{
           const nowDot=trackCardEl.querySelector('.tl-now-dot');
           if(nowDot){
@@ -5717,7 +5718,7 @@ function syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,mflowCidSet,con
       return;
     }
     const rightEl=document.querySelector('.tl-half-right');
-    if(!rightEl||!trackCardEl)return;
+    if(!rightEl||!trackCardEl){if(trackCardEl)trackCardEl.classList.add('tl-ready');return;}
     const cardPadding=46; // .tl-track-card의 상하 padding(20px+26px) 근사값
     // 우측 전체 높이(일정/타임테이블+메모+할일+감상)에 맞춰 트랙 높이 결정 — 좌측 상단 배너(수면+습관)는 트랙 밖에
     // 별도로 있으므로 그 높이만큼 빼서 트랙 카드 자체의 목표 높이를 우측과 맞춤.
@@ -5729,7 +5730,11 @@ function syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,mflowCidSet,con
     // 이전에는 패딩을 빼지 않고 rightEl 전체 높이를 그대로 넣어 트랙 카드가 우측보다 패딩만큼 더 커 보였음.
     trackCardEl.style.maxHeight=(targetH+cardPadding)+'px';
     trackCardEl.style.overflowY='auto';
+    trackCardEl.classList.add('tl-ready'); // 실측 기준 재렌더(정확한 텍스트 위치)가 끝난 뒤에만 노출
   };
+  // [2026-09-06] 탭/날짜 전환 시 이전 트랙이 잠깐 남아있다 깜빡이지 않도록, 재렌더 시작 전 매번 숨김 처리.
+  const existingCard=document.querySelector('.tl-track-card');
+  if(existingCard)existingCard.classList.remove('tl-ready');
   // 1차: 두 프레임 뒤(레이아웃이 한 번 더 안정된 시점)에 측정 — 모든 로드에 항상 필요.
   requestAnimationFrame(()=>requestAnimationFrame(doSync));
   // 2차/3차 재동기화(웹폰트 로딩 대기, 400ms 지연 재확인)는 앱 최초 로딩 때만 필요한 보정 —
@@ -6107,28 +6112,45 @@ function renderTimelineTrack(dk,todos,sleep,meals,rblocks,mflowCidSet,totalHOver
     return {bk,bi,by,bh,durMin,isShort:durMin<=60,canTwoLine};
   });
   renderBlocks.forEach(r=>{if(r.by+r.bh>maxBottom)maxBottom=r.by+r.bh;});
-  // 라벨 배치 판정 — 라벨이 놓일 화면 영역(px)이 다른 항목(식사 알약, 다른 리듬 블록 등)의 실제 화면
-  // 영역과 겹치면 그 항목 바로 아래로 민다. 반올림 오차(_tlTimeToY의 Math.round) 흡수를 위해 BUFFER_PX만큼
-  // 여유를 둔다. 식사 알약도 by~by+MEAL_PILL_H가 실제 화면 점유 범위이므로 별도 처리 없이 동일하게 비교된다.
+  // 라벨 배치 판정 — 긴 블록(long) 내부에서 다른 항목(식사 알약 등)이 걸치는 구간을 뺀 "빈 구간"들을 구하고,
+  // 그중 라벨이 들어갈 수 있는 가장 넓은 구간의 상단에 라벨을 배치한다(무조건 아래로 미는 게 아니라 위/아래
+  // 중 더 넓은 쪽을 선택). BUFFER_PX는 반올림 오차 및 시각적으로 맞닿는 것까지 겹침으로 취급하기 위한 여유.
   const BUFFER_PX=3;
   const labelTopFix={};
   renderBlocks.forEach(long=>{
     if(long.isShort)return;
-    let pushToBy=null;
+    // long 범위(by~by+bh) 안에서, 다른 항목이 걸치는 [start,end] 구간들을 BUFFER_PX만큼 넓혀 수집.
+    const obstacles=[];
     renderBlocks.forEach(other=>{
       if(other===long)return;
-      const otherTop=other.by,otherBottom=other.by+other.bh;
-      // long의 라벨 후보 영역 — 겹침이 없으면 한줄(26px) 기준, 있으면 이후 갱신되므로 매 반복 최신 canTwoLine 기준 사용.
-      const labelBand=long.canTwoLine?46:26;
-      const longLabelTop=long.by,longLabelBottom=long.by+labelBand;
-      const overlaps=otherBottom+BUFFER_PX>longLabelTop&&otherTop-BUFFER_PX<longLabelBottom;
-      if(!overlaps)return;
-      long.canTwoLine=false; // 겹치면 우선 두줄모드부터 해제해 라벨 영역 자체를 줄임(26px로 재판정 유도)
-      if(pushToBy==null||otherBottom>pushToBy)pushToBy=otherBottom;
+      const otherTop=other.by-BUFFER_PX,otherBottom=other.by+other.bh+BUFFER_PX;
+      if(otherBottom<=long.by||otherTop>=long.by+long.bh)return; // long 범위와 아예 무관하면 제외
+      obstacles.push({top:Math.max(otherTop,long.by),bottom:Math.min(otherBottom,long.by+long.bh)});
     });
-    if(pushToBy!=null){
-      labelTopFix[long.bi]=Math.max(pushToBy-long.by,0);
-    }
+    if(!obstacles.length)return; // 걸치는 게 없으면 원래 위치(블록 시작점) 그대로
+    obstacles.sort((a,b)=>a.top-b.top);
+    // 병합(겹치는 장애물끼리 하나로 합침)
+    const merged=[];
+    obstacles.forEach(o=>{
+      const last=merged[merged.length-1];
+      if(last&&o.top<=last.bottom)last.bottom=Math.max(last.bottom,o.bottom);
+      else merged.push({...o});
+    });
+    // 장애물 사이사이의 빈 구간(gap) 후보 산출 — long 시작~첫 장애물, 장애물 사이, 마지막 장애물~long 끝.
+    const gaps=[];
+    let cursor=long.by;
+    merged.forEach(m=>{
+      if(m.top>cursor)gaps.push({top:cursor,bottom:m.top});
+      cursor=Math.max(cursor,m.bottom);
+    });
+    if(long.by+long.bh>cursor)gaps.push({top:cursor,bottom:long.by+long.bh});
+    if(!gaps.length){labelTopFix[long.bi]=0;return;} // 장애물이 블록 전체를 덮는 극단적 케이스 — 안전장치
+    // 가장 넓은 gap 선택. 그 gap 높이가 두줄모드(46px) 라벨을 못 담으면 두줄모드부터 해제.
+    let best=gaps[0];
+    gaps.forEach(g=>{if(g.bottom-g.top>best.bottom-best.top)best=g;});
+    const gapH=best.bottom-best.top;
+    if(long.canTwoLine&&gapH<46)long.canTwoLine=false;
+    labelTopFix[long.bi]=Math.max(best.top-long.by,0);
   });
   renderBlocks.forEach(r=>{
     const {bk,bi,by,bh,isShort,canTwoLine}=r;
