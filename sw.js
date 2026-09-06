@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.17-evening2-reorder-book-nudge';
+const CACHE = 'iikoto-v2.18-quote-margin-fix';
 const ASSETS = [
   './',
   './index.html'
