@@ -498,10 +498,16 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .tl-now-line{position:absolute;left:36px;right:0;height:2px;border-radius:1px;background:linear-gradient(90deg,rgba(235,180,20,0.9),rgba(255,205,110,0.75));z-index:20;}
 .tl-now-dot{position:absolute;left:36px;width:12px;height:12px;border-radius:50%;background:#fffefa;border:3px solid rgba(235,180,20,0.9);transform:translate(-50%,-50%);z-index:21;}
 /* 오른쪽 컬럼(일정+시간표+완료투두 통합) — 겹치면 러프하게 아래로 밀려남(JS에서 계산), 스타일은 단순 리스트 */
-.tl-todo-item{position:absolute;left:0;right:0;display:flex;align-items:flex-start;gap:6px;font-size:var(--fs-sm);color:var(--tp);}
+.tl-todo-item{position:absolute;left:0;right:0;display:flex;align-items:flex-start;gap:6px;font-size:var(--fs-sm);color:var(--tp);z-index:1;}
 .tl-todo-marker{flex-shrink:0;margin-top:1px;width:15px;height:15px;display:flex;align-items:center;justify-content:center;}
 .tl-todo-check{width:15px;height:15px;border-radius:50%;background:rgba(var(--pal-mint-rgb),0.9);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;}
 .tl-schedule-dot{width:8px;height:8px;border-radius:50%;background:rgba(var(--pal-lavender-rgb),0.9);}
+.tl-schedule-dot.done{opacity:0.45;}
+.tl-habit-dot{width:8px;height:8px;border-radius:50%;background:rgba(var(--pal-sky-rgb),0.9);}
+.tl-todo-line{position:absolute;left:7px;width:1px;background:rgba(var(--divider-rgb),0.35);z-index:0;}
+.tl-meal-pill{position:absolute;left:22px;display:inline-flex;align-items:center;gap:4px;background:rgba(255,250,240,0.92);border:1px solid rgba(70,155,110,0.55);border-radius:14px;padding:2px 9px 2px 7px;font-size:var(--fs-sm);font-weight:500;color:rgba(25,100,60,0.95);white-space:nowrap;max-width:calc(100% - 30px);overflow:hidden;text-overflow:ellipsis;line-height:1.3;}
+.tl-meal-pill-icon{font-size:12px;flex-shrink:0;opacity:0.85;}
+.tl-meal-pill-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .tl-event-dot-sm{background:rgba(var(--pal-lavender-rgb),1);width:9px;height:9px;}
 .tl-todo-body{min-width:0;}
 .tl-todo-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}

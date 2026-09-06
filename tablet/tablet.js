@@ -47,7 +47,7 @@ function _habitCheckCountOf(h,checksArr){
 // 두 필드 모두 없는 습관(마이그레이션 이전부터 있던 레거시)은 항상 활성으로 간주(본앱 규칙과 동일).
 function _isHabitActiveOn(h,dk){
   if(h.created_at_key&&dk<h.created_at_key)return false;
-  if(h.archived_at&&dk>h.archived_at)return false;
+  if(h.archived_at&&dk>=h.archived_at)return false;
   return true;
 }
 // [2026-09-06] 습관 달성률 분모 계산 — "습관 개수 × 기간 일수" 대신, 그 기간 동안 각 습관이
@@ -5675,15 +5675,15 @@ async function loadTimelineTab(){
 
   // 좌측 상단 — 수면배너 + 습관배너(아이콘만)
   renderTimelineSleepBanner(sleep);
-  renderTimelineHabitBanner(habits||[],habitChecks||[]);
-  renderTimelineTrack(dk,todos||[],sleep,mealsRow,rblocks||[],mflowCidSet,undefined,contents||[]);
+  renderTimelineHabitBanner(dk,habits||[],habitChecks||[]);
+  renderTimelineTrack(dk,todos||[],sleep,mealsRow,rblocks||[],mflowCidSet,undefined,contents||[],habits||[],habitChecks||[]);
   renderTimelineCompareCard(dk,todos||[],sleep,rblocks||[],habits||[],habitChecks||[]);
 
   // 좌우 높이 동기화 — 오른쪽 영역(도넛~감상/습관까지) 실제 렌더 높이를 측정해, 그 값을 트랙 전체 높이(TOTAL_H)로
   // 다시 사용해 트랙을 재렌더링. 이렇게 하면 0~24시 전체가 스크롤 없이 오른쪽 높이 안에 정확히 들어맞는다.
   // (기존에는 트랙을 고정 900px로 그린 뒤 컨테이너만 잘라서 스크롤을 만들었는데, 그러면 24시가 항상 스크롤 밖으로
   // 밀려나 있었음 — 트랙 콘텐츠 자체를 오른쪽 실측 높이 기준으로 다시 그리는 방식으로 수정.)
-  syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,mflowCidSet,contents||[]);
+  syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,mflowCidSet,contents||[],habits||[],habitChecks||[]);
 }
 
 // 좌우 높이 동기화를 별도 함수로 분리 — 첫 탭 진입 시 폰트/레이아웃이 아직 자리잡기 전에 offsetHeight를 측정해
@@ -5692,7 +5692,7 @@ async function loadTimelineTab(){
 let _isFirstTimelineLoad=true; // 앱 최초 로딩 시에는 사이드바 캘린더/인사배너 등 다른 초기화가 동시에 돌면서
 // 레이아웃이 계속 바뀌는 중이라 rAF 두 번만으로는 최종 높이가 잡히기 전에 측정되는 경우가 있어, 이 경우에만
 // 넉넉한 지연을 둔 추가 재동기화를 한 번 더 건다(재방문 시에는 이미 안정적이라 불필요).
-function syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,mflowCidSet,contents){
+function syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,mflowCidSet,contents,habits,habitChecks){
   const doSync=()=>{
     const sideEl=document.getElementById('side');
     const sidebarOpen=sideEl&&!sideEl.classList.contains('collapsed');
@@ -5721,7 +5721,7 @@ function syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,mflowCidSet,con
     const bannersEl=document.querySelector('.tl-top-banners');
     const bannersH=(bannersEl?bannersEl.offsetHeight:0)+12; // 배너와 트랙카드 사이 margin-bottom(12px) 포함
     const targetH=Math.max(rightEl.offsetHeight-cardPadding-bannersH,400);
-    renderTimelineTrack(dk,todos||[],sleep,mealsRow,rblocks||[],mflowCidSet,targetH,contents||[]);
+    renderTimelineTrack(dk,todos||[],sleep,mealsRow,rblocks||[],mflowCidSet,targetH,contents||[],habits||[],habitChecks||[]);
     // 카드 외곽 높이(max-height)는 컨텐츠 높이(targetH)에 패딩을 더한 값이어야 우측과 정확히 맞음 —
     // 이전에는 패딩을 빼지 않고 rightEl 전체 높이를 그대로 넣어 트랙 카드가 우측보다 패딩만큼 더 커 보였음.
     trackCardEl.style.maxHeight=(targetH+cardPadding)+'px';
@@ -5768,11 +5768,13 @@ function renderTimelineSleepBanner(sleep){
 }
 
 // ── 좌측 상단 습관배너 — 제목 없이 아이콘만, 체크된 것만 색이 들어옴(오늘탭 habit-row 마크업 재사용, 텍스트만 숨김).
-function renderTimelineHabitBanner(habits,checks){
+// 그 날짜(dk) 기준으로 아직 생성 전이거나 이미 archive된 습관은 표기하지 않음(_isHabitActiveOn 재사용).
+function renderTimelineHabitBanner(dk,habits,checks){
   const el=document.getElementById('tl-habits');
-  if(!habits.length){el.innerHTML='<div class="empty-msg">등록된 습관 없음</div>';return;}
+  const activeHabits=(habits||[]).filter(h=>_isHabitActiveOn(h,dk));
+  if(!activeHabits.length){el.innerHTML='<div class="empty-msg">등록된 습관 없음</div>';return;}
   const colorMap={mint:'var(--pal-mint-rgb)',pink:'var(--pal-pink-rgb)',sky:'var(--pal-sky-rgb)',yellow:'var(--pal-yellow-rgb)',lavender:'var(--pal-lavender-rgb)',orange:'var(--pal-orange-rgb)',warmgray:'var(--pal-warmgray-rgb)',lime:'var(--pal-lime-rgb)'};
-  el.innerHTML=`<div class="habit-grid">${habits.map(h=>{
+  el.innerHTML=`<div class="habit-grid">${activeHabits.map(h=>{
     const done=_isHabitChecked(h,checks);
     const c=done?(colorMap[h.color]||'var(--pal-warmgray-rgb)'):'var(--pal-warmgray-rgb)';
     const hIcon=getHabitIcon(h.name);
@@ -6030,8 +6032,9 @@ function _tlTimeToY(min,TOTAL_H){
 
 // 좌측 리듬트랙 — 리듬 막대(rt-fill 스타일) + 일정(도트+점선) + 시간표/완료투두를 같은 세로축에 정렬해 함께 렌더.
 // 스크롤 없이 전체 24시간을 다 보여주는 고정 높이(TOTAL_H) — 우측 카드 분량과 균형은 추후 조정 예정.
-function renderTimelineTrack(dk,todos,sleep,meals,rblocks,mflowCidSet,totalHOverride,contents){
+function renderTimelineTrack(dk,todos,sleep,meals,rblocks,mflowCidSet,totalHOverride,contents,habits,habitChecks){
   mflowCidSet=mflowCidSet||new Set();
+  const MEAL_PILL_H=24; // 식사 알약(.tl-meal-pill) 실제 렌더 높이 — 밀어내기(labelTopFix) 계산에 동일하게 사용
   const gridEl=document.getElementById('tl-track-grid');
   const TOTAL_H=totalHOverride||900;
   const isToday=dk===dateKey(logicalTodayDate());
@@ -6088,6 +6091,9 @@ function renderTimelineTrack(dk,todos,sleep,meals,rblocks,mflowCidSet,totalHOver
   const renderBlocks=blocksSorted.map((bk,bi)=>{
     const offset=(bk.sortKey!=null)?(bk.sortKey-bk.start):0;
     const by=_tlTimeToY(bk.start+offset,TOTAL_H);
+    if(bk.kind==='meal'){
+      return {bk,bi,by,bh:MEAL_PILL_H,durMin:30,isShort:true,canTwoLine:false};
+    }
     const stubEnd=bk.end!=null?bk.end:(isToday?nowMin:Math.min(bk.start+20,1440));
     const bh=Math.max(_tlTimeToY(stubEnd+offset,TOTAL_H)-by,22);
     const durMin=(bk.end!=null&&bk.start!=null)?(stubEnd-bk.start):9999;
@@ -6098,21 +6104,36 @@ function renderTimelineTrack(dk,todos,sleep,meals,rblocks,mflowCidSet,totalHOver
     return {bk,bi,by,bh,durMin,isShort:durMin<=60,canTwoLine};
   });
   renderBlocks.forEach(r=>{if(r.by+r.bh>maxBottom)maxBottom=r.by+r.bh;});
-  // 라벨 top 보정 — 짧은 블록의 top이 긴 블록의 top 근처(라벨 높이 이내)에 겹치면, 긴 블록 라벨만 짧은 블록 아래로 내림.
-  // labelBand는 긴 블록이 두 줄 모드면 그만큼 커진 실제 텍스트 높이를 기준으로 함.
+  // 라벨 배치 판정 — 라벨이 놓일 화면 영역(px)이 다른 항목(식사 알약, 다른 리듬 블록 등)의 실제 화면
+  // 영역과 겹치면 그 항목 바로 아래로 민다. 반올림 오차(_tlTimeToY의 Math.round) 흡수를 위해 BUFFER_PX만큼
+  // 여유를 둔다. 식사 알약도 by~by+MEAL_PILL_H가 실제 화면 점유 범위이므로 별도 처리 없이 동일하게 비교된다.
+  const BUFFER_PX=3;
   const labelTopFix={};
-  renderBlocks.forEach(short=>{
-    if(!short.isShort)return;
-    renderBlocks.forEach(long=>{
-      if(long===short||long.isShort)return;
-      const labelBand=long.canTwoLine?46:26; // 라벨(+시간) 텍스트가 차지하는 대략적 높이
-      if(short.by>=long.by&&short.by<long.by+labelBand){
-        labelTopFix[long.bi]=Math.max(labelTopFix[long.bi]||0,short.by+short.bh-long.by);
-      }
+  renderBlocks.forEach(long=>{
+    if(long.isShort)return;
+    let pushToBy=null;
+    renderBlocks.forEach(other=>{
+      if(other===long)return;
+      const otherTop=other.by,otherBottom=other.by+other.bh;
+      // long의 라벨 후보 영역 — 겹침이 없으면 한줄(26px) 기준, 있으면 이후 갱신되므로 매 반복 최신 canTwoLine 기준 사용.
+      const labelBand=long.canTwoLine?46:26;
+      const longLabelTop=long.by,longLabelBottom=long.by+labelBand;
+      const overlaps=otherBottom+BUFFER_PX>longLabelTop&&otherTop-BUFFER_PX<longLabelBottom;
+      if(!overlaps)return;
+      long.canTwoLine=false; // 겹치면 우선 두줄모드부터 해제해 라벨 영역 자체를 줄임(26px로 재판정 유도)
+      if(pushToBy==null||otherBottom>pushToBy)pushToBy=otherBottom;
     });
+    if(pushToBy!=null){
+      labelTopFix[long.bi]=Math.max(pushToBy-long.by,0);
+    }
   });
   renderBlocks.forEach(r=>{
     const {bk,bi,by,bh,isShort,canTwoLine}=r;
+    if(bk.kind==='meal'){
+      const iconHtml=bk.icon?`<i class="ti ${bk.icon} tl-meal-pill-icon" aria-hidden="true"></i>`:'';
+      axisHtml+=`<div class="tl-meal-pill" style="top:${by}px;z-index:${20+bi};">${iconHtml}<span class="tl-meal-pill-label">${escapeHtml(bk.label)}</span></div>`;
+      return;
+    }
     const labelFix=labelTopFix[bi];
     const marginStyle=labelFix?` style="margin-top:${labelFix}px;"`:'';
     const timeHtml=(!bk.ongoing&&bk.start!=null&&bk.end!=null)?`<span class="tl-fill-time">${toHHMMFromMin(bk.start)}-${toHHMMFromMin(bk.end)}</span>`:'';
@@ -6148,11 +6169,21 @@ function renderTimelineTrack(dk,todos,sleep,meals,rblocks,mflowCidSet,totalHOver
     const min=parseInt(m[1],10)*60+parseInt(m[2],10);
     todoEntries.push({min,label:e.text,kind:'event',timeText:e.event_time});
   });
-  scheduleItems.forEach(it=>todoEntries.push({min:it.min,label:it.label,kind:it.done?'done':'schedule',timeText:it.time}));
+  scheduleItems.forEach(it=>todoEntries.push({min:it.min,label:it.label,kind:'schedule',timeText:it.time,done:it.done}));
   plainDoneTodos.forEach(t=>{
     const d=new Date(t.completed_at);
     const min=d.getHours()*60+d.getMinutes();
     todoEntries.push({min,label:t.text,kind:'done',timeText:toHHMMFromMin(min)});
+  });
+  // 습관체크 — checked_time("HH:MM")이 있는 항목만 하늘색 도트로 오른쪽 타임라인에 병합.
+  (habitChecks||[]).forEach(c=>{
+    if(!c.checked_time)return;
+    const m=c.checked_time.match(/^(\d{1,2}):(\d{2})/);
+    if(!m)return;
+    const min=parseInt(m[1],10)*60+parseInt(m[2],10);
+    const h=(habits||[]).find(hh=>_habitCheckKeyOf(hh)===c.habit_name);
+    const label=h?h.name:c.habit_name;
+    todoEntries.push({min,label,kind:'habit',timeText:c.checked_time});
   });
   // 조각모드 — "말머리 > 조각1 / 조각2" 형식. 완료된 조각(strike_parts)마다 완료시각(strike_times[인덱스])을 읽어
   // "말머리 > 조각명" 형태로 각각 별도 항목으로 추가.
@@ -6182,18 +6213,32 @@ function renderTimelineTrack(dk,todos,sleep,meals,rblocks,mflowCidSet,totalHOver
   });
   positioned.forEach(it=>{if(it.y+ROW_H>maxBottom)maxBottom=it.y+ROW_H;});
 
+  // 채움로그식 연결선 — 각 마커(위에서 8px, 마커 중심 대략 위치)를 시간순으로 세로선 하나씩 이어 그림.
+  // absolute 배치라 flex의 ::before처럼 자동으로 이어지지 않으므로, 이전 항목 마커 중심 → 현재 항목 마커 중심까지의
+  // 선분 높이를 직접 계산해서 각 항목 앞에 별도 라인 div로 추가.
+  const MARKER_CY=8.5; // .tl-todo-marker의 top:1px + 15px/2 = 8.5px, 마커(도트/체크) 실제 세로 중심
   let todoHtml='';
-  positioned.forEach(it=>{
+  positioned.forEach((it,idx)=>{
     let markerHtml,doneCls='';
     if(it.kind==='event'){
       markerHtml='<span class="tl-schedule-dot tl-event-dot-sm"></span>';
     }else if(it.kind==='done'){
       markerHtml='<span class="tl-todo-check"><i class="ti ti-check" aria-hidden="true"></i></span>';
       doneCls=' done';
+    }else if(it.kind==='habit'){
+      markerHtml='<span class="tl-habit-dot"></span>';
     }else{
       markerHtml='<span class="tl-schedule-dot"></span>';
+      if(it.done)doneCls=' done';
     }
-    todoHtml+=`<div class="tl-todo-item${doneCls}" style="top:${it.y}px;"><span class="tl-todo-marker">${markerHtml}</span><div class="tl-todo-body"><div class="tl-todo-text">${escapeHtml(it.label)}</div><span class="tl-todo-time">${it.timeText}</span></div></div>`;
+    let lineHtml='';
+    if(idx>0){
+      const prevCy=positioned[idx-1].y+MARKER_CY;
+      const curCy=it.y+MARKER_CY;
+      const lineH=Math.max(curCy-prevCy,0);
+      if(lineH>0)lineHtml=`<div class="tl-todo-line" style="top:${prevCy}px;height:${lineH}px;"></div>`;
+    }
+    todoHtml+=`${lineHtml}<div class="tl-todo-item${doneCls}" style="top:${it.y}px;"><span class="tl-todo-marker">${markerHtml}</span><div class="tl-todo-body"><div class="tl-todo-text">${escapeHtml(it.label)}</div><span class="tl-todo-time">${it.timeText}</span></div></div>`;
   });
 
   const trackHeight=Math.max(TOTAL_H+14+10,maxBottom+10); // +14는 _tlTimeToY의 07시 이전 압축 여백(PRE_COMPRESS_H)
