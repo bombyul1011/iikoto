@@ -273,7 +273,7 @@ const RHYTHM_CATS={
   exercise:{label:'운동',color:'rgba(var(--pal-pink-rgb),0.80)',icon:'ti-run'},
   rest:{label:'휴식',color:'rgba(var(--pal-mint-rgb),0.55)',icon:'ti-armchair'},
   groom:{label:'단장',color:'rgba(var(--pal-orange-rgb),0.82)',icon:'ti-mood-spark'},
-  work:{label:'업무',color:'rgba(var(--pal-sky-rgb),0.30)',icon:'ti-keyboard'},
+  work:{label:'업무',color:'rgba(var(--pal-sky-rgb),0.45)',icon:'ti-keyboard'},
   appointment:{label:'외출',color:'rgba(var(--pal-rose-rgb),0.25)',icon:'ti-bus'},
   note:{label:'책상',color:'rgba(var(--pal-yellow-rgb),0.82)',icon:'ti-desk'},
   enjoy:{label:'감상',color:'rgba(var(--pal-lavender-rgb),0.80)',icon:'ti-stack-2'},
