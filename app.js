@@ -63,9 +63,6 @@ function renderHomeBody(section){
   if(section==='morning'){
     // 아침 루틴(굿모닝) 카드 — 파트1: 선택배너만, 파트2: 선택배너(+어제/오늘 흐름코멘트 내장)
     const isMorning2=getSubSection()==='morning_2';
-    if(isMorning2){
-      body.appendChild(makeNutriCommentBanner());
-    }
     body.appendChild(makeMorningFlowCard(isMorning2));
     body.appendChild(makeHabitStreakRow());
     body.appendChild(makeTodayRhythmBanner());
@@ -304,28 +301,29 @@ function saveRhythmBlock(){
   saveRhythmBlocks(_rhythmDk,blocks);
   if(isNew){
     autoCheckHabitFromRhythm(cat,_rhythmDk,start);
-    if(cat==='note'&&text==='일기')checkHabitDirect('일기',_rhythmDk,start);
+    if(cat==='note'&&text==='일기')checkHabitDirect('diary',_rhythmDk,start);
   }
   _rhythmFormOpen=false;_resetRhythmForm();
   refreshRhythmTrack();
   setTimeout(()=>{_rhythmSubmitting=false;},500);
 }
 // 리듬 블록 카테고리에 대응하는 습관(월간 결산용)을 자동으로 체크
-// 카테고리 1:1로 명확히 매칭되는 것만: 운동→'운동'
+// 매핑은 HABIT_AUTO_RHYTHM_MAP(카탈로그 도입, 2026-09-05)에 정의 — 운동/정리/케어(단장) 3개 카테고리 지원
 function autoCheckHabitFromRhythm(cat,dk,startTime){
-  const map={exercise:'운동'};
-  const habitName=map[cat];if(!habitName)return;
-  checkHabitDirect(habitName,dk,startTime);
+  const habitId=HABIT_AUTO_RHYTHM_MAP[cat];if(!habitId)return;
+  checkHabitDirect(habitId,dk,startTime);
 }
-// 습관 이름을 지정해 직접 체크(이미 켜져 있으면 그대로 둠 - 수동으로 끈 걸 되돌리지 않기 위함).
+// 습관 id를 지정해 직접 체크(이미 켜져 있으면 그대로 둠 - 수동으로 끈 걸 되돌리지 않기 위함).
+// [2026-09-05] 기존엔 습관 "이름"이 키였으나, 카탈로그 도입으로 습관마다 고유 id를 갖게 되어
+// 체크 데이터도 id 기준으로 저장 — 이름을 나중에 바꿔도 체크 기록이 끊기지 않음.
 // timeStr('HH:MM')을 넘기면 그 시각(예: 리듬 블록의 시작시간)을 기록하고, 없으면 현재 시각을 씀.
 // 이미 체크되어 있는 상태여도, 아직 시각 기록이 없다면 시각만은 보강해서 남긴다.
-function checkHabitDirect(habitName,dk,timeStr){
+function checkHabitDirect(habitId,dk,timeStr){
   const habits=getHabits();
-  if(!habits.some(h=>h.name===habitName))return;
+  if(!habits.some(h=>h.id===habitId&&!h.archivedAt))return;
   const d=new Date(dk+'T00:00:00');
   const wk=weekKey(d),dow=(d.getDay()+6)%7;
-  const key=habitName+'-'+dow;
+  const key=habitId+'-'+dow;
   const checks=getHabitChecks(wk);
   const alreadyChecked=!!checks[key];
   const hcTimes=getHabitCheckTimes(wk);
@@ -609,7 +607,7 @@ function buildDailyRhythmTrack(dk){
   _rhythmTrackEl=outer;
   return outer;
 }
-function getHabitMonthCount(name){
+function getHabitMonthCount(habitId){
   const now=new Date();
   const yr=now.getFullYear(),mo=now.getMonth();
   const firstDay=new Date(yr,mo,1);
@@ -618,24 +616,74 @@ function getHabitMonthCount(name){
   const cur=new Date(firstDay);
   while(cur<=today){
     const wk=weekKey(cur),dow=(cur.getDay()+6)%7;
-    if(getHabitChecks(wk)[name+'-'+dow])count++;
+    if(getHabitChecks(wk)[habitId+'-'+dow])count++;
     cur.setDate(cur.getDate()+1);
   }
   return count;
 }
-function makeHabitStreakRow(){
-  const wrap=document.createElement('div');wrap.className='habit-numbox-grid';
-  const habits=getHabits();
-  if(!habits.length){wrap.innerHTML='<div style="font-size:var(--dow-label-size);color:var(--tm);padding:8px 2px;width:100%;text-align:center;">습관을 추가해보세요</div>';return wrap;}
-  habits.forEach(function(h){
-    const monthCount=getHabitMonthCount(h.name);
-    const hIcon=getHabitIcon(h.name);
-    const iconColor=getHabitIconColor(h.name,h.color);
-    const col=document.createElement('div');col.className='habit-numbox-card';
-    col.innerHTML=(hIcon?`<i class="ti ${hIcon}" style="font-size:20px;color:${iconColor};margin-bottom:6px;" aria-hidden="true"></i>`:`<span class="home-habit-dot ${h.color}" style="margin-bottom:6px;"></span><span class="habit-numbox-name">${h.name}</span>`)
-      +`<span class="habit-numbox-num">${monthCount}</span>`;
-    wrap.appendChild(col);
+// 특정 습관의 "연속 체크일수" — 오늘(logicalDate)부터 거슬러 올라가며 하루라도 빠지면 중단.
+// 오늘은 아직 체크 전일 수 있어(아침 시간대 배너 용도) 오늘 제외하고 "어제부터" 계산.
+function getHabitStreak(habitId){
+  let streak=0;
+  const d=getLogicalDate();
+  d.setDate(d.getDate()-1); // 어제부터 시작
+  for(let i=0;i<90;i++){ // 최대 90일까지만 탐색(그 이상은 의미상 상한)
+    const wk=weekKey(d),dow=(d.getDay()+6)%7;
+    if(!getHabitChecks(wk)[habitId+'-'+dow])break;
+    streak++;
+    d.setDate(d.getDate()-1);
+  }
+  return streak;
+}
+// 습관 동력 배너 헤드라인 — 스트릭(연속기록) > 어제실적 > 이번달누적 순으로 그날 보여줄 수 있는
+// 가장 힘있는 정보 하나를 규칙 기반으로 고름(2026-09-06). API 없이 순수 계산.
+function _habitMotivationLine(habits){
+  if(!habits.length)return null;
+  // 1순위: 스트릭 2일 이상인 습관 중 가장 긴 것
+  let best=null;
+  habits.forEach(h=>{
+    const streak=getHabitStreak(h.id);
+    if(streak>=2&&(!best||streak>best.streak))best={habit:h,streak};
   });
+  if(best)return `${best.habit.name} ${best.streak}일 연속 이어가는 중`;
+  // 2순위: 어제 체크한 개수
+  const y=getLogicalDate();y.setDate(y.getDate()-1);
+  const ywk=weekKey(y),ydow=(y.getDay()+6)%7;
+  const yChecks=getHabitChecks(ywk);
+  const yCount=habits.filter(h=>yChecks[h.id+'-'+ydow]).length;
+  if(yCount>0)return `어제 습관 ${yCount}개 챙겼어요`;
+  // 3순위: 이번 달 누적이 가장 많은 습관
+  let topHabit=null,topCount=0;
+  habits.forEach(h=>{
+    const c=getHabitMonthCount(h.id);
+    if(c>topCount){topCount=c;topHabit=h;}
+  });
+  if(topHabit)return `이번 달 ${topHabit.name} ${topCount}번째예요`;
+  return null;
+}
+function makeHabitStreakRow(){
+  const wrap=document.createElement('div');wrap.className='habit-streak-wrap';
+  const habits=getActiveHabits();
+  if(!habits.length){wrap.innerHTML='<div style="font-size:var(--dow-label-size);color:var(--tm);padding:8px 2px;width:100%;text-align:center;">습관을 추가해보세요</div>';return wrap;}
+  const motivationLine=_habitMotivationLine(habits);
+  let html='';
+  if(motivationLine)html+=`<div class="habit-motivation-line"><i class="ti ti-flame ico-inline-13" aria-hidden="true"></i>${escapeHtml(motivationLine)}</div>`;
+  html+='<div class="habit-numbox-grid">';
+  habits.forEach(function(h){
+    const streak=getHabitStreak(h.id);
+    const monthCount=getHabitMonthCount(h.id);
+    // 스트릭 2일 이상이면 스트릭을, 아니면 기존처럼 이번달 누적을 표시 — 잘 이어가는 습관을 시각적으로 구분.
+    const showStreak=streak>=2;
+    const numText=showStreak?`${streak}일`:`${monthCount}`;
+    const catalogItem=getHabitCatalogItem(h.id);
+    const hIcon=catalogItem?catalogItem.icon:getHabitIcon(h.name);
+    const iconColor=getHabitIconColor(h.name,h.color);
+    html+=`<div class="habit-numbox-card${showStreak?' streak':''}">`
+      +(hIcon?`<i class="ti ${hIcon}" style="font-size:20px;color:${iconColor};margin-bottom:6px;" aria-hidden="true"></i>`:`<span class="home-habit-dot ${h.color}" style="margin-bottom:6px;"></span><span class="habit-numbox-name">${escapeHtml(h.name)}</span>`)
+      +`<span class="habit-numbox-num">${numText}</span></div>`;
+  });
+  html+='</div>';
+  wrap.innerHTML=html;
   return wrap;
 }
 function makeRhythmBanner(lineText,builderFn,extraClass,fontSize,dk){
@@ -909,7 +957,10 @@ function computeRawStatsForRange(y,mo,lastDay,light){
     if(!light){const wk=weekKey(date);weekSet[wk]=true;}
     const dow=(date.getDay()+6)%7;
     const checks=getHabitChecks(weekKey(date));
-    habits.forEach(h=>{ht++;if(checks[`${h.name}-${dow}`])hc++;});
+    habits.forEach(h=>{
+      if(!_isHabitActiveOn(h,dk))return; // 2026-09-06: 비활성 기간(시작 전/archive 이후)은 달성률 분모에서 제외
+      ht++;if(checks[`${h.id}-${dow}`])hc++;
+    });
     const dd=getDayCategoryDurations(dk);
     Object.keys(dd).forEach(function(k){
       rhythmDur[k]=(rhythmDur[k]||0)+dd[k];
@@ -1449,7 +1500,7 @@ async function makeWeeklySummaryCard(){
     // 습관 체크
     const dow=(d.getDay()+6)%7;
     habits.forEach(h=>{
-      if(checks[h.name+'-'+dow])habitDoneCounts[h.name]=(habitDoneCounts[h.name]||0)+1;
+      if(checks[h.id+'-'+dow])habitDoneCounts[h.name]=(habitDoneCounts[h.name]||0)+1;
     });
     // 리듬 카테고리별 시간 집계 (이번 주)
     getRhythmBlocks(dk).forEach(b=>{
@@ -1674,7 +1725,7 @@ async function fetchHomeWeather(section){
   const sleep=getSleep(dk);
   const habits=getHabits();
   const checks=getHabitChecks(wk);
-  const doneHabitsCount=habits.filter(h=>checks[h.name+'-'+dow]).length;
+  const doneHabitsCount=habits.filter(h=>checks[h.id+'-'+dow]).length;
   const rblocks=getRhythmBlocks(dk);
   const weatherDesc=weather?`(참고용, 수치 그대로 출력 금지) 날씨: ${weather.icon} ${weather.temp}도`:'날씨 정보 없음';
 
@@ -1981,8 +2032,101 @@ function getCatBarColor(cat){
 function getCatDotColor(cat){
   return CONTENT_DOT_COLOR[cat]||'var(--tm)';
 }
-const HABIT_COLORS=['mint','pink','sky','yellow']; // 4개로 고정(2026-08-16) — 습관이 4개를 넘긴 적이 없어 8색 순환 구조가 불필요했음. 늘어나면 그때 다시 설계.
-const DEFAULT_HABITS=[{name:'운동',color:'mint'},{name:'독서',color:'pink'},{name:'영양제',color:'sky'},{name:'물',color:'yellow'}];
+const HABIT_COLORS=['mint','pink','sky','yellow','lavender','peach','warmgray']; // 카탈로그(2026-09-05) 도입으로 7개까지 늘어날 수 있어 색상 종류 확장. 커스텀(직접입력) 습관에 순환 배정할 때 사용.
+// [2026-09-05] 습관 카탈로그 — 고정 id를 가진 미리 정의된 항목들. 이름을 자유롭게 바꿀 수 있던 기존 구조는
+// "이름 자체가 통계 데이터의 키"라서, 이름을 조금만 고쳐도(오타 수정 포함) 과거 기록과 완전히 단절되는
+// 근본적인 약점이 있었음. 카탈로그 항목은 id가 코드에 고정되어 있어 이 문제가 원천 차단됨.
+// 사용자가 카탈로그에 없는 걸 원하면 직접입력도 가능(뒤의 custom 습관) — 이 경우도 등록 시점에 한 번
+// id를 발급받고, 이후 이름을 바꿔도 그 id를 유지하는 방식으로 동일한 안전성을 갖게 함.
+const HABIT_CATALOG=[
+  {id:'exercise',   label:'운동',     icon:'ti-run',          color:'mint'},
+  {id:'reading',    label:'독서',     icon:'ti-book',         color:'pink'},
+  {id:'diary',      label:'일기',     icon:'ti-pencil-heart', color:'sky'},
+  {id:'tidy',       label:'정리',     icon:'ti-sparkles',     color:'yellow'},
+  {id:'care',       label:'케어',     icon:'ti-mood-spark',   color:'lavender'},
+  {id:'wake',       label:'아침기상', icon:'ti-sunrise',      color:'peach'},
+  {id:'supplement', label:'영양제',   icon:'ti-pill',         color:'warmgray'}
+];
+function getHabitCatalogItem(id){return HABIT_CATALOG.find(c=>c.id===id)||null;}
+// 습관별 "목표" 저장소 — 지금은 아침기상의 목표시각(goalTime, 'HH:MM')만 실사용하지만,
+// 나중에 다른 습관도 목표를 가질 수 있도록(예: 월간 목표 횟수) habitId 기준 범용 구조로 둠.
+function getHabitGoals(){return S.get('habit_goals')||{};}
+function saveHabitGoals(v){S.set('habit_goals',v);autoSync('habitGoals',null);}
+function getHabitGoal(habitId){return getHabitGoals()[habitId]||null;}
+function setHabitGoalTime(habitId,timeStr){
+  const goals=getHabitGoals();
+  goals[habitId]={...(goals[habitId]||{}),goalTime:timeStr};
+  saveHabitGoals(goals);
+}
+// habit_goals는 goal_notes 테이블(note_key+lines(jsonb) 범용 저장소)을 그대로 재사용 —
+// note_key='habit_goals' 한 행에 {habitId:{goalTime}} 객체 전체를 lines로 통째로 저장.
+async function syncHabitGoalsUp(){
+  const goals=getHabitGoals();
+  await supaUpsert('goal_notes','note_key',[{note_key:'habit_goals',lines:goals}]);
+}
+async function syncHabitGoalsDown(){
+  const rows=await supaFetch('goal_notes?note_key=eq.habit_goals');
+  if(!rows)return;
+  if(!rows.length){
+    const local=getHabitGoals();
+    if(Object.keys(local).length)await syncHabitGoalsUp();
+    return;
+  }
+  S.set('habit_goals',rows[0].lines||{});
+}
+// 리듬 카테고리 → 습관 id 자동체크 매핑. 여기 추가되는 카테고리는 그 리듬블록이 생성되는 순간
+// 자동으로 해당 습관이 체크됨(이미 켜져 있으면 그대로 둠 — 수동으로 끈 걸 되살리지 않기 위함, checkHabitDirect 참고).
+const HABIT_AUTO_RHYTHM_MAP={exercise:'exercise',home:'tidy',groom:'care'};
+const DEFAULT_HABITS=[{id:'exercise',name:'운동',color:'mint'},{id:'reading',name:'독서',color:'pink'},{id:'diary',name:'일기',color:'sky'},{id:'tidy',name:'정리',color:'yellow'}];
+// 기존 데이터(이름만 있고 id가 없는 습관)에 처음 한 번만 id를 부여하는 마이그레이션.
+// 카탈로그와 이름이 일치하면 그 카탈로그 id를 그대로 부여(기존에 쌓인 이름 기반 체크 기록과 자연스럽게 이어짐)하고,
+// 카탈로그에 없는 이름이면 새 랜덤 id를 발급해 커스텀 습관으로 전환.
+function _migrateHabitIds(){
+  const habits=S.get('habits');
+  if(!habits)return; // 완전 신규 사용자는 DEFAULT_HABITS를 그대로 쓰므로 마이그레이션 불필요
+  let changed=false;
+  const nameToId={}; // 체크 데이터 키 치환에 재사용 — 예: {'운동':'exercise','독서':'reading',...}
+  const migrated=habits.map(h=>{
+    if(h.id){nameToId[h.name]=h.id;return h;} // 이미 마이그레이션된 습관
+    changed=true;
+    const catalogMatch=HABIT_CATALOG.find(c=>c.label===h.name);
+    const id=catalogMatch?catalogMatch.id:'custom_'+genCid();
+    nameToId[h.name]=id;
+    return {...h,id,custom:!catalogMatch};
+  });
+  if(changed){
+    saveHabits(migrated);
+    _migrateHabitCheckKeys(nameToId); // 체크 데이터(hc:*, hcTime:*) 안의 '운동-3' 같은 키도 함께 옮김
+  }
+}
+// habits 목록에 id가 처음 부여되는 그 순간, localStorage에 흩어진 주차별 체크 데이터
+// (hc:YYYY-Www, hcTime:YYYY-Www 안의 '이름-요일' 형태 키)를 새 id 기준 키로 옮김.
+// 서버(habit_checks 테이블)의 habit_name 컬럼도 2026-09-05에 동일한 매핑으로 이미 일괄 변경해둠 —
+// 이 함수는 그 서버 변경과 짝을 맞추는 로컬 쪽 처리.
+function _migrateHabitCheckKeys(nameToId){
+  const renames=Object.entries(nameToId).filter(([name,id])=>name!==id);
+  if(!renames.length)return; // 바뀐 이름이 하나도 없으면(전부 이미 id와 이름이 같음) 손댈 것 없음
+  for(let i=0;i<localStorage.length;i++){
+    const key=localStorage.key(i);
+    if(!key||!(key.startsWith('hc:')||key.startsWith('hcTime:')))continue;
+    let obj;
+    try{obj=JSON.parse(localStorage.getItem(key));}catch(e){continue;}
+    if(!obj||typeof obj!=='object')continue;
+    let touched=false;
+    const next={};
+    Object.keys(obj).forEach(k=>{
+      // 'k'는 '이름-요일' 형태 — 마지막 '-' 기준으로 요일 숫자를 분리하고 앞부분(이름)만 치환 대상으로 봄
+      const m=k.match(/^(.+)-(\d)$/);
+      if(m&&nameToId[m[1]]&&nameToId[m[1]]!==m[1]){
+        next[nameToId[m[1]]+'-'+m[2]]=obj[k];
+        touched=true;
+      }else{
+        next[k]=obj[k];
+      }
+    });
+    if(touched)localStorage.setItem(key,JSON.stringify(next));
+  }
+}
 // 습관명은 자유 텍스트라 완전 자동매칭엔 한계가 있음 — 이름에 특정 키워드가 포함되면 아이콘을 붙이고, 매칭 안 되면 아이콘 없이 텍스트만 표시
 const HABIT_ICON_RULES=[
   {keywords:['운동','헬스','필라테스','런닝','러닝','조깅'],icon:'ti-run',color:'var(--pal-mint-border)'},
@@ -2612,8 +2756,26 @@ function getReadingStreak(){
   }
   return streak;
 }
-function getHabits(){return S.get('habits')||DEFAULT_HABITS;}
+function getHabits(){_migrateHabitIds();return S.get('habits')||DEFAULT_HABITS;}
 function saveHabits(v){S.set('habits',v);autoSync('habits',null);}
+// 습관 archive(보관) — 실제 삭제 대신 archivedAt에 날짜만 채워 기록은 보존하고 화면 노출만 끔.
+// 나중에 같은 카탈로그 항목을 다시 켜면(재활성화) 과거 체크 기록이 id 기준으로 자연스럽게 이어짐.
+function archiveHabit(id){
+  const habits=S.get('habits')||DEFAULT_HABITS;
+  const idx=habits.findIndex(h=>h.id===id);
+  if(idx<0)return;
+  habits[idx]={...habits[idx],archivedAt:dateKey(getLogicalDate())};
+  saveHabits(habits);
+}
+function unarchiveHabit(id){
+  const habits=S.get('habits')||DEFAULT_HABITS;
+  const idx=habits.findIndex(h=>h.id===id);
+  if(idx<0)return;
+  const {archivedAt,...rest}=habits[idx];
+  habits[idx]=rest;
+  saveHabits(habits);
+}
+function getActiveHabits(){return getHabits().filter(h=>!h.archivedAt);}
 function getHabitChecks(wk){return S.get(S.key('hc',wk))||{};}
 // 습관 체크 시각(별도 저장소) — 기존 checks[key]=true/false 불리언 구조를 안 건드리기 위해 분리.
 // 새벽홈탭 타임라인 등에서 "몇 시에 체크했는지"가 필요할 때만 참조.
@@ -2625,15 +2787,15 @@ function getHabitCheckTimes(wk){return S.get(S.key('hcTime',wk))||{};}
 // checks[key]와 hcTimes[key]를 모두 로컬에 반영한 뒤 서버 동기화(syncHCUp)를 1회만 호출해
 // checkHabitDirect와 동일하게 레이스 컨디션(먼저 나간 시각-없는 요청이 나중에 도착해 checked_time을
 // null로 덮어쓰는 문제)을 방지한다. 호출부는 checks 객체를 직접 변경하지 않고 이 함수만 호출하면 됨.
-function toggleHabitCheckWithTime(wk,habitName,dow,dk){
-  const key=habitName+'-'+dow;
+function toggleHabitCheckWithTime(wk,habitId,dow,dk){
+  const key=habitId+'-'+dow;
   const checks=getHabitChecks(wk);
   const wasOn=!!checks[key];
   const hcTimes=getHabitCheckTimes(wk);
   if(wasOn){
     delete checks[key];
     if(hcTimes[key])delete hcTimes[key];
-    addDelPending('hc',wk,habitName+'|'+dk);
+    addDelPending('hc',wk,habitId+'|'+dk);
   }else{
     checks[key]=true;
     hcTimes[key]=pad(new Date().getHours())+':'+pad(new Date().getMinutes());
@@ -2813,12 +2975,25 @@ async function syncHabitsDown(){
   const rows=await supaFetch('habits?order=sort_order');
   if(!rows)return;
   if(rows.length===0&&getHabits().length>0){syncHabitsUp();return;}
-  if(rows.length>0)S.set('habits',rows.map(r=>({name:r.name,color:r.color})));
+  // [2026-09-05] habit_id(카탈로그 id)/custom/archived_at도 함께 복원 — 이걸 빠뜨리면 동기화할 때마다
+  // 로컬의 id가 사라져 _migrateHabitIds가 매번 다시 돌고, 특히 커스텀 습관은 매번 새 랜덤 id를 받아
+  // 과거 체크 기록과 끊기는 문제가 생김.
+  // [2026-09-06 버그 수정] createdAt(활성 시작일)도 빠짐없이 함께 복원 — 이게 빠지면 월간 그리드의
+  // "활성 기간만 표시" 로직이 동기화 후 초기화되어, 방금 새로 등록한 습관도 예전부터 있던 것처럼
+  // (비활성 표시 없이) 보이는 문제가 있었음.
+  if(rows.length>0)S.set('habits',rows.map(r=>{
+    const h={name:r.name,color:r.color};
+    if(r.habit_id)h.id=r.habit_id;
+    if(r.custom)h.custom=true;
+    if(r.archived_at)h.archivedAt=r.archived_at;
+    if(r.created_at_key)h.createdAt=r.created_at_key;
+    return h;
+  }));
 }
 async function syncHabitsUp(){
   const h=getHabits();
   if(h.length){
-    const ok=await supaUpsert('habits','name',h.map((hh,i)=>({name:hh.name,color:hh.color,sort_order:i})));
+    const ok=await supaUpsert('habits','name',h.map((hh,i)=>({name:hh.name,color:hh.color,sort_order:i,habit_id:hh.id||null,custom:!!hh.custom,archived_at:hh.archivedAt||null,created_at_key:hh.createdAt||null})));
     if(!ok)return false;
   }
   const delNames=getDelPendingCids('habits','global');
@@ -2843,11 +3018,13 @@ async function syncHCUp(wk){
   const checks=getHabitChecks(wk);const ws=wk.replace('week:','');
   const times=getHabitCheckTimes(wk);
   const rows=[];const mon=new Date(ws);
+  // [2026-09-05] 키 앞부분은 원래 습관 "이름"이었으나 카탈로그 도입 후 습관 "id"로 바뀜(예: 'exercise-3').
+  // 서버 컬럼명(habit_name)은 그대로 두고 담기는 값만 id로 바뀐 것 — 별도 변경 없이 자연히 호환됨.
   Object.keys(checks).filter(k=>checks[k]).forEach(k=>{
     const parts=k.split('-');const dow=parseInt(parts[parts.length-1]);
-    const name=parts.slice(0,-1).join('-');
+    const habitId=parts.slice(0,-1).join('-');
     const d=new Date(mon);d.setDate(mon.getDate()+dow);
-    rows.push({habit_name:name,date_key:dateKey(d),checked_time:times[k]||null});
+    rows.push({habit_name:habitId,date_key:dateKey(d),checked_time:times[k]||null});
   });
   if(rows.length){
     const ok=await supaUpsert('habit_checks','habit_name,date_key',rows);
@@ -2856,8 +3033,8 @@ async function syncHCUp(wk){
   const delKeys=getDelPendingCids('hc',wk);
   for(const dkKey of delKeys){
     const sepIdx=dkKey.lastIndexOf('|');
-    const name=dkKey.slice(0,sepIdx),dateStr=dkKey.slice(sepIdx+1);
-    const res=await supaFetch(`habit_checks?habit_name=eq.${encodeURIComponent(name)}&date_key=eq.${dateStr}`,'DELETE');
+    const habitId=dkKey.slice(0,sepIdx),dateStr=dkKey.slice(sepIdx+1);
+    const res=await supaFetch(`habit_checks?habit_name=eq.${encodeURIComponent(habitId)}&date_key=eq.${dateStr}`,'DELETE');
     if(res===null)return false; // 네트워크 실패 — 삭제 대기 목록 유지, 다음 기회에 재시도
   }
   delKeys.forEach(k=>removeDelPending('hc',wk,k));
@@ -2973,6 +3150,7 @@ async function autoSync(type,key){
   else if(type==='sleep'){await syncSleepUp(key);S.set(S.key('sleep_pending',key),false);}
   else if(type==='meals_field'){await syncMealsUp(key);}
   else if(type==='habits')syncHabitsUp();
+  else if(type==='habitGoals')syncHabitGoalsUp();
   else if(type==='hc'){await syncHCUp(key);S.set('hc_pending_'+key,false);}
   else if(type==='hcTime'){await syncHCUp(key);S.set('hc_pending_'+key,false);} // 습관체크 시각도 결국 habit_checks 테이블의 checked_time 컬럼이라 같은 upload 함수(syncHCUp)를 재사용
   else if(type==='goal')syncGoalUp(key);
@@ -3019,6 +3197,7 @@ async function syncAll(){
     syncTodosDown(dk),syncMemosDown(dk),syncSleepDown(dk),syncMealsDown(dk),
     syncHabitsDown(),syncHCDown(wk),syncContentsDown(mk),
     syncGoalDown(S.key('mgoal',monthKey(now))),
+    syncHabitGoalsDown(),
     syncWChallengeDown(wk),
     // 날짜 없는 전역 데이터 — 예전엔 initSync(최초 1회)에만 있어서 앱을 켜둔 채로 오래 쓰면
     // 다른 기기(모바일 등)에서 바꾼 보관함/독서 내역이 반영 안 되던 버그 수정
@@ -3518,6 +3697,12 @@ function renderSleepAvgMarkers(avg){
 // 손을 뗄 때 속도(velocity) 기반 관성 + 40px 그리드 스냅 — 네이티브 iOS 피커 방식.
 // 매 프레임(rAF) 위치를 계산해 가운데 항목에만 sel, 그 위아래에만 near를 갱신하므로
 // 이전처럼 손 뗄 때 DOM을 통째로 다시 그리며 끊기는 지점이 없음.
+// [2026-09-05 추가] PC(마우스 포인터, 터치 없음) 환경에서는 롤링 휠 대신 시:분 숫자 입력창으로 대체 —
+// 롤링은 모바일 터치에 최적화된 동작이라 마우스로는 불편함. 판별은 진입 시 한 번만(_isPcTimeInput),
+// 롤링 쪽 로직(관성/스냅 등)은 전혀 건드리지 않고 렌더링 갈림길만 추가.
+function _isPcTimeInput(){
+  return !('ontouchstart' in window)&&window.matchMedia&&window.matchMedia('(pointer:fine)').matches;
+}
 const TW_ITEM_H=40;
 const TW_VISIBLE_PAD=1; // 위아래 여백용 빈 칸(가운데 정렬을 위해 값 배열 앞뒤에 1개씩)
 function _twBuildTrack(trackId,values,fmt){
@@ -3624,15 +3809,24 @@ function _twAttach(trackId,onSelect){
     document.addEventListener('mousemove',mm);document.addEventListener('mouseup',mu);
   });
 }
-// 공용 휠 렌더러 — hourTrackId/minTrackId/inpId를 넘기면 어떤 시간 인풋에도 붙일 수 있음
-function _renderTimeWheelFor(hourTrackId,minTrackId,inpId){
+// 공용 휠 렌더러 — hourTrackId/minTrackId/inpId/wrapId를 넘기면 어떤 시간 인풋에도 붙일 수 있음.
+// wrap은 트랙 id로 역추적(closest)하지 않고 wrapId로 직접 찾음 — PC 모드에서는 트랙 엘리먼트 자체가
+// DOM에서 사라지므로(PC 입력 UI로 교체됨), 트랙 기준 closest는 재렌더 시 null 참조로 깨짐(2026-09-05 발견).
+function _renderTimeWheelFor(hourTrackId,minTrackId,inpId,wrapId){
   const cur=document.getElementById(inpId).value||'';
   const m=cur.match(/^(\d{1,2}):(\d{1,2})$/);
   const n=new Date();
   const h=m?Math.min(23,parseInt(m[1],10)):n.getHours();
   const mi=m?Math.min(59,parseInt(m[2],10)):n.getMinutes();
-  const hours=[...Array(24).keys()],mins=[...Array(60).keys()];
+  const wrap=document.getElementById(wrapId);
+  if(_isPcTimeInput()){
+    _renderPcTimeInput(wrap,inpId,h,mi);
+    return;
+  }
+  // 모바일(또는 이전에 PC입력으로 갈아끼워진 뒤 다시 롤링으로 돌아오는 경우) — 원래 롤링 마크업을 복원
+  _restoreWheelMarkup(wrap,hourTrackId,minTrackId);
   const hourTrack=document.getElementById(hourTrackId),minTrack=document.getElementById(minTrackId);
+  const hours=[...Array(24).keys()],mins=[...Array(60).keys()];
   const sync=()=>_twSyncInput(hourTrackId,minTrackId,inpId);
   _twBuildTrack(hourTrackId,hours,v=>pad(v));
   _twBuildTrack(minTrackId,mins,v=>pad(v));
@@ -3644,12 +3838,53 @@ function _renderTimeWheelFor(hourTrackId,minTrackId,inpId){
   _twAttach(hourTrackId,sync);
   _twAttach(minTrackId,sync);
 }
+// PC용 시:분 숫자 입력 UI — 롤링 트랙(.tw-col 2개)이 있던 자리를 통째로 이 마크업으로 교체.
+// 앱 공용 톤(--inp/--inp-b/--tp)을 그대로 써서 다른 입력창과 이질감 없게 함.
+function _renderPcTimeInput(wrap,inpId,h,mi){
+  if(wrap.dataset.pcMode==='1')return; // 이미 PC 입력 UI면 다시 그릴 필요 없음(값만 아래에서 갱신)
+  wrap.dataset.pcMode='1';
+  wrap.innerHTML=`
+    <div class="tw-pc-input-row">
+      <input type="number" class="tw-pc-input" id="tw-pc-hour" min="0" max="23" value="${pad(h)}" inputmode="numeric">
+      <span class="tw-colon">:</span>
+      <input type="number" class="tw-pc-input" id="tw-pc-min" min="0" max="59" value="${pad(mi)}" inputmode="numeric">
+    </div>`;
+  const hEl=document.getElementById('tw-pc-hour'),mEl=document.getElementById('tw-pc-min');
+  const sync=()=>{
+    let hv=Math.max(0,Math.min(23,parseInt(hEl.value,10)||0));
+    let mv=Math.max(0,Math.min(59,parseInt(mEl.value,10)||0));
+    document.getElementById(inpId).value=pad(hv)+':'+pad(mv);
+  };
+  const onBlurPad=(el,max)=>{
+    let v=Math.max(0,Math.min(max,parseInt(el.value,10)||0));
+    el.value=pad(v);
+    sync();
+  };
+  hEl.addEventListener('input',sync);
+  mEl.addEventListener('input',sync);
+  hEl.addEventListener('blur',()=>onBlurPad(hEl,23));
+  mEl.addEventListener('blur',()=>onBlurPad(mEl,59));
+  // 시 필드에서 2자리 다 채우면 자동으로 분 필드로 포커스 이동(네이티브 time input과 유사한 사용감)
+  hEl.addEventListener('input',()=>{if(hEl.value.length>=2)mEl.focus();});
+  sync();
+}
+// PC 입력 UI에서 다시 롤링(모바일)으로 돌아올 때 원래 트랙 마크업 복원
+function _restoreWheelMarkup(wrap,hourTrackId,minTrackId){
+  if(wrap.dataset.pcMode!=='1')return; // 이미 롤링 마크업이면 손댈 필요 없음
+  wrap.dataset.pcMode='0';
+  wrap.innerHTML=`
+    <div class="tw-fade-top"></div>
+    <div class="tw-fade-bottom"></div>
+    <div class="tw-col"><div class="tw-hl"></div><div class="tw-track" id="${hourTrackId}"></div></div>
+    <div class="tw-colon">:</div>
+    <div class="tw-col"><div class="tw-hl"></div><div class="tw-track" id="${minTrackId}"></div></div>`;
+}
 function renderTimeWheel(){
-  _renderTimeWheelFor('tw-hour-track','tw-min-track','time-inp');
+  _renderTimeWheelFor('tw-hour-track','tw-min-track','time-inp','tw-wrap-1');
 }
 function openMemoEditTimePicker(){
   openModal('memo-edit-time-modal');
-  _renderTimeWheelFor('tw2-hour-track','tw2-min-track','memo-edit-time-inp');
+  _renderTimeWheelFor('tw2-hour-track','tw2-min-track','memo-edit-time-inp','tw-wrap-2');
 }
 function confirmMemoEditTime(){
   closeModal('memo-edit-time-modal');
@@ -3967,6 +4202,12 @@ function confirmTime(){
     closeModal('time-modal');
     return;
   }
+  if(_sleepTarget==='habitGoalWake'){
+    setHabitGoalTime('wake',v);
+    closeModal('time-modal');
+    renderSettingsHabitSection();
+    return;
+  }
   const dk=dateKey(currentDate),d=getSleep(dk);
   if(_sleepTarget==='sleep')d.sleep=v;else d.wake=v;
   saveSleepData(dk,d);loadSleep();closeModal('time-modal');
@@ -3974,6 +4215,14 @@ function confirmTime(){
   // getLogicalDate()(지금 이 순간의 실제 오늘)를 쓰면, 다음날 이후 화면을 과거 날짜로 옮겨 소급 입력할 때
   // dk와 어긋나 자동마감 대상 범위([오늘,어제] 단 이틀)를 벗어나 버리는 버그가 있었음.
   if(_sleepTarget==='sleep'){autoCloseUnfinishedRhythmBlocks(dk,v);refreshRhythmTrack();}
+  // "아침기상" 습관 자동체크(2026-09-05) — 목표시각이 설정돼 있고, 이번에 확정한 기상시각이
+  // 그 이내면 자동으로 체크. 목표시각을 늦게 넘겨 일어난 날은 자동체크하지 않되(정직하게 반영),
+  // 이미 다른 방법(수기)으로 체크해둔 걸 자동판단이 강제로 끄지는 않음 — checkHabitDirect의
+  // "이미 켜져있으면 그대로 둠" 원칙과 별개로, 여기선 애초에 목표시각 밖이면 호출 자체를 안 함.
+  if(_sleepTarget==='wake'){
+    const goal=getHabitGoal('wake');
+    if(goal&&goal.goalTime&&v<=goal.goalTime)checkHabitDirect('wake',dk,v);
+  }
 }
 
 // ── TODO
@@ -4919,7 +5168,7 @@ function _startMorningFlowRhythm(key,targetCid,mk,subKey){
   saveRhythmBlocks(dk,blocks);
   autoSync('rblocks',dk);
   autoCheckHabitFromRhythm(rhythmCat,dk,startStr); // 운동→습관 자동체크 등, 리듬탭 수동등록과 동일하게 연동
-  if(key==='desk'&&subKey==='diary')checkHabitDirect('일기',dk,startStr); // 리듬탭에서 note+"일기" 텍스트일 때 자동체크되던 것과 동일하게 연동
+  if(key==='desk'&&subKey==='diary')checkHabitDirect('diary',dk,startStr); // 리듬탭에서 note+"일기" 텍스트일 때 자동체크되던 것과 동일하게 연동
   flow.picks[key]={status:'running',blockCid,startTs:now,subKey:subKey||null};
   saveMorningFlow(dk,flow);
   refreshMorningFlowCard();
@@ -5233,7 +5482,7 @@ function _paceHabitCheckedCount(dk,nowMinLimit){
   const checks=getHabitChecks(wk);
   const times=getHabitCheckTimes(wk);
   return habits.filter(h=>{
-    const key=h.name+'-'+dow;
+    const key=h.id+'-'+dow;
     if(!checks[key])return false;
     if(nowMinLimit==null)return true; // 하루 전체 기준(지난주 물채우기 등)
     const t=times[key];
@@ -5844,7 +6093,7 @@ function _paceDayEvents(dk){
   const checks=getHabitChecks(wk);
   const times=getHabitCheckTimes(wk);
   habits.forEach(h=>{
-    const key=h.name+'-'+dow;
+    const key=h.id+'-'+dow;
     if(!checks[key]||!times[key])return;
     const p=times[key].split(':');
     events.push({type:'habit',min:_paceAdjustMin(parseInt(p[0],10)*60+parseInt(p[1],10)),label:h.name});
@@ -6011,19 +6260,20 @@ function getDayRecordDensity(dk){
   const dow=(new Date(dk+'T00:00:00').getDay()+6)%7;
   const checks=getHabitChecks(wk);
   let habitChecked=0;
-  habits.forEach(h=>{if(checks[h.name+'-'+dow])habitChecked++;});
+  habits.forEach(h=>{if(checks[h.id+'-'+dow])habitChecked++;});
   return memos+doneTodos+habitChecked;
 }
 function makeHabitMiniCheckRow(){
   const wrap=document.createElement('div');
   wrap.style.cssText='display:flex;justify-content:space-around;padding:6px 4px;margin-bottom:10px;';
-  const habits=getHabits();
+  const habits=getActiveHabits();
   if(!habits.length){wrap.style.display='none';return wrap;}
   const _ld=getLogicalDate();
   const wk=weekKey(_ld),checks=getHabitChecks(wk),dow=(_ld.getDay()+6)%7;
   habits.forEach(h=>{
-    const checked=!!checks[h.name+'-'+dow];
-    const hIcon=getHabitIcon(h.name);
+    const checked=!!checks[h.id+'-'+dow];
+    const catalogItem=getHabitCatalogItem(h.id);
+    const hIcon=catalogItem?catalogItem.icon:getHabitIcon(h.name);
     const rgba=getHabitColorSoft(h.color);
     const rgbaText=getHabitColorText(h.color);
     const badge=document.createElement('div');
@@ -6033,7 +6283,7 @@ function makeHabitMiniCheckRow(){
       ?`<i class="ti ${hIcon}" style="font-size:15px;color:${checked?rgbaText:'rgba(var(--divider-rgb),0.7)'};" aria-hidden="true"></i>`
       :`<span class="home-habit-dot ${checked?h.color:''}" style="width:9px;height:9px;${checked?'':'background:rgba(var(--divider-rgb),0.5);'}"></span>`;
     badge.addEventListener('click',function(){
-      toggleHabitCheckWithTime(wk,h.name,dow,dateKey(_ld));
+      toggleHabitCheckWithTime(wk,h.id,dow,dateKey(_ld));
       const fresh=makeHabitMiniCheckRow();
       wrap.replaceWith(fresh);
       refreshDotTimelineCard();
@@ -6057,121 +6307,6 @@ function _daysSinceLastReading(dk){
   return 90;
 }
 
-// ── 아침 파트2(9~12시, morning_2) "식사 분석" 배너 — 인사카드 하단, 어제+오늘 meals 데이터를 메뉴명 기준으로 AI가 정성적으로 분석.
-// 정량 수치(g)는 앱에 입력되지 않으므로 사용하지 않고, 메뉴 구성 기반 추정 코멘트만 생성.
-// 인사배너와 동일한 캐시 패턴(메모리→로컬→서버 ai_cache) 재사용.
-let _nutriCommentCache={};
-function _nutriHeadlineFallback(){return '오늘의 식사를 살펴봤어요';}
-async function _fetchNutriComment(dk){
-  if(_nutriCommentCache[dk])return _nutriCommentCache[dk];
-  const localCached=_bcGet('nutricomment_'+dk);
-  if(localCached){try{const parsed=JSON.parse(localCached);_nutriCommentCache[dk]=parsed;return parsed;}catch(e){}}
-  const key=getClaudeKey();
-  if(!key){
-    const cached=await aiCacheGet('nutricomment_'+dk);
-    if(cached){try{const parsed=JSON.parse(cached);_nutriCommentCache[dk]=parsed;_bcSet('nutricomment_'+dk,cached);return parsed;}catch(e){}}
-    return null;
-  }
-  const yDate=new Date(dk+'T00:00:00');yDate.setDate(yDate.getDate()-1);
-  const ydk=dateKey(yDate);
-  const todayMeals=getMeals(dk)||{},yMeals=getMeals(ydk)||{};
-  // 시간이 있으면 함께 표기하고, 시간 기준으로 정렬 — 간식은 저장 순서상 항상 맨 뒤라
-  // 시간 없이는 "밤에 먹은 것"으로 오분석되기 쉬움(실제론 점심-저녁 사이인 경우가 많음).
-  const fmtMeals=m=>{
-    const items=MEAL_KEYS.map(k=>{
-      if(!m[k])return null;
-      const t=m[k+'_time'];
-      return {label:MEAL_LABELS[k],menu:m[k],time:t||'',sortKey:t||'99:99'};
-    }).filter(Boolean);
-    items.sort((a,b)=>a.sortKey.localeCompare(b.sortKey));
-    return items.map(it=>it.time?`${it.label}(${it.time}): ${it.menu}`:`${it.label}: ${it.menu}`).join(', ');
-  };
-  const yText=fmtMeals(yMeals),tText=fmtMeals(todayMeals);
-  if(!yText&&!tText)return null;
-  // 어제 운동 여부(리듬트랙 exercise 카테고리 존재 여부) — "오늘 예정" 쪽은 아직 일어나지 않은 일이라 반영하지 않음
-  const yExercised=getRhythmBlocks(ydk).some(b=>b.cat==='exercise');
-  // 최근 며칠 메뉴 흐름도 함께 참고자료로 전달 — 반복 패턴/부족한 영양소 판단에 활용
-  const recentLines=[];
-  for(let i=2;i<=6;i++){
-    const d=new Date(dk+'T00:00:00');d.setDate(d.getDate()-i);
-    const rdk=dateKey(d);
-    const rt=fmtMeals(getMeals(rdk)||{});
-    if(rt)recentLines.push(rt);
-  }
-  const dataContext=[
-    yText?`어제 식사: ${yText}${yExercised?' (참고: 어제 운동함)':''}`:'어제 식사 기록 없음',
-    tText?`오늘 식사(예정 포함): ${tText}`:'오늘 식사 기록 없음',
-    recentLines.length?`최근 며칠 참고용 식사 흐름: ${recentLines.join(' / ')}`:''
-  ].filter(Boolean).join('\n');
-  const sys=`당신은 탄단지 균형과 건강식에 관심이 많은 사용자를 위한 다정한 영양 코멘트 작성자예요.
-사용자는 현재 체지방 감량과 근육량 향상을 목표로 운동과 식단을 철저히 관리하고 있어요. 이 목표를 염두에 두고 분석과 제안의 관점을 잡아주세요(예: 단백질 섭취가 목표에 도움이 되는지, 근손실 우려는 없는지, 체지방 감량에 방해될 만한 구성인지 등을 자연스럽게 반영).
-아래는 사용자의 어제 식사, 오늘 식사(계획 포함), 최근 며칠 식사 흐름이에요. 메뉴명만으로 탄수화물/단백질/지방 구성을 정성적으로 추정해서 코멘트를 작성하세요.
-각 끼니 옆 괄호 안 시간은 실제 섭취 시각이에요. 특히 간식은 저장 순서상 항상 마지막에 나열되지만 시간 기준으로 보면 점심-저녁 사이 등 다른 시점일 수 있으니, 반드시 괄호 안 시간을 기준으로 언제 먹은 것인지 판단하세요(시간이 없으면 순서나 짐작만으로 야식이라 단정하지 말 것).
-
-**출력 형식 — 반드시 아래 JSON 형식만 출력, 다른 텍스트 없이:**
-{"headline":"짧은 헤드라인 한 줄(정량 수치 없이, 예: '단백질 든든하게 채운 하루')","yesterday":"어제 식사 분석 2문장 이내","today":"오늘 식사 분석과 제안 2~3문장 이내"}
-
-**절대 원칙:**
-- g, mg, kcal 같은 구체적 수치는 절대 쓰지 마세요. "충분히", "든든하게", "가볍게", "비중이 높았어요" 같은 정성적 표현만 사용.
-- 메뉴명은 이미 화면 위쪽에 목록으로 노출되어 있어요. 문장에서 메뉴를 하나하나 다시 나열하지 마세요. 대신 그 구성이 어떤 특징을 가지는지(예: 단백질 중심, 지방 비중, 식이섬유 균형 등) 분석과 코멘트에 집중하세요.
-- 체지방 감량·근육량 향상이라는 목표를 과하게 반복 언급하지 말고, 관련 있을 때만 자연스럽게 녹여주세요. 매 코멘트마다 목표를 직접 언급할 필요는 없어요.
-- 제안은 선택 사항이에요. 최근 며칠 흐름에 비해 뚜렷하게 잘 안 보였던 영양소가 있거나 목표 관점에서 아쉬운 부분이 있을 때만 today 코멘트에 자연스럽게 한 번 제안하세요. 이미 균형이 괜찮으면 억지로 제안을 만들지 말고 분석과 긍정적인 마무리로 끝내세요.
-- 어제나 오늘 중 기록이 없는 쪽은 해당 필드에 "기록이 없어요" 같은 짧은 문장으로 자연스럽게 처리.
-- 어제 식사 옆에 "(참고: 어제 운동함)" 표시가 있으면, 운동한 날 단백질/전체적인 섭취량이 어땠는지 정도로만 가볍게 참고하세요.
-- 잔소리 톤이나 단정적 진단 금지 — 친한 친구가 툭 건네는 다정한 말투.
-- 반드시 ~해요, ~이에요, ~어요 체의 존댓말만 사용.
-- 이모지나 특수기호는 쓰지 않아요.`;
-  const reply=await callClaude(sys,[{role:'user',content:dataContext}],400);
-  if(!reply||reply.startsWith('__ERR__'))return null;
-  let parsed;
-  try{
-    const cleaned=reply.trim().replace(/^```json|```$/g,'').trim();
-    parsed=JSON.parse(cleaned);
-  }catch(e){return null;}
-  if(!parsed||!parsed.headline)return null;
-  _nutriCommentCache[dk]=parsed;
-  const raw=JSON.stringify(parsed);
-  _bcSet('nutricomment_'+dk,raw);
-  aiCacheSet('nutricomment_'+dk,raw);
-  return parsed;
-}
-function makeNutriCommentBanner(){
-  const dk=dateKey(getLogicalDate());
-  const banner=document.createElement('div');
-  banner.className='report-banner nutri-soft';
-  banner.id='nutri-comment-banner';
-  banner.innerHTML=`<div class="report-banner-inner">
-    <div class="report-banner-line"><i class="ti ti-apple ico-inline-12" aria-hidden="true"></i><span id="nutri-banner-headline">식사를 살펴보고 있어요</span></div>
-    <div class="report-banner-arrow"><i class="ti ti-chevron-up ico-sz-15" aria-hidden="true"></i></div>
-  </div>`;
-  banner.onclick=()=>openNutriCommentSheet(dk);
-  _fetchNutriComment(dk).then(data=>{
-    const hEl=document.getElementById('nutri-banner-headline');
-    if(hEl)hEl.textContent=data&&data.headline?data.headline:_nutriHeadlineFallback();
-  });
-  return banner;
-}
-async function openNutriCommentSheet(dk){
-  const body=document.getElementById('nutri-comment-body');
-  const yDate=new Date(dk+'T00:00:00');yDate.setDate(yDate.getDate()-1);
-  const ydk=dateKey(yDate);
-  const yMeals=getMeals(ydk)||{},tMeals=getMeals(dk)||{};
-  const fmtRows=m=>MEAL_KEYS.map(k=>m[k]?`<div class="nutri-menu-row"><div class="nutri-menu-cat">${MEAL_LABELS[k]}</div><div>${escapeHtml(m[k])}</div></div>`:'').join('');
-  const yRows=fmtRows(yMeals),tRows=fmtRows(tMeals);
-  body.innerHTML=`
-    <div class="nutri-section-label">어제 먹은 메뉴</div>
-    ${yRows||'<div class="nutri-empty">기록된 식사가 없어요</div>'}
-    <div class="nutri-analysis-text" id="nutri-yesterday-text">분석하는 중이에요...</div>
-    <div class="nutri-section-label">오늘 메뉴</div>
-    ${tRows||'<div class="nutri-empty">기록된 식사가 없어요</div>'}
-    <div class="nutri-analysis-text" id="nutri-today-text">분석하는 중이에요...</div>
-  `;
-  openSheet('nutri-comment-sheet');
-  const data=await _fetchNutriComment(dk);
-  const yEl=document.getElementById('nutri-yesterday-text'),tEl=document.getElementById('nutri-today-text');
-  if(yEl)yEl.textContent=data&&data.yesterday?data.yesterday:'분석할 식사 기록이 부족해요.';
-  if(tEl)tEl.textContent=data&&data.today?data.today:'분석할 식사 기록이 부족해요.';
-}
 function makeDawnRecapCard(){
   const wrap=document.createElement('div');
   wrap.id='dawn-recap-card';
@@ -6184,7 +6319,7 @@ function makeDawnRecapCard(){
   const memos=getMemos(dk);
   const habits=getHabits();
   const checks=getHabitChecks(wk);
-  const doneHabits=habits.filter(hb=>checks[hb.name+'-'+dow]);
+  const doneHabits=habits.filter(hb=>checks[hb.id+'-'+dow]);
   const sleep=getSleep(dk)||{};
   const rblocks=getRhythmBlocks(dk);
   const oneLine=getDailyOneLine(dk).trim();
@@ -7622,18 +7757,8 @@ function buildWeekStrip(){
 // ██ 오늘탭 (4/4 — 나머지는 시간대팝업, SLEEP~아침파트2, MEMO, 예비투두 부근) — HABIT/CONTENT TIMELINE ██
 // ══════════════════════════════════════════════════════════
 // ── HABIT
-function openHabitModal(){
-  document.getElementById('habit-modal-inp').value=getHabits().map(h=>h.name).join('\n');
-  openModal('habit-modal');
-}
-function confirmHabit(){
-  const val=document.getElementById('habit-modal-inp').value.trim();if(!val)return;
-  const newH=val.split('\n').map((n,i)=>({name:n.trim(),color:HABIT_COLORS[i%HABIT_COLORS.length]})).filter(h=>h.name);
-  const oldNames=getHabits().map(h=>h.name);
-  const newNames=new Set(newH.map(h=>h.name));
-  oldNames.filter(n=>!newNames.has(n)).forEach(n=>addDelPending('habits','global',n));
-  saveHabits(newH);closeModal('habit-modal');renderHabitMonthly();renderDailyHabitCheck();
-}
+// [2026-09-05] 습관 편집(구 habit-modal, 줄바꿈 텍스트박스)은 설정탭 "해빗" 코너로 완전히 이전됨.
+// renderSettingsHabitSection/toggleCatalogHabit/toggleCustomHabit/addCustomHabitFromSettings 참고.
 
 // ── CONTENT TIMELINE
 let _contentCtx={};
@@ -8703,8 +8828,16 @@ function hideApiResults(){const el=document.getElementById('api-results');if(el)
 // ██ 월간탭 (3/3 — 나머지는 MONTHLY REPORT 부근, API SEARCH 부근) — HABIT MONTHLY/CALENDAR/MONTHLY STAT BAR ██
 // ══════════════════════════════════════════════════════════
 // ── HABIT MONTHLY
+// [2026-09-06] 습관마다 실제 "추적 중이던 기간"(createdAt~archivedAt)만 체크 대상으로 보고,
+// 그 밖의 날짜(아직 시작 전이거나 archive 이후)는 비활성 칸으로 표시 — 월 중 몇 번을 바꾸든
+// 그리드가 항상 정직하게 그 기간의 실제 추적 여부만 보여줌(인위적인 "월 1회 변경 제한" 없이 해결).
+function _isHabitActiveOn(h,dk){
+  if(h.createdAt&&dk<h.createdAt)return false;
+  if(h.archivedAt&&dk>h.archivedAt)return false;
+  return true;
+}
 function renderHabitMonthly(){
-  const habits=getHabits(),y=_calYear,mo=_calMonth;
+  const habits=getActiveHabits(),y=_calYear,mo=_calMonth; // 2026-09-06: archive(목록에서 제외)한 습관은 월간에서도 노출 안 함
   const dim=new Date(y,mo+1,0).getDate();
   const el=document.getElementById('habit-monthly');if(!el)return;
   el.innerHTML='';
@@ -8721,23 +8854,24 @@ function renderHabitMonthly(){
   habits.forEach(h=>{
     const row=document.createElement('div');row.className='hm-row';
     const lbl=document.createElement('span');lbl.className='hm-lbl';
-    const hIcon=getHabitIcon(h.name);
+    const hIcon=getHabitCatalogItem(h.id)?.icon||getHabitIcon(h.name);
     lbl.innerHTML=hIcon?`<i class="ti ${hIcon}" style="font-size:12px;vertical-align:-1px;margin-right:3px;" aria-hidden="true"></i>${h.name}`:h.name;
     row.appendChild(lbl);
     const dots=document.createElement('div');dots.className='hm-dots';
-    let checked_cnt=0;
+    let checked_cnt=0,activeDayCnt=0;
     for(let d=1;d<=dim;d++){
-      const date=new Date(y,mo,d);const wk=weekKey(date);const dow=(date.getDay()+6)%7;
-      const checked=getWkChecks(wk)[`${h.name}-${dow}`];
-      if(checked&&d<=habitLastDay)checked_cnt++;
-      const dot=document.createElement('div');dot.className='hm-dot';
+      const date=new Date(y,mo,d);const dk=dateKey(date);const wk=weekKey(date);const dow=(date.getDay()+6)%7;
+      const isActive=_isHabitActiveOn(h,dk);
+      const checked=isActive&&getWkChecks(wk)[`${h.id}-${dow}`];
+      if(isActive&&d<=habitLastDay){activeDayCnt++;if(checked)checked_cnt++;}
+      const dot=document.createElement('div');dot.className='hm-dot'+(isActive?'':' inactive');
       if(checked){dot.style.background=getHabitColorSoft(h.color);}
       dots.appendChild(dot);
     }
-    const pct=habitLastDay>0?Math.round(checked_cnt/habitLastDay*100):0;
+    const pct=activeDayCnt>0?Math.round(checked_cnt/activeDayCnt*100):0;
     const pctEl=document.createElement('div');
     pctEl.style.cssText='font-size:var(--dow-label-size);color:var(--tm);margin-top:5px;padding-bottom:8px;width:100%;text-align:right;';
-    pctEl.textContent=`${checked_cnt}/${habitLastDay}일 · ${pct}%`;
+    pctEl.textContent=`${checked_cnt}/${activeDayCnt}일 · ${pct}%`;
     const wrap=document.createElement('div');wrap.style.cssText='display:flex;flex-direction:column;flex:1;';
     wrap.appendChild(dots);wrap.appendChild(pctEl);row.appendChild(wrap);el.appendChild(row);
   });
@@ -9084,7 +9218,10 @@ function renderMonthlyStatBar(){
     if(d>habitLastDay)continue;
     const date=new Date(y,mo,d);const wk=weekKey(date);const dow=(date.getDay()+6)%7;
     const checks=getHabitChecks(wk);
-    habits.forEach(h=>{ht++;if(checks[`${h.name}-${dow}`])hc++;});
+    habits.forEach(h=>{
+      if(!_isHabitActiveOn(h,dk))return;
+      ht++;if(checks[`${h.id}-${dow}`])hc++;
+    });
   }
   const pct=ht>0?Math.round(hc/ht*100):0;
   const mk=calMonthKey();
@@ -9128,7 +9265,10 @@ function renderWeeklyStatBar(){
     if(d>today)continue;
     const dow=(d.getDay()+6)%7;
     const checks=getHabitChecks(wk);
-    habits.forEach(h=>{ht++;if(checks[`${h.name}-${dow}`])hc++;});
+    habits.forEach(h=>{
+      if(!_isHabitActiveOn(h,dk))return;
+      ht++;if(checks[`${h.id}-${dow}`])hc++;
+    });
   }
   const pct=ht>0?Math.round(hc/ht*100):0;
   // 콘텐츠: 완료(done/stopped)된 것만, 종료일이 이 주(월~일) 안에 속하면 1회 카운트.
@@ -9257,17 +9397,18 @@ function getHabitColorBorder(colorKey){
 }
 function renderDailyHabitCheck(){
   const el=document.getElementById('daily-habit-box');if(!el)return;
-  const habits=getHabits();
+  const habits=getActiveHabits();
   if(!habits.length){el.innerHTML='<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:6px 0;width:100%;">습관을 추가해보세요</div>';return;}
   const wk=weekKey(currentDate),dow=(currentDate.getDay()+6)%7;
   const checks=getHabitChecks(wk);
   el.innerHTML='';
   habits.forEach(function(h){
-    const key=h.name+'-'+dow;
+    const key=h.id+'-'+dow;
     const checked=!!checks[key];
     const rgba=getHabitColorSoft(h.color);
     const rgbaText=getHabitColorText(h.color);
-    const hIcon=getHabitIcon(h.name);
+    const catalogItem=getHabitCatalogItem(h.id);
+    const hIcon=catalogItem?catalogItem.icon:getHabitIcon(h.name);
     const isGlass=document.documentElement.dataset.theme==='glass';
     const innerMark=isGlass
       ?(hIcon
@@ -9281,7 +9422,7 @@ function renderDailyHabitCheck(){
     const chkStyle=checked?(isGlass?' style="border-color:'+rgbaText+';"':' style="background:'+rgba+';border-color:'+rgbaBorder+';"'):'';
     col.innerHTML='<div class="habit-check-name">'+h.name+'</div><div class="habit-chk2'+(checked?' on':'')+'"'+chkStyle+'>'+innerMark+'</div>';
     col.querySelector('.habit-chk2').addEventListener('click',function(){
-      toggleHabitCheckWithTime(wk,h.name,dow,dateKey(currentDate));
+      toggleHabitCheckWithTime(wk,h.id,dow,dateKey(currentDate));
       renderDailyHabitCheck();
       if(document.getElementById('v-monthly')&&document.getElementById('v-monthly').classList.contains('on'))renderHabitMonthly();
       if(document.getElementById('v-weekly')&&document.getElementById('v-weekly').classList.contains('on'))renderWeeklyHabitBox();
@@ -9590,7 +9731,7 @@ function loadWeekly(){
 }
 function renderWeeklyHabitBox(){
   const el=document.getElementById('weekly-habit-box');if(!el)return;
-  const habits=getHabits();
+  const habits=getActiveHabits();
   if(!habits.length){el.innerHTML='<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:8px 0;">습관을 추가해보세요</div>';return;}
   const now=new Date();
   const wk=weekKey(now);
@@ -9605,7 +9746,7 @@ function renderWeeklyHabitBox(){
     const rgbaText=getHabitColorText(h.color);
     let cnt=0,dotsHtml='';
     for(let d=0;d<7;d++){
-      const on=!!checks[h.name+'-'+d];
+      const on=!!checks[h.id+'-'+d];
       if(on)cnt++;
       const isToday=d===todayDow;
       const borderColor=on?rgbaBorder:'rgba(var(--divider-rgb),0.5)';
@@ -9883,7 +10024,103 @@ function openSettings(){
   document.querySelectorAll('.ctheme-btn').forEach(b=>b.classList.remove('on'));
   const act=document.getElementById('ct-'+theme);if(act)act.classList.add('on');
   initTextScaleUI();
+  renderSettingsHabitSection();
   document.getElementById('settings-ov').classList.add('on');
+}
+// [2026-09-05] 설정탭 해빗 코너 — 카탈로그 칩(토글) + 직접입력 습관 + 아침기상 목표시각.
+// 기존에 오늘탭 하단에 있던 "+ 항목 편집"(habit-modal, 줄바꿈 텍스트박스) 방식을 완전히 대체.
+function renderSettingsHabitSection(){
+  const chipsWrap=document.getElementById('settings-habit-catalog-chips');
+  if(!chipsWrap)return;
+  const habits=getHabits(); // archive된 것도 여기선 필요(칩 on/off 상태 판단에 archive 여부까지 반영해야 함)
+  chipsWrap.innerHTML=HABIT_CATALOG.map(c=>{
+    const existing=habits.find(h=>h.id===c.id);
+    const isOn=existing&&!existing.archivedAt;
+    return `<span class="rhythm-content-chip${isOn?' sel':''}" onclick="toggleCatalogHabit('${c.id}')"><i class="ti ${c.icon} ico-inline-13" aria-hidden="true"></i>${escapeHtml(c.label)}</span>`;
+  }).join('');
+  // 커스텀(직접입력) 습관도 같은 칩 목록에 이어서 노출 — 탭하면 archive 토글, 길게는 없음(단순화)
+  const customHabits=habits.filter(h=>h.custom);
+  if(customHabits.length){
+    chipsWrap.innerHTML+=customHabits.map(h=>{
+      const isOn=!h.archivedAt;
+      const hIcon=getHabitIcon(h.name);
+      return `<span class="rhythm-content-chip${isOn?' sel':''}" onclick="toggleCustomHabit('${h.id}')">${hIcon?`<i class="ti ${hIcon} ico-inline-13" aria-hidden="true"></i>`:''}${escapeHtml(h.name)}</span>`;
+    }).join('');
+  }
+  // 아침기상 칩이 켜져 있을 때만 목표시각 입력 영역 노출
+  const wakeOn=habits.some(h=>h.id==='wake'&&!h.archivedAt);
+  const goalWrap=document.getElementById('settings-habit-goal-wake-wrap');
+  if(goalWrap)goalWrap.style.display=wakeOn?'':'none';
+  const goalInp=document.getElementById('settings-habit-wake-goal-inp');
+  if(goalInp){const goal=getHabitGoal('wake');goalInp.value=goal&&goal.goalTime?goal.goalTime:'';}
+}
+// 카탈로그 칩 토글 — 이미 등록돼 있으면(archive 여부 무관) 있는/없는 상태를 뒤집고,
+// 아예 처음 켜는 것이면 카탈로그 정의(색상 포함)로 새로 추가.
+// [2026-09-06] 월간 해빗 그리드에서 "이 습관을 실제로 추적하고 있던 기간"만 정확히 표시하기 위해
+// createdAt(활성 시작일)을 함께 관리. archive했다가 재활성화하면 새로운 활성 구간이 시작되는 것으로
+// 보고 createdAt을 그 시점으로 갱신 — 비활성이었던 기간은 실제로 체크되지 않았을 것이므로,
+// 재활성화 이전 날짜까지 "추적 대상이었다"고 그리드에 표시하면 부정확함.
+function toggleCatalogHabit(catalogId){
+  const habits=getHabits();
+  const idx=habits.findIndex(h=>h.id===catalogId);
+  const today=dateKey(getLogicalDate());
+  if(idx>=0){
+    // 이미 있음 — archive 토글(진짜 삭제 대신 보관/복원)
+    // createdAt이 아예 없는 경우(마이그레이션으로 예전부터 있던 것처럼 들어온 습관, 2026-09-06 발견된 케이스)도
+    // 여기서 오늘 날짜로 보정 — 그래야 이번에 "끄기"를 눌러 archive될 때 활성 구간이 정확히 기록됨.
+    if(!habits[idx].createdAt)habits[idx]={...habits[idx],createdAt:today};
+    if(habits[idx].archivedAt){const {archivedAt,...rest}=habits[idx];habits[idx]={...rest,createdAt:today};}
+    else habits[idx]={...habits[idx],archivedAt:today};
+    saveHabits(habits);
+  }else{
+    const c=getHabitCatalogItem(catalogId);if(!c)return;
+    habits.push({id:c.id,name:c.label,color:c.color,createdAt:today});
+    saveHabits(habits);
+  }
+  renderSettingsHabitSection();
+  refreshHabitUIEverywhere();
+}
+function toggleCustomHabit(habitId){
+  const habits=getHabits();
+  const idx=habits.findIndex(h=>h.id===habitId);
+  if(idx<0)return;
+  const today=dateKey(getLogicalDate());
+  if(habits[idx].archivedAt){const {archivedAt,...rest}=habits[idx];habits[idx]={...rest,createdAt:today};}
+  else habits[idx]={...habits[idx],archivedAt:today};
+  saveHabits(habits);
+  renderSettingsHabitSection();
+  refreshHabitUIEverywhere();
+}
+function addCustomHabitFromSettings(){
+  const inp=document.getElementById('settings-habit-custom-inp');
+  const name=(inp.value||'').trim();
+  if(!name)return;
+  const habits=getHabits();
+  if(habits.some(h=>h.name===name&&!h.archivedAt)){inp.value='';return;} // 이미 동일 이름의 활성 습관이 있으면 중복 추가 안 함
+  const usedColors=new Set(habits.map(h=>h.color));
+  const color=HABIT_COLORS.find(c=>!usedColors.has(c))||HABIT_COLORS[habits.length%HABIT_COLORS.length];
+  habits.push({id:'custom_'+genCid(),name,color,custom:true,createdAt:dateKey(getLogicalDate())});
+  saveHabits(habits);
+  inp.value='';
+  renderSettingsHabitSection();
+  refreshHabitUIEverywhere();
+}
+// 아침기상 목표시각 입력 — 기존 공용 시간 휠 모달(#time-modal)을 재사용하되,
+// confirmTime()의 기존 분기(수면/기상/일정 등)와 겹치지 않도록 별도 _sleepTarget 값을 씀.
+function openTimeModalForHabitGoal(){
+  const goal=getHabitGoal('wake');
+  document.getElementById('time-inp').value=(goal&&goal.goalTime)||'07:30';
+  _sleepTarget='habitGoalWake';
+  openModal('time-modal');
+  renderTimeWheel();
+}
+// 습관 목록이 바뀔 때(카탈로그 토글/직접추가) 이미 그려져 있을 수 있는 다른 화면들도 즉시 갱신.
+// 설정탭은 보통 다른 탭 위에 오버레이로 뜨므로, 닫은 뒤 뒤 화면이 바로 최신 상태를 보여주게 함.
+function refreshHabitUIEverywhere(){
+  if(document.getElementById('daily-habit-box'))renderDailyHabitCheck();
+  if(document.getElementById('morning-flow-card')||document.querySelector('.mf-hero'))refreshMorningFlowCard();
+  if(document.getElementById('weekly-habit-box'))renderWeeklyHabitBox();
+  if(document.getElementById('habit-monthly'))renderHabitMonthly();
 }
 function closeSettings(){document.getElementById('settings-ov').classList.remove('on');}
 function downloadFullJSONBackup(){
@@ -12075,7 +12312,7 @@ function toggleStopwatch(cid){
     blocks.push({cat:'enjoy',start:minToHHMM(startMin),end:'',text:text,created:Date.now(),cid:_swBlockCid,contentCid:cid});
     saveRhythmBlocks(dk,blocks);
     autoSync('rblocks',dk);
-    checkHabitDirect('독서',dk,minToHHMM(startMin)); // 스톱워치 독서 활동은 카테고리(감상)와 무관하게 '독서' 습관을 직접 체크, 시작시각 기준
+    checkHabitDirect('reading',dk,minToHHMM(startMin)); // 스톱워치 독서 활동은 카테고리(감상)와 무관하게 '독서' 습관을 직접 체크, 시작시각 기준
     try{localStorage.setItem(SW_PERSIST_KEY,JSON.stringify({startTs:_swStartTs,cid:_swBookCid,blockCid:_swBlockCid,dk}));}catch(e){}
     if(_rdPendingCid===cid){_rdPendingCid=null;} // pending 카드에서 재생 링으로 시작한 경우 pending 상태 정리
     wrap?.classList.add('spinning');
@@ -12411,6 +12648,7 @@ async function initSync(){
   }
   // 습관 / 습관체크 — 항상 동기화 (이전엔 syncAll에만 있어서 PC 사파리 등 새 탭에서 누락되던 버그)
   await syncHabitsDown();
+  await syncHabitGoalsDown();
   // 굿모닝(모닝 플로우) — 최근 2일(오늘+어제, 파트2 회고용)만 다운로드
   {
     const mflowTasks=[];
