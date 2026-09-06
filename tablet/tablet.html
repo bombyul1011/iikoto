@@ -229,6 +229,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .month-compact .habit-numbox-card .habit-numbox-icon{font-size:var(--fs-lg);}
 .month-compact .habit-numbox-num{font-size:var(--fs-title);margin-top:4px;}
 .month-compact .habit-numbox-name{font-size:var(--fs-sm);}
+/* [2026-09-06] 습관 모아보기 가로 스크롤 — 부모(.month-top-left .card)의 overflow:hidden은 세로축 제약이라
+   가로 스크롤엔 영향 없음. 4개 폭 기준으로 카드 폭을 고정해, 처음 열었을 때는 딱 4개(활성 습관)만
+   보이고 그 이상은 옆으로 스크롤해서 archive된 습관까지 확인 가능. */
+.habit-numbox-hscroll{display:flex!important;overflow-x:auto;overflow-y:hidden;gap:7px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;padding-bottom:2px;}
+.habit-numbox-hscroll .habit-numbox-card{flex:0 0 calc((100% - 21px) / 4);scroll-snap-align:start;}
 .empty-msg{font-size:var(--fs-body);color:var(--tm);text-align:center;padding:12px 0;}
 .loading-msg{font-size:var(--fs-body);color:var(--tm);text-align:center;padding:18px 0;}
 

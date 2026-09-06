@@ -89,6 +89,24 @@ function _activeHabitDayCount(habits,startDk,endDk){
 function _getActiveHabitsOnly(habits){
   return (habits||[]).filter(_isHabitCurrentlyOn);
 }
+// 습관 목록에서 "특정 날짜(dk) 기준으로 활성"인 것만 걸러냄 — _getActiveHabitsOnly(현재 시점 기준)와 달리
+// 아직 시작 전(미래 예정)이거나 그 날짜 이후 archive된 습관까지 날짜별로 정확히 구분함.
+// 오늘탭 습관배너(renderTimelineHabitBanner)와 사이드바 오늘진행률(renderSideProgress)이 공유(2026-09-06).
+function _getHabitsActiveOnDate(habits,dk){
+  return (habits||[]).filter(h=>_isHabitActiveOn(h,dk));
+}
+// 습관 목록에서 "기간(startDk~endDk) 안에 하루라도 활성이었던" 것만 걸러냄 — 주간/월간 카드처럼
+// "그 기간을 보고 있을 때 표시할 행/카드 목록"을 정할 때 사용. 현재 시점(archive 여부) 대신 그 기간
+// 자체의 실제 상태를 기준으로 하므로, 과거/미래 기간으로 이동해도 그 시점 기준 정확한 습관만 표시됨
+// (renderWeekHabitMatrix, renderMonthHabits가 공유, 2026-09-06).
+function _getHabitsActiveInRange(habits,startDk,endDk){
+  return (habits||[]).filter(h=>{
+    for(let d=new Date(startDk+'T00:00:00'),end=new Date(endDk+'T00:00:00');d<=end;d.setDate(d.getDate()+1)){
+      if(_isHabitActiveOn(h,dateKey(d)))return true;
+    }
+    return false;
+  });
+}
 // ── 별점 표시 헬퍼 (본앱과 동일 — 0.5단위, tabler 아이콘 기반. 읽기전용이라 표시만 필요, 클릭 위젯 없음) ──
 function _starIconClass(val,n){
   if(val>=n)return 'ti-star-filled';
@@ -448,7 +466,14 @@ function switchTab(tab){
   closeFloatMenu();
   // 오늘탭으로 돌아올 때는 논리적 오늘 날짜로 재설정(04시 이전엔 자정을 넘겨도 전날 유지)
   if(tab==='today'){_selectedDate=logicalTodayDate();loadTimelineTab();}
-  else if(tab==='week')loadWeekTab();
+  else if(tab==='week'){
+    // 주간탭은 카드 수가 많아 비동기 로드 완료 후 DOM이 여러 단계로 커지며
+    // 위에서 미리 걸어둔 scrollTop=0이 밀리는 현상이 있어, 로드 완료 후 한 번 더 보정한다(2026-09-06).
+    loadWeekTab().then(()=>{
+      document.getElementById('tab-week').scrollTop=0;
+      if(mainWrap)mainWrap.scrollTop=0;
+    }).catch(()=>{});
+  }
   else if(tab==='month'){loadMonthTab();initCgridHeightSync();}
   else if(tab==='reports'){resetReportsView();loadReportsTab();}
   else if(tab==='yearly')loadYearlyTab();
@@ -478,23 +503,31 @@ function closeFloatMenu(){
 (function initFloatFabGesture(){
   const LONGPRESS_MS=380;   // 이 시간 이상 누르고 있으면 롱프레스로 판정
   const MOVE_CANCEL_PX=10;  // 롱프레스 판정 전 이 거리 이상 움직이면 탭으로 취급하지 않음(스크롤 등과 충돌 방지)
+  const ITEM_STEP_PX=42;    // 이 정도 세로 이동마다 한 칸씩 이동 — 실측 후 감도 튜닝 지점(작을수록 예민)
   const fab=document.getElementById('float-fab');
   if(!fab)return;
 
-  let pressTimer=null,startX=0,startY=0,isLongPress=false,hoveredTab=null,pointerId=null;
+  let pressTimer=null,startX=0,startY=0,isLongPress=false,pointerId=null;
+  let tabOrder=[],baseIndex=0,curIndex=0;
 
   function clearHoverStyles(){
     document.querySelectorAll('.float-tab.drag-hover').forEach(el=>el.classList.remove('drag-hover'));
   }
 
-  function tabElAt(x,y){
-    // 메뉴가 펼쳐진 상태에서 현재 좌표 아래 있는 .float-tab 요소를 찾음(드래그 중이라 pointer capture 상태이므로 elementFromPoint 사용)
-    const el=document.elementFromPoint(x,y);
-    if(!el)return null;
-    return el.closest('.float-tab');
+  function refreshTabOrder(){
+    // 펼칠 때마다 다시 읽어 항목 추가/순서변경에도 안전하게 대응(DOM 순서 = 실제 노출 순서)
+    tabOrder=Array.from(document.querySelectorAll('#float-tab-menu .float-tab'));
   }
 
-  function beginLongPress(){
+  function applyHighlight(idx){
+    if(idx===curIndex&&document.querySelector('.float-tab.drag-hover'))return;
+    curIndex=idx;
+    clearHoverStyles();
+    const el=tabOrder[idx];
+    if(el)el.classList.add('drag-hover');
+  }
+
+  function beginLongPress(clientY){
     isLongPress=true;
     fab.classList.add('longpress');
     if(navigator.vibrate)navigator.vibrate(12); // 지원 기기에서만 짧은 촉각 피드백, 미지원이어도 무해
@@ -502,32 +535,36 @@ function closeFloatMenu(){
     document.getElementById('float-tab-menu').classList.add('on');
     document.getElementById('float-fab').classList.add('open');
     document.getElementById('float-fab-icon').className='ti ti-x';
+    refreshTabOrder();
+    baseIndex=Math.max(0,tabOrder.findIndex(el=>el.dataset.tab===_currentTab));
+    curIndex=baseIndex;
+    startY=clientY;
+    applyHighlight(baseIndex);
   }
 
-  function endGesture(clientX,clientY){
+  function endGesture(){
     fab.classList.remove('longpress');
     clearHoverStyles();
     if(isLongPress){
-      const el=(clientX!=null)?tabElAt(clientX,clientY):hoveredTab;
+      const el=tabOrder[curIndex];
       if(el&&el.dataset.tab){
-        switchTab(el.dataset.tab); // 손을 뗀 지점의 탭으로 스무스하게 전환(switchTab이 알아서 closeFloatMenu까지 처리)
+        switchTab(el.dataset.tab); // 이동거리로 결정된 항목으로 스무스하게 전환(switchTab이 알아서 closeFloatMenu까지 처리)
       }else{
         closeFloatMenu();
       }
     }
     isLongPress=false;
-    hoveredTab=null;
   }
 
   fab.addEventListener('contextmenu',e=>e.preventDefault()); // iOS 롱프레스 시 뜨는 텍스트선택/복사 팝업 차단
 
   fab.addEventListener('pointerdown',e=>{
     e.preventDefault();
-    startX=e.clientX;startY=e.clientY;isLongPress=false;hoveredTab=null;
+    startX=e.clientX;startY=e.clientY;isLongPress=false;
     pointerId=e.pointerId;
     clearTimeout(pressTimer);
     pressTimer=setTimeout(()=>{
-      beginLongPress();
+      beginLongPress(e.clientY);
       try{fab.setPointerCapture(pointerId);}catch(err){}
     },LONGPRESS_MS);
   });
@@ -538,19 +575,19 @@ function closeFloatMenu(){
       if(Math.hypot(dx,dy)>MOVE_CANCEL_PX)clearTimeout(pressTimer); // 롱프레스 되기 전에 손가락이 많이 움직이면 취소(스크롤 의도로 간주)
       return;
     }
-    const el=tabElAt(e.clientX,e.clientY);
-    if(el!==hoveredTab){
-      clearHoverStyles();
-      hoveredTab=el;
-      if(el)el.classList.add('drag-hover');
-    }
+    // 위로 움직이면(clientY 감소) 메뉴 위쪽 항목으로, 아래로 움직이면 아래쪽(버튼에 가까운) 항목으로 이동.
+    // 정확히 그 항목 위에 손가락이 있지 않아도, 이동거리만으로 한 칸씩 넘어가는 "휠" 방식.
+    const dy=startY-e.clientY;
+    const steps=Math.round(dy/ITEM_STEP_PX);
+    const idx=Math.min(tabOrder.length-1,Math.max(0,baseIndex+steps));
+    applyHighlight(idx);
   });
 
   function onUp(e){
     clearTimeout(pressTimer);
     if(isLongPress){
       try{fab.releasePointerCapture(pointerId);}catch(err){}
-      endGesture(e.clientX,e.clientY);
+      endGesture();
     }else{
       // 짧은 탭 — 기존 토글 동작 유지
       toggleFloatMenu();
@@ -562,7 +599,7 @@ function closeFloatMenu(){
     fab.classList.remove('longpress');
     clearHoverStyles();
     if(isLongPress)closeFloatMenu();
-    isLongPress=false;hoveredTab=null;
+    isLongPress=false;
   });
 
   // 메뉴가 펼쳐진 상태에서 항목을 일반 클릭(탭)하는 경우 — 기존 onclick 방식을 위임 리스너로 대체
@@ -570,6 +607,34 @@ function closeFloatMenu(){
     const el=e.target.closest('.float-tab');
     if(el&&el.dataset.tab)switchTab(el.dataset.tab);
   });
+
+  // [2026-09-06] PC(마우스+hover 지원 환경) 전용 — 아이패드/터치에선 펼치기 클릭 한 번이 부담 없지만,
+  // PC에서는 "펼치기 클릭 → 탭 클릭" 2단계가 번거롭다는 피드백에 따라, 마우스를 올리기만 해도
+  // 클릭 없이 자동으로 펼쳐지도록 함. 터치 기기는 hover 개념이 없어 이 로직이 아예 걸리지 않으므로
+  // 기존 롱프레스/탭 제스처는 그대로 유지됨(서로 다른 입력 방식이라 충돌하지 않음).
+  const supportsHover=window.matchMedia('(hover:hover) and (pointer:fine)').matches;
+  if(supportsHover){
+    const menu=document.getElementById('float-tab-menu');
+    const wrap=fab.closest('.float-tabs')||fab.parentElement; // 버튼+메뉴를 함께 감싸는 실제 컨테이너 기준으로 hover 판정
+    let hoverCloseTimer=null;
+    function openByHover(){
+      clearTimeout(hoverCloseTimer);
+      if(_floatMenuOpen)return;
+      _floatMenuOpen=true;
+      menu.classList.add('on');
+      fab.classList.add('open');
+      document.getElementById('float-fab-icon').className='ti ti-x';
+    }
+    function scheduleHoverClose(){
+      clearTimeout(hoverCloseTimer);
+      // 버튼→메뉴 사이를 이동하는 짧은 순간에 바로 닫히지 않도록 약간의 유예를 둠
+      hoverCloseTimer=setTimeout(()=>{closeFloatMenu();},150);
+    }
+    if(wrap){
+      wrap.addEventListener('mouseenter',openByHover);
+      wrap.addEventListener('mouseleave',scheduleHoverClose);
+    }
+  }
 })();
 
 // ══════════════════════════════════════════════════════════
@@ -748,8 +813,9 @@ async function renderSideProgress(){
   const doneCount=todoList.filter(t=>t.done).length;
   const totalTodo=todoList.length;
   const pct=totalTodo?Math.round(doneCount/totalTodo*100):0;
-  const habitCount=(habits||[]).length;
-  const habitDone=(habits||[]).filter(h=>_isHabitChecked(h,habitChecks)).length;
+  const activeHabits=_getHabitsActiveOnDate(habits,todayDk);
+  const habitCount=activeHabits.length;
+  const habitDone=activeHabits.filter(h=>_isHabitChecked(h,habitChecks)).length;
 
   const r=17,circumference=2*Math.PI*r;
   const dashOffset=circumference*(1-pct/100);
@@ -1502,7 +1568,11 @@ function renderWeekGoals(row){
 
 function renderWeekHabitMatrix(habits,checks,weekDates){
   const el=document.getElementById('week-habit-matrix');
-  const activeHabits=_getActiveHabitsOnly(habits); // 2026-09-06: archive(목록에서 제외)한 습관은 노출 안 함
+  // [2026-09-06] 기존엔 _getActiveHabitsOnly(현재 시점 기준)로 행을 걸러 지난주/다음주로 이동해도
+  // "오늘 활성인 습관"이 그대로 반영되는 문제가 있었음(이번주 새로 만든 습관이 지난주에도 빈 줄로 뜨거나,
+  // 이번주 archive한 습관이 지난주에서도 사라짐). weekDates 범위 안에 하루라도 활성이었던 습관만 행으로
+  // 표시하도록 변경 — 그 주 자체의 실제 상태를 반영(각 날짜 점의 _isHabitActiveOn과 동일 기준으로 통일).
+  const activeHabits=_getHabitsActiveInRange(habits,weekDates[0],weekDates[weekDates.length-1]);
   if(!activeHabits.length){el.innerHTML='<div class="empty-msg">등록된 습관 없음</div>';return;}
   const colorMap={mint:'var(--pal-mint-rgb)',pink:'var(--pal-pink-rgb)',sky:'var(--pal-sky-rgb)',yellow:'var(--pal-yellow-rgb)',lavender:'var(--pal-lavender-rgb)',orange:'var(--pal-orange-rgb)',warmgray:'var(--pal-warmgray-rgb)',lime:'var(--pal-lime-rgb)'};
   let html=`<div class="habit-matrix">`;
@@ -1510,7 +1580,7 @@ function renderWeekHabitMatrix(habits,checks,weekDates){
     html+=`<div class="rowlbl">${escapeHtml(h.name)}</div>`;
     const c=colorMap[h.color]||'var(--pal-warmgray-rgb)';
     weekDates.forEach(dk=>{
-      const isActive=_isHabitActiveOn(h,dk); // 아직 시작 전 날짜는 비활성 칸으로 구분(본앱 월간그리드와 동일 원칙)
+      const isActive=_isHabitActiveOn(h,dk); // 아직 시작 전/이미 종료된 날짜는 비활성 칸으로 구분(본앱 월간그리드와 동일 원칙)
       const done=isActive&&checks.some(ch=>ch.habit_name===_habitCheckKeyOf(h)&&ch.date_key===dk);
       html+=`<div class="dot${isActive?'':' inactive'}" style="${done?`background:rgba(${c},1);`:''}"></div>`;
     });
@@ -2285,11 +2355,24 @@ async function renderMonthHabits(y,mo,habitsData){
   const el=document.getElementById('month-habits');
   const mk=`${y}-${pad(mo+1)}`;
   const daysInMonth=new Date(y,mo+1,0).getDate();
+  const monthStartDk=`${mk}-01`,monthEndDk=`${mk}-${pad(daysInMonth)}`;
   const habitsRaw=habitsData?habitsData.habits:(await supaFetch(`habits?order=sort_order.asc`))||[];
-  const habits=_getActiveHabitsOnly(habitsRaw); // 2026-09-06: archive(목록에서 제외)한 습관은 노출 안 함
+  // [2026-09-06] renderWeekHabitMatrix와 동일 원칙 — _getActiveHabitsOnly(현재 시점 기준) 대신
+  // "이 달(monthStartDk~monthEndDk) 범위 안에 하루라도 활성이었는지"로 판정. 과거/미래 달로 이동해도
+  // 그 달 기준 정확한 습관 카드만 표시됨(이번 달 새 습관이 지난 달에 뜨거나, 이번 달 archive한 습관이
+  // 지난 달에서 사라지는 문제 방지).
+  const habits=_getHabitsActiveInRange(habitsRaw,monthStartDk,monthEndDk);
   const checks=habitsData?habitsData.checks:(await supaFetch(`habit_checks?date_key=gte.${mk}-01&date_key=lte.${mk}-${pad(daysInMonth)}`))||[];
   if(!habits||!habits.length){el.innerHTML='<div class="empty-msg">등록된 습관 없음</div>';return;}
-  el.innerHTML=`<div class="habit-numbox-grid">${habits.map(h=>{
+  // [2026-09-06] 세로 높이가 좁아(.month-top-grid 270px 고정) 4개(1줄) 넘는 습관은 가려지고
+  // 스크롤도 부모의 overflow:hidden에 막혀 있었음 — 가로 스크롤로 전환하고, 지금 시점 기준
+  // 활성 습관을 앞에, archive된(지금은 안 하는) 습관을 뒤로 보내 처음 열었을 때 화면(4개분)엔
+  // 활성 습관만 보이고 나머지는 옆으로 스크롤해서 확인하도록 함.
+  const sortedHabits=[...habits].sort((a,b)=>{
+    const aOn=_isHabitCurrentlyOn(a)?0:1,bOn=_isHabitCurrentlyOn(b)?0:1;
+    return aOn-bOn;
+  });
+  el.innerHTML=`<div class="habit-numbox-grid habit-numbox-hscroll">${sortedHabits.map(h=>{
     const count=_habitCheckCountOf(h,checks);
     const hIcon=getHabitIcon(h.name);
     const iconColor=getHabitIconColor(h.name,h.color);
@@ -2337,7 +2420,7 @@ async function renderMonthStatBar(y,mo,habitsData){
     supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&month_key=eq.${pmk}`),
     supaFetch(`habit_checks?date_key=gte.${prevStartDk}&date_key=lte.${prevCmpEndDk}`)
   ]);
-  const habits=_getActiveHabitsOnly(habitsRaw0||[]); // archive된 습관은 이 달 통계에서 제외
+  const habits=_getHabitsActiveInRange(habitsRaw0||[],startDk,cmpEndDk); // 이 달(cmpEndDk까지) 범위 안에서 활성이었던 습관만 — 현재 시점 기준이 아니므로 과거 달 조회 시에도 정확
 
   renderStatBar('month-stat-bar',{
     memos:memos||[],todos:todos||[],sleepRows:sleepRows||[],contents:contents||[],
@@ -3198,7 +3281,7 @@ async function loadMonthlyReportPage(){
   const monthlyRefContext=_mrpBuildRefContext(weeklySummaryRowsList,weeklyMemoRowsList);
 
   renderMrpHero(monthlyRows&&monthlyRows[0]);
-  const mrpActiveHabits=_getActiveHabitsOnly(habits); // archive된 습관은 이 달 리포트에서 제외
+  const mrpActiveHabits=_getHabitsActiveInRange(habits,startDk,endDk); // 이 달(startDk~endDk) 범위 안에서 활성이었던 습관만 — 과거 달 리포트를 열어도 그 달 기준으로 정확
   const mrpHabitDenom=_activeHabitDayCount(mrpActiveHabits,startDk,endDk);
   const mrpPrevHabitDenom=_activeHabitDayCount(mrpActiveHabits,prevStartDk,prevEndDk);
   renderMrpGoalsAndStats(goalRows&&goalRows[0],todos||[],memosRows||[],sleepRows||[],mrpActiveHabits,habitChecksAll||[],mrpHabitDenom,prevTodos||[],prevHabitChecksAll||[],prevMemosRows||[],mrpPrevHabitDenom);
@@ -5818,7 +5901,7 @@ function renderTimelineSleepBanner(sleep){
 // 그 날짜(dk) 기준으로 아직 생성 전이거나 이미 archive된 습관은 표기하지 않음(_isHabitActiveOn 재사용).
 function renderTimelineHabitBanner(dk,habits,checks){
   const el=document.getElementById('tl-habits');
-  const activeHabits=(habits||[]).filter(h=>_isHabitActiveOn(h,dk));
+  const activeHabits=_getHabitsActiveOnDate(habits,dk);
   if(!activeHabits.length){el.innerHTML='<div class="empty-msg">등록된 습관 없음</div>';return;}
   const colorMap={mint:'var(--pal-mint-rgb)',pink:'var(--pal-pink-rgb)',sky:'var(--pal-sky-rgb)',yellow:'var(--pal-yellow-rgb)',lavender:'var(--pal-lavender-rgb)',orange:'var(--pal-orange-rgb)',warmgray:'var(--pal-warmgray-rgb)',lime:'var(--pal-lime-rgb)'};
   el.innerHTML=`<div class="habit-grid">${activeHabits.map(h=>{
