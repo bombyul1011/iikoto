@@ -8840,7 +8840,7 @@ function _habitPeriods(h){
 function _isHabitActiveOn(h,dk){
   const periods=_habitPeriods(h);
   if(!periods.length)return true; // 구간 정보가 아예 없으면(아주 오래된 데이터) 항상 활성으로 간주
-  return periods.some(p=>dk>=p.start&&(!p.end||dk<=p.end));
+  return periods.some(p=>(!p.start||dk>=p.start)&&(!p.end||dk<=p.end));
 }
 function renderHabitMonthly(){
   const habits=getActiveHabits(),y=_calYear,mo=_calMonth; // 2026-09-06: archive(목록에서 제외)한 습관은 월간에서도 노출 안 함

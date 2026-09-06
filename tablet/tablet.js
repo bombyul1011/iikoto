@@ -42,13 +42,31 @@ function _habitCheckCountOf(h,checksArr){
   const key=_habitCheckKeyOf(h);
   return (checksArr||[]).filter(c=>c.habit_name===key).length;
 }
-// [2026-09-06] 본앱과 동일한 "활성 기간만 정확히 표시" 원칙 — 습관이 archived_at으로 보관되거나
-// created_at_key 이후에 시작된 경우, 그 기간 밖의 날짜는 분모/그리드 계산에서 아예 제외.
-// 두 필드 모두 없는 습관(마이그레이션 이전부터 있던 레거시)은 항상 활성으로 간주(본앱 규칙과 동일).
+// [2026-09-06 periods 전환] 본앱이 created_at_key/archived_at 단일값 구조를 periods(jsonb 배열,
+// [{start,end}], end:null=진행중) 구조로 전환함에 따라 아카이브도 동일하게 맞춤. 기존 단일값 방식은
+// 재활성화(온→오프→온)를 반복하면 재활성화 시점의 created_at_key로 덮어써져 과거 활성 구간(과거 실적)이
+// 통계에서 사라지는 문제가 있었음 — periods 배열은 온오프를 몇 번 반복해도 각 활성 구간이 독립적으로
+// 누적 보존됨. 서버 habits 테이블에 periods(jsonb) 컬럼이 추가되었고, 본앱은 더 이상 created_at_key/
+// archived_at을 갱신하지 않음(구버전 폴백 읽기용으로만 남아있음) — 아카이브도 periods를 우선 읽어야
+// 본앱에서 앞으로 발생하는 온오프 변경이 정확히 반영됨.
+function _habitPeriods(h){
+  if(h.periods&&h.periods.length)return h.periods;
+  if(h.created_at_key)return [{start:h.created_at_key,end:h.archived_at||null}]; // 구버전 데이터 폴백
+  return [];
+}
+function _isHabitCurrentlyOn(h){
+  const p=_habitPeriods(h);
+  if(!p.length)return !h.archived_at; // periods/created_at_key 둘 다 없는 아주 오래된 습관은 archived_at만으로 최소 판정
+  const last=p[p.length-1];
+  return !!last&&!last.end;
+}
+// [2026-09-06] 본앱과 동일한 "활성 기간만 정확히 표시" 원칙 — periods 배열 중 dk가 포함되는 구간이
+// 하나라도 있으면 활성. 온오프를 여러 번 반복해도 각 구간이 독립적으로 판정되므로 정확함.
+// periods도 created_at_key도 전혀 없는 습관(구간 이력 도입 이전부터 있던 데이터)은 항상 활성으로 간주.
 function _isHabitActiveOn(h,dk){
-  if(h.created_at_key&&dk<h.created_at_key)return false;
-  if(h.archived_at&&dk>=h.archived_at)return false;
-  return true;
+  const periods=_habitPeriods(h);
+  if(!periods.length)return true;
+  return periods.some(p=>(!p.start||dk>=p.start)&&(!p.end||dk<=p.end));
 }
 // [2026-09-06] 습관 달성률 분모 계산 — "습관 개수 × 기간 일수" 대신, 그 기간 동안 각 습관이
 // 실제로 활성이었던 일수만 합산. 월 중간에 습관을 켜거나 archive해도 달성률이 왜곡되지 않음.
@@ -63,10 +81,10 @@ function _activeHabitDayCount(habits,startDk,endDk){
   });
   return total;
 }
-// 습관 목록에서 "지금 활성 상태"(archive 안 된 것)만 걸러냄 — 월간/주간 리스트에서 archive된 습관을
-// 아예 빼고 싶을 때 사용(본앱 getActiveHabits와 동일 개념).
+// 습관 목록에서 "지금 활성 상태"만 걸러냄 — 월간/주간 리스트에서 archive된 습관을
+// 아예 빼고 싶을 때 사용(본앱 getActiveHabits와 동일 개념). [2026-09-06] periods 기준으로 전환.
 function _getActiveHabitsOnly(habits){
-  return (habits||[]).filter(h=>!h.archived_at);
+  return (habits||[]).filter(_isHabitCurrentlyOn);
 }
 // ── 별점 표시 헬퍼 (본앱과 동일 — 0.5단위, tabler 아이콘 기반. 읽기전용이라 표시만 필요, 클릭 위젯 없음) ──
 function _starIconClass(val,n){
@@ -4408,8 +4426,8 @@ function renderYrKeywordCloud(ctx){
 // ctx당 1회만 계산되도록 ctx 자체에 캐시(요약탭→습관탭 순으로 이 턴 안에서 두 번 불릴 때 재계산 방지).
 // [2026-09-06] 습관 카탈로그 개편 반영 — 세 가지 개선:
 // 1) daysInMonth(그 달 전체일수) 대신, 그 달 안에서 실제 활성이었던 일수로 나눔(월중 신규/archive 반영)
-// 2) "최초 체크 기록월"로 시작달을 추정하던 기존 방식 대신, created_at_key(정확한 등록일)가 있으면 그걸 우선 사용
-// 3) archive된 습관은 archived_at 이후 달을 activeSeq에서 완전히 제외(추적 자체를 안 하던 기간이 0%로 잡혀 평균을 왜곡하지 않도록)
+// 2) periods(구간 배열) 기준으로 월별 활성 여부(byMonth의 null 판정)를 정확히 계산 — 온오프를 여러 번
+//    반복해도 각 활성 구간이 자연스럽게 반영됨(단일 시작월/종료월 추정 방식 폐기).
 function _yrHabitOverallStats(ctx){
   if(ctx._habitStatsCache)return ctx._habitStatsCache;
   if(!ctx.habits.length)return {avgPct:0,perHabit:[],habitStats:[]};
@@ -4426,42 +4444,21 @@ function _yrHabitOverallStats(ctx){
       byMonth[m][h.name]=activeDays>0?Math.round(cnt/activeDays*100):null; // null=이 달엔 아예 추적 대상이 아니었음(0%와 구분)
     });
   }
-  // 습관별 "실제 추적 시작월" — created_at_key(정확한 등록일)가 있으면 그걸로 계산, 없으면(레거시 습관)
-  // 기존처럼 최초 체크 기록으로 추정(앱을 6월 중순부터 쓰기 시작해 1~5월은 기록 자체가 없는 경우 등).
-  const firstTrackedMonthOf=h=>{
-    if(h.created_at_key){
-      const mo=parseInt(h.created_at_key.slice(5,7),10)-1;
-      return Math.min(Math.max(mo,0),ctx.elapsedMonths-1);
-    }
-    const checks=ctx.habitChecks.filter(c=>c.habit_name===_habitCheckKeyOf(h)&&c.date_key);
-    if(!checks.length)return 0;
-    const earliestDk=checks.map(c=>c.date_key).sort()[0];
-    const mo=parseInt(earliestDk.slice(5,7),10)-1;
-    return Math.min(mo,ctx.elapsedMonths-1);
-  };
-  // archive된 습관은 archived_at월 다음달부터 activeSeq에서 완전히 제외 — 그 이후는 애초에 추적을 안 하던 기간.
-  const lastTrackedMonthOf=h=>{
-    if(!h.archived_at)return ctx.elapsedMonths-1;
-    const mo=parseInt(h.archived_at.slice(5,7),10)-1;
-    return Math.min(mo,ctx.elapsedMonths-1);
-  };
-  // 앱 출시 첫 달(6월, 반달치)은 전체통계(activeSeq)에서 완전히 제외 — 트랙 그래프(seq)에는 그대로
-  // 남겨 시각적으로는 계속 보이게 함(2027-01, 봄이님 결정). 기준값은 YR_FIRST_LAUNCH_MONTH_IDX 참고.
-  // seq는 12개월 전체를 담되(트랙 그래프용), 통계 계산(activeSeq)은 startMonth~endMonth 구간 + 출시 첫 달(반달치) 제외.
+  // [2026-09-06 periods 전환] 기존엔 "시작월~종료월" 단일 구간만 계산했으나, 습관이 온오프를 여러 번
+  // 반복(periods 여러 구간)할 수 있게 되면서 단일 구간 가정이 더 이상 맞지 않음. byMonth[m][h.name]은
+  // 이미 _isHabitActiveOn(periods 기준)으로 정확히 계산돼 있으므로(null=그 달엔 비활성), 시작/종료월을
+  // 따로 추정하지 않고 null이 아닌 달만 그대로 모으면 온오프를 몇 번 반복해도 정확한 activeSeq가 됨.
   const habitStats=ctx.habits.map(h=>{
     const seq=Array.from({length:ctx.elapsedMonths},(_,m)=>byMonth[m][h.name]); // null 유지(트랙 그래프에서 '추적 안 함' 표시용)
-    let startMonth=firstTrackedMonthOf(h);
-    if(startMonth<=YR_FIRST_LAUNCH_MONTH_IDX)startMonth=YR_FIRST_LAUNCH_MONTH_IDX+1;
-    const endMonth=lastTrackedMonthOf(h);
-    // activeSeq는 실제 추적 기간(startMonth~endMonth)에 해당하는 달 중, 그 달에도 활성이었던(null 아닌) 값만 모음
+    // 앱 출시 첫 달(6월, 반달치)은 전체통계(activeSeq)에서 제외(2027-01 결정) — 그 뒤로는 활성인 달만 순서대로 모음.
     const activeSeq=[];
-    for(let m=startMonth;m<=endMonth;m++){if(byMonth[m][h.name]!=null)activeSeq.push(byMonth[m][h.name]);}
+    for(let m=YR_FIRST_LAUNCH_MONTH_IDX+1;m<ctx.elapsedMonths;m++){if(byMonth[m][h.name]!=null)activeSeq.push(byMonth[m][h.name]);}
     const overallPct=activeSeq.length?Math.round(activeSeq.reduce((a,b)=>a+b,0)/activeSeq.length):0;
     const mean=activeSeq.length?activeSeq.reduce((a,b)=>a+b,0)/activeSeq.length:0;
     const variance=activeSeq.length?activeSeq.reduce((a,b)=>a+(b-mean)**2,0)/activeSeq.length:0;
     const stdev=Math.sqrt(variance);
     const delta=activeSeq.length>=2?activeSeq[activeSeq.length-1]-activeSeq[0]:0; // 실제 시작달 대비 최근달 증감(BEST FLOW용)
-    return {name:h.name,color:h.color,seq,startMonth,endMonth,archived:!!h.archived_at,activeSeq,overallPct,stdev,delta};
+    return {name:h.name,color:h.color,seq,archived:!_isHabitCurrentlyOn(h),activeSeq,overallPct,stdev,delta};
   });
   const perHabit=habitStats.map(({name,color,overallPct,archived})=>({name,color,overallPct,archived}));
   const avgPct=perHabit.length?Math.round(perHabit.reduce((s,h)=>s+h.overallPct,0)/perHabit.length):0;
@@ -4614,8 +4611,8 @@ function renderYrHabitTab(ctx){
       cells.push(pct===0?'<i class="empty"></i>':`<i style="--v:${(pct/100).toFixed(2)};--dot-color:${dotColor};"></i>`);
     }
     const hIcon=getHabitIcon(h.name);
-    return `<div class="yr-habit-row${h.archived_at?' archived':''}">
-      <div class="habit-name" style="--icon-color:${dotColor};">${hIcon?`<i class="ti ${hIcon}"></i>`:''}<span>${escapeHtml(h.name)}</span>${h.archived_at?'<span class="habit-archived-tag">보관됨</span>':''}</div>
+    return `<div class="yr-habit-row${!_isHabitCurrentlyOn(h)?' archived':''}">
+      <div class="habit-name" style="--icon-color:${dotColor};">${hIcon?`<i class="ti ${hIcon}"></i>`:''}<span>${escapeHtml(h.name)}</span>${!_isHabitCurrentlyOn(h)?'<span class="habit-archived-tag">보관됨</span>':''}</div>
       <div class="habit-track">${cells.join('')}</div>
       <b>${overallPct}%</b>
     </div>`;
@@ -4672,7 +4669,10 @@ function renderYrHabitInsights(ctx,habitStats){
 
   const bestFlow=[...habitStats].sort((a,b)=>b.delta-a.delta)[0];
   const needsCare=[...habitStats].sort((a,b)=>a.overallPct-b.overallPct)[0];
-  const firstMonthNum=bestFlow.startMonth+1;
+  // [2026-09-06 periods 전환] startMonth 필드가 사라졌으므로(온오프 여러 구간 지원), activeSeq[0]에
+  // 해당하는 실제 월을 seq(12개월 전체, null 포함) 안에서 첫 번째 non-null 인덱스로 역산.
+  const firstActiveIdx=bestFlow.seq.findIndex(v=>v!=null);
+  const firstMonthNum=(firstActiveIdx>=0?firstActiveIdx:0)+1;
   const lastMonthNum=ctx.elapsedMonths;
   const firstMonthPct=bestFlow.activeSeq[0]||0;
   const lastMonthPct=bestFlow.activeSeq[bestFlow.activeSeq.length-1]||0;
