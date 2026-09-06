@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.14-rhythm-label-size';
+const CACHE = 'iikoto-v2.15-rhythm-track-tweaks';
 const ASSETS = [
   './',
   './index.html'

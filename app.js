@@ -531,12 +531,12 @@ function buildDailyRhythmTrack(dk){
   };
 
   // 시간 눈금 — 0~8시 압축구간은 눈금을 생략(그 구간엔 보통 수면만 있어 8시부터 표기해도 충분)하고 8시부터 2시간 간격으로.
-  // [2026-09-06] 자정 넘겨 이어지는 블록이 실제 끝시각까지 표시되므로(강제절단 제거), 24시 이후 구간에도
-  // 다음날 02시까지 눈금을 추가 — 트랙이 자정을 넘어 확장됐을 때 몇 시까지 이어졌는지 판독 가능하도록.
+  // [2026-09-06] 24시 이후로 넘어가는 블록은 실제 끝시각까지 그대로 이어서 그리되(강제절단 없음),
+  // 새벽 구간 자체엔 숫자 눈금을 따로 두지 않기로 함 — 24시까지만 표기하고 그 아래는 눈금 없이 이어짐.
   let html='';
-  [8,10,12,14,16,18,20,22,24,26].forEach(function(h){
+  [8,10,12,14,16,18,20,22,24].forEach(function(h){
     const y=toY(h*60);
-    const label=h>24?String(h-24).padStart(2,'0'):String(h).padStart(2,'0');
+    const label=String(h).padStart(2,'0');
     html+='<div class="rt-gridline" style="top:'+y+'px;"></div><div class="rt-hourlabel" data-h="'+h+'" style="top:'+y+'px;">'+label+'</div>';
   });
 
