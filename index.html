@@ -351,6 +351,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .memo-search-empty{text-align:center;color:var(--tm);font-size:var(--dow-label-size);padding:20px 2px;}
 /* 설정탭 공용 버튼 — fill(채움)/outline(테두리)/small(축소) 3종, 새 설정 항목에도 재사용 */
 .settings-btn-fill{width:100%;padding:9px;border-radius:10px;border:none;background:rgba(255,175,200,0.28);color:var(--pal-pink-text);font-family:'DM Sans',sans-serif;font-size:var(--dow-label-size);font-weight:500;cursor:pointer;}
+.settings-btn-fill.dirty{background:rgba(var(--pal-pink-rgb),0.85);color:#fff;} /* 미저장 변경 있음 — 저장 버튼 강조 */
 .settings-btn-outline{width:100%;padding:9px;border-radius:10px;border:1px solid rgba(var(--divider-rgb),0.40);background:transparent;color:var(--tp);font-family:'DM Sans',sans-serif;font-size:var(--dow-label-size);font-weight:500;cursor:pointer;}
 .settings-btn-small{width:100%;padding:7px;border-radius:10px;border:1px solid rgba(var(--divider-rgb),0.40);background:transparent;color:var(--tm);font-family:'DM Sans',sans-serif;font-size:var(--dow-label-size);cursor:pointer;}
 .settings-key-inp{margin-bottom:0;font-size:var(--dow-label-size);width:100%;font-family:monospace;}
@@ -1358,6 +1359,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rt-hourlabel{position:absolute;left:0;width:28px;text-align:right;font-size:var(--dow-label-size-3);color:var(--tm);transform:translateY(-50%);}
 .rt-fill{position:absolute;left:44px;right:0;border-radius:4px;display:flex;align-items:center;justify-content:space-between;padding:0 8px;box-sizing:border-box;overflow:hidden;}
 .rt-fill::before{content:'';position:absolute;inset:0;background:rgba(255,250,240,0.22);border-radius:4px;pointer-events:none;}
+/* [2026-09-06] 총 소요시간 61분 이상인 블록은 텍스트를 상단정렬로 전환 — 긴 블록 한가운데 짧은 블록(점심
+   식사 등)이 걸쳐 텍스트가 부딪히는 문제 방지. 60분 이하는 기존 중앙정렬(짧은 블록에서 텍스트가 상/하단
+   으로 쏠려 보이는 문제 방지 목적) 유지. */
+.rt-fill.rt-fill-top{align-items:flex-start;padding-top:6px;}
 .rt-fill-label{position:relative;font-size:var(--dow-label-size);font-weight:500;color:var(--tp);display:flex;align-items:center;gap:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1;}
 .rt-fill-time{position:relative;flex-shrink:0;font-size:var(--dow-label-size-3);color:var(--tp);font-variant-numeric:tabular-nums;font-family:'DM Sans',sans-serif;margin-left:6px;}
 .rt-fill-actions{position:relative;flex-shrink:0;display:flex;align-items:center;gap:5px;padding-left:6px;}
@@ -2280,13 +2285,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           <input type="text" id="settings-habit-custom-inp" class="modal-inp" placeholder="예: 베란다 식물 물주기" style="margin-bottom:0;flex:1;" autocomplete="off">
           <button class="settings-btn-fill" style="width:auto;padding:0 16px;" onclick="addCustomHabitFromSettings()">추가</button>
         </div>
-        <div id="settings-habit-goal-wake-wrap" style="display:none;border-top:1px solid var(--card-b);padding-top:12px;">
+        <div id="settings-habit-goal-wake-wrap" style="display:none;border-top:1px solid var(--card-b);padding-top:12px;margin-bottom:14px;">
           <div class="settings-item-lbl" style="margin-bottom:8px;">아침기상 목표시각</div>
           <div style="display:flex;align-items:center;gap:8px;">
             <input type="text" id="settings-habit-wake-goal-inp" class="modal-inp time-inp" style="margin-bottom:0;width:110px;" placeholder="07:30" readonly onclick="openTimeModalForHabitGoal()">
             <span style="font-size:var(--dow-label-size);color:var(--tm);">이내 기상 시 자동 체크</span>
           </div>
         </div>
+        <button id="settings-habit-save-btn" class="settings-btn-fill" style="width:100%;" onclick="saveHabitEdits()">저장됨</button>
       </div>
     </div>
     <div>
@@ -2331,8 +2337,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div>
       <div class="settings-slbl">앱 정보</div>
       <div class="settings-card">
-        <div class="settings-item"><span class="settings-item-lbl">버전</span><span class="settings-item-val">2.8</span></div>
-        <div class="settings-item"><span class="settings-item-lbl">2.8 주요 업데이트</span><span class="settings-item-val">사진 메모, 해빗 트래커 강화</span></div>
+        <div class="settings-item"><span class="settings-item-lbl">버전</span><span class="settings-item-val">2.9</span></div>
+        <div class="settings-item"><span class="settings-item-lbl">2.9 주요 업데이트</span><span class="settings-item-val">해빗 저장버튼, 리듬바 정렬 개선</span></div>
       </div>
     </div>
   </div>

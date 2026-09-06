@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.8-habit-tracker';
+const CACHE = 'iikoto-v2.9-rhythm-habit-fix';
 const ASSETS = [
   './',
   './index.html'

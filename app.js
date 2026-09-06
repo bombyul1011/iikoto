@@ -320,7 +320,7 @@ function autoCheckHabitFromRhythm(cat,dk,startTime){
 // 이미 체크되어 있는 상태여도, 아직 시각 기록이 없다면 시각만은 보강해서 남긴다.
 function checkHabitDirect(habitId,dk,timeStr){
   const habits=getHabits();
-  if(!habits.some(h=>h.id===habitId&&!h.archivedAt))return;
+  if(!habits.some(h=>h.id===habitId&&_isHabitCurrentlyOn(h)))return;
   const d=new Date(dk+'T00:00:00');
   const wk=weekKey(d),dow=(d.getDay()+6)%7;
   const key=habitId+'-'+dow;
@@ -531,28 +531,22 @@ function buildDailyRhythmTrack(dk){
   };
 
   // 시간 눈금 — 0~8시 압축구간은 눈금을 생략(그 구간엔 보통 수면만 있어 8시부터 표기해도 충분)하고 8시부터 2시간 간격으로.
+  // [2026-09-06] 자정 넘겨 이어지는 블록이 실제 끝시각까지 표시되므로(강제절단 제거), 24시 이후 구간에도
+  // 다음날 02시까지 눈금을 추가 — 트랙이 자정을 넘어 확장됐을 때 몇 시까지 이어졌는지 판독 가능하도록.
   let html='';
-  [8,10,12,14,16,18,20,22,24].forEach(function(h){
+  [8,10,12,14,16,18,20,22,24,26].forEach(function(h){
     const y=toY(h*60);
-    html+='<div class="rt-gridline" style="top:'+y+'px;"></div><div class="rt-hourlabel" data-h="'+h+'" style="top:'+y+'px;">'+String(h).padStart(2,'0')+'</div>';
+    const label=h>24?String(h-24).padStart(2,'0'):String(h).padStart(2,'0');
+    html+='<div class="rt-gridline" style="top:'+y+'px;"></div><div class="rt-hourlabel" data-h="'+h+'" style="top:'+y+'px;">'+label+'</div>';
   });
 
-  // 블록 통합 목록: 수면(자동) + 식사(자동,30분) + 수기 블록 — 공통 함수 computeRhythmBlocksRaw로 통일
+  // 블록 통합 목록: 수면(자동) + 식사(자동,30분) + 수기 블록 — 공통 함수 computeRhythmBlocksRaw로 통일.
+  // [2026-09-06] 자정을 넘겨 끝나는 활동(예: 23:00~02:00)은 24시에서 잘라내지 않고 실제 종료시각까지
+  // 그대로 이어서 그림(끝시각을 1440+분의 절대좌표로 확장) — 아카이브앱(renderTimelineTrack)과 동일 원칙.
   let blocks=computeRhythmBlocksRaw(dk).map(function(bk){
     let eMin=bk.end;
-    if(eMin!=null&&eMin<=bk.start)eMin=1440; // 자정을 넘기는 블록은 당일 트랙에서는 24시까지로 표시(세로트랙만의 시각적 처리)
+    if(eMin!=null&&eMin<=bk.start)eMin+=1440;
     return Object.assign({},bk,{end:eMin});
-  });
-  // 전날 블록이 자정을 넘겨서 오늘로 이어진 경우, 그 이어진 구간(0시~끝시각)을 오늘 트랙에도 표시
-  const prevD=new Date(dk+'T00:00:00');prevD.setDate(prevD.getDate()-1);
-  const prevDk=dateKey(prevD);
-  getRhythmBlocks(prevDk).forEach(function(b){
-    if(!b.end)return;
-    const cat=RHYTHM_CATS[b.cat];if(!cat)return;
-    const sMin=toMin(b.start),eMin=toMin(b.end);
-    if(eMin<=sMin&&eMin>0){
-      blocks.push({start:0,end:eMin,color:getRhythmColor(b.cat),label:(b.text||cat.label)+' (전날 이어짐)',time:'00:00 – '+b.end,noLabel:true});
-    }
   });
   blocks.sort(function(a,b){
     const ka=a.sortKey!=null?a.sortKey:a.start;
@@ -573,7 +567,13 @@ function buildDailyRhythmTrack(dk){
     const stubEnd=bk.end!=null?bk.end:(isToday?(function(){const n=new Date();return n.getHours()*60+n.getMinutes();})():Math.min(bk.start+20,1440));
     const bh=Math.max(toY(stubEnd+offset)-by,16); // 라벨 텍스트가 최소한은 들어갈 높이 확보
     if(by+bh>maxBottom)maxBottom=by+bh;
-    html+='<div class="rt-fill'+(bk.ongoing?' ongoing':'')+'" style="top:'+by+'px;height:'+bh+'px;background-color:'+bk.color+';z-index:'+(10+bi)+';">';
+    // [2026-09-06] 텍스트 정렬 규칙 — 총 소요시간(진행중이면 현재까지 경과시간) 60분 이하는 중앙정렬(짧은
+    // 블록에서 텍스트가 상/하단에 쏠려 보이는 문제 방지 목적, 기존과 동일), 61분 이상은 상단정렬로 전환.
+    // 긴 블록일수록 텍스트가 블록 중앙(화면 스크롤상 한참 아래)에 있으면 블록 시작 지점과 눈에 안 들어와
+    // 매칭이 어려웠던 문제와, 점심식사처럼 짧은 블록이 긴 블록 한가운데 걸치는 문제를 함께 해결.
+    const durMin=stubEnd-bk.start;
+    const alignCls=durMin>60?' rt-fill-top':'';
+    html+='<div class="rt-fill'+alignCls+(bk.ongoing?' ongoing':'')+'" style="top:'+by+'px;height:'+bh+'px;background-color:'+bk.color+';z-index:'+(10+bi)+';">';
     if(!bk.noLabel){
       const iconHtml=bk.icon?'<i class="ti ti-tools-kitchen-3" aria-hidden="true"></i>':'';
       html+='<span class="rt-fill-label">'+iconHtml+escapeHtml(bk.label)+'</span>';
@@ -2043,7 +2043,7 @@ const HABIT_CATALOG=[
   {id:'diary',      label:'일기',     icon:'ti-pencil-heart', color:'yellow'},
   {id:'tidy',       label:'정리',     icon:'ti-sparkles',     color:'lime'},
   {id:'care',       label:'케어',     icon:'ti-mood-spark',   color:'orange'},
-  {id:'wake',       label:'아침기상', icon:'ti-sunrise',      color:'sky'},
+  {id:'wake',       label:'기상',     icon:'ti-sunrise',      color:'sky'},
   {id:'supplement', label:'영양제',   icon:'ti-pill',         color:'warmgray'}
 ];
 function getHabitCatalogItem(id){return HABIT_CATALOG.find(c=>c.id===id)||null;}
@@ -2765,7 +2765,16 @@ function getReadingStreak(){
 }
 function getHabits(){_migrateHabitIds();return S.get('habits')||DEFAULT_HABITS;}
 function saveHabits(v){S.set('habits',v);autoSync('habits',null);}
-function getActiveHabits(){return getHabits().filter(h=>!h.archivedAt);}
+// _habitPeriods/_isHabitActiveOn 정의는 파일 하단(HABIT MONTHLY 섹션)에 있음 — function 선언 호이스팅으로 순서 무관 동작.
+// periods도 createdAt도 전혀 없는 아주 오래된 습관(구간 이력 도입 이전부터 있던 데이터)은 "정보 없음"이지
+// "꺼짐"이 아니므로, 이 경우엔 archivedAt 유무만으로 최소 판정(archivedAt이 있으면 꺼짐, 없으면 켜짐).
+function _isHabitCurrentlyOn(h){
+  const p=_habitPeriods(h);
+  if(!p.length)return !h.archivedAt;
+  const last=p[p.length-1];
+  return !!last&&!last.end;
+}
+function getActiveHabits(){return getHabits().filter(_isHabitCurrentlyOn);}
 function getHabitChecks(wk){return S.get(S.key('hc',wk))||{};}
 // 습관 체크 시각(별도 저장소) — 기존 checks[key]=true/false 불리언 구조를 안 건드리기 위해 분리.
 // 새벽홈탭 타임라인 등에서 "몇 시에 체크했는지"가 필요할 때만 참조.
@@ -2968,22 +2977,22 @@ async function syncHabitsDown(){
   // [2026-09-05] habit_id(카탈로그 id)/custom/archived_at도 함께 복원 — 이걸 빠뜨리면 동기화할 때마다
   // 로컬의 id가 사라져 _migrateHabitIds가 매번 다시 돌고, 특히 커스텀 습관은 매번 새 랜덤 id를 받아
   // 과거 체크 기록과 끊기는 문제가 생김.
-  // [2026-09-06 버그 수정] createdAt(활성 시작일)도 빠짐없이 함께 복원 — 이게 빠지면 월간 그리드의
-  // "활성 기간만 표시" 로직이 동기화 후 초기화되어, 방금 새로 등록한 습관도 예전부터 있던 것처럼
-  // (비활성 표시 없이) 보이는 문제가 있었음.
+  // [2026-09-06 periods 전환] 활성/비활성 이력을 periods(jsonb 배열) 컬럼 하나로 관리 —
+  // 온오프를 반복해도 각 활성 구간이 독립적으로 누적 보존됨(구간 배열 push/close 방식).
+  // 구버전 컬럼(archived_at/created_at_key)만 있는 예전 서버 데이터는 폴백으로 단일구간 변환.
   if(rows.length>0)S.set('habits',rows.map(r=>{
     const h={name:r.name,color:r.color};
     if(r.habit_id)h.id=r.habit_id;
     if(r.custom)h.custom=true;
-    if(r.archived_at)h.archivedAt=r.archived_at;
-    if(r.created_at_key)h.createdAt=r.created_at_key;
+    if(r.periods&&r.periods.length)h.periods=r.periods;
+    else if(r.created_at_key)h.periods=[{start:r.created_at_key,end:r.archived_at||null}]; // 구버전 폴백
     return h;
   }));
 }
 async function syncHabitsUp(){
   const h=getHabits();
   if(h.length){
-    const ok=await supaUpsert('habits','name',h.map((hh,i)=>({name:hh.name,color:hh.color,sort_order:i,habit_id:hh.id||null,custom:!!hh.custom,archived_at:hh.archivedAt||null,created_at_key:hh.createdAt||null})));
+    const ok=await supaUpsert('habits','name',h.map((hh,i)=>({name:hh.name,color:hh.color,sort_order:i,habit_id:hh.id||null,custom:!!hh.custom,periods:_habitPeriods(hh)})));
     if(!ok)return false;
   }
   const delNames=getDelPendingCids('habits','global');
@@ -8817,13 +8826,21 @@ function hideApiResults(){const el=document.getElementById('api-results');if(el)
 // ██ 월간탭 (3/3 — 나머지는 MONTHLY REPORT 부근, API SEARCH 부근) — HABIT MONTHLY/CALENDAR/MONTHLY STAT BAR ██
 // ══════════════════════════════════════════════════════════
 // ── HABIT MONTHLY
-// [2026-09-06] 습관마다 실제 "추적 중이던 기간"(createdAt~archivedAt)만 체크 대상으로 보고,
-// 그 밖의 날짜(아직 시작 전이거나 archive 이후)는 비활성 칸으로 표시 — 월 중 몇 번을 바꾸든
-// 그리드가 항상 정직하게 그 기간의 실제 추적 여부만 보여줌(인위적인 "월 1회 변경 제한" 없이 해결).
+// [2026-09-06] 습관마다 실제 "추적 중이던 기간"만 체크 대상으로 보고, 그 밖의 날짜(시작 전/일시중단/archive 이후)는
+// 비활성 칸으로 표시 — 온오프를 몇 번 반복하든 그리드가 항상 정직하게 실제 추적 여부만 보여줌.
+// [2026-09-06 개선] createdAt/archivedAt 단일 값 방식은 재활성화할 때마다 과거 활성 구간(과거 createdAt)이
+// 통째로 덮어써져 사라지는 문제가 있었음(예: 6월부터 하던 습관을 9월에 껐다 10월에 다시 켜면, 6~9월 실적이
+// 통계에서 빠져버림) — periods(구간 배열, [{start,end}], end:null=진행중)로 전환해 온오프를 반복해도
+// 각 활성 구간이 독립적으로 누적 보존되도록 함. 구버전 createdAt/archivedAt만 있는 습관은 폴백으로 처리.
+function _habitPeriods(h){
+  if(h.periods&&h.periods.length)return h.periods;
+  if(h.createdAt)return [{start:h.createdAt,end:h.archivedAt||null}]; // 구버전 데이터 폴백(마이그레이션 전)
+  return [];
+}
 function _isHabitActiveOn(h,dk){
-  if(h.createdAt&&dk<h.createdAt)return false;
-  if(h.archivedAt&&dk>h.archivedAt)return false;
-  return true;
+  const periods=_habitPeriods(h);
+  if(!periods.length)return true; // 구간 정보가 아예 없으면(아주 오래된 데이터) 항상 활성으로 간주
+  return periods.some(p=>dk>=p.start&&(!p.end||dk<=p.end));
 }
 function renderHabitMonthly(){
   const habits=getActiveHabits(),y=_calYear,mo=_calMonth; // 2026-09-06: archive(목록에서 제외)한 습관은 월간에서도 노출 안 함
@@ -10016,86 +10033,109 @@ function openSettings(){
   document.querySelectorAll('.ctheme-btn').forEach(b=>b.classList.remove('on'));
   const act=document.getElementById('ct-'+theme);if(act)act.classList.add('on');
   initTextScaleUI();
+  _resetHabitEditDraft(); // 설정탭 진입 시마다 편집용 임시본을 실데이터로 새로 초기화(이전 진입의 미저장 변경은 버림)
   renderSettingsHabitSection();
   document.getElementById('settings-ov').classList.add('on');
 }
+// [2026-09-06 저장버튼 도입] "항목 선택" 칩은 탭 즉시 실제 저장(saveHabits)하지 않고, 이 임시 배열(_habitEditDraft)만
+// 바꾼 뒤 화면만 다시 그림 — 실수로 잘못 누른 칩이 바로 서버까지 반영되던 문제를 막고, "저장" 버튼을 눌러야만
+// 실제 반영+동기화(saveHabits)가 실행되도록 해서 한 번 더 확인할 기회를 줌.
+let _habitEditDraft=null;
+function _resetHabitEditDraft(){_habitEditDraft=getHabits().map(h=>({...h,periods:_habitPeriods(h).map(p=>({...p}))}));}
 // [2026-09-05] 설정탭 해빗 코너 — 카탈로그 칩(토글) + 직접입력 습관 + 아침기상 목표시각.
 // 기존에 오늘탭 하단에 있던 "+ 항목 편집"(habit-modal, 줄바꿈 텍스트박스) 방식을 완전히 대체.
 function renderSettingsHabitSection(){
   const chipsWrap=document.getElementById('settings-habit-catalog-chips');
   if(!chipsWrap)return;
-  const habits=getHabits(); // archive된 것도 여기선 필요(칩 on/off 상태 판단에 archive 여부까지 반영해야 함)
+  if(!_habitEditDraft)_resetHabitEditDraft();
+  const habits=_habitEditDraft; // 화면은 항상 임시본 기준으로 그림 — 저장 전까지 실제 데이터(getHabits())는 그대로 유지됨
   chipsWrap.innerHTML=HABIT_CATALOG.map(c=>{
     const existing=habits.find(h=>h.id===c.id);
-    const isOn=existing&&!existing.archivedAt;
+    const isOn=existing&&_isHabitCurrentlyOn(existing);
     return `<span class="rhythm-content-chip${isOn?' sel':''}" onclick="toggleCatalogHabit('${c.id}')"><i class="ti ${c.icon} ico-inline-13" aria-hidden="true"></i>${escapeHtml(c.label)}</span>`;
   }).join('');
   // 커스텀(직접입력) 습관도 같은 칩 목록에 이어서 노출 — 탭하면 archive 토글, 길게는 없음(단순화)
   const customHabits=habits.filter(h=>h.custom);
   if(customHabits.length){
     chipsWrap.innerHTML+=customHabits.map(h=>{
-      const isOn=!h.archivedAt;
+      const isOn=_isHabitCurrentlyOn(h);
       const hIcon=getHabitIcon(h.name);
       return `<span class="rhythm-content-chip${isOn?' sel':''}" onclick="toggleCustomHabit('${h.id}')">${hIcon?`<i class="ti ${hIcon} ico-inline-13" aria-hidden="true"></i>`:''}${escapeHtml(h.name)}</span>`;
     }).join('');
   }
   // 아침기상 칩이 켜져 있을 때만 목표시각 입력 영역 노출
-  const wakeOn=habits.some(h=>h.id==='wake'&&!h.archivedAt);
+  const wakeOn=habits.some(h=>h.id==='wake'&&_isHabitCurrentlyOn(h));
   const goalWrap=document.getElementById('settings-habit-goal-wake-wrap');
   if(goalWrap)goalWrap.style.display=wakeOn?'':'none';
   const goalInp=document.getElementById('settings-habit-wake-goal-inp');
   if(goalInp){const goal=getHabitGoal('wake');goalInp.value=goal&&goal.goalTime?goal.goalTime:'';}
+  // 실제 저장된 상태(getHabits())와 임시본이 다르면 저장 버튼을 강조 — 미저장 변경이 있음을 알림
+  const saveBtn=document.getElementById('settings-habit-save-btn');
+  if(saveBtn){
+    const dirty=JSON.stringify(getHabits())!==JSON.stringify(_habitEditDraft);
+    saveBtn.classList.toggle('dirty',dirty);
+    saveBtn.textContent=dirty?'저장 (변경사항 있음)':'저장됨';
+  }
 }
-// 카탈로그 칩 토글 — 이미 등록돼 있으면(archive 여부 무관) 있는/없는 상태를 뒤집고,
-// 아예 처음 켜는 것이면 카탈로그 정의(색상 포함)로 새로 추가.
-// [2026-09-06] 월간 해빗 그리드에서 "이 습관을 실제로 추적하고 있던 기간"만 정확히 표시하기 위해
-// createdAt(활성 시작일)을 함께 관리. archive했다가 재활성화하면 새로운 활성 구간이 시작되는 것으로
-// 보고 createdAt을 그 시점으로 갱신 — 비활성이었던 기간은 실제로 체크되지 않았을 것이므로,
-// 재활성화 이전 날짜까지 "추적 대상이었다"고 그리드에 표시하면 부정확함.
-function toggleCatalogHabit(catalogId){
-  const habits=getHabits();
-  const idx=habits.findIndex(h=>h.id===catalogId);
+// [2026-09-06 periods 전환] 활성/비활성 전환 시 구간 배열에 push/close만 하는 공용 헬퍼.
+// 이미 열린 구간이 있는데 또 켜기(중복 시작) / 이미 닫힌 상태인데 또 끄기(중복 종료) 시도는
+// 조용히 무시 — 더블탭 등 실수로 같은 토글이 연속 호출돼도 구간이 꼬이지 않도록 방어.
+// 같은 날 안에서 껐다가 다시 켜는 것(오전 끄기→오후 켜기)은 정상 케이스로 허용 — 이 경우 하루짜리
+// 닫힌 구간({start:오늘,end:오늘})이 하나 남고 그 뒤로 새 열린 구간이 이어짐.
+function _applyHabitToggle(h){
+  const periods=_habitPeriods(h).map(p=>({...p})); // 원본 훼손 방지 위해 얕은 복사
   const today=dateKey(getLogicalDate());
+  const last=periods[periods.length-1];
+  if(!last||last.end){
+    periods.push({start:today,end:null}); // 현재 비활성 상태 → 새 구간 열기(켜기)
+  }else{
+    last.end=today; // 현재 활성 상태 → 마지막 구간 닫기(끄기)
+  }
+  const {createdAt,archivedAt,...rest}=h; // 구버전 필드는 정리(더 이상 이중 관리 안 함)
+  return {...rest,periods};
+}
+// 카탈로그 칩 토글 — [2026-09-06 저장버튼 도입] 이제 실제 저장은 하지 않고 _habitEditDraft만 변경.
+// 이미 등록돼 있으면(archive 여부 무관) 있는/없는 상태를 뒤집고, 아예 처음 켜는 것이면 카탈로그 정의로 새로 추가.
+function toggleCatalogHabit(catalogId){
+  if(!_habitEditDraft)_resetHabitEditDraft();
+  const idx=_habitEditDraft.findIndex(h=>h.id===catalogId);
   if(idx>=0){
-    // 이미 있음 — archive 토글(진짜 삭제 대신 보관/복원)
-    // createdAt이 아예 없는 경우(마이그레이션으로 예전부터 있던 것처럼 들어온 습관, 2026-09-06 발견된 케이스)도
-    // 여기서 오늘 날짜로 보정 — 그래야 이번에 "끄기"를 눌러 archive될 때 활성 구간이 정확히 기록됨.
-    if(!habits[idx].createdAt)habits[idx]={...habits[idx],createdAt:today};
-    if(habits[idx].archivedAt){const {archivedAt,...rest}=habits[idx];habits[idx]={...rest,createdAt:today};}
-    else habits[idx]={...habits[idx],archivedAt:today};
-    saveHabits(habits);
+    _habitEditDraft[idx]=_applyHabitToggle(_habitEditDraft[idx]);
   }else{
     const c=getHabitCatalogItem(catalogId);if(!c)return;
-    habits.push({id:c.id,name:c.label,color:c.color,createdAt:today});
-    saveHabits(habits);
+    const today=dateKey(getLogicalDate());
+    _habitEditDraft.push({id:c.id,name:c.label,color:c.color,periods:[{start:today,end:null}]});
   }
   renderSettingsHabitSection();
-  refreshHabitUIEverywhere();
 }
 function toggleCustomHabit(habitId){
-  const habits=getHabits();
-  const idx=habits.findIndex(h=>h.id===habitId);
+  if(!_habitEditDraft)_resetHabitEditDraft();
+  const idx=_habitEditDraft.findIndex(h=>h.id===habitId);
   if(idx<0)return;
-  const today=dateKey(getLogicalDate());
-  if(habits[idx].archivedAt){const {archivedAt,...rest}=habits[idx];habits[idx]={...rest,createdAt:today};}
-  else habits[idx]={...habits[idx],archivedAt:today};
-  saveHabits(habits);
+  _habitEditDraft[idx]=_applyHabitToggle(_habitEditDraft[idx]);
   renderSettingsHabitSection();
+}
+// [2026-09-06] "저장" 버튼 — 여기서만 실제 saveHabits(서버 동기화 포함)가 실행됨.
+// 칩을 아무리 눌러도 이 버튼을 눌러야 확정되므로, 실수로 잘못 누른 칩은 설정탭을 그냥 닫으면(재진입 시
+// _resetHabitEditDraft로 초기화됨) 아무 영향 없이 취소됨.
+function saveHabitEdits(){
+  if(!_habitEditDraft)return;
+  saveHabits(_habitEditDraft);
   refreshHabitUIEverywhere();
+  renderSettingsHabitSection();
+  showToast('해빗 설정이 저장됐어요 ✓');
 }
 function addCustomHabitFromSettings(){
   const inp=document.getElementById('settings-habit-custom-inp');
   const name=(inp.value||'').trim();
   if(!name)return;
-  const habits=getHabits();
-  if(habits.some(h=>h.name===name&&!h.archivedAt)){inp.value='';return;} // 이미 동일 이름의 활성 습관이 있으면 중복 추가 안 함
-  const usedColors=new Set(habits.map(h=>h.color));
-  const color=HABIT_COLORS.find(c=>!usedColors.has(c))||HABIT_COLORS[habits.length%HABIT_COLORS.length];
-  habits.push({id:'custom_'+genCid(),name,color,custom:true,createdAt:dateKey(getLogicalDate())});
-  saveHabits(habits);
+  if(!_habitEditDraft)_resetHabitEditDraft();
+  if(_habitEditDraft.some(h=>h.name===name&&_isHabitCurrentlyOn(h))){inp.value='';return;} // 이미 동일 이름의 활성 습관이 있으면 중복 추가 안 함
+  const usedColors=new Set(_habitEditDraft.map(h=>h.color));
+  const color=HABIT_COLORS.find(c=>!usedColors.has(c))||HABIT_COLORS[_habitEditDraft.length%HABIT_COLORS.length];
+  _habitEditDraft.push({id:'custom_'+genCid(),name,color,custom:true,periods:[{start:dateKey(getLogicalDate()),end:null}]});
   inp.value='';
-  renderSettingsHabitSection();
-  refreshHabitUIEverywhere();
+  renderSettingsHabitSection(); // 저장버튼을 눌러야 실제 반영(saveHabitEdits)됨
 }
 // 아침기상 목표시각 입력 — 기존 공용 시간 휠 모달(#time-modal)을 재사용하되,
 // confirmTime()의 기존 분기(수면/기상/일정 등)와 겹치지 않도록 별도 _sleepTarget 값을 씀.
