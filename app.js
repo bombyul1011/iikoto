@@ -676,7 +676,7 @@ function makeHabitStreakRow(){
     const showStreak=streak>=2;
     const numText=showStreak?`${streak}일`:`${monthCount}`;
     const hIcon=getHabitIconFor(h);
-    const iconColor=getHabitIconColor(h.name,h.color);
+    const iconColor=getHabitIconColor(h.color);
     html+=`<div class="habit-numbox-card${showStreak?' streak':''}">`
       +(hIcon?`<i class="ti ${hIcon}" style="font-size:20px;color:${iconColor};margin-bottom:6px;" aria-hidden="true"></i>`:`<span class="home-habit-dot ${h.color}" style="margin-bottom:6px;"></span><span class="habit-numbox-name">${escapeHtml(h.name)}</span>`)
       +`<span class="habit-numbox-num">${numText}</span></div>`;
@@ -2129,10 +2129,10 @@ function _migrateHabitCheckKeys(nameToId){
 // 습관명은 자유 텍스트라 완전 자동매칭엔 한계가 있음 — 이름에 특정 키워드가 포함되면 아이콘을 붙이고, 매칭 안 되면 아이콘 없이 텍스트만 표시
 // [2026-09-06] 리듬 카테고리와 통일된 새 색상 배정에 맞춤(HABIT_CATALOG 참고)
 const HABIT_ICON_RULES=[
-  {keywords:['운동','헬스','필라테스','런닝','러닝','조깅'],icon:'ti-run',color:'var(--pal-pink-border)'},
-  {keywords:['독서','책'],icon:'ti-book',color:'var(--pal-lavender-border)'},
-  {keywords:['일기','다이어리','글쓰기'],icon:'ti-pencil-heart',color:'var(--pal-yellow-border)'},
-  {keywords:['영양제','비타민','약'],icon:'ti-pill',color:'var(--pal-warmgray-border)'}
+  {keywords:['운동','헬스','필라테스','런닝','러닝','조깅'],icon:'ti-run'},
+  {keywords:['독서','책'],icon:'ti-book'},
+  {keywords:['일기','다이어리','글쓰기'],icon:'ti-pencil-heart'},
+  {keywords:['영양제','비타민','약'],icon:'ti-pill'}
 ];
 function getHabitIcon(name){
   if(!name)return null;
@@ -2146,11 +2146,11 @@ function getHabitIconFor(h){
   const catalogItem=getHabitCatalogItem(h.id);
   return catalogItem?catalogItem.icon:getHabitIcon(h.name);
 }
-function getHabitIconColor(name,habitColor){
-  if(habitColor)return getHabitColorBorder(habitColor);
-  if(!name)return 'var(--tm)';
-  const rule=HABIT_ICON_RULES.find(r=>r.keywords.some(k=>name.includes(k)));
-  return rule?rule.color:'var(--tm)';
+// [2026-09-06 정리] 습관은 생성 시 항상 color를 갖도록 보장되므로(카탈로그/커스텀 공통) 유일한
+// 호출부(makeHabitStreakRow)에서 habitColor가 없는 경우는 실제로 발생하지 않음 — 이름 키워드매칭
+// 폴백 분기(구버전 HABIT_ICON_RULES.color)는 죽은 코드였음, 제거하고 팔레트 조회로 단순화.
+function getHabitIconColor(habitColor){
+  return getHabitColorBorder(habitColor);
 }
 
 // ── STORAGE
