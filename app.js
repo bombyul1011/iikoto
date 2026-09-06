@@ -125,7 +125,7 @@ const RHYTHM_CATS={
   exercise:{label:'운동',color:'rgba(var(--pal-pink-rgb),0.80)',icon:'ti-run'},
   rest:{label:'휴식',color:'rgba(var(--pal-mint-rgb),0.55)',icon:'ti-armchair'},
   groom:{label:'단장',color:'rgba(var(--pal-orange-rgb),0.82)',icon:'ti-mood-spark'},
-  work:{label:'업무',color:'rgba(var(--pal-sky-rgb),0.30)',icon:'ti-keyboard'}, // 업무 존재감 낮추기 위해 알파만 낮춤(채도는 원색 그대로), 2026-09-04
+  work:{label:'업무',color:'rgba(var(--pal-sky-rgb),0.45)',icon:'ti-keyboard'}, // 업무 존재감 살짝 올림(식사 아이콘과 겹쳐도 시인성 확인 완료), 2026-09-06
   appointment:{label:'외출',color:'rgba(var(--pal-rose-rgb),0.25)',icon:'ti-bus'}, // 알파만 낮춤(채도는 원색 그대로), 외출도 지속시간이 길어 존재감 조절, 2026-09-04
   note:{label:'책상',color:'rgba(var(--pal-yellow-rgb),0.82)',icon:'ti-desk'},
   enjoy:{label:'감상',color:'rgba(var(--pal-lavender-rgb),0.80)',icon:'ti-stack-2'},
