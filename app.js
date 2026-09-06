@@ -5659,11 +5659,26 @@ function _paceAfternoonTimelineItems(dk){
     if(min==null||min<AFTERNOON_TL_START||min>AFTERNOON_TL_END)return;
     items.push({type:'rhythm',min,time:b.start,label:(b.text&&b.text.trim())||cat.label+' 시작',icon:cat.icon});
   });
+  // 습관 — 체크 시각(checked_time)이 기록된 것만, 12~19시 범위 안에서만 표시.
+  {
+    const wk=weekKey(new Date(dk+'T00:00:00'));
+    const dow=(new Date(dk+'T00:00:00').getDay()+6)%7;
+    const checks=getHabitChecks(wk);
+    const times=getHabitCheckTimes(wk);
+    getHabits().forEach(h=>{
+      const key=h.id+'-'+dow;
+      if(!checks[key]||!times[key])return;
+      const p=times[key].split(':');
+      const min=parseInt(p[0],10)*60+parseInt(p[1],10);
+      if(min<AFTERNOON_TL_START||min>AFTERNOON_TL_END)return;
+      items.push({type:'habit',min,time:times[key],label:h.name+' 체크',icon:getHabitIconFor(h)||'ti-repeat'});
+    });
+  }
   items.sort((a,b)=>a.min-b.min);
   return items;
 }
-const AFTERNOON_TL_COLORVAR={meal:'--src-meal',todo:'--src-todo',event:'--src-event',rhythm:'--src-rhythm'};
-const AFTERNOON_TL_TEXTVAR={meal:'--src-meal-text',todo:'--src-todo-text',event:'--src-event-text',rhythm:'--src-rhythm-text'};
+const AFTERNOON_TL_COLORVAR={meal:'--src-meal',todo:'--src-todo',event:'--src-event',rhythm:'--src-rhythm',habit:'--src-habit'};
+const AFTERNOON_TL_TEXTVAR={meal:'--src-meal-text',todo:'--src-todo-text',event:'--src-event-text',rhythm:'--src-rhythm-text',habit:'--src-habit-text'};
 function makeAfternoonHomeCard(){
   const dk=dateKey(getLogicalDate());
   const now=new Date();
@@ -5731,6 +5746,7 @@ function makeAfternoonHomeCard(){
       <span class="htl-legend-item"><span class="htl-legend-dot" style="background:var(--src-todo);"></span>할일</span>
       <span class="htl-legend-item"><span class="htl-legend-dot" style="background:var(--src-meal);"></span>식사</span>
       <span class="htl-legend-item"><span class="htl-legend-dot" style="background:var(--src-rhythm);"></span>리듬</span>
+      <span class="htl-legend-item"><span class="htl-legend-dot" style="background:var(--src-habit);"></span>습관</span>
     </div>
     <div class="htl-list">${listHtml}</div>`:''}
     <div class="pace-divider"></div>
