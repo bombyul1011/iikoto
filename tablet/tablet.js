@@ -66,7 +66,8 @@ function _isHabitCurrentlyOn(h){
 function _isHabitActiveOn(h,dk){
   const periods=_habitPeriods(h);
   if(!periods.length)return true;
-  return periods.some(p=>(!p.start||dk>=p.start)&&(!p.end||dk<=p.end));
+  // [2026-09-06 경계 수정] 본앱과 동일 — end는 "비활성화 당일"이 저장되므로 그 날부터는 비활성(dk<p.end).
+  return periods.some(p=>(!p.start||dk>=p.start)&&(!p.end||dk<p.end));
 }
 // [2026-09-06] 습관 달성률 분모 계산 — "습관 개수 × 기간 일수" 대신, 그 기간 동안 각 습관이
 // 실제로 활성이었던 일수만 합산. 월 중간에 습관을 켜거나 archive해도 달성률이 왜곡되지 않음.
