@@ -675,8 +675,7 @@ function makeHabitStreakRow(){
     // 스트릭 2일 이상이면 스트릭을, 아니면 기존처럼 이번달 누적을 표시 — 잘 이어가는 습관을 시각적으로 구분.
     const showStreak=streak>=2;
     const numText=showStreak?`${streak}일`:`${monthCount}`;
-    const catalogItem=getHabitCatalogItem(h.id);
-    const hIcon=catalogItem?catalogItem.icon:getHabitIcon(h.name);
+    const hIcon=getHabitIconFor(h);
     const iconColor=getHabitIconColor(h.name,h.color);
     html+=`<div class="habit-numbox-card${showStreak?' streak':''}">`
       +(hIcon?`<i class="ti ${hIcon}" style="font-size:20px;color:${iconColor};margin-bottom:6px;" aria-hidden="true"></i>`:`<span class="home-habit-dot ${h.color}" style="margin-bottom:6px;"></span><span class="habit-numbox-name">${escapeHtml(h.name)}</span>`)
@@ -2032,19 +2031,19 @@ function getCatBarColor(cat){
 function getCatDotColor(cat){
   return CONTENT_DOT_COLOR[cat]||'var(--tm)';
 }
-const HABIT_COLORS=['mint','pink','sky','yellow','lavender','peach','warmgray']; // 카탈로그(2026-09-05) 도입으로 7개까지 늘어날 수 있어 색상 종류 확장. 커스텀(직접입력) 습관에 순환 배정할 때 사용.
-// [2026-09-05] 습관 카탈로그 — 고정 id를 가진 미리 정의된 항목들. 이름을 자유롭게 바꿀 수 있던 기존 구조는
-// "이름 자체가 통계 데이터의 키"라서, 이름을 조금만 고쳐도(오타 수정 포함) 과거 기록과 완전히 단절되는
-// 근본적인 약점이 있었음. 카탈로그 항목은 id가 코드에 고정되어 있어 이 문제가 원천 차단됨.
-// 사용자가 카탈로그에 없는 걸 원하면 직접입력도 가능(뒤의 custom 습관) — 이 경우도 등록 시점에 한 번
-// id를 발급받고, 이후 이름을 바꿔도 그 id를 유지하는 방식으로 동일한 안전성을 갖게 함.
+const HABIT_COLORS=['pink','lavender','yellow','lime','orange','sky','warmgray']; // [2026-09-06] 각 습관과 연동된 리듬 카테고리 색상에 맞춰 전면 재배정(아래 카탈로그 주석 참고). 커스텀 습관 순환 배정용 팔레트 순서는 이제 이 배열 순서를 그대로 따름.
+// [2026-09-06] 습관 색상을 연동된 리듬 카테고리 색과 통일 — 리듬바(캘린더/타임라인 등 앱 전역)의
+// 색이 곧 그 활동을 대표하는 색이므로, 습관 그리드에서도 같은 색이 나오면 "이 색=이 활동"이라는
+// 인지가 한 번에 이어짐. 매칭 근거: 운동↔리듬exercise(pink), 정리↔리듬home(lime),
+// 케어↔리듬groom/단장(orange), 일기↔리듬note/책상(yellow), 독서↔리듬enjoy/감상(lavender).
+// 아침기상·영양제는 리듬 카테고리와 직접 연동되는 게 없어 리듬 팔레트와 안 겹치는 색(sky/warmgray)을 배정.
 const HABIT_CATALOG=[
-  {id:'exercise',   label:'운동',     icon:'ti-run',          color:'mint'},
-  {id:'reading',    label:'독서',     icon:'ti-book',         color:'pink'},
-  {id:'diary',      label:'일기',     icon:'ti-pencil-heart', color:'sky'},
-  {id:'tidy',       label:'정리',     icon:'ti-sparkles',     color:'yellow'},
-  {id:'care',       label:'케어',     icon:'ti-mood-spark',   color:'lavender'},
-  {id:'wake',       label:'아침기상', icon:'ti-sunrise',      color:'peach'},
+  {id:'exercise',   label:'운동',     icon:'ti-run',          color:'pink'},
+  {id:'reading',    label:'독서',     icon:'ti-book',         color:'lavender'},
+  {id:'diary',      label:'일기',     icon:'ti-pencil-heart', color:'yellow'},
+  {id:'tidy',       label:'정리',     icon:'ti-sparkles',     color:'lime'},
+  {id:'care',       label:'케어',     icon:'ti-mood-spark',   color:'orange'},
+  {id:'wake',       label:'아침기상', icon:'ti-sunrise',      color:'sky'},
   {id:'supplement', label:'영양제',   icon:'ti-pill',         color:'warmgray'}
 ];
 function getHabitCatalogItem(id){return HABIT_CATALOG.find(c=>c.id===id)||null;}
@@ -2077,7 +2076,7 @@ async function syncHabitGoalsDown(){
 // 리듬 카테고리 → 습관 id 자동체크 매핑. 여기 추가되는 카테고리는 그 리듬블록이 생성되는 순간
 // 자동으로 해당 습관이 체크됨(이미 켜져 있으면 그대로 둠 — 수동으로 끈 걸 되살리지 않기 위함, checkHabitDirect 참고).
 const HABIT_AUTO_RHYTHM_MAP={exercise:'exercise',home:'tidy',groom:'care'};
-const DEFAULT_HABITS=[{id:'exercise',name:'운동',color:'mint'},{id:'reading',name:'독서',color:'pink'},{id:'diary',name:'일기',color:'sky'},{id:'tidy',name:'정리',color:'yellow'}];
+const DEFAULT_HABITS=[{id:'exercise',name:'운동',color:'pink'},{id:'reading',name:'독서',color:'lavender'},{id:'diary',name:'일기',color:'yellow'},{id:'tidy',name:'정리',color:'lime'}]; // [2026-09-06] 카탈로그 색상 재배정에 맞춰 정정
 // 기존 데이터(이름만 있고 id가 없는 습관)에 처음 한 번만 id를 부여하는 마이그레이션.
 // 카탈로그와 이름이 일치하면 그 카탈로그 id를 그대로 부여(기존에 쌓인 이름 기반 체크 기록과 자연스럽게 이어짐)하고,
 // 카탈로그에 없는 이름이면 새 랜덤 id를 발급해 커스텀 습관으로 전환.
@@ -2128,16 +2127,24 @@ function _migrateHabitCheckKeys(nameToId){
   }
 }
 // 습관명은 자유 텍스트라 완전 자동매칭엔 한계가 있음 — 이름에 특정 키워드가 포함되면 아이콘을 붙이고, 매칭 안 되면 아이콘 없이 텍스트만 표시
+// [2026-09-06] 리듬 카테고리와 통일된 새 색상 배정에 맞춤(HABIT_CATALOG 참고)
 const HABIT_ICON_RULES=[
-  {keywords:['운동','헬스','필라테스','런닝','러닝','조깅'],icon:'ti-run',color:'var(--pal-mint-border)'},
-  {keywords:['독서','책'],icon:'ti-book',color:'var(--pal-pink-border)'},
-  {keywords:['일기','다이어리','글쓰기'],icon:'ti-pencil-heart',color:'var(--pal-sky-border)'},
-  {keywords:['영양제','비타민','약'],icon:'ti-pill',color:'var(--pal-yellow-border)'}
+  {keywords:['운동','헬스','필라테스','런닝','러닝','조깅'],icon:'ti-run',color:'var(--pal-pink-border)'},
+  {keywords:['독서','책'],icon:'ti-book',color:'var(--pal-lavender-border)'},
+  {keywords:['일기','다이어리','글쓰기'],icon:'ti-pencil-heart',color:'var(--pal-yellow-border)'},
+  {keywords:['영양제','비타민','약'],icon:'ti-pill',color:'var(--pal-warmgray-border)'}
 ];
 function getHabitIcon(name){
   if(!name)return null;
   const rule=HABIT_ICON_RULES.find(r=>r.keywords.some(k=>name.includes(k)));
   return rule?rule.icon:null;
+}
+// 습관 아이콘 통합 조회 — 카탈로그 습관이면 카탈로그 아이콘, 커스텀 습관이면 이름 키워드매칭 폴백.
+// [2026-09-06 정리] 호출부 4곳(makeHabitStreakRow/makeHabitMiniCheckRow/renderHabitMonthly/
+// renderDailyHabitCheck)에 동일 로직이 문법만 다르게(?: vs ?.||) 중복돼 있던 것을 이 헬퍼로 통일.
+function getHabitIconFor(h){
+  const catalogItem=getHabitCatalogItem(h.id);
+  return catalogItem?catalogItem.icon:getHabitIcon(h.name);
 }
 function getHabitIconColor(name,habitColor){
   if(habitColor)return getHabitColorBorder(habitColor);
@@ -2758,23 +2765,6 @@ function getReadingStreak(){
 }
 function getHabits(){_migrateHabitIds();return S.get('habits')||DEFAULT_HABITS;}
 function saveHabits(v){S.set('habits',v);autoSync('habits',null);}
-// 습관 archive(보관) — 실제 삭제 대신 archivedAt에 날짜만 채워 기록은 보존하고 화면 노출만 끔.
-// 나중에 같은 카탈로그 항목을 다시 켜면(재활성화) 과거 체크 기록이 id 기준으로 자연스럽게 이어짐.
-function archiveHabit(id){
-  const habits=S.get('habits')||DEFAULT_HABITS;
-  const idx=habits.findIndex(h=>h.id===id);
-  if(idx<0)return;
-  habits[idx]={...habits[idx],archivedAt:dateKey(getLogicalDate())};
-  saveHabits(habits);
-}
-function unarchiveHabit(id){
-  const habits=S.get('habits')||DEFAULT_HABITS;
-  const idx=habits.findIndex(h=>h.id===id);
-  if(idx<0)return;
-  const {archivedAt,...rest}=habits[idx];
-  habits[idx]=rest;
-  saveHabits(habits);
-}
 function getActiveHabits(){return getHabits().filter(h=>!h.archivedAt);}
 function getHabitChecks(wk){return S.get(S.key('hc',wk))||{};}
 // 습관 체크 시각(별도 저장소) — 기존 checks[key]=true/false 불리언 구조를 안 건드리기 위해 분리.
@@ -6272,8 +6262,7 @@ function makeHabitMiniCheckRow(){
   const wk=weekKey(_ld),checks=getHabitChecks(wk),dow=(_ld.getDay()+6)%7;
   habits.forEach(h=>{
     const checked=!!checks[h.id+'-'+dow];
-    const catalogItem=getHabitCatalogItem(h.id);
-    const hIcon=catalogItem?catalogItem.icon:getHabitIcon(h.name);
+    const hIcon=getHabitIconFor(h);
     const rgba=getHabitColorSoft(h.color);
     const rgbaText=getHabitColorText(h.color);
     const badge=document.createElement('div');
@@ -8854,7 +8843,7 @@ function renderHabitMonthly(){
   habits.forEach(h=>{
     const row=document.createElement('div');row.className='hm-row';
     const lbl=document.createElement('span');lbl.className='hm-lbl';
-    const hIcon=getHabitCatalogItem(h.id)?.icon||getHabitIcon(h.name);
+    const hIcon=getHabitIconFor(h);
     lbl.innerHTML=hIcon?`<i class="ti ${hIcon}" style="font-size:12px;vertical-align:-1px;margin-right:3px;" aria-hidden="true"></i>${h.name}`:h.name;
     row.appendChild(lbl);
     const dots=document.createElement('div');dots.className='hm-dots';
@@ -9382,9 +9371,13 @@ function recordMealTime(dk,k){
   const now=new Date();
   patchMealField(dk,k,'time',`${pad(now.getHours())}:${pad(now.getMinutes())}`);
 }
-const HABIT_COLOR_BG={mint:'var(--pal-mint-bg)',pink:'var(--pal-pink-bg)',sky:'var(--pal-sky-bg)',yellow:'var(--pal-yellow-bg)'};
-const HABIT_COLOR_TEXT={mint:'var(--pal-mint-text)',pink:'var(--pal-pink-text)',sky:'var(--pal-sky-text)',yellow:'var(--pal-yellow-text)'};
-const HABIT_COLOR_BORDER={mint:'var(--pal-mint-border)',pink:'var(--pal-pink-border)',sky:'var(--pal-sky-border)',yellow:'var(--pal-yellow-border)'};
+// [2026-09-06] 카탈로그 도입으로 4색→7색 확장(lavender/orange/warmgray 추가) — 각 팔레트는 index.html의
+// --pal-*-bg/text/border 변수가 실제로 존재하는 것만 사용(peach는 존재하지 않아 orange로 대체).
+// [2026-09-06] 습관 색상을 리듬 카테고리와 통일하며 lime 추가(정리↔리듬home). mint는 더 이상 습관에서 안 쓰지만
+// 매핑 자체는 남겨둠(과거 데이터 호환 — 예전에 mint로 저장된 커스텀 습관이 있을 수 있음).
+const HABIT_COLOR_BG={mint:'var(--pal-mint-bg)',pink:'var(--pal-pink-bg)',sky:'var(--pal-sky-bg)',yellow:'var(--pal-yellow-bg)',lavender:'var(--pal-lavender-bg)',orange:'var(--pal-orange-bg)',warmgray:'var(--pal-warmgray-bg)',lime:'var(--pal-lime-bg)'};
+const HABIT_COLOR_TEXT={mint:'var(--pal-mint-text)',pink:'var(--pal-pink-text)',sky:'var(--pal-sky-text)',yellow:'var(--pal-yellow-text)',lavender:'var(--pal-lavender-text)',orange:'var(--pal-orange-text)',warmgray:'var(--pal-warmgray-text)',lime:'var(--pal-lime-text)'};
+const HABIT_COLOR_BORDER={mint:'var(--pal-mint-border)',pink:'var(--pal-pink-border)',sky:'var(--pal-sky-border)',yellow:'var(--pal-yellow-border)',lavender:'var(--pal-lavender-border)',orange:'var(--pal-orange-border)',warmgray:'var(--pal-warmgray-border)',lime:'var(--pal-lime-border)'};
 // 배경으로 넓게 깔리는 곳(이번주 해빗현황 도트 등)엔 solid 대신 이 연한톤을 사용 — 파스텔 기조 유지
 function getHabitColorSoft(colorKey){
   return HABIT_COLOR_BG[colorKey]||'var(--pal-pink-bg)';
@@ -9407,8 +9400,7 @@ function renderDailyHabitCheck(){
     const checked=!!checks[key];
     const rgba=getHabitColorSoft(h.color);
     const rgbaText=getHabitColorText(h.color);
-    const catalogItem=getHabitCatalogItem(h.id);
-    const hIcon=catalogItem?catalogItem.icon:getHabitIcon(h.name);
+    const hIcon=getHabitIconFor(h);
     const isGlass=document.documentElement.dataset.theme==='glass';
     const innerMark=isGlass
       ?(hIcon

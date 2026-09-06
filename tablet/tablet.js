@@ -28,6 +28,46 @@ async function chaeumFetch(path){
 
 // ── 날짜 유틸 (iikoto와 동일 규칙) ──
 function pad(n){return String(n).padStart(2,'0');}
+// [2026-09-06] 본앱이 습관 카탈로그 체계로 개편되며(운동/독서/일기/정리/케어/아침기상/영양제, 고유 id 부여),
+// habit_checks.habit_name 컬럼의 실제 저장값이 한글 이름("운동")에서 카탈로그 id("exercise")로 전면 교체됨.
+// habits 테이블의 name 컬럼 자체는 그대로 한글이라, "habits.name === habit_checks.habit_name"로 비교하던
+// 기존 방식은 더 이상 매칭되지 않음(항상 false) — 반드시 이 헬퍼로 h.habit_id 우선, 없으면 h.name으로 비교.
+// (habit_id가 없는 경우는 본앱 마이그레이션 이전 옛 데이터를 가리키는 극히 드문 경우에 대한 안전장치.)
+function _habitCheckKeyOf(h){return h.habit_id||h.name;}
+function _isHabitChecked(h,checksArr){
+  const key=_habitCheckKeyOf(h);
+  return (checksArr||[]).some(c=>c.habit_name===key);
+}
+function _habitCheckCountOf(h,checksArr){
+  const key=_habitCheckKeyOf(h);
+  return (checksArr||[]).filter(c=>c.habit_name===key).length;
+}
+// [2026-09-06] 본앱과 동일한 "활성 기간만 정확히 표시" 원칙 — 습관이 archived_at으로 보관되거나
+// created_at_key 이후에 시작된 경우, 그 기간 밖의 날짜는 분모/그리드 계산에서 아예 제외.
+// 두 필드 모두 없는 습관(마이그레이션 이전부터 있던 레거시)은 항상 활성으로 간주(본앱 규칙과 동일).
+function _isHabitActiveOn(h,dk){
+  if(h.created_at_key&&dk<h.created_at_key)return false;
+  if(h.archived_at&&dk>h.archived_at)return false;
+  return true;
+}
+// [2026-09-06] 습관 달성률 분모 계산 — "습관 개수 × 기간 일수" 대신, 그 기간 동안 각 습관이
+// 실제로 활성이었던 일수만 합산. 월 중간에 습관을 켜거나 archive해도 달성률이 왜곡되지 않음.
+function _activeHabitDayCount(habits,startDk,endDk){
+  let total=0;
+  const start=new Date(startDk+'T00:00:00'),end=new Date(endDk+'T00:00:00');
+  (habits||[]).forEach(h=>{
+    for(let d=new Date(start);d<=end;d.setDate(d.getDate()+1)){
+      const dk=dateKey(d);
+      if(_isHabitActiveOn(h,dk))total++;
+    }
+  });
+  return total;
+}
+// 습관 목록에서 "지금 활성 상태"(archive 안 된 것)만 걸러냄 — 월간/주간 리스트에서 archive된 습관을
+// 아예 빼고 싶을 때 사용(본앱 getActiveHabits와 동일 개념).
+function _getActiveHabitsOnly(habits){
+  return (habits||[]).filter(h=>!h.archived_at);
+}
 // ── 별점 표시 헬퍼 (본앱과 동일 — 0.5단위, tabler 아이콘 기반. 읽기전용이라 표시만 필요, 클릭 위젯 없음) ──
 function _starIconClass(val,n){
   if(val>=n)return 'ti-star-filled';
@@ -130,9 +170,12 @@ function countContentsCompletedInRange(contents,startDk,endDk){
 }
 
 // 주간탭/월간탭 공통 미니 통계바(메모/완료투두/습관%/콘텐츠완결/평균수면) — habitDenominator만 다름(주간:7, 월간:daysInMonth)
-function renderStatBar(elId,{memoCount,doneCount,habitCount,checkCount,habitDenominator,contentCount,avgSleep}){
+// [2026-09-06] habitDenominator의 의미를 "일수"에서 "활성 습관-일수 총합"(_activeHabitDayCount)으로 변경.
+// 이전엔 habitCount*habitDenominator로 분모를 만들었으나, 이러면 archive/월중 신규습관을 반영 못 함 —
+// 이제 호출부가 이미 정확한 분모를 계산해 넘기므로 여기선 곱셈 없이 그대로 사용.
+function renderStatBar(elId,{memoCount,doneCount,checkCount,habitDenominator,contentCount,avgSleep}){
   const el=document.getElementById(elId);
-  const pct=habitCount?Math.round(checkCount/(habitCount*habitDenominator)*100):0;
+  const pct=habitDenominator?Math.round(checkCount/habitDenominator*100):0;
   el.innerHTML=`
     <div class="sbar-item"><i class="ti ti-notes" aria-hidden="true"></i><span class="sbar-num">${memoCount}</span></div>
     <div class="sbar-div"></div>
@@ -665,8 +708,7 @@ async function renderSideProgress(){
   const totalTodo=todoList.length;
   const pct=totalTodo?Math.round(doneCount/totalTodo*100):0;
   const habitCount=(habits||[]).length;
-  const checkedNames=new Set((habitChecks||[]).map(c=>c.habit_name));
-  const habitDone=(habits||[]).filter(h=>checkedNames.has(h.name)).length;
+  const habitDone=(habits||[]).filter(h=>_isHabitChecked(h,habitChecks)).length;
 
   const r=17,circumference=2*Math.PI*r;
   const dashOffset=circumference*(1-pct/100);
@@ -1326,8 +1368,13 @@ function renderWeekDelta(cur,prev){
   const el=document.getElementById('week-delta');
   const curDone=cur.todos.filter(t=>t.done).length;
   const prevDone=prev.todos.filter(t=>t.done).length;
-  const curHabitPct=cur.habits.length?Math.round(_uniqueHabitCheckCount(cur.checks)/(cur.habits.length*cur.cmpDayCount)*100):0;
-  const prevHabitPct=cur.habits.length?Math.round(_uniqueHabitCheckCount(prev.checks)/(cur.habits.length*cur.cmpDayCount)*100):0;
+  // [2026-09-06] 분모를 "습관 개수×기간일수"에서 "실제 활성 일수 합"으로 변경 — 활성 습관 목록은
+  // 이번주/지난주 모두 cur.habits(현재 등록된 습관)를 기준으로 하되, 각 기간 내 활성 여부는
+  // 그 기간의 날짜로 따로 판정(예: 이번주엔 활성, 지난주엔 아직 시작 전이었으면 지난주 분모에서 제외).
+  const curActiveDays=_activeHabitDayCount(cur.habits,cur.startDk,cur.endDk);
+  const prevActiveDays=_activeHabitDayCount(cur.habits,prev.startDk,prev.endDk);
+  const curHabitPct=curActiveDays?Math.round(_uniqueHabitCheckCount(cur.checks)/curActiveDays*100):0;
+  const prevHabitPct=prevActiveDays?Math.round(_uniqueHabitCheckCount(prev.checks)/prevActiveDays*100):0;
   const curContent=countContentsCompletedInRange(cur.contents,cur.startDk,cur.endDk);
   const prevContent=countContentsCompletedInRange(prev.contents,prev.startDk,prev.endDk);
   const curSleep=parseFloat(avgSleepHoursFromRows(cur.sleepRows))||0;
@@ -1414,15 +1461,17 @@ function renderWeekGoals(row){
 
 function renderWeekHabitMatrix(habits,checks,weekDates){
   const el=document.getElementById('week-habit-matrix');
-  if(!habits.length){el.innerHTML='<div class="empty-msg">등록된 습관 없음</div>';return;}
-  const colorMap={mint:'var(--pal-mint-rgb)',pink:'var(--pal-pink-rgb)',sky:'var(--pal-sky-rgb)',yellow:'var(--pal-yellow-rgb)'};
+  const activeHabits=_getActiveHabitsOnly(habits); // 2026-09-06: archive(목록에서 제외)한 습관은 노출 안 함
+  if(!activeHabits.length){el.innerHTML='<div class="empty-msg">등록된 습관 없음</div>';return;}
+  const colorMap={mint:'var(--pal-mint-rgb)',pink:'var(--pal-pink-rgb)',sky:'var(--pal-sky-rgb)',yellow:'var(--pal-yellow-rgb)',lavender:'var(--pal-lavender-rgb)',orange:'var(--pal-orange-rgb)',warmgray:'var(--pal-warmgray-rgb)',lime:'var(--pal-lime-rgb)'};
   let html=`<div class="habit-matrix">`;
-  habits.forEach(h=>{
+  activeHabits.forEach(h=>{
     html+=`<div class="rowlbl">${escapeHtml(h.name)}</div>`;
     const c=colorMap[h.color]||'var(--pal-warmgray-rgb)';
     weekDates.forEach(dk=>{
-      const done=checks.some(ch=>ch.habit_name===h.name&&ch.date_key===dk);
-      html+=`<div class="dot" style="${done?`background:rgba(${c},1);`:''}"></div>`;
+      const isActive=_isHabitActiveOn(h,dk); // 아직 시작 전 날짜는 비활성 칸으로 구분(본앱 월간그리드와 동일 원칙)
+      const done=isActive&&checks.some(ch=>ch.habit_name===_habitCheckKeyOf(h)&&ch.date_key===dk);
+      html+=`<div class="dot${isActive?'':' inactive'}" style="${done?`background:rgba(${c},1);`:''}"></div>`;
     });
   });
   html+='</div>';
@@ -2170,19 +2219,22 @@ async function renderMonthTimetable(y,mo,contentsData){
   });
 }
 
-// 습관명 키워드 매칭 아이콘 규칙 — 본앱(iikoto index.html) HABIT_ICON_RULES와 동일하게 유지
+// 습관명 키워드 매칭 아이콘 규칙 — 본앱(iikoto app.js HABIT_CATALOG) 색상 재배정(2026-09-06, 리듬 카테고리와 통일)에 맞춤.
 const HABIT_ICON_RULES=[
-  {keywords:['운동','헬스','필라테스','런닝','러닝','조깅'],icon:'ti-run',color:'var(--pal-mint-border)'},
-  {keywords:['독서','책'],icon:'ti-book',color:'var(--pal-pink-border)'},
-  {keywords:['일기','다이어리','글쓰기'],icon:'ti-pencil-heart',color:'var(--pal-sky-border)'},
-  {keywords:['영양제','비타민','약'],icon:'ti-pill',color:'var(--pal-yellow-border)'}
+  {keywords:['운동','헬스','필라테스','런닝','러닝','조깅'],icon:'ti-run',color:'var(--pal-pink-border)'},
+  {keywords:['독서','책'],icon:'ti-book',color:'var(--pal-lavender-border)'},
+  {keywords:['일기','다이어리','글쓰기'],icon:'ti-pencil-heart',color:'var(--pal-yellow-border)'},
+  {keywords:['정리','청소','빨래'],icon:'ti-sparkles',color:'var(--pal-lime-border)'},
+  {keywords:['케어','단장','스킨케어','세안'],icon:'ti-mood-spark',color:'var(--pal-orange-border)'},
+  {keywords:['아침기상','기상'],icon:'ti-sunrise',color:'var(--pal-sky-border)'},
+  {keywords:['영양제','비타민','약'],icon:'ti-pill',color:'var(--pal-warmgray-border)'}
 ];
 function getHabitIcon(name){
   if(!name)return null;
   const rule=HABIT_ICON_RULES.find(r=>r.keywords.some(k=>name.includes(k)));
   return rule?rule.icon:null;
 }
-const HABIT_COLOR_BORDER_MAP={mint:'var(--pal-mint-border)',pink:'var(--pal-pink-border)',sky:'var(--pal-sky-border)',yellow:'var(--pal-yellow-border)'};
+const HABIT_COLOR_BORDER_MAP={mint:'var(--pal-mint-border)',pink:'var(--pal-pink-border)',sky:'var(--pal-sky-border)',yellow:'var(--pal-yellow-border)',lavender:'var(--pal-lavender-border)',orange:'var(--pal-orange-border)',warmgray:'var(--pal-warmgray-border)',lime:'var(--pal-lime-border)'};
 function getHabitIconColor(name,habitColor){
   if(habitColor&&HABIT_COLOR_BORDER_MAP[habitColor])return HABIT_COLOR_BORDER_MAP[habitColor];
   const rule=HABIT_ICON_RULES.find(r=>name&&r.keywords.some(k=>name.includes(k)));
@@ -2192,11 +2244,12 @@ async function renderMonthHabits(y,mo,habitsData){
   const el=document.getElementById('month-habits');
   const mk=`${y}-${pad(mo+1)}`;
   const daysInMonth=new Date(y,mo+1,0).getDate();
-  const habits=habitsData?habitsData.habits:(await supaFetch(`habits?order=sort_order.asc`))||[];
+  const habitsRaw=habitsData?habitsData.habits:(await supaFetch(`habits?order=sort_order.asc`))||[];
+  const habits=_getActiveHabitsOnly(habitsRaw); // 2026-09-06: archive(목록에서 제외)한 습관은 노출 안 함
   const checks=habitsData?habitsData.checks:(await supaFetch(`habit_checks?date_key=gte.${mk}-01&date_key=lte.${mk}-${pad(daysInMonth)}`))||[];
   if(!habits||!habits.length){el.innerHTML='<div class="empty-msg">등록된 습관 없음</div>';return;}
   el.innerHTML=`<div class="habit-numbox-grid">${habits.map(h=>{
-    const count=(checks||[]).filter(ch=>ch.habit_name===h.name).length;
+    const count=_habitCheckCountOf(h,checks);
     const hIcon=getHabitIcon(h.name);
     const iconColor=getHabitIconColor(h.name,h.color);
     const inner=hIcon
@@ -2216,16 +2269,20 @@ async function renderMonthStatBar(y,mo,habitsData){
     supaFetch(`sleep?date_key=gte.${startDk}&date_key=lte.${endDk}&select=sleep_time,wake_time`),
     supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&month_key=eq.${mk}`)
   ]);
-  const habits=habitsData?habitsData.habits:(await supaFetch(`habits?order=sort_order.asc`))||[];
+  const habitsRaw=habitsData?habitsData.habits:(await supaFetch(`habits?order=sort_order.asc`))||[];
+  const habits=_getActiveHabitsOnly(habitsRaw); // archive된 습관은 이 달 통계에서 제외
   const checks=habitsData?habitsData.checks:(await supaFetch(`habit_checks?date_key=gte.${startDk}&date_key=lte.${endDk}`))||[];
   const daysInMonth=new Date(y,mo+1,0).getDate();
-  const habitList=habits||[];
+  const realEndDk=`${mk}-${pad(daysInMonth)}`;
+  // 당월이 진행 중이면(오늘이 이 달 안이면) "오늘까지"만 분모에 반영 — 기존 미니통계바 원칙과 동일하게 유지.
+  const today=new Date();
+  const isCurMonth=(y===today.getFullYear()&&mo===today.getMonth());
+  const habitEndDk=isCurMonth?dateKey(today):realEndDk;
   renderStatBar('month-stat-bar',{
     memoCount:(memos||[]).length,
     doneCount:(todos||[]).filter(t=>t.done).length,
-    habitCount:habitList.length,
     checkCount:_uniqueHabitCheckCount(checks),
-    habitDenominator:daysInMonth,
+    habitDenominator:_activeHabitDayCount(habits,startDk,habitEndDk),
     contentCount:countContentsCompletedInRange(contents,startDk,endDk),
     avgSleep:avgSleepHoursFromRows(sleepRows)
   });
@@ -3081,7 +3138,10 @@ async function loadMonthlyReportPage(){
   const monthlyRefContext=_mrpBuildRefContext(weeklySummaryRowsList,weeklyMemoRowsList);
 
   renderMrpHero(monthlyRows&&monthlyRows[0]);
-  renderMrpGoalsAndStats(goalRows&&goalRows[0],todos||[],memosRows||[],sleepRows||[],habits||[],habitChecksAll||[],dim,prevTodos||[],prevHabitChecksAll||[],prevMemosRows||[],prevDim);
+  const mrpActiveHabits=_getActiveHabitsOnly(habits); // archive된 습관은 이 달 리포트에서 제외
+  const mrpHabitDenom=_activeHabitDayCount(mrpActiveHabits,startDk,endDk);
+  const mrpPrevHabitDenom=_activeHabitDayCount(mrpActiveHabits,prevStartDk,prevEndDk);
+  renderMrpGoalsAndStats(goalRows&&goalRows[0],todos||[],memosRows||[],sleepRows||[],mrpActiveHabits,habitChecksAll||[],mrpHabitDenom,prevTodos||[],prevHabitChecksAll||[],prevMemosRows||[],mrpPrevHabitDenom);
   const heroCommentText=_mrpExtractHeroComment(monthlyRows&&monthlyRows[0]);
   renderMrpTrajectory(mk,sleepRows||[],habits||[],habitChecksAll||[],rblocks||[],weeksInMonth,dim,
     {sleepRows:prevSleepRows||[],habitChecks:prevHabitChecksAll||[],rblocks:prevRblocks||[],weeksInMonth:prevWeeksInMonth,habits:habits||[]},
@@ -3204,6 +3264,8 @@ async function renderMrpHero(row){
 }
 
 // 목표(왼쪽)와 숫자(오른쪽)를 반반 배치 — 목표만 두면 배너가 비어 보여 숫자 카드와 짝지음
+// [2026-09-06] habitDenominator의 의미를 "일수"에서 "활성 습관-일수 총합"으로 변경(renderMonthStatBar와 동일 원칙).
+// 호출부(loadMonthlyReportPage)가 _activeHabitDayCount로 미리 계산해 넘기므로, 여기선 habits.length 곱셈 없이 그대로 사용.
 function renderMrpGoalsAndStats(goalRow,todos,memos,sleepRows,habits,habitChecks,habitDenominator,prevTodos,prevHabitChecks,prevMemos,prevHabitDenominator){
   const goalsEl=document.getElementById('mrp-goals');
   // mgoal: 캐시는 wchallenge_(주간챌린지)와 저장 구조가 다름 — lines가 {text,days}[] 객체 배열이 아니라 순수 문자열 배열(string[]).
@@ -3213,13 +3275,14 @@ function renderMrpGoalsAndStats(goalRow,todos,memos,sleepRows,habits,habitChecks
   const statsEl=document.getElementById('mrp-stats');
   const doneTodos=todos.filter(t=>t.done).length;
   const memoCount=(memos||[]).length;
-  const habitPct=habits.length?Math.round(_uniqueHabitCheckCount(habitChecks)/(habits.length*habitDenominator)*100):0;
+  const habitPct=habitDenominator?Math.round(_uniqueHabitCheckCount(habitChecks)/habitDenominator*100):0;
 
   // 전월 대비(각 통계 하단에 증감만 짧게) — 전월 분모(prevHabitDenominator)는 이번 달과 별개로, 진행 중인 달이면
   // 동일하게 "오늘까지의 경과일수"로 절단된 값이 상위(loadMonthlyReportPage)에서 넘어옴(2026-08-22 확정).
   const prevDoneTodos=(prevTodos||[]).filter(t=>t.done).length;
   const prevMemoCount=(prevMemos||[]).length;
-  const prevHabitPct=habits.length?Math.round(_uniqueHabitCheckCount(prevHabitChecks)/(habits.length*(prevHabitDenominator||habitDenominator))*100):0;
+  const prevDenom=prevHabitDenominator||habitDenominator;
+  const prevHabitPct=prevDenom?Math.round(_uniqueHabitCheckCount(prevHabitChecks)/prevDenom*100):0;
   const deltaOf=(cur,prev,fmt)=>{
     const diff=Math.round((cur-prev)*10)/10;
     const dir=diff>0?'up':(diff<0?'down':'flat');
@@ -4343,6 +4406,10 @@ function renderYrKeywordCloud(ctx){
 // 로직을 각자 중복 계산하고 있었던 것을 하나로 통합(2026-08). habitStats에 필요한 모든 필드(seq/stdev/delta
 // 포함)를 여기서 한 번에 만들고, 요약탭은 이 중 overallPct/avgPct만 골라 쓰면 됨.
 // ctx당 1회만 계산되도록 ctx 자체에 캐시(요약탭→습관탭 순으로 이 턴 안에서 두 번 불릴 때 재계산 방지).
+// [2026-09-06] 습관 카탈로그 개편 반영 — 세 가지 개선:
+// 1) daysInMonth(그 달 전체일수) 대신, 그 달 안에서 실제 활성이었던 일수로 나눔(월중 신규/archive 반영)
+// 2) "최초 체크 기록월"로 시작달을 추정하던 기존 방식 대신, created_at_key(정확한 등록일)가 있으면 그걸 우선 사용
+// 3) archive된 습관은 archived_at 이후 달을 activeSeq에서 완전히 제외(추적 자체를 안 하던 기간이 0%로 잡혀 평균을 왜곡하지 않도록)
 function _yrHabitOverallStats(ctx){
   if(ctx._habitStatsCache)return ctx._habitStatsCache;
   if(!ctx.habits.length)return {avgPct:0,perHabit:[],habitStats:[]};
@@ -4350,46 +4417,62 @@ function _yrHabitOverallStats(ctx){
   for(let m=0;m<ctx.elapsedMonths;m++){
     const mk=`${ctx.y}-${pad(m+1)}`;
     const daysInMonth=new Date(ctx.y,m+1,0).getDate();
+    const monthStartDk=`${mk}-01`,monthEndDk=`${mk}-${pad(daysInMonth)}`;
     const checksInMonth=ctx.habitChecks.filter(c=>c.date_key&&c.date_key.startsWith(mk));
     byMonth[m]={};
     ctx.habits.forEach(h=>{
-      const cnt=checksInMonth.filter(c=>c.habit_name===h.name).length;
-      byMonth[m][h.name]=Math.round(cnt/daysInMonth*100);
+      const cnt=_habitCheckCountOf(h,checksInMonth);
+      const activeDays=_activeHabitDayCount([h],monthStartDk,monthEndDk); // 이 습관이 이 달에 실제 활성이었던 일수만 분모로
+      byMonth[m][h.name]=activeDays>0?Math.round(cnt/activeDays*100):null; // null=이 달엔 아예 추적 대상이 아니었음(0%와 구분)
     });
   }
-  // 습관별 "실제 기록이 시작된 달" — 앱을 6월 중순부터 쓰기 시작해 1~5월은 기록 자체가 없는데
-  // 이걸 0%로 계산에 포함시키면 평균/편차/증감이 왜곡됨. 습관별 최초 체크 기록월부터만 계산.
-  const firstCheckMonthOf=h=>{
-    const checks=ctx.habitChecks.filter(c=>c.habit_name===h.name&&c.date_key);
+  // 습관별 "실제 추적 시작월" — created_at_key(정확한 등록일)가 있으면 그걸로 계산, 없으면(레거시 습관)
+  // 기존처럼 최초 체크 기록으로 추정(앱을 6월 중순부터 쓰기 시작해 1~5월은 기록 자체가 없는 경우 등).
+  const firstTrackedMonthOf=h=>{
+    if(h.created_at_key){
+      const mo=parseInt(h.created_at_key.slice(5,7),10)-1;
+      return Math.min(Math.max(mo,0),ctx.elapsedMonths-1);
+    }
+    const checks=ctx.habitChecks.filter(c=>c.habit_name===_habitCheckKeyOf(h)&&c.date_key);
     if(!checks.length)return 0;
     const earliestDk=checks.map(c=>c.date_key).sort()[0];
     const mo=parseInt(earliestDk.slice(5,7),10)-1;
     return Math.min(mo,ctx.elapsedMonths-1);
   };
+  // archive된 습관은 archived_at월 다음달부터 activeSeq에서 완전히 제외 — 그 이후는 애초에 추적을 안 하던 기간.
+  const lastTrackedMonthOf=h=>{
+    if(!h.archived_at)return ctx.elapsedMonths-1;
+    const mo=parseInt(h.archived_at.slice(5,7),10)-1;
+    return Math.min(mo,ctx.elapsedMonths-1);
+  };
   // 앱 출시 첫 달(6월, 반달치)은 전체통계(activeSeq)에서 완전히 제외 — 트랙 그래프(seq)에는 그대로
   // 남겨 시각적으로는 계속 보이게 함(2027-01, 봄이님 결정). 기준값은 YR_FIRST_LAUNCH_MONTH_IDX 참고.
-  // seq는 12개월 전체를 담되(트랙 그래프용), 통계 계산(activeSeq)은 startMonth 이후 + 출시 첫 달(반달치) 제외.
+  // seq는 12개월 전체를 담되(트랙 그래프용), 통계 계산(activeSeq)은 startMonth~endMonth 구간 + 출시 첫 달(반달치) 제외.
   const habitStats=ctx.habits.map(h=>{
-    const seq=Array.from({length:ctx.elapsedMonths},(_,m)=>byMonth[m][h.name]||0);
-    let startMonth=firstCheckMonthOf(h);
+    const seq=Array.from({length:ctx.elapsedMonths},(_,m)=>byMonth[m][h.name]); // null 유지(트랙 그래프에서 '추적 안 함' 표시용)
+    let startMonth=firstTrackedMonthOf(h);
     if(startMonth<=YR_FIRST_LAUNCH_MONTH_IDX)startMonth=YR_FIRST_LAUNCH_MONTH_IDX+1;
-    const activeSeq=seq.slice(startMonth);
+    const endMonth=lastTrackedMonthOf(h);
+    // activeSeq는 실제 추적 기간(startMonth~endMonth)에 해당하는 달 중, 그 달에도 활성이었던(null 아닌) 값만 모음
+    const activeSeq=[];
+    for(let m=startMonth;m<=endMonth;m++){if(byMonth[m][h.name]!=null)activeSeq.push(byMonth[m][h.name]);}
     const overallPct=activeSeq.length?Math.round(activeSeq.reduce((a,b)=>a+b,0)/activeSeq.length):0;
     const mean=activeSeq.length?activeSeq.reduce((a,b)=>a+b,0)/activeSeq.length:0;
     const variance=activeSeq.length?activeSeq.reduce((a,b)=>a+(b-mean)**2,0)/activeSeq.length:0;
     const stdev=Math.sqrt(variance);
     const delta=activeSeq.length>=2?activeSeq[activeSeq.length-1]-activeSeq[0]:0; // 실제 시작달 대비 최근달 증감(BEST FLOW용)
-    return {name:h.name,color:h.color,seq,startMonth,activeSeq,overallPct,stdev,delta};
+    return {name:h.name,color:h.color,seq,startMonth,endMonth,archived:!!h.archived_at,activeSeq,overallPct,stdev,delta};
   });
-  const perHabit=habitStats.map(({name,color,overallPct})=>({name,color,overallPct}));
+  const perHabit=habitStats.map(({name,color,overallPct,archived})=>({name,color,overallPct,archived}));
   const avgPct=perHabit.length?Math.round(perHabit.reduce((s,h)=>s+h.overallPct,0)/perHabit.length):0;
   const result={avgPct,perHabit,habitStats};
   ctx._habitStatsCache=result;
   return result;
 }
 
-// 습관 4색 — 앱 전역 관례(오늘탭/주간탭 colorMap)와 동일하게 -rgb 변수 + rgba()로 통일(2026-08, 기존엔 -text 변수를 직접 써서 톤이 미묘하게 달랐음).
-const YR_HABIT_COLOR_MAP={mint:'rgba(var(--pal-mint-rgb),1)',pink:'rgba(var(--pal-pink-rgb),1)',sky:'rgba(var(--pal-sky-rgb),1)',yellow:'rgba(var(--pal-yellow-rgb),1)'};
+// 습관 색상 — 카탈로그 개편(2026-09-06)으로 색상 종류가 4개→7개로 늘어남에 맞춰 확장.
+// (본앱에서 'peach'로 잘못 명명됐던 것을 실제 존재하는 팔레트인 'orange'로 정정한 것과 동일하게 맞춤)
+const YR_HABIT_COLOR_MAP={mint:'rgba(var(--pal-mint-rgb),1)',pink:'rgba(var(--pal-pink-rgb),1)',sky:'rgba(var(--pal-sky-rgb),1)',yellow:'rgba(var(--pal-yellow-rgb),1)',lavender:'rgba(var(--pal-lavender-rgb),1)',orange:'rgba(var(--pal-orange-rgb),1)',warmgray:'rgba(var(--pal-warmgray-rgb),1)',lime:'rgba(var(--pal-lime-rgb),1)'};
 
 function renderYrMetricGrid(ctx){
   const el=document.getElementById('yr-metric-grid');
@@ -4521,15 +4604,18 @@ function renderYrHabitTab(ctx){
 
   const rowsHtml=ctx.habits.map((h,i)=>{
     const {seq,overallPct}=habitStats[i];
+    const dotColor=YR_HABIT_COLOR_MAP[h.color]||'var(--pal-mint-text)';
     const cells=[];
     for(let m=0;m<12;m++){
       if(m>=ctx.elapsedMonths){cells.push('<i class="future"></i>');continue;}
-      const pct=seq[m]||0;
-      cells.push(pct===0?'<i class="empty"></i>':`<i style="--v:${(pct/100).toFixed(2)}"></i>`);
+      const pct=seq[m];
+      // pct===null: 이 달엔 습관이 아직 시작 전이었거나 archive 이후라 애초에 추적 대상이 아니었음(0%와 구분)
+      if(pct==null){cells.push('<i class="inactive"></i>');continue;}
+      cells.push(pct===0?'<i class="empty"></i>':`<i style="--v:${(pct/100).toFixed(2)};--dot-color:${dotColor};"></i>`);
     }
     const hIcon=getHabitIcon(h.name);
-    return `<div class="yr-habit-row">
-      <div class="habit-name">${hIcon?`<i class="ti ${hIcon}"></i>`:''}<span>${escapeHtml(h.name)}</span></div>
+    return `<div class="yr-habit-row${h.archived_at?' archived':''}">
+      <div class="habit-name" style="--icon-color:${dotColor};">${hIcon?`<i class="ti ${hIcon}"></i>`:''}<span>${escapeHtml(h.name)}</span>${h.archived_at?'<span class="habit-archived-tag">보관됨</span>':''}</div>
       <div class="habit-track">${cells.join('')}</div>
       <b>${overallPct}%</b>
     </div>`;
@@ -5685,10 +5771,9 @@ function renderTimelineSleepBanner(sleep){
 function renderTimelineHabitBanner(habits,checks){
   const el=document.getElementById('tl-habits');
   if(!habits.length){el.innerHTML='<div class="empty-msg">등록된 습관 없음</div>';return;}
-  const checkedNames=new Set(checks.map(c=>c.habit_name));
-  const colorMap={mint:'var(--pal-mint-rgb)',pink:'var(--pal-pink-rgb)',sky:'var(--pal-sky-rgb)',yellow:'var(--pal-yellow-rgb)'};
+  const colorMap={mint:'var(--pal-mint-rgb)',pink:'var(--pal-pink-rgb)',sky:'var(--pal-sky-rgb)',yellow:'var(--pal-yellow-rgb)',lavender:'var(--pal-lavender-rgb)',orange:'var(--pal-orange-rgb)',warmgray:'var(--pal-warmgray-rgb)',lime:'var(--pal-lime-rgb)'};
   el.innerHTML=`<div class="habit-grid">${habits.map(h=>{
-    const done=checkedNames.has(h.name);
+    const done=_isHabitChecked(h,checks);
     const c=done?(colorMap[h.color]||'var(--pal-warmgray-rgb)'):'var(--pal-warmgray-rgb)';
     const hIcon=getHabitIcon(h.name);
     const iconHtml=hIcon?`<i class="ti ${hIcon} habit-row-icon" style="color:rgba(${c},${done?1:0.35});" aria-hidden="true"></i>`:'';

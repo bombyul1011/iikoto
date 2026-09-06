@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.86-timetable-comment-cleanup';
+const CACHE = 'iikoto-v2.8-habit-tracker';
 const ASSETS = [
   './',
   './index.html'

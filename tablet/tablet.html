@@ -528,6 +528,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .habit-matrix{display:grid;grid-template-columns:56px repeat(7,1fr);gap:8px 3px;align-items:center;}
 .habit-matrix .rowlbl{font-size:var(--fs-body);color:var(--ts);}
 .habit-matrix .dot{width:14px;height:14px;border-radius:50%;margin:0 auto;background:rgba(200,190,180,0.2);}
+.habit-matrix .dot.inactive{background:rgba(200,190,180,0.08);}
 
 /* 이번 주 요약 미니 통계바 — 이이코토 본앱 stat-bar-wrap/sbar-item 스타일 그대로 차용, 박스 없이 심플하게 */
 .stat-bar-wrap{display:flex;align-items:center;justify-content:center;gap:14px;padding:14px 4px 6px;border-top:1px solid rgba(var(--divider-rgb),0.25);margin-top:8px;}
@@ -1510,10 +1511,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   color:var(--ts);}
 .habit-name i{font-size:13px;
   flex-shrink:0;
-  color:var(--pal-mint-text);}
-.yr-habit-row:nth-child(2) .habit-name i{color:var(--pal-pink-text)}
-.yr-habit-row:nth-child(3) .habit-name i{color:var(--pal-sky-text)}
-.yr-habit-row:nth-child(4) .habit-name i{color:var(--pal-yellow-text)}
+  color:var(--icon-color,var(--pal-mint-text));}
+.habit-archived-tag{font-size:10px;color:var(--tm);background:rgba(var(--divider-rgb),.25);border-radius:6px;padding:1px 6px;margin-left:2px;flex-shrink:0;}
+.yr-habit-row.archived{opacity:.6;}
 .habit-track{height:32px;
   display:grid;
   grid-template-columns:repeat(12,1fr);
@@ -1535,13 +1535,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   border-radius:50%;
   position:relative;
   z-index:1;
-  background:color-mix(in srgb,var(--pal-mint-text) calc(25% + var(--v)*75%), transparent);
+  background:color-mix(in srgb,var(--dot-color,var(--pal-mint-text)) calc(25% + var(--v)*75%), transparent);
   box-shadow:0 0 0 3px var(--card);}
-.yr-habit-row:nth-child(2) .habit-track i:not(.empty){background:color-mix(in srgb,var(--pal-pink-text) calc(25% + var(--v)*75%), transparent)}
-.yr-habit-row:nth-child(3) .habit-track i:not(.empty){background:color-mix(in srgb,var(--pal-sky-text) calc(25% + var(--v)*75%), transparent)}
-.yr-habit-row:nth-child(4) .habit-track i:not(.empty){background:color-mix(in srgb,var(--pal-yellow-text) calc(25% + var(--v)*75%), transparent)}
 .habit-track i.empty{width:6px;height:6px;
   background:rgba(var(--divider-rgb),.22);
+  box-shadow:none;}
+.habit-track i.inactive{width:5px;height:5px;
+  background:rgba(var(--divider-rgb),.10);
   box-shadow:none;}
 .habit-track i.future{width:5px;height:5px;
   background:transparent;
