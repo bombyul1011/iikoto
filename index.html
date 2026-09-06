@@ -67,6 +67,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --dow-label-size:12px; /* 서브텍스트 사이즈 — 요일(월화수목금토일) 라벨에서 시작해 각종 보조 텍스트(날짜/카테고리, 필터탭, 코멘트보기 등)까지 두루 쓰이는 공용 크기. 앞으로 "서브텍스트 사이즈"가 필요한 곳은 전부 이 변수를 끌어다 쓰기 */
   --dow-label-size-2:11px; /* dow-label-size 파생 실험용 — 현재는 월간캘린더 연속일정 바(.cal-event-bar)·하루짜리 배지(.cal-event-badge) 폰트 사이즈 테스트 전용 */
   --dow-label-size-3:10px; /* dow-label-size-2보다 한 단계 더 작은 실험용 — 동일 용도 */
+  --rt-fill-label-size:calc(var(--dow-label-size) + 1px); /* 홈탭 리듬바(.rt-fill-label) 전용 — dow-label-size 파생이라 추후 전체 폰트스케일 조정 시 함께 움직임, 2026-09-06 */
   --sleep-warmgray:#8a8078; /* 수면카드 전용 웜그레이 — 남색 강조색을 제외한 시간표기/아이콘 전부가 참조. CSS 클래스(sleep-*) 7곳 + JS 인라인 스타일 4곳(5376/5405/6192/6197 근처) 동일 색 사용 중 */
   --sleep-warmgray-strong:#6b6259; /* 취침/기상/총수면시간 전용 — sleep-warmgray보다 더 진한 값. sleep-time-val, sleep-top-num/unit, sleep-collapsed-time/dur 5곳이 참조 */
   --graph-track-color:rgba(var(--divider-rgb),0.25); /* 그래프/진행바 공용 기준선·트랙 색 — rd-progress-track(독서 진행바) 등에서 참조 */
@@ -93,6 +94,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --dow-label-size:12px;
   --dow-label-size-2:11px;
   --dow-label-size-3:10px;
+  --rt-fill-label-size:calc(var(--dow-label-size) + 1px);
   --sleep-warmgray:#8a8078;
   --sleep-warmgray-strong:#6b6259;
   --graph-track-color:rgba(var(--divider-rgb),0.25);
@@ -1364,7 +1366,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
    식사 등)이 걸쳐 텍스트가 부딪히는 문제 방지. 60분 이하는 기존 중앙정렬(짧은 블록에서 텍스트가 상/하단
    으로 쏠려 보이는 문제 방지 목적) 유지. */
 .rt-fill.rt-fill-top{align-items:flex-start;padding-top:6px;}
-.rt-fill-label{position:relative;font-size:var(--dow-label-size);font-weight:500;color:var(--tp);display:flex;align-items:center;gap:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1;}
+.rt-fill-label{position:relative;font-size:var(--rt-fill-label-size);font-weight:500;color:var(--tp);display:flex;align-items:center;gap:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1;}
 .rt-fill-time{position:relative;flex-shrink:0;font-size:var(--dow-label-size-3);color:var(--tp);font-variant-numeric:tabular-nums;font-family:'DM Sans',sans-serif;margin-left:6px;}
 .rt-fill-actions{position:relative;flex-shrink:0;display:flex;align-items:center;gap:5px;padding-left:6px;}
 .rt-fill.ongoing{background-image:repeating-linear-gradient(135deg,rgba(255,255,255,0.35) 0 3px,transparent 3px 6px);}

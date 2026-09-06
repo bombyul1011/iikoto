@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.13-work-color';
+const CACHE = 'iikoto-v2.14-rhythm-label-size';
 const ASSETS = [
   './',
   './index.html'
