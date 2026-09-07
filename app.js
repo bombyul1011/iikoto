@@ -3092,8 +3092,19 @@ async function syncTodosDown(dk){
 async function syncTodosUp(dk){
   const todos=getTodos(dk);
   if(ensureItemCids(todos))S.set(S.key('todos',dk),todos);
+  // 업로드 직전 cid 기준 dedupe 안전망 — 서버가 "ON CONFLICT DO UPDATE cannot affect row a second time"로
+  // 거부하는 경우는 로컬 배열 안에 같은 cid가 두 번 이상 있다는 뜻(정상 경로에선 발생하지 않아야 하지만,
+  // 과거 버전의 버그나 예외적 타이밍에 로컬에 중복이 남았을 가능성에 대비한 방어적 정리). 먼저 나온 것만 남김.
+  const seenCids=new Set();
+  const deduped=todos.filter(t=>{
+    if(!t.cid)return true;
+    if(seenCids.has(t.cid))return false;
+    seenCids.add(t.cid);
+    return true;
+  });
+  if(deduped.length!==todos.length)S.set(S.key('todos',dk),deduped);
   const delCids=getDelPendingCids('todos',dk);
-  const ok=await syncListUpSafe('todos',`date_key=eq.${dk}`,'date_key,client_id',todos,
+  const ok=await syncListUpSafe('todos',`date_key=eq.${dk}`,'date_key,client_id',deduped,
     t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,strike_parts:t.strikeParts||[],strike_times:t.strikeTimes||{},completed_at:(t.completedAt!=null?t.completedAt:null),sort_order:(typeof t.sortOrder==='number'?t.sortOrder:null),is_event:!!t.isEvent,event_cat:t.eventCat||null,event_time:t.eventTime||null,event_end_date:t.eventEndDate||null,cat:t.cat||'todo',pinned:!!t.pinned,recur_rule_cid:t.recurRuleCid||null}),
     delCids);
   if(ok)delCids.forEach(cid=>removeDelPending('todos',dk,cid));

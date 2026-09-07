@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.43-recur-check-tdz-fix';
+const CACHE = 'iikoto-v2.44-todos-upload-dedupe';
 const ASSETS = [
   './',
   './index.html'
