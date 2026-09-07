@@ -471,7 +471,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .todo-alert-time-row-half{flex:1;margin:0;min-width:0;}
 .todo-recur-chip-half{flex:1;margin:0;}
 /* 일정 시간 아이콘 — 시간 미선택 시 시계, 선택 시 벨(알림 온오프 토글)로 전환. on 상태는 강조 색상. */
-#todo-event-time-icon.alert-on{color:rgb(var(--pal-orange-rgb));}
+#todo-event-time-icon.alert-on,#todo-alert-time-icon.alert-on{color:rgb(var(--pal-orange-rgb));}
 .todo-multiday-arrow{display:flex;align-items:center;justify-content:center;width:22px;height:22px;flex-shrink:0;cursor:pointer;color:var(--tm);transition:transform .2s;}
 .todo-multiday-arrow.on{transform:rotate(180deg);color:var(--tp);}
 .todo-multiday-end-row{display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:10px;border:1px solid var(--card-b);background:var(--card);margin:4px 0;}
@@ -2050,7 +2050,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     </div>
     <div class="todo-alert-recur-row" id="todo-alert-recur-row">
       <div class="todo-event-time-row todo-alert-time-row-half" id="todo-alert-time-row">
-        <i class="ti ti-bell ico-sz-13" aria-hidden="true" onclick="openAlertTimePicker()" style="cursor:pointer;"></i>
+        <i class="ti ti-bell ico-sz-13" id="todo-alert-time-icon" aria-hidden="true" onclick="onTodoAlertIconClick()" style="cursor:pointer;"></i>
         <span class="todo-event-time-inp" id="todo-alert-time-inp" data-value="" onclick="openAlertTimePicker()" style="cursor:pointer;">알림 없음</span>
         <span class="todo-event-time-clear" id="todo-alert-time-clear" onclick="event.stopPropagation();clearTodoAlertTime()" title="알림 지우기" style="display:none;">✕</span>
       </div>
