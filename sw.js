@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.20-solar-term-baekro-fix';
+const CACHE = 'iikoto-v2.30-recurring-cleanup';
 const ASSETS = [
   './',
   './index.html'

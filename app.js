@@ -2423,6 +2423,85 @@ function compareTodoOrder(a,b){
   if(typeof a.sortOrder==='number'&&typeof b.sortOrder==='number')return a.sortOrder-b.sortOrder;
   return parseTodoLeadingTime(a.text)-parseTodoLeadingTime(b.text);
 }
+// ── 반복 투두/일정 (2026-09-07) ──
+// 원본 규칙은 딱 하나만 저장(habits의 periods와 달리 구간 이력 없음 — "하나의 규칙 기준"으로 결정).
+// 실제 각 날짜 화면에는 이 규칙을 매번 계산해서 가상으로 끼워 넣음 — 미리 여러 날짜에 데이터를 만들어두지 않음.
+// 특정 날짜만 스킵(삭제)하는 건 별도 예외 저장소에만 기록되고 원본 규칙(rule)은 건드리지 않아, 이후 반복에 영향 없음.
+function getRecurringItems(){return S.get('recurring_items')||[];}
+function saveRecurringItems(v){S.set('recurring_items',v);autoSync('recurringItems',null);}
+function getRecurringExceptions(dk){return S.get(S.key('recur_exc',dk))||{};}
+// 특정 날짜(dk)에서 특정 반복항목(cid)을 스킵 처리 — 원본 규칙은 그대로, 그날의 표시만 막음.
+function skipRecurringItemOn(cid,dk){
+  const exc=getRecurringExceptions(dk);
+  exc[cid]={status:'skipped'};
+  S.set(S.key('recur_exc',dk),exc);
+  autoSync('recurExc',dk);
+}
+// 그날 하루만 텍스트를 바꿔치기 — 원본 규칙(rule.text)은 건드리지 않아 다른 날짜엔 영향 없음.
+// 예: "운동"이 매주 월수금 반복인데, 이번 수요일만 "운동 (헬스장 다리날)"로 남기고 싶을 때.
+function editRecurringItemTextOn(cid,dk,newText){
+  const exc=getRecurringExceptions(dk);
+  exc[cid]={status:'edited',text:newText};
+  S.set(S.key('recur_exc',dk),exc);
+  autoSync('recurExc',dk);
+}
+// 반복 규칙(rule)이 특정 날짜(dk)에 해당하는지 판정.
+// rule.type: 'daily'(rule.n=간격일수, 기본 1=매일) | 'weekly'(rule.days=['MO','TU',...], rule.weekInterval=1(매주)|2(격주)) | 'monthly'(rule.day=1~31)
+function _isRecurringDueOn(item,dk){
+  if(item.startDate&&dk<item.startDate)return false;
+  if(item.endDate&&dk>item.endDate)return false;
+  const d=new Date(dk+'T00:00:00');
+  const rule=item.rule||{};
+  if(rule.type==='daily'){
+    const n=rule.n||1; // n=1이면 매일, n>=2면 그만큼의 간격(예: 3이면 사흘마다) — "매일"의 자연스러운 일반형
+    if(n===1)return true;
+    if(!item.startDate)return true;
+    const start=new Date(item.startDate+'T00:00:00');
+    const daysDiff=Math.round((d-start)/86400000);
+    return daysDiff>=0&&daysDiff%n===0;
+  }
+  if(rule.type==='weekly'){
+    const dow=['SU','MO','TU','WE','TH','FR','SA'][d.getDay()];
+    if(!(rule.days||[]).includes(dow))return false;
+    // weekInterval:2(격주)는 요일 자체는 매주 그 요일이 되, 시작일 기준 몇 주째인지로 2주에 한 번만 걸러냄.
+    // "N일마다(14일)"로 대체하지 않는 이유: 특정 요일 자체가 기준이라 스킵/시작일 변경에도 안정적으로 계산됨.
+    if((rule.weekInterval||1)===2){
+      if(!item.startDate)return true;
+      const start=new Date(item.startDate+'T00:00:00');
+      const weeksDiff=Math.floor((d-start)/(7*86400000));
+      return weeksDiff%2===0;
+    }
+    return true;
+  }
+  if(rule.type==='monthly')return d.getDate()===rule.day;
+  return false;
+}
+// 그날(dk) 실제로 보여줘야 할 반복 항목만 계산해서 반환 — 원본 데이터를 복제하지 않고 매번 새로 산출.
+// 그날 예외로 텍스트가 바뀐 항목은 여기서 바로 반영(원본 규칙은 그대로 둔 채 표시용 텍스트만 교체).
+function getRecurringItemsForDate(dk){
+  const items=getRecurringItems();
+  const exc=getRecurringExceptions(dk);
+  return items.filter(item=>_isRecurringDueOn(item,dk)&&exc[item.cid]?.status!=='skipped')
+    .map(item=>exc[item.cid]?.status==='edited'?{...item,text:exc[item.cid].text}:item);
+}
+// 그날의 반복 항목 중 일정(isEvent)만, 렌더 시 필요한 _isRecur 표식을 붙여 반환 — 일정 리스트/월간캘린더 두 곳에서 동일하게 사용
+function getRecurringEventsForDate(dk){
+  return getRecurringItemsForDate(dk).filter(item=>item.isEvent).map(item=>({...item,_isRecur:true}));
+}
+// 그날의 반복 항목 중 할일(isEvent 아님)만 반환 — 오늘탭 투두 목록/정렬 통합 두 곳에서 동일하게 사용
+function getRecurringTodosForDate(dk){
+  return getRecurringItemsForDate(dk).filter(item=>!item.isEvent);
+}
+// getTodos(dk)의 실제 저장 데이터 + 그날 해당하는 반복 항목(가상)을 합쳐서 반환.
+// 반복 항목은 렌더링에 필요한 필드(done, cid 등)를 갖춘 todo 형태로 변환해 기존 렌더 로직을 그대로 재사용.
+// 반복 항목의 완료 체크는 날짜별 별도 저장소(recur_done_{dk})에 기록 — 원본 규칙과 분리.
+function getRecurringDoneMap(dk){return S.get(S.key('recur_done',dk))||{};}
+function toggleRecurringDone(cid,dk){
+  const doneMap=getRecurringDoneMap(dk);
+  doneMap[cid]=!doneMap[cid];
+  S.set(S.key('recur_done',dk),doneMap);
+  autoSync('recurDone',dk);
+}
 function getTodos(dk){return S.get(S.key('todos',dk))||[];}
 // ── 월간 캘린더 연속일정 bar 좌표 계산 ──
 // weekDates: 그 주의 7개 dk(월~일) 배열. multidayEvents: getActiveMultiDayEvents류로 모은 이번 달 전체 연속일정 목록(중복 제거된 원본, {_startDk,eventEndDate,...}).
@@ -3002,6 +3081,51 @@ async function syncHabitsUp(){
   delNames.forEach(n=>removeDelPending('habits','global',n));
   return true;
 }
+async function syncRecurringItemsDown(){
+  const rows=await supaFetch('recurring_items?order=sort_order');
+  if(!rows)return;
+  if(rows.length===0&&getRecurringItems().length>0){syncRecurringItemsUp();return;}
+  if(rows.length>0)S.set('recurring_items',rows.map(r=>({
+    cid:r.client_id,text:r.text,isEvent:!!r.is_event,eventTime:r.event_time||null,
+    eventCat:r.event_cat||null,timeSection:r.time_section||null,
+    rule:r.rule,startDate:r.start_date,endDate:r.end_date||null,
+    sortOrder:r.todo_sort_order!=null?r.todo_sort_order:undefined
+  })));
+}
+async function syncRecurringItemsUp(){
+  const items=getRecurringItems();
+  if(items.length){
+    const ok=await supaUpsert('recurring_items','client_id',items.map((it,i)=>({
+      client_id:it.cid,text:it.text,is_event:!!it.isEvent,event_time:it.eventTime||null,
+      event_cat:it.eventCat||null,time_section:it.timeSection||null,
+      rule:it.rule,start_date:it.startDate,end_date:it.endDate||null,sort_order:i,
+      todo_sort_order:typeof it.sortOrder==='number'?it.sortOrder:null
+    })));
+    if(!ok)return false;
+  }
+  const delCids=getDelPendingCids('recurring_items','global');
+  if(delCids.length){
+    const inList=delCids.map(c=>encodeURIComponent(c)).join(',');
+    const res=await supaFetch(`recurring_items?client_id=in.(${inList})`,'DELETE');
+    if(res===null)return false;
+  }
+  delCids.forEach(c=>removeDelPending('recurring_items','global',c));
+  return true;
+}
+async function syncRecurExcUp(dk){
+  const exc=getRecurringExceptions(dk);
+  const rows=Object.keys(exc).map(cid=>({recur_cid:cid,date_key:dk,status:exc[cid].status,edited_text:exc[cid].text||null}));
+  if(!rows.length)return true;
+  return await supaUpsert('recurring_exceptions','recur_cid,date_key',rows);
+}
+async function syncRecurExcDown(dk){
+  const rows=await supaFetch(`recurring_exceptions?date_key=eq.${dk}`);
+  if(!rows)return;
+  if(!rows.length)return;
+  const exc={};
+  rows.forEach(r=>{exc[r.recur_cid]={status:r.status,text:r.edited_text||null};});
+  S.set(S.key('recur_exc',dk),exc);
+}
 async function syncHCDown(wk){
   const ws=wk.replace('week:','');const we=getWeekEnd(ws);
   const rows=await supaFetch(`habit_checks?date_key=gte.${ws}&date_key=lt.${we}`);
@@ -3147,6 +3271,9 @@ async function autoSync(type,key){
   else if(type==='sleep'){await syncSleepUp(key);S.set(S.key('sleep_pending',key),false);}
   else if(type==='meals_field'){await syncMealsUp(key);}
   else if(type==='habits')syncHabitsUp();
+  else if(type==='recurringItems')syncRecurringItemsUp();
+  else if(type==='recurExc')syncRecurExcUp(key);
+  else if(type==='recurDone'){/* 완료체크는 개인 로컬 상태 위주라 별도 서버 동기화 없음(습관 체크와 달리 통계 집계 대상 아님) */}
   else if(type==='habitGoals')syncHabitGoalsUp();
   else if(type==='hc'){await syncHCUp(key);S.set('hc_pending_'+key,false);}
   else if(type==='hcTime'){await syncHCUp(key);S.set('hc_pending_'+key,false);} // 습관체크 시각도 결국 habit_checks 테이블의 checked_time 컬럼이라 같은 upload 함수(syncHCUp)를 재사용
@@ -3193,6 +3320,7 @@ async function syncAll(){
   await Promise.all([
     syncTodosDown(dk),syncMemosDown(dk),syncSleepDown(dk),syncMealsDown(dk),
     syncHabitsDown(),syncHCDown(wk),syncContentsDown(mk),
+    syncRecurringItemsDown(),syncRecurExcDown(dk),
     syncGoalDown(S.key('mgoal',monthKey(now))),
     syncHabitGoalsDown(),
     syncWChallengeDown(wk),
@@ -4296,7 +4424,15 @@ function renderTodos(){
   }
   const list=document.getElementById('todo-list');if(!list)return;
   list.innerHTML='';
-  const sorted=[...todos.map((t,i)=>({...t,_i:i})).filter(t=>!t.isEvent).filter(t=>!SCHEDULE_TIME_RE.test(t.text)).filter(t=>!_todoPinnedFilter||t.pinned)].sort((a,b)=>{
+  const realList=todos.map((t,i)=>({...t,_i:i,_isRecur:false})).filter(t=>!t.isEvent).filter(t=>!SCHEDULE_TIME_RE.test(t.text)).filter(t=>!_todoPinnedFilter||t.pinned);
+  // 반복 투두(가상 항목) — 실제 todos 배열엔 없지만, 시간대별 정렬(오전→오후→저녁→미정)은 일반 투두와 동일하게 적용돼야
+  // 자연스러우므로 여기서 realList와 하나의 배열로 합쳐서 함께 정렬. 렌더 방식만 _isRecur로 갈라서 처리(인덱스 기반 vs cid 기반).
+  // 일정(isEvent)인 반복 항목은 여기(할일 목록)에 넣지 않음 — 일정 쪽 반복 렌더는 renderEventList에서 별도 처리.
+  const recurList=_todoPinnedFilter?[]:getRecurringTodosForDate(dk).map(item=>{
+    const doneMap=getRecurringDoneMap(dk);
+    return {...item,done:!!doneMap[item.cid],_isRecur:true};
+  });
+  const sorted=[...realList,...recurList].sort((a,b)=>{
     if(a.done!==b.done)return a.done?1:-1;
     return compareTodoOrder(a,b);
   });
@@ -4305,6 +4441,25 @@ function renderTodos(){
     return;
   }
   sorted.forEach((t)=>{
+    if(t._isRecur){
+      const done=t.done;
+      const ts=t.timeSection||'none';
+      const el=document.createElement('div');el.className='todo-item';
+      el.dataset.recurCid=t.cid;
+      el.dataset.tsGroup=ts;
+      const rmEligible=_todoReorderMode&&!done;
+      const handleHtml=`<div class="todo-drag-handle${rmEligible?' rm-eligible':''}"><i class="ti ti-grip-vertical ico-sz-13" aria-hidden="true"></i></div>`;
+      const chkHtml=`<div class="chk ts-${ts}${done?' on':''}" onclick="toggleRecurringDone('${t.cid}','${dk}');renderTodos();"></div>`;
+      const iconHtml=`<i class="ti ti-repeat ico-sz-11" style="color:var(--tm);flex-shrink:0;margin-left:auto;" aria-hidden="true" title="반복"></i>`;
+      el.innerHTML=`${handleHtml}${chkHtml}<span class="todo-txt${done?' done':''}" style="margin-left:4px;">${escapeHtml(t.text)}</span>${iconHtml}`;
+      if(rmEligible){
+        attachTodoReorderDrag(el,'r:'+t.cid,ts);
+      }else if(!_todoReorderMode){
+        attachRecurringTodoSwipeMode(el,t.cid,dk);
+      }
+      list.appendChild(el);
+      return;
+    }
     const i=t._i;
     const ts=t.timeSection||'none';
     const tsClass=` ts-${ts||'none'}`;
@@ -4431,7 +4586,10 @@ function renderEventList(dk,todos){
   const events=todos.filter(t=>t.isEvent&&!t.eventEndDate);
   // 연속일정 — 오늘이 시작일이든 아니든, 오늘을 범위로 품는 모든 연속일정을 공용 함수로 조회
   const multiday=getActiveMultiDayEvents(dk);
-  const all=[...events,...multiday];
+  // 반복 일정(가상) — 실제 todos 배열엔 없음. 연속일정 개념과는 무관(eventEndDate 없음, 항상 "하루짜리" 취급)하므로 events와 동일하게 취급.
+  // 완료 판정(isPast)은 여기 없음 — 반복 일정은 매일 다시 나타나는 성격이라 "완료로 지나감" 개념을 적용하지 않고 항상 표시.
+  const recurEvents=getRecurringEventsForDate(dk);
+  const all=[...events,...multiday,...recurEvents];
   const scheduleItems=parseScheduleTodos(dk,todos);
   const hasEvent=all.length>0,hasSchedule=scheduleItems.length>0;
   if(!hasEvent&&!hasSchedule){section.style.display='none';list.innerHTML='';if(scheduleBody)scheduleBody.style.display='none';return;}
@@ -4472,6 +4630,7 @@ function renderEventList(dk,todos){
   // 오늘 실제 날짜(자정 기준)일 때만 '완료(지남)' 판정 적용 — 다른 날짜(과거/미래 조회)엔 적용 안 함
   const nowMinToday=_nowMinIfToday(dk);
   const isPast=(ev)=>{
+    if(ev._isRecur)return false; // 반복 일정은 "완료로 지나감" 개념 없이 항상 표시
     if(nowMinToday==null||!ev.eventTime||ev.eventEndDate)return false;
     const evMin=_parseHHMM(ev.eventTime);
     if(evMin==null)return false;
@@ -4498,13 +4657,15 @@ function renderEventList(dk,todos){
     const ec=getEventCat(ev.eventCat);
     const el=document.createElement('div');
     el.className='event-item'+(isPast(ev)?' event-past':'');
-    // 클릭하면 투두와 동일하게 하단 시트(수정/삭제)를 먼저 염 — 하루짜리는 오늘 dk, 연속일정은 시작일(_startDk) 기준
+    // 클릭하면 투두와 동일하게 하단 시트를 먼저 염 — 반복 일정은 전용 시트(오늘만 수정/삭제, 전체삭제)로,
+    // 그 외(하루짜리·연속일정)는 기존 event-sheet(수정/삭제)로 분기. 하루짜리는 오늘 dk, 연속일정은 시작일(_startDk) 기준.
     const targetDk=ev.eventEndDate?ev._startDk:dk;
-    el.onclick=()=>openEventSheet(targetDk,ev.cid,ev.text);
+    el.onclick=ev._isRecur?(()=>openRecurringItemSheet(ev.cid,dk,ev.text)):(()=>openEventSheet(targetDk,ev.cid,ev.text));
     // 일정 텍스트는 투두의 '조각 나누기' 기능이 필요 없어 단순 escape만 함(renderTodoTextParts를 쓰면 내부 클릭 핸들러가 투두 인덱스를 잘못 참조해 엉뚱한 투두가 열리는 문제가 있었음)
     const textHtml=escapeHtml(ev.text);
+    const recurIconHtml=ev._isRecur?'<i class="ti ti-repeat ico-sz-11" style="color:var(--tm);flex-shrink:0;margin-right:2px;" aria-hidden="true" title="반복"></i>':'';
     const rightBadge=ev.eventEndDate?`<span class="event-time event-daycount">${ev.dayIndex}일차</span>`:(ev.eventTime?`<span class="event-time">${ev.eventTime}</span>`:'');
-    el.innerHTML=`<i class="ti ${ec.icon}" style="font-size:14px;color:${ec.textColor};flex-shrink:0;" title="${ec.label}" aria-hidden="true"></i><span class="event-txt">${textHtml}</span>${rightBadge}`;
+    el.innerHTML=`<i class="ti ${ec.icon}" style="font-size:14px;color:${ec.textColor};flex-shrink:0;" title="${ec.label}" aria-hidden="true"></i><span class="event-txt">${textHtml}</span>${recurIconHtml}${rightBadge}`;
     list.appendChild(el);
   });
 }
@@ -4803,37 +4964,64 @@ function attachTodoReorderDrag(el,i,tsGroup,itemSelector,onDrop){
   handle.addEventListener('pointerup',endDrag);
   handle.addEventListener('pointercancel',endDrag);
 }
-// 같은 시간대 그룹 내에서 idx 항목을 shift칸 이동시키고 sortOrder를 재기록
 // 리스트 순서 변경(위/아래 이동) 공용 헬퍼 — "정렬된 배열에서 현재 위치 찾기 → shift만큼 이동 →
-// 그룹 내 순서대로 sortOrder 재기록"까지 공통 처리. applyTodoReorder/applyReserveReorder가
-// 그룹 필터링(filterFn)과 정렬 기준(sortFn)만 다르고 거의 동일한 구조였던 것을 통합.
+// 그룹 내 순서대로 sortOrder 재기록"까지 공통 처리. applyTodoReorder(단일+반복 혼합 배열)/
+// applyReserveReorder(보관함 단일 배열)가 그룹 필터링·정렬 기준·재기록 대상만 다르고 나머지 구조가
+// 동일했던 것을 하나로 통합.
+// items: 태그가 이미 붙은 배열(각 항목에 idKey로 조회 가능한 고유값 필요) — 호출부가 원본 그대로 넘기면 됨
+// idKey: 각 항목에서 고유 식별값을 꺼내는 함수(a)=>id — 이 값으로 idx(현재 위치의 대상)를 찾음
+// idx: 이동시킬 항목의 식별값(idKey가 반환하는 값과 같은 종류)
 // filterFn: (item)=>boolean — 재정렬 대상 그룹만 추림(그룹 없으면 null로 전체 대상)
 // sortFn: (a,b)=>number — 화면 표시와 동일한 정렬 기준
+// applyOrder: (item,order)=>void — 재정렬 후 각 항목의 실제 저장 위치에 sortOrder를 반영(단일 배열이면 items[i].sortOrder=order, 혼합이면 소속별로 분기)
 // 반환: 재정렬이 실제로 일어났으면 true(호출부가 save+render 수행), 아니면 false
-function reorderListItems(items,idx,shift,filterFn,sortFn){
-  const tagged=items.map((t,i)=>({...t,_i:i}));
-  const group=(filterFn?tagged.filter(filterFn):tagged).sort(sortFn);
-  const curPos=group.findIndex(t=>t._i===idx);
+function reorderListItems(items,idx,shift,filterFn,sortFn,idKey,applyOrder){
+  const group=(filterFn?items.filter(filterFn):items.slice()).sort(sortFn);
+  const curPos=group.findIndex(t=>idKey(t)===idx);
   if(curPos<0)return false;
   let newPos=curPos+shift;
   newPos=Math.max(0,Math.min(group.length-1,newPos));
   if(newPos===curPos)return false;
   const [moved]=group.splice(curPos,1);
   group.splice(newPos,0,moved);
-  group.forEach((t,order)=>{items[t._i].sortOrder=order;});
+  group.forEach((t,order)=>applyOrder(t,order));
   return true;
 }
-function applyTodoReorder(idx,tsGroup,shift){
-  const dk=dateKey(currentDate),todos=getTodos(dk);
-  const changed=reorderListItems(todos,idx,shift,t=>!t.done&&(t.timeSection||'none')===tsGroup,compareTodoOrder);
+// 일반 투두(getTodos)와 반복 투두(getRecurringItems)를 하나의 배열로 합쳐 순서를 계산한 뒤,
+// 계산된 sortOrder를 각자 원래 저장소에 나눠 반영 — 드래그 시점엔 "무엇이 어디 소속인지" 신경 쓸 필요 없이
+// 화면에 보이는 순서 그대로(compareTodoOrder 기준) 하나의 배열로 다루고, 저장할 때만 두 곳으로 갈라짐.
+// id: 일반 투두는 숫자 인덱스, 반복 투두는 'r:'+cid 형태의 문자열(attachTodoReorderDrag가 그대로 넘겨줌).
+function applyTodoReorder(id,tsGroup,shift){
+  const dk=dateKey(currentDate);
+  const todos=getTodos(dk);
+  const recurItems=getRecurringItems();
+  const recurForDk=getRecurringTodosForDate(dk);
+  const doneMap=getRecurringDoneMap(dk);
+  // 혼합 배열 — 실제 저장 위치를 찾아올 수 있도록 각 항목에 소속 정보(_src/_ref)를 붙임
+  const mixed=[
+    ...todos.map((t,i)=>({...t,_src:'todo',_ref:i,_mixId:i})),
+    ...recurForDk.map(it=>({...it,done:!!doneMap[it.cid],_src:'recur',_ref:it.cid,_mixId:'r:'+it.cid}))
+  ];
+  const filterFn=t=>!t.done&&(tsGroup==null||(t.timeSection||'none')===tsGroup);
+  const changed=reorderListItems(mixed,id,shift,filterFn,compareTodoOrder,t=>t._mixId,(t,order)=>{
+    if(t._src==='todo')todos[t._ref].sortOrder=order;
+    else{
+      const item=recurItems.find(it=>it.cid===t._ref);
+      if(item)item.sortOrder=order;
+    }
+  });
   if(!changed)return;
   saveTodos(dk,todos);
+  saveRecurringItems(recurItems);
   renderTodos();
 }
 // 보관함 전체 목록 기준 순서 재기록(시간대 그룹 없음, 전체가 하나의 그룹)
 function applyReserveReorder(idx,_g,shift){
   const todos=getReserveTodos();
-  const changed=reorderListItems(todos,idx,shift,null,(a,b)=>(a.sortOrder!=null?a.sortOrder:9999)-(b.sortOrder!=null?b.sortOrder:9999));
+  const tagged=todos.map((t,i)=>({...t,_i:i}));
+  const changed=reorderListItems(tagged,idx,shift,null,
+    (a,b)=>(a.sortOrder!=null?a.sortOrder:9999)-(b.sortOrder!=null?b.sortOrder:9999),
+    t=>t._i,(t,order)=>{todos[t._i].sortOrder=order;});
   if(!changed)return;
   saveReserveTodos(todos);
   renderReserveList();
@@ -6546,9 +6734,106 @@ function openTodoModal(editIdx=-1){
   endDateInp.value=existingEndDate?shortDk(existingEndDate):'';
   modal.dataset.eventStartDate=dk;
   modal.dataset.eventEndDate=hasMultiday?existingEndDate:'';
+  // 반복 설정 초기화 — 신규/일반항목 편집 모두 항상 "반복 안함"으로 시작(반복 항목 자체의 규칙 수정은 별도 경로로 처리)
+  resetRecurUI();
   // 할일/일정 탭 초기화 — 기존 항목의 isEvent 값에 따라, 신규는 항상 '할일' 탭에서 시작
   selectTodoKind(existing?.isEvent?'event':'todo',document.querySelector(`.todo-kind-tabs button.tk-${existing?.isEvent?'event':'todo'}`));
   openModal('todo-modal');setTimeout(()=>document.getElementById('todo-modal-inp').focus(),100);
+}
+// ── 반복 설정 UI 제어 ──
+function resetRecurUI(){
+  const modal=document.getElementById('todo-modal');
+  modal.dataset.recurType='';
+  modal.dataset.recurDays='';
+  modal.dataset.recurWeekInterval='1';
+  modal.dataset.recurEndDate='';
+  document.getElementById('todo-recur-panel').style.display='none';
+  document.getElementById('todo-recur-chip').classList.remove('on');
+  document.getElementById('todo-recur-chevron').classList.remove('on');
+  document.getElementById('todo-recur-chip-label').textContent='반복 안함';
+  document.querySelectorAll('.rt-opt').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.rd-opt').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.ri-opt').forEach(b=>b.classList.remove('active'));
+  document.querySelector('.ri-opt[data-interval="1"]')?.classList.add('active');
+  document.getElementById('todo-recur-days-row').style.display='none';
+  document.getElementById('todo-recur-interval-row').style.display='none';
+  document.getElementById('todo-recur-n-row').style.display='none';
+  document.getElementById('todo-recur-monthday-row').style.display='none';
+  document.getElementById('todo-recur-cancel-row').style.display='none';
+  document.getElementById('todo-recur-n-inp').value='1';
+  document.getElementById('todo-recur-monthday-inp').value='';
+  document.getElementById('todo-recur-end-date').value='';
+  document.getElementById('todo-recur-end-clear').style.display='none';
+}
+function toggleRecurBox(){
+  const panel=document.getElementById('todo-recur-panel');
+  const on=panel.style.display==='none';
+  panel.style.display=on?'flex':'none';
+  document.getElementById('todo-recur-chevron').classList.toggle('on',on);
+}
+function _recurTypeLabel(type,weekInterval,dailyN){
+  if(type==='weekly')return weekInterval==='2'?'2주마다':'매주';
+  if(type==='daily'){
+    const n=parseInt(dailyN,10);
+    return(!n||n<=1)?'매일':`${n}일마다`;
+  }
+  return {monthly:'매월'}[type]||'반복 안함';
+}
+// 반복 타입 선택 — daily는 간격(며칠마다, 1이면 매일)을 그 안에서 조절, weekly는 요일선택+간격토글(매주/2주=격주), monthly는 날짜입력.
+// 타입을 하나라도 고르면 "반복 취소" 버튼이 나타나 언제든 반복 자체를 없던 일로 되돌릴 수 있음.
+function selectRecurType(type,btn){
+  const modal=document.getElementById('todo-modal');
+  modal.dataset.recurType=type;
+  document.querySelectorAll('.rt-opt').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('todo-recur-chip').classList.add('on');
+  document.getElementById('todo-recur-chip-label').textContent=_recurTypeLabel(type,modal.dataset.recurWeekInterval,document.getElementById('todo-recur-n-inp').value);
+  document.getElementById('todo-recur-days-row').style.display=type==='weekly'?'flex':'none';
+  document.getElementById('todo-recur-interval-row').style.display=type==='weekly'?'flex':'none';
+  document.getElementById('todo-recur-n-row').style.display=type==='daily'?'flex':'none';
+  document.getElementById('todo-recur-monthday-row').style.display=type==='monthly'?'flex':'none';
+  document.getElementById('todo-recur-cancel-row').style.display='flex';
+}
+// daily 간격 입력이 바뀔 때마다 칩 라벨도 즉시 갱신(예: "3"을 입력하면 칩이 바로 "3일마다"로 바뀜)
+function onRecurDailyNInput(){
+  const modal=document.getElementById('todo-modal');
+  if(modal.dataset.recurType==='daily')document.getElementById('todo-recur-chip-label').textContent=_recurTypeLabel('daily',null,document.getElementById('todo-recur-n-inp').value);
+}
+// weekly 전용 — 1주(매주)/2주(격주) 간격 토글. 별도 타입이 아니라 weekly의 부속 설정이라 rule.type은 그대로 'weekly'.
+function selectRecurWeekInterval(n,btn){
+  const modal=document.getElementById('todo-modal');
+  modal.dataset.recurWeekInterval=String(n);
+  document.querySelectorAll('.ri-opt').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  if(modal.dataset.recurType==='weekly')document.getElementById('todo-recur-chip-label').textContent=_recurTypeLabel('weekly',String(n));
+}
+function toggleRecurDay(day,btn){
+  const modal=document.getElementById('todo-modal');
+  const days=(modal.dataset.recurDays||'').split(',').filter(Boolean);
+  const idx=days.indexOf(day);
+  if(idx>=0){days.splice(idx,1);btn.classList.remove('active');}
+  else{days.push(day);btn.classList.add('active');}
+  modal.dataset.recurDays=days.join(',');
+}
+// 반복 취소 — 지금까지 고른 타입/요일/간격/종료일을 전부 지우고 "반복 안함" 상태로 되돌림(칩이 다시 접힌 기본 모습으로).
+function cancelRecurSetting(){
+  resetRecurUI();
+}
+function openTodoRecurEndDatePicker(){
+  const modal=document.getElementById('todo-modal');
+  const dk=dateKey(currentDate);
+  const curVal=modal.dataset.recurEndDate||dk;
+  openDatePickerModal(curVal,function(selectedDk){
+    document.getElementById('todo-recur-end-date').value=shortDk(selectedDk);
+    modal.dataset.recurEndDate=selectedDk;
+    document.getElementById('todo-recur-end-clear').style.display='block';
+  },'종료일 선택','확인');
+}
+function clearTodoRecurEndDate(){
+  const modal=document.getElementById('todo-modal');
+  modal.dataset.recurEndDate='';
+  document.getElementById('todo-recur-end-date').value='';
+  document.getElementById('todo-recur-end-clear').style.display='none';
 }
 let _todoSubmitting=false;
 function selectTodoKind(kind,btn){
@@ -6669,13 +6954,54 @@ function deleteTodoFromModal(){
   closeModal('todo-modal');
   restoreCalModeAndRender(modal,true);
 }
+// 반복 투두/일정 신규 등록 — 모달의 반복 설정(dataset)을 rule 객체로 조립해 recurring_items에 저장.
+// 일반 투두 저장(confirmTodo 본체)과 완전히 분리된 경로 — 연속일정/조각모드 등 기존 로직에 영향 없음.
+function confirmRecurringTodo(text){
+  const modal=document.getElementById('todo-modal');
+  const type=modal.dataset.recurType;
+  const isEvent=modal.dataset.kind==='event';
+  const timeSection=modal.dataset.timeSection||'none';
+  const eventCat=isEvent?(modal.dataset.eventCat||'schedule'):null;
+  const eventTime=isEvent?(document.getElementById('todo-event-time-inp').dataset.value||null):null;
+  const dk=dateKey(currentDate);
+  const rule={type};
+  if(type==='daily'){
+    const n=parseInt(document.getElementById('todo-recur-n-inp').value,10);
+    if(!n||n<1){showToast('며칠마다 반복할지 입력해주세요');return;}
+    rule.n=n; // n=1이면 매일
+  }else if(type==='weekly'){
+    const days=(modal.dataset.recurDays||'').split(',').filter(Boolean);
+    if(!days.length){showToast('반복할 요일을 선택해주세요');return;}
+    rule.days=days;
+    rule.weekInterval=modal.dataset.recurWeekInterval==='2'?2:1;
+  }else if(type==='monthly'){
+    const day=parseInt(document.getElementById('todo-recur-monthday-inp').value,10);
+    if(!day||day<1||day>31){showToast('매월 며칠인지 입력해주세요(1~31)');return;}
+    rule.day=day;
+  }
+  const endDate=modal.dataset.recurEndDate||null;
+  if(endDate&&endDate<dk){showToast('종료일은 시작일 이후로 선택해주세요');return;}
+  _todoSubmitting=true;
+  const items=getRecurringItems();
+  items.push({cid:genCid(),text,isEvent,eventCat,eventTime,timeSection:isEvent?null:timeSection,rule,startDate:dk,endDate});
+  saveRecurringItems(items);
+  closeModal('todo-modal');
+  restoreCalModeAndRender(modal,true);
+  setTimeout(()=>{_todoSubmitting=false;},500);
+}
 function confirmTodo(){
   if(_todoSubmitting)return;
   const text=document.getElementById('todo-modal-inp').value.trim();if(!text)return;
+  const modal=document.getElementById('todo-modal');
+  // 반복 설정이 돼 있으면 일반 투두/일정 저장 로직(연속일정, 조각모드 등)을 타지 않고 별도 경로로 분기.
+  // 편집(editIdx>=0)인 기존 항목엔 반복 설정을 적용하지 않음 — 신규 등록에서만 지원(범위를 좁혀 복잡도 관리).
+  const editIdx=modal.dataset.editIdx!==''&&modal.dataset.editIdx!=null?parseInt(modal.dataset.editIdx):-1;
+  if(editIdx<0&&modal.dataset.recurType){
+    confirmRecurringTodo(text);
+    return;
+  }
   _todoSubmitting=true;
   const dk=dateKey(currentDate),todos=getTodos(dk);
-  const modal=document.getElementById('todo-modal');
-  const editIdx=modal.dataset.editIdx!==''&&modal.dataset.editIdx!=null?parseInt(modal.dataset.editIdx):-1;
   const timeSection=modal.dataset.timeSection||'none';
   const isEvent=modal.dataset.kind==='event';
   const pinned=!isEvent&&modal.dataset.pinned==='1'; // 일정에는 강조 개념 없음, 할일에만 적용
@@ -6776,6 +7102,64 @@ function eventSheetDelete(){
   if(!removeTodoByCid(_eventSheetDk,_eventSheetCid))return;
   renderTodos();
   if(document.getElementById('monthly-cal'))renderCalendar();
+}
+// ── 반복 투두/일정 — 탭하면 시트(오늘만 수정/오늘만 삭제)를 열고, 원본 규칙(recurring_items)은 절대 건드리지 않음 ──
+let _recurSheetCid=null,_recurSheetDk=null;
+function openRecurringItemSheet(cid,dk,title){
+  _recurSheetCid=cid;_recurSheetDk=dk;
+  document.getElementById('recur-sheet-title').textContent=title||'';
+  openSheet('recur-sheet');
+}
+function recurSheetSkipToday(){
+  closeSheet('recur-sheet');
+  if(!_recurSheetCid||!_recurSheetDk)return;
+  skipRecurringItemOn(_recurSheetCid,_recurSheetDk);
+  renderTodos();
+  if(document.getElementById('monthly-cal'))renderCalendar();
+}
+// 원본 규칙(recurring_items) 자체를 완전히 삭제 — 이후 모든 날짜에서 이 반복이 더 이상 나타나지 않음.
+// 과거에 이미 지나간 날짜의 완료 기록(recur_done_*)이나 예외(recur_exc_*)는 그대로 남지만, 원본이 없으니
+// getRecurringItemsForDate가 애초에 걸러내지 않아 화면에 다시 노출될 일은 없음(죽은 데이터로만 남음, 무해).
+function recurSheetDeleteAll(){
+  closeSheet('recur-sheet');
+  if(!_recurSheetCid)return;
+  const items=getRecurringItems();
+  const idx=items.findIndex(it=>it.cid===_recurSheetCid);
+  if(idx<0)return;
+  addDelPending('recurring_items','global',_recurSheetCid);
+  items.splice(idx,1);
+  saveRecurringItems(items);
+  renderTodos();
+  if(document.getElementById('monthly-cal'))renderCalendar();
+}
+function recurSheetEditTextToday(){
+  closeSheet('recur-sheet');
+  if(!_recurSheetCid||!_recurSheetDk)return;
+  const items=getRecurringItems();
+  const item=items.find(it=>it.cid===_recurSheetCid);
+  const exc=getRecurringExceptions(_recurSheetDk);
+  const curText=exc[_recurSheetCid]?.status==='edited'?exc[_recurSheetCid].text:(item?.text||'');
+  document.getElementById('recur-edit-text-inp').value=curText;
+  openModal('recur-edit-text-modal');
+  setTimeout(()=>document.getElementById('recur-edit-text-inp').focus(),100);
+}
+function confirmRecurEditText(){
+  const text=document.getElementById('recur-edit-text-inp').value.trim();
+  if(!text||!_recurSheetCid||!_recurSheetDk)return;
+  editRecurringItemTextOn(_recurSheetCid,_recurSheetDk,text);
+  closeModal('recur-edit-text-modal');
+  renderTodos();
+  if(document.getElementById('monthly-cal'))renderCalendar();
+}
+// 반복 투두 항목의 탭 상호작용 — 기존 스와이프(복사/조각모드)와 무관하게 단순 탭으로 시트를 염(반복 항목은 조각모드/복사 대상 아님).
+function attachRecurringTodoSwipeMode(el,cid,dk){
+  const textEl=el.querySelector('.todo-txt');
+  if(!textEl)return;
+  textEl.style.cursor='pointer';
+  textEl.addEventListener('click',()=>{
+    const item=getRecurringItems().find(it=>it.cid===cid);
+    openRecurringItemSheet(cid,dk,item?.text||'');
+  });
 }
 function todoSheetToReserve(){
   if(_todoSwipeIdx<0)return;
@@ -8992,8 +9376,10 @@ function renderCalendar(){
     const todos=getTodos(dk);
     if(getMemos(dk).length>0||todos.some(t=>t.done)||getSleep(dk).sleep)hasRecord[d]=true;
     // 하루짜리 일정만 배지 대상(연속일정은 eventEndDate가 있으므로 여기서 제외 — 아래 bar로 별도 렌더)
+    // 반복 일정도 여기 배지에 함께 포함 — 반복은 항상 "하루짜리" 성격(eventEndDate 없음)이라 bar 쪽엔 관여 안 함.
     // 같은 날 여러 일정이 있으면 시간순으로 표기(시간 있는 일정 먼저, 없는 일정은 뒤로)
-    const evs=todos.filter(t=>t.isEvent&&!t.eventEndDate).sort((a,b)=>{
+    const recurEvs=getRecurringEventsForDate(dk);
+    const evs=[...todos.filter(t=>t.isEvent&&!t.eventEndDate),...recurEvs].sort((a,b)=>{
       if(!!a.eventTime!==!!b.eventTime)return a.eventTime?-1:1;
       if(a.eventTime&&b.eventTime)return a.eventTime.localeCompare(b.eventTime);
       return 0;
@@ -9066,7 +9452,10 @@ function renderCalendar(){
       evsShown.forEach(ev=>{
         const ec=getEventCat(ev.eventCat);
         const title=parseTodoTextParts(ev.text).parts[0]||ev.text;
-        badges+=`<div class="cal-event-badge ev-${ev.eventCat||'etc'}" title="${ec.label}: ${title}" onclick="event.stopPropagation();openEventSheet('${y}-${pad(mo+1)}-${pad(d)}','${ev.cid}','${title.replace(/'/g,"\\'")}');">${title}</div>`;
+        const clickFn=ev._isRecur
+          ?`openRecurringItemSheet('${ev.cid}','${y}-${pad(mo+1)}-${pad(d)}','${title.replace(/'/g,"\\'")}')`
+          :`openEventSheet('${y}-${pad(mo+1)}-${pad(d)}','${ev.cid}','${title.replace(/'/g,"\\'")}')`;
+        badges+=`<div class="cal-event-badge ev-${ev.eventCat||'etc'}" title="${ec.label}: ${title}" onclick="event.stopPropagation();${clickFn};">${title}</div>`;
       });
       // "+n개"는 하루짜리 중 안 보인 것만 카운트(bar 자체는 항상 보이므로 미노출分에서 제외)
       const hiddenCount=(evs?evs.length-evsShown.length:0);
