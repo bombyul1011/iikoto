@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.18-quote-margin-fix';
+const CACHE = 'iikoto-v2.20-solar-term-baekro-fix';
 const ASSETS = [
   './',
   './index.html'

@@ -672,7 +672,7 @@ function makeHabitStreakRow(){
     const monthCount=getHabitMonthCount(h.id);
     // 스트릭 2일 이상이면 스트릭을, 아니면 기존처럼 이번달 누적을 표시 — 잘 이어가는 습관을 시각적으로 구분.
     const showStreak=streak>=2;
-    const numText=showStreak?`${streak}일`:`${monthCount}`;
+    const numText=showStreak?`${streak}`:`${monthCount}`;
     const hIcon=getHabitIconFor(h);
     const iconColor=getHabitIconColor(h.color);
     html+=`<div class="habit-numbox-card${showStreak?' streak':''}">`
@@ -2170,7 +2170,7 @@ const SOLAR_TERMS_BY_YEAR={
     {key:'2026-07-23',name:'대서',hanja:'大暑'},
     {key:'2026-08-07',name:'입추',hanja:'立秋'},
     {key:'2026-08-23',name:'처서',hanja:'處暑'},
-    {key:'2026-09-08',name:'백로',hanja:'白露'},
+    {key:'2026-09-07',name:'백로',hanja:'白露'}, // [2026-09-07] 9/8→9/7로 정정, 한국천문연구원 기준 절입 9/7 23:41
     {key:'2026-09-23',name:'추분',hanja:'秋分'},
     {key:'2026-10-08',name:'한로',hanja:'寒露'},
     {key:'2026-10-23',name:'상강',hanja:'霜降'},
