@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.41-recur-nightpostpone-fix';
+const CACHE = 'iikoto-v2.42-recur-deleteall-toast';
 const ASSETS = [
   './',
   './index.html'

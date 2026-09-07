@@ -7273,7 +7273,7 @@ async function recurSheetDeleteAll(){
   if(!_recurSheetRuleCid)return;
   const items=getRecurringItems();
   const idx=items.findIndex(it=>it.cid===_recurSheetRuleCid);
-  if(idx<0)return;
+  if(idx<0){showToast('이미 반복이 해제됐어요. 남은 항목은 각각 삭제해주세요');return;}
   const rule=items[idx];
   const fromDk=_recurSheetDk||dateKey(new Date());
   addDelPending('recurring_items','global',_recurSheetRuleCid);
