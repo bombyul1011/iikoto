@@ -2448,6 +2448,23 @@ function compareTodoOrder(a,b){
   }
   S.set('_recur_cleanup_v1_done',true);
 })();
+// 1회성 마이그레이션 v2(2026-09-07): 실체화 저장이 todos_pending 플래그를 잘못 세우던 버그(위 saveTodos.raw
+// 참고)로 인해, 최근 며칠치 todos_pending이 true로 남아 서버의 정상 데이터가 로컬에 반영되지 못하고 있었음
+// (recurRuleCid 없는 옛 로컬 캐시가 서버값으로 안 고쳐져 "일반 메뉴가 뜨는" 등 증상 발생). 잘못 세워진
+// pending 플래그를 지워 다음 sync 때 서버값이 정상 반영되게 함. 아울러 시간표(HH:MM) 형식으로 실수 등록된
+// 반복 규칙도 함께 정리(이후 등록 자체를 막는 코드는 별도 적용됨, 이건 이미 만들어진 과거분 정리).
+(function _recurCleanupV2(){
+  if(S.get('_recur_cleanup_v2_done'))return;
+  const today=new Date();
+  for(let i=-10;i<=40;i++){
+    const d=new Date(today);d.setDate(today.getDate()+i);
+    const dk=dateKey(d);
+    S.set(S.key('todos_pending',dk),false);
+  }
+  const rules=(S.get('recurring_items')||[]).filter(it=>!/^(\d{1,2}):(\d{2})\s+/.test(it.text||''));
+  S.set('recurring_items',rules);
+  S.set('_recur_cleanup_v2_done',true);
+})();
 function getRecurringItems(){return S.get('recurring_items')||[];}
 function saveRecurringItems(v){S.set('recurring_items',v);autoSync('recurringItems',null);_materializedDkCache.clear();}
 // 특정 규칙(ruleCid)이 특정 날짜(dk)에 실체화되지 않도록 막는 예외 — "오늘만 삭제"에서만 씀.
@@ -2507,16 +2524,28 @@ function _recurMaterializeAllowed(rule,dk){
 // 세션 내 이미 확인 끝난 dk는 _materializedDkCache에 표시해두고 재확인을 건너뜀 — 월간캘린더처럼 같은 달을
 // 반복해서 다시 그릴 때(달 넘겼다 되돌아오기 등) 매번 규칙 전체를 훑는 낭비를 막기 위함. 새 규칙을
 // 등록/삭제한 직후(saveRecurringItems)에는 캐시를 비워 다음 조회 때 다시 확인하게 함.
-// 주의: saveTodos.raw(=saveTodos)는 autoSync를 통해 syncTodosUp을 부르고, syncTodosUp 내부가 다시
-// getTodos(dk)를 호출하는 재진입 경로가 있음 — 이 재진입 자체는 캐시로 막히지만, 등록 직후 캐시가 비워진
-// 좁은 틈에 다른 화면(캘린더 등)이 거의 동시에 같은 dk를 조회하면 같은 규칙이 두 번 push될 여지가
-// 이론상 있었고, 실사용에서 실제로 발생함(2026-09-07). 저장 직전에 디스크의 최신 값을 다시 읽어 규칙cid
-// 기준으로 병합·중복 제거한 뒤 저장하는 안전망을 추가함.
-// getTodos(dk)를 부르는 사이 다른 화면(캘린더 등)이 실체화 직후에 함께 재진입될 수 있어, 저장 직전에도
-// 별도의 dedupe 안전망(아래)을 갖췄지만, 그와 별개로 이미 확인 끝난 날짜는 재확인 자체를 건너뛰는 캐시.
+// 주의: saveTodos.raw(=saveTodosRaw, todos_pending을 세우지 않는 전용 저장 함수)는 autoSync를 통해
+// syncTodosUp을 부르고, syncTodosUp 내부가 다시 getTodos(dk)를 호출하는 재진입 경로가 있음 — 이 재진입
+// 자체는 캐시로 막히지만, 등록 직후 캐시가 비워진 좁은 틈에 다른 화면(캘린더 등)이 거의 동시에 같은
+// dk를 조회하면 같은 규칙이 두 번 push될 여지가 이론상 있었고, 실사용에서 실제로 발생함(2026-09-07).
+// 저장 직전에 디스크의 최신 값을 다시 읽어 규칙cid 기준으로 병합·중복 제거한 뒤 저장하는 안전망을 추가함.
 const _materializedDkCache=new Set();
+// 같은 dk에 대해 이 함수가 동시에(재진입) 실행되는 것을 막는 락. saveTodos.raw(내부에서 호출)가
+// autoSync→syncTodosUp→getTodos(dk) 재진입 경로를 갖고 있어, 캐시가 비워진 좁은 틈에 다른 화면
+// (캘린더 등)이 같은 dk를 거의 동시에 조회하면 규칙이 두 번 push되는 경합이 실사용에서 발생했었음.
+// 저장 직전 dedupe 안전망은 유지하되, 애초에 동시 진입 자체를 막아 경합 창구를 없앰.
+const _materializingDkLock=new Set();
 function _materializeRecurringForDate(dk){
   if(_materializedDkCache.has(dk))return false;
+  if(_materializingDkLock.has(dk))return false; // 이미 이 dk를 처리 중(재진입) — 중복 실행 방지
+  _materializingDkLock.add(dk);
+  try{
+    return _materializeRecurringForDateInner(dk);
+  }finally{
+    _materializingDkLock.delete(dk);
+  }
+}
+function _materializeRecurringForDateInner(dk){
   _materializedDkCache.add(dk);
   const rules=getRecurringItems();
   if(!rules.length)return false;
@@ -2647,7 +2676,16 @@ function saveTodos(dk,v){
   S.set(S.key('todos_pending',dk),true); // 업로드 필요 플래그
   autoSync('todos',dk); // 온라인이면 즉시 업로드
 }
-saveTodos.raw=saveTodos; // 실체화 로직 내부에서 쓰는 이름 — 동작은 saveTodos와 동일(별칭)
+// 반복 실체화 전용 저장 — saveTodos와 달리 todos_pending 플래그를 세우지 않음. 실체화는 사용자의 수동
+// 편집이 아니라 시스템이 자동으로 채워넣는 것이라, "서버가 이 로컬 수정사항을 덮어쓰면 안 됨"을 뜻하는
+// todos_pending과 의미가 다름. 이 플래그가 세워진 채 업로드가 한 번이라도 실패(오프라인 등)하면 이후
+// syncTodosDown이 서버값 반영 자체를 계속 건너뛰게 되어, 서버 데이터가 정상이어도 로컬(recurRuleCid가
+// 빠진 옛 캐시 등)이 영영 안 고쳐지는 문제가 실사용에서 발생함(2026-09-07) — 그래서 별도로 분리.
+function saveTodosRaw(dk,v){
+  S.set(S.key('todos',dk),v);
+  autoSync('todos',dk); // pending 플래그 없이 조용히 업로드 시도 — 실패해도 다음 sync down이 정상적으로 서버값을 반영할 수 있음
+}
+saveTodos.raw=saveTodosRaw;
 function getMemos(dk){return S.get(S.key('memos',dk))||[];}
 // memos 서버 row → 로컬 저장 포맷 변환 (down/월간프리페치 공통 사용)
 function memoRowToLocal(r){return {time:r.memo_time,text:r.text,created:r.created,cid:r.client_id||genCid(),type:r.type||undefined,photoUrl:r.photo_url||undefined};}
@@ -3405,10 +3443,15 @@ async function syncAll(){
   const todayDate=now.getDate();
   for(let i=0;i<2;i++){const d=new Date(now);d.setDate(now.getDate()-i);mflowDks.push(dateKey(d));}
   // Down (Supabase → 로컬)
+  // 반복 규칙(recurring_items)/스킵기록(recurring_exceptions)은 todos보다 먼저 로컬에 반영되어야 함 —
+  // syncTodosDown이 끝나며 renderTodos()를 호출하고, 그 안에서 getTodos()가 그 자리에서 바로 반복
+  // 실체화 판정을 하기 때문에, skip 기록이 아직 안 내려온 상태로 이게 먼저 돌면 "오늘만 삭제"한 반복
+  // 항목이 skip 미반영 상태로 오판되어 되살아나는 경합이 있었음(2026-09-07 확인). 병렬 Promise.all 안에서는
+  // 응답 순서가 보장되지 않으므로, 이 두 개만 await로 먼저 끝내고 나머지를 병렬로 진행.
+  await Promise.all([syncRecurringItemsDown(),syncRecurSkipDown(dk)]);
   await Promise.all([
     syncTodosDown(dk),syncMemosDown(dk),syncSleepDown(dk),syncMealsDown(dk),
     syncHabitsDown(),syncHCDown(wk),syncContentsDown(mk),
-    syncRecurringItemsDown(),syncRecurSkipDown(dk),
     syncGoalDown(S.key('mgoal',monthKey(now))),
     syncHabitGoalsDown(),
     syncWChallengeDown(wk),
@@ -4530,22 +4573,26 @@ function renderTodos(){
     el.dataset.todoIdx=i;
     el.dataset.tsGroup=ts;
     if(_todoPartModeIdx===i)el.dataset.partModeIdx=i;
+    // 반복 항목이면 클릭 위임(attachTodoItemClick)이 참조할 정보를 데이터 속성으로 심어둔다 —
+    // 렌더링 시점에 onclick 문자열을 조립하지 않고, 클릭 시점에 이 속성들을 읽어 분기한다.
+    if(t.recurRuleCid){
+      el.dataset.recur='1';el.dataset.dk=dk;el.dataset.cid=t.cid||'';el.dataset.ruleCid=t.recurRuleCid;el.dataset.title=t.text;
+    }
     const textHtml=renderTodoTextParts(t.text,t.strikeParts||[],i);
     const partModeStyle=_todoPartModeIdx===i?'background:rgba(255,255,255,0.45);border-radius:8px;padding:2px 6px;':'';
     const rmEligible=_todoReorderMode&&!t.done;
     const handleHtml=`<div class="todo-drag-handle${rmEligible?' rm-eligible':''}"><i class="ti ti-grip-vertical ico-sz-13" aria-hidden="true"></i></div>`;
     const chkHtml=(!t.done&&t.pinned)
-      ? `<div class="todo-pinned-chk" onclick="toggleTodo(${i},'${t.cid||''}')"><i class="ti ti-bolt-filled" aria-hidden="true"></i></div>`
-      : `<div class="chk${tsClass}${t.done?' on':''}" onclick="toggleTodo(${i},'${t.cid||''}')"></div>`;
+      ? `<div class="todo-pinned-chk" data-role="chk"><i class="ti ti-bolt-filled" aria-hidden="true"></i></div>`
+      : `<div class="chk${tsClass}${t.done?' on':''}" data-role="chk"></div>`;
     const recurIconHtml=t.recurRuleCid?'<i class="ti ti-repeat ico-sz-11" style="color:var(--tm);flex-shrink:0;margin-left:auto;" aria-hidden="true" title="반복"></i>':'';
     el.innerHTML=`${handleHtml}${chkHtml}<span class="todo-txt${t.done?' done':''}" data-todo-i="${i}" style="${partModeStyle}">${textHtml}</span>${recurIconHtml}`;
     const hasMultipleParts=_isTouchDevice()&&parseTodoTextParts(t.text).parts.length>1;
+    attachTodoItemClick(el,i,t.cid||'');
     if(rmEligible){
       attachTodoReorderDrag(el,i,ts);
-    }else if(t.recurRuleCid){
-      // 반복으로 생성된 투두는 조각모드/복사 대상이 아니라 전용 시트(오늘만 삭제/이 반복 전체 삭제)를 염
-      attachRecurringTodoSwipeMode(el,i,dk,t.recurRuleCid);
-    }else if(!_todoReorderMode){
+    }else if(!t.recurRuleCid&&!_todoReorderMode){
+      // 반복 투두는 조각모드/스와이프 복사 대상이 아니므로 attachTodoSwipeMode는 일반 투두에만 붙인다.
       attachTodoSwipeMode(el,i,hasMultipleParts);
     }
     list.appendChild(el);
@@ -4766,36 +4813,71 @@ function parseTodoTextParts(text){
 }
 // 투두 텍스트를 조각내어 렌더링. strikeParts에 포함된 조각 인덱스는 취소선 처리.
 // 조각 모드일 때 항목 끝에 "미체크 조각 전부 내일로 복사" 버튼 하나를 노출.
+// 클릭 처리는 여기서 onclick 문자열을 조립하지 않음 — 대신 각 조각/접두어 스팬에 data-part-idx만
+// 남겨두고, 실제 클릭 판정은 attachTodoItemClick(부모 .todo-item 하나에만 리스너)이 위임 처리한다.
+// (예전엔 조각마다 onclick="onTodoPartClick(...)" 문자열을 조립했는데, 텍스트에 따옴표가 섞이면
+// 깨질 수 있고, 반복/일반 분기마다 별도 문자열을 만들어야 해서 케이스가 늘수록 복잡해지는 구조였음.
+// 지금은 데이터 속성만 남기고 판단은 attachTodoItemClick 한 곳에서 한다.)
 function renderTodoTextParts(text,strikeParts,todoIdx){
   const {prefix,parts,hasPrefix}=parseTodoTextParts(text);
   const inPartMode=_todoPartModeIdx===todoIdx;
   let html='';
   if(hasPrefix){
-    html+=`<span onclick="event.stopPropagation();if(_todoPartModeIdx!==${todoIdx})openTodoSheet(${todoIdx});">${prefix} ></span> `;
+    html+=`<span class="todo-prefix" data-role="prefix">${prefix} ></span> `;
   }
   parts.forEach((seg,partIdx)=>{
     const isStruck=strikeParts.includes(partIdx);
     if(partIdx>0)html+=' / ';
-    html+=`<span class="todo-part" data-part-idx="${partIdx}" onclick="onTodoPartClick(event,${todoIdx},${partIdx})" style="user-select:none;-webkit-user-select:none;-webkit-user-drag:none;${isStruck?'text-decoration:line-through;color:var(--tm);':''}">${seg}</span>`;
+    html+=`<span class="todo-part" data-part-idx="${partIdx}" style="user-select:none;-webkit-user-select:none;-webkit-user-drag:none;${isStruck?'text-decoration:line-through;color:var(--tm);':''}">${seg}</span>`;
   });
   if(inPartMode){
     const hasUnstruck=parts.some((_,idx)=>!strikeParts.includes(idx));
     if(hasUnstruck){
-      html+=`<span onclick="event.stopPropagation();copyUnstruckPartsToTomorrow(${todoIdx})" title="미완료 조각 내일로 복사" style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;margin-left:6px;border-radius:50%;background:rgba(150,190,225,0.25);cursor:pointer;vertical-align:middle;">
+      html+=`<span data-role="copy-unstruck" title="미완료 조각 내일로 복사" style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;margin-left:6px;border-radius:50%;background:rgba(150,190,225,0.25);cursor:pointer;vertical-align:middle;">
         <i class="ti ti-copy" style="font-size:10px;color:rgba(90,130,180,0.85);" aria-hidden="true"></i>
       </span>`;
     }
   }
   return html;
 }
-// 조각 모드가 아닐 때 조각(part)을 클릭하면 시트 열림(기존 동작 유지). 조각 모드일 땐 취소선 토글.
-function onTodoPartClick(evt,todoIdx,partIdx){
-  evt.stopPropagation();
-  if(_todoPartModeIdx===todoIdx){
-    toggleTodoStrikePart(todoIdx,partIdx);
-  }else{
-    openTodoSheet(todoIdx);
-  }
+// ── 투두 항목 하나(.todo-item)에 클릭 처리를 위임하는 단일 진입점 ──
+// 예전엔 조각(.todo-part)마다 인라인 onclick으로 openTodoSheet/openRecurringItemSheet를 직접 호출했는데,
+// 그러면 "반복인지 아닌지"를 렌더링 시점마다 문자열로 미리 결정해둬야 했고, 부모(.todo-txt)에 별도로
+// 달아둔 반복용 리스너는 자식의 stopPropagation에 막혀 애초에 실행되지 못하는 버그(2026-09-07)가 있었음.
+// 지금은 이벤트가 항상 이 리스너 하나로만 들어오므로 그 경합 자체가 구조적으로 발생할 수 없다.
+// isRecurring: el.dataset.recur==='1' 여부로 렌더 시점에 이미 심어둔 값을 그대로 사용.
+function attachTodoItemClick(el,idx,cid){
+  el.addEventListener('click',e=>{
+    const t=e.target;
+    if(t.closest('[data-role="chk"]')){
+      toggleTodo(idx,cid||'');
+      return;
+    }
+    const isRecurring=el.dataset.recur==='1';
+    const dk=el.dataset.dk;
+    const cid=el.dataset.cid;
+    const ruleCid=el.dataset.ruleCid;
+    const title=el.dataset.title||'';
+    const openSheetForThis=()=>{
+      if(isRecurring)openRecurringItemSheet(dk,cid,ruleCid,title);
+      else openTodoSheet(idx);
+    };
+    if(t.closest('[data-role="copy-unstruck"]')){
+      copyUnstruckPartsToTomorrow(idx);
+      return;
+    }
+    const partEl=t.closest('.todo-part');
+    if(partEl){
+      const partIdx=parseInt(partEl.dataset.partIdx,10);
+      if(_todoPartModeIdx===idx)toggleTodoStrikePart(idx,partIdx);
+      else openSheetForThis();
+      return;
+    }
+    if(t.closest('[data-role="prefix"]')){
+      if(_todoPartModeIdx!==idx)openSheetForThis();
+      return;
+    }
+  });
 }
 // [v2] 항목을 완료조각/미완료조각으로 나눠 이동 또는 복사하는 통합 로직.
 // mode:'move' → 원본에서 미완료조각 제거(미루기/날짜지정 공용)
@@ -6789,6 +6871,10 @@ function openTodoModal(editIdx=-1){
   openModal('todo-modal');setTimeout(()=>document.getElementById('todo-modal-inp').focus(),100);
 }
 // ── 반복 설정 UI 제어 ──
+// 타입별로 나타나는 입력 row들 — selectRecurType도 이 목록을 그대로 사용해 "타입 하나만 보이고
+// 나머지는 숨김" 로직을 한 곳(RECUR_TYPE_ROWS)만 고치면 되게 함.
+const RECUR_TYPE_ROWS={weekly:['todo-recur-days-row','todo-recur-interval-row'],daily:['todo-recur-n-row'],monthly:['todo-recur-monthday-row']};
+const RECUR_ALL_TYPE_ROWS=Object.values(RECUR_TYPE_ROWS).flat();
 function resetRecurUI(){
   const modal=document.getElementById('todo-modal');
   modal.dataset.recurType='';
@@ -6799,14 +6885,9 @@ function resetRecurUI(){
   document.getElementById('todo-recur-chip').classList.remove('on');
   document.getElementById('todo-recur-chevron').classList.remove('on');
   document.getElementById('todo-recur-chip-label').textContent='반복 안함';
-  document.querySelectorAll('.rt-opt').forEach(b=>b.classList.remove('active'));
-  document.querySelectorAll('.rd-opt').forEach(b=>b.classList.remove('active'));
-  document.querySelectorAll('.ri-opt').forEach(b=>b.classList.remove('active'));
+  ['.rt-opt','.rd-opt','.ri-opt'].forEach(sel=>document.querySelectorAll(sel).forEach(b=>b.classList.remove('active')));
   document.querySelector('.ri-opt[data-interval="1"]')?.classList.add('active');
-  document.getElementById('todo-recur-days-row').style.display='none';
-  document.getElementById('todo-recur-interval-row').style.display='none';
-  document.getElementById('todo-recur-n-row').style.display='none';
-  document.getElementById('todo-recur-monthday-row').style.display='none';
+  RECUR_ALL_TYPE_ROWS.forEach(id=>{document.getElementById(id).style.display='none';});
   document.getElementById('todo-recur-cancel-row').style.display='none';
   document.getElementById('todo-recur-n-inp').value='1';
   document.getElementById('todo-recur-monthday-inp').value='';
@@ -6836,10 +6917,9 @@ function selectRecurType(type,btn){
   btn.classList.add('active');
   document.getElementById('todo-recur-chip').classList.add('on');
   document.getElementById('todo-recur-chip-label').textContent=_recurTypeLabel(type,modal.dataset.recurWeekInterval,document.getElementById('todo-recur-n-inp').value);
-  document.getElementById('todo-recur-days-row').style.display=type==='weekly'?'flex':'none';
-  document.getElementById('todo-recur-interval-row').style.display=type==='weekly'?'flex':'none';
-  document.getElementById('todo-recur-n-row').style.display=type==='daily'?'flex':'none';
-  document.getElementById('todo-recur-monthday-row').style.display=type==='monthly'?'flex':'none';
+  // 이 타입에 해당하는 row만 보이고 나머지 타입들의 row는 전부 숨김(RECUR_TYPE_ROWS 테이블 기준)
+  const showRows=new Set(RECUR_TYPE_ROWS[type]||[]);
+  RECUR_ALL_TYPE_ROWS.forEach(id=>{document.getElementById(id).style.display=showRows.has(id)?'flex':'none';});
   document.getElementById('todo-recur-cancel-row').style.display='flex';
 }
 // daily 간격 입력이 바뀔 때마다 칩 라벨도 즉시 갱신(예: "3"을 입력하면 칩이 바로 "3일마다"로 바뀜)
@@ -7228,17 +7308,6 @@ function confirmRecurEditText(){
   closeModal('recur-edit-text-modal');
   renderTodos();
   if(document.getElementById('monthly-cal'))renderCalendar();
-}
-// 반복으로 생성된 투두 항목의 탭 상호작용 — 기존 스와이프(복사/조각모드)와 무관하게 단순 탭으로 시트를 염(조각모드/복사 대상 아님).
-function attachRecurringTodoSwipeMode(el,idx,dk,ruleCid){
-  const textEl=el.querySelector('.todo-txt');
-  if(!textEl)return;
-  textEl.style.cursor='pointer';
-  textEl.addEventListener('click',()=>{
-    const todos=getTodos(dk);
-    const item=todos[idx];
-    openRecurringItemSheet(dk,item?.cid,ruleCid,item?.text||'');
-  });
 }
 function todoSheetToReserve(){
   if(_todoSwipeIdx<0)return;
