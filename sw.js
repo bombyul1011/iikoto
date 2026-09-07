@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.30-recurring-cleanup';
+const CACHE = 'iikoto-v2.32-recurring-review';
 const ASSETS = [
   './',
   './index.html'

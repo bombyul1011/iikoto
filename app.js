@@ -2423,27 +2423,21 @@ function compareTodoOrder(a,b){
   if(typeof a.sortOrder==='number'&&typeof b.sortOrder==='number')return a.sortOrder-b.sortOrder;
   return parseTodoLeadingTime(a.text)-parseTodoLeadingTime(b.text);
 }
-// ── 반복 투두/일정 (2026-09-07) ──
-// 원본 규칙은 딱 하나만 저장(habits의 periods와 달리 구간 이력 없음 — "하나의 규칙 기준"으로 결정).
-// 실제 각 날짜 화면에는 이 규칙을 매번 계산해서 가상으로 끼워 넣음 — 미리 여러 날짜에 데이터를 만들어두지 않음.
-// 특정 날짜만 스킵(삭제)하는 건 별도 예외 저장소에만 기록되고 원본 규칙(rule)은 건드리지 않아, 이후 반복에 영향 없음.
+// ── 반복 투두/일정 (2026-09-07 전면 재설계) ──
+// 반복은 투두/일정의 "특수한 종류"가 아니라 옵션 하나로 취급한다: 규칙에 해당하는 날짜가 되면 그날의 실제
+// todos 레코드를 한 번 생성(실체화)하고, 그 이후로는 done/sortOrder/sync/렌더 등 시스템 어디서도 일반
+// 투두/일정과 구분하지 않는다 — 남는 표식은 어느 규칙에서 나왔는지 가리키는 recurRuleCid 필드 하나뿐.
+// (구 방식은 매번 규칙을 계산해 가상 항목을 병합하는 방식이었으나, 완료체크가 로컬 전용 별도 저장소에
+// 남아 기기 간 동기화가 전혀 안 되는 치명적 결함이 있었음 — 그 구조 자체를 폐기하고 새로 설계함.)
 function getRecurringItems(){return S.get('recurring_items')||[];}
-function saveRecurringItems(v){S.set('recurring_items',v);autoSync('recurringItems',null);}
-function getRecurringExceptions(dk){return S.get(S.key('recur_exc',dk))||{};}
-// 특정 날짜(dk)에서 특정 반복항목(cid)을 스킵 처리 — 원본 규칙은 그대로, 그날의 표시만 막음.
-function skipRecurringItemOn(cid,dk){
-  const exc=getRecurringExceptions(dk);
-  exc[cid]={status:'skipped'};
-  S.set(S.key('recur_exc',dk),exc);
-  autoSync('recurExc',dk);
-}
-// 그날 하루만 텍스트를 바꿔치기 — 원본 규칙(rule.text)은 건드리지 않아 다른 날짜엔 영향 없음.
-// 예: "운동"이 매주 월수금 반복인데, 이번 수요일만 "운동 (헬스장 다리날)"로 남기고 싶을 때.
-function editRecurringItemTextOn(cid,dk,newText){
-  const exc=getRecurringExceptions(dk);
-  exc[cid]={status:'edited',text:newText};
-  S.set(S.key('recur_exc',dk),exc);
-  autoSync('recurExc',dk);
+function saveRecurringItems(v){S.set('recurring_items',v);autoSync('recurringItems',null);_materializedDkCache.clear();}
+// 특정 규칙(ruleCid)이 특정 날짜(dk)에 실체화되지 않도록 막는 예외 — "오늘만 삭제"에서만 씀.
+// 실체화 자체를 스킵하는 용도라, 실체화된 뒤에는 그냥 그 todos 레코드를 지우는 문제일 뿐이라 skip 개념만 남음
+// (구 버전에 있던 edited_text 예외는 폐기 — 실체화된 레코드의 text를 직접 수정하면 되므로 불필요해짐).
+function getRecurSkips(dk){return S.get(S.key('recur_skip',dk))||[];}
+function addRecurSkip(ruleCid,dk){
+  const skips=getRecurSkips(dk);
+  if(!skips.includes(ruleCid)){skips.push(ruleCid);S.set(S.key('recur_skip',dk),skips);autoSync('recurSkip',dk);}
 }
 // 반복 규칙(rule)이 특정 날짜(dk)에 해당하는지 판정.
 // rule.type: 'daily'(rule.n=간격일수, 기본 1=매일) | 'weekly'(rule.days=['MO','TU',...], rule.weekInterval=1(매주)|2(격주)) | 'monthly'(rule.day=1~31)
@@ -2464,7 +2458,6 @@ function _isRecurringDueOn(item,dk){
     const dow=['SU','MO','TU','WE','TH','FR','SA'][d.getDay()];
     if(!(rule.days||[]).includes(dow))return false;
     // weekInterval:2(격주)는 요일 자체는 매주 그 요일이 되, 시작일 기준 몇 주째인지로 2주에 한 번만 걸러냄.
-    // "N일마다(14일)"로 대체하지 않는 이유: 특정 요일 자체가 기준이라 스킵/시작일 변경에도 안정적으로 계산됨.
     if((rule.weekInterval||1)===2){
       if(!item.startDate)return true;
       const start=new Date(item.startDate+'T00:00:00');
@@ -2476,33 +2469,55 @@ function _isRecurringDueOn(item,dk){
   if(rule.type==='monthly')return d.getDate()===rule.day;
   return false;
 }
-// 그날(dk) 실제로 보여줘야 할 반복 항목만 계산해서 반환 — 원본 데이터를 복제하지 않고 매번 새로 산출.
-// 그날 예외로 텍스트가 바뀐 항목은 여기서 바로 반영(원본 규칙은 그대로 둔 채 표시용 텍스트만 교체).
-function getRecurringItemsForDate(dk){
-  const items=getRecurringItems();
-  const exc=getRecurringExceptions(dk);
-  return items.filter(item=>_isRecurringDueOn(item,dk)&&exc[item.cid]?.status!=='skipped')
-    .map(item=>exc[item.cid]?.status==='edited'?{...item,text:exc[item.cid].text}:item);
+// 반복 실체화를 어느 날짜(dk)까지 허용할지 규칙별로 판정.
+// 할일 규칙은 "오늘 그 자체"일 때만(dk===오늘) — 미리 넘겨봐도 실체화되지 않고, 실제 그날이 와야 생김.
+// 일정 규칙은 캘린더가 미리 보는 용도라 오늘~+30일 범위까지는 미리 실체화를 허용(월간캘린더 다음 달 조회 대응).
+const RECUR_EVENT_PREVIEW_DAYS=30;
+function _recurMaterializeAllowed(rule,dk){
+  const todayDk=dateKey(new Date());
+  if(!rule.isEvent)return dk===todayDk;
+  if(dk<todayDk)return false;
+  const limit=new Date();limit.setDate(limit.getDate()+RECUR_EVENT_PREVIEW_DAYS);
+  return dk<=dateKey(limit);
 }
-// 그날의 반복 항목 중 일정(isEvent)만, 렌더 시 필요한 _isRecur 표식을 붙여 반환 — 일정 리스트/월간캘린더 두 곳에서 동일하게 사용
-function getRecurringEventsForDate(dk){
-  return getRecurringItemsForDate(dk).filter(item=>item.isEvent).map(item=>({...item,_isRecur:true}));
+// 그날(dk) 아직 실체화 안 된 반복 규칙들을 찾아 todos에 실제 레코드로 추가 — getTodos(dk) 호출 시마다 실행되지만,
+// 이미 그 규칙(recurRuleCid)으로 그날 만들어진 레코드가 있으면 다시 만들지 않아 중복 생성되지 않는다.
+// cid는 "규칙cid_dk" 형태의 결정적 값으로 만들어, 여러 기기가 같은 날 동시에 처음 열어도 upsert 시 자연히 하나로 합쳐짐.
+// 세션 내 이미 확인 끝난 dk는 _materializedDkCache에 표시해두고 재확인을 건너뜀 — 월간캘린더처럼 같은 달을
+// 반복해서 다시 그릴 때(달 넘겼다 되돌아오기 등) 매번 규칙 전체를 훑는 낭비를 막기 위함. 새 규칙을
+// 등록/삭제한 직후(saveRecurringItems)에는 캐시를 비워 다음 조회 때 다시 확인하게 함.
+const _materializedDkCache=new Set();
+function _materializeRecurringForDate(dk){
+  if(_materializedDkCache.has(dk))return false;
+  _materializedDkCache.add(dk);
+  const rules=getRecurringItems();
+  if(!rules.length)return false;
+  const todos=getTodos.raw(dk);
+  const already=new Set(todos.filter(t=>t.recurRuleCid).map(t=>t.recurRuleCid));
+  const skips=new Set(getRecurSkips(dk));
+  let changed=false;
+  rules.forEach(rule=>{
+    if(already.has(rule.cid)||skips.has(rule.cid))return;
+    if(!_recurMaterializeAllowed(rule,dk))return;
+    if(!_isRecurringDueOn(rule,dk))return;
+    todos.push({
+      cid:rule.cid+'_'+dk,text:rule.text,isEvent:!!rule.isEvent,eventCat:rule.eventCat||null,
+      eventTime:rule.eventTime||null,timeSection:rule.isEvent?null:(rule.timeSection||'none'),
+      done:false,created:Date.now(),recurRuleCid:rule.cid
+    });
+    changed=true;
+  });
+  if(changed)saveTodos.raw(dk,todos);
+  return changed;
 }
-// 그날의 반복 항목 중 할일(isEvent 아님)만 반환 — 오늘탭 투두 목록/정렬 통합 두 곳에서 동일하게 사용
-function getRecurringTodosForDate(dk){
-  return getRecurringItemsForDate(dk).filter(item=>!item.isEvent);
+// getTodos는 호출될 때마다 그날 실체화가 필요한 반복 항목이 있는지 먼저 확인해 반영한 뒤 반환한다.
+// .raw는 실체화 로직 내부에서만 쓰는 원본 접근(무한 재귀 방지용) — 그 외 모든 호출부는 getTodos(dk)만 쓰면 됨.
+function getTodos(dk){
+  _materializeRecurringForDate(dk);
+  return getTodos.raw(dk);
 }
-// getTodos(dk)의 실제 저장 데이터 + 그날 해당하는 반복 항목(가상)을 합쳐서 반환.
-// 반복 항목은 렌더링에 필요한 필드(done, cid 등)를 갖춘 todo 형태로 변환해 기존 렌더 로직을 그대로 재사용.
-// 반복 항목의 완료 체크는 날짜별 별도 저장소(recur_done_{dk})에 기록 — 원본 규칙과 분리.
-function getRecurringDoneMap(dk){return S.get(S.key('recur_done',dk))||{};}
-function toggleRecurringDone(cid,dk){
-  const doneMap=getRecurringDoneMap(dk);
-  doneMap[cid]=!doneMap[cid];
-  S.set(S.key('recur_done',dk),doneMap);
-  autoSync('recurDone',dk);
-}
-function getTodos(dk){return S.get(S.key('todos',dk))||[];}
+getTodos.raw=function(dk){return S.get(S.key('todos',dk))||[];};
+
 // ── 월간 캘린더 연속일정 bar 좌표 계산 ──
 // weekDates: 그 주의 7개 dk(월~일) 배열. multidayEvents: getActiveMultiDayEvents류로 모은 이번 달 전체 연속일정 목록(중복 제거된 원본, {_startDk,eventEndDate,...}).
 // 반환: 이 주에 걸치는 각 이벤트의 {left,width,row,clipStart,clipEnd,...ev} — left/width는 칸(cell) 단위 정수(0~6, 1~7), row는 겹칠 때 세로 순번(0부터).
@@ -2590,6 +2605,7 @@ function saveTodos(dk,v){
   S.set(S.key('todos_pending',dk),true); // 업로드 필요 플래그
   autoSync('todos',dk); // 온라인이면 즉시 업로드
 }
+saveTodos.raw=saveTodos; // 실체화 로직 내부에서 쓰는 이름 — 동작은 saveTodos와 동일(별칭)
 function getMemos(dk){return S.get(S.key('memos',dk))||[];}
 // memos 서버 row → 로컬 저장 포맷 변환 (down/월간프리페치 공통 사용)
 function memoRowToLocal(r){return {time:r.memo_time,text:r.text,created:r.created,cid:r.client_id||genCid(),type:r.type||undefined,photoUrl:r.photo_url||undefined};}
@@ -2980,7 +2996,7 @@ async function syncTodosDown(dk){
   if(!rows)return; // 연결 실패(null) — 로컬 유지. 빈 배열은 "서버에 진짜 0개"라는 뜻이라 그대로 반영.
   if(S.get(S.key('todos_pending',dk)))return; // 업로드 대기중인 로컬 수정(미루기 등) 있으면 덮어쓰지 않음
   S.set(S.key('todos',dk),rows.map(function(r){
-    return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null,eventEndDate:r.event_end_date||null,cat:r.cat||'todo',pinned:!!r.pinned};
+    return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null,eventEndDate:r.event_end_date||null,cat:r.cat||'todo',pinned:!!r.pinned,recurRuleCid:r.recur_rule_cid||undefined};
   }));
   renderTodos();
 }
@@ -2989,7 +3005,7 @@ async function syncTodosUp(dk){
   if(ensureItemCids(todos))S.set(S.key('todos',dk),todos);
   const delCids=getDelPendingCids('todos',dk);
   const ok=await syncListUpSafe('todos',`date_key=eq.${dk}`,'date_key,client_id',todos,
-    t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,strike_parts:t.strikeParts||[],strike_times:t.strikeTimes||{},completed_at:(t.completedAt!=null?t.completedAt:null),sort_order:(typeof t.sortOrder==='number'?t.sortOrder:null),is_event:!!t.isEvent,event_cat:t.eventCat||null,event_time:t.eventTime||null,event_end_date:t.eventEndDate||null,cat:t.cat||'todo',pinned:!!t.pinned}),
+    t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,strike_parts:t.strikeParts||[],strike_times:t.strikeTimes||{},completed_at:(t.completedAt!=null?t.completedAt:null),sort_order:(typeof t.sortOrder==='number'?t.sortOrder:null),is_event:!!t.isEvent,event_cat:t.eventCat||null,event_time:t.eventTime||null,event_end_date:t.eventEndDate||null,cat:t.cat||'todo',pinned:!!t.pinned,recur_rule_cid:t.recurRuleCid||null}),
     delCids);
   if(ok)delCids.forEach(cid=>removeDelPending('todos',dk,cid));
   return ok;
@@ -3081,16 +3097,19 @@ async function syncHabitsUp(){
   delNames.forEach(n=>removeDelPending('habits','global',n));
   return true;
 }
+// 원본 규칙(recurring_items)만 다룸 — 완료체크/실체화 여부는 이제 todos 자체에 있으므로 별도 sync 불필요.
 async function syncRecurringItemsDown(){
   const rows=await supaFetch('recurring_items?order=sort_order');
   if(!rows)return;
   if(rows.length===0&&getRecurringItems().length>0){syncRecurringItemsUp();return;}
-  if(rows.length>0)S.set('recurring_items',rows.map(r=>({
-    cid:r.client_id,text:r.text,isEvent:!!r.is_event,eventTime:r.event_time||null,
-    eventCat:r.event_cat||null,timeSection:r.time_section||null,
-    rule:r.rule,startDate:r.start_date,endDate:r.end_date||null,
-    sortOrder:r.todo_sort_order!=null?r.todo_sort_order:undefined
-  })));
+  if(rows.length>0){
+    S.set('recurring_items',rows.map(r=>({
+      cid:r.client_id,text:r.text,isEvent:!!r.is_event,eventTime:r.event_time||null,
+      eventCat:r.event_cat||null,timeSection:r.time_section||null,
+      rule:r.rule,startDate:r.start_date,endDate:r.end_date||null
+    })));
+    _materializedDkCache.clear(); // 다른 기기에서 등록/삭제된 규칙이 반영됐으니, 이미 "확인 끝남"으로 캐시된 날짜들도 다시 실체화 검토 대상이 되어야 함
+  }
 }
 async function syncRecurringItemsUp(){
   const items=getRecurringItems();
@@ -3098,8 +3117,7 @@ async function syncRecurringItemsUp(){
     const ok=await supaUpsert('recurring_items','client_id',items.map((it,i)=>({
       client_id:it.cid,text:it.text,is_event:!!it.isEvent,event_time:it.eventTime||null,
       event_cat:it.eventCat||null,time_section:it.timeSection||null,
-      rule:it.rule,start_date:it.startDate,end_date:it.endDate||null,sort_order:i,
-      todo_sort_order:typeof it.sortOrder==='number'?it.sortOrder:null
+      rule:it.rule,start_date:it.startDate,end_date:it.endDate||null,sort_order:i
     })));
     if(!ok)return false;
   }
@@ -3112,19 +3130,17 @@ async function syncRecurringItemsUp(){
   delCids.forEach(c=>removeDelPending('recurring_items','global',c));
   return true;
 }
-async function syncRecurExcUp(dk){
-  const exc=getRecurringExceptions(dk);
-  const rows=Object.keys(exc).map(cid=>({recur_cid:cid,date_key:dk,status:exc[cid].status,edited_text:exc[cid].text||null}));
-  if(!rows.length)return true;
-  return await supaUpsert('recurring_exceptions','recur_cid,date_key',rows);
+// 실체화 스킵 기록(그 규칙을 그 날짜엔 만들지 않음) — "오늘만 삭제"에서만 씀. 배열 하나뿐이라 upsert 없이 통째로 저장.
+async function syncRecurSkipUp(dk){
+  const skips=getRecurSkips(dk);
+  if(!skips.length)return true;
+  return await supaUpsert('recurring_exceptions','recur_cid,date_key',skips.map(cid=>({recur_cid:cid,date_key:dk,status:'skipped'})));
 }
-async function syncRecurExcDown(dk){
+async function syncRecurSkipDown(dk){
   const rows=await supaFetch(`recurring_exceptions?date_key=eq.${dk}`);
   if(!rows)return;
   if(!rows.length)return;
-  const exc={};
-  rows.forEach(r=>{exc[r.recur_cid]={status:r.status,text:r.edited_text||null};});
-  S.set(S.key('recur_exc',dk),exc);
+  S.set(S.key('recur_skip',dk),rows.map(r=>r.recur_cid));
 }
 async function syncHCDown(wk){
   const ws=wk.replace('week:','');const we=getWeekEnd(ws);
@@ -3272,8 +3288,7 @@ async function autoSync(type,key){
   else if(type==='meals_field'){await syncMealsUp(key);}
   else if(type==='habits')syncHabitsUp();
   else if(type==='recurringItems')syncRecurringItemsUp();
-  else if(type==='recurExc')syncRecurExcUp(key);
-  else if(type==='recurDone'){/* 완료체크는 개인 로컬 상태 위주라 별도 서버 동기화 없음(습관 체크와 달리 통계 집계 대상 아님) */}
+  else if(type==='recurSkip')syncRecurSkipUp(key);
   else if(type==='habitGoals')syncHabitGoalsUp();
   else if(type==='hc'){await syncHCUp(key);S.set('hc_pending_'+key,false);}
   else if(type==='hcTime'){await syncHCUp(key);S.set('hc_pending_'+key,false);} // 습관체크 시각도 결국 habit_checks 테이블의 checked_time 컬럼이라 같은 upload 함수(syncHCUp)를 재사용
@@ -3320,7 +3335,7 @@ async function syncAll(){
   await Promise.all([
     syncTodosDown(dk),syncMemosDown(dk),syncSleepDown(dk),syncMealsDown(dk),
     syncHabitsDown(),syncHCDown(wk),syncContentsDown(mk),
-    syncRecurringItemsDown(),syncRecurExcDown(dk),
+    syncRecurringItemsDown(),syncRecurSkipDown(dk),
     syncGoalDown(S.key('mgoal',monthKey(now))),
     syncHabitGoalsDown(),
     syncWChallengeDown(wk),
@@ -4424,42 +4439,17 @@ function renderTodos(){
   }
   const list=document.getElementById('todo-list');if(!list)return;
   list.innerHTML='';
-  const realList=todos.map((t,i)=>({...t,_i:i,_isRecur:false})).filter(t=>!t.isEvent).filter(t=>!SCHEDULE_TIME_RE.test(t.text)).filter(t=>!_todoPinnedFilter||t.pinned);
-  // 반복 투두(가상 항목) — 실제 todos 배열엔 없지만, 시간대별 정렬(오전→오후→저녁→미정)은 일반 투두와 동일하게 적용돼야
-  // 자연스러우므로 여기서 realList와 하나의 배열로 합쳐서 함께 정렬. 렌더 방식만 _isRecur로 갈라서 처리(인덱스 기반 vs cid 기반).
-  // 일정(isEvent)인 반복 항목은 여기(할일 목록)에 넣지 않음 — 일정 쪽 반복 렌더는 renderEventList에서 별도 처리.
-  const recurList=_todoPinnedFilter?[]:getRecurringTodosForDate(dk).map(item=>{
-    const doneMap=getRecurringDoneMap(dk);
-    return {...item,done:!!doneMap[item.cid],_isRecur:true};
-  });
-  const sorted=[...realList,...recurList].sort((a,b)=>{
-    if(a.done!==b.done)return a.done?1:-1;
-    return compareTodoOrder(a,b);
-  });
+  // 반복으로 생성된 항목(recurRuleCid 있음)도 이제 todos 배열의 평범한 원소라 별도 병합 없이 그대로 필터+정렬만 하면 됨.
+  const sorted=todos.map((t,i)=>({...t,_i:i})).filter(t=>!t.isEvent).filter(t=>!SCHEDULE_TIME_RE.test(t.text)).filter(t=>!_todoPinnedFilter||t.pinned)
+    .sort((a,b)=>{
+      if(a.done!==b.done)return a.done?1:-1;
+      return compareTodoOrder(a,b);
+    });
   if(_todoPinnedFilter&&!sorted.length){
     list.innerHTML='<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:12px 0;">강조한 할 일이 없어요</div>';
     return;
   }
   sorted.forEach((t)=>{
-    if(t._isRecur){
-      const done=t.done;
-      const ts=t.timeSection||'none';
-      const el=document.createElement('div');el.className='todo-item';
-      el.dataset.recurCid=t.cid;
-      el.dataset.tsGroup=ts;
-      const rmEligible=_todoReorderMode&&!done;
-      const handleHtml=`<div class="todo-drag-handle${rmEligible?' rm-eligible':''}"><i class="ti ti-grip-vertical ico-sz-13" aria-hidden="true"></i></div>`;
-      const chkHtml=`<div class="chk ts-${ts}${done?' on':''}" onclick="toggleRecurringDone('${t.cid}','${dk}');renderTodos();"></div>`;
-      const iconHtml=`<i class="ti ti-repeat ico-sz-11" style="color:var(--tm);flex-shrink:0;margin-left:auto;" aria-hidden="true" title="반복"></i>`;
-      el.innerHTML=`${handleHtml}${chkHtml}<span class="todo-txt${done?' done':''}" style="margin-left:4px;">${escapeHtml(t.text)}</span>${iconHtml}`;
-      if(rmEligible){
-        attachTodoReorderDrag(el,'r:'+t.cid,ts);
-      }else if(!_todoReorderMode){
-        attachRecurringTodoSwipeMode(el,t.cid,dk);
-      }
-      list.appendChild(el);
-      return;
-    }
     const i=t._i;
     const ts=t.timeSection||'none';
     const tsClass=` ts-${ts||'none'}`;
@@ -4474,10 +4464,14 @@ function renderTodos(){
     const chkHtml=(!t.done&&t.pinned)
       ? `<div class="todo-pinned-chk" onclick="toggleTodo(${i},'${t.cid||''}')"><i class="ti ti-bolt-filled" aria-hidden="true"></i></div>`
       : `<div class="chk${tsClass}${t.done?' on':''}" onclick="toggleTodo(${i},'${t.cid||''}')"></div>`;
-    el.innerHTML=`${handleHtml}${chkHtml}<span class="todo-txt${t.done?' done':''}" data-todo-i="${i}" style="${partModeStyle}">${textHtml}</span>`;
+    const recurIconHtml=t.recurRuleCid?'<i class="ti ti-repeat ico-sz-11" style="color:var(--tm);flex-shrink:0;margin-left:auto;" aria-hidden="true" title="반복"></i>':'';
+    el.innerHTML=`${handleHtml}${chkHtml}<span class="todo-txt${t.done?' done':''}" data-todo-i="${i}" style="${partModeStyle}">${textHtml}</span>${recurIconHtml}`;
     const hasMultipleParts=_isTouchDevice()&&parseTodoTextParts(t.text).parts.length>1;
     if(rmEligible){
       attachTodoReorderDrag(el,i,ts);
+    }else if(t.recurRuleCid){
+      // 반복으로 생성된 투두는 조각모드/복사 대상이 아니라 전용 시트(오늘만 삭제/이 반복 전체 삭제)를 염
+      attachRecurringTodoSwipeMode(el,i,dk,t.recurRuleCid);
     }else if(!_todoReorderMode){
       attachTodoSwipeMode(el,i,hasMultipleParts);
     }
@@ -4582,14 +4576,12 @@ function renderEventList(dk,todos){
   const label=document.getElementById('event-section-label');
   const scheduleBody=document.getElementById('schedule-body');
   if(!section||!list)return;
-  // 하루짜리 일정(오늘 date_key에 저장된 것) — 연속일정(eventEndDate 있는 것)은 여기서 제외하고 아래서 별도 병합
+  // 하루짜리 일정(오늘 date_key에 저장된 것) — 연속일정(eventEndDate 있는 것)은 여기서 제외하고 아래서 별도 병합.
+  // 반복으로 생성된 일정도 이미 todos 배열의 평범한 원소라 별도 조회 없이 여기 자연히 포함됨(recurRuleCid로만 구분).
   const events=todos.filter(t=>t.isEvent&&!t.eventEndDate);
   // 연속일정 — 오늘이 시작일이든 아니든, 오늘을 범위로 품는 모든 연속일정을 공용 함수로 조회
   const multiday=getActiveMultiDayEvents(dk);
-  // 반복 일정(가상) — 실제 todos 배열엔 없음. 연속일정 개념과는 무관(eventEndDate 없음, 항상 "하루짜리" 취급)하므로 events와 동일하게 취급.
-  // 완료 판정(isPast)은 여기 없음 — 반복 일정은 매일 다시 나타나는 성격이라 "완료로 지나감" 개념을 적용하지 않고 항상 표시.
-  const recurEvents=getRecurringEventsForDate(dk);
-  const all=[...events,...multiday,...recurEvents];
+  const all=[...events,...multiday];
   const scheduleItems=parseScheduleTodos(dk,todos);
   const hasEvent=all.length>0,hasSchedule=scheduleItems.length>0;
   if(!hasEvent&&!hasSchedule){section.style.display='none';list.innerHTML='';if(scheduleBody)scheduleBody.style.display='none';return;}
@@ -4630,7 +4622,7 @@ function renderEventList(dk,todos){
   // 오늘 실제 날짜(자정 기준)일 때만 '완료(지남)' 판정 적용 — 다른 날짜(과거/미래 조회)엔 적용 안 함
   const nowMinToday=_nowMinIfToday(dk);
   const isPast=(ev)=>{
-    if(ev._isRecur)return false; // 반복 일정은 "완료로 지나감" 개념 없이 항상 표시
+    if(ev.recurRuleCid)return false; // 반복 일정은 "완료로 지나감" 개념 없이 항상 표시
     if(nowMinToday==null||!ev.eventTime||ev.eventEndDate)return false;
     const evMin=_parseHHMM(ev.eventTime);
     if(evMin==null)return false;
@@ -4657,13 +4649,13 @@ function renderEventList(dk,todos){
     const ec=getEventCat(ev.eventCat);
     const el=document.createElement('div');
     el.className='event-item'+(isPast(ev)?' event-past':'');
-    // 클릭하면 투두와 동일하게 하단 시트를 먼저 염 — 반복 일정은 전용 시트(오늘만 수정/삭제, 전체삭제)로,
+    // 클릭하면 투두와 동일하게 하단 시트를 먼저 염 — 반복으로 생성된 일정은 전용 시트(오늘만 삭제/이 반복 전체 삭제)로,
     // 그 외(하루짜리·연속일정)는 기존 event-sheet(수정/삭제)로 분기. 하루짜리는 오늘 dk, 연속일정은 시작일(_startDk) 기준.
     const targetDk=ev.eventEndDate?ev._startDk:dk;
-    el.onclick=ev._isRecur?(()=>openRecurringItemSheet(ev.cid,dk,ev.text)):(()=>openEventSheet(targetDk,ev.cid,ev.text));
+    el.onclick=ev.recurRuleCid?(()=>openRecurringItemSheet(dk,ev.cid,ev.recurRuleCid,ev.text)):(()=>openEventSheet(targetDk,ev.cid,ev.text));
     // 일정 텍스트는 투두의 '조각 나누기' 기능이 필요 없어 단순 escape만 함(renderTodoTextParts를 쓰면 내부 클릭 핸들러가 투두 인덱스를 잘못 참조해 엉뚱한 투두가 열리는 문제가 있었음)
     const textHtml=escapeHtml(ev.text);
-    const recurIconHtml=ev._isRecur?'<i class="ti ti-repeat ico-sz-11" style="color:var(--tm);flex-shrink:0;margin-right:2px;" aria-hidden="true" title="반복"></i>':'';
+    const recurIconHtml=ev.recurRuleCid?'<i class="ti ti-repeat ico-sz-11" style="color:var(--tm);flex-shrink:0;margin-right:2px;" aria-hidden="true" title="반복"></i>':'';
     const rightBadge=ev.eventEndDate?`<span class="event-time event-daycount">${ev.dayIndex}일차</span>`:(ev.eventTime?`<span class="event-time">${ev.eventTime}</span>`:'');
     el.innerHTML=`<i class="ti ${ec.icon}" style="font-size:14px;color:${ec.textColor};flex-shrink:0;" title="${ec.label}" aria-hidden="true"></i><span class="event-txt">${textHtml}</span>${recurIconHtml}${rightBadge}`;
     list.appendChild(el);
@@ -4965,15 +4957,14 @@ function attachTodoReorderDrag(el,i,tsGroup,itemSelector,onDrop){
   handle.addEventListener('pointercancel',endDrag);
 }
 // 리스트 순서 변경(위/아래 이동) 공용 헬퍼 — "정렬된 배열에서 현재 위치 찾기 → shift만큼 이동 →
-// 그룹 내 순서대로 sortOrder 재기록"까지 공통 처리. applyTodoReorder(단일+반복 혼합 배열)/
-// applyReserveReorder(보관함 단일 배열)가 그룹 필터링·정렬 기준·재기록 대상만 다르고 나머지 구조가
-// 동일했던 것을 하나로 통합.
+// 그룹 내 순서대로 sortOrder 재기록"까지 공통 처리. applyTodoReorder/applyReserveReorder가
+// 그룹 필터링·정렬 기준만 다르고 나머지 구조가 동일했던 것을 하나로 통합.
 // items: 태그가 이미 붙은 배열(각 항목에 idKey로 조회 가능한 고유값 필요) — 호출부가 원본 그대로 넘기면 됨
 // idKey: 각 항목에서 고유 식별값을 꺼내는 함수(a)=>id — 이 값으로 idx(현재 위치의 대상)를 찾음
 // idx: 이동시킬 항목의 식별값(idKey가 반환하는 값과 같은 종류)
 // filterFn: (item)=>boolean — 재정렬 대상 그룹만 추림(그룹 없으면 null로 전체 대상)
 // sortFn: (a,b)=>number — 화면 표시와 동일한 정렬 기준
-// applyOrder: (item,order)=>void — 재정렬 후 각 항목의 실제 저장 위치에 sortOrder를 반영(단일 배열이면 items[i].sortOrder=order, 혼합이면 소속별로 분기)
+// applyOrder: (item,order)=>void — 재정렬 후 각 항목의 실제 저장 위치에 sortOrder를 반영
 // 반환: 재정렬이 실제로 일어났으면 true(호출부가 save+render 수행), 아니면 false
 function reorderListItems(items,idx,shift,filterFn,sortFn,idKey,applyOrder){
   const group=(filterFn?items.filter(filterFn):items.slice()).sort(sortFn);
@@ -4987,32 +4978,16 @@ function reorderListItems(items,idx,shift,filterFn,sortFn,idKey,applyOrder){
   group.forEach((t,order)=>applyOrder(t,order));
   return true;
 }
-// 일반 투두(getTodos)와 반복 투두(getRecurringItems)를 하나의 배열로 합쳐 순서를 계산한 뒤,
-// 계산된 sortOrder를 각자 원래 저장소에 나눠 반영 — 드래그 시점엔 "무엇이 어디 소속인지" 신경 쓸 필요 없이
-// 화면에 보이는 순서 그대로(compareTodoOrder 기준) 하나의 배열로 다루고, 저장할 때만 두 곳으로 갈라짐.
-// id: 일반 투두는 숫자 인덱스, 반복 투두는 'r:'+cid 형태의 문자열(attachTodoReorderDrag가 그대로 넘겨줌).
-function applyTodoReorder(id,tsGroup,shift){
+// 같은 시간대 그룹 내에서 idx(투두 인덱스) 항목을 shift칸 이동시키고 sortOrder를 재기록.
+// 반복으로 생성된 투두도 todos 배열의 평범한 원소라 별도 처리 없이 이 로직 그대로 적용됨.
+function applyTodoReorder(idx,tsGroup,shift){
   const dk=dateKey(currentDate);
   const todos=getTodos(dk);
-  const recurItems=getRecurringItems();
-  const recurForDk=getRecurringTodosForDate(dk);
-  const doneMap=getRecurringDoneMap(dk);
-  // 혼합 배열 — 실제 저장 위치를 찾아올 수 있도록 각 항목에 소속 정보(_src/_ref)를 붙임
-  const mixed=[
-    ...todos.map((t,i)=>({...t,_src:'todo',_ref:i,_mixId:i})),
-    ...recurForDk.map(it=>({...it,done:!!doneMap[it.cid],_src:'recur',_ref:it.cid,_mixId:'r:'+it.cid}))
-  ];
+  const tagged=todos.map((t,i)=>({...t,_i:i}));
   const filterFn=t=>!t.done&&(tsGroup==null||(t.timeSection||'none')===tsGroup);
-  const changed=reorderListItems(mixed,id,shift,filterFn,compareTodoOrder,t=>t._mixId,(t,order)=>{
-    if(t._src==='todo')todos[t._ref].sortOrder=order;
-    else{
-      const item=recurItems.find(it=>it.cid===t._ref);
-      if(item)item.sortOrder=order;
-    }
-  });
+  const changed=reorderListItems(tagged,idx,shift,filterFn,compareTodoOrder,t=>t._i,(t,order)=>{todos[t._i].sortOrder=order;});
   if(!changed)return;
   saveTodos(dk,todos);
-  saveRecurringItems(recurItems);
   renderTodos();
 }
 // 보관함 전체 목록 기준 순서 재기록(시간대 그룹 없음, 전체가 하나의 그룹)
@@ -6954,8 +6929,9 @@ function deleteTodoFromModal(){
   closeModal('todo-modal');
   restoreCalModeAndRender(modal,true);
 }
-// 반복 투두/일정 신규 등록 — 모달의 반복 설정(dataset)을 rule 객체로 조립해 recurring_items에 저장.
-// 일반 투두 저장(confirmTodo 본체)과 완전히 분리된 경로 — 연속일정/조각모드 등 기존 로직에 영향 없음.
+// 반복 투두/일정 규칙 등록 — 모달의 반복 설정(dataset)을 rule 객체로 조립해 recurring_items(원본 규칙)에 저장.
+// 실제 오늘 날짜에 나타나는 실체화는 여기서 하지 않음 — 등록 직후 restoreCalModeAndRender가 renderTodos()를
+// 호출하고, 그 안의 getTodos(dk)가 자동으로 오늘치를 실체화하므로 별도 처리가 필요 없음.
 function confirmRecurringTodo(text){
   const modal=document.getElementById('todo-modal');
   const type=modal.dataset.recurType;
@@ -7103,62 +7079,86 @@ function eventSheetDelete(){
   renderTodos();
   if(document.getElementById('monthly-cal'))renderCalendar();
 }
-// ── 반복 투두/일정 — 탭하면 시트(오늘만 수정/오늘만 삭제)를 열고, 원본 규칙(recurring_items)은 절대 건드리지 않음 ──
-let _recurSheetCid=null,_recurSheetDk=null;
-function openRecurringItemSheet(cid,dk,title){
-  _recurSheetCid=cid;_recurSheetDk=dk;
+// ── 반복으로 생성된 투두/일정 — 탭하면 시트(오늘만 수정/오늘만 삭제/이 반복 전체 삭제)를 염 ──
+// todoCid: 그날 실체화된 실제 todos 레코드의 cid(수정/삭제 대상). ruleCid: 원본 규칙(recurring_items)의 cid("전체 삭제" 대상).
+let _recurSheetTodoCid=null,_recurSheetRuleCid=null,_recurSheetDk=null;
+function openRecurringItemSheet(dk,todoCid,ruleCid,title){
+  _recurSheetTodoCid=todoCid;_recurSheetRuleCid=ruleCid;_recurSheetDk=dk;
   document.getElementById('recur-sheet-title').textContent=title||'';
   openSheet('recur-sheet');
 }
+// 오늘만 삭제 — 실체화된 그날 레코드를 지우고, 같은 규칙이 그날 다시 실체화되지 않도록 skip 기록을 남김.
 function recurSheetSkipToday(){
   closeSheet('recur-sheet');
-  if(!_recurSheetCid||!_recurSheetDk)return;
-  skipRecurringItemOn(_recurSheetCid,_recurSheetDk);
+  if(!_recurSheetTodoCid||!_recurSheetDk)return;
+  removeTodoByCid(_recurSheetDk,_recurSheetTodoCid);
+  addRecurSkip(_recurSheetRuleCid,_recurSheetDk);
   renderTodos();
   if(document.getElementById('monthly-cal'))renderCalendar();
 }
-// 원본 규칙(recurring_items) 자체를 완전히 삭제 — 이후 모든 날짜에서 이 반복이 더 이상 나타나지 않음.
-// 과거에 이미 지나간 날짜의 완료 기록(recur_done_*)이나 예외(recur_exc_*)는 그대로 남지만, 원본이 없으니
-// getRecurringItemsForDate가 애초에 걸러내지 않아 화면에 다시 노출될 일은 없음(죽은 데이터로만 남음, 무해).
-function recurSheetDeleteAll(){
+// 원본 규칙(recurring_items) 삭제 + "삭제를 실행한 그 날짜(기준일, 포함) 이후"로 이미 실체화된 레코드까지 함께 제거.
+// 기준일 이전(과거)엔 그대로 유지(일반 투두로 남음, 지우고 싶으면 직접 스와이프 삭제) — 확정된 정책.
+// 로컬은 할일이면 기준일 하루만(할일은 오늘 당일만 실체화되므로 미래분 자체가 없음), 일정이면 기준일부터
+// 최대 실체화 범위(+30일)까지 순회하며 지움. 서버 삭제는 각 날짜마다 개별 upload하지 않고 recur_rule_cid
+// 조건의 DELETE 쿼리 한 번으로 기준일 이후 전체를 정리 — 날짜 수만큼 네트워크 요청이 나가는 걸 피함.
+async function recurSheetDeleteAll(){
   closeSheet('recur-sheet');
-  if(!_recurSheetCid)return;
+  if(!_recurSheetRuleCid)return;
   const items=getRecurringItems();
-  const idx=items.findIndex(it=>it.cid===_recurSheetCid);
+  const idx=items.findIndex(it=>it.cid===_recurSheetRuleCid);
   if(idx<0)return;
-  addDelPending('recurring_items','global',_recurSheetCid);
+  const rule=items[idx];
+  const fromDk=_recurSheetDk||dateKey(new Date());
+  addDelPending('recurring_items','global',_recurSheetRuleCid);
   items.splice(idx,1);
   saveRecurringItems(items);
+  // 로컬 실체화분 제거(화면 즉시 반영용) — 할일은 오늘 하루뿐, 일정은 fromDk~+30일 순회. 서버 업로드는 안 함(아래서 DELETE로 일괄 처리).
+  const scanDays=rule.isEvent?RECUR_EVENT_PREVIEW_DAYS:0;
+  const base=new Date(fromDk+'T00:00:00');
+  for(let i=0;i<=scanDays;i++){
+    const d=new Date(base);d.setDate(base.getDate()+i);
+    const dk=dateKey(d);
+    const todos=getTodos.raw(dk);
+    const filtered=todos.filter(t=>t.recurRuleCid!==_recurSheetRuleCid);
+    if(filtered.length!==todos.length)saveTodos.raw(dk,filtered);
+  }
+  // 서버 쪽 기준일 이후 전체 정리 — 로컬에 없던(다른 기기에서 만들어진) 실체화분까지 이 한 번으로 포함됨.
+  if(navigator.onLine){
+    await supaFetch(`todos?recur_rule_cid=eq.${encodeURIComponent(_recurSheetRuleCid)}&date_key=gte.${fromDk}`,'DELETE');
+  }
   renderTodos();
   if(document.getElementById('monthly-cal'))renderCalendar();
 }
+// 오늘만 내용 수정 — 실체화된 그 todos 레코드의 text를 직접 고침(일반 투두 수정과 완전히 동일한 대상).
+// 원본 규칙(rule.text)은 건드리지 않으므로 다른 날짜/미래 실체화엔 영향 없음.
 function recurSheetEditTextToday(){
   closeSheet('recur-sheet');
-  if(!_recurSheetCid||!_recurSheetDk)return;
-  const items=getRecurringItems();
-  const item=items.find(it=>it.cid===_recurSheetCid);
-  const exc=getRecurringExceptions(_recurSheetDk);
-  const curText=exc[_recurSheetCid]?.status==='edited'?exc[_recurSheetCid].text:(item?.text||'');
-  document.getElementById('recur-edit-text-inp').value=curText;
+  if(!_recurSheetTodoCid||!_recurSheetDk)return;
+  const todos=getTodos(_recurSheetDk);
+  const item=todos.find(t=>t.cid===_recurSheetTodoCid);
+  document.getElementById('recur-edit-text-inp').value=item?.text||'';
   openModal('recur-edit-text-modal');
   setTimeout(()=>document.getElementById('recur-edit-text-inp').focus(),100);
 }
 function confirmRecurEditText(){
   const text=document.getElementById('recur-edit-text-inp').value.trim();
-  if(!text||!_recurSheetCid||!_recurSheetDk)return;
-  editRecurringItemTextOn(_recurSheetCid,_recurSheetDk,text);
+  if(!text||!_recurSheetTodoCid||!_recurSheetDk)return;
+  const todos=getTodos(_recurSheetDk);
+  const item=todos.find(t=>t.cid===_recurSheetTodoCid);
+  if(item){item.text=text;saveTodos(_recurSheetDk,todos);}
   closeModal('recur-edit-text-modal');
   renderTodos();
   if(document.getElementById('monthly-cal'))renderCalendar();
 }
-// 반복 투두 항목의 탭 상호작용 — 기존 스와이프(복사/조각모드)와 무관하게 단순 탭으로 시트를 염(반복 항목은 조각모드/복사 대상 아님).
-function attachRecurringTodoSwipeMode(el,cid,dk){
+// 반복으로 생성된 투두 항목의 탭 상호작용 — 기존 스와이프(복사/조각모드)와 무관하게 단순 탭으로 시트를 염(조각모드/복사 대상 아님).
+function attachRecurringTodoSwipeMode(el,idx,dk,ruleCid){
   const textEl=el.querySelector('.todo-txt');
   if(!textEl)return;
   textEl.style.cursor='pointer';
   textEl.addEventListener('click',()=>{
-    const item=getRecurringItems().find(it=>it.cid===cid);
-    openRecurringItemSheet(cid,dk,item?.text||'');
+    const todos=getTodos(dk);
+    const item=todos[idx];
+    openRecurringItemSheet(dk,item?.cid,ruleCid,item?.text||'');
   });
 }
 function todoSheetToReserve(){
@@ -9376,10 +9376,9 @@ function renderCalendar(){
     const todos=getTodos(dk);
     if(getMemos(dk).length>0||todos.some(t=>t.done)||getSleep(dk).sleep)hasRecord[d]=true;
     // 하루짜리 일정만 배지 대상(연속일정은 eventEndDate가 있으므로 여기서 제외 — 아래 bar로 별도 렌더)
-    // 반복 일정도 여기 배지에 함께 포함 — 반복은 항상 "하루짜리" 성격(eventEndDate 없음)이라 bar 쪽엔 관여 안 함.
+    // 반복으로 생성된 일정도 getTodos(dk)가 이미 실체화해서 포함하고 있으므로 별도 조회 없이 자연히 함께 잡힘.
     // 같은 날 여러 일정이 있으면 시간순으로 표기(시간 있는 일정 먼저, 없는 일정은 뒤로)
-    const recurEvs=getRecurringEventsForDate(dk);
-    const evs=[...todos.filter(t=>t.isEvent&&!t.eventEndDate),...recurEvs].sort((a,b)=>{
+    const evs=todos.filter(t=>t.isEvent&&!t.eventEndDate).sort((a,b)=>{
       if(!!a.eventTime!==!!b.eventTime)return a.eventTime?-1:1;
       if(a.eventTime&&b.eventTime)return a.eventTime.localeCompare(b.eventTime);
       return 0;
@@ -9452,8 +9451,8 @@ function renderCalendar(){
       evsShown.forEach(ev=>{
         const ec=getEventCat(ev.eventCat);
         const title=parseTodoTextParts(ev.text).parts[0]||ev.text;
-        const clickFn=ev._isRecur
-          ?`openRecurringItemSheet('${ev.cid}','${y}-${pad(mo+1)}-${pad(d)}','${title.replace(/'/g,"\\'")}')`
+        const clickFn=ev.recurRuleCid
+          ?`openRecurringItemSheet('${y}-${pad(mo+1)}-${pad(d)}','${ev.cid}','${ev.recurRuleCid}','${title.replace(/'/g,"\\'")}')`
           :`openEventSheet('${y}-${pad(mo+1)}-${pad(d)}','${ev.cid}','${title.replace(/'/g,"\\'")}')`;
         badges+=`<div class="cal-event-badge ev-${ev.eventCat||'etc'}" title="${ec.label}: ${title}" onclick="event.stopPropagation();${clickFn};">${title}</div>`;
       });
