@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.35-recur-local-cleanup';
+const CACHE = 'iikoto-v2.36-recur-dedupe-guard';
 const ASSETS = [
   './',
   './index.html'

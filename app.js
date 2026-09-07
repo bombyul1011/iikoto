@@ -2507,6 +2507,13 @@ function _recurMaterializeAllowed(rule,dk){
 // 세션 내 이미 확인 끝난 dk는 _materializedDkCache에 표시해두고 재확인을 건너뜀 — 월간캘린더처럼 같은 달을
 // 반복해서 다시 그릴 때(달 넘겼다 되돌아오기 등) 매번 규칙 전체를 훑는 낭비를 막기 위함. 새 규칙을
 // 등록/삭제한 직후(saveRecurringItems)에는 캐시를 비워 다음 조회 때 다시 확인하게 함.
+// 주의: saveTodos.raw(=saveTodos)는 autoSync를 통해 syncTodosUp을 부르고, syncTodosUp 내부가 다시
+// getTodos(dk)를 호출하는 재진입 경로가 있음 — 이 재진입 자체는 캐시로 막히지만, 등록 직후 캐시가 비워진
+// 좁은 틈에 다른 화면(캘린더 등)이 거의 동시에 같은 dk를 조회하면 같은 규칙이 두 번 push될 여지가
+// 이론상 있었고, 실사용에서 실제로 발생함(2026-09-07). 저장 직전에 디스크의 최신 값을 다시 읽어 규칙cid
+// 기준으로 병합·중복 제거한 뒤 저장하는 안전망을 추가함.
+// getTodos(dk)를 부르는 사이 다른 화면(캘린더 등)이 실체화 직후에 함께 재진입될 수 있어, 저장 직전에도
+// 별도의 dedupe 안전망(아래)을 갖췄지만, 그와 별개로 이미 확인 끝난 날짜는 재확인 자체를 건너뛰는 캐시.
 const _materializedDkCache=new Set();
 function _materializeRecurringForDate(dk){
   if(_materializedDkCache.has(dk))return false;
@@ -2521,6 +2528,7 @@ function _materializeRecurringForDate(dk){
     if(already.has(rule.cid)||skips.has(rule.cid))return;
     if(!_recurMaterializeAllowed(rule,dk))return;
     if(!_isRecurringDueOn(rule,dk))return;
+    already.add(rule.cid);
     todos.push({
       cid:rule.cid+'_'+dk,text:rule.text,isEvent:!!rule.isEvent,eventCat:rule.eventCat||null,
       eventTime:rule.eventTime||null,timeSection:rule.isEvent?null:(rule.timeSection||'none'),
@@ -2528,7 +2536,20 @@ function _materializeRecurringForDate(dk){
     });
     changed=true;
   });
-  if(changed)saveTodos.raw(dk,todos);
+  if(!changed)return false;
+  // 저장 직전 최종 안전망 — 디스크의 최신 값을 다시 읽어, 이 함수가 새로 만든 항목 중 이미 최신본에
+  // 같은 규칙cid로 존재하는 게 있으면 빼고 합침. 그 뒤 규칙cid별로 최초 1개만 남기는 dedupe까지 적용.
+  const latest=getTodos.raw(dk);
+  const latestRuleCids=new Set(latest.filter(t=>t.recurRuleCid).map(t=>t.recurRuleCid));
+  const seenCids=new Set();
+  const merged=[...latest,...todos.filter(t=>t.recurRuleCid&&!latestRuleCids.has(t.recurRuleCid))]
+    .filter(t=>{
+      if(!t.recurRuleCid)return true;
+      if(seenCids.has(t.recurRuleCid))return false;
+      seenCids.add(t.recurRuleCid);
+      return true;
+    });
+  saveTodos.raw(dk,merged);
   return changed;
 }
 // getTodos는 호출될 때마다 그날 실체화가 필요한 반복 항목이 있는지 먼저 확인해 반영한 뒤 반환한다.
@@ -3016,9 +3037,18 @@ async function syncTodosDown(dk){
   const rows=await supaFetch('todos?date_key=eq.'+dk+'&order=created');
   if(!rows)return; // 연결 실패(null) — 로컬 유지. 빈 배열은 "서버에 진짜 0개"라는 뜻이라 그대로 반영.
   if(S.get(S.key('todos_pending',dk)))return; // 업로드 대기중인 로컬 수정(미루기 등) 있으면 덮어쓰지 않음
-  S.set(S.key('todos',dk),rows.map(function(r){
+  const mapped=rows.map(function(r){
     return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null,eventEndDate:r.event_end_date||null,cat:r.cat||'todo',pinned:!!r.pinned,recurRuleCid:r.recur_rule_cid||undefined};
-  }));
+  });
+  // 반복 규칙cid가 같은 row가 두 개 이상 섞여 있으면(과거 경합으로 생긴 서버측 중복 등) 먼저 만들어진 것만 남김 — 방어적 dedupe.
+  const seenRuleCids=new Set();
+  const deduped=mapped.filter(t=>{
+    if(!t.recurRuleCid)return true;
+    if(seenRuleCids.has(t.recurRuleCid))return false;
+    seenRuleCids.add(t.recurRuleCid);
+    return true;
+  });
+  S.set(S.key('todos',dk),deduped);
   renderTodos();
 }
 async function syncTodosUp(dk){
@@ -6977,8 +7007,12 @@ function deleteTodoFromModal(){
 // 호출하고, 그 안의 getTodos(dk)가 자동으로 오늘치를 실체화하므로 별도 처리가 필요 없음.
 function confirmRecurringTodo(text){
   const modal=document.getElementById('todo-modal');
-  const type=modal.dataset.recurType;
   const isEvent=modal.dataset.kind==='event';
+  // 시간표(맨 앞 "HH:MM ") 형식 텍스트는 반복 대상이 될 수 없음 — 시간표는 인덱스 기반 파싱 구조라 cid로
+  // 실체화하는 반복 구조와 근본적으로 안 맞음(성립 시 두 시스템이 같은 todos 레코드를 서로 다른 방식으로
+  // 다루며 충돌). 등록 시점에 미리 막아 애초에 이런 데이터가 안 생기게 함.
+  if(!isEvent&&SCHEDULE_TIME_RE.test(text)){showToast('시간표 형식(HH:MM)은 반복 등록을 지원하지 않아요');return;}
+  const type=modal.dataset.recurType;
   const timeSection=modal.dataset.timeSection||'none';
   const eventCat=isEvent?(modal.dataset.eventCat||'schedule'):null;
   const eventTime=isEvent?(document.getElementById('todo-event-time-inp').dataset.value||null):null;
