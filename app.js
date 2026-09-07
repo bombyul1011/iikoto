@@ -2470,14 +2470,16 @@ function _isRecurringDueOn(item,dk){
   return false;
 }
 // 반복 실체화를 어느 날짜(dk)까지 허용할지 규칙별로 판정.
-// 할일 규칙은 "오늘 그 자체"일 때만(dk===오늘) — 미리 넘겨봐도 실체화되지 않고, 실제 그날이 와야 생김.
-// 일정 규칙은 캘린더가 미리 보는 용도라 오늘~+30일 범위까지는 미리 실체화를 허용(월간캘린더 다음 달 조회 대응).
+// 둘 다 "오늘 그 날짜를 조회하는 순간 실체화"라는 동일한 원리를 쓰되, 미리보기 허용 범위(오늘+N일)만 다름:
+// 할일은 오늘탭 날짜 네비게이터가 최대 +7일까지만 열리므로 그에 맞춤. 일정은 월간캘린더가 한 화면에 한 달을
+// 통째로 보여주는 용도라 +30일(대략 한 달)까지 미리 실체화를 허용해 캘린더에서 바로 보이게 함.
+const RECUR_TODO_PREVIEW_DAYS=7;
 const RECUR_EVENT_PREVIEW_DAYS=30;
 function _recurMaterializeAllowed(rule,dk){
   const todayDk=dateKey(new Date());
-  if(!rule.isEvent)return dk===todayDk;
   if(dk<todayDk)return false;
-  const limit=new Date();limit.setDate(limit.getDate()+RECUR_EVENT_PREVIEW_DAYS);
+  const days=rule.isEvent?RECUR_EVENT_PREVIEW_DAYS:RECUR_TODO_PREVIEW_DAYS;
+  const limit=new Date();limit.setDate(limit.getDate()+days);
   return dk<=dateKey(limit);
 }
 // 그날(dk) 아직 실체화 안 된 반복 규칙들을 찾아 todos에 실제 레코드로 추가 — getTodos(dk) 호출 시마다 실행되지만,
@@ -7098,9 +7100,9 @@ function recurSheetSkipToday(){
 }
 // 원본 규칙(recurring_items) 삭제 + "삭제를 실행한 그 날짜(기준일, 포함) 이후"로 이미 실체화된 레코드까지 함께 제거.
 // 기준일 이전(과거)엔 그대로 유지(일반 투두로 남음, 지우고 싶으면 직접 스와이프 삭제) — 확정된 정책.
-// 로컬은 할일이면 기준일 하루만(할일은 오늘 당일만 실체화되므로 미래분 자체가 없음), 일정이면 기준일부터
-// 최대 실체화 범위(+30일)까지 순회하며 지움. 서버 삭제는 각 날짜마다 개별 upload하지 않고 recur_rule_cid
-// 조건의 DELETE 쿼리 한 번으로 기준일 이후 전체를 정리 — 날짜 수만큼 네트워크 요청이 나가는 걸 피함.
+// 로컬은 기준일부터 각 규칙 종류의 미리보기 범위(할일 +7일/일정 +30일)까지 순회하며 지움. 서버 삭제는
+// 각 날짜마다 개별 upload하지 않고 recur_rule_cid 조건의 DELETE 쿼리 한 번으로 기준일 이후 전체를 정리
+// — 날짜 수만큼 네트워크 요청이 나가는 걸 피함.
 async function recurSheetDeleteAll(){
   closeSheet('recur-sheet');
   if(!_recurSheetRuleCid)return;
@@ -7112,8 +7114,8 @@ async function recurSheetDeleteAll(){
   addDelPending('recurring_items','global',_recurSheetRuleCid);
   items.splice(idx,1);
   saveRecurringItems(items);
-  // 로컬 실체화분 제거(화면 즉시 반영용) — 할일은 오늘 하루뿐, 일정은 fromDk~+30일 순회. 서버 업로드는 안 함(아래서 DELETE로 일괄 처리).
-  const scanDays=rule.isEvent?RECUR_EVENT_PREVIEW_DAYS:0;
+  // 로컬 실체화분 제거(화면 즉시 반영용) — fromDk부터 그 규칙의 미리보기 범위까지 순회. 서버 업로드는 안 함(아래서 DELETE로 일괄 처리).
+  const scanDays=rule.isEvent?RECUR_EVENT_PREVIEW_DAYS:RECUR_TODO_PREVIEW_DAYS;
   const base=new Date(fromDk+'T00:00:00');
   for(let i=0;i<=scanDays;i++){
     const d=new Date(base);d.setDate(base.getDate()+i);
