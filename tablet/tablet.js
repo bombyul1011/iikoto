@@ -467,11 +467,26 @@ function switchTab(tab){
   // 오늘탭으로 돌아올 때는 논리적 오늘 날짜로 재설정(04시 이전엔 자정을 넘겨도 전날 유지)
   if(tab==='today'){_selectedDate=logicalTodayDate();loadTimelineTab();}
   else if(tab==='week'){
-    // 주간탭은 카드 수가 많아 비동기 로드 완료 후 DOM이 여러 단계로 커지며
-    // 위에서 미리 걸어둔 scrollTop=0이 밀리는 현상이 있어, 로드 완료 후 한 번 더 보정한다(2026-09-06).
+    // 주간탭은 카드 수가 많아 loadWeekTab() 완료(=innerHTML 삽입) 시점에도 사진/책표지 등 <img>가
+    // 아직 로딩 중이라, 그 로드가 끝나며 요소 높이가 늘어나 scrollTop=0 보정 이후에도 스크롤이 다시 밀리는
+    // 현상이 있었다(2026-09-06 1차 보정으론 불충분). tab-week 안의 모든 img가 로드/에러로 완전히 끝날
+    // 때까지 기다린 뒤 마지막으로 한 번 더 보정한다(2026-09-07).
     loadWeekTab().then(()=>{
-      document.getElementById('tab-week').scrollTop=0;
+      const weekEl=document.getElementById('tab-week');
+      weekEl.scrollTop=0;
       if(mainWrap)mainWrap.scrollTop=0;
+      const imgs=Array.from(weekEl.querySelectorAll('img'));
+      const pending=imgs.filter(img=>!img.complete);
+      if(!pending.length)return;
+      Promise.all(pending.map(img=>new Promise(res=>{
+        img.addEventListener('load',res,{once:true});
+        img.addEventListener('error',res,{once:true});
+      }))).then(()=>{
+        // 로딩 중 다른 탭으로 이미 이동했다면 되돌리지 않음
+        if(_currentTab!=='week')return;
+        weekEl.scrollTop=0;
+        if(mainWrap)mainWrap.scrollTop=0;
+      });
     }).catch(()=>{});
   }
   else if(tab==='month'){loadMonthTab();initCgridHeightSync();}
@@ -1635,8 +1650,10 @@ function renderWeekPhotos(rows,weekDates){
   const cells=weekDates.map((dk,i)=>({dk,dow:WC_DOW[i],m:byDate[dk]}));
   el.innerHTML=`<div class="wk-photo-grid">${cells.map(c=>{
     if(!c.m)return `<div class="wk-photo-cell wk-photo-cell-empty"><span class="wk-photo-cell-dow">${c.dow}</span></div>`;
-    const txt=escapeHtml(c.m.text||'');
-    return `<div class="wk-photo-cell" onclick="openPhotoViewerArchive('${c.m.photo_url}','${txt.replace(/'/g,"\\'")}','${c.dk}','${c.m.memo_time||''}')"><div class="wk-photo-thumb-ph"><i class="ti ti-photo" aria-hidden="true"></i></div><img src="${c.m.photo_url}" alt="" loading="lazy" onload="this.classList.add('loaded');this.previousElementSibling.classList.add('hide');" onerror="this.previousElementSibling.classList.add('hide');"><span class="wk-photo-cell-dow">${c.dow}</span></div>`;
+    // 텍스트에 줄바꿈이 섞여 있으면 onclick 속성 문자열이 중간에 끊겨 SyntaxError(Unexpected EOF)가 나므로 함께 이스케이프.
+    const txt=escapeHtml(c.m.text||'').replace(/'/g,"\\'").replace(/\r?\n/g,' ');
+    const photoUrl=(c.m.photo_url||'').replace(/'/g,"\\'");
+    return `<div class="wk-photo-cell" onclick="openPhotoViewerArchive('${photoUrl}','${txt}','${c.dk}','${c.m.memo_time||''}')"><div class="wk-photo-thumb-ph"><i class="ti ti-photo" aria-hidden="true"></i></div><img src="${c.m.photo_url}" alt="" loading="lazy" onload="this.classList.add('loaded');this.previousElementSibling.classList.add('hide');" onerror="this.previousElementSibling.classList.add('hide');"><span class="wk-photo-cell-dow">${c.dow}</span></div>`;
   }).join('')}</div>`;
 }
 
@@ -5916,6 +5933,20 @@ function _tlRhythmCatDurations(rblocks){
   });
   return dur;
 }
+// 카테고리 안에서 세부 텍스트별 시간을 합산해, 오늘 그 카테고리를 대표하는 텍스트(가장 오래 쓴 것) 1개를 뽑음.
+// "책상 시간이 길어요"보다 "개인작업 시간이 길어요"처럼 실제 활동명으로 안내하기 위한 용도 — 텍스트가 없으면 null(카테고리명 폴백).
+function _tlDominantTextInCat(rblocks,cat){
+  const dur={};
+  (rblocks||[]).forEach(b=>{
+    if(b.cat!==cat||!b.start_time||!b.end_time||!b.text)return;
+    const sv=b.start_time.split(':').map(Number),ev=b.end_time.split(':').map(Number);
+    let m=(ev[0]*60+ev[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;
+    dur[b.text]=(dur[b.text]||0)+m;
+  });
+  let best=null,bestMin=0;
+  Object.entries(dur).forEach(([t,m])=>{if(m>bestMin){bestMin=m;best=t;}});
+  return best;
+}
 async function renderTimelineCompareCard(dk,todayTodos,todaySleep,todayRblocks,todayHabits,todayHabitChecks){
   const el=document.getElementById('tl-compare');
   if(!el)return;
@@ -6001,10 +6032,12 @@ async function renderTimelineCompareCard(dk,todayTodos,todaySleep,todayRblocks,t
     if(marginAvg>=20&&marginAvg>bestCatAvgScore){bestCatAvgScore=marginAvg;bestCatAvg=cat;}
   }
   if(bestCatY){
-    candidatesYesterday.push({score:bestCatYScore,icon:'ti-flame',text:`어제보다 ${TL_COMPARE_CAT_PHRASE[bestCatY]} 시간이 길어요`});
+    const label=_tlDominantTextInCat(todayRblocks,bestCatY)||TL_COMPARE_CAT_PHRASE[bestCatY];
+    candidatesYesterday.push({score:bestCatYScore,icon:'ti-flame',text:`어제보다 ${label} 시간이 길어요`});
   }
   if(bestCatAvg){
-    candidatesAvg.push({score:bestCatAvgScore,icon:'ti-flame',text:`${dowLabel} 평균보다 ${TL_COMPARE_CAT_PHRASE[bestCatAvg]} 시간이 길어요`});
+    const label=_tlDominantTextInCat(todayRblocks,bestCatAvg)||TL_COMPARE_CAT_PHRASE[bestCatAvg];
+    candidatesAvg.push({score:bestCatAvgScore,icon:'ti-flame',text:`${dowLabel} 평균보다 ${label} 시간이 길어요`});
   }
 
   // ④ 습관 — 어제 대비 / 같은요일 평균 대비 각각 판단
