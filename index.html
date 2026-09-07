@@ -444,31 +444,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .weekly-review-banner-title{font-size:var(--main-text-size);font-weight:700;color:rgba(65,125,70,0.95);letter-spacing:0.05em;margin-bottom:4px;}
 .weekly-review-banner-sub{font-size:var(--dow-label-size);color:rgba(100,140,75,0.80);display:flex;align-items:center;justify-content:space-between;}
 @keyframes bannerShine{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
-/* ── TIME SLOT POPUP (시간대 리마인더 팝업) ── */
-.tsp-overlay{display:none;position:fixed;inset:0;z-index:9999;background:rgba(30,20,20,0.18);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);align-items:center;justify-content:center;}
-.tsp-overlay.on{display:flex;}
-.tsp-box{
-  width:250px;padding:26px 22px 22px;border-radius:20px;text-align:center;
-  background-color:transparent;border:1.6px solid transparent;
-  background-image:var(--modal),linear-gradient(135deg,rgba(245,210,140,0.95),rgba(250,225,170,0.85),rgba(232,164,187,0.85),rgba(245,210,140,0.95));
-  background-origin:border-box;background-clip:padding-box,border-box;
-  background-size:100% 100%,300% 300%;
-  animation:bannerShine 4s ease infinite;
-  box-shadow:0 12px 32px rgba(90,64,64,.16);
-}
-[data-theme="glass"] .tsp-box{background-image:var(--modal),linear-gradient(135deg,rgba(245,210,140,0.95),rgba(250,225,170,0.85),rgba(232,164,187,0.85),rgba(245,210,140,0.95));}
-.tsp-slot{font-size:var(--dow-label-size);letter-spacing:.16em;text-transform:uppercase;color:var(--pal-pink-text);margin-bottom:10px;}
-.tsp-msg{font-family:'Bareonbatang',serif;font-size:16px;line-height:1.65;color:var(--tp);font-weight:400;}
-.tsp-sub{font-size:var(--dow-label-size);color:var(--tm);margin-top:10px;}
-.tsp-todo-list{margin-top:16px;border-top:1px solid rgba(var(--divider-rgb),0.25);padding-top:14px;text-align:left;display:flex;flex-direction:column;gap:8px;}
-.tsp-todo-item{display:flex;align-items:center;gap:8px;font-size:var(--dow-label-size);color:var(--ts);}
-.tsp-todo-dot{width:5px;height:5px;border-radius:50%;background:var(--pal-pink-text);flex-shrink:0;}
-.tsp-todo-more{font-size:var(--dow-label-size);color:var(--tm);padding-left:13px;}
-.tsp-btn{margin-top:16px;width:100%;padding:10px;border-radius:12px;border:none;background:var(--pal-pink-bg);color:var(--pal-pink-text);font-family:'DM Sans',sans-serif;font-size:var(--dow-label-size);font-weight:500;cursor:pointer;}
-.tsp-seed-wrap{margin-top:16px;display:flex;align-items:center;gap:6px;border-top:1px solid rgba(var(--divider-rgb),0.25);padding-top:14px;}
-.tsp-seed-inp{flex:1;background:none;border:none;border-bottom:1px dashed rgba(var(--divider-rgb),0.38);outline:none;font-size:var(--dow-label-size);color:var(--tp);padding:4px 2px;font-family:'DM Sans',sans-serif;}
-.tsp-seed-inp::placeholder{color:var(--tm);}
-.tsp-seed-submit{width:26px;height:26px;border-radius:50%;background:var(--pal-pink-bg);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--pal-pink-text);font-size:13px;cursor:pointer;flex-shrink:0;}
 .todo-time-sel{display:flex;gap:6px;margin:10px 0 4px;}
 .todo-time-sel button{flex:1;padding:6px 0;border-radius:10px;border:1px solid var(--inp-b);background:var(--inp);font-size:var(--dow-label-size);color:var(--tm);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;}
 #reserve-date-modal .ts-morning,
@@ -2068,6 +2043,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <button class="ts-night" onclick="selectTodoTime('night',this)">저녁</button>
       <button class="ts-none active" onclick="selectTodoTime('none',this)">지정없음</button>
     </div>
+    <div class="todo-event-time-row" id="todo-alert-time-row">
+      <i class="ti ti-bell ico-sz-13" aria-hidden="true" onclick="openAlertTimePicker()" style="cursor:pointer;"></i>
+      <span class="todo-event-time-inp" id="todo-alert-time-inp" data-value="" onclick="openAlertTimePicker()" style="cursor:pointer;">알림 없음</span>
+      <span class="todo-event-time-clear" id="todo-alert-time-clear" onclick="event.stopPropagation();clearTodoAlertTime()" title="알림 지우기" style="display:none;">✕</span>
+    </div>
     <!-- 아이콘은 EVENT_CATS(JS)와 이 4개 버튼 두 곳에 각각 하드코딩됨 — 아이콘 변경 시 반드시 둘 다 수정. 색상은 CSS 변수(--ev-*)로 단일화되어 여기 손댈 필요 없음. -->
     <div class="todo-event-sel" id="todo-event-sel" style="display:none;">
       <button class="ev-schedule active" onclick="selectTodoEventCat('schedule',this)"><i class="ti ti-confetti ico-sz-13" aria-hidden="true"></i> 약속</button>
@@ -2427,9 +2407,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   </div>
 </div>
 <!-- TIME SLOT POPUP (시간대 리마인더 팝업) -->
-<div class="tsp-overlay" id="tsp-overlay" onclick="if(event.target===this)closeTimeSlotPopup();">
-  <div class="tsp-box" id="tsp-box"></div>
-</div>
 
 </div></div>
 
