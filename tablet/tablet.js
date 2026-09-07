@@ -903,7 +903,8 @@ function renderTodoPartsRow(t){
   const chkHtml=(!allDone&&!t.done&&t.pinned)
     ?`<div class="pinned-ico"><i class="ti ti-bolt-filled" aria-hidden="true"></i></div>`
     :`<div class="chk ts-${ts}${allDone||t.done?' on':''}"></div>`;
-  return `<div class="todo-row-parts${allDone||t.done?' done':''}">${chkHtml}<div class="todo-parts-body"><span class="todo-parts-scope">${escapeHtml(parsed.scope)} &gt;</span>${partsHtml}</div></div>`;
+  const recurIconHtml=t.recur_rule_cid?'<i class="ti ti-repeat" style="font-size:11px;color:var(--tm);flex-shrink:0;margin-left:auto;" aria-hidden="true" title="반복"></i>':'';
+  return `<div class="todo-row-parts${allDone||t.done?' done':''}">${chkHtml}<div class="todo-parts-body"><span class="todo-parts-scope">${escapeHtml(parsed.scope)} &gt;</span>${partsHtml}</div>${recurIconHtml}</div>`;
 }
 
 // ── 사진메모 뷰어(조회 전용) — 본앱 openPhotoViewer와 동일 톤(폴라로이드), 아카이브는 삭제/스와이프 없이 보기만 ──
@@ -6052,7 +6053,8 @@ function renderTimelineTodos(todos){
     const chkHtml=(!t.done&&t.pinned)
       ?`<div class="pinned-ico"><i class="ti ti-bolt-filled" aria-hidden="true"></i></div>`
       :`<div class="chk ts-${ts}${t.done?' on':''}"></div>`;
-    return `<div class="todo-row${t.done?' done':''}">${chkHtml}${escapeHtml(t.text)}</div>`;
+    const recurIconHtml=t.recur_rule_cid?'<i class="ti ti-repeat" style="font-size:11px;color:var(--tm);flex-shrink:0;margin-left:auto;" aria-hidden="true" title="반복"></i>':'';
+    return `<div class="todo-row${t.done?' done':''}">${chkHtml}${escapeHtml(t.text)}${recurIconHtml}</div>`;
   }).join(''):'<div class="empty-msg">오늘 할 일이 없어요</div>';
 }
 
@@ -6091,7 +6093,8 @@ function renderTimelineEventsAndSchedule(todos){
         const m=e.event_time.match(/^(\d{1,2}):(\d{2})/);
         if(m){const evMin=parseInt(m[1],10)*60+parseInt(m[2],10);isPast=nowMin>=evMin+60;}
       }
-      return `<div class="event-row${isPast?' past':''}"><span class="event-time">${e.event_time||''}</span>${escapeHtml(e.text)}</div>`;
+      const recurIconHtml=e.recur_rule_cid?'<i class="ti ti-repeat" style="font-size:11px;color:var(--tm);flex-shrink:0;margin-right:2px;" aria-hidden="true" title="반복"></i>':'';
+      return `<div class="event-row${isPast?' past':''}">${recurIconHtml}<span class="event-time">${e.event_time||''}</span>${escapeHtml(e.text)}</div>`;
     }).join(''):'<div class="empty-msg">오늘 일정이 없어요</div>';
   }
 
