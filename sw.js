@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.44-todos-upload-dedupe';
+const CACHE = 'iikoto-v2.45-todosup-reentrant-lock';
 const ASSETS = [
   './',
   './index.html'

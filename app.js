@@ -3089,7 +3089,22 @@ async function syncTodosDown(dk){
   S.set(S.key('todos',dk),deduped);
   renderTodos();
 }
+// 같은 dk에 대한 업로드가 동시에(재진입) 실행되는 것을 막는 락 — saveTodos의 즉시 업로드(autoSync)와
+// 탭 전환/주기 동기화(syncAll)가 같은 dk를 거의 동시에 올리면, 두 개의 upsert 요청이 겹쳐 서버가
+// "ON CONFLICT DO UPDATE cannot affect row a second time"로 거부하는 경합이 있었음(2026-09-07 확인).
+// 이미 진행 중인 업로드가 있으면 새로 시작하지 않고 그 결과를 그대로 기다렸다가 반환한다.
+const _syncingTodosUpDk=new Map();
 async function syncTodosUp(dk){
+  if(_syncingTodosUpDk.has(dk))return _syncingTodosUpDk.get(dk);
+  const p=_syncTodosUpInner(dk);
+  _syncingTodosUpDk.set(dk,p);
+  try{
+    return await p;
+  }finally{
+    _syncingTodosUpDk.delete(dk);
+  }
+}
+async function _syncTodosUpInner(dk){
   const todos=getTodos(dk);
   if(ensureItemCids(todos))S.set(S.key('todos',dk),todos);
   // 업로드 직전 cid 기준 dedupe 안전망 — 서버가 "ON CONFLICT DO UPDATE cannot affect row a second time"로
