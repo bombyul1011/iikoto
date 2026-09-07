@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.39-recur-click-unify';
+const CACHE = 'iikoto-v2.40-recur-partmode-allow';
 const ASSETS = [
   './',
   './index.html'

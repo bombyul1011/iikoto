@@ -4591,9 +4591,10 @@ function renderTodos(){
     attachTodoItemClick(el,i,t.cid||'');
     if(rmEligible){
       attachTodoReorderDrag(el,i,ts);
-    }else if(!t.recurRuleCid&&!_todoReorderMode){
-      // 반복 투두는 조각모드/스와이프 복사 대상이 아니므로 attachTodoSwipeMode는 일반 투두에만 붙인다.
-      attachTodoSwipeMode(el,i,hasMultipleParts);
+    }else if(!_todoReorderMode){
+      // 반복 항목도 조각모드(취소선 토글)는 일반 투두와 동일하게 지원 — attachTodoSwipeMode 내부에서
+      // isRecurring 여부에 따라 "내일도 복사"만 별도로 막는다(중복 생성 방지, 토스트 안내로 처리).
+      attachTodoSwipeMode(el,i,hasMultipleParts,!!t.recurRuleCid);
     }
     list.appendChild(el);
   });
@@ -4742,11 +4743,10 @@ function renderEventList(dk,todos){
   // 오늘 실제 날짜(자정 기준)일 때만 '완료(지남)' 판정 적용 — 다른 날짜(과거/미래 조회)엔 적용 안 함
   const nowMinToday=_nowMinIfToday(dk);
   const isPast=(ev)=>{
-    if(ev.recurRuleCid)return false; // 반복 일정은 "완료로 지나감" 개념 없이 항상 표시
     if(nowMinToday==null||!ev.eventTime||ev.eventEndDate)return false;
     const evMin=_parseHHMM(ev.eventTime);
     if(evMin==null)return false;
-    return nowMinToday>=evMin+60; // 지정 시간 +60분 지나면 '완료'로 간주
+    return nowMinToday>=evMin+60; // 지정 시간 +60분 지나면 '완료'로 간주 — 반복이든 아니든 오늘 실체화된 레코드는 동일하게 적용
   };
   // 정렬: 미완료 먼저(시간 있는 하루짜리 → 연속일정(며칠차 오름차순) → 시간 없는 하루짜리), 완료(지난 시간)는 맨 뒤로 밀림
   const sorted=[...all].sort((a,b)=>{
@@ -5007,9 +5007,12 @@ function confirmCopyUnstruckParts(){
   renderTodos();
 }
 // 왼쪽 스와이프(터치 및 PC 마우스 드래그 모두 지원)
-// - 구분자(,/)가 있는 항목: 조각 선택 모드 진입/해제
-// - 구분자 없는 단일 항목: 항목 전체를 내일로 복사(오늘 항목은 유지, "오늘도 내일도 해야 하는 일" 용도)
-function attachTodoSwipeMode(el,i,hasMultipleParts){
+// - 구분자(,/)가 있는 항목: 조각 선택 모드 진입/해제 (반복 항목도 동일하게 지원 — 조각 완료 상태는
+//   실체화된 그 날짜의 레코드에만 저장되고, 다른 날짜 실체는 규칙 텍스트로 매번 새로 만들어지므로
+//   서로 영향을 주지 않음. 즉 조각 기능 관점에서 반복 항목과 일반 항목은 완전히 동일하게 다뤄도 됨.)
+// - 구분자 없는 단일 항목: 항목 전체를 내일로 복사(오늘 항목은 유지, "오늘도 내일도 해야 하는 일" 용도) —
+//   단, 반복 항목은 내일 몫이 이미 규칙에 따라 자동 생성되므로 이 복사 동작만 제외한다.
+function attachTodoSwipeMode(el,i,hasMultipleParts,isRecurring){
   let sx=0,sy=0,moved=false,dragging=false,pid=null,captured=false;
   el.addEventListener('pointerdown',e=>{
     // 체크박스 위에서 시작한 드래그는 완료 토글과 충돌하지 않게 무시. 조각(.todo-part)은 이제 허용(조각모드 재진입 가능해야 함).
@@ -5042,6 +5045,10 @@ function attachTodoSwipeMode(el,i,hasMultipleParts){
       if(hasMultipleParts){
         _todoPartModeIdx=(_todoPartModeIdx===i)?-1:i;
         setTimeout(renderTodos,0);
+      }else if(isRecurring){
+        // 내일 몫은 이미 규칙에 따라 자동으로 다시 실체화되므로 수동 복사는 지원하지 않음(중복 생성 방지).
+        // 별도 처리 코드 없이, 동작만 막고 이유를 안내 — 스와이프했는데 아무 반응이 없는 것보다 명확함.
+        showToast('반복 항목은 복사할 수 없어요');
       }else{
         copyWholeTodoToTomorrow(i);
       }
