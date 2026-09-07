@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.45-todosup-reentrant-lock';
+const CACHE = 'iikoto-v2.46-webpush';
 const ASSETS = [
   './',
   './index.html'
@@ -47,5 +47,40 @@ self.addEventListener('fetch', e => {
         // 오프라인이면 캐시에서 — 상대경로 './'로 폴백 (앱 루트, 절대경로 '/' 아님)
         return caches.match(e.request) || caches.match('./');
       })
+  );
+});
+
+// ── Web Push 수신 ──
+// Edge Function이 alerts 테이블을 스캔해 보내는 push 메시지를 받아 시스템 알림으로 표시.
+// payload가 없거나 JSON이 아닌 경우를 대비해 기본값으로 방어.
+self.addEventListener('push', e => {
+  let data = { title: '이이코토', body: '', url: './' };
+  try {
+    if (e.data) data = { ...data, ...e.data.json() };
+  } catch (err) {
+    // JSON 파싱 실패 시 텍스트만이라도 본문에 반영
+    if (e.data) data.body = e.data.text();
+  }
+  e.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: './icon-192.png',
+      badge: './icon-192.png',
+      data: { url: data.url || './' }
+    })
+  );
+});
+
+// ── 알림 탭 — 이미 열린 탭이 있으면 포커스, 없으면 새로 열기 ──
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const targetUrl = e.notification.data?.url || './';
+  e.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
+      for (const c of clientList) {
+        if ('focus' in c) return c.focus();
+      }
+      if (clients.openWindow) return clients.openWindow(targetUrl);
+    })
   );
 });

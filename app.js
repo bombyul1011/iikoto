@@ -1990,6 +1990,59 @@ function renderHome(){
 // ── CONSTANTS
 const SUPA_URL='https://vqvpzrxmtpryzhontlxc.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdnB6cnhtdHByeXpob250bHhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTgxMjksImV4cCI6MjA5NjYzNDEyOX0.pbtq1UMPC7ylYM1H2xVa19C1TFlceLmEfEtkz3WK2VI';
+// ── Web Push 구독 ──
+// VAPID 공개키(비공개키는 Edge Function 쪽에만 존재, 클라이언트엔 절대 노출 안 함).
+const VAPID_PUBLIC_KEY='BE6z_NOX-WIzFGaw6gsU1ft_rbZfOxplfsC6VtOZ9l7Z2L0WcXztM9eh5lV1VTvWALkwRgVk67_eg_6g9Zgd_Vk';
+function _urlBase64ToUint8Array(base64String){
+  const padding='='.repeat((4-base64String.length%4)%4);
+  const base64=(base64String+padding).replace(/-/g,'+').replace(/_/g,'/');
+  const raw=atob(base64);
+  const arr=new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++)arr[i]=raw.charCodeAt(i);
+  return arr;
+}
+async function getExistingPushSubscription(){
+  if(!('serviceWorker' in navigator)||!('PushManager' in window))return null;
+  try{
+    const reg=await navigator.serviceWorker.ready;
+    return await reg.pushManager.getSubscription();
+  }catch(e){return null;}
+}
+async function refreshPushStatusUI(){
+  const lbl=document.getElementById('push-status-lbl');
+  const btn=document.getElementById('push-toggle-btn');
+  if(!lbl||!btn)return;
+  if(!('serviceWorker' in navigator)||!('PushManager' in window)){
+    lbl.textContent='이 환경에서는 알림을 지원하지 않아요';
+    btn.style.display='none';
+    return;
+  }
+  const sub=await getExistingPushSubscription();
+  lbl.textContent=sub?'알림이 켜져 있어요':'알림이 꺼져 있어요';
+  btn.textContent=sub?'알림 끄기':'알림 켜기';
+}
+async function togglePushSubscription(){
+  const btn=document.getElementById('push-toggle-btn');
+  if(btn)btn.disabled=true;
+  try{
+    const existing=await getExistingPushSubscription();
+    if(existing){
+      await supaFetch(`push_subscriptions?endpoint=eq.${encodeURIComponent(existing.endpoint)}`,'DELETE');
+      await existing.unsubscribe();
+      showToast('알림을 껐어요');
+    }else{
+      const perm=await Notification.requestPermission();
+      if(perm!=='granted'){showToast('알림 권한이 필요해요');if(btn)btn.disabled=false;await refreshPushStatusUI();return;}
+      const reg=await navigator.serviceWorker.ready;
+      const sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:_urlBase64ToUint8Array(VAPID_PUBLIC_KEY)});
+      const json=sub.toJSON();
+      await supaUpsert('push_subscriptions','endpoint',[{endpoint:json.endpoint,p256dh:json.keys.p256dh,auth:json.keys.auth}]);
+      showToast('알림을 켰어요');
+    }
+  }catch(e){console.error('push toggle 실패',e);showToast('알림 설정에 실패했어요');}
+  if(btn)btn.disabled=false;
+  await refreshPushStatusUI();
+}
 const TMDB_KEY='6c78371ce15bb9d262938a66d5ef256e';
 const KAKAO_KEY='33799426c5377181c89616f5b2154bf0';
 const DAYS=['일','월','화','수','목','금','토'];
@@ -10575,6 +10628,7 @@ function openSettings(){
   initTextScaleUI();
   _resetHabitEditDraft(); // 설정탭 진입 시마다 편집용 임시본을 실데이터로 새로 초기화(이전 진입의 미저장 변경은 버림)
   renderSettingsHabitSection();
+  refreshPushStatusUI();
   document.getElementById('settings-ov').classList.add('on');
 }
 // [2026-09-06 저장버튼 도입] "항목 선택" 칩은 탭 즉시 실제 저장(saveHabits)하지 않고, 이 임시 배열(_habitEditDraft)만
