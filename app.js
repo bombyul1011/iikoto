@@ -2429,6 +2429,25 @@ function compareTodoOrder(a,b){
 // 투두/일정과 구분하지 않는다 — 남는 표식은 어느 규칙에서 나왔는지 가리키는 recurRuleCid 필드 하나뿐.
 // (구 방식은 매번 규칙을 계산해 가상 항목을 병합하는 방식이었으나, 완료체크가 로컬 전용 별도 저장소에
 // 남아 기기 간 동기화가 전혀 안 되는 치명적 결함이 있었음 — 그 구조 자체를 폐기하고 새로 설계함.)
+// 1회성 마이그레이션(2026-09-07): 구설계~재설계 초기 테스트 과정에서 만들어진 반복 규칙/실체화 데이터가
+// 기기 로컬에 남아, 서버에서 지워도 다음 sync 때 로컬 잔재가 되살리는 문제가 실사용에서 발생함(수기로
+// 지워도 재실행 시 재생성). 아직 실사용 목적 반복은 등록된 게 없다고 확인했으므로, 앱 로드 시 로컬의
+// recurring_items/recur_skip/실체화된 todos를 전부 한 번만 지움 — _recurCleanupV1 플래그로 재실행 방지.
+(function _recurCleanupV1(){
+  if(S.get('_recur_cleanup_v1_done'))return;
+  S.set('recurring_items',[]);
+  // 최근 40일(할일 미리보기 7일+일정 미리보기 30일+여유분)치 todos에서 recurRuleCid 붙은 항목과 recur_skip 기록을 정리
+  const today=new Date();
+  for(let i=-10;i<=40;i++){
+    const d=new Date(today);d.setDate(today.getDate()+i);
+    const dk=dateKey(d);
+    const todos=S.get(S.key('todos',dk))||[];
+    const filtered=todos.filter(t=>!t.recurRuleCid);
+    if(filtered.length!==todos.length)S.set(S.key('todos',dk),filtered);
+    S.set(S.key('recur_skip',dk),[]);
+  }
+  S.set('_recur_cleanup_v1_done',true);
+})();
 function getRecurringItems(){return S.get('recurring_items')||[];}
 function saveRecurringItems(v){S.set('recurring_items',v);autoSync('recurringItems',null);_materializedDkCache.clear();}
 // 특정 규칙(ruleCid)이 특정 날짜(dk)에 실체화되지 않도록 막는 예외 — "오늘만 삭제"에서만 씀.
@@ -3132,6 +3151,27 @@ async function syncRecurringItemsUp(){
   delCids.forEach(c=>removeDelPending('recurring_items','global',c));
   return true;
 }
+// 반복 규칙 삭제 시 "기준일 이후 실체화분"을 서버에서 지우는 DELETE 쿼리 재시도 목록.
+// {ruleCid, fromDk} 쌍을 통째로 저장(개별 cid가 아니라 "이 규칙의 이 날짜 이후 전부"라는 조건 자체를 재시도해야 하므로
+// getDelPendingCids류의 단일 cid 목록과는 형태가 달라 별도로 둠). recurSheetDeleteAll이 실패했을 때만 여기 쌓임.
+function addRecurFutureDelPending(ruleCid,fromDk){
+  const list=S.get('recur_future_delpending')||[];
+  if(!list.some(e=>e.ruleCid===ruleCid&&e.fromDk===fromDk)){
+    list.push({ruleCid,fromDk});
+    S.set('recur_future_delpending',list);
+  }
+}
+async function syncRecurFutureDel(){
+  if(!navigator.onLine)return;
+  const list=S.get('recur_future_delpending')||[];
+  if(!list.length)return;
+  const remaining=[];
+  for(const e of list){
+    const res=await supaFetch(`todos?recur_rule_cid=eq.${encodeURIComponent(e.ruleCid)}&date_key=gte.${e.fromDk}`,'DELETE');
+    if(res===null)remaining.push(e); // 실패 — 다음 기회에 재시도하도록 목록에 유지
+  }
+  S.set('recur_future_delpending',remaining);
+}
 // 실체화 스킵 기록(그 규칙을 그 날짜엔 만들지 않음) — "오늘만 삭제"에서만 씀. 배열 하나뿐이라 upsert 없이 통째로 저장.
 async function syncRecurSkipUp(dk){
   const skips=getRecurSkips(dk);
@@ -3325,6 +3365,7 @@ async function syncAll(){
   if(S.get('wchallenge_pending_'+wk))upTasks.push(autoSync('wchallenge','wchallenge_'+wk).then(()=>S.set('wchallenge_pending_'+wk,false)));
   if(S.get(S.key('rblocks_pending',dk)))upTasks.push(syncRhythmBlocksUp(dk).then(()=>S.set(S.key('rblocks_pending',dk),false)));
   if(S.get('hc_pending_'+wk))upTasks.push(syncHCUp(wk).then(()=>S.set('hc_pending_'+wk,false)));
+  if((S.get('recur_future_delpending')||[]).length)upTasks.push(syncRecurFutureDel());
   if(upTasks.length)await Promise.all(upTasks);
   // 이번 주 리듬블록(가로바용) 날짜키
   const weekRblockDks=[];
@@ -7103,6 +7144,9 @@ function recurSheetSkipToday(){
 // 로컬은 기준일부터 각 규칙 종류의 미리보기 범위(할일 +7일/일정 +30일)까지 순회하며 지움. 서버 삭제는
 // 각 날짜마다 개별 upload하지 않고 recur_rule_cid 조건의 DELETE 쿼리 한 번으로 기준일 이후 전체를 정리
 // — 날짜 수만큼 네트워크 요청이 나가는 걸 피함.
+// 이 DELETE가 오프라인/실패로 못 나가면 그대로 유실되던 문제(로컬은 지워졌는데 서버엔 남아있다가, 이후
+// 로컬에 남아있던 다른 옛 데이터가 재업로드되며 되살아난 사고가 실제로 있었음)가 있어, 일반 투두 삭제와
+// 동일한 delPending 방식(재시도 목록)을 여기에도 적용 — 실패 시 목록에 남겨두고 다음 sync 때 재시도.
 async function recurSheetDeleteAll(){
   closeSheet('recur-sheet');
   if(!_recurSheetRuleCid)return;
@@ -7124,10 +7168,9 @@ async function recurSheetDeleteAll(){
     const filtered=todos.filter(t=>t.recurRuleCid!==_recurSheetRuleCid);
     if(filtered.length!==todos.length)saveTodos.raw(dk,filtered);
   }
-  // 서버 쪽 기준일 이후 전체 정리 — 로컬에 없던(다른 기기에서 만들어진) 실체화분까지 이 한 번으로 포함됨.
-  if(navigator.onLine){
-    await supaFetch(`todos?recur_rule_cid=eq.${encodeURIComponent(_recurSheetRuleCid)}&date_key=gte.${fromDk}`,'DELETE');
-  }
+  // 서버 쪽 기준일 이후 전체 정리 — 성공하면 끝, 실패(오프라인 포함)하면 재시도 목록에 남겨 다음 sync 때 자동 재시도.
+  addRecurFutureDelPending(_recurSheetRuleCid,fromDk);
+  await syncRecurFutureDel();
   renderTodos();
   if(document.getElementById('monthly-cal'))renderCalendar();
 }

@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.33-recurring-preview-window';
+const CACHE = 'iikoto-v2.35-recur-local-cleanup';
 const ASSETS = [
   './',
   './index.html'
