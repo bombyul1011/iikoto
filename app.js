@@ -4854,12 +4854,12 @@ function attachTodoItemClick(el,idx,cid){
       return;
     }
     const isRecurring=el.dataset.recur==='1';
-    const dk=el.dataset.dk;
-    const cid=el.dataset.cid;
+    const recurDk=el.dataset.dk;
+    const recurCid=el.dataset.cid;
     const ruleCid=el.dataset.ruleCid;
     const title=el.dataset.title||'';
     const openSheetForThis=()=>{
-      if(isRecurring)openRecurringItemSheet(dk,cid,ruleCid,title);
+      if(isRecurring)openRecurringItemSheet(recurDk,recurCid,ruleCid,title);
       else openTodoSheet(idx);
     };
     if(t.closest('[data-role="copy-unstruck"]')){

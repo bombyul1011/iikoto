@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.42-recur-deleteall-toast';
+const CACHE = 'iikoto-v2.43-recur-check-tdz-fix';
 const ASSETS = [
   './',
   './index.html'
