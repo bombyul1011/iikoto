@@ -3093,7 +3093,7 @@ async function syncTodosDown(dk){
   if(!rows)return; // 연결 실패(null) — 로컬 유지. 빈 배열은 "서버에 진짜 0개"라는 뜻이라 그대로 반영.
   if(S.get(S.key('todos_pending',dk)))return; // 업로드 대기중인 로컬 수정(미루기 등) 있으면 덮어쓰지 않음
   const mapped=rows.map(function(r){
-    return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null,eventEndDate:r.event_end_date||null,cat:r.cat||'todo',pinned:!!r.pinned,recurRuleCid:r.recur_rule_cid||undefined,alertTime:r.alert_time||null};
+    return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null,eventEndDate:r.event_end_date||null,cat:r.cat||'todo',pinned:!!r.pinned,recurRuleCid:r.recur_rule_cid||undefined,alertTime:r.alert_time||null,eventAlertOn:!!r.event_alert_on};
   });
   // 반복 규칙cid가 같은 row가 두 개 이상 섞여 있으면(과거 경합으로 생긴 서버측 중복 등) 먼저 만들어진 것만 남김 — 방어적 dedupe.
   const seenRuleCids=new Set();
@@ -3137,7 +3137,7 @@ async function _syncTodosUpInner(dk){
   if(deduped.length!==todos.length)S.set(S.key('todos',dk),deduped);
   const delCids=getDelPendingCids('todos',dk);
   const ok=await syncListUpSafe('todos',`date_key=eq.${dk}`,'date_key,client_id',deduped,
-    t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,strike_parts:t.strikeParts||[],strike_times:t.strikeTimes||{},completed_at:(t.completedAt!=null?t.completedAt:null),sort_order:(typeof t.sortOrder==='number'?t.sortOrder:null),is_event:!!t.isEvent,event_cat:t.eventCat||null,event_time:t.eventTime||null,event_end_date:t.eventEndDate||null,cat:t.cat||'todo',pinned:!!t.pinned,recur_rule_cid:t.recurRuleCid||null,alert_time:t.alertTime||null}),
+    t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,strike_parts:t.strikeParts||[],strike_times:t.strikeTimes||{},completed_at:(t.completedAt!=null?t.completedAt:null),sort_order:(typeof t.sortOrder==='number'?t.sortOrder:null),is_event:!!t.isEvent,event_cat:t.eventCat||null,event_time:t.eventTime||null,event_end_date:t.eventEndDate||null,cat:t.cat||'todo',pinned:!!t.pinned,recur_rule_cid:t.recurRuleCid||null,alert_time:t.alertTime||null,event_alert_on:!!t.eventAlertOn}),
     delCids);
   if(ok)delCids.forEach(cid=>removeDelPending('todos',dk,cid));
   return ok;
@@ -4377,8 +4377,12 @@ function confirmTime(){
   if(_sleepTarget==='rblock-end'){_rhythmFormEnd=v;closeModal('time-modal');refreshRhythmTrack();return;}
   if(_sleepTarget==='event'){
     const inp=document.getElementById('todo-event-time-inp');
+    const modal=document.getElementById('todo-modal');
+    const hadTime=!!inp.dataset.value;
     inp.dataset.value=v;inp.textContent=v;
     document.getElementById('todo-event-time-clear').style.display='block';
+    if(!hadTime)modal.dataset.eventAlertOn='1'; // 시간을 새로 지정하면 기본으로 알림 켜짐(아이콘 탭으로 끌 수 있음)
+    updateEventTimeIcon();
     closeModal('time-modal');
     return;
   }
@@ -6545,7 +6549,10 @@ function toggleTodo(i,expectedCid){
   // 체크완료 시점의 시각이 최종 처리 시각(completedAt)이라 예상시간 기준 알림은 더 이상 필요 없음 — 정리.
   // 체크 해제 시엔 alertTime이 남아있다면 다시 예약(재사용 의도로 지운 게 아니라 되돌린 것이므로).
   if(target.done)deleteAlertFor(target.isEvent?'event':'todo',target.cid);
-  else if(target.alertTime)syncAlertFor(target.isEvent?'event':'todo',target.cid,dk,target.alertTime,target.text);
+  else{
+    const basisTime=target.isEvent?(target.eventAlertOn?target.eventTime:null):target.alertTime;
+    if(basisTime)syncAlertFor(target.isEvent?'event':'todo',target.cid,dk,basisTime,target.text);
+  }
 }
 
 // 투두/습관 체크 등으로 오늘 활동 분포가 바뀌었을 때 저녁 홈탭의 점 타임라인 카드를 새로 그려 교체.
@@ -6800,6 +6807,8 @@ function openTodoModal(editIdx=-1){
   const evTimeVal=existing?.eventTime||'';
   evTimeInp.dataset.value=evTimeVal;evTimeInp.textContent=evTimeVal||'시간 선택';
   document.getElementById('todo-event-time-clear').style.display=evTimeVal?'block':'none';
+  modal.dataset.eventAlertOn=(existing?.isEvent&&existing?.eventAlertOn)?'1':'';
+  updateEventTimeIcon();
   // 할일 알림 시간 초기화 — existing.alertTime은 "임시 예상 시간"일 뿐, 실제 처리 시각은 completedAt 기준
   const alertTimeInp=document.getElementById('todo-alert-time-inp');
   const alertTimeVal=existing?.alertTime||'';
@@ -6987,6 +6996,8 @@ function clearTodoEventTime(){
   const inp=document.getElementById('todo-event-time-inp');
   inp.dataset.value='';inp.textContent='시간 선택';
   document.getElementById('todo-event-time-clear').style.display='none';
+  document.getElementById('todo-modal').dataset.eventAlertOn='';
+  updateEventTimeIcon();
 }
 function openEventTimePicker(){
   _sleepTarget='event';
@@ -6996,6 +7007,24 @@ function openEventTimePicker(){
   document.getElementById('time-inp').value=current;
   openModal('time-modal');
   renderTimeWheel();
+}
+// ── 일정 시간 아이콘: 시간 미선택 시 시계(클릭→시간피커), 선택 시 벨(클릭→알림 온오프 토글)로 전환.
+// 시간 입력 자체는 항상 텍스트(todo-event-time-inp) 쪽에만 있음 — 아이콘은 표시+토글 전용.
+function updateEventTimeIcon(){
+  const icon=document.getElementById('todo-event-time-icon');
+  const modal=document.getElementById('todo-modal');
+  const hasTime=!!document.getElementById('todo-event-time-inp').dataset.value;
+  const alertOn=modal.dataset.eventAlertOn==='1';
+  icon.className='ti ico-sz-13 '+(hasTime?'ti-bell':'ti-clock')+(hasTime&&alertOn?' alert-on':'');
+  icon.title=hasTime?(alertOn?'알림 켜짐 (탭하여 끄기)':'알림 꺼짐 (탭하여 켜기)'):'';
+}
+function onEventTimeIconClick(){
+  const modal=document.getElementById('todo-modal');
+  const hasTime=!!document.getElementById('todo-event-time-inp').dataset.value;
+  if(!hasTime){openEventTimePicker();return;}
+  const on=modal.dataset.eventAlertOn==='1';
+  modal.dataset.eventAlertOn=on?'':'1';
+  updateEventTimeIcon();
 }
 // ── 할일 알림(예상 시각) — event의 시간 선택과 동일한 time-modal 재사용.
 // 여기서 정하는 시각은 "임시 예상/희망 시간"으로 알람 트리거 전용이며, 실제 완료 처리 시각(completedAt)과는 별개.
@@ -7113,6 +7142,7 @@ async function confirmTodo(){
   const pinned=!isEvent&&modal.dataset.pinned==='1'; // 일정에는 강조 개념 없음, 할일에만 적용
   const eventCat=isEvent?(modal.dataset.eventCat||'schedule'):'';
   const eventTime=isEvent?(document.getElementById('todo-event-time-inp').dataset.value||null):null;
+  const eventAlertOn=isEvent&&modal.dataset.eventAlertOn==='1'; // 시간이 있어도 아이콘으로 꺼뒀으면 알림 발송 안 함
   // 할일의 알림 시간 — "임시 예상/희망 시간"일 뿐. 실제 처리 시각은 체크완료 시점(completedAt)이 기준.
   const alertTime=!isEvent?(document.getElementById('todo-alert-time-inp').dataset.value||null):null;
   // 시작일(=일정이 속한 date_key) — 아코디언에서 바꾸지 않았다면 modal.dataset.eventStartDate가 원래 dk와 같음
@@ -7127,9 +7157,9 @@ async function confirmTodo(){
     todos.splice(editIdx,1);
     saveTodos(dk,todos);
     const targetTodos=getTodos(newDk);
-    targetTodos.push({text,done:old.done||false,created:old.created||Date.now(),timeSection,isEvent:true,eventCat,eventTime,eventEndDate,cid:old.cid,strikeParts:[],strikeTimes:{},pinned:false,alertTime:null});
+    targetTodos.push({text,done:old.done||false,created:old.created||Date.now(),timeSection,isEvent:true,eventCat,eventTime,eventEndDate,cid:old.cid,strikeParts:[],strikeTimes:{},pinned:false,alertTime:null,eventAlertOn});
     saveTodos(newDk,targetTodos);
-    if(eventTime)await syncAlertFor('event',old.cid,newDk,eventTime,text);else await deleteAlertFor('event',old.cid);
+    if(eventTime&&eventAlertOn)await syncAlertFor('event',old.cid,newDk,eventTime,text);else await deleteAlertFor('event',old.cid);
     closeModal('todo-modal');
     restoreCalModeAndRender(modal,true);
     setTimeout(()=>{_todoSubmitting=false;},500);
@@ -7164,13 +7194,13 @@ async function confirmTodo(){
     }
     old.text=text;old.timeSection=timeSection;
     old.isEvent=isEvent;old.eventCat=isEvent?eventCat:null;old.eventTime=isEvent?eventTime:null;old.eventEndDate=isEvent?eventEndDate:null;
-    old.pinned=pinned;old.alertTime=alertTime;
+    old.pinned=pinned;old.alertTime=alertTime;old.eventAlertOn=eventAlertOn;
   }
-  else todos.push({text,done:false,created:Date.now(),timeSection,isEvent,eventCat:isEvent?eventCat:null,eventTime:isEvent?eventTime:null,eventEndDate:isEvent?eventEndDate:null,cid:genCid(),pinned,alertTime});
+  else todos.push({text,done:false,created:Date.now(),timeSection,isEvent,eventCat:isEvent?eventCat:null,eventTime:isEvent?eventTime:null,eventEndDate:isEvent?eventEndDate:null,cid:genCid(),pinned,alertTime,eventAlertOn});
   const savedTodo=editIdx>=0?todos[editIdx]:todos[todos.length-1];
   saveTodos(dk,todos);closeModal('todo-modal');
-  // alerts 동기화 — 일정은 eventTime, 할일은 alertTime을 기준으로 발송 예약(둘 다 없으면 예약 삭제)
-  const alertBasisTime=isEvent?eventTime:alertTime;
+  // alerts 동기화 — 일정은 eventTime+eventAlertOn(온일 때만), 할일은 alertTime을 기준으로 발송 예약
+  const alertBasisTime=isEvent?(eventAlertOn?eventTime:null):alertTime;
   if(alertBasisTime)syncAlertFor(isEvent?'event':'todo',savedTodo.cid,dk,alertBasisTime,text);
   else deleteAlertFor(isEvent?'event':'todo',savedTodo.cid);
   // 월간 캘린더의 "이 날에 일정 추가"에서 열린 경우 — currentDate를 원래대로 되돌리고 캘린더/상세를 갱신

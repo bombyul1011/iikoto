@@ -467,6 +467,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .todo-event-sel button.ev-work.active{background:var(--ev-work-bg);border-color:var(--ev-work-border);color:var(--ev-work-text);}
 .todo-event-sel button.ev-etc.active{background:var(--ev-etc-bg);border-color:var(--ev-etc-border);color:var(--ev-etc-text);}
 .todo-event-time-row{display:flex;align-items:center;gap:8px;margin:8px 0 4px;padding:8px 12px;border-radius:10px;border:1px solid var(--inp-b);background:var(--inp);color:var(--tm);}
+.todo-alert-recur-row{display:flex;gap:8px;margin:8px 0 4px;}
+.todo-alert-time-row-half{flex:1;margin:0;min-width:0;}
+.todo-recur-chip-half{flex:1;margin:0;}
+/* 일정 시간 아이콘 — 시간 미선택 시 시계, 선택 시 벨(알림 온오프 토글)로 전환. on 상태는 강조 색상. */
+#todo-event-time-icon.alert-on{color:rgb(var(--pal-orange-rgb));}
 .todo-multiday-arrow{display:flex;align-items:center;justify-content:center;width:22px;height:22px;flex-shrink:0;cursor:pointer;color:var(--tm);transition:transform .2s;}
 .todo-multiday-arrow.on{transform:rotate(180deg);color:var(--tp);}
 .todo-multiday-end-row{display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:10px;border:1px solid var(--card-b);background:var(--card);margin:4px 0;}
@@ -2043,10 +2048,16 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <button class="ts-night" onclick="selectTodoTime('night',this)">저녁</button>
       <button class="ts-none active" onclick="selectTodoTime('none',this)">지정없음</button>
     </div>
-    <div class="todo-event-time-row" id="todo-alert-time-row">
-      <i class="ti ti-bell ico-sz-13" aria-hidden="true" onclick="openAlertTimePicker()" style="cursor:pointer;"></i>
-      <span class="todo-event-time-inp" id="todo-alert-time-inp" data-value="" onclick="openAlertTimePicker()" style="cursor:pointer;">알림 없음</span>
-      <span class="todo-event-time-clear" id="todo-alert-time-clear" onclick="event.stopPropagation();clearTodoAlertTime()" title="알림 지우기" style="display:none;">✕</span>
+    <div class="todo-alert-recur-row" id="todo-alert-recur-row">
+      <div class="todo-event-time-row todo-alert-time-row-half" id="todo-alert-time-row">
+        <i class="ti ti-bell ico-sz-13" aria-hidden="true" onclick="openAlertTimePicker()" style="cursor:pointer;"></i>
+        <span class="todo-event-time-inp" id="todo-alert-time-inp" data-value="" onclick="openAlertTimePicker()" style="cursor:pointer;">알림 없음</span>
+        <span class="todo-event-time-clear" id="todo-alert-time-clear" onclick="event.stopPropagation();clearTodoAlertTime()" title="알림 지우기" style="display:none;">✕</span>
+      </div>
+      <div class="todo-recur-chip todo-recur-chip-half" id="todo-recur-chip" onclick="toggleRecurBox()">
+        <span><i class="ti ti-repeat ico-sz-13" aria-hidden="true"></i> <span id="todo-recur-chip-label">반복 안함</span></span>
+        <i class="ti ti-chevron-down ico-sz-13" id="todo-recur-chevron" aria-hidden="true"></i>
+      </div>
     </div>
     <!-- 아이콘은 EVENT_CATS(JS)와 이 4개 버튼 두 곳에 각각 하드코딩됨 — 아이콘 변경 시 반드시 둘 다 수정. 색상은 CSS 변수(--ev-*)로 단일화되어 여기 손댈 필요 없음. -->
     <div class="todo-event-sel" id="todo-event-sel" style="display:none;">
@@ -2056,7 +2067,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <button class="ev-etc" onclick="selectTodoEventCat('etc',this)"><i class="ti ti-calendar-smile ico-sz-13" aria-hidden="true"></i> 기타</button>
     </div>
     <div class="todo-event-time-row" id="todo-event-time-row" style="display:none;">
-      <i class="ti ti-clock ico-sz-13" aria-hidden="true" onclick="openEventTimePicker()" style="cursor:pointer;"></i>
+      <i class="ti ti-clock ico-sz-13" id="todo-event-time-icon" aria-hidden="true" onclick="onEventTimeIconClick()" style="cursor:pointer;"></i>
       <span class="todo-event-time-inp" id="todo-event-time-inp" data-value="" onclick="openEventTimePicker()" style="cursor:pointer;">시간 선택</span>
       <span class="todo-event-time-clear" id="todo-event-time-clear" onclick="event.stopPropagation();clearTodoEventTime()" title="시간 지우기" style="display:none;">✕</span>
       <span class="todo-multiday-arrow" id="todo-multiday-arrow" onclick="toggleTodoMultiday()" title="날짜 변경 · 며칠간 이어지는 일정"><i class="ti ti-chevron-down ico-sz-13" aria-hidden="true"></i></span>
@@ -2067,10 +2078,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <input type="text" class="todo-multiday-end-inp" id="todo-event-end-date" readonly onclick="openTodoEventEndDatePicker()" placeholder="MM.DD" style="flex:1;text-align:center;">
     </div>
     <div class="todo-recur-box" id="todo-recur-box">
-      <div class="todo-recur-chip" id="todo-recur-chip" onclick="toggleRecurBox()">
-        <span><i class="ti ti-repeat ico-sz-13" aria-hidden="true"></i> <span id="todo-recur-chip-label">반복 안함</span></span>
-        <i class="ti ti-chevron-down ico-sz-13" id="todo-recur-chevron" aria-hidden="true"></i>
-      </div>
       <div class="todo-recur-panel" id="todo-recur-panel" style="display:none;">
         <div class="todo-recur-type-row" id="todo-recur-type-row">
           <button class="rt-opt" data-type="daily" onclick="selectRecurType('daily',this)">매일</button>
