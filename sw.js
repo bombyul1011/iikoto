@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.40-recur-partmode-allow';
+const CACHE = 'iikoto-v2.41-recur-nightpostpone-fix';
 const ASSETS = [
   './',
   './index.html'

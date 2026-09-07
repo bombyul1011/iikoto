@@ -4506,7 +4506,7 @@ let _nightPostponeChecked=new Set();
 function openNightPostponeSheet(){
   _nightPostponeChecked=new Set();
   const dk=dateKey(currentDate),todos=getTodos(dk);
-  const targets=todos.map((t,i)=>({...t,_i:i})).filter(t=>!t.done&&!t.isEvent);
+  const targets=todos.map((t,i)=>({...t,_i:i})).filter(t=>!t.done&&!t.isEvent&&!t.recurRuleCid);
   const list=document.getElementById('night-postpone-list');
   if(!targets.length){
     list.innerHTML='<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:16px 0;">오늘 남은 할 일이 없어요</div>';
