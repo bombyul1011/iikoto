@@ -1992,7 +1992,7 @@ const SUPA_URL='https://vqvpzrxmtpryzhontlxc.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdnB6cnhtdHByeXpob250bHhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTgxMjksImV4cCI6MjA5NjYzNDEyOX0.pbtq1UMPC7ylYM1H2xVa19C1TFlceLmEfEtkz3WK2VI';
 // ── Web Push 구독 ──
 // VAPID 공개키(비공개키는 Edge Function 쪽에만 존재, 클라이언트엔 절대 노출 안 함).
-const VAPID_PUBLIC_KEY='BE6z_NOX-WIzFGaw6gsU1ft_rbZfOxplfsC6VtOZ9l7Z2L0WcXztM9eh5lV1VTvWALkwRgVk67_eg_6g9Zgd_Vk';
+const VAPID_PUBLIC_KEY='BL9_A9IIRXzrxiz28IvKth5NQVRV_uEgVj-Efd3Ca-cUvuDeQZrXrLYx5PFQFpsy2McaMzNmx1-BI98-OzdtLWI';
 function _urlBase64ToUint8Array(base64String){
   const padding='='.repeat((4-base64String.length%4)%4);
   const base64=(base64String+padding).replace(/-/g,'+').replace(/_/g,'/');
