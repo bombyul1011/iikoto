@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.52-notif-expand-cleanup';
+const CACHE = 'iikoto-v2.53-exercise-toggle';
 const ASSETS = [
   './',
   './index.html'

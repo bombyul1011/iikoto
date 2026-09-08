@@ -457,8 +457,10 @@ function _buildExerciseStatMessage(){
   }
   return {title:'운동 완료 🏃',body};
 }
-function scheduleExerciseStatAlert(blockCid){
+async function scheduleExerciseStatAlert(blockCid){
   if(!blockCid)return;
+  const settings=await getUserSettings();
+  if(settings&&settings.exercise_stat_enabled===false)return; // 개별 온오프에서 꺼둔 경우 예약 자체를 생략
   const {title,body}=_buildExerciseStatMessage();
   const alertAt=new Date(Date.now()+10*60*1000); // 종료 10분 후
   scheduleAlertAt('exercise_stat',blockCid,alertAt,title,body);
@@ -10872,7 +10874,7 @@ function openSettings(){
 // 전체 push 구독이 꺼져있으면(getExistingPushSubscription 없음) 개별 토글은 값 유지한 채 시각적으로만 비활성화.
 // ALERT_TIME_FIELD_MAP/ALERT_ENABLED_FIELD_MAP은 렌더링과 토글 양쪽에서 쓰여 아래 공용 상수로 뽑음(중복 정의 제거).
 const ALERT_TIME_FIELD_MAP={morning:'morning_briefing_time',evening:'evening_wrap_time',remaining:'remaining_todo_time'};
-const ALERT_ENABLED_FIELD_MAP={morning:'morning_enabled',evening:'evening_enabled',remaining:'remaining_enabled',sleep:'sleep_enabled',rhythm:'rhythm_enabled',report:'report_enabled'};
+const ALERT_ENABLED_FIELD_MAP={morning:'morning_enabled',evening:'evening_enabled',remaining:'remaining_enabled',sleep:'sleep_enabled',rhythm:'rhythm_enabled',report:'report_enabled',exercise:'exercise_stat_enabled'};
 async function renderSettingsAlertSection(){
   const wrap=document.getElementById('settings-acc-alert-detail');
   if(!wrap)return;
