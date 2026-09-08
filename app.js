@@ -208,6 +208,56 @@ async function syncRhythmBlocksDown(dk){
   if(S.get(S.key('rblocks_pending',dk)))return; // 업로드 대기중인 로컬 수정 있으면 덮어쓰지 않음
   S.set(S.key('rblocks',dk),rows.map(function(r){return {cat:r.cat,start:r.start_time,end:r.end_time,text:r.text||'',created:r.created,cid:r.client_id||genCid(),autoClosed:!!r.auto_closed,contentCid:r.content_cid||null};}));
 }
+// ── initSync 전용 범위 다운로드 — 날짜별로 따로 fetch하면 N일치면 N번 왕복이 그대로 쌓여
+// (특히 LTE/콜드스타트에서) 로딩이 길어짐. date_key=in.(...) 한 번으로 묶어 왕복을 1회로 줄임.
+// 매핑 로직은 각 syncXDown의 기존 rowToLocal/변환 그대로 재사용 — 중복 재구현 안 함.
+// pending 있는 날짜는 덮어쓰지 않는 것도 syncXDown과 동일하게 유지.
+async function _syncManyDown(table,dks,pendingKey,mapFn,setFn){
+  if(!dks.length)return;
+  const rows=await supaFetch(`${table}?date_key=in.(${dks.join(',')})&order=created`);
+  if(!rows)return; // 연결 실패 — 로컬 유지
+  const byDk={};
+  dks.forEach(dk=>{byDk[dk]=[];});
+  rows.forEach(r=>{if(byDk[r.date_key])byDk[r.date_key].push(r);});
+  dks.forEach(dk=>{
+    if(pendingKey&&S.get(S.key(pendingKey,dk)))return; // 업로드 대기중인 로컬 수정 있으면 덮어쓰지 않음
+    setFn(dk,byDk[dk].map(mapFn));
+  });
+}
+async function syncTodosDownMany(dks){
+  await _syncManyDown('todos',dks,'todos_pending',
+    r=>({text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null,eventEndDate:r.event_end_date||null,cat:r.cat||'todo',pinned:!!r.pinned,recurRuleCid:r.recur_rule_cid||undefined,alertTime:r.alert_time||null,eventAlertOn:!!r.event_alert_on,todoAlertOn:!!r.todo_alert_on}),
+    (dk,mapped)=>{
+      // 반복 규칙cid 중복 방어(syncTodosDown과 동일 로직)
+      const seenRuleCids=new Set();
+      const deduped=mapped.filter(t=>{
+        if(!t.recurRuleCid)return true;
+        if(seenRuleCids.has(t.recurRuleCid))return false;
+        seenRuleCids.add(t.recurRuleCid);
+        return true;
+      });
+      S.set(S.key('todos',dk),deduped);
+    });
+  renderTodos();
+}
+async function syncMemosDownMany(dks){
+  await _syncManyDown('memos',dks,'memos_pending',memoRowToLocal,(dk,mapped)=>S.set(S.key('memos',dk),mapped));
+  renderMemos();
+}
+async function syncSleepDownMany(dks){
+  await _syncManyDown('sleep',dks,'sleep_pending',sleepRowToLocal,(dk,mapped)=>{if(mapped.length)S.set(S.key('sleep',dk),mapped[0]);});
+}
+async function syncMealsDownMany(dks){
+  await _syncManyDown('meals',dks,null,mealRowToLocal,(dk,mapped)=>{
+    if((S.get(S.key('meals_fields_pending',dk))||[]).length)return; // 업로드 대기중인 필드 있으면 덮어쓰지 않음
+    if(mapped.length)S.set(S.key('meals',dk),mapped[0]);
+  });
+}
+async function syncRhythmBlocksDownMany(dks){
+  await _syncManyDown('rhythm_blocks',dks,'rblocks_pending',
+    r=>({cat:r.cat,start:r.start_time,end:r.end_time,text:r.text||'',created:r.created,cid:r.client_id||genCid(),autoClosed:!!r.auto_closed,contentCid:r.content_cid||null}),
+    (dk,mapped)=>S.set(S.key('rblocks',dk),mapped));
+}
 let _rhythmTrackEl=null,_rhythmDk=null,_rhythmFormOpen=false,_rhythmFormCat=null,_rhythmFormStart='',_rhythmFormEnd='',_rhythmFormText='',_rhythmEditIdx=null,_rhythmSubmitting=false;
 // 홈탭 트랙과 주간탭 리듬바 양쪽에서 폼이 열려있을 수 있으므로, 저장/취소/편집 시 둘 다 안전하게 갱신.
 // 홈탭 트랙이 화면에 없으면(주간탭에서 입력 중인 경우) 그 부분만 건너뛰고 주간탭만 갱신.
@@ -13399,22 +13449,22 @@ async function initSync(){
     var od=new Date(mon);od.setDate(mon.getDate()+i);
     await syncGoalDown(S.key('oneline',dateKey(od)));
   }
-  // Up 하지 않은 날짜만 Supabase → 로컬 복원 (pending 체크는 각 syncXDown 내부에서 처리)
-  for(var i=0;i<dates.length;i++){
-    var dk=dates[i];
-    if(!uploadedDates[dk]){
-      await Promise.all([syncTodosDown(dk),syncMemosDown(dk),syncSleepDown(dk),syncMealsDown(dk),syncRhythmBlocksDown(dk)]);
-    }
+  // Up 하지 않은 날짜만 Supabase → 로컬 복원 (pending 체크는 각 함수 내부에서 처리)
+  // 날짜별 개별 fetch(N일→N번 왕복) 대신 date_key=in.(...) 범위쿼리로 묶어 왕복 1회로 축소.
+  {
+    const pastDown=dates.filter(dk=>!uploadedDates[dk]);
+    await Promise.all([
+      syncTodosDownMany(pastDown),syncMemosDownMany(pastDown),
+      syncSleepDownMany(pastDown),syncMealsDownMany(pastDown),syncRhythmBlocksDownMany(pastDown)
+    ]);
   }
-  // 미래 날짜 Down
-  for(var i=0;i<futureDates.length;i++){
-    var fdk=futureDates[i];
-    if(!uploadedDates[fdk]){
-      await syncTodosDown(fdk);
-      await syncMemosDown(fdk);
-      await syncMealsDown(fdk);
-      await syncRhythmBlocksDown(fdk);
-    }
+  // 미래 날짜 Down — 동일하게 범위쿼리로 묶음
+  {
+    const futureDown=futureDates.filter(fdk=>!uploadedDates[fdk]);
+    await Promise.all([
+      syncTodosDownMany(futureDown),syncMemosDownMany(futureDown),
+      syncMealsDownMany(futureDown),syncRhythmBlocksDownMany(futureDown)
+    ]);
   }
   window._restoring=false;
   // 예비 투두 동기화

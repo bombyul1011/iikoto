@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.50-splash-sync-gate';
+const CACHE = 'iikoto-v2.51-batch-initsync';
 const ASSETS = [
   './',
   './index.html'
