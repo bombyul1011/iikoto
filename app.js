@@ -2564,12 +2564,17 @@ async function syncAlertFor(sourceType,sourceCid,dk,timeHHMM,title){
 }
 // syncAlertFor는 "그날 HH:MM"만 다루는데, 종료-N분후처럼 임의의 절대 시각(Date 객체)에
 // title+body 둘 다 채워 예약해야 하는 알림(운동 통계 등)엔 안 맞아 별도 저수준 헬퍼로 분리.
-// alertAtDate: Date 객체(로컬 시각) — ISO 변환 시 KST 오프셋을 명시해 Postgres UTC 해석 버그(2026-09-08)를 피함.
+// alertAtDate: Date 객체(로컬 시각) — ISO 변환 시 기기의 실제 시간대 오프셋을 반영(시차 대응, 2026-09-08).
 // upsert 실행부는 여기 하나뿐 — syncAlertFor도 이 함수를 거쳐가므로 alerts insert 경로가 단일화됨.
+// 오프셋은 기기의 현재 시간대를 그대로 반영(getTimezoneOffset, 분 단위·부호 반대) — 예전엔 +09:00 고정이라
+// 해외에서 로컬 시각과 실제 예약 시각이 시차만큼 어긋나는 문제가 있었음(2026-09-08 발견, 시차 대응으로 수정).
 async function scheduleAlertAt(sourceType,sourceCid,alertAtDate,title,body){
   if(!sourceCid)return;
   const d=alertAtDate;
-  const iso=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}+09:00`;
+  const offMin=-d.getTimezoneOffset(); // getTimezoneOffset은 UTC-로컬이라 부호 반대로 뒤집어야 +09:00 표기가 됨
+  const offSign=offMin>=0?'+':'-';
+  const offH=pad(Math.floor(Math.abs(offMin)/60)),offM=pad(Math.abs(offMin)%60);
+  const iso=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}${offSign}${offH}:${offM}`;
   await supaUpsert('alerts','source_type,source_cid',[{
     source_type:sourceType,source_cid:sourceCid,alert_at:iso,title:title||'',body:body||null,sent:false
   }]);
@@ -2587,6 +2592,17 @@ async function getUserSettings(){
 }
 async function setUserSettingTime(field,timeStr){
   await supaUpsert('user_settings','id',[{id:true,[field]:timeStr}]);
+}
+// 기기 시간대를 서버에 동기화 — 여행 등으로 시간대가 바뀌었을 때만 서버에 씀(값이 같으면 요청 자체를 안 보냄).
+// 로컬(S.get)에 마지막으로 보낸 시간대를 기억해두고 비교하는 방식이라, 평소(시간대 안 바뀜)엔 매일 앱을
+// 열어도 서버 쓰기가 전혀 늘지 않음 — send-alerts가 KST 대신 이 값 기준으로 고정시각 알림을 판단하게 됨.
+async function syncUserTimezoneIfChanged(){
+  try{
+    const tz=Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if(!tz||tz===S.get('user_timezone_last_synced'))return;
+    await supaUpsert('user_settings','id',[{id:true,timezone:tz}]);
+    S.set('user_timezone_last_synced',tz);
+  }catch(e){} // Intl 미지원 등 예외 시 조용히 스킵(기존 KST 고정값 그대로 유지되어 안전)
 }
 // 일정/할일 객체(또는 관련 필드를 담은 임시 객체)에서 "알림 발송 기준 시각"을 뽑는 공용 로직.
 // 일정은 eventAlertOn+eventTime, 할일은 todoAlertOn+alertTime — 온오프가 꺼져 있으면 시간이 있어도 null.
@@ -13512,6 +13528,7 @@ if('serviceWorker' in navigator){
 // 앱 시작 시 항상 Supabase에서 복구 (로컬 무시)
 async function initSync(){
   if(!navigator.onLine){_initSyncDone=true;return;}
+  syncUserTimezoneIfChanged(); // fire-and-forget — 시간대 안 바뀌었으면 로컬 비교만 하고 끝나 로딩에 영향 없음
   window._restoring=true;
   var dates=[];
   for(var i=29;i>=0;i--){var d=new Date();d.setDate(d.getDate()-i);dates.push(dateKey(d));}
