@@ -12091,7 +12091,7 @@ function _chCollectNoteSource(months){
   const notes=[]; // {cid,cat,title,dk,text,updatedAt} — poster는 저장 안 하므로 소속 contents 항목의 값을 붙임
   months.forEach(mk=>{
     getContents(mk).forEach(c=>{
-      if(c.status==='done'||c.status==='stopped'){
+      if(c.cat!=='music'&&(c.status==='done'||c.status==='stopped')){
         finals.push({cid:c.cid,cat:c.cat,title:c.title,poster:c.poster||null,stars:c.stars||0,review:c.review||'',dk:c.endDate||c.startDate||''});
       }
       (c.notes||[]).forEach(n=>notes.push({...n,cid:c.cid,poster:c.poster||null}));
