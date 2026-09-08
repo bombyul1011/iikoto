@@ -12086,11 +12086,12 @@ function _chCollectNoteSource(months){
     months=[];
     for(let i=0;i<_chNoteTimelineMonths;i++)months.push(monthKey(new Date(now.getFullYear(),now.getMonth()-i,1)));
   }
-  const finals=[]; // {cid,cat,title,poster,stars,review,dk}
+  const finals=[]; // {cid,cat,title,poster,stars,review,dk} — status가 done/stopped(=완결 처리됨)인 작품 전부 포함,
+  // review/stars는 있을 수도 없을 수도 있음(완결 배지 판정은 status 기준, 총평 텍스트 유무와 별개)(2026-09-09 수정)
   const notes=[]; // {cid,cat,title,dk,text,updatedAt} — poster는 저장 안 하므로 소속 contents 항목의 값을 붙임
   months.forEach(mk=>{
     getContents(mk).forEach(c=>{
-      if(c.review&&c.review.trim()){
+      if(c.status==='done'||c.status==='stopped'){
         finals.push({cid:c.cid,cat:c.cat,title:c.title,poster:c.poster||null,stars:c.stars||0,review:c.review||'',dk:c.endDate||c.startDate||''});
       }
       (c.notes||[]).forEach(n=>notes.push({...n,cid:c.cid,poster:c.poster||null}));
@@ -12146,8 +12147,8 @@ function _chRenderNoteTimelineByWork(finals,notes){
     const g=groups[cid];
     const m=WCAL_CAT_META[g.cat]||{label:''};
     const posterHtml=_wcalPosterThumbHtml(g.cat,g.poster);
-    const finalHtml=g.final?
-      `<div class="ch-tlB-final-row">${g.final.stars>0?`<div class="ch-tlB-stars">${renderStarDisplayHtml(g.final.stars)}</div>`:''}</div>
+    const finalHtml=g.final&&(g.final.stars>0||g.final.review)?
+      `${g.final.stars>0?`<div class="ch-tlB-final-row"><div class="ch-tlB-stars">${renderStarDisplayHtml(g.final.stars)}</div></div>`:''}
        ${g.final.review?`<div class="ch-tlB-final-text">${escapeHtml(g.final.review)}</div>`:''}`
       :'';
     const progressBadgeHtml=g.final?'':'<span class="ch-tlB-progress-badge">진행중</span>';
