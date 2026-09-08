@@ -1271,45 +1271,6 @@ function _cmrDetailBodyHtml(c,wcalNotes,flat,showHead){
   return headHtml+progressHtml+finalPartHtml+notesPartHtml;
 }
 // 카테고리별 리스트형(제목+별점+코멘트 아이콘, 한 줄씩) — 드라마/영화/책의 기본 표시 형태
-function renderContentByCatHtml(byCat){
-  const cats=['drama','book','movie'];
-  const hasAny=cats.some(cat=>byCat[cat].length>0);
-  if(!hasAny&&!byCat.music.length)return '<div style="text-align:center;color:var(--tm);padding:24px 0;">이 달엔 완료한 콘텐츠가 없어요</div>';
-  const listHtml=cats.filter(cat=>byCat[cat].length>0).map(cat=>{
-    const meta=CAT_ICON_META[cat];
-    const items=byCat[cat].map(c=>{
-      const starsHtml=c.stars>0?`<span style="color:#e0b050;font-size:var(--dow-label-size);">${renderStarDisplayHtml(c.stars)}</span>`:'';
-      // 음악은 항상 status='done'으로 저장되므로 stopped/watching 조건에 자연히 안 걸림 — 별도 예외 불필요
-      const statusHtml=c.status==='stopped'?`<span style="color:var(--tm);font-size:var(--dow-label-size);">중단</span>`:(c.status==='watching'?`<span style="color:var(--tm);font-size:var(--dow-label-size);">진행중</span>`:'');
-      const posterHtml=c.poster?`<img src="${c.poster}" style="width:36px;height:36px;border-radius:8px;object-fit:cover;flex-shrink:0;" />`:`<div style="width:36px;height:36px;border-radius:8px;background:${meta.color};flex-shrink:0;display:flex;align-items:center;justify-content:center;"><i class="ti ${meta.icon}" style="font-size:15px;color:#fff;" aria-hidden="true"></i></div>`;
-      const reviewId=c.cid||('t'+(c.created||0));
-      const wcalNotes=(c.notes||[]).slice().sort((a,b)=>(b.dk||'').localeCompare(a.dk||''));
-      const hasReviewContent=!!(c.review||wcalNotes.length);
-      const reviewIconHtml=hasReviewContent?`<span class="cmr-review-icon" onclick="toggleCmrReview('${reviewId}')" title="코멘트 보기"><i class="ti ti-message-circle ico-sz-13" aria-hidden="true"></i></span>`:'';
-      const reviewBoxHtml=hasReviewContent?`<div class="cmr-review-box" id="cmr-review-${reviewId}">${_cmrDetailBodyHtml(c,wcalNotes)}</div>`:'';
-      return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;">
-        ${posterHtml}
-        <div style="flex:1;min-width:0;font-size:var(--main-text-size);color:var(--tp);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:5px;">
-          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.title}</span>${reviewIconHtml}
-        </div>
-        ${(starsHtml||statusHtml)?`<div style="flex-shrink:0;text-align:right;">${starsHtml}${statusHtml}</div>`:''}
-      </div>${reviewBoxHtml}`;
-    }).join('');
-    return `<div class="mr-card" style="margin-bottom:10px;">
-      <div class="mr-sec-title"><i class="ti ${meta.icon} ico-12" aria-hidden="true"></i> ${CONTENT_CAT_LABEL[cat]}</div>
-      ${items}
-    </div>`;
-  }).join('');
-  return listHtml+renderMusicGridHtml(byCat.music);
-}
-// 음악 그리드 — 개별 mr-card 배너(리스트형 뷰에서 사용). 그리드 뷰 전용 통합 배너는 renderMusicGridSection 참고.
-function renderMusicGridHtml(musicList){
-  if(!musicList||!musicList.length)return '';
-  return `<div class="mr-card" style="margin-bottom:10px;">
-    <div class="mr-sec-title"><i class="ti ${CAT_ICON_META.music.icon} ico-12" aria-hidden="true"></i> ${CONTENT_CAT_LABEL.music}</div>
-    <div class="cgrid-grid" id="content-grid-inner-music">${_cgridRowsHtml(musicList,'music')}</div>
-  </div>`;
-}
 // 카테고리별 그리드형 — 음악(항상 그리드)과 드라마/영화/책(토글 시 그리드)이 공유하는 렌더러.
 // 예전엔 음악 전용/콘텐츠 전용으로 거의 동일한 로직이 중복돼 있던 것을 통합(2026-08-25).
 const CGRID_COLS=5; // 화면이 좁으면 CSS에서 4열로 줄어듦(auto-fit 미사용, 반응형 필요시 조정)
@@ -3911,7 +3872,6 @@ function switchToTab(v,direction){
   document.querySelector('.scroll').scrollTop=0;
   _todoPartModeIdx=-1;
   if(_weeklyRhythmFormOpen){_weeklyRhythmFormOpen=false;_rhythmFormOpen=false;_resetRhythmForm();}
-  _wrbFlowOpenDk=null;
   if(_wishPlacing)cancelWishPlacing();
   if(v==='daily')loadDaily();
   else if(v==='weekly')loadWeekly();
@@ -5655,7 +5615,7 @@ function startMorningFlowCard(key){
     if(flow.enjoy?.targetCid){_startMorningFlowRhythm('enjoy',flow.enjoy.targetCid,flow.enjoy.targetMk||null);return;}
     if(sub==='read'){
       const ongoing=_getOngoingReadingWithCid();
-      if(ongoing.length===0)openAddBookModal();
+      if(ongoing.length===0)return; // 진행중인 책이 없으면(정상 흐름에서 거의 발생 안 함) 조용히 무시
       return;
     }
     if(sub==='content'){
@@ -9512,7 +9472,9 @@ function searchITunes(q,el){
     };
     const script=document.createElement('script');
     script.id=cbName;
-    script.src=`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=song&limit=6&country=KR&callback=${cbName}`;
+    // country=KR 파라미터를 넣으면 iTunes Search API가 song 검색에서 resultCount:0을 반환하는 문제 확인(2026-09)
+    // country 생략 시(미국 스토어 기준) 정상 결과 반환 — 곡명/아티스트/앨범/발매연도/커버 등 필요한 필드는 동일하게 제공됨
+    script.src=`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=song&limit=6&callback=${cbName}`;
     script.onerror=()=>{clearTimeout(timer);cleanup();el.innerHTML='<div class="api-loading">검색 실패 — 직접 입력해주세요</div>';resolve();};
     document.body.appendChild(script);
   });
@@ -10294,214 +10256,54 @@ function loadDaily(){
   const dk=dateKey(currentDate);
   ensureDateSynced(dk).then(fetched=>{if(fetched){loadSleep();renderTodos();renderMemos();renderTodayMeal();renderDailyHabitCheck();}});
 }
-function computeRhythmSegsForDay(dk,realTodayDk,_curLogicalDk){
-  const sleep=getSleep(dk)||{};
-  const meals=getMeals(dk)||{};
-  const wakeMin=toMin(sleep.wake),sleepMin=toMin(sleep.sleep);
-  let segs=[];
-  if(wakeMin!=null&&sleepMin!=null&&sleepMin<=wakeMin){
-    segs.push({start:sleepMin,end:wakeMin,color:getRhythmColor('_sleep'),label:'수면'});
-  }else{
-    if(wakeMin!=null)segs.push({start:0,end:wakeMin,color:getRhythmColor('_sleep'),label:'수면'});
-    if(sleepMin!=null&&wakeMin==null){
-      // 자정~4시(DAWN_CUTOFF_MIN) 사이엔 "아직 자는 중"으로 보고 그날 끝(1440)까지, 4시 이후엔 지금 시각까지 그림
-      const end=dk===realTodayDk?(function(){const n=new Date();return n.getHours()*60+n.getMinutes()<DAWN_CUTOFF_MIN?1440:(n.getHours()*60+n.getMinutes());})():1440;
-      segs.push({start:sleepMin,end:end,color:getRhythmColor('_sleep'),ongoing:true,label:'수면'});
-    }
+// 주간탭 리듬 취합 — 월간 리포트와 동일한 방식(카테고리별 누적시간 비율 막대 + 상위 항목 리스트)으로 간소화.
+// 기존엔 7일치 가로 시간축 바 + 요일별 흐름보기가 있었으나, 그 상세 조회는 아카이브앱으로 이관하고
+// 본앱엔 "이번주 어디에 시간을 많이 썼는지"만 가볍게 보여주는 요약 + 오늘 리듬 입력 진입점만 남김
+// (2026-09-08 간소화 — computeRhythmSegsForDay/renderRhythmBarHtml/흐름보기 등 시간축 계산 로직 전량 제거).
+// 이번주(월~일) 카테고리별 누적시간 — getDayCategoryDurations(기존 공용 유틸)를 7일 돌며 합산.
+// 수면/식사는 buildMonthlyRhythmBar 쪽에서 이미 활동 카테고리(RHYTHM_CATS)만 추리므로 자동 제외됨.
+function computeWeeklyRhythmDur(){
+  const now=new Date();
+  const mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7));
+  const dur={};
+  for(let i=0;i<7;i++){
+    const d=new Date(mon);d.setDate(mon.getDate()+i);
+    const dd=getDayCategoryDurations(dateKey(d));
+    Object.keys(dd).forEach(function(k){dur[k]=(dur[k]||0)+dd[k];});
   }
-  // 자정 전(저녁~밤)에 잠들면 그 취침 기록은 "다음날" 데이터로 저장됨(수면은 기상시각 기준으로 귀속되므로).
-  // 그래서 오늘(dk) 바에는 그 수면이 하나도 안 보이고 밤 시간대가 텅 비어 보이는 문제가 있었음.
-  // 다음날의 취침시각이 정오(12시) 이후(=저녁~밤에 잠든 경우)면, 오늘 바 끝(24시)까지 이어 그려줌.
-  // 정오 기준으로 나누는 이유: 자정 넘어(00~04시경) 늦게 잠든 경우는 이미 그 다음날 자체 데이터로
-  // 정상 처리되므로(위 if문), 여기서 다시 처리하면 안 됨 — 정오 이전 취침시각은 그 케이스로 간주해 제외.
-  // 취침 등록 시 이전 미완료 활동은 이미 자동으로 마감 처리되므로(autoCloseUnfinishedRhythmBlocks),
-  // 이 시간대에 다른 수기활동과 겹칠 일은 없음 — 수면이 그 시각 이후를 그대로 채워도 안전함.
-  const nextD=new Date(dk+'T00:00:00');nextD.setDate(nextD.getDate()+1);
-  const nextSleep=getSleep(dateKey(nextD))||{};
-  const nextSleepMin=toMin(nextSleep.sleep);
-  if(nextSleepMin!=null&&nextSleepMin>=720){
-    segs.push({start:nextSleepMin,end:1440,color:getRhythmColor('_sleep'),label:'수면'});
-  }
-  MEAL_KEYS.forEach(function(k){
-    const t=meals[k+'_time'];if(!t)return;
-    const start=toMin(t);
-    segs.push({start:start,end:Math.min(start+30,1440),color:getRhythmColor('_meal'),label:'식사'});
-  });
-  // 당일(dk) 수기블록은 공통함수(computeRhythmBlocksRaw)의 manual 결과를 그대로 재사용 —
-  // 세로트랙/흐름목록과 동일한 원천 데이터를 쓰되, 여기서는 물리적 24시간 축 표기로 후처리만 다르게 함.
-  computeRhythmBlocksRaw(dk).filter(function(bk){return bk.kind==='manual';}).forEach(function(bk){
-    const s=bk.start;
-    if(s!=null&&s<240)return; // 새벽 4시 이전 시작 블록은 아래(전날 넘어온 처리)에서 별도로 다룸
-    if(bk.end!=null){
-      let e=bk.end;
-      if(e<=s)e=1440;
-      segs.push({start:s,end:e,color:bk.color,label:bk.label});
-    }else{
-      const endMin=dk===realTodayDk?(function(){const n=new Date();return n.getHours()*60+n.getMinutes();})():1440;
-      segs.push({start:s,end:endMin,color:bk.color,ongoing:true,label:bk.label});
-    }
-  });
-  const d=new Date(dk+'T00:00:00');
-  const prevD=new Date(d);prevD.setDate(d.getDate()-1);
-  getRhythmBlocks(dateKey(prevD)).forEach(function(b){
-    const cat=RHYTHM_CATS[b.cat];if(!cat)return;
-    const s=toMin(b.start);
-    if(s==null)return;
-    const lbl=cat.label+(b.text?' · '+b.text:'');
-    if(b.end){
-      const eRaw=toMin(b.end);
-      if(s<240){
-        let e=eRaw<=s?240:eRaw;
-        segs.push({start:s,end:e,color:getRhythmColor(b.cat),label:lbl});
-      }else if(eRaw<=s){
-        segs.push({start:0,end:eRaw,color:getRhythmColor(b.cat),label:lbl});
-      }
-    }else{
-      if(s<240){
-        // 00:00~03:59 사이 시작한 미종료 블록: 이미 자정을 넘긴 시각에 시작한 것이므로
-        // 항상 익일(=오늘) 바에 그려짐. 끝나는 지점은 논리적으로 아직 오늘이 안 끝났으면 현재시각,
-        // 논리적 날짜가 넘어갔으면(다음날 새벽6시 이후) 고정 240분.
-        const endMin=dateKey(prevD)===_curLogicalDk?(function(){const n=new Date();return n.getHours()*60+n.getMinutes();})():240;
-        segs.push({start:0,end:endMin,color:getRhythmColor(b.cat),ongoing:true,label:lbl});
-      }else if(s>=1380){
-        // 23:00~23:59 시작한 미종료 블록: 자정을 아직 안 넘겼으면(같은 논리적 날짜=아직 전날 저녁)
-        // 익일 바엔 그리지 않음(경과분 0). 자정을 넘긴 뒤부터 그 경과분만큼만 채움.
-        let endMin;
-        if(dateKey(prevD)===_curLogicalDk){
-          const n=new Date();
-          const nowMinToday=n.getHours()*60+n.getMinutes();
-          endMin=n.getHours()<12?nowMinToday:0; // 자정~정오 사이면 실제 경과분, 아직 전날 저녁~밤이면 0(안보임)
-        }else{
-          endMin=240;
-        }
-        if(endMin<=0)return;
-        segs.push({start:0,end:endMin,color:getRhythmColor(b.cat),ongoing:true,label:lbl});
-      }
-    }
-  });
-  return segs;
+  return dur;
 }
-// 주간탭 가로바 시간축 압축: 1시~7시 구간을 1/3로 축소, 남는 폭은 나머지 시간대에 균등 배분
-const WRB_COMPRESS_START=60, WRB_COMPRESS_END=420; // 1시~7시(분)
-const WRB_COMPRESS_RATIO=1/3;
-const WRB_ORIG_SPAN=WRB_COMPRESS_END-WRB_COMPRESS_START; // 360
-const WRB_COMPRESSED_SPAN=WRB_ORIG_SPAN*WRB_COMPRESS_RATIO; // 120
-const WRB_SAVED=WRB_ORIG_SPAN-WRB_COMPRESSED_SPAN; // 240
-const WRB_REST_SPAN=1440-WRB_ORIG_SPAN; // 1080
-const WRB_EXPAND_RATE=(WRB_REST_SPAN+WRB_SAVED)/WRB_REST_SPAN;
-function wrbCompressX(min){
-  if(min<=WRB_COMPRESS_START)return min*WRB_EXPAND_RATE;
-  if(min<=WRB_COMPRESS_END)return WRB_COMPRESS_START*WRB_EXPAND_RATE+(min-WRB_COMPRESS_START)*(WRB_COMPRESSED_SPAN/WRB_ORIG_SPAN);
-  return WRB_COMPRESS_START*WRB_EXPAND_RATE+WRB_COMPRESSED_SPAN+(min-WRB_COMPRESS_END)*WRB_EXPAND_RATE;
-}
-const WRB_TOTAL_COMPRESSED=wrbCompressX(1440);
-function renderRhythmBarHtml(segs){
-  let track='<div class="wrb-track">';
-  const segsSorted=segs.slice().sort(function(a,b){return (b.end-b.start)-(a.end-a.start);});
-  segsSorted.forEach(function(sg,si){
-    const bg=sg.color;
-    // 실제 기록 시간은 그대로 두되, 30분 미만 활동은 그리기용 종료 시각만 늘려서 최소 30분 폭으로 표시
-    const drawEnd=(!sg.ongoing&&sg.end-sg.start<30)?Math.min(sg.start+30,1440):sg.end;
-    const left=wrbCompressX(sg.start)/WRB_TOTAL_COMPRESSED*100;
-    const right=wrbCompressX(drawEnd)/WRB_TOTAL_COMPRESSED*100;
-    track+='<div class="wrb-seg'+(sg.ongoing?' ongoing':'')+'" style="left:'+left+'%;width:'+Math.max(right-left,0.8)+'%;background-color:'+bg+';z-index:'+(10+si)+';"></div>';
-  });
-  track+='</div>';
-  return track;
+// 최대 5위까지만 — buildMonthlyRhythmBar는 전체를 다 나열하므로, 상위 5개만 골라 같은 형식으로 재구성.
+function buildWeeklyRhythmBarTop5(dur){
+  const order=Object.values(RHYTHM_CATS).map(function(c){return c.label;});
+  const top5=order.filter(function(k){return (dur[k]||0)>0;})
+    .sort(function(a,b){return dur[b]-dur[a];}).slice(0,5);
+  const trimmedDur={};
+  top5.forEach(function(k){trimmedDur[k]=dur[k];});
+  return buildMonthlyRhythmBar(trimmedDur,false,null);
 }
 function renderWeeklyRhythmBars(){
   const el=document.getElementById('weekly-rhythm-bars');if(!el)return;
-  const now=new Date();
-  const mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7));
-  const DOW=['월','화','수','목','금','토','일'];
-  const todayDk=dateKey(now);
-  const _curLogicalDk=dateKey(getLogicalDate());
-  let html='<div class="wrb-wrap">';
-  for(let i=0;i<7;i++){
-    const d=new Date(mon);d.setDate(mon.getDate()+i);
-    const dk=dateKey(d);
-    const segs=computeRhythmSegsForDay(dk,todayDk,_curLogicalDk);
-    const track=renderRhythmBarHtml(segs);
-    const isToday=dk===todayDk;
-    const isPast=dk<todayDk;
-    const isOpen=_wrbFlowOpenDk===dk;
-    const clickAttr=isToday?' onclick="toggleWeeklyRhythmForm()" style="cursor:pointer;"'
-      :(isPast?' onclick="toggleWeeklyRhythmFlow(\''+dk+'\')" style="cursor:pointer;"':'');
-    const dayLabelHtml=DOW[i];
-    html+='<div class="wrb-row"'+clickAttr+'><div class="wrb-daylabel'+(isToday?' today':'')+'">'+dayLabelHtml+'</div><div class="wrb-trackwrap">'+track+'</div></div>';
-    if(isToday&&_weeklyRhythmFormOpen){
-      html+='<div class="wrb-form-slot" id="wrb-today-form"></div>';
-    }
-    if(isPast&&isOpen){
-      html+='<div class="wrb-flow-slot">'+renderRhythmFlowHtml(segs,dk)+'</div>';
-    }
+  const dur=computeWeeklyRhythmDur();
+  const barHtml=Object.keys(dur).length?buildWeeklyRhythmBarTop5(dur):'<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:12px 0;">이번주 기록된 리듬이 없어요</div>';
+  let html='<div class="wrb-wrap"><div class="wrb-summary" onclick="toggleWeeklyRhythmForm()" style="cursor:pointer;">'+barHtml+'</div>';
+  if(_weeklyRhythmFormOpen){
+    html+='<div class="wrb-form-slot" id="wrb-today-form"></div>';
   }
   html+='</div>';
-  html+='<div class="wrb-legend">'+
-    Object.keys(RHYTHM_CATS).map(function(k){return '<span><i style="background:'+getRhythmColor(k)+';"></i>'+RHYTHM_CATS[k].label+'</span>';}).join('')+'</div>';
   el.innerHTML=html;
   if(_weeklyRhythmFormOpen){
     const slot=document.getElementById('wrb-today-form');
     if(slot)slot.appendChild(buildRhythmFormEl(true));
   }
 }
-// 주간탭 "과거 요일 바" 클릭 시 그날의 시간순 흐름(타임라인)을 텍스트로 펼쳐 보여줌.
-// 당일은 제외(당일은 홈탭 세로 리듬바로 이미 볼 수 있음). AI 분석 없이 순수하게 기록만 나열해
-// 스스로 "이날은 이런 시간이 길었구나" 판단할 수 있게 하는 목적.
-let _wrbFlowOpenDk=null;
-function toggleWeeklyRhythmFlow(dk){
-  _wrbFlowOpenDk=(_wrbFlowOpenDk===dk)?null:dk;
-  // 흐름보기를 열 때(또는 다른 요일로 전환할 때) 오늘 요일 입력폼이 열려있으면 함께 닫아서
-  // 항상 한 번에 하나의 슬롯만 펼쳐지도록 함(과거 요일 흐름보기 ↔ 오늘 입력폼 서로 배타적).
-  if(_wrbFlowOpenDk!=null&&_weeklyRhythmFormOpen){
-    _weeklyRhythmFormOpen=false;_rhythmFormOpen=false;_resetRhythmForm();
-  }
-  renderWeeklyRhythmBars();
-}
-function renderRhythmFlowHtml(segs,dk){
-  const toHHMM=function(min){
-    const m=((min%1440)+1440)%1440;
-    return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
-  };
-  // 세로 리듬바(buildDailyRhythmTrack)와 동일한 공통함수(computeRhythmBlocksRaw)를 사용.
-  // computeRhythmSegsForDay가 만드는 segs는 가로바 그리기용이라 "전날 밤~익일 새벽으로 이어지는 조각"이
-  // 섞여 들어있는데, 이 조각은 실제로는 전날 소속 활동이라 흐름보기(텍스트 목록)에는 포함하면 안 되므로
-  // segs 파라미터 대신 computeRhythmBlocksRaw(dk)를 직접 사용.
-  const raw=dk?computeRhythmBlocksRaw(dk):[];
-  const dayItems=raw.map(function(bk){
-    // labelEnd: 텍스트 라벨(예: "23:54~01:37")에 쓸 실제 종료시각 — 자정을 넘겨도 원본 그대로 유지
-    // end(정렬/화면용): 자정을 넘긴 경우 1440으로 보정(라벨과는 무관)
-    let e=bk.end,labelEnd=e;
-    if(e!=null&&e<=bk.start){labelEnd=e+1440;e=1440;}
-    // 흐름목록만의 라벨 형식: 식사는 "식사 · 메뉴"로 접두어를 붙임(세로트랙은 메뉴명만 단독 표기)
-    const label=bk.kind==='meal'?'식사 · '+bk.label:bk.label;
-    return Object.assign({},bk,{
-      label:label,
-      end:e==null?bk.start:e,
-      labelEnd:labelEnd==null?bk.start:labelEnd,
-      ongoing:bk.end==null
-    });
-  });
-  const items=dayItems.filter(s=>s.label).map(function(s){
-    return Object.assign({},s,{sortKey:s.sortKey!=null?s.sortKey:s.start});
-  }).sort((a,b)=>a.sortKey-b.sortKey);
-  if(!items.length)return '<div class="wrb-flow-empty">이날은 기록된 리듬이 없어요</div>';
-  const rows=items.map(function(s){
-    const displayEnd=s.labelEnd!=null?s.labelEnd:s.end;
-    const timeRange=toHHMM(s.start)+(s.ongoing?'~진행중':'~'+toHHMM(displayEnd));
-    return '<div class="wrb-flow-row"><span class="wrb-flow-dot" style="background:'+s.color+';"></span><span class="wrb-flow-time">'+timeRange+'</span><span class="wrb-flow-label">'+s.label+'</span></div>';
-  }).join('');
-  return '<div class="wrb-flow-list">'+rows+'</div>';
-}
-// 주간탭 "당일 바" 클릭 시 리듬 입력 폼 토글 — 홈탭과 동일한 폼(카테고리 선택+시간+메모)을 그대로 재사용.
+// 주간탭 리듬 요약 클릭 시 오늘 리듬 입력폼 토글 — 홈탭과 동일한 폼(카테고리 선택+시간+메모)을 그대로 재사용.
 // 리듬 리뷰나 다른 리포트는 붙이지 않고 순수 입력 기능만 제공.
 let _weeklyRhythmFormOpen=false;
 function toggleWeeklyRhythmForm(){
   _weeklyRhythmFormOpen=!_weeklyRhythmFormOpen;
   _rhythmDk=dateKey(getLogicalDate());
   if(!_weeklyRhythmFormOpen){_rhythmFormOpen=false;_resetRhythmForm();}
-  // 입력폼을 열 때 과거 요일 흐름보기가 열려있으면 함께 닫음(서로 배타적으로 하나만 열림).
-  if(_weeklyRhythmFormOpen&&_wrbFlowOpenDk!=null){_wrbFlowOpenDk=null;}
   renderWeeklyRhythmBars();
 }
 // 카테고리 레전드 + 시간/메모 입력 폼 — buildDailyRhythmTrack의 폼 부분과 동일한 HTML을 생성하는 공통 함수.
@@ -11368,7 +11170,7 @@ function openQuoteSheetCheck(bookCid){
     return;
   }
   const cur=_rdSelectedBook();
-  if(!cur){openAddBookModal();return;}
+  if(!cur)return; // 선택된 책이 없으면(정상 흐름에서 거의 발생 안 함) 조용히 무시
   _rdSheetBookCid=cur.cid;
   document.getElementById('rd-quote-inp').value='';
   openSheet('quote-sheet');
@@ -11685,15 +11487,6 @@ function removeBook(cid){
   renderReadingHub(); // 아카이브 리스트뿐 아니라 상단(진행중 표시/커버 등)까지 즉시 갱신
   renderContentTimeline();
 }
-let _rdNewUnit='percent';
-function setRdUnit(u){
-  _rdNewUnit=u;
-  document.getElementById('rd-unit-pages').classList.toggle('on',u==='pages');
-  document.getElementById('rd-unit-percent').classList.toggle('on',u==='percent');
-  document.getElementById('rd-new-total').style.display=u==='percent'?'none':'';
-  document.getElementById('rd-unit-hint').style.display=u==='percent'?'block':'none';
-}
-
 // ===== 독서 공유카드 =====
 const SHARE_CYCLE = {
   header: [['none','헤더 없음'],['rl','모먼츠'],['idx','인덱스'],['books','북스']],
@@ -11701,72 +11494,6 @@ const SHARE_CYCLE = {
   progress: [['none','진행률 없음'],['top','진행률 · 상단좌'],['topright','진행률 · 상단우'],['bottom','진행률 · 하단']],
   cover: [['none','표지 없음'],['bl','표지 · 좌하단'],['bl-title','표지 · 좌하단+제목'],['br','표지 · 우하단'],['br-title','표지 · 우하단+제목'],['tl','표지 · 좌상단'],['tl-title','표지 · 좌상단+제목'],['tr','표지 · 우상단'],['tr-title','표지 · 우상단+제목']]
 };
-function openAddBookModal(){
-  document.getElementById('rd-new-title').value='';
-  document.getElementById('rd-new-total').value='';
-  document.getElementById('rd-wish-results').style.display='none';
-  _rdNewPoster=null;_rdNewAuthor='';
-  setRdUnit('percent');
-  openModal('add-book-modal');
-}
-let _rdWishTimer=null,_rdNewPoster=null,_rdNewAuthor='';
-function onRdTitleInput(v){
-  clearTimeout(_rdWishTimer);
-  _rdNewPoster=null;_rdNewAuthor='';
-  const resultsEl=document.getElementById('rd-wish-results');
-  if(!v||v.length<1){resultsEl.style.display='none';return;}
-  _rdWishTimer=setTimeout(()=>searchKakaoBookWish(v),400);
-}
-async function searchKakaoBookWish(q){
-  const resultsEl=document.getElementById('rd-wish-results');if(!resultsEl)return;
-  resultsEl.style.display='block';resultsEl.innerHTML='<div class="api-loading">검색 중...</div>';
-  try{
-    const url=`https://dapi.kakao.com/v3/search/book?query=${encodeURIComponent(q)}&size=6`;
-    const res=await fetch(url,{headers:{'Authorization':`KakaoAK ${KAKAO_KEY}`}});
-    if(!res.ok){
-      const errBody=await res.text();
-      console.error('카카오 책 검색(찜) 실패',res.status,errBody);
-      resultsEl.innerHTML=`<div class="api-loading">검색 실패 (${res.status}) — 직접 입력해주세요</div>`;
-      return;
-    }
-    const data=await res.json();const results=(data.documents||[]).slice(0,6);
-    if(!results.length){resultsEl.innerHTML='<div class="api-loading">결과 없음 — 직접 입력해주세요</div>';return;}
-    resultsEl.innerHTML='';
-    results.forEach(item=>{
-      const title=item.title||'';const author=(item.authors||[]).join(', ');const poster=item.thumbnail||null;
-      const isbn=item.isbn||'';
-      const div=document.createElement('div');div.className='api-result-item';
-      div.innerHTML=poster?`<img class="api-result-poster" src="${poster}" alt="">`:`<div class="api-result-poster-placeholder">📚</div>`;
-      div.innerHTML+=`<div class="api-result-info"><div class="api-result-title">${title}</div><div class="api-result-sub">${author}</div></div>`;
-      div.addEventListener('click',()=>{
-        document.getElementById('rd-new-title').value=title;
-        _rdNewPoster=poster;_rdNewAuthor=author;
-        resultsEl.style.display='none';
-        fetchAladinPageCountInto('rd-new-total',isbn);
-      });
-      resultsEl.appendChild(div);
-    });
-  }catch(e){resultsEl.innerHTML='<div class="api-loading">검색 실패 — 직접 입력해주세요</div>';}
-}
-function confirmAddBook(){
-  const title=document.getElementById('rd-new-title').value.trim();
-  if(!title)return;
-  const total=_rdNewUnit==='pages'?(parseInt(document.getElementById('rd-new-total').value,10)||null):null;
-  const status='reading';
-  const today=dateKey(new Date());
-  const mk=monthKey(new Date());
-  const sharedCid=genCid(); // book과 contents가 하나의 항목이므로 cid를 반드시 공유해야 함(2026-08-29 통합 — 예전엔 여기서 cid가 서로 달라 연결이 끊기는 버그가 있었음)
-  const book={cid:sharedCid,title,status,unit:_rdNewUnit,pages:0,totalPages:total,percent:0,seconds:0,todayDate:null,todayStart:0,created:Date.now(),completedAt:null,poster:_rdNewPoster||null,author:_rdNewAuthor||''};
-  // 콘텐츠 타임테이블에도 자동 등록 (쌍방 연동)
-  book.linkedContent=true;book.contentMk=mk;book.contentTitle=title;
-  const contents=getContents(mk);
-  contents.push({cat:'book',title,startDate:today,endDate:null,status:'watching',review:'',stars:0,poster:book.poster,author:book.author,created:Date.now(),cid:sharedCid});
-  saveContents(mk,contents);
-  upsertBookLocal(book);
-  _rdNewPoster=null;_rdNewAuthor='';
-  closeModal('add-book-modal');
-  renderReadingHub();
-}
 // ══════════════════════════════════════════════════════════
 // ██ 독서 허브 (2/2 — 나머지는 READING HUB~씨앗코너 부근) — 진행률입력모달~공유모달공통(문장카드 포함) ██
 // ══════════════════════════════════════════════════════════
@@ -11775,7 +11502,7 @@ let _pgBookCid=null,_pgUnit='pages',_pgSeconds=0,_pgStartVal=0;
 // cid: 병렬독서 지원(2026-09-03)으로 어느 책의 진행률인지 항상 명시. 진행바 직접 클릭(0초)도 cid를 함께 넘김.
 function openProgressModal(cid,seconds){
   const book=getBooks().find(b=>b.cid===cid);
-  if(!book){if(seconds>0){_swSeconds=0;}openAddBookModal();return;}
+  if(!book){if(seconds>0){_swSeconds=0;}return;} // 대상 책이 없으면(정상 흐름에서 거의 발생 안 함) 조용히 무시
   _pgBookCid=book.cid;_pgSeconds=seconds||0;_pgUnit=book.unit||'pages';
   _pgStartVal=_pgUnit==='percent'?(book.percent||0):(book.pages||0);
   document.getElementById('pg-unit-pages').classList.toggle('on',_pgUnit==='pages');
@@ -12275,18 +12002,8 @@ function renderChHubMonthBanners(){
   }
   el.innerHTML=html;
 }
-// 선택된 달의 콘텐츠 목록(월간 카테고리별 집계) — renderContentByCatHtml이 각 항목 코멘트 아이콘에 완결 총평+감상 중 메모를 함께 보여줌
-// 음악은 항상 그리드, 드라마/영화/책은 리스트↔그리드 토글(_chArchiveGridMode)
-let _chArchiveGridMode=true;
-function chToggleArchiveGridMode(){
-  _chArchiveGridMode=!_chArchiveGridMode;
-  const btn=document.getElementById('ch-archive-grid-toggle');
-  if(btn){
-    btn.classList.toggle('on',_chArchiveGridMode);
-    btn.title=_chArchiveGridMode?'리스트로 보기':'그리드로 보기';
-  }
-  chExpandMonth(_chArchiveMk);
-}
+// 선택된 달의 콘텐츠 목록(월간 카테고리별 집계) — renderContentAsGridHtml이 각 항목 코멘트 아이콘에 완결 총평+감상 중 메모를 함께 보여줌
+// 그리드형으로 통일(2026-09-08) — 리스트형(renderContentByCatHtml)은 실사용 저조로 완전 제거, 음악도 원래부터 항상 그리드였음
 // 콘텐츠허브 내에서 감상 기록이 바뀔 때(스톱워치 종료, 진행률 저장, 완결 전환) 호출 —
 // 아카이브 펼침뷰(chExpandMonth)는 각 호출부에서 이미 갱신하고 있었지만, 감상달력(loadAndRenderWatchCal)은
 // 콘텐츠허브가 열려있어도 다시 그려지지 않아 나갔다 들어와야 반영되는 문제가 있었음(2026-09-01).
@@ -12302,7 +12019,7 @@ function chExpandMonth(mk){
   const [y,mo]=mk.split('-').map(Number);
   const byCat=computeContentMonthlyByCat(y,mo-1);
   _cmrByCatCache=byCat; // 그리드 모드의 코멘트 토글 갱신이 이 캐시를 참조함
-  el.innerHTML=_chArchiveGridMode?renderContentAsGridHtml(byCat):renderContentByCatHtml(byCat);
+  el.innerHTML=renderContentAsGridHtml(byCat);
 }
 
 // ── 콘텐츠 허브 — 코멘트 모아보기(타임라인, 읽기 전용) — 독서코너의 독서달력 진입구와 동일한 위치의 헤더 아이콘으로 진입 ──
