@@ -4585,8 +4585,10 @@ function renderTodos(){
     const chkHtml=(!t.done&&t.pinned)
       ? `<div class="todo-pinned-chk" data-role="chk"><i class="ti ti-bolt-filled" aria-hidden="true"></i></div>`
       : `<div class="chk${tsClass}${t.done?' on':''}" data-role="chk"></div>`;
-    const recurIconHtml=t.recurRuleCid?'<i class="ti ti-repeat ico-sz-11" style="color:var(--tm);flex-shrink:0;margin-left:auto;" aria-hidden="true" title="반복"></i>':'';
-    el.innerHTML=`${handleHtml}${chkHtml}<span class="todo-txt${t.done?' done':''}" data-todo-i="${i}" style="${partModeStyle}">${textHtml}</span>${recurIconHtml}`;
+    const recurIconHtml=t.recurRuleCid?'<i class="ti ti-repeat ico-sz-11" style="color:var(--tm);flex-shrink:0;" aria-hidden="true" title="반복"></i>':'';
+    const alertIconHtml=(t.todoAlertOn&&t.alertTime)?'<i class="ti ti-bell ico-sz-11" style="color:var(--tm);flex-shrink:0;" aria-hidden="true" title="알림 '+t.alertTime+'"></i>':'';
+    const rightIconsHtml=(recurIconHtml||alertIconHtml)?`<div style="display:flex;align-items:center;gap:4px;margin-left:auto;">${recurIconHtml}${alertIconHtml}</div>`:'';
+    el.innerHTML=`${handleHtml}${chkHtml}<span class="todo-txt${t.done?' done':''}" data-todo-i="${i}" style="${partModeStyle}">${textHtml}</span>${rightIconsHtml}`;
     const hasMultipleParts=_isTouchDevice()&&parseTodoTextParts(t.text).parts.length>1;
     attachTodoItemClick(el,i,t.cid||'');
     if(rmEligible){
@@ -7053,91 +7055,79 @@ function openTodoEventEndDatePicker(){
     modal.dataset.eventEndDate=selectedDk;
   },'종료일 선택','확인');
 }
-function clearTodoEventTime(){
-  const inp=document.getElementById('todo-event-time-inp');
-  inp.dataset.value='';inp.textContent='시간 선택';
-  document.getElementById('todo-event-time-clear').style.display='none';
-  document.getElementById('todo-modal').dataset.eventAlertOn='';
-  updateEventTimeIcon();
+// ── 시간+알림 아이콘 공용 로직 — 일정(event)과 할일(todo-alert)이 완전히 같은 패턴이라 하나로 통합.
+// cfg: {inpId, clearBtnId, iconId, datasetKey, clockIcon, emptyTitle, sleepTarget}
+// clockIcon이 있으면(일정) 시간 없을 때 시계 아이콘, 없으면(할일) 항상 벨 아이콘만 사용.
+function _timeAlertCfg(kind){
+  return kind==='event'
+    ? {inpId:'todo-event-time-inp',clearBtnId:'todo-event-time-clear',iconId:'todo-event-time-icon',datasetKey:'eventAlertOn',clockIcon:'ti-clock',emptyTitle:'',sleepTarget:'event'}
+    : {inpId:'todo-alert-time-inp',clearBtnId:'todo-alert-time-clear',iconId:'todo-alert-time-icon',datasetKey:'todoAlertOn',clockIcon:null,emptyTitle:'탭하여 알림 시간 설정',sleepTarget:'todo-alert'};
 }
-function openEventTimePicker(){
-  _sleepTarget='event';
-  const inp=document.getElementById('todo-event-time-inp');
+function _clearTimeAlert(kind){
+  const cfg=_timeAlertCfg(kind);
+  const inp=document.getElementById(cfg.inpId);
+  inp.dataset.value='';inp.textContent=kind==='event'?'시간 선택':'알림 없음';
+  document.getElementById(cfg.clearBtnId).style.display='none';
+  document.getElementById('todo-modal').dataset[cfg.datasetKey]='';
+  _updateTimeAlertIcon(kind);
+}
+function _openTimeAlertPicker(kind){
+  const cfg=_timeAlertCfg(kind);
+  _sleepTarget=cfg.sleepTarget;
+  const inp=document.getElementById(cfg.inpId);
   const n=new Date();
   const current=inp.dataset.value||`${pad(n.getHours())}:${pad(n.getMinutes())}`;
   document.getElementById('time-inp').value=current;
   openModal('time-modal');
   renderTimeWheel();
 }
-// ── 일정 시간 아이콘: 시간 미선택 시 시계(클릭→시간피커), 선택 시 벨(클릭→알림 온오프 토글)로 전환.
-// 시간 입력 자체는 항상 텍스트(todo-event-time-inp) 쪽에만 있음 — 아이콘은 표시+토글 전용.
-function updateEventTimeIcon(){
-  const icon=document.getElementById('todo-event-time-icon');
+// 시간 미선택+clockIcon 설정된 경우(일정)만 시계, 그 외엔 항상 벨. 켜짐 상태만 강조색.
+function _updateTimeAlertIcon(kind){
+  const cfg=_timeAlertCfg(kind);
+  const icon=document.getElementById(cfg.iconId);
   const modal=document.getElementById('todo-modal');
-  const hasTime=!!document.getElementById('todo-event-time-inp').dataset.value;
-  const alertOn=modal.dataset.eventAlertOn==='1';
-  icon.className='ti ico-sz-13 '+(hasTime?'ti-bell':'ti-clock')+(hasTime&&alertOn?' alert-on':'');
-  icon.title=hasTime?(alertOn?'알림 켜짐 (탭하여 끄기)':'알림 꺼짐 (탭하여 켜기)'):'';
+  const hasTime=!!document.getElementById(cfg.inpId).dataset.value;
+  const on=modal.dataset[cfg.datasetKey]==='1';
+  const baseIcon=(cfg.clockIcon&&!hasTime)?cfg.clockIcon:'ti-bell';
+  icon.className='ti ico-sz-13 '+baseIcon+(hasTime&&on?' alert-on':'');
+  icon.title=hasTime?(on?'알림 켜짐 (탭하여 끄기)':'알림 꺼짐 (탭하여 켜기)'):cfg.emptyTitle;
 }
-function onEventTimeIconClick(){
+// 아이콘 클릭 — 시간 있으면 온오프 토글만. 시간 없으면(할일만) 시간표 형식("09:00 회의") 자동감지 후 채워 넣고 켬, 아니면 피커 오픈.
+// 일정은 시간표 자동감지 대상이 아니므로 곧장 피커를 연다.
+function _onTimeAlertIconClick(kind){
+  const cfg=_timeAlertCfg(kind);
   const modal=document.getElementById('todo-modal');
-  const hasTime=!!document.getElementById('todo-event-time-inp').dataset.value;
-  if(!hasTime){openEventTimePicker();return;}
-  const on=modal.dataset.eventAlertOn==='1';
-  modal.dataset.eventAlertOn=on?'':'1';
-  updateEventTimeIcon();
-}
-// ── 할일 알림(예상 시각) — event의 시간 선택과 동일한 time-modal 재사용.
-// 여기서 정하는 시각은 "임시 예상/희망 시간"으로 알람 트리거 전용이며, 실제 완료 처리 시각(completedAt)과는 별개.
-function clearTodoAlertTime(){
-  const inp=document.getElementById('todo-alert-time-inp');
-  inp.dataset.value='';inp.textContent='알림 없음';
-  document.getElementById('todo-alert-time-clear').style.display='none';
-  document.getElementById('todo-modal').dataset.todoAlertOn='';
-  updateTodoAlertIcon();
-}
-function openAlertTimePicker(){
-  _sleepTarget='todo-alert';
-  const inp=document.getElementById('todo-alert-time-inp');
-  const n=new Date();
-  const current=inp.dataset.value||`${pad(n.getHours())}:${pad(n.getMinutes())}`;
-  document.getElementById('time-inp').value=current;
-  openModal('time-modal');
-  renderTimeWheel();
-}
-// 일정과 동일한 아이콘 표시 규칙: 시간 미지정이면 무채색 벨(피커 유도), 지정+온이면 강조색.
-function updateTodoAlertIcon(){
-  const icon=document.getElementById('todo-alert-time-icon');
-  const modal=document.getElementById('todo-modal');
-  const hasTime=!!document.getElementById('todo-alert-time-inp').dataset.value;
-  const on=modal.dataset.todoAlertOn==='1';
-  icon.className='ti ti-bell ico-sz-13'+(hasTime&&on?' alert-on':'');
-  icon.title=hasTime?(on?'알림 켜짐 (탭하여 끄기)':'알림 꺼짐 (탭하여 켜기)'):'탭하여 알림 시간 설정';
-}
-// 아이콘 클릭 — 이미 시간이 있으면 온오프만 토글(시간 변경은 텍스트 쪽에서).
-// 시간이 아직 없으면: 텍스트가 시간표 형식("09:00 회의")이면 그 앞머리 시각을 그대로 알림 시간으로 채워 즉시 켬(원하면 이후 텍스트로 수정 가능).
-// 시간표 형식이 아니면 기존처럼 피커를 연다.
-function onTodoAlertIconClick(){
-  const modal=document.getElementById('todo-modal');
-  const inp=document.getElementById('todo-alert-time-inp');
+  const inp=document.getElementById(cfg.inpId);
   if(inp.dataset.value){
-    const on=modal.dataset.todoAlertOn==='1';
-    modal.dataset.todoAlertOn=on?'':'1';
-    updateTodoAlertIcon();
+    const on=modal.dataset[cfg.datasetKey]==='1';
+    modal.dataset[cfg.datasetKey]=on?'':'1';
+    _updateTimeAlertIcon(kind);
     return;
   }
-  const text=document.getElementById('todo-modal-inp').value;
-  const m=(text||'').match(SCHEDULE_TIME_RE);
-  if(m){
-    const hh=pad(Math.min(23,parseInt(m[1],10))),mm=pad(Math.min(59,parseInt(m[2],10)));
-    inp.dataset.value=`${hh}:${mm}`;inp.textContent=`${hh}:${mm}`;
-    document.getElementById('todo-alert-time-clear').style.display='block';
-    modal.dataset.todoAlertOn='1';
-    updateTodoAlertIcon();
-    return;
+  if(kind==='todo'){
+    const text=document.getElementById('todo-modal-inp').value;
+    const m=(text||'').match(SCHEDULE_TIME_RE);
+    if(m){
+      const hh=pad(Math.min(23,parseInt(m[1],10))),mm=pad(Math.min(59,parseInt(m[2],10)));
+      inp.dataset.value=`${hh}:${mm}`;inp.textContent=`${hh}:${mm}`;
+      document.getElementById(cfg.clearBtnId).style.display='block';
+      modal.dataset[cfg.datasetKey]='1';
+      _updateTimeAlertIcon(kind);
+      return;
+    }
   }
-  openAlertTimePicker();
+  _openTimeAlertPicker(kind);
 }
+function clearTodoEventTime(){_clearTimeAlert('event');}
+function openEventTimePicker(){_openTimeAlertPicker('event');}
+function updateEventTimeIcon(){_updateTimeAlertIcon('event');}
+function onEventTimeIconClick(){_onTimeAlertIconClick('event');}
+// ── 할일 알림(예상 시각) — 여기서 정하는 시각은 "임시 예상/희망 시간"으로 알람 트리거 전용이며,
+// 실제 완료 처리 시각(completedAt)과는 별개.
+function clearTodoAlertTime(){_clearTimeAlert('todo');}
+function openAlertTimePicker(){_openTimeAlertPicker('todo');}
+function updateTodoAlertIcon(){_updateTimeAlertIcon('todo');}
+function onTodoAlertIconClick(){_onTimeAlertIconClick('todo');}
 function selectTodoTime(ts,btn){
   document.querySelectorAll('.todo-time-sel button').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');

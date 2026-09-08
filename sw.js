@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.46-webpush';
+const CACHE = 'iikoto-v2.47-alert-ui-refactor';
 const ASSETS = [
   './',
   './index.html'
