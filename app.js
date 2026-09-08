@@ -11021,8 +11021,11 @@ function cswRingSvg(cid,mk,running){
     <div class="rd-sw-face"><i class="ti ${running?'ti-player-stop-filled':'ti-player-play'}" style="font-size:20px;" aria-hidden="true"></i></div>
   </div>`;
 }
-// 병렬 진행중(2개 이상)일 때 스와이프+도트 카드 — 각 슬라이드는 buildSingleHtml(item)이 만드는
-// "1개일 때와 동일한 단일 카드"를 그대로 재사용. 화살표 없이 스와이프/탭으로만 전환(2026-09-09).
+// 병렬 진행중(2개 이상)일 때 스와이프+도트 카드 — buildSingleHtml(item)은 "카드 내용물"만 반환해야 함
+// (.rd-top-inner 같은 카드 껍데기는 포함하지 않는 게 규칙 — 껍데기는 호출부가 <div class="rd-top">
+// <div class="rd-top-inner">이 함수 호출 결과</div></div>로 직접 감쌈). 도트는 트랙 위가 아니라
+// 아래(진행률바 밑)에 둬서, 바깥 그라데이션 테두리(.rd-top)가 도트까지 포함해 위로 튀어나오지 않고
+// 카드 하나만 딱 감싸도록 함(1개일 때와 동일한 테두리 모양 유지, 2026-09-09 수정).
 // wrapId는 이 카드가 그려질 컨테이너의 id, 여러 인스턴스가 동시에 존재하지 않으므로 전역 카운터로 고유 id 부여.
 let _swipeCardSeq=0;
 function buildSwipeCardHtml(items,buildSingleHtml){
@@ -11030,8 +11033,8 @@ function buildSwipeCardHtml(items,buildSingleHtml){
   const dotsHtml=items.map((_,i)=>`<span class="sw-card-dot${i===0?' on':''}" data-i="${i}"></span>`).join('');
   const slidesHtml=items.map(item=>`<div class="sw-card-slide">${buildSingleHtml(item)}</div>`).join('');
   return `<div class="sw-card" id="sw-card-${seq}" data-idx="0">
-    <div class="sw-card-dots">${dotsHtml}</div>
     <div class="sw-card-track">${slidesHtml}</div>
+    <div class="sw-card-dots">${dotsHtml}</div>
   </div>`;
 }
 // 렌더 직후 호출 — 터치 스와이프와 탭 전환을 바인딩. 요소가 DOM에 붙은 다음에만 동작하므로
@@ -11084,12 +11087,11 @@ function _rdProgressBarHtml(book){
     <div class="rd-progress-bead" style="left:${pct}%;"></div>
   </div>`;
 }
-// 책 하나가 진행중 스톱워치 대상일 때의 메인 카드 — 1권만 있을 때, 또는 2권+ 중 하나를 선택한 뒤 공통으로 사용.
-function _rdTopSingleHtml(book,running){
+// 카드 내용물만(.rd-top-inner 껍데기 제외) — 콘텐츠허브 슬라이드 함수와 동일 규칙, 1개 카드/스와이프 슬라이드 양쪽에서 공용.
+function _rdTopInnerBodyHtml(book,running){
   const cover=book.poster?`<img class="rd-top-cover" src="${book.poster}" alt="">`:`<div class="rd-top-cover-empty"></div>`;
   const progressHtml=_rdProgressBarHtml(book);
-  return `<div class="rd-top-inner">
-      <div class="rd-top-main">
+  return `<div class="rd-top-main">
         ${cover}
         <div class="rd-top-info">
           <div class="rd-top-title">${book.title}</div>
@@ -11097,8 +11099,11 @@ function _rdTopSingleHtml(book,running){
         </div>
         <div class="rd-top-sw">${swRingSvg(book.cid,running)}</div>
       </div>
-      ${progressHtml||''}
-    </div>`;
+      ${progressHtml||''}`;
+}
+// 책 하나가 진행중 스톱워치 대상일 때의 메인 카드(껍데기 포함) — 1권만 있을 때 단독으로 사용.
+function _rdTopSingleHtml(book,running){
+  return `<div class="rd-top-inner">${_rdTopInnerBodyHtml(book,running)}</div>`;
 }
 // 진행중 책 선택 단계 — 콘텐츠의 selectPendingWatch와 동일한 역할, 실수 탭으로 스톱워치가 바로 시작되지 않도록 함.
 let _rdPendingCid=null;
@@ -11144,12 +11149,14 @@ function renderRdTop(){
   }else if(ongoing.length===1){
     el.innerHTML=_rdTopSingleHtml(ongoing[0],false);
   }else{
-    el.innerHTML=buildSwipeCardHtml(ongoing,book=>{
-      // 1권일 때(_rdTopSingleHtml)와 동일한 마크업 그대로 재사용 — onclick만 selectPendingRead로 감싸 추가.
-      // 스톱워치 링 자체의 클릭이 바깥 selectPendingRead로 버블링되지 않도록 swRingSvg 쪽에 stopPropagation 추가(아래 참고).
-      // 이전엔 별도 인라인 스타일로 새로 짜서 커버 간격/진행률바 위치/불필요한 선 등이 원본과 미묘하게 달라졌었음(2026-09-09 수정).
-      return `<div onclick="selectPendingRead('${book.cid}')" style="cursor:pointer;">${_rdTopSingleHtml(book,false)}</div>`;
-    });
+    // 콘텐츠허브(renderCwatchMainCard)와 동일 패턴: 바깥을 .rd-top-inner로 한 번만 감싸고,
+    // 슬라이드에는 카드 내용물(_rdTopInnerBodyHtml, .rd-top-inner 껍데기 제외)만 넣음 — 이렇게 해야
+    // 도트가 카드 안쪽(진행률바 밑)에 들어가고 바깥 그라데이션 테두리가 1개일 때와 똑같이 카드 하나만
+    // 딱 감싸게 됨(이전엔 _rdTopSingleHtml 전체를 슬라이드에 넣어 .rd-top-inner가 중첩되며 테두리가
+    // 도트까지 포함해 위로 튀어나오는 문제가 있었음, 2026-09-09 재수정).
+    el.innerHTML=`<div class="rd-top-inner">`+buildSwipeCardHtml(ongoing,book=>{
+      return `<div onclick="selectPendingRead('${book.cid}')" style="cursor:pointer;">${_rdTopInnerBodyHtml(book,false)}</div>`;
+    })+`</div>`;
     bindSwipeCard('rd-top');
   }
 }
