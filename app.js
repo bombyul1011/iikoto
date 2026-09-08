@@ -556,7 +556,8 @@ function buildMonthlyRhythmBar(dur,dim,dayCount){
     barHtml+='<div class="mr-rhythm-seg" style="width:'+pct+'%;background:'+colorMap[k]+';" title="'+k+' '+fmtDur(v)+'"></div>';
   });
   barHtml+='</div>';
-  const listItems=order.filter(function(k){return (dur[k]||0)>0;});
+  const listItems=order.filter(function(k){return (dur[k]||0)>0;})
+    .sort(function(a,b){return dur[b]-dur[a];}); // 누계 많은 순 정렬(2026-09-08)
   const listHtml=listItems.length?'<div class="mr-rhythm-list">'+listItems.map(function(k){
     const v=dur[k],days=(dayCount&&dayCount[k])||1,avg=v/days;
     return '<div class="mr-rhythm-item"><span class="dot" style="background:'+colorMap[k]+';"></span><span class="lbl">'+k+'</span><span class="val">누계 '+fmtDur(v)+' · 일평균 '+fmtDur(avg)+'</span></div>';
@@ -10260,32 +10261,36 @@ function loadDaily(){
 // 기존엔 7일치 가로 시간축 바 + 요일별 흐름보기가 있었으나, 그 상세 조회는 아카이브앱으로 이관하고
 // 본앱엔 "이번주 어디에 시간을 많이 썼는지"만 가볍게 보여주는 요약 + 오늘 리듬 입력 진입점만 남김
 // (2026-09-08 간소화 — computeRhythmSegsForDay/renderRhythmBarHtml/흐름보기 등 시간축 계산 로직 전량 제거).
-// 이번주(월~일) 카테고리별 누적시간 — getDayCategoryDurations(기존 공용 유틸)를 7일 돌며 합산.
+// 최근 7일(오늘 포함) 카테고리별 누적시간+발생일수 — getDayCategoryDurations(기존 공용 유틸)를 7일 돌며 합산.
 // 수면/식사는 buildMonthlyRhythmBar 쪽에서 이미 활동 카테고리(RHYTHM_CATS)만 추리므로 자동 제외됨.
+// 기존엔 월~오늘(주초반엔 표본이 1~2일뿐)이었으나, 홈탭 오늘의 흐름 인사이트와 동일하게 항상 최근 7일 고정 윈도우로 통일(2026-09-08).
+// dayCount(카테고리별 실제 발생일수)는 computeRawStatsForRange(월간리포트)와 동일 기준(dd[k]>0인 날만 카운트)으로 별도 집계 — 이게 없으면 buildMonthlyRhythmBar의 일평균이 누계와 같아짐.
 function computeWeeklyRhythmDur(){
   const now=new Date();
-  const mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7));
-  const dur={};
+  const dur={},dayCount={};
   for(let i=0;i<7;i++){
-    const d=new Date(mon);d.setDate(mon.getDate()+i);
+    const d=new Date(now);d.setDate(now.getDate()-i);
     const dd=getDayCategoryDurations(dateKey(d));
-    Object.keys(dd).forEach(function(k){dur[k]=(dur[k]||0)+dd[k];});
+    Object.keys(dd).forEach(function(k){
+      dur[k]=(dur[k]||0)+dd[k];
+      if(dd[k]>0)dayCount[k]=(dayCount[k]||0)+1;
+    });
   }
-  return dur;
+  return {dur,dayCount};
 }
 // 최대 5위까지만 — buildMonthlyRhythmBar는 전체를 다 나열하므로, 상위 5개만 골라 같은 형식으로 재구성.
-function buildWeeklyRhythmBarTop5(dur){
+function buildWeeklyRhythmBarTop5(dur,dayCount){
   const order=Object.values(RHYTHM_CATS).map(function(c){return c.label;});
   const top5=order.filter(function(k){return (dur[k]||0)>0;})
     .sort(function(a,b){return dur[b]-dur[a];}).slice(0,5);
-  const trimmedDur={};
-  top5.forEach(function(k){trimmedDur[k]=dur[k];});
-  return buildMonthlyRhythmBar(trimmedDur,false,null);
+  const trimmedDur={},trimmedDayCount={};
+  top5.forEach(function(k){trimmedDur[k]=dur[k];trimmedDayCount[k]=dayCount[k];});
+  return buildMonthlyRhythmBar(trimmedDur,false,trimmedDayCount);
 }
 function renderWeeklyRhythmBars(){
   const el=document.getElementById('weekly-rhythm-bars');if(!el)return;
-  const dur=computeWeeklyRhythmDur();
-  const barHtml=Object.keys(dur).length?buildWeeklyRhythmBarTop5(dur):'<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:12px 0;">이번주 기록된 리듬이 없어요</div>';
+  const {dur,dayCount}=computeWeeklyRhythmDur();
+  const barHtml=Object.keys(dur).length?buildWeeklyRhythmBarTop5(dur,dayCount):'<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:12px 0;">최근 7일간 기록된 리듬이 없어요</div>';
   let html='<div class="wrb-wrap"><div class="wrb-summary" onclick="toggleWeeklyRhythmForm()" style="cursor:pointer;">'+barHtml+'</div>';
   if(_weeklyRhythmFormOpen){
     html+='<div class="wrb-form-slot" id="wrb-today-form"></div>';
