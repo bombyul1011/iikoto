@@ -2021,6 +2021,29 @@ async function refreshPushStatusUI(){
   lbl.textContent=sub?'알림이 켜져 있어요':'알림이 꺼져 있어요';
   btn.textContent=sub?'알림 끄기':'알림 켜기';
 }
+// ── 재구독 만료 감지 및 자동 복구 ──
+// iOS Safari는 pushsubscriptionchange 이벤트가 신뢰성 있게 발화되지 않아, 그 이벤트에 기대는 대신
+// 앱을 열 때마다 "브라우저가 아는 구독"과 "서버(push_subscriptions)에 실제로 남아있는 구독"을 직접 대조한다.
+// Edge Function이 발송 실패(410/404) 시 서버 쪽 구독을 이미 지우고 있으므로, 이 불일치가 곧 "만료됨" 신호다.
+// 권한 자체는 이미 허용된 상태이므로 subscribe()는 사용자 제스처 없이도 호출 가능 — 조용히 자동 복구 시도.
+async function checkAndRecoverPushSubscription(){
+  if(!('serviceWorker' in navigator)||!('PushManager' in window))return;
+  const sub=await getExistingPushSubscription();
+  if(!sub)return; // 애초에 구독 안 한 상태면 감지 대상 아님(설정에서 수동으로 켜야 함)
+  const rows=await supaFetch(`push_subscriptions?endpoint=eq.${encodeURIComponent(sub.endpoint)}&select=id`);
+  if(rows&&rows.length)return; // 서버에도 정상 존재 — 문제 없음
+  // 서버엔 없는데 브라우저만 구독 중인 상태 = 만료/삭제됨. 재구독 시도.
+  try{
+    const reg=await navigator.serviceWorker.ready;
+    await sub.unsubscribe();
+    const newSub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:_urlBase64ToUint8Array(VAPID_PUBLIC_KEY)});
+    const json=newSub.toJSON();
+    await supaUpsert('push_subscriptions','endpoint',[{endpoint:json.endpoint,p256dh:json.keys.p256dh,auth:json.keys.auth}]);
+  }catch(e){
+    console.warn('알림 재구독 자동 복구 실패',e);
+  }
+  refreshPushStatusUI();
+}
 async function togglePushSubscription(){
   const btn=document.getElementById('push-toggle-btn');
   if(btn)btn.disabled=true;
@@ -2420,6 +2443,28 @@ async function syncAlertFor(sourceType,sourceCid,dk,timeHHMM,title){
 async function deleteAlertFor(sourceType,sourceCid){
   if(!sourceCid)return;
   await supaFetch(`alerts?source_type=eq.${encodeURIComponent(sourceType)}&source_cid=eq.${encodeURIComponent(sourceCid)}`,'DELETE');
+}
+// 일정/할일 객체(또는 관련 필드를 담은 임시 객체)에서 "알림 발송 기준 시각"을 뽑는 공용 로직.
+// 일정은 eventAlertOn+eventTime, 할일은 todoAlertOn+alertTime — 온오프가 꺼져 있으면 시간이 있어도 null.
+// 저장/완료체크/이동 등 3곳에서 동일 계산을 하던 것을 통합(중복 제거, 2026-09-08).
+function alertBasisTimeFor(t){
+  return t.isEvent?(t.eventAlertOn?t.eventTime:null):(t.todoAlertOn?t.alertTime:null);
+}
+// ── 뱃지 카운트 — "알림 온 할일(source_type=todo, sent=true) 중 아직 완료 안 된 것" 개수.
+// 완료 체크로 실제 사용자가 정리하는 게 기준이라 일정(event)은 자연히 제외됨.
+// 서버 push가 알아서 갱신해주지만, 완료 체크 직후엔 그 결과를 기다리지 않고 클라이언트에서 즉시 반영.
+async function refreshAppBadge(){
+  if(!navigator.setAppBadge)return;
+  const alerts=await supaFetch('alerts?source_type=eq.todo&sent=eq.true&select=source_cid');
+  if(!alerts||!alerts.length){try{await navigator.clearAppBadge();}catch(e){}return;}
+  const cids=[...new Set(alerts.map(a=>a.source_cid))];
+  const rows=await supaFetch('todos?client_id=in.('+cids.map(c=>encodeURIComponent(c)).join(',')+')&select=client_id,done');
+  const doneSet=new Set((rows||[]).filter(r=>r.done).map(r=>r.client_id));
+  const count=cids.filter(cid=>!doneSet.has(cid)).length;
+  try{
+    if(count>0)await navigator.setAppBadge(count);
+    else await navigator.clearAppBadge();
+  }catch(e){}
 }
 // 3일 지난 greeting_* 캐시 정리 — 앱 시작(스플래시) 시점에 호출.
 // 매번 서버에 삭제 요청을 보내지 않도록, 로컬에 마지막 정리 시각을 남겨 7일에 한 번만 실제로 실행.
@@ -3649,12 +3694,19 @@ function initTextScaleUI(){
 // ██ 공용 유틸 (3/3 — 나머지는 리듬집계유틸, CONSTANTS~SUPABASE SYNC 부근) — SPLASH/DATE NAV/TABS/모달헬퍼 ██
 // ══════════════════════════════════════════════════════════
 // ── SPLASH
-setTimeout(()=>{
+// 고정 2.2초가 아니라 "최소 2.2초는 유지 + initSync(30일치 동기화) 완료" 중 늦게 끝나는 시점에 해제.
+// 예전엔 화면은 열렸는데 뒤에서 아직 동기화 중이라 클릭이 씹히는 구간이 있었음 — 스플래시가 그 구간을
+// 그대로 덮어써서, 스플래시가 사라진 순간부터는 확실히 조작 가능하게 함.
+let _initSyncDone=false;
+function hideSplash(){
   const s=document.getElementById('splash');
+  if(!s||s.classList.contains('hide'))return;
   s.classList.add('hide');
   // s.remove() 하지 않음 — DOM에서 완전히 지우면 그 순간 reflow로 배경이 잠깐 씹히는 현상 있어
   // opacity 0 + pointer-events none 상태로 계속 남겨서 배경 역할은 유지
-},2200);
+}
+const _SPLASH_MIN_MS=2200;
+const _splashMinTimer=new Promise(res=>setTimeout(res,_SPLASH_MIN_MS));
 
 // ── DATE NAV
 // 특정 탭이 현재 열려있을 때만 해당 로드 함수를 다시 호출 — 데이터/날짜가 바뀐 뒤 열린 탭만 갱신할 때 공용으로 사용
@@ -6610,9 +6662,10 @@ function toggleTodo(i,expectedCid){
   // 체크 해제 시엔 alertTime이 남아있다면 다시 예약(재사용 의도로 지운 게 아니라 되돌린 것이므로).
   if(target.done)deleteAlertFor(target.isEvent?'event':'todo',target.cid);
   else{
-    const basisTime=target.isEvent?(target.eventAlertOn?target.eventTime:null):(target.todoAlertOn?target.alertTime:null);
+    const basisTime=alertBasisTimeFor(target);
     if(basisTime)syncAlertFor(target.isEvent?'event':'todo',target.cid,dk,basisTime,target.text);
   }
+  refreshAppBadge();
 }
 
 // 투두/습관 체크 등으로 오늘 활동 분포가 바뀌었을 때 저녁 홈탭의 점 타임라인 카드를 새로 그려 교체.
@@ -7287,7 +7340,7 @@ async function confirmTodo(){
   const savedTodo=editIdx>=0?todos[editIdx]:todos[todos.length-1];
   saveTodos(dk,todos);closeModal('todo-modal');
   // alerts 동기화 — 일정은 eventTime+eventAlertOn, 할일은 alertTime+todoAlertOn(둘 다 온일 때만) 기준으로 발송 예약
-  const alertBasisTime=isEvent?(eventAlertOn?eventTime:null):(todoAlertOn?alertTime:null);
+  const alertBasisTime=alertBasisTimeFor({isEvent,eventAlertOn,eventTime,todoAlertOn,alertTime});
   if(alertBasisTime)syncAlertFor(isEvent?'event':'todo',savedTodo.cid,dk,alertBasisTime,text);
   else deleteAlertFor(isEvent?'event':'todo',savedTodo.cid);
   // 월간 캘린더의 "이 날에 일정 추가"에서 열린 경우 — currentDate를 원래대로 되돌리고 캘린더/상세를 갱신
@@ -13257,7 +13310,7 @@ if('serviceWorker' in navigator){
 
 // 앱 시작 시 항상 Supabase에서 복구 (로컬 무시)
 async function initSync(){
-  if(!navigator.onLine) return;
+  if(!navigator.onLine){_initSyncDone=true;return;}
   window._restoring=true;
   var dates=[];
   for(var i=29;i>=0;i--){var d=new Date();d.setDate(d.getDate()-i);dates.push(dateKey(d));}
@@ -13373,7 +13426,20 @@ async function initSync(){
   loadDaily();
   refreshIfTabOpen('v-weekly',loadWeekly);
   refreshIfTabOpen('v-monthly',loadMonthly);
+  _initSyncDone=true;
 }
 setTimeout(initSync, 500);
+setTimeout(refreshAppBadge, 1000);
+setTimeout(checkAndRecoverPushSubscription, 1500);
+// initSync(오프라인이면 즉시 반환) 완료와 최소 스플래시 시간 중 늦게 끝나는 쪽에 맞춰 해제.
+// initSync 시작(500ms 지연)까지 감안해 넉넉히 폴링하되, 혹시 실패해도 최소시간 이후엔 반드시 내려가도록 방어.
+(async function waitAndHideSplash(){
+  await _splashMinTimer;
+  const deadline=Date.now()+8000; // 동기화가 비정상적으로 오래 걸려도 최대 8초 뒤엔 강제로 화면을 보여줌
+  while(!_initSyncDone&&Date.now()<deadline){
+    await new Promise(res=>setTimeout(res,100));
+  }
+  hideSplash();
+})();
 
 

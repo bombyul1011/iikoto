@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.47-alert-ui-refactor';
+const CACHE = 'iikoto-v2.50-splash-sync-gate';
 const ASSETS = [
   './',
   './index.html'
@@ -62,12 +62,19 @@ self.addEventListener('push', e => {
     if (e.data) data.body = e.data.text();
   }
   e.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: './icon-192.png',
-      badge: './icon-192.png',
-      data: { url: data.url || './' }
-    })
+    (async () => {
+      await self.registration.showNotification(data.title, {
+        body: data.body,
+        icon: './icon-192.png',
+        badge: './icon-192.png',
+        data: { url: data.url || './' }
+      });
+      // 뱃지 카운트 — Edge Function이 실어보낸 "안 읽은 알림 총개수"를 그대로 표시.
+      // navigator가 아니라 self(ServiceWorkerGlobalScope)에서 호출해야 함. 미지원 환경에서도 조용히 무시.
+      if (typeof data.badge_count === 'number' && self.registration.setAppBadge) {
+        try { await self.registration.setAppBadge(data.badge_count); } catch (err) {}
+      }
+    })()
   );
 });
 
