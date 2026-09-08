@@ -3045,6 +3045,7 @@ function _bookContentToShape(c,mk){
     todayStart:useToday?todaySnap.todayStart:0,
     poster:c.poster||null,author:c.author||'',
     created:c.created,completedAt:c.status==='done'?(c.endDate||null):null,
+    lastActivityAt:c.lastActivityAt||0,
     linkedContent:true,contentMk:mk,contentTitle:c.title
   };
 }
@@ -9166,7 +9167,7 @@ function _getOngoingWatchingWithCid(){
       result.push({...c,_mk:m});
     });
   });
-  return result;
+  return result.sort((a,b)=>(b.lastActivityAt||0)-(a.lastActivityAt||0)); // 최근 본 작품 우선노출(2026-09-09)
 }
 function openWatchPicker(){
   const list=_getOngoingWatchingWithCid();
@@ -9279,22 +9280,17 @@ function renderCwatchMainCard(){
       </div>
     </div>`;
   }else{
-    const two=ongoing.slice(0,2);
-    const halvesHtml=two.map(c=>{
+    el.innerHTML=`<div class="rd-top" style="margin-bottom:14px;"><div class="rd-top-inner">`+buildSwipeCardHtml(ongoing,c=>{
       const progressHtml=_cswProgressBarHtml(c,true);
-      return `<div style="flex:1;min-width:0;display:flex;gap:8px;cursor:pointer;" onclick="selectPendingWatch('${c.cid}','${c._mk}')">
+      return `<div style="display:flex;gap:8px;cursor:pointer;" onclick="selectPendingWatch('${c.cid}','${c._mk}')">
         ${_cswPosterHtml(c)}
         <div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;">
           <div class="rd-top-title" style="font-size:var(--main-text-size);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.title||'')}</div>
           ${progressHtml||'<div class="rd-top-sub">눌러서 시청을 시작해보세요</div>'}
         </div>
       </div>`;
-    }).join('');
-    el.innerHTML=`<div class="rd-top" style="margin-bottom:14px;">
-      <div class="rd-top-inner">
-        <div style="display:flex;gap:16px;">${halvesHtml}</div>
-      </div>
-    </div>`;
+    })+`</div></div>`;
+    bindSwipeCard('cwatch-main-card');
   }
 }
 // 포스터 탭 — 즉시 시작하지 않고 이 작품만 남긴 카드로 전환. 실제 시작은 그 카드의 재생 링(cswRingSvg)에서.
@@ -9318,6 +9314,8 @@ function toggleContentStopwatch(cid,knownMk){
   const found=knownMk?{mk:knownMk,list:getContents(knownMk),idx:getContents(knownMk).findIndex(c=>c.cid===cid)}:_findContentByCidNearMk(cid,_chArchiveMk||monthKey(new Date()));
   if(!found||found.idx<0){_cswStarting=false;return;}
   const c=found.list[found.idx];
+  c.lastActivityAt=Date.now(); // 최근 본 작품 우선노출(콘텐츠허브 스와이프 카드) 정렬 기준(2026-09-09)
+  saveContents(found.mk,found.list);
   _cswRunning=true;_cswCid=cid;_cswCat=c.cat;_cswTitle=c.title||'';_cswMk=found.mk;
   _cswStartTs=Date.now();
   const dk=dateKey(getLogicalDate(_cswStartTs));
@@ -11019,9 +11017,48 @@ function cswRingSvg(cid,mk,running){
     <div class="rd-sw-face"><i class="ti ${running?'ti-player-stop-filled':'ti-player-play'}" style="font-size:20px;" aria-hidden="true"></i></div>
   </div>`;
 }
+// 병렬 진행중(2개 이상)일 때 스와이프+도트 카드 — 각 슬라이드는 buildSingleHtml(item)이 만드는
+// "1개일 때와 동일한 단일 카드"를 그대로 재사용. 화살표 없이 스와이프/탭으로만 전환(2026-09-09).
+// wrapId는 이 카드가 그려질 컨테이너의 id, 여러 인스턴스가 동시에 존재하지 않으므로 전역 카운터로 고유 id 부여.
+let _swipeCardSeq=0;
+function buildSwipeCardHtml(items,buildSingleHtml){
+  const seq=++_swipeCardSeq;
+  const dotsHtml=items.map((_,i)=>`<span class="sw-card-dot${i===0?' on':''}" data-i="${i}"></span>`).join('');
+  const slidesHtml=items.map(item=>`<div class="sw-card-slide">${buildSingleHtml(item)}</div>`).join('');
+  return `<div class="sw-card" id="sw-card-${seq}" data-idx="0">
+    <div class="sw-card-dots">${dotsHtml}</div>
+    <div class="sw-card-track">${slidesHtml}</div>
+  </div>`;
+}
+// 렌더 직후 호출 — 터치 스와이프와 탭 전환을 바인딩. 요소가 DOM에 붙은 다음에만 동작하므로
+// innerHTML 대입 직후 반드시 호출해야 함(콘텐츠허브/독서허브 렌더 함수 쪽에서 호출).
+function bindSwipeCard(wrapId){
+  const wrap=document.getElementById(wrapId)?.querySelector('.sw-card');
+  if(!wrap)return;
+  const track=wrap.querySelector('.sw-card-track');
+  const dots=[...wrap.querySelectorAll('.sw-card-dot')];
+  const n=dots.length;
+  if(n<2)return;
+  function goTo(i){
+    const idx=Math.max(0,Math.min(n-1,i));
+    wrap.dataset.idx=idx;
+    track.style.transform='translateX(-'+(idx*100)+'%)';
+    dots.forEach((d,di)=>d.classList.toggle('on',di===idx));
+  }
+  let startX=0;
+  track.addEventListener('touchstart',e=>{startX=e.touches[0].clientX;},{passive:true});
+  track.addEventListener('touchend',e=>{
+    const dx=e.changedTouches[0].clientX-startX;
+    const cur=parseInt(wrap.dataset.idx,10)||0;
+    if(dx<-30)goTo(cur+1);
+    else if(dx>30)goTo(cur-1);
+  },{passive:true});
+  dots.forEach(d=>d.addEventListener('click',e=>{e.stopPropagation();goTo(parseInt(d.dataset.i,10));}));
+}
 // 진행중(status==='reading') 책 목록 — 콘텐츠의 _getOngoingWatchingWithCid와 동일한 역할.
 function _getOngoingReadingWithCid(){
-  return getBooks().filter(b=>b.status==='reading'&&b.cid);
+  return getBooks().filter(b=>b.status==='reading'&&b.cid)
+    .sort((a,b)=>(b.lastActivityAt||0)-(a.lastActivityAt||0)); // 최근 활동한 책 우선노출(2026-09-09)
 }
 // 진행률 바 + 오늘 읽은 구간 표시 — 여러 책에서 반복 쓰이므로 분리(2026-09-03, 병렬독서 지원 리팩터).
 // 진행률 데이터(퍼센트 단위이거나 총 페이지가 있음)가 없으면 null 반환 — 콘텐츠 코너(totalUnit 없으면 문구 폴백)와 동일한 규칙.
@@ -11103,19 +11140,18 @@ function renderRdTop(){
   }else if(ongoing.length===1){
     el.innerHTML=_rdTopSingleHtml(ongoing[0],false);
   }else{
-    const two=ongoing.slice(0,2);
-    const halvesHtml=two.map(book=>{
+    el.innerHTML=`<div class="rd-top-inner">`+buildSwipeCardHtml(ongoing,book=>{
       const cover=book.poster?`<img class="rd-top-cover" src="${book.poster}" alt="">`:`<div class="rd-top-cover-empty"></div>`;
       const progressHtml=_rdProgressBarHtml(book);
-      return `<div style="flex:1;min-width:0;display:flex;gap:8px;cursor:pointer;" onclick="selectPendingRead('${book.cid}')">
+      return `<div style="display:flex;gap:8px;cursor:pointer;" onclick="selectPendingRead('${book.cid}')">
         ${cover}
         <div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;">
-          <div class="rd-top-title" style="font-size:var(--main-text-size);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${book.title}</div>
+          <div class="rd-top-title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${book.title}</div>
           ${progressHtml||'<div class="rd-top-sub">눌러서 읽기를 시작해보세요</div>'}
         </div>
       </div>`;
-    }).join('');
-    el.innerHTML=`<div class="rd-top-inner"><div style="display:flex;gap:16px;">${halvesHtml}</div></div>`;
+    })+`</div>`;
+    bindSwipeCard('rd-top');
   }
 }
 function renderRdStreak(){
@@ -12959,6 +12995,12 @@ function toggleStopwatch(cid){
     const startMin=new Date(_swStartTs).getHours()*60+new Date(_swStartTs).getMinutes();
     const book=getBooks().find(b=>b.cid===cid);
     const text=book&&book.title?('독서 - '+book.title):'독서';
+    // 최근 읽은 책 우선노출(독서허브 스와이프 카드) 정렬 기준 — contents 항목에 직접 기록(2026-09-09)
+    const foundBook=_findContentByCidNearMkInRange(cid,_BOOK_SCAN_MONTHS);
+    if(foundBook){
+      foundBook.list[foundBook.idx].lastActivityAt=Date.now();
+      saveContents(foundBook.mk,foundBook.list);
+    }
     _swBlockCid=genCid();
     const blocks=getRhythmBlocks(dk);
     blocks.push({cat:'enjoy',start:minToHHMM(startMin),end:'',text:text,created:Date.now(),cid:_swBlockCid,contentCid:cid});
