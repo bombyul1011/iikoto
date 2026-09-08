@@ -357,6 +357,21 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .settings-btn-outline{width:100%;padding:9px;border-radius:10px;border:1px solid rgba(var(--divider-rgb),0.40);background:transparent;color:var(--tp);font-family:'DM Sans',sans-serif;font-size:var(--dow-label-size);font-weight:500;cursor:pointer;}
 .settings-btn-small{width:100%;padding:7px;border-radius:10px;border:1px solid rgba(var(--divider-rgb),0.40);background:transparent;color:var(--tm);font-family:'DM Sans',sans-serif;font-size:var(--dow-label-size);cursor:pointer;}
 .settings-key-inp{margin-bottom:0;font-size:var(--dow-label-size);width:100%;font-family:monospace;}
+/* 설정탭 공용 아코디언 — 알림 섹션에 먼저 적용, 추후 다른 설정 카드에도 재사용 예정 */
+.settings-acc-header{display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;}
+.settings-acc-header .ti{transition:transform .2s ease;color:var(--tm);}
+.settings-acc-header.open .ti{transform:rotate(180deg);}
+.settings-acc-body{max-height:0;overflow:hidden;transition:max-height .25s ease;}
+.settings-acc-body.open{max-height:600px;}
+.settings-acc-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid rgba(var(--divider-rgb),0.30);}
+.settings-acc-row:first-child{border-top:none;}
+.settings-acc-time{cursor:pointer;font-weight:600;color:var(--tp);}
+/* 공용 토글 스위치 — 알림 개별 온오프, 추후 다른 설정에도 재사용 가능 */
+.settings-toggle{position:relative;width:40px;height:22px;border-radius:11px;background:rgba(var(--divider-rgb),0.45);cursor:pointer;flex-shrink:0;transition:background .2s ease;}
+.settings-toggle.on{background:var(--pal-pink-text);}
+.settings-toggle::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .2s ease;}
+.settings-toggle.on::after{transform:translateX(18px);}
+.settings-toggle.disabled{opacity:0.4;cursor:not-allowed;}
 .cmr-review-icon{color:var(--tm);opacity:0.65;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center;}
 .cmr-review-box{margin:0 0 7px 46px;display:none;}
 .cmr-review-box.on{display:block;}
@@ -2336,6 +2351,47 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="settings-card">
         <div class="settings-item-lbl" style="margin-bottom:8px;" id="push-status-lbl">알림이 꺼져 있어요</div>
         <button class="settings-btn-fill" id="push-toggle-btn" style="width:100%;" onclick="togglePushSubscription()">알림 켜기</button>
+        <div class="settings-acc-header" style="margin-top:14px;" onclick="toggleSettingsAccordion('alert-detail')">
+          <span class="settings-item-lbl">알림 종류 관리</span>
+          <i class="ti ti-chevron-down" aria-hidden="true"></i>
+        </div>
+        <div class="settings-acc-body" id="settings-acc-alert-detail">
+          <div style="padding-top:10px;display:flex;flex-direction:column;">
+            <div class="settings-acc-row">
+              <span class="settings-item-lbl">아침 브리핑</span>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span class="settings-acc-time" id="alert-time-morning" onclick="openAlertTimePickerFor('morning')">--:--</span>
+                <div class="settings-toggle" id="alert-toggle-morning" onclick="toggleAlertEnabled('morning')"></div>
+              </div>
+            </div>
+            <div class="settings-acc-row">
+              <span class="settings-item-lbl">저녁 마무리</span>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span class="settings-acc-time" id="alert-time-evening" onclick="openAlertTimePickerFor('evening')">--:--</span>
+                <div class="settings-toggle" id="alert-toggle-evening" onclick="toggleAlertEnabled('evening')"></div>
+              </div>
+            </div>
+            <div class="settings-acc-row">
+              <span class="settings-item-lbl">남은 할일</span>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span class="settings-acc-time" id="alert-time-remaining" onclick="openAlertTimePickerFor('remaining')">--:--</span>
+                <div class="settings-toggle" id="alert-toggle-remaining" onclick="toggleAlertEnabled('remaining')"></div>
+              </div>
+            </div>
+            <div class="settings-acc-row">
+              <span class="settings-item-lbl">수면 시간 (23:00 고정)</span>
+              <div class="settings-toggle" id="alert-toggle-sleep" onclick="toggleAlertEnabled('sleep')"></div>
+            </div>
+            <div class="settings-acc-row">
+              <span class="settings-item-lbl">리듬 진행중 리마인드 (60분 고정)</span>
+              <div class="settings-toggle" id="alert-toggle-rhythm" onclick="toggleAlertEnabled('rhythm')"></div>
+            </div>
+            <div class="settings-acc-row">
+              <span class="settings-item-lbl">주간·월말 리포트 (22:00 고정)</span>
+              <div class="settings-toggle" id="alert-toggle-report" onclick="toggleAlertEnabled('report')"></div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
     <div>

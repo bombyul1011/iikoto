@@ -400,7 +400,68 @@ function finishRhythmBlock(idx){
   delete blocks[idx].autoClosed; // 사용자가 직접 종료했으므로 자동종료 표시를 지워 이후 취침시각 재수정에 영향받지 않게 확정
   saveRhythmBlocks(_rhythmDk,blocks);
   syncMorningFlowOnRhythmBlockEnd(_rhythmDk,blocks[idx].cid,endStr); // 모닝플로우로 시작한 블록이면 picks도 done으로 동기화
+  if(blocks[idx].cat==='exercise')scheduleExerciseStatAlert(blocks[idx].cid);
   refreshRhythmTrack();
+}
+// ── 운동 리듬바 종료 통계 알림 (2026-09-08 설계) ──
+// exercise 카테고리 블록을 종료할 때마다, 이번달 누적 횟수 + 주3회 목표 스트릭(완결된 주까지만 정확 계산,
+// 진행중인 이번주는 자연어로 유연하게 언급)을 조합해 종료 10분 뒤 알림 예약.
+// 로컬 캐시가 30일치라 스트릭 역산은 최대 4주(지난주부터)로 제한 — 그 이상은 서버 별도조회 필요해 범위 밖.
+function _countExerciseInMonth(mk){
+  // mk: 'YYYY-MM'. 로컬 캐시(dk별 rblocks)를 이번달 1일~오늘까지 순회해 exercise 블록 개수를 셈.
+  const [y,m]=mk.split('-').map(Number);
+  const today=new Date();
+  const isCurMonth=(today.getFullYear()===y&&today.getMonth()+1===m);
+  const lastDay=isCurMonth?today.getDate():new Date(y,m,0).getDate();
+  let count=0;
+  for(let day=1;day<=lastDay;day++){
+    const dk=`${y}-${pad(m)}-${pad(day)}`;
+    count+=getRhythmBlocks(dk).filter(b=>b.cat==='exercise'&&b.end).length;
+  }
+  return count;
+}
+// 특정 주(weekKey 형식 'week:YYYY-MM-DD', 월요일 시작)의 exercise 운동 횟수
+function _countExerciseInWeek(wk){
+  const wkStart=wk.replace('week:','');
+  const d=new Date(wkStart+'T00:00:00');
+  let count=0;
+  for(let i=0;i<7;i++){
+    const dd=new Date(d);dd.setDate(d.getDate()+i);
+    count+=getRhythmBlocks(dateKey(dd)).filter(b=>b.cat==='exercise'&&b.end).length;
+  }
+  return count;
+}
+// 완결된 주(지난주부터 역산, 최대 4주)를 훑어 "연속으로 주3회 이상 채운 주가 몇 주째인지" 계산.
+// 한 주라도 3회 미만이면 그 지점에서 스트릭 종료.
+function _exerciseWeekStreak(){
+  const now=new Date();
+  let streak=0;
+  for(let i=1;i<=4;i++){
+    const wkDate=new Date(now);wkDate.setDate(now.getDate()-7*i);
+    const wk=weekKey(wkDate);
+    if(_countExerciseInWeek(wk)>=3)streak++;
+    else break;
+  }
+  return streak;
+}
+function _buildExerciseStatMessage(){
+  const mk=monthKey(new Date());
+  const monthCount=_countExerciseInMonth(mk);
+  const thisWeekCount=_countExerciseInWeek(weekKey(new Date()));
+  const streak=_exerciseWeekStreak();
+  let body=`이번달 ${monthCount}번째 운동이에요.`;
+  if(thisWeekCount>=3){
+    body+=streak>0?` 이번주도 목표 달성! ${streak+1}주 연속이에요.`:' 이번주 목표 달성이에요!';
+  }else if(streak>0){
+    body+=` 이번주 ${thisWeekCount}번째, 벌써 ${streak}주째 꾸준히 이어가고 있어요.`;
+  }
+  return {title:'운동 완료 🏃',body};
+}
+function scheduleExerciseStatAlert(blockCid){
+  if(!blockCid)return;
+  const {title,body}=_buildExerciseStatMessage();
+  const alertAt=new Date(Date.now()+10*60*1000); // 종료 10분 후
+  scheduleAlertAt('exercise_stat',blockCid,alertAt,title,body);
 }
 // 리듬바에서 블록을 직접 종료했을 때, 그 블록이 모닝플로우 카드로 시작된 것이면(blockCid 매칭)
 // 모닝플로우 쪽 status도 done으로 함께 갱신 — 오전 홈탭이 지나가버려 모닝플로우 화면에서 종료를 못 누르는
@@ -2115,6 +2176,7 @@ async function togglePushSubscription(){
   }catch(e){console.error('push toggle 실패',e);showToast('알림 설정에 실패했어요');}
   if(btn)btn.disabled=false;
   await refreshPushStatusUI();
+  await renderSettingsAlertSection(); // 전체 온오프가 바뀌면 개별 6개 토글의 비활성 표시도 즉시 갱신
 }
 const TMDB_KEY='6c78371ce15bb9d262938a66d5ef256e';
 const KAKAO_KEY='33799426c5377181c89616f5b2154bf0';
@@ -2350,6 +2412,13 @@ function _batchimSuffix(word){
   const hasBatchim=(last-0xAC00)%28!==0;
   return hasBatchim?'이에요':'예요';
 }
+// 받침 유무에 따른 조사 판별 범용 유틸 — 은/는, 이/가도 같은 규칙(_batchimSuffix와 동일 판정)이라
+// 별도 함수로 뽑아 재사용. withBatchim/withoutBatchim 예: ('은','는'), ('이','가').
+function _josa(word,withBatchim,withoutBatchim){
+  const last=word.charCodeAt(word.length-1);
+  const hasBatchim=(last-0xAC00)%28!==0;
+  return hasBatchim?withBatchim:withoutBatchim;
+}
 function getSolarTermLine(){
   const today=getTodaySolarTerm();
   if(today){
@@ -2481,18 +2550,41 @@ async function aiCacheSet(cacheKey,content){
 // 자체 필드(todos.completed_at 등)를 그대로 쓰며, alerts는 그 값을 절대 참조/갱신하지 않는다.
 // source_cid 하나당 alerts row는 최대 1개만 유지(upsert) — 조각모드처럼 레코드 안에 여러 조각이
 // 있어도 레코드 자체는 하나이므로 자동으로 "1건만" 원칙이 지켜진다.
+// ISO 변환·upsert 실행은 scheduleAlertAt에 위임(중복 제거) — 이 함수는 "그날 dk+HH:MM" 표기를
+// Date 객체로 바꾸는 얇은 wrapper. title만 받는 경우가 대부분이라 body는 null로 고정.
 async function syncAlertFor(sourceType,sourceCid,dk,timeHHMM,title){
   if(!sourceCid)return;
   if(!timeHHMM){await deleteAlertFor(sourceType,sourceCid);return;}
-  // 타임존을 명시하지 않으면 Postgres가 UTC로 해석해 9시간 밀리는 버그가 있었음(2026-09-08) — KST(+09:00) 고정 명시.
-  const alertAt=`${dk}T${timeHHMM}:00+09:00`;
+  const [hh,mm]=timeHHMM.split(':').map(Number);
+  const [y,m,day]=dk.split('-').map(Number);
+  const alertAtDate=new Date(y,m-1,day,hh,mm,0);
+  await scheduleAlertAt(sourceType,sourceCid,alertAtDate,title,null);
+}
+// syncAlertFor는 "그날 HH:MM"만 다루는데, 종료-N분후처럼 임의의 절대 시각(Date 객체)에
+// title+body 둘 다 채워 예약해야 하는 알림(운동 통계 등)엔 안 맞아 별도 저수준 헬퍼로 분리.
+// alertAtDate: Date 객체(로컬 시각) — ISO 변환 시 KST 오프셋을 명시해 Postgres UTC 해석 버그(2026-09-08)를 피함.
+// upsert 실행부는 여기 하나뿐 — syncAlertFor도 이 함수를 거쳐가므로 alerts insert 경로가 단일화됨.
+async function scheduleAlertAt(sourceType,sourceCid,alertAtDate,title,body){
+  if(!sourceCid)return;
+  const d=alertAtDate;
+  const iso=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}+09:00`;
   await supaUpsert('alerts','source_type,source_cid',[{
-    source_type:sourceType,source_cid:sourceCid,alert_at:alertAt,title:title||'',body:null,sent:false
+    source_type:sourceType,source_cid:sourceCid,alert_at:iso,title:title||'',body:body||null,sent:false
   }]);
 }
 async function deleteAlertFor(sourceType,sourceCid){
   if(!sourceCid)return;
   await supaFetch(`alerts?source_type=eq.${encodeURIComponent(sourceType)}&source_cid=eq.${encodeURIComponent(sourceCid)}`,'DELETE');
+}
+// ── 알림 시각 설정(user_settings) — 서버 send-alerts Edge Function이 이 값과 지금 시각을 비교해
+// 아침브리핑/남은할일+습관/수면/저녁마무리 4종의 발송 시각을 판단(리듬 진행중/주간·월말 리포트는 고정).
+// row가 항상 1개뿐인 단일설정 테이블이라 로컬 캐시 없이 매번 직접 조회/저장(불일치 걱정 없음).
+async function getUserSettings(){
+  const rows=await supaFetch('user_settings?id=eq.true');
+  return (rows&&rows[0])||null;
+}
+async function setUserSettingTime(field,timeStr){
+  await supaUpsert('user_settings','id',[{id:true,[field]:timeStr}]);
 }
 // 일정/할일 객체(또는 관련 필드를 담은 임시 객체)에서 "알림 발송 기준 시각"을 뽑는 공용 로직.
 // 일정은 eventAlertOn+eventTime, 할일은 todoAlertOn+alertTime — 온오프가 꺼져 있으면 시간이 있어도 null.
@@ -4564,6 +4656,13 @@ function confirmTime(){
     setHabitGoalTime('wake',v);
     closeModal('time-modal');
     renderSettingsHabitSection();
+    return;
+  }
+  if(_sleepTarget.startsWith('alertTime:')){
+    const kind=_sleepTarget.split(':')[1];
+    setUserSettingTime(ALERT_TIME_FIELD_MAP[kind],v);
+    closeModal('time-modal');
+    renderSettingsAlertSection();
     return;
   }
   const dk=dateKey(currentDate),d=getSleep(dk);
@@ -10766,7 +10865,57 @@ function openSettings(){
   _resetHabitEditDraft(); // 설정탭 진입 시마다 편집용 임시본을 실데이터로 새로 초기화(이전 진입의 미저장 변경은 버림)
   renderSettingsHabitSection();
   refreshPushStatusUI();
+  renderSettingsAlertSection();
   document.getElementById('settings-ov').classList.add('on');
+}
+// 설정탭 알림 시각 3종(아침브리핑/저녁마무리/남은할일) + 개별 온오프 6종 UI — user_settings를 직접 조회해 채움.
+// 전체 push 구독이 꺼져있으면(getExistingPushSubscription 없음) 개별 토글은 값 유지한 채 시각적으로만 비활성화.
+// ALERT_TIME_FIELD_MAP/ALERT_ENABLED_FIELD_MAP은 렌더링과 토글 양쪽에서 쓰여 아래 공용 상수로 뽑음(중복 정의 제거).
+const ALERT_TIME_FIELD_MAP={morning:'morning_briefing_time',evening:'evening_wrap_time',remaining:'remaining_todo_time'};
+const ALERT_ENABLED_FIELD_MAP={morning:'morning_enabled',evening:'evening_enabled',remaining:'remaining_enabled',sleep:'sleep_enabled',rhythm:'rhythm_enabled',report:'report_enabled'};
+async function renderSettingsAlertSection(){
+  const wrap=document.getElementById('settings-acc-alert-detail');
+  if(!wrap)return;
+  const settings=await getUserSettings();
+  if(!settings)return;
+  Object.keys(ALERT_TIME_FIELD_MAP).forEach(kind=>{
+    const el=document.getElementById('alert-time-'+kind);
+    if(el)el.textContent=settings[ALERT_TIME_FIELD_MAP[kind]]||'--:--';
+  });
+  const pushOn=!!(await getExistingPushSubscription());
+  Object.keys(ALERT_ENABLED_FIELD_MAP).forEach(kind=>{
+    const toggle=document.getElementById('alert-toggle-'+kind);
+    if(!toggle)return;
+    toggle.classList.toggle('on',!!settings[ALERT_ENABLED_FIELD_MAP[kind]]);
+    toggle.classList.toggle('disabled',!pushOn); // 전체 알림 꺼져있으면 개별 토글은 값 유지+비활성 표시만
+  });
+}
+// 아코디언 헤더 클릭 — 알림 섹션에 우선 적용, 추후 다른 설정 카드에도 같은 id 규칙(settings-acc-<key>)으로 재사용 예정.
+function toggleSettingsAccordion(key){
+  const body=document.getElementById('settings-acc-'+key);
+  const header=body&&body.previousElementSibling;
+  if(!body)return;
+  body.classList.toggle('open');
+  if(header)header.classList.toggle('open');
+}
+// 개별 알림 온오프 토글 — 전체 push가 꺼져있으면(비활성 표시 상태) 클릭 무시.
+async function toggleAlertEnabled(kind){
+  const toggle=document.getElementById('alert-toggle-'+kind);
+  if(!toggle||toggle.classList.contains('disabled'))return;
+  const field=ALERT_ENABLED_FIELD_MAP[kind];if(!field)return;
+  const nowOn=toggle.classList.contains('on');
+  toggle.classList.toggle('on',!nowOn); // 즉시 반영(낙관적 업데이트), 실패해도 다음 진입 시 서버값으로 재동기화됨
+  await supaUpsert('user_settings','id',[{id:true,[field]:!nowOn}]);
+}
+// 알림 시각 피커 — 기존 공용 시간 휠 모달(#time-modal) 재사용, _sleepTarget으로 3종 구분.
+// DOM id가 'alert-time-'+kind 고정 패턴이라 별도 맵 없이 문자열 조합으로 충분(불필요한 맵 제거).
+function openAlertTimePickerFor(kind){
+  const el=document.getElementById('alert-time-'+kind);
+  const cur=el.textContent;
+  document.getElementById('time-inp').value=(cur&&cur!=='--:--')?cur:'08:00';
+  _sleepTarget='alertTime:'+kind;
+  openModal('time-modal');
+  renderTimeWheel();
 }
 // [2026-09-06 저장버튼 도입] "항목 선택" 칩은 탭 즉시 실제 저장(saveHabits)하지 않고, 이 임시 배열(_habitEditDraft)만
 // 바꾼 뒤 화면만 다시 그림 — 실수로 잘못 누른 칩이 바로 서버까지 반영되던 문제를 막고, "저장" 버튼을 눌러야만

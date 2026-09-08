@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.51-batch-initsync';
+const CACHE = 'iikoto-v2.52-notif-expand-cleanup';
 const ASSETS = [
   './',
   './index.html'
