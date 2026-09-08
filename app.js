@@ -9281,14 +9281,18 @@ function renderCwatchMainCard(){
     </div>`;
   }else{
     el.innerHTML=`<div class="rd-top" style="margin-bottom:14px;"><div class="rd-top-inner">`+buildSwipeCardHtml(ongoing,c=>{
-      const progressHtml=_cswProgressBarHtml(c,true);
-      return `<div style="display:flex;gap:8px;cursor:pointer;" onclick="selectPendingWatch('${c.cid}','${c._mk}')">
-        ${_cswPosterHtml(c)}
-        <div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;">
-          <div class="rd-top-title" style="font-size:var(--main-text-size);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.title||'')}</div>
-          ${progressHtml||'<div class="rd-top-sub">눌러서 시청을 시작해보세요</div>'}
+      // 1개일 때(위 ongoing.length===1 분기)와 동일한 마크업 그대로 재사용 — 스톱워치 링(cswRingSvg) 포함.
+      // 이전엔 별도 인라인 스타일로 새로 짜면서 스톱워치 링 자체가 누락되어 있었음(2026-09-09 수정).
+      const progressHtml=_cswProgressBarHtml(c)||'';
+      return `<div class="rd-top-main" onclick="selectPendingWatch('${c.cid}','${c._mk}')" style="cursor:pointer;">
+          ${_cswPosterHtml(c)}
+          <div style="flex:1;min-width:0;">
+            <div class="rd-top-title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.title||'')}</div>
+            <div class="rd-top-sub">시청 시작 전</div>
+          </div>
+          <div class="rd-top-sw">${cswRingSvg(c.cid,c._mk,false)}</div>
         </div>
-      </div>`;
+        ${progressHtml}`;
     })+`</div></div>`;
     bindSwipeCard('cwatch-main-card');
   }
@@ -10991,7 +10995,7 @@ function restoreStopwatchUI(){
 }
 // running=true(이미 이 책으로 스톱워치가 도는 중)면 시작 즉시 재생 상태로 그림 — restoreStopwatchUI가 다시 덧씌움.
 function swRingSvg(cid,running){
-  return `<div class="rd-sw-ring-wrap${running?' spinning':''}" id="rd-sw-ring-wrap" onclick="toggleStopwatch('${cid}')">
+  return `<div class="rd-sw-ring-wrap${running?' spinning':''}" id="rd-sw-ring-wrap" onclick="event.stopPropagation();toggleStopwatch('${cid}')">
     <div class="rd-sw-bg"></div>
     <svg class="rd-sw-ring-svg" width="76" height="76" viewBox="0 0 76 76">
       <defs>
@@ -11012,7 +11016,7 @@ function swRingSvg(cid,running){
 // 시청 스톱워치용 원형 링 — swRingSvg와 동일한 디자인, id/onclick만 시청 전용으로 분리(독서 스톱워치와 동시에 떠도 충돌 없게)
 // 초단위 표시 없이 재생/정지 아이콘만 토글하는 원탭 버튼 — 독서 스톱워치의 링(cswRingSvg 구버전)보다 훨씬 가벼움
 function cswRingSvg(cid,mk,running){
-  return `<div class="rd-sw-ring-wrap${running?' spinning cwatch-active':''}" onclick="toggleContentStopwatch('${cid}','${mk}')">
+  return `<div class="rd-sw-ring-wrap${running?' spinning cwatch-active':''}" onclick="event.stopPropagation();toggleContentStopwatch('${cid}','${mk}')">
     <div class="rd-sw-bg"></div>
     <div class="rd-sw-face"><i class="ti ${running?'ti-player-stop-filled':'ti-player-play'}" style="font-size:20px;" aria-hidden="true"></i></div>
   </div>`;
@@ -11140,17 +11144,12 @@ function renderRdTop(){
   }else if(ongoing.length===1){
     el.innerHTML=_rdTopSingleHtml(ongoing[0],false);
   }else{
-    el.innerHTML=`<div class="rd-top-inner">`+buildSwipeCardHtml(ongoing,book=>{
-      const cover=book.poster?`<img class="rd-top-cover" src="${book.poster}" alt="">`:`<div class="rd-top-cover-empty"></div>`;
-      const progressHtml=_rdProgressBarHtml(book);
-      return `<div style="display:flex;gap:8px;cursor:pointer;" onclick="selectPendingRead('${book.cid}')">
-        ${cover}
-        <div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;">
-          <div class="rd-top-title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${book.title}</div>
-          ${progressHtml||'<div class="rd-top-sub">눌러서 읽기를 시작해보세요</div>'}
-        </div>
-      </div>`;
-    })+`</div>`;
+    el.innerHTML=buildSwipeCardHtml(ongoing,book=>{
+      // 1권일 때(_rdTopSingleHtml)와 동일한 마크업 그대로 재사용 — onclick만 selectPendingRead로 감싸 추가.
+      // 스톱워치 링 자체의 클릭이 바깥 selectPendingRead로 버블링되지 않도록 swRingSvg 쪽에 stopPropagation 추가(아래 참고).
+      // 이전엔 별도 인라인 스타일로 새로 짜서 커버 간격/진행률바 위치/불필요한 선 등이 원본과 미묘하게 달라졌었음(2026-09-09 수정).
+      return `<div onclick="selectPendingRead('${book.cid}')" style="cursor:pointer;">${_rdTopSingleHtml(book,false)}</div>`;
+    });
     bindSwipeCard('rd-top');
   }
 }
