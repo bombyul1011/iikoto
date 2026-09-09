@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.54-timezone-aware';
+const CACHE = 'iikoto-v2.55-rhythm-fix';
 const ASSETS = [
   './',
   './index.html'

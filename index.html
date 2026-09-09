@@ -899,13 +899,16 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rd-top-title{font-size:15px;font-weight:600;color:var(--tp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .rd-top-author{font-size:var(--dow-label-size);color:var(--tm);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .sw-card{position:relative;}
-/* 클리핑은 이 레이어 하나만 담당 — 트랙/슬라이드 쪽엔 overflow를 두지 않아 이중 클리핑 경계로 인한
-   서브픽셀 leak(세로줄)이 생길 여지를 원천 차단(2026-09-09b 재설계). */
-.sw-card-clip{overflow:hidden;border-radius:2px;touch-action:pan-y;}
-.sw-card-track{display:flex;will-change:transform;}
-.sw-card-slide{flex:none;box-sizing:border-box;}
-.sw-card-dots{display:flex;justify-content:center;gap:5px;margin-top:10px;}
-.sw-card-dot{width:5px;height:5px;border-radius:50%;background:var(--card-b);transition:background .2s;}
+/* 탭 전환 방식(2026-09-09e) — 슬라이드가 동시에 1개만 레이아웃에 존재(display:block/none)하므로
+   트랙/클리핑 경계 자체가 필요 없음. 이전의 스와이프+트랙+transform 구조가 반복적으로 렌더링
+   아티팩트(옆 카드 경계가 새어나오는 세로줄)를 일으켜서 구조를 단순화함. */
+.sw-card-panels{position:relative;}
+.sw-card-slide{box-sizing:border-box;}
+.sw-card-dots{display:flex;justify-content:center;align-items:center;gap:5px;margin-top:10px;cursor:pointer;position:relative;}
+/* 탭 히트 영역만 위아래로 넓힘(레이아웃 높이엔 영향 없는 절대배치) — 배너 세로 길이가 1권일 때와
+   동일하게 유지되도록 실제 박스 크기는 그대로 두고, 터치 판정 범위만 :: before로 확장(2026-09-09g). */
+.sw-card-dots::before{content:'';position:absolute;left:0;right:0;top:-8px;bottom:-8px;}
+.sw-card-dot{width:5px;height:5px;border-radius:50%;background:var(--card-b);transition:background .2s;cursor:pointer;}
 .sw-card-dot.on{background:var(--tp);}
 .rd-top-sw{display:flex;align-items:center;flex-shrink:0;}
 .rd-sw-ring-wrap{position:relative;width:76px;height:76px;flex-shrink:0;cursor:pointer;}
