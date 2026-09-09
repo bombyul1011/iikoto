@@ -11042,9 +11042,11 @@ function buildSwipeCardHtml(items,buildSingleHtml){
     <div class="sw-card-dots">${dotsHtml}</div>
   </div>`;
 }
-// 렌더 직후 호출 — 트랙 폭/위치를 px로 직접 계산해 transform으로 이동시키고, 터치 스와이프를 수동
-// 판정. 요소가 DOM에 붙은 다음에만 동작하므로 innerHTML 대입 직후 반드시 호출해야 함
-// (콘텐츠허브/독서허브 렌더 함수 쪽에서 호출).
+// 렌더 직후 호출 — 위치 이동을 전부 %(퍼센트) 기준으로만 계산해 px 실측(getBoundingClientRect)에
+// 의존하지 않음(2026-09-09c 재설계). 이전 버전은 clip 폭을 px로 실측해 슬라이드에 직접 박아넣었는데,
+// 레이아웃이 확정되기 전에 측정되면 실제보다 넓게 잡혀 옆 슬라이드가 카드 밖으로 삐져나오는 문제가
+// 있었음. 트랙 폭은 CSS로 n*100%, 슬라이드 폭은 100/n%로 고정(각 슬라이드=카드 폭 전체)하고, JS는
+// translateX(calc(-idx*100% + 드래그중px))만 사용 — 부모 폭이 언제 확정되든 항상 정확히 맞음.
 function bindSwipeCard(wrapId){
   const wrap=document.getElementById(wrapId)?.querySelector('.sw-card');
   if(!wrap)return;
@@ -11054,27 +11056,21 @@ function bindSwipeCard(wrapId){
   const dots=[...wrap.querySelectorAll('.sw-card-dot')];
   const n=slides.length;
   if(n<2)return;
-  let idx=0,cw=0,startX=0,startY=0,dragging=false,dx=0,lockedAxis=null;
-  function measure(){
-    cw=clip.getBoundingClientRect().width;
-    track.style.width=(cw*n)+'px';
-    slides.forEach(s=>{s.style.width=cw+'px';});
-  }
+  track.style.width=(n*100)+'%';
+  slides.forEach(s=>{s.style.width=(100/n)+'%';});
+  let idx=0,startX=0,startY=0,dragging=false,dx=0,lockedAxis=null,cw=0;
   function setActive(i,animate){
     idx=Math.max(0,Math.min(n-1,i));
     wrap.dataset.idx=idx;
     track.style.transition=animate?'transform .28s cubic-bezier(.22,.61,.36,1)':'none';
-    track.style.transform=`translateX(${-idx*cw}px)`;
+    track.style.transform=`translateX(${-idx*100/n}%)`;
     dots.forEach((d,di)=>d.classList.toggle('on',di===idx));
   }
-  measure();
   setActive(0,false);
-  // 레이아웃이 뒤늦게 확정되는 경우(폰트/이미지 로드 등) 대비해 폭을 한 번 더 재계산.
-  requestAnimationFrame(()=>{measure();setActive(idx,false);});
-  window.addEventListener('resize',()=>{measure();setActive(idx,false);});
   clip.addEventListener('touchstart',e=>{
     const t=e.touches[0];
     startX=t.clientX;startY=t.clientY;dragging=true;dx=0;lockedAxis=null;
+    cw=clip.getBoundingClientRect().width||1; // 드래그 중 픽셀→퍼센트 환산에만 사용(스냅 위치 자체는 %로 고정)
     track.style.transition='none';
   },{passive:true});
   clip.addEventListener('touchmove',e=>{
@@ -11087,7 +11083,8 @@ function bindSwipeCard(wrapId){
     dx=rawDx;
     let extra=0;
     if((idx===0&&dx>0)||(idx===n-1&&dx<0))extra=dx*0.35-dx;
-    track.style.transform=`translateX(${-idx*cw+dx+extra}px)`;
+    const dragPct=((dx+extra)/cw)*(100/n);
+    track.style.transform=`translateX(${-idx*100/n+dragPct}%)`;
   },{passive:false});
   function endDrag(){
     if(!dragging)return;

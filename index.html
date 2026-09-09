@@ -903,7 +903,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
    서브픽셀 leak(세로줄)이 생길 여지를 원천 차단(2026-09-09b 재설계). */
 .sw-card-clip{overflow:hidden;border-radius:2px;touch-action:pan-y;}
 .sw-card-track{display:flex;will-change:transform;}
-.sw-card-slide{flex:0 0 auto;box-sizing:border-box;}
+.sw-card-slide{flex:none;box-sizing:border-box;}
 .sw-card-dots{display:flex;justify-content:center;gap:5px;margin-top:10px;}
 .sw-card-dot{width:5px;height:5px;border-radius:50%;background:var(--card-b);transition:background .2s;}
 .sw-card-dot.on{background:var(--tp);}
