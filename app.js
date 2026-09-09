@@ -11030,10 +11030,16 @@ function cswRingSvg(cid,mk,running){
 let _swipeCardSeq=0;
 function buildSwipeCardHtml(items,buildSingleHtml){
   const seq=++_swipeCardSeq;
+  const n=items.length;
   const dotsHtml=items.map((_,i)=>`<span class="sw-card-dot${i===0?' on':''}" data-i="${i}"></span>`).join('');
-  const slidesHtml=items.map(item=>`<div class="sw-card-slide">${buildSingleHtml(item)}</div>`).join('');
+  const slideWidth=(100/n);
+  const slidesHtml=items.map(item=>`<div class="sw-card-slide" style="width:${slideWidth}%;">${buildSingleHtml(item)}</div>`).join('');
+  // 트랙 너비를 슬라이드 개수×100%로 명시하고, 슬라이드 각각은 트랙의 1/n 폭으로 지정 — 이 둘이 짝을
+  // 이뤄야 함. 트랙 너비만 늘리고 슬라이드 폭(.sw-card-slide{flex:0 0 100%}, CSS 고정값)을 그대로 두면
+  // 슬라이드가 "트랙의 100%"로 계산되어 카드 폭의 n배가 되고, 두 번째 슬라이드가 첫 슬라이드 중간부터
+  // 겹쳐 보이는 이음매(세로선)가 생김(2026-09-09 수정).
   return `<div class="sw-card" id="sw-card-${seq}" data-idx="0">
-    <div class="sw-card-track">${slidesHtml}</div>
+    <div class="sw-card-track" style="width:${n*100}%;">${slidesHtml}</div>
     <div class="sw-card-dots">${dotsHtml}</div>
   </div>`;
 }
@@ -11049,7 +11055,9 @@ function bindSwipeCard(wrapId){
   function goTo(i){
     const idx=Math.max(0,Math.min(n-1,i));
     wrap.dataset.idx=idx;
-    track.style.transform='translateX(-'+(idx*100)+'%)';
+    // 트랙 너비가 n*100%이므로, 트랙 기준 이동량도 (100/n)%씩 — 이전엔 100%씩 이동해 트랙 폭
+    // 확장분(위 buildSwipeCardHtml 수정)과 어긋나던 부분 함께 수정(2026-09-09).
+    track.style.transform='translateX(-'+(idx*(100/n))+'%)';
     dots.forEach((d,di)=>d.classList.toggle('on',di===idx));
   }
   let startX=0;
