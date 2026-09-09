@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.59-badge-cleanup-removed';
+const CACHE = 'iikoto-v2.60-cal-todo-btn';
 const ASSETS = [
   './',
   './index.html'

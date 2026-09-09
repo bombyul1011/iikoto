@@ -7463,7 +7463,7 @@ async function confirmTodo(){
   const alertBasisTime=alertBasisTimeFor({isEvent,eventAlertOn,eventTime,todoAlertOn,alertTime});
   if(alertBasisTime)syncAlertFor(isEvent?'event':'todo',savedTodo.cid,dk,alertBasisTime,text);
   else deleteAlertFor(isEvent?'event':'todo',savedTodo.cid);
-  // 월간 캘린더의 "이 날에 일정 추가"에서 열린 경우 — currentDate를 원래대로 되돌리고 캘린더/상세를 갱신
+  // 월간 캘린더의 "투두 추가하기"에서 열린 경우 — currentDate를 원래대로 되돌리고 캘린더/상세를 갱신
   // (calMode가 아니면 restoreCalModeAndRender 내부에서 renderTodos만 실행됨)
   restoreCalModeAndRender(modal,true);
   setTimeout(()=>{_todoSubmitting=false;},500);
@@ -9976,7 +9976,7 @@ function buildDayDetailHtml(dk){
   }
   return headerHtml+items+mealHtml;
 }
-// 월간 캘린더의 "이 날에 일정 추가" 진입점 — currentDate를 선택 날짜로 임시 전환해 기존 openTodoModal을 그대로 재사용.
+// 월간 캘린더의 "투두 추가하기" 진입점 — currentDate를 선택 날짜로 임시 전환해 기존 openTodoModal을 그대로 재사용.
 // 저장/취소 후에는 confirmTodo(calMode 분기) 또는 closeModal에서 원래 날짜로 복원됨.
 function openEventFromCalendar(d){
   const targetDate=new Date(_calYear,_calMonth,d);
@@ -10019,7 +10019,7 @@ function renderCalDetail(d){
       <span class="cal-detail-date" style="margin-bottom:0;flex-shrink:0;">${dateStr}</span>
     </div>`;
   const bodyHtml=buildDayDetailHtml(dk);
-  const addEventBtnHtml=`<div class="cal-add-event-btn" onclick="openEventFromCalendar(${d})"><i class="ti ti-plus ico-sz-13" aria-hidden="true"></i> 이 날에 일정 추가</div>`;
+  const addEventBtnHtml=`<div class="cal-add-event-btn" onclick="openEventFromCalendar(${d})"><i class="ti ti-plus ico-sz-13" aria-hidden="true"></i> 투두 추가하기</div>`;
   el.innerHTML=`<div class="cal-detail-wrap">${dateHeaderHtml}${bodyHtml}${addEventBtnHtml}</div>`;
   el.style.display='block';
   setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'nearest'}),100);
