@@ -11025,26 +11025,25 @@ function cswRingSvg(cid,mk,running){
 // (.rd-top-inner 같은 카드 껍데기는 포함하지 않는 게 규칙 — 껍데기는 호출부가 <div class="rd-top">
 // <div class="rd-top-inner">이 함수 호출 결과</div></div>로 직접 감쌈). 도트는 트랙 위가 아니라
 // 아래(진행률바 밑)에 둬서, 바깥 그라데이션 테두리(.rd-top)가 도트까지 포함해 위로 튀어나오지 않고
-// 카드 하나만 딱 감싸도록 함(1개일 때와 동일한 테두리 모양 유지, 2026-09-09 수정).
+// 카드 하나만 딱 감싸도록 함(1개일 때와 동일한 테두리 모양 유지).
+// 구조 재설계(2026-09-09): 기존엔 flex 트랙 폭을 n*100%로, 슬라이드 폭을 100/n%로 손으로 맞춰
+// translateX 계산까지 직접 했는데, 이 방식이 반올림 오차로 슬라이드 경계에 세로선이 남는 문제를
+// 반복적으로 일으켰음. CSS scroll-snap(네이티브 가로 스크롤+스냅)으로 교체 — 트랙/슬라이드 폭 계산이
+// 아예 필요 없어지고(각 슬라이드는 단순히 100% 폭), 스와이프도 브라우저가 직접 처리해 touchstart/
+// touchend 수동 판정 로직도 제거됨. 구조가 단순해진 만큼 이런 종류의 오차가 재발할 여지가 없음.
 // wrapId는 이 카드가 그려질 컨테이너의 id, 여러 인스턴스가 동시에 존재하지 않으므로 전역 카운터로 고유 id 부여.
 let _swipeCardSeq=0;
 function buildSwipeCardHtml(items,buildSingleHtml){
   const seq=++_swipeCardSeq;
-  const n=items.length;
   const dotsHtml=items.map((_,i)=>`<span class="sw-card-dot${i===0?' on':''}" data-i="${i}"></span>`).join('');
-  const slideWidth=(100/n);
-  const slidesHtml=items.map(item=>`<div class="sw-card-slide" style="width:${slideWidth}%;">${buildSingleHtml(item)}</div>`).join('');
-  // 트랙 너비를 슬라이드 개수×100%로 명시하고, 슬라이드 각각은 트랙의 1/n 폭으로 지정 — 이 둘이 짝을
-  // 이뤄야 함. 트랙 너비만 늘리고 슬라이드 폭(.sw-card-slide{flex:0 0 100%}, CSS 고정값)을 그대로 두면
-  // 슬라이드가 "트랙의 100%"로 계산되어 카드 폭의 n배가 되고, 두 번째 슬라이드가 첫 슬라이드 중간부터
-  // 겹쳐 보이는 이음매(세로선)가 생김(2026-09-09 수정).
+  const slidesHtml=items.map(item=>`<div class="sw-card-slide">${buildSingleHtml(item)}</div>`).join('');
   return `<div class="sw-card" id="sw-card-${seq}" data-idx="0">
-    <div class="sw-card-track" style="width:${n*100}%;">${slidesHtml}</div>
+    <div class="sw-card-track">${slidesHtml}</div>
     <div class="sw-card-dots">${dotsHtml}</div>
   </div>`;
 }
-// 렌더 직후 호출 — 터치 스와이프와 탭 전환을 바인딩. 요소가 DOM에 붙은 다음에만 동작하므로
-// innerHTML 대입 직후 반드시 호출해야 함(콘텐츠허브/독서허브 렌더 함수 쪽에서 호출).
+// 렌더 직후 호출 — 스크롤 위치를 관찰해 도트만 갱신하고, 도트 탭 시 scrollTo로 이동. 요소가 DOM에
+// 붙은 다음에만 동작하므로 innerHTML 대입 직후 반드시 호출해야 함(콘텐츠허브/독서허브 렌더 함수 쪽에서 호출).
 function bindSwipeCard(wrapId){
   const wrap=document.getElementById(wrapId)?.querySelector('.sw-card');
   if(!wrap)return;
@@ -11052,23 +11051,26 @@ function bindSwipeCard(wrapId){
   const dots=[...wrap.querySelectorAll('.sw-card-dot')];
   const n=dots.length;
   if(n<2)return;
-  function goTo(i){
-    const idx=Math.max(0,Math.min(n-1,i));
+  function setActive(idx){
     wrap.dataset.idx=idx;
-    // 트랙 너비가 n*100%이므로, 트랙 기준 이동량도 (100/n)%씩 — 이전엔 100%씩 이동해 트랙 폭
-    // 확장분(위 buildSwipeCardHtml 수정)과 어긋나던 부분 함께 수정(2026-09-09).
-    track.style.transform='translateX(-'+(idx*(100/n))+'%)';
     dots.forEach((d,di)=>d.classList.toggle('on',di===idx));
   }
-  let startX=0;
-  track.addEventListener('touchstart',e=>{startX=e.touches[0].clientX;},{passive:true});
-  track.addEventListener('touchend',e=>{
-    const dx=e.changedTouches[0].clientX-startX;
-    const cur=parseInt(wrap.dataset.idx,10)||0;
-    if(dx<-30)goTo(cur+1);
-    else if(dx>30)goTo(cur-1);
+  // 스크롤이 멎을 때마다 현재 슬라이드 폭 기준으로 가장 가까운 인덱스를 계산 — scroll-snap이 실제
+  // 정렬을 담당하므로 여기선 도트 표시만 그 결과를 따라가면 됨.
+  let scrollTimer=null;
+  track.addEventListener('scroll',()=>{
+    clearTimeout(scrollTimer);
+    scrollTimer=setTimeout(()=>{
+      const idx=Math.round(track.scrollLeft/track.clientWidth);
+      setActive(Math.max(0,Math.min(n-1,idx)));
+    },80);
   },{passive:true});
-  dots.forEach(d=>d.addEventListener('click',e=>{e.stopPropagation();goTo(parseInt(d.dataset.i,10));}));
+  dots.forEach(d=>d.addEventListener('click',e=>{
+    e.stopPropagation();
+    const idx=parseInt(d.dataset.i,10);
+    track.scrollTo({left:idx*track.clientWidth,behavior:'smooth'});
+    setActive(idx);
+  }));
 }
 // 진행중(status==='reading') 책 목록 — 콘텐츠의 _getOngoingWatchingWithCid와 동일한 역할.
 function _getOngoingReadingWithCid(){
