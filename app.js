@@ -13355,6 +13355,11 @@ if(navigator.onLine){
   cleanupOldGreetingCache(); // fire-and-forget — 실패해도 다음 앱 시작 때 재시도되므로 await로 초기화를 막지 않음
   processPhotoR2DeleteQueue(); // 지난 세션에서 R2 삭제가 실패해 대기열에 남은 사진이 있으면 재시도
 }
+// [2026-09-09] 앱 아이콘 배지 기능 자체를 완전히 제거(요청에 따라) — 서버가 더 이상 badge_count를
+// 보내지 않고 클라이언트도 setAppBadge를 더 이상 호출하지 않음. 하지만 제거 이전에 이미 떠 있던
+// 배지는 지우는 코드가 같이 사라지면 영영 안 지워지는 채로 남으므로, 딱 한 번만 clearAppBadge를
+// 호출해 기존 배지를 정리. 이후로는 이 앱이 배지에 다시 관여하지 않음(재등록 없음).
+if(navigator.clearAppBadge){try{navigator.clearAppBadge();}catch(e){}}
 
 // Service Worker 등록 (오프라인 지원)
 if('serviceWorker' in navigator){
