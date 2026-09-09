@@ -898,13 +898,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rd-top-info{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;}
 .rd-top-title{font-size:15px;font-weight:600;color:var(--tp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .rd-top-author{font-size:var(--dow-label-size);color:var(--tm);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.sw-card{overflow:hidden;}
+.sw-card{overflow:hidden;isolation:isolate;transform:translateZ(0);border-radius:2px;}
 .sw-card-dots{display:flex;justify-content:center;gap:5px;margin-top:10px;}
 .sw-card-dot{width:5px;height:5px;border-radius:50%;background:var(--card-b);transition:background .2s;}
 .sw-card-dot.on{background:var(--tp);}
 .sw-card-track{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
 .sw-card-track::-webkit-scrollbar{display:none;}
-.sw-card-slide{flex:0 0 100%;min-width:100%;scroll-snap-align:start;box-sizing:border-box;}
+.sw-card-slide{flex:0 0 100%;min-width:100%;scroll-snap-align:start;scroll-snap-stop:always;box-sizing:border-box;}
 .rd-top-sw{display:flex;align-items:center;flex-shrink:0;}
 .rd-sw-ring-wrap{position:relative;width:76px;height:76px;flex-shrink:0;cursor:pointer;}
 .rd-sw-ring-svg{transform:rotate(-90deg);transform-origin:50% 50%;position:relative;z-index:1;}
@@ -914,7 +914,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rd-sw-ring-wrap.cwatch-active .rd-sw-bg{background:linear-gradient(135deg,#c9e6a8,#dcefb8,#b9e4d0,#c9e6a8);background-size:300% 300%;animation:bannerShine 3s ease infinite;}
 .rd-sw-face{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#6a4458;z-index:2;}
 .rd-sw-time{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#6a4458;font-family:'DM Sans',sans-serif;z-index:2;}
-.rd-progress-bar{width:100%;position:relative;margin-bottom:7px;cursor:pointer;padding:5px 0;}
+.rd-progress-bar{width:100%;position:relative;margin-bottom:7px;cursor:pointer;padding:5px 7px;box-sizing:border-box;}
 .rd-progress-track{height:4px;border-radius:3px;background:var(--graph-track-color);overflow:hidden;position:relative;}
 .rd-progress-fill{position:absolute;left:0;top:0;height:100%;border-radius:3px;background:#ffc9da;transition:width .4s ease;}
 .rd-progress-today{position:absolute;top:0;height:100%;background:#ff9ec0;transition:left .4s ease,width .4s ease;}
