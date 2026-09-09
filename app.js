@@ -11038,38 +11038,72 @@ function buildSwipeCardHtml(items,buildSingleHtml){
   const dotsHtml=items.map((_,i)=>`<span class="sw-card-dot${i===0?' on':''}" data-i="${i}"></span>`).join('');
   const slidesHtml=items.map(item=>`<div class="sw-card-slide">${buildSingleHtml(item)}</div>`).join('');
   return `<div class="sw-card" id="sw-card-${seq}" data-idx="0">
-    <div class="sw-card-track">${slidesHtml}</div>
+    <div class="sw-card-clip"><div class="sw-card-track">${slidesHtml}</div></div>
     <div class="sw-card-dots">${dotsHtml}</div>
   </div>`;
 }
-// 렌더 직후 호출 — 스크롤 위치를 관찰해 도트만 갱신하고, 도트 탭 시 scrollTo로 이동. 요소가 DOM에
-// 붙은 다음에만 동작하므로 innerHTML 대입 직후 반드시 호출해야 함(콘텐츠허브/독서허브 렌더 함수 쪽에서 호출).
+// 렌더 직후 호출 — 트랙 폭/위치를 px로 직접 계산해 transform으로 이동시키고, 터치 스와이프를 수동
+// 판정. 요소가 DOM에 붙은 다음에만 동작하므로 innerHTML 대입 직후 반드시 호출해야 함
+// (콘텐츠허브/독서허브 렌더 함수 쪽에서 호출).
 function bindSwipeCard(wrapId){
   const wrap=document.getElementById(wrapId)?.querySelector('.sw-card');
   if(!wrap)return;
+  const clip=wrap.querySelector('.sw-card-clip');
   const track=wrap.querySelector('.sw-card-track');
+  const slides=[...wrap.querySelectorAll('.sw-card-slide')];
   const dots=[...wrap.querySelectorAll('.sw-card-dot')];
-  const n=dots.length;
+  const n=slides.length;
   if(n<2)return;
-  function setActive(idx){
+  let idx=0,cw=0,startX=0,startY=0,dragging=false,dx=0,lockedAxis=null;
+  function measure(){
+    cw=clip.getBoundingClientRect().width;
+    track.style.width=(cw*n)+'px';
+    slides.forEach(s=>{s.style.width=cw+'px';});
+  }
+  function setActive(i,animate){
+    idx=Math.max(0,Math.min(n-1,i));
     wrap.dataset.idx=idx;
+    track.style.transition=animate?'transform .28s cubic-bezier(.22,.61,.36,1)':'none';
+    track.style.transform=`translateX(${-idx*cw}px)`;
     dots.forEach((d,di)=>d.classList.toggle('on',di===idx));
   }
-  // 스크롤이 멎을 때마다 현재 슬라이드 폭 기준으로 가장 가까운 인덱스를 계산 — scroll-snap이 실제
-  // 정렬을 담당하므로 여기선 도트 표시만 그 결과를 따라가면 됨.
-  let scrollTimer=null;
-  track.addEventListener('scroll',()=>{
-    clearTimeout(scrollTimer);
-    scrollTimer=setTimeout(()=>{
-      const idx=Math.round(track.scrollLeft/track.clientWidth);
-      setActive(Math.max(0,Math.min(n-1,idx)));
-    },80);
+  measure();
+  setActive(0,false);
+  // 레이아웃이 뒤늦게 확정되는 경우(폰트/이미지 로드 등) 대비해 폭을 한 번 더 재계산.
+  requestAnimationFrame(()=>{measure();setActive(idx,false);});
+  window.addEventListener('resize',()=>{measure();setActive(idx,false);});
+  clip.addEventListener('touchstart',e=>{
+    const t=e.touches[0];
+    startX=t.clientX;startY=t.clientY;dragging=true;dx=0;lockedAxis=null;
+    track.style.transition='none';
   },{passive:true});
-  dots.forEach(d=>d.addEventListener('click',e=>{
+  clip.addEventListener('touchmove',e=>{
+    if(!dragging)return;
+    const t=e.touches[0];
+    const rawDx=t.clientX-startX, rawDy=t.clientY-startY;
+    if(lockedAxis===null)lockedAxis=Math.abs(rawDx)>Math.abs(rawDy)?'x':'y';
+    if(lockedAxis==='y')return;
+    e.preventDefault();
+    dx=rawDx;
+    let extra=0;
+    if((idx===0&&dx>0)||(idx===n-1&&dx<0))extra=dx*0.35-dx;
+    track.style.transform=`translateX(${-idx*cw+dx+extra}px)`;
+  },{passive:false});
+  function endDrag(){
+    if(!dragging)return;
+    dragging=false;
+    if(lockedAxis==='y'){lockedAxis=null;return;}
+    const threshold=cw*0.18;
+    if(dx<=-threshold&&idx<n-1)idx++;
+    else if(dx>=threshold&&idx>0)idx--;
+    setActive(idx,true);
+    lockedAxis=null;
+  }
+  clip.addEventListener('touchend',endDrag);
+  clip.addEventListener('touchcancel',endDrag);
+  dots.forEach((d,di)=>d.addEventListener('click',e=>{
     e.stopPropagation();
-    const idx=parseInt(d.dataset.i,10);
-    track.scrollTo({left:idx*track.clientWidth,behavior:'smooth'});
-    setActive(idx);
+    setActive(di,true);
   }));
 }
 // 진행중(status==='reading') 책 목록 — 콘텐츠의 _getOngoingWatchingWithCid와 동일한 역할.
