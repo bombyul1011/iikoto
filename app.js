@@ -2580,22 +2580,6 @@ async function syncUserTimezoneIfChanged(){
 function alertBasisTimeFor(t){
   return t.isEvent?(t.eventAlertOn?t.eventTime:null):(t.todoAlertOn?t.alertTime:null);
 }
-// ── 뱃지 카운트 — "알림 온 할일(source_type=todo, sent=true) 중 아직 완료 안 된 것" 개수.
-// 완료 체크로 실제 사용자가 정리하는 게 기준이라 일정(event)은 자연히 제외됨.
-// 서버 push가 알아서 갱신해주지만, 완료 체크 직후엔 그 결과를 기다리지 않고 클라이언트에서 즉시 반영.
-async function refreshAppBadge(){
-  if(!navigator.setAppBadge)return;
-  const alerts=await supaFetch('alerts?source_type=eq.todo&sent=eq.true&select=source_cid');
-  if(!alerts||!alerts.length){try{await navigator.clearAppBadge();}catch(e){}return;}
-  const cids=[...new Set(alerts.map(a=>a.source_cid))];
-  const rows=await supaFetch('todos?client_id=in.('+cids.map(c=>encodeURIComponent(c)).join(',')+')&select=client_id,done');
-  const doneSet=new Set((rows||[]).filter(r=>r.done).map(r=>r.client_id));
-  const count=cids.filter(cid=>!doneSet.has(cid)).length;
-  try{
-    if(count>0)await navigator.setAppBadge(count);
-    else await navigator.clearAppBadge();
-  }catch(e){}
-}
 // 3일 지난 greeting_* 캐시 정리 — 앱 시작(스플래시) 시점에 호출.
 // 매번 서버에 삭제 요청을 보내지 않도록, 로컬에 마지막 정리 시각을 남겨 7일에 한 번만 실제로 실행.
 // (매일 돌리든 일주일에 한 번 돌리든 최종적으로 남는 데이터는 동일 — 실행 빈도만 낮춰 서버 부담을 줄임)
@@ -6802,7 +6786,6 @@ function toggleTodo(i,expectedCid){
     const basisTime=alertBasisTimeFor(target);
     if(basisTime)syncAlertFor(target.isEvent?'event':'todo',target.cid,dk,basisTime,target.text);
   }
-  refreshAppBadge();
 }
 
 // 투두/습관 체크 등으로 오늘 활동 분포가 바뀌었을 때 저녁 홈탭의 점 타임라인 카드를 새로 그려 교체.
@@ -13504,7 +13487,6 @@ async function initSync(){
   _initSyncDone=true;
 }
 setTimeout(initSync, 500);
-setTimeout(refreshAppBadge, 1000);
 setTimeout(checkAndRecoverPushSubscription, 1500);
 // initSync(오프라인이면 즉시 반환) 완료와 최소 스플래시 시간 중 늦게 끝나는 쪽에 맞춰 해제.
 // initSync 시작(500ms 지연)까지 감안해 넉넉히 폴링하되, 혹시 실패해도 최소시간 이후엔 반드시 내려가도록 방어.
