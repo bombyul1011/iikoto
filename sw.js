@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.61-cal-pending-mark';
+const CACHE = 'iikoto-v2.63-cleanup';
 const ASSETS = [
   './',
   './index.html'

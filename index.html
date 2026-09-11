@@ -1720,16 +1720,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 
 
-<!-- READING CALENDAR SHEET -->
-<div class="overlay" id="reading-cal-sheet" style="z-index:8500;" onclick="closeSheet('reading-cal-sheet',event)">
-  <div class="bsheet" style="max-height:85vh;overflow-y:auto;" onclick="event.stopPropagation()">
-    <div class="sheet-handle"></div>
-    <div style="padding:0 20px 24px;">
-      <div id="rdcal-view"></div>
-    </div>
-  </div>
-</div>
-
 <!-- WEEK MEAL SHEET -->
 <div class="overlay" id="week-meal-sheet" onclick="closeSheet('week-meal-sheet',event)">
   <div class="bsheet" style="max-height:85vh;overflow-y:auto;" onclick="event.stopPropagation()">
@@ -2487,9 +2477,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     </div>
     <span class="settings-ttl" style="cursor:pointer;" onclick="resetReadingSelection()">독서</span>
     <div style="flex:1;"></div>
-    <div class="settings-back" style="width:30px;height:30px;" onclick="openReadingCalendar()">
-      <i class="ti ti-calendar-stats" style="font-size:15px;color:var(--ts);" aria-hidden="true"></i>
-    </div>
   </div>
   <div class="reading-body">
     <div class="rd-top" id="rd-top"></div>

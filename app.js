@@ -3670,7 +3670,7 @@ async function autoSync(type,key){
   else if(type==='contents'){if(await syncContentsUp(key))S.set(S.key('contents_pending',key),false);}
   else if(type==='rblocks'){if(await syncRhythmBlocksUp(key))S.set(S.key('rblocks_pending',key),false);}
   else if(type==='mflow')syncMorningFlowUp(key);
-  else if(type==='rdlog'){if(await syncReadingDailyLogUp(key))S.set(S.key('rdlog_pending',key),false);}
+  else if(type==='cdlog'){if(await syncContentDailyLogUp(key))S.set(S.key('cdlog_pending',key),false);}
 }
 async function syncAll(){
   if(!navigator.onLine)return;
@@ -7831,8 +7831,9 @@ function openSeedArchive(){
   }
   openModal('seed-archive-modal');
 }
-function jumpToMemoDateFromSeed(dk){
-  closeModal('seed-archive-modal');
+// 날짜 전환 공용 헬퍼 — currentDate를 dk로 바꾸고 오늘탭으로 전환. 씨앗모아보기/월간탭 상세보기 등
+// 여러 진입점에서 공유(2026-09-11 중복 제거 통합).
+function _gotoDailyTab(dk){
   const parts=dk.split('-').map(Number);
   currentDate=new Date(parts[0],parts[1]-1,parts[2]);
   updateDateUI();
@@ -7841,16 +7842,13 @@ function jumpToMemoDateFromSeed(dk){
   document.querySelector('.scroll').scrollTop=0;
   loadDaily();
 }
-// 월간탭 상세보기 "오늘탭에서 보기" 칩 — jumpToMemoDateFromSeed와 동일한 날짜 전환 패턴,
-// 모달이 아니라 월간탭 자체에서 호출되므로 closeModal 없이 바로 탭 전환만 수행.
+function jumpToMemoDateFromSeed(dk){
+  closeModal('seed-archive-modal');
+  _gotoDailyTab(dk);
+}
+// 월간탭 상세보기 "오늘탭에서 보기" 칩 — 모달이 아니라 월간탭 자체에서 호출되므로 closeModal 없이 바로 전환.
 function jumpToDailyTab(dk){
-  const parts=dk.split('-').map(Number);
-  currentDate=new Date(parts[0],parts[1]-1,parts[2]);
-  updateDateUI();
-  document.querySelectorAll('.vtab').forEach(t=>t.classList.toggle('on',t.dataset.v==='daily'));
-  document.querySelectorAll('.view').forEach(vw=>vw.classList.toggle('on',vw.id==='v-daily'));
-  document.querySelector('.scroll').scrollTop=0;
-  loadDaily();
+  _gotoDailyTab(dk);
 }
 // 사진메모 모아보기 — seed 모아보기(openSeedArchive)와 동일한 방식으로 localStorage 전체를 훑어
 // 사진이 첨부된 메모만 모아 최신순 그리드로 보여줌. 썸네일은 오늘탭 목록과 동일하게
@@ -9033,11 +9031,13 @@ function _findContentByCidNearMk(cid,mk){
 }
 let _cpgCid=null;
 // watchedNow: 시청 종료로 자동 열린 경우, 그동안 본 분(드라마는 화 단위 환산 불가하므로 영화만 자동 가산 — 드라마는 방영 회차 단위라 시간으로 환산할 수 없어 수동 입력 유지)
-function openContentProgressModal(cid,watchedNow){
+let _cpgSeconds=0;
+function openContentProgressModal(cid,watchedNow,secondsWatched){
   const found=_findContentByCidNearMk(cid,_chArchiveMk||monthKey(new Date()));
   if(!found)return;
   const c=found.list[found.idx];
   _cpgCid=cid;
+  _cpgSeconds=secondsWatched||0; // 감상달력 일자별 로그(content_daily_log)에 기록할 이번 세션 시청시간
   const unitLabel=c.cat==='drama'?'화':'분';
   document.getElementById('cpg-title').textContent=escapeHtml(c.title||'')+' 진행률';
   document.getElementById('cpg-sub').textContent=c.totalUnit?`전체 ${c.totalUnit}${unitLabel} 중 지금까지 본 ${unitLabel}수를 입력하세요`:`지금까지 본 ${unitLabel}수를 입력하세요 (전체 ${unitLabel}수는 아직 미입력)`;
@@ -9083,8 +9083,15 @@ function confirmContentProgress(){
   const val=parseInt(document.getElementById('cpg-inp').value,10);
   if(isNaN(val))return;
   const c=found.list[found.idx];
+  const beforeUnit=c.currentUnit||0;
   c.currentUnit=Math.max(0,Math.min(val,c.totalUnit||val));
   saveContents(found.mk,found.list);
+  // 감상달력 일자별 진행률 로그(content_daily_log) — 2026-09-11 독서 전용에서 책/드라마/영화 공용으로 확장.
+  // 기존 콘텐츠 이력은 소급 없이 오늘 이 저장 시점부터 새로 쌓임(독서와 동일한 amountRead=증가분 방식).
+  const amountRead=Math.max(0,c.currentUnit-beforeUnit);
+  const logUnit=c.cat==='drama'?'episode':'minute';
+  logContentDaily(c.cid,dateKey(getLogicalDate()),amountRead,_cpgSeconds,logUnit,null,c.currentUnit);
+  _cpgSeconds=0;
   pushContentNote(_cpgCid,c.title,c.cat,document.getElementById('cpg-note-inp')?.value);
   // 진행률이 사실상 다 본 지점에 도달하면(currentUnit이 totalUnit 이상) 완료로 넘어갈지
   // 모달 안에서 바로 물어봄 — 독서코너의 완독 확인 흐름과 동일. totalUnit 미입력 시엔 판정 불가하므로 노출 안 함.
@@ -9395,7 +9402,7 @@ function stopContentStopwatch(){
   if(_chArchiveMk)chExpandMonth(_chArchiveMk);
   refreshContentHubViews();
   renderCwatchMainCard();
-  if(secondsWatched>=60)openContentProgressModal(cid,minutesWatched); // 1분 미만은 진행률 입력도 의미 없으니 띄우지 않음
+  if(secondsWatched>=60)openContentProgressModal(cid,minutesWatched,secondsWatched); // 1분 미만은 진행률 입력도 의미 없으니 띄우지 않음
 }
 // 새로고침·앱 재시작으로 메모리 상태가 초기화돼도 시청중 표시를 이어감(초단위 표시가 없어 setInterval 재개는 불필요)
 (function restoreContentWatchFromStorage(){
@@ -9981,7 +9988,7 @@ function buildDayDetailHtml(dk){
         <span style="display:flex;align-items:center;gap:8px;cursor:pointer;" onclick="calShowPendingTodos('${dk}')"><div class="cal-detail-icon"><i class="ti ti-clock" style="font-size:var(--dow-label-size);color:var(--tm);" aria-hidden="true"></i></div><span class="cal-detail-text" id="cal-pending-summary-${dk}">예정된 일 ${pendingTodos.length}개 <i class="ti ti-chevron-right ico-inline-11" aria-hidden="true"></i></span></span>
         <span class="cal-jump-daily-chip" onclick="jumpToDailyTab('${dk}')">오늘탭에서 보기 <i class="ti ti-arrow-right ico-inline-11" aria-hidden="true"></i></span>
       </div>
-        <div id="cal-pending-rows-${dk}" style="display:none;"></div>`;
+      <div id="cal-pending-rows-${dk}" style="display:none;"></div>`;
     }
   }
   const MAX=3;const total=allMemos.length;
@@ -10057,34 +10064,27 @@ function renderCalDetail(d){
   el.style.display='block';
   setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'nearest'}),100);
 }
-function calShowTodos(dk){
-  const todos=getTodos(dk).filter(t=>t.done);
-  const rowsWrap=document.getElementById('cal-todo-rows-'+dk);if(!rowsWrap)return;
-  const summaryEl=document.getElementById('cal-todo-summary-'+dk);
+// 완료/예정 투두 펼침 토글 공용 헬퍼 — rowsPrefix/summaryPrefix의 DOM id 규칙과 label만 다르고
+// 나머지 로직은 동일해 통합(2026-09-11 중복 제거).
+function _calToggleTodoRows(dk,todos,rowsPrefix,summaryPrefix,label){
+  const rowsWrap=document.getElementById(rowsPrefix+dk);if(!rowsWrap)return;
+  const summaryEl=document.getElementById(summaryPrefix+dk);
   const isOpen=rowsWrap.style.display!=='none';
   if(isOpen){
     rowsWrap.style.display='none';
-    if(summaryEl)summaryEl.innerHTML=`완료한 일 ${todos.length}개 <i class="ti ti-chevron-right ico-inline-11" aria-hidden="true"></i>`;
+    if(summaryEl)summaryEl.innerHTML=`${label} ${todos.length}개 <i class="ti ti-chevron-right ico-inline-11" aria-hidden="true"></i>`;
   }else{
     rowsWrap.innerHTML=todos.map(t=>`<div class="cal-detail-row" style="padding-left:20px;"><span class="cal-detail-text">${t.text}</span></div>`).join('');
     rowsWrap.style.display='block';
-    if(summaryEl)summaryEl.innerHTML=`완료한 일 ${todos.length}개 <i class="ti ti-chevron-down ico-inline-11" aria-hidden="true"></i>`;
+    if(summaryEl)summaryEl.innerHTML=`${label} ${todos.length}개 <i class="ti ti-chevron-down ico-inline-11" aria-hidden="true"></i>`;
   }
 }
-// 미래 날짜용 — calShowTodos와 동일 패턴이되 미완료 투두를 읽기전용으로 나열(체크/수정 불가, 오늘탭 칩으로 유도).
+function calShowTodos(dk){
+  _calToggleTodoRows(dk,getTodos(dk).filter(t=>t.done),'cal-todo-rows-','cal-todo-summary-','완료한 일');
+}
+// 미래 날짜용 — 미완료 투두를 읽기전용으로 나열(체크/수정 불가, 오늘탭 칩으로 유도). 일정(isEvent)은 달력에 이미 표기되므로 제외.
 function calShowPendingTodos(dk){
-  const todos=getTodos(dk).filter(t=>!t.done&&!t.isEvent);
-  const rowsWrap=document.getElementById('cal-pending-rows-'+dk);if(!rowsWrap)return;
-  const summaryEl=document.getElementById('cal-pending-summary-'+dk);
-  const isOpen=rowsWrap.style.display!=='none';
-  if(isOpen){
-    rowsWrap.style.display='none';
-    if(summaryEl)summaryEl.innerHTML=`예정된 일 ${todos.length}개 <i class="ti ti-chevron-right ico-inline-11" aria-hidden="true"></i>`;
-  }else{
-    rowsWrap.innerHTML=todos.map(t=>`<div class="cal-detail-row" style="padding-left:20px;"><span class="cal-detail-text">${t.text}</span></div>`).join('');
-    rowsWrap.style.display='block';
-    if(summaryEl)summaryEl.innerHTML=`예정된 일 ${todos.length}개 <i class="ti ti-chevron-down ico-inline-11" aria-hidden="true"></i>`;
-  }
+  _calToggleTodoRows(dk,getTodos(dk).filter(t=>!t.done&&!t.isEvent),'cal-pending-rows-','cal-pending-summary-','예정된 일');
 }
 function calShowAll(dk){
   const memos=getMemos(dk);
@@ -11695,157 +11695,46 @@ function openProgressModal(cid,seconds){
   openModal('progress-modal');
   setTimeout(()=>document.getElementById('pg-end-inp').focus(),100);
 }
-// ── 일자별 독서 로그 (달력용) — 진행률 저장 시점(confirmProgress)에만 기록됨.
-// 같은 날 여러 세션(스톱워치 여러 번)이면 client_id를 date_key+book_cid로 고정해 upsert로 누적.
-function getReadingDailyLog(dk){return S.get(S.key('rdlog',dk))||[];}
-function saveReadingDailyLog(dk,arr){
-  S.set(S.key('rdlog',dk),arr);
-  S.set(S.key('rdlog_pending',dk),true);
-  autoSync('rdlog',dk);
+// ── 일자별 콘텐츠 진행률 로그 (감상달력용) — 진행률 저장 시점에만 기록됨.
+// 2026-09-11: reading_daily_log→content_daily_log로 통합, 책 전용에서 책/드라마/영화 공용으로 확장.
+// 같은 날 여러 세션(스톱워치 여러 번)이면 client_id를 date_key+cid로 고정해 upsert로 누적.
+function getContentDailyLog(dk){return S.get(S.key('cdlog',dk))||[];}
+function saveContentDailyLog(dk,arr){
+  S.set(S.key('cdlog',dk),arr);
+  S.set(S.key('cdlog_pending',dk),true);
+  autoSync('cdlog',dk);
 }
-function logReadingDaily(book,dk,amountRead,seconds,unit,percentAfter,pagesAfter){
-  const logs=getReadingDailyLog(dk);
-  const cid='rdlog_'+dk+'_'+book.cid;
-  const idx=logs.findIndex(l=>l.cid===cid);
+// unit: 'pages'|'percent'(책), 'episode'(드라마), 'minute'(영화). unitAfter=그날 도달한 진행값(percent 제외).
+function logContentDaily(cid,dk,amountRead,seconds,unit,percentAfter,unitAfter){
+  const logs=getContentDailyLog(dk);
+  const cidKey='cdlog_'+dk+'_'+cid;
+  const idx=logs.findIndex(l=>l.cid===cidKey);
   if(idx>=0){
     logs[idx].amountRead=(logs[idx].amountRead||0)+amountRead;
     logs[idx].seconds=(logs[idx].seconds||0)+(seconds||0);
     logs[idx].unit=unit;
     logs[idx].percentAfter=percentAfter;
-    logs[idx].pagesAfter=pagesAfter;
+    logs[idx].unitAfter=unitAfter;
   }else{
-    logs.push({cid:cid,bookCid:book.cid,unit:unit,amountRead:amountRead,seconds:seconds||0,percentAfter:percentAfter,pagesAfter:pagesAfter,created:Date.now()});
+    logs.push({cid:cidKey,contentCid:cid,unit:unit,amountRead:amountRead,seconds:seconds||0,percentAfter:percentAfter,unitAfter:unitAfter,created:Date.now()});
   }
-  saveReadingDailyLog(dk,logs);
+  saveContentDailyLog(dk,logs);
 }
-async function syncReadingDailyLogUp(dk){
-  const logs=getReadingDailyLog(dk);
+async function syncContentDailyLogUp(dk){
+  const logs=getContentDailyLog(dk);
   if(!logs.length)return true;
-  const ok=await supaUpsert('reading_daily_log','client_id',logs.map(l=>({
-    date_key:dk,book_cid:l.bookCid,unit:l.unit,amount_read:l.amountRead||0,
+  const ok=await supaUpsert('content_daily_log','client_id',logs.map(l=>({
+    date_key:dk,content_cid:l.contentCid,unit:l.unit,amount_read:l.amountRead||0,
     percent_after:(l.unit==='percent'?l.percentAfter:null),
-    pages_after:(l.unit==='pages'?l.pagesAfter:null),
+    unit_after:(l.unit!=='percent'?l.unitAfter:null),
     seconds:l.seconds||0,created:l.created,client_id:l.cid
   })));
   return ok;
 }
-// ── 독서 달력 (일자별 로그 모아보기) — 그리드 아래에 선택 날짜 상세를 펼치는 단일 뷰 구조
-let _rdCalDate=new Date();
-let _rdCalLogsByDate={}; // 이번 달 로그 캐시: {dk: [row,...]}
-let _rdCalOpenDk=null; // 현재 펼쳐진 날짜 (없으면 null)
-function openReadingCalendar(){
-  _rdCalDate=new Date();
-  _rdCalOpenDk=null;
-  openSheet('reading-cal-sheet');
-  loadAndRenderReadingCal();
-}
-function rdCalMonthShift(delta){
-  _rdCalDate.setMonth(_rdCalDate.getMonth()+delta);
-  _rdCalOpenDk=null;
-  loadAndRenderReadingCal();
-}
+// _rdProgressLabel — 콘텐츠 감상달력(renderWatchCalDetail)의 책 진행률 표시에서도 재사용(2026-09-11 독서달력 폐기 이후 잔존).
 function _rdProgressLabel(unit,percentAfter,pagesAfter){
   if(unit==='percent')return (percentAfter!=null?percentAfter:0)+'%';
   return (pagesAfter!=null?pagesAfter:0)+'p';
-}
-async function loadAndRenderReadingCal(){
-  const el=document.getElementById('rdcal-view');
-  const y=_rdCalDate.getFullYear(),m=_rdCalDate.getMonth();
-  const mk=y+'-'+String(m+1).padStart(2,'0');
-  el.innerHTML='<div class="sheet-loading-msg">불러오는 중...</div>';
-  const rows=await supaFetch(`reading_daily_log?date_key=gte.${mk}-01&date_key=lte.${mk}-31&order=created`);
-  _rdCalLogsByDate={};
-  (rows||[]).forEach(r=>{
-    if(!_rdCalLogsByDate[r.date_key])_rdCalLogsByDate[r.date_key]=[];
-    _rdCalLogsByDate[r.date_key].push(r);
-  });
-  renderReadingCalView();
-}
-function rdCalDayTap(dk){
-  _rdCalOpenDk=(_rdCalOpenDk===dk)?null:dk;
-  renderReadingCalView();
-}
-function renderReadingCalView(){
-  const el=document.getElementById('rdcal-view');
-  const y=_rdCalDate.getFullYear(),m=_rdCalDate.getMonth();
-  const first=new Date(y,m,1);
-  const startWeekday=(first.getDay()+6)%7; // 월요일 시작(0=월 ... 6=일)
-  const daysInMonth=new Date(y,m+1,0).getDate();
-  const books=getBooks();
-  const bookMap={};books.forEach(b=>bookMap[b.cid]=b);
-  const totalBooksThisMonth=new Set();
-  Object.values(_rdCalLogsByDate).forEach(list=>list.forEach(r=>totalBooksThisMonth.add(r.book_cid)));
-  const weekdays=['월','화','수','목','금','토','일'];
-  let html=`<div style="display:flex;align-items:center;justify-content:center;gap:18px;margin:2px 0 6px;">
-    <i class="ti ti-chevron-left ico-cal-nav" onclick="rdCalMonthShift(-1)" aria-hidden="true"></i>
-    <div style="font-weight:600;font-size:var(--main-text-size);color:var(--tp);">${y}년 ${String(m+1).padStart(2,'0')}월</div>
-    <i class="ti ti-chevron-right ico-cal-nav" onclick="rdCalMonthShift(1)" aria-hidden="true"></i>
-  </div>
-  <div style="text-align:center;font-size:30px;font-weight:700;color:var(--tp);margin:8px 0 18px;letter-spacing:-.01em;">${totalBooksThisMonth.size}권</div>
-  <div style="display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:8px;">
-    ${weekdays.map(w=>`<div style="text-align:center;font-size:var(--dow-label-size);color:var(--tm);font-weight:500;">${w}</div>`).join('')}
-  </div>
-  <div style="display:grid;grid-template-columns:repeat(7,1fr);row-gap:14px;">`;
-  for(let i=0;i<startWeekday;i++)html+='<div></div>';
-  for(let d=1;d<=daysInMonth;d++){
-    const dk=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const dayLogs=_rdCalLogsByDate[dk]||[];
-    const cids=[...new Set(dayLogs.slice().reverse().map(r=>r.book_cid))];
-    let cellInner;
-    if(cids.length){
-      // 표지가 있는 날은 밀리의 서재 방식대로 일자 숫자를 생략 — 표지 자체가 그 날의 표식이 됨
-      const cover=bookMap[cids[0]]&&bookMap[cids[0]].poster;
-      const cover2=cids.length>1&&bookMap[cids[1]]&&bookMap[cids[1]].poster;
-      cellInner=`<div style="position:relative;width:34px;height:46px;margin:0 auto;">
-        ${cids.length>1?`<div style="position:absolute;top:2px;left:3px;width:34px;height:46px;border-radius:6px;overflow:hidden;background:var(--card);border:1px solid var(--card-b);box-shadow:0 1px 3px rgba(0,0,0,0.15);${cover2?`background-image:url('${cover2}');background-size:cover;background-position:center;`:''}"></div>`:''}
-        <div style="position:absolute;top:0;left:0;width:34px;height:46px;border-radius:6px;overflow:hidden;background:var(--card);border:1px solid var(--card-b);${cids.length>1?'box-shadow:-1px 1px 4px rgba(0,0,0,0.18);':''}${cover?`background-image:url('${cover}');background-size:cover;background-position:center;`:''}"></div>
-        ${cids.length>1?`<div style="position:absolute;bottom:-4px;right:-4px;background:rgba(60,40,35,0.85);color:#fff;font-size:9px;font-weight:600;border-radius:7px;min-width:14px;height:14px;display:flex;align-items:center;justify-content:center;padding:0 3px;z-index:2;">${cids.length}</div>`:''}
-      </div>`;
-    }else{
-      cellInner=`<div style="text-align:center;font-size:var(--dow-label-size);color:var(--tm);height:46px;display:flex;align-items:center;justify-content:center;">${d}</div>`;
-    }
-    html+=`<div style="cursor:${cids.length?'pointer':'default'};" ${cids.length?`onclick="rdCalDayTap('${dk}')"`:''}>${cellInner}</div>`;
-  }
-  html+='</div>';
-  if(_rdCalOpenDk&&_rdCalLogsByDate[_rdCalOpenDk]){
-    html+=`<div class="rdcal-detail-in" style="margin-top:18px;">${renderReadingCalDayDetailHtml(_rdCalOpenDk,_rdCalLogsByDate[_rdCalOpenDk],bookMap)}</div>`;
-  }
-  el.innerHTML=html;
-}
-function renderReadingCalDayDetailHtml(dk,dayLogs,bookMap){
-  const dispDate=parseInt(dk.slice(5,7),10)+'월 '+parseInt(dk.slice(8,10),10)+'일';
-  const dayRblocks=getRhythmBlocks(dk);
-  const items=dayLogs.map(r=>{
-    const book=bookMap[r.book_cid];
-    const title=book?book.title:'(삭제된 책)';
-    const author=book?book.author:'';
-    const cover=book&&book.poster;
-    const progText=_rdProgressLabel(r.unit,r.percent_after,r.pages_after);
-    const amountText=r.amount_read>0?(r.unit==='percent'?`+${r.amount_read}%`:`+${r.amount_read}p`):'';
-    // rblocks(리듬 블록)는 스톱워치 종료 시점에 세션 단위로 시작~종료 시각을 정확히 남기므로, 이걸 그대로 가져와 표시.
-    // rdlog(진행률 로그)는 하루/책 단위로 시간을 합산해 저장하는 구조라 시각 정보가 없음 — 같은 책을 여러 세션 읽었으면 각 세션을 모두 나열.
-    const target='독서 - '+title;
-    const sessionBlocks=book?dayRblocks.filter(b=>b.cat==='enjoy'&&b.text===target):[];
-    const sessionRanges=sessionBlocks.map(b=>`${b.start}-${b.end}`);
-    const totalMin=sessionBlocks.reduce((sum,b)=>sum+Math.max(0,toMin(b.end)-toMin(b.start)),0);
-    const timeText=sessionRanges.length?`${sessionRanges.join(', ')} (총 ${totalMin}분)`:(r.seconds>0?Math.round(r.seconds/60)+'분':'');
-    const metaLine=[progText,amountText,timeText].filter(Boolean).join(' · ');
-    const posterHtml=cover?`<img src="${cover}" style="width:32px;height:44px;border-radius:5px;object-fit:cover;flex-shrink:0;" />`:`<div style="width:32px;height:44px;border-radius:5px;background:var(--card2);flex-shrink:0;display:flex;align-items:center;justify-content:center;"><i class="ti ti-book ico-13" style="color:var(--tm);" aria-hidden="true"></i></div>`;
-    const shareBtn=`<span onclick="event.stopPropagation();openTodayReadingShareModal('${r.book_cid}','${r.unit}',${r.percent_after!=null?r.percent_after:'null'},${r.pages_after!=null?r.pages_after:'null'},${r.seconds||0},'${dk}')" title="공유 이미지" style="cursor:pointer;color:var(--ts);opacity:0.75;flex-shrink:0;padding:4px;"><i class="ti ti-share-2 ico-sz-14" aria-hidden="true"></i></span>`;
-    return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;">
-      ${posterHtml}
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:var(--main-text-size);color:var(--tp);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${title}</div>
-        ${author?`<div style="font-size:var(--dow-label-size);color:var(--tm);margin-top:1px;">${author}</div>`:''}
-        <div style="font-size:var(--dow-label-size);color:var(--ts);margin-top:2px;">${metaLine}</div>
-      </div>
-      ${shareBtn}
-    </div>`;
-  }).join('');
-  return `<div class="mr-card" style="margin:2px 0 4px;">
-    <div class="mr-sec-title" style="margin-bottom:6px;">${dispDate}</div>
-    ${items}
-  </div>`;
 }
 // ── 감상 캘린더 (실제로 본 날짜에 포스터를 꽂는 달력형 뷰. 콘텐츠 모아보기(카테고리별 리스트)와는 별개 기능) ──
 // 데이터 소스: 새 테이블 없이 기존 리듬 기록을 그대로 사용.
@@ -11887,7 +11776,7 @@ function wcalSetFilter(cat){
 }
 // 드라마 검색은 TMDB tv 엔드포인트를 그대로 쓰므로(searchTMDB), 예능/시사교양처럼 tv로 등록된 프로그램도
 // 이미 'drama' 카테고리로 함께 검색·저장됨 — 감상 캘린더도 별도 처리 없이 그대로 포섭.
-function loadAndRenderWatchCal(){
+async function loadAndRenderWatchCal(){
   const y=_wcalDate.getFullYear(),m=_wcalDate.getMonth();
   const mk=y+'-'+String(m+1).padStart(2,'0');
   const prevMk=monthKey(new Date(y,m-1,1));
@@ -11942,6 +11831,22 @@ function loadAndRenderWatchCal(){
       const key=it.cat+'|'+it.title;
       if(seen.has(key))return false;
       seen.add(key);return true;
+    });
+  });
+
+  // 일자별 진행률 로그(content_daily_log) — 책은 기존 로그가, 드라마/영화는 2026-09-11 저장 시점부터의 로그가 매칭됨(과거분 소급 없음).
+  // cid 기준으로 매칭하므로 cid가 없는 항목(수동추가분 등)은 진행률 없이 감상시간만 표시됨.
+  const logRows=await supaFetch(`content_daily_log?date_key=gte.${mk}-01&date_key=lte.${mk}-31&order=created`)||[];
+  const logsByDkCid={};
+  logRows.forEach(r=>{
+    if(!r.content_cid)return;
+    const key=r.date_key+'|'+r.content_cid;
+    logsByDkCid[key]=r; // 같은 날 같은 콘텐츠는 upsert로 이미 누적된 1행이므로 그대로 사용
+  });
+  Object.keys(_wcalByDate).forEach(dk=>{
+    _wcalByDate[dk].forEach(it=>{
+      if(!it.cid)return;
+      it.dailyLog=logsByDkCid[dk+'|'+it.cid]||null;
     });
   });
 
@@ -12040,6 +11945,8 @@ function renderWatchCalDetail(){
   if(!items.length){el.innerHTML='';return;}
   const dispDate=parseInt(_wcalSelectedDk.slice(5,7),10)+'월 '+parseInt(_wcalSelectedDk.slice(8,10),10)+'일';
   const dk=_wcalSelectedDk;
+  const dayRblocks=getRhythmBlocks(dk);
+  const catPrefix={drama:'드라마 - ',movie:'영화 - ',book:'독서 - '};
   const rows=items.map((it,idx)=>{
     const m=WCAL_CAT_META[it.cat];
     const posterHtml=_wcalPosterThumbHtml(it.cat,it.poster);
@@ -12047,14 +11954,37 @@ function renderWatchCalDetail(){
     const noteBtnHtml=it.cid?`<span class="wcal-note-icon${hasNote?' has':''}" onclick="openWcalNoteInput('${it.cid}','${dk}',${idx})" title="코멘트"><i class="ti ti-message-circle ico-sz-13" aria-hidden="true"></i></span>`:'';
     const statusBadgeHtml=it.status==='watching'?'<span class="wcal-status-badge watching">진행중</span>':(it.status==='done'?'<span class="wcal-status-badge done">완결</span>':'');
     const noteRowHtml=`<div id="wcal-note-row-${idx}"></div>`;
+    // 감상시간 — 리듬블록(그날 세션 시작~종료), 독서달력과 동일한 방식. 음악은 리듬블록 기반이 아니라 제외.
+    let timeText='';
+    if(catPrefix[it.cat]){
+      const target=catPrefix[it.cat]+it.title;
+      const sessionBlocks=dayRblocks.filter(b=>b.cat==='enjoy'&&b.text===target);
+      const sessionRanges=sessionBlocks.map(b=>`${b.start}-${b.end}`);
+      const totalMin=sessionBlocks.reduce((sum,b)=>sum+Math.max(0,toMin(b.end)-toMin(b.start)),0);
+      if(sessionRanges.length)timeText=`${sessionRanges.join(', ')} (총 ${totalMin}분)`;
+    }
+    // 진행률 — content_daily_log(책은 기존 로그, 드라마/영화는 2026-09-11부터의 신규 로그만 존재).
+    let progText='',amountText='';
+    const log=it.dailyLog;
+    if(log){
+      if(it.cat==='book')progText=_rdProgressLabel(log.unit,log.percent_after,log.unit_after);
+      else if(log.unit_after!=null)progText=it.cat==='drama'?`${log.unit_after}화`:`${log.unit_after}분`;
+      amountText=log.amount_read>0?(log.unit==='percent'?`+${log.amount_read}%`:`+${log.amount_read}${it.cat==='drama'?'화':(it.cat==='book'?'p':'분')}`):'';
+    }
+    const metaLine=[progText,amountText,timeText].filter(Boolean).join(' · ');
+    const metaHtml=metaLine?`<div style="font-size:var(--dow-label-size);color:var(--ts);margin-top:2px;">${metaLine}</div>`:'';
+    // 독서 전용 공유카드 — 구 독서달력(2026-09-11 폐기)에 있던 진입점을 여기로 이전. 그날 진행률 로그(dailyLog)가 있는 책만 노출.
+    const shareBtnHtml=(it.cat==='book'&&log)?`<span onclick="event.stopPropagation();openTodayReadingShareModal('${it.cid}','${log.unit}',${log.percent_after!=null?log.percent_after:'null'},${log.unit_after!=null?log.unit_after:'null'},${log.seconds||0},'${dk}')" title="공유 이미지" style="cursor:pointer;color:var(--ts);opacity:0.75;flex-shrink:0;padding:4px;"><i class="ti ti-share-2 ico-sz-14" aria-hidden="true"></i></span>`:'';
     return `<div style="padding:7px 0;">
       <div style="display:flex;align-items:center;gap:10px;">
         ${posterHtml}
         <div style="flex:1;min-width:0;">
           <div style="font-size:var(--main-text-size);color:var(--tp);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(it.title)}</div>
           <div style="font-size:var(--dow-label-size);color:var(--ts);margin-top:2px;">${m.label}</div>
+          ${metaHtml}
         </div>
         ${statusBadgeHtml}
+        ${shareBtnHtml}
         ${noteBtnHtml}
       </div>
       ${noteRowHtml}
@@ -13058,7 +12988,7 @@ function confirmProgress(){
   if(_pgSeconds>0)book.seconds=(book.seconds||0)+_pgSeconds;
   upsertBookLocal(book);
   const _amountRead=Math.max(0,endVal-_pgStartVal);
-  logReadingDaily(book,today,_amountRead,_pgSeconds,_pgUnit,book.percent,book.pages);
+  logContentDaily(book.cid,today,_amountRead,_pgSeconds,_pgUnit,book.percent,book.pages);
   markReadingActivityToday();
   // 통합 이후(2026-08-29) book.cid가 곧 연결된 contents 항목의 cid이므로 별도 매칭 불필요.
   pushContentNote(book.cid,book.contentTitle||book.title,'book',document.getElementById('pg-note-inp')?.value);
