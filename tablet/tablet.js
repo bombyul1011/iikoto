@@ -5829,6 +5829,7 @@ async function loadTimelineTab(){
   Promise.all([rightRenderDone,compareCardDone]).then(()=>{
     syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,mflowCidSet,contents||[],habits||[],habitChecks||[]);
   });
+}
 
 // 좌우 높이 동기화를 별도 함수로 분리 — 첫 탭 진입 시 폰트/레이아웃이 아직 자리잡기 전에 offsetHeight를 측정해
 // 실제보다 낮게 나오는 문제(재방문 시에만 정확해지던 현상)를 보정하기 위해, 두 프레임 뒤에 측정하고
