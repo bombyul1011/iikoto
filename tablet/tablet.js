@@ -1384,11 +1384,12 @@ async function loadWeekTab(){
     // 수면 리포트 최근 2주
     supaFetch(`sleep?date_key=gte.${slStartDk}&date_key=lte.${slEndDk}&select=date_key,score,sleep_time,wake_time`),
     supaFetch(`rhythm_blocks?date_key=gte.${lastStartDk}&date_key=lte.${lastCmpEndDk}`),
-    // 이번 주 독서용 — 스트릭 계산은 여전히 reading_daily_log 기준(현재 읽는 책 자체는 위 contents에서 파생)
-    supaFetch(`reading_daily_log?date_key=gte.${rdStreakStartDk}&select=date_key`),
+    // 이번 주 독서용 — 스트릭 계산은 여전히 content_daily_log 기준(현재 읽는 책 자체는 위 contents에서 파생).
+    // 2026-09-11: reading_daily_log→content_daily_log로 통합(책/드라마/영화 공용), book_cid→content_cid.
+    supaFetch(`content_daily_log?date_key=gte.${rdStreakStartDk}&select=date_key`),
     // 이번 주 독서 활동(탭 전환용) — 이번 주/지난주 각각의 독서 로그(권별 진행량 계산용)
-    supaFetch(`reading_daily_log?date_key=gte.${startDk}&date_key=lte.${cmpEndDk}&select=date_key,book_cid,unit,amount_read,seconds&order=date_key.asc`),
-    supaFetch(`reading_daily_log?date_key=gte.${lastStartDk}&date_key=lte.${lastCmpEndDk}&select=date_key,book_cid,unit,amount_read,seconds&order=date_key.asc`),
+    supaFetch(`content_daily_log?date_key=gte.${startDk}&date_key=lte.${cmpEndDk}&select=date_key,content_cid,unit,amount_read,seconds&order=date_key.asc`),
+    supaFetch(`content_daily_log?date_key=gte.${lastStartDk}&date_key=lte.${lastCmpEndDk}&select=date_key,content_cid,unit,amount_read,seconds&order=date_key.asc`),
     // 이번주 아침 흐름 배너용 — 캘린더 주(월~일) 범위 morning_flow_picks 전체
     supaFetch(`morning_flow_picks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
     // 이번주 사진 기록 필름스트립용 — 캘린더 주(월~일) 범위 사진메모(photo_url 있는 것만)
@@ -1775,9 +1776,9 @@ const WEEK_KW_COLORS=['var(--pal-pink-text)','var(--pal-orange-text)','var(--pal
 // 아래 토크나이저·색상 상수는 연간탭 renderYrKeywordCloud("올해의 키워드")가 그대로 재사용하므로 유지.
 
 // 이번 주 독서 — 이이코토 본앱 rd-top-*/rd-progress-* 스타일 그대로 이식(2026-08-26).
-// 현재 읽고 있는 책의 표지+진행률 바(무지개 구슬 포함)와, reading_daily_log 기준 연속 독서일(스트릭)을 함께 보여줌.
+// 현재 읽고 있는 책의 표지+진행률 바(무지개 구슬 포함)와, content_daily_log 기준 연속 독서일(스트릭)을 함께 보여줌.
 // 스트릭 계산은 본앱 getReadingStreak()과 동일한 로직(어제부터 거슬러 올라가며 기록이 끊기는 지점까지 카운트)을
-// reading_daily_log(서버 기준 실제 독서 로그) 데이터로 재구현.
+// content_daily_log(서버 기준 실제 독서 로그, 2026-09-11 reading_daily_log에서 통합) 데이터로 재구현.
 function _readingStreakOf(logRows){
   const dates=new Set((logRows||[]).map(r=>r.date_key));
   let streak=0;
@@ -1879,8 +1880,8 @@ function _wraStatsOf(logRows,booksByCid){
   // 책별로 이번 범위 내 첫/마지막 기록의 percent_after를 비교해 진행폭 산출.
   const byBook={};
   (logRows||[]).forEach(r=>{
-    if(!byBook[r.book_cid])byBook[r.book_cid]=[];
-    byBook[r.book_cid].push(r);
+    if(!byBook[r.content_cid])byBook[r.content_cid]=[];
+    byBook[r.content_cid].push(r);
   });
   const activeDays=new Set((logRows||[]).map(r=>r.date_key)).size;
   const totalSeconds=(logRows||[]).reduce((s,r)=>s+(r.seconds||0),0);
@@ -1919,7 +1920,7 @@ function renderWeekReadingActivity(logsThis,logsLast,booksAll,contents,startDk,e
   const {rows:rowsLast,activeDays:activeDaysLast,totalSeconds:totalSecondsLast}=_wraStatsOf(logsLast,booksByCid);
 
   const doneThis=(contents||[]).filter(c=>c.content_cat==='book'&&_isContentFinished(c)&&c.end_date&&c.end_date>=startDk&&c.end_date<=endDk);
-  // 2026-08-29 통합 이후 book_cid(reading_daily_log)와 contents.client_id가 동일한 ID 체계이므로
+  // 2026-08-29 통합 이후 content_cid(content_daily_log, 구 book_cid/reading_daily_log)와 contents.client_id가 동일한 ID 체계이므로
   // cid로 직접 매칭 가능 — 예전 title 매칭 우회(동명이서 오매칭 리스크 있었음)를 제거.
   const doneCidSet=new Set(doneThis.map(c=>c.client_id));
 
@@ -2072,7 +2073,9 @@ async function _loadCgridYearly(y){
     if(_isContentFinished(c))return true;
     return c.status==='watching'&&y===new Date().getFullYear();
   };
-  _cgridContents=(rows||[]).filter(belongsHere).sort((a,b)=>(b.created||0)-(a.created||0));
+  // 정렬 기준: last_activity_at(스톱워치 최근 활동, 2026-09-11 본앱과 동일 기준 통일) 우선, 없으면 created로 폴백.
+  _cgridContents=(rows||[]).filter(belongsHere).sort((a,b)=>(b.last_activity_at||b.created||0)-(a.last_activity_at||a.created||0));
+  await _loadCgridLogsFor(_cgridContents);
   _cgridFilter='all';
   _cgridStatusFilter='all';
   _updateCgridFilterChipUI();
@@ -2097,8 +2100,23 @@ async function renderMonthContentGrid(y,mo,contentsData){
     return c.status==='watching'&&isSameMonth;
   };
   _cgridContents=[...(curRows||[]).filter(belongsHere),...(prevRows||[]).filter(belongsHere)]
-    .sort((a,b)=>(b.created||0)-(a.created||0));
+    .sort((a,b)=>(b.last_activity_at||b.created||0)-(a.last_activity_at||a.created||0));
+  await _loadCgridLogsFor(_cgridContents);
   _renderCgridFromCache();
+}
+// 콘텐츠 모아보기 상세(Timeline)에 감상로그(그날 진행률·시간)를 코멘트와 함께 병합해 보여주기 위한 캐시.
+// cid 목록으로 조회(날짜 범위 무관 — 등록 시점이 콘텐츠 소속월과 다를 수 있어 전체 범위로 가져옴), cid별로 그룹핑.
+let _cgridLogsByCid={};
+async function _loadCgridLogsFor(contents){
+  _cgridLogsByCid={};
+  const cids=[...new Set((contents||[]).map(c=>c.client_id).filter(Boolean))];
+  if(!cids.length)return;
+  const cidFilter=cids.map(c=>`"${c}"`).join(',');
+  const rows=await supaFetch(`content_daily_log?content_cid=in.(${cidFilter})&order=date_key.asc`);
+  (rows||[]).forEach(r=>{
+    if(!_cgridLogsByCid[r.content_cid])_cgridLogsByCid[r.content_cid]=[];
+    _cgridLogsByCid[r.content_cid].push(r);
+  });
 }
 // 카테고리+상태 필터를 함께 적용 — _renderCgridFromCache/toggleCgridDetail에서 공용
 function _cgridFilteredList(){
@@ -2179,13 +2197,31 @@ function _cgridDetailHtml(c){
   }
   const finalHtml=c.review?`<div class="cgrid-detail-final"><span class="cgrid-detail-final-lbl">Comment :</span> ${escapeHtml(c.review)}</div>`:'';
   // 2026-08-29 통합: 감상 메모도 이제 c.notes[]에 직접 있음 — 별도 goal_notes 조회/cid 매칭 불필요.
-  const notes=(c.notes||[]).slice().sort((a,b)=>(b.dk||'').localeCompare(a.dk||''));
-  const notesHtml=notes.length?`<div class="cgrid-detail-notes${c.review?' with-final':''}">
+  // 2026-09-11: 여기에 content_daily_log(그날 진행률·감상시간)를 같은 날짜(dk) 기준으로 병합 — 시안 검토 후 확정.
+  // 같은 날 로그와 코멘트가 모두 있으면 로그(진행률) 줄이 위, 코멘트가 아래로 오도록 한 항목에 합쳐서 표시.
+  const notesByDk={};
+  (c.notes||[]).forEach(n=>{if(n.dk)notesByDk[n.dk]=n;});
+  const logsByDk={};
+  (_cgridLogsByCid[c.client_id]||[]).forEach(r=>{logsByDk[r.date_key]=r;});
+  const allDks=[...new Set([...Object.keys(notesByDk),...Object.keys(logsByDk)])].sort((a,b)=>b.localeCompare(a));
+  const tlUnitLabel=c.content_cat==='drama'?'화':(c.content_cat==='movie'?'분':'p');
+  const notesHtml=allDks.length?`<div class="cgrid-detail-notes${c.review?' with-final':''}">
     <div class="cgrid-detail-notes-lbl">Timeline</div>
     <div class="cgrid-detail-notes-tl">
-      ${notes.map(n=>{
-        const dispDate=n.dk?(parseInt(n.dk.slice(5,7),10)+'/'+parseInt(n.dk.slice(8,10),10)):'';
-        return `<div class="cgrid-detail-note-item"><span class="cgrid-detail-note-date">${dispDate}</span><span>${escapeHtml(n.text||'')}</span></div>`;
+      ${allDks.map(dk=>{
+        const dispDate=parseInt(dk.slice(5,7),10)+'/'+parseInt(dk.slice(8,10),10);
+        const r=logsByDk[dk];
+        const n=notesByDk[dk];
+        let logLine='';
+        if(r){
+          const progText=r.unit==='percent'?`${r.percent_after!=null?r.percent_after:0}%`:(r.unit_after!=null?`${r.unit_after}${tlUnitLabel}`:'');
+          const amountText=r.amount_read>0?(r.unit==='percent'?`+${r.amount_read}%`:`+${r.amount_read}${tlUnitLabel}`):'';
+          const totalMin=r.seconds>0?Math.round(r.seconds/60)+'분':'';
+          logLine=[progText,amountText,totalMin].filter(Boolean).join(' · ');
+        }
+        const logHtml=logLine?`<div class="cgrid-detail-note-log">${logLine}</div>`:'';
+        const noteHtml=n?`<span>${escapeHtml(n.text||'')}</span>`:'';
+        return `<div class="cgrid-detail-note-item"><span class="cgrid-detail-note-date">${dispDate}</span><div>${logHtml}${noteHtml}</div></div>`;
       }).join('')}
     </div>
   </div>`:'';
