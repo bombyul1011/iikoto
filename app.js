@@ -9166,9 +9166,20 @@ function createDelayedCommitStopwatch(config){
   const checkReadingHabit=!!config.checkReadingHabit;
   const hasTicker=!!config.hasTicker;
   const onTick=config.onTick||function(){};       // hasTicker일 때만 사용 (1초 간격)
-  const onStart=config.onStart||function(){};
+  // [2026-09-12 재설계] onStart는 이제 두 단계로 분리:
+  //  - onResolve(cid,extra) : "시작하기 전" 데이터 조회 전용. st를 건드리지 않고 순수 조회만 하며,
+  //    실패 시 false/null을 반환하면 시작 자체가 취소됨. 여기서 렌더링(DOM 갱신)을 하면 안 됨 —
+  //    이 시점엔 아직 st.running이 false라 화면이 "시작 전" 상태로 그려지는 순서버그가 재발함
+  //    (2026-09-12 발견: 재생 버튼을 눌러도 상태는 바뀌는데 화면만 안 바뀌는 먹통 증상의 원인이었음).
+  //  - onStart(st) : st.running=true 등 상태가 전부 확정된 "이후"에 호출. 여기서 렌더링/DOM 조작.
+  // config.onStart를 그대로 넘기면 위 onResolve 자리에 잘못 꽂힐 위험이 있어, 아래에서 명시적으로
+  // onResolve/onStarted 두 키를 분리해서 받는다. 기존 코드가 하나의 onStart 안에 조회+렌더링을
+  // 섞어 쓰던 것도 이번에 전부 분리해서 재작성함(_cswSw/_swSw 정의부 참조).
+  const onResolve=config.onResolve||function(){return true;};
+  const onStarted=config.onStarted||function(){};
   const onCommit=config.onCommit||function(){};
   const onStop=config.onStop||function(){};
+  const onRestored=config.onRestored||function(){};
   const buildTitleText=config.buildTitleText;      // (state)=>string — 리듬블록 text
   const buildPersistPayload=config.buildPersistPayload; // (state)=>obj — localStorage에 저장할 추가 필드
 
@@ -9189,13 +9200,17 @@ function createDelayedCommitStopwatch(config){
     if(st.running)return;
     if(st.starting)return; // 연타 방지 락 — 콘텐츠 쪽에만 있던 걸 공용화(2026-09-01 유래)
     st.starting=true;
-    const ok=onStart(st,cid,extra); // onStart가 st에 cat/title/mk 등을 채우고, 실패 시 false 반환 가능
+    // 1단계: 조회만 — st는 아직 running=false. 실패하면 여기서 조용히 취소(락만 풀고 끝).
+    const ok=onResolve(st,cid,extra); // onResolve가 st.cat/title/mk 등을 채우되 running은 아직 안 건드림
     if(ok===false){st.starting=false;return;}
+    // 2단계: 상태 확정 — 이 시점부터 st.running=true. 이후에야 렌더링 콜백을 호출한다(순서 고정).
     st.running=true;st.cid=cid;st.startTs=Date.now();st.blockCid=null;st.committed=false;
+    st.starting=false;
     persist();
     if(hasTicker)st.tickInterval=setInterval(()=>{onTick(st);},1000);
     st.commitTimer=setTimeout(commitNow,60000);
-    st.starting=false;
+    // 3단계: 상태가 전부 확정된 뒤에만 렌더링/DOM 콜백 호출 — 이 순서를 절대 바꾸지 말 것.
+    onStarted(st);
   }
 
   function commitNow(){
@@ -9207,7 +9222,7 @@ function createDelayedCommitStopwatch(config){
     const text=buildTitleText(st);
     st.blockCid=_commitEnjoyRhythmBlock({text,contentCid:cid,dk,startMin,checkReadingHabit});
     persist();
-    onCommit(st);
+    onCommit(st); // st.committed/blockCid가 이미 확정된 뒤 호출 — 기존에도 순서 문제 없었음(그대로 유지)
   }
 
   function stop(){
@@ -9219,7 +9234,7 @@ function createDelayedCommitStopwatch(config){
     if(persistKey)try{localStorage.removeItem(persistKey);}catch(e){}
     st.running=false;st.startTs=0;st.cid=null;st.blockCid=null;st.committed=false;st.seconds=0;
     if(wasCommitted)autoLogReadingRhythm(blockCid,startTs,endTs);
-    onStop(st,{startTs,endTs,wasCommitted,cid,blockCid});
+    onStop(st,{startTs,endTs,wasCommitted,cid,blockCid}); // st.running=false가 이미 확정된 뒤 호출 — 기존과 동일, 문제 없었음
   }
 
   function toggle(cid,extra){
@@ -9239,7 +9254,6 @@ function createDelayedCommitStopwatch(config){
       if(!saved||!saved.startTs)return;
       st.startTs=saved.startTs;st.cid=saved.cid;st.blockCid=saved.blockCid||null;
       st.running=true;
-      if(config.onRestore)config.onRestore(st,saved);
       if(st.blockCid){
         st.committed=true;
       }else{
@@ -9247,6 +9261,8 @@ function createDelayedCommitStopwatch(config){
         st.commitTimer=setTimeout(commitNow,Math.max(0,remain));
       }
       if(hasTicker)st.tickInterval=setInterval(()=>{onTick(st);},1000);
+      // 상태(running/cid/blockCid/committed)가 전부 확정된 뒤에 부가 데이터 채우기+렌더링 콜백 호출.
+      onRestored(st,saved);
     }catch(e){}
   }
 
@@ -9272,22 +9288,29 @@ const _cswSw=createDelayedCommitStopwatch({
   checkReadingHabit:false,
   hasTicker:false,
   extraState:{cat:null,title:null,mk:null},
-  onStart:function(st,cid,knownMk){
+  onResolve:function(st,cid,knownMk){
+    // 1단계(조회 전용) — st.running은 아직 false. 여기서 렌더링하면 화면이 "시작 전" 상태로 그려지는
+    // 순서버그가 남으로 절대 렌더링 호출 금지 (2026-09-12 발견: 재생 버튼 눌러도 상태만 바뀌고
+    // 화면은 새로고침 전까지 안 바뀌는 먹통 증상의 원인이었음).
     const found=knownMk?{mk:knownMk,list:getContents(knownMk),idx:getContents(knownMk).findIndex(c=>c.cid===cid)}:_findContentByCidNearMk(cid,_chArchiveMk||monthKey(new Date()));
     if(!found||found.idx<0)return false;
     const c=found.list[found.idx];
     st.cat=c.cat;st.title=c.title||'';st.mk=found.mk;
-    if(_cswPendingCid===cid){_cswPendingCid=null;_cswPendingMk=null;} // pending 카드에서 재생 링으로 시작한 경우 pending 상태 정리
-    document.querySelectorAll('.seed-icon-btn').forEach(el=>el.classList.add('cwatch-active'));
-    if(_chArchiveMk)chExpandMonth(_chArchiveMk);
-    _cswSyncMirror(st);
-    renderCwatchMainCard();
+    return true;
   },
   buildTitleText:function(st){
     const catLabel=st.cat==='drama'?'드라마':'영화';
     return st.title?(catLabel+' - '+st.title):catLabel;
   },
   buildPersistPayload:function(st){return{cat:st.cat,title:st.title||'',mk:st.mk};},
+  onStarted:function(st){
+    // 2단계 — st.running=true 등 상태가 전부 확정된 뒤 호출. 여기서만 렌더링/DOM 조작.
+    if(_cswPendingCid===st.cid){_cswPendingCid=null;_cswPendingMk=null;} // pending 카드에서 재생 링으로 시작한 경우 pending 상태 정리
+    document.querySelectorAll('.seed-icon-btn').forEach(el=>el.classList.add('cwatch-active'));
+    if(_chArchiveMk)chExpandMonth(_chArchiveMk);
+    _cswSyncMirror(st);
+    renderCwatchMainCard();
+  },
   onCommit:function(st){
     // 최근 본 작품 우선노출(콘텐츠허브 스와이프 카드) 정렬 기준 — 기존 _cswCommitNow에만 있던 로직
     const list=getContents(st.mk);
@@ -9296,10 +9319,12 @@ const _cswSw=createDelayedCommitStopwatch({
     _cswSyncMirror(st);
     renderCwatchMainCard(); // 리듬바/카드가 화면에 막 등장하는 시점이므로 갱신
   },
-  onRestore:function(st,saved){
+  onRestored:function(st,saved){
+    // restoreFromStorage()가 st.running=true 등을 이미 확정한 뒤 호출 — 여기선 저장해둔 부가데이터만 채우고 렌더링.
     st.cat=saved.cat;st.title=saved.title||'';st.mk=saved.mk||null;
     document.querySelectorAll('.seed-icon-btn').forEach(el=>el.classList.add('cwatch-active'));
     _cswSyncMirror(st);
+    renderCwatchMainCard();
   },
   onStop:function(st,info){
     document.querySelectorAll('.seed-icon-btn').forEach(el=>el.classList.remove('cwatch-active'));
@@ -11083,6 +11108,7 @@ const _swSw=createDelayedCommitStopwatch({
   persistKey:SW_PERSIST_KEY,
   checkReadingHabit:true,
   hasTicker:true,
+  extraState:{title:null},
   onTick:function(st){
     // 실제 경과시간(시작시각 기준)으로 재계산 — 화면이 꺼져 setInterval이 멈췄다 재개되어도
     // 그 사이 흐른 시간이 누락되지 않고 정확히 보정됨
@@ -11090,15 +11116,26 @@ const _swSw=createDelayedCommitStopwatch({
     _swSyncMirror(st);
     updateStopwatchDisplay();
   },
-  onStart:function(st,cid){
-    if(_rdPendingCid===cid){_rdPendingCid=null;} // pending 카드에서 재생 링으로 시작한 경우 pending 상태 정리
+  onResolve:function(st,cid){
+    // [2026-09-12] 콘텐츠(_cswSw)와 동일하게 방식 통일 — 독서도 결국 API로 표지·페이지수까지
+    // 검색해서 쓰는 콘텐츠와 같은 성격이라, "책이 이미 삭제된 채로 스톱워치만 도는" 예외가
+    // 콘텐츠와 똑같이 실재함(스톱워치 진행 중 서재에서 그 책을 삭제하는 경우). 콘텐츠처럼
+    // 시작 시점에 조회해서 없으면 시작 자체를 취소.
+    const book=getBooks().find(b=>b.cid===cid);
+    if(!book)return false;
+    st.title=book.title||'';
+    return true;
+  },
+  buildTitleText:function(st){
+    return st.title?('독서 - '+st.title):'독서';
+  },
+  buildPersistPayload:function(st){return{title:st.title||''};},
+  onStarted:function(st){
+    // st.running=true 등 상태가 전부 확정된 뒤 호출 — 렌더링/DOM 조작은 여기서만.
+    if(_rdPendingCid===st.cid){_rdPendingCid=null;} // pending 카드에서 재생 링으로 시작한 경우 pending 상태 정리
     document.querySelector('.reading-icon-btn')?.classList.add('sw-active');
     _swSyncMirror(st);
     renderRdTop(); // DOM 갱신은 이 한 곳에서만 — running=true로 다시 그려지며 spinning/id 등이 자동 반영됨
-  },
-  buildTitleText:function(st){
-    const book=getBooks().find(b=>b.cid===st.cid);
-    return book&&book.title?('독서 - '+book.title):'독서';
   },
   onCommit:function(st){
     // 최근 읽은 책 우선노출(독서허브 스와이프 카드) 정렬 기준 — 기존 _swCommitNow에만 있던 로직
@@ -11118,9 +11155,11 @@ const _swSw=createDelayedCommitStopwatch({
     const seconds=Math.max(0,Math.round((info.endTs-info.startTs)/1000));
     if(seconds>=60)openProgressModal(info.cid,seconds); // 1분 미만은 진행률 입력도 의미 없으니 띄우지 않음
   },
-  onRestore:function(st,saved){
+  onRestored:function(st,saved){
+    st.title=saved.title||'';
     st.seconds=Math.floor((Date.now()-st.startTs)/1000);
     _swSyncMirror(st);
+    renderRdTop();
   }
 });
 // ══ 씨앗 코너 ══
