@@ -796,10 +796,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cgrid-status-chip.cat-movie{color:var(--pal-sky-text);background:rgba(var(--pal-sky-rgb),0.35);border-color:transparent;}
 .cgrid-status-chip.cat-music{color:var(--pal-lime-text);background:rgba(var(--pal-lime-rgb),0.35);border-color:transparent;}
 .cgrid-scroll{flex:1;min-height:0;overflow-y:auto;padding-right:2px;}
-.ch-tl-type-chips{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:8px;}
-.ch-tl-type-chip{display:inline-flex;align-items:center;gap:4px;height:26px;box-sizing:border-box;font-size:var(--fs-xs);font-weight:600;color:var(--tm);background:rgba(255,253,248,0.8);border:1px solid var(--card-b);border-radius:7px;padding:0 9px;cursor:pointer;opacity:0.5;transition:opacity 0.15s;}
-.ch-tl-type-chip i{font-size:13px;}
-.ch-tl-type-chip.on{opacity:1;}
+.ch-tl-type-chips{display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+.ch-tl-type-chip{display:inline-flex;align-items:center;justify-content:center;gap:4px;height:28px;min-width:28px;box-sizing:border-box;font-size:var(--fs-xs);font-weight:600;color:var(--tm);background:rgba(255,253,248,0.8);border:1px solid var(--card-b);border-radius:7px;padding:0 8px;cursor:pointer;}
+.ch-tl-type-chip i{font-size:14px;}
+.ch-tl-type-chip-label{display:none;}
+.ch-tl-type-chip.on .ch-tl-type-chip-label{display:inline;}
 .ch-tl-type-chip.on[data-type="note"]{color:rgb(140,175,150);background:rgba(140,175,150,0.18);border-color:transparent;}
 .ch-tl-type-chip.on[data-type="final"]{color:var(--accent-gold);background:rgba(255,205,90,0.35);border-color:transparent;}
 .ch-tl-type-chip.on[data-type="log"]{color:rgb(190,130,70);background:rgba(190,130,70,0.18);border-color:transparent;}
@@ -2039,15 +2040,15 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
                 </div>
                 <i class="ti ti-calendar-stats cgrid-year-toggle" id="cgrid-year-toggle" onclick="toggleCgridYearMode()" title="연간모아보기" aria-hidden="true"></i>
               </div>
+              <div class="ch-tl-type-chips" id="ch-tl-type-chips" style="display:none;">
+                <div class="ch-tl-type-chip on" data-type="note" onclick="toggleChTlTypeFilter('note')"><i class="ti ti-message-circle" aria-hidden="true"></i><span class="ch-tl-type-chip-label">코멘트</span></div>
+                <div class="ch-tl-type-chip on" data-type="final" onclick="toggleChTlTypeFilter('final')"><i class="ti ti-sparkles" aria-hidden="true"></i><span class="ch-tl-type-chip-label">완결</span></div>
+                <div class="ch-tl-type-chip on" data-type="log" onclick="toggleChTlTypeFilter('log')"><i class="ti ti-clock" aria-hidden="true"></i><span class="ch-tl-type-chip-label">감상로그</span></div>
+              </div>
             </div>
             <div class="rd-tabs" id="note-tl-subtabs" style="display:none;margin-top:10px;">
               <div class="rd-tab on" data-view="date" onclick="switchNoteTimelineView(this,'date')">날짜순</div>
               <div class="rd-tab" data-view="work" onclick="switchNoteTimelineView(this,'work')">작품별</div>
-            </div>
-            <div class="ch-tl-type-chips" id="ch-tl-type-chips" style="display:none;">
-              <div class="ch-tl-type-chip on" data-type="note" onclick="toggleChTlTypeFilter('note')"><i class="ti ti-message-circle" aria-hidden="true"></i>코멘트</div>
-              <div class="ch-tl-type-chip on" data-type="final" onclick="toggleChTlTypeFilter('final')"><i class="ti ti-sparkles" aria-hidden="true"></i>완결</div>
-              <div class="ch-tl-type-chip on" data-type="log" onclick="toggleChTlTypeFilter('log')"><i class="ti ti-clock" aria-hidden="true"></i>감상로그</div>
             </div>
           </div>
           <div class="cgrid-scroll" id="month-content-grid"></div>

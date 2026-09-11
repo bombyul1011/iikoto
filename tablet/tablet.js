@@ -1021,12 +1021,12 @@ function _parseEnjoyBlock(b,contentsByCid){
   if(b.content_cid&&contentsByCid&&contentsByCid[b.content_cid]){
     const c=contentsByCid[b.content_cid];
     if(c.content_cat==='drama'||c.content_cat==='book'||c.content_cat==='movie'){
-      return {cat:c.content_cat,title:c.title||''};
+      return {cat:c.content_cat,title:c.title||'',cid:b.content_cid};
     }
   }
-  if(b.text.startsWith('드라마 - '))return {cat:'drama',title:b.text.slice(6)};
-  if(b.text.startsWith('독서 - '))return {cat:'book',title:b.text.slice(5)};
-  if(b.text.startsWith('영화 - '))return {cat:'movie',title:b.text.slice(5)};
+  if(b.text.startsWith('드라마 - '))return {cat:'drama',title:b.text.slice(6),cid:null};
+  if(b.text.startsWith('독서 - '))return {cat:'book',title:b.text.slice(5),cid:null};
+  if(b.text.startsWith('영화 - '))return {cat:'movie',title:b.text.slice(5),cid:null};
   return null;
 }
 // contents 배열 → {client_id: row} 맵. 위 파서에 넘길 때 공용으로 사용.
@@ -1034,6 +1034,41 @@ function _contentsByCidMap(contents){
   const m={};
   (contents||[]).forEach(c=>{if(c.client_id)m[c.client_id]=c;});
   return m;
+}
+// rhythm_blocks(cat='enjoy')에서 "dk+cid" 기준 감상 세션(시작~끝 시각, 총분)을 뽑는 공용 헬퍼.
+// 본앱 renderWatchCalDetail의 sessionRanges/totalMin 로직과 동일 규칙 — 콘텐츠 모아보기 상세(_cgridDetailHtml)와
+// 로그 모아보기(_chCollectNoteSource) 양쪽에서 공용으로 사용(2026-09-12, 중복 제거 통합).
+// 반환: {byKey:{'{dk}|{cid}':{ranges:[{start,end}],totalMin}}, noCid:[{dk,cat,title,ranges,totalMin}]}
+// noCid는 content_cid 없이 텍스트로만 남은 구버전 리듬블록(수동추가분 등) — cid 매칭 실패해도 시간은 표시되어야 함.
+function _enjoySessionsByDkCid(rblocks,contentsByCid){
+  const byKey={};
+  const noCidMap={}; // "{dk}|{cat}|{title}" → 세션 누적(구버전 폴백용)
+  (rblocks||[]).forEach(b=>{
+    if(!b.start_time||!b.end_time)return;
+    const parsed=_parseEnjoyBlock(b,contentsByCid);
+    if(!parsed)return;
+    let m=_paceParseHM(b.end_time)-_paceParseHM(b.start_time);if(m<0)m+=1440;
+    m=Math.max(0,m);
+    const range={start:b.start_time,end:b.end_time};
+    if(parsed.cid){
+      const key=b.date_key+'|'+parsed.cid;
+      if(!byKey[key])byKey[key]={ranges:[],totalMin:0};
+      byKey[key].ranges.push(range);
+      byKey[key].totalMin+=m;
+    }else{
+      const key=b.date_key+'|'+parsed.cat+'|'+parsed.title;
+      if(!noCidMap[key])noCidMap[key]={dk:b.date_key,cat:parsed.cat,title:parsed.title,ranges:[],totalMin:0};
+      noCidMap[key].ranges.push(range);
+      noCidMap[key].totalMin+=m;
+    }
+  });
+  return {byKey,noCid:Object.values(noCidMap)};
+}
+// 세션 배열(ranges)+총분을 본앱과 동일한 "HH:MM-HH:MM, ... (총 N분)" 텍스트로 조립.
+function _sessionRangesText(sess){
+  if(!sess||!sess.ranges||!sess.ranges.length)return '';
+  const rangesText=sess.ranges.map(r=>`${r.start}-${r.end}`).join(', ');
+  return `${rangesText} (총 ${sess.totalMin}분)`;
 }
 // rhythm_blocks에서 start_time/end_time을 분 단위로 파싱해 카테고리별로 합산(자정 넘김 자동 보정) — 공통 헬퍼.
 // 기존에 renderWeekRhythmFlow/renderMrpTrajectory/renderMrpMilestones 세 곳에 거의 동일한 로직이 각각
@@ -1988,7 +2023,8 @@ async function loadMonthTab(){
     renderMonthQuotes(y,mo),
     renderMonthContentGrid(y,mo,contentsData),
     renderChaeumLogTablet(),
-    renderWatchCal(contentsData)
+    renderWatchCal(contentsData),
+    _cgridMode==='timeline'?renderContentNoteTimeline(contentsData):Promise.resolve()
   ]);
   // 감상 달력(wcal-card) 렌더가 끝나 실제 높이가 확정된 직후 한 번 더 동기화 —
   // ResizeObserver도 이후 변화를 계속 잡아주지만, 최초 렌더 프레임에서 한 박자 밀리는 걸 방지.
@@ -2107,15 +2143,30 @@ async function renderMonthContentGrid(y,mo,contentsData){
 // 콘텐츠 모아보기 상세(Timeline)에 감상로그(그날 진행률·시간)를 코멘트와 함께 병합해 보여주기 위한 캐시.
 // cid 목록으로 조회(날짜 범위 무관 — 등록 시점이 콘텐츠 소속월과 다를 수 있어 전체 범위로 가져옴), cid별로 그룹핑.
 let _cgridLogsByCid={};
+// 감상 세션(시작~끝 시각) 캐시 — "{cid}|{dk}" 키. 진행률 로그와 별개 소스(rhythm_blocks)라 별도 캐시로 관리.
+let _cgridSessionsByCidDk={};
 async function _loadCgridLogsFor(contents){
   _cgridLogsByCid={};
+  _cgridSessionsByCidDk={};
   const cids=[...new Set((contents||[]).map(c=>c.client_id).filter(Boolean))];
   if(!cids.length)return;
   const cidFilter=cids.map(c=>`"${c}"`).join(',');
-  const rows=await supaFetch(`content_daily_log?content_cid=in.(${cidFilter})&order=date_key.asc`);
+  const dks=[...new Set((contents||[]).flatMap(c=>[c.start_date,c.end_date]).filter(Boolean))].sort();
+  const startDk=dks.length?dks[0]:null;
+  const endDk=dks.length?dks[dks.length-1]:null;
+  const [rows,rblocks]=await Promise.all([
+    supaFetch(`content_daily_log?content_cid=in.(${cidFilter})&order=date_key.asc`),
+    startDk?supaFetch(`rhythm_blocks?date_key=gte.${startDk}&date_key=lte.${endDk}&cat=eq.enjoy`):Promise.resolve([])
+  ]);
   (rows||[]).forEach(r=>{
     if(!_cgridLogsByCid[r.content_cid])_cgridLogsByCid[r.content_cid]=[];
     _cgridLogsByCid[r.content_cid].push(r);
+  });
+  const contentsByCid=_contentsByCidMap(contents);
+  const {byKey}=_enjoySessionsByDkCid(rblocks,contentsByCid);
+  Object.keys(byKey).forEach(key=>{
+    const [dk,cid]=key.split('|');
+    _cgridSessionsByCidDk[cid+'|'+dk]=byKey[key];
   });
 }
 // 카테고리+상태 필터를 함께 적용 — _renderCgridFromCache/toggleCgridDetail에서 공용
@@ -2197,13 +2248,15 @@ function _cgridDetailHtml(c){
   }
   const finalHtml=c.review?`<div class="cgrid-detail-final"><span class="cgrid-detail-final-lbl">Comment :</span> ${escapeHtml(c.review)}</div>`:'';
   // 2026-08-29 통합: 감상 메모도 이제 c.notes[]에 직접 있음 — 별도 goal_notes 조회/cid 매칭 불필요.
-  // 2026-09-11: 여기에 content_daily_log(그날 진행률·감상시간)를 같은 날짜(dk) 기준으로 병합 — 시안 검토 후 확정.
+  // 2026-09-12: 진행률(content_daily_log)과 감상세션 시각(rhythm_blocks)을 같은 날짜(dk) 기준으로 병합해 표시.
+  // 시간 표시는 본앱 renderWatchCalDetail과 동일 규칙(HH:MM-HH:MM, ... (총 N분)) — 드라마/영화/책 공통.
   // 같은 날 로그와 코멘트가 모두 있으면 로그(진행률) 줄이 위, 코멘트가 아래로 오도록 한 항목에 합쳐서 표시.
   const notesByDk={};
   (c.notes||[]).forEach(n=>{if(n.dk)notesByDk[n.dk]=n;});
   const logsByDk={};
   (_cgridLogsByCid[c.client_id]||[]).forEach(r=>{logsByDk[r.date_key]=r;});
-  const allDks=[...new Set([...Object.keys(notesByDk),...Object.keys(logsByDk)])].sort((a,b)=>b.localeCompare(a));
+  const sessDks=Object.keys(_cgridSessionsByCidDk).filter(k=>k.startsWith(c.client_id+'|')).map(k=>k.split('|')[1]);
+  const allDks=[...new Set([...Object.keys(notesByDk),...Object.keys(logsByDk),...sessDks])].sort((a,b)=>b.localeCompare(a));
   const tlUnitLabel=c.content_cat==='drama'?'화':(c.content_cat==='movie'?'분':'p');
   const notesHtml=allDks.length?`<div class="cgrid-detail-notes${c.review?' with-final':''}">
     <div class="cgrid-detail-notes-lbl">Timeline</div>
@@ -2212,13 +2265,15 @@ function _cgridDetailHtml(c){
         const dispDate=parseInt(dk.slice(5,7),10)+'/'+parseInt(dk.slice(8,10),10);
         const r=logsByDk[dk];
         const n=notesByDk[dk];
+        const sess=_cgridSessionsByCidDk[c.client_id+'|'+dk];
         let logLine='';
         if(r){
           const progText=r.unit==='percent'?`${r.percent_after!=null?r.percent_after:0}%`:(r.unit_after!=null?`${r.unit_after}${tlUnitLabel}`:'');
           const amountText=r.amount_read>0?(r.unit==='percent'?`+${r.amount_read}%`:`+${r.amount_read}${tlUnitLabel}`):'';
-          const totalMin=r.seconds>0?Math.round(r.seconds/60)+'분':'';
-          logLine=[progText,amountText,totalMin].filter(Boolean).join(' · ');
+          logLine=[progText,amountText].filter(Boolean).join(' · ');
         }
+        const timeText=_sessionRangesText(sess);
+        logLine=[logLine,timeText].filter(Boolean).join(' · ');
         const logHtml=logLine?`<div class="cgrid-detail-note-log">${logLine}</div>`:'';
         const noteHtml=n?`<span>${escapeHtml(n.text||'')}</span>`:'';
         return `<div class="cgrid-detail-note-item"><span class="cgrid-detail-note-date">${dispDate}</span><div>${logHtml}${noteHtml}</div></div>`;
@@ -4229,7 +4284,6 @@ function toggleMrpContentsView(){
 // 코멘트 모아보기(타임라인, 읽기 전용) — 본앱 로직 이식, supaFetch 기반으로 재작성
 // 완결 코멘트(contents.review+stars)와 감상 메모(contents.notes[], 2026-08-29 통합)를 함께 모아 보여줌.
 // ══════════════════════════════════════════════════════════
-let _chNoteTimelineMonths=6; // 최근 몇 개월치를 모아볼지
 let _chNoteTimelineView='date';
 let _cgridMode='grid'; // 'grid'(콘텐츠 모아보기) | 'timeline'(로그 모아보기) — 제목을 눌러 전환
 function toggleCgridMode(){
@@ -4260,65 +4314,39 @@ function toggleChTlTypeFilter(type){
   document.querySelector(`.ch-tl-type-chip[data-type="${type}"]`).classList.toggle('on',_chTlTypeFilter[type]);
   renderContentNoteTimeline();
 }
-// 최근 N개월치의 완결 콘텐츠(review 또는 stars가 있는 것)와 감상 메모, 감상로그(그날 진행률·시간)를 함께 수집
-async function _chCollectNoteSource(){
-  const now=new Date();
-  const months=[];
-  for(let i=0;i<_chNoteTimelineMonths;i++)months.push(monthKeyOf(new Date(now.getFullYear(),now.getMonth()-i,1)));
-  const oldestMk=months[months.length-1];
-  const startDk=oldestMk+'-01';
-  const endDk=monthKeyOf(now)+'-31';
-  const [contentRows,rblocks]=await Promise.all([
-    Promise.all(months.map(mk=>supaFetch(`contents?month_key=eq.${mk}`))),
-    supaFetch(`rhythm_blocks?date_key=gte.${startDk}&date_key=lte.${endDk}&cat=eq.enjoy`)
-  ]);
+// 이번 달(_monthCalDate)에 속한 콘텐츠의 완결 코멘트/감상 메모/감상로그(그날 진행률·시간)를 함께 수집.
+// 2026-09-12: 콘텐츠 모아보기와 동일하게 월단위로 전환(기존엔 최근 6개월을 한번에 로드) — 월간탭 상단 네비게이션과
+// 함께 이동하도록 loadMonthTab이 넘겨주는 contentsData(당월+전월 contents)를 그대로 재사용, 없으면 자체 조회.
+async function _chCollectNoteSource(contentsData){
+  const mk=monthKeyOf(_monthCalDate);
+  const startDk=mk+'-01';
+  const endDk=mk+'-31';
+  let contents;
+  if(contentsData){
+    contents=contentsData.cur||[];
+  }else{
+    contents=(await supaFetch(`contents?month_key=eq.${mk}`))||[];
+  }
+  const rblocks=await supaFetch(`rhythm_blocks?date_key=gte.${startDk}&date_key=lte.${endDk}&cat=eq.enjoy`);
   const finals=[]; // {cid,cat,title,poster,stars,review,dk}
   const notes=[]; // {cid,cat,title,dk,text,time,updatedAt}
-  const contents=[];
   // 2026-08-29 통합: 감상 메모는 이제 contents.notes[]에 직접 있음 — 별도 goal_notes 조회/cid 매칭(_resolveBookNoteCids) 불필요.
-  contentRows.forEach(rows=>(rows||[]).forEach(c=>{
-    contents.push(c);
+  contents.forEach(c=>{
     if(c.review&&c.review.trim()){
       finals.push({cid:c.client_id,cat:c.content_cat,title:c.title,poster:c.poster||null,stars:c.stars||0,review:c.review||'',dk:c.end_date||c.start_date||''});
     }
-    (c.notes||[]).forEach(n=>notes.push({...n,cid:c.client_id,cat:c.content_cat,poster:c.poster||null}));
-  }));
-  // 감상로그 — 감상시간은 리듬블록(전체 기간, 스톱워치 기록 있는 모든 과거분 포함)에서, 진행률은
-  // content_daily_log(2026-09-11 이후 신규 저장분만 존재)에서 가져와 날짜+cid 기준으로 병합.
-  // 본앱 감상달력(renderWatchCalDetail)과 동일한 소스·동일한 집계 방식.
+    (c.notes||[]).forEach(n=>{if(n.dk&&n.dk>=startDk&&n.dk<=endDk)notes.push({...n,cid:c.client_id,cat:c.content_cat,poster:c.poster||null});});
+  });
+  // 감상로그 — 감상시간은 리듬블록(이번 달, 스톱워치 기록)에서, 진행률은 content_daily_log(2026-09-11 이후
+  // 신규 저장분만 존재)에서 가져와 날짜+cid 기준으로 병합. 본앱 감상달력(renderWatchCalDetail)과 동일한
+  // 소스·동일한 집계 방식·동일한 시간 표기(공용 헬퍼 재사용, 2026-09-12).
   const cids=[...new Set(contents.map(c=>c.client_id).filter(Boolean))];
-  const logRows=cids.length?(await supaFetch(`content_daily_log?content_cid=in.(${cids.map(c=>`"${c}"`).join(',')})&order=date_key.asc`))||[]:[];
+  const logRows=cids.length?(await supaFetch(`content_daily_log?content_cid=in.(${cids.map(c=>`"${c}"`).join(',')})&date_key=gte.${startDk}&date_key=lte.${endDk}&order=date_key.asc`))||[]:[];
   const progressByDkCid={};
   logRows.forEach(r=>{progressByDkCid[r.date_key+'|'+r.content_cid]=r;});
   const contentsByCid=_contentsByCidMap(contents);
-  const catPrefix={drama:'드라마 - ',movie:'영화 - ',book:'독서 - '};
-  // 감상시간은 리듬블록이 content_cid 없이 텍스트로만 남긴 구버전 기록도 있어, cat+title로 우선 집계한 뒤
-  // 아래에서 dk+cid 기준으로 재귀합쳐 진행률과 어긋나지 않게 함(리듬블록 파싱 title과 contents.title 표기가
-  // 미세하게 달라 별개 항목으로 쪼개지는 사각지대 방지, 2026-09-11).
-  const timeByDkTitleCat={}; // "{dk}|{cat}|{title}" → 총 감상분
-  (rblocks||[]).forEach(b=>{
-    if(!b.start_time||!b.end_time)return;
-    const parsed=_parseEnjoyBlock(b,contentsByCid);
-    if(!parsed)return;
-    const {cat,title}=parsed;
-    if(!catPrefix[cat])return; // 음악 등 리듬 기록 기반이 아닌 카테고리는 제외
-    let m=_paceParseHM(b.end_time)-_paceParseHM(b.start_time);if(m<0)m+=1440;
-    const key=b.date_key+'|'+cat+'|'+title;
-    timeByDkTitleCat[key]=(timeByDkTitleCat[key]||0)+Math.max(0,m);
-  });
-  // dk+cid 기준으로 재정리 — title로 contents를 역매칭해 cid를 확정하고, 같은 dk+cid면 시간을 합산.
-  const timeByDkCid={}; // "{dk}|{cid}" → 총 감상분
-  const metaByDkCidNoCid=[]; // cid 매칭 실패한 것들(수동추가분 등, cid 없이도 표시는 되어야 함): {dk,cat,title,min}
-  Object.keys(timeByDkTitleCat).forEach(key=>{
-    const [dk,cat,title]=key.split('|');
-    const cidMatch=contents.find(c=>c.content_cat===cat&&c.title===title);
-    if(cidMatch){
-      const k2=dk+'|'+cidMatch.client_id;
-      timeByDkCid[k2]=(timeByDkCid[k2]||0)+timeByDkTitleCat[key];
-    }else{
-      metaByDkCidNoCid.push({dk,cat,title,min:timeByDkTitleCat[key]});
-    }
-  });
+  const catPrefix={drama:1,movie:1,book:1};
+  const {byKey:sessByDkCid,noCid:sessNoCid}=_enjoySessionsByDkCid(rblocks,contentsByCid);
   const logs=[]; // {cid,cat,title,poster,dk,progText,amountText,timeText}
   const buildProgText=(log,cat)=>{
     if(!log)return{progText:'',amountText:''};
@@ -4327,29 +4355,31 @@ async function _chCollectNoteSource(){
     const amountText=log.amount_read>0?(log.unit==='percent'?`+${log.amount_read}%`:`+${log.amount_read}${unitLabel}`):'';
     return{progText,amountText};
   };
-  // cid로 확정된 항목 — dk+cid 기준으로 시간(timeByDkCid)과 진행률(progressByDkCid)을 한 번에 합침.
-  const allDkCidKeys=new Set([...Object.keys(timeByDkCid),...Object.keys(progressByDkCid)]);
+  // cid로 확정된 항목 — dk+cid 기준으로 세션 시각(sessByDkCid)과 진행률(progressByDkCid)을 한 번에 합침.
+  // 음악 등 리듬 기록 기반이 아닌 카테고리는 catPrefix 체크로 제외(진행률만 있고 시간 세션이 없는 경우 방지).
+  const allDkCidKeys=new Set([...Object.keys(sessByDkCid),...Object.keys(progressByDkCid)]);
   allDkCidKeys.forEach(key=>{
     const [dk,cid]=key.split('|');
     const c=contentsByCid[cid];
-    if(!c)return;
-    const totalMin=timeByDkCid[key];
-    const timeText=totalMin?`${totalMin}분`:'';
+    if(!c||!catPrefix[c.content_cat])return;
+    const timeText=_sessionRangesText(sessByDkCid[key]);
     const{progText,amountText}=buildProgText(progressByDkCid[key],c.content_cat);
     if(!timeText&&!progText&&!amountText)return;
     logs.push({cid,cat:c.content_cat,title:c.title,poster:c.poster||null,dk,progText,amountText,timeText});
   });
   // cid 매칭 실패한 리듬 기록(수동추가분 등, 진행률 로그는 애초에 cid 있어야만 저장되므로 시간만 표시)
-  metaByDkCidNoCid.forEach(({dk,cat,title,min})=>{
-    if(!min)return;
-    logs.push({cid:null,cat,title,poster:null,dk,progText:'',amountText:'',timeText:`${min}분`});
+  sessNoCid.forEach(sess=>{
+    if(!catPrefix[sess.cat])return;
+    const timeText=_sessionRangesText(sess);
+    if(!timeText)return;
+    logs.push({cid:null,cat:sess.cat,title:sess.title,poster:null,dk:sess.dk,progText:'',amountText:'',timeText});
   });
   return {finals,notes,logs};
 }
-async function renderContentNoteTimeline(){
+async function renderContentNoteTimeline(contentsData){
   const el=document.getElementById('content-note-timeline-list');if(!el)return;
   el.innerHTML='<div class="loading-msg">불러오는 중...</div>';
-  const {finals,notes,logs}=await _chCollectNoteSource();
+  const {finals,notes,logs}=await _chCollectNoteSource(contentsData);
   if(!finals.length&&!notes.length&&!logs.length){el.innerHTML='<div class="ch-note-tl-empty">아직 남긴 기록이 없어요</div>';return;}
   const f2=_chTlTypeFilter.final?finals:[];
   const n2=_chTlTypeFilter.note?notes:[];
@@ -4358,6 +4388,9 @@ async function renderContentNoteTimeline(){
   el.innerHTML=_chNoteTimelineView==='work'?_chRenderNoteTimelineByWork(f2,n2,l2):_chRenderNoteTimelineByDate(f2,n2,l2);
 }
 // 날짜순 뷰 — 날짜별로 묶어 최신순 정렬, 완결 카드 먼저 + 감상로그·메모는 곁가지로
+// 날짜순 뷰 — 날짜별로 묶어 최신순 정렬. 같은 날짜 안에서도 동일 작품(cid)의 로그·메모·완결은
+// 하나의 카드로 병합해 보여줌(2026-09-12, 구조 개편) — "동일 콘텐츠의 감상기록과 감상평이 따로 노는" 문제 해결.
+// cid 없는 항목(구버전 리듬블록 텍스트 폴백 등)은 병합 대상이 없으므로 기존처럼 개별 행 유지.
 function _chRenderNoteTimelineByDate(finals,notes,logs){
   const byDate={};
   const push=(dk,item)=>{if(!dk)return;if(!byDate[dk])byDate[dk]=[];byDate[dk].push(item);};
@@ -4368,13 +4401,49 @@ function _chRenderNoteTimelineByDate(finals,notes,logs){
   return dks.map(dk=>{
     const dispDate=parseInt(dk.slice(5,7),10)+'월 '+parseInt(dk.slice(8,10),10)+'일';
     const items=byDate[dk].slice().sort((a,b)=>(a.time||'').localeCompare(b.time||''));
+    // cid 있는 항목은 작품 단위로 그룹핑, cid 없는 항목은 그대로 개별 유지 — 원래 순서(시간순) 보존.
+    const groups=[]; // [{cid,items:[...]} | {solo:item}]
+    const groupByCid={};
+    items.forEach(it=>{
+      if(it.cid){
+        if(!groupByCid[it.cid]){
+          const g={cid:it.cid,items:[]};
+          groupByCid[it.cid]=g;
+          groups.push(g);
+        }
+        groupByCid[it.cid].items.push(it);
+      }else{
+        groups.push({solo:it});
+      }
+    });
     const showTime=items.length>1;
-    const rowsHtml=items.map(it=>it.__type==='final'?_chFinalRowHtml(it):(it.__type==='log'?_chLogRowHtml(it):_chNoteRowHtml(it,showTime))).join('');
+    const rowsHtml=groups.map(g=>g.solo?_chSoloRowHtml(g.solo,showTime):_chMergedCidRowHtml(g.items)).join('');
     return `<div class="ch-tlA-day">
       <div class="ch-tlA-day-date">${dispDate}</div>
       ${rowsHtml}
     </div>`;
   }).join('');
+}
+function _chSoloRowHtml(it,showTime){
+  return it.__type==='final'?_chFinalRowHtml(it):(it.__type==='log'?_chLogRowHtml(it):_chNoteRowHtml(it,showTime));
+}
+// 같은 날짜+같은 cid로 묶인 항목들(로그/메모/완결)을 한 행에 합쳐 렌더 — 완결이 있으면 제목줄에 완결뱃지+별점,
+// 로그(시간·진행률) 줄이 위, 메모/완결평 텍스트가 아래로 오는 순서(작품별 뷰와 동일한 순서 규칙).
+function _chMergedCidRowHtml(items){
+  const final=items.find(it=>it.__type==='final');
+  const log=items.find(it=>it.__type==='log');
+  const note=items.find(it=>it.__type==='note');
+  const base=final||log||note;
+  const catColor=(WCAL_CAT_META[base.cat]||{}).color||'rgba(140,175,150,0.85)';
+  const badgeHtml=final?`<span class="ch-tlA-badge-final">완</span>`:'';
+  const starsHtml=(final&&final.stars>0)?`<span class="ch-tlA-stars">${renderStarDisplayHtml(final.stars)}</span>`:'';
+  const catTagHtml=!final?`<span class="ch-tlA-cat-tag">${(WCAL_CAT_META[base.cat]||{}).label||''}</span>`:'';
+  const titleRowHtml=`${badgeHtml}<span class="ch-tlA-title">${escapeHtml(base.title||'')}</span>${starsHtml}${catTagHtml}`;
+  const logLine=log?[log.progText,log.amountText,log.timeText].filter(Boolean).join(' · '):'';
+  const logHtml=logLine?`<div class="ch-tlA-text ch-tlA-log-text">${logLine}</div>`:'';
+  const textSource=final?final.review:(note?note.text:'');
+  const textHtml=textSource?`<div class="ch-tlA-text">${escapeHtml(textSource)}</div>`:'';
+  return _chTlRowHtml(catColor,base.poster,titleRowHtml,logHtml+textHtml);
 }
 // 작품별 뷰 — cid 기준으로 묶음
 function _chRenderNoteTimelineByWork(finals,notes,logs){
