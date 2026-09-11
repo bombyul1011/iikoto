@@ -1175,15 +1175,18 @@ function renderTodayReading(dk,rblocks,contents,manualItems){
     let mins=e-s;if(mins<0)mins+=1440;
     const key=cat+'|'+title;
     durMinByKey[key]=(durMinByKey[key]||0)+mins;
-    if(cat==='drama'||cat==='book')push(cat,title);
+    if(cat==='drama'||cat==='book'||cat==='movie')push(cat,title);
   });
   (contents||[]).filter(c=>c.content_cat==='music'&&c.start_date===dk).forEach(c=>push('music',c.title,c.poster));
-  // 영화는 리듬 기록 유무와 무관하게 contents 하나만 기준으로 판단 — 하루짜리(당일 시작~종료), 기간형(진행중이면
-  // 시작일~오늘 사이), 콘텐츠탭에만 등록된 경우까지 모두 이 하나의 규칙으로 포섭(2026-08-25 단순화).
+  // 영화 — 오늘 실제 감상 기록(리듬 블록)이 있으면 위 루프에서 이미 push됐으므로, 여기서는 리듬 기록이 없는 경우만 추가:
+  // 하루짜리(당일 시작~종료) 또는 완결일이 오늘인 경우. status==='watching'만으로는 추가하지 않음 —
+  // 시청을 시작해두고 며칠간 이어보지 않아도 status가 계속 watching으로 남아있어, 실제로 오늘 안 본 영화까지
+  // 매일 "오늘의 감상"에 잡혀 콘텐츠가 1개뿐인데도 점 인디케이터가 뜨는 버그가 있었음(2026-09-11 수정).
   (contents||[]).filter(c=>c.content_cat==='movie').forEach(c=>{
-    const isToday=(c.status==='watching'&&c.start_date&&c.start_date<=dk)||c.start_date===dk||c.end_date===dk;
+    const key='movie|'+(c.title||'');
+    if(durMinByKey[key])return; // 이미 오늘 리듬 기록으로 push됨
+    const isToday=c.start_date===dk||c.end_date===dk;
     if(isToday)push('movie',c.title,c.poster);
-    // 영화도 같은 날 리듬 블록에 기록이 있으면(나눠 보기 등) 그 시간을 위 durMinByKey에서 그대로 가져다 씀.
   });
   (manualItems||[]).forEach(it=>push(it.cat,it.title));
   // 포스터/상태 매칭 — 오늘 넘어온 contents 목록에서 같은 제목의 poster·status·total_unit(영화 완결 러닝타임)을 찾아 붙임
@@ -5790,10 +5793,17 @@ async function loadTimelineTab(){
   const mealsRow=meals&&meals[0];
 
   // 할일/메모/감상/하루한줄 렌더 — 일정과 타임테이블은 토글 없이 나란히 동시 노출.
-  renderTodayOnelineHl(onelineRows&&onelineRows[0]);
+  // renderTodayOnelineHl/renderTodayMemos는 async(내부에서 supaFetch로 추가 조회)라 await 없이 그냥 호출하면
+  // 완료 시점이 들쭉날쭉해져, 그 결과로 오른쪽 영역 높이가 나중에 바뀌어도 이미 지나간 동기화 타이밍(아래
+  // syncTimelineTrackHeight의 rAF×2/폰트로드/400ms 타이밍)이 그 변화를 놓칠 수 있었음 — 특히 메모가 길어
+  // memo-txt-photo 등으로 줄바꿈이 늘어나는 경우 우측이 나중에 커지면서 좌측 트랙과 안 맞는 원인이었음
+  // (2026-09-11). 이제 Promise.all로 실제 완료를 기다린 뒤에만 아래 높이 동기화를 시작한다.
+  const rightRenderDone=Promise.all([
+    renderTodayOnelineHl(onelineRows&&onelineRows[0]),
+    renderTodayMemos(dk)
+  ]);
   renderTimelineTodos(todos||[]);
   renderTimelineEventsAndSchedule(todos||[]);
-  renderTodayMemos(dk);
   const todayManual=((todayManualRows&&todayManualRows[0]&&todayManualRows[0].lines)||[]).filter(it=>it.dk===dk);
   renderTodayReading(dk,rblocks||[],contents||[],todayManual);
 
@@ -5808,14 +5818,17 @@ async function loadTimelineTab(){
   renderTimelineSleepBanner(sleep);
   renderTimelineHabitBanner(dk,habits||[],habitChecks||[]);
   renderTimelineTrack(dk,todos||[],sleep,mealsRow,rblocks||[],mflowCidSet,undefined,contents||[],habits||[],habitChecks||[]);
-  renderTimelineCompareCard(dk,todos||[],sleep,rblocks||[],habits||[],habitChecks||[]);
+  const compareCardDone=renderTimelineCompareCard(dk,todos||[],sleep,rblocks||[],habits||[],habitChecks||[]);
 
   // 좌우 높이 동기화 — 오른쪽 영역(도넛~감상/습관까지) 실제 렌더 높이를 측정해, 그 값을 트랙 전체 높이(TOTAL_H)로
   // 다시 사용해 트랙을 재렌더링. 이렇게 하면 0~24시 전체가 스크롤 없이 오른쪽 높이 안에 정확히 들어맞는다.
   // (기존에는 트랙을 고정 900px로 그린 뒤 컨테이너만 잘라서 스크롤을 만들었는데, 그러면 24시가 항상 스크롤 밖으로
   // 밀려나 있었음 — 트랙 콘텐츠 자체를 오른쪽 실측 높이 기준으로 다시 그리는 방식으로 수정.)
-  syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,mflowCidSet,contents||[],habits||[],habitChecks||[]);
-}
+  // 우측 비동기 렌더(메모·하루한줄·비교카드)가 실제로 끝난 뒤에 동기화를 시작 — 그 전에는 오른쪽 높이가
+  // 아직 최종값이 아니므로 이르게 측정하면 어긋난다.
+  Promise.all([rightRenderDone,compareCardDone]).then(()=>{
+    syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,mflowCidSet,contents||[],habits||[],habitChecks||[]);
+  });
 
 // 좌우 높이 동기화를 별도 함수로 분리 — 첫 탭 진입 시 폰트/레이아웃이 아직 자리잡기 전에 offsetHeight를 측정해
 // 실제보다 낮게 나오는 문제(재방문 시에만 정확해지던 현상)를 보정하기 위해, 두 프레임 뒤에 측정하고
@@ -5876,6 +5889,22 @@ function syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,mflowCidSet,con
     }
     // 다른 초기화(사이드바 캘린더 렌더 등)까지 다 끝난 뒤 최종적으로 한 번 더 재확인
     setTimeout(doSync,400);
+  }
+  // 안전망: 위 고정 타이밍들 이후에도 오른쪽 영역 높이가 바뀌는 경우(사진메모 썸네일·콘텐츠 포스터 등
+  // <img>가 뒤늦게 로드돼 늘어나는 경우, 메모가 길어 줄바꿈이 늘어나는 경우 등)를 모두 커버하기 위해
+  // ResizeObserver로 우측 영역을 계속 감시하다가 높이가 바뀌면 자동 재동기화한다. doSync 자신이
+  // trackCardEl의 max-height를 바꾸므로, 좌측 트랙 카드 자체는 감시 대상에서 제외해 무한루프를 막는다(2026-09-11).
+  const rightElForObserve=document.querySelector('.tl-half-right');
+  if(rightElForObserve&&!rightElForObserve._tlResizeObserverAttached&&window.ResizeObserver){
+    rightElForObserve._tlResizeObserverAttached=true;
+    let lastH=null;
+    const ro=new ResizeObserver(()=>{
+      const h=rightElForObserve.offsetHeight;
+      if(h===lastH)return;
+      lastH=h;
+      requestAnimationFrame(doSync);
+    });
+    ro.observe(rightElForObserve);
   }
 }
 
