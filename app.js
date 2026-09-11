@@ -11960,7 +11960,8 @@ function renderWatchCalDetail(){
       const target=catPrefix[it.cat]+it.title;
       const sessionBlocks=dayRblocks.filter(b=>b.cat==='enjoy'&&b.text===target);
       const sessionRanges=sessionBlocks.map(b=>`${b.start}-${b.end}`);
-      const totalMin=sessionBlocks.reduce((sum,b)=>sum+Math.max(0,toMin(b.end)-toMin(b.start)),0);
+      // 자정을 넘긴 세션(예: 22:59 시작~00:22 종료)은 end<start가 되어 음수가 나오므로 +1440 보정 — 취침시간 계산 등과 동일 패턴.
+      const totalMin=sessionBlocks.reduce((sum,b)=>{let m=toMin(b.end)-toMin(b.start);if(m<0)m+=1440;return sum+Math.max(0,m);},0);
       if(sessionRanges.length)timeText=`${sessionRanges.join(', ')} (총 ${totalMin}분)`;
     }
     // 진행률 — content_daily_log(책은 기존 로그, 드라마/영화는 2026-09-11부터의 신규 로그만 존재).
@@ -11983,9 +11984,10 @@ function renderWatchCalDetail(){
           <div style="font-size:var(--dow-label-size);color:var(--ts);margin-top:2px;">${m.label}</div>
           ${metaHtml}
         </div>
-        ${statusBadgeHtml}
-        ${shareBtnHtml}
-        ${noteBtnHtml}
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0;">
+          ${statusBadgeHtml||'<span></span>'}
+          <div style="display:flex;align-items:center;gap:2px;">${shareBtnHtml}${noteBtnHtml}</div>
+        </div>
       </div>
       ${noteRowHtml}
     </div>`;
