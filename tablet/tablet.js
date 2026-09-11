@@ -4235,7 +4235,7 @@ let _cgridMode='grid'; // 'grid'(콘텐츠 모아보기) | 'timeline'(코멘트 
 function toggleCgridMode(){
   _cgridMode=_cgridMode==='grid'?'timeline':'grid';
   const isTl=_cgridMode==='timeline';
-  document.getElementById('cgrid-title-text').textContent=isTl?'코멘트 모아보기':'콘텐츠 모아보기';
+  document.getElementById('cgrid-title-text').textContent=isTl?'로그 모아보기':'콘텐츠 모아보기';
   document.getElementById('cgrid-title-icon').className=`ti ${isTl?'ti-timeline':'ti-stack-2'}`;
   document.getElementById('cgrid-hdr-actions').style.display=isTl?'none':'';
   document.getElementById('note-tl-subtabs').style.display=isTl?'':'none';
@@ -4249,42 +4249,100 @@ function switchNoteTimelineView(btn,view){
   btn.classList.add('on');
   renderContentNoteTimeline();
 }
-// 최근 N개월치의 완결 콘텐츠(review 또는 stars가 있는 것)와 감상 메모를 함께 수집
+// 최근 N개월치의 완결 콘텐츠(review 또는 stars가 있는 것)와 감상 메모, 감상로그(그날 진행률·시간)를 함께 수집
 async function _chCollectNoteSource(){
   const now=new Date();
   const months=[];
   for(let i=0;i<_chNoteTimelineMonths;i++)months.push(monthKeyOf(new Date(now.getFullYear(),now.getMonth()-i,1)));
-  const contentRows=await Promise.all(months.map(mk=>supaFetch(`contents?month_key=eq.${mk}`)));
+  const oldestMk=months[months.length-1];
+  const startDk=oldestMk+'-01';
+  const endDk=monthKeyOf(now)+'-31';
+  const [contentRows,rblocks]=await Promise.all([
+    Promise.all(months.map(mk=>supaFetch(`contents?month_key=eq.${mk}`))),
+    supaFetch(`rhythm_blocks?date_key=gte.${startDk}&date_key=lte.${endDk}&cat=eq.enjoy`)
+  ]);
   const finals=[]; // {cid,cat,title,poster,stars,review,dk}
   const notes=[]; // {cid,cat,title,dk,text,time,updatedAt}
+  const contents=[];
   // 2026-08-29 통합: 감상 메모는 이제 contents.notes[]에 직접 있음 — 별도 goal_notes 조회/cid 매칭(_resolveBookNoteCids) 불필요.
   contentRows.forEach(rows=>(rows||[]).forEach(c=>{
+    contents.push(c);
     if(c.review&&c.review.trim()){
       finals.push({cid:c.client_id,cat:c.content_cat,title:c.title,poster:c.poster||null,stars:c.stars||0,review:c.review||'',dk:c.end_date||c.start_date||''});
     }
     (c.notes||[]).forEach(n=>notes.push({...n,cid:c.client_id,cat:c.content_cat,poster:c.poster||null}));
   }));
-  return {finals,notes};
+  // 감상로그 — 감상시간은 리듬블록(전체 기간, 스톱워치 기록 있는 모든 과거분 포함)에서, 진행률은
+  // content_daily_log(2026-09-11 이후 신규 저장분만 존재)에서 가져와 날짜+cid 기준으로 병합.
+  // 본앱 감상달력(renderWatchCalDetail)과 동일한 소스·동일한 집계 방식.
+  const cids=[...new Set(contents.map(c=>c.client_id).filter(Boolean))];
+  const logRows=cids.length?(await supaFetch(`content_daily_log?content_cid=in.(${cids.map(c=>`"${c}"`).join(',')})&order=date_key.asc`))||[]:[];
+  const progressByDkCid={};
+  logRows.forEach(r=>{progressByDkCid[r.date_key+'|'+r.content_cid]=r;});
+  const contentsByCid=_contentsByCidMap(contents);
+  const catPrefix={drama:'드라마 - ',movie:'영화 - ',book:'독서 - '};
+  const timeByDkKey={}; // "{dk}|{cat}|{title}" → 총 감상분(같은 날 여러 세션 합산)
+  (rblocks||[]).forEach(b=>{
+    if(!b.start_time||!b.end_time)return;
+    const parsed=_parseEnjoyBlock(b,contentsByCid);
+    if(!parsed)return;
+    const {cat,title}=parsed;
+    if(!catPrefix[cat])return; // 음악 등 리듬 기록 기반이 아닌 카테고리는 제외
+    let m=_paceParseHM(b.end_time)-_paceParseHM(b.start_time);if(m<0)m+=1440;
+    const key=b.date_key+'|'+cat+'|'+title;
+    timeByDkKey[key]=(timeByDkKey[key]||0)+Math.max(0,m);
+  });
+  const logs=[]; // {cid,cat,title,poster,dk,progText,amountText,timeText}
+  const seenLogKeys=new Set();
+  const addLog=(dk,cat,title,cid,poster)=>{
+    const key=dk+'|'+cat+'|'+title;
+    if(seenLogKeys.has(key))return;
+    seenLogKeys.add(key);
+    const totalMin=timeByDkKey[key];
+    const timeText=totalMin?`${totalMin}분`:'';
+    const log=cid?progressByDkCid[dk+'|'+cid]:null;
+    let progText='',amountText='';
+    if(log){
+      const unitLabel=cat==='drama'?'화':(cat==='movie'?'분':'p');
+      progText=log.unit==='percent'?`${log.percent_after!=null?log.percent_after:0}%`:(log.unit_after!=null?`${log.unit_after}${unitLabel}`:'');
+      amountText=log.amount_read>0?(log.unit==='percent'?`+${log.amount_read}%`:`+${log.amount_read}${unitLabel}`):'';
+    }
+    if(!timeText&&!progText&&!amountText)return; // 표시할 정보가 전혀 없으면 스킵
+    logs.push({cid,cat,title,poster,dk,progText,amountText,timeText});
+  };
+  Object.keys(timeByDkKey).forEach(key=>{
+    const [dk,cat,title]=key.split('|');
+    const cidMatch=contents.find(c=>c.content_cat===cat&&c.title===title);
+    addLog(dk,cat,title,cidMatch?cidMatch.client_id:null,cidMatch?cidMatch.poster:null);
+  });
+  // 리듬 기록은 없지만 진행률 로그만 있는 날(예: 리듬블록 없이 진행률만 수동 갱신한 경우)도 포함
+  logRows.forEach(r=>{
+    const c=contentsByCid[r.content_cid];
+    if(!c)return;
+    addLog(r.date_key,c.content_cat,c.title,c.client_id,c.poster);
+  });
+  return {finals,notes,logs};
 }
 async function renderContentNoteTimeline(){
   const el=document.getElementById('content-note-timeline-list');if(!el)return;
   el.innerHTML='<div class="loading-msg">불러오는 중...</div>';
-  const {finals,notes}=await _chCollectNoteSource();
-  if(!finals.length&&!notes.length){el.innerHTML='<div class="ch-note-tl-empty">아직 남긴 코멘트가 없어요</div>';return;}
-  el.innerHTML=_chNoteTimelineView==='work'?_chRenderNoteTimelineByWork(finals,notes):_chRenderNoteTimelineByDate(finals,notes);
+  const {finals,notes,logs}=await _chCollectNoteSource();
+  if(!finals.length&&!notes.length&&!logs.length){el.innerHTML='<div class="ch-note-tl-empty">아직 남긴 기록이 없어요</div>';return;}
+  el.innerHTML=_chNoteTimelineView==='work'?_chRenderNoteTimelineByWork(finals,notes,logs):_chRenderNoteTimelineByDate(finals,notes,logs);
 }
-// 날짜순 뷰 — 날짜별로 묶어 최신순 정렬, 완결 카드 먼저 + 감상 메모는 곁가지로
-function _chRenderNoteTimelineByDate(finals,notes){
+// 날짜순 뷰 — 날짜별로 묶어 최신순 정렬, 완결 카드 먼저 + 감상로그·메모는 곁가지로
+function _chRenderNoteTimelineByDate(finals,notes,logs){
   const byDate={};
   const push=(dk,item)=>{if(!dk)return;if(!byDate[dk])byDate[dk]=[];byDate[dk].push(item);};
   finals.forEach(f=>push(f.dk,{...f,__type:'final'}));
   notes.forEach(n=>push(n.dk,{...n,__type:'note'}));
+  (logs||[]).forEach(l=>push(l.dk,{...l,__type:'log'}));
   const dks=Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
   return dks.map(dk=>{
     const dispDate=parseInt(dk.slice(5,7),10)+'월 '+parseInt(dk.slice(8,10),10)+'일';
     const items=byDate[dk].slice().sort((a,b)=>(a.time||'').localeCompare(b.time||''));
     const showTime=items.length>1;
-    const rowsHtml=items.map(it=>it.__type==='final'?_chFinalRowHtml(it):_chNoteRowHtml(it,showTime)).join('');
+    const rowsHtml=items.map(it=>it.__type==='final'?_chFinalRowHtml(it):(it.__type==='log'?_chLogRowHtml(it):_chNoteRowHtml(it,showTime))).join('');
     return `<div class="ch-tlA-day">
       <div class="ch-tlA-day-date">${dispDate}</div>
       ${rowsHtml}
@@ -4292,22 +4350,28 @@ function _chRenderNoteTimelineByDate(finals,notes){
   }).join('');
 }
 // 작품별 뷰 — cid 기준으로 묶음
-function _chRenderNoteTimelineByWork(finals,notes){
+function _chRenderNoteTimelineByWork(finals,notes,logs){
   const groups={};
   finals.forEach(f=>{
     if(!f.cid)return;
-    groups[f.cid]=groups[f.cid]||{cat:f.cat,title:f.title,poster:f.poster,final:null,notes:[]};
+    groups[f.cid]=groups[f.cid]||{cat:f.cat,title:f.title,poster:f.poster,final:null,notes:[],logs:[]};
     groups[f.cid].final=f;
   });
   notes.forEach(n=>{
     if(!n.cid)return;
-    groups[n.cid]=groups[n.cid]||{cat:n.cat,title:n.title,poster:n.poster||null,final:null,notes:[]};
+    groups[n.cid]=groups[n.cid]||{cat:n.cat,title:n.title,poster:n.poster||null,final:null,notes:[],logs:[]};
     if(!groups[n.cid].poster)groups[n.cid].poster=n.poster||null;
     groups[n.cid].notes.push(n);
   });
+  (logs||[]).forEach(l=>{
+    if(!l.cid)return;
+    groups[l.cid]=groups[l.cid]||{cat:l.cat,title:l.title,poster:l.poster||null,final:null,notes:[],logs:[]};
+    if(!groups[l.cid].poster)groups[l.cid].poster=l.poster||null;
+    groups[l.cid].logs.push(l);
+  });
   const cids=Object.keys(groups).sort((a,b)=>{
-    const la=groups[a].notes.concat(groups[a].final?[groups[a].final]:[]).map(x=>x.dk||x.updatedAt||0).sort().pop()||'';
-    const lb=groups[b].notes.concat(groups[b].final?[groups[b].final]:[]).map(x=>x.dk||x.updatedAt||0).sort().pop()||'';
+    const la=groups[a].notes.concat(groups[a].logs).concat(groups[a].final?[groups[a].final]:[]).map(x=>x.dk||x.updatedAt||0).sort().pop()||'';
+    const lb=groups[b].notes.concat(groups[b].logs).concat(groups[b].final?[groups[b].final]:[]).map(x=>x.dk||x.updatedAt||0).sort().pop()||'';
     return String(lb).localeCompare(String(la));
   });
   return cids.map(cid=>{
@@ -4319,10 +4383,17 @@ function _chRenderNoteTimelineByWork(finals,notes){
        ${g.final.review?`<div class="ch-tlB-final-text">${escapeHtml(g.final.review)}</div>`:''}`
       :'';
     const progressBadgeHtml=g.final?'':'<span class="status-badge">진행중</span>';
-    const notesSorted=g.notes.slice().sort((a,b)=>(b.dk||'').localeCompare(a.dk||''));
-    const notesHtml=notesSorted.length?`<div class="ch-tlB-notes">${notesSorted.map(n=>{
-      const dispDate=n.dk?(parseInt(n.dk.slice(5,7),10)+'/'+parseInt(n.dk.slice(8,10),10)):'';
-      return `<div class="ch-tlB-note-item"><div class="ch-tlB-note-date">${dispDate}</div><div class="ch-tlB-note-text">${escapeHtml(n.text||'')}</div></div>`;
+    // 같은 날짜에 로그와 메모가 모두 있으면 한 항목에 합쳐서 표시 — 로그(진행률·시간) 줄이 위, 코멘트가 아래.
+    const logsByDk={};g.logs.forEach(l=>{logsByDk[l.dk]=l;});
+    const notesByDk={};g.notes.forEach(n=>{notesByDk[n.dk]=n;});
+    const allDks=[...new Set([...Object.keys(logsByDk),...Object.keys(notesByDk)])].sort((a,b)=>b.localeCompare(a));
+    const notesHtml=allDks.length?`<div class="ch-tlB-notes">${allDks.map(dk=>{
+      const dispDate=parseInt(dk.slice(5,7),10)+'/'+parseInt(dk.slice(8,10),10);
+      const l=logsByDk[dk],n=notesByDk[dk];
+      const logLine=l?[l.progText,l.amountText,l.timeText].filter(Boolean).join(' · '):'';
+      const logHtml=logLine?`<div class="ch-tlB-note-log">${logLine}</div>`:'';
+      const noteHtml=n?`<div class="ch-tlB-note-text">${escapeHtml(n.text||'')}</div>`:'';
+      return `<div class="ch-tlB-note-item"><div class="ch-tlB-note-date">${dispDate}</div><div>${logHtml}${noteHtml}</div></div>`;
     }).join('')}</div>`:'';
     return `<div class="ch-tlB-card">
       <div class="ch-tlB-top">
@@ -4343,8 +4414,9 @@ function _wcalPosterThumbHtml(cat,poster){
 }
 function _chFinalRowHtml(f){
   const posterHtml=`<img class="ch-tlA-poster" src="${f.poster||''}" style="${f.poster?'':'background:var(--card);'}" alt="">`;
+  const catColor=(WCAL_CAT_META[f.cat]||{}).color||'rgba(140,175,150,0.85)';
   return `<div class="ch-tlA-row">
-    <div class="ch-tlA-dot final"></div>
+    <div class="ch-tlA-dot" style="background:${catColor};"></div>
     <div class="ch-tlA-content">
       ${posterHtml}
       <div class="ch-tlA-main">
@@ -4360,10 +4432,10 @@ function _chFinalRowHtml(f){
 }
 function _chNoteRowHtml(n,showTime){
   const posterHtml=`<img class="ch-tlA-poster" src="${n.poster||''}" style="${n.poster?'':'background:var(--card);'}" alt="">`;
-  const m=WCAL_CAT_META[n.cat]||{label:''};
+  const m=WCAL_CAT_META[n.cat]||{label:'',color:'rgba(140,175,150,0.85)'};
   const timeHtml=(showTime&&n.time)?`<span class="ch-tlA-time">${n.time}</span>`:'';
   return `<div class="ch-tlA-row">
-    <div class="ch-tlA-dot"></div>
+    <div class="ch-tlA-dot" style="background:${m.color};"></div>
     <div class="ch-tlA-content">
       ${posterHtml}
       <div class="ch-tlA-main">
@@ -4373,6 +4445,25 @@ function _chNoteRowHtml(n,showTime){
           <span class="ch-tlA-cat-tag">${m.label}</span>
         </div>
         <div class="ch-tlA-text">${escapeHtml(n.text||'')}</div>
+      </div>
+    </div>
+  </div>`;
+}
+// 감상로그 행 — 코멘트/메모가 없는 순수 진행률·감상시간 기록. 도트는 다른 타입과 동일하게 카테고리색 사용(2026-09-11).
+function _chLogRowHtml(l){
+  const posterHtml=`<img class="ch-tlA-poster" src="${l.poster||''}" style="${l.poster?'':'background:var(--card);'}" alt="">`;
+  const m=WCAL_CAT_META[l.cat]||{label:'',color:'rgba(140,175,150,0.85)'};
+  const metaLine=[l.progText,l.amountText,l.timeText].filter(Boolean).join(' · ');
+  return `<div class="ch-tlA-row">
+    <div class="ch-tlA-dot" style="background:${m.color};"></div>
+    <div class="ch-tlA-content">
+      ${posterHtml}
+      <div class="ch-tlA-main">
+        <div class="ch-tlA-title-row">
+          <span class="ch-tlA-title">${escapeHtml(l.title||'')}</span>
+          <span class="ch-tlA-cat-tag">${m.label}</span>
+        </div>
+        <div class="ch-tlA-text ch-tlA-log-text">${metaLine}</div>
       </div>
     </div>
   </div>`;
