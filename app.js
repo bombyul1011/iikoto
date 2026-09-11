@@ -192,6 +192,8 @@ function autoCloseUnfinishedRhythmBlocks(todayDk,sleepTime){
     if(changed)saveRhythmBlocks(dk,blocks);
   });
 }
+// row→local 매핑 공용화(memoRowToLocal 등과 동일 패턴) — syncRhythmBlocksDown/DownMany 양쪽에서 재사용, 중복 정의 제거
+function rhythmBlockRowToLocal(r){return {cat:r.cat,start:r.start_time,end:r.end_time,text:r.text||'',created:r.created,cid:r.client_id||genCid(),autoClosed:!!r.auto_closed,contentCid:r.content_cid||null};}
 async function syncRhythmBlocksUp(dk){
   const blocks=getRhythmBlocks(dk);
   if(ensureItemCids(blocks))S.set(S.key('rblocks',dk),blocks);
@@ -206,7 +208,7 @@ async function syncRhythmBlocksDown(dk){
   const rows=await supaFetch('rhythm_blocks?date_key=eq.'+dk+'&order=created');
   if(!rows)return; // 연결 실패 — 로컬 유지
   if(S.get(S.key('rblocks_pending',dk)))return; // 업로드 대기중인 로컬 수정 있으면 덮어쓰지 않음
-  S.set(S.key('rblocks',dk),rows.map(function(r){return {cat:r.cat,start:r.start_time,end:r.end_time,text:r.text||'',created:r.created,cid:r.client_id||genCid(),autoClosed:!!r.auto_closed,contentCid:r.content_cid||null};}));
+  S.set(S.key('rblocks',dk),rows.map(rhythmBlockRowToLocal));
 }
 // ── initSync 전용 범위 다운로드 — 날짜별로 따로 fetch하면 N일치면 N번 왕복이 그대로 쌓여
 // (특히 LTE/콜드스타트에서) 로딩이 길어짐. date_key=in.(...) 한 번으로 묶어 왕복을 1회로 줄임.
@@ -254,11 +256,10 @@ async function syncMealsDownMany(dks){
   });
 }
 async function syncRhythmBlocksDownMany(dks){
-  await _syncManyDown('rhythm_blocks',dks,'rblocks_pending',
-    r=>({cat:r.cat,start:r.start_time,end:r.end_time,text:r.text||'',created:r.created,cid:r.client_id||genCid(),autoClosed:!!r.auto_closed,contentCid:r.content_cid||null}),
+  await _syncManyDown('rhythm_blocks',dks,'rblocks_pending',rhythmBlockRowToLocal,
     (dk,mapped)=>S.set(S.key('rblocks',dk),mapped));
 }
-let _rhythmTrackEl=null,_rhythmDk=null,_rhythmFormOpen=false,_rhythmFormCat=null,_rhythmFormStart='',_rhythmFormEnd='',_rhythmFormText='',_rhythmEditIdx=null,_rhythmSubmitting=false;
+let _rhythmTrackEl=null,_rhythmDk=null,_rhythmFormOpen=false,_rhythmFormCat=null,_rhythmFormStart='',_rhythmFormEnd='',_rhythmFormText='',_rhythmFormCid=null,_rhythmEditIdx=null,_rhythmSubmitting=false;
 // 홈탭 트랙과 주간탭 리듬바 양쪽에서 폼이 열려있을 수 있으므로, 저장/취소/편집 시 둘 다 안전하게 갱신.
 // 홈탭 트랙이 화면에 없으면(주간탭에서 입력 중인 경우) 그 부분만 건너뛰고 주간탭만 갱신.
 // 주간탭에서 폼을 열었다가 취소/저장으로 닫히면(_rhythmFormOpen=false) 바 아래 슬롯도 함께 접음.
@@ -272,7 +273,7 @@ function refreshRhythmTrack(){
   if(document.getElementById('v-weekly')&&document.getElementById('v-weekly').classList.contains('on'))renderWeeklyRhythmBars();
 }
 function _resetRhythmForm(){
-  _rhythmFormCat=null;_rhythmFormStart='';_rhythmFormEnd='';_rhythmFormText='';_rhythmEditIdx=null;
+  _rhythmFormCat=null;_rhythmFormStart='';_rhythmFormEnd='';_rhythmFormText='';_rhythmFormCid=null;_rhythmEditIdx=null;
 }
 function toggleRhythmAddForm(){
   _rhythmFormOpen=!_rhythmFormOpen;
@@ -281,7 +282,7 @@ function toggleRhythmAddForm(){
 }
 function openRhythmEditForm(idx){
   const b=getRhythmBlocks(_rhythmDk)[idx];if(!b)return;
-  _rhythmEditIdx=idx;_rhythmFormCat=b.cat;_rhythmFormStart=b.start;_rhythmFormEnd=b.end||'';_rhythmFormText=b.text||'';
+  _rhythmEditIdx=idx;_rhythmFormCat=b.cat;_rhythmFormStart=b.start;_rhythmFormEnd=b.end||'';_rhythmFormText=b.text||'';_rhythmFormCid=b.contentCid||null;
   _rhythmFormOpen=true;
   refreshRhythmTrack();
 }
@@ -294,8 +295,9 @@ function _lightenRgba(rgbaStr,newAlpha){
   if(!m)return rgbaStr;
   return 'rgba('+m[1]+','+m[2]+','+m[3]+','+newAlpha+')';
 }
-function pickRhythmContentTitle(fullTitle,chipEl){
+function pickRhythmContentTitle(fullTitle,chipEl,cid){
   _rhythmFormText=fullTitle;
+  _rhythmFormCid=cid||null; // 콘텐츠 칩(감상)이 아닌 경우(외출/운동 등 고정문구 칩)는 cid 없이 null
   const inp=document.getElementById('rhythm-text-inp');
   if(inp)inp.value=fullTitle;
   document.querySelectorAll('.rhythm-content-chip').forEach(el=>el.classList.remove('sel'));
@@ -340,11 +342,13 @@ function saveRhythmBlock(){
   const text=t?t.value.trim():'';
   const blocks=getRhythmBlocks(_rhythmDk);
   const isNew=_rhythmEditIdx==null;
+  // enjoy(감상) 카테고리이고 콘텐츠 칩으로 선택한 경우에만 contentCid를 붙임 — 직접입력/타 카테고리는 undefined 그대로(불필요한 null 남기지 않음)
+  const contentCid=(cat==='enjoy'&&_rhythmFormCid)?_rhythmFormCid:undefined;
   if(_rhythmEditIdx!=null&&blocks[_rhythmEditIdx]){
     const old=blocks[_rhythmEditIdx];
-    blocks[_rhythmEditIdx]={cat:cat,start:start,end:end||'',text:text,created:old.created,cid:old.cid||genCid()};
+    blocks[_rhythmEditIdx]={cat:cat,start:start,end:end||'',text:text,created:old.created,cid:old.cid||genCid(),contentCid:contentCid!==undefined?contentCid:old.contentCid};
   }else{
-    blocks.push({cat:cat,start:start,end:end||'',text:text,created:Date.now(),cid:genCid()});
+    blocks.push({cat:cat,start:start,end:end||'',text:text,created:Date.now(),cid:genCid(),contentCid:contentCid});
   }
   saveRhythmBlocks(_rhythmDk,blocks);
   if(isNew){
@@ -3243,7 +3247,7 @@ function getOngoingWatchingContents(){
       const dedupeKey=c.cid||c.title;
       if(seen.has(dedupeKey))return;
       seen.add(dedupeKey);
-      result.push({cat:c.cat,title:c.title});
+      result.push({cat:c.cat,title:c.title,cid:c.cid||null});
     });
   });
   return result.slice(0,4);
@@ -9148,20 +9152,172 @@ function confirmContentProgressDone(){
   renderCwatchMainCard();
 }
 // ══════════════════════════════════════════════════════════
+// ██ 지연커밋 스톱워치 공용 팩토리 (2026-09-12 리팩터) ██
+// ══════════════════════════════════════════════════════════
+// 독서(_sw*)/콘텐츠(_csw*) 스톱워치가 각자 따로 구현하던 "시작 시 상태만 세팅 → 60초 뒤
+// 타이머로 리듬블록 커밋(시작시각 소급등록) → 종료 시 커밋됐으면 end만 채움" 로직(2026-09-09j
+// 확정 정책)을 하나의 팩토리로 통합. 각 스톱워치는 이 팩토리로 인스턴스를 만들고, 기존 전역변수/
+// 함수 이름(_cswRunning, toggleContentStopwatch 등)은 그 인스턴스를 그대로 비추는 getter/얇은
+// wrapper로 유지 — 호출부(인라인 onclick, 렌더 함수 등)를 하나도 안 건드리기 위함(외부 API 불변 원칙).
+// pending 선택 상태(_cswPendingCid류)는 스톱워치 자체 상태가 아니라 카드 UI 상태라 팩토리 밖에 유지.
+// _cswStarting류 연타방지 락은 팩토리 안에 공용으로 넣어 독서 쪽도 자동으로 안전해짐(부수 이득).
+function createDelayedCommitStopwatch(config){
+  const persistKey=config.persistKey;
+  const checkReadingHabit=!!config.checkReadingHabit;
+  const hasTicker=!!config.hasTicker;
+  const onTick=config.onTick||function(){};       // hasTicker일 때만 사용 (1초 간격)
+  const onStart=config.onStart||function(){};
+  const onCommit=config.onCommit||function(){};
+  const onStop=config.onStop||function(){};
+  const buildTitleText=config.buildTitleText;      // (state)=>string — 리듬블록 text
+  const buildPersistPayload=config.buildPersistPayload; // (state)=>obj — localStorage에 저장할 추가 필드
+
+  const st={running:false,cid:null,startTs:0,blockCid:null,committed:false,commitTimer:null,tickInterval:null,starting:false,seconds:0};
+  // config가 넘겨준 부가 상태(cat/title/mk 등)를 st 위에 얹어 콜백들이 자유롭게 읽고 쓰게 함
+  Object.assign(st,config.extraState||{});
+
+  function persist(){
+    if(!persistKey)return;
+    try{
+      const payload=Object.assign({startTs:st.startTs,cid:st.cid,blockCid:st.blockCid,
+        dk:dateKey(getLogicalDate(st.startTs))},buildPersistPayload?buildPersistPayload(st):{});
+      localStorage.setItem(persistKey,JSON.stringify(payload));
+    }catch(e){}
+  }
+
+  function start(cid,extra){
+    if(st.running)return;
+    if(st.starting)return; // 연타 방지 락 — 콘텐츠 쪽에만 있던 걸 공용화(2026-09-01 유래)
+    st.starting=true;
+    const ok=onStart(st,cid,extra); // onStart가 st에 cat/title/mk 등을 채우고, 실패 시 false 반환 가능
+    if(ok===false){st.starting=false;return;}
+    st.running=true;st.cid=cid;st.startTs=Date.now();st.blockCid=null;st.committed=false;
+    persist();
+    if(hasTicker)st.tickInterval=setInterval(()=>{onTick(st);},1000);
+    st.commitTimer=setTimeout(commitNow,60000);
+    st.starting=false;
+  }
+
+  function commitNow(){
+    if(!st.running||st.committed)return; // 그 사이 이미 종료됐으면(타이머가 늦게 도착) 아무것도 하지 않음
+    st.committed=true;
+    const cid=st.cid,startTs=st.startTs;
+    const dk=dateKey(getLogicalDate(startTs));
+    const startMin=new Date(startTs).getHours()*60+new Date(startTs).getMinutes();
+    const text=buildTitleText(st);
+    st.blockCid=_commitEnjoyRhythmBlock({text,contentCid:cid,dk,startMin,checkReadingHabit});
+    persist();
+    onCommit(st);
+  }
+
+  function stop(){
+    if(!st.running)return;
+    const endTs=Date.now();
+    const startTs=st.startTs,cid=st.cid,wasCommitted=st.committed,blockCid=st.blockCid;
+    clearTimeout(st.commitTimer);st.commitTimer=null;
+    if(hasTicker){clearInterval(st.tickInterval);st.tickInterval=null;}
+    if(persistKey)try{localStorage.removeItem(persistKey);}catch(e){}
+    st.running=false;st.startTs=0;st.cid=null;st.blockCid=null;st.committed=false;st.seconds=0;
+    if(wasCommitted)autoLogReadingRhythm(blockCid,startTs,endTs);
+    onStop(st,{startTs,endTs,wasCommitted,cid,blockCid});
+  }
+
+  function toggle(cid,extra){
+    // cid가 없는 호출(=현재 진행중인 항목을 그냥 멈춰라)은 독서 쪽 종료 호출부(모닝플로우 "완료" 등)에서
+    // 옛 toggleStopwatch()처럼 인자 없이 쓰던 패턴 — 진행중이면 무조건 종료로 처리.
+    if(st.running&&(cid===undefined||cid===null||st.cid===cid)){stop();return;}
+    if(st.running)return; // 다른 항목이 이미 진행중이면 무시(동시에 하나만)
+    start(cid,extra);
+  }
+
+  function restoreFromStorage(){
+    if(!persistKey)return;
+    try{
+      const raw=localStorage.getItem(persistKey);
+      if(!raw)return;
+      const saved=JSON.parse(raw);
+      if(!saved||!saved.startTs)return;
+      st.startTs=saved.startTs;st.cid=saved.cid;st.blockCid=saved.blockCid||null;
+      st.running=true;
+      if(config.onRestore)config.onRestore(st,saved);
+      if(st.blockCid){
+        st.committed=true;
+      }else{
+        const remain=60000-(Date.now()-st.startTs);
+        st.commitTimer=setTimeout(commitNow,Math.max(0,remain));
+      }
+      if(hasTicker)st.tickInterval=setInterval(()=>{onTick(st);},1000);
+    }catch(e){}
+  }
+
+  return{state:st,start,stop,toggle,commitNow,restoreFromStorage,persist};
+}
+
+// ══════════════════════════════════════════════════════════
 // ██ 콘텐츠 허브 (1/2 — 나머지는 콘텐츠허브 진입점~코멘트모아보기 부근) ██
 // ══════════════════════════════════════════════════════════
 // ── 시청 등록 (드라마/영화 전용) ──
 // 스톱워치가 아닌 시작/종료 원탭 방식: 시작 탭에서 리듬블록을 end 없이 생성해두고,
 // 종료 탭에서 end를 채워 마감 + 진행률·메모 모달을 연다. 초단위 표시가 없어 setInterval/화면복귀 보정이 불필요해짐.
 const CSW_PERSIST_KEY='iikoto_content_watch_start';
+// [2026-09-12 리팩터] 실제 상태는 팩토리(_cswSw.state)가 들고 있고, 아래 _csw* 전역들은
+// 기존 호출부(1235, 5655, 9232~9267, 11041~11123줄 등)가 그대로 읽을 수 있도록 각 콜백
+// 시점에 동기화해주는 얕은 미러(mirror) 변수. 값의 소유자는 항상 _cswSw.state 쪽.
 let _cswRunning=false,_cswCid=null,_cswCat=null,_cswTitle=null,_cswMk=null,_cswStartTs=0,_cswBlockCid=null;
+function _cswSyncMirror(st){
+  _cswRunning=st.running;_cswCid=st.cid;_cswCat=st.cat;_cswTitle=st.title;_cswMk=st.mk;_cswStartTs=st.startTs;_cswBlockCid=st.blockCid;
+}
+const _cswSw=createDelayedCommitStopwatch({
+  persistKey:CSW_PERSIST_KEY,
+  checkReadingHabit:false,
+  hasTicker:false,
+  extraState:{cat:null,title:null,mk:null},
+  onStart:function(st,cid,knownMk){
+    const found=knownMk?{mk:knownMk,list:getContents(knownMk),idx:getContents(knownMk).findIndex(c=>c.cid===cid)}:_findContentByCidNearMk(cid,_chArchiveMk||monthKey(new Date()));
+    if(!found||found.idx<0)return false;
+    const c=found.list[found.idx];
+    st.cat=c.cat;st.title=c.title||'';st.mk=found.mk;
+    if(_cswPendingCid===cid){_cswPendingCid=null;_cswPendingMk=null;} // pending 카드에서 재생 링으로 시작한 경우 pending 상태 정리
+    document.querySelectorAll('.seed-icon-btn').forEach(el=>el.classList.add('cwatch-active'));
+    if(_chArchiveMk)chExpandMonth(_chArchiveMk);
+    _cswSyncMirror(st);
+    renderCwatchMainCard();
+  },
+  buildTitleText:function(st){
+    const catLabel=st.cat==='drama'?'드라마':'영화';
+    return st.title?(catLabel+' - '+st.title):catLabel;
+  },
+  buildPersistPayload:function(st){return{cat:st.cat,title:st.title||'',mk:st.mk};},
+  onCommit:function(st){
+    // 최근 본 작품 우선노출(콘텐츠허브 스와이프 카드) 정렬 기준 — 기존 _cswCommitNow에만 있던 로직
+    const list=getContents(st.mk);
+    const idx=list.findIndex(x=>x.cid===st.cid);
+    if(idx>=0){list[idx].lastActivityAt=Date.now();saveContents(st.mk,list);}
+    _cswSyncMirror(st);
+    renderCwatchMainCard(); // 리듬바/카드가 화면에 막 등장하는 시점이므로 갱신
+  },
+  onRestore:function(st,saved){
+    st.cat=saved.cat;st.title=saved.title||'';st.mk=saved.mk||null;
+    document.querySelectorAll('.seed-icon-btn').forEach(el=>el.classList.add('cwatch-active'));
+    _cswSyncMirror(st);
+  },
+  onStop:function(st,info){
+    document.querySelectorAll('.seed-icon-btn').forEach(el=>el.classList.remove('cwatch-active'));
+    const secondsWatched=Math.max(0,Math.round((info.endTs-info.startTs)/1000));
+    const minutesWatched=Math.round(secondsWatched/60);
+    if(_chArchiveMk)chExpandMonth(_chArchiveMk);
+    _cswSyncMirror(st);
+    refreshContentHubViews();
+    renderCwatchMainCard();
+    if(secondsWatched>=60)openContentProgressModal(info.cid,minutesWatched,secondsWatched); // 1분 미만은 진행률 입력도 의미 없으니 띄우지 않음
+  }
+});
 // 시청 시작 확인 단계 — 포스터를 눌러 바로 스톱워치가 시작되면 실수 탭·연타 시 리듬 블록이 중복 생성될 위험이 있어(2026-09-01),
 // 포스터 탭 → 그 작품 하나만 남은 확인 배너("시작" 버튼 포함) → 버튼을 눌러야 실제 시작되는 2단계로 분리.
 // 진행중(_cswRunning)일 때는 이 확인 단계를 거치지 않고 바로 종료로 이어짐(기존 동작 유지).
-let _cswPendingCid=null,_cswPendingMk=null,_cswStarting=false;
-// [2026-09-09j] 독서 스톱워치와 동일한 60초 지연 커밋 방식 — 60초 전엔 리듬블록/최근활동을 아예
-// 만들지 않고, 60초 시점에 한 번에 커밋. "생성 후 삭제/되돌리기" 구조를 완전히 대체.
-let _cswCommitTimer=null,_cswCommitted=false;
+let _cswPendingCid=null,_cswPendingMk=null;
+// [2026-09-12 리팩터] _cswStarting(연타방지 락)과 _cswCommitTimer/_cswCommitted(60초 지연커밋
+// 상태)는 이제 공용 팩토리(_cswSw.state) 내부로 이동 — createDelayedCommitStopwatch 정의부 참조.
 // ── 시청 시작 선택 시트 — 진행중 드라마/영화 중 골라 스톱워치 시작, 없으면 새로 등록 후 바로 시작 ──
 function _getOngoingWatchingWithCid(){
   const now=new Date();
@@ -9342,88 +9498,14 @@ function _commitEnjoyRhythmBlock(opts){
   }
   return blockCid;
 }
-// [2026-09-09j] 독서 스톱워치와 동일하게, 60초를 넘기기 전엔 리듬블록/최근활동을 아예 만들지 않음.
-// 시작 탭: 상태만 세팅하고 60초 뒤 커밋 타이머를 건다. 60초 시점에 리듬블록 생성+최근활동 갱신을
-// 한 번에 실행(시작시각은 실제 시작시각으로 소급 등록). 종료 탭: 커밋된 경우에만 end를 채움 — 60초
-// 전에 종료하면 타이머만 취소, 애초에 아무것도 안 만들어졌으니 지우거나 되돌릴 게 없음.
-function toggleContentStopwatch(cid,knownMk){
-  if(_cswRunning&&_cswCid===cid){stopContentStopwatch();return;}
-  if(_cswRunning&&_cswCid!==cid)return; // 다른 작품이 이미 시청중이면 무시(동시에 하나만)
-  if(_cswStarting)return; // 같은 틱 안에서 두 번 호출되는 것 방지(연타로 인한 블록 중복 생성 원천 차단, 2026-09-01)
-  _cswStarting=true;
-  if(_cswPendingCid===cid){_cswPendingCid=null;_cswPendingMk=null;} // pending 카드에서 재생 링으로 시작한 경우 pending 상태 정리
-  const found=knownMk?{mk:knownMk,list:getContents(knownMk),idx:getContents(knownMk).findIndex(c=>c.cid===cid)}:_findContentByCidNearMk(cid,_chArchiveMk||monthKey(new Date()));
-  if(!found||found.idx<0){_cswStarting=false;return;}
-  const c=found.list[found.idx];
-  _cswRunning=true;_cswCid=cid;_cswCat=c.cat;_cswTitle=c.title||'';_cswMk=found.mk;
-  _cswStartTs=Date.now();
-  _cswBlockCid=null;_cswCommitted=false;
-  try{localStorage.setItem(CSW_PERSIST_KEY,JSON.stringify({startTs:_cswStartTs,cid,cat:c.cat,title:c.title||'',mk:found.mk,dk:dateKey(getLogicalDate(_cswStartTs))}));}catch(e){}
-  document.querySelectorAll('.seed-icon-btn').forEach(el=>el.classList.add('cwatch-active'));
-  _cswCommitTimer=setTimeout(_cswCommitNow,60000);
-  if(_chArchiveMk)chExpandMonth(_chArchiveMk);
-  renderCwatchMainCard();
-  _cswStarting=false;
-}
-// 60초 경과 시점에 호출 — 리듬블록 생성+최근활동 갱신을 이 시점에 한 번에 실행.
-function _cswCommitNow(){
-  if(!_cswRunning||_cswCommitted)return; // 그 사이 이미 종료됐으면(타이머가 늦게 도착) 아무것도 하지 않음
-  _cswCommitted=true;
-  const cid=_cswCid,mk=_cswMk,startTs=_cswStartTs;
-  const list=getContents(mk);
-  const idx=list.findIndex(x=>x.cid===cid);
-  if(idx>=0){
-    list[idx].lastActivityAt=Date.now(); // 최근 본 작품 우선노출(콘텐츠허브 스와이프 카드) 정렬 기준
-    saveContents(mk,list);
-  }
-  const dk=dateKey(getLogicalDate(startTs));
-  const startMin=new Date(startTs).getHours()*60+new Date(startTs).getMinutes();
-  const catLabel=_cswCat==='drama'?'드라마':'영화';
-  const text=_cswTitle?(catLabel+' - '+_cswTitle):catLabel;
-  const blockCid=_commitEnjoyRhythmBlock({text,contentCid:cid,dk,startMin,checkReadingHabit:false});
-  _cswBlockCid=blockCid;
-  try{localStorage.setItem(CSW_PERSIST_KEY,JSON.stringify({startTs:_cswStartTs,cid,cat:_cswCat,title:_cswTitle||'',mk,blockCid,dk}));}catch(e){}
-  renderCwatchMainCard(); // 리듬바/카드가 화면에 막 등장하는 시점이므로 갱신
-}
-function stopContentStopwatch(){
-  if(!_cswRunning)return;
-  const endTs=Date.now();
-  const startTs=_cswStartTs,cid=_cswCid,wasCommitted=_cswCommitted,blockCid=_cswBlockCid;
-  clearTimeout(_cswCommitTimer);_cswCommitTimer=null;
-  try{localStorage.removeItem(CSW_PERSIST_KEY);}catch(e){}
-  _cswRunning=false;_cswStartTs=0;_cswCid=null;_cswCat=null;_cswTitle=null;_cswMk=null;_cswBlockCid=null;_cswCommitted=false;
-  document.querySelectorAll('.seed-icon-btn').forEach(el=>el.classList.remove('cwatch-active'));
-  const secondsWatched=Math.max(0,Math.round((endTs-startTs)/1000));
-  const minutesWatched=Math.round(secondsWatched/60);
-  // 60초를 넘겨 이미 커밋(리듬블록 생성)된 경우에만 end를 채움 — 60초 전이면 wasCommitted가 false라
-  // 애초에 만들어진 블록이 없으므로 아무것도 할 필요가 없음. end 채우기 자체는 독서 스톱워치와 완전히
-  // 동일한 로직(자정 넘김 보정 포함)이라 autoLogReadingRhythm을 그대로 재사용(2026-09-09k 중복 제거).
-  if(wasCommitted)autoLogReadingRhythm(blockCid,startTs,endTs);
-  if(_chArchiveMk)chExpandMonth(_chArchiveMk);
-  refreshContentHubViews();
-  renderCwatchMainCard();
-  if(secondsWatched>=60)openContentProgressModal(cid,minutesWatched,secondsWatched); // 1분 미만은 진행률 입력도 의미 없으니 띄우지 않음
-}
+// [2026-09-12 리팩터] 아래 4개는 이제 팩토리 인스턴스(_cswSw)로의 얇은 wrapper.
+// 실제 로직(60초 지연커밋, 연타방지 락, 복원)은 createDelayedCommitStopwatch 정의부 참조.
+// 함수 이름은 그대로 유지 — 인라인 onclick 등 외부 호출부를 바꾸지 않기 위함.
+function toggleContentStopwatch(cid,knownMk){_cswSw.toggle(cid,knownMk);}
+function _cswCommitNow(){_cswSw.commitNow();}
+function stopContentStopwatch(){_cswSw.stop();}
 // 새로고침·앱 재시작으로 메모리 상태가 초기화돼도 시청중 표시를 이어감(초단위 표시가 없어 setInterval 재개는 불필요)
-(function restoreContentWatchFromStorage(){
-  try{
-    const raw=localStorage.getItem(CSW_PERSIST_KEY);
-    if(!raw)return;
-    const saved=JSON.parse(raw);
-    if(!saved||!saved.startTs)return;
-    _cswStartTs=saved.startTs;_cswCid=saved.cid;_cswCat=saved.cat;_cswTitle=saved.title||'';_cswMk=saved.mk||null;_cswBlockCid=saved.blockCid||null;
-    _cswRunning=true;
-    document.querySelectorAll('.seed-icon-btn').forEach(el=>el.classList.add('cwatch-active'));
-    // [2026-09-09j] blockCid가 이미 있으면 60초를 넘겨 커밋된 상태로 복원. 없으면 아직 60초 전이므로
-    // 남은 시간만큼 커밋 타이머를 다시 건다(이미 60초를 넘겼으면 즉시 커밋).
-    if(_cswBlockCid){
-      _cswCommitted=true;
-    }else{
-      const remain=60000-(Date.now()-_cswStartTs);
-      _cswCommitTimer=setTimeout(_cswCommitNow,Math.max(0,remain));
-    }
-  }catch(e){}
-})();
+_cswSw.restoreFromStorage();
 // 콘텐츠 등록/수정(cat='book') 직후 독서코너 진행률 초기값을 세팅. 이제 book이 곧 contents 항목이므로
 // cid로 직접 찾아 반영 — title 매칭을 없애 연결 끊김 버그 클래스를 원천 차단(2026-08-29).
 // status: 'done'|'stopped'|그 외(진행중) → book.status: 'done'|'paused'|'reading'
@@ -10437,7 +10519,7 @@ function buildRhythmFormEl(showOngoingList){
         ongoingContents.map(function(c){
           const catLabel=c.cat==='drama'?'드라마':'영화';
           const full=catLabel+' - '+c.title;
-          return '<span class="rhythm-content-chip" style="--sel-color:'+selColor+';--sel-bg:'+selBg+';" onclick="pickRhythmContentTitle(\''+full.replace(/'/g,"\\'")+'\',this)">'+full+'</span>';
+          return '<span class="rhythm-content-chip" style="--sel-color:'+selColor+';--sel-bg:'+selBg+';" onclick="pickRhythmContentTitle(\''+full.replace(/'/g,"\\'")+'\',this,\''+(c.cid||'')+'\')">'+full+'</span>';
         }).join('')+
         '</div>'
       ):'';
@@ -10466,7 +10548,7 @@ function buildRhythmFormEl(showOngoingList){
         '<div class="rhythm-timebox"><span class="rhythm-timebox-l">끝(선택)</span><span class="rhythm-timebox-v" onclick="openRhythmTimeModal(\'end\')">'+(_rhythmFormEnd||'--:--')+'</span><span class="rhythm-timebox-now" onclick="setRhythmNow(\'end\')"><i class="ti ti-clock-hour-4 ico-sz-11" aria-hidden="true"></i></span></div>'+
       '</div>'+
       contentPickerHtml+
-      '<input type="text" id="rhythm-text-inp" class="rhythm-memo-inp" placeholder="한 줄 메모 (선택)" value="'+(_rhythmFormText||'').replace(/"/g,'&quot;')+'" oninput="_rhythmFormText=this.value;document.querySelectorAll(\'.rhythm-content-chip.sel\').forEach(function(el){if(el.textContent!==this.value)el.classList.remove(\'sel\');}.bind(this))">'+
+      '<input type="text" id="rhythm-text-inp" class="rhythm-memo-inp" placeholder="한 줄 메모 (선택)" value="'+(_rhythmFormText||'').replace(/"/g,'&quot;')+'" oninput="_rhythmFormText=this.value;if(_rhythmFormCid)_rhythmFormCid=null;document.querySelectorAll(\'.rhythm-content-chip.sel\').forEach(function(el){if(el.textContent!==this.value)el.classList.remove(\'sel\');}.bind(this))">'+
       '<div style="display:flex;gap:8px;">'+
         '<button class="rhythm-save-btn" style="background:none;border:1.5px solid var(--card-b);color:var(--tm);flex:0 0 80px;" onclick="toggleRhythmAddForm()">취소</button>'+
         '<button class="rhythm-save-btn" style="flex:1;" onclick="saveRhythmBlock()">'+(_rhythmEditIdx!=null?'수정 완료':'트랙에 추가')+'</button>'+
@@ -10984,18 +11066,63 @@ let _rdOpenCid=null;
 let _rdDoneQuoteBookCid=null;
 let _rdDoneCommentBookCid=null;
 let _rdSheetBookCid=null;
-let _swSeconds=0,_swRunning=false,_swInterval=null,_swStartTs=0,_swBookCid=null,_swBlockCid=null;
-// [2026-09-09j 전면 재설계] "생성 후 취소/되돌리기" 구조를 완전히 버림 — 습관체크·최근활동·리듬블록을
-// 되돌리는 코드가 계속 복잡해지고 실제로 안 먹히는 문제가 반복돼서, 애초에 60초 전엔 아무것도 만들지
-// 않는 구조로 바꿈. 시작 시엔 상태(_swRunning/_swBookCid/_swStartTs)만 세팅하고 60초 뒤 타이머
-// (_swCommitTimer)가 그제서야 리듬블록 생성+습관체크+lastActivityAt 갱신을 한 번에 실행. 60초 전에
-// 종료하면 타이머를 취소만 하면 끝 — 애초에 아무것도 안 만들어졌으니 지울 것도 되돌릴 것도 없음.
-let _swCommitTimer=null,_swCommitted=false;
+// [2026-09-12 리팩터] 실제 상태는 팩토리(_swSw.state)가 들고 있고, 아래 _sw* 전역들은
+// 기존 호출부(2068, 5654, 11093~11322, 11756, 13082, 13200~13210줄 등)가 그대로 읽을 수 있도록
+// 각 콜백 시점에 동기화해주는 얕은 미러(mirror) 변수. 값의 소유자는 항상 _swSw.state 쪽.
+// (콘텐츠 스톱워치 _cswSw와 동일한 팩토리 재사용 — createDelayedCommitStopwatch 정의부 참조)
+let _swSeconds=0,_swRunning=false,_swStartTs=0,_swBookCid=null,_swBlockCid=null;
 const RD_SW_C=2*Math.PI*32;
 // 스톱워치 시작시각을 localStorage에 영속화 — 새로고침/앱 완전종료 후 재시작해도
 // 이 값이 남아있으면 경과시간을 그대로 이어서 복원한다(백그라운드 전환은 메모리가 유지돼
 // 원래도 문제없었지만, 새로고침·앱 재시작은 메모리 변수가 초기화되어 별도 보존이 필요했음).
 const SW_PERSIST_KEY='iikoto_reading_sw_start';
+function _swSyncMirror(st){
+  _swRunning=st.running;_swBookCid=st.cid;_swStartTs=st.startTs;_swBlockCid=st.blockCid;_swSeconds=st.seconds;
+}
+const _swSw=createDelayedCommitStopwatch({
+  persistKey:SW_PERSIST_KEY,
+  checkReadingHabit:true,
+  hasTicker:true,
+  onTick:function(st){
+    // 실제 경과시간(시작시각 기준)으로 재계산 — 화면이 꺼져 setInterval이 멈췄다 재개되어도
+    // 그 사이 흐른 시간이 누락되지 않고 정확히 보정됨
+    st.seconds=Math.floor((Date.now()-st.startTs)/1000);
+    _swSyncMirror(st);
+    updateStopwatchDisplay();
+  },
+  onStart:function(st,cid){
+    if(_rdPendingCid===cid){_rdPendingCid=null;} // pending 카드에서 재생 링으로 시작한 경우 pending 상태 정리
+    document.querySelector('.reading-icon-btn')?.classList.add('sw-active');
+    _swSyncMirror(st);
+    renderRdTop(); // DOM 갱신은 이 한 곳에서만 — running=true로 다시 그려지며 spinning/id 등이 자동 반영됨
+  },
+  buildTitleText:function(st){
+    const book=getBooks().find(b=>b.cid===st.cid);
+    return book&&book.title?('독서 - '+book.title):'독서';
+  },
+  onCommit:function(st){
+    // 최근 읽은 책 우선노출(독서허브 스와이프 카드) 정렬 기준 — 기존 _swCommitNow에만 있던 로직
+    const foundBook=_findContentByCidNearMkInRange(st.cid,_BOOK_SCAN_MONTHS);
+    if(foundBook){
+      foundBook.list[foundBook.idx].lastActivityAt=Date.now();
+      saveContents(foundBook.mk,foundBook.list);
+    }
+    _swSyncMirror(st);
+    renderRdTop(); // 리듬바가 화면에 막 등장하는 시점이므로 갱신
+  },
+  onStop:function(st,info){
+    document.querySelector('.reading-icon-btn')?.classList.remove('sw-active');
+    _swSyncMirror(st);
+    renderRdTop();
+    renderRdQuotes(); // 스톱워치 종료로 선택 대상이 바뀌므로(1권이면 그 책, 2권 이상이면 재선택 대기) 문장수집도 함께 갱신
+    const seconds=Math.max(0,Math.round((info.endTs-info.startTs)/1000));
+    if(seconds>=60)openProgressModal(info.cid,seconds); // 1분 미만은 진행률 입력도 의미 없으니 띄우지 않음
+  },
+  onRestore:function(st,saved){
+    st.seconds=Math.floor((Date.now()-st.startTs)/1000);
+    _swSyncMirror(st);
+  }
+});
 // ══ 씨앗 코너 ══
 function openReading(){
   _rdTab='reading';
@@ -11794,7 +11921,8 @@ async function loadAndRenderWatchCal(){
       else if(b.text.startsWith('영화 - ')){cat='movie';title=b.text.slice(5);}
       else if(b.text.startsWith('독서 - ')){cat='book';title=b.text.slice(5);}
       if(!cat)return;
-      push(dk,{cat,title});
+      // cid는 리듬블록에 이미 저장된 contentCid를 그대로 사용(제목 매칭 경유 안 함) — 동명 콘텐츠/제목 변경 시에도 정확한 콘텐츠로 연동됨
+      push(dk,{cat,title,cid:b.contentCid||null});
     });
   }
   // 음악 — contents(등록=감상일) 이번 달분
@@ -11821,7 +11949,9 @@ async function loadAndRenderWatchCal(){
     if(c.cat!=='music'&&c.title){posterByTitle[c.title]=c.poster||null;cidByTitle[c.title]=c.cid||null;statusByTitle[c.title]=c.status||null;}
   });
   Object.values(_wcalByDate).forEach(list=>list.forEach(it=>{
-    if(it.cat!=='music'){it.poster=posterByTitle[it.title]||null;it.cid=cidByTitle[it.title]||null;it.status=statusByTitle[it.title]||null;}
+    // cid는 리듬블록에서 이미 정확히 채워진 경우(it.cid 존재) 덮어쓰지 않음 — 동명 콘텐츠/제목변경 시 오매칭 방지.
+    // 수동추가분 등 cid가 아직 없는 항목만 제목기준으로 보강(기존 동작 유지).
+    if(it.cat!=='music'){it.poster=posterByTitle[it.title]||null;if(!it.cid)it.cid=cidByTitle[it.title]||null;it.status=statusByTitle[it.title]||null;}
   }));
 
   // 한 날짜에 같은 제목이 여러 세션(리듬 블록)으로 중복 등록됐을 수 있으므로 날짜별로 제목+카테고리 기준 유일화
@@ -13042,58 +13172,14 @@ function confirmReadingProgressDone(){
 // 시점에 리듬바가 "방금 나타난" 게 아니라 "1분 전부터 있었던 것"처럼 정확히 표시됨. 60초 전에
 // 종료하면 타이머만 취소하면 끝 — 애초에 아무것도 안 만들어졌으니 지우거나 되돌릴 것이 없음.
 // cid: 시작 시 반드시 전달(어느 책인지 명시) — 종료 호출(재생 중 다시 탭)은 인자 없이도 _swBookCid로 식별.
+// [2026-09-12 리팩터] 실제 로직(60초 지연커밋, 연타방지 락, 복원)은 createDelayedCommitStopwatch
+// 정의부 참조. 종료 로직도(콘텐츠와 달리 별도 stop 함수가 없었던 것과 무관하게) toggle 안에서
+// start/stop을 모두 처리하는 팩토리 쪽으로 이관됨.
 function toggleStopwatch(cid){
-  if(!_swRunning){
-    if(!cid)return; // 시작인데 어느 책인지 모르면 아무것도 하지 않음(방어)
-    _swRunning=true;
-    _swBookCid=cid;
-    _swStartTs=Date.now();
-    _swBlockCid=null;
-    _swCommitted=false;
-    try{localStorage.setItem(SW_PERSIST_KEY,JSON.stringify({startTs:_swStartTs,cid:_swBookCid,dk:dateKey(getLogicalDate(_swStartTs))}));}catch(e){}
-    if(_rdPendingCid===cid){_rdPendingCid=null;} // pending 카드에서 재생 링으로 시작한 경우 pending 상태 정리
-    _swInterval=setInterval(updateStopwatchDisplay,1000);
-    _swCommitTimer=setTimeout(_swCommitNow,60000);
-    document.querySelector('.reading-icon-btn')?.classList.add('sw-active');
-    renderRdTop(); // DOM 갱신은 이 한 곳에서만 — running=true로 다시 그려지며 spinning/id 등이 자동 반영됨
-  }else{
-    _swRunning=false;
-    const finishedCid=_swBookCid;
-    const wasCommitted=_swCommitted;
-    const blockCid=_swBlockCid;
-    const startTs=_swStartTs;
-    clearTimeout(_swCommitTimer);_swCommitTimer=null;
-    clearInterval(_swInterval);
-    const seconds=Math.max(0,Math.floor((Date.now()-startTs)/1000));
-    _swSeconds=0;_swBookCid=null;_swBlockCid=null;_swCommitted=false;
-    try{localStorage.removeItem(SW_PERSIST_KEY);}catch(e){}
-    document.querySelector('.reading-icon-btn')?.classList.remove('sw-active');
-    // 60초를 넘겨 이미 커밋(리듬블록 생성)된 경우에만 end를 채움 — 60초 전이면 wasCommitted가 false라
-    // 애초에 만들어진 블록이 없으므로 아무것도 할 필요가 없음.
-    if(wasCommitted)autoLogReadingRhythm(blockCid,startTs,Date.now());
-    renderRdTop();
-    renderRdQuotes(); // 스톱워치 종료로 선택 대상이 바뀌므로(1권이면 그 책, 2권 이상이면 재선택 대기) 문장수집도 함께 갱신
-    if(seconds>=60)openProgressModal(finishedCid,seconds); // 1분 미만은 진행률 입력도 의미 없으니 띄우지 않음
-  }
+  _swSw.toggle(cid);
 }
-// 60초 경과 시점에 호출 — 리듬블록 생성+습관체크+최근활동 갱신을 이 시점에 한 번에 실행.
-// 시작시각은 _swStartTs로 소급해서 등록하므로, 화면상 리듬바엔 처음부터 있었던 것처럼 정확히 표시됨.
 function _swCommitNow(){
-  if(!_swRunning||_swCommitted)return; // 그 사이 이미 종료됐으면(타이머가 늦게 도착) 아무것도 하지 않음
-  _swCommitted=true;
-  const cid=_swBookCid,startTs=_swStartTs;
-  const dk=dateKey(getLogicalDate(startTs));
-  const startMin=new Date(startTs).getHours()*60+new Date(startTs).getMinutes();
-  const book=getBooks().find(b=>b.cid===cid);
-  const text=book&&book.title?('독서 - '+book.title):'독서';
-  const foundBook=_findContentByCidNearMkInRange(cid,_BOOK_SCAN_MONTHS);
-  if(foundBook){
-    foundBook.list[foundBook.idx].lastActivityAt=Date.now(); // 최근 읽은 책 우선노출(독서허브 스와이프 카드) 정렬 기준
-    saveContents(foundBook.mk,foundBook.list);
-  }
-  _swBlockCid=_commitEnjoyRhythmBlock({text,contentCid:cid,dk,startMin,checkReadingHabit:true});
-  try{localStorage.setItem(SW_PERSIST_KEY,JSON.stringify({startTs:_swStartTs,cid:_swBookCid,blockCid:_swBlockCid,dk}));}catch(e){}
-  renderRdTop(); // 리듬바가 화면에 막 등장하는 시점이므로 갱신
+  _swSw.commitNow();
 }
 // 시작 시 생성해둔 리듬블록(blockCid)을 찾아 end만 채움 — 다른 카테고리(운동/휴식 등)와 동일 규칙.
 // minToHHMM은 콘텐츠 시청 스톱워치 쪽(파일 하단)에 정의된 전역 함수를 그대로 재사용(중복 정의 제거, 2026-08-30)
@@ -13112,9 +13198,9 @@ function autoLogReadingRhythm(blockCid,startTs,endTs){
   autoSync('rblocks',dk);
 }
 function updateStopwatchDisplay(){
-  // 실제 경과시간(시작시각 기준)으로 재계산 — 화면이 꺼져 setInterval이 멈췄다 재개되어도
-  // 그 사이 흐른 시간이 누락되지 않고 정확히 보정됨
-  _swSeconds=Math.floor((Date.now()-_swStartTs)/1000);
+  // 경과시간 재계산은 팩토리 onTick 콜백(_swSw 정의부)에서 이미 처리되어 _swSeconds에 미러됨 —
+  // 여기선 화면 복귀(visibilitychange) 시 즉시 보정 호출용으로도 그대로 재사용되므로 그 경우엔 아래서 재계산.
+  if(_swRunning)_swSeconds=Math.floor((Date.now()-_swStartTs)/1000);
   const m=Math.floor(_swSeconds/60),s=_swSeconds%60;
   const timeEl=document.getElementById('rd-sw-time');
   if(timeEl)timeEl.textContent=`${pad(m)}:${pad(s)}`;
@@ -13314,28 +13400,7 @@ loadDaily();
 // 새로고침/앱 완전종료 후 재시작 시, 켜져 있던 독서 스톱워치를 이어서 복원.
 // localStorage에 저장된 시작시각이 있으면(=종료 처리 없이 앱이 닫힌 경우) 그 시각 기준으로
 // 경과시간을 계산해 스톱워치를 다시 돌아가는 상태로 되살린다.
-(function restoreStopwatchFromStorage(){
-  try{
-    const raw=localStorage.getItem(SW_PERSIST_KEY);
-    if(!raw)return;
-    const saved=JSON.parse(raw);
-    if(!saved||!saved.startTs)return;
-    _swStartTs=saved.startTs;
-    _swBookCid=saved.cid||null;
-    _swBlockCid=saved.blockCid||null;
-    _swSeconds=Math.floor((Date.now()-_swStartTs)/1000);
-    _swRunning=true;
-    _swInterval=setInterval(updateStopwatchDisplay,1000);
-    // [2026-09-09j] blockCid가 이미 있으면 60초를 넘겨 커밋된 상태로 복원. 없으면 아직 60초 전이므로
-    // 남은 시간만큼 커밋 타이머를 다시 건다(이미 60초를 넘겼으면 즉시 커밋).
-    if(_swBlockCid){
-      _swCommitted=true;
-    }else{
-      const remain=60000-(Date.now()-_swStartTs);
-      _swCommitTimer=setTimeout(_swCommitNow,Math.max(0,remain));
-    }
-  }catch(e){}
-})();
+_swSw.restoreFromStorage();
 // 최초 로드 시엔 로컬 캐시만으로 그려지므로(completedAt 등 최신 서버값 반영 전),
 // online/visibilitychange 이벤트를 기다리지 않고 여기서 한 번 동기화를 실행해 최신 상태로 맞춘다.
 if(navigator.onLine){

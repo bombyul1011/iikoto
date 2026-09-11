@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.67-log-filters';
+const CACHE = 'iikoto-v2.69-sw-refactor';
 const ASSETS = [
   './',
   './index.html'
