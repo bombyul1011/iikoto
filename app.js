@@ -5764,10 +5764,17 @@ function makeMorningFlowCard(showRecap){
   // [2026-09-05] 리듬탭에서 blockCid로 연결된 리듬블록을 직접 지워버린 경우 — "하려다가 안 한 것"으로 보고
   // 해당 pick을 통째로 지워 idle(미시작) 상태로 되돌림. 화면을 그리기 전에 한 번에 정리해두면
   // 아래 렌더링 로직에서 매번 삭제 여부를 따로 신경 쓸 필요가 없어짐.
+  // [2026-09-12 보완] 감상(독서/콘텐츠) 카드는 60초를 못 채우고 종료하면 애초에 리듬블록이
+  // 생성되지 않아 blockCid가 계속 null로 남는 경우가 있음(60초 지연커밋 정책상 정상) — 이 경우도
+  // "기록이 없다"는 점에서 블록이 지워진 경우와 동일하게 취급해 idle로 되돌림. done인데 blockCid가
+  // 없으면 대상, running인데 blockCid가 없으면 "지금 진행 중"인 정상 상태이므로 건드리지 않음.
   let _flowPruned=false;
   Object.keys(flow.picks).forEach(key=>{
     const p=flow.picks[key];
-    if(p&&p.blockCid&&(p.status==='running'||p.status==='done')&&!_mfBlockFor(dk,p.blockCid)){
+    if(!p)return;
+    const blockGone=(p.status==='running'||p.status==='done')&&p.blockCid&&!_mfBlockFor(dk,p.blockCid);
+    const noRecordMade=p.status==='done'&&!p.blockCid;
+    if(blockGone||noRecordMade){
       delete flow.picks[key];
       _flowPruned=true;
     }

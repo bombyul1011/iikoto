@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.69-sw-refactor';
+const CACHE = 'iikoto-v2.70-render-order-fix';
 const ASSETS = [
   './',
   './index.html'
