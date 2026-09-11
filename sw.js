@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.60-cal-todo-btn';
+const CACHE = 'iikoto-v2.61-cal-pending-mark';
 const ASSETS = [
   './',
   './index.html'

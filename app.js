@@ -3615,7 +3615,7 @@ async function syncContentsDownRaw(mk){
       const matched=localNoCidByKey[key];
       if(matched){l=matched;delete localNoCidByKey[key];}
     }
-    const serverItem={cat:r.content_cat,title:r.title,startDate:r.start_date||(r.start_day?mk+'-'+pad(r.start_day):null),endDate:r.end_date||(r.end_day?mk+'-'+pad(r.end_day):null),status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',musicUrl:r.music_url||null,album:r.album||null,releaseYear:r.release_year||null,totalUnit:r.total_unit||null,currentUnit:r.current_unit||null,notes:r.notes||[],unitLabel:r.unit_label||null,readSeconds:r.read_seconds||0,isAiring:!!r.is_airing,created:r.created,cid,updatedAt:r.updated_at};
+    const serverItem={cat:r.content_cat,title:r.title,startDate:r.start_date||(r.start_day?mk+'-'+pad(r.start_day):null),endDate:r.end_date||(r.end_day?mk+'-'+pad(r.end_day):null),status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',musicUrl:r.music_url||null,album:r.album||null,releaseYear:r.release_year||null,totalUnit:r.total_unit||null,currentUnit:r.current_unit||null,notes:r.notes||[],unitLabel:r.unit_label||null,readSeconds:r.read_seconds||0,isAiring:!!r.is_airing,created:r.created,cid,updatedAt:r.updated_at,lastActivityAt:r.last_activity_at||0};
     if(!l){merged.push(serverItem);return;}
     // 로컬/서버 둘 다 있으면 updated_at(서버) vs 로컬수정시각 비교, 서버가 더 최신이거나 로컬에 수정시각 기록이 없으면 서버값 채택
     const localTs=l.updatedAt?new Date(l.updatedAt).getTime():0;
@@ -3641,7 +3641,7 @@ async function syncContentsUp(mk){
   if(ensureItemCids(c))S.set(S.key('contents',mk),c);
   const delCids=getDelPendingCids('contents',mk);
   const ok=await syncListUpSafe('contents',`month_key=eq.${mk}`,'month_key,client_id',c,
-    it=>({month_key:mk,content_cat:it.cat,title:it.title,start_date:it.startDate,end_date:it.endDate,status:it.status,review:it.review||'',stars:it.stars||0,poster:it.poster||null,author:it.author||'',music_url:it.musicUrl||null,album:it.album||null,release_year:it.releaseYear||null,total_unit:it.totalUnit||null,current_unit:it.currentUnit||null,notes:it.notes||[],unit_label:it.unitLabel||null,read_seconds:it.readSeconds||0,is_airing:!!it.isAiring,created:it.created,client_id:it.cid}),
+    it=>({month_key:mk,content_cat:it.cat,title:it.title,start_date:it.startDate,end_date:it.endDate,status:it.status,review:it.review||'',stars:it.stars||0,poster:it.poster||null,author:it.author||'',music_url:it.musicUrl||null,album:it.album||null,release_year:it.releaseYear||null,total_unit:it.totalUnit||null,current_unit:it.currentUnit||null,notes:it.notes||[],unit_label:it.unitLabel||null,read_seconds:it.readSeconds||0,is_airing:!!it.isAiring,created:it.created,client_id:it.cid,last_activity_at:it.lastActivityAt||null}),
     delCids);
   if(ok)delCids.forEach(cid=>removeDelPending('contents',mk,cid));
   return ok;
@@ -7841,6 +7841,17 @@ function jumpToMemoDateFromSeed(dk){
   document.querySelector('.scroll').scrollTop=0;
   loadDaily();
 }
+// 월간탭 상세보기 "오늘탭에서 보기" 칩 — jumpToMemoDateFromSeed와 동일한 날짜 전환 패턴,
+// 모달이 아니라 월간탭 자체에서 호출되므로 closeModal 없이 바로 탭 전환만 수행.
+function jumpToDailyTab(dk){
+  const parts=dk.split('-').map(Number);
+  currentDate=new Date(parts[0],parts[1]-1,parts[2]);
+  updateDateUI();
+  document.querySelectorAll('.vtab').forEach(t=>t.classList.toggle('on',t.dataset.v==='daily'));
+  document.querySelectorAll('.view').forEach(vw=>vw.classList.toggle('on',vw.id==='v-daily'));
+  document.querySelector('.scroll').scrollTop=0;
+  loadDaily();
+}
 // 사진메모 모아보기 — seed 모아보기(openSeedArchive)와 동일한 방식으로 localStorage 전체를 훑어
 // 사진이 첨부된 메모만 모아 최신순 그리드로 보여줌. 썸네일은 오늘탭 목록과 동일하게
 // placeholder→로드완료 페이드인 방식으로 깜빡임 없이 표시.
@@ -9834,11 +9845,17 @@ function renderCalendar(){
   const daysInMonth=new Date(y,mo+1,0).getDate();
   const today=new Date();
   const hasRecord={};
+  const hasPending={};
   const eventsByDay={};
+  const todayDk=dateKey(today);
   for(let d=1;d<=daysInMonth;d++){
     const dk=`${y}-${pad(mo+1)}-${pad(d)}`;
     const todos=getTodos(dk);
     if(getMemos(dk).length>0||todos.some(t=>t.done)||getSleep(dk).sleep)hasRecord[d]=true;
+    // 오늘 이후(오늘 제외, 순수 미래)에 미완료 투두(할일+시간표, 일정 제외)가 하나라도 있으면 표시 —
+    // 일정은 이미 달력에 배지/막대로 노출되므로 동그라미 판정에서는 제외(중복 표기 방지).
+    // 과거(has-record, 채움)와 겹치지 않도록 미래 날짜에만 한정.
+    if(dk>todayDk&&todos.some(t=>!t.done&&!t.isEvent))hasPending[d]=true;
     // 하루짜리 일정만 배지 대상(연속일정은 eventEndDate가 있으므로 여기서 제외 — 아래 bar로 별도 렌더)
     // 반복으로 생성된 일정도 getTodos(dk)가 이미 실체화해서 포함하고 있으므로 별도 조회 없이 자연히 함께 잡힘.
     // 같은 날 여러 일정이 있으면 시간순으로 표기(시간 있는 일정 먼저, 없는 일정은 뒤로)
@@ -9889,7 +9906,7 @@ function renderCalendar(){
       if(d<1||d>daysInMonth){h+=`<div class="cal-day other-month"><div class="cal-num"></div></div>`;continue;}
       const isToday2=today.getFullYear()===y&&today.getMonth()===mo&&today.getDate()===d;
       const isSel=_calSelectedDay===d;
-      let cls='cal-day';if(isToday2)cls+=' today';if(isSel)cls+=' selected';if(hasRecord[d])cls+=' has-record';
+      let cls='cal-day';if(isToday2)cls+=' today';if(isSel)cls+=' selected';if(hasRecord[d])cls+=' has-record';if(hasPending[d])cls+=' has-pending';
       // 이 칸을 지나가는 모든 bar의 "조각"을 그림 — 조각은 오직 이 칸 안에서만 존재하는 완결된 요소라 절대 밀리거나 클릭 영역이 어긋나지 않음.
       // 시작칸=텍스트+왼쪽 둥근모서리, 중간칸=빈 막대만(옆 칸과 이어지는 것처럼 보이지만 실제로는 각자 독립된 요소), 끝칸=오른쪽 둥근모서리.
       const cIdxInWeek=cellIdx-w*7;
@@ -9953,6 +9970,20 @@ function buildDayDetailHtml(dk){
     items+=`<div class="cal-detail-row" style="cursor:pointer;" onclick="calShowTodos('${dk}')"><div class="cal-detail-icon"><i class="ti ti-check" style="font-size:var(--dow-label-size);color:var(--tm);" aria-hidden="true"></i></div><span class="cal-detail-text" id="cal-todo-summary-${dk}">완료한 일 ${doneTodos.length}개 <i class="ti ti-chevron-right ico-inline-11" aria-hidden="true"></i></span></div>
       <div id="cal-todo-rows-${dk}" style="display:none;"></div>`;
   }
+  // 미래 날짜(자정 기준, 월간탭 규칙과 동일) 전용 — 등록해둔 미완료 투두(할일/시간표) 요약.
+  // 일정(isEvent)은 달력에 이미 배지/막대로 노출되고 있어 여기선 제외해 중복 표기를 피함.
+  // 실제 체크/수정은 오늘탭에서 하도록, 요약 줄 옆에 이동 칩을 한 줄로 나란히 배치(jumpToDailyTab).
+  const isFuture=dk>dateKey(new Date());
+  if(isFuture){
+    const pendingTodos=todos.filter(t=>!t.done&&!t.isEvent);
+    if(pendingTodos.length>0){
+      items+=`<div class="cal-detail-row" style="align-items:center;justify-content:space-between;">
+        <span style="display:flex;align-items:center;gap:8px;cursor:pointer;" onclick="calShowPendingTodos('${dk}')"><div class="cal-detail-icon"><i class="ti ti-clock" style="font-size:var(--dow-label-size);color:var(--tm);" aria-hidden="true"></i></div><span class="cal-detail-text" id="cal-pending-summary-${dk}">예정된 일 ${pendingTodos.length}개 <i class="ti ti-chevron-right ico-inline-11" aria-hidden="true"></i></span></span>
+        <span class="cal-jump-daily-chip" onclick="jumpToDailyTab('${dk}')">오늘탭에서 보기 <i class="ti ti-arrow-right ico-inline-11" aria-hidden="true"></i></span>
+      </div>
+        <div id="cal-pending-rows-${dk}" style="display:none;"></div>`;
+    }
+  }
   const MAX=3;const total=allMemos.length;
   // 시간순 정렬: toSortKey(04:00 기준)로 하루 시작 — 새벽 0~3시대는 하루 끝으로 취급
   const sortedMemos=[...allMemos].sort((a,b)=>{
@@ -9967,10 +9998,12 @@ function buildDayDetailHtml(dk){
     items+=`</div>`;
   }
   let mealHtml='';
-  MEAL_KEYS.forEach(k=>{
-    if(meals[k])mealHtml+=`<div class="cal-detail-row"><span class="cal-detail-time">${MEAL_LABELS[k]}</span><span class="cal-detail-text" style="flex:1;">${meals[k]}</span>${meals[k+'_time']?`<span style="font-size:var(--dow-label-size);color:var(--tm);flex-shrink:0;">${meals[k+'_time']}</span>`:''}</div>`;
-  });
-  if(mealHtml)mealHtml=`<div style="font-size:var(--dow-label-size);font-weight:500;color:rgba(190,130,70,0.85);margin:12px 0 4px;">식사</div>${mealHtml}`;
+  if(!isFuture){
+    MEAL_KEYS.forEach(k=>{
+      if(meals[k])mealHtml+=`<div class="cal-detail-row"><span class="cal-detail-time">${MEAL_LABELS[k]}</span><span class="cal-detail-text" style="flex:1;">${meals[k]}</span>${meals[k+'_time']?`<span style="font-size:var(--dow-label-size);color:var(--tm);flex-shrink:0;">${meals[k+'_time']}</span>`:''}</div>`;
+    });
+    if(mealHtml)mealHtml=`<div style="font-size:var(--dow-label-size);font-weight:500;color:rgba(190,130,70,0.85);margin:12px 0 4px;">식사</div>${mealHtml}`;
+  }
   if(!items&&!mealHtml){
     return headerHtml+'<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:10px 0;">이 날은 기록이 없어요</div>';
   }
@@ -10036,6 +10069,21 @@ function calShowTodos(dk){
     rowsWrap.innerHTML=todos.map(t=>`<div class="cal-detail-row" style="padding-left:20px;"><span class="cal-detail-text">${t.text}</span></div>`).join('');
     rowsWrap.style.display='block';
     if(summaryEl)summaryEl.innerHTML=`완료한 일 ${todos.length}개 <i class="ti ti-chevron-down ico-inline-11" aria-hidden="true"></i>`;
+  }
+}
+// 미래 날짜용 — calShowTodos와 동일 패턴이되 미완료 투두를 읽기전용으로 나열(체크/수정 불가, 오늘탭 칩으로 유도).
+function calShowPendingTodos(dk){
+  const todos=getTodos(dk).filter(t=>!t.done&&!t.isEvent);
+  const rowsWrap=document.getElementById('cal-pending-rows-'+dk);if(!rowsWrap)return;
+  const summaryEl=document.getElementById('cal-pending-summary-'+dk);
+  const isOpen=rowsWrap.style.display!=='none';
+  if(isOpen){
+    rowsWrap.style.display='none';
+    if(summaryEl)summaryEl.innerHTML=`예정된 일 ${todos.length}개 <i class="ti ti-chevron-right ico-inline-11" aria-hidden="true"></i>`;
+  }else{
+    rowsWrap.innerHTML=todos.map(t=>`<div class="cal-detail-row" style="padding-left:20px;"><span class="cal-detail-text">${t.text}</span></div>`).join('');
+    rowsWrap.style.display='block';
+    if(summaryEl)summaryEl.innerHTML=`예정된 일 ${todos.length}개 <i class="ti ti-chevron-down ico-inline-11" aria-hidden="true"></i>`;
   }
 }
 function calShowAll(dk){
@@ -10345,6 +10393,14 @@ function toggleWeeklyRhythmForm(){
   _rhythmDk=dateKey(getLogicalDate());
   if(!_weeklyRhythmFormOpen){_rhythmFormOpen=false;_resetRhythmForm();}
   renderWeeklyRhythmBars();
+  // 폼이 열릴 때만 — 카테고리 레전드를 누르면 시간/메모 입력 필드가 아래로 이어져 나오므로,
+  // 렌더링 직후(DOM 반영 다음 프레임) 카드 위치로 스크롤해 폼이 화면 하단에서도 바로 보이게 함.
+  if(_weeklyRhythmFormOpen){
+    requestAnimationFrame(()=>{
+      const el=document.getElementById('weekly-rhythm-bars');
+      if(el)el.scrollIntoView({behavior:'smooth',block:'end'});
+    });
+  }
 }
 // 카테고리 레전드 + 시간/메모 입력 폼 — buildDailyRhythmTrack의 폼 부분과 동일한 HTML을 생성하는 공통 함수.
 // 홈탭(buildDailyRhythmTrack)과 주간탭(renderWeeklyRhythmBars) 양쪽에서 재사용됨.

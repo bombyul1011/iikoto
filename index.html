@@ -702,6 +702,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 #monthly-cal .cal-day{min-height:56px;padding:3px 1px;min-width:0;overflow:visible;position:relative;}
 #monthly-cal .cal-num{width:24px;height:24px;font-size:12px;margin-bottom:2px;}
 #monthly-cal .cal-day.has-record .cal-num{background:rgba(200,176,168,0.12);}
+/* 미래 날짜에 등록된 미완료 투두(할일/시간표 포함) 존재 표시 — 과거 has-record(채움)와 구분되도록 테두리만, 존재감 최소화 */
+#monthly-cal .cal-day.has-pending .cal-num{border:1px solid rgba(200,176,168,0.22);background-image:repeating-linear-gradient(135deg,rgba(200,176,168,0.35) 0 2px,transparent 2px 5px);}
 #monthly-cal .cal-day.today .cal-num{background:rgba(205,95,95,0.65);color:#fff;}
 #monthly-cal .cal-day.selected .cal-num{background:rgba(230,150,150,0.24);color:rgba(180,90,90,0.90);}
 #monthly-cal .cal-day.today.selected .cal-num{background:rgba(230,150,150,0.30)!important;color:rgba(180,90,90,0.90)!important;border:none!important;}
@@ -727,6 +729,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cal-detail-more{font-size:var(--dow-label-size);color:var(--pal-pink-text);padding:6px 0;text-align:center;cursor:pointer;}
 .cal-add-event-btn{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:10px;padding:8px 10px;border:1px dashed rgba(154,128,112,0.3);border-radius:10px;color:var(--ts);font-size:var(--dow-label-size);cursor:pointer;transition:all .15s;}
 .cal-add-event-btn:active{background:rgba(255,255,255,0.3);}
+.cal-jump-daily-chip{display:flex;align-items:center;gap:4px;flex-shrink:0;padding:5px 9px;border-radius:10px;background:rgba(200,176,168,0.16);color:var(--ts);font-size:var(--dow-label-size);cursor:pointer;transition:all .15s;white-space:nowrap;}
+.cal-jump-daily-chip:active{background:rgba(200,176,168,0.28);}
 
 /* ── STAT BAR ── */
 .stat-bar-wrap{display:flex;align-items:center;justify-content:center;gap:14px;padding:14px 4px 6px;border-top:1px solid rgba(var(--divider-rgb),0.25);margin-top:8px;}
@@ -802,7 +806,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .tw-fade-bottom{bottom:0;background:linear-gradient(0deg,var(--modal) 10%,rgba(0,0,0,0));}
 /* PC(마우스 포인터) 환경 전용 — 롤링 휠 대신 노출되는 시:분 숫자 입력. 롤링과 동일한 자리(.tw-wrap)에 렌더되며 톤은 --inp/--tp 등 앱 공용 변수 재사용(2026-09-05). */
 .tw-pc-input-row{display:flex;align-items:center;gap:6px;}
-.tw-pc-input{width:52px;height:56px;font-size:23px;font-weight:600;text-align:center;color:var(--tp);background:var(--inp);border:1px solid var(--inp-b);border-radius:12px;font-variant-numeric:tabular-nums;box-sizing:border-box;-moz-appearance:textfield;}
+.tw-pc-input{width:44px;height:48px;font-size:19px;font-weight:600;text-align:center;color:var(--tp);background:var(--inp);border:1px solid var(--inp-b);border-radius:12px;font-variant-numeric:tabular-nums;box-sizing:border-box;-moz-appearance:textfield;}
 .tw-pc-input::-webkit-inner-spin-button,.tw-pc-input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
 .tw-pc-input:focus{outline:none;border-color:var(--sel-color,rgba(190,160,230,0.75));}
 .todo-pinned-btn{flex-shrink:0;width:24px;height:24px;background:none;border:none;padding:0;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:19px;color:var(--pal-warmgray-border);transition:all .15s;}
