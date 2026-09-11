@@ -2111,7 +2111,7 @@ async function _loadCgridYearly(y){
   };
   // 정렬 기준: last_activity_at(스톱워치 최근 활동, 2026-09-11 본앱과 동일 기준 통일) 우선, 없으면 created로 폴백.
   _cgridContents=(rows||[]).filter(belongsHere).sort((a,b)=>(b.last_activity_at||b.created||0)-(a.last_activity_at||a.created||0));
-  await _loadCgridLogsFor(_cgridContents);
+  await _loadCgridLogsFor(_cgridContents,rows||[]);
   _cgridFilter='all';
   _cgridStatusFilter='all';
   _updateCgridFilterChipUI();
@@ -2137,7 +2137,10 @@ async function renderMonthContentGrid(y,mo,contentsData){
   };
   _cgridContents=[...(curRows||[]).filter(belongsHere),...(prevRows||[]).filter(belongsHere)]
     .sort((a,b)=>(b.last_activity_at||b.created||0)-(a.last_activity_at||a.created||0));
-  await _loadCgridLogsFor(_cgridContents);
+  // 2026-09-12: 리듬블록 cid 매칭용 contentsByCid는 화면 카드 필터링(belongsHere) 이전의 원본 전체를 써야 함 —
+  // belongsHere로 걸러진 목록만 넘기면, 지난달 등록돼 아직 진행중인 콘텐츠가 이번 달 카드 목록엔 없어서
+  // 그 콘텐츠의 리듬블록 content_cid가 매칭 실패하고 시간이 아예 안 뜨는 버그가 있었음(골드 선셋 사례).
+  await _loadCgridLogsFor(_cgridContents,[...(curRows||[]),...(prevRows||[])]);
   _renderCgridFromCache();
 }
 // 콘텐츠 모아보기 상세(Timeline)에 감상로그(그날 진행률·시간)를 코멘트와 함께 병합해 보여주기 위한 캐시.
@@ -2145,7 +2148,7 @@ async function renderMonthContentGrid(y,mo,contentsData){
 let _cgridLogsByCid={};
 // 감상 세션(시작~끝 시각) 캐시 — "{cid}|{dk}" 키. 진행률 로그와 별개 소스(rhythm_blocks)라 별도 캐시로 관리.
 let _cgridSessionsByCidDk={};
-async function _loadCgridLogsFor(contents){
+async function _loadCgridLogsFor(contents,cidSource){
   _cgridLogsByCid={};
   _cgridSessionsByCidDk={};
   const cids=[...new Set((contents||[]).map(c=>c.client_id).filter(Boolean))];
@@ -2162,7 +2165,9 @@ async function _loadCgridLogsFor(contents){
     if(!_cgridLogsByCid[r.content_cid])_cgridLogsByCid[r.content_cid]=[];
     _cgridLogsByCid[r.content_cid].push(r);
   });
-  const contentsByCid=_contentsByCidMap(contents);
+  // cid 매칭은 화면 필터링 이전의 원본(cidSource, 없으면 contents로 폴백)을 사용 — belongsHere로 걸러진
+  // contents만 쓰면 지난달 등록돼 진행중인 콘텐츠가 매칭 실패하는 문제가 있었음(2026-09-12 수정).
+  const contentsByCid=_contentsByCidMap(cidSource||contents);
   const {byKey}=_enjoySessionsByDkCid(rblocks,contentsByCid);
   Object.keys(byKey).forEach(key=>{
     const [dk,cid]=key.split('|');
@@ -2267,7 +2272,7 @@ function _cgridDetailHtml(c){
         const n=notesByDk[dk];
         const sess=_cgridSessionsByCidDk[c.client_id+'|'+dk];
         let logLine='';
-        if(r){
+        if(r&&c.content_cat!=='drama'){ // 드라마는 회차 진행률 표기 생략(시간만 표시) — 요청 반영, 2026-09-12
           const progText=r.unit==='percent'?`${r.percent_after!=null?r.percent_after:0}%`:(r.unit_after!=null?`${r.unit_after}${tlUnitLabel}`:'');
           const amountText=r.amount_read>0?(r.unit==='percent'?`+${r.amount_read}%`:`+${r.amount_read}${tlUnitLabel}`):'';
           logLine=[progText,amountText].filter(Boolean).join(' · ');
@@ -4306,10 +4311,11 @@ function switchNoteTimelineView(btn,view){
 }
 // 로그 모아보기 타입 필터 — 코멘트(감상메모)/완결(완독·완결 코멘트)/감상로그(진행률·시간), 각각 독립 토글(다중 선택).
 // 최소 1개는 항상 켜져 있어야 함(전부 꺼지면 아무것도 안 보이는 혼란 방지).
-let _chTlTypeFilter={note:true,final:true,log:true};
+// 로그 모아보기 타입 필터 — 코멘트(감상메모)/완결(완독·완결 코멘트)/감상로그(진행률·시간), 각각 독립 토글(다중 선택).
+// 기본은 전부 off(꺼짐=필터 없음, 전체 표시) — 칩을 누르면 그 타입만 켜져서(강조) 그것만 필터링되어 보임.
+// 콘텐츠 모아보기 상태칩(전체→진행중→완결 순환)과 달리, "아무것도 안 누르면 전체"가 기본 화면이라는 게 핵심.
+let _chTlTypeFilter={note:false,final:false,log:false};
 function toggleChTlTypeFilter(type){
-  const onCount=Object.values(_chTlTypeFilter).filter(Boolean).length;
-  if(_chTlTypeFilter[type]&&onCount<=1)return; // 마지막 하나는 끄지 못하게 방지
   _chTlTypeFilter[type]=!_chTlTypeFilter[type];
   document.querySelector(`.ch-tl-type-chip[data-type="${type}"]`).classList.toggle('on',_chTlTypeFilter[type]);
   renderContentNoteTimeline();
@@ -4321,11 +4327,17 @@ async function _chCollectNoteSource(contentsData){
   const mk=monthKeyOf(_monthCalDate);
   const startDk=mk+'-01';
   const endDk=mk+'-31';
-  let contents;
+  const prevMk=monthKeyOf(new Date(_monthCalDate.getFullYear(),_monthCalDate.getMonth()-1,1));
+  let contents,prevContents;
   if(contentsData){
     contents=contentsData.cur||[];
+    prevContents=contentsData.prev||[];
   }else{
-    contents=(await supaFetch(`contents?month_key=eq.${mk}`))||[];
+    [contents,prevContents]=await Promise.all([
+      supaFetch(`contents?month_key=eq.${mk}`),
+      supaFetch(`contents?month_key=eq.${prevMk}`)
+    ]);
+    contents=contents||[];prevContents=prevContents||[];
   }
   const rblocks=await supaFetch(`rhythm_blocks?date_key=gte.${startDk}&date_key=lte.${endDk}&cat=eq.enjoy`);
   const finals=[]; // {cid,cat,title,poster,stars,review,dk}
@@ -4344,22 +4356,29 @@ async function _chCollectNoteSource(contentsData){
   const logRows=cids.length?(await supaFetch(`content_daily_log?content_cid=in.(${cids.map(c=>`"${c}"`).join(',')})&date_key=gte.${startDk}&date_key=lte.${endDk}&order=date_key.asc`))||[]:[];
   const progressByDkCid={};
   logRows.forEach(r=>{progressByDkCid[r.date_key+'|'+r.content_cid]=r;});
-  const contentsByCid=_contentsByCidMap(contents);
+  // cid 매칭용 룩업은 이번 달+전월 콘텐츠를 함께 사용(전월 등록·이번달까지 진행중인 콘텐츠의 리듬블록 매칭
+  // 실패를 막기 위함, 2026-09-12 수정) — 단, 실제로 타임라인에 표시되는 대상(finals/notes/logs)은 위에서
+  // 이미 이번 달 contents만으로 만들어졌으므로 전월 콘텐츠 자체가 화면에 새로 뜨는 일은 없음.
+  const contentsByCid=_contentsByCidMap([...contents,...prevContents]);
   const catPrefix={drama:1,movie:1,book:1};
   const {byKey:sessByDkCid,noCid:sessNoCid}=_enjoySessionsByDkCid(rblocks,contentsByCid);
   const logs=[]; // {cid,cat,title,poster,dk,progText,amountText,timeText}
   const buildProgText=(log,cat)=>{
-    if(!log)return{progText:'',amountText:''};
-    const unitLabel=cat==='drama'?'화':(cat==='movie'?'분':'p');
+    if(!log||cat==='drama')return{progText:'',amountText:''}; // 드라마는 회차 진행률 표기 생략(시간만 표시) — 요청 반영, 2026-09-12
+    const unitLabel=cat==='movie'?'분':'p';
     const progText=log.unit==='percent'?`${log.percent_after!=null?log.percent_after:0}%`:(log.unit_after!=null?`${log.unit_after}${unitLabel}`:'');
     const amountText=log.amount_read>0?(log.unit==='percent'?`+${log.amount_read}%`:`+${log.amount_read}${unitLabel}`):'';
     return{progText,amountText};
   };
   // cid로 확정된 항목 — dk+cid 기준으로 세션 시각(sessByDkCid)과 진행률(progressByDkCid)을 한 번에 합침.
   // 음악 등 리듬 기록 기반이 아닌 카테고리는 catPrefix 체크로 제외(진행률만 있고 시간 세션이 없는 경우 방지).
+  // contentsByCid는 전월 콘텐츠까지 포함하지만, 여기서는 cids(=이번달 contents)에 있는 cid만 순회하므로
+  // 전월에만 있고 이번달엔 없는 콘텐츠가 로그에 새로 섞여 들어가는 일은 없음.
+  const cidSet=new Set(cids);
   const allDkCidKeys=new Set([...Object.keys(sessByDkCid),...Object.keys(progressByDkCid)]);
   allDkCidKeys.forEach(key=>{
     const [dk,cid]=key.split('|');
+    if(!cidSet.has(cid))return;
     const c=contentsByCid[cid];
     if(!c||!catPrefix[c.content_cat])return;
     const timeText=_sessionRangesText(sessByDkCid[key]);
@@ -4381,9 +4400,11 @@ async function renderContentNoteTimeline(contentsData){
   el.innerHTML='<div class="loading-msg">불러오는 중...</div>';
   const {finals,notes,logs}=await _chCollectNoteSource(contentsData);
   if(!finals.length&&!notes.length&&!logs.length){el.innerHTML='<div class="ch-note-tl-empty">아직 남긴 기록이 없어요</div>';return;}
-  const f2=_chTlTypeFilter.final?finals:[];
-  const n2=_chTlTypeFilter.note?notes:[];
-  const l2=_chTlTypeFilter.log?logs:[];
+  // 전부 off(아무 칩도 안 눌린 기본 상태)면 전체 표시, 하나라도 on이면 켜진 타입만 필터링.
+  const anyOn=_chTlTypeFilter.note||_chTlTypeFilter.final||_chTlTypeFilter.log;
+  const f2=(!anyOn||_chTlTypeFilter.final)?finals:[];
+  const n2=(!anyOn||_chTlTypeFilter.note)?notes:[];
+  const l2=(!anyOn||_chTlTypeFilter.log)?logs:[];
   if(!f2.length&&!n2.length&&!l2.length){el.innerHTML='<div class="ch-note-tl-empty">선택한 항목이 없어요</div>';return;}
   el.innerHTML=_chNoteTimelineView==='work'?_chRenderNoteTimelineByWork(f2,n2,l2):_chRenderNoteTimelineByDate(f2,n2,l2);
 }
