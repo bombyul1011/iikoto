@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.65-wcal-fixes';
+const CACHE = 'iikoto-v2.67-log-filters';
 const ASSETS = [
   './',
   './index.html'

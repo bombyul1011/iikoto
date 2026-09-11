@@ -3275,7 +3275,7 @@ function saveContents(mk,v){
   const now=Date.now();
   v.forEach(it=>{
     const p=it.cid?prevByCid[it.cid]:null;
-    const isSame=p&&p.status===it.status&&p.startDate===it.startDate&&p.endDate===it.endDate&&p.review===it.review&&p.stars===it.stars&&p.title===it.title&&p.totalUnit===it.totalUnit&&p.currentUnit===it.currentUnit&&p.unitLabel===it.unitLabel&&p.readSeconds===it.readSeconds&&JSON.stringify(p.notes||[])===JSON.stringify(it.notes||[]);
+    const isSame=p&&p.status===it.status&&p.startDate===it.startDate&&p.endDate===it.endDate&&p.review===it.review&&p.stars===it.stars&&p.title===it.title&&p.totalUnit===it.totalUnit&&p.currentUnit===it.currentUnit&&p.unitLabel===it.unitLabel&&p.readSeconds===it.readSeconds&&p.lastActivityAt===it.lastActivityAt&&JSON.stringify(p.notes||[])===JSON.stringify(it.notes||[]);
     if(!isSame)it.updatedAt=now;
     else if(p&&p.updatedAt)it.updatedAt=p.updatedAt;
   });
