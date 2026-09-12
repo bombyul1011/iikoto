@@ -1860,6 +1860,16 @@ const WEEK_KW_COLORS=['var(--pal-pink-text)','var(--pal-orange-text)','var(--pal
 // 아래 토크나이저·색상 상수는 연간탭 renderYrKeywordCloud("올해의 키워드")가 그대로 재사용하므로 유지.
 
 // 이번 주 독서 — 이이코토 본앱 rd-top-*/rd-progress-* 스타일 그대로 이식(2026-08-26).
+// ── 독서 관련 카드(week-reading/week-reading-activity) 공용 헬퍼 (2026-09-13 중복 통합) ──
+// content_daily_log가 책/드라마/영화 테이블을 공유하면서(2026-09-11) "책 로그만 걸러내기"와
+// "이번 범위 내 완독 도서 판별"이 renderWeekReading/renderWeekReadingActivity 양쪽에 각각
+// 토씨 하나 안 틀리고 중복 구현돼 있던 것을 여기로 모음 — 이후 조건이 바뀌어도 한 곳만 고치면 됨.
+function _bookCidSetOf(contents){
+  return new Set((contents||[]).filter(c=>c.content_cat==='book').map(c=>c.client_id));
+}
+function _bookFinishedInRange(contents,startDk,endDk){
+  return (contents||[]).filter(c=>c.content_cat==='book'&&_isContentFinished(c)&&c.end_date&&c.end_date>=startDk&&c.end_date<=endDk);
+}
 // 현재 읽고 있는 책의 표지+진행률 바(무지개 구슬 포함)와, content_daily_log 기준 연속 독서일(스트릭)을 함께 보여줌.
 // 스트릭 계산은 본앱 getReadingStreak()과 동일한 로직(어제부터 거슬러 올라가며 기록이 끊기는 지점까지 카운트)을
 // content_daily_log(서버 기준 실제 독서 로그, 2026-09-11 reading_daily_log에서 통합) 데이터로 재구현.
@@ -1879,7 +1889,7 @@ function renderWeekReading(contents,book,streakLogRows,startDk,endDk){
   if(!el)return;
   // 이번 주 완독한 책 — contents(content_cat='book')에서 done/stopped이고 종료일이 이번 주 범위인 것.
   // 2026-08-29 통합 이후 book(진행중 1권)도 이 contents 배열에서 파생되므로 완독작 판별도 동일 배열로 처리.
-  const doneThisWeek=(contents||[]).find(c=>c.content_cat==='book'&&_isContentFinished(c)&&c.end_date&&c.end_date>=startDk&&c.end_date<=endDk);
+  const doneThisWeek=_bookFinishedInRange(contents,startDk,endDk)[0];
 
   if(!book&&!doneThisWeek){
     el.innerHTML=`<div class="week-reading-inner"><div class="week-reading-title" style="color:var(--tm);">지금 읽는 책이 없어요</div></div>`;
@@ -1892,7 +1902,11 @@ function renderWeekReading(contents,book,streakLogRows,startDk,endDk){
     if(book.unit_label==='percent')pct=book.current_unit||0;
     else if(book.total_unit)pct=Math.min(100,Math.round((book.current_unit/book.total_unit)*100));
   }
-  const streak=_readingStreakOf(streakLogRows);
+  // 2026-09-13 버그수정: content_daily_log는 책/드라마/영화가 테이블을 공유하므로(2026-09-11 통합),
+  // streakLogRows에 책이 아닌 콘텐츠(드라마 등) 기록도 섞여 있으면 그날 책을 안 읽었어도 스트릭에
+  // 잘못 포함됨(골드 선셋(드라마)만 본 날이 독서 연속일수에 끼어든 사례). book cid로 한정한 뒤 스트릭 계산.
+  const bookCidSet=_bookCidSetOf(contents);
+  const streak=_readingStreakOf((streakLogRows||[]).filter(r=>bookCidSet.has(r.content_cid)));
   const streakText=streak>0?`연속 <b>${streak}일째</b> 읽고 있어요`:'오늘부터 다시 시작해볼까요?';
 
   const bookCoverHtml=(b,badge)=>{
@@ -1957,33 +1971,38 @@ function renderWeekReading(contents,book,streakLogRows,startDk,endDk){
 }
 
 // 이번 주 독서 활동(탭 전환용) — "지금 읽는 책 1권" 스냅샷과 달리, 이번 주에 실제 기록이 있었던
-// 모든 책(병렬 독서 포함)의 주간 진행량을 권별로 보여주고, 완독 권수·활동일수를 지난주와 비교.
-// 페이지 단위 책은 total_pages가 있어야 %로 환산 가능 — 없는 책(초기 등록 누락분)은 "기록됨"만 표시하고
-// 완독/활동일 집계에는 포함하되, 진행률 델타 계산에서만 제외(2026-08-28).
-function _wraStatsOf(logRows,booksByCid){
-  // 책별로 이번 범위 내 첫/마지막 기록의 percent_after를 비교해 진행폭 산출.
+// 주간 독서 활동 배너(week-reading-activity) — 책별 진행 기록 + 하단 요약(독서시간/독서일 2줄).
+// 2026-09-13 전면 재구성. 이전 구조의 문제:
+//  1) content_daily_log는 책/드라마/영화가 테이블을 공유하는데(2026-09-11 통합), 이 카드로 넘어오는
+//     로그가 날짜범위로만 걸러져 있어 책이 아닌 콘텐츠 로그가 섞여 들어옴(골드 선셋(드라마) 사례) —
+//     진행률이 null로 남아 "+null%"인 빈 줄이 뜨고, 독서시간(합산초)에도 드라마 시청시간이 얹혔었음.
+//  2) 하단 "진행량"이 서로 다른 책의 진행률(%)을 단순 합산한 값이라(예: 41%+49%=90%) 의미가 불분명했음.
+// 수정: ① _wraBookLogsOf에서 book인 cid의 로그만 걸러 이후 모든 계산의 유일한 소스로 삼음(재발 방지),
+// ② 하단 요약에서 진행량을 제거하고 독서시간/독서일 2줄만 표시, ③ 책별 목록은 unit_label 그대로
+// 페이지면 p, percent면 %로 표기(서로 다른 단위를 %로 뭉뚱그려 합산하지 않음 — 리스트/하단 모두 동일 원칙).
+function _wraBookLogsOf(logRows,bookCidSet){
+  return (logRows||[]).filter(r=>bookCidSet.has(r.content_cid));
+}
+// 책별 이번 범위 내 기록 합산 — 단위(pages/percent)별로 표기 텍스트만 만들고, 서로 다른 단위끼리는
+// 절대 합산하지 않는다(위 설계 원칙 ③).
+function _wraBookRowsOf(bookLogRows,booksByCid){
   const byBook={};
-  (logRows||[]).forEach(r=>{
+  bookLogRows.forEach(r=>{
     if(!byBook[r.content_cid])byBook[r.content_cid]=[];
     byBook[r.content_cid].push(r);
   });
-  const activeDays=new Set((logRows||[]).map(r=>r.date_key)).size;
-  const totalSeconds=(logRows||[]).reduce((s,r)=>s+(r.seconds||0),0);
-  const rows=Object.keys(byBook).map(cid=>{
-    const logs=byBook[cid].sort((a,b)=>a.date_key<b.date_key?-1:1);
+  return Object.keys(byBook).map(cid=>{
+    const logs=byBook[cid];
     const book=booksByCid[cid]||{};
-    let deltaPct=null;
-    // 2026-08-29 통합: book은 이제 contents 로우(unit_label/total_unit)
+    const amountSum=logs.reduce((s,r)=>s+(r.amount_read||0),0);
+    let deltaText=null; // 표시용 텍스트("+41%" 또는 "+73p") — 단위 그대로, 절대 서로 변환/합산하지 않음
     if(book.unit_label==='percent'){
-      // amount_read를 그날의 증가폭으로 기록해뒀다는 전제 하에 합산(로그 1건이든 여러 건이든 동일 로직).
-      deltaPct=logs.reduce((s,r)=>s+(r.amount_read||0),0);
-    }else if(book.unit_label==='pages'&&book.total_unit){
-      const pagesRead=logs.reduce((s,r)=>s+(r.amount_read||0),0);
-      deltaPct=Math.round((pagesRead/book.total_unit)*100);
+      deltaText=`+${amountSum}%`;
+    }else if(book.unit_label==='pages'){
+      deltaText=`+${amountSum}p`;
     }
-    return {cid,title:book.title||'',deltaPct,noTotal:book.unit_label==='pages'&&!book.total_unit};
+    return {cid,title:book.title||'',deltaText};
   });
-  return {rows,activeDays,totalSeconds};
 }
 function toggleWeekReadingView(){
   const a=document.getElementById('week-reading'),b=document.getElementById('week-reading-activity'),txt=document.getElementById('week-reading-title-text');
@@ -1999,30 +2018,33 @@ function renderWeekReadingActivity(logsThis,logsLast,booksAll,contents,startDk,e
   const booksByCid={};
   // 2026-08-29 통합: book은 이제 contents 로우이므로 client_id가 곧 cid
   (booksAll||[]).forEach(b=>{booksByCid[b.client_id]=b;});
+  const bookCidSet=_bookCidSetOf(booksAll);
 
-  const {rows,activeDays,totalSeconds}=_wraStatsOf(logsThis,booksByCid);
-  const {rows:rowsLast,activeDays:activeDaysLast,totalSeconds:totalSecondsLast}=_wraStatsOf(logsLast,booksByCid);
+  const bookLogsThis=_wraBookLogsOf(logsThis,bookCidSet);
+  const bookLogsLast=_wraBookLogsOf(logsLast,bookCidSet);
+  const rows=_wraBookRowsOf(bookLogsThis,booksByCid);
 
-  const doneThis=(contents||[]).filter(c=>c.content_cat==='book'&&_isContentFinished(c)&&c.end_date&&c.end_date>=startDk&&c.end_date<=endDk);
+  const activeDays=new Set(bookLogsThis.map(r=>r.date_key)).size;
+  const activeDaysLast=new Set(bookLogsLast.map(r=>r.date_key)).size;
+  const totalSeconds=bookLogsThis.reduce((s,r)=>s+(r.seconds||0),0);
+  const totalSecondsLast=bookLogsLast.reduce((s,r)=>s+(r.seconds||0),0);
+
+  const doneThis=_bookFinishedInRange(contents,startDk,endDk);
   // 2026-08-29 통합 이후 content_cid(content_daily_log, 구 book_cid/reading_daily_log)와 contents.client_id가 동일한 ID 체계이므로
   // cid로 직접 매칭 가능 — 예전 title 매칭 우회(동명이서 오매칭 리스크 있었음)를 제거.
   const doneCidSet=new Set(doneThis.map(c=>c.client_id));
 
-  const sumPct=(rs)=>rs.reduce((s,r)=>s+(r.noTotal?0:(r.deltaPct||0)),0);
-  const totalThis=sumPct(rows),totalLast=sumPct(rowsLast);
-
   const rowsHtml=rows.length?rows.map(r=>{
     const isDone=doneCidSet.has(r.cid);
     const badge=isDone?`<span class="wra-row-badge">완독</span>`:'';
-    if(r.noTotal)return `<div class="wra-row"><span class="wra-row-title">${escapeHtml(r.title)}</span>${badge}<span class="wra-row-flag">기록됨</span></div>`;
-    return `<div class="wra-row"><span class="wra-row-title">${escapeHtml(r.title)}</span>${badge}<span class="wra-row-delta">+${r.deltaPct}%</span></div>`;
+    if(r.deltaText==null)return `<div class="wra-row"><span class="wra-row-title">${escapeHtml(r.title)}</span>${badge}<span class="wra-row-flag">기록됨</span></div>`;
+    return `<div class="wra-row"><span class="wra-row-title">${escapeHtml(r.title)}</span>${badge}<span class="wra-row-delta">${r.deltaText}</span></div>`;
   }).join(''):'';
   // 진행 로그가 아예 없이 완독만 된 책(예: 지난주 전에 다 읽고 이번 주에 상태만 done으로 바뀐 경우) 별도 표기
   const doneOnlyHtml=doneThis.filter(c=>!rows.some(r=>r.cid===c.client_id)).map(c=>`<div class="wra-row"><span class="wra-row-title">${escapeHtml(c.title||'')}</span><span class="wra-row-badge">완독</span></div>`).join('');
   const bodyHtml=(rowsHtml+doneOnlyHtml)||`<div class="wra-empty">이번 주엔 독서 기록이 없어요</div>`;
 
   const deltaDays=activeDays-activeDaysLast;
-  const deltaPctTotal=totalThis-totalLast;
   const deltaSeconds=totalSeconds-totalSecondsLast;
   const deltaHtml=(d,suffix='')=>d>0?`<span class="wra-stat-delta up">+${d}${suffix}</span>`:d<0?`<span class="wra-stat-delta down">${d}${suffix}</span>`:`<span class="wra-stat-delta flat">-</span>`;
   const fmtHM=(sec)=>{const h=Math.floor(sec/3600),m=Math.round((sec%3600)/60);return h>0?`${h}시간${m>0?' '+m+'분':''}`:`${m}분`;};
@@ -2030,10 +2052,9 @@ function renderWeekReadingActivity(logsThis,logsLast,booksAll,contents,startDk,e
 
   el.innerHTML=`<div class="week-reading-inner">
     <div class="wra-list">${bodyHtml}</div>
-    <div class="wra-summary">
-      <div class="wra-stat"><div class="wra-stat-num">${totalThis}%</div><div class="wra-stat-lbl">진행량</div>${deltaHtml(deltaPctTotal,'%')}</div>
+    <div class="wra-summary wra-summary-2col">
       <div class="wra-stat"><div class="wra-stat-num">${fmtHM(totalSeconds)}</div><div class="wra-stat-lbl">독서시간</div>${deltaMinHtml(deltaSeconds)}</div>
-      <div class="wra-stat"><div class="wra-stat-num">${activeDays}</div><div class="wra-stat-lbl">활동일</div>${deltaHtml(deltaDays)}</div>
+      <div class="wra-stat"><div class="wra-stat-num">${activeDays}</div><div class="wra-stat-lbl">독서일</div>${deltaHtml(deltaDays)}</div>
     </div>
   </div>`;
 }

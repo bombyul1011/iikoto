@@ -703,6 +703,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .wra-stat{flex:1;text-align:center;}
 .wra-stat-num{font-size:var(--fs-lg);font-weight:700;color:var(--tp);font-family:'DM Sans',sans-serif;white-space:nowrap;}
 .wra-summary .wra-stat:nth-child(2) .wra-stat-num{font-size:var(--fs-body);}
+/* 2026-09-13: 진행량 칸을 없애고 독서시간/독서일 2칸 구조로 재구성 — "시간h 분m" 형태로 텍스트가
+   길어질 수 있는 1번째 칸(독서시간)에 축소 폰트 규칙을 적용. 3칸이던 시절엔 가운데(2번째=독서시간)가
+   그 대상이었으나, 칸 순서가 바뀌었으므로 규칙도 함께 옮김. */
+.wra-summary-2col .wra-stat:nth-child(2) .wra-stat-num{font-size:var(--fs-lg);}
+.wra-summary-2col .wra-stat:nth-child(1) .wra-stat-num{font-size:var(--fs-body);}
 .wra-stat-lbl{font-size:var(--fs-sm);color:var(--tm);margin-top:2px;}
 .wra-stat-delta{font-size:var(--fs-sm);margin-top:2px;font-weight:600;}
 .wra-stat-delta.up{color:rgba(var(--pal-pink-border-rgb),0.85);}
