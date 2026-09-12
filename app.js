@@ -12550,11 +12550,17 @@ async function renderContentNoteTimeline(){
 function _chRenderNoteTimelineByDate(finals,notes,logs){
   const byDate={};
   const push=(dk,item)=>{if(!dk)return;if(!byDate[dk])byDate[dk]=[];byDate[dk].push(item);};
-  finals.forEach(f=>push(f.dk,{...f,__type:'final'}));
-  // note에 같은 날짜+cid 로그가 있으면 진행률 정보를 붙이고, 로그 쪽에서 소비됐다고 표시(중복 노출 방지)
   const logByKey={};
   (logs||[]).forEach(l=>{logByKey[l.dk+'|'+l.cid]=l;});
   const consumedLogKeys=new Set();
+  // 완결 리뷰도 같은 날짜+cid 로그가 있으면 함께 병합(그 날 마지막 감상시간을 완결 리뷰 아래에 같이 노출)
+  finals.forEach(f=>{
+    const key=f.dk+'|'+f.cid;
+    const log=logByKey[key];
+    if(log)consumedLogKeys.add(key);
+    push(f.dk,{...f,__type:'final',log:log||null});
+  });
+  // note에 같은 날짜+cid 로그가 있으면 진행률 정보를 붙이고, 로그 쪽에서 소비됐다고 표시(중복 노출 방지)
   notes.forEach(n=>{
     const key=n.dk+'|'+n.cid;
     const log=logByKey[key];
@@ -12618,7 +12624,7 @@ function _chRenderNoteTimelineByWork(finals,notes,logs){
     const posterHtml=_wcalPosterThumbHtml(g.cat,g.poster);
     const finalHtml=g.final&&(g.final.stars>0||g.final.review)?
       `${g.final.stars>0?`<div class="ch-tlB-final-row"><div class="ch-tlB-stars">${renderStarDisplayHtml(g.final.stars)}</div></div>`:''}
-       ${g.final.review?`<div class="ch-tlB-final-text">${escapeHtml(g.final.review)}</div>`:''}`
+       ${g.final.review?`<div class="ch-tlB-final-text ch-tlA-final-review">${escapeHtml(g.final.review)}</div>`:''}`
       :'';
     const progressBadgeHtml=g.final?'':'<span class="ch-tlB-progress-badge">진행중</span>';
     const notesSorted=g.notes.slice().sort((a,b)=>(b.dk||'').localeCompare(a.dk||''));
@@ -12647,6 +12653,8 @@ function _chFinalRowHtml(f){
   const posterHtml=_wcalPosterThumbHtml(f.cat,f.poster);
   // 도트는 항상 카테고리 지정색(인라인 style) — 완결 여부는 옆의 '완' 배지(ch-tlA-badge-final, 옐로우 고정색)로 구분.
   // 예전엔 .ch-tlA-dot.final 클래스로도 색을 주려 했으나 인라인 style에 항상 가려지는 죽은 규칙이라 제거함(2026-09-12).
+  const progAmountText=_chNoteMetaText(f.cat,f.log);
+  const metaHtml=progAmountText?`<div class="ch-tlA-meta">${progAmountText}</div>`:'';
   return `<div class="ch-tlA-row">
     <div class="ch-tlA-dot" style="background:${m.color};"></div>
     <div class="ch-tlA-content">
@@ -12657,7 +12665,8 @@ function _chFinalRowHtml(f){
           <span class="ch-tlA-title">${escapeHtml(f.title||'')}</span>
           ${f.stars>0?`<span class="ch-tlA-stars">${renderStarDisplayHtml(f.stars)}</span>`:''}
         </div>
-        ${f.review?`<div class="ch-tlA-text">${escapeHtml(f.review)}</div>`:''}
+        ${metaHtml}
+        ${f.review?`<div class="ch-tlA-text ch-tlA-final-review">${escapeHtml(f.review)}</div>`:''}
       </div>
     </div>
   </div>`;
