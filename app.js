@@ -4153,7 +4153,7 @@ function _twSyncInput(hourTrackId,minTrackId,targetInpId){
 }
 // 관성 스크롤 — 마지막 몇 개 이동 샘플로 속도 계산 후 감속시키며 40px 그리드에 스냅
 function _twMomentum(track,velocity,onSettle){
-  const friction=0.94,minVelocity=0.3; // 이 속도 밑으로 떨어지면 그 자리에서 바로 가까운 칸에 스냅
+  const friction=0.955,minVelocity=0.3; // 이 속도 밑으로 떨어지면 그 자리에서 바로 가까운 칸에 스냅
   let v=velocity;
   let idx=parseFloat(track.dataset.rawIdx||track.dataset.curIdx);
   function step(){
@@ -4174,10 +4174,14 @@ function _twMomentum(track,velocity,onSettle){
   }
   track._twRaf=requestAnimationFrame(step);
 }
-// 목표 칸으로 즉시 스냅 — 애니메이션 없이 한 번에 값 고정(정확한 위치 도착이 최우선)
+// 목표 칸으로 스냅 — 목표값(정수) 자체는 호출부에서 이미 확정된 값이라 여기서 값이 바뀌지 않음.
+// 짧은 transition만 입혀 도착 과정을 부드럽게 보이게 함(종점 정확도에는 영향 없음).
 function _twSnap(track,targetIdx,onSettle){
+  track.style.transition='transform .12s ease-out';
   const settled=_twApplyIdx(track,targetIdx);
   track.dataset.rawIdx=settled;
+  const clearTransition=()=>{track.style.transition='';track.removeEventListener('transitionend',clearTransition);};
+  track.addEventListener('transitionend',clearTransition);
   onSettle();
 }
 function _twAttach(trackId,onSelect){
@@ -4191,6 +4195,7 @@ function _twAttach(trackId,onSelect){
   let dragging=false,startY=0,startIdx=0,lastY=0,lastT=0,velocity=0;
   function start(y){
     if(track._twRaf)cancelAnimationFrame(track._twRaf);
+    track.style.transition='none'; // 스냅 애니메이션 도중 다시 잡아도 즉시 손가락을 따라가도록
     dragging=true;
     startY=lastY=y;
     lastT=performance.now();
