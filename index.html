@@ -1182,6 +1182,39 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .ch-month-banner-chip{flex-shrink:0;font-size:var(--main-text-size);font-weight:500;color:var(--tp);background:var(--card);border:1px solid var(--card-b);border-radius:12px;padding:10px 16px;cursor:pointer;white-space:nowrap;}
 .ch-month-banner-chip.on{background:rgba(255,160,180,.16);border-color:rgba(255,140,160,.38);color:var(--tp);font-weight:700;}
 .ch-note-tl-empty{font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:20px 0;}
+/* ── 콘텐츠 허브 코멘트 모아보기 — 날짜순(ch-tlA-*) / 작품별(ch-tlB-*) ── */
+.ch-tlA-day{margin-bottom:4px;}
+.ch-tlA-day-date{font-size:var(--dow-label-size);font-weight:700;color:var(--tm);letter-spacing:0.04em;padding:14px 0 8px 24px;}
+.ch-tlA-day:first-child .ch-tlA-day-date{padding-top:0;}
+.ch-tlA-row{position:relative;display:flex;gap:11px;padding:0 0 16px 24px;}
+.ch-tlA-row::before{content:'';position:absolute;left:4px;top:6px;bottom:-4px;width:1px;background:rgba(var(--divider-rgb),0.4);}
+.ch-tlA-row:last-child::before{display:none;}
+.ch-tlA-dot{position:absolute;left:0;top:5px;width:9px;height:9px;border-radius:50%;background:var(--tm);flex-shrink:0;}
+.ch-tlA-content{flex:1;min-width:0;display:flex;gap:9px;align-items:flex-start;}
+.ch-tlA-main{flex:1;min-width:0;}
+.ch-tlA-title-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.ch-tlA-badge-final{font-size:9px;font-weight:700;color:#fff;background:var(--pal-yellow-text,#e0a339);border-radius:5px;width:15px;height:15px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;}
+.ch-tlA-title{font-size:var(--main-text-size);font-weight:600;color:var(--tp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
+.ch-tlA-stars{font-size:11px;color:var(--pal-yellow-text,#e0a339);letter-spacing:-0.5px;flex-shrink:0;}
+.ch-tlA-cat-tag{font-size:10px;color:var(--tm);background:var(--card2);border-radius:5px;padding:1px 5px;flex-shrink:0;}
+.ch-tlA-time{font-size:var(--dow-label-size);color:var(--tm);font-variant-numeric:tabular-nums;flex-shrink:0;}
+.ch-tlA-meta{font-size:var(--dow-label-size);color:var(--tm);margin-top:2px;}
+.ch-tlA-text{font-size:var(--main-text-size);color:var(--ts);line-height:1.55;margin-top:4px;word-break:break-word;}
+.ch-tlB-card{background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:14px 15px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,0.03);}
+.ch-tlB-top{display:flex;gap:11px;}
+.ch-tlB-body{flex:1;min-width:0;}
+.ch-tlB-title-row{display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap;}
+.ch-tlB-title{font-size:15px;font-weight:600;color:var(--tp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
+.ch-tlB-cat{font-size:10px;color:var(--tm);background:var(--card2);border-radius:5px;padding:2px 6px;flex-shrink:0;}
+.ch-tlB-progress-badge{font-size:11px;color:var(--ts);flex-shrink:0;}
+.ch-tlB-final-row{display:flex;align-items:center;gap:6px;margin-bottom:4px;}
+.ch-tlB-stars{font-size:11px;color:var(--pal-yellow-text,#e0a339);}
+.ch-tlB-final-text{font-size:var(--main-text-size);color:var(--ts);line-height:1.55;word-break:break-word;}
+.ch-tlB-notes{margin-top:10px;padding-top:10px;border-top:1px dashed var(--card-b);display:flex;flex-direction:column;gap:8px;}
+.ch-tlB-note-item{display:flex;gap:8px;}
+.ch-tlB-note-date{font-size:var(--dow-label-size);color:var(--tm);font-weight:600;white-space:nowrap;padding-top:1px;min-width:34px;}
+.ch-tlB-note-text{font-size:var(--main-text-size);color:var(--tp);line-height:1.5;flex:1;word-break:break-word;}
+.ch-tlB-note-meta{font-size:var(--dow-label-size);color:var(--tm);margin-bottom:3px;}
 
 .wcal-new-picker-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px;}
 .wcal-new-picker-item{display:flex;align-items:center;justify-content:center;gap:6px;padding:14px 10px;border-radius:14px;background:var(--card);border:1px solid var(--card-b);cursor:pointer;font-size:var(--main-text-size);color:var(--tp);font-weight:500;}
@@ -1925,6 +1958,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div class="rd-tab on" data-view="date" onclick="switchNoteTimelineView(this,'date')">날짜순</div>
         <div class="rd-tab" data-view="work" onclick="switchNoteTimelineView(this,'work')">작품별</div>
       </div>
+      <div class="month-chips" id="ch-note-timeline-month-chips" style="margin-top:10px;margin-bottom:0;"></div>
       <div id="content-note-timeline-list" style="margin-top:12px;"></div>
     </div>
   </div>

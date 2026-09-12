@@ -12030,6 +12030,27 @@ function _rdProgressLabel(unit,percentAfter,pagesAfter){
   if(unit==='percent')return (percentAfter!=null?percentAfter:0)+'%';
   return (pagesAfter!=null?pagesAfter:0)+'p';
 }
+// 카테고리별 일일 진행 로그(dailyLog)를 "35% · +5%" 같은 한 줄 텍스트로 변환 — 일자별 상세화면(renderWcalDayDetail)과
+// 코멘트 모아보기(_chNoteRowHtml)가 동일 포맷을 쓰도록 공용 헬퍼로 분리(2026-09-12).
+function _chDailyLogMetaText(cat,log){
+  if(!log)return '';
+  let progText='',amountText='';
+  if(cat==='book')progText=_rdProgressLabel(log.unit,log.percent_after,log.unit_after);
+  else if(log.unit_after!=null)progText=cat==='drama'?`${log.unit_after}화`:`${log.unit_after}분`;
+  amountText=log.amount_read>0?(log.unit==='percent'?`+${log.amount_read}%`:`+${log.amount_read}${cat==='drama'?'화':(cat==='book'?'p':'분')}`):'';
+  return [progText,amountText].filter(Boolean).join(' · ');
+}
+// 코멘트 모아보기 전용 — 독서는 증감률+감상시간, 드라마/영화는 감상시간만 노출(2026-09-12).
+// _chDailyLogMetaText(상세화면과 공용)는 그대로 두고, 이 시트에서만 카테고리별로 항목을 추리는 얇은 래퍼.
+function _chNoteMetaText(cat,log){
+  if(!log)return '';
+  const timeText=log.timeText||'';
+  if(cat==='book'){
+    const progAmount=_chDailyLogMetaText(cat,log);
+    return [progAmount,timeText].filter(Boolean).join(' · ');
+  }
+  return timeText;
+}
 // ── 감상 캘린더 (실제로 본 날짜에 포스터를 꽂는 달력형 뷰. 콘텐츠 모아보기(카테고리별 리스트)와는 별개 기능) ──
 // 데이터 소스: 새 테이블 없이 기존 리듬 기록을 그대로 사용.
 //  - 드라마/영화: rhythm_blocks(cat='enjoy', text="드라마 - 제목"/"영화 - 제목")의 date_key가 곧 감상일.
@@ -12262,14 +12283,9 @@ function renderWatchCalDetail(){
       if(sessionRanges.length)timeText=`${sessionRanges.join(', ')} (총 ${totalMin}분)`;
     }
     // 진행률 — content_daily_log(책은 기존 로그, 드라마/영화는 2026-09-11부터의 신규 로그만 존재).
-    let progText='',amountText='';
     const log=it.dailyLog;
-    if(log){
-      if(it.cat==='book')progText=_rdProgressLabel(log.unit,log.percent_after,log.unit_after);
-      else if(log.unit_after!=null)progText=it.cat==='drama'?`${log.unit_after}화`:`${log.unit_after}분`;
-      amountText=log.amount_read>0?(log.unit==='percent'?`+${log.amount_read}%`:`+${log.amount_read}${it.cat==='drama'?'화':(it.cat==='book'?'p':'분')}`):'';
-    }
-    const metaLine=[progText,amountText,timeText].filter(Boolean).join(' · ');
+    const progAmountText=_chDailyLogMetaText(it.cat,log);
+    const metaLine=[progAmountText,timeText].filter(Boolean).join(' · ');
     const metaHtml=metaLine?`<div style="font-size:var(--dow-label-size);color:var(--ts);margin-top:2px;">${metaLine}</div>`:'';
     // 독서 전용 공유카드 — 구 독서달력(2026-09-11 폐기)에 있던 진입점을 여기로 이전. 그날 진행률 로그(dailyLog)가 있는 책만 노출.
     const shareBtnHtml=(it.cat==='book'&&log)?`<span onclick="event.stopPropagation();openTodayReadingShareModal('${it.cid}','${log.unit}',${log.percent_after!=null?log.percent_after:'null'},${log.unit_after!=null?log.unit_after:'null'},${log.seconds||0},'${dk}')" title="공유 이미지" style="cursor:pointer;color:var(--ts);opacity:0.75;flex-shrink:0;padding:4px;"><i class="ti ti-share-2 ico-sz-14" aria-hidden="true"></i></span>`:'';
@@ -12426,11 +12442,96 @@ function chExpandMonth(mk){
 // 완결 코멘트(contents.review+stars, 작품당 1개)와 감상 메모(wcal_note, 날짜당 여러 개)를 함께 모아 보여줌.
 // 날짜순: 완결 코멘트는 카드, 감상 메모는 그 아래 곁가지로 — 시간 흐름이 기준축.
 // 작품별: 작품 카드 하나에 완결 총평 + 그 작품에 남긴 감상 메모들을 날짜순으로 접어 넣음 — 작품이 기준축.
-let _chNoteTimelineMonths=6; // 최근 몇 개월치를 모아볼지
+let _chSelectedMonth=monthKey(new Date()); // 코멘트 모아보기 — 현재 선택된 월(YYYY-MM), 칩으로 전환
+// 선택된 월 하나만 수집(효율성 — 전체 기간을 한번에 불러오지 않음, 2026-09-12 월별 칩 도입)
+// finals(완결 총평)·notes(감상 메모)·logs(일자별 진행률+감상시간)를 함께 반환
+async function _chCollectNoteSource(mk){
+  mk=mk||_chSelectedMonth;
+  await syncMonthRange(parseInt(mk.slice(0,4),10),parseInt(mk.slice(5,7),10)-1); // 그 달 콘텐츠/리듬블록을 로컬에 채워둠(달력과 동일한 소스)
+  const finals=[]; // {cid,cat,title,poster,stars,review,dk} — status가 done/stopped(=완결 처리됨)인 작품 전부 포함,
+  // review/stars는 있을 수도 없을 수도 있음(완결 배지 판정은 status 기준, 총평 텍스트 유무와 별개)(2026-09-09 수정)
+  const notes=[]; // {cid,cat,title,dk,text,updatedAt} — poster는 저장 안 하므로 소속 contents 항목의 값을 붙임
+  const contentByCid={}; // cid → {cat,title,poster} — 로그 병합 시 제목/포스터 조회용
+  getContents(mk).forEach(c=>{
+    if(c.cat!=='music'&&(c.status==='done'||c.status==='stopped')){
+      finals.push({cid:c.cid,cat:c.cat,title:c.title,poster:c.poster||null,stars:c.stars||0,review:c.review||'',dk:c.endDate||c.startDate||''});
+    }
+    (c.notes||[]).forEach(n=>notes.push({...n,cid:c.cid,poster:c.poster||null}));
+    if(c.cid)contentByCid[c.cid]={cat:c.cat,title:c.title,poster:c.poster||null};
+  });
+  // 일자별 진행률 로그(content_daily_log) — 감상달력 일자별 상세화면(renderWcalDayDetail)과 동일한 소스.
+  // 코멘트(리뷰/메모) 없이 진행률만 기록된 날도 모아보기에 나오도록 별도 배열로 수집.
+  const daysInMonth=new Date(parseInt(mk.slice(0,4),10),parseInt(mk.slice(5,7),10),0).getDate();
+  const fromDk=`${mk}-01`,toDk=`${mk}-${pad(daysInMonth)}`;
+  const logRows=await supaFetch(`content_daily_log?date_key=gte.${fromDk}&date_key=lte.${toDk}&order=date_key`)||[];
+  // 카테고리별 감상시간(리듬블록) — 독서/드라마/영화는 그날의 enjoy 리듬블록 합산 시간을 구해 로그에 얹음.
+  // 독서: 증감률+시간, 드라마/영화: 시간만 노출(2026-09-12) — 표시 여부는 렌더 함수(_chDailyLogMetaText)에서 처리.
+  const catPrefix={drama:'드라마 - ',movie:'영화 - ',book:'독서 - '};
+  const timeCache={}; // dk|cid -> "HH:MM-HH:MM, ... (총 N분)"
+  function timeTextFor(dk,cat,title){
+    const key=dk+'|'+cat+'|'+title;
+    if(timeCache[key]!==undefined)return timeCache[key];
+    if(!catPrefix[cat]){timeCache[key]='';return '';}
+    const target=catPrefix[cat]+title;
+    const sessionBlocks=getRhythmBlocks(dk).filter(b=>b.cat==='enjoy'&&b.text===target);
+    const sessionRanges=sessionBlocks.map(b=>`${b.start}-${b.end}`);
+    const totalMin=sessionBlocks.reduce((sum,b)=>{let m=toMin(b.end)-toMin(b.start);if(m<0)m+=1440;return sum+Math.max(0,m);},0);
+    const text=sessionRanges.length?`${sessionRanges.join(', ')} (총 ${totalMin}분)`:'';
+    timeCache[key]=text;
+    return text;
+  }
+  const logs=[]; // {cid,cat,title,poster,dk,unit,percent_after,unit_after,amount_read,seconds,timeText}
+  logRows.forEach(r=>{
+    if(!r.content_cid)return;
+    const c=contentByCid[r.content_cid];
+    if(!c)return; // 이번 수집 범위(이 달)에 없는 콘텐츠의 로그는 제외
+    logs.push({cid:r.content_cid,cat:c.cat,title:c.title,poster:c.poster,dk:r.date_key,unit:r.unit,percent_after:r.percent_after,unit_after:r.unit_after,amount_read:r.amount_read,seconds:r.seconds,timeText:timeTextFor(r.date_key,c.cat,c.title)});
+  });
+  // 로그가 없어도(진행률 미기록) 리듬블록만으로 감상한 날이 있을 수 있음 — 그 날짜도 시간만으로 항목 생성.
+  const loggedKeys=new Set(logs.map(l=>l.dk+'|'+l.cid));
+  Object.keys(contentByCid).forEach(cid=>{
+    const c=contentByCid[cid];
+    if(!catPrefix[c.cat])return; // 음악 등 리듬블록 기반이 아닌 카테고리는 제외
+    const target=catPrefix[c.cat]+c.title;
+    for(let d=1;d<=daysInMonth;d++){
+      const dk=`${mk}-${pad(d)}`;
+      const key=dk+'|'+cid;
+      if(loggedKeys.has(key))continue;
+      const t=timeTextFor(dk,c.cat,c.title);
+      if(!t)continue;
+      logs.push({cid,cat:c.cat,title:c.title,poster:c.poster,dk,unit:null,percent_after:null,unit_after:null,amount_read:0,seconds:0,timeText:t});
+    }
+  });
+  return {finals,notes,logs};
+}
 let _chNoteTimelineView='date';
 function openContentNoteTimeline(){
+  _chSelectedMonth=monthKey(new Date()); // 열 때마다 이번 달로 초기화
+  renderChNoteMonthChips();
   openSheet('content-note-timeline-sheet');
   renderContentNoteTimeline();
+}
+// 최근 6개월치 칩만 노출 — 그 밖의 달은 이 시트에서 보지 않음(2026-09-12, 전체기간 로딩 대신 월별 조회로 전환)
+function renderChNoteMonthChips(){
+  const wrap=document.getElementById('ch-note-timeline-month-chips');if(!wrap)return;
+  const now=new Date();
+  wrap.innerHTML='';
+  for(let i=5;i>=0;i--){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const mk=monthKey(d);
+    const chip=document.createElement('div');
+    chip.className='m-chip'+(mk===_chSelectedMonth?' active':'');
+    chip.textContent=(d.getMonth()+1)+'월';
+    chip.addEventListener('click',()=>{
+      if(mk===_chSelectedMonth)return;
+      _chSelectedMonth=mk;
+      renderChNoteMonthChips();
+      renderContentNoteTimeline();
+    });
+    wrap.appendChild(chip);
+  }
+  const activeChip=wrap.querySelector('.m-chip.active');
+  if(activeChip)activeChip.scrollIntoView({behavior:'auto',block:'nearest',inline:'center'});
 }
 function switchNoteTimelineView(btn,view){
   _chNoteTimelineView=view;
@@ -12438,39 +12539,34 @@ function switchNoteTimelineView(btn,view){
   btn.classList.add('on');
   renderContentNoteTimeline();
 }
-// 최근 N개월치의 완결 콘텐츠(review 또는 stars가 있는 것)와 감상 메모를 함께 수집
-function _chCollectNoteSource(months){
-  if(!months){
-    const now=new Date();
-    months=[];
-    for(let i=0;i<_chNoteTimelineMonths;i++)months.push(monthKey(new Date(now.getFullYear(),now.getMonth()-i,1)));
-  }
-  const finals=[]; // {cid,cat,title,poster,stars,review,dk} — status가 done/stopped(=완결 처리됨)인 작품 전부 포함,
-  // review/stars는 있을 수도 없을 수도 있음(완결 배지 판정은 status 기준, 총평 텍스트 유무와 별개)(2026-09-09 수정)
-  const notes=[]; // {cid,cat,title,dk,text,updatedAt} — poster는 저장 안 하므로 소속 contents 항목의 값을 붙임
-  months.forEach(mk=>{
-    getContents(mk).forEach(c=>{
-      if(c.cat!=='music'&&(c.status==='done'||c.status==='stopped')){
-        finals.push({cid:c.cid,cat:c.cat,title:c.title,poster:c.poster||null,stars:c.stars||0,review:c.review||'',dk:c.endDate||c.startDate||''});
-      }
-      (c.notes||[]).forEach(n=>notes.push({...n,cid:c.cid,poster:c.poster||null}));
-    });
-  });
-  return {finals,notes};
-}
-function renderContentNoteTimeline(){
+async function renderContentNoteTimeline(){
   const el=document.getElementById('content-note-timeline-list');if(!el)return;
-  const {finals,notes}=_chCollectNoteSource();
-  if(!finals.length&&!notes.length){el.innerHTML='<div class="ch-note-tl-empty">아직 남긴 코멘트가 없어요</div>';return;}
-  el.innerHTML=_chNoteTimelineView==='work'?_chRenderNoteTimelineByWork(finals,notes):_chRenderNoteTimelineByDate(finals,notes);
+  el.innerHTML='<div class="ch-note-tl-empty">불러오는 중...</div>';
+  const {finals,notes,logs}=await _chCollectNoteSource();
+  if(!finals.length&&!notes.length&&!logs.length){el.innerHTML='<div class="ch-note-tl-empty">아직 남긴 코멘트가 없어요</div>';return;}
+  el.innerHTML=_chNoteTimelineView==='work'?_chRenderNoteTimelineByWork(finals,notes,logs):_chRenderNoteTimelineByDate(finals,notes,logs);
 }
-// 날짜순 뷰 — 날짜별로 묶어 최신순 정렬, 완결 카드 먼저 + 감상 메모는 곁가지로
-// 날짜순 뷰 — 완결/감상 메모 모두 대등한 라인 위에, 점 색으로만 구분
-function _chRenderNoteTimelineByDate(finals,notes){
+// 날짜순 뷰 — 날짜별로 묶어 최신순 정렬, 완결/감상 메모/진행률 로그를 대등한 라인 위에 점 색으로만 구분해 표시
+function _chRenderNoteTimelineByDate(finals,notes,logs){
   const byDate={};
   const push=(dk,item)=>{if(!dk)return;if(!byDate[dk])byDate[dk]=[];byDate[dk].push(item);};
   finals.forEach(f=>push(f.dk,{...f,__type:'final'}));
-  notes.forEach(n=>push(n.dk,{...n,__type:'note'}));
+  // note에 같은 날짜+cid 로그가 있으면 진행률 정보를 붙이고, 로그 쪽에서 소비됐다고 표시(중복 노출 방지)
+  const logByKey={};
+  (logs||[]).forEach(l=>{logByKey[l.dk+'|'+l.cid]=l;});
+  const consumedLogKeys=new Set();
+  notes.forEach(n=>{
+    const key=n.dk+'|'+n.cid;
+    const log=logByKey[key];
+    if(log)consumedLogKeys.add(key);
+    push(n.dk,{...n,__type:'note',log:log||null});
+  });
+  // 코멘트가 없어도 진행률만 기록된 날 — 로그만으로 항목 생성
+  (logs||[]).forEach(l=>{
+    const key=l.dk+'|'+l.cid;
+    if(consumedLogKeys.has(key))return;
+    push(l.dk,{cid:l.cid,cat:l.cat,title:l.title,poster:l.poster,dk:l.dk,text:'',log:l,__type:'note'});
+  });
   const dks=Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
   return dks.map(dk=>{
     const dispDate=parseInt(dk.slice(5,7),10)+'월 '+parseInt(dk.slice(8,10),10)+'일';
@@ -12484,18 +12580,32 @@ function _chRenderNoteTimelineByDate(finals,notes){
   }).join('');
 }
 // 작품별 뷰 — cid 기준으로 묶음(cid 없는 감상 메모는 원칙상 없음 — 메모는 항상 cid 연결 항목에서만 작성됨)
-function _chRenderNoteTimelineByWork(finals,notes){
+function _chRenderNoteTimelineByWork(finals,notes,logs){
   const groups={}; // cid -> {cat,title,poster,final,notes:[]}
   finals.forEach(f=>{
     if(!f.cid)return;
     groups[f.cid]=groups[f.cid]||{cat:f.cat,title:f.title,poster:f.poster,final:null,notes:[]};
     groups[f.cid].final=f;
   });
+  const logByKey={};
+  (logs||[]).forEach(l=>{logByKey[l.dk+'|'+l.cid]=l;});
+  const consumedLogKeys=new Set();
   notes.forEach(n=>{
     if(!n.cid)return;
     groups[n.cid]=groups[n.cid]||{cat:n.cat,title:n.title,poster:n.poster||null,final:null,notes:[]};
     if(!groups[n.cid].poster)groups[n.cid].poster=n.poster||null; // finals에 없던(=완결 전) 작품도 메모 쪽 최신 poster로 채움
-    groups[n.cid].notes.push(n);
+    const key=n.dk+'|'+n.cid;
+    const log=logByKey[key];
+    if(log)consumedLogKeys.add(key);
+    groups[n.cid].notes.push({...n,log:log||null});
+  });
+  // 코멘트 없이 진행률만 기록된 날 — 로그만으로 노트 항목 생성해 같은 작품 카드에 포함
+  (logs||[]).forEach(l=>{
+    const key=l.dk+'|'+l.cid;
+    if(consumedLogKeys.has(key))return;
+    groups[l.cid]=groups[l.cid]||{cat:l.cat,title:l.title,poster:l.poster,final:null,notes:[]};
+    if(!groups[l.cid].poster)groups[l.cid].poster=l.poster||null;
+    groups[l.cid].notes.push({cid:l.cid,cat:l.cat,dk:l.dk,text:'',log:l});
   });
   const cids=Object.keys(groups).sort((a,b)=>{
     const la=groups[a].notes.concat(groups[a].final?[groups[a].final]:[]).map(x=>x.dk||x.updatedAt||0).sort().pop()||'';
@@ -12514,7 +12624,10 @@ function _chRenderNoteTimelineByWork(finals,notes){
     const notesSorted=g.notes.slice().sort((a,b)=>(b.dk||'').localeCompare(a.dk||''));
     const notesHtml=notesSorted.length?`<div class="ch-tlB-notes">${notesSorted.map(n=>{
       const dispDate=n.dk?(parseInt(n.dk.slice(5,7),10)+'/'+parseInt(n.dk.slice(8,10),10)):'';
-      return `<div class="ch-tlB-note-item"><div class="ch-tlB-note-date">${dispDate}</div><div class="ch-tlB-note-text">${escapeHtml(n.text||'')}</div></div>`;
+      const progAmountText=_chNoteMetaText(g.cat,n.log);
+      const metaHtml=progAmountText?`<div class="ch-tlB-note-meta">${progAmountText}</div>`:'';
+      const textHtml=n.text?`<div class="ch-tlB-note-text">${escapeHtml(n.text)}</div>`:'';
+      return `<div class="ch-tlB-note-item"><div class="ch-tlB-note-date">${dispDate}</div><div>${metaHtml}${textHtml}</div></div>`;
     }).join('')}</div>`:'';
     return `<div class="ch-tlB-card">
       <div class="ch-tlB-top">
@@ -12528,11 +12641,14 @@ function _chRenderNoteTimelineByWork(finals,notes){
     </div>`;
   }).join('');
 }
-// 날짜순 뷰의 완결 항목 — 정사각형(1:1) 포스터 작게, 완 배지+제목+별점 한 줄
+// 날짜순 뷰의 완결 항목 — 감상달력 일자별 상세화면과 동일한 포스터 규격(_wcalPosterThumbHtml, 32x44 세로형) 재사용
 function _chFinalRowHtml(f){
-  const posterHtml=`<img class="ch-tlA-poster" src="${f.poster||''}" style="${f.poster?'':'background:var(--card2);'}" alt="">`;
+  const m=WCAL_CAT_META[f.cat]||{color:'var(--tm)'};
+  const posterHtml=_wcalPosterThumbHtml(f.cat,f.poster);
+  // 도트는 항상 카테고리 지정색(인라인 style) — 완결 여부는 옆의 '완' 배지(ch-tlA-badge-final, 옐로우 고정색)로 구분.
+  // 예전엔 .ch-tlA-dot.final 클래스로도 색을 주려 했으나 인라인 style에 항상 가려지는 죽은 규칙이라 제거함(2026-09-12).
   return `<div class="ch-tlA-row">
-    <div class="ch-tlA-dot final"></div>
+    <div class="ch-tlA-dot" style="background:${m.color};"></div>
     <div class="ch-tlA-content">
       ${posterHtml}
       <div class="ch-tlA-main">
@@ -12546,14 +12662,20 @@ function _chFinalRowHtml(f){
     </div>
   </div>`;
 }
-// 날짜순 뷰의 감상 메모 — 완결과 동일한 구조(정사각형 포스터, 한 줄 타이틀), 배지 대신 카테고리 태그만
+// 날짜순 뷰의 감상 메모 — 완결과 동일한 구조(포스터+한 줄 타이틀), 배지 대신 카테고리 태그만
 // showTime: 그날 항목이 여러 개일 때만 작성 시각을 곁들여 순서를 짚어줌
+// n.log: 그날 진행률 로그(content_daily_log) — 코멘트 없이 진행률만 있는 날도 이 로그로 한 줄 표시됨(2026-09-12)
+// 도트를 잇는 세로선은 .ch-tlA-row::before(position:absolute, row 자신 기준 top/bottom)가 그려서
+// row 높이가 가변이어도 자동으로 다음 도트까지 이어짐 — 마지막 행은 CSS :last-child가 자동으로 선을 숨김
+// (아카이브앱 tablet.js/html의 코멘트 모아보기 구현을 그대로 이식, 2026-09-12)
 function _chNoteRowHtml(n,showTime){
-  const posterHtml=`<img class="ch-tlA-poster" src="${n.poster||''}" style="${n.poster?'':'background:var(--card2);'}" alt="">`;
-  const m=WCAL_CAT_META[n.cat]||{label:''};
+  const m=WCAL_CAT_META[n.cat]||{label:'',color:'var(--tm)'};
+  const posterHtml=_wcalPosterThumbHtml(n.cat,n.poster);
   const timeHtml=(showTime&&n.time)?`<span class="ch-tlA-time">${n.time}</span>`:'';
+  const progAmountText=_chNoteMetaText(n.cat,n.log);
+  const metaHtml=progAmountText?`<div class="ch-tlA-meta">${progAmountText}</div>`:'';
   return `<div class="ch-tlA-row">
-    <div class="ch-tlA-dot"></div>
+    <div class="ch-tlA-dot" style="background:${m.color};"></div>
     <div class="ch-tlA-content">
       ${posterHtml}
       <div class="ch-tlA-main">
@@ -12562,7 +12684,8 @@ function _chNoteRowHtml(n,showTime){
           <span class="ch-tlA-title">${escapeHtml(n.title||'')}</span>
           <span class="ch-tlA-cat-tag">${m.label}</span>
         </div>
-        <div class="ch-tlA-text">${escapeHtml(n.text||'')}</div>
+        ${metaHtml}
+        ${n.text?`<div class="ch-tlA-text">${escapeHtml(n.text)}</div>`:''}
       </div>
     </div>
   </div>`;

@@ -1,11 +1,10 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.69-morningflow-exercise-rest-sub';
+const CACHE = 'iikoto-v2.71-content-hub-note-timeline';
 const ASSETS = [
   './',
   './index.html'
 ];
 
-// 설치 — 핵심 파일 캐시
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE).then(c => c.addAll(ASSETS))
@@ -13,7 +12,6 @@ self.addEventListener('install', e => {
   self.skipWaiting();
 });
 
-// 활성화 — 이전 캐시 삭제 후 즉시 클라이언트 점유
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
@@ -22,7 +20,6 @@ self.addEventListener('activate', e => {
   );
 });
 
-// 요청 처리 — 네트워크 우선, 실패시 캐시
 self.addEventListener('fetch', e => {
   if(e.request.url.includes('supabase.co')) return;
   if(e.request.method !== 'GET') return;
@@ -41,7 +38,6 @@ self.addEventListener('fetch', e => {
   );
 });
 
-// ── Web Push 수신 ──
 self.addEventListener('push', e => {
   let data = { title: '이이코토', body: '', url: './' };
   try {
@@ -59,7 +55,6 @@ self.addEventListener('push', e => {
   );
 });
 
-// ── 알림 탭 ──
 self.addEventListener('notificationclick', e => {
   e.notification.close();
   const targetUrl = e.notification.data?.url || './';
