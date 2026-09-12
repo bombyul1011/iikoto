@@ -4151,7 +4151,7 @@ function _twSyncInput(hourTrackId,minTrackId,targetInpId){
   const inp=document.getElementById(targetInpId);
   if(hT&&mT&&inp)inp.value=hT._twFmt(hT._twValues[hT.dataset.curIdx])+':'+mT._twFmt(mT._twValues[mT.dataset.curIdx]);
 }
-// 관성 스크롤 — 마지막 몇 개 이동 샘플로 속도 계산 후 감속시키며 40px 그리드에 스냅
+// 관성 스크롤 — 손 뗄 때 속도로 감속시키다 40px 그리드에 스냅
 function _twMomentum(track,velocity,onSettle){
   const friction=0.955,minVelocity=0.3; // 이 속도 밑으로 떨어지면 그 자리에서 바로 가까운 칸에 스냅
   let v=velocity;
