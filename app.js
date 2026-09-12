@@ -127,7 +127,7 @@ const RHYTHM_CATS={
   appointment:{label:'외출',color:'rgba(var(--pal-rose-rgb),0.25)',icon:'ti-bus'}, // 알파만 낮춤(채도는 원색 그대로), 외출도 지속시간이 길어 존재감 조절, 2026-09-04
   note:{label:'책상',color:'rgba(var(--pal-yellow-rgb),0.82)',icon:'ti-desk'},
   enjoy:{label:'감상',color:'rgba(var(--pal-lavender-rgb),0.80)',icon:'ti-stack-2'},
-  home:{label:'정리',color:'rgba(var(--pal-lime-rgb),0.82)',icon:'ti-home'}
+  home:{label:'살림',color:'rgba(var(--pal-lime-rgb),0.82)',icon:'ti-home'}
 };
 const RHYTHM_SLEEP_COLOR='rgba(var(--pal-warmgray-rgb),0.30)'; // 알파만 낮춤(채도는 원색 그대로), 2026-09-04
 const RHYTHM_MEAL_COLOR='rgba(var(--pal-green-rgb),0.90)';
@@ -352,7 +352,11 @@ function saveRhythmBlock(){
   }
   saveRhythmBlocks(_rhythmDk,blocks);
   if(isNew){
-    autoCheckHabitFromRhythm(cat,_rhythmDk,start);
+    if(cat==='home'){
+      if(text==='정리')checkHabitDirect('tidy',_rhythmDk,start); // 살림 중 '정리' 칩 선택했을 때만 습관 연결 — 세탁/주방은 제외
+    }else{
+      autoCheckHabitFromRhythm(cat,_rhythmDk,start);
+    }
     if(cat==='note'&&text==='일기')checkHabitDirect('diary',_rhythmDk,start);
   }
   _rhythmFormOpen=false;_resetRhythmForm();
@@ -360,7 +364,8 @@ function saveRhythmBlock(){
   setTimeout(()=>{_rhythmSubmitting=false;},500);
 }
 // 리듬 블록 카테고리에 대응하는 습관(월간 결산용)을 자동으로 체크
-// 매핑은 HABIT_AUTO_RHYTHM_MAP(카탈로그 도입, 2026-09-05)에 정의 — 운동/정리/케어(단장) 3개 카테고리 지원
+// 매핑은 HABIT_AUTO_RHYTHM_MAP(카탈로그 도입, 2026-09-05)에 정의 — 운동/케어(단장) 2개 카테고리 지원
+// (살림은 '정리' 칩 선택시에만 연결하는 별도 분기가 있어 이 공용 맵엔 포함하지 않음, 2026-09-12)
 function autoCheckHabitFromRhythm(cat,dk,startTime){
   const habitId=HABIT_AUTO_RHYTHM_MAP[cat];if(!habitId)return;
   checkHabitDirect(habitId,dk,startTime);
@@ -2237,7 +2242,7 @@ async function syncHabitGoalsDown(){
 }
 // 리듬 카테고리 → 습관 id 자동체크 매핑. 여기 추가되는 카테고리는 그 리듬블록이 생성되는 순간
 // 자동으로 해당 습관이 체크됨(이미 켜져 있으면 그대로 둠 — 수동으로 끈 걸 되살리지 않기 위함, checkHabitDirect 참고).
-const HABIT_AUTO_RHYTHM_MAP={exercise:'exercise',home:'tidy',groom:'care'};
+const HABIT_AUTO_RHYTHM_MAP={exercise:'exercise',groom:'care'}; // home(살림)은 '정리' 칩 선택시에만 연결하는 별도 분기(rhythm 등록 함수 내)로 처리 — 여기 넣으면 세탁/주방도 걸려버림
 const DEFAULT_HABITS=[{id:'exercise',name:'운동',color:'pink'},{id:'reading',name:'독서',color:'lavender'},{id:'diary',name:'일기',color:'yellow'},{id:'tidy',name:'정리',color:'lime'}]; // [2026-09-06] 카탈로그 색상 재배정에 맞춰 정정
 // 기존 데이터(이름만 있고 id가 없는 습관)에 처음 한 번만 id를 부여하는 마이그레이션.
 // 카탈로그와 이름이 일치하면 그 카탈로그 id를 그대로 부여(기존에 쌓인 이름 기반 체크 기록과 자연스럽게 이어짐)하고,
@@ -5414,7 +5419,7 @@ const MORNING_FLOW_CARDS=[
   {key:'exercise',label:'운동',icon:'ti-run',colorRgb:'var(--pal-pink-rgb)',rhythmCat:'exercise'},
   {key:'enjoy',label:'감상',icon:'ti-stack-2',colorRgb:'var(--pal-lavender-rgb)',rhythmCat:'enjoy'}, // 서브선택(독서/콘텐츠) 필요 — 기타와 동일 패턴
   {key:'desk',label:'책상',icon:'ti-desk',colorRgb:'var(--pal-yellow-rgb)',rhythmCat:'note'}, // 서브선택(일기/노트정리/개인작업) 필요
-  {key:'clean',label:'정리',icon:'ti-sparkles',colorRgb:'var(--pal-lime-rgb)',rhythmCat:'home'},
+  {key:'clean',label:'살림',icon:'ti-sparkles',colorRgb:'var(--pal-lime-rgb)',rhythmCat:'home'},
   {key:'etc',label:'기타',icon:'ti-dots',colorRgb:'var(--pal-warmgray-rgb)',rhythmCat:null} // 서브선택(업무/외출/자유입력)에 따라 카테고리가 갈림
 ];
 const MORNING_FLOW_ENJOY_SUB=[
@@ -5429,6 +5434,11 @@ const MORNING_FLOW_EXERCISE_SUB=[
 const MORNING_FLOW_REST_SUB=[
   {key:'nap',label:'낮잠'},
   {key:'lazing',label:'빈둥빈둥'}
+];
+const MORNING_FLOW_CLEAN_SUB=[
+  {key:'clean',label:'정리'},
+  {key:'laundry',label:'세탁'},
+  {key:'kitchen',label:'주방'}
 ];
 const MORNING_FLOW_DESK_SUB=[
   {key:'diary',label:'일기'},
@@ -5472,7 +5482,7 @@ function _mfDurationMin(startStr,endStr){
   if(endMin<startMin)endMin+=1440;
   return endMin-startMin;
 }
-function getMorningFlow(dk){return S.get('mflow_'+dk)||{picks:{},etc:{},enjoy:{},desk:{},exercise:{},rest:{},confirmed:false};}
+function getMorningFlow(dk){return S.get('mflow_'+dk)||{picks:{},etc:{},enjoy:{},desk:{},exercise:{},rest:{},clean:{},confirmed:false};}
 // [2026-09-05] 모닝플로우 카드의 시작/종료 시각은 더 이상 flow.picks에 별도 저장하지 않고
 // 항상 연결된 리듬블록(blockCid)에서 직접 읽어옴 — 리듬탭에서 시간을 수정해도 즉시 반영되고,
 // "복제된 값이 원본과 어긋나는" 불일치가 구조적으로 사라짐.
@@ -5508,6 +5518,7 @@ async function syncMorningFlowUp(dk){
   if(flow.desk)etcPayload._desk=flow.desk;
   if(flow.exercise)etcPayload._exercise=flow.exercise;
   if(flow.rest)etcPayload._rest=flow.rest;
+  if(flow.clean)etcPayload._clean=flow.clean;
   const clientTs=flow._localTs||Date.now();
   const ok=await supaUpsert('morning_flow_picks','date_key',[{date_key:dk,picks:flow.picks||{},etc:etcPayload,client_ts:clientTs}]);
   // 업로드 도중(await 대기 중) 그 사이 다른 로컬 변경이 또 들어와 _localTs가 갱신됐을 수 있으므로,
@@ -5534,8 +5545,9 @@ async function syncMorningFlowDown(dk){
   const desk=etcRaw._desk||{};
   const exercise=etcRaw._exercise||{};
   const rest=etcRaw._rest||{};
-  const etc={...etcRaw};delete etc._enjoy;delete etc._desk;delete etc._exercise;delete etc._rest;
-  S.set('mflow_'+dk,{picks:r.picks||{},etc,enjoy,desk,exercise,rest,confirmed:Object.keys(r.picks||{}).length>0,_localTs:r.client_ts||Date.now()});
+  const clean=etcRaw._clean||{};
+  const etc={...etcRaw};delete etc._enjoy;delete etc._desk;delete etc._exercise;delete etc._rest;delete etc._clean;
+  S.set('mflow_'+dk,{picks:r.picks||{},etc,enjoy,desk,exercise,rest,clean,confirmed:Object.keys(r.picks||{}).length>0,_localTs:r.client_ts||Date.now()});
 }
 // 카드 선택 토글(그리드 화면 전용) — 이미 confirmed 상태에서는 이 함수가 호출될 일이 없음(그리드 자체가 안 보이므로).
 function toggleMorningFlowPick(key){
@@ -5548,6 +5560,7 @@ function toggleMorningFlowPick(key){
     if(key==='desk')delete flow.desk;
     if(key==='exercise')delete flow.exercise;
     if(key==='rest')delete flow.rest;
+    if(key==='clean')delete flow.clean;
   }else{
     flow.picks[key]={status:'idle'}; // idle → running → done. 자정 넘어 11:59까지 idle이면 통계 미반영(집계 시점에 자연히 제외).
   }
@@ -5612,6 +5625,14 @@ function selectMorningFlowRestSub(subKey){
   const flow=getMorningFlow(dk);
   if(!flow.picks.rest)return;
   flow.rest={sub:subKey};
+  saveMorningFlow(dk,flow);
+  refreshMorningFlowCard();
+}
+function selectMorningFlowCleanSub(subKey){
+  const dk=dateKey(getLogicalDate());
+  const flow=getMorningFlow(dk);
+  if(!flow.picks.clean)return;
+  flow.clean={sub:subKey};
   saveMorningFlow(dk,flow);
   refreshMorningFlowCard();
 }
@@ -5696,6 +5717,13 @@ function startMorningFlowCard(key){
     _startMorningFlowRhythm('rest',null,null,sub);
     return;
   }
+  if(key==='clean'){
+    const dk=dateKey(getLogicalDate());
+    const sub=getMorningFlow(dk).clean?.sub;
+    if(!sub)return; // 서브선택(정리/세탁/주방) 안 한 상태면 아무것도 하지 않음
+    _startMorningFlowRhythm('clean',null,null,sub);
+    return;
+  }
   _startMorningFlowRhythm(key);
 }
 // 실제 리듬블록 시작 등록 — key: 카드종류, targetCid: 감상(독서/콘텐츠)일 때 대상 cid, mk: 콘텐츠 월키, subKey: 기타(업무/외출)·책상(일기/노트정리/개인작업) 서브선택 공용.
@@ -5717,7 +5745,7 @@ function _startMorningFlowRhythm(key,targetCid,mk,subKey){
   const card=MORNING_FLOW_CARDS.find(c=>c.key===key);
   const rhythmCat=key==='etc'?(subKey==='work'?'work':'appointment'):card.rhythmCat;
   const deskLabelMap={diary:'일기',notes:'노트정리',work_personal:'개인작업'};
-  const label=key==='etc'?(subKey==='work'?'업무':(flow.etc?.title||'외출')):key==='desk'?deskLabelMap[subKey]:key==='exercise'?(MORNING_FLOW_EXERCISE_SUB.find(s=>s.key===subKey)?.label||card.label):key==='rest'?(MORNING_FLOW_REST_SUB.find(s=>s.key===subKey)?.label||card.label):card.label;
+  const label=key==='etc'?(subKey==='work'?'업무':(flow.etc?.title||'외출')):key==='desk'?deskLabelMap[subKey]:key==='exercise'?(MORNING_FLOW_EXERCISE_SUB.find(s=>s.key===subKey)?.label||card.label):key==='rest'?(MORNING_FLOW_REST_SUB.find(s=>s.key===subKey)?.label||card.label):key==='clean'?(MORNING_FLOW_CLEAN_SUB.find(s=>s.key===subKey)?.label||card.label):card.label;
   const now=Date.now();
   const startMin=new Date(now).getHours()*60+new Date(now).getMinutes();
   const startStr=minToHHMM(startMin);
@@ -5726,7 +5754,11 @@ function _startMorningFlowRhythm(key,targetCid,mk,subKey){
   blocks.push({cat:rhythmCat,start:startStr,end:'',text:label,created:now,cid:blockCid});
   saveRhythmBlocks(dk,blocks);
   autoSync('rblocks',dk);
-  autoCheckHabitFromRhythm(rhythmCat,dk,startStr); // 운동→습관 자동체크 등, 리듬탭 수동등록과 동일하게 연동
+  if(rhythmCat==='home'){
+    if(subKey==='clean')checkHabitDirect('tidy',dk,startStr); // 살림 중 '정리' 칩일 때만 습관 연결 — 세탁/주방은 제외(리듬탭 수기등록과 동일 규칙)
+  }else{
+    autoCheckHabitFromRhythm(rhythmCat,dk,startStr); // 운동→습관 자동체크 등, 리듬탭 수동등록과 동일하게 연동
+  }
   if(key==='desk'&&subKey==='diary')checkHabitDirect('diary',dk,startStr); // 리듬탭에서 note+"일기" 텍스트일 때 자동체크되던 것과 동일하게 연동
   flow.picks[key]={status:'running',blockCid,startTs:now,subKey:subKey||null};
   saveMorningFlow(dk,flow);
@@ -5793,6 +5825,8 @@ function _mfYesterdayRecapLine(){
       doneLabels.push(MORNING_FLOW_EXERCISE_SUB.find(s=>s.key===flow.exercise?.sub)?.label||c.label);
     }else if(c.key==='rest'){
       doneLabels.push(MORNING_FLOW_REST_SUB.find(s=>s.key===flow.rest?.sub)?.label||c.label);
+    }else if(c.key==='clean'){
+      doneLabels.push(MORNING_FLOW_CLEAN_SUB.find(s=>s.key===flow.clean?.sub)?.label||c.label);
     }else{
       doneLabels.push(c.label);
     }
@@ -5885,17 +5919,20 @@ function makeMorningFlowCard(showRecap){
       const isDesk=c.key==='desk';
       const isExercise=c.key==='exercise';
       const isRest=c.key==='rest';
+      const isClean=c.key==='clean';
       const etcSub=flow.etc?.sub;
       const enjoySub=flow.enjoy?.sub;
       const deskSub=flow.desk?.sub;
       const exerciseSub=flow.exercise?.sub;
       const restSub=flow.rest?.sub;
-      // 서브선택이 필요한 카드(기타/감상/책상/운동/휴식)인데 아직 안 고른 경우 — 칩만 노출, 시작 행 자체는 아직 안 그림
+      const cleanSub=flow.clean?.sub;
+      // 서브선택이 필요한 카드(기타/감상/책상/운동/휴식/살림)인데 아직 안 고른 경우 — 칩만 노출, 시작 행 자체는 아직 안 그림
       if(isEtc&&!etcSub)return _mfSubPickRowHtml(c,'기타',MORNING_FLOW_ETC_SUB,'selectMorningFlowEtcSub',false);
       if(isEnjoy&&!enjoySub)return _mfSubPickRowHtml(c,'감상',MORNING_FLOW_ENJOY_SUB,'selectMorningFlowEnjoySub',false);
       if(isDesk&&!deskSub)return _mfSubPickRowHtml(c,'책상',MORNING_FLOW_DESK_SUB,'selectMorningFlowDeskSub',true);
       if(isExercise&&!exerciseSub)return _mfSubPickRowHtml(c,'운동',MORNING_FLOW_EXERCISE_SUB,'selectMorningFlowExerciseSub',false);
       if(isRest&&!restSub)return _mfSubPickRowHtml(c,'휴식',MORNING_FLOW_REST_SUB,'selectMorningFlowRestSub',false);
+      if(isClean&&!cleanSub)return _mfSubPickRowHtml(c,'살림',MORNING_FLOW_CLEAN_SUB,'selectMorningFlowCleanSub',true);
       // 감상(독서/콘텐츠) 서브선택은 끝났지만 아직 대상(어떤 책/작품)을 안 고른 상태 —
       // 책상/기타와 동일하게 "칩으로 대상만 먼저 고르고 → 시작 행이 뜨면 시작 버튼을 누르는" 2단계 구조로 통일(2026-09-05).
       // 3개 이상이면 줄바꿈 대신 가로 스와이프(rhythm-content-picker-swipe, 리듬탭에서 쓰던 것과 동일 패턴).
@@ -5949,7 +5986,7 @@ function makeMorningFlowCard(showRecap){
         </div>`;
       }
       const deskLabelMap={diary:'일기',notes:'노트정리',work_personal:'개인작업'};
-      const label=isEtc?(etcSub==='work'?'업무':(flow.etc?.title||'외출')):isEnjoy?(enjoySub==='read'?'독서':'콘텐츠'):isDesk?deskLabelMap[deskSub]:isExercise?(MORNING_FLOW_EXERCISE_SUB.find(s=>s.key===exerciseSub)?.label||c.label):isRest?(MORNING_FLOW_REST_SUB.find(s=>s.key===restSub)?.label||c.label):c.label;
+      const label=isEtc?(etcSub==='work'?'업무':(flow.etc?.title||'외출')):isEnjoy?(enjoySub==='read'?'독서':'콘텐츠'):isDesk?deskLabelMap[deskSub]:isExercise?(MORNING_FLOW_EXERCISE_SUB.find(s=>s.key===exerciseSub)?.label||c.label):isRest?(MORNING_FLOW_REST_SUB.find(s=>s.key===restSub)?.label||c.label):isClean?(MORNING_FLOW_CLEAN_SUB.find(s=>s.key===cleanSub)?.label||c.label):c.label;
       const icon=isEtc?(etcSub==='work'?'ti-keyboard':'ti-bus'):isEnjoy?(MORNING_FLOW_ENJOY_SUB.find(s=>s.key===enjoySub)?.icon||c.icon):c.icon;
       // 시각은 저장값이 아니라 연결된 리듬블록(blockCid)에서 그때그때 읽음 — 리듬탭에서 시간을 고치면 바로 반영됨.
       const linkedBlock=_mfBlockFor(dk,pick.blockCid);
@@ -6146,7 +6183,7 @@ function _paceWeekInsight(dk){
     return {icon:'ti-droplet',text:'오늘은 조금 여유로운 흐름이에요'};
   }
   // 카테고리 최다 — 오늘의 카테고리별 소요시간이 최근 7일 중 최댓값이면 언급(외출 제외)
-  const CAT_PHRASE={work:'업무',exercise:'운동',home:'정리',rest:'휴식',note:'책상',enjoy:'감상',groom:'단장'};
+  const CAT_PHRASE={work:'업무',exercise:'운동',home:'살림',rest:'휴식',note:'책상',enjoy:'감상',groom:'단장'};
   const todayDur=_paceCatDurations(dk);
   for(const cat of Object.keys(CAT_PHRASE)){
     const todayVal=todayDur[cat]||0;
@@ -6729,7 +6766,7 @@ function _paceDayEvents(dk){
     }
     if(min==null)return;
     const deskLabelMap={diary:'일기',notes:'노트정리',work_personal:'개인작업'};
-    const label=c.key==='etc'?(mflow.etc?.sub==='work'?'업무':'외출'):c.key==='enjoy'?(mflow.enjoy?.sub==='read'?'독서':'콘텐츠'):c.key==='desk'?(deskLabelMap[mflow.desk?.sub]||'책상'):c.key==='exercise'?(MORNING_FLOW_EXERCISE_SUB.find(s=>s.key===mflow.exercise?.sub)?.label||c.label):c.key==='rest'?(MORNING_FLOW_REST_SUB.find(s=>s.key===mflow.rest?.sub)?.label||c.label):c.label;
+    const label=c.key==='etc'?(mflow.etc?.sub==='work'?'업무':'외출'):c.key==='enjoy'?(mflow.enjoy?.sub==='read'?'독서':'콘텐츠'):c.key==='desk'?(deskLabelMap[mflow.desk?.sub]||'책상'):c.key==='exercise'?(MORNING_FLOW_EXERCISE_SUB.find(s=>s.key===mflow.exercise?.sub)?.label||c.label):c.key==='rest'?(MORNING_FLOW_REST_SUB.find(s=>s.key===mflow.rest?.sub)?.label||c.label):c.key==='clean'?(MORNING_FLOW_CLEAN_SUB.find(s=>s.key===mflow.clean?.sub)?.label||c.label):c.label;
     events.push({type:'morning',min:_paceAdjustMin(min),label});
   });
   return events;
@@ -10608,7 +10645,7 @@ function buildRhythmFormEl(showOngoingList){
   if(_rhythmFormOpen){
     const form=document.createElement('div');form.className='rhythm-add-form';
     // 카테고리별 빠른 선택지: 감상은 콘텐츠탭 연동(객체), 나머지는 고정 문구(문자열) 배열.
-    const RHYTHM_QUICK_CHOICES={exercise:['홈트','헬스장'],rest:['낮잠','빈둥빈둥'],note:['일기','노트정리','개인작업']};
+    const RHYTHM_QUICK_CHOICES={exercise:['홈트','헬스장'],rest:['낮잠','빈둥빈둥'],note:['일기','노트정리','개인작업'],home:['정리','세탁','주방']};
     const selColor=getRhythmColor(_rhythmFormCat); // 선택 강조색 — 카테고리 고유색 그대로 사용
     const selBg=_lightenRgba(selColor,0.14);
     let contentPickerHtml='';
