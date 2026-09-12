@@ -4158,10 +4158,14 @@ function _twMomentum(track,velocity,onSettle){
   const magnetStrength=0.22; // 목표 칸까지 남은 거리에 곱해 더하는 당김 계수 — 클수록 확 붙는 느낌
   let v=velocity;
   let idx=parseFloat(track.dataset.rawIdx||track.dataset.curIdx);
+  let lockedTarget=null; // 저속 진입 시 한 번만 정해서 고정 — 매 프레임 Math.round를 다시 하면
+                          // 두 칸 정중앙(예: 4.5)에서 반올림 결과가 4/5 사이로 미세하게 뒤집히며
+                          // 당김 방향도 같이 뒤집혀 좌우로 떠는 버그(2026-09-12 발견)가 생김
   function step(){
-    const nearest=Math.round(idx);
+    if(lockedTarget===null&&Math.abs(v)<magnetThreshold)lockedTarget=Math.round(idx);
+    const nearest=lockedTarget!==null?lockedTarget:Math.round(idx);
     const dist=nearest-idx;
-    if(Math.abs(v)<magnetThreshold)v+=dist*magnetStrength; // 저속 구간 — 가까운 칸 쪽으로 자석처럼 끌어당김
+    if(lockedTarget!==null)v+=dist*magnetStrength; // 저속 구간 — 고정된 목표 칸으로만 자석처럼 끌어당김
     if(Math.abs(v)<minVelocity&&Math.abs(dist)<0.02){
       _twSnap(track,nearest,onSettle);
       return;
