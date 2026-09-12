@@ -10285,6 +10285,22 @@ function renderCalDetail(d){
 }
 // 완료/예정 투두 펼침 토글 공용 헬퍼 — rowsPrefix/summaryPrefix의 DOM id 규칙과 label만 다르고
 // 나머지 로직은 동일해 통합(2026-09-11 중복 제거).
+// dk 날짜의 미완료 투두를 "시간표(텍스트에 HH:MM 있음, 시간순) → 시간대 미설정 투두(오전/오후/저녁/미정 순)"로 정렬해 표시용 배열 반환
+const _CAL_TS_ORDER={morning:0,afternoon:1,night:2,none:3};
+function _calSortPendingTodos(todos){
+  const timed=[],untimed=[];
+  todos.forEach(t=>{
+    const m=(t.text||'').match(SCHEDULE_TIME_RE);
+    if(m){
+      const hh=parseInt(m[1],10),mm=parseInt(m[2],10);
+      if(hh<=23&&mm<=59){timed.push({t,min:hh*60+mm});return;}
+    }
+    untimed.push(t);
+  });
+  timed.sort((a,b)=>a.min-b.min);
+  untimed.sort((a,b)=>(_CAL_TS_ORDER[a.timeSection||'none']??3)-(_CAL_TS_ORDER[b.timeSection||'none']??3));
+  return timed.map(x=>x.t).concat(untimed);
+}
 function _calToggleTodoRows(dk,todos,rowsPrefix,summaryPrefix,label){
   const rowsWrap=document.getElementById(rowsPrefix+dk);if(!rowsWrap)return;
   const summaryEl=document.getElementById(summaryPrefix+dk);
@@ -10293,7 +10309,7 @@ function _calToggleTodoRows(dk,todos,rowsPrefix,summaryPrefix,label){
     rowsWrap.style.display='none';
     if(summaryEl)summaryEl.innerHTML=`${label} ${todos.length}개 <i class="ti ti-chevron-right ico-inline-11" aria-hidden="true"></i>`;
   }else{
-    rowsWrap.innerHTML=todos.map(t=>`<div class="cal-detail-row" style="padding-left:20px;"><span class="cal-detail-text">${t.text}</span></div>`).join('');
+    rowsWrap.innerHTML=_calSortPendingTodos(todos).map(t=>`<div class="cal-detail-row" style="padding-left:20px;"><span class="cal-detail-text">${t.text}</span></div>`).join('');
     rowsWrap.style.display='block';
     if(summaryEl)summaryEl.innerHTML=`${label} ${todos.length}개 <i class="ti ti-chevron-down ico-inline-11" aria-hidden="true"></i>`;
   }
