@@ -4153,13 +4153,17 @@ function _twSyncInput(hourTrackId,minTrackId,targetInpId){
 }
 // 관성 스크롤 — 마지막 몇 개 이동 샘플로 속도 계산 후 감속시키며 40px 그리드에 스냅
 function _twMomentum(track,velocity,onSettle){
-  const friction=0.94,minVelocity=0.02;
+  const friction=0.94,minVelocity=0.05;
+  const magnetThreshold=0.6; // 이 속도 밑으로 떨어지면 자석 당김 시작 — 값이 크면 더 일찍부터 끌어당김
+  const magnetStrength=0.22; // 목표 칸까지 남은 거리에 곱해 더하는 당김 계수 — 클수록 확 붙는 느낌
   let v=velocity;
   let idx=parseFloat(track.dataset.rawIdx||track.dataset.curIdx);
   function step(){
-    if(Math.abs(v)<minVelocity){
-      const settled=Math.round(idx);
-      _twSnap(track,settled,onSettle);
+    const nearest=Math.round(idx);
+    const dist=nearest-idx;
+    if(Math.abs(v)<magnetThreshold)v+=dist*magnetStrength; // 저속 구간 — 가까운 칸 쪽으로 자석처럼 끌어당김
+    if(Math.abs(v)<minVelocity&&Math.abs(dist)<0.02){
+      _twSnap(track,nearest,onSettle);
       return;
     }
     idx-=v/TW_ITEM_H;
@@ -4173,7 +4177,7 @@ function _twMomentum(track,velocity,onSettle){
   track._twRaf=requestAnimationFrame(step);
 }
 function _twSnap(track,targetIdx,onSettle){
-  track.style.transition='transform .18s cubic-bezier(.25,.8,.4,1)';
+  track.style.transition='transform .22s cubic-bezier(.34,1.4,.4,1)'; // 살짝 오버슈트 후 착지 — 자석에 착 붙는 느낌
   const settled=_twApplyIdx(track,targetIdx);
   track.dataset.rawIdx=settled;
   const clearTransition=()=>{track.style.transition='';track.removeEventListener('transitionend',clearTransition);};
@@ -4184,21 +4188,24 @@ function _twAttach(trackId,onSelect){
   const track=document.getElementById(trackId),col=track.parentElement;
   if(col.dataset.twBound)return;
   col.dataset.twBound='1';
-  let dragging=false,startY=0,startIdx=0,lastY=0,lastT=0,velocity=0;
+  let dragging=false,startY=0,startIdx=0,lastY=0,lastT=0,velocity=0,vSamples=[];
   function start(y){
     if(track._twRaf)cancelAnimationFrame(track._twRaf);
     track.style.transition='none';
     dragging=true;
     startY=lastY=y;
     lastT=performance.now();
-    velocity=0;
+    velocity=0;vSamples=[];
     startIdx=parseFloat(track.dataset.rawIdx||track.dataset.curIdx);
   }
   function move(y){
     if(!dragging)return;
     const now=performance.now();
     const dt=Math.max(1,now-lastT);
-    velocity=(y-lastY)/dt*16.67; // 프레임당 이동량으로 정규화
+    const instVel=(y-lastY)/dt*16.67; // 프레임당 이동량으로 정규화
+    vSamples.push(instVel);
+    if(vSamples.length>4)vSamples.shift(); // 최근 몇 프레임만 유지 — 손 뗄 때 마지막 1프레임 튐(떨림)이 그대로 관성에 반영되는 것 방지
+    velocity=vSamples.reduce((a,b)=>a+b,0)/vSamples.length;
     lastY=y;lastT=now;
     const delta=y-startY;
     const idx=startIdx-delta/TW_ITEM_H;
@@ -4237,14 +4244,17 @@ function _renderTimeWheelFor(hourTrackId,minTrackId,inpId,wrapId){
   // 모바일(또는 이전에 PC입력으로 갈아끼워진 뒤 다시 롤링으로 돌아오는 경우) — 원래 롤링 마크업을 복원
   _restoreWheelMarkup(wrap,hourTrackId,minTrackId);
   const hourTrack=document.getElementById(hourTrackId),minTrack=document.getElementById(minTrackId);
-  const hours=[...Array(24).keys()],mins=[...Array(60).keys()];
+  const hours=[...Array(24).keys()];
+  const MIN_STEP=5;
+  const mins=[...Array(60/MIN_STEP).keys()].map(v=>v*MIN_STEP); // 0,5,10...55 — 5분 단위
+  const miIdx=Math.round(mi/MIN_STEP)%mins.length; // 저장값이 5분 단위가 아니어도(예: 과거 데이터) 가장 가까운 값으로 스냅
   const sync=()=>_twSyncInput(hourTrackId,minTrackId,inpId);
   _twBuildTrack(hourTrackId,hours,v=>pad(v));
   _twBuildTrack(minTrackId,mins,v=>pad(v));
   hourTrack.style.transition='none';minTrack.style.transition='none';
   _twApplyIdx(hourTrack,h);
-  _twApplyIdx(minTrack,mi);
-  hourTrack.dataset.rawIdx=h;minTrack.dataset.rawIdx=mi;
+  _twApplyIdx(minTrack,miIdx);
+  hourTrack.dataset.rawIdx=h;minTrack.dataset.rawIdx=miIdx;
   sync();
   _twAttach(hourTrackId,sync);
   _twAttach(minTrackId,sync);
