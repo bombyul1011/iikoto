@@ -4153,21 +4153,12 @@ function _twSyncInput(hourTrackId,minTrackId,targetInpId){
 }
 // 관성 스크롤 — 마지막 몇 개 이동 샘플로 속도 계산 후 감속시키며 40px 그리드에 스냅
 function _twMomentum(track,velocity,onSettle){
-  const friction=0.94,minVelocity=0.05;
-  const magnetThreshold=0.6; // 이 속도 밑으로 떨어지면 자석 당김 시작 — 값이 크면 더 일찍부터 끌어당김
-  const magnetStrength=0.22; // 목표 칸까지 남은 거리에 곱해 더하는 당김 계수 — 클수록 확 붙는 느낌
+  const friction=0.94,minVelocity=0.3; // 이 속도 밑으로 떨어지면 그 자리에서 바로 가까운 칸에 스냅
   let v=velocity;
   let idx=parseFloat(track.dataset.rawIdx||track.dataset.curIdx);
-  let lockedTarget=null; // 저속 진입 시 한 번만 정해서 고정 — 매 프레임 Math.round를 다시 하면
-                          // 두 칸 정중앙(예: 4.5)에서 반올림 결과가 4/5 사이로 미세하게 뒤집히며
-                          // 당김 방향도 같이 뒤집혀 좌우로 떠는 버그(2026-09-12 발견)가 생김
   function step(){
-    if(lockedTarget===null&&Math.abs(v)<magnetThreshold)lockedTarget=Math.round(idx);
-    const nearest=lockedTarget!==null?lockedTarget:Math.round(idx);
-    const dist=nearest-idx;
-    if(lockedTarget!==null)v+=dist*magnetStrength; // 저속 구간 — 고정된 목표 칸으로만 자석처럼 끌어당김
-    if(Math.abs(v)<minVelocity&&Math.abs(dist)<0.02){
-      _twSnap(track,nearest,onSettle);
+    if(Math.abs(v)<minVelocity){
+      _twSnap(track,Math.round(idx),onSettle);
       return;
     }
     idx-=v/TW_ITEM_H;
@@ -4180,12 +4171,10 @@ function _twMomentum(track,velocity,onSettle){
   }
   track._twRaf=requestAnimationFrame(step);
 }
+// 목표 칸으로 즉시 스냅 — 애니메이션 없이 한 번에 값 고정(정확한 위치 도착이 최우선)
 function _twSnap(track,targetIdx,onSettle){
-  track.style.transition='transform .22s cubic-bezier(.34,1.4,.4,1)'; // 살짝 오버슈트 후 착지 — 자석에 착 붙는 느낌
   const settled=_twApplyIdx(track,targetIdx);
   track.dataset.rawIdx=settled;
-  const clearTransition=()=>{track.style.transition='';track.removeEventListener('transitionend',clearTransition);};
-  track.addEventListener('transitionend',clearTransition);
   onSettle();
 }
 function _twAttach(trackId,onSelect){
