@@ -9304,11 +9304,14 @@ function createDelayedCommitStopwatch(config){
     try{
       const payload=Object.assign({startTs:st.startTs,cid:st.cid,blockCid:st.blockCid,
         dk:dateKey(getLogicalDate(st.startTs))},buildPersistPayload?buildPersistPayload(st):{});
+      // [DEBUG content_cid 유실 추적용 — 원인 확정되면 제거]
+      console.log('[SW-DEBUG]',persistKey,'persist() cid=',payload.cid,'running=',st.running,new Error().stack);
       localStorage.setItem(persistKey,JSON.stringify(payload));
     }catch(e){}
   }
 
   function start(cid,extra){
+    console.log('[SW-DEBUG]',persistKey,'start() called cid=',cid,'extra=',extra);
     if(st.running)return;
     if(st.starting)return; // 연타 방지 락 — 콘텐츠 쪽에만 있던 걸 공용화(2026-09-01 유래)
     st.starting=true;
@@ -9326,6 +9329,7 @@ function createDelayedCommitStopwatch(config){
   }
 
   function commitNow(){
+    console.log('[SW-DEBUG]',persistKey,'commitNow() entry st.cid=',st.cid,'st.running=',st.running,'st.committed=',st.committed,'now=',new Date().toISOString());
     if(!st.running||st.committed)return; // 그 사이 이미 종료됐으면(타이머가 늦게 도착) 아무것도 하지 않음
     st.committed=true;
     const cid=st.cid,startTs=st.startTs;
@@ -9363,6 +9367,7 @@ function createDelayedCommitStopwatch(config){
       const raw=localStorage.getItem(persistKey);
       if(!raw)return;
       const saved=JSON.parse(raw);
+      console.log('[SW-DEBUG]',persistKey,'restoreFromStorage() raw=',raw,'parsed.cid=',saved&&saved.cid,'parsed.startTs=',saved&&saved.startTs);
       if(!saved||!saved.startTs)return;
       st.startTs=saved.startTs;st.cid=saved.cid;st.blockCid=saved.blockCid||null;
       st.running=true;
