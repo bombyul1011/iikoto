@@ -4164,7 +4164,10 @@ function _twMomentum(track,velocity,onSettle){
     idx-=v/TW_ITEM_H;
     v*=friction;
     const clamped=Math.max(0,Math.min(track._twValues.length-1,idx));
-    if(clamped!==idx){idx=clamped;v=0;} // 끝에 닿으면 즉시 정지 후 스냅
+    if(clamped!==idx){ // 끝단을 넘어감 — 여기서도 항상 정수 칸(맨 위=0 또는 맨 아래=length-1)으로 스냅해서 종료
+      _twSnap(track,clamped,onSettle);
+      return;
+    }
     track.dataset.rawIdx=idx;
     _twApplyIdx(track,idx);
     track._twRaf=requestAnimationFrame(step);
@@ -4181,29 +4184,31 @@ function _twAttach(trackId,onSelect){
   const track=document.getElementById(trackId),col=track.parentElement;
   if(col.dataset.twBound)return;
   col.dataset.twBound='1';
-  let dragging=false,startY=0,startIdx=0,lastY=0,lastT=0,velocity=0,vSamples=[];
+  const MAX_VELOCITY=2.5; // 한 프레임(16.67ms 기준) 당 최대 이동 인덱스 — 이 값보다 크면 dt가 비정상적으로
+                            // 짧게 측정된 것(이벤트가 몰려 들어온 경우 등)이라 판단하고 상한을 씌움.
+                            // 이게 없으면 살짝만 움직여도 속도가 폭발적으로 커져 트랙 끝까지 튕겨나가는
+                            // 버그(2026-09-12 발견)가 생김.
+  let dragging=false,startY=0,startIdx=0,lastY=0,lastT=0,velocity=0;
   function start(y){
     if(track._twRaf)cancelAnimationFrame(track._twRaf);
-    track.style.transition='none';
     dragging=true;
     startY=lastY=y;
     lastT=performance.now();
-    velocity=0;vSamples=[];
+    velocity=0;
     startIdx=parseFloat(track.dataset.rawIdx||track.dataset.curIdx);
   }
   function move(y){
     if(!dragging)return;
     const now=performance.now();
-    const dt=Math.max(1,now-lastT);
-    const instVel=(y-lastY)/dt*16.67; // 프레임당 이동량으로 정규화
-    vSamples.push(instVel);
-    if(vSamples.length>4)vSamples.shift(); // 최근 몇 프레임만 유지 — 손 뗄 때 마지막 1프레임 튐(떨림)이 그대로 관성에 반영되는 것 방지
-    velocity=vSamples.reduce((a,b)=>a+b,0)/vSamples.length;
+    const dt=Math.max(8,now-lastT); // 최소 8ms로 바닥을 둬서 dt가 너무 작아 속도가 튀는 것 방지
+    const rawV=(y-lastY)/dt*16.67;
+    velocity=Math.max(-MAX_VELOCITY,Math.min(MAX_VELOCITY,rawV)); // 순간 속도 자체도 상한
     lastY=y;lastT=now;
     const delta=y-startY;
     const idx=startIdx-delta/TW_ITEM_H;
-    track.dataset.rawIdx=idx;
-    _twApplyIdx(track,idx);
+    const clamped=Math.max(0,Math.min(track._twValues.length-1,idx));
+    track.dataset.rawIdx=clamped;
+    _twApplyIdx(track,clamped);
   }
   function end(){
     if(!dragging)return;
