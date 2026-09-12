@@ -1070,6 +1070,55 @@ function _sessionRangesText(sess){
   const rangesText=sess.ranges.map(r=>`${r.start}-${r.end}`).join(', ');
   return `${rangesText} (총 ${sess.totalMin}분)`;
 }
+// ── 콘텐츠 통합 로그(진행률+감상시간) 공용 조회 헬퍼 (2026-09-12 구조 개편) ──
+// "콘텐츠 모아보기 상세"와 "로그 모아보기" 양쪽이 각자 content_daily_log/rhythm_blocks를 따로 조회하고
+// 날짜범위도 각자 계산하던 것을 하나로 통합. 범위 계산 실수(예: watching 콘텐츠의 end_date=null로 인한
+// 조회범위 누락, 2026-09-12 골드 선셋 버그)가 재발해도 이 함수 한 곳만 고치면 되도록 함.
+//
+// 호출부는 두 종류의 범위 요구가 있어 rangeMode로 구분:
+//  - 'cid'  : 날짜 범위 없이 cid 목록 전체 이력을 가져옴(콘텐츠 상세뷰용). 내부적으로 실제 데이터가
+//             존재하는 날짜(로그/메모/오늘)까지 자동으로 rhythm_blocks 범위를 넓혀 절대 놓치지 않음.
+//  - 'range': 호출부가 지정한 startDk~endDk 범위로 양쪽 다 조회(달력 월 등 고정 기간 뷰용).
+//
+// cidContents: 조회 대상 cid를 뽑아낼 콘텐츠 배열(화면 필터링된 목록이어도 됨 — 이 목록의 client_id들만 조회).
+// matchContents: cid→콘텐츠 매칭(카테고리 판정 등)에 쓸 원본 배열. 화면 필터링 이전의 전체 목록을 넘길 것 —
+//   필터링된 목록만 넘기면 지난달 등록돼 이번달까지 진행중인 콘텐츠가 매칭 실패하는 문제가 재발함
+//   (2026-09-12, 골드 선셋 사례). 생략 시 cidContents로 폴백.
+// 반환: {logsByCid:{cid:[content_daily_log row,...]}, sessByDkCid:{'{dk}|{cid}':{ranges,totalMin}}, sessNoCid:[...]}
+async function _loadContentLogsAndSessions(cidContents,rangeMode,startDk,endDk,matchContents){
+  const cids=[...new Set((cidContents||[]).map(c=>c.client_id).filter(Boolean))];
+  const empty={logsByCid:{},sessByDkCid:{},sessNoCid:[]};
+  if(!cids.length)return empty;
+  const cidFilter=cids.map(c=>`"${c}"`).join(',');
+  const logQuery=rangeMode==='range'
+    ?`content_daily_log?content_cid=in.(${cidFilter})&date_key=gte.${startDk}&date_key=lte.${endDk}&order=date_key.asc`
+    :`content_daily_log?content_cid=in.(${cidFilter})&order=date_key.asc`;
+  const rows=(await supaFetch(logQuery))||[];
+  const logsByCid={};
+  rows.forEach(r=>{
+    if(!logsByCid[r.content_cid])logsByCid[r.content_cid]=[];
+    logsByCid[r.content_cid].push(r);
+  });
+  let rbStartDk=startDk,rbEndDk=endDk;
+  if(rangeMode!=='range'){
+    // 'cid' 모드 — 콘텐츠의 start_date/end_date만으로 범위를 잡으면 status='watching'(진행중, end_date=null)
+    // 콘텐츠는 등록일 하루로 범위가 고정돼 그 이후 여러 날~수개월치 감상시간이 통째로 누락됨. 실제 데이터가
+    // 존재하는 날짜(로그/메모/오늘)를 모두 반영해 범위를 넓혀야 진행 기간에 관계없이 항상 정확함.
+    const todayDk=dateKey(new Date());
+    const dks=[...new Set([
+      ...(cidContents||[]).flatMap(c=>[c.start_date,c.end_date]).filter(Boolean),
+      ...(cidContents||[]).filter(c=>c.status==='watching').map(()=>todayDk),
+      ...rows.map(r=>r.date_key).filter(Boolean),
+      ...(cidContents||[]).flatMap(c=>(c.notes||[]).map(n=>n.dk)).filter(Boolean)
+    ])].sort();
+    rbStartDk=dks.length?dks[0]:null;
+    rbEndDk=dks.length?dks[dks.length-1]:null;
+  }
+  const rblocks=rbStartDk?((await supaFetch(`rhythm_blocks?date_key=gte.${rbStartDk}&date_key=lte.${rbEndDk}&cat=eq.enjoy`))||[]):[];
+  const contentsByCid=_contentsByCidMap(matchContents||cidContents);
+  const {byKey,noCid}=_enjoySessionsByDkCid(rblocks,contentsByCid);
+  return {logsByCid,sessByDkCid:byKey,sessNoCid:noCid};
+}
 // rhythm_blocks에서 start_time/end_time을 분 단위로 파싱해 카테고리별로 합산(자정 넘김 자동 보정) — 공통 헬퍼.
 // 기존에 renderWeekRhythmFlow/renderMrpTrajectory/renderMrpMilestones 세 곳에 거의 동일한 로직이 각각
 // 로컬 함수로 중복 정의돼 있던 것을 하나로 통합함(2026-08-22). renderMrpRhythm은 카테고리별 dayCount(일평균 분모)까지
@@ -2144,34 +2193,19 @@ async function renderMonthContentGrid(y,mo,contentsData){
   _renderCgridFromCache();
 }
 // 콘텐츠 모아보기 상세(Timeline)에 감상로그(그날 진행률·시간)를 코멘트와 함께 병합해 보여주기 위한 캐시.
-// cid 목록으로 조회(날짜 범위 무관 — 등록 시점이 콘텐츠 소속월과 다를 수 있어 전체 범위로 가져옴), cid별로 그룹핑.
+// 실제 조회/병합은 공용 헬퍼 _loadContentLogsAndSessions('cid' 모드)가 담당(2026-09-12 통합).
 let _cgridLogsByCid={};
 // 감상 세션(시작~끝 시각) 캐시 — "{cid}|{dk}" 키. 진행률 로그와 별개 소스(rhythm_blocks)라 별도 캐시로 관리.
 let _cgridSessionsByCidDk={};
 async function _loadCgridLogsFor(contents,cidSource){
-  _cgridLogsByCid={};
-  _cgridSessionsByCidDk={};
-  const cids=[...new Set((contents||[]).map(c=>c.client_id).filter(Boolean))];
-  if(!cids.length)return;
-  const cidFilter=cids.map(c=>`"${c}"`).join(',');
-  const dks=[...new Set((contents||[]).flatMap(c=>[c.start_date,c.end_date]).filter(Boolean))].sort();
-  const startDk=dks.length?dks[0]:null;
-  const endDk=dks.length?dks[dks.length-1]:null;
-  const [rows,rblocks]=await Promise.all([
-    supaFetch(`content_daily_log?content_cid=in.(${cidFilter})&order=date_key.asc`),
-    startDk?supaFetch(`rhythm_blocks?date_key=gte.${startDk}&date_key=lte.${endDk}&cat=eq.enjoy`):Promise.resolve([])
-  ]);
-  (rows||[]).forEach(r=>{
-    if(!_cgridLogsByCid[r.content_cid])_cgridLogsByCid[r.content_cid]=[];
-    _cgridLogsByCid[r.content_cid].push(r);
-  });
   // cid 매칭은 화면 필터링 이전의 원본(cidSource, 없으면 contents로 폴백)을 사용 — belongsHere로 걸러진
   // contents만 쓰면 지난달 등록돼 진행중인 콘텐츠가 매칭 실패하는 문제가 있었음(2026-09-12 수정).
-  const contentsByCid=_contentsByCidMap(cidSource||contents);
-  const {byKey}=_enjoySessionsByDkCid(rblocks,contentsByCid);
-  Object.keys(byKey).forEach(key=>{
+  const {logsByCid,sessByDkCid}=await _loadContentLogsAndSessions(contents,'cid',null,null,cidSource||contents);
+  _cgridLogsByCid=logsByCid;
+  _cgridSessionsByCidDk={};
+  Object.keys(sessByDkCid).forEach(key=>{
     const [dk,cid]=key.split('|');
-    _cgridSessionsByCidDk[cid+'|'+dk]=byKey[key];
+    _cgridSessionsByCidDk[cid+'|'+dk]=sessByDkCid[key];
   });
 }
 // 카테고리+상태 필터를 함께 적용 — _renderCgridFromCache/toggleCgridDetail에서 공용
@@ -4339,7 +4373,6 @@ async function _chCollectNoteSource(contentsData){
     ]);
     contents=contents||[];prevContents=prevContents||[];
   }
-  const rblocks=await supaFetch(`rhythm_blocks?date_key=gte.${startDk}&date_key=lte.${endDk}&cat=eq.enjoy`);
   const finals=[]; // {cid,cat,title,poster,stars,review,dk}
   const notes=[]; // {cid,cat,title,dk,text,time,updatedAt}
   // 2026-08-29 통합: 감상 메모는 이제 contents.notes[]에 직접 있음 — 별도 goal_notes 조회/cid 매칭(_resolveBookNoteCids) 불필요.
@@ -4349,19 +4382,17 @@ async function _chCollectNoteSource(contentsData){
     }
     (c.notes||[]).forEach(n=>{if(n.dk&&n.dk>=startDk&&n.dk<=endDk)notes.push({...n,cid:c.client_id,cat:c.content_cat,poster:c.poster||null});});
   });
-  // 감상로그 — 감상시간은 리듬블록(이번 달, 스톱워치 기록)에서, 진행률은 content_daily_log(2026-09-11 이후
-  // 신규 저장분만 존재)에서 가져와 날짜+cid 기준으로 병합. 본앱 감상달력(renderWatchCalDetail)과 동일한
-  // 소스·동일한 집계 방식·동일한 시간 표기(공용 헬퍼 재사용, 2026-09-12).
+  // 감상로그 — 감상시간(rhythm_blocks)과 진행률(content_daily_log)을 날짜+cid 기준으로 병합.
+  // 공용 헬퍼(_loadContentLogsAndSessions, 'range' 모드)로 조회 — 콘텐츠 모아보기 상세와 동일 로직 재사용
+  // (2026-09-12 통합, 중복 쿼리/범위계산 제거). cid 매칭용 원본은 이번 달+전월 콘텐츠를 함께 사용(전월 등록·
+  // 이번달까지 진행중인 콘텐츠의 리듬블록 매칭 실패를 막기 위함) — 단, 실제로 타임라인에 표시되는 대상
+  // (finals/notes/logs)은 위에서 이미 이번 달 contents만으로 만들어졌으므로 전월 콘텐츠가 화면에 새로 뜨는 일은 없음.
   const cids=[...new Set(contents.map(c=>c.client_id).filter(Boolean))];
-  const logRows=cids.length?(await supaFetch(`content_daily_log?content_cid=in.(${cids.map(c=>`"${c}"`).join(',')})&date_key=gte.${startDk}&date_key=lte.${endDk}&order=date_key.asc`))||[]:[];
+  const {logsByCid,sessByDkCid,sessNoCid}=await _loadContentLogsAndSessions(contents,'range',startDk,endDk,[...contents,...prevContents]);
   const progressByDkCid={};
-  logRows.forEach(r=>{progressByDkCid[r.date_key+'|'+r.content_cid]=r;});
-  // cid 매칭용 룩업은 이번 달+전월 콘텐츠를 함께 사용(전월 등록·이번달까지 진행중인 콘텐츠의 리듬블록 매칭
-  // 실패를 막기 위함, 2026-09-12 수정) — 단, 실제로 타임라인에 표시되는 대상(finals/notes/logs)은 위에서
-  // 이미 이번 달 contents만으로 만들어졌으므로 전월 콘텐츠 자체가 화면에 새로 뜨는 일은 없음.
+  Object.values(logsByCid).forEach(rows=>rows.forEach(r=>{progressByDkCid[r.date_key+'|'+r.content_cid]=r;}));
   const contentsByCid=_contentsByCidMap([...contents,...prevContents]);
   const catPrefix={drama:1,movie:1,book:1};
-  const {byKey:sessByDkCid,noCid:sessNoCid}=_enjoySessionsByDkCid(rblocks,contentsByCid);
   const logs=[]; // {cid,cat,title,poster,dk,progText,amountText,timeText}
   const buildProgText=(log,cat)=>{
     if(!log||cat==='drama')return{progText:'',amountText:''}; // 드라마는 회차 진행률 표기 생략(시간만 표시) — 요청 반영, 2026-09-12
