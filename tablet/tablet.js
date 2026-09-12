@@ -6026,7 +6026,17 @@ function shiftTimelineDate(delta){
   loadTimelineTab();
 }
 
+// 날짜 이동 시 경쟁상태(race condition) 방지용 세대 토큰. loadTimelineTab이 매 호출마다 값을 올리고
+// 자신의 세대를 캡처해둔 뒤, 비동기 조회가 끝난 시점과 지연 재동기화(syncTimelineTrackHeight의
+// requestAnimationFrame/setTimeout/ResizeObserver 콜백) 시점 모두에서 여전히 최신 세대인지 검사한다.
+// 2026-09-12 버그수정: 화살표를 빠르게 눌러 날짜를 연속 이동하면, 먼저 시작된 이전 날짜의 조회/지연
+// 렌더가 최신 날짜 렌더보다 늦게 끝나 화면을 다시 덮어쓰는 문제가 있었음(특히 타임라인 트랙만 유독
+// 심했던 이유는 syncTimelineTrackHeight의 2차 renderTimelineTrack 호출이 rAF로 한 박자 늦게 실행되기
+// 때문 — 그 사이 다음 날짜 이동이 끼어들면 이전 dk로 지연 실행된 렌더가 마지막에 승리해버림).
+let _tlLoadGen=0;
+
 async function loadTimelineTab(){
+  const myGen=++_tlLoadGen;
   const dk=dateKey(_selectedDate);
   document.getElementById('tl-date').textContent=`${_selectedDate.getMonth()+1}월 ${_selectedDate.getDate()}일`;
   document.getElementById('tl-dow').textContent=DOW[_selectedDate.getDay()]+'요일';
@@ -6043,6 +6053,9 @@ async function loadTimelineTab(){
     supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('oneline:'+dk)}`),
     supaFetch(`morning_flow_picks?date_key=eq.${dk}`)
   ]);
+  // 조회가 끝난 시점에 이미 더 최신 날짜 이동이 일어났다면, 이 결과로 렌더하지 않고 여기서 중단.
+  // (여러 날짜를 빠르게 이동해도 각 요청은 끝까지 실행되지만, 화면 반영은 마지막 요청 결과만 함.)
+  if(myGen!==_tlLoadGen)return;
 
   const sleep=sleepRows&&sleepRows[0];
   const mealsRow=meals&&meals[0];
@@ -6082,7 +6095,8 @@ async function loadTimelineTab(){
   // 우측 비동기 렌더(메모·하루한줄·비교카드)가 실제로 끝난 뒤에 동기화를 시작 — 그 전에는 오른쪽 높이가
   // 아직 최종값이 아니므로 이르게 측정하면 어긋난다.
   Promise.all([rightRenderDone,compareCardDone]).then(()=>{
-    syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,mflowCidSet,contents||[],habits||[],habitChecks||[]);
+    if(myGen!==_tlLoadGen)return; // 대기하는 동안 더 최신 날짜 이동이 있었으면 동기화 자체를 시작하지 않음
+    syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,mflowCidSet,contents||[],habits||[],habitChecks||[],myGen);
   });
 }
 
@@ -6092,8 +6106,9 @@ async function loadTimelineTab(){
 let _isFirstTimelineLoad=true; // 앱 최초 로딩 시에는 사이드바 캘린더/인사배너 등 다른 초기화가 동시에 돌면서
 // 레이아웃이 계속 바뀌는 중이라 rAF 두 번만으로는 최종 높이가 잡히기 전에 측정되는 경우가 있어, 이 경우에만
 // 넉넉한 지연을 둔 추가 재동기화를 한 번 더 건다(재방문 시에는 이미 안정적이라 불필요).
-function syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,mflowCidSet,contents,habits,habitChecks){
+function syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,mflowCidSet,contents,habits,habitChecks,gen){
   const doSync=()=>{
+    if(gen!==_tlLoadGen)return; // 이 동기화가 예약된 뒤 더 최신 날짜 이동이 있었으면 건너뜀(경쟁상태 방지, 2026-09-12)
     const sideEl=document.getElementById('side');
     const sidebarOpen=sideEl&&!sideEl.classList.contains('collapsed');
     const trackCardEl=document.querySelector('.tl-track-card');
@@ -6129,6 +6144,7 @@ function syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,mflowCidSet,con
     trackCardEl.style.overflowY='auto';
     trackCardEl.classList.add('tl-ready'); // 실측 기준 재렌더(정확한 텍스트 위치)가 끝난 뒤에만 노출
   };
+  if(gen!==_tlLoadGen)return; // 진입 시점에 이미 낡은 세대면 예약조차 하지 않음
   // [2026-09-06] 탭/날짜 전환 시 이전 트랙이 잠깐 남아있다 깜빡이지 않도록, 재렌더 시작 전 매번 숨김 처리.
   const existingCard=document.querySelector('.tl-track-card');
   if(existingCard)existingCard.classList.remove('tl-ready');
@@ -6150,6 +6166,9 @@ function syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,mflowCidSet,con
   // <img>가 뒤늦게 로드돼 늘어나는 경우, 메모가 길어 줄바꿈이 늘어나는 경우 등)를 모두 커버하기 위해
   // ResizeObserver로 우측 영역을 계속 감시하다가 높이가 바뀌면 자동 재동기화한다. doSync 자신이
   // trackCardEl의 max-height를 바꾸므로, 좌측 트랙 카드 자체는 감시 대상에서 제외해 무한루프를 막는다(2026-09-11).
+  // ResizeObserver는 탭 최초 진입 시 한 번만 등록되는 영구 콜백이라 gen을 클로저로 캡처하지 않고, 매번 실행
+  // 시점의 doSync 내부 검사(gen!==_tlLoadGen)에 맡긴다 — 단, doSync 자체가 이 gen을 캡처하므로, 날짜 이동
+  // 후 첫 리사이즈 콜백은 이전 gen의 doSync를 참조하지만 그 안의 가드가 걸러내므로 안전함.
   const rightElForObserve=document.querySelector('.tl-half-right');
   if(rightElForObserve&&!rightElForObserve._tlResizeObserverAttached&&window.ResizeObserver){
     rightElForObserve._tlResizeObserverAttached=true;
