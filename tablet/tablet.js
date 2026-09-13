@@ -1040,6 +1040,9 @@ function _contentsByCidMap(contents){
 // 로그 모아보기(_chCollectNoteSource) 양쪽에서 공용으로 사용(2026-09-12, 중복 제거 통합).
 // 반환: {byKey:{'{dk}|{cid}':{ranges:[{start,end}],totalMin}}, noCid:[{dk,cat,title,ranges,totalMin}]}
 // noCid는 content_cid 없이 텍스트로만 남은 구버전 리듬블록(수동추가분 등) — cid 매칭 실패해도 시간은 표시되어야 함.
+// 2026-09-13: 한때 content_cid 없는 블록을 제목으로 역매칭하는 폴백을 넣었었으나, 본앱 등록 구조 수정으로
+// 신규 블록은 항상 cid가 채워지고, 과거 null 데이터도 서버 확인 결과 텍스트조차 없는 완전 유실 2건뿐이라
+// (역매칭으로도 복구 불가능) 폴백을 제거하고 원래의 단순 형태로 되돌림.
 function _enjoySessionsByDkCid(rblocks,contentsByCid){
   const byKey={};
   const noCidMap={}; // "{dk}|{cat}|{title}" → 세션 누적(구버전 폴백용)
