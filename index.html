@@ -561,8 +561,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .reserve-count-badge{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:var(--pal-pink-bg);color:var(--ts);font-size:11px;line-height:1;margin-left:2px;}
 
 /* ── MEMO ── */
-.memo-item{display:flex;gap:9px;margin-bottom:8px;align-items:flex-start;position:relative;overflow:hidden;}
-.memo-time{font-size:var(--main-text-size);color:var(--ts);white-space:nowrap;padding-top:6px;min-width:40px;}
+.memo-item{display:flex;gap:8px;margin-bottom:8px;align-items:flex-start;position:relative;overflow:hidden;}
+.memo-time{font-size:var(--main-text-size);color:var(--ts);white-space:nowrap;padding-top:6px;min-width:40px;font-variant-numeric:tabular-nums;}
 .memo-bub{background:rgba(var(--pal-rose-rgb),0.06);border:none;border-left:2.5px solid rgba(var(--pal-rose-rgb),0.32);border-radius:0 6px 6px 0;padding:6px 8px;font-size:var(--main-text-size);color:var(--tp);line-height:1.4;flex:1;}
 .memo-bub.tod-morning{background:rgba(var(--pal-orange-rgb),0.06);border-left-color:rgba(var(--pal-orange-rgb),0.45);}
 .memo-bub.tod-afternoon{background:rgba(var(--pal-rose-rgb),0.05);border-left-color:rgba(var(--pal-rose-rgb),0.28);}
@@ -901,13 +901,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .enddate-row.show{display:flex;gap:8px;align-items:center;}
 
 /* ══ DARK MODE OVERRIDES ══ */
-[data-theme="glass"] .memo-bub{background:none;border:none;border-left:2.5px solid rgba(180,160,150,0.45);border-radius:0;padding:2px 0 0 10px;}
+[data-theme="glass"] .memo-bub{background:none;border:none;border-left:2.5px solid rgba(180,160,150,0.45);border-radius:0;padding:2px 0 0 8px;}
 [data-theme="glass"] .memo-bub.tod-morning{background:none;border-left-color:rgba(var(--pal-orange-rgb),0.45);}
 [data-theme="glass"] .memo-bub.tod-afternoon{background:none;border-left-color:rgba(var(--pal-rose-rgb),0.28);}
 [data-theme="glass"] .memo-bub.tod-night{background:none;border-left-color:rgba(var(--pal-lavender-rgb),0.28);}
 [data-theme="glass"] .memo-bub.memo-bub-seed{background:none;border-left-color:rgba(var(--pal-mint-rgb),0.30);}
 [data-theme="glass"] .memo-bub.memo-bub-content{background:none;border-left-color:rgba(var(--pal-sky-rgb),0.35);}
-[data-theme="glass"] .memo-item{margin-bottom:14px;}
+[data-theme="glass"] .memo-item{margin-bottom:14px;gap:8px;}
 /* ── READING HUB ── */
 .reading-ov{position:fixed;inset:0;margin:0 auto;max-width:430px;z-index:8000;background:var(--bg);background-attachment:fixed;display:none;flex-direction:column;overflow-y:auto;}
 .reading-ov .settings-hdr{position:sticky;top:0;z-index:10;background:var(--bg);background-attachment:fixed;border-bottom:none;}
