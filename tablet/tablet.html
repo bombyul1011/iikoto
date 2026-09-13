@@ -317,6 +317,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .memo-item.tod-night{border-left-color:rgba(var(--pal-lavender-border-rgb),0.5);}
 .memo-item.memo-seed{border-left-color:rgba(120,155,160,0.5);}
 .memo-time .seed-ico{font-size:13px;color:rgba(120,155,160,0.95);}
+/* 2026-09-13: 콘텐츠 감상메모(contents.notes[])를 일반 메모와 시간순으로 함께 표시 — 시간 칼럼 아래에
+   정사각형 포스터를 넣어 작품을 표시(제목 뱃지 방식은 너무 작고 존재감이 없어 1:1 포스터로 교체, 피드백 반영).
+   진행률/감상시간은 "오늘의 감상" 카드에 이미 있으므로 여기서는 코멘트 텍스트만 노출.*/
+.memo-time-col{display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;width:38px;}
+.memo-content-poster{width:34px;height:34px;border-radius:8px;background-size:cover;background-position:center;flex-shrink:0;}
+.memo-content-title{font-size:12px;color:var(--tm);font-weight:500;margin-bottom:2px;}
+.memo-content-txt{color:var(--ts);}
 
 .habit-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;}
 .habit-grid .habit-row:nth-child(2n){margin-left:-6px;}

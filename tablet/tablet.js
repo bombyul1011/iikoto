@@ -933,12 +933,23 @@ function openPhotoViewerArchive(src,text,dk,time){
 function closePhotoViewerArchive(){
   document.getElementById('pv-ov').classList.remove('on');
 }
-async function renderTodayMemos(dk){
+// 2026-09-13: 일반 메모(memos 테이블)와 콘텐츠 감상메모(contents.notes[])를 합쳐 시간순으로 함께 보여줌 —
+// "오늘의 감상" 카드가 이미 진행률·감상시간을 보여주므로, 여기서는 코멘트 텍스트만 작품 이름표와 함께 노출.
+// contents는 loadTimelineTab에서 이미 조회한 배열을 그대로 받아 재사용(별도 쿼리 없음).
+async function renderTodayMemos(dk,contents){
   const el=document.getElementById('today-memos');
   const memosRaw=await supaFetch(`memos?date_key=eq.${dk}&order=memo_time.asc`);
-  if(!memosRaw||!memosRaw.length){el.innerHTML='<div class="empty-msg">오늘 남긴 메모가 없어요</div>';return;}
+  const contentNotes=[];
+  (contents||[]).forEach(c=>{
+    (c.notes||[]).forEach(n=>{
+      if(n.dk!==dk||!n.text)return;
+      contentNotes.push({memo_time:n.time||'',text:n.text,isContentNote:true,contentTitle:c.title||n.title||'',contentCat:c.content_cat,contentPoster:c.poster||null});
+    });
+  });
+  if((!memosRaw||!memosRaw.length)&&!contentNotes.length){el.innerHTML='<div class="empty-msg">오늘 남긴 메모가 없어요</div>';return;}
   // DB order는 단순 문자열순이라 00:00~03:59 기록이 맨 앞으로 와버림 — 새벽 4시 컷 기준으로 재정렬(본앱과 동일 규칙).
-  const memos=memosRaw.slice().sort((a,b)=>toSortKey(a.memo_time)-toSortKey(b.memo_time));
+  // 콘텐츠 메모도 같은 정렬 기준(toSortKey)으로 섞어서 전체를 하나의 시간순 목록으로 만듦.
+  const memos=[...(memosRaw||[]),...contentNotes].sort((a,b)=>toSortKey(a.memo_time)-toSortKey(b.memo_time));
   el.innerHTML=memos.map(m=>{
     const isSeed=m.type==='seed';
     let todClass='';
@@ -947,6 +958,12 @@ async function renderTodayMemos(dk){
       todClass=h>=5&&h<12?' tod-morning':h>=12&&h<18?' tod-afternoon':' tod-night';
     }
     const timeHtml=isSeed?'<i class="ti ti-seeding seed-ico" aria-hidden="true"></i>':(m.memo_time||'');
+    if(m.isContentNote){
+      const meta=WCAL_CAT_META[m.contentCat]||{icon:'ti-stack-2',color:'rgba(150,150,150,1)'};
+      const posterStyle=m.contentPoster?`background-image:url('${m.contentPoster}');`:`background:${meta.color};display:flex;align-items:center;justify-content:center;`;
+      const posterIcon=m.contentPoster?'':`<i class="ti ${meta.icon}" style="color:#fff;font-size:15px;" aria-hidden="true"></i>`;
+      return `<div class="memo-item${todClass}"><div class="memo-time-col"><div class="memo-time">${timeHtml}</div><div class="memo-content-poster" style="${posterStyle}">${posterIcon}</div></div><div class="memo-txt memo-txt-content"><div class="memo-content-title">${escapeHtml(m.contentTitle)}</div><div class="memo-content-txt">${escapeHtml(m.text)}</div></div></div>`;
+    }
     // 사진메모 — 본앱 renderMemos와 동일 조건(photo_url 존재)·마크업(52px 썸네일+텍스트, placeholder→로드 시 페이드인, 텍스트 없으면 "사진")
     if(m.photo_url){
       const txt=escapeHtml(m.text||'');
@@ -6092,7 +6109,7 @@ async function loadTimelineTab(){
   // (2026-09-11). 이제 Promise.all로 실제 완료를 기다린 뒤에만 아래 높이 동기화를 시작한다.
   const rightRenderDone=Promise.all([
     renderTodayOnelineHl(onelineRows&&onelineRows[0]),
-    renderTodayMemos(dk)
+    renderTodayMemos(dk,contents)
   ]);
   renderTimelineTodos(todos||[]);
   renderTimelineEventsAndSchedule(todos||[]);
