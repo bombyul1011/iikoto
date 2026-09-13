@@ -4508,6 +4508,62 @@ async function _uploadMemoPhotoToR2(blob,dk,cid,ext){
   }
   return `${PHOTO_PROXY_BASE}/photo/${key}`;
 }
+// ── 메모 수정창 사진 첨부/교체/삭제 ──
+// 신규 작성(_memoPendingPhoto)과 별개 상태로 관리: 수정 모달은 "기존 사진이 이미 있을 수 있음"과
+// "그 사진을 지우기로 했음(제거 의도)"을 함께 표현해야 해서 상태가 하나 더 필요함.
+let _memoEditPendingPhoto=null; // 새로 선택한(교체/신규 첨부) 사진 {blob,ext,localUrl}
+let _memoEditRemovePhoto=false; // 기존 사진을 삭제하기로 했는지
+function triggerMemoEditPhotoPick(){
+  document.getElementById('memo-edit-photo-file-inp').click();
+}
+async function handleMemoEditPhotoSelect(ev){
+  const file=ev.target.files&&ev.target.files[0];
+  ev.target.value='';
+  if(!file)return;
+  try{
+    const {blob,ext}=await _resizeImageToWebp(file,640);
+    if(_memoEditPendingPhoto&&_memoEditPendingPhoto.localUrl)URL.revokeObjectURL(_memoEditPendingPhoto.localUrl);
+    const localUrl=URL.createObjectURL(blob);
+    _memoEditPendingPhoto={blob,ext,localUrl};
+    _memoEditRemovePhoto=false; // 새로 골랐으면 삭제 의도는 취소
+    renderMemoEditPhotoPreview();
+  }catch(err){
+    console.error('사진 처리 실패',err);
+  }
+}
+// 수정 모달을 열 때(memoEditSwipe) 현재 메모(m)를 넘겨받아 기존 사진 유무에 따라 프리뷰를 그림
+function renderMemoEditPhotoPreview(existingUrl){
+  const row=document.getElementById('memo-edit-photo-preview-row');
+  const btn=document.getElementById('memo-edit-photo-btn');
+  if(!row)return;
+  const showUrl=_memoEditPendingPhoto?_memoEditPendingPhoto.localUrl:(!_memoEditRemovePhoto?existingUrl:null);
+  if(btn)btn.classList.toggle('on',!!showUrl);
+  if(!showUrl){row.style.display='none';row.innerHTML='';return;}
+  row.style.display='flex';
+  row.innerHTML='';
+  const wrap=document.createElement('div');
+  wrap.className='memo-edit-photo-preview-wrap';
+  const img=document.createElement('img');
+  img.className='memo-edit-photo-preview-thumb';
+  img.src=showUrl;
+  const clear=document.createElement('div');
+  clear.className='memo-edit-photo-preview-clear';
+  clear.innerHTML='<i class="ti ti-x" style="font-size:13px;" aria-hidden="true"></i>';
+  clear.onclick=clearMemoEditPhotoPreview;
+  wrap.appendChild(img);wrap.appendChild(clear);
+  row.appendChild(wrap);
+}
+// X 버튼: 새로 고른 사진이 있으면 그것만 취소, 없으면(=기존 사진 보는 중) 삭제 의도로 표시
+function clearMemoEditPhotoPreview(){
+  if(_memoEditPendingPhoto){
+    if(_memoEditPendingPhoto.localUrl)URL.revokeObjectURL(_memoEditPendingPhoto.localUrl);
+    _memoEditPendingPhoto=null;
+  }else{
+    _memoEditRemovePhoto=true;
+  }
+  renderMemoEditPhotoPreview(_memoEditCurrentPhotoUrl);
+}
+let _memoEditCurrentPhotoUrl=null; // memoEditSwipe가 세팅, confirmMemoEdit/clear에서 참조
 async function _deletePhotoFromR2(photoUrl){
   const key=photoUrl.split('/photo/')[1];
   if(!key)return;
@@ -7995,6 +8051,12 @@ function memoEditSwipe(i){
   document.getElementById('memo-edit-inp').value=m?.text||'';
   document.getElementById('memo-edit-time-inp').value=m?.time||'';
   document.getElementById('memo-edit-modal').dataset.editIdx=i;
+  // 사진 상태 초기화 — 모달 열 때마다 이전 편집 잔여 상태(취소하고 나간 경우 등)가 남지 않도록
+  if(_memoEditPendingPhoto&&_memoEditPendingPhoto.localUrl)URL.revokeObjectURL(_memoEditPendingPhoto.localUrl);
+  _memoEditPendingPhoto=null;
+  _memoEditRemovePhoto=false;
+  _memoEditCurrentPhotoUrl=m?.photoUrl||m?.photoLocalUrl||null;
+  renderMemoEditPhotoPreview(_memoEditCurrentPhotoUrl);
   openModal('memo-edit-modal');setTimeout(()=>document.getElementById('memo-edit-inp').focus(),100);
 }
 function memoDelSwipe(i){
@@ -8011,8 +8073,44 @@ function confirmMemoEdit(){
   const time=padTime(document.getElementById('memo-edit-time-inp').value);
   const i=parseInt(document.getElementById('memo-edit-modal').dataset.editIdx||'0');
   const dk=dateKey(currentDate),memos=getMemos(dk);
-  if(memos[i]){memos[i].text=text;if(time)memos[i].time=time;}
+  const m=memos[i];
+  if(m){
+    m.text=text;if(time)m.time=time;
+    const oldPhotoUrl=m.photoUrl; // 새 업로드 성공 후 지우기 위해 보관(선삭제 금지 — 업로드 실패 시 기존 사진 보존)
+    if(_memoEditPendingPhoto){
+      // 신규 첨부 또는 교체 — 로컬은 즉시 미리보기로 반영, 실제 업로드는 큐를 통해 비동기 진행
+      m.photoLocalUrl=_memoEditPendingPhoto.localUrl;
+      m.photoStatus='pending_upload';
+      m.photoUrl=null; // 새 사진 업로드가 끝나야 확정 URL이 채워짐(그 전까지 이전 URL을 남겨두면 화면에 옛 사진이 보임)
+      S.set(S.key('memos_pending',dk),true);
+      queueMemoPhotoUpload(dk,m.cid,_memoEditPendingPhoto.blob,_memoEditPendingPhoto.ext);
+      if(oldPhotoUrl)_queuePhotoR2DeleteAfter(dk,m.cid,oldPhotoUrl);
+    }else if(_memoEditRemovePhoto){
+      // 기존 사진만 제거 — 업로드할 새 파일이 없으니 바로 필드 정리 + R2 삭제
+      m.photoUrl=null;delete m.photoLocalUrl;delete m.photoStatus;delete m.photoErrorMsg;
+      if(oldPhotoUrl){_deletePhotoFromR2(oldPhotoUrl).catch(err=>{console.error('R2 사진 삭제 실패, 재시도 대기',err);_queuePhotoR2Delete(oldPhotoUrl);});}
+    }
+  }
   saveMemos(dk,memos);closeModal('memo-edit-modal');renderMemos();
+  _memoEditPendingPhoto=null;_memoEditRemovePhoto=false;_memoEditCurrentPhotoUrl=null;
+}
+// 교체 케이스 전용: 새 사진 업로드가 "성공적으로 끝난 뒤"에만 이전 사진을 지움.
+// queueMemoPhotoUpload의 처리 큐를 직접 감시하기보다, 업로드 성공 시 photoStatus가 'synced'로
+// 바뀌는 것을 짧은 간격으로 확인하는 방식이 processMemoPhotoUploadQueue 구조 변경 없이 가장 단순함.
+function _queuePhotoR2DeleteAfter(dk,cid,oldPhotoUrl){
+  const check=()=>{
+    const memos=getMemos(dk);
+    const m=memos.find(x=>x.cid===cid);
+    if(!m)return; // 메모 자체가 삭제됨 — 이전 사진 삭제는 memoDelSwipe 경로에서 이미 처리
+    if(m.photoStatus==='synced'){
+      _deletePhotoFromR2(oldPhotoUrl).catch(err=>{console.error('R2 이전 사진 삭제 실패, 재시도 대기',err);_queuePhotoR2Delete(oldPhotoUrl);});
+    }else if(m.photoStatus==='upload_failed'){
+      // 새 업로드가 실패했으면 이전 사진을 지우면 안 됨(데이터 유실) — 그냥 종료
+    }else{
+      setTimeout(check,1500);
+    }
+  };
+  setTimeout(check,1500);
 }
 function showUndo(){
   clearTimeout(_undoTimer);
