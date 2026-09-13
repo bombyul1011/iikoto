@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.72-instant-rhythm-commit';
+const CACHE = 'iikoto-v2.73-completed-time-edit';
 const ASSETS = [
   './',
   './index.html'

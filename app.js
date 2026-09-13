@@ -4622,6 +4622,13 @@ function padTime(v){
   if(!m)return v;
   return pad(Math.min(23,parseInt(m[1],10)))+':'+pad(Math.min(59,parseInt(m[2],10)));
 }
+// 기존 completedAt(날짜)는 그대로 두고 시각(HH:MM)만 교체 — 수기 완료시각 수정 두 경로(일반 할일/시간표) 공용.
+function _applyCompletedTimeOnly(baseMs,hhmm){
+  const d=new Date(baseMs);
+  const [hh,mm]=hhmm.split(':').map(Number);
+  d.setHours(hh,mm,0,0);
+  return d.getTime();
+}
 function confirmTime(){
   const v=padTime(document.getElementById('time-inp').value);if(!v)return;
   if(_sleepTarget==='rblock-start'){_rhythmFormStart=v;closeModal('time-modal');refreshRhythmTrack();return;}
@@ -4653,10 +4660,7 @@ function confirmTime(){
     const dk=dateKey(currentDate),todos=getTodos(dk);
     const t=todos[i];
     if(t&&t.done){
-      const d=new Date(t.completedAt);
-      const [hh,mm]=v.split(':').map(Number);
-      d.setHours(hh,mm,0,0);
-      t.completedAt=d.getTime();
+      t.completedAt=_applyCompletedTimeOnly(t.completedAt,v);
       saveTodos(dk,todos);renderTodos();
     }
     closeModal('time-modal');
@@ -4669,12 +4673,7 @@ function confirmTime(){
     const m=t&&(t.text||'').match(SCHEDULE_TIME_RE);
     if(t&&m){
       t.text=`${v} ${m[3]}`;
-      if(t.done&&t.completedAt){
-        const d=new Date(t.completedAt);
-        const [hh,mm]=v.split(':').map(Number);
-        d.setHours(hh,mm,0,0);
-        t.completedAt=d.getTime();
-      }
+      if(t.done&&t.completedAt)t.completedAt=_applyCompletedTimeOnly(t.completedAt,v);
       saveTodos(dk,todos);renderTodos();
     }
     closeModal('time-modal');
@@ -9300,32 +9299,28 @@ function openContentProgressModal(cid,watchedNow,secondsWatched){
 }
 // 감상 메모 저장 공용 헬퍼 — contents 항목 자체의 notes[] 배열에 직접 저장(구 goal_notes/wcal_note 방식에서 통합, 2026-08-29).
 // cat: 콘텐츠 카테고리('movie'|'drama'|'book' 등) — 책도 여기 합류해 코멘트 모아보기 타임라인에 함께 노출됨(독서코너 자체엔 별도 노출 안 함).
-function pushContentNote(cid,title,cat,text){
+// replace=true면 기존 notes를 전부 지우고 이 한 건으로 교체(음악처럼 "곡당 메모 1개"만 유지하는 카테고리용, 2026-09-13).
+function pushContentNote(cid,title,cat,text,replace){
   const trimmed=(text||'').trim();
-  if(!trimmed)return;
   const found=_findContentByCidNearMk(cid,_chArchiveMk||monthKey(new Date()));
   if(!found)return;
   const c=found.list[found.idx];
+  if(!trimmed){
+    if(replace){c.notes=[];saveContents(found.mk,found.list);} // 교체모드에서 빈값 저장 = 메모 삭제
+    return;
+  }
   const dk=dateKey(getLogicalDate());
   const now=new Date();
   const time=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
-  if(!c.notes)c.notes=[];
-  c.notes.push({dk,title:title||c.title||'',cat:cat||c.cat||'',text:trimmed,time,updatedAt:Date.now()});
+  const entry={dk,title:title||c.title||'',cat:cat||c.cat||'',text:trimmed,time,updatedAt:Date.now()};
+  if(replace)c.notes=[entry];
+  else{if(!c.notes)c.notes=[];c.notes.push(entry);}
   saveContents(found.mk,found.list);
 }
 // 음악 전용 감상메모 저장 — 음악은 곡당 메모 1개만 유지(같은 곡 재감상이 바뀌면 콘텐츠를 새로 등록하는 편이라 자연스러움).
-// notes[] 배열 방식(pushContentNote)을 그대로 재사용하되, 매번 추가하지 않고 항상 단일 요소로 교체.
+// pushContentNote(replace=true)의 얇은 래퍼.
 function setMusicContentNote(cid,title,text){
-  const trimmed=(text||'').trim();
-  const found=_findContentByCidNearMk(cid,_chArchiveMk||monthKey(new Date()));
-  if(!found)return;
-  const c=found.list[found.idx];
-  if(!trimmed){c.notes=[];saveContents(found.mk,found.list);return;}
-  const dk=dateKey(getLogicalDate());
-  const now=new Date();
-  const time=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
-  c.notes=[{dk,title:title||c.title||'',cat:'music',text:trimmed,time,updatedAt:Date.now()}];
-  saveContents(found.mk,found.list);
+  pushContentNote(cid,title,'music',text,true);
 }
 // 진행률 저장 + (입력했다면) 감상 메모까지 한 번에
 let _cpgDoneConfirmCid=null,_cpgDoneConfirmMk=null;
