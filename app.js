@@ -5752,8 +5752,7 @@ function _startMorningFlowRhythm(key,targetCid,mk,subKey){
   const blockCid=genCid();
   const blocks=getRhythmBlocks(dk);
   blocks.push({cat:rhythmCat,start:startStr,end:'',text:label,created:now,cid:blockCid});
-  saveRhythmBlocks(dk,blocks);
-  autoSync('rblocks',dk);
+  saveRhythmBlocks(dk,blocks); // saveRhythmBlocks 내부에서 이미 autoSync('rblocks',dk) 호출 — 중복 호출 금지(2026-09-13 정리)
   if(rhythmCat==='home'){
     if(subKey==='clean')checkHabitDirect('tidy',dk,startStr); // 살림 중 '정리' 칩일 때만 습관 연결 — 세탁/주방은 제외(리듬탭 수기등록과 동일 규칙)
   }else{
@@ -5788,8 +5787,7 @@ function endMorningFlowCard(key){
     let endMin=endD.getHours()*60+endD.getMinutes();
     if(dateKey(getLogicalDate(now))!==dk)endMin+=1440;
     blocks[idx].end=minToHHMM(endMin%1440);
-    saveRhythmBlocks(dk,blocks);
-    autoSync('rblocks',dk);
+    saveRhythmBlocks(dk,blocks); // saveRhythmBlocks 내부에서 이미 autoSync('rblocks',dk) 호출 — 중복 호출 금지(2026-09-13 정리)
   }
   flow.picks[key]={status:'done',blockCid:pick.blockCid,subKey:pick.subKey};
   saveMorningFlow(dk,flow);
@@ -5860,10 +5858,9 @@ function makeMorningFlowCard(showRecap){
   // [2026-09-05] 리듬탭에서 blockCid로 연결된 리듬블록을 직접 지워버린 경우 — "하려다가 안 한 것"으로 보고
   // 해당 pick을 통째로 지워 idle(미시작) 상태로 되돌림. 화면을 그리기 전에 한 번에 정리해두면
   // 아래 렌더링 로직에서 매번 삭제 여부를 따로 신경 쓸 필요가 없어짐.
-  // [2026-09-12 보완] 감상(독서/콘텐츠) 카드는 60초를 못 채우고 종료하면 애초에 리듬블록이
-  // 생성되지 않아 blockCid가 계속 null로 남는 경우가 있음(60초 지연커밋 정책상 정상) — 이 경우도
-  // "기록이 없다"는 점에서 블록이 지워진 경우와 동일하게 취급해 idle로 되돌림. done인데 blockCid가
-  // 없으면 대상, running인데 blockCid가 없으면 "지금 진행 중"인 정상 상태이므로 건드리지 않음.
+  // [2026-09-13] 감상 스톱워치는 이제 시작 즉시 리듬블록을 생성하므로(오탭 방지용 자동삭제 없음)
+  // done인데 blockCid가 애초에 없는 케이스는 정상 흐름에선 발생하지 않음 — 다만 리듬탭에서 직접
+  // 삭제한 경우는 blockGone으로 이미 위에서 처리되므로, noRecordMade는 방어적으로만 남겨둠.
   let _flowPruned=false;
   Object.keys(flow.picks).forEach(key=>{
     const p=flow.picks[key];
@@ -9264,38 +9261,37 @@ function confirmContentProgressDone(){
   renderCwatchMainCard();
 }
 // ══════════════════════════════════════════════════════════
-// ██ 지연커밋 스톱워치 공용 팩토리 (2026-09-12 리팩터) ██
+// ██ 즉시커밋 스톱워치 공용 팩토리 (2026-09-13 재설계) ██
 // ══════════════════════════════════════════════════════════
-// 독서(_sw*)/콘텐츠(_csw*) 스톱워치가 각자 따로 구현하던 "시작 시 상태만 세팅 → 60초 뒤
-// 타이머로 리듬블록 커밋(시작시각 소급등록) → 종료 시 커밋됐으면 end만 채움" 로직(2026-09-09j
-// 확정 정책)을 하나의 팩토리로 통합. 각 스톱워치는 이 팩토리로 인스턴스를 만들고, 기존 전역변수/
-// 함수 이름(_cswRunning, toggleContentStopwatch 등)은 그 인스턴스를 그대로 비추는 getter/얇은
-// wrapper로 유지 — 호출부(인라인 onclick, 렌더 함수 등)를 하나도 안 건드리기 위함(외부 API 불변 원칙).
+// 독서(_sw*)/콘텐츠(_csw*) 스톱워치 공용 팩토리. 이전엔 "시작 시 상태만 세팅 → 60초 뒤 타이머로
+// 리듬블록 커밋(시작시각 소급등록)" 방식(2026-09-09j)이었으나, 60초 지연 구간에서 화면이 오래
+// 꺼졌다 켜지며 다른 sync 흐름과 겹치는 경합으로 content_cid가 누락되는 버그가 발견됨(2026-09-12
+// 밤). 지연 커밋 자체가 경합의 원인이라 판단해, 시작 즉시 리듬블록을 생성하는 방식으로 재설계.
+// 오탭 방지(짧으면 자동삭제) 기능은 넣지 않음 — 과거 "즉시생성+짧으면 자동삭제" 방식을 시도했다가
+// 생성 upsert와 삭제 요청이 sync에서 서로 경합해 삭제가 무효화(삭제한 게 되살아남)되는 문제로
+// 폐기된 이력이 있음. 오탭했다면 리듬탭에서 직접 스와이프 삭제(deleteRhythmBlock)하면 됨 — 자동
+// 삭제 로직 자체를 두지 않는 쪽이 sync 경합의 여지를 원천 차단해 더 안전하다고 판단.
+// 각 스톱워치는 이 팩토리로 인스턴스를 만들고, 기존 전역변수/함수 이름(_cswRunning,
+// toggleContentStopwatch 등)은 그 인스턴스를 비추는 얇은 wrapper로 유지 — 호출부(인라인 onclick,
+// 렌더 함수 등)를 건드리지 않기 위함(외부 API 불변 원칙).
 // pending 선택 상태(_cswPendingCid류)는 스톱워치 자체 상태가 아니라 카드 UI 상태라 팩토리 밖에 유지.
-// _cswStarting류 연타방지 락은 팩토리 안에 공용으로 넣어 독서 쪽도 자동으로 안전해짐(부수 이득).
-function createDelayedCommitStopwatch(config){
+function createInstantCommitStopwatch(config){
   const persistKey=config.persistKey;
   const checkReadingHabit=!!config.checkReadingHabit;
   const hasTicker=!!config.hasTicker;
   const onTick=config.onTick||function(){};       // hasTicker일 때만 사용 (1초 간격)
-  // [2026-09-12 재설계] onStart는 이제 두 단계로 분리:
-  //  - onResolve(cid,extra) : "시작하기 전" 데이터 조회 전용. st를 건드리지 않고 순수 조회만 하며,
-  //    실패 시 false/null을 반환하면 시작 자체가 취소됨. 여기서 렌더링(DOM 갱신)을 하면 안 됨 —
-  //    이 시점엔 아직 st.running이 false라 화면이 "시작 전" 상태로 그려지는 순서버그가 재발함
-  //    (2026-09-12 발견: 재생 버튼을 눌러도 상태는 바뀌는데 화면만 안 바뀌는 먹통 증상의 원인이었음).
-  //  - onStart(st) : st.running=true 등 상태가 전부 확정된 "이후"에 호출. 여기서 렌더링/DOM 조작.
-  // config.onStart를 그대로 넘기면 위 onResolve 자리에 잘못 꽂힐 위험이 있어, 아래에서 명시적으로
-  // onResolve/onStarted 두 키를 분리해서 받는다. 기존 코드가 하나의 onStart 안에 조회+렌더링을
-  // 섞어 쓰던 것도 이번에 전부 분리해서 재작성함(_cswSw/_swSw 정의부 참조).
+  // onResolve(st,cid,extra) : "시작하기 전" 데이터 조회 전용. st.running은 아직 false. 실패 시
+  //   false를 반환하면 시작 자체가 취소됨. 여기서 렌더링(DOM 갱신)을 하면 안 됨 — 이 시점엔 아직
+  //   화면이 "시작 전" 상태라 순서버그가 남(재생 버튼 눌러도 화면만 안 바뀌는 먹통 증상).
+  // onStarted(st) : st.running=true 및 리듬블록 생성까지 전부 확정된 "이후"에 호출. 렌더링은 여기서만.
   const onResolve=config.onResolve||function(){return true;};
   const onStarted=config.onStarted||function(){};
-  const onCommit=config.onCommit||function(){};
   const onStop=config.onStop||function(){};
   const onRestored=config.onRestored||function(){};
   const buildTitleText=config.buildTitleText;      // (state)=>string — 리듬블록 text
   const buildPersistPayload=config.buildPersistPayload; // (state)=>obj — localStorage에 저장할 추가 필드
 
-  const st={running:false,cid:null,startTs:0,blockCid:null,committed:false,commitTimer:null,tickInterval:null,starting:false,seconds:0};
+  const st={running:false,cid:null,startTs:0,blockCid:null,tickInterval:null,starting:false,seconds:0};
   // config가 넘겨준 부가 상태(cat/title/mk 등)를 st 위에 얹어 콜백들이 자유롭게 읽고 쓰게 함
   Object.assign(st,config.extraState||{});
 
@@ -9304,58 +9300,55 @@ function createDelayedCommitStopwatch(config){
     try{
       const payload=Object.assign({startTs:st.startTs,cid:st.cid,blockCid:st.blockCid,
         dk:dateKey(getLogicalDate(st.startTs))},buildPersistPayload?buildPersistPayload(st):{});
-      // [DEBUG content_cid 유실 추적용 — 원인 확정되면 제거]
-      console.log('[SW-DEBUG]',persistKey,'persist() cid=',payload.cid,'running=',st.running,new Error().stack);
       localStorage.setItem(persistKey,JSON.stringify(payload));
     }catch(e){}
   }
 
   function start(cid,extra){
-    console.log('[SW-DEBUG]',persistKey,'start() called cid=',cid,'extra=',extra);
     if(st.running)return;
-    if(st.starting)return; // 연타 방지 락 — 콘텐츠 쪽에만 있던 걸 공용화(2026-09-01 유래)
+    if(st.starting)return; // 연타 방지 락
     st.starting=true;
     // 1단계: 조회만 — st는 아직 running=false. 실패하면 여기서 조용히 취소(락만 풀고 끝).
     const ok=onResolve(st,cid,extra); // onResolve가 st.cat/title/mk 등을 채우되 running은 아직 안 건드림
     if(ok===false){st.starting=false;return;}
-    // 2단계: 상태 확정 — 이 시점부터 st.running=true. 이후에야 렌더링 콜백을 호출한다(순서 고정).
-    st.running=true;st.cid=cid;st.startTs=Date.now();st.blockCid=null;st.committed=false;
+    // 2단계: 상태 확정 + 리듬블록 즉시 생성(지연 없음 — 경합의 원인이던 지연 구간 자체를 제거).
+    if(!cid){
+      // 방어적 안전장치: cid 없이 시작이 시도되는 경우(정상 흐름에선 발생 안 함) — 조용히 취소.
+      console.warn('[stopwatch] start() called without cid — aborting');
+      st.starting=false;return;
+    }
+    st.running=true;st.cid=cid;st.startTs=Date.now();
     st.starting=false;
-    persist();
-    if(hasTicker)st.tickInterval=setInterval(()=>{onTick(st);},1000);
-    st.commitTimer=setTimeout(commitNow,60000);
-    // 3단계: 상태가 전부 확정된 뒤에만 렌더링/DOM 콜백 호출 — 이 순서를 절대 바꾸지 말 것.
-    onStarted(st);
-  }
-
-  function commitNow(){
-    console.log('[SW-DEBUG]',persistKey,'commitNow() entry st.cid=',st.cid,'st.running=',st.running,'st.committed=',st.committed,'now=',new Date().toISOString());
-    if(!st.running||st.committed)return; // 그 사이 이미 종료됐으면(타이머가 늦게 도착) 아무것도 하지 않음
-    st.committed=true;
-    const cid=st.cid,startTs=st.startTs;
-    const dk=dateKey(getLogicalDate(startTs));
-    const startMin=new Date(startTs).getHours()*60+new Date(startTs).getMinutes();
+    const dk=dateKey(getLogicalDate(st.startTs));
+    const startMin=new Date(st.startTs).getHours()*60+new Date(st.startTs).getMinutes();
     const text=buildTitleText(st);
     st.blockCid=_commitEnjoyRhythmBlock({text,contentCid:cid,dk,startMin,checkReadingHabit});
     persist();
-    onCommit(st); // st.committed/blockCid가 이미 확정된 뒤 호출 — 기존에도 순서 문제 없었음(그대로 유지)
+    if(hasTicker)st.tickInterval=setInterval(()=>{onTick(st);},1000);
+    // 3단계: 상태가 전부 확정된 뒤에만 렌더링/DOM 콜백 호출 — 이 순서를 절대 바꾸지 말 것.
+    onStarted(st);
   }
 
   function stop(){
     if(!st.running)return;
     const endTs=Date.now();
-    const startTs=st.startTs,cid=st.cid,wasCommitted=st.committed,blockCid=st.blockCid;
-    clearTimeout(st.commitTimer);st.commitTimer=null;
+    const startTs=st.startTs,cid=st.cid,blockCid=st.blockCid;
+    const seconds=Math.max(0,Math.round((endTs-startTs)/1000));
     if(hasTicker){clearInterval(st.tickInterval);st.tickInterval=null;}
     if(persistKey)try{localStorage.removeItem(persistKey);}catch(e){}
-    st.running=false;st.startTs=0;st.cid=null;st.blockCid=null;st.committed=false;st.seconds=0;
-    if(wasCommitted)autoLogReadingRhythm(blockCid,startTs,endTs);
-    onStop(st,{startTs,endTs,wasCommitted,cid,blockCid}); // st.running=false가 이미 확정된 뒤 호출 — 기존과 동일, 문제 없었음
+    st.running=false;st.startTs=0;st.cid=null;st.blockCid=null;st.seconds=0;
+    // 오탭 방지 로직 없음(2026-09-13) — 몇 초를 했든 항상 end를 채워 정상 종료. 실수로 눌렀다면
+    // 리듬탭에서 직접 스와이프 삭제하면 됨(deleteRhythmBlock, 기존 UI 그대로). 예전에 "즉시생성+
+    // 짧으면 자동삭제" 방식을 시도했다가 생성 upsert와 삭제 요청이 경합해 삭제가 무효화(되살아남)되는
+    // 문제로 폐기된 이력이 있어, 자동삭제 자체를 다시 두지 않기로 함 — 오탭 처리를 사용자 수동
+    // 삭제로 넘기는 대신 sync 경합의 여지를 원천 차단.
+    autoLogReadingRhythm(blockCid,startTs,endTs);
+    onStop(st,{startTs,endTs,cid,blockCid,seconds}); // st.running=false가 이미 확정된 뒤 호출
   }
 
   function toggle(cid,extra){
-    // cid가 없는 호출(=현재 진행중인 항목을 그냥 멈춰라)은 독서 쪽 종료 호출부(모닝플로우 "완료" 등)에서
-    // 옛 toggleStopwatch()처럼 인자 없이 쓰던 패턴 — 진행중이면 무조건 종료로 처리.
+    // cid가 없는 호출(=현재 진행중인 항목을 그냥 멈춰라)은 종료 호출부(모닝플로우 "완료" 등)에서
+    // 인자 없이 쓰는 패턴 — 진행중이면 무조건 종료로 처리.
     if(st.running&&(cid===undefined||cid===null||st.cid===cid)){stop();return;}
     if(st.running)return; // 다른 항목이 이미 진행중이면 무시(동시에 하나만)
     start(cid,extra);
@@ -9367,23 +9360,16 @@ function createDelayedCommitStopwatch(config){
       const raw=localStorage.getItem(persistKey);
       if(!raw)return;
       const saved=JSON.parse(raw);
-      console.log('[SW-DEBUG]',persistKey,'restoreFromStorage() raw=',raw,'parsed.cid=',saved&&saved.cid,'parsed.startTs=',saved&&saved.startTs);
       if(!saved||!saved.startTs)return;
       st.startTs=saved.startTs;st.cid=saved.cid;st.blockCid=saved.blockCid||null;
       st.running=true;
-      if(st.blockCid){
-        st.committed=true;
-      }else{
-        const remain=60000-(Date.now()-st.startTs);
-        st.commitTimer=setTimeout(commitNow,Math.max(0,remain));
-      }
       if(hasTicker)st.tickInterval=setInterval(()=>{onTick(st);},1000);
-      // 상태(running/cid/blockCid/committed)가 전부 확정된 뒤에 부가 데이터 채우기+렌더링 콜백 호출.
+      // 상태(running/cid/blockCid)가 전부 확정된 뒤에 부가 데이터 채우기+렌더링 콜백 호출.
       onRestored(st,saved);
     }catch(e){}
   }
 
-  return{state:st,start,stop,toggle,commitNow,restoreFromStorage,persist};
+  return{state:st,start,stop,toggle,restoreFromStorage,persist};
 }
 
 // ══════════════════════════════════════════════════════════
@@ -9393,22 +9379,21 @@ function createDelayedCommitStopwatch(config){
 // 스톱워치가 아닌 시작/종료 원탭 방식: 시작 탭에서 리듬블록을 end 없이 생성해두고,
 // 종료 탭에서 end를 채워 마감 + 진행률·메모 모달을 연다. 초단위 표시가 없어 setInterval/화면복귀 보정이 불필요해짐.
 const CSW_PERSIST_KEY='iikoto_content_watch_start';
-// [2026-09-12 리팩터] 실제 상태는 팩토리(_cswSw.state)가 들고 있고, 아래 _csw* 전역들은
+// [2026-09-13 재설계] 실제 상태는 팩토리(_cswSw.state)가 들고 있고, 아래 _csw* 전역들은
 // 기존 호출부(1235, 5655, 9232~9267, 11041~11123줄 등)가 그대로 읽을 수 있도록 각 콜백
 // 시점에 동기화해주는 얕은 미러(mirror) 변수. 값의 소유자는 항상 _cswSw.state 쪽.
 let _cswRunning=false,_cswCid=null,_cswCat=null,_cswTitle=null,_cswMk=null,_cswStartTs=0,_cswBlockCid=null;
 function _cswSyncMirror(st){
   _cswRunning=st.running;_cswCid=st.cid;_cswCat=st.cat;_cswTitle=st.title;_cswMk=st.mk;_cswStartTs=st.startTs;_cswBlockCid=st.blockCid;
 }
-const _cswSw=createDelayedCommitStopwatch({
+const _cswSw=createInstantCommitStopwatch({
   persistKey:CSW_PERSIST_KEY,
   checkReadingHabit:false,
   hasTicker:false,
   extraState:{cat:null,title:null,mk:null},
   onResolve:function(st,cid,knownMk){
     // 1단계(조회 전용) — st.running은 아직 false. 여기서 렌더링하면 화면이 "시작 전" 상태로 그려지는
-    // 순서버그가 남으로 절대 렌더링 호출 금지 (2026-09-12 발견: 재생 버튼 눌러도 상태만 바뀌고
-    // 화면은 새로고침 전까지 안 바뀌는 먹통 증상의 원인이었음).
+    // 순서버그가 남으므로 절대 렌더링 호출 금지(재생 버튼 눌러도 화면은 새로고침 전까지 안 바뀌는 먹통 증상의 원인).
     const found=knownMk?{mk:knownMk,list:getContents(knownMk),idx:getContents(knownMk).findIndex(c=>c.cid===cid)}:_findContentByCidNearMk(cid,_chArchiveMk||monthKey(new Date()));
     if(!found||found.idx<0)return false;
     const c=found.list[found.idx];
@@ -9421,20 +9406,16 @@ const _cswSw=createDelayedCommitStopwatch({
   },
   buildPersistPayload:function(st){return{cat:st.cat,title:st.title||'',mk:st.mk};},
   onStarted:function(st){
-    // 2단계 — st.running=true 등 상태가 전부 확정된 뒤 호출. 여기서만 렌더링/DOM 조작.
+    // 2단계 — st.running=true 및 리듬블록 생성까지 전부 확정된 뒤 호출. 여기서만 렌더링/DOM 조작.
     if(_cswPendingCid===st.cid){_cswPendingCid=null;_cswPendingMk=null;} // pending 카드에서 재생 링으로 시작한 경우 pending 상태 정리
+    // 최근 본 작품 우선노출(콘텐츠허브 스와이프 카드) 정렬 기준 — 기존 커밋 시점 로직을 시작 시점으로 이관
+    const list=getContents(st.mk);
+    const idx=list.findIndex(x=>x.cid===st.cid);
+    if(idx>=0){list[idx].lastActivityAt=Date.now();saveContents(st.mk,list);}
     document.querySelectorAll('.seed-icon-btn').forEach(el=>el.classList.add('cwatch-active'));
     if(_chArchiveMk)chExpandMonth(_chArchiveMk);
     _cswSyncMirror(st);
     renderCwatchMainCard();
-  },
-  onCommit:function(st){
-    // 최근 본 작품 우선노출(콘텐츠허브 스와이프 카드) 정렬 기준 — 기존 _cswCommitNow에만 있던 로직
-    const list=getContents(st.mk);
-    const idx=list.findIndex(x=>x.cid===st.cid);
-    if(idx>=0){list[idx].lastActivityAt=Date.now();saveContents(st.mk,list);}
-    _cswSyncMirror(st);
-    renderCwatchMainCard(); // 리듬바/카드가 화면에 막 등장하는 시점이므로 갱신
   },
   onRestored:function(st,saved){
     // restoreFromStorage()가 st.running=true 등을 이미 확정한 뒤 호출 — 여기선 저장해둔 부가데이터만 채우고 렌더링.
@@ -9445,21 +9426,20 @@ const _cswSw=createDelayedCommitStopwatch({
   },
   onStop:function(st,info){
     document.querySelectorAll('.seed-icon-btn').forEach(el=>el.classList.remove('cwatch-active'));
-    const secondsWatched=Math.max(0,Math.round((info.endTs-info.startTs)/1000));
-    const minutesWatched=Math.round(secondsWatched/60);
+    const minutesWatched=Math.round(info.seconds/60);
     if(_chArchiveMk)chExpandMonth(_chArchiveMk);
     _cswSyncMirror(st);
     refreshContentHubViews();
     renderCwatchMainCard();
-    if(secondsWatched>=60)openContentProgressModal(info.cid,minutesWatched,secondsWatched); // 1분 미만은 진행률 입력도 의미 없으니 띄우지 않음
+    openContentProgressModal(info.cid,minutesWatched,info.seconds); // 2026-09-13: 시간 문턱 없이 항상 띄움(리듬블록도 항상 생성되므로 일관되게)
   }
 });
 // 시청 시작 확인 단계 — 포스터를 눌러 바로 스톱워치가 시작되면 실수 탭·연타 시 리듬 블록이 중복 생성될 위험이 있어(2026-09-01),
 // 포스터 탭 → 그 작품 하나만 남은 확인 배너("시작" 버튼 포함) → 버튼을 눌러야 실제 시작되는 2단계로 분리.
 // 진행중(_cswRunning)일 때는 이 확인 단계를 거치지 않고 바로 종료로 이어짐(기존 동작 유지).
 let _cswPendingCid=null,_cswPendingMk=null;
-// [2026-09-12 리팩터] _cswStarting(연타방지 락)과 _cswCommitTimer/_cswCommitted(60초 지연커밋
-// 상태)는 이제 공용 팩토리(_cswSw.state) 내부로 이동 — createDelayedCommitStopwatch 정의부 참조.
+// _cswStarting(연타방지 락) 등 나머지 상태는 공용 팩토리(_cswSw.state) 내부로 이동 —
+// createInstantCommitStopwatch 정의부 참조.
 // ── 시청 시작 선택 시트 — 진행중 드라마/영화 중 골라 스톱워치 시작, 없으면 새로 등록 후 바로 시작 ──
 function _getOngoingWatchingWithCid(){
   const now=new Date();
@@ -9627,11 +9607,18 @@ function _commitEnjoyRhythmBlock(opts){
   const blockCid=genCid();
   const blocks=getRhythmBlocks(dk);
   blocks.push({cat:'enjoy',start:minToHHMM(startMin),end:'',text,created:Date.now(),cid:blockCid,contentCid});
-  saveRhythmBlocks(dk,blocks);
-  autoSync('rblocks',dk);
+  saveRhythmBlocks(dk,blocks); // saveRhythmBlocks 내부에서 이미 autoSync('rblocks',dk) 호출 — 중복 호출 금지
+  // 안전장치(2026-09-13): cid 없이 감상 리듬블록이 커밋되는 경우는 정상 흐름에선 없어야 하나,
+  // 혹시라도 재발하면 조용히 묻히지 않도록 눈에 띄게 남김. 블록 자체는 그대로 생성해 감상시간
+  // 데이터는 보존(삭제/차단하지 않음) — 다만 콘텐츠 연동만 못 하는 상태로 남는 걸 감지하기 위함.
+  if(!contentCid){
+    console.warn('[rhythm] enjoy 블록이 content_cid 없이 생성됨',{blockCid,dk,text});
+    scheduleAlertAt('rhythm_cid_missing',blockCid,new Date(),
+      '감상 기록에 콘텐츠 연동 누락',(text||'감상')+' 기록이 콘텐츠 연동 없이 저장됐어요. 확인해 주세요.');
+  }
   if(checkReadingHabit)checkHabitDirect('reading',dk,minToHHMM(startMin)); // 스톱워치 독서 활동은 카테고리(감상)와 무관하게 '독서' 습관을 직접 체크, 시작시각 기준
   // 모닝플로우 카드가 이 스톱워치로 시작된 경우, running pick의 blockCid를 지금 막 생긴 블록으로 채움
-  // — 60초 전엔 blockCid가 null이라 "몇 시부터 진행중"이 화면에 안 뜨다가, 이 시점부터 정상 표시됨.
+  // — 시작과 동시에 채워지므로 "몇 시부터 진행중"이 화면에 바로 표시됨.
   const flow=getMorningFlow(dk);
   if(flow.picks.enjoy&&flow.picks.enjoy.status==='running'&&flow.picks.enjoy.cid===contentCid){
     flow.picks.enjoy.blockCid=blockCid;
@@ -9640,11 +9627,10 @@ function _commitEnjoyRhythmBlock(opts){
   }
   return blockCid;
 }
-// [2026-09-12 리팩터] 아래 4개는 이제 팩토리 인스턴스(_cswSw)로의 얇은 wrapper.
-// 실제 로직(60초 지연커밋, 연타방지 락, 복원)은 createDelayedCommitStopwatch 정의부 참조.
+// 아래 2개는 팩토리 인스턴스(_cswSw)로의 얇은 wrapper.
+// 실제 로직(즉시커밋, 연타방지 락, 복원)은 createInstantCommitStopwatch 정의부 참조.
 // 함수 이름은 그대로 유지 — 인라인 onclick 등 외부 호출부를 바꾸지 않기 위함.
 function toggleContentStopwatch(cid,knownMk){_cswSw.toggle(cid,knownMk);}
-function _cswCommitNow(){_cswSw.commitNow();}
 function stopContentStopwatch(){_cswSw.stop();}
 // 새로고침·앱 재시작으로 메모리 상태가 초기화돼도 시청중 표시를 이어감(초단위 표시가 없어 setInterval 재개는 불필요)
 _cswSw.restoreFromStorage();
@@ -11224,10 +11210,10 @@ let _rdOpenCid=null;
 let _rdDoneQuoteBookCid=null;
 let _rdDoneCommentBookCid=null;
 let _rdSheetBookCid=null;
-// [2026-09-12 리팩터] 실제 상태는 팩토리(_swSw.state)가 들고 있고, 아래 _sw* 전역들은
+// [2026-09-13 재설계] 실제 상태는 팩토리(_swSw.state)가 들고 있고, 아래 _sw* 전역들은
 // 기존 호출부(2068, 5654, 11093~11322, 11756, 13082, 13200~13210줄 등)가 그대로 읽을 수 있도록
 // 각 콜백 시점에 동기화해주는 얕은 미러(mirror) 변수. 값의 소유자는 항상 _swSw.state 쪽.
-// (콘텐츠 스톱워치 _cswSw와 동일한 팩토리 재사용 — createDelayedCommitStopwatch 정의부 참조)
+// (콘텐츠 스톱워치 _cswSw와 동일한 팩토리 재사용 — createInstantCommitStopwatch 정의부 참조)
 let _swSeconds=0,_swRunning=false,_swStartTs=0,_swBookCid=null,_swBlockCid=null;
 const RD_SW_C=2*Math.PI*32;
 // 스톱워치 시작시각을 localStorage에 영속화 — 새로고침/앱 완전종료 후 재시작해도
@@ -11237,7 +11223,7 @@ const SW_PERSIST_KEY='iikoto_reading_sw_start';
 function _swSyncMirror(st){
   _swRunning=st.running;_swBookCid=st.cid;_swStartTs=st.startTs;_swBlockCid=st.blockCid;_swSeconds=st.seconds;
 }
-const _swSw=createDelayedCommitStopwatch({
+const _swSw=createInstantCommitStopwatch({
   persistKey:SW_PERSIST_KEY,
   checkReadingHabit:true,
   hasTicker:true,
@@ -11250,10 +11236,9 @@ const _swSw=createDelayedCommitStopwatch({
     updateStopwatchDisplay();
   },
   onResolve:function(st,cid){
-    // [2026-09-12] 콘텐츠(_cswSw)와 동일하게 방식 통일 — 독서도 결국 API로 표지·페이지수까지
-    // 검색해서 쓰는 콘텐츠와 같은 성격이라, "책이 이미 삭제된 채로 스톱워치만 도는" 예외가
-    // 콘텐츠와 똑같이 실재함(스톱워치 진행 중 서재에서 그 책을 삭제하는 경우). 콘텐츠처럼
-    // 시작 시점에 조회해서 없으면 시작 자체를 취소.
+    // 독서도 결국 API로 표지·페이지수까지 검색해서 쓰는 콘텐츠와 같은 성격이라, "책이 이미
+    // 삭제된 채로 스톱워치만 도는" 예외가 콘텐츠와 똑같이 실재함(진행 중 서재에서 그 책을
+    // 삭제하는 경우). 콘텐츠처럼 시작 시점에 조회해서 없으면 시작 자체를 취소.
     const book=getBooks().find(b=>b.cid===cid);
     if(!book)return false;
     st.title=book.title||'';
@@ -11264,29 +11249,24 @@ const _swSw=createDelayedCommitStopwatch({
   },
   buildPersistPayload:function(st){return{title:st.title||''};},
   onStarted:function(st){
-    // st.running=true 등 상태가 전부 확정된 뒤 호출 — 렌더링/DOM 조작은 여기서만.
+    // st.running=true 및 리듬블록 생성까지 전부 확정된 뒤 호출 — 렌더링/DOM 조작은 여기서만.
     if(_rdPendingCid===st.cid){_rdPendingCid=null;} // pending 카드에서 재생 링으로 시작한 경우 pending 상태 정리
-    document.querySelector('.reading-icon-btn')?.classList.add('sw-active');
-    _swSyncMirror(st);
-    renderRdTop(); // DOM 갱신은 이 한 곳에서만 — running=true로 다시 그려지며 spinning/id 등이 자동 반영됨
-  },
-  onCommit:function(st){
-    // 최근 읽은 책 우선노출(독서허브 스와이프 카드) 정렬 기준 — 기존 _swCommitNow에만 있던 로직
+    // 최근 읽은 책 우선노출(독서허브 스와이프 카드) 정렬 기준 — 기존 커밋 시점 로직을 시작 시점으로 이관
     const foundBook=_findContentByCidNearMkInRange(st.cid,_BOOK_SCAN_MONTHS);
     if(foundBook){
       foundBook.list[foundBook.idx].lastActivityAt=Date.now();
       saveContents(foundBook.mk,foundBook.list);
     }
+    document.querySelector('.reading-icon-btn')?.classList.add('sw-active');
     _swSyncMirror(st);
-    renderRdTop(); // 리듬바가 화면에 막 등장하는 시점이므로 갱신
+    renderRdTop(); // DOM 갱신은 이 한 곳에서만 — running=true로 다시 그려지며 spinning/id 등이 자동 반영됨
   },
   onStop:function(st,info){
     document.querySelector('.reading-icon-btn')?.classList.remove('sw-active');
     _swSyncMirror(st);
     renderRdTop();
     renderRdQuotes(); // 스톱워치 종료로 선택 대상이 바뀌므로(1권이면 그 책, 2권 이상이면 재선택 대기) 문장수집도 함께 갱신
-    const seconds=Math.max(0,Math.round((info.endTs-info.startTs)/1000));
-    if(seconds>=60)openProgressModal(info.cid,seconds); // 1분 미만은 진행률 입력도 의미 없으니 띄우지 않음
+    openProgressModal(info.cid,info.seconds); // 2026-09-13: 시간 문턱 없이 항상 띄움(리듬블록도 항상 생성되므로 일관되게)
   },
   onRestored:function(st,saved){
     st.title=saved.title||'';
@@ -13470,20 +13450,13 @@ function confirmReadingProgressDone(){
   closeModal('progress-modal');
   setBookStatus(cid,'done',{stars,review}); // 상태전환 공용 경로 — 콘텐츠 연동(syncReadingBookToContent)까지 함께 처리됨
 }
-// [2026-09-09j 전면 재설계] 60초를 넘기기 전엔 리듬블록/습관체크/최근활동을 아예 만들지 않음.
-// 시작 시엔 상태만 세팅하고 setTimeout으로 60초 뒤 커밋 타이머를 건다. 60초를 채우면 그 시점에
-// 딱 한 번 리듬블록을 생성하되 시작시각은 실제 시작시각(_swStartTs)으로 소급 등록 — 화면엔 60초
-// 시점에 리듬바가 "방금 나타난" 게 아니라 "1분 전부터 있었던 것"처럼 정확히 표시됨. 60초 전에
-// 종료하면 타이머만 취소하면 끝 — 애초에 아무것도 안 만들어졌으니 지우거나 되돌릴 것이 없음.
+// [2026-09-13 재설계] 시작 즉시 리듬블록을 생성(지연 없음), 종료 시 몇 초를 했든 항상 end를
+// 채워 정상 기록으로 마감 — 오탭 방지용 자동삭제는 두지 않음(사용 이력 참조: 즉시생성+자동삭제
+// 시도 시 생성/삭제 sync 경합으로 삭제가 무효화된 이력 있음). 실수로 눌렀다면 리듬탭에서 직접
+// 삭제(deleteRhythmBlock). 실제 로직(연타방지 락, 복원 포함)은 createInstantCommitStopwatch 정의부 참조.
 // cid: 시작 시 반드시 전달(어느 책인지 명시) — 종료 호출(재생 중 다시 탭)은 인자 없이도 _swBookCid로 식별.
-// [2026-09-12 리팩터] 실제 로직(60초 지연커밋, 연타방지 락, 복원)은 createDelayedCommitStopwatch
-// 정의부 참조. 종료 로직도(콘텐츠와 달리 별도 stop 함수가 없었던 것과 무관하게) toggle 안에서
-// start/stop을 모두 처리하는 팩토리 쪽으로 이관됨.
 function toggleStopwatch(cid){
   _swSw.toggle(cid);
-}
-function _swCommitNow(){
-  _swSw.commitNow();
 }
 // 시작 시 생성해둔 리듬블록(blockCid)을 찾아 end만 채움 — 다른 카테고리(운동/휴식 등)와 동일 규칙.
 // minToHHMM은 콘텐츠 시청 스톱워치 쪽(파일 하단)에 정의된 전역 함수를 그대로 재사용(중복 정의 제거, 2026-08-30)
@@ -13498,8 +13471,7 @@ function autoLogReadingRhythm(blockCid,startTs,endTs){
   // 자정을 넘겨 끝난 경우, 같은 논리적 하루(리듬 4시 기준) 안이면 24시를 더해 이어지도록 표시
   if(dateKey(getLogicalDate(endTs))!==dk)endMin+=1440;
   blocks[idx].end=minToHHMM(endMin%1440);
-  saveRhythmBlocks(dk,blocks);
-  autoSync('rblocks',dk);
+  saveRhythmBlocks(dk,blocks); // saveRhythmBlocks 내부에서 이미 autoSync('rblocks',dk) 호출 — 중복 호출 금지
 }
 function updateStopwatchDisplay(){
   // 경과시간 재계산은 팩토리 onTick 콜백(_swSw 정의부)에서 이미 처리되어 _swSeconds에 미러됨 —

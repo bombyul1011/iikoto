@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.71-content-hub-note-timeline';
+const CACHE = 'iikoto-v2.72-instant-rhythm-commit';
 const ASSETS = [
   './',
   './index.html'
