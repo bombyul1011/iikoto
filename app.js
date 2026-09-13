@@ -3234,7 +3234,7 @@ function getContents(mk){
 async function fetchAllMusicContents(){
   const rows=await supaFetch(`contents?content_cat=eq.music&order=created`);
   if(!rows)return [];
-  return rows.map(r=>({cat:r.content_cat,title:r.title,startDate:r.start_date,endDate:r.end_date,status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',musicUrl:r.music_url||null,album:r.album||null,releaseYear:r.release_year||null,notes:r.notes||[],created:r.created,cid:r.client_id}));
+  return rows.map(r=>({cat:r.content_cat,title:r.title,startDate:r.start_date,endDate:r.end_date,status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',musicUrl:r.music_url||null,album:r.album||null,releaseYear:r.release_year||null,notes:r.notes||[],reviewSavedDk:r.review_saved_dk||null,reviewSavedTime:r.review_saved_time||null,created:r.created,cid:r.client_id}));
 }
 // 리듬바 "감상" 입력 시 진행중 드라마/영화를 제목 선택용으로 제공.
 // 책은 독서 스톱워치가 종료 시점에 감상 리듬을 자동 기록하므로 여기서는 제외.
@@ -3284,7 +3284,7 @@ function saveContents(mk,v){
   const now=Date.now();
   v.forEach(it=>{
     const p=it.cid?prevByCid[it.cid]:null;
-    const isSame=p&&p.status===it.status&&p.startDate===it.startDate&&p.endDate===it.endDate&&p.review===it.review&&p.stars===it.stars&&p.title===it.title&&p.totalUnit===it.totalUnit&&p.currentUnit===it.currentUnit&&p.unitLabel===it.unitLabel&&p.readSeconds===it.readSeconds&&p.lastActivityAt===it.lastActivityAt&&JSON.stringify(p.notes||[])===JSON.stringify(it.notes||[]);
+    const isSame=p&&p.status===it.status&&p.startDate===it.startDate&&p.endDate===it.endDate&&p.review===it.review&&p.reviewSavedDk===it.reviewSavedDk&&p.reviewSavedTime===it.reviewSavedTime&&p.stars===it.stars&&p.title===it.title&&p.totalUnit===it.totalUnit&&p.currentUnit===it.currentUnit&&p.unitLabel===it.unitLabel&&p.readSeconds===it.readSeconds&&p.lastActivityAt===it.lastActivityAt&&JSON.stringify(p.notes||[])===JSON.stringify(it.notes||[]);
     if(!isSame)it.updatedAt=now;
     else if(p&&p.updatedAt)it.updatedAt=p.updatedAt;
   });
@@ -3624,7 +3624,7 @@ async function syncContentsDownRaw(mk){
       const matched=localNoCidByKey[key];
       if(matched){l=matched;delete localNoCidByKey[key];}
     }
-    const serverItem={cat:r.content_cat,title:r.title,startDate:r.start_date||(r.start_day?mk+'-'+pad(r.start_day):null),endDate:r.end_date||(r.end_day?mk+'-'+pad(r.end_day):null),status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',musicUrl:r.music_url||null,album:r.album||null,releaseYear:r.release_year||null,totalUnit:r.total_unit||null,currentUnit:r.current_unit||null,notes:r.notes||[],unitLabel:r.unit_label||null,readSeconds:r.read_seconds||0,isAiring:!!r.is_airing,created:r.created,cid,updatedAt:r.updated_at,lastActivityAt:r.last_activity_at||0};
+    const serverItem={cat:r.content_cat,title:r.title,startDate:r.start_date||(r.start_day?mk+'-'+pad(r.start_day):null),endDate:r.end_date||(r.end_day?mk+'-'+pad(r.end_day):null),status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',musicUrl:r.music_url||null,album:r.album||null,releaseYear:r.release_year||null,totalUnit:r.total_unit||null,currentUnit:r.current_unit||null,notes:r.notes||[],reviewSavedDk:r.review_saved_dk||null,reviewSavedTime:r.review_saved_time||null,unitLabel:r.unit_label||null,readSeconds:r.read_seconds||0,isAiring:!!r.is_airing,created:r.created,cid,updatedAt:r.updated_at,lastActivityAt:r.last_activity_at||0};
     if(!l){merged.push(serverItem);return;}
     // 로컬/서버 둘 다 있으면 updated_at(서버) vs 로컬수정시각 비교, 서버가 더 최신이거나 로컬에 수정시각 기록이 없으면 서버값 채택
     const localTs=l.updatedAt?new Date(l.updatedAt).getTime():0;
@@ -3650,7 +3650,7 @@ async function syncContentsUp(mk){
   if(ensureItemCids(c))S.set(S.key('contents',mk),c);
   const delCids=getDelPendingCids('contents',mk);
   const ok=await syncListUpSafe('contents',`month_key=eq.${mk}`,'month_key,client_id',c,
-    it=>({month_key:mk,content_cat:it.cat,title:it.title,start_date:it.startDate,end_date:it.endDate,status:it.status,review:it.review||'',stars:it.stars||0,poster:it.poster||null,author:it.author||'',music_url:it.musicUrl||null,album:it.album||null,release_year:it.releaseYear||null,total_unit:it.totalUnit||null,current_unit:it.currentUnit||null,notes:it.notes||[],unit_label:it.unitLabel||null,read_seconds:it.readSeconds||0,is_airing:!!it.isAiring,created:it.created,client_id:it.cid,last_activity_at:it.lastActivityAt||null}),
+    it=>({month_key:mk,content_cat:it.cat,title:it.title,start_date:it.startDate,end_date:it.endDate,status:it.status,review:it.review||'',stars:it.stars||0,poster:it.poster||null,author:it.author||'',music_url:it.musicUrl||null,album:it.album||null,release_year:it.releaseYear||null,total_unit:it.totalUnit||null,current_unit:it.currentUnit||null,notes:it.notes||[],review_saved_dk:it.reviewSavedDk||null,review_saved_time:it.reviewSavedTime||null,unit_label:it.unitLabel||null,read_seconds:it.readSeconds||0,is_airing:!!it.isAiring,created:it.created,client_id:it.cid,last_activity_at:it.lastActivityAt||null}),
     delCids);
   if(ok)delCids.forEach(cid=>removeDelPending('contents',mk,cid));
   return ok;
@@ -7814,6 +7814,28 @@ function openTodoDatePickerSheet(todoIdx){
 // ══════════════════════════════════════════════════════════
 // ── MEMO
 let _deletedMemo=null,_undoTimer=null,_memoSwipeIdx=-1;
+// 오늘탭 메모 배너용 — 특정 날짜(dk)에 작성된 콘텐츠 감상메모(notes[])와 완결 총평(review, 저장 시점=dk 기준)을 뽑아옴.
+// 표시 전용(작성/편집은 콘텐츠허브에서만), 월 버킷을 넘나드는 이월 콘텐츠도 놓치지 않도록 해당 월+전월 둘 다 조회.
+// 완결 총평은 음악 제외(콘텐츠허브 로그 모음 시트와 동일 기준, WCAL_CAT_META 참고).
+function getContentMemoItemsForDate(dk){
+  const mk=dk.slice(0,7);
+  const [y,m]=mk.split('-').map(Number);
+  const prevMk=monthKey(new Date(y,m-2,1));
+  const seen=new Set();
+  const items=[]; // {kind:'note'|'final',cid,cat,title,poster,text,time}
+  [mk,prevMk].forEach(searchMk=>{
+    getContents(searchMk).forEach(c=>{
+      if(seen.has(c.cid))return;seen.add(c.cid);
+      (c.notes||[]).forEach(n=>{
+        if(n.dk===dk)items.push({kind:'note',cid:c.cid,cat:c.cat,title:n.title||c.title||'',text:n.text||'',time:n.time||''});
+      });
+      if(c.cat!=='music'&&c.review&&c.reviewSavedDk===dk){
+        items.push({kind:'final',cid:c.cid,cat:c.cat,title:c.title||'',poster:c.poster||null,text:c.review,time:c.reviewSavedTime||''});
+      }
+    });
+  });
+  return items;
+}
 // 사진메모 깜빡임 방지 — sync 루틴들이 짧은 시간에 renderMemos()를 여러 번 호출해도
 // 실제 내용(memos 배열)이 바뀌지 않았으면 재렌더(=<img src> 재할당으로 인한 깜빡임)를 스킵.
 // 내용이 같은지는 가벼운 직렬화 비교로 판단(리스트가 크지 않아 비용 무시 가능한 단순 접근).
@@ -7821,22 +7843,42 @@ let _lastRenderedMemosDk=null,_lastRenderedMemosSig=null;
 function renderMemos(){
   const dk=dateKey(currentDate),memos=getMemos(dk);
   const list=document.getElementById('memo-list');if(!list)return;
-  const sig=dk+'|'+JSON.stringify(memos.map(m=>[m.cid,m.time,m.text,m.photoUrl,m.photoLocalUrl,m.photoStatus,m.photoErrorMsg]));
+  // 콘텐츠 감상메모/완결총평(표시 전용) — 일반 memos와 같은 목록에 섞여 시간순 정렬됨.
+  const contentItems=getContentMemoItemsForDate(dk);
+  const sig=dk+'|'+JSON.stringify(memos.map(m=>[m.cid,m.time,m.text,m.photoUrl,m.photoLocalUrl,m.photoStatus,m.photoErrorMsg]))+'|'+JSON.stringify(contentItems);
   if(dk===_lastRenderedMemosDk&&sig===_lastRenderedMemosSig)return; // 내용 동일 — 깜빡임만 유발하므로 스킵
   _lastRenderedMemosDk=dk;_lastRenderedMemosSig=sig;
   list.innerHTML='';
   // time(HH:MM) 기준 오름차순 정렬, 원본 배열 인덱스는 그대로 유지해서 수정/삭제가 정확한 항목을 가리키게 함
   // 새벽 시각은 "전날 자정 넘어 쓴 기록"으로 보고 정렬상 맨 뒤로 보냄(표시는 그대로 00:30 등 실제 시간).
   // 전역 toSortKey(06:00 기준 새벽보정)를 그대로 사용 — 과거엔 여기만 5시 기준으로 별도 계산해 다른 화면과 기준이 달랐음.
-  const ordered=memos.map((m,i)=>({m,i})).sort((a,b)=>{
+  const memoEntries=memos.map((m,i)=>({kind:'memo',m,i}));
+  const contentEntries=contentItems.map(c=>({kind:'content',m:c,i:-1}));
+  const ordered=[...memoEntries,...contentEntries].sort((a,b)=>{
     const ka=toSortKey(a.m.time),kb=toSortKey(b.m.time);
     if(ka!==9999&&kb!==9999)return ka-kb;
     if(ka!==9999&&kb===9999)return -1;
     if(ka===9999&&kb!==9999)return 1;
     return (a.m.created||0)-(b.m.created||0);
   });
-  ordered.forEach(({m,i})=>{
+  ordered.forEach(({kind,m,i})=>{
     const el=document.createElement('div');el.className='memo-item';
+    if(kind==='content'){
+      const isFinal=m.kind==='final';
+      const meta=WCAL_CAT_META[m.cat]||{icon:'ti-tag',color:'var(--tm)'};
+      const bub=document.createElement('div');bub.className='memo-bub memo-bub-content';
+      const headHtml=isFinal
+        ?(m.poster?`<div class="memo-content-poster"><img src="${m.poster}" alt=""></div><span class="memo-content-title">${escapeHtml(m.title)}</span>`
+                  :`<span class="memo-content-title">${escapeHtml(m.title)}</span>`)
+        :`<i class="ti ${meta.icon} memo-content-icon" aria-hidden="true"></i><span class="memo-content-title">${escapeHtml(m.title)}</span>`;
+      bub.innerHTML=`<div class="memo-content-head">${headHtml}</div><div class="memo-content-body">${escapeHtml(m.text)}</div>`;
+      const time=document.createElement('span');
+      time.className='memo-time';
+      time.textContent=m.time||'';
+      el.appendChild(time);el.appendChild(bub);
+      list.appendChild(el);
+      return;
+    }
     const isSeed=m.type==='seed';
     const h=m.time?parseInt(m.time.split(':')[0],10):null;
     const tod=h==null?'':h>=5&&h<12?' tod-morning':h>=12&&h<18?' tod-afternoon':' tod-night';
@@ -8977,6 +9019,8 @@ function openContentModal(cat,item=null,mk=null,onSaved=null){
   document.getElementById('cm-end').value=item?(item.endDate||''):'';
   document.getElementById('cm-review').value=item?.review||'';
   document.getElementById('cm-stars').value=item?.stars||0;
+  const musicNoteEl=document.getElementById('cm-music-note');
+  if(musicNoteEl)musicNoteEl.value=(item?.notes&&item.notes[0]&&item.notes[0].text)||'';
   renderStarPicker('cm-star-picker','cm-stars',item?.stars||0);
   document.getElementById('cm-del-btn').style.display=item?'block':'none';
   const status=item?.status||'watching';
@@ -9052,6 +9096,8 @@ function setCStatus(status){
   const reviewEl=document.getElementById('cm-review');
   if(starRow)starRow.style.display=showReviewFields?'flex':'none';
   if(reviewEl)reviewEl.style.display=showReviewFields?'':'none';
+  const musicNoteEl=document.getElementById('cm-music-note');
+  if(musicNoteEl)musicNoteEl.style.display=isMusic?'':'none';
 }
 function toggleCDone(){
   setCStatus(_contentCtx.status==='done'?'watching':'done');
@@ -9098,7 +9144,11 @@ function confirmContent(){
   if(_contentCtx.mode==='edit'&&_contentCtx.item){
     const oldContents=getContents(oldMk);
     const idx=oldContents.findIndex(c=>c.cid===_contentCtx.item.cid);
-    const updated=idx>=0?{...oldContents[idx],title,startDate,endDate,status,review,stars,poster,author,musicUrl,album,releaseYear,totalUnit,currentUnit,isAiring}:null;
+    // review 텍스트가 실제로 바뀐 경우에만 저장 시점(오늘탭 메모 배너 기준일)을 새로 찍음 — 다른 필드만 고친 경우는 기존 시점 유지.
+    const reviewChanged=idx>=0&&review!==(oldContents[idx].review||'');
+    const reviewSavedDk=review?(reviewChanged?dateKey(getLogicalDate()):(idx>=0?oldContents[idx].reviewSavedDk:null)):null;
+    const reviewSavedTime=review?(reviewChanged?(String(new Date().getHours()).padStart(2,'0')+':'+String(new Date().getMinutes()).padStart(2,'0')):(idx>=0?oldContents[idx].reviewSavedTime:null)):null;
+    const updated=idx>=0?{...oldContents[idx],title,startDate,endDate,status,review,stars,poster,author,musicUrl,album,releaseYear,totalUnit,currentUnit,isAiring,reviewSavedDk,reviewSavedTime}:null;
     if(idx>=0){
       savedCid=oldContents[idx].cid;
       if(newMk===oldMk){
@@ -9118,9 +9168,15 @@ function confirmContent(){
     const contents=getContents(newMk);
     const newCid=genCid();
     savedCid=newCid;
-    contents.push({cat:_contentCtx.cat,title,startDate,endDate,status,review,stars,poster,author,musicUrl,album,releaseYear,totalUnit,currentUnit,isAiring,created:Date.now(),cid:newCid});
+    const reviewSavedDk=review?dateKey(getLogicalDate()):null;
+    const reviewSavedTime=review?(String(new Date().getHours()).padStart(2,'0')+':'+String(new Date().getMinutes()).padStart(2,'0')):null;
+    contents.push({cat:_contentCtx.cat,title,startDate,endDate,status,review,stars,poster,author,musicUrl,album,releaseYear,totalUnit,currentUnit,isAiring,reviewSavedDk,reviewSavedTime,created:Date.now(),cid:newCid});
     saveContents(newMk,contents);
     if(_contentCtx.onSaved){const cb=_contentCtx.onSaved;_contentCtx.onSaved=null;setTimeout(()=>cb(newCid),0);}
+  }
+  if(_contentCtx.cat==='music'&&savedCid){
+    const musicNoteEl=document.getElementById('cm-music-note');
+    setMusicContentNote(savedCid,title,musicNoteEl?musicNoteEl.value:'');
   }
   closeModal('content-modal');renderContentTimeline();
   if(_contentCtx.cat==='book'&&savedCid){
@@ -9185,6 +9241,20 @@ function pushContentNote(cid,title,cat,text){
   const time=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
   if(!c.notes)c.notes=[];
   c.notes.push({dk,title:title||c.title||'',cat:cat||c.cat||'',text:trimmed,time,updatedAt:Date.now()});
+  saveContents(found.mk,found.list);
+}
+// 음악 전용 감상메모 저장 — 음악은 곡당 메모 1개만 유지(같은 곡 재감상이 바뀌면 콘텐츠를 새로 등록하는 편이라 자연스러움).
+// notes[] 배열 방식(pushContentNote)을 그대로 재사용하되, 매번 추가하지 않고 항상 단일 요소로 교체.
+function setMusicContentNote(cid,title,text){
+  const trimmed=(text||'').trim();
+  const found=_findContentByCidNearMk(cid,_chArchiveMk||monthKey(new Date()));
+  if(!found)return;
+  const c=found.list[found.idx];
+  if(!trimmed){c.notes=[];saveContents(found.mk,found.list);return;}
+  const dk=dateKey(getLogicalDate());
+  const now=new Date();
+  const time=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  c.notes=[{dk,title:title||c.title||'',cat:'music',text:trimmed,time,updatedAt:Date.now()}];
   saveContents(found.mk,found.list);
 }
 // 진행률 저장 + (입력했다면) 감상 메모까지 한 번에
@@ -9254,7 +9324,11 @@ function confirmContentProgressDone(){
   c.status='done';
   c.endDate=dateKey(getLogicalDate());
   if(stars)c.stars=stars;
-  if(review)c.review=review;
+  if(review){
+    c.review=review;
+    c.reviewSavedDk=dateKey(getLogicalDate());
+    c.reviewSavedTime=String(new Date().getHours()).padStart(2,'0')+':'+String(new Date().getMinutes()).padStart(2,'0');
+  }
   saveContents(found.mk,found.list);
   chExpandMonth(_chArchiveMk||found.mk);
   refreshContentHubViews();
