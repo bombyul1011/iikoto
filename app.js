@@ -4270,7 +4270,16 @@ function _renderTimeWheelFor(hourTrackId,minTrackId,inpId,wrapId){
 // PC용 시:분 숫자 입력 UI — 롤링 트랙(.tw-col 2개)이 있던 자리를 통째로 이 마크업으로 교체.
 // 앱 공용 톤(--inp/--inp-b/--tp)을 그대로 써서 다른 입력창과 이질감 없게 함.
 function _renderPcTimeInput(wrap,inpId,h,mi){
-  if(wrap.dataset.pcMode==='1')return; // 이미 PC 입력 UI면 다시 그릴 필요 없음(값만 아래에서 갱신)
+  if(wrap.dataset.pcMode==='1'){
+    // 이미 PC 입력 UI면 마크업은 재사용하되, 새로 열린 항목의 실제 값으로 입력창을 갱신해야 함
+    // (이 갱신이 빠져있어 여러 항목을 연달아 열 때 이전 값이 그대로 남아있던 버그, 2026-09-13 수정).
+    const hEl=document.getElementById('tw-pc-hour'),mEl=document.getElementById('tw-pc-min');
+    if(hEl&&mEl){
+      hEl.value=pad(h);mEl.value=pad(mi);
+      document.getElementById(inpId).value=pad(h)+':'+pad(mi);
+    }
+    return;
+  }
   wrap.dataset.pcMode='1';
   wrap.innerHTML=`
     <div class="tw-pc-input-row">
@@ -4639,6 +4648,38 @@ function confirmTime(){
     closeModal('time-modal');
     return;
   }
+  if(_sleepTarget.startsWith('todo-completed:')){
+    const i=parseInt(_sleepTarget.split(':')[1],10);
+    const dk=dateKey(currentDate),todos=getTodos(dk);
+    const t=todos[i];
+    if(t&&t.done){
+      const d=new Date(t.completedAt);
+      const [hh,mm]=v.split(':').map(Number);
+      d.setHours(hh,mm,0,0);
+      t.completedAt=d.getTime();
+      saveTodos(dk,todos);renderTodos();
+    }
+    closeModal('time-modal');
+    return;
+  }
+  if(_sleepTarget.startsWith('schedule-time:')){
+    const i=parseInt(_sleepTarget.split(':')[1],10);
+    const dk=dateKey(currentDate),todos=getTodos(dk);
+    const t=todos[i];
+    const m=t&&(t.text||'').match(SCHEDULE_TIME_RE);
+    if(t&&m){
+      t.text=`${v} ${m[3]}`;
+      if(t.done&&t.completedAt){
+        const d=new Date(t.completedAt);
+        const [hh,mm]=v.split(':').map(Number);
+        d.setHours(hh,mm,0,0);
+        t.completedAt=d.getTime();
+      }
+      saveTodos(dk,todos);renderTodos();
+    }
+    closeModal('time-modal');
+    return;
+  }
   if(_sleepTarget==='meal'){
     const {dk,k}=_mealTimeTarget;
     patchMealField(dk,k,'time',v);
@@ -4736,6 +4777,31 @@ function confirmNightPostpone(){
   renderTodos();
   showToast(movedCount?`${movedCount}개를 내일로 옮겼어요`:'옮기지 못했어요');
 }
+// 완료 시각(completedAt, epoch ms) → "HH:MM" 표시용 포맷.
+function formatCompletedTimeHHMM(ms){
+  const d=new Date(ms);
+  return pad(d.getHours())+':'+pad(d.getMinutes());
+}
+// 일반 할일 완료시각(completedAt) 수정 — 목록에서 완료시각 텍스트를 눌러 공용 시간휠 오픈.
+// 날짜(dk)는 그대로 두고 시각만 교체 — 수기로 늦게 체크한 경우 실제 완료시각을 바로잡기 위함.
+function openTodoCompletedTimePicker(i){
+  const dk=dateKey(currentDate),todos=getTodos(dk);
+  const t=todos[i];if(!t||!t.done||!t.completedAt)return;
+  _sleepTarget='todo-completed:'+i;
+  document.getElementById('time-inp').value=formatCompletedTimeHHMM(t.completedAt);
+  openModal('time-modal');
+  renderTimeWheel();
+}
+// 시간표 항목(텍스트 앞 "HH:MM ")의 완료시각 수정 — 텍스트 자체의 HH:MM 부분을 갱신하고 completedAt도 같은 값으로 맞춤.
+function openScheduleTimePicker(i){
+  const dk=dateKey(currentDate),todos=getTodos(dk);
+  const t=todos[i];if(!t||!t.done)return;
+  const m=(t.text||'').match(SCHEDULE_TIME_RE);if(!m)return;
+  _sleepTarget='schedule-time:'+i;
+  document.getElementById('time-inp').value=m[1].padStart(2,'0')+':'+m[2];
+  openModal('time-modal');
+  renderTimeWheel();
+}
 function renderTodos(){
   const dk=dateKey(currentDate),todos=getTodos(dk);
   renderEventList(dk,todos);
@@ -4780,10 +4846,11 @@ function renderTodos(){
     const chkHtml=(!t.done&&t.pinned)
       ? `<div class="todo-pinned-chk" data-role="chk"><i class="ti ti-bolt-filled" aria-hidden="true"></i></div>`
       : `<div class="chk${tsClass}${t.done?' on':''}" data-role="chk"></div>`;
+    const completedTimeHtml=(t.done&&t.completedAt)?`<div class="todo-completed-time" onclick="event.stopPropagation();openTodoCompletedTimePicker(${i})">${formatCompletedTimeHHMM(t.completedAt)}</div>`:'';
     const recurIconHtml=t.recurRuleCid?'<i class="ti ti-repeat ico-sz-11" style="color:var(--tm);flex-shrink:0;" aria-hidden="true" title="반복"></i>':'';
     const alertIconHtml=(t.todoAlertOn&&t.alertTime)?'<i class="ti ti-bell ico-sz-11" style="color:var(--tm);flex-shrink:0;" aria-hidden="true" title="알림 '+t.alertTime+'"></i>':'';
     const rightIconsHtml=(recurIconHtml||alertIconHtml)?`<div style="display:flex;align-items:center;gap:4px;margin-left:auto;">${recurIconHtml}${alertIconHtml}</div>`:'';
-    el.innerHTML=`${handleHtml}${chkHtml}<span class="todo-txt${t.done?' done':''}" data-todo-i="${i}" style="${partModeStyle}">${textHtml}</span>${rightIconsHtml}`;
+    el.innerHTML=`${handleHtml}${chkHtml}${completedTimeHtml}<span class="todo-txt${t.done?' done':''}" data-todo-i="${i}" style="${partModeStyle}">${textHtml}</span>${rightIconsHtml}`;
     const hasMultipleParts=_isTouchDevice()&&parseTodoTextParts(t.text).parts.length>1;
     attachTodoItemClick(el,i,t.cid||'');
     if(rmEligible){
@@ -4870,7 +4937,10 @@ function renderScheduleList(dk,items){
     const isNext=idx===0&&!it.done;
     const el=document.createElement('div');
     el.className='rt-item'+(it.done?' done':'')+(isNext?' current':'');
-    el.innerHTML=`<div class="chk${it.done?' on':''}" onclick="toggleTodo(${it.i},'${it.cid||''}')"></div><div class="rt-time">${it.time}</div><div class="rt-text" onclick="openTodoSheet(${it.i})">${escapeHtml(it.label)}</div>`;
+    const timeClickHtml=it.done
+      ?`<div class="rt-time rt-time-editable" onclick="event.stopPropagation();openScheduleTimePicker(${it.i})">${it.time}</div>`
+      :`<div class="rt-time">${it.time}</div>`;
+    el.innerHTML=`<div class="chk${it.done?' on':''}" onclick="toggleTodo(${it.i},'${it.cid||''}')"></div>${timeClickHtml}<div class="rt-text" onclick="openTodoSheet(${it.i})">${escapeHtml(it.label)}</div>`;
     list.appendChild(el);
   });
 }

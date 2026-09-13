@@ -519,6 +519,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .todo-kind-tabs button{flex:1;padding:12px 0;border:none;background:rgba(200,180,170,0.12);color:var(--tm);font-size:var(--dow-label-size);cursor:pointer;font-family:'DM Sans',sans-serif;transition:background .15s,color .15s;display:flex;align-items:center;justify-content:center;gap:5px;}
 .todo-kind-tabs button.active{background:var(--card);color:var(--tp);font-weight:600;}
 .chk{width:16px;height:16px;border-radius:5px;border:1.5px solid rgba(200,160,160,0.55);flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;}
+.todo-completed-time{font-size:var(--dow-label-size);color:var(--ts);font-variant-numeric:tabular-nums;flex-shrink:0;cursor:pointer;white-space:nowrap;}
+.rt-time-editable{cursor:pointer;}
 /* 시간표 배너 — 도넛(실제 리듬 기록)+할일(투두 HH:MM) 리스트. 체크박스는 .chk 그대로 재사용. */
 .rt-body{display:flex;align-items:center;gap:12px;}
 .rt-donut{flex-shrink:0;width:58px;height:58px;position:relative;}
@@ -562,7 +564,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .memo-item{display:flex;gap:9px;margin-bottom:8px;align-items:flex-start;position:relative;overflow:hidden;}
 .memo-time{font-size:var(--dow-label-size);color:var(--ts);white-space:nowrap;padding-top:6px;min-width:36px;}
 .memo-bub{background:rgba(var(--pal-rose-rgb),0.06);border:none;border-left:2.5px solid rgba(var(--pal-rose-rgb),0.32);border-radius:0 6px 6px 0;padding:6px 10px;font-size:var(--main-text-size);color:var(--tp);line-height:1.4;flex:1;}
-.memo-bub.tod-morning{background:rgba(var(--pal-yellow-rgb),0.06);border-left-color:rgba(var(--pal-yellow-rgb),0.55);}
+.memo-bub.tod-morning{background:rgba(var(--pal-orange-rgb),0.06);border-left-color:rgba(var(--pal-orange-rgb),0.45);}
 .memo-bub.tod-afternoon{background:rgba(var(--pal-rose-rgb),0.05);border-left-color:rgba(var(--pal-rose-rgb),0.28);}
 .memo-bub.tod-night{background:rgba(var(--pal-lavender-rgb),0.06);border-left-color:rgba(var(--pal-lavender-rgb),0.28);}
 .memo-bub.memo-bub-seed{background:rgba(var(--pal-mint-rgb),0.06);border-left-color:rgba(var(--pal-mint-rgb),0.30);}
@@ -890,7 +892,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 /* ══ DARK MODE OVERRIDES ══ */
 [data-theme="glass"] .memo-bub{background:none;border:none;border-left:2.5px solid rgba(180,160,150,0.45);border-radius:0;padding:2px 0 0 10px;}
-[data-theme="glass"] .memo-bub.tod-morning{background:none;border-left-color:rgba(var(--pal-yellow-rgb),0.55);}
+[data-theme="glass"] .memo-bub.tod-morning{background:none;border-left-color:rgba(var(--pal-orange-rgb),0.45);}
 [data-theme="glass"] .memo-bub.tod-afternoon{background:none;border-left-color:rgba(var(--pal-rose-rgb),0.28);}
 [data-theme="glass"] .memo-bub.tod-night{background:none;border-left-color:rgba(var(--pal-lavender-rgb),0.28);}
 [data-theme="glass"] .memo-bub.memo-bub-seed{background:none;border-left-color:rgba(var(--pal-mint-rgb),0.30);}
