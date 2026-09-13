@@ -9360,7 +9360,12 @@ function createInstantCommitStopwatch(config){
       const raw=localStorage.getItem(persistKey);
       if(!raw)return;
       const saved=JSON.parse(raw);
-      if(!saved||!saved.startTs)return;
+      if(!saved||!saved.startTs||!saved.cid){
+        // cid 없이 저장된 손상된 값이면 복원하지 않고 정리 — cid 없는 "진행중" 유령 상태로
+        // 복원되면 종료해도 리듬블록이 없어 아무 반응 없는 것처럼 보이는 UI 불일치가 생김(2026-09-13 보강).
+        if(raw)try{localStorage.removeItem(persistKey);}catch(e){}
+        return;
+      }
       st.startTs=saved.startTs;st.cid=saved.cid;st.blockCid=saved.blockCid||null;
       st.running=true;
       if(hasTicker)st.tickInterval=setInterval(()=>{onTick(st);},1000);
