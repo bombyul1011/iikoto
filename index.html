@@ -2182,7 +2182,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 </div>
 
 <!-- MEMO EDIT MODAL -->
-<div class="modal-ov" id="memo-edit-modal" onclick="closeModal('memo-edit-modal',event)">
+<div class="modal-ov" id="memo-edit-modal" onclick="cancelMemoEdit(event)">
   <div class="modal">
     <div class="modal-title">메모 수정</div>
     <input type="text" class="modal-inp time-inp" id="memo-edit-time-inp" placeholder="00:00" readonly onclick="openMemoEditTimePicker()">
@@ -2193,7 +2193,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <input type="file" accept="image/*" id="memo-edit-photo-file-inp" style="display:none;" onchange="handleMemoEditPhotoSelect(event)">
     </div>
     <div class="modal-actions">
-      <button class="mbtn cancel" onclick="closeModal('memo-edit-modal')">취소</button>
+      <button class="mbtn cancel" onclick="cancelMemoEdit()">취소</button>
       <button class="mbtn ok" onclick="confirmMemoEdit()">저장</button>
     </div>
   </div>

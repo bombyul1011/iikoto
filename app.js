@@ -4456,8 +4456,10 @@ function clearMemoPhotoPreview(){
 // 업로드 대기열 — 현재는 메모리 배열(새로고침 시 소실). R2 연동 확정 시 IndexedDB로 교체해
 // 앱 재시작/오프라인 지속 상태에서도 대기열이 유지되도록 영속화 예정(오늘은 프론트 뼈대만).
 const _memoPhotoUploadQueue=[];
-function queueMemoPhotoUpload(dk,cid,blob,ext){
-  _memoPhotoUploadQueue.push({dk,cid,blob,ext});
+// onDone(선택): 이 job의 업로드가 끝난 직후 호출 — (err, url) 형태. 성공 시 err=null.
+// 폴링 없이 "이 사진의 업로드가 끝났을 때" 후속 작업(예: 교체 전 사진 삭제)을 직접 걸 수 있게 하기 위함.
+function queueMemoPhotoUpload(dk,cid,blob,ext,onDone){
+  _memoPhotoUploadQueue.push({dk,cid,blob,ext,onDone});
   // 업로드 완료 전까지 photo_url이 아직 null인 스냅샷으로 syncMemosDown이 로컬을 덮어쓰지 않도록
   // pending 플래그를 계속 세워둠(레이스 컨디션 방지) — 실제 해제는 업로드 성공 후 saveMemos에서.
   S.set(S.key('memos_pending',dk),true);
@@ -4474,6 +4476,7 @@ async function processMemoPhotoUploadQueue(){
       saveMemos(job.dk,memos);
       _memoPhotoUploadQueue.shift();
       renderMemos();
+      if(job.onDone)job.onDone(null,url);
     }catch(err){
       console.error('사진 업로드 실패, 재시도 대기',err);
       // 진단을 위해 실패한 메모에 에러 상태를 남겨 화면에서도 바로 확인 가능하게 함
@@ -4482,6 +4485,7 @@ async function processMemoPhotoUploadQueue(){
       if(m){m.photoStatus='upload_failed';m.photoErrorMsg=String(err.message||err);}
       saveMemos(job.dk,memos);
       renderMemos();
+      if(job.onDone)job.onDone(err,null);
       break;
     }
   }
@@ -8068,6 +8072,11 @@ function memoDelSwipe(i){
 }
 function memoSheetEdit(){_memoSwipeIdx>=0&&memoEditSwipe(_memoSwipeIdx);}
 function memoSheetDelete(){_memoSwipeIdx>=0&&memoDelSwipe(_memoSwipeIdx);}
+function cancelMemoEdit(e){
+  if(_memoEditPendingPhoto&&_memoEditPendingPhoto.localUrl)URL.revokeObjectURL(_memoEditPendingPhoto.localUrl);
+  _memoEditPendingPhoto=null;_memoEditRemovePhoto=false;_memoEditCurrentPhotoUrl=null;
+  closeModal('memo-edit-modal',e);
+}
 function confirmMemoEdit(){
   const text=document.getElementById('memo-edit-inp').value.trim();
   const time=padTime(document.getElementById('memo-edit-time-inp').value);
@@ -8083,8 +8092,10 @@ function confirmMemoEdit(){
       m.photoStatus='pending_upload';
       m.photoUrl=null; // 새 사진 업로드가 끝나야 확정 URL이 채워짐(그 전까지 이전 URL을 남겨두면 화면에 옛 사진이 보임)
       S.set(S.key('memos_pending',dk),true);
-      queueMemoPhotoUpload(dk,m.cid,_memoEditPendingPhoto.blob,_memoEditPendingPhoto.ext);
-      if(oldPhotoUrl)_queuePhotoR2DeleteAfter(dk,m.cid,oldPhotoUrl);
+      queueMemoPhotoUpload(dk,m.cid,_memoEditPendingPhoto.blob,_memoEditPendingPhoto.ext,
+        // 교체 케이스: 새 사진 업로드가 성공했을 때만 이전 사진을 R2에서 지움(실패 시 기존 사진 보존)
+        oldPhotoUrl?(err)=>{if(!err)_deletePhotoFromR2(oldPhotoUrl).catch(e=>{console.error('R2 이전 사진 삭제 실패, 재시도 대기',e);_queuePhotoR2Delete(oldPhotoUrl);});}:undefined
+      );
     }else if(_memoEditRemovePhoto){
       // 기존 사진만 제거 — 업로드할 새 파일이 없으니 바로 필드 정리 + R2 삭제
       m.photoUrl=null;delete m.photoLocalUrl;delete m.photoStatus;delete m.photoErrorMsg;
@@ -8093,24 +8104,6 @@ function confirmMemoEdit(){
   }
   saveMemos(dk,memos);closeModal('memo-edit-modal');renderMemos();
   _memoEditPendingPhoto=null;_memoEditRemovePhoto=false;_memoEditCurrentPhotoUrl=null;
-}
-// 교체 케이스 전용: 새 사진 업로드가 "성공적으로 끝난 뒤"에만 이전 사진을 지움.
-// queueMemoPhotoUpload의 처리 큐를 직접 감시하기보다, 업로드 성공 시 photoStatus가 'synced'로
-// 바뀌는 것을 짧은 간격으로 확인하는 방식이 processMemoPhotoUploadQueue 구조 변경 없이 가장 단순함.
-function _queuePhotoR2DeleteAfter(dk,cid,oldPhotoUrl){
-  const check=()=>{
-    const memos=getMemos(dk);
-    const m=memos.find(x=>x.cid===cid);
-    if(!m)return; // 메모 자체가 삭제됨 — 이전 사진 삭제는 memoDelSwipe 경로에서 이미 처리
-    if(m.photoStatus==='synced'){
-      _deletePhotoFromR2(oldPhotoUrl).catch(err=>{console.error('R2 이전 사진 삭제 실패, 재시도 대기',err);_queuePhotoR2Delete(oldPhotoUrl);});
-    }else if(m.photoStatus==='upload_failed'){
-      // 새 업로드가 실패했으면 이전 사진을 지우면 안 됨(데이터 유실) — 그냥 종료
-    }else{
-      setTimeout(check,1500);
-    }
-  };
-  setTimeout(check,1500);
 }
 function showUndo(){
   clearTimeout(_undoTimer);

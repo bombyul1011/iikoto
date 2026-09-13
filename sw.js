@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.73-completed-time-edit';
+const CACHE = 'iikoto-v2.74-memo-photo-edit';
 const ASSETS = [
   './',
   './index.html'
