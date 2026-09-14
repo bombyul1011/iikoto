@@ -3691,14 +3691,19 @@ async function syncAll(){
   for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);weekOnelines.push(syncGoalDown(S.key('oneline',dateKey(d))));}
   // pending인 것들 먼저 Up
   const upTasks=[];
-  if(S.get(S.key('todos_pending',dk)))upTasks.push(syncTodosUp(dk).then(()=>S.set(S.key('todos_pending',dk),false)));
-  if(S.get(S.key('memos_pending',dk)))upTasks.push(syncMemosUp(dk).then(()=>S.set(S.key('memos_pending',dk),false)));
+  // 주의: 아래 .then(()=>S.set(pending,false))는 예전엔 업로드 성공 여부(ok)를 확인하지 않고 무조건
+  // pending을 껐음 — 업로드가 실패(네트워크 순간 끊김 등)해도 pending이 꺼져버려, 뒤이은 Down 단계가
+  // "업로드 대기중 아님"으로 오판하고 서버의 옛 값(체크 이전 상태 등)으로 로컬을 덮어쓰는 데이터 유실
+  // 버그가 있었음(2026-09-14, PC 완료체크가 모바일 미반영 후 새로고침 시 PC도 미체크로 되돌아가던 사례로 확인).
+  // ok===true일 때만 꺼서, 실패 시 pending이 남아 다음 Down이 안전하게 스킵되도록 수정.
+  if(S.get(S.key('todos_pending',dk)))upTasks.push(syncTodosUp(dk).then(ok=>{if(ok)S.set(S.key('todos_pending',dk),false);}));
+  if(S.get(S.key('memos_pending',dk)))upTasks.push(syncMemosUp(dk).then(ok=>{if(ok)S.set(S.key('memos_pending',dk),false);}));
   if((S.get(S.key('meals_fields_pending',dk))||[]).length)upTasks.push(syncMealsUp(dk));
-  if(S.get(S.key('sleep_pending',dk)))upTasks.push(syncSleepUp(dk).then(()=>S.set(S.key('sleep_pending',dk),false)));
-  if(S.get(S.key('contents_pending',mk)))upTasks.push(runContentsSyncLocked(mk,()=>syncContentsUp(mk)).then(()=>S.set(S.key('contents_pending',mk),false)));
+  if(S.get(S.key('sleep_pending',dk)))upTasks.push(syncSleepUp(dk).then(ok=>{if(ok!==false)S.set(S.key('sleep_pending',dk),false);}));
+  if(S.get(S.key('contents_pending',mk)))upTasks.push(runContentsSyncLocked(mk,()=>syncContentsUp(mk)).then(ok=>{if(ok)S.set(S.key('contents_pending',mk),false);}));
   if(S.get('wchallenge_pending_'+wk))upTasks.push(autoSync('wchallenge','wchallenge_'+wk).then(()=>S.set('wchallenge_pending_'+wk,false)));
-  if(S.get(S.key('rblocks_pending',dk)))upTasks.push(syncRhythmBlocksUp(dk).then(()=>S.set(S.key('rblocks_pending',dk),false)));
-  if(S.get('hc_pending_'+wk))upTasks.push(syncHCUp(wk).then(()=>S.set('hc_pending_'+wk,false)));
+  if(S.get(S.key('rblocks_pending',dk)))upTasks.push(syncRhythmBlocksUp(dk).then(ok=>{if(ok)S.set(S.key('rblocks_pending',dk),false);}));
+  if(S.get('hc_pending_'+wk))upTasks.push(syncHCUp(wk).then(ok=>{if(ok!==false)S.set('hc_pending_'+wk,false);}));
   if((S.get('recur_future_delpending')||[]).length)upTasks.push(syncRecurFutureDel());
   if(upTasks.length)await Promise.all(upTasks);
   // 이번 주 리듬블록(가로바용) 날짜키
@@ -4879,6 +4884,12 @@ function renderTodos(){
   const sorted=todos.map((t,i)=>({...t,_i:i})).filter(t=>!t.isEvent).filter(t=>!SCHEDULE_TIME_RE.test(t.text)).filter(t=>!_todoPinnedFilter||t.pinned)
     .sort((a,b)=>{
       if(a.done!==b.done)return a.done?1:-1;
+      if(a.done&&b.done){
+        // 완료된 항목끼리는 완료시각(completedAt) 순으로 — 시각 없는 항목은 뒤로.
+        const ca=a.completedAt?new Date(a.completedAt).getTime():Infinity;
+        const cb=b.completedAt?new Date(b.completedAt).getTime():Infinity;
+        if(ca!==cb)return ca-cb;
+      }
       return compareTodoOrder(a,b);
     });
   if(_todoPinnedFilter&&!sorted.length){
