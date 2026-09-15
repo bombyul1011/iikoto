@@ -3749,6 +3749,20 @@ async function syncAll(){
 }
 window.addEventListener('online',()=>syncAll());
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
+// 주기적 pending 재시도 타이머 — online/visibilitychange 이벤트에만 의존하면, 앱을 화면 전환 없이
+// 켜둔 채 두거나(예: 오늘 탭만 계속 보고 있는 경우) 업로드가 실패한 순간 마침 두 이벤트 다 안 걸리면
+// pending이 남은 채로 재시도 기회 자체가 영영 안 옴 — 로컬 수정사항이 서버에 끝내 안 올라가는 근본
+// 원인(2026-09-15 확인). 2분마다 남은 pending이 있는지만 가볍게 확인해 자동 재시도.
+function hasAnyPendingSync(){
+  const dk=dateKey(currentDate),mk=monthKey(currentDate),wk=weekKey(new Date());
+  return !!(S.get(S.key('todos_pending',dk))||S.get(S.key('memos_pending',dk))||
+    (S.get(S.key('meals_fields_pending',dk))||[]).length||S.get(S.key('sleep_pending',dk))||
+    S.get(S.key('contents_pending',mk))||S.get('wchallenge_pending_'+wk)||
+    S.get(S.key('rblocks_pending',dk))||S.get('hc_pending_'+wk));
+}
+setInterval(()=>{
+  if(navigator.onLine&&!window._restoring&&hasAnyPendingSync())syncAll();
+},120000);
 // 탭 전환(같은 화면 안에서 오늘↔주간↔월간↔홈 이동) 시에도 최신 서버 데이터 반영 —
 // PC/모바일 번갈아 사용 시 다른 기기에서 바꾼 값이 탭 이동만으로 보이도록.
 // 8초 debounce로 연속 탭 클릭 시 요청 폭주 방지.
@@ -13955,23 +13969,21 @@ async function initSync(){
   for(var i=0;i<dates.length;i++){
     var dk=dates[i];
     var didUp=false;
+    // 아래 각 syncXxxUp 호출은 반환값(성공 여부)을 확인해 성공했을 때만 pending을 끄고 uploadedDates에
+    // 표시한다. 예전엔 무조건 껐는데, 업로드가 실패(오프라인 전환 순간 등)해도 pending이 꺼지고
+    // uploadedDates에 찍혀 아래 pastDown 대상에서도 빠져버려, "Up도 실패, Down도 스킵"으로 로컬 변경사항이
+    // 통째로 유실되는 경로가 있었음(2026-09-15, 기기간 체크 상태가 반복적으로 되돌아가던 문제와 연결).
     if(S.get(S.key('todos_pending',dk))){
-      await syncTodosUp(dk);
-      S.set(S.key('todos_pending',dk),false);
-      didUp=true;
+      if(await syncTodosUp(dk)){S.set(S.key('todos_pending',dk),false);didUp=true;}
     }
     if(S.get(S.key('memos_pending',dk))){
-      await syncMemosUp(dk);
-      S.set(S.key('memos_pending',dk),false);
-      didUp=true;
+      if(await syncMemosUp(dk)){S.set(S.key('memos_pending',dk),false);didUp=true;}
     }
     if((S.get(S.key('meals_fields_pending',dk))||[]).length){
       await syncMealsUp(dk);
     }
     if(S.get(S.key('rblocks_pending',dk))){
-      await syncRhythmBlocksUp(dk);
-      S.set(S.key('rblocks_pending',dk),false);
-      didUp=true;
+      if(await syncRhythmBlocksUp(dk)){S.set(S.key('rblocks_pending',dk),false);didUp=true;}
     }
     if(didUp)uploadedDates[dk]=true;
   }
@@ -13979,9 +13991,7 @@ async function initSync(){
   for(var i=0;i<futureDates.length;i++){
     var fdk=futureDates[i];
     if(S.get(S.key('todos_pending',fdk))){
-      await syncTodosUp(fdk);
-      S.set(S.key('todos_pending',fdk),false);
-      uploadedDates[fdk]=true;
+      if(await syncTodosUp(fdk)){S.set(S.key('todos_pending',fdk),false);uploadedDates[fdk]=true;}
     }
   }
   // wchallenge pending 있으면 Up 먼저

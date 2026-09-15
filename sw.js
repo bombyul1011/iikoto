@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.75-todo-done-sort';
+const CACHE = 'iikoto-v2.77-sync-retry-timer';
 const ASSETS = [
   './',
   './index.html'
