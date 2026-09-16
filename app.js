@@ -635,10 +635,7 @@ function buildDailyRhythmTrack(dk){
   dateRow.innerHTML='<span>'+(d.getMonth()+1)+'월 '+d.getDate()+'일 '+_HOME_DAYS[d.getDay()]+'요일</span><span class="w">'+(isToday?'오늘':'')+'</span>';
   outer.appendChild(dateRow);
   const wrap=document.createElement('div');wrap.className='rhythm-track';
-  // [2026-09-16] 480→550으로 확대 — 시간당 간격을 넓혀 짧은 블록끼리 겹쳐 보이는 문제 완화.
-  // 시트 자체 높이(.bsheet의 max-height:88vh)는 그대로 유지하고, 늘어난 트랙 높이는 .bsheet에 이미
-  // 걸려있는 overflow-y:auto로 자연스럽게 세로 스크롤 처리됨(별도 스크롤 컨테이너 추가 불필요).
-  const TOTAL_H=550;
+  const TOTAL_H=480; // 2026-09-05: 320→480으로 확대 — 시트 세로 공간을 넉넉히 써서 짧은 블록끼리 겹쳐 보이는 문제 완화
   // 0~8시(자는 시간)는 절반 크기로 압축하고, 줄어든 만큼을 나머지 8~24시 구간에 균일하게 더해줌
   const NIGHT_END=480; // 8시(분)
   const H1=TOTAL_H/8; // 0~8시 구간이 차지하는 높이 (원래 1/4 → 절반인 1/8로)
@@ -3675,8 +3672,8 @@ async function autoSync(type,key){
   else if(type==='wchallenge'){
     const data=S.get(key);
     if(data){
-      await supaUpsert('goal_notes','note_key',[{note_key:key,lines:data}]);
-      S.set('wchallenge_pending_'+key.replace('wchallenge_',''),false);
+      const ok=await supaUpsert('goal_notes','note_key',[{note_key:key,lines:data}]);
+      if(ok)S.set('wchallenge_pending_'+key.replace('wchallenge_',''),false);
     }
   }
   else if(type==='contents'){if(await syncContentsUp(key))S.set(S.key('contents_pending',key),false);}
@@ -3694,17 +3691,16 @@ async function syncAll(){
   for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);weekOnelines.push(syncGoalDown(S.key('oneline',dateKey(d))));}
   // pending인 것들 먼저 Up
   const upTasks=[];
-  // 주의: 아래 .then(()=>S.set(pending,false))는 예전엔 업로드 성공 여부(ok)를 확인하지 않고 무조건
-  // pending을 껐음 — 업로드가 실패(네트워크 순간 끊김 등)해도 pending이 꺼져버려, 뒤이은 Down 단계가
-  // "업로드 대기중 아님"으로 오판하고 서버의 옛 값(체크 이전 상태 등)으로 로컬을 덮어쓰는 데이터 유실
-  // 버그가 있었음(2026-09-14, PC 완료체크가 모바일 미반영 후 새로고침 시 PC도 미체크로 되돌아가던 사례로 확인).
-  // ok===true일 때만 꺼서, 실패 시 pending이 남아 다음 Down이 안전하게 스킵되도록 수정.
+  // pending 플래그는 각 syncXxxUp이 성공(ok)했을 때만 끈다. 예전엔 무조건 껐는데, 업로드 실패 시에도
+  // pending이 꺼져 뒤이은 Down 단계가 서버의 옛 값으로 로컬을 덮어쓰는 데이터 유실 버그가 있었다
+  // (2026-09-14, PC 완료체크가 모바일 미반영 후 새로고침 시 PC도 미체크로 되돌아간 사례).
   if(S.get(S.key('todos_pending',dk)))upTasks.push(syncTodosUp(dk).then(ok=>{if(ok)S.set(S.key('todos_pending',dk),false);}));
   if(S.get(S.key('memos_pending',dk)))upTasks.push(syncMemosUp(dk).then(ok=>{if(ok)S.set(S.key('memos_pending',dk),false);}));
   if((S.get(S.key('meals_fields_pending',dk))||[]).length)upTasks.push(syncMealsUp(dk));
   if(S.get(S.key('sleep_pending',dk)))upTasks.push(syncSleepUp(dk).then(ok=>{if(ok!==false)S.set(S.key('sleep_pending',dk),false);}));
   if(S.get(S.key('contents_pending',mk)))upTasks.push(runContentsSyncLocked(mk,()=>syncContentsUp(mk)).then(ok=>{if(ok)S.set(S.key('contents_pending',mk),false);}));
-  if(S.get('wchallenge_pending_'+wk))upTasks.push(autoSync('wchallenge','wchallenge_'+wk).then(()=>S.set('wchallenge_pending_'+wk,false)));
+  // wchallenge는 autoSync 내부에서 ok 체크 후 자체적으로 pending을 끄므로 여기선 호출만 한다.
+  if(S.get('wchallenge_pending_'+wk))upTasks.push(autoSync('wchallenge','wchallenge_'+wk));
   if(S.get(S.key('rblocks_pending',dk)))upTasks.push(syncRhythmBlocksUp(dk).then(ok=>{if(ok)S.set(S.key('rblocks_pending',dk),false);}));
   if(S.get('hc_pending_'+wk))upTasks.push(syncHCUp(wk).then(ok=>{if(ok!==false)S.set('hc_pending_'+wk,false);}));
   if((S.get('recur_future_delpending')||[]).length)upTasks.push(syncRecurFutureDel());

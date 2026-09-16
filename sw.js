@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.80-sheet-fixed-height';
+const CACHE = 'iikoto-v2.82-wchallenge-pending-fix';
 const ASSETS = [
   './',
   './index.html'
