@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.79-rhythm-track-550';
+const CACHE = 'iikoto-v2.80-sheet-fixed-height';
 const ASSETS = [
   './',
   './index.html'
