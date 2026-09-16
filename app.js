@@ -635,7 +635,10 @@ function buildDailyRhythmTrack(dk){
   dateRow.innerHTML='<span>'+(d.getMonth()+1)+'월 '+d.getDate()+'일 '+_HOME_DAYS[d.getDay()]+'요일</span><span class="w">'+(isToday?'오늘':'')+'</span>';
   outer.appendChild(dateRow);
   const wrap=document.createElement('div');wrap.className='rhythm-track';
-  const TOTAL_H=480; // 2026-09-05: 320→480으로 확대 — 시트 세로 공간을 넉넉히 써서 짧은 블록끼리 겹쳐 보이는 문제 완화
+  // [2026-09-16] 480→550으로 확대 — 시간당 간격을 넓혀 짧은 블록끼리 겹쳐 보이는 문제 완화.
+  // 시트 자체 높이(.bsheet의 max-height:88vh)는 그대로 유지하고, 늘어난 트랙 높이는 .bsheet에 이미
+  // 걸려있는 overflow-y:auto로 자연스럽게 세로 스크롤 처리됨(별도 스크롤 컨테이너 추가 불필요).
+  const TOTAL_H=550;
   // 0~8시(자는 시간)는 절반 크기로 압축하고, 줄어든 만큼을 나머지 8~24시 구간에 균일하게 더해줌
   const NIGHT_END=480; // 8시(분)
   const H1=TOTAL_H/8; // 0~8시 구간이 차지하는 높이 (원래 1/4 → 절반인 1/8로)

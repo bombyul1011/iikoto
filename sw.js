@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.77-sync-retry-timer';
+const CACHE = 'iikoto-v2.79-rhythm-track-550';
 const ASSETS = [
   './',
   './index.html'
