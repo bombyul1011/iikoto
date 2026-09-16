@@ -3695,6 +3695,16 @@ async function autoSync(type,key){
   else if(type==='mflow')syncMorningFlowUp(key);
   else if(type==='cdlog'){if(await syncContentDailyLogUp(key))S.set(S.key('cdlog_pending',key),false);}
 }
+// delCids 기반 삭제(syncListUpSafe) 패턴을 쓰는 타입 공통 재시도 헬퍼 — pending 플래그가 서 있거나
+// delPending 큐(delType,dk)에 남은 항목이 있으면 업로드를 재시도하고, 성공했을 때만 pending 플래그를
+// 끈다. todos에서 "재시도 게이트가 delPending을 안 봐서 삭제가 영영 재시도 안 됨" 버그가 있었는데
+// (2026-09-16), 같은 패턴을 쓰는 memos/contents/rblocks도 동일한 사각지대를 갖고 있어 공통화함 —
+// 새 타입이 추가돼도 이 헬퍼를 쓰면 delPending 누락 문제가 구조적으로 재발하지 않음.
+function pushDelPendingAwareUpTask(upTasks,pendingKey,delType,dk,upFn){
+  if(S.get(pendingKey)||getDelPendingCids(delType,dk).length){
+    upTasks.push(upFn().then(ok=>{if(ok)S.set(pendingKey,false);}));
+  }
+}
 async function syncAll(){
   if(!navigator.onLine)return;
   if(window._restoring)return; // 복구 중엔 sync 차단
@@ -3708,17 +3718,16 @@ async function syncAll(){
   // pending 플래그는 각 syncXxxUp이 성공(ok)했을 때만 끈다. 예전엔 무조건 껐는데, 업로드 실패 시에도
   // pending이 꺼져 뒤이은 Down 단계가 서버의 옛 값으로 로컬을 덮어쓰는 데이터 유실 버그가 있었다
   // (2026-09-14, PC 완료체크가 모바일 미반영 후 새로고침 시 PC도 미체크로 되돌아간 사례).
-  // todos_pending(수정 대기)뿐 아니라 todos_delpending_list(삭제 대기)도 재시도 트리거로 함께 확인.
-  // 락 경합 등으로 삭제 업로드가 한 번 누락돼 todos_pending만 먼저 꺼진 경우에도, 남은 delPending
-  // 큐가 있으면 다음 sync 사이클에 자동으로 다시 시도되어 최종적으로 서버 상태와 수렴하게 함(2026-09-16).
-  if(S.get(S.key('todos_pending',dk))||getDelPendingCids('todos',dk).length)upTasks.push(syncTodosUp(dk).then(ok=>{if(ok)S.set(S.key('todos_pending',dk),false);}));
-  if(S.get(S.key('memos_pending',dk)))upTasks.push(syncMemosUp(dk).then(ok=>{if(ok)S.set(S.key('memos_pending',dk),false);}));
+  // todos/memos/contents/rblocks — delCids 기반 삭제 패턴 공통 타입. pending 플래그 또는 delPending
+  // 큐 중 하나라도 남아있으면 재시도(2026-09-16, 공통 헬퍼로 4곳 통일 — 개별 사각지대 재발 방지).
+  pushDelPendingAwareUpTask(upTasks,S.key('todos_pending',dk),'todos',dk,()=>syncTodosUp(dk));
+  pushDelPendingAwareUpTask(upTasks,S.key('memos_pending',dk),'memos',dk,()=>syncMemosUp(dk));
   if((S.get(S.key('meals_fields_pending',dk))||[]).length)upTasks.push(syncMealsUp(dk));
   if(S.get(S.key('sleep_pending',dk)))upTasks.push(syncSleepUp(dk).then(ok=>{if(ok!==false)S.set(S.key('sleep_pending',dk),false);}));
-  if(S.get(S.key('contents_pending',mk)))upTasks.push(runContentsSyncLocked(mk,()=>syncContentsUp(mk)).then(ok=>{if(ok)S.set(S.key('contents_pending',mk),false);}));
+  pushDelPendingAwareUpTask(upTasks,S.key('contents_pending',mk),'contents',mk,()=>runContentsSyncLocked(mk,()=>syncContentsUp(mk)));
   // wchallenge는 autoSync 내부에서 ok 체크 후 자체적으로 pending을 끄므로 여기선 호출만 한다.
   if(S.get('wchallenge_pending_'+wk))upTasks.push(autoSync('wchallenge','wchallenge_'+wk));
-  if(S.get(S.key('rblocks_pending',dk)))upTasks.push(syncRhythmBlocksUp(dk).then(ok=>{if(ok)S.set(S.key('rblocks_pending',dk),false);}));
+  pushDelPendingAwareUpTask(upTasks,S.key('rblocks_pending',dk),'rblocks',dk,()=>syncRhythmBlocksUp(dk));
   if(S.get('hc_pending_'+wk))upTasks.push(syncHCUp(wk).then(ok=>{if(ok!==false)S.set('hc_pending_'+wk,false);}));
   if((S.get('recur_future_delpending')||[]).length)upTasks.push(syncRecurFutureDel());
   if(upTasks.length)await Promise.all(upTasks);
@@ -3771,12 +3780,13 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator
 // 원인(2026-09-15 확인). 2분마다 남은 pending이 있는지만 가볍게 확인해 자동 재시도.
 function hasAnyPendingSync(){
   const dk=dateKey(currentDate),mk=monthKey(currentDate),wk=weekKey(new Date());
-  // todos_delpending_list(삭제 대기 큐)도 포함 — 이게 빠지면 락 경합 등으로 todos_pending만 먼저
-  // 꺼진 삭제 건이 이 게이트에 막혀 syncAll 자체가 안 불리고 영영 재시도되지 않음(2026-09-16).
-  return !!(S.get(S.key('todos_pending',dk))||getDelPendingCids('todos',dk).length||S.get(S.key('memos_pending',dk))||
+  // delCids 기반 삭제 패턴 4종(todos/memos/contents/rblocks) 모두 pending 플래그와 delPending 큐를
+  // 함께 확인 — 이 게이트에서 빠지면 syncAll 자체가 안 불려 아래 syncAll 내부 재시도까지 도달 못 함(2026-09-16).
+  return !!(S.get(S.key('todos_pending',dk))||getDelPendingCids('todos',dk).length||
+    S.get(S.key('memos_pending',dk))||getDelPendingCids('memos',dk).length||
     (S.get(S.key('meals_fields_pending',dk))||[]).length||S.get(S.key('sleep_pending',dk))||
-    S.get(S.key('contents_pending',mk))||S.get('wchallenge_pending_'+wk)||
-    S.get(S.key('rblocks_pending',dk))||S.get('hc_pending_'+wk));
+    S.get(S.key('contents_pending',mk))||getDelPendingCids('contents',mk).length||S.get('wchallenge_pending_'+wk)||
+    S.get(S.key('rblocks_pending',dk))||getDelPendingCids('rblocks',dk).length||S.get('hc_pending_'+wk));
 }
 setInterval(()=>{
   if(navigator.onLine&&!window._restoring&&hasAnyPendingSync())syncAll();

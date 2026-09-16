@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.83-sync-lock-coalesce';
+const CACHE = 'iikoto-v2.84-delpending-unify';
 const ASSETS = [
   './',
   './index.html'
