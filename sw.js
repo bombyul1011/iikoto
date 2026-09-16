@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.82-wchallenge-pending-fix';
+const CACHE = 'iikoto-v2.83-sync-lock-coalesce';
 const ASSETS = [
   './',
   './index.html'

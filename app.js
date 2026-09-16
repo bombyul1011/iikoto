@@ -3332,10 +3332,24 @@ async function syncTodosDown(dk){
 // 같은 dk에 대한 업로드가 동시에(재진입) 실행되는 것을 막는 락 — saveTodos의 즉시 업로드(autoSync)와
 // 탭 전환/주기 동기화(syncAll)가 같은 dk를 거의 동시에 올리면, 두 개의 upsert 요청이 겹쳐 서버가
 // "ON CONFLICT DO UPDATE cannot affect row a second time"로 거부하는 경합이 있었음(2026-09-07 확인).
-// 이미 진행 중인 업로드가 있으면 새로 시작하지 않고 그 결과를 그대로 기다렸다가 반환한다.
-const _syncingTodosUpDk=new Map();
+// [2026-09-16 개선] 기존엔 이미 진행 중인 업로드가 있으면 새로 시작하지 않고 그 결과를 그대로 기다렸다가
+// 반환했으나, 이 경우 락에 걸린 호출이 "자신이 요청한 시점 이후의 로컬 변경(삭제 등)"을 서버에 반영하지
+// 못한 채 남의 결과를 그대로 돌려받는 유실이 발생함(삭제 addDelPending 직후 saveTodos→syncTodosUp이
+// 락에 걸리면, 그 삭제가 반영 안 된 이전 업로드 결과를 "성공"으로 착각해 todos_pending을 꺼버림 —
+// 2026-09-16 "바레 상담" 재발 사건으로 확정). 요청 병합(coalescing) 방식으로 교체: 락에 걸린 동안 들어온
+// 요청은 진행 중인 작업이 끝난 뒤 반드시 한 번 더(그 시점의 최신 로컬 상태로) 실행되도록 큐잉한다.
+const _syncingTodosUpDk=new Map(); // dk → 현재 실행 중인 Promise
+const _pendingTodosUpDk=new Map(); // dk → 완료 후 한 번 더 실행 예약된 Promise(대기자들이 공유)
 async function syncTodosUp(dk){
-  if(_syncingTodosUpDk.has(dk))return _syncingTodosUpDk.get(dk);
+  if(_syncingTodosUpDk.has(dk)){
+    // 이미 실행 중 — 새로 시작하지 않되, 그 결과를 재사용하지도 않는다. 진행 중인 작업이 끝나면
+    // 반드시 한 번 더(최신 로컬 상태로) 돌리도록 예약하고, 그 재실행 결과를 기다린다.
+    if(!_pendingTodosUpDk.has(dk)){
+      const rerun=_syncingTodosUpDk.get(dk).then(()=>syncTodosUp(dk)).finally(()=>{_pendingTodosUpDk.delete(dk);});
+      _pendingTodosUpDk.set(dk,rerun);
+    }
+    return _pendingTodosUpDk.get(dk);
+  }
   const p=_syncTodosUpInner(dk);
   _syncingTodosUpDk.set(dk,p);
   try{
@@ -3694,7 +3708,10 @@ async function syncAll(){
   // pending 플래그는 각 syncXxxUp이 성공(ok)했을 때만 끈다. 예전엔 무조건 껐는데, 업로드 실패 시에도
   // pending이 꺼져 뒤이은 Down 단계가 서버의 옛 값으로 로컬을 덮어쓰는 데이터 유실 버그가 있었다
   // (2026-09-14, PC 완료체크가 모바일 미반영 후 새로고침 시 PC도 미체크로 되돌아간 사례).
-  if(S.get(S.key('todos_pending',dk)))upTasks.push(syncTodosUp(dk).then(ok=>{if(ok)S.set(S.key('todos_pending',dk),false);}));
+  // todos_pending(수정 대기)뿐 아니라 todos_delpending_list(삭제 대기)도 재시도 트리거로 함께 확인.
+  // 락 경합 등으로 삭제 업로드가 한 번 누락돼 todos_pending만 먼저 꺼진 경우에도, 남은 delPending
+  // 큐가 있으면 다음 sync 사이클에 자동으로 다시 시도되어 최종적으로 서버 상태와 수렴하게 함(2026-09-16).
+  if(S.get(S.key('todos_pending',dk))||getDelPendingCids('todos',dk).length)upTasks.push(syncTodosUp(dk).then(ok=>{if(ok)S.set(S.key('todos_pending',dk),false);}));
   if(S.get(S.key('memos_pending',dk)))upTasks.push(syncMemosUp(dk).then(ok=>{if(ok)S.set(S.key('memos_pending',dk),false);}));
   if((S.get(S.key('meals_fields_pending',dk))||[]).length)upTasks.push(syncMealsUp(dk));
   if(S.get(S.key('sleep_pending',dk)))upTasks.push(syncSleepUp(dk).then(ok=>{if(ok!==false)S.set(S.key('sleep_pending',dk),false);}));
@@ -3754,7 +3771,9 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator
 // 원인(2026-09-15 확인). 2분마다 남은 pending이 있는지만 가볍게 확인해 자동 재시도.
 function hasAnyPendingSync(){
   const dk=dateKey(currentDate),mk=monthKey(currentDate),wk=weekKey(new Date());
-  return !!(S.get(S.key('todos_pending',dk))||S.get(S.key('memos_pending',dk))||
+  // todos_delpending_list(삭제 대기 큐)도 포함 — 이게 빠지면 락 경합 등으로 todos_pending만 먼저
+  // 꺼진 삭제 건이 이 게이트에 막혀 syncAll 자체가 안 불리고 영영 재시도되지 않음(2026-09-16).
+  return !!(S.get(S.key('todos_pending',dk))||getDelPendingCids('todos',dk).length||S.get(S.key('memos_pending',dk))||
     (S.get(S.key('meals_fields_pending',dk))||[]).length||S.get(S.key('sleep_pending',dk))||
     S.get(S.key('contents_pending',mk))||S.get('wchallenge_pending_'+wk)||
     S.get(S.key('rblocks_pending',dk))||S.get('hc_pending_'+wk));
