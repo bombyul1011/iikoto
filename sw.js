@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.91-rhythm-memo-bg-revert';
+const CACHE = 'iikoto-v2.93-session-cleanup';
 const ASSETS = [
   './',
   './index.html'

@@ -415,15 +415,9 @@ function finishRhythmBlock(idx){
   if(cat==='exercise')scheduleExerciseStatAlert(blocks[idx].cid);
   refreshRhythmTrack();
   // 종료 시점 메모 제안 — 리듬블록에 입력된 텍스트(콘텐츠 제목 등)가 있으면 그걸 우선 표시,
-  // 없으면 기존처럼 카테고리 라벨·지속시간으로 폴백.
-  const catInfo=RHYTHM_CATS[cat];
-  if(catInfo&&startStr){
-    const durMin=_rhythmDurationMin(startStr,endStr);
-    const durLabel=durMin>=60?`${Math.floor(durMin/60)}시간${durMin%60?' '+(durMin%60)+'분':''}`:`${durMin}분`;
-    const displayTitle=_rhythmBlockDisplayTitle(blocks[idx].text);
-    const title=displayTitle?`${catInfo.label} · ${displayTitle}`:`${catInfo.label} · ${durLabel}`;
-    openRhythmMemoModal(cat,_rhythmDk,title,'오늘 이 시간, 짧게 남겨볼까요?');
-  }
+  // 없으면 기존처럼 카테고리 라벨·지속시간으로 폴백(_buildRhythmMemoTitle 공용 로직, 2026-09-18).
+  const title=_buildRhythmMemoTitle(cat,startStr,endStr,blocks[idx].text);
+  if(title)openRhythmMemoModal(cat,_rhythmDk,title,'오늘 이 시간, 짧게 남겨볼까요?');
 }
 // 시작~종료(HH:MM) 사이 경과 분 — 자정 넘김 보정 포함. 리듬바 자정넘김 규칙(2026-09-09)과 동일 방식.
 function _rhythmDurationMin(startStr,endStr){
@@ -440,6 +434,18 @@ function _rhythmBlockDisplayTitle(text){
   const catPrefix={'드라마 - ':6,'영화 - ':5,'독서 - ':5};
   for(const p in catPrefix){if(text.startsWith(p))return text.slice(catPrefix[p]);}
   return text;
+}
+// 리듬 메모 모달 제목 생성 — "카테고리 · 콘텐츠 제목"(text 있을 때) 또는 "카테고리 · 지속시간"(없을 때).
+// 종료 시점(finishRhythmBlock)/1시간 알림(_openRhythmMemoFromUrlIfPresent) 양쪽에서 동일 로직이라
+// 공용화(2026-09-18). endStr을 안 넘기면 현재 시각까지의 경과로 계산(아직 진행 중인 블록용).
+function _buildRhythmMemoTitle(cat,startStr,endStr,text){
+  const catInfo=RHYTHM_CATS[cat];
+  if(!catInfo||!startStr)return null;
+  const actualEnd=endStr||(pad(new Date().getHours())+':'+pad(new Date().getMinutes()));
+  const durMin=_rhythmDurationMin(startStr,actualEnd);
+  const durLabel=durMin>=60?`${Math.floor(durMin/60)}시간${durMin%60?' '+(durMin%60)+'분':''}`:`${durMin}분`;
+  const displayTitle=_rhythmBlockDisplayTitle(text);
+  return displayTitle?`${catInfo.label} · ${displayTitle}`:`${catInfo.label} · ${durLabel}`;
 }
 // ── 운동 리듬바 종료 통계 알림 (2026-09-08 설계) ──
 // exercise 카테고리 블록을 종료할 때마다, 이번달 누적 횟수 + 주3회 목표 스트릭(완결된 주까지만 정확 계산,
@@ -2358,6 +2364,10 @@ const S={
 // ── DATE HELPERS
 function pad(n){return String(n).padStart(2,'0');}
 function pickRandom(pool){return pool[Math.floor(Math.random()*pool.length)];}
+// 할일/시간표 공용 알림 벨아이콘 — 알림이 켜져있고 시각이 있을 때만 노출.
+function _todoAlertIconHtml(todoAlertOn,alertTime){
+  return (todoAlertOn&&alertTime)?'<i class="ti ti-bell ico-sz-11" style="color:var(--tm);flex-shrink:0;" aria-hidden="true" title="알림 '+alertTime+'"></i>':'';
+}
 function escapeHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 // 자정~새벽(아직 잠들기 전, night_2)에는 "오늘"을 전날 밤 기준으로 보는 논리적 날짜
 // ── 절기(節氣) 정보 — 7~12월 우선 적용, 필요시 이후 확장
@@ -4452,7 +4462,6 @@ let _memoInlineComposing=false;
 // ⚠︎ 이 블록이 호출하는 R2 업로드/조회/삭제 API는 별도 파일 worker-photo-proxy.js가 담당
 // (Cloudflare Worker, GitHub 저장소 밖에 따로 배포됨). 이 파일만 고쳐서는 실제 동작이 안 바뀌니
 // 관련 버그 수정 시 그 파일도 함께 요청할 것.
-let _memoPendingPhoto=null;
 function triggerMemoPhotoPick(){
   document.getElementById('memo-photo-file-inp').click();
 }
@@ -4496,39 +4505,68 @@ function _resizeImageToWebp(file,maxDim){
     reader.readAsDataURL(file);
   });
 }
-async function handleMemoPhotoSelect(ev){
-  const file=ev.target.files&&ev.target.files[0];
-  ev.target.value='';
-  if(!file)return;
-  try{
-    const {blob,ext}=await _resizeImageToWebp(file,640);
-    const localUrl=URL.createObjectURL(blob);
-    _memoPendingPhoto={blob,ext,localUrl};
-    renderMemoPhotoPreview();
-  }catch(err){
-    console.error('사진 처리 실패',err);
+// 신규 작성형 사진 첨부(1장, 미리보기, 취소) 컨트롤러 팩토리 — 오늘탭 인라인 메모와 리듬 메모
+// 제안 모달이 완전히 동일한 로직(리사이즈→로컬미리보기→해제)을 각자 복붙해 갖고 있던 것을 통합
+// (2026-09-18). "기존 사진+삭제 의도"까지 다루는 수정 모달(memo-edit-*)은 책임이 달라 별도 유지.
+// opts.wrapClass가 있으면 썸네일을 그 클래스로 감싼 wrap 안에 넣는다(72px 정사각+오버레이 X버튼형,
+// 리듬 메모가 이 형태). 없으면 기존 오늘탭 인라인처럼 img/clear를 나란히 넣는다.
+// opts.toggleBtnId가 있으면 사진 첨부 여부에 따라 그 버튼에 .on 클래스를 토글(아이콘 흐림 처리).
+function _makePendingPhotoController(previewRowId,thumbClass,clearClass,opts){
+  opts=opts||{};
+  const state={photo:null};
+  function render(){
+    const row=document.getElementById(previewRowId);
+    if(!row)return;
+    if(opts.toggleBtnId){
+      const btn=document.getElementById(opts.toggleBtnId);
+      if(btn)btn.classList.toggle('on',!!state.photo);
+    }
+    if(!state.photo){row.style.display='none';row.innerHTML='';return;}
+    row.style.display='flex';
+    row.innerHTML='';
+    const img=document.createElement('img');
+    img.className=thumbClass;
+    img.src=state.photo.localUrl;
+    const clear=document.createElement('div');
+    clear.className=clearClass;
+    clear.innerHTML='<i class="ti ti-x" style="font-size:13px;" aria-hidden="true"></i>';
+    clear.onclick=()=>controller.clear();
+    if(opts.wrapClass){
+      const wrap=document.createElement('div');
+      wrap.className=opts.wrapClass;
+      wrap.appendChild(img);wrap.appendChild(clear);
+      row.appendChild(wrap);
+    }else{
+      row.appendChild(img);row.appendChild(clear);
+    }
   }
+  const controller={
+    get photo(){return state.photo;},
+    async handleSelect(ev){
+      const file=ev.target.files&&ev.target.files[0];
+      ev.target.value='';
+      if(!file)return;
+      try{
+        const {blob,ext}=await _resizeImageToWebp(file,640);
+        const localUrl=URL.createObjectURL(blob);
+        state.photo={blob,ext,localUrl};
+        render();
+      }catch(err){
+        console.error('사진 처리 실패',err);
+      }
+    },
+    clear(){
+      if(state.photo&&state.photo.localUrl)URL.revokeObjectURL(state.photo.localUrl);
+      state.photo=null;
+      render();
+    },
+    render,
+  };
+  return controller;
 }
-function renderMemoPhotoPreview(){
-  const row=document.getElementById('memo-photo-preview-row');
-  if(!row)return;
-  if(!_memoPendingPhoto){row.style.display='none';row.innerHTML='';return;}
-  row.style.display='flex';
-  row.innerHTML='';
-  const img=document.createElement('img');
-  img.className='memo-photo-preview-thumb';
-  img.src=_memoPendingPhoto.localUrl;
-  const clear=document.createElement('div');
-  clear.className='memo-photo-preview-clear';
-  clear.innerHTML='<i class="ti ti-x" style="font-size:13px;" aria-hidden="true"></i>';
-  clear.onclick=clearMemoPhotoPreview;
-  row.appendChild(img);row.appendChild(clear);
-}
-function clearMemoPhotoPreview(){
-  if(_memoPendingPhoto&&_memoPendingPhoto.localUrl)URL.revokeObjectURL(_memoPendingPhoto.localUrl);
-  _memoPendingPhoto=null;
-  renderMemoPhotoPreview();
-}
+const _memoPhotoCtl=_makePendingPhotoController('memo-photo-preview-row','memo-photo-preview-thumb','memo-photo-preview-clear');
+function handleMemoPhotoSelect(ev){return _memoPhotoCtl.handleSelect(ev);}
+function clearMemoPhotoPreview(){return _memoPhotoCtl.clear();}
 // 업로드 대기열 — 현재는 메모리 배열(새로고침 시 소실). R2 연동 확정 시 IndexedDB로 교체해
 // 앱 재시작/오프라인 지속 상태에서도 대기열이 유지되도록 영속화 예정(오늘은 프론트 뼈대만).
 const _memoPhotoUploadQueue=[];
@@ -4693,9 +4731,7 @@ function closePhotoViewer(ev){
 }
 // ── 리듬 활동 메모 제안 모달 (종료 시점 팝업 / 1시간 알림 클릭 공용) ──
 // 카테고리 구분은 RHYTHM_CATS[cat]의 color/icon/label을 그대로 사용 — 별도 색상 테이블 불필요.
-// 사진 첨부는 오늘탭 메모의 기존 리사이즈(_resizeImageToWebp)/R2업로드(큐잉) 로직을 그대로 재사용하되,
-// _memoPendingPhoto와 상태가 섞이지 않도록 전용 변수(_rmemoPendingPhoto)로 분리(2026-09-17).
-let _rmemoPendingPhoto=null;
+// 사진 첨부는 공용 _makePendingPhotoController(_rmemoPhotoCtl, 위에 정의)를 사용(2026-09-18 통합).
 let _rmemoCtx=null; // {dk, cat} — 저장 시 어느 날짜의 오늘탭 메모에 넣을지
 function openRhythmMemoModal(cat,dk,title,body){
   const catInfo=RHYTHM_CATS[cat];
@@ -4729,50 +4765,15 @@ function closeRhythmMemoModal(ev){
 function triggerRhythmMemoPhotoPick(){
   document.getElementById('rmemo-photo-file-inp').click();
 }
-async function handleRhythmMemoPhotoSelect(ev){
-  const file=ev.target.files&&ev.target.files[0];
-  ev.target.value='';
-  if(!file)return;
-  try{
-    const {blob,ext}=await _resizeImageToWebp(file,640);
-    const localUrl=URL.createObjectURL(blob);
-    _rmemoPendingPhoto={blob,ext,localUrl};
-    renderRhythmMemoPhotoPreview();
-  }catch(err){
-    console.error('사진 처리 실패',err);
-  }
-}
-function renderRhythmMemoPhotoPreview(){
-  const row=document.getElementById('rmemo-photo-preview-row');
-  const btn=document.getElementById('rmemo-photo-btn');
-  if(!row)return;
-  if(btn)btn.classList.toggle('on',!!_rmemoPendingPhoto);
-  if(!_rmemoPendingPhoto){row.style.display='none';row.innerHTML='';return;}
-  row.style.display='flex';
-  row.innerHTML='';
-  const wrap=document.createElement('div');
-  wrap.className='memo-edit-photo-preview-wrap';
-  const img=document.createElement('img');
-  img.className='memo-edit-photo-preview-thumb';
-  img.src=_rmemoPendingPhoto.localUrl;
-  const clear=document.createElement('div');
-  clear.className='memo-edit-photo-preview-clear';
-  clear.innerHTML='<i class="ti ti-x" style="font-size:13px;" aria-hidden="true"></i>';
-  clear.onclick=clearRhythmMemoPhotoPreview;
-  wrap.appendChild(img);wrap.appendChild(clear);
-  row.appendChild(wrap);
-}
-function clearRhythmMemoPhotoPreview(){
-  if(_rmemoPendingPhoto&&_rmemoPendingPhoto.localUrl)URL.revokeObjectURL(_rmemoPendingPhoto.localUrl);
-  _rmemoPendingPhoto=null;
-  renderRhythmMemoPhotoPreview();
-}
+const _rmemoPhotoCtl=_makePendingPhotoController('rmemo-photo-preview-row','memo-edit-photo-preview-thumb','memo-edit-photo-preview-clear',{wrapClass:'memo-edit-photo-preview-wrap',toggleBtnId:'rmemo-photo-btn'});
+function handleRhythmMemoPhotoSelect(ev){return _rmemoPhotoCtl.handleSelect(ev);}
+function clearRhythmMemoPhotoPreview(){return _rmemoPhotoCtl.clear();}
 // 저장 경로는 오늘탭 메모(memos)와 완전히 동일 — saveMemos를 그대로 호출해 배너에 자연히 합류시킴.
 function submitRhythmMemo(){
   if(!_rmemoCtx)return;
   const inp=document.getElementById('rmemo-inp');
   const text=inp?inp.value.trim():'';
-  const photo=_rmemoPendingPhoto;
+  const photo=_rmemoPhotoCtl.photo;
   if(!text&&!photo)return; // 빈 채로 "기록하기"는 무시(닫으려면 나중에/X 사용)
   const {dk}=_rmemoCtx;
   const n=new Date();
@@ -4861,7 +4862,7 @@ function submitMemoInline(){
   if(_memoSubmitting)return;
   const inp=document.getElementById('memo-inline-inp');
   const text=inp?inp.value.trim():'';
-  const photo=_memoPendingPhoto;
+  const photo=_memoPhotoCtl.photo;
   if(!text&&!photo)return;
   _memoSubmitting=true;
   const n=new Date();
@@ -5123,7 +5124,7 @@ function renderTodos(){
       : `<div class="chk${tsClass}${t.done?' on':''}" data-role="chk"></div>`;
     const completedTimeHtml=(t.done&&t.completedAt)?`<div class="todo-completed-time" onclick="event.stopPropagation();openTodoCompletedTimePicker(${i})">${formatCompletedTimeHHMM(t.completedAt)}</div>`:'';
     const recurIconHtml=t.recurRuleCid?'<i class="ti ti-repeat ico-sz-11" style="color:var(--tm);flex-shrink:0;" aria-hidden="true" title="반복"></i>':'';
-    const alertIconHtml=(t.todoAlertOn&&t.alertTime)?'<i class="ti ti-bell ico-sz-11" style="color:var(--tm);flex-shrink:0;" aria-hidden="true" title="알림 '+t.alertTime+'"></i>':'';
+    const alertIconHtml=_todoAlertIconHtml(t.todoAlertOn,t.alertTime);
     const rightIconsHtml=(recurIconHtml||alertIconHtml)?`<div style="display:flex;align-items:center;gap:4px;margin-left:auto;">${recurIconHtml}${alertIconHtml}</div>`:'';
     el.innerHTML=`${handleHtml}${chkHtml}${completedTimeHtml}<span class="todo-txt${t.done?' done':''}" data-todo-i="${i}" style="${partModeStyle}">${textHtml}</span>${rightIconsHtml}`;
     const hasMultipleParts=_isTouchDevice()&&parseTodoTextParts(t.text).parts.length>1;
@@ -5215,8 +5216,8 @@ function renderScheduleList(dk,items){
     const timeClickHtml=it.done
       ?`<div class="rt-time rt-time-editable" onclick="event.stopPropagation();openScheduleTimePicker(${it.i})">${it.time}</div>`
       :`<div class="rt-time">${it.time}</div>`;
-    // 오늘 할일 목록과 동일한 규칙(alertIconHtml, 4963행 참조) — 알림이 켜져있고 시각이 있을 때만 노출.
-    const alertIconHtml=(it.todoAlertOn&&it.alertTime)?'<i class="ti ti-bell ico-sz-11" style="color:var(--tm);flex-shrink:0;" aria-hidden="true" title="알림 '+it.alertTime+'"></i>':'';
+    // 오늘 할일 목록과 동일한 규칙(renderTodos의 alertIconHtml 계산과 동일) — 알림이 켜져있고 시각이 있을 때만 노출.
+    const alertIconHtml=_todoAlertIconHtml(it.todoAlertOn,it.alertTime);
     el.innerHTML=`<div class="chk${it.done?' on':''}" onclick="toggleTodo(${it.i},'${it.cid||''}')"></div>${timeClickHtml}<div class="rt-text" onclick="openTodoSheet(${it.i})">${escapeHtml(it.label)}</div>${alertIconHtml}`;
     list.appendChild(el);
   });
@@ -14170,12 +14171,8 @@ async function _openRhythmMemoFromUrlIfPresent(urlStr){
     if(rows&&rows[0]){found=rhythmBlockRowToLocal(rows[0]);foundDk=rows[0].date_key;}
   }
   if(!found||!found.cat)return;
-  const catInfo=RHYTHM_CATS[found.cat];
-  if(!catInfo)return;
-  const durMin=found.end?_rhythmDurationMin(found.start,found.end):_rhythmDurationMin(found.start,pad(new Date().getHours())+':'+pad(new Date().getMinutes()));
-  const durLabel=durMin>=60?`${Math.floor(durMin/60)}시간${durMin%60?' '+(durMin%60)+'분':''}`:`${durMin}분`;
-  const displayTitle=_rhythmBlockDisplayTitle(found.text);
-  const title=displayTitle?`${catInfo.label} · ${displayTitle}`:`${catInfo.label} · ${durLabel}`;
+  const title=_buildRhythmMemoTitle(found.cat,found.start,found.end,found.text);
+  if(!title)return;
   openRhythmMemoModal(found.cat,foundDk||todayDk,title,'지금 이 순간을 기록해보세요.');
 }
 // URL 쿼리 경로(콜드 스타트)의 실행은 스플래시 해제 이후로 미뤄야 하므로 아래 waitAndHideSplash에서 호출.
