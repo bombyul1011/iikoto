@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.84-delpending-unify';
+const CACHE = 'iikoto-v2.85-schedule-alert-icon';
 const ASSETS = [
   './',
   './index.html'

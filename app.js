@@ -4998,7 +4998,7 @@ function parseScheduleTodos(dk,todos){
     if(!m)return;
     const hh=parseInt(m[1],10),mm=parseInt(m[2],10);
     if(hh>23||mm>59)return;
-    items.push({i:i,cid:t.cid,time:m[1].padStart(2,'0')+':'+m[2],min:hh*60+mm,label:m[3],done:t.done});
+    items.push({i:i,cid:t.cid,time:m[1].padStart(2,'0')+':'+m[2],min:hh*60+mm,label:m[3],done:t.done,todoAlertOn:t.todoAlertOn,alertTime:t.alertTime});
   });
   // 정렬 우선순위: ①지연(시각이 이미 지났는데 미완료 — 가장 급함) → ②아직 안 온 시각(가까운 순) → ③완료(맨 뒤).
   // 기존엔 지난 시각도 "다음날 것"으로 계산해 남은 시간이 커져버려, 정작 제일 급한 지연 항목이 뒤로 밀리는 문제가 있었음(2026-09-01).
@@ -5052,7 +5052,9 @@ function renderScheduleList(dk,items){
     const timeClickHtml=it.done
       ?`<div class="rt-time rt-time-editable" onclick="event.stopPropagation();openScheduleTimePicker(${it.i})">${it.time}</div>`
       :`<div class="rt-time">${it.time}</div>`;
-    el.innerHTML=`<div class="chk${it.done?' on':''}" onclick="toggleTodo(${it.i},'${it.cid||''}')"></div>${timeClickHtml}<div class="rt-text" onclick="openTodoSheet(${it.i})">${escapeHtml(it.label)}</div>`;
+    // 오늘 할일 목록과 동일한 규칙(alertIconHtml, 4963행 참조) — 알림이 켜져있고 시각이 있을 때만 노출.
+    const alertIconHtml=(it.todoAlertOn&&it.alertTime)?'<i class="ti ti-bell ico-sz-11" style="color:var(--tm);flex-shrink:0;" aria-hidden="true" title="알림 '+it.alertTime+'"></i>':'';
+    el.innerHTML=`<div class="chk${it.done?' on':''}" onclick="toggleTodo(${it.i},'${it.cid||''}')"></div>${timeClickHtml}<div class="rt-text" onclick="openTodoSheet(${it.i})">${escapeHtml(it.label)}</div>${alertIconHtml}`;
     list.appendChild(el);
   });
 }
