@@ -4656,10 +4656,45 @@ async function openPhotoViewer(url,text,meta){
   document.getElementById('photo-viewer-text').textContent=text||'';
   document.getElementById('photo-viewer-date').textContent=meta||'';
   document.getElementById('photo-viewer-ov').classList.add('on');
+  _setupPhotoViewerSwipe();
 }
 function closePhotoViewer(ev){
   if(ev&&ev.target.closest('.photo-viewer-img'))return;
   document.getElementById('photo-viewer-ov').classList.remove('on');
+}
+// 뷰어 좌우 스와이프로 이전/다음 사진 넘기기 — 배열 양끝에서는 자연스럽게 멈춤(순환 안 함).
+// dir: -1(다음, 최신→과거 진행방향) 또는 1(이전).
+function _navPhotoArchive(dir){
+  const next=_photoArchiveIdx+dir;
+  if(next<0||next>=_photoArchiveResults.length)return; // 양끝 — 아무 동작 없음
+  const img=document.getElementById('photo-viewer-img');
+  if(img){
+    img.classList.add('nav-fade');
+    setTimeout(()=>{openPhotoArchiveItem(next);img.classList.remove('nav-fade');},150);
+  }else{
+    openPhotoArchiveItem(next);
+  }
+}
+let _photoViewerSwipeSetup=false;
+function _setupPhotoViewerSwipe(){
+  if(_photoViewerSwipeSetup)return;
+  _photoViewerSwipeSetup=true;
+  const frame=document.querySelector('.photo-viewer-frame');
+  if(!frame)return;
+  let startX=0,startY=0,tracking=false;
+  frame.addEventListener('touchstart',function(e){
+    if(e.touches.length!==1)return;
+    startX=e.touches[0].clientX;startY=e.touches[0].clientY;tracking=true;
+  },{passive:true});
+  frame.addEventListener('touchend',function(e){
+    if(!tracking)return;
+    tracking=false;
+    const t=e.changedTouches[0];
+    const dx=t.clientX-startX,dy=t.clientY-startY;
+    const THRESHOLD=50;
+    if(Math.abs(dx)<THRESHOLD||Math.abs(dx)<Math.abs(dy)*1.3)return; // 세로 스크롤 의도는 무시
+    _navPhotoArchive(dx<0?-1:1); // 왼쪽으로 밀면 다음(-1), 오른쪽으로 밀면 이전(+1)
+  },{passive:true});
 }
 function setupMemoInlineInput(){
   const inp=document.getElementById('memo-inline-inp');
@@ -8084,6 +8119,7 @@ function renderMemos(){
       img.addEventListener('click',e=>{
         e.stopPropagation();
         const meta=`${currentDate.getMonth()+1}월 ${currentDate.getDate()}일 ${_HOME_DAYS[currentDate.getDay()]}요일 · ${m.time||''}`;
+        _photoArchiveIdx=-1; // 모아보기 목록과 무관한 단일 사진 진입 — 스와이프 넘기기 비활성(범위 밖 인덱스)
         openPhotoViewer(thumbSrc,m.text||'',meta);
       });
       const txt=document.createElement('span');txt.className='memo-photo-text';
@@ -8248,9 +8284,12 @@ function openPhotoArchive(){
   openModal('photo-archive-modal');
 }
 let _photoArchiveResults=[];
+let _photoArchiveIdx=-1; // 뷰어에서 현재 보고 있는 사진의 _photoArchiveResults 내 인덱스 — 좌우 넘기기 기준
 function openPhotoArchiveItem(i){
   const r=_photoArchiveResults[i];if(!r)return;
-  closeModal('photo-archive-modal'); // 그리드 모달을 먼저 닫아야 photo-viewer가 그 뒤에 겹쳐 보이지 않음
+  // 그리드 모달(z-index 9999)을 닫지 않고 그대로 둔 채 뷰어(z-index 10001)를 그 위에 연다 —
+  // 뷰어를 닫으면(closePhotoViewer) 자연스럽게 그리드로 돌아가도록 하기 위함(2026-09-17).
+  _photoArchiveIdx=i;
   const d=new Date(r.dk+'T00:00:00');
   const meta=`${d.getMonth()+1}월 ${d.getDate()}일 ${_HOME_DAYS[d.getDay()]}요일 · ${r.time||''}`;
   openPhotoViewer(r.src,r.text,meta);
