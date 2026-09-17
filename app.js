@@ -414,12 +414,15 @@ function finishRhythmBlock(idx){
   syncMorningFlowOnRhythmBlockEnd(_rhythmDk,blocks[idx].cid,endStr); // 모닝플로우로 시작한 블록이면 picks도 done으로 동기화
   if(cat==='exercise')scheduleExerciseStatAlert(blocks[idx].cid);
   refreshRhythmTrack();
-  // 종료 시점 메모 제안 — RHYTHM_CATS 라벨/지속시간을 제목에 반영, 본문은 알림과 결을 맞춘 기록 유도 문구.
+  // 종료 시점 메모 제안 — 리듬블록에 입력된 텍스트(콘텐츠 제목 등)가 있으면 그걸 우선 표시,
+  // 없으면 기존처럼 카테고리 라벨·지속시간으로 폴백.
   const catInfo=RHYTHM_CATS[cat];
   if(catInfo&&startStr){
     const durMin=_rhythmDurationMin(startStr,endStr);
     const durLabel=durMin>=60?`${Math.floor(durMin/60)}시간${durMin%60?' '+(durMin%60)+'분':''}`:`${durMin}분`;
-    openRhythmMemoModal(cat,_rhythmDk,`${catInfo.label} · ${durLabel}`,'오늘 이 시간, 짧게 남겨볼까요?');
+    const displayTitle=_rhythmBlockDisplayTitle(blocks[idx].text);
+    const title=displayTitle?`${catInfo.label} · ${displayTitle}`:`${catInfo.label} · ${durLabel}`;
+    openRhythmMemoModal(cat,_rhythmDk,title,'오늘 이 시간, 짧게 남겨볼까요?');
   }
 }
 // 시작~종료(HH:MM) 사이 경과 분 — 자정 넘김 보정 포함. 리듬바 자정넘김 규칙(2026-09-09)과 동일 방식.
@@ -428,6 +431,15 @@ function _rhythmDurationMin(startStr,endStr){
   let dur=(eh*60+em)-(sh*60+sm);
   if(dur<0)dur+=1440;
   return dur;
+}
+// 리듬블록 text에서 사람이 읽을 제목을 뽑는다 — "드라마 - 제목"/"영화 - 제목"/"독서 - 제목" 형태는
+// 접두어를 떼고 제목만, 접두어 없는 자유입력(운동/휴식 등 직접 타이핑)은 그대로, text 자체가
+// 없으면 null을 반환해 호출부가 카테고리 라벨로 폴백하게 한다(2026-09-17).
+function _rhythmBlockDisplayTitle(text){
+  if(!text||!text.trim())return null;
+  const catPrefix={'드라마 - ':6,'영화 - ':5,'독서 - ':5};
+  for(const p in catPrefix){if(text.startsWith(p))return text.slice(catPrefix[p]);}
+  return text;
 }
 // ── 운동 리듬바 종료 통계 알림 (2026-09-08 설계) ──
 // exercise 카테고리 블록을 종료할 때마다, 이번달 누적 횟수 + 주3회 목표 스트릭(완결된 주까지만 정확 계산,
@@ -4732,18 +4744,23 @@ async function handleRhythmMemoPhotoSelect(ev){
 }
 function renderRhythmMemoPhotoPreview(){
   const row=document.getElementById('rmemo-photo-preview-row');
+  const btn=document.getElementById('rmemo-photo-btn');
   if(!row)return;
+  if(btn)btn.classList.toggle('on',!!_rmemoPendingPhoto);
   if(!_rmemoPendingPhoto){row.style.display='none';row.innerHTML='';return;}
   row.style.display='flex';
   row.innerHTML='';
+  const wrap=document.createElement('div');
+  wrap.className='memo-edit-photo-preview-wrap';
   const img=document.createElement('img');
-  img.className='memo-photo-preview-thumb';
+  img.className='memo-edit-photo-preview-thumb';
   img.src=_rmemoPendingPhoto.localUrl;
   const clear=document.createElement('div');
-  clear.className='memo-photo-preview-clear';
+  clear.className='memo-edit-photo-preview-clear';
   clear.innerHTML='<i class="ti ti-x" style="font-size:13px;" aria-hidden="true"></i>';
   clear.onclick=clearRhythmMemoPhotoPreview;
-  row.appendChild(img);row.appendChild(clear);
+  wrap.appendChild(img);wrap.appendChild(clear);
+  row.appendChild(wrap);
 }
 function clearRhythmMemoPhotoPreview(){
   if(_rmemoPendingPhoto&&_rmemoPendingPhoto.localUrl)URL.revokeObjectURL(_rmemoPendingPhoto.localUrl);
@@ -14157,10 +14174,12 @@ async function _openRhythmMemoFromUrlIfPresent(urlStr){
   if(!catInfo)return;
   const durMin=found.end?_rhythmDurationMin(found.start,found.end):_rhythmDurationMin(found.start,pad(new Date().getHours())+':'+pad(new Date().getMinutes()));
   const durLabel=durMin>=60?`${Math.floor(durMin/60)}시간${durMin%60?' '+(durMin%60)+'분':''}`:`${durMin}분`;
-  openRhythmMemoModal(found.cat,foundDk||todayDk,`${catInfo.label} · ${durLabel}`,'지금 이 순간을 기록해보세요.');
+  const displayTitle=_rhythmBlockDisplayTitle(found.text);
+  const title=displayTitle?`${catInfo.label} · ${displayTitle}`:`${catInfo.label} · ${durLabel}`;
+  openRhythmMemoModal(found.cat,foundDk||todayDk,title,'지금 이 순간을 기록해보세요.');
 }
-_openRhythmMemoFromUrlIfPresent();
-// 앱이 이미 열려있는 상태에서 알림을 클릭한 경우 — SW가 URL을 못 바꾸므로 postMessage로 전달받아 동일하게 처리.
+// URL 쿼리 경로(콜드 스타트)의 실행은 스플래시 해제 이후로 미뤄야 하므로 아래 waitAndHideSplash에서 호출.
+// SW postMessage 경로(앱이 이미 열려있어 스플래시가 없는 경우)는 즉시 처리해도 무방.
 if('serviceWorker' in navigator){
   navigator.serviceWorker.addEventListener('message',e=>{
     if(e.data&&e.data.type==='notification-click'&&e.data.url){
@@ -14317,6 +14336,8 @@ setTimeout(checkAndRecoverPushSubscription, 1500);
     await new Promise(res=>setTimeout(res,100));
   }
   hideSplash();
+  // 1시간 리마인드 알림으로 콜드 스타트된 경우 — 스플래시가 완전히 사라진 뒤에만 메모 모달을 띄운다(2026-09-17).
+  _openRhythmMemoFromUrlIfPresent();
 })();
 
 

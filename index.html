@@ -590,6 +590,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .memo-photo-preview-clear{width:22px;height:22px;border-radius:20px;background:var(--card);border:1px solid var(--card-b);display:flex;align-items:center;justify-content:center;color:var(--ts);cursor:pointer;flex-shrink:0;}
 
 #memo-edit-photo-preview-row{display:flex;justify-content:center;margin-bottom:8px;}
+#rmemo-photo-preview-row{display:flex;justify-content:center;margin-bottom:8px;}
 .memo-edit-photo-preview-wrap{position:relative;display:inline-block;}
 .memo-edit-photo-preview-thumb{width:72px;height:72px;border-radius:10px;object-fit:cover;display:block;}
 .memo-edit-photo-preview-clear{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:20px;background:var(--card);border:1px solid var(--card-b);display:flex;align-items:center;justify-content:center;color:var(--ts);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.12);}
@@ -599,14 +600,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 .photo-viewer-ov{position:fixed;inset:0;background:rgba(30,20,18,.82);z-index:10001;display:none;align-items:center;justify-content:center;padding:20px;}
 .photo-viewer-ov.on{display:flex;}
-.rhythm-memo-ov{position:fixed;inset:0;background:rgba(30,20,18,.45);z-index:10001;display:none;align-items:center;justify-content:center;padding:20px;}
+.rhythm-memo-ov{position:fixed;inset:0;background:rgba(60,40,35,.22);z-index:10001;display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(6px);}
 .rhythm-memo-ov.on{display:flex;}
 .rhythm-memo-card{width:100%;max-width:320px;background:var(--card,#fdf8f2);border-radius:16px;padding:20px 18px 18px;box-shadow:0 8px 28px rgba(0,0,0,0.35);position:relative;}
 .rhythm-memo-close{position:absolute;top:10px;right:10px;width:24px;height:24px;border-radius:12px;background:rgba(30,20,18,0.08);border:none;display:flex;align-items:center;justify-content:center;color:var(--ts);cursor:pointer;}
 .rhythm-memo-icon{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;}
 .rhythm-memo-title{font-size:15px;color:var(--tp);font-weight:500;text-align:center;}
 .rhythm-memo-body{font-size:12.5px;color:var(--ts);margin-top:4px;text-align:center;}
-.rhythm-memo-input-area{margin-top:16px;}
+.rhythm-memo-input-area{margin-top:16px;position:relative;}
 .rhythm-memo-actions{display:flex;gap:8px;margin-top:14px;}
 .rhythm-memo-actions .mbtn{flex:1;}
 /* 바깥 카드 배경 없이 폴라로이드 프레임이 바로 어두운 오버레이 위에 뜨는 구조 */
@@ -646,6 +647,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .memo-field-wrap .memo-field{width:100%;display:block;}
 #memo-edit-modal .memo-field-wrap{display:block;flex:none;}
 #memo-edit-modal .memo-field-wrap textarea{width:100%;display:block;box-sizing:border-box;}
+#rhythm-memo-ov .memo-field-wrap{display:block;flex:none;}
+#rhythm-memo-ov .memo-field-wrap textarea{width:100%;display:block;box-sizing:border-box;}
 .memo-seed-toggle{position:absolute;right:5px;top:0;bottom:0;margin:auto;height:22px;width:22px;background:none;border:none;padding:0;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--tm);opacity:0.23;transition:opacity .15s,color .15s;}
 .memo-seed-toggle i{font-size:17px;line-height:0;}
 .memo-seed-toggle.on{opacity:1;color:rgba(120,155,160,0.95);}
@@ -2250,15 +2253,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div class="rhythm-memo-icon" id="rmemo-icon"><i class="ti" id="rmemo-icon-i" aria-hidden="true"></i></div>
     <div class="rhythm-memo-title" id="rmemo-title"></div>
     <div class="rhythm-memo-body" id="rmemo-body"></div>
-    <div class="rhythm-memo-input-area">
-      <div id="rmemo-photo-preview-row" style="display:none;"></div>
-      <div class="memo-input-row" style="margin-top:8px;padding-top:0;">
-        <button class="stamp-btn memo-stamp-sm" onclick="triggerRhythmMemoPhotoPick()" id="rmemo-photo-btn" title="사진 첨부"><i class="ti ti-photo" style="font-size:14px;color:var(--ts);" aria-hidden="true"></i></button>
-        <input type="file" accept="image/*" id="rmemo-photo-file-inp" style="display:none;" onchange="handleRhythmMemoPhotoSelect(event)">
-        <div class="memo-field-wrap">
-          <textarea class="memo-field memo-field-sm" id="rmemo-inp" placeholder="" rows="1" autocomplete="off"></textarea>
-        </div>
-      </div>
+    <div id="rmemo-photo-preview-row" style="display:none;"></div>
+    <div class="memo-field-wrap" style="margin-top:8px;">
+      <textarea class="modal-inp" id="rmemo-inp" rows="2" style="resize:none;line-height:1.6;" placeholder="" autocomplete="off"></textarea>
+      <button class="memo-edit-photo-toggle" onclick="triggerRhythmMemoPhotoPick()" id="rmemo-photo-btn" title="사진 첨부"><i class="ti ti-photo" aria-hidden="true"></i></button>
+      <input type="file" accept="image/*" id="rmemo-photo-file-inp" style="display:none;" onchange="handleRhythmMemoPhotoSelect(event)">
     </div>
     <div class="rhythm-memo-actions">
       <button class="mbtn cancel" onclick="closeRhythmMemoModal()">나중에</button>

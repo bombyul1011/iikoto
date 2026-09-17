@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.88-review-prompt-random';
+const CACHE = 'iikoto-v2.89-rhythm-memo-polish';
 const ASSETS = [
   './',
   './index.html'
