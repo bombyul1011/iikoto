@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.85-schedule-alert-icon';
+const CACHE = 'iikoto-v2.88-review-prompt-random';
 const ASSETS = [
   './',
   './index.html'
@@ -61,7 +61,10 @@ self.addEventListener('notificationclick', e => {
   e.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
       for (const c of clientList) {
-        if ('focus' in c) return c.focus();
+        // 이미 열려있는 창은 URL이 자동으로 안 바뀌므로, 창을 포커스하면서
+        // postMessage로 목적지 정보를 전달 — app.js가 수신해 직접 모달을 연다(2026-09-17).
+        c.postMessage({ type: 'notification-click', url: targetUrl });
+        return c.focus();
       }
       if (clients.openWindow) return clients.openWindow(targetUrl);
     })

@@ -406,12 +406,28 @@ function finishRhythmBlock(idx){
   if(!blocks[idx])return;
   const n=new Date();
   const endStr=pad(n.getHours())+':'+pad(n.getMinutes());
+  const startStr=blocks[idx].start;
   blocks[idx].end=endStr;
   delete blocks[idx].autoClosed; // 사용자가 직접 종료했으므로 자동종료 표시를 지워 이후 취침시각 재수정에 영향받지 않게 확정
+  const cat=blocks[idx].cat;
   saveRhythmBlocks(_rhythmDk,blocks);
   syncMorningFlowOnRhythmBlockEnd(_rhythmDk,blocks[idx].cid,endStr); // 모닝플로우로 시작한 블록이면 picks도 done으로 동기화
-  if(blocks[idx].cat==='exercise')scheduleExerciseStatAlert(blocks[idx].cid);
+  if(cat==='exercise')scheduleExerciseStatAlert(blocks[idx].cid);
   refreshRhythmTrack();
+  // 종료 시점 메모 제안 — RHYTHM_CATS 라벨/지속시간을 제목에 반영, 본문은 알림과 결을 맞춘 기록 유도 문구.
+  const catInfo=RHYTHM_CATS[cat];
+  if(catInfo&&startStr){
+    const durMin=_rhythmDurationMin(startStr,endStr);
+    const durLabel=durMin>=60?`${Math.floor(durMin/60)}시간${durMin%60?' '+(durMin%60)+'분':''}`:`${durMin}분`;
+    openRhythmMemoModal(cat,_rhythmDk,`${catInfo.label} · ${durLabel}`,'오늘 이 시간, 짧게 남겨볼까요?');
+  }
+}
+// 시작~종료(HH:MM) 사이 경과 분 — 자정 넘김 보정 포함. 리듬바 자정넘김 규칙(2026-09-09)과 동일 방식.
+function _rhythmDurationMin(startStr,endStr){
+  const [sh,sm]=startStr.split(':').map(Number),[eh,em]=endStr.split(':').map(Number);
+  let dur=(eh*60+em)-(sh*60+sm);
+  if(dur<0)dur+=1440;
+  return dur;
 }
 // ── 운동 리듬바 종료 통계 알림 (2026-09-08 설계) ──
 // exercise 카테고리 블록을 종료할 때마다, 이번달 누적 횟수 + 주3회 목표 스트릭(완결된 주까지만 정확 계산,
@@ -2329,6 +2345,7 @@ const S={
 
 // ── DATE HELPERS
 function pad(n){return String(n).padStart(2,'0');}
+function pickRandom(pool){return pool[Math.floor(Math.random()*pool.length)];}
 function escapeHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 // 자정~새벽(아직 잠들기 전, night_2)에는 "오늘"을 전날 밤 기준으로 보는 논리적 날짜
 // ── 절기(節氣) 정보 — 7~12월 우선 적용, 필요시 이후 확장
@@ -4661,6 +4678,100 @@ async function openPhotoViewer(url,text,meta){
 function closePhotoViewer(ev){
   if(ev&&ev.target.closest('.photo-viewer-img'))return;
   document.getElementById('photo-viewer-ov').classList.remove('on');
+}
+// ── 리듬 활동 메모 제안 모달 (종료 시점 팝업 / 1시간 알림 클릭 공용) ──
+// 카테고리 구분은 RHYTHM_CATS[cat]의 color/icon/label을 그대로 사용 — 별도 색상 테이블 불필요.
+// 사진 첨부는 오늘탭 메모의 기존 리사이즈(_resizeImageToWebp)/R2업로드(큐잉) 로직을 그대로 재사용하되,
+// _memoPendingPhoto와 상태가 섞이지 않도록 전용 변수(_rmemoPendingPhoto)로 분리(2026-09-17).
+let _rmemoPendingPhoto=null;
+let _rmemoCtx=null; // {dk, cat} — 저장 시 어느 날짜의 오늘탭 메모에 넣을지
+function openRhythmMemoModal(cat,dk,title,body){
+  const catInfo=RHYTHM_CATS[cat];
+  const iconWrap=document.getElementById('rmemo-icon');
+  const iconI=document.getElementById('rmemo-icon-i');
+  const submitBtn=document.getElementById('rmemo-submit-btn');
+  if(catInfo){
+    // work/appointment는 알파가 낮게 조정된 색(리듬바 시인성 목적)이라 아이콘 배경으로 쓰기엔
+    // 옅어 보일 수 있어, 모달 전용으로 최소 0.5 알파를 보장(원색 계열 자체는 그대로 유지).
+    const bgColor=catInfo.color.replace(/,\s*([\d.]+)\)$/,(m,a)=>`,${Math.max(parseFloat(a),0.5)})`);
+    iconWrap.style.background=bgColor;
+    iconI.className='ti '+catInfo.icon;
+    iconI.style.color='var(--tp)';
+    iconI.style.fontSize='20px';
+    submitBtn.style.background=bgColor;
+    submitBtn.style.color='var(--tp)';
+  }
+  document.getElementById('rmemo-title').textContent=title||'';
+  document.getElementById('rmemo-body').textContent=body||'';
+  document.getElementById('rmemo-inp').value='';
+  document.getElementById('rmemo-inp').placeholder=catInfo?`${catInfo.label} 메모를 남겨보세요`:'메모를 남겨보세요';
+  _rmemoCtx={dk:dk||dateKey(currentDate),cat};
+  clearRhythmMemoPhotoPreview();
+  document.getElementById('rhythm-memo-ov').classList.add('on');
+}
+function closeRhythmMemoModal(ev){
+  if(ev&&ev.target.closest('.rhythm-memo-card'))return;
+  document.getElementById('rhythm-memo-ov').classList.remove('on');
+  clearRhythmMemoPhotoPreview();
+}
+function triggerRhythmMemoPhotoPick(){
+  document.getElementById('rmemo-photo-file-inp').click();
+}
+async function handleRhythmMemoPhotoSelect(ev){
+  const file=ev.target.files&&ev.target.files[0];
+  ev.target.value='';
+  if(!file)return;
+  try{
+    const {blob,ext}=await _resizeImageToWebp(file,640);
+    const localUrl=URL.createObjectURL(blob);
+    _rmemoPendingPhoto={blob,ext,localUrl};
+    renderRhythmMemoPhotoPreview();
+  }catch(err){
+    console.error('사진 처리 실패',err);
+  }
+}
+function renderRhythmMemoPhotoPreview(){
+  const row=document.getElementById('rmemo-photo-preview-row');
+  if(!row)return;
+  if(!_rmemoPendingPhoto){row.style.display='none';row.innerHTML='';return;}
+  row.style.display='flex';
+  row.innerHTML='';
+  const img=document.createElement('img');
+  img.className='memo-photo-preview-thumb';
+  img.src=_rmemoPendingPhoto.localUrl;
+  const clear=document.createElement('div');
+  clear.className='memo-photo-preview-clear';
+  clear.innerHTML='<i class="ti ti-x" style="font-size:13px;" aria-hidden="true"></i>';
+  clear.onclick=clearRhythmMemoPhotoPreview;
+  row.appendChild(img);row.appendChild(clear);
+}
+function clearRhythmMemoPhotoPreview(){
+  if(_rmemoPendingPhoto&&_rmemoPendingPhoto.localUrl)URL.revokeObjectURL(_rmemoPendingPhoto.localUrl);
+  _rmemoPendingPhoto=null;
+  renderRhythmMemoPhotoPreview();
+}
+// 저장 경로는 오늘탭 메모(memos)와 완전히 동일 — saveMemos를 그대로 호출해 배너에 자연히 합류시킴.
+function submitRhythmMemo(){
+  if(!_rmemoCtx)return;
+  const inp=document.getElementById('rmemo-inp');
+  const text=inp?inp.value.trim():'';
+  const photo=_rmemoPendingPhoto;
+  if(!text&&!photo)return; // 빈 채로 "기록하기"는 무시(닫으려면 나중에/X 사용)
+  const {dk}=_rmemoCtx;
+  const n=new Date();
+  const stamp=`${pad(n.getHours())}:${pad(n.getMinutes())}`;
+  const memos=getMemos(dk);
+  const item={text,time:stamp,created:Date.now(),cid:genCid()};
+  if(photo){
+    item.photoLocalUrl=photo.localUrl;
+    item.photoStatus='pending_upload';
+  }
+  memos.push(item);
+  if(photo)S.set(S.key('memos_pending',dk),true);
+  saveMemos(dk,memos);
+  if(photo)queueMemoPhotoUpload(dk,item.cid,photo.blob,photo.ext);
+  if(dk===dateKey(currentDate))renderMemos();
+  closeRhythmMemoModal();
 }
 // 뷰어 좌우 스와이프로 이전/다음 사진 넘기기 — 배열 양끝에서는 자연스럽게 멈춤(순환 안 함).
 // dir: -1(다음, 최신→과거 진행방향) 또는 1(이전).
@@ -9349,9 +9460,20 @@ function setCStatus(status){
   const starRow=document.getElementById('cm-star-row');
   const reviewEl=document.getElementById('cm-review');
   if(starRow)starRow.style.display=showReviewFields?'flex':'none';
-  if(reviewEl)reviewEl.style.display=showReviewFields?'':'none';
+  if(reviewEl){
+    reviewEl.style.display=showReviewFields?'':'none';
+    const reviewPools={
+      book:['다 읽고 나서 어떤 문장이 남았나요? (선택)','완독 후 든 생각을 남겨보세요 (선택)','가장 기억에 남는 장면은? (선택)'],
+      drama:['다 보고 나서 어떤 장면이 남았나요? (선택)','완결 후 든 생각을 남겨보세요 (선택)','가장 좋았던 순간은? (선택)'],
+      movie:['다 보고 나서 어떤 장면이 남았나요? (선택)','영화가 끝나고 든 생각을 남겨보세요 (선택)','가장 좋았던 순간은? (선택)'],
+    };
+    reviewEl.placeholder=reviewPools[_contentCtx.cat]?pickRandom(reviewPools[_contentCtx.cat]):'감상 메모 (선택)';
+  }
   const musicNoteEl=document.getElementById('cm-music-note');
-  if(musicNoteEl)musicNoteEl.style.display=isMusic?'':'none';
+  if(musicNoteEl){
+    musicNoteEl.style.display=isMusic?'':'none';
+    if(isMusic)musicNoteEl.placeholder=pickRandom(['이 곡, 어떤 상황에서 다시 듣고 싶나요? (선택)','이 곡을 들으며 든 생각을 남겨보세요 (선택)','좋았던 가사나 소절이 있었나요? (선택)']);
+  }
 }
 function toggleCDone(){
   setCStatus(_contentCtx.status==='done'?'watching':'done');
@@ -9470,7 +9592,10 @@ function openContentProgressModal(cid,watchedNow,secondsWatched){
   inp.value=(watchedNow&&c.cat==='movie')?Math.min(base+watchedNow,c.totalUnit||(base+watchedNow)):base;
   inp.max=c.totalUnit||'';
   const noteInp=document.getElementById('cpg-note-inp');
-  if(noteInp)noteInp.value='';
+  if(noteInp){
+    noteInp.value='';
+    noteInp.placeholder=pickRandom(['인상 깊은 장면이 있었나요? (선택)','오늘 본 것에서 기억에 남는 대사는? (선택)','지금 느낀 감상을 짧게 남겨보세요 (선택)']);
+  }
   // 완료확인 UI가 이전 열람에서 떠 있던 상태로 남지 않도록 저장버튼 초기 상태로 리셋
   const confirmEl=document.getElementById('cpg-done-confirm');
   const actionsEl=document.getElementById('cpg-modal-actions');
@@ -12291,7 +12416,10 @@ function openProgressModal(cid,seconds){
   const totalEl=document.getElementById('pg-total');
   totalEl.textContent=(_pgUnit==='pages'&&book.totalPages)?`총 ${book.totalPages}페이지`:'';
   const noteEl=document.getElementById('pg-note-inp');
-  if(noteEl)noteEl.value='';
+  if(noteEl){
+    noteEl.value='';
+    noteEl.placeholder=pickRandom(['오늘 읽은 부분에서 기억나는 문장은? (선택)','인상 깊은 구절이 있었나요? (선택)','오늘 읽으며 든 생각을 남겨보세요 (선택)']);
+  }
   // 완독확인 UI가 이전 열람에서 떠 있던 상태로 남지 않도록 저장버튼 초기 상태로 리셋
   const confirmEl=document.getElementById('pg-done-confirm');
   const actionsEl=document.getElementById('pg-modal-actions');
@@ -14002,6 +14130,44 @@ const DAYS_KO=['일','월','화','수','목','금','토'];
 // ── INIT
 updateDateUI();
 loadDaily();
+// 1시간 리마인드 알림 클릭 시 URL에 실려온 ?memo=rhythm&cid=xxx를 읽어 해당 활동의
+// 메모 제안 모달을 자동으로 연다. 로컬 30일 캐시 범위 밖(예: 자정을 넘겨 어제 블록인 경우)일
+// 수 있어, 못 찾으면 서버에서 직접 이 cid의 리듬블록을 조회한다(2026-09-17).
+async function _openRhythmMemoFromUrlIfPresent(urlStr){
+  const params=new URLSearchParams((urlStr?urlStr.split('?')[1]:location.search)||'');
+  if(params.get('memo')!=='rhythm')return;
+  const cid=params.get('cid');
+  if(!cid)return;
+  if(!urlStr)history.replaceState(null,'',location.pathname); // 최초 로드 경로일 때만 자기 URL을 정리(SW 메시지 경로는 애초에 주소가 안 바뀌므로 불필요)
+  let found=null,foundDk=null;
+  const todayDk=dateKey(new Date());
+  for(let i=0;i<2;i++){ // 자정을 막 넘긴 경우까지 고려해 오늘/어제 두 날짜만 로컬에서 우선 탐색
+    const d=new Date();d.setDate(d.getDate()-i);
+    const dk=dateKey(d);
+    const b=getRhythmBlocks(dk).find(x=>x.cid===cid);
+    if(b){found=b;foundDk=dk;break;}
+  }
+  if(!found){
+    // 로컬에 없으면 서버에서 직접 조회(오래 지난 알림을 뒤늦게 클릭한 경우 등)
+    const rows=await supaFetch(`rhythm_blocks?client_id=eq.${encodeURIComponent(cid)}&limit=1`);
+    if(rows&&rows[0]){found=rhythmBlockRowToLocal(rows[0]);foundDk=rows[0].date_key;}
+  }
+  if(!found||!found.cat)return;
+  const catInfo=RHYTHM_CATS[found.cat];
+  if(!catInfo)return;
+  const durMin=found.end?_rhythmDurationMin(found.start,found.end):_rhythmDurationMin(found.start,pad(new Date().getHours())+':'+pad(new Date().getMinutes()));
+  const durLabel=durMin>=60?`${Math.floor(durMin/60)}시간${durMin%60?' '+(durMin%60)+'분':''}`:`${durMin}분`;
+  openRhythmMemoModal(found.cat,foundDk||todayDk,`${catInfo.label} · ${durLabel}`,'지금 이 순간을 기록해보세요.');
+}
+_openRhythmMemoFromUrlIfPresent();
+// 앱이 이미 열려있는 상태에서 알림을 클릭한 경우 — SW가 URL을 못 바꾸므로 postMessage로 전달받아 동일하게 처리.
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.addEventListener('message',e=>{
+    if(e.data&&e.data.type==='notification-click'&&e.data.url){
+      _openRhythmMemoFromUrlIfPresent(e.data.url);
+    }
+  });
+}
 // 새로고침/앱 완전종료 후 재시작 시, 켜져 있던 독서 스톱워치를 이어서 복원.
 // localStorage에 저장된 시작시각이 있으면(=종료 처리 없이 앱이 닫힌 경우) 그 시각 기준으로
 // 경과시간을 계산해 스톱워치를 다시 돌아가는 상태로 되살린다.

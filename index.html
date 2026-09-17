@@ -599,6 +599,16 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 .photo-viewer-ov{position:fixed;inset:0;background:rgba(30,20,18,.82);z-index:10001;display:none;align-items:center;justify-content:center;padding:20px;}
 .photo-viewer-ov.on{display:flex;}
+.rhythm-memo-ov{position:fixed;inset:0;background:rgba(30,20,18,.45);z-index:10001;display:none;align-items:center;justify-content:center;padding:20px;}
+.rhythm-memo-ov.on{display:flex;}
+.rhythm-memo-card{width:100%;max-width:320px;background:var(--card,#fdf8f2);border-radius:16px;padding:20px 18px 18px;box-shadow:0 8px 28px rgba(0,0,0,0.35);position:relative;}
+.rhythm-memo-close{position:absolute;top:10px;right:10px;width:24px;height:24px;border-radius:12px;background:rgba(30,20,18,0.08);border:none;display:flex;align-items:center;justify-content:center;color:var(--ts);cursor:pointer;}
+.rhythm-memo-icon{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;}
+.rhythm-memo-title{font-size:15px;color:var(--tp);font-weight:500;text-align:center;}
+.rhythm-memo-body{font-size:12.5px;color:var(--ts);margin-top:4px;text-align:center;}
+.rhythm-memo-input-area{margin-top:16px;}
+.rhythm-memo-actions{display:flex;gap:8px;margin-top:14px;}
+.rhythm-memo-actions .mbtn{flex:1;}
 /* 바깥 카드 배경 없이 폴라로이드 프레임이 바로 어두운 오버레이 위에 뜨는 구조 */
 .photo-viewer-card{width:100%;max-width:330px;max-height:88vh;display:flex;flex-direction:column;}
 /* 폴라로이드 프레임 — 사진+날짜+텍스트를 흰 카드 하나로 감싸고 살짝 기울여 손으로 놓은 듯한 느낌 */
@@ -2233,6 +2243,30 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   </div>
 </div>
 
+<!-- RHYTHM MEMO SUGGEST MODAL (리듬 활동 메모 제안 — 종료 시점/1시간 알림 공용) -->
+<div class="rhythm-memo-ov" id="rhythm-memo-ov" onclick="closeRhythmMemoModal(event)">
+  <div class="rhythm-memo-card" onclick="event.stopPropagation()">
+    <button class="rhythm-memo-close" onclick="closeRhythmMemoModal()" aria-label="닫기"><i class="ti ti-x" aria-hidden="true"></i></button>
+    <div class="rhythm-memo-icon" id="rmemo-icon"><i class="ti" id="rmemo-icon-i" aria-hidden="true"></i></div>
+    <div class="rhythm-memo-title" id="rmemo-title"></div>
+    <div class="rhythm-memo-body" id="rmemo-body"></div>
+    <div class="rhythm-memo-input-area">
+      <div id="rmemo-photo-preview-row" style="display:none;"></div>
+      <div class="memo-input-row" style="margin-top:8px;padding-top:0;">
+        <button class="stamp-btn memo-stamp-sm" onclick="triggerRhythmMemoPhotoPick()" id="rmemo-photo-btn" title="사진 첨부"><i class="ti ti-photo" style="font-size:14px;color:var(--ts);" aria-hidden="true"></i></button>
+        <input type="file" accept="image/*" id="rmemo-photo-file-inp" style="display:none;" onchange="handleRhythmMemoPhotoSelect(event)">
+        <div class="memo-field-wrap">
+          <textarea class="memo-field memo-field-sm" id="rmemo-inp" placeholder="" rows="1" autocomplete="off"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="rhythm-memo-actions">
+      <button class="mbtn cancel" onclick="closeRhythmMemoModal()">나중에</button>
+      <button class="mbtn ok" id="rmemo-submit-btn" onclick="submitRhythmMemo()">기록하기</button>
+    </div>
+  </div>
+</div>
+
 <!-- CONTENT MODAL -->
 <div class="modal-ov" id="content-modal" onclick="closeModal('content-modal',event)">
   <div class="modal" style="max-width:340px;">
@@ -2278,7 +2312,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <input type="hidden" id="cm-stars" value="0">
     </div>
     <textarea class="modal-inp" id="cm-review" rows="2" style="resize:none;display:none;" placeholder="감상 메모 (선택)" autocomplete="off"></textarea>
-    <textarea class="modal-inp" id="cm-music-note" rows="2" style="resize:none;display:none;" placeholder="감상 메모 (선택)" autocomplete="off"></textarea>
+    <textarea class="modal-inp" id="cm-music-note" rows="2" style="resize:none;display:none;" placeholder="" autocomplete="off"></textarea>
     <div class="modal-actions" style="flex-wrap:wrap;gap:8px;">
       <button class="mbtn cancel" onclick="closeModal('content-modal')">취소</button>
       <button class="mbtn" id="cm-del-btn" onclick="deleteContent()" style="display:none;background:var(--pal-rose-bg);color:var(--pal-rose-text);border:1px solid var(--pal-rose-border);">삭제</button>
@@ -2618,7 +2652,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       </div>
     </div>
     <div class="pg-total" id="pg-total"></div>
-    <textarea class="modal-inp" id="pg-note-inp" rows="2" style="resize:none;margin-top:8px;" placeholder="감상 메모 (선택)" autocomplete="off"></textarea>
+    <textarea class="modal-inp" id="pg-note-inp" rows="2" style="resize:none;margin-top:8px;" placeholder="" autocomplete="off"></textarea>
     <div id="pg-done-confirm" style="display:none;"></div>
     <div class="modal-actions" id="pg-modal-actions">
       <button class="mbtn cancel" onclick="closeModal('progress-modal')">취소</button>
