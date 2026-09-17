@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.89-rhythm-memo-polish';
+const CACHE = 'iikoto-v2.91-rhythm-memo-bg-revert';
 const ASSETS = [
   './',
   './index.html'
