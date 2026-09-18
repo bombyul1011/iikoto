@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.94-weekstrip-rhythm-ring';
+const CACHE = 'iikoto-v2.95-morningflow-label-fix';
 const ASSETS = [
   './',
   './index.html'

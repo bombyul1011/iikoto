@@ -6093,7 +6093,9 @@ function _startMorningFlowRhythm(key,targetCid,mk,subKey){
   const card=MORNING_FLOW_CARDS.find(c=>c.key===key);
   const rhythmCat=key==='etc'?(subKey==='work'?'work':'appointment'):card.rhythmCat;
   const deskLabelMap={diary:'일기',notes:'노트정리',work_personal:'개인작업'};
-  const label=key==='etc'?(subKey==='work'?'업무':(flow.etc?.title||'외출')):key==='desk'?deskLabelMap[subKey]:key==='exercise'?(MORNING_FLOW_EXERCISE_SUB.find(s=>s.key===subKey)?.label||card.label):key==='rest'?(MORNING_FLOW_REST_SUB.find(s=>s.key===subKey)?.label||card.label):key==='clean'?(MORNING_FLOW_CLEAN_SUB.find(s=>s.key===subKey)?.label||card.label):card.label;
+  // label: 카테고리 라벨과 구분되는 "진짜 세부정보"가 있을 때만 채움 — 서브키가 없거나 매칭 실패해
+  // card.label(카테고리 라벨 그 자체)로 떨어지는 경우는 중복 정보라 애초에 빈 문자열로 둠(2026-09-18).
+  const label=key==='etc'?(subKey==='work'?'':(flow.etc?.title||'')):key==='desk'?(deskLabelMap[subKey]||''):key==='exercise'?(MORNING_FLOW_EXERCISE_SUB.find(s=>s.key===subKey)?.label||''):key==='rest'?(MORNING_FLOW_REST_SUB.find(s=>s.key===subKey)?.label||''):key==='clean'?(MORNING_FLOW_CLEAN_SUB.find(s=>s.key===subKey)?.label||''):'';
   const now=Date.now();
   const startMin=new Date(now).getHours()*60+new Date(now).getMinutes();
   const startStr=minToHHMM(startMin);
