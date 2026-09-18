@@ -4748,11 +4748,21 @@ function openRhythmMemoModal(cat,dk,title,body){
     iconI.style.fontSize='20px';
     submitBtn.style.background=bgColor;
     submitBtn.style.color='var(--tp)';
+  }else if(cat==='sleep'){
+    // 리듬 8종 밖의 예외 케이스 — 23시 취침 알림에서 오는 하루 회고 메모(2026-09-19 추가).
+    // RHYTHM_SLEEP_COLOR(기존 리듬트랙 수면 구간 색)를 그대로 재사용해 시각적 일관성 유지.
+    const bgColor=RHYTHM_SLEEP_COLOR.replace(/,\s*([\d.]+)\)$/,(m,a)=>`,${Math.max(parseFloat(a),0.5)})`);
+    iconWrap.style.background=bgColor;
+    iconI.className='ti ti-moon';
+    iconI.style.color='var(--tp)';
+    iconI.style.fontSize='20px';
+    submitBtn.style.background=bgColor;
+    submitBtn.style.color='var(--tp)';
   }
   document.getElementById('rmemo-title').textContent=title||'';
   document.getElementById('rmemo-body').textContent=body||'';
   document.getElementById('rmemo-inp').value='';
-  document.getElementById('rmemo-inp').placeholder=catInfo?`${catInfo.label} 메모를 남겨보세요`:'메모를 남겨보세요';
+  document.getElementById('rmemo-inp').placeholder=catInfo?`${catInfo.label} 메모를 남겨보세요`:(cat==='sleep'?'오늘 하루를 남겨보세요':'메모를 남겨보세요');
   _rmemoCtx={dk:dk||dateKey(currentDate),cat};
   clearRhythmMemoPhotoPreview();
   document.getElementById('rhythm-memo-ov').classList.add('on');
@@ -14187,17 +14197,23 @@ const DAYS_KO=['일','월','화','수','목','금','토'];
 // ── INIT
 updateDateUI();
 loadDaily();
-// 1시간 리마인드 알림 클릭 시 URL에 실려온 ?memo=rhythm&cid=xxx를 읽어 해당 활동의
-// 메모 제안 모달을 자동으로 연다. 로컬 30일 캐시 범위 밖(예: 자정을 넘겨 어제 블록인 경우)일
-// 수 있어, 못 찾으면 서버에서 직접 이 cid의 리듬블록을 조회한다(2026-09-17).
+// 리마인드 알림 클릭 시 URL에 실려온 메모 유도 파라미터를 읽어 메모 제안 모달을 자동으로 연다.
+// - memo=rhythm&cid=xxx: 리듬 1/3시간 진행중 알림 — 해당 리듬블록을 찾아 그 카테고리로 연다.
+//   로컬 30일 캐시 범위 밖(예: 자정을 넘겨 어제 블록인 경우)일 수 있어, 못 찾으면 서버에서 직접 조회.
+// - memo=sleep: 23시 취침 알림(하루 회고) — 특정 리듬블록에 종속되지 않는 단독 메모라 조회 없이 바로 연다(2026-09-19 추가).
 async function _openRhythmMemoFromUrlIfPresent(urlStr){
   const params=new URLSearchParams((urlStr?urlStr.split('?')[1]:location.search)||'');
-  if(params.get('memo')!=='rhythm')return;
+  const memoType=params.get('memo');
+  if(memoType!=='rhythm'&&memoType!=='sleep')return;
+  if(!urlStr)history.replaceState(null,'',location.pathname); // 최초 로드 경로일 때만 자기 URL을 정리(SW 메시지 경로는 애초에 주소가 안 바뀌므로 불필요)
+  const todayDk=dateKey(new Date());
+  if(memoType==='sleep'){
+    openRhythmMemoModal('sleep',todayDk,'오늘 하루는 어땠나요?','잠들기 전, 오늘을 짧게 남겨보세요.');
+    return;
+  }
   const cid=params.get('cid');
   if(!cid)return;
-  if(!urlStr)history.replaceState(null,'',location.pathname); // 최초 로드 경로일 때만 자기 URL을 정리(SW 메시지 경로는 애초에 주소가 안 바뀌므로 불필요)
   let found=null,foundDk=null;
-  const todayDk=dateKey(new Date());
   for(let i=0;i<2;i++){ // 자정을 막 넘긴 경우까지 고려해 오늘/어제 두 날짜만 로컬에서 우선 탐색
     const d=new Date();d.setDate(d.getDate()-i);
     const dk=dateKey(d);

@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.96-rhythm-subchoices-unified';
+const CACHE = 'iikoto-v2.97-sleep-memo-nudge';
 const ASSETS = [
   './',
   './index.html'
