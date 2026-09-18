@@ -5789,7 +5789,8 @@ const MORNING_FLOW_ENJOY_SUB=[
 const RHYTHM_EXERCISE_SUB=[
   {key:'hometraining',label:'홈트'},
   {key:'gym',label:'헬스장'},
-  {key:'barre',label:'바레'}
+  {key:'barre',label:'바레'},
+  {key:'running',label:'러닝'}
 ];
 const RHYTHM_REST_SUB=[
   {key:'nap',label:'낮잠'},

@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.98-sleep-memo-random-copy';
+const CACHE = 'iikoto-v2.99-add-running-chip';
 const ASSETS = [
   './',
   './index.html'
