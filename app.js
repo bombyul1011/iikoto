@@ -14208,7 +14208,8 @@ async function _openRhythmMemoFromUrlIfPresent(urlStr){
   if(!urlStr)history.replaceState(null,'',location.pathname); // 최초 로드 경로일 때만 자기 URL을 정리(SW 메시지 경로는 애초에 주소가 안 바뀌므로 불필요)
   const todayDk=dateKey(new Date());
   if(memoType==='sleep'){
-    openRhythmMemoModal('sleep',todayDk,'오늘 하루는 어땠나요?','잠들기 전, 오늘을 짧게 남겨보세요.');
+    const t=params.get('t'),b=params.get('b');
+    openRhythmMemoModal('sleep',todayDk,t||'오늘 하루는 어땠나요?',b||'잠들기 전, 오늘을 짧게 남겨보세요.');
     return;
   }
   const cid=params.get('cid');

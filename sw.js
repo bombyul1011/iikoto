@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.97-sleep-memo-nudge';
+const CACHE = 'iikoto-v2.98-sleep-memo-random-copy';
 const ASSETS = [
   './',
   './index.html'
