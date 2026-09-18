@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.95-morningflow-label-fix';
+const CACHE = 'iikoto-v2.96-rhythm-subchoices-unified';
 const ASSETS = [
   './',
   './index.html'

@@ -5774,19 +5774,26 @@ const MORNING_FLOW_ENJOY_SUB=[
   {key:'read',label:'독서',icon:'ti-book'},
   {key:'content',label:'콘텐츠',icon:'ti-device-tv'}
 ];
-// 리듬탭 RHYTHM_QUICK_CHOICES(exercise/rest)와 동일 문구로 통일 — 모닝플로우도 같은 선택지 사용
-const MORNING_FLOW_EXERCISE_SUB=[
+// 서브선택 상수 — 모닝플로우 카드와 리듬탭 빠른선택 칩이 공용으로 참조(2026-09-19 통합).
+// 종류 추가/수정 시 이 한 곳만 고치면 두 화면(모닝플로우 서브칩, 리듬탭 빠른선택)에 자동 반영됨.
+const RHYTHM_EXERCISE_SUB=[
   {key:'hometraining',label:'홈트'},
-  {key:'gym',label:'헬스장'}
+  {key:'gym',label:'헬스장'},
+  {key:'barre',label:'바레'}
 ];
-const MORNING_FLOW_REST_SUB=[
+const RHYTHM_REST_SUB=[
   {key:'nap',label:'낮잠'},
   {key:'lazing',label:'빈둥빈둥'}
 ];
-const MORNING_FLOW_CLEAN_SUB=[
+const RHYTHM_CLEAN_SUB=[
   {key:'clean',label:'정리'},
   {key:'laundry',label:'세탁'},
   {key:'kitchen',label:'주방'}
+];
+const RHYTHM_DESK_SUB=[
+  {key:'diary',label:'일기'},
+  {key:'notes',label:'노트정리'},
+  {key:'work_personal',label:'개인작업'}
 ];
 const MORNING_FLOW_DESK_SUB=[
   {key:'diary',label:'일기'},
@@ -6092,10 +6099,9 @@ function _startMorningFlowRhythm(key,targetCid,mk,subKey){
   // 휴식/운동/정리/기타(업무·외출)/책상(일기·노트정리·개인작업) — 리듬블록을 end 없이 직접 생성해두고 종료 시 채우는 방식(콘텐츠 시청 스톱워치와 동일 패턴).
   const card=MORNING_FLOW_CARDS.find(c=>c.key===key);
   const rhythmCat=key==='etc'?(subKey==='work'?'work':'appointment'):card.rhythmCat;
-  const deskLabelMap={diary:'일기',notes:'노트정리',work_personal:'개인작업'};
   // label: 카테고리 라벨과 구분되는 "진짜 세부정보"가 있을 때만 채움 — 서브키가 없거나 매칭 실패해
   // card.label(카테고리 라벨 그 자체)로 떨어지는 경우는 중복 정보라 애초에 빈 문자열로 둠(2026-09-18).
-  const label=key==='etc'?(subKey==='work'?'':(flow.etc?.title||'')):key==='desk'?(deskLabelMap[subKey]||''):key==='exercise'?(MORNING_FLOW_EXERCISE_SUB.find(s=>s.key===subKey)?.label||''):key==='rest'?(MORNING_FLOW_REST_SUB.find(s=>s.key===subKey)?.label||''):key==='clean'?(MORNING_FLOW_CLEAN_SUB.find(s=>s.key===subKey)?.label||''):'';
+  const label=key==='etc'?(subKey==='work'?'':(flow.etc?.title||'')):key==='desk'?(RHYTHM_DESK_SUB.find(s=>s.key===subKey)?.label||''):key==='exercise'?(RHYTHM_EXERCISE_SUB.find(s=>s.key===subKey)?.label||''):key==='rest'?(RHYTHM_REST_SUB.find(s=>s.key===subKey)?.label||''):key==='clean'?(RHYTHM_CLEAN_SUB.find(s=>s.key===subKey)?.label||''):'';
   const now=Date.now();
   const startMin=new Date(now).getHours()*60+new Date(now).getMinutes();
   const startStr=minToHHMM(startMin);
@@ -6167,14 +6173,13 @@ function _mfYesterdayRecapLine(){
       if(flow.enjoy?.sub==='read')doneLabels.push('독서');
       else if(flow.enjoy?.sub==='content')doneLabels.push('콘텐츠');
     }else if(c.key==='desk'){
-      const deskLabelMap={diary:'일기',notes:'노트정리',work_personal:'개인작업'};
-      if(flow.desk?.sub)doneLabels.push(deskLabelMap[flow.desk.sub]);
+      if(flow.desk?.sub)doneLabels.push(RHYTHM_DESK_SUB.find(s=>s.key===flow.desk.sub)?.label);
     }else if(c.key==='exercise'){
-      doneLabels.push(MORNING_FLOW_EXERCISE_SUB.find(s=>s.key===flow.exercise?.sub)?.label||c.label);
+      doneLabels.push(RHYTHM_EXERCISE_SUB.find(s=>s.key===flow.exercise?.sub)?.label||c.label);
     }else if(c.key==='rest'){
-      doneLabels.push(MORNING_FLOW_REST_SUB.find(s=>s.key===flow.rest?.sub)?.label||c.label);
+      doneLabels.push(RHYTHM_REST_SUB.find(s=>s.key===flow.rest?.sub)?.label||c.label);
     }else if(c.key==='clean'){
-      doneLabels.push(MORNING_FLOW_CLEAN_SUB.find(s=>s.key===flow.clean?.sub)?.label||c.label);
+      doneLabels.push(RHYTHM_CLEAN_SUB.find(s=>s.key===flow.clean?.sub)?.label||c.label);
     }else{
       doneLabels.push(c.label);
     }
@@ -6277,9 +6282,9 @@ function makeMorningFlowCard(showRecap){
       if(isEtc&&!etcSub)return _mfSubPickRowHtml(c,'기타',MORNING_FLOW_ETC_SUB,'selectMorningFlowEtcSub',false);
       if(isEnjoy&&!enjoySub)return _mfSubPickRowHtml(c,'감상',MORNING_FLOW_ENJOY_SUB,'selectMorningFlowEnjoySub',false);
       if(isDesk&&!deskSub)return _mfSubPickRowHtml(c,'책상',MORNING_FLOW_DESK_SUB,'selectMorningFlowDeskSub',true);
-      if(isExercise&&!exerciseSub)return _mfSubPickRowHtml(c,'운동',MORNING_FLOW_EXERCISE_SUB,'selectMorningFlowExerciseSub',false);
-      if(isRest&&!restSub)return _mfSubPickRowHtml(c,'휴식',MORNING_FLOW_REST_SUB,'selectMorningFlowRestSub',false);
-      if(isClean&&!cleanSub)return _mfSubPickRowHtml(c,'살림',MORNING_FLOW_CLEAN_SUB,'selectMorningFlowCleanSub',true);
+      if(isExercise&&!exerciseSub)return _mfSubPickRowHtml(c,'운동',RHYTHM_EXERCISE_SUB,'selectMorningFlowExerciseSub',false);
+      if(isRest&&!restSub)return _mfSubPickRowHtml(c,'휴식',RHYTHM_REST_SUB,'selectMorningFlowRestSub',false);
+      if(isClean&&!cleanSub)return _mfSubPickRowHtml(c,'살림',RHYTHM_CLEAN_SUB,'selectMorningFlowCleanSub',true);
       // 감상(독서/콘텐츠) 서브선택은 끝났지만 아직 대상(어떤 책/작품)을 안 고른 상태 —
       // 책상/기타와 동일하게 "칩으로 대상만 먼저 고르고 → 시작 행이 뜨면 시작 버튼을 누르는" 2단계 구조로 통일(2026-09-05).
       // 3개 이상이면 줄바꿈 대신 가로 스와이프(rhythm-content-picker-swipe, 리듬탭에서 쓰던 것과 동일 패턴).
@@ -6332,8 +6337,7 @@ function makeMorningFlowCard(showRecap){
           ${chipsHtml}          <div style="display:flex;gap:6px;margin-top:8px;"><input id="mf-appointment-inp" class="modal-inp" style="margin-bottom:0;flex:1;" placeholder="예: 병원" value=""><button class="mf-start-btn" style="border-color:rgba(${c.colorRgb},0.6);color:rgb(${c.colorRgb});" onclick="pickMorningFlowAppointment(document.getElementById('mf-appointment-inp').value.trim())">시작</button></div>
         </div>`;
       }
-      const deskLabelMap={diary:'일기',notes:'노트정리',work_personal:'개인작업'};
-      const label=isEtc?(etcSub==='work'?'업무':(flow.etc?.title||'외출')):isEnjoy?(enjoySub==='read'?'독서':'콘텐츠'):isDesk?deskLabelMap[deskSub]:isExercise?(MORNING_FLOW_EXERCISE_SUB.find(s=>s.key===exerciseSub)?.label||c.label):isRest?(MORNING_FLOW_REST_SUB.find(s=>s.key===restSub)?.label||c.label):isClean?(MORNING_FLOW_CLEAN_SUB.find(s=>s.key===cleanSub)?.label||c.label):c.label;
+      const label=isEtc?(etcSub==='work'?'업무':(flow.etc?.title||'외출')):isEnjoy?(enjoySub==='read'?'독서':'콘텐츠'):isDesk?(RHYTHM_DESK_SUB.find(s=>s.key===deskSub)?.label||c.label):isExercise?(RHYTHM_EXERCISE_SUB.find(s=>s.key===exerciseSub)?.label||c.label):isRest?(RHYTHM_REST_SUB.find(s=>s.key===restSub)?.label||c.label):isClean?(RHYTHM_CLEAN_SUB.find(s=>s.key===cleanSub)?.label||c.label):c.label;
       const icon=isEtc?(etcSub==='work'?'ti-keyboard':'ti-bus'):isEnjoy?(MORNING_FLOW_ENJOY_SUB.find(s=>s.key===enjoySub)?.icon||c.icon):c.icon;
       // 시각은 저장값이 아니라 연결된 리듬블록(blockCid)에서 그때그때 읽음 — 리듬탭에서 시간을 고치면 바로 반영됨.
       const linkedBlock=_mfBlockFor(dk,pick.blockCid);
@@ -7112,8 +7116,7 @@ function _paceDayEvents(dk){
       const d=new Date(p.startTs);min=d.getHours()*60+d.getMinutes();
     }
     if(min==null)return;
-    const deskLabelMap={diary:'일기',notes:'노트정리',work_personal:'개인작업'};
-    const label=c.key==='etc'?(mflow.etc?.sub==='work'?'업무':'외출'):c.key==='enjoy'?(mflow.enjoy?.sub==='read'?'독서':'콘텐츠'):c.key==='desk'?(deskLabelMap[mflow.desk?.sub]||'책상'):c.key==='exercise'?(MORNING_FLOW_EXERCISE_SUB.find(s=>s.key===mflow.exercise?.sub)?.label||c.label):c.key==='rest'?(MORNING_FLOW_REST_SUB.find(s=>s.key===mflow.rest?.sub)?.label||c.label):c.key==='clean'?(MORNING_FLOW_CLEAN_SUB.find(s=>s.key===mflow.clean?.sub)?.label||c.label):c.label;
+    const label=c.key==='etc'?(mflow.etc?.sub==='work'?'업무':'외출'):c.key==='enjoy'?(mflow.enjoy?.sub==='read'?'독서':'콘텐츠'):c.key==='desk'?(RHYTHM_DESK_SUB.find(s=>s.key===mflow.desk?.sub)?.label||'책상'):c.key==='exercise'?(RHYTHM_EXERCISE_SUB.find(s=>s.key===mflow.exercise?.sub)?.label||c.label):c.key==='rest'?(RHYTHM_REST_SUB.find(s=>s.key===mflow.rest?.sub)?.label||c.label):c.key==='clean'?(RHYTHM_CLEAN_SUB.find(s=>s.key===mflow.clean?.sub)?.label||c.label):c.label;
     events.push({type:'morning',min:_paceAdjustMin(min),label});
   });
   return events;
@@ -11159,8 +11162,8 @@ function buildRhythmFormEl(showOngoingList){
   wrap.appendChild(legend);
   if(_rhythmFormOpen){
     const form=document.createElement('div');form.className='rhythm-add-form';
-    // 카테고리별 빠른 선택지: 감상은 콘텐츠탭 연동(객체), 나머지는 고정 문구(문자열) 배열.
-    const RHYTHM_QUICK_CHOICES={exercise:['홈트','헬스장'],rest:['낮잠','빈둥빈둥'],note:['일기','노트정리','개인작업'],home:['정리','세탁','주방']};
+    // 카테고리별 빠른 선택지: 감상은 콘텐츠탭 연동(객체), 나머지는 모닝플로우와 공용인 서브선택 상수 재사용(2026-09-19 통합).
+    const RHYTHM_QUICK_CHOICES={exercise:RHYTHM_EXERCISE_SUB,rest:RHYTHM_REST_SUB,note:RHYTHM_DESK_SUB,home:RHYTHM_CLEAN_SUB};
     const selColor=getRhythmColor(_rhythmFormCat); // 선택 강조색 — 카테고리 고유색 그대로 사용
     const selBg=_lightenRgba(selColor,0.14);
     let contentPickerHtml='';
@@ -11187,8 +11190,8 @@ function buildRhythmFormEl(showOngoingList){
     } else if(RHYTHM_QUICK_CHOICES[_rhythmFormCat]){
       contentPickerHtml=
         '<div class="rhythm-content-picker rhythm-content-picker-swipe">'+
-        RHYTHM_QUICK_CHOICES[_rhythmFormCat].map(function(label){
-          return '<span class="rhythm-content-chip" style="--sel-color:'+selColor+';--sel-bg:'+selBg+';" onclick="pickRhythmContentTitle(\''+label.replace(/'/g,"\\'")+'\',this)">'+label+'</span>';
+        RHYTHM_QUICK_CHOICES[_rhythmFormCat].map(function(s){
+          return '<span class="rhythm-content-chip" style="--sel-color:'+selColor+';--sel-bg:'+selBg+';" onclick="pickRhythmContentTitle(\''+s.label.replace(/'/g,"\\'")+'\',this)">'+s.label+'</span>';
         }).join('')+
         '</div>';
     }
