@@ -9070,6 +9070,39 @@ function renderGoalNote(containerId,storageKey,readOnly=false){
 }
 
 // ── WEEK STRIP
+// 날짜칩 링 — 그날 리듬 카테고리(kind:'manual')별 합산 시간 중 상위 4개만 비율로 재구성해 표시.
+// 수면/식사(kind:'sleep'/'meal')는 카테고리 성격이 달라 이 요약 링 집계에서는 제외.
+function _topRhythmCatsForRing(dk){
+  const raw=computeRhythmBlocksRaw(dk);
+  const nowMin=_nowMinIfToday(dk);
+  const sums={}; // cat key -> 합산 분
+  raw.forEach(function(b){
+    if(b.kind!=='manual')return;
+    const catKey=Object.keys(RHYTHM_CATS).find(function(k){return RHYTHM_CATS[k].color===b.color;});
+    if(!catKey)return;
+    let s=b.start,e=b.end;
+    if(e==null)e=(nowMin!=null&&nowMin>s)?nowMin:s+1;
+    if(e<=s)e=s+1;
+    if(e>1440)e=1440;
+    sums[catKey]=(sums[catKey]||0)+(e-s);
+  });
+  if(Object.keys(sums).length===0)return [];
+  const top4=Object.keys(sums).sort(function(a,b){return sums[b]-sums[a];}).slice(0,4);
+  const top4Total=top4.reduce(function(a,k){return a+sums[k];},0);
+  return top4.map(function(k){return {color:RHYTHM_CATS[k].color,pct:sums[k]/top4Total*100};});
+}
+function _rhythmRingSvg(dk,dateNum,isToday){
+  const segs=_topRhythmCatsForRing(dk);
+  const r=13.5,circ=100; // pathLength=100 기준 퍼센트 그대로 사용
+  let acc=0;
+  let circles='<circle cx="17" cy="17" r="'+r+'" fill="none" stroke="var(--empty-bg)" stroke-width="4"/>';
+  segs.forEach(function(seg){
+    const len=seg.pct;
+    circles+='<circle cx="17" cy="17" r="'+r+'" fill="none" stroke="'+seg.color+'" stroke-width="4" pathLength="'+circ+'" style="stroke-dasharray:'+len+' '+circ+';stroke-dashoffset:'+(-acc)+';transform:rotate(-90deg);transform-origin:17px 17px"/>';
+    acc+=len;
+  });
+  return '<div class="ring-wrap"><svg viewBox="0 0 34 34" width="34" height="34">'+circles+'</svg><span class="ring-num'+(isToday?' today-num':'')+'">'+dateNum+'</span></div>';
+}
 function buildWeekStrip(){
   const now=new Date(),dow=now.getDay();
   const mon=new Date(now);mon.setDate(now.getDate()-((dow+6)%7));
@@ -9078,8 +9111,9 @@ function buildWeekStrip(){
   for(let i=0;i<7;i++){
     const d=new Date(mon);d.setDate(mon.getDate()+i);
     const today=d.toDateString()===now.toDateString();
+    const dk=dateKey(d);
     const el=document.createElement('div');el.className='day-btn'+(today?' today':'');
-    el.innerHTML=`<div class="day-name">${DAYS[d.getDay()]}</div><div class="day-num">${d.getDate()}</div>`;
+    el.innerHTML=_rhythmRingSvg(dk,d.getDate(),today)+`<div class="day-name">${DAYS[d.getDay()]}</div>`;
     el.addEventListener('click',()=>{
       currentDate=new Date(d);
       document.querySelectorAll('.vtab').forEach(t=>t.classList.toggle('on',t.dataset.v==='daily'));

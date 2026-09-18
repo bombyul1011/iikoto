@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.93-session-cleanup';
+const CACHE = 'iikoto-v2.94-weekstrip-rhythm-ring';
 const ASSETS = [
   './',
   './index.html'
