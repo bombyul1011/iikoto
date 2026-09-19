@@ -2871,9 +2871,8 @@ getTodos.raw=function(dk){return S.get(S.key('todos',dk))||[];};
 // weekDates: 그 주의 7개 dk(월~일) 배열. multidayEvents: getActiveMultiDayEvents류로 모은 이번 달 전체 연속일정 목록(중복 제거된 원본, {_startDk,eventEndDate,...}).
 // 반환: 이 주에 걸치는 각 이벤트의 {left,width,row,clipStart,clipEnd,...ev} — left/width는 칸(cell) 단위 정수(0~6, 1~7), row는 겹칠 때 세로 순번(0부터).
 // 겹침 배정은 "실사용상 거의 겹치지 않는다"는 전제로 단순하게: 이미 배정된 row들과 구간이 겹치면 다음 row로.
-// weekDates에서 "그 달에 속하지 않는 빈 칸"을 표시하는 센티널 — 문자열 대소비교(weekStart/weekEnd, indexOf)에서
-// 절대 실제 날짜와 겹치지 않도록 사전으로 정렬 시 가장 뒤에 오는 문자열로 고정.
-const EMPTY_CAL_CELL='____NONE____';
+// weekDates는 항상 실제 날짜 7개(전달/다음달 칸 포함)여야 함 — 예전엔 이번 달 밖 칸을 센티널 문자열로 채웠는데,
+// 첫 주 첫 칸이 센티널이면 weekStart가 센티널이 되어 문자열 비교에서 그 주의 연속일정이 전부 누락되던 버그가 있었음(2026-09-19 수정).
 function computeWeekBars(weekDates,multidayEvents){
   const weekStart=weekDates[0],weekEnd=weekDates[6];
   const barsInWeek=[];
@@ -2924,24 +2923,22 @@ function getActiveMultiDayEvents(dk){
   }
   return result;
 }
-// ── 월간 캘린더 전용: 해당 월(y,mo)에 걸치는 연속일정 원본을 한 번에 모아 반환(중복 제거) ──
+// ── 월간 캘린더 전용: 날짜 범위(rangeStart~rangeEnd, dk 문자열)에 걸치는 연속일정 원본을 한 번에 모아 반환(중복 제거) ──
+// 월간 달력은 전달/다음달 칸까지 그리므로 월 경계가 아니라 "달력 격자 전체 범위"를 넘겨 호출함.
 // getActiveMultiDayEvents는 "하루 기준" 조회라 월 전체를 훑으면 같은 이벤트가 여러 날에서 중복 조회됨.
 // 이 함수는 월의 시작~끝(+앞뒤 룩백)만 스캔해 이벤트 원본을 cid 기준으로 1건씩만 모음 — computeWeekBars의 입력으로 사용.
-function getMultiDayEventsForMonth(y,mo){
-  const monthStart=`${y}-${pad(mo+1)}-01`;
-  const daysInMonth=new Date(y,mo+1,0).getDate();
-  const monthEnd=`${y}-${pad(mo+1)}-${pad(daysInMonth)}`;
+function getMultiDayEventsForRange(rangeStart,rangeEnd){
   const seen=new Set();
   const result=[];
-  // 월 시작일 기준으로 최대 MULTIDAY_LOOKBACK_DAYS일 전부터, 월 마지막날까지 시작일 후보를 훑음
-  const scanFrom=new Date(monthStart+'T00:00:00');scanFrom.setDate(scanFrom.getDate()-MULTIDAY_LOOKBACK_DAYS);
-  const scanTo=new Date(monthEnd+'T00:00:00');
+  // 범위 시작일 기준으로 최대 MULTIDAY_LOOKBACK_DAYS일 전부터, 범위 마지막날까지 시작일 후보를 훑음
+  const scanFrom=new Date(rangeStart+'T00:00:00');scanFrom.setDate(scanFrom.getDate()-MULTIDAY_LOOKBACK_DAYS);
+  const scanTo=new Date(rangeEnd+'T00:00:00');
   for(let d=new Date(scanFrom);d<=scanTo;d.setDate(d.getDate()+1)){
     const startDk=dateKey(d);
     const todos=getTodos(startDk);
     todos.forEach((t,idx)=>{
       if(!t.isEvent||!t.eventEndDate)return;
-      if(t.eventEndDate<monthStart||startDk>monthEnd)return; // 이번 달과 전혀 안 겹치면 제외
+      if(t.eventEndDate<rangeStart||startDk>rangeEnd)return; // 이 범위와 전혀 안 겹치면 제외
       const key=t.cid||`${startDk}_${idx}`;
       if(seen.has(key))return;seen.add(key);
       result.push({...t,_startDk:startDk});
@@ -5809,6 +5806,10 @@ const RHYTHM_DESK_SUB=[
   {key:'diary',label:'일기'},
   {key:'notes',label:'노트정리'},
   {key:'work_personal',label:'개인작업'}
+];
+const RHYTHM_WORK_SUB=[
+  {key:'remote',label:'재택'},
+  {key:'field',label:'외근'}
 ];
 const MORNING_FLOW_DESK_SUB=[
   {key:'diary',label:'일기'},
@@ -10558,7 +10559,12 @@ async function syncMonthRange(y,mo){
     });
   }
   const prevMk2=(()=>{const d=new Date(y,mo-1,1);return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;})();
-  await Promise.all([syncContentsDown(mk),syncContentsDown(prevMk2),syncGoalDown(S.key('mgoal',mk))]);
+  // 달력 격자에 나오는 전달/다음달 칸용 일정 데이터 — 전달 말일 쪽은 그 달에서 시작해 이어지는 연속일정(시작일 row에만 저장됨)까지
+  // 잡으려고 MULTIDAY_LOOKBACK_DAYS일 전부터, 다음달 쪽은 격자에 보일 수 있는 최대 6일치만 가볍게 조회(todos만, 1회 왕복).
+  const edgeDks=[];
+  for(let i=1;i<=MULTIDAY_LOOKBACK_DAYS;i++)edgeDks.push(dateKey(new Date(y,mo,1-i)));
+  for(let i=1;i<=6;i++)edgeDks.push(dateKey(new Date(y,mo,daysInMonth+i)));
+  await Promise.all([syncContentsDown(mk),syncContentsDown(prevMk2),syncGoalDown(S.key('mgoal',mk)),syncTodosDownMany(edgeDks)]);
   return true;
 }
 function calShiftMonth(n){
@@ -10589,16 +10595,26 @@ function renderCalendar(){
   const today=new Date();
   const hasRecord={};
   const hasPending={};
-  const eventsByDay={};
+  const eventsByDk={}; // 하루짜리 일정 배지 — 전달/다음달 칸까지 포함해 날짜키(dk)로 보관
   const todayDk=dateKey(today);
-  for(let d=1;d<=daysInMonth;d++){
-    const dk=`${y}-${pad(mo+1)}-${pad(d)}`;
+  const firstDayRaw=new Date(y,mo,1).getDay();
+  const firstDay=(firstDayRaw+6)%7; // 월요일=0 기준으로 변환
+  const totalCells=firstDay+daysInMonth;
+  const trailingBlank=(7-(totalCells%7))%7;
+  const totalWeeks=(firstDay+daysInMonth+trailingBlank)/7;
+  // 격자 각 칸의 실제 날짜(전달/다음달 포함) — 인덱스 0이 첫 칸(월요일)
+  const cellDkOf=(idx)=>dateKey(new Date(y,mo,idx-firstDay+1));
+  for(let idx=0;idx<totalWeeks*7;idx++){
+    const d=idx-firstDay+1;
+    const dk=cellDkOf(idx);
     const todos=getTodos(dk);
-    if(getMemos(dk).length>0||todos.some(t=>t.done)||getSleep(dk).sleep)hasRecord[d]=true;
-    // 오늘 이후(오늘 제외, 순수 미래)에 미완료 투두(할일+시간표, 일정 제외)가 하나라도 있으면 표시 —
-    // 일정은 이미 달력에 배지/막대로 노출되므로 동그라미 판정에서는 제외(중복 표기 방지).
-    // 과거(has-record, 채움)와 겹치지 않도록 미래 날짜에만 한정.
-    if(dk>todayDk&&todos.some(t=>!t.done&&!t.isEvent))hasPending[d]=true;
+    if(d>=1&&d<=daysInMonth){
+      if(getMemos(dk).length>0||todos.some(t=>t.done)||getSleep(dk).sleep)hasRecord[d]=true;
+      // 오늘 이후(오늘 제외, 순수 미래)에 미완료 투두(할일+시간표, 일정 제외)가 하나라도 있으면 표시 —
+      // 일정은 이미 달력에 배지/막대로 노출되므로 동그라미 판정에서는 제외(중복 표기 방지).
+      // 과거(has-record, 채움)와 겹치지 않도록 미래 날짜에만 한정.
+      if(dk>todayDk&&todos.some(t=>!t.done&&!t.isEvent))hasPending[d]=true;
+    }
     // 하루짜리 일정만 배지 대상(연속일정은 eventEndDate가 있으므로 여기서 제외 — 아래 bar로 별도 렌더)
     // 반복으로 생성된 일정도 getTodos(dk)가 이미 실체화해서 포함하고 있으므로 별도 조회 없이 자연히 함께 잡힘.
     // 같은 날 여러 일정이 있으면 시간순으로 표기(시간 있는 일정 먼저, 없는 일정은 뒤로)
@@ -10607,26 +10623,15 @@ function renderCalendar(){
       if(a.eventTime&&b.eventTime)return a.eventTime.localeCompare(b.eventTime);
       return 0;
     });
-    if(evs.length)eventsByDay[d]=evs;
+    if(evs.length)eventsByDk[dk]=evs;
   }
-  const multidayEvents=getMultiDayEventsForMonth(y,mo); // 이 달에 걸치는 연속일정 원본(중복 제거됨)
-  const firstDayRaw=new Date(y,mo,1).getDay();
-  const firstDay=(firstDayRaw+6)%7; // 월요일=0 기준으로 변환
-  const totalCells=firstDay+daysInMonth;
-  const trailingBlank=(7-(totalCells%7))%7;
-  const totalWeeks=(firstDay+daysInMonth+trailingBlank)/7;
-  // 주(w)별 bar 목록을 미리 계산
+  const multidayEvents=getMultiDayEventsForRange(cellDkOf(0),cellDkOf(totalWeeks*7-1)); // 격자 전체(전달/다음달 칸 포함)에 걸치는 연속일정 원본(중복 제거됨)
+  // 주(w)별 bar 목록을 미리 계산 — 전달/다음달 칸도 실제 날짜로 넘겨 그 칸까지 막대가 이어지게 함
   const weekBarsAll=[];
   for(let w=0;w<totalWeeks;w++){
     const weekDates=[];
-    for(let c=0;c<7;c++){
-      const cellIdx=w*7+c;
-      const dayNum=cellIdx-firstDay+1;
-      weekDates.push(dayNum>=1&&dayNum<=daysInMonth?`${y}-${pad(mo+1)}-${pad(dayNum)}`:null);
-    }
-    if(weekDates.every(dk=>!dk)){weekBarsAll.push([]);continue;}
-    const safeWeekDates=weekDates.map(dk=>dk||EMPTY_CAL_CELL);
-    weekBarsAll.push(computeWeekBars(safeWeekDates,multidayEvents));
+    for(let c=0;c<7;c++)weekDates.push(cellDkOf(w*7+c));
+    weekBarsAll.push(computeWeekBars(weekDates,multidayEvents));
   }
   // 총 슬롯 수(배지+bar 합쳐서 실제 보이는 줄) 상한 — 셀 높이를 넘지 않도록 2줄까지만 텍스트로, 나머지는 "+n개"
   const MAX_VISIBLE_SLOTS=2;
@@ -10646,10 +10651,14 @@ function renderCalendar(){
     for(let c=0;c<7;c++){
       const cellIdx=w*7+c;
       const d=cellIdx-firstDay+1;
-      if(d<1||d>daysInMonth){h+=`<div class="cal-day other-month"><div class="cal-num"></div></div>`;continue;}
-      const isToday2=today.getFullYear()===y&&today.getMonth()===mo&&today.getDate()===d;
-      const isSel=_calSelectedDay===d;
-      let cls='cal-day';if(isToday2)cls+=' today';if(isSel)cls+=' selected';if(hasRecord[d])cls+=' has-record';if(hasPending[d])cls+=' has-pending';
+      const inMonth=d>=1&&d<=daysInMonth;
+      const cdk=cellDkOf(cellIdx); // 이 칸의 실제 날짜(전달/다음달 칸이면 그쪽 날짜)
+      const numLabel=inMonth?d:parseInt(cdk.slice(8,10),10);
+      // 1일 앞·말일 뒤 남는 칸: 전달/다음달 날짜를 흐리게 표시하고 일정(배지/막대)도 함께 노출하되,
+      // 칸 자체는 클릭 불가(기록·상세는 그 달로 이동해서 보도록) — 일정 배지는 자체 클릭으로 열림(2026-09-19)
+      const isToday2=inMonth&&today.getFullYear()===y&&today.getMonth()===mo&&today.getDate()===d;
+      const isSel=inMonth&&_calSelectedDay===d;
+      let cls='cal-day';if(!inMonth)cls+=' other-month';if(isToday2)cls+=' today';if(isSel)cls+=' selected';if(hasRecord[d])cls+=' has-record';if(hasPending[d])cls+=' has-pending';
       // 이 칸을 지나가는 모든 bar의 "조각"을 그림 — 조각은 오직 이 칸 안에서만 존재하는 완결된 요소라 절대 밀리거나 클릭 영역이 어긋나지 않음.
       // 시작칸=텍스트+왼쪽 둥근모서리, 중간칸=빈 막대만(옆 칸과 이어지는 것처럼 보이지만 실제로는 각자 독립된 요소), 끝칸=오른쪽 둥근모서리.
       const cIdxInWeek=cellIdx-w*7;
@@ -10670,20 +10679,20 @@ function renderCalendar(){
       const usedByBar=barsHere.length;
       const remainSlots=Math.max(0,MAX_VISIBLE_SLOTS-usedByBar);
       let badges='';
-      const evs=eventsByDay[d];
+      const evs=eventsByDk[cdk];
       const evsShown=evs?evs.slice(0,remainSlots):[];
       evsShown.forEach(ev=>{
         const ec=getEventCat(ev.eventCat);
         const title=parseTodoTextParts(ev.text).parts[0]||ev.text;
         const clickFn=ev.recurRuleCid
-          ?`openRecurringItemSheet('${y}-${pad(mo+1)}-${pad(d)}','${ev.cid}','${ev.recurRuleCid}','${title.replace(/'/g,"\\'")}')`
-          :`openEventSheet('${y}-${pad(mo+1)}-${pad(d)}','${ev.cid}','${title.replace(/'/g,"\\'")}')`;
+          ?`openRecurringItemSheet('${cdk}','${ev.cid}','${ev.recurRuleCid}','${title.replace(/'/g,"\\'")}')`
+          :`openEventSheet('${cdk}','${ev.cid}','${title.replace(/'/g,"\\'")}')`;
         badges+=`<div class="cal-event-badge ev-${ev.eventCat||'etc'}" title="${ec.label}: ${title}" onclick="event.stopPropagation();${clickFn};">${title}</div>`;
       });
       // "+n개"는 하루짜리 중 안 보인 것만 카운트(bar 자체는 항상 보이므로 미노출分에서 제외)
       const hiddenCount=(evs?evs.length-evsShown.length:0);
       if(hiddenCount>0)badges+=`<div class="cal-event-more">+${hiddenCount}개</div>`;
-      h+=`<div class="${cls}" onclick="calDayClick(${d})"><div class="cal-num">${d}</div>${barsHtml}${badges}</div>`;
+      h+=`<div class="${cls}"${inMonth?` onclick="calDayClick(${d})"`:' style="cursor:default;"'}><div class="cal-num">${numLabel}</div>${barsHtml}${badges}</div>`;
     }
   }
   h+=`</div></div>`;
@@ -11178,7 +11187,7 @@ function buildRhythmFormEl(showOngoingList){
   if(_rhythmFormOpen){
     const form=document.createElement('div');form.className='rhythm-add-form';
     // 카테고리별 빠른 선택지: 감상은 콘텐츠탭 연동(객체), 나머지는 모닝플로우와 공용인 서브선택 상수 재사용(2026-09-19 통합).
-    const RHYTHM_QUICK_CHOICES={exercise:RHYTHM_EXERCISE_SUB,rest:RHYTHM_REST_SUB,note:RHYTHM_DESK_SUB,home:RHYTHM_CLEAN_SUB};
+    const RHYTHM_QUICK_CHOICES={exercise:RHYTHM_EXERCISE_SUB,rest:RHYTHM_REST_SUB,note:RHYTHM_DESK_SUB,home:RHYTHM_CLEAN_SUB,work:RHYTHM_WORK_SUB};
     const selColor=getRhythmColor(_rhythmFormCat); // 선택 강조색 — 카테고리 고유색 그대로 사용
     const selBg=_lightenRgba(selColor,0.14);
     let contentPickerHtml='';
