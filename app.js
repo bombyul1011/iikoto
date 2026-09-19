@@ -3912,9 +3912,13 @@ function hideSplash(){
   const s=document.getElementById('splash');
   if(!s||s.classList.contains('hide'))return;
   s.classList.add('hide');
-  // s.remove() 하지 않음 — DOM에서 완전히 지우면 그 순간 reflow로 배경이 잠깐 씹히는 현상 있어
-  // opacity 0 + pointer-events none 상태로 계속 남겨서 배경 역할은 유지
+  // [테스트 2026-09-19] 예전엔 opacity 0 + pointer-events none으로 계속 남겨 배경 역할을 유지했으나,
+  // 이제 배경은 #bg-fixed가 담당하므로 페이드아웃(0.6s)이 끝난 뒤 display:none으로 완전히 뺀다.
+  // 화면 전체를 덮는 불투명 fixed 레이어가 opacity 0으로 남아 있으면 iOS 26이 상단(상태바) 영역을
+  // 이 레이어 기준으로 처리해 헤더가 뿌옇게 보일 수 있다는 가설 검증용. s.remove()는 여전히 쓰지 않음.
+  setTimeout(()=>{ s.style.display='none'; },700);
 }
+
 const _SPLASH_MIN_MS=2200;
 const _splashMinTimer=new Promise(res=>setTimeout(res,_SPLASH_MIN_MS));
 
