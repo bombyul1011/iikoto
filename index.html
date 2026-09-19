@@ -138,7 +138,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 /* ── TOPBAR ── */
 .topbar{flex-shrink:0;display:flex;flex-direction:column;background:transparent;}
-.topbar-row1{display:flex;align-items:center;justify-content:space-between;padding:max(14px,env(safe-area-inset-top)) 18px 4px;} /* 상단 여백 = 안전영역과 14px 중 큰 값 (2026-09-19 원복 확인) */
+.topbar-row1{display:flex;align-items:center;justify-content:space-between;padding:env(safe-area-inset-top) 18px 4px;} /* 상단 여백 = 안전영역만(default 상태바 방식에서는 0) — iOS 27 대응으로 status-bar-style을 default로 바꾼 뒤 14px 하한 제거 (2026-09-19) */
 .topbar-logo{height:32px;width:auto;}
 .topbar-right{display:flex;align-items:center;gap:6px;}
 .date-nav{display:flex;align-items:center;gap:4px;}
@@ -872,7 +872,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 /* ── SETTINGS ── */
 .settings-ov{position:fixed;inset:0;margin:0 auto;max-width:430px;z-index:8000;background:var(--bg);display:none;flex-direction:column;overflow-y:auto;}
 .settings-ov.on{display:flex;}
-.settings-hdr{padding:max(50px,env(safe-area-inset-top)) 20px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid rgba(var(--divider-rgb),0.25);flex-shrink:0;}
+.settings-hdr{padding:env(safe-area-inset-top) 20px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid rgba(var(--divider-rgb),0.25);flex-shrink:0;}
 .settings-back{width:36px;height:36px;background:var(--card);border:1px solid var(--card-b);border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .settings-ttl{font-size:18px;font-weight:500;color:var(--tp);}
 .settings-body{padding:20px;display:flex;flex-direction:column;gap:20px;}
@@ -2373,7 +2373,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 <!-- SETTINGS -->
 <div class="settings-ov" id="settings-ov">
-  <div class="settings-hdr" style="padding-top:max(20px,env(safe-area-inset-top));">
+  <div class="settings-hdr" style="padding-top:env(safe-area-inset-top);">
     <div class="settings-back" onclick="closeSettings()">
       <i class="ti ti-chevron-left" style="font-size:16px;color:var(--ts);" aria-hidden="true"></i>
     </div>
@@ -2529,7 +2529,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 <!-- READING HUB -->
 <div class="reading-ov" id="reading-ov">
-  <div class="settings-hdr" style="padding-top:max(20px,env(safe-area-inset-top));">
+  <div class="settings-hdr" style="padding-top:env(safe-area-inset-top);">
     <div class="settings-back" onclick="closeReading()">
       <i class="ti ti-chevron-left" style="font-size:16px;color:var(--ts);" aria-hidden="true"></i>
     </div>
@@ -2568,7 +2568,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 <!-- CONTENT HUB (콘텐츠 전용 진입구) — 감상 캘린더가 메인, 코멘트 타임라인/월별 아카이브는 독서코너 톤 차용 -->
 <div class="content-hub-ov" id="content-hub-ov">
-  <div class="settings-hdr" style="padding-top:max(20px,env(safe-area-inset-top));">
+  <div class="settings-hdr" style="padding-top:env(safe-area-inset-top);">
     <div class="settings-back" onclick="closeContentHub()">
       <i class="ti ti-chevron-left" style="font-size:16px;color:var(--ts);" aria-hidden="true"></i>
     </div>
