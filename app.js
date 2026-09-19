@@ -2925,8 +2925,8 @@ function getActiveMultiDayEvents(dk){
 }
 // ── 월간 캘린더 전용: 날짜 범위(rangeStart~rangeEnd, dk 문자열)에 걸치는 연속일정 원본을 한 번에 모아 반환(중복 제거) ──
 // 월간 달력은 전달/다음달 칸까지 그리므로 월 경계가 아니라 "달력 격자 전체 범위"를 넘겨 호출함.
-// getActiveMultiDayEvents는 "하루 기준" 조회라 월 전체를 훑으면 같은 이벤트가 여러 날에서 중복 조회됨.
-// 이 함수는 월의 시작~끝(+앞뒤 룩백)만 스캔해 이벤트 원본을 cid 기준으로 1건씩만 모음 — computeWeekBars의 입력으로 사용.
+// getActiveMultiDayEvents는 "하루 기준" 조회라 범위 전체를 훑으면 같은 이벤트가 여러 날에서 중복 조회됨.
+// 이 함수는 범위 시작~끝(+앞쪽 룩백)만 스캔해 이벤트 원본을 cid 기준으로 1건씩만 모음 — computeWeekBars의 입력으로 사용.
 function getMultiDayEventsForRange(rangeStart,rangeEnd){
   const seen=new Set();
   const result=[];
@@ -2963,7 +2963,7 @@ function saveTodosRaw(dk,v){
 saveTodos.raw=saveTodosRaw;
 function getMemos(dk){return S.get(S.key('memos',dk))||[];}
 // memos 서버 row → 로컬 저장 포맷 변환 (down/월간프리페치 공통 사용)
-function memoRowToLocal(r){return {time:r.memo_time,text:r.text,created:r.created,cid:r.client_id||genCid(),type:r.type||undefined,photoUrl:r.photo_url||undefined};}
+function memoRowToLocal(r){return {time:r.memo_time,text:r.text,created:r.created,cid:r.client_id||genCid(),type:r.type||undefined,photoUrl:r.photo_url||undefined,question:r.question||undefined};}
 function saveMemos(dk,v){
   S.set(S.key('memos',dk),v);
   S.set(S.key('memos_pending',dk),true);
@@ -3427,7 +3427,7 @@ async function syncMemosUp(dk){
   if(ensureItemCids(memos))S.set(S.key('memos',dk),memos);
   const delCids=getDelPendingCids('memos',dk);
   const ok=await syncListUpSafe('memos',`date_key=eq.${dk}`,'date_key,client_id',memos,
-    m=>({date_key:dk,memo_time:m.time,text:m.text,created:m.created,client_id:m.cid,type:m.type||null,photo_url:m.photoUrl||null}),
+    m=>({date_key:dk,memo_time:m.time,text:m.text,created:m.created,client_id:m.cid,type:m.type||null,photo_url:m.photoUrl||null,question:m.question||null}),
     delCids);
   if(ok)delCids.forEach(cid=>removeDelPending('memos',dk,cid));
   // 이 날짜에 아직 R2 업로드가 끝나지 않은 사진(pending_upload)이 있으면, 방금 photo_url=null로
@@ -4733,28 +4733,24 @@ function closePhotoViewer(ev){
 // ── 리듬 활동 메모 제안 모달 (종료 시점 팝업 / 1시간 알림 클릭 공용) ──
 // 카테고리 구분은 RHYTHM_CATS[cat]의 color/icon/label을 그대로 사용 — 별도 색상 테이블 불필요.
 // 사진 첨부는 공용 _makePendingPhotoController(_rmemoPhotoCtl, 위에 정의)를 사용(2026-09-18 통합).
-let _rmemoCtx=null; // {dk, cat} — 저장 시 어느 날짜의 오늘탭 메모에 넣을지
+let _rmemoCtx=null; // {dk, cat, (question일 때) question/qId/qKind} — 저장 시 어느 날짜의 오늘탭 메모에 넣을지
+const RMEMO_SPECIAL_CATS={
+  sleep:{icon:'ti-moon',color:RHYTHM_SLEEP_COLOR,placeholder:'오늘 하루를 남겨보세요'}, // 리듬 수면 구간 색 재사용
+  noon:{icon:'ti-sun',color:'rgba(var(--pal-yellow-rgb),0.82)',placeholder:'지금 컨디션이나 오후 계획을 남겨보세요'},
+  question:{icon:'ti-sparkles',color:'rgba(var(--pal-lime-rgb),0.80)',placeholder:'떠오르는 대로 답을 남겨보세요'} // 메모 배너의 질문답변 세로선(연두)과 같은 색
+};
 function openRhythmMemoModal(cat,dk,title,body){
   const catInfo=RHYTHM_CATS[cat];
+  const look=catInfo||RMEMO_SPECIAL_CATS[cat]; // 리듬 8종 또는 특수(취침 회고/점심 후/오늘의 질문) — 둘 다 {color,icon}을 가짐
   const iconWrap=document.getElementById('rmemo-icon');
   const iconI=document.getElementById('rmemo-icon-i');
   const submitBtn=document.getElementById('rmemo-submit-btn');
-  if(catInfo){
+  if(look){
     // work/appointment는 알파가 낮게 조정된 색(리듬바 시인성 목적)이라 아이콘 배경으로 쓰기엔
     // 옅어 보일 수 있어, 모달 전용으로 최소 0.5 알파를 보장(원색 계열 자체는 그대로 유지).
-    const bgColor=catInfo.color.replace(/,\s*([\d.]+)\)$/,(m,a)=>`,${Math.max(parseFloat(a),0.5)})`);
+    const bgColor=look.color.replace(/,\s*([\d.]+)\)$/,(m,a)=>`,${Math.max(parseFloat(a),0.5)})`);
     iconWrap.style.background=bgColor;
-    iconI.className='ti '+catInfo.icon;
-    iconI.style.color='var(--tp)';
-    iconI.style.fontSize='20px';
-    submitBtn.style.background=bgColor;
-    submitBtn.style.color='var(--tp)';
-  }else if(cat==='sleep'){
-    // 리듬 8종 밖의 예외 케이스 — 23시 취침 알림에서 오는 하루 회고 메모(2026-09-19 추가).
-    // RHYTHM_SLEEP_COLOR(기존 리듬트랙 수면 구간 색)를 그대로 재사용해 시각적 일관성 유지.
-    const bgColor=RHYTHM_SLEEP_COLOR.replace(/,\s*([\d.]+)\)$/,(m,a)=>`,${Math.max(parseFloat(a),0.5)})`);
-    iconWrap.style.background=bgColor;
-    iconI.className='ti ti-moon';
+    iconI.className='ti '+look.icon;
     iconI.style.color='var(--tp)';
     iconI.style.fontSize='20px';
     submitBtn.style.background=bgColor;
@@ -4763,10 +4759,126 @@ function openRhythmMemoModal(cat,dk,title,body){
   document.getElementById('rmemo-title').textContent=title||'';
   document.getElementById('rmemo-body').textContent=body||'';
   document.getElementById('rmemo-inp').value='';
-  document.getElementById('rmemo-inp').placeholder=catInfo?`${catInfo.label} 메모를 남겨보세요`:(cat==='sleep'?'오늘 하루를 남겨보세요':'메모를 남겨보세요');
+  document.getElementById('rmemo-inp').placeholder=catInfo?`${catInfo.label} 메모를 남겨보세요`:(RMEMO_SPECIAL_CATS[cat]?RMEMO_SPECIAL_CATS[cat].placeholder:'메모를 남겨보세요');
+  const rerollBtn=document.getElementById('rmemo-reroll');if(rerollBtn)rerollBtn.style.display=(cat==='question')?'flex':'none';
   _rmemoCtx={dk:dk||dateKey(currentDate),cat};
   clearRhythmMemoPhotoPreview();
   document.getElementById('rhythm-memo-ov').classList.add('on');
+}
+// ══ 오늘의 질문 (2026-09-19) ══
+// 서버 memo_prompts 풀에서 질문 1개를 받아 메모 모달(rhythm-memo-ov)에 띄움. 앱은 "오늘 쓸 수 있는 상황 조건 이름"만 서버에 보내고
+// (실제 값은 보내지 않음), 받은 질문의 {빈칸}은 로컬 데이터로 직접 채움. 답변을 저장하는 순간 서버에서 사용 처리.
+const QUESTION_FALLBACK_TEXT='오늘 하루는 어땠나요?'; // 서버 연결 실패/풀 소진 시 기본 문구
+const WMO_WORD={0:'맑음',1:'대체로 맑음',2:'구름 조금',3:'흐림',45:'안개',48:'안개',51:'이슬비',53:'이슬비',55:'이슬비',61:'비',63:'비',65:'비',71:'눈',73:'눈',75:'눈',80:'소나기',81:'소나기',82:'소나기',95:'뇌우',96:'뇌우',99:'뇌우'};
+let _qSessionExcl=[]; // 이번 모달 세션에서 이미 보여준 질문 id — "다른 질문 받기"에서 제외(소모는 아님)
+function _qcSleepDurStr(dk){
+  const sl=getSleep(dk);if(!sl||!sl.sleep||!sl.wake)return '';
+  const [sh,sm]=sl.sleep.split(':').map(Number),[wh,wm]=sl.wake.split(':').map(Number);
+  let sMin=sh*60+sm;if(sMin<720)sMin+=1440; // 서버 send-alerts와 동일한 새벽 보정(정오 기준)
+  let dur=wh*60+wm-sMin;if(dur<0)dur+=1440;
+  const h=Math.floor(dur/60),m=dur%60;
+  return m?`${h}시간 ${m}분`:`${h}시간`;
+}
+function _qcBlockTitle(b,dk){
+  if(b.contentCid){
+    const d=new Date(dk+'T00:00:00');
+    for(const mk of [monthKey(d),monthKey(new Date(d.getFullYear(),d.getMonth()-1,1))]){
+      const it=getContents(mk).find(c=>c.cid===b.contentCid);
+      if(it&&it.title)return it.title;
+    }
+  }
+  return (b.text||'').replace(/^\s*(드라마|영화|독서|책|음악)\s*-\s*/,'').trim();
+}
+// 이 날짜(dk)에 쓸 수 있는 상황 조건 이름 목록 + 빈칸에 채울 값. 콘텐츠는 밤늦게 보는 경우가 많아 전날+당일 기록을 함께 봄.
+function _collectQuestionConds(dk){
+  const d=new Date(dk+'T00:00:00');
+  const list=[],vals={};
+  const mo=d.getMonth()+1,day=d.getDate(),last=new Date(d.getFullYear(),mo,0).getDate();
+  list.push('dow_'+d.getDay());
+  if(day<=5)list.push('month_start');
+  if(day>=last-4)list.push('month_end');
+  list.push('month_'+mo);
+  list.push('season_'+(mo>=3&&mo<=5?'spring':mo>=6&&mo<=8?'summer':mo>=9&&mo<=11?'autumn':'winter'));
+  const prev=new Date(d);prev.setDate(prev.getDate()-1);
+  const prevDk=dateKey(prev);
+  // 콘텐츠(전날+당일 감상 기록 중 가장 최근)
+  let contentTitle='';
+  for(const x of [prevDk,dk]){
+    const eb=getRhythmBlocks(x).filter(b=>b.cat==='enjoy');
+    if(eb.length){const t=_qcBlockTitle(eb[eb.length-1],x);if(t)contentTitle=t;}
+  }
+  if(contentTitle){list.push('content');vals['콘텐츠제목']=contentTitle.slice(0,30);}
+  // 운동(당일) — 종류 메모가 없으면 빈칸은 괄호째 생략됨
+  const dayBlocks=getRhythmBlocks(dk);
+  const ex=dayBlocks.filter(b=>b.cat==='exercise');
+  if(ex.length){list.push('exercise');vals['운동종류']=(ex[ex.length-1].text||'').trim().slice(0,14);}
+  // 외출(당일 외출 블록 + 제목: 블록 메모 → 오늘 일정 순)
+  const ap=dayBlocks.filter(b=>b.cat==='appointment');
+  if(ap.length){
+    let title=(ap[ap.length-1].text||'').trim();
+    if(!title){const ev=getTodos(dk).find(t=>t.isEvent);if(ev)title=(parseTodoTextParts(ev.text).parts[0]||ev.text||'').trim();}
+    if(title){list.push('outing');vals['일정제목']=title.slice(0,20);}
+  }
+  const dur=_qcSleepDurStr(dk);
+  if(dur){list.push('sleep');vals['수면시간']=dur;}
+  if(dk===dateKey(new Date())&&_homeWeatherCache&&WMO_WORD[_homeWeatherCache.code]){list.push('weather');vals['날씨']=WMO_WORD[_homeWeatherCache.code];}
+  const photoCnt=getMemos(dk).filter(m=>m.photoUrl||m.photoLocalUrl).length;
+  if(photoCnt>0){list.push('photo');vals['사진개수']=String(photoCnt);}
+  const doneCnt=getTodos(dk).filter(t=>!t.isEvent&&t.done).length;
+  if(doneCnt>0){list.push('todo');vals['완료개수']=String(doneCnt);}
+  return {list,vals};
+}
+// 질문 문장의 {빈칸}을 채움. 값이 빈 "({키})"는 괄호째 제거, 그 외 채우지 못한 빈칸이 남으면 null(다른 질문 재요청).
+function _fillQuestionBlanks(text,vals){
+  let out=text;
+  Object.keys(vals).forEach(k=>{
+    const v=vals[k];
+    if(v===''||v==null)out=out.split('({'+k+'})').join('');
+    else out=out.split('{'+k+'}').join(v);
+  });
+  return /\{[^}]+\}/.test(out)?null:out;
+}
+async function _pickMemoQuestion(dk){
+  const conds=_collectQuestionConds(dk);
+  const lastKind=S.get('mprompt_last_kind')||null;
+  let excl=_qSessionExcl.slice();
+  for(let i=0;i<4;i++){
+    const rows=await supaFetch('rpc/pick_memo_prompt','POST',{p_conds:conds.list,p_exclude:excl,p_last_kind:lastKind});
+    const r=rows&&rows[0];
+    if(!r)return null;
+    const filled=_fillQuestionBlanks(r.text,conds.vals);
+    if(filled)return {id:r.id,text:filled,kind:r.kind};
+    excl.push(r.id); // 이 기기 데이터로 채울 수 없는 질문 — 제외하고 다시 요청
+  }
+  return null;
+}
+// dk: 답을 저장할 날짜(오늘탭 버튼은 보고 있는 날짜, 알림 클릭은 오늘)
+async function openQuestionMemo(dk){
+  dk=dk||dateKey(currentDate);
+  _qSessionExcl=[];
+  openRhythmMemoModal('question',dk,'질문을 고르고 있어요…','');
+  _rmemoCtx.question=null;_rmemoCtx.qId=null;_rmemoCtx.qKind=null;
+  await _applyMemoQuestion(dk);
+}
+async function _applyMemoQuestion(dk){
+  const q=await _pickMemoQuestion(dk);
+  if(!_rmemoCtx||_rmemoCtx.cat!=='question')return; // 그 사이 창을 닫았거나 다른 모드로 열린 경우
+  const titleEl=document.getElementById('rmemo-title');
+  if(q){
+    _qSessionExcl.push(q.id);
+    _rmemoCtx.question=q.text;_rmemoCtx.qId=q.id;_rmemoCtx.qKind=q.kind;
+    if(titleEl)titleEl.textContent=q.text;
+  }else{
+    // 서버 연결 실패/풀 소진 — 기본 문구(사용 처리 없음)
+    _rmemoCtx.question=QUESTION_FALLBACK_TEXT;_rmemoCtx.qId=null;_rmemoCtx.qKind=null;
+    if(titleEl)titleEl.textContent=QUESTION_FALLBACK_TEXT;
+  }
+}
+async function rerollMemoQuestion(){
+  if(!_rmemoCtx||_rmemoCtx.cat!=='question')return;
+  const btn=document.getElementById('rmemo-reroll');if(btn)btn.disabled=true;
+  await _applyMemoQuestion(_rmemoCtx.dk);
+  if(btn)btn.disabled=false;
 }
 function closeRhythmMemoModal(ev){
   if(ev&&ev.target.closest('.rhythm-memo-card'))return;
@@ -4791,6 +4903,7 @@ function submitRhythmMemo(){
   const stamp=`${pad(n.getHours())}:${pad(n.getMinutes())}`;
   const memos=getMemos(dk);
   const item={text,time:stamp,created:Date.now(),cid:genCid()};
+  if(_rmemoCtx.question)item.question=_rmemoCtx.question; // 오늘의 질문 — 질문 문장을 메모에 복사 저장(서버 풀이 바뀌어도 그대로 남음)
   if(photo){
     item.photoLocalUrl=photo.localUrl;
     item.photoStatus='pending_upload';
@@ -4800,6 +4913,11 @@ function submitRhythmMemo(){
   saveMemos(dk,memos);
   if(photo)queueMemoPhotoUpload(dk,item.cid,photo.blob,photo.ext);
   if(dk===dateKey(currentDate))renderMemos();
+  // 질문은 "답변을 저장한 순간"에만 사용 처리(닫기/다른 질문 받기는 소모하지 않음). 서버 연결 실패 시 조용히 넘어감.
+  if(_rmemoCtx.qId!=null){
+    supaFetch('rpc/mark_memo_prompt_used','POST',{p_id:_rmemoCtx.qId});
+    if(_rmemoCtx.qKind)S.set('mprompt_last_kind',_rmemoCtx.qKind);
+  }
   closeRhythmMemoModal();
 }
 // 뷰어 좌우 스와이프로 이전/다음 사진 넘기기 — 배열 양끝에서는 자연스럽게 멈춤(순환 안 함).
@@ -8214,7 +8332,7 @@ function renderMemos(){
   const list=document.getElementById('memo-list');if(!list)return;
   // 콘텐츠 감상메모/완결총평(표시 전용) — 일반 memos와 같은 목록에 섞여 시간순 정렬됨.
   const contentItems=getContentMemoItemsForDate(dk);
-  const sig=dk+'|'+JSON.stringify(memos.map(m=>[m.cid,m.time,m.text,m.photoUrl,m.photoLocalUrl,m.photoStatus,m.photoErrorMsg]))+'|'+JSON.stringify(contentItems);
+  const sig=dk+'|'+JSON.stringify(memos.map(m=>[m.cid,m.time,m.text,m.photoUrl,m.photoLocalUrl,m.photoStatus,m.photoErrorMsg,m.question]))+'|'+JSON.stringify(contentItems);
   if(dk===_lastRenderedMemosDk&&sig===_lastRenderedMemosSig)return; // 내용 동일 — 깜빡임만 유발하므로 스킵
   _lastRenderedMemosDk=dk;_lastRenderedMemosSig=sig;
   list.innerHTML='';
@@ -8252,7 +8370,7 @@ function renderMemos(){
     const h=m.time?parseInt(m.time.split(':')[0],10):null;
     const tod=h==null?'':h>=5&&h<12?' tod-morning':h>=12&&h<18?' tod-afternoon':' tod-night';
     const hasPhoto=!!(m.photoUrl||m.photoLocalUrl);
-    const bub=document.createElement('div');bub.className='memo-bub'+(isSeed?' memo-bub-seed':tod)+(hasPhoto?' memo-bub-photo':'');
+    const bub=document.createElement('div');bub.className='memo-bub'+(isSeed?' memo-bub-seed':(m.question?' memo-bub-question':tod))+(hasPhoto?' memo-bub-photo':'');
     bub.style.cursor='pointer';
     if(hasPhoto){
       const thumbSrc=m.photoUrl||m.photoLocalUrl;
@@ -8273,11 +8391,13 @@ function renderMemos(){
         openPhotoViewer(thumbSrc,m.text||'',meta);
       });
       const txt=document.createElement('span');txt.className='memo-photo-text';
-      txt.textContent=m.photoStatus==='upload_failed'?`⚠︎ 업로드 실패: ${m.photoErrorMsg||''}`:(m.text||'');
+      const _ptxt=m.photoStatus==='upload_failed'?`⚠︎ 업로드 실패: ${m.photoErrorMsg||''}`:(m.text||'');
+      if(m.question&&m.photoStatus!=='upload_failed')txt.innerHTML=`<span class="memo-q">Q. ${escapeHtml(m.question)}</span>`+escapeHtml(_ptxt);
+      else txt.textContent=_ptxt;
       bub.appendChild(wrap);bub.appendChild(txt);
       bub.addEventListener('click',()=>{_memoSwipeIdx=i;openSheet('memo-sheet');});
     }else{
-      bub.innerHTML=m.text||'';
+      bub.innerHTML=(m.question?`<span class="memo-q">Q. ${escapeHtml(m.question)}</span>`:'')+(m.text||'');
       bub.addEventListener('click',()=>{_memoSwipeIdx=i;openSheet('memo-sheet');});
     }
     const time=document.createElement('span');
@@ -11549,7 +11669,7 @@ function openSettings(){
 // 전체 push 구독이 꺼져있으면(getExistingPushSubscription 없음) 개별 토글은 값 유지한 채 시각적으로만 비활성화.
 // ALERT_TIME_FIELD_MAP/ALERT_ENABLED_FIELD_MAP은 렌더링과 토글 양쪽에서 쓰여 아래 공용 상수로 뽑음(중복 정의 제거).
 const ALERT_TIME_FIELD_MAP={morning:'morning_briefing_time',evening:'evening_wrap_time',remaining:'remaining_todo_time'};
-const ALERT_ENABLED_FIELD_MAP={morning:'morning_enabled',evening:'evening_enabled',remaining:'remaining_enabled',sleep:'sleep_enabled',rhythm:'rhythm_enabled',report:'report_enabled',exercise:'exercise_stat_enabled'};
+const ALERT_ENABLED_FIELD_MAP={morning:'morning_enabled',evening:'evening_enabled',remaining:'remaining_enabled',sleep:'sleep_enabled',rhythm:'rhythm_enabled',report:'report_enabled',exercise:'exercise_stat_enabled',noon:'noon_memo_enabled',question:'question_enabled'};
 async function renderSettingsAlertSection(){
   const wrap=document.getElementById('settings-acc-alert-detail');
   if(!wrap)return;
@@ -11566,6 +11686,9 @@ async function renderSettingsAlertSection(){
     toggle.classList.toggle('on',!!settings[ALERT_ENABLED_FIELD_MAP[kind]]);
     toggle.classList.toggle('disabled',!pushOn); // 전체 알림 꺼져있으면 개별 토글은 값 유지+비활성 표시만
   });
+  // 오늘의 질문 풀에 남은 질문 수(미사용 + 재사용 가능한 날짜형) — 줄어들면 질문을 더 채워 넣을 때
+  const remainEl=document.getElementById('question-remaining-lbl');
+  if(remainEl)supaFetch('rpc/count_available_memo_prompts','POST',{}).then(n=>{remainEl.textContent=(typeof n==='number')?`${n}개`:'-';});
 }
 // 아코디언 헤더 클릭 — 알림 섹션에 우선 적용, 추후 다른 설정 카드에도 같은 id 규칙(settings-acc-<key>)으로 재사용 예정.
 function toggleSettingsAccordion(key){
@@ -14214,18 +14337,22 @@ loadDaily();
 // 리마인드 알림 클릭 시 URL에 실려온 메모 유도 파라미터를 읽어 메모 제안 모달을 자동으로 연다.
 // - memo=rhythm&cid=xxx: 리듬 1/3시간 진행중 알림 — 해당 리듬블록을 찾아 그 카테고리로 연다.
 //   로컬 30일 캐시 범위 밖(예: 자정을 넘겨 어제 블록인 경우)일 수 있어, 못 찾으면 서버에서 직접 조회.
-// - memo=sleep: 23시 취침 알림(하루 회고) — 특정 리듬블록에 종속되지 않는 단독 메모라 조회 없이 바로 연다(2026-09-19 추가).
+// - memo=sleep / memo=noon: 23시 취침 회고 / 13시 점심 후 — 리듬블록에 종속되지 않는 단독 메모라 조회 없이 바로 연다(MEMO_URL_DEFAULT_COPY).
+// - memo=question: 19:30 오늘의 질문 — openQuestionMemo가 서버 풀에서 질문을 뽑아 연다(2026-09-19).
+// 알림 클릭으로 열리는 단독 메모(리듬블록에 종속되지 않음)의 기본 문구 — 서버가 t/b를 실어 보내면 그 문구를, 없으면 이 문구를 표시.
+const MEMO_URL_DEFAULT_COPY={
+  sleep:['오늘 하루는 어땠나요?','잠들기 전, 오늘을 짧게 남겨보세요.'],
+  noon:['식사 후 나른한 시간이에요','지금 컨디션이나 오후 계획을 한 줄 남겨볼까요?']
+};
 async function _openRhythmMemoFromUrlIfPresent(urlStr){
   const params=new URLSearchParams((urlStr?urlStr.split('?')[1]:location.search)||'');
   const memoType=params.get('memo');
-  if(memoType!=='rhythm'&&memoType!=='sleep')return;
+  if(!['rhythm','sleep','noon','question'].includes(memoType))return;
   if(!urlStr)history.replaceState(null,'',location.pathname); // 최초 로드 경로일 때만 자기 URL을 정리(SW 메시지 경로는 애초에 주소가 안 바뀌므로 불필요)
   const todayDk=dateKey(new Date());
-  if(memoType==='sleep'){
-    const t=params.get('t'),b=params.get('b');
-    openRhythmMemoModal('sleep',todayDk,t||'오늘 하루는 어땠나요?',b||'잠들기 전, 오늘을 짧게 남겨보세요.');
-    return;
-  }
+  const copy=MEMO_URL_DEFAULT_COPY[memoType];
+  if(copy){openRhythmMemoModal(memoType,todayDk,params.get('t')||copy[0],params.get('b')||copy[1]);return;}
+  if(memoType==='question'){openQuestionMemo(todayDk);return;} // 질문은 알림에 싣지 않고 앱이 풀에서 직접 뽑음
   const cid=params.get('cid');
   if(!cid)return;
   let found=null,foundDk=null;

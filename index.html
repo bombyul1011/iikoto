@@ -569,11 +569,15 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .memo-bub.tod-night{background:rgba(var(--pal-lavender-rgb),0.06);border-left-color:rgba(var(--pal-lavender-rgb),0.28);}
 .memo-bub.memo-bub-seed{background:rgba(var(--pal-mint-rgb),0.06);border-left-color:rgba(var(--pal-mint-rgb),0.30);}
 .memo-bub.memo-bub-content{background:rgba(var(--pal-sky-rgb),0.07);border-left-color:rgba(var(--pal-sky-rgb),0.35);padding:6px 10px;cursor:default;}
+.memo-bub.memo-bub-question{background:rgba(var(--pal-lime-rgb),0.08);border-left-color:rgba(var(--pal-lime-rgb),0.55);} /* 오늘의 질문 답변 — 연두, 옅은 색이라 선 알파를 높임(2026-09-19) */
 .memo-content-head{display:flex;align-items:center;gap:5px;margin-bottom:2px;}
 .memo-content-icon{font-size:13px;color:var(--pal-sky-text);flex-shrink:0;}
 .memo-content-title{font-size:12.5px;font-weight:500;color:var(--pal-sky-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .memo-content-poster{width:24px;height:24px;border-radius:5px;flex-shrink:0;overflow:hidden;background:var(--card2,rgba(210,190,175,0.20));}
 .memo-content-poster img{width:100%;height:100%;object-fit:cover;display:block;}
+.memo-q{display:block;font-size:calc(var(--main-text-size) - 1px);color:var(--ts);line-height:1.35;margin-bottom:3px;} /* 오늘의 질문 — 답변 위 흐린 한 줄(Q.), 2026-09-19 */
+.rmemo-reroll{align-items:center;gap:4px;width:fit-content;margin:2px auto 4px;padding:4px 10px;background:none;border:none;color:var(--ts);font-size:var(--dow-label-size);cursor:pointer;}
+.rmemo-reroll:disabled{opacity:.4;}
 .memo-content-body{font-size:var(--main-text-size);color:var(--tp);line-height:1.4;}
 
 .memo-bub-photo{display:flex;gap:8px;align-items:flex-start;padding:6px 8px 6px 10px;}
@@ -927,6 +931,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="glass"] .memo-bub.tod-night{background:none;border-left-color:rgba(var(--pal-lavender-rgb),0.28);}
 [data-theme="glass"] .memo-bub.memo-bub-seed{background:none;border-left-color:rgba(var(--pal-mint-rgb),0.30);}
 [data-theme="glass"] .memo-bub.memo-bub-content{background:none;border-left-color:rgba(var(--pal-sky-rgb),0.35);}
+[data-theme="glass"] .memo-bub.memo-bub-question{background:none;border-left-color:rgba(var(--pal-lime-rgb),0.55);}
 [data-theme="glass"] .memo-item{margin-bottom:14px;gap:8px;}
 /* ── READING HUB ── */
 .reading-ov{position:fixed;inset:0;margin:0 auto;max-width:430px;z-index:8000;background:var(--bg);background-attachment:fixed;display:none;flex-direction:column;overflow-y:auto;}
@@ -1667,6 +1672,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="slabel-row">
         <span class="slabel">메모</span>
         <div style="display:flex;align-items:center;gap:4px;">
+          <button class="slabel-search-btn" onclick="openQuestionMemo()" title="오늘의 질문"><i class="ti ti-sparkles ico-sz-14" aria-hidden="true"></i></button>
           <button class="slabel-search-btn" onclick="openPhotoArchive()" title="사진메모 모아보기"><i class="ti ti-layout-grid ico-sz-14" aria-hidden="true"></i></button>
           <button class="slabel-search-btn" onclick="openSeedArchive()" title="씨앗 모아보기"><i class="ti ti-seeding ico-sz-14" aria-hidden="true"></i></button>
         </div>
@@ -2258,6 +2264,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div class="rhythm-memo-icon" id="rmemo-icon"><i class="ti" id="rmemo-icon-i" aria-hidden="true"></i></div>
     <div class="rhythm-memo-title" id="rmemo-title"></div>
     <div class="rhythm-memo-body" id="rmemo-body"></div>
+    <button class="rmemo-reroll" id="rmemo-reroll" onclick="rerollMemoQuestion()" style="display:none;"><i class="ti ti-refresh" aria-hidden="true"></i> 다른 질문 받기</button>
     <div id="rmemo-photo-preview-row" style="display:none;"></div>
     <div class="memo-field-wrap" style="margin-top:8px;">
       <textarea class="modal-inp" id="rmemo-inp" rows="2" style="resize:none;line-height:1.6;" placeholder="" autocomplete="off"></textarea>
@@ -2442,6 +2449,18 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
             <div class="settings-acc-row">
               <span class="settings-item-lbl">운동 통계 (종료 10분 후)</span>
               <div class="settings-toggle" id="alert-toggle-exercise" onclick="toggleAlertEnabled('exercise')"></div>
+            </div>
+            <div class="settings-acc-row">
+              <span class="settings-item-lbl">점심 후 메모 유도 (13:00 고정)</span>
+              <div class="settings-toggle" id="alert-toggle-noon" onclick="toggleAlertEnabled('noon')"></div>
+            </div>
+            <div class="settings-acc-row">
+              <span class="settings-item-lbl">오늘의 질문 (19:30 고정)</span>
+              <div class="settings-toggle" id="alert-toggle-question" onclick="toggleAlertEnabled('question')"></div>
+            </div>
+            <div class="settings-acc-row">
+              <span class="settings-item-lbl">오늘의 질문 남은 개수</span>
+              <span class="settings-acc-time" id="question-remaining-lbl" style="cursor:default;">-</span>
             </div>
           </div>
         </div>

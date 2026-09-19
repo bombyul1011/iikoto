@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.100-cal-adjacent-sunday-red';
+const CACHE = 'iikoto-v2.101-daily-question';
 const ASSETS = [
   './',
   './index.html'
