@@ -1730,7 +1730,8 @@ function renderWeekMflow(rows,rblocks){
   });
   (rows||[]).forEach(row=>{
     const picks=row.picks||{};
-    Object.entries(picks).forEach(([key,p])=>{
+    Object.entries(picks).forEach(([pickId,p])=>{
+      const key=(p&&p.key)||pickId; // 복수 슬롯 구조(2026-09-20): picks의 키는 슬롯id, 카드는 p.key — 옛 구조는 키가 곧 카드
       if(!p||!stats[key])return;
       if(p.status==='running'||p.status==='done')stats[key].count++;
       if(p.status!=='done')return;
