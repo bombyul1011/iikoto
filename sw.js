@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.101-daily-question';
+const CACHE = 'iikoto-v2.103-morning-slots';
 const ASSETS = [
   './',
   './index.html'
