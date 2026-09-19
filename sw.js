@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.99-add-running-chip';
+const CACHE = 'iikoto-v2.100-cal-adjacent-sunday-red';
 const ASSETS = [
   './',
   './index.html'

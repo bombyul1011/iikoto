@@ -753,6 +753,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cal-day.today .cal-num{background:rgba(230,150,150,0.24);color:rgba(180,90,90,0.90);border:1.5px solid rgba(230,150,150,0.65);}
 .cal-day.selected .cal-num{background:rgba(230,150,150,0.24);color:rgba(180,90,90,0.90);}
 .cal-day.other-month .cal-num{color:rgba(200,180,175,.38);}
+/* 일요일(7번째 열)만 빨간색 — 월간탭 달력과 날짜선택 팝업 달력 공통(둘 다 .cal-grid 직계 자식이 7열로 흐르는 구조라 7n번째=일요일). 오늘/선택 칸은 각자 색 규칙 유지, 전달·다음달 칸은 옅은 빨강 (2026-09-19) */
+.cal-grid > .cal-day-name:nth-child(7n){color:rgba(205,100,100,.8);}
+.cal-grid > .cal-day:nth-child(7n):not(.other-month):not(.today):not(.selected) .cal-num{color:rgba(205,95,95,.9);}
+.cal-grid > .cal-day.other-month:nth-child(7n) .cal-num{color:rgba(205,110,110,.35);}
 .cal-detail-wrap{background:rgba(255,250,240,.60);border:1px solid rgba(255,255,255,.88);border-radius:16px;padding:14px 15px;margin:8px 0 12px;animation:sd .2s ease;}
 @keyframes sd{from{opacity:0;transform:translateY(-5px);}to{opacity:1;transform:translateY(0);}}
 .cal-detail-date{font-size:var(--dow-label-size);font-weight:500;color:var(--ts);margin-bottom:10px;}
