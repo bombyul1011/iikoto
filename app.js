@@ -62,7 +62,7 @@ function renderHomeBody(section){
   if(_ldDay===1)maybeBackfillWeeklyReview();
 
   if(section==='morning'){
-    // 아침 루틴(굿모닝) 카드 — 카드 그리드 + 오늘의 슬롯(어제 회고/오늘 일정 문구는 제거)
+    // 아침 루틴(굿모닝) 카드 — 카드 그리드 + 오늘의 슬롯
     body.appendChild(makeMorningFlowCard());
     body.appendChild(makeHabitStreakRow());
     body.appendChild(makeTodayRhythmBanner());
@@ -575,6 +575,20 @@ function getDayCategoryDurations(dk){
   });
   return dur;
 }
+// startDate부터 days일 동안의 카테고리(라벨)별 누적시간+발생일수 — 최근 7일 요약(computeWeeklyRhythmDur), 주간 리포트(이번주/지난주 비교),
+// 다음주 제안이 공용으로 사용(예전엔 리포트마다 같은 집계 루프를 따로 갖고 있었음).
+function sumCategoryDurations(startDate,days){
+  const dur={},dayCount={};
+  for(let i=0;i<days;i++){
+    const d=new Date(startDate);d.setDate(startDate.getDate()+i);
+    const dd=getDayCategoryDurations(dateKey(d));
+    Object.keys(dd).forEach(function(k){
+      dur[k]=(dur[k]||0)+dd[k];
+      if(dd[k]>0)dayCount[k]=(dayCount[k]||0)+1;
+    });
+  }
+  return {dur,dayCount};
+}
 function fmtDur(min){
   const h=Math.floor(min/60),m=Math.round(min%60);
   if(h>0&&m>0)return h+'시간 '+m+'분';
@@ -967,8 +981,6 @@ async function callClaude(systemPrompt, messages, maxTokens){
   }catch(e){console.error('Claude fetch err:',e);_lastAiError=(e&&e.name==='AbortError')?'응답 시간 초과':String((e&&e.message)||e);return null;}
 }
 
-// ─ 오늘 하루 데이터 요약 생성
-const TS_LABEL={'morning':'오전','afternoon':'오후','night':'저녁','none':''};
 
 
 
@@ -1385,10 +1397,6 @@ function renderContentAsGridHtml(byCat){
   }).join('');
   return `<div class="mr-card" style="margin-bottom:10px;">${sectionsHtml}${renderMusicGridSection(byCat.music)}</div>`;
 }
-function toggleCmrReview(id){
-  const box=document.getElementById('cmr-review-'+id);
-  if(box)box.classList.toggle('on');
-}
 
 // ── 월 선택 칩 공용 렌더러 (주간목표 모아보기, 콘텐츠 모아보기 등에서 공유) ──
 // wrapId: 칩을 그릴 컨테이너 id / curYear,curMonth: 현재 활성화된 (year, 0-based month)
@@ -1607,7 +1615,6 @@ async function makeWeeklySummaryCard(){
   const checks=getHabitChecks(wk);
   const habitDoneCounts={};
   habits.forEach(h=>{habitDoneCounts[h.name]=0;});
-  const rhythmDurThis={};
 
   for(let i=0;i<7;i++){
     const d=new Date(weekStart);d.setDate(weekStart.getDate()+i);
@@ -1619,50 +1626,23 @@ async function makeWeeklySummaryCard(){
     allMemos.push(...memos.map(m=>m.text).filter(Boolean));
     const dayTexts=memos.map(m=>m.type==='seed'?`[씨앗] ${m.text}`:m.text).filter(Boolean);
     evenSample(dayTexts,8).forEach(t=>allMemosWithDay.push(`${dayName}: ${t}`));
-    const sleep=getSleep(dk);
-    if(sleep.sleep&&sleep.wake){
-      // 수면 시간 계산
-      const [sh,sm]=sleep.sleep.split(':').map(Number);
-      const [wh,wm]=sleep.wake.split(':').map(Number);
-      let mins=(wh*60+wm)-(sh*60+sm);
-      if(mins<0)mins+=24*60;
-      allSleep.push(mins);
-    }
+    const sleepMin=sleepDurMin(getSleep(dk));
+    if(sleepMin!=null)allSleep.push(sleepMin);
     // 습관 체크
     const dow=(d.getDay()+6)%7;
     habits.forEach(h=>{
       if(checks[h.id+'-'+dow])habitDoneCounts[h.name]=(habitDoneCounts[h.name]||0)+1;
     });
-    // 리듬 카테고리별 시간 집계 (이번 주)
-    getRhythmBlocks(dk).forEach(b=>{
-      const cat=RHYTHM_CATS[b.cat];if(!cat)return;
-      const s=b.start?parseInt(b.start.split(':')[0],10)*60+parseInt(b.start.split(':')[1],10):null;
-      const e=b.end?parseInt(b.end.split(':')[0],10)*60+parseInt(b.end.split(':')[1],10):null;
-      if(s==null||e==null)return;
-      let dur=e-s;if(dur<0)dur+=1440;
-      rhythmDurThis[b.cat]=(rhythmDurThis[b.cat]||0)+dur;
-    });
   }
 
-  // 리듬 카테고리별 시간 집계 (지난 주, 비교용)
+  // 리듬 카테고리별 시간 집계 (이번 주 vs 지난 주, 비교용) — 공용 util(sumCategoryDurations)로 라벨 기준 합산
+  const rhythmDurThis=sumCategoryDurations(weekStart,7).dur;
   const lastWeekStart=new Date(weekStart);lastWeekStart.setDate(weekStart.getDate()-7);
-  const rhythmDurLast={};
-  for(let i=0;i<7;i++){
-    const d=new Date(lastWeekStart);d.setDate(lastWeekStart.getDate()+i);
-    const dk=dateKey(d);
-    getRhythmBlocks(dk).forEach(b=>{
-      const cat=RHYTHM_CATS[b.cat];if(!cat)return;
-      const s=b.start?parseInt(b.start.split(':')[0],10)*60+parseInt(b.start.split(':')[1],10):null;
-      const e=b.end?parseInt(b.end.split(':')[0],10)*60+parseInt(b.end.split(':')[1],10):null;
-      if(s==null||e==null)return;
-      let dur=e-s;if(dur<0)dur+=1440;
-      rhythmDurLast[b.cat]=(rhythmDurLast[b.cat]||0)+dur;
-    });
-  }
+  const rhythmDurLast=sumCategoryDurations(lastWeekStart,7).dur;
   // 변화가 뚜렷한 카테고리(전주 대비 30분 이상 증감) 추출, 최대 2개
-  const rhythmChanges=Object.keys(RHYTHM_CATS).map(k=>{
-    const thisMin=rhythmDurThis[k]||0,lastMin=rhythmDurLast[k]||0;
-    return {key:k,label:RHYTHM_CATS[k].label,thisMin,lastMin,diff:thisMin-lastMin};
+  const rhythmChanges=Object.values(RHYTHM_CATS).map(c=>{
+    const thisMin=rhythmDurThis[c.label]||0,lastMin=rhythmDurLast[c.label]||0;
+    return {label:c.label,thisMin,lastMin,diff:thisMin-lastMin};
   }).filter(c=>Math.abs(c.diff)>=30).sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff)).slice(0,2);
   const rhythmChangeText=rhythmChanges.map(c=>{
     const dir=c.diff>0?'늘고':'줄고';
@@ -1673,7 +1653,7 @@ async function makeWeeklySummaryCard(){
   const totalTodos=allTodos.length;
   const doneTodos=allTodos.filter(t=>t.done).length;
   const avgSleep=allSleep.length?Math.round(allSleep.reduce((a,b)=>a+b,0)/allSleep.length):null;
-  const avgSleepStr=avgSleep?`${Math.floor(avgSleep/60)}시간 ${avgSleep%60}분`:null;
+  const avgSleepStr=avgSleep?fmtDur(avgSleep):null;
   const topHabit=Object.entries(habitDoneCounts).sort((a,b)=>b[1]-a[1])[0];
   const bottomHabit=Object.entries(habitDoneCounts).sort((a,b)=>a[1]-b[1])[0];
   // 자주 등장한 투두 (같은 텍스트가 여러 날 반복 등록된 것) — 완료율 대신 실행 빈도 중심 코멘트용
@@ -1767,14 +1747,15 @@ ${RHYTHM_CAT_GUIDE}
 // ─ 날씨 + Claude 비서 브리핑
 let _homeWeatherCache=null; // {icon, temp, desc, lat, lon, fetchedAt}
 
-const WMO_ICON={
-  0:'☀️',1:'🌤️',2:'⛅',3:'☁️',
-  45:'🌫️',48:'🌫️',
-  51:'🌦️',53:'🌦️',55:'🌧️',
-  61:'🌧️',63:'🌧️',65:'🌧️',
-  71:'🌨️',73:'🌨️',75:'🌨️',
-  80:'🌦️',81:'🌧️',82:'🌧️',
-  95:'⛈️',96:'⛈️',99:'⛈️'
+// WMO 날씨 코드 → [이모지, 짧은 한글 표현] — 홈 날씨 배지(아이콘)와 오늘의 질문 빈칸({날씨})이 공용으로 사용.
+const WMO_INFO={
+  0:['☀️','맑음'],1:['🌤️','대체로 맑음'],2:['⛅','구름 조금'],3:['☁️','흐림'],
+  45:['🌫️','안개'],48:['🌫️','안개'],
+  51:['🌦️','이슬비'],53:['🌦️','이슬비'],55:['🌧️','이슬비'],
+  61:['🌧️','비'],63:['🌧️','비'],65:['🌧️','비'],
+  71:['🌨️','눈'],73:['🌨️','눈'],75:['🌨️','눈'],
+  80:['🌦️','소나기'],81:['🌧️','소나기'],82:['🌧️','소나기'],
+  95:['⛈️','뇌우'],96:['⛈️','뇌우'],99:['⛈️','뇌우']
 };
 
 async function fetchWeatherData(){
@@ -1792,7 +1773,7 @@ async function fetchWeatherData(){
         const cur=data.current;
         const code=cur.weathercode;
         const temp=Math.round(cur.temperature_2m);
-        const icon=WMO_ICON[code]||'🌡️';
+        const icon=(WMO_INFO[code]||[])[0]||'🌡️';
         _homeWeatherCache={icon,temp,code,fetchedAt:Date.now()};
         resolve(_homeWeatherCache);
       }catch(e){resolve(null);}
@@ -2228,10 +2209,6 @@ const CHAEUM_CAT_META={
 };
 // 채움로그 앱톤(세이지 그린 계열) — 배너 전용 색상
 const CHAEUM_TONE={bg:'#F3EFE6',paper:'#F7F4EC',card:'#FDFBF6',sage:'#A6A583',line:'#E4DCC9',ink:'#5C5648',subInk:'#8A8270',muted:'#B5AC98'};
-// 콘텐츠 카테고리 아이콘 배지(파스텔톤, CAT_ICON_META 기반) 색상
-function getCatColor(cat){
-  return CAT_ICON_META[cat]?CAT_ICON_META[cat].color:'var(--tm)';
-}
 // 콘텐츠 바/점(진한 톤, dawn 리포트 기반) 색상
 function getCatBarColor(cat){
   return CONTENT_BAR_COLOR[cat]||'var(--tm)';
@@ -2440,13 +2417,6 @@ function _batchimSuffix(word){
   const last=word.charCodeAt(word.length-1);
   const hasBatchim=(last-0xAC00)%28!==0;
   return hasBatchim?'이에요':'예요';
-}
-// 받침 유무에 따른 조사 판별 범용 유틸 — 은/는, 이/가도 같은 규칙(_batchimSuffix와 동일 판정)이라
-// 별도 함수로 뽑아 재사용. withBatchim/withoutBatchim 예: ('은','는'), ('이','가').
-function _josa(word,withBatchim,withoutBatchim){
-  const last=word.charCodeAt(word.length-1);
-  const hasBatchim=(last-0xAC00)%28!==0;
-  return hasBatchim?withBatchim:withoutBatchim;
 }
 function getSolarTermLine(){
   const today=getTodaySolarTerm();
@@ -3042,6 +3012,12 @@ function saveMemos(dk,v){
   autoSync('memos',dk);
 }
 function getSleep(dk){return S.get(S.key('sleep',dk))||{};}
+// 수면 시간(분) — 취침/기상이 둘 다 있을 때만, 자정을 넘겨도 정상 계산(없으면 null). 주간 요약·오늘의 질문 등이 공용으로 사용.
+function sleepDurMin(sl){
+  if(!sl||!sl.sleep||!sl.wake)return null;
+  const [sh,sm]=sl.sleep.split(':').map(Number),[wh,wm]=sl.wake.split(':').map(Number);
+  return ((wh*60+wm)-(sh*60+sm)+1440)%1440;
+}
 function saveSleepData(dk,v){S.set(S.key('sleep',dk),v);S.set(S.key('sleep_pending',dk),true);autoSync('sleep',dk);}
 // sleep 서버 row → 로컬 저장 포맷 변환 (down/월간프리페치 공통 사용)
 function sleepRowToLocal(r){return {sleep:r.sleep_time,wake:r.wake_time,score:r.score};}
@@ -3339,7 +3315,7 @@ function getContents(mk){
   return arr;
 }
 // 이번달+지난달 콘텐츠를 합쳐 반환(중복 제거, 각 항목에 _mk=월키 부여) — 월초에 지난달부터 이어지는 진행중 콘텐츠를 놓치지 않기 위한 공용 조회.
-// 진행중 작품 목록/저녁 최근 콘텐츠 카드/질문 상황 조건이 같은 조회를 각자 반복하던 것을 통합(2026-09-19).
+// 진행중 작품 목록/질문 상황 조건이 같은 조회를 각자 반복하던 것을 통합(2026-09-19).
 function getRecentMonthsContents(base){
   const d=base||new Date();
   const seen=new Set(),out=[];
@@ -4497,28 +4473,6 @@ function openTimeModal(t){
   renderTimeWheel();
 }
 let _memoSubmitting=false;
-// ── 씨앗 메모(새벽 팝업용 인라인 입력) ──
-function openMemoModal(){
-  const inp=document.getElementById('memo-modal-inp');
-  if(inp)inp.value='';
-  openModal('memo-modal');
-  setTimeout(()=>{if(inp)inp.focus();},80);
-}
-function confirmMemo(){
-  if(_memoSubmitting)return;
-  const inp=document.getElementById('memo-modal-inp');
-  const text=inp?inp.value.trim():'';
-  if(!text)return;
-  _memoSubmitting=true;
-  const n=new Date();
-  const stamp=`${pad(n.getHours())}:${pad(n.getMinutes())}`;
-  const dk=dateKey(currentDate),memos=getMemos(dk);
-  memos.push({text,time:stamp,created:Date.now(),cid:genCid()});
-  saveMemos(dk,memos);
-  closeModal('memo-modal');
-  renderMemos();
-  setTimeout(()=>{_memoSubmitting=false;},500);
-}
 // 모바일 한글 IME 대응: event.isComposing/keyCode===229만으로는 iOS Safari 일부 버전에서
 // 조합 중 특정 시점(주로 받침 있는 음절 완성 찰나)에 오탐이 발생해 Enter로 잘못 처리되는 사례가 있음.
 // compositionstart/compositionend로 조합 상태를 직접 추적해 이중으로 확인.
@@ -4833,16 +4787,8 @@ function openRhythmMemoModal(cat,dk,title,body){
 // 서버 memo_prompts 풀에서 질문 1개를 받아 메모 모달(rhythm-memo-ov)에 띄움. 앱은 "오늘 쓸 수 있는 상황 조건 이름"만 서버에 보내고
 // (실제 값은 보내지 않음), 받은 질문의 {빈칸}은 로컬 데이터로 직접 채움. 답변을 저장하는 순간 서버에서 사용 처리.
 const QUESTION_FALLBACK_TEXT='오늘 하루는 어땠나요?'; // 서버 연결 실패/풀 소진 시 기본 문구
-const WMO_WORD={0:'맑음',1:'대체로 맑음',2:'구름 조금',3:'흐림',45:'안개',48:'안개',51:'이슬비',53:'이슬비',55:'이슬비',61:'비',63:'비',65:'비',71:'눈',73:'눈',75:'눈',80:'소나기',81:'소나기',82:'소나기',95:'뇌우',96:'뇌우',99:'뇌우'};
 let _qSessionExcl=[]; // 이번 모달 세션에서 이미 보여준 질문 id — "다른 질문 받기"에서 제외(소모는 아님)
-function _qcSleepDurStr(dk){
-  const sl=getSleep(dk);if(!sl||!sl.sleep||!sl.wake)return '';
-  const [sh,sm]=sl.sleep.split(':').map(Number),[wh,wm]=sl.wake.split(':').map(Number);
-  let sMin=sh*60+sm;if(sMin<720)sMin+=1440; // 서버 send-alerts와 동일한 새벽 보정(정오 기준)
-  let dur=wh*60+wm-sMin;if(dur<0)dur+=1440;
-  const h=Math.floor(dur/60),m=dur%60;
-  return m?`${h}시간 ${m}분`:`${h}시간`;
-}
+function _qcSleepDurStr(dk){const m=sleepDurMin(getSleep(dk));return m==null?'':fmtDur(m);}
 function _qcBlockTitle(b,dk){
   const item=b.contentCid&&getRecentMonthsContents(new Date(dk+'T00:00:00')).find(c=>c.cid===b.contentCid);
   return (item&&item.title)||(b.text||'').replace(/^\s*(드라마|영화|독서|책|음악)\s*-\s*/,'').trim();
@@ -4879,7 +4825,8 @@ function _collectQuestionConds(dk){
   }
   const dur=_qcSleepDurStr(dk);
   if(dur){list.push('sleep');vals['수면시간']=dur;}
-  if(dk===dateKey(new Date())&&_homeWeatherCache&&WMO_WORD[_homeWeatherCache.code]){list.push('weather');vals['날씨']=WMO_WORD[_homeWeatherCache.code];}
+  const weatherWord=dk===dateKey(new Date())&&_homeWeatherCache&&(WMO_INFO[_homeWeatherCache.code]||[])[1];
+  if(weatherWord){list.push('weather');vals['날씨']=weatherWord;}
   const photoCnt=getMemos(dk).filter(m=>m.photoUrl||m.photoLocalUrl).length;
   if(photoCnt>0){list.push('photo');vals['사진개수']=String(photoCnt);}
   const doneCnt=getTodos(dk).filter(t=>!t.isEvent&&t.done).length;
@@ -5945,9 +5892,10 @@ function confirmCopyWholeTodo(){
 }
 // ══════════════════════════════════════════════════════════
 // 굿모닝(모닝 플로우)
-// 카드 6개(휴식/운동/감상/책상/정리/기타) 중 복수선택 → "선택 완료"(원형 체크)를 눌러야 시작목록으로 확정 → 카드별 시작/종료(=리듬블록 자동 등록) → 파트2에 어제 회고+오늘 일정 미리보기.
-// 감상(독서/콘텐츠)·책상(일기/노트정리/개인작업)·기타(업무/외출/자유입력)는 같은 패턴 — 탭 후 서브선택 칩.
-// 서버 테이블: morning_flow_picks(date_key, picks jsonb, etc jsonb).
+// 카드 6개(휴식/운동/감상/책상/정리/기타)를 누를 때마다 "슬롯"(원형 아이콘)이 하나씩 추가됨(같은 카드도 여러 번, 감상만 1개) → 슬롯을 눌러 종류(서브선택)를 고르고
+// 시작/종료(=리듬블록 자동 등록). 같은 카드 안에서는 하나가 끝나야 다음을 시작(순차), 길게 누르면 슬롯 삭제. 카드 밑 숫자는 이번 달 완료 횟수.
+// 감상(독서/콘텐츠)·책상(일기/노트정리/개인작업)·기타(업무/외출/자유입력)는 같은 패턴 — 슬롯 패널에서 서브선택 칩.
+// 서버 테이블: morning_flow_picks(date_key, picks jsonb=슬롯맵, etc jsonb=미사용 빈 객체, client_ts).
 // ══════════════════════════════════════════════════════════
 const MORNING_FLOW_CARDS=[
   {key:'rest',label:'휴식',icon:'ti-cup',colorRgb:'var(--pal-mint-rgb)',rhythmCat:'rest'},
@@ -6382,18 +6330,6 @@ function makeMorningFlowCard(){
     selectMorningFlowSlot(t.dataset.id);
   });
   return hero;
-}
-function renderSleepScoreBadge(dk){
-  const score=getSleepScore(dk);
-  if(score==null){
-    return `<div onclick="promptSleepScore('${dk}')" style="width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1px solid rgba(200,180,165,0.4);cursor:pointer;" title="수면 점수 입력">
-      <i class="ti ti-zzz" style="font-size:14px;color:var(--sleep-warmgray);" aria-hidden="true"></i>
-    </div>`;
-  }
-  const lv=getSleepScoreLevel(score);
-  return `<div onclick="promptSleepScore('${dk}')" style="width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;" title="수면 점수 ${score}점 (${lv.label})">
-    <i class="ti ${lv.icon}" style="font-size:19px;color:var(--sleep-warmgray);" aria-hidden="true"></i>
-  </div>`;
 }
 let _sleepScoreModalDk='';
 function promptSleepScore(dk){
@@ -6984,48 +6920,6 @@ function makeBookCardWithCover(){
   </div>`;
   return wrap;
 }
-// 저녁 파트2용 최근 콘텐츠 카드 — 진행중인 것 기준(책은 %, 드라마는 N일째, 영화는 감상중/감상완료, 음악은 당일만 텍스트없이)
-function makeRecentContentsCard(){
-  const todayDk=dateKey(getLogicalDate());
-  const contents=getRecentMonthsContents(getLogicalDate()); // 월초에 지난달부터 이어지는 진행중 콘텐츠를 놓치지 않도록 이번달+지난달 합침
-  const items=[];
-  const book=getBooks().find(b=>b.status==='reading');
-  if(book)items.push({cat:'book',title:book.title,rightText:getBookProgressPct(book)+'%'});
-  contents.forEach(c=>{
-    if(c.cat==='drama'&&c.status==='watching'&&c.startDate){
-      const start=new Date(c.startDate+'T00:00:00');
-      const now=new Date(todayDk+'T00:00:00');
-      const days=Math.max(1,Math.round((now-start)/86400000)+1);
-      items.push({cat:'drama',title:c.title,rightText:days+'일째 보는 중'});
-    }else if(c.cat==='movie'&&(c.status==='watching'||c.status==='done')&&c.startDate===todayDk){
-      items.push({cat:'movie',title:c.title,rightText:c.status==='done'?'감상 완료':'감상 중'});
-    }else if(c.cat==='music'&&c.startDate===todayDk){
-      items.push({cat:'music',title:c.title,rightText:null});
-    }
-  });
-  const card=document.createElement('div');card.className='pace-card';
-  if(!items.length){
-    card.innerHTML=`<div class="pace-title"><i class="ti ti-stack-2 ico-sz-13" aria-hidden="true"></i> 최근 콘텐츠</div>
-      <div style="text-align:center;padding:8px 0;">
-        <div style="font-size:var(--dow-label-size);color:var(--tm);">지금 즐기고 있는 콘텐츠가 없어요</div>
-      </div>`;
-    return card;
-  }
-  let html=`<div class="pace-title"><i class="ti ti-stack-2 ico-sz-13" aria-hidden="true"></i> 최근 콘텐츠</div>`;
-  html+=`<div style="display:flex;flex-direction:column;gap:9px;">`;
-  items.forEach(it=>{
-    const meta=CAT_ICON_META[it.cat];
-    html+=`<div style="display:flex;align-items:center;gap:8px;">
-      <div style="width:26px;height:26px;border-radius:8px;background:${getCatColor(it.cat)};display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="ti ${meta.icon}" style="font-size:13px;color:${getCatBarColor(it.cat)};" aria-hidden="true"></i></div>
-      <span style="font-size:var(--dow-label-size);color:var(--tp);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${it.title}</span>
-      ${it.rightText?`<span style="font-size:var(--dow-label-size);color:var(--tm);">${it.rightText}</span>`:''}
-    </div>`;
-  });
-  html+=`</div>`;
-  card.innerHTML=html;
-  return card;
-}
-
 // 오늘 이전 날짜의 nextweek_suggest 캐시 자동 삭제 (누적 방지)
 (function(){
   try{
@@ -8742,68 +8636,6 @@ async function buildWeeklyMemoReportHtml(wk){
       <div style="margin:6px 0;font-size:var(--main-text-size);line-height:1.6;color:var(--tp);">${escapeHtml(data.summary||'')}</div>`;
   }catch(e){return null;}
 }
-async function buildNextWeekFeedbackHtml(wk){
-  const items=getWChallenge(wk).filter(it=>it.text&&it.text.trim());
-  if(!items.length)return '<div class="sheet-loading-msg">다음주에 지정한 목표가 없어요</div>';
-  const key=getClaudeKey();
-  if(!key)return '<div class="sheet-loading-msg">설정에서 Claude API 키를 입력하면 분석을 받을 수 있어요</div>';
-
-  // 최근 8주간의 챌린지 이력(이번에 준비 중인 주 제외) — 텍스트+체크일수만 간단히, 어느 주인지는 굳이 안 밝힘
-  const historyLines=[];
-  for(let i=1;i<=8;i++){
-    const d=new Date();d.setDate(d.getDate()-7*i);
-    const pastWk=weekKey(d);
-    const pastItems=getWChallenge(pastWk).filter(it=>it.text&&it.text.trim());
-    pastItems.forEach(it=>historyLines.push(`"${it.text}" — ${it.days.filter(Boolean).length}/7일 체크`));
-  }
-
-  const nextText=items.map(it=>`"${it.text}"`).join(', ');
-  const dataContext=[
-    getUserProfileContext(),
-    `다음 주에 새로 준비 중인 목표: ${nextText}`,
-    historyLines.length?`최근 몇 주간의 목표 이력(참고용):\n${historyLines.join('\n')}`:'과거 목표 이력 없음(처음 시작)'
-  ].filter(Boolean).join('\n\n');
-
-  const sys=`당신은 따뜻한 생활 코치예요. 사용자가 다음 주에 새로 준비 중인 목표를 보고, 실제로 달성 가능성을 높일 수 있는 짧은 코멘트를 목표별로 하나씩 작성해요.
-
-**핵심 판단 로직:**
-1. 먼저 다음 주 목표가 과거 이력 중 의미상 비슷한 카테고리에 속하는지 판단하세요. 텍스트가 정확히 같을 필요는 없어요 — 예를 들어 "운동"이라는 주제 안에 헬스장, 홈트, 걷기, 러닝 등을 모두 같은 흐름으로 묶어 판단하세요. 음식/식단, 수면, 공부처럼 다른 주제도 마찬가지로 유연하게 묶어서 보세요.
-2. 비슷한 카테고리가 과거에 반복 등장했고 체크 일수가 대체로 낮았다면(예: 7일 중 0~2일 수준), "완벽하게 하려는 부담을 버리고 더 작은 단위로 쪼개보자" 같은 식으로, 달성 가능성을 실질적으로 높일 수 있는 구체적인 팁을 자연스럽게 건네세요.
-3. 처음 시도하는 유형의 목표이거나, 과거 비슷한 목표의 달성률이 이미 괜찮았다면, 굳이 과거를 들추지 말고 그 목표 자체에 대한 가벼운 격려나 실용적인 팁(건강 상식 등 일반적으로 잘 알려진 수준의 정보 한 조각) 정도로 자연스럽게 마무리하세요.
-
-**절대 원칙:**
-- 과거 기록을 세세하게 거론하지 마세요(날짜, 정확한 체크 횟수 등을 콕 집어 말하지 않기). "이전에도 비슷한 목표를 몇 번 도전하셨던 것 같아요" 정도로 뭉뚱그려 언급하는 수준까지만.
-- "실패", "부족", "아쉽다" 같은 부정적 평가 금지.
-- 건강/생활 상식을 곁들일 땐 명백히 잘 알려진 일반적인 내용만 사용하고, 불확실하거나 특수한 정보는 지어내지 마세요.
-- 각 목표당 1~2문장, 목표별로 줄바꿈해서 구분하세요. 목표가 여러 개면 전체 분량은 개수에 비례해서 조절(과하게 길어지지 않게).
-- 반드시 ~해요, ~이에요, ~어요 체의 정감있는 존댓말만 사용. 반말 절대 금지. 이름 호칭 없음.
-- 이모지, 마크다운 기호 사용 금지.
-
-**출력 형식(반드시 준수):**
-각 목표마다 정확히 다음 형식의 한 줄로 시작하세요:
-[카테고리] 목표원문 :: 코멘트내용
-
-카테고리는 다음 중 목표 성격에 가장 가까운 것 하나만 골라 대괄호 안에 그대로 쓰세요: 운동, 식사, 수면, 공부, 업무, 마음가짐, 습관
-목표원문은 사용자가 입력한 목표 텍스트를 그대로(줄이거나 바꾸지 말고) 쓰세요.
-예:
-[운동] 주 3회 헬스장 가기 :: 이전에도 비슷한 목표를 몇 번 도전하셨던 것 같아요.
-[습관] 밥먹고 계단 걷기 :: 밥 직후 가벼운 움직임은 혈당 안정화에도 도움이 되니 좋은 습관이에요.
-
-목표가 여러 개면 목표 개수만큼 줄을 만드세요. 한 목표에 대한 코멘트가 길어져도 그 목표의 한 줄(문단) 안에서만 이어가고, 다음 줄로 넘어가면 안 돼요.`;
-
-  const reply=await callClaude(sys,[{role:'user',content:dataContext}],700);
-  if(!reply||reply.startsWith('__ERR__'))return null;
-
-  const lines=reply.trim().split('\n').filter(l=>l.trim());
-  return lines.map((l,idx)=>{
-    const m=l.trim().match(/^\[(.+?)\]\s*(.+?)\s*::\s*(.+)$/);
-    const cat=m?m[1].trim():'';
-    const goalText=m?m[2].trim():(items[idx]?items[idx].text:'');
-    const text=m?m[3].trim():l.trim();
-    const icon=NEXT_WEEK_CAT_ICON[cat]||'ti-sparkles';
-    return `<div class="nwf-item"><div class="nwf-item-head"><i class="ti ${icon} nwf-item-icon" aria-hidden="true"></i><span class="nwf-item-goal">${escapeHtml(goalText)}</span></div><span class="nwf-item-text">${text}</span></div>`;
-  }).join('');
-}
 
 // ── 다음 주 확장 목표 제안 (구 "챌린지 점검" 대체) ──
 // 이번주 리듬(카테고리별 시간+전주 대비 변화), 이번주 메모(요일별 샘플), 최근 8주 챌린지 이력(텍스트+체크+본인 주석 원문)을
@@ -8829,7 +8661,6 @@ async function buildNextWeekSuggestHtml(wk){
   const weekStart=new Date(now);weekStart.setDate(now.getDate()-6);
 
   const allMemosWithDay=[];
-  const rhythmDurThis={};
   for(let i=0;i<7;i++){
     const d=new Date(weekStart);d.setDate(weekStart.getDate()+i);
     const dk=dateKey(d);
@@ -8837,20 +8668,13 @@ async function buildNextWeekSuggestHtml(wk){
     const memos=getMemos(dk);
     const dayTexts=memos.map(m=>m.type==='seed'?`[씨앗] ${m.text}`:m.text).filter(Boolean);
     evenSample(dayTexts,8).forEach(t=>allMemosWithDay.push(`${dayName}: ${t}`));
-    getRhythmBlocks(dk).forEach(b=>{
-      const cat=RHYTHM_CATS[b.cat];if(!cat)return;
-      const s=b.start?parseInt(b.start.split(':')[0],10)*60+parseInt(b.start.split(':')[1],10):null;
-      const e=b.end?parseInt(b.end.split(':')[0],10)*60+parseInt(b.end.split(':')[1],10):null;
-      if(s==null||e==null)return;
-      let dur=e-s;if(dur<0)dur+=1440;
-      rhythmDurThis[b.cat]=(rhythmDurThis[b.cat]||0)+dur;
-    });
   }
-  const rhythmText=Object.keys(RHYTHM_CATS).map(k=>{
-    const min=rhythmDurThis[k]||0;
+  const rhythmDurThis=sumCategoryDurations(weekStart,7).dur; // 공용 util(라벨 기준)
+  const rhythmText=Object.values(RHYTHM_CATS).map(c=>{
+    const min=rhythmDurThis[c.label]||0;
     if(min<10)return null;
     const h=(min/60).toFixed(1).replace(/\.0$/,'');
-    return `${RHYTHM_CATS[k].label} ${h}시간`;
+    return `${c.label} ${h}시간`;
   }).filter(Boolean).join(', ');
 
   // 최근 8주 챌린지 이력 — 텍스트(괄호 속 본인 주석 포함 원문 그대로)+체크일수, 최근 주가 위로 오게
@@ -11078,17 +10902,8 @@ function loadDaily(){
 // 기존엔 월~오늘(주초반엔 표본이 1~2일뿐)이었으나, 홈탭 오늘의 흐름 인사이트와 동일하게 항상 최근 7일 고정 윈도우로 통일(2026-09-08).
 // dayCount(카테고리별 실제 발생일수)는 computeRawStatsForRange(월간리포트)와 동일 기준(dd[k]>0인 날만 카운트)으로 별도 집계 — 이게 없으면 buildMonthlyRhythmBar의 일평균이 누계와 같아짐.
 function computeWeeklyRhythmDur(){
-  const now=new Date();
-  const dur={},dayCount={};
-  for(let i=0;i<7;i++){
-    const d=new Date(now);d.setDate(now.getDate()-i);
-    const dd=getDayCategoryDurations(dateKey(d));
-    Object.keys(dd).forEach(function(k){
-      dur[k]=(dur[k]||0)+dd[k];
-      if(dd[k]>0)dayCount[k]=(dayCount[k]||0)+1;
-    });
-  }
-  return {dur,dayCount};
+  const start=new Date();start.setDate(start.getDate()-6); // 오늘 포함 최근 7일
+  return sumCategoryDurations(start,7);
 }
 // 최대 5위까지만 — buildMonthlyRhythmBar는 전체를 다 나열하므로, 상위 5개만 골라 같은 형식으로 재구성.
 function buildWeeklyRhythmBarTop5(dur,dayCount){
@@ -12417,13 +12232,6 @@ function removeBook(cid){
   renderReadingHub(); // 아카이브 리스트뿐 아니라 상단(진행중 표시/커버 등)까지 즉시 갱신
   renderContentTimeline();
 }
-// ===== 독서 공유카드 =====
-const SHARE_CYCLE = {
-  header: [['none','헤더 없음'],['rl','모먼츠'],['idx','인덱스'],['books','북스']],
-  quote: [['none','문장 없음'],['qs','문장 · 심플'],['qt','문장 · 테이프'],['hl','문장 · 하이라이트'],['paper','문장 · 편지지']],
-  progress: [['none','진행률 없음'],['top','진행률 · 상단좌'],['topright','진행률 · 상단우'],['bottom','진행률 · 하단']],
-  cover: [['none','표지 없음'],['bl','표지 · 좌하단'],['bl-title','표지 · 좌하단+제목'],['br','표지 · 우하단'],['br-title','표지 · 우하단+제목'],['tl','표지 · 좌상단'],['tl-title','표지 · 좌상단+제목'],['tr','표지 · 우상단'],['tr-title','표지 · 우상단+제목']]
-};
 // ══════════════════════════════════════════════════════════
 // ██ 독서 허브 (2/2 — 나머지는 READING HUB~씨앗코너 부근) — 진행률입력모달~공유모달공통(문장카드 포함) ██
 // ══════════════════════════════════════════════════════════
@@ -14149,7 +13957,6 @@ function confirmReserveMove(){
 // ██ 초기화 (2/2 — 나머지는 LOAD 부근) — HOME 재진입/INIT/마이그레이션 ██
 // ══════════════════════════════════════════════════════════
 // ── HOME
-const DAYS_KO=['일','월','화','수','목','금','토'];
 
 
 

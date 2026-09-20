@@ -185,8 +185,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .slabel-row .slabel{margin:0;}
 .slabel-search-btn{background:none;border:none;padding:2px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--tm);opacity:.7;}
 .slabel-search-btn:active{opacity:1;}
-.wgoal-add-btn{background:none;border:none;padding:2px;cursor:pointer;color:rgba(var(--divider-rgb),0.6);display:flex;align-items:center;justify-content:center;}
-.wgoal-add-btn:active{color:rgba(var(--divider-rgb),0.9);}
 .reserve-section-btn{flex:1;padding:7px 0;border-radius:10px;border:1px solid var(--card-b);background:var(--card);font-size:var(--dow-label-size);color:var(--tm);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;}
 .reserve-section-btn.active{background:var(--pal-pink-bg);color:var(--pal-pink-text);border-color:var(--pal-pink-border);font-weight:600;}
 #reserve-filter-row .reserve-section-btn[data-filter="all"].active{background:var(--card);color:var(--tm);border-color:var(--card-b);font-weight:600;}
@@ -309,8 +307,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .meal-cat{width:38px;flex-shrink:0;font-size:var(--dow-label-size);color:var(--tm);margin-right:6px;}
 .meal-time-inp{width:62px;flex-shrink:0;background:none;border:none;outline:none;font-family:'DM Sans',sans-serif;font-size:var(--main-text-size);color:var(--ts);padding:5px 2px 4px 6px;text-align:right;font-variant-numeric:tabular-nums;cursor:pointer;}
 .cm-star-picker{display:flex;gap:3px;flex:1;}
-@keyframes discSpin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
-.playlist-disc-spin{display:inline-block;animation:discSpin 3s linear infinite;}
 .pl-item-play{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
 .pl-item-play i{font-size:13px;}
 .pl-item-play.dim{opacity:.35;cursor:default;}
@@ -347,15 +343,12 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .week-chips-4 .m-chip{flex:1;flex-shrink:1;text-align:center;padding:9px 6px;}
 .m-chip.disabled{opacity:0.35;cursor:default;}
 .mr-card{border-radius:16px;background:var(--card);border:1px solid var(--card-b);padding:15px 15px 13px;margin-bottom:12px;}
-@keyframes rdCalFadeSlide{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
-.rdcal-detail-in{animation:rdCalFadeSlide .28s ease;}
 .mr-sec-title{font-size:var(--dow-label-size);color:var(--tm);letter-spacing:.10em;text-transform:uppercase;margin-bottom:11px;}
 .mr-ai-empty{font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:6px 0;}
 .memo-search-empty{text-align:center;color:var(--tm);font-size:var(--dow-label-size);padding:20px 2px;}
 /* 설정탭 공용 버튼 — fill(채움)/outline(테두리)/small(축소) 3종, 새 설정 항목에도 재사용 */
 .settings-btn-fill{width:100%;padding:9px;border-radius:10px;border:none;background:rgba(255,175,200,0.28);color:var(--pal-pink-text);font-family:'DM Sans',sans-serif;font-size:var(--dow-label-size);font-weight:500;cursor:pointer;}
 .settings-btn-fill.dirty{background:rgba(var(--pal-pink-rgb),0.85);color:#fff;} /* 미저장 변경 있음 — 저장 버튼 강조 */
-.settings-btn-outline{width:100%;padding:9px;border-radius:10px;border:1px solid rgba(var(--divider-rgb),0.40);background:transparent;color:var(--tp);font-family:'DM Sans',sans-serif;font-size:var(--dow-label-size);font-weight:500;cursor:pointer;}
 .settings-btn-small{width:100%;padding:7px;border-radius:10px;border:1px solid rgba(var(--divider-rgb),0.40);background:transparent;color:var(--tm);font-family:'DM Sans',sans-serif;font-size:var(--dow-label-size);cursor:pointer;}
 .settings-key-inp{margin-bottom:0;font-size:var(--dow-label-size);width:100%;font-family:monospace;}
 /* 설정탭 공용 아코디언 — 알림 섹션에 먼저 적용, 추후 다른 설정 카드에도 재사용 예정 */
@@ -373,9 +366,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .settings-toggle::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .2s ease;}
 .settings-toggle.on::after{transform:translateX(18px);}
 .settings-toggle.disabled{opacity:0.4;cursor:not-allowed;}
-.cmr-review-icon{color:var(--tm);opacity:0.65;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center;}
-.cmr-review-box{margin:0 0 7px 46px;display:none;}
-.cmr-review-box.on{display:block;}
 /* 코멘트 상세 헤더 — 날짜 + 별점, 리스트형/그리드형 공통 */
 .cmr-detail-head{display:flex;align-items:center;gap:8px;margin-bottom:7px;font-size:var(--dow-label-size);}
 .cmr-detail-head .cwatch-btn{margin-left:auto;}
@@ -555,7 +545,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .chk.ts-none.on::after{border-color:var(--pal-warmgray-text);}
 .todo-txt{flex:1;line-height:1.4;cursor:pointer;}
 .todo-txt.done{text-decoration:line-through;color:var(--tm);}
-.add-btn{display:flex;align-items:center;gap:7px;padding:0 11px;height:38px;box-sizing:border-box;background:rgba(255,250,240,.30);border:1.5px dashed color-mix(in srgb, var(--tp) 20%, transparent);border-radius:11px;color:var(--tm);font-size:var(--main-text-size);cursor:pointer;margin-top:8px;width:100%;font-family:'DM Sans',sans-serif;}
 .add-btn-row{display:flex;gap:8px;margin-top:8px;}
 .add-btn-half{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 8px;height:38px;box-sizing:border-box;background:rgba(255,250,240,.35);border:1.3px dashed color-mix(in srgb, var(--tp) 22%, transparent);border-radius:10px;color:var(--ts);font-size:calc(var(--main-text-size) - 1px);cursor:pointer;font-family:'DM Sans',sans-serif;position:relative;}
 .add-btn-half:active{opacity:.65;}
@@ -612,7 +601,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rhythm-memo-icon{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;}
 .rhythm-memo-title{font-size:15px;color:var(--tp);font-weight:500;text-align:center;}
 .rhythm-memo-body{font-size:12.5px;color:var(--ts);margin-top:4px;text-align:center;}
-.rhythm-memo-input-area{margin-top:16px;position:relative;}
 .rhythm-memo-actions{display:flex;gap:8px;margin-top:14px;}
 .rhythm-memo-actions .mbtn{flex:1;}
 /* 바깥 카드 배경 없이 폴라로이드 프레임이 바로 어두운 오버레이 위에 뜨는 구조 */
@@ -1001,7 +989,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 @keyframes mfSlotPulse{50%{opacity:.5;}}
 .mf-panel{margin-top:14px;}
 .mf-slot-del{font-size:11.5px;color:var(--tm);text-align:right;margin-top:8px;cursor:pointer;}
-.mf-start-list{display:flex;flex-direction:column;gap:10px;}
 .mf-start-row{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,0.4);border:1px solid var(--card-b);border-radius:16px;padding:12px 14px;transition:all .18s;}
 .mf-start-icon{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .mf-start-row .mf-label{font-size:14px;font-weight:600;color:var(--tp);flex:1;}
@@ -1010,7 +997,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .mf-start-btn.running{color:#fff;border:none;}
 .mf-etc-chips{display:flex;gap:6px;margin-top:8px;}
 .mf-etc-chip{padding:5px 10px;border-radius:12px;border:1px solid var(--card-b);background:rgba(255,255,255,0.5);font-size:11.5px;color:var(--ts);cursor:pointer;}
-.mf-etc-chip.on{background:rgba(195,180,168,0.22);border-color:rgba(195,180,168,0.6);color:var(--tp);font-weight:600;}
 .pace-title{font-size:var(--dow-label-size);color:var(--tm);margin-bottom:10px;display:flex;align-items:center;gap:5px;}
 .pace-divider{height:1px;background:rgba(var(--divider-rgb),0.25);margin:16px 0;}
 
@@ -1406,7 +1392,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 #event-card{background:rgba(255,250,240,0.62);}
 .habit-check-col{display:flex;flex-direction:column;align-items:center;gap:7px;min-width:42px;}
 .habit-check-name{font-size:var(--dow-label-size);color:var(--tp);text-align:center;}
-.habit-check-foot{width:100%;display:flex;justify-content:flex-end;margin-top:5px;margin-bottom:0;}
 .habit-chk2{width:25px;height:25px;border-radius:50%;border:1.5px dashed var(--card-b);background:var(--card);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;}
 .habit-chk2.on{border-style:solid;}
 
@@ -2182,18 +2167,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <button class="mbtn cancel" id="todo-modal-delete" onclick="deleteTodoFromModal()" style="display:none;color:var(--pal-rose-text);flex:0.8;">삭제</button>
       <button class="mbtn cancel" onclick="closeTodoModal()">취소</button>
       <button class="mbtn ok" onclick="confirmTodo()">저장</button>
-    </div>
-  </div>
-</div>
-
-<!-- MEMO MODAL -->
-<div class="modal-ov" id="memo-modal" onclick="closeModal('memo-modal',event)">
-  <div class="modal">
-    <div class="modal-title">메모 추가</div>
-    <textarea class="modal-inp" id="memo-modal-inp" placeholder="메모를 입력하세요" rows="3" autocomplete="off" style="resize:none;" onkeydown="if(event.isComposing||event.keyCode===229||event.key===' '||event.code==='Space')return;if((event.key==='Enter'||event.keyCode===13)&&!event.shiftKey){event.preventDefault();confirmMemo();}"></textarea>
-    <div class="modal-actions">
-      <button class="mbtn cancel" onclick="closeModal('memo-modal')">취소</button>
-      <button class="mbtn ok" onclick="confirmMemo()">저장</button>
     </div>
   </div>
 </div>
