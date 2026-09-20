@@ -50,7 +50,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --grad-pinkyellow:linear-gradient(120deg,rgba(255,210,230,0.80),rgba(255,230,200,0.70)); /* 핑크-옐로 카드 그라디언트 — reading-icon-btn 기준값, mr-goal-card는 알파만 더 연하게 별도 지정 */
   --grad-mintyellow:linear-gradient(135deg,rgba(210,244,225,0.85),rgba(248,245,200,0.85),rgba(212,242,222,0.85)); /* 민트-옐로 3색 그라디언트 — weekly-review-banner-inner/report-banner-inner/quote-chip-inner 공용, 2026-08-16 통합 */
   --pal-mauvepink:rgb(198,116,149); /* 모브핑크 — 다음주목표/glass오늘표시/뮤직재생/glass캘린더오늘 4곳 통합용, 2026-08-16 */
-  --rainbow-done:linear-gradient(120deg,#ffd28a,#ffb0c8,#c9a8ff,#9fd8ff,#ffd28a); /* 완독 축하 버튼 테두리 전용 */
+  --rainbow-done:linear-gradient(120deg,#ffd28a,#ffb0c8,#c9a8ff,#9fd8ff,#ffd28a); /* 완독 축하 버튼 테두리 + 공용 팝업(.rhythm-memo-card) 상단띠·스누즈 완료 버튼 테두리 공용 */
   --rainbow-bead:linear-gradient(270deg,#ffb0c8,#ffd28a,#bdf0c4,#9fd8ff,#c9a8ff,#ffb0c8); /* 진행바 구슬 애니메이션 — rd-progress-bead 전용 */
 }
 /* ══ EVENT CATEGORY COLORS — 단일 소스. 값 변경 시 여기만 고치면 JS(EVENT_CATS)·모달버튼·캘린더배지에 모두 반영됨 ══
@@ -335,7 +335,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .wish-del-btn{font-size:var(--dow-label-size);color:var(--tm);cursor:pointer;padding:2px 4px;flex-shrink:0;}
 .meal-inp.wish-target{background:rgba(190,230,205,0.18);border-radius:6px;}
 .month-chips{display:flex;gap:6px;margin-bottom:16px;overflow-x:auto;padding-bottom:2px;}
-.snooze-chip{flex:1;min-width:0;text-align:center;font-size:var(--dow-label-size);color:var(--tp);padding:8px 0;border-radius:12px;background:transparent;border:1px solid var(--card-b);cursor:pointer;font-weight:500;white-space:nowrap;} /* 할일 알림 스누즈 팝업 칩(4개 한 줄) */
+.snooze-chip{flex:1;min-width:0;text-align:center;font-size:var(--dow-label-size);color:var(--tp);padding:8px 0;border-radius:12px;background:transparent;border:none;cursor:pointer;font-weight:500;white-space:nowrap;} /* 할일 알림 스누즈 팝업 칩(4개 한 줄) — 키별 팔레트 색(오늘 저녁 칩이 빠져도 색이 밀리지 않게 nth-child 대신 키 클래스) */
+.snooze-chip.snooze-m30{background:var(--pal-pink-bg);color:var(--pal-pink-text);}
+.snooze-chip.snooze-h1{background:var(--pal-orange-bg);color:var(--pal-orange-text);}
+.snooze-chip.snooze-eve{background:var(--pal-yellow-bg);color:var(--pal-yellow-text);}
+.snooze-chip.snooze-morn{background:var(--pal-mint-bg);color:var(--pal-mint-text);}
 .m-chip{flex-shrink:0;font-size:var(--dow-label-size);color:var(--tm);padding:7px 13px;border-radius:13px;background:var(--card);border:1px solid var(--card-b);cursor:pointer;font-weight:500;}
 .m-chip.active{background:rgba(150,215,180,0.4);border-color:rgba(140,210,170,0.55);color:#3a7858;font-weight:700;}
 /* 4주 리포트 칩 전용 — 개수가 4개로 고정이라 가로 스크롤 대신 화면 폭에 맞춰 균등 4등분. */
@@ -594,15 +598,20 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 .photo-viewer-ov{position:fixed;inset:0;background:rgba(30,20,18,.82);z-index:10001;display:none;align-items:center;justify-content:center;padding:20px;}
 .photo-viewer-ov.on{display:flex;}
-.rhythm-memo-ov{position:fixed;inset:0;background:rgba(50,38,32,.55);z-index:10001;display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(10px);}
+/* 딤은 background-color가 아니라 background-image로 — iOS 26+는 화면 상단에 닿는 fixed 레이어의 배경색으로 상태바 영역을 칠하므로(app.js hideSplash 주석 참고), 반투명 딤이 상태바를 물들이지 않고 #bg-fixed(앱컬러)가 기준으로 남게 함 (2026-09-21) */
+.rhythm-memo-ov{position:fixed;inset:0;background:linear-gradient(rgba(140,105,95,.38),rgba(140,105,95,.38));z-index:10001;display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(10px);}
 .rhythm-memo-ov.on{display:flex;}
-.rhythm-memo-card{width:100%;max-width:320px;background:var(--card,#fdf8f2);border-radius:16px;padding:20px 18px 18px;box-shadow:0 8px 28px rgba(0,0,0,0.35);position:relative;}
-.rhythm-memo-close{position:absolute;top:10px;right:10px;width:24px;height:24px;border-radius:12px;background:rgba(30,20,18,0.08);border:none;display:flex;align-items:center;justify-content:center;color:var(--ts);cursor:pointer;}
-.rhythm-memo-icon{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;}
+.rhythm-memo-card{width:100%;max-width:320px;background:linear-gradient(160deg,#fffafb,#fffbf3);border-radius:20px;padding:22px 18px 18px;box-shadow:0 10px 30px rgba(190,110,120,.2);position:relative;overflow:hidden;} /* 스누즈·메모유도·질문 팝업 공용 — 2026-09-21 화사한 핑크화이트 카드로 개편 */
+.rhythm-memo-card::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:var(--rainbow-done);} /* 상단 무지개띠 — 완독 버튼과 같은 공용 변수 */
+.rhythm-memo-close{position:absolute;top:10px;right:10px;width:26px;height:26px;border-radius:13px;background:rgba(107,82,72,.08);border:none;display:flex;align-items:center;justify-content:center;color:var(--ts);cursor:pointer;}
+.rhythm-memo-icon{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:6px auto 10px;}
 .rhythm-memo-title{font-size:15px;color:var(--tp);font-weight:500;text-align:center;}
 .rhythm-memo-body{font-size:12.5px;color:var(--ts);margin-top:4px;text-align:center;}
 .rhythm-memo-actions{display:flex;gap:8px;margin-top:14px;}
 .rhythm-memo-actions .mbtn{flex:1;}
+.rhythm-memo-card .mbtn.cancel{background:#f3e5e0;color:#9c8378;border:1.5px solid transparent;} /* 닫기/나중에 — 카드 배경보다 한 톤 진한 웜베이지 */
+#snooze-ov .mbtn.ok{border:1.5px solid transparent;background:linear-gradient(#fffafb,#fffafb) padding-box,var(--rainbow-done) border-box;color:var(--pal-pink-text);font-weight:500;} /* 스누즈 완료 — 무지개 테두리(메모유도의 기록하기는 JS가 리듬색 채움을 인라인으로 지정) */
+#rhythm-memo-ov .modal-inp{background:rgba(255,255,255,.75);border-color:rgba(255,210,200,.5);}
 /* 바깥 카드 배경 없이 폴라로이드 프레임이 바로 어두운 오버레이 위에 뜨는 구조 */
 .photo-viewer-card{width:100%;max-width:330px;max-height:88vh;display:flex;flex-direction:column;}
 /* 폴라로이드 프레임 — 사진+날짜+텍스트를 흰 카드 하나로 감싸고 살짝 기울여 손으로 놓은 듯한 느낌 */
@@ -2014,7 +2023,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 <div class="rhythm-memo-ov" id="snooze-ov" onclick="closeSheet('snooze-ov',event)">
   <div class="rhythm-memo-card" onclick="event.stopPropagation()">
     <button class="rhythm-memo-close" onclick="closeSheet('snooze-ov')" aria-label="닫기"><i class="ti ti-x" aria-hidden="true"></i></button>
-    <div class="rhythm-memo-icon" style="background:rgba(var(--pal-pink-rgb),0.30);"><i class="ti ti-bell" style="color:var(--tp);font-size:20px;" aria-hidden="true"></i></div>
+    <div class="rhythm-memo-icon" style="background:rgba(var(--pal-pink-rgb),0.40);"><i class="ti ti-bell" style="color:var(--tp);font-size:20px;" aria-hidden="true"></i></div>
     <div class="rhythm-memo-title" id="snooze-title"></div>
     <div class="rhythm-memo-body">다시 알려드릴까요?</div>
     <div id="snooze-chips" style="display:flex;gap:6px;margin-top:14px;"></div>

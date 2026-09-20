@@ -2634,7 +2634,7 @@ async function openSnoozePopup(cid){
   const targets=_snoozeTargets(settings);
   _snoozeCtx={cid,text:found.todo.text,dk:found.dk,targets};
   document.getElementById('snooze-title').textContent=found.todo.text;
-  document.getElementById('snooze-chips').innerHTML=targets.map(t=>`<div class="snooze-chip" onclick="snoozeTodo('${t.key}')">${t.label}</div>`).join('');
+  document.getElementById('snooze-chips').innerHTML=targets.map(t=>`<div class="snooze-chip snooze-${t.key}" onclick="snoozeTodo('${t.key}')">${t.label}</div>`).join('');
   openSheet('snooze-ov');
 }
 async function snoozeTodo(key){
