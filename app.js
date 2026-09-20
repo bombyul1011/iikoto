@@ -2626,7 +2626,7 @@ async function setUserSettingTime(field,timeStr){
   await supaUpsert('user_settings','id',[{id:true,[field]:timeStr}]);
 }
 // ── 할일 알림 스누즈 (2026-09-20) ──
-// 할일 알림('todo'/'todo_snooze')을 누르면 ?snooze=<cid>로 앱이 열려 하단 시트가 뜨고, 30분/1시간/오늘 저녁/내일 아침 중 골라 다시 알림을 예약.
+// 할일 알림('todo'/'todo_snooze')을 누르면 ?snooze=<cid>로 앱이 열려 메모 유도와 같은 모양의 팝업이 뜨고, 30분/1시간/오늘 저녁/내일 아침 중 골라 다시 알림을 예약.
 // 스누즈는 원래 알림과 별개의 임시 알림('todo_snooze', 할일당 1개 — 다시 미루면 덮어씀)이라 할일의 알림 시각 설정은 바뀌지 않음.
 // 정리: 완료/삭제/알림 시각 변경(clearTodoAlerts, 수정 저장부) + 서버가 발송 직전에 완료 여부를 한 번 더 확인.
 let _snoozeCtx=null; // {cid,text,dk,targets}
@@ -2656,7 +2656,7 @@ function _snoozeTargets(settings){
   list.push({key:'morn',label:'내일 아침',at:morn,msg:'내일 아침에'});
   return list;
 }
-async function openSnoozeSheet(cid){
+async function openSnoozePopup(cid){
   const found=_findTodoByCid(cid);
   if(!found||found.todo.isEvent){showToast('찾을 수 없는 할일이에요');return;}
   if(found.todo.done){showToast('이미 끝낸 할일이에요');return;}
@@ -2665,20 +2665,20 @@ async function openSnoozeSheet(cid){
   _snoozeCtx={cid,text:found.todo.text,dk:found.dk,targets};
   document.getElementById('snooze-title').textContent=found.todo.text;
   document.getElementById('snooze-chips').innerHTML=targets.map(t=>`<div class="snooze-chip" onclick="snoozeTodo('${t.key}')">${t.label}</div>`).join('');
-  openSheet('snooze-sheet');
+  openSheet('snooze-ov');
 }
 async function snoozeTodo(key){
   const ctx=_snoozeCtx;
   const t=ctx&&ctx.targets.find(x=>x.key===key);
   if(!t)return;
-  closeSheet('snooze-sheet');
+  closeSheet('snooze-ov');
   await scheduleAlertAt('todo_snooze',ctx.cid,t.at,ctx.text,null);
   showToast(t.msg+' 다시 알려드릴게요');
 }
 function completeSnoozeTodo(){
   const ctx=_snoozeCtx;
   if(!ctx)return;
-  closeSheet('snooze-sheet');
+  closeSheet('snooze-ov');
   const idx=getTodos(ctx.dk).findIndex(x=>x.cid===ctx.cid);
   if(idx>=0&&!getTodos(ctx.dk)[idx].done)toggleTodoAt(ctx.dk,idx,ctx.cid);
   showToast('완료로 표시했어요');
@@ -14172,7 +14172,7 @@ async function _openFromNotificationUrl(urlStr){
   const memoType=params.get('memo');
   if(!snoozeCid&&!['rhythm','sleep','noon','question'].includes(memoType))return;
   if(!urlStr)history.replaceState(null,'',location.pathname); // 최초 로드 경로일 때만 자기 URL을 정리(SW 메시지 경로는 애초에 주소가 안 바뀌므로 불필요)
-  if(snoozeCid){openSnoozeSheet(snoozeCid);return;}
+  if(snoozeCid){openSnoozePopup(snoozeCid);return;}
   const todayDk=dateKey(new Date());
   const copy=MEMO_URL_DEFAULT_COPY[memoType];
   if(copy){openRhythmMemoModal(memoType,todayDk,params.get('t')||copy[0],params.get('b')||copy[1]);return;}

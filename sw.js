@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.107-todo-snooze';
+const CACHE = 'iikoto-v2.108-snooze-popup';
 const ASSETS = [
   './',
   './index.html'
