@@ -20,14 +20,15 @@ async function maybeBackfillWeeklyReview(){
   if(_backfillInFlight)return;
   const dk=_thisWeekSundayDk();
   const cacheKey='weekly_summary_'+dk;
-  if(S.get(cacheKey))return; // 이미 있음(정상 생성됨) — 아무 일도 하지 않음
+  const localCached=S.get(cacheKey);
+  if(localCached&&!_isWeeklyFallback(localCached))return; // 이미 있음(정상 생성됨) — 아무 일도 하지 않음
   if(!getClaudeKey())return; // 생성 불가 환경이면 조용히 스킵
   _backfillInFlight=true;
   try{
     const serverHtml=await aiCacheGet(cacheKey);
-    if(serverHtml){S.set(cacheKey,serverHtml);return;} // 다른 기기에서 이미 생성된 경우 — 토스트 없이 조용히 캐싱만
+    if(serverHtml&&!_isWeeklyFallback(serverHtml)){S.set(cacheKey,serverHtml);return;} // 다른 기기에서 이미 생성된 경우 — 토스트 없이 조용히 캐싱만
     const html=await makeWeeklySummaryCard();
-    if(html&&!html.includes('__ERR__')){
+    if(html&&!_isWeeklyFallback(html)){
       S.set(cacheKey,html);
       aiCacheSet(cacheKey,html);
       showToast('지난주 요약이 준비됐어요 🌿');
@@ -945,9 +946,10 @@ function getUserProfileContext(){
   const p=(S.get('user_profile')||'').trim();
   return p?`사용자에 대한 참고 정보(직접 입력함): ${p}`:'';
 }
+let _lastAiError=''; // 마지막 Claude 호출 실패 사유(성공하면 비움) — 리포트가 기록 요약만 나올 때 원인을 화면에 보여주기 위함
 async function callClaude(systemPrompt, messages, maxTokens){
   const key=getClaudeKey();
-  if(!key){return null;}
+  if(!key){_lastAiError='API 키 없음';return null;}
   try{
     const controller=new AbortController();
     const timer=setTimeout(()=>controller.abort(),30000);
@@ -958,10 +960,11 @@ async function callClaude(systemPrompt, messages, maxTokens){
       body:JSON.stringify({model:'claude-haiku-4-5',max_tokens:maxTokens||600,system:systemPrompt,messages})
     });
     clearTimeout(timer);
-    if(!res.ok){const err=await res.json().catch(()=>({error:{message:res.status}}));console.error('Claude API err:',err);return '__ERR__'+(err.error?.message||res.status);}
+    if(!res.ok){const err=await res.json().catch(()=>({error:{message:res.status}}));console.error('Claude API err:',err);_lastAiError=String(err.error?.message||res.status);return '__ERR__'+(err.error?.message||res.status);}
     const data=await res.json();
+    _lastAiError='';
     return data.content&&data.content[0]&&data.content[0].text||null;
-  }catch(e){console.error('Claude fetch err:',e);return null;}
+  }catch(e){console.error('Claude fetch err:',e);_lastAiError=(e&&e.name==='AbortError')?'응답 시간 초과':String((e&&e.message)||e);return null;}
 }
 
 // ─ 오늘 하루 데이터 요약 생성
@@ -1537,10 +1540,10 @@ function loadWeeklyReviewFor(dk){
   const content=document.getElementById('weekly-review-content');
   const cacheKey='weekly_summary_'+dk;
   const cached=S.get(cacheKey);
-  if(cached){content.innerHTML=cached;return;}
+  if(cached&&!_isWeeklyFallback(cached)){content.innerHTML=cached;return;}
   content.innerHTML='<div class="sheet-loading-msg">한 주 요약 작성 중이에요.. 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">약 10-20초 소요돼요</span></div>';
   aiCacheGet(cacheKey).then(function(serverHtml){
-    if(serverHtml){
+    if(serverHtml&&!_isWeeklyFallback(serverHtml)){
       S.set(cacheKey,serverHtml);
       content.innerHTML=serverHtml;
       return;
@@ -1556,11 +1559,14 @@ function loadWeeklyReviewFor(dk){
       return;
     }
     makeWeeklySummaryCard().then(function(html){
-      if(html&&!html.includes('__ERR__')){
+      if(html&&!_isWeeklyFallback(html)){
         S.set(cacheKey,html);
         aiCacheSet(cacheKey,html);
         content.innerHTML=html;
-      } else {
+      }else if(html){
+        // AI 요약 실패 — 기록 요약만 보여주되 캐시에 저장하지 않음(다시 열면 다시 시도). 원인(_lastAiError)을 함께 표시.
+        content.innerHTML=html+'<div style="margin-top:14px;font-size:var(--dow-label-size);color:var(--tm);line-height:1.6;">AI 요약을 만들지 못했어요. 다시 열면 다시 시도해요'+(_lastAiError?' ('+escapeHtml(_lastAiError)+')':'')+'</div>';
+      }else{
         content.innerHTML='<div class="sheet-loading-msg">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
       }
     });
@@ -1570,6 +1576,9 @@ function openWeeklyReviewSheet(){
   openSheet('weekly-review-sheet');
   loadWeeklyReviewFor(_thisWeekSundayDk());
 }
+// 주간 요약의 fallback(AI 없이 기록만 나열한 버전) 판별 — 실패한 결과를 성공한 요약처럼 캐시(로컬+서버)하면 그 주는 영구히 fallback으로 굳어버림(2026-09-20 발생).
+// 그래서 fallback은 화면에만 보여주고 캐시에 저장/재사용하지 않음. 뒤쪽 조건은 마커 도입 전에 이미 캐시된 옛 fallback을 걸러내기 위한 것.
+function _isWeeklyFallback(html){return !!html&&(html.includes('data-wk-fallback')||html.includes('font-weight:600;color:rgba(80,140,200,0.9);">이번 주 기록 요약'));}
 async function makeWeeklySummaryCard(){
   // 하루치 메모 중 N개를 시간대 전체에 고르게 펼쳐서 뽑기 (아침 루틴 멘트로만 쏠리는 것 방지)
   const evenSample=(arr,n)=>{
@@ -1672,7 +1681,7 @@ async function makeWeeklySummaryCard(){
   allTodos.forEach(t=>{if(t.text)todoTextTally[t.text]=(todoTextTally[t.text]||0)+1;});
   const frequentTodo=Object.entries(todoTextTally).filter(([,c])=>c>=2).sort((a,b)=>b[1]-a[1])[0];
 
-  const fallbackHtml=`<div style="font-size:var(--main-text-size);color:var(--tp);line-height:1.9;">
+  const fallbackHtml=`<div data-wk-fallback="1" style="font-size:var(--main-text-size);color:var(--tp);line-height:1.9;">
     <div style="margin-bottom:10px;font-weight:600;color:rgba(80,140,200,0.9);">이번 주 기록 요약</div>
     ${avgSleepStr?`<div>◎ 평균 수면 <b>${avgSleepStr}</b></div>`:''}
     <div>✓ 실행한 투두 <b>${doneTodos}개</b></div>
@@ -3762,7 +3771,7 @@ async function syncAll(){
   // 이번 주 리듬블록(가로바용) 날짜키
   const weekRblockDks=[];
   for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);weekRblockDks.push(dateKey(d));}
-  // 굿모닝(모닝 플로우)은 그날의 선택+상태만 다루는 가벼운 데이터라 이번 달 전체가 아니라 최근 2일(오늘+어제, 파트2 회고용)만 동기화.
+  // 굿모닝(모닝 플로우)은 그날의 슬롯+상태만 다루는 가벼운 데이터라 이번 달 전체가 아니라 최근 2일(오늘+어제, 새벽 4시 경계 대비)만 동기화.
   const mflowDks=[];
   const todayDate=now.getDate();
   for(let i=0;i<2;i++){const d=new Date(now);d.setDate(now.getDate()-i);mflowDks.push(dateKey(d));}
@@ -5964,18 +5973,8 @@ function _mfDurationMin(startStr,endStr){
   return endMin-startMin;
 }
 // 모닝플로우 저장 구조(2026-09-20 복수 슬롯 개편): flow.picks = {슬롯id: {key(카드), sub, title, text, status, t(생성시각), blockCid, ...}}.
-// 같은 카드도 슬롯을 여러 개 만들 수 있음(예: 업무+외출). 옛 구조(카드key로 된 pick + flow.etc/enjoy/desk/... 별도 상태)는 읽는 순간 슬롯으로 변환.
-function _mfNormalizeFlow(raw){
-  const picks={...((raw&&raw.picks)||{})};
-  Object.keys(picks).forEach(k=>{
-    const p=picks[k];
-    if(!p||p.key||!MORNING_FLOW_CARDS.some(c=>c.key===k))return; // 이미 슬롯이거나 알 수 없는 항목
-    const st=raw[k]||{};
-    picks[k]={...p,key:k,sub:st.sub||p.subKey||null,title:st.title||'',text:st.text||'',targetCid:st.targetCid,targetMk:st.targetMk,t:p.startTs||0};
-  });
-  return {picks,_localTs:raw&&raw._localTs};
-}
-function getMorningFlow(dk){return _mfNormalizeFlow(S.get('mflow_'+dk));}
+// 같은 카드도 슬롯을 여러 개 만들 수 있음(예: 업무+외출). 옛 구조(카드별 pick + flow.etc/enjoy/... 별도 상태)는 서버 기록을 일괄 변환하고 변환 코드도 제거함(2026-09-20).
+function getMorningFlow(dk){return S.get('mflow_'+dk)||{picks:{}};}
 // 슬롯 목록(생성순) — flow.picks의 값에 id를 붙인 사본. 수정은 항상 flow.picks[id]에 해야 함.
 function _mfSlots(flow){return Object.keys(flow.picks).map(id=>({...flow.picks[id],id})).sort((a,b)=>(a.t||0)-(b.t||0));}
 // 같은 카드의 다른 슬롯이 진행중이면 새로 시작할 수 없음(같은 카드 안에서는 순차 진행).
@@ -6002,7 +6001,7 @@ function getMorningFlowMonthCounts(mk){
     if(!k||!k.startsWith('mflow_')||!k.startsWith('mflow_'+mk))continue;
     const flow=S.get(k);
     if(!flow||!flow.picks)continue;
-    Object.keys(flow.picks).forEach(pk=>{const p=flow.picks[pk];const ck=(p&&p.key)||pk;if(counts[ck]!==undefined&&p&&p.status==='done')counts[ck]++;}); // 옛 구조(카드key)와 슬롯 구조 모두 집계
+    Object.keys(flow.picks).forEach(pk=>{const p=flow.picks[pk];const ck=(p&&p.key)||pk;if(counts[ck]!==undefined&&p&&p.status==='done')counts[ck]++;}); // 슬롯의 key가 카드. 옛 구조로 기기에 남은 과거 로컬 기록(id=카드key)도 세도록 pk 폴백(이번 달이 지나면 불필요)
   }
   return counts;
 }
@@ -6012,8 +6011,8 @@ function saveMorningFlow(dk,data){data._localTs=Date.now();S.set('mflow_'+dk,dat
 async function syncMorningFlowUp(dk){
   const flow=getMorningFlow(dk);
   const clientTs=flow._localTs||Date.now();
-  // picks = 슬롯 맵(각 값에 key=카드). etc 컬럼은 새 형식 표식({v:2}) — 옛 형식(카드별 etc/_enjoy/_desk/... 상태)과 구분용.
-  const ok=await supaUpsert('morning_flow_picks','date_key',[{date_key:dk,picks:flow.picks||{},etc:{v:2},client_ts:clientTs}]);
+  // picks = 슬롯 맵(각 값에 key=카드). etc 컬럼은 더 이상 쓰지 않음(빈 객체) — 컬럼 자체는 옛 캐시 버전의 업로드가 실패하지 않도록 남겨둠.
+  const ok=await supaUpsert('morning_flow_picks','date_key',[{date_key:dk,picks:flow.picks||{},etc:{},client_ts:clientTs}]);
   // 업로드 도중(await 대기 중) 그 사이 다른 로컬 변경이 또 들어와 _localTs가 갱신됐을 수 있으므로,
   // "지금 올린 시각과 현재 로컬 시각이 같을 때만" pending 해제 — 아니면 그 사이의 새 변경분이 아직 안 올라간 것으로 간주.
   if(ok){const cur=getMorningFlow(dk);if((cur._localTs||0)<=clientTs)S.set(S.key('mflow_pending',dk),false);}
@@ -6033,13 +6032,7 @@ async function syncMorningFlowDown(dk){
   // 서버 client_ts가 로컬 _localTs보다 오래됐거나 같으면(=로컬이 더 최신이거나 동시) 덮어쓰지 않음.
   // 서버에 client_ts가 없는 옛 레코드(마이그레이션 이전)는 0으로 취급해 항상 로컬 우선.
   if((r.client_ts||0)<=(local._localTs||0)&&(local._localTs||0)>0)return;
-  const etcRaw=r.etc||{};
-  let raw={picks:r.picks||{}};
-  if(etcRaw.v!==2){ // 옛 형식 — 카드별 상태가 etc 컬럼에 _enjoy/_desk/... 로 들어있음(읽는 즉시 슬롯으로 변환됨)
-    const etc={...etcRaw};['_enjoy','_desk','_exercise','_rest','_clean'].forEach(k=>delete etc[k]);
-    raw={picks:r.picks||{},etc,enjoy:etcRaw._enjoy||{},desk:etcRaw._desk||{},exercise:etcRaw._exercise||{},rest:etcRaw._rest||{},clean:etcRaw._clean||{}};
-  }
-  S.set('mflow_'+dk,{..._mfNormalizeFlow(raw),_localTs:r.client_ts||Date.now()});
+  S.set('mflow_'+dk,{picks:r.picks||{},_localTs:r.client_ts||Date.now()});
 }
 // ── 슬롯 조작(2026-09-20) ──
 let _mfSelId=null; // 화면에서 펼쳐 둔 슬롯 id(저장하지 않는 화면 상태)
@@ -14214,7 +14207,7 @@ async function initSync(){
   // 습관 / 습관체크 — 항상 동기화 (이전엔 syncAll에만 있어서 PC 사파리 등 새 탭에서 누락되던 버그)
   await syncHabitsDown();
   await syncHabitGoalsDown();
-  // 굿모닝(모닝 플로우) — 최근 2일(오늘+어제, 파트2 회고용)만 다운로드
+  // 굿모닝(모닝 플로우) — 최근 2일(오늘+어제, 새벽 4시 경계 대비)만 다운로드
   {
     const mflowTasks=[];
     const nowD=new Date();
