@@ -436,7 +436,7 @@ function _rhythmBlockDisplayTitle(text){
   return text;
 }
 // 리듬 메모 모달 제목 생성 — "카테고리 · 콘텐츠 제목"(text 있을 때) 또는 "카테고리 · 지속시간"(없을 때).
-// 종료 시점(finishRhythmBlock)/1시간 알림(_openRhythmMemoFromUrlIfPresent) 양쪽에서 동일 로직이라
+// 종료 시점(finishRhythmBlock)/1시간 알림(_openFromNotificationUrl) 양쪽에서 동일 로직이라
 // 공용화(2026-09-18). endStr을 안 넘기면 현재 시각까지의 경과로 계산(아직 진행 중인 블록용).
 function _buildRhythmMemoTitle(cat,startStr,endStr,text){
   const catInfo=RHYTHM_CATS[cat];
@@ -2610,6 +2610,11 @@ async function deleteAlertFor(sourceType,sourceCid){
   if(!sourceCid)return;
   await supaFetch(`alerts?source_type=eq.${encodeURIComponent(sourceType)}&source_cid=eq.${encodeURIComponent(sourceCid)}`,'DELETE');
 }
+// 할일/일정의 알림 예약을 모두 정리 — 원래 알림 + (할일이면) 스누즈 임시 알림('todo_snooze').
+function clearTodoAlerts(isEvent,cid){
+  deleteAlertFor(isEvent?'event':'todo',cid);
+  if(!isEvent)deleteAlertFor('todo_snooze',cid);
+}
 // ── 알림 시각 설정(user_settings) — 서버 send-alerts Edge Function이 이 값과 지금 시각을 비교해
 // 아침브리핑/남은할일+습관/수면/저녁마무리 4종의 발송 시각을 판단(리듬 진행중/주간·월말 리포트는 고정).
 // row가 항상 1개뿐인 단일설정 테이블이라 로컬 캐시 없이 매번 직접 조회/저장(불일치 걱정 없음).
@@ -2619,6 +2624,64 @@ async function getUserSettings(){
 }
 async function setUserSettingTime(field,timeStr){
   await supaUpsert('user_settings','id',[{id:true,[field]:timeStr}]);
+}
+// ── 할일 알림 스누즈 (2026-09-20) ──
+// 할일 알림('todo'/'todo_snooze')을 누르면 ?snooze=<cid>로 앱이 열려 하단 시트가 뜨고, 30분/1시간/오늘 저녁/내일 아침 중 골라 다시 알림을 예약.
+// 스누즈는 원래 알림과 별개의 임시 알림('todo_snooze', 할일당 1개 — 다시 미루면 덮어씀)이라 할일의 알림 시각 설정은 바뀌지 않음.
+// 정리: 완료/삭제/알림 시각 변경(clearTodoAlerts, 수정 저장부) + 서버가 발송 직전에 완료 여부를 한 번 더 확인.
+let _snoozeCtx=null; // {cid,text,dk,targets}
+function _findTodoByCid(cid){
+  for(let i=0;i<localStorage.length;i++){
+    const k=localStorage.key(i);
+    if(!k||!k.startsWith('todos:'))continue;
+    const dk=k.slice(6);
+    const todo=getTodos.raw(dk).find(x=>x.cid===cid);
+    if(todo)return {dk,todo};
+  }
+  return null;
+}
+// 스누즈 칩 목록 — 오늘 저녁/내일 아침 시각은 설정탭의 남은 할일 알림·아침 브리핑 시각을 그대로 읽음(없으면 19:30/08:00).
+// 오늘 저녁이 이미 지났으면 그 칩은 뺌. 새벽 0~4시는 아직 "어젯밤"이라 내일 아침 = 오늘 아침.
+function _snoozeTargets(settings){
+  const now=new Date();
+  const at=hhmm=>{const [h,m]=hhmm.split(':').map(Number);const d=new Date(now);d.setHours(h,m,0,0);return d;};
+  const eve=at((settings&&settings.remaining_todo_time)||'19:30');
+  const morn=at((settings&&settings.morning_briefing_time)||'08:00');
+  if(now.getHours()>=4)morn.setDate(morn.getDate()+1);
+  const list=[
+    {key:'m30',label:'30분 후',at:new Date(now.getTime()+30*60000),msg:'30분 뒤에'},
+    {key:'h1',label:'1시간 후',at:new Date(now.getTime()+60*60000),msg:'1시간 뒤에'}
+  ];
+  if(eve>now)list.push({key:'eve',label:'오늘 저녁',at:eve,msg:'오늘 저녁에'});
+  list.push({key:'morn',label:'내일 아침',at:morn,msg:'내일 아침에'});
+  return list;
+}
+async function openSnoozeSheet(cid){
+  const found=_findTodoByCid(cid);
+  if(!found||found.todo.isEvent){showToast('찾을 수 없는 할일이에요');return;}
+  if(found.todo.done){showToast('이미 끝낸 할일이에요');return;}
+  const settings=await getUserSettings().catch(()=>null);
+  const targets=_snoozeTargets(settings);
+  _snoozeCtx={cid,text:found.todo.text,dk:found.dk,targets};
+  document.getElementById('snooze-title').textContent=found.todo.text;
+  document.getElementById('snooze-chips').innerHTML=targets.map(t=>`<div class="snooze-chip" onclick="snoozeTodo('${t.key}')">${t.label}</div>`).join('');
+  openSheet('snooze-sheet');
+}
+async function snoozeTodo(key){
+  const ctx=_snoozeCtx;
+  const t=ctx&&ctx.targets.find(x=>x.key===key);
+  if(!t)return;
+  closeSheet('snooze-sheet');
+  await scheduleAlertAt('todo_snooze',ctx.cid,t.at,ctx.text,null);
+  showToast(t.msg+' 다시 알려드릴게요');
+}
+function completeSnoozeTodo(){
+  const ctx=_snoozeCtx;
+  if(!ctx)return;
+  closeSheet('snooze-sheet');
+  const idx=getTodos(ctx.dk).findIndex(x=>x.cid===ctx.cid);
+  if(idx>=0&&!getTodos(ctx.dk)[idx].done)toggleTodoAt(ctx.dk,idx,ctx.cid);
+  showToast('완료로 표시했어요');
 }
 // 기기 시간대를 서버에 동기화 — 여행 등으로 시간대가 바뀌었을 때만 서버에 씀(값이 같으면 요청 자체를 안 보냄).
 // 로컬(S.get)에 마지막으로 보낸 시간대를 기억해두고 비교하는 방식이라, 평소(시간대 안 바뀜)엔 매일 앱을
@@ -7143,8 +7206,10 @@ function fillRemainingTodoStrikeParts(target,now){
   target.strikeTimes=st;
 }
 // cid를 함께 받아 todos[i]의 cid가 다르면 cid로 정확한 항목을 재탐색해 그 항목을 토글.
-function toggleTodo(i,expectedCid){
-  const dk=dateKey(currentDate),todos=getTodos(dk);
+function toggleTodo(i,expectedCid){toggleTodoAt(dateKey(currentDate),i,expectedCid);}
+// dk를 받는 버전 — 스누즈 시트의 "완료"처럼 지금 보고 있는 날짜(currentDate)와 다른 날짜의 할일도 처리하기 위함.
+function toggleTodoAt(dk,i,expectedCid){
+  const todos=getTodos(dk);
   const{target}=findTodoSafe(todos,i,expectedCid);
   if(!target)return;
   target.done=!target.done;
@@ -7174,7 +7239,7 @@ function toggleTodo(i,expectedCid){
   saveTodos(dk,todos);renderTodos();
   // 체크완료 시점의 시각이 최종 처리 시각(completedAt)이라 예상시간 기준 알림은 더 이상 필요 없음 — 정리.
   // 체크 해제 시엔 alertTime이 남아있다면 다시 예약(재사용 의도로 지운 게 아니라 되돌린 것이므로).
-  if(target.done)deleteAlertFor(target.isEvent?'event':'todo',target.cid);
+  if(target.done)clearTodoAlerts(target.isEvent,target.cid);
   else{
     const basisTime=alertBasisTimeFor(target);
     if(basisTime)syncAlertFor(target.isEvent?'event':'todo',target.cid,dk,basisTime,target.text);
@@ -7721,7 +7786,7 @@ function removeTodoByCid(dk,cid){
   const t=todos[idx];
   addDelPending('todos',dk,cid);
   todos.splice(idx,1);saveTodos(dk,todos);
-  deleteAlertFor(t.isEvent?'event':'todo',cid); // 알림 예약이 있었다면 함께 정리(없어도 무해)
+  clearTodoAlerts(t.isEvent,cid); // 알림 예약(스누즈 포함)이 있었다면 함께 정리(없어도 무해)
   return true;
 }
 // 일정/할일 모달 안 삭제 버튼 — 오늘탭 일정처럼 스와이프 진입점이 없는 곳에서도 모달을 열어 바로 삭제할 수 있게 함.
@@ -7818,8 +7883,10 @@ async function confirmTodo(){
     setTimeout(()=>{_todoSubmitting=false;},500);
     return;
   }
+  let alertChanged=false; // 수정 저장으로 알림 시각/온오프가 바뀌었는지 — 바뀌었으면 옛 스누즈 예약도 정리
   if(editIdx>=0&&todos[editIdx]){
     const old=todos[editIdx];
+    alertChanged=old.alertTime!==alertTime||!!old.todoAlertOn!==!!todoAlertOn;
     // 조각(strikeParts)이 있는 투두의 텍스트를 수기 편집하면, 조각 개수/순서가 바뀔 수 있음.
     // strikeParts/strikeTimes가 "조각 내용"이 아니라 "인덱스"만 기억하는 구조라, 그대로 두면
     // 예: [메일확인, 마케팅회의, 보고서작성, 서류체크]에서 "보고서작성"(idx 2)을 완료 표시한 뒤
@@ -7855,7 +7922,8 @@ async function confirmTodo(){
   // alerts 동기화 — 일정은 eventTime+eventAlertOn, 할일은 alertTime+todoAlertOn(둘 다 온일 때만) 기준으로 발송 예약
   const alertBasisTime=alertBasisTimeFor({isEvent,eventAlertOn,eventTime,todoAlertOn,alertTime});
   if(alertBasisTime)syncAlertFor(isEvent?'event':'todo',savedTodo.cid,dk,alertBasisTime,text);
-  else deleteAlertFor(isEvent?'event':'todo',savedTodo.cid);
+  else clearTodoAlerts(isEvent,savedTodo.cid); // 알림을 껐거나 시각이 없어졌으면 스누즈 임시 알림까지 정리
+  if(!isEvent&&alertChanged)deleteAlertFor('todo_snooze',savedTodo.cid); // 알림 시각/온오프를 바꿨으면 옛 스누즈도 정리
   // 월간 캘린더의 "투두 추가하기"에서 열린 경우 — currentDate를 원래대로 되돌리고 캘린더/상세를 갱신
   // (calMode가 아니면 restoreCalModeAndRender 내부에서 renderTodos만 실행됨)
   restoreCalModeAndRender(modal,true);
@@ -14098,11 +14166,13 @@ const MEMO_URL_DEFAULT_COPY={
   sleep:['오늘 하루는 어땠나요?','잠들기 전, 오늘을 짧게 남겨보세요.'],
   noon:['식사 후 나른한 시간이에요','지금 컨디션이나 오후 계획을 한 줄 남겨볼까요?']
 };
-async function _openRhythmMemoFromUrlIfPresent(urlStr){
+async function _openFromNotificationUrl(urlStr){
   const params=new URLSearchParams((urlStr?urlStr.split('?')[1]:location.search)||'');
+  const snoozeCid=params.get('snooze'); // 할일 알림 — 스누즈 시트
   const memoType=params.get('memo');
-  if(!['rhythm','sleep','noon','question'].includes(memoType))return;
+  if(!snoozeCid&&!['rhythm','sleep','noon','question'].includes(memoType))return;
   if(!urlStr)history.replaceState(null,'',location.pathname); // 최초 로드 경로일 때만 자기 URL을 정리(SW 메시지 경로는 애초에 주소가 안 바뀌므로 불필요)
+  if(snoozeCid){openSnoozeSheet(snoozeCid);return;}
   const todayDk=dateKey(new Date());
   const copy=MEMO_URL_DEFAULT_COPY[memoType];
   if(copy){openRhythmMemoModal(memoType,todayDk,params.get('t')||copy[0],params.get('b')||copy[1]);return;}
@@ -14131,7 +14201,7 @@ async function _openRhythmMemoFromUrlIfPresent(urlStr){
 if('serviceWorker' in navigator){
   navigator.serviceWorker.addEventListener('message',e=>{
     if(e.data&&e.data.type==='notification-click'&&e.data.url){
-      _openRhythmMemoFromUrlIfPresent(e.data.url);
+      _openFromNotificationUrl(e.data.url);
     }
   });
 }
@@ -14285,7 +14355,7 @@ setTimeout(checkAndRecoverPushSubscription, 1500);
   }
   hideSplash();
   // 1시간 리마인드 알림으로 콜드 스타트된 경우 — 스플래시가 완전히 사라진 뒤에만 메모 모달을 띄운다(2026-09-17).
-  _openRhythmMemoFromUrlIfPresent();
+  _openFromNotificationUrl();
 })();
 
 

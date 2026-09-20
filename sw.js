@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.106-weekly-fallback';
+const CACHE = 'iikoto-v2.107-todo-snooze';
 const ASSETS = [
   './',
   './index.html'

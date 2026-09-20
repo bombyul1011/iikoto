@@ -339,6 +339,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .wish-del-btn{font-size:var(--dow-label-size);color:var(--tm);cursor:pointer;padding:2px 4px;flex-shrink:0;}
 .meal-inp.wish-target{background:rgba(190,230,205,0.18);border-radius:6px;}
 .month-chips{display:flex;gap:6px;margin-bottom:16px;overflow-x:auto;padding-bottom:2px;}
+.snooze-chip{flex:1;text-align:center;font-size:var(--dow-label-size);color:var(--tp);padding:9px 0;border-radius:12px;background:var(--card);border:1px solid var(--card-b);cursor:pointer;font-weight:500;white-space:nowrap;} /* 할일 알림 스누즈 시트 칩(4개 한 줄) */
 .m-chip{flex-shrink:0;font-size:var(--dow-label-size);color:var(--tm);padding:7px 13px;border-radius:13px;background:var(--card);border:1px solid var(--card-b);cursor:pointer;font-weight:500;}
 .m-chip.active{background:rgba(150,215,180,0.4);border-color:rgba(140,210,170,0.55);color:#3a7858;font-weight:700;}
 /* 4주 리포트 칩 전용 — 개수가 4개로 고정이라 가로 스크롤 대신 화면 폭에 맞춰 균등 4등분. */
@@ -2020,6 +2021,22 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div style="font-size:var(--main-text-size);font-weight:600;color:rgba(80,140,200,0.9);text-align:center;margin-bottom:16px;letter-spacing:0.04em;"><i class="ti ti-sparkles ico-13" aria-hidden="true"></i> 주간 돌아보기 <i class="ti ti-sparkles ico-13" aria-hidden="true"></i></div>
       <div id="wr-week-chips" class="month-chips week-chips-4" style="margin-bottom:14px;"></div>
       <div id="weekly-review-content" style="font-size:var(--main-text-size);color:var(--tp);line-height:1.9;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- TODO SNOOZE SHEET (할일 알림 클릭 시) -->
+<div class="overlay" id="snooze-sheet" onclick="closeSheet('snooze-sheet',event)">
+  <div class="bsheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div style="padding:0 20px 24px;">
+      <div style="font-size:var(--dow-label-size);color:var(--ts);margin-bottom:2px;">할일 알림</div>
+      <div id="snooze-title" style="font-size:var(--main-text-size);font-weight:600;color:var(--tp);line-height:1.5;margin-bottom:14px;"></div>
+      <div id="snooze-chips" style="display:flex;gap:6px;"></div>
+      <div style="display:flex;gap:8px;margin-top:14px;">
+        <button class="mbtn ok" onclick="completeSnoozeTodo()">완료</button>
+        <button class="mbtn" style="background:rgba(var(--divider-rgb),0.12);color:var(--ts);" onclick="closeSheet('snooze-sheet')">닫기</button>
+      </div>
     </div>
   </div>
 </div>
