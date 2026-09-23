@@ -27,7 +27,7 @@
 /* ── RESET ── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 html{height:100%;min-height:calc(100% + env(safe-area-inset-top));background:var(--bg);}
-#bg-fixed{position:fixed;inset:0;z-index:0;background:var(--bg);}
+#bg-fixed{position:fixed;inset:0;z-index:0;background:var(--bg);background-attachment:fixed;} /* Safari 상단바 색 스캔 대응 — 독서(.reading-ov)/콘텐츠(.content-hub-ov)는 background-attachment:fixed가 있어 최초 진입부터 정상 채워지는데, 메인 화면엔 없어서 첫 렌더 시 흰색으로 남는 것으로 추정 (2026-09-24, 문제 시 되돌릴 것) */
 body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;background:var(--bg);}
 
 /* ══ PALETTE — 앱 공용 8색 컬러 팔레트 (2026-08-16 통합) ══
