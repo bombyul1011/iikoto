@@ -5455,7 +5455,7 @@ function renderEventList(dk,todos){
     // 일정 텍스트는 투두의 '조각 나누기' 기능이 필요 없어 단순 escape만 함(renderTodoTextParts를 쓰면 내부 클릭 핸들러가 투두 인덱스를 잘못 참조해 엉뚱한 투두가 열리는 문제가 있었음)
     const textHtml=escapeHtml(ev.text);
     const recurIconHtml=ev.recurRuleCid?'<i class="ti ti-repeat ico-sz-11" style="color:var(--tm);flex-shrink:0;margin-right:2px;" aria-hidden="true" title="반복"></i>':'';
-    const rightBadge=ev.eventEndDate?`<span class="event-time event-daycount">${ev.dayIndex}일차</span>`:(ev.eventTime?`<span class="event-time">${ev.eventTime}</span>`:'');
+    const rightBadge=ev.eventEndDate?`<span class="event-time">Day ${ev.dayIndex}</span>`:(ev.eventTime?`<span class="event-time">${ev.eventTime}</span>`:''); // 연속일정 며칠차 — 배지 스타일 제거, 시간 표기와 동일한 톤으로 "Day n" 표기 (2026-09-24)
     el.innerHTML=`<i class="ti ${ec.icon}" style="font-size:14px;color:${ec.textColor};flex-shrink:0;" title="${ec.label}" aria-hidden="true"></i><span class="event-txt">${textHtml}</span>${recurIconHtml}${rightBadge}`;
     list.appendChild(el);
   });
