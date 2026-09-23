@@ -28,8 +28,6 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 html{height:100%;min-height:calc(100% + env(safe-area-inset-top));background:var(--bg);}
 #bg-fixed{position:fixed;inset:0;z-index:0;background:var(--bg);}
-#bg-topstrip{position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top);z-index:1;background:#fdf0e8;} /* Safari가 상단바 색을 그라디언트(--bg)에서 불안정하게 읽는 문제 대응 — 상태바 영역만 덮는 단색 레이어. 색은 테마 전환 스크립트가 갱신 (2026-09-24) */
-[data-theme="glass"] #bg-topstrip{background:#f7f4ee;}
 body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;background:var(--bg);}
 
 /* ══ PALETTE — 앱 공용 8색 컬러 팔레트 (2026-08-16 통합) ══
@@ -126,7 +124,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="glass"] .quote-soft{filter:none;}
 
 /* ══ SPLASH ══ */
-#splash{position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;transition:opacity .6s,transform .6s;}
+#splash{position:fixed;inset:0;z-index:9999;background:#fdf0e8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;transition:opacity .6s,transform .6s;} /* Safari 상단바 색 스캔이 그라디언트(--bg)를 못 읽는 문제 대응 — 최초 로드 시 화면 전체를 덮는 스플래시부터 단색으로 (2026-09-24, 문제 시 되돌릴 것) */
+[data-theme="glass"] #splash{background:#f7f4ee;}
 #splash.hide{opacity:0;transform:scale(1.04);pointer-events:none;}
 .sp-logo{width:200px;height:auto;opacity:0;transform:translateY(14px);animation:fadeUp .7s .2s cubic-bezier(.22,.8,.44,1) forwards;}
 .sp-sub{font-family:'Comfortaa',cursive;font-size:var(--dow-label-size);color:var(--tm);letter-spacing:3.5px;text-transform:uppercase;opacity:0;animation:fadeUp .5s .6s ease forwards;}
@@ -1501,8 +1500,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 </head>
 <body>
 <div id="bg-fixed"></div>
-<div id="bg-topstrip"></div>
-<script>(function(){try{var t=localStorage.getItem('theme');if(t){t=JSON.parse(t);document.documentElement.setAttribute('data-theme',t);var c={light:'#fdf0e8',glass:'#f7f4ee'}[t];var m=document.querySelector('meta[name="theme-color"]');if(m&&c)m.setAttribute('content',c);var ts=document.getElementById('bg-topstrip');if(ts&&c)ts.style.background=c;}}catch(e){}})();</script>
+<script>(function(){try{var t=localStorage.getItem('theme');if(t){t=JSON.parse(t);document.documentElement.setAttribute('data-theme',t);var c={light:'#fdf0e8',glass:'#f7f4ee'}[t];var m=document.querySelector('meta[name="theme-color"]');if(m&&c)m.setAttribute('content',c);}}catch(e){}})();</script>
 <script>(function(){try{var s=localStorage.getItem('textScale');s=s?JSON.parse(s):0;var base={'-1':{main:13,dow:11},'0':{main:14,dow:12},'1':{main:15,dow:13}}[String(s)]||{main:14,dow:12};document.documentElement.style.setProperty('--main-text-size',base.main+'px');document.documentElement.style.setProperty('--dow-label-size',base.dow+'px');}catch(e){}})();</script>
 
 <!-- SPLASH -->
