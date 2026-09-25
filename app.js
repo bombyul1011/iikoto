@@ -1157,8 +1157,6 @@ function computeRawStatsForRange(y,mo,lastDay,light){
         if(!_isHabitActiveOn(h,dk))return; // 2026-09-06: 비활성 기간(시작 전/archive 이후)은 달성률 분모에서 제외
         ht++;if(checks[`${h.id}-${dow}`])hc++;
       });
-    }
-    if(!isVac){
       const dd=getDayCategoryDurations(dk);
       Object.keys(dd).forEach(function(k){
         rhythmDur[k]=(rhythmDur[k]||0)+dd[k];
