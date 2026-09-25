@@ -1,72 +1,14168 @@
-// iikoto Service Worker
-const CACHE = 'iikoto-v2.112-splash-color';
-const ASSETS = [
-  './',
-  './index.html'
-];
 
-self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(ASSETS))
-  );
-  self.skipWaiting();
-});
 
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
-  );
-});
+// 일요일 0시~월요일 24시 구간(일요일 전체+월요일 전체)에 노출되는 "주간 돌아보기" 배너/시트가 참조할 "그 주 일요일" 날짜키.
+// 생성 가능한 시점은 일요일 22시(night_2)뿐. 그 외 시점의 조회는 아카이브앱으로 분리됨.
+// getLogicalDate()는 새벽 4시 컷이라 월요일 저녁(19~24시)엔 그냥 "월요일"을 반환해버려서,
+// 이 구간에서 곧이곧대로 쓰면 일요일 밤에 만들어둔 weekly_summary_ 캐시를 못 찾는 문제가 생김.
+// 그래서 "화~토요일(2~6)"이면 오늘, "일요일(0)"이면 오늘, "월요일(1)"이면 하루 전으로 보정.
+function _thisWeekSundayDk(){
+  const now=new Date();
+  const d=new Date(now);
+  if(now.getDay()===1)d.setDate(d.getDate()-1); // 월요일 전체(0~24시) → 어제(일요일)로 보정
+  else if(now.getHours()<4)d.setDate(d.getDate()-1); // 그 외 요일은 기존 getLogicalDate와 동일한 새벽 4시 컷 유지
+  return dateKey(d);
+}
+// 일요일 22시(생성 시점) 전용 배너 — 클릭 시 없으면 새로 생성(openWeeklyReviewSheet).
+// 월요일 한정 — 지난주(그 주 일요일) 요약이 아직 없으면(=일요일 22시 생성을 놓친 경우) 조용히 생성.
+// 화면에 배너를 띄우지 않고, 완료 시 토스트로만 알림(조회는 아카이브앱). 중복 실행 방지용 플래그 포함.
+let _backfillInFlight=false;
+async function maybeBackfillWeeklyReview(){
+  if(_backfillInFlight)return;
+  const dk=_thisWeekSundayDk();
+  const cacheKey='weekly_summary_'+dk;
+  const localCached=S.get(cacheKey);
+  if(localCached&&!_isWeeklyFallback(localCached))return; // 이미 있음(정상 생성됨) — 아무 일도 하지 않음
+  if(!getClaudeKey())return; // 생성 불가 환경이면 조용히 스킵
+  _backfillInFlight=true;
+  try{
+    const serverHtml=await aiCacheGet(cacheKey);
+    if(serverHtml&&!_isWeeklyFallback(serverHtml)){S.set(cacheKey,serverHtml);return;} // 다른 기기에서 이미 생성된 경우 — 토스트 없이 조용히 캐싱만
+    const html=await makeWeeklySummaryCard();
+    if(html&&!_isWeeklyFallback(html)){
+      S.set(cacheKey,html);
+      aiCacheSet(cacheKey,html);
+      showToast('지난주 요약이 준비됐어요 🌿');
+    }
+  }catch(e){}
+  finally{_backfillInFlight=false;}
+}
+function appendSundayGenerateBanner(body){
+  const banner=document.createElement('div');
+  banner.className='weekly-review-banner';
+  banner.innerHTML=`<div class="weekly-review-banner-inner">
+    <div class="weekly-review-banner-title"><i class="ti ti-sparkles ico-13" aria-hidden="true"></i> 주간 돌아보기 <i class="ti ti-sparkles ico-13" aria-hidden="true"></i></div>
+    <div class="weekly-review-banner-sub"><span>지난 한주간의 나는 어땠을까요?</span><span style="font-size:15px;opacity:0.6;"><i class="ti ti-chevron-up" aria-hidden="true"></i></span></div>
+  </div>`;
+  banner.addEventListener('click',openWeeklyReviewSheet);
+  body.appendChild(banner);
+}
+function renderHomeBody(section){
+  const body=document.getElementById('home-body');
+  if(!body)return;
+  body.innerHTML='';
+  const _ld=getLogicalDate();
+  const _lh=new Date().getHours();
+  const _isLateNightOrDawn=_lh>=22||_lh<6; // 기간별 리포트(월간 중간·말일) 전용 — 파트2(22시)+새벽에만 노출
+  // 주간리포트 배너: 일요일 22시(night_2)에만 "생성 가능" 배너. 그 외 시점은 노출 없음(조회는 아카이브앱으로 분리됨).
+  const _ldDay=_ld.getDay(); // 논리적 요일(새벽 4시 컷) — 물리적 getDay() 대신 사용, 새벽 0~4시 구간 오작동 방지
+  const isSundayNight2=_ldDay===0&&getSubSection()==='night_2';
+  const isLastDayOfMonth=(()=>{const t=new Date(_ld);t.setDate(_ld.getDate()+1);return t.getDate()===1;})()&&_isLateNightOrDawn;
+  // 월요일 한정 놓친 주간요약 보완 — 일요일 22시(생성 시점)를 놓쳐서 지난주 캐시가 없으면
+  // 배너 없이 조용히 백그라운드 생성 후 토스트만 알림. 화면엔 아무것도 띄우지 않음(조회는 아카이브앱에서).
+  if(_ldDay===1)maybeBackfillWeeklyReview();
 
-self.addEventListener('fetch', e => {
-  if(e.request.url.includes('supabase.co')) return;
-  if(e.request.method !== 'GET') return;
-  if(e.request.url.includes('workers.dev')) return;
-
-  e.respondWith(
-    fetch(e.request)
-      .then(res => {
-        const clone = res.clone();
-        caches.open(CACHE).then(c => c.put(e.request, clone));
-        return res;
-      })
-      .catch(() => {
-        return caches.match(e.request) || caches.match('./');
-      })
-  );
-});
-
-self.addEventListener('push', e => {
-  let data = { title: '이이코토', body: '', url: './' };
-  try {
-    if (e.data) data = { ...data, ...e.data.json() };
-  } catch (err) {
-    if (e.data) data.body = e.data.text();
-  }
-  e.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: './icon-192.png',
-      badge: './icon-192.png',
-      data: { url: data.url || './' }
-    })
-  );
-});
-
-self.addEventListener('notificationclick', e => {
-  e.notification.close();
-  const targetUrl = e.notification.data?.url || './';
-  e.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
-      for (const c of clientList) {
-        // 이미 열려있는 창은 URL이 자동으로 안 바뀌므로, 창을 포커스하면서
-        // postMessage로 목적지 정보를 전달 — app.js가 수신해 직접 모달을 연다(2026-09-17).
-        c.postMessage({ type: 'notification-click', url: targetUrl });
-        return c.focus();
+  if(section==='morning'){
+    // 아침 루틴(굿모닝) 카드 — 카드 그리드 + 오늘의 슬롯
+    body.appendChild(makeMorningFlowCard());
+    body.appendChild(makeHabitStreakRow());
+    body.appendChild(makeTodayRhythmBanner());
+  } else if(section==='afternoon'){
+    body.appendChild(makeAfternoonHomeCard());
+    body.appendChild(makeTodayRhythmBanner());
+  } else if(section==='dawn'){
+    const dawnDk=dateKey(getLogicalDate());
+    const paceBanner=makeDawnPaceBanner(dawnDk);
+    if(paceBanner)body.appendChild(paceBanner);
+    body.appendChild(makeDawnRecapCard());
+    body.appendChild(makeLabel('오늘의 리듬'));
+    body.appendChild(makeTodayRhythmBanner());
+  } else {
+    // 저녁 공통 틀(파트1): [그날의 특수 배너] → 링 → 리듬배너 → (브리핑) → 독서카드
+    // 저녁 파트2(2026-09-06 개편): 인사카드 → 오늘의 독서 → 오늘의 문장 → (리포트 있는 날) 리포트 배너 → 오늘의 리듬기록
+    function appendReportBannerIfAny(){
+      if(isLastDayOfMonth){
+        body.appendChild(makeLabel('🌿 이번 달 누계'));
+        const rbanner=document.createElement('div');
+        rbanner.className='weekly-review-banner';
+        rbanner.innerHTML=`<div class="weekly-review-banner-inner">
+          <div class="weekly-review-banner-title">🌿 이번 달 누계 보기</div>
+          <div class="weekly-review-banner-sub"><span>한 달 동안의 기록을 모아봤어요</span><div class="report-banner-arrow" style="display:inline-flex;"><i class="ti ti-chevron-up ico-sz-15" aria-hidden="true"></i></div></div>
+        </div>`;
+        rbanner.addEventListener('click',openMonthlyReportSheet);
+        body.appendChild(rbanner);
+      } else if(isSundayNight2){
+        appendSundayGenerateBanner(body);
       }
-      if (clients.openWindow) return clients.openWindow(targetUrl);
-    })
-  );
+    }
+    const isNight2=getSubSection()==='night_2';
+    if(!isNight2)appendReportBannerIfAny(); // 파트1은 원래 순서(맨 앞) 그대로 유지 — 건드리지 않음
+    if(isNight2){
+      body.appendChild(makeLabel('오늘의 독서'));
+      body.appendChild(makeBookCardWithCover());
+      const quoteCard=makeTodayQuoteCard();
+      if(quoteCard)body.appendChild(quoteCard);
+      appendReportBannerIfAny(); // 파트2 개편(2026-09-06): 문장 다음, 리듬기록 이전으로 이동
+      body.appendChild(makeTodayRhythmBanner());
+    }else{
+      body.appendChild(makeHabitMiniCheckRow());
+      body.appendChild(makeChaeumBanner());
+      body.appendChild(makeLabel('저녁 플리'));
+      body.appendChild(makePlaylistMiniCard());
+      body.appendChild(makeTodayRhythmBanner());
+      // "오늘 마무리" 브리핑은 통합카드(상단 인삿말)가 흡수함
+      body.appendChild(makeEveningMiniStatCard());
+    }
+  }
+}
+
+function makeLabel(txt){
+  const d=document.createElement('div');
+  d.className='slabel';d.textContent=txt;return d;
+}
+const RHYTHM_CATS={
+  exercise:{label:'운동',color:'rgba(var(--pal-pink-rgb),0.80)',icon:'ti-run'},
+  rest:{label:'휴식',color:'rgba(var(--pal-mint-rgb),0.55)',icon:'ti-armchair'},
+  groom:{label:'단장',color:'rgba(var(--pal-orange-rgb),0.82)',icon:'ti-mood-spark'},
+  work:{label:'업무',color:'rgba(var(--pal-sky-rgb),0.45)',icon:'ti-keyboard'}, // 업무 존재감 살짝 올림(식사 아이콘과 겹쳐도 시인성 확인 완료), 2026-09-06
+  appointment:{label:'외출',color:'rgba(var(--pal-rose-rgb),0.25)',icon:'ti-bus'}, // 알파만 낮춤(채도는 원색 그대로), 외출도 지속시간이 길어 존재감 조절, 2026-09-04
+  note:{label:'책상',color:'rgba(var(--pal-yellow-rgb),0.82)',icon:'ti-desk'},
+  enjoy:{label:'감상',color:'rgba(var(--pal-lavender-rgb),0.80)',icon:'ti-stack-2'},
+  home:{label:'살림',color:'rgba(var(--pal-lime-rgb),0.82)',icon:'ti-home'}
+};
+const RHYTHM_SLEEP_COLOR='rgba(var(--pal-warmgray-rgb),0.30)'; // 알파만 낮춤(채도는 원색 그대로), 2026-09-04
+const RHYTHM_MEAL_COLOR='rgba(var(--pal-green-rgb),0.90)';
+// 다음주 코멘트/제안 카드의 카테고리→아이콘 매핑 공용 베이스. 제안 카드(NEXT_WEEK_SUGGEST_CAT_ICON)만 '취미' 아이콘이 추가로 필요해 확장해 사용.
+const NEXT_WEEK_CAT_ICON={
+  '운동':'ti-run','식사':'ti-salad','수면':'ti-moon','공부':'ti-book',
+  '업무':'ti-briefcase','마음가짐':'ti-heart','습관':'ti-repeat'
+};
+const NEXT_WEEK_SUGGEST_CAT_ICON={...NEXT_WEEK_CAT_ICON,'취미':'ti-stack-2'};
+// 리듬 카테고리 분류 설명 — AI 프롬프트에서 시간 사용 데이터를 다룰 때 카테고리 오분류(예: 업무↔책상, 휴식↔감상)를 줄이기 위해 공통으로 붙이는 한 줄 설명.
+const RHYTHM_CAT_GUIDE='(카테고리 참고: 운동=홈트/헬스장/러닝 등, 휴식=낮잠/멍때리기/게임 등 목적 없이 흘려보내는 시간, 단장=기상 후 스트레칭·씻기·스킨케어 등 몸을 준비하는 루틴이나 취침 전 씻고 정돈하는 루틴, 그리고 다음날/다음 일정을 위해 미리 손 써두는 시간(여행 짐 챙기기, 다음날 식사 미리 준비해두기 등)까지 포함 — 지금 당장이 아니라 다가올 시간을 위해 준비하는 행위 전반(휴식과 구분됨), 업무=주로 노트북으로 하는 작업(가끔 외근 포함), 외출=지인과의 약속이나 혼자 가는 카페/산책 등, 책상=일기·공부·앱 정비·노트정리 등 책상에서 하는 작업, 감상=드라마·독서·영화, 정리=청소·빨래 등 집안 정리)';
+function getRhythmColor(key){
+  if(key==='_sleep')return RHYTHM_SLEEP_COLOR;
+  if(key==='_meal')return RHYTHM_MEAL_COLOR;
+  return RHYTHM_CATS[key]?RHYTHM_CATS[key].color:'var(--tm)';
+}
+// 투두 중 '일정'(isEvent:true)에 붙는 카테고리 — 애플 캘린더식 4분류(약속/개인/업무/기타).
+// 색상 단일 소스는 CSS :root의 --ev-* 변수(위 THEME TOKENS 앞 EVENT CATEGORY COLORS 블록) —
+// 값을 바꿀 땐 그 CSS 블록만 고치면 여기·모달버튼·캘린더배지에 자동 반영됨.
+function _evVar(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim();}
+const EVENT_CATS={
+  schedule:{label:'약속',textColor:_evVar('--ev-schedule-border'),bg:_evVar('--ev-schedule-bg'),icon:'ti-confetti'},
+  personal:{label:'개인',textColor:_evVar('--ev-personal-border'),bg:_evVar('--ev-personal-bg'),icon:'ti-plant'},
+  work:{label:'업무',textColor:_evVar('--ev-work-border'),bg:_evVar('--ev-work-bg'),icon:'ti-moneybag-heart'},
+  etc:{label:'기타',textColor:_evVar('--ev-etc-border'),bg:_evVar('--ev-etc-bg'),icon:'ti-calendar-smile'}
+};
+function getEventCat(key){return EVENT_CATS[key]||EVENT_CATS.etc;}
+function getRhythmBlocks(dk){return S.get(S.key('rblocks',dk))||[];}
+function saveRhythmBlocks(dk,v){
+  S.set(S.key('rblocks',dk),v);
+  S.set(S.key('rblocks_pending',dk),true);
+  autoSync('rblocks',dk);
+}
+// 취침 시각이 등록되면(화면이 보던 날짜 dk와 그 전날, 총 이틀) end가 비어있거나
+// 이전에 자동종료로 채워진(autoClosed=true) 블록을 찾아 취침시각 기준으로 (재)완료 처리.
+// - 사용자가 직접 "종료" 버튼으로 채운 end(finishRhythmBlock)는 autoClosed가 없으므로 절대 건드리지 않음.
+// - 자동종료로 채운 end는 취침시각이 이후에 다시 수정되면(예: 08:26으로 잘못 입력 후 01:50으로 정정)
+//   그때마다 다시 이 함수가 불려 최신 취침시각 기준으로 end가 재계산됨 — 몇 번을 고쳐도 계속 따라감.
+function autoCloseUnfinishedRhythmBlocks(todayDk,sleepTime){
+  if(!sleepTime)return;
+  const sleepMin=dawnTimeToAdjustedMin(sleepTime);
+  if(sleepMin==null)return;
+  const yesterdayDk=dateKey(new Date(new Date(todayDk+'T00:00:00').getTime()-86400000));
+  [todayDk,yesterdayDk].forEach(dk=>{
+    const blocks=getRhythmBlocks(dk);
+    if(!blocks.length)return;
+    let changed=false;
+    blocks.forEach(b=>{
+      if(b.end&&!b.autoClosed)return; // 사용자가 직접 종료한 블록은 절대 건드리지 않음
+      const startMin=dawnTimeToAdjustedMin(b.start);
+      if(startMin==null)return;
+      if(dk===todayDk){
+        if(startMin>=sleepMin)return; // 시작시각이 취침시각 이후/동일이면 스킵(비정상 데이터 보호)
+      }
+      // dk===yesterdayDk인 경우: 전날 시작해 자정을 넘겨 오늘 새벽 취침시각까지 이어진 블록.
+      // sleepMin은 항상 새벽보정(1440분 이상)된 값이므로 그 직전 시각을 그대로 종료시각으로 씀.
+      const closeMin=(sleepMin-1)%1440;
+      b.end=pad(Math.floor(closeMin/60))+':'+pad(closeMin%60);
+      b.autoClosed=true;
+      changed=true;
+    });
+    if(changed)saveRhythmBlocks(dk,blocks);
+  });
+}
+// row→local 매핑 공용화(memoRowToLocal 등과 동일 패턴) — syncRhythmBlocksDown/DownMany 양쪽에서 재사용, 중복 정의 제거
+function rhythmBlockRowToLocal(r){return {cat:r.cat,start:r.start_time,end:r.end_time,text:r.text||'',created:r.created,cid:r.client_id||genCid(),autoClosed:!!r.auto_closed,contentCid:r.content_cid||null};}
+async function syncRhythmBlocksUp(dk){
+  const blocks=getRhythmBlocks(dk);
+  if(ensureItemCids(blocks))S.set(S.key('rblocks',dk),blocks);
+  const delCids=getDelPendingCids('rblocks',dk);
+  const ok=await syncListUpSafe('rhythm_blocks',`date_key=eq.${dk}`,'date_key,client_id',blocks,
+    b=>({date_key:dk,cat:b.cat,start_time:b.start,end_time:b.end,text:b.text||'',created:b.created||Date.now(),client_id:b.cid,auto_closed:!!b.autoClosed,content_cid:b.contentCid||null}),
+    delCids);
+  if(ok)delCids.forEach(cid=>removeDelPending('rblocks',dk,cid));
+  return ok;
+}
+async function syncRhythmBlocksDown(dk){
+  const rows=await supaFetch('rhythm_blocks?date_key=eq.'+dk+'&order=created');
+  if(!rows)return; // 연결 실패 — 로컬 유지
+  if(S.get(S.key('rblocks_pending',dk)))return; // 업로드 대기중인 로컬 수정 있으면 덮어쓰지 않음
+  S.set(S.key('rblocks',dk),rows.map(rhythmBlockRowToLocal));
+}
+// ── initSync 전용 범위 다운로드 — 날짜별로 따로 fetch하면 N일치면 N번 왕복이 그대로 쌓여
+// (특히 LTE/콜드스타트에서) 로딩이 길어짐. date_key=in.(...) 한 번으로 묶어 왕복을 1회로 줄임.
+// 매핑 로직은 각 syncXDown의 기존 rowToLocal/변환 그대로 재사용 — 중복 재구현 안 함.
+// pending 있는 날짜는 덮어쓰지 않는 것도 syncXDown과 동일하게 유지.
+async function _syncManyDown(table,dks,pendingKey,mapFn,setFn){
+  if(!dks.length)return;
+  const rows=await supaFetch(`${table}?date_key=in.(${dks.join(',')})&order=created`);
+  if(!rows)return; // 연결 실패 — 로컬 유지
+  const byDk={};
+  dks.forEach(dk=>{byDk[dk]=[];});
+  rows.forEach(r=>{if(byDk[r.date_key])byDk[r.date_key].push(r);});
+  dks.forEach(dk=>{
+    if(pendingKey&&S.get(S.key(pendingKey,dk)))return; // 업로드 대기중인 로컬 수정 있으면 덮어쓰지 않음
+    setFn(dk,byDk[dk].map(mapFn));
+  });
+}
+async function syncTodosDownMany(dks){
+  await _syncManyDown('todos',dks,'todos_pending',
+    r=>({text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null,eventEndDate:r.event_end_date||null,cat:r.cat||'todo',pinned:!!r.pinned,recurRuleCid:r.recur_rule_cid||undefined,alertTime:r.alert_time||null,eventAlertOn:!!r.event_alert_on,todoAlertOn:!!r.todo_alert_on}),
+    (dk,mapped)=>{
+      // 반복 규칙cid 중복 방어(syncTodosDown과 동일 로직)
+      const seenRuleCids=new Set();
+      const deduped=mapped.filter(t=>{
+        if(!t.recurRuleCid)return true;
+        if(seenRuleCids.has(t.recurRuleCid))return false;
+        seenRuleCids.add(t.recurRuleCid);
+        return true;
+      });
+      S.set(S.key('todos',dk),deduped);
+    });
+  renderTodos();
+}
+async function syncMemosDownMany(dks){
+  await _syncManyDown('memos',dks,'memos_pending',memoRowToLocal,(dk,mapped)=>S.set(S.key('memos',dk),mapped));
+  renderMemos();
+}
+async function syncSleepDownMany(dks){
+  await _syncManyDown('sleep',dks,'sleep_pending',sleepRowToLocal,(dk,mapped)=>{if(mapped.length)S.set(S.key('sleep',dk),mapped[0]);});
+}
+async function syncMealsDownMany(dks){
+  await _syncManyDown('meals',dks,null,mealRowToLocal,(dk,mapped)=>{
+    if((S.get(S.key('meals_fields_pending',dk))||[]).length)return; // 업로드 대기중인 필드 있으면 덮어쓰지 않음
+    if(mapped.length)S.set(S.key('meals',dk),mapped[0]);
+  });
+}
+async function syncRhythmBlocksDownMany(dks){
+  await _syncManyDown('rhythm_blocks',dks,'rblocks_pending',rhythmBlockRowToLocal,
+    (dk,mapped)=>S.set(S.key('rblocks',dk),mapped));
+}
+let _rhythmTrackEl=null,_rhythmDk=null,_rhythmFormOpen=false,_rhythmFormCat=null,_rhythmFormStart='',_rhythmFormEnd='',_rhythmFormText='',_rhythmFormCid=null,_rhythmEditIdx=null,_rhythmSubmitting=false;
+// 홈탭 트랙과 주간탭 리듬바 양쪽에서 폼이 열려있을 수 있으므로, 저장/취소/편집 시 둘 다 안전하게 갱신.
+// 홈탭 트랙이 화면에 없으면(주간탭에서 입력 중인 경우) 그 부분만 건너뛰고 주간탭만 갱신.
+// 주간탭에서 폼을 열었다가 취소/저장으로 닫히면(_rhythmFormOpen=false) 바 아래 슬롯도 함께 접음.
+function refreshRhythmTrack(){
+  if(_rhythmTrackEl&&_rhythmDk){
+    const old=_rhythmTrackEl; // buildDailyRhythmTrack이 _rhythmTrackEl을 새 노드로 덮어쓰기 전에 먼저 잡아둠
+    const fresh=buildDailyRhythmTrack(_rhythmDk);
+    if(old.parentNode)old.replaceWith(fresh);
+  }
+  if(_weeklyRhythmFormOpen&&!_rhythmFormOpen)_weeklyRhythmFormOpen=false;
+  if(document.getElementById('v-weekly')&&document.getElementById('v-weekly').classList.contains('on'))renderWeeklyRhythmBars();
+}
+function _resetRhythmForm(){
+  _rhythmFormCat=null;_rhythmFormStart='';_rhythmFormEnd='';_rhythmFormText='';_rhythmFormCid=null;_rhythmEditIdx=null;
+}
+function toggleRhythmAddForm(){
+  _rhythmFormOpen=!_rhythmFormOpen;
+  if(!_rhythmFormOpen)_resetRhythmForm();
+  refreshRhythmTrack();
+}
+function openRhythmEditForm(idx){
+  const b=getRhythmBlocks(_rhythmDk)[idx];if(!b)return;
+  _rhythmEditIdx=idx;_rhythmFormCat=b.cat;_rhythmFormStart=b.start;_rhythmFormEnd=b.end||'';_rhythmFormText=b.text||'';_rhythmFormCid=b.contentCid||null;
+  _rhythmFormOpen=true;
+  refreshRhythmTrack();
+}
+// 리듬바 감상 입력 폼에서 진행중 드라마/영화 칩을 누르면 한줄메모 인풋에 제목을 채움.
+// 전체 폼을 다시 그리지 않고 인풋 값만 직접 갱신해 다른 입력값(시작/끝 시각 등) 유지.
+// 책상 카테고리에서 '일기'를 선택하면 '일기' 습관이 있을 경우 자동으로 체크(습관 이름이 바뀌었거나 없으면 조용히 무시).
+// rgba(r,g,b,a) 형태의 리듬색에서 배경용으로 알파값만 낮춘 옅은 버전을 만듦(color-mix() 미지원 브라우저 대비).
+function _lightenRgba(rgbaStr,newAlpha){
+  const m=rgbaStr.match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/);
+  if(!m)return rgbaStr;
+  return 'rgba('+m[1]+','+m[2]+','+m[3]+','+newAlpha+')';
+}
+function pickRhythmContentTitle(fullTitle,chipEl,cid){
+  _rhythmFormText=fullTitle;
+  _rhythmFormCid=cid||null; // 콘텐츠 칩(감상)이 아닌 경우(외출/운동 등 고정문구 칩)는 cid 없이 null
+  const inp=document.getElementById('rhythm-text-inp');
+  if(inp)inp.value=fullTitle;
+  document.querySelectorAll('.rhythm-content-chip').forEach(el=>el.classList.remove('sel'));
+  if(chipEl)chipEl.classList.add('sel');
+  // 일기 습관 자동체크는 실제 저장 시점(saveRhythmBlock)에서 처리 — 칩만 누르고 저장 안 하면 습관이 먼저 체크되는 걸 방지
+}
+function selectRhythmCatAndOpen(cat){
+  if(_rhythmFormOpen&&_rhythmFormCat===cat&&_rhythmEditIdx==null){
+    // 같은 카테고리를 다시 누르면 폼을 닫음
+    _rhythmFormOpen=false;_resetRhythmForm();
+    refreshRhythmTrack();
+  }else{
+    // 다른 카테고리를 누르면 폼이 열려있어도 그대로 이어서 카테고리만 전환(시간값은 유지, 메모 텍스트는 초기화)
+    _rhythmFormCat=cat;
+    _rhythmFormOpen=true;
+    _rhythmFormText='';
+    refreshRhythmTrack();
+    setTimeout(()=>{
+      const f=_rhythmTrackEl&&_rhythmTrackEl.querySelector('.rhythm-add-form');
+      if(f)f.scrollIntoView({behavior:'smooth',block:'end'});
+    },50);
+  }
+}
+function setRhythmNow(which){
+  const n=new Date(),v=pad(n.getHours())+':'+pad(n.getMinutes());
+  if(which==='start')_rhythmFormStart=v;else _rhythmFormEnd=v;
+  refreshRhythmTrack();
+}
+function openRhythmTimeModal(which){
+  _sleepTarget='rblock-'+which;
+  document.getElementById('time-inp').value=which==='start'?_rhythmFormStart:_rhythmFormEnd;
+  openModal('time-modal');
+  renderTimeWheel();
+}
+function saveRhythmBlock(){
+  if(_rhythmSubmitting)return;
+  const cat=_rhythmFormCat;if(!cat)return;
+  const t=document.getElementById('rhythm-text-inp');
+  const start=_rhythmFormStart,end=_rhythmFormEnd;
+  if(!start)return;
+  _rhythmSubmitting=true;
+  const text=t?t.value.trim():'';
+  const blocks=getRhythmBlocks(_rhythmDk);
+  const isNew=_rhythmEditIdx==null;
+  // enjoy(감상) 카테고리이고 콘텐츠 칩으로 선택한 경우에만 contentCid를 붙임 — 직접입력/타 카테고리는 undefined 그대로(불필요한 null 남기지 않음)
+  const contentCid=(cat==='enjoy'&&_rhythmFormCid)?_rhythmFormCid:undefined;
+  if(_rhythmEditIdx!=null&&blocks[_rhythmEditIdx]){
+    const old=blocks[_rhythmEditIdx];
+    blocks[_rhythmEditIdx]={cat:cat,start:start,end:end||'',text:text,created:old.created,cid:old.cid||genCid(),contentCid:contentCid!==undefined?contentCid:old.contentCid};
+  }else{
+    blocks.push({cat:cat,start:start,end:end||'',text:text,created:Date.now(),cid:genCid(),contentCid:contentCid});
+  }
+  saveRhythmBlocks(_rhythmDk,blocks);
+  if(isNew){
+    if(cat==='home'){
+      if(text==='정리')checkHabitDirect('tidy',_rhythmDk,start); // 살림 중 '정리' 칩 선택했을 때만 습관 연결 — 세탁/주방은 제외
+    }else{
+      autoCheckHabitFromRhythm(cat,_rhythmDk,start);
+    }
+    if(cat==='note'&&text==='일기')checkHabitDirect('diary',_rhythmDk,start);
+  }
+  _rhythmFormOpen=false;_resetRhythmForm();
+  refreshRhythmTrack();
+  setTimeout(()=>{_rhythmSubmitting=false;},500);
+}
+// 리듬 블록 카테고리에 대응하는 습관(월간 결산용)을 자동으로 체크
+// 매핑은 HABIT_AUTO_RHYTHM_MAP(카탈로그 도입, 2026-09-05)에 정의 — 운동/케어(단장) 2개 카테고리 지원
+// (살림은 '정리' 칩 선택시에만 연결하는 별도 분기가 있어 이 공용 맵엔 포함하지 않음, 2026-09-12)
+function autoCheckHabitFromRhythm(cat,dk,startTime){
+  const habitId=HABIT_AUTO_RHYTHM_MAP[cat];if(!habitId)return;
+  checkHabitDirect(habitId,dk,startTime);
+}
+// 습관 id를 지정해 직접 체크(이미 켜져 있으면 그대로 둠 - 수동으로 끈 걸 되돌리지 않기 위함).
+// [2026-09-05] 기존엔 습관 "이름"이 키였으나, 카탈로그 도입으로 습관마다 고유 id를 갖게 되어
+// 체크 데이터도 id 기준으로 저장 — 이름을 나중에 바꿔도 체크 기록이 끊기지 않음.
+// timeStr('HH:MM')을 넘기면 그 시각(예: 리듬 블록의 시작시간)을 기록하고, 없으면 현재 시각을 씀.
+// 이미 체크되어 있는 상태여도, 아직 시각 기록이 없다면 시각만은 보강해서 남긴다.
+// habitId 습관을 dk(날짜)에 체크 — 이미 체크+시각이 모두 있으면(다른 경로로 이미 기록된 경우) 아무것도 안 함.
+function checkHabitDirect(habitId,dk,timeStr){
+  const habits=getHabits();
+  if(!habits.some(h=>h.id===habitId&&_isHabitCurrentlyOn(h)))return;
+  const d=new Date(dk+'T00:00:00');
+  const wk=weekKey(d),dow=(d.getDay()+6)%7;
+  const key=habitId+'-'+dow;
+  const checks=getHabitChecks(wk);
+  const alreadyChecked=!!checks[key];
+  const hcTimes=getHabitCheckTimes(wk);
+  const alreadyHasTime=!!hcTimes[key];
+  if(alreadyChecked&&alreadyHasTime)return; // 이미 체크+시각 둘 다 있으면 더 할 일 없음
+  if(!alreadyChecked)checks[key]=true;
+  if(!alreadyHasTime){
+    if(timeStr)hcTimes[key]=timeStr;
+    else hcTimes[key]=pad(new Date().getHours())+':'+pad(new Date().getMinutes());
+  }
+  // checks/hcTimes를 로컬에 먼저 반영한 뒤, 서버 동기화는 한 번만 트리거해 레이스 컨디션 방지
+  // (이전엔 saveHabitChecks/saveHabitCheckTimes가 각각 autoSync→syncHCUp을 별도 호출해
+  //  hcTimes 세팅 전에 나간 첫 호출이 checked_time:null로 서버를 덮어쓰는 경우가 있었음)
+  S.set(S.key('hc',wk),checks);
+  S.set(S.key('hcTime',wk),hcTimes);
+  S.set('hc_pending_'+wk,true);
+  autoSync('hc',wk);
+  if(document.getElementById('daily-habit-box'))renderDailyHabitCheck();
+}
+function finishRhythmBlock(idx){
+  const blocks=getRhythmBlocks(_rhythmDk);
+  if(!blocks[idx])return;
+  const n=new Date();
+  const endStr=pad(n.getHours())+':'+pad(n.getMinutes());
+  const startStr=blocks[idx].start;
+  blocks[idx].end=endStr;
+  delete blocks[idx].autoClosed; // 사용자가 직접 종료했으므로 자동종료 표시를 지워 이후 취침시각 재수정에 영향받지 않게 확정
+  const cat=blocks[idx].cat;
+  saveRhythmBlocks(_rhythmDk,blocks);
+  syncMorningFlowOnRhythmBlockEnd(_rhythmDk,blocks[idx].cid,endStr); // 모닝플로우로 시작한 블록이면 picks도 done으로 동기화
+  if(cat==='exercise')scheduleExerciseStatAlert(blocks[idx].cid);
+  refreshRhythmTrack();
+  // 종료 시점 메모 제안 — 리듬블록에 입력된 텍스트(콘텐츠 제목 등)가 있으면 그걸 우선 표시,
+  // 없으면 기존처럼 카테고리 라벨·지속시간으로 폴백(_buildRhythmMemoTitle 공용 로직, 2026-09-18).
+  const title=_buildRhythmMemoTitle(cat,startStr,endStr,blocks[idx].text);
+  if(title)openRhythmMemoModal(cat,_rhythmDk,title,'오늘 이 시간, 짧게 남겨볼까요?');
+}
+// 시작~종료(HH:MM) 사이 경과 분 — 자정 넘김 보정 포함. 리듬바 자정넘김 규칙(2026-09-09)과 동일 방식.
+function _rhythmDurationMin(startStr,endStr){
+  const [sh,sm]=startStr.split(':').map(Number),[eh,em]=endStr.split(':').map(Number);
+  let dur=(eh*60+em)-(sh*60+sm);
+  if(dur<0)dur+=1440;
+  return dur;
+}
+// 리듬블록 text에서 사람이 읽을 제목을 뽑는다 — "드라마 - 제목"/"영화 - 제목"/"독서 - 제목" 형태는
+// 접두어를 떼고 제목만, 접두어 없는 자유입력(운동/휴식 등 직접 타이핑)은 그대로, text 자체가
+// 없으면 null을 반환해 호출부가 카테고리 라벨로 폴백하게 한다(2026-09-17).
+function _rhythmBlockDisplayTitle(text){
+  if(!text||!text.trim())return null;
+  const catPrefix={'드라마 - ':6,'영화 - ':5,'독서 - ':5};
+  for(const p in catPrefix){if(text.startsWith(p))return text.slice(catPrefix[p]);}
+  return text;
+}
+// 리듬 메모 모달 제목 생성 — "카테고리 · 콘텐츠 제목"(text 있을 때) 또는 "카테고리 · 지속시간"(없을 때).
+// 종료 시점(finishRhythmBlock)/1시간 알림(_openFromNotificationUrl) 양쪽에서 동일 로직이라
+// 공용화(2026-09-18). endStr을 안 넘기면 현재 시각까지의 경과로 계산(아직 진행 중인 블록용).
+function _buildRhythmMemoTitle(cat,startStr,endStr,text){
+  const catInfo=RHYTHM_CATS[cat];
+  if(!catInfo||!startStr)return null;
+  const actualEnd=endStr||(pad(new Date().getHours())+':'+pad(new Date().getMinutes()));
+  const durMin=_rhythmDurationMin(startStr,actualEnd);
+  const durLabel=durMin>=60?`${Math.floor(durMin/60)}시간${durMin%60?' '+(durMin%60)+'분':''}`:`${durMin}분`;
+  const displayTitle=_rhythmBlockDisplayTitle(text);
+  return displayTitle?`${catInfo.label} · ${displayTitle}`:`${catInfo.label} · ${durLabel}`;
+}
+// ── 운동 리듬바 종료 통계 알림 (2026-09-08 설계) ──
+// exercise 카테고리 블록을 종료할 때마다, 이번달 누적 횟수 + 주3회 목표 스트릭(완결된 주까지만 정확 계산,
+// 진행중인 이번주는 자연어로 유연하게 언급)을 조합해 종료 10분 뒤 알림 예약.
+// 로컬 캐시가 30일치라 스트릭 역산은 최대 4주(지난주부터)로 제한 — 그 이상은 서버 별도조회 필요해 범위 밖.
+function _countExerciseInMonth(mk){
+  // mk: 'YYYY-MM'. 로컬 캐시(dk별 rblocks)를 이번달 1일~오늘까지 순회해 exercise 블록 개수를 셈.
+  const [y,m]=mk.split('-').map(Number);
+  const today=new Date();
+  const isCurMonth=(today.getFullYear()===y&&today.getMonth()+1===m);
+  const lastDay=isCurMonth?today.getDate():new Date(y,m,0).getDate();
+  let count=0;
+  for(let day=1;day<=lastDay;day++){
+    const dk=`${y}-${pad(m)}-${pad(day)}`;
+    count+=getRhythmBlocks(dk).filter(b=>b.cat==='exercise'&&b.end).length;
+  }
+  return count;
+}
+// 특정 주(weekKey 형식 'week:YYYY-MM-DD', 월요일 시작)의 exercise 운동 횟수
+function _countExerciseInWeek(wk){
+  const wkStart=wk.replace('week:','');
+  const d=new Date(wkStart+'T00:00:00');
+  let count=0;
+  for(let i=0;i<7;i++){
+    const dd=new Date(d);dd.setDate(d.getDate()+i);
+    count+=getRhythmBlocks(dateKey(dd)).filter(b=>b.cat==='exercise'&&b.end).length;
+  }
+  return count;
+}
+// 완결된 주(지난주부터 역산, 최대 4주)를 훑어 "연속으로 주3회 이상 채운 주가 몇 주째인지" 계산.
+// 한 주라도 3회 미만이면 그 지점에서 스트릭 종료.
+function _exerciseWeekStreak(){
+  const now=new Date();
+  let streak=0;
+  for(let i=1;i<=4;i++){
+    const wkDate=new Date(now);wkDate.setDate(now.getDate()-7*i);
+    const wk=weekKey(wkDate);
+    if(_countExerciseInWeek(wk)>=3)streak++;
+    else break;
+  }
+  return streak;
+}
+function _buildExerciseStatMessage(){
+  const mk=monthKey(new Date());
+  const monthCount=_countExerciseInMonth(mk);
+  const thisWeekCount=_countExerciseInWeek(weekKey(new Date()));
+  const streak=_exerciseWeekStreak();
+  let body=`이번달 ${monthCount}번째 운동이에요.`;
+  if(thisWeekCount>=3){
+    body+=streak>0?` 이번주도 목표 달성! ${streak+1}주 연속이에요.`:' 이번주 목표 달성이에요!';
+  }else if(streak>0){
+    body+=` 이번주 ${thisWeekCount}번째, 벌써 ${streak}주째 꾸준히 이어가고 있어요.`;
+  }
+  return {title:'운동 완료 🏃',body};
+}
+async function scheduleExerciseStatAlert(blockCid){
+  if(!blockCid)return;
+  const settings=await getUserSettings();
+  if(settings&&settings.exercise_stat_enabled===false)return; // 개별 온오프에서 꺼둔 경우 예약 자체를 생략
+  const {title,body}=_buildExerciseStatMessage();
+  const alertAt=new Date(Date.now()+10*60*1000); // 종료 10분 후
+  scheduleAlertAt('exercise_stat',blockCid,alertAt,title,body);
+}
+// 리듬바에서 블록을 직접 종료했을 때, 그 블록이 모닝플로우 카드로 시작된 것이면(blockCid 매칭)
+// 모닝플로우 쪽 status도 done으로 함께 갱신 — 오전 홈탭이 지나가버려 모닝플로우 화면에서 종료를 못 누르는
+// 경우(예: 외출이 오전 내내 안 끝남) 리듬바에서 종료해도 월간 카운트/통계에 정상 반영되도록.
+// (2026-09-04 추가 — 이게 없으면 리듬바 종료는 rhythm_blocks만 갱신하고 모닝플로우 picks는 영원히
+//  running으로 붕 떠서, "시작만 하고 종료 안 하면 미시작 취급" 정책과 어긋나는 상태가 됨)
+function syncMorningFlowOnRhythmBlockEnd(dk,blockCid,endStr){
+  if(!blockCid)return;
+  const flow=getMorningFlow(dk);
+  let changed=false;
+  Object.keys(flow.picks).forEach(key=>{
+    const p=flow.picks[key];
+    if(p&&p.status==='running'&&p.blockCid===blockCid){
+      flow.picks[key]={...p,status:'done'}; // 종료 시각은 리듬블록에 이미 기록됨 — 여기선 status만 done으로 전환
+      changed=true;
+    }
+  });
+  if(changed){saveMorningFlow(dk,flow);if(document.querySelector('.mf-hero'))refreshMorningFlowCard();}
+}
+function deleteRhythmBlock(idx){
+  const blocks=getRhythmBlocks(_rhythmDk);
+  const b=blocks[idx];
+  if(b)addDelPending('rblocks',_rhythmDk,b.cid);
+  blocks.splice(idx,1);
+  saveRhythmBlocks(_rhythmDk,blocks);
+  if(b)syncMorningFlowOnRhythmBlockDelete(_rhythmDk,b.cid); // 모닝플로우로 시작된 블록을 리듬탭에서 지운 경우 — "하려다가 안 한 것"으로 보고 pick도 idle로 되돌림
+  refreshRhythmTrack();
+}
+// 리듬탭에서 블록을 직접 삭제했을 때, 그 블록이 모닝플로우 카드로 시작된 것이면(blockCid 매칭)
+// 해당 pick을 통째로 지워 미시작(idle) 상태로 되돌림 — "등록한 리듬을 지운다 = 하려다가 안 했다"는 정책(2026-09-05).
+function syncMorningFlowOnRhythmBlockDelete(dk,blockCid){
+  if(!blockCid)return;
+  const flow=getMorningFlow(dk);
+  let changed=false;
+  Object.keys(flow.picks).forEach(key=>{
+    if(flow.picks[key]&&flow.picks[key].blockCid===blockCid){
+      delete flow.picks[key];
+      changed=true;
+    }
+  });
+  if(changed){saveMorningFlow(dk,flow);if(document.querySelector('.mf-hero'))refreshMorningFlowCard();}
+}
+
+// ══════════════════════════════════════════════════════════
+// ██ 공용 유틸 (1/3 — 나머지는 CONSTANTS~SUPABASE SYNC 부근, 별점위젯헬퍼 부근) ██
+// ══════════════════════════════════════════════════════════
+// ── 리듬 카테고리별 시간 집계 유틸 (월간/주간 등 여러 리포트에서 공용으로 사용)
+function getDayCategoryDurations(dk){
+  const sleep=getSleep(dk)||{},meals=getMeals(dk)||{},manual=getRhythmBlocks(dk);
+  const dur={};
+  const add=function(label,min){if(min>0)dur[label]=(dur[label]||0)+min;};
+  const wakeMin=toMin(sleep.wake),sleepMin=toMin(sleep.sleep);
+  if(wakeMin!=null&&sleepMin!=null&&sleepMin<=wakeMin){add('수면',wakeMin-sleepMin);}
+  else{
+    if(wakeMin!=null)add('수면',wakeMin);
+    // 기상을 아직 안 누른 경우(sleepMin만 있고 wakeMin 없음)는 진행중이라 누계에서 제외
+  }
+  MEAL_KEYS.forEach(function(k){if(meals[k+'_time'])add('식사',60);});
+  manual.forEach(function(b){
+    if(!b.end)return; // 진행중 블록은 누계에서 제외
+    const cat=RHYTHM_CATS[b.cat];if(!cat)return;
+    const s=toMin(b.start),e=toMin(b.end);
+    if(s==null||e==null)return;
+    add(cat.label,e>s?e-s:(1440-s+e)); // 자정을 넘기는 경우도 전체 길이로 집계
+  });
+  return dur;
+}
+// startDate부터 days일 동안의 카테고리(라벨)별 누적시간+발생일수 — 최근 7일 요약(computeWeeklyRhythmDur), 주간 리포트(이번주/지난주 비교),
+// 다음주 제안이 공용으로 사용(예전엔 리포트마다 같은 집계 루프를 따로 갖고 있었음).
+function sumCategoryDurations(startDate,days){
+  const dur={},dayCount={};
+  for(let i=0;i<days;i++){
+    const d=new Date(startDate);d.setDate(startDate.getDate()+i);
+    const dd=getDayCategoryDurations(dateKey(d));
+    Object.keys(dd).forEach(function(k){
+      dur[k]=(dur[k]||0)+dd[k];
+      if(dd[k]>0)dayCount[k]=(dayCount[k]||0)+1;
+    });
+  }
+  return {dur,dayCount};
+}
+function fmtDur(min){
+  const h=Math.floor(min/60),m=Math.round(min%60);
+  if(h>0&&m>0)return h+'시간 '+m+'분';
+  if(h>0)return h+'시간';
+  return m+'분';
+}
+function durSummaryLine(dur){
+  const keys=Object.keys(dur);
+  if(!keys.length)return '';
+  return keys.map(function(k){return k+' '+fmtDur(dur[k]);}).join(' · ');
+}
+function buildMonthlyRhythmBar(dur,dim,dayCount){
+  // 막대는 활동 카테고리끼리만 비교 (수면은 이미 상단 통계에 평균값으로 따로 표시됨, 식사는 시간 기록 단위가 아니라 비교 의미가 적음)
+  const order=Object.values(RHYTHM_CATS).map(function(c){return c.label;});
+  const colorMap={};
+  Object.keys(RHYTHM_CATS).forEach(function(k){colorMap[RHYTHM_CATS[k].label]=getRhythmColor(k);});
+  const total=order.reduce(function(s,k){return s+(dur[k]||0);},0);
+  if(!total)return '';
+  let barHtml='<div class="mr-rhythm-bar">';
+  order.forEach(function(k){
+    const v=dur[k]||0;if(v<=0)return;
+    const pct=v/total*100;
+    barHtml+='<div class="mr-rhythm-seg" style="width:'+pct+'%;background:'+colorMap[k]+';" title="'+k+' '+fmtDur(v)+'"></div>';
+  });
+  barHtml+='</div>';
+  const listItems=order.filter(function(k){return (dur[k]||0)>0;})
+    .sort(function(a,b){return dur[b]-dur[a];}); // 누계 많은 순 정렬(2026-09-08)
+  const listHtml=listItems.length?'<div class="mr-rhythm-list">'+listItems.map(function(k){
+    const v=dur[k],days=(dayCount&&dayCount[k])||1,avg=v/days;
+    return '<div class="mr-rhythm-item"><span class="dot" style="background:'+colorMap[k]+';"></span><span class="lbl">'+k+'</span><span class="val">누계 '+fmtDur(v)+' · 일평균 '+fmtDur(avg)+'</span></div>';
+  }).join('')+'</div>':'<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:4px 0;">기록된 리듬 항목이 없어요</div>';
+  return barHtml+listHtml;
+}
+function buildDailyRhythmTrackFresh(dk){
+  // 새로 화면에 들어올 때마다 입력폼은 항상 닫힌 상태로 시작 (열린 채로 남아있던 버그 수정)
+  _rhythmFormOpen=false;_resetRhythmForm();
+  return buildDailyRhythmTrack(dk);
+}
+// ── 리듬 구간(수면/식사/수기블록) 공통 계산 — 세로트랙/가로바/흐름목록 3곳에서 각자 재구현되던
+// "자정 넘김 판단 + 수면·식사·수기블록을 구간으로 변환" 로직을 하나로 통일.
+// 반환하는 각 구간: {start,end,color,label,time,ongoing,manualIdx,sortKey,ref} — end/ongoing 등은
+// 그날(dk) 자체 기준(전날에서 이어지는 조각이나 다음날로 넘어가는 조각은 포함하지 않음. 그건 호출부가
+// 필요시 prevDk/nextDk를 별도로 한번 더 호출해 직접 이어붙임).
+function computeRhythmBlocksRaw(dk){
+  const sleep=getSleep(dk)||{};
+  const meals=getMeals(dk)||{};
+  const manual=getRhythmBlocks(dk);
+  const blocks=[];
+  const wakeMin=toMin(sleep.wake),sleepMin=toMin(sleep.sleep);
+  if(wakeMin!=null&&sleepMin!=null&&sleepMin<=wakeMin){
+    blocks.push({start:sleepMin,end:wakeMin,color:getRhythmColor('_sleep'),label:'수면',time:sleep.sleep+' – '+sleep.wake,kind:'sleep'});
+  }else{
+    if(wakeMin!=null)blocks.push({start:0,end:wakeMin,color:getRhythmColor('_sleep'),label:'수면',time:'00:00 – '+sleep.wake,kind:'sleep'});
+    if(sleepMin!=null&&wakeMin==null){
+      blocks.push({start:sleepMin,end:null,color:getRhythmColor('_sleep'),label:'수면',time:sleep.sleep+' – 기상 전',ongoing:true,kind:'sleep'});
+    }
+  }
+  MEAL_KEYS.forEach(function(k){
+    const t=meals[k+'_time'];
+    if(!t)return;
+    const start=toMin(t);
+    blocks.push({start:start,end:Math.min(start+30,1440),color:getRhythmColor('_meal'),label:meals[k]||MEAL_LABELS[k],time:t,icon:true,kind:'meal'});
+  });
+  // 자정 넘어 새로 등록된 블록(예: 00:30 시작)을 그날 이른 새벽 활동과 구분하기 위한 기준시각.
+  // 그날 이미 등록된 수기 블록들 중 가장 늦은 시각(끝났으면 end, 진행중이면 start)을 구해두고,
+  // 이보다 훨씬 이른 새벽 시각(DAWN_CUTOFF_MIN, 04시 이전)에 시작하는 블록이 새로 추가되면
+  // "자정을 넘겨 시작한 것"으로 보고 정렬 순서(sortKey)만 +1440분(다음날 취급) 적용.
+  let latestManualMin=-1;
+  manual.forEach(function(b){
+    const s=toMin(b.start);if(s==null)return;
+    const e=b.end?toMin(b.end):s;
+    const ref=(e!=null&&e>s)?e:s;
+    if(ref>latestManualMin)latestManualMin=ref;
+  });
+  manual.forEach(function(b,idx){
+    const cat=RHYTHM_CATS[b.cat];if(!cat)return;
+    const sMin=toMin(b.start);if(sMin==null)return;
+    let eMin=b.end?toMin(b.end):null;
+    const isLateNightNew=sMin<DAWN_CUTOFF_MIN&&latestManualMin>=DAWN_CUTOFF_MIN&&sMin<latestManualMin;
+    let sortKey=sMin;
+    if(isLateNightNew)sortKey+=1440;
+    blocks.push({start:sMin,end:eMin,sortKey:sortKey,color:getRhythmColor(b.cat),label:b.text||cat.label,time:b.start+' – '+(b.end||'진행중'),manualIdx:idx,ongoing:!b.end,kind:'manual'});
+  });
+  return blocks;
+}
+function buildDailyRhythmTrack(dk){
+  _rhythmDk=dk;
+  const outer=document.createElement('div');
+  const d=new Date(dk+'T00:00:00');
+  const isToday=dk===dateKey(new Date());
+  const dateRow=document.createElement('div');dateRow.className='rhythm-track-datelabel';
+  dateRow.innerHTML='<span>'+(d.getMonth()+1)+'월 '+d.getDate()+'일 '+_HOME_DAYS[d.getDay()]+'요일</span><span class="w">'+(isToday?'오늘':'')+'</span>';
+  outer.appendChild(dateRow);
+  const wrap=document.createElement('div');wrap.className='rhythm-track';
+  const TOTAL_H=480; // 2026-09-05: 320→480으로 확대 — 시트 세로 공간을 넉넉히 써서 짧은 블록끼리 겹쳐 보이는 문제 완화
+  // 0~8시(자는 시간)는 절반 크기로 압축하고, 줄어든 만큼을 나머지 8~24시 구간에 균일하게 더해줌
+  const NIGHT_END=480; // 8시(분)
+  const H1=TOTAL_H/8; // 0~8시 구간이 차지하는 높이 (원래 1/4 → 절반인 1/8로)
+  const H2=TOTAL_H-H1; // 8~24시 구간이 차지하는 높이
+  // 자정 넘겨 새로 시작한 블록(sortKey로 +1440 처리된 것)은 24시 지점을 그대로 고정한 채
+  // 그 아래로 이어붙여서 그린다. EXTRA_RATE는 0~8시 구간과 동일한 압축비를 사용.
+  const EXTRA_RATE=H1/NIGHT_END;
+  const toY=function(min){
+    if(min>1440){
+      return Math.round(H1+H2+(min-1440)*EXTRA_RATE);
+    }
+    const m=Math.min(min,1440);
+    if(m<=NIGHT_END)return Math.round(m/NIGHT_END*H1);
+    return Math.round(H1+(m-NIGHT_END)/(1440-NIGHT_END)*H2);
+  };
+
+  // 시간 눈금 — 0~8시 압축구간은 눈금을 생략(그 구간엔 보통 수면만 있어 8시부터 표기해도 충분)하고 8시부터 2시간 간격으로.
+  // [2026-09-06] 24시 이후로 넘어가는 블록은 실제 끝시각까지 그대로 이어서 그리되(강제절단 없음),
+  // 새벽 구간 자체엔 숫자 눈금을 따로 두지 않기로 함 — 24시까지만 표기하고 그 아래는 눈금 없이 이어짐.
+  let html='';
+  [8,10,12,14,16,18,20,22,24].forEach(function(h){
+    const y=toY(h*60);
+    const label=String(h).padStart(2,'0');
+    html+='<div class="rt-gridline" style="top:'+y+'px;"></div><div class="rt-hourlabel" data-h="'+h+'" style="top:'+y+'px;">'+label+'</div>';
+  });
+
+  // 블록 통합 목록: 수면(자동) + 식사(자동,30분) + 수기 블록 — 공통 함수 computeRhythmBlocksRaw로 통일.
+  // [2026-09-06] 자정을 넘겨 끝나는 활동(예: 23:00~02:00)은 24시에서 잘라내지 않고 실제 종료시각까지
+  // 그대로 이어서 그림(끝시각을 1440+분의 절대좌표로 확장) — 아카이브앱(renderTimelineTrack)과 동일 원칙.
+  // [2026-09-09 버그수정] 기존엔 eMin<=bk.start(같은 값 포함)를 자정 넘김으로 봐서, 시작~종료가 같은
+  // 분(1분 미만 스톱워치처럼 초 단위 차이만 있는 경우)이면 eMin===start가 되어 +1440이 잘못 적용되고
+  // 블록이 거의 24시간 길이로 부풀려 그려지는 문제가 있었음. "더 작을 때만"(<)으로 좁히고, 정확히
+  // 같은 값(진짜로 시작=끝, 즉 1분 미만이라 분 단위가 같은 경우)은 최소 1분 길이로만 보정.
+  let blocks=computeRhythmBlocksRaw(dk).map(function(bk){
+    let eMin=bk.end;
+    if(eMin!=null){
+      if(eMin<bk.start)eMin+=1440;
+      else if(eMin===bk.start)eMin=bk.start+1; // 1분 미만 사용 등 시작=끝(분 단위)인 경우 최소 폭 보정
+    }
+    return Object.assign({},bk,{end:eMin});
+  });
+  blocks.sort(function(a,b){
+    const ka=a.sortKey!=null?a.sortKey:a.start;
+    const kb=b.sortKey!=null?b.sortKey:b.start;
+    return ka-kb;
+  });
+
+  // 짧은 블록(끼어든 활동)이 긴 블록(외출/업무) 위로 보이도록 지속시간 내림차순 정렬 — 렌더 순서(z-index)에 그대로 반영.
+  const blocksSorted=blocks.slice().sort(function(a,b){
+    const durA=(a.end!=null&&a.start!=null)?a.end-a.start:1440;
+    const durB=(b.end!=null&&b.start!=null)?b.end-b.start:1440;
+    return durB-durA; // 긴 것 먼저 → 낮은 z-index → 뒤로, 짧은 것 나중 → 높은 z-index → 앞으로
+  });
+  let maxBottom=TOTAL_H;
+  blocksSorted.forEach(function(bk,bi){
+    const offset=(bk.sortKey!=null)?(bk.sortKey-bk.start):0; // 자정 넘김 보정값(+1440 또는 0)
+    const by=toY(bk.start+offset);
+    const stubEnd=bk.end!=null?bk.end:(isToday?(function(){const n=new Date();return n.getHours()*60+n.getMinutes();})():Math.min(bk.start+20,1440));
+    const bh=Math.max(toY(stubEnd+offset)-by,16); // 라벨 텍스트가 최소한은 들어갈 높이 확보
+    if(by+bh>maxBottom)maxBottom=by+bh;
+    // [2026-09-06] 텍스트 정렬 규칙 — 총 소요시간(진행중이면 현재까지 경과시간) 60분 이하는 중앙정렬(짧은
+    // 블록에서 텍스트가 상/하단에 쏠려 보이는 문제 방지 목적, 기존과 동일), 61분 이상은 상단정렬로 전환.
+    // 긴 블록일수록 텍스트가 블록 중앙(화면 스크롤상 한참 아래)에 있으면 블록 시작 지점과 눈에 안 들어와
+    // 매칭이 어려웠던 문제와, 점심식사처럼 짧은 블록이 긴 블록 한가운데 걸치는 문제를 함께 해결.
+    const durMin=stubEnd-bk.start;
+    const alignCls=durMin>60?' rt-fill-top':'';
+    html+='<div class="rt-fill'+alignCls+(bk.ongoing?' ongoing':'')+'" style="top:'+by+'px;height:'+bh+'px;background-color:'+bk.color+';z-index:'+(10+bi)+';">';
+    if(!bk.noLabel){
+      const iconHtml=bk.icon?'<i class="ti ti-tools-kitchen-3" aria-hidden="true"></i>':'';
+      html+='<span class="rt-fill-label">'+iconHtml+escapeHtml(bk.label)+'</span>';
+      const timeRangeHtml=(!bk.ongoing&&bk.start!=null&&bk.end!=null)?'<span class="rt-fill-time">'+minToHHMM(bk.start)+'-'+minToHHMM(bk.end)+'</span>':'';
+      if(timeRangeHtml)html+=timeRangeHtml;
+      const delBtn=bk.manualIdx!=null?'<span class="rt-del" onclick="event.stopPropagation();deleteRhythmBlock('+bk.manualIdx+')"><i class="ti ti-x ico-sz-13" aria-hidden="true"></i></span>':'';
+      const editBtn=bk.manualIdx!=null?'<span class="rt-edit" onclick="event.stopPropagation();openRhythmEditForm('+bk.manualIdx+')"><i class="ti ti-pencil ico-sz-13" aria-hidden="true"></i></span>':'';
+      const finishBtn=(bk.ongoing&&bk.manualIdx!=null)?'<span class="rt-finish" onclick="event.stopPropagation();finishRhythmBlock('+bk.manualIdx+')"><i class="ti ti-player-stop ico-sz-13" aria-hidden="true"></i></span>':'';
+      const actions=(finishBtn||editBtn||delBtn)?'<span class="rt-fill-actions">'+finishBtn+editBtn+delBtn+'</span>':'';
+      if(actions)html+=actions;
+    }
+    html+='</div>';
+  });
+
+  // 현재시각 — 선+원 마커만(텍스트 라벨 없이 양옆 시간눈금으로 직관적으로 파악)
+  if(isToday){
+    const nowMin=new Date().getHours()*60+new Date().getMinutes();
+    const nowY=toY(nowMin);
+    html+='<div class="rt-now-line" style="top:'+nowY+'px;"></div><div class="rt-now-dot" style="top:'+nowY+'px;"></div>';
+    if(nowY>maxBottom)maxBottom=nowY;
+  }
+
+  const trackHeight=Math.max(TOTAL_H+10,maxBottom+10);
+  wrap.style.height=trackHeight+'px';
+  wrap.innerHTML=blocks.length?html:'';
+  if(!blocks.length){
+    wrap.innerHTML='<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:24px 0;">오늘 기록된 수면·식사·블록이 없어요</div>';
+  }
+  outer.appendChild(wrap);
+  outer.appendChild(buildRhythmFormEl(false));
+  _rhythmTrackEl=outer;
+  return outer;
+}
+function getHabitMonthCount(habitId){
+  const now=new Date();
+  const yr=now.getFullYear(),mo=now.getMonth();
+  const firstDay=new Date(yr,mo,1);
+  const today=new Date(yr,mo,now.getDate());
+  let count=0;
+  const cur=new Date(firstDay);
+  while(cur<=today){
+    const wk=weekKey(cur),dow=(cur.getDay()+6)%7;
+    if(getHabitChecks(wk)[habitId+'-'+dow])count++;
+    cur.setDate(cur.getDate()+1);
+  }
+  return count;
+}
+// 특정 습관의 "연속 체크일수" — 오늘(logicalDate)부터 거슬러 올라가며 하루라도 빠지면 중단.
+// 오늘은 아직 체크 전일 수 있어(아침 시간대 배너 용도) 오늘 제외하고 "어제부터" 계산.
+function getHabitStreak(habitId){
+  let streak=0;
+  const d=getLogicalDate();
+  d.setDate(d.getDate()-1); // 어제부터 시작
+  for(let i=0;i<90;i++){ // 최대 90일까지만 탐색(그 이상은 의미상 상한)
+    const wk=weekKey(d),dow=(d.getDay()+6)%7;
+    if(!getHabitChecks(wk)[habitId+'-'+dow])break;
+    streak++;
+    d.setDate(d.getDate()-1);
+  }
+  return streak;
+}
+// 습관 동력 배너 헤드라인 — 스트릭(연속기록) > 어제실적 > 이번달누적 순으로 그날 보여줄 수 있는
+// 가장 힘있는 정보 하나를 규칙 기반으로 고름(2026-09-06). API 없이 순수 계산.
+function _habitMotivationLine(habits){
+  if(!habits.length)return null;
+  // 1순위: 스트릭 2일 이상인 습관 중 가장 긴 것
+  let best=null;
+  habits.forEach(h=>{
+    const streak=getHabitStreak(h.id);
+    if(streak>=2&&(!best||streak>best.streak))best={habit:h,streak};
+  });
+  if(best)return `${best.habit.name} ${best.streak}일 연속 이어가는 중`;
+  // 2순위: 어제 체크한 개수
+  const y=getLogicalDate();y.setDate(y.getDate()-1);
+  const ywk=weekKey(y),ydow=(y.getDay()+6)%7;
+  const yChecks=getHabitChecks(ywk);
+  const yCount=habits.filter(h=>yChecks[h.id+'-'+ydow]).length;
+  if(yCount>0)return `어제 습관 ${yCount}개 챙겼어요`;
+  // 3순위: 이번 달 누적이 가장 많은 습관
+  let topHabit=null,topCount=0;
+  habits.forEach(h=>{
+    const c=getHabitMonthCount(h.id);
+    if(c>topCount){topCount=c;topHabit=h;}
+  });
+  if(topHabit)return `이번 달 ${topHabit.name} ${topCount}번째예요`;
+  return null;
+}
+function makeHabitStreakRow(){
+  const wrap=document.createElement('div');wrap.className='habit-streak-wrap';
+  const habits=getActiveHabits();
+  if(!habits.length){wrap.innerHTML='<div style="font-size:var(--dow-label-size);color:var(--tm);padding:8px 2px;width:100%;text-align:center;">습관을 추가해보세요</div>';return wrap;}
+  const motivationLine=_habitMotivationLine(habits);
+  let html='';
+  if(motivationLine)html+=`<div class="habit-motivation-line"><i class="ti ti-flame ico-inline-13" aria-hidden="true"></i>${escapeHtml(motivationLine)}</div>`;
+  html+='<div class="habit-numbox-grid">';
+  habits.forEach(function(h){
+    const streak=getHabitStreak(h.id);
+    const monthCount=getHabitMonthCount(h.id);
+    // 스트릭 2일 이상이면 스트릭을, 아니면 기존처럼 이번달 누적을 표시 — 잘 이어가는 습관을 시각적으로 구분.
+    const showStreak=streak>=2;
+    const numText=showStreak?`${streak}`:`${monthCount}`;
+    const hIcon=getHabitIconFor(h);
+    const iconColor=getHabitIconColor(h.color);
+    html+=`<div class="habit-numbox-card${showStreak?' streak':''}">`
+      +(hIcon?`<i class="ti ${hIcon}" style="font-size:20px;color:${iconColor};margin-bottom:6px;" aria-hidden="true"></i>`:`<span class="home-habit-dot ${h.color}" style="margin-bottom:6px;"></span><span class="habit-numbox-name">${escapeHtml(h.name)}</span>`)
+      +`<span class="habit-numbox-num">${numText}</span></div>`;
+  });
+  html+='</div>';
+  wrap.innerHTML=html;
+  return wrap;
+}
+function makeRhythmBanner(lineText,builderFn,extraClass,fontSize,dk){
+  const b=document.createElement('div');b.className='report-banner'+(extraClass?' '+extraClass:'');
+  const lineIcon=extraClass==='rhythm-soft'?'<i class="ti ti-rainbow ico-inline-13" aria-hidden="true"></i>':'';
+  b.innerHTML='<div class="report-banner-inner"><div class="report-banner-line"'+(fontSize?` style="font-size:${fontSize}px;"`:'')+'>'+lineIcon+lineText+'</div><div class="report-banner-arrow"><i class="ti ti-chevron-up ico-sz-15" aria-hidden="true"></i></div></div>';
+  b.addEventListener('click',function(){openHomeDetailSheet(lineText,builderFn);});
+  return b;
+}
+// 홈탭 4개 시간대(아침/오후/새벽/저녁) 모두 "오늘의 리듬 기록" 배너를 동일한 인자로 붙이므로 공용 헬퍼로 통일(2026-08-30).
+function makeTodayRhythmBanner(){
+  const dk=dateKey(getLogicalDate());
+  return makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dk);},'rhythm-soft',12.5,dk);
+}
+function openHomeDetailSheet(title,builderFn){
+  const titleEl=document.getElementById('home-detail-sheet-title');
+  if(titleEl)titleEl.textContent=title;
+  const body=document.getElementById('home-detail-sheet-body');
+  if(!body)return;
+  body.innerHTML='<div style="font-size:var(--dow-label-size);color:var(--tm);padding:24px 0;text-align:center;">불러오는 중...</div>';
+  openSheet('home-detail-sheet');
+  const result=builderFn();
+  if(result&&typeof result.then==='function'){
+    result.then(function(el){body.innerHTML='';body.appendChild(el);})
+      .catch(function(){body.innerHTML='<div style="font-size:var(--dow-label-size);color:var(--tm);padding:24px 0;text-align:center;">불러올 수 없어요</div>';});
+  }else{
+    body.innerHTML='';body.appendChild(result);
+  }
+}
+// ══════════════════════════════════════════════════════════
+// ██ HOME (1/1) ██
+// ══════════════════════════════════════════════════════════
+// ══ HOME ══
+const _HOME_DAYS=['일','월','화','수','목','금','토'];
+let _weatherCache=null,_weatherCacheTime=0;
+
+// localStorage 브리핑 캐시 헬퍼
+function _bcGet(subSec){
+  try{
+    const key='iikoto_briefing_'+dateKey(getLogicalDate())+'_'+subSec;
+    const v=localStorage.getItem(key);
+    return v?JSON.parse(v):null;
+  }catch(e){return null;}
+}
+function _bcSet(subSec,val){
+  try{
+    const key='iikoto_briefing_'+dateKey(getLogicalDate())+'_'+subSec;
+    localStorage.setItem(key,JSON.stringify(val));
+  }catch(e){}
+}
+// 오늘 이전 브리핑 캐시 자동 삭제 (자정~새벽엔 논리적 날짜=전날이라 그 캐시는 보존됨)
+(function(){
+  try{
+    const today=dateKey(getLogicalDate());
+    Object.keys(localStorage).forEach(k=>{
+      if(k.startsWith('iikoto_briefing_')&&!k.includes(today))localStorage.removeItem(k);
+    });
+  }catch(e){}
+})();
+
+// 앱 시작 시 오늘 캐시 복원
+let _greetingCache=null;
+function _initBriefingCache(){
+  const subSec=getSubSection();
+  const gc=_bcGet(subSec+'_greeting');
+  if(gc){_greetingCache=gc;}
+}
+
+// ── 홈탭 전용 시간대 판정 (단일 소스) ──
+// 물리적 하루를 7구간으로: 아침1(기상~9시)→아침2(~12)→오후1(~16)→오후2(~19)→저녁1(~22)→저녁2(~24)→새벽(자정~기상, 마지막 구간).
+// "잠들고 일어나야 하루가 시작된다"는 생활 개념과 맞춰, 새벽(dawn)이 하루의 끝에 오도록 배치.
+// 이 값은 홈탭이 그때그때 어떤 카드/배너를 보여줄지 정하는 화면 판정 전용이며,
+// 기록이 어느 날짜에 소속되는지는 별개 개념(DAWN_CUTOFF_MIN/getLogicalDate, 아래쪽 데이터 유틸 섹션 참고).
+// getSection/getSubSection은 모두 이 함수에서 파생되므로 서로 어긋날 수 없음(getGreetingSubSection은 getSubSection과 완전 중복이라 2026-08-30 통합·제거).
+function getHomeTimeSlot(){
+  const h=new Date().getHours();
+  if(h<4)return 'dawn';
+  if(h<9)return 'morning_1';
+  if(h<12)return 'morning_2';
+  if(h<16)return 'afternoon_1';
+  if(h<19)return 'afternoon_2';
+  if(h<22)return 'night_1';
+  return 'night_2';
+}
+function getSubSection(){
+  return getHomeTimeSlot();
+}
+_initBriefingCache();
+
+
+// ── HOME ACTION FUNCTIONS
+
+// ─ Claude API 유틸
+function getClaudeKey(){return S.get('claude_api_key')||'';}
+// 설정에서 사용자가 직접 입력한 개인정보(성향, 상황 등) — 모든 AI 생성 프롬프트에 공통으로 참고시킴.
+// 빈 값이면 빈 문자열 반환(dataContext 배열에서 .filter(Boolean)으로 자연히 제외됨).
+function getUserProfileContext(){
+  const p=(S.get('user_profile')||'').trim();
+  return p?`사용자에 대한 참고 정보(직접 입력함): ${p}`:'';
+}
+let _lastAiError=''; // 마지막 Claude 호출 실패 사유(성공하면 비움) — 리포트가 기록 요약만 나올 때 원인을 화면에 보여주기 위함
+async function callClaude(systemPrompt, messages, maxTokens){
+  const key=getClaudeKey();
+  if(!key){_lastAiError='API 키 없음';return null;}
+  try{
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),30000);
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      signal:controller.signal,
+      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-haiku-4-5',max_tokens:maxTokens||600,system:systemPrompt,messages})
+    });
+    clearTimeout(timer);
+    if(!res.ok){const err=await res.json().catch(()=>({error:{message:res.status}}));console.error('Claude API err:',err);_lastAiError=String(err.error?.message||res.status);return '__ERR__'+(err.error?.message||res.status);}
+    const data=await res.json();
+    _lastAiError='';
+    return data.content&&data.content[0]&&data.content[0].text||null;
+  }catch(e){console.error('Claude fetch err:',e);_lastAiError=(e&&e.name==='AbortError')?'응답 시간 초과':String((e&&e.message)||e);return null;}
+}
+
+
+
+
+// ══════════════════════════════════════════════════════════
+// ██ 월간탭 (1/3 — 나머지는 API SEARCH, HABIT MONTHLY~MONTHLY STAT BAR 부근) ██
+// ══════════════════════════════════════════════════════════
+// ── MONTHLY REPORT
+let _reportYear=new Date().getFullYear();
+let _reportMonth=new Date().getMonth();
+function updateReportBannerLabel(){
+  const el=document.getElementById('report-banner-month-lbl');if(!el)return;
+  el.textContent=(new Date().getMonth()+1)+'월 리포트';
+}
+// ── DIARY MONTH (하루한줄 모아보기)
+function updateDiaryBannerLabel(){
+  const lblEl=document.getElementById('diary-banner-month-lbl');
+  if(!lblEl)return;
+  const now=new Date();
+  lblEl.textContent=(now.getMonth()+1)+'월의 하루한줄';
+}
+async function syncOnelineMonthRange(y,mo){
+  if(!navigator.onLine)return false;
+  const start=`${y}-${pad(mo+1)}-01`;
+  const daysInMonth=new Date(y,mo+1,0).getDate();
+  const end=`${y}-${pad(mo+1)}-${pad(daysInMonth)}`;
+  const rows=await supaFetch(`goal_notes?note_key=gte.oneline:${start}&note_key=lte.oneline:${end}`);
+  if(!rows)return false;
+  rows.forEach(r=>{
+    const dk=r.note_key.replace('oneline:','');
+    if(!S.get(S.key('oneline_pending',dk))&&typeof r.lines==='string')S.set(S.key('oneline',dk),r.lines);
+  });
+  return true;
+}
+async function openDiaryMonthSheet(){
+  const el=document.getElementById('diary-month-content');
+  if(el){
+    const now=new Date();
+    el.innerHTML=`<div style="font-family:'Comfortaa',sans-serif;font-weight:700;font-size:17px;color:var(--tp);margin-bottom:2px;">${now.getMonth()+1}월의 하루한줄</div>
+      <div style="font-size:var(--dow-label-size);color:var(--tm);margin-bottom:14px;">${now.getFullYear()}.${now.getMonth()+1}</div>
+      <div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:30px 0;">불러오는 중...</div>`;
+  }
+  openSheet('diary-month-sheet');
+  await renderDiaryMonthSheet();
+}
+async function renderDiaryMonthSheet(){
+  const el=document.getElementById('diary-month-content');if(!el)return;
+  try{
+    const now=new Date();
+    const y=now.getFullYear(),mo=now.getMonth(),today=now.getDate();
+    const daysInMonth=new Date(y,mo+1,0).getDate();
+    await syncOnelineMonthRange(y,mo);
+    let rowsHtml='';
+    for(let d=1;d<=daysInMonth;d++){
+      const dk=`${y}-${pad(mo+1)}-${pad(d)}`;
+      const date=new Date(y,mo,d);
+      const dow=date.getDay();
+      const isHoliday=dow===0||dow===6;
+      const isToday=d===today;
+      const text=getDailyOneLine(dk).trim();
+      rowsHtml+=`<div class="diary-row"${isToday?' id="diary-today-row"':''}>
+        <div class="diary-date-chip${isHoliday?' holiday':''}${isToday?' today':''}">${pad(d)}</div>
+        <div class="diary-line-text${text?'':' empty'}">${text?text:'···'}</div>
+      </div>`;
+    }
+    el.innerHTML=`<div style="font-family:'Comfortaa',sans-serif;font-weight:700;font-size:17px;color:var(--tp);margin-bottom:2px;">${mo+1}월의 하루한줄</div>
+      <div style="font-size:var(--dow-label-size);color:var(--tm);margin-bottom:14px;">${y}.${mo+1}</div>
+      <div id="diary-month-list-scroll" style="max-height:330px;overflow-y:auto;">
+        <div class="card" style="padding:2px 14px;">${rowsHtml}</div>
+      </div>`;
+    const scrollEl=document.getElementById('diary-month-list-scroll');
+    const todayEl=document.getElementById('diary-today-row');
+    if(scrollEl&&todayEl){
+      const top=todayEl.getBoundingClientRect().top-scrollEl.getBoundingClientRect().top+scrollEl.scrollTop;
+      scrollEl.scrollTop=top-4;
+    }
+  }catch(e){
+    console.warn('diary month sheet err:',e);
+    el.innerHTML=`<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:30px 0;">불러오지 못했어요, 다시 시도해주세요</div>`;
+  }
+}
+// 콘텐츠 완결 판정 — 2종. 조회/렌더링용은 콘텐츠 객체를 받고, 등록 모달의 저장 직전 로직처럼
+// 아직 객체가 아닌 상태 문자열만 있는 지점은 문자열 버전을 씀. 9곳에 흩어져 있던 동일 조건을 통합(2026-08-31).
+// 음악은 이 판정 대상이 아님(진행/완결 개념 자체가 없음, 항상 status 없이 등록일만 사용).
+// 방영중으로 표시해둔 콘텐츠(주로 드라마)의 완료 후 타임라인 렌더링용 — 해당 월(mk) 안에서
+// 리듬 블록("드라마 - {title}" 텍스트매칭, loadAndRenderWatchCal과 동일 규칙)에 실제로 잡힌 감상일(day 숫자)만 추출.
+function getWatchedDaysInMonth(title,mk){
+  const [y,m]=mk.split('-').map(Number);
+  const daysInMonth=new Date(y,m,0).getDate();
+  const days=[];
+  for(let d=1;d<=daysInMonth;d++){
+    const dk=`${mk}-${String(d).padStart(2,'0')}`;
+    const hit=getRhythmBlocks(dk).some(b=>b.cat==='enjoy'&&b.text&&b.text.startsWith('드라마 - ')&&b.text.slice(6)===title);
+    if(hit)days.push(d);
+  }
+  return days;
+}
+function isContentFinished(c){return c.status==='done'||c.status==='stopped';}
+function isFinishedStatus(status){return status==='done'||status==='stopped';}
+// 콘텐츠가 이번 달(mk)로 이월되는지 판정하는 공통 조건.
+// 진행중(watching)이거나, 완료/중단됐어도 종료월이 이번 달 이후면 이월 대상.
+// getContentsForReport(리포트)와 renderContentTimeline(콘텐츠 타임라인) 양쪽에서 각자 재구현되던 로직을 통일.
+function isContentCarryOver(c,mk){
+  if(c.cat==='music')return false; // 음악은 등록일=완료일 개념이라 이월 대상이 아님(status가 항상 'watching'으로 저장되는 것과 무관하게 항상 false)
+  if(c.status==='watching')return true;
+  if(isContentFinished(c)&&c.endDate&&c.endDate.slice(0,7)>=mk)return true;
+  return false;
+}
+function getContentsForReport(mk){
+  // 음악: 등록일=완료일로 취급 — 시작월에만 노출/집계, 별도 상태표기 없음
+  // 드라마/영화/책: 보는중인 동안은 관련된 모든 달에 노출되지만(상태:보는중), 집계(완료/중단 확정)는 끝난 달에서만 잡힘
+  const [y,mo]=mk.split('-').map(Number);
+  const prevMk=monthKey(new Date(y,mo-2,1));
+  const cur=getContents(mk);
+  const prev=getContents(prevMk);
+  const carry=prev.filter(c=>isContentCarryOver(c,mk)).map(c=>({...c,_carried:true}));
+  const all=[...carry,...cur];
+  // 콘텐츠 종류(드라마→책→영화→음악)별로 묶은 뒤, 그 안에서는 시작일 오름차순으로 정렬
+  const catOrder={drama:0,book:1,movie:2,music:3};
+  return all.sort((a,b)=>{
+    const co=(catOrder[a.cat]??9)-(catOrder[b.cat]??9);
+    if(co!==0)return co;
+    return (a.startDate||'').localeCompare(b.startDate||'');
+  });
+}
+// 한 달(y-mo, 1일~lastDay)치 기본 통계(투두/습관/수면/리듬시간)를 계산하는 공용 코어.
+// light=true면 이번달 전용 계산(메모/원라인/주간챌린지/콘텐츠/rhythmDayCount)은 건너뛰고
+// 전월 비교에 필요한 최소 항목(rhythmDur, todoPct, habitPct, avgSleep)만 반환.
+function computeRawStatsForRange(y,mo,lastDay,light){
+  const habits=getHabits();
+  let memos=0,doneTodos=0,totalTodos=0,hc=0,ht=0,sleepMin=0,sleepCnt=0;
+  const allMemoTexts=[];
+  const onelineTexts=[];
+  const weekSet={};
+  const rhythmDur={};
+  const rhythmDayCount={};
+  for(let d=1;d<=lastDay;d++){
+    const dk=`${y}-${pad(mo+1)}-${pad(d)}`;
+    if(!light){
+      const dayMemos=getMemos(dk);
+      memos+=dayMemos.length;
+      dayMemos.forEach(m=>{if(m.text)allMemoTexts.push(m.text);});
+      const ol=getDailyOneLine(dk);
+      if(ol&&ol.trim())onelineTexts.push(`${d}일: ${ol.trim()}`);
+    }
+    const dayTodos=getTodos(dk);
+    totalTodos+=dayTodos.length;doneTodos+=dayTodos.filter(t=>t.done).length;
+    const sl=getSleep(dk);
+    if(sl.sleep&&sl.wake){const sv=sl.sleep.split(':').map(Number),wv=sl.wake.split(':').map(Number);let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;sleepMin+=m;sleepCnt++;}
+    const date=new Date(y,mo,d);
+    if(!light){const wk=weekKey(date);weekSet[wk]=true;}
+    const dow=(date.getDay()+6)%7;
+    const checks=getHabitChecks(weekKey(date));
+    habits.forEach(h=>{
+      if(!_isHabitActiveOn(h,dk))return; // 2026-09-06: 비활성 기간(시작 전/archive 이후)은 달성률 분모에서 제외
+      ht++;if(checks[`${h.id}-${dow}`])hc++;
+    });
+    const dd=getDayCategoryDurations(dk);
+    Object.keys(dd).forEach(function(k){
+      rhythmDur[k]=(rhythmDur[k]||0)+dd[k];
+      if(!light&&dd[k]>0)rhythmDayCount[k]=(rhythmDayCount[k]||0)+1;
+    });
+  }
+  const habitPct=ht>0?Math.round(hc/ht*100):0;
+  const todoPct=totalTodos>0?Math.round(doneTodos/totalTodos*100):0;
+  const avgSleep=sleepCnt>0?(sleepMin/sleepCnt/60).toFixed(1):null;
+  return {memos,doneTodos,totalTodos,todoPct,habitPct,avgSleep,allMemoTexts,onelineTexts,weekSet,rhythmDur,rhythmDayCount,habits};
+}
+function computeMonthStats(y,mo,endDay){
+  const dim=new Date(y,mo+1,0).getDate();
+  const lastDay=endDay?Math.min(endDay,dim):dim;
+  const cur=computeRawStatsForRange(y,mo,lastDay,false);
+  const {memos,doneTodos,totalTodos,todoPct,habitPct,avgSleep,allMemoTexts,onelineTexts,weekSet,rhythmDur,rhythmDayCount}=cur;
+  const weeks=Object.keys(weekSet).sort();
+  const wcByWeek=weeks.map(wk=>{
+    const items=getWChallenge(wk).filter(c=>c.text&&c.text.trim());
+    const wkStart=new Date(wk.replace('week:',''));
+    const wkEnd=new Date(wkStart);wkEnd.setDate(wkStart.getDate()+6);
+    const label=`${wkStart.getMonth()+1}.${wkStart.getDate()}–${wkEnd.getMonth()+1}.${wkEnd.getDate()}`;
+    const lines=items.map(c=>({text:c.text,pct:Math.round(c.days.filter(Boolean).length/7*100)}));
+    const isOngoing=wkEnd>=new Date(new Date().toDateString()); // 그 주의 마지막 날(일요일)이 아직 안 지났으면 진행중
+    return {wk,label,lines,isOngoing};
+  }).filter(w=>w.lines.length>0);
+  const mk=`${y}-${pad(mo+1)}`;
+  const contentsList=getContentsForReport(mk);
+  const goalLines=getGoal(S.key('mgoal',mk)).filter(l=>l&&l.trim());
+  // 전월 같은 일수 구간의 카테고리별 시간 + 투두완료율/습관달성률/평균수면을 가볍게 뽑아 비교
+  const prevMonthDate=new Date(y,mo-1,1);
+  const py=prevMonthDate.getFullYear(),pmo=prevMonthDate.getMonth();
+  const prev=computeRawStatsForRange(py,pmo,lastDay,true);
+  const prevDur=prev.rhythmDur;
+  const prevHt=lastDay*prev.habits.length;
+  const prevTodoPct=prev.totalTodos>0?prev.todoPct:null;
+  const prevHabitPct=prevHt>0?prev.habitPct:null;
+  const prevAvgSleep=prev.avgSleep;
+  // 의미 있는 변화만 텍스트로(투두완료율/습관달성률 10%p 이상, 수면 0.5시간 이상 차이)
+  const monthCompareLines=[];
+  if(prevTodoPct!=null&&Math.abs(todoPct-prevTodoPct)>=10)monthCompareLines.push(`투두 완료율 전월 ${prevTodoPct}% → 이번달 ${todoPct}%`);
+  if(prevHabitPct!=null&&Math.abs(habitPct-prevHabitPct)>=10)monthCompareLines.push(`습관 달성률 전월 ${prevHabitPct}% → 이번달 ${habitPct}%`);
+  if(prevAvgSleep!=null&&avgSleep!=null&&Math.abs(parseFloat(avgSleep)-parseFloat(prevAvgSleep))>=0.5)monthCompareLines.push(`평균 수면 전월 ${prevAvgSleep}h → 이번달 ${avgSleep}h`);
+  const monthCompareText=monthCompareLines.join(' / ');
+  const rhythmCompare=Object.keys(rhythmDur).filter(k=>k!=='수면'&&k!=='식사').map(k=>{
+    const thisMin=rhythmDur[k]||0,lastMin=prevDur[k]||0;
+    return {label:k,thisMin,lastMin,diff:thisMin-lastMin};
+  }).filter(c=>Math.abs(c.diff)>=60).sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff)).slice(0,2);
+  const rhythmCompareText=rhythmCompare.map(c=>{
+    const dir=c.diff>0?'늘었어요':'줄었어요';
+    const thisH=(c.thisMin/60).toFixed(1).replace(/\.0$/,''),lastH=(c.lastMin/60).toFixed(1).replace(/\.0$/,'');
+    return `${c.label} 전월 ${lastH}h → 이번달 ${thisH}h, ${dir}`;
+  }).join(' / ');
+  const rhythmSummary=Object.keys(rhythmDur).length?durSummaryLine(rhythmDur):'';
+  return {memos,doneTodos,totalTodos,todoPct,habitPct,avgSleep,allMemoTexts,onelineTexts,wcByWeek,contentsList,rhythmSummary,rhythmCompareText,monthCompareText,rhythmDur,rhythmDayCount,dim,goalLines};
+}
+// 콘텐츠 상태(watching/done/stopped)를 한글 라벨로 변환 — 월간 리포트 화면 표시와
+// AI 프롬프트 두 곳에서 완전히 동일하게 재구현되던 것을 통일.
+function cStatusLabel(c){
+  if(c.cat==='music')return '';
+  if(c.cat==='book')return c.status==='stopped'?'중단':(c.status==='done'?'완료':'읽는중');
+  return c.status==='stopped'?'중단':(c.status==='done'?'완료':'보는중');
+}
+async function generateMonthlyReportAI(mk,stats){
+  const key=getClaudeKey();
+  if(!key)return null;
+  const dataContext=[
+    `${mk} 한 달 데이터:`,
+    getUserProfileContext(),
+    stats.goalLines.length?`이번 달 목표:\n${stats.goalLines.map(g=>'- '+g).join('\n')}`:'',
+    `투두 완료 ${stats.doneTodos}개 (총 ${stats.totalTodos}개 중)`,
+    `습관 달성률 ${stats.habitPct}%`,
+    stats.avgSleep?`평균 수면 ${stats.avgSleep}시간`:'수면 기록 없음',
+    stats.rhythmSummary?`시간 사용 누계: ${stats.rhythmSummary}`:'',
+    stats.rhythmCompareText?`전월 같은 기간 대비 시간 사용 변화: ${stats.rhythmCompareText}`:'',
+    stats.monthCompareText?`전월 같은 기간 대비 투두/습관/수면 변화: ${stats.monthCompareText}`:'',
+    stats.allMemoTexts.length?`이번 달 메모 전체 (${stats.allMemoTexts.length}건, 시간순):\n${stats.allMemoTexts.slice(0,2000).join('\n')}`:'',
+    stats.contentsList.length?`콘텐츠 기록: ${stats.contentsList.map(c=>`${c.title}(${c.cat}${cStatusLabel(c)?', '+cStatusLabel(c):''})`).join(', ')}`:'',
+    stats.wcByWeek.length?`주간 미션 현황: ${stats.wcByWeek.map(w=>w.lines.map(l=>`${l.text} ${l.pct}%`).join(', ')).join(' | ')}`:''
+  ].filter(Boolean).join('\n');
+  const sys=`당신은 따뜻한 월간 회고 비서예요. 한 달 데이터를 보고 풍부한 총평과 키워드를 만들어요.
+${RHYTHM_CAT_GUIDE}
+반드시 아래 JSON 형식으로만 응답해요. 다른 텍스트나 마크다운 코드블록 없이 순수 JSON만 출력해요.
+{"comment":"6-8문장의 한 달 총평, ~해요/이에요/어요체, 이모지 1-2개 정도","keywords":["키워드1","키워드2","키워드3","키워드4"]}
+정말 짚어줄 만한 구체적인 사건/감정 변화가 있다면 분량을 아끼지 말고 그 달의 흐름(시작~중반~막판)을 충분히 풀어서 써도 좋아요. 다만 내용을 늘리기 위해 같은 얘기를 다른 말로 반복하거나 억지로 문장을 쪼개지 말고, 실제로 새로운 내용이 있을 때만 늘려요. 어떤 경우에도 전체 10문장은 넘기지 않아요.
+이 코멘트 바로 아래에 투두 완료 개수와 습관 달성률 수치가 별도로 표시되니, 그 숫자(예: "85개", "20%" 같은 구체적 수치)를 코멘트에서 직접 나열하지 말아요. 대신 그 수치가 의미하는 바에 대한 해석이나 코멘트로 자연스럽게 시작하거나 녹여요 (예: "습관 달성률은 낮았지만 ~"처럼 수치 자체보다 그 이면의 맥락 위주로).
+키워드는 하루 한 줄 기록과 메모 내용에서 자주 등장하거나 인상적인 단어/장소/감정 위주로 2~5개 뽑아요.
+전월 대비 시간 사용 변화 데이터가 주어졌다면, 총평 안에 자연스럽게 한 문장 정도 녹여요 (예: "전월보다 ○○에 시간을 더 쓴 한 달이었어요" 처럼). 수치를 나열하기보다 그 변화가 이 달의 흐름과 어떻게 맞닿는지로 풀어요.
+전월 대비 투두/습관/수면 변화 데이터가 주어졌다면, 마찬가지로 자연스럽게 한 문장 녹이되(예: "전월보다 습관을 더 꾸준히 챙긴 달이었어요"), 두 비교 데이터를 억지로 다 넣으려 하지 말고 이 달의 흐름과 더 잘 맞는 쪽 위주로 자연스럽게.
+이번 달 목표가 있다면, 메모나 하루 한 줄 기록에 그 목표와 관련된 직접적인 언급(진행 상황, 결과, 감상 등)이 있는지 찾아서 총평에 자연스럽게 녹여요.
+단, 메모에 명확한 근거가 없는 목표는 달성 여부를 추측하거나 단정하지 말고, 가볍게 언급만 하거나 자연스럽게 비켜가요. "달성했어요" 같은 확정적 표현은 메모에 명확한 근거가 있을 때만 사용해요.`;
+  const reply=await callClaude(sys,[{role:'user',content:dataContext}],1400);
+  if(!reply||reply.startsWith('__ERR__'))return null;
+  try{
+    const clean=reply.replace(/```json|```/g,'').trim();
+    const parsed=JSON.parse(clean);
+    if(parsed&&parsed.comment)return parsed;
+  }catch(e){}
+  return null;
+}
+// ── 콘텐츠 월별 집계 (콘텐츠 허브의 월별 아카이브가 사용하는 데이터 계산 로직) ──
+// 원칙: 콘텐츠는 항상 "현재 상태가 속한 딱 한 달"에만 존재.
+//  - 완결(done/stopped): 종료월(drama/book/movie는 endDate, music은 startDate — 음악은 등록=감상 시점)에 딱 한 번만.
+//  - 진행중(watching): 오늘이 속한 달을 볼 때만 노출(화면이 비어 보이지 않게). 다른 달엔 절대 안 보임.
+// 콘텐츠는 시작월(mk)에 저장되므로 대부분 당월 데이터만으로 충분함.
+// 예외는 "전월에 시작해 이번 달에 끝난" 이월 콘텐츠뿐 — 전월 데이터에서 그 케이스만 추려서 합침.
+// 음악은 등록과 동시에 status='done'으로 저장되므로(confirmContent 참고), endDate는 항상 null.
+// 아래 계산에서 endDate||startDate로 자연스럽게 startDate(=감상월)를 종료월로 쓰게 됨 — 별도 분기 불필요.
+// 원칙: 콘텐츠 월별 모아보기는 "종료일 기준 취합"이 기본 규칙.
+//  - 완결(done/stopped): 종료월(drama/book/movie는 endDate, music은 등록 즉시 done 처리되어 endDate=null→startDate 사용)에 딱 한 번만.
+//  - 진행중(watching): 종료되기 전까지는 시작월부터 지금까지 매달 노출(오늘 날짜 여부와 무관 — 타임테이블처럼 흐름을 보여줌).
+//    종료되는 순간 이 규칙에서 빠지고 위 완결 규칙으로 넘어가 종료월 한 곳에만 남음.
+function isContentEndedInMonth(c,targetMk){
+  return (c.endDate||c.startDate||'').slice(0,7)===targetMk;
+}
+function computeContentMonthlyList(y,mo){
+  const targetMk=`${y}-${pad(mo+1)}`;
+  const belongsHere=c=>{
+    if(isContentFinished(c))return isContentEndedInMonth(c,targetMk);
+    return c.status==='watching';
+  };
+  const prevMk=monthKey(new Date(y,mo-1,1));
+  return getContents(targetMk).filter(belongsHere).concat(getContents(prevMk).filter(belongsHere));
+}
+function computeContentMonthlyByCat(y,mo){
+  const list=computeContentMonthlyList(y,mo);
+  const byCat={drama:[],book:[],movie:[],music:[]};
+  list.forEach(c=>{if(byCat[c.cat])byCat[c.cat].push(c);});
+  return byCat;
+}
+const CONTENT_CAT_LABEL={drama:'드라마',book:'책',movie:'영화',music:'음악'};
+// 카테고리별 콘텐츠 카드 마크업 — 콘텐츠 허브의 월별 아카이브가 씀(리스트형/그리드형 공통 톤)
+// 시작~종료 기간 라벨 — 태블릿 아카이브 앱과 동일 규칙(2026-08-25 참고 반영)
+// 시작/종료가 다르면 범위로, 같으면(음악처럼 하루짜리) 단일 날짜만
+function _cmrPeriodLabel(c){
+  const s=c.startDate,e=c.endDate;
+  if(s&&e&&s!==e)return `${parseInt(s.slice(5,7),10)}.${parseInt(s.slice(8,10),10)}~${parseInt(e.slice(5,7),10)}.${parseInt(e.slice(8,10),10)}`;
+  const single=e||s||'';
+  return single?`${parseInt(single.slice(5,7),10)}.${parseInt(single.slice(8,10),10)}`:'';
+}
+// 완결 총평(review)과 감상 중 메모(wcal_note)를 함께 담은 코멘트 본문 — 리스트형/그리드형 detail이 공통으로 씀
+// flat=true면 완결 총평 안쪽 박스 스타일을 없앰(그리드형처럼 바깥이 이미 카드 배경일 때 이중 배너 방지)
+// showHead=true면 상단에 기간+별점 헤더를 붙임(그리드형 전용 — 리스트형은 줄에 별점이 이미 있어 생략)
+function _cmrDetailBodyHtml(c,wcalNotes,flat,showHead){
+  const dispDate=_cmrPeriodLabel(c);
+  const starsHtml=c.stars>0?`<span class="cmr-detail-stars">${renderStarDisplayHtml(c.stars)}</span>`:'';
+  // 시청 시작/정지 — 진행중(watching) 상태의 드라마/영화만, 그리드 상세에서만(showHead 전용). 음악·책은 대상 아님(책은 독서코너 스톱워치가 별도로 있음).
+  const canWatch=showHead&&c.status==='watching'&&(c.cat==='drama'||c.cat==='movie');
+  const isWatchingNow=canWatch&&_cswRunning&&_cswCid===c.cid;
+  const watchBtnHtml=canWatch?`<span class="cwatch-btn${isWatchingNow?' active':''}" onclick="event.stopPropagation();toggleContentStopwatch('${c.cid}')"><i class="ti ${isWatchingNow?'ti-player-stop-filled':'ti-player-play-filled'}" aria-hidden="true"></i>${isWatchingNow?'시청중':'시청 시작'}</span>`:'';
+  // 재생 — 음악만, musicUrl이 등록돼 있을 때만(그리드 상세에서만). 날짜/별점 등 다른 정보가 없는 자리라 오른쪽 정렬(music-play-btn 클래스, margin-left:auto).
+  const musicPlayBtnHtml=showHead&&c.cat==='music'&&c.musicUrl?`<span class="pl-item-play music-play-btn" style="background:rgba(160,105,180,.18);border:1px solid rgba(160,105,180,.45);" onclick="event.stopPropagation();window.location.href='${c.musicUrl.replace(/'/g,"\\'")}'"><i class="ti ti-player-play-filled" style="color:rgba(160,105,180,1);" aria-hidden="true"></i></span>`:'';
+  // 음악 메타 — 아티스트명(위) / 앨범명 · 연도(아래) 두 줄로 표기(제목은 위 썸네일 라벨에 이미 있어 중복 생략). 그리드 상세에서만.
+  const musicAlbumYearParts=[];
+  if(showHead&&c.cat==='music'){
+    if(c.album)musicAlbumYearParts.push(escapeHtml(c.album));
+    if(c.releaseYear)musicAlbumYearParts.push(c.releaseYear);
+  }
+  const musicMetaHtml=(showHead&&c.cat==='music'&&(c.author||musicAlbumYearParts.length))?`<div class="cmr-music-meta">${c.author?`<div class="cmr-detail-date">${escapeHtml(c.author)}</div>`:''}${musicAlbumYearParts.length?`<div class="cmr-detail-date" style="opacity:.72;">${musicAlbumYearParts.join(' · ')}</div>`:''}</div>`:'';
+  const headHtml=showHead&&(dispDate||starsHtml||watchBtnHtml||musicPlayBtnHtml||musicMetaHtml)?`<div class="cmr-detail-head">${musicMetaHtml||(dispDate?`<span class="cmr-detail-date"><i class="ti ti-calendar" style="font-size:11px;" aria-hidden="true"></i> ${dispDate}</span>`:'<span></span>')}${starsHtml}${watchBtnHtml}${musicPlayBtnHtml}</div>`:'';
+  // 진행률 바 — 진행중인 항목에만 필요: 드라마/영화(watching)는 회차/러닝타임 총량 입력된 경우, 책(reading)은 reading_books 연동된 경우. 완결/중단 콘텐츠는 노출 안 함.
+  let progressHtml='';
+  if(showHead&&(c.cat==='drama'||c.cat==='movie')&&c.status==='watching'&&c.totalUnit){
+    const cur=Math.min(c.currentUnit||0,c.totalUnit);
+    const pct=Math.round((cur/c.totalUnit)*100);
+    const unitLabel=c.cat==='drama'?'화':'분';
+    progressHtml=`<div class="cmr-progress-bar" onclick="event.stopPropagation();openContentProgressModal('${c.cid}')">
+      <div class="cmr-progress-track"><div class="cmr-progress-fill" style="width:${pct}%;"></div></div>
+      <div class="cmr-progress-label">${cur}/${c.totalUnit}${unitLabel}</div>
+    </div>`;
+  }else if(showHead&&c.cat==='book'&&c.status==='watching'){
+    // 통합 이후(2026-08-29) 책 진행률도 contents 항목 자체(totalUnit/currentUnit/unitLabel)에 있음 — drama/movie와 동일 패턴.
+    if(c.unitLabel==='percent'&&c.currentUnit!=null){
+      const pct=Math.min(100,Math.round(c.currentUnit||0));
+      progressHtml=`<div class="cmr-progress-bar">
+        <div class="cmr-progress-track"><div class="cmr-progress-fill" style="width:${pct}%;"></div></div>
+        <div class="cmr-progress-label">${pct}%</div>
+      </div>`;
+    }else if(c.unitLabel==='pages'&&c.totalUnit){
+      const cur=Math.min(c.currentUnit||0,c.totalUnit);
+      const pct=Math.round((cur/c.totalUnit)*100);
+      progressHtml=`<div class="cmr-progress-bar">
+        <div class="cmr-progress-track"><div class="cmr-progress-fill" style="width:${pct}%;"></div></div>
+        <div class="cmr-progress-label">${cur}/${c.totalUnit}페이지</div>
+      </div>`;
+    }
+  }
+  const finalPartHtml=c.review?`<div class="cmr-review-final${flat?' flat':''}"><span class="cmr-review-final-lbl">Comment :</span> ${escapeHtml(c.review)}</div>`:'';
+  const notesPartHtml=wcalNotes.length?`<div class="cmr-review-notes${c.review?' with-final':''}">
+    <div class="cmr-review-notes-lbl">Timeline</div>
+    <div class="cmr-review-notes-tl">
+      ${wcalNotes.map(n=>{
+        const nDispDate=n.dk?(parseInt(n.dk.slice(5,7),10)+'/'+parseInt(n.dk.slice(8,10),10)):'';
+        return `<div class="cmr-review-note-item"><span class="cmr-review-note-date">${nDispDate}</span><span class="cmr-review-note-text">${escapeHtml(n.text||'')}</span></div>`;
+      }).join('')}
+    </div>
+  </div>`:'';
+  return headHtml+progressHtml+finalPartHtml+notesPartHtml;
+}
+// 카테고리별 리스트형(제목+별점+코멘트 아이콘, 한 줄씩) — 드라마/영화/책의 기본 표시 형태
+// 카테고리별 그리드형 — 음악(항상 그리드)과 드라마/영화/책(토글 시 그리드)이 공유하는 렌더러.
+// 예전엔 음악 전용/콘텐츠 전용으로 거의 동일한 로직이 중복돼 있던 것을 통합(2026-08-25).
+const CGRID_COLS=5; // 화면이 좁으면 CSS에서 4열로 줄어듦(auto-fit 미사용, 반응형 필요시 조정)
+let _gridActiveCid=null;
+function renderMusicGridSection(musicList){
+  if(!musicList||!musicList.length)return '';
+  return `<div class="mr-sec-title" style="margin-top:14px;"><i class="ti ${CAT_ICON_META.music.icon} ico-12" aria-hidden="true"></i> ${CONTENT_CAT_LABEL.music}</div>
+    <div class="cgrid-grid" id="content-grid-inner-music">${_cgridRowsHtml(musicList,'music')}</div>`;
+}
+function _cgridRowsHtml(list,cat){
+  let html='';
+  for(let i=0;i<list.length;i+=CGRID_COLS){
+    const row=list.slice(i,i+CGRID_COLS);
+    html+=row.map(c=>_cgridItemHtml(c,cat)).join('');
+    const activeInRow=row.find(c=>(c.cid||('t'+(c.created||0)))===_gridActiveCid);
+    html+=`<div class="cgrid-detail-row-wrap${activeInRow?' on':''}">${activeInRow?_cgridDetailHtml(activeInRow):''}</div>`;
+  }
+  return html;
+}
+function _cgridItemHtml(c,cat){
+  const meta=CAT_ICON_META[cat];
+  const id=c.cid||('t'+(c.created||0));
+  const thumb=c.poster?`<img class="cgrid-thumb" src="${c.poster}" />`:`<div class="cgrid-thumb-fallback" style="background:${meta.color};"><i class="ti ${meta.icon}" aria-hidden="true"></i></div>`;
+  const statusDot=cat!=='music'&&c.status==='watching'?'<span class="cgrid-status-dot">진행중</span>':'';
+  const icons=[];
+  if(c.stars>0)icons.push('<i class="ti ti-star" aria-hidden="true"></i>');
+  if(c.review||(c.notes&&c.notes.length))icons.push('<i class="ti ti-message-circle" aria-hidden="true"></i>');
+  const thumbIcons=icons.length?`<div class="cgrid-thumb-icons">${icons.join('')}</div>`:'';
+  const active=id===_gridActiveCid;
+  return `<div class="cgrid-item${active?' active':''}" onclick="toggleCgridDetail('${id}')">
+    <div class="cgrid-thumb-wrap">${thumb}${statusDot}${thumbIcons}</div>
+    <div class="cgrid-title">${escapeHtml(c.title||'')}</div>
+  </div>`;
+}
+function _cgridDetailHtml(c){
+  const wcalNotes=(c.notes||[]).slice().sort((a,b)=>(b.dk||'').localeCompare(a.dk||''));
+  return `<div class="cgrid-detail">${_cmrDetailBodyHtml(c,wcalNotes,true,true)}</div>`;
+}
+// 그리드 항목 탭 — 활성 id만 바꾸고, 화면에 있는 모든 카테고리 그리드를 캐시 기준으로 다시 그림
+function toggleCgridDetail(id){
+  _gridActiveCid=(_gridActiveCid===id)?null:id;
+  document.querySelectorAll('[id^="content-grid-inner-"]').forEach(el=>{
+    const cat=el.id.replace('content-grid-inner-','');
+    const list=_cmrByCatCache?_cmrByCatCache[cat]:null;
+    if(list)el.innerHTML=_cgridRowsHtml(list,cat);
+  });
+}
+// 카테고리별 그리드형 — 드라마/영화/책도 음악과 동일한 정사각 썸네일 그리드로. 탭 인터랙션은 리스트형과 동일하게 코멘트 펼침.
+function renderContentAsGridHtml(byCat){
+  const cats=['drama','book','movie'];
+  const hasAny=cats.some(cat=>byCat[cat].length>0);
+  if(!hasAny&&!byCat.music.length)return '<div style="text-align:center;color:var(--tm);padding:24px 0;">이 달엔 완료한 콘텐츠가 없어요</div>';
+  _gridActiveCid=null;
+  const sectionsHtml=cats.filter(cat=>byCat[cat].length>0).map((cat,i)=>{
+    const meta=CAT_ICON_META[cat];
+    return `<div class="mr-sec-title" style="margin-top:${i===0?'0':'14px'};"><i class="ti ${meta.icon} ico-12" aria-hidden="true"></i> ${CONTENT_CAT_LABEL[cat]}</div>
+      <div class="cgrid-grid" id="content-grid-inner-${cat}">${_cgridRowsHtml(byCat[cat],cat)}</div>`;
+  }).join('');
+  return `<div class="mr-card" style="margin-bottom:10px;">${sectionsHtml}${renderMusicGridSection(byCat.music)}</div>`;
+}
+
+// ── 월 선택 칩 공용 렌더러 (주간목표 모아보기, 콘텐츠 모아보기 등에서 공유) ──
+// wrapId: 칩을 그릴 컨테이너 id / curYear,curMonth: 현재 활성화된 (year, 0-based month)
+// onSelect(m): 칩 클릭 시 호출되는 콜백(0-based month 전달) — 상태 갱신+재렌더+콘텐츠 로드는 콜백 쪽 책임
+// (2026-08: 과거 무제한→최근 3개월로 축소. 그 이전 달은 아카이브앱에서 조회)
+function renderMonthChipsGeneric(wrapId,curYear,curMonth,onSelect){
+  const wrap=document.getElementById(wrapId);if(!wrap)return;
+  const now=new Date();
+  const monthsAgo=(y,m)=>(now.getFullYear()-y)*12+(now.getMonth()-m); // 이번 달 기준 몇 개월 전인지(0=이번 달)
+  wrap.innerHTML='';
+  for(let m=0;m<12;m++){
+    const future=curYear>now.getFullYear()||(curYear===now.getFullYear()&&m>now.getMonth());
+    const tooOld=monthsAgo(curYear,m)>=3; // 최근 3개월(이번 달 포함) 밖이면 잠금
+    const disabled=future||tooOld;
+    const chip=document.createElement('div');
+    chip.className='m-chip'+(m===curMonth?' active':'')+(disabled?' disabled':'');
+    chip.textContent=(m+1)+'월';
+    if(!disabled)chip.addEventListener('click',()=>onSelect(m));
+    wrap.appendChild(chip);
+  }
+  const activeChip=wrap.querySelector('.m-chip.active');
+  if(activeChip)activeChip.scrollIntoView({behavior:'auto',block:'nearest',inline:'center'});
+}
+
+function openMonthlyReportSheet(){
+  const _ld=new Date();
+  _reportYear=_ld.getFullYear();_reportMonth=_ld.getMonth();
+  renderReportMonthChips();
+  loadMonthlyReportContent();
+  openSheet('monthly-report-sheet');
+  // 시트 오픈 트랜지션/레이아웃 계산 이후 한 번 더 스크롤 위치 보정 (initial render 시점엔 요소 폭이 0으로 잡히는 경우 방지)
+  setTimeout(()=>{
+    const wrap=document.getElementById('mr-month-chips');
+    const activeChip=wrap&&wrap.querySelector('.m-chip.active');
+    if(activeChip)activeChip.scrollIntoView({behavior:'auto',block:'nearest',inline:'center'});
+  },50);
+}
+function renderReportMonthChips(){
+  renderMonthChipsGeneric('mr-month-chips',_reportYear,_reportMonth,m=>{_reportMonth=m;renderReportMonthChips();loadMonthlyReportContent();});
+}
+async function loadMonthlyReportContent(){
+  const el=document.getElementById('mr-content');if(!el)return;
+  const y=_reportYear,mo=_reportMonth;
+  const mk=`${y}-${pad(mo+1)}`;
+  const stats=computeMonthStats(y,mo);
+  const goalHtml=stats.goalLines.length?`<div class="mr-card mr-goal-card">
+    <div class="mr-sec-title"><i class="ti ti-flag-3 ico-12" aria-hidden="true"></i> 이번 달 목표</div>
+    ${stats.goalLines.map(g=>`<div style="font-size:var(--main-text-size);color:var(--tp);line-height:1.7;padding:2px 0;">${g}</div>`).join('')}
+  </div>` : '';
+  const statsHtml=`<div class="mr-row2" style="margin-bottom:12px;">
+    <div class="mr-stat"><div class="v">${stats.doneTodos}개</div><div class="l">투두 완료</div></div>
+    <div class="mr-stat"><div class="v">${stats.habitPct}%</div><div class="l">습관 달성률</div></div>
+    <div class="mr-stat"><div class="v">${stats.avgSleep?stats.avgSleep+'h':'-'}</div><div class="l">평균 수면</div></div>
+  </div>`;
+  const rhythmHtml=stats.rhythmDur&&Object.keys(stats.rhythmDur).length?`<div class="mr-card">
+    <div class="mr-sec-title"><i class="ti ti-rainbow ico-13" aria-hidden="true"></i> 이번 달 리듬</div>
+    ${buildMonthlyRhythmBar(stats.rhythmDur,stats.dim,stats.rhythmDayCount)}
+  </div>` : '';
+  const contentsHtml=stats.contentsList.length?`<div class="mr-card">
+    <div class="mr-sec-title"><i class="ti ti-stack-2 ico-12" aria-hidden="true"></i> 콘텐츠 기록</div>
+    ${stats.contentsList.map(c=>`<div class="mr-wc-line"><span class="txt"><span style="display:inline-block;width:7px;height:7px;border-radius:2px;background:${getCatDotColor(c.cat)};margin-right:6px;"></span>${c.title}</span><span class="pct" style="color:var(--tm);font-weight:400;">${cStatusLabel(c)}</span></div>`).join('')}
+  </div>` : `<div class="mr-card"><div class="mr-sec-title"><i class="ti ti-stack-2 ico-12" aria-hidden="true"></i> 콘텐츠 기록</div><div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:8px 0;">이 달엔 기록한 콘텐츠가 없어요</div></div>`;
+
+  el.innerHTML=`${goalHtml}<div id="mr-ai-slot"></div>${statsHtml}${rhythmHtml}${contentsHtml}`;
+  const slot=document.getElementById('mr-ai-slot');
+
+  const now=new Date();
+  const lastDateOfThisMonth=new Date(y,mo+1,0).getDate();
+  const _lh=new Date().getHours();
+  const isLastDayEvening=now.getDate()===lastDateOfThisMonth&&(_lh>=19||_lh<6);
+  const isThisMonth=(y===now.getFullYear()&&mo===now.getMonth());
+  const isOngoingMonth=isThisMonth&&!isLastDayEvening;
+
+  if(isOngoingMonth){
+    // 이 달이 아직 끝나지 않음: 말일 저녁까지는 종합 리포트 없이 안내만
+    slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles ico-12" aria-hidden="true"></i> 이번 달 한눈에</div><div class="mr-ai-empty">이 달이 끝나면 전체를 정리해드릴게요</div></div>`;
+    return;
+  }
+  slot.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles ico-12" aria-hidden="true"></i> 이번 달 한눈에</div><div class="mr-ai-empty">불러오는 중...</div></div>`;
+
+  // 말일 저녁 이후 또는 지난 달: 전체 기간으로 최종 리포트
+  const cacheKey='monthly_report_'+mk;
+  let report=S.get(cacheKey);
+  if(!report){
+    const serverJson=await aiCacheGet(cacheKey);
+    if(serverJson){
+      try{report=JSON.parse(serverJson);S.set(cacheKey,report);}catch(e){}
+    }
+  }
+  if(!report&&getClaudeKey()){
+    report=await generateMonthlyReportAI(mk,stats);
+    if(report){
+      S.set(cacheKey,report);
+      aiCacheSet(cacheKey,JSON.stringify(report));
+    }
+  }
+  // 그 사이에 다른 달로 넘어갔으면 적용하지 않음
+  if(`${_reportYear}-${pad(_reportMonth+1)}`!==mk)return;
+  const slot2=document.getElementById('mr-ai-slot');if(!slot2)return;
+  if(report){
+    slot2.innerHTML=`<div class="mr-ai-card">
+      <div class="mr-sec-title"><i class="ti ti-sparkles ico-12" aria-hidden="true"></i> 이번 달 한눈에</div>
+      <p style="font-size:var(--main-text-size);color:var(--tp);line-height:1.9;margin-bottom:${report.keywords&&report.keywords.length?'12px':'0'};">${report.comment}</p>
+      ${report.keywords&&report.keywords.length?`<div class="mr-tag-cloud">${report.keywords.map(k=>`<span class="mr-tag">${k}</span>`).join('')}</div>`:''}
+    </div>`;
+  } else {
+    slot2.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles ico-12" aria-hidden="true"></i> 이번 달 한눈에</div><div class="mr-ai-empty">${getClaudeKey()?'코멘트를 만들 데이터가 부족해요':'아직 준비 중이에요 (다른 기기에서 먼저 열어보시면 여기서도 볼 수 있어요)'}</div></div>`;
+  }
+}
+
+// 최근 2주(지난주~2주전) weekKey('week:YYYY-MM-DD', 월요일 기준) 목록.
+// challenge_review_, weekly_memo_report_ 둘 다 이 형식을 캐시 키로 쓰므로 공유해서 사용.
+// (2026-08: 4주→2주로 축소. 그 이전 회차는 아카이브앱에서 조회)
+function _recentWeekKeys(){
+  const out=[];
+  for(let i=1;i<=2;i++){
+    const d=new Date();d.setDate(d.getDate()-7*i);
+    out.push(weekKey(d));
+  }
+  return out; // [지난주, 2주전]
+}
+// 최근 2주(이번주 포함) 일요일 논리일 날짜키 목록 — weekly_summary 캐시 키와 1:1 대응.
+function _recentWeekSundays(){
+  const base=_thisWeekSundayDk();
+  const baseDate=new Date(base+'T00:00:00');
+  const out=[];
+  for(let i=0;i<2;i++){
+    const d=new Date(baseDate);d.setDate(baseDate.getDate()-7*i);
+    out.push(dateKey(d));
+  }
+  return out; // [이번주 일요일, 1주전]
+}
+// 칩 렌더링 — 클릭 시 이번주 캐시 없으면 생성 시도(loadWeeklyReviewFor).
+// 라벨: 배열 0번(가장 최근 일요일)이 "지난주"이고 이후 2주전/3주전/4주전 순.
+function renderWeekReviewChips(activeDk){
+  const wrap=document.getElementById('wr-week-chips');if(!wrap)return;
+  const weeks=_recentWeekSundays();
+  wrap.innerHTML='';
+  weeks.forEach((dk,i)=>{
+    const chip=document.createElement('div');
+    chip.className='m-chip'+(dk===activeDk?' active':'');
+    chip.textContent=i===0?'지난주':(i+1)+'주전';
+    chip.addEventListener('click',()=>loadWeeklyReviewFor(dk));
+    wrap.appendChild(chip);
+  });
+}
+function loadWeeklyReviewFor(dk){
+  renderWeekReviewChips(dk);
+  const content=document.getElementById('weekly-review-content');
+  const cacheKey='weekly_summary_'+dk;
+  const cached=S.get(cacheKey);
+  if(cached&&!_isWeeklyFallback(cached)){content.innerHTML=cached;return;}
+  content.innerHTML='<div class="sheet-loading-msg">한 주 요약 작성 중이에요.. 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">약 10-20초 소요돼요</span></div>';
+  aiCacheGet(cacheKey).then(function(serverHtml){
+    if(serverHtml&&!_isWeeklyFallback(serverHtml)){
+      S.set(cacheKey,serverHtml);
+      content.innerHTML=serverHtml;
+      return;
+    }
+    const isCurrentWeek=dk===_thisWeekSundayDk();
+    if(!isCurrentWeek){
+      // 지난 주차는 그 시점에 한 번도 열람 안 됐다면(=생성 이력 없음) 새로 만들지 않고 안내만.
+      content.innerHTML='<div class="sheet-loading-msg">이 주는 아직 기록된 요약이 없어요 🌿</div>';
+      return;
+    }
+    if(!getClaudeKey()){
+      content.innerHTML='<div class="sheet-loading-msg">아직 준비 중이에요 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">다른 기기에서 먼저 열어보시면 여기서도 볼 수 있어요</span></div>';
+      return;
+    }
+    makeWeeklySummaryCard().then(function(html){
+      if(html&&!_isWeeklyFallback(html)){
+        S.set(cacheKey,html);
+        aiCacheSet(cacheKey,html);
+        content.innerHTML=html;
+      }else if(html){
+        // AI 요약 실패 — 기록 요약만 보여주되 캐시에 저장하지 않음(다시 열면 다시 시도). 원인(_lastAiError)을 함께 표시.
+        content.innerHTML=html+'<div style="margin-top:14px;font-size:var(--dow-label-size);color:var(--tm);line-height:1.6;">AI 요약을 만들지 못했어요. 다시 열면 다시 시도해요'+(_lastAiError?' ('+escapeHtml(_lastAiError)+')':'')+'</div>';
+      }else{
+        content.innerHTML='<div class="sheet-loading-msg">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
+      }
+    });
+  });
+}
+function openWeeklyReviewSheet(){
+  openSheet('weekly-review-sheet');
+  loadWeeklyReviewFor(_thisWeekSundayDk());
+}
+// 주간 요약의 fallback(AI 없이 기록만 나열한 버전) 판별 — 실패한 결과를 성공한 요약처럼 캐시(로컬+서버)하면 그 주는 영구히 fallback으로 굳어버림(2026-09-20 발생).
+// 그래서 fallback은 화면에만 보여주고 캐시에 저장/재사용하지 않음. 뒤쪽 조건은 마커 도입 전에 이미 캐시된 옛 fallback을 걸러내기 위한 것.
+function _isWeeklyFallback(html){return !!html&&(html.includes('data-wk-fallback')||html.includes('font-weight:600;color:rgba(80,140,200,0.9);">이번 주 기록 요약'));}
+async function makeWeeklySummaryCard(){
+  // 하루치 메모 중 N개를 시간대 전체에 고르게 펼쳐서 뽑기 (아침 루틴 멘트로만 쏠리는 것 방지)
+  const evenSample=(arr,n)=>{
+    if(arr.length<=n)return arr;
+    const result=[];
+    for(let i=0;i<n;i++){
+      const idx=Math.round(i*(arr.length-1)/(n-1));
+      result.push(arr[idx]);
+    }
+    return [...new Set(result)];
+  };
+  const card=document.createElement('div');
+  card.className='card m';
+
+  // 이번 주 월~토 데이터 수집
+  // now.getDay() 기준으로 계산하면 월요일 저녁(이 함수가 이제 이 시간대에도 호출될 수 있음)엔
+  // "이번 주"가 오늘부터 시작하는 걸로 잘못 잡힘 — 항상 "그 주 일요일"을 기준으로 역산.
+  const sundayDk=_thisWeekSundayDk();
+  const now=new Date(sundayDk+'T00:00:00');
+  const weekStart=new Date(now);
+  weekStart.setDate(now.getDate()-6); // 그 주 일요일의 6일 전 = 월요일
+
+  const allTodos=[],allMemos=[],allMemosWithDay=[],allSleep=[];
+  const habits=getHabits();
+  const wk=weekKey(now);
+  const checks=getHabitChecks(wk);
+  const habitDoneCounts={};
+  habits.forEach(h=>{habitDoneCounts[h.name]=0;});
+
+  for(let i=0;i<7;i++){
+    const d=new Date(weekStart);d.setDate(weekStart.getDate()+i);
+    const dk=dateKey(d);
+    const dayName=_HOME_DAYS[d.getDay()]+'요일';
+    const todos=getTodos(dk);
+    allTodos.push(...todos);
+    const memos=getMemos(dk);
+    allMemos.push(...memos.map(m=>m.text).filter(Boolean));
+    const dayTexts=memos.map(m=>m.type==='seed'?`[씨앗] ${m.text}`:m.text).filter(Boolean);
+    evenSample(dayTexts,8).forEach(t=>allMemosWithDay.push(`${dayName}: ${t}`));
+    const sleepMin=sleepDurMin(getSleep(dk));
+    if(sleepMin!=null)allSleep.push(sleepMin);
+    // 습관 체크
+    const dow=(d.getDay()+6)%7;
+    habits.forEach(h=>{
+      if(checks[h.id+'-'+dow])habitDoneCounts[h.name]=(habitDoneCounts[h.name]||0)+1;
+    });
+  }
+
+  // 리듬 카테고리별 시간 집계 (이번 주 vs 지난 주, 비교용) — 공용 util(sumCategoryDurations)로 라벨 기준 합산
+  const rhythmDurThis=sumCategoryDurations(weekStart,7).dur;
+  const lastWeekStart=new Date(weekStart);lastWeekStart.setDate(weekStart.getDate()-7);
+  const rhythmDurLast=sumCategoryDurations(lastWeekStart,7).dur;
+  // 변화가 뚜렷한 카테고리(전주 대비 30분 이상 증감) 추출, 최대 2개
+  const rhythmChanges=Object.values(RHYTHM_CATS).map(c=>{
+    const thisMin=rhythmDurThis[c.label]||0,lastMin=rhythmDurLast[c.label]||0;
+    return {label:c.label,thisMin,lastMin,diff:thisMin-lastMin};
+  }).filter(c=>Math.abs(c.diff)>=30).sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff)).slice(0,2);
+  const rhythmChangeText=rhythmChanges.map(c=>{
+    const dir=c.diff>0?'늘고':'줄고';
+    const thisH=(c.thisMin/60).toFixed(1).replace(/\.0$/,''),lastH=(c.lastMin/60).toFixed(1).replace(/\.0$/,'');
+    return `${c.label} ${dir}있음 (지난주 ${lastH}h → 이번주 ${thisH}h)`;
+  }).join(', ');
+
+  const totalTodos=allTodos.length;
+  const doneTodos=allTodos.filter(t=>t.done).length;
+  const avgSleep=allSleep.length?Math.round(allSleep.reduce((a,b)=>a+b,0)/allSleep.length):null;
+  const avgSleepStr=avgSleep?fmtDur(avgSleep):null;
+  const topHabit=Object.entries(habitDoneCounts).sort((a,b)=>b[1]-a[1])[0];
+  const bottomHabit=Object.entries(habitDoneCounts).sort((a,b)=>a[1]-b[1])[0];
+  // 자주 등장한 투두 (같은 텍스트가 여러 날 반복 등록된 것) — 완료율 대신 실행 빈도 중심 코멘트용
+  const todoTextTally={};
+  allTodos.forEach(t=>{if(t.text)todoTextTally[t.text]=(todoTextTally[t.text]||0)+1;});
+  const frequentTodo=Object.entries(todoTextTally).filter(([,c])=>c>=2).sort((a,b)=>b[1]-a[1])[0];
+
+  const fallbackHtml=`<div data-wk-fallback="1" style="font-size:var(--main-text-size);color:var(--tp);line-height:1.9;">
+    <div style="margin-bottom:10px;font-weight:600;color:rgba(80,140,200,0.9);">이번 주 기록 요약</div>
+    ${avgSleepStr?`<div>◎ 평균 수면 <b>${avgSleepStr}</b></div>`:''}
+    <div>✓ 실행한 투두 <b>${doneTodos}개</b></div>
+    <div>✦ 메모 총 <b>${allMemos.length}건</b></div>
+    ${topHabit&&topHabit[1]>0?`<div>→ 가장 많이 한 습관: <b>${topHabit[0]}</b></div>`:''}
+    ${frequentTodo?`<div>◇ 자주 등장한 일: <b>${frequentTodo[0]}(${frequentTodo[1]}회)</b></div>`:''}
+    ${rhythmChangeText?`<div>◈ 리듬 변화: <b>${rhythmChangeText}</b></div>`:''}
+  </div>`;
+
+  const key=getClaudeKey();
+  if(!key) return fallbackHtml;
+
+  // Claude에게 요약 요청
+  const wChallenges=getWChallenge(wk);
+  const challengeSummary=wChallenges.filter(c=>c.text&&c.text.trim()).map(c=>{
+    const total=c.days.filter(Boolean).length;
+    return `${c.text} ${total}/7`;
+  });
+
+  const dataContext=[
+    `이번 주(월~일) 데이터:`,
+    getUserProfileContext(),
+    avgSleepStr?`평균 수면: ${avgSleepStr}`:'수면 기록 없음',
+    `투두: 총 ${totalTodos}개 중 ${doneTodos}개 실행함`,
+    `메모 총 ${allMemos.length}건`,
+    allMemos.length?`메모 내용 (요일별로 시간대 고르게 샘플링):\n${allMemosWithDay.join('\n')}`:'',
+    topHabit&&topHabit[1]>0?`가장 많이 완료한 습관: ${topHabit[0]} (${topHabit[1]}일)`:'',
+    bottomHabit&&bottomHabit[1]===0?`한 번도 못 한 습관: ${bottomHabit[0]}`:'',
+    frequentTodo?`이번 주 자주 등장한 투두: ${frequentTodo[0]} (${frequentTodo[1]}회)`:'',
+    challengeSummary.length?`이번 주 목표 달성:\n${challengeSummary.join(', ')}`:'',
+    rhythmChangeText?`지난주 대비 리듬 시간 변화: ${rhythmChangeText}`:'',
+  ].filter(Boolean).join('\n');
+
+  const sys=`당신은 따뜻한 한 주 정리 비서예요. 이번 주 데이터를 보고 주간 회고 카드를 작성해요.
+${RHYTHM_CAT_GUIDE}
+메모 분석 시 유의할 점:
+- 단순히 "바빴어요/피곤했어요" 같은 뭉뚱그린 표현 대신, 메모에 실제로 등장한 장소/활동/사람/사건을 구체적으로 짚어서 언급해요.
+- 요일별로 흐름이 어떻게 바뀌었는지 (예: 초반엔 OO, 중반부터 OO로 전환) 구체적인 사건 기반으로 설명해요.
+- 반복적으로 등장하는 키워드나 감정선이 있으면 짚어줘요.
+- 앞에 [씨앗]이 붙은 메모는 성격이 달라요 — 사용자가 그날 겪은 일이 아니라, 어디선가 발견해 남겨둔 인상 깊은 문장이나 장면(드라마 대사, 책 구절, 우연히 들은 말 등)이에요. 이 항목은 사용자가 실제로 겪은 일처럼 단정하지 말고, "이런 문장을 마음에 담아두셨네요" 정도로만 참고해요.
+
+투두 관련 유의할 점 (중요):
+- 투두는 원래 해야 할 일 목록일 뿐, "완료율/완성도/달성률" 같은 성취 평가의 대상이 아니에요. "투두 완료율이 높았다/완벽했다" 같은 표현은 절대 쓰지 마세요.
+- 투두를 언급할 땐 오직 "실행한 개수"만 말하거나, 자주 등장한 일(반복 등록된 투두)이나 자주 미룬 일처럼 패턴에 대한 코멘트로 다뤄요.
+
+형식:
+1. 첫 문장: 이번 주 전반적인 흐름을 한 문장으로 (수면/컨디션 언급, 투두 완료율·완성도 언급 금지)
+2. "한 주간의 흐름을 보면 주 초반에는~" 으로 시작하는 감정/분위기 요약 2문장 (메모에 등장한 구체적 사건/장소 기반, 위 유의사항 반영)
+3. 빈 줄 후 "이번 주 기록 요약" 소제목
+4. 아래 소재들을 각각 기호를 붙인 짧은 한 줄씩으로 표현하되, 있는 것만 자연스럽게 골라서 최대 4~5줄로 압축해요. 여러 소재를 하나의 줄에 자연스럽게 엮어도 좋아요(예: 수면과 투두를 한 줄에, 리듬 변화와 목표 현황을 한 줄에 묶는 식). 없는 항목은 억지로 만들지 말고 건너뛰어요.
+   - ◎ 평균 수면 + ✓ 실행한 투두 개수 + ✦ 메모 건수 (이 셋은 보통 한 줄로 묶어서 표현, 투두 완료율/퍼센트는 절대 쓰지 않음)
+   - → 이동/특이사항이 있으면 짧게
+   - ◇ 자주 등장한 일(반복 등록된 투두)이 있으면
+   - ◐ 자주 미룬 일이 있으면
+   - ◈ 지난주 대비 리듬 시간 변화가 있으면 (예: ◈ 업무 시간이 늘고 휴식이 줄었어요)
+   - ★ 이번 주 목표 달성 현황이 있으면
+5. 빈 줄 후 다음 주를 위한 따뜻한 한 마디
+
+규칙:
+- 다정한 구어체 존댓말
+- 기호 사용: ◎ ✓ ✦ → ◇ ◐ ◈ ★ (이모지 금지)
+- 이름 호칭 없음
+- 전체 6-8문장 이내(기록 요약 줄 포함)
+- 분량을 넘기지 않도록 조절하고, 마지막 항목과 마지막 문장까지 반드시 완전한 문장으로 끝맺기 (중간에 잘리지 않게)
+- HTML 태그 없이 순수 텍스트만 출력`;
+
+  const reply=await callClaude(sys,[{role:'user',content:dataContext}],900);
+
+  if(reply&&!reply.startsWith('__ERR__')){
+    // 텍스트를 HTML로 변환 — 소제목 볼드, 기호 항목 정렬
+    const lines=reply.trim().split('\n');
+    const htmlLines=lines.map(line=>{
+      const t=line.trim();
+      if(!t)return '<div style="height:8px;"></div>';
+      if(t==='이번 주 기록 요약')return `<div style="font-weight:600;color:rgba(80,140,200,0.9);margin:4px 0 6px;">${t}</div>`;
+      if(/^[◎✓✦→◇◐◈★]/.test(t))return `<div style="font-size:var(--dow-label-size);color:var(--ts);margin:2px 0;">${t}</div>`;
+      return `<div style="margin:2px 0;">${t}</div>`;
+    });
+    return `<div style="font-size:var(--main-text-size);color:var(--tp);line-height:1.85;">${htmlLines.join('')}</div>`;
+  }
+  return fallbackHtml;
+}
+// ─ 날씨 + Claude 비서 브리핑
+let _homeWeatherCache=null; // {icon, temp, desc, lat, lon, fetchedAt}
+
+// WMO 날씨 코드 → [이모지, 짧은 한글 표현] — 홈 날씨 배지(아이콘)와 오늘의 질문 빈칸({날씨})이 공용으로 사용.
+const WMO_INFO={
+  0:['☀️','맑음'],1:['🌤️','대체로 맑음'],2:['⛅','구름 조금'],3:['☁️','흐림'],
+  45:['🌫️','안개'],48:['🌫️','안개'],
+  51:['🌦️','이슬비'],53:['🌦️','이슬비'],55:['🌧️','이슬비'],
+  61:['🌧️','비'],63:['🌧️','비'],65:['🌧️','비'],
+  71:['🌨️','눈'],73:['🌨️','눈'],75:['🌨️','눈'],
+  80:['🌦️','소나기'],81:['🌧️','소나기'],82:['🌧️','소나기'],
+  95:['⛈️','뇌우'],96:['⛈️','뇌우'],99:['⛈️','뇌우']
+};
+
+async function fetchWeatherData(){
+  // 30분 캐시
+  if(_homeWeatherCache&&Date.now()-_homeWeatherCache.fetchedAt<60*60*1000)return _homeWeatherCache;
+  return new Promise((resolve)=>{
+    if(!navigator.geolocation){resolve(null);return;}
+    navigator.geolocation.getCurrentPosition(async(pos)=>{
+      try{
+        const {latitude:lat,longitude:lon}=pos.coords;
+        const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weathercode,apparent_temperature&timezone=auto`;
+        const res=await fetch(url);
+        if(!res.ok){resolve(null);return;}
+        const data=await res.json();
+        const cur=data.current;
+        const code=cur.weathercode;
+        const temp=Math.round(cur.temperature_2m);
+        const icon=(WMO_INFO[code]||[])[0]||'🌡️';
+        _homeWeatherCache={icon,temp,code,fetchedAt:Date.now()};
+        resolve(_homeWeatherCache);
+      }catch(e){resolve(null);}
+    },(err)=>{resolve(null);},{timeout:8000});
+  });
+}
+
+// 인사말 프롬프트 공통 규칙 — fetchHomeWeather의 dawn/night/morning·afternoon 세 분기에서
+// 토씨까지 동일하게 반복되던 블록을 하나로 통일. 말투/컨디션 대응 규칙을 바꿀 땐 여기 한 곳만 고치면 됨.
+const GREETING_CONDITION_RULE=`- 메모에 담긴 컨디션(피곤함, 아픔, 특정 신체 상태 등)은 그 시점의 일시적 상황으로만 참고하고, 이를 근거로 "쉬어야 해요", "무리하지 마세요" 같은 조언이나 걱정을 반복적으로 얹지 말 것. 컨디션 언급이 여러 날 메모 조회 범위에 걸쳐 있어도 매번 다시 꺼내 강조하지 않기 — 특히 생리/월경처럼 주기적 신체 상태는 하루이틀 지나면 이미 지난 일로 간주하고 재언급하지 말 것.
+- 메모 속 컨디션 정보는 "오늘 어떤 하루였는지" 분위기를 파악하는 참고 재료일 뿐, 매번 되짚어 걱정하거나 지속 상태로 단정하는 근거로 쓰지 말 것.`;
+const GREETING_OUTPUT_RULE=`- 반드시 ~해요, ~이에요, ~어요 체의 정감있는 존댓말만 사용. 반말 절대 금지.
+- "너", "당신" 등 호칭 절대 사용 금지.
+- 스스로를 소개하거나 설명하는 표현 절대 금지. 곧바로 본문으로 시작.
+- 오직 문장만 출력, 따옴표나 설명 없이`;
+// night/morning·afternoon(비-dawn) 두 곳에서만 공통인 규칙(날씨·시각 재언급 금지 + 계절 참고) — dawn은 날씨 브리핑 성격이 아니라 제외
+const GREETING_WEATHER_SEASON_RULE=(extra)=>`- ${extra} 단, 날씨(온도, 맑음/흐림 등)와 현재 시각(몇 시, 오전/오후)은 화면 상단에 이미 별도로 표시되고 있으니, 본문에 숫자나 문장으로 다시 적지 말 것 — "26도", "오후 4시" 같은 표현 절대 금지.
+- 현재 월(${new Date().getMonth()+1}월)을 반드시 참고해서 계절 언급 시 오류 없도록.`;
+
+async function fetchHomeWeather(section){
+  const subEl=document.getElementById('home-greeting-sub');
+  const weatherIconEl=document.getElementById('home-weather-icon');
+
+  const key=getClaudeKey();
+
+  // 날씨 먼저 가져오기
+  const weather=await fetchWeatherData();
+
+  // 날씨 아이콘 topbar에 표시
+  if(weatherIconEl&&weather){
+    weatherIconEl.textContent=' '+weather.icon+' '+weather.temp+'°';
+  }
+
+  // 인사 캐시 유효하면 바로 표시 (sub-section 기준, dawn 포함 7분류)
+  const subSec=getSubSection();
+  if(_greetingCache&&_greetingCache.subSection===subSec){
+    if(subEl)subEl.textContent=_greetingCache.text;
+    return;
+  }
+
+  // Claude 키 없으면 서버 캐시 조회 → 있으면 그 문구 표시, 없으면 준비중 안내
+  if(!key){
+    if(subEl){
+      const serverCacheKey='greeting_'+dateKey(new Date())+'_'+subSec;
+      const cached=await aiCacheGet(serverCacheKey);
+      subEl.textContent=cached||'곧 준비될 거예요';
+    }
+    return;
+  }
+
+  // 오늘 데이터 수집 — dawn(새벽)은 "방금 지나간 하루"를 돌아보는 시점이라 getLogicalDate() 기준(어제)으로 조회
+  const now=new Date();
+  const dataDate=section==='dawn'?getLogicalDate():now;
+  const dk=dateKey(dataDate);
+  const wk=weekKey(dataDate);
+  const dow=(dataDate.getDay()+6)%7;
+  const todos=getTodos(dk);
+  const pendCount=todos.filter(t=>!t.done).length;
+  const doneCount=todos.filter(t=>t.done).length;
+  const allMemos=getMemos(dk).map(m=>m.text).filter(Boolean);
+  const sleep=getSleep(dk);
+  const habits=getHabits();
+  const checks=getHabitChecks(wk);
+  const doneHabitsCount=habits.filter(h=>checks[h.id+'-'+dow]).length;
+  const rblocks=getRhythmBlocks(dk);
+  const weatherDesc=weather?`(참고용, 수치 그대로 출력 금지) 날씨: ${weather.icon} ${weather.temp}도`:'날씨 정보 없음';
+
+  // 서브섹션별 메모 조회 범위
+  let pickedMemos=[];
+  if(subSec==='morning_1')pickedMemos=allMemos.slice(0,2);
+  else if(subSec==='morning_2')pickedMemos=allMemos.slice(0,5);
+  else if(subSec==='afternoon_1')pickedMemos=allMemos.slice(0,7);
+  else if(subSec==='afternoon_2')pickedMemos=_pickRandom(allMemos,7);
+  else if(subSec==='night_1')pickedMemos=allMemos.slice(-5);
+  else if(subSec==='dawn')pickedMemos=allMemos.slice(0,8);
+  else pickedMemos=_pickRandom(allMemos,10);
+
+  // 리듬 블록 중 가장 비중 컸던 카테고리 1개 산출 (분 단위 합산)
+  const rhythmSummary=(()=>{
+    if(!rblocks||!rblocks.length)return '';
+    const durByCat={};
+    rblocks.forEach(b=>{
+      if(!b.cat||!RHYTHM_CATS[b.cat])return;
+      if(b.start==null||b.end==null)return;
+      const s=toMin(b.start),e=toMin(b.end);
+      if(s==null||e==null)return;
+      const dur=Math.max(0,(e>s?e-s:(1440-s+e)));
+      durByCat[b.cat]=(durByCat[b.cat]||0)+dur;
+    });
+    const top=Object.entries(durByCat).sort((a,b)=>b[1]-a[1])[0];
+    if(!top)return '';
+    return `오늘 리듬 중 비중이 컸던 카테고리: ${RHYTHM_CATS[top[0]].label}`;
+  })();
+
+  // 참고: 독서 시간은 책 단위 누적치만 있고 '오늘 하루치'를 분리할 수 없어 이번엔 제외
+
+  const sectionLabel={morning:'오전',afternoon:'오후',night:'저녁',dawn:'새벽'};
+  const subSecLabel={
+    morning_1:'아침(하루가 막 시작된 시점)',morning_2:'오전(흘러가는 중)',
+    afternoon_1:'낮(하루의 중반)',afternoon_2:'늦은 오후(하루가 저물어가는 시점)',
+    night_1:'초저녁(하루 마무리를 시작하는 시점)',night_2:'밤(하루의 끝, 다음 하루로 넘어가는 문턱)',
+    dawn:'새벽(하루를 마감하고 돌아보는 시점)'
+  };
+
+  // 할일 항목명 상세 (통합카드는 구체적 언급 허용)
+  const bySection=(ts)=>todos.filter(t=>t.timeSection===ts&&!t.isEvent);
+  const morningTodos=bySection('morning'),afternoonTodos=bySection('afternoon'),nightTodos=bySection('night');
+  const noneTodos=bySection('none').concat(todos.filter(t=>!t.timeSection&&!t.isEvent));
+  const todoLine=(arr,label)=>{
+    const done=arr.filter(t=>t.done).map(t=>t.text);
+    const pend=arr.filter(t=>!t.done).map(t=>t.text);
+    const parts=[];
+    if(pend.length)parts.push(`미완료: ${pend.join(', ')}`);
+    if(done.length)parts.push(`완료: ${done.join(', ')}`);
+    return parts.length?`${label} 할일 — ${parts.join(' / ')}`:null;
+  };
+
+  let dataContext,sys;
+
+  if(section==='dawn'){
+    // 새벽은 "방금 지나간 하루"를 담담히 돌아보는 총평 — 시간대별 사건 나열이 아니라
+    // 하루 전체를 하나로 뭉뚱그려 "이런 결의 하루였다"는 인상 위주로 전달
+    const allDoneTodos=todos.filter(t=>t.done).map(t=>t.text);
+    const allPendTodos=todos.filter(t=>!t.done).map(t=>t.text);
+    dataContext=[
+      `지금은 새벽 시간대라 ${_HOME_DAYS[dataDate.getDay()]}요일 하루를 마감하는 시점이에요. 이 하루는 아직 "오늘"이며 "어제"라고 부르면 안 돼요(자정이 지났어도 새벽 4시 전까지는 이 논리적 하루가 계속 "오늘"이에요).`,
+      getUserProfileContext(),
+      `(참고용, 출력 금지) 지금은 하루를 마감하는 새벽 시간대예요.`,
+      allDoneTodos.length?`오늘 완료한 일: ${allDoneTodos.join(', ')}`:'',
+      allPendTodos.length?`오늘 못한 일: ${allPendTodos.join(', ')}`:'',
+      rhythmSummary,
+      pickedMemos.length?`메모: ${pickedMemos.join(' / ')}`:'',
+      sleep.sleep||sleep.wake?`수면: ${sleep.sleep||'?'} 취침 ${sleep.wake||'?'} 기상`:''
+    ].filter(Boolean).join('\n');
+    sys=`당신은 따뜻한 생활 코치예요. 방금 지나간 하루의 기록을 보고, "오늘은 이런 결의 하루였다"는 한 줄 총평과 포근한 한마디를 건네요.
+
+**분량 제한 (반드시 지킬 것):**
+- 전체 2-3문장 이내로 짧게.
+
+**절대 원칙 — 사건 나열 금지:**
+- "오전에 X하고 오후에 Y하고 저녁에 Z했다" 같은 시간순 사건 나열 문장을 절대 만들지 말 것.
+- 개별 항목을 순서대로 이어붙이지 말고, 먼저 하루 전체를 관통하는 인상이나 결(분주했다/차분했다/바깥일이 많았다/집중하는 하루였다 등)을 한 문장으로 요약하고, 그 다음에 인상적인 일 1개 정도만 자연스럽게 곁들일 것.
+- 완료한 일들을 나열형으로 다시 읊지 말 것 — "이것저것 챙기며", "바쁘게 움직인" 처럼 뭉뚱그려 표현.
+
+기타 규칙:
+- 지금은 하루를 마감하는 새벽 시간대예요 — "아직 안 자냐"거나 재촉하는 말은 하지 말고, 담담하고 편안한 톤으로.
+- 내일 할일이나 예고는 언급하지 말 것 — 오직 지나간 하루에 대한 총평만.
+- 확정적이지 않은 내용은 추측하지 말고, 실제 기록에 있는 내용 위주로.
+${GREETING_CONDITION_RULE}
+${GREETING_OUTPUT_RULE}
+- 이모지나 특수기호는 쓰지 않아요.`;
+  } else if(section==='night'){
+    // 저녁은 기존 브리핑처럼 하루 요약+내일 예고가 핵심이라 별도 구성
+    const tom=new Date(now);tom.setDate(now.getDate()+1);
+    const tomTodos=getTodos(dateKey(tom));
+    dataContext=[
+      `오늘은 ${_HOME_DAYS[now.getDay()]}요일이에요.`,
+      weatherDesc,
+      getUserProfileContext(),
+      `(참고용, 출력 금지) 현재 시각: ${now.getHours()}시 · 지금 시점: ${subSecLabel[subSec]}`,
+      todoLine(morningTodos,'오늘 오전'),
+      todoLine(afternoonTodos,'오늘 오후'),
+      todoLine(nightTodos,'오늘 저녁'),
+      todoLine(noneTodos,'오늘 시간지정없음'),
+      tomTodos.length?`내일 할일: ${tomTodos.filter(t=>!t.done&&!t.isEvent).map(t=>t.text).join(', ')}`:'',
+      (()=>{const evs=tomTodos.filter(t=>t.isEvent);return evs.length?`내일 일정: ${evs.map(t=>t.eventTime?`${t.eventTime} ${t.text}`:t.text).join(', ')}`:'';})(),
+      rhythmSummary,
+      pickedMemos.length?`오늘 메모: ${pickedMemos.join(' / ')}`:'',
+      sleep.sleep||sleep.wake?`수면: ${sleep.sleep||'?'} 취침 ${sleep.wake||'?'} 기상`:''
+    ].filter(Boolean).join('\n');
+    sys=`당신은 날씨와 하루의 결을 살필 줄 아는 따뜻한 하루 비서예요. 오늘 하루를 마무리하는 저녁(${subSecLabel[subSec]}) 시점에 어울리는 브리핑을 작성해요.
+
+**분량 제한 (반드시 지킬 것):**
+- ${subSec==='night_2'?'전투력이 떨어지는 늦은 밤이니 짧게: 전체 3-4문장 이내.':'전체 3-4문장 이내로, 지금보다 두 줄 정도 짧게 압축.'}
+
+기타 규칙:
+- 오늘 완료한 일은 전부 나열하지 말고, 그중 인상적인 1-2가지만 골라 자연스럽게 녹여요. 나머지는 "이것저것", "여러 가지를 챙기며" 처럼 뭉뚱그려 표현해요.
+- ${subSec==='night_2'?'내일에 대한 작은 기대나 응원을 딱 한 문장만, 할일을 나열하지 말고 가볍게. 내일 일정이 있다면 그 사실 정도만 가볍게 언급해도 좋아요(예: "내일은 ~하는 날이네요").':'오늘 하루를 돌아보는 내용이 전체 문장의 중심이 되도록 하고(비중 약 7:3), 내일 할일은 마지막에 짧게 한 문장으로만 덧붙여요 — 항목명은 최대 2-3개까지만 언급하고 그 이상은 나열하지 말 것. 내일 일정이 있다면 할일과 자연스럽게 묶어 언급하되, 일정 시간이 있으면 시간도 함께 녹여요(예: "내일은 14시에 ~일정이 있으니").'}
+${GREETING_WEATHER_SEASON_RULE('날씨/계절/메모 등에서 느껴지는 분위기를 한 줄 정도 자연스럽게 녹여요.')}
+- 리듬 카테고리를 언급할 땐 가장 비중 컸던 것 하나 정도만 은유적으로.
+- 실제 시각과 어긋나는 낮/햇살/노을 묘사 금지 (이미 해가 진 시간).
+- 메모에서 현재 상황(위치, 컨디션)을 자연스럽게 반영해요.
+${GREETING_CONDITION_RULE}
+${GREETING_OUTPUT_RULE}
+- 이모지 1-2개`;
+  } else {
+    const sectionTodos=section==='morning'?morningTodos:afternoonTodos;
+    dataContext=[
+      `오늘은 ${_HOME_DAYS[now.getDay()]}요일이에요.`,
+      weatherDesc,
+      getUserProfileContext(),
+      `(참고용, 출력 금지) 현재 시각: ${now.getHours()}시 · 지금 시점: ${subSecLabel[subSec]}`,
+      todoLine(sectionTodos,section==='morning'?'오늘 오전':'오늘 오후'),
+      todoLine(noneTodos,'시간지정없음'),
+      doneHabitsCount?`오늘 완료한 습관: ${doneHabitsCount}개`:'',
+      rhythmSummary,
+      pickedMemos.length?`오늘 메모: ${pickedMemos.join(' / ')}`:'',
+      sleep.sleep||sleep.wake?`수면: ${sleep.sleep||'?'} 취침 ${sleep.wake||'?'} 기상`:''
+    ].filter(Boolean).join('\n');
+    sys=`당신은 날씨와 하루의 결을 살필 줄 아는 따뜻한 하루 비서예요. 아래 데이터를 참고해서 ${sectionLabel[section]}(${subSecLabel[subSec]}) 시점에 맞는 브리핑을 작성해요.
+
+**분량 제한 (반드시 지킬 것):**
+- 최대 3-4문장, 전체 공백 포함 150자 이내.
+
+기타 규칙:
+${GREETING_WEATHER_SEASON_RULE('날씨/계절/메모 등에서 느껴지는 그 순간의 분위기를 한 줄 정도 자연스럽게 녹여요.')}
+- 오늘 할일은 구체적인 항목명을 언급해도 좋아요. 단, 나열식으로 딱딱하게 늘어놓지 말고 자연스러운 문장 속에 녹여내요.
+- 리듬 카테고리를 언급할 땐 가장 비중 컸던 것 하나 정도만 은유적으로 녹여내요.
+- morning_1(아침) 시점에는 수면 시간을 매번 안내하듯 말하지 말고, 계절감·할일 등과 섞어 다채롭게, 하루를 여는 희망찬 분위기로.
+- 메모에서 현재 상황(위치, 컨디션)을 자연스럽게 반영해요.
+${GREETING_CONDITION_RULE}
+${GREETING_OUTPUT_RULE}
+- 이모지 1-2개`;
+  }
+
+  if(subEl)subEl.textContent='잠깐만요...';
+
+  const maxTok=section==='night'||section==='dawn'?320:280;
+  const reply=await callClaude(sys,[{role:'user',content:dataContext}],maxTok);
+
+  if(subEl){
+    if(reply&&!reply.startsWith('__ERR__')){
+      const text=reply.trim();
+      subEl.textContent=text;
+      _greetingCache={text,subSection:subSec,fetchedAt:Date.now()};
+      _bcSet(subSec+'_greeting',_greetingCache);
+      aiCacheSet('greeting_'+dateKey(new Date())+'_'+subSec,text);
+    } else {
+      const wStr=weather?weather.icon+' '+weather.temp+'° · ':'';
+      const defaults={morning:wStr+'오늘 하루도 잘 부탁해요 🌿',afternoon:wStr+'오늘도 잘 해내고 있어요 ✨',night:wStr+'오늘 하루 고생 많았어요 🌙',dawn:'오늘도 하루를 잘 채워내셨어요. 편안한 밤 되세요.'};
+      subEl.textContent=defaults[section];
+    }
+  }
+}
+function _pickRandom(arr,n){
+  if(!arr||arr.length<=n)return arr||[];
+  const copy=arr.slice();
+  for(let i=copy.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [copy[i],copy[j]]=[copy[j],copy[i]];
+  }
+  return copy.slice(0,n);
+}
+
+function goHome(fromSwipe){
+  document.querySelectorAll('.view').forEach(function(v){v.classList.remove('on');});
+  const vh=document.getElementById('v-home');
+  if(vh){
+    vh.classList.add('on');
+    if(fromSwipe){
+      vh.classList.remove('tab-enter-from-left','tab-enter-from-right');
+      void vh.offsetWidth;
+      vh.classList.add('tab-enter-from-left');
+      setTimeout(()=>{vh.classList.remove('tab-enter-from-left');},260);
+    }
+  }
+  document.querySelectorAll('.vtab').forEach(t=>t.classList.remove('on'));
+  _todoPartModeIdx=-1;
+  renderHome();
+  syncOnTabEnter();
+}
+let _todoPartModeIdx=-1;
+
+function getSection(){
+  const slot=getHomeTimeSlot();
+  if(slot==='dawn')return 'dawn';
+  if(slot==='morning_1'||slot==='morning_2')return 'morning';
+  if(slot==='afternoon_1'||slot==='afternoon_2')return 'afternoon';
+  return 'night';
+}
+
+function renderHome(){
+  const now=new Date();
+  const section=getSection();
+  const hcard=document.getElementById('home-header-card');
+  if(hcard){
+    hcard.className='home-hcard '+section;
+  }
+  const h=now.getHours(),m=now.getMinutes();
+  const ap=h<12?'오전':'오후';
+  const hh=h===0?12:h>12?h-12:h;
+  const timeEl=document.getElementById('home-time');
+  if(timeEl)timeEl.innerHTML=ap+' '+hh+':'+String(m).padStart(2,'0')+' · '+_HOME_DAYS[now.getDay()]+'요일 <span id="home-weather-icon"></span>';
+  const termEl=document.getElementById('home-solar-term-line');
+  if(termEl){
+    const termInfo=getSolarTermLine();
+    if(termInfo){
+      termEl.textContent=termInfo.isEve
+        ? `내일은 ${termInfo.term.name}(${termInfo.term.hanja})${_batchimSuffix(termInfo.term.name)} · ${termInfo.line}`
+        : `${termInfo.term.name}(${termInfo.term.hanja}) · ${termInfo.line}`;
+      termEl.style.display='block';
+    }else{
+      termEl.style.display='none';
+    }
+  }
+  const greetingPool={
+    morning:['좋은 아침이에요','오늘도 좋은 하루예요','활기찬 하루 보내요','상쾌한 아침이에요'],
+    afternoon:['잘 하고 있어요','오늘도 순항 중이에요','좋은 흐름이에요','한창인 하루예요'],
+    night:['오늘도 수고했어요','오늘 하루도 애쓰셨어요','하루를 잘 마무리해요','편안한 저녁 되세요'],
+    dawn:['오늘 하루도 잘 보내셨어요','하루를 잘 채워내셨어요','오늘도 무사히 지나갔어요','편안한 밤 되세요']
+  };
+  const greetEl=document.getElementById('home-greeting');
+  if(greetEl){
+    const pool=greetingPool[section]||['좋은 하루예요'];
+    greetEl.textContent=pool[Math.floor(Math.random()*pool.length)];
+  }
+  const subEl=document.getElementById('home-greeting-sub');
+  // 캐시된 인사말이 있으면 로딩 문구 없이 바로 표시(깜빡임 방지), 없을 때만 로딩 문구
+  if(subEl){
+    const subSec=getSubSection();
+    if(_greetingCache&&_greetingCache.subSection===subSec){
+      subEl.textContent=_greetingCache.text;
+    }else{
+      subEl.textContent='잠깐만요...';
+    }
+  }
+  renderHomeBody(section);
+  fetchHomeWeather(section);
+  const readingBtn=document.querySelector('.reading-icon-btn');
+  if(readingBtn)readingBtn.classList.toggle('sw-active',_swRunning);
+}
+
+// ═══════════════════════════════════════
+// IIKOTO — JavaScript (Clean Rewrite)
+// 순서: constants → storage → helpers → supabase → data → ui → events → init
+// ═══════════════════════════════════════
+// ██ 공용 유틸 (2/3 — 나머지는 리듬집계유틸, 별점위젯헬퍼 부근) — CONSTANTS~SUPABASE SYNC까지 ██
+
+// ── CONSTANTS
+const SUPA_URL='https://vqvpzrxmtpryzhontlxc.supabase.co';
+const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdnB6cnhtdHByeXpob250bHhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTgxMjksImV4cCI6MjA5NjYzNDEyOX0.pbtq1UMPC7ylYM1H2xVa19C1TFlceLmEfEtkz3WK2VI';
+// ── Web Push 구독 ──
+// VAPID 공개키(비공개키는 Edge Function 쪽에만 존재, 클라이언트엔 절대 노출 안 함).
+const VAPID_PUBLIC_KEY='BL9_A9IIRXzrxiz28IvKth5NQVRV_uEgVj-Efd3Ca-cUvuDeQZrXrLYx5PFQFpsy2McaMzNmx1-BI98-OzdtLWI';
+function _urlBase64ToUint8Array(base64String){
+  const padding='='.repeat((4-base64String.length%4)%4);
+  const base64=(base64String+padding).replace(/-/g,'+').replace(/_/g,'/');
+  const raw=atob(base64);
+  const arr=new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++)arr[i]=raw.charCodeAt(i);
+  return arr;
+}
+async function getExistingPushSubscription(){
+  if(!('serviceWorker' in navigator)||!('PushManager' in window))return null;
+  try{
+    const reg=await navigator.serviceWorker.ready;
+    return await reg.pushManager.getSubscription();
+  }catch(e){return null;}
+}
+async function refreshPushStatusUI(){
+  const lbl=document.getElementById('push-status-lbl');
+  const btn=document.getElementById('push-toggle-btn');
+  if(!lbl||!btn)return;
+  if(!('serviceWorker' in navigator)||!('PushManager' in window)){
+    lbl.textContent='이 환경에서는 알림을 지원하지 않아요';
+    btn.style.display='none';
+    return;
+  }
+  const sub=await getExistingPushSubscription();
+  lbl.textContent=sub?'알림이 켜져 있어요':'알림이 꺼져 있어요';
+  btn.textContent=sub?'알림 끄기':'알림 켜기';
+}
+// ── 재구독 만료 감지 및 자동 복구 ──
+// iOS Safari는 pushsubscriptionchange 이벤트가 신뢰성 있게 발화되지 않아, 그 이벤트에 기대는 대신
+// 앱을 열 때마다 "브라우저가 아는 구독"과 "서버(push_subscriptions)에 실제로 남아있는 구독"을 직접 대조한다.
+// Edge Function이 발송 실패(410/404) 시 서버 쪽 구독을 이미 지우고 있으므로, 이 불일치가 곧 "만료됨" 신호다.
+// 권한 자체는 이미 허용된 상태이므로 subscribe()는 사용자 제스처 없이도 호출 가능 — 조용히 자동 복구 시도.
+async function checkAndRecoverPushSubscription(){
+  if(!('serviceWorker' in navigator)||!('PushManager' in window))return;
+  const sub=await getExistingPushSubscription();
+  if(!sub)return; // 애초에 구독 안 한 상태면 감지 대상 아님(설정에서 수동으로 켜야 함)
+  const rows=await supaFetch(`push_subscriptions?endpoint=eq.${encodeURIComponent(sub.endpoint)}&select=id`);
+  if(rows&&rows.length)return; // 서버에도 정상 존재 — 문제 없음
+  // 서버엔 없는데 브라우저만 구독 중인 상태 = 만료/삭제됨. 재구독 시도.
+  try{
+    const reg=await navigator.serviceWorker.ready;
+    await sub.unsubscribe();
+    const newSub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:_urlBase64ToUint8Array(VAPID_PUBLIC_KEY)});
+    const json=newSub.toJSON();
+    await supaUpsert('push_subscriptions','endpoint',[{endpoint:json.endpoint,p256dh:json.keys.p256dh,auth:json.keys.auth}]);
+  }catch(e){
+    console.warn('알림 재구독 자동 복구 실패',e);
+  }
+  refreshPushStatusUI();
+}
+async function togglePushSubscription(){
+  const btn=document.getElementById('push-toggle-btn');
+  if(btn)btn.disabled=true;
+  try{
+    const existing=await getExistingPushSubscription();
+    if(existing){
+      await supaFetch(`push_subscriptions?endpoint=eq.${encodeURIComponent(existing.endpoint)}`,'DELETE');
+      await existing.unsubscribe();
+      showToast('알림을 껐어요');
+    }else{
+      const perm=await Notification.requestPermission();
+      if(perm!=='granted'){showToast('알림 권한이 필요해요');if(btn)btn.disabled=false;await refreshPushStatusUI();return;}
+      const reg=await navigator.serviceWorker.ready;
+      const sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:_urlBase64ToUint8Array(VAPID_PUBLIC_KEY)});
+      const json=sub.toJSON();
+      await supaUpsert('push_subscriptions','endpoint',[{endpoint:json.endpoint,p256dh:json.keys.p256dh,auth:json.keys.auth}]);
+      showToast('알림을 켰어요');
+    }
+  }catch(e){console.error('push toggle 실패',e);showToast('알림 설정에 실패했어요');}
+  if(btn)btn.disabled=false;
+  await refreshPushStatusUI();
+  await renderSettingsAlertSection(); // 전체 온오프가 바뀌면 개별 6개 토글의 비활성 표시도 즉시 갱신
+}
+const TMDB_KEY='6c78371ce15bb9d262938a66d5ef256e';
+const KAKAO_KEY='33799426c5377181c89616f5b2154bf0';
+const DAYS=['일','월','화','수','목','금','토'];
+const CATS=['drama','book','movie','music'];
+const CAT_LABELS={drama:'드라마',book:'책',movie:'영화',music:'음악'};
+const CAT_ICON_META={
+  drama:{icon:'ti-device-tv',color:'var(--pal-pink-bg)',iconColor:'var(--pal-pink-text)'},
+  book:{icon:'ti-book',color:'var(--pal-yellow-bg)',iconColor:'var(--pal-yellow-text)'},
+  movie:{icon:'ti-movie',color:'var(--pal-sky-bg)',iconColor:'var(--pal-sky-text)'},
+  music:{icon:'ti-music',color:'var(--pal-lime-bg)',iconColor:'var(--pal-lime-text)'}
+};
+const CONTENT_BAR_COLOR={drama:'var(--pal-pink-text)',book:'var(--pal-yellow-text)',movie:'var(--pal-sky-text)',music:'var(--pal-lime-text)'};
+const CONTENT_DOT_COLOR={drama:'var(--pal-pink-border)',book:'var(--pal-yellow-border)',movie:'var(--pal-sky-border)',music:'var(--pal-lime-border)'};
+// 채움로그(별도 프로젝트) — 읽기 전용 조회만 수행
+const CHAEUM_SUPA_URL='https://sqeyoqpchiljvinuqxjf.supabase.co';
+const CHAEUM_SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNxZXlvcXBjaGlsanZpbnVxeGpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5ODY5NTksImV4cCI6MjEwMjU2Mjk1OX0.H_JNNYz7_eguAqds-Wm6cwK926U74aVPaS_XwGRKeB0';
+const CHAEUM_CAT_META={
+  '시사':{icon:'ti-news',color:'#DEB07E'},
+  '예술':{icon:'ti-palette',color:'#CA8080'},
+  '역사':{icon:'ti-hourglass',color:'#C2B9A9'},
+  '음악':{icon:'ti-music',color:'#B198C7'},
+  '영화':{icon:'ti-movie',color:'#8FB5D1'},
+  '건축':{icon:'ti-building',color:'#7E8DBE'},
+  '기타':{icon:'ti-tag',color:'#9AA79B'}
+};
+// 채움로그 앱톤(세이지 그린 계열) — 배너 전용 색상
+const CHAEUM_TONE={bg:'#F3EFE6',paper:'#F7F4EC',card:'#FDFBF6',sage:'#A6A583',line:'#E4DCC9',ink:'#5C5648',subInk:'#8A8270',muted:'#B5AC98'};
+// 콘텐츠 바/점(진한 톤, dawn 리포트 기반) 색상
+function getCatBarColor(cat){
+  return CONTENT_BAR_COLOR[cat]||'var(--tm)';
+}
+// 배경 없이 작은 점 단독으로 쓰이는 곳(오늘 본 콘텐츠 도트 등)엔 -text 대신 이 중간톤을 사용 — 월간탭 배지와 밝기 인상을 맞춤
+function getCatDotColor(cat){
+  return CONTENT_DOT_COLOR[cat]||'var(--tm)';
+}
+const HABIT_COLORS=['pink','lavender','yellow','lime','orange','sky','warmgray']; // [2026-09-06] 각 습관과 연동된 리듬 카테고리 색상에 맞춰 전면 재배정(아래 카탈로그 주석 참고). 커스텀 습관 순환 배정용 팔레트 순서는 이제 이 배열 순서를 그대로 따름.
+// [2026-09-06] 습관 색상을 연동된 리듬 카테고리 색과 통일 — 리듬바(캘린더/타임라인 등 앱 전역)의
+// 색이 곧 그 활동을 대표하는 색이므로, 습관 그리드에서도 같은 색이 나오면 "이 색=이 활동"이라는
+// 인지가 한 번에 이어짐. 매칭 근거: 운동↔리듬exercise(pink), 정리↔리듬home(lime),
+// 케어↔리듬groom/단장(orange), 일기↔리듬note/책상(yellow), 독서↔리듬enjoy/감상(lavender).
+// 아침기상·영양제는 리듬 카테고리와 직접 연동되는 게 없어 리듬 팔레트와 안 겹치는 색(sky/warmgray)을 배정.
+const HABIT_CATALOG=[
+  {id:'exercise',   label:'운동',     icon:'ti-run',          color:'pink'},
+  {id:'reading',    label:'독서',     icon:'ti-book',         color:'lavender'},
+  {id:'diary',      label:'일기',     icon:'ti-pencil-heart', color:'yellow'},
+  {id:'tidy',       label:'정리',     icon:'ti-sparkles',     color:'lime'},
+  {id:'care',       label:'케어',     icon:'ti-mood-spark',   color:'orange'},
+  {id:'wake',       label:'기상',     icon:'ti-sunrise',      color:'sky'},
+  {id:'supplement', label:'영양제',   icon:'ti-pill',         color:'warmgray'}
+];
+function getHabitCatalogItem(id){return HABIT_CATALOG.find(c=>c.id===id)||null;}
+// 습관별 "목표" 저장소 — 지금은 아침기상의 목표시각(goalTime, 'HH:MM')만 실사용하지만,
+// 나중에 다른 습관도 목표를 가질 수 있도록(예: 월간 목표 횟수) habitId 기준 범용 구조로 둠.
+function getHabitGoals(){return S.get('habit_goals')||{};}
+function saveHabitGoals(v){S.set('habit_goals',v);autoSync('habitGoals',null);}
+function getHabitGoal(habitId){return getHabitGoals()[habitId]||null;}
+function setHabitGoalTime(habitId,timeStr){
+  const goals=getHabitGoals();
+  goals[habitId]={...(goals[habitId]||{}),goalTime:timeStr};
+  saveHabitGoals(goals);
+}
+// habit_goals는 goal_notes 테이블(note_key+lines(jsonb) 범용 저장소)을 그대로 재사용 —
+// note_key='habit_goals' 한 행에 {habitId:{goalTime}} 객체 전체를 lines로 통째로 저장.
+async function syncHabitGoalsUp(){
+  const goals=getHabitGoals();
+  await supaUpsert('goal_notes','note_key',[{note_key:'habit_goals',lines:goals}]);
+}
+async function syncHabitGoalsDown(){
+  const rows=await supaFetch('goal_notes?note_key=eq.habit_goals');
+  if(!rows)return;
+  if(!rows.length){
+    const local=getHabitGoals();
+    if(Object.keys(local).length)await syncHabitGoalsUp();
+    return;
+  }
+  S.set('habit_goals',rows[0].lines||{});
+}
+// 리듬 카테고리 → 습관 id 자동체크 매핑. 여기 추가되는 카테고리는 그 리듬블록이 생성되는 순간
+// 자동으로 해당 습관이 체크됨(이미 켜져 있으면 그대로 둠 — 수동으로 끈 걸 되살리지 않기 위함, checkHabitDirect 참고).
+const HABIT_AUTO_RHYTHM_MAP={exercise:'exercise',groom:'care'}; // home(살림)은 '정리' 칩 선택시에만 연결하는 별도 분기(rhythm 등록 함수 내)로 처리 — 여기 넣으면 세탁/주방도 걸려버림
+const DEFAULT_HABITS=[{id:'exercise',name:'운동',color:'pink'},{id:'reading',name:'독서',color:'lavender'},{id:'diary',name:'일기',color:'yellow'},{id:'tidy',name:'정리',color:'lime'}]; // [2026-09-06] 카탈로그 색상 재배정에 맞춰 정정
+// 기존 데이터(이름만 있고 id가 없는 습관)에 처음 한 번만 id를 부여하는 마이그레이션.
+// 카탈로그와 이름이 일치하면 그 카탈로그 id를 그대로 부여(기존에 쌓인 이름 기반 체크 기록과 자연스럽게 이어짐)하고,
+// 카탈로그에 없는 이름이면 새 랜덤 id를 발급해 커스텀 습관으로 전환.
+function _migrateHabitIds(){
+  const habits=S.get('habits');
+  if(!habits)return; // 완전 신규 사용자는 DEFAULT_HABITS를 그대로 쓰므로 마이그레이션 불필요
+  let changed=false;
+  const nameToId={}; // 체크 데이터 키 치환에 재사용 — 예: {'운동':'exercise','독서':'reading',...}
+  const migrated=habits.map(h=>{
+    if(h.id){nameToId[h.name]=h.id;return h;} // 이미 마이그레이션된 습관
+    changed=true;
+    const catalogMatch=HABIT_CATALOG.find(c=>c.label===h.name);
+    const id=catalogMatch?catalogMatch.id:'custom_'+genCid();
+    nameToId[h.name]=id;
+    return {...h,id,custom:!catalogMatch};
+  });
+  if(changed){
+    saveHabits(migrated);
+    _migrateHabitCheckKeys(nameToId); // 체크 데이터(hc:*, hcTime:*) 안의 '운동-3' 같은 키도 함께 옮김
+  }
+}
+// habits 목록에 id가 처음 부여되는 그 순간, localStorage에 흩어진 주차별 체크 데이터
+// (hc:YYYY-Www, hcTime:YYYY-Www 안의 '이름-요일' 형태 키)를 새 id 기준 키로 옮김.
+// 서버(habit_checks 테이블)의 habit_name 컬럼도 2026-09-05에 동일한 매핑으로 이미 일괄 변경해둠 —
+// 이 함수는 그 서버 변경과 짝을 맞추는 로컬 쪽 처리.
+function _migrateHabitCheckKeys(nameToId){
+  const renames=Object.entries(nameToId).filter(([name,id])=>name!==id);
+  if(!renames.length)return; // 바뀐 이름이 하나도 없으면(전부 이미 id와 이름이 같음) 손댈 것 없음
+  for(let i=0;i<localStorage.length;i++){
+    const key=localStorage.key(i);
+    if(!key||!(key.startsWith('hc:')||key.startsWith('hcTime:')))continue;
+    let obj;
+    try{obj=JSON.parse(localStorage.getItem(key));}catch(e){continue;}
+    if(!obj||typeof obj!=='object')continue;
+    let touched=false;
+    const next={};
+    Object.keys(obj).forEach(k=>{
+      // 'k'는 '이름-요일' 형태 — 마지막 '-' 기준으로 요일 숫자를 분리하고 앞부분(이름)만 치환 대상으로 봄
+      const m=k.match(/^(.+)-(\d)$/);
+      if(m&&nameToId[m[1]]&&nameToId[m[1]]!==m[1]){
+        next[nameToId[m[1]]+'-'+m[2]]=obj[k];
+        touched=true;
+      }else{
+        next[k]=obj[k];
+      }
+    });
+    if(touched)localStorage.setItem(key,JSON.stringify(next));
+  }
+}
+// 습관명은 자유 텍스트라 완전 자동매칭엔 한계가 있음 — 이름에 특정 키워드가 포함되면 아이콘을 붙이고, 매칭 안 되면 아이콘 없이 텍스트만 표시
+// [2026-09-06] 리듬 카테고리와 통일된 새 색상 배정에 맞춤(HABIT_CATALOG 참고)
+const HABIT_ICON_RULES=[
+  {keywords:['운동','헬스','필라테스','런닝','러닝','조깅'],icon:'ti-run'},
+  {keywords:['독서','책'],icon:'ti-book'},
+  {keywords:['일기','다이어리','글쓰기'],icon:'ti-pencil-heart'},
+  {keywords:['영양제','비타민','약'],icon:'ti-pill'}
+];
+function getHabitIcon(name){
+  if(!name)return null;
+  const rule=HABIT_ICON_RULES.find(r=>r.keywords.some(k=>name.includes(k)));
+  return rule?rule.icon:null;
+}
+// 습관 아이콘 통합 조회 — 카탈로그 습관이면 카탈로그 아이콘, 커스텀 습관이면 이름 키워드매칭 폴백.
+// [2026-09-06 정리] 호출부 4곳(makeHabitStreakRow/makeHabitMiniCheckRow/renderHabitMonthly/
+// renderDailyHabitCheck)에 동일 로직이 문법만 다르게(?: vs ?.||) 중복돼 있던 것을 이 헬퍼로 통일.
+function getHabitIconFor(h){
+  const catalogItem=getHabitCatalogItem(h.id);
+  return catalogItem?catalogItem.icon:getHabitIcon(h.name);
+}
+// [2026-09-06 정리] 습관은 생성 시 항상 color를 갖도록 보장되므로(카탈로그/커스텀 공통) 유일한
+// 호출부(makeHabitStreakRow)에서 habitColor가 없는 경우는 실제로 발생하지 않음 — 이름 키워드매칭
+// 폴백 분기(구버전 HABIT_ICON_RULES.color)는 죽은 코드였음, 제거하고 팔레트 조회로 단순화.
+function getHabitIconColor(habitColor){
+  return getHabitColorBorder(habitColor);
+}
+
+// ── STORAGE
+const S={
+  get:k=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):null;}catch(e){return null;}},
+  set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(e){if(e.name==='QuotaExceededError'||e.code===22){console.warn('저장 공간 부족 — 오래된 사진 메모 정리를 권장합니다');}else{console.warn('storage:',e);}}},
+  key:(...a)=>a.join(':')
+};
+
+// ── DATE HELPERS
+function pad(n){return String(n).padStart(2,'0');}
+function pickRandom(pool){return pool[Math.floor(Math.random()*pool.length)];}
+// 할일/시간표 공용 알림 벨아이콘 — 알림이 켜져있고 시각이 있을 때만 노출.
+function _todoAlertIconHtml(todoAlertOn,alertTime){
+  return (todoAlertOn&&alertTime)?'<i class="ti ti-bell ico-sz-11" style="color:var(--tm);flex-shrink:0;" aria-hidden="true" title="알림 '+alertTime+'"></i>':'';
+}
+function escapeHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+function escapeAttr(s){return escapeHtml(s).replace(/"/g,'&quot;');} // HTML 속성값(data-*)용 — 따옴표까지 이스케이프
+// 자정~새벽(아직 잠들기 전, night_2)에는 "오늘"을 전날 밤 기준으로 보는 논리적 날짜
+// ── 절기(節氣) 정보 — 7~12월 우선 적용, 필요시 이후 확장
+// 날짜는 한국천문연구원 절입시각 기준 (연도별로 1~2일 오차 가능, 매년 갱신 필요)
+const SOLAR_TERMS_BY_YEAR={
+  2026:[
+    {key:'2026-07-07',name:'소서',hanja:'小暑'},
+    {key:'2026-07-23',name:'대서',hanja:'大暑'},
+    {key:'2026-08-07',name:'입추',hanja:'立秋'},
+    {key:'2026-08-23',name:'처서',hanja:'處暑'},
+    {key:'2026-09-07',name:'백로',hanja:'白露'}, // [2026-09-07] 9/8→9/7로 정정, 한국천문연구원 기준 절입 9/7 23:41
+    {key:'2026-09-23',name:'추분',hanja:'秋分'},
+    {key:'2026-10-08',name:'한로',hanja:'寒露'},
+    {key:'2026-10-23',name:'상강',hanja:'霜降'},
+    {key:'2026-11-07',name:'입동',hanja:'立冬'},
+    {key:'2026-11-22',name:'소설',hanja:'小雪'},
+    {key:'2026-12-07',name:'대설',hanja:'大雪'},
+    {key:'2026-12-22',name:'동지',hanja:'冬至'}
+  ]
+};
+const SOLAR_TERM_LINES={
+  '소서':['본격적인 더위가 시작되는 절기, 장마 사이로 여름이 짙어져요','작은 더위라지만 하루가 벌써 뜨거워지고 있어요'],
+  '대서':['한 해 중 가장 뜨거운 시기, 열기가 절정을 향해요','더위가 가장 무르익는 절기예요'],
+  '입추':['이름은 가을이지만 더위는 아직 여운을 남겨요','가을의 첫 기척이 슬며시 들어서는 절기예요'],
+  '처서':['더위가 한풀 꺾이고 아침저녁으로 선선함이 스며들어요','볕은 여전해도 바람결이 조금씩 달라지는 절기예요'],
+  '백로':['풀잎에 이슬이 맺히기 시작하는, 가을이 완연해지는 절기예요','새벽 공기가 서늘해지며 가을이 자리를 잡아가요'],
+  '추분':['밤과 낮의 길이가 꼭 같아지는 절기예요','해가 조금씩 짧아지며 가을이 깊어가는 시점이에요'],
+  '한로':['찬 이슬이 내리기 시작하는, 늦가을의 문턱이에요','아침 공기에 서늘한 결이 스며드는 절기예요'],
+  '상강':['서리가 내리기 시작하며 가을이 저물어가요','들녘이 가을빛을 완전히 머금는 절기예요'],
+  '입동':['겨울의 첫걸음이 시작되는 절기예요','바람 끝이 차가워지며 겨울 채비를 서두르게 돼요'],
+  '소설':['첫눈이 소식을 전해올 무렵, 겨울이 성큼 다가와요','작은 눈이라지만 공기는 이미 겨울의 결이에요'],
+  '대설':['눈이 가장 많이 내린다는, 한 해 중 깊은 겨울의 절기예요','추위가 짙어지며 겨울이 절정으로 향해요'],
+  '동지':['밤이 가장 긴 날, 이제부터 다시 해가 길어지기 시작해요','한 해 중 가장 깊은 어둠을 지나 빛으로 돌아서는 절기예요']
+};
+function getTodaySolarTerm(){
+  const now=new Date();
+  const yr=now.getFullYear();
+  const dk=dateKey(now);
+  const list=SOLAR_TERMS_BY_YEAR[yr];
+  if(!list)return null;
+  return list.find(t=>t.key===dk)||null;
+}
+function getTomorrowSolarTerm(){
+  const tom=new Date();
+  tom.setDate(tom.getDate()+1);
+  const yr=tom.getFullYear();
+  const dk=dateKey(tom);
+  const list=SOLAR_TERMS_BY_YEAR[yr];
+  if(!list)return null;
+  return list.find(t=>t.key===dk)||null;
+}
+// 당일 문구를 전날 예고형으로 자연스럽게 변형하기 어려운 부분이 있어
+// 최소한의 안전한 접두만 적용: "곧 ~" 을 앞에 붙이고 문장은 그대로 둠
+// (자동변형은 완벽하지 않을 수 있어 사용하면서 SOLAR_TERM_LINES 옆에
+//  전날 전용 문구를 추가해 다듬어갈 수 있음)
+function _toTomorrowLine(line){
+  return '곧 '+line.trim();
+}
+// 한글 단어 받침 유무에 따라 "예요"/"이에요" 접미사 반환
+function _batchimSuffix(word){
+  const last=word.charCodeAt(word.length-1);
+  const hasBatchim=(last-0xAC00)%28!==0;
+  return hasBatchim?'이에요':'예요';
+}
+function getSolarTermLine(){
+  const today=getTodaySolarTerm();
+  if(today){
+    const lines=SOLAR_TERM_LINES[today.name];
+    if(!lines||!lines.length)return null;
+    const idx=parseInt(dateKey(new Date()).replace(/-/g,''),10)%lines.length;
+    return {term:today,line:lines[idx],isEve:false};
+  }
+  const tom=getTomorrowSolarTerm();
+  if(tom){
+    const lines=SOLAR_TERM_LINES[tom.name];
+    if(!lines||!lines.length)return null;
+    const idx=parseInt(dateKey(new Date()).replace(/-/g,''),10)%lines.length;
+    return {term:tom,line:_toTomorrowLine(lines[idx]),isEve:true};
+  }
+  return null;
+}
+// 논리적 하루(새벽 4시 기준) 판정. 인자를 생략하면 "지금"을, ts를 넘기면 그 시각 기준으로 판정.
+// (기존 호출부는 대부분 인자 없이 "지금" 기준으로 쓰고 있어 그대로 호환됨)
+function getLogicalDate(ts){
+  const d=ts!=null?new Date(ts):new Date();
+  if(d.getHours()<4)d.setDate(d.getDate()-1);
+  return d;
+}
+// ── 논리적 하루 경계 보정 유틸 모음 (getLogicalDate와 같은 04:00 기준을 공유) ──
+// 시:분 문자열 → 분값 변환, 그리고 "00:00~cutoffMin 이전" 시각을 전날 늦은 시간대로 보고
+// +1440분 밀어주는 정렬 보정까지 한 곳에 모아둠. 과거 여러 함수에서 각자 재구현하던 걸 통일.
+const DAWN_CUTOFF_MIN=4*60; // 04:00 — getLogicalDate()와 동일한 기준
+function _dawnTimeToMin(t){if(!t)return null;const p=t.split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);}
+const toMin=_dawnTimeToMin;
+// 수면 그래프 축 전용 시각→분 변환 — 정오(720분) 이후 값은 "그 전날 밤"으로 보고 음수로 뒤집음.
+// (예: 23:30 취침 → -30, 07:00 기상 → 420 — 자정을 가로지르는 취침~기상 구간을 하나의 축 위에 표시하기 위함)
+// [t[0],t[1]] 형태(시,분 배열)를 받음 — HH:MM 문자열은 .split(':').map(Number)로 변환 후 전달.
+function sleepAxisMin(t){
+  let mm=t[0]*60+t[1];
+  if(mm>=720)mm-=1440;
+  return mm;
+}
+// cutoffMin 생략 시 DAWN_CUTOFF_MIN(4시) 기준.
+// - 일반 활동(투두/습관/리듬블록 정렬 등): 기본값 그대로 사용
+// - 취침시각처럼 밤 11시~새벽에 넓게 걸치는 특수 케이스: cutoffMin을 더 늦게(예: 12시) 넘겨서 호출
+function toDawnAdjustedMin(min,cutoffMin){
+  if(min==null)return null;
+  const c=cutoffMin!=null?cutoffMin:DAWN_CUTOFF_MIN;
+  return min<c?min+1440:min;
+}
+function dawnTimeToAdjustedMin(t,cutoffMin){return toDawnAdjustedMin(_dawnTimeToMin(t),cutoffMin);}
+// 시:분 문자열 → 정렬용 분값(04:00 이전은 +1440). 값이 없으면 9999(항상 맨 뒤).
+function toSortKey(t){
+  if(!t)return 9999;
+  const min=_dawnTimeToMin(t);
+  if(min==null)return 9999;
+  return toDawnAdjustedMin(min);
+}
+function genCid(){
+  return Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+}
+let _toastTimer=null;
+function showToast(msg){
+  let t=document.getElementById('generic-toast');
+  if(!t){
+    t=document.createElement('div');
+    t.id='generic-toast';
+    t.className='undo-toast';
+    document.body.appendChild(t);
+  }
+  t.textContent=msg;
+  t.classList.add('on');
+  clearTimeout(_toastTimer);
+  _toastTimer=setTimeout(function(){t.classList.remove('on');},2200);
+}
+function dateKey(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;}
+function monthKey(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;}
+function weekKey(d){const m=new Date(d);m.setDate(d.getDate()-((d.getDay()+6)%7));return `week:${dateKey(m)}`;}
+function getWeekEnd(wkStart){const d=new Date(wkStart);d.setDate(d.getDate()+7);return dateKey(d);}
+
+let currentDate=new Date();
+
+// ── SUPABASE
+function parseDk(dk){const p=dk.split('-').map(Number);return new Date(p[0],p[1]-1,p[2]);}
+const _oldDateSynced={};
+async function ensureDateSynced(dk){
+  if(!navigator.onLine)return false;
+  const today=new Date();today.setHours(0,0,0,0);
+  const d=parseDk(dk);d.setHours(0,0,0,0);
+  const diffDays=Math.round((today-d)/86400000);
+  if(diffDays<=29&&diffDays>=-6)return false; // 30일 윈도우 안 — initSync/syncAll이 이미 처리
+  if(_oldDateSynced[dk])return false; // 이번 세션에 이미 시도함
+  _oldDateSynced[dk]=true;
+  await Promise.all([syncTodosDown(dk),syncMemosDown(dk),syncSleepDown(dk),syncMealsDown(dk),syncRhythmBlocksDown(dk)]);
+  return true;
+}
+async function supaFetch(path,method='GET',body=null){
+  try{
+    const opts={method,headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json'}};
+    if(body)opts.body=JSON.stringify(body);
+    const res=await fetch(SUPA_URL+'/rest/v1/'+path,opts);
+    if(!res.ok){console.warn('supa err:',path,await res.text());return null;}
+    if(method==='DELETE'||res.status===204)return true;
+    return await res.json();
+  }catch(e){return null;}
+}
+
+async function supaUpsert(path,onConflict,body){
+  try{
+    const opts={method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'}};
+    opts.body=JSON.stringify(body);
+    const sep=path.includes('?')?'&':'?';
+    const res=await fetch(SUPA_URL+'/rest/v1/'+path+sep+'on_conflict='+onConflict,opts);
+    if(!res.ok){console.warn('supa upsert err:',path,await res.text());return null;}
+    return true;
+  }catch(e){return null;}
+}
+// ── AI 캐시 (서버 공유) ──
+// 목적: API 키가 있는 기기(주로 모바일)가 생성한 AI 문구를, 키가 없는 기기(주로 PC)도 그대로 볼 수 있게 서버에 저장.
+// 용량이 매우 작아(텍스트 위주, 무료 플랜 500MB 기준 수십 년치 여유) 리포트류(weekly/monthly/nutricomment 등)는 만료/삭제 없이 영구 보관.
+// 단, greeting_*(홈탭 인사카드)만은 예외 — 그날 그 시간대(subSection)에만 조회되고 이후 다시 읽히지 않는 순수 캐시라
+// 오래된 것을 남겨둘 이유가 없음(아래 cleanupOldGreetingCache 참고, 2026-08-30).
+async function aiCacheGet(cacheKey){
+  const rows=await supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent(cacheKey)}&select=content`);
+  if(!rows||!rows.length)return null;
+  return rows[0].content;
+}
+async function aiCacheSet(cacheKey,content){
+  await supaUpsert('ai_cache','cache_key',[{cache_key:cacheKey,content}]);
+}
+// ── 알림(alerts) 동기화 — 범용, source_type 무엇이든 재사용 가능 ──
+// alert_time은 "임시 예상/희망 시간"으로 알람 발송 트리거 전용. 실제 처리 시각은 각 도메인의
+// 자체 필드(todos.completed_at 등)를 그대로 쓰며, alerts는 그 값을 절대 참조/갱신하지 않는다.
+// source_cid 하나당 alerts row는 최대 1개만 유지(upsert) — 조각모드처럼 레코드 안에 여러 조각이
+// 있어도 레코드 자체는 하나이므로 자동으로 "1건만" 원칙이 지켜진다.
+// ISO 변환·upsert 실행은 scheduleAlertAt에 위임(중복 제거) — 이 함수는 "그날 dk+HH:MM" 표기를
+// Date 객체로 바꾸는 얇은 wrapper. title만 받는 경우가 대부분이라 body는 null로 고정.
+async function syncAlertFor(sourceType,sourceCid,dk,timeHHMM,title){
+  if(!sourceCid)return;
+  if(!timeHHMM){await deleteAlertFor(sourceType,sourceCid);return;}
+  const [hh,mm]=timeHHMM.split(':').map(Number);
+  const [y,m,day]=dk.split('-').map(Number);
+  const alertAtDate=new Date(y,m-1,day,hh,mm,0);
+  await scheduleAlertAt(sourceType,sourceCid,alertAtDate,title,null);
+}
+// syncAlertFor는 "그날 HH:MM"만 다루는데, 종료-N분후처럼 임의의 절대 시각(Date 객체)에
+// title+body 둘 다 채워 예약해야 하는 알림(운동 통계 등)엔 안 맞아 별도 저수준 헬퍼로 분리.
+// alertAtDate: Date 객체(로컬 시각) — ISO 변환 시 기기의 실제 시간대 오프셋을 반영(시차 대응, 2026-09-08).
+// upsert 실행부는 여기 하나뿐 — syncAlertFor도 이 함수를 거쳐가므로 alerts insert 경로가 단일화됨.
+// 오프셋은 기기의 현재 시간대를 그대로 반영(getTimezoneOffset, 분 단위·부호 반대) — 예전엔 +09:00 고정이라
+// 해외에서 로컬 시각과 실제 예약 시각이 시차만큼 어긋나는 문제가 있었음(2026-09-08 발견, 시차 대응으로 수정).
+async function scheduleAlertAt(sourceType,sourceCid,alertAtDate,title,body){
+  if(!sourceCid)return;
+  const d=alertAtDate;
+  const offMin=-d.getTimezoneOffset(); // getTimezoneOffset은 UTC-로컬이라 부호 반대로 뒤집어야 +09:00 표기가 됨
+  const offSign=offMin>=0?'+':'-';
+  const offH=pad(Math.floor(Math.abs(offMin)/60)),offM=pad(Math.abs(offMin)%60);
+  const iso=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}${offSign}${offH}:${offM}`;
+  await supaUpsert('alerts','source_type,source_cid',[{
+    source_type:sourceType,source_cid:sourceCid,alert_at:iso,title:title||'',body:body||null,sent:false
+  }]);
+}
+async function deleteAlertFor(sourceType,sourceCid){
+  if(!sourceCid)return;
+  await supaFetch(`alerts?source_type=eq.${encodeURIComponent(sourceType)}&source_cid=eq.${encodeURIComponent(sourceCid)}`,'DELETE');
+}
+// 할일/일정의 알림 예약을 모두 정리 — 원래 알림 + (할일이면) 스누즈 임시 알림('todo_snooze').
+function clearTodoAlerts(isEvent,cid){
+  deleteAlertFor(isEvent?'event':'todo',cid);
+  if(!isEvent)deleteAlertFor('todo_snooze',cid);
+}
+// ── 알림 시각 설정(user_settings) — 서버 send-alerts Edge Function이 이 값과 지금 시각을 비교해
+// 아침브리핑/남은할일+습관/수면/저녁마무리 4종의 발송 시각을 판단(리듬 진행중/주간·월말 리포트는 고정).
+// row가 항상 1개뿐인 단일설정 테이블이라 로컬 캐시 없이 매번 직접 조회/저장(불일치 걱정 없음).
+async function getUserSettings(){
+  const rows=await supaFetch('user_settings?id=eq.true');
+  return (rows&&rows[0])||null;
+}
+async function setUserSettingTime(field,timeStr){
+  await supaUpsert('user_settings','id',[{id:true,[field]:timeStr}]);
+}
+// ── 할일 알림 스누즈 (2026-09-20) ──
+// 할일 알림('todo'/'todo_snooze')을 누르면 ?snooze=<cid>로 앱이 열려 메모 유도와 같은 모양의 팝업이 뜨고, 30분/1시간/오늘 저녁/내일 아침 중 골라 다시 알림을 예약.
+// 스누즈는 원래 알림과 별개의 임시 알림('todo_snooze', 할일당 1개 — 다시 미루면 덮어씀)이라 할일의 알림 시각 설정은 바뀌지 않음.
+// 정리: 완료/삭제/알림 시각 변경(clearTodoAlerts, 수정 저장부) + 서버가 발송 직전에 완료 여부를 한 번 더 확인.
+let _snoozeCtx=null; // {cid,text,dk,targets}
+function _findTodoByCid(cid){
+  for(let i=0;i<localStorage.length;i++){
+    const k=localStorage.key(i);
+    if(!k||!k.startsWith('todos:'))continue;
+    const dk=k.slice(6);
+    const todo=getTodos.raw(dk).find(x=>x.cid===cid);
+    if(todo)return {dk,todo};
+  }
+  return null;
+}
+// 스누즈 칩 목록 — 오늘 저녁/내일 아침 시각은 설정탭의 남은 할일 알림·아침 브리핑 시각을 그대로 읽음(없으면 19:30/08:00).
+// 오늘 저녁이 이미 지났으면 그 칩은 뺌. 새벽 0~4시는 아직 "어젯밤"이라 내일 아침 = 오늘 아침.
+function _snoozeTargets(settings){
+  const now=new Date();
+  const at=hhmm=>{const [h,m]=hhmm.split(':').map(Number);const d=new Date(now);d.setHours(h,m,0,0);return d;};
+  const eve=at((settings&&settings.remaining_todo_time)||'19:30');
+  const morn=at((settings&&settings.morning_briefing_time)||'08:00');
+  if(now.getHours()>=4)morn.setDate(morn.getDate()+1);
+  const list=[
+    {key:'m30',label:'30분 후',at:new Date(now.getTime()+30*60000),msg:'30분 뒤에'},
+    {key:'h1',label:'1시간 후',at:new Date(now.getTime()+60*60000),msg:'1시간 뒤에'}
+  ];
+  if(eve>now)list.push({key:'eve',label:'오늘 저녁',at:eve,msg:'오늘 저녁에'});
+  list.push({key:'morn',label:'내일 아침',at:morn,msg:'내일 아침에'});
+  return list;
+}
+async function openSnoozePopup(cid){
+  const found=_findTodoByCid(cid);
+  if(!found||found.todo.isEvent){showToast('찾을 수 없는 할일이에요');return;}
+  if(found.todo.done){showToast('이미 끝낸 할일이에요');return;}
+  const settings=await getUserSettings().catch(()=>null);
+  const targets=_snoozeTargets(settings);
+  _snoozeCtx={cid,text:found.todo.text,dk:found.dk,targets};
+  document.getElementById('snooze-title').textContent=found.todo.text;
+  document.getElementById('snooze-chips').innerHTML=targets.map(t=>`<div class="snooze-chip snooze-${t.key}" onclick="snoozeTodo('${t.key}')">${t.label}</div>`).join('');
+  openSheet('snooze-ov');
+}
+async function snoozeTodo(key){
+  const ctx=_snoozeCtx;
+  const t=ctx&&ctx.targets.find(x=>x.key===key);
+  if(!t)return;
+  closeSheet('snooze-ov');
+  await scheduleAlertAt('todo_snooze',ctx.cid,t.at,ctx.text,null);
+  showToast(t.msg+' 다시 알려드릴게요');
+}
+function completeSnoozeTodo(){
+  const ctx=_snoozeCtx;
+  if(!ctx)return;
+  closeSheet('snooze-ov');
+  const idx=getTodos(ctx.dk).findIndex(x=>x.cid===ctx.cid);
+  if(idx>=0&&!getTodos(ctx.dk)[idx].done)toggleTodoAt(ctx.dk,idx,ctx.cid);
+  showToast('완료로 표시했어요');
+}
+// 기기 시간대를 서버에 동기화 — 여행 등으로 시간대가 바뀌었을 때만 서버에 씀(값이 같으면 요청 자체를 안 보냄).
+// 로컬(S.get)에 마지막으로 보낸 시간대를 기억해두고 비교하는 방식이라, 평소(시간대 안 바뀜)엔 매일 앱을
+// 열어도 서버 쓰기가 전혀 늘지 않음 — send-alerts가 KST 대신 이 값 기준으로 고정시각 알림을 판단하게 됨.
+async function syncUserTimezoneIfChanged(){
+  try{
+    const tz=Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if(!tz||tz===S.get('user_timezone_last_synced'))return;
+    await supaUpsert('user_settings','id',[{id:true,timezone:tz}]);
+    S.set('user_timezone_last_synced',tz);
+  }catch(e){} // Intl 미지원 등 예외 시 조용히 스킵(기존 KST 고정값 그대로 유지되어 안전)
+}
+// 일정/할일 객체(또는 관련 필드를 담은 임시 객체)에서 "알림 발송 기준 시각"을 뽑는 공용 로직.
+// 일정은 eventAlertOn+eventTime, 할일은 todoAlertOn+alertTime — 온오프가 꺼져 있으면 시간이 있어도 null.
+// 저장/완료체크/이동 등 3곳에서 동일 계산을 하던 것을 통합(중복 제거, 2026-09-08).
+function alertBasisTimeFor(t){
+  return t.isEvent?(t.eventAlertOn?t.eventTime:null):(t.todoAlertOn?t.alertTime:null);
+}
+// 3일 지난 greeting_* 캐시 정리 — 앱 시작(스플래시) 시점에 호출.
+// 매번 서버에 삭제 요청을 보내지 않도록, 로컬에 마지막 정리 시각을 남겨 7일에 한 번만 실제로 실행.
+// (매일 돌리든 일주일에 한 번 돌리든 최종적으로 남는 데이터는 동일 — 실행 빈도만 낮춰 서버 부담을 줄임)
+const GREETING_CLEANUP_INTERVAL_MS=7*24*60*60*1000;
+const GREETING_CLEANUP_KEEP_DAYS=3;
+async function cleanupOldGreetingCache(){
+  if(!navigator.onLine)return;
+  const last=S.get('greeting_cleanup_last')||0;
+  if(Date.now()-last<GREETING_CLEANUP_INTERVAL_MS)return;
+  const cutoff=new Date();cutoff.setDate(cutoff.getDate()-GREETING_CLEANUP_KEEP_DAYS);
+  const res=await supaFetch(`ai_cache?cache_key=like.greeting_*&created_at=lt.${cutoff.toISOString()}`,'DELETE');
+  if(res!==null)S.set('greeting_cleanup_last',Date.now()); // 실패 시 다음 시작 때 다시 시도하도록 시각 갱신 안 함
+}
+// ── 배열형(하루/월 단위 여러 행) 동기화: DELETE 후 POST가 아니라
+// upsert(추가/수정) + 로컬에서 사라진 항목만 개별 삭제로 처리.
+// 이렇게 하면 두 요청 사이에 서버가 통째로 비는 순간이 없어서
+// 그 사이 다른 기기가 syncDown 하거나 네트워크가 끊겨도 데이터가 통째로 날아가지 않음.
+function ensureItemCids(items){
+  let changed=false;
+  items.forEach(it=>{if(!it.cid){it.cid=genCid();changed=true;}});
+  return changed;
+}
+// ── 삭제 의도 명시적 추적 (todos/memos) ──
+// "로컬 목록에 없으면 지운 것으로 간주"하던 기존 syncListUp 방식은, 다른 기기가
+// 방금 추가한 항목을 이 기기가 아직 못 받아온 순간에 업로드하면 그걸 삭제해버리는
+// 위험이 있었음. 삭제/이동 시점에 cid를 명시적으로 기록해두고, 업로드 때는 그
+// 목록에 있는 것만 지우도록 분리.
+function addDelPending(type,dk,cid){
+  if(!cid)return;
+  const key=type+'_delpending_list';
+  const list=S.get(key)||[];
+  if(!list.some(e=>e.dk===dk&&e.cid===cid)){list.push({dk,cid});S.set(key,list);}
+}
+function removeDelPending(type,dk,cid){
+  const key=type+'_delpending_list';
+  const list=(S.get(key)||[]).filter(e=>!(e.dk===dk&&e.cid===cid));
+  S.set(key,list);
+}
+function getDelPendingCids(type,dk){
+  return (S.get(type+'_delpending_list')||[]).filter(e=>e.dk===dk).map(e=>e.cid);
+}
+async function syncListUpSafe(table,filterQ,uniqueCols,localItems,toRow,delCids){
+  if(localItems.length){
+    const ok=await supaUpsert(table,uniqueCols,localItems.map(toRow));
+    if(!ok)return false;
+  }
+  if(delCids&&delCids.length){
+    const inList=delCids.map(c=>encodeURIComponent(c)).join(',');
+    const q=filterQ?`&${filterQ}`:'';
+    const res=await supaFetch(`${table}?client_id=in.(${inList})${q}`,'DELETE');
+    if(res===null)return false; // 네트워크 실패 — 삭제 대기 목록 유지, 다음 기회에 재시도
+  }
+  return true;
+}
+// ── DATA ACCESSORS
+// 투두 시간대(timeSection) 정렬 순서 및 텍스트 앞머리 시:분 파싱 — 여러 곳(정렬/재정렬/백업내보내기)에서
+// 각자 재구현되던 로직을 통일. 시간대 없음('none')은 항상 맨 뒤로 취급.
+const TODO_TS_ORDER={morning:0,afternoon:1,night:2,none:3};
+function parseTodoLeadingTime(text){
+  const m=text.match(/^(\d{1,2}):(\d{2})/);
+  return m?parseInt(m[1],10)*60+parseInt(m[2],10):9999;
+}
+// 미완료 투두 정렬 비교 함수: timeSection → sortOrder(수동 순서, 있으면 우선) → 텍스트 앞머리 시:분.
+// renderTodos(전체 목록)와 applyTodoReorder(같은 시간대 그룹 추출)가 공통으로 사용 — done 여부는 호출측에서 별도 처리.
+function compareTodoOrder(a,b){
+  const ta=TODO_TS_ORDER[a.timeSection||'none']??3;
+  const tb=TODO_TS_ORDER[b.timeSection||'none']??3;
+  if(ta!==tb)return ta-tb;
+  const pa=a.pinned?0:1,pb=b.pinned?0:1;
+  if(pa!==pb)return pa-pb; // 같은 시간대 안에서 강조(볼트) 항목이 최상단
+  if(typeof a.sortOrder==='number'&&typeof b.sortOrder==='number')return a.sortOrder-b.sortOrder;
+  return parseTodoLeadingTime(a.text)-parseTodoLeadingTime(b.text);
+}
+// ── 반복 투두/일정 (2026-09-07 전면 재설계) ──
+// 반복은 투두/일정의 "특수한 종류"가 아니라 옵션 하나로 취급한다: 규칙에 해당하는 날짜가 되면 그날의 실제
+// todos 레코드를 한 번 생성(실체화)하고, 그 이후로는 done/sortOrder/sync/렌더 등 시스템 어디서도 일반
+// 투두/일정과 구분하지 않는다 — 남는 표식은 어느 규칙에서 나왔는지 가리키는 recurRuleCid 필드 하나뿐.
+// (구 방식은 매번 규칙을 계산해 가상 항목을 병합하는 방식이었으나, 완료체크가 로컬 전용 별도 저장소에
+// 남아 기기 간 동기화가 전혀 안 되는 치명적 결함이 있었음 — 그 구조 자체를 폐기하고 새로 설계함.)
+// 1회성 마이그레이션(2026-09-07): 구설계~재설계 초기 테스트 과정에서 만들어진 반복 규칙/실체화 데이터가
+// 기기 로컬에 남아, 서버에서 지워도 다음 sync 때 로컬 잔재가 되살리는 문제가 실사용에서 발생함(수기로
+// 지워도 재실행 시 재생성). 아직 실사용 목적 반복은 등록된 게 없다고 확인했으므로, 앱 로드 시 로컬의
+// recurring_items/recur_skip/실체화된 todos를 전부 한 번만 지움 — _recurCleanupV1 플래그로 재실행 방지.
+(function _recurCleanupV1(){
+  if(S.get('_recur_cleanup_v1_done'))return;
+  S.set('recurring_items',[]);
+  // 최근 40일(할일 미리보기 7일+일정 미리보기 30일+여유분)치 todos에서 recurRuleCid 붙은 항목과 recur_skip 기록을 정리
+  const today=new Date();
+  for(let i=-10;i<=40;i++){
+    const d=new Date(today);d.setDate(today.getDate()+i);
+    const dk=dateKey(d);
+    const todos=S.get(S.key('todos',dk))||[];
+    const filtered=todos.filter(t=>!t.recurRuleCid);
+    if(filtered.length!==todos.length)S.set(S.key('todos',dk),filtered);
+    S.set(S.key('recur_skip',dk),[]);
+  }
+  S.set('_recur_cleanup_v1_done',true);
+})();
+// 1회성 마이그레이션 v2(2026-09-07): 실체화 저장이 todos_pending 플래그를 잘못 세우던 버그(위 saveTodos.raw
+// 참고)로 인해, 최근 며칠치 todos_pending이 true로 남아 서버의 정상 데이터가 로컬에 반영되지 못하고 있었음
+// (recurRuleCid 없는 옛 로컬 캐시가 서버값으로 안 고쳐져 "일반 메뉴가 뜨는" 등 증상 발생). 잘못 세워진
+// pending 플래그를 지워 다음 sync 때 서버값이 정상 반영되게 함. 아울러 시간표(HH:MM) 형식으로 실수 등록된
+// 반복 규칙도 함께 정리(이후 등록 자체를 막는 코드는 별도 적용됨, 이건 이미 만들어진 과거분 정리).
+(function _recurCleanupV2(){
+  if(S.get('_recur_cleanup_v2_done'))return;
+  const today=new Date();
+  for(let i=-10;i<=40;i++){
+    const d=new Date(today);d.setDate(today.getDate()+i);
+    const dk=dateKey(d);
+    S.set(S.key('todos_pending',dk),false);
+  }
+  const rules=(S.get('recurring_items')||[]).filter(it=>!/^(\d{1,2}):(\d{2})\s+/.test(it.text||''));
+  S.set('recurring_items',rules);
+  S.set('_recur_cleanup_v2_done',true);
+})();
+function getRecurringItems(){return S.get('recurring_items')||[];}
+function saveRecurringItems(v){S.set('recurring_items',v);autoSync('recurringItems',null);_materializedDkCache.clear();}
+// 특정 규칙(ruleCid)이 특정 날짜(dk)에 실체화되지 않도록 막는 예외 — "오늘만 삭제"에서만 씀.
+// 실체화 자체를 스킵하는 용도라, 실체화된 뒤에는 그냥 그 todos 레코드를 지우는 문제일 뿐이라 skip 개념만 남음
+// (구 버전에 있던 edited_text 예외는 폐기 — 실체화된 레코드의 text를 직접 수정하면 되므로 불필요해짐).
+function getRecurSkips(dk){return S.get(S.key('recur_skip',dk))||[];}
+function addRecurSkip(ruleCid,dk){
+  const skips=getRecurSkips(dk);
+  if(!skips.includes(ruleCid)){skips.push(ruleCid);S.set(S.key('recur_skip',dk),skips);autoSync('recurSkip',dk);}
+}
+// 반복 규칙(rule)이 특정 날짜(dk)에 해당하는지 판정.
+// rule.type: 'daily'(rule.n=간격일수, 기본 1=매일) | 'weekly'(rule.days=['MO','TU',...], rule.weekInterval=1(매주)|2(격주)) | 'monthly'(rule.day=1~31)
+function _isRecurringDueOn(item,dk){
+  if(item.startDate&&dk<item.startDate)return false;
+  if(item.endDate&&dk>item.endDate)return false;
+  const d=new Date(dk+'T00:00:00');
+  const rule=item.rule||{};
+  if(rule.type==='daily'){
+    const n=rule.n||1; // n=1이면 매일, n>=2면 그만큼의 간격(예: 3이면 사흘마다) — "매일"의 자연스러운 일반형
+    if(n===1)return true;
+    if(!item.startDate)return true;
+    const start=new Date(item.startDate+'T00:00:00');
+    const daysDiff=Math.round((d-start)/86400000);
+    return daysDiff>=0&&daysDiff%n===0;
+  }
+  if(rule.type==='weekly'){
+    const dow=['SU','MO','TU','WE','TH','FR','SA'][d.getDay()];
+    if(!(rule.days||[]).includes(dow))return false;
+    // weekInterval:2(격주)는 요일 자체는 매주 그 요일이 되, 시작일 기준 몇 주째인지로 2주에 한 번만 걸러냄.
+    if((rule.weekInterval||1)===2){
+      if(!item.startDate)return true;
+      const start=new Date(item.startDate+'T00:00:00');
+      const weeksDiff=Math.floor((d-start)/(7*86400000));
+      return weeksDiff%2===0;
+    }
+    return true;
+  }
+  if(rule.type==='monthly')return d.getDate()===rule.day;
+  return false;
+}
+// 반복 실체화를 어느 날짜(dk)까지 허용할지 규칙별로 판정.
+// 둘 다 "오늘 그 날짜를 조회하는 순간 실체화"라는 동일한 원리를 쓰되, 미리보기 허용 범위(오늘+N일)만 다름:
+// 할일은 오늘탭 날짜 네비게이터가 최대 +7일까지만 열리므로 그에 맞춤. 일정은 월간캘린더가 한 화면에 한 달을
+// 통째로 보여주는 용도라 +30일(대략 한 달)까지 미리 실체화를 허용해 캘린더에서 바로 보이게 함.
+const RECUR_TODO_PREVIEW_DAYS=7;
+const RECUR_EVENT_PREVIEW_DAYS=30;
+function _recurMaterializeAllowed(rule,dk){
+  const todayDk=dateKey(new Date());
+  if(dk<todayDk)return false;
+  const days=rule.isEvent?RECUR_EVENT_PREVIEW_DAYS:RECUR_TODO_PREVIEW_DAYS;
+  const limit=new Date();limit.setDate(limit.getDate()+days);
+  return dk<=dateKey(limit);
+}
+// 그날(dk) 아직 실체화 안 된 반복 규칙들을 찾아 todos에 실제 레코드로 추가 — getTodos(dk) 호출 시마다 실행되지만,
+// 이미 그 규칙(recurRuleCid)으로 그날 만들어진 레코드가 있으면 다시 만들지 않아 중복 생성되지 않는다.
+// cid는 "규칙cid_dk" 형태의 결정적 값으로 만들어, 여러 기기가 같은 날 동시에 처음 열어도 upsert 시 자연히 하나로 합쳐짐.
+// 세션 내 이미 확인 끝난 dk는 _materializedDkCache에 표시해두고 재확인을 건너뜀 — 월간캘린더처럼 같은 달을
+// 반복해서 다시 그릴 때(달 넘겼다 되돌아오기 등) 매번 규칙 전체를 훑는 낭비를 막기 위함. 새 규칙을
+// 등록/삭제한 직후(saveRecurringItems)에는 캐시를 비워 다음 조회 때 다시 확인하게 함.
+// 주의: saveTodos.raw(=saveTodosRaw, todos_pending을 세우지 않는 전용 저장 함수)는 autoSync를 통해
+// syncTodosUp을 부르고, syncTodosUp 내부가 다시 getTodos(dk)를 호출하는 재진입 경로가 있음 — 이 재진입
+// 자체는 캐시로 막히지만, 등록 직후 캐시가 비워진 좁은 틈에 다른 화면(캘린더 등)이 거의 동시에 같은
+// dk를 조회하면 같은 규칙이 두 번 push될 여지가 이론상 있었고, 실사용에서 실제로 발생함(2026-09-07).
+// 저장 직전에 디스크의 최신 값을 다시 읽어 규칙cid 기준으로 병합·중복 제거한 뒤 저장하는 안전망을 추가함.
+const _materializedDkCache=new Set();
+// 같은 dk에 대해 이 함수가 동시에(재진입) 실행되는 것을 막는 락. saveTodos.raw(내부에서 호출)가
+// autoSync→syncTodosUp→getTodos(dk) 재진입 경로를 갖고 있어, 캐시가 비워진 좁은 틈에 다른 화면
+// (캘린더 등)이 같은 dk를 거의 동시에 조회하면 규칙이 두 번 push되는 경합이 실사용에서 발생했었음.
+// 저장 직전 dedupe 안전망은 유지하되, 애초에 동시 진입 자체를 막아 경합 창구를 없앰.
+const _materializingDkLock=new Set();
+function _materializeRecurringForDate(dk){
+  if(_materializedDkCache.has(dk))return false;
+  if(_materializingDkLock.has(dk))return false; // 이미 이 dk를 처리 중(재진입) — 중복 실행 방지
+  _materializingDkLock.add(dk);
+  try{
+    return _materializeRecurringForDateInner(dk);
+  }finally{
+    _materializingDkLock.delete(dk);
+  }
+}
+function _materializeRecurringForDateInner(dk){
+  _materializedDkCache.add(dk);
+  const rules=getRecurringItems();
+  if(!rules.length)return false;
+  const todos=getTodos.raw(dk);
+  const already=new Set(todos.filter(t=>t.recurRuleCid).map(t=>t.recurRuleCid));
+  const skips=new Set(getRecurSkips(dk));
+  let changed=false;
+  rules.forEach(rule=>{
+    if(already.has(rule.cid)||skips.has(rule.cid))return;
+    if(!_recurMaterializeAllowed(rule,dk))return;
+    if(!_isRecurringDueOn(rule,dk))return;
+    already.add(rule.cid);
+    todos.push({
+      cid:rule.cid+'_'+dk,text:rule.text,isEvent:!!rule.isEvent,eventCat:rule.eventCat||null,
+      eventTime:rule.eventTime||null,timeSection:rule.isEvent?null:(rule.timeSection||'none'),
+      done:false,created:Date.now(),recurRuleCid:rule.cid
+    });
+    changed=true;
+  });
+  if(!changed)return false;
+  // 저장 직전 최종 안전망 — 디스크의 최신 값을 다시 읽어, 이 함수가 새로 만든 항목 중 이미 최신본에
+  // 같은 규칙cid로 존재하는 게 있으면 빼고 합침. 그 뒤 규칙cid별로 최초 1개만 남기는 dedupe까지 적용.
+  const latest=getTodos.raw(dk);
+  const latestRuleCids=new Set(latest.filter(t=>t.recurRuleCid).map(t=>t.recurRuleCid));
+  const seenCids=new Set();
+  const merged=[...latest,...todos.filter(t=>t.recurRuleCid&&!latestRuleCids.has(t.recurRuleCid))]
+    .filter(t=>{
+      if(!t.recurRuleCid)return true;
+      if(seenCids.has(t.recurRuleCid))return false;
+      seenCids.add(t.recurRuleCid);
+      return true;
+    });
+  saveTodos.raw(dk,merged);
+  return changed;
+}
+// getTodos는 호출될 때마다 그날 실체화가 필요한 반복 항목이 있는지 먼저 확인해 반영한 뒤 반환한다.
+// .raw는 실체화 로직 내부에서만 쓰는 원본 접근(무한 재귀 방지용) — 그 외 모든 호출부는 getTodos(dk)만 쓰면 됨.
+function getTodos(dk){
+  _materializeRecurringForDate(dk);
+  return getTodos.raw(dk);
+}
+getTodos.raw=function(dk){return S.get(S.key('todos',dk))||[];};
+
+// ── 월간 캘린더 연속일정 bar 좌표 계산 ──
+// weekDates: 그 주의 7개 dk(월~일) 배열. multidayEvents: getActiveMultiDayEvents류로 모은 이번 달 전체 연속일정 목록(중복 제거된 원본, {_startDk,eventEndDate,...}).
+// 반환: 이 주에 걸치는 각 이벤트의 {left,width,row,clipStart,clipEnd,...ev} — left/width는 칸(cell) 단위 정수(0~6, 1~7), row는 겹칠 때 세로 순번(0부터).
+// 겹침 배정은 "실사용상 거의 겹치지 않는다"는 전제로 단순하게: 이미 배정된 row들과 구간이 겹치면 다음 row로.
+// weekDates는 항상 실제 날짜 7개(전달/다음달 칸 포함)여야 함 — 예전엔 이번 달 밖 칸을 센티널 문자열로 채웠는데,
+// 첫 주 첫 칸이 센티널이면 weekStart가 센티널이 되어 문자열 비교에서 그 주의 연속일정이 전부 누락되던 버그가 있었음(2026-09-19 수정).
+function computeWeekBars(weekDates,multidayEvents){
+  const weekStart=weekDates[0],weekEnd=weekDates[6];
+  const barsInWeek=[];
+  multidayEvents.forEach(ev=>{
+    const evStart=ev._startDk,evEnd=ev.eventEndDate;
+    if(evEnd<weekStart||evStart>weekEnd)return; // 이번 주와 전혀 안 겹침
+    const startIdx=weekDates.indexOf(evStart);
+    const endIdx=weekDates.indexOf(evEnd);
+    const left=startIdx>=0?startIdx:0; // 이번 주 이전에 시작했으면 주 맨 앞부터
+    const right=endIdx>=0?endIdx:6;    // 이번 주 이후까지 이어지면 주 맨 끝까지
+    barsInWeek.push({ev,left,width:right-left+1,clipStart:startIdx<0,clipEnd:endIdx<0});
+  });
+  // row 배정 — 시작이 이른 순으로 정렬 후, 기존 row들과 겹치는지 검사해 안 겹치는 첫 row에 배정
+  barsInWeek.sort((a,b)=>a.left-b.left);
+  const rows=[]; // 각 row는 [{left,width}] 배열(그 row에 이미 배정된 bar들의 구간)
+  barsInWeek.forEach(bar=>{
+    let placed=false;
+    for(let r=0;r<rows.length;r++){
+      const overlap=rows[r].some(b=>!(bar.left+bar.width<=b.left||bar.left>=b.left+b.width));
+      if(!overlap){rows[r].push({left:bar.left,width:bar.width});bar.row=r;placed=true;break;}
+    }
+    if(!placed){rows.push([{left:bar.left,width:bar.width}]);bar.row=rows.length-1;}
+  });
+  return barsInWeek;
+}
+// ── 연속일정(며칠간 이어지는 일정) 공용 조회 함수 ──
+// 특정 날짜(dk)를 범위(startDate~eventEndDate)로 품고 있는 연속일정을 전부 찾아 반환.
+// 연속일정 row는 시작일의 date_key에만 저장되므로, 최근 MULTIDAY_LOOKBACK_DAYS일 이내를 거슬러 올라가며 훑는다.
+// 반환 각 항목에 dayIndex(오늘이 며칠차인지, 1부터 시작)와 totalDays(총 며칠짜리인지)를 덧붙여준다.
+const MULTIDAY_LOOKBACK_DAYS=14; // 실사용상 최대 연속일정 길이를 넉넉히 잡은 상한
+function getActiveMultiDayEvents(dk){
+  const target=new Date(dk+'T00:00:00');
+  const result=[];
+  for(let i=0;i<MULTIDAY_LOOKBACK_DAYS;i++){
+    const d=new Date(target);d.setDate(d.getDate()-i);
+    const startDk=dateKey(d);
+    const todos=getTodos(startDk);
+    todos.forEach((t)=>{
+      if(!t.isEvent||!t.eventEndDate)return; // 연속일정이 아니면 스킵(하루짜리는 여기서 제외)
+      if(startDk>dk||t.eventEndDate<dk)return; // 오늘이 범위 밖이면 스킵
+      if(startDk===dk&&t.eventEndDate===dk)return; // 시작=종료(=오늘)면 실질적으로 하루짜리이므로 스킵(방어)
+      const startD=new Date(startDk+'T00:00:00');
+      const endD=new Date(t.eventEndDate+'T00:00:00');
+      const totalDays=Math.round((endD-startD)/86400000)+1;
+      const dayIndex=Math.round((target-startD)/86400000)+1;
+      result.push({...t,_startDk:startDk,dayIndex,totalDays});
+    });
+  }
+  return result;
+}
+// ── 월간 캘린더 전용: 날짜 범위(rangeStart~rangeEnd, dk 문자열)에 걸치는 연속일정 원본을 한 번에 모아 반환(중복 제거) ──
+// 월간 달력은 전달/다음달 칸까지 그리므로 월 경계가 아니라 "달력 격자 전체 범위"를 넘겨 호출함.
+// getActiveMultiDayEvents는 "하루 기준" 조회라 범위 전체를 훑으면 같은 이벤트가 여러 날에서 중복 조회됨.
+// 이 함수는 범위 시작~끝(+앞쪽 룩백)만 스캔해 이벤트 원본을 cid 기준으로 1건씩만 모음 — computeWeekBars의 입력으로 사용.
+function getMultiDayEventsForRange(rangeStart,rangeEnd){
+  const seen=new Set();
+  const result=[];
+  // 범위 시작일 기준으로 최대 MULTIDAY_LOOKBACK_DAYS일 전부터, 범위 마지막날까지 시작일 후보를 훑음
+  const scanFrom=new Date(rangeStart+'T00:00:00');scanFrom.setDate(scanFrom.getDate()-MULTIDAY_LOOKBACK_DAYS);
+  const scanTo=new Date(rangeEnd+'T00:00:00');
+  for(let d=new Date(scanFrom);d<=scanTo;d.setDate(d.getDate()+1)){
+    const startDk=dateKey(d);
+    const todos=getTodos(startDk);
+    todos.forEach((t,idx)=>{
+      if(!t.isEvent||!t.eventEndDate)return;
+      if(t.eventEndDate<rangeStart||startDk>rangeEnd)return; // 이 범위와 전혀 안 겹치면 제외
+      const key=t.cid||`${startDk}_${idx}`;
+      if(seen.has(key))return;seen.add(key);
+      result.push({...t,_startDk:startDk});
+    });
+  }
+  return result;
+}
+function saveTodos(dk,v){
+  S.set(S.key('todos',dk),v);
+  S.set(S.key('todos_pending',dk),true); // 업로드 필요 플래그
+  autoSync('todos',dk); // 온라인이면 즉시 업로드
+}
+// 반복 실체화 전용 저장 — saveTodos와 달리 todos_pending 플래그를 세우지 않음. 실체화는 사용자의 수동
+// 편집이 아니라 시스템이 자동으로 채워넣는 것이라, "서버가 이 로컬 수정사항을 덮어쓰면 안 됨"을 뜻하는
+// todos_pending과 의미가 다름. 이 플래그가 세워진 채 업로드가 한 번이라도 실패(오프라인 등)하면 이후
+// syncTodosDown이 서버값 반영 자체를 계속 건너뛰게 되어, 서버 데이터가 정상이어도 로컬(recurRuleCid가
+// 빠진 옛 캐시 등)이 영영 안 고쳐지는 문제가 실사용에서 발생함(2026-09-07) — 그래서 별도로 분리.
+function saveTodosRaw(dk,v){
+  S.set(S.key('todos',dk),v);
+  autoSync('todos',dk); // pending 플래그 없이 조용히 업로드 시도 — 실패해도 다음 sync down이 정상적으로 서버값을 반영할 수 있음
+}
+saveTodos.raw=saveTodosRaw;
+function getMemos(dk){return S.get(S.key('memos',dk))||[];}
+// memos 서버 row → 로컬 저장 포맷 변환 (down/월간프리페치 공통 사용)
+function memoRowToLocal(r){return {time:r.memo_time,text:r.text,created:r.created,cid:r.client_id||genCid(),type:r.type||undefined,photoUrl:r.photo_url||undefined,question:r.question||undefined};}
+function saveMemos(dk,v){
+  S.set(S.key('memos',dk),v);
+  S.set(S.key('memos_pending',dk),true);
+  autoSync('memos',dk);
+}
+function getSleep(dk){return S.get(S.key('sleep',dk))||{};}
+// 수면 시간(분) — 취침/기상이 둘 다 있을 때만, 자정을 넘겨도 정상 계산(없으면 null). 주간 요약·오늘의 질문 등이 공용으로 사용.
+function sleepDurMin(sl){
+  if(!sl||!sl.sleep||!sl.wake)return null;
+  const [sh,sm]=sl.sleep.split(':').map(Number),[wh,wm]=sl.wake.split(':').map(Number);
+  return ((wh*60+wm)-(sh*60+sm)+1440)%1440;
+}
+function saveSleepData(dk,v){S.set(S.key('sleep',dk),v);S.set(S.key('sleep_pending',dk),true);autoSync('sleep',dk);}
+// sleep 서버 row → 로컬 저장 포맷 변환 (down/월간프리페치 공통 사용)
+function sleepRowToLocal(r){return {sleep:r.sleep_time,wake:r.wake_time,score:r.score};}
+function getSleepScore(dk){const d=getSleep(dk);return d.score!=null?d.score:null;}
+function saveSleepScore(dk,score){
+  const d=getSleep(dk);
+  d.score=score;
+  saveSleepData(dk,d);
+}
+// 최근 N일(오늘 제외, 어제부터)의 평균 수면 점수 계산
+function getAvgSleepScore(days){
+  days=days||7;
+  let vals=[];
+  let d=getLogicalDate();
+  for(let i=1;i<=days;i++){
+    const dd=new Date(d);dd.setDate(dd.getDate()-i);
+    const dk=dateKey(dd);
+    const sc=getSleepScore(dk);
+    if(sc!=null)vals.push(sc);
+  }
+  if(vals.length===0)return null;
+  const avg=Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
+  return {avg:avg,sampleCount:vals.length};
+}
+// 최근 N일(오늘 제외, 어제부터)의 평균 취침·기상 시각 계산
+// 취침시각은 밤 11시~새벽까지 넓게 걸쳐 나타나므로, 자정 기준(4시)보다 늦은 12시를 경계로 보정한다.
+// (예: 23시 취침도 01시 취침도 모두 "그날 밤 잠든 것"으로 같은 방향으로 평균에 반영되어야 함)
+function getAvgSleepWindow(days){
+  days=days||7;
+  const SLEEP_CUTOFF_MIN=12*60; // 정오 — 이 시각 이전은 전날 밤에 걸친 취침으로 간주
+  let sleepVals=[],wakeVals=[];
+  let d=getLogicalDate();
+  for(let i=1;i<=days;i++){
+    const dd=new Date(d);dd.setDate(dd.getDate()-i);
+    const dk=dateKey(dd);
+    const sl=getSleep(dk);
+    if(!sl||!sl.sleep||!sl.wake)continue;
+    const sMin=dawnTimeToAdjustedMin(sl.sleep,SLEEP_CUTOFF_MIN),wMin=_dawnTimeToMin(sl.wake);
+    if(sMin==null||wMin==null)continue;
+    sleepVals.push(sMin);
+    wakeVals.push(wMin);
+  }
+  if(sleepVals.length===0)return null;
+  const avgSleep=((sleepVals.reduce((a,b)=>a+b,0)/sleepVals.length)%1440+1440)%1440;
+  const avgWake=((wakeVals.reduce((a,b)=>a+b,0)/wakeVals.length)%1440+1440)%1440;
+  const fmt=function(m){const h=Math.floor(m/60),mm=Math.round(m%60);return pad(h)+':'+pad(mm);};
+  return {sleepMin:avgSleep,wakeMin:avgWake,sleepStr:fmt(avgSleep),wakeStr:fmt(avgWake),sampleCount:sleepVals.length};
+}
+// 수면 점수(애플워치 등 외부 기록) → 표정 아이콘 매핑
+const SLEEP_SCORE_LEVELS=[
+  {max:50,  key:'verylow',  icon:'ti-mood-angry',      label:'매우낮음'},
+  {max:65,  key:'low',      icon:'ti-mood-sad',        label:'낮음'},
+  {max:78,  key:'normal',   icon:'ti-mood-empty',      label:'보통'},
+  {max:89,  key:'high',     icon:'ti-mood-smile',      label:'높음'},
+  {max:101, key:'veryhigh', icon:'ti-mood-smile-beam', label:'매우높음'}
+];
+function getSleepScoreLevel(score){
+  return SLEEP_SCORE_LEVELS.find(l=>score<=l.max) || SLEEP_SCORE_LEVELS[SLEEP_SCORE_LEVELS.length-1];
+}
+// 식사 카테고리 라벨/키 순서 — 리듬바, 오늘탭 카드, 캘린더 상세보기, 마크다운 백업 등
+// 여러 화면에서 각자 다른 문구("아침"/"아침 식사")로 중복 정의되던 것을 통일.
+const MEAL_LABELS={breakfast:'아침',lunch:'점심',dinner:'저녁',snack:'간식'};
+const MEAL_KEYS=['breakfast','lunch','snack','dinner'];
+function getMeals(dk){return S.get(S.key('meals',dk))||{};}
+// meals 서버 row(단일 객체) → 로컬 저장 포맷 변환. 서버에서 내려온 3군데 지점이 모두 이 함수를 거침.
+function mealRowToLocal(r){
+  return {breakfast:r.breakfast||'',lunch:r.lunch||'',dinner:r.dinner||'',snack:r.snack||'',breakfast_time:r.breakfast_time||'',lunch_time:r.lunch_time||'',dinner_time:r.dinner_time||'',snack_time:r.snack_time||''};
+}
+// 식사 필드 단위 저장 — 메뉴명 또는 시간 중 "실제로 바뀐 필드 하나"만 로컬 갱신 + 서버 patch.
+// 예전엔 그 날 4끼 전체를 객체로 합쳐 통째로 push하는 구조라, 로컬 캐시가 최신이 아닌
+// 상태(예: 다른 기기에서 방금 등록한 시간을 아직 못 받아온 상태)에서 메뉴만 고쳐도
+// 무관한 시간 필드까지 서버에서 통째로 사라지는 문제가 반복됐음.
+// 이제는 바뀐 필드 하나만 pending 큐에 쌓고 서버로도 그 필드만 patch하므로,
+// 로컬이 낡아 있어도 서버의 다른 필드를 건드릴 방법 자체가 없음.
+function patchMealField(dk,key,field,value){
+  const m=getMeals(dk);
+  const col=field==='time'?key+'_time':key;
+  m[col]=value;
+  S.set(S.key('meals',dk),m);
+  const pend=S.get(S.key('meals_fields_pending',dk))||[];
+  if(!pend.includes(col))pend.push(col);
+  S.set(S.key('meals_fields_pending',dk),pend);
+  autoSync('meals_field',dk);
+  if(dk===dateKey(currentDate))renderTodayMeal();
+}
+// ── 독서(reading_books) → contents 통합 어댑터 (2026-08-29) ──
+// book은 이제 별도 테이블이 아니라 contents의 cat='book' 항목. 기존 37곳 호출부가 기대하는
+// book shape({cid,title,status:'reading'|'done'|'paused',pages,totalPages,seconds,unit,percent,
+// todayDate,todayStart,poster,author,created,completedAt,linkedContent,contentMk,contentTitle})는
+// 최대한 그대로 유지해 호출부 변경을 최소화한다.
+// status 매핑: contents.status('watching'|'done'|'stopped') ↔ book.status('reading'|'done'|'paused')
+const _BOOK_STATUS_TO_CONTENT={reading:'watching',done:'done',paused:'stopped'};
+const _CONTENT_STATUS_TO_BOOK={watching:'reading',done:'done',stopped:'paused'};
+// todayStart/todayDate(오늘 읽은 양 계산용)는 drama/movie 시청 스톱워치의 시작시각 관리와 동일하게
+// 서버에 남기지 않는 세션성 로컬 값 — 메모리 캐시로만 관리(자정 지나면 자연히 today_date 불일치로 무효화됨).
+let _bookTodayMap={}; // {cid: {todayDate, todayStart}}
+const _BOOK_SCAN_MONTHS=24; // 서재(완독 목록)가 계속 누적되므로 넉넉히 2년치 스캔
+function _bookContentToShape(c,mk){
+  const todaySnap=_bookTodayMap[c.cid];
+  const useToday=todaySnap&&todaySnap.todayDate===dateKey(getLogicalDate());
+  return {
+    cid:c.cid,title:c.title,
+    status:_CONTENT_STATUS_TO_BOOK[c.status]||'reading',
+    unit:c.unitLabel||'pages',
+    pages:c.unitLabel==='pages'?(c.currentUnit||0):0,
+    totalPages:c.unitLabel==='pages'?(c.totalUnit||null):null,
+    percent:c.unitLabel==='percent'?(c.currentUnit||0):0,
+    seconds:c.readSeconds||0,
+    todayDate:useToday?todaySnap.todayDate:null,
+    todayStart:useToday?todaySnap.todayStart:0,
+    poster:c.poster||null,author:c.author||'',
+    created:c.created,completedAt:c.status==='done'?(c.endDate||null):null,
+    lastActivityAt:c.lastActivityAt||0,
+    linkedContent:true,contentMk:mk,contentTitle:c.title
+  };
+}
+// 최근 _BOOK_SCAN_MONTHS개월의 book 카테고리 항목을 모아 book shape 배열로 리턴.
+// renderReadingHub 등 한 렌더 사이클에서 여러 하위 함수가 반복 호출하므로 짧게 메모이제이션
+// (saveContents/upsertBookLocal 등 contents가 바뀌는 모든 지점에서 _booksCache=null로 무효화됨).
+let _booksCache=null;
+function getBooks(){
+  if(_booksCache)return _booksCache;
+  const now=new Date();
+  const result=[];
+  const seen=new Set();
+  for(let i=0;i<_BOOK_SCAN_MONTHS;i++){
+    const mk=monthKey(new Date(now.getFullYear(),now.getMonth()-i,1));
+    getContents(mk).forEach(c=>{
+      if(c.cat!=='book'||!c.cid||seen.has(c.cid))return;
+      seen.add(c.cid);
+      result.push(_bookContentToShape(c,mk));
+    });
+  }
+  _booksCache=result;
+  return result;
+}
+function getQuotes(){return S.get('reading_quotes')||[];}
+function saveQuotesLocal(arr){S.set('reading_quotes',arr);}
+function upsertQuoteLocal(q){
+  const arr=getQuotes();
+  const i=arr.findIndex(x=>x.cid===q.cid);
+  if(i>=0)arr[i]=q;else arr.push(q);
+  saveQuotesLocal(arr);
+  S.set('quote_pending_'+q.cid,true);
+  autoSync('reading_quote',q.cid);
+}
+async function deleteQuoteLocal(cid){
+  saveQuotesLocal(getQuotes().filter(q=>q.cid!==cid));
+  const pend=S.get('quote_delpending_list')||[];
+  if(!pend.includes(cid))pend.push(cid);
+  S.set('quote_delpending_list',pend);
+  const res=await supaFetch(`reading_quotes?cid=eq.${cid}`,'DELETE');
+  if(res!==null)S.set('quote_delpending_list',(S.get('quote_delpending_list')||[]).filter(c=>c!==cid));
+}
+async function syncQuoteUp(cid){
+  const q=getQuotes().find(x=>x.cid===cid);
+  if(!q)return;
+  await supaUpsert('reading_quotes','cid',[{cid:q.cid,book_cid:q.bookCid,text:q.text,created:q.created,comment:q.comment||''}]);
+  S.set('quote_pending_'+cid,false);
+}
+async function syncQuotesDownAll(){
+  const rows=await supaFetch('reading_quotes?order=created');
+  if(!rows)return;
+  const local=getQuotes();
+  const localByCid={};
+  local.forEach(q=>{localByCid[q.cid]=q;});
+  const merged=rows.map(r=>{
+    if(S.get('quote_pending_'+r.cid)&&localByCid[r.cid])return localByCid[r.cid]; // 업로드 대기중이면 로컬 우선
+    return {cid:r.cid,bookCid:r.book_cid,text:r.text,created:r.created,comment:r.comment||''};
+  });
+  // 서버에 아직 없지만 로컬에 pending중인 신규 문장도 보존
+  local.forEach(q=>{
+    if(S.get('quote_pending_'+q.cid)&&!merged.find(m=>m.cid===q.cid))merged.push(q);
+  });
+  saveQuotesLocal(merged);
+  renderRdQuotes();
+}
+// book shape를 다시 contents 필드로 되돌려 저장. cid로 항목을 찾아 반영하고, 없으면(완전 신규 책) 새 contents 항목 생성.
+function upsertBookLocal(book){
+  if(book.todayDate)_bookTodayMap[book.cid]={todayDate:book.todayDate,todayStart:book.todayStart||0};
+  const now=new Date();
+  const found=_findContentByCidNearMkInRange(book.cid,_BOOK_SCAN_MONTHS);
+  const targetMk=book.contentMk||(found?found.mk:monthKey(now));
+  const list=getContents(targetMk);
+  let item=found?found.list[found.idx]:list.find(c=>c.cid===book.cid);
+  if(!item){
+    item={cid:book.cid,cat:'book',title:book.contentTitle||book.title,status:_BOOK_STATUS_TO_CONTENT[book.status]||'watching',
+      startDate:dateKey(now),poster:book.poster||null,author:book.author||'',review:'',stars:0,notes:[],created:book.created||Date.now()};
+    list.push(item);
+  }
+  const newStatus=_BOOK_STATUS_TO_CONTENT[book.status]||item.status;
+  if(newStatus==='watching')item.endDate=null;
+  else if(item.status!=='watching'||item.endDate==null)item.endDate=item.endDate||dateKey(now); // watching→done/stopped 전환 시에만 종료일 채움, 이미 종료된 건 유지
+  item.status=newStatus;
+  item.unitLabel=book.unit||'pages';
+  item.currentUnit=book.unit==='pages'?(book.pages||0):(book.percent||0);
+  item.totalUnit=book.unit==='pages'?(book.totalPages||null):100;
+  item.readSeconds=book.seconds||0;
+  if(book.poster)item.poster=book.poster;
+  if(book.author)item.author=book.author;
+  if(book.stars)item.stars=book.stars;
+  if(book.review)item.review=book.review;
+  if(book.status==='done'&&!item.endDate)item.endDate=book.completedAt||dateKey(now);
+  saveContents(found?found.mk:targetMk,found?found.list:list);
+}
+// _findContentByCidNearMk는 최근 2개월만 보므로, 서재 전체(완독 포함 넉넉한 범위)를 찾을 때 쓰는 확장판.
+function _findContentByCidNearMkInRange(cid,monthsBack){
+  const now=new Date();
+  for(let i=0;i<monthsBack;i++){
+    const mk=monthKey(new Date(now.getFullYear(),now.getMonth()-i,1));
+    const list=getContents(mk);
+    const idx=list.findIndex(c=>c.cid===cid);
+    if(idx>=0)return{mk,list,idx};
+  }
+  return null;
+}
+function deleteBookLocal(cid){
+  const found=_findContentByCidNearMkInRange(cid,_BOOK_SCAN_MONTHS);
+  if(!found)return;
+  addDelPending('contents',found.mk,cid);
+  found.list.splice(found.idx,1);
+  saveContents(found.mk,found.list);
+  delete _bookTodayMap[cid];
+}
+function markReadingActivityToday(){
+  const key='reading_dates';
+  const arr=getGoal(key).filter(l=>l&&l.trim());
+  const today=dateKey(new Date());
+  if(!arr.includes(today)){arr.push(today);saveGoal(key,arr);}
+}
+function getReadingStreak(){
+  const arr=getGoal('reading_dates').filter(l=>l&&l.trim()).sort();
+  if(!arr.length)return 0;
+  let streak=0;
+  let cur=new Date();
+  for(let i=0;i<arr.length+1;i++){
+    const dk=dateKey(cur);
+    if(arr.includes(dk)){streak++;cur.setDate(cur.getDate()-1);}
+    else break;
+  }
+  return streak;
+}
+function getHabits(){_migrateHabitIds();return S.get('habits')||DEFAULT_HABITS;}
+function saveHabits(v){S.set('habits',v);autoSync('habits',null);}
+// _habitPeriods/_isHabitActiveOn 정의는 파일 하단(HABIT MONTHLY 섹션)에 있음 — function 선언 호이스팅으로 순서 무관 동작.
+// periods도 createdAt도 전혀 없는 아주 오래된 습관(구간 이력 도입 이전부터 있던 데이터)은 "정보 없음"이지
+// "꺼짐"이 아니므로, 이 경우엔 archivedAt 유무만으로 최소 판정(archivedAt이 있으면 꺼짐, 없으면 켜짐).
+function _isHabitCurrentlyOn(h){
+  const p=_habitPeriods(h);
+  if(!p.length)return !h.archivedAt;
+  const last=p[p.length-1];
+  return !!last&&!last.end;
+}
+function getActiveHabits(){return getHabits().filter(_isHabitCurrentlyOn);}
+function getHabitChecks(wk){return S.get(S.key('hc',wk))||{};}
+// 습관 체크 시각(별도 저장소) — 기존 checks[key]=true/false 불리언 구조를 안 건드리기 위해 분리.
+// 새벽홈탭 타임라인 등에서 "몇 시에 체크했는지"가 필요할 때만 참조.
+function getHabitCheckTimes(wk){return S.get(S.key('hcTime',wk))||{};}
+// 습관 체크/시각 저장(setter+동기화)은 checkHabitDirect(자동체크)와 toggleHabitCheckWithTime(수동체크)
+// 두 곳으로 통일되어 있음 — 과거엔 saveHabitChecks/saveHabitCheckTimes를 각각 따로 호출해
+// syncHCUp이 두 번 발사되며 레이스 컨디션(checked_time이 null로 덮어써짐)이 있었음.
+// 습관 체크 온/오프를 시각 기록과 함께 한 번에 처리하는 공통 함수.
+// checks[key]와 hcTimes[key]를 모두 로컬에 반영한 뒤 서버 동기화(syncHCUp)를 1회만 호출해
+// checkHabitDirect와 동일하게 레이스 컨디션(먼저 나간 시각-없는 요청이 나중에 도착해 checked_time을
+// null로 덮어쓰는 문제)을 방지한다. 호출부는 checks 객체를 직접 변경하지 않고 이 함수만 호출하면 됨.
+function toggleHabitCheckWithTime(wk,habitId,dow,dk){
+  const key=habitId+'-'+dow;
+  const checks=getHabitChecks(wk);
+  const wasOn=!!checks[key];
+  const hcTimes=getHabitCheckTimes(wk);
+  if(wasOn){
+    delete checks[key];
+    if(hcTimes[key])delete hcTimes[key];
+    addDelPending('hc',wk,habitId+'|'+dk);
+  }else{
+    checks[key]=true;
+    hcTimes[key]=pad(new Date().getHours())+':'+pad(new Date().getMinutes());
+  }
+  S.set(S.key('hc',wk),checks);
+  S.set(S.key('hcTime',wk),hcTimes);
+  S.set('hc_pending_'+wk,true);
+  autoSync('hc',wk);
+  return checks;
+}
+function getContents(mk){
+  const arr=S.get(S.key('contents',mk))||[];
+  let changed=false;
+  arr.forEach(item=>{
+    if(!item.startDate&&item.startDay){item.startDate=mk+'-'+pad(item.startDay);changed=true;}
+    if(!item.endDate&&item.endDay){item.endDate=mk+'-'+pad(item.endDay);changed=true;}
+    // cid가 없는 항목은 여기서 즉시 발급하지 않음 — syncContentsDown이 서버의
+    // client_id와 title+startDate 기준으로 먼저 매칭할 기회를 준 뒤에도 없으면 그때 발급.
+  });
+  if(changed)S.set(S.key('contents',mk),arr);
+  return arr;
+}
+// 이번달+지난달 콘텐츠를 합쳐 반환(중복 제거, 각 항목에 _mk=월키 부여) — 월초에 지난달부터 이어지는 진행중 콘텐츠를 놓치지 않기 위한 공용 조회.
+// 진행중 작품 목록/질문 상황 조건이 같은 조회를 각자 반복하던 것을 통합(2026-09-19).
+function getRecentMonthsContents(base){
+  const d=base||new Date();
+  const seen=new Set(),out=[];
+  [monthKey(new Date(d.getFullYear(),d.getMonth()-1,1)),monthKey(d)].forEach(mk=>{
+    getContents(mk).forEach(c=>{
+      const key=c.cid||(c.cat+'|'+c.title+'|'+c.startDate);
+      if(seen.has(key))return;
+      seen.add(key);out.push({...c,_mk:mk});
+    });
+  });
+  return out;
+}
+// Supabase에서 cat=music만 서버 필터링으로 직접 조회 — 저녁 플리(전체 기간 랜덤) 등 월 경계 없는 조회용
+async function fetchAllMusicContents(){
+  const rows=await supaFetch(`contents?content_cat=eq.music&order=created`);
+  if(!rows)return [];
+  return rows.map(r=>({cat:r.content_cat,title:r.title,startDate:r.start_date,endDate:r.end_date,status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',musicUrl:r.music_url||null,album:r.album||null,releaseYear:r.release_year||null,notes:r.notes||[],reviewSavedDk:r.review_saved_dk||null,reviewSavedTime:r.review_saved_time||null,created:r.created,cid:r.client_id}));
+}
+// 리듬탭 폼/모닝플로우 칩 선택지 — 카테고리별 [{label,cid?}]. 감상=진행중 드라마·영화(cid로 콘텐츠 연동), 외출=오늘 일정,
+// 업무=오늘 업무 일정+재택/외근, 그 외=공용 서브선택 목록(RHYTHM_QUICK_CHOICES). 칩이 나오는 모든 곳이 이 함수 하나를 씀(2026-09-19).
+function getRhythmChipOptions(cat){
+  if(cat==='enjoy')return _getOngoingWatchingWithCid().slice(0,4).map(c=>({label:(c.cat==='drama'?'드라마':'영화')+' - '+c.title,cid:c.cid}));
+  const events=(cat==='appointment'||cat==='work')?getTodayEventChipTitles(cat).map(t=>({label:t})):[];
+  return events.concat((RHYTHM_QUICK_CHOICES[cat]||[]).map(x=>({label:x.label})));
+}
+// 리듬바/모닝플로우 칩용 — 오늘 일정 중 조건에 맞는 것의 제목 목록(시간순, 시간 없는 일정은 뒤). 리듬탭 칩과 모닝플로우 외출 칩이 공용으로 사용(2026-09-19 통합).
+// kind 'appointment'(외출): 업무가 아닌 "시간이 지정된" 일정 — 시간창(±60분)은 없앴음(일찍 출발해도 뜨도록). 하루종일 일정(생일/기념일 등)은 노이즈라 제외.
+// kind 'work'(업무): 업무 카테고리 일정 전부(시간 무관) — 며칠 이어지는 업무 일정도 오늘을 지나는 중이면 포함.
+function getTodayEventChipTitles(kind){
+  const dk=dateKey(new Date());
+  const byCid=new Map(); // 오늘 시작 연속일정은 getTodos와 getActiveMultiDayEvents 양쪽에 잡히므로 cid로 중복 제거
+  [...getTodos(dk),...(kind==='work'?getActiveMultiDayEvents(dk):[])].forEach(t=>{if(t.isEvent)byCid.set(t.cid||t.text,t);});
+  const match=kind==='work'?(t=>t.eventCat==='work'):(t=>t.eventTime&&t.eventCat!=='work');
+  return [...byCid.values()].filter(match)
+    .sort((a,b)=>(a.eventTime||'99:99').localeCompare(b.eventTime||'99:99'))
+    .map(t=>parseTodoTextParts(t.text).parts[0]||t.text);
+}
+function saveContents(mk,v){
+  const prev=S.get(S.key('contents',mk))||[];
+  const prevByCid={};
+  prev.forEach(it=>{if(it.cid)prevByCid[it.cid]=it;});
+  const now=Date.now();
+  v.forEach(it=>{
+    const p=it.cid?prevByCid[it.cid]:null;
+    const isSame=p&&p.status===it.status&&p.startDate===it.startDate&&p.endDate===it.endDate&&p.review===it.review&&p.reviewSavedDk===it.reviewSavedDk&&p.reviewSavedTime===it.reviewSavedTime&&p.stars===it.stars&&p.title===it.title&&p.totalUnit===it.totalUnit&&p.currentUnit===it.currentUnit&&p.unitLabel===it.unitLabel&&p.readSeconds===it.readSeconds&&p.lastActivityAt===it.lastActivityAt&&JSON.stringify(p.notes||[])===JSON.stringify(it.notes||[]);
+    if(!isSame)it.updatedAt=now;
+    else if(p&&p.updatedAt)it.updatedAt=p.updatedAt;
+  });
+  S.set(S.key('contents',mk),v);
+  S.set(S.key('contents_pending',mk),true);
+  _booksCache=null; // getBooks() 메모이제이션 무효화 — contents가 바뀌면 book 목록도 바뀔 수 있으므로
+  // contents 동기화(Up/Down)는 mk별로 직렬화 — runContentsSyncLocked 큐를 통해서만 실행
+  runContentsSyncLocked(mk,()=>autoSync('contents',mk));
+}
+// ── contents mk별 동기화 락
+// syncContentsDown(다운로드+병합)과 saveContents→syncContentsUp(업로드)이
+// 같은 월(mk)에 대해 동시에 실행되면, 늦게 끝나는 쪽이 오래된 스냅샷으로
+// 최신 로컬 변경을 덮어써버리는 경합이 생김(독서코너 상태변경이 콘텐츠탭
+// 왕복 후 되돌아가는 문제의 원인). mk별 Promise 체인으로 항상 한 번에
+// 하나의 동기화 작업만 실행되도록 강제한다.
+const _contentsSyncChain={};
+function runContentsSyncLocked(mk,fn){
+  const prevChain=_contentsSyncChain[mk]||Promise.resolve();
+  const nextChain=prevChain.then(fn).catch(()=>{});
+  _contentsSyncChain[mk]=nextChain;
+  return nextChain;
+}
+function getGoal(key){return S.get(key)||[''];}
+function saveGoal(key,lines){S.set(key,lines);autoSync('goal',key);}
+
+// ── SUPABASE SYNC
+async function syncTodosDown(dk){
+  const rows=await supaFetch('todos?date_key=eq.'+dk+'&order=created');
+  if(!rows)return; // 연결 실패(null) — 로컬 유지. 빈 배열은 "서버에 진짜 0개"라는 뜻이라 그대로 반영.
+  if(S.get(S.key('todos_pending',dk)))return; // 업로드 대기중인 로컬 수정(미루기 등) 있으면 덮어쓰지 않음
+  const mapped=rows.map(function(r){
+    return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null,eventEndDate:r.event_end_date||null,cat:r.cat||'todo',pinned:!!r.pinned,recurRuleCid:r.recur_rule_cid||undefined,alertTime:r.alert_time||null,eventAlertOn:!!r.event_alert_on,todoAlertOn:!!r.todo_alert_on};
+  });
+  // 반복 규칙cid가 같은 row가 두 개 이상 섞여 있으면(과거 경합으로 생긴 서버측 중복 등) 먼저 만들어진 것만 남김 — 방어적 dedupe.
+  const seenRuleCids=new Set();
+  const deduped=mapped.filter(t=>{
+    if(!t.recurRuleCid)return true;
+    if(seenRuleCids.has(t.recurRuleCid))return false;
+    seenRuleCids.add(t.recurRuleCid);
+    return true;
+  });
+  S.set(S.key('todos',dk),deduped);
+  renderTodos();
+}
+// 같은 dk에 대한 업로드가 동시에(재진입) 실행되는 것을 막는 락 — saveTodos의 즉시 업로드(autoSync)와
+// 탭 전환/주기 동기화(syncAll)가 같은 dk를 거의 동시에 올리면, 두 개의 upsert 요청이 겹쳐 서버가
+// "ON CONFLICT DO UPDATE cannot affect row a second time"로 거부하는 경합이 있었음(2026-09-07 확인).
+// [2026-09-16 개선] 기존엔 이미 진행 중인 업로드가 있으면 새로 시작하지 않고 그 결과를 그대로 기다렸다가
+// 반환했으나, 이 경우 락에 걸린 호출이 "자신이 요청한 시점 이후의 로컬 변경(삭제 등)"을 서버에 반영하지
+// 못한 채 남의 결과를 그대로 돌려받는 유실이 발생함(삭제 addDelPending 직후 saveTodos→syncTodosUp이
+// 락에 걸리면, 그 삭제가 반영 안 된 이전 업로드 결과를 "성공"으로 착각해 todos_pending을 꺼버림 —
+// 2026-09-16 "바레 상담" 재발 사건으로 확정). 요청 병합(coalescing) 방식으로 교체: 락에 걸린 동안 들어온
+// 요청은 진행 중인 작업이 끝난 뒤 반드시 한 번 더(그 시점의 최신 로컬 상태로) 실행되도록 큐잉한다.
+const _syncingTodosUpDk=new Map(); // dk → 현재 실행 중인 Promise
+const _pendingTodosUpDk=new Map(); // dk → 완료 후 한 번 더 실행 예약된 Promise(대기자들이 공유)
+async function syncTodosUp(dk){
+  if(_syncingTodosUpDk.has(dk)){
+    // 이미 실행 중 — 새로 시작하지 않되, 그 결과를 재사용하지도 않는다. 진행 중인 작업이 끝나면
+    // 반드시 한 번 더(최신 로컬 상태로) 돌리도록 예약하고, 그 재실행 결과를 기다린다.
+    if(!_pendingTodosUpDk.has(dk)){
+      const rerun=_syncingTodosUpDk.get(dk).then(()=>syncTodosUp(dk)).finally(()=>{_pendingTodosUpDk.delete(dk);});
+      _pendingTodosUpDk.set(dk,rerun);
+    }
+    return _pendingTodosUpDk.get(dk);
+  }
+  const p=_syncTodosUpInner(dk);
+  _syncingTodosUpDk.set(dk,p);
+  try{
+    return await p;
+  }finally{
+    _syncingTodosUpDk.delete(dk);
+  }
+}
+async function _syncTodosUpInner(dk){
+  const todos=getTodos(dk);
+  if(ensureItemCids(todos))S.set(S.key('todos',dk),todos);
+  // 업로드 직전 cid 기준 dedupe 안전망 — 서버가 "ON CONFLICT DO UPDATE cannot affect row a second time"로
+  // 거부하는 경우는 로컬 배열 안에 같은 cid가 두 번 이상 있다는 뜻(정상 경로에선 발생하지 않아야 하지만,
+  // 과거 버전의 버그나 예외적 타이밍에 로컬에 중복이 남았을 가능성에 대비한 방어적 정리). 먼저 나온 것만 남김.
+  const seenCids=new Set();
+  const deduped=todos.filter(t=>{
+    if(!t.cid)return true;
+    if(seenCids.has(t.cid))return false;
+    seenCids.add(t.cid);
+    return true;
+  });
+  if(deduped.length!==todos.length)S.set(S.key('todos',dk),deduped);
+  const delCids=getDelPendingCids('todos',dk);
+  const ok=await syncListUpSafe('todos',`date_key=eq.${dk}`,'date_key,client_id',deduped,
+    t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,strike_parts:t.strikeParts||[],strike_times:t.strikeTimes||{},completed_at:(t.completedAt!=null?t.completedAt:null),sort_order:(typeof t.sortOrder==='number'?t.sortOrder:null),is_event:!!t.isEvent,event_cat:t.eventCat||null,event_time:t.eventTime||null,event_end_date:t.eventEndDate||null,cat:t.cat||'todo',pinned:!!t.pinned,recur_rule_cid:t.recurRuleCid||null,alert_time:t.alertTime||null,event_alert_on:!!t.eventAlertOn,todo_alert_on:!!t.todoAlertOn}),
+    delCids);
+  if(ok)delCids.forEach(cid=>removeDelPending('todos',dk,cid));
+  return ok;
+}
+async function syncMemosDown(dk){
+  const rows=await supaFetch('memos?date_key=eq.'+dk+'&order=created');
+  if(!rows)return; // 연결 실패(null) — 로컬 유지. 빈 배열은 "서버에 진짜 0개"라는 뜻이라 그대로 반영.
+  if(S.get(S.key('memos_pending',dk)))return; // 업로드 대기중인 로컬 수정 있으면 덮어쓰지 않음
+  S.set(S.key('memos',dk),rows.map(memoRowToLocal));
+  renderMemos();
+}
+async function syncMemosUp(dk){
+  const memos=getMemos(dk);
+  if(ensureItemCids(memos))S.set(S.key('memos',dk),memos);
+  const delCids=getDelPendingCids('memos',dk);
+  const ok=await syncListUpSafe('memos',`date_key=eq.${dk}`,'date_key,client_id',memos,
+    m=>({date_key:dk,memo_time:m.time,text:m.text,created:m.created,client_id:m.cid,type:m.type||null,photo_url:m.photoUrl||null,question:m.question||null}),
+    delCids);
+  if(ok)delCids.forEach(cid=>removeDelPending('memos',dk,cid));
+  // 이 날짜에 아직 R2 업로드가 끝나지 않은 사진(pending_upload)이 있으면, 방금 photo_url=null로
+  // 서버에 올라간 스냅샷을 syncMemosDown이 그대로 되받아 로컬 사진을 지워버리는 레이스를 막기 위해
+  // pending 해제를 보류 — 업로드 완료 후 재저장될 때 다시 syncMemosUp이 돌며 정상 해제됨.
+  const stillUploading=memos.some(m=>m.photoStatus==='pending_upload');
+  return ok&&!stillUploading;
+}
+async function syncSleepDown(dk){
+  const rows=await supaFetch(`sleep?date_key=eq.${dk}`);
+  if(!rows)return; // 연결 실패(null) — 로컬 유지
+  if(S.get(S.key('sleep_pending',dk)))return; // 업로드 대기중인 로컬 수정 있으면 덮어쓰지 않음
+  if(!rows.length)return;
+  S.set(S.key('sleep',dk),sleepRowToLocal(rows[0]));
+}
+async function syncSleepUp(dk){
+  const d=getSleep(dk);if(!d.sleep&&!d.wake&&d.score==null)return;
+  await supaUpsert('sleep','date_key',[{date_key:dk,sleep_time:d.sleep,wake_time:d.wake,score:d.score!=null?d.score:null}]);
+}
+async function syncMealsDown(dk){
+  const rows=await supaFetch(`meals?date_key=eq.${dk}`);
+  if(!rows)return; // 연결 실패(null) — 로컬 유지
+  if((S.get(S.key('meals_fields_pending',dk))||[]).length)return; // 업로드 대기중인 필드 있으면 덮어쓰지 않음
+  if(!rows.length)return;
+  S.set(S.key('meals',dk),mealRowToLocal(rows[0]));
+}
+// 필드 단위 patch — pending 큐에 쌓인 컬럼만 골라서 서버로 보냄(나머지 컬럼은 손대지 않음).
+// resolution=merge-duplicates upsert는 body에 없는 컬럼을 기존값 그대로 두므로,
+// 로컬이 낡아 있어도 서버의 다른 필드를 덮어쓸 방법이 없어짐.
+async function syncMealsUp(dk){
+  const pend=S.get(S.key('meals_fields_pending',dk))||[];
+  if(!pend.length)return true;
+  const local=getMeals(dk);
+  const row={date_key:dk,created:Date.now()};
+  pend.forEach(col=>{row[col]=local[col]||null;});
+  const ok=await supaUpsert('meals','date_key',[row]);
+  if(ok)S.set(S.key('meals_fields_pending',dk),(S.get(S.key('meals_fields_pending',dk))||[]).filter(c=>!pend.includes(c)));
+  if(dk===dateKey(currentDate))renderTodayMeal();
+  return !!ok;
+}
+async function syncHabitsDown(){
+  const rows=await supaFetch('habits?order=sort_order');
+  if(!rows)return;
+  if(rows.length===0&&getHabits().length>0){syncHabitsUp();return;}
+  // [2026-09-05] habit_id(카탈로그 id)/custom/archived_at도 함께 복원 — 이걸 빠뜨리면 동기화할 때마다
+  // 로컬의 id가 사라져 _migrateHabitIds가 매번 다시 돌고, 특히 커스텀 습관은 매번 새 랜덤 id를 받아
+  // 과거 체크 기록과 끊기는 문제가 생김.
+  // [2026-09-06 periods 전환] 활성/비활성 이력을 periods(jsonb 배열) 컬럼 하나로 관리 —
+  // 온오프를 반복해도 각 활성 구간이 독립적으로 누적 보존됨(구간 배열 push/close 방식).
+  // 구버전 컬럼(archived_at/created_at_key)만 있는 예전 서버 데이터는 폴백으로 단일구간 변환.
+  if(rows.length>0)S.set('habits',rows.map(r=>{
+    const h={name:r.name,color:r.color};
+    if(r.habit_id)h.id=r.habit_id;
+    if(r.custom)h.custom=true;
+    if(r.periods&&r.periods.length)h.periods=r.periods;
+    else if(r.created_at_key||r.archived_at)h.periods=[{start:r.created_at_key||null,end:r.archived_at||null}]; // 구버전 폴백(archived_at만 있어도 처리 — 2026-09-06 영양제 케이스 재발 방지)
+    return h;
+  }));
+}
+async function syncHabitsUp(){
+  const h=getHabits();
+  if(h.length){
+    const ok=await supaUpsert('habits','name',h.map((hh,i)=>({name:hh.name,color:hh.color,sort_order:i,habit_id:hh.id||null,custom:!!hh.custom,periods:_habitPeriods(hh)})));
+    if(!ok)return false;
+  }
+  const delNames=getDelPendingCids('habits','global');
+  if(delNames.length){
+    const inList=delNames.map(n=>encodeURIComponent(n)).join(',');
+    const res=await supaFetch(`habits?name=in.(${inList})`,'DELETE');
+    if(res===null)return false; // 네트워크 실패 — 삭제 대기 목록 유지, 다음 기회에 재시도
+  }
+  delNames.forEach(n=>removeDelPending('habits','global',n));
+  return true;
+}
+// 원본 규칙(recurring_items)만 다룸 — 완료체크/실체화 여부는 이제 todos 자체에 있으므로 별도 sync 불필요.
+async function syncRecurringItemsDown(){
+  const rows=await supaFetch('recurring_items?order=sort_order');
+  if(!rows)return;
+  if(rows.length===0&&getRecurringItems().length>0){syncRecurringItemsUp();return;}
+  if(rows.length>0){
+    S.set('recurring_items',rows.map(r=>({
+      cid:r.client_id,text:r.text,isEvent:!!r.is_event,eventTime:r.event_time||null,
+      eventCat:r.event_cat||null,timeSection:r.time_section||null,
+      rule:r.rule,startDate:r.start_date,endDate:r.end_date||null
+    })));
+    _materializedDkCache.clear(); // 다른 기기에서 등록/삭제된 규칙이 반영됐으니, 이미 "확인 끝남"으로 캐시된 날짜들도 다시 실체화 검토 대상이 되어야 함
+  }
+}
+async function syncRecurringItemsUp(){
+  const items=getRecurringItems();
+  if(items.length){
+    const ok=await supaUpsert('recurring_items','client_id',items.map((it,i)=>({
+      client_id:it.cid,text:it.text,is_event:!!it.isEvent,event_time:it.eventTime||null,
+      event_cat:it.eventCat||null,time_section:it.timeSection||null,
+      rule:it.rule,start_date:it.startDate,end_date:it.endDate||null,sort_order:i
+    })));
+    if(!ok)return false;
+  }
+  const delCids=getDelPendingCids('recurring_items','global');
+  if(delCids.length){
+    const inList=delCids.map(c=>encodeURIComponent(c)).join(',');
+    const res=await supaFetch(`recurring_items?client_id=in.(${inList})`,'DELETE');
+    if(res===null)return false;
+  }
+  delCids.forEach(c=>removeDelPending('recurring_items','global',c));
+  return true;
+}
+// 반복 규칙 삭제 시 "기준일 이후 실체화분"을 서버에서 지우는 DELETE 쿼리 재시도 목록.
+// {ruleCid, fromDk} 쌍을 통째로 저장(개별 cid가 아니라 "이 규칙의 이 날짜 이후 전부"라는 조건 자체를 재시도해야 하므로
+// getDelPendingCids류의 단일 cid 목록과는 형태가 달라 별도로 둠). recurSheetDeleteAll이 실패했을 때만 여기 쌓임.
+function addRecurFutureDelPending(ruleCid,fromDk){
+  const list=S.get('recur_future_delpending')||[];
+  if(!list.some(e=>e.ruleCid===ruleCid&&e.fromDk===fromDk)){
+    list.push({ruleCid,fromDk});
+    S.set('recur_future_delpending',list);
+  }
+}
+async function syncRecurFutureDel(){
+  if(!navigator.onLine)return;
+  const list=S.get('recur_future_delpending')||[];
+  if(!list.length)return;
+  const remaining=[];
+  for(const e of list){
+    const res=await supaFetch(`todos?recur_rule_cid=eq.${encodeURIComponent(e.ruleCid)}&date_key=gte.${e.fromDk}`,'DELETE');
+    if(res===null)remaining.push(e); // 실패 — 다음 기회에 재시도하도록 목록에 유지
+  }
+  S.set('recur_future_delpending',remaining);
+}
+// 실체화 스킵 기록(그 규칙을 그 날짜엔 만들지 않음) — "오늘만 삭제"에서만 씀. 배열 하나뿐이라 upsert 없이 통째로 저장.
+async function syncRecurSkipUp(dk){
+  const skips=getRecurSkips(dk);
+  if(!skips.length)return true;
+  return await supaUpsert('recurring_exceptions','recur_cid,date_key',skips.map(cid=>({recur_cid:cid,date_key:dk,status:'skipped'})));
+}
+async function syncRecurSkipDown(dk){
+  const rows=await supaFetch(`recurring_exceptions?date_key=eq.${dk}`);
+  if(!rows)return;
+  if(!rows.length)return;
+  S.set(S.key('recur_skip',dk),rows.map(r=>r.recur_cid));
+}
+async function syncHCDown(wk){
+  const ws=wk.replace('week:','');const we=getWeekEnd(ws);
+  const rows=await supaFetch(`habit_checks?date_key=gte.${ws}&date_key=lt.${we}`);
+  if(!rows)return;
+  const checks={};const times={};
+  rows.forEach(r=>{const d=new Date(r.date_key);const dow=(d.getDay()+6)%7;const key=`${r.habit_name}-${dow}`;checks[key]=true;if(r.checked_time)times[key]=r.checked_time;});
+  S.set(S.key('hc',wk),checks);
+  if(Object.keys(times).length)S.set(S.key('hcTime',wk),times);
+}
+async function syncHCUp(wk){
+  const checks=getHabitChecks(wk);const ws=wk.replace('week:','');
+  const times=getHabitCheckTimes(wk);
+  const rows=[];const mon=new Date(ws);
+  // [2026-09-05] 키 앞부분은 원래 습관 "이름"이었으나 카탈로그 도입 후 습관 "id"로 바뀜(예: 'exercise-3').
+  // 서버 컬럼명(habit_name)은 그대로 두고 담기는 값만 id로 바뀐 것 — 별도 변경 없이 자연히 호환됨.
+  Object.keys(checks).filter(k=>checks[k]).forEach(k=>{
+    const parts=k.split('-');const dow=parseInt(parts[parts.length-1]);
+    const habitId=parts.slice(0,-1).join('-');
+    const d=new Date(mon);d.setDate(mon.getDate()+dow);
+    rows.push({habit_name:habitId,date_key:dateKey(d),checked_time:times[k]||null});
+  });
+  if(rows.length){
+    const ok=await supaUpsert('habit_checks','habit_name,date_key',rows);
+    if(!ok)return false;
+  }
+  const delKeys=getDelPendingCids('hc',wk);
+  for(const dkKey of delKeys){
+    const sepIdx=dkKey.lastIndexOf('|');
+    const habitId=dkKey.slice(0,sepIdx),dateStr=dkKey.slice(sepIdx+1);
+    const res=await supaFetch(`habit_checks?habit_name=eq.${encodeURIComponent(habitId)}&date_key=eq.${dateStr}`,'DELETE');
+    if(res===null)return false; // 네트워크 실패 — 삭제 대기 목록 유지, 다음 기회에 재시도
+  }
+  delKeys.forEach(k=>removeDelPending('hc',wk,k));
+  return true;
+}
+async function syncGoalDown(key){
+  const rows=await supaFetch(`goal_notes?note_key=eq.${encodeURIComponent(key)}`);
+  if(!rows)return;
+  if(!rows.length){
+    // 로컬에 데이터 있으면 Supabase로 올려줌 (사파리에서 입력 후 PWA 접속 시)
+    const local=getGoal(key);
+    if(local&&local.some(l=>l.trim()))await syncGoalUp(key);
+    return;
+  }
+  S.set(key,rows[0].lines);
+}
+async function syncGoalUp(key){
+  const lines=getGoal(key);
+  await supaUpsert('goal_notes','note_key',[{note_key:key,lines}]);
+}
+async function syncWChallengeDown(wk){
+  const key='wchallenge_'+wk;
+  const pendingKey='wchallenge_pending_'+wk;
+  // 로컬에서 변경이 있었으면 Up 우선 (다른 기기 데이터로 덮어쓰지 않음)
+  if(S.get(pendingKey)){
+    await autoSync('wchallenge',key);
+    return;
+  }
+  const rows=await supaFetch(`goal_notes?note_key=eq.${encodeURIComponent(key)}`);
+  if(!rows)return;
+  if(!rows.length){
+    const local=S.get(key);
+    if(local&&local.length&&local.some(i=>i.text&&i.text.trim())){
+      await supaUpsert('goal_notes','note_key',[{note_key:key,lines:local}]);
+    }
+    return;
+  }
+  // Supabase → 로컬 반영 후 weekly 탭 열려있으면 화면 갱신
+  S.set(key,rows[0].lines);
+  const weeklyView=document.getElementById('v-weekly');
+  if(weeklyView&&weeklyView.classList.contains('on'))setupWeeklyChallengeToggle();
+}
+// syncContentsDown은 mk별 락 큐를 통해서만 실제 로직(syncContentsDownRaw)을 실행 —
+// saveContents가 유발하는 syncContentsUp과 절대 동시에 실행되지 않도록 보장한다.
+async function syncContentsDown(mk){
+  return runContentsSyncLocked(mk,()=>syncContentsDownRaw(mk));
+}
+async function syncContentsDownRaw(mk){
+  const rows=await supaFetch(`contents?month_key=eq.${mk}&order=created`);
+  if(!rows)return;
+  // rows=0이고 로컬에 데이터 있으면 덮어쓰지 않음 (사파리↔PWA 엇박 방지)
+  if(!rows.length&&getContents(mk).length){
+    if(S.get(S.key('contents_pending',mk)))await syncContentsUp(mk);
+    return;
+  }
+  const local=getContents(mk);
+  const localByCid={};
+  const localNoCidByKey={}; // cid 없는 로컬 항목: title+startDate 키로 매칭 시도
+  local.forEach(it=>{
+    if(it.cid)localByCid[it.cid]=it;
+    else localNoCidByKey[it.title+'|'+(it.startDate||'')]=it;
+  });
+  const delCids=new Set(getDelPendingCids('contents',mk));
+  const merged=[];
+  const seenCids=new Set();
+  rows.forEach(r=>{
+    const cid=r.client_id||genCid();
+    seenCids.add(cid);
+    if(delCids.has(cid))return; // 로컬에서 삭제 예정인 항목은 서버값이 와도 무시
+    let l=localByCid[cid];
+    if(!l){
+      // cid로 못 찾으면 title+startDate로 cid 없는 로컬 항목과 매칭 시도 (구버전 이월 데이터 대응)
+      const key=r.title+'|'+(r.start_date||'');
+      const matched=localNoCidByKey[key];
+      if(matched){l=matched;delete localNoCidByKey[key];}
+    }
+    const serverItem={cat:r.content_cat,title:r.title,startDate:r.start_date||(r.start_day?mk+'-'+pad(r.start_day):null),endDate:r.end_date||(r.end_day?mk+'-'+pad(r.end_day):null),status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',musicUrl:r.music_url||null,album:r.album||null,releaseYear:r.release_year||null,totalUnit:r.total_unit||null,currentUnit:r.current_unit||null,notes:r.notes||[],reviewSavedDk:r.review_saved_dk||null,reviewSavedTime:r.review_saved_time||null,unitLabel:r.unit_label||null,readSeconds:r.read_seconds||0,isAiring:!!r.is_airing,created:r.created,cid,updatedAt:r.updated_at,lastActivityAt:r.last_activity_at||0};
+    if(!l){merged.push(serverItem);return;}
+    // 로컬/서버 둘 다 있으면 updated_at(서버) vs 로컬수정시각 비교, 서버가 더 최신이거나 로컬에 수정시각 기록이 없으면 서버값 채택
+    const localTs=l.updatedAt?new Date(l.updatedAt).getTime():0;
+    const serverTs=r.updated_at?new Date(r.updated_at).getTime():0;
+    if(serverTs>=localTs)merged.push(serverItem);
+    else{l.cid=cid;merged.push(l);} // 로컬값 채택 시에도 서버 cid를 물려받아 다음 매칭이 정상 작동하도록
+  });
+  // 서버에 없는 로컬 항목: 방금(5분 이내) 생성된 것만 "아직 업로드 안 한 신규"로 보고 보존.
+  // 그보다 오래된 항목이 서버에 없다는 건 다른 기기에서 이미 삭제됐다는 뜻이므로 로컬에서도 제거.
+  const RECENT_MS=5*60*1000;
+  const now=Date.now();
+  local.forEach(it=>{
+    if(!it.cid||seenCids.has(it.cid)||delCids.has(it.cid))return;
+    if(it.created&&(now-it.created)<RECENT_MS)merged.push(it);
+  });
+  // title+startDate로도 서버와 매칭 안 된 cid-없는 로컬 항목(진짜 신규) — 이제 cid 발급
+  Object.values(localNoCidByKey).forEach(it=>{it.cid=genCid();merged.push(it);});
+  S.set(S.key('contents',mk),merged);
+  if(S.get(S.key('contents_pending',mk)))await syncContentsUp(mk).then(ok=>{if(ok)S.set(S.key('contents_pending',mk),false);});
+}
+async function syncContentsUp(mk){
+  const c=getContents(mk);
+  if(ensureItemCids(c))S.set(S.key('contents',mk),c);
+  const delCids=getDelPendingCids('contents',mk);
+  const ok=await syncListUpSafe('contents',`month_key=eq.${mk}`,'month_key,client_id',c,
+    it=>({month_key:mk,content_cat:it.cat,title:it.title,start_date:it.startDate,end_date:it.endDate,status:it.status,review:it.review||'',stars:it.stars||0,poster:it.poster||null,author:it.author||'',music_url:it.musicUrl||null,album:it.album||null,release_year:it.releaseYear||null,total_unit:it.totalUnit||null,current_unit:it.currentUnit||null,notes:it.notes||[],review_saved_dk:it.reviewSavedDk||null,review_saved_time:it.reviewSavedTime||null,unit_label:it.unitLabel||null,read_seconds:it.readSeconds||0,is_airing:!!it.isAiring,created:it.created,client_id:it.cid,last_activity_at:it.lastActivityAt||null}),
+    delCids);
+  if(ok)delCids.forEach(cid=>removeDelPending('contents',mk,cid));
+  return ok;
+}
+async function autoSync(type,key){
+  if(!navigator.onLine)return;
+  if(type==='reading_quote'){await syncQuoteUp(key);}
+  else if(type==='todos'){if(await syncTodosUp(key))S.set(S.key('todos_pending',key),false);}
+  else if(type==='memos'){if(await syncMemosUp(key))S.set(S.key('memos_pending',key),false);}
+  else if(type==='sleep'){await syncSleepUp(key);S.set(S.key('sleep_pending',key),false);}
+  else if(type==='meals_field'){await syncMealsUp(key);}
+  else if(type==='habits')syncHabitsUp();
+  else if(type==='recurringItems')syncRecurringItemsUp();
+  else if(type==='recurSkip')syncRecurSkipUp(key);
+  else if(type==='habitGoals')syncHabitGoalsUp();
+  else if(type==='hc'){await syncHCUp(key);S.set('hc_pending_'+key,false);}
+  else if(type==='hcTime'){await syncHCUp(key);S.set('hc_pending_'+key,false);} // 습관체크 시각도 결국 habit_checks 테이블의 checked_time 컬럼이라 같은 upload 함수(syncHCUp)를 재사용
+  else if(type==='goal')syncGoalUp(key);
+  else if(type==='wchallenge'){
+    const data=S.get(key);
+    if(data){
+      const ok=await supaUpsert('goal_notes','note_key',[{note_key:key,lines:data}]);
+      if(ok)S.set('wchallenge_pending_'+key.replace('wchallenge_',''),false);
+    }
+  }
+  else if(type==='contents'){if(await syncContentsUp(key))S.set(S.key('contents_pending',key),false);}
+  else if(type==='rblocks'){if(await syncRhythmBlocksUp(key))S.set(S.key('rblocks_pending',key),false);}
+  else if(type==='mflow')syncMorningFlowUp(key);
+  else if(type==='cdlog'){if(await syncContentDailyLogUp(key))S.set(S.key('cdlog_pending',key),false);}
+}
+// delCids 기반 삭제(syncListUpSafe) 패턴을 쓰는 타입 공통 재시도 헬퍼 — pending 플래그가 서 있거나
+// delPending 큐(delType,dk)에 남은 항목이 있으면 업로드를 재시도하고, 성공했을 때만 pending 플래그를
+// 끈다. todos에서 "재시도 게이트가 delPending을 안 봐서 삭제가 영영 재시도 안 됨" 버그가 있었는데
+// (2026-09-16), 같은 패턴을 쓰는 memos/contents/rblocks도 동일한 사각지대를 갖고 있어 공통화함 —
+// 새 타입이 추가돼도 이 헬퍼를 쓰면 delPending 누락 문제가 구조적으로 재발하지 않음.
+function pushDelPendingAwareUpTask(upTasks,pendingKey,delType,dk,upFn){
+  if(S.get(pendingKey)||getDelPendingCids(delType,dk).length){
+    upTasks.push(upFn().then(ok=>{if(ok)S.set(pendingKey,false);}));
+  }
+}
+async function syncAll(){
+  if(!navigator.onLine)return;
+  if(window._restoring)return; // 복구 중엔 sync 차단
+  const dk=dateKey(currentDate),mk=monthKey(currentDate),now=new Date(),wk=weekKey(now);
+  // 이번 주 하루한줄
+  const weekOnelines=[];
+  const mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7));
+  for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);weekOnelines.push(syncGoalDown(S.key('oneline',dateKey(d))));}
+  // pending인 것들 먼저 Up
+  const upTasks=[];
+  // pending 플래그는 각 syncXxxUp이 성공(ok)했을 때만 끈다. 예전엔 무조건 껐는데, 업로드 실패 시에도
+  // pending이 꺼져 뒤이은 Down 단계가 서버의 옛 값으로 로컬을 덮어쓰는 데이터 유실 버그가 있었다
+  // (2026-09-14, PC 완료체크가 모바일 미반영 후 새로고침 시 PC도 미체크로 되돌아간 사례).
+  // todos/memos/contents/rblocks — delCids 기반 삭제 패턴 공통 타입. pending 플래그 또는 delPending
+  // 큐 중 하나라도 남아있으면 재시도(2026-09-16, 공통 헬퍼로 4곳 통일 — 개별 사각지대 재발 방지).
+  pushDelPendingAwareUpTask(upTasks,S.key('todos_pending',dk),'todos',dk,()=>syncTodosUp(dk));
+  pushDelPendingAwareUpTask(upTasks,S.key('memos_pending',dk),'memos',dk,()=>syncMemosUp(dk));
+  if((S.get(S.key('meals_fields_pending',dk))||[]).length)upTasks.push(syncMealsUp(dk));
+  if(S.get(S.key('sleep_pending',dk)))upTasks.push(syncSleepUp(dk).then(ok=>{if(ok!==false)S.set(S.key('sleep_pending',dk),false);}));
+  pushDelPendingAwareUpTask(upTasks,S.key('contents_pending',mk),'contents',mk,()=>runContentsSyncLocked(mk,()=>syncContentsUp(mk)));
+  // wchallenge는 autoSync 내부에서 ok 체크 후 자체적으로 pending을 끄므로 여기선 호출만 한다.
+  if(S.get('wchallenge_pending_'+wk))upTasks.push(autoSync('wchallenge','wchallenge_'+wk));
+  pushDelPendingAwareUpTask(upTasks,S.key('rblocks_pending',dk),'rblocks',dk,()=>syncRhythmBlocksUp(dk));
+  if(S.get('hc_pending_'+wk))upTasks.push(syncHCUp(wk).then(ok=>{if(ok!==false)S.set('hc_pending_'+wk,false);}));
+  if((S.get('recur_future_delpending')||[]).length)upTasks.push(syncRecurFutureDel());
+  if(upTasks.length)await Promise.all(upTasks);
+  // 이번 주 리듬블록(가로바용) 날짜키
+  const weekRblockDks=[];
+  for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);weekRblockDks.push(dateKey(d));}
+  // 굿모닝(모닝 플로우)은 그날의 슬롯+상태만 다루는 가벼운 데이터라 이번 달 전체가 아니라 최근 2일(오늘+어제, 새벽 4시 경계 대비)만 동기화.
+  const mflowDks=[];
+  const todayDate=now.getDate();
+  for(let i=0;i<2;i++){const d=new Date(now);d.setDate(now.getDate()-i);mflowDks.push(dateKey(d));}
+  // Down (Supabase → 로컬)
+  // 반복 규칙(recurring_items)/스킵기록(recurring_exceptions)은 todos보다 먼저 로컬에 반영되어야 함 —
+  // syncTodosDown이 끝나며 renderTodos()를 호출하고, 그 안에서 getTodos()가 그 자리에서 바로 반복
+  // 실체화 판정을 하기 때문에, skip 기록이 아직 안 내려온 상태로 이게 먼저 돌면 "오늘만 삭제"한 반복
+  // 항목이 skip 미반영 상태로 오판되어 되살아나는 경합이 있었음(2026-09-07 확인). 병렬 Promise.all 안에서는
+  // 응답 순서가 보장되지 않으므로, 이 두 개만 await로 먼저 끝내고 나머지를 병렬로 진행.
+  await Promise.all([syncRecurringItemsDown(),syncRecurSkipDown(dk)]);
+  await Promise.all([
+    syncTodosDown(dk),syncMemosDown(dk),syncSleepDown(dk),syncMealsDown(dk),
+    syncHabitsDown(),syncHCDown(wk),syncContentsDown(mk),
+    syncGoalDown(S.key('mgoal',monthKey(now))),
+    syncHabitGoalsDown(),
+    syncWChallengeDown(wk),
+    // 날짜 없는 전역 데이터 — 예전엔 initSync(최초 1회)에만 있어서 앱을 켜둔 채로 오래 쓰면
+    // 다른 기기(모바일 등)에서 바꾼 보관함/독서 내역이 반영 안 되던 버그 수정
+    (S.get(S.key('todos_pending',RESERVE_DK))?Promise.resolve():syncTodosDown(RESERVE_DK)),
+    // 책은 이제 contents(cat='book')로 통합되어 syncContentsDown(mk)가 이미 이번 달치를 받아오지만,
+    // 서재(완독 목록)는 여러 달에 걸쳐 쌓이므로 최근 몇 달치를 추가로 받아 최신 상태 반영.
+    ...Array.from({length:5},(_, i)=>i+1).map(i=>syncContentsDown(monthKey(new Date(now.getFullYear(),now.getMonth()-i,1)))),
+    syncQuotesDownAll(),
+    ...weekOnelines,
+    ...weekRblockDks.map(rdk=>syncRhythmBlocksDown(rdk)),
+    ...mflowDks.map(mdk=>syncMorningFlowDown(mdk))
+  ]);
+  loadDaily();
+  refreshIfTabOpen('v-weekly',loadWeekly);
+  refreshIfTabOpen('v-monthly',loadMonthly);
+  if(_rhythmTrackEl&&document.body.contains(_rhythmTrackEl))refreshRhythmTrack();
+  // loadDaily()가 다시 그리지 못하는 새벽 리캡 카드(어제 투두/습관/수면 요약 등)를 최신 데이터로 교체
+  const oldDawnCard=document.getElementById('dawn-recap-card');
+  if(oldDawnCard&&document.getElementById('v-home')&&document.getElementById('v-home').classList.contains('on')){
+    oldDawnCard.replaceWith(makeDawnRecapCard());
+  }
+}
+window.addEventListener('online',()=>syncAll());
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
+// 주기적 pending 재시도 타이머 — online/visibilitychange 이벤트에만 의존하면, 앱을 화면 전환 없이
+// 켜둔 채 두거나(예: 오늘 탭만 계속 보고 있는 경우) 업로드가 실패한 순간 마침 두 이벤트 다 안 걸리면
+// pending이 남은 채로 재시도 기회 자체가 영영 안 옴 — 로컬 수정사항이 서버에 끝내 안 올라가는 근본
+// 원인(2026-09-15 확인). 2분마다 남은 pending이 있는지만 가볍게 확인해 자동 재시도.
+function hasAnyPendingSync(){
+  const dk=dateKey(currentDate),mk=monthKey(currentDate),wk=weekKey(new Date());
+  // delCids 기반 삭제 패턴 4종(todos/memos/contents/rblocks) 모두 pending 플래그와 delPending 큐를
+  // 함께 확인 — 이 게이트에서 빠지면 syncAll 자체가 안 불려 아래 syncAll 내부 재시도까지 도달 못 함(2026-09-16).
+  return !!(S.get(S.key('todos_pending',dk))||getDelPendingCids('todos',dk).length||
+    S.get(S.key('memos_pending',dk))||getDelPendingCids('memos',dk).length||
+    (S.get(S.key('meals_fields_pending',dk))||[]).length||S.get(S.key('sleep_pending',dk))||
+    S.get(S.key('contents_pending',mk))||getDelPendingCids('contents',mk).length||S.get('wchallenge_pending_'+wk)||
+    S.get(S.key('rblocks_pending',dk))||getDelPendingCids('rblocks',dk).length||S.get('hc_pending_'+wk));
+}
+setInterval(()=>{
+  if(navigator.onLine&&!window._restoring&&hasAnyPendingSync())syncAll();
+},120000);
+// 탭 전환(같은 화면 안에서 오늘↔주간↔월간↔홈 이동) 시에도 최신 서버 데이터 반영 —
+// PC/모바일 번갈아 사용 시 다른 기기에서 바꾼 값이 탭 이동만으로 보이도록.
+// 8초 debounce로 연속 탭 클릭 시 요청 폭주 방지.
+let _lastTabSync=0;
+function syncOnTabEnter(){
+  const now=Date.now();
+  if(now-_lastTabSync<8000)return;
+  _lastTabSync=now;
+  if(navigator.onLine)syncAll();
+}
+
+// ══════════════════════════════════════════════════════════
+// ██ 오늘탭 (1/4 — 나머지는 MEMO, HABIT~CONTENT TIMELINE, 예비투두 부근) ██
+// ══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════
+// ██ 설정 (1/2 — 나머지는 SETTINGS 부근) ██
+// ══════════════════════════════════════════════════════════
+// ── THEME
+const THEME_COLORS={light:'#fdf0e8',glass:'#f7f4ee'};
+function applyThemeColorMeta(theme){
+  const m=document.querySelector('meta[name="theme-color"]');
+  if(m)m.setAttribute('content',THEME_COLORS[theme]||THEME_COLORS.light);
+}
+(function initTheme(){
+  let t=S.get('theme')||'light';
+  S.set('theme',t);
+  document.documentElement.setAttribute('data-theme',t);
+  applyThemeColorMeta(t);
+})();
+function setTheme(theme,btn){
+  document.documentElement.setAttribute('data-theme',theme);
+  applyThemeColorMeta(theme);
+  S.set('theme',theme);
+  document.querySelectorAll('.ctheme-btn').forEach(b=>b.classList.remove('on'));
+  if(btn)btn.classList.add('on');
+  // 습관 체크 아이콘 마크업이 테마(글라스 여부)에 따라 렌더링 시점에 분기되므로, 테마 전환 즉시 다시 그려줘야 함
+  // (다시 그리지 않으면 이전 테마 기준 DOM이 남아있어, 체크를 한번 더 토글해야만 아이콘이 나타나는 문제가 있었음)
+  if(document.getElementById('daily-habit-box'))renderDailyHabitCheck();
+}
+
+// ── TEXT SCALE (작게/기본/크게) — --main-text-size, --dow-label-size 두 변수만 조절. 제목류/아이콘/달력/큰 숫자 등 예외 요소는 적용 안 됨(의도된 한계)
+// 키는 숫자 리터럴로 선언하지만 JS 객체는 내부적으로 모두 문자열 키로 저장되므로,
+// 아래 조회부에서 TEXT_SCALE_STEPS[step]처럼 숫자를 그대로 넣어도 자동 변환되어 안전하게 조회됨(String() 변환 불필요).
+const TEXT_SCALE_STEPS={[-1]:{main:13,dow:11},[0]:{main:14,dow:12},[1]:{main:15,dow:13}};
+function setTextScale(step){
+  const b=TEXT_SCALE_STEPS[step]||TEXT_SCALE_STEPS[0];
+  document.documentElement.style.setProperty('--main-text-size',b.main+'px');
+  document.documentElement.style.setProperty('--dow-label-size',b.dow+'px');
+  S.set('textScale',step);
+  refreshTextScaleUI(step);
+}
+function stepTextScale(dir){
+  const cur=S.get('textScale')||0;
+  const next=Math.max(-1,Math.min(1,cur+dir));
+  if(next===cur)return;
+  setTextScale(next);
+}
+function refreshTextScaleUI(step){
+  document.querySelectorAll('.text-scale-dot').forEach(dot=>dot.classList.remove('on'));
+  const dot=document.getElementById('tsc-dot-'+step);
+  if(dot)dot.classList.add('on');
+  const dec=document.getElementById('tsc-dec'),inc=document.getElementById('tsc-inc');
+  if(dec)dec.disabled=(step<=-1);
+  if(inc)inc.disabled=(step>=1);
+}
+function initTextScaleUI(){
+  const step=S.get('textScale')||0;
+  refreshTextScaleUI(step);
+}
+
+// ══════════════════════════════════════════════════════════
+// ██ 공용 유틸 (3/3 — 나머지는 리듬집계유틸, CONSTANTS~SUPABASE SYNC 부근) — SPLASH/DATE NAV/TABS/모달헬퍼 ██
+// ══════════════════════════════════════════════════════════
+// ── SPLASH
+// 고정 2.2초가 아니라 "최소 2.2초는 유지 + initSync(30일치 동기화) 완료" 중 늦게 끝나는 시점에 해제.
+// 예전엔 화면은 열렸는데 뒤에서 아직 동기화 중이라 클릭이 씹히는 구간이 있었음 — 스플래시가 그 구간을
+// 그대로 덮어써서, 스플래시가 사라진 순간부터는 확실히 조작 가능하게 함.
+let _initSyncDone=false;
+function hideSplash(){
+  const s=document.getElementById('splash');
+  if(!s||s.classList.contains('hide'))return;
+  s.classList.add('hide');
+  // [테스트 2026-09-19] 예전엔 opacity 0 + pointer-events none으로 계속 남겨 배경 역할을 유지했으나,
+  // 이제 배경은 #bg-fixed가 담당하므로 페이드아웃(0.6s)이 끝난 뒤 display:none으로 완전히 뺀다.
+  // 화면 전체를 덮는 불투명 fixed 레이어가 opacity 0으로 남아 있으면 iOS 26이 상단(상태바) 영역을
+  // 이 레이어 기준으로 처리해 헤더가 뿌옇게 보일 수 있다는 가설 검증용. s.remove()는 여전히 쓰지 않음.
+  setTimeout(()=>{ s.style.display='none'; },700);
+}
+
+const _SPLASH_MIN_MS=2200;
+const _splashMinTimer=new Promise(res=>setTimeout(res,_SPLASH_MIN_MS));
+
+// ── DATE NAV
+// 특정 탭이 현재 열려있을 때만 해당 로드 함수를 다시 호출 — 데이터/날짜가 바뀐 뒤 열린 탭만 갱신할 때 공용으로 사용
+function refreshIfTabOpen(viewId,loadFn){
+  const el=document.getElementById(viewId);
+  if(el&&el.classList.contains('on')&&typeof loadFn==='function')loadFn();
+}
+function updateDateUI(){
+  const d=currentDate;
+  const el=document.getElementById('js-date');
+  if(el)el.textContent=`${d.getFullYear()}. ${d.getMonth()+1}. ${d.getDate()}. ${DAYS[d.getDay()]}`;
+  const nxt=document.getElementById('btn-next');
+  if(nxt){
+    const limit=new Date();limit.setDate(limit.getDate()+6);limit.setHours(23,59,59,999);
+    const over=d>=limit;
+    nxt.style.opacity=over?'0.3':'1';
+    nxt.style.pointerEvents=over?'none':'auto';
+  }
+  if(typeof loadDaily==='function')loadDaily();
+  // 월간탭이 열려있는 상태면 네비게이터 이동을 즉시 반영 (다시 탭 클릭 안 해도 되게)
+  refreshIfTabOpen('v-monthly',loadMonthly);
+}
+function shiftDay(n){
+  const d=new Date(currentDate);d.setDate(d.getDate()+n);
+  const limit=new Date();limit.setDate(limit.getDate()+6);limit.setHours(23,59,59,999);
+  if(d>limit)return;
+  currentDate=d;updateDateUI();
+}
+function goToday(){
+  currentDate=new Date();
+  document.querySelectorAll('.vtab').forEach(t=>t.classList.toggle('on',t.dataset.v==='daily'));
+  document.querySelectorAll('.view').forEach(vw=>vw.classList.toggle('on',vw.id==='v-daily'));
+  const sc=document.querySelector('.scroll');if(sc)sc.scrollTop=0;
+  updateDateUI();
+}
+
+// ── TABS
+function switchToTab(v,direction){
+  if(v==='daily'){currentDate=new Date();updateDateUI();} // 오늘탭 진입 시 항상 오늘 날짜로(네비게이터의 goToday와 동일 동작) + 상단 날짜표시 갱신
+  document.querySelectorAll('.vtab').forEach(t=>t.classList.toggle('on',t.dataset.v===v));
+  document.querySelectorAll('.view').forEach(vw=>vw.classList.toggle('on',vw.id===`v-${v}`));
+  document.querySelector('.scroll').scrollTop=0;
+  _todoPartModeIdx=-1;
+  if(_weeklyRhythmFormOpen){_weeklyRhythmFormOpen=false;_rhythmFormOpen=false;_resetRhythmForm();}
+  if(_wishPlacing)cancelWishPlacing();
+  if(v==='daily')loadDaily();
+  else if(v==='weekly')loadWeekly();
+  else if(v==='monthly')loadMonthly();
+  syncOnTabEnter();
+  // direction이 지정된 경우(스와이프로 전환된 경우)에만 가벼운 페이드+슬라이드 진입 애니메이션 적용.
+  // 탭 클릭(direction 없음)은 기존처럼 즉시 전환.
+  if(direction){
+    const activeView=document.getElementById('v-'+v);
+    if(activeView){
+      activeView.classList.remove('tab-enter-from-left','tab-enter-from-right');
+      void activeView.offsetWidth; // 강제 리플로우로 애니메이션 재시작 보장
+      activeView.classList.add(direction==='left'?'tab-enter-from-right':'tab-enter-from-left');
+      setTimeout(()=>{activeView.classList.remove('tab-enter-from-left','tab-enter-from-right');},260);
+    }
+  }
+}
+document.querySelectorAll('.vtab').forEach(b=>b.addEventListener('click',()=>{
+  switchToTab(b.dataset.v);
+}));
+
+// ── 탭 전환 스와이프 (오늘 ↔ 주간 ↔ 월간 ↔ 홈)
+// 콘텐츠 카드(투두, 메모, 캘린더 제외, 목표, 통계 등) 안에서 시작된 터치는 기존 카드 내부 제스처와
+// 충돌 방지를 위해 스와이프 판정에서 제외. 카드 사이 여백 배경 및 캘린더 영역에서만 동작.
+// 캘린더(.cal-day, .cal-grid)는 클릭 선택 외 별도 제스처가 없어 예외적으로 스와이프 허용.
+(function(){
+  const TAB_ORDER=['daily','weekly','monthly'];
+  const SWIPE_EXCLUDE_SELECTOR='.card,.pace-card,.report-banner,.weekly-review-banner,.wrb-wrap,textarea,input,.todo-part,.habit-check-box,.recipe,.rhythm-track,.rhythm-add-form,.mf-hero';
+  let startX=0,startY=0,startedInExcluded=false,tracking=false;
+  function isInExcludedArea(target){
+    // 캘린더 그리드 안쪽은 예외 허용(스와이프 가능) — 별도 제스처가 없으므로.
+    if(target.closest('.cal-grid')||target.closest('.cal-day'))return false;
+    return !!target.closest(SWIPE_EXCLUDE_SELECTOR);
+  }
+  const scrollEl=document.querySelector('.scroll');
+  if(!scrollEl)return;
+  scrollEl.addEventListener('touchstart',function(e){
+    if(e.touches.length!==1)return;
+    const t=e.touches[0];
+    startX=t.clientX;startY=t.clientY;
+    startedInExcluded=isInExcludedArea(e.target);
+    tracking=true;
+  },{passive:true});
+  scrollEl.addEventListener('touchend',function(e){
+    if(!tracking)return;
+    tracking=false;
+    if(startedInExcluded)return;
+    const t=e.changedTouches[0];
+    const dx=t.clientX-startX,dy=t.clientY-startY;
+    const THRESHOLD=70;
+    // 세로 이동이 가로 이동보다 크면(스크롤 의도) 무시
+    if(Math.abs(dx)<THRESHOLD||Math.abs(dx)<Math.abs(dy)*1.3)return;
+
+    const isHomeView=document.getElementById('v-home')&&document.getElementById('v-home').classList.contains('on');
+    const activeTab=document.querySelector('.vtab.on');
+    const curIdx=activeTab?TAB_ORDER.indexOf(activeTab.dataset.v):-1;
+
+    if(dx<0){
+      // 왼쪽으로 스와이프 = 다음(오늘→주간→월간), 홈탭에서는 오늘탭으로
+      if(isHomeView){switchToTab('daily','left');return;}
+      if(curIdx>=0&&curIdx<TAB_ORDER.length-1)switchToTab(TAB_ORDER[curIdx+1],'left');
+    }else{
+      // 오른쪽으로 스와이프 = 이전(월간→주간→오늘), 오늘탭에서 더 가면 홈탭으로
+      if(isHomeView)return; // 홈탭에서 오른쪽은 무반응
+      if(curIdx>0)switchToTab(TAB_ORDER[curIdx-1],'right');
+      else if(curIdx===0)goHome(true);
+    }
+  },{passive:true});
+})();
+
+// ══════════════════════════════════════════════════════════
+// ██ 오늘탭 (2/4 — 나머지는 시간대팝업, HABIT~CONTENT TIMELINE, 예비투두 부근) ██
+// ══════════════════════════════════════════════════════════
+// ── SLEEP
+let _sleepTarget='';
+function loadSleep(){
+  const dk=dateKey(currentDate),d=getSleep(dk);
+  const st=document.getElementById('sleep-time'),wt=document.getElementById('wake-time');
+  if(st)st.textContent=d.sleep||'--:--';
+  if(wt)wt.textContent=d.wake||'--:--';
+  calcSleep(d.sleep,d.wake);
+}
+function renderSleepAvgScoreBadge(){
+  const el=document.getElementById('sleep-avg-score-badge');
+  if(!el)return;
+  const avg=getAvgSleepScore(14);
+  if(!avg||avg.sampleCount<3){el.innerHTML='';el.title='';return;}
+  const lv=getSleepScoreLevel(avg.avg);
+  el.innerHTML=`<i class="ti ${lv.icon}" style="font-size:19px;color:var(--sleep-warmgray);" aria-hidden="true"></i>`;
+  el.title='최근 14일 평균 수면점수 '+avg.avg+'점 ('+lv.label+')';
+}
+// 수면카드 접힘 — 홈탭 시간파트 기준 09:00~21:59(morning_2~night_1) 사이엔 기본 접힘, 그 외엔 펼침.
+// 사용자가 탭해서 직접 연 경우엔 그 세션 동안(_sleepCollapseOverride) 자동판단을 무시하고 유지.
+let _sleepCollapseOverride=null;
+function shouldSleepAutoCollapse(){
+  const slot=getHomeTimeSlot();
+  return slot==='morning_2'||slot==='afternoon_1'||slot==='afternoon_2'||slot==='night_1';
+}
+function applySleepCollapseState(){
+  const card=document.getElementById('sleep-card');if(!card)return;
+  const label=document.getElementById('sleep-label');
+  const collapseBtn=document.getElementById('sleep-manual-collapse-btn');
+  const collapsed=_sleepCollapseOverride!==null?_sleepCollapseOverride:shouldSleepAutoCollapse();
+  card.classList.toggle('collapsed',collapsed);
+  // 접힌 상태: 라벨 자체는 숨김(요약 줄의 chevron-down이 펼치기 역할 대신함)
+  // 펼친 상태: 라벨 노출 + 우측 접기 버튼 노출
+  if(label)label.style.display=collapsed?'none':'';
+  if(collapseBtn)collapseBtn.style.display=collapsed?'none':'';
+}
+function toggleSleepCollapse(e){
+  if(e)e.stopPropagation(); // 라벨의 접기 버튼과 collapsed-row 클릭이 겹치지 않도록
+  const card=document.getElementById('sleep-card');if(!card)return;
+  const isCollapsed=card.classList.contains('collapsed');
+  _sleepCollapseOverride=isCollapsed?false:true; // 접혀있으면 펼치고(false), 펼쳐져있으면 접음(true)
+  applySleepCollapseState();
+}
+function renderSleepCollapsedRow(s,w){
+  const scoreEl=document.getElementById('sleep-collapsed-score');
+  const srcBadge=document.getElementById('sleep-avg-score-badge');
+  if(scoreEl&&srcBadge){
+    scoreEl.innerHTML=srcBadge.innerHTML;
+    const icon=scoreEl.querySelector('i');
+    if(icon)icon.style.color='var(--sleep-warmgray)'; // 접힌 배너 톤(연한 남색 무채)에 맞게 재적용 — CSS만으로는 인라인 스타일을 못 덮어씀
+  }
+  const sEl=document.getElementById('sleep-collapsed-sleep'),wEl=document.getElementById('sleep-collapsed-wake'),dEl=document.getElementById('sleep-collapsed-dur');
+  if(sEl)sEl.textContent=s&&s!=='--:--'?s:'--:--';
+  if(wEl)wEl.textContent=w&&w!=='--:--'?w:'--:--';
+  if(dEl){
+    if(s&&s!=='--:--'&&w&&w!=='--:--'){
+      const sv=s.split(':').map(Number),wv=w.split(':').map(Number);
+      let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;
+      dEl.textContent=Math.floor(m/60)+'h'+(m%60?' '+(m%60)+'m':'');
+    }else{
+      dEl.textContent='';
+    }
+  }
+  applySleepCollapseState();
+}
+// ── 수면 그래프 좌표 계산(순수 함수, DOM 접근 없음) ──
+// 취침(s)·기상(w) 시각(HH:MM 문자열, 없으면 null/'--:--')을 받아 그래프에 필요한 모든 값을 계산해 반환.
+// 다른 화면(예: 월간 리포트 미니 그래프)에서도 이 함수만 가져다 쓰면 동일한 좌표 계산을 재사용할 수 있음.
+// 반환: {state:'empty'|'sleep-only'|'full', startPct, endPct, durationLabel, avg:{...}|null}
+//   - startPct/endPct: 축(00:00~08:00, 480분) 기준 0~100 사이 퍼센트 위치
+//   - avg: 최근 14일 평균과 비교한 좌표+비교문구. 표본이 3개 미만이면 null.
+const SLEEP_AXIS_MIN=480; // 00:00~08:00 추천 구간(분)
+function computeSleepAxisLayout(s,w){
+  if(!s||s==='--:--')return {state:'empty'};
+  const sv=s.split(':').map(Number);
+  const toPct=(t)=>{
+    const px=Math.max(0,Math.min(SLEEP_AXIS_MIN,sleepAxisMin(t)));
+    return px/SLEEP_AXIS_MIN*100;
+  };
+  const startPct=toPct(sv);
+  if(!w||w==='--:--')return {state:'sleep-only',startPct};
+
+  const wv=w.split(':').map(Number);
+  let durMin=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(durMin<0)durMin+=1440;
+  const durationLabel=Math.floor(durMin/60)+'h'+(durMin%60?' '+(durMin%60)+'m':'');
+  let endPct=toPct(wv);
+  if(endPct<startPct)endPct=startPct;
+
+  // 최근 14일 평균 취침/기상과 비교(표본 3개 미만이면 비교 안 함)
+  let avg=null;
+  const avgWindow=getAvgSleepWindow(14);
+  if(avgWindow&&avgWindow.sampleCount>=3){
+    const avgSleepArr=[Math.floor(avgWindow.sleepMin/60)%24,Math.round(avgWindow.sleepMin%60)];
+    const avgWakeArr=[Math.floor(avgWindow.wakeMin/60)%24,Math.round(avgWindow.wakeMin%60)];
+    const diff=Math.round(sleepAxisMin(sv)-sleepAxisMin(avgSleepArr)); // 양수=오늘이 더 늦게, 음수=더 빠르게
+    let compareText;
+    if(Math.abs(diff)<3)compareText='평소와 비슷하게 잠들었어요';
+    else compareText='평균보다 '+Math.abs(diff)+'분 '+(diff>0?'늦게':'빠르게')+' 잠들었어요';
+    avg={startPct:toPct(avgSleepArr),endPct:toPct(avgWakeArr),compareText};
+  }
+  return {state:'full',startPct,endPct,durationLabel,avg};
+}
+function calcSleep(s,w){
+  const numEl=document.getElementById('sleep-dur-num'),unitEl=document.getElementById('sleep-dur-unit');
+  const clipRect=document.getElementById('sleep-clip-rect');
+  const badgeStart=document.getElementById('sleep-badge-start'),badgeEnd=document.getElementById('sleep-badge-end');
+  renderSleepAvgScoreBadge();
+  renderSleepCollapsedRow(s,w);
+  if(!numEl)return;
+  const mStart0=document.getElementById('sleep-avg-marker-start'),mEnd0=document.getElementById('sleep-avg-marker-end');
+  const compareEl0=document.getElementById('sleep-avg-compare');
+
+  const layout=computeSleepAxisLayout(s,w);
+
+  if(layout.state==='empty'){
+    numEl.textContent='--';unitEl.textContent='';
+    if(clipRect)clipRect.setAttribute('width','0');
+    if(badgeStart)badgeStart.style.display='none';
+    if(badgeEnd)badgeEnd.style.display='none';
+    if(mStart0)mStart0.style.display='none';
+    if(mEnd0)mEnd0.style.display='none';
+    if(compareEl0)compareEl0.style.display='none';
+    return;
+  }
+
+  const SVG_W=340;
+  const startPx=layout.startPct/100*SVG_W;
+  if(badgeStart){badgeStart.style.left=layout.startPct+'%';badgeStart.style.display='';}
+
+  if(layout.state==='sleep-only'){
+    // 취침만 입력된 상태 — 시작 아이콘만 표시, 바는 아직 채우지 않고 종료 배지도 숨김
+    numEl.textContent='--';unitEl.textContent='';
+    if(clipRect)clipRect.setAttribute('width','0');
+    if(badgeEnd)badgeEnd.style.display='none';
+    return;
+  }
+
+  numEl.textContent=layout.durationLabel;
+  unitEl.textContent='';
+  const endPx=layout.endPct/100*SVG_W;
+
+  if(clipRect){clipRect.setAttribute('x',startPx);clipRect.setAttribute('width',Math.max(0,endPx-startPx));}
+  const grad=document.getElementById('sleepWaveGrad');
+  if(grad){grad.setAttribute('x1',startPx);grad.setAttribute('x2',Math.max(startPx+1,endPx));}
+  if(badgeEnd){badgeEnd.style.left=layout.endPct+'%';badgeEnd.style.display='';}
+  renderSleepAvgMarkers(layout.avg);
+}
+function renderSleepAvgMarkers(avg){
+  const mStart=document.getElementById('sleep-avg-marker-start'),mEnd=document.getElementById('sleep-avg-marker-end');
+  const compareEl=document.getElementById('sleep-avg-compare');
+  if(!mStart||!mEnd)return;
+  if(!avg){
+    mStart.style.display='none';mEnd.style.display='none';
+    if(compareEl)compareEl.style.display='none';
+    return;
+  }
+  mStart.style.left=avg.startPct+'%';mStart.style.display='';
+  mEnd.style.left=avg.endPct+'%';mEnd.style.display='';
+  if(compareEl){compareEl.textContent=avg.compareText;compareEl.style.display='';}
+}
+// ── 시간 휠 피커 공용 유틸 (취침/기상/리듬/메모/일정/식사/메모수정 7곳 공유) ──
+// [2026-09-05 재작성] 값 전체(시 24개/분 60개)를 한번만 DOM에 렌더해두고 translateY로만 스크롤.
+// 손을 뗄 때 속도(velocity) 기반 관성 + 40px 그리드 스냅 — 네이티브 iOS 피커 방식.
+// 매 프레임(rAF) 위치를 계산해 가운데 항목에만 sel, 그 위아래에만 near를 갱신하므로
+// 이전처럼 손 뗄 때 DOM을 통째로 다시 그리며 끊기는 지점이 없음.
+// [2026-09-05 추가] PC(마우스 포인터, 터치 없음) 환경에서는 롤링 휠 대신 시:분 숫자 입력창으로 대체 —
+// 롤링은 모바일 터치에 최적화된 동작이라 마우스로는 불편함. 판별은 진입 시 한 번만(_isPcTimeInput),
+// 롤링 쪽 로직(관성/스냅 등)은 전혀 건드리지 않고 렌더링 갈림길만 추가.
+function _isPcTimeInput(){
+  return !('ontouchstart' in window)&&window.matchMedia&&window.matchMedia('(pointer:fine)').matches;
+}
+const TW_ITEM_H=40;
+const TW_VISIBLE_PAD=1; // 위아래 여백용 빈 칸(가운데 정렬을 위해 값 배열 앞뒤에 1개씩)
+function _twBuildTrack(trackId,values,fmt){
+  const t=document.getElementById(trackId);
+  t.innerHTML='';
+  t._twValues=values;
+  t._twFmt=fmt;
+  const frag=document.createDocumentFragment();
+  for(let i=0;i<TW_VISIBLE_PAD;i++)frag.appendChild(_twMakeItem(''));
+  values.forEach(v=>frag.appendChild(_twMakeItem(fmt(v))));
+  for(let i=0;i<TW_VISIBLE_PAD;i++)frag.appendChild(_twMakeItem(''));
+  t.appendChild(frag);
+  t._twItems=Array.from(t.children);
+}
+function _twMakeItem(text){
+  const el=document.createElement('div');
+  el.className='tw-item';
+  el.textContent=text;
+  return el;
+}
+// idx(값 배열 기준, 소수 가능)에 맞춰 트랙을 이동시키고 sel/near 클래스를 갱신
+function _twApplyIdx(track,idx){
+  const clamped=Math.max(0,Math.min(track._twValues.length-1,idx));
+  track.style.transform=`translateY(${-clamped*TW_ITEM_H}px)`;
+  const nearestInt=Math.round(clamped);
+  track._twItems.forEach((el,pos)=>{
+    const valueIdx=pos-TW_VISIBLE_PAD;
+    el.className='tw-item'+(valueIdx===nearestInt?' sel':(Math.abs(valueIdx-nearestInt)===1?' near':''));
+  });
+  track.dataset.curIdx=nearestInt;
+  return nearestInt;
+}
+function _twSyncInput(hourTrackId,minTrackId,targetInpId){
+  const hT=document.getElementById(hourTrackId),mT=document.getElementById(minTrackId);
+  const inp=document.getElementById(targetInpId);
+  if(hT&&mT&&inp)inp.value=hT._twFmt(hT._twValues[hT.dataset.curIdx])+':'+mT._twFmt(mT._twValues[mT.dataset.curIdx]);
+}
+// 관성 스크롤 — 손 뗄 때 속도로 감속시키다 40px 그리드에 스냅
+function _twMomentum(track,velocity,onSettle){
+  const friction=0.955,minVelocity=0.3; // 이 속도 밑으로 떨어지면 그 자리에서 바로 가까운 칸에 스냅
+  let v=velocity;
+  let idx=parseFloat(track.dataset.rawIdx||track.dataset.curIdx);
+  function step(){
+    if(Math.abs(v)<minVelocity){
+      _twSnap(track,Math.round(idx),onSettle);
+      return;
+    }
+    idx-=v/TW_ITEM_H;
+    v*=friction;
+    const clamped=Math.max(0,Math.min(track._twValues.length-1,idx));
+    if(clamped!==idx){ // 끝단을 넘어감 — 여기서도 항상 정수 칸(맨 위=0 또는 맨 아래=length-1)으로 스냅해서 종료
+      _twSnap(track,clamped,onSettle);
+      return;
+    }
+    track.dataset.rawIdx=idx;
+    _twApplyIdx(track,idx);
+    track._twRaf=requestAnimationFrame(step);
+  }
+  track._twRaf=requestAnimationFrame(step);
+}
+// 목표 칸으로 스냅 — 목표값(정수) 자체는 호출부에서 이미 확정된 값이라 여기서 값이 바뀌지 않음.
+// 짧은 transition만 입혀 도착 과정을 부드럽게 보이게 함(종점 정확도에는 영향 없음).
+function _twSnap(track,targetIdx,onSettle){
+  track.style.transition='transform .12s ease-out';
+  const settled=_twApplyIdx(track,targetIdx);
+  track.dataset.rawIdx=settled;
+  const clearTransition=()=>{track.style.transition='';track.removeEventListener('transitionend',clearTransition);};
+  track.addEventListener('transitionend',clearTransition);
+  onSettle();
+}
+function _twAttach(trackId,onSelect){
+  const track=document.getElementById(trackId),col=track.parentElement;
+  if(col.dataset.twBound)return;
+  col.dataset.twBound='1';
+  const MAX_VELOCITY=2.5; // 한 프레임(16.67ms 기준) 당 최대 이동 인덱스 — 이 값보다 크면 dt가 비정상적으로
+                            // 짧게 측정된 것(이벤트가 몰려 들어온 경우 등)이라 판단하고 상한을 씌움.
+                            // 이게 없으면 살짝만 움직여도 속도가 폭발적으로 커져 트랙 끝까지 튕겨나가는
+                            // 버그(2026-09-12 발견)가 생김.
+  let dragging=false,startY=0,startIdx=0,lastY=0,lastT=0,velocity=0;
+  function start(y){
+    if(track._twRaf)cancelAnimationFrame(track._twRaf);
+    track.style.transition='none'; // 스냅 애니메이션 도중 다시 잡아도 즉시 손가락을 따라가도록
+    dragging=true;
+    startY=lastY=y;
+    lastT=performance.now();
+    velocity=0;
+    startIdx=parseFloat(track.dataset.rawIdx||track.dataset.curIdx);
+  }
+  function move(y){
+    if(!dragging)return;
+    const now=performance.now();
+    const dt=Math.max(8,now-lastT); // 최소 8ms로 바닥을 둬서 dt가 너무 작아 속도가 튀는 것 방지
+    const rawV=(y-lastY)/dt*16.67;
+    velocity=Math.max(-MAX_VELOCITY,Math.min(MAX_VELOCITY,rawV)); // 순간 속도 자체도 상한
+    lastY=y;lastT=now;
+    const delta=y-startY;
+    const idx=startIdx-delta/TW_ITEM_H;
+    const clamped=Math.max(0,Math.min(track._twValues.length-1,idx));
+    track.dataset.rawIdx=clamped;
+    _twApplyIdx(track,clamped);
+  }
+  function end(){
+    if(!dragging)return;
+    dragging=false;
+    _twMomentum(track,velocity,onSelect);
+  }
+  col.addEventListener('touchstart',e=>start(e.touches[0].clientY),{passive:true});
+  col.addEventListener('touchmove',e=>{move(e.touches[0].clientY);},{passive:true});
+  col.addEventListener('touchend',end);
+  col.addEventListener('mousedown',e=>{
+    e.preventDefault();
+    start(e.clientY);
+    const mm=ev=>move(ev.clientY),mu=()=>{end();document.removeEventListener('mousemove',mm);document.removeEventListener('mouseup',mu);};
+    document.addEventListener('mousemove',mm);document.addEventListener('mouseup',mu);
+  });
+}
+// 공용 휠 렌더러 — hourTrackId/minTrackId/inpId/wrapId를 넘기면 어떤 시간 인풋에도 붙일 수 있음.
+// wrap은 트랙 id로 역추적(closest)하지 않고 wrapId로 직접 찾음 — PC 모드에서는 트랙 엘리먼트 자체가
+// DOM에서 사라지므로(PC 입력 UI로 교체됨), 트랙 기준 closest는 재렌더 시 null 참조로 깨짐(2026-09-05 발견).
+function _renderTimeWheelFor(hourTrackId,minTrackId,inpId,wrapId){
+  const cur=document.getElementById(inpId).value||'';
+  const m=cur.match(/^(\d{1,2}):(\d{1,2})$/);
+  const n=new Date();
+  const h=m?Math.min(23,parseInt(m[1],10)):n.getHours();
+  const mi=m?Math.min(59,parseInt(m[2],10)):n.getMinutes();
+  const wrap=document.getElementById(wrapId);
+  if(_isPcTimeInput()){
+    _renderPcTimeInput(wrap,inpId,h,mi);
+    return;
+  }
+  // 모바일(또는 이전에 PC입력으로 갈아끼워진 뒤 다시 롤링으로 돌아오는 경우) — 원래 롤링 마크업을 복원
+  _restoreWheelMarkup(wrap,hourTrackId,minTrackId);
+  const hourTrack=document.getElementById(hourTrackId),minTrack=document.getElementById(minTrackId);
+  const hours=[...Array(24).keys()];
+  const MIN_STEP=5;
+  const mins=[...Array(60/MIN_STEP).keys()].map(v=>v*MIN_STEP); // 0,5,10...55 — 5분 단위
+  const miIdx=Math.round(mi/MIN_STEP)%mins.length; // 저장값이 5분 단위가 아니어도(예: 과거 데이터) 가장 가까운 값으로 스냅
+  const sync=()=>_twSyncInput(hourTrackId,minTrackId,inpId);
+  _twBuildTrack(hourTrackId,hours,v=>pad(v));
+  _twBuildTrack(minTrackId,mins,v=>pad(v));
+  hourTrack.style.transition='none';minTrack.style.transition='none';
+  _twApplyIdx(hourTrack,h);
+  _twApplyIdx(minTrack,miIdx);
+  hourTrack.dataset.rawIdx=h;minTrack.dataset.rawIdx=miIdx;
+  sync();
+  _twAttach(hourTrackId,sync);
+  _twAttach(minTrackId,sync);
+}
+// PC용 시:분 숫자 입력 UI — 롤링 트랙(.tw-col 2개)이 있던 자리를 통째로 이 마크업으로 교체.
+// 앱 공용 톤(--inp/--inp-b/--tp)을 그대로 써서 다른 입력창과 이질감 없게 함.
+function _renderPcTimeInput(wrap,inpId,h,mi){
+  if(wrap.dataset.pcMode==='1'){
+    // 이미 PC 입력 UI면 마크업은 재사용하되, 새로 열린 항목의 실제 값으로 입력창을 갱신해야 함
+    // (이 갱신이 빠져있어 여러 항목을 연달아 열 때 이전 값이 그대로 남아있던 버그, 2026-09-13 수정).
+    const hEl=document.getElementById('tw-pc-hour'),mEl=document.getElementById('tw-pc-min');
+    if(hEl&&mEl){
+      hEl.value=pad(h);mEl.value=pad(mi);
+      document.getElementById(inpId).value=pad(h)+':'+pad(mi);
+    }
+    return;
+  }
+  wrap.dataset.pcMode='1';
+  wrap.innerHTML=`
+    <div class="tw-pc-input-row">
+      <input type="number" class="tw-pc-input" id="tw-pc-hour" min="0" max="23" value="${pad(h)}" inputmode="numeric">
+      <span class="tw-colon">:</span>
+      <input type="number" class="tw-pc-input" id="tw-pc-min" min="0" max="59" value="${pad(mi)}" inputmode="numeric">
+    </div>`;
+  const hEl=document.getElementById('tw-pc-hour'),mEl=document.getElementById('tw-pc-min');
+  const sync=()=>{
+    let hv=Math.max(0,Math.min(23,parseInt(hEl.value,10)||0));
+    let mv=Math.max(0,Math.min(59,parseInt(mEl.value,10)||0));
+    document.getElementById(inpId).value=pad(hv)+':'+pad(mv);
+  };
+  const onBlurPad=(el,max)=>{
+    let v=Math.max(0,Math.min(max,parseInt(el.value,10)||0));
+    el.value=pad(v);
+    sync();
+  };
+  hEl.addEventListener('input',sync);
+  mEl.addEventListener('input',sync);
+  hEl.addEventListener('blur',()=>onBlurPad(hEl,23));
+  mEl.addEventListener('blur',()=>onBlurPad(mEl,59));
+  // 시 필드에서 2자리 다 채우면 자동으로 분 필드로 포커스 이동(네이티브 time input과 유사한 사용감)
+  hEl.addEventListener('input',()=>{if(hEl.value.length>=2)mEl.focus();});
+  sync();
+}
+// PC 입력 UI에서 다시 롤링(모바일)으로 돌아올 때 원래 트랙 마크업 복원
+function _restoreWheelMarkup(wrap,hourTrackId,minTrackId){
+  if(wrap.dataset.pcMode!=='1')return; // 이미 롤링 마크업이면 손댈 필요 없음
+  wrap.dataset.pcMode='0';
+  wrap.innerHTML=`
+    <div class="tw-fade-top"></div>
+    <div class="tw-fade-bottom"></div>
+    <div class="tw-col"><div class="tw-hl"></div><div class="tw-track" id="${hourTrackId}"></div></div>
+    <div class="tw-colon">:</div>
+    <div class="tw-col"><div class="tw-hl"></div><div class="tw-track" id="${minTrackId}"></div></div>`;
+}
+function renderTimeWheel(){
+  _renderTimeWheelFor('tw-hour-track','tw-min-track','time-inp','tw-wrap-1');
+}
+function openMemoEditTimePicker(){
+  openModal('memo-edit-time-modal');
+  _renderTimeWheelFor('tw2-hour-track','tw2-min-track','memo-edit-time-inp','tw-wrap-2');
+}
+function confirmMemoEditTime(){
+  closeModal('memo-edit-time-modal');
+}
+// ── 취침/기상 시간 입력 공용 유틸 (지금시각 세팅, 시각 모달) ──
+function setNow(t){
+  const n=new Date(),v=`${pad(n.getHours())}:${pad(n.getMinutes())}`;
+  const dk=dateKey(currentDate),d=getSleep(dk);
+  if(t==='sleep')d.sleep=v;else d.wake=v;
+  saveSleepData(dk,d);loadSleep();
+  // 미완료 리듬블록 자동마감은 "수면 데이터가 실제로 저장되는 날짜(dk, 화면이 보던 날짜)"를 기준으로 스캔해야 함.
+  // 예전엔 getLogicalDate()(지금 이 순간의 실제 오늘)를 썼는데, 사용자가 다음날 이후에 화면을 과거 날짜로
+  // 옮겨 소급 입력하는 경우 dk와 어긋나서 자동마감 대상 범위([오늘,어제] 단 이틀)를 벗어나 버리는 버그가 있었음.
+  if(t==='sleep'){autoCloseUnfinishedRhythmBlocks(dk,v);refreshRhythmTrack();}
+}
+function openTimeModal(t){
+  _sleepTarget=t;
+  const dk=dateKey(currentDate),d=getSleep(dk);
+  document.getElementById('time-inp').value=t==='sleep'?(d.sleep||''):(d.wake||'');
+  openModal('time-modal');
+  renderTimeWheel();
+}
+let _memoSubmitting=false;
+// 모바일 한글 IME 대응: event.isComposing/keyCode===229만으로는 iOS Safari 일부 버전에서
+// 조합 중 특정 시점(주로 받침 있는 음절 완성 찰나)에 오탐이 발생해 Enter로 잘못 처리되는 사례가 있음.
+// compositionstart/compositionend로 조합 상태를 직접 추적해 이중으로 확인.
+let _memoInlineComposing=false;
+// ── 메모 사진 첨부 (한 장씩, 오프라인 큐잉 지원) ──
+// ⚠︎ 이 블록이 호출하는 R2 업로드/조회/삭제 API는 별도 파일 worker-photo-proxy.js가 담당
+// (Cloudflare Worker, GitHub 저장소 밖에 따로 배포됨). 이 파일만 고쳐서는 실제 동작이 안 바뀌니
+// 관련 버그 수정 시 그 파일도 함께 요청할 것.
+function triggerMemoPhotoPick(){
+  document.getElementById('memo-photo-file-inp').click();
+}
+// 사진메모 썸네일은 52px로 작게 표시되고 뷰어에서도 화면 크기 이상 키울 일이 없어
+// 640px면 충분히 선명함 — 이전 1000px/quality0.82는 목표 용량(80~150KB)보다 커서 축소.
+// 그래도 사진에 따라(디테일 많은 사진 등) 커질 수 있어 1차 결과가 200KB를 넘으면
+// quality를 한 단계 낮춰 재인코딩하는 안전장치를 둠(최대 2회 추가 시도).
+function _resizeImageToWebp(file,maxDim){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    const reader=new FileReader();
+    reader.onload=()=>{img.src=reader.result;};
+    reader.onerror=reject;
+    img.onload=()=>{
+      let w=img.width,h=img.height;
+      if(w>h&&w>maxDim){h=Math.round(h*maxDim/w);w=maxDim;}
+      else if(h>=w&&h>maxDim){w=Math.round(w*maxDim/h);h=maxDim;}
+      const canvas=document.createElement('canvas');
+      canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      const qualities=[0.72,0.55,0.4]; // 1차 시도 후 200KB 초과 시 순서대로 낮춰 재시도
+      const tryEncode=(qIdx)=>{
+        const q=qualities[qIdx];
+        // Safari(iOS/macOS)는 canvas.toBlob의 image/webp를 지원하지 않고 조용히 무손실 PNG로
+        // 폴백해버려 용량이 크게 부풀어짐 — WebP 인코딩 성공 여부를 실제로 확인해 실패 시 JPEG로 재시도.
+        canvas.toBlob(blob=>{
+          if(blob&&blob.type==='image/webp'){
+            if(blob.size>200*1024&&qIdx<qualities.length-1){tryEncode(qIdx+1);return;}
+            resolve({blob,ext:'webp'});return;
+          }
+          canvas.toBlob(jblob=>{
+            if(!jblob){reject(new Error('resize failed'));return;}
+            if(jblob.size>200*1024&&qIdx<qualities.length-1){tryEncode(qIdx+1);return;}
+            resolve({blob:jblob,ext:'jpg'});
+          },'image/jpeg',q);
+        },'image/webp',q);
+      };
+      tryEncode(0);
+    };
+    img.onerror=reject;
+    reader.readAsDataURL(file);
+  });
+}
+// 신규 작성형 사진 첨부(1장, 미리보기, 취소) 컨트롤러 팩토리 — 오늘탭 인라인 메모와 리듬 메모
+// 제안 모달이 완전히 동일한 로직(리사이즈→로컬미리보기→해제)을 각자 복붙해 갖고 있던 것을 통합
+// (2026-09-18). "기존 사진+삭제 의도"까지 다루는 수정 모달(memo-edit-*)은 책임이 달라 별도 유지.
+// opts.wrapClass가 있으면 썸네일을 그 클래스로 감싼 wrap 안에 넣는다(72px 정사각+오버레이 X버튼형,
+// 리듬 메모가 이 형태). 없으면 기존 오늘탭 인라인처럼 img/clear를 나란히 넣는다.
+// opts.toggleBtnId가 있으면 사진 첨부 여부에 따라 그 버튼에 .on 클래스를 토글(아이콘 흐림 처리).
+function _makePendingPhotoController(previewRowId,thumbClass,clearClass,opts){
+  opts=opts||{};
+  const state={photo:null};
+  function render(){
+    const row=document.getElementById(previewRowId);
+    if(!row)return;
+    if(opts.toggleBtnId){
+      const btn=document.getElementById(opts.toggleBtnId);
+      if(btn)btn.classList.toggle('on',!!state.photo);
+    }
+    if(!state.photo){row.style.display='none';row.innerHTML='';return;}
+    row.style.display='flex';
+    row.innerHTML='';
+    const img=document.createElement('img');
+    img.className=thumbClass;
+    img.src=state.photo.localUrl;
+    const clear=document.createElement('div');
+    clear.className=clearClass;
+    clear.innerHTML='<i class="ti ti-x" style="font-size:13px;" aria-hidden="true"></i>';
+    clear.onclick=()=>controller.clear();
+    if(opts.wrapClass){
+      const wrap=document.createElement('div');
+      wrap.className=opts.wrapClass;
+      wrap.appendChild(img);wrap.appendChild(clear);
+      row.appendChild(wrap);
+    }else{
+      row.appendChild(img);row.appendChild(clear);
+    }
+  }
+  const controller={
+    get photo(){return state.photo;},
+    async handleSelect(ev){
+      const file=ev.target.files&&ev.target.files[0];
+      ev.target.value='';
+      if(!file)return;
+      try{
+        const {blob,ext}=await _resizeImageToWebp(file,640);
+        const localUrl=URL.createObjectURL(blob);
+        state.photo={blob,ext,localUrl};
+        render();
+      }catch(err){
+        console.error('사진 처리 실패',err);
+      }
+    },
+    clear(){
+      if(state.photo&&state.photo.localUrl)URL.revokeObjectURL(state.photo.localUrl);
+      state.photo=null;
+      render();
+    },
+    render,
+  };
+  return controller;
+}
+const _memoPhotoCtl=_makePendingPhotoController('memo-photo-preview-row','memo-photo-preview-thumb','memo-photo-preview-clear');
+function handleMemoPhotoSelect(ev){return _memoPhotoCtl.handleSelect(ev);}
+function clearMemoPhotoPreview(){return _memoPhotoCtl.clear();}
+// 업로드 대기열 — 현재는 메모리 배열(새로고침 시 소실). R2 연동 확정 시 IndexedDB로 교체해
+// 앱 재시작/오프라인 지속 상태에서도 대기열이 유지되도록 영속화 예정(오늘은 프론트 뼈대만).
+const _memoPhotoUploadQueue=[];
+// onDone(선택): 이 job의 업로드가 끝난 직후 호출 — (err, url) 형태. 성공 시 err=null.
+// 폴링 없이 "이 사진의 업로드가 끝났을 때" 후속 작업(예: 교체 전 사진 삭제)을 직접 걸 수 있게 하기 위함.
+function queueMemoPhotoUpload(dk,cid,blob,ext,onDone){
+  _memoPhotoUploadQueue.push({dk,cid,blob,ext,onDone});
+  // 업로드 완료 전까지 photo_url이 아직 null인 스냅샷으로 syncMemosDown이 로컬을 덮어쓰지 않도록
+  // pending 플래그를 계속 세워둠(레이스 컨디션 방지) — 실제 해제는 업로드 성공 후 saveMemos에서.
+  S.set(S.key('memos_pending',dk),true);
+  if(navigator.onLine)processMemoPhotoUploadQueue();
+}
+async function processMemoPhotoUploadQueue(){
+  while(_memoPhotoUploadQueue.length){
+    const job=_memoPhotoUploadQueue[0];
+    try{
+      const url=await _uploadMemoPhotoToR2(job.blob,job.dk,job.cid,job.ext);
+      const memos=getMemos(job.dk);
+      const m=memos.find(x=>x.cid===job.cid);
+      if(m){m.photoUrl=url;m.photoStatus='synced';delete m.photoBlob;delete m.photoLocalUrl;}
+      saveMemos(job.dk,memos);
+      _memoPhotoUploadQueue.shift();
+      renderMemos();
+      if(job.onDone)job.onDone(null,url);
+    }catch(err){
+      console.error('사진 업로드 실패, 재시도 대기',err);
+      // 진단을 위해 실패한 메모에 에러 상태를 남겨 화면에서도 바로 확인 가능하게 함
+      const memos=getMemos(job.dk);
+      const m=memos.find(x=>x.cid===job.cid);
+      if(m){m.photoStatus='upload_failed';m.photoErrorMsg=String(err.message||err);}
+      saveMemos(job.dk,memos);
+      renderMemos();
+      if(job.onDone)job.onDone(err,null);
+      break;
+    }
+  }
+}
+window.addEventListener('online',processMemoPhotoUploadQueue);
+// 사진 업로드용 Worker 엔드포인트
+const PHOTO_PROXY_BASE='https://iikoto-photo-proxy.faith-003.workers.dev';
+const PHOTO_UPLOAD_SECRET='twinkle77*';
+async function _uploadMemoPhotoToR2(blob,dk,cid,ext){
+  // 키에 '/'를 넣으면 URL 인코딩(%2F) 처리가 프록시/브라우저 환경별로 갈릴 수 있어
+  // 안전하게 슬래시 없는 평평한 키로 구성 (날짜는 언더스코어로 접두)
+  // 확장자는 실제 인코딩 성공한 포맷(webp 또는 Safari 폴백 jpg)을 그대로 반영
+  const safeExt=ext||'webp';
+  const contentType=safeExt==='jpg'?'image/jpeg':'image/webp';
+  const key=`${dk.replace(/-/g,'')}_${cid}.${safeExt}`;
+  const res=await fetch(`${PHOTO_PROXY_BASE}/upload/${key}`,{
+    method:'POST',
+    headers:{'Content-Type':contentType,'X-Upload-Secret':PHOTO_UPLOAD_SECRET},
+    body:blob
+  });
+  if(!res.ok){
+    const detail=await res.text().catch(()=>'');
+    throw new Error(`R2 업로드 실패: ${res.status} ${detail}`);
+  }
+  return `${PHOTO_PROXY_BASE}/photo/${key}`;
+}
+// ── 메모 수정창 사진 첨부/교체/삭제 ──
+// 신규 작성(_memoPendingPhoto)과 별개 상태로 관리: 수정 모달은 "기존 사진이 이미 있을 수 있음"과
+// "그 사진을 지우기로 했음(제거 의도)"을 함께 표현해야 해서 상태가 하나 더 필요함.
+let _memoEditPendingPhoto=null; // 새로 선택한(교체/신규 첨부) 사진 {blob,ext,localUrl}
+let _memoEditRemovePhoto=false; // 기존 사진을 삭제하기로 했는지
+function triggerMemoEditPhotoPick(){
+  document.getElementById('memo-edit-photo-file-inp').click();
+}
+async function handleMemoEditPhotoSelect(ev){
+  const file=ev.target.files&&ev.target.files[0];
+  ev.target.value='';
+  if(!file)return;
+  try{
+    const {blob,ext}=await _resizeImageToWebp(file,640);
+    if(_memoEditPendingPhoto&&_memoEditPendingPhoto.localUrl)URL.revokeObjectURL(_memoEditPendingPhoto.localUrl);
+    const localUrl=URL.createObjectURL(blob);
+    _memoEditPendingPhoto={blob,ext,localUrl};
+    _memoEditRemovePhoto=false; // 새로 골랐으면 삭제 의도는 취소
+    renderMemoEditPhotoPreview();
+  }catch(err){
+    console.error('사진 처리 실패',err);
+  }
+}
+// 수정 모달을 열 때(memoEditSwipe) 현재 메모(m)를 넘겨받아 기존 사진 유무에 따라 프리뷰를 그림
+function renderMemoEditPhotoPreview(existingUrl){
+  const row=document.getElementById('memo-edit-photo-preview-row');
+  const btn=document.getElementById('memo-edit-photo-btn');
+  if(!row)return;
+  const showUrl=_memoEditPendingPhoto?_memoEditPendingPhoto.localUrl:(!_memoEditRemovePhoto?existingUrl:null);
+  if(btn)btn.classList.toggle('on',!!showUrl);
+  if(!showUrl){row.style.display='none';row.innerHTML='';return;}
+  row.style.display='flex';
+  row.innerHTML='';
+  const wrap=document.createElement('div');
+  wrap.className='memo-edit-photo-preview-wrap';
+  const img=document.createElement('img');
+  img.className='memo-edit-photo-preview-thumb';
+  img.src=showUrl;
+  const clear=document.createElement('div');
+  clear.className='memo-edit-photo-preview-clear';
+  clear.innerHTML='<i class="ti ti-x" style="font-size:13px;" aria-hidden="true"></i>';
+  clear.onclick=clearMemoEditPhotoPreview;
+  wrap.appendChild(img);wrap.appendChild(clear);
+  row.appendChild(wrap);
+}
+// X 버튼: 새로 고른 사진이 있으면 그것만 취소, 없으면(=기존 사진 보는 중) 삭제 의도로 표시
+function clearMemoEditPhotoPreview(){
+  if(_memoEditPendingPhoto){
+    if(_memoEditPendingPhoto.localUrl)URL.revokeObjectURL(_memoEditPendingPhoto.localUrl);
+    _memoEditPendingPhoto=null;
+  }else{
+    _memoEditRemovePhoto=true;
+  }
+  renderMemoEditPhotoPreview(_memoEditCurrentPhotoUrl);
+}
+let _memoEditCurrentPhotoUrl=null; // memoEditSwipe가 세팅, confirmMemoEdit/clear에서 참조
+async function _deletePhotoFromR2(photoUrl){
+  const key=photoUrl.split('/photo/')[1];
+  if(!key)return;
+  const res=await fetch(`${PHOTO_PROXY_BASE}/upload/${key}`,{
+    method:'DELETE',
+    headers:{'X-Upload-Secret':PHOTO_UPLOAD_SECRET}
+  });
+  if(!res.ok){
+    const detail=await res.text().catch(()=>'');
+    throw new Error(`R2 삭제 실패: ${res.status} ${detail}`);
+  }
+}
+// R2 삭제 실패 시(오프라인, Worker 일시 장애, 시크릿 미설정 등) 조용히 유실되지 않도록
+// 로컬(localStorage)에 대기열로 남겨두고, 앱 시작 시와 online 복귀 시 자동 재시도.
+// 이미 삭제된 키를 다시 지워도 Worker는 정상 응답하므로(존재하지 않는 R2 객체 delete는 무해) 중복 재시도는 안전함.
+const R2_DEL_QUEUE_KEY='photo_r2_delpending_list';
+function _queuePhotoR2Delete(photoUrl){
+  if(!photoUrl)return;
+  const list=S.get(R2_DEL_QUEUE_KEY)||[];
+  if(!list.includes(photoUrl)){list.push(photoUrl);S.set(R2_DEL_QUEUE_KEY,list);}
+}
+async function processPhotoR2DeleteQueue(){
+  if(!navigator.onLine)return;
+  const list=S.get(R2_DEL_QUEUE_KEY)||[];
+  if(!list.length)return;
+  const remaining=[];
+  for(const url of list){
+    try{await _deletePhotoFromR2(url);}
+    catch(err){console.error('R2 사진 삭제 재시도 실패',err);remaining.push(url);}
+  }
+  S.set(R2_DEL_QUEUE_KEY,remaining);
+}
+window.addEventListener('online',processPhotoR2DeleteQueue);
+// Bareonbatang 로딩을 먼저 기다린 뒤 텍스트를 채워서, 기본 폰트로 잠깐 그려졌다가
+// 바뀌는 깜빡임(FOUT)을 없앤다.
+async function openPhotoViewer(url,text,meta){
+  await _ensureBareonbatangLoaded();
+  document.getElementById('photo-viewer-img').src=url;
+  document.getElementById('photo-viewer-text').textContent=text||'';
+  document.getElementById('photo-viewer-date').textContent=meta||'';
+  document.getElementById('photo-viewer-ov').classList.add('on');
+  _setupPhotoViewerSwipe();
+}
+function closePhotoViewer(ev){
+  if(ev&&ev.target.closest('.photo-viewer-img'))return;
+  document.getElementById('photo-viewer-ov').classList.remove('on');
+}
+// ── 리듬 활동 메모 제안 모달 (종료 시점 팝업 / 1시간 알림 클릭 공용) ──
+// 카테고리 구분은 RHYTHM_CATS[cat]의 color/icon/label을 그대로 사용 — 별도 색상 테이블 불필요.
+// 사진 첨부는 공용 _makePendingPhotoController(_rmemoPhotoCtl, 위에 정의)를 사용(2026-09-18 통합).
+let _rmemoCtx=null; // {dk, cat, (question일 때) question/qId/qKind} — 저장 시 어느 날짜의 오늘탭 메모에 넣을지
+const RMEMO_SPECIAL_CATS={
+  sleep:{icon:'ti-moon',color:RHYTHM_SLEEP_COLOR,placeholder:'오늘 하루를 남겨보세요'}, // 리듬 수면 구간 색 재사용
+  noon:{icon:'ti-sun',color:'rgba(var(--pal-yellow-rgb),0.82)',placeholder:'지금 컨디션이나 오후 계획을 남겨보세요'},
+  question:{icon:'ti-sparkles',color:'rgba(var(--pal-lime-rgb),0.80)',placeholder:'떠오르는 대로 답을 남겨보세요'} // 메모 배너의 질문답변 세로선(연두)과 같은 색
+};
+function openRhythmMemoModal(cat,dk,title,body){
+  const catInfo=RHYTHM_CATS[cat];
+  const look=catInfo||RMEMO_SPECIAL_CATS[cat]; // 리듬 8종 또는 특수(취침 회고/점심 후/오늘의 질문) — 둘 다 {color,icon}을 가짐
+  const iconWrap=document.getElementById('rmemo-icon');
+  const iconI=document.getElementById('rmemo-icon-i');
+  const submitBtn=document.getElementById('rmemo-submit-btn');
+  if(look){
+    // work/appointment는 알파가 낮게 조정된 색(리듬바 시인성 목적)이라 아이콘 배경으로 쓰기엔
+    // 옅어 보일 수 있어, 모달 전용으로 최소 0.5 알파를 보장(원색 계열 자체는 그대로 유지).
+    const bgColor=look.color.replace(/,\s*([\d.]+)\)$/,(m,a)=>`,${Math.max(parseFloat(a),0.5)})`);
+    iconWrap.style.background=bgColor;
+    iconI.className='ti '+look.icon;
+    iconI.style.color='var(--tp)';
+    iconI.style.fontSize='20px';
+    submitBtn.style.background=bgColor;
+    submitBtn.style.color='var(--tp)';
+  }
+  document.getElementById('rmemo-title').textContent=title||'';
+  document.getElementById('rmemo-body').textContent=body||'';
+  document.getElementById('rmemo-inp').value='';
+  document.getElementById('rmemo-inp').placeholder=catInfo?`${catInfo.label} 메모를 남겨보세요`:(RMEMO_SPECIAL_CATS[cat]?RMEMO_SPECIAL_CATS[cat].placeholder:'메모를 남겨보세요');
+  const rerollBtn=document.getElementById('rmemo-reroll');if(rerollBtn)rerollBtn.style.display=(cat==='question')?'flex':'none';
+  _rmemoCtx={dk:dk||dateKey(currentDate),cat};
+  clearRhythmMemoPhotoPreview();
+  document.getElementById('rhythm-memo-ov').classList.add('on');
+}
+// ══ 오늘의 질문 (2026-09-19) ══
+// 서버 memo_prompts 풀에서 질문 1개를 받아 메모 모달(rhythm-memo-ov)에 띄움. 앱은 "오늘 쓸 수 있는 상황 조건 이름"만 서버에 보내고
+// (실제 값은 보내지 않음), 받은 질문의 {빈칸}은 로컬 데이터로 직접 채움. 답변을 저장하는 순간 서버에서 사용 처리.
+const QUESTION_FALLBACK_TEXT='오늘 하루는 어땠나요?'; // 서버 연결 실패/풀 소진 시 기본 문구
+let _qSessionExcl=[]; // 이번 모달 세션에서 이미 보여준 질문 id — "다른 질문 받기"에서 제외(소모는 아님)
+function _qcSleepDurStr(dk){const m=sleepDurMin(getSleep(dk));return m==null?'':fmtDur(m);}
+function _qcBlockTitle(b,dk){
+  const item=b.contentCid&&getRecentMonthsContents(new Date(dk+'T00:00:00')).find(c=>c.cid===b.contentCid);
+  return (item&&item.title)||(b.text||'').replace(/^\s*(드라마|영화|독서|책|음악)\s*-\s*/,'').trim();
+}
+// 이 날짜(dk)에 쓸 수 있는 상황 조건 이름 목록 + 빈칸에 채울 값. 콘텐츠는 밤늦게 보는 경우가 많아 전날+당일 기록을 함께 봄.
+function _collectQuestionConds(dk){
+  const d=new Date(dk+'T00:00:00');
+  const list=[],vals={};
+  const mo=d.getMonth()+1,day=d.getDate(),last=new Date(d.getFullYear(),mo,0).getDate();
+  list.push('dow_'+d.getDay());
+  if(day<=5)list.push('month_start');
+  if(day>=last-4)list.push('month_end');
+  list.push('month_'+mo);
+  list.push('season_'+(mo>=3&&mo<=5?'spring':mo>=6&&mo<=8?'summer':mo>=9&&mo<=11?'autumn':'winter'));
+  const prev=new Date(d);prev.setDate(prev.getDate()-1);
+  const prevDk=dateKey(prev);
+  // 콘텐츠(전날+당일 감상 기록 중 가장 최근)
+  let contentTitle='';
+  for(const x of [prevDk,dk]){
+    const eb=getRhythmBlocks(x).filter(b=>b.cat==='enjoy');
+    if(eb.length){const t=_qcBlockTitle(eb[eb.length-1],x);if(t)contentTitle=t;}
+  }
+  if(contentTitle){list.push('content');vals['콘텐츠제목']=contentTitle.slice(0,30);}
+  // 운동(당일) — 종류 메모가 없으면 빈칸은 괄호째 생략됨
+  const dayBlocks=getRhythmBlocks(dk);
+  const ex=dayBlocks.filter(b=>b.cat==='exercise');
+  if(ex.length){list.push('exercise');vals['운동종류']=(ex[ex.length-1].text||'').trim().slice(0,14);}
+  // 외출(당일 외출 블록 + 제목: 블록 메모 → 오늘 일정 순)
+  const ap=dayBlocks.filter(b=>b.cat==='appointment');
+  if(ap.length){
+    let title=(ap[ap.length-1].text||'').trim();
+    if(!title){const ev=getTodos(dk).find(t=>t.isEvent);if(ev)title=(parseTodoTextParts(ev.text).parts[0]||ev.text||'').trim();}
+    if(title){list.push('outing');vals['일정제목']=title.slice(0,20);}
+  }
+  const dur=_qcSleepDurStr(dk);
+  if(dur){list.push('sleep');vals['수면시간']=dur;}
+  const weatherWord=dk===dateKey(new Date())&&_homeWeatherCache&&(WMO_INFO[_homeWeatherCache.code]||[])[1];
+  if(weatherWord){list.push('weather');vals['날씨']=weatherWord;}
+  const photoCnt=getMemos(dk).filter(m=>m.photoUrl||m.photoLocalUrl).length;
+  if(photoCnt>0){list.push('photo');vals['사진개수']=String(photoCnt);}
+  const doneCnt=getTodos(dk).filter(t=>!t.isEvent&&t.done).length;
+  if(doneCnt>0){list.push('todo');vals['완료개수']=String(doneCnt);}
+  return {list,vals};
+}
+// 질문 문장의 {빈칸}을 채움. 값이 빈 "({키})"는 괄호째 제거, 그 외 채우지 못한 빈칸이 남으면 null(다른 질문 재요청).
+function _fillQuestionBlanks(text,vals){
+  let out=text;
+  Object.keys(vals).forEach(k=>{
+    const v=vals[k];
+    if(v===''||v==null)out=out.split('({'+k+'})').join('');
+    else out=out.split('{'+k+'}').join(v);
+  });
+  return /\{[^}]+\}/.test(out)?null:out;
+}
+async function _pickMemoQuestion(dk){
+  const conds=_collectQuestionConds(dk);
+  const lastKind=S.get('mprompt_last_kind')||null;
+  let excl=_qSessionExcl.slice();
+  for(let i=0;i<4;i++){
+    const rows=await supaFetch('rpc/pick_memo_prompt','POST',{p_conds:conds.list,p_exclude:excl,p_last_kind:lastKind});
+    const r=rows&&rows[0];
+    if(!r)return null;
+    const filled=_fillQuestionBlanks(r.text,conds.vals);
+    if(filled)return {id:r.id,text:filled,kind:r.kind};
+    excl.push(r.id); // 이 기기 데이터로 채울 수 없는 질문 — 제외하고 다시 요청
+  }
+  return null;
+}
+// dk: 답을 저장할 날짜(오늘탭 버튼은 보고 있는 날짜, 알림 클릭은 오늘)
+async function openQuestionMemo(dk){
+  dk=dk||dateKey(currentDate);
+  _qSessionExcl=[];
+  openRhythmMemoModal('question',dk,'질문을 고르고 있어요…','');
+  _rmemoCtx.question=null;_rmemoCtx.qId=null;_rmemoCtx.qKind=null;
+  await _applyMemoQuestion(dk);
+}
+async function _applyMemoQuestion(dk){
+  const q=await _pickMemoQuestion(dk);
+  if(!_rmemoCtx||_rmemoCtx.cat!=='question')return; // 그 사이 창을 닫았거나 다른 모드로 열린 경우
+  const titleEl=document.getElementById('rmemo-title');
+  if(q){
+    _qSessionExcl.push(q.id);
+    _rmemoCtx.question=q.text;_rmemoCtx.qId=q.id;_rmemoCtx.qKind=q.kind;
+    if(titleEl)titleEl.textContent=q.text;
+  }else{
+    // 서버 연결 실패/풀 소진 — 기본 문구(사용 처리 없음)
+    _rmemoCtx.question=QUESTION_FALLBACK_TEXT;_rmemoCtx.qId=null;_rmemoCtx.qKind=null;
+    if(titleEl)titleEl.textContent=QUESTION_FALLBACK_TEXT;
+  }
+}
+async function rerollMemoQuestion(){
+  if(!_rmemoCtx||_rmemoCtx.cat!=='question')return;
+  const btn=document.getElementById('rmemo-reroll');if(btn)btn.disabled=true;
+  await _applyMemoQuestion(_rmemoCtx.dk);
+  if(btn)btn.disabled=false;
+}
+function closeRhythmMemoModal(ev){
+  if(ev&&ev.target.closest('.rhythm-memo-card'))return;
+  document.getElementById('rhythm-memo-ov').classList.remove('on');
+  clearRhythmMemoPhotoPreview();
+}
+function triggerRhythmMemoPhotoPick(){
+  document.getElementById('rmemo-photo-file-inp').click();
+}
+const _rmemoPhotoCtl=_makePendingPhotoController('rmemo-photo-preview-row','memo-edit-photo-preview-thumb','memo-edit-photo-preview-clear',{wrapClass:'memo-edit-photo-preview-wrap',toggleBtnId:'rmemo-photo-btn'});
+function handleRhythmMemoPhotoSelect(ev){return _rmemoPhotoCtl.handleSelect(ev);}
+function clearRhythmMemoPhotoPreview(){return _rmemoPhotoCtl.clear();}
+// 저장 경로는 오늘탭 메모(memos)와 완전히 동일 — saveMemos를 그대로 호출해 배너에 자연히 합류시킴.
+function submitRhythmMemo(){
+  if(!_rmemoCtx)return;
+  const inp=document.getElementById('rmemo-inp');
+  const text=inp?inp.value.trim():'';
+  const photo=_rmemoPhotoCtl.photo;
+  if(!text&&!photo)return; // 빈 채로 "기록하기"는 무시(닫으려면 나중에/X 사용)
+  const {dk}=_rmemoCtx;
+  const n=new Date();
+  const stamp=`${pad(n.getHours())}:${pad(n.getMinutes())}`;
+  const memos=getMemos(dk);
+  const item={text,time:stamp,created:Date.now(),cid:genCid()};
+  if(_rmemoCtx.question)item.question=_rmemoCtx.question; // 오늘의 질문 — 질문 문장을 메모에 복사 저장(서버 풀이 바뀌어도 그대로 남음)
+  if(photo){
+    item.photoLocalUrl=photo.localUrl;
+    item.photoStatus='pending_upload';
+  }
+  memos.push(item);
+  if(photo)S.set(S.key('memos_pending',dk),true);
+  saveMemos(dk,memos);
+  if(photo)queueMemoPhotoUpload(dk,item.cid,photo.blob,photo.ext);
+  if(dk===dateKey(currentDate))renderMemos();
+  // 질문은 "답변을 저장한 순간"에만 사용 처리(닫기/다른 질문 받기는 소모하지 않음). 서버 연결 실패 시 조용히 넘어감.
+  if(_rmemoCtx.qId!=null){
+    supaFetch('rpc/mark_memo_prompt_used','POST',{p_id:_rmemoCtx.qId});
+    if(_rmemoCtx.qKind)S.set('mprompt_last_kind',_rmemoCtx.qKind);
+  }
+  closeRhythmMemoModal();
+}
+// 뷰어 좌우 스와이프로 이전/다음 사진 넘기기 — 배열 양끝에서는 자연스럽게 멈춤(순환 안 함).
+// dir: -1(다음, 최신→과거 진행방향) 또는 1(이전).
+function _navPhotoArchive(dir){
+  const next=_photoArchiveIdx+dir;
+  if(next<0||next>=_photoArchiveResults.length)return; // 양끝 — 아무 동작 없음
+  const img=document.getElementById('photo-viewer-img');
+  if(img){
+    img.classList.add('nav-fade');
+    setTimeout(()=>{openPhotoArchiveItem(next);img.classList.remove('nav-fade');},150);
+  }else{
+    openPhotoArchiveItem(next);
+  }
+}
+let _photoViewerSwipeSetup=false;
+function _setupPhotoViewerSwipe(){
+  if(_photoViewerSwipeSetup)return;
+  _photoViewerSwipeSetup=true;
+  const frame=document.querySelector('.photo-viewer-frame');
+  if(!frame)return;
+  let startX=0,startY=0,tracking=false;
+  frame.addEventListener('touchstart',function(e){
+    if(e.touches.length!==1)return;
+    startX=e.touches[0].clientX;startY=e.touches[0].clientY;tracking=true;
+  },{passive:true});
+  frame.addEventListener('touchend',function(e){
+    if(!tracking)return;
+    tracking=false;
+    const t=e.changedTouches[0];
+    const dx=t.clientX-startX,dy=t.clientY-startY;
+    const THRESHOLD=50;
+    if(Math.abs(dx)<THRESHOLD||Math.abs(dx)<Math.abs(dy)*1.3)return; // 세로 스크롤 의도는 무시
+    _navPhotoArchive(dx<0?-1:1); // 왼쪽으로 밀면 다음(-1), 오른쪽으로 밀면 이전(+1)
+  },{passive:true});
+}
+function setupMemoInlineInput(){
+  const inp=document.getElementById('memo-inline-inp');
+  if(!inp||inp.dataset.imeSetup)return;
+  inp.dataset.imeSetup='1';
+  inp.addEventListener('compositionstart',()=>{_memoInlineComposing=true;});
+  inp.addEventListener('compositionend',()=>{
+    // compositionend 직후 한 박자(다음 이벤트 루프) 뒤에 플래그를 내림 —
+    // 조합 종료와 거의 동시에 발생하는 keydown이 여전히 조합의 일부로 취급되게 함
+    setTimeout(()=>{_memoInlineComposing=false;},0);
+  });
+  inp.addEventListener('keydown',e=>{
+    if(_memoInlineComposing||e.isComposing||e.keyCode===229)return;
+    if((e.key==='Enter'||e.keyCode===13)&&!e.shiftKey){
+      // 모바일(터치기기)에서는 Enter가 줄바꿈으로 동작 — 타이핑 중 실수로 조기 등록되는 것 방지.
+      // PC는 기존처럼 Enter=등록 유지(키보드 오조작 빈도가 낮아 굳이 바꿀 필요 없음).
+      if(_isTouchDevice())return;
+      e.preventDefault();
+      submitMemoInline();
+    }
+  });
+  // 모바일에서만: 입력 중 화면의 다른 부분을 눌러 포커스가 빠지면 자동 저장.
+  // submitMemoInline 자체가 빈 텍스트/중복 호출을 이미 방어하므로 여기선 조건 없이 호출.
+  // 등록 버튼 클릭 시에도 blur가 먼저 뜰 수 있지만, _memoSubmitting 가드 덕분에 두 번 등록되지 않음.
+  if(_isTouchDevice()){
+    inp.addEventListener('blur',()=>{submitMemoInline();});
+  }
+}
+let _memoSeedOn=false;
+function toggleMemoSeed(){
+  _memoSeedOn=!_memoSeedOn;
+  const btn=document.getElementById('memo-seed-toggle');
+  if(btn)btn.classList.toggle('on',_memoSeedOn);
+}
+function submitMemoInline(){
+  if(_memoSubmitting)return;
+  const inp=document.getElementById('memo-inline-inp');
+  const text=inp?inp.value.trim():'';
+  const photo=_memoPhotoCtl.photo;
+  if(!text&&!photo)return;
+  _memoSubmitting=true;
+  const n=new Date();
+  const stamp=`${pad(n.getHours())}:${pad(n.getMinutes())}`;
+  const dk=dateKey(currentDate),memos=getMemos(dk);
+  const item={text,time:stamp,created:Date.now(),cid:genCid()};
+  if(_memoSeedOn)item.type='seed';
+  if(photo){
+    item.photoLocalUrl=photo.localUrl;
+    item.photoStatus='pending_upload';
+  }
+  memos.push(item);
+  if(photo)S.set(S.key('memos_pending',dk),true); // saveMemos의 autoSync가 photo_url=null인 채로 먼저 나가지 않도록 선점
+  saveMemos(dk,memos);
+  if(photo)queueMemoPhotoUpload(dk,item.cid,photo.blob,photo.ext);
+  if(inp){inp.value='';inp.style.height='';}
+  clearMemoPhotoPreview();
+  // 씨앗 토글은 한 건만 적용되고 자동 해제
+  _memoSeedOn=false;
+  const seedBtn=document.getElementById('memo-seed-toggle');
+  if(seedBtn)seedBtn.classList.remove('on');
+  renderMemos();
+  setTimeout(()=>{_memoSubmitting=false;},500);
+}
+function padTime(v){
+  if(!v)return v;
+  const m=v.match(/^(\d{1,2}):(\d{1,2})$/);
+  if(!m)return v;
+  return pad(Math.min(23,parseInt(m[1],10)))+':'+pad(Math.min(59,parseInt(m[2],10)));
+}
+// 기존 completedAt(날짜)는 그대로 두고 시각(HH:MM)만 교체 — 수기 완료시각 수정 두 경로(일반 할일/시간표) 공용.
+function _applyCompletedTimeOnly(baseMs,hhmm){
+  const d=new Date(baseMs);
+  const [hh,mm]=hhmm.split(':').map(Number);
+  d.setHours(hh,mm,0,0);
+  return d.getTime();
+}
+function confirmTime(){
+  const v=padTime(document.getElementById('time-inp').value);if(!v)return;
+  if(_sleepTarget==='rblock-start'){_rhythmFormStart=v;closeModal('time-modal');refreshRhythmTrack();return;}
+  if(_sleepTarget==='rblock-end'){_rhythmFormEnd=v;closeModal('time-modal');refreshRhythmTrack();return;}
+  if(_sleepTarget==='event'){
+    const inp=document.getElementById('todo-event-time-inp');
+    const modal=document.getElementById('todo-modal');
+    const hadTime=!!inp.dataset.value;
+    inp.dataset.value=v;inp.textContent=v;
+    document.getElementById('todo-event-time-clear').style.display='block';
+    if(!hadTime)modal.dataset.eventAlertOn='1'; // 시간을 새로 지정하면 기본으로 알림 켜짐(아이콘 탭으로 끌 수 있음)
+    updateEventTimeIcon();
+    closeModal('time-modal');
+    return;
+  }
+  if(_sleepTarget==='todo-alert'){
+    const inp=document.getElementById('todo-alert-time-inp');
+    const modal=document.getElementById('todo-modal');
+    const hadTime=!!inp.dataset.value;
+    inp.dataset.value=v;inp.textContent=v;
+    document.getElementById('todo-alert-time-clear').style.display='block';
+    if(!hadTime)modal.dataset.todoAlertOn='1';
+    updateTodoAlertIcon();
+    closeModal('time-modal');
+    return;
+  }
+  if(_sleepTarget.startsWith('todo-completed:')){
+    const i=parseInt(_sleepTarget.split(':')[1],10);
+    const dk=dateKey(currentDate),todos=getTodos(dk);
+    const t=todos[i];
+    if(t&&t.done){
+      t.completedAt=_applyCompletedTimeOnly(t.completedAt,v);
+      saveTodos(dk,todos);renderTodos();
+    }
+    closeModal('time-modal');
+    return;
+  }
+  if(_sleepTarget.startsWith('schedule-time:')){
+    const i=parseInt(_sleepTarget.split(':')[1],10);
+    const dk=dateKey(currentDate),todos=getTodos(dk);
+    const t=todos[i];
+    const m=t&&(t.text||'').match(SCHEDULE_TIME_RE);
+    if(t&&m){
+      t.text=`${v} ${m[3]}`;
+      if(t.done&&t.completedAt)t.completedAt=_applyCompletedTimeOnly(t.completedAt,v);
+      saveTodos(dk,todos);renderTodos();
+    }
+    closeModal('time-modal');
+    return;
+  }
+  if(_sleepTarget==='meal'){
+    const {dk,k}=_mealTimeTarget;
+    patchMealField(dk,k,'time',v);
+    refreshMealTimeGroup(dk,k,v);
+    closeModal('time-modal');
+    return;
+  }
+  if(_sleepTarget==='habitGoalWake'){
+    setHabitGoalTime('wake',v);
+    closeModal('time-modal');
+    renderSettingsHabitSection();
+    return;
+  }
+  if(_sleepTarget.startsWith('alertTime:')){
+    const kind=_sleepTarget.split(':')[1];
+    setUserSettingTime(ALERT_TIME_FIELD_MAP[kind],v);
+    closeModal('time-modal');
+    renderSettingsAlertSection();
+    return;
+  }
+  const dk=dateKey(currentDate),d=getSleep(dk);
+  if(_sleepTarget==='sleep')d.sleep=v;else d.wake=v;
+  saveSleepData(dk,d);loadSleep();closeModal('time-modal');
+  // 미완료 리듬블록 자동마감은 "수면 데이터가 실제로 저장되는 날짜(dk, 화면이 보던 날짜)"를 기준으로 스캔해야 함.
+  // getLogicalDate()(지금 이 순간의 실제 오늘)를 쓰면, 다음날 이후 화면을 과거 날짜로 옮겨 소급 입력할 때
+  // dk와 어긋나 자동마감 대상 범위([오늘,어제] 단 이틀)를 벗어나 버리는 버그가 있었음.
+  if(_sleepTarget==='sleep'){autoCloseUnfinishedRhythmBlocks(dk,v);refreshRhythmTrack();}
+  // "아침기상" 습관 자동체크(2026-09-05) — 목표시각이 설정돼 있고, 이번에 확정한 기상시각이
+  // 그 이내면 자동으로 체크. 목표시각을 늦게 넘겨 일어난 날은 자동체크하지 않되(정직하게 반영),
+  // 이미 다른 방법(수기)으로 체크해둔 걸 자동판단이 강제로 끄지는 않음 — checkHabitDirect의
+  // "이미 켜져있으면 그대로 둠" 원칙과 별개로, 여기선 애초에 목표시각 밖이면 호출 자체를 안 함.
+  if(_sleepTarget==='wake'){
+    const goal=getHabitGoal('wake');
+    if(goal&&goal.goalTime&&v<=goal.goalTime)checkHabitDirect('wake',dk,v);
+  }
+}
+
+// ── TODO
+let _todoSwipeIdx=-1;
+let _eventSheetDk='',_eventSheetCid=''; // 일정 시트 대상 — 인덱스 대신 dk+cid로 저장해 화면 재렌더링에도 안전하게 유지
+let _todoReorderMode=false;
+let _todoPinnedFilter=false;
+function toggleTodoPinnedFilter(){
+  _todoPinnedFilter=!_todoPinnedFilter;
+  document.getElementById('todo-pinned-filter-btn')?.classList.toggle('on',_todoPinnedFilter);
+  renderTodos();
+}
+// 부분완료(조각모드) 기능은 트랙패드 드래그가 브라우저 기본 텍스트선택과 충돌해
+// PC에서 스와이프가 정상 동작하지 않으므로, 터치 지원 기기(모바일)에서만 활성화한다.
+function _isTouchDevice(){
+  return ('ontouchstart' in window)||navigator.maxTouchPoints>0;
+}
+function toggleTodoReorderMode(){
+  _todoReorderMode=!_todoReorderMode;
+  document.getElementById('todo-card')?.classList.toggle('todo-reorder-mode',_todoReorderMode);
+  document.getElementById('todo-reorder-btn')?.classList.toggle('on',_todoReorderMode);
+  renderTodos();
+}
+let _nightPostponeChecked=new Set();
+function openNightPostponeSheet(){
+  _nightPostponeChecked=new Set();
+  const dk=dateKey(currentDate),todos=getTodos(dk);
+  const targets=todos.map((t,i)=>({...t,_i:i})).filter(t=>!t.done&&!t.isEvent&&!t.recurRuleCid);
+  const list=document.getElementById('night-postpone-list');
+  if(!targets.length){
+    list.innerHTML='<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:16px 0;">오늘 남은 할 일이 없어요</div>';
+  }else{
+    list.innerHTML=targets.map(t=>
+      `<div class="event-item" style="cursor:pointer;" onclick="toggleNightPostponeCheck(${t._i},this)">`+
+      `<div class="chk" data-idx="${t._i}"></div>`+
+      `<span class="event-txt">${escapeHtml(t.text)}</span>`+
+      `</div>`
+    ).join('');
+  }
+  openSheet('night-postpone-sheet');
+}
+function toggleNightPostponeCheck(idx,rowEl){
+  if(_nightPostponeChecked.has(idx))_nightPostponeChecked.delete(idx);
+  else _nightPostponeChecked.add(idx);
+  rowEl.querySelector('.chk')?.classList.toggle('on',_nightPostponeChecked.has(idx));
+}
+function confirmNightPostpone(){
+  if(!_nightPostponeChecked.size){closeSheet('night-postpone-sheet');return;}
+  const dk=dateKey(currentDate);
+  const tom=new Date(currentDate);tom.setDate(tom.getDate()+1);
+  const tdk=dateKey(tom);
+  // 인덱스가 큰 것부터 처리해야 splice로 인한 인덱스 밀림이 없음
+  const idxs=[...(_nightPostponeChecked)].sort((a,b)=>b-a);
+  let movedCount=0;
+  idxs.forEach(idx=>{
+    const result=relocateTodo(dk,idx,tdk,'move');
+    if(result.success)movedCount++;
+  });
+  closeSheet('night-postpone-sheet');
+  renderTodos();
+  showToast(movedCount?`${movedCount}개를 내일로 옮겼어요`:'옮기지 못했어요');
+}
+// 완료 시각(completedAt, epoch ms) → "HH:MM" 표시용 포맷.
+function formatCompletedTimeHHMM(ms){
+  const d=new Date(ms);
+  return pad(d.getHours())+':'+pad(d.getMinutes());
+}
+// 일반 할일 완료시각(completedAt) 수정 — 목록에서 완료시각 텍스트를 눌러 공용 시간휠 오픈.
+// 날짜(dk)는 그대로 두고 시각만 교체 — 수기로 늦게 체크한 경우 실제 완료시각을 바로잡기 위함.
+function openTodoCompletedTimePicker(i){
+  const dk=dateKey(currentDate),todos=getTodos(dk);
+  const t=todos[i];if(!t||!t.done||!t.completedAt)return;
+  _sleepTarget='todo-completed:'+i;
+  document.getElementById('time-inp').value=formatCompletedTimeHHMM(t.completedAt);
+  openModal('time-modal');
+  renderTimeWheel();
+}
+// 시간표 항목(텍스트 앞 "HH:MM ")의 완료시각 수정 — 텍스트 자체의 HH:MM 부분을 갱신하고 completedAt도 같은 값으로 맞춤.
+function openScheduleTimePicker(i){
+  const dk=dateKey(currentDate),todos=getTodos(dk);
+  const t=todos[i];if(!t||!t.done)return;
+  const m=(t.text||'').match(SCHEDULE_TIME_RE);if(!m)return;
+  _sleepTarget='schedule-time:'+i;
+  document.getElementById('time-inp').value=m[1].padStart(2,'0')+':'+m[2];
+  openModal('time-modal');
+  renderTimeWheel();
+}
+function renderTodos(){
+  const dk=dateKey(currentDate),todos=getTodos(dk);
+  renderEventList(dk,todos);
+  updateReserveCountBadge();
+  // 밤 시간대(22:00-23:59)이고 오늘 날짜를 보고 있을 때만 일괄 미루기 아이콘 노출
+  const nightBtn=document.getElementById('todo-night-postpone-btn');
+  if(nightBtn){
+    const h=new Date().getHours();
+    const isNight=h>=21&&h<24;
+    const isTodayView=dk===dateKey(new Date());
+    nightBtn.style.display=(isNight&&isTodayView)?'':'none';
+  }
+  const list=document.getElementById('todo-list');if(!list)return;
+  list.innerHTML='';
+  // 반복으로 생성된 항목(recurRuleCid 있음)도 이제 todos 배열의 평범한 원소라 별도 병합 없이 그대로 필터+정렬만 하면 됨.
+  const sorted=todos.map((t,i)=>({...t,_i:i})).filter(t=>!t.isEvent).filter(t=>!SCHEDULE_TIME_RE.test(t.text)).filter(t=>!_todoPinnedFilter||t.pinned)
+    .sort((a,b)=>{
+      if(a.done!==b.done)return a.done?1:-1;
+      if(a.done&&b.done){
+        // 완료된 항목끼리는 완료시각(completedAt) 순으로 — 시각 없는 항목은 뒤로.
+        const ca=a.completedAt?new Date(a.completedAt).getTime():Infinity;
+        const cb=b.completedAt?new Date(b.completedAt).getTime():Infinity;
+        if(ca!==cb)return ca-cb;
+      }
+      return compareTodoOrder(a,b);
+    });
+  if(_todoPinnedFilter&&!sorted.length){
+    list.innerHTML='<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:12px 0;">강조한 할 일이 없어요</div>';
+    return;
+  }
+  sorted.forEach((t)=>{
+    const i=t._i;
+    const ts=t.timeSection||'none';
+    const tsClass=` ts-${ts||'none'}`;
+    const el=document.createElement('div');el.className='todo-item';
+    el.dataset.todoIdx=i;
+    el.dataset.tsGroup=ts;
+    if(_todoPartModeIdx===i)el.dataset.partModeIdx=i;
+    // 반복 항목이면 클릭 위임(attachTodoItemClick)이 참조할 정보를 데이터 속성으로 심어둔다 —
+    // 렌더링 시점에 onclick 문자열을 조립하지 않고, 클릭 시점에 이 속성들을 읽어 분기한다.
+    if(t.recurRuleCid){
+      el.dataset.recur='1';el.dataset.dk=dk;el.dataset.cid=t.cid||'';el.dataset.ruleCid=t.recurRuleCid;el.dataset.title=t.text;
+    }
+    const textHtml=renderTodoTextParts(t.text,t.strikeParts||[],i);
+    const partModeStyle=_todoPartModeIdx===i?'background:rgba(255,255,255,0.45);border-radius:8px;padding:2px 6px;':'';
+    const rmEligible=_todoReorderMode&&!t.done;
+    const handleHtml=`<div class="todo-drag-handle${rmEligible?' rm-eligible':''}"><i class="ti ti-grip-vertical ico-sz-13" aria-hidden="true"></i></div>`;
+    const chkHtml=(!t.done&&t.pinned)
+      ? `<div class="todo-pinned-chk" data-role="chk"><i class="ti ti-bolt-filled" aria-hidden="true"></i></div>`
+      : `<div class="chk${tsClass}${t.done?' on':''}" data-role="chk"></div>`;
+    const completedTimeHtml=(t.done&&t.completedAt)?`<div class="todo-completed-time" onclick="event.stopPropagation();openTodoCompletedTimePicker(${i})">${formatCompletedTimeHHMM(t.completedAt)}</div>`:'';
+    const recurIconHtml=t.recurRuleCid?'<i class="ti ti-repeat ico-sz-11" style="color:var(--tm);flex-shrink:0;" aria-hidden="true" title="반복"></i>':'';
+    const alertIconHtml=_todoAlertIconHtml(t.todoAlertOn,t.alertTime);
+    const rightIconsHtml=(recurIconHtml||alertIconHtml)?`<div style="display:flex;align-items:center;gap:4px;margin-left:auto;">${recurIconHtml}${alertIconHtml}</div>`:'';
+    el.innerHTML=`${handleHtml}${chkHtml}${completedTimeHtml}<span class="todo-txt${t.done?' done':''}" data-todo-i="${i}" style="${partModeStyle}">${textHtml}</span>${rightIconsHtml}`;
+    const hasMultipleParts=_isTouchDevice()&&parseTodoTextParts(t.text).parts.length>1;
+    attachTodoItemClick(el,i,t.cid||'');
+    if(rmEligible){
+      attachTodoReorderDrag(el,i,ts);
+    }else if(!_todoReorderMode){
+      // 반복 항목도 조각모드(취소선 토글)는 일반 투두와 동일하게 지원 — attachTodoSwipeMode 내부에서
+      // isRecurring 여부에 따라 "내일도 복사"만 별도로 막는다(중복 생성 방지, 토스트 안내로 처리).
+      attachTodoSwipeMode(el,i,hasMultipleParts,!!t.recurRuleCid);
+    }
+    list.appendChild(el);
+  });
+}
+// 투두 텍스트 맨 앞의 "HH:MM " 표기를 시간표 항목으로 인식 — 봄이님의 기존 입력 습관(고정 규칙)을 그대로 파싱.
+const SCHEDULE_TIME_RE=/^(\d{1,2}):(\d{2})\s+(.+)/;
+// 시간표 라벨 표기 시 괄호( ) 안 내용은 부가설명으로 보고 제외 — 예: "헬스장 출석률 높이기(주3회 목표)" -> "헬스장 출석률 높이기"
+function stripScheduleParens(text){return (text||'').replace(/\([^)]*\)/g,'').replace(/\s+/g,' ').trim();}
+// dk가 오늘이면 현재 분(0~1439), 아니면 null — 시간표/일정 배너 여러 곳에서 반복되던 "오늘인지+현재분" 계산을 통일.
+function _nowMinIfToday(dk){
+  return dk===dateKey(new Date())?(new Date().getHours()*60+new Date().getMinutes()):null;
+}
+// "HH:MM" 형식 일정/투두 시각 문자열 → 분(0~1439) 변환. 매치 실패 시 null — toMin(_dawnTimeToMin)과 달리
+// 형식이 보장 안 된 자유입력(eventTime 등)에도 안전하게 쓰기 위한 버전.
+function _parseHHMM(t){
+  const m=(t||'').match(/^(\d{1,2}):(\d{2})$/);
+  return m?parseInt(m[1],10)*60+parseInt(m[2],10):null;
+}
+function parseScheduleTodos(dk,todos){
+  const nowMin=_nowMinIfToday(dk);
+  const items=[];
+  todos.forEach((t,i)=>{
+    if(t.isEvent)return;
+    const m=(t.text||'').match(SCHEDULE_TIME_RE);
+    if(!m)return;
+    const hh=parseInt(m[1],10),mm=parseInt(m[2],10);
+    if(hh>23||mm>59)return;
+    items.push({i:i,cid:t.cid,time:m[1].padStart(2,'0')+':'+m[2],min:hh*60+mm,label:m[3],done:t.done,todoAlertOn:t.todoAlertOn,alertTime:t.alertTime});
+  });
+  // 정렬 우선순위: ①지연(시각이 이미 지났는데 미완료 — 가장 급함) → ②아직 안 온 시각(가까운 순) → ③완료(맨 뒤).
+  // 기존엔 지난 시각도 "다음날 것"으로 계산해 남은 시간이 커져버려, 정작 제일 급한 지연 항목이 뒤로 밀리는 문제가 있었음(2026-09-01).
+  items.sort((a,b)=>{
+    if(a.done!==b.done)return a.done?1:-1;
+    if(!a.done&&nowMin!=null){
+      const aOverdue=a.min<nowMin,bOverdue=b.min<nowMin;
+      if(aOverdue!==bOverdue)return aOverdue?-1:1; // 지연된 쪽이 항상 먼저
+      if(aOverdue&&bOverdue)return a.min-b.min; // 둘 다 지연이면 더 오래 지난(이른 시각) 것 먼저
+      return a.min-b.min; // 둘 다 아직 안 왔으면 가까운 시각 먼저
+    }
+    return a.min-b.min;
+  });
+  return items;
+}
+// 시간표 도넛 — 실제 리듬 기록(computeRhythmBlocksRaw) 그대로 시각화. 빈 시간은 배경(웜그레이 톤)으로 남김.
+function renderScheduleDonut(dk){
+  const wrap=document.getElementById('schedule-donut');
+  if(!wrap)return;
+  const raw=computeRhythmBlocksRaw(dk);
+  const nowMin=_nowMinIfToday(dk);
+  let circles='<circle cx="29" cy="29" r="23" fill="none" stroke="var(--empty-bg)" stroke-width="13"/>';
+  // 겹치는 구간에서 짧은 시간대가 위로 오도록, 긴 구간부터 먼저 그리고 짧은 구간을 나중에(위에) 그림
+  const sorted=raw.slice().sort(function(a,b){
+    const da=(a.end==null?((nowMin!=null&&nowMin>a.start)?nowMin:a.start+1):a.end)-a.start;
+    const db=(b.end==null?((nowMin!=null&&nowMin>b.start)?nowMin:b.start+1):b.end)-b.start;
+    return db-da; // 긴 구간 먼저(아래), 짧은 구간 나중(위)
+  });
+  sorted.forEach(function(b){
+    let s=b.start,e=b.end;
+    if(e==null)e=(nowMin!=null&&nowMin>s)?nowMin:s+1; // 진행중 블록은 현재 시각까지, 정보 없으면 최소폭
+    if(e<=s)e=s+1; // 자정 넘김 등 역전 방지(당일 도넛에서는 다음날로 안 넘기고 그 자리에서 끝냄)
+    if(e>1440)e=1440;
+    const length=Math.max((e-s)/1440*360,0.5);
+    const offset=-(s/1440*360);
+    circles+=`<circle cx="29" cy="29" r="23" fill="none" stroke="${b.color}" stroke-width="13" pathLength="360" style="stroke-dasharray:${length} 360;stroke-dashoffset:${offset}"/>`;
+  });
+  wrap.innerHTML=`<svg viewBox="0 0 58 58">${circles}</svg>`;
+}
+// 시간표 리스트 — 텍스트만 노출, 체크박스는 기존 .chk/toggleTodo() 그대로 재사용(별도 저장/토글 로직 없음).
+// items는 parseScheduleTodos가 이미 "미완료 중 가장 가까운 것 최상단" 순으로 정렬해 반환하므로,
+// 맨 앞의 미완료 항목(0번 인덱스)만 진행중(current)으로 강조 — 매 항목마다 배열을 다시 훑을 필요 없음.
+function renderScheduleList(dk,items){
+  const list=document.getElementById('schedule-list');
+  if(!list)return;
+  list.innerHTML='';
+  items.forEach(function(it,idx){
+    const isNext=idx===0&&!it.done;
+    const el=document.createElement('div');
+    el.className='rt-item'+(it.done?' done':'')+(isNext?' current':'');
+    const timeClickHtml=it.done
+      ?`<div class="rt-time rt-time-editable" onclick="event.stopPropagation();openScheduleTimePicker(${it.i})">${it.time}</div>`
+      :`<div class="rt-time">${it.time}</div>`;
+    // 오늘 할일 목록과 동일한 규칙(renderTodos의 alertIconHtml 계산과 동일) — 알림이 켜져있고 시각이 있을 때만 노출.
+    const alertIconHtml=_todoAlertIconHtml(it.todoAlertOn,it.alertTime);
+    el.innerHTML=`<div class="chk${it.done?' on':''}" onclick="toggleTodo(${it.i},'${it.cid||''}')"></div>${timeClickHtml}<div class="rt-text" onclick="openTodoSheet(${it.i})">${escapeHtml(it.label)}</div>${alertIconHtml}`;
+    list.appendChild(el);
+  });
+}
+// 오늘 일정 / 시간표 — 같은 자리(event-section)에서 교차 노출. 둘 다 있는 날에만 제목 옆 전환 아이콘 노출.
+// 둘 다 있는 날 자동 선노출 기준 — 각자 카테고리에서 가장 가까운(아직 안 지난) 항목의 시각끼리 비교, 더 가까운 쪽 선노출.
+// 사용자가 제목을 탭해 수동 전환하면 그 값을 세션 동안 유지(재계산하지 않음) — 오늘탭 재진입(loadDaily) 또는 조회 날짜 변경 시에만 자동판단으로 리셋.
+let _todayBannerMode=null;
+let _todayBannerModeDk=null;
+function _nextUpcomingMin(nowMin,mins){
+  const upcoming=mins.filter(m=>m>=nowMin);
+  return upcoming.length?Math.min(...upcoming):null;
+}
+function toggleTodayBannerMode(){
+  _todayBannerMode=_todayBannerMode==='event'?'schedule':'event';
+  renderTodos();
+}
+// 오늘 일정 배너 — 체크박스 없이 아이콘(카테고리)-일정명-시간(오른쪽 끝) 배치. 일정도 시간표도 없으면 섹션 자체를 숨김.
+function renderEventList(dk,todos){
+  const section=document.getElementById('event-section');
+  const list=document.getElementById('event-list');
+  const label=document.getElementById('event-section-label');
+  const scheduleBody=document.getElementById('schedule-body');
+  if(!section||!list)return;
+  // 하루짜리 일정(오늘 date_key에 저장된 것) — 연속일정(eventEndDate 있는 것)은 여기서 제외하고 아래서 별도 병합.
+  // 반복으로 생성된 일정도 이미 todos 배열의 평범한 원소라 별도 조회 없이 여기 자연히 포함됨(recurRuleCid로만 구분).
+  const events=todos.filter(t=>t.isEvent&&!t.eventEndDate);
+  // 연속일정 — 오늘이 시작일이든 아니든, 오늘을 범위로 품는 모든 연속일정을 공용 함수로 조회
+  const multiday=getActiveMultiDayEvents(dk);
+  const all=[...events,...multiday];
+  const scheduleItems=parseScheduleTodos(dk,todos);
+  const hasEvent=all.length>0,hasSchedule=scheduleItems.length>0;
+  if(!hasEvent&&!hasSchedule){section.style.display='none';list.innerHTML='';if(scheduleBody)scheduleBody.style.display='none';return;}
+  section.style.display='block';
+  // 날짜가 바뀌어 다시 보는 화면이면(다른 날짜 조회 후 복귀 등) 수동 전환 기록을 리셋 — 매 조회마다 새로 자동판단
+  if(_todayBannerModeDk!==dk){_todayBannerMode=null;_todayBannerModeDk=dk;}
+  let mode;
+  if(!hasEvent)mode='schedule';
+  else if(!hasSchedule)mode='event';
+  else if(_todayBannerMode)mode=_todayBannerMode; // 사용자가 이미 수동 전환한 경우 그대로 유지
+  else{
+    // 지연 감지 우선: 시각이 이미 지났는데 아직 체크 안 된 시간표 항목이 하나라도 있으면, 그 일이 밀리고 있을
+    // 가능성이 있으므로 무조건 시간표를 먼저 보여줌(2026-09-01). 지연 항목이 없으면 기존처럼 "각자 카테고리에서
+    // 가장 가까운(아직 안 지난) 항목 시각끼리 비교, 더 가까운 쪽" 규칙 그대로 적용.
+    const nowMin=_nowMinIfToday(dk)??0;
+    const hasOverdueSchedule=scheduleItems.some(it=>!it.done&&it.min<nowMin);
+    if(hasOverdueSchedule){
+      mode='schedule';
+    }else{
+      const eventMins=all.filter(ev=>!ev.eventEndDate&&ev.eventTime).map(ev=>_parseHHMM(ev.eventTime)).filter(m=>m!=null);
+      const scheduleMins=scheduleItems.filter(it=>!it.done).map(it=>it.min);
+      const nextEvent=_nextUpcomingMin(nowMin,eventMins);
+      const nextSchedule=_nextUpcomingMin(nowMin,scheduleMins);
+      mode=(nextSchedule!=null&&(nextEvent==null||nextSchedule<nextEvent))?'schedule':'event';
+    }
+  }
+  const showSwitch=hasEvent&&hasSchedule;
+  if(label)label.innerHTML=(mode==='event'?'오늘 일정':'시간표')+(showSwitch?' <i class="ti ti-switch-horizontal" aria-hidden="true"></i>':'');
+  if(mode==='schedule'){
+    list.innerHTML='';list.style.display='none';
+    if(scheduleBody)scheduleBody.style.display='flex';
+    renderScheduleDonut(dk);
+    renderScheduleList(dk,scheduleItems);
+    return;
+  }
+  list.style.display='';
+  if(scheduleBody)scheduleBody.style.display='none';
+  // 오늘 실제 날짜(자정 기준)일 때만 '완료(지남)' 판정 적용 — 다른 날짜(과거/미래 조회)엔 적용 안 함
+  const nowMinToday=_nowMinIfToday(dk);
+  const isPast=(ev)=>{
+    if(nowMinToday==null||!ev.eventTime||ev.eventEndDate)return false;
+    const evMin=_parseHHMM(ev.eventTime);
+    if(evMin==null)return false;
+    return nowMinToday>=evMin+60; // 지정 시간 +60분 지나면 '완료'로 간주 — 반복이든 아니든 오늘 실체화된 레코드는 동일하게 적용
+  };
+  // 정렬: 미완료 먼저(시간 있는 하루짜리 → 연속일정(며칠차 오름차순) → 시간 없는 하루짜리), 완료(지난 시간)는 맨 뒤로 밀림
+  const sorted=[...all].sort((a,b)=>{
+    const aP=isPast(a),bP=isPast(b);
+    if(aP!==bP)return aP?1:-1;
+    const aM=!!a.eventEndDate,bM=!!b.eventEndDate;
+    if(aM!==bM){
+      // 연속일정은 시간유무와 무관하게 '시간 있는 하루짜리' 바로 다음, '시간 없는 하루짜리'보다는 앞
+      if(!aM&&a.eventTime)return -1;
+      if(!bM&&b.eventTime)return 1;
+      return aM?-1:1;
+    }
+    if(aM&&bM)return a.dayIndex-b.dayIndex;
+    if(!!a.eventTime!==!!b.eventTime)return a.eventTime?-1:1;
+    if(a.eventTime&&b.eventTime)return a.eventTime.localeCompare(b.eventTime);
+    return 0;
+  });
+  list.innerHTML='';
+  sorted.forEach(ev=>{
+    const ec=getEventCat(ev.eventCat);
+    const el=document.createElement('div');
+    el.className='event-item'+(isPast(ev)?' event-past':'');
+    // 클릭하면 투두와 동일하게 하단 시트를 먼저 염 — 반복으로 생성된 일정은 전용 시트(오늘만 삭제/이 반복 전체 삭제)로,
+    // 그 외(하루짜리·연속일정)는 기존 event-sheet(수정/삭제)로 분기. 하루짜리는 오늘 dk, 연속일정은 시작일(_startDk) 기준.
+    const targetDk=ev.eventEndDate?ev._startDk:dk;
+    el.onclick=ev.recurRuleCid?(()=>openRecurringItemSheet(dk,ev.cid,ev.recurRuleCid,ev.text)):(()=>openEventSheet(targetDk,ev.cid,ev.text));
+    // 일정 텍스트는 투두의 '조각 나누기' 기능이 필요 없어 단순 escape만 함(renderTodoTextParts를 쓰면 내부 클릭 핸들러가 투두 인덱스를 잘못 참조해 엉뚱한 투두가 열리는 문제가 있었음)
+    const textHtml=escapeHtml(ev.text);
+    const recurIconHtml=ev.recurRuleCid?'<i class="ti ti-repeat ico-sz-11" style="color:var(--tm);flex-shrink:0;margin-right:2px;" aria-hidden="true" title="반복"></i>':'';
+    const rightBadge=ev.eventEndDate?`<span class="event-time">Day ${ev.dayIndex}</span>`:(ev.eventTime?`<span class="event-time">${ev.eventTime}</span>`:''); // 연속일정 며칠차 — 배지 스타일 제거, 시간 표기와 동일한 톤으로 "Day n" 표기 (2026-09-24)
+    el.innerHTML=`<i class="ti ${ec.icon}" style="font-size:14px;color:${ec.textColor};flex-shrink:0;" title="${ec.label}" aria-hidden="true"></i><span class="event-txt">${textHtml}</span>${recurIconHtml}${rightBadge}`;
+    list.appendChild(el);
+  });
+}
+// 투두 텍스트를 접두어('>' 앞부분)와 조각(/ 기준)으로 파싱. (아래 parseTodoTextParts 본문의 상세 설명 참고)
+// 예: "업무 > 블로그, 카페" -> prefix:"업무", parts:["블로그","카페"]
+// '>' 없으면 prefix는 빈 문자열, 전체가 조각 대상.
+function parseTodoTextParts(text){
+  // '>' 를 접두어(카테고리) 구분자로 사용. 예: "업무 > 블로그, 카페" -> prefix:"업무", parts:["블로그","카페"]
+  // ')' 대신 '>' 를 쓰는 이유: 일반 문장에서 괄호는 자주 쓰이지만 '>' 는 투두 텍스트에 거의 등장하지 않아 오인식 위험이 적음.
+  // 단, "->"(화살표 표현)는 접두어 구분자가 아니므로 건너뛰고 그다음 '>' 를 찾음.
+  let closeIdx=-1;
+  let searchFrom=0;
+  while(searchFrom<text.length){
+    const idx=text.indexOf('>',searchFrom);
+    if(idx<0)break;
+    if(text[idx-1]==='-'){searchFrom=idx+1;continue;} // "->" 화살표는 건너뜀
+    closeIdx=idx;break;
+  }
+  let prefix='',body=text;
+  if(closeIdx>=0){
+    prefix=text.slice(0,closeIdx).trim();
+    body=text.slice(closeIdx+1);
+  }
+  // body를 구분자(슬래시만) 보존하며 split — 쉼표(,)는 일반 문장부호로 취급, 조각 분리 트리거 아님
+  const rawParts=body.split(/(\/)/);
+  const parts=[];
+  rawParts.forEach(seg=>{
+    if(seg==='/')return;
+    if(seg.trim()==='')return;
+    parts.push(seg.trim()); // [v2 개선] 이전엔 trim 안 해서 조각 재조립(미루기/복사) 시 공백이 남는 문제가 있었음
+  });
+  return {prefix,parts,hasPrefix:closeIdx>=0};
+}
+// 투두 텍스트를 조각내어 렌더링. strikeParts에 포함된 조각 인덱스는 취소선 처리.
+// 조각 모드일 때 항목 끝에 "미체크 조각 전부 내일로 복사" 버튼 하나를 노출.
+// 클릭 처리는 여기서 onclick 문자열을 조립하지 않음 — 대신 각 조각/접두어 스팬에 data-part-idx만
+// 남겨두고, 실제 클릭 판정은 attachTodoItemClick(부모 .todo-item 하나에만 리스너)이 위임 처리한다.
+// (예전엔 조각마다 onclick="onTodoPartClick(...)" 문자열을 조립했는데, 텍스트에 따옴표가 섞이면
+// 깨질 수 있고, 반복/일반 분기마다 별도 문자열을 만들어야 해서 케이스가 늘수록 복잡해지는 구조였음.
+// 지금은 데이터 속성만 남기고 판단은 attachTodoItemClick 한 곳에서 한다.)
+function renderTodoTextParts(text,strikeParts,todoIdx){
+  const {prefix,parts,hasPrefix}=parseTodoTextParts(text);
+  const inPartMode=_todoPartModeIdx===todoIdx;
+  let html='';
+  if(hasPrefix){
+    html+=`<span class="todo-prefix" data-role="prefix">${prefix} ></span> `;
+  }
+  parts.forEach((seg,partIdx)=>{
+    const isStruck=strikeParts.includes(partIdx);
+    if(partIdx>0)html+=' / ';
+    html+=`<span class="todo-part" data-part-idx="${partIdx}" style="user-select:none;-webkit-user-select:none;-webkit-user-drag:none;${isStruck?'text-decoration:line-through;color:var(--tm);':''}">${seg}</span>`;
+  });
+  if(inPartMode){
+    const hasUnstruck=parts.some((_,idx)=>!strikeParts.includes(idx));
+    if(hasUnstruck){
+      html+=`<span data-role="copy-unstruck" title="미완료 조각 내일로 복사" style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;margin-left:6px;border-radius:50%;background:rgba(150,190,225,0.25);cursor:pointer;vertical-align:middle;">
+        <i class="ti ti-copy" style="font-size:10px;color:rgba(90,130,180,0.85);" aria-hidden="true"></i>
+      </span>`;
+    }
+  }
+  return html;
+}
+// ── 투두 항목 하나(.todo-item)에 클릭 처리를 위임하는 단일 진입점 ──
+// 예전엔 조각(.todo-part)마다 인라인 onclick으로 openTodoSheet/openRecurringItemSheet를 직접 호출했는데,
+// 그러면 "반복인지 아닌지"를 렌더링 시점마다 문자열로 미리 결정해둬야 했고, 부모(.todo-txt)에 별도로
+// 달아둔 반복용 리스너는 자식의 stopPropagation에 막혀 애초에 실행되지 못하는 버그(2026-09-07)가 있었음.
+// 지금은 이벤트가 항상 이 리스너 하나로만 들어오므로 그 경합 자체가 구조적으로 발생할 수 없다.
+// isRecurring: el.dataset.recur==='1' 여부로 렌더 시점에 이미 심어둔 값을 그대로 사용.
+function attachTodoItemClick(el,idx,cid){
+  el.addEventListener('click',e=>{
+    const t=e.target;
+    if(t.closest('[data-role="chk"]')){
+      toggleTodo(idx,cid||'');
+      return;
+    }
+    const isRecurring=el.dataset.recur==='1';
+    const recurDk=el.dataset.dk;
+    const recurCid=el.dataset.cid;
+    const ruleCid=el.dataset.ruleCid;
+    const title=el.dataset.title||'';
+    const openSheetForThis=()=>{
+      if(isRecurring)openRecurringItemSheet(recurDk,recurCid,ruleCid,title);
+      else openTodoSheet(idx);
+    };
+    if(t.closest('[data-role="copy-unstruck"]')){
+      copyUnstruckPartsToTomorrow(idx);
+      return;
+    }
+    const partEl=t.closest('.todo-part');
+    if(partEl){
+      const partIdx=parseInt(partEl.dataset.partIdx,10);
+      if(_todoPartModeIdx===idx)toggleTodoStrikePart(idx,partIdx);
+      else openSheetForThis();
+      return;
+    }
+    if(t.closest('[data-role="prefix"]')){
+      if(_todoPartModeIdx!==idx)openSheetForThis();
+      return;
+    }
+  });
+}
+// [v2] 항목을 완료조각/미완료조각으로 나눠 이동 또는 복사하는 통합 로직.
+// mode:'move' → 원본에서 미완료조각 제거(미루기/날짜지정 공용)
+// mode:'copy' → 원본은 유지하되, 완료조각만 남기고 미완료조각은 제거(스와이프 복사 공용)
+// 조각 없는 단일 항목은 mode에 따라 전체 이동/전체 복사로 동일하게 처리(기존 동작 유지).
+// 남은 완료조각만으로 구성되면 항목 전체를 자동 완료 체크(done=true) 처리.
+function relocateTodo(dk,idx,targetDk,mode){
+  const todos=getTodos(dk),todo=todos[idx];
+  if(!todo)return{success:false,message:'항목을 찾을 수 없어요'};
+  const {prefix,parts,hasPrefix}=parseTodoTextParts(todo.text);
+  const strikeSet=new Set(todo.strikeParts||[]);
+  const strikeTimes=todo.strikeTimes||{};
+  const hasMultipleParts=parts.length>1;
+  const successMsg=mode==='move'?'다음 날로 옮겼어요':'내일에도 추가했어요';
+
+  if(!hasMultipleParts){
+    const targetTodos=getTodos(targetDk);
+    if(targetTodos.some(x=>x.text===todo.text))return{success:false,message:'이미 해당 날짜에 있어요'};
+    targetTodos.push({text:todo.text,done:false,created:Date.now(),timeSection:todo.timeSection||'none',cid:genCid(),strikeParts:[],strikeTimes:{},pinned:todo.pinned||false});
+    saveTodos(targetDk,targetTodos);
+    if(mode==='move'){
+      addDelPending('todos',dk,todo.cid);
+      todos.splice(idx,1);
+      saveTodos(dk,todos);
+    }
+    return{success:true,message:successMsg};
+  }
+
+  // 조각(strikeParts)이 있는 todo는 mode(move/copy) 구분 없이 항상 동일하게 동작(의도한 설계):
+  // 미완료 조각만 targetDk로 넘기고, 원본(dk)은 완료된 조각만 남겨 정리(=사실상 항상 move).
+  // "복사" 버튼을 눌러도 순수 복사가 아니라 이 동작으로 통일되어 있음.
+
+  const unstruckIdxs=parts.map((_,i)=>i).filter(i=>!strikeSet.has(i));
+  if(!unstruckIdxs.length)return{success:false,message:'이동할 미완료 조각이 없어요'};
+  const movedParts=unstruckIdxs.map(i=>parts[i]);
+  const movedText=hasPrefix?`${prefix} > ${movedParts.join(' / ')}`:movedParts.join(' / ');
+  const targetTodos=getTodos(targetDk);
+  if(!targetTodos.some(x=>x.text===movedText)){
+    // 옮겨가는 조각들은 아직 미완료 상태이므로 시각 정보 없이 새로 시작
+    targetTodos.push({text:movedText,done:false,created:Date.now(),timeSection:todo.timeSection||'none',cid:genCid(),strikeParts:[],strikeTimes:{},pinned:todo.pinned||false});
+    saveTodos(targetDk,targetTodos);
+  }
+
+  const remainingIdxs=parts.map((_,i)=>i).filter(i=>strikeSet.has(i));
+  const remainingParts=remainingIdxs.map(i=>parts[i]);
+  // 완료된 조각만 남기며 인덱스가 0,1,2...로 재배치되므로, strikeTimes도 원래 인덱스 → 새 인덱스로 함께 리매핑
+  // (재매핑을 안 하면 시각이 엉뚱한 위치의 조각에 붙거나 유실됨 — 이동/복사 시 가장 신경 써야 하는 지점)
+  const newStrikeTimes={};
+  remainingIdxs.forEach((origIdx,newIdx)=>{
+    if(strikeTimes[origIdx]!=null)newStrikeTimes[newIdx]=strikeTimes[origIdx];
+  });
+  // dk 쪽엔 이 시점까지 저장이 일어난 적이 없으므로(targetDk에만 저장) todos 스냅샷을 그대로 재사용.
+  const cur=todos[idx];
+  if(!cur)return{success:true,message:'이동했어요'};
+  if(!remainingParts.length){
+    addDelPending('todos',dk,cur.cid);
+    todos.splice(idx,1);
+    saveTodos(dk,todos);
+    _todoPartModeIdx=-1;
+  }else{
+    cur.text=hasPrefix?`${prefix} > ${remainingParts.join(' / ')}`:remainingParts.join(' / ');
+    cur.strikeParts=remainingParts.map((_,i)=>i);
+    cur.strikeTimes=newStrikeTimes;
+    cur.done=true; // 남은 조각이 전부 완료 상태이므로 항목 전체도 완료로 자동 체크
+    // 전체 완료시각은 "지금(이동한 시각)"이 아니라 실제 조각을 완료했던 시각 중 가장 늦은 것으로 —
+    // 그래야 "아까 완료한 조각"이 "방금 이동한 시각"으로 잘못 찍히지 않음
+    const times=Object.values(newStrikeTimes).filter(v=>typeof v==='number');
+    cur.completedAt=times.length?Math.max(...times):(cur.completedAt!=null?cur.completedAt:Date.now());
+    saveTodos(dk,todos);
+  }
+  return{success:true,message:'다음 날로 옮겼어요'};
+}
+// [v2] 조각 하나의 완료(취소선) 상태 토글. strikeParts 변경 시 항상 saveTodos로 즉시 저장+동기화.
+// 모든 조각에 취소선이 그어지면 항목 전체를 자동 완료 처리(done=true, completedAt 기록) — 새벽 리캡 등 시각 통계가 이 값을 참조하므로 누락 없이 채워야 함.
+// strikeTimes: 조각 인덱스 → 완료 시각(ms). 홈탭 활동 분포에서 조각별로 점을 찍기 위한 용도.
+function toggleTodoStrikePart(i,partIdx){
+  const dk=dateKey(currentDate),todos=getTodos(dk),todo=todos[i];
+  if(!todo)return;
+  const sp=new Set(todo.strikeParts||[]);
+  const st={...(todo.strikeTimes||{})};
+  if(sp.has(partIdx)){
+    sp.delete(partIdx);
+    delete st[partIdx];
+  }else{
+    sp.add(partIdx);
+    st[partIdx]=Date.now();
+  }
+  todo.strikeParts=Array.from(sp);
+  todo.strikeTimes=st;
+  const totalParts=parseTodoTextParts(todo.text).parts.length;
+  const allStruck=totalParts>0&&sp.size>=totalParts;
+  if(allStruck&&!todo.done){
+    todo.done=true;
+    // 항목 전체 완료시각은 마지막으로 체크된 조각의 시각을 그대로 사용 — "방금 다 끝냈다"는 실제 순간과 일치시킴
+    const times=Object.values(st).filter(v=>typeof v==='number');
+    todo.completedAt=times.length?Math.max(...times):Date.now();
+  }else if(!allStruck&&todo.done){
+    // 취소선을 다시 풀어 미완료 조각이 생기면 완료 상태도 되돌림
+    todo.done=false;
+    todo.completedAt=null;
+  }
+  saveTodos(dk,todos);
+  renderTodos();
+}
+// 조각 하나를 내일로 복사(새 항목 생성) 후, 오늘 항목에서 해당 조각은 삭제.
+// 조각모드에서 미체크(취소선 없는) 조각 전부를 내일로 복사. 먼저 확인 토스트로 묻고 "네" 눌러야 실행.
+let _pendingPartCopyIdx=-1,_partCopyConfirmTimer=null;
+function copyUnstruckPartsToTomorrow(i){
+  _pendingPartCopyIdx=i;
+  const t=document.getElementById('todo-copy-confirm-toast');
+  if(!t)return;
+  clearTimeout(_partCopyConfirmTimer);
+  clearTimeout(_copyConfirmTimer);
+  _pendingCopyTodoIdx=-1; // 전체복사 확인과 겹치지 않게
+  t.classList.add('on');
+  _partCopyConfirmTimer=setTimeout(()=>{t.classList.remove('on');_pendingPartCopyIdx=-1;},4000);
+}
+function confirmCopyUnstruckParts(){
+  const i=_pendingPartCopyIdx;
+  _pendingPartCopyIdx=-1;
+  if(i<0)return;
+  const dk=dateKey(currentDate);
+  const tom=new Date(currentDate);tom.setDate(tom.getDate()+1);
+  const tdk=dateKey(tom);
+  const result=relocateTodo(dk,i,tdk,'copy');
+  showToast(result.message);
+  renderTodos();
+}
+// 왼쪽 스와이프(터치 및 PC 마우스 드래그 모두 지원)
+// - 구분자(,/)가 있는 항목: 조각 선택 모드 진입/해제 (반복 항목도 동일하게 지원 — 조각 완료 상태는
+//   실체화된 그 날짜의 레코드에만 저장되고, 다른 날짜 실체는 규칙 텍스트로 매번 새로 만들어지므로
+//   서로 영향을 주지 않음. 즉 조각 기능 관점에서 반복 항목과 일반 항목은 완전히 동일하게 다뤄도 됨.)
+// - 구분자 없는 단일 항목: 항목 전체를 내일로 복사(오늘 항목은 유지, "오늘도 내일도 해야 하는 일" 용도) —
+//   단, 반복 항목은 내일 몫이 이미 규칙에 따라 자동 생성되므로 이 복사 동작만 제외한다.
+function attachTodoSwipeMode(el,i,hasMultipleParts,isRecurring){
+  let sx=0,sy=0,moved=false,dragging=false,pid=null,captured=false;
+  el.addEventListener('pointerdown',e=>{
+    // 체크박스 위에서 시작한 드래그는 완료 토글과 충돌하지 않게 무시. 조각(.todo-part)은 이제 허용(조각모드 재진입 가능해야 함).
+    if(e.target.closest('.chk'))return;
+    sx=e.clientX;sy=e.clientY;moved=false;dragging=true;captured=false;
+    pid=e.pointerId;
+    // 주의: 여기서 곧바로 setPointerCapture를 걸면 PC 마우스에서 순수 클릭(드래그 없는 탭)의
+    // click 이벤트 target이 el(줄 전체)로 왜곡되어, 클릭한 조각(.todo-part)의 onclick이 실행되지 않는
+    // 부작용이 있었음. 그래서 실제로 좌측 드래그 임계값(pointermove에서 dx<-15)을 넘었을 때만 캡처한다.
+  });
+  el.addEventListener('pointermove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-sx;
+    const dy=Math.abs(e.clientY-sy);
+    // 세로 이동이 크면 스크롤 의도로 보고 드래그 취소
+    if(dy>18&&Math.abs(dx)<18){dragging=false;el.style.transform='';return;}
+    if(dx<-15){
+      el.style.transform=`translateX(${Math.max(dx,-30)}px)`;moved=true;
+      if(window.getSelection)window.getSelection().removeAllRanges(); // 트랙패드 드래그 중 텍스트가 선택돼버리는 것을 방지
+      if(!captured){try{el.setPointerCapture(pid);captured=true;}catch(err){}}
+    }
+  });
+  const endDrag=()=>{
+    if(!dragging)return;
+    dragging=false;
+    el.style.transform='';
+    if(captured&&pid!=null){try{el.releasePointerCapture(pid);}catch(err){}}
+    pid=null;captured=false;
+    if(moved){
+      if(hasMultipleParts){
+        _todoPartModeIdx=(_todoPartModeIdx===i)?-1:i;
+        setTimeout(renderTodos,0);
+      }else if(isRecurring){
+        // 내일 몫은 이미 규칙에 따라 자동으로 다시 실체화되므로 수동 복사는 지원하지 않음(중복 생성 방지).
+        // 별도 처리 코드 없이, 동작만 막고 이유를 안내 — 스와이프했는데 아무 반응이 없는 것보다 명확함.
+        showToast('반복 항목은 복사할 수 없어요');
+      }else{
+        copyWholeTodoToTomorrow(i);
+      }
+    }
+    moved=false;
+  };
+  el.addEventListener('pointerup',endDrag);
+  el.addEventListener('pointercancel',endDrag);
+}
+// 정렬모드 전용 드래그: 같은 시간대 그룹 내에서만, DOM 재생성 없이 transform으로만 이동.
+// 손 뗄 때 1회만 배열 재정렬 + sortOrder 재기록 + 리렌더링.
+// 항목 높이가 제각각(1줄/2줄 텍스트)이라 고정 높이 분할 대신, 형제 요소들의 실제 좌표를 기준으로 판단한다.
+function attachTodoReorderDrag(el,i,tsGroup,itemSelector,onDrop){
+  itemSelector=itemSelector||'.todo-item';
+  onDrop=onDrop||applyTodoReorder;
+  let sy=0,dragging=false,pid=null,captured=false,curShift=0;
+  const handle=el.querySelector('.todo-drag-handle');
+  if(!handle)return;
+  let siblings=[]; // {el, top, mid, height}, 화면 순서대로(자기 자신 제외)
+  const startDrag=(clientY,pointerId)=>{
+    sy=clientY;dragging=true;captured=false;pid=pointerId;curShift=0;
+    el.classList.add('reorder-active');
+    const selfRect=el.getBoundingClientRect();
+    siblings=Array.from(document.querySelectorAll(tsGroup!=null?`${itemSelector}[data-ts-group="${tsGroup}"]`:itemSelector))
+      .filter(s=>s!==el)
+      .map(s=>{const r=s.getBoundingClientRect();return {el:s,top:r.top,mid:r.top+r.height/2,height:r.height};})
+      .sort((a,b)=>a.top-b.top);
+    siblings._selfTop=selfRect.top;
+  };
+  handle.addEventListener('pointerdown',e=>{
+    e.preventDefault();
+    startDrag(e.clientY,e.pointerId);
+    try{handle.setPointerCapture(pid);captured=true;}catch(err){}
+  });
+  handle.addEventListener('pointermove',e=>{
+    if(!dragging)return;
+    const dy=e.clientY-sy;
+    el.style.transform=`translateY(${dy}px)`;
+    const selfH=el.offsetHeight;
+    const selfMid=siblings._selfTop+dy+selfH/2;
+    let shift=0;
+    siblings.forEach(sib=>{
+      if(sib.top<siblings._selfTop&&selfMid<sib.mid)shift-=1; // 위쪽 형제를 앞질렀음
+      else if(sib.top>siblings._selfTop&&selfMid>sib.mid)shift+=1; // 아래쪽 형제를 앞질렀음
+    });
+    if(shift!==curShift){
+      curShift=shift;
+      siblings.forEach(sib=>{
+        const isAbove=sib.top<siblings._selfTop;
+        const willPass=isAbove?(selfMid<sib.mid):(selfMid>sib.mid);
+        sib.el.classList.add('reorder-shift');
+        sib.el.style.transform=willPass?`translateY(${isAbove?selfH:-selfH}px)`:'';
+      });
+    }
+  });
+  const endDrag=()=>{
+    if(!dragging)return;
+    dragging=false;
+    el.classList.remove('reorder-active');
+    el.style.transform='';
+    siblings.forEach(sib=>{sib.el.classList.remove('reorder-shift');sib.el.style.transform='';});
+    if(captured&&pid!=null){try{handle.releasePointerCapture(pid);}catch(err){}}
+    pid=null;captured=false;
+    if(curShift!==0)onDrop(i,tsGroup,curShift);
+    curShift=0;
+  };
+  handle.addEventListener('pointerup',endDrag);
+  handle.addEventListener('pointercancel',endDrag);
+}
+// 리스트 순서 변경(위/아래 이동) 공용 헬퍼 — "정렬된 배열에서 현재 위치 찾기 → shift만큼 이동 →
+// 그룹 내 순서대로 sortOrder 재기록"까지 공통 처리. applyTodoReorder/applyReserveReorder가
+// 그룹 필터링·정렬 기준만 다르고 나머지 구조가 동일했던 것을 하나로 통합.
+// items: 태그가 이미 붙은 배열(각 항목에 idKey로 조회 가능한 고유값 필요) — 호출부가 원본 그대로 넘기면 됨
+// idKey: 각 항목에서 고유 식별값을 꺼내는 함수(a)=>id — 이 값으로 idx(현재 위치의 대상)를 찾음
+// idx: 이동시킬 항목의 식별값(idKey가 반환하는 값과 같은 종류)
+// filterFn: (item)=>boolean — 재정렬 대상 그룹만 추림(그룹 없으면 null로 전체 대상)
+// sortFn: (a,b)=>number — 화면 표시와 동일한 정렬 기준
+// applyOrder: (item,order)=>void — 재정렬 후 각 항목의 실제 저장 위치에 sortOrder를 반영
+// 반환: 재정렬이 실제로 일어났으면 true(호출부가 save+render 수행), 아니면 false
+function reorderListItems(items,idx,shift,filterFn,sortFn,idKey,applyOrder){
+  const group=(filterFn?items.filter(filterFn):items.slice()).sort(sortFn);
+  const curPos=group.findIndex(t=>idKey(t)===idx);
+  if(curPos<0)return false;
+  let newPos=curPos+shift;
+  newPos=Math.max(0,Math.min(group.length-1,newPos));
+  if(newPos===curPos)return false;
+  const [moved]=group.splice(curPos,1);
+  group.splice(newPos,0,moved);
+  group.forEach((t,order)=>applyOrder(t,order));
+  return true;
+}
+// 같은 시간대 그룹 내에서 idx(투두 인덱스) 항목을 shift칸 이동시키고 sortOrder를 재기록.
+// 반복으로 생성된 투두도 todos 배열의 평범한 원소라 별도 처리 없이 이 로직 그대로 적용됨.
+function applyTodoReorder(idx,tsGroup,shift){
+  const dk=dateKey(currentDate);
+  const todos=getTodos(dk);
+  const tagged=todos.map((t,i)=>({...t,_i:i}));
+  const filterFn=t=>!t.done&&(tsGroup==null||(t.timeSection||'none')===tsGroup);
+  const changed=reorderListItems(tagged,idx,shift,filterFn,compareTodoOrder,t=>t._i,(t,order)=>{todos[t._i].sortOrder=order;});
+  if(!changed)return;
+  saveTodos(dk,todos);
+  renderTodos();
+}
+// 보관함 전체 목록 기준 순서 재기록(시간대 그룹 없음, 전체가 하나의 그룹)
+function applyReserveReorder(idx,_g,shift){
+  const todos=getReserveTodos();
+  const tagged=todos.map((t,i)=>({...t,_i:i}));
+  const changed=reorderListItems(tagged,idx,shift,null,
+    (a,b)=>(a.sortOrder!=null?a.sortOrder:9999)-(b.sortOrder!=null?b.sortOrder:9999),
+    t=>t._i,(t,order)=>{todos[t._i].sortOrder=order;});
+  if(!changed)return;
+  saveReserveTodos(todos);
+  renderReserveList();
+}
+// 조각모드가 켜진 상태에서, 그 항목 바깥(다른 투두, 체크박스, 다른 UI 등)을 클릭하면 자동으로 조각모드 해제
+document.addEventListener('click',e=>{
+  if(_todoPartModeIdx<0)return;
+  const activeEl=document.querySelector(`.todo-item[data-part-mode-idx="${_todoPartModeIdx}"]`);
+  if(activeEl&&activeEl.contains(e.target))return; // 조각모드 항목 내부 클릭은 무시(정상 조작)
+  _todoPartModeIdx=-1;
+  renderTodos();
 });
+// 정렬모드 중 카드 바깥을 클릭하면 자동 종료(저장은 이미 각 드래그 종료 시점에 완료된 상태)
+document.addEventListener('click',e=>{
+  if(!_todoReorderMode)return;
+  const card=document.getElementById('todo-card');
+  const btn=document.getElementById('todo-reorder-btn');
+  if(card&&card.contains(e.target))return; // 카드 내부(핸들 포함) 클릭은 무시
+  if(btn&&btn.contains(e.target))return; // 버튼 자체 클릭은 toggleTodoReorderMode가 처리
+  toggleTodoReorderMode();
+});
+// 확인 토스트의 "네" 버튼 - 대기 중인 작업(전체복사 or 조각복사)에 따라 분기
+function confirmTodoCopyToast(){
+  if(_pendingCopyTodoIdx>=0)confirmCopyWholeTodo();
+  else if(_pendingPartCopyIdx>=0)confirmCopyUnstruckParts();
+}
+// 구분자(,/) 없는 단일 항목 전체를 내일로 복사 (오늘 항목은 그대로 유지). 스와이프하면 먼저 확인 토스트로 묻고, "네" 눌러야 실제 복사됨.
+let _pendingCopyTodoIdx=-1,_copyConfirmTimer=null;
+function copyWholeTodoToTomorrow(i){
+  _pendingCopyTodoIdx=i;
+  const t=document.getElementById('todo-copy-confirm-toast');
+  if(!t)return;
+  clearTimeout(_copyConfirmTimer);
+  clearTimeout(_partCopyConfirmTimer);
+  _pendingPartCopyIdx=-1; // 조각복사 확인과 겹치지 않게
+  t.classList.add('on');
+  _copyConfirmTimer=setTimeout(()=>{t.classList.remove('on');_pendingCopyTodoIdx=-1;},4000);
+}
+function confirmCopyWholeTodo(){
+  const t=document.getElementById('todo-copy-confirm-toast');
+  if(t)t.classList.remove('on');
+  clearTimeout(_copyConfirmTimer);
+  const i=_pendingCopyTodoIdx;
+  _pendingCopyTodoIdx=-1;
+  if(i<0)return;
+  const dk=dateKey(currentDate);
+  const tom=new Date(currentDate);tom.setDate(tom.getDate()+1);
+  const tdk=dateKey(tom);
+  const result=relocateTodo(dk,i,tdk,'copy');
+  showToast(result.message);
+  renderTodos();
+}
+// ══════════════════════════════════════════════════════════
+// 굿모닝(모닝 플로우)
+// 카드 6개(휴식/운동/감상/책상/정리/기타)를 누를 때마다 "슬롯"(원형 아이콘)이 하나씩 추가됨(같은 카드도 여러 번, 감상만 1개) → 슬롯을 눌러 종류(서브선택)를 고르고
+// 시작/종료(=리듬블록 자동 등록). 같은 카드 안에서는 하나가 끝나야 다음을 시작(순차), 길게 누르면 슬롯 삭제. 카드 밑 숫자는 이번 달 완료 횟수.
+// 감상(독서/콘텐츠)·책상(일기/노트정리/개인작업)·기타(업무/외출/자유입력)는 같은 패턴 — 슬롯 패널에서 서브선택 칩.
+// 서버 테이블: morning_flow_picks(date_key, picks jsonb=슬롯맵, etc jsonb=미사용 빈 객체, client_ts).
+// ══════════════════════════════════════════════════════════
+const MORNING_FLOW_CARDS=[
+  {key:'rest',label:'휴식',icon:'ti-cup',colorRgb:'var(--pal-mint-rgb)',rhythmCat:'rest'},
+  {key:'exercise',label:'운동',icon:'ti-run',colorRgb:'var(--pal-pink-rgb)',rhythmCat:'exercise'},
+  {key:'enjoy',label:'감상',icon:'ti-stack-2',colorRgb:'var(--pal-lavender-rgb)',rhythmCat:'enjoy'}, // 서브선택(독서/콘텐츠) 필요 — 기타와 동일 패턴
+  {key:'desk',label:'책상',icon:'ti-desk',colorRgb:'var(--pal-yellow-rgb)',rhythmCat:'note',subWrap:true}, // 서브선택(일기/노트정리/개인작업) 필요 — 칩 3개라 줄바꿈 허용(subWrap)
+  {key:'clean',label:'살림',icon:'ti-sparkles',colorRgb:'var(--pal-lime-rgb)',rhythmCat:'home',subWrap:true},
+  {key:'etc',label:'기타',icon:'ti-dots',colorRgb:'var(--pal-warmgray-rgb)',rhythmCat:null} // 서브선택(업무/외출/자유입력)에 따라 카테고리가 갈림
+];
+const MORNING_FLOW_ENJOY_SUB=[
+  {key:'read',label:'독서',icon:'ti-book'},
+  {key:'content',label:'콘텐츠',icon:'ti-device-tv'}
+];
+// 서브선택 상수 — 모닝플로우 카드와 리듬탭 빠른선택 칩이 공용으로 참조(2026-09-19 통합).
+// 종류 추가/수정 시 이 한 곳만 고치면 두 화면(모닝플로우 서브칩, 리듬탭 빠른선택)에 자동 반영됨.
+const RHYTHM_EXERCISE_SUB=[
+  {key:'hometraining',label:'홈트'},
+  {key:'gym',label:'헬스장'},
+  {key:'barre',label:'바레'},
+  {key:'running',label:'러닝'}
+];
+const RHYTHM_REST_SUB=[
+  {key:'nap',label:'낮잠'},
+  {key:'lazing',label:'빈둥빈둥'}
+];
+const RHYTHM_CLEAN_SUB=[
+  {key:'clean',label:'정리'},
+  {key:'laundry',label:'세탁'},
+  {key:'kitchen',label:'주방'}
+];
+const RHYTHM_DESK_SUB=[
+  {key:'diary',label:'일기'},
+  {key:'notes',label:'노트정리'},
+  {key:'work_personal',label:'개인작업'}
+];
+const RHYTHM_WORK_SUB=[
+  {key:'remote',label:'재택'},
+  {key:'field',label:'외근'}
+];
+const MORNING_FLOW_ETC_SUB=[
+  {key:'work',label:'업무',icon:'ti-keyboard',rhythmCat:'work'},
+  {key:'appointment',label:'외출',icon:'ti-bus',rhythmCat:'appointment'},
+  {key:'free',label:'자유입력',icon:'ti-pencil',rhythmCat:null} // 리듬 연동 없음, 텍스트만 로컬+서버 기록
+];
+// 리듬탭 빠른선택 — 리듬 카테고리별 서브선택 목록(감상/외출은 콘텐츠·일정 연동이라 getRhythmChipOptions에서 따로 처리).
+const RHYTHM_QUICK_CHOICES={exercise:RHYTHM_EXERCISE_SUB,rest:RHYTHM_REST_SUB,note:RHYTHM_DESK_SUB,home:RHYTHM_CLEAN_SUB,work:RHYTHM_WORK_SUB};
+// 모닝플로우 카드(key) → 서브선택 목록. 종류 목록은 위 상수 한 곳에서만 정의하고 여기선 연결만 함.
+const MF_SUB_LISTS={etc:MORNING_FLOW_ETC_SUB,enjoy:MORNING_FLOW_ENJOY_SUB,desk:RHYTHM_QUICK_CHOICES.note,exercise:RHYTHM_QUICK_CHOICES.exercise,rest:RHYTHM_QUICK_CHOICES.rest,clean:RHYTHM_QUICK_CHOICES.home};
+// 서브선택 항목({key,label,icon?,rhythmCat?}) 조회 — 라벨/아이콘/리듬카테고리를 한 곳에서 읽음.
+function _mfSubMeta(key,subKey){return (MF_SUB_LISTS[key]||[]).find(x=>x.key===subKey)||null;}
+// 슬롯의 화면 표시 이름 — 고른 종류(서브선택)가 있으면 그 이름, 없으면 카드 이름. withTitle이면 기타에서 고른 제목(일정/재택 등)을 우선.
+function _mfSlotLabel(slot,withTitle){
+  const card=MORNING_FLOW_CARDS.find(c=>c.key===slot.key);
+  return (withTitle&&slot.key==='etc'&&slot.title)||_mfSubMeta(slot.key,slot.sub)?.label||card.label;
+}
+// 오늘의 문구 — 선택 전/선택 후 두 세트, 날짜 기준 시드로 같은 날엔 같은 문구가 나오도록 고정(선택 전→후 전환 시 톤만 바뀜).
+const MORNING_FLOW_PHRASES_BEFORE=[
+  '오늘도 좋은 기운으로 하루를 열어봐요.','좋아하는 일로 오늘을 시작해볼까요?','오늘은 어떤 하루를 만들어볼까요?',
+  '기분 좋은 시작이 하루를 바꿔요.','오늘도 나에게 맞는 아침을 골라보세요.','새로운 하루, 무엇부터 시작해볼까요?',
+  '오늘의 에너지를 어디에 써볼까요?','하고 싶은 것부터 하나씩 시작해봐요.','가볍게 시작해도, 힘차게 시작해도 좋아요.',
+  '좋은 하루를 위한 첫 시간을 골라보세요.','오늘의 시작을 내가 골라볼까요?','움직여도 좋고, 쉬어도 좋은 아침이에요.',
+  '오늘도 하고 싶은 것부터 시작해요.'
+];
+const MORNING_FLOW_PHRASES_AFTER=[
+  '좋아요, 오늘은 이렇게 시작해볼게요.','오늘의 아침이 정해졌어요.','좋은 시작이에요. 이제 하나씩 해볼까요?',
+  '좋아요, 오늘도 나답게 시작해요.','오늘은 이 시간들로 채워볼게요.','오늘의 아침, 이렇게 보내볼까요?',
+  '내가 고른 아침으로 하루를 열어요.','좋아요. 오늘의 시작이 준비됐어요.','오늘의 리듬을 이렇게 만들어볼게요.',
+  '고른 것부터 하나씩 시작해봐요.','오늘 아침도 내가 원하는 모습으로.','오늘의 첫 장면을 골랐어요.',
+  '오늘의 시작이 조금 더 선명해졌어요.'
+];
+// 날짜(dk) 문자열을 시드로 한 결정적 해시 — 같은 날엔 항상 같은 값, len으로 나눈 나머지를 인덱스로 사용.
+// 오버플로우 없는 부호 없는 32비트 해시(>>>0) 방식으로 통일.
+function dateSeedIndex(dk,len){
+  let seed=0;for(let i=0;i<dk.length;i++)seed=(seed*31+dk.charCodeAt(i))>>>0;
+  return seed%len;
+}
+function _mfPhraseIndex(dk,len){
+  return dateSeedIndex(dk,len);
+}
+// HH:MM 두 시각의 분단위 소요시간 — 자정을 넘긴 경우(예: 23:50~00:10)도 고려해 종료가 시작보다 이르면 24시간을 더함.
+function _mfDurationMin(startStr,endStr){
+  const [sh,sm]=startStr.split(':').map(Number);
+  const [eh,em]=endStr.split(':').map(Number);
+  let startMin=sh*60+sm,endMin=eh*60+em;
+  if(endMin<startMin)endMin+=1440;
+  return endMin-startMin;
+}
+// 모닝플로우 저장 구조(2026-09-20 복수 슬롯 개편): flow.picks = {슬롯id: {key(카드), sub, title, text, status, t(생성시각), blockCid, ...}}.
+// 같은 카드도 슬롯을 여러 개 만들 수 있음(예: 업무+외출). 옛 구조(카드별 pick + flow.etc/enjoy/... 별도 상태)는 서버 기록을 일괄 변환하고 변환 코드도 제거함(2026-09-20).
+function getMorningFlow(dk){return S.get('mflow_'+dk)||{picks:{}};}
+// 슬롯 목록(생성순) — flow.picks의 값에 id를 붙인 사본. 수정은 항상 flow.picks[id]에 해야 함.
+function _mfSlots(flow){return Object.keys(flow.picks).map(id=>({...flow.picks[id],id})).sort((a,b)=>(a.t||0)-(b.t||0));}
+// 같은 카드의 다른 슬롯이 진행중이면 새로 시작할 수 없음(같은 카드 안에서는 순차 진행).
+function _mfSiblingRunning(flow,id){const me=flow.picks[id];return Object.keys(flow.picks).some(k=>k!==id&&flow.picks[k].key===me.key&&flow.picks[k].status==='running');}
+const MF_BLOCKED_MSG='같은 카드는 하나가 끝나야 다음을 시작할 수 있어요';
+// [2026-09-05] 모닝플로우 카드의 시작/종료 시각은 더 이상 flow.picks에 별도 저장하지 않고
+// 항상 연결된 리듬블록(blockCid)에서 직접 읽어옴 — 리듬탭에서 시간을 수정해도 즉시 반영되고,
+// "복제된 값이 원본과 어긋나는" 불일치가 구조적으로 사라짐.
+// 블록이 삭제된 경우(null 리턴) 호출부에서 해당 pick을 idle로 되돌리는 처리를 함께 함.
+function _mfBlockFor(dk,blockCid){
+  if(!blockCid)return null;
+  return getRhythmBlocks(dk).find(b=>b.cid===blockCid)||null;
+}
+// 감상 칩(독서/콘텐츠 여러 개 중 고르기) 표기용 — 6자 넘으면 5자+…로 축약(2026-09-05).
+function _mfShortTitle(title){
+  return title.length>6?title.slice(0,5)+'…':title;
+}
+// 이번 달(1일~오늘) 로컬에 저장된 mflow_YYYY-MM-DD 전부를 훑어 카드별(key) 누적 완료 횟수 집계(슬롯 단위) — 그리드 카드 하단 표시용.
+function getMorningFlowMonthCounts(mk){
+  const counts={};
+  MORNING_FLOW_CARDS.forEach(c=>counts[c.key]=0);
+  for(let i=0;i<localStorage.length;i++){
+    const k=localStorage.key(i);
+    if(!k||!k.startsWith('mflow_')||!k.startsWith('mflow_'+mk))continue;
+    const flow=S.get(k);
+    if(!flow||!flow.picks)continue;
+    Object.keys(flow.picks).forEach(pk=>{const p=flow.picks[pk];const ck=(p&&p.key)||pk;if(counts[ck]!==undefined&&p&&p.status==='done')counts[ck]++;}); // 슬롯의 key가 카드. 옛 구조로 기기에 남은 과거 로컬 기록(id=카드key)도 세도록 pk 폴백(이번 달이 지나면 불필요)
+  }
+  return counts;
+}
+// pending 플래그: Up이 아직 서버에 반영 안 된 로컬 변경사항이 있으면 syncMorningFlowDown이 그 날짜를 덮어쓰지 않도록 방지
+// (기존엔 autoSync가 완료를 기다리지 않고 fire-and-forget이라, 새로고침 시 syncAll의 Down이 먼저 실행되며 방금 로컬에 저장한 진행상태를 서버의 옛 데이터로 되돌리는 버그가 있었음 — 2026-09-03 수정)
+function saveMorningFlow(dk,data){data._localTs=Date.now();S.set('mflow_'+dk,data);S.set(S.key('mflow_pending',dk),true);autoSync('mflow',dk);}
+async function syncMorningFlowUp(dk){
+  const flow=getMorningFlow(dk);
+  const clientTs=flow._localTs||Date.now();
+  // picks = 슬롯 맵(각 값에 key=카드). etc 컬럼은 더 이상 쓰지 않음(빈 객체) — 컬럼 자체는 옛 캐시 버전의 업로드가 실패하지 않도록 남겨둠.
+  const ok=await supaUpsert('morning_flow_picks','date_key',[{date_key:dk,picks:flow.picks||{},etc:{},client_ts:clientTs}]);
+  // 업로드 도중(await 대기 중) 그 사이 다른 로컬 변경이 또 들어와 _localTs가 갱신됐을 수 있으므로,
+  // "지금 올린 시각과 현재 로컬 시각이 같을 때만" pending 해제 — 아니면 그 사이의 새 변경분이 아직 안 올라간 것으로 간주.
+  if(ok){const cur=getMorningFlow(dk);if((cur._localTs||0)<=clientTs)S.set(S.key('mflow_pending',dk),false);}
+  return !!ok;
+}
+async function syncMorningFlowDown(dk){
+  if(S.get(S.key('mflow_pending',dk)))return; // 아직 업로드 안 된 로컬 변경사항이 있으면 서버값으로 덮어쓰지 않음
+  const rows=await supaFetch(`morning_flow_picks?date_key=eq.${dk}`);
+  if(!rows)return;
+  if(!rows.length){
+    const local=getMorningFlow(dk);
+    if(Object.keys(local.picks||{}).length)await syncMorningFlowUp(dk);
+    return;
+  }
+  const r=rows[0];
+  const local=getMorningFlow(dk);
+  // 서버 client_ts가 로컬 _localTs보다 오래됐거나 같으면(=로컬이 더 최신이거나 동시) 덮어쓰지 않음.
+  // 서버에 client_ts가 없는 옛 레코드(마이그레이션 이전)는 0으로 취급해 항상 로컬 우선.
+  if((r.client_ts||0)<=(local._localTs||0)&&(local._localTs||0)>0)return;
+  S.set('mflow_'+dk,{picks:r.picks||{},_localTs:r.client_ts||Date.now()});
+}
+// ── 슬롯 조작(2026-09-20) ──
+let _mfSelId=null; // 화면에서 펼쳐 둔 슬롯 id(저장하지 않는 화면 상태)
+let _mfLpFired=false; // 길게 눌러 삭제가 방금 발동했는지(뒤따르는 click 무시용)
+function _mfNewSlotId(flow){let id;do{id='s'+Date.now().toString(36)+Math.floor(Math.random()*36).toString(36);}while(flow.picks[id]);return id;}
+// 그리드 카드를 누르면 그 카드의 슬롯이 하나 추가됨 — 같은 카드도 여러 번(예: 업무+외출). 감상은 스톱워치 연동이라 하나만.
+function addMorningFlowSlot(key){
+  const dk=dateKey(getLogicalDate());
+  const flow=getMorningFlow(dk);
+  if(key==='enjoy'){
+    const ex=_mfSlots(flow).find(s=>s.key==='enjoy');
+    if(ex){_mfSelId=ex.id;refreshMorningFlowCard();return;}
+  }
+  const id=_mfNewSlotId(flow);
+  flow.picks[id]={key,sub:null,status:'idle',t:Date.now()};
+  _mfSelId=id;
+  saveMorningFlow(dk,flow);
+  refreshMorningFlowCard();
+}
+function selectMorningFlowSlot(id){_mfSelId=(_mfSelId===id)?null:id;refreshMorningFlowCard();}
+// 슬롯 삭제 — 길게 누르기 또는 패널의 "삭제". 이미 시작한 슬롯은 확인 후 슬롯만 지움(리듬바 기록은 그대로 남음).
+function deleteMorningFlowSlot(id){
+  const dk=dateKey(getLogicalDate());
+  const flow=getMorningFlow(dk);
+  const s=flow.picks[id];
+  if(!s)return;
+  if(s.status!=='idle'&&!confirm('이미 시작한 활동이에요. 슬롯만 지울까요? 리듬바 기록은 그대로 남아요.'))return;
+  delete flow.picks[id];
+  if(_mfSelId===id)_mfSelId=null;
+  saveMorningFlow(dk,flow);
+  refreshMorningFlowCard();
+}
+// 슬롯 값 수정 공용 — patch를 병합해 저장하고 화면 갱신.
+function _mfPatchSlot(id,patch){
+  const dk=dateKey(getLogicalDate());
+  const flow=getMorningFlow(dk);
+  if(!flow.picks[id])return null;
+  Object.assign(flow.picks[id],patch);
+  saveMorningFlow(dk,flow);
+  refreshMorningFlowCard();
+  return flow.picks[id];
+}
+// 슬롯의 종류(서브선택) 확정 — 감상/책상/운동/휴식/살림/기타 공용.
+function selectMorningFlowSub(id,subKey){_mfPatchSlot(id,{sub:subKey});}
+// 감상(독서/콘텐츠) 대상이 여러 개일 때 칩으로 하나를 고름. 여기선 대상만 확정하고, 실제 시작은 이어서 뜨는 "시작" 버튼(startMorningFlowSlot)에서 함.
+function pickMorningFlowEnjoyTarget(id,cid,mk){_mfPatchSlot(id,{targetCid:cid,targetMk:mk||''});}
+// 기타 > 자유입력 — 시작/종료 없이 입력 즉시 완료 처리(리듬 연동 없음, 텍스트만 기록)
+function submitMorningFlowEtcFreeText(id){
+  const inp=document.getElementById('mf-etc-free-inp');
+  const text=inp?inp.value.trim():'';
+  if(!text)return;
+  _mfPatchSlot(id,{text,status:'done'});
+}
+// 기타 > 업무/외출 — 칩 또는 입력으로 제목을 정하고 곧바로 리듬블록 시작(리듬탭 칩과 같은 소스: getRhythmChipOptions). 외출은 제목 필수, 업무는 제목 없이도 시작 가능.
+function pickMorningFlowEtcTitle(id,title){
+  const dk=dateKey(getLogicalDate());
+  const flow=getMorningFlow(dk);
+  const s=flow.picks[id];
+  if(!s||s.key!=='etc'||(s.sub!=='work'&&s.sub!=='appointment'))return;
+  if(!title&&s.sub==='appointment')return;
+  if(_mfSiblingRunning(flow,id)){showToast(MF_BLOCKED_MSG);return;}
+  s.title=title||'';
+  saveMorningFlow(dk,flow);
+  _startMorningFlowRhythm(id,null,null,s.sub);
+}
+// 슬롯 시작 — 감상은 대상(어떤 책/작품)이 정해졌으면 그걸로 바로 시작, 진행중 작품이 없으면 신규 등록 화면으로 안내.
+function startMorningFlowSlot(id){
+  const dk=dateKey(getLogicalDate());
+  const s=getMorningFlow(dk).picks[id];
+  if(!s)return;
+  if(s.key==='enjoy'){
+    if(s.targetCid){_startMorningFlowRhythm(id,s.targetCid,s.targetMk||null);return;}
+    if(s.sub==='content'&&!_getOngoingWatchingWithCid().some(c=>c.cid))openWatchNewContentPicker(); // 독서(진행중 책 없음)/서브선택 전은 조용히 무시
+    return;
+  }
+  if(!s.sub||s.sub==='free')return; // 서브선택 전이거나 자유입력(시작 버튼 없음)
+  _startMorningFlowRhythm(id,null,null,s.sub);
+}
+// 실제 리듬블록 시작 등록 — id: 슬롯, targetCid: 감상(독서/콘텐츠)일 때 대상 cid, mk: 콘텐츠 월키, subKey: 서브선택 키.
+// 리듬탭에서 수동 등록 시 호출되는 autoCheckHabitFromRhythm(운동→습관 자동체크)를 여기서도 동일하게 호출해야 습관탭과 연동됨.
+function _startMorningFlowRhythm(id,targetCid,mk,subKey){
+  const dk=dateKey(getLogicalDate());
+  const flow=getMorningFlow(dk);
+  const s=flow.picks[id];
+  if(!s)return;
+  if(_mfSiblingRunning(flow,id)){showToast(MF_BLOCKED_MSG);return;}
+  const key=s.key;
+  if(key==='enjoy'){
+    const now=Date.now();
+    // 독서/콘텐츠 스톱워치가 리듬블록 생성까지 전담 — 그 블록의 cid(_swBlockCid/_cswBlockCid)만 받아서
+    // 연결고리로 저장. 시작 시각은 더 이상 여기서 복제하지 않고, 화면 표시 시 그 블록에서 직접 읽음.
+    if(s.sub==='read'){toggleStopwatch(targetCid);flow.picks[id]={...s,status:'running',cid:targetCid,blockCid:_swBlockCid,startTs:now};saveMorningFlow(dk,flow);refreshMorningFlowCard();refreshRhythmTrack();return;}
+    if(s.sub==='content'){toggleContentStopwatch(targetCid,mk);flow.picks[id]={...s,status:'running',cid:targetCid,mk,blockCid:_cswBlockCid,startTs:now};saveMorningFlow(dk,flow);refreshMorningFlowCard();refreshRhythmTrack();return;}
+    return;
+  }
+  // 휴식/운동/정리/기타(업무·외출)/책상(일기·노트정리·개인작업) — 리듬블록을 end 없이 직접 생성해두고 종료 시 채우는 방식(콘텐츠 시청 스톱워치와 동일 패턴).
+  const card=MORNING_FLOW_CARDS.find(c=>c.key===key);
+  const rhythmCat=key==='etc'?_mfSubMeta('etc',subKey)?.rhythmCat:card.rhythmCat;
+  // label: 카테고리 라벨과 구분되는 "진짜 세부정보"가 있을 때만 채움(기타는 고른 제목, 나머지는 종류 이름) — 카테고리 라벨과 중복되는 "업무 · 업무" 방지(2026-09-18).
+  const label=key==='etc'?(s.title||''):(_mfSubMeta(key,subKey)?.label||'');
+  const now=Date.now();
+  const startMin=new Date(now).getHours()*60+new Date(now).getMinutes();
+  const startStr=minToHHMM(startMin);
+  const blockCid=genCid();
+  const blocks=getRhythmBlocks(dk);
+  blocks.push({cat:rhythmCat,start:startStr,end:'',text:label,created:now,cid:blockCid});
+  saveRhythmBlocks(dk,blocks); // saveRhythmBlocks 내부에서 이미 autoSync('rblocks',dk) 호출 — 중복 호출 금지(2026-09-13 정리)
+  if(rhythmCat==='home'){
+    if(subKey==='clean')checkHabitDirect('tidy',dk,startStr); // 살림 중 '정리' 칩일 때만 습관 연결 — 세탁/주방은 제외(리듬탭 수기등록과 동일 규칙)
+  }else{
+    autoCheckHabitFromRhythm(rhythmCat,dk,startStr); // 운동→습관 자동체크 등, 리듬탭 수동등록과 동일하게 연동
+  }
+  if(key==='desk'&&subKey==='diary')checkHabitDirect('diary',dk,startStr); // 리듬탭에서 note+"일기" 텍스트일 때 자동체크되던 것과 동일하게 연동
+  flow.picks[id]={...s,status:'running',blockCid,startTs:now,subKey:subKey||null};
+  saveMorningFlow(dk,flow);
+  refreshMorningFlowCard();
+  refreshRhythmTrack();
+}
+// 슬롯 종료 — 독서/콘텐츠는 각자의 종료 로직(진행률 모달까지)을 그대로 재사용, 나머지는 리듬블록 end만 채움.
+// 시각(startStr/endStr)은 저장하지 않음 — status와 연결고리(blockCid/cid)만 남기고, 실제 시:분 표시는 화면 렌더 시점에 리듬블록을 조회해서 채움(_mfBlockFor).
+function endMorningFlowSlot(id){
+  const dk=dateKey(getLogicalDate());
+  const flow=getMorningFlow(dk);
+  const s=flow.picks[id];
+  if(!s||s.status!=='running')return;
+  if(s.key==='enjoy'){
+    // 1분 미만 자동삭제 로직 완전 제거(2026-09-03) — 몇 초든 시작~종료 구간을 그대로 기록, 다른 카테고리와 동일 규칙.
+    if(s.sub==='read')toggleStopwatch();
+    else if(s.sub==='content')stopContentStopwatch();
+    else return;
+  }else{
+    const blocks=getRhythmBlocks(dk);
+    const idx=blocks.findIndex(b=>b.cid===s.blockCid);
+    if(idx>=0){
+      const endD=new Date();
+      let endMin=endD.getHours()*60+endD.getMinutes();
+      if(dateKey(getLogicalDate(endD.getTime()))!==dk)endMin+=1440;
+      blocks[idx].end=minToHHMM(endMin%1440);
+      saveRhythmBlocks(dk,blocks); // saveRhythmBlocks 내부에서 이미 autoSync('rblocks',dk) 호출 — 중복 호출 금지(2026-09-13 정리)
+    }
+  }
+  flow.picks[id]={...s,status:'done'};
+  saveMorningFlow(dk,flow);
+  refreshMorningFlowCard();
+  refreshRhythmTrack();
+}
+function refreshMorningFlowCard(){
+  const old=document.getElementById('morning-flow-card');
+  if(!old)return;
+  old.replaceWith(makeMorningFlowCard());
+}
+// 서브선택 대기 행 — 슬롯의 카드명 옆에 종류 칩을 나란히 배치. 목록은 MF_SUB_LISTS, 줄바꿈 여부는 카드의 subWrap.
+function _mfSubPickRowHtml(c,id){
+  return `<div class="mf-start-row">
+      <div class="mf-start-icon" style="background:rgba(${c.colorRgb},0.18);"><i class="ti ${c.icon}" style="font-size:17px;color:rgb(${c.colorRgb});" aria-hidden="true"></i></div>
+      <div class="mf-label" style="flex:0 0 auto;">${c.label}</div>
+    <div class="mf-etc-chips" style="margin-top:0;flex:1;justify-content:flex-end;${c.subWrap?'flex-wrap:wrap;':''}">${MF_SUB_LISTS[c.key].map(x=>`<div class="mf-etc-chip" onclick="selectMorningFlowSub('${id}','${x.key}')">${x.label}</div>`).join('')}</div>
+  </div>`;
+}
+// 세로형 행(아이콘+이름 위, 칩/입력 아래) — 감상 대상 고르기 / 기타 자유입력 / 업무·외출 제목 고르기 공용 마크업.
+function _mfStackedRowHtml(c,icon,label,bodyHtml){
+  return `<div class="mf-start-row" style="flex-direction:column;align-items:stretch;">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div class="mf-start-icon" style="background:rgba(${c.colorRgb},0.18);"><i class="ti ${icon}" style="font-size:17px;color:rgb(${c.colorRgb});" aria-hidden="true"></i></div>
+      <div class="mf-label">${label}</div>
+    </div>
+    ${bodyHtml}
+  </div>`;
+}
+// 펼쳐진 슬롯의 패널 — 상태에 따라 종류 선택 → (감상 대상 / 자유입력 / 업무·외출 제목) → 시작·종료 행.
+function _mfPanelHtml(dk,flow,slot,c){
+  const id=slot.id,sub=slot.sub;
+  if(!sub)return _mfSubPickRowHtml(c,id);
+  // 감상(독서/콘텐츠) 서브선택은 끝났지만 아직 대상(어떤 책/작품)을 안 고른 상태 — 칩으로 대상만 먼저 고르고, 시작 행이 뜨면 시작 버튼을 누르는 2단계 구조.
+  // 3개 이상이면 줄바꿈 대신 가로 스와이프(rhythm-content-picker-swipe, 리듬탭에서 쓰던 것과 동일 패턴).
+  if(slot.key==='enjoy'&&slot.status==='idle'&&!slot.targetCid){
+    const ongoing=sub==='read'?_getOngoingReadingWithCid():_getOngoingWatchingWithCid().filter(x=>x.cid);
+    if(ongoing.length>1){
+      const wrapClass=ongoing.length>2?'rhythm-content-picker rhythm-content-picker-swipe':'rhythm-content-picker';
+      const chipsHtml=`<div class="${wrapClass}">${ongoing.map(item=>{
+        const mkArg=sub==='content'?(item._mk||''):'';
+        return `<span class="rhythm-content-chip" onclick="pickMorningFlowEnjoyTarget('${id}','${item.cid}','${mkArg}')">${escapeHtml(_mfShortTitle(item.title||''))}</span>`;
+      }).join('')}</div>`;
+      const meta=_mfSubMeta('enjoy',sub);
+      return _mfStackedRowHtml(c,meta.icon,'감상 · '+meta.label,chipsHtml);
+    }
+    // 1개뿐이면 고를 필요 없이 바로 그 항목을 대상으로 확정(칩 자체를 생략). 0개면 아래 공용 시작 행이 신규 등록 화면으로 안내.
+    if(ongoing.length===1){
+      slot.targetCid=ongoing[0].cid;slot.targetMk=sub==='content'?(ongoing[0]._mk||''):'';
+      flow.picks[id].targetCid=slot.targetCid;flow.picks[id].targetMk=slot.targetMk;
+      saveMorningFlow(dk,flow);
+    }
+  }
+  if(slot.key==='etc'&&sub==='free'){
+    const savedText=slot.text||'';
+    const freeBody=slot.status==='done'
+      ?`<div class="mf-status" style="margin-top:6px;">${escapeHtml(savedText)}</div>`
+      :`<div style="display:flex;gap:6px;margin-top:8px;"><input id="mf-etc-free-inp" class="modal-inp" style="margin-bottom:0;flex:1;" placeholder="예: 병원 다녀옴" value="${escapeHtml(savedText)}"><button class="mf-start-btn" style="border-color:rgba(${c.colorRgb},0.6);color:rgb(${c.colorRgb});" onclick="submitMorningFlowEtcFreeText('${id}')">저장</button></div>`;
+    return _mfStackedRowHtml(c,'ti-pencil','기타 · 자유입력',freeBody);
+  }
+  // 기타 > 업무/외출 — 아직 제목을 안 정한 상태: 오늘 일정(업무는 업무 일정+재택/외근, 외출은 시간 지정 일정)을 칩으로 제시하고,
+  // 칩(또는 직접 입력)을 누르면 그 제목으로 바로 시작. 리듬탭과 같은 소스(getRhythmChipOptions).
+  if(slot.key==='etc'&&(sub==='work'||sub==='appointment')&&!slot.title&&slot.status==='idle'){
+    const chips=getRhythmChipOptions(sub);
+    const chipsHtml=chips.length?`<div class="rhythm-content-picker">${chips.map(x=>`<span class="rhythm-content-chip" data-t="${escapeAttr(x.label)}" onclick="pickMorningFlowEtcTitle('${id}',this.dataset.t)">${escapeHtml(x.label)}</span>`).join('')}</div>`:'';
+    const meta=_mfSubMeta('etc',sub);
+    return _mfStackedRowHtml(c,meta.icon,'기타 · '+meta.label,chipsHtml+`<div style="display:flex;gap:6px;margin-top:8px;"><input id="mf-etc-title-inp" class="modal-inp" style="margin-bottom:0;flex:1;" placeholder="${sub==='work'?'예: 재택':'예: 병원'}" value=""><button class="mf-start-btn" style="border-color:rgba(${c.colorRgb},0.6);color:rgb(${c.colorRgb});" onclick="pickMorningFlowEtcTitle('${id}',document.getElementById('mf-etc-title-inp').value.trim())">시작</button></div>`);
+  }
+  const label=_mfSlotLabel(slot,true);
+  const icon=_mfSubMeta(slot.key,sub)?.icon||c.icon;
+  // 시각은 저장값이 아니라 연결된 리듬블록(blockCid)에서 그때그때 읽음 — 리듬탭에서 시간을 고치면 바로 반영됨.
+  const linkedBlock=_mfBlockFor(dk,slot.blockCid);
+  let statusText='시작 전',btnText='시작',btnOn=false;
+  if(slot.status==='running'){
+    statusText=linkedBlock&&linkedBlock.start?`${linkedBlock.start}부터 진행중`:'진행중';
+    btnText='종료';btnOn=true;
+  }else if(slot.status==='done'){
+    statusText=(linkedBlock&&linkedBlock.start&&linkedBlock.end)?`${linkedBlock.start}-${linkedBlock.end} · ${_mfDurationMin(linkedBlock.start,linkedBlock.end)}분`:'완료';
+  }
+  const btnHtml=slot.status==='done'
+    ?`<i class="ti ti-check" style="font-size:16px;color:rgb(${c.colorRgb});" aria-hidden="true"></i>`
+    :`<button class="mf-start-btn${btnOn?' running':''}" style="${btnOn?`background:rgb(${c.colorRgb});`:`border-color:rgba(${c.colorRgb},0.6);color:rgb(${c.colorRgb});`}" onclick="${btnOn?`endMorningFlowSlot('${id}')`:`startMorningFlowSlot('${id}')`}">${btnText}</button>`;
+  return `<div class="mf-start-row">
+    <div class="mf-start-icon" style="background:rgba(${c.colorRgb},0.18);"><i class="ti ${icon}" style="font-size:17px;color:rgb(${c.colorRgb});" aria-hidden="true"></i></div>
+    <div style="flex:1;"><div class="mf-label">${label}</div><div class="mf-status">${statusText}</div></div>
+    ${btnHtml}
+  </div>`;
+}
+// 모닝플로우 카드 — 위: 카드 그리드(누르면 슬롯 추가, 숫자=이번 달 완료 횟수), 아래: 오늘의 슬롯(원형 아이콘) + 펼친 슬롯의 패널.
+// 슬롯 상태: 시작 전(테두리만) / 진행중(옅은 색+깜빡임) / 완료(꽉 채움). 길게 누르면 삭제.
+function makeMorningFlowCard(){
+  const dk=dateKey(getLogicalDate());
+  const flow=getMorningFlow(dk);
+  // [2026-09-05] 리듬탭에서 blockCid로 연결된 리듬블록을 직접 지워버린 경우 — "하려다가 안 한 것"으로 보고 해당 슬롯을 통째로 지움.
+  // [2026-09-13] done인데 blockCid가 애초에 없는 케이스는 정상 흐름에선 없음(자유입력은 리듬 연동이 없어 blockCid가 없는 게 정상이라 제외).
+  let _flowPruned=false;
+  Object.keys(flow.picks).forEach(id=>{
+    const p=flow.picks[id];
+    const blockGone=(p.status==='running'||p.status==='done')&&p.blockCid&&!_mfBlockFor(dk,p.blockCid);
+    const noRecordMade=p.status==='done'&&!p.blockCid&&p.sub!=='free';
+    if(blockGone||noRecordMade){delete flow.picks[id];_flowPruned=true;}
+  });
+  if(_flowPruned)saveMorningFlow(dk,flow);
+  const slots=_mfSlots(flow);
+  // 펼친 슬롯이 없거나 사라졌으면, 진행중인 슬롯이 있을 때 그걸 펼침(재진입 시 바로 종료 버튼이 보이도록)
+  if(!slots.some(x=>x.id===_mfSelId))_mfSelId=(slots.find(x=>x.status==='running')||{}).id||null;
+  const phrases=slots.length?MORNING_FLOW_PHRASES_AFTER:MORNING_FLOW_PHRASES_BEFORE;
+  const phrase=phrases[_mfPhraseIndex(dk,phrases.length)];
+
+  const hero=document.createElement('div');
+  hero.className='mf-hero';
+  hero.id='morning-flow-card';
+  const dateLabel=(dk.split('-')[1]|0)+'월 '+(dk.split('-')[2]|0)+'일';
+  const monthCounts=getMorningFlowMonthCounts(dk.slice(0,7));
+  const gridHtml=MORNING_FLOW_CARDS.map(c=>`<div class="mf-card" onclick="addMorningFlowSlot('${c.key}')">
+      <i class="ti ${c.icon} mf-card-icon" style="color:rgb(${c.colorRgb});" aria-hidden="true"></i>
+      <span class="mf-card-label">${c.label}</span>
+      <span class="mf-card-count">${monthCounts[c.key]||0}</span>
+    </div>`).join('');
+  const slotsHtml=slots.length?`<div class="mf-slots">${slots.map(x=>{
+    const c=MORNING_FLOW_CARDS.find(cc=>cc.key===x.key);
+    const icon=_mfSubMeta(x.key,x.sub)?.icon||c.icon;
+    return `<div class="mf-slot ${x.status}${x.id===_mfSelId?' sel':''}" data-id="${x.id}" style="--mf-rgb:${c.colorRgb};" role="button" tabindex="0" aria-label="${_mfSlotLabel(x,true)}"><i class="ti ${icon}" aria-hidden="true"></i></div>`;
+  }).join('')}</div>`:'';
+  const sel=slots.find(x=>x.id===_mfSelId);
+  const panelHtml=sel?`<div class="mf-panel">${_mfPanelHtml(dk,flow,sel,MORNING_FLOW_CARDS.find(cc=>cc.key===sel.key))}<div class="mf-slot-del" onclick="deleteMorningFlowSlot('${sel.id}')">삭제</div></div>`:'';
+  hero.innerHTML=`<div class="mf-hero-inner">
+    <div class="mf-hero-top-row"><div class="mf-hero-date">${dateLabel}</div></div>
+    <div class="mf-hero-line${slots.length?' picked':''}">${phrase}</div>
+    <div class="mf-grid">${gridHtml}</div>
+    ${slotsHtml}${panelHtml}
+  </div>`;
+  // 슬롯 누르기(펼치기/접기) + 길게 누르기(삭제) — 슬롯은 렌더마다 다시 그려지므로 카드에 위임해서 처리.
+  let lp=null;
+  hero.addEventListener('pointerdown',e=>{
+    const t=e.target.closest('.mf-slot');if(!t)return;
+    _mfLpFired=false;
+    lp=setTimeout(()=>{_mfLpFired=true;deleteMorningFlowSlot(t.dataset.id);},600);
+  });
+  ['pointerup','pointerleave','pointercancel'].forEach(ev=>hero.addEventListener(ev,()=>clearTimeout(lp)));
+  hero.addEventListener('click',e=>{
+    const t=e.target.closest('.mf-slot');if(!t)return;
+    if(_mfLpFired){_mfLpFired=false;return;}
+    selectMorningFlowSlot(t.dataset.id);
+  });
+  return hero;
+}
+let _sleepScoreModalDk='';
+function promptSleepScore(dk){
+  _sleepScoreModalDk=dk;
+  const cur=getSleepScore(dk);
+  const inp=document.getElementById('sleep-score-inp');
+  if(inp)inp.value=cur!=null?String(cur):'';
+  openModal('sleep-score-modal');
+  setTimeout(()=>{if(inp)inp.focus();},80);
+}
+function confirmSleepScore(){
+  const inp=document.getElementById('sleep-score-inp');
+  const num=parseInt(inp.value,10);
+  if(isNaN(num)||num<0||num>100){
+    inp.style.borderColor='var(--pal-rose-text)';
+    return;
+  }
+  saveSleepScore(_sleepScoreModalDk,num);
+  closeModal('sleep-score-modal');
+  renderSleepAvgScoreBadge();
+}
+
+// 완료 개수 카운트 — 조각 단위. 조각이 있는 투두는 완료된 조각 수만큼, 조각 없는 투두는 done이면 1개로 센다.
+// (활동 분포 점 찍기와 동일한 단위로 통일 — 파트별로 하나씩 끝낼 때마다 카운트되는 게 실사용에 더 맞음)
+function _paceCountDoneUntilNow(dk,nowMinLimit){
+  const todos=getTodos(dk);
+  let count=0;
+  todos.forEach(t=>{
+    const st=t.strikeTimes||{};
+    const timeEntries=Object.entries(st).filter(([,v])=>typeof v==='number');
+    if(timeEntries.length){
+      // 조각 투두 — 완료된 조각마다 1개씩, nowMinLimit 있으면 해당 조각의 완료 시각으로 필터
+      timeEntries.forEach(([,ms])=>{
+        if(nowMinLimit==null){count++;return;}
+        const d=new Date(ms);
+        if(d.getHours()*60+d.getMinutes()<=nowMinLimit)count++;
+      });
+    }else if(t.done){
+      // 조각 없는 일반 투두 — done이면 1개
+      if(nowMinLimit==null){count++;return;}
+      if(!t.completedAt)return; // completedAt 없는 과거 데이터는 시각 비교 불가하므로 제외
+      const d=new Date(t.completedAt);
+      if(d.getHours()*60+d.getMinutes()<=nowMinLimit)count++;
+    }
+  });
+  return count;
+}
+function _paceHabitCheckedCount(dk,nowMinLimit){
+  const wk=weekKey(new Date(dk+'T00:00:00'));
+  const dow=(new Date(dk+'T00:00:00').getDay()+6)%7;
+  const habits=getHabits();
+  const checks=getHabitChecks(wk);
+  const times=getHabitCheckTimes(wk);
+  return habits.filter(h=>{
+    const key=h.id+'-'+dow;
+    if(!checks[key])return false;
+    if(nowMinLimit==null)return true; // 하루 전체 기준(지난주 물채우기 등)
+    const t=times[key];
+    if(!t)return false; // 시각 기록 없는 과거 체크는 시각 비교 불가하므로 제외
+    return _dawnTimeToMin(t)<=nowMinLimit;
+  }).length;
+}
+function _paceTopRhythmCat(dk){
+  const blocks=getRhythmBlocks(dk);
+  const dur={};
+  const catBlocks={}; // 카테고리별 블록 목록(메모 텍스트 탐색용)
+  const isToday=dk===dateKey(getLogicalDate());
+  const nowMin=isToday?(new Date().getHours()*60+new Date().getMinutes()):null;
+  blocks.forEach(b=>{
+    if(b.cat==='_sleep')return; // 수면은 항상 최장이라 최다카테고리 후보에서 제외
+    const s=_dawnTimeToMin(b.start);
+    if(s==null)return;
+    let e;
+    if(b.end){
+      e=_dawnTimeToMin(b.end);
+    }else if(isToday&&nowMin!=null){
+      // 진행중 블록(종료 미입력) — 오늘 데이터라면 현재 시각까지로 잠정 집계
+      e=nowMin;
+    }else{
+      return; // 오늘이 아닌데 종료가 없으면 집계 제외(과거 데이터 이상값 방어)
+    }
+    let d=e-s;if(d<0)d+=1440;
+    dur[b.cat]=(dur[b.cat]||0)+d;
+    (catBlocks[b.cat]=catBlocks[b.cat]||[]).push({...b,_dur:d});
+  });
+  const top=Object.keys(dur).sort((a,b)=>dur[b]-dur[a])[0];
+  if(!top)return null;
+  // 최다 카테고리 블록들 중 메모(text)가 있는 것 하나 — 가장 긴 블록 우선
+  const memoBlock=(catBlocks[top]||[]).filter(b=>b.text&&b.text.trim()).sort((a,b)=>b._dur-a._dur)[0];
+  const memo=memoBlock?memoBlock.text.trim():'';
+  if(RHYTHM_CATS[top])return {key:top,icon:RHYTHM_CATS[top].icon,color:RHYTHM_CATS[top].color,label:RHYTHM_CATS[top].label,memo};
+  if(top==='_meal')return {key:top,icon:'ti-tools-kitchen-3',color:RHYTHM_MEAL_COLOR,label:'식사',memo};
+  return null;
+}
+
+// ══════════════════════════════════════════════════════════
+// 오후 홈탭 "오늘의 흐름" 카드 (2026-09-04 개편 — 기존 무거운 오후 통계카드를 대체)
+// 12~19시 가로 타임라인(식사/할일완료/일정/리듬 4종 마커, 외출 리듬은 일정과 중복 잦아 제외)
+// + 완료개수·평소(최근7일)비교 + 오후 남은 할일(탭 이동) + 최근7일 인사이트 한 줄
+// ══════════════════════════════════════════════════════════
+const AFTERNOON_TL_START=12*60,AFTERNOON_TL_END=19*60;
+// 카테고리별(수면 제외) 당일 소요시간(분) 맵 — _paceTopRhythmCat과 동일 집계 로직을 재사용해 별도 함수로 분리.
+function _paceCatDurations(dk){
+  const blocks=getRhythmBlocks(dk);
+  const dur={};
+  const isToday=dk===dateKey(getLogicalDate());
+  const nowMin=isToday?(new Date().getHours()*60+new Date().getMinutes()):null;
+  blocks.forEach(b=>{
+    if(b.cat==='_sleep')return;
+    const s=_dawnTimeToMin(b.start);
+    if(s==null)return;
+    let e;
+    if(b.end)e=_dawnTimeToMin(b.end);
+    else if(isToday&&nowMin!=null)e=nowMin;
+    else return;
+    let d=e-s;if(d<0)d+=1440;
+    dur[b.cat]=(dur[b.cat]||0)+d;
+  });
+  return dur;
+}
+// 오늘 vs 최근 7일(오늘 제외) 비교 특징 문구 — 우선순위: ①최고/최저 기록 ②동률 ③카테고리 최다(업무·외출·운동 등) ④연속기록 ⑤기본(최다리듬 해석).
+// 하나만 골라 반환. 캐시 없이 매 렌더 시 로컬 데이터로 즉시 계산(가벼운 연산이라 실시간 반영).
+function _paceWeekInsight(dk){
+  const totals=[]; // 최근 7일(오늘 제외) 하루 총 완료량
+  for(let i=1;i<=7;i++){
+    const d=new Date(dk+'T00:00:00');d.setDate(d.getDate()-i);
+    totals.push(_paceCountDoneUntilNow(dateKey(d),null));
+  }
+  const todayTotal=_paceCountDoneUntilNow(dk,null);
+  const maxPast=totals.length?Math.max(...totals):0;
+  const minPast=totals.length?Math.min(...totals):0;
+
+  if(todayTotal>maxPast&&todayTotal>0){
+    return {icon:'ti-sparkles',text:'최근 7일 중 오늘이 가장 활발한 하루예요'};
+  }
+  if(todayTotal===maxPast&&todayTotal>0){
+    return {icon:'ti-flame',text:'최근 7일 중 최고 기록과 동률이에요'};
+  }
+  if(todayTotal<minPast||(todayTotal===0&&minPast===0)){
+    return {icon:'ti-droplet',text:'오늘은 조금 여유로운 흐름이에요'};
+  }
+  // 카테고리 최다 — 오늘의 카테고리별 소요시간이 최근 7일 중 최댓값이면 언급(외출 제외)
+  const CAT_PHRASE={work:'업무',exercise:'운동',home:'살림',rest:'휴식',note:'책상',enjoy:'감상',groom:'단장'};
+  const todayDur=_paceCatDurations(dk);
+  for(const cat of Object.keys(CAT_PHRASE)){
+    const todayVal=todayDur[cat]||0;
+    if(todayVal<=0)continue;
+    let isMax=true;
+    for(let i=1;i<=7;i++){
+      const d=new Date(dk+'T00:00:00');d.setDate(d.getDate()-i);
+      const pastVal=(_paceCatDurations(dateKey(d))[cat])||0;
+      if(pastVal>todayVal){isMax=false;break;}
+    }
+    if(isMax)return {icon:'ti-sparkles',text:`이번 주 들어 ${CAT_PHRASE[cat]} 시간이 가장 긴 날이에요`};
+  }
+  // 연속 기록 — 최근 며칠 연속으로 어제보다 같거나 많았는지(느슨한 스트릭)
+  let streak=0;
+  let prev=todayTotal;
+  for(let i=0;i<totals.length;i++){
+    if(totals[i]<=prev){streak++;prev=totals[i];}else break;
+  }
+  if(streak>=3)return {icon:'ti-bolt',text:`${streak}일 연속 평소보다 활발하게 보내고 있어요`};
+
+  // 기본 — 최다 리듬 해석
+  const top=_paceTopRhythmCat(dk);
+  if(top){
+    const LABEL_PHRASE={work:'업무를 중심으로',exercise:'움직이는 시간이',home:'정리하는 시간이',rest:'여유로운 흐름이',note:'책상에 앉아있는 시간이',enjoy:'감상하는 시간이',groom:'단장하는 시간이',_meal:'식사가'};
+    const phrase=LABEL_PHRASE[top.key]||`${top.label}이`;
+    return {icon:'ti-droplet',text:`오늘은 ${phrase} 많은 하루예요`};
+  }
+  return {icon:'ti-droplet',text:'아직 하루의 흐름이 만들어지는 중이에요'};
+}
+// 오늘 남은 오후 할 일(시간대 파트 기준) 개수 — timeSection==='afternoon', 미완료만(일정 제외).
+function _paceAfternoonRemainCount(dk){
+  const todos=getTodos(dk);
+  return todos.filter(t=>!t.isEvent&&!t.done&&t.timeSection==='afternoon').length;
+}
+// 타임라인에 얹을 이벤트 수집 — 식사/할일완료/일정/리듬(외출 제외) 4종, 12~19시 범위만.
+// 리듬은 시작 시각(순간)만 점으로 표시하고, 지속시간(면적)은 쓰지 않음(리듬탭과의 시각 언어 차별화).
+function _paceAfternoonTimelineItems(dk){
+  const items=[];
+  // 식사
+  const meals=getMeals(dk);
+  MEAL_KEYS.forEach(k=>{
+    const t=meals[k+'_time'];
+    if(!t)return;
+    const m=t.split(':');const min=parseInt(m[0],10)*60+parseInt(m[1],10);
+    if(min<AFTERNOON_TL_START||min>AFTERNOON_TL_END)return;
+    items.push({type:'meal',min,time:t,label:(MEAL_LABELS[k]||'식사')+(meals[k]?' · '+meals[k]:''),icon:'ti-tools-kitchen-3'});
+  });
+  // 할일 완료 + 일정(시간표 포함)
+  getTodos(dk).forEach(t=>{
+    if(t.isEvent){
+      if(!t.eventTime)return;
+      const m=t.eventTime.split(':');const min=parseInt(m[0],10)*60+parseInt(m[1],10);
+      if(min<AFTERNOON_TL_START||min>AFTERNOON_TL_END)return;
+      const {parts}=parseTodoTextParts(t.text);
+      items.push({type:'event',min,time:t.eventTime,label:parts[0]||t.text||'',icon:'ti-calendar-event'});
+      return;
+    }
+    const st=t.strikeTimes||{};
+    const timeEntries=Object.entries(st).filter(([,v])=>typeof v==='number');
+    if(timeEntries.length){
+      const {prefix,parts,hasPrefix}=parseTodoTextParts(t.text);
+      // 조각 텍스트만으로는 어떤 상위 항목(업무/취미 등)에 속한 조각인지 구분이 안 돼
+      // 접두어(카테고리)가 있으면 "접두어 · 조각" 형태로 함께 표기.
+      timeEntries.forEach(([idxStr,ms])=>{
+        const d=new Date(ms);const min=d.getHours()*60+d.getMinutes();
+        if(min<AFTERNOON_TL_START||min>AFTERNOON_TL_END)return;
+        const partText=parts[parseInt(idxStr,10)]||t.text||'';
+        const label=hasPrefix&&prefix?prefix+' · '+partText:partText;
+        items.push({type:'todo',min,time:minToHHMM(min),label,icon:'ti-check'});
+      });
+    }else if(t.done&&t.completedAt){
+      const d=new Date(t.completedAt);const min=d.getHours()*60+d.getMinutes();
+      if(min<AFTERNOON_TL_START||min>AFTERNOON_TL_END)return;
+      const {prefix,hasPrefix,parts}=parseTodoTextParts(t.text);
+      let label=hasPrefix&&prefix?prefix+' · '+(parts.join(' / ')||t.text||''):(t.text||'');
+      // 시간표(HH:MM 접두어) 형식으로 쓴 투두면 괄호( ) 안 부가설명은 제외하고 표기
+      const scheduleM=(t.scheduleOrigText||t.text||'').match(SCHEDULE_TIME_RE);
+      if(scheduleM)label=stripScheduleParens(hasPrefix&&prefix?prefix+' · '+scheduleM[3]:scheduleM[3]);
+      items.push({type:'todo',min,time:minToHHMM(min),label,icon:'ti-check'});
+    }
+  });
+  // 리듬 — 외출(appointment) 제외, 시작 시각만
+  getRhythmBlocks(dk).forEach(b=>{
+    if(b.cat==='_sleep'||b.cat==='appointment')return;
+    const cat=RHYTHM_CATS[b.cat];if(!cat)return;
+    const min=_dawnTimeToMin(b.start);
+    if(min==null||min<AFTERNOON_TL_START||min>AFTERNOON_TL_END)return;
+    items.push({type:'rhythm',min,time:b.start,label:(b.text&&b.text.trim())||cat.label+' 시작',icon:cat.icon});
+  });
+  // 습관 — 체크 시각(checked_time)이 기록된 것만, 12~19시 범위 안에서만 표시.
+  {
+    const wk=weekKey(new Date(dk+'T00:00:00'));
+    const dow=(new Date(dk+'T00:00:00').getDay()+6)%7;
+    const checks=getHabitChecks(wk);
+    const times=getHabitCheckTimes(wk);
+    getHabits().forEach(h=>{
+      const key=h.id+'-'+dow;
+      if(!checks[key]||!times[key])return;
+      const p=times[key].split(':');
+      const min=parseInt(p[0],10)*60+parseInt(p[1],10);
+      if(min<AFTERNOON_TL_START||min>AFTERNOON_TL_END)return;
+      items.push({type:'habit',min,time:times[key],label:h.name+' 체크',icon:getHabitIconFor(h)||'ti-repeat'});
+    });
+  }
+  items.sort((a,b)=>a.min-b.min);
+  return items;
+}
+const AFTERNOON_TL_COLORVAR={meal:'--src-meal',todo:'--src-todo',event:'--src-event',rhythm:'--src-rhythm',habit:'--src-habit'};
+const AFTERNOON_TL_TEXTVAR={meal:'--src-meal-text',todo:'--src-todo-text',event:'--src-event-text',rhythm:'--src-rhythm-text',habit:'--src-habit-text'};
+function makeAfternoonHomeCard(){
+  const dk=dateKey(getLogicalDate());
+  const now=new Date();
+  const nowMin=Math.min(Math.max(now.getHours()*60+now.getMinutes(),AFTERNOON_TL_START),AFTERNOON_TL_END);
+  const nowPct=(nowMin-AFTERNOON_TL_START)/(AFTERNOON_TL_END-AFTERNOON_TL_START)*100;
+
+  const items=_paceAfternoonTimelineItems(dk);
+  const todayDone=_paceCountDoneUntilNow(dk,null);
+  // 최근 7일(오늘 제외) 같은 "지금 시각까지" 평균 — 하루 중간 시점 비교의 공정성을 위해 nowMin 기준 절단 평균 사용.
+  const curNowMin=now.getHours()*60+now.getMinutes();
+  let sum=0,cnt=0;
+  for(let i=1;i<=7;i++){
+    const d=new Date(dk+'T00:00:00');d.setDate(d.getDate()-i);
+    sum+=_paceCountDoneUntilNow(dateKey(d),curNowMin);cnt++;
+  }
+  const avg=cnt?Math.round(sum/cnt):0;
+  const delta=todayDone-avg;
+  const deltaHtml=delta>0?`평소보다 +${delta}`:delta<0?`평소보다 ${delta}`:'평소와 비슷해요';
+  const deltaColorHtml=delta<0
+    ?'background:rgba(var(--pal-warmgray-rgb),0.28);color:var(--pal-warmgray-text);'
+    :'';
+
+  const insight=_paceWeekInsight(dk);
+  const remainCount=_paceAfternoonRemainCount(dk);
+
+  const card=document.createElement('div');
+  card.className='pace-card';card.id='afternoon-home-card';
+
+  let markersHtml='';
+  items.forEach(it=>{
+    const pct=Math.min(100,Math.max(0,(it.min-AFTERNOON_TL_START)/(AFTERNOON_TL_END-AFTERNOON_TL_START)*100));
+    markersHtml+=`<div class="htl-marker" style="left:${pct}%;--mk-color:var(${AFTERNOON_TL_COLORVAR[it.type]});" title="${escapeHtml(it.time+' '+it.label)}"></div>`;
+  });
+
+  let listHtml='';
+  items.forEach(it=>{
+    listHtml+=`<div class="htl-list-row">
+      <span class="htl-list-time">${it.time}</span>
+      <span class="htl-list-dot" style="background:var(${AFTERNOON_TL_COLORVAR[it.type]});"></span>
+      <i class="ti ${it.icon} htl-list-icon" style="color:var(${AFTERNOON_TL_TEXTVAR[it.type]});" aria-hidden="true"></i>
+      <span class="htl-list-text${it.type==='event'?' emph':''}">${escapeHtml(it.label)}</span>
+    </div>`;
+  });
+
+  card.innerHTML=`<div class="pace-title"><i class="ti ti-clock ico-sz-13" aria-hidden="true"></i> 오늘의 흐름</div>
+    <div class="htl-track-wrap">
+      <div class="htl-track">
+        <div class="htl-fill" style="width:${nowPct}%;"></div>
+        ${markersHtml}
+        <div class="htl-now" style="left:${nowPct}%;"></div>
+      </div>
+      <div class="htl-labels">
+        <span style="left:0%;">12시</span>
+        <span style="left:14.3%;">13시</span>
+        <span style="left:28.6%;">14시</span>
+        <span style="left:42.9%;">15시</span>
+        <span style="left:57.1%;">16시</span>
+        <span style="left:71.4%;">17시</span>
+        <span style="left:85.7%;">18시</span>
+        <span style="left:100%;">19시</span>
+      </div>
+    </div>
+    ${items.length?`<div class="htl-legend">
+      <span class="htl-legend-item"><span class="htl-legend-dot" style="background:var(--src-event);"></span>일정</span>
+      <span class="htl-legend-item"><span class="htl-legend-dot" style="background:var(--src-todo);"></span>할일</span>
+      <span class="htl-legend-item"><span class="htl-legend-dot" style="background:var(--src-meal);"></span>식사</span>
+      <span class="htl-legend-item"><span class="htl-legend-dot" style="background:var(--src-rhythm);"></span>리듬</span>
+      <span class="htl-legend-item"><span class="htl-legend-dot" style="background:var(--src-habit);"></span>습관</span>
+    </div>
+    <div class="htl-list">${listHtml}</div>`:''}
+    <div class="pace-divider"></div>
+    <div class="pace-summary">
+      <span class="pace-summary-num">${todayDone}개</span><span class="pace-summary-sub">완료</span>
+      <span class="pace-summary-delta" style="${deltaColorHtml}">${deltaHtml}</span>
+    </div>
+    <div class="pace-remain-pill" onclick="switchToTab('daily')">
+      <div class="pace-remain-label"><i class="ti ti-list-check" aria-hidden="true"></i> 오후에 남은 할 일</div>
+      <div style="display:flex;align-items:center;gap:4px;">
+        <div class="pace-remain-num">${remainCount}개</div>
+        <i class="ti ti-chevron-right" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i>
+      </div>
+    </div>
+    <div class="pace-insight"><i class="ti ${insight.icon}" aria-hidden="true"></i>${insight.text}</div>`;
+  return card;
+}
+// 저녁 파트1용 미니통계 카드 — 당일 기록 기준(완료 투두 / 체크 습관 / 오늘의 최다 리듬), 오후 통계카드보다 훨씬 컴팩트하게
+// 저녁 홈탭 — 오늘 활동 분포(점 타임라인) 카드. 내용 없으면 카드 자체를 만들지 않음.
+function makeEveningMiniStatCard(){
+  const dk=dateKey(getLogicalDate());
+  const doneTodos=_paceCountDoneUntilNow(dk,null);
+  const checkedHabits=_paceHabitCheckedCount(dk);
+  const memoCount=getMemos(dk).length;
+  const topRhythm=_paceTopRhythmCat(dk);
+  const wrap=document.createElement('div');
+  wrap.style.cssText='display:flex;justify-content:center;align-items:center;gap:18px;padding:8px 4px;margin-bottom:10px;flex-wrap:wrap;';
+  wrap.innerHTML=
+    `<span style="display:flex;align-items:center;gap:5px;"><i class="ti ti-checks" style="font-size:15px;color:rgba(100,165,190,0.9);" aria-hidden="true"></i><span style="font-size:15px;font-weight:500;color:var(--tp);">${doneTodos}</span></span>`
+    +`<span style="display:flex;align-items:center;gap:5px;"><i class="ti ti-flame" style="font-size:15px;color:rgba(150,110,200,0.9);" aria-hidden="true"></i><span style="font-size:15px;font-weight:500;color:var(--tp);">${checkedHabits}</span></span>`
+    +`<span style="display:flex;align-items:center;gap:5px;"><i class="ti ti-notes" style="font-size:15px;color:rgba(190,150,30,0.9);" aria-hidden="true"></i><span style="font-size:15px;font-weight:500;color:var(--tp);">${memoCount}</span></span>`
+    +(topRhythm?`<span style="display:flex;align-items:center;"><i class="ti ${topRhythm.icon}" style="font-size:15px;color:${topRhythm.color};" aria-hidden="true"></i></span>`:'');
+  return wrap;
+}
+// ── 채움로그 연동 배너 (읽기 전용 조회만 수행) ──
+async function fetchChaeumInProgress(){
+  try{
+    const res=await fetch(`${CHAEUM_SUPA_URL}/rest/v1/sessions?status=eq.in_progress&order=created_at.desc&limit=1`,{
+      headers:{'apikey':CHAEUM_SUPA_KEY,'Authorization':`Bearer ${CHAEUM_SUPA_KEY}`}
+    });
+    if(!res.ok)return null;
+    const rows=await res.json();
+    return rows[0]||null;
+  }catch(err){
+    console.error('채움로그 조회 실패',err);
+    return null;
+  }
+}
+async function fetchChaeumTimeline(limit){
+  try{
+    const res=await fetch(`${CHAEUM_SUPA_URL}/rest/v1/sessions?order=created_at.desc&limit=${limit||30}`,{
+      headers:{'apikey':CHAEUM_SUPA_KEY,'Authorization':`Bearer ${CHAEUM_SUPA_KEY}`}
+    });
+    if(!res.ok)return [];
+    return await res.json();
+  }catch(err){
+    console.error('채움로그 타임라인 조회 실패',err);
+    return [];
+  }
+}
+function makeChaeumBanner(){
+  const wrap=document.createElement('div');wrap.id='chaeum-banner-wrap';
+  wrap.style.cssText=`background:${CHAEUM_TONE.bg};border:1px solid ${CHAEUM_TONE.line};border-radius:16px;padding:16px;margin-bottom:10px;`;
+  wrap.innerHTML=`<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+      <i class="ti ti-leaf" style="font-size:14px;color:${CHAEUM_TONE.sage};" aria-hidden="true"></i>
+      <span style="font-size:var(--main-text-size);font-weight:600;color:${CHAEUM_TONE.ink};flex:1;">채움로그</span>
+    </div>
+    <div id="chaeum-banner-body" style="cursor:pointer;" onclick="openChaeumTimelineSheet()">
+      <div style="display:flex;align-items:center;gap:7px;">
+        <span style="font-size:var(--main-text-size);color:${CHAEUM_TONE.muted};">불러오는 중…</span>
+      </div>
+    </div>`;
+  fetchChaeumInProgress().then(row=>{
+    const body=document.getElementById('chaeum-banner-body');
+    if(!body)return;
+    if(!row){
+      body.innerHTML=`<div style="display:flex;align-items:center;gap:7px;">
+        <i class="ti ti-leaf" style="font-size:13px;flex-shrink:0;color:${CHAEUM_TONE.muted};" aria-hidden="true"></i>
+        <span style="font-size:var(--main-text-size);color:${CHAEUM_TONE.muted};">채움로그를 시작해보세요</span>
+      </div>`;
+      return;
+    }
+    const meta=CHAEUM_CAT_META[row.category]||{icon:'ti-tag',color:CHAEUM_TONE.sage};
+    body.innerHTML=`<div style="display:flex;gap:10px;align-items:center;">
+      <div style="width:36px;height:36px;border-radius:9px;background:${meta.color}22;flex-shrink:0;display:flex;align-items:center;justify-content:center;">
+        <i class="ti ${meta.icon}" style="font-size:16px;color:${meta.color};" aria-hidden="true"></i>
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:var(--main-text-size);font-weight:500;color:${CHAEUM_TONE.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(row.short_title||row.title||'')}</div>
+        <div style="font-size:var(--dow-label-size);color:${CHAEUM_TONE.subInk};">${escapeHtml(row.category||'')} · 진행중</div>
+      </div>
+    </div>`;
+  });
+  return wrap;
+}
+function openChaeumTimelineSheet(){
+  let sheet=document.getElementById('chaeum-timeline-modal');
+  if(!sheet){
+    sheet=document.createElement('div');
+    sheet.className='overlay';sheet.id='chaeum-timeline-modal';
+    sheet.setAttribute('onclick',"closeSheet('chaeum-timeline-modal',event)");
+    sheet.innerHTML=`<div class="bsheet" style="max-height:80vh;overflow-y:auto;background:${CHAEUM_TONE.paper||CHAEUM_TONE.bg};" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <div style="padding:0 20px 20px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+          <i class="ti ti-leaf" style="font-size:20px;color:${CHAEUM_TONE.sage};" aria-hidden="true"></i>
+          <span style="font-size:var(--main-text-size);font-weight:600;color:${CHAEUM_TONE.ink};flex:1;">채움로그 타임라인</span>
+        </div>
+        <div id="chaeum-timeline-list" style="display:flex;flex-direction:column;gap:2px;">불러오는 중…</div>
+      </div>
+    </div>`;
+    document.body.appendChild(sheet);
+  }
+  openSheet('chaeum-timeline-modal');
+  fetchChaeumTimeline(30).then(rows=>{
+    const list=document.getElementById('chaeum-timeline-list');
+    if(!list)return;
+    if(!rows.length){
+      list.innerHTML=`<div style="color:${CHAEUM_TONE.muted};padding:10px 0;font-size:var(--main-text-size);">아직 채운 기록이 없어요</div>`;
+      return;
+    }
+    list.innerHTML=rows.map((row,idx)=>{
+      const meta=CHAEUM_CAT_META[row.category]||{icon:'ti-tag',color:CHAEUM_TONE.sage};
+      const inProgress=row.status==='in_progress';
+      const hasSummary=!!row.brief_summary;
+      return `<div style="padding:9px 0;border-bottom:1px solid ${CHAEUM_TONE.line};">
+        <div style="display:flex;gap:10px;align-items:flex-start;${hasSummary?'cursor:pointer;':''}" ${hasSummary?`onclick="toggleChaeumSummary(${idx})"`:''}>
+          <div style="width:32px;height:32px;border-radius:8px;background:${meta.color}22;flex-shrink:0;display:flex;align-items:center;justify-content:center;margin-top:1px;">
+            <i class="ti ${meta.icon}" style="font-size:14px;color:${meta.color};" aria-hidden="true"></i>
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:var(--main-text-size);font-weight:500;color:${CHAEUM_TONE.ink};">${escapeHtml(row.short_title||row.title||'')}${inProgress?` <span style="font-size:var(--dow-label-size);color:${CHAEUM_TONE.sage};">· 진행중</span>`:''}</div>
+            <div style="font-size:var(--dow-label-size);color:${CHAEUM_TONE.subInk};margin-top:2px;">${escapeHtml(row.date_key||'')} · ${escapeHtml(row.category||'')}</div>
+          </div>
+          ${hasSummary?`<i id="chaeum-sum-chevron-${idx}" class="ti ti-chevron-down" style="font-size:14px;color:${CHAEUM_TONE.muted};flex-shrink:0;margin-top:4px;transition:transform .2s;" aria-hidden="true"></i>`:''}
+        </div>
+        ${hasSummary?`<div id="chaeum-sum-${idx}" style="display:none;font-size:var(--dow-label-size);color:${CHAEUM_TONE.subInk};margin-top:6px;margin-left:42px;line-height:1.5;">${escapeHtml(row.brief_summary)}</div>`:''}
+      </div>`;
+    }).join('');
+  });
+}
+function toggleChaeumSummary(idx){
+  const box=document.getElementById(`chaeum-sum-${idx}`);
+  const chevron=document.getElementById(`chaeum-sum-chevron-${idx}`);
+  if(!box)return;
+  const open=box.style.display==='block';
+  box.style.display=open?'none':'block';
+  if(chevron)chevron.style.transform=open?'rotate(0deg)':'rotate(180deg)';
+}
+// 저녁 파트1용 저녁 플리 미니카드 — 전체 기간 등록된 음악(cat=music) 중 매일 하나씩 랜덤으로(날짜 기준 시드 고정, 하루 동안 유지) 노출.
+// Supabase에서 content_cat=eq.music으로 직접 필터링해 조회 — 로컬 월별 스캔 없이 단순하게.
+function makePlaylistMiniCard(){
+  const wrap=document.createElement('div');wrap.className='pace-card';
+  wrap.innerHTML='<div class="home-content-info" style="display:flex;align-items:center;gap:7px;">'
+    +'<i class="ti ti-music" style="font-size:13px;flex-shrink:0;color:var(--tm);" aria-hidden="true"></i>'
+    +'<span class="home-content-title" style="color:var(--tm);">불러오는 중...</span>'
+    +'</div>';
+  fetchAllMusicContents().then(allMusic=>{
+    if(!allMusic.length){
+      wrap.innerHTML='<div class="home-content-info" style="display:flex;align-items:center;gap:7px;">'
+        +'<i class="ti ti-music" style="font-size:13px;flex-shrink:0;color:var(--tm);" aria-hidden="true"></i>'
+        +'<span class="home-content-title" style="color:var(--tm);">아직 등록된 음악이 없어요</span>'
+        +'</div>';
+      return;
+    }
+    // 날짜 문자열을 시드로 한 결정적 랜덤 — 같은 날엔 계속 같은 곡, 자정 지나면 다음 곡
+    const dk=dateKey(getLogicalDate());
+    const idx=dateSeedIndex(dk,allMusic.length);
+    const item=allMusic[idx];
+    const musicRgb='160,105,180';
+    const coverInner=item.poster
+      ?`<img src="${item.poster}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;" alt="">`
+      :`<i class="ti ti-music" style="font-size:16px;color:rgba(136,120,171,0.75);" aria-hidden="true"></i>`;
+    const hasUrl=!!item.musicUrl;
+    wrap.innerHTML=`<div style="display:flex;gap:10px;align-items:center;">
+        <div style="width:40px;height:40px;border-radius:8px;background:rgba(160,105,180,0.18);flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden;">${coverInner}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:var(--main-text-size);font-weight:500;color:var(--tp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(item.title||'')}</div>
+          ${item.author?`<div style="font-size:var(--dow-label-size);color:var(--ts);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(item.author)}</div>`:''}
+        </div>
+        <div class="pl-item-play${hasUrl?'':' dim'}" style="background:rgba(${musicRgb},.18);border:1px solid rgba(${musicRgb},.45);flex-shrink:0;" ${hasUrl?`onclick="window.location.href='${item.musicUrl.replace(/'/g,"\\'")}'"`:''}><i class="ti ti-player-play-filled" style="color:rgba(${musicRgb},1);" aria-hidden="true"></i></div>
+      </div>`;
+  }).catch(()=>{
+    wrap.innerHTML='<div class="home-content-info" style="display:flex;align-items:center;gap:7px;">'
+      +'<i class="ti ti-music" style="font-size:13px;flex-shrink:0;color:var(--tm);" aria-hidden="true"></i>'
+      +'<span class="home-content-title" style="color:var(--tm);">불러오지 못했어요</span>'
+      +'</div>';
+  });
+  return wrap;
+}
+// 저녁 파트1용 독서 카드 B — 표지(또는 대체 아이콘)+진행바 포함, 넛지 문구는 우측 정렬로 기존 A와 동일 스타일
+function makeTodayQuoteCard(){
+  const quotes=getQuotes().filter(q=>q.text&&q.text.trim());
+  if(!quotes.length)return null;
+  // 그날 하루 동안은 같은 문장이 나오도록, 날짜 기반 시드로 고정 선택
+  const dk=dateKey(getLogicalDate());
+  const idx=dateSeedIndex(dk,quotes.length);
+  const q=quotes[idx];
+  const book=getBooks().find(b=>b.cid===q.bookCid);
+  const wrap=document.createElement('div');wrap.className='today-quote-wrap';
+  wrap.innerHTML=`<div class="today-quote-card" onclick="openReading()">
+    <div class="today-quote-title"><i class="ti ti-quote" aria-hidden="true"></i>오늘의 문장
+      <span onclick="event.stopPropagation();shareQuoteCard('${q.cid}')" title="공유 이미지" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:rgba(160,105,180,0.80);opacity:0.7;margin-left:auto;">
+        <i class="ti ti-share-2 ico-sz-11" aria-hidden="true"></i>
+      </span>
+    </div>
+    <div class="today-quote-text">${escapeHtml(q.text)}</div>
+    <div class="today-quote-footer"><span class="today-quote-source">${escapeHtml(book?book.title:'')}</span></div>
+  </div>`;
+  return wrap;
+}
+// book의 실제 진행률(%) — unitLabel이 'percent'면 book.percent를 그대로, 'pages'면 pages/totalPages로 직접 계산.
+// book.percent는 퍼센트 단위로 기록 중인 책만 채워지는 필드라, 페이지 단위 책에 그대로 쓰면 항상 0%로 보이는 문제가 있었음.
+function getBookProgressPct(book){
+  if(!book)return 0;
+  if(book.unit==='pages')return book.totalPages?Math.max(0,Math.min(100,Math.round(book.pages/book.totalPages*100))):0;
+  return book.percent||0;
+}
+// 날짜(dk) 문자열을 시드로 한 0~1 사이 의사난수 — 같은 날엔 항상 같은 값(하루종일 문구 고정),
+// 다음날엔 자연스럽게 다른 값이 나옴. 암호학적 용도 아님, 단순 문구 로테이션용.
+function _seededRandomByDk(dk){
+  let h=0;
+  for(let i=0;i<dk.length;i++){h=(h*31+dk.charCodeAt(i))|0;}
+  return (Math.abs(h)%1000)/1000;
+}
+// 독서카드 하단 문구 — 상황(스트릭/미독일수/완독률/예상잔여회차)별 후보를 모아 날짜시드로 하나 고정 선택.
+// 병렬독서 대비 "독서" 활동 전체 기준(특정 책이 아님)의 스트릭/미독일수를 사용.
+function _getBookNudgeText(book,pct){
+  const dk=dateKey(getLogicalDate());
+  const streak=getReadingActivityStreak(dk);
+  const idleDays=_daysSinceLastReading(dk);
+  const sessionCount=countReadingSessionsForBook(book);
+  const est=estimateRemainingReadingSessions(book,sessionCount);
+  const candidates=[];
+  if(streak>=2)candidates.push(`독서 ${streak}일째 이어가는 중이에요`);
+  if(streak===0&&idleDays>=2)candidates.push(`독서를 안 한 지 ${idleDays}일째예요`);
+  if(pct>0&&pct<100)candidates.push(`완독까지 ${100-pct}% 남았어요`);
+  if(est&&est.ready)candidates.push(`완독까지 약 ${est.remainingSessions}회 더 예상돼요`);
+  candidates.push('잠들기 전 15분 독서 어떠세요?'); // 위 조건에 하나도 안 걸리는 경우(막 시작한 책 등) 대비 기본 문구
+  const idx=Math.floor(_seededRandomByDk(dk+'|'+(book.cid||book.title))*candidates.length);
+  return candidates[idx];
+}
+function makeBookCardWithCover(){
+  const book=getBooks().find(b=>b.status==='reading');
+  const wrap=document.createElement('div');wrap.className='pace-card';
+  if(!book){
+    wrap.innerHTML='<div class="home-content-info" style="display:flex;align-items:center;gap:7px;">'
+      +'<i class="ti ti-book" style="font-size:13px;flex-shrink:0;color:var(--tm);" aria-hidden="true"></i>'
+      +'<span class="home-content-title" style="color:var(--tm);">오늘밤엔 새로운 책을 찾아보아요</span>'
+      +'</div>';
+    return wrap;
+  }
+  // book.percent는 퍼센트 단위(unitLabel==='percent')로 기록 중인 책만 채워짐 — 페이지 단위(pages)로
+  // 기록 중인 책은 percent가 항상 0이라, getBookProgressPct가 pages/totalPages로 직접 계산해줌.
+  const pct=getBookProgressPct(book);
+  const coverInner=book.poster
+    ?`<img src="${book.poster}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;" alt="">`
+    :`<i class="ti ti-book-2" style="font-size:20px;color:rgba(190,150,30,0.7);" aria-hidden="true"></i>`;
+  const nudgeText=_getBookNudgeText(book,pct);
+  wrap.innerHTML=`<div style="display:flex;gap:12px;">
+    <div style="width:52px;height:74px;border-radius:8px;background:linear-gradient(135deg,rgba(255,220,120,.6),rgba(255,200,150,.5));flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden;">${coverInner}</div>
+    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:6px;min-width:0;">
+      <div style="font-size:var(--main-text-size);font-weight:500;color:var(--tp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${book.title}</div>
+      ${book.author?`<div style="font-size:var(--dow-label-size);color:var(--ts);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${book.author}</div>`:''}
+      <div style="width:100%;height:4px;border-radius:2px;background:rgba(200,176,168,0.2);overflow:hidden;"><div style="width:${pct}%;height:100%;background:rgba(255,200,110,0.85);"></div></div>
+      <div style="text-align:right;"><span class="reading-nudge" onclick="openReading()" style="cursor:pointer;">${nudgeText}</span></div>
+    </div>
+  </div>`;
+  return wrap;
+}
+// 오늘 이전 날짜의 nextweek_suggest 캐시 자동 삭제 (누적 방지)
+(function(){
+  try{
+    const today=dateKey(getLogicalDate());
+    Object.keys(localStorage).forEach(k=>{
+      if(k.startsWith('nextweek_suggest_')&&!k.includes(today))localStorage.removeItem(k);
+    });
+    // weekly_summary_는 하루 단위 캐시라 매주 새 키가 생김 — 2주(14일) 지난 것만 정리해 최근 2주치는 남겨둠
+    const todayMs=new Date(today).getTime();
+    Object.keys(localStorage).forEach(k=>{
+      if(!k.startsWith('weekly_summary_'))return;
+      const dk=k.replace('weekly_summary_','');
+      const dkMs=new Date(dk).getTime();
+      if(isNaN(dkMs))return; // 키 형식이 예상과 다르면 건드리지 않음(안전)
+      if((todayMs-dkMs)/86400000>14)localStorage.removeItem(k);
+    });
+    // challenge_review_는 주 단위 캐시(key: challenge_review_week:YYYY-MM-DD) — 마찬가지로 14일 지난 것만 정리
+    Object.keys(localStorage).forEach(k=>{
+      if(!k.startsWith('challenge_review_'))return;
+      const dk=k.replace('challenge_review_week:','');
+      const dkMs=new Date(dk).getTime();
+      if(isNaN(dkMs))return;
+      if((todayMs-dkMs)/86400000>14)localStorage.removeItem(k);
+    });
+  }catch(e){}
+})();
+// 오늘(dk) 하루의 투두/습관/아침루틴 완료 시각을 {type,min,label} 배열로 반환.
+// 시각 정보 없는 항목(과거 completedAt/hcTime 미기록)은 자연히 제외됨.
+// 조각별 완료 시각(strikeTimes)이 있으면 조각마다 점을 찍고, 없으면 기존처럼 항목 전체 completedAt 기준 점 1개.
+// 논리적 하루(새벽 4시까지 전날 귀속) 기준 보정: 00:00~03:59 사이 실제 시계 시각은
+// 활동 분포 타임라인에서 24:00~27:59로 표시되어야 전날 마지막 구간(24시 옆)에 붙어 보임.
+function _paceAdjustMin(min){return toDawnAdjustedMin(min,PACE_DOT_RANGE_START);}
+function _paceDayEvents(dk){
+  const events=[];
+  getTodos(dk).forEach(t=>{
+    if(t.isEvent){
+      // 일정은 완료 개념이 없어 eventTime(사용자가 지정한 시각)을 그대로 좌표로 사용. 시간 미지정 일정은 찍을 좌표가 없어 제외.
+      if(!t.eventTime)return;
+      const p=t.eventTime.split(':');
+      const {parts}=parseTodoTextParts(t.text);
+      events.push({type:'event',min:_paceAdjustMin(parseInt(p[0],10)*60+parseInt(p[1],10)),label:parts[0]||t.text||''});
+      return;
+    }
+    const st=t.strikeTimes||{};
+    const timeEntries=Object.entries(st).filter(([,v])=>typeof v==='number');
+    if(timeEntries.length){
+      // 조각 일부만 완료된 상태(항목 전체는 아직 done:false)여도, 완료된 조각은 점으로 찍혀야 함
+      const {parts}=parseTodoTextParts(t.text);
+      timeEntries.forEach(([idxStr,ms])=>{
+        const idx=parseInt(idxStr,10);
+        const d=new Date(ms);
+        events.push({type:'todo',min:_paceAdjustMin(d.getHours()*60+d.getMinutes()),label:parts[idx]||t.text||''});
+      });
+    }else if(t.done&&t.completedAt){
+      const d=new Date(t.completedAt);
+      events.push({type:'todo',min:_paceAdjustMin(d.getHours()*60+d.getMinutes()),label:t.text||''});
+    }
+  });
+  const wk=weekKey(new Date(dk+'T00:00:00'));
+  const dow=(new Date(dk+'T00:00:00').getDay()+6)%7;
+  const habits=getHabits();
+  const checks=getHabitChecks(wk);
+  const times=getHabitCheckTimes(wk);
+  habits.forEach(h=>{
+    const key=h.id+'-'+dow;
+    if(!checks[key]||!times[key])return;
+    const p=times[key].split(':');
+    events.push({type:'habit',min:_paceAdjustMin(parseInt(p[0],10)*60+parseInt(p[1],10)),label:h.name});
+  });
+  const mflow=getMorningFlow(dk);
+  const mflowBlocks=getRhythmBlocks(dk);
+  _mfSlots(mflow).forEach(p=>{
+    if(p.status==='idle')return;
+    let min=null;
+    if(p.key==='enjoy'){
+      const block=mflowBlocks.find(b=>b.contentCid===p.cid&&b.cat==='enjoy');
+      if(block){const sp=block.start.split(':');min=parseInt(sp[0],10)*60+parseInt(sp[1],10);}
+    }else if(p.startTs){
+      const d=new Date(p.startTs);min=d.getHours()*60+d.getMinutes();
+    }
+    if(min==null)return;
+    events.push({type:'morning',min:_paceAdjustMin(min),label:_mfSlotLabel(p,false)});
+  });
+  return events;
+}
+// 오늘 하루 활동 시각 분포 — 이벤트 수집→좌표변환→겹침 그룹핑까지의 공통 계산.
+// 새벽 시간대(별빛 스타일, makeDawnPaceBanner)가 이 결과를 사용한다.
+function _paceDotGroups(dk,rangeStart,rangeEnd){
+  const rangeLen=rangeEnd-rangeStart;
+  const events=_paceDayEvents(dk)
+    .filter(ev=>ev.min>=rangeStart)
+    .map(ev=>({...ev,xPct:Math.min(100,(ev.min-rangeStart)/rangeLen*100)}))
+    .sort((a,b)=>a.xPct-b.xPct);
+  if(!events.length)return null;
+  const MIN_GAP_PCT=2.0;
+  const groups=[];
+  events.forEach(ev=>{
+    const last=groups[groups.length-1];
+    if(last&&ev.xPct-last.centerX<MIN_GAP_PCT){
+      last.items.push(ev);
+      last.centerX=last.items.reduce((s,it)=>s+it.xPct,0)/last.items.length;
+    }else{
+      groups.push({centerX:ev.xPct,items:[ev]});
+    }
+  });
+  return {groups,MIN_GAP_PCT,rangeLen};
+}
+// 시간 눈금 HTML 생성 공통화 — lineClass/labelClass만 낮/새벽 스타일에 맞춰 다르게 넘김.
+function _paceHourMarksHtml(rangeStart,rangeEnd,lineClass,labelClass){
+  let hourMarks='';
+  for(let h=rangeStart/60;h<=rangeEnd/60;h+=6){
+    const x=(h*60-rangeStart)/(rangeEnd-rangeStart)*100;
+    hourMarks+=`<div class="${lineClass}" style="left:${x}%;"></div><div class="${labelClass}" style="left:${x}%;">${h}시</div>`;
+  }
+  return hourMarks;
+}
+const PACE_DOT_RANGE_START=6*60; // 06:00
+const PACE_DOT_RANGE_END=24*60; // 24:00
+
+// 새벽 전용 별빛 활동분포 배너 — 인사카드(dawn 톤) 바로 아래 독립 배너로 노출.
+// 계산(_paceDotGroups)은 낮 버전과 공유하고, 렌더링(별빛 스타일)만 다름.
+const DAWN_STAR_COLORS=['#f2cf8e','#f0a5b0','#a8d4b3'];
+function makeDawnPaceBanner(dk){
+  const TRACK_H=42,BASE_Y=18;
+  const g=_paceDotGroups(dk,PACE_DOT_RANGE_START,PACE_DOT_RANGE_END);
+  if(!g)return null;
+  let dotsHtml='';let i=0;
+  g.groups.forEach(gr=>{
+    const n=gr.items.length;
+    gr.items.forEach((ev,idx)=>{
+      const offset=(idx-(n-1)/2)*g.MIN_GAP_PCT;
+      const x=Math.min(100,Math.max(0,gr.centerX+offset));
+      const color=DAWN_STAR_COLORS[i%DAWN_STAR_COLORS.length];
+      const size=5+(i%2); // 5px/6px 번갈아 — 반짝임에 미세한 크기 변주
+      const delay=((i*0.45)%2.6).toFixed(2);
+      dotsHtml+=`<div class="star-dot" style="left:${x}%;top:${BASE_Y}px;width:${size}px;height:${size}px;background:${color};color:${color};animation-delay:${delay}s;" title="${escapeHtml(ev.label)}"></div>`;
+      i++;
+    });
+  });
+  const hourMarks=_paceHourMarksHtml(PACE_DOT_RANGE_START,PACE_DOT_RANGE_END,'pace-dot-hourline-dawn','pace-dot-hourlabel-dawn');
+  const wrap=document.createElement('div');
+  wrap.className='dawn-pace-banner';
+  wrap.innerHTML=`<div class="pace-title-dawn"><span>✦</span> 오늘 활동 분포</div>
+    <div class="pace-dot-track-dawn" style="height:${TRACK_H}px;">
+      <div class="pace-dot-baseline-dawn" style="top:${BASE_Y}px;"></div>
+      ${hourMarks}
+      ${dotsHtml}
+    </div>`;
+  return wrap;
+}
+
+
+// [안전화] 렌더링 시점(sorted 배열)과 클릭 처리 시점 사이에 백그라운드 동기화 등으로
+// 원본 todos 배열 순서/개수가 바뀌면 인덱스 i가 엉뚱한 항목을 가리킬 수 있음.
+// expectedCid가 주어졌는데 todos[i]와 cid가 다르면(동기화 등으로 인덱스가 어긋난 경우)
+// cid로 실제 항목을 재탐색. { target, idx } 형태로 반환하며 못 찾으면 target은 null.
+function findTodoSafe(todos,i,expectedCid){
+  let target=todos[i];
+  if(expectedCid&&(!target||target.cid!==expectedCid)){
+    const realIdx=todos.findIndex(t=>t.cid===expectedCid);
+    if(realIdx>=0){i=realIdx;target=todos[i];}
+  }
+  return{target,idx:i};
+}
+// 투두 항목을 완료 처리할 때, 조각모드(여러 파트로 구성된 텍스트)라면 아직 체크 안 된
+// 나머지 조각들도 "지금 이 시각에 끝냈다"로 간주해 strikeParts/strikeTimes를 마저 채움 —
+// 그래야 활동 분포에서 이미 조각 체크된 것만 찍히고 나머지가 누락되는 일이 없음.
+// toggleTodo에서 호출해 완료 처리 결과가 일관되게 반영되도록 함.
+function fillRemainingTodoStrikeParts(target,now){
+  const{parts}=parseTodoTextParts(target.text);
+  if(parts.length<=1)return;
+  const st={...(target.strikeTimes||{})};
+  const sp=new Set(target.strikeParts||[]);
+  parts.forEach((_,idx)=>{
+    if(!sp.has(idx)){sp.add(idx);st[idx]=now;}
+  });
+  target.strikeParts=Array.from(sp);
+  target.strikeTimes=st;
+}
+// cid를 함께 받아 todos[i]의 cid가 다르면 cid로 정확한 항목을 재탐색해 그 항목을 토글.
+function toggleTodo(i,expectedCid){toggleTodoAt(dateKey(currentDate),i,expectedCid);}
+// dk를 받는 버전 — 스누즈 시트의 "완료"처럼 지금 보고 있는 날짜(currentDate)와 다른 날짜의 할일도 처리하기 위함.
+function toggleTodoAt(dk,i,expectedCid){
+  const todos=getTodos(dk);
+  const{target}=findTodoSafe(todos,i,expectedCid);
+  if(!target)return;
+  target.done=!target.done;
+  const now=Date.now();
+  if(target.done){
+    target.completedAt=now;
+    fillRemainingTodoStrikeParts(target,now);
+    // 시간표 형식(맨 앞 "HH:MM ")이면 텍스트 앞머리를 실제 체크 시각으로 교체 — 수기 등록 시각과 실제 완료 시각이
+    // 다를 때(예: 08:00 약먹기를 09:15에 체크) 시간표에 실제 시각이 반영되도록 함. 원본은 잠깐 백업해뒀다가
+    // 체크 해제 시 그대로 복원(2026-09-01).
+    const m=(target.text||'').match(SCHEDULE_TIME_RE);
+    if(m){
+      target.scheduleOrigText=target.text;
+      const d=new Date(now);
+      const hh=String(d.getHours()).padStart(2,'0'),mm=String(d.getMinutes()).padStart(2,'0');
+      target.text=`${hh}:${mm} ${m[3]}`;
+    }
+  }else{
+    target.completedAt=null;
+    // 체크 해제는 "다시 하기/미루기/복사" 등 최초 상태로 되돌리려는 의도가 대부분이라, 중간에 텍스트를
+    // 수기로 더 고쳤더라도 항상 최초 등록 텍스트로 복원 — 별도 되돌리기 이력을 남기지 않는 가장 단순한 규칙.
+    if(target.scheduleOrigText){
+      target.text=target.scheduleOrigText;
+      delete target.scheduleOrigText;
+    }
+  }
+  saveTodos(dk,todos);renderTodos();
+  // 체크완료 시점의 시각이 최종 처리 시각(completedAt)이라 예상시간 기준 알림은 더 이상 필요 없음 — 정리.
+  // 체크 해제 시엔 alertTime이 남아있다면 다시 예약(재사용 의도로 지운 게 아니라 되돌린 것이므로).
+  if(target.done)clearTodoAlerts(target.isEvent,target.cid);
+  else{
+    const basisTime=alertBasisTimeFor(target);
+    if(basisTime)syncAlertFor(target.isEvent?'event':'todo',target.cid,dk,basisTime,target.text);
+  }
+}
+
+// 투두/습관 체크 등으로 오늘 활동 분포가 바뀌었을 때 저녁 홈탭의 점 타임라인 카드를 새로 그려 교체.
+// 카드가 화면에 없으면(다른 화면이거나 데이터가 비어 카드 자체가 없던 경우) 조용히 무시.
+function refreshDotTimelineCard(){
+  const old=document.getElementById('home-dot-timeline-card');
+  if(!old)return;
+  const fresh=makeDotTimelineCard();
+  if(fresh)old.replaceWith(fresh);
+  else old.remove();
+}
+function makeHabitMiniCheckRow(){
+  const wrap=document.createElement('div');
+  wrap.style.cssText='display:flex;justify-content:space-around;padding:6px 4px;margin-bottom:10px;';
+  const habits=getActiveHabits();
+  if(!habits.length){wrap.style.display='none';return wrap;}
+  const _ld=getLogicalDate();
+  const wk=weekKey(_ld),checks=getHabitChecks(wk),dow=(_ld.getDay()+6)%7;
+  habits.forEach(h=>{
+    const checked=!!checks[h.id+'-'+dow];
+    const hIcon=getHabitIconFor(h);
+    const rgba=getHabitColorSoft(h.color);
+    const rgbaText=getHabitColorText(h.color);
+    const badge=document.createElement('div');
+    badge.style.cssText=`width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;background:${checked?rgba:'rgba(var(--divider-rgb),0.15)'};`;
+    badge.title=h.name;
+    badge.innerHTML=hIcon
+      ?`<i class="ti ${hIcon}" style="font-size:15px;color:${checked?rgbaText:'rgba(var(--divider-rgb),0.7)'};" aria-hidden="true"></i>`
+      :`<span class="home-habit-dot ${checked?h.color:''}" style="width:9px;height:9px;${checked?'':'background:rgba(var(--divider-rgb),0.5);'}"></span>`;
+    badge.addEventListener('click',function(){
+      toggleHabitCheckWithTime(wk,h.id,dow,dateKey(_ld));
+      const fresh=makeHabitMiniCheckRow();
+      wrap.replaceWith(fresh);
+      refreshDotTimelineCard();
+      if(document.getElementById('v-monthly')&&document.getElementById('v-monthly').classList.contains('on'))renderHabitMonthly();
+      if(document.getElementById('v-weekly')&&document.getElementById('v-weekly').classList.contains('on'))renderWeeklyHabitBox();
+    });
+    wrap.appendChild(badge);
+  });
+  return wrap;
+}
+// 오늘(dk) 포함, 끊기지 않고 연속으로 독서 기록(감상 카테고리, 텍스트가 "독서"로 시작)이 있었던 날수.
+// 오늘 아직 안 읽었으면 어제부터 거슬러 셈(오늘 하루 공백만으로 스트릭이 0이 되지 않도록).
+// 책 단위가 아니라 "독서" 활동 전체 기준 — 여러 책을 병렬로 읽어도 하루에 하나만 읽었으면 스트릭 유지.
+function getReadingActivityStreak(dk){
+  const hasReadingOn=x=>getRhythmBlocks(x).some(b=>b.cat==='enjoy'&&b.text&&b.text.startsWith('독서'));
+  let cur=new Date(dk+'T00:00:00');
+  if(!hasReadingOn(dateKey(cur)))cur.setDate(cur.getDate()-1);
+  let streak=0;
+  for(let i=0;i<365;i++){
+    const ck=dateKey(cur);
+    if(hasReadingOn(ck)){streak++;cur.setDate(cur.getDate()-1);}
+    else break;
+  }
+  return streak;
+}
+// 주어진 날짜(dk)로부터 과거로 거슬러 올라가며 독서 기록(감상 카테고리, 텍스트가 "독서"로 시작)이
+// 마지막으로 있었던 날까지 며칠 지났는지 계산. 최대 90일까지만 탐색(그 이상은 사실상 의미 없어 상한).
+function _daysSinceLastReading(dk){
+  const d=new Date(dk+'T00:00:00');
+  for(let i=1;i<=90;i++){
+    const prev=new Date(d);prev.setDate(d.getDate()-i);
+    const prevDk=dateKey(prev);
+    const hasReading=getRhythmBlocks(prevDk).some(b=>b.cat==='enjoy'&&b.text&&b.text.startsWith('독서'));
+    if(hasReading)return i;
+  }
+  return 90;
+}
+
+function makeDawnRecapCard(){
+  const wrap=document.createElement('div');
+  wrap.id='dawn-recap-card';
+  const dk=dateKey(getLogicalDate());
+  const wk=weekKey(getLogicalDate());
+  const dow=(getLogicalDate().getDay()+6)%7;
+
+  const todos=getTodos(dk);
+  const doneTodos=todos.filter(t=>t.done);
+  const memos=getMemos(dk);
+  const habits=getHabits();
+  const checks=getHabitChecks(wk);
+  const doneHabits=habits.filter(hb=>checks[hb.id+'-'+dow]);
+  const sleep=getSleep(dk)||{};
+  const rblocks=getRhythmBlocks(dk);
+  const oneLine=getDailyOneLine(dk).trim();
+
+  // 수면: 어제 기록된 sleep~wake 시간 기준, 7.5시간을 만근으로
+  let sleepMin=null;
+  if(sleep.sleep&&sleep.wake){
+    const sv=_dawnTimeToMin(sleep.sleep),wv=_dawnTimeToMin(sleep.wake);
+    if(sv!=null&&wv!=null){sleepMin=wv-sv;if(sleepMin<0)sleepMin+=1440;}
+  }
+  const SLEEP_GOAL=450; // 7.5h
+  const sleepRatio=sleepMin!=null?Math.min(1,sleepMin/SLEEP_GOAL):0;
+  const sleepLabel=sleepMin!=null?((sleepMin/60).toFixed(1).replace(/\.0$/,'')+'h'+(sleepRatio>=1?'+':'')):'-';
+
+  // 습관 달성률
+  const habitPct=habits.length?Math.round(doneHabits.length/habits.length*100):0;
+
+  // 리듬 시간분포 (분 단위 합산, 카테고리별) — 수면은 위 도넛에서 이미 보여주므로 여기선 제외
+  const durByCat={};let totalDur=0;
+  rblocks.forEach(b=>{
+    const s=_dawnTimeToMin(b.start),e=_dawnTimeToMin(b.end);
+    if(s==null||e==null)return;
+    let dur=e-s;if(dur<0)dur+=1440;
+    if(dur<=0)return;
+    durByCat[b.cat]=(durByCat[b.cat]||0)+dur;totalDur+=dur;
+  });
+
+  // 독서 시간 (감상 카테고리 중 텍스트가 "독서"로 시작하는 블록 합산)
+  let readingMin=0;
+  rblocks.forEach(b=>{
+    if(b.cat!=='enjoy'||!b.text||!b.text.startsWith('독서'))return;
+    const s=_dawnTimeToMin(b.start),e=_dawnTimeToMin(b.end);
+    if(s==null||e==null)return;
+    let dur=e-s;if(dur<0)dur+=1440;
+    readingMin+=Math.max(0,dur);
+  });
+
+  // 오늘 본 콘텐츠 (감상 카테고리 전체 - 독서 포함, 텍스트 있는 것만)
+  // 텍스트가 "분류 - 제목" 형식이면 좌우로 분할 표시, 아니면 그대로 제목 자리에 노출
+  const contentItems=rblocks.filter(b=>b.cat==='enjoy'&&b.text)
+    .map(b=>{
+      const m=b.text.match(/^(.+?)\s*-\s*(.+)$/);
+      const parsed=m?{cat:m[1].trim(),title:m[2].trim()}:{cat:'',title:b.text};
+      return {...parsed,start:b.start,end:b.end};
+    })
+    .sort((a,b)=>(_dawnTimeToMin(a.start)||0)-(_dawnTimeToMin(b.start)||0));
+
+  const label=document.createElement('div');label.className='slabel';label.textContent='오늘 하루';
+  wrap.appendChild(label);
+
+  const card=document.createElement('div');card.className='day-recap-card';
+  let html='';
+
+  if(oneLine){
+    html+=`<div class="vow-recap-block"><div class="vow-recap-row"><div class="vow-recap-label">하루를 마무리하며</div><div class="vow-recap-text">${escapeHtml(oneLine)}</div></div></div>`;
+  }
+
+  html+=`<div class="recap-donut-row">
+    <div class="recap-donut-item"><div class="recap-donut-wrap"><svg width="88" height="48" viewBox="0 0 88 48">
+      <path d="M 6 44 A 38 38 0 0 1 82 44" fill="none" stroke="var(--graph-track-color)" stroke-width="7" stroke-linecap="round"/>
+      <path d="M 6 44 A 38 38 0 0 1 82 44" fill="none" class="recap-donut-habit-fg" stroke-width="7" stroke-dasharray="119.4" stroke-dashoffset="${119.4*(1-habitPct/100)}" stroke-linecap="round"/>
+    </svg><div class="recap-donut-label">${habitPct}%</div></div><div class="recap-donut-l">습관 달성</div></div>
+    <div class="recap-donut-item"><div class="recap-donut-wrap"><svg width="88" height="48" viewBox="0 0 88 48">
+      <path d="M 6 44 A 38 38 0 0 1 82 44" fill="none" stroke="var(--graph-track-color)" stroke-width="7" stroke-linecap="round"/>
+      <path d="M 6 44 A 38 38 0 0 1 82 44" fill="none" stroke="rgba(205,194,182,0.9)" stroke-width="7" stroke-dasharray="119.4" stroke-dashoffset="${119.4*(1-sleepRatio)}" stroke-linecap="round"/>
+    </svg><div class="recap-donut-label">${sleepLabel}</div></div><div class="recap-donut-l">수면</div></div>
+  </div>`;
+
+  if(totalDur>0){
+    html+=`<div class="day-recap-sec-title"><i class="ti ti-rainbow ico-sz-13" aria-hidden="true"></i> 오늘의 리듬</div>
+      <div class="recap-rhythm-bar-chart">`;
+    Object.keys(RHYTHM_CATS).forEach(k=>{
+      if(!durByCat[k])return;
+      html+=`<div class="recap-rhythm-bar-seg" style="width:${durByCat[k]/totalDur*100}%;background:${getRhythmColor(k)};"><i class="ti ${RHYTHM_CATS[k].icon}"></i></div>`;
+    });
+    html+=`</div><div class="recap-rhythm-chip-legend">`;
+    Object.keys(RHYTHM_CATS).forEach(k=>{
+      if(!durByCat[k])return;
+      html+=`<span><span class="dot" style="background:${getRhythmColor(k)};"></span>${RHYTHM_CATS[k].label} ${Math.floor(durByCat[k]/60)}h${durByCat[k]%60?' '+(durByCat[k]%60)+'m':''}</span>`;
+    });
+    html+=`</div>`;
+  }
+
+  if(contentItems.length||readingMin===0){
+    const catToKey=(cat)=>{
+      if(cat==='독서')return 'book';
+      if(cat==='드라마')return 'drama';
+      if(cat==='영화')return 'movie';
+      if(cat==='음악')return 'music';
+      return Object.keys(CAT_LABELS).find(k=>CAT_LABELS[k]===cat)||null;
+    };
+    html+=`<div class="day-recap-sec-title"><i class="ti ${RHYTHM_CATS.enjoy.icon}" style="font-size:12px;" aria-hidden="true"></i> 오늘 본 콘텐츠</div>`;
+    if(!contentItems.some(c=>c.cat==='독서')){
+      const readingLabel=readingMin>0?readingMin+'분':_daysSinceLastReading(dk)+'일째 안읽음';
+      html+=`<div class="recap-content-item"><span class="cdot" style="background:${getCatDotColor('book')};"></span>독서<span class="ctime">${readingLabel}</span></div>`;
+    }
+    // 같은 콘텐츠(카테고리+제목)를 여러 번 읽거나 봤을 경우 항목이 중복되지 않도록 병합.
+    // 시간(분)은 각 블록의 실제 재생시간을 합산해 표시.
+    const mergedContentMap=new Map();
+    contentItems.forEach(c=>{
+      const s=_dawnTimeToMin(c.start),e=_dawnTimeToMin(c.end);
+      let dur=0;
+      if(s!=null&&e!=null){dur=e-s;if(dur<0)dur+=1440;}
+      const mkey=(c.cat||'')+'|'+c.title;
+      if(mergedContentMap.has(mkey)){
+        const existing=mergedContentMap.get(mkey);
+        existing.dur+=Math.max(0,dur);
+      }else{
+        mergedContentMap.set(mkey,{cat:c.cat,title:c.title,dur:Math.max(0,dur)});
+      }
+    });
+    Array.from(mergedContentMap.values()).forEach(c=>{
+      const key=catToKey(c.cat);
+      const dotColor=key?getCatDotColor(key):'rgba(190,160,230,0.55)';
+      const durLabel=c.dur>0?`${Math.floor(c.dur/60)}h${c.dur%60?' '+(c.dur%60)+'m':''}`.replace(/^0h /,''):'';
+      html+=`<div class="recap-content-item"><span class="cdot" style="background:${dotColor};"></span>${c.cat||'감상'}<span class="ctime">${c.title}${durLabel?' · '+durLabel:''}</span></div>`;
+    });
+  }
+
+  card.innerHTML=html;
+  wrap.appendChild(card);
+  return wrap;
+}
+// calMode(월간탭에서 다른 날짜를 임시로 열어 편집 중)였다면 원래 날짜로 복원하고 관련 화면을 다시 그림.
+// withCalendar=true면 캘린더/상세까지 갱신(저장·삭제 후), false면 오늘탭만 가볍게 갱신(단순 닫기).
+function restoreCalModeAndRender(modal,withCalendar){
+  if(modal.dataset.calMode==='1'){
+    modal.dataset.calMode='';
+    const restoreDate=modal.dataset.calRestoreDate;
+    if(restoreDate)currentDate=new Date(restoreDate);
+    if(withCalendar){
+      renderCalendar();
+      if(_calSelectedDay)renderCalDetail(_calSelectedDay);
+    }
+  }
+  renderTodos(); // currentDate가 다른 날짜(연속일정 편집 등)로 전환됐다가 복원된 경우, 화면(오늘탭 이벤트 리스트)도 반드시 다시 그려야 다음 클릭 시 인덱스가 최신 상태로 맞음
+}
+function closeTodoModal(e){
+  const modal=document.getElementById('todo-modal');
+  if(e&&e.target!==modal)return; // 오버레이 클릭 시에는 modal-ov 자체를 클릭했을 때만 닫힘(기존 closeModal과 동일 동작)
+  restoreCalModeAndRender(modal,false);
+  modal.classList.remove('on');
+}
+function openTodoModal(editIdx=-1){
+  const modal=document.getElementById('todo-modal');
+  modal.dataset.editIdx=editIdx>=0?editIdx:'';
+  modal.dataset.calMode=''; // 다른 진입 경로(+버튼, 스와이프 수정)로 열릴 때 이전 캘린더모드 잔존 방지 — 캘린더 경로는 이 호출 직후 별도로 다시 세팅함
+  document.getElementById('todo-modal-delete').style.display=editIdx>=0?'block':'none'; // 신규 등록 시엔 삭제할 대상이 없으므로 숨김
+  const dk=dateKey(currentDate);
+  const existing=editIdx>=0?getTodos(dk)[editIdx]:null;
+  document.getElementById('todo-modal-inp').value=existing?.text||'';
+  // 시간대 버튼 초기화
+  const ts=existing?.timeSection||'none';
+  document.querySelectorAll('.todo-time-sel button').forEach(b=>b.classList.remove('active'));
+  const activeBtn=document.querySelector(`.todo-time-sel button.ts-${ts}`);
+  if(activeBtn)activeBtn.classList.add('active');
+  modal.dataset.timeSection=ts;
+  // 강조(볼트) 상태 초기화 — 편집 시 기존값 복원, 신규는 항상 꺼짐
+  const pinned=!!existing?.pinned;
+  modal.dataset.pinned=pinned?'1':'';
+  document.getElementById('todo-pinned-toggle')?.classList.toggle('on',pinned);
+  // 일정 카테고리 버튼 초기화 — 항상 유효한 카테고리 하나(기본 schedule)를 유지, '일정 아님' 상태는 없음
+  const ec=existing?.isEvent?(existing.eventCat||'schedule'):'schedule';
+  document.querySelectorAll('.todo-event-sel button').forEach(b=>b.classList.remove('active'));
+  const activeEvBtn=document.querySelector(`.todo-event-sel button.ev-${ec}`);
+  if(activeEvBtn)activeEvBtn.classList.add('active');
+  modal.dataset.eventCat=ec;
+  // 일정 시간 초기화
+  const evTimeInp=document.getElementById('todo-event-time-inp');
+  const evTimeVal=existing?.eventTime||'';
+  evTimeInp.dataset.value=evTimeVal;evTimeInp.textContent=evTimeVal||'시간 선택';
+  document.getElementById('todo-event-time-clear').style.display=evTimeVal?'block':'none';
+  modal.dataset.eventAlertOn=(existing?.isEvent&&existing?.eventAlertOn)?'1':'';
+  updateEventTimeIcon();
+  // 할일 알림 시간 초기화 — existing.alertTime은 "임시 예상 시간"일 뿐, 실제 처리 시각은 completedAt 기준
+  const alertTimeInp=document.getElementById('todo-alert-time-inp');
+  const alertTimeVal=existing?.alertTime||'';
+  alertTimeInp.dataset.value=alertTimeVal;alertTimeInp.textContent=alertTimeVal||'알림 없음';
+  document.getElementById('todo-alert-time-clear').style.display=alertTimeVal?'block':'none';
+  // todoAlertOn이 저장 안 된 기존 데이터는 alertTime이 있으면 기본 on으로 간주(하위호환)
+  modal.dataset.todoAlertOn=alertTimeVal?(existing?.todoAlertOn===false?'':'1'):'';
+  updateTodoAlertIcon();
+  // 연속일정(며칠간) 초기화 — 기존에 eventEndDate가 있고 시작일과 다르면 화살표 펼침 상태로 복원
+  const multidayArrow=document.getElementById('todo-multiday-arrow');
+  const multidayEndRow=document.getElementById('todo-multiday-end-row');
+  const startDateInp=document.getElementById('todo-event-start-date');
+  const endDateInp=document.getElementById('todo-event-end-date');
+  const existingEndDate=existing?.eventEndDate||'';
+  const hasMultiday=!!(existingEndDate&&existingEndDate!==dk);
+  multidayArrow.classList.toggle('on',hasMultiday);
+  multidayEndRow.style.display=hasMultiday?'flex':'none';
+  startDateInp.value=shortDk(dk); // 표시는 짧게(MM.DD), 실제 값은 modal.dataset.eventStartDate가 원본(YYYY-MM-DD)으로 관리
+  endDateInp.value=existingEndDate?shortDk(existingEndDate):'';
+  modal.dataset.eventStartDate=dk;
+  modal.dataset.eventEndDate=hasMultiday?existingEndDate:'';
+  // 반복 설정 초기화 — 신규/일반항목 편집 모두 항상 "반복 안함"으로 시작(반복 항목 자체의 규칙 수정은 별도 경로로 처리)
+  resetRecurUI();
+  // 할일/일정 탭 초기화 — 기존 항목의 isEvent 값에 따라, 신규는 항상 '할일' 탭에서 시작
+  selectTodoKind(existing?.isEvent?'event':'todo',document.querySelector(`.todo-kind-tabs button.tk-${existing?.isEvent?'event':'todo'}`));
+  openModal('todo-modal');setTimeout(()=>document.getElementById('todo-modal-inp').focus(),100);
+}
+// ── 반복 설정 UI 제어 ──
+// 타입별로 나타나는 입력 row들 — selectRecurType도 이 목록을 그대로 사용해 "타입 하나만 보이고
+// 나머지는 숨김" 로직을 한 곳(RECUR_TYPE_ROWS)만 고치면 되게 함.
+const RECUR_TYPE_ROWS={weekly:['todo-recur-days-row','todo-recur-interval-row'],daily:['todo-recur-n-row'],monthly:['todo-recur-monthday-row']};
+const RECUR_ALL_TYPE_ROWS=Object.values(RECUR_TYPE_ROWS).flat();
+function resetRecurUI(){
+  const modal=document.getElementById('todo-modal');
+  modal.dataset.recurType='';
+  modal.dataset.recurDays='';
+  modal.dataset.recurWeekInterval='1';
+  modal.dataset.recurEndDate='';
+  document.getElementById('todo-recur-panel').style.display='none';
+  document.getElementById('todo-recur-chip').classList.remove('on');
+  document.getElementById('todo-recur-chevron').classList.remove('on');
+  document.getElementById('todo-recur-chip-label').textContent='반복 안함';
+  ['.rt-opt','.rd-opt','.ri-opt'].forEach(sel=>document.querySelectorAll(sel).forEach(b=>b.classList.remove('active')));
+  document.querySelector('.ri-opt[data-interval="1"]')?.classList.add('active');
+  RECUR_ALL_TYPE_ROWS.forEach(id=>{document.getElementById(id).style.display='none';});
+  document.getElementById('todo-recur-cancel-row').style.display='none';
+  document.getElementById('todo-recur-n-inp').value='1';
+  document.getElementById('todo-recur-monthday-inp').value='';
+  document.getElementById('todo-recur-end-date').value='';
+  document.getElementById('todo-recur-end-clear').style.display='none';
+}
+function toggleRecurBox(){
+  const panel=document.getElementById('todo-recur-panel');
+  const on=panel.style.display==='none';
+  panel.style.display=on?'flex':'none';
+  document.getElementById('todo-recur-chevron').classList.toggle('on',on);
+}
+function _recurTypeLabel(type,weekInterval,dailyN){
+  if(type==='weekly')return weekInterval==='2'?'2주마다':'매주';
+  if(type==='daily'){
+    const n=parseInt(dailyN,10);
+    return(!n||n<=1)?'매일':`${n}일마다`;
+  }
+  return {monthly:'매월'}[type]||'반복 안함';
+}
+// 반복 타입 선택 — daily는 간격(며칠마다, 1이면 매일)을 그 안에서 조절, weekly는 요일선택+간격토글(매주/2주=격주), monthly는 날짜입력.
+// 타입을 하나라도 고르면 "반복 취소" 버튼이 나타나 언제든 반복 자체를 없던 일로 되돌릴 수 있음.
+function selectRecurType(type,btn){
+  const modal=document.getElementById('todo-modal');
+  modal.dataset.recurType=type;
+  document.querySelectorAll('.rt-opt').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('todo-recur-chip').classList.add('on');
+  document.getElementById('todo-recur-chip-label').textContent=_recurTypeLabel(type,modal.dataset.recurWeekInterval,document.getElementById('todo-recur-n-inp').value);
+  // 이 타입에 해당하는 row만 보이고 나머지 타입들의 row는 전부 숨김(RECUR_TYPE_ROWS 테이블 기준)
+  const showRows=new Set(RECUR_TYPE_ROWS[type]||[]);
+  RECUR_ALL_TYPE_ROWS.forEach(id=>{document.getElementById(id).style.display=showRows.has(id)?'flex':'none';});
+  document.getElementById('todo-recur-cancel-row').style.display='flex';
+}
+// daily 간격 입력이 바뀔 때마다 칩 라벨도 즉시 갱신(예: "3"을 입력하면 칩이 바로 "3일마다"로 바뀜)
+function onRecurDailyNInput(){
+  const modal=document.getElementById('todo-modal');
+  if(modal.dataset.recurType==='daily')document.getElementById('todo-recur-chip-label').textContent=_recurTypeLabel('daily',null,document.getElementById('todo-recur-n-inp').value);
+}
+// weekly 전용 — 1주(매주)/2주(격주) 간격 토글. 별도 타입이 아니라 weekly의 부속 설정이라 rule.type은 그대로 'weekly'.
+function selectRecurWeekInterval(n,btn){
+  const modal=document.getElementById('todo-modal');
+  modal.dataset.recurWeekInterval=String(n);
+  document.querySelectorAll('.ri-opt').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  if(modal.dataset.recurType==='weekly')document.getElementById('todo-recur-chip-label').textContent=_recurTypeLabel('weekly',String(n));
+}
+function toggleRecurDay(day,btn){
+  const modal=document.getElementById('todo-modal');
+  const days=(modal.dataset.recurDays||'').split(',').filter(Boolean);
+  const idx=days.indexOf(day);
+  if(idx>=0){days.splice(idx,1);btn.classList.remove('active');}
+  else{days.push(day);btn.classList.add('active');}
+  modal.dataset.recurDays=days.join(',');
+}
+// 반복 취소 — 지금까지 고른 타입/요일/간격/종료일을 전부 지우고 "반복 안함" 상태로 되돌림(칩이 다시 접힌 기본 모습으로).
+function cancelRecurSetting(){
+  resetRecurUI();
+}
+function openTodoRecurEndDatePicker(){
+  const modal=document.getElementById('todo-modal');
+  const dk=dateKey(currentDate);
+  const curVal=modal.dataset.recurEndDate||dk;
+  openDatePickerModal(curVal,function(selectedDk){
+    document.getElementById('todo-recur-end-date').value=shortDk(selectedDk);
+    modal.dataset.recurEndDate=selectedDk;
+    document.getElementById('todo-recur-end-clear').style.display='block';
+  },'종료일 선택','확인');
+}
+function clearTodoRecurEndDate(){
+  const modal=document.getElementById('todo-modal');
+  modal.dataset.recurEndDate='';
+  document.getElementById('todo-recur-end-date').value='';
+  document.getElementById('todo-recur-end-clear').style.display='none';
+}
+let _todoSubmitting=false;
+function selectTodoKind(kind,btn){
+  document.querySelectorAll('.todo-kind-tabs button').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  document.getElementById('todo-modal').dataset.kind=kind;
+  document.getElementById('todo-time-sel').style.display=kind==='todo'?'flex':'none';
+  document.getElementById('todo-event-sel').style.display=kind==='event'?'flex':'none';
+  document.getElementById('todo-event-time-row').style.display=kind==='event'?'flex':'none';
+  document.getElementById('todo-alert-time-row').style.display=kind==='todo'?'flex':'none';
+  document.getElementById('todo-pinned-toggle').style.display=kind==='todo'?'flex':'none';
+  if(kind!=='event')document.getElementById('todo-multiday-end-row').style.display='none';
+}
+// dk(YYYY-MM-DD)를 화면 표시용 짧은 포맷(MM.DD)으로 변환 — 저장값(input.value/dataset)은 항상 dk 원본 유지, 표시만 축약
+function shortDk(dk){
+  if(!dk)return '';
+  const parts=dk.split('-');
+  return parts.length===3?`${parts[1]}.${parts[2]}`:dk;
+}
+function toggleTodoMultiday(){
+  const arrow=document.getElementById('todo-multiday-arrow');
+  const endRow=document.getElementById('todo-multiday-end-row');
+  const on=!arrow.classList.contains('on');
+  arrow.classList.toggle('on',on);
+  endRow.style.display=on?'flex':'none';
+  if(!on){
+    document.getElementById('todo-event-end-date').value='';
+    document.getElementById('todo-modal').dataset.eventEndDate='';
+  }else{
+    // 펼칠 때 종료일 기본값 = 현재 선택된 시작일로 세팅, 사용자가 바로 조정하도록
+    const modal=document.getElementById('todo-modal');
+    const startDk=modal.dataset.eventStartDate||dateKey(currentDate);
+    const endInp=document.getElementById('todo-event-end-date');
+    if(!modal.dataset.eventEndDate){endInp.value=shortDk(startDk);modal.dataset.eventEndDate=startDk;}
+  }
+}
+// 콘텐츠 등록 모달(cm-start/cm-end)과 동일한 방식 — 공용 openDatePickerModal 재사용.
+// 네이티브 input[type=date]는 iOS/브라우저별 세로정렬·렌더링이 불안정해서, 텍스트+커스텀 피커 방식으로 통일함.
+// 시작일(=이 일정이 속한 날짜) 변경 — 하루짜리 일정도 이 아코디언을 펼치면 날짜를 바꿀 수 있음(별도 "날짜 변경" 버튼 없이 수정모달에서 처리).
+// 진짜 값은 modal.dataset.eventStartDate/eventEndDate(YYYY-MM-DD)에만 저장, input.value는 항상 표시용 축약(MM.DD)만 담음(칸이 좁아 4자리 연도가 넘치는 것 방지)
+function openTodoEventStartDatePicker(){
+  const startInp=document.getElementById('todo-event-start-date');
+  const modal=document.getElementById('todo-modal');
+  const curVal=modal.dataset.eventStartDate||dateKey(currentDate);
+  openDatePickerModal(curVal,function(selectedDk){
+    const endVal=modal.dataset.eventEndDate;
+    startInp.value=shortDk(selectedDk);
+    modal.dataset.eventStartDate=selectedDk;
+    // 종료일이 시작일보다 앞서게 되면(=일정을 뒤로 미룸) 종료일도 시작일과 같은 날로 함께 이동
+    if(endVal&&selectedDk>endVal){
+      const endInp=document.getElementById('todo-event-end-date');
+      endInp.value=shortDk(selectedDk);
+      modal.dataset.eventEndDate=selectedDk;
+    }
+  },'날짜 선택','확인');
+}
+function openTodoEventEndDatePicker(){
+  const endInp=document.getElementById('todo-event-end-date');
+  const modal=document.getElementById('todo-modal');
+  const startVal=modal.dataset.eventStartDate||dateKey(currentDate);
+  const curVal=modal.dataset.eventEndDate||startVal;
+  openDatePickerModal(curVal,function(selectedDk){
+    if(selectedDk<startVal){showToast('종료일은 시작일 이후로 선택해주세요');return;}
+    endInp.value=shortDk(selectedDk);
+    modal.dataset.eventEndDate=selectedDk;
+  },'종료일 선택','확인');
+}
+// ── 시간+알림 아이콘 공용 로직 — 일정(event)과 할일(todo-alert)이 완전히 같은 패턴이라 하나로 통합.
+// cfg: {inpId, clearBtnId, iconId, datasetKey, clockIcon, emptyTitle, sleepTarget}
+// clockIcon이 있으면(일정) 시간 없을 때 시계 아이콘, 없으면(할일) 항상 벨 아이콘만 사용.
+function _timeAlertCfg(kind){
+  return kind==='event'
+    ? {inpId:'todo-event-time-inp',clearBtnId:'todo-event-time-clear',iconId:'todo-event-time-icon',datasetKey:'eventAlertOn',clockIcon:'ti-clock',emptyTitle:'',sleepTarget:'event'}
+    : {inpId:'todo-alert-time-inp',clearBtnId:'todo-alert-time-clear',iconId:'todo-alert-time-icon',datasetKey:'todoAlertOn',clockIcon:null,emptyTitle:'탭하여 알림 시간 설정',sleepTarget:'todo-alert'};
+}
+function _clearTimeAlert(kind){
+  const cfg=_timeAlertCfg(kind);
+  const inp=document.getElementById(cfg.inpId);
+  inp.dataset.value='';inp.textContent=kind==='event'?'시간 선택':'알림 없음';
+  document.getElementById(cfg.clearBtnId).style.display='none';
+  document.getElementById('todo-modal').dataset[cfg.datasetKey]='';
+  _updateTimeAlertIcon(kind);
+}
+function _openTimeAlertPicker(kind){
+  const cfg=_timeAlertCfg(kind);
+  _sleepTarget=cfg.sleepTarget;
+  const inp=document.getElementById(cfg.inpId);
+  const n=new Date();
+  const current=inp.dataset.value||`${pad(n.getHours())}:${pad(n.getMinutes())}`;
+  document.getElementById('time-inp').value=current;
+  openModal('time-modal');
+  renderTimeWheel();
+}
+// 시간 미선택+clockIcon 설정된 경우(일정)만 시계, 그 외엔 항상 벨. 켜짐 상태만 강조색.
+function _updateTimeAlertIcon(kind){
+  const cfg=_timeAlertCfg(kind);
+  const icon=document.getElementById(cfg.iconId);
+  const modal=document.getElementById('todo-modal');
+  const hasTime=!!document.getElementById(cfg.inpId).dataset.value;
+  const on=modal.dataset[cfg.datasetKey]==='1';
+  const baseIcon=(cfg.clockIcon&&!hasTime)?cfg.clockIcon:'ti-bell';
+  icon.className='ti ico-sz-13 '+baseIcon+(hasTime&&on?' alert-on':'');
+  icon.title=hasTime?(on?'알림 켜짐 (탭하여 끄기)':'알림 꺼짐 (탭하여 켜기)'):cfg.emptyTitle;
+}
+// 아이콘 클릭 — 시간 있으면 온오프 토글만. 시간 없으면(할일만) 시간표 형식("09:00 회의") 자동감지 후 채워 넣고 켬, 아니면 피커 오픈.
+// 일정은 시간표 자동감지 대상이 아니므로 곧장 피커를 연다.
+function _onTimeAlertIconClick(kind){
+  const cfg=_timeAlertCfg(kind);
+  const modal=document.getElementById('todo-modal');
+  const inp=document.getElementById(cfg.inpId);
+  if(inp.dataset.value){
+    const on=modal.dataset[cfg.datasetKey]==='1';
+    modal.dataset[cfg.datasetKey]=on?'':'1';
+    _updateTimeAlertIcon(kind);
+    return;
+  }
+  if(kind==='todo'){
+    const text=document.getElementById('todo-modal-inp').value;
+    const m=(text||'').match(SCHEDULE_TIME_RE);
+    if(m){
+      const hh=pad(Math.min(23,parseInt(m[1],10))),mm=pad(Math.min(59,parseInt(m[2],10)));
+      inp.dataset.value=`${hh}:${mm}`;inp.textContent=`${hh}:${mm}`;
+      document.getElementById(cfg.clearBtnId).style.display='block';
+      modal.dataset[cfg.datasetKey]='1';
+      _updateTimeAlertIcon(kind);
+      return;
+    }
+  }
+  _openTimeAlertPicker(kind);
+}
+function clearTodoEventTime(){_clearTimeAlert('event');}
+function openEventTimePicker(){_openTimeAlertPicker('event');}
+function updateEventTimeIcon(){_updateTimeAlertIcon('event');}
+function onEventTimeIconClick(){_onTimeAlertIconClick('event');}
+// ── 할일 알림(예상 시각) — 여기서 정하는 시각은 "임시 예상/희망 시간"으로 알람 트리거 전용이며,
+// 실제 완료 처리 시각(completedAt)과는 별개.
+function clearTodoAlertTime(){_clearTimeAlert('todo');}
+function openAlertTimePicker(){_openTimeAlertPicker('todo');}
+function updateTodoAlertIcon(){_updateTimeAlertIcon('todo');}
+function onTodoAlertIconClick(){_onTimeAlertIconClick('todo');}
+function selectTodoTime(ts,btn){
+  document.querySelectorAll('.todo-time-sel button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('todo-modal').dataset.timeSection=ts;
+}
+function toggleTodoPinnedDraft(){
+  const modal=document.getElementById('todo-modal');
+  const on=modal.dataset.pinned==='1';
+  modal.dataset.pinned=on?'':'1';
+  document.getElementById('todo-pinned-toggle')?.classList.toggle('on',!on);
+}
+function selectTodoEventCat(cat,btn){
+  document.querySelectorAll('.todo-event-sel button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('todo-modal').dataset.eventCat=cat||'';
+}
+// ── 투두/일정 삭제 코어 — dk+cid로 대상 하나를 찾아 addDelPending+splice+saveTodos까지 처리.
+// 진입 경로(스와이프/시트/모달)와 무관하게 "실제로 지우는 동작"은 이거 하나로 통일.
+// 반환값: 실제로 지워졌으면 true, 대상을 못 찾았으면 false.
+function removeTodoByCid(dk,cid){
+  if(!cid)return false;
+  const todos=getTodos(dk);
+  const idx=todos.findIndex(t=>t.cid===cid);
+  if(idx<0)return false;
+  const t=todos[idx];
+  addDelPending('todos',dk,cid);
+  todos.splice(idx,1);saveTodos(dk,todos);
+  clearTodoAlerts(t.isEvent,cid); // 알림 예약(스누즈 포함)이 있었다면 함께 정리(없어도 무해)
+  return true;
+}
+// 일정/할일 모달 안 삭제 버튼 — 오늘탭 일정처럼 스와이프 진입점이 없는 곳에서도 모달을 열어 바로 삭제할 수 있게 함.
+// calMode(연속일정 등 다른 날짜를 임시로 열어 편집 중)인 경우, 그 날짜(currentDate) 기준으로 삭제 후 원래 날짜로 복원.
+function deleteTodoFromModal(){
+  const modal=document.getElementById('todo-modal');
+  const editIdx=modal.dataset.editIdx!==''&&modal.dataset.editIdx!=null?parseInt(modal.dataset.editIdx):-1;
+  if(editIdx<0)return; // 신규 등록 상태(삭제 대상 없음) 방어
+  const dk=dateKey(currentDate),todos=getTodos(dk);
+  const t=todos[editIdx];
+  if(t)removeTodoByCid(dk,t.cid);
+  closeModal('todo-modal');
+  restoreCalModeAndRender(modal,true);
+}
+// 반복 투두/일정 규칙 등록 — 모달의 반복 설정(dataset)을 rule 객체로 조립해 recurring_items(원본 규칙)에 저장.
+// 실제 오늘 날짜에 나타나는 실체화는 여기서 하지 않음 — 등록 직후 restoreCalModeAndRender가 renderTodos()를
+// 호출하고, 그 안의 getTodos(dk)가 자동으로 오늘치를 실체화하므로 별도 처리가 필요 없음.
+function confirmRecurringTodo(text){
+  const modal=document.getElementById('todo-modal');
+  const isEvent=modal.dataset.kind==='event';
+  // 시간표(맨 앞 "HH:MM ") 형식 텍스트는 반복 대상이 될 수 없음 — 시간표는 인덱스 기반 파싱 구조라 cid로
+  // 실체화하는 반복 구조와 근본적으로 안 맞음(성립 시 두 시스템이 같은 todos 레코드를 서로 다른 방식으로
+  // 다루며 충돌). 등록 시점에 미리 막아 애초에 이런 데이터가 안 생기게 함.
+  if(!isEvent&&SCHEDULE_TIME_RE.test(text)){showToast('시간표 형식(HH:MM)은 반복 등록을 지원하지 않아요');return;}
+  const type=modal.dataset.recurType;
+  const timeSection=modal.dataset.timeSection||'none';
+  const eventCat=isEvent?(modal.dataset.eventCat||'schedule'):null;
+  const eventTime=isEvent?(document.getElementById('todo-event-time-inp').dataset.value||null):null;
+  const dk=dateKey(currentDate);
+  const rule={type};
+  if(type==='daily'){
+    const n=parseInt(document.getElementById('todo-recur-n-inp').value,10);
+    if(!n||n<1){showToast('며칠마다 반복할지 입력해주세요');return;}
+    rule.n=n; // n=1이면 매일
+  }else if(type==='weekly'){
+    const days=(modal.dataset.recurDays||'').split(',').filter(Boolean);
+    if(!days.length){showToast('반복할 요일을 선택해주세요');return;}
+    rule.days=days;
+    rule.weekInterval=modal.dataset.recurWeekInterval==='2'?2:1;
+  }else if(type==='monthly'){
+    const day=parseInt(document.getElementById('todo-recur-monthday-inp').value,10);
+    if(!day||day<1||day>31){showToast('매월 며칠인지 입력해주세요(1~31)');return;}
+    rule.day=day;
+  }
+  const endDate=modal.dataset.recurEndDate||null;
+  if(endDate&&endDate<dk){showToast('종료일은 시작일 이후로 선택해주세요');return;}
+  _todoSubmitting=true;
+  const items=getRecurringItems();
+  items.push({cid:genCid(),text,isEvent,eventCat,eventTime,timeSection:isEvent?null:timeSection,rule,startDate:dk,endDate});
+  saveRecurringItems(items);
+  closeModal('todo-modal');
+  restoreCalModeAndRender(modal,true);
+  setTimeout(()=>{_todoSubmitting=false;},500);
+}
+async function confirmTodo(){
+  if(_todoSubmitting)return;
+  const text=document.getElementById('todo-modal-inp').value.trim();if(!text)return;
+  const modal=document.getElementById('todo-modal');
+  // 반복 설정이 돼 있으면 일반 투두/일정 저장 로직(연속일정, 조각모드 등)을 타지 않고 별도 경로로 분기.
+  // 편집(editIdx>=0)인 기존 항목엔 반복 설정을 적용하지 않음 — 신규 등록에서만 지원(범위를 좁혀 복잡도 관리).
+  const editIdx=modal.dataset.editIdx!==''&&modal.dataset.editIdx!=null?parseInt(modal.dataset.editIdx):-1;
+  if(editIdx<0&&modal.dataset.recurType){
+    confirmRecurringTodo(text);
+    return;
+  }
+  _todoSubmitting=true;
+  const dk=dateKey(currentDate),todos=getTodos(dk);
+  const timeSection=modal.dataset.timeSection||'none';
+  const isEvent=modal.dataset.kind==='event';
+  const pinned=!isEvent&&modal.dataset.pinned==='1'; // 일정에는 강조 개념 없음, 할일에만 적용
+  const eventCat=isEvent?(modal.dataset.eventCat||'schedule'):'';
+  const eventTime=isEvent?(document.getElementById('todo-event-time-inp').dataset.value||null):null;
+  const eventAlertOn=isEvent&&modal.dataset.eventAlertOn==='1'; // 시간이 있어도 아이콘으로 꺼뒀으면 알림 발송 안 함
+  // 할일의 알림 시간 — "임시 예상/희망 시간"일 뿐. 실제 처리 시각은 체크완료 시점(completedAt)이 기준.
+  const alertTime=!isEvent?(document.getElementById('todo-alert-time-inp').dataset.value||null):null;
+  const todoAlertOn=!isEvent&&modal.dataset.todoAlertOn==='1'; // 시간이 있어도 아이콘으로 꺼뒀으면 알림 발송 안 함
+  // 시작일(=일정이 속한 date_key) — 아코디언에서 바꾸지 않았다면 modal.dataset.eventStartDate가 원래 dk와 같음
+  const newDk=isEvent?(modal.dataset.eventStartDate||dk):dk;
+  // 종료일이 시작일과 같거나 비어있으면 하루짜리 일정으로 취급(eventEndDate:null) — 하위호환 유지
+  const rawEndDate=isEvent?(modal.dataset.eventEndDate||''):'';
+  const eventEndDate=(rawEndDate&&rawEndDate!==newDk)?rawEndDate:null;
+  // 일정 시작일이 원래 날짜(dk)와 달라진 경우 — 기존 row를 dk에서 제거하고 newDk에 새로 저장(투두의 조각 이동과 달리 일정은 통째로 이동이라 단순함)
+  if(isEvent&&editIdx>=0&&todos[editIdx]&&newDk!==dk){
+    const old=todos[editIdx];
+    addDelPending('todos',dk,old.cid);
+    todos.splice(editIdx,1);
+    saveTodos(dk,todos);
+    const targetTodos=getTodos(newDk);
+    targetTodos.push({text,done:old.done||false,created:old.created||Date.now(),timeSection,isEvent:true,eventCat,eventTime,eventEndDate,cid:old.cid,strikeParts:[],strikeTimes:{},pinned:false,alertTime:null,eventAlertOn});
+    saveTodos(newDk,targetTodos);
+    if(eventTime&&eventAlertOn)await syncAlertFor('event',old.cid,newDk,eventTime,text);else await deleteAlertFor('event',old.cid);
+    closeModal('todo-modal');
+    restoreCalModeAndRender(modal,true);
+    setTimeout(()=>{_todoSubmitting=false;},500);
+    return;
+  }
+  let alertChanged=false; // 수정 저장으로 알림 시각/온오프가 바뀌었는지 — 바뀌었으면 옛 스누즈 예약도 정리
+  if(editIdx>=0&&todos[editIdx]){
+    const old=todos[editIdx];
+    alertChanged=old.alertTime!==alertTime||!!old.todoAlertOn!==!!todoAlertOn;
+    // 조각(strikeParts)이 있는 투두의 텍스트를 수기 편집하면, 조각 개수/순서가 바뀔 수 있음.
+    // strikeParts/strikeTimes가 "조각 내용"이 아니라 "인덱스"만 기억하는 구조라, 그대로 두면
+    // 예: [메일확인, 마케팅회의, 보고서작성, 서류체크]에서 "보고서작성"(idx 2)을 완료 표시한 뒤
+    // 맨 앞 "메일확인"을 지우면 새 배열은 [마케팅회의, 보고서작성, 서류체크](idx 0,1,2)가 되어
+    // 기존 strikeParts=[2]가 엉뚱하게 "서류체크"를 가리키게 되는 버그가 있었음.
+    // → 텍스트 기준으로 이전 조각과 새 조각을 매칭해, 내용이 그대로 남은 조각의 완료 상태만 이어받음.
+    if((old.strikeParts||[]).length){
+      const oldParts=parseTodoTextParts(old.text).parts;
+      const newParts=parseTodoTextParts(text).parts;
+      const oldStrikeSet=new Set(old.strikeParts);
+      const oldTimes=old.strikeTimes||{};
+      const newStrikeParts=[];
+      const newStrikeTimes={};
+      newParts.forEach((p,newIdx)=>{
+        const oldIdx=oldParts.indexOf(p); // 같은 텍스트를 가진 조각을 이전 배열에서 찾아 매칭
+        if(oldIdx>=0&&oldStrikeSet.has(oldIdx)){
+          newStrikeParts.push(newIdx);
+          if(oldTimes[oldIdx]!=null)newStrikeTimes[newIdx]=oldTimes[oldIdx];
+        }
+      });
+      old.strikeParts=newStrikeParts;
+      old.strikeTimes=newStrikeTimes;
+      // 모든 조각이 사라졌다면(완료 조각을 전부 지운 경우) 전체 완료 상태도 자동으로 해제
+      if(!newParts.length||newStrikeParts.length<newParts.length)old.done=false;
+    }
+    old.text=text;old.timeSection=timeSection;
+    old.isEvent=isEvent;old.eventCat=isEvent?eventCat:null;old.eventTime=isEvent?eventTime:null;old.eventEndDate=isEvent?eventEndDate:null;
+    old.pinned=pinned;old.alertTime=alertTime;old.eventAlertOn=eventAlertOn;old.todoAlertOn=todoAlertOn;
+  }
+  else todos.push({text,done:false,created:Date.now(),timeSection,isEvent,eventCat:isEvent?eventCat:null,eventTime:isEvent?eventTime:null,eventEndDate:isEvent?eventEndDate:null,cid:genCid(),pinned,alertTime,eventAlertOn,todoAlertOn});
+  const savedTodo=editIdx>=0?todos[editIdx]:todos[todos.length-1];
+  saveTodos(dk,todos);closeModal('todo-modal');
+  // alerts 동기화 — 일정은 eventTime+eventAlertOn, 할일은 alertTime+todoAlertOn(둘 다 온일 때만) 기준으로 발송 예약
+  const alertBasisTime=alertBasisTimeFor({isEvent,eventAlertOn,eventTime,todoAlertOn,alertTime});
+  if(alertBasisTime)syncAlertFor(isEvent?'event':'todo',savedTodo.cid,dk,alertBasisTime,text);
+  else clearTodoAlerts(isEvent,savedTodo.cid); // 알림을 껐거나 시각이 없어졌으면 스누즈 임시 알림까지 정리
+  if(!isEvent&&alertChanged)deleteAlertFor('todo_snooze',savedTodo.cid); // 알림 시각/온오프를 바꿨으면 옛 스누즈도 정리
+  // 월간 캘린더의 "투두 추가하기"에서 열린 경우 — currentDate를 원래대로 되돌리고 캘린더/상세를 갱신
+  // (calMode가 아니면 restoreCalModeAndRender 내부에서 renderTodos만 실행됨)
+  restoreCalModeAndRender(modal,true);
+  setTimeout(()=>{_todoSubmitting=false;},500);
+}
+function todoDelSwipe(i){
+  closeSheet('todo-sheet');
+  const dk=dateKey(currentDate),todos=getTodos(dk);
+  const t=todos[i];
+  if(t)removeTodoByCid(dk,t.cid);
+  renderTodos();
+}
+function openTodoSheet(i){
+  _todoSwipeIdx=i;
+  const dk=dateKey(currentDate),todos=getTodos(dk);
+  document.getElementById('todo-sheet-title').textContent=todos[i]?.text||'';
+  openSheet('todo-sheet');
+}
+function todoSheetEdit(){_todoSwipeIdx>=0&&(closeSheet('todo-sheet'),openTodoModal(_todoSwipeIdx));}
+function todoSheetDelete(){todoDelSwipe(_todoSwipeIdx);}
+// 일정 전용 시트 — dk+cid로 대상을 저장해두고, 그 시점 기준으로 실제 배열 인덱스를 다시 찾아 처리(인덱스 stale 방지).
+function openEventSheet(dk,cid,title){
+  _eventSheetDk=dk;_eventSheetCid=cid;
+  document.getElementById('event-sheet-title').textContent=title||'';
+  openSheet('event-sheet');
+}
+function eventSheetEdit(){
+  closeSheet('event-sheet');
+  if(!_eventSheetDk||!_eventSheetCid)return;
+  const todos=getTodos(_eventSheetDk);
+  const idx=todos.findIndex(t=>t.cid===_eventSheetCid);
+  if(idx<0)return;
+  if(_eventSheetDk===dateKey(currentDate)){
+    openTodoModal(idx); // 오늘 날짜(=시작일)면 currentDate 전환 불필요, 바로 편집
+  }else{
+    openEventEditFromCalendar(new Date(_eventSheetDk+'T00:00:00').getDate(),idx,new Date(_eventSheetDk+'T00:00:00').getFullYear(),new Date(_eventSheetDk+'T00:00:00').getMonth());
+  }
+}
+function eventSheetDelete(){
+  closeSheet('event-sheet');
+  if(!removeTodoByCid(_eventSheetDk,_eventSheetCid))return;
+  renderTodos();
+  if(document.getElementById('monthly-cal'))renderCalendar();
+}
+// ── 반복으로 생성된 투두/일정 — 탭하면 시트(오늘만 수정/오늘만 삭제/이 반복 전체 삭제)를 염 ──
+// todoCid: 그날 실체화된 실제 todos 레코드의 cid(수정/삭제 대상). ruleCid: 원본 규칙(recurring_items)의 cid("전체 삭제" 대상).
+let _recurSheetTodoCid=null,_recurSheetRuleCid=null,_recurSheetDk=null;
+function openRecurringItemSheet(dk,todoCid,ruleCid,title){
+  _recurSheetTodoCid=todoCid;_recurSheetRuleCid=ruleCid;_recurSheetDk=dk;
+  document.getElementById('recur-sheet-title').textContent=title||'';
+  openSheet('recur-sheet');
+}
+// 오늘만 삭제 — 실체화된 그날 레코드를 지우고, 같은 규칙이 그날 다시 실체화되지 않도록 skip 기록을 남김.
+function recurSheetSkipToday(){
+  closeSheet('recur-sheet');
+  if(!_recurSheetTodoCid||!_recurSheetDk)return;
+  removeTodoByCid(_recurSheetDk,_recurSheetTodoCid);
+  addRecurSkip(_recurSheetRuleCid,_recurSheetDk);
+  renderTodos();
+  if(document.getElementById('monthly-cal'))renderCalendar();
+}
+// 원본 규칙(recurring_items) 삭제 + "삭제를 실행한 그 날짜(기준일, 포함) 이후"로 이미 실체화된 레코드까지 함께 제거.
+// 기준일 이전(과거)엔 그대로 유지(일반 투두로 남음, 지우고 싶으면 직접 스와이프 삭제) — 확정된 정책.
+// 로컬은 기준일부터 각 규칙 종류의 미리보기 범위(할일 +7일/일정 +30일)까지 순회하며 지움. 서버 삭제는
+// 각 날짜마다 개별 upload하지 않고 recur_rule_cid 조건의 DELETE 쿼리 한 번으로 기준일 이후 전체를 정리
+// — 날짜 수만큼 네트워크 요청이 나가는 걸 피함.
+// 이 DELETE가 오프라인/실패로 못 나가면 그대로 유실되던 문제(로컬은 지워졌는데 서버엔 남아있다가, 이후
+// 로컬에 남아있던 다른 옛 데이터가 재업로드되며 되살아난 사고가 실제로 있었음)가 있어, 일반 투두 삭제와
+// 동일한 delPending 방식(재시도 목록)을 여기에도 적용 — 실패 시 목록에 남겨두고 다음 sync 때 재시도.
+async function recurSheetDeleteAll(){
+  closeSheet('recur-sheet');
+  if(!_recurSheetRuleCid)return;
+  const items=getRecurringItems();
+  const idx=items.findIndex(it=>it.cid===_recurSheetRuleCid);
+  if(idx<0){showToast('이미 반복이 해제됐어요. 남은 항목은 각각 삭제해주세요');return;}
+  const rule=items[idx];
+  const fromDk=_recurSheetDk||dateKey(new Date());
+  addDelPending('recurring_items','global',_recurSheetRuleCid);
+  items.splice(idx,1);
+  saveRecurringItems(items);
+  // 로컬 실체화분 제거(화면 즉시 반영용) — fromDk부터 그 규칙의 미리보기 범위까지 순회. 서버 업로드는 안 함(아래서 DELETE로 일괄 처리).
+  const scanDays=rule.isEvent?RECUR_EVENT_PREVIEW_DAYS:RECUR_TODO_PREVIEW_DAYS;
+  const base=new Date(fromDk+'T00:00:00');
+  for(let i=0;i<=scanDays;i++){
+    const d=new Date(base);d.setDate(base.getDate()+i);
+    const dk=dateKey(d);
+    const todos=getTodos.raw(dk);
+    const filtered=todos.filter(t=>t.recurRuleCid!==_recurSheetRuleCid);
+    if(filtered.length!==todos.length)saveTodos.raw(dk,filtered);
+  }
+  // 서버 쪽 기준일 이후 전체 정리 — 성공하면 끝, 실패(오프라인 포함)하면 재시도 목록에 남겨 다음 sync 때 자동 재시도.
+  addRecurFutureDelPending(_recurSheetRuleCid,fromDk);
+  await syncRecurFutureDel();
+  renderTodos();
+  if(document.getElementById('monthly-cal'))renderCalendar();
+}
+// 오늘만 내용 수정 — 실체화된 그 todos 레코드의 text를 직접 고침(일반 투두 수정과 완전히 동일한 대상).
+// 원본 규칙(rule.text)은 건드리지 않으므로 다른 날짜/미래 실체화엔 영향 없음.
+function recurSheetEditTextToday(){
+  closeSheet('recur-sheet');
+  if(!_recurSheetTodoCid||!_recurSheetDk)return;
+  const todos=getTodos(_recurSheetDk);
+  const item=todos.find(t=>t.cid===_recurSheetTodoCid);
+  document.getElementById('recur-edit-text-inp').value=item?.text||'';
+  openModal('recur-edit-text-modal');
+  setTimeout(()=>document.getElementById('recur-edit-text-inp').focus(),100);
+}
+function confirmRecurEditText(){
+  const text=document.getElementById('recur-edit-text-inp').value.trim();
+  if(!text||!_recurSheetTodoCid||!_recurSheetDk)return;
+  const todos=getTodos(_recurSheetDk);
+  const item=todos.find(t=>t.cid===_recurSheetTodoCid);
+  if(item){item.text=text;saveTodos(_recurSheetDk,todos);}
+  closeModal('recur-edit-text-modal');
+  renderTodos();
+  if(document.getElementById('monthly-cal'))renderCalendar();
+}
+function todoSheetToReserve(){
+  if(_todoSwipeIdx<0)return;
+  closeSheet('todo-sheet');
+  document.getElementById('todo-to-reserve-modal').classList.add('on');
+}
+function confirmTodoToReserve(cat){
+  closeModal('todo-to-reserve-modal');
+  if(_todoSwipeIdx<0)return;
+  const dk=dateKey(currentDate);
+  const todos=getTodos(dk);
+  const t=todos[_todoSwipeIdx];
+  if(!t)return;
+  // 원본 투두 제거(일정용 필드는 보관함에 남기지 않음 — 보관함은 날짜 미정 항목이라 isEvent 관련 필드 불필요)
+  addDelPending('todos',dk,t.cid);
+  todos.splice(_todoSwipeIdx,1);
+  saveTodos(dk,todos);
+  const reserveTodos=getReserveTodos();
+  reserveTodos.push({text:t.text,done:false,created:Date.now(),timeSection:'none',cid:genCid(),cat});
+  saveReserveTodos(reserveTodos);
+  updateReserveCountBadge();
+  renderTodos();
+  showToast('보관함으로 보냈어요');
+}
+function todoSheetPostpone(type){
+  if(_todoSwipeIdx<0)return;
+  const dk=dateKey(currentDate);
+  if(type==='tomorrow'){
+    const tom=new Date(currentDate);tom.setDate(tom.getDate()+1);
+    const tdk=dateKey(tom);
+    const result=relocateTodo(dk,_todoSwipeIdx,tdk,'move');
+    showToast(result.message);
+    closeSheet('todo-sheet');renderTodos();
+  } else {
+    closeSheet('todo-sheet');
+    openTodoDatePickerSheet(_todoSwipeIdx);
+  }
+}
+// [v2] 범용 커스텀 캘린더 팝업 — 월간탭(.cal-grid/.cal-day)과 동일한 시각 스타일 재사용.
+// 투두 날짜변경, 콘텐츠 시작일/완료일 등 "단일 날짜 하나 선택" UI가 필요한 곳에서 공용으로 사용.
+let _dpYear=0,_dpMonth=0,_dpSelectedDk=null,_dpOnConfirm=null;
+// initialDk: 처음 열렸을 때 선택돼 있을 날짜(YYYY-MM-DD). onConfirm(dk): 확정 시 호출될 콜백.
+// title/confirmLabel: 호출 상황에 맞는 문구(예: 투두는 "날짜 변경"/"이동", 콘텐츠는 "시작일 선택"/"확인").
+function openDatePickerModal(initialDk,onConfirm,title,confirmLabel){
+  const base=initialDk?new Date(initialDk+'T00:00:00'):new Date();
+  _dpYear=base.getFullYear();_dpMonth=base.getMonth();
+  _dpSelectedDk=initialDk||dateKey(base);
+  _dpOnConfirm=onConfirm;
+  const titleEl=document.getElementById('dp-modal-title');
+  if(titleEl)titleEl.textContent=title||'날짜 선택';
+  const confirmBtn=document.querySelector('#shared-date-picker-modal .mbtn.ok');
+  if(confirmBtn)confirmBtn.textContent=confirmLabel||'확인';
+  renderDatePickerModal();
+  openModal('shared-date-picker-modal');
+}
+function renderDatePickerModal(){
+  const wrap=document.getElementById('tdp-cal-wrap');if(!wrap)return;
+  const y=_dpYear,mo=_dpMonth;
+  const daysInMonth=new Date(y,mo+1,0).getDate();
+  const today=new Date();
+  let h=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding:0 4px;">
+    <div class="nav-arr" onclick="dpShiftMonth(-1)"><i class="ti ti-chevron-left" style="font-size:10px;color:var(--tm);" aria-hidden="true"></i></div>
+    <span style="font-size:15px;font-weight:500;color:var(--tp);">${y}년 ${mo+1}월</span>
+    <div class="nav-arr" onclick="dpShiftMonth(1)"><i class="ti ti-chevron-right" style="font-size:10px;color:var(--tm);" aria-hidden="true"></i></div>
+  </div>
+  <div class="cal-grid">`;
+  ['월','화','수','목','금','토','일'].forEach(d=>h+=`<div class="cal-day-name">${d}</div>`);
+  const firstDayRaw=new Date(y,mo,1).getDay();
+  const firstDay=(firstDayRaw+6)%7;
+  for(let i=0;i<firstDay;i++)h+=`<div class="cal-day other-month"><div class="cal-num"></div></div>`;
+  for(let d=1;d<=daysInMonth;d++){
+    const dk=`${y}-${pad(mo+1)}-${pad(d)}`;
+    const isToday2=today.getFullYear()===y&&today.getMonth()===mo&&today.getDate()===d;
+    const isSel=_dpSelectedDk===dk;
+    let cls='cal-day';if(isToday2)cls+=' today';if(isSel)cls+=' selected';
+    h+=`<div class="${cls}" onclick="dpDayClick('${dk}')"><div class="cal-num">${d}</div></div>`;
+  }
+  h+=`</div>`;
+  wrap.innerHTML=h;
+}
+function dpShiftMonth(delta){
+  _dpMonth+=delta;
+  if(_dpMonth<0){_dpMonth=11;_dpYear--;}
+  else if(_dpMonth>11){_dpMonth=0;_dpYear++;}
+  renderDatePickerModal();
+}
+function dpDayClick(dk){
+  _dpSelectedDk=dk;
+  renderDatePickerModal();
+}
+function tdpConfirm(){
+  if(!_dpSelectedDk)return;
+  closeModal('shared-date-picker-modal');
+  if(typeof _dpOnConfirm==='function')_dpOnConfirm(_dpSelectedDk);
+}
+// 콘텐츠 모달(시작일/완료일) 전용 래퍼 — 대상 input의 현재 값을 초기 선택값으로 사용, 확정 시 그 input에 값 반영.
+function openContentDatePicker(targetInputId){
+  const targetInp=document.getElementById(targetInputId);
+  const curVal=targetInp?.value||dateKey(currentDate);
+  const title=targetInputId==='cm-start'?'시작일 선택':'완료일 선택';
+  openDatePickerModal(curVal,function(selectedDk){
+    if(targetInp){
+      targetInp.value=selectedDk;
+      targetInp.dispatchEvent(new Event('change',{bubbles:true}));
+    }
+  },title,'확인');
+}
+// 투두 날짜변경 전용 래퍼 — 기존 호출부(todoSheetPostpone)와의 연결 유지.
+function openTodoDatePickerSheet(todoIdx){
+  const base=new Date(currentDate);base.setDate(base.getDate()+1); // 기본 선택은 내일
+  openDatePickerModal(dateKey(base),function(selectedDk){
+    const dk=dateKey(currentDate);
+    const result=relocateTodo(dk,todoIdx,selectedDk,'move');
+    showToast(result.message);
+    renderTodos();
+  },'날짜 변경','이동');
+}
+// ══════════════════════════════════════════════════════════
+// ██ 오늘탭 (3/4 — 나머지는 시간대팝업, SLEEP~아침파트2, HABIT~CONTENT TIMELINE, 예비투두 부근) ██
+// ══════════════════════════════════════════════════════════
+// ── MEMO
+let _deletedMemo=null,_undoTimer=null,_memoSwipeIdx=-1;
+// 오늘탭 메모 배너용 — 특정 날짜(dk)에 작성된 콘텐츠 감상메모(notes[])와 완결 총평(review, 저장 시점=dk 기준)을 뽑아옴.
+// 표시 전용(작성/편집은 콘텐츠허브에서만), 월 버킷을 넘나드는 이월 콘텐츠도 놓치지 않도록 해당 월+전월 둘 다 조회.
+// 완결 총평은 음악 제외(콘텐츠허브 로그 모음 시트와 동일 기준, WCAL_CAT_META 참고).
+function getContentMemoItemsForDate(dk){
+  const mk=dk.slice(0,7);
+  const [y,m]=mk.split('-').map(Number);
+  const prevMk=monthKey(new Date(y,m-2,1));
+  const seen=new Set();
+  const items=[]; // {kind:'note'|'final',cid,cat,title,poster,text,time}
+  [mk,prevMk].forEach(searchMk=>{
+    getContents(searchMk).forEach(c=>{
+      if(seen.has(c.cid))return;seen.add(c.cid);
+      (c.notes||[]).forEach(n=>{
+        if(n.dk===dk)items.push({kind:'note',cid:c.cid,cat:c.cat,title:n.title||c.title||'',text:n.text||'',time:n.time||''});
+      });
+      if(c.cat!=='music'&&c.review&&c.reviewSavedDk===dk){
+        items.push({kind:'final',cid:c.cid,cat:c.cat,title:c.title||'',poster:c.poster||null,text:c.review,time:c.reviewSavedTime||''});
+      }
+    });
+  });
+  return items;
+}
+// 사진메모 깜빡임 방지 — sync 루틴들이 짧은 시간에 renderMemos()를 여러 번 호출해도
+// 실제 내용(memos 배열)이 바뀌지 않았으면 재렌더(=<img src> 재할당으로 인한 깜빡임)를 스킵.
+// 내용이 같은지는 가벼운 직렬화 비교로 판단(리스트가 크지 않아 비용 무시 가능한 단순 접근).
+let _lastRenderedMemosDk=null,_lastRenderedMemosSig=null;
+function renderMemos(){
+  const dk=dateKey(currentDate),memos=getMemos(dk);
+  const list=document.getElementById('memo-list');if(!list)return;
+  // 콘텐츠 감상메모/완결총평(표시 전용) — 일반 memos와 같은 목록에 섞여 시간순 정렬됨.
+  const contentItems=getContentMemoItemsForDate(dk);
+  const sig=dk+'|'+JSON.stringify(memos.map(m=>[m.cid,m.time,m.text,m.photoUrl,m.photoLocalUrl,m.photoStatus,m.photoErrorMsg,m.question]))+'|'+JSON.stringify(contentItems);
+  if(dk===_lastRenderedMemosDk&&sig===_lastRenderedMemosSig)return; // 내용 동일 — 깜빡임만 유발하므로 스킵
+  _lastRenderedMemosDk=dk;_lastRenderedMemosSig=sig;
+  list.innerHTML='';
+  // time(HH:MM) 기준 오름차순 정렬, 원본 배열 인덱스는 그대로 유지해서 수정/삭제가 정확한 항목을 가리키게 함
+  // 새벽 시각은 "전날 자정 넘어 쓴 기록"으로 보고 정렬상 맨 뒤로 보냄(표시는 그대로 00:30 등 실제 시간).
+  // 전역 toSortKey(06:00 기준 새벽보정)를 그대로 사용 — 과거엔 여기만 5시 기준으로 별도 계산해 다른 화면과 기준이 달랐음.
+  const memoEntries=memos.map((m,i)=>({kind:'memo',m,i}));
+  const contentEntries=contentItems.map(c=>({kind:'content',m:c,i:-1}));
+  const ordered=[...memoEntries,...contentEntries].sort((a,b)=>{
+    const ka=toSortKey(a.m.time),kb=toSortKey(b.m.time);
+    if(ka!==9999&&kb!==9999)return ka-kb;
+    if(ka!==9999&&kb===9999)return -1;
+    if(ka===9999&&kb!==9999)return 1;
+    return (a.m.created||0)-(b.m.created||0);
+  });
+  ordered.forEach(({kind,m,i})=>{
+    const el=document.createElement('div');el.className='memo-item';
+    if(kind==='content'){
+      const isFinal=m.kind==='final';
+      const meta=WCAL_CAT_META[m.cat]||{icon:'ti-tag',color:'var(--tm)'};
+      const bub=document.createElement('div');bub.className='memo-bub memo-bub-content';
+      const headHtml=isFinal
+        ?(m.poster?`<div class="memo-content-poster"><img src="${m.poster}" alt=""></div><span class="memo-content-title">${escapeHtml(m.title)}</span>`
+                  :`<span class="memo-content-title">${escapeHtml(m.title)}</span>`)
+        :`<i class="ti ${meta.icon} memo-content-icon" aria-hidden="true"></i><span class="memo-content-title">${escapeHtml(m.title)}</span>`;
+      bub.innerHTML=`<div class="memo-content-head">${headHtml}</div><div class="memo-content-body">${escapeHtml(m.text)}</div>`;
+      const time=document.createElement('span');
+      time.className='memo-time';
+      time.textContent=m.time||'';
+      el.appendChild(time);el.appendChild(bub);
+      list.appendChild(el);
+      return;
+    }
+    const isSeed=m.type==='seed';
+    const h=m.time?parseInt(m.time.split(':')[0],10):null;
+    const tod=h==null?'':h>=5&&h<12?' tod-morning':h>=12&&h<18?' tod-afternoon':' tod-night';
+    const hasPhoto=!!(m.photoUrl||m.photoLocalUrl);
+    const bub=document.createElement('div');bub.className='memo-bub'+(isSeed?' memo-bub-seed':(m.question?' memo-bub-question':tod))+(hasPhoto?' memo-bub-photo':'');
+    bub.style.cursor='pointer';
+    if(hasPhoto){
+      const thumbSrc=m.photoUrl||m.photoLocalUrl;
+      // 완전 로딩 전엔 사진 아이콘만 보여주고, onload 시점에만 이미지를 페이드인 — 깜빡임 대신 자연스러운 등장
+      const wrap=document.createElement('div');wrap.className='memo-photo-wrap';
+      const ph=document.createElement('div');ph.className='memo-photo-placeholder';
+      ph.innerHTML='<i class="ti ti-photo" aria-hidden="true"></i>';
+      const img=document.createElement('img');
+      img.className='memo-photo-thumb';img.alt='';img.loading='lazy';
+      img.addEventListener('load',()=>{img.classList.add('loaded');ph.classList.add('hide');},{once:true});
+      img.addEventListener('error',()=>{ph.classList.add('hide');},{once:true});
+      img.src=thumbSrc;
+      wrap.appendChild(ph);wrap.appendChild(img);
+      img.addEventListener('click',e=>{
+        e.stopPropagation();
+        const meta=`${currentDate.getMonth()+1}월 ${currentDate.getDate()}일 ${_HOME_DAYS[currentDate.getDay()]}요일 · ${m.time||''}`;
+        _photoArchiveIdx=-1; // 모아보기 목록과 무관한 단일 사진 진입 — 스와이프 넘기기 비활성(범위 밖 인덱스)
+        openPhotoViewer(thumbSrc,m.text||'',meta);
+      });
+      const txt=document.createElement('span');txt.className='memo-photo-text';
+      const _ptxt=m.photoStatus==='upload_failed'?`⚠︎ 업로드 실패: ${m.photoErrorMsg||''}`:(m.text||'');
+      if(m.question&&m.photoStatus!=='upload_failed')txt.innerHTML=`<span class="memo-q">Q. ${escapeHtml(m.question)}</span>`+escapeHtml(_ptxt);
+      else txt.textContent=_ptxt;
+      bub.appendChild(wrap);bub.appendChild(txt);
+      bub.addEventListener('click',()=>{_memoSwipeIdx=i;openSheet('memo-sheet');});
+    }else{
+      bub.innerHTML=(m.question?`<span class="memo-q">Q. ${escapeHtml(m.question)}</span>`:'')+(m.text||'');
+      bub.addEventListener('click',()=>{_memoSwipeIdx=i;openSheet('memo-sheet');});
+    }
+    const time=document.createElement('span');
+    time.className='memo-time';
+    if(isSeed){time.innerHTML='<i class="ti ti-seeding" style="font-size:13px;color:rgba(120,155,160,0.95);" aria-hidden="true"></i>';}
+    else{time.textContent=m.time||'';}
+    el.appendChild(time);el.appendChild(bub);
+    list.appendChild(el);
+  });
+  setupMemoInlineInput();
+  list.scrollTop=list.scrollHeight;
+}
+function memoEditSwipe(i){
+  closeSheet('memo-sheet');
+  const dk=dateKey(currentDate),m=getMemos(dk)[i];
+  document.getElementById('memo-edit-inp').value=m?.text||'';
+  document.getElementById('memo-edit-time-inp').value=m?.time||'';
+  document.getElementById('memo-edit-modal').dataset.editIdx=i;
+  // 사진 상태 초기화 — 모달 열 때마다 이전 편집 잔여 상태(취소하고 나간 경우 등)가 남지 않도록
+  if(_memoEditPendingPhoto&&_memoEditPendingPhoto.localUrl)URL.revokeObjectURL(_memoEditPendingPhoto.localUrl);
+  _memoEditPendingPhoto=null;
+  _memoEditRemovePhoto=false;
+  _memoEditCurrentPhotoUrl=m?.photoUrl||m?.photoLocalUrl||null;
+  renderMemoEditPhotoPreview(_memoEditCurrentPhotoUrl);
+  openModal('memo-edit-modal');setTimeout(()=>document.getElementById('memo-edit-inp').focus(),100);
+}
+function memoDelSwipe(i){
+  closeSheet('memo-sheet');
+  const dk=dateKey(currentDate),memos=getMemos(dk);
+  _deletedMemo={memo:memos[i],idx:i,dk};
+  if(memos[i])addDelPending('memos',dk,memos[i].cid);
+  memos.splice(i,1);saveMemos(dk,memos);renderMemos();showUndo();
+}
+function memoSheetEdit(){_memoSwipeIdx>=0&&memoEditSwipe(_memoSwipeIdx);}
+function memoSheetDelete(){_memoSwipeIdx>=0&&memoDelSwipe(_memoSwipeIdx);}
+function cancelMemoEdit(e){
+  if(_memoEditPendingPhoto&&_memoEditPendingPhoto.localUrl)URL.revokeObjectURL(_memoEditPendingPhoto.localUrl);
+  _memoEditPendingPhoto=null;_memoEditRemovePhoto=false;_memoEditCurrentPhotoUrl=null;
+  closeModal('memo-edit-modal',e);
+}
+function confirmMemoEdit(){
+  const text=document.getElementById('memo-edit-inp').value.trim();
+  const time=padTime(document.getElementById('memo-edit-time-inp').value);
+  const i=parseInt(document.getElementById('memo-edit-modal').dataset.editIdx||'0');
+  const dk=dateKey(currentDate),memos=getMemos(dk);
+  const m=memos[i];
+  if(m){
+    m.text=text;if(time)m.time=time;
+    const oldPhotoUrl=m.photoUrl; // 새 업로드 성공 후 지우기 위해 보관(선삭제 금지 — 업로드 실패 시 기존 사진 보존)
+    if(_memoEditPendingPhoto){
+      // 신규 첨부 또는 교체 — 로컬은 즉시 미리보기로 반영, 실제 업로드는 큐를 통해 비동기 진행
+      m.photoLocalUrl=_memoEditPendingPhoto.localUrl;
+      m.photoStatus='pending_upload';
+      m.photoUrl=null; // 새 사진 업로드가 끝나야 확정 URL이 채워짐(그 전까지 이전 URL을 남겨두면 화면에 옛 사진이 보임)
+      S.set(S.key('memos_pending',dk),true);
+      queueMemoPhotoUpload(dk,m.cid,_memoEditPendingPhoto.blob,_memoEditPendingPhoto.ext,
+        // 교체 케이스: 새 사진 업로드가 성공했을 때만 이전 사진을 R2에서 지움(실패 시 기존 사진 보존)
+        oldPhotoUrl?(err)=>{if(!err)_deletePhotoFromR2(oldPhotoUrl).catch(e=>{console.error('R2 이전 사진 삭제 실패, 재시도 대기',e);_queuePhotoR2Delete(oldPhotoUrl);});}:undefined
+      );
+    }else if(_memoEditRemovePhoto){
+      // 기존 사진만 제거 — 업로드할 새 파일이 없으니 바로 필드 정리 + R2 삭제
+      m.photoUrl=null;delete m.photoLocalUrl;delete m.photoStatus;delete m.photoErrorMsg;
+      if(oldPhotoUrl){_deletePhotoFromR2(oldPhotoUrl).catch(err=>{console.error('R2 사진 삭제 실패, 재시도 대기',err);_queuePhotoR2Delete(oldPhotoUrl);});}
+    }
+  }
+  saveMemos(dk,memos);closeModal('memo-edit-modal');renderMemos();
+  _memoEditPendingPhoto=null;_memoEditRemovePhoto=false;_memoEditCurrentPhotoUrl=null;
+}
+function showUndo(){
+  clearTimeout(_undoTimer);
+  const t=document.getElementById('undo-toast');t.classList.add('on');
+  _undoTimer=setTimeout(()=>{
+    t.classList.remove('on');
+    // 실행취소 유예시간(4초)이 지나 삭제가 확정된 시점 — 사진이 있던 메모라면 R2 원본도 함께 정리.
+    // 실패하면(오프라인/Worker 장애 등) 대기열에 남겨 다음 접속 때 자동 재시도.
+    if(_deletedMemo&&_deletedMemo.memo&&_deletedMemo.memo.photoUrl){
+      const purl=_deletedMemo.memo.photoUrl;
+      _deletePhotoFromR2(purl).catch(err=>{console.error('R2 사진 삭제 실패, 재시도 대기',err);_queuePhotoR2Delete(purl);});
+    }
+    _deletedMemo=null;
+  },4000);
+}
+function undoMemo(){
+  if(!_deletedMemo)return;
+  const memos=getMemos(_deletedMemo.dk);
+  if(_deletedMemo.memo)removeDelPending('memos',_deletedMemo.dk,_deletedMemo.memo.cid);
+  memos.splice(_deletedMemo.idx,0,_deletedMemo.memo);
+  saveMemos(_deletedMemo.dk,memos);_deletedMemo=null;
+  document.getElementById('undo-toast').classList.remove('on');renderMemos();
+}
+function openSeedArchive(){
+  const resEl=document.getElementById('seed-archive-results');
+  const results=[];
+  for(let i=0;i<localStorage.length;i++){
+    const k=localStorage.key(i);
+    if(!k||!k.startsWith('memos:'))continue;
+    const dk=k.slice('memos:'.length);
+    getMemos(dk).forEach(m=>{
+      if(m.type==='seed')results.push({dk,time:m.time||'',text:m.text||''});
+    });
+  }
+  results.sort((a,b)=>(b.dk+(b.time||'')).localeCompare(a.dk+(a.time||'')));
+  if(!results.length){
+    resEl.innerHTML='<div class="memo-search-empty">아직 남긴 씨앗이 없어요</div>';
+  }else{
+    resEl.innerHTML=results.map(r=>`<div class="msr-item" onclick="jumpToMemoDateFromSeed('${r.dk}')"><div class="msr-date"><i class="ti ti-seeding" style="font-size:var(--dow-label-size);color:rgba(120,155,160,0.95);margin-right:3px;" aria-hidden="true"></i>${r.dk}${r.time?' · '+r.time:''}</div><div class="msr-text">${r.text}</div></div>`).join('');
+  }
+  openModal('seed-archive-modal');
+}
+// 날짜 전환 공용 헬퍼 — currentDate를 dk로 바꾸고 오늘탭으로 전환. 씨앗모아보기/월간탭 상세보기 등
+// 여러 진입점에서 공유(2026-09-11 중복 제거 통합).
+function _gotoDailyTab(dk){
+  const parts=dk.split('-').map(Number);
+  currentDate=new Date(parts[0],parts[1]-1,parts[2]);
+  updateDateUI();
+  document.querySelectorAll('.vtab').forEach(t=>t.classList.toggle('on',t.dataset.v==='daily'));
+  document.querySelectorAll('.view').forEach(vw=>vw.classList.toggle('on',vw.id==='v-daily'));
+  document.querySelector('.scroll').scrollTop=0;
+  loadDaily();
+}
+function jumpToMemoDateFromSeed(dk){
+  closeModal('seed-archive-modal');
+  _gotoDailyTab(dk);
+}
+// 월간탭 상세보기 "오늘탭에서 보기" 칩 — 모달이 아니라 월간탭 자체에서 호출되므로 closeModal 없이 바로 전환.
+function jumpToDailyTab(dk){
+  _gotoDailyTab(dk);
+}
+// 사진메모 모아보기 — seed 모아보기(openSeedArchive)와 동일한 방식으로 localStorage 전체를 훑어
+// 사진이 첨부된 메모만 모아 최신순 그리드로 보여줌. 썸네일은 오늘탭 목록과 동일하게
+// placeholder→로드완료 페이드인 방식으로 깜빡임 없이 표시.
+function openPhotoArchive(){
+  const resEl=document.getElementById('photo-archive-results');
+  const results=[];
+  for(let i=0;i<localStorage.length;i++){
+    const k=localStorage.key(i);
+    if(!k||!k.startsWith('memos:'))continue;
+    const dk=k.slice('memos:'.length);
+    getMemos(dk).forEach(m=>{
+      const src=m.photoUrl||m.photoLocalUrl;
+      if(src)results.push({dk,time:m.time||'',text:m.text||'',src});
+    });
+  }
+  results.sort((a,b)=>(b.dk+(b.time||'')).localeCompare(a.dk+(a.time||'')));
+  if(!results.length){
+    resEl.innerHTML='<div class="photo-archive-empty">아직 사진메모가 없어요</div>';
+  }else{
+    resEl.innerHTML=results.map((r,i)=>`<div class="photo-archive-thumb" onclick="openPhotoArchiveItem(${i})">
+      <div class="photo-archive-thumb-ph"><i class="ti ti-photo" aria-hidden="true"></i></div>
+      <img src="${r.src}" alt="" loading="lazy" onload="this.classList.add('loaded');this.previousElementSibling.classList.add('hide');" onerror="this.previousElementSibling.classList.add('hide');">
+    </div>`).join('');
+    _photoArchiveResults=results;
+  }
+  openModal('photo-archive-modal');
+}
+let _photoArchiveResults=[];
+let _photoArchiveIdx=-1; // 뷰어에서 현재 보고 있는 사진의 _photoArchiveResults 내 인덱스 — 좌우 넘기기 기준
+function openPhotoArchiveItem(i){
+  const r=_photoArchiveResults[i];if(!r)return;
+  // 그리드 모달(z-index 9999)을 닫지 않고 그대로 둔 채 뷰어(z-index 10001)를 그 위에 연다 —
+  // 뷰어를 닫으면(closePhotoViewer) 자연스럽게 그리드로 돌아가도록 하기 위함(2026-09-17).
+  _photoArchiveIdx=i;
+  const d=new Date(r.dk+'T00:00:00');
+  const meta=`${d.getMonth()+1}월 ${d.getDate()}일 ${_HOME_DAYS[d.getDay()]}요일 · ${r.time||''}`;
+  openPhotoViewer(r.src,r.text,meta);
+}
+
+// ══════════════════════════════════════════════════════════
+// ██ 주간탭 (1/1) ██
+// ══════════════════════════════════════════════════════════
+// ── WEEKLY CHALLENGE
+const WC_DAYS=['M','T','W','T','F','S','S'];
+const WC_COLORS=[
+  'var(--pal-pink-bg)', // 월 — 핑크
+  'var(--pal-orange-bg)', // 화 — 오렌지
+  'var(--pal-yellow-bg)', // 수 — 옐로
+  'var(--pal-mint-bg)', // 목 — 민트
+  'var(--pal-sky-bg)', // 금 — 스카이
+  'var(--pal-lavender-bg)', // 토 — 라벤더
+  'var(--pal-rose-bg)', // 일 — 로즈(팔레트에 라일락 없어 대체)
+];
+const WC_COLORS_TEXT=[
+  'var(--pal-pink-text)','var(--pal-orange-text)','var(--pal-yellow-text)','var(--pal-mint-text)',
+  'var(--pal-sky-text)','var(--pal-lavender-text)','var(--pal-rose-text)'
+];
+const WC_COLORS_BORDER=[
+  'var(--pal-pink-border)','var(--pal-orange-border)','var(--pal-yellow-border)','var(--pal-mint-border)',
+  'var(--pal-sky-border)','var(--pal-lavender-border)','var(--pal-rose-border)'
+];
+function getWChallenge(wk){return S.get('wchallenge_'+wk)||[];}
+function saveWChallenge(wk,data){S.set('wchallenge_'+wk,data);S.set('wchallenge_pending_'+wk,true);}
+
+function nextWeekKey(){const d=new Date();d.setDate(d.getDate()+7);return weekKey(d);}
+function lastWeekKey(){const d=new Date();d.setDate(d.getDate()-7);return weekKey(d);}
+async function openNextWeekChallengeSheet(){
+  openSheet('nextweek-sheet');
+  const wk=nextWeekKey();
+  if(navigator.onLine){
+    const now=new Date();
+    const mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7));
+    const dks=[];for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);dks.push(dateKey(d));}
+    // AI 요약을 만들기 전에, 다른 기기에서 방금 체크했을 수 있는 이번 주 데이터를 먼저 최신화
+    await Promise.all([
+      syncWChallengeDown(wk),
+      syncHCDown(weekKey(now)),
+      ...dks.map(dk=>syncTodosDown(dk)),
+      ...dks.map(dk=>syncMemosDown(dk)),
+      ...dks.map(dk=>syncSleepDown(dk))
+    ]);
+  }
+  renderWeeklyChallenge(wk,'nextweek-challenge-wrap');
+  setupNextWeekFeedbackToggle();
+}
+// 일요일 19시 이후엔 다음 주 챌린지 준비 시트 상단 타이틀이 클릭 가능한 배너로 바뀌어
+// nextweek-feedback-sheet(같은 시트 위에 쌓이는 점검 코멘트 화면)를 열 수 있음.
+// 그 외 시간대(목~토, 일요일 19시 이전)엔 기존처럼 클릭 불가한 일반 타이틀로 유지.
+function setupNextWeekFeedbackToggle(){
+  const titleEl=document.getElementById('nextweek-sheet-title');
+  if(!titleEl)return;
+  const now=new Date();
+  const isSundayEvening=now.getDay()===0&&now.getHours()>=19;
+  if(isSundayEvening){
+    titleEl.className='report-banner rhythm-soft';
+    titleEl.style.margin='0 0 12px';
+    titleEl.innerHTML='<div class="report-banner-inner" style="justify-content:flex-start;gap:5px;"><div class="report-banner-line" style="white-space:nowrap;"><i class="ti ti-flag-heart ico-inline-13" aria-hidden="true"></i>다음주 목표 제안받기</div></div>';
+    titleEl.style.cursor='pointer';
+    titleEl.onclick=openNextWeekFeedbackSheet;
+  }else{
+    titleEl.className='goal-section-title';
+    titleEl.style.margin='0';
+    titleEl.innerHTML='◉ 다음 주 챌린지 준비하기';
+    titleEl.style.cursor='default';
+    titleEl.onclick=null;
+  }
+}
+// ── 지난주 목표 돌아보기 (월요일 전용) ──
+// 일요일 밤 주간리뷰와 겹치지 않도록, 순수하게 "지난주 지정했던 챌린지"에 초점을 맞춘 리포트.
+// 단순 달성일수(X/7일) 나열이 아니라, 지난주 메모 원문에서 각 챌린지와 관련된 노력의 흔적을 찾아 코멘트함.
+// 최근 4주(지난주~4주전) 칩 지원 — 배너 자체가 이미 월요일 하루만 노출되므로 별도 조회전용 분리는 불필요:
+// 가장 최근 주(지난주)만 캐시 없을 시 생성 시도, 그 이전 주차들은 캐시 조회만(생성 안 함).
+function renderChallengeReviewChips(activeWk){
+  const wrap=document.getElementById('cr-week-chips');if(!wrap)return;
+  const weeks=_recentWeekKeys();
+  wrap.innerHTML='';
+  weeks.forEach((wk,i)=>{
+    const chip=document.createElement('div');
+    chip.className='m-chip'+(wk===activeWk?' active':'');
+    chip.textContent=i===0?'지난주':(i+1)+'주전';
+    chip.addEventListener('click',()=>loadChallengeReviewFor(wk));
+    wrap.appendChild(chip);
+  });
+}
+async function loadChallengeReviewFor(wk){
+  renderChallengeReviewChips(wk);
+  const content=document.getElementById('challenge-review-content');
+  const cacheKey='challenge_review_'+wk;
+  const cached=S.get(cacheKey);
+  if(cached){content.innerHTML=cached;return;}
+  content.innerHTML='<div class="sheet-loading-msg">불러오는 중이에요.. 🌿</div>';
+  const serverHtml=await aiCacheGet(cacheKey);
+  if(serverHtml){S.set(cacheKey,serverHtml);content.innerHTML=serverHtml;return;}
+  const isLastWeek=wk===lastWeekKey();
+  if(!isLastWeek){
+    content.innerHTML='<div class="sheet-loading-msg">이 주는 아직 기록된 요약이 없어요 🌿</div>';
+    return;
+  }
+  content.innerHTML='<div class="sheet-loading-msg">지난주 목표를 돌아보는 중이에요.. 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">약 10-20초 소요돼요</span></div>';
+  if(!getClaudeKey()){
+    content.innerHTML='<div class="sheet-loading-msg">아직 준비 중이에요 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">다른 기기에서 먼저 열어보시면 여기서도 볼 수 있어요</span></div>';
+    return;
+  }
+  const html=await buildChallengeReviewHtml(wk);
+  if(html){
+    S.set(cacheKey,html);
+    aiCacheSet(cacheKey,html);
+    content.innerHTML=html;
+  }
+  else content.innerHTML='<div class="sheet-loading-msg">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
+}
+async function openChallengeReviewSheet(){
+  openSheet('challenge-review-sheet');
+  loadChallengeReviewFor(lastWeekKey());
+}
+async function buildChallengeReviewHtml(wk){
+  const items=getWChallenge(wk).filter(it=>it.text&&it.text.trim());
+  if(!items.length)return '<div class="sheet-loading-msg">지난주에 지정한 목표가 없었어요</div>';
+  const key=getClaudeKey();
+  if(!key)return '<div class="sheet-loading-msg">설정에서 Claude API 키를 입력하면 분석을 받을 수 있어요</div>';
+
+  // 지난주(월~일) 7일치 메모를 요일별로 고르게 샘플링 — 일요일 리포트(makeWeeklySummaryCard)와 동일한 방식 재사용
+  const evenSample=(arr,n)=>{
+    if(arr.length<=n)return arr;
+    const result=[];
+    for(let i=0;i<n;i++){
+      const idx=Math.round(i*(arr.length-1)/(n-1));
+      result.push(arr[idx]);
+    }
+    return [...new Set(result)];
+  };
+  const [wy,wmo,wd]=wk.replace('week:','').split('-').map(Number);
+  const weekStart=new Date(wy,wmo-1,wd);
+  const allMemosWithDay=[];
+  let onelineCount=0;
+  for(let i=0;i<7;i++){
+    const d=new Date(weekStart);d.setDate(weekStart.getDate()+i);
+    const dk=dateKey(d);
+    const dayName=_HOME_DAYS[d.getDay()]+'요일';
+    const dayTexts=getMemos(dk).map(m=>m.text).filter(Boolean);
+    evenSample(dayTexts,8).forEach(t=>allMemosWithDay.push(`${dayName}: ${t}`));
+    if(getDailyOneLine(dk).trim())onelineCount++;
+  }
+
+  const challengeText=items.map(it=>`"${it.text}" — ${it.days.filter(Boolean).length}/7일 체크`).join('\n');
+  const dataContext=[
+    getUserProfileContext(),
+    `지난주(월~일) 지정했던 목표:\n${challengeText}`,
+    allMemosWithDay.length?`지난주 메모 (요일별로 시간대 고르게 샘플링):\n${allMemosWithDay.join('\n')}`:'지난주 메모 없음',
+    `하루한줄 작성일: ${onelineCount}/7일`
+  ].filter(Boolean).join('\n\n');
+
+  const sys=`당신은 따뜻한 생활 코치예요. 지난주 지정했던 목표(챌린지)들을 돌아보는 짧은 코멘트를 작성해요.
+${RHYTHM_CAT_GUIDE}
+
+**핵심 분석 방식(가장 중요): 체크된 일수(X/7일)를 그대로 나열하지 마요. 대신 지난주 메모 원문을 뒤져서, 각 목표와 관련된 실제 노력이나 상황의 흔적을 찾아 구체적으로 언급해요.**
+예: 목표가 "운동 주 3회"라면, 메모에 운동 가기 싫었던 마음, 운동 후 느낌, 컨디션 관련 언급이 있는지 찾아서 그 내용을 근거로 코멘트해요. "체크 표시상으로는 2회지만, 메모를 보니 실제로는 꾸준히 신경 쓰고 있었던 흔적이 보여요" 같은 식으로, 체크 숫자 너머의 진짜 노력을 짚어줘요.
+목표와 직접 관련된 메모가 없는 항목은 억지로 연결짓지 말고, 체크 일수만 담백하게 언급하고 넘어가요. 없는 내용을 지어내지 마요.
+메모 문장을 통째로 따옴표 인용하지 마요. 목표당 정말 핵심적인 흔적 1~2개 정도만 구체적으로 짚어주고, 나머지는 따옴표 인용 없이 자연스러운 흐름으로 녹여서 풀어 써요.
+
+각 목표당 1~2문장, 목표별로 줄바꿈해서 구분해요. 목표가 여러 개면 각각 다루되, 전체 분량은 목표 개수에 비례해서 조절해요(과하게 길어지지 않게).
+
+**첫 줄은 반드시 지난주 목표 이행 전체를 관통하는 짧은 헤드라인 한 줄이에요(예: "쉽지 않았지만 나름의 리듬을 찾아간 한 주였어요").** 개별 목표 나열이 아니라 전체를 한 문장으로 요약하는 톤. 이 헤드라인 줄 다음에 목표별 코멘트 줄들이 이어져요.
+
+톤 규칙:
+- 체크 일수가 낮아도 "실패", "부족", "아쉽다" 같은 부정적 평가 금지. 노력의 흔적이 있다면 그걸 우선 짚어주고, 다음 시도를 위한 담백한 제안으로 마무리.
+- 반드시 ~해요, ~이에요, ~어요 체의 정감있는 존댓말만 사용. 반말 절대 금지. 이름 호칭 없음
+- 이모지 최대 1개, 전체 응답 순수 텍스트만 (마크다운 기호 없이)
+
+**출력 형식(반드시 준수): 첫 줄에 헤드라인, 그 다음 줄부터 목표별 코멘트.**`;
+
+  const reply=await callClaude(sys,[{role:'user',content:dataContext}],700);
+  if(!reply||reply.startsWith('__ERR__'))return null;
+  const lines=reply.trim().split('\n').filter(l=>l.trim());
+  if(!lines.length)return null;
+  const [headline,...rest]=lines;
+  const headlineHtml=`<div style="margin:6px 0 10px;font-weight:600;color:var(--tp);font-size:var(--main-text-size);">${escapeHtml(headline)}</div>`;
+  const bodyHtml=rest.map(l=>`<div style="margin:8px 0;">${l.trim()}</div>`).join('');
+  return headlineHtml+bodyHtml;
+}
+// 일요일 19시 이후 nextweek-sheet 타이틀 배너를 누르면 열리는 확장 목표 제안 시트.
+// (구) "다음주 챌린지 점검하기"를 대체 — 사용자가 입력한 목표에 코멘트만 달던 방식에서,
+// 이번주 리듬+메모+최근 8주 챌린지 이력을 종합해 AI가 먼저 2~3개 목표 후보를 제안하는 방식으로 변경.
+// 이미 다음주 챌린지를 입력해뒀어도 무관하게 항상 제안하며, 채택 시 기존 목록에 "추가"만 됨(덮어쓰지 않음).
+async function openNextWeekFeedbackSheet(){
+  openSheet('nextweek-feedback-sheet');
+  const wk=nextWeekKey();
+  const content=document.getElementById('nextweek-feedback-content');
+  const cacheKey='nextweek_suggest_'+wk;
+  const cached=S.get(cacheKey);
+  if(cached){content.innerHTML=cached;bindNextWeekSuggestButtons(wk);return;}
+  content.innerHTML='<div class="sheet-loading-msg">다음주를 위한 목표를 살펴보는 중이에요.. 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">약 10-20초 소요돼요</span></div>';
+  const serverHtml=await aiCacheGet(cacheKey);
+  if(serverHtml){S.set(cacheKey,serverHtml);content.innerHTML=serverHtml;bindNextWeekSuggestButtons(wk);return;}
+  if(!getClaudeKey()){
+    content.innerHTML='<div class="sheet-loading-msg">아직 준비 중이에요 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">다른 기기에서 먼저 열어보시면 여기서도 볼 수 있어요</span></div>';
+    return;
+  }
+  const html=await buildNextWeekSuggestHtml(wk);
+  if(html){
+    S.set(cacheKey,html);
+    aiCacheSet(cacheKey,html);
+    content.innerHTML=html;
+    bindNextWeekSuggestButtons(wk);
+  }
+  else content.innerHTML='<div class="sheet-loading-msg">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
+}
+// 제안 카드의 "이걸로 정하기" 버튼 클릭 시 — 기존 다음주 챌린지 목록에 추가(덮어쓰지 않음).
+// 캐시된 HTML을 innerHTML로 꽂은 뒤라 버튼에 이벤트가 없으므로, 렌더 직후 매번 다시 바인딩.
+function bindNextWeekSuggestButtons(wk){
+  const wrap=document.getElementById('nextweek-feedback-content');
+  if(!wrap)return;
+  wrap.querySelectorAll('.nwf-adopt-btn').forEach(btn=>{
+    btn.onclick=()=>{
+      if(btn.dataset.adopted==='1')return; // 중복 클릭 방지
+      const text=btn.dataset.goalText;
+      if(!text)return;
+      const existing=getWChallenge(wk);
+      saveWChallenge(wk,[...existing,{text,days:[false,false,false,false,false,false,false]}]);
+      btn.dataset.adopted='1';
+      btn.textContent='추가됨';
+      btn.classList.add('adopted');
+      // 다음주 챌린지 준비 화면(nextweek-challenge-wrap)이 같은 시트 아래 깔려있으므로 반영해둠 —
+      // 점검 시트를 닫고 돌아갔을 때 바로 보이도록.
+      renderWeeklyChallenge(wk,'nextweek-challenge-wrap');
+    };
+  });
+}
+// 주간 미니통계의 메모 아이콘(월요일 하루 동안만 활성화, isReportDay 기준)을 누르면 열리는 시트.
+// 그 주(월~일) 메모를 모두 모아 AI에 넘겨, 이번 주 메모에 드러난 화두/톤을 짧게 정리해줌.
+// 월간(약 200개)보다 데이터량이 적당해(대개 30~50개) 요약이 뭉개지지 않음.
+// 최근 4주(지난주~4주전) 칩 지원 — 가장 최근 주만 캐시 없을 시 생성 시도, 이전 주차는 조회만.
+function renderWeeklyMemoReportChips(activeWk){
+  const wrap=document.getElementById('wmr-week-chips');if(!wrap)return;
+  const weeks=_recentWeekKeys();
+  wrap.innerHTML='';
+  weeks.forEach((wk,i)=>{
+    const chip=document.createElement('div');
+    chip.className='m-chip'+(wk===activeWk?' active':'');
+    chip.textContent=i===0?'지난주':(i+1)+'주전';
+    chip.addEventListener('click',()=>loadWeeklyMemoReportFor(wk));
+    wrap.appendChild(chip);
+  });
+}
+async function loadWeeklyMemoReportFor(wk){
+  renderWeeklyMemoReportChips(wk);
+  const content=document.getElementById('weekly-memo-report-content');
+  const cacheKey='weekly_memo_report_'+wk;
+  const cached=S.get(cacheKey);
+  if(cached){content.innerHTML=cached;return;}
+  content.innerHTML='<div class="sheet-loading-msg">불러오는 중이에요.. 🌿</div>';
+  const serverHtml=await aiCacheGet(cacheKey);
+  if(serverHtml){S.set(cacheKey,serverHtml);content.innerHTML=serverHtml;return;}
+  const isRecentWeek=wk===weekKey((()=>{const d=new Date();d.setDate(d.getDate()-1);return d;})());
+  if(!isRecentWeek){
+    content.innerHTML='<div class="sheet-loading-msg">이 주는 아직 기록된 요약이 없어요 🌿</div>';
+    return;
+  }
+  content.innerHTML='<div class="sheet-loading-msg">이번 주 메모를 살펴보는 중이에요.. 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">약 10-20초 소요돼요</span></div>';
+  if(!getClaudeKey()){
+    content.innerHTML='<div class="sheet-loading-msg">아직 준비 중이에요 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">다른 기기에서 먼저 열어보시면 여기서도 볼 수 있어요</span></div>';
+    return;
+  }
+  const html=await buildWeeklyMemoReportHtml(wk);
+  if(html){
+    S.set(cacheKey,html);
+    aiCacheSet(cacheKey,html);
+    content.innerHTML=html;
+  }
+  else content.innerHTML='<div class="sheet-loading-msg">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
+}
+async function openWeeklyMemoReport(){
+  openSheet('weekly-memo-report-sheet');
+  // 월요일에 여는 것은 "막 끝난 지난주" 리포트이므로, 하루 전(일요일) 기준으로 주를 계산.
+  const d=new Date();d.setDate(d.getDate()-1);
+  loadWeeklyMemoReportFor(weekKey(d));
+}
+async function buildWeeklyMemoReportHtml(wk){
+  const wkStart=new Date(wk.replace('week:',''));
+  const key=getClaudeKey();
+  const lines=[];
+  for(let i=0;i<7;i++){
+    const d=new Date(wkStart);d.setDate(wkStart.getDate()+i);
+    const dk=dateKey(d);
+    getMemos(dk).forEach(m=>{if(m.text&&m.text.trim())lines.push(`${m.type==='seed'?'[씨앗] ':''}[${dk} ${m.time||''}] ${m.text.trim()}`);});
+  }
+  if(!lines.length)return '<div class="sheet-loading-msg">이번 주 남긴 메모가 없어요</div>';
+  if(!key)return null;
+  const dataContext=lines.join('\n');
+  const sys=`당신은 사용자의 한 주 메모(일기 형식의 짧은 기록들)를 읽고, 지난 한 주에 어떤 화두나 감정 흐름이 있었는지
+짚어주는 다정한 관찰자예요.
+아래는 사용자가 지난 한 주(월~일) 동안 남긴 메모 전체예요. 시간순으로 나열되어 있어요.
+지금은 그 주가 완전히 끝난 뒤, 그 다음 월요일에 이 리포트를 작성하는 시점이에요. 그러니 모든 내용을 반드시 과거형으로 서술하세요. "~할 예정이에요", "~준비를 다지고 있어요"처럼 아직 안 끝난 것처럼 쓰면 안 돼요 — 그 다짐이나 계획조차 이미 지난주에 있었던 일이니 "~하기로 했어요", "~준비를 다졌어요"처럼 지나간 일로 표현하세요.
+앞에 [씨앗]이 붙은 항목은 일반 메모와 성격이 달라요 — 사용자가 그날 겪은 일이 아니라, 어디선가 발견해 남겨둔 인상 깊은 문장이나 장면(드라마 대사, 책 구절, 우연히 들은 말 등)이에요. 이 항목은 사용자가 실제로 겪은 일처럼 단정하지 말고, "이런 문장을 마음에 담아두었어요" 정도로만 참고하세요.
+
+이걸 바탕으로:
+1. 지난 한 주에 자주 등장했거나 인상적이었던 화두/사건을 구체적으로 짚어주세요(단순히 "바빴다/피곤했다"로 뭉뚱그리지 말고, 실제로 어떤 일이 있었는지 담아서).
+2. 주 초반부터 후반까지 흐름이나 톤이 어떻게 흘러갔는지(예: 초반엔 분주했지만 후반엔 여유를 찾음) 자연스럽게 서술하세요.
+3. 전반적인 정서(여유로움, 바쁨, 설렘, 피로 등)를 마지막에 짧게 짚어주세요.
+
+**출력 형식 — 반드시 아래 JSON 형식만 출력, 다른 텍스트 없이:**
+{"headline":"짧은 헤드라인 한 줄, 과거형(예: '여행 준비로 바빴던 한 주였어요')","summary":"4-5문장 정도로 세심하게 풀어서 서술, 전부 과거형"}
+
+과도하게 해석하거나 감정을 단정짓지 말고, 메모에 실제로 드러난 내용 위주로 담백하게 정리하세요.
+특정 요일에 무엇을 적었는지 다시 설명하거나 인용하지 마세요(예: "월요일에는 ~라고 적으셨어요" 같은 문장 금지) — 개별 메모를 재확인해주는 게 아니라, 한 주 전체를 관통하는 흐름을 이야기하듯 풀어주세요.
+이모지 최대 1개, 마크다운 기호 없이 순수 텍스트만.`;
+  const reply=await callClaude(sys,[{role:'user',content:dataContext}],650);
+  if(!reply||reply.startsWith('__ERR__'))return null;
+  try{
+    const cleaned=reply.trim().replace(/^```json\s*|```$/g,'');
+    const data=JSON.parse(cleaned);
+    return `<div style="margin:6px 0 4px;font-weight:600;color:var(--tp);font-size:var(--main-text-size);">${escapeHtml(data.headline||'')}</div>
+      <div style="margin:6px 0;font-size:var(--main-text-size);line-height:1.6;color:var(--tp);">${escapeHtml(data.summary||'')}</div>`;
+  }catch(e){return null;}
+}
+
+// ── 다음 주 확장 목표 제안 (구 "챌린지 점검" 대체) ──
+// 이번주 리듬(카테고리별 시간+전주 대비 변화), 이번주 메모(요일별 샘플), 최근 8주 챌린지 이력(텍스트+체크+본인 주석 원문)을
+// 함께 넘겨 AI가 2~3개의 새 목표 후보를 제안. 사용자가 이미 입력해둔 다음주 챌린지 유무와 무관하게 항상 제안하며,
+// 채택 시 기존 목록에 추가되는 방식(덮어쓰지 않음)이라 여기선 순수 제안 생성만 담당.
+async function buildNextWeekSuggestHtml(wk){
+  const key=getClaudeKey();
+  if(!key)return '<div class="sheet-loading-msg">설정에서 Claude API 키를 입력하면 분석을 받을 수 있어요</div>';
+
+  const evenSample=(arr,n)=>{
+    if(arr.length<=n)return arr;
+    const result=[];
+    for(let i=0;i<n;i++){
+      const idx=Math.round(i*(arr.length-1)/(n-1));
+      result.push(arr[idx]);
+    }
+    return [...new Set(result)];
+  };
+
+  // 이번주(월~일, 방금 끝난 주) 리듬+메모 수집 — makeWeeklySummaryCard와 동일 기준으로 "그 주 일요일" 역산
+  const sundayDk=_thisWeekSundayDk();
+  const now=new Date(sundayDk+'T00:00:00');
+  const weekStart=new Date(now);weekStart.setDate(now.getDate()-6);
+
+  const allMemosWithDay=[];
+  for(let i=0;i<7;i++){
+    const d=new Date(weekStart);d.setDate(weekStart.getDate()+i);
+    const dk=dateKey(d);
+    const dayName=_HOME_DAYS[d.getDay()]+'요일';
+    const memos=getMemos(dk);
+    const dayTexts=memos.map(m=>m.type==='seed'?`[씨앗] ${m.text}`:m.text).filter(Boolean);
+    evenSample(dayTexts,8).forEach(t=>allMemosWithDay.push(`${dayName}: ${t}`));
+  }
+  const rhythmDurThis=sumCategoryDurations(weekStart,7).dur; // 공용 util(라벨 기준)
+  const rhythmText=Object.values(RHYTHM_CATS).map(c=>{
+    const min=rhythmDurThis[c.label]||0;
+    if(min<10)return null;
+    const h=(min/60).toFixed(1).replace(/\.0$/,'');
+    return `${c.label} ${h}시간`;
+  }).filter(Boolean).join(', ');
+
+  // 최근 8주 챌린지 이력 — 텍스트(괄호 속 본인 주석 포함 원문 그대로)+체크일수, 최근 주가 위로 오게
+  const historyLines=[];
+  for(let i=1;i<=8;i++){
+    const d=new Date();d.setDate(d.getDate()-7*i);
+    const pastWk=weekKey(d);
+    const pastItems=getWChallenge(pastWk).filter(it=>it.text&&it.text.trim());
+    pastItems.forEach(it=>historyLines.push(`"${it.text}" — ${it.days.filter(Boolean).length}/7일 체크`));
+  }
+  // 이미 입력해둔 다음주 챌린지(있다면) — 덮어쓰지 않고 참고만 하도록 별도로 전달
+  const alreadySet=getWChallenge(wk).filter(it=>it.text&&it.text.trim());
+  const alreadySetText=alreadySet.map(it=>`"${it.text}"`).join(', ');
+
+  const dataContext=[
+    getUserProfileContext(),
+    rhythmText?`지난 한 주간 리듬 기록(카테고리별 누적 시간):\n${rhythmText}`:'지난 한 주 리듬 기록 부족',
+    allMemosWithDay.length?`지난 한 주간 메모(요일별로 시간대 고르게 샘플링):\n${allMemosWithDay.join('\n')}`:'지난 한 주 메모 없음',
+    historyLines.length?`최근 몇 주간의 챌린지 이력(텍스트에 남긴 본인 메모 포함, 원문 그대로):\n${historyLines.join('\n')}`:'과거 챌린지 이력 없음(처음 시작)',
+    alreadySetText?`사용자가 이미 다음 주 챌린지로 입력해둔 목표(참고만 — 여기 제안은 이걸 대체하지 않고 추가되는 것):\n${alreadySetText}`:null
+  ].filter(Boolean).join('\n\n');
+
+  const sys=`당신은 따뜻한 생활 코치예요. 지난 한 주간의 리듬 기록과 메모, 그리고 최근 몇 주간의 챌린지 이력을 참고해서,
+다음 주에 시도해볼 만한 새로운 목표 후보를 2~3개 제안해요.
+
+${RHYTHM_CAT_GUIDE}
+
+**핵심 판단 방식:**
+1. 행동 변화(리듬 기록)와 본인 언급(메모)이 함께 나타나는 지점을 우선적으로 살펴보세요. 예를 들어 특정 활동이 늘거나 줄었고, 메모에서도 그와 관련된 언급이 반복된다면 그게 가장 근거가 뚜렷한 제안 후보예요.
+2. 최근 챌린지 이력도 함께 보세요. 특히 목표 텍스트에 사용자가 직접 남긴 괄호 메모나 정황(예: 중단 사유, 톤 변화)이 있다면 그걸 가장 중요한 단서로 삼으세요. 최근 저조했거나 중단된 흐름이 있다면, 무작정 강도를 올리는 제안 대신 지금 상황에 맞게 문턱을 낮춘 제안을 하세요. 반대로 꾸준히 잘 되고 있는 흐름이라면 한 단계 확장하는 제안을 해도 좋아요.
+3. 최근 8주 이력과 문자 그대로 겹치는 제안은 하지 마세요. 다만 같은 결을 잇되 강도나 접근 방식을 조정한 제안(예: 이전이 "헬스장 가기"였다면 "밥먹고 5분 걷기")은 괜찮습니다.
+4. 서로 다른 영역에서 2~3개를 고르게 제안하세요(같은 주제로 쏠리지 않게). 단, 최근 흐름상 특정 주제(예: 몸 상태, 컨디션 관리)가 명백히 우선순위가 높아 보인다면 그 주제를 하나는 반드시 포함하세요.
+
+**절대 원칙:**
+- "실패", "부족", "아쉽다" 같은 부정적 평가 금지.
+- 과거 기록을 세세하게 거론하지 마세요(정확한 날짜, 체크 횟수를 콕 집어 말하지 않기). "최근 며칠 어려움이 있었던 것 같아요" 정도로 뭉뚱그려 언급하는 수준까지만.
+- 근거 없이 지어내지 마세요. 데이터에서 실제로 확인되는 흐름만 근거로 삼으세요.
+- 반드시 ~해요, ~이에요, ~어요 체의 정감있는 존댓말만 사용. 반말 절대 금지. 이름 호칭 없음.
+- 이모지, 마크다운 기호 사용 금지.
+
+**출력 형식(반드시 준수):**
+각 제안마다 정확히 다음 형식의 한 줄로 시작하세요:
+[카테고리] 제목 :: 근거와 제안 이유(1~2문장) :: 실제 챌린지 문구
+
+카테고리는 다음 중 성격에 가장 가까운 것 하나만 골라 대괄호 안에 그대로 쓰세요: 운동, 식사, 수면, 공부, 업무, 마음가짐, 습관, 취미
+세 번째 필드(실제 챌린지 문구)는 다음 주 챌린지 목록에 그대로 등록될 짧고 명확한 문장이어야 해요(코멘트 없이 행동 자체만).
+예:
+[운동] 문턱 낮춰 다시 시작 :: 최근 며칠 운동 흐름이 잠시 끊겼던 것 같아요. 다시 습관을 만드는 시기엔 강도보다 재진입 자체가 중요할 수 있어요 :: 밥먹고 5분 걷기
+
+제안 개수만큼(2~3줄) 줄을 만드세요. 각 제안은 한 줄(문단) 안에서만 내용을 이어가고 다음 줄로 넘어가면 안 돼요.`;
+
+  const reply=await callClaude(sys,[{role:'user',content:dataContext}],700);
+  if(!reply||reply.startsWith('__ERR__'))return null;
+
+  const lines=reply.trim().split('\n').filter(l=>l.trim());
+  return lines.map(l=>{
+    const m=l.trim().match(/^\[(.+?)\]\s*(.+?)\s*::\s*(.+?)\s*::\s*(.+)$/);
+    if(!m)return '';
+    const cat=m[1].trim(),title=m[2].trim(),reason=m[3].trim(),goalText=m[4].trim();
+    const icon=NEXT_WEEK_SUGGEST_CAT_ICON[cat]||'ti-sparkles';
+    return `<div class="nwf-item">
+      <div class="nwf-item-head"><i class="ti ${icon} nwf-item-icon" aria-hidden="true"></i><span class="nwf-item-goal">${escapeHtml(title)}</span></div>
+      <span class="nwf-item-text">${escapeHtml(reason)}</span>
+      <div class="nwf-adopt-row">
+        <span class="nwf-goal-preview">${escapeHtml(goalText)}</span>
+        <button type="button" class="nwf-adopt-btn" data-goal-text="${escapeHtml(goalText)}">이걸로 정하기</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// 목요일(4)부터 일요일까지 "이번 주도 화이팅" 카드의 깃발 아이콘을 flag-plus로 교체 —
+// 클릭하면 기존 다음 주 챌린지 시트(openNextWeekChallengeSheet)가 열려 다음 주 목표를 미리 입력 가능.
+// 저장은 nextWeekKey() 기준 별도 키라 다음 주 월요일이 되면 자동으로 "이번 주" 목표로 반영됨.
+// 월요일(1)엔 지난주 목표 돌아보기(openChallengeReviewSheet)로 전환 — "오늘의 리듬 기록" 배너(report-banner rhythm-soft)와
+// 완전히 동일한 배경/테두리 스타일을 그대로 가져다 씀. 요일 판단은 new Date() 기준(자정 경계, 주간탭 표준)이라
+// 자정이 지나 주간탭이 다음 주로 넘어가는 순간 차주입력창(ti-flag-plus)도 함께 내려감 — 새벽4시(getLogicalDate) 기준이면
+// 일요일 자정~4시 사이 주간탭은 이미 다음주인데 배너만 구주 상태로 남아 불필요한 API 제안이 발생하던 문제 수정.
+function setupWeeklyChallengeToggle(){
+  const titleEl=document.getElementById('wchallenge-title');
+  if(!titleEl)return;
+  const dow=new Date().getDay();
+  const isPrepWindow=dow===4||dow===5||dow===6||dow===0; // 목,금,토,일
+  const isMonday=dow===1;
+  titleEl.onclick=null;
+  titleEl.style.cursor='default';
+  if(isMonday){
+    // report-banner rhythm-soft 구조(무지개 그라디언트 테두리) 유지, 사이즈만 goal-section-title과 동일하게 축소
+    titleEl.className='report-banner rhythm-soft wchallenge-review-tag';
+    titleEl.style.margin='0';
+    titleEl.style.display='inline-block';
+    titleEl.style.borderRadius='10px';
+    titleEl.innerHTML='<div class="report-banner-inner" style="padding:5px 13px;border-radius:8.5px;justify-content:flex-start;gap:5px;"><div class="report-banner-line" style="font-size:11px;white-space:nowrap;"><i class="ti ti-flag-heart ico-inline-13" aria-hidden="true"></i>지난주 목표 돌아보기</div></div>';
+    titleEl.style.cursor='pointer';
+    titleEl.onclick=openChallengeReviewSheet;
+    renderWeeklyChallenge(weekKey(new Date()),'weekly-goal-wrap');
+    renderWeeklyStatBar();
+    return;
+  }
+  // 월요일이 아니면 원래 구조(goal-section-title + 아이콘)로 복원
+  titleEl.className='goal-section-title';
+  titleEl.style.margin='0';
+  titleEl.innerHTML='<i class="ti ti-flag-3" id="wchallenge-icon" class="ico-13" aria-hidden="true"></i> 주간 목표';
+  const iconEl=document.getElementById('wchallenge-icon');
+  if(isPrepWindow){
+    iconEl.className='ti ti-flag-plus';
+    titleEl.title='다음 주 목표 미리 준비하기';
+    titleEl.style.cursor='pointer';
+    titleEl.onclick=openNextWeekChallengeSheet;
+  }else{
+    iconEl.className='ti ti-flag-3';
+    titleEl.title='';
+  }
+  renderWeeklyChallenge(weekKey(new Date()),'weekly-goal-wrap');
+  renderWeeklyStatBar();
+}
+function renderWeeklyChallenge(wk,containerId){
+  wk=wk||weekKey(new Date());
+  containerId=containerId||'weekly-goal-wrap';
+  const wrap=document.getElementById(containerId);
+  if(!wrap)return;
+  wrap.innerHTML='';
+  let items=getWChallenge(wk);
+  if(!items.length)items=[{text:'',days:[false,false,false,false,false,false,false]}];
+
+  function save(){
+    const result=items.map(it=>({text:it.text,days:[...it.days]}));
+    saveWChallenge(wk,result);
+  }
+
+  function renderItems(){
+    wrap.innerHTML='';
+    items.forEach((item,idx)=>{
+      const row=document.createElement('div');row.className='wchallenge-item';
+
+      // 텍스트 입력 행
+      const inpRow=document.createElement('div');inpRow.className='wchallenge-inp-row';
+      const inp=document.createElement('input');
+      inp.className='wchallenge-inp';inp.type='text';
+      inp.placeholder='이번 주 실천할 것...';inp.value=item.text||'';
+      inp.autocomplete='off';
+      inp.addEventListener('input',()=>{items[idx].text=inp.value;save();});
+      inp.addEventListener('keydown',e=>{
+        if(e.key==='Enter'){e.preventDefault();
+          items.push({text:'',days:[false,false,false,false,false,false,false]});
+          save();renderItems();
+          setTimeout(()=>{const inps=wrap.querySelectorAll('.wchallenge-inp');if(inps[idx+1])inps[idx+1].focus();},50);
+        }
+      });
+      const del=document.createElement('button');del.className='wchallenge-del';del.textContent='×';
+      del.addEventListener('click',()=>{
+        if(items.length===1){items[0]={text:'',days:[false,false,false,false,false,false,false]};save();renderItems();return;}
+        items.splice(idx,1);save();renderItems();
+      });
+      inpRow.appendChild(inp);inpRow.appendChild(del);
+
+      // 요일 체크 행
+      const daysRow=document.createElement('div');daysRow.className='wchallenge-days';
+      item.days.forEach((checked,di)=>{
+        const btn=document.createElement('div');btn.className='wchallenge-day'+(checked?' on':'');
+        btn.textContent=WC_DAYS[di];
+        if(checked)btn.style.background=WC_COLORS[di];
+        if(checked)btn.style.borderColor=WC_COLORS_BORDER[di];
+        if(checked)btn.style.color=WC_COLORS_TEXT[di];
+        btn.addEventListener('click',()=>{
+          items[idx].days[di]=!items[idx].days[di];save();renderItems();
+        });
+        daysRow.appendChild(btn);
+      });
+
+      row.appendChild(inpRow);row.appendChild(daysRow);wrap.appendChild(row);
+    });
+
+    // 항목 추가는 weekly-goal-wrap에서는 입력창 Enter로만 처리 (상단 target-arrow 아이콘은 항상 주간 목표 모아보기로 연결됨).
+    // nextweek-challenge-wrap(다음 주 챌린지 준비 시트)에서는 여전히 "+항목 추가" 버튼 사용.
+    const useTopAddBtn=containerId==='weekly-goal-wrap';
+    const doAdd=()=>{
+      items.push({text:'',days:[false,false,false,false,false,false,false]});
+      save();renderItems();
+      setTimeout(()=>{const inps=wrap.querySelectorAll('.wchallenge-inp');if(inps[items.length-1])inps[items.length-1].focus();},50);
+    };
+    if(!useTopAddBtn&&items.length<4){
+      const addBtn=document.createElement('button');addBtn.className='wchallenge-add';
+      addBtn.innerHTML='<span style="font-size:16px;line-height:1;">+</span> 항목 추가';
+      addBtn.addEventListener('click',doAdd);
+      wrap.appendChild(addBtn);
+    }
+  }
+  renderItems();
+}
+
+// ── GOAL NOTE
+function renderGoalNote(containerId,storageKey,readOnly=false){
+  const saved=getGoal(storageKey);
+  const wrap=document.getElementById(containerId);if(!wrap)return;
+  wrap.innerHTML='';
+  const lines=saved.length?saved:[''];
+  function addLine(val){
+    const inp=document.createElement('input');
+    inp.type='text';inp.className='goal-inp';inp.value=val||'';
+    inp.autocomplete='off';
+    if(readOnly){
+      inp.readOnly=true;inp.style.opacity='0.55';inp.style.cursor='default';
+      wrap.appendChild(inp);return;
+    }
+    inp.addEventListener('keydown',e=>{
+      if(e.key==='Enter'){
+        e.preventDefault();addLine('');
+        const all=wrap.querySelectorAll('.goal-inp');all[all.length-1].focus();save();
+      } else if(e.key==='Backspace'&&inp.value===''&&wrap.querySelectorAll('.goal-inp').length>1){
+        e.preventDefault();const all=wrap.querySelectorAll('.goal-inp');const idx=Array.from(all).indexOf(inp);
+        inp.remove();save();if(wrap.querySelectorAll('.goal-inp')[idx-1])wrap.querySelectorAll('.goal-inp')[idx-1].focus();
+      }
+    });
+    inp.addEventListener('input',save);wrap.appendChild(inp);
+  }
+  function save(){const lines=Array.from(wrap.querySelectorAll('.goal-inp')).map(i=>i.value);saveGoal(storageKey,lines);}
+  lines.forEach(v=>addLine(v));
+}
+
+// ── WEEK STRIP
+// 날짜칩 링 — 그날 리듬 카테고리(kind:'manual')별 합산 시간 중 상위 4개만 비율로 재구성해 표시.
+// 수면/식사(kind:'sleep'/'meal')는 카테고리 성격이 달라 이 요약 링 집계에서는 제외.
+function _topRhythmCatsForRing(dk){
+  const raw=computeRhythmBlocksRaw(dk);
+  const nowMin=_nowMinIfToday(dk);
+  const sums={}; // cat key -> 합산 분
+  raw.forEach(function(b){
+    if(b.kind!=='manual')return;
+    const catKey=Object.keys(RHYTHM_CATS).find(function(k){return RHYTHM_CATS[k].color===b.color;});
+    if(!catKey)return;
+    let s=b.start,e=b.end;
+    if(e==null)e=(nowMin!=null&&nowMin>s)?nowMin:s+1;
+    if(e<=s)e=s+1;
+    if(e>1440)e=1440;
+    sums[catKey]=(sums[catKey]||0)+(e-s);
+  });
+  if(Object.keys(sums).length===0)return [];
+  const top4=Object.keys(sums).sort(function(a,b){return sums[b]-sums[a];}).slice(0,4);
+  const top4Total=top4.reduce(function(a,k){return a+sums[k];},0);
+  return top4.map(function(k){return {color:RHYTHM_CATS[k].color,pct:sums[k]/top4Total*100};});
+}
+function _rhythmRingSvg(dk,dateNum,isToday){
+  const segs=_topRhythmCatsForRing(dk);
+  const r=13.5,circ=100; // pathLength=100 기준 퍼센트 그대로 사용
+  let acc=0;
+  let circles='<circle cx="17" cy="17" r="'+r+'" fill="none" stroke="var(--empty-bg)" stroke-width="4"/>';
+  segs.forEach(function(seg){
+    const len=seg.pct;
+    circles+='<circle cx="17" cy="17" r="'+r+'" fill="none" stroke="'+seg.color+'" stroke-width="4" pathLength="'+circ+'" style="stroke-dasharray:'+len+' '+circ+';stroke-dashoffset:'+(-acc)+';transform:rotate(-90deg);transform-origin:17px 17px"/>';
+    acc+=len;
+  });
+  return '<div class="ring-wrap"><svg viewBox="0 0 34 34" width="34" height="34">'+circles+'</svg><span class="ring-num'+(isToday?' today-num':'')+'">'+dateNum+'</span></div>';
+}
+function buildWeekStrip(){
+  const now=new Date(),dow=now.getDay();
+  const mon=new Date(now);mon.setDate(now.getDate()-((dow+6)%7));
+  const strip=document.getElementById('week-strip');if(!strip)return;
+  strip.innerHTML='';
+  for(let i=0;i<7;i++){
+    const d=new Date(mon);d.setDate(mon.getDate()+i);
+    const today=d.toDateString()===now.toDateString();
+    const dk=dateKey(d);
+    const el=document.createElement('div');el.className='day-btn'+(today?' today':'');
+    el.innerHTML=_rhythmRingSvg(dk,d.getDate(),today)+`<div class="day-name">${DAYS[d.getDay()]}</div>`;
+    el.addEventListener('click',()=>{
+      currentDate=new Date(d);
+      document.querySelectorAll('.vtab').forEach(t=>t.classList.toggle('on',t.dataset.v==='daily'));
+      document.querySelectorAll('.view').forEach(vw=>vw.classList.toggle('on',vw.id==='v-daily'));
+      updateDateUI();document.querySelector('.scroll').scrollTop=0;
+    });
+    strip.appendChild(el);
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// ██ 오늘탭 (4/4 — 나머지는 시간대팝업, SLEEP~아침파트2, MEMO, 예비투두 부근) — HABIT/CONTENT TIMELINE ██
+// ══════════════════════════════════════════════════════════
+// ── HABIT
+// [2026-09-05] 습관 편집(구 habit-modal, 줄바꿈 텍스트박스)은 설정탭 "해빗" 코너로 완전히 이전됨.
+// renderSettingsHabitSection/toggleCatalogHabit/toggleCustomHabit/addCustomHabitFromSettings 참고.
+
+// ── CONTENT TIMELINE
+let _contentCtx={};
+let _contentSubmitting=false;
+let _selectedPoster=null;
+let _selectedAuthor=null;
+let _selectedMusicUrl=null;
+let _selectedAlbum=null;
+let _selectedReleaseYear=null;
+let _selectedTotalUnit=null; // TMDB 상세 조회로 자동 확인된 드라마 총회차/영화 총러닝타임(분)
+let _apiTimer=null;
+
+function renderContentTimeline(){
+  const mk=calMonthKey();
+  const prevDateObj=new Date(_calYear,_calMonth-1,1);
+  const prevMk=monthKey(prevDateObj);
+  const contents=getContents(mk);
+  const prevContents=getContents(prevMk);
+  const headInner=document.getElementById('ctl-head-inner');
+  const headDates=document.getElementById('ctl-head-dates');
+  const rowsEl=document.getElementById('ctl-rows');
+  if(!rowsEl)return;
+  const todayDay=new Date().getDate();
+  const isSameMonth=mk===monthKey(new Date());
+  const daysInMonth=new Date(_calYear,_calMonth+1,0).getDate();
+
+  // 헤더 — 실제 그 달 일수만큼만 그림(31일 고정 시 2월 등에서 막대 없는 빈 눈금이 남는 문제 수정)
+  if(headInner){
+    headInner.innerHTML='';
+    for(let i=1;i<=daysInMonth;i++){
+      const s=document.createElement('span');s.textContent=i;headInner.appendChild(s);
+    }
+  }
+  rowsEl.innerHTML='';
+
+  CATS.forEach(cat=>{
+    const items=contents.filter(c=>c.cat===cat);
+    // 전월에서 시작해서 이번 달까지 이어지는 항목(진행중, 또는 끝났어도 종료달이 이번달 이후)도 같이 표시
+    const carry=prevContents.filter(c=>{
+      if(c.cat!==cat)return false;
+      return isContentCarryOver(c,mk);
+    }).map(c=>({...c,_carried:true}));
+    const all=[...carry,...items];
+
+    const laid=all.map(item=>{
+      const sStr=item.startDate||(mk+'-01');
+      const eStr=item.endDate;
+      const isWatching=item.status==='watching'&&cat!=='music';
+      const startD=item._carried?1:Math.max(1,parseInt(sStr.slice(8,10),10)||1);
+      let endD;
+      if(isWatching&&!eStr){
+        endD=isSameMonth?todayDay:daysInMonth;
+      }else if(!eStr){
+        // music은 '며칠씩 걸리는' 개념이 없으므로 상태(watching 포함)와 무관하게 항상 시작일 하루짜리 점으로 고정.
+        // music 외 다른 카테고리가 혹시 이 분기를 타는 경우(예외적 데이터)에는 기존처럼 watching이면 오늘/월말까지 연장.
+        endD=(cat!=='music'&&item.status==='watching')?(isSameMonth?todayDay:daysInMonth):startD;
+      }else{
+        const eMonth=eStr.slice(0,7);
+        endD=eMonth===mk?Math.max(parseInt(eStr.slice(8,10),10)||startD,startD):daysInMonth;
+      }
+      endD=Math.min(Math.max(endD,startD),daysInMonth);
+      return {item,startD,endD,isWatching};
+    }).sort((a,b)=>a.startD-b.startD);
+
+    // 같은 카테고리 안에서 기간이 겹치는 항목은 트랙(줄)을 나눠서 배치 (그리디 인터벌 스케줄링)
+    // 단, 음악은 하루짜리 단기 기록이라 여러 개여도 항상 한 줄에 모아서 숫자 배지로 표기 (트랙 분리 안 함)
+    let tracks;
+    if(cat==='music'){
+      tracks=[laid];
+    }else{
+      const trackEnds=[];tracks=[];
+      laid.forEach(c=>{
+        let placed=false;
+        for(let i=0;i<trackEnds.length;i++){
+          // 앞 항목이 완료(done/stopped)된 경우, 종료일과 시작일이 같은 날이어도 겹침으로 보지 않고 같은 줄에 이어 배치
+          // (하루에 책을 다 읽고 새 책을 시작하는 경우 등 — 서로 독립된 블록으로 렌더링되므로 시각적으로도 안전)
+          const prevItem=tracks[i][tracks[i].length-1].item;
+          const prevDone=isContentFinished(prevItem);
+          const canFollow=prevDone?(c.startD>=trackEnds[i]):(c.startD>trackEnds[i]);
+          if(canFollow){trackEnds[i]=c.endD;tracks[i].push(c);placed=true;break;}
+        }
+        if(!placed){trackEnds.push(c.endD);tracks.push([c]);}
+      });
+    }
+    if(!tracks.length)tracks.push([]);
+
+    tracks.forEach((trackItems,tIdx)=>{
+      const row=document.createElement('div');row.className='ctl-row';
+      const catEl=document.createElement('div');catEl.className='ctl-cat-fixed';
+      if(tIdx===0){
+        const meta=CAT_ICON_META[cat];
+        catEl.innerHTML=meta?`<span style="display:inline-flex;align-items:center;gap:4px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:4px;background:${meta.color};flex-shrink:0;"><i class="ti ${meta.icon}" style="font-size:9px;color:${meta.iconColor};" aria-hidden="true"></i></span><span>${CAT_LABELS[cat]}</span></span>`:CAT_LABELS[cat];
+        catEl.addEventListener('click',()=>openContentModal(cat));
+      }else{
+        catEl.classList.add('ctl-cat-sub');
+      }
+      const scroll=document.createElement('div');scroll.className='ctl-date-scroll';
+      scroll.setAttribute('data-tt','1');
+      const inner=document.createElement('div');inner.className='ctl-date-inner';
+      // 트랙 내 아이템을 시작일 순으로 순회하며, 표시시작일을 max(실제 startD, 커서)로 보정.
+      // 겹치지 않으면 항상 자기 startD 그대로 사용되므로 기존 동작과 완전히 동일하게 흘러가고,
+      // 겹칠 때만(예: 완독 종료일=다음 항목 시작일) 자동으로 뒤로 밀려 폭이 줄어들며 자연스럽게 이어붙음.
+      const sortedGroups=cat==='music'
+        ?Object.values(trackItems.reduce((acc,c)=>{(acc[c.startD]=acc[c.startD]||[]).push(c);return acc;},{})).sort((a,b)=>a[0].startD-b[0].startD)
+        :trackItems.slice().sort((a,b)=>a.startD-b.startD).map(c=>[c]);
+      let cursor=1;
+      sortedGroups.forEach(group=>{
+        const {startD,endD,isWatching,item}=group[0];
+        const dispStart=Math.max(startD,cursor);
+        if(dispStart>cursor){
+          for(let d=cursor;d<dispStart;d++){
+            const cell=document.createElement('div');cell.className='ctl-cell';inner.appendChild(cell);
+          }
+        }
+        const dispEnd=Math.max(endD,dispStart);
+        const span=dispEnd-dispStart+1,w=span*20+(span-1)*2;
+        // 방영중으로 표시해둔 드라마(isAiring)는 상태(보는중/완료/중단) 무관하게 하나로 이어진 막대는 유지하되
+        // 실제 감상일만 진한 톤, 안 본 날은 옅은 톤으로 — 완결작과 같은 "쭉 이어진 형태" 언어를 유지하면서 밀도 구분
+        // 전월부터 이어진(_carried) 경우에도 이 톤을 유지 — 이월 여부와 무관하게 방영중 상태 자체가 기준(2026-09-03 수정)
+        const useAiringTone=cat==='drama'&&item.isAiring;
+        if(useAiringTone){
+          const watchedDays=new Set(getWatchedDaysInMonth(item.title,mk));
+          const track=document.createElement('div');
+          track.className='ctl-block drama ctl-airing-tone';
+          track.style.cssText=`width:${w}px;min-width:${w}px;position:relative;padding:0;overflow:hidden;display:flex;`;
+          track.title=(item._carried?item.title+' (전월부터 이어짐)':item.title)+(item.status==='stopped'?' · 중단':'');
+          for(let d=dispStart;d<=dispEnd;d++){
+            const seg=document.createElement('div');
+            seg.className='ctl-airing-seg'+(watchedDays.has(d)?' watched':'');
+            track.appendChild(seg);
+          }
+          const lbl=document.createElement('span');lbl.className='ctl-airing-tone-label';lbl.textContent=item.title;
+          track.appendChild(lbl);
+          if(isWatching){
+            const stripe=document.createElement('div');stripe.className='ctl-airing-live-stripe';
+            track.appendChild(stripe);
+          }
+          if(item.status==='stopped')track.style.filter='saturate(0.45)';
+          track.addEventListener('click',()=>openContentModal(cat,item,item._carried?prevMk:mk));
+          track.style.cursor='pointer';
+          inner.appendChild(track);
+          cursor=dispEnd+1;
+          return;
+        }
+        const block=document.createElement('div');block.className=`ctl-block ${cat}`;
+        block.style.cssText=`width:${w}px;min-width:${w}px;position:relative;`;
+        if(isWatching){
+          block.style.backgroundImage=`repeating-linear-gradient(45deg,transparent,transparent 6px,rgba(255,255,255,0.45) 6px,rgba(255,255,255,0.45) 10px)`;
+          block.style.opacity='0.85';
+        }
+        if(item.status==='stopped'){
+          block.style.filter='saturate(0.45)';
+          block.style.opacity='0.7';
+        }
+        if(cat==='music'&&group.length>1){
+          block.textContent=String(group.length);
+          block.title=group.map(g=>g.item.title).join(', ');
+          block.addEventListener('click',()=>openMusicGroupModal(group.map(g=>g.item),mk));
+          block.style.cursor='pointer';
+        }else{
+          block.textContent=cat==='music'?(item.title||'').charAt(0):item.title;
+          block.title=(item._carried?item.title+' (전월부터 이어짐)':item.title)+(item.status==='stopped'?' · 중단':'');
+          if(!item._carried){
+            block.addEventListener('click',()=>openContentModal(cat,item,mk));
+            block.style.cursor='pointer';
+          }else{
+            block.addEventListener('click',()=>openContentModal(cat,item,prevMk));
+            block.style.cursor='pointer';
+          }
+        }
+        inner.appendChild(block);
+        cursor=dispEnd+1;
+      });
+      if(cursor<=31){
+        for(let d=cursor;d<=31;d++){
+          const cell=document.createElement('div');cell.className='ctl-cell';inner.appendChild(cell);
+        }
+      }
+      scroll.appendChild(inner);row.appendChild(catEl);row.appendChild(scroll);rowsEl.appendChild(row);
+    });
+  });
+
+  // 스크롤 동기화
+  const allScrolls=Array.from(rowsEl.querySelectorAll('[data-tt]'));
+  function syncScroll(src){
+    const sl=src.scrollLeft;
+    if(headDates)headDates.scrollLeft=sl;
+    allScrolls.forEach(s=>{if(s!==src)s.scrollLeft=sl;});
+  }
+  allScrolls.forEach(s=>s.addEventListener('scroll',()=>syncScroll(s),{passive:true}));
+  if(headDates)headDates.addEventListener('scroll',()=>syncScroll(headDates),{passive:true});
+
+  // 오늘-3일 위치로 초기 스크롤 (같은 달일 때만)
+  if(isSameMonth){
+    const targetDay=Math.max(1,todayDay-3);
+    const scrollX=(targetDay-1)*22;
+    setTimeout(()=>{
+      if(headDates)headDates.scrollLeft=scrollX;
+      allScrolls.forEach(s=>s.scrollLeft=scrollX);
+    },50);
+  }
+  // 완결 콘텐츠 미니 통계 — 카테고리별 이번 달 "완결" 수량.
+  // 완결 기준은 종료일(endDate)의 월 = 이번 달(mk). 전월에 시작해 이번 달에 끝난 것도 포함,
+  // 반대로 이번 달에 시작했어도 다음 달 이후에 끝나면 이번 달 완결에서 제외(carry 로직과 동일 기준).
+  // music은 완결 개념이 없는 카테고리라 대신 "이번 달 기록 수량"(시작일=이번달 기준)으로 집계.
+  const statsEl=document.getElementById('ctl-complete-stats');
+  if(statsEl){
+    const allForStats=[...contents,...prevContents];
+    const seen=new Set();
+    const counts={};
+    CATS.forEach(c=>{counts[c]=0;});
+    allForStats.forEach(c=>{
+      if(counts[c.cat]===undefined)return;
+      if(c.cat==='music'){
+        const sMonth=(c.startDate||'').slice(0,7);
+        if(sMonth!==mk)return;
+        const dedupeKey=c.cat+'|'+c.title+'|'+c.startDate;
+        if(seen.has(dedupeKey))return;
+        seen.add(dedupeKey);
+        counts[c.cat]++;
+        return;
+      }
+      if(c.status!=='done'||!c.endDate||c.endDate.slice(0,7)!==mk)return;
+      const dedupeKey=c.cat+'|'+c.title+'|'+c.endDate;
+      if(seen.has(dedupeKey))return;
+      seen.add(dedupeKey);
+      counts[c.cat]++;
+    });
+    statsEl.innerHTML='<div class="stat-bar-wrap" style="border-top:none;margin-top:0;padding-top:10px;">'+CATS.map((cat,i)=>{
+      const meta=CAT_ICON_META[cat];
+      return (i>0?'<div class="sbar-div"></div>':'')+`<div class="sbar-item"><i class="ti ${meta.icon} sub-tm-13" aria-hidden="true"></i><span class="sbar-num">${counts[cat]}</span></div>`;
+    }).join('')+'</div>';
+  }
+}
+// ── 별점 위젯 공용 헬퍼 (0.5단위, tabler 아이콘 기반) ──
+// 규칙: 빈 별 클릭 → 그 지점까지 꽉 채움. 이미 꽉 찬 그 별을 다시 클릭 → 반쪽. 반쪽인 그 별을 다시 클릭 → 다시 꽉 참(순환, 0으로는 안 꺼짐).
+function _starIconClass(val,n){
+  if(val>=n)return 'ti-star-filled';
+  if(val>=n-0.5)return 'ti-star-half-filled';
+  return 'ti-star';
+}
+function renderStarPickerHtml(val,onClickExpr){
+  // onClickExpr: 각 별 클릭시 실행할 전체 함수 호출문의 앞부분(여는 괄호까지 포함, 마지막 인자 자리만 비움).
+  // 예: onClickExpr="setCmStars(" → 별 3번 클릭 시 "setCmStars(3)" 실행
+  //     onClickExpr="setStarValue('cm-star-picker','cm-stars'," → "setStarValue('cm-star-picker','cm-stars',3)" 실행
+  return [1,2,3,4,5].map(n=>`<i class="ti ${_starIconClass(val,n)} cm-star${val>=n-0.5?' on':''}" data-val="${n}" onclick="${onClickExpr}${n})" aria-hidden="true"></i>`).join('');
+}
+function nextStarValue(cur,n){
+  if(cur>=n)return n-0.5; // 이미 그 별까지 꽉 찬 상태 → 반쪽으로
+  if(cur>=n-0.5)return n; // 반쪽 상태 → 다시 꽉 참으로 순환
+  return n; // 빈 별 → 그 지점까지 꽉 채움
+}
+// 별점 표시(읽기 전용) — 0.5단위 반영. 채워진 개수만큼 filled, 나머지는 outline.
+function renderStarDisplayHtml(stars,sizeClass){
+  if(!stars||stars<=0)return '';
+  const cls=sizeClass?` ${sizeClass}`:'';
+  return [1,2,3,4,5].map(n=>`<i class="ti ${_starIconClass(stars,n)}${cls}" aria-hidden="true"></i>`).join('');
+}
+// 별점 위젯 공용 렌더/클릭 — pickerElId(별 목록 표시 컨테이너)·valueElId(hidden input) 쌍으로 어떤 위젯 인스턴스든 동일하게 처리.
+// 콘텐츠 등록모달(cm-star-picker/cm-stars), 독서 완독배너(pg-done-star-picker/pg-done-stars),
+// 콘텐츠 완료배너(cpg-done-star-picker/cpg-done-stars) 3곳이 공유.
+function renderStarPicker(pickerElId,valueElId,val){
+  const el=document.getElementById(pickerElId);if(!el)return;
+  el.innerHTML=renderStarPickerHtml(val,`setStarValue('${pickerElId}','${valueElId}',`);
+}
+function setStarValue(pickerElId,valueElId,n){
+  const inp=document.getElementById(valueElId);if(!inp)return;
+  const cur=parseFloat(inp.value)||0;
+  const next=nextStarValue(cur,n);
+  inp.value=next;
+  renderStarPicker(pickerElId,valueElId,next);
+}
+function openMusicGroupModal(items,mk){
+
+  const listEl=document.getElementById('mg-list');
+  listEl.innerHTML='';
+  items.forEach(item=>{
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;background:var(--card);border:1px solid var(--card-b);cursor:pointer;';
+    row.innerHTML=`<i class="ti ti-music" style="font-size:14px;color:${getCatBarColor('music')};flex-shrink:0;" aria-hidden="true"></i><span style="font-size:var(--main-text-size);color:var(--tp);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${item.title||''}</span>`;
+    row.addEventListener('click',()=>{closeModal('music-group-modal');openContentModal('music',item,mk);});
+    listEl.appendChild(row);
+  });
+  openModal('music-group-modal');
+}
+function openContentModal(cat,item=null,mk=null,onSaved=null){
+  _contentCtx={cat,item,mk:mk||calMonthKey(),mode:item?'edit':'add',onSaved};
+  document.getElementById('cm-title').value=item?.title||'';
+  _selectedPoster=null;_selectedAuthor=null;_selectedMusicUrl=item?.musicUrl||null;
+  _selectedAlbum=item?.album||null;_selectedReleaseYear=item?.releaseYear||null;
+  const pp=document.getElementById('cm-poster-preview');
+  if(pp){
+    if(item?.poster){
+      pp.style.display='flex';
+      const pimg=document.getElementById('cm-poster-img');if(pimg)pimg.src=item.poster;
+      document.getElementById('cm-poster-title').textContent=item.title||'';
+      const subEl=document.getElementById('cm-poster-sub');
+      if(subEl)subEl.textContent=((cat==='book'||cat==='music')&&item.author)?item.author:'';
+    }
+    else pp.style.display='none';
+  }
+  const today=dateKey(currentDate);
+  document.getElementById('cm-start').value=item?(item.startDate||today):today;
+  document.getElementById('cm-end').value=item?(item.endDate||''):'';
+  document.getElementById('cm-review').value=item?.review||'';
+  document.getElementById('cm-stars').value=item?.stars||0;
+  const musicNoteEl=document.getElementById('cm-music-note');
+  if(musicNoteEl)musicNoteEl.value=(item?.notes&&item.notes[0]&&item.notes[0].text)||'';
+  renderStarPicker('cm-star-picker','cm-stars',item?.stars||0);
+  document.getElementById('cm-del-btn').style.display=item?'block':'none';
+  const status=item?.status||'watching';
+  setCStatus(status);
+  hideApiResults();
+  // 음악은 완료/중단/별점 개념이 없으므로 숨기고, 대신 애플뮤직 재생 버튼을 보여줌
+  const isMusic=cat==='music';
+  const isBook=cat==='book';
+  const statusBtns=document.getElementById('cm-status-btns');
+  const playBtn=document.getElementById('cm-music-play-btn');
+  const startLabel=document.getElementById('cm-start-label');
+  if(startLabel)startLabel.style.display=isMusic?'none':'inline';
+  if(statusBtns)statusBtns.style.display=isMusic?'none':'flex';
+  if(playBtn)playBtn.style.display=(isMusic&&_selectedMusicUrl)?'block':'none';
+  // 책: 독서코너와 동일하게 페이지/퍼센트 기록 방식 선택 — 콘텐츠탭 등록 시에도 함께 반영되도록 연동
+  const bookUnitRow=document.getElementById('cm-book-unit-row');
+  if(bookUnitRow){
+    bookUnitRow.style.display=isBook?'block':'none';
+    if(isBook){
+      const linkedBook=item?.cid?getBooks().find(b=>b.cid===item.cid):null;
+      const initialUnit=linkedBook?.unit||'percent';
+      setCmUnit(initialUnit);
+      document.getElementById('cm-total-pages').value=linkedBook?.totalPages||'';
+    }
+  }
+  // 드라마(회차)/영화(러닝타임분) — TMDB 상세 조회로 자동 확인, 수기 입력 없음.
+  // 수정(edit) 모드에서 기존에 저장된 값이 있으면 그대로 힌트로 표시하고, 검색해서 새로 선택하면 자동으로 덮어씀.
+  _selectedTotalUnit=item?.totalUnit||null;
+  renderCmProgressHint();
+  // 방영중 표시 토글 — 드라마만 해당(등록 시 미리 켜두면 완료 시점에 점선+네모 타임라인으로 전환됨)
+  _cmAiringOn=!!(item?.isAiring);
+  const airingBtn=document.getElementById('cm-airing-toggle');
+  if(airingBtn){
+    airingBtn.style.display=(cat==='drama')?'flex':'none';
+    airingBtn.classList.toggle('on',_cmAiringOn);
+  }
+  openModal('content-modal');setTimeout(()=>document.getElementById('cm-title').focus(),100);
+}
+let _cmAiringOn=false;
+function toggleCmAiring(){
+  _cmAiringOn=!_cmAiringOn;
+  const btn=document.getElementById('cm-airing-toggle');
+  if(btn)btn.classList.toggle('on',_cmAiringOn);
+}
+let _cmUnit='percent';
+function setCmUnit(u){
+  _cmUnit=u;
+  document.getElementById('cm-unit-percent').classList.toggle('on',u==='percent');
+  document.getElementById('cm-unit-pages').classList.toggle('on',u==='pages');
+  document.getElementById('cm-total-pages').style.display=u==='pages'?'':'none';
+}
+function openAppleMusicLink(){
+  if(_selectedMusicUrl)window.location.href=_selectedMusicUrl;
+}
+function setCStatus(status){
+  _contentCtx.status=status;
+  const d=document.getElementById('cm-done');
+  if(d)d.classList.toggle('dim',status!=='done');
+  const s=document.getElementById('cm-stop');
+  if(s)s.classList.toggle('dim',status!=='stopped');
+  const edr=document.getElementById('cm-enddate-row');
+  const lbl=document.getElementById('cm-enddate-label');
+  if(edr){
+    const showEnd=isFinishedStatus(status)&&_contentCtx.cat!=='music';
+    edr.classList.toggle('show',showEnd);
+    if(lbl)lbl.textContent=status==='stopped'?'중단일':'완료일';
+    if(showEnd&&!document.getElementById('cm-end').value)document.getElementById('cm-end').value=dateKey(currentDate);
+  }
+  // 별점·감상은 완료/중단 상태에서만 의미가 있으므로, 그 전까지는 숨겨서 등록 화면을 간결하게 유지 (음악은 원래부터 별점 개념이 없어 항상 숨김)
+  const isMusic=_contentCtx.cat==='music';
+  const showReviewFields=!isMusic&&isFinishedStatus(status);
+  const starRow=document.getElementById('cm-star-row');
+  const reviewEl=document.getElementById('cm-review');
+  if(starRow)starRow.style.display=showReviewFields?'flex':'none';
+  if(reviewEl){
+    reviewEl.style.display=showReviewFields?'':'none';
+    const reviewPools={
+      book:['다 읽고 나서 어떤 문장이 남았나요? (선택)','완독 후 든 생각을 남겨보세요 (선택)','가장 기억에 남는 장면은? (선택)'],
+      drama:['다 보고 나서 어떤 장면이 남았나요? (선택)','완결 후 든 생각을 남겨보세요 (선택)','가장 좋았던 순간은? (선택)'],
+      movie:['다 보고 나서 어떤 장면이 남았나요? (선택)','영화가 끝나고 든 생각을 남겨보세요 (선택)','가장 좋았던 순간은? (선택)'],
+    };
+    reviewEl.placeholder=reviewPools[_contentCtx.cat]?pickRandom(reviewPools[_contentCtx.cat]):'감상 메모 (선택)';
+  }
+  const musicNoteEl=document.getElementById('cm-music-note');
+  if(musicNoteEl){
+    musicNoteEl.style.display=isMusic?'':'none';
+    if(isMusic)musicNoteEl.placeholder=pickRandom(['이 곡, 어떤 상황에서 다시 듣고 싶나요? (선택)','이 곡을 들으며 든 생각을 남겨보세요 (선택)','좋았던 가사나 소절이 있었나요? (선택)']);
+  }
+}
+function toggleCDone(){
+  setCStatus(_contentCtx.status==='done'?'watching':'done');
+}
+function toggleCStop(){
+  setCStatus(_contentCtx.status==='stopped'?'watching':'stopped');
+}
+function confirmContent(){
+  if(_contentSubmitting)return;
+  const title=document.getElementById('cm-title').value.trim();if(!title)return;
+  _contentSubmitting=true;
+  const startVal=document.getElementById('cm-start').value;
+  const today=dateKey(currentDate);
+  const startDate=startVal||today;
+  // 음악은 '듣는 데 며칠씩 걸리는' 개념이 아니라 등록=감상 완료이므로,
+  // UI에 상태 선택 버튼이 없는 것과 일관되게 저장 시에도 항상 done으로 고정(진행중 딱지가 남지 않도록).
+  const status=_contentCtx.cat==='music'?'done':(isFinishedStatus(_contentCtx.status)?_contentCtx.status:'watching');
+  let endDate=null;
+  if(isFinishedStatus(status)&&_contentCtx.cat!=='music'){
+    const endVal=document.getElementById('cm-end').value;
+    endDate=endVal||startDate;
+    if(endDate<startDate)endDate=startDate; // 끝이 시작보다 빠를 수 없음
+  }
+  // 음악은 '듣는 데 며칠씩 걸리는' 개념이 아니므로 완료/중단 상태여도 endDate는 항상 null로 유지.
+  const review=document.getElementById('cm-review').value.trim();
+  const stars=parseFloat(document.getElementById('cm-stars').value)||0;
+  const poster=_selectedPoster||(_contentCtx.item&&_contentCtx.item.poster)||null;
+  const author=_selectedAuthor||(_contentCtx.item&&_contentCtx.item.author)||'';
+  const musicUrl=_contentCtx.cat==='music'?(_selectedMusicUrl||(_contentCtx.item&&_contentCtx.item.musicUrl)||null):null;
+  const album=_contentCtx.cat==='music'?(_selectedAlbum||(_contentCtx.item&&_contentCtx.item.album)||null):null;
+  const releaseYear=_contentCtx.cat==='music'?(_selectedReleaseYear||(_contentCtx.item&&_contentCtx.item.releaseYear)||null):null;
+  // 드라마(회차)/영화(러닝타임분) 총량 — TMDB 자동 확인값(_selectedTotalUnit) 사용. 기존 진행분(currentUnit)은 유지하되 새 총량보다 크면 총량에 맞춰 보정
+  let totalUnit=null,currentUnit=_contentCtx.item?.currentUnit||null;
+  if(_contentCtx.cat==='drama'||_contentCtx.cat==='movie'){
+    totalUnit=_selectedTotalUnit||null;
+    if(totalUnit&&currentUnit&&currentUnit>totalUnit)currentUnit=totalUnit;
+  }
+  // 방영중 표시 토글 — 드라마만 저장(다른 카테고리는 항상 false로 고정, 완료 버튼 누르는 시점의 렌더링 분기에만 사용됨)
+  const isAiring=_contentCtx.cat==='drama'?_cmAiringOn:false;
+  _selectedPoster=null;_selectedAuthor=null;_selectedMusicUrl=null;_selectedTotalUnit=null;_selectedAlbum=null;_selectedReleaseYear=null;_cmAiringOn=false;
+  const newMk=startDate.slice(0,7); // 시작한 달 = 저장 버킷
+  const oldMk=_contentCtx.mk;
+  let savedCid=null;
+  if(_contentCtx.mode==='edit'&&_contentCtx.item){
+    const oldContents=getContents(oldMk);
+    const idx=oldContents.findIndex(c=>c.cid===_contentCtx.item.cid);
+    // review 텍스트가 실제로 바뀐 경우에만 저장 시점(오늘탭 메모 배너 기준일)을 새로 찍음 — 다른 필드만 고친 경우는 기존 시점 유지.
+    const reviewChanged=idx>=0&&review!==(oldContents[idx].review||'');
+    const reviewSavedDk=review?(reviewChanged?dateKey(getLogicalDate()):(idx>=0?oldContents[idx].reviewSavedDk:null)):null;
+    const reviewSavedTime=review?(reviewChanged?(String(new Date().getHours()).padStart(2,'0')+':'+String(new Date().getMinutes()).padStart(2,'0')):(idx>=0?oldContents[idx].reviewSavedTime:null)):null;
+    const updated=idx>=0?{...oldContents[idx],title,startDate,endDate,status,review,stars,poster,author,musicUrl,album,releaseYear,totalUnit,currentUnit,isAiring,reviewSavedDk,reviewSavedTime}:null;
+    if(idx>=0){
+      savedCid=oldContents[idx].cid;
+      if(newMk===oldMk){
+        oldContents[idx]=updated;
+        saveContents(oldMk,oldContents);
+      }else{
+        // 시작월이 바뀌면 원래 버킷에서 빼고 새 버킷으로 이동
+        addDelPending('contents',oldMk,oldContents[idx].cid);
+        oldContents.splice(idx,1);
+        saveContents(oldMk,oldContents);
+        const newContents=getContents(newMk);
+        newContents.push(updated);
+        saveContents(newMk,newContents);
+      }
+    }
+  } else {
+    const contents=getContents(newMk);
+    const newCid=genCid();
+    savedCid=newCid;
+    const reviewSavedDk=review?dateKey(getLogicalDate()):null;
+    const reviewSavedTime=review?(String(new Date().getHours()).padStart(2,'0')+':'+String(new Date().getMinutes()).padStart(2,'0')):null;
+    contents.push({cat:_contentCtx.cat,title,startDate,endDate,status,review,stars,poster,author,musicUrl,album,releaseYear,totalUnit,currentUnit,isAiring,reviewSavedDk,reviewSavedTime,created:Date.now(),cid:newCid});
+    saveContents(newMk,contents);
+    if(_contentCtx.onSaved){const cb=_contentCtx.onSaved;_contentCtx.onSaved=null;setTimeout(()=>cb(newCid),0);}
+  }
+  if(_contentCtx.cat==='music'&&savedCid){
+    const musicNoteEl=document.getElementById('cm-music-note');
+    setMusicContentNote(savedCid,title,musicNoteEl?musicNoteEl.value:'');
+  }
+  closeModal('content-modal');renderContentTimeline();
+  if(_contentCtx.cat==='book'&&savedCid){
+    const bookUnit=_cmUnit||'percent';
+    const bookTotalPages=bookUnit==='pages'?(parseInt(document.getElementById('cm-total-pages').value,10)||null):null;
+    syncContentToReadingBook(savedCid,title,status,poster,author,newMk,bookUnit,bookTotalPages);
+  }
+  setTimeout(()=>{_contentSubmitting=false;},500);
+}
+// cid로 실제 저장 버킷(month_key)을 찾음 — 콘텐츠는 시작월에 저장되지만, 화면엔 진행중 이월분이 섞여 보일 수 있어
+// 현재 보고 있는 달(mk)과 그 전월 둘 다 뒤짐(computeContentMonthlyList와 동일한 탐색 범위).
+function _findContentByCidNearMk(cid,mk){
+  const [y,m]=mk.split('-').map(Number);
+  const prevMk=monthKey(new Date(y,m-2,1));
+  for(const searchMk of [mk,prevMk]){
+    const list=getContents(searchMk);
+    const idx=list.findIndex(c=>c.cid===cid);
+    if(idx>=0)return{mk:searchMk,list,idx};
+  }
+  return null;
+}
+let _cpgCid=null;
+// watchedNow: 시청 종료로 자동 열린 경우, 그동안 본 분(드라마는 화 단위 환산 불가하므로 영화만 자동 가산 — 드라마는 방영 회차 단위라 시간으로 환산할 수 없어 수동 입력 유지)
+let _cpgSeconds=0;
+function openContentProgressModal(cid,watchedNow,secondsWatched){
+  const found=_findContentByCidNearMk(cid,_chArchiveMk||monthKey(new Date()));
+  if(!found)return;
+  const c=found.list[found.idx];
+  _cpgCid=cid;
+  _cpgSeconds=secondsWatched||0; // 감상달력 일자별 로그(content_daily_log)에 기록할 이번 세션 시청시간
+  const unitLabel=c.cat==='drama'?'화':'분';
+  document.getElementById('cpg-title').textContent=escapeHtml(c.title||'')+' 진행률';
+  document.getElementById('cpg-sub').textContent=c.totalUnit?`전체 ${c.totalUnit}${unitLabel} 중 지금까지 본 ${unitLabel}수를 입력하세요`:`지금까지 본 ${unitLabel}수를 입력하세요 (전체 ${unitLabel}수는 아직 미입력)`;
+  const inp=document.getElementById('cpg-inp');
+  // 영화는 방금 시청한 분을 자동으로 더해서 미리 채움(수정 가능). 드라마는 시간이 곧 회차가 아니므로 자동 가산하지 않음.
+  const base=c.currentUnit||0;
+  inp.value=(watchedNow&&c.cat==='movie')?Math.min(base+watchedNow,c.totalUnit||(base+watchedNow)):base;
+  inp.max=c.totalUnit||'';
+  const noteInp=document.getElementById('cpg-note-inp');
+  if(noteInp){
+    noteInp.value='';
+    noteInp.placeholder=pickRandom(['인상 깊은 장면이 있었나요? (선택)','오늘 본 것에서 기억에 남는 대사는? (선택)','지금 느낀 감상을 짧게 남겨보세요 (선택)']);
+  }
+  // 완료확인 UI가 이전 열람에서 떠 있던 상태로 남지 않도록 저장버튼 초기 상태로 리셋
+  const confirmEl=document.getElementById('cpg-done-confirm');
+  const actionsEl=document.getElementById('cpg-modal-actions');
+  if(confirmEl){confirmEl.style.display='none';confirmEl.innerHTML='';}
+  if(actionsEl){
+    actionsEl.innerHTML=`<button class="mbtn cancel" onclick="closeModal('content-progress-modal')">취소</button>
+      <button class="mbtn ok" onclick="confirmContentProgress()">저장</button>`;
+  }
+  _cpgDoneConfirmCid=null;_cpgDoneConfirmMk=null;
+  openModal('content-progress-modal');
+}
+// 감상 메모 저장 공용 헬퍼 — contents 항목 자체의 notes[] 배열에 직접 저장(구 goal_notes/wcal_note 방식에서 통합, 2026-08-29).
+// cat: 콘텐츠 카테고리('movie'|'drama'|'book' 등) — 책도 여기 합류해 코멘트 모아보기 타임라인에 함께 노출됨(독서코너 자체엔 별도 노출 안 함).
+// replace=true면 기존 notes를 전부 지우고 이 한 건으로 교체(음악처럼 "곡당 메모 1개"만 유지하는 카테고리용, 2026-09-13).
+function pushContentNote(cid,title,cat,text,replace){
+  const trimmed=(text||'').trim();
+  const found=_findContentByCidNearMk(cid,_chArchiveMk||monthKey(new Date()));
+  if(!found)return;
+  const c=found.list[found.idx];
+  if(!trimmed){
+    if(replace){c.notes=[];saveContents(found.mk,found.list);} // 교체모드에서 빈값 저장 = 메모 삭제
+    return;
+  }
+  const dk=dateKey(getLogicalDate());
+  const now=new Date();
+  const time=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  const entry={dk,title:title||c.title||'',cat:cat||c.cat||'',text:trimmed,time,updatedAt:Date.now()};
+  if(replace)c.notes=[entry];
+  else{if(!c.notes)c.notes=[];c.notes.push(entry);}
+  saveContents(found.mk,found.list);
+}
+// 음악 전용 감상메모 저장 — 음악은 곡당 메모 1개만 유지(같은 곡 재감상이 바뀌면 콘텐츠를 새로 등록하는 편이라 자연스러움).
+// pushContentNote(replace=true)의 얇은 래퍼.
+function setMusicContentNote(cid,title,text){
+  pushContentNote(cid,title,'music',text,true);
+}
+// 진행률 저장 + (입력했다면) 감상 메모까지 한 번에
+let _cpgDoneConfirmCid=null,_cpgDoneConfirmMk=null;
+function confirmContentProgress(){
+  if(!_cpgCid)return;
+  const found=_findContentByCidNearMk(_cpgCid,_chArchiveMk||monthKey(new Date()));
+  if(!found)return;
+  const val=parseInt(document.getElementById('cpg-inp').value,10);
+  if(isNaN(val))return;
+  const c=found.list[found.idx];
+  const beforeUnit=c.currentUnit||0;
+  c.currentUnit=Math.max(0,Math.min(val,c.totalUnit||val));
+  saveContents(found.mk,found.list);
+  // 감상달력 일자별 진행률 로그(content_daily_log) — 2026-09-11 독서 전용에서 책/드라마/영화 공용으로 확장.
+  // 기존 콘텐츠 이력은 소급 없이 오늘 이 저장 시점부터 새로 쌓임(독서와 동일한 amountRead=증가분 방식).
+  const amountRead=Math.max(0,c.currentUnit-beforeUnit);
+  const logUnit=c.cat==='drama'?'episode':'minute';
+  logContentDaily(c.cid,dateKey(getLogicalDate()),amountRead,_cpgSeconds,logUnit,null,c.currentUnit);
+  _cpgSeconds=0;
+  pushContentNote(_cpgCid,c.title,c.cat,document.getElementById('cpg-note-inp')?.value);
+  // 진행률이 사실상 다 본 지점에 도달하면(currentUnit이 totalUnit 이상) 완료로 넘어갈지
+  // 모달 안에서 바로 물어봄 — 독서코너의 완독 확인 흐름과 동일. totalUnit 미입력 시엔 판정 불가하므로 노출 안 함.
+  const reachedDone=c.totalUnit&&c.currentUnit>=c.totalUnit;
+  if(reachedDone&&c.status==='watching'){
+    _cpgDoneConfirmCid=c.cid;
+    _cpgDoneConfirmMk=found.mk;
+    const confirmEl=document.getElementById('cpg-done-confirm');
+    const actionsEl=document.getElementById('cpg-modal-actions');
+    if(confirmEl&&actionsEl){
+      const doneLabel=c.cat==='drama'?'다 보셨나요?':'다 보셨나요?';
+      confirmEl.style.display='block';
+      confirmEl.innerHTML=`<div class="pg-done-msg">${doneLabel}</div>
+        <div style="display:flex;gap:8px;align-items:center;margin:10px 0 8px;">
+          <span style="font-size:var(--dow-label-size);color:var(--tm);white-space:nowrap;">별점</span>
+          <div id="cpg-done-star-picker" class="cm-star-picker"></div>
+          <input type="hidden" id="cpg-done-stars" value="0">
+        </div>
+        <textarea class="modal-inp" id="cpg-done-review" rows="2" style="resize:none;" placeholder="감상 메모 (선택)" autocomplete="off"></textarea>`;
+      renderStarPicker('cpg-done-star-picker','cpg-done-stars',0);
+      actionsEl.innerHTML=`<button class="mbtn cancel" onclick="closeModal('content-progress-modal')">나중에</button>
+        <div class="mbtn-done-wrap" onclick="confirmContentProgressDone()"><button class="mbtn-done"><i class="ti ti-sparkles ico-sz-14" aria-hidden="true"></i> 완료</button></div>`;
+    }
+    return;
+  }
+  closeModal('content-progress-modal');
+  _cpgCid=null;
+  chExpandMonth(_chArchiveMk||found.mk);
+  refreshContentHubViews();
+  renderCwatchMainCard();
+}
+// 완료 확정 — 콘텐츠 상태를 done으로 전환하고 별점/감상을 반영. 저장되면 월간 콘텐츠 타임라인/허브에도
+// status==='done' 분기를 통해 그대로 반영됨(독서코너 완독이 서재 목록에 반영되는 것과 동일 구조).
+function confirmContentProgressDone(){
+  const cid=_cpgDoneConfirmCid,mk=_cpgDoneConfirmMk;
+  _cpgDoneConfirmCid=null;_cpgDoneConfirmMk=null;
+  if(!cid||!mk){closeModal('content-progress-modal');_cpgCid=null;return;}
+  const found=_findContentByCidNearMk(cid,mk);
+  closeModal('content-progress-modal');
+  _cpgCid=null;
+  if(!found)return;
+  const c=found.list[found.idx];
+  const starsEl=document.getElementById('cpg-done-stars');
+  const reviewEl=document.getElementById('cpg-done-review');
+  const stars=starsEl?(parseFloat(starsEl.value)||0):0;
+  const review=reviewEl?reviewEl.value.trim():'';
+  c.status='done';
+  c.endDate=dateKey(getLogicalDate());
+  if(stars)c.stars=stars;
+  if(review){
+    c.review=review;
+    c.reviewSavedDk=dateKey(getLogicalDate());
+    c.reviewSavedTime=String(new Date().getHours()).padStart(2,'0')+':'+String(new Date().getMinutes()).padStart(2,'0');
+  }
+  saveContents(found.mk,found.list);
+  chExpandMonth(_chArchiveMk||found.mk);
+  refreshContentHubViews();
+  renderCwatchMainCard();
+}
+// ══════════════════════════════════════════════════════════
+// ██ 즉시커밋 스톱워치 공용 팩토리 (2026-09-13 재설계) ██
+// ══════════════════════════════════════════════════════════
+// 독서(_sw*)/콘텐츠(_csw*) 스톱워치 공용 팩토리. 이전엔 "시작 시 상태만 세팅 → 60초 뒤 타이머로
+// 리듬블록 커밋(시작시각 소급등록)" 방식(2026-09-09j)이었으나, 60초 지연 구간에서 화면이 오래
+// 꺼졌다 켜지며 다른 sync 흐름과 겹치는 경합으로 content_cid가 누락되는 버그가 발견됨(2026-09-12
+// 밤). 지연 커밋 자체가 경합의 원인이라 판단해, 시작 즉시 리듬블록을 생성하는 방식으로 재설계.
+// 오탭 방지(짧으면 자동삭제) 기능은 넣지 않음 — 과거 "즉시생성+짧으면 자동삭제" 방식을 시도했다가
+// 생성 upsert와 삭제 요청이 sync에서 서로 경합해 삭제가 무효화(삭제한 게 되살아남)되는 문제로
+// 폐기된 이력이 있음. 오탭했다면 리듬탭에서 직접 스와이프 삭제(deleteRhythmBlock)하면 됨 — 자동
+// 삭제 로직 자체를 두지 않는 쪽이 sync 경합의 여지를 원천 차단해 더 안전하다고 판단.
+// 각 스톱워치는 이 팩토리로 인스턴스를 만들고, 기존 전역변수/함수 이름(_cswRunning,
+// toggleContentStopwatch 등)은 그 인스턴스를 비추는 얇은 wrapper로 유지 — 호출부(인라인 onclick,
+// 렌더 함수 등)를 건드리지 않기 위함(외부 API 불변 원칙).
+// pending 선택 상태(_cswPendingCid류)는 스톱워치 자체 상태가 아니라 카드 UI 상태라 팩토리 밖에 유지.
+function createInstantCommitStopwatch(config){
+  const persistKey=config.persistKey;
+  const checkReadingHabit=!!config.checkReadingHabit;
+  const hasTicker=!!config.hasTicker;
+  const onTick=config.onTick||function(){};       // hasTicker일 때만 사용 (1초 간격)
+  // onResolve(st,cid,extra) : "시작하기 전" 데이터 조회 전용. st.running은 아직 false. 실패 시
+  //   false를 반환하면 시작 자체가 취소됨. 여기서 렌더링(DOM 갱신)을 하면 안 됨 — 이 시점엔 아직
+  //   화면이 "시작 전" 상태라 순서버그가 남(재생 버튼 눌러도 화면만 안 바뀌는 먹통 증상).
+  // onStarted(st) : st.running=true 및 리듬블록 생성까지 전부 확정된 "이후"에 호출. 렌더링은 여기서만.
+  const onResolve=config.onResolve||function(){return true;};
+  const onStarted=config.onStarted||function(){};
+  const onStop=config.onStop||function(){};
+  const onRestored=config.onRestored||function(){};
+  const buildTitleText=config.buildTitleText;      // (state)=>string — 리듬블록 text
+  const buildPersistPayload=config.buildPersistPayload; // (state)=>obj — localStorage에 저장할 추가 필드
+
+  const st={running:false,cid:null,startTs:0,blockCid:null,tickInterval:null,starting:false,seconds:0};
+  // config가 넘겨준 부가 상태(cat/title/mk 등)를 st 위에 얹어 콜백들이 자유롭게 읽고 쓰게 함
+  Object.assign(st,config.extraState||{});
+
+  function persist(){
+    if(!persistKey)return;
+    try{
+      const payload=Object.assign({startTs:st.startTs,cid:st.cid,blockCid:st.blockCid,
+        dk:dateKey(getLogicalDate(st.startTs))},buildPersistPayload?buildPersistPayload(st):{});
+      localStorage.setItem(persistKey,JSON.stringify(payload));
+    }catch(e){}
+  }
+
+  function start(cid,extra){
+    if(st.running)return;
+    if(st.starting)return; // 연타 방지 락
+    st.starting=true;
+    // 1단계: 조회만 — st는 아직 running=false. 실패하면 여기서 조용히 취소(락만 풀고 끝).
+    const ok=onResolve(st,cid,extra); // onResolve가 st.cat/title/mk 등을 채우되 running은 아직 안 건드림
+    if(ok===false){st.starting=false;return;}
+    // 2단계: 상태 확정 + 리듬블록 즉시 생성(지연 없음 — 경합의 원인이던 지연 구간 자체를 제거).
+    if(!cid){
+      // 방어적 안전장치: cid 없이 시작이 시도되는 경우(정상 흐름에선 발생 안 함) — 조용히 취소.
+      console.warn('[stopwatch] start() called without cid — aborting');
+      st.starting=false;return;
+    }
+    st.running=true;st.cid=cid;st.startTs=Date.now();
+    st.starting=false;
+    const dk=dateKey(getLogicalDate(st.startTs));
+    const startMin=new Date(st.startTs).getHours()*60+new Date(st.startTs).getMinutes();
+    const text=buildTitleText(st);
+    st.blockCid=_commitEnjoyRhythmBlock({text,contentCid:cid,dk,startMin,checkReadingHabit});
+    persist();
+    if(hasTicker)st.tickInterval=setInterval(()=>{onTick(st);},1000);
+    // 3단계: 상태가 전부 확정된 뒤에만 렌더링/DOM 콜백 호출 — 이 순서를 절대 바꾸지 말 것.
+    onStarted(st);
+  }
+
+  function stop(){
+    if(!st.running)return;
+    const endTs=Date.now();
+    const startTs=st.startTs,cid=st.cid,blockCid=st.blockCid;
+    const seconds=Math.max(0,Math.round((endTs-startTs)/1000));
+    if(hasTicker){clearInterval(st.tickInterval);st.tickInterval=null;}
+    if(persistKey)try{localStorage.removeItem(persistKey);}catch(e){}
+    st.running=false;st.startTs=0;st.cid=null;st.blockCid=null;st.seconds=0;
+    // 오탭 방지 로직 없음(2026-09-13) — 몇 초를 했든 항상 end를 채워 정상 종료. 실수로 눌렀다면
+    // 리듬탭에서 직접 스와이프 삭제하면 됨(deleteRhythmBlock, 기존 UI 그대로). 예전에 "즉시생성+
+    // 짧으면 자동삭제" 방식을 시도했다가 생성 upsert와 삭제 요청이 경합해 삭제가 무효화(되살아남)되는
+    // 문제로 폐기된 이력이 있어, 자동삭제 자체를 다시 두지 않기로 함 — 오탭 처리를 사용자 수동
+    // 삭제로 넘기는 대신 sync 경합의 여지를 원천 차단.
+    autoLogReadingRhythm(blockCid,startTs,endTs);
+    onStop(st,{startTs,endTs,cid,blockCid,seconds}); // st.running=false가 이미 확정된 뒤 호출
+  }
+
+  function toggle(cid,extra){
+    // cid가 없는 호출(=현재 진행중인 항목을 그냥 멈춰라)은 종료 호출부(모닝플로우 "완료" 등)에서
+    // 인자 없이 쓰는 패턴 — 진행중이면 무조건 종료로 처리.
+    if(st.running&&(cid===undefined||cid===null||st.cid===cid)){stop();return;}
+    if(st.running)return; // 다른 항목이 이미 진행중이면 무시(동시에 하나만)
+    start(cid,extra);
+  }
+
+  function restoreFromStorage(){
+    if(!persistKey)return;
+    try{
+      const raw=localStorage.getItem(persistKey);
+      if(!raw)return;
+      const saved=JSON.parse(raw);
+      if(!saved||!saved.startTs||!saved.cid){
+        // cid 없이 저장된 손상된 값이면 복원하지 않고 정리 — cid 없는 "진행중" 유령 상태로
+        // 복원되면 종료해도 리듬블록이 없어 아무 반응 없는 것처럼 보이는 UI 불일치가 생김(2026-09-13 보강).
+        if(raw)try{localStorage.removeItem(persistKey);}catch(e){}
+        return;
+      }
+      st.startTs=saved.startTs;st.cid=saved.cid;st.blockCid=saved.blockCid||null;
+      st.running=true;
+      if(hasTicker)st.tickInterval=setInterval(()=>{onTick(st);},1000);
+      // 상태(running/cid/blockCid)가 전부 확정된 뒤에 부가 데이터 채우기+렌더링 콜백 호출.
+      onRestored(st,saved);
+    }catch(e){}
+  }
+
+  return{state:st,start,stop,toggle,restoreFromStorage,persist};
+}
+
+// ══════════════════════════════════════════════════════════
+// ██ 콘텐츠 허브 (1/2 — 나머지는 콘텐츠허브 진입점~코멘트모아보기 부근) ██
+// ══════════════════════════════════════════════════════════
+// ── 시청 등록 (드라마/영화 전용) ──
+// 스톱워치가 아닌 시작/종료 원탭 방식: 시작 탭에서 리듬블록을 end 없이 생성해두고,
+// 종료 탭에서 end를 채워 마감 + 진행률·메모 모달을 연다. 초단위 표시가 없어 setInterval/화면복귀 보정이 불필요해짐.
+const CSW_PERSIST_KEY='iikoto_content_watch_start';
+// [2026-09-13 재설계] 실제 상태는 팩토리(_cswSw.state)가 들고 있고, 아래 _csw* 전역들은
+// 기존 호출부(1235, 5655, 9232~9267, 11041~11123줄 등)가 그대로 읽을 수 있도록 각 콜백
+// 시점에 동기화해주는 얕은 미러(mirror) 변수. 값의 소유자는 항상 _cswSw.state 쪽.
+let _cswRunning=false,_cswCid=null,_cswCat=null,_cswTitle=null,_cswMk=null,_cswStartTs=0,_cswBlockCid=null;
+function _cswSyncMirror(st){
+  _cswRunning=st.running;_cswCid=st.cid;_cswCat=st.cat;_cswTitle=st.title;_cswMk=st.mk;_cswStartTs=st.startTs;_cswBlockCid=st.blockCid;
+}
+const _cswSw=createInstantCommitStopwatch({
+  persistKey:CSW_PERSIST_KEY,
+  checkReadingHabit:false,
+  hasTicker:false,
+  extraState:{cat:null,title:null,mk:null},
+  onResolve:function(st,cid,knownMk){
+    // 1단계(조회 전용) — st.running은 아직 false. 여기서 렌더링하면 화면이 "시작 전" 상태로 그려지는
+    // 순서버그가 남으므로 절대 렌더링 호출 금지(재생 버튼 눌러도 화면은 새로고침 전까지 안 바뀌는 먹통 증상의 원인).
+    const found=knownMk?{mk:knownMk,list:getContents(knownMk),idx:getContents(knownMk).findIndex(c=>c.cid===cid)}:_findContentByCidNearMk(cid,_chArchiveMk||monthKey(new Date()));
+    if(!found||found.idx<0)return false;
+    const c=found.list[found.idx];
+    st.cat=c.cat;st.title=c.title||'';st.mk=found.mk;
+    return true;
+  },
+  buildTitleText:function(st){
+    const catLabel=st.cat==='drama'?'드라마':'영화';
+    return st.title?(catLabel+' - '+st.title):catLabel;
+  },
+  buildPersistPayload:function(st){return{cat:st.cat,title:st.title||'',mk:st.mk};},
+  onStarted:function(st){
+    // 2단계 — st.running=true 및 리듬블록 생성까지 전부 확정된 뒤 호출. 여기서만 렌더링/DOM 조작.
+    if(_cswPendingCid===st.cid){_cswPendingCid=null;_cswPendingMk=null;} // pending 카드에서 재생 링으로 시작한 경우 pending 상태 정리
+    // 최근 본 작품 우선노출(콘텐츠허브 스와이프 카드) 정렬 기준 — 기존 커밋 시점 로직을 시작 시점으로 이관
+    const list=getContents(st.mk);
+    const idx=list.findIndex(x=>x.cid===st.cid);
+    if(idx>=0){list[idx].lastActivityAt=Date.now();saveContents(st.mk,list);}
+    document.querySelectorAll('.seed-icon-btn').forEach(el=>el.classList.add('cwatch-active'));
+    if(_chArchiveMk)chExpandMonth(_chArchiveMk);
+    _cswSyncMirror(st);
+    renderCwatchMainCard();
+  },
+  onRestored:function(st,saved){
+    // restoreFromStorage()가 st.running=true 등을 이미 확정한 뒤 호출 — 여기선 저장해둔 부가데이터만 채우고 렌더링.
+    st.cat=saved.cat;st.title=saved.title||'';st.mk=saved.mk||null;
+    document.querySelectorAll('.seed-icon-btn').forEach(el=>el.classList.add('cwatch-active'));
+    _cswSyncMirror(st);
+    renderCwatchMainCard();
+  },
+  onStop:function(st,info){
+    document.querySelectorAll('.seed-icon-btn').forEach(el=>el.classList.remove('cwatch-active'));
+    const minutesWatched=Math.round(info.seconds/60);
+    if(_chArchiveMk)chExpandMonth(_chArchiveMk);
+    _cswSyncMirror(st);
+    refreshContentHubViews();
+    renderCwatchMainCard();
+    openContentProgressModal(info.cid,minutesWatched,info.seconds); // 2026-09-13: 시간 문턱 없이 항상 띄움(리듬블록도 항상 생성되므로 일관되게)
+  }
+});
+// 시청 시작 확인 단계 — 포스터를 눌러 바로 스톱워치가 시작되면 실수 탭·연타 시 리듬 블록이 중복 생성될 위험이 있어(2026-09-01),
+// 포스터 탭 → 그 작품 하나만 남은 확인 배너("시작" 버튼 포함) → 버튼을 눌러야 실제 시작되는 2단계로 분리.
+// 진행중(_cswRunning)일 때는 이 확인 단계를 거치지 않고 바로 종료로 이어짐(기존 동작 유지).
+let _cswPendingCid=null,_cswPendingMk=null;
+// _cswStarting(연타방지 락) 등 나머지 상태는 공용 팩토리(_cswSw.state) 내부로 이동 —
+// createInstantCommitStopwatch 정의부 참조.
+// ── 시청 시작 선택 시트 — 진행중 드라마/영화 중 골라 스톱워치 시작, 없으면 새로 등록 후 바로 시작 ──
+function _getOngoingWatchingWithCid(){
+  return getRecentMonthsContents().filter(c=>c.status==='watching'&&(c.cat==='drama'||c.cat==='movie'))
+    .sort((a,b)=>(b.lastActivityAt||0)-(a.lastActivityAt||0)); // 최근 본 작품 우선노출(2026-09-09)
+}
+function openWatchPicker(){
+  const list=_getOngoingWatchingWithCid();
+  const listEl=document.getElementById('watch-picker-list');
+  if(!list.length){
+    listEl.innerHTML='<div style="text-align:center;color:var(--tm);font-size:var(--dow-label-size);padding:10px 0;">진행중인 드라마·영화가 없어요</div>';
+  }else{
+    listEl.innerHTML=list.filter(c=>c.cid).map(c=>{
+      const meta=CAT_ICON_META[c.cat];
+      const posterHtml=c.poster?`<img class="watch-picker-item-poster" src="${c.poster}" alt="">`:`<div class="watch-picker-item-poster-ph" style="background:${meta.color};"><i class="ti ${meta.icon}" aria-hidden="true"></i></div>`;
+      return `<div class="watch-picker-item" onclick="closeSheet('watch-picker-sheet');selectPendingWatch('${c.cid}','${c._mk}');">
+        ${posterHtml}<div class="watch-picker-item-title">${escapeHtml(c.title||'')}</div>
+      </div>`;
+    }).join('');
+  }
+  openSheet('watch-picker-sheet');
+}
+function openWatchNewContentPicker(){openSheet('watch-new-cat-sheet');}
+// 콘텐츠 코너 메인 상단 카드 — 독서코너 rd-top과 같은 급으로 상시 노출. 재생 중이면 실시간 경과시간+정지, 아니면 시작 유도.
+// 시작 전 상태는 두 단계: ①포스터 탭 → 그 작품 하나만 남기고 "시작" 버튼이 있는 확인 배너로 전환, ②버튼을 눌러야 실제 스톱워치 시작.
+// 포스터 자체엔 onclick으로 바로 시작을 걸지 않아 실수 탭·연타로 인한 리듬 블록 중복 생성을 원천 차단(2026-09-01).
+// 포스터/진행률바 HTML은 아래 두 헬퍼로 통일 — 시청중·선택됨·단일·병렬 4가지 상태가 각자 따로 만들던 동일 마크업을 하나로 묶음(2026-09-03 리팩터).
+function _cswPosterHtml(c,size){
+  size=size||52;
+  const meta=CAT_ICON_META[c.cat]||CAT_ICON_META.drama;
+  return c.poster
+    ?`<img class="rd-top-cover" src="${c.poster}" style="width:${size}px;height:${Math.round(size*76/52)}px;object-fit:cover;">`
+    :`<div class="rd-top-cover" style="width:${size}px;height:${Math.round(size*76/52)}px;background:${meta.color};display:flex;align-items:center;justify-content:center;"><i class="ti ${meta.icon}" style="font-size:22px;color:#fff;" aria-hidden="true"></i></div>`;
+}
+// 진행률 데이터(totalUnit)가 없으면 null — 독서코너 _rdProgressBarHtml과 동일 규칙(2026-09-03).
+function _cswProgressBarHtml(c,compact){
+  if(!c||!c.totalUnit)return null;
+  const cur=Math.min(c.currentUnit||0,c.totalUnit);
+  const pct=Math.round((cur/c.totalUnit)*100);
+  const unitLabel=c.cat==='drama'?'화':'분';
+  const barMargin=compact?'margin-top:6px;':'';
+  const subAlign=compact?'':'text-align:right;';
+  return `<div class="rd-progress-bar" style="${barMargin}" onclick="event.stopPropagation();openContentProgressModal('${c.cid}')">
+      <div class="rd-progress-track"><div class="rd-progress-fill" style="width:${pct}%;"></div></div>
+      <div class="rd-progress-bead" style="left:${pct}%;"></div>
+    </div>
+    <div class="rd-top-sub" style="margin-top:-4px;${subAlign}">${cur}/${c.totalUnit}${unitLabel}</div>`;
+}
+function renderCwatchMainCard(){
+  const el=document.getElementById('cwatch-main-card');if(!el)return;
+  if(_cswRunning&&_cswCid){
+    const found=_findContentByCidNearMk(_cswCid,_chArchiveMk||monthKey(new Date()));
+    const c=found?found.list[found.idx]:null;
+    const posterHtml=c?_cswPosterHtml(c):_cswPosterHtml({cat:_cswCat||'drama'});
+    const progressHtml=_cswProgressBarHtml(c)||'';
+    el.innerHTML=`<div class="rd-top playing" style="margin-bottom:14px;">
+      <div class="rd-top-inner">
+        <div class="rd-top-main">
+          ${posterHtml}
+          <div style="flex:1;min-width:0;">
+            <div class="rd-top-title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(_cswTitle||'')}</div>
+            <div class="rd-top-sub">시청 중</div>
+          </div>
+          <div class="rd-top-sw">${cswRingSvg(_cswCid,found?found.mk:monthKey(new Date()),true)}</div>
+        </div>
+        ${progressHtml}
+      </div>
+    </div>`;
+    return;
+  }
+  // 확인 단계 — 포스터를 눌러 이 작품 하나가 선택된 상태. ongoing.length===1 카드와 동일한 모양으로 보여주되,
+  // 재생 링(cswRingSvg)만 실제 시작 트리거 — 포스터/제목 영역을 눌러도 아무 동작 없어 실수 시작을 방지(2026-09-01).
+  if(_cswPendingCid){
+    const found=_findContentByCidNearMk(_cswPendingCid,_cswPendingMk||_chArchiveMk||monthKey(new Date()));
+    const c=found?found.list[found.idx]:null;
+    if(!c){_cswPendingCid=null;_cswPendingMk=null;renderCwatchMainCard();return;}
+    const progressHtml=_cswProgressBarHtml(c)||'';
+    el.innerHTML=`<div class="rd-top" style="margin-bottom:14px;">
+      <div class="rd-top-inner">
+        <div class="rd-top-main">
+          ${_cswPosterHtml(c)}
+          <div style="flex:1;min-width:0;">
+            <div class="rd-top-title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.title||'')}</div>
+            <div class="rd-top-sub">재생 버튼을 눌러 시작하세요</div>
+          </div>
+          <div class="rd-top-sw">${cswRingSvg(c.cid,c._mk||_cswPendingMk,false)}</div>
+        </div>
+        ${progressHtml}
+      </div>
+    </div>`;
+    return;
+  }
+  const ongoing=_getOngoingWatchingWithCid().filter(c=>c.cid);
+  if(!ongoing.length){
+    el.innerHTML=`<div class="rd-top" style="margin-bottom:14px;" onclick="openWatchPicker()">
+      <div class="rd-top-inner" style="cursor:pointer;">
+        <div class="rd-top-title" style="color:var(--tm);">지금 보고 있는 작품이 없어요</div>
+        <div class="rd-top-sub">눌러서 시청을 시작해보세요</div>
+      </div>
+    </div>`;
+  }else if(ongoing.length===1){
+    const c=ongoing[0];
+    const progressHtml=_cswProgressBarHtml(c)||'';
+    el.innerHTML=`<div class="rd-top" style="margin-bottom:14px;">
+      <div class="rd-top-inner">
+        <div class="rd-top-main">
+          ${_cswPosterHtml(c)}
+          <div style="flex:1;min-width:0;">
+            <div class="rd-top-title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.title||'')}</div>
+            <div class="rd-top-sub">시청 시작 전</div>
+          </div>
+          <div class="rd-top-sw">${cswRingSvg(c.cid,c._mk,false)}</div>
+        </div>
+        ${progressHtml}
+      </div>
+    </div>`;
+  }else{
+    el.innerHTML=`<div class="rd-top" style="margin-bottom:14px;"><div class="rd-top-inner">`+buildSwipeCardHtml(ongoing,c=>{
+      // 1개일 때(위 ongoing.length===1 분기)와 동일한 마크업 그대로 재사용 — 스톱워치 링(cswRingSvg) 포함.
+      // 이전엔 별도 인라인 스타일로 새로 짜면서 스톱워치 링 자체가 누락되어 있었음(2026-09-09 수정).
+      const progressHtml=_cswProgressBarHtml(c)||'';
+      return `<div class="rd-top-main" onclick="selectPendingWatch('${c.cid}','${c._mk}')" style="cursor:pointer;">
+          ${_cswPosterHtml(c)}
+          <div style="flex:1;min-width:0;">
+            <div class="rd-top-title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.title||'')}</div>
+            <div class="rd-top-sub">시청 시작 전</div>
+          </div>
+          <div class="rd-top-sw">${cswRingSvg(c.cid,c._mk,false)}</div>
+        </div>
+        ${progressHtml}`;
+    })+`</div></div>`;
+    bindSwipeCard('cwatch-main-card');
+  }
+}
+// 포스터 탭 — 즉시 시작하지 않고 이 작품만 남긴 카드로 전환. 실제 시작은 그 카드의 재생 링(cswRingSvg)에서.
+function selectPendingWatch(cid,mk){
+  _cswPendingCid=cid;_cswPendingMk=mk;
+  renderCwatchMainCard();
+}
+function watchPickNewContentCat(cat){
+  closeSheet('watch-new-cat-sheet');
+  openContentModal(cat,null,monthKey(new Date()),function(newCid){toggleContentStopwatch(newCid,monthKey(new Date()));});
+}
+function minToHHMM(mins){mins=((mins%1440)+1440)%1440;const h=Math.floor(mins/60),m=mins%60;return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');}
+// [2026-09-09k 코드 정리] 독서/콘텐츠 스톱워치의 "60초 커밋" 로직이 리듬블록 생성 + 모닝플로우
+// blockCid 연결 부분에서 거의 완전히 동일하게 중복돼 있던 것을 공용 헬퍼로 통합. 각 스톱워치는
+// 라벨 문구, 습관체크 여부, 최근활동 갱신 방식만 다르므로 그 차이는 옵션(opts)으로 받는다.
+// opts: {text, contentCid, dk, startMin, checkReadingHabit}
+// 반환: 새로 생성된 리듬블록의 cid.
+function _commitEnjoyRhythmBlock(opts){
+  const{text,contentCid,dk,startMin,checkReadingHabit}=opts;
+  const blockCid=genCid();
+  const blocks=getRhythmBlocks(dk);
+  blocks.push({cat:'enjoy',start:minToHHMM(startMin),end:'',text,created:Date.now(),cid:blockCid,contentCid});
+  saveRhythmBlocks(dk,blocks); // saveRhythmBlocks 내부에서 이미 autoSync('rblocks',dk) 호출 — 중복 호출 금지
+  // 안전장치(2026-09-13): cid 없이 감상 리듬블록이 커밋되는 경우는 정상 흐름에선 없어야 하나,
+  // 혹시라도 재발하면 조용히 묻히지 않도록 눈에 띄게 남김. 블록 자체는 그대로 생성해 감상시간
+  // 데이터는 보존(삭제/차단하지 않음) — 다만 콘텐츠 연동만 못 하는 상태로 남는 걸 감지하기 위함.
+  if(!contentCid){
+    console.warn('[rhythm] enjoy 블록이 content_cid 없이 생성됨',{blockCid,dk,text});
+    scheduleAlertAt('rhythm_cid_missing',blockCid,new Date(),
+      '감상 기록에 콘텐츠 연동 누락',(text||'감상')+' 기록이 콘텐츠 연동 없이 저장됐어요. 확인해 주세요.');
+  }
+  if(checkReadingHabit)checkHabitDirect('reading',dk,minToHHMM(startMin)); // 스톱워치 독서 활동은 카테고리(감상)와 무관하게 '독서' 습관을 직접 체크, 시작시각 기준
+  // 모닝플로우 감상 슬롯이 이 스톱워치로 시작된 경우, running 슬롯의 blockCid를 지금 막 생긴 블록으로 채움
+  // — 시작과 동시에 채워지므로 "몇 시부터 진행중"이 화면에 바로 표시됨.
+  const flow=getMorningFlow(dk);
+  const mfId=Object.keys(flow.picks).find(k=>{const q=flow.picks[k];return q.key==='enjoy'&&q.status==='running'&&q.cid===contentCid;});
+  if(mfId){
+    flow.picks[mfId].blockCid=blockCid;
+    saveMorningFlow(dk,flow);
+    if(document.querySelector('.mf-hero'))refreshMorningFlowCard();
+  }
+  return blockCid;
+}
+// 아래 2개는 팩토리 인스턴스(_cswSw)로의 얇은 wrapper.
+// 실제 로직(즉시커밋, 연타방지 락, 복원)은 createInstantCommitStopwatch 정의부 참조.
+// 함수 이름은 그대로 유지 — 인라인 onclick 등 외부 호출부를 바꾸지 않기 위함.
+function toggleContentStopwatch(cid,knownMk){_cswSw.toggle(cid,knownMk);}
+function stopContentStopwatch(){_cswSw.stop();}
+// 새로고침·앱 재시작으로 메모리 상태가 초기화돼도 시청중 표시를 이어감(초단위 표시가 없어 setInterval 재개는 불필요)
+_cswSw.restoreFromStorage();
+// 콘텐츠 등록/수정(cat='book') 직후 독서코너 진행률 초기값을 세팅. 이제 book이 곧 contents 항목이므로
+// cid로 직접 찾아 반영 — title 매칭을 없애 연결 끊김 버그 클래스를 원천 차단(2026-08-29).
+// status: 'done'|'stopped'|그 외(진행중) → book.status: 'done'|'paused'|'reading'
+function syncContentToReadingBook(cid,title,status,poster,author,mk,unit,totalPages){
+  const STATUS_MAP={done:'done',stopped:'paused'};
+  const bookStatus=STATUS_MAP[status]||'reading';
+  const found=_findContentByCidNearMkInRange(cid,_BOOK_SCAN_MONTHS);
+  if(!found)return; // 방금 저장한 콘텐츠가 아직 로컬에 없을 리 없지만, 방어적으로 스킵
+  const c=found.list[found.idx];
+  const finalUnit=unit||'percent';
+  // 이미 진행 중이던 책이면 기존 진행률(currentUnit/readSeconds)은 보존하고 상태/메타만 갱신.
+  // 신규거나 단위가 바뀌면 currentUnit을 리셋(기존 upsertBookLocal 신규 생성 로직과 동일한 취지).
+  if(c.unitLabel!==finalUnit){c.currentUnit=0;}
+  c.status=STATUS_MAP[status]||'watching';
+  c.unitLabel=finalUnit;
+  c.totalUnit=finalUnit==='pages'?(totalPages||null):100;
+  if(!c.readSeconds)c.readSeconds=0;
+  if(poster)c.poster=poster;
+  if(author)c.author=author;
+  if(bookStatus==='done'&&!c.endDate)c.endDate=dateKey(new Date());
+  saveContents(found.mk,found.list);
+}
+// 콘텐츠 삭제 시 그 작품을 가리키던 리듬 블록(cat='enjoy', contentCid로 연결)도 함께 정리 —
+// 콘텐츠만 지우고 리듬 블록을 그대로 두면 감상달력·아카이브 등 리듬 기반 조회에 고아 데이터로 계속 남는 문제가 있었음(2026-09-01).
+// startDate~endDate(또는 없으면 created 기준 앞뒤 여유) 범위만 순회 — 콘텐츠가 걸쳐있을 수 있는 날짜만 확인해 불필요한 전체 스캔 방지.
+function deleteRhythmBlocksByContentCid(cid,startDate,endDate){
+  if(!cid)return;
+  let start=startDate?new Date(startDate+'T00:00:00'):new Date();
+  let end=endDate?new Date(endDate+'T00:00:00'):new Date();
+  // 시작/종료일 정보가 아예 없는 경우(음악 등 즉시등록형) 대비 하루 여유를 둠
+  start.setDate(start.getDate()-1);
+  end.setDate(end.getDate()+1);
+  const dk=(d)=>dateKey(d);
+  for(let d=new Date(start);d<=end;d.setDate(d.getDate()+1)){
+    const curDk=dk(d);
+    const blocks=getRhythmBlocks(curDk);
+    const toRemove=blocks.filter(b=>b.contentCid===cid);
+    if(!toRemove.length)continue;
+    toRemove.forEach(b=>addDelPending('rblocks',curDk,b.cid));
+    const remaining=blocks.filter(b=>b.contentCid!==cid);
+    saveRhythmBlocks(curDk,remaining);
+  }
+}
+function deleteContent(){
+  if(!_contentCtx.item)return;
+  const mk=_contentCtx.mk,contents=getContents(mk);
+  const idx=contents.findIndex(c=>c.cid===_contentCtx.item.cid);
+  if(idx>=0){
+    const deletedItem=contents[idx];
+    addDelPending('contents',mk,deletedItem.cid);
+    contents.splice(idx,1);
+    if(deletedItem.cid)deleteRhythmBlocksByContentCid(deletedItem.cid,deletedItem.startDate,deletedItem.endDate);
+    // book 카테고리도 이 항목 자체가 book이므로(2026-08-29 통합) 별도 삭제 불필요 — contents.splice로 이미 끝남
+  }
+  saveContents(mk,contents);closeModal('content-modal');renderContentTimeline();
+}
+
+// ══════════════════════════════════════════════════════════
+// ██ 월간탭 (2/3 — 나머지는 MONTHLY REPORT 부근, HABIT MONTHLY~MONTHLY STAT BAR 부근) — 콘텐츠 검색(TMDB), 월간탭 콘텐츠타임라인에서 등록 ██
+// ══════════════════════════════════════════════════════════
+// ── API SEARCH
+function apiSearchDebounce(q){
+  clearTimeout(_apiTimer);
+  if(!q||q.length<1){hideApiResults();return;}
+  _apiTimer=setTimeout(()=>apiSearch(q),400);
+}
+async function apiSearch(q){
+  if(!q)return;
+  const cat=_contentCtx.cat||'drama';
+  const resultsEl=document.getElementById('api-results');if(!resultsEl)return;
+  resultsEl.style.display='block';resultsEl.innerHTML='<div class="api-loading">검색 중...</div>';
+  try{
+    if(cat==='book')await searchKakaoBook(q,resultsEl);
+    else if(cat==='music')await searchITunes(q,resultsEl);
+    else await searchTMDB(q,cat,resultsEl);
+  }catch(e){resultsEl.innerHTML='<div class="api-loading">검색 실패 — 직접 입력해주세요</div>';}
+}
+function searchITunes(q,el){
+  return new Promise((resolve)=>{
+    const cbName='_itunesCb'+Date.now();
+    const cleanup=()=>{delete window[cbName];const s=document.getElementById(cbName);if(s)s.remove();};
+    const timer=setTimeout(()=>{cleanup();el.innerHTML='<div class="api-loading">검색 실패 — 직접 입력해주세요</div>';resolve();},6000);
+    window[cbName]=function(data){
+      clearTimeout(timer);cleanup();
+      const results=(data.results||[]).slice(0,6);
+      if(!results.length){el.innerHTML='<div class="api-loading">결과 없음</div>';resolve();return;}
+      el.innerHTML='';
+      results.forEach(item=>{
+        const title=item.trackName||'';
+        const artist=item.artistName||'';
+        const date=(item.releaseDate||'').slice(0,4);
+        const album=item.collectionName||'';
+        const poster=item.artworkUrl100||null;
+        const div=document.createElement('div');div.className='api-result-item';
+        div.innerHTML=poster?`<img class="api-result-poster" src="${poster}" alt="">`:`<div class="api-result-poster-placeholder">♩</div>`;
+        div.innerHTML+=`<div class="api-result-info"><div class="api-result-title">${title}</div><div class="api-result-sub">${artist}${date?' · '+date:''}</div></div>`;
+        div.addEventListener('click',()=>selectApiResult(title,poster,artist,date,item.trackViewUrl||null,null,album));el.appendChild(div);
+      });
+      resolve();
+    };
+    const script=document.createElement('script');
+    script.id=cbName;
+    // country=KR 파라미터를 넣으면 iTunes Search API가 song 검색에서 resultCount:0을 반환하는 문제 확인(2026-09)
+    // country 생략 시(미국 스토어 기준) 정상 결과 반환 — 곡명/아티스트/앨범/발매연도/커버 등 필요한 필드는 동일하게 제공됨
+    script.src=`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=song&limit=6&callback=${cbName}`;
+    script.onerror=()=>{clearTimeout(timer);cleanup();el.innerHTML='<div class="api-loading">검색 실패 — 직접 입력해주세요</div>';resolve();};
+    document.body.appendChild(script);
+  });
+}
+async function searchTMDB(q,cat,el){
+  const type=cat==='movie'?'movie':'tv';
+  const url=`https://api.themoviedb.org/3/search/${type}?api_key=${TMDB_KEY}&query=${encodeURIComponent(q)}&language=ko-KR`;
+  const res=await fetch(url);const data=await res.json();
+  const results=(data.results||[]).slice(0,6);
+  if(!results.length){el.innerHTML='<div class="api-loading">결과 없음</div>';return;}
+  el.innerHTML='';
+  results.forEach(item=>{
+    const title=item.title||item.name||'';const date=(item.release_date||item.first_air_date||'').slice(0,4);
+    const poster=item.poster_path?`https://image.tmdb.org/t/p/w92${item.poster_path}`:null;
+    const div=document.createElement('div');div.className='api-result-item';
+    div.innerHTML=poster?`<img class="api-result-poster" src="${poster}" alt="">`:`<div class="api-result-poster-placeholder">🎬</div>`;
+    div.innerHTML+=`<div class="api-result-info"><div class="api-result-title">${title}</div><div class="api-result-sub">${date}</div></div>`;
+    div.addEventListener('click',()=>selectApiResult(title,poster,date,'',null,{tmdbId:item.id,tmdbType:type}));el.appendChild(div);
+  });
+}
+async function searchKakaoBook(q,el){
+  const url=`https://dapi.kakao.com/v3/search/book?query=${encodeURIComponent(q)}&size=6`;
+  try{
+    const res=await fetch(url,{headers:{'Authorization':`KakaoAK ${KAKAO_KEY}`}});
+    if(!res.ok){
+      const errBody=await res.text();
+      console.error('카카오 책 검색 실패',res.status,errBody);
+      el.innerHTML=`<div class="api-loading">검색 실패 (${res.status}) — 잠시 후 다시 시도해주세요</div>`;
+      return;
+    }
+    const data=await res.json();const results=(data.documents||[]).slice(0,6);
+    if(!results.length){el.innerHTML='<div class="api-loading">결과 없음</div>';return;}
+    el.innerHTML='';
+    results.forEach(item=>{
+      const title=item.title||'';const author=(item.authors||[]).join(', ');const poster=item.thumbnail||null;
+      const isbn=item.isbn||''; // 카카오 응답: "isbn10 isbn13" 형태 공백구분 — 알라딘 페이지 수 보완 조회용
+      const div=document.createElement('div');div.className='api-result-item';
+      div.innerHTML=poster?`<img class="api-result-poster" src="${poster}" alt="">`:`<div class="api-result-poster-placeholder">📚</div>`;
+      div.innerHTML+=`<div class="api-result-info"><div class="api-result-title">${title}</div><div class="api-result-sub">${author}</div></div>`;
+      div.addEventListener('click',()=>{selectApiResult(title,poster,author,item.publisher||'');fetchAladinPageCountInto('cm-total-pages',isbn);});el.appendChild(div);
+    });
+  }catch(e){
+    console.error('카카오 책 검색 네트워크 오류',e);
+    el.innerHTML='<div class="api-loading">검색 중 오류가 발생했어요</div>';
+  }
+}
+function selectApiResult(title,poster,sub1,sub2,musicUrl,tmdbMeta,album){
+  document.getElementById('cm-title').value=title;hideApiResults();
+  _selectedPoster=poster;_selectedAuthor=sub1||'';_selectedMusicUrl=musicUrl||null;
+  // album/releaseYear는 음악 검색(searchITunes)에서만 의미 있는 값 — 책(sub2=출판사)·영화(sub2='') 오염 방지
+  _selectedAlbum=(_contentCtx.cat==='music')?(album||null):null;
+  _selectedReleaseYear=(_contentCtx.cat==='music')?(sub2||null):null;
+  _selectedTotalUnit=null;
+  const preview=document.getElementById('cm-poster-preview');
+  if(preview){
+    if(poster){preview.style.display='flex';document.getElementById('cm-poster-img').src=poster;document.getElementById('cm-poster-title').textContent=title;document.getElementById('cm-poster-sub').textContent=sub1+(sub2?' · '+sub2:'');}
+    else preview.style.display='none';
+  }
+  if(tmdbMeta&&tmdbMeta.tmdbId)fetchTmdbTotalUnit(tmdbMeta.tmdbId,tmdbMeta.tmdbType);
+}
+const OCR_PROXY_URL='https://ocr-prox.faith-003.workers.dev/';
+// 문장 수집 — 카메라/갤러리로 찍은 종이책 사진에서 텍스트만 추출해 입력창에 채움.
+// 이미지는 base64로 인코딩해 Worker로 보내고 응답(텍스트)만 받음 — 이미지 자체는 클라이언트/서버 어디에도 저장하지 않음.
+async function handleQuoteOcrFile(file){
+  if(!file)return;
+  const statusEl=document.getElementById('rd-quote-ocr-status');
+  const inp=document.getElementById('rd-quote-inp');
+  if(statusEl)statusEl.style.display='flex';
+  try{
+    const base64=await fileToBase64(file);
+    const res=await fetch(OCR_PROXY_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({imageBase64:base64})
+    });
+    if(!res.ok)throw new Error('OCR 서버 응답 오류');
+    const data=await res.json();
+    if(data.error)throw new Error(data.error);
+    if(data.text&&inp){
+      // 기존 입력 내용이 있으면 줄바꿈 후 이어붙이고, 없으면 그대로 채움 — 두 경우 모두 수정 가능한 상태 유지
+      inp.value=inp.value.trim()?inp.value.trim()+'\n'+data.text:data.text;
+      inp.focus();
+    }
+  }catch(e){
+    console.error('문장 수집 OCR 실패',e);
+    alert('사진에서 텍스트를 읽어오지 못했어요. 다시 시도해주세요.');
+  }finally{
+    if(statusEl)statusEl.style.display='none';
+    // 같은 파일을 다시 선택해도 change 이벤트가 발생하도록 입력값 초기화
+    document.getElementById('rd-quote-ocr-camera-input').value='';
+    document.getElementById('rd-quote-ocr-gallery-input').value='';
+  }
+}
+function fileToBase64(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(reader.result);
+    reader.onerror=reject;
+    reader.readAsDataURL(file);
+  });
+}
+const ALADIN_PROXY_URL='https://aladin-book-proxy.faith-003.workers.dev/';
+// 카카오 책 검색 결과의 isbn으로 알라딘 프록시(Cloudflare Worker)를 조회해 페이지 수를 targetInputId에 채움.
+// 카카오는 페이지 수 필드 자체가 없어서 별도 소스가 필요 — 검색 결과 클릭 직후 1회만 호출, 실패/누락 시 조용히 스킵(수동 입력 폴백 유지).
+async function fetchAladinPageCountInto(targetInputId,isbnRaw){
+  const isbn=(isbnRaw||'').trim().split(/\s+/).pop(); // "isbn10 isbn13" 중 뒤쪽(13자리) 우선 사용
+  if(!isbn)return;
+  try{
+    const res=await fetch(`${ALADIN_PROXY_URL}?isbn=${encodeURIComponent(isbn)}`);
+    if(!res.ok)return;
+    const data=await res.json();
+    if(!data.pageCount)return;
+    const input=document.getElementById(targetInputId);
+    if(input)input.value=data.pageCount;
+  }catch(e){
+    console.error('알라딘 페이지 수 조회 실패',e);
+  }
+}
+// TMDB 상세 엔드포인트로 총 회차(tv)/총 러닝타임분(movie)을 가져옴 — 검색 결과 클릭 직후 1회만 호출.
+// 검색 엔드포인트엔 이 정보가 없어 상세 조회가 별도로 필요함(TMDB 자체 제약, /search가 아닌 /tv 또는 /movie 단건 조회 필요).
+async function fetchTmdbTotalUnit(id,type){
+  try{
+    const url=`https://api.themoviedb.org/3/${type}/${id}?api_key=${TMDB_KEY}&language=ko-KR`;
+    const res=await fetch(url);
+    if(!res.ok)return;
+    const data=await res.json();
+    const totalUnit=type==='tv'?(data.number_of_episodes||null):(data.runtime||null);
+    if(!totalUnit)return;
+    _selectedTotalUnit=totalUnit;
+    renderCmProgressHint();
+  }catch(e){
+    console.error('TMDB 상세 조회 실패',e);
+  }
+}
+// 자동으로 채워진 총량을 등록 폼에 조용히 표시(입력창은 없음 — 수기 입력 대신 완전 자동)
+function renderCmProgressHint(){
+  const el=document.getElementById('cm-progress-hint');if(!el)return;
+  const cat=_contentCtx.cat;
+  const showProgress=cat==='drama'||cat==='movie';
+  if(!showProgress||!_selectedTotalUnit){el.style.display='none';el.textContent='';return;}
+  const unitLabel=cat==='drama'?'화':'분';
+  el.style.display='block';
+  el.textContent=`총 ${_selectedTotalUnit}${unitLabel}`;
+  const preview=document.getElementById('cm-poster-preview');
+  if(preview&&preview.style.display==='none')preview.style.display='flex';
+}
+function hideApiResults(){const el=document.getElementById('api-results');if(el)el.style.display='none';}
+
+// ══════════════════════════════════════════════════════════
+// ██ 월간탭 (3/3 — 나머지는 MONTHLY REPORT 부근, API SEARCH 부근) — HABIT MONTHLY/CALENDAR/MONTHLY STAT BAR ██
+// ══════════════════════════════════════════════════════════
+// ── HABIT MONTHLY
+// [2026-09-06] 습관마다 실제 "추적 중이던 기간"만 체크 대상으로 보고, 그 밖의 날짜(시작 전/일시중단/archive 이후)는
+// 비활성 칸으로 표시 — 온오프를 몇 번 반복하든 그리드가 항상 정직하게 실제 추적 여부만 보여줌.
+// [2026-09-06 개선] createdAt/archivedAt 단일 값 방식은 재활성화할 때마다 과거 활성 구간(과거 createdAt)이
+// 통째로 덮어써져 사라지는 문제가 있었음(예: 6월부터 하던 습관을 9월에 껐다 10월에 다시 켜면, 6~9월 실적이
+// 통계에서 빠져버림) — periods(구간 배열, [{start,end}], end:null=진행중)로 전환해 온오프를 반복해도
+// 각 활성 구간이 독립적으로 누적 보존되도록 함. 구버전 createdAt/archivedAt만 있는 습관은 폴백으로 처리.
+function _habitPeriods(h){
+  if(h.periods&&h.periods.length)return h.periods;
+  // [2026-09-06 폴백 보강] createdAt(start)이 없어도 archivedAt(end)만 있는 경우를 놓치면
+  // "구간 정보 없음"으로 오판되어 무조건 활성 처리됨 — start 없이 end만 있어도 폴백 구간을 만든다.
+  if(h.createdAt||h.archivedAt)return [{start:h.createdAt||null,end:h.archivedAt||null}];
+  return [];
+}
+function _isHabitActiveOn(h,dk){
+  const periods=_habitPeriods(h);
+  if(!periods.length)return true; // 구간 정보가 아예 없으면(아주 오래된 데이터) 항상 활성으로 간주
+  // [2026-09-06 경계 수정] end에는 "비활성화한 당일"(_applyHabitToggle에서 today로 기록)이 저장되므로,
+  // end 당일부터는 비활성으로 쳐야 함 — dk<p.end (당일 미포함)로 판정. 이전엔 dk<=p.end라 종료 당일까지
+  // 활성으로 잘못 포함되어(달성률 분모/월간 캘린더 모두) 비활성화 당일 하루가 통계에 남아있었음.
+  return periods.some(p=>(!p.start||dk>=p.start)&&(!p.end||dk<p.end));
+}
+function renderHabitMonthly(){
+  const habits=getActiveHabits(),y=_calYear,mo=_calMonth; // 2026-09-06: archive(목록에서 제외)한 습관은 월간에서도 노출 안 함
+  const dim=new Date(y,mo+1,0).getDate();
+  const el=document.getElementById('habit-monthly');if(!el)return;
+  el.innerHTML='';
+  // 퍼센트 분모는 미니통계바와 동일 원칙: 당월인 경우 "오늘까지"만 반영(아직 안 온 날을 미달성으로 세지 않음).
+  // 점 그리드는 달력 형태 유지 목적으로 31일 전체를 그대로 표시.
+  const today=new Date();
+  const isCurMonth=(y===today.getFullYear()&&mo===today.getMonth());
+  const habitLastDay=isCurMonth?today.getDate():dim;
+  // 이 렌더 호출 안에서만 쓰는 임시 캐시 — 한 달엔 주(week)가 4~5개뿐이라 습관 수만큼 반복해도 매번 새로 읽을 필요 없음.
+  // localStorage 자체(S.get의 원본)는 동기화(syncHCDown 등)가 갱신하므로, 다음 renderHabitMonthly 호출 때는
+  // 이 캐시가 비어있는 상태로 다시 시작해 항상 최신값을 읽음 — 동기화 반영 지연 없음.
+  const wkChecksCache={};
+  const getWkChecks=wk=>wkChecksCache[wk]||(wkChecksCache[wk]=getHabitChecks(wk));
+  habits.forEach(h=>{
+    const row=document.createElement('div');row.className='hm-row';
+    const lbl=document.createElement('span');lbl.className='hm-lbl';
+    const hIcon=getHabitIconFor(h);
+    lbl.innerHTML=hIcon?`<i class="ti ${hIcon}" style="font-size:12px;vertical-align:-1px;margin-right:3px;" aria-hidden="true"></i>${h.name}`:h.name;
+    row.appendChild(lbl);
+    const dots=document.createElement('div');dots.className='hm-dots';
+    let checked_cnt=0,activeDayCnt=0;
+    for(let d=1;d<=dim;d++){
+      const date=new Date(y,mo,d);const dk=dateKey(date);const wk=weekKey(date);const dow=(date.getDay()+6)%7;
+      const isActive=_isHabitActiveOn(h,dk);
+      const checked=isActive&&getWkChecks(wk)[`${h.id}-${dow}`];
+      if(isActive&&d<=habitLastDay){activeDayCnt++;if(checked)checked_cnt++;}
+      const dot=document.createElement('div');dot.className='hm-dot'+(isActive?'':' inactive');
+      if(checked){dot.style.background=getHabitColorSoft(h.color);}
+      dots.appendChild(dot);
+    }
+    const pct=activeDayCnt>0?Math.round(checked_cnt/activeDayCnt*100):0;
+    const pctEl=document.createElement('div');
+    pctEl.style.cssText='font-size:var(--dow-label-size);color:var(--tm);margin-top:5px;padding-bottom:8px;width:100%;text-align:right;';
+    pctEl.textContent=`${checked_cnt}/${activeDayCnt}일 · ${pct}%`;
+    const wrap=document.createElement('div');wrap.style.cssText='display:flex;flex-direction:column;flex:1;';
+    wrap.appendChild(dots);wrap.appendChild(pctEl);row.appendChild(wrap);el.appendChild(row);
+  });
+}
+
+// ── CALENDAR
+let _calYear=new Date().getFullYear();
+let _calMonth=new Date().getMonth();
+function calMonthKey(){return `${_calYear}-${pad(_calMonth+1)}`;}
+function isCalCurrentMonth(){const n=new Date();return _calYear===n.getFullYear()&&_calMonth===n.getMonth();}
+function isCalPastMonth(){const n=new Date();return _calYear<n.getFullYear()||(_calYear===n.getFullYear()&&_calMonth<n.getMonth());}
+function updateMonthlyGoalTitle(){
+  const el=document.getElementById('monthly-goal-title');if(!el)return;
+  const ic='<i class="ti ti-flag-3 ico-13" aria-hidden="true"></i>';
+  el.innerHTML=isCalCurrentMonth()?`${ic} 이번 달 목표`:`${ic} ${_calMonth+1}월 목표`;
+}
+let _calSelectedDay=null;
+
+const _monthSynced={};
+const MONTH_SYNC_TTL=60*1000; // 60초 — 이 시간이 지나면 캐시를 신뢰하지 않고 서버를 다시 조회.
+// 무기한 캐시였을 때는, 세션 도중 서버 데이터가 외부(다른 기기, 직접 SQL 등)에서 바뀌어도
+// 이 세션은 그 변경을 전혀 모른 채 "구버전 로컬 스냅샷"을 계속 유지하다가, 그 스냅샷을 그대로
+// 업로드(saveContents 등)해버리면 서버의 새 데이터가 지워진 것처럼 되는 사고로 이어졌음.
+async function syncMonthRange(y,mo){
+  if(!navigator.onLine)return false;
+  const mk=`${y}-${pad(mo+1)}`;
+  const lastSync=_monthSynced[mk];
+  if(lastSync&&(Date.now()-lastSync)<MONTH_SYNC_TTL)return false;
+  _monthSynced[mk]=Date.now();
+  const daysInMonth=new Date(y,mo+1,0).getDate();
+  const start=`${y}-${pad(mo+1)}-01`;
+  const end=`${y}-${pad(mo+1)}-${pad(daysInMonth)}`;
+  const [mRows,tRows,sRows,mlRows,hcRows,rbRows]=await Promise.all([
+    supaFetch(`memos?date_key=gte.${start}&date_key=lte.${end}&order=created`),
+    supaFetch(`todos?date_key=gte.${start}&date_key=lte.${end}&order=created`),
+    supaFetch(`sleep?date_key=gte.${start}&date_key=lte.${end}`),
+    supaFetch(`meals?date_key=gte.${start}&date_key=lte.${end}`),
+    supaFetch(`habit_checks?date_key=gte.${start}&date_key=lte.${end}`),
+    supaFetch(`rhythm_blocks?date_key=gte.${start}&date_key=lte.${end}&order=created`)
+  ]);
+  if(mRows){
+    const byDate={};
+    mRows.forEach(r=>{(byDate[r.date_key]=byDate[r.date_key]||[]).push(memoRowToLocal(r));});
+    Object.keys(byDate).forEach(dk=>{if(!S.get(S.key('memos_pending',dk)))S.set(S.key('memos',dk),byDate[dk]);});
+  }
+  if(tRows){
+    const byDate={};
+    tRows.forEach(r=>{if(r.date_key===RESERVE_DK)return;/* 예비투두 관련 로직은 파일 하단 RESERVE_DK 블록(getReserveTodos 등) 참고 */(byDate[r.date_key]=byDate[r.date_key]||[]).push({text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null,eventEndDate:r.event_end_date||null,pinned:!!r.pinned});});
+    Object.keys(byDate).forEach(dk=>{if(!S.get(S.key('todos_pending',dk)))S.set(S.key('todos',dk),byDate[dk]);});
+  }
+  if(sRows)sRows.forEach(r=>{if(!S.get(S.key('sleep_pending',r.date_key)))S.set(S.key('sleep',r.date_key),sleepRowToLocal(r));});
+  if(mlRows)mlRows.forEach(r=>{
+    const pend=S.get(S.key('meals_fields_pending',r.date_key))||[];
+    const serverRow=mealRowToLocal(r);
+    if(!pend.length){S.set(S.key('meals',r.date_key),serverRow);return;}
+    // pending인 필드(아직 서버로 못 올라간 로컬 수정)만 로컬값 유지, 나머지는 서버값 반영.
+    const local=getMeals(r.date_key);
+    const merged={...serverRow};
+    pend.forEach(col=>{merged[col]=local[col];});
+    S.set(S.key('meals',r.date_key),merged);
+  });
+  if(rbRows){
+    const byDate={};
+    rbRows.forEach(r=>{(byDate[r.date_key]=byDate[r.date_key]||[]).push({cat:r.cat,start:r.start_time,end:r.end_time,text:r.text||'',created:r.created,cid:r.client_id||genCid()});});
+    Object.keys(byDate).forEach(dk=>{if(!S.get(S.key('rblocks_pending',dk)))S.set(S.key('rblocks',dk),byDate[dk]);});
+  }
+  if(hcRows){
+    const byWeek={};const timesByWeek={};
+    hcRows.forEach(r=>{
+      const d=new Date(r.date_key);const wk=weekKey(d);const dow=(d.getDay()+6)%7;
+      const key=`${r.habit_name}-${dow}`;
+      (byWeek[wk]=byWeek[wk]||{})[key]=true;
+      if(r.checked_time)(timesByWeek[wk]=timesByWeek[wk]||{})[key]=r.checked_time;
+    });
+    Object.keys(byWeek).forEach(wk=>{
+      const merged=Object.assign({},getHabitChecks(wk),byWeek[wk]);
+      S.set(S.key('hc',wk),merged);
+      if(timesByWeek[wk]){
+        const mergedTimes=Object.assign({},getHabitCheckTimes(wk),timesByWeek[wk]);
+        S.set(S.key('hcTime',wk),mergedTimes);
+      }
+    });
+  }
+  const prevMk2=(()=>{const d=new Date(y,mo-1,1);return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;})();
+  // 달력 격자에 나오는 전달/다음달 칸용 일정 데이터 — 전달 말일 쪽은 그 달에서 시작해 이어지는 연속일정(시작일 row에만 저장됨)까지
+  // 잡으려고 MULTIDAY_LOOKBACK_DAYS일 전부터, 다음달 쪽은 격자에 보일 수 있는 최대 6일치만 가볍게 조회(todos만, 1회 왕복).
+  const edgeDks=[];
+  for(let i=1;i<=MULTIDAY_LOOKBACK_DAYS;i++)edgeDks.push(dateKey(new Date(y,mo,1-i)));
+  for(let i=1;i<=6;i++)edgeDks.push(dateKey(new Date(y,mo,daysInMonth+i)));
+  await Promise.all([syncContentsDown(mk),syncContentsDown(prevMk2),syncGoalDown(S.key('mgoal',mk)),syncTodosDownMany(edgeDks)]);
+  return true;
+}
+function calShiftMonth(n){
+  _calMonth+=n;
+  if(_calMonth>11){_calMonth=0;_calYear++;}
+  if(_calMonth<0){_calMonth=11;_calYear--;}
+  _calSelectedDay=null;
+  const el=document.getElementById('cal-detail');if(el)el.innerHTML='';
+  renderCalendar();
+  renderContentTimeline();
+  renderHabitMonthly();
+  renderMonthlyStatBar();
+  renderGoalNote('monthly-goal-wrap',S.key('mgoal',calMonthKey()),isCalPastMonth());
+  updateMonthlyGoalTitle();
+  const sy=_calYear,smo=_calMonth;
+  syncMonthRange(sy,smo).then(fetched=>{
+    if(fetched&&_calYear===sy&&_calMonth===smo){
+      renderCalendar();renderContentTimeline();renderHabitMonthly();renderMonthlyStatBar();
+      renderGoalNote('monthly-goal-wrap',S.key('mgoal',calMonthKey()),isCalPastMonth());
+      if(_calSelectedDay)renderCalDetail(_calSelectedDay);
+    }
+  });
+}
+function renderCalendar(){
+  const wrap=document.getElementById('monthly-cal');if(!wrap)return;
+  const y=_calYear,mo=_calMonth;
+  const daysInMonth=new Date(y,mo+1,0).getDate();
+  const today=new Date();
+  const hasRecord={};
+  const hasPending={};
+  const eventsByDk={}; // 하루짜리 일정 배지 — 전달/다음달 칸까지 포함해 날짜키(dk)로 보관
+  const todayDk=dateKey(today);
+  const firstDayRaw=new Date(y,mo,1).getDay();
+  const firstDay=(firstDayRaw+6)%7; // 월요일=0 기준으로 변환
+  const totalCells=firstDay+daysInMonth;
+  const trailingBlank=(7-(totalCells%7))%7;
+  const totalWeeks=(firstDay+daysInMonth+trailingBlank)/7;
+  // 격자 각 칸의 실제 날짜(전달/다음달 포함) — 인덱스 0이 첫 칸(월요일)
+  const cellDkOf=(idx)=>dateKey(new Date(y,mo,idx-firstDay+1));
+  for(let idx=0;idx<totalWeeks*7;idx++){
+    const d=idx-firstDay+1;
+    const dk=cellDkOf(idx);
+    const todos=getTodos(dk);
+    if(d>=1&&d<=daysInMonth){
+      if(getMemos(dk).length>0||todos.some(t=>t.done)||getSleep(dk).sleep)hasRecord[d]=true;
+      // 오늘 이후(오늘 제외, 순수 미래)에 미완료 투두(할일+시간표, 일정 제외)가 하나라도 있으면 표시 —
+      // 일정은 이미 달력에 배지/막대로 노출되므로 동그라미 판정에서는 제외(중복 표기 방지).
+      // 과거(has-record, 채움)와 겹치지 않도록 미래 날짜에만 한정.
+      if(dk>todayDk&&todos.some(t=>!t.done&&!t.isEvent))hasPending[d]=true;
+    }
+    // 하루짜리 일정만 배지 대상(연속일정은 eventEndDate가 있으므로 여기서 제외 — 아래 bar로 별도 렌더)
+    // 반복으로 생성된 일정도 getTodos(dk)가 이미 실체화해서 포함하고 있으므로 별도 조회 없이 자연히 함께 잡힘.
+    // 같은 날 여러 일정이 있으면 시간순으로 표기(시간 있는 일정 먼저, 없는 일정은 뒤로)
+    const evs=todos.filter(t=>t.isEvent&&!t.eventEndDate).sort((a,b)=>{
+      if(!!a.eventTime!==!!b.eventTime)return a.eventTime?-1:1;
+      if(a.eventTime&&b.eventTime)return a.eventTime.localeCompare(b.eventTime);
+      return 0;
+    });
+    if(evs.length)eventsByDk[dk]=evs;
+  }
+  const multidayEvents=getMultiDayEventsForRange(cellDkOf(0),cellDkOf(totalWeeks*7-1)); // 격자 전체(전달/다음달 칸 포함)에 걸치는 연속일정 원본(중복 제거됨)
+  // 주(w)별 bar 목록을 미리 계산 — 전달/다음달 칸도 실제 날짜로 넘겨 그 칸까지 막대가 이어지게 함
+  const weekBarsAll=[];
+  for(let w=0;w<totalWeeks;w++){
+    const weekDates=[];
+    for(let c=0;c<7;c++)weekDates.push(cellDkOf(w*7+c));
+    weekBarsAll.push(computeWeekBars(weekDates,multidayEvents));
+  }
+  // 총 슬롯 수(배지+bar 합쳐서 실제 보이는 줄) 상한 — 셀 높이를 넘지 않도록 2줄까지만 텍스트로, 나머지는 "+n개"
+  const MAX_VISIBLE_SLOTS=2;
+  let h=`<div style="padding:4px 2px 0;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div class="nav-arr" onclick="calShiftMonth(-1)"><i class="ti ti-chevron-left" style="font-size:10px;color:var(--tm);" aria-hidden="true"></i></div>
+      <span style="font-size:15px;font-weight:500;color:var(--tp);">${y}년 ${mo+1}월</span>
+      <div class="nav-arr" onclick="calShiftMonth(1)"><i class="ti ti-chevron-right" style="font-size:10px;color:var(--tm);" aria-hidden="true"></i></div>
+    </div>
+    <div class="cal-grid cal-day-name-row">`;
+  ['월','화','수','목','금','토','일'].forEach(d=>h+=`<div class="cal-day-name">${d}</div>`);
+  h+=`</div>
+    <div class="cal-grid cal-grid-body">`;
+  // ── 주 단위로 "날짜 행" + "그 주의 bar 행(연속일정 있을 때만, 항상 배지보다 위)"을 순서대로 그림 ──
+  for(let w=0;w<totalWeeks;w++){
+    const weekBars=weekBarsAll[w];
+    for(let c=0;c<7;c++){
+      const cellIdx=w*7+c;
+      const d=cellIdx-firstDay+1;
+      const inMonth=d>=1&&d<=daysInMonth;
+      const cdk=cellDkOf(cellIdx); // 이 칸의 실제 날짜(전달/다음달 칸이면 그쪽 날짜)
+      const numLabel=inMonth?d:parseInt(cdk.slice(8,10),10);
+      // 1일 앞·말일 뒤 남는 칸: 전달/다음달 날짜를 흐리게 표시하고 일정(배지/막대)도 함께 노출하되,
+      // 칸 자체는 클릭 불가(기록·상세는 그 달로 이동해서 보도록) — 일정 배지는 자체 클릭으로 열림(2026-09-19)
+      const isToday2=inMonth&&today.getFullYear()===y&&today.getMonth()===mo&&today.getDate()===d;
+      const isSel=inMonth&&_calSelectedDay===d;
+      let cls='cal-day';if(!inMonth)cls+=' other-month';if(isToday2)cls+=' today';if(isSel)cls+=' selected';if(hasRecord[d])cls+=' has-record';if(hasPending[d])cls+=' has-pending';
+      // 이 칸을 지나가는 모든 bar의 "조각"을 그림 — 조각은 오직 이 칸 안에서만 존재하는 완결된 요소라 절대 밀리거나 클릭 영역이 어긋나지 않음.
+      // 시작칸=텍스트+왼쪽 둥근모서리, 중간칸=빈 막대만(옆 칸과 이어지는 것처럼 보이지만 실제로는 각자 독립된 요소), 끝칸=오른쪽 둥근모서리.
+      const cIdxInWeek=cellIdx-w*7;
+      const barsHere=(weekBars||[]).filter(b=>cIdxInWeek>=b.left&&cIdxInWeek<b.left+b.width).sort((a,b2)=>a.row-b2.row);
+      let barsHtml='';
+      barsHere.forEach(bar=>{
+        const ec=getEventCat(bar.ev.eventCat);
+        const title=parseTodoTextParts(bar.ev.text).parts[0]||bar.ev.text;
+        const isSegStart=(cIdxInWeek===bar.left); // 이 주 안에서 이 칸이 그 bar의 첫 칸인지
+        const isSegEnd=(cIdxInWeek===bar.left+bar.width-1); // 이 주 안에서 이 칸이 그 bar의 마지막 칸인지
+        // 실제 이벤트 전체의 시작/끝인지(주 경계에서 잘린 게 아니라 진짜 시작/끝인지)에 따라 둥근 모서리 부여
+        const roundL=isSegStart&&!bar.clipStart?' bar-round-l':'';
+        const roundR=isSegEnd&&!bar.clipEnd?' bar-round-r':'';
+        const segText=isSegStart?title:''; // 텍스트는 시작 칸에만 표시(중간/끝 칸은 빈 막대로 이어지는 느낌만)
+        barsHtml+=`<div class="cal-event-bar ev-${bar.ev.eventCat||'etc'}${roundL}${roundR}" title="${ec.label}: ${title}" onclick="event.stopPropagation();openEventSheet('${bar.ev._startDk}','${bar.ev.cid}','${title.replace(/'/g,"\\'")}');">${segText}</div>`;
+      });
+      // bar가 이미 차지한 슬롯만큼 하루짜리 배지 노출 개수를 줄임 — bar가 항상 우선(상단)이므로 배지는 남는 자리만 사용
+      const usedByBar=barsHere.length;
+      const remainSlots=Math.max(0,MAX_VISIBLE_SLOTS-usedByBar);
+      let badges='';
+      const evs=eventsByDk[cdk];
+      const evsShown=evs?evs.slice(0,remainSlots):[];
+      evsShown.forEach(ev=>{
+        const ec=getEventCat(ev.eventCat);
+        const title=parseTodoTextParts(ev.text).parts[0]||ev.text;
+        const clickFn=ev.recurRuleCid
+          ?`openRecurringItemSheet('${cdk}','${ev.cid}','${ev.recurRuleCid}','${title.replace(/'/g,"\\'")}')`
+          :`openEventSheet('${cdk}','${ev.cid}','${title.replace(/'/g,"\\'")}')`;
+        badges+=`<div class="cal-event-badge ev-${ev.eventCat||'etc'}" title="${ec.label}: ${title}" onclick="event.stopPropagation();${clickFn};">${title}</div>`;
+      });
+      // "+n개"는 하루짜리 중 안 보인 것만 카운트(bar 자체는 항상 보이므로 미노출分에서 제외)
+      const hiddenCount=(evs?evs.length-evsShown.length:0);
+      if(hiddenCount>0)badges+=`<div class="cal-event-more">+${hiddenCount}개</div>`;
+      h+=`<div class="${cls}"${inMonth?` onclick="calDayClick(${d})"`:' style="cursor:default;"'}><div class="cal-num">${numLabel}</div>${barsHtml}${badges}</div>`;
+    }
+  }
+  h+=`</div></div>`;
+  wrap.innerHTML=h;
+  if(_calSelectedDay)renderCalDetail(_calSelectedDay);
+}
+function calDayClick(d){
+  _calSelectedDay=(_calSelectedDay===d)?null:d;
+  renderCalendar();
+  if(!_calSelectedDay){const el=document.getElementById('cal-detail');if(el)el.innerHTML='';}
+}
+// 하루 상세 HTML 생성 — 월간탭(renderCalDetail)에서 사용. [2026-09-06] 밀도의 숲 기능 완전 제거로 공유 대상이던 makeDaySummaryEl도 함께 삭제됨.
+function buildDayDetailHtml(dk){
+  const allMemos=getMemos(dk);const todos=getTodos(dk);const doneTodos=todos.filter(t=>t.done);const sleep=getSleep(dk);
+  const meals=getMeals(dk);
+  const oneLine=getDailyOneLine(dk);
+  const headerHtml=oneLine?`<div style="font-size:var(--dow-label-size);color:var(--ts);font-style:italic;margin-bottom:10px;">&#x275D; ${oneLine} &#x275E;</div>`:'';
+  let items='';
+  if(sleep.sleep||sleep.wake){
+    const sv=sleep.sleep?sleep.sleep.split(':').map(Number):null;
+    const wv=sleep.wake?sleep.wake.split(':').map(Number):null;
+    let dur='';
+    if(sv&&wv){let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;dur=` · ${Math.floor(m/60)}h ${m%60}m`;}
+    items+=`<div class="cal-detail-row"><div class="cal-detail-icon"><i class="ti ti-moon-stars sub-tm-13" aria-hidden="true"></i></div><span class="cal-detail-text" style="color:var(--ts);">${sleep.sleep||'--'} 취침 · ${sleep.wake||'--'} 기상${dur}</span></div>`;
+  }
+  if(doneTodos.length>0){
+    items+=`<div class="cal-detail-row" style="cursor:pointer;" onclick="calShowTodos('${dk}')"><div class="cal-detail-icon"><i class="ti ti-check" style="font-size:var(--dow-label-size);color:var(--tm);" aria-hidden="true"></i></div><span class="cal-detail-text" id="cal-todo-summary-${dk}">완료한 일 ${doneTodos.length}개 <i class="ti ti-chevron-right ico-inline-11" aria-hidden="true"></i></span></div>
+      <div id="cal-todo-rows-${dk}" style="display:none;"></div>`;
+  }
+  // 미래 날짜(자정 기준, 월간탭 규칙과 동일) 전용 — 등록해둔 미완료 투두(할일/시간표) 요약.
+  // 일정(isEvent)은 달력에 이미 배지/막대로 노출되고 있어 여기선 제외해 중복 표기를 피함.
+  // 실제 체크/수정은 오늘탭에서 하도록, 요약 줄 옆에 이동 칩을 한 줄로 나란히 배치(jumpToDailyTab).
+  const isFuture=dk>dateKey(new Date());
+  if(isFuture){
+    const pendingTodos=todos.filter(t=>!t.done&&!t.isEvent);
+    if(pendingTodos.length>0){
+      items+=`<div class="cal-detail-row" style="align-items:center;justify-content:space-between;">
+        <span style="display:flex;align-items:center;gap:8px;cursor:pointer;" onclick="calShowPendingTodos('${dk}')"><div class="cal-detail-icon"><i class="ti ti-clock" style="font-size:var(--dow-label-size);color:var(--tm);" aria-hidden="true"></i></div><span class="cal-detail-text" id="cal-pending-summary-${dk}">예정된 일 ${pendingTodos.length}개 <i class="ti ti-chevron-right ico-inline-11" aria-hidden="true"></i></span></span>
+        <span class="cal-jump-daily-chip" onclick="jumpToDailyTab('${dk}')">오늘탭에서 보기 <i class="ti ti-arrow-right ico-inline-11" aria-hidden="true"></i></span>
+      </div>
+      <div id="cal-pending-rows-${dk}" style="display:none;"></div>`;
+    }
+  }
+  const MAX=3;const total=allMemos.length;
+  // 시간순 정렬: toSortKey(04:00 기준)로 하루 시작 — 새벽 0~3시대는 하루 끝으로 취급
+  const sortedMemos=[...allMemos].sort((a,b)=>{
+        return toSortKey(a.time)-toSortKey(b.time);
+  });
+  const hiddenCnt=Math.max(0,total-MAX);
+  const showMemos=hiddenCnt>0?sortedMemos.slice(0,MAX):sortedMemos;
+  if(hiddenCnt>0)items+=`<div class="cal-detail-more" onclick="calShowAll('${dk}')">··· ${hiddenCnt}개 더 보기</div>`;
+  if(showMemos.length>0){
+    items+=`<div class="cal-memo-rows" id="cal-memo-rows-${dk}">`;
+    showMemos.forEach(m=>{items+=`<div class="cal-detail-row"><span class="cal-detail-time">${m.time||''}</span><span class="cal-detail-text">${m.text||''}</span></div>`;});
+    items+=`</div>`;
+  }
+  let mealHtml='';
+  if(!isFuture){
+    MEAL_KEYS.forEach(k=>{
+      if(meals[k])mealHtml+=`<div class="cal-detail-row"><span class="cal-detail-time">${MEAL_LABELS[k]}</span><span class="cal-detail-text" style="flex:1;">${meals[k]}</span>${meals[k+'_time']?`<span style="font-size:var(--dow-label-size);color:var(--tm);flex-shrink:0;">${meals[k+'_time']}</span>`:''}</div>`;
+    });
+    if(mealHtml)mealHtml=`<div style="font-size:var(--dow-label-size);font-weight:500;color:rgba(190,130,70,0.85);margin:12px 0 4px;">식사</div>${mealHtml}`;
+  }
+  if(!items&&!mealHtml){
+    return headerHtml+'<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:10px 0;">이 날은 기록이 없어요</div>';
+  }
+  return headerHtml+items+mealHtml;
+}
+// 월간 캘린더의 "투두 추가하기" 진입점 — currentDate를 선택 날짜로 임시 전환해 기존 openTodoModal을 그대로 재사용.
+// 저장/취소 후에는 confirmTodo(calMode 분기) 또는 closeModal에서 원래 날짜로 복원됨.
+function openEventFromCalendar(d){
+  const targetDate=new Date(_calYear,_calMonth,d);
+  const restoreDate=currentDate.toISOString();
+  currentDate=targetDate;
+  openTodoModal(-1);
+  const modal=document.getElementById('todo-modal');
+  modal.dataset.calMode='1';
+  modal.dataset.calRestoreDate=restoreDate;
+  // 캘린더에서 여는 일정 추가는 '일정' 탭 + '약속' 카테고리가 기본 선택된 상태로 시작(가장 흔한 용도)
+  selectTodoKind('event',document.querySelector('.todo-kind-tabs button.tk-event'));
+}
+// 월간 캘린더의 일정 배지를 탭했을 때 — 그 날짜로 currentDate를 임시 전환하고 해당 투두를 수정 모드로 염.
+// openEventFromCalendar와 동일한 currentDate 전환/복원 구조를 재사용하되, editIdx를 넘겨 기존 값을 채워서 연다.
+// year/month를 생략하면 캘린더 탭이 보고 있는 월(_calYear/_calMonth) 기준 — 오늘탭 등 다른 곳에서 호출할 땐 명시적으로 넘겨줌.
+function openEventEditFromCalendar(d,editIdx,year,month){
+  const y=year!=null?year:_calYear;
+  const m=month!=null?month:_calMonth;
+  const targetDate=new Date(y,m,d);
+  const restoreDate=currentDate.toISOString();
+  currentDate=targetDate;
+  openTodoModal(editIdx);
+  const modal=document.getElementById('todo-modal');
+  modal.dataset.calMode='1';
+  modal.dataset.calRestoreDate=restoreDate;
+}
+function renderCalDetail(d){
+  const el=document.getElementById('cal-detail');if(!el)return;
+  const dk=`${_calYear}-${pad(_calMonth+1)}-${pad(d)}`;
+  ensureDateSynced(dk).then(fetched=>{if(fetched)renderCalDetail(d);});
+  // 하루한줄은 별도 테이블 — 새 기기에서 전월 달력 클릭 시 누락될 수 있으므로 한 번 동기화
+  const _olSyncKey='oneline_month_synced_'+`${_calYear}-${pad(_calMonth+1)}`;
+  if(!sessionStorage.getItem(_olSyncKey)&&navigator.onLine){
+    sessionStorage.setItem(_olSyncKey,'1');
+    syncOnelineMonthRange(_calYear,_calMonth).then(fetched=>{if(fetched)renderCalDetail(d);});
+  }
+  const date=new Date(_calYear,_calMonth,d);
+  const dateStr=`${_calMonth+1}월 ${d}일 ${DAYS[date.getDay()]}`;
+  const dateHeaderHtml=`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;">
+      <span class="cal-detail-date" style="margin-bottom:0;flex-shrink:0;">${dateStr}</span>
+    </div>`;
+  const bodyHtml=buildDayDetailHtml(dk);
+  const addEventBtnHtml=`<div class="cal-add-event-btn" onclick="openEventFromCalendar(${d})"><i class="ti ti-plus ico-sz-13" aria-hidden="true"></i> 투두 추가하기</div>`;
+  el.innerHTML=`<div class="cal-detail-wrap">${dateHeaderHtml}${bodyHtml}${addEventBtnHtml}</div>`;
+  el.style.display='block';
+  setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'nearest'}),100);
+}
+// 완료/예정 투두 펼침 토글 공용 헬퍼 — rowsPrefix/summaryPrefix의 DOM id 규칙과 label만 다르고
+// 나머지 로직은 동일해 통합(2026-09-11 중복 제거).
+// dk 날짜의 미완료 투두를 "시간표(텍스트에 HH:MM 있음, 시간순) → 시간대 미설정 투두(오전/오후/저녁/미정 순)"로 정렬해 표시용 배열 반환
+const _CAL_TS_ORDER={morning:0,afternoon:1,night:2,none:3};
+function _calSortPendingTodos(todos){
+  const timed=[],untimed=[];
+  todos.forEach(t=>{
+    const m=(t.text||'').match(SCHEDULE_TIME_RE);
+    if(m){
+      const hh=parseInt(m[1],10),mm=parseInt(m[2],10);
+      if(hh<=23&&mm<=59){timed.push({t,min:hh*60+mm});return;}
+    }
+    untimed.push(t);
+  });
+  timed.sort((a,b)=>a.min-b.min);
+  untimed.sort((a,b)=>(_CAL_TS_ORDER[a.timeSection||'none']??3)-(_CAL_TS_ORDER[b.timeSection||'none']??3));
+  return timed.map(x=>x.t).concat(untimed);
+}
+function _calToggleTodoRows(dk,todos,rowsPrefix,summaryPrefix,label){
+  const rowsWrap=document.getElementById(rowsPrefix+dk);if(!rowsWrap)return;
+  const summaryEl=document.getElementById(summaryPrefix+dk);
+  const isOpen=rowsWrap.style.display!=='none';
+  if(isOpen){
+    rowsWrap.style.display='none';
+    if(summaryEl)summaryEl.innerHTML=`${label} ${todos.length}개 <i class="ti ti-chevron-right ico-inline-11" aria-hidden="true"></i>`;
+  }else{
+    rowsWrap.innerHTML=_calSortPendingTodos(todos).map(t=>`<div class="cal-detail-row" style="padding-left:20px;"><span class="cal-detail-text">${t.text}</span></div>`).join('');
+    rowsWrap.style.display='block';
+    if(summaryEl)summaryEl.innerHTML=`${label} ${todos.length}개 <i class="ti ti-chevron-down ico-inline-11" aria-hidden="true"></i>`;
+  }
+}
+function calShowTodos(dk){
+  _calToggleTodoRows(dk,getTodos(dk).filter(t=>t.done),'cal-todo-rows-','cal-todo-summary-','완료한 일');
+}
+// 미래 날짜용 — 미완료 투두를 읽기전용으로 나열(체크/수정 불가, 오늘탭 칩으로 유도). 일정(isEvent)은 달력에 이미 표기되므로 제외.
+function calShowPendingTodos(dk){
+  _calToggleTodoRows(dk,getTodos(dk).filter(t=>!t.done&&!t.isEvent),'cal-pending-rows-','cal-pending-summary-','예정된 일');
+}
+function calShowAll(dk){
+  const memos=getMemos(dk);
+  const rowsWrap=document.getElementById('cal-memo-rows-'+dk);if(!rowsWrap)return;
+  const moreBtn=rowsWrap.parentElement?rowsWrap.parentElement.querySelector('.cal-detail-more'):null;
+    const sorted=[...memos].sort(function(a,b){return toSortKey(a.time)-toSortKey(b.time);});
+  const MAX=3;
+  let extra='';sorted.slice(MAX).forEach(function(m){extra+=`<div class="cal-detail-row"><span class="cal-detail-time">${m.time||''}</span><span class="cal-detail-text">${m.text||''}</span></div>`;});
+  rowsWrap.insertAdjacentHTML('beforeend',extra);
+  if(moreBtn)moreBtn.remove();
+}
+
+// ── MONTHLY STAT BAR
+function renderMonthlyStatBar(){
+  const el=document.getElementById('monthly-stat-bar');if(!el)return;
+  const y=_calYear,mo=_calMonth;
+  const dim=new Date(y,mo+1,0).getDate();
+  let memos=0,todos=0,hc=0,ht=0,sleepMin=0,sleepCnt=0;
+  const habits=getHabits();
+  const today=new Date();
+  // 습관 달성률(%)만 당월인 경우 "오늘까지"로 분모를 제한 — 아직 오지 않은 날을 미달성으로 세지 않기 위함.
+  // memos/todos/sleep은 누적 합계·평균이라 31일 기준이어도 왜곡 없음(안 온 날은 그냥 안 더해짐).
+  const isCurMonth=(y===today.getFullYear()&&mo===today.getMonth());
+  const habitLastDay=isCurMonth?today.getDate():dim;
+  for(let d=1;d<=dim;d++){
+    const dk=`${y}-${pad(mo+1)}-${pad(d)}`;
+    memos+=getMemos(dk).length;todos+=getTodos(dk).filter(t=>t.done).length;
+    const sl=getSleep(dk);
+    if(sl.sleep&&sl.wake){const sv=sl.sleep.split(':').map(Number),wv=sl.wake.split(':').map(Number);let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;sleepMin+=m;sleepCnt++;}
+    if(d>habitLastDay)continue;
+    const date=new Date(y,mo,d);const wk=weekKey(date);const dow=(date.getDay()+6)%7;
+    const checks=getHabitChecks(wk);
+    habits.forEach(h=>{
+      if(!_isHabitActiveOn(h,dk))return;
+      ht++;if(checks[`${h.id}-${dow}`])hc++;
+    });
+  }
+  const pct=ht>0?Math.round(hc/ht*100):0;
+  const mk=calMonthKey();
+  // 콘텐츠 통계: 진행중은 제외, 완료(done/stopped)된 것만 종료일(endDate) 기준으로 그 달에 정확히 1회 카운트.
+  // getContentsForReport가 이미 "당월+전월 이월분"을 합쳐서 정확히 제공하므로 그대로 재사용.
+  // music은 완결 개념이 없어 status가 항상 'watching'이므로 위 필터를 통과 못 함 — 등록일(startDate) 기준으로 별도 집계.
+  const mcAll=getContentsForReport(mk);
+  const cc=mcAll.filter(c=>
+    c.cat!=='music'&&isContentFinished(c)&&c.endDate&&c.endDate.slice(0,7)===mk
+  ).length+mcAll.filter(c=>c.cat==='music'&&(c.startDate||'').slice(0,7)===mk).length;
+  const avgSleep=sleepCnt>0?(sleepMin/sleepCnt/60).toFixed(1):'-';
+  el.innerHTML=`<div class="stat-bar-wrap">
+    <div class="sbar-item"><i class="ti ti-notes sub-tm-13" aria-hidden="true"></i><span class="sbar-num">${memos}</span></div>
+    <div class="sbar-div"></div>
+    <div class="sbar-item"><i class="ti ti-checkbox sub-tm-13" aria-hidden="true"></i><span class="sbar-num">${todos}</span></div>
+    <div class="sbar-div"></div>
+    <div class="sbar-item"><i class="ti ti-chart-donut sub-tm-13" aria-hidden="true"></i><span class="sbar-num">${pct}%</span></div>
+    <div class="sbar-div"></div>
+    <div class="sbar-item"><i class="ti ti-stack-2 sub-tm-13" aria-hidden="true"></i><span class="sbar-num">${cc}</span></div>
+    <div class="sbar-div"></div>
+    <div class="sbar-item"><i class="ti ti-moon-stars sub-tm-13" aria-hidden="true"></i><span class="sbar-num">${avgSleep}h</span></div>
+  </div>`;
+}
+// 주간탭 미니 통계바 — renderMonthlyStatBar와 동일한 원칙(콘텐츠는 완료+종료일 기준)을 주 단위로 적용.
+function renderWeeklyStatBar(){
+  const el=document.getElementById('weekly-stat-bar');if(!el)return;
+  const wk=weekKey(new Date());
+  const wkStart=new Date(wk.replace('week:',''));
+  let memos=0,todos=0,hc=0,ht=0,sleepMin=0,sleepCnt=0;
+  const habits=getHabits();
+  const days=[];
+  const today=new Date();today.setHours(0,0,0,0);
+  for(let i=0;i<7;i++){
+    const d=new Date(wkStart);d.setDate(wkStart.getDate()+i);
+    days.push(d);
+    const dk=dateKey(d);
+    memos+=getMemos(dk).length;todos+=getTodos(dk).filter(t=>t.done).length;
+    const sl=getSleep(dk);
+    if(sl.sleep&&sl.wake){const sv=sl.sleep.split(':').map(Number),wv=sl.wake.split(':').map(Number);let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;sleepMin+=m;sleepCnt++;}
+    // 습관 달성률(%)만 "오늘까지"로 분모를 제한 — 아직 오지 않은 날을 미달성으로 세지 않기 위함(월간탭과 동일한 원칙).
+    if(d>today)continue;
+    const dow=(d.getDay()+6)%7;
+    const checks=getHabitChecks(wk);
+    habits.forEach(h=>{
+      if(!_isHabitActiveOn(h,dk))return;
+      ht++;if(checks[`${h.id}-${dow}`])hc++;
+    });
+  }
+  const pct=ht>0?Math.round(hc/ht*100):0;
+  // 콘텐츠: 완료(done/stopped)된 것만, 종료일이 이 주(월~일) 안에 속하면 1회 카운트.
+  // getContentsForReport(m)이 이미 "m월+전달 이월분"을 합쳐서 주므로, 한 주(최대 7일)는
+  // 항상 같은 달이거나 인접한 두 달에만 걸치기 때문에 종료일이 속한 달(wkEnd 기준) 하나만 조회하면 충분.
+  const wkEnd=days[6];
+  // music은 완결 개념이 없어 status가 항상 'watching'이므로 위 필터를 통과 못 함 — 등록일(startDate) 기준으로 별도 집계.
+  const wcAll=getContentsForReport(monthKey(wkEnd));
+  const cc=wcAll.filter(c=>
+    c.cat!=='music'&&isContentFinished(c)&&c.endDate&&
+    c.endDate>=dateKey(wkStart)&&c.endDate<=dateKey(wkEnd)
+  ).length+wcAll.filter(c=>
+    c.cat==='music'&&c.startDate&&c.startDate>=dateKey(wkStart)&&c.startDate<=dateKey(wkEnd)
+  ).length;
+  const wkAvgSleep=sleepCnt>0?(sleepMin/sleepCnt/60).toFixed(1):'-';
+  const now=new Date();
+  // 주간목표 한주 리포트와 동일하게 "그 주가 끝난 뒤" 월요일 하루 동안만 노출
+  const isReportDay=now.getDay()===1;
+  const memoItemClass=isReportDay?'sbar-item sbar-item-active':'sbar-item';
+  const memoItemAttr=isReportDay?`onclick="openWeeklyMemoReport()" title="이번 주 메모 리포트 보기"`:'';
+  el.innerHTML=`<div class="stat-bar-wrap" style="border-top:none;margin-top:0;">
+    <div class="${memoItemClass}" ${memoItemAttr}><i class="ti ti-notes sub-tm-13" aria-hidden="true"></i><span class="sbar-num">${memos}</span></div>
+    <div class="sbar-div"></div>
+    <div class="sbar-item"><i class="ti ti-checkbox sub-tm-13" aria-hidden="true"></i><span class="sbar-num">${todos}</span></div>
+    <div class="sbar-div"></div>
+    <div class="sbar-item"><i class="ti ti-chart-donut sub-tm-13" aria-hidden="true"></i><span class="sbar-num">${pct}%</span></div>
+    <div class="sbar-div"></div>
+    <div class="sbar-item"><i class="ti ti-stack-2 sub-tm-13" aria-hidden="true"></i><span class="sbar-num">${cc}</span></div>
+    <div class="sbar-div"></div>
+    <div class="sbar-item"><i class="ti ti-moon-stars sub-tm-13" aria-hidden="true"></i><span class="sbar-num">${wkAvgSleep}h</span></div>
+  </div>`;
+}
+
+
+
+// ── 진행률 링
+
+// ── DAILY ONE LINE
+function getDailyOneLine(dk){
+  const v=S.get(S.key('oneline',dk));
+  if(typeof v==='string')return v;
+  if(Array.isArray(v))return v.find(x=>typeof x==='string'&&x.trim())||'';
+  return '';
+}
+function saveDailyOneLine(dk,text){
+  S.set(S.key('oneline',dk),text);
+  // goal_notes 테이블에 동기화 (key: oneline:YYYY-MM-DD)
+  if(navigator.onLine)syncGoalUp(S.key('oneline',dk));
+}
+function renderDailyOneLineWeek(){
+  const el=document.getElementById('daily-oneline-list');if(!el)return;
+  const now=new Date(),dow=now.getDay();
+  const mon=new Date(now);mon.setDate(now.getDate()-((dow+6)%7));
+  el.innerHTML='';
+  for(let i=0;i<7;i++){
+    const d=new Date(mon);d.setDate(mon.getDate()+i);
+    const dk=dateKey(d);
+    const isToday=d.toDateString()===now.toDateString();
+    const row=document.createElement('div');
+    row.className='oneline-row'+(isToday?' oneline-today':'');
+    const dayWrap=document.createElement('div');dayWrap.className='oneline-day-wrap';
+    const dayEl=document.createElement('span');dayEl.className='oneline-day';
+    dayEl.textContent=DAYS[d.getDay()];
+    dayWrap.appendChild(dayEl);
+    const divider=document.createElement('div');divider.className='oneline-divider';
+    const inp=document.createElement('input');
+    inp.type='text';inp.className='oneline-inp';
+    inp.value=getDailyOneLine(dk);
+    inp.placeholder=isToday?'오늘 하루 한 줄...':'';
+    inp.autocomplete='off';
+    inp.addEventListener('blur',()=>saveDailyOneLine(dk,inp.value.trim()));
+    inp.addEventListener('compositionend',()=>{}); // 한글 IME 안전
+    inp.addEventListener('keydown',e=>{if(e.key==='Enter')inp.blur();});
+    row.appendChild(dayWrap);row.appendChild(divider);row.appendChild(inp);
+    el.appendChild(row);
+  }
+}
+// ── TODO DRAG
+// ══════════════════════════════════════════════════════════
+// ██ 초기화 (1/2 — 나머지는 파일 끝 HOME/INIT/마이그레이션) ██
+// ══════════════════════════════════════════════════════════
+// ── LOAD
+function tabularTimeHtml(str){
+  if(!str)return'';
+  return str.split('').map(c=>`<span style="display:inline-block;width:${c===':'?'0.32em':'0.62em'};text-align:center;">${c}</span>`).join('');
+}
+// ── 오늘탭 마무리: 뭐먹지/해빗 카드 렌더 ──
+function renderTodayMeal(){
+  const el=document.getElementById('daily-meal-card');if(!el)return;
+  const dk=dateKey(currentDate);
+  const m=getMeals(dk);
+  const items=MEAL_KEYS.filter(k=>m[k]);
+  // 시간이 등록된 항목이 하나라도 있으면 시간순 정렬, 없으면 기본 순서 유지
+  const hasAnyTime=items.some(k=>m[k+'_time']);
+  if(hasAnyTime){
+    items.sort((a,b)=>{
+      const ta=m[a+'_time']||'99:99';
+      const tb=m[b+'_time']||'99:99';
+      return ta.localeCompare(tb);
+    });
+  }
+  let html='';
+  items.forEach(k=>{
+    const t=m[k+'_time'];
+    const timeHtml=t?`<span class="meal-time-tag">${tabularTimeHtml(t)}</span>`:`<button class="meal-time-btn" onclick="recordMealTime('${dk}','${k}')" title="식사 시간 기록"><i class="ti ti-check" style="font-size:10px;" aria-hidden="true"></i></button>`;
+    html+=`<div class="cal-detail-row"><span class="cal-detail-time">${MEAL_LABELS[k]}</span><span class="cal-detail-text" style="flex:1;">${m[k]}</span>${timeHtml}</div>`;
+  });
+  el.innerHTML=html||'<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:8px 0;">주간 메뉴판에서 적어보세요</div>';
+}
+function recordMealTime(dk,k){
+  const now=new Date();
+  patchMealField(dk,k,'time',`${pad(now.getHours())}:${pad(now.getMinutes())}`);
+}
+// [2026-09-06] 카탈로그 도입으로 4색→7색 확장(lavender/orange/warmgray 추가) — 각 팔레트는 index.html의
+// --pal-*-bg/text/border 변수가 실제로 존재하는 것만 사용(peach는 존재하지 않아 orange로 대체).
+// [2026-09-06] 습관 색상을 리듬 카테고리와 통일하며 lime 추가(정리↔리듬home). mint는 더 이상 습관에서 안 쓰지만
+// 매핑 자체는 남겨둠(과거 데이터 호환 — 예전에 mint로 저장된 커스텀 습관이 있을 수 있음).
+const HABIT_COLOR_BG={mint:'var(--pal-mint-bg)',pink:'var(--pal-pink-bg)',sky:'var(--pal-sky-bg)',yellow:'var(--pal-yellow-bg)',lavender:'var(--pal-lavender-bg)',orange:'var(--pal-orange-bg)',warmgray:'var(--pal-warmgray-bg)',lime:'var(--pal-lime-bg)'};
+const HABIT_COLOR_TEXT={mint:'var(--pal-mint-text)',pink:'var(--pal-pink-text)',sky:'var(--pal-sky-text)',yellow:'var(--pal-yellow-text)',lavender:'var(--pal-lavender-text)',orange:'var(--pal-orange-text)',warmgray:'var(--pal-warmgray-text)',lime:'var(--pal-lime-text)'};
+const HABIT_COLOR_BORDER={mint:'var(--pal-mint-border)',pink:'var(--pal-pink-border)',sky:'var(--pal-sky-border)',yellow:'var(--pal-yellow-border)',lavender:'var(--pal-lavender-border)',orange:'var(--pal-orange-border)',warmgray:'var(--pal-warmgray-border)',lime:'var(--pal-lime-border)'};
+// 배경으로 넓게 깔리는 곳(이번주 해빗현황 도트 등)엔 solid 대신 이 연한톤을 사용 — 파스텔 기조 유지
+function getHabitColorSoft(colorKey){
+  return HABIT_COLOR_BG[colorKey]||'var(--pal-pink-bg)';
+}
+function getHabitColorText(colorKey){
+  return HABIT_COLOR_TEXT[colorKey]||'var(--pal-pink-text)';
+}
+function getHabitColorBorder(colorKey){
+  return HABIT_COLOR_BORDER[colorKey]||'var(--pal-pink-border)';
+}
+function renderDailyHabitCheck(){
+  const el=document.getElementById('daily-habit-box');if(!el)return;
+  const habits=getActiveHabits();
+  if(!habits.length){el.innerHTML='<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:6px 0;width:100%;">습관을 추가해보세요</div>';return;}
+  const wk=weekKey(currentDate),dow=(currentDate.getDay()+6)%7;
+  const checks=getHabitChecks(wk);
+  el.innerHTML='';
+  habits.forEach(function(h){
+    const key=h.id+'-'+dow;
+    const checked=!!checks[key];
+    const rgba=getHabitColorSoft(h.color);
+    const rgbaText=getHabitColorText(h.color);
+    const hIcon=getHabitIconFor(h);
+    const isGlass=document.documentElement.dataset.theme==='glass';
+    const innerMark=isGlass
+      ?(hIcon
+        ?'<i class="ti '+hIcon+'" style="font-size:16px;color:'+rgbaText+';display:'+(checked?'block':'none')+';" aria-hidden="true"></i>'
+        :'<i class="ti ti-check" style="font-size:15px;color:'+rgbaText+';display:'+(checked?'block':'none')+';" aria-hidden="true"></i>')
+      :(hIcon
+        ?'<i class="ti '+hIcon+'" style="font-size:12px;color:'+rgbaText+';display:'+(checked?'block':'none')+';" aria-hidden="true"></i>'
+        :'<i class="ti ti-check" style="font-size:12px;color:'+rgbaText+';display:'+(checked?'block':'none')+';" aria-hidden="true"></i>');
+    const rgbaBorder=getHabitColorBorder(h.color);
+    const col=document.createElement('div');col.className='habit-check-col';
+    const chkStyle=checked?(isGlass?' style="border-color:'+rgbaText+';"':' style="background:'+rgba+';border-color:'+rgbaBorder+';"'):'';
+    col.innerHTML='<div class="habit-check-name">'+h.name+'</div><div class="habit-chk2'+(checked?' on':'')+'"'+chkStyle+'>'+innerMark+'</div>';
+    col.querySelector('.habit-chk2').addEventListener('click',function(){
+      toggleHabitCheckWithTime(wk,h.id,dow,dateKey(currentDate));
+      renderDailyHabitCheck();
+      if(document.getElementById('v-monthly')&&document.getElementById('v-monthly').classList.contains('on'))renderHabitMonthly();
+      if(document.getElementById('v-weekly')&&document.getElementById('v-weekly').classList.contains('on'))renderWeeklyHabitBox();
+    });
+    el.appendChild(col);
+  });
+}
+// ── 오늘탭 전체 로드 진입점 + 주간탭용 리듬바 계산 ──
+function loadDaily(){
+  _sleepCollapseOverride=null; // 오늘탭 재진입(다시 누르기 포함) 시 사용자가 펼쳐뒀던 상태를 초기화 — 시간대 기준 자동판단으로 되돌아감
+  _todayBannerMode=null; // 오늘탭 재진입(다시 누르기 포함) 시 일정/시간표 수동전환 기록도 초기화 — 자동판단으로 되돌아감
+  loadSleep();renderTodos();renderMemos();renderTodayMeal();renderDailyHabitCheck();
+  const dk=dateKey(currentDate);
+  ensureDateSynced(dk).then(fetched=>{if(fetched){loadSleep();renderTodos();renderMemos();renderTodayMeal();renderDailyHabitCheck();}});
+}
+// 주간탭 리듬 취합 — 월간 리포트와 동일한 방식(카테고리별 누적시간 비율 막대 + 상위 항목 리스트)으로 간소화.
+// 기존엔 7일치 가로 시간축 바 + 요일별 흐름보기가 있었으나, 그 상세 조회는 아카이브앱으로 이관하고
+// 본앱엔 "이번주 어디에 시간을 많이 썼는지"만 가볍게 보여주는 요약 + 오늘 리듬 입력 진입점만 남김
+// (2026-09-08 간소화 — computeRhythmSegsForDay/renderRhythmBarHtml/흐름보기 등 시간축 계산 로직 전량 제거).
+// 최근 7일(오늘 포함) 카테고리별 누적시간+발생일수 — getDayCategoryDurations(기존 공용 유틸)를 7일 돌며 합산.
+// 수면/식사는 buildMonthlyRhythmBar 쪽에서 이미 활동 카테고리(RHYTHM_CATS)만 추리므로 자동 제외됨.
+// 기존엔 월~오늘(주초반엔 표본이 1~2일뿐)이었으나, 홈탭 오늘의 흐름 인사이트와 동일하게 항상 최근 7일 고정 윈도우로 통일(2026-09-08).
+// dayCount(카테고리별 실제 발생일수)는 computeRawStatsForRange(월간리포트)와 동일 기준(dd[k]>0인 날만 카운트)으로 별도 집계 — 이게 없으면 buildMonthlyRhythmBar의 일평균이 누계와 같아짐.
+function computeWeeklyRhythmDur(){
+  const start=new Date();start.setDate(start.getDate()-6); // 오늘 포함 최근 7일
+  return sumCategoryDurations(start,7);
+}
+// 최대 5위까지만 — buildMonthlyRhythmBar는 전체를 다 나열하므로, 상위 5개만 골라 같은 형식으로 재구성.
+function buildWeeklyRhythmBarTop5(dur,dayCount){
+  const order=Object.values(RHYTHM_CATS).map(function(c){return c.label;});
+  const top5=order.filter(function(k){return (dur[k]||0)>0;})
+    .sort(function(a,b){return dur[b]-dur[a];}).slice(0,5);
+  const trimmedDur={},trimmedDayCount={};
+  top5.forEach(function(k){trimmedDur[k]=dur[k];trimmedDayCount[k]=dayCount[k];});
+  return buildMonthlyRhythmBar(trimmedDur,false,trimmedDayCount);
+}
+function renderWeeklyRhythmBars(){
+  const el=document.getElementById('weekly-rhythm-bars');if(!el)return;
+  const {dur,dayCount}=computeWeeklyRhythmDur();
+  const barHtml=Object.keys(dur).length?buildWeeklyRhythmBarTop5(dur,dayCount):'<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:12px 0;">최근 7일간 기록된 리듬이 없어요</div>';
+  let html='<div class="wrb-wrap"><div class="wrb-summary" onclick="toggleWeeklyRhythmForm()" style="cursor:pointer;">'+barHtml+'</div>';
+  if(_weeklyRhythmFormOpen){
+    html+='<div class="wrb-form-slot" id="wrb-today-form"></div>';
+  }
+  html+='</div>';
+  el.innerHTML=html;
+  if(_weeklyRhythmFormOpen){
+    const slot=document.getElementById('wrb-today-form');
+    if(slot)slot.appendChild(buildRhythmFormEl(true));
+  }
+}
+// 주간탭 리듬 요약 클릭 시 오늘 리듬 입력폼 토글 — 홈탭과 동일한 폼(카테고리 선택+시간+메모)을 그대로 재사용.
+// 리듬 리뷰나 다른 리포트는 붙이지 않고 순수 입력 기능만 제공.
+let _weeklyRhythmFormOpen=false;
+function toggleWeeklyRhythmForm(){
+  _weeklyRhythmFormOpen=!_weeklyRhythmFormOpen;
+  _rhythmDk=dateKey(getLogicalDate());
+  if(!_weeklyRhythmFormOpen){_rhythmFormOpen=false;_resetRhythmForm();}
+  renderWeeklyRhythmBars();
+  // 폼이 열릴 때만 — 카테고리 레전드를 누르면 시간/메모 입력 필드가 아래로 이어져 나오므로,
+  // 렌더링 직후(DOM 반영 다음 프레임) 카드 위치로 스크롤해 폼이 화면 하단에서도 바로 보이게 함.
+  if(_weeklyRhythmFormOpen){
+    requestAnimationFrame(()=>{
+      const el=document.getElementById('weekly-rhythm-bars');
+      if(el)el.scrollIntoView({behavior:'smooth',block:'end'});
+    });
+  }
+}
+// 카테고리 레전드 + 시간/메모 입력 폼 — buildDailyRhythmTrack의 폼 부분과 동일한 HTML을 생성하는 공통 함수.
+// 홈탭(buildDailyRhythmTrack)과 주간탭(renderWeeklyRhythmBars) 양쪽에서 재사용됨.
+function buildRhythmFormEl(showOngoingList){
+  const wrap=document.createElement('div');
+  // 진행중인(끝 시간 없는) 블록이 있으면 폼 위에 간단히 보여주고 종료 버튼 제공.
+  // 홈탭은 buildDailyRhythmTrack의 전체 타임라인에 이미 동일한 진행중 항목+종료버튼이 있으므로 중복 방지 차 여기선 생략.
+  // 주간탭 호출 시(showOngoingList=true)에만 이 요약 목록을 노출.
+  if(showOngoingList){
+    const ongoingBlocks=getRhythmBlocks(_rhythmDk).map((b,idx)=>({...b,idx})).filter(b=>b.start&&!b.end);
+    if(ongoingBlocks.length){
+      const ongoingWrap=document.createElement('div');ongoingWrap.className='rhythm-track-ongoing';
+      ongoingWrap.innerHTML=ongoingBlocks.map(function(b){
+        const cat=RHYTHM_CATS[b.cat];if(!cat)return '';
+        return '<div class="rt-row"><span class="rt-time">'+b.start+'~</span><span class="rt-txt">'+cat.label+(b.text&&b.text.trim()?' — '+b.text.trim():'')+'</span><span class="rt-actions"><span class="rt-finish" onclick="finishRhythmBlock('+b.idx+')"><i class="ti ti-player-stop ico-sz-13" aria-hidden="true"></i></span></span></div>';
+      }).join('');
+      wrap.appendChild(ongoingWrap);
+    }
+  }
+  const legend=document.createElement('div');legend.className='rhythm-track-legend';
+  legend.innerHTML=Object.keys(RHYTHM_CATS).map(function(k){const c=RHYTHM_CATS[k];const rc=getRhythmColor(k);const sel=_rhythmFormOpen&&_rhythmFormCat===k;return '<span class="rhythm-legend-item"><span class="rhythm-legend-dot'+(sel?' sel':'')+'" style="background:'+rc+';--cat-color:'+rc+';" title="'+c.label+'" onclick="selectRhythmCatAndOpen(\''+k+'\')"><i class="ti '+c.icon+'" aria-hidden="true"></i></span><span class="rhythm-legend-lbl">'+c.label+'</span></span>';}).join('');
+  wrap.appendChild(legend);
+  if(_rhythmFormOpen){
+    const form=document.createElement('div');form.className='rhythm-add-form';
+    const selColor=getRhythmColor(_rhythmFormCat); // 선택 강조색 — 카테고리 고유색 그대로 사용
+    const selBg=_lightenRgba(selColor,0.14);
+    // 칩 한 개 = {label, cid?}. 값은 data 속성으로 넘겨 제목에 따옴표/특수문자가 있어도 깨지지 않게 함(cid는 감상 칩만).
+    const chip=c=>'<span class="rhythm-content-chip" data-t="'+escapeAttr(c.label)+'"'+(c.cid?' data-c="'+escapeAttr(c.cid)+'"':'')+' style="--sel-color:'+selColor+';--sel-bg:'+selBg+';" onclick="pickRhythmContentTitle(this.dataset.t,this,this.dataset.c)">'+escapeHtml(c.label)+'</span>';
+    const chips=getRhythmChipOptions(_rhythmFormCat);
+    const swipe=_rhythmFormCat!=='enjoy'&&_rhythmFormCat!=='appointment'; // 감상/외출은 개수가 적어 줄바꿈, 나머지는 가로 스와이프
+    const contentPickerHtml=chips.length?'<div class="rhythm-content-picker'+(swipe?' rhythm-content-picker-swipe':'')+'">'+chips.map(chip).join('')+'</div>':'';
+    form.innerHTML=
+      '<div class="rhythm-form-label">시작 — 끝</div>'+
+      '<div class="rhythm-time-row">'+
+        '<div class="rhythm-timebox"><span class="rhythm-timebox-l">시작</span><span class="rhythm-timebox-v" onclick="openRhythmTimeModal(\'start\')">'+(_rhythmFormStart||'--:--')+'</span><span class="rhythm-timebox-now" onclick="setRhythmNow(\'start\')"><i class="ti ti-clock-hour-4 ico-sz-11" aria-hidden="true"></i></span></div>'+
+        '<span class="rhythm-arrow">→</span>'+
+        '<div class="rhythm-timebox"><span class="rhythm-timebox-l">끝(선택)</span><span class="rhythm-timebox-v" onclick="openRhythmTimeModal(\'end\')">'+(_rhythmFormEnd||'--:--')+'</span><span class="rhythm-timebox-now" onclick="setRhythmNow(\'end\')"><i class="ti ti-clock-hour-4 ico-sz-11" aria-hidden="true"></i></span></div>'+
+      '</div>'+
+      contentPickerHtml+
+      '<input type="text" id="rhythm-text-inp" class="rhythm-memo-inp" placeholder="한 줄 메모 (선택)" value="'+(_rhythmFormText||'').replace(/"/g,'&quot;')+'" oninput="_rhythmFormText=this.value;if(_rhythmFormCid)_rhythmFormCid=null;document.querySelectorAll(\'.rhythm-content-chip.sel\').forEach(function(el){if(el.textContent!==this.value)el.classList.remove(\'sel\');}.bind(this))">'+
+      '<div style="display:flex;gap:8px;">'+
+        '<button class="rhythm-save-btn" style="background:none;border:1.5px solid var(--card-b);color:var(--tm);flex:0 0 80px;" onclick="toggleRhythmAddForm()">취소</button>'+
+        '<button class="rhythm-save-btn" style="flex:1;" onclick="saveRhythmBlock()">'+(_rhythmEditIdx!=null?'수정 완료':'트랙에 추가')+'</button>'+
+      '</div>';
+    wrap.appendChild(form);
+  }
+  return wrap;
+}
+// ── 주간탭 전체 로드 진입점 ──
+function loadWeekly(){
+  buildWeekStrip();
+  setupWeeklyChallengeToggle();
+  renderDailyOneLineWeek();
+  renderWeeklyRhythmBars();
+  renderWeeklyHabitBox();
+}
+function renderWeeklyHabitBox(){
+  const el=document.getElementById('weekly-habit-box');if(!el)return;
+  const habits=getActiveHabits();
+  if(!habits.length){el.innerHTML='<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:8px 0;">습관을 추가해보세요</div>';return;}
+  const now=new Date();
+  const wk=weekKey(now);
+  const mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7));
+  const todayDow=(now.getDay()+6)%7;
+  const checks=getHabitChecks(wk);
+  const dayLabels=['월','화','수','목','금','토','일'];
+  let html='<div class="hw-daylabels">'+dayLabels.map(d=>'<span>'+d+'</span>').join('')+'</div>';
+  habits.forEach(function(h){
+    const rgbaBg=getHabitColorSoft(h.color);
+    const rgbaBorder=getHabitColorBorder(h.color);
+    const rgbaText=getHabitColorText(h.color);
+    let cnt=0,dotsHtml='';
+    for(let d=0;d<7;d++){
+      const on=!!checks[h.id+'-'+d];
+      if(on)cnt++;
+      const isToday=d===todayDow;
+      const borderColor=on?rgbaBorder:'rgba(var(--divider-rgb),0.5)';
+      const borderWidth=isToday?'2px':'1.3px';
+      const bg=on?rgbaBg:'none';
+      dotsHtml+='<div class="hw-dot-wrap"><div class="hw-dot" style="background:'+bg+';border-color:'+borderColor+';border-width:'+borderWidth+';"></div></div>';
+    }
+    html+='<div class="hw-row"><div class="hw-name"><span class="hw-name-dot" style="background:'+rgbaBg+';"></span>'+h.name+'</div><div class="hw-dots">'+dotsHtml+'</div><div class="hw-streak">'+cnt+'/7</div></div>';
+  });
+  el.innerHTML=html;
+}
+// ── 월간탭 전체 로드 진입점 ──
+function loadMonthly(){
+  const _ld0=currentDate; // 날짜 네비게이터가 가리키는 날짜 기준으로 월간탭 진입 (기존: 항상 오늘 기준)
+  _calYear=_ld0.getFullYear();_calMonth=_ld0.getMonth();
+  _calSelectedDay=null;
+  const _cdEl0=document.getElementById('cal-detail');if(_cdEl0)_cdEl0.innerHTML='';
+  renderContentTimeline();renderHabitMonthly();
+  renderGoalNote('monthly-goal-wrap',S.key('mgoal',calMonthKey()),isCalPastMonth());
+  updateMonthlyGoalTitle();
+  renderCalendar();renderMonthlyStatBar();
+  updateReportBannerLabel();
+  updateDiaryBannerLabel();
+  const sy=_calYear,smo=_calMonth;
+  syncOnelineMonthRange(sy,smo).then(fetched=>{
+    if(fetched&&_calYear===sy&&_calMonth===smo)updateDiaryBannerLabel();
+  });
+  syncMonthRange(sy,smo).then(fetched=>{
+    if(fetched&&_calYear===sy&&_calMonth===smo){
+      renderCalendar();renderContentTimeline();renderHabitMonthly();renderMonthlyStatBar();
+      renderGoalNote('monthly-goal-wrap',S.key('mgoal',calMonthKey()),isCalPastMonth());
+    }
+  });
+}
+
+// ── MODAL / SHEET HELPERS
+function openModal(id){const el=document.getElementById(id);document.body.appendChild(el);el.classList.add('on');}
+function closeModal(id,e){if(!e||e.target===document.getElementById(id))document.getElementById(id).classList.remove('on');}
+function getMealWishlist(){return getGoal('wishlist:meal').filter(l=>l&&l.trim());}
+function saveMealWishlist(arr){saveGoal('wishlist:meal',arr.length?arr:['']);}
+function toggleMealWishlist(){
+  const p=document.getElementById('meal-wishlist-panel');
+  if(p.style.display==='none'){renderMealWishlist();p.style.display='block';}
+  else p.style.display='none';
+}
+function renderMealWishlist(){
+  const p=document.getElementById('meal-wishlist-panel');
+  const items=getMealWishlist();
+  p.innerHTML='<div class="wish-add-row"><input id="wish-add-inp" class="meal-inp" type="text" placeholder="먹고싶은 메뉴 추가" autocomplete="off" onkeydown="if(event.isComposing||event.keyCode===229)return;if(event.key===\'Enter\'){event.preventDefault();addMealWish();}"><button class="wish-add-btn" onclick="addMealWish()">+</button></div>'+
+    (items.length?items.map((t,i)=>`<div class="wish-item"><span class="wish-text" onclick="editMealWish(${i},this)">${t}</span><span class="wish-place-btn" onclick="startWishPlacing(${i})">넣기</span><span class="wish-del-btn" onclick="removeMealWish(${i})">✕</span></div>`).join(''):'<div style="font-size:var(--dow-label-size);color:var(--tm);padding:6px 2px;">아직 담아둔 메뉴가 없어요</div>');
+}
+function editMealWish(i,spanEl){
+  const items=getMealWishlist();
+  const cur=items[i];if(cur==null)return;
+  const inp=document.createElement('input');
+  inp.type='text';inp.className='meal-inp';inp.value=cur;inp.autocomplete='off';
+  inp.style.cssText='flex:1;font-size:var(--main-text-size);';
+  function commit(){
+    const v=inp.value.trim();
+    if(v){items[i]=v;saveMealWishlist(items);}
+    renderMealWishlist();
+  }
+  inp.addEventListener('keydown',e=>{
+    if(e.isComposing||e.keyCode===229)return;
+    if(e.key==='Enter'){e.preventDefault();commit();}
+  });
+  inp.addEventListener('blur',commit);
+  spanEl.replaceWith(inp);
+  inp.focus();inp.select();
+}
+function addMealWish(){
+  const inp=document.getElementById('wish-add-inp');
+  const v=inp.value.trim();if(!v)return;
+  const items=getMealWishlist();items.push(v);saveMealWishlist(items);
+  inp.value='';renderMealWishlist();
+}
+function removeMealWish(i){
+  const items=getMealWishlist();items.splice(i,1);saveMealWishlist(items);renderMealWishlist();
+}
+let _wishPlacing=null,_wishPlacingIdx=null;
+function startWishPlacing(i){
+  const items=getMealWishlist();
+  _wishPlacing=items[i];if(!_wishPlacing)return;
+  _wishPlacingIdx=i;
+  document.querySelectorAll('#week-meal-body .meal-inp').forEach(el=>el.classList.add('wish-target'));
+  document.getElementById('wish-placing-hint').style.display='block';
+}
+function cancelWishPlacing(){
+  _wishPlacing=null;_wishPlacingIdx=null;
+  document.querySelectorAll('#week-meal-body .meal-inp').forEach(el=>el.classList.remove('wish-target'));
+  const hintEl=document.getElementById('wish-placing-hint');
+  if(hintEl)hintEl.style.display='none';
+}
+function placeWish(el){
+  if(!_wishPlacing)return;
+  el.value=el.value?el.value+', '+_wishPlacing:_wishPlacing;
+  // onblur로만 저장되는 구조라, 배치 직후엔 아직 blur가 안 일어난 상태 — 명시적으로 저장 호출.
+  // el.id는 wm-${dk}-${k} 형식(dk 자체에 '-'가 포함되므로 마지막 조각만 k, 나머지가 dk).
+  const idParts=el.id.split('-');
+  if(idParts[0]==='wm')saveMealMenu(idParts.slice(1,-1).join('-'),idParts[idParts.length-1]);
+  // 특정 날짜 칸에 배치됐으니 위시리스트에서 제거
+  if(_wishPlacingIdx!=null){
+    const items=getMealWishlist();
+    items.splice(_wishPlacingIdx,1);
+    saveMealWishlist(items);
+    renderMealWishlist();
+  }
+  cancelWishPlacing();
+}
+(function(){
+  const body=document.getElementById('week-meal-body');
+  if(!body)return;
+  const handler=function(e){
+    if(!_wishPlacing)return;
+    const el=e.target.closest('.meal-inp');
+    if(!el)return;
+    e.preventDefault();
+    placeWish(el);
+  };
+  body.addEventListener('mousedown',handler);
+  body.addEventListener('touchstart',handler,{passive:false});
+})();
+let _mealCatPressTimer=null;
+function mealCatPressStart(el,dk,k){
+  clearTimeout(_mealCatPressTimer);
+  _mealCatPressTimer=setTimeout(()=>{
+    const tEl=document.getElementById(`wm-${dk}-${k}-time`);
+    if(tEl&&tEl.value){
+      tEl.value='';
+      patchMealField(dk,k,'time','');
+      refreshMealTimeGroup(dk,k,'');
+      el.style.transition='opacity .15s';el.style.opacity='0.3';
+      setTimeout(()=>{el.style.opacity='';},220);
+    }
+    _mealCatPressTimer=null;
+  },550);
+}
+function mealCatPressEnd(){
+  clearTimeout(_mealCatPressTimer);
+  _mealCatPressTimer=null;
+}
+// 시간 입력창(type=time) 자체엔 지우기 버튼이 없어 한번 넣은 시간을 못 지우던 문제 — 별도 X 버튼으로 지원.
+function clearMealTime(dk,k){
+  const tEl=document.getElementById(`wm-${dk}-${k}-time`);
+  if(tEl)tEl.dataset.value='';
+  patchMealField(dk,k,'time','');
+  refreshMealTimeGroup(dk,k,'');
+}
+// 메뉴칸(onblur) — 메뉴 필드만 patch. 메뉴가 비면 시간도 같이 지움(리듬 막대 잔존 방지).
+// 시간 필드는 절대 건드리지 않으므로 다른 기기가 등록한 시간이 여기서 사라질 수 없음.
+function saveMealMenu(dk,k){
+  const el=document.getElementById(`wm-${dk}-${k}`);
+  const val=el?el.value.trim():'';
+  patchMealField(dk,k,'menu',val);
+  if(!val){
+    patchMealField(dk,k,'time','');
+    const tEl=document.getElementById(`wm-${dk}-${k}-time`);
+    if(tEl)tEl.dataset.value='';
+    refreshMealTimeGroup(dk,k,'');
+  }
+}
+// 식사 시간 피커 — 취침/메모/일정과 동일한 공용 time-modal 재사용
+let _mealTimeTarget=null;
+function openMealTimePicker(dk,k){
+  _sleepTarget='meal';
+  _mealTimeTarget={dk,k};
+  const tEl=document.getElementById(`wm-${dk}-${k}-time`);
+  const n=new Date();
+  const current=(tEl&&tEl.dataset.value)||`${pad(n.getHours())}:${pad(n.getMinutes())}`;
+  document.getElementById('time-inp').value=current;
+  openModal('time-modal');
+  renderTimeWheel();
+}
+// 시간 입력 직후 ✕ 지우기 버튼과 빈값 스타일이 재진입 없이 바로 반영되도록 meal-time-group만 다시 그림.
+function refreshMealTimeGroup(dk,k,tVal){
+  const tEl=document.getElementById(`wm-${dk}-${k}-time`);
+  if(!tEl)return;
+  const group=tEl.parentElement;if(!group)return;
+  tEl.classList.toggle('mt-empty',!tVal);
+  tEl.textContent=tVal||'--:--';
+  tEl.dataset.value=tVal||'';
+  group.querySelectorAll('.meal-time-clear').forEach(b=>b.remove());
+  if(tVal){
+    const clearBtn=document.createElement('span');
+    clearBtn.className='meal-time-clear';
+    clearBtn.title='시간 지우기';
+    clearBtn.textContent='✕';
+    clearBtn.onclick=()=>clearMealTime(dk,k);
+    group.appendChild(clearBtn);
+  }
+}
+function openWeekMealSheet(){
+  cancelWishPlacing();
+  document.getElementById('meal-wishlist-panel').style.display='none';
+  const now=new Date();
+  const mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7));
+  const body=document.getElementById('week-meal-body');
+  body.innerHTML='';
+  const DOW=['월','화','수','목','금','토','일'];
+  const CATS=MEAL_KEYS.map(k=>[k,MEAL_LABELS[k]]);
+  const dayCount=14; // 이번 주 + 다음 주, 2주치 노출
+  for(let i=0;i<dayCount;i++){
+    const d=new Date(mon);d.setDate(mon.getDate()+i);
+    const dk=dateKey(d);
+    const m=getMeals(dk);
+    const isNextWeekPeek=i>=7;
+    const block=document.createElement('div');block.className='week-meal-day';block.id='wm-block-'+dk;
+    block.innerHTML=`<div class="week-meal-day-label">${DOW[i%7]} · ${d.getMonth()+1}/${d.getDate()}${isNextWeekPeek?' · 다음 주':''}</div>`+
+      CATS.map(([k,label])=>{
+        const tVal=m[k+'_time']||'';
+        // PC(비터치)에서는 네이티브 time input이 시(hour) 포커스 시 파란 하이라이트가
+        // 필드 폭을 넘어 튀어나오고, 폭을 넓히면 메뉴 입력칸이 과도하게 좁아지는 문제가 있어
+        // PC에서는 시간을 읽기 전용 텍스트로만 표기(24시간제)하고, 입력/수정은 모바일 또는
+        // 오늘탭 "오늘 뭐 먹지" 체크 기능에서 하도록 분리함.
+        const timeBlock=_isTouchDevice()
+          ? `<span class="meal-time-inp${tVal?'':' mt-empty'}" id="wm-${dk}-${k}-time" data-value="${tVal}" onclick="openMealTimePicker('${dk}','${k}')">${tVal||'--:--'}</span>${tVal?`<span onclick="clearMealTime('${dk}','${k}')" class="meal-time-clear" title="시간 지우기">✕</span>`:''}`
+          : (tVal?`<span class="meal-time-readonly">${tVal}</span>`:'');
+        return `<div class="meal-row"><div class="meal-cat" onpointerdown="mealCatPressStart(this,'${dk}','${k}')" onpointerup="mealCatPressEnd(this)" onpointerleave="mealCatPressEnd(this)" onpointercancel="mealCatPressEnd(this)">${label}</div><input class="meal-inp" style="flex:1 1 0;min-width:0;" id="wm-${dk}-${k}" type="text" placeholder="메뉴 입력" autocomplete="off" value="${(m[k]||'').replace(/"/g,'&quot;')}" onblur="saveMealMenu('${dk}','${k}')"><div class="meal-time-group">${timeBlock}</div></div>`;
+      }).join('');
+    body.appendChild(block);
+  }
+  openSheet('week-meal-sheet');
+  const todayDk=dateKey(now);
+  const tEl=document.getElementById('wm-block-'+todayDk);
+  const scroller=document.getElementById('week-meal-scroll');
+  if(tEl&&scroller)setTimeout(()=>{
+    const sr=scroller.getBoundingClientRect(),er=tEl.getBoundingClientRect();
+    scroller.scrollTop+=(er.top-sr.top);
+  },50);
+}
+function openSheet(id){document.getElementById(id).classList.add('on');}
+function closeSheet(id,e){if(!e||e.target===document.getElementById(id))document.getElementById(id).classList.remove('on');}
+
+// ══════════════════════════════════════════════════════════
+// ██ 설정 (2/2 — 나머지는 THEME/TEXT SCALE 부근) ██
+// ══════════════════════════════════════════════════════════
+// ── SETTINGS
+
+
+
+function saveClaudeKey(){
+  const inp=document.getElementById('claude-api-key-inp');
+  if(!inp)return;
+  const val=inp.value.trim();
+  if(!val||val.startsWith('••••')){showToast('키를 입력해주세요');return;}
+  S.set('claude_api_key',val);
+  inp.value='••••••••••••'+val.slice(-4);
+  const statusEl=document.getElementById('claude-key-status');
+  if(statusEl)statusEl.textContent='저장됐어요 ✅';
+  showToast('Claude API 키 저장됐어요 ✓');
+}
+function saveUserProfile(){
+  const inp=document.getElementById('user-profile-inp');
+  if(!inp)return;
+  const val=inp.value.trim();
+  if(val){S.set('user_profile',val);showToast('저장됐어요 ✓');}
+  else{try{localStorage.removeItem('user_profile');}catch(e){}showToast('삭제됐어요');}
+}
+function clearClaudeKey(){
+  try{
+    localStorage.removeItem('claude_api_key');
+    const inp=document.getElementById('claude-api-key-inp');
+    if(inp){inp.value='';inp.placeholder='sk-ant-api03-...';}
+    const statusEl=document.getElementById('claude-key-status');
+    if(statusEl)statusEl.textContent='날씨 인사 · 주간 루틴 · 일정 요약에 사용돼요';
+    _weatherCache=null;
+    showToast('삭제됐어요');
+  }catch(e){}
+}
+function openSettings(){
+  const keyInp=document.getElementById('claude-api-key-inp');
+  if(keyInp){const k=S.get('claude_api_key');keyInp.value=k?'sk-ant-••••'+k.slice(-4):'';}
+  const profileInp=document.getElementById('user-profile-inp');if(profileInp)profileInp.value=S.get('user_profile')||'';
+  const theme=S.get('theme')||'light';
+  document.querySelectorAll('.ctheme-btn').forEach(b=>b.classList.remove('on'));
+  const act=document.getElementById('ct-'+theme);if(act)act.classList.add('on');
+  initTextScaleUI();
+  _resetHabitEditDraft(); // 설정탭 진입 시마다 편집용 임시본을 실데이터로 새로 초기화(이전 진입의 미저장 변경은 버림)
+  renderSettingsHabitSection();
+  refreshPushStatusUI();
+  renderSettingsAlertSection();
+  document.getElementById('settings-ov').classList.add('on');
+}
+// 설정탭 알림 시각 3종(아침브리핑/저녁마무리/남은할일) + 개별 온오프 6종 UI — user_settings를 직접 조회해 채움.
+// 전체 push 구독이 꺼져있으면(getExistingPushSubscription 없음) 개별 토글은 값 유지한 채 시각적으로만 비활성화.
+// ALERT_TIME_FIELD_MAP/ALERT_ENABLED_FIELD_MAP은 렌더링과 토글 양쪽에서 쓰여 아래 공용 상수로 뽑음(중복 정의 제거).
+const ALERT_TIME_FIELD_MAP={morning:'morning_briefing_time',evening:'evening_wrap_time',remaining:'remaining_todo_time'};
+const ALERT_ENABLED_FIELD_MAP={morning:'morning_enabled',evening:'evening_enabled',remaining:'remaining_enabled',sleep:'sleep_enabled',rhythm:'rhythm_enabled',report:'report_enabled',exercise:'exercise_stat_enabled',noon:'noon_memo_enabled',question:'question_enabled'};
+async function renderSettingsAlertSection(){
+  const wrap=document.getElementById('settings-acc-alert-detail');
+  if(!wrap)return;
+  const settings=await getUserSettings();
+  if(!settings)return;
+  Object.keys(ALERT_TIME_FIELD_MAP).forEach(kind=>{
+    const el=document.getElementById('alert-time-'+kind);
+    if(el)el.textContent=settings[ALERT_TIME_FIELD_MAP[kind]]||'--:--';
+  });
+  const pushOn=!!(await getExistingPushSubscription());
+  Object.keys(ALERT_ENABLED_FIELD_MAP).forEach(kind=>{
+    const toggle=document.getElementById('alert-toggle-'+kind);
+    if(!toggle)return;
+    toggle.classList.toggle('on',!!settings[ALERT_ENABLED_FIELD_MAP[kind]]);
+    toggle.classList.toggle('disabled',!pushOn); // 전체 알림 꺼져있으면 개별 토글은 값 유지+비활성 표시만
+  });
+  // 오늘의 질문 풀에 남은 질문 수(미사용 + 재사용 가능한 날짜형) — 줄어들면 질문을 더 채워 넣을 때
+  const remainEl=document.getElementById('question-remaining-lbl');
+  if(remainEl)supaFetch('rpc/count_available_memo_prompts','POST',{}).then(n=>{remainEl.textContent=(typeof n==='number')?`${n}개`:'-';});
+}
+// 아코디언 헤더 클릭 — 알림 섹션에 우선 적용, 추후 다른 설정 카드에도 같은 id 규칙(settings-acc-<key>)으로 재사용 예정.
+function toggleSettingsAccordion(key){
+  const body=document.getElementById('settings-acc-'+key);
+  const header=body&&body.previousElementSibling;
+  if(!body)return;
+  body.classList.toggle('open');
+  if(header)header.classList.toggle('open');
+}
+// 개별 알림 온오프 토글 — 전체 push가 꺼져있으면(비활성 표시 상태) 클릭 무시.
+async function toggleAlertEnabled(kind){
+  const toggle=document.getElementById('alert-toggle-'+kind);
+  if(!toggle||toggle.classList.contains('disabled'))return;
+  const field=ALERT_ENABLED_FIELD_MAP[kind];if(!field)return;
+  const nowOn=toggle.classList.contains('on');
+  toggle.classList.toggle('on',!nowOn); // 즉시 반영(낙관적 업데이트), 실패해도 다음 진입 시 서버값으로 재동기화됨
+  await supaUpsert('user_settings','id',[{id:true,[field]:!nowOn}]);
+}
+// 알림 시각 피커 — 기존 공용 시간 휠 모달(#time-modal) 재사용, _sleepTarget으로 3종 구분.
+// DOM id가 'alert-time-'+kind 고정 패턴이라 별도 맵 없이 문자열 조합으로 충분(불필요한 맵 제거).
+function openAlertTimePickerFor(kind){
+  const el=document.getElementById('alert-time-'+kind);
+  const cur=el.textContent;
+  document.getElementById('time-inp').value=(cur&&cur!=='--:--')?cur:'08:00';
+  _sleepTarget='alertTime:'+kind;
+  openModal('time-modal');
+  renderTimeWheel();
+}
+// [2026-09-06 저장버튼 도입] "항목 선택" 칩은 탭 즉시 실제 저장(saveHabits)하지 않고, 이 임시 배열(_habitEditDraft)만
+// 바꾼 뒤 화면만 다시 그림 — 실수로 잘못 누른 칩이 바로 서버까지 반영되던 문제를 막고, "저장" 버튼을 눌러야만
+// 실제 반영+동기화(saveHabits)가 실행되도록 해서 한 번 더 확인할 기회를 줌.
+let _habitEditDraft=null;
+function _resetHabitEditDraft(){_habitEditDraft=getHabits().map(h=>({...h,periods:_habitPeriods(h).map(p=>({...p}))}));}
+// [2026-09-05] 설정탭 해빗 코너 — 카탈로그 칩(토글) + 직접입력 습관 + 아침기상 목표시각.
+// 기존에 오늘탭 하단에 있던 "+ 항목 편집"(habit-modal, 줄바꿈 텍스트박스) 방식을 완전히 대체.
+function renderSettingsHabitSection(){
+  const chipsWrap=document.getElementById('settings-habit-catalog-chips');
+  if(!chipsWrap)return;
+  if(!_habitEditDraft)_resetHabitEditDraft();
+  const habits=_habitEditDraft; // 화면은 항상 임시본 기준으로 그림 — 저장 전까지 실제 데이터(getHabits())는 그대로 유지됨
+  chipsWrap.innerHTML=HABIT_CATALOG.map(c=>{
+    const existing=habits.find(h=>h.id===c.id);
+    const isOn=existing&&_isHabitCurrentlyOn(existing);
+    return `<span class="rhythm-content-chip${isOn?' sel':''}" onclick="toggleCatalogHabit('${c.id}')"><i class="ti ${c.icon} ico-inline-13" aria-hidden="true"></i>${escapeHtml(c.label)}</span>`;
+  }).join('');
+  // 커스텀(직접입력) 습관도 같은 칩 목록에 이어서 노출 — 탭하면 archive 토글, 길게는 없음(단순화)
+  const customHabits=habits.filter(h=>h.custom);
+  if(customHabits.length){
+    chipsWrap.innerHTML+=customHabits.map(h=>{
+      const isOn=_isHabitCurrentlyOn(h);
+      const hIcon=getHabitIcon(h.name);
+      return `<span class="rhythm-content-chip${isOn?' sel':''}" onclick="toggleCustomHabit('${h.id}')">${hIcon?`<i class="ti ${hIcon} ico-inline-13" aria-hidden="true"></i>`:''}${escapeHtml(h.name)}</span>`;
+    }).join('');
+  }
+  // 아침기상 칩이 켜져 있을 때만 목표시각 입력 영역 노출
+  const wakeOn=habits.some(h=>h.id==='wake'&&_isHabitCurrentlyOn(h));
+  const goalWrap=document.getElementById('settings-habit-goal-wake-wrap');
+  if(goalWrap)goalWrap.style.display=wakeOn?'':'none';
+  const goalInp=document.getElementById('settings-habit-wake-goal-inp');
+  if(goalInp){const goal=getHabitGoal('wake');goalInp.value=goal&&goal.goalTime?goal.goalTime:'';}
+  // 실제 저장된 상태(getHabits())와 임시본이 다르면 저장 버튼을 강조 — 미저장 변경이 있음을 알림
+  const saveBtn=document.getElementById('settings-habit-save-btn');
+  if(saveBtn){
+    const dirty=JSON.stringify(getHabits())!==JSON.stringify(_habitEditDraft);
+    saveBtn.classList.toggle('dirty',dirty);
+    saveBtn.textContent=dirty?'저장 (변경사항 있음)':'저장됨';
+  }
+}
+// [2026-09-06 periods 전환] 활성/비활성 전환 시 구간 배열에 push/close만 하는 공용 헬퍼.
+// 이미 열린 구간이 있는데 또 켜기(중복 시작) / 이미 닫힌 상태인데 또 끄기(중복 종료) 시도는
+// 조용히 무시 — 더블탭 등 실수로 같은 토글이 연속 호출돼도 구간이 꼬이지 않도록 방어.
+// 같은 날 안에서 껐다가 다시 켜는 것(오전 끄기→오후 켜기)은 정상 케이스로 허용 — 이 경우 하루짜리
+// 닫힌 구간({start:오늘,end:오늘})이 하나 남고 그 뒤로 새 열린 구간이 이어짐.
+function _applyHabitToggle(h){
+  const periods=_habitPeriods(h).map(p=>({...p})); // 원본 훼손 방지 위해 얕은 복사
+  const today=dateKey(getLogicalDate());
+  const last=periods[periods.length-1];
+  if(!last||last.end){
+    periods.push({start:today,end:null}); // 현재 비활성 상태 → 새 구간 열기(켜기)
+  }else{
+    last.end=today; // 현재 활성 상태 → 마지막 구간 닫기(끄기)
+  }
+  const {createdAt,archivedAt,...rest}=h; // 구버전 필드는 정리(더 이상 이중 관리 안 함)
+  return {...rest,periods};
+}
+// 카탈로그 칩 토글 — [2026-09-06 저장버튼 도입] 이제 실제 저장은 하지 않고 _habitEditDraft만 변경.
+// 이미 등록돼 있으면(archive 여부 무관) 있는/없는 상태를 뒤집고, 아예 처음 켜는 것이면 카탈로그 정의로 새로 추가.
+function toggleCatalogHabit(catalogId){
+  if(!_habitEditDraft)_resetHabitEditDraft();
+  const idx=_habitEditDraft.findIndex(h=>h.id===catalogId);
+  if(idx>=0){
+    _habitEditDraft[idx]=_applyHabitToggle(_habitEditDraft[idx]);
+  }else{
+    const c=getHabitCatalogItem(catalogId);if(!c)return;
+    const today=dateKey(getLogicalDate());
+    _habitEditDraft.push({id:c.id,name:c.label,color:c.color,periods:[{start:today,end:null}]});
+  }
+  renderSettingsHabitSection();
+}
+function toggleCustomHabit(habitId){
+  if(!_habitEditDraft)_resetHabitEditDraft();
+  const idx=_habitEditDraft.findIndex(h=>h.id===habitId);
+  if(idx<0)return;
+  _habitEditDraft[idx]=_applyHabitToggle(_habitEditDraft[idx]);
+  renderSettingsHabitSection();
+}
+// [2026-09-06] "저장" 버튼 — 여기서만 실제 saveHabits(서버 동기화 포함)가 실행됨.
+// 칩을 아무리 눌러도 이 버튼을 눌러야 확정되므로, 실수로 잘못 누른 칩은 설정탭을 그냥 닫으면(재진입 시
+// _resetHabitEditDraft로 초기화됨) 아무 영향 없이 취소됨.
+function saveHabitEdits(){
+  if(!_habitEditDraft)return;
+  saveHabits(_habitEditDraft);
+  refreshHabitUIEverywhere();
+  renderSettingsHabitSection();
+  showToast('해빗 설정이 저장됐어요 ✓');
+}
+function addCustomHabitFromSettings(){
+  const inp=document.getElementById('settings-habit-custom-inp');
+  const name=(inp.value||'').trim();
+  if(!name)return;
+  if(!_habitEditDraft)_resetHabitEditDraft();
+  if(_habitEditDraft.some(h=>h.name===name&&_isHabitCurrentlyOn(h))){inp.value='';return;} // 이미 동일 이름의 활성 습관이 있으면 중복 추가 안 함
+  const usedColors=new Set(_habitEditDraft.map(h=>h.color));
+  const color=HABIT_COLORS.find(c=>!usedColors.has(c))||HABIT_COLORS[_habitEditDraft.length%HABIT_COLORS.length];
+  _habitEditDraft.push({id:'custom_'+genCid(),name,color,custom:true,periods:[{start:dateKey(getLogicalDate()),end:null}]});
+  inp.value='';
+  renderSettingsHabitSection(); // 저장버튼을 눌러야 실제 반영(saveHabitEdits)됨
+}
+// 아침기상 목표시각 입력 — 기존 공용 시간 휠 모달(#time-modal)을 재사용하되,
+// confirmTime()의 기존 분기(수면/기상/일정 등)와 겹치지 않도록 별도 _sleepTarget 값을 씀.
+function openTimeModalForHabitGoal(){
+  const goal=getHabitGoal('wake');
+  document.getElementById('time-inp').value=(goal&&goal.goalTime)||'07:30';
+  _sleepTarget='habitGoalWake';
+  openModal('time-modal');
+  renderTimeWheel();
+}
+// 습관 목록이 바뀔 때(카탈로그 토글/직접추가) 이미 그려져 있을 수 있는 다른 화면들도 즉시 갱신.
+// 설정탭은 보통 다른 탭 위에 오버레이로 뜨므로, 닫은 뒤 뒤 화면이 바로 최신 상태를 보여주게 함.
+function refreshHabitUIEverywhere(){
+  if(document.getElementById('daily-habit-box'))renderDailyHabitCheck();
+  if(document.getElementById('morning-flow-card')||document.querySelector('.mf-hero'))refreshMorningFlowCard();
+  if(document.getElementById('weekly-habit-box'))renderWeeklyHabitBox();
+  if(document.getElementById('habit-monthly'))renderHabitMonthly();
+}
+function closeSettings(){document.getElementById('settings-ov').classList.remove('on');}
+function downloadFullJSONBackup(){
+  try{
+    // API 키/노션 백업 키 등 민감정보는 백업 파일에 포함하지 않음
+    const EXCLUDE_KEYS=new Set(['claude_api_key']);
+    const data={};
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(!k||EXCLUDE_KEYS.has(k))continue;
+      data[k]=localStorage.getItem(k);
+    }
+    const payload={app:'iikoto',exportedAt:new Date().toISOString(),data};
+    const json=JSON.stringify(payload,null,2);
+    const blob=new Blob([json],{type:'application/json;charset=utf-8'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download=`iikoto-backup-${dateKey(new Date())}.json`;
+    document.body.appendChild(a);a.click();
+    document.body.removeChild(a);URL.revokeObjectURL(url);
+    showToast('전체 데이터가 저장됐어요 ↓');
+  }catch(e){
+    showToast('백업 실패 — 저장 공간을 확인해주세요');
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// ██ 독서 허브 (1/2 — 나머지는 진행률입력모달~공유모달공통 부근) ██
+// ══════════════════════════════════════════════════════════
+// ── READING HUB
+let _rdTab='reading';
+let _rdOpenCid=null;
+let _rdDoneQuoteBookCid=null;
+let _rdDoneCommentBookCid=null;
+let _rdSheetBookCid=null;
+// [2026-09-13 재설계] 실제 상태는 팩토리(_swSw.state)가 들고 있고, 아래 _sw* 전역들은
+// 기존 호출부(2068, 5654, 11093~11322, 11756, 13082, 13200~13210줄 등)가 그대로 읽을 수 있도록
+// 각 콜백 시점에 동기화해주는 얕은 미러(mirror) 변수. 값의 소유자는 항상 _swSw.state 쪽.
+// (콘텐츠 스톱워치 _cswSw와 동일한 팩토리 재사용 — createInstantCommitStopwatch 정의부 참조)
+let _swSeconds=0,_swRunning=false,_swStartTs=0,_swBookCid=null,_swBlockCid=null;
+const RD_SW_C=2*Math.PI*32;
+// 스톱워치 시작시각을 localStorage에 영속화 — 새로고침/앱 완전종료 후 재시작해도
+// 이 값이 남아있으면 경과시간을 그대로 이어서 복원한다(백그라운드 전환은 메모리가 유지돼
+// 원래도 문제없었지만, 새로고침·앱 재시작은 메모리 변수가 초기화되어 별도 보존이 필요했음).
+const SW_PERSIST_KEY='iikoto_reading_sw_start';
+function _swSyncMirror(st){
+  _swRunning=st.running;_swBookCid=st.cid;_swStartTs=st.startTs;_swBlockCid=st.blockCid;_swSeconds=st.seconds;
+}
+const _swSw=createInstantCommitStopwatch({
+  persistKey:SW_PERSIST_KEY,
+  checkReadingHabit:true,
+  hasTicker:true,
+  extraState:{title:null},
+  onTick:function(st){
+    // 실제 경과시간(시작시각 기준)으로 재계산 — 화면이 꺼져 setInterval이 멈췄다 재개되어도
+    // 그 사이 흐른 시간이 누락되지 않고 정확히 보정됨
+    st.seconds=Math.floor((Date.now()-st.startTs)/1000);
+    _swSyncMirror(st);
+    updateStopwatchDisplay();
+  },
+  onResolve:function(st,cid){
+    // 독서도 결국 API로 표지·페이지수까지 검색해서 쓰는 콘텐츠와 같은 성격이라, "책이 이미
+    // 삭제된 채로 스톱워치만 도는" 예외가 콘텐츠와 똑같이 실재함(진행 중 서재에서 그 책을
+    // 삭제하는 경우). 콘텐츠처럼 시작 시점에 조회해서 없으면 시작 자체를 취소.
+    const book=getBooks().find(b=>b.cid===cid);
+    if(!book)return false;
+    st.title=book.title||'';
+    return true;
+  },
+  buildTitleText:function(st){
+    return st.title?('독서 - '+st.title):'독서';
+  },
+  buildPersistPayload:function(st){return{title:st.title||''};},
+  onStarted:function(st){
+    // st.running=true 및 리듬블록 생성까지 전부 확정된 뒤 호출 — 렌더링/DOM 조작은 여기서만.
+    if(_rdPendingCid===st.cid){_rdPendingCid=null;} // pending 카드에서 재생 링으로 시작한 경우 pending 상태 정리
+    // 최근 읽은 책 우선노출(독서허브 스와이프 카드) 정렬 기준 — 기존 커밋 시점 로직을 시작 시점으로 이관
+    const foundBook=_findContentByCidNearMkInRange(st.cid,_BOOK_SCAN_MONTHS);
+    if(foundBook){
+      foundBook.list[foundBook.idx].lastActivityAt=Date.now();
+      saveContents(foundBook.mk,foundBook.list);
+    }
+    document.querySelector('.reading-icon-btn')?.classList.add('sw-active');
+    _swSyncMirror(st);
+    renderRdTop(); // DOM 갱신은 이 한 곳에서만 — running=true로 다시 그려지며 spinning/id 등이 자동 반영됨
+  },
+  onStop:function(st,info){
+    document.querySelector('.reading-icon-btn')?.classList.remove('sw-active');
+    _swSyncMirror(st);
+    renderRdTop();
+    renderRdQuotes(); // 스톱워치 종료로 선택 대상이 바뀌므로(1권이면 그 책, 2권 이상이면 재선택 대기) 문장수집도 함께 갱신
+    openProgressModal(info.cid,info.seconds); // 2026-09-13: 시간 문턱 없이 항상 띄움(리듬블록도 항상 생성되므로 일관되게)
+  },
+  onRestored:function(st,saved){
+    st.title=saved.title||'';
+    st.seconds=Math.floor((Date.now()-st.startTs)/1000);
+    _swSyncMirror(st);
+    renderRdTop();
+  }
+});
+// ══ 씨앗 코너 ══
+function openReading(){
+  _rdTab='reading';
+  _rdQuoteShowAll=false;
+  document.querySelectorAll('.rd-tab').forEach(t=>t.classList.toggle('on',t.dataset.status==='reading'));
+  renderReadingHub();
+  document.getElementById('reading-ov').classList.add('on');
+}
+function closeReading(){
+  document.getElementById('reading-ov').classList.remove('on');
+  _rdPendingCid=null; // 코너를 나가면 선택 상태 초기화 — 다시 들어오면 병렬 카드가 미선택 상태로 시작(2026-09-03)
+}
+// 코너 상단 "독서" 라벨 탭 — 나갔다 들어오지 않아도 바로 선택 초기화(2026-09-03). 스톱워치 진행중일 땐 무의미하므로 무시.
+function resetReadingSelection(){
+  if(_swRunning)return;
+  _rdPendingCid=null;
+  renderRdTop();
+  renderRdQuotes();
+}
+// ══════════════════════════════════════════════════════════
+// ██ 콘텐츠 허브 (2/2 — 나머지는 시청등록~시청시작시트 부근) — 진입점~코멘트모아보기 ██
+// ══════════════════════════════════════════════════════════
+// ── 콘텐츠 허브 진입점 (풀스크린) — 감상 캘린더가 메인, 코멘트 타임라인/월별 아카이브는 독서코너 톤 차용 ──
+function openContentHub(){
+  _wcalDate=new Date();
+  _wcalFilter='all';
+  _wcalSelectedDk=null;
+  _wcalCollapsed=true;
+  document.getElementById('content-hub-ov').classList.add('on');
+  document.getElementById('wcal-grid').style.display='none';
+  document.getElementById('wcal-week-row').style.display='';
+  _wcalRefresh();
+  renderChHubMonthBanners();
+  chExpandMonth(monthKey(new Date())); // 당월을 기본으로 펼쳐서 시작
+  renderCwatchMainCard();
+}
+function closeContentHub(){
+  document.getElementById('content-hub-ov').classList.remove('on');
+  _cswPendingCid=null;_cswPendingMk=null; // 코너를 나가면 선택 상태 초기화 — 다시 들어오면 병렬 카드가 미선택 상태로 시작(2026-09-03)
+}
+// 코너 상단 "콘텐츠" 라벨 탭 — 나갔다 들어오지 않아도 바로 선택 초기화(2026-09-03). 스톱워치 진행중일 땐 무의미하므로 무시.
+function resetContentWatchSelection(){
+  if(_cswRunning)return;
+  _cswPendingCid=null;_cswPendingMk=null;
+  renderCwatchMainCard();
+}
+
+// ── 독서/씨앗/설정/콘텐츠 코너 엣지 스와이프 뒤로가기 ──
+(function(){
+  let sx=null,sy=null,active=false;
+  document.addEventListener('touchstart',function(e){
+    const ov=document.querySelector('.reading-ov.on,.settings-ov.on,.content-hub-ov.on');
+    if(!ov){active=false;return;}
+    if(document.querySelector('.overlay.on,.modal-ov.on')){active=false;return;} // 시트/모달 열려있으면 무시
+    const t=e.touches[0];
+    if(t.clientX>24){active=false;return;} // 왼쪽 가장자리에서 시작할 때만
+    sx=t.clientX;sy=t.clientY;active=true;
+  },{passive:true});
+  document.addEventListener('touchend',function(e){
+    if(!active)return;
+    active=false;
+    const t=e.changedTouches[0];
+    const dx=t.clientX-sx,dy=t.clientY-sy;
+    if(dx>80&&Math.abs(dy)<60){
+      const ov=document.querySelector('.reading-ov.on,.settings-ov.on,.content-hub-ov.on');
+      if(!ov)return;
+      if(ov.id==='reading-ov')closeReading();
+      else if(ov.id==='settings-ov')closeSettings();
+      else if(ov.id==='content-hub-ov')closeContentHub();
+    }
+  },{passive:true});
+})();
+function renderReadingHub(){
+  renderRdTop();
+  renderRdStreak();
+  renderRdQuotes();
+  renderRdMonthStat();
+  renderRdCovers();
+  renderBookList();
+  restoreStopwatchUI();
+}
+function restoreStopwatchUI(){
+  // 탭 이동 등으로 renderReadingHub가 재호출되어 스톱워치 DOM이 새로 그려져도
+  // _swRunning이 true면(시간 계속 흐르는 중) 화면 상태를 즉시 이어서 복원.
+  // renderRdTop()이 _swRunning+_swBookCid를 보고 이미 재생 중 카드를 그려주므로, 여기선 홈버튼 표시만 처리.
+  const homeBtn=document.querySelector('.reading-icon-btn');
+  if(homeBtn)homeBtn.classList.toggle('sw-active',_swRunning);
+  if(!_swRunning)return;
+  const timeEl=document.getElementById('rd-sw-time');
+  if(!timeEl)return;
+  updateStopwatchDisplay();
+}
+// running=true(이미 이 책으로 스톱워치가 도는 중)면 시작 즉시 재생 상태로 그림 — restoreStopwatchUI가 다시 덧씌움.
+// gradient id는 cid로 유일하게 만듦 — 두 슬라이드가 동시에 렌더되면 <linearGradient id="rdSwGrad">가
+// 중복되어 두 번째 인스턴스의 렌더링이 깨지는 문제가 있었음(2026-09-09d). rd-sw-ring-wrap 등은 다른
+// 코드에서 getElementById로 참조하므로, 실제 running인 인스턴스에만 부여.
+function swRingSvg(cid,running){
+  const gradId=`rdSwGrad-${cid}`;
+  const idAttrs=running?` id="rd-sw-ring-wrap"`:'';
+  return `<div class="rd-sw-ring-wrap${running?' spinning':''}"${idAttrs} onclick="event.stopPropagation();toggleStopwatch('${cid}')">
+    <div class="rd-sw-bg"></div>
+    <svg class="rd-sw-ring-svg" width="76" height="76" viewBox="0 0 76 76">
+      <defs>
+        <linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#ff9ec0"/>
+          <stop offset="30%" stop-color="#ffcf86"/>
+          <stop offset="60%" stop-color="#8fe3c0"/>
+          <stop offset="100%" stop-color="#9cc8ff"/>
+        </linearGradient>
+      </defs>
+      <circle cx="38" cy="38" r="32" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="4.5"/>
+      <circle${running?' id="rd-sw-ring"':''} cx="38" cy="38" r="32" fill="none" stroke="url(#${gradId})" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="${RD_SW_C}" stroke-dashoffset="${RD_SW_C}"/>
+    </svg>
+    <div class="rd-sw-face"${running?' id="rd-sw-face"':''} style="${running?'display:none;':''}"><i class="ti ti-player-play" style="font-size:20px;" aria-hidden="true"></i></div>
+    <div class="rd-sw-time"${running?' id="rd-sw-time"':''} style="display:${running?'flex':'none'};">00:00</div>
+  </div>`;
+}
+// 시청 스톱워치용 원형 링 — swRingSvg와 동일한 디자인, id/onclick만 시청 전용으로 분리(독서 스톱워치와 동시에 떠도 충돌 없게)
+// 초단위 표시 없이 재생/정지 아이콘만 토글하는 원탭 버튼 — 독서 스톱워치의 링(cswRingSvg 구버전)보다 훨씬 가벼움
+function cswRingSvg(cid,mk,running){
+  return `<div class="rd-sw-ring-wrap${running?' spinning cwatch-active':''}" onclick="event.stopPropagation();toggleContentStopwatch('${cid}','${mk}')">
+    <div class="rd-sw-bg"></div>
+    <div class="rd-sw-face"><i class="ti ${running?'ti-player-stop-filled':'ti-player-play'}" style="font-size:20px;" aria-hidden="true"></i></div>
+  </div>`;
+}
+// 병렬 진행중(2개 이상)일 때 도트 탭 전환 카드 — buildSingleHtml(item)은 "카드 내용물"만 반환해야 함
+// (.rd-top-inner 같은 카드 껍데기는 포함하지 않는 게 규칙 — 껍데기는 호출부가 <div class="rd-top">
+// <div class="rd-top-inner">이 함수 호출 결과</div></div>로 직접 감쌈). 도트는 패널 위가 아니라
+// 아래(진행률바 밑)에 둬서, 바깥 그라데이션 테두리(.rd-top)가 도트까지 포함해 위로 튀어나오지 않고
+// 카드 하나만 딱 감싸도록 함(1개일 때와 동일한 테두리 모양 유지).
+// 구조 재설계(2026-09-09e): 스와이프+트랙+transform 방식(및 그 이전의 scroll-snap 방식)을 완전히
+// 버리고 도트 탭 전환 방식으로 교체. 두 슬라이드가 같은 트랙에 나란히 존재하는 구조 자체가 트랙 폭
+// 계산이나 클리핑 경계에서 반복적으로 렌더링 아티팩트(옆 카드 경계가 새어나오는 세로줄)를 일으켜서,
+// 그 구조를 없앰 — 각 슬라이드는 완전히 독립된 블록이고 항상 1개만 display:block, 나머지는
+// display:none이라 트랙/클리핑 경계 자체가 필요 없음.
+let _swipeCardSeq=0;
+function buildSwipeCardHtml(items,buildSingleHtml){
+  const seq=++_swipeCardSeq;
+  const dotsHtml=items.map((_,i)=>`<span class="sw-card-dot${i===0?' on':''}" data-i="${i}"></span>`).join('');
+  const slidesHtml=items.map((item,i)=>`<div class="sw-card-slide"${i===0?'':' style="display:none;"'}>${buildSingleHtml(item)}</div>`).join('');
+  return `<div class="sw-card" id="sw-card-${seq}" data-idx="0">
+    <div class="sw-card-panels">${slidesHtml}</div>
+    <div class="sw-card-dots">${dotsHtml}</div>
+  </div>`;
+}
+// 렌더 직후 호출 — 도트 영역 어디를 눌러도(작은 점 하나를 정확히 노리지 않아도) 다음 슬라이드로
+// 순환 전환. 개별 도트 클릭 판정 대신 .sw-card-dots 전체를 탭 영역으로 씀(2026-09-09f).
+// onChange(idx) 콜백은 슬라이드가 바뀔 때마다 호출됨 — 독서허브처럼 "지금 보이는 카드"를 다른
+// 영역(문장수집 등)이 함께 참조하는 경우, 이 콜백에서 그 상태를 갱신해야 함. 이전엔 도트 전환이
+// display만 바꾸고 아무 콜백이 없어서, 카드로는 책이 넘어가도 문장수집은 이전 책 기준에 멈춰있는
+// 불일치가 있었음(2026-09-09 오류 리포트).
+function bindSwipeCard(wrapId,onChange){
+  const wrap=document.getElementById(wrapId)?.querySelector('.sw-card');
+  if(!wrap)return;
+  const slides=[...wrap.querySelectorAll('.sw-card-slide')];
+  const dotsWrap=wrap.querySelector('.sw-card-dots');
+  const dots=[...wrap.querySelectorAll('.sw-card-dot')];
+  const n=slides.length;
+  if(n<2)return;
+  function setActive(idx){
+    idx=((idx%n)+n)%n;
+    wrap.dataset.idx=idx;
+    slides.forEach((s,si)=>{s.style.display=si===idx?'block':'none';});
+    dots.forEach((d,di)=>d.classList.toggle('on',di===idx));
+    if(typeof onChange==='function')onChange(idx);
+  }
+  dotsWrap?.addEventListener('click',e=>{
+    e.stopPropagation();
+    setActive(parseInt(wrap.dataset.idx,10)+1); // 어디를 눌러도 다음 슬라이드로 순환
+  });
+  // 초기 상태(0번 슬라이드)도 onChange로 한 번 알려서, 호출부가 "지금 보이는 책" 상태를 렌더 직후
+  // 바로 동기화할 수 있게 함(예: 독서허브의 _rdPendingCid).
+  if(typeof onChange==='function')onChange(0);
+}
+// 진행중(status==='reading') 책 목록 — 콘텐츠의 _getOngoingWatchingWithCid와 동일한 역할.
+function _getOngoingReadingWithCid(){
+  return getBooks().filter(b=>b.status==='reading'&&b.cid)
+    .sort((a,b)=>(b.lastActivityAt||0)-(a.lastActivityAt||0)); // 최근 활동한 책 우선노출(2026-09-09)
+}
+// 진행률 바 + 오늘 읽은 구간 표시 — 여러 책에서 반복 쓰이므로 분리(2026-09-03, 병렬독서 지원 리팩터).
+// 진행률 데이터(퍼센트 단위이거나 총 페이지가 있음)가 없으면 null 반환 — 콘텐츠 코너(totalUnit 없으면 문구 폴백)와 동일한 규칙.
+function _rdProgressBarHtml(book){
+  const hasData=book.unit==='percent'||!!book.totalPages;
+  if(!hasData)return null;
+  let pct=book.unit==='percent'?(book.percent||0):Math.min(100,Math.round((book.pages/book.totalPages)*100));
+  const today=dateKey(new Date());
+  let todayPct=pct;
+  if(book.todayDate===today){
+    todayPct=book.unit==='percent'?(book.todayStart||0):(book.totalPages?Math.min(100,Math.round((book.todayStart||0)/book.totalPages*100)):pct);
+  }
+  todayPct=Math.min(todayPct,pct);
+  return `<div class="rd-progress-bar" onclick="event.stopPropagation();openProgressModal('${book.cid}',0)">
+    <div class="rd-progress-track">
+      <div class="rd-progress-fill" style="width:${pct}%;"></div>
+      <div class="rd-progress-today" style="left:${todayPct}%;width:${Math.max(0,pct-todayPct)}%;"></div>
+    </div>
+    <div class="rd-progress-bead" style="left:${pct}%;"></div>
+  </div>`;
+}
+// 카드 내용물만(.rd-top-inner 껍데기 제외) — 콘텐츠허브 슬라이드 함수와 동일 규칙, 1개 카드/스와이프 슬라이드 양쪽에서 공용.
+function _rdTopInnerBodyHtml(book,running){
+  const cover=book.poster?`<img class="rd-top-cover" src="${book.poster}" alt="">`:`<div class="rd-top-cover-empty"></div>`;
+  const progressHtml=_rdProgressBarHtml(book);
+  return `<div class="rd-top-main">
+        ${cover}
+        <div class="rd-top-info">
+          <div class="rd-top-title">${book.title}</div>
+          <div class="rd-top-author">${book.author||''}</div>
+        </div>
+        <div class="rd-top-sw">${swRingSvg(book.cid,running)}</div>
+      </div>
+      ${progressHtml||''}`;
+}
+// 책 하나가 진행중 스톱워치 대상일 때의 메인 카드(껍데기 포함) — 1권만 있을 때 단독으로 사용.
+function _rdTopSingleHtml(book,running){
+  return `<div class="rd-top-inner">${_rdTopInnerBodyHtml(book,running)}</div>`;
+}
+// 진행중 책 선택 단계 — 콘텐츠의 selectPendingWatch와 동일한 역할, 실수 탭으로 스톱워치가 바로 시작되지 않도록 함.
+let _rdPendingCid=null;
+function selectPendingRead(cid){
+  _rdPendingCid=cid;
+  renderRdTop();
+  renderRdQuotes(); // 병렬독서 중 선택 대상이 바뀌면 문장수집도 그 책 기준으로 갱신(2026-09-03)
+}
+// 지금 화면(rd-top)에 표시 중인 "선택된 책" 하나를 반환 — 문장수집 등 다른 영역도 이 기준을 그대로 따름.
+// 우선순위: 스톱워치 진행중인 책 > 방금 선택(pending)한 책 > 진행중인 책이 1권뿐이면 그 책 > 없음(2권 이상인데 아직 선택 안 함).
+function _rdSelectedBook(){
+  if(_swRunning&&_swBookCid){
+    const book=getBooks().find(b=>b.cid===_swBookCid);
+    if(book)return book;
+  }
+  if(_rdPendingCid){
+    const book=getBooks().find(b=>b.cid===_rdPendingCid);
+    if(book)return book;
+  }
+  const ongoing=_getOngoingReadingWithCid();
+  if(ongoing.length===1)return ongoing[0];
+  return null;
+}
+function renderRdTop(){
+  const el=document.getElementById('rd-top');if(!el)return;
+  el.classList.toggle('playing',_swRunning);
+  if(_swRunning&&_swBookCid){
+    const book=getBooks().find(b=>b.cid===_swBookCid);
+    if(book){el.innerHTML=_rdTopSingleHtml(book,true);return;}
+  }
+  if(_rdPendingCid){
+    const book=getBooks().find(b=>b.cid===_rdPendingCid);
+    if(!book){_rdPendingCid=null;renderRdTop();return;}
+    el.innerHTML=_rdTopSingleHtml(book,false);
+    return;
+  }
+  const ongoing=_getOngoingReadingWithCid();
+  if(!ongoing.length){
+    el.innerHTML=`<div class="rd-top-inner">
+      <div class="rd-top-title" style="color:var(--tm);">지금 읽는 책이 없어요</div>
+      <div class="rd-top-sub">+ 버튼으로 책을 추가해보세요</div>
+    </div>`;
+  }else if(ongoing.length===1){
+    el.innerHTML=_rdTopSingleHtml(ongoing[0],false);
+  }else{
+    // 콘텐츠허브(renderCwatchMainCard)와 동일 패턴: 바깥을 .rd-top-inner로 한 번만 감싸고,
+    // 슬라이드에는 카드 내용물(_rdTopInnerBodyHtml, .rd-top-inner 껍데기 제외)만 넣음 — 이렇게 해야
+    // 도트가 카드 안쪽(진행률바 밑)에 들어가고 바깥 그라데이션 테두리가 1개일 때와 똑같이 카드 하나만
+    // 딱 감싸게 됨(이전엔 _rdTopSingleHtml 전체를 슬라이드에 넣어 .rd-top-inner가 중첩되며 테두리가
+    // 도트까지 포함해 위로 튀어나오는 문제가 있었음, 2026-09-09 재수정).
+    el.innerHTML=`<div class="rd-top-inner">`+buildSwipeCardHtml(ongoing,book=>{
+      return `<div onclick="selectPendingRead('${book.cid}')" style="cursor:pointer;">${_rdTopInnerBodyHtml(book,false)}</div>`;
+    })+`</div>`;
+    // 도트로 슬라이드가 바뀔 때마다 그 책을 "선택된 책"으로 반영 — 이전엔 이 콜백이 없어서 도트로
+    // 카드는 넘어가도 문장수집(renderRdQuotes)이 이전 책 기준에 멈춰있는 불일치가 있었음(2026-09-09).
+    bindSwipeCard('rd-top',idx=>{
+      const book=ongoing[idx];
+      if(book){_rdPendingCid=book.cid;renderRdQuotes();}
+    });
+  }
+}
+function renderRdStreak(){
+  const el=document.getElementById('rd-streak');if(!el)return;
+  const s=getReadingStreak();
+  el.textContent=s>0?`연속 ${s}일째 읽고 있어요`:'오늘부터 다시 시작해볼까요?';
+}
+let _rdQuoteShowAll=false;
+function renderRdQuotes(){
+  const listEl=document.getElementById('rd-quote-list');if(!listEl)return;
+  const foldEl=document.getElementById('rd-quote-fold');
+  const cur=_rdSelectedBook();
+  // cur가 null인 경우는 두 가지를 반드시 구분해야 함(2026-09-09 오류 리포트: "책이 바뀌면 문장수집이
+  // 연결 안 된다"는 문제가 실은 이 두 경우가 똑같이 빈 목록으로 보여서 데이터가 날아간 것처럼
+  // 오인되게 만들었음) — ①진행중인 책이 아예 없음 ②진행중인 책이 2권 이상인데 아직 카드에서
+  // 선택하지 않음(_rdSelectedBook 우선순위 규칙상 이 경우 의도적으로 null). ②는 데이터 유실이
+  // 아니라 "위 카드에서 책을 먼저 선택해주세요" 안내가 맞는 상태이므로 문구를 분리함.
+  if(!cur){
+    const ongoingCount=_getOngoingReadingWithCid().length;
+    listEl.innerHTML=ongoingCount>1
+      ? '<div class="rd-quote-empty">위에서 책을 먼저 선택하면 문장수집이 보여요</div>'
+      : '';
+    listEl.style.maxHeight='';listEl.style.overflowY='';if(foldEl)foldEl.style.display='none';return;
+  }
+  const quotes=getQuotes().filter(q=>q.bookCid===cur.cid).sort((a,b)=>(b.created||0)-(a.created||0));
+  if(!quotes.length){listEl.innerHTML='<div class="rd-quote-empty">아직 모은 문장이 없어요</div>';listEl.style.maxHeight='';listEl.style.overflowY='';if(foldEl)foldEl.style.display='none';return;}
+  const MAX=2;
+  const shown=_rdQuoteShowAll?quotes:quotes.slice(0,MAX);
+  let html=shown.map(q=>`<div class="rd-quote-item">
+      <div class="rd-quote-text" data-cid="${q.cid}" onclick="startEditQuoteText('${q.cid}')" style="cursor:pointer;">${q.text}</div>
+      ${q.comment?`<div class="rd-quote-comment" onclick="toggleQuoteCommentEditor('${q.cid}')" style="font-size:var(--dow-label-size);color:var(--pal-mintlime);margin-top:4px;padding:5px 8px;background:rgba(102,160,85,0.14);border-radius:8px;cursor:pointer;">${q.comment}</div>`:''}
+      <div id="qc-editor-${q.cid}" class="qc-editor" style="display:none;margin-top:5px;" onclick="event.stopPropagation();">
+        <textarea class="qc-comment-textarea" placeholder="이 문장에 대한 감상을 적어보세요">${q.comment||''}</textarea>
+        <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px;">
+          <span onclick="document.getElementById('qc-editor-${q.cid}').style.display='none';" style="font-size:var(--dow-label-size);color:var(--tm);cursor:pointer;padding:3px 8px;">취소</span>
+          <span onclick="commitQuoteComment('${q.cid}')" style="font-size:var(--dow-label-size);color:var(--pal-mintlime);cursor:pointer;padding:3px 8px;font-weight:600;">저장</span>
+        </div>
+      </div>
+      <span style="position:absolute;right:8px;bottom:6px;display:flex;align-items:center;gap:3px;">
+        <span onclick="shareQuoteCard('${q.cid}')" title="공유 이미지" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;color:var(--tm);opacity:0.7;">
+          <i class="ti ti-share-2 ico-sz-13" aria-hidden="true"></i>
+        </span>
+        <span onclick="toggleQuoteCommentEditor('${q.cid}')" title="${q.comment?'코멘트 수정':'코멘트 남기기'}" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;color:${q.comment?'var(--pal-mintlime)':'var(--tm)'};opacity:${q.comment?'1':'0.7'};">
+          <i class="ti ${q.comment?'ti-message-circle-filled':'ti-message-circle'} ico-sz-13" aria-hidden="true"></i>
+        </span>
+        <span class="rd-quote-del" onclick="removeQuote('${q.cid}')" style="position:static;font-size:10px;padding:2px;display:inline-flex;align-items:center;justify-content:center;"><i class="ti ti-x ico-sz-13" aria-hidden="true"></i></span>
+      </span>
+    </div>`).join('');
+  if(quotes.length>MAX){
+    if(_rdQuoteShowAll){
+      if(foldEl)foldEl.style.display='';
+    }else{
+      html+=`<div class="rd-quote-more" onclick="_rdQuoteShowAll=true;renderRdQuotes();">··· ${quotes.length-MAX}개 더 보기</div>`;
+      if(foldEl)foldEl.style.display='none';
+    }
+  }else{
+    if(foldEl)foldEl.style.display='none';
+  }
+  listEl.innerHTML=html;
+  if(_rdQuoteShowAll){listEl.style.maxHeight='320px';listEl.style.overflowY='auto';}
+  else{listEl.style.maxHeight='';listEl.style.overflowY='';}
+}
+function openQuoteSheetCheck(bookCid){
+  if(bookCid){
+    _rdSheetBookCid=bookCid;
+    document.getElementById('rd-quote-inp').value='';
+    openSheet('quote-sheet');
+    return;
+  }
+  const cur=_rdSelectedBook();
+  if(!cur)return; // 선택된 책이 없으면(정상 흐름에서 거의 발생 안 함) 조용히 무시
+  _rdSheetBookCid=cur.cid;
+  document.getElementById('rd-quote-inp').value='';
+  openSheet('quote-sheet');
+}
+function saveQuoteComment(cid,text){
+  const quotes=getQuotes();
+  const q=quotes.find(x=>x.cid===cid);
+  if(!q)return;
+  q.comment=text;
+  saveQuotesLocal(quotes);
+  S.set('quote_pending_'+cid,true);
+  autoSync('reading_quote',cid);
+}
+function toggleQuoteCommentEditor(cid){
+  const el=document.getElementById('qc-editor-'+cid);
+  if(!el)return;
+  const isOpen=el.style.display==='block';
+  document.querySelectorAll('.qc-editor').forEach(e=>e.style.display='none');
+  el.style.display=isOpen?'none':'block';
+  if(!isOpen){
+    const inp=el.querySelector('textarea');
+    if(inp)setTimeout(()=>inp.focus(),50);
+  }
+}
+function commitQuoteComment(cid){
+  const el=document.getElementById('qc-editor-'+cid);
+  if(!el)return;
+  const inp=el.querySelector('textarea');
+  if(!inp)return;
+  saveQuoteComment(cid,inp.value.trim());
+  el.style.display='none';
+  renderRdQuotes();
+}
+// 문장 원문 인라인 편집 — 투두 보관함(startEditReserveTodo)과 동일 패턴
+// 읽는중 카드(rd-quote-list)와 완독 책 카드(rd-done-quote-list-*) 양쪽에서 다 호출될 수 있어
+// 실제로 이 cid가 어느 목록 DOM에 있는지 찾아서, 편집 완료 후 그 목록에 맞는 렌더 함수를 부름.
+function startEditQuoteText(cid){
+  let listEl=document.getElementById('rd-quote-list');
+  let div=listEl?listEl.querySelector(`.rd-quote-text[data-cid="${cid}"]`):null;
+  let doneBookCid=null;
+  if(!div){
+    const doneList=document.querySelector(`[id^="rd-done-quote-list-"] .rd-quote-text[data-cid="${cid}"]`);
+    if(doneList){
+      div=doneList;
+      listEl=div.closest('[id^="rd-done-quote-list-"]');
+      doneBookCid=listEl?listEl.id.replace('rd-done-quote-list-',''):null;
+    }
+  }
+  if(!div)return;
+  const q=getQuotes().find(x=>x.cid===cid);if(!q)return;
+  const inp=document.createElement('textarea');
+  inp.className='rd-quote-edit-inp';
+  inp.rows=2;
+  inp.value=q.text;
+  inp.style.cssText='width:100%;font-size:var(--main-text-size);color:var(--tp);font-style:italic;line-height:1.55;background:transparent;border:none;border-bottom:1px solid var(--tm);outline:none;font-family:inherit;resize:none;padding:0;';
+  div.replaceWith(inp);
+  inp.focus();
+  inp.setSelectionRange(inp.value.length,inp.value.length);
+  let committed=false;
+  const commit=()=>{
+    if(committed)return;committed=true;
+    const val=inp.value.trim();
+    const cur=getQuotes().find(x=>x.cid===cid);
+    if(cur&&val&&val!==cur.text){upsertQuoteLocal({...cur,text:val});}
+    if(doneBookCid)renderDoneBookQuotes(doneBookCid);else renderRdQuotes();
+  };
+  inp.addEventListener('blur',commit);
+  inp.addEventListener('keydown',e=>{
+    if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();inp.blur();}
+    else if(e.key==='Escape'){committed=true;if(doneBookCid)renderDoneBookQuotes(doneBookCid);else renderRdQuotes();}
+  });
+}
+function saveQuoteSheet(){
+  const targetCid=_rdSheetBookCid||(getBooks().find(b=>b.status==='reading')||{}).cid;
+  if(targetCid){
+    const inp=document.getElementById('rd-quote-inp');
+    const text=inp.value.trim();
+    if(text){
+      upsertQuoteLocal({cid:genCid(),bookCid:targetCid,text,created:Date.now()});
+      inp.value='';
+      inp.focus();
+    }
+  }
+  renderRdQuotes();
+  renderBookList();
+}
+function removeQuote(cid){
+  deleteQuoteLocal(cid);
+  renderRdQuotes();
+  renderBookList();
+}
+function commitDoneQuoteComment(cid,bookCid){
+  const el=document.getElementById('qc-editor-'+cid);
+  if(!el)return;
+  const inp=el.querySelector('textarea');
+  if(!inp)return;
+  saveQuoteComment(cid,inp.value.trim());
+  el.style.display='none';
+  renderDoneBookQuotes(bookCid);
+}
+function renderDoneBookQuotes(bookCid){
+  const listEl=document.getElementById('rd-done-quote-list-'+bookCid);if(!listEl)return;
+  const quotes=getQuotes().filter(q=>q.bookCid===bookCid).sort((a,b)=>(b.created||0)-(a.created||0));
+  if(!quotes.length){listEl.innerHTML='<div class="rd-quote-empty">아직 모은 문장이 없어요</div>';listEl.style.maxHeight='';listEl.style.overflowY='';return;}
+  listEl.innerHTML=quotes.map(q=>`<div class="rd-quote-item">
+      <div class="rd-quote-text" data-cid="${q.cid}" onclick="event.stopPropagation();startEditQuoteText('${q.cid}')" style="cursor:pointer;">${q.text}</div>
+      <div id="qc-editor-${q.cid}" class="qc-editor" style="display:none;margin-top:5px;" onclick="event.stopPropagation();">
+        <textarea class="qc-comment-textarea" placeholder="이 문장에 대한 감상을 적어보세요">${q.comment||''}</textarea>
+        <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px;">
+          <span onclick="event.stopPropagation();document.getElementById('qc-editor-${q.cid}').style.display='none';" style="font-size:var(--dow-label-size);color:var(--tm);cursor:pointer;padding:3px 8px;">취소</span>
+          <span onclick="event.stopPropagation();commitDoneQuoteComment('${q.cid}','${bookCid}')" style="font-size:var(--dow-label-size);color:var(--pal-mintlime);cursor:pointer;padding:3px 8px;font-weight:600;">저장</span>
+        </div>
+      </div>
+      <span style="position:absolute;right:8px;bottom:6px;display:flex;align-items:center;gap:3px;">
+        <span onclick="event.stopPropagation();shareQuoteCard('${q.cid}')" title="공유 이미지" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:var(--tm);opacity:0.7;">
+          <i class="ti ti-share-2 ico-sz-11" aria-hidden="true"></i>
+        </span>
+        <span onclick="event.stopPropagation();toggleQuoteCommentEditor('${q.cid}')" title="${q.comment?'코멘트 수정':'코멘트 남기기'}" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:${q.comment?'var(--pal-mintlime)':'var(--tm)'};opacity:${q.comment?'1':'0.7'};">
+          <i class="ti ${q.comment?'ti-message-circle-filled':'ti-message-circle'} ico-sz-11" aria-hidden="true"></i>
+        </span>
+        <span class="rd-quote-del" onclick="event.stopPropagation();removeQuote('${q.cid}');renderDoneBookQuotes('${bookCid}')" style="position:static;font-size:10px;padding:2px;display:inline-flex;align-items:center;justify-content:center;"><i class="ti ti-x ico-sz-11" aria-hidden="true"></i></span>
+      </span>
+    </div>`).join('');
+  listEl.style.maxHeight='320px';
+  listEl.style.overflowY='auto';
+}
+function toggleDoneBookQuotes(cid){
+  _rdDoneQuoteBookCid=_rdDoneQuoteBookCid===cid?null:cid;
+  _rdDoneCommentBookCid=null;
+  renderBookList();
+  if(_rdDoneQuoteBookCid===cid)renderDoneBookQuotes(cid);
+}
+function toggleDoneBookComments(cid){
+  _rdDoneCommentBookCid=_rdDoneCommentBookCid===cid?null:cid;
+  _rdDoneQuoteBookCid=null;
+  renderBookList();
+  if(_rdDoneCommentBookCid===cid)renderDoneBookComments(cid);
+}
+function renderDoneBookComments(bookCid){
+  const listEl=document.getElementById('rd-done-comment-list-'+bookCid);if(!listEl)return;
+  const quotes=getQuotes().filter(q=>q.bookCid===bookCid&&q.comment).sort((a,b)=>(b.created||0)-(a.created||0));
+  if(!quotes.length){listEl.innerHTML='<div class="rd-quote-empty">아직 남긴 코멘트가 없어요</div>';listEl.style.maxHeight='';listEl.style.overflowY='';return;}
+  listEl.innerHTML=quotes.map(q=>`<div class="rd-comment-item">
+      <div class="rd-quote-text" style="font-size:var(--dow-label-size);color:var(--tm);margin-bottom:4px;">${q.text}</div>
+      <div class="rd-quote-comment" onclick="event.stopPropagation();toggleQuoteCommentEditor('${q.cid}')" style="font-size:var(--dow-label-size);color:var(--tp);padding:6px 8px;background:rgba(var(--divider-rgb),0.14);border-radius:8px;cursor:pointer;">${q.comment}</div>
+      <div id="qc-editor-${q.cid}" class="qc-editor" style="display:none;margin-top:5px;" onclick="event.stopPropagation();">
+        <textarea class="qc-comment-textarea" placeholder="이 문장에 대한 감상을 적어보세요">${q.comment||''}</textarea>
+        <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px;">
+          <span onclick="event.stopPropagation();document.getElementById('qc-editor-${q.cid}').style.display='none';" style="font-size:var(--dow-label-size);color:var(--tm);cursor:pointer;padding:3px 8px;">취소</span>
+          <span onclick="event.stopPropagation();commitDoneQuoteComment('${q.cid}','${bookCid}');renderDoneBookComments('${bookCid}')" style="font-size:var(--dow-label-size);color:var(--pal-mintlime);cursor:pointer;padding:3px 8px;font-weight:600;">저장</span>
+        </div>
+      </div>
+    </div>`).join('');
+  listEl.style.maxHeight='320px';
+  listEl.style.overflowY='auto';
+}
+function renderRdMonthStat(){
+  const el=document.getElementById('rd-month-stat');if(!el)return;
+  const mk=monthKey(new Date());
+  const doneCount=getBooks().filter(b=>b.status==='done'&&b.completedAt&&b.completedAt.slice(0,7)===mk).length;
+  el.textContent=`이달 완독 ${doneCount}권`;
+}
+function renderRdCovers(){
+  const el=document.getElementById('rd-cover-row');if(!el)return;
+  const covers=getBooks().filter(b=>b.poster).sort((a,b)=>(b.created||0)-(a.created||0)).slice(0,5);
+  const slots=5;
+  let html='';
+  for(let i=0;i<slots;i++){
+    if(covers[i])html+=`<img class="rd-cover" src="${covers[i].poster}" alt="${covers[i].title}">`;
+    else html+='<div class="rd-cover rd-cover-empty"></div>';
+  }
+  el.innerHTML=html;
+}
+function switchReadingTab(btn,status){
+  _rdTab=status;_rdOpenCid=null;_rdDoneQuoteBookCid=null;
+  document.querySelectorAll('.rd-tab').forEach(t=>t.classList.remove('on'));
+  btn.classList.add('on');
+  renderBookList();
+}
+// 리듬 블록(감상 카테고리, text에 "독서 - 책제목" 형식으로 자동 기록됨)을 세어 이 책을 읽은 세션(회차) 수를 계산.
+// 병렬독서 시에도 책 제목으로 구분되므로 책별로 독립적으로 정확함.
+// book(cid 포함)을 넘기면 해당 책의 startDate부터 오늘까지만 훑어 불필요한 조회를 줄임.
+// book을 못 찾거나 cid가 없으면 기존처럼 365일 상한으로 폴백.
+function countReadingSessionsForBook(book){
+  const title=typeof book==='string'?book:book&&book.title;
+  if(!title)return 0;
+  const target='독서 - '+title;
+  let count=0;
+  const today=new Date();
+  let maxDays=365;
+  if(book&&typeof book==='object'&&book.cid){
+    const found=_findContentByCidNearMkInRange(book.cid,_BOOK_SCAN_MONTHS);
+    const item=found?found.list[found.idx]:null;
+    if(item&&item.startDate){
+      const start=new Date(item.startDate+'T00:00:00');
+      const daysSinceStart=Math.floor((new Date(dateKey(today)+'T00:00:00')-start)/86400000)+1;
+      if(daysSinceStart>0)maxDays=Math.min(365,daysSinceStart);
+    }
+  }
+  for(let i=0;i<maxDays;i++){
+    const d=new Date(today);d.setDate(today.getDate()-i);
+    const dk=dateKey(d);
+    const blocks=getRhythmBlocks(dk);
+    count+=blocks.filter(b=>b.cat==='enjoy'&&b.text===target).length;
+  }
+  return count;
+}
+// 남은 예상 회차 계산. 데이터(회차)가 3회 미만이면 아직 추정하기 이르다고 판단해 null 반환.
+// sessionCount를 이미 계산해둔 경우 재계산 없이 그대로 전달 가능(호출부 중복 연산 방지).
+function estimateRemainingReadingSessions(book,sessionCount){
+  if(!book||book.status!=='reading')return null;
+  const sessions=sessionCount!=null?sessionCount:countReadingSessionsForBook(book);
+  if(sessions<3)return {sessions,ready:false};
+  let currentAmt,totalAmt;
+  if(book.unit==='percent'){
+    currentAmt=book.percent||0;totalAmt=100;
+  }else{
+    if(!book.totalPages)return null; // 전체 페이지 수를 모르면 추정 불가
+    currentAmt=book.pages||0;totalAmt=book.totalPages;
+  }
+  if(currentAmt<=0)return {sessions,ready:false};
+  const perSession=currentAmt/sessions;
+  const remaining=Math.max(totalAmt-currentAmt,0);
+  const remainingSessions=Math.ceil(remaining/perSession);
+  return {sessions,ready:true,remainingSessions};
+}
+// book에 연결된 contents 항목(startDate/endDate)을 찾아 읽는중="며칠째", 다읽음="며칠간" 문구를 만듦.
+// 통합 이후(2026-08-29) book은 항상 contents 항목이므로 cid로 직접 찾음.
+function getBookDurationLabel(book){
+  const found=_findContentByCidNearMkInRange(book.cid,_BOOK_SCAN_MONTHS);
+  const item=found?found.list[found.idx]:null;
+  if(!item||!item.startDate)return null;
+  const start=new Date(item.startDate+'T00:00:00');
+  if(book.status==='reading'){
+    const days=Math.max(1,Math.floor((new Date(dateKey(new Date())+'T00:00:00')-start)/86400000)+1);
+    return `${days}일째 읽는 중`;
+  }
+  if(book.status==='done'&&item.endDate){
+    const end=new Date(item.endDate+'T00:00:00');
+    const days=Math.max(1,Math.floor((end-start)/86400000)+1);
+    return `${days}일간 읽음`;
+  }
+  return null;
+}
+function renderBookList(){
+  const el=document.getElementById('rd-book-list');if(!el)return;
+  const books=getBooks().filter(b=>b.status===_rdTab).sort((a,b)=>(b.created||0)-(a.created||0));
+  if(!books.length){el.innerHTML='<div class="rd-empty">아직 항목이 없어요</div>';return;}
+  el.innerHTML=books.map(b=>{
+    const sub=b.status==='done'?'':(b.unit==='percent'?`${b.percent||0}%`:(b.totalPages?`${b.pages}/${b.totalPages}페이지`:`${b.pages||0}페이지`));
+    const timeStr=b.seconds?`${Math.floor(b.seconds/60)}분`:'';
+    const durLabel=getBookDurationLabel(b);
+    const sessionCount=b.status==='reading'?countReadingSessionsForBook(b):0;
+    const sessionStr=sessionCount>0?`${sessionCount}회차`:'';
+    const metaStr=[sub,timeStr,durLabel,sessionStr].filter(Boolean).join(' · ');
+    const est=b.status==='reading'?estimateRemainingReadingSessions(b,sessionCount):null;
+    const estHtml=est?(
+      est.ready
+        ?`<div class="rd-est-line">완독까지 약 ${est.remainingSessions}회 남았어요</div>`
+        :`<div class="rd-est-line dim">기록이 조금 더 쌓이면 예상 회차를 알려드릴게요</div>`
+    ):'';
+    const open=_rdOpenCid===b.cid;
+    const quoteOpen=_rdDoneQuoteBookCid===b.cid;
+    const commentOpen=_rdDoneCommentBookCid===b.cid;
+    const doneQuoteBlock=_rdTab==='done'?`
+        <div class="done-banner-row">
+          <div class="done-quote-chip" onclick="event.stopPropagation();toggleDoneBookQuotes('${b.cid}')">
+            <div class="done-quote-chip-inner" onclick="event.stopPropagation();toggleDoneBookQuotes('${b.cid}')"><i class="ti ti-quote ico-12" aria-hidden="true"></i> 수집한 문장</div>
+          </div>
+          <div class="done-comment-chip" onclick="event.stopPropagation();toggleDoneBookComments('${b.cid}')">
+            <div class="done-comment-chip-inner" onclick="event.stopPropagation();toggleDoneBookComments('${b.cid}')"><i class="ti ti-message-circle ico-12" aria-hidden="true"></i> 코멘트</div>
+          </div>
+        </div>
+        ${quoteOpen?`<div id="rd-done-quote-list-${b.cid}" style="margin-top:6px;"></div>
+        <div class="rd-quote-more" onclick="event.stopPropagation();openQuoteSheetCheck('${b.cid}')">+ 문장 추가</div>`:''}
+        ${commentOpen?`<div id="rd-done-comment-list-${b.cid}" style="margin-top:6px;"></div>`:''}`:'';
+    const detailRow=_rdTab==='done'?'':
+      `<div class="rd-detail-row">
+          <span class="rd-status-btn${b.status==='reading'?' active':''}" onclick="event.stopPropagation();setBookStatus('${b.cid}','reading')">읽는 중</span>
+          <span class="rd-status-btn${b.status==='done'?' active':''}" onclick="event.stopPropagation();setBookStatus('${b.cid}','done')">다 읽음</span>
+          <span class="rd-status-btn${b.status==='paused'?' active':''}" onclick="event.stopPropagation();setBookStatus('${b.cid}','paused')">중단</span>
+          <span class="rd-del-btn" onclick="event.stopPropagation();removeBook('${b.cid}')" title="삭제"><i class="ti ti-x ico-sz-13" aria-hidden="true"></i></span>
+        </div>`;
+    const titleRow=_rdTab==='done'?
+      `<div class="rd-book-title" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>${b.title}</span>
+        <span class="rd-del-btn" onclick="event.stopPropagation();removeBook('${b.cid}')" title="삭제"><i class="ti ti-x ico-sz-13" aria-hidden="true"></i></span>
+      </div>`:
+      `<div class="rd-book-title">${b.title}</div>`;
+    return `<div class="rd-book-item${open?' open':''}" onclick="toggleBookDetail('${b.cid}')">
+      ${titleRow}
+      <div class="rd-book-meta">${metaStr}</div>
+      ${estHtml}
+      <div class="rd-book-detail">
+        ${detailRow}
+        ${doneQuoteBlock}
+      </div>
+    </div>`;
+  }).join('');
+}
+function toggleBookDetail(cid){_rdOpenCid=_rdOpenCid===cid?null:cid;_rdDoneQuoteBookCid=null;renderBookList();}
+function setBookStatus(cid,status,review){
+  const book=getBooks().find(b=>b.cid===cid);if(!book)return;
+  book.status=status;
+  if(status==='done')book.completedAt=dateKey(new Date());
+  if(review){book.stars=review.stars||0;book.review=review.review||'';}
+  upsertBookLocal(book); // book이 곧 contents 항목이므로 이 호출 하나로 contents 반영까지 끝남(2026-08-29, 구 syncReadingBookToContent 제거)
+  renderReadingHub();
+  renderContentTimeline();
+}
+function removeBook(cid){
+  if(_rdOpenCid===cid)_rdOpenCid=null;
+  deleteBookLocal(cid); // book이 곧 contents 항목이므로 이 호출 하나로 contents 삭제까지 끝남(2026-08-29)
+  renderReadingHub(); // 아카이브 리스트뿐 아니라 상단(진행중 표시/커버 등)까지 즉시 갱신
+  renderContentTimeline();
+}
+// ══════════════════════════════════════════════════════════
+// ██ 독서 허브 (2/2 — 나머지는 READING HUB~씨앗코너 부근) — 진행률입력모달~공유모달공통(문장카드 포함) ██
+// ══════════════════════════════════════════════════════════
+// ── 진행률 입력 모달
+let _pgBookCid=null,_pgUnit='pages',_pgSeconds=0,_pgStartVal=0;
+// cid: 병렬독서 지원(2026-09-03)으로 어느 책의 진행률인지 항상 명시. 진행바 직접 클릭(0초)도 cid를 함께 넘김.
+function openProgressModal(cid,seconds){
+  const book=getBooks().find(b=>b.cid===cid);
+  if(!book){if(seconds>0){_swSeconds=0;}return;} // 대상 책이 없으면(정상 흐름에서 거의 발생 안 함) 조용히 무시
+  _pgBookCid=book.cid;_pgSeconds=seconds||0;_pgUnit=book.unit||'pages';
+  _pgStartVal=_pgUnit==='percent'?(book.percent||0):(book.pages||0);
+  document.getElementById('pg-unit-pages').classList.toggle('on',_pgUnit==='pages');
+  document.getElementById('pg-unit-percent').classList.toggle('on',_pgUnit==='percent');
+  document.getElementById('pg-start-val').textContent=_pgUnit==='percent'?_pgStartVal+'%':_pgStartVal+'p';
+  document.getElementById('pg-end-inp').value=_pgStartVal;
+  const totalEl=document.getElementById('pg-total');
+  totalEl.textContent=(_pgUnit==='pages'&&book.totalPages)?`총 ${book.totalPages}페이지`:'';
+  const noteEl=document.getElementById('pg-note-inp');
+  if(noteEl){
+    noteEl.value='';
+    noteEl.placeholder=pickRandom(['오늘 읽은 부분에서 기억나는 문장은? (선택)','인상 깊은 구절이 있었나요? (선택)','오늘 읽으며 든 생각을 남겨보세요 (선택)']);
+  }
+  // 완독확인 UI가 이전 열람에서 떠 있던 상태로 남지 않도록 저장버튼 초기 상태로 리셋
+  const confirmEl=document.getElementById('pg-done-confirm');
+  const actionsEl=document.getElementById('pg-modal-actions');
+  if(confirmEl){confirmEl.style.display='none';confirmEl.innerHTML='';}
+  if(actionsEl){
+    actionsEl.innerHTML=`<button class="mbtn cancel" onclick="closeModal('progress-modal')">취소</button>
+      <button class="mbtn ok" onclick="confirmProgress()">저장</button>`;
+  }
+  openModal('progress-modal');
+  setTimeout(()=>document.getElementById('pg-end-inp').focus(),100);
+}
+// ── 일자별 콘텐츠 진행률 로그 (감상달력용) — 진행률 저장 시점에만 기록됨.
+// 2026-09-11: reading_daily_log→content_daily_log로 통합, 책 전용에서 책/드라마/영화 공용으로 확장.
+// 같은 날 여러 세션(스톱워치 여러 번)이면 client_id를 date_key+cid로 고정해 upsert로 누적.
+function getContentDailyLog(dk){return S.get(S.key('cdlog',dk))||[];}
+function saveContentDailyLog(dk,arr){
+  S.set(S.key('cdlog',dk),arr);
+  S.set(S.key('cdlog_pending',dk),true);
+  autoSync('cdlog',dk);
+}
+// unit: 'pages'|'percent'(책), 'episode'(드라마), 'minute'(영화). unitAfter=그날 도달한 진행값(percent 제외).
+function logContentDaily(cid,dk,amountRead,seconds,unit,percentAfter,unitAfter){
+  const logs=getContentDailyLog(dk);
+  const cidKey='cdlog_'+dk+'_'+cid;
+  const idx=logs.findIndex(l=>l.cid===cidKey);
+  if(idx>=0){
+    logs[idx].amountRead=(logs[idx].amountRead||0)+amountRead;
+    logs[idx].seconds=(logs[idx].seconds||0)+(seconds||0);
+    logs[idx].unit=unit;
+    logs[idx].percentAfter=percentAfter;
+    logs[idx].unitAfter=unitAfter;
+  }else{
+    logs.push({cid:cidKey,contentCid:cid,unit:unit,amountRead:amountRead,seconds:seconds||0,percentAfter:percentAfter,unitAfter:unitAfter,created:Date.now()});
+  }
+  saveContentDailyLog(dk,logs);
+}
+async function syncContentDailyLogUp(dk){
+  const logs=getContentDailyLog(dk);
+  if(!logs.length)return true;
+  const ok=await supaUpsert('content_daily_log','client_id',logs.map(l=>({
+    date_key:dk,content_cid:l.contentCid,unit:l.unit,amount_read:l.amountRead||0,
+    percent_after:(l.unit==='percent'?l.percentAfter:null),
+    unit_after:(l.unit!=='percent'?l.unitAfter:null),
+    seconds:l.seconds||0,created:l.created,client_id:l.cid
+  })));
+  return ok;
+}
+// _rdProgressLabel — 콘텐츠 감상달력(renderWatchCalDetail)의 책 진행률 표시에서도 재사용(2026-09-11 독서달력 폐기 이후 잔존).
+function _rdProgressLabel(unit,percentAfter,pagesAfter){
+  if(unit==='percent')return (percentAfter!=null?percentAfter:0)+'%';
+  return (pagesAfter!=null?pagesAfter:0)+'p';
+}
+// 카테고리별 일일 진행 로그(dailyLog)를 "35% · +5%" 같은 한 줄 텍스트로 변환 — 일자별 상세화면(renderWcalDayDetail)과
+// 코멘트 모아보기(_chNoteRowHtml)가 동일 포맷을 쓰도록 공용 헬퍼로 분리(2026-09-12).
+function _chDailyLogMetaText(cat,log){
+  if(!log)return '';
+  let progText='',amountText='';
+  if(cat==='book')progText=_rdProgressLabel(log.unit,log.percent_after,log.unit_after);
+  else if(log.unit_after!=null)progText=cat==='drama'?`${log.unit_after}화`:`${log.unit_after}분`;
+  amountText=log.amount_read>0?(log.unit==='percent'?`+${log.amount_read}%`:`+${log.amount_read}${cat==='drama'?'화':(cat==='book'?'p':'분')}`):'';
+  return [progText,amountText].filter(Boolean).join(' · ');
+}
+// 코멘트 모아보기 전용 — 독서는 증감률+감상시간, 드라마/영화는 감상시간만 노출(2026-09-12).
+// _chDailyLogMetaText(상세화면과 공용)는 그대로 두고, 이 시트에서만 카테고리별로 항목을 추리는 얇은 래퍼.
+function _chNoteMetaText(cat,log){
+  if(!log)return '';
+  const timeText=log.timeText||'';
+  if(cat==='book'){
+    const progAmount=_chDailyLogMetaText(cat,log);
+    return [progAmount,timeText].filter(Boolean).join(' · ');
+  }
+  return timeText;
+}
+// ── 감상 캘린더 (실제로 본 날짜에 포스터를 꽂는 달력형 뷰. 콘텐츠 모아보기(카테고리별 리스트)와는 별개 기능) ──
+// 데이터 소스: 새 테이블 없이 기존 리듬 기록을 그대로 사용.
+//  - 드라마/영화: rhythm_blocks(cat='enjoy', text="드라마 - 제목"/"영화 - 제목")의 date_key가 곧 감상일.
+//  - 책: rhythm_blocks(cat='enjoy', text="독서 - 제목")도 동일 — 스톱워치 종료 시 자동 기록되던 그 블록.
+//  - 음악: 리듬 기록이 없으므로 contents(cat='music')의 startDate(=등록일=감상일 개념)를 그 날의 기록으로 사용.
+const WCAL_CAT_META={
+  drama:{label:'드라마',icon:'ti-device-tv',color:'rgba(var(--pal-pink-rgb),1)'},
+  movie:{label:'영화',icon:'ti-movie',color:'rgba(var(--pal-sky-rgb),1)'},
+  book:{label:'책',icon:'ti-book',color:'rgba(var(--pal-yellow-rgb),1)'},
+  music:{label:'음악',icon:'ti-music',color:'rgba(var(--pal-lime-rgb),1)'}
+};
+let _wcalDate=new Date();
+let _wcalFilter='all';
+let _wcalByDate={}; // 이번 달 집계 캐시: {dk: [{cat,title,poster}, ...]}
+let _wcalSelectedDk=null;
+let _wcalCollapsed=false; // 달력 접기/펼치기 — 접으면 이번 주 7칸만, 펼치면 월 전체 그리드
+// 서버의 수동 추가분을 먼저 내려받고, 그 결과와 무관하게 로컬 데이터로 즉시 1차 렌더(체감 속도용) — 공통 로직이라 헬퍼로 뽑음
+function _wcalRefresh(){
+  const mk=monthKey(_wcalDate);
+  const prevMk=monthKey(new Date(_wcalDate.getFullYear(),_wcalDate.getMonth()-1,1));
+  // 감상 메모가 contents.notes[]로 통합되어(2026-08-29) 서버 반영을 위해 contents도 함께 내려받음.
+  // 정주행 등으로 지난달에 걸친 항목의 메모도 있을 수 있어 이전 달도 함께.
+  Promise.all([syncWcalManualDown(mk),syncContentsDown(mk),syncContentsDown(prevMk)]).then(loadAndRenderWatchCal);
+  loadAndRenderWatchCal();
+}
+function wcalMonthShift(delta){
+  _wcalDate.setMonth(_wcalDate.getMonth()+delta);
+  _wcalSelectedDk=null;
+  if(_wcalCollapsed)wcalToggleCollapse(); // 다른 달로 이동하면 '이번 주' 개념이 어긋나므로 자동으로 펼침 상태로 복귀
+  _wcalRefresh();
+}
+function wcalSetFilter(cat){
+  _wcalFilter=cat;
+  renderWatchCalGrid();
+  renderWatchCalWeekRow();
+  renderWcalFilterChips();
+  renderWatchCalDetail();
+}
+// 드라마 검색은 TMDB tv 엔드포인트를 그대로 쓰므로(searchTMDB), 예능/시사교양처럼 tv로 등록된 프로그램도
+// 이미 'drama' 카테고리로 함께 검색·저장됨 — 감상 캘린더도 별도 처리 없이 그대로 포섭.
+async function loadAndRenderWatchCal(){
+  const y=_wcalDate.getFullYear(),m=_wcalDate.getMonth();
+  const mk=y+'-'+String(m+1).padStart(2,'0');
+  const prevMk=monthKey(new Date(y,m-1,1));
+  _wcalByDate={};
+  const push=(dk,item)=>{if(!_wcalByDate[dk])_wcalByDate[dk]=[];_wcalByDate[dk].push(item);};
+
+  // 드라마/영화/독서 — 리듬 블록에서 그 달(+말일 자정 넘어간 전날 몫 보정용으로 prevMk 말일도 포함) 수집
+  const daysInMonth=new Date(y,m+1,0).getDate();
+  for(let d=1;d<=daysInMonth;d++){
+    const dk=`${mk}-${String(d).padStart(2,'0')}`;
+    getRhythmBlocks(dk).forEach(b=>{
+      if(b.cat!=='enjoy'||!b.text)return;
+      let cat=null,title=null;
+      if(b.text.startsWith('드라마 - ')){cat='drama';title=b.text.slice(6);}
+      else if(b.text.startsWith('영화 - ')){cat='movie';title=b.text.slice(5);}
+      else if(b.text.startsWith('독서 - ')){cat='book';title=b.text.slice(5);}
+      if(!cat)return;
+      // cid는 리듬블록에 이미 저장된 contentCid를 그대로 사용(제목 매칭 경유 안 함) — 동명 콘텐츠/제목 변경 시에도 정확한 콘텐츠로 연동됨
+      push(dk,{cat,title,cid:b.contentCid||null});
+    });
+  }
+  // 음악 — contents(등록=감상일) 이번 달분
+  getContents(mk).filter(c=>c.cat==='music'&&c.startDate).forEach(c=>{
+    push(c.startDate,{cat:'music',title:c.title,poster:c.poster,cid:c.cid||null});
+  });
+  // 영화 — 극장 관람 등 리듬 기록 없이 콘텐츠탭에만 등록되는 경우가 잦아, 리듬 블록으로 한 번도 안 잡힌 영화는
+  // contents의 종료일(없으면 시작일)로 폴백. 리듬 기록이 있는 영화는 그 실제 감상일이 더 정확하므로 폴백 대상에서 제외.
+  const moviesCapturedByRhythm=new Set();
+  Object.values(_wcalByDate).forEach(list=>list.forEach(it=>{if(it.cat==='movie')moviesCapturedByRhythm.add(it.title);}));
+  getContents(mk).filter(c=>c.cat==='movie').forEach(c=>{
+    if(moviesCapturedByRhythm.has(c.title))return;
+    const fallbackDk=c.endDate||c.startDate;
+    if(fallbackDk&&fallbackDk.slice(0,7)===mk)push(fallbackDk,{cat:'movie',title:c.title});
+  });
+
+  // 수동 추가분(드라마/책) — 자동 수집(리듬 기록)이 못 잡는 사각지대(오디오북 미등록, TV 감상탭 미입력 등) 보충용
+  getWcalManual(mk).forEach(it=>push(it.dk,{cat:it.cat,title:it.title}));
+
+  // 포스터/상태 매칭 — 드라마/영화/책은 같은 제목의 콘텐츠 항목(이번 달+전월, 진행중 포함)에서 poster/status를 찾아 붙임
+  // cid도 함께 매칭해 붙임 — 콘텐츠탭 등록 원본과 연결해야 일자별 코멘트(cid 기준)를 저장할 수 있음
+  const posterByTitle={},cidByTitle={},statusByTitle={};
+  [...getContents(mk),...getContents(prevMk)].forEach(c=>{
+    if(c.cat!=='music'&&c.title){posterByTitle[c.title]=c.poster||null;cidByTitle[c.title]=c.cid||null;statusByTitle[c.title]=c.status||null;}
+  });
+  Object.values(_wcalByDate).forEach(list=>list.forEach(it=>{
+    // cid는 리듬블록에서 이미 정확히 채워진 경우(it.cid 존재) 덮어쓰지 않음 — 동명 콘텐츠/제목변경 시 오매칭 방지.
+    // 수동추가분 등 cid가 아직 없는 항목만 제목기준으로 보강(기존 동작 유지).
+    if(it.cat!=='music'){it.poster=posterByTitle[it.title]||null;if(!it.cid)it.cid=cidByTitle[it.title]||null;it.status=statusByTitle[it.title]||null;}
+  }));
+
+  // 한 날짜에 같은 제목이 여러 세션(리듬 블록)으로 중복 등록됐을 수 있으므로 날짜별로 제목+카테고리 기준 유일화
+  Object.keys(_wcalByDate).forEach(dk=>{
+    const seen=new Set();
+    _wcalByDate[dk]=_wcalByDate[dk].filter(it=>{
+      const key=it.cat+'|'+it.title;
+      if(seen.has(key))return false;
+      seen.add(key);return true;
+    });
+  });
+
+  // 일자별 진행률 로그(content_daily_log) — 책은 기존 로그가, 드라마/영화는 2026-09-11 저장 시점부터의 로그가 매칭됨(과거분 소급 없음).
+  // cid 기준으로 매칭하므로 cid가 없는 항목(수동추가분 등)은 진행률 없이 감상시간만 표시됨.
+  const logRows=await supaFetch(`content_daily_log?date_key=gte.${mk}-01&date_key=lte.${mk}-31&order=created`)||[];
+  const logsByDkCid={};
+  logRows.forEach(r=>{
+    if(!r.content_cid)return;
+    const key=r.date_key+'|'+r.content_cid;
+    logsByDkCid[key]=r; // 같은 날 같은 콘텐츠는 upsert로 이미 누적된 1행이므로 그대로 사용
+  });
+  Object.keys(_wcalByDate).forEach(dk=>{
+    _wcalByDate[dk].forEach(it=>{
+      if(!it.cid)return;
+      it.dailyLog=logsByDkCid[dk+'|'+it.cid]||null;
+    });
+  });
+
+  renderWatchCalHeader();
+  renderWcalFilterChips();
+  renderWatchCalGrid();
+  renderWatchCalWeekRow();
+  renderWatchCalDetail();
+}
+function renderWatchCalHeader(){
+  const el=document.getElementById('wcal-month-label');
+  if(el)el.textContent=`${_wcalDate.getFullYear()}년 ${String(_wcalDate.getMonth()+1).padStart(2,'0')}월`;
+}
+function renderWcalFilterChips(){
+  const el=document.getElementById('wcal-filter-chips');if(!el)return;
+  const cats=[{key:'all',label:'전체',icon:'ti-apps'},...Object.keys(WCAL_CAT_META).map(k=>({key:k,label:WCAL_CAT_META[k].label,icon:WCAL_CAT_META[k].icon}))];
+  el.innerHTML=cats.map(c=>`<div class="wcal-filter-chip${c.key===_wcalFilter?' on':''}" data-cat="${c.key}" onclick="wcalSetFilter('${c.key}')"><i class="ti ${c.icon}" aria-hidden="true" style="font-size:12px;margin-right:3px;"></i>${c.label}</div>`).join('');
+}
+function _wcalFilteredItems(dk){
+  const items=_wcalByDate[dk]||[];
+  return _wcalFilter==='all'?items:items.filter(it=>it.cat===_wcalFilter);
+}
+function _wcalSwatch(it){
+  const m=WCAL_CAT_META[it.cat];
+  if(it.poster)return `<img src="${it.poster}" alt="">`;
+  return `<div class="wcal-cat-fallback" style="background:${m.color};"><i class="ti ${m.icon}" aria-hidden="true"></i></div>`;
+}
+// 32x44 고정 크기 포스터(또는 카테고리색 폴백) — 하단 상세 목록과 추가시트 검색 목록에서 공통으로 씀
+function _wcalPosterThumbHtml(cat,poster){
+  const m=WCAL_CAT_META[cat];
+  if(poster)return `<img src="${poster}" style="width:32px;height:44px;border-radius:5px;object-fit:cover;flex-shrink:0;" />`;
+  return `<div style="width:32px;height:44px;border-radius:5px;background:var(--card2);flex-shrink:0;display:flex;align-items:center;justify-content:center;"><i class="ti ${m.icon} ico-13" style="color:var(--tm);" aria-hidden="true"></i></div>`;
+}
+// 1개=꽉 채움 / 2개=위아래 반반 / 3개=위 하나 크게+아래 좌우 둘 / 4개=2x2, 5개~=+N — 찌그러뜨리지 않고 각 조각도 object-fit:cover로 중앙 크롭
+function _wcalBuildThumb(items){
+  const n=items.length;
+  if(n===1)return _wcalSwatch(items[0]);
+  if(n===2)return `<div class="wcal-split2">${items.slice(0,2).map(_wcalSwatch).join('')}</div>`;
+  if(n===3)return `<div class="wcal-split3">${_wcalSwatch(items[0])}<div class="wcal-split3-bottom">${items.slice(1,3).map(_wcalSwatch).join('')}</div></div>`;
+  return `<div class="wcal-split4">${items.slice(0,4).map(_wcalSwatch).join('')}</div>${n>4?`<div class="wcal-more">+${n-4}</div>`:''}`;
+}
+function renderWatchCalGrid(){
+  const el=document.getElementById('wcal-grid');if(!el)return;
+  const y=_wcalDate.getFullYear(),m=_wcalDate.getMonth();
+  const first=new Date(y,m,1);
+  const startWeekday=(first.getDay()+6)%7; // 월요일 시작
+  const daysInMonth=new Date(y,m+1,0).getDate();
+  let html='';
+  for(let i=0;i<startWeekday;i++)html+='<div class="wcal-cell"></div>';
+  for(let d=1;d<=daysInMonth;d++){
+    const dk=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const items=_wcalFilteredItems(dk);
+    if(!items.length){html+=`<div class="wcal-cell"><div class="wcal-date-plain">${d}</div></div>`;continue;}
+    const sel=dk===_wcalSelectedDk?' selected':'';
+    html+=`<div class="wcal-cell"><div class="wcal-thumb${sel}" onclick="wcalSelectDay('${dk}')">${_wcalBuildThumb(items)}</div></div>`;
+  }
+  el.innerHTML=html;
+}
+// 달력 접기/펼치기 — 월 라벨 텍스트를 눌러 토글, 접으면 이번 주(오늘 기준 월~일) 7칸만 한 줄로
+function wcalToggleCollapse(){
+  _wcalCollapsed=!_wcalCollapsed;
+  document.getElementById('wcal-grid').style.display=_wcalCollapsed?'none':'';
+  document.getElementById('wcal-week-row').style.display=_wcalCollapsed?'':'none';
+  renderWatchCalHeader(); // 라벨에 붙는 펼침/접힘 화살표 갱신
+  if(_wcalCollapsed)renderWatchCalWeekRow();
+}
+// 접힌 상태의 주간 뷰 — 오늘이 속한 주(월~일) 7칸, 월 그리드와 같은 포스터 조합 로직(_wcalBuildThumb) 재사용
+function renderWatchCalWeekRow(){
+  const el=document.getElementById('wcal-week-row');if(!el)return;
+  if(!_wcalCollapsed){el.innerHTML='';return;}
+  const today=new Date();
+  const dow=(today.getDay()+6)%7; // 월요일 시작 기준 요일 인덱스
+  const monday=new Date(today);monday.setDate(today.getDate()-dow);
+  let html='';
+  for(let i=0;i<7;i++){
+    const d=new Date(monday);d.setDate(monday.getDate()+i);
+    const dk=dateKey(d);
+    const items=_wcalFilteredItems(dk);
+    const isToday=dateKey(today)===dk;
+    const sel=dk===_wcalSelectedDk?' selected':'';
+    const dayNum=d.getDate();
+    if(!items.length){
+      html+=`<div class="wcal-week-cell${isToday?' today':''}"><div class="wcal-date-plain">${dayNum}</div></div>`;
+    }else{
+      html+=`<div class="wcal-week-cell${isToday?' today':''}"><div class="wcal-thumb${sel}" onclick="wcalSelectDay('${dk}')">${_wcalBuildThumb(items)}</div></div>`;
+    }
+  }
+  el.innerHTML=html;
+}
+// 하단 상세 — 독서달력 renderReadingCalDayDetailHtml과 동일한 mr-card/mr-sec-title 톤(포스터+제목+메타 한 줄)
+// 각 항목에 코멘트 아이콘 노출 — cid가 있는 항목만 코멘트 작성 가능(콘텐츠탭 등록 원본 기준으로만 연결)
+function renderWatchCalDetail(){
+  const el=document.getElementById('wcal-detail');if(!el)return;
+  if(!_wcalSelectedDk){el.innerHTML='';return;}
+  const items=_wcalFilteredItems(_wcalSelectedDk);
+  if(!items.length){el.innerHTML='';return;}
+  const dispDate=parseInt(_wcalSelectedDk.slice(5,7),10)+'월 '+parseInt(_wcalSelectedDk.slice(8,10),10)+'일';
+  const dk=_wcalSelectedDk;
+  const dayRblocks=getRhythmBlocks(dk);
+  const catPrefix={drama:'드라마 - ',movie:'영화 - ',book:'독서 - '};
+  const rows=items.map((it,idx)=>{
+    const m=WCAL_CAT_META[it.cat];
+    const posterHtml=_wcalPosterThumbHtml(it.cat,it.poster);
+    const hasNote=it.cid&&!!getWcalNoteFor(it.cid,dk);
+    const noteBtnHtml=it.cid?`<span class="wcal-note-icon${hasNote?' has':''}" onclick="openWcalNoteInput('${it.cid}','${dk}',${idx})" title="코멘트"><i class="ti ti-message-circle ico-sz-13" aria-hidden="true"></i></span>`:'';
+    const statusBadgeHtml=it.status==='watching'?'<span class="wcal-status-badge watching">진행중</span>':(it.status==='done'?'<span class="wcal-status-badge done">완결</span>':'');
+    const noteRowHtml=`<div id="wcal-note-row-${idx}"></div>`;
+    // 감상시간 — 리듬블록(그날 세션 시작~종료), 독서달력과 동일한 방식. 음악은 리듬블록 기반이 아니라 제외.
+    let timeText='';
+    if(catPrefix[it.cat]){
+      const target=catPrefix[it.cat]+it.title;
+      const sessionBlocks=dayRblocks.filter(b=>b.cat==='enjoy'&&b.text===target);
+      const sessionRanges=sessionBlocks.map(b=>`${b.start}-${b.end}`);
+      // 자정을 넘긴 세션(예: 22:59 시작~00:22 종료)은 end<start가 되어 음수가 나오므로 +1440 보정 — 취침시간 계산 등과 동일 패턴.
+      const totalMin=sessionBlocks.reduce((sum,b)=>{let m=toMin(b.end)-toMin(b.start);if(m<0)m+=1440;return sum+Math.max(0,m);},0);
+      if(sessionRanges.length)timeText=`${sessionRanges.join(', ')} (총 ${totalMin}분)`;
+    }
+    // 진행률 — content_daily_log(책은 기존 로그, 드라마/영화는 2026-09-11부터의 신규 로그만 존재).
+    const log=it.dailyLog;
+    const progAmountText=_chDailyLogMetaText(it.cat,log);
+    const metaLine=[progAmountText,timeText].filter(Boolean).join(' · ');
+    const metaHtml=metaLine?`<div style="font-size:var(--dow-label-size);color:var(--ts);margin-top:2px;">${metaLine}</div>`:'';
+    // 독서 전용 공유카드 — 구 독서달력(2026-09-11 폐기)에 있던 진입점을 여기로 이전. 그날 진행률 로그(dailyLog)가 있는 책만 노출.
+    const shareBtnHtml=(it.cat==='book'&&log)?`<span onclick="event.stopPropagation();openTodayReadingShareModal('${it.cid}','${log.unit}',${log.percent_after!=null?log.percent_after:'null'},${log.unit_after!=null?log.unit_after:'null'},${log.seconds||0},'${dk}')" title="공유 이미지" style="cursor:pointer;color:var(--ts);opacity:0.75;flex-shrink:0;padding:4px;"><i class="ti ti-share-2 ico-sz-14" aria-hidden="true"></i></span>`:'';
+    return `<div style="padding:7px 0;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        ${posterHtml}
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:var(--main-text-size);color:var(--tp);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(it.title)}</div>
+          <div style="font-size:var(--dow-label-size);color:var(--ts);margin-top:2px;">${m.label}</div>
+          ${metaHtml}
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0;">
+          ${statusBadgeHtml||'<span></span>'}
+          <div style="display:flex;align-items:center;gap:2px;">${shareBtnHtml}${noteBtnHtml}</div>
+        </div>
+      </div>
+      ${noteRowHtml}
+    </div>`;
+  }).join('');
+  el.innerHTML=`<div class="mr-card" style="margin-top:16px;padding-top:14px;border:none;border-top:1px dashed var(--card-b);border-radius:0;background:transparent;">
+    <div class="mr-sec-title" style="margin-bottom:6px;">${dispDate} — ${items.length}개</div>
+    ${rows}
+  </div>`;
+  // 기존에 작성된 코멘트가 있으면 접힌 상태로 미리 보여줌
+  items.forEach((it,idx)=>{
+    if(!it.cid)return;
+    const note=getWcalNoteFor(it.cid,dk);
+    if(note)renderWcalNoteRow(idx,it.cid,dk,note,false);
+  });
+}
+function wcalSelectDay(dk){
+  _wcalSelectedDk=(_wcalSelectedDk===dk)?null:dk;
+  renderWatchCalGrid();
+  renderWatchCalDetail();
+}
+
+// ── 일자별 감상 코멘트 (콘텐츠탭 등록 원본의 cid 기준으로만 연결 — 별점/총평(contents.review)과는 별개의 가벼운 기록) ──
+// 저장 위치: contents 항목 자체의 notes[] 배열(구 goal_notes/wcal_note 월별 저장소에서 통합, 2026-08-29).
+// note 형태: {dk,title,cat,text,time,updatedAt} — cid는 소속된 contents 항목으로 이미 결정되므로 note 자체엔 저장 안 함.
+// 특정 cid+날짜에 남긴 코멘트 하나 조회(같은 cid+날짜는 1개로 취급 — 그날 감상에 대한 메모는 계속 이어 써서 수정하는 형태)
+function getWcalNoteFor(cid,dk){
+  const found=_findContentByCidNearMk(cid,dk.slice(0,7));
+  if(!found)return null;
+  const c=found.list[found.idx];
+  return (c.notes||[]).find(n=>n.dk===dk)||null;
+}
+// 코멘트 입력창을 해당 항목 자리에 펼침(작성/수정 겸용) — 이미 있으면 기존 텍스트를 채워 수정 모드로 시작
+function openWcalNoteInput(cid,dk,idx){
+  const existing=getWcalNoteFor(cid,dk);
+  const rowEl=document.getElementById('wcal-note-row-'+idx);
+  if(!rowEl)return;
+  rowEl.innerHTML=`<div style="margin-top:8px;">
+    <textarea id="wcal-note-inp-${idx}" class="rhythm-memo-inp" style="margin-bottom:8px;min-height:44px;" placeholder="오늘 본 것에서 인상적이었던 순간을 가볍게 남겨보세요">${escapeHtml(existing?existing.text:'')}</textarea>
+    <div style="display:flex;gap:8px;">
+      <button onclick="saveWcalNote('${cid}','${dk}',${idx})" style="flex:1;padding:9px;border-radius:10px;border:none;background:var(--pal-mauvepink);color:#fff;font-size:var(--dow-label-size);font-weight:600;">저장</button>
+      ${existing?`<button onclick="deleteWcalNote('${cid}','${dk}',${idx})" style="padding:9px 14px;border-radius:10px;border:1px solid var(--card-b);background:var(--card);color:var(--ts);font-size:var(--dow-label-size);">삭제</button>`:''}
+    </div>
+  </div>`;
+}
+function saveWcalNote(cid,dk,idx){
+  const inp=document.getElementById('wcal-note-inp-'+idx);
+  if(!inp)return;
+  const text=inp.value.trim();
+  if(!text)return;
+  const found=_findContentByCidNearMk(cid,dk.slice(0,7));
+  if(!found)return;
+  const c=found.list[found.idx];
+  if(!c.notes)c.notes=[];
+  const item=(_wcalByDate[dk]||[]).find(it=>it.cid===cid);
+  const i=c.notes.findIndex(n=>n.dk===dk);
+  const now=new Date();
+  const time=i>=0&&c.notes[i].time?c.notes[i].time:(String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')); // 최초 작성 시각 고정 — 수정해도 바뀌지 않음
+  const entry={dk,title:item?item.title:c.title,cat:item?item.cat:c.cat,text,time,updatedAt:Date.now()}; // poster는 저장 안 함 — contents가 원본, 표시할 때 항상 최신 값을 조회
+  if(i>=0)c.notes[i]=entry;else c.notes.push(entry);
+  saveContents(found.mk,found.list);
+  renderWcalNoteRow(idx,cid,dk,entry,false);
+}
+function deleteWcalNote(cid,dk,idx){
+  const found=_findContentByCidNearMk(cid,dk.slice(0,7));
+  if(!found)return;
+  const c=found.list[found.idx];
+  c.notes=(c.notes||[]).filter(n=>n.dk!==dk);
+  saveContents(found.mk,found.list);
+  const rowEl=document.getElementById('wcal-note-row-'+idx);
+  if(rowEl)rowEl.innerHTML='';
+}
+// 저장 완료 후 읽기 모드로 접어서 보여줌(다시 탭하면 openWcalNoteInput으로 수정 모드 재진입)
+function renderWcalNoteRow(idx,cid,dk,note,editing){
+  const rowEl=document.getElementById('wcal-note-row-'+idx);
+  if(!rowEl)return;
+  rowEl.innerHTML=`<div class="wcal-note-display" onclick="openWcalNoteInput('${cid}','${dk}',${idx})">${escapeHtml(note.text)}</div>`;
+}
+
+// ── 감상 기록 수동 추가분 — 등록 UI는 삭제됨. 과거에 이미 저장된 데이터를 감상 캘린더가 계속 읽고 동기화하기 위해 이 저장소 접근 함수만 유지.
+// 저장 위치: 새 테이블 없이 goal_notes를 wchallenge와 동일한 범용 저장소 패턴으로 재사용.
+// key: 'wcal_manual_YYYY-MM', lines: [{cat,title,dk}, ...] — 월별로 나눠 저장해 한 항목이 비대해지지 않게 함.
+function getWcalManual(mk){return S.get('wcal_manual_'+mk)||[];}
+async function syncWcalManualDown(mk){
+  const key='wcal_manual_'+mk;
+  const pendingKey='wcal_manual_pending_'+mk;
+  if(S.get(pendingKey)){
+    await supaUpsert('goal_notes','note_key',[{note_key:key,lines:S.get(key)||[]}]);
+    S.set(pendingKey,false);
+    return;
+  }
+  const rows=await supaFetch(`goal_notes?note_key=eq.${encodeURIComponent(key)}`);
+  if(!rows)return;
+  if(!rows.length){
+    const local=S.get(key);
+    if(local&&local.length)await supaUpsert('goal_notes','note_key',[{note_key:key,lines:local}]);
+    return;
+  }
+  S.set(key,rows[0].lines);
+}
+
+// ── 콘텐츠 허브 — 월별 아카이브 (가로 스크롤 월 칩 + 선택된 달의 포스터 그리드가 그 자리 아래로 펼쳐짐) ──
+// 클릭식 아코디언이 아니라, 항상 하나의 달이 펼쳐져 있는 상태(열 때는 당월) — 다른 칩을 누르면 펼쳐진 내용만 바뀜
+let _chArchiveMk=null;
+let _cmrByCatCache=null; // 그리드 토글 갱신 시 재조회 없이 쓰기 위한 캐시 — chExpandMonth에서 채움
+function renderChHubMonthBanners(){
+  const el=document.getElementById('ch-month-banner-row');if(!el)return;
+  const now=new Date();
+  let html='';
+  for(let i=0;i<12;i++){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const mk=monthKey(d);
+    const label=(d.getMonth()+1)+'월';
+    const on=mk===_chArchiveMk?' on':'';
+    html+=`<div class="ch-month-banner-chip${on}" onclick="chExpandMonth('${mk}')">${label}</div>`;
+  }
+  el.innerHTML=html;
+}
+// 선택된 달의 콘텐츠 목록(월간 카테고리별 집계) — renderContentAsGridHtml이 각 항목 코멘트 아이콘에 완결 총평+감상 중 메모를 함께 보여줌
+// 그리드형으로 통일(2026-09-08) — 리스트형(renderContentByCatHtml)은 실사용 저조로 완전 제거, 음악도 원래부터 항상 그리드였음
+// 콘텐츠허브 내에서 감상 기록이 바뀔 때(스톱워치 종료, 진행률 저장, 완결 전환) 호출 —
+// 아카이브 펼침뷰(chExpandMonth)는 각 호출부에서 이미 갱신하고 있었지만, 감상달력(loadAndRenderWatchCal)은
+// 콘텐츠허브가 열려있어도 다시 그려지지 않아 나갔다 들어와야 반영되는 문제가 있었음(2026-09-01).
+// 콘텐츠허브가 열려있을 때만 갱신 — 닫혀 있으면 다음에 열 때(openContentHub) 어차피 새로 불러오므로 불필요한 연산 방지.
+function refreshContentHubViews(){
+  if(!document.getElementById('content-hub-ov')?.classList.contains('on'))return;
+  loadAndRenderWatchCal();
+}
+function chExpandMonth(mk){
+  _chArchiveMk=mk;
+  renderChHubMonthBanners();
+  const el=document.getElementById('ch-month-archive-grid');if(!el)return;
+  const [y,mo]=mk.split('-').map(Number);
+  const byCat=computeContentMonthlyByCat(y,mo-1);
+  _cmrByCatCache=byCat; // 그리드 모드의 코멘트 토글 갱신이 이 캐시를 참조함
+  el.innerHTML=renderContentAsGridHtml(byCat);
+}
+
+// ── 콘텐츠 허브 — 코멘트 모아보기(타임라인, 읽기 전용) — 독서코너의 독서달력 진입구와 동일한 위치의 헤더 아이콘으로 진입 ──
+// 완결 코멘트(contents.review+stars, 작품당 1개)와 감상 메모(wcal_note, 날짜당 여러 개)를 함께 모아 보여줌.
+// 날짜순: 완결 코멘트는 카드, 감상 메모는 그 아래 곁가지로 — 시간 흐름이 기준축.
+// 작품별: 작품 카드 하나에 완결 총평 + 그 작품에 남긴 감상 메모들을 날짜순으로 접어 넣음 — 작품이 기준축.
+let _chSelectedMonth=monthKey(new Date()); // 코멘트 모아보기 — 현재 선택된 월(YYYY-MM), 칩으로 전환
+// 선택된 월 하나만 수집(효율성 — 전체 기간을 한번에 불러오지 않음, 2026-09-12 월별 칩 도입)
+// finals(완결 총평)·notes(감상 메모)·logs(일자별 진행률+감상시간)를 함께 반환
+async function _chCollectNoteSource(mk){
+  mk=mk||_chSelectedMonth;
+  await syncMonthRange(parseInt(mk.slice(0,4),10),parseInt(mk.slice(5,7),10)-1); // 그 달 콘텐츠/리듬블록을 로컬에 채워둠(달력과 동일한 소스)
+  const finals=[]; // {cid,cat,title,poster,stars,review,dk} — status가 done/stopped(=완결 처리됨)인 작품 전부 포함,
+  // review/stars는 있을 수도 없을 수도 있음(완결 배지 판정은 status 기준, 총평 텍스트 유무와 별개)(2026-09-09 수정)
+  const notes=[]; // {cid,cat,title,dk,text,updatedAt} — poster는 저장 안 하므로 소속 contents 항목의 값을 붙임
+  const contentByCid={}; // cid → {cat,title,poster} — 로그 병합 시 제목/포스터 조회용
+  getContents(mk).forEach(c=>{
+    if(c.cat!=='music'&&(c.status==='done'||c.status==='stopped')){
+      finals.push({cid:c.cid,cat:c.cat,title:c.title,poster:c.poster||null,stars:c.stars||0,review:c.review||'',dk:c.endDate||c.startDate||''});
+    }
+    (c.notes||[]).forEach(n=>notes.push({...n,cid:c.cid,poster:c.poster||null}));
+    if(c.cid)contentByCid[c.cid]={cat:c.cat,title:c.title,poster:c.poster||null};
+  });
+  // 일자별 진행률 로그(content_daily_log) — 감상달력 일자별 상세화면(renderWcalDayDetail)과 동일한 소스.
+  // 코멘트(리뷰/메모) 없이 진행률만 기록된 날도 모아보기에 나오도록 별도 배열로 수집.
+  const daysInMonth=new Date(parseInt(mk.slice(0,4),10),parseInt(mk.slice(5,7),10),0).getDate();
+  const fromDk=`${mk}-01`,toDk=`${mk}-${pad(daysInMonth)}`;
+  const logRows=await supaFetch(`content_daily_log?date_key=gte.${fromDk}&date_key=lte.${toDk}&order=date_key`)||[];
+  // 카테고리별 감상시간(리듬블록) — 독서/드라마/영화는 그날의 enjoy 리듬블록 합산 시간을 구해 로그에 얹음.
+  // 독서: 증감률+시간, 드라마/영화: 시간만 노출(2026-09-12) — 표시 여부는 렌더 함수(_chDailyLogMetaText)에서 처리.
+  const catPrefix={drama:'드라마 - ',movie:'영화 - ',book:'독서 - '};
+  const timeCache={}; // dk|cid -> "HH:MM-HH:MM, ... (총 N분)"
+  function timeTextFor(dk,cat,title){
+    const key=dk+'|'+cat+'|'+title;
+    if(timeCache[key]!==undefined)return timeCache[key];
+    if(!catPrefix[cat]){timeCache[key]='';return '';}
+    const target=catPrefix[cat]+title;
+    const sessionBlocks=getRhythmBlocks(dk).filter(b=>b.cat==='enjoy'&&b.text===target);
+    const sessionRanges=sessionBlocks.map(b=>`${b.start}-${b.end}`);
+    const totalMin=sessionBlocks.reduce((sum,b)=>{let m=toMin(b.end)-toMin(b.start);if(m<0)m+=1440;return sum+Math.max(0,m);},0);
+    const text=sessionRanges.length?`${sessionRanges.join(', ')} (총 ${totalMin}분)`:'';
+    timeCache[key]=text;
+    return text;
+  }
+  const logs=[]; // {cid,cat,title,poster,dk,unit,percent_after,unit_after,amount_read,seconds,timeText}
+  logRows.forEach(r=>{
+    if(!r.content_cid)return;
+    const c=contentByCid[r.content_cid];
+    if(!c)return; // 이번 수집 범위(이 달)에 없는 콘텐츠의 로그는 제외
+    logs.push({cid:r.content_cid,cat:c.cat,title:c.title,poster:c.poster,dk:r.date_key,unit:r.unit,percent_after:r.percent_after,unit_after:r.unit_after,amount_read:r.amount_read,seconds:r.seconds,timeText:timeTextFor(r.date_key,c.cat,c.title)});
+  });
+  // 로그가 없어도(진행률 미기록) 리듬블록만으로 감상한 날이 있을 수 있음 — 그 날짜도 시간만으로 항목 생성.
+  const loggedKeys=new Set(logs.map(l=>l.dk+'|'+l.cid));
+  Object.keys(contentByCid).forEach(cid=>{
+    const c=contentByCid[cid];
+    if(!catPrefix[c.cat])return; // 음악 등 리듬블록 기반이 아닌 카테고리는 제외
+    const target=catPrefix[c.cat]+c.title;
+    for(let d=1;d<=daysInMonth;d++){
+      const dk=`${mk}-${pad(d)}`;
+      const key=dk+'|'+cid;
+      if(loggedKeys.has(key))continue;
+      const t=timeTextFor(dk,c.cat,c.title);
+      if(!t)continue;
+      logs.push({cid,cat:c.cat,title:c.title,poster:c.poster,dk,unit:null,percent_after:null,unit_after:null,amount_read:0,seconds:0,timeText:t});
+    }
+  });
+  return {finals,notes,logs};
+}
+let _chNoteTimelineView='date';
+function openContentNoteTimeline(){
+  _chSelectedMonth=monthKey(new Date()); // 열 때마다 이번 달로 초기화
+  renderChNoteMonthChips();
+  openSheet('content-note-timeline-sheet');
+  renderContentNoteTimeline();
+}
+// 최근 6개월치 칩만 노출 — 그 밖의 달은 이 시트에서 보지 않음(2026-09-12, 전체기간 로딩 대신 월별 조회로 전환)
+function renderChNoteMonthChips(){
+  const wrap=document.getElementById('ch-note-timeline-month-chips');if(!wrap)return;
+  const now=new Date();
+  wrap.innerHTML='';
+  for(let i=5;i>=0;i--){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const mk=monthKey(d);
+    const chip=document.createElement('div');
+    chip.className='m-chip'+(mk===_chSelectedMonth?' active':'');
+    chip.textContent=(d.getMonth()+1)+'월';
+    chip.addEventListener('click',()=>{
+      if(mk===_chSelectedMonth)return;
+      _chSelectedMonth=mk;
+      renderChNoteMonthChips();
+      renderContentNoteTimeline();
+    });
+    wrap.appendChild(chip);
+  }
+  const activeChip=wrap.querySelector('.m-chip.active');
+  if(activeChip)activeChip.scrollIntoView({behavior:'auto',block:'nearest',inline:'center'});
+}
+function switchNoteTimelineView(btn,view){
+  _chNoteTimelineView=view;
+  document.querySelectorAll('#content-note-timeline-sheet .rd-tab').forEach(t=>t.classList.remove('on'));
+  btn.classList.add('on');
+  renderContentNoteTimeline();
+}
+async function renderContentNoteTimeline(){
+  const el=document.getElementById('content-note-timeline-list');if(!el)return;
+  el.innerHTML='<div class="ch-note-tl-empty">불러오는 중...</div>';
+  const {finals,notes,logs}=await _chCollectNoteSource();
+  if(!finals.length&&!notes.length&&!logs.length){el.innerHTML='<div class="ch-note-tl-empty">아직 남긴 코멘트가 없어요</div>';return;}
+  el.innerHTML=_chNoteTimelineView==='work'?_chRenderNoteTimelineByWork(finals,notes,logs):_chRenderNoteTimelineByDate(finals,notes,logs);
+}
+// 날짜순 뷰 — 날짜별로 묶어 최신순 정렬, 완결/감상 메모/진행률 로그를 대등한 라인 위에 점 색으로만 구분해 표시
+function _chRenderNoteTimelineByDate(finals,notes,logs){
+  const byDate={};
+  const push=(dk,item)=>{if(!dk)return;if(!byDate[dk])byDate[dk]=[];byDate[dk].push(item);};
+  const logByKey={};
+  (logs||[]).forEach(l=>{logByKey[l.dk+'|'+l.cid]=l;});
+  const consumedLogKeys=new Set();
+  // 완결 리뷰도 같은 날짜+cid 로그가 있으면 함께 병합(그 날 마지막 감상시간을 완결 리뷰 아래에 같이 노출)
+  finals.forEach(f=>{
+    const key=f.dk+'|'+f.cid;
+    const log=logByKey[key];
+    if(log)consumedLogKeys.add(key);
+    push(f.dk,{...f,__type:'final',log:log||null});
+  });
+  // note에 같은 날짜+cid 로그가 있으면 진행률 정보를 붙이고, 로그 쪽에서 소비됐다고 표시(중복 노출 방지)
+  notes.forEach(n=>{
+    const key=n.dk+'|'+n.cid;
+    const log=logByKey[key];
+    if(log)consumedLogKeys.add(key);
+    push(n.dk,{...n,__type:'note',log:log||null});
+  });
+  // 코멘트가 없어도 진행률만 기록된 날 — 로그만으로 항목 생성
+  (logs||[]).forEach(l=>{
+    const key=l.dk+'|'+l.cid;
+    if(consumedLogKeys.has(key))return;
+    push(l.dk,{cid:l.cid,cat:l.cat,title:l.title,poster:l.poster,dk:l.dk,text:'',log:l,__type:'note'});
+  });
+  const dks=Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
+  return dks.map(dk=>{
+    const dispDate=parseInt(dk.slice(5,7),10)+'월 '+parseInt(dk.slice(8,10),10)+'일';
+    const items=byDate[dk].slice().sort((a,b)=>(a.time||'').localeCompare(b.time||'')); // 시간 있는 메모는 그 시각 순으로
+    const showTime=items.length>1; // 그날 항목이 여러 개일 때만 시간 노출
+    const rowsHtml=items.map(it=>it.__type==='final'?_chFinalRowHtml(it):_chNoteRowHtml(it,showTime)).join('');
+    return `<div class="ch-tlA-day">
+      <div class="ch-tlA-day-date">${dispDate}</div>
+      ${rowsHtml}
+    </div>`;
+  }).join('');
+}
+// 작품별 뷰 — cid 기준으로 묶음(cid 없는 감상 메모는 원칙상 없음 — 메모는 항상 cid 연결 항목에서만 작성됨)
+function _chRenderNoteTimelineByWork(finals,notes,logs){
+  const groups={}; // cid -> {cat,title,poster,final,notes:[]}
+  finals.forEach(f=>{
+    if(!f.cid)return;
+    groups[f.cid]=groups[f.cid]||{cat:f.cat,title:f.title,poster:f.poster,final:null,notes:[]};
+    groups[f.cid].final=f;
+  });
+  const logByKey={};
+  (logs||[]).forEach(l=>{logByKey[l.dk+'|'+l.cid]=l;});
+  const consumedLogKeys=new Set();
+  notes.forEach(n=>{
+    if(!n.cid)return;
+    groups[n.cid]=groups[n.cid]||{cat:n.cat,title:n.title,poster:n.poster||null,final:null,notes:[]};
+    if(!groups[n.cid].poster)groups[n.cid].poster=n.poster||null; // finals에 없던(=완결 전) 작품도 메모 쪽 최신 poster로 채움
+    const key=n.dk+'|'+n.cid;
+    const log=logByKey[key];
+    if(log)consumedLogKeys.add(key);
+    groups[n.cid].notes.push({...n,log:log||null});
+  });
+  // 코멘트 없이 진행률만 기록된 날 — 로그만으로 노트 항목 생성해 같은 작품 카드에 포함
+  (logs||[]).forEach(l=>{
+    const key=l.dk+'|'+l.cid;
+    if(consumedLogKeys.has(key))return;
+    groups[l.cid]=groups[l.cid]||{cat:l.cat,title:l.title,poster:l.poster,final:null,notes:[]};
+    if(!groups[l.cid].poster)groups[l.cid].poster=l.poster||null;
+    groups[l.cid].notes.push({cid:l.cid,cat:l.cat,dk:l.dk,text:'',log:l});
+  });
+  const cids=Object.keys(groups).sort((a,b)=>{
+    const la=groups[a].notes.concat(groups[a].final?[groups[a].final]:[]).map(x=>x.dk||x.updatedAt||0).sort().pop()||'';
+    const lb=groups[b].notes.concat(groups[b].final?[groups[b].final]:[]).map(x=>x.dk||x.updatedAt||0).sort().pop()||'';
+    return String(lb).localeCompare(String(la));
+  });
+  return cids.map(cid=>{
+    const g=groups[cid];
+    const m=WCAL_CAT_META[g.cat]||{label:''};
+    const posterHtml=_wcalPosterThumbHtml(g.cat,g.poster);
+    const finalHtml=g.final&&(g.final.stars>0||g.final.review)?
+      `${g.final.stars>0?`<div class="ch-tlB-final-row"><div class="ch-tlB-stars">${renderStarDisplayHtml(g.final.stars)}</div></div>`:''}
+       ${g.final.review?`<div class="ch-tlB-final-text ch-tlA-final-review">${escapeHtml(g.final.review)}</div>`:''}`
+      :'';
+    const progressBadgeHtml=g.final?'':'<span class="ch-tlB-progress-badge">진행중</span>';
+    const notesSorted=g.notes.slice().sort((a,b)=>(b.dk||'').localeCompare(a.dk||''));
+    const notesHtml=notesSorted.length?`<div class="ch-tlB-notes">${notesSorted.map(n=>{
+      const dispDate=n.dk?(parseInt(n.dk.slice(5,7),10)+'/'+parseInt(n.dk.slice(8,10),10)):'';
+      const progAmountText=_chNoteMetaText(g.cat,n.log);
+      const metaHtml=progAmountText?`<div class="ch-tlB-note-meta">${progAmountText}</div>`:'';
+      const textHtml=n.text?`<div class="ch-tlB-note-text">${escapeHtml(n.text)}</div>`:'';
+      return `<div class="ch-tlB-note-item"><div class="ch-tlB-note-date">${dispDate}</div><div>${metaHtml}${textHtml}</div></div>`;
+    }).join('')}</div>`:'';
+    return `<div class="ch-tlB-card">
+      <div class="ch-tlB-top">
+        ${posterHtml}
+        <div class="ch-tlB-body">
+          <div class="ch-tlB-title-row"><div class="ch-tlB-title">${escapeHtml(g.title||'')}</div><div class="ch-tlB-cat">${m.label}</div>${progressBadgeHtml}</div>
+          ${finalHtml}
+        </div>
+      </div>
+      ${notesHtml}
+    </div>`;
+  }).join('');
+}
+// 날짜순 뷰의 완결 항목 — 감상달력 일자별 상세화면과 동일한 포스터 규격(_wcalPosterThumbHtml, 32x44 세로형) 재사용
+function _chFinalRowHtml(f){
+  const m=WCAL_CAT_META[f.cat]||{color:'var(--tm)'};
+  const posterHtml=_wcalPosterThumbHtml(f.cat,f.poster);
+  // 도트는 항상 카테고리 지정색(인라인 style) — 완결 여부는 옆의 '완' 배지(ch-tlA-badge-final, 옐로우 고정색)로 구분.
+  // 예전엔 .ch-tlA-dot.final 클래스로도 색을 주려 했으나 인라인 style에 항상 가려지는 죽은 규칙이라 제거함(2026-09-12).
+  const progAmountText=_chNoteMetaText(f.cat,f.log);
+  const metaHtml=progAmountText?`<div class="ch-tlA-meta">${progAmountText}</div>`:'';
+  return `<div class="ch-tlA-row">
+    <div class="ch-tlA-dot" style="background:${m.color};"></div>
+    <div class="ch-tlA-content">
+      ${posterHtml}
+      <div class="ch-tlA-main">
+        <div class="ch-tlA-title-row">
+          <span class="ch-tlA-badge-final">완</span>
+          <span class="ch-tlA-title">${escapeHtml(f.title||'')}</span>
+          ${f.stars>0?`<span class="ch-tlA-stars">${renderStarDisplayHtml(f.stars)}</span>`:''}
+        </div>
+        ${metaHtml}
+        ${f.review?`<div class="ch-tlA-text ch-tlA-final-review">${escapeHtml(f.review)}</div>`:''}
+      </div>
+    </div>
+  </div>`;
+}
+// 날짜순 뷰의 감상 메모 — 완결과 동일한 구조(포스터+한 줄 타이틀), 배지 대신 카테고리 태그만
+// showTime: 그날 항목이 여러 개일 때만 작성 시각을 곁들여 순서를 짚어줌
+// n.log: 그날 진행률 로그(content_daily_log) — 코멘트 없이 진행률만 있는 날도 이 로그로 한 줄 표시됨(2026-09-12)
+// 도트를 잇는 세로선은 .ch-tlA-row::before(position:absolute, row 자신 기준 top/bottom)가 그려서
+// row 높이가 가변이어도 자동으로 다음 도트까지 이어짐 — 마지막 행은 CSS :last-child가 자동으로 선을 숨김
+// (아카이브앱 tablet.js/html의 코멘트 모아보기 구현을 그대로 이식, 2026-09-12)
+function _chNoteRowHtml(n,showTime){
+  const m=WCAL_CAT_META[n.cat]||{label:'',color:'var(--tm)'};
+  const posterHtml=_wcalPosterThumbHtml(n.cat,n.poster);
+  const timeHtml=(showTime&&n.time)?`<span class="ch-tlA-time">${n.time}</span>`:'';
+  const progAmountText=_chNoteMetaText(n.cat,n.log);
+  const metaHtml=progAmountText?`<div class="ch-tlA-meta">${progAmountText}</div>`:'';
+  return `<div class="ch-tlA-row">
+    <div class="ch-tlA-dot" style="background:${m.color};"></div>
+    <div class="ch-tlA-content">
+      ${posterHtml}
+      <div class="ch-tlA-main">
+        <div class="ch-tlA-title-row">
+          ${timeHtml}
+          <span class="ch-tlA-title">${escapeHtml(n.title||'')}</span>
+          <span class="ch-tlA-cat-tag">${m.label}</span>
+        </div>
+        ${metaHtml}
+        ${n.text?`<div class="ch-tlA-text">${escapeHtml(n.text)}</div>`:''}
+      </div>
+    </div>
+  </div>`;
+}
+
+
+// ── 독서 공유카드 (투명 PNG) ──
+// 원칙: canvas는 처음부터 끝까지 완전 투명 배경 하나만 그린다.
+// 미리보기는 그 canvas를 앱 배경(--bg) 위에 그대로 얹어서 보여주면 되므로,
+// "미리보기용 불투명 버전"을 별도로 그릴 필요가 없다 — 그리기는 1회, 표시/복사는 같은 결과물 재사용.
+function _shareWrapText(ctx,text,maxWidth){
+  // 단어(공백) 단위로 줄바꿈 — 글자 단위로 자르면 어절 중간에서 끊길 수 있어 단어 경계를 지킴
+  const words=text.split(' ');
+  let lines=[],cur='';
+  for(let i=0;i<words.length;i++){
+    const word=words[i];
+    const test=cur?cur+' '+word:word;
+    if(ctx.measureText(test).width>maxWidth&&cur){
+      lines.push(cur);
+      // 단어 자체가 한 줄 폭보다 긴 경우(매우 긴 합성어 등)에만 글자 단위로 강제 분할
+      if(ctx.measureText(word).width>maxWidth){
+        let sub='';
+        for(const ch of word){
+          const t2=sub+ch;
+          if(ctx.measureText(t2).width>maxWidth&&sub){lines.push(sub);sub=ch;}
+          else sub=t2;
+        }
+        cur=sub;
+      }else{
+        cur=word;
+      }
+    }else{
+      cur=test;
+    }
+  }
+  if(cur)lines.push(cur);
+  return lines;
+}
+async function _shareCanvasToClipboard(canvas){
+  return new Promise(resolve=>{
+    canvas.toBlob(async blob=>{
+      try{
+        await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
+        resolve(true);
+      }catch(e){resolve(false);}
+    },'image/png');
+  });
+}
+function _shareToast(msg){
+  const t=document.createElement('div');
+  t.textContent=msg;
+  t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:rgba(60,40,35,0.85);color:#fff;font-size:var(--main-text-size);padding:10px 18px;border-radius:20px;z-index:99999;';
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),1800);
+}
+function _roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+let _bareonbatangLoaded=false;
+async function _ensureBareonbatangLoaded(){
+  if(_bareonbatangLoaded)return;
+  try{await document.fonts.load('400 40px Bareonbatang');await document.fonts.load('italic 400 24px Bareonbatang');_bareonbatangLoaded=true;}catch(e){}
+}
+const READING_LOGO_02="data:image/png;base64,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";
+const READING_LOGO_02_WHITE="data:image/png;base64,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";
+let _readingLogoImgs={};
+function _loadReadingLogo(which,colorMode){
+  const key=which+'_'+(colorMode||'brown');
+  if(_readingLogoImgs[key])return Promise.resolve(_readingLogoImgs[key]);
+  return new Promise(resolve=>{
+    const img=new Image();
+    img.onload=()=>{_readingLogoImgs[key]=img;resolve(img);};
+    img.onerror=()=>resolve(null);
+    const isWhite=colorMode==='white';
+    img.src=isWhite?READING_LOGO_02_WHITE:READING_LOGO_02;
+  });
+}
+// 표지 이미지(카카오/애플뮤직/TMDB 등 외부 CDN)를 캔버스에 그릴 때 CORS 오염 방지용 프록시 경유 로더
+// 저장 없이 매번 즉시 중계만 하는 Cloudflare Worker(iikoto-img-proxy)를 통해 로드
+const IMG_PROXY_BASE='https://iikoto-img-proxy.faith-003.workers.dev/img-proxy?url=';
+const _posterImgCache={};
+function _loadPosterViaProxy(posterUrl){
+  if(!posterUrl)return Promise.resolve(null);
+  if(_posterImgCache[posterUrl])return Promise.resolve(_posterImgCache[posterUrl]);
+  return new Promise(resolve=>{
+    const img=new Image();
+    img.crossOrigin='anonymous';
+    img.onload=()=>{_posterImgCache[posterUrl]=img;resolve(img);};
+    img.onerror=()=>resolve(null);
+    img.src=IMG_PROXY_BASE+encodeURIComponent(posterUrl);
+  });
+}
+
+// ── 문장 카드: G(배경 따옴표형) / H(카드 인 카드형) — 배경은 항상 투명, H만 반투명 패널 사용
+// ── 문장 카드: G(로고형) / H(카드형, 가변 높이) — 배경은 항상 투명, H만 반투명 패널
+async function _drawQuoteCardG(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode,showComment){
+  await _ensureBareonbatangLoaded();
+  const isWhite=colorMode==='white';
+  const textColor=isWhite?'#fff':'#5a4040';
+  const subColor=isWhite?'rgba(255,255,255,0.75)':'#9a8070';
+  const fontStyle=italicMode?'italic ':'';
+  const align=alignMode||'left';
+  const fs=fontSize||40;
+  const lineH=Math.round(fs*1.6);
+  const contentW=W-176;
+  const tx0=align==='center'?W/2:(align==='right'?W-88:88);
+  const ty=quoteMark?200:140;
+  // 형광펜은 G스타일 전용 장식이라 공용 파이프라인 밖에서 본문 줄 위치에 맞춰 먼저 그림
+  const HIGHLIGHT_COLORS={yellow:'rgba(255,214,130,0.55)',pink:'rgba(230,140,160,0.38)',mint:'rgba(150,200,180,0.42)'};
+  if(highlightMode&&HIGHLIGHT_COLORS[highlightMode]){
+    ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
+    const lines=_shareWrapText(ctx,q.text,contentW);
+    let hy=ty+(quoteMark?76:0);
+    const padH=Math.round(fs*0.14);
+    lines.forEach(line=>{
+      const w=ctx.measureText(line).width;
+      const bx=align==='center'?tx0-w/2:(align==='right'?tx0-w:tx0);
+      ctx.fillStyle=HIGHLIGHT_COLORS[highlightMode];
+      ctx.save();
+      ctx.translate(bx-8,hy-padH/2);
+      ctx.rotate(-0.006);
+      ctx.fillRect(0,0,w+16,fs+padH);
+      ctx.restore();
+      hy+=lineH;
+    });
+  }
+  await _drawQuoteBody(ctx,{tx0,ty,contentW,align,footerAlign:'left',showInfo:false},q,book,textColor,subColor,isWhite,fontStyle,fs,quoteMark,showComment);
+  // G스타일 footer는 로고+제목/작가 상하배치 고유 디자인이라 공용 파이프라인과 별도로 처리
+  const showInfo=showBookInfo&&book;
+  if(showInfo){
+    const bodyH=_measureQuoteBody(ctx,contentW,q,fs,quoteMark,showComment,false);
+    let fty=ty+bodyH+30;
+    const logoImg=await _loadReadingLogo('02',colorMode);
+    const logoH=76,logoW=logoImg?logoH*(logoImg.width/logoImg.height):0;
+    if(logoImg)ctx.drawImage(logoImg,88,fty,logoW,logoH);
+    const tx=88+logoW+20;
+    const title=book.title||'';
+    const author=book.author||'';
+    ctx.font='600 26px "DM Sans",sans-serif';
+    ctx.fillStyle=textColor;
+    const titleY=author?fty+8:fty+logoH/2-16;
+    ctx.fillText(title,tx,titleY);
+    if(author){
+      ctx.font='400 22px "DM Sans",sans-serif';
+      ctx.fillStyle=subColor;
+      ctx.fillText(author,tx,titleY+34);
+    }
+  }
+}
+// 코멘트 라벨용 pencil-heart 아이콘(습관탭 '일기' 아이콘과 동일 SVG) — 24x24 뷰박스 기준 path를 지정 크기·색으로 그림
+const _PENCIL_HEART_PATHS=[
+  new Path2D('M17 11l1.5 -1.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4h4l2 -2'),
+  new Path2D('M13.5 6.5l4 4'),
+  new Path2D('M18 22l3.35 -3.284a2.143 2.143 0 0 0 .005 -3.071a2.242 2.242 0 0 0 -3.129 -.006l-.224 .22l-.223 -.22a2.242 2.242 0 0 0 -3.128 -.006a2.143 2.143 0 0 0 -.006 3.071l3.355 3.296')
+];
+function _drawPencilHeartIcon(ctx,x,y,size,color){
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.scale(size/24,size/24);
+  ctx.strokeStyle=color;
+  ctx.lineWidth=2;
+  ctx.lineCap='round';
+  ctx.lineJoin='round';
+  _PENCIL_HEART_PATHS.forEach(p=>ctx.stroke(p));
+  ctx.restore();
+}
+
+// 문장카드 공용 파이프라인 — G/H/J가 배경·패널만 각자 그리고, 따옴표/본문/코멘트/footer는 이 함수가 전담
+// layout: {tx0, ty, contentW, align, footerAlign:'left'|'center', dashColor(footer 구분선 색, 옵션)}
+async function _drawQuoteBody(ctx,layout,q,book,textColor,subColor,isWhite,fontStyle,fs,quoteMark,showComment,footerDashColor){
+  const {tx0,contentW,align}=layout;
+  let ty=layout.ty;
+  const lineH=Math.round(fs*1.6);
+  // 줄바꿈 폭 측정은 실제 본문 폰트가 적용된 상태에서 이뤄져야 함 — 인용부호(64px) 등 다른 font 설정이 남아있으면 측정이 틀어짐
+  ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
+  const lines=_shareWrapText(ctx,q.text,contentW);
+  if(quoteMark){
+    ctx.save();
+    ctx.font="700 64px 'Apple SD Gothic Neo', 'Noto Sans Symbols', Georgia, serif";
+    ctx.textAlign=align;
+    ctx.textBaseline='alphabetic';
+    ctx.fillStyle=textColor;
+    ctx.fillText('\u275d',tx0,ty+56);
+    ctx.restore();
+    ty+=76;
+  }
+  ctx.fillStyle=textColor;
+  ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
+  ctx.textBaseline='top';
+  ctx.textAlign=align;
+  lines.forEach(line=>{ctx.fillText(line,tx0,ty);ty+=lineH;});
+  ctx.textAlign='left';
+  const showCmt=showComment&&q.comment;
+  if(showCmt){
+    const cmtFs=27,labelFs=17,cmtLineH=Math.round(cmtFs*1.5),gapLabelToText=12;
+    ty+=16;
+    ctx.fillStyle=textColor;
+    const labelX=layout.footerAlign==='center'?tx0-contentW/2:tx0;
+    if(showComment==='label'){
+      const iconSize=labelFs,gapIconToLabel=6;
+      const labelColor=isWhite?'rgba(255,255,255,0.5)':'rgba(154,128,112,0.8)';
+      _drawPencilHeartIcon(ctx,labelX,ty,iconSize,labelColor);
+      ctx.font='600 '+labelFs+'px "DM Sans",sans-serif';
+      ctx.fillStyle=labelColor;
+      ctx.fillText('comment',labelX+iconSize+gapIconToLabel,ty);
+      ty+=labelFs+gapLabelToText;
+      ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
+      ctx.fillStyle=isWhite?'rgba(255,255,255,0.92)':'#6b5548';
+      const cmtLines=_shareWrapText(ctx,q.comment,contentW);
+      cmtLines.forEach(line=>{ctx.fillText(line,labelX,ty);ty+=cmtLineH;});
+    }else{
+      const barX=labelX+28;
+      ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
+      const cmtLines=_shareWrapText(ctx,q.comment,contentW-28-22);
+      const textTop=ty;
+      ctx.strokeStyle=isWhite?'rgba(255,255,255,0.35)':'rgba(154,128,112,0.4)';
+      ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(barX,textTop-4);ctx.lineTo(barX,textTop+cmtLineH*cmtLines.length-6);ctx.stroke();
+      ctx.fillStyle=isWhite?'rgba(255,255,255,0.92)':'#6b5548';
+      let cy=textTop;
+      cmtLines.forEach(line=>{ctx.fillText(line,barX+22,cy);cy+=cmtLineH;});
+      ty+=cmtLineH*cmtLines.length;
+    }
+  }
+  const showInfo=layout.showInfo;
+  if(showInfo){
+    const fy=ty+30;
+    const fx0=layout.footerAlign==='center'?tx0-contentW/2:tx0;
+    ctx.strokeStyle=footerDashColor||(isWhite?'rgba(255,255,255,0.18)':'rgba(154,128,112,0.18)');
+    ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(fx0,fy);ctx.lineTo(fx0+contentW,fy);ctx.stroke();
+    ctx.font='600 26px "DM Sans",sans-serif';
+    ctx.fillStyle=textColor;
+    const title=book.title||'';
+    if(layout.footerAlign==='center'){
+      ctx.textAlign='center';
+      const author=book.author?' · '+book.author:'';
+      ctx.fillText(title+author,fx0+contentW/2,fy+28);
+      ctx.textAlign='left';
+    }else{
+      ctx.fillText(title,fx0,fy+28);
+      const titleW=ctx.measureText(title).width;
+      if(book.author){
+        ctx.font='400 24px "DM Sans",sans-serif';
+        ctx.fillStyle=subColor;
+        ctx.fillText(' · '+book.author,fx0+titleW,fy+28);
+      }
+    }
+  }
+}
+// 코멘트/footer 블록 높이를 미리 계산(가변 카드 높이용) — _drawQuoteBody와 동일한 규칙을 따름
+function _measureQuoteBody(ctx,contentW,q,fs,quoteMark,showComment,showInfo){
+  const lineH=Math.round(fs*1.6);
+  ctx.font='400 '+fs+'px Bareonbatang, serif';
+  const lines=_shareWrapText(ctx,q.text,contentW);
+  let h=lines.length*lineH;
+  if(quoteMark)h+=76;
+  const showCmt=showComment&&q.comment;
+  if(showCmt){
+    const cmtFs=27,labelFs=17,cmtLineH=Math.round(cmtFs*1.5),gapLabelToText=12;
+    ctx.font='400 '+cmtFs+'px "DM Sans",sans-serif';
+    h+=16;
+    if(showComment==='label'){
+      const cmtLines=_shareWrapText(ctx,q.comment,contentW);
+      h+=labelFs+gapLabelToText+cmtLineH*cmtLines.length;
+    }else{
+      const cmtLines=_shareWrapText(ctx,q.comment,contentW-28-22);
+      h+=cmtLineH*cmtLines.length;
+    }
+  }
+  if(showInfo)h+=30+96;
+  return h;
+}
+
+function _sharePanelFillStroke(isWhite){
+  return {
+    fill: isWhite?'rgba(0,0,0,0.22)':'rgba(255,255,255,0.42)',
+    stroke: isWhite?'rgba(255,255,255,0.35)':'rgba(255,255,255,0.6)'
+  };
+}
+async function _drawQuoteCardH(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode,showComment,sidebarMode){
+  await _ensureBareonbatangLoaded();
+  const isWhite=colorMode==='white';
+  const textColor=isWhite?'#fff':'#5a4040';
+  const subColor=isWhite?'rgba(255,255,255,0.75)':'#9a8070';
+  const barColor='#f5f0e8'; // 사이드바/마름모는 브라운/화이트 모드 무관하게 항상 불투명 아이보리 고정(반투명 시 배경이 비쳐 보임)
+  const barW=32;
+  const fontStyle=italicMode?'italic ':'';
+  const align=alignMode||'left';
+  const showInfo=showBookInfo&&book;
+  const fs=fontSize||40;
+  // 카드 자체는 항상 고정 좌표계(H스타일 기본값) — 사이드바는 카드 내부에 삽입되는 요소이므로 padLeft만 늘어남
+  const px=88,pw=W-176,roundR=32;
+  const padLeft=sidebarMode?barW+56:48;
+  const padRight=48;
+  const contentW=pw-padLeft-padRight;
+  ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
+  const bodyH=_measureQuoteBody(ctx,contentW,q,fs,quoteMark,showComment,showInfo);
+  const padTop=56,padBottom=48;
+  const ph=padTop+bodyH+padBottom;
+  const py=(H-ph)/2;
+  const panelColors=_sharePanelFillStroke(isWhite);
+  ctx.fillStyle=panelColors.fill;
+  _roundRect(ctx,px,py,pw,ph,roundR);ctx.fill();
+  ctx.strokeStyle=panelColors.stroke;ctx.lineWidth=2;
+  _roundRect(ctx,px,py,pw,ph,roundR);ctx.stroke();
+  if(sidebarMode){
+    // 왼쪽 사이드바 — 카드 왼쪽 모서리(둥근 부분)에 맞춰 클리핑 후 채움. 카드 좌표계가 고정이라 항상 동일 위치
+    ctx.save();
+    _roundRect(ctx,px,py,pw,ph,roundR);
+    ctx.clip();
+    ctx.fillStyle=barColor;
+    ctx.fillRect(px,py,barW,ph);
+    ctx.restore();
+    // 마름모 꺾임 포인트 — 항상 카드 세로 중앙. 카드 테두리(px)에 절반 정도 침범하는 수염 형태로 포인트 강조
+    ctx.save();
+    ctx.translate(px+barW,py+ph/2);
+    ctx.rotate(Math.PI/4);
+    ctx.fillStyle=barColor;
+    ctx.fillRect(-12,-12,24,24);
+    ctx.restore();
+  }
+  const tx0=align==='center'?px+padLeft+contentW/2:(align==='right'?px+pw-padRight:px+padLeft);
+  await _drawQuoteBody(ctx,{tx0,ty:py+padTop,contentW,align,footerAlign:'left',showInfo},q,book,textColor,subColor,isWhite,fontStyle,fs,quoteMark,showComment);
+}
+// J스타일: 완전 투명 배경 + 점선 테두리(흰색/현재색 전환은 기존 colorMode 토글 재사용) + 독서 로고 + 포인트 별 2개(고정 색)
+async function _drawQuoteCardJ(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode,showComment){
+  await _ensureBareonbatangLoaded();
+  const isWhite=colorMode==='white';
+  const textColor=isWhite?'#fff':'#5a4040';
+  const subColor=isWhite?'rgba(255,255,255,0.75)':'#9a8070';
+  const dashColor=isWhite?'rgba(255,255,255,0.85)':'rgba(90,64,64,0.75)'; // 다른 카드들과 동일한 #5a4040 계열로 통일 — 사진 위에서도 잘 보이도록
+  const fontStyle=italicMode?'italic ':'';
+  const align=alignMode||'center';
+  const showInfo=showBookInfo&&book;
+  const fs=fontSize||40;
+  const px=56,padX=48;
+  const pw=W-112;
+  const contentW=pw-padX*2;
+  ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
+  const logoH=154; // 상단 독서 로고 자리 (로고 116px + 여백)
+  const bodyH=_measureQuoteBody(ctx,contentW,q,fs,false,showComment,showInfo); // J는 자체 상단 로고를 쓰므로 quoteMark 장식은 미사용
+  const padTop=48,padBottom=48;
+  const ph=padTop+logoH+bodyH+padBottom;
+  const py=(H-ph)/2;
+  // 배경 완전 투명 — fill 없이 점선 테두리만
+  const ix=px+12,iy=py+12,iw=pw-24,ih=ph-24,ir=20;
+  ctx.strokeStyle=dashColor;
+  ctx.lineWidth=2;
+  ctx.setLineDash([6,5]);
+  _roundRect(ctx,ix,iy,iw,ih,ir);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // 포인트 별 2개 — 색은 항상 고정(테두리 색 전환과 무관하게 유지)
+  const STAR1_Y_PCT=0.28,STAR2_Y_PCT=0.86;
+  ctx.save();
+  ctx.translate(ix+iw,iy+ih*STAR1_Y_PCT);
+  ctx.fillStyle='rgba(240,200,80,0.9)';
+  ctx.font="28px 'Apple SD Gothic Neo', sans-serif";
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText('\u2726',0,0);
+  ctx.restore();
+  ctx.save();
+  ctx.translate(ix,iy+ih*STAR2_Y_PCT);
+  ctx.fillStyle='rgba(230,140,160,0.9)';
+  ctx.font="28px 'Apple SD Gothic Neo', sans-serif";
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText('\u2726',0,0);
+  ctx.restore();
+  // 상단 독서 로고
+  const logoImg=await _loadReadingLogo('02',colorMode);
+  if(logoImg){
+    const logoDrawH=116,logoDrawW=logoImg.width/logoImg.height*logoDrawH;
+    ctx.drawImage(logoImg,px+pw/2-logoDrawW/2,py+padTop,logoDrawW,logoDrawH);
+  }
+  const tx0=align==='center'?px+pw/2:(align==='right'?px+pw-padX:px+padX);
+  await _drawQuoteBody(ctx,{tx0,ty:py+padTop+logoH,contentW,align,footerAlign:'center',showInfo},q,book,textColor,subColor,isWhite,fontStyle,fs,false,showComment,dashColor);
+}
+const QUOTE_CARD_STYLES={G:{label:'로고형',draw:_drawQuoteCardG},H:{label:'카드형',draw:_drawQuoteCardH},J:{label:'점선형',draw:_drawQuoteCardJ}};
+
+// ── 오늘의 기록 카드: A(미니멀 숫자형) / C(로고+텍스트형)
+async function _drawTodayCardA(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds,colorMode,dk){
+  await _ensureBareonbatangLoaded();
+  const isWhite=colorMode==='white';
+  const textColor=isWhite?'#fff':'#5a4040';
+  const subColor=isWhite?'rgba(255,255,255,0.75)':'#9a8070';
+  const cx=W/2;
+  ctx.textAlign='center';
+  ctx.textBaseline='top';
+  const logoImg=await _loadReadingLogo('02',colorMode);
+  let ty=150;
+  if(logoImg){
+    const lh=110,lw=lh*(logoImg.width/logoImg.height);
+    ctx.drawImage(logoImg,cx-lw/2,ty,lw,lh);
+    ty+=lh+28;
+  }
+  ctx.font='500 24px "DM Sans",sans-serif';
+  ctx.fillStyle=subColor;
+  ctx.fillText("TODAY'S READING",cx,ty);
+  ty+=44;
+  ctx.font='400 48px Bareonbatang, serif';
+  ctx.fillStyle=textColor;
+  const titleLines=_shareWrapText(ctx,book.title,W-240);
+  titleLines.forEach(line=>{ctx.fillText(line,cx,ty);ty+=64;});
+  if(book.author){
+    ctx.font='400 22px "DM Sans",sans-serif';
+    ctx.fillStyle=subColor;
+    ctx.fillText(book.author,cx,ty);
+    ty+=32;
+  }
+  ty+=(book.author?16:48);
+  const progVal=unit==='percent'?(percentAfter!=null?percentAfter:0):(pagesAfter!=null?pagesAfter:0);
+  const progUnit=unit==='percent'?'%':'p';
+  ctx.font='500 26px "DM Sans",sans-serif';
+  ctx.fillStyle=subColor;
+  const dispDate=dk?(parseInt(dk.slice(5,7),10)+'월 '+parseInt(dk.slice(8,10),10)+'일'):null;
+  const timeStr=seconds?Math.floor(seconds/60)+'분':null;
+  const completeLine=[dispDate,progVal+progUnit,timeStr].filter(Boolean).join('  ·  ');
+  if(completeLine)ctx.fillText(completeLine,cx,ty);
+}
+// C: 로고01(80% 투명도) 왼쪽 + 오른쪽에 날짜 한 줄 / 책제목 한 줄 / 시간·독서량 한 줄 — 표지 이미지 불필요, CORS 문제 없음
+async function _drawTodayCardC(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds,colorMode,dk){
+  await _ensureBareonbatangLoaded();
+  const isWhite=colorMode==='white';
+  const textColor=isWhite?'#fff':'#5a4040';
+  const subColor=isWhite?'rgba(255,255,255,0.7)':'#9a8070';
+  const logoImg=await _loadReadingLogo('02',colorMode);
+  const logoH=280,logoW=logoImg?logoH*(logoImg.width/logoImg.height):0;
+  const logoX=90,logoY=(H-logoH)/2;
+  if(logoImg)ctx.drawImage(logoImg,logoX,logoY,logoW,logoH);
+  const tx=logoX+logoW+28;
+  const tw=W-tx-88;
+  ctx.textAlign='left';
+  ctx.textBaseline='top';
+  const dispDate=dk?(parseInt(dk.slice(5,7),10)+'월 '+parseInt(dk.slice(8,10),10)+'일'):'';
+  const timeStr=seconds?Math.floor(seconds/60)+'분':null;
+  const progVal=unit==='percent'?(percentAfter!=null?percentAfter:0):(pagesAfter!=null?pagesAfter:0);
+  const progUnit=unit==='percent'?'%':'p';
+  const metaLine=[timeStr,progVal+progUnit].filter(Boolean).join('  ·  ');
+  // 세 줄(날짜/제목/시간·독서량)의 전체 높이를 계산해 로고 세로 중앙에 맞춤 — 로고가 커진 만큼 텍스트도 확대
+  ctx.font='400 56px Bareonbatang, serif';
+  const titleLines=_shareWrapText(ctx,book.title,tw).slice(0,2);
+  const firstTitleLineW=titleLines.length?ctx.measureText(titleLines[0]).width:0;
+  const dateH=32,titleLineH=73,gapAfterDate=20,gapAfterTitle=18,metaH=44;
+  const totalH=dateH+gapAfterDate+titleLines.length*titleLineH+gapAfterTitle+metaH;
+  let ty=logoY+(logoH-totalH)/2;
+  ctx.font='500 30px "DM Sans",sans-serif';
+  ctx.fillStyle=subColor;
+  ctx.fillText(dispDate,tx,ty);
+  if(book.author){
+    ctx.font='400 26px "DM Sans",sans-serif';
+    ctx.textAlign='right';
+    // DM Sans(26px)는 Bareonbatang(56px)보다 글자 상단 여백이 작아 top 기준시 더 아래로 보임 — 시각적 베이스라인을 제목 첫 줄에 맞춰 보정
+    ctx.fillText(book.author,tx+firstTitleLineW,ty+3);
+    ctx.textAlign='left';
+  }
+  ty+=dateH+gapAfterDate;
+  ctx.font='400 56px Bareonbatang, serif';
+  ctx.fillStyle=textColor;
+  // Bareonbatang(세리프)은 좌측 사이드 베어링이 커서 DM Sans 줄과 나란히 두면 오른쪽으로 밀려 보임 — 시각 보정
+  titleLines.forEach(line=>{ctx.fillText(line,tx-8,ty);ty+=titleLineH;});
+  ty+=gapAfterTitle;
+  ctx.font='600 38px "DM Sans",sans-serif';
+  ctx.fillStyle=subColor;
+  ctx.fillText(metaLine,tx,ty);
+}
+// D: 표지형 — 왼쪽 책 표지(프록시 경유 로드) + 오른쪽 날짜/제목/시간·진행률. 표지는 흰색 전환 시에도 그대로, 텍스트 색만 전환
+async function _drawTodayCardD(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds,colorMode,dk){
+  await _ensureBareonbatangLoaded();
+  const isWhite=colorMode==='white';
+  const textColor=isWhite?'#fff':'#5a4040';
+  const subColor=isWhite?'rgba(255,255,255,0.7)':'#9a8070';
+  const coverImg=book.poster?await _loadPosterViaProxy(book.poster):null;
+  const coverH=260,coverW=coverH*(2/3);
+  const coverX=90,coverY=(H-coverH)/2;
+  if(coverImg){
+    ctx.save();
+    _roundRect(ctx,coverX,coverY,coverW,coverH,12);
+    ctx.clip();
+    // object-fit:cover 방식으로 표지 비율 유지하며 프레임을 꽉 채움
+    const ir=coverImg.width/coverImg.height,fr=coverW/coverH;
+    let sw=coverImg.width,sh=coverImg.height,sx=0,sy=0;
+    if(ir>fr){sw=coverImg.height*fr;sx=(coverImg.width-sw)/2;}else{sh=coverImg.width/fr;sy=(coverImg.height-sh)/2;}
+    ctx.drawImage(coverImg,sx,sy,sw,sh,coverX,coverY,coverW,coverH);
+    ctx.restore();
+    ctx.strokeStyle=isWhite?'rgba(255,255,255,0.25)':'rgba(154,128,112,0.25)';
+    ctx.lineWidth=1.5;
+    _roundRect(ctx,coverX,coverY,coverW,coverH,12);ctx.stroke();
+  }else{
+    ctx.fillStyle=isWhite?'rgba(255,255,255,0.14)':'rgba(154,128,112,0.14)';
+    _roundRect(ctx,coverX,coverY,coverW,coverH,12);ctx.fill();
+  }
+  const tx=coverX+coverW+56;
+  const tw=W-tx-88;
+  ctx.textAlign='left';
+  ctx.textBaseline='top';
+  const dispDate=dk?(parseInt(dk.slice(5,7),10)+'월 '+parseInt(dk.slice(8,10),10)+'일'):'';
+  const timeStr=seconds?Math.floor(seconds/60)+'분':null;
+  const progVal=unit==='percent'?(percentAfter!=null?percentAfter:0):(pagesAfter!=null?pagesAfter:0);
+  const progUnit=unit==='percent'?'%':'p';
+  const metaLine=[timeStr,progVal+progUnit].filter(Boolean).join('  ·  ');
+  ctx.font='400 56px Bareonbatang, serif';
+  const titleLines=_shareWrapText(ctx,book.title,tw).slice(0,2);
+  const dateH=32,titleLineH=73,gapAfterDate=20,gapAfterTitle=18,metaH=44;
+  const totalH=dateH+gapAfterDate+titleLines.length*titleLineH+gapAfterTitle+metaH;
+  let ty=coverY+(coverH-totalH)/2;
+  // 작가명과 iikoto 워터마크는 항상 같은 오른쪽 기준선(텍스트 영역 우측 끝)에 맞춰 끝점이 흔들리지 않게 함
+  const rightEdge=tx+tw;
+  ctx.font='500 30px "DM Sans",sans-serif';
+  ctx.fillStyle=subColor;
+  ctx.fillText(dispDate,tx,ty);
+  if(book.author){
+    ctx.font='400 26px "DM Sans",sans-serif';
+    ctx.textAlign='right';
+    ctx.fillText(book.author,rightEdge,ty+3);
+    ctx.textAlign='left';
+  }
+  ty+=dateH+gapAfterDate;
+  ctx.font='400 56px Bareonbatang, serif';
+  ctx.fillStyle=textColor;
+  // Bareonbatang(세리프)은 좌측 사이드 베어링이 커서 DM Sans 줄과 나란히 두면 오른쪽으로 밀려 보임 — 시각 보정
+  titleLines.forEach(line=>{ctx.fillText(line,tx-8,ty);ty+=titleLineH;});
+  ty+=gapAfterTitle;
+  ctx.font='600 38px "DM Sans",sans-serif';
+  ctx.fillStyle=subColor;
+  ctx.fillText(metaLine,tx,ty);
+  // iikoto 워터마크: 진행률과 같은 줄, 작가명과 동일한 오른쪽 기준선에 맞춰 배치
+  ctx.textAlign='right';
+  ctx.font='italic 500 30px "DM Sans",sans-serif';
+  ctx.fillStyle=isWhite?'rgba(255,255,255,0.55)':'rgba(154,128,112,0.6)';
+  ctx.fillText('iikoto',rightEdge,ty+4);
+}
+const TODAY_CARD_STYLES={A:{label:'숫자형',draw:_drawTodayCardA},C:{label:'로고형',draw:_drawTodayCardC},D:{label:'표지형',draw:_drawTodayCardD}};
+
+// ── 공유 모달 공통: 캔버스 생성 → 앱 배경 위에 미리보기 표시 → 스타일 선택 → 복사
+async function _buildQuoteCanvas(styleKey,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode,showComment,sidebarMode){
+  const W=1080,H=1350;
+  const canvas=document.createElement('canvas');
+  canvas.width=W;canvas.height=H;
+  const ctx=canvas.getContext('2d');
+  await QUOTE_CARD_STYLES[styleKey].draw(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode,showComment,sidebarMode);
+  return canvas;
+}
+async function _buildTodayCanvas(styleKey,book,unit,percentAfter,pagesAfter,seconds,colorMode,dk){
+  const W=1080,H=1350;
+  const canvas=document.createElement('canvas');
+  canvas.width=W;canvas.height=H;
+  const ctx=canvas.getContext('2d');
+  await TODAY_CARD_STYLES[styleKey].draw(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds,colorMode,dk);
+  return canvas;
+}
+let _shareModalCtx=null; // {kind:'quote'|'today', args:[...], styleKey, colorMode, showBookInfo, italicMode}
+function _closeShareModal(){
+  const ov=document.getElementById('share-card-modal');
+  if(ov)ov.remove();
+  _shareModalCtx=null;
+}
+async function _buildCurrentShareCanvas(){
+  const ctx=_shareModalCtx;if(!ctx)return null;
+  if(ctx.kind==='quote')return await _buildQuoteCanvas(ctx.styleKey,ctx.args[0],ctx.args[1],ctx.colorMode,ctx.showBookInfo,ctx.italicMode,ctx.quoteMark,ctx.alignMode,ctx.fontSize,ctx.highlightMode,ctx.showComment,ctx.sidebarMode);
+  const [book,unit,percentAfter,pagesAfter,seconds,dk]=ctx.args;
+  return await _buildTodayCanvas(ctx.styleKey,book,unit,percentAfter,pagesAfter,seconds,ctx.colorMode,dk);
+}
+function _shareIconBtn(active,onclick,inner,title){
+  return `<button onclick="${onclick}" title="${title||''}" style="width:33px;height:33px;flex-shrink:0;border-radius:10px;border:none;background:transparent;color:${active?'var(--pal-pink-text)':'var(--ts)'};display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;opacity:${active?1:0.55};transition:all .15s;">${inner}</button>`;
+}
+function _shareStyleBanner(active,onclick,label){
+  return `<button onclick="${onclick}" style="flex:1;min-width:0;height:46px;border-radius:14px;border:1.5px solid ${active?'var(--pal-pink-border)':'var(--card-b)'};background:${active?'var(--pal-pink-bg)':'var(--card)'};color:${active?'var(--pal-pink-text)':'var(--ts)'};display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:var(--main-text-size);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 6px;transition:all .15s;">${label}</button>`;
+}
+function _cycleHighlightMode(){
+  const c=[null,'yellow','pink','mint'];
+  _shareModalCtx.highlightMode=c[(c.indexOf(_shareModalCtx.highlightMode)+1)%c.length];
+  _renderShareModal();
+}
+function _cycleAlignMode(){
+  const c=['left','center','right'];
+  _shareModalCtx.alignMode=c[(c.indexOf(_shareModalCtx.alignMode)+1)%c.length];
+  _renderShareModal();
+}
+// 인용부호 토글 — 켤 때는 자동으로 중앙정렬(따옴표 스타일에 어울림), 끌 때는 이전 정렬로 복귀.
+function _selectShareStyle(k){
+  const ctx=_shareModalCtx;
+  const wasJ=ctx.styleKey==='J';
+  ctx.styleKey=k;
+  // J(점선형)은 기본 노출이 중앙정렬 — 진입 시 이전 정렬 백업 후 중앙으로, 이탈 시 복귀
+  if(k==='J'&&!wasJ){
+    ctx._prevAlignMode=ctx.alignMode||'left';
+    ctx.alignMode='center';
+  }else if(k!=='J'&&wasJ){
+    ctx.alignMode=ctx._prevAlignMode||'left';
+  }
+  _renderShareModal();
+}
+function _toggleQuoteMark(){
+  const ctx=_shareModalCtx;
+  ctx.quoteMark=!ctx.quoteMark;
+  if(ctx.quoteMark){
+    ctx._prevAlignMode=ctx.alignMode||'left';
+    ctx.alignMode='center';
+  }else{
+    ctx.alignMode=ctx._prevAlignMode||'left';
+  }
+  _renderShareModal();
+}
+function _cycleCommentStyle(){
+  const c=[null,'label','bar'];
+  _shareModalCtx.showComment=c[(c.indexOf(_shareModalCtx.showComment)+1)%c.length];
+  _renderShareModal();
+}
+async function _renderShareModal(){
+  const ctx=_shareModalCtx;if(!ctx)return;
+  const styles=ctx.kind==='quote'?QUOTE_CARD_STYLES:TODAY_CARD_STYLES;
+  const canvas=await _buildCurrentShareCanvas();
+  const dataUrl=canvas.toDataURL('image/png');
+  let ov=document.getElementById('share-card-modal');
+  const isNew=!ov;
+  if(isNew){
+    ov=document.createElement('div');
+    ov.id='share-card-modal';
+    ov.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(60,40,35,0.4);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);';
+    ov.onclick=e=>{if(e.target===ov)_closeShareModal();};
+    document.body.appendChild(ov);
+  }
+  // 스타일 선택: 가로로 길고 얇은 배너 4칸(한 줄), 향후 스타일 추가를 위한 여유 슬롯 포함
+  const styleKeys=Object.keys(styles);
+  const styleSlotCount=Math.max(4,styleKeys.length);
+  const styleBanners=styleKeys.map(k=>_shareStyleBanner(k===ctx.styleKey,`_selectShareStyle('${k}');`,styles[k].label));
+  while(styleBanners.length<styleSlotCount)styleBanners.push(`<div style="flex:1;min-width:0;height:46px;border-radius:14px;border:1.5px dashed rgba(154,128,112,0.45);"></div>`);
+  const styleBannerRow=`<div style="display:flex;gap:8px;margin-bottom:14px;">${styleBanners.join('')}</div>`;
+  // 색상: 반반 원 하나로 브라운/아이보리 토글 (클릭 시 전환)
+  const colorSwatch=_shareIconBtn(true,`_shareModalCtx.colorMode=_shareModalCtx.colorMode==='brown'?'white':'brown';_renderShareModal();`,
+    `<span style="width:22px;height:22px;border-radius:50%;overflow:hidden;display:flex;box-shadow:inset 0 0 0 1px rgba(154,128,112,0.25);">
+      <span style="width:50%;background:${ctx.colorMode==='brown'?'#5a4040':'#f3e8d8'};"></span>
+      <span style="width:50%;background:${ctx.colorMode==='brown'?'#f3e8d8':'#5a4040'};"></span>
+    </span>`,'글자색 전환');
+  // A: 한 번 클릭마다 기본↔이탤릭 순환 (문장카드 전용)
+  const fontToggle=ctx.kind==='quote'?_shareIconBtn(true,`_shareModalCtx.italicMode=!_shareModalCtx.italicMode;_renderShareModal();`,
+    `<span style="font-family:'DM Sans',sans-serif;font-weight:600;font-style:${ctx.italicMode?'italic':'normal'};">A</span>`,ctx.italicMode?'이탤릭체':'기본체'):'';
+  const bookToggle=ctx.kind==='quote'?_shareIconBtn(!!ctx.showBookInfo,`_shareModalCtx.showBookInfo=!_shareModalCtx.showBookInfo;_renderShareModal();`,
+    `<i class="ti ti-book" aria-hidden="true"></i>`,'책 정보 표시'):'';
+  const hasComment=ctx.kind==='quote'&&ctx.args[0]&&ctx.args[0].comment;
+  const commentToggle=hasComment?_shareIconBtn(!!ctx.showComment,`_cycleCommentStyle();`,
+    `<i class="ti ti-message-circle" aria-hidden="true"></i>`,ctx.showComment==='label'?'코멘트: 라벨형 (탭하면 세로바형)':(ctx.showComment==='bar'?'코멘트: 세로바형 (탭하면 끄기)':'코멘트 표시')):'';
+  const quoteMarkToggle=ctx.kind==='quote'?_shareIconBtn(!!ctx.quoteMark,`_toggleQuoteMark();`,
+    `<span style="font-family:'DM Sans',sans-serif;font-weight:600;font-size:18px;">\u275d</span>`,ctx.quoteMark?'인용부호 끄기':'인용부호 켜기'):'';
+  const ALIGN_ICON={left:'left',center:'center',right:'right'};
+  const curAlign=ctx.alignMode||'left';
+  const alignToggle=ctx.kind==='quote'?_shareIconBtn(true,`_cycleAlignMode();`,
+    `<i class="ti ti-align-${ALIGN_ICON[curAlign]}" aria-hidden="true"></i>`,curAlign==='center'?'중앙정렬':(curAlign==='right'?'우측정렬':'좌측정렬')):'';
+  const curFs=ctx.fontSize||40;
+  const fontSizeDown=ctx.kind==='quote'?_shareIconBtn(false,`_shareModalCtx.fontSize=Math.max(28,(_shareModalCtx.fontSize||40)-1);_renderShareModal();`,
+    `<span style="font-weight:600;font-size:17px;">−</span>`,'글자 작게'):'';
+  const fontSizeUp=ctx.kind==='quote'?_shareIconBtn(false,`_shareModalCtx.fontSize=Math.min(52,(_shareModalCtx.fontSize||40)+1);_renderShareModal();`,
+    `<span style="font-weight:600;font-size:17px;">+</span>`,'글자 크게'):'';
+  const HL_SWATCH={yellow:'#ffd682',pink:'#e68ca0',mint:'#96c8b4'};
+  const curHl=ctx.highlightMode||null;
+  const highlightToggle=(ctx.kind==='quote'&&ctx.styleKey==='G')?_shareIconBtn(!!curHl,`_cycleHighlightMode();`,
+    curHl?`<span style="width:20px;height:20px;border-radius:6px;background:${HL_SWATCH[curHl]};display:inline-block;"></span>`:`<i class="ti ti-highlight" aria-hidden="true"></i>`,curHl?'형광펜 색상 변경':'형광펜 켜기'):'';
+  // 사이드바 토글 — 카드형(H)에서만 노출, 왼쪽 사이드바+마름모 포인트 추가
+  const sidebarToggle=(ctx.kind==='quote'&&ctx.styleKey==='H')?_shareIconBtn(!!ctx.sidebarMode,`_shareModalCtx.sidebarMode=!_shareModalCtx.sidebarMode;_renderShareModal();`,
+    `<i class="ti ti-layout-sidebar" aria-hidden="true"></i>`,ctx.sidebarMode?'사이드바 끄기':'사이드바 켜기'):'';
+  const iconRow=[colorSwatch,fontToggle,alignToggle,bookToggle,commentToggle,quoteMarkToggle,sidebarToggle,highlightToggle,fontSizeDown,fontSizeUp].filter(Boolean).join('');
+  ov.innerHTML=`<div style="background:var(--sheet);border-radius:26px;padding:22px;width:min(90vw,420px);max-height:88vh;overflow-y:auto;box-sizing:border-box;" onclick="event.stopPropagation();">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div style="font-weight:600;font-size:15px;color:var(--tp);">공유 이미지</div>
+      <i class="ti ti-x" style="font-size:19px;color:var(--ts);cursor:pointer;" onclick="_closeShareModal()" aria-hidden="true"></i>
+    </div>
+    <div style="border-radius:20px;overflow:hidden;background:var(--bg);box-shadow:0 6px 24px rgba(90,64,64,0.16);margin-bottom:16px;">
+      <img src="${dataUrl}" style="width:100%;display:block;" />
+    </div>
+    ${styleBannerRow}
+    <div style="display:flex;gap:5px;justify-content:center;flex-wrap:nowrap;margin-bottom:16px;overflow-x:auto;">${iconRow}</div>
+    <button onclick="_confirmShareCopy()" style="width:100%;padding:15px 0;border-radius:16px;border:none;background:linear-gradient(120deg,rgba(255,175,200,0.95),var(--pal-pink-border));color:#fff;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(214,90,140,0.35);display:flex;align-items:center;justify-content:center;gap:7px;">
+      <i class="ti ti-copy" style="font-size:17px;" aria-hidden="true"></i>이미지 복사하기
+    </button>
+  </div>`;
+}
+async function _confirmShareCopy(){
+  const ctx=_shareModalCtx;if(!ctx)return;
+  const canvas=await _buildCurrentShareCanvas();
+  const ok=await _shareCanvasToClipboard(canvas);
+  _shareToast(ok?'이미지가 복사됐어요':'복사에 실패했어요 (사파리 최신버전 권장)');
+  if(ok)_closeShareModal();
+}
+async function shareQuoteCard(quoteCid){
+  const q=getQuotes().find(x=>x.cid===quoteCid);if(!q)return;
+  const book=getBooks().find(b=>b.cid===q.bookCid);
+  _shareModalCtx={kind:'quote',args:[q,book],styleKey:'G',colorMode:'brown',showBookInfo:false,italicMode:false,quoteMark:false,alignMode:'left',fontSize:40,highlightMode:null,showComment:q.comment?'label':null,sidebarMode:false};
+  await _renderShareModal();
+}
+async function openTodayReadingShareModal(bookCid,unit,percentAfter,pagesAfter,seconds,dk){
+  const book=getBooks().find(b=>b.cid===bookCid);if(!book)return;
+  _shareModalCtx={kind:'today',args:[book,unit,percentAfter,pagesAfter,seconds,dk],styleKey:'A',colorMode:'brown'};
+  await _renderShareModal();
+}
+function setPgUnit(u){
+  const book=getBooks().find(b=>b.cid===_pgBookCid);if(!book)return;
+  _pgUnit=u;
+  _pgStartVal=u==='percent'?(book.percent||0):(book.pages||0);
+  document.getElementById('pg-unit-pages').classList.toggle('on',u==='pages');
+  document.getElementById('pg-unit-percent').classList.toggle('on',u==='percent');
+  document.getElementById('pg-start-val').textContent=u==='percent'?_pgStartVal+'%':_pgStartVal+'p';
+  document.getElementById('pg-end-inp').value=_pgStartVal;
+  document.getElementById('pg-total').textContent=(u==='pages'&&book.totalPages)?`총 ${book.totalPages}페이지`:'';
+}
+let _pgDoneConfirmCid=null;
+function confirmProgress(){
+  const book=getBooks().find(b=>b.cid===_pgBookCid);if(!book)return;
+  const endVal=parseInt(document.getElementById('pg-end-inp').value,10);
+  if(isNaN(endVal))return;
+  const today=dateKey(getLogicalDate());
+  if(book.todayDate!==today){book.todayDate=today;book.todayStart=_pgStartVal;}
+  book.unit=_pgUnit;
+  if(_pgUnit==='percent')book.percent=Math.max(0,Math.min(100,endVal));
+  else book.pages=Math.max(0,endVal);
+  if(_pgSeconds>0)book.seconds=(book.seconds||0)+_pgSeconds;
+  upsertBookLocal(book);
+  const _amountRead=Math.max(0,endVal-_pgStartVal);
+  logContentDaily(book.cid,today,_amountRead,_pgSeconds,_pgUnit,book.percent,book.pages);
+  markReadingActivityToday();
+  // 통합 이후(2026-08-29) book.cid가 곧 연결된 contents 항목의 cid이므로 별도 매칭 불필요.
+  pushContentNote(book.cid,book.contentTitle||book.title,'book',document.getElementById('pg-note-inp')?.value);
+  // 독서 습관체크는 스톱워치 종료 시점(autoLogReadingRhythm)에서만 처리 —
+  // 진행바를 직접 클릭해 페이지/퍼센트만 입력한 경우는 습관체크하지 않음.
+  _swSeconds=0;
+  renderReadingHub();
+  // 진행률이 사실상 다 읽은 지점에 도달하면(percent=100, 또는 pages가 totalPages 이상)
+  // 완독으로 넘어갈지 모달 안에서 바로 물어봄 — 하단 토스트는 놓치기 쉬워 모달을 닫지 않고 그 자리에서 확인.
+  // totalPages를 안 적어둔 책은 "도달" 판정이 불가능하므로 페이지 단위에선 totalPages가 있을 때만 노출.
+  const reachedDone=_pgUnit==='percent'
+    ?book.percent>=100
+    :(book.totalPages&&book.pages>=book.totalPages);
+  if(reachedDone&&book.status==='reading'){
+    _pgDoneConfirmCid=book.cid;
+    const confirmEl=document.getElementById('pg-done-confirm');
+    const actionsEl=document.getElementById('pg-modal-actions');
+    if(confirmEl&&actionsEl){
+      confirmEl.style.display='block';
+      confirmEl.innerHTML=`<div class="pg-done-msg">다 읽으셨나요?</div>
+        <div style="display:flex;gap:8px;align-items:center;margin:10px 0 8px;">
+          <span style="font-size:var(--dow-label-size);color:var(--tm);white-space:nowrap;">별점</span>
+          <div id="pg-done-star-picker" class="cm-star-picker"></div>
+          <input type="hidden" id="pg-done-stars" value="0">
+        </div>
+        <textarea class="modal-inp" id="pg-done-review" rows="2" style="resize:none;" placeholder="감상 메모 (선택)" autocomplete="off"></textarea>`;
+      renderStarPicker('pg-done-star-picker','pg-done-stars',0);
+      actionsEl.innerHTML=`<button class="mbtn cancel" onclick="closeModal('progress-modal')">나중에</button>
+        <div class="mbtn-done-wrap" onclick="confirmReadingProgressDone()"><button class="mbtn-done"><i class="ti ti-sparkles ico-sz-14" aria-hidden="true"></i> 완독</button></div>`;
+    }
+    return;
+  }
+  closeModal('progress-modal');
+}
+function confirmReadingProgressDone(){
+  const cid=_pgDoneConfirmCid;
+  _pgDoneConfirmCid=null;
+  if(!cid){closeModal('progress-modal');return;}
+  const starsEl=document.getElementById('pg-done-stars');
+  const reviewEl=document.getElementById('pg-done-review');
+  const stars=starsEl?(parseFloat(starsEl.value)||0):0;
+  const review=reviewEl?reviewEl.value.trim():'';
+  closeModal('progress-modal');
+  setBookStatus(cid,'done',{stars,review}); // 상태전환 공용 경로 — 콘텐츠 연동(syncReadingBookToContent)까지 함께 처리됨
+}
+// [2026-09-13 재설계] 시작 즉시 리듬블록을 생성(지연 없음), 종료 시 몇 초를 했든 항상 end를
+// 채워 정상 기록으로 마감 — 오탭 방지용 자동삭제는 두지 않음(사용 이력 참조: 즉시생성+자동삭제
+// 시도 시 생성/삭제 sync 경합으로 삭제가 무효화된 이력 있음). 실수로 눌렀다면 리듬탭에서 직접
+// 삭제(deleteRhythmBlock). 실제 로직(연타방지 락, 복원 포함)은 createInstantCommitStopwatch 정의부 참조.
+// cid: 시작 시 반드시 전달(어느 책인지 명시) — 종료 호출(재생 중 다시 탭)은 인자 없이도 _swBookCid로 식별.
+function toggleStopwatch(cid){
+  _swSw.toggle(cid);
+}
+// 시작 시 생성해둔 리듬블록(blockCid)을 찾아 end만 채움 — 다른 카테고리(운동/휴식 등)와 동일 규칙.
+// minToHHMM은 콘텐츠 시청 스톱워치 쪽(파일 하단)에 정의된 전역 함수를 그대로 재사용(중복 정의 제거, 2026-08-30)
+function autoLogReadingRhythm(blockCid,startTs,endTs){
+  if(!blockCid||!startTs||!endTs)return;
+  const dk=dateKey(getLogicalDate(startTs));
+  const blocks=getRhythmBlocks(dk);
+  const idx=blocks.findIndex(b=>b.cid===blockCid);
+  if(idx<0)return;
+  const endD=new Date(endTs);
+  let endMin=endD.getHours()*60+endD.getMinutes();
+  // 자정을 넘겨 끝난 경우, 같은 논리적 하루(리듬 4시 기준) 안이면 24시를 더해 이어지도록 표시
+  if(dateKey(getLogicalDate(endTs))!==dk)endMin+=1440;
+  blocks[idx].end=minToHHMM(endMin%1440);
+  saveRhythmBlocks(dk,blocks); // saveRhythmBlocks 내부에서 이미 autoSync('rblocks',dk) 호출 — 중복 호출 금지
+}
+function updateStopwatchDisplay(){
+  // 경과시간 재계산은 팩토리 onTick 콜백(_swSw 정의부)에서 이미 처리되어 _swSeconds에 미러됨 —
+  // 여기선 화면 복귀(visibilitychange) 시 즉시 보정 호출용으로도 그대로 재사용되므로 그 경우엔 아래서 재계산.
+  if(_swRunning)_swSeconds=Math.floor((Date.now()-_swStartTs)/1000);
+  const m=Math.floor(_swSeconds/60),s=_swSeconds%60;
+  const timeEl=document.getElementById('rd-sw-time');
+  if(timeEl)timeEl.textContent=`${pad(m)}:${pad(s)}`;
+  const pct=(_swSeconds%3600)/3600;
+  const offset=RD_SW_C-(RD_SW_C*pct);
+  const ringEl=document.getElementById('rd-sw-ring');
+  if(ringEl)ringEl.setAttribute('stroke-dashoffset',offset);
+}
+document.addEventListener('visibilitychange',function(){
+  if(!document.hidden&&_swRunning)updateStopwatchDisplay(); // 화면 복귀 즉시 정확한 시간으로 보정 (독서 전용 — 콘텐츠 시청은 초단위 표시가 없어 보정 불필요)
+});
+
+// ── 오늘탭 소속(예비 투두) — 나머지는 시간대팝업/SLEEP~아침파트2/MEMO/HABIT~CONTENT TIMELINE 부근 ──
+// ── 예비 투두 ──
+const RESERVE_DK='reserve';
+let _reserveMoveIdx=-1,_reserveSection='none';
+function updateReserveCountBadge(){
+  const badge=document.getElementById('reserve-count-badge');if(!badge)return;
+  const n=getReserveTodos().length;
+  if(n>0){badge.textContent=n;badge.style.display='inline-flex';}
+  else{badge.style.display='none';}
+}
+function getReserveTodos(){return S.get(S.key('todos',RESERVE_DK))||[];}
+function saveReserveTodos(v){
+  S.set(S.key('todos',RESERVE_DK),v);
+  S.set(S.key('todos_pending',RESERVE_DK),true);
+  autoSync('todos',RESERVE_DK);
+  updateReserveCountBadge();
+}
+
+let _reserveCat='todo';
+let _reserveFilter='all';
+let _reserveReorderMode=false;
+function toggleReserveReorderMode(){
+  _reserveReorderMode=!_reserveReorderMode;
+  document.getElementById('reserve-reorder-btn')?.classList.toggle('on',_reserveReorderMode);
+  renderReserveList();
+}
+function toggleReserveCatDropup(){
+  document.getElementById('reserve-cat-dropup').classList.toggle('on');
+}
+function setReserveCat(cat){
+  _reserveCat=cat;
+  const map={shop:'ti-shopping-cart',watch:'ti-movie',todo:'ti-flag-3',etc:'ti-dots'};
+  const btn=document.getElementById('reserve-cat-btn');
+  btn.innerHTML=`<i class="ti ${map[cat]} ico-sz-14" aria-hidden="true"></i>`;
+  btn.className='send-btn send-btn-sm cat-color-'+cat;
+  document.querySelectorAll('#reserve-cat-dropup .cat-dropup-opt').forEach(b=>b.classList.toggle('active',b.dataset.cat===cat));
+  document.getElementById('reserve-cat-dropup').classList.remove('on');
+}
+function setReserveFilter(f){
+  _reserveFilter=f;
+  document.querySelectorAll('#reserve-filter-row .reserve-section-btn').forEach(b=>b.classList.toggle('active',b.dataset.filter===f));
+  renderReserveList();
+}
+function openReserveSheet(){
+  _reserveReorderMode=false;
+  document.getElementById('reserve-reorder-btn')?.classList.remove('on');
+  setReserveFilter('all');
+  setReserveCat('todo');
+  openSheet('reserve-sheet');
+}
+function renderReserveList(){
+  const list=document.getElementById('reserve-list');if(!list)return;
+  const allTodos=getReserveTodos();
+  let todos=_reserveFilter==='all'?allTodos:allTodos.filter(t=>(t.cat||'todo')===_reserveFilter);
+  todos=[...todos].sort((a,b)=>(a.sortOrder!=null?a.sortOrder:9999)-(b.sortOrder!=null?b.sortOrder:9999));
+  if(!todos.length){list.innerHTML='<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:12px 0;">비어있어요 — 날짜 미정 할 일을 추가해보세요</div>';return;}
+  list.innerHTML='';
+  const catIcon={shop:'ti-shopping-cart',watch:'ti-movie',todo:'ti-flag-3',etc:'ti-dots'};
+  const canReorder=_reserveReorderMode&&_reserveFilter==='all';
+  todos.forEach((t)=>{
+    const i=allTodos.indexOf(t);
+    const cat=t.cat||'todo';
+    const el=document.createElement('div');
+    el.className='reserve-item';
+    el.style.position='relative';
+    const handleHtml=canReorder?`<div class="todo-drag-handle rm-eligible" style="display:flex;"><i class="ti ti-grip-vertical ico-sz-13" aria-hidden="true"></i></div>`:'';
+    el.innerHTML=handleHtml
+      +`<button class="item-cat-icon ${cat}" onclick="toggleItemCatDropup(this,${i})" title="카테고리 변경"><i class="ti ${catIcon[cat]} ico-sz-15" aria-hidden="true"></i></button>`
+      +`<span class="reserve-text" data-i="${i}">${t.text}</span>`
+      +`<div class="item-actions">`
+      +`<button class="reserve-act-btn" onclick="openReserveMoveModal(${i})" title="날짜 지정"><i class="ti ti-calendar-plus ico-sz-15" aria-hidden="true"></i></button>`
+      +`<button class="reserve-del-btn" onclick="deleteReserveTodo(${i})" title="삭제"><i class="ti ti-x ico-sz-14" aria-hidden="true"></i></button>`
+      +`</div>`;
+    el.querySelector('.reserve-text').addEventListener('click',()=>startEditReserveTodo(i));
+    if(canReorder)attachTodoReorderDrag(el,i,null,'.reserve-item',applyReserveReorder);
+    list.appendChild(el);
+  });
+}
+function toggleItemCatDropup(btnEl,i){
+  const existing=document.getElementById('item-cat-dropup');
+  if(existing){const wasSameBtn=existing.dataset.i==i;existing.remove();if(wasSameBtn)return;}
+  const catIcon={shop:'ti-shopping-cart',watch:'ti-movie',todo:'ti-flag-3',etc:'ti-dots'};
+  const dd=document.createElement('div');
+  dd.className='cat-dropup on';
+  dd.id='item-cat-dropup';
+  dd.dataset.i=i;
+  dd.style.cssText='position:absolute;top:26px;left:0;';
+  dd.innerHTML=Object.keys(catIcon).map(c=>`<button class="cat-dropup-opt" onclick="event.stopPropagation();setItemCat(${i},'${c}')" title="${c}"><i class="ti ${catIcon[c]} ico-sz-14" aria-hidden="true"></i></button>`).join('');
+  btnEl.parentElement.appendChild(dd);
+  setTimeout(()=>document.addEventListener('click',function h(e){if(!dd.contains(e.target)&&e.target!==btnEl){dd.remove();document.removeEventListener('click',h);}}),0);
+}
+function setItemCat(i,cat){
+  const todos=getReserveTodos();
+  if(todos[i]){todos[i].cat=cat;saveReserveTodos(todos);}
+  renderReserveList();
+}
+function startEditReserveTodo(i){
+  const list=document.getElementById('reserve-list');if(!list)return;
+  const span=list.querySelector(`.reserve-text[data-i="${i}"]`);if(!span)return;
+  const todos=getReserveTodos();const t=todos[i];if(!t)return;
+  const inp=document.createElement('textarea');
+  inp.className='reserve-edit-inp';
+  inp.rows=1;
+  inp.value=t.text;
+  inp.style.cssText='flex:1;font-size:var(--main-text-size);color:var(--tp);background:transparent;border:none;border-bottom:1px solid var(--tm);outline:none;font-family:inherit;resize:none;padding:0;';
+  span.replaceWith(inp);
+  inp.focus();
+  inp.setSelectionRange(inp.value.length,inp.value.length);
+  let committed=false;
+  const commit=()=>{
+    if(committed)return;committed=true;
+    const val=inp.value.trim();
+    const cur=getReserveTodos();
+    if(cur[i]&&val&&val!==cur[i].text){cur[i].text=val;saveReserveTodos(cur);}
+    renderReserveList();
+  };
+  inp.addEventListener('blur',commit);
+  inp.addEventListener('keydown',e=>{
+    if(e.isComposing||e.keyCode===229)return;
+    if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();inp.blur();}
+    if(e.key==='Escape'){committed=true;renderReserveList();}
+  });
+}
+function addReserveTodo(){
+  const inp=document.getElementById('reserve-inp');
+  const text=inp?inp.value.trim():'';if(!text)return;
+  const todos=getReserveTodos();
+  todos.push({text,done:false,created:Date.now(),timeSection:'none',cid:genCid(),cat:_reserveCat});
+  saveReserveTodos(todos);
+  if(inp){inp.value='';inp.style.height='';}
+  renderReserveList();
+}
+function deleteReserveTodo(i){
+  const todos=getReserveTodos();
+  const t=todos[i];if(t)addDelPending('todos',RESERVE_DK,t.cid);
+  todos.splice(i,1);saveReserveTodos(todos);renderReserveList();
+}
+function openReserveMoveModal(i){
+  _reserveMoveIdx=i;_reserveSection='none';
+  setReserveSection('none');
+  const dateInp=document.getElementById('reserve-date-inp');
+  if(dateInp)dateInp.value=dateKey(new Date());
+  document.getElementById('reserve-date-modal').classList.add('on');
+}
+function setReserveSection(s){
+  _reserveSection=s;
+  const map={morning:'rsec-morning',afternoon:'rsec-afternoon',night:'rsec-night',none:'rsec-none'};
+  Object.keys(map).forEach(k=>{
+    const btn=document.getElementById(map[k]);
+    if(!btn)return;
+    btn.classList.toggle('active',k===s);
+  });
+  // 기본 active 상태가 취소되지 않도록 none 버튼 클래스 보정
+}
+function confirmReserveMove(){
+  const val=document.getElementById('reserve-date-inp').value;
+  if(!val||_reserveMoveIdx<0)return;
+  const todos=getReserveTodos();
+  const t=todos[_reserveMoveIdx];if(!t)return;
+  // 예비 목록에서 제거 (삭제 의도 기록)
+  addDelPending('todos',RESERVE_DK,t.cid);
+  todos.splice(_reserveMoveIdx,1);saveReserveTodos(todos);
+  // 선택한 날짜 투두에 추가
+  const newTodo={text:t.text,done:false,created:Date.now(),timeSection:_reserveSection,cid:genCid()};
+  const targetTodos=getTodos(val);targetTodos.push(newTodo);saveTodos(val,targetTodos);
+  // 오늘 날짜면 화면도 갱신
+  if(val===dateKey(currentDate))renderTodos();
+  closeModal('reserve-date-modal');
+  _reserveMoveIdx=-1;_reserveSection='none';
+  renderReserveList();
+  showToast(val+' 투두에 추가했어요 ✓');
+}
+
+// ══════════════════════════════════════════════════════════
+// ██ 초기화 (2/2 — 나머지는 LOAD 부근) — HOME 재진입/INIT/마이그레이션 ██
+// ══════════════════════════════════════════════════════════
+// ── HOME
+
+
+
+// ── INIT
+updateDateUI();
+loadDaily();
+// 리마인드 알림 클릭 시 URL에 실려온 메모 유도 파라미터를 읽어 메모 제안 모달을 자동으로 연다.
+// - memo=rhythm&cid=xxx: 리듬 1/3시간 진행중 알림 — 해당 리듬블록을 찾아 그 카테고리로 연다.
+//   로컬 30일 캐시 범위 밖(예: 자정을 넘겨 어제 블록인 경우)일 수 있어, 못 찾으면 서버에서 직접 조회.
+// - memo=sleep / memo=noon: 23시 취침 회고 / 13시 점심 후 — 리듬블록에 종속되지 않는 단독 메모라 조회 없이 바로 연다(MEMO_URL_DEFAULT_COPY).
+// - memo=question: 19:30 오늘의 질문 — openQuestionMemo가 서버 풀에서 질문을 뽑아 연다(2026-09-19).
+// 알림 클릭으로 열리는 단독 메모(리듬블록에 종속되지 않음)의 기본 문구 — 서버가 t/b를 실어 보내면 그 문구를, 없으면 이 문구를 표시.
+const MEMO_URL_DEFAULT_COPY={
+  sleep:['오늘 하루는 어땠나요?','잠들기 전, 오늘을 짧게 남겨보세요.'],
+  noon:['식사 후 나른한 시간이에요','지금 컨디션이나 오후 계획을 한 줄 남겨볼까요?']
+};
+async function _openFromNotificationUrl(urlStr){
+  const params=new URLSearchParams((urlStr?urlStr.split('?')[1]:location.search)||'');
+  const snoozeCid=params.get('snooze'); // 할일 알림 — 스누즈 시트
+  const memoType=params.get('memo');
+  if(!snoozeCid&&!['rhythm','sleep','noon','question'].includes(memoType))return;
+  if(!urlStr)history.replaceState(null,'',location.pathname); // 최초 로드 경로일 때만 자기 URL을 정리(SW 메시지 경로는 애초에 주소가 안 바뀌므로 불필요)
+  if(snoozeCid){openSnoozePopup(snoozeCid);return;}
+  const todayDk=dateKey(new Date());
+  const copy=MEMO_URL_DEFAULT_COPY[memoType];
+  if(copy){openRhythmMemoModal(memoType,todayDk,params.get('t')||copy[0],params.get('b')||copy[1]);return;}
+  if(memoType==='question'){openQuestionMemo(todayDk);return;} // 질문은 알림에 싣지 않고 앱이 풀에서 직접 뽑음
+  const cid=params.get('cid');
+  if(!cid)return;
+  let found=null,foundDk=null;
+  for(let i=0;i<2;i++){ // 자정을 막 넘긴 경우까지 고려해 오늘/어제 두 날짜만 로컬에서 우선 탐색
+    const d=new Date();d.setDate(d.getDate()-i);
+    const dk=dateKey(d);
+    const b=getRhythmBlocks(dk).find(x=>x.cid===cid);
+    if(b){found=b;foundDk=dk;break;}
+  }
+  if(!found){
+    // 로컬에 없으면 서버에서 직접 조회(오래 지난 알림을 뒤늦게 클릭한 경우 등)
+    const rows=await supaFetch(`rhythm_blocks?client_id=eq.${encodeURIComponent(cid)}&limit=1`);
+    if(rows&&rows[0]){found=rhythmBlockRowToLocal(rows[0]);foundDk=rows[0].date_key;}
+  }
+  if(!found||!found.cat)return;
+  const title=_buildRhythmMemoTitle(found.cat,found.start,found.end,found.text);
+  if(!title)return;
+  openRhythmMemoModal(found.cat,foundDk||todayDk,title,'지금 이 순간을 기록해보세요.');
+}
+// URL 쿼리 경로(콜드 스타트)의 실행은 스플래시 해제 이후로 미뤄야 하므로 아래 waitAndHideSplash에서 호출.
+// SW postMessage 경로(앱이 이미 열려있어 스플래시가 없는 경우)는 즉시 처리해도 무방.
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.addEventListener('message',e=>{
+    if(e.data&&e.data.type==='notification-click'&&e.data.url){
+      _openFromNotificationUrl(e.data.url);
+    }
+  });
+}
+// 새로고침/앱 완전종료 후 재시작 시, 켜져 있던 독서 스톱워치를 이어서 복원.
+// localStorage에 저장된 시작시각이 있으면(=종료 처리 없이 앱이 닫힌 경우) 그 시각 기준으로
+// 경과시간을 계산해 스톱워치를 다시 돌아가는 상태로 되살린다.
+_swSw.restoreFromStorage();
+// 최초 로드 시엔 로컬 캐시만으로 그려지므로(completedAt 등 최신 서버값 반영 전),
+// online/visibilitychange 이벤트를 기다리지 않고 여기서 한 번 동기화를 실행해 최신 상태로 맞춘다.
+if(navigator.onLine){
+  syncAll();
+  cleanupOldGreetingCache(); // fire-and-forget — 실패해도 다음 앱 시작 때 재시도되므로 await로 초기화를 막지 않음
+  processPhotoR2DeleteQueue(); // 지난 세션에서 R2 삭제가 실패해 대기열에 남은 사진이 있으면 재시도
+}
+
+// Service Worker 등록 (오프라인 지원)
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('./sw.js').then(reg=>{
+      reg.update();
+    }).catch(()=>{});
+  });
+}
+
+// 앱 시작 시 항상 Supabase에서 복구 (로컬 무시)
+async function initSync(){
+  if(!navigator.onLine){_initSyncDone=true;return;}
+  syncUserTimezoneIfChanged(); // fire-and-forget — 시간대 안 바뀌었으면 로컬 비교만 하고 끝나 로딩에 영향 없음
+  window._restoring=true;
+  var dates=[];
+  for(var i=29;i>=0;i--){var d=new Date();d.setDate(d.getDate()-i);dates.push(dateKey(d));}
+  // 미래 6일치 날짜 추가
+  var futureDates=[];
+  for(var i=1;i<=6;i++){var d=new Date();d.setDate(d.getDate()+i);futureDates.push(dateKey(d));}
+  var uploadedDates={};
+  // pending 있는 날짜는 Up 먼저 — 로컬 데이터 보호
+  for(var i=0;i<dates.length;i++){
+    var dk=dates[i];
+    var didUp=false;
+    // 아래 각 syncXxxUp 호출은 반환값(성공 여부)을 확인해 성공했을 때만 pending을 끄고 uploadedDates에
+    // 표시한다. 예전엔 무조건 껐는데, 업로드가 실패(오프라인 전환 순간 등)해도 pending이 꺼지고
+    // uploadedDates에 찍혀 아래 pastDown 대상에서도 빠져버려, "Up도 실패, Down도 스킵"으로 로컬 변경사항이
+    // 통째로 유실되는 경로가 있었음(2026-09-15, 기기간 체크 상태가 반복적으로 되돌아가던 문제와 연결).
+    if(S.get(S.key('todos_pending',dk))){
+      if(await syncTodosUp(dk)){S.set(S.key('todos_pending',dk),false);didUp=true;}
+    }
+    if(S.get(S.key('memos_pending',dk))){
+      if(await syncMemosUp(dk)){S.set(S.key('memos_pending',dk),false);didUp=true;}
+    }
+    if((S.get(S.key('meals_fields_pending',dk))||[]).length){
+      await syncMealsUp(dk);
+    }
+    if(S.get(S.key('rblocks_pending',dk))){
+      if(await syncRhythmBlocksUp(dk)){S.set(S.key('rblocks_pending',dk),false);didUp=true;}
+    }
+    if(didUp)uploadedDates[dk]=true;
+  }
+  // 미래 날짜 pending Up
+  for(var i=0;i<futureDates.length;i++){
+    var fdk=futureDates[i];
+    if(S.get(S.key('todos_pending',fdk))){
+      if(await syncTodosUp(fdk)){S.set(S.key('todos_pending',fdk),false);uploadedDates[fdk]=true;}
+    }
+  }
+  // wchallenge pending 있으면 Up 먼저
+  var wk=weekKey(new Date());
+  if(S.get('wchallenge_pending_'+wk)){
+    await autoSync('wchallenge','wchallenge_'+wk);
+  } else {
+    // 없으면 Supabase에서 Down
+    await syncWChallengeDown(wk);
+  }
+  // 습관 / 습관체크 — 항상 동기화 (이전엔 syncAll에만 있어서 PC 사파리 등 새 탭에서 누락되던 버그)
+  await syncHabitsDown();
+  await syncHabitGoalsDown();
+  // 굿모닝(모닝 플로우) — 최근 2일(오늘+어제, 새벽 4시 경계 대비)만 다운로드
+  {
+    const mflowTasks=[];
+    const nowD=new Date();
+    for(let i=0;i<2;i++){const d=new Date(nowD);d.setDate(nowD.getDate()-i);mflowTasks.push(syncMorningFlowDown(dateKey(d)));}
+    await Promise.all(mflowTasks);
+  }
+  await syncGoalDown('wishlist:meal');
+  await syncGoalDown('reading_dates');
+  // 책은 contents(cat='book')로 통합됨 — 서재가 여러 달에 걸쳐 있으므로 최근 여러 달치를 다운로드.
+  // pending 업로드는 saveContents가 이미 자체적으로 처리(contents_pending)하므로 별도 루프 불필요.
+  {
+    const nowB=new Date();
+    for(let i=0;i<6;i++){await syncContentsDown(monthKey(new Date(nowB.getFullYear(),nowB.getMonth()-i,1)));}
+  }
+  await syncQuotesDownAll();
+  const pendDel=S.get('quote_delpending_list')||[];
+  for(const cid of pendDel){
+    saveQuotesLocal(getQuotes().filter(q=>q.cid!==cid));
+    const res=await supaFetch(`reading_quotes?cid=eq.${cid}`,'DELETE');
+    if(res!==null)S.set('quote_delpending_list',(S.get('quote_delpending_list')||[]).filter(c=>c!==cid));
+  }
+  for(const q of getQuotes()){
+    if(S.get('quote_pending_'+q.cid))await syncQuoteUp(q.cid);
+  }
+  await syncHCDown(wk);
+  await syncGoalDown(S.key('mgoal',monthKey(new Date())));
+  await syncMonthRange(new Date().getFullYear(),new Date().getMonth());
+  // 콘텐츠 — 항상 Down 먼저 호출 (내부에서 pending이면 병합 후 자동 Up까지 처리)
+  var mk0=monthKey(new Date());
+  await syncContentsDown(mk0);
+  // 하루한줄 — 이번 주 월~일
+  var mon=new Date();mon.setDate(mon.getDate()-((mon.getDay()+6)%7));
+  for(var i=0;i<7;i++){
+    var od=new Date(mon);od.setDate(mon.getDate()+i);
+    await syncGoalDown(S.key('oneline',dateKey(od)));
+  }
+  // Up 하지 않은 날짜만 Supabase → 로컬 복원 (pending 체크는 각 함수 내부에서 처리)
+  // 날짜별 개별 fetch(N일→N번 왕복) 대신 date_key=in.(...) 범위쿼리로 묶어 왕복 1회로 축소.
+  {
+    const pastDown=dates.filter(dk=>!uploadedDates[dk]);
+    await Promise.all([
+      syncTodosDownMany(pastDown),syncMemosDownMany(pastDown),
+      syncSleepDownMany(pastDown),syncMealsDownMany(pastDown),syncRhythmBlocksDownMany(pastDown)
+    ]);
+  }
+  // 미래 날짜 Down — 동일하게 범위쿼리로 묶음
+  {
+    const futureDown=futureDates.filter(fdk=>!uploadedDates[fdk]);
+    await Promise.all([
+      syncTodosDownMany(futureDown),syncMemosDownMany(futureDown),
+      syncMealsDownMany(futureDown),syncRhythmBlocksDownMany(futureDown)
+    ]);
+  }
+  window._restoring=false;
+  // 예비 투두 동기화
+  if(S.get(S.key('todos_pending',RESERVE_DK))){
+    if(await syncTodosUp(RESERVE_DK))S.set(S.key('todos_pending',RESERVE_DK),false);
+  }else{
+    await syncTodosDown(RESERVE_DK);
+  }
+  loadDaily();
+  refreshIfTabOpen('v-weekly',loadWeekly);
+  refreshIfTabOpen('v-monthly',loadMonthly);
+  _initSyncDone=true;
+}
+setTimeout(initSync, 500);
+setTimeout(checkAndRecoverPushSubscription, 1500);
+// initSync(오프라인이면 즉시 반환) 완료와 최소 스플래시 시간 중 늦게 끝나는 쪽에 맞춰 해제.
+// initSync 시작(500ms 지연)까지 감안해 넉넉히 폴링하되, 혹시 실패해도 최소시간 이후엔 반드시 내려가도록 방어.
+(async function waitAndHideSplash(){
+  await _splashMinTimer;
+  const deadline=Date.now()+8000; // 동기화가 비정상적으로 오래 걸려도 최대 8초 뒤엔 강제로 화면을 보여줌
+  while(!_initSyncDone&&Date.now()<deadline){
+    await new Promise(res=>setTimeout(res,100));
+  }
+  hideSplash();
+  // 1시간 리마인드 알림으로 콜드 스타트된 경우 — 스플래시가 완전히 사라진 뒤에만 메모 모달을 띄운다(2026-09-17).
+  _openFromNotificationUrl();
+})();
+
+
