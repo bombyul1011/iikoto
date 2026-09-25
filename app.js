@@ -227,6 +227,7 @@ async function _syncManyDown(table,dks,pendingKey,mapFn,setFn){
   });
 }
 async function syncTodosDownMany(dks){
+  let hasMultidayChange=false;
   await _syncManyDown('todos',dks,'todos_pending',
     r=>({text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null,eventEndDate:r.event_end_date||null,cat:r.cat||'todo',pinned:!!r.pinned,recurRuleCid:r.recur_rule_cid||undefined,alertTime:r.alert_time||null,eventAlertOn:!!r.event_alert_on,todoAlertOn:!!r.todo_alert_on,isVacation:!!r.is_vacation}),
     (dk,mapped)=>{
@@ -239,7 +240,11 @@ async function syncTodosDownMany(dks){
         return true;
       });
       S.set(S.key('todos',dk),deduped);
+      if(deduped.some(t=>t.isEvent&&t.eventEndDate))hasMultidayChange=true;
     });
+  // 여러 날짜(최대 30여일)를 한 번에 받아오는 경로 — 다른 기기의 연속일정/오프 변경이 섞여 있을 수 있으므로
+  // 루프 전체가 끝난 뒤 한 번만 캐시 무효화(다운로드 도중 여러 번 지우는 것보다 효율적, syncTodosDown과 동일 원칙).
+  if(hasMultidayChange)_invalidateVacationCache();
   renderTodos();
 }
 async function syncMemosDownMany(dks){
@@ -3495,6 +3500,10 @@ async function syncTodosDown(dk){
     return true;
   });
   S.set(S.key('todos',dk),deduped);
+  // 다른 기기에서 온 변경사항 중 연속일정(오프 여부 포함)이 있으면 isVacationDate 캐시도 함께 무효화 —
+  // 로컬 직접 저장/삭제 때만 무효화하던 기존 처리가 sync down 경로를 놓쳐, 다른 기기에서 바꾼 오프 상태가
+  // 이 기기에서 캐시된 옛 판정으로 계속 보이는 문제가 있었음(2026-09-25 확인).
+  if(deduped.some(t=>t.isEvent&&t.eventEndDate))_invalidateVacationCache();
   renderTodos();
 }
 // 같은 dk에 대한 업로드가 동시에(재진입) 실행되는 것을 막는 락 — saveTodos의 즉시 업로드(autoSync)와
