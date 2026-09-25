@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.110-dead-code';
+const CACHE = 'iikoto-v2.111-font-scale-cleanup';
 const ASSETS = [
   './',
   './index.html'
