@@ -3025,8 +3025,12 @@ function isVacationDate(dOrDk){
   return result;
 }
 // 오프 일정을 새로 저장/수정/삭제할 때 호출 — 캐시가 낡은 값을 들고 있지 않도록 통째로 비움(캐시 크기가 작아 재계산 비용 낮음).
+// 화면에 습관 배너(월간 한달현황/주간 박스)가 떠 있으면 오프 반영이 통계에 즉시 보이도록 함께 다시 그림 —
+// 두 함수 모두 대상 요소가 없으면 조용히 반환하는 방어 로직이 이미 있어 탭이 달라도 안전하게 호출 가능.
 function _invalidateVacationCache(){
   Object.keys(_vacationDateCache).forEach(k=>delete _vacationDateCache[k]);
+  if(typeof renderHabitMonthly==='function')renderHabitMonthly();
+  if(typeof renderWeeklyHabitBox==='function')renderWeeklyHabitBox();
 }
 // ── 연속일정(며칠간 이어지는 일정) 공용 조회 함수 ──
 // 특정 날짜(dk)를 범위(startDate~eventEndDate)로 품고 있는 연속일정을 전부 찾아 반환.
@@ -7882,8 +7886,6 @@ async function confirmTodo(){
   const eventEndDate=(rawEndDate&&rawEndDate!==newDk)?rawEndDate:null;
   // 오프 표시 — 연속일정(eventEndDate 존재)일 때만 의미 있음, 하루짜리는 항상 false로 저장
   const isVacation=isEvent&&!!eventEndDate&&modal.dataset.isVacation==='1';
-  // 연속일정 저장(오프 여부 포함)은 isVacationDate 캐시를 낡게 만들 수 있으므로 무효화 — 연속일정이 아닌 저장(할일 등)까지 매번 지울 필요는 없어 이 조건으로 좁힘
-  if(isEvent&&eventEndDate)_invalidateVacationCache();
   // 일정 시작일이 원래 날짜(dk)와 달라진 경우 — 기존 row를 dk에서 제거하고 newDk에 새로 저장(투두의 조각 이동과 달리 일정은 통째로 이동이라 단순함)
   if(isEvent&&editIdx>=0&&todos[editIdx]&&newDk!==dk){
     const old=todos[editIdx];
@@ -7893,6 +7895,8 @@ async function confirmTodo(){
     const targetTodos=getTodos(newDk);
     targetTodos.push({text,done:old.done||false,created:old.created||Date.now(),timeSection,isEvent:true,eventCat,eventTime,eventEndDate,cid:old.cid,strikeParts:[],strikeTimes:{},pinned:false,alertTime:null,eventAlertOn,isVacation});
     saveTodos(newDk,targetTodos);
+    // 연속일정 저장(오프 여부 포함)이 로컬에 실제로 반영된 뒤에 캐시 무효화+배너 재렌더 — saveTodos 이전에 하면 옛 값으로 다시 그려지는 타이밍 문제가 있음.
+    if(eventEndDate)_invalidateVacationCache();
     if(eventTime&&eventAlertOn)await syncAlertFor('event',old.cid,newDk,eventTime,text);else await deleteAlertFor('event',old.cid);
     closeModal('todo-modal');
     restoreCalModeAndRender(modal,true);
@@ -7935,6 +7939,8 @@ async function confirmTodo(){
   else todos.push({text,done:false,created:Date.now(),timeSection,isEvent,eventCat:isEvent?eventCat:null,eventTime:isEvent?eventTime:null,eventEndDate:isEvent?eventEndDate:null,cid:genCid(),pinned,alertTime,eventAlertOn,todoAlertOn,isVacation});
   const savedTodo=editIdx>=0?todos[editIdx]:todos[todos.length-1];
   saveTodos(dk,todos);closeModal('todo-modal');
+  // 연속일정 저장(오프 여부 포함)이 로컬에 실제로 반영된 뒤에 캐시 무효화+배너 재렌더 — saveTodos 이전에 하면 옛 값으로 다시 그려지는 타이밍 문제가 있음.
+  if(isEvent&&eventEndDate)_invalidateVacationCache();
   // alerts 동기화 — 일정은 eventTime+eventAlertOn, 할일은 alertTime+todoAlertOn(둘 다 온일 때만) 기준으로 발송 예약
   const alertBasisTime=alertBasisTimeFor({isEvent,eventAlertOn,eventTime,todoAlertOn,alertTime});
   if(alertBasisTime)syncAlertFor(isEvent?'event':'todo',savedTodo.cid,dk,alertBasisTime,text);
