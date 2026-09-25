@@ -1500,46 +1500,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 </style>
 </head>
 <body>
-<script>
-// ══ 임시 디버그 오버레이 (원인 확인 후 제거) ══
-// 전역 에러 / Promise rejection을 화면에 직접 찍어줌 — 콘솔 접근 불가 시 진단용.
-(function(){
-  var box=null, lines=[];
-  function ensureBox(){
-    if(box)return box;
-    box=document.createElement('div');
-    box.id='__debugOverlay';
-    box.style.cssText='position:fixed;left:0;right:0;bottom:0;max-height:60vh;overflow:auto;'
-      +'background:rgba(20,0,0,.92);color:#ff6b6b;font:12px/1.5 monospace;padding:10px;'
-      +'z-index:2147483647;white-space:pre-wrap;word-break:break-all;box-sizing:border-box;';
-    document.documentElement.appendChild(box);
-    return box;
-  }
-  function log(prefix,msg){
-    lines.push('['+new Date().toLocaleTimeString()+'] '+prefix+': '+msg);
-    ensureBox().textContent=lines.join('\n\n');
-  }
-  window.addEventListener('error',function(e){
-    var msg=e.message||String(e.error);
-    var loc=(e.filename||'')+':'+e.lineno+':'+e.colno;
-    log('ERROR',msg+'\n  at '+loc+(e.error&&e.error.stack?('\n  stack: '+e.error.stack):''));
-  });
-  window.addEventListener('unhandledrejection',function(e){
-    var r=e.reason;
-    var msg=(r&&r.message)?r.message:String(r);
-    log('UNHANDLED PROMISE REJECTION',msg+(r&&r.stack?('\n  stack: '+r.stack):''));
-  });
-  // 5초 뒤에도 스플래시가 안 사라져 있으면 상태를 같이 찍음 (에러가 안 났는데도 멈춘 경우 대비)
-  setTimeout(function(){
-    var s=document.getElementById('splash');
-    if(s&&!s.classList.contains('hide')){
-      log('STATUS','5초 경과, 스플래시 아직 안 사라짐. '
-        +'_initSyncDone='+(typeof _initSyncDone!=='undefined'?_initSyncDone:'(참조불가)')
-        +', navigator.onLine='+navigator.onLine);
-    }
-  },5000);
-})();
-</script>
 <div id="bg-fixed"></div>
 <script>(function(){try{var t=localStorage.getItem('theme');if(t){t=JSON.parse(t);document.documentElement.setAttribute('data-theme',t);var c={light:'#fef2e4',glass:'#f7f4ee'}[t];var m=document.querySelector('meta[name="theme-color"]');if(m&&c)m.setAttribute('content',c);}}catch(e){}})();</script>
 <script>(function(){try{var s=localStorage.getItem('textScale');s=s?JSON.parse(s):0;var base={'-1':{main:13,dow:11},'0':{main:14,dow:12},'1':{main:15,dow:13}}[String(s)]||{main:14,dow:12};document.documentElement.style.setProperty('--main-text-size',base.main+'px');document.documentElement.style.setProperty('--dow-label-size',base.dow+'px');}catch(e){}})();</script>
