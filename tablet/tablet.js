@@ -119,6 +119,14 @@ function renderStarDisplayHtml(stars,sizeClass){
   return [1,2,3,4,5].map(n=>`<i class="ti ${_starIconClass(stars,n)}${cls}" aria-hidden="true"></i>`).join('');
 }
 function dateKey(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;}
+// 일정 카테고리 — 본앱 EVENT_CATS와 동일(라벨/아이콘/색), 오늘탭 일정 목록 아이콘 표시용(2026-09-25).
+const EVENT_CATS={
+  schedule:{label:'약속',textColor:'var(--ev-schedule-text)',bg:'var(--ev-schedule-bg)',icon:'ti-confetti'},
+  personal:{label:'개인',textColor:'var(--ev-personal-text)',bg:'var(--ev-personal-bg)',icon:'ti-plant'},
+  work:{label:'업무',textColor:'var(--ev-work-text)',bg:'var(--ev-work-bg)',icon:'ti-moneybag-heart'},
+  etc:{label:'기타',textColor:'var(--ev-etc-text)',bg:'var(--ev-etc-bg)',icon:'ti-calendar-smile'}
+};
+function getEventCat(key){return EVENT_CATS[key]||EVENT_CATS.etc;}
 // 본앱과 동일한 논리적 하루(새벽 4시 컷) 정렬 기준. 00:00~03:59 기록은 전날 늦은 시간대로 보고 +1440분 밀어서 맨 뒤로 정렬.
 const DAWN_CUTOFF_MIN=4*60;
 // 오늘탭이 보여줄 "논리적 오늘" 날짜. 자정을 넘겨도 04:00 이전이고 아직 잠들기 전이면 전날 그대로 유지.
@@ -936,7 +944,7 @@ function closePhotoViewerArchive(){
 // 2026-09-13: 일반 메모(memos 테이블)와 콘텐츠 감상메모(contents.notes[])를 합쳐 시간순으로 함께 보여줌 —
 // "오늘의 감상" 카드가 이미 진행률·감상시간을 보여주므로, 여기서는 코멘트 텍스트만 작품 이름표와 함께 노출.
 // contents는 loadTimelineTab에서 이미 조회한 배열을 그대로 받아 재사용(별도 쿼리 없음).
-async function renderTodayMemos(dk,contents){
+async function renderTodayMemos(dk,contents,finalReviews){
   const el=document.getElementById('today-memos');
   const memosRaw=await supaFetch(`memos?date_key=eq.${dk}&order=memo_time.asc`);
   const contentNotes=[];
@@ -945,6 +953,11 @@ async function renderTodayMemos(dk,contents){
       if(n.dk!==dk||!n.text)return;
       contentNotes.push({memo_time:n.time||'',text:n.text,isContentNote:true,contentTitle:c.title||n.title||'',contentCat:c.content_cat,contentPoster:c.poster||null});
     });
+  });
+  // 완결 총평(review) — 본앱 getContentMemoItemsForDate와 동일하게 감상메모와 함께 통합 표시(음악 제외는 조회 시점에 이미 필터링됨, 2026-09-25).
+  (finalReviews||[]).forEach(c=>{
+    if(!c.review)return;
+    contentNotes.push({memo_time:c.review_saved_time||'',text:c.review,isContentNote:true,contentTitle:c.title||'',contentCat:c.content_cat,contentPoster:c.poster||null});
   });
   if((!memosRaw||!memosRaw.length)&&!contentNotes.length){el.innerHTML='<div class="empty-msg">오늘 남긴 메모가 없어요</div>';return;}
   // DB order는 단순 문자열순이라 00:00~03:59 기록이 맨 앞으로 와버림 — 새벽 4시 컷 기준으로 재정렬(본앱과 동일 규칙).
@@ -965,11 +978,14 @@ async function renderTodayMemos(dk,contents){
       return `<div class="memo-item${todClass}"><div class="memo-time-col"><div class="memo-time">${timeHtml}</div><div class="memo-content-poster" style="${posterStyle}">${posterIcon}</div></div><div class="memo-txt memo-txt-content"><div class="memo-content-title">${escapeHtml(m.contentTitle)}</div><div class="memo-content-txt">${escapeHtml(m.text)}</div></div></div>`;
     }
     // 사진메모 — 본앱 renderMemos와 동일 조건(photo_url 존재)·마크업(52px 썸네일+텍스트, placeholder→로드 시 페이드인, 텍스트 없으면 "사진")
+    // 질문 알림에 사진으로 답한 경우도 있어(본앱과 동일) 답변 위에 "Q." 줄을 함께 붙임(2026-09-25).
     if(m.photo_url){
-      const txt=escapeHtml(m.text||'');
-      return `<div class="memo-item${isSeed?' memo-seed':todClass}"><div class="memo-time">${timeHtml}</div><div class="memo-txt memo-txt-photo"><div class="memo-photo-wrap"><div class="memo-photo-placeholder"><i class="ti ti-photo" aria-hidden="true"></i></div><img class="memo-photo-thumb memo-photo-thumb-static" src="${m.photo_url}" alt="" loading="lazy" onload="this.classList.add('loaded');this.previousElementSibling.classList.add('hide');" onerror="this.previousElementSibling.classList.add('hide');"></div><span class="memo-photo-text">${txt}</span></div></div>`;
+      const txt=(m.question?`<span class="memo-q">Q. ${escapeHtml(m.question)}</span>`:'')+escapeHtml(m.text||'');
+      return `<div class="memo-item${isSeed?' memo-seed':(m.question?' memo-question':todClass)}"><div class="memo-time">${timeHtml}</div><div class="memo-txt memo-txt-photo"><div class="memo-photo-wrap"><div class="memo-photo-placeholder"><i class="ti ti-photo" aria-hidden="true"></i></div><img class="memo-photo-thumb memo-photo-thumb-static" src="${m.photo_url}" alt="" loading="lazy" onload="this.classList.add('loaded');this.previousElementSibling.classList.add('hide');" onerror="this.previousElementSibling.classList.add('hide');"></div><span class="memo-photo-text">${txt}</span></div></div>`;
     }
-    return `<div class="memo-item${isSeed?' memo-seed':todClass}"><div class="memo-time">${timeHtml}</div><div class="memo-txt">${escapeHtml(m.text)}</div></div>`;
+    // 오늘의 질문(question) — 답변 위에 흐린 "Q. 질문" 한 줄을 붙이고, 세로선을 라임으로 구분(본앱과 동일, 2026-09-25).
+    const qHtml=m.question?`<span class="memo-q">Q. ${escapeHtml(m.question)}</span>`:'';
+    return `<div class="memo-item${isSeed?' memo-seed':(m.question?' memo-question':todClass)}"><div class="memo-time">${timeHtml}</div><div class="memo-txt">${qHtml}${escapeHtml(m.text)}</div></div>`;
   }).join('');
   // 정렬 순서는 그대로(시간순) 두고, 첫 화면 노출은 최신(마지막) 메모가 보이도록 스크롤을 맨 아래로
   el.scrollTop=el.scrollHeight;
@@ -6083,7 +6099,13 @@ async function loadTimelineTab(){
   document.getElementById('tl-date').textContent=`${_selectedDate.getMonth()+1}월 ${_selectedDate.getDate()}일`;
   document.getElementById('tl-dow').textContent=DOW[_selectedDate.getDay()]+'요일';
 
-  const [todos,sleepRows,habits,habitChecks,meals,contents,rblocks,todayManualRows,onelineRows,morningChecks]=await Promise.all([
+  // 연속일정(며칠짜리 일정)은 시작일의 date_key에만 저장되므로, 오늘 하루치 조회로는 잡히지 않는다.
+  // 본앱 getActiveMultiDayEvents와 동일 원칙(최근 14일 lookback) — 여기선 로컬 캐시가 없어 날짜별 순회 대신
+  // 범위 쿼리 한 번으로 가져온 뒤 JS에서 "오늘을 포함하는 것"만 걸러 dayIndex/totalDays를 계산한다(2026-09-25).
+  const MULTIDAY_LOOKBACK_DAYS=14;
+  const lookbackStartDk=dateKey(new Date(new Date(dk+'T00:00:00').getTime()-(MULTIDAY_LOOKBACK_DAYS-1)*86400000));
+
+  const [todos,sleepRows,habits,habitChecks,meals,contents,rblocks,todayManualRows,onelineRows,morningChecks,multidayRows,finalReviewRows]=await Promise.all([
     supaFetch(`todos?date_key=eq.${dk}&order=created.asc`),
     supaFetch(`sleep?date_key=eq.${dk}`),
     supaFetch(`habits?order=sort_order.asc`),
@@ -6093,8 +6115,20 @@ async function loadTimelineTab(){
     supaFetch(`rhythm_blocks?date_key=eq.${dk}&order=start_time.asc`),
     supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wcal_manual_'+dk.slice(0,7))}`),
     supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('oneline:'+dk)}`),
-    supaFetch(`morning_flow_picks?date_key=eq.${dk}`)
+    supaFetch(`morning_flow_picks?date_key=eq.${dk}`),
+    supaFetch(`todos?date_key=gte.${lookbackStartDk}&date_key=lte.${dk}&is_event=eq.true&event_end_date=not.is.null&order=date_key.asc`),
+    // 완결 총평(review) — 저장 시각(review_saved_dk)이 완결일(end_date)과 다를 수 있어(예: 완결 며칠 뒤 총평 작성)
+    // 위 contents 조회(watching/오늘완결/오늘시작 좁은 조건)로는 놓칠 수 있음. 본앱 getContentMemoItemsForDate와
+    // 동일하게 review_saved_dk를 직접 서버 필터링(음악 제외)해서 정확히 가져온다(2026-09-25).
+    supaFetch(`contents?content_cat=neq.music&review_saved_dk=eq.${dk}&select=client_id,content_cat,title,poster,review,review_saved_time`)
   ]);
+  // 오늘(dk)이 [시작일, 종료일] 범위 안에 있는 연속일정만 남기고, 표시에 필요한 dayIndex/totalDays를 계산.
+  // 시작=종료(=오늘)면 실질적으로 하루짜리이므로 제외(본앱 getActiveMultiDayEvents와 동일 방어).
+  const multidayEvents=(multidayRows||[]).filter(e=>e.date_key<=dk&&e.event_end_date>=dk&&!(e.date_key===dk&&e.event_end_date===dk))
+    .map(e=>{
+      const startD=new Date(e.date_key+'T00:00:00'),endD=new Date(e.event_end_date+'T00:00:00'),todayD=new Date(dk+'T00:00:00');
+      return {...e,_startDk:e.date_key,dayIndex:Math.round((todayD-startD)/86400000)+1,totalDays:Math.round((endD-startD)/86400000)+1};
+    });
   // 조회가 끝난 시점에 이미 더 최신 날짜 이동이 일어났다면, 이 결과로 렌더하지 않고 여기서 중단.
   // (여러 날짜를 빠르게 이동해도 각 요청은 끝까지 실행되지만, 화면 반영은 마지막 요청 결과만 함.)
   if(myGen!==_tlLoadGen)return;
@@ -6110,10 +6144,10 @@ async function loadTimelineTab(){
   // (2026-09-11). 이제 Promise.all로 실제 완료를 기다린 뒤에만 아래 높이 동기화를 시작한다.
   const rightRenderDone=Promise.all([
     renderTodayOnelineHl(onelineRows&&onelineRows[0]),
-    renderTodayMemos(dk,contents)
+    renderTodayMemos(dk,contents,finalReviewRows)
   ]);
   renderTimelineTodos(todos||[]);
-  renderTimelineEventsAndSchedule(todos||[]);
+  renderTimelineEventsAndSchedule(todos||[],multidayEvents);
   const todayManual=((todayManualRows&&todayManualRows[0]&&todayManualRows[0].lines)||[]).filter(it=>it.dk===dk);
   renderTodayReading(dk,rblocks||[],contents||[],todayManual);
 
@@ -6456,24 +6490,42 @@ function _applyTimelineEventMode(){
   evCard.classList.toggle('on',mode==='event');
   ttCard.classList.toggle('on',mode==='schedule');
 }
-function renderTimelineEventsAndSchedule(todos){
+function renderTimelineEventsAndSchedule(todos,multidayEvents){
   const isToday=dateKey(_selectedDate)===dateKey(logicalTodayDate());
   let nowMin=new Date().getHours()*60+new Date().getMinutes();
   if(isToday&&nowMin<DAWN_CUTOFF_MIN)nowMin+=1440;
   const scheduleItems=parseTabletScheduleTodos(todos.filter(t=>!t.is_event));
-  const events=todos.filter(t=>t.is_event);
-  const sorted=events.slice().sort((a,b)=>(a.event_time||'99:99').localeCompare(b.event_time||'99:99'));
+  // 하루짜리 일정 — 연속일정(event_end_date 있음)은 여기서 제외하고 별도 인자(multidayEvents)로 병합(2026-09-25, 본앱 getActiveMultiDayEvents와 동일 원칙).
+  const events=todos.filter(t=>t.is_event&&!t.event_end_date);
+  const all=[...events,...(multidayEvents||[])];
+  // 본앱 renderEventList와 동일한 정렬 규칙: 연속일정은 시간유무와 무관하게 시간있는 하루짜리 바로 다음, 시간없는 하루짜리보다는 앞.
+  const sorted=all.slice().sort((a,b)=>{
+    const aM=!!a.event_end_date,bM=!!b.event_end_date;
+    if(aM!==bM){
+      if(!aM&&a.event_time)return -1;
+      if(!bM&&b.event_time)return 1;
+      return aM?-1:1;
+    }
+    if(aM&&bM)return a.dayIndex-b.dayIndex;
+    if(!!a.event_time!==!!b.event_time)return a.event_time?-1:1;
+    if(a.event_time&&b.event_time)return a.event_time.localeCompare(b.event_time);
+    return 0;
+  });
 
   const evEl=document.getElementById('tl-events');
   if(evEl){
     evEl.innerHTML=sorted.length?sorted.map(e=>{
       let isPast=false;
-      if(isToday&&e.event_time){
+      if(isToday&&e.event_time&&!e.event_end_date){
         const m=e.event_time.match(/^(\d{1,2}):(\d{2})/);
         if(m){const evMin=parseInt(m[1],10)*60+parseInt(m[2],10);isPast=nowMin>=evMin+60;}
       }
       const recurIconHtml=e.recur_rule_cid?'<i class="ti ti-repeat" style="font-size:11px;color:var(--tm);flex-shrink:0;margin-right:2px;" aria-hidden="true" title="반복"></i>':'';
-      return `<div class="event-row${isPast?' past':''}">${recurIconHtml}<span class="event-time">${e.event_time||''}</span>${escapeHtml(e.text)}</div>`;
+      // 연속일정은 기존 .event-time 자리(왼쪽, width:42px 고정)에 시간 대신 "Day n" 표기 — 레이아웃(폭 고정) 그대로 유지하기 위해 순서는 안 바꿈(2026-09-25).
+      const timeHtml=e.event_end_date?`Day ${e.dayIndex}`:(e.event_time||'');
+      const ec=getEventCat(e.event_cat);
+      const catIconHtml=`<i class="ti ${ec.icon}" style="font-size:13px;color:${ec.textColor};flex-shrink:0;margin-right:1px;" title="${ec.label}" aria-hidden="true"></i>`;
+      return `<div class="event-row${isPast?' past':''}">${recurIconHtml}<span class="event-time">${timeHtml}</span>${catIconHtml}${escapeHtml(e.text)}</div>`;
     }).join(''):'<div class="empty-msg">오늘 일정이 없어요</div>';
   }
 

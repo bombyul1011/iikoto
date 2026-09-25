@@ -55,6 +55,11 @@
   --pal-lime-rgb:200,220,140;--pal-lime-bg:rgba(200,220,140,0.55);--pal-lime-border:rgba(135,165,60,0.55);--pal-lime-text:rgba(95,120,35,0.95);
   --pal-rose-rgb:230,126,126;--pal-rose-bg:rgba(230,126,126,0.52);--pal-rose-border-rgb:205,95,95;--pal-rose-border:rgba(205,95,95,0.55);--pal-rose-text:rgba(165,60,60,0.95);
   --pal-green-rgb:95,175,130;--pal-green-bg:rgba(95,175,130,0.55);--pal-green-border:rgba(50,130,85,0.55);--pal-green-text:rgba(25,100,60,0.95);
+  /* 일정 카테고리(약속/개인/업무/기타) 색 — 본앱 EVENT_CATS와 동일 팔레트 매핑(2026-09-25) */
+  --ev-schedule-text:var(--pal-lavender-text);--ev-schedule-bg:var(--pal-lavender-bg);
+  --ev-personal-text:var(--pal-yellow-text);--ev-personal-bg:var(--pal-yellow-bg);
+  --ev-work-text:var(--pal-sky-text);--ev-work-bg:var(--pal-sky-bg);
+  --ev-etc-text:var(--pal-warmgray-text);--ev-etc-bg:var(--pal-warmgray-bg);
   --grad-mintyellow:linear-gradient(135deg,rgba(210,244,225,0.85),rgba(248,245,200,0.85),rgba(212,242,222,0.85));
 
   /* 리듬 8색 — RHYTHM_CATS 원본과 동일 */
@@ -311,11 +316,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .memo-item{display:flex;gap:9px;padding:6px 0;border-left:2px solid rgba(var(--divider-rgb),0.3);padding-left:10px;margin-left:2px;}
 .memo-time{font-size:var(--fs-sm);color:var(--tm);flex-shrink:0;width:38px;}
 .memo-txt{font-size:var(--fs-body);color:var(--ts);line-height:1.5;}
+.memo-q{display:block;font-size:calc(var(--fs-body) - 1px);color:var(--tm);line-height:1.35;margin-bottom:3px;} /* 오늘의 질문 — 답변 위 흐린 한 줄(Q.), 본앱과 동일 톤(2026-09-25) */
 /* 시간대별 세로줄 컬러 — 본앱 memo-bub tod 3색 + 씨앗(청록) */
 .memo-item.tod-morning{border-left-color:rgba(var(--pal-yellow-border-rgb),0.5);}
 .memo-item.tod-afternoon{border-left-color:rgba(var(--pal-rose-border-rgb),0.5);}
 .memo-item.tod-night{border-left-color:rgba(var(--pal-lavender-border-rgb),0.5);}
 .memo-item.memo-seed{border-left-color:rgba(120,155,160,0.5);}
+.memo-item.memo-question{border-left-color:rgba(var(--pal-lime-rgb),0.55);} /* 오늘의 질문 — 본앱과 동일하게 라임(2026-09-25) */
 .memo-time .seed-ico{font-size:13px;color:rgba(120,155,160,0.95);}
 /* 2026-09-13: 콘텐츠 감상메모(contents.notes[])를 일반 메모와 시간순으로 함께 표시 — 시간 칼럼 아래에
    정사각형 포스터를 넣어 작품을 표시(제목 뱃지 방식은 너무 작고 존재감이 없어 1:1 포스터로 교체, 피드백 반영).
@@ -362,14 +369,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 /* 감상/비교 하단 두 카드 — 일반 배너 스타일(할일 카드와 동일 톤), 나란히 배치되어 grid2 stretch로 높이를 서로 맞춤 */
 .tl-bottom-card{min-height:104px;}
-.rd-cur-book{display:flex;gap:15px;align-items:center;height:104px;}
-.rd-cur-cover{width:58px;height:80px;border-radius:7px;background:rgba(200,180,160,0.3);flex-shrink:0;background-size:cover;background-position:center;box-shadow:0 3px 10px rgba(0,0,0,0.12);}
-.rd-cur-info{display:flex;flex-direction:column;justify-content:center;gap:3px;}
-.rd-cur-title{font-size:var(--fs-lg);color:var(--tp);font-weight:600;line-height:1.25;}
-.rd-cur-author{font-size:var(--fs-body);color:var(--tm);}
-.rd-cur-pct{display:flex;align-items:center;justify-content:space-between;font-size:var(--fs-sm);color:rgba(var(--pal-pink-text-rgb),0.85);}
-.rd-cur-streak{font-size:var(--fs-xs);color:var(--tm);}
-.rd-cur-more-badge{font-size:var(--fs-xs);color:var(--pal-pink-text);background:rgba(var(--pal-pink-rgb),0.28);padding:2px 7px;border-radius:8px;flex-shrink:0;font-weight:600;}
 .rd-cur-row{display:flex;gap:12px;height:104px;}
 .rd-cur-book-sm{flex:1;min-width:0;display:flex;gap:9px;align-items:center;}
 /* 타임라인탭 — 감상 항목이 2개 이상이면 배너 너비는 고정하고 가로스크롤로 넘겨보기 */
@@ -385,7 +384,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rd-cur-info-sm{min-width:0;display:flex;flex-direction:column;justify-content:center;gap:3px;}
 .rd-cur-title-sm{font-size:var(--fs-body);color:var(--tp);font-weight:600;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .rd-cur-pct-sm{font-size:var(--fs-sm);color:rgba(var(--pal-pink-text-rgb),0.85);}
-.rd-cur-more-tiny{display:block;text-align:right;font-size:10px;color:var(--tm);opacity:0.6;margin-top:2px;}
 
 /* ── 목표 배너 강조 — 본앱 홈탭 오후 인사카드(home-hcard.afternoon) 스타일 차용 ── */
 .goal-hcard{border-radius:20px;background:linear-gradient(120deg,rgba(250,215,100,0.32),rgba(255,235,170,0.26))!important;border:1.6px solid transparent!important;border-image:linear-gradient(120deg,rgba(250,180,60,0.85),rgba(255,215,120,0.85),rgba(250,190,90,0.85)) 1;box-shadow:0 2px 20px rgba(200,150,50,0.12),inset 0 1px 0 rgba(var(--card-rgb),0.62);}
@@ -457,10 +455,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="glass"] .tl-sleep-banner{background:var(--card);border-color:rgba(95,115,170,0.55);}
 .tl-sleep-row{display:flex;align-items:center;gap:8px;position:relative;width:100%;}
 #tl-sleep-score{color:var(--sleep-warmgray);display:inline-flex;width:18px;height:18px;align-items:center;justify-content:center;flex-shrink:0;}
-.tl-sleep-mid{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;align-items:center;gap:6px;white-space:nowrap;}
-.tl-sleep-icon{font-size:14px;color:var(--sleep-warmgray);}
-.tl-sleep-dash{color:var(--sleep-warmgray);font-size:12px;opacity:.7;}
-.tl-sleep-time{font-size:13px;color:var(--sleep-warmgray-strong);font-variant-numeric:tabular-nums;font-weight:500;}
 .tl-sleep-dur{font-size:13px;color:var(--sleep-warmgray-strong);flex-shrink:0;margin-left:auto;}
 /* 습관배너 — 제목 없이 아이콘 4개만, 수면배너와 동일 높이로 나란히 */
 .tl-habit-banner{border-radius:16px;padding:4px 18px;background:var(--card);border:1px solid var(--card-b);height:44px;box-sizing:border-box;display:flex;align-items:center;gap:16px;}
@@ -553,12 +547,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .habit-matrix .dot{width:14px;height:14px;border-radius:50%;margin:0 auto;background:rgba(200,190,180,0.2);}
 .habit-matrix .dot.inactive{background:rgba(200,190,180,0.08);}
 
-/* 이번 주 요약 미니 통계바 — 이이코토 본앱 stat-bar-wrap/sbar-item 스타일 그대로 차용, 박스 없이 심플하게 */
+/* 이번 주 요약 미니 통계바 — renderStatBar(wd-item/wd-num/wd-delta)가 실제 사용 클래스 */
 .stat-bar-wrap{display:flex;align-items:center;justify-content:center;gap:14px;padding:14px 4px 6px;border-top:1px solid rgba(var(--divider-rgb),0.25);margin-top:8px;}
-.sbar-item{display:flex;align-items:center;gap:5px;}
-.sbar-item i{font-size:var(--fs-body);color:var(--tm);}
-.sbar-num{font-size:var(--fs-body);color:var(--ts);}
-.sbar-div{width:1px;height:14px;background:rgba(200,175,165,.28);}
 
 /* 하루한줄 — 좌우 절반(월화수 / 목금토일) 2열 배치 */
 .oneline-2col{display:grid;grid-template-columns:1fr 1fr;gap:0 18px;}
@@ -578,14 +568,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 /* ── 월간탭 ── */
 .top-row{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;align-items:start;}
 .top-row .card{box-sizing:border-box;margin-bottom:0;}
-.rdcal-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin:0 0 4px;}
-.rdcal-nav i{font-size:var(--fs-title);color:var(--tm);cursor:pointer;}
-.rdcal-month{font-weight:600;font-size:var(--fs-body);color:var(--tp);}
-.rdcal-count{text-align:center;font-size:var(--fs-xl);font-weight:700;color:var(--tp);margin:6px 0 14px;letter-spacing:-.01em;}
-.rdcal-count span{font-size:var(--fs-sm);color:var(--tm);font-weight:400;}
-.rdcal-grid{display:grid;grid-template-columns:repeat(7,1fr);row-gap:14px;}
-.rdcal-dow{text-align:center;font-size:var(--fs-sm);color:var(--tm);font-weight:500;margin-bottom:6px;}
-.rdcal-num{text-align:center;font-size:var(--fs-sm);color:var(--tm);height:46px;display:flex;align-items:center;justify-content:center;}
 .mgoal-row{display:flex;align-items:center;gap:7px;padding:3px 0;font-size:var(--fs-body);color:var(--tp);}
 /* ── 감상 달력(월간탭, 독서달력 대체) — 본앱 wcal 구조 이식, 조회 전용 ── */
 .wcal-filter-chips{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;}
@@ -615,8 +597,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .wcal-more{position:absolute;bottom:2px;right:2px;background:rgba(0,0,0,0.55);color:#fff;font-size:9px;font-weight:700;border-radius:6px;padding:1px 4px;z-index:3;}
 .wcal-cat-fallback{width:100%;height:100%;display:flex;align-items:center;justify-content:center;}
 .wcal-cat-fallback i{color:#fff;font-size:13px;}
-/* ── 콘텐츠 모아보기 헤더 코멘트 모아보기 진입 아이콘 ── */
-.cgrid-note-tl-toggle{font-size:14px;color:var(--tm);cursor:pointer;margin-left:6px;}
+/* ── 콘텐츠 모아보기 헤더 코멘트 모아보기 진입(cgrid-title-toggle 클릭으로 대체됨) ── */
 .cgrid-title-toggle{cursor:pointer;user-select:none;}
 /* ── 코멘트 모아보기(날짜순/작품별 토글) — 본앱 ch-tlA/ch-tlB 구조 이식 ── */
 .rd-tabs{display:flex;gap:6px;}
@@ -774,13 +755,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .mq-quote-item{font-family:'HakgyoansimBareonbatangR',serif;font-size:var(--fs-body-1);line-height:1.5;color:var(--ts);padding-left:9px;padding-top:7px;border-left:2px solid rgba(var(--divider-rgb),0.35);border-top:1px solid rgba(var(--divider-rgb),0.18);}
 .mq-quote-item:first-child{border-top:none;padding-top:0;}
 .mq-quote-comment{font-family:'DM Sans',sans-serif;font-size:var(--fs-sm);color:var(--tm);margin-top:3px;}
-/* 오늘 활동 분포 — 본앱 pace-dot 타임라인 그대로 이식 */
-.pace-dot-track{position:relative;margin-top:4px;}
-.pace-dot-baseline{position:absolute;left:0;right:0;height:1px;background:rgba(var(--divider-rgb),0.25);}
-.pace-dot-hourline{position:absolute;top:18px;width:1px;height:8px;background:rgba(var(--divider-rgb),0.25);}
-.pace-dot-hourlabel{position:absolute;top:28px;font-size:9px;color:var(--tm);transform:translateX(-50%);white-space:nowrap;}
-.pace-dot{position:absolute;width:8px;height:8px;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 1px 2px rgba(0,0,0,0.12);}
-.pace-empty{font-size:var(--fs-sm);color:var(--tm);text-align:center;padding:14px 0;}
 
 /* 콘텐츠 모아보기(월별, 리스트형) — 그리드형(.cgrid-*)으로 대체됨, 아래 죽은 CSS 전체 제거됨
 
@@ -838,7 +812,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cgrid-detail-artist{font-size:var(--fs-sm);color:var(--tp);font-weight:600;}
 .pl-item-play{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
 .pl-item-play i{font-size:13px;}
-.cgrid-detail-review{margin-top:6px;color:var(--tp);}
 .cgrid-section-label{grid-column:1/-1;font-size:var(--fs-sm);font-weight:600;color:var(--tm);margin:12px 0 2px;}
 .cgrid-section-label:first-child{margin-top:0;}
 
@@ -1133,15 +1106,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 /* ── 오늘의 메모 (본앱 메모 배너와 동일한 연핑크) ── */
 .card.p{background:rgba(var(--pal-pink-rgb),0.15);border-color:rgba(var(--pal-pink-rgb),0.32);}
 
-/* ── 오늘의 리듬 흐름 팝업(주간탭 wrb-flow 스타일 차용) ── */
-.wrb-flow-list{display:flex;flex-direction:column;gap:2px;}
-.wrb-flow-row{display:flex;align-items:center;gap:10px;padding:7px 2px;border-bottom:1px dashed rgba(var(--divider-rgb),0.25);}
-.wrb-flow-row:last-child{border-bottom:none;}
-.wrb-flow-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
-.wrb-flow-time{font-size:var(--fs-sm);color:var(--ts);font-weight:600;width:110px;flex-shrink:0;}
-.wrb-flow-label{font-size:var(--fs-body);color:var(--tp);}
-.wrb-flow-empty{font-size:var(--fs-body);color:var(--tm);text-align:center;padding:20px 0;}
-
 /* ══════════════════════════════════════════════════════════
    ── 세로 화면(모바일) 대응 ──
    가로(PC/아이패드) 레이아웃은 위 스타일 그대로 유지하고, 세로로 좁을 때만 아래로 덮어씀.
@@ -1331,7 +1295,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .yr-kw-summary{font-size:var(--fs-sm);color:var(--ts);line-height:1.6;margin-top:10px;padding-top:10px;border-top:1px dashed rgba(var(--divider-rgb),0.3);}
 .mrsl-half-card{border:1px solid var(--card-b);border-radius:14px;padding:14px;background:var(--card);}
 .mrsl-half-title{font-size:var(--fs-sm);font-weight:600;color:var(--ts);}
-.mrsl-half-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
 /* =========================================================
    iikoto Annual — "YEAR IN MOTION"
    Palette / background / JS / data: original
@@ -1625,31 +1588,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   font-size:13px;
   color:var(--ts);}
 .habit-spark{display:block;width:100%;height:26px;margin-top:10px;position:relative;z-index:1;}
-/* compare */
-.habit-compare{padding:19px 20px!important;}
-.habit-compare-line{display:grid;
-  grid-template-columns:40px 1fr 30px;
-  gap:10px;
-  align-items:center;
-  margin-top:13px;}
-.compare-label{font-size:13px;color:var(--ts)}
-.compare-bar{height:8px;
-  border-radius:99px;
-  background:rgba(var(--divider-rgb),.24);
-  overflow:hidden;}
-.compare-bar span{display:block;
-  height:100%;
-  border-radius:99px;
-  background:var(--pal-mint-text);}
-.habit-compare-line.muted .compare-bar span{background:var(--pal-sky-text)}
-.habit-compare-line strong{font-size:13px;
-  text-align:right;}
-.habit-footnote{margin:14px 0 0;
-  padding-top:12px;
-  border-top:1px dashed rgba(var(--divider-rgb),.35);
-  font-size:13px;
-  line-height:1.6;
-  color:var(--tm);}
 /* ===== Bento/Trend style extension for content/rhythm/sleep/chaeum ===== */
 /* 공용 Layout */
 .tab-intro{padding:8px 2px 22px;}
@@ -1778,22 +1716,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .donut-svg-center{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;}
 .donut-svg-center b{font-size:22px; color:var(--tp); font-weight:700; line-height:1;}
 .donut-svg-center span{font-size:13px; color:var(--ts);}
-/* ----- CHAEUM TAB STYLES ----- */
-.index-list{display:flex;flex-direction:column;}
-.index-month-hdr{font-size:13px;font-weight:750;color:var(--tm);letter-spacing:0.08em;text-transform:uppercase;margin:18px 0 10px;padding-bottom:8px;border-bottom:1px solid var(--border);}
-.index-month-hdr:first-child{margin-top:0;}
-.index-item{position:relative;display:flex;gap:11px;padding:0 0 18px;}
-.index-item:last-child{padding-bottom:2px;}
-.index-date{width:32px;flex-shrink:0;font-size:13px;color:var(--tm);font-weight:600;text-align:right;padding-top:1px;font-variant-numeric:tabular-nums;}
-.index-line-wrap{position:relative;width:8px;flex-shrink:0;display:flex;justify-content:center;}
-.index-line-wrap::before{content:'';position:absolute;top:12px;bottom:-18px;width:1px;background:rgba(var(--divider-rgb),0.35);}
-.index-item:last-child .index-line-wrap::before{display:none;}
-.index-dot{width:7px;height:7px;border-radius:50%;background:rgba(var(--pal-mint-rgb),1);margin-top:6px;flex-shrink:0;}
-.index-content{flex:1;min-width:0;}
-.index-title{font-size:15px;font-weight:600;color:var(--tp);line-height:1.5;margin-bottom:7px;}
-.index-tag{display:inline-block;padding:4px 10px;border-radius:9px;font-size:13px;font-weight:600;background:rgba(120,170,140,0.15);color:rgba(40,100,70,0.95);}
-.index-tag.photo{background:rgba(var(--pal-sky-rgb),0.2);color:rgba(40,80,110,0.95);}
-.index-tag.write{background:rgba(var(--pal-yellow-rgb),0.2);color:rgba(130,100,0,0.95);}
+/* ----- CHAEUM TAB STYLES ----- 옛 index-* 클래스는 chaeum-log-*로 리네이밍되어 대체됨(2026-09-25 정리) */
 
 /* ══════════════════════════════════════════════════════════
    연간탭 — 리듬/수면 서브탭 신규 클래스 (목업v6에서 이식)
@@ -1817,23 +1740,12 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .r-sm-bar{width:14px;border-radius:3px 3px 1px 1px;}
 .r-sm-lbl{font-size:12px;color:var(--tm);}
 
-/* 수면탭: 요일별 취침·기상 범위 바 */
-.sleep-range-wrap{margin-top:16px;display:flex;flex-direction:column;gap:10px;}
-.range-row{display:flex;align-items:center;gap:10px;}
-.range-lbl{width:20px;font-size:13px;color:var(--ts);text-align:right;}
-.range-track{flex:1;height:12px;background:var(--graph-track-color);border-radius:6px;position:relative;}
-.range-fill{position:absolute;top:0;bottom:0;background:rgba(var(--pal-sky-rgb),0.85);border-radius:6px;min-width:4px;}
-.range-val{width:60px;font-size:13px;color:var(--tm);text-align:left;}
-.range-axis{display:flex;justify-content:space-between;margin-left:30px;margin-right:70px;font-size:12px;color:var(--tm);padding-top:4px;border-top:1px solid rgba(var(--divider-rgb),0.2);}
-
 /* 수면탭: 콤보차트(수면시간 막대 + 컨디션 점수 도트) */
 .combo-wrap{position:relative;height:150px;margin-top:10px;border-bottom:1px solid rgba(var(--divider-rgb),0.2);}
 .combo-bars{display:flex;justify-content:space-around;align-items:flex-end;position:absolute;inset:0 0 20px 0;}
 .c-bar-col{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;width:40px;position:relative;z-index:1;}
 .c-bar{width:24px;background:rgba(var(--pal-sky-rgb),0.5);border-radius:6px 6px 2px 2px;}
 .c-val{font-size:13px;color:var(--ts);margin-bottom:4px;}
-.combo-svg{position:absolute;inset:0 0 20px 0;width:100%;height:100%;z-index:2;pointer-events:none;}
-.combo-dot{position:absolute;bottom:20px;width:11px;height:11px;border-radius:50%;background:var(--pal-orange-border);border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.15);transform:translate(-50%,50%);z-index:2;}
 .combo-labels{display:flex;justify-content:space-around;position:absolute;bottom:0;left:0;right:0;font-size:13px;color:var(--tm);}
 
 /* 수면탭: 콤보차트/취침기상 범례 (공용 chart-legend, 습관탭 등과 무관) */
