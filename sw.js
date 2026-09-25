@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.113-splash-color';
+const CACHE = 'iikoto-v2.114-off-mode';
 const ASSETS = [
   './',
   './index.html'

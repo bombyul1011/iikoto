@@ -228,7 +228,7 @@ async function _syncManyDown(table,dks,pendingKey,mapFn,setFn){
 }
 async function syncTodosDownMany(dks){
   await _syncManyDown('todos',dks,'todos_pending',
-    r=>({text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null,eventEndDate:r.event_end_date||null,cat:r.cat||'todo',pinned:!!r.pinned,recurRuleCid:r.recur_rule_cid||undefined,alertTime:r.alert_time||null,eventAlertOn:!!r.event_alert_on,todoAlertOn:!!r.todo_alert_on}),
+    r=>({text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null,eventEndDate:r.event_end_date||null,cat:r.cat||'todo',pinned:!!r.pinned,recurRuleCid:r.recur_rule_cid||undefined,alertTime:r.alert_time||null,eventAlertOn:!!r.event_alert_on,todoAlertOn:!!r.todo_alert_on,isVacation:!!r.is_vacation}),
     (dk,mapped)=>{
       // 반복 규칙cid 중복 방어(syncTodosDown과 동일 로직)
       const seenRuleCids=new Set();
@@ -460,6 +460,7 @@ function _countExerciseInMonth(mk){
   let count=0;
   for(let day=1;day<=lastDay;day++){
     const dk=`${y}-${pad(m)}-${pad(day)}`;
+    if(isVacationDate(dk))continue; // 오프 기간은 통계 집계에서 제외
     count+=getRhythmBlocks(dk).filter(b=>b.cat==='exercise'&&b.end).length;
   }
   return count;
@@ -471,18 +472,23 @@ function _countExerciseInWeek(wk){
   let count=0;
   for(let i=0;i<7;i++){
     const dd=new Date(d);dd.setDate(d.getDate()+i);
+    if(isVacationDate(dd))continue; // 오프 기간은 통계 집계에서 제외
     count+=getRhythmBlocks(dateKey(dd)).filter(b=>b.cat==='exercise'&&b.end).length;
   }
   return count;
 }
 // 완결된 주(지난주부터 역산, 최대 4주)를 훑어 "연속으로 주3회 이상 채운 주가 몇 주째인지" 계산.
-// 한 주라도 3회 미만이면 그 지점에서 스트릭 종료.
+// 한 주라도 3회 미만이면 그 지점에서 스트릭 종료. 그 주에 오프 기간이 하루라도 끼면 평가 대상에서 제외(건너뜀) — 스트릭이 끊기지도, 유지되지도 않고 그냥 스킵.
 function _exerciseWeekStreak(){
   const now=new Date();
   let streak=0;
   for(let i=1;i<=4;i++){
     const wkDate=new Date(now);wkDate.setDate(now.getDate()-7*i);
     const wk=weekKey(wkDate);
+    const wkStart=new Date(wk.replace('week:',''));
+    let hasVacationDay=false;
+    for(let d=0;d<7;d++){const dd=new Date(wkStart);dd.setDate(wkStart.getDate()+d);if(isVacationDate(dd)){hasVacationDay=true;break;}}
+    if(hasVacationDay)continue; // 오프가 낀 주는 스트릭 판정에서 제외
     if(_countExerciseInWeek(wk)>=3)streak++;
     else break;
   }
@@ -581,6 +587,7 @@ function sumCategoryDurations(startDate,days){
   const dur={},dayCount={};
   for(let i=0;i<days;i++){
     const d=new Date(startDate);d.setDate(startDate.getDate()+i);
+    if(isVacationDate(d))continue; // 오프 기간은 리듬 집계(주간/월간 바)에서 제외 — buildMonthlyRhythmBar·computeWeeklyRhythmDur 공통 반영
     const dd=getDayCategoryDurations(dateKey(d));
     Object.keys(dd).forEach(function(k){
       dur[k]=(dur[k]||0)+dd[k];
@@ -792,19 +799,23 @@ function getHabitMonthCount(habitId){
   let count=0;
   const cur=new Date(firstDay);
   while(cur<=today){
-    const wk=weekKey(cur),dow=(cur.getDay()+6)%7;
-    if(getHabitChecks(wk)[habitId+'-'+dow])count++;
+    if(!isVacationDate(cur)){ // 오프 기간은 통계 분모에서 제외(기록 자체는 남아있어도 카운트 안 함)
+      const wk=weekKey(cur),dow=(cur.getDay()+6)%7;
+      if(getHabitChecks(wk)[habitId+'-'+dow])count++;
+    }
     cur.setDate(cur.getDate()+1);
   }
   return count;
 }
 // 특정 습관의 "연속 체크일수" — 오늘(logicalDate)부터 거슬러 올라가며 하루라도 빠지면 중단.
 // 오늘은 아직 체크 전일 수 있어(아침 시간대 배너 용도) 오늘 제외하고 "어제부터" 계산.
+// 오프 기간이 스트릭 도중에 끼면 그 지점에서 끊긴 것으로 간주(건너뛰지 않고 새로 계산) — 2026-09-25 확정 규칙.
 function getHabitStreak(habitId){
   let streak=0;
   const d=getLogicalDate();
   d.setDate(d.getDate()-1); // 어제부터 시작
   for(let i=0;i<90;i++){ // 최대 90일까지만 탐색(그 이상은 의미상 상한)
+    if(isVacationDate(d))break;
     const wk=weekKey(d),dow=(d.getDay()+6)%7;
     if(!getHabitChecks(wk)[habitId+'-'+dow])break;
     streak++;
@@ -926,6 +937,8 @@ function _initBriefingCache(){
   const subSec=getSubSection();
   const gc=_bcGet(subSec+'_greeting');
   if(gc){_greetingCache=gc;}
+  // 참고: 오프 기간엔 fetchHomeWeather가 subSec 대신 section(4단계)으로 캐시를 저장하므로,
+  // 이 초기 로드 시점엔 캐시 미스가 날 수 있음 — 치명적이지 않음(뒤이은 fetchHomeWeather가 정상 복구).
 }
 
 // ── 홈탭 전용 시간대 판정 (단일 소스) ──
@@ -1118,6 +1131,7 @@ function computeRawStatsForRange(y,mo,lastDay,light){
   const rhythmDayCount={};
   for(let d=1;d<=lastDay;d++){
     const dk=`${y}-${pad(mo+1)}-${pad(d)}`;
+    const isVac=isVacationDate(dk); // 오프 기간 — 습관/리듬 통계에서만 제외, 메모/투두/수면은 그대로 반영
     if(!light){
       const dayMemos=getMemos(dk);
       memos+=dayMemos.length;
@@ -1133,15 +1147,19 @@ function computeRawStatsForRange(y,mo,lastDay,light){
     if(!light){const wk=weekKey(date);weekSet[wk]=true;}
     const dow=(date.getDay()+6)%7;
     const checks=getHabitChecks(weekKey(date));
-    habits.forEach(h=>{
-      if(!_isHabitActiveOn(h,dk))return; // 2026-09-06: 비활성 기간(시작 전/archive 이후)은 달성률 분모에서 제외
-      ht++;if(checks[`${h.id}-${dow}`])hc++;
-    });
-    const dd=getDayCategoryDurations(dk);
-    Object.keys(dd).forEach(function(k){
-      rhythmDur[k]=(rhythmDur[k]||0)+dd[k];
-      if(!light&&dd[k]>0)rhythmDayCount[k]=(rhythmDayCount[k]||0)+1;
-    });
+    if(!isVac){
+      habits.forEach(h=>{
+        if(!_isHabitActiveOn(h,dk))return; // 2026-09-06: 비활성 기간(시작 전/archive 이후)은 달성률 분모에서 제외
+        ht++;if(checks[`${h.id}-${dow}`])hc++;
+      });
+    }
+    if(!isVac){
+      const dd=getDayCategoryDurations(dk);
+      Object.keys(dd).forEach(function(k){
+        rhythmDur[k]=(rhythmDur[k]||0)+dd[k];
+        if(!light&&dd[k]>0)rhythmDayCount[k]=(rhythmDayCount[k]||0)+1;
+      });
+    }
   }
   const habitPct=ht>0?Math.round(hc/ht*100):0;
   const todoPct=totalTodos>0?Math.round(doneTodos/totalTodos*100):0;
@@ -1793,6 +1811,48 @@ const GREETING_OUTPUT_RULE=`- 반드시 ~해요, ~이에요, ~어요 체의 정�
 const GREETING_WEATHER_SEASON_RULE=(extra)=>`- ${extra} 단, 날씨(온도, 맑음/흐림 등)와 현재 시각(몇 시, 오전/오후)은 화면 상단에 이미 별도로 표시되고 있으니, 본문에 숫자나 문장으로 다시 적지 말 것 — "26도", "오후 4시" 같은 표현 절대 금지.
 - 현재 월(${new Date().getMonth()+1}월)을 반드시 참고해서 계절 언급 시 오류 없도록.`;
 
+// ── 오프 기간 전용 인사배너 프롬프트 ── (2026-09-25)
+// 평소 fetchHomeWeather의 dawn/morning/afternoon/night 4개 분기가 각자 할일완료/습관/리듬 비중 등
+// "얼마나 했는지" 평가성 정보를 프롬프트에 넣는데, 오프 기간엔 그 정보 자체를 아예 배제해야 해서
+// 별도 함수로 격리(자주 쓰이는 기능이 아니므로 기존 4개 분기 안에 흩어 넣지 않고 한 곳에 모음).
+// section: 'dawn'|'morning'|'afternoon'|'night'. vacationEvent: {text,dayIndex,totalDays}(getActiveMultiDayEvents 반환 형식 그대로).
+// allMemos: 호출부(fetchHomeWeather)가 이미 구해둔 그날 메모 텍스트 배열 — 중복 조회 방지를 위해 그대로 전달받음.
+// 반환: {dataContext, sys} — 기존 dataContext/sys와 동일한 형식으로 fetchHomeWeather에 그대로 대입.
+function buildVacationGreetingPrompt(section,vacationEvent,weather,dataDate,dk,allMemos){
+  const pickedMemos=_pickRandom(allMemos,5); // 오프 기간은 세분화된 subSec 조회 범위 대신 단순하게 최대 5개
+  const weatherDesc=weather?`(참고용, 수치 그대로 출력 금지) 날씨: ${weather.icon} ${weather.temp}도`:'날씨 정보 없음';
+  const {text:eventText,dayIndex,totalDays}=vacationEvent;
+  const sectionLabel={dawn:'새벽',morning:'아침',afternoon:'오후',night:'저녁'};
+
+  const dataContext=[
+    `오늘은 ${_HOME_DAYS[dataDate.getDay()]}요일이에요.`,
+    weatherDesc,
+    getUserProfileContext(),
+    `(참고용, 출력 금지) 현재는 오프 기간(휴가/일시정지) 중이에요. 진행 중인 일정명: "${eventText}", ${dayIndex}일째 (총 ${totalDays}일). 지금 시점: ${sectionLabel[section]}`,
+    pickedMemos.length?`오늘 메모: ${pickedMemos.join(' / ')}`:''
+  ].filter(Boolean).join('\n');
+
+  const sys=`당신은 날씨와 하루의 결을 살필 줄 아는 따뜻한 하루 비서예요. 지금은 "${eventText}"라는 오프 기간(휴가/일시정지) 중 ${dayIndex}일째(총 ${totalDays}일)이고, ${sectionLabel[section]} 시점에 어울리는 인사를 건네요.
+
+**분량 제한 (반드시 지킬 것):**
+- 최대 3-4문장, 전체 공백 포함 150자 이내.
+
+**오프 기간 전용 절대 원칙:**
+- 오늘 할일 완료/미완료, 습관 체크, 리듬(시간 기록) 비중 등 "얼마나 했는지"를 나타내는 정보는 절대 언급하지 말 것 — 이 기간은 평가·집계 대상이 아니에요.
+- "쉬는 중이니 잘하고 있다" 같은 평가나 격려보다는, 그 시간의 결(여행/명절/출장 등 일정명에서 느껴지는 분위기)을 함께 지지하는 담담하고 다정한 톤으로.
+- 일정명(${eventText})과 며칠째(${dayIndex}일째)라는 사실을 자연스럽게 한 번은 녹여낼 것 — 단, 기계적으로 "n일째입니다"라고 나열하듯 말하지 말고 문장 속에 자연스럽게.
+- ${section==='dawn'?'하루를 마감하는 시점이니, 오늘 하루도 평소와는 다른 결로 흘러갔을 거라는 담담한 총평 톤으로.':'서두르거나 재촉하는 표현은 쓰지 말 것.'}
+
+기타 규칙:
+${GREETING_WEATHER_SEASON_RULE('날씨/계절/메모 등에서 느껴지는 분위기를 한 줄 정도 자연스럽게 녹여요.')}
+- 메모가 있다면 그 내용을 가볍게 반영하되, 없어도 자연스럽게 흘러가는 문장으로.
+${GREETING_CONDITION_RULE}
+${GREETING_OUTPUT_RULE}
+- 이모지 1-2개`;
+
+  return {dataContext,sys};
+}
+
 async function fetchHomeWeather(section){
   const subEl=document.getElementById('home-greeting-sub');
   const weatherIconEl=document.getElementById('home-weather-icon');
@@ -1807,8 +1867,17 @@ async function fetchHomeWeather(section){
     weatherIconEl.textContent=' '+weather.icon+' '+weather.temp+'°';
   }
 
-  // 인사 캐시 유효하면 바로 표시 (sub-section 기준, dawn 포함 7분류)
-  const subSec=getSubSection();
+  // 오늘 데이터 수집 — dawn(새벽)은 "방금 지나간 하루"를 돌아보는 시점이라 getLogicalDate() 기준(어제)으로 조회
+  const now=new Date();
+  const dataDate=section==='dawn'?getLogicalDate():now;
+  const dk=dateKey(dataDate);
+
+  // 오프 기간 판정 — 오프면 세분화된 subSec 대신 section(4단계: dawn/morning/afternoon/night)만으로 캐시 키를 잡아 호출 횟수를 7→4로 줄임.
+  const vacationEvent=getActiveMultiDayEvents(dk).find(ev=>ev.isVacation)||null;
+  const subSecRaw=getSubSection();
+  const subSec=vacationEvent?section:subSecRaw; // 오프 기간엔 4단계로 캐시 키 축소
+
+  // 인사 캐시 유효하면 바로 표시 (sub-section 기준, dawn 포함 7분류 — 오프 기간은 위에서 4분류로 축소됨)
   if(_greetingCache&&_greetingCache.subSection===subSec){
     if(subEl)subEl.textContent=_greetingCache.text;
     return;
@@ -1824,10 +1893,6 @@ async function fetchHomeWeather(section){
     return;
   }
 
-  // 오늘 데이터 수집 — dawn(새벽)은 "방금 지나간 하루"를 돌아보는 시점이라 getLogicalDate() 기준(어제)으로 조회
-  const now=new Date();
-  const dataDate=section==='dawn'?getLogicalDate():now;
-  const dk=dateKey(dataDate);
   const wk=weekKey(dataDate);
   const dow=(dataDate.getDay()+6)%7;
   const todos=getTodos(dk);
@@ -1840,6 +1905,8 @@ async function fetchHomeWeather(section){
   const doneHabitsCount=habits.filter(h=>checks[h.id+'-'+dow]).length;
   const rblocks=getRhythmBlocks(dk);
   const weatherDesc=weather?`(참고용, 수치 그대로 출력 금지) 날씨: ${weather.icon} ${weather.temp}도`:'날씨 정보 없음';
+  // 참고: 아래 데이터 수집은 오프 기간이어도 그대로 실행됨(오프 분기는 결과를 쓰지 않을 뿐) — 전부 로컬 조회라
+  // 비용이 낮아 조건부로 건너뛰게 만드는 리팩터링(여러 변수를 조건부 선언으로 바꿔야 함)은 하지 않기로 함.
 
   // 서브섹션별 메모 조회 범위
   let pickedMemos=[];
@@ -1893,7 +1960,10 @@ async function fetchHomeWeather(section){
 
   let dataContext,sys;
 
-  if(section==='dawn'){
+  if(vacationEvent){
+    // 오프 기간 — 위에서 이미 계산된 데이터(todos/allMemos 등)는 쓰지 않고 전용 프롬프트로 대체
+    ({dataContext,sys}=buildVacationGreetingPrompt(section,vacationEvent,weather,dataDate,dk,allMemos));
+  } else if(section==='dawn'){
     // 새벽은 "방금 지나간 하루"를 담담히 돌아보는 총평 — 시간대별 사건 나열이 아니라
     // 하루 전체를 하나로 뭉뚱그려 "이런 결의 하루였다"는 인상 위주로 전달
     const allDoneTodos=todos.filter(t=>t.done).map(t=>t.text);
@@ -2940,6 +3010,24 @@ function computeWeekBars(weekDates,multidayEvents){
   });
   return barsInWeek;
 }
+// ── 오프 기간(is_vacation) 공용 판별 함수 ──
+// 특정 날짜(dk)가 is_vacation=true인 연속일정 범위 안에 있는지 체크. 통계/진행률 계산에서 해당 날짜를
+// 분모/스트릭 판정에서 빼는 용도로만 쓰이며, 기능 자체를 막는 데는 쓰지 않는다(기능은 항상 그대로 열려있음).
+// 월간 통계 루프 등에서 날짜마다 반복 호출되므로, getActiveMultiDayEvents(내부적으로 최대 14일을 매번 역탐색하는 무거운 함수)를
+// 매번 부르지 않도록 "그 오프 일정이 속한 시작일(dk)" 단위로 결과를 캐싱한다. 캐시는 앱 로드 세션 동안만 유지(새로고침 시 초기화)되며,
+// 습관체크/리듬 등 다른 캐시와 마찬가지로 데이터 자체가 아니라 조회 결과만 캐싱하므로 sync가 로컬 데이터를 갱신하면 자동으로 최신 상태를 다시 계산함.
+const _vacationDateCache={};
+function isVacationDate(dOrDk){
+  const dk=typeof dOrDk==='string'?dOrDk:dateKey(dOrDk);
+  if(dk in _vacationDateCache)return _vacationDateCache[dk];
+  const result=getActiveMultiDayEvents(dk).some(ev=>ev.isVacation);
+  _vacationDateCache[dk]=result;
+  return result;
+}
+// 오프 일정을 새로 저장/수정/삭제할 때 호출 — 캐시가 낡은 값을 들고 있지 않도록 통째로 비움(캐시 크기가 작아 재계산 비용 낮음).
+function _invalidateVacationCache(){
+  Object.keys(_vacationDateCache).forEach(k=>delete _vacationDateCache[k]);
+}
 // ── 연속일정(며칠간 이어지는 일정) 공용 조회 함수 ──
 // 특정 날짜(dk)를 범위(startDate~eventEndDate)로 품고 있는 연속일정을 전부 찾아 반환.
 // 연속일정 row는 시작일의 date_key에만 저장되므로, 최근 MULTIDAY_LOOKBACK_DAYS일 이내를 거슬러 올라가며 훑는다.
@@ -3392,7 +3480,7 @@ async function syncTodosDown(dk){
   if(!rows)return; // 연결 실패(null) — 로컬 유지. 빈 배열은 "서버에 진짜 0개"라는 뜻이라 그대로 반영.
   if(S.get(S.key('todos_pending',dk)))return; // 업로드 대기중인 로컬 수정(미루기 등) 있으면 덮어쓰지 않음
   const mapped=rows.map(function(r){
-    return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null,eventEndDate:r.event_end_date||null,cat:r.cat||'todo',pinned:!!r.pinned,recurRuleCid:r.recur_rule_cid||undefined,alertTime:r.alert_time||null,eventAlertOn:!!r.event_alert_on,todoAlertOn:!!r.todo_alert_on};
+    return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null,eventEndDate:r.event_end_date||null,cat:r.cat||'todo',pinned:!!r.pinned,recurRuleCid:r.recur_rule_cid||undefined,alertTime:r.alert_time||null,eventAlertOn:!!r.event_alert_on,todoAlertOn:!!r.todo_alert_on,isVacation:!!r.is_vacation};
   });
   // 반복 규칙cid가 같은 row가 두 개 이상 섞여 있으면(과거 경합으로 생긴 서버측 중복 등) 먼저 만들어진 것만 남김 — 방어적 dedupe.
   const seenRuleCids=new Set();
@@ -3450,7 +3538,7 @@ async function _syncTodosUpInner(dk){
   if(deduped.length!==todos.length)S.set(S.key('todos',dk),deduped);
   const delCids=getDelPendingCids('todos',dk);
   const ok=await syncListUpSafe('todos',`date_key=eq.${dk}`,'date_key,client_id',deduped,
-    t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,strike_parts:t.strikeParts||[],strike_times:t.strikeTimes||{},completed_at:(t.completedAt!=null?t.completedAt:null),sort_order:(typeof t.sortOrder==='number'?t.sortOrder:null),is_event:!!t.isEvent,event_cat:t.eventCat||null,event_time:t.eventTime||null,event_end_date:t.eventEndDate||null,cat:t.cat||'todo',pinned:!!t.pinned,recur_rule_cid:t.recurRuleCid||null,alert_time:t.alertTime||null,event_alert_on:!!t.eventAlertOn,todo_alert_on:!!t.todoAlertOn}),
+    t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,strike_parts:t.strikeParts||[],strike_times:t.strikeTimes||{},completed_at:(t.completedAt!=null?t.completedAt:null),sort_order:(typeof t.sortOrder==='number'?t.sortOrder:null),is_event:!!t.isEvent,event_cat:t.eventCat||null,event_time:t.eventTime||null,event_end_date:t.eventEndDate||null,cat:t.cat||'todo',pinned:!!t.pinned,recur_rule_cid:t.recurRuleCid||null,alert_time:t.alertTime||null,event_alert_on:!!t.eventAlertOn,todo_alert_on:!!t.todoAlertOn,is_vacation:!!t.isVacation}),
     delCids);
   if(ok)delCids.forEach(cid=>removeDelPending('todos',dk,cid));
   return ok;
@@ -5455,7 +5543,8 @@ function renderEventList(dk,todos){
     // 일정 텍스트는 투두의 '조각 나누기' 기능이 필요 없어 단순 escape만 함(renderTodoTextParts를 쓰면 내부 클릭 핸들러가 투두 인덱스를 잘못 참조해 엉뚱한 투두가 열리는 문제가 있었음)
     const textHtml=escapeHtml(ev.text);
     const recurIconHtml=ev.recurRuleCid?'<i class="ti ti-repeat ico-sz-11" style="color:var(--tm);flex-shrink:0;margin-right:2px;" aria-hidden="true" title="반복"></i>':'';
-    const rightBadge=ev.eventEndDate?`<span class="event-time">Day ${ev.dayIndex}</span>`:(ev.eventTime?`<span class="event-time">${ev.eventTime}</span>`:''); // 연속일정 며칠차 — 배지 스타일 제거, 시간 표기와 동일한 톤으로 "Day n" 표기 (2026-09-24)
+    const dayLabel=ev.isVacation?'Off':'Day'; // 오프 기간 연속일정은 "Day n" 대신 "Off n" — 배경 없이 텍스트만 교체, 색은 공용 로즈 팔레트로 구분(2026-09-25)
+    const rightBadge=ev.eventEndDate?`<span class="event-time"${ev.isVacation?' style="color:var(--off-badge-text);"':''}>${dayLabel} ${ev.dayIndex}</span>`:(ev.eventTime?`<span class="event-time">${ev.eventTime}</span>`:''); // 연속일정 며칠차 — 배지 스타일 제거, 시간 표기와 동일한 톤으로 "Day n" 표기 (2026-09-24). 오프 색은 --off-badge-text 참조(값은 index.html :root에서 단일 관리)
     el.innerHTML=`<i class="ti ${ec.icon}" style="font-size:14px;color:${ec.textColor};flex-shrink:0;" title="${ec.label}" aria-hidden="true"></i><span class="event-txt">${textHtml}</span>${recurIconHtml}${rightBadge}`;
     list.appendChild(el);
   });
@@ -6010,6 +6099,8 @@ function getMorningFlowMonthCounts(mk){
   for(let i=0;i<localStorage.length;i++){
     const k=localStorage.key(i);
     if(!k||!k.startsWith('mflow_')||!k.startsWith('mflow_'+mk))continue;
+    const dk=k.slice('mflow_'.length,'mflow_'.length+10); // 키 형식 mflow_YYYY-MM-DD
+    if(isVacationDate(dk))continue; // 오프 기간은 모닝플로우 월간 카운트에서 제외
     const flow=S.get(k);
     if(!flow||!flow.picks)continue;
     Object.keys(flow.picks).forEach(pk=>{const p=flow.picks[pk];const ck=(p&&p.key)||pk;if(counts[ck]!==undefined&&p&&p.status==='done')counts[ck]++;}); // 슬롯의 key가 카드. 옛 구조로 기기에 남은 과거 로컬 기록(id=카드key)도 세도록 pk 폴백(이번 달이 지나면 불필요)
@@ -7415,6 +7506,9 @@ function openTodoModal(editIdx=-1){
   endDateInp.value=existingEndDate?shortDk(existingEndDate):'';
   modal.dataset.eventStartDate=dk;
   modal.dataset.eventEndDate=hasMultiday?existingEndDate:'';
+  // 오프 아이콘 초기화 — 연속일정이 아니면 항상 꺼진 상태로 시작(하루짜리엔 의미 없음)
+  modal.dataset.isVacation=(hasMultiday&&existing?.isVacation)?'1':'';
+  updateVacationIcon();
   // 반복 설정 초기화 — 신규/일반항목 편집 모두 항상 "반복 안함"으로 시작(반복 항목 자체의 규칙 수정은 별도 경로로 처리)
   resetRecurUI();
   // 할일/일정 탭 초기화 — 기존 항목의 isEvent 값에 따라, 신규는 항상 '할일' 탭에서 시작
@@ -7524,7 +7618,12 @@ function selectTodoKind(kind,btn){
   document.getElementById('todo-event-time-row').style.display=kind==='event'?'flex':'none';
   document.getElementById('todo-alert-time-row').style.display=kind==='todo'?'flex':'none';
   document.getElementById('todo-pinned-toggle').style.display=kind==='todo'?'flex':'none';
-  if(kind!=='event')document.getElementById('todo-multiday-end-row').style.display='none';
+  if(kind!=='event'){
+    document.getElementById('todo-multiday-end-row').style.display='none';
+    // 할일 탭으로 전환하면 오프 표시도 함께 초기화 — dataset이 남아있다가 나중에 다시 일정 탭으로 돌아왔을 때 아이콘 표시와 어긋나는 것 방지
+    document.getElementById('todo-modal').dataset.isVacation='';
+    updateVacationIcon();
+  }
 }
 // dk(YYYY-MM-DD)를 화면 표시용 짧은 포맷(MM.DD)으로 변환 — 저장값(input.value/dataset)은 항상 dk 원본 유지, 표시만 축약
 function shortDk(dk){
@@ -7541,6 +7640,9 @@ function toggleTodoMultiday(){
   if(!on){
     document.getElementById('todo-event-end-date').value='';
     document.getElementById('todo-modal').dataset.eventEndDate='';
+    // 하루짜리로 되돌아가면 오프 표시도 의미 없으므로 함께 초기화
+    document.getElementById('todo-modal').dataset.isVacation='';
+    updateVacationIcon();
   }else{
     // 펼칠 때 종료일 기본값 = 현재 선택된 시작일로 세팅, 사용자가 바로 조정하도록
     const modal=document.getElementById('todo-modal');
@@ -7647,6 +7749,21 @@ function clearTodoEventTime(){_clearTimeAlert('event');}
 function openEventTimePicker(){_openTimeAlertPicker('event');}
 function updateEventTimeIcon(){_updateTimeAlertIcon('event');}
 function onEventTimeIconClick(){_onTimeAlertIconClick('event');}
+// ── 오프 아이콘 — 연속일정(멀티데이) 등록/수정창 날짜범위 옆, 단순 온오프 토글.
+// 알림 아이콘과 달리 시간 유무 분기가 없어 별도 함수로 둠. 텍스트 노출 없이 아이콘 모양+색으로만 표현.
+function updateVacationIcon(){
+  const icon=document.getElementById('todo-vacation-icon');
+  const modal=document.getElementById('todo-modal');
+  const on=modal.dataset.isVacation==='1';
+  icon.className='ti ico-sz-13 '+(on?'ti-calendar-off vacation-on':'ti-calendar');
+  icon.title=on?'오프 표시 켜짐 (탭하여 끄기)':'오프로 표시 (탭하여 켜기)';
+}
+function onVacationIconClick(){
+  const modal=document.getElementById('todo-modal');
+  const on=modal.dataset.isVacation==='1';
+  modal.dataset.isVacation=on?'':'1';
+  updateVacationIcon();
+}
 // ── 할일 알림(예상 시각) — 여기서 정하는 시각은 "임시 예상/희망 시간"으로 알람 트리거 전용이며,
 // 실제 완료 처리 시각(completedAt)과는 별개.
 function clearTodoAlertTime(){_clearTimeAlert('todo');}
@@ -7681,6 +7798,7 @@ function removeTodoByCid(dk,cid){
   addDelPending('todos',dk,cid);
   todos.splice(idx,1);saveTodos(dk,todos);
   clearTodoAlerts(t.isEvent,cid); // 알림 예약(스누즈 포함)이 있었다면 함께 정리(없어도 무해)
+  if(t.isEvent&&t.eventEndDate)_invalidateVacationCache(); // 연속일정 삭제는 isVacationDate 캐시를 낡게 만들 수 있음
   return true;
 }
 // 일정/할일 모달 안 삭제 버튼 — 오늘탭 일정처럼 스와이프 진입점이 없는 곳에서도 모달을 열어 바로 삭제할 수 있게 함.
@@ -7762,6 +7880,10 @@ async function confirmTodo(){
   // 종료일이 시작일과 같거나 비어있으면 하루짜리 일정으로 취급(eventEndDate:null) — 하위호환 유지
   const rawEndDate=isEvent?(modal.dataset.eventEndDate||''):'';
   const eventEndDate=(rawEndDate&&rawEndDate!==newDk)?rawEndDate:null;
+  // 오프 표시 — 연속일정(eventEndDate 존재)일 때만 의미 있음, 하루짜리는 항상 false로 저장
+  const isVacation=isEvent&&!!eventEndDate&&modal.dataset.isVacation==='1';
+  // 연속일정 저장(오프 여부 포함)은 isVacationDate 캐시를 낡게 만들 수 있으므로 무효화 — 연속일정이 아닌 저장(할일 등)까지 매번 지울 필요는 없어 이 조건으로 좁힘
+  if(isEvent&&eventEndDate)_invalidateVacationCache();
   // 일정 시작일이 원래 날짜(dk)와 달라진 경우 — 기존 row를 dk에서 제거하고 newDk에 새로 저장(투두의 조각 이동과 달리 일정은 통째로 이동이라 단순함)
   if(isEvent&&editIdx>=0&&todos[editIdx]&&newDk!==dk){
     const old=todos[editIdx];
@@ -7769,7 +7891,7 @@ async function confirmTodo(){
     todos.splice(editIdx,1);
     saveTodos(dk,todos);
     const targetTodos=getTodos(newDk);
-    targetTodos.push({text,done:old.done||false,created:old.created||Date.now(),timeSection,isEvent:true,eventCat,eventTime,eventEndDate,cid:old.cid,strikeParts:[],strikeTimes:{},pinned:false,alertTime:null,eventAlertOn});
+    targetTodos.push({text,done:old.done||false,created:old.created||Date.now(),timeSection,isEvent:true,eventCat,eventTime,eventEndDate,cid:old.cid,strikeParts:[],strikeTimes:{},pinned:false,alertTime:null,eventAlertOn,isVacation});
     saveTodos(newDk,targetTodos);
     if(eventTime&&eventAlertOn)await syncAlertFor('event',old.cid,newDk,eventTime,text);else await deleteAlertFor('event',old.cid);
     closeModal('todo-modal');
@@ -7808,9 +7930,9 @@ async function confirmTodo(){
     }
     old.text=text;old.timeSection=timeSection;
     old.isEvent=isEvent;old.eventCat=isEvent?eventCat:null;old.eventTime=isEvent?eventTime:null;old.eventEndDate=isEvent?eventEndDate:null;
-    old.pinned=pinned;old.alertTime=alertTime;old.eventAlertOn=eventAlertOn;old.todoAlertOn=todoAlertOn;
+    old.pinned=pinned;old.alertTime=alertTime;old.eventAlertOn=eventAlertOn;old.todoAlertOn=todoAlertOn;old.isVacation=isVacation;
   }
-  else todos.push({text,done:false,created:Date.now(),timeSection,isEvent,eventCat:isEvent?eventCat:null,eventTime:isEvent?eventTime:null,eventEndDate:isEvent?eventEndDate:null,cid:genCid(),pinned,alertTime,eventAlertOn,todoAlertOn});
+  else todos.push({text,done:false,created:Date.now(),timeSection,isEvent,eventCat:isEvent?eventCat:null,eventTime:isEvent?eventTime:null,eventEndDate:isEvent?eventEndDate:null,cid:genCid(),pinned,alertTime,eventAlertOn,todoAlertOn,isVacation});
   const savedTodo=editIdx>=0?todos[editIdx]:todos[todos.length-1];
   saveTodos(dk,todos);closeModal('todo-modal');
   // alerts 동기화 — 일정은 eventTime+eventAlertOn, 할일은 alertTime+todoAlertOn(둘 다 온일 때만) 기준으로 발송 예약
@@ -10256,11 +10378,14 @@ function renderHabitMonthly(){
     let checked_cnt=0,activeDayCnt=0;
     for(let d=1;d<=dim;d++){
       const date=new Date(y,mo,d);const dk=dateKey(date);const wk=weekKey(date);const dow=(date.getDay()+6)%7;
-      const isActive=_isHabitActiveOn(h,dk);
-      const checked=isActive&&getWkChecks(wk)[`${h.id}-${dow}`];
-      if(isActive&&d<=habitLastDay){activeDayCnt++;if(checked)checked_cnt++;}
+      const isHabitActive=_isHabitActiveOn(h,dk); // 습관 자체의 활성 기간(시작 전/archive 이후 여부) — 오프와 별개 개념
+      const isVac=isVacationDate(dk);
+      const isActive=isHabitActive&&!isVac; // 통계 분모(퍼센트)용 — 습관 비활성이거나 오프 기간이면 제외
+      // 도트 색 표시는 "습관이 원래 비활성 기간"일 땐 기존처럼 계속 흐리게, "오프 기간이라 통계에서만 빠진 것"일 땐 체크 기록이 있으면 색을 보여줌.
+      const actuallyChecked=isHabitActive&&!!getWkChecks(wk)[`${h.id}-${dow}`];
+      if(isActive&&d<=habitLastDay){activeDayCnt++;if(actuallyChecked)checked_cnt++;}
       const dot=document.createElement('div');dot.className='hm-dot'+(isActive?'':' inactive');
-      if(checked){dot.style.background=getHabitColorSoft(h.color);}
+      if(actuallyChecked){dot.style.background=getHabitColorSoft(h.color);}
       dots.appendChild(dot);
     }
     const pct=activeDayCnt>0?Math.round(checked_cnt/activeDayCnt*100):0;
@@ -10671,7 +10796,7 @@ function renderMonthlyStatBar(){
     const date=new Date(y,mo,d);const wk=weekKey(date);const dow=(date.getDay()+6)%7;
     const checks=getHabitChecks(wk);
     habits.forEach(h=>{
-      if(!_isHabitActiveOn(h,dk))return;
+      if(!_isHabitActiveOn(h,dk)||isVacationDate(dk))return; // 오프 기간은 습관 달성률 분모에서 제외
       ht++;if(checks[`${h.id}-${dow}`])hc++;
     });
   }
@@ -10718,7 +10843,7 @@ function renderWeeklyStatBar(){
     const dow=(d.getDay()+6)%7;
     const checks=getHabitChecks(wk);
     habits.forEach(h=>{
-      if(!_isHabitActiveOn(h,dk))return;
+      if(!_isHabitActiveOn(h,dk)||isVacationDate(dk))return; // 오프 기간은 습관 달성률 분모에서 제외
       ht++;if(checks[`${h.id}-${dow}`])hc++;
     });
   }
@@ -11018,7 +11143,9 @@ function renderWeeklyHabitBox(){
     const rgbaText=getHabitColorText(h.color);
     let cnt=0,dotsHtml='';
     for(let d=0;d<7;d++){
-      const on=!!checks[h.id+'-'+d];
+      const dDate=new Date(mon);dDate.setDate(mon.getDate()+d);
+      const dDk=dateKey(dDate);
+      const on=!isVacationDate(dDk)&&!!checks[h.id+'-'+d]; // 오프 기간은 기존 미체크와 동일하게 처리(주간배너는 원래 활성/비활성 개념 없음, 월간과 달리 분모·스타일 변경 없이 유지)
       if(on)cnt++;
       const isToday=d===todayDow;
       const borderColor=on?rgbaBorder:'rgba(var(--divider-rgb),0.5)';
