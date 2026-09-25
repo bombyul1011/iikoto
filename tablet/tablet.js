@@ -28,6 +28,23 @@ async function chaeumFetch(path){
 
 // ── 날짜 유틸 (iikoto와 동일 규칙) ──
 function pad(n){return String(n).padStart(2,'0');}
+// [2026-09-25] 오프 기간(is_vacation=true인 연속일정) — 본앱 isVacationDate와 동일 개념을 읽기 전용 구조에 맞게 이식.
+// 본앱은 로컬 캐시를 순회하지만, 아카이브는 서버 쿼리 기반이라 "그 탭이 보는 날짜 범위" 하나로 한 번만 조회해
+// 결과 배열(vacationRanges)을 각 통계 함수가 인자로 받아 판정하는 방식으로 통일(_isHabitActiveOn과 동일 패턴).
+// startDk~endDk 범위와 겹치는 연속일정만 가져오면 되므로, 시작일이 (endDk 이전)이고 종료일이 (startDk 이후)인 것만 필터.
+async function fetchVacationRanges(startDk,endDk){
+  const MULTIDAY_LOOKBACK_DAYS=14; // 연속일정 시작일이 조회 범위보다 앞설 수 있어 본앱과 동일하게 룩백
+  const lookbackStartDk=dateKey(new Date(new Date(startDk+'T00:00:00').getTime()-(MULTIDAY_LOOKBACK_DAYS-1)*86400000));
+  // date_key<=endDk는 서버 쿼리에서 이미 걸렀으므로, 클라이언트에서는 "종료일이 조회 시작일 이후"만 추가로 확인하면 됨
+  // (서버 쿼리만으론 event_end_date>=startDk를 함께 표현하기 번거로워 룩백으로 넓게 가져온 뒤 여기서 정밀하게 거름).
+  const rows=await supaFetch(`todos?date_key=gte.${lookbackStartDk}&date_key=lte.${endDk}&is_event=eq.true&event_end_date=not.is.null&is_vacation=eq.true&select=date_key,event_end_date`);
+  return (rows||[]).filter(r=>r.event_end_date>=startDk)
+    .map(r=>({start:r.date_key,end:r.event_end_date}));
+}
+// dk가 오프 범위(vacationRanges, {start,end} 배열) 안에 있는지 판정하는 순수 함수 — _isHabitActiveOn과 동일 스타일.
+function _isVacationOn(dk,vacationRanges){
+  return (vacationRanges||[]).some(v=>dk>=v.start&&dk<=v.end);
+}
 // [2026-09-06] 본앱이 습관 카탈로그 체계로 개편되며(운동/독서/일기/정리/케어/아침기상/영양제, 고유 id 부여),
 // habit_checks.habit_name 컬럼의 실제 저장값이 한글 이름("운동")에서 카탈로그 id("exercise")로 전면 교체됨.
 // habits 테이블의 name 컬럼 자체는 그대로 한글이라, "habits.name === habit_checks.habit_name"로 비교하던
@@ -73,13 +90,15 @@ function _isHabitActiveOn(h,dk){
 }
 // [2026-09-06] 습관 달성률 분모 계산 — "습관 개수 × 기간 일수" 대신, 그 기간 동안 각 습관이
 // 실제로 활성이었던 일수만 합산. 월 중간에 습관을 켜거나 archive해도 달성률이 왜곡되지 않음.
-function _activeHabitDayCount(habits,startDk,endDk){
+// [2026-09-25] vacationRanges(선택): 넘기면 오프 기간에 해당하는 날짜를 분모에서 제외(본앱 isVacationDate와 동일 원칙).
+// 넘기지 않으면(undefined) 기존과 완전히 동일하게 동작 — 오프 대응이 필요 없는 호출부는 그대로 둬도 안전함.
+function _activeHabitDayCount(habits,startDk,endDk,vacationRanges){
   let total=0;
   const start=new Date(startDk+'T00:00:00'),end=new Date(endDk+'T00:00:00');
   (habits||[]).forEach(h=>{
     for(let d=new Date(start);d<=end;d.setDate(d.getDate()+1)){
       const dk=dateKey(d);
-      if(_isHabitActiveOn(h,dk))total++;
+      if(_isHabitActiveOn(h,dk)&&!_isVacationOn(dk,vacationRanges))total++;
     }
   });
   return total;
@@ -221,14 +240,15 @@ function countContentsCompletedInRange(contents,startDk,endDk){
 // 이전엔 habitCount*habitDenominator로 분모를 만들었으나, 이러면 archive/월중 신규습관을 반영 못 함 —
 // 이제 호출부가 이미 정확한 분모를 계산해 넘기므로 여기선 곱셈 없이 그대로 사용.
 // 주간탭/월간탭 공통 미니 통계바(메모/완료투두/습관%/콘텐츠완결/평균수면) — renderWeekDelta와 동일 원칙:
-// cur/prev 각각 {memos,todos,sleepRows,contents,habits,checks,startDk,endDk}를 받아 증감 화살표까지 표시.
+// cur/prev 각각 {memos,todos,sleepRows,contents,habits,checks,startDk,endDk,vacationRanges}를 받아 증감 화살표까지 표시.
 // habits는 cur에만 필요(활성습관 분모 계산용, prev 습관율은 cur.habits 기준으로 prev 기간만 다시 판정).
+// vacationRanges는 각 기간(cur/prev)마다 다를 수 있어 각자 따로 받음(없으면 오프 필터 없이 기존과 동일 동작).
 function renderStatBar(elId,cur,prev){
   const el=document.getElementById(elId);
-  const curActiveDays=_activeHabitDayCount(cur.habits,cur.startDk,cur.endDk);
-  const prevActiveDays=_activeHabitDayCount(cur.habits,prev.startDk,prev.endDk);
-  const curHabitPct=curActiveDays?Math.round(_uniqueHabitCheckCount(cur.checks)/curActiveDays*100):0;
-  const prevHabitPct=prevActiveDays?Math.round(_uniqueHabitCheckCount(prev.checks)/prevActiveDays*100):0;
+  const curActiveDays=_activeHabitDayCount(cur.habits,cur.startDk,cur.endDk,cur.vacationRanges);
+  const prevActiveDays=_activeHabitDayCount(cur.habits,prev.startDk,prev.endDk,prev.vacationRanges);
+  const curHabitPct=curActiveDays?Math.round(_uniqueHabitCheckCount(cur.checks,cur.vacationRanges)/curActiveDays*100):0;
+  const prevHabitPct=prevActiveDays?Math.round(_uniqueHabitCheckCount(prev.checks,prev.vacationRanges)/prevActiveDays*100):0;
   const curDone=(cur.todos||[]).filter(t=>t.done).length;
   const prevDone=(prev.todos||[]).filter(t=>t.done).length;
   const curContent=countContentsCompletedInRange(cur.contents,cur.startDk,cur.endDk);
@@ -1039,8 +1059,11 @@ const MFLOW_CARDS=[
 // habit_checks를 "날짜+습관명" 조합 기준으로 중복 제거해서 세는 통합 헬퍼.
 // 네트워크 재시도나 동시 클릭 등으로 실수로 중복 삽입되면 length 기준 집계는 100%를 넘는 왜곡된 비율을 만들 수 있어
 // 모든 습관 카운트 계산을 이 고유매칭 방식으로 통일함(2026-08-22, 봄이님 결정).
-function _uniqueHabitCheckCount(checks){
-  return new Set((checks||[]).map(c=>c.date_key+'|'+c.habit_name)).size;
+// [2026-09-25] vacationRanges(선택): 넘기면 오프 기간의 체크는 카운트에서 제외(본앱과 동일 원칙 — 체크 기록 자체는
+// 서버에 그대로 남아있고, 여기서는 통계 집계에서만 뺌). 넘기지 않으면 기존과 동일하게 전부 카운트.
+function _uniqueHabitCheckCount(checks,vacationRanges){
+  const filtered=vacationRanges?(checks||[]).filter(c=>!_isVacationOn(c.date_key,vacationRanges)):(checks||[]);
+  return new Set(filtered.map(c=>c.date_key+'|'+c.habit_name)).size;
 }
 function _paceParseHM(hm){const p=(hm||'').split(':');return parseInt(p[0],10)*60+parseInt(p[1],10);}
 // enjoy 리듬블록(cat='enjoy')에서 콘텐츠 카테고리/제목을 식별하는 공통 파서 — 2026-08-31 이후 생성된 블록엔
@@ -1477,7 +1500,7 @@ async function loadWeekTab(){
   const [goalRows,habits,habitChecks,memos,todos,sleepRows,onelineRows,contents,
     lwMemos,lwTodos,lwSleepRows,lwHabitChecks,rblocksFull,sleepReportRows,
     rblocksLast,readingLogRows,
-    rdaThisWeek,rdaLastWeek,weekMflowRows,weekPhotoRows]=await Promise.all([
+    rdaThisWeek,rdaLastWeek,weekMflowRows,weekPhotoRows,vacationRanges,lwVacationRanges]=await Promise.all([
     supaFetch(`goal_notes?note_key=eq.wchallenge_${encodeURIComponent(wk)}`),
     supaFetch(`habits?order=sort_order.asc`),
     supaFetch(`habit_checks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
@@ -1513,7 +1536,10 @@ async function loadWeekTab(){
     // 이번주 아침 흐름 배너용 — 캘린더 주(월~일) 범위 morning_flow_picks 전체
     supaFetch(`morning_flow_picks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
     // 이번주 사진 기록 필름스트립용 — 캘린더 주(월~일) 범위 사진메모(photo_url 있는 것만)
-    supaFetch(`memos?date_key=gte.${startDk}&date_key=lte.${endDk}&photo_url=not.is.null&order=date_key.asc,memo_time.asc`)
+    supaFetch(`memos?date_key=gte.${startDk}&date_key=lte.${endDk}&photo_url=not.is.null&order=date_key.asc,memo_time.asc`),
+    // 오프 기간(습관율 계산에서 제외용) — 이번주/지난주 각각 별도 조회
+    fetchVacationRanges(startDk,cmpEndDk),
+    fetchVacationRanges(lastStartDk,lastCmpEndDk)
   ]);
   // 현재 읽는 책 1권 + 전체 책 목록 — 이제 contents(content_cat='book')에서 직접 파생(2026-08-29, reading_books 제거로 별도 쿼리 불필요)
   const weekBooks=(contents||[]).filter(c=>c.content_cat==='book');
@@ -1527,10 +1553,10 @@ async function loadWeekTab(){
   renderWeekSleepReport(sleepReportRows||[]);
   renderWeekDelta({
     memos:memos||[],todos:todos||[],sleepRows:sleepRows||[],habits:habits||[],checks:habitChecks||[],contents:contents||[],
-    startDk,endDk:cmpEndDk,cmpDayCount
+    startDk,endDk:cmpEndDk,cmpDayCount,vacationRanges
   },{
     memos:lwMemos||[],todos:lwTodos||[],sleepRows:lwSleepRows||[],checks:lwHabitChecks||[],contents:contents||[],
-    startDk:lastStartDk,endDk:lastCmpEndDk
+    startDk:lastStartDk,endDk:lastCmpEndDk,vacationRanges:lwVacationRanges
   });
   renderWeekRhythmFlow(rblocksThis||[],rblocksLast||[],cmpDayCount);
   renderWeekMflow(weekMflowRows||[],rblocksFull||[]);
@@ -1599,6 +1625,7 @@ function renderWeekSleepReport(rows){
 }
 
 // 지난주 대비 — 오늘 요일까지로 절단된 동일 범위끼리 비교(주 진행 중엔 항상 마이너스로 왜곡되는 문제 방지)
+// cur/prev 각각 vacationRanges(선택)를 받아 습관율 계산에서 오프 기간을 제외(renderStatBar와 동일 원칙).
 function renderWeekDelta(cur,prev){
   const el=document.getElementById('week-delta');
   const curDone=cur.todos.filter(t=>t.done).length;
@@ -1606,10 +1633,10 @@ function renderWeekDelta(cur,prev){
   // [2026-09-06] 분모를 "습관 개수×기간일수"에서 "실제 활성 일수 합"으로 변경 — 활성 습관 목록은
   // 이번주/지난주 모두 cur.habits(현재 등록된 습관)를 기준으로 하되, 각 기간 내 활성 여부는
   // 그 기간의 날짜로 따로 판정(예: 이번주엔 활성, 지난주엔 아직 시작 전이었으면 지난주 분모에서 제외).
-  const curActiveDays=_activeHabitDayCount(cur.habits,cur.startDk,cur.endDk);
-  const prevActiveDays=_activeHabitDayCount(cur.habits,prev.startDk,prev.endDk);
-  const curHabitPct=curActiveDays?Math.round(_uniqueHabitCheckCount(cur.checks)/curActiveDays*100):0;
-  const prevHabitPct=prevActiveDays?Math.round(_uniqueHabitCheckCount(prev.checks)/prevActiveDays*100):0;
+  const curActiveDays=_activeHabitDayCount(cur.habits,cur.startDk,cur.endDk,cur.vacationRanges);
+  const prevActiveDays=_activeHabitDayCount(cur.habits,prev.startDk,prev.endDk,prev.vacationRanges);
+  const curHabitPct=curActiveDays?Math.round(_uniqueHabitCheckCount(cur.checks,cur.vacationRanges)/curActiveDays*100):0;
+  const prevHabitPct=prevActiveDays?Math.round(_uniqueHabitCheckCount(prev.checks,prev.vacationRanges)/prevActiveDays*100):0;
   const curContent=countContentsCompletedInRange(cur.contents,cur.startDk,cur.endDk);
   const prevContent=countContentsCompletedInRange(prev.contents,prev.startDk,prev.endDk);
   const curSleep=parseFloat(avgSleepHoursFromRows(cur.sleepRows))||0;
@@ -2602,7 +2629,7 @@ async function renderMonthStatBar(y,mo,habitsData){
   const prevStartDk=`${pmk}-01`,prevCmpEndDk=`${pmk}-${pad(prevCmpDay)}`;
 
   const [memos,todos,sleepRows,contents,habitsRaw0,checks,
-    prevMemos,prevTodos,prevSleepRows,prevContents,prevChecks]=await Promise.all([
+    prevMemos,prevTodos,prevSleepRows,prevContents,prevChecks,vacationRanges,prevVacationRanges]=await Promise.all([
     supaFetch(`memos?date_key=gte.${startDk}&date_key=lte.${cmpEndDk}&select=id`),
     supaFetch(`todos?date_key=gte.${startDk}&date_key=lte.${cmpEndDk}&select=done`),
     supaFetch(`sleep?date_key=gte.${startDk}&date_key=lte.${cmpEndDk}&select=sleep_time,wake_time`),
@@ -2615,16 +2642,18 @@ async function renderMonthStatBar(y,mo,habitsData){
     supaFetch(`todos?date_key=gte.${prevStartDk}&date_key=lte.${prevCmpEndDk}&select=done`),
     supaFetch(`sleep?date_key=gte.${prevStartDk}&date_key=lte.${prevCmpEndDk}&select=sleep_time,wake_time`),
     supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&month_key=eq.${pmk}`),
-    supaFetch(`habit_checks?date_key=gte.${prevStartDk}&date_key=lte.${prevCmpEndDk}`)
+    supaFetch(`habit_checks?date_key=gte.${prevStartDk}&date_key=lte.${prevCmpEndDk}`),
+    fetchVacationRanges(startDk,cmpEndDk),
+    fetchVacationRanges(prevStartDk,prevCmpEndDk)
   ]);
   const habits=_getHabitsActiveInRange(habitsRaw0||[],startDk,cmpEndDk); // 이 달(cmpEndDk까지) 범위 안에서 활성이었던 습관만 — 현재 시점 기준이 아니므로 과거 달 조회 시에도 정확
 
   renderStatBar('month-stat-bar',{
     memos:memos||[],todos:todos||[],sleepRows:sleepRows||[],contents:contents||[],
-    habits,checks:checks||[],startDk,endDk:cmpEndDk
+    habits,checks:checks||[],startDk,endDk:cmpEndDk,vacationRanges
   },{
     memos:prevMemos||[],todos:prevTodos||[],sleepRows:prevSleepRows||[],contents:prevContents||[],
-    checks:prevChecks||[],startDk:prevStartDk,endDk:prevCmpEndDk
+    checks:prevChecks||[],startDk:prevStartDk,endDk:prevCmpEndDk,vacationRanges:prevVacationRanges
   });
 }
 
@@ -3445,7 +3474,7 @@ async function loadMonthlyReportPage(){
   const prevStartDk=`${prevMk}-01`,prevEndDk=`${prevMk}-${pad(prevDim)}`;
   const prevWeeksInMonth=getReportWeeksOfMonth(py,pmo);
 
-  const [monthlyRows,goalRows,todos,memosRows,sleepRows,habits,habitChecksAll,rblocks,prevRblocks,contents,wcRowsList,milestoneRows,prevWcRowsList,prevTodos,prevSleepRows,prevHabitChecksAll,trajectoryRows,sleepReportCacheRows,weeklySummaryRowsList,weeklyMemoRowsList,prevMemosRows]=await Promise.all([
+  const [monthlyRows,goalRows,todos,memosRows,sleepRows,habits,habitChecksAll,rblocks,prevRblocks,contents,wcRowsList,milestoneRows,prevWcRowsList,prevTodos,prevSleepRows,prevHabitChecksAll,trajectoryRows,sleepReportCacheRows,weeklySummaryRowsList,weeklyMemoRowsList,prevMemosRows,mrpVacationRanges,mrpPrevVacationRanges]=await Promise.all([
     supaFetch(`ai_cache?cache_key=eq.monthly_report_${mk}&select=content`),
     supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('mgoal:'+mk)}`),
     supaFetch(`todos?date_key=gte.${startDk}&date_key=lte.${endDk}&select=done,date_key`),
@@ -3471,7 +3500,10 @@ async function loadMonthlyReportPage(){
     // 세 프롬프트(궤적/리듬/수면)가 공통 참고자료로 쓸 그 달 주간종합/주간메모 리포트 — 조회는 한 번만, 정제해서 각 함수에 전달
     Promise.all(weeksInMonth.map(wk=>supaFetch(`ai_cache?cache_key=eq.weekly_summary_${_mondayToSundayDk(wk)}&select=content`))),
     Promise.all(weeksInMonth.map(wk=>supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent('weekly_memo_report_week:'+wk)}&select=content`))),
-    supaFetch(`memos?date_key=gte.${prevStartDk}&date_key=lte.${prevEndDk}&select=id`)
+    supaFetch(`memos?date_key=gte.${prevStartDk}&date_key=lte.${prevEndDk}&select=id`),
+    // 오프 기간(습관율 계산에서 제외용) — 이번달/전달 각각 별도 조회
+    fetchVacationRanges(startDk,endDk),
+    fetchVacationRanges(prevStartDk,prevEndDk)
   ]);
 
   // 참고자료 정제: 저장된 HTML 카드에서 태그만 제거한 순수 텍스트로 — 세 프롬프트 공통 재료
@@ -3479,13 +3511,13 @@ async function loadMonthlyReportPage(){
 
   renderMrpHero(monthlyRows&&monthlyRows[0]);
   const mrpActiveHabits=_getHabitsActiveInRange(habits,startDk,endDk); // 이 달(startDk~endDk) 범위 안에서 활성이었던 습관만 — 과거 달 리포트를 열어도 그 달 기준으로 정확
-  const mrpHabitDenom=_activeHabitDayCount(mrpActiveHabits,startDk,endDk);
-  const mrpPrevHabitDenom=_activeHabitDayCount(mrpActiveHabits,prevStartDk,prevEndDk);
-  renderMrpGoalsAndStats(goalRows&&goalRows[0],todos||[],memosRows||[],sleepRows||[],mrpActiveHabits,habitChecksAll||[],mrpHabitDenom,prevTodos||[],prevHabitChecksAll||[],prevMemosRows||[],mrpPrevHabitDenom);
+  const mrpHabitDenom=_activeHabitDayCount(mrpActiveHabits,startDk,endDk,mrpVacationRanges);
+  const mrpPrevHabitDenom=_activeHabitDayCount(mrpActiveHabits,prevStartDk,prevEndDk,mrpPrevVacationRanges);
+  renderMrpGoalsAndStats(goalRows&&goalRows[0],todos||[],memosRows||[],sleepRows||[],mrpActiveHabits,habitChecksAll||[],mrpHabitDenom,prevTodos||[],prevHabitChecksAll||[],prevMemosRows||[],mrpPrevHabitDenom,mrpVacationRanges,mrpPrevVacationRanges);
   const heroCommentText=_mrpExtractHeroComment(monthlyRows&&monthlyRows[0]);
   renderMrpTrajectory(mk,sleepRows||[],habits||[],habitChecksAll||[],rblocks||[],weeksInMonth,dim,
     {sleepRows:prevSleepRows||[],habitChecks:prevHabitChecksAll||[],rblocks:prevRblocks||[],weeksInMonth:prevWeeksInMonth,habits:habits||[]},
-    trajectoryRows&&trajectoryRows[0],heroCommentText,monthlyRefContext);
+    trajectoryRows&&trajectoryRows[0],heroCommentText,monthlyRefContext,mrpVacationRanges);
   renderMrpSleep(mk,sleepRows||[],prevSleepRows||[],sleepReportCacheRows&&sleepReportCacheRows[0],monthlyRefContext,heroCommentText);
   renderMrpRhythm(rblocks||[],prevRblocks||[]);
   renderMrpMilestones(mk,rblocks||[],prevRblocks||[],weeksInMonth,wcRowsList||[],milestoneRows&&milestoneRows[0],prevWcRowsList||[],heroCommentText,monthlyRefContext);
@@ -3606,7 +3638,7 @@ async function renderMrpHero(row){
 // 목표(왼쪽)와 숫자(오른쪽)를 반반 배치 — 목표만 두면 배너가 비어 보여 숫자 카드와 짝지음
 // [2026-09-06] habitDenominator의 의미를 "일수"에서 "활성 습관-일수 총합"으로 변경(renderMonthStatBar와 동일 원칙).
 // 호출부(loadMonthlyReportPage)가 _activeHabitDayCount로 미리 계산해 넘기므로, 여기선 habits.length 곱셈 없이 그대로 사용.
-function renderMrpGoalsAndStats(goalRow,todos,memos,sleepRows,habits,habitChecks,habitDenominator,prevTodos,prevHabitChecks,prevMemos,prevHabitDenominator){
+function renderMrpGoalsAndStats(goalRow,todos,memos,sleepRows,habits,habitChecks,habitDenominator,prevTodos,prevHabitChecks,prevMemos,prevHabitDenominator,vacationRanges,prevVacationRanges){
   const goalsEl=document.getElementById('mrp-goals');
   // mgoal: 캐시는 wchallenge_(주간챌린지)와 저장 구조가 다름 — lines가 {text,days}[] 객체 배열이 아니라 순수 문자열 배열(string[]).
   const lines=(goalRow&&Array.isArray(goalRow.lines))?goalRow.lines.filter(l=>l&&typeof l==='string'&&l.trim()):[];
@@ -3615,14 +3647,14 @@ function renderMrpGoalsAndStats(goalRow,todos,memos,sleepRows,habits,habitChecks
   const statsEl=document.getElementById('mrp-stats');
   const doneTodos=todos.filter(t=>t.done).length;
   const memoCount=(memos||[]).length;
-  const habitPct=habitDenominator?Math.round(_uniqueHabitCheckCount(habitChecks)/habitDenominator*100):0;
+  const habitPct=habitDenominator?Math.round(_uniqueHabitCheckCount(habitChecks,vacationRanges)/habitDenominator*100):0;
 
   // 전월 대비(각 통계 하단에 증감만 짧게) — 전월 분모(prevHabitDenominator)는 이번 달과 별개로, 진행 중인 달이면
   // 동일하게 "오늘까지의 경과일수"로 절단된 값이 상위(loadMonthlyReportPage)에서 넘어옴(2026-08-22 확정).
   const prevDoneTodos=(prevTodos||[]).filter(t=>t.done).length;
   const prevMemoCount=(prevMemos||[]).length;
   const prevDenom=prevHabitDenominator||habitDenominator;
-  const prevHabitPct=prevDenom?Math.round(_uniqueHabitCheckCount(prevHabitChecks)/prevDenom*100):0;
+  const prevHabitPct=prevDenom?Math.round(_uniqueHabitCheckCount(prevHabitChecks,prevVacationRanges)/prevDenom*100):0;
   const deltaOf=(cur,prev,fmt)=>{
     const diff=Math.round((cur-prev)*10)/10;
     const dir=diff>0?'up':(diff<0?'down':'flat');
@@ -3732,7 +3764,7 @@ function _mrpWaveSvg(rows,weekCount,tailOverridesByKey){
 }
 // 생활밸런스(업무 대비 개인작업) 목표 비율 — 업무 3시간당 개인작업(책상) 2시간이 이상적이라는 기준(2026-08-22 확정).
 const WORK_NOTE_TARGET_RATIO=2/3;
-async function renderMrpTrajectory(mk,sleepRows,habits,habitChecks,rblocks,weeksInMonth,dim,prevData,cacheRow,heroComment,refContext){
+async function renderMrpTrajectory(mk,sleepRows,habits,habitChecks,rblocks,weeksInMonth,dim,prevData,cacheRow,heroComment,refContext,vacationRanges){
   const el=document.getElementById('mrp-traj');
   if(!weeksInMonth.length){el.innerHTML='<div class="empty-msg">이 달엔 표시할 주차가 없어요</div>';return;}
 
@@ -3758,7 +3790,8 @@ async function renderMrpTrajectory(mk,sleepRows,habits,habitChecks,rblocks,weeks
       if(!habits.length)return null;
       const checks=habitChecks.filter(c=>days.includes(c.date_key));
       if(!checks.length)return null;
-      return Math.round(_uniqueHabitCheckCount(checks)/(habits.length*7)*100);
+      // 분모는 기존 간이식(습관수×7일) 유지 — 여기선 오프 기간의 체크만 분자에서 제외(완전한 정밀 분모 계산은 이 그래프 용도상 과함)
+      return Math.round(_uniqueHabitCheckCount(checks,vacationRanges)/(habits.length*7)*100);
     });
     // 생활밸런스: 그 주 (책상/업무) 실제비율을 목표비율(2/3)로 나눈 달성률(%). 업무기록이 없는 주는 null.
     const byWeekBalance=weeksInMonth.map(wk=>{
@@ -3783,7 +3816,7 @@ async function renderMrpTrajectory(mk,sleepRows,habits,habitChecks,rblocks,weeks
   // 다른 카드(이달의 수면/습관 달성률)와 값이 일치하도록 함(2026-08-22, 마지막 주차 값 표시 문제 수정).
   // 수면 지표는 시간이 아니라 컨디션 점수 기준(2026-08-22, 시간과 컨디션이 항상 같이 움직이지 않아 해석에 혼선이 있어 변경).
   const monthAvgSleep=_avgSleepScoreOf(sleepRows);
-  const monthAvgHabit=habits.length?Math.round(_uniqueHabitCheckCount(habitChecks)/(habits.length*dim)*100):null;
+  const monthAvgHabit=habits.length?Math.round(_uniqueHabitCheckCount(habitChecks,vacationRanges)/(habits.length*dim)*100):null;
   const monthWorkMin=_rhythmSumCatMin(rblocks,'work');
   const monthNoteMin=_rhythmSumCatMin(rblocks,'note');
   const monthAvgBalance=monthWorkMin?Math.round((monthNoteMin/monthWorkMin)/WORK_NOTE_TARGET_RATIO*100):null;
@@ -4728,7 +4761,7 @@ async function loadYearlyTab(){
   const endDk=dateKey(now.getFullYear()===y?now:new Date(y,11,31));
   const elapsedMonths=(now.getFullYear()===y?now.getMonth():11)+1;
 
-  const [todos,memos,onelineRows,sleepRows,habits,habitChecks,rblocks,contents,goalRows]=await Promise.all([
+  const [todos,memos,onelineRows,sleepRows,habits,habitChecks,rblocks,contents,goalRows,vacationRanges]=await Promise.all([
     supaFetch(`todos?date_key=gte.${startDk}&date_key=lte.${endDk}&select=done,date_key`),
     supaFetch(`memos?date_key=gte.${startDk}&date_key=lte.${endDk}&select=id,text`),
     // 하루한줄(goal_notes, note_key='oneline:YYYY-MM-DD') — renderWeekKeywords와 동일하게 메모와 합쳐 집계
@@ -4738,12 +4771,13 @@ async function loadYearlyTab(){
     supaFetch(`habit_checks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
     supaFetch(`rhythm_blocks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
     supaFetch(`contents?or=(status.in.(done,stopped),content_cat.eq.music)&order=created.desc&limit=500`),
-    supaFetch(`ai_cache?cache_key=like.quarterly_summary_${y}*&select=cache_key,content`)
+    supaFetch(`ai_cache?cache_key=like.quarterly_summary_${y}*&select=cache_key,content`),
+    fetchVacationRanges(startDk,endDk)
   ]);
 
   const ctx={y,elapsedMonths,todos:todos||[],memos:memos||[],onelineRows:onelineRows||[],
     sleepRows:sleepRows||[],habits:habits||[],habitChecks:habitChecks||[],rblocks:rblocks||[],
-    contents:contents||[],quarterlyCache:goalRows||[]};
+    contents:contents||[],quarterlyCache:goalRows||[],vacationRanges:vacationRanges||[]};
 
   // 상단 페이지 라벨, 습관탭 인트로 텍스트(연도) — 정적 마크업의 빈 span을 채움
   const periodEl=document.getElementById('yr-period-label');
@@ -4886,8 +4920,10 @@ function _yrHabitOverallStats(ctx){
     const checksInMonth=ctx.habitChecks.filter(c=>c.date_key&&c.date_key.startsWith(mk));
     byMonth[m]={};
     ctx.habits.forEach(h=>{
-      const cnt=_habitCheckCountOf(h,checksInMonth);
-      const activeDays=_activeHabitDayCount([h],monthStartDk,monthEndDk); // 이 습관이 이 달에 실제 활성이었던 일수만 분모로
+      // [2026-09-25] 오프 기간(ctx.vacationRanges)에 해당하는 체크는 분자에서 제외 — 본앱 isVacationDate와 동일 원칙.
+      const checksExcludingVacation=ctx.vacationRanges?checksInMonth.filter(c=>!_isVacationOn(c.date_key,ctx.vacationRanges)):checksInMonth;
+      const cnt=_habitCheckCountOf(h,checksExcludingVacation);
+      const activeDays=_activeHabitDayCount([h],monthStartDk,monthEndDk,ctx.vacationRanges); // 이 습관이 이 달에 실제 활성이었던 일수(오프 기간 제외)만 분모로
       byMonth[m][h.name]=activeDays>0?Math.round(cnt/activeDays*100):null; // null=이 달엔 아예 추적 대상이 아니었음(0%와 구분)
     });
   }
@@ -6522,7 +6558,9 @@ function renderTimelineEventsAndSchedule(todos,multidayEvents){
       }
       const recurIconHtml=e.recur_rule_cid?'<i class="ti ti-repeat" style="font-size:11px;color:var(--tm);flex-shrink:0;margin-right:2px;" aria-hidden="true" title="반복"></i>':'';
       // 연속일정은 기존 .event-time 자리(왼쪽, width:42px 고정)에 시간 대신 "Day n" 표기 — 레이아웃(폭 고정) 그대로 유지하기 위해 순서는 안 바꿈(2026-09-25).
-      const timeHtml=e.event_end_date?`Day ${e.dayIndex}`:(e.event_time||'');
+      // 오프 기간(e.is_vacation)이면 "Off n"으로 텍스트만 교체, 색은 본앱과 동일한 --off-badge-text 참조(2026-09-25).
+      const dayLabel=e.is_vacation?'Off':'Day';
+      const timeHtml=e.event_end_date?(e.is_vacation?`<span style="color:var(--off-badge-text);">${dayLabel} ${e.dayIndex}</span>`:`${dayLabel} ${e.dayIndex}`):(e.event_time||'');
       const ec=getEventCat(e.event_cat);
       const catIconHtml=`<i class="ti ${ec.icon}" style="font-size:13px;color:${ec.textColor};flex-shrink:0;margin-right:1px;" title="${ec.label}" aria-hidden="true"></i>`;
       return `<div class="event-row${isPast?' past':''}">${recurIconHtml}<span class="event-time">${timeHtml}</span>${catIconHtml}${escapeHtml(e.text)}</div>`;
