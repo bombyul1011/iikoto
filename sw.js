@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.120-notif-force-reload';
+const CACHE = 'iikoto-v2.121-force-reload-postmsg';
 const ASSETS = [
   './',
   './index.html'
@@ -75,16 +75,31 @@ async function _debugLog(step, extra){
 }
 
 self.addEventListener('notificationclick', e => {
-  _debugLog('notificationclick:entered', e.notification.data?.url); // 핸들러 진입 여부 확인용
   e.notification.close();
   const targetUrl = e.notification.data?.url || './';
-  // iOS Safari(WebKit)에서 client.navigate()는 백그라운드/frozen 탭에 대해 신뢰할 수 없이 동작함
-  // (호출/await는 되지만 실제 네비게이션이 일어나지 않는 사례). navigate()를 완전히 버리고
-  // 항상 openWindow()로 통일 — PWA 스코프 내 URL이면 대부분 플랫폼이 기존 창을 재사용/포커스함(2026-09-26).
-  e.waitUntil(
-    clients.openWindow(targetUrl).then(
-      () => _debugLog('notificationclick:openWindow_ok'),
-      (err) => _debugLog('notificationclick:openWindow_fail', String(err))
-    )
-  );
+  // iOS에서 openWindow()가 스코프 내 기존 창을 "새로고침 없이 포커스만" 하는 경우가 있어
+  // (실제로 겪은 증상: 창은 열리는데 새로고침이 안 되고 팝업도 안 뜸), 그 경로를 신뢰하지 않기로 함.
+  // 대신 기존 클라이언트가 있으면 postMessage로 강제 새로고침(location.reload)을 지시하고,
+  // 없으면 openWindow로 새 창을 연다. 두 경로 모두 완료 후 서버에 로그를 남겨 진단(2026-09-26).
+  e.waitUntil((async () => {
+    await _debugLog('notificationclick:entered', targetUrl);
+    try {
+      const clientList = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+      if (clientList.length > 0) {
+        // 기존 창에 강제 새로고침 지시. postMessage는 freeze된 탭에서 씹힐 수 있으나,
+        // notificationclick 자체가 사용자 제스처로 깨어난 시점이라 이전의 순수 postMessage
+        // 실패 사례와는 조건이 다름 — 그래도 실패 대비 openWindow도 함께 시도.
+        for (const c of clientList) {
+          c.postMessage({ type: 'FORCE_RELOAD', url: targetUrl });
+        }
+        await _debugLog('notificationclick:postMessage_sent', clientList.length + ' clients');
+      } else {
+        await clients.openWindow(targetUrl);
+        await _debugLog('notificationclick:openWindow_ok_no_existing_client');
+      }
+    } catch (err) {
+      await _debugLog('notificationclick:error', String(err));
+      try { await clients.openWindow(targetUrl); } catch (e2) {}
+    }
+  })());
 });

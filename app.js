@@ -14228,6 +14228,17 @@ if(navigator.onLine){
   processPhotoR2DeleteQueue(); // 지난 세션에서 R2 삭제가 실패해 대기열에 남은 사진이 있으면 재시도
 }
 
+// 알림 클릭 시 sw.js가 이 탭에 강제 새로고침을 지시하면(FORCE_RELOAD), 백그라운드에서 JS가
+// freeze돼 있었을 수 있으므로 다른 로직 없이 즉시 location.reload()로 완전히 새로 읽는다.
+// notificationclick은 사용자 제스처로 시스템이 앱을 깨운 시점이라 이 메시지는 그 직후에 도착함(2026-09-26).
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.addEventListener('message', ev => {
+    if(ev.data && ev.data.type === 'FORCE_RELOAD'){
+      const url = ev.data.url || location.pathname;
+      location.href = url;
+    }
+  });
+}
 // Service Worker 등록 (오프라인 지원)
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
