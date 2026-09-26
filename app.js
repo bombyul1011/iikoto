@@ -2712,6 +2712,16 @@ async function getUserSettings(){
   const rows=await supaFetch('user_settings?id=eq.true');
   return (rows&&rows[0])||null;
 }
+// 스누즈 팝업 전용 캐시 — user_settings는 거의 안 바뀌는 값(알림 시각 설정)이라, 앱이 켜져 있는 동안은
+// 매번 새로 fetch하지 않고 재사용. 백그라운드 탭에서 postMessage 처리 시 네트워크 왕복을 하나 줄여
+// 스누즈 팝업이 늦게/안 뜨는 문제를 완화(2026-09-26).
+let _cachedUserSettings=null;
+async function getUserSettingsCached(){
+  if(_cachedUserSettings)return _cachedUserSettings;
+  const s=await getUserSettings().catch(()=>null);
+  if(s)_cachedUserSettings=s;
+  return s;
+}
 async function setUserSettingTime(field,timeStr){
   await supaUpsert('user_settings','id',[{id:true,[field]:timeStr}]);
 }
@@ -2760,10 +2770,11 @@ function _snoozeTargets(settings){
   return list;
 }
 async function openSnoozePopup(cid){
-  const found=await _findTodoByCidRemote(cid);
+  // 할일 조회(로컬 우선, 없으면 서버)와 설정 조회를 병렬로 — 백그라운드 탭에서 순차 fetch 시 지연이 누적돼
+  // 팝업이 안 뜨는 문제가 있었음(2026-09-26). 설정은 캐시 재사용으로 왕복을 하나 더 줄임.
+  const [found,settings]=await Promise.all([_findTodoByCidRemote(cid),getUserSettingsCached()]);
   if(!found||found.todo.isEvent){showToast('찾을 수 없는 할일이에요');return;}
   if(found.todo.done){showToast('이미 끝낸 할일이에요');return;}
-  const settings=await getUserSettings().catch(()=>null);
   const targets=_snoozeTargets(settings);
   _snoozeCtx={cid,text:found.todo.text,dk:found.dk,targets};
   document.getElementById('snooze-title').textContent=found.todo.text;

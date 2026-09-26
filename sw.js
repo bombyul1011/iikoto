@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.117-snooze-remote-fallback';
+const CACHE = 'iikoto-v2.118-notif-focus-order-fix';
 const ASSETS = [
   './',
   './index.html'
@@ -59,12 +59,15 @@ self.addEventListener('notificationclick', e => {
   e.notification.close();
   const targetUrl = e.notification.data?.url || './';
   e.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async clientList => {
       for (const c of clientList) {
-        // 이미 열려있는 창은 URL이 자동으로 안 바뀌므로, 창을 포커스하면서
-        // postMessage로 목적지 정보를 전달 — app.js가 수신해 직접 모달을 연다(2026-09-17).
+        // focus()를 먼저 완료한 뒤 postMessage를 보내도록 순서를 바꿈 — 이전엔 postMessage를 먼저 보내서,
+        // 탭이 아직 백그라운드(스로틀링 상태)일 때 메시지가 도착해 처리가 밀리거나 씹히는 경우가 있었음
+        // (특히 async 작업이 여러 개 걸리는 처리부일수록 취약). focus 완료 후 전송하면 포그라운드 상태가
+        // 보장된 채로 메시지를 받으므로 훨씬 안정적(2026-09-26).
+        await c.focus();
         c.postMessage({ type: 'notification-click', url: targetUrl });
-        return c.focus();
+        return;
       }
       if (clients.openWindow) return clients.openWindow(targetUrl);
     })
