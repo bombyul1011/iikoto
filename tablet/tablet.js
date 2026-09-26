@@ -2327,6 +2327,13 @@ function _cgridPeriodLabel(c){
 }
 // 본앱 _cmrDetailBodyHtml과 동일한 구조 — 진행률 바, 완결 총평(Comment), 감상 메모(Timeline)를 함께 표시.
 // (본앱의 "시청 시작" 스톱워치 버튼은 태블릿 상세뷰 성격상 제외.)
+// 감상 요약 한 줄 포맷 — 본앱 formatWatchSummary와 동일 규칙(snake_case 필드만 다름, 서버 원본 그대로 사용).
+function formatWatchSummaryTablet(c){
+  if(!c||!c.watched_days_count)return null; // 데이터 없으면 표시 안 함(리듬 기록 없이 등록/완결된 경우 등)
+  const h=Math.floor((c.watched_seconds||0)/3600),m=Math.floor(((c.watched_seconds||0)%3600)/60);
+  const timeStr=h>0?`${h}시간 ${m}분`:`${m}분`;
+  return `${c.watch_span_days||c.watched_days_count}일 중 ${c.watched_days_count}일 감상 · 총 ${timeStr}`;
+}
 function _cgridDetailHtml(c){
   const period=_cgridPeriodLabel(c);
   const stars=c.stars>0?`<span class="cgrid-detail-stars">${renderStarDisplayHtml(c.stars)}</span>`:'';
@@ -2370,8 +2377,10 @@ function _cgridDetailHtml(c){
       </div>`;
     }
   }
+  // 감상 요약(본앱에서 완결 확정 시점에 계산해 저장한 스냅샷) — 값 없으면 표시 안 함(2026-09-26, 본앱과 동일).
+  const watchSummary=formatWatchSummaryTablet(c);
+  const watchSummaryHtml=watchSummary?`<div class="cgrid-watch-summary"><i class="ti ti-clock" aria-hidden="true"></i> ${escapeHtml(watchSummary)}</div>`:'';
   const finalHtml=c.review?`<div class="cgrid-detail-final"><span class="cgrid-detail-final-lbl">Comment :</span> ${escapeHtml(c.review)}</div>`:'';
-  // 2026-08-29 통합: 감상 메모도 이제 c.notes[]에 직접 있음 — 별도 goal_notes 조회/cid 매칭 불필요.
   // 2026-09-12: 진행률(content_daily_log)과 감상세션 시각(rhythm_blocks)을 같은 날짜(dk) 기준으로 병합해 표시.
   // 시간 표시는 본앱 renderWatchCalDetail과 동일 규칙(HH:MM-HH:MM, ... (총 N분)) — 드라마/영화/책 공통.
   // 같은 날 로그와 코멘트가 모두 있으면 로그(진행률) 줄이 위, 코멘트가 아래로 오도록 한 항목에 합쳐서 표시.
@@ -2404,7 +2413,7 @@ function _cgridDetailHtml(c){
       }).join('')}
     </div>
   </div>`:'';
-  return `<div class="cgrid-detail">${topRow}${musicMetaHtml}${progressHtml}${finalHtml}${notesHtml}</div>`;
+  return `<div class="cgrid-detail">${topRow}${musicMetaHtml}${progressHtml}${watchSummaryHtml}${finalHtml}${notesHtml}</div>`;
 }
 function _cgridItemHtml(c){
   const meta=CAT_ICON_META[c.content_cat]||{icon:'ti-stack-2',bg:'rgba(150,150,150,1)'};
@@ -2430,30 +2439,40 @@ function toggleCgridDetail(id){
 async function renderMonthTimetable(y,mo,contentsData){
   const el=document.getElementById('month-tt');
   const mk=`${y}-${pad(mo+1)}`;
-  const isSameMonth=mk===monthKeyOf(new Date());
   const prevMk=monthKeyOf(new Date(y,mo-1,1));
   const contents=contentsData?contentsData.cur:(await supaFetch(`contents?month_key=eq.${mk}`))||[];
   const prevContents=contentsData?contentsData.prev:(await supaFetch(`contents?month_key=eq.${prevMk}`))||[];
-  const todayDay=new Date().getDate();
   const daysInMonth=new Date(y,mo+1,0).getDate();
   const CATS=['drama','book','movie','music'];
 
-  // 방영중 표시(is_airing)된 드라마의 톤다운 트랙 렌더링을 위해, 이번 달 범위 rhythm_blocks를 한 번만 조회해
-  // 제목별 실제 감상일(day 숫자) 셋을 만들어둠. is_airing 항목이 하나도 없으면 조회 자체를 생략.
-  const hasAiring=[...contents,...prevContents].some(c=>c.content_cat==='drama'&&c.is_airing);
-  let watchedDaysByTitle=null;
-  if(hasAiring){
+  // 진행중(watching, 음악 제외) 콘텐츠의 세그먼트 렌더링용 — 이번 달 범위 rhythm_blocks를 한 번만 조회해
+  // (cid,cat)별 실제 감상일(day 숫자) 셋을 만들어둠. isAiring 개념 폐기, 모든 watching에 동일 적용(2026-09-26, 본앱과 동일).
+  const hasWatching=[...contents,...prevContents].some(c=>c.status==='watching'&&c.content_cat!=='music');
+  let watchedDaysByCid=null;
+  if(hasWatching){
     const startDk=`${mk}-01`,endDk=`${mk}-31`;
     const rblocks=(await supaFetch(`rhythm_blocks?date_key=gte.${startDk}&date_key=lte.${endDk}&cat=eq.enjoy`))||[];
     const cidMap=_contentsByCidMap([...contents,...prevContents]);
-    watchedDaysByTitle={};
+    watchedDaysByCid={};
     rblocks.forEach(b=>{
       const parsed=_parseEnjoyBlock(b,cidMap);
-      if(!parsed||parsed.cat!=='drama')return;
+      if(!parsed)return;
       const day=parseInt((b.date_key||'').slice(8,10),10);
       if(!day)return;
-      (watchedDaysByTitle[parsed.title]=watchedDaysByTitle[parsed.title]||new Set()).add(day);
+      const key=(parsed.cid||'')+'|'+parsed.title;
+      (watchedDaysByCid[key]=watchedDaysByCid[key]||new Set()).add(day);
     });
+  }
+  // 연속된 날짜(숫자 배열)를 [{from,to}] 구간 배열로 묶음 — 본앱 groupConsecutiveDays와 동일.
+  function groupConsecutiveDaysTablet(days){
+    if(!days.length)return[];
+    const sorted=[...days].sort((a,b)=>a-b);
+    const groups=[{from:sorted[0],to:sorted[0]}];
+    for(let i=1;i<sorted.length;i++){
+      const g=groups[groups.length-1];
+      if(sorted[i]===g.to+1)g.to=sorted[i];else groups.push({from:sorted[i],to:sorted[i]});
+    }
+    return groups;
   }
 
   let headHtml='';
@@ -2465,18 +2484,29 @@ async function renderMonthTimetable(y,mo,contentsData){
     const items=contents.filter(c=>c.content_cat===cat);
     const carry=prevContents.filter(c=>c.content_cat===cat&&isContentCarryOverTablet(c,mk)).map(c=>({...c,_carried:true}));
     const all=[...carry,...items];
-    const laid=all.map(item=>{
+    // watching(진행중, 음악 제외)은 실제 감상일 기준 세그먼트 여러 개로 펼침. done/stopped는 기존과 동일하게
+    // 시작일~종료일 통짜 하나(2026-09-26, 본앱과 동일 개편).
+    let laid=[];
+    all.forEach(item=>{
+      const isWatching=item.status==='watching'&&cat!=='music';
+      if(isWatching){
+        const key=(item.client_id||'')+'|'+item.title;
+        const watchedDays=[...((watchedDaysByCid&&watchedDaysByCid[key])||[])];
+        const segments=groupConsecutiveDaysTablet(watchedDays);
+        if(!segments.length)return; // 이번 달엔 아직 실제 감상 기록 없음 — 그릴 것 없음.
+        segments.forEach(seg=>laid.push({item,startD:seg.from,endD:seg.to}));
+        return;
+      }
       const sStr=item.start_date||(mk+'-01');
       const eStr=item.end_date;
-      const isWatching=item.status==='watching'&&cat!=='music';
       const startD=item._carried?1:Math.max(1,parseInt((sStr||'').slice(8,10),10)||1);
       let endD;
-      if(isWatching&&!eStr){endD=isSameMonth?todayDay:daysInMonth;}
-      else if(!eStr){endD=(cat!=='music'&&item.status==='watching')?(isSameMonth?todayDay:daysInMonth):startD;}
+      if(!eStr){endD=startD;} // music은 항상 하루짜리 점
       else{const eMonth=eStr.slice(0,7);endD=eMonth===mk?Math.max(parseInt(eStr.slice(8,10),10)||startD,startD):daysInMonth;}
       endD=Math.min(Math.max(endD,startD),31);
-      return {item,startD,endD};
-    }).sort((a,b)=>a.startD-b.startD);
+      laid.push({item,startD,endD});
+    });
+    laid.sort((a,b)=>a.startD-b.startD);
 
     let tracks;
     if(cat==='music'){tracks=[laid];}
@@ -2513,20 +2543,6 @@ async function renderMonthTimetable(y,mo,contentsData){
         const w=span*22+(span-1)*1.5;
         const isWatching=c.item.status==='watching'&&cat!=='music';
         const isStopped=c.item.status==='stopped';
-        // 전월부터 이어진(_carried) 경우에도 방영중 톤 유지 — 이월 여부와 무관하게 is_airing이 기준(2026-09-03, 본앱 수정과 동일 적용)
-        const isAiringTone=cat==='drama'&&c.item.is_airing;
-        if(isAiringTone){
-          const watchedDays=(watchedDaysByTitle&&watchedDaysByTitle[c.item.title])||new Set();
-          const titleAttr=(c.item._carried?c.item.title+' (전월부터 이어짐)':c.item.title)+(isStopped?' · 중단':'');
-          let segsHtml='';
-          for(let d=dispStart;d<=dispEnd;d++){
-            segsHtml+=`<div class="tt-airing-seg${watchedDays.has(d)?' watched':''}"></div>`;
-          }
-          const stripe=isWatching?'<div class="tt-airing-live-stripe"></div>':'';
-          cellsHtml+=`<div class="tt-block drama tt-airing-tone${isStopped?' stopped':''}" style="width:${w}px;min-width:${w}px;" title="${escapeHtml(titleAttr)}"><span class="tt-airing-tone-label">${escapeHtml(c.item.title||'')}</span>${stripe}${segsHtml}</div>`;
-          cursor=dispEnd+1;
-          return;
-        }
         let label,titleAttr;
         if(cat==='music'&&group.length>1){
           label=String(group.length);

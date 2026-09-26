@@ -639,6 +639,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .ch-tlB-note-log{font-size:10.5px;color:rgba(190,130,70,0.85);margin-bottom:3px;}
 /* ── 콘텐츠 모아보기 상세(진행률+review+감상메모) — 본앱 cmr-progress-*/cmr-review-* 구조 그대로 이식 ── */
 .cgrid-progress-bar{display:flex;align-items:center;gap:8px;margin-bottom:7px;padding:3px 0;}
+.cgrid-watch-summary{display:flex;align-items:center;gap:6px;font-size:var(--fs-sm);color:var(--pal-pink-text);background:rgba(var(--pal-pink-rgb),0.14);border-radius:8px;padding:6px 10px;margin-bottom:8px;}
+.cgrid-watch-summary i{font-size:12px;}
 .cgrid-progress-track{flex:1;height:4px;border-radius:3px;background:var(--graph-track-color);overflow:hidden;}
 .cgrid-progress-fill{height:100%;border-radius:3px;background:#ffc9da;}
 .cgrid-progress-label{font-size:10px;color:var(--tm);white-space:nowrap;flex-shrink:0;}
@@ -730,11 +732,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .tt-block.music{background:var(--pal-lime-bg);color:var(--tp);}
 .tt-block.watching{background-image:repeating-linear-gradient(45deg,transparent,transparent 6px,rgba(255,255,255,0.45) 6px,rgba(255,255,255,0.45) 10px);opacity:0.85;}
 .tt-block.stopped{filter:saturate(0.45);opacity:0.7;}
-.tt-block.tt-airing-tone{background:none!important;padding:0;position:relative;}
-.tt-airing-seg{flex:1;height:100%;background:rgba(var(--pal-pink-rgb),0.09);}
-.tt-airing-seg.watched{background:var(--pal-pink-bg);}
-.tt-airing-tone-label{position:absolute;left:5px;top:0;height:23px;display:flex;align-items:center;font-size:var(--fs-sm);color:var(--tp);white-space:nowrap;pointer-events:none;z-index:2;overflow:hidden;text-overflow:ellipsis;max-width:calc(100% - 10px);}
-.tt-airing-live-stripe{position:absolute;inset:0;pointer-events:none;z-index:1;background-image:repeating-linear-gradient(45deg,transparent,transparent 6px,rgba(255,255,255,0.55) 6px,rgba(255,255,255,0.55) 10px);}
 .habit-month-dots{display:flex;gap:2px;flex-wrap:wrap;flex:1;}
 .habit-month-dots span{width:8px;height:8px;border-radius:2px;background:rgba(200,190,180,0.2);}
 .habit-numbox-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:10px;}
