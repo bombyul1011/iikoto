@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.118-notif-focus-order-fix';
+const CACHE = 'iikoto-v2.119-notif-client-navigate';
 const ASSETS = [
   './',
   './index.html'
@@ -61,10 +61,19 @@ self.addEventListener('notificationclick', e => {
   e.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async clientList => {
       for (const c of clientList) {
-        // focus()를 먼저 완료한 뒤 postMessage를 보내도록 순서를 바꿈 — 이전엔 postMessage를 먼저 보내서,
-        // 탭이 아직 백그라운드(스로틀링 상태)일 때 메시지가 도착해 처리가 밀리거나 씹히는 경우가 있었음
-        // (특히 async 작업이 여러 개 걸리는 처리부일수록 취약). focus 완료 후 전송하면 포그라운드 상태가
-        // 보장된 채로 메시지를 받으므로 훨씬 안정적(2026-09-26).
+        // postMessage는 백그라운드(freeze)에 있던 탭에서 메시지 리스너 자체가 깨어나지 않아
+        // 씹히는 경우가 실제로 있었음(2026-09-26) — focus만으로는 JS 실행이 즉시 재개된다는 보장이 없음.
+        // client.navigate()로 그 탭의 URL을 직접 바꾸면 콜드 스타트(openWindow)와 동일하게 페이지가
+        // 다시 로드되면서 location.search를 처음부터 읽으므로, freeze 상태와 무관하게 동작함.
+        if ('navigate' in c) {
+          try {
+            await c.navigate(targetUrl);
+            return c.focus();
+          } catch (err) {
+            // navigate 실패 시 postMessage 대신 openWindow로 폴백 — 콜드 스타트와 동일한 검증된 경로.
+            if (clients.openWindow) return clients.openWindow(targetUrl);
+          }
+        }
         await c.focus();
         c.postMessage({ type: 'notification-click', url: targetUrl });
         return;
