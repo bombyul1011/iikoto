@@ -14183,6 +14183,84 @@ const MEMO_URL_DEFAULT_COPY={
   sleep:['오늘 하루는 어땠나요?','잠들기 전, 오늘을 짧게 남겨보세요.'],
   noon:['식사 후 나른한 시간이에요','지금 컨디션이나 오후 계획을 한 줄 남겨볼까요?']
 };
+// ── 포그라운드 복귀 시 서버 폴링 방식 (2026-09-26 재설계) ──
+// notificationclick 이벤트가 iOS PWA 백그라운드 조건에서 발화하지 않는 사례가 있어(진단 완료 —
+// sw.js 핸들러 진입 로그 자체가 안 찍힘, 웹사이트 데이터 완전 삭제 후 재설치해도 재현됨),
+// 알림 클릭에 의존하지 않고 "앱이 포그라운드로 돌아올 때마다 서버에 처리 안 된 알림이 있는지
+// 물어보고 그 자리에서 팝업을 띄우는" 방식으로 전환. alerts.opened 컬럼으로 중복 방지.
+// URL 기반 _openFromNotificationUrl()은 당분간 보존(?snooze=/?memo= 링크를 다른 경로로 직접
+// 받는 경우 — 예: 알림 자체가 새 창을 여는 데는 성공한 극히 드문 케이스 — 대비 폴백으로 유지).
+let _pendingAlertCheckInFlight=false;
+async function checkPendingAlerts(){
+  if(_pendingAlertCheckInFlight)return; // 중복 호출(연속 visibilitychange 등) 방지
+  if(!navigator.onLine)return;
+  _pendingAlertCheckInFlight=true;
+  try{
+    const rows=await supaFetch(`alerts?sent=eq.true&opened=eq.false&order=alert_at.desc&limit=5`);
+    if(!rows||!rows.length)return;
+    // 여러 개 밀려있어도 한 번에 하나만 팝업(가장 최근 것) — 나머지는 opened만 표시해 다음에 또 안 뜨게 함.
+    const target=rows[0];
+    const rest=rows.slice(1);
+    if(rest.length){
+      await supaFetch(`alerts?id=in.(${rest.map(r=>r.id).join(',')})`,'PATCH',{opened:true});
+    }
+    await _openPopupForAlert(target);
+    await supaFetch(`alerts?id=eq.${target.id}`,'PATCH',{opened:true});
+  }catch(err){ /* 실패해도 다음 포그라운드 복귀 때 재시도되므로 조용히 무시 */ }
+  finally{ _pendingAlertCheckInFlight=false; }
+}
+// source_type별로 알맞은 팝업을 연다 — send-alerts의 url 생성 분기와 1:1 대응.
+async function _openPopupForAlert(alert){
+  const type=alert.source_type;
+  const todayDk=dateKey(new Date());
+  if(type==='todo'||type==='todo_snooze'){
+    const cid=alert.link_cid||alert.source_cid;
+    if(cid)openSnoozePopup(cid);
+    return;
+  }
+  if(type==='sleep_alert'){
+    const copy=MEMO_URL_DEFAULT_COPY.sleep;
+    openRhythmMemoModal('sleep',todayDk,alert.title||copy[0],alert.body||copy[1]);
+    return;
+  }
+  if(type==='noon_memo'){
+    openRhythmMemoModal('noon',todayDk,alert.title||MEMO_URL_DEFAULT_COPY.noon[0],alert.body||MEMO_URL_DEFAULT_COPY.noon[1]);
+    return;
+  }
+  if(type==='question_alert'){
+    openQuestionMemo(todayDk);
+    return;
+  }
+  if(type==='rhythm_ongoing'){
+    const cid=alert.link_cid||alert.source_cid;
+    if(!cid)return;
+    let found=null,foundDk=null;
+    for(let i=0;i<2;i++){
+      const d=new Date();d.setDate(d.getDate()-i);
+      const dk=dateKey(d);
+      const b=getRhythmBlocks(dk).find(x=>x.cid===cid);
+      if(b){found=b;foundDk=dk;break;}
+    }
+    if(!found){
+      const rowsR=await supaFetch(`rhythm_blocks?client_id=eq.${encodeURIComponent(cid)}&limit=1`);
+      if(rowsR&&rowsR[0]){found=rhythmBlockRowToLocal(rowsR[0]);foundDk=rowsR[0].date_key;}
+    }
+    if(!found||!found.cat)return;
+    const title=_buildRhythmMemoTitle(found.cat,found.start,found.end,found.text);
+    if(!title)return;
+    openRhythmMemoModal(found.cat,foundDk||todayDk,title,'지금 이 순간을 기록해보세요.');
+    return;
+  }
+  // morning_briefing/remaining_todo/evening_wrap/weekly_report/monthly_report 등은 팝업 없이
+  // 앱이 열리는 것만으로 충분 — 별도 처리 없음.
+}
+// 포그라운드로 돌아올 때마다 체크: 앱 최초 로드 시(스플래시 이후)와, 이후 탭 전환/화면 켜짐 등으로
+// 다시 보이게 될 때마다. visibilitychange가 iOS PWA에서 notificationclick보다 훨씬 안정적으로 fire됨.
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible')checkPendingAlerts();
+});
+window.addEventListener('pageshow',()=>{ checkPendingAlerts(); }); // bfcache 복귀 등 visibilitychange가 안 잡는 경우 보강
+
 async function _openFromNotificationUrl(){
   const params=new URLSearchParams(location.search);
   const snoozeCid=params.get('snooze'); // 할일 알림 — 스누즈 시트
@@ -14378,6 +14456,7 @@ setTimeout(checkAndRecoverPushSubscription, 1500);
   hideSplash();
   // 1시간 리마인드 알림으로 콜드 스타트된 경우 — 스플래시가 완전히 사라진 뒤에만 메모 모달을 띄운다(2026-09-17).
   _openFromNotificationUrl();
+  checkPendingAlerts(); // 알림 클릭 자체가 안 먹혔던 백그라운드 복귀 케이스 커버(2026-09-26)
 })();
 
 
