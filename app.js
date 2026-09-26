@@ -12848,6 +12848,7 @@ function saveWcalNote(cid,dk,idx){
   if(i>=0)c.notes[i]=entry;else c.notes.push(entry);
   saveContents(found.mk,found.list);
   renderWcalNoteRow(idx,cid,dk,entry,false);
+  refreshOtherContentHubViews(); // 월별 아카이브 그리드/코멘트 모아보기가 열려있으면 즉시 반영(2026-09-26)
 }
 function deleteWcalNote(cid,dk,idx){
   const found=_findContentByCidNearMk(cid,dk.slice(0,7));
@@ -12857,6 +12858,7 @@ function deleteWcalNote(cid,dk,idx){
   saveContents(found.mk,found.list);
   const rowEl=document.getElementById('wcal-note-row-'+idx);
   if(rowEl)rowEl.innerHTML='';
+  refreshOtherContentHubViews();
 }
 // 저장 완료 후 읽기 모드로 접어서 보여줌(다시 탭하면 openWcalNoteInput으로 수정 모드 재진입)
 function renderWcalNoteRow(idx,cid,dk,note,editing){
@@ -12906,13 +12908,26 @@ function renderChHubMonthBanners(){
 }
 // 선택된 달의 콘텐츠 목록(월간 카테고리별 집계) — renderContentAsGridHtml이 각 항목 코멘트 아이콘에 완결 총평+감상 중 메모를 함께 보여줌
 // 그리드형으로 통일(2026-09-08) — 리스트형(renderContentByCatHtml)은 실사용 저조로 완전 제거, 음악도 원래부터 항상 그리드였음
-// 콘텐츠허브 내에서 감상 기록이 바뀔 때(스톱워치 종료, 진행률 저장, 완결 전환) 호출 —
-// 아카이브 펼침뷰(chExpandMonth)는 각 호출부에서 이미 갱신하고 있었지만, 감상달력(loadAndRenderWatchCal)은
-// 콘텐츠허브가 열려있어도 다시 그려지지 않아 나갔다 들어와야 반영되는 문제가 있었음(2026-09-01).
-// 콘텐츠허브가 열려있을 때만 갱신 — 닫혀 있으면 다음에 열 때(openContentHub) 어차피 새로 불러오므로 불필요한 연산 방지.
+// 콘텐츠허브 내에서 감상 기록이 바뀔 때(스톱워치 종료, 진행률 저장, 완결 전환, 감상 캘린더의
+// 감상메모 등록/수정/삭제) 호출 — 콘텐츠허브 안의 여러 뷰가 같은 contents.notes[]를 각자 따로
+// 그리기 때문에, 한 곳에서 메모를 바꾸면 다른 곳(월별 아카이브 그리드, 코멘트 모아보기)은
+// 나갔다 들어오기 전엔 반영이 안 되던 문제가 있었음(2026-09-26, 감상 캘린더의 wcal-note 저장이
+// 이 함수를 안 쓰고 있던 게 원인). 각 뷰는 현재 열려있을 때만 갱신 — 닫혀있으면 다음에 열 때
+// 어차피 새로 불러오므로 불필요한 연산 방지.
 function refreshContentHubViews(){
   if(!document.getElementById('content-hub-ov')?.classList.contains('on'))return;
   loadAndRenderWatchCal();
+  if(_chArchiveMk)chExpandMonth(_chArchiveMk); // 월별 아카이브 그리드가 펼쳐져 있으면 같은 달 기준으로 다시 그림
+  if(document.getElementById('content-note-timeline-sheet')?.classList.contains('on'))renderContentNoteTimeline();
+}
+// 감상 캘린더 자체(감상메모를 방금 입력한 그 화면)는 이미 로컬에서 갱신돼 있으므로 제외하고,
+// 콘텐츠허브 안의 "다른" 노출 영역(월별 아카이브 그리드, 코멘트 모아보기)만 갱신할 때 씀 —
+// 감상 캘린더에서 감상메모를 등록/수정/삭제한 직후처럼, 그 화면을 무겁게(서버 재조회 포함) 다시
+// 그릴 필요 없이 다른 곳만 최신 상태로 맞추면 되는 경우(2026-09-26).
+function refreshOtherContentHubViews(){
+  if(!document.getElementById('content-hub-ov')?.classList.contains('on'))return;
+  if(_chArchiveMk)chExpandMonth(_chArchiveMk);
+  if(document.getElementById('content-note-timeline-sheet')?.classList.contains('on'))renderContentNoteTimeline();
 }
 function chExpandMonth(mk){
   _chArchiveMk=mk;
@@ -14201,11 +14216,13 @@ async function checkPendingAlerts(){
     // 여러 개 밀려있어도 한 번에 하나만 팝업(가장 최근 것) — 나머지는 opened만 표시해 다음에 또 안 뜨게 함.
     const target=rows[0];
     const rest=rows.slice(1);
-    if(rest.length){
-      await supaFetch(`alerts?id=in.(${rest.map(r=>r.id).join(',')})`,'PATCH',{opened:true});
-    }
+    // opened 표시를 먼저 하고 팝업을 연다 — 순서를 반대로 하면 _openPopupForAlert 도중 예외가
+    // 나거나 사용자가 팝업을 보기 전에 앱을 다시 백그라운드로 보내는 등의 경우, opened가 영영
+    // true로 안 찍혀서 매번 포그라운드 전환마다 같은 알림이 반복해서 뜨는 문제가 생길 수 있음.
+    // "팝업을 한 번 못 볼 수 있음"이 "팝업이 무한 반복됨"보다 안전한 실패 모드라 이 순서를 택함(2026-09-26).
+    const allIds=[target.id,...rest.map(r=>r.id)];
+    await supaFetch(`alerts?id=in.(${allIds.join(',')})`,'PATCH',{opened:true});
     await _openPopupForAlert(target);
-    await supaFetch(`alerts?id=eq.${target.id}`,'PATCH',{opened:true});
   }catch(err){ /* 실패해도 다음 포그라운드 복귀 때 재시도되므로 조용히 무시 */ }
   finally{ _pendingAlertCheckInFlight=false; }
 }
@@ -14265,15 +14282,15 @@ async function _openFromNotificationUrl(){
   const params=new URLSearchParams(location.search);
   const snoozeCid=params.get('snooze'); // 할일 알림 — 스누즈 시트
   const memoType=params.get('memo');
-  if(!snoozeCid&&!['rhythm','sleep','noon','question'].includes(memoType))return;
+  if(!snoozeCid&&!['rhythm','sleep','noon','question'].includes(memoType))return false;
   history.replaceState(null,'',location.pathname); // 처리 후 자기 URL 정리(뒤로가기/새로고침 시 재실행 방지)
-  if(snoozeCid){openSnoozePopup(snoozeCid);return;}
+  if(snoozeCid){openSnoozePopup(snoozeCid);return true;}
   const todayDk=dateKey(new Date());
   const copy=MEMO_URL_DEFAULT_COPY[memoType];
-  if(copy){openRhythmMemoModal(memoType,todayDk,params.get('t')||copy[0],params.get('b')||copy[1]);return;}
-  if(memoType==='question'){openQuestionMemo(todayDk);return;} // 질문은 알림에 싣지 않고 앱이 풀에서 직접 뽑음
+  if(copy){openRhythmMemoModal(memoType,todayDk,params.get('t')||copy[0],params.get('b')||copy[1]);return true;}
+  if(memoType==='question'){openQuestionMemo(todayDk);return true;} // 질문은 알림에 싣지 않고 앱이 풀에서 직접 뽑음
   const cid=params.get('cid');
-  if(!cid)return;
+  if(!cid)return true; // memo=rhythm인데 cid가 없는 이상 케이스 — URL은 이미 처리(정리)했으니 폴링으로 재시도할 필요 없음
   let found=null,foundDk=null;
   for(let i=0;i<2;i++){ // 자정을 막 넘긴 경우까지 고려해 오늘/어제 두 날짜만 로컬에서 우선 탐색
     const d=new Date();d.setDate(d.getDate()-i);
@@ -14286,14 +14303,12 @@ async function _openFromNotificationUrl(){
     const rows=await supaFetch(`rhythm_blocks?client_id=eq.${encodeURIComponent(cid)}&limit=1`);
     if(rows&&rows[0]){found=rhythmBlockRowToLocal(rows[0]);foundDk=rows[0].date_key;}
   }
-  if(!found||!found.cat)return;
+  if(!found||!found.cat)return true;
   const title=_buildRhythmMemoTitle(found.cat,found.start,found.end,found.text);
-  if(!title)return;
+  if(!title)return true;
   openRhythmMemoModal(found.cat,foundDk||todayDk,title,'지금 이 순간을 기록해보세요.');
+  return true;
 }
-// 알림 클릭 시 sw.js가 열려있는 탭을 navigate()로 새로고침하거나 새 창을 열기 때문에, 이 페이지는
-// 항상 콜드 스타트와 동일하게 location.search를 처음부터 읽는다(waitAndHideSplash에서 호출) — postMessage
-// 수신 경로는 백그라운드 탭의 JS freeze로 메시지가 씹히는 문제가 있어 폐기(2026-09-26).
 // 새로고침/앱 완전종료 후 재시작 시, 켜져 있던 독서 스톱워치를 이어서 복원.
 // localStorage에 저장된 시작시각이 있으면(=종료 처리 없이 앱이 닫힌 경우) 그 시각 기준으로
 // 경과시간을 계산해 스톱워치를 다시 돌아가는 상태로 되살린다.
@@ -14306,17 +14321,6 @@ if(navigator.onLine){
   processPhotoR2DeleteQueue(); // 지난 세션에서 R2 삭제가 실패해 대기열에 남은 사진이 있으면 재시도
 }
 
-// 알림 클릭 시 sw.js가 이 탭에 강제 새로고침을 지시하면(FORCE_RELOAD), 백그라운드에서 JS가
-// freeze돼 있었을 수 있으므로 다른 로직 없이 즉시 location.reload()로 완전히 새로 읽는다.
-// notificationclick은 사용자 제스처로 시스템이 앱을 깨운 시점이라 이 메시지는 그 직후에 도착함(2026-09-26).
-if('serviceWorker' in navigator){
-  navigator.serviceWorker.addEventListener('message', ev => {
-    if(ev.data && ev.data.type === 'FORCE_RELOAD'){
-      const url = ev.data.url || location.pathname;
-      location.href = url;
-    }
-  });
-}
 // Service Worker 등록 (오프라인 지원)
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
@@ -14455,8 +14459,9 @@ setTimeout(checkAndRecoverPushSubscription, 1500);
   }
   hideSplash();
   // 1시간 리마인드 알림으로 콜드 스타트된 경우 — 스플래시가 완전히 사라진 뒤에만 메모 모달을 띄운다(2026-09-17).
-  _openFromNotificationUrl();
-  checkPendingAlerts(); // 알림 클릭 자체가 안 먹혔던 백그라운드 복귀 케이스 커버(2026-09-26)
+  // _openFromNotificationUrl(URL 파라미터 기반, 폴백 경로)이 뭔가 처리했으면 checkPendingAlerts를
+  // 건너뛴다 — 안 그러면 같은 알림에 대해 두 시스템이 각각 팝업을 열려고 해서 경합이 생길 수 있음.
+  _openFromNotificationUrl().then(handled=>{ if(!handled)checkPendingAlerts(); });
 })();
 
 
