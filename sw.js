@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.116-airing-refactor';
+const CACHE = 'iikoto-v2.117-snooze-remote-fallback';
 const ASSETS = [
   './',
   './index.html'

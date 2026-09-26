@@ -2730,6 +2730,19 @@ function _findTodoByCid(cid){
   }
   return null;
 }
+// 로컬에 없을 때(다른 기기에서 등록/완료돼 아직 동기화 전, 또는 백그라운드에서 알림만 먼저 도착한 경우)
+// 서버에서 직접 조회하는 폴백 — 리듬 메모 알림(_openFromNotificationUrl)과 동일한 패턴(2026-09-26 추가).
+// 스누즈 팝업이 실제로 쓰는 최소 필드(text/done/isEvent)만 매핑.
+async function _findTodoByCidRemote(cid){
+  const local=_findTodoByCid(cid);
+  if(local)return local;
+  try{
+    const rows=await supaFetch(`todos?client_id=eq.${encodeURIComponent(cid)}&limit=1`);
+    if(!rows||!rows[0])return null;
+    const r=rows[0];
+    return {dk:r.date_key,todo:{cid:r.client_id,text:r.text,done:!!r.done,isEvent:!!r.is_event}};
+  }catch(e){return null;}
+}
 // 스누즈 칩 목록 — 오늘 저녁/내일 아침 시각은 설정탭의 남은 할일 알림·아침 브리핑 시각을 그대로 읽음(없으면 19:30/08:00).
 // 오늘 저녁이 이미 지났으면 그 칩은 뺌. 새벽 0~4시는 아직 "어젯밤"이라 내일 아침 = 오늘 아침.
 function _snoozeTargets(settings){
@@ -2747,7 +2760,7 @@ function _snoozeTargets(settings){
   return list;
 }
 async function openSnoozePopup(cid){
-  const found=_findTodoByCid(cid);
+  const found=await _findTodoByCidRemote(cid);
   if(!found||found.todo.isEvent){showToast('찾을 수 없는 할일이에요');return;}
   if(found.todo.done){showToast('이미 끝낸 할일이에요');return;}
   const settings=await getUserSettings().catch(()=>null);
