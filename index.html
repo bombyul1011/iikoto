@@ -381,6 +381,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cmr-detail-date{color:var(--tm);font-weight:600;font-variant-numeric:tabular-nums;}
 .cmr-detail-stars{color:#e0b050;letter-spacing:1px;}
 .cmr-progress-bar{display:flex;align-items:center;gap:8px;margin-bottom:7px;cursor:pointer;padding:3px 0;}
+.cmr-watch-summary{display:flex;align-items:center;gap:6px;font-size:var(--xs-label-size);color:var(--pal-pink-text);background:rgba(var(--pal-pink-rgb),0.14);border-radius:8px;padding:6px 10px;margin-bottom:8px;}
+.cmr-watch-summary i{font-size:12px;}
 .cmr-progress-track{flex:1;height:4px;border-radius:3px;background:var(--graph-track-color);overflow:hidden;}
 .cmr-progress-fill{height:100%;border-radius:3px;background:#ffc9da;transition:width .3s ease;}
 .cmr-progress-label{font-size:var(--xs-label-size);color:var(--tm);white-space:nowrap;flex-shrink:0;}
@@ -658,9 +660,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .memo-seed-toggle{position:absolute;right:5px;top:0;bottom:0;margin:auto;height:22px;width:22px;background:none;border:none;padding:0;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--tm);opacity:0.23;transition:opacity .15s,color .15s;}
 .memo-seed-toggle i{font-size:17px;line-height:0;}
 .memo-seed-toggle.on{opacity:1;color:rgba(120,155,160,0.95);}
-.cm-airing-toggle{position:absolute;right:6px;top:11px;height:24px;width:24px;background:none;border:none;padding:0;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--tm);opacity:0.25;transition:opacity .15s,color .15s;}
-.cm-airing-toggle i{font-size:16px;line-height:0;}
-.cm-airing-toggle.on{opacity:1;color:rgba(120,155,160,0.95);}
+.cm-watch-summary{display:none;align-items:center;gap:6px;font-size:var(--xs-label-size);color:var(--pal-pink-text);background:rgba(var(--pal-pink-rgb),0.14);border-radius:8px;padding:7px 10px;margin-bottom:12px;}
+.cm-watch-summary i{font-size:12px;}
 .send-btn-sm{width:32px;height:32px;border-radius:9px;}
 .seed-icon-btn{background:linear-gradient(120deg,rgba(185,215,140,0.75),rgba(210,230,165,0.65));border:1px solid rgba(145,185,80,0.45);box-shadow:0 2px 10px rgba(110,155,55,0.10);}
 [data-theme="glass"] .seed-icon-btn{background:linear-gradient(120deg,rgba(185,215,140,0.40),rgba(210,230,165,0.32));border:1.4px solid rgba(145,185,80,0.35);}
@@ -703,11 +704,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .ctl-block.book{background:var(--pal-yellow-bg);}
 .ctl-block.movie{background:var(--pal-sky-bg);}
 .ctl-block.music{background:var(--pal-lime-bg);justify-content:center;padding:0;}
-.ctl-airing-tone{background:none!important;}
-.ctl-airing-seg{flex:1;height:100%;background:rgba(var(--pal-pink-rgb),0.09);}
-.ctl-airing-seg.watched{background:var(--pal-pink-bg);}
-.ctl-airing-tone-label{position:absolute;left:6px;top:0;height:20px;display:flex;align-items:center;font-size:var(--dow-label-size);color:var(--tp);white-space:nowrap;pointer-events:none;z-index:2;overflow:hidden;text-overflow:ellipsis;max-width:calc(100% - 12px);}
-.ctl-airing-live-stripe{position:absolute;inset:0;pointer-events:none;z-index:1;background-image:repeating-linear-gradient(45deg,transparent,transparent 6px,rgba(255,255,255,0.55) 6px,rgba(255,255,255,0.55) 10px);}
 .ctl-head-row{display:flex;align-items:center;margin-bottom:4px;}
 .ctl-head-spacer{width:60px;flex-shrink:0;}
 .ctl-head-dates{flex:1;overflow-x:hidden;}
@@ -2286,7 +2282,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   <div class="modal" style="max-width:340px;">
     <div class="api-search-wrap" style="position:relative;">
       <input type="text" class="modal-inp" id="cm-title" placeholder="제목 검색..." autocomplete="off" oninput="apiSearchDebounce(this.value)" onblur="setTimeout(()=>hideApiResults(),200)" style="padding-right:36px;">
-      <button type="button" class="cm-airing-toggle" id="cm-airing-toggle" onclick="toggleCmAiring()" title="방영중 작품으로 표시"><i class="ti ti-player-play" aria-hidden="true"></i></button>
       <div class="api-results" id="api-results" style="display:none;"></div>
     </div>
     <div id="cm-poster-preview" style="display:none;margin-bottom:10px;flex-direction:row;gap:10px;align-items:center;">
@@ -2327,6 +2322,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     </div>
     <textarea class="modal-inp" id="cm-review" rows="2" style="resize:none;display:none;" placeholder="감상 메모 (선택)" autocomplete="off"></textarea>
     <textarea class="modal-inp" id="cm-music-note" rows="2" style="resize:none;display:none;" placeholder="" autocomplete="off"></textarea>
+    <div class="cm-watch-summary" id="cm-watch-summary"><i class="ti ti-clock" aria-hidden="true"></i><span></span></div>
     <div class="modal-actions" style="flex-wrap:wrap;gap:8px;">
       <button class="mbtn cancel" onclick="closeModal('content-modal')">취소</button>
       <button class="mbtn" id="cm-del-btn" onclick="deleteContent()" style="display:none;background:var(--pal-rose-bg);color:var(--pal-rose-text);border:1px solid var(--pal-rose-border);">삭제</button>

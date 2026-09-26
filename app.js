@@ -1082,20 +1082,64 @@ async function renderDiaryMonthSheet(){
 // 콘텐츠 완결 판정 — 2종. 조회/렌더링용은 콘텐츠 객체를 받고, 등록 모달의 저장 직전 로직처럼
 // 아직 객체가 아닌 상태 문자열만 있는 지점은 문자열 버전을 씀. 9곳에 흩어져 있던 동일 조건을 통합(2026-08-31).
 // 음악은 이 판정 대상이 아님(진행/완결 개념 자체가 없음, 항상 status 없이 등록일만 사용).
-// 방영중으로 표시해둔 콘텐츠(주로 드라마)의 완료 후 타임라인 렌더링용 — 해당 월(mk) 안에서
-// 리듬 블록("드라마 - {title}" 텍스트매칭, loadAndRenderWatchCal과 동일 규칙)에 실제로 잡힌 감상일(day 숫자)만 추출.
-function getWatchedDaysInMonth(title,mk){
+// 리듬블록 하나가 특정 콘텐츠(cid+title+cat)의 감상 기록인지 판정하는 공용 헬퍼 — content_cid 매칭 우선,
+// content_cid가 없는 과거 블록만 텍스트 매칭("{카테고리} - {title}")으로 폴백.
+// getWatchedDaysInMonth/computeWatchSummary 양쪽이 공유(2026-09-26 방영중 개편 시 통합).
+function _isContentWatchBlock(b,cid,title,cat){
+  if(b.cat!=='enjoy')return false;
+  if(cid&&b.contentCid)return b.contentCid===cid;
+  const catPrefix={drama:'드라마 - ',movie:'영화 - ',book:'독서 - '}[cat];
+  return!!(catPrefix&&b.text&&b.text.startsWith(catPrefix)&&b.text.slice(catPrefix.length)===title);
+}
+// 진행중(watching) 콘텐츠의 세그먼트 렌더링용 — 해당 월(mk) 안에서 리듬 블록에 실제로 잡힌 감상일(day 숫자)만 추출.
+function getWatchedDaysInMonth(cid,title,cat,mk){
   const [y,m]=mk.split('-').map(Number);
   const daysInMonth=new Date(y,m,0).getDate();
   const days=[];
   for(let d=1;d<=daysInMonth;d++){
     const dk=`${mk}-${String(d).padStart(2,'0')}`;
-    const hit=getRhythmBlocks(dk).some(b=>b.cat==='enjoy'&&b.text&&b.text.startsWith('드라마 - ')&&b.text.slice(6)===title);
-    if(hit)days.push(d);
+    if(getRhythmBlocks(dk).some(b=>_isContentWatchBlock(b,cid,title,cat)))days.push(d);
   }
   return days;
 }
+// 연속된 날짜(숫자 배열, 오름차순)를 [{from,to}] 구간 배열로 묶음 — 세그먼트 배치의 기본 단위.
+function groupConsecutiveDays(days){
+  if(!days.length)return[];
+  const sorted=[...days].sort((a,b)=>a-b);
+  const groups=[{from:sorted[0],to:sorted[0]}];
+  for(let i=1;i<sorted.length;i++){
+    const g=groups[groups.length-1];
+    if(sorted[i]===g.to+1)g.to=sorted[i];
+    else groups.push({from:sorted[i],to:sorted[i]});
+  }
+  return groups;
+}
 function isContentFinished(c){return c.status==='done'||c.status==='stopped';}
+// 완결 확정 시점에 1회 계산하는 감상 요약(2026-09-26 방영중 개편 시 도입) — watchedDaysCount(실제 감상일수)/
+// watchSpanDays(시작~종료 전체일수)/watchedSeconds(총 감상시간) 3개를 리듬블록에서 스캔해 스냅샷으로 저장.
+// 이후 리듬블록이 삭제/수정돼도 이 값은 그대로 유지됨(재계산은 다시 완결 처리할 때만). 음악은 대상 아님(호출부에서 이미 제외).
+function computeWatchSummary(cat,cid,title,startDate,endDate){
+  if(!startDate)return{};
+  const spanEnd=endDate||startDate;
+  const spanDays=Math.round((new Date(spanEnd+'T00:00:00')-new Date(startDate+'T00:00:00'))/86400000)+1;
+  let seconds=0;const daySet=new Set();
+  let d=new Date(startDate+'T00:00:00');
+  const end=new Date(spanEnd+'T00:00:00');
+  while(d<=end){
+    const dk=dateKey(d);
+    getRhythmBlocks(dk).forEach(b=>{
+      if(!_isContentWatchBlock(b,cid,title,cat))return;
+      daySet.add(dk);
+      if(b.start&&b.end){
+        const[sh,sm]=b.start.split(':').map(Number),[eh,em]=b.end.split(':').map(Number);
+        let sMin=sh*60+sm,eMin=eh*60+em;if(eMin<=sMin)eMin+=1440;
+        seconds+=(eMin-sMin)*60;
+      }
+    });
+    d.setDate(d.getDate()+1);
+  }
+  return{watchedDaysCount:daySet.size,watchSpanDays:spanDays,watchedSeconds:seconds};
+}
 function isFinishedStatus(status){return status==='done'||status==='stopped';}
 // 콘텐츠가 이번 달(mk)로 이월되는지 판정하는 공통 조건.
 // 진행중(watching)이거나, 완료/중단됐어도 종료월이 이번 달 이후면 이월 대상.
@@ -1345,6 +1389,9 @@ function _cmrDetailBodyHtml(c,wcalNotes,flat,showHead){
       </div>`;
     }
   }
+  // 감상 요약(완결 확정 시점 스냅샷) — showHead(그리드 상세)에서만, 값 없으면 표시 안 함(2026-09-26).
+  const watchSummary=showHead?formatWatchSummary(c):null;
+  const watchSummaryHtml=watchSummary?`<div class="cmr-watch-summary"><i class="ti ti-clock" aria-hidden="true"></i> ${escapeHtml(watchSummary)}</div>`:'';
   const finalPartHtml=c.review?`<div class="cmr-review-final${flat?' flat':''}"><span class="cmr-review-final-lbl">Comment :</span> ${escapeHtml(c.review)}</div>`:'';
   const notesPartHtml=wcalNotes.length?`<div class="cmr-review-notes${c.review?' with-final':''}">
     <div class="cmr-review-notes-lbl">Timeline</div>
@@ -1355,7 +1402,7 @@ function _cmrDetailBodyHtml(c,wcalNotes,flat,showHead){
       }).join('')}
     </div>
   </div>`:'';
-  return headHtml+progressHtml+finalPartHtml+notesPartHtml;
+  return headHtml+progressHtml+watchSummaryHtml+finalPartHtml+notesPartHtml;
 }
 // 카테고리별 리스트형(제목+별점+코멘트 아이콘, 한 줄씩) — 드라마/영화/책의 기본 표시 형태
 // 카테고리별 그리드형 — 음악(항상 그리드)과 드라마/영화/책(토글 시 그리드)이 공유하는 렌더러.
@@ -3813,7 +3860,7 @@ async function syncContentsDownRaw(mk){
       const matched=localNoCidByKey[key];
       if(matched){l=matched;delete localNoCidByKey[key];}
     }
-    const serverItem={cat:r.content_cat,title:r.title,startDate:r.start_date||(r.start_day?mk+'-'+pad(r.start_day):null),endDate:r.end_date||(r.end_day?mk+'-'+pad(r.end_day):null),status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',musicUrl:r.music_url||null,album:r.album||null,releaseYear:r.release_year||null,totalUnit:r.total_unit||null,currentUnit:r.current_unit||null,notes:r.notes||[],reviewSavedDk:r.review_saved_dk||null,reviewSavedTime:r.review_saved_time||null,unitLabel:r.unit_label||null,readSeconds:r.read_seconds||0,isAiring:!!r.is_airing,created:r.created,cid,updatedAt:r.updated_at,lastActivityAt:r.last_activity_at||0};
+    const serverItem={cat:r.content_cat,title:r.title,startDate:r.start_date||(r.start_day?mk+'-'+pad(r.start_day):null),endDate:r.end_date||(r.end_day?mk+'-'+pad(r.end_day):null),status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',musicUrl:r.music_url||null,album:r.album||null,releaseYear:r.release_year||null,totalUnit:r.total_unit||null,currentUnit:r.current_unit||null,notes:r.notes||[],reviewSavedDk:r.review_saved_dk||null,reviewSavedTime:r.review_saved_time||null,unitLabel:r.unit_label||null,readSeconds:r.read_seconds||0,watchedDaysCount:r.watched_days_count||null,watchSpanDays:r.watch_span_days||null,watchedSeconds:r.watched_seconds||null,created:r.created,cid,updatedAt:r.updated_at,lastActivityAt:r.last_activity_at||0};
     if(!l){merged.push(serverItem);return;}
     // 로컬/서버 둘 다 있으면 updated_at(서버) vs 로컬수정시각 비교, 서버가 더 최신이거나 로컬에 수정시각 기록이 없으면 서버값 채택
     const localTs=l.updatedAt?new Date(l.updatedAt).getTime():0;
@@ -3839,7 +3886,7 @@ async function syncContentsUp(mk){
   if(ensureItemCids(c))S.set(S.key('contents',mk),c);
   const delCids=getDelPendingCids('contents',mk);
   const ok=await syncListUpSafe('contents',`month_key=eq.${mk}`,'month_key,client_id',c,
-    it=>({month_key:mk,content_cat:it.cat,title:it.title,start_date:it.startDate,end_date:it.endDate,status:it.status,review:it.review||'',stars:it.stars||0,poster:it.poster||null,author:it.author||'',music_url:it.musicUrl||null,album:it.album||null,release_year:it.releaseYear||null,total_unit:it.totalUnit||null,current_unit:it.currentUnit||null,notes:it.notes||[],review_saved_dk:it.reviewSavedDk||null,review_saved_time:it.reviewSavedTime||null,unit_label:it.unitLabel||null,read_seconds:it.readSeconds||0,is_airing:!!it.isAiring,created:it.created,client_id:it.cid,last_activity_at:it.lastActivityAt||null}),
+    it=>({month_key:mk,content_cat:it.cat,title:it.title,start_date:it.startDate,end_date:it.endDate,status:it.status,review:it.review||'',stars:it.stars||0,poster:it.poster||null,author:it.author||'',music_url:it.musicUrl||null,album:it.album||null,release_year:it.releaseYear||null,total_unit:it.totalUnit||null,current_unit:it.currentUnit||null,notes:it.notes||[],review_saved_dk:it.reviewSavedDk||null,review_saved_time:it.reviewSavedTime||null,unit_label:it.unitLabel||null,read_seconds:it.readSeconds||0,watched_days_count:it.watchedDaysCount||null,watch_span_days:it.watchSpanDays||null,watched_seconds:it.watchedSeconds||null,created:it.created,client_id:it.cid,last_activity_at:it.lastActivityAt||null}),
     delCids);
   if(ok)delCids.forEach(cid=>removeDelPending('contents',mk,cid));
   return ok;
@@ -9135,25 +9182,39 @@ function renderContentTimeline(){
     }).map(c=>({...c,_carried:true}));
     const all=[...carry,...items];
 
-    const laid=all.map(item=>{
+    // watching(진행중, 음악 제외)은 실제 감상일 기준 세그먼트 여러 개로 펼침 — isAiring 개념 폐기(2026-09-26),
+    // 대신 모든 watching에 동일 적용. 연속 감상일만 이어붙이고, 하루라도 비면 별도 세그먼트(트랙 배치 대상 독립).
+    // done/stopped는 기존과 완전히 동일하게 시작일~종료일 통짜 하나.
+    let laid=[];
+    all.forEach(item=>{
+      const isWatching=item.status==='watching'&&cat!=='music';
+      if(isWatching){
+        const watchedDays=getWatchedDaysInMonth(item.cid,item.title,cat,mk);
+        const segments=groupConsecutiveDays(watchedDays);
+        if(!segments.length){
+          // 이번 달엔 실제 감상 기록이 아직 없음(예: 이월만 되고 이번달엔 안 본 경우) — 그릴 것 없음, 스킵.
+          return;
+        }
+        segments.forEach(seg=>{
+          laid.push({item,startD:seg.from,endD:seg.to,isWatching:true,_seg:true});
+        });
+        return;
+      }
       const sStr=item.startDate||(mk+'-01');
       const eStr=item.endDate;
-      const isWatching=item.status==='watching'&&cat!=='music';
       const startD=item._carried?1:Math.max(1,parseInt(sStr.slice(8,10),10)||1);
       let endD;
-      if(isWatching&&!eStr){
-        endD=isSameMonth?todayDay:daysInMonth;
-      }else if(!eStr){
-        // music은 '며칠씩 걸리는' 개념이 없으므로 상태(watching 포함)와 무관하게 항상 시작일 하루짜리 점으로 고정.
-        // music 외 다른 카테고리가 혹시 이 분기를 타는 경우(예외적 데이터)에는 기존처럼 watching이면 오늘/월말까지 연장.
-        endD=(cat!=='music'&&item.status==='watching')?(isSameMonth?todayDay:daysInMonth):startD;
+      if(!eStr){
+        // music은 '며칠씩 걸리는' 개념이 없으므로 항상 시작일 하루짜리 점으로 고정.
+        endD=startD;
       }else{
         const eMonth=eStr.slice(0,7);
         endD=eMonth===mk?Math.max(parseInt(eStr.slice(8,10),10)||startD,startD):daysInMonth;
       }
       endD=Math.min(Math.max(endD,startD),daysInMonth);
-      return {item,startD,endD,isWatching};
-    }).sort((a,b)=>a.startD-b.startD);
+      laid.push({item,startD,endD,isWatching:false});
+    });
+    laid.sort((a,b)=>a.startD-b.startD);
 
     // 같은 카테고리 안에서 기간이 겹치는 항목은 트랙(줄)을 나눠서 배치 (그리디 인터벌 스케줄링)
     // 단, 음악은 하루짜리 단기 기록이라 여러 개여도 항상 한 줄에 모아서 숫자 배지로 표기 (트랙 분리 안 함)
@@ -9207,34 +9268,9 @@ function renderContentTimeline(){
         }
         const dispEnd=Math.max(endD,dispStart);
         const span=dispEnd-dispStart+1,w=span*20+(span-1)*2;
-        // 방영중으로 표시해둔 드라마(isAiring)는 상태(보는중/완료/중단) 무관하게 하나로 이어진 막대는 유지하되
-        // 실제 감상일만 진한 톤, 안 본 날은 옅은 톤으로 — 완결작과 같은 "쭉 이어진 형태" 언어를 유지하면서 밀도 구분
-        // 전월부터 이어진(_carried) 경우에도 이 톤을 유지 — 이월 여부와 무관하게 방영중 상태 자체가 기준(2026-09-03 수정)
-        const useAiringTone=cat==='drama'&&item.isAiring;
-        if(useAiringTone){
-          const watchedDays=new Set(getWatchedDaysInMonth(item.title,mk));
-          const track=document.createElement('div');
-          track.className='ctl-block drama ctl-airing-tone';
-          track.style.cssText=`width:${w}px;min-width:${w}px;position:relative;padding:0;overflow:hidden;display:flex;`;
-          track.title=(item._carried?item.title+' (전월부터 이어짐)':item.title)+(item.status==='stopped'?' · 중단':'');
-          for(let d=dispStart;d<=dispEnd;d++){
-            const seg=document.createElement('div');
-            seg.className='ctl-airing-seg'+(watchedDays.has(d)?' watched':'');
-            track.appendChild(seg);
-          }
-          const lbl=document.createElement('span');lbl.className='ctl-airing-tone-label';lbl.textContent=item.title;
-          track.appendChild(lbl);
-          if(isWatching){
-            const stripe=document.createElement('div');stripe.className='ctl-airing-live-stripe';
-            track.appendChild(stripe);
-          }
-          if(item.status==='stopped')track.style.filter='saturate(0.45)';
-          track.addEventListener('click',()=>openContentModal(cat,item,item._carried?prevMk:mk));
-          track.style.cursor='pointer';
-          inner.appendChild(track);
-          cursor=dispEnd+1;
-          return;
-        }
+        // isAiring 개념 폐기(2026-09-26) — watching 세그먼트도 완결작과 동일한 ctl-block으로 그리되
+        // 사선 스트라이프(진행중 표시)만 얹음. 세그먼트는 laid 단계에서 이미 "실제 감상 구간"으로
+        // 쪼개져 있으므로 여기서는 통짜 막대와 렌더링 로직 차이가 없음(문자열 잘림도 기존과 동일하게 ellipsis 처리).
         const block=document.createElement('div');block.className=`ctl-block ${cat}`;
         block.style.cssText=`width:${w}px;min-width:${w}px;position:relative;`;
         if(isWatching){
@@ -9428,20 +9464,23 @@ function openContentModal(cat,item=null,mk=null,onSaved=null){
   // 수정(edit) 모드에서 기존에 저장된 값이 있으면 그대로 힌트로 표시하고, 검색해서 새로 선택하면 자동으로 덮어씀.
   _selectedTotalUnit=item?.totalUnit||null;
   renderCmProgressHint();
-  // 방영중 표시 토글 — 드라마만 해당(등록 시 미리 켜두면 완료 시점에 점선+네모 타임라인으로 전환됨)
-  _cmAiringOn=!!(item?.isAiring);
-  const airingBtn=document.getElementById('cm-airing-toggle');
-  if(airingBtn){
-    airingBtn.style.display=(cat==='drama')?'flex':'none';
-    airingBtn.classList.toggle('on',_cmAiringOn);
-  }
+  // 완결 콘텐츠라면 저장된 감상 요약을 모달 하단에 표시(방영중/isAiring 개념 폐기, 2026-09-26)
+  renderCmWatchSummary(item);
   openModal('content-modal');setTimeout(()=>document.getElementById('cm-title').focus(),100);
 }
-let _cmAiringOn=false;
-function toggleCmAiring(){
-  _cmAiringOn=!_cmAiringOn;
-  const btn=document.getElementById('cm-airing-toggle');
-  if(btn)btn.classList.toggle('on',_cmAiringOn);
+// 감상 요약 한 줄 포맷 — 콘텐츠허브 카드와 등록모달 양쪽에서 공용으로 재사용.
+function formatWatchSummary(c){
+  if(!c||!c.watchedDaysCount)return null; // 데이터 없으면 표시 안 함(리듬 기록 없이 등록/완결된 경우 등)
+  const h=Math.floor((c.watchedSeconds||0)/3600),m=Math.floor(((c.watchedSeconds||0)%3600)/60);
+  const timeStr=h>0?`${h}시간 ${m}분`:`${m}분`;
+  return `${c.watchSpanDays||c.watchedDaysCount}일 중 ${c.watchedDaysCount}일 감상 · 총 ${timeStr}`;
+}
+function renderCmWatchSummary(item){
+  const el=document.getElementById('cm-watch-summary');
+  if(!el)return;
+  const summary=item&&isContentFinished(item)?formatWatchSummary(item):null;
+  if(summary){el.querySelector('span').textContent=summary;el.style.display='flex';}
+  else{el.style.display='none';}
 }
 let _cmUnit='percent';
 function setCmUnit(u){
@@ -9524,9 +9563,7 @@ function confirmContent(){
     totalUnit=_selectedTotalUnit||null;
     if(totalUnit&&currentUnit&&currentUnit>totalUnit)currentUnit=totalUnit;
   }
-  // 방영중 표시 토글 — 드라마만 저장(다른 카테고리는 항상 false로 고정, 완료 버튼 누르는 시점의 렌더링 분기에만 사용됨)
-  const isAiring=_contentCtx.cat==='drama'?_cmAiringOn:false;
-  _selectedPoster=null;_selectedAuthor=null;_selectedMusicUrl=null;_selectedTotalUnit=null;_selectedAlbum=null;_selectedReleaseYear=null;_cmAiringOn=false;
+  _selectedPoster=null;_selectedAuthor=null;_selectedMusicUrl=null;_selectedTotalUnit=null;_selectedAlbum=null;_selectedReleaseYear=null;
   const newMk=startDate.slice(0,7); // 시작한 달 = 저장 버킷
   const oldMk=_contentCtx.mk;
   let savedCid=null;
@@ -9537,7 +9574,15 @@ function confirmContent(){
     const reviewChanged=idx>=0&&review!==(oldContents[idx].review||'');
     const reviewSavedDk=review?(reviewChanged?dateKey(getLogicalDate()):(idx>=0?oldContents[idx].reviewSavedDk:null)):null;
     const reviewSavedTime=review?(reviewChanged?(String(new Date().getHours()).padStart(2,'0')+':'+String(new Date().getMinutes()).padStart(2,'0')):(idx>=0?oldContents[idx].reviewSavedTime:null)):null;
-    const updated=idx>=0?{...oldContents[idx],title,startDate,endDate,status,review,stars,poster,author,musicUrl,album,releaseYear,totalUnit,currentUnit,isAiring,reviewSavedDk,reviewSavedTime}:null;
+    // 방금 완결(done/stopped)로 새로 전환된 경우에만 감상 요약을 1회 계산해 스냅샷 저장(2026-09-26).
+    // 이미 완결 상태였다가 재수정하는 경우는 기존 값을 유지(재계산 안 함) — 되돌렸다 다시 완결하면 그때 새로 계산.
+    const wasFinished=idx>=0&&isFinishedStatus(oldContents[idx].status);
+    const nowFinished=isFinishedStatus(status);
+    let watchSummaryFields={};
+    if(nowFinished&&!wasFinished&&_contentCtx.cat!=='music'){
+      watchSummaryFields=computeWatchSummary(_contentCtx.cat,idx>=0?oldContents[idx].cid:null,title,startDate,endDate);
+    }
+    const updated=idx>=0?{...oldContents[idx],title,startDate,endDate,status,review,stars,poster,author,musicUrl,album,releaseYear,totalUnit,currentUnit,reviewSavedDk,reviewSavedTime,...watchSummaryFields}:null;
     if(idx>=0){
       savedCid=oldContents[idx].cid;
       if(newMk===oldMk){
@@ -9559,7 +9604,9 @@ function confirmContent(){
     savedCid=newCid;
     const reviewSavedDk=review?dateKey(getLogicalDate()):null;
     const reviewSavedTime=review?(String(new Date().getHours()).padStart(2,'0')+':'+String(new Date().getMinutes()).padStart(2,'0')):null;
-    contents.push({cat:_contentCtx.cat,title,startDate,endDate,status,review,stars,poster,author,musicUrl,album,releaseYear,totalUnit,currentUnit,isAiring,reviewSavedDk,reviewSavedTime,created:Date.now(),cid:newCid});
+    // 신규 등록인데 처음부터 완결 상태로 저장하는 경우(과거 콘텐츠 수기 등록 등)도 감상 요약 계산 대상.
+    const watchSummaryFields=(isFinishedStatus(status)&&_contentCtx.cat!=='music')?computeWatchSummary(_contentCtx.cat,newCid,title,startDate,endDate):{};
+    contents.push({cat:_contentCtx.cat,title,startDate,endDate,status,review,stars,poster,author,musicUrl,album,releaseYear,totalUnit,currentUnit,reviewSavedDk,reviewSavedTime,created:Date.now(),cid:newCid,...watchSummaryFields});
     saveContents(newMk,contents);
     if(_contentCtx.onSaved){const cb=_contentCtx.onSaved;_contentCtx.onSaved=null;setTimeout(()=>cb(newCid),0);}
   }

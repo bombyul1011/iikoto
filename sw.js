@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.115-vacation-sync-fix';
+const CACHE = 'iikoto-v2.116-airing-refactor';
 const ASSETS = [
   './',
   './index.html'
