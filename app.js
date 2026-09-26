@@ -2713,8 +2713,7 @@ async function getUserSettings(){
   return (rows&&rows[0])||null;
 }
 // 스누즈 팝업 전용 캐시 — user_settings는 거의 안 바뀌는 값(알림 시각 설정)이라, 앱이 켜져 있는 동안은
-// 매번 새로 fetch하지 않고 재사용. 백그라운드 탭에서 postMessage 처리 시 네트워크 왕복을 하나 줄여
-// 스누즈 팝업이 늦게/안 뜨는 문제를 완화(2026-09-26).
+// 매번 새로 fetch하지 않고 재사용(2026-09-26).
 let _cachedUserSettings=null;
 async function getUserSettingsCached(){
   if(_cachedUserSettings)return _cachedUserSettings;
@@ -14184,12 +14183,12 @@ const MEMO_URL_DEFAULT_COPY={
   sleep:['오늘 하루는 어땠나요?','잠들기 전, 오늘을 짧게 남겨보세요.'],
   noon:['식사 후 나른한 시간이에요','지금 컨디션이나 오후 계획을 한 줄 남겨볼까요?']
 };
-async function _openFromNotificationUrl(urlStr){
-  const params=new URLSearchParams((urlStr?urlStr.split('?')[1]:location.search)||'');
+async function _openFromNotificationUrl(){
+  const params=new URLSearchParams(location.search);
   const snoozeCid=params.get('snooze'); // 할일 알림 — 스누즈 시트
   const memoType=params.get('memo');
   if(!snoozeCid&&!['rhythm','sleep','noon','question'].includes(memoType))return;
-  if(!urlStr)history.replaceState(null,'',location.pathname); // 최초 로드 경로일 때만 자기 URL을 정리(SW 메시지 경로는 애초에 주소가 안 바뀌므로 불필요)
+  history.replaceState(null,'',location.pathname); // 처리 후 자기 URL 정리(뒤로가기/새로고침 시 재실행 방지)
   if(snoozeCid){openSnoozePopup(snoozeCid);return;}
   const todayDk=dateKey(new Date());
   const copy=MEMO_URL_DEFAULT_COPY[memoType];
@@ -14214,15 +14213,9 @@ async function _openFromNotificationUrl(urlStr){
   if(!title)return;
   openRhythmMemoModal(found.cat,foundDk||todayDk,title,'지금 이 순간을 기록해보세요.');
 }
-// URL 쿼리 경로(콜드 스타트)의 실행은 스플래시 해제 이후로 미뤄야 하므로 아래 waitAndHideSplash에서 호출.
-// SW postMessage 경로(앱이 이미 열려있어 스플래시가 없는 경우)는 즉시 처리해도 무방.
-if('serviceWorker' in navigator){
-  navigator.serviceWorker.addEventListener('message',e=>{
-    if(e.data&&e.data.type==='notification-click'&&e.data.url){
-      _openFromNotificationUrl(e.data.url);
-    }
-  });
-}
+// 알림 클릭 시 sw.js가 열려있는 탭을 navigate()로 새로고침하거나 새 창을 열기 때문에, 이 페이지는
+// 항상 콜드 스타트와 동일하게 location.search를 처음부터 읽는다(waitAndHideSplash에서 호출) — postMessage
+// 수신 경로는 백그라운드 탭의 JS freeze로 메시지가 씹히는 문제가 있어 폐기(2026-09-26).
 // 새로고침/앱 완전종료 후 재시작 시, 켜져 있던 독서 스톱워치를 이어서 복원.
 // localStorage에 저장된 시작시각이 있으면(=종료 처리 없이 앱이 닫힌 경우) 그 시각 기준으로
 // 경과시간을 계산해 스톱워치를 다시 돌아가는 상태로 되살린다.

@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.119-notif-client-navigate';
+const CACHE = 'iikoto-v2.120-notif-force-reload';
 const ASSETS = [
   './',
   './index.html'
@@ -55,30 +55,21 @@ self.addEventListener('push', e => {
   );
 });
 
+// 알림 클릭 시 열려있는 탭이 있으면 그 탭을 새 URL로 새로고침(navigate)하고, 없으면 새 창을 연다.
+// postMessage로 열려있는 페이지에 메시지만 전달하던 이전 방식은 앱이 백그라운드에 오래 있을 때
+// 페이지의 JS 실행이 멈춰(freeze) 메시지가 씹히는 문제가 있어 폐기(2026-09-26).
+// navigate/openWindow 둘 다 페이지를 처음부터 새로 읽게 만들어 location.search 파싱 경로 하나로 통일.
 self.addEventListener('notificationclick', e => {
   e.notification.close();
   const targetUrl = e.notification.data?.url || './';
   e.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async clientList => {
-      for (const c of clientList) {
-        // postMessage는 백그라운드(freeze)에 있던 탭에서 메시지 리스너 자체가 깨어나지 않아
-        // 씹히는 경우가 실제로 있었음(2026-09-26) — focus만으로는 JS 실행이 즉시 재개된다는 보장이 없음.
-        // client.navigate()로 그 탭의 URL을 직접 바꾸면 콜드 스타트(openWindow)와 동일하게 페이지가
-        // 다시 로드되면서 location.search를 처음부터 읽으므로, freeze 상태와 무관하게 동작함.
-        if ('navigate' in c) {
-          try {
-            await c.navigate(targetUrl);
-            return c.focus();
-          } catch (err) {
-            // navigate 실패 시 postMessage 대신 openWindow로 폴백 — 콜드 스타트와 동일한 검증된 경로.
-            if (clients.openWindow) return clients.openWindow(targetUrl);
-          }
-        }
-        await c.focus();
-        c.postMessage({ type: 'notification-click', url: targetUrl });
-        return;
+      const c = clientList[0];
+      if (c && 'navigate' in c) {
+        await c.navigate(targetUrl);
+        return c.focus();
       }
-      if (clients.openWindow) return clients.openWindow(targetUrl);
+      return clients.openWindow(targetUrl);
     })
   );
 });
