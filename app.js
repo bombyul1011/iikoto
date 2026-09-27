@@ -2886,50 +2886,15 @@ function compareTodoOrder(a,b){
   if(typeof a.sortOrder==='number'&&typeof b.sortOrder==='number')return a.sortOrder-b.sortOrder;
   return parseTodoLeadingTime(a.text)-parseTodoLeadingTime(b.text);
 }
-// ── 반복 투두/일정 (2026-09-07 전면 재설계) ──
+// ── 반복 투두/일정 ──
 // 반복은 투두/일정의 "특수한 종류"가 아니라 옵션 하나로 취급한다: 규칙에 해당하는 날짜가 되면 그날의 실제
-// todos 레코드를 한 번 생성(실체화)하고, 그 이후로는 done/sortOrder/sync/렌더 등 시스템 어디서도 일반
-// 투두/일정과 구분하지 않는다 — 남는 표식은 어느 규칙에서 나왔는지 가리키는 recurRuleCid 필드 하나뿐.
-// (구 방식은 매번 규칙을 계산해 가상 항목을 병합하는 방식이었으나, 완료체크가 로컬 전용 별도 저장소에
-// 남아 기기 간 동기화가 전혀 안 되는 치명적 결함이 있었음 — 그 구조 자체를 폐기하고 새로 설계함.)
-// 1회성 마이그레이션(2026-09-07): 구설계~재설계 초기 테스트 과정에서 만들어진 반복 규칙/실체화 데이터가
-// 기기 로컬에 남아, 서버에서 지워도 다음 sync 때 로컬 잔재가 되살리는 문제가 실사용에서 발생함(수기로
-// 지워도 재실행 시 재생성). 아직 실사용 목적 반복은 등록된 게 없다고 확인했으므로, 앱 로드 시 로컬의
-// recurring_items/recur_skip/실체화된 todos를 전부 한 번만 지움 — _recurCleanupV1 플래그로 재실행 방지.
-(function _recurCleanupV1(){
-  if(S.get('_recur_cleanup_v1_done'))return;
-  S.set('recurring_items',[]);
-  // 최근 40일(할일 미리보기 7일+일정 미리보기 30일+여유분)치 todos에서 recurRuleCid 붙은 항목과 recur_skip 기록을 정리
-  const today=new Date();
-  for(let i=-10;i<=40;i++){
-    const d=new Date(today);d.setDate(today.getDate()+i);
-    const dk=dateKey(d);
-    const todos=S.get(S.key('todos',dk))||[];
-    const filtered=todos.filter(t=>!t.recurRuleCid);
-    if(filtered.length!==todos.length)S.set(S.key('todos',dk),filtered);
-    S.set(S.key('recur_skip',dk),[]);
-  }
-  S.set('_recur_cleanup_v1_done',true);
-})();
-// 1회성 마이그레이션 v2(2026-09-07): 실체화 저장이 todos_pending 플래그를 잘못 세우던 버그(위 saveTodos.raw
-// 참고)로 인해, 최근 며칠치 todos_pending이 true로 남아 서버의 정상 데이터가 로컬에 반영되지 못하고 있었음
-// (recurRuleCid 없는 옛 로컬 캐시가 서버값으로 안 고쳐져 "일반 메뉴가 뜨는" 등 증상 발생). 잘못 세워진
-// pending 플래그를 지워 다음 sync 때 서버값이 정상 반영되게 함. 아울러 시간표(HH:MM) 형식으로 실수 등록된
-// 반복 규칙도 함께 정리(이후 등록 자체를 막는 코드는 별도 적용됨, 이건 이미 만들어진 과거분 정리).
-(function _recurCleanupV2(){
-  if(S.get('_recur_cleanup_v2_done'))return;
-  const today=new Date();
-  for(let i=-10;i<=40;i++){
-    const d=new Date(today);d.setDate(today.getDate()+i);
-    const dk=dateKey(d);
-    S.set(S.key('todos_pending',dk),false);
-  }
-  const rules=(S.get('recurring_items')||[]).filter(it=>!/^(\d{1,2}):(\d{2})\s+/.test(it.text||''));
-  S.set('recurring_items',rules);
-  S.set('_recur_cleanup_v2_done',true);
-})();
+// todos 레코드를 생성(실체화)하고, 그 이후로는 done/sortOrder/sync/렌더 등 시스템 어디서도 일반 투두/일정과
+// 구분하지 않는다 — 남는 표식은 어느 규칙에서 나왔는지 가리키는 recurRuleCid 필드 하나뿐.
+// 실체화는 서버(materialize-recurring Edge Function, 매일 자정 직후 cron)가 전담한다 — 클라이언트가
+// 각자 판정+저장하던 예전 방식은 여러 기기/여러 sync 경로가 동시에 같은 날짜를 실체화하려 들며 경합이
+// 반복적으로 발생해 폐기했다(2026-09-27 재설계).
 function getRecurringItems(){return S.get('recurring_items')||[];}
-function saveRecurringItems(v){S.set('recurring_items',v);autoSync('recurringItems',null);_materializedDkCache.clear();}
+function saveRecurringItems(v){S.set('recurring_items',v);autoSync('recurringItems',null);}
 // 특정 규칙(ruleCid)이 특정 날짜(dk)에 실체화되지 않도록 막는 예외 — "오늘만 삭제"에서만 씀.
 // 실체화 자체를 스킵하는 용도라, 실체화된 뒤에는 그냥 그 todos 레코드를 지우는 문제일 뿐이라 skip 개념만 남음
 // (구 버전에 있던 edited_text 예외는 폐기 — 실체화된 레코드의 text를 직접 수정하면 되므로 불필요해짐).
@@ -2938,119 +2903,64 @@ function addRecurSkip(ruleCid,dk){
   const skips=getRecurSkips(dk);
   if(!skips.includes(ruleCid)){skips.push(ruleCid);S.set(S.key('recur_skip',dk),skips);autoSync('recurSkip',dk);}
 }
-// 반복 규칙(rule)이 특정 날짜(dk)에 해당하는지 판정.
-// rule.type: 'daily'(rule.n=간격일수, 기본 1=매일) | 'weekly'(rule.days=['MO','TU',...], rule.weekInterval=1(매주)|2(격주)) | 'monthly'(rule.day=1~31)
-function _isRecurringDueOn(item,dk){
-  if(item.startDate&&dk<item.startDate)return false;
-  if(item.endDate&&dk>item.endDate)return false;
+// 반복 규칙별 실체화 허용 범위(다른 곳에서도 참조 — 예: recurSheetDeleteAll이 로컬 삭제 범위를 정할 때).
+const RECUR_TODO_PREVIEW_DAYS=7;
+const RECUR_EVENT_PREVIEW_DAYS=30;
+// 규칙이 특정 날짜(dk)에 해당하는지 판정 — 서버(materialize-recurring)의 isDueOn과 동일한 기준.
+// 클라이언트에서는 오직 "방금 등록한 규칙이 오늘도 해당되면 그 자리에서 1건만 즉시 보여주기" 용도로만
+// 씀(아래 _materializeToday) — 날짜를 여러 개 순회하며 판정/저장하는 일은 이제 하지 않음(그건 서버 cron
+// 전담). 판정 로직 자체는 규칙 하나·날짜 하나에 대한 순수 계산이라 경합의 여지가 없음.
+function _isRuleDueOn(rule,dk){
+  if(rule.startDate&&dk<rule.startDate)return false;
+  if(rule.endDate&&dk>rule.endDate)return false;
   const d=new Date(dk+'T00:00:00');
-  const rule=item.rule||{};
-  if(rule.type==='daily'){
-    const n=rule.n||1; // n=1이면 매일, n>=2면 그만큼의 간격(예: 3이면 사흘마다) — "매일"의 자연스러운 일반형
+  const r=rule.rule||{};
+  if(r.type==='daily'){
+    const n=r.n||1;
     if(n===1)return true;
-    if(!item.startDate)return true;
-    const start=new Date(item.startDate+'T00:00:00');
+    if(!rule.startDate)return true;
+    const start=new Date(rule.startDate+'T00:00:00');
     const daysDiff=Math.round((d-start)/86400000);
     return daysDiff>=0&&daysDiff%n===0;
   }
-  if(rule.type==='weekly'){
+  if(r.type==='weekly'){
     const dow=['SU','MO','TU','WE','TH','FR','SA'][d.getDay()];
-    if(!(rule.days||[]).includes(dow))return false;
-    // weekInterval:2(격주)는 요일 자체는 매주 그 요일이 되, 시작일 기준 몇 주째인지로 2주에 한 번만 걸러냄.
-    if((rule.weekInterval||1)===2){
-      if(!item.startDate)return true;
-      const start=new Date(item.startDate+'T00:00:00');
+    if(!(r.days||[]).includes(dow))return false;
+    if((r.weekInterval||1)===2){
+      if(!rule.startDate)return true;
+      const start=new Date(rule.startDate+'T00:00:00');
       const weeksDiff=Math.floor((d-start)/(7*86400000));
       return weeksDiff%2===0;
     }
     return true;
   }
-  if(rule.type==='monthly')return d.getDate()===rule.day;
+  if(r.type==='monthly')return d.getDate()===r.day;
   return false;
 }
-// 반복 실체화를 어느 날짜(dk)까지 허용할지 규칙별로 판정.
-// 둘 다 "오늘 그 날짜를 조회하는 순간 실체화"라는 동일한 원리를 쓰되, 미리보기 허용 범위(오늘+N일)만 다름:
-// 할일은 오늘탭 날짜 네비게이터가 최대 +7일까지만 열리므로 그에 맞춤. 일정은 월간캘린더가 한 화면에 한 달을
-// 통째로 보여주는 용도라 +30일(대략 한 달)까지 미리 실체화를 허용해 캘린더에서 바로 보이게 함.
-const RECUR_TODO_PREVIEW_DAYS=7;
-const RECUR_EVENT_PREVIEW_DAYS=30;
-function _recurMaterializeAllowed(rule,dk){
-  const todayDk=dateKey(new Date());
-  if(dk<todayDk)return false;
-  const days=rule.isEvent?RECUR_EVENT_PREVIEW_DAYS:RECUR_TODO_PREVIEW_DAYS;
-  const limit=new Date();limit.setDate(limit.getDate()+days);
-  return dk<=dateKey(limit);
-}
-// 그날(dk) 아직 실체화 안 된 반복 규칙들을 찾아 todos에 실제 레코드로 추가 — getTodos(dk) 호출 시마다 실행되지만,
-// 이미 그 규칙(recurRuleCid)으로 그날 만들어진 레코드가 있으면 다시 만들지 않아 중복 생성되지 않는다.
-// cid는 "규칙cid_dk" 형태의 결정적 값으로 만들어, 여러 기기가 같은 날 동시에 처음 열어도 upsert 시 자연히 하나로 합쳐짐.
-// 세션 내 이미 확인 끝난 dk는 _materializedDkCache에 표시해두고 재확인을 건너뜀 — 월간캘린더처럼 같은 달을
-// 반복해서 다시 그릴 때(달 넘겼다 되돌아오기 등) 매번 규칙 전체를 훑는 낭비를 막기 위함. 새 규칙을
-// 등록/삭제한 직후(saveRecurringItems)에는 캐시를 비워 다음 조회 때 다시 확인하게 함.
-// 주의: saveTodos.raw(=saveTodosRaw, todos_pending을 세우지 않는 전용 저장 함수)는 autoSync를 통해
-// syncTodosUp을 부르고, syncTodosUp 내부가 다시 getTodos(dk)를 호출하는 재진입 경로가 있음 — 이 재진입
-// 자체는 캐시로 막히지만, 등록 직후 캐시가 비워진 좁은 틈에 다른 화면(캘린더 등)이 거의 동시에 같은
-// dk를 조회하면 같은 규칙이 두 번 push될 여지가 이론상 있었고, 실사용에서 실제로 발생함(2026-09-07).
-// 저장 직전에 디스크의 최신 값을 다시 읽어 규칙cid 기준으로 병합·중복 제거한 뒤 저장하는 안전망을 추가함.
-const _materializedDkCache=new Set();
-// 같은 dk에 대해 이 함수가 동시에(재진입) 실행되는 것을 막는 락. saveTodos.raw(내부에서 호출)가
-// autoSync→syncTodosUp→getTodos(dk) 재진입 경로를 갖고 있어, 캐시가 비워진 좁은 틈에 다른 화면
-// (캘린더 등)이 같은 dk를 거의 동시에 조회하면 규칙이 두 번 push되는 경합이 실사용에서 발생했었음.
-// 저장 직전 dedupe 안전망은 유지하되, 애초에 동시 진입 자체를 막아 경합 창구를 없앰.
-const _materializingDkLock=new Set();
-function _materializeRecurringForDate(dk){
-  if(_materializedDkCache.has(dk))return false;
-  if(_materializingDkLock.has(dk))return false; // 이미 이 dk를 처리 중(재진입) — 중복 실행 방지
-  _materializingDkLock.add(dk);
-  try{
-    return _materializeRecurringForDateInner(dk);
-  }finally{
-    _materializingDkLock.delete(dk);
-  }
-}
-function _materializeRecurringForDateInner(dk){
-  _materializedDkCache.add(dk);
-  const rules=getRecurringItems();
-  if(!rules.length)return false;
-  const todos=getTodos.raw(dk);
-  const already=new Set(todos.filter(t=>t.recurRuleCid).map(t=>t.recurRuleCid));
-  const skips=new Set(getRecurSkips(dk));
-  let changed=false;
-  rules.forEach(rule=>{
-    if(already.has(rule.cid)||skips.has(rule.cid))return;
-    if(!_recurMaterializeAllowed(rule,dk))return;
-    if(!_isRecurringDueOn(rule,dk))return;
-    already.add(rule.cid);
-    todos.push({
-      cid:rule.cid+'_'+dk,text:rule.text,isEvent:!!rule.isEvent,eventCat:rule.eventCat||null,
-      eventTime:rule.eventTime||null,timeSection:rule.isEvent?null:(rule.timeSection||'none'),
-      done:false,created:Date.now(),recurRuleCid:rule.cid
-    });
-    changed=true;
+// 방금 등록한 규칙 하나가 오늘(dk) 해당되면, 서버 cron(다음 자정)을 기다리지 않고 그 자리에서
+// todos에 1건만 즉시 만들어 넣음 — cid는 서버와 동일한 결정적 패턴(규칙cid_dk)이라, 다음 자정에
+// 서버 cron이 같은 dk를 다시 훑어도 "이미 있음"으로 보고 중복 생성하지 않음(2026-09-27).
+function _materializeTodayIfDue(rule,dk){
+  if(!_isRuleDueOn(rule,dk))return;
+  const todos=getTodos(dk);
+  if(todos.some(t=>t.recurRuleCid===rule.cid))return; // 이미 있으면(재등록 등) 건너뜀
+  todos.push({
+    cid:rule.cid+'_'+dk,text:rule.text,isEvent:!!rule.isEvent,eventCat:rule.eventCat||null,
+    eventTime:rule.eventTime||null,timeSection:rule.isEvent?null:(rule.timeSection||'none'),
+    done:false,created:Date.now(),recurRuleCid:rule.cid
   });
-  if(!changed)return false;
-  // 저장 직전 최종 안전망 — 디스크의 최신 값을 다시 읽어, 이 함수가 새로 만든 항목 중 이미 최신본에
-  // 같은 규칙cid로 존재하는 게 있으면 빼고 합침. 그 뒤 규칙cid별로 최초 1개만 남기는 dedupe까지 적용.
-  const latest=getTodos.raw(dk);
-  const latestRuleCids=new Set(latest.filter(t=>t.recurRuleCid).map(t=>t.recurRuleCid));
-  const seenCids=new Set();
-  const merged=[...latest,...todos.filter(t=>t.recurRuleCid&&!latestRuleCids.has(t.recurRuleCid))]
-    .filter(t=>{
-      if(!t.recurRuleCid)return true;
-      if(seenCids.has(t.recurRuleCid))return false;
-      seenCids.add(t.recurRuleCid);
-      return true;
-    });
-  saveTodos.raw(dk,merged);
-  return changed;
+  saveTodos(dk,todos);
 }
-// getTodos는 호출될 때마다 그날 실체화가 필요한 반복 항목이 있는지 먼저 확인해 반영한 뒤 반환한다.
-// .raw는 실체화 로직 내부에서만 쓰는 원본 접근(무한 재귀 방지용) — 그 외 모든 호출부는 getTodos(dk)만 쓰면 됨.
-function getTodos(dk){
-  _materializeRecurringForDate(dk);
-  return getTodos.raw(dk);
-}
-getTodos.raw=function(dk){return S.get(S.key('todos',dk))||[];};
+// (2026-09-27 재설계) 반복 규칙을 실제 todos 레코드로 만드는 일("실체화")은 이제 클라이언트가
+// 하지 않는다 — 서버의 materialize-recurring Edge Function이 하루 한 번(cron) 전담해서 처리하고,
+// 클라이언트는 그 결과인 todos를 그냥 받아서 읽기만 한다. 예전엔 getTodos(dk) 호출 시마다 클라이언트가
+// 직접 판정+저장까지 했는데, 여러 기기·여러 sync 경로가 동시에 같은 날짜를 실체화하려 들면서 경합이
+// 반복적으로 발생했었다(반복 규칙이 풀리거나 recur_rule_cid가 null로 남는 등 — 2026-09-07/09-16/09-27
+// 세 차례 재발). 실체화 주체를 서버 하나로 좁히면 "여러 주체가 동시에 같은 작업을 한다"는 경합의
+// 전제 자체가 없어진다 — 클라이언트 쪽엔 이제 반복 판정 로직, 락, 캐시, 업로드 추적이 전혀 필요 없다.
+function getTodos(dk){return S.get(S.key('todos',dk))||[];}
+getTodos.raw=getTodos; // 과거엔 실체화 재귀 방지를 위해 별도였음 — 이제 getTodos 자체가 순수 읽기라 완전히 동일.
+
 
 // ── 월간 캘린더 연속일정 bar 좌표 계산 ──
 // weekDates: 그 주의 7개 dk(월~일) 배열. multidayEvents: getActiveMultiDayEvents류로 모은 이번 달 전체 연속일정 목록(중복 제거된 원본, {_startDk,eventEndDate,...}).
@@ -3712,18 +3622,18 @@ async function syncHabitsUp(){
   return true;
 }
 // 원본 규칙(recurring_items)만 다룸 — 완료체크/실체화 여부는 이제 todos 자체에 있으므로 별도 sync 불필요.
+// 서버가 0개를 반환하면 그대로 로컬도 0개로 맞춘다 — 예전엔 "로컬에 남아있으면 서버가 잘못 비워진 걸로
+// 보고 되살린다"는 방어 로직이 있었는데, 이게 오히려 다른 기기가 방금 정상적으로 전부 삭제한 경우와
+// 구분을 못 해 그 삭제를 무효화시키는 사고를 만들 수 있었음(2026-09-27 점검 중 발견, 실제 재현 사례는
+// 없었지만 구조적으로 위험). 서버가 규칙의 유일한 원본이므로 그 값을 그대로 신뢰.
 async function syncRecurringItemsDown(){
   const rows=await supaFetch('recurring_items?order=sort_order');
   if(!rows)return;
-  if(rows.length===0&&getRecurringItems().length>0){syncRecurringItemsUp();return;}
-  if(rows.length>0){
-    S.set('recurring_items',rows.map(r=>({
-      cid:r.client_id,text:r.text,isEvent:!!r.is_event,eventTime:r.event_time||null,
-      eventCat:r.event_cat||null,timeSection:r.time_section||null,
-      rule:r.rule,startDate:r.start_date,endDate:r.end_date||null
-    })));
-    _materializedDkCache.clear(); // 다른 기기에서 등록/삭제된 규칙이 반영됐으니, 이미 "확인 끝남"으로 캐시된 날짜들도 다시 실체화 검토 대상이 되어야 함
-  }
+  S.set('recurring_items',rows.map(r=>({
+    cid:r.client_id,text:r.text,isEvent:!!r.is_event,eventTime:r.event_time||null,
+    eventCat:r.event_cat||null,timeSection:r.time_section||null,
+    rule:r.rule,startDate:r.start_date,endDate:r.end_date||null
+  })));
 }
 async function syncRecurringItemsUp(){
   const items=getRecurringItems();
@@ -3985,10 +3895,10 @@ async function syncAll(){
   for(let i=0;i<2;i++){const d=new Date(now);d.setDate(now.getDate()-i);mflowDks.push(dateKey(d));}
   // Down (Supabase → 로컬)
   // 반복 규칙(recurring_items)/스킵기록(recurring_exceptions)은 todos보다 먼저 로컬에 반영되어야 함 —
-  // syncTodosDown이 끝나며 renderTodos()를 호출하고, 그 안에서 getTodos()가 그 자리에서 바로 반복
-  // 실체화 판정을 하기 때문에, skip 기록이 아직 안 내려온 상태로 이게 먼저 돌면 "오늘만 삭제"한 반복
-  // 항목이 skip 미반영 상태로 오판되어 되살아나는 경합이 있었음(2026-09-07 확인). 병렬 Promise.all 안에서는
-  // 응답 순서가 보장되지 않으므로, 이 두 개만 await로 먼저 끝내고 나머지를 병렬로 진행.
+  // (2026-09-27 재설계 이후) 실체화 자체는 서버(materialize-recurring cron)가 전담하지만, "오늘만 삭제"
+  // 등 클라이언트가 화면에 보여줄 스킵 상태는 여전히 로컬에도 필요해서, todos보다 먼저 받아둬야 화면이
+  // 일시적으로 어긋나지 않음. 병렬 Promise.all 안에서는 응답 순서가 보장되지 않으므로, 이 두 개만
+  // await로 먼저 끝내고 나머지를 병렬로 진행.
   await Promise.all([syncRecurringItemsDown(),syncRecurSkipDown(dk)]);
   await Promise.all([
     syncTodosDown(dk),syncMemosDown(dk),syncSleepDown(dk),syncMealsDown(dk),
@@ -7895,8 +7805,10 @@ function deleteTodoFromModal(){
   restoreCalModeAndRender(modal,true);
 }
 // 반복 투두/일정 규칙 등록 — 모달의 반복 설정(dataset)을 rule 객체로 조립해 recurring_items(원본 규칙)에 저장.
-// 실제 오늘 날짜에 나타나는 실체화는 여기서 하지 않음 — 등록 직후 restoreCalModeAndRender가 renderTodos()를
-// 호출하고, 그 안의 getTodos(dk)가 자동으로 오늘치를 실체화하므로 별도 처리가 필요 없음.
+// 앞으로의 날짜들은 서버(materialize-recurring cron, 매일 자정 직후 실행)가 알아서 채워 넣지만, "오늘"이
+// 해당 요일/간격이면 다음 자정까지 기다리지 않고 이 자리에서 바로 1건만 만들어 화면에 보이게 함
+// (_materializeTodayIfDue, 2026-09-27) — 등록하자마자 오늘 목록에 안 보이면 등록이 실패한 것처럼
+// 보일 수 있어서 둔 예외이고, 그 외 모든 날짜는 서버 전담.
 function confirmRecurringTodo(text){
   const modal=document.getElementById('todo-modal');
   const isEvent=modal.dataset.kind==='event';
@@ -7928,8 +7840,10 @@ function confirmRecurringTodo(text){
   if(endDate&&endDate<dk){showToast('종료일은 시작일 이후로 선택해주세요');return;}
   _todoSubmitting=true;
   const items=getRecurringItems();
-  items.push({cid:genCid(),text,isEvent,eventCat,eventTime,timeSection:isEvent?null:timeSection,rule,startDate:dk,endDate});
+  const newRule={cid:genCid(),text,isEvent,eventCat,eventTime,timeSection:isEvent?null:timeSection,rule,startDate:dk,endDate};
+  items.push(newRule);
   saveRecurringItems(items);
+  _materializeTodayIfDue(newRule,dk);
   closeModal('todo-modal');
   restoreCalModeAndRender(modal,true);
   setTimeout(()=>{_todoSubmitting=false;},500);

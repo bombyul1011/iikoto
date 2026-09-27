@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.130-polling-redesign';
+const CACHE = 'iikoto-v2.11-recur-redesign';
 const ASSETS = [
   './',
   './index.html'
