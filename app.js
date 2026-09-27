@@ -8462,7 +8462,22 @@ const WC_COLORS_BORDER=[
   'var(--pal-sky-border)','var(--pal-lavender-border)','var(--pal-rose-border)'
 ];
 function getWChallenge(wk){return S.get('wchallenge_'+wk)||[];}
-function saveWChallenge(wk,data){S.set('wchallenge_'+wk,data);S.set('wchallenge_pending_'+wk,true);}
+// 요일 체크/텍스트 입력 즉시 서버 반영(2026-09-27) — 예전엔 pending 플래그만 세우고 실제 업로드는
+// 탭 전환(syncOnTabEnter)이나 2분 주기 syncAll에 맡겼는데, PC/모바일 1인 양방향 사용 환경에서
+// "체크했는데 바로 다른 기기에 안 보임" 문제가 있었음. apiSearchDebounce(TMDB 검색창)와 동일한
+// clearTimeout+setTimeout 디바운스 패턴을 재사용 — 연속 클릭/타이핑 중엔 요청을 쌓지 않고,
+// 입력이 800ms 멈췄을 때 한 번만 서버로 올린다. 주(wk)별로 타이머를 분리해서 다른 주 데이터가
+// 섞이지 않게 함. pending 플래그는 그대로 유지 — 업로드 도중 오프라인 전환 등으로 실패해도
+// 기존 안전망(탭 전환/주기 동기화)이 재시도해준다.
+const _wchallengeSyncTimers={};
+function saveWChallenge(wk,data){
+  S.set('wchallenge_'+wk,data);
+  S.set('wchallenge_pending_'+wk,true);
+  clearTimeout(_wchallengeSyncTimers[wk]);
+  _wchallengeSyncTimers[wk]=setTimeout(()=>{
+    if(navigator.onLine)autoSync('wchallenge','wchallenge_'+wk);
+  },800);
+}
 
 function nextWeekKey(){const d=new Date();d.setDate(d.getDate()+7);return weekKey(d);}
 function lastWeekKey(){const d=new Date();d.setDate(d.getDate()-7);return weekKey(d);}
