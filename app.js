@@ -5348,6 +5348,14 @@ function renderTodos(){
       // 반복 항목도 조각모드(취소선 토글)는 일반 투두와 동일하게 지원 — attachTodoSwipeMode 내부에서
       // isRecurring 여부에 따라 "내일도 복사"만 별도로 막는다(중복 생성 방지, 토스트 안내로 처리).
       attachTodoSwipeMode(el,i,hasMultipleParts,!!t.recurRuleCid);
+      // PC 우클릭으로 조각모드 진입(2026-09-29) — 모바일 왼쪽 스와이프(dx<-15)와 동일한 진입 동작을
+      // PC에서 우클릭으로 대체. 마우스 환경에서는 pointermove 기반 드래그 임계값이 미세한 손떨림과
+      // 구분이 안 돼 setPointerCapture가 잘못 걸리는 경우가 있었고(엉뚱하게 "내일로 복사"가 실행되거나
+      // 조각모드가 안 열리는 오작동), contextmenu는 그 드래그 경로를 아예 타지 않아 이 문제와 무관하다.
+      // 터치 기기에서는 스와이프가 이미 정상 동작하므로 붙이지 않음(불필요한 우클릭 메뉴 차단 방지).
+      if(!_isTouchDevice()&&!t.recurRuleCid&&parseTodoTextParts(t.text).parts.length>1){
+        attachTodoPartModeContextMenu(el,i);
+      }
     }
     list.appendChild(el);
   });
@@ -5816,6 +5824,17 @@ function attachTodoSwipeMode(el,i,hasMultipleParts,isRecurring){
   };
   el.addEventListener('pointerup',endDrag);
   el.addEventListener('pointercancel',endDrag);
+}
+// PC 전용 — 우클릭으로 조각모드 진입/해제(attachTodoSwipeMode의 왼쪽 스와이프 진입을 대체).
+// 브라우저 기본 컨텍스트 메뉴(복사/검색 등)를 막고 토글만 수행 — 이후 각 조각(.todo-part) 클릭으로
+// 완료 토글하는 흐름은 attachTodoItemClick이 그대로 처리하므로 여기선 손대지 않음.
+function attachTodoPartModeContextMenu(el,i){
+  el.addEventListener('contextmenu',e=>{
+    if(e.target.closest('.chk')||e.target.closest('[data-role="copy-unstruck"]'))return;
+    e.preventDefault();
+    _todoPartModeIdx=(_todoPartModeIdx===i)?-1:i;
+    renderTodos();
+  });
 }
 // 정렬모드 전용 드래그: 같은 시간대 그룹 내에서만, DOM 재생성 없이 transform으로만 이동.
 // 손 뗄 때 1회만 배열 재정렬 + sortOrder 재기록 + 리렌더링.
