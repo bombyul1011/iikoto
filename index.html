@@ -46,7 +46,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --pal-lime-rgb:200,220,140;--pal-lime-bg:rgba(200,220,140,0.55);--pal-lime-border:rgba(135,165,60,0.55);--pal-lime-text:rgba(95,120,35,0.95);
   --pal-rose-rgb:230,126,126;--pal-rose-bg:rgba(230,126,126,0.52);--pal-rose-border:rgba(205,95,95,0.55);--pal-rose-text:rgba(165,60,60,0.95); /* 2026-09-04 채도 x1.3 강화 — 외출용으로 칙칙하지 않게 */
   --off-badge-text:rgba(165,60,60,0.7); /* 오늘탭 "Off n" 표기 전용 — pal-rose-text와 같은 RGB에 알파만 낮춰 캘린더 일요일 색(rgba(205,95,95,0.9))과 톤을 맞춤, 2026-09-25 */
-  --pal-green-rgb:95,175,130;--pal-green-bg:rgba(95,175,130,0.55);--pal-green-border:rgba(50,130,85,0.55);--pal-green-text:rgba(25,100,60,0.95); /* 청록빛 그린 — mint(민트그린)와 구분되는 진한 톤, 2026-09-04 리듬 식사색 전용으로 추가 */
+  --pal-green-rgb:95,175,130; /* 청록빛 그린 — mint(민트그린)와 구분되는 진한 톤, 2026-09-04 리듬 식사색(RHYTHM_MEAL_COLOR) 전용 — rgba(var(--pal-green-rgb),알파) 형태로만 참조되므로 bg/border/text 파생 변수는 두지 않음 */
   --pal-mintlime:rgb(102,160,85); /* 민트+연두 중간톤 — 문장저장/문장코멘트/영양제/인용구칩 4곳 통합용, 2026-08-16 */
   --grad-pinkyellow:linear-gradient(120deg,rgba(255,210,230,0.80),rgba(255,230,200,0.70)); /* 핑크-옐로 카드 그라디언트 — reading-icon-btn 기준값, mr-goal-card는 알파만 더 연하게 별도 지정 */
   --grad-mintyellow:linear-gradient(135deg,rgba(210,244,225,0.85),rgba(248,245,200,0.85),rgba(212,242,222,0.85)); /* 민트-옐로 3색 그라디언트 — weekly-review-banner-inner/report-banner-inner/quote-chip-inner 공용, 2026-08-16 통합 */
@@ -83,13 +83,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --card-y:rgba(var(--pal-yellow-rgb),0.22);--card-yb:rgba(var(--pal-yellow-rgb),0.32); /* 투두 배너 — 2026-08-16 공용팔레트 참조로 전환, 알파를 기존톤에 맞춰 재조정 */
   --card-s:rgba(var(--pal-lime-rgb),0.30);--card-sb:rgba(var(--pal-lime-rgb),0.45); /* 식사 배너 — 2026-08-16 연두로 전환(ID셀렉터 #daily-meal-card가 우선 적용되던 문제 해결) */
   /* --acc, --acc-soft 2026-08-17 완전 제거 — 오늘날짜/강조색은 로즈(오늘 표기류) 또는 pal-pink(일반 강조/액션류)로 분할 통합됨 */
-  --nav:rgba(255,250,240,0.78);--nav-b:rgba(255,210,200,0.42);
   --sheet:linear-gradient(160deg,#fdf3ec,#fef7e8);
   --modal:linear-gradient(145deg,#fdf3ec,#fef7e8);
   --inp:rgba(255,250,240,0.82);--inp-b:rgba(255,210,200,0.42);
-  --memo-b:rgba(255,250,240,0.68);--memo-bb:rgba(255,210,200,0.50);
   --sleep-b:rgba(255,250,240,0.60);--sleep-bb:rgba(255,200,180,0.42);
-  --sleep-badge-bg:#fffaf5;
 }
 [data-theme="glass"]{
   --main-text-size:14px;
@@ -111,13 +108,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --card-y:var(--card);--card-yb:rgba(250,215,100,0.62);
   --card-s:var(--card);--card-sb:rgba(150,180,225,0.55);
   /* --acc, --acc-soft 2026-08-17 완전 제거 — glass 전용 강조색(황토톤)도 사용처 없어져 함께 삭제 */
-  --nav:rgba(250,246,238,0.80);--nav-b:rgba(225,210,185,0.40);
   --sheet:linear-gradient(160deg,#f8f5ee,#fbf8f1);
   --modal:linear-gradient(145deg,#f8f5ee,#fbf8f1);
   --inp:rgba(255,255,255,0.50);--inp-b:rgba(220,205,180,0.40);
-  --memo-b:rgba(255,253,248,0.50);--memo-bb:rgba(240,160,190,0.45);
   --sleep-b:rgba(255,253,248,0.50);--sleep-bb:rgba(95,115,170,0.55);
-  --sleep-badge-bg:#fdfbf6;
   --glass-chip-bg:rgba(253,251,245,0.95); /* 완료칩/배너 등 14곳에서 반복되던 배경색 통합 */
 }
 [data-theme="glass"] .card,[data-theme="glass"] .sleep-card,[data-theme="glass"] .habit-week-box,[data-theme="glass"] .habit-chk2,[data-theme="glass"] .habit-check-box{border-width:1.4px;box-shadow:0 1.5px 1.5px rgba(255,255,255,0.9) inset,0 -8px 14px -10px rgba(120,110,95,0.15) inset,0 5px 14px rgba(150,140,120,0.08);}
