@@ -7463,6 +7463,59 @@ function closeTodoModal(e){
   if(e&&e.target!==modal)return; // 오버레이 클릭 시에는 modal-ov 자체를 클릭했을 때만 닫힘(기존 closeModal과 동일 동작)
   restoreCalModeAndRender(modal,false);
   modal.classList.remove('on');
+  hideTodoFragChips();
+}
+// DR 조각 자동제안(2026-09-29) — 실사용 데이터 기준 "DR >" 뒤에 반복 등장한 상위 조각.
+// 서버 투두 텍스트 분석 결과 블로그 43회/인스타 39회/카페 21회/영상 6회/드라이브 5회로 압도적 상위라 이 5개만 고정.
+// 이후 사용 패턴이 바뀌면 이 배열만 조정하면 됨(자동 집계 아님 — 하드코딩이 더 예측 가능하고 단순해 이 방식으로 결정).
+const DR_FRAG_SUGGESTIONS=['블로그','인스타','카페','영상','드라이브'];
+function onTodoModalInpInput(){
+  const inp=document.getElementById('todo-modal-inp');
+  const row=document.getElementById('todo-frag-chip-row');
+  if(!inp||!row)return;
+  const v=inp.value;
+  // "DR" 뒤에 ">"까지 입력된 시점부터 노출(예: "DR >", "DR>", "DR > " 전부 인식)
+  if(/^DR\s*>/.test(v.trim())){
+    renderTodoFragChips();
+  }else{
+    hideTodoFragChips();
+  }
+}
+function renderTodoFragChips(){
+  const row=document.getElementById('todo-frag-chip-row');
+  const inp=document.getElementById('todo-modal-inp');
+  if(!row||!inp)return;
+  const afterGt=inp.value.split('>').slice(1).join('>'); // ">" 이후 부분(이미 넣은 조각 판별용)
+  row.style.display='flex';
+  row.innerHTML=DR_FRAG_SUGGESTIONS.map(f=>{
+    const used=afterGt.includes(f);
+    return `<button type="button" class="todo-frag-chip${used?' used':''}" onclick="appendTodoFragChip('${f}')">${f}</button>`;
+  }).join('');
+}
+function hideTodoFragChips(){
+  const row=document.getElementById('todo-frag-chip-row');
+  if(row){row.style.display='none';row.innerHTML='';}
+}
+function appendTodoFragChip(frag){
+  const inp=document.getElementById('todo-modal-inp');
+  if(!inp)return;
+  let v=inp.value;
+  const gtIdx=v.indexOf('>');
+  if(gtIdx<0)return; // 방어: ">"가 사라진 상태에서 호출되는 경우는 없어야 하지만 안전하게 무시
+  const before=v.slice(0,gtIdx+1); // "DR >" 포함
+  let after=v.slice(gtIdx+1);
+  const trimmedAfter=after.trim();
+  if(trimmedAfter.includes(frag)){ // 이미 들어간 조각을 다시 누르면 제거(토글)
+    after=' '+trimmedAfter.split('/').map(s=>s.trim()).filter(s=>s&&s!==frag).join(' / ');
+  }else if(!trimmedAfter){
+    after=' '+frag;
+  }else{
+    after=' '+trimmedAfter+' / '+frag;
+  }
+  inp.value=before+after;
+  inp.focus();
+  inp.setSelectionRange(inp.value.length,inp.value.length);
+  renderTodoFragChips();
 }
 function openTodoModal(editIdx=-1){
   const modal=document.getElementById('todo-modal');
@@ -7472,6 +7525,7 @@ function openTodoModal(editIdx=-1){
   const dk=dateKey(currentDate);
   const existing=editIdx>=0?getTodos(dk)[editIdx]:null;
   document.getElementById('todo-modal-inp').value=existing?.text||'';
+  onTodoModalInpInput(); // 수정 진입 시 기존 텍스트가 "DR >"로 시작하면 칩 상태도 즉시 맞춰줌
   // 시간대 버튼 초기화
   const ts=existing?.timeSection||'none';
   document.querySelectorAll('.todo-time-sel button').forEach(b=>b.classList.remove('active'));

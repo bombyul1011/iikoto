@@ -184,6 +184,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .slabel-search-btn{background:none;border:none;padding:2px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--tm);opacity:.7;}
 .slabel-search-btn:active{opacity:1;}
 .reserve-section-btn{flex:1;padding:7px 0;border-radius:10px;border:1px solid var(--card-b);background:var(--card);font-size:var(--dow-label-size);color:var(--tm);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;}
+/* DR 조각 자동제안 칩(2026-09-29) — "DR >" 입력 감지 시에만 나타남, 빈도 상위 조각(블로그/인스타/카페/영상/드라이브)을 탭 한 번으로 이어붙임 */
+.todo-frag-chip-row{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0 12px;}
+.todo-frag-chip{padding:5px 11px;border-radius:20px;border:1px solid var(--card-b);background:var(--card);font-size:var(--dow-label-size);color:var(--ts);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;}
+.todo-frag-chip.used{opacity:0.4;}
 .reserve-section-btn.active{background:var(--pal-pink-bg);color:var(--pal-pink-text);border-color:var(--pal-pink-border);font-weight:600;}
 #reserve-filter-row .reserve-section-btn[data-filter="all"].active{background:var(--card);color:var(--tm);border-color:var(--card-b);font-weight:600;}
 #reserve-filter-row .reserve-section-btn[data-filter="shop"].active{background:var(--pal-orange-bg);color:var(--pal-orange-text);border-color:var(--pal-orange-border);}
@@ -2087,10 +2091,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <button class="tk-todo active" onclick="selectTodoKind('todo',this)"><i class="ti ti-checkbox ico-sz-13" aria-hidden="true"></i> 할일</button>
       <button class="tk-event" onclick="selectTodoKind('event',this)"><i class="ti ti-calendar-event ico-sz-13" aria-hidden="true"></i> 일정</button>
     </div>
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
-      <input type="text" class="modal-inp" id="todo-modal-inp" placeholder="할 일을 입력하세요" autocomplete="off" style="flex:1;margin-bottom:0;" onkeydown="if(event.isComposing||event.keyCode===229)return;if(event.key==='Enter'){event.preventDefault();confirmTodo();}">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:0;">
+      <input type="text" class="modal-inp" id="todo-modal-inp" placeholder="할 일을 입력하세요" autocomplete="off" style="flex:1;margin-bottom:0;" oninput="onTodoModalInpInput()" onkeydown="if(event.isComposing||event.keyCode===229)return;if(event.key==='Enter'){event.preventDefault();confirmTodo();}">
       <button type="button" id="todo-pinned-toggle" class="todo-pinned-btn" onclick="toggleTodoPinnedDraft()" title="오늘 안에 강조" aria-label="오늘 안에 강조"><i class="ti ti-bolt-filled" aria-hidden="true"></i></button>
     </div>
+    <div class="todo-frag-chip-row" id="todo-frag-chip-row" style="display:none;"></div>
     <div class="todo-time-sel" id="todo-time-sel">
       <button class="ts-morning" onclick="selectTodoTime('morning',this)">오전</button>
       <button class="ts-afternoon" onclick="selectTodoTime('afternoon',this)">오후</button>
