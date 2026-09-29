@@ -185,8 +185,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .slabel-search-btn:active{opacity:1;}
 .reserve-section-btn{flex:1;padding:7px 0;border-radius:10px;border:1px solid var(--card-b);background:var(--card);font-size:var(--dow-label-size);color:var(--tm);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;}
 /* DR 조각 자동제안 칩(2026-09-29) — "DR >" 입력 감지 시에만 나타남, 빈도 상위 조각(블로그/인스타/카페/영상/드라이브)을 탭 한 번으로 이어붙임 */
-.todo-frag-chip-row{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0 12px;}
-.todo-frag-chip{padding:5px 11px;border-radius:20px;border:1px solid var(--card-b);background:var(--card);font-size:var(--dow-label-size);color:var(--ts);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;}
+.todo-frag-chip-row{display:flex;flex-wrap:nowrap;gap:5px;margin:8px 0 12px;overflow-x:auto;touch-action:pan-x;-ms-overflow-style:none;scrollbar-width:none;}
+.todo-frag-chip-row::-webkit-scrollbar{display:none;}
+.todo-frag-chip{flex-shrink:0;padding:5px 11px;border-radius:20px;border:1px solid var(--card-b);background:var(--card);font-size:var(--dow-label-size);color:var(--ts);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;white-space:nowrap;}
 .todo-frag-chip.used{opacity:0.4;}
 .reserve-section-btn.active{background:var(--pal-pink-bg);color:var(--pal-pink-text);border-color:var(--pal-pink-border);font-weight:600;}
 #reserve-filter-row .reserve-section-btn[data-filter="all"].active{background:var(--card);color:var(--tm);border-color:var(--card-b);font-weight:600;}
