@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.11-recur-redesign';
+const CACHE = 'iikoto-v2.12-pc-partmode-ctxmenu';
 const ASSETS = [
   './',
   './index.html'
