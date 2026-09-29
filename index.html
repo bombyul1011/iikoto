@@ -639,7 +639,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .undo-btn{font-size:var(--dow-label-size);color:rgba(255,200,180,.90);font-weight:500;cursor:pointer;}
 .memo-input-row{margin-top:12px;padding-top:11px;display:flex;gap:7px;align-items:center;}
 .stamp-btn{width:38px;height:38px;background:var(--card);border:1px solid var(--card-b);border-radius:11px;padding:0;font-size:var(--dow-label-size);color:var(--ts);display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:'DM Sans',sans-serif;flex-shrink:0;}
-.memo-field{flex:1;height:38px;box-sizing:border-box;background:rgba(255,250,240,.30);border:1.5px dashed color-mix(in srgb, var(--tp) 20%, transparent);border-radius:11px;padding:8px 12px;font-size:16px;color:var(--tp);font-family:'DM Sans',sans-serif;outline:none;resize:none;line-height:1.3;max-height:100px;overflow-y:auto;}
+.memo-field{flex:1;height:38px;box-sizing:border-box;background:rgba(255,250,240,.30);border:1.5px dashed color-mix(in srgb, var(--tp) 20%, transparent);border-radius:11px;padding:8px 12px;font-size:16px;color:var(--tp);font-family:'DM Sans',sans-serif;outline:none;resize:none;line-height:1.3;max-height:100px;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none;} /* PC(macOS "항상 표시" 스크롤바 설정)에서 텍스트가 거의 없어도 세로 스크롤바가 보이던 문제 — 모바일은 원래 오버레이라 안 보였음. 숨겨도 스크롤 자체는 그대로 동작 */
+.memo-field::-webkit-scrollbar{display:none;}
 .memo-field::placeholder{color:var(--tm);font-size:var(--main-text-size);}
 .send-btn{width:38px;height:38px;background:var(--card);border:1px solid var(--card-b);border-radius:11px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:var(--tm);}
 .memo-input-row .send-btn{border-color:var(--card-b);}
