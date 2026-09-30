@@ -2778,7 +2778,8 @@ async function _findTodoByCidRemote(cid){
     return {dk:r.date_key,todo:{cid:r.client_id,text:r.text,done:!!r.done,isEvent:!!r.is_event}};
   }catch(e){return null;}
 }
-// 스누즈 칩 목록 — 오늘 저녁/내일 아침 시각은 설정탭의 남은 할일 알림·아침 브리핑 시각을 그대로 읽음(없으면 19:30/08:00).
+// 스누즈 칩 목록 — 오늘 저녁/내일 아침 시각은 user_settings의 remaining_todo_time·morning_briefing_time을 그대로 읽음(없으면 19:30/08:00).
+// [2026-10-01] 남은 할일 알림 자체는 폐지돼 설정탭에서 이 시각을 바꿀 수 없음 — 컬럼값(19:30)은 "오늘 저녁" 스누즈 시각 용도로만 남겨둔 것.
 // 오늘 저녁이 이미 지났으면 그 칩은 뺌. 새벽 0~4시는 아직 "어젯밤"이라 내일 아침 = 오늘 아침.
 function _snoozeTargets(settings){
   const now=new Date();
@@ -11559,8 +11560,8 @@ function openSettings(){
 // 설정탭 알림 시각 3종(아침브리핑/저녁마무리/남은할일) + 개별 온오프 6종 UI — user_settings를 직접 조회해 채움.
 // 전체 push 구독이 꺼져있으면(getExistingPushSubscription 없음) 개별 토글은 값 유지한 채 시각적으로만 비활성화.
 // ALERT_TIME_FIELD_MAP/ALERT_ENABLED_FIELD_MAP은 렌더링과 토글 양쪽에서 쓰여 아래 공용 상수로 뽑음(중복 정의 제거).
-const ALERT_TIME_FIELD_MAP={morning:'morning_briefing_time',evening:'evening_wrap_time',remaining:'remaining_todo_time'};
-const ALERT_ENABLED_FIELD_MAP={morning:'morning_enabled',evening:'evening_enabled',remaining:'remaining_enabled',sleep:'sleep_enabled',rhythm:'rhythm_enabled',report:'report_enabled',exercise:'exercise_stat_enabled',noon:'noon_memo_enabled',question:'question_enabled'};
+const ALERT_TIME_FIELD_MAP={morning:'morning_briefing_time'};
+const ALERT_ENABLED_FIELD_MAP={morning:'morning_enabled',sleep:'sleep_enabled',rhythm:'rhythm_enabled',report:'report_enabled',exercise:'exercise_stat_enabled',question:'question_enabled',sleepscore:'sleep_score_enabled'};
 async function renderSettingsAlertSection(){
   const wrap=document.getElementById('settings-acc-alert-detail');
   if(!wrap)return;
@@ -14292,6 +14293,10 @@ async function _openPopupForAlert(alert){
     openQuestionMemo(todayDk);
     return;
   }
+  if(type==='sleep_score_missing'){
+    if(getSleepScore(todayDk)==null)promptSleepScore(todayDk); // 그 사이 등록했으면 팝업 생략
+    return;
+  }
   if(type==='rhythm_ongoing'){
     const cid=alert.link_cid||alert.source_cid;
     if(!cid)return;
@@ -14317,22 +14322,29 @@ async function _openPopupForAlert(alert){
 }
 // 포그라운드로 돌아올 때마다 체크: 앱 최초 로드 시(스플래시 이후)와, 이후 탭 전환/화면 켜짐 등으로
 // 다시 보이게 될 때마다. visibilitychange가 iOS PWA에서 notificationclick보다 훨씬 안정적으로 fire됨.
-document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='visible')checkPendingAlerts();
-});
-window.addEventListener('pageshow',()=>{ checkPendingAlerts(); }); // bfcache 복귀 등 visibilitychange가 안 잡는 경우 보강
+// [2026-10-01] 위 자동 트리거(visibilitychange/pageshow)는 제거 — 알림을 누르지 않아도 앱에 들어올 때마다
+// 안 본 알림의 팝업이 뜨던 문제. 이제 팝업은 "알림을 눌러 열린 경우"에만 뜬다: 서버가 Declarative Web Push(iOS 18.4+)로
+// navigate URL(?memo=…&aid=…)을 실어 보내고, 알림 탭 시 iOS가 그 URL로 앱을 열면 아래 _openFromNotificationUrl이 팝업을 띄움.
+// checkPendingAlerts/_openPopupForAlert는 호출부 없이 남겨둠(선언형 푸시가 동작 안 할 때 폴링 방식으로 되돌리는 용도).
 
 async function _openFromNotificationUrl(){
   const params=new URLSearchParams(location.search);
   const snoozeCid=params.get('snooze'); // 할일 알림 — 스누즈 시트
   const memoType=params.get('memo');
-  if(!snoozeCid&&!['rhythm','sleep','noon','question'].includes(memoType))return false;
+  const aid=params.get('aid'); // 알림 row id — 알림을 눌러 열렸음을 alerts.opened에 기록(이제 "열림" = 실제로 탭해서 들어옴)
+  const markAlertOpened=()=>{ if(aid)Promise.resolve(supaFetch(`alerts?id=eq.${encodeURIComponent(aid)}`,'PATCH',{opened:true})).catch(()=>{}); };
+  if(!snoozeCid&&!['rhythm','sleep','noon','question','sleepscore'].includes(memoType)){
+    if(aid){markAlertOpened();history.replaceState(null,'',location.pathname);} // 팝업 없는 알림(아침 브리핑·리포트 등)도 탭으로 열렸음은 기록
+    return false;
+  }
+  markAlertOpened();
   history.replaceState(null,'',location.pathname); // 처리 후 자기 URL 정리(뒤로가기/새로고침 시 재실행 방지)
   if(snoozeCid){openSnoozePopup(snoozeCid);return true;}
   const todayDk=dateKey(new Date());
   const copy=MEMO_URL_DEFAULT_COPY[memoType];
   if(copy){openRhythmMemoModal(memoType,todayDk,params.get('t')||copy[0],params.get('b')||copy[1]);return true;}
   if(memoType==='question'){openQuestionMemo(todayDk);return true;} // 질문은 알림에 싣지 않고 앱이 풀에서 직접 뽑음
+  if(memoType==='sleepscore'){if(getSleepScore(todayDk)==null)promptSleepScore(todayDk);return true;} // 그 사이 등록했으면 팝업 생략
   const cid=params.get('cid');
   if(!cid)return true; // memo=rhythm인데 cid가 없는 이상 케이스 — URL은 이미 처리(정리)했으니 폴링으로 재시도할 필요 없음
   let found=null,foundDk=null;
@@ -14517,7 +14529,7 @@ setTimeout(checkAndRecoverPushSubscription, 1500);
   // 1시간 리마인드 알림으로 콜드 스타트된 경우 — 스플래시가 완전히 사라진 뒤에만 메모 모달을 띄운다(2026-09-17).
   // _openFromNotificationUrl(URL 파라미터 기반, 폴백 경로)이 뭔가 처리했으면 checkPendingAlerts를
   // 건너뛴다 — 안 그러면 같은 알림에 대해 두 시스템이 각각 팝업을 열려고 해서 경합이 생길 수 있음.
-  _openFromNotificationUrl().then(handled=>{ if(!handled)checkPendingAlerts(); });
+  _openFromNotificationUrl(); // [2026-10-01] 알림 탭으로 열린 경우(URL 파라미터)에만 팝업 — 자동 폴링(checkPendingAlerts) 폴백은 제거
 })();
 
 
