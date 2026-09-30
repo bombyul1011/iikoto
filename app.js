@@ -226,19 +226,45 @@ async function _syncManyDown(table,dks,pendingKey,mapFn,setFn){
     setFn(dk,byDk[dk].map(mapFn));
   });
 }
+// todos 서버 행 → 로컬 객체 매핑을 한 곳으로 통합(2026-09-30) — 예전엔 syncTodosDown/syncTodosDownMany/
+// syncMonthRange 세 곳에 이 매핑을 각자 따로 써놨는데, 필드가 하나 추가될 때마다 세 곳을 다 고쳐야 했고
+// 한 곳(syncMonthRange)만 놓쳐서 recur_rule_cid 등 6개 필드가 누락된 채 로컬을 덮어쓰는 버그가 있었다
+// (반복투두 "바레 예약"이 앱을 처음 열면 반복 설정이 풀려 보이다가 한참 뒤에야 복구되던 현상의 원인).
+// 앞으로 todos 필드가 늘어나면 이 함수 하나만 고치면 세 경로 모두에 반영된다.
+function todoRowToLocal(r){
+  return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null,eventEndDate:r.event_end_date||null,cat:r.cat||'todo',pinned:!!r.pinned,recurRuleCid:r.recur_rule_cid||undefined,alertTime:r.alert_time||null,eventAlertOn:!!r.event_alert_on,todoAlertOn:!!r.todo_alert_on,isVacation:!!r.is_vacation};
+}
+// 반복 규칙cid가 같은 항목이 두 개 이상 섞여 있으면(과거 경합으로 생긴 서버측 중복 등) 먼저 것만 남김.
+// syncTodosDown/syncTodosDownMany 두 곳에 각자 있던 동일 로직을 통합.
+function dedupeRecurTodos(list){
+  const seenRuleCids=new Set();
+  return list.filter(t=>{
+    if(!t.recurRuleCid)return true;
+    if(seenRuleCids.has(t.recurRuleCid))return false;
+    seenRuleCids.add(t.recurRuleCid);
+    return true;
+  });
+}
+// 캘린더 월간뷰 전용 캐시(2026-09-30) — renderCalendar()의 칸 미리보기(배지/막대)가 오늘탭과 같은
+// todos_* 저장소를 읽지 않도록 분리. syncMonthRange가 채워두며, 아직 한 번도 캐시되지 않은 날짜는
+// (예: 이번 달로 막 진입해 아직 syncMonthRange가 안 끝난 순간) 정식 todos_*로 폴백해 빈 칸으로
+// 보이는 것을 방지한다 — 캐시가 "더 부정확한" 상황은 없고, 기껏해야 "아직 없어서 정식 걸 대신 보여줌".
+function getCalTodos(dk){
+  const cached=S.get(S.key('cal_todos_cache',dk));
+  return cached!==undefined&&cached!==null?cached:getTodos(dk);
+}
+// 캘린더에서 직접 등록/수정/삭제가 즉시 반영되도록, 저장 직후 해당 날짜의 캐시도 같이 갱신.
+// confirmTodo 등 정식 todos_*를 saveTodos로 바꾼 직후 이 함수를 호출하면, 다음 renderCalendar()
+// 호출(탭 전환 없이 바로 이어짐)에서 캐시가 아니라 방금 그 최신값을 그대로 보여준다.
+function syncCalCacheFromTodos(dk){
+  S.set(S.key('cal_todos_cache',dk),getTodos(dk));
+}
 async function syncTodosDownMany(dks){
   let hasMultidayChange=false;
   await _syncManyDown('todos',dks,'todos_pending',
-    r=>({text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null,eventEndDate:r.event_end_date||null,cat:r.cat||'todo',pinned:!!r.pinned,recurRuleCid:r.recur_rule_cid||undefined,alertTime:r.alert_time||null,eventAlertOn:!!r.event_alert_on,todoAlertOn:!!r.todo_alert_on,isVacation:!!r.is_vacation}),
+    todoRowToLocal,
     (dk,mapped)=>{
-      // 반복 규칙cid 중복 방어(syncTodosDown과 동일 로직)
-      const seenRuleCids=new Set();
-      const deduped=mapped.filter(t=>{
-        if(!t.recurRuleCid)return true;
-        if(seenRuleCids.has(t.recurRuleCid))return false;
-        seenRuleCids.add(t.recurRuleCid);
-        return true;
-      });
+      const deduped=dedupeRecurTodos(mapped);
       S.set(S.key('todos',dk),deduped);
       if(deduped.some(t=>t.isEvent&&t.eventEndDate))hasMultidayChange=true;
     });
@@ -3044,7 +3070,9 @@ function getActiveMultiDayEvents(dk){
 // 월간 달력은 전달/다음달 칸까지 그리므로 월 경계가 아니라 "달력 격자 전체 범위"를 넘겨 호출함.
 // getActiveMultiDayEvents는 "하루 기준" 조회라 범위 전체를 훑으면 같은 이벤트가 여러 날에서 중복 조회됨.
 // 이 함수는 범위 시작~끝(+앞쪽 룩백)만 스캔해 이벤트 원본을 cid 기준으로 1건씩만 모음 — computeWeekBars의 입력으로 사용.
-function getMultiDayEventsForRange(rangeStart,rangeEnd){
+// todosGetter: 어느 저장소(정식 todos_* 또는 캘린더 캐시)에서 읽을지 주입 — 기본은 정식 todos_*.
+function getMultiDayEventsForRange(rangeStart,rangeEnd,todosGetter){
+  const getFn=todosGetter||getTodos;
   const seen=new Set();
   const result=[];
   // 범위 시작일 기준으로 최대 MULTIDAY_LOOKBACK_DAYS일 전부터, 범위 마지막날까지 시작일 후보를 훑음
@@ -3052,7 +3080,7 @@ function getMultiDayEventsForRange(rangeStart,rangeEnd){
   const scanTo=new Date(rangeEnd+'T00:00:00');
   for(let d=new Date(scanFrom);d<=scanTo;d.setDate(d.getDate()+1)){
     const startDk=dateKey(d);
-    const todos=getTodos(startDk);
+    const todos=getFn(startDk);
     todos.forEach((t,idx)=>{
       if(!t.isEvent||!t.eventEndDate)return;
       if(t.eventEndDate<rangeStart||startDk>rangeEnd)return; // 이 범위와 전혀 안 겹치면 제외
@@ -3466,17 +3494,8 @@ async function syncTodosDown(dk){
   const rows=await supaFetch('todos?date_key=eq.'+dk+'&order=created');
   if(!rows)return; // 연결 실패(null) — 로컬 유지. 빈 배열은 "서버에 진짜 0개"라는 뜻이라 그대로 반영.
   if(S.get(S.key('todos_pending',dk)))return; // 업로드 대기중인 로컬 수정(미루기 등) 있으면 덮어쓰지 않음
-  const mapped=rows.map(function(r){
-    return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null,eventEndDate:r.event_end_date||null,cat:r.cat||'todo',pinned:!!r.pinned,recurRuleCid:r.recur_rule_cid||undefined,alertTime:r.alert_time||null,eventAlertOn:!!r.event_alert_on,todoAlertOn:!!r.todo_alert_on,isVacation:!!r.is_vacation};
-  });
-  // 반복 규칙cid가 같은 row가 두 개 이상 섞여 있으면(과거 경합으로 생긴 서버측 중복 등) 먼저 만들어진 것만 남김 — 방어적 dedupe.
-  const seenRuleCids=new Set();
-  const deduped=mapped.filter(t=>{
-    if(!t.recurRuleCid)return true;
-    if(seenRuleCids.has(t.recurRuleCid))return false;
-    seenRuleCids.add(t.recurRuleCid);
-    return true;
-  });
+  const mapped=rows.map(todoRowToLocal);
+  const deduped=dedupeRecurTodos(mapped);
   S.set(S.key('todos',dk),deduped);
   // 다른 기기에서 온 변경사항 중 연속일정(오프 여부 포함)이 있으면 isVacationDate 캐시도 함께 무효화 —
   // 로컬 직접 저장/삭제 때만 무효화하던 기존 처리가 sync down 경로를 놓쳐, 다른 기기에서 바꾼 오프 상태가
@@ -7875,6 +7894,7 @@ function deleteTodoFromModal(){
   const t=todos[editIdx];
   if(t)removeTodoByCid(dk,t.cid);
   closeModal('todo-modal');
+  syncCalCacheFromTodos(dk); // 캘린더에서 바로 삭제 시 탭 전환 없이 즉시 반영되도록
   restoreCalModeAndRender(modal,true);
 }
 // 반복 투두/일정 규칙 등록 — 모달의 반복 설정(dataset)을 rule 객체로 조립해 recurring_items(원본 규칙)에 저장.
@@ -7918,6 +7938,7 @@ function confirmRecurringTodo(text){
   saveRecurringItems(items);
   _materializeTodayIfDue(newRule,dk);
   closeModal('todo-modal');
+  syncCalCacheFromTodos(dk); // 캘린더에서 반복투두 등록 시 탭 전환 없이 즉시 반영되도록
   restoreCalModeAndRender(modal,true);
   setTimeout(()=>{_todoSubmitting=false;},500);
 }
@@ -7963,6 +7984,7 @@ async function confirmTodo(){
     if(eventEndDate)_invalidateVacationCache();
     if(eventTime&&eventAlertOn)await syncAlertFor('event',old.cid,newDk,eventTime,text);else await deleteAlertFor('event',old.cid);
     closeModal('todo-modal');
+    syncCalCacheFromTodos(dk);syncCalCacheFromTodos(newDk); // 시작일이 바뀐 경우 원래 날짜/새 날짜 둘 다 즉시 반영
     restoreCalModeAndRender(modal,true);
     setTimeout(()=>{_todoSubmitting=false;},500);
     return;
@@ -8012,6 +8034,7 @@ async function confirmTodo(){
   if(!isEvent&&alertChanged)deleteAlertFor('todo_snooze',savedTodo.cid); // 알림 시각/온오프를 바꿨으면 옛 스누즈도 정리
   // 월간 캘린더의 "투두 추가하기"에서 열린 경우 — currentDate를 원래대로 되돌리고 캘린더/상세를 갱신
   // (calMode가 아니면 restoreCalModeAndRender 내부에서 renderTodos만 실행됨)
+  syncCalCacheFromTodos(dk); // 캘린더에서 직접 등록/수정 시 탭 전환 없이 즉시 반영되도록
   restoreCalModeAndRender(modal,true);
   setTimeout(()=>{_todoSubmitting=false;},500);
 }
@@ -8051,6 +8074,7 @@ function eventSheetEdit(){
 function eventSheetDelete(){
   closeSheet('event-sheet');
   if(!removeTodoByCid(_eventSheetDk,_eventSheetCid))return;
+  syncCalCacheFromTodos(_eventSheetDk); // 2026-09-30: 캘린더 일정 삭제도 캐시 즉시 반영
   renderTodos();
   if(document.getElementById('monthly-cal'))renderCalendar();
 }
@@ -8068,6 +8092,8 @@ function recurSheetSkipToday(){
   if(!_recurSheetTodoCid||!_recurSheetDk)return;
   removeTodoByCid(_recurSheetDk,_recurSheetTodoCid);
   addRecurSkip(_recurSheetRuleCid,_recurSheetDk);
+  syncCalCacheFromTodos(_recurSheetDk); // 2026-09-30: 오늘만삭제도 캘린더 캐시를 같이 갱신 — 안 하면
+  // 지운 항목이 캘린더 탭 재진입 전까지 그 날짜 칸에 그대로 남아있는 것처럼 보일 수 있음.
   renderTodos();
   if(document.getElementById('monthly-cal'))renderCalendar();
 }
@@ -8098,7 +8124,11 @@ async function recurSheetDeleteAll(){
     const dk=dateKey(d);
     const todos=getTodos.raw(dk);
     const filtered=todos.filter(t=>t.recurRuleCid!==_recurSheetRuleCid);
-    if(filtered.length!==todos.length)saveTodos.raw(dk,filtered);
+    if(filtered.length!==todos.length){
+      saveTodos.raw(dk,filtered);
+      syncCalCacheFromTodos(dk); // 2026-09-30: 이 날짜의 캘린더 캐시도 같이 갱신 — 안 하면 전체삭제한
+      // 반복 일정이 캘린더 탭 재진입 전까지 미리보기 칸에 그대로 남아있는 것처럼 보이는 버그가 있었음.
+    }
   }
   // 서버 쪽 기준일 이후 전체 정리 — 성공하면 끝, 실패(오프라인 포함)하면 재시도 목록에 남겨 다음 sync 때 자동 재시도.
   addRecurFutureDelPending(_recurSheetRuleCid,fromDk);
@@ -8124,6 +8154,7 @@ function confirmRecurEditText(){
   const item=todos.find(t=>t.cid===_recurSheetTodoCid);
   if(item){item.text=text;saveTodos(_recurSheetDk,todos);}
   closeModal('recur-edit-text-modal');
+  syncCalCacheFromTodos(_recurSheetDk); // 2026-09-30: 오늘만 텍스트 수정도 캐시 즉시 반영
   renderTodos();
   if(document.getElementById('monthly-cal'))renderCalendar();
 }
@@ -10524,8 +10555,19 @@ async function syncMonthRange(y,mo){
   }
   if(tRows){
     const byDate={};
-    tRows.forEach(r=>{if(r.date_key===RESERVE_DK)return;/* 예비투두 관련 로직은 파일 하단 RESERVE_DK 블록(getReserveTodos 등) 참고 */(byDate[r.date_key]=byDate[r.date_key]||[]).push({text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null,eventEndDate:r.event_end_date||null,pinned:!!r.pinned});});
-    Object.keys(byDate).forEach(dk=>{if(!S.get(S.key('todos_pending',dk)))S.set(S.key('todos',dk),byDate[dk]);});
+    // 2026-09-30: todoRowToLocal 공용 함수로 통합(필드 누락 버그 방지) + 캘린더 전용 캐시(cal_todos_cache_*)로
+    // 저장처 분리. 예전엔 여기서 정식 todos_* 자리를 직접 덮어써서, 오늘탭이 쓰는 저장소와 캘린더가
+    // 경쟁하며 서로 다른 시점에 서로 다른 완성도로 같은 자리를 채우는 구조였다(반복투두가 일시적으로
+    // 풀려 보이던 버그의 근본 원인). 캘린더 미리보기(칸의 배지/막대)는 이제 이 캐시만 읽고, 오늘탭이
+    // 쓰는 정식 todos_*는 여기서 더 이상 건드리지 않는다 — 날짜 클릭 시 뜨는 상세 화면은 지금처럼
+    // 정식 todos_*를 그대로 읽으므로 항상 실시간 정확도를 유지한다(변경 없음).
+    tRows.forEach(r=>{if(r.date_key===RESERVE_DK)return;/* 예비투두 관련 로직은 파일 하단 RESERVE_DK 블록(getReserveTodos 등) 참고 */(byDate[r.date_key]=byDate[r.date_key]||[]).push(todoRowToLocal(r));});
+    Object.keys(byDate).forEach(dk=>{
+      // pending(오늘탭에서 이미 만든 미업로드 로컬 수정)이 있는 날짜는 정식 쪽이 항상 더 최신이므로
+      // 캐시도 그 정식 값을 그대로 따라가게 함 — 캐시가 낡은 서버값으로 미리보기를 잘못 그리는 것 방지.
+      const src=S.get(S.key('todos_pending',dk))?getTodos(dk):dedupeRecurTodos(byDate[dk]);
+      S.set(S.key('cal_todos_cache',dk),src);
+    });
   }
   if(sRows)sRows.forEach(r=>{if(!S.get(S.key('sleep_pending',r.date_key)))S.set(S.key('sleep',r.date_key),sleepRowToLocal(r));});
   if(mlRows)mlRows.forEach(r=>{
@@ -10609,7 +10651,7 @@ function renderCalendar(){
   for(let idx=0;idx<totalWeeks*7;idx++){
     const d=idx-firstDay+1;
     const dk=cellDkOf(idx);
-    const todos=getTodos(dk);
+    const todos=getCalTodos(dk);
     if(d>=1&&d<=daysInMonth){
       if(getMemos(dk).length>0||todos.some(t=>t.done)||getSleep(dk).sleep)hasRecord[d]=true;
       // 오늘 이후(오늘 제외, 순수 미래)에 미완료 투두(할일+시간표, 일정 제외)가 하나라도 있으면 표시 —
@@ -10627,7 +10669,7 @@ function renderCalendar(){
     });
     if(evs.length)eventsByDk[dk]=evs;
   }
-  const multidayEvents=getMultiDayEventsForRange(cellDkOf(0),cellDkOf(totalWeeks*7-1)); // 격자 전체(전달/다음달 칸 포함)에 걸치는 연속일정 원본(중복 제거됨)
+  const multidayEvents=getMultiDayEventsForRange(cellDkOf(0),cellDkOf(totalWeeks*7-1),getCalTodos); // 격자 전체(전달/다음달 칸 포함)에 걸치는 연속일정 원본(중복 제거됨) — 캘린더 캐시 사용
   // 주(w)별 bar 목록을 미리 계산 — 전달/다음달 칸도 실제 날짜로 넘겨 그 칸까지 막대가 이어지게 함
   const weekBarsAll=[];
   for(let w=0;w<totalWeeks;w++){
@@ -14364,6 +14406,18 @@ async function initSync(){
       if(await syncRhythmBlocksUp(dk)){S.set(S.key('rblocks_pending',dk),false);didUp=true;}
     }
     if(didUp)uploadedDates[dk]=true;
+  }
+  // 오늘 날짜는 다른 모든 동기화(wchallenge/습관/모닝플로우/콘텐츠/하루한줄/월간캘린더 등)보다
+  // 먼저, 확실하게 최신화한다(2026-09-30, 3번 안정화). 예전엔 이 갱신이 그 부수 작업들 전부가
+  // 끝난 뒤에야 실행돼서, 초기 로딩 시 화면이 "오래된 로컬 캐시"로 먼저 그려진 채 한참(때로는
+  // 수 분) 동안 정확한 값으로 안 바뀌는 지연이 있었다(반복투두 아이콘이 늦게 나타나던 현상의
+  // 체감 시간 대부분이 여기서 비롯됨 — 근본 원인인 필드 누락은 이미 앞서 고쳤지만, 정상 필드라도
+  // 늦게 도착하면 같은 지연 체감이 남는다). uploadedDates에 없으면(방금 Up 안 했으면) 바로 Down.
+  {
+    const todayDk=dateKey(new Date());
+    if(!uploadedDates[todayDk]){
+      await syncTodosDown(todayDk);
+    }
   }
   // 미래 날짜 pending Up
   for(var i=0;i<futureDates.length;i++){
