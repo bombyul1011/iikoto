@@ -723,8 +723,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cal-day-name-row{margin-bottom:0;}
 /* 월간탭 연속일정 bar — 각 날짜 칸이 자기 몫의 "조각"만 그리는 방식(칸 폭 100%로 딱 맞음, 절대 밀리거나 클릭 영역이 어긋나지 않음).
    시작조각=왼쪽 둥근모서리+텍스트, 중간조각=사각형 빈 막대, 끝조각=오른쪽 둥근모서리. 옆 칸과 이어붙어 하나의 막대처럼 보임. */
-/* 막대/배지 글자 왼쪽 여백 = (칸 폭 - 5글자 폭)/2, 최소 1.3px(오른쪽 .7px과 합쳐 좌우 합계 2px 유지 — 5글자 들어가는 폭은 그대로) — 5글자가 딱 들어갈 때 가운데 정렬처럼 보이되 실제는 왼쪽 정렬이라 짧은 제목도 시작선이 같음. 여백 조정은 이 식의 5(글자 수)만 바꾸면 됨 */
-#monthly-cal .cal-event-bar{display:flex;align-items:center;width:calc(100% + 2px);margin-left:-1px;margin-right:-1px;height:13px;line-height:1;font-size:var(--dow-label-size-3);color:#fff;padding:0 .7px 0 max(1.3px,calc((100% - 5em) / 2));overflow:hidden;white-space:nowrap;text-overflow:ellipsis;text-align:left;cursor:pointer;box-sizing:border-box;margin-top:1px;margin-bottom:1px;}
+/* 막대/배지 글자 왼쪽 여백 = (칸 폭 - 5글자 폭)/2, 최소 2px(오른쪽 .5px, 좌우 합계 2.5px — 5글자 붙여쓰기 제목이 잘리면 이 값을 줄일 것) — 5글자가 딱 들어갈 때 가운데 정렬처럼 보이되 실제는 왼쪽 정렬이라 짧은 제목도 시작선이 같음. 여백 조정은 이 식의 5(글자 수)만 바꾸면 됨 */
+#monthly-cal .cal-event-bar{display:flex;align-items:center;width:calc(100% + 2px);margin-left:-1px;margin-right:-1px;height:13px;line-height:1;font-size:var(--dow-label-size-3);color:#fff;padding:0 .5px 0 max(2px,calc((100% - 5em) / 2));overflow:hidden;white-space:nowrap;text-overflow:ellipsis;text-align:left;cursor:pointer;box-sizing:border-box;margin-top:1px;margin-bottom:1px;}
 #monthly-cal .cal-event-bar.bar-round-l{border-top-left-radius:4px;border-bottom-left-radius:4px;margin-left:0;width:calc(100% + 1px);} /* 실제 시작 칸은 왼쪽 끝을 하루짜리 배지(.cal-event-badge, 칸 안쪽 1px 여백)와 같은 선에 맞춤 — 이어지는 쪽(오른쪽)만 옆 칸으로 1px 번지게 유지 */
 #monthly-cal .cal-event-bar.bar-round-r{border-top-right-radius:4px;border-bottom-right-radius:4px;margin-right:0;width:calc(100% + 1px);} /* 실제 끝 칸은 오른쪽 끝을 배지와 같은 선에 맞춤 */
 #monthly-cal .cal-event-bar.bar-round-l.bar-round-r{width:100%;} /* 하루 칸 안에서 시작+끝인 막대(주 안 1칸짜리)는 양쪽 다 배지와 동일 폭 */
@@ -746,7 +746,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 #monthly-cal .cal-day.today .cal-num{background:rgba(205,95,95,0.65);color:#fff;}
 #monthly-cal .cal-day.selected .cal-num{background:rgba(230,150,150,0.24);color:rgba(180,90,90,0.90);}
 #monthly-cal .cal-day.today.selected .cal-num{background:rgba(230,150,150,0.30)!important;color:rgba(180,90,90,0.90)!important;border:none!important;}
-#monthly-cal .cal-event-badge{font-size:var(--dow-label-size-3);line-height:1;padding:2.5px .7px 2px max(1.3px,calc((100% - 5em) / 2));border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;align-self:stretch;box-sizing:border-box;margin-bottom:1px;text-align:left;}
+#monthly-cal .cal-event-badge{font-size:var(--dow-label-size-3);line-height:1;padding:2.5px .5px 2px max(2px,calc((100% - 5em) / 2));border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;align-self:stretch;box-sizing:border-box;margin-bottom:1px;text-align:left;}
 #monthly-cal .cal-event-badge.ev-schedule{color:var(--ev-schedule-text);background:var(--ev-schedule-bg);}
 #monthly-cal .cal-event-badge.ev-personal{color:var(--ev-personal-text);background:var(--ev-personal-bg);}
 #monthly-cal .cal-event-badge.ev-work{color:var(--ev-work-text);background:var(--ev-work-bg);}
