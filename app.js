@@ -1876,6 +1876,10 @@ const GREETING_OUTPUT_RULE=`- 반드시 ~해요, ~이에요, ~어요 체의 정�
 - 스스로를 소개하거나 설명하는 표현 절대 금지. 곧바로 본문으로 시작.
 - 오직 문장만 출력, 따옴표나 설명 없이`;
 // night/morning·afternoon(비-dawn) 두 곳에서만 공통인 규칙(날씨·시각 재언급 금지 + 계절 참고) — dawn은 날씨 브리핑 성격이 아니라 제외
+// 인사 프롬프트(평소/오프/생일 3종) 공용 조각 — 같은 문구가 세 빌더에 복붙돼 있던 것을 한 곳으로 모음.
+const GREETING_LENGTH_RULE='- 최대 3-4문장, 전체 공백 포함 150자 이내.';
+function _greetingWeatherDesc(weather){return weather?`(참고용, 수치 그대로 출력 금지) 날씨: ${weather.icon} ${weather.temp}도`:'날씨 정보 없음';}
+function _greetingMemoLine(picked){return picked.length?`오늘 메모: ${picked.join(' / ')}`:'';}
 const GREETING_WEATHER_SEASON_RULE=(extra)=>`- ${extra} 단, 날씨(온도, 맑음/흐림 등)와 현재 시각(몇 시, 오전/오후)은 화면 상단에 이미 별도로 표시되고 있으니, 본문에 숫자나 문장으로 다시 적지 말 것 — "26도", "오후 4시" 같은 표현 절대 금지.
 - 현재 월(${new Date().getMonth()+1}월)을 반드시 참고해서 계절 언급 시 오류 없도록.`;
 
@@ -1888,7 +1892,7 @@ const GREETING_WEATHER_SEASON_RULE=(extra)=>`- ${extra} 단, 날씨(온도, 맑�
 // 반환: {dataContext, sys} — 기존 dataContext/sys와 동일한 형식으로 fetchHomeWeather에 그대로 대입.
 function buildVacationGreetingPrompt(section,vacationEvent,weather,dataDate,dk,allMemos){
   const pickedMemos=_pickRandom(allMemos,5); // 오프 기간은 세분화된 subSec 조회 범위 대신 단순하게 최대 5개
-  const weatherDesc=weather?`(참고용, 수치 그대로 출력 금지) 날씨: ${weather.icon} ${weather.temp}도`:'날씨 정보 없음';
+  const weatherDesc=_greetingWeatherDesc(weather);
   const {text:eventText,dayIndex,totalDays}=vacationEvent;
   const sectionLabel={dawn:'새벽',morning:'아침',afternoon:'오후',night:'저녁'};
 
@@ -1897,13 +1901,13 @@ function buildVacationGreetingPrompt(section,vacationEvent,weather,dataDate,dk,a
     weatherDesc,
     getUserProfileContext(),
     `(참고용, 출력 금지) 현재는 오프 기간(휴가/일시정지) 중이에요. 진행 중인 일정명: "${eventText}", ${dayIndex}일째 (총 ${totalDays}일). 지금 시점: ${sectionLabel[section]}`,
-    pickedMemos.length?`오늘 메모: ${pickedMemos.join(' / ')}`:''
+    _greetingMemoLine(pickedMemos)
   ].filter(Boolean).join('\n');
 
   const sys=`당신은 날씨와 하루의 결을 살필 줄 아는 따뜻한 하루 비서예요. 지금은 "${eventText}"라는 오프 기간(휴가/일시정지) 중 ${dayIndex}일째(총 ${totalDays}일)이고, ${sectionLabel[section]} 시점에 어울리는 인사를 건네요.
 
 **분량 제한 (반드시 지킬 것):**
-- 최대 3-4문장, 전체 공백 포함 150자 이내.
+${GREETING_LENGTH_RULE}
 
 **오프 기간 전용 절대 원칙:**
 - 오늘 할일 완료/미완료, 습관 체크, 리듬(시간 기록) 비중 등 "얼마나 했는지"를 나타내는 정보는 절대 언급하지 말 것 — 이 기간은 평가·집계 대상이 아니에요.
@@ -1973,7 +1977,7 @@ async function fetchHomeWeather(section){
   const checks=getHabitChecks(wk);
   const doneHabitsCount=habits.filter(h=>checks[h.id+'-'+dow]).length;
   const rblocks=getRhythmBlocks(dk);
-  const weatherDesc=weather?`(참고용, 수치 그대로 출력 금지) 날씨: ${weather.icon} ${weather.temp}도`:'날씨 정보 없음';
+  const weatherDesc=_greetingWeatherDesc(weather);
   // 참고: 아래 데이터 수집은 오프 기간이어도 그대로 실행됨(오프 분기는 결과를 쓰지 않을 뿐) — 전부 로컬 조회라
   // 비용이 낮아 조건부로 건너뛰게 만드는 리팩터링(여러 변수를 조건부 선언으로 바꿔야 함)은 하지 않기로 함.
 
@@ -2083,7 +2087,7 @@ ${GREETING_OUTPUT_RULE}
       tomTodos.length?`내일 할일: ${tomTodos.filter(t=>!t.done&&!t.isEvent).map(t=>t.text).join(', ')}`:'',
       (()=>{const evs=tomTodos.filter(t=>t.isEvent);return evs.length?`내일 일정: ${evs.map(t=>t.eventTime?`${t.eventTime} ${t.text}`:t.text).join(', ')}`:'';})(),
       rhythmSummary,
-      pickedMemos.length?`오늘 메모: ${pickedMemos.join(' / ')}`:'',
+      _greetingMemoLine(pickedMemos),
       sleep.sleep||sleep.wake?`수면: ${sleep.sleep||'?'} 취침 ${sleep.wake||'?'} 기상`:''
     ].filter(Boolean).join('\n');
     sys=`당신은 날씨와 하루의 결을 살필 줄 아는 따뜻한 하루 비서예요. 오늘 하루를 마무리하는 저녁(${subSecLabel[subSec]}) 시점에 어울리는 브리핑을 작성해요.
@@ -2112,13 +2116,13 @@ ${GREETING_OUTPUT_RULE}
       todoLine(noneTodos,'시간지정없음'),
       doneHabitsCount?`오늘 완료한 습관: ${doneHabitsCount}개`:'',
       rhythmSummary,
-      pickedMemos.length?`오늘 메모: ${pickedMemos.join(' / ')}`:'',
+      _greetingMemoLine(pickedMemos),
       sleep.sleep||sleep.wake?`수면: ${sleep.sleep||'?'} 취침 ${sleep.wake||'?'} 기상`:''
     ].filter(Boolean).join('\n');
     sys=`당신은 날씨와 하루의 결을 살필 줄 아는 따뜻한 하루 비서예요. 아래 데이터를 참고해서 ${sectionLabel[section]}(${subSecLabel[subSec]}) 시점에 맞는 브리핑을 작성해요.
 
 **분량 제한 (반드시 지킬 것):**
-- 최대 3-4문장, 전체 공백 포함 150자 이내.
+${GREETING_LENGTH_RULE}
 
 기타 규칙:
 ${GREETING_WEATHER_SEASON_RULE('날씨/계절/메모 등에서 느껴지는 그 순간의 분위기를 한 줄 정도 자연스럽게 녹여요.')}
@@ -2276,7 +2280,7 @@ async function syncBirthdayFromServer(){
 // ── 생일 당일 인사배너 전용 프롬프트 ── 오프 전용 프롬프트(buildVacationGreetingPrompt)와 같은 형식의 {dataContext,sys} 반환.
 // 평가성 정보(할일/습관/리듬)는 배제하고 축하만. 오프 기간(여행 등)과 겹치면 그 일정명을 한 번 녹임.
 function buildBirthdayGreetingPrompt(section,vacationEvent,weather,dataDate,dk,allMemos){
-  const weatherDesc=weather?`(참고용, 수치 그대로 출력 금지) 날씨: ${weather.icon} ${weather.temp}도`:'날씨 정보 없음';
+  const weatherDesc=_greetingWeatherDesc(weather);
   const pickedMemos=section==='dawn'?[]:_pickRandom(allMemos,3); // 새벽엔 dk가 전날이라 메모 제외
   const now=new Date();
   const sectionLabel={dawn:'새벽(자정을 막 넘겨 생일이 시작된 시점)',morning:'아침',afternoon:'오후',night:'저녁'};
@@ -2285,12 +2289,12 @@ function buildBirthdayGreetingPrompt(section,vacationEvent,weather,dataDate,dk,a
     weatherDesc,
     getUserProfileContext(),
     vacationEvent?`(참고용, 출력 금지) 지금은 "${vacationEvent.text}" 일정 중이에요(${vacationEvent.dayIndex}일째, 총 ${vacationEvent.totalDays}일).`:'',
-    pickedMemos.length?`오늘 메모: ${pickedMemos.join(' / ')}`:''
+    _greetingMemoLine(pickedMemos)
   ].filter(Boolean).join('\n');
   const sys=`당신은 날씨와 하루의 결을 살필 줄 아는 따뜻한 하루 비서예요. 오늘은 사용자의 생일이에요. ${sectionLabel[section]} 시점에 어울리는 짧은 생일 축하 인사를 건네요.
 
 **분량 제한 (반드시 지킬 것):**
-- 최대 3-4문장, 전체 공백 포함 150자 이내.
+${GREETING_LENGTH_RULE}
 
 **생일 전용 원칙:**
 - 첫 문장은 생일을 진심으로 축하하는 말로 시작해요. 호칭은 "${BIRTHDAY_CALL_NAME}"을 쓰되 한 번만.
@@ -14268,34 +14272,29 @@ function confirmReserveMove(){
 // ── INIT
 updateDateUI();
 loadDaily();
-// 리마인드 알림 클릭 시 URL에 실려온 메모 유도 파라미터를 읽어 메모 제안 모달을 자동으로 연다.
+// ── 알림 탭 → 팝업 ──
+// 서버(send-alerts)가 Declarative Web Push(iOS 18.4+)로 navigate URL(?snooze=/?memo=…&aid=…)을 실어 보내고, 알림을 탭하면
+// 앱이 백그라운드/종료 상태여도 iOS가 그 URL로 앱을 열어준다. 이 함수가 URL을 읽어 팝업을 띄우고, aid로 alerts.opened에
+// "탭해서 열림"을 기록한다(팝업 없는 알림도 aid만 있으면 기록). 앱에 들어올 때마다 안 본 알림을 폴링해 띄우던 방식은 없앴다 —
+// notificationclick이 iOS PWA 백그라운드에서 발화하지 않던 문제의 우회였고, 알림을 안 눌러도 팝업이 뜨는 부작용이 있었다.
+// - snooze=<cid>: 할일/스누즈 알림 — 스누즈 시트(openSnoozePopup).
 // - memo=rhythm&cid=xxx: 리듬 1/3시간 진행중 알림 — 해당 리듬블록을 찾아 그 카테고리로 연다.
 //   로컬 30일 캐시 범위 밖(예: 자정을 넘겨 어제 블록인 경우)일 수 있어, 못 찾으면 서버에서 직접 조회.
-// - memo=sleep: 23시 취침 회고 — 리듬블록에 종속되지 않는 단독 메모라 조회 없이 바로 연다(MEMO_URL_DEFAULT_COPY).
+// - memo=sleep: 23시 취침 회고 — 리듬블록에 종속되지 않는 단독 메모라 조회 없이 바로 연다. 서버가 t/b를 실어 보내면 그 문구, 없으면 기본 문구.
 // - memo=question: 19:30 오늘의 질문 — openQuestionMemo가 서버 풀에서 질문을 뽑아 연다.
 // - memo=sleepscore: 09:00 수면 점수 미등록 — 점수 입력창(promptSleepScore)을 연다. 그 사이 등록했으면 열지 않음.
-// - snooze=<cid>: 할일/스누즈 알림 — 스누즈 시트(openSnoozePopup).
-// 알림 클릭으로 열리는 단독 메모(리듬블록에 종속되지 않음)의 기본 문구 — 서버가 t/b를 실어 보내면 그 문구를, 없으면 이 문구를 표시.
 const MEMO_URL_DEFAULT_COPY={
   sleep:['오늘 하루는 어땠나요?','잠들기 전, 오늘을 짧게 남겨보세요.']
 };
-// ── 알림 탭 → 팝업 ──
-// 예전엔 iOS PWA 백그라운드에서 notificationclick이 발화하지 않아, 앱이 포그라운드로 돌아올 때마다 서버에서 안 본 알림을 폴링해
-// 팝업을 띄웠다(알림을 안 눌러도 들어올 때마다 뜨는 문제). 지금은 서버(send-alerts)가 Declarative Web Push(iOS 18.4+)로
-// navigate URL(?snooze=/?memo=…&aid=…)을 실어 보내고, 알림을 탭하면 앱이 백그라운드/종료여도 iOS가 그 URL로 앱을 열어준다.
-// 아래 함수가 그 URL을 읽어 팝업을 띄우고, aid로 alerts.opened에 "탭해서 열림"을 기록한다(팝업 없는 알림도 aid만 있으면 기록).
 async function _openFromNotificationUrl(){
   const params=new URLSearchParams(location.search);
   const snoozeCid=params.get('snooze'); // 할일 알림 — 스누즈 시트
   const memoType=params.get('memo');
   const aid=params.get('aid'); // 알림 row id — 알림을 눌러 열렸음을 alerts.opened에 기록(이제 "열림" = 실제로 탭해서 들어옴)
   const markAlertOpened=()=>{ if(aid)Promise.resolve(supaFetch(`alerts?id=eq.${encodeURIComponent(aid)}`,'PATCH',{opened:true})).catch(()=>{}); };
-  if(!snoozeCid&&!['rhythm','sleep','question','sleepscore'].includes(memoType)){
-    if(aid){markAlertOpened();history.replaceState(null,'',location.pathname);} // 팝업 없는 알림(아침 브리핑·리포트 등)도 탭으로 열렸음은 기록
-    return false;
-  }
-  markAlertOpened();
-  history.replaceState(null,'',location.pathname); // 처리 후 자기 URL 정리(뒤로가기/새로고침 시 재실행 방지)
+  const hasPopup=!!snoozeCid||['rhythm','sleep','question','sleepscore'].includes(memoType);
+  if(aid||hasPopup){markAlertOpened();history.replaceState(null,'',location.pathname);} // 처리 후 URL 정리(뒤로가기/새로고침 시 재실행 방지) — 팝업 없는 알림(아침 브리핑·리포트 등)도 탭으로 열렸음은 기록
+  if(!hasPopup)return false;
   if(snoozeCid){openSnoozePopup(snoozeCid);return true;}
   const todayDk=dateKey(new Date());
   const copy=MEMO_URL_DEFAULT_COPY[memoType];
