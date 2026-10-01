@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.16-cleanup2';
+const CACHE = 'iikoto-v2.17-feature-trim';
 const ASSETS = [
   './',
   './index.html'

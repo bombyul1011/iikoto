@@ -1711,7 +1711,7 @@ async function makeWeeklySummaryCard(){
     allTodos.push(...todos);
     const memos=getMemos(dk);
     allMemos.push(...memos.map(m=>m.text).filter(Boolean));
-    const dayTexts=memos.map(m=>m.type==='seed'?`[씨앗] ${m.text}`:m.text).filter(Boolean);
+    const dayTexts=memos.map(m=>m.text).filter(Boolean);
     evenSample(dayTexts,8).forEach(t=>allMemosWithDay.push(`${dayName}: ${t}`));
     const sleepMin=sleepDurMin(getSleep(dk));
     if(sleepMin!=null)allSleep.push(sleepMin);
@@ -1788,7 +1788,6 @@ ${RHYTHM_CAT_GUIDE}
 - 단순히 "바빴어요/피곤했어요" 같은 뭉뚱그린 표현 대신, 메모에 실제로 등장한 장소/활동/사람/사건을 구체적으로 짚어서 언급해요.
 - 요일별로 흐름이 어떻게 바뀌었는지 (예: 초반엔 OO, 중반부터 OO로 전환) 구체적인 사건 기반으로 설명해요.
 - 반복적으로 등장하는 키워드나 감정선이 있으면 짚어줘요.
-- 앞에 [씨앗]이 붙은 메모는 성격이 달라요 — 사용자가 그날 겪은 일이 아니라, 어디선가 발견해 남겨둔 인상 깊은 문장이나 장면(드라마 대사, 책 구절, 우연히 들은 말 등)이에요. 이 항목은 사용자가 실제로 겪은 일처럼 단정하지 말고, "이런 문장을 마음에 담아두셨네요" 정도로만 참고해요.
 
 투두 관련 유의할 점 (중요):
 - 투두는 원래 해야 할 일 목록일 뿐, "완료율/완성도/달성률" 같은 성취 평가의 대상이 아니에요. "투두 완료율이 높았다/완벽했다" 같은 표현은 절대 쓰지 마세요.
@@ -3233,7 +3232,7 @@ function saveTodosRaw(dk,v){
 saveTodos.raw=saveTodosRaw;
 function getMemos(dk){return S.get(S.key('memos',dk))||[];}
 // memos 서버 row → 로컬 저장 포맷 변환 (down/월간프리페치 공통 사용)
-function memoRowToLocal(r){return {time:r.memo_time,text:r.text,created:r.created,cid:r.client_id||genCid(),type:r.type||undefined,photoUrl:r.photo_url||undefined,question:r.question||undefined};}
+function memoRowToLocal(r){return {time:r.memo_time,text:r.text,created:r.created,cid:r.client_id||genCid(),photoUrl:r.photo_url||undefined,question:r.question||undefined};}
 function saveMemos(dk,v){
   S.set(S.key('memos',dk),v);
   S.set(S.key('memos_pending',dk),true);
@@ -3690,7 +3689,7 @@ async function syncMemosUp(dk){
   if(ensureItemCids(memos))S.set(S.key('memos',dk),memos);
   const delCids=getDelPendingCids('memos',dk);
   const ok=await syncListUpSafe('memos',`date_key=eq.${dk}`,'date_key,client_id',memos,
-    m=>({date_key:dk,memo_time:m.time,text:m.text,created:m.created,client_id:m.cid,type:m.type||null,photo_url:m.photoUrl||null,question:m.question||null}),
+    m=>({date_key:dk,memo_time:m.time,text:m.text,created:m.created,client_id:m.cid,photo_url:m.photoUrl||null,question:m.question||null}),
     delCids);
   if(ok)delCids.forEach(cid=>removeDelPending('memos',dk,cid));
   // 이 날짜에 아직 R2 업로드가 끝나지 않은 사진(pending_upload)이 있으면, 방금 photo_url=null로
@@ -5208,12 +5207,6 @@ function setupMemoInlineInput(){
     inp.addEventListener('blur',()=>{submitMemoInline();});
   }
 }
-let _memoSeedOn=false;
-function toggleMemoSeed(){
-  _memoSeedOn=!_memoSeedOn;
-  const btn=document.getElementById('memo-seed-toggle');
-  if(btn)btn.classList.toggle('on',_memoSeedOn);
-}
 function submitMemoInline(){
   if(_memoSubmitting)return;
   const inp=document.getElementById('memo-inline-inp');
@@ -5225,7 +5218,6 @@ function submitMemoInline(){
   const stamp=`${pad(n.getHours())}:${pad(n.getMinutes())}`;
   const dk=dateKey(currentDate),memos=getMemos(dk);
   const item={text,time:stamp,created:Date.now(),cid:genCid()};
-  if(_memoSeedOn)item.type='seed';
   if(photo){
     item.photoLocalUrl=photo.localUrl;
     item.photoStatus='pending_upload';
@@ -5236,10 +5228,6 @@ function submitMemoInline(){
   if(photo)queueMemoPhotoUpload(dk,item.cid,photo.blob,photo.ext);
   if(inp){inp.value='';inp.style.height='';}
   clearMemoPhotoPreview();
-  // 씨앗 토글은 한 건만 적용되고 자동 해제
-  _memoSeedOn=false;
-  const seedBtn=document.getElementById('memo-seed-toggle');
-  if(seedBtn)seedBtn.classList.remove('on');
   renderMemos();
   setTimeout(()=>{_memoSubmitting=false;},500);
 }
@@ -5364,45 +5352,6 @@ function toggleTodoReorderMode(){
   document.getElementById('todo-reorder-btn')?.classList.toggle('on',_todoReorderMode);
   renderTodos();
 }
-let _nightPostponeChecked=new Set();
-function openNightPostponeSheet(){
-  _nightPostponeChecked=new Set();
-  const dk=dateKey(currentDate),todos=getTodos(dk);
-  const targets=todos.map((t,i)=>({...t,_i:i})).filter(t=>!t.done&&!t.isEvent&&!t.recurRuleCid);
-  const list=document.getElementById('night-postpone-list');
-  if(!targets.length){
-    list.innerHTML='<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:16px 0;">오늘 남은 할 일이 없어요</div>';
-  }else{
-    list.innerHTML=targets.map(t=>
-      `<div class="event-item" style="cursor:pointer;" onclick="toggleNightPostponeCheck(${t._i},this)">`+
-      `<div class="chk" data-idx="${t._i}"></div>`+
-      `<span class="event-txt">${escapeHtml(t.text)}</span>`+
-      `</div>`
-    ).join('');
-  }
-  openSheet('night-postpone-sheet');
-}
-function toggleNightPostponeCheck(idx,rowEl){
-  if(_nightPostponeChecked.has(idx))_nightPostponeChecked.delete(idx);
-  else _nightPostponeChecked.add(idx);
-  rowEl.querySelector('.chk')?.classList.toggle('on',_nightPostponeChecked.has(idx));
-}
-function confirmNightPostpone(){
-  if(!_nightPostponeChecked.size){closeSheet('night-postpone-sheet');return;}
-  const dk=dateKey(currentDate);
-  const tom=new Date(currentDate);tom.setDate(tom.getDate()+1);
-  const tdk=dateKey(tom);
-  // 인덱스가 큰 것부터 처리해야 splice로 인한 인덱스 밀림이 없음
-  const idxs=[...(_nightPostponeChecked)].sort((a,b)=>b-a);
-  let movedCount=0;
-  idxs.forEach(idx=>{
-    const result=relocateTodo(dk,idx,tdk,'move');
-    if(result.success)movedCount++;
-  });
-  closeSheet('night-postpone-sheet');
-  renderTodos();
-  showToast(movedCount?`${movedCount}개를 내일로 옮겼어요`:'옮기지 못했어요');
-}
 // 완료 시각(completedAt, epoch ms) → "HH:MM" 표시용 포맷.
 function formatCompletedTimeHHMM(ms){
   const d=new Date(ms);
@@ -5432,14 +5381,6 @@ function renderTodos(){
   const dk=dateKey(currentDate),todos=getTodos(dk);
   renderEventList(dk,todos);
   updateReserveCountBadge();
-  // 밤 시간대(22:00-23:59)이고 오늘 날짜를 보고 있을 때만 일괄 미루기 아이콘 노출
-  const nightBtn=document.getElementById('todo-night-postpone-btn');
-  if(nightBtn){
-    const h=new Date().getHours();
-    const isNight=h>=21&&h<24;
-    const isTodayView=dk===dateKey(new Date());
-    nightBtn.style.display=(isNight&&isTodayView)?'':'none';
-  }
   const list=document.getElementById('todo-list');if(!list)return;
   list.innerHTML='';
   // 반복으로 생성된 항목(recurRuleCid 있음)도 이제 todos 배열의 평범한 원소라 별도 병합 없이 그대로 필터+정렬만 하면 됨.
@@ -8468,11 +8409,10 @@ function renderMemos(){
       list.appendChild(el);
       return;
     }
-    const isSeed=m.type==='seed';
     const h=m.time?parseInt(m.time.split(':')[0],10):null;
     const tod=h==null?'':h>=5&&h<12?' tod-morning':h>=12&&h<18?' tod-afternoon':' tod-night';
     const hasPhoto=!!(m.photoUrl||m.photoLocalUrl);
-    const bub=document.createElement('div');bub.className='memo-bub'+(isSeed?' memo-bub-seed':(m.question?' memo-bub-question':tod))+(hasPhoto?' memo-bub-photo':'');
+    const bub=document.createElement('div');bub.className='memo-bub'+(m.question?' memo-bub-question':tod)+(hasPhoto?' memo-bub-photo':'');
     bub.style.cursor='pointer';
     if(hasPhoto){
       const thumbSrc=m.photoUrl||m.photoLocalUrl;
@@ -8504,8 +8444,7 @@ function renderMemos(){
     }
     const time=document.createElement('span');
     time.className='memo-time';
-    if(isSeed){time.innerHTML='<i class="ti ti-seeding" style="font-size:13px;color:rgba(120,155,160,0.95);" aria-hidden="true"></i>';}
-    else{time.textContent=m.time||'';}
+    time.textContent=m.time||'';
     el.appendChild(time);el.appendChild(bub);
     list.appendChild(el);
   });
@@ -8590,27 +8529,7 @@ function undoMemo(){
   saveMemos(_deletedMemo.dk,memos);_deletedMemo=null;
   document.getElementById('undo-toast').classList.remove('on');renderMemos();
 }
-function openSeedArchive(){
-  const resEl=document.getElementById('seed-archive-results');
-  const results=[];
-  for(let i=0;i<localStorage.length;i++){
-    const k=localStorage.key(i);
-    if(!k||!k.startsWith('memos:'))continue;
-    const dk=k.slice('memos:'.length);
-    getMemos(dk).forEach(m=>{
-      if(m.type==='seed')results.push({dk,time:m.time||'',text:m.text||''});
-    });
-  }
-  results.sort((a,b)=>(b.dk+(b.time||'')).localeCompare(a.dk+(a.time||'')));
-  if(!results.length){
-    resEl.innerHTML='<div class="memo-search-empty">아직 남긴 씨앗이 없어요</div>';
-  }else{
-    resEl.innerHTML=results.map(r=>`<div class="msr-item" onclick="jumpToMemoDateFromSeed('${r.dk}')"><div class="msr-date"><i class="ti ti-seeding" style="font-size:var(--dow-label-size);color:rgba(120,155,160,0.95);margin-right:3px;" aria-hidden="true"></i>${r.dk}${r.time?' · '+r.time:''}</div><div class="msr-text">${r.text}</div></div>`).join('');
-  }
-  openModal('seed-archive-modal');
-}
-// 날짜 전환 공용 헬퍼 — currentDate를 dk로 바꾸고 오늘탭으로 전환. 씨앗모아보기/월간탭 상세보기 등
-// 여러 진입점에서 공유.
+// 날짜 전환 공용 헬퍼 — currentDate를 dk로 바꾸고 오늘탭으로 전환(월간탭 상세보기 등 여러 진입점에서 공유).
 function _gotoDailyTab(dk){
   const parts=dk.split('-').map(Number);
   currentDate=new Date(parts[0],parts[1]-1,parts[2]);
@@ -8620,15 +8539,11 @@ function _gotoDailyTab(dk){
   document.querySelector('.scroll').scrollTop=0;
   loadDaily();
 }
-function jumpToMemoDateFromSeed(dk){
-  closeModal('seed-archive-modal');
-  _gotoDailyTab(dk);
-}
-// 월간탭 상세보기 "오늘탭에서 보기" 칩 — 모달이 아니라 월간탭 자체에서 호출되므로 closeModal 없이 바로 전환.
+// 월간탭 상세보기 "오늘탭에서 보기" 칩.
 function jumpToDailyTab(dk){
   _gotoDailyTab(dk);
 }
-// 사진메모 모아보기 — seed 모아보기(openSeedArchive)와 동일한 방식으로 localStorage 전체를 훑어
+// 사진메모 모아보기 — localStorage 전체를 훑어
 // 사진이 첨부된 메모만 모아 최신순 그리드로 보여줌. 썸네일은 오늘탭 목록과 동일하게
 // placeholder→로드완료 페이드인 방식으로 깜빡임 없이 표시.
 function openPhotoArchive(){
@@ -8967,7 +8882,7 @@ async function buildWeeklyMemoReportHtml(wk){
   for(let i=0;i<7;i++){
     const d=new Date(wkStart);d.setDate(wkStart.getDate()+i);
     const dk=dateKey(d);
-    getMemos(dk).forEach(m=>{if(m.text&&m.text.trim())lines.push(`${m.type==='seed'?'[씨앗] ':''}[${dk} ${m.time||''}] ${m.text.trim()}`);});
+    getMemos(dk).forEach(m=>{if(m.text&&m.text.trim())lines.push(`[${dk} ${m.time||''}] ${m.text.trim()}`);});
   }
   if(!lines.length)return '<div class="sheet-loading-msg">이번 주 남긴 메모가 없어요</div>';
   if(!key)return null;
@@ -8976,7 +8891,6 @@ async function buildWeeklyMemoReportHtml(wk){
 짚어주는 다정한 관찰자예요.
 아래는 사용자가 지난 한 주(월~일) 동안 남긴 메모 전체예요. 시간순으로 나열되어 있어요.
 지금은 그 주가 완전히 끝난 뒤, 그 다음 월요일에 이 리포트를 작성하는 시점이에요. 그러니 모든 내용을 반드시 과거형으로 서술하세요. "~할 예정이에요", "~준비를 다지고 있어요"처럼 아직 안 끝난 것처럼 쓰면 안 돼요 — 그 다짐이나 계획조차 이미 지난주에 있었던 일이니 "~하기로 했어요", "~준비를 다졌어요"처럼 지나간 일로 표현하세요.
-앞에 [씨앗]이 붙은 항목은 일반 메모와 성격이 달라요 — 사용자가 그날 겪은 일이 아니라, 어디선가 발견해 남겨둔 인상 깊은 문장이나 장면(드라마 대사, 책 구절, 우연히 들은 말 등)이에요. 이 항목은 사용자가 실제로 겪은 일처럼 단정하지 말고, "이런 문장을 마음에 담아두었어요" 정도로만 참고하세요.
 
 이걸 바탕으로:
 1. 지난 한 주에 자주 등장했거나 인상적이었던 화두/사건을 구체적으로 짚어주세요(단순히 "바빴다/피곤했다"로 뭉뚱그리지 말고, 실제로 어떤 일이 있었는지 담아서).
@@ -9028,7 +8942,7 @@ async function buildNextWeekSuggestHtml(wk){
     const dk=dateKey(d);
     const dayName=_HOME_DAYS[d.getDay()]+'요일';
     const memos=getMemos(dk);
-    const dayTexts=memos.map(m=>m.type==='seed'?`[씨앗] ${m.text}`:m.text).filter(Boolean);
+    const dayTexts=memos.map(m=>m.text).filter(Boolean);
     evenSample(dayTexts,8).forEach(t=>allMemosWithDay.push(`${dayName}: ${t}`));
   }
   const rhythmDurThis=sumCategoryDurations(weekStart,7).dur; // 공용 util(라벨 기준)
@@ -10106,7 +10020,7 @@ const _cswSw=createInstantCommitStopwatch({
     const list=getContents(st.mk);
     const idx=list.findIndex(x=>x.cid===st.cid);
     if(idx>=0){list[idx].lastActivityAt=Date.now();saveContents(st.mk,list);}
-    document.querySelectorAll('.seed-icon-btn').forEach(el=>el.classList.add('cwatch-active'));
+    document.querySelectorAll('.hub-icon-btn').forEach(el=>el.classList.add('cwatch-active'));
     if(_chArchiveMk)chExpandMonth(_chArchiveMk);
     _cswSyncMirror(st);
     renderCwatchMainCard();
@@ -10114,12 +10028,12 @@ const _cswSw=createInstantCommitStopwatch({
   onRestored:function(st,saved){
     // restoreFromStorage()가 st.running=true 등을 이미 확정한 뒤 호출 — 여기선 저장해둔 부가데이터만 채우고 렌더링.
     st.cat=saved.cat;st.title=saved.title||'';st.mk=saved.mk||null;
-    document.querySelectorAll('.seed-icon-btn').forEach(el=>el.classList.add('cwatch-active'));
+    document.querySelectorAll('.hub-icon-btn').forEach(el=>el.classList.add('cwatch-active'));
     _cswSyncMirror(st);
     renderCwatchMainCard();
   },
   onStop:function(st,info){
-    document.querySelectorAll('.seed-icon-btn').forEach(el=>el.classList.remove('cwatch-active'));
+    document.querySelectorAll('.hub-icon-btn').forEach(el=>el.classList.remove('cwatch-active'));
     const minutesWatched=Math.round(info.seconds/60);
     if(_chArchiveMk)chExpandMonth(_chArchiveMk);
     _cswSyncMirror(st);
@@ -11946,7 +11860,7 @@ const _swSw=createInstantCommitStopwatch({
     renderRdTop();
   }
 });
-// ══ 씨앗 코너 ══
+// ══ 독서 코너 ══
 function openReading(){
   _rdTab='reading';
   _rdQuoteShowAll=false;
@@ -11993,7 +11907,7 @@ function resetContentWatchSelection(){
   renderCwatchMainCard();
 }
 
-// ── 독서/씨앗/설정/콘텐츠 코너 엣지 스와이프 뒤로가기 ──
+// ── 독서/설정/콘텐츠 코너 엣지 스와이프 뒤로가기 ──
 (function(){
   let sx=null,sy=null,active=false;
   document.addEventListener('touchstart',function(e){
@@ -12609,7 +12523,7 @@ function removeBook(cid){
   renderContentTimeline();
 }
 // ══════════════════════════════════════════════════════════
-// ██ 독서 허브 (2/2 — 나머지는 READING HUB~씨앗코너 부근) — 진행률입력모달~공유모달공통(문장카드 포함) ██
+// ██ 독서 허브 (2/2 — 나머지는 READING HUB~독서 코너 부근) — 진행률입력모달~공유모달공통(문장카드 포함) ██
 // ══════════════════════════════════════════════════════════
 // ── 진행률 입력 모달
 let _pgBookCid=null,_pgUnit='pages',_pgSeconds=0,_pgStartVal=0;
