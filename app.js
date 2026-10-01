@@ -7557,7 +7557,7 @@ function closeTodoModal(e){
 // 서버 투두 텍스트 분석 결과 블로그 43회/인스타 39회/카페 21회/영상 6회/드라이브 5회로 압도적 상위라 이 5개만 고정.
 // 이후 사용 패턴이 바뀌면 이 배열만 조정하면 됨(자동 집계 아님 — 하드코딩이 더 예측 가능하고 단순해 이 방식으로 결정).
 const DR_FRAG_SUGGESTIONS=['블로그','인스타','카페','영상','드라이브'];
-function onTodoModalInpInput(){
+function onTodoModalInpInput(e){
   const inp=document.getElementById('todo-modal-inp');
   const row=document.getElementById('todo-frag-chip-row');
   if(!inp||!row)return;
@@ -7565,9 +7565,72 @@ function onTodoModalInpInput(){
   // "DR" 뒤에 ">"까지 입력된 시점부터 노출(예: "DR >", "DR>", "DR > " 전부 인식)
   if(/^DR\s*>/.test(v.trim())){
     renderTodoFragChips();
+  }else if(e&&e.type==='input'){
+    // 사용자가 직접 입력 중일 때만 자동완성 — 수정창을 열 때(기존 텍스트 채움)는 제안이 뜨지 않게 함
+    renderTodoAutoChips(v);
   }else{
     hideTodoFragChips();
   }
+}
+// 투두 입력 자동완성 — 최근 30일(앱이 시작 시 기기로 받아 둔 범위) 로컬 투두 문장만 훑음. 서버 조회 없음.
+// 후보 목록은 등록창을 처음 입력할 때 한 번만 만들고(openTodoModal에서 초기화), 글자마다 하는 일은 이 목록 필터링뿐.
+// 제외: 일정, 반복 규칙으로 생긴 항목, "DR >" 문장(DR 조각 칩이 담당), 지금 보는 날짜에 이미 있는 문장. 앞의 "HH:MM "은 떼고 비교.
+// 2글자 미만은 제안 안 함(한글 조합 중 깜빡임·후보 과다 방지).
+let _todoAcIndex=null,_todoAcShown=[];
+function _buildTodoAcIndex(){
+  const map=new Map();
+  const viewDk=dateKey(currentDate);
+  const todayTexts=new Set(getTodos(viewDk).map(t=>_todoAcNorm(t.text)));
+  for(let i=0;i<30;i++){
+    const d=new Date();d.setDate(d.getDate()-i);
+    const dk=dateKey(d);
+    getTodos(dk).forEach(t=>{
+      if(t.isEvent||t.recurRuleCid)return;
+      const txt=_todoAcNorm(t.text);
+      if(txt.length<2||/^DR\s*>/.test(txt)||todayTexts.has(txt))return;
+      const cur=map.get(txt);
+      if(cur){cur.n++;if(i<cur.ago)cur.ago=i;}
+      else map.set(txt,{t:txt,n:1,ago:i});
+    });
+  }
+  return Array.from(map.values());
+}
+function _todoAcNorm(text){
+  const s=(text||'').trim();
+  const m=s.match(SCHEDULE_TIME_RE);
+  return (m?m[3]:s).trim();
+}
+function renderTodoAutoChips(v){
+  const row=document.getElementById('todo-frag-chip-row');
+  if(!row)return;
+  const modal=document.getElementById('todo-modal');
+  const q=(v||'').trim().toLowerCase();
+  if(modal?.dataset.kind==='event'||q.length<2){hideTodoFragChips();return;}
+  if(!_todoAcIndex)_todoAcIndex=_buildTodoAcIndex();
+  const hits=[];
+  _todoAcIndex.forEach(c=>{
+    const k=c.t.toLowerCase().indexOf(q);
+    if(k<0||c.t.toLowerCase()===q)return;
+    hits.push({c,k,p:k===0?0:1});
+  });
+  hits.sort((a,b)=>a.p-b.p||b.c.n-a.c.n||a.c.ago-b.c.ago);
+  _todoAcShown=hits.slice(0,3).map(h=>h.c.t);
+  if(!_todoAcShown.length){hideTodoFragChips();return;}
+  row.style.display='flex';
+  row.innerHTML=_todoAcShown.map((txt,i)=>{
+    const k=txt.toLowerCase().indexOf(q);
+    const html=escapeHtml(txt.slice(0,k))+'<b>'+escapeHtml(txt.slice(k,k+q.length))+'</b>'+escapeHtml(txt.slice(k+q.length));
+    return `<button type="button" class="todo-frag-chip ac" onclick="pickTodoAutoChip(${i})">${html}</button>`;
+  }).join('');
+}
+function pickTodoAutoChip(i){
+  const inp=document.getElementById('todo-modal-inp');
+  const txt=_todoAcShown[i];
+  if(!inp||txt==null)return;
+  inp.value=txt;
+  inp.focus();
+  inp.setSelectionRange(inp.value.length,inp.value.length);
+  hideTodoFragChips();
 }
 function renderTodoFragChips(){
   const row=document.getElementById('todo-frag-chip-row');
@@ -7613,6 +7676,7 @@ function openTodoModal(editIdx=-1){
   const dk=dateKey(currentDate);
   const existing=editIdx>=0?getTodos(dk)[editIdx]:null;
   document.getElementById('todo-modal-inp').value=existing?.text||'';
+  _todoAcIndex=null; // 자동완성 후보는 등록창을 열 때마다 새로 만듦(방금 등록한 문장 반영)
   onTodoModalInpInput(); // 수정 진입 시 기존 텍스트가 "DR >"로 시작하면 칩 상태도 즉시 맞춰줌
   // 시간대 버튼 초기화
   const ts=existing?.timeSection||'none';

@@ -195,6 +195,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .todo-frag-chip-row::-webkit-scrollbar{display:none;}
 .todo-frag-chip{flex-shrink:0;padding:5px 11px;border-radius:20px;border:1px solid var(--card-b);background:var(--card);font-size:var(--dow-label-size);color:var(--ts);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;white-space:nowrap;}
 .todo-frag-chip.used{opacity:0.4;}
+/* 입력 자동완성 칩 — 긴 문장은 말줄임, 입력과 일치한 부분만 진하게 */
+.todo-frag-chip.ac{max-width:62%;overflow:hidden;text-overflow:ellipsis;}
+.todo-frag-chip.ac b{font-weight:600;color:var(--tp);}
 /* 보관함 날짜 지정 모달의 조각 선택 — DR 제안 칩과 같은 알약 칩, 선택된 조각은 보관함 분홍 활성색 */
 .todo-frag-chip.sel{background:var(--pal-pink-bg);color:var(--pal-pink-text);border-color:var(--pal-pink-border);font-weight:600;}
 .reserve-part-prefix{flex-shrink:0;align-self:center;font-size:var(--dow-label-size);color:var(--tm);}
@@ -2111,7 +2114,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <button class="tk-event" onclick="selectTodoKind('event',this)"><i class="ti ti-calendar-event ico-sz-13" aria-hidden="true"></i> 일정</button>
     </div>
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:0;">
-      <input type="text" class="modal-inp" id="todo-modal-inp" placeholder="할 일을 입력하세요" autocomplete="off" style="flex:1;margin-bottom:0;" oninput="onTodoModalInpInput()" onkeydown="if(event.isComposing||event.keyCode===229)return;if(event.key==='Enter'){event.preventDefault();confirmTodo();}">
+      <input type="text" class="modal-inp" id="todo-modal-inp" placeholder="할 일을 입력하세요" autocomplete="off" style="flex:1;margin-bottom:0;" oninput="onTodoModalInpInput(event)" onkeydown="if(event.isComposing||event.keyCode===229)return;if(event.key==='Enter'){event.preventDefault();confirmTodo();}">
       <button type="button" id="todo-pinned-toggle" class="todo-pinned-btn" onclick="toggleTodoPinnedDraft()" title="오늘 안에 강조" aria-label="오늘 안에 강조"><i class="ti ti-bolt-filled" aria-hidden="true"></i></button>
     </div>
     <div class="todo-frag-chip-row" id="todo-frag-chip-row" style="display:none;"></div>
