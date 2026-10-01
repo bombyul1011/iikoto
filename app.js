@@ -7576,7 +7576,7 @@ function onTodoModalInpInput(e){
 // 후보 목록은 등록창을 처음 입력할 때 한 번만 만들고(openTodoModal에서 초기화), 글자마다 하는 일은 이 목록 필터링뿐.
 // 제외: 일정, 반복 규칙으로 생긴 항목, "DR >" 문장(DR 조각 칩이 담당), 지금 보는 날짜에 이미 있는 문장. 앞의 "HH:MM "은 떼고 비교.
 // 2글자 미만은 제안 안 함(한글 조합 중 깜빡임·후보 과다 방지).
-let _todoAcIndex=null,_todoAcShown=[];
+let _todoAcIndex=null,_todoAcShown=[],_todoAcPrefix='';
 function _buildTodoAcIndex(){
   const map=new Map();
   const viewDk=dateKey(currentDate);
@@ -7604,7 +7604,10 @@ function renderTodoAutoChips(v){
   const row=document.getElementById('todo-frag-chip-row');
   if(!row)return;
   const modal=document.getElementById('todo-modal');
-  const q=(v||'').trim().toLowerCase();
+  // 시간표 형식("14:30 베개")으로 입력 중이면 앞의 시각은 검색에서 빼고, 고를 때 그 시각을 그대로 붙여줌
+  const tm=(v||'').trim().match(/^(\d{1,2}:\d{2})\s+(.*)$/);
+  _todoAcPrefix=tm?tm[1]+' ':'';
+  const q=(tm?tm[2]:(v||'')).trim().toLowerCase();
   if(modal?.dataset.kind==='event'||q.length<2){hideTodoFragChips();return;}
   if(!_todoAcIndex)_todoAcIndex=_buildTodoAcIndex();
   const hits=[];
@@ -7627,7 +7630,7 @@ function pickTodoAutoChip(i){
   const inp=document.getElementById('todo-modal-inp');
   const txt=_todoAcShown[i];
   if(!inp||txt==null)return;
-  inp.value=txt;
+  inp.value=_todoAcPrefix+txt;
   inp.focus();
   inp.setSelectionRange(inp.value.length,inp.value.length);
   hideTodoFragChips();
