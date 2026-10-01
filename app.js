@@ -14226,11 +14226,35 @@ function deleteReserveTodo(i){
   const t=todos[i];if(t)addDelPending('todos',RESERVE_DK,t.cid);
   todos.splice(i,1);saveReserveTodos(todos);renderReserveList();
 }
+// 조각 구분(>, /)이 있는 보관함 항목은 날짜 모달에서 보낼 조각만 골라 이동 — 안 고른 조각은 보관함에 남음.
+// 선택 상태는 모달이 열려 있는 동안만 쓰는 임시값이라 저장/동기화 대상 아님. 조각 파싱은 parseTodoTextParts 재사용.
+let _reservePartCtx=null; // {prefix,parts,hasPrefix,sel:Set<인덱스>} — 조각이 2개 미만이면 null(칩 없이 기존 동작)
+function renderReservePartChips(){
+  const row=document.getElementById('reserve-part-row');if(!row)return;
+  const c=_reservePartCtx;
+  if(!c){row.style.display='none';row.innerHTML='';return;}
+  row.style.display='flex';
+  const pre=c.hasPrefix?`<span class="reserve-part-prefix">${escapeHtml(c.prefix)} &gt;</span>`:'';
+  row.innerHTML=pre+c.parts.map((p,k)=>`<button type="button" class="todo-frag-chip${c.sel.has(k)?' sel':''}" onclick="toggleReservePart(${k})">${escapeHtml(p)}</button>`).join('');
+}
+function toggleReservePart(k){
+  const c=_reservePartCtx;if(!c)return;
+  if(c.sel.has(k))c.sel.delete(k);else c.sel.add(k);
+  renderReservePartChips();
+}
+function _joinReserveParts(c,idxs){
+  const body=idxs.map(k=>c.parts[k]).join(' / ');
+  return c.hasPrefix?`${c.prefix} > ${body}`:body;
+}
 function openReserveMoveModal(i){
   _reserveMoveIdx=i;_reserveSection='none';
   setReserveSection('none');
   const dateInp=document.getElementById('reserve-date-inp');
   if(dateInp)dateInp.value=dateKey(new Date());
+  const t=getReserveTodos()[i];
+  const pp=t?parseTodoTextParts(t.text):null;
+  _reservePartCtx=(pp&&pp.parts.length>1)?{prefix:pp.prefix,parts:pp.parts,hasPrefix:pp.hasPrefix,sel:new Set(pp.parts.map((_,k)=>k))}:null;
+  renderReservePartChips();
   document.getElementById('reserve-date-modal').classList.add('on');
 }
 function setReserveSection(s){
@@ -14248,16 +14272,33 @@ function confirmReserveMove(){
   if(!val||_reserveMoveIdx<0)return;
   const todos=getReserveTodos();
   const t=todos[_reserveMoveIdx];if(!t)return;
-  // 예비 목록에서 제거 (삭제 의도 기록)
-  addDelPending('todos',RESERVE_DK,t.cid);
-  todos.splice(_reserveMoveIdx,1);saveReserveTodos(todos);
+  const c=_reservePartCtx;
+  let movedText=t.text;
+  if(c){
+    if(!c.sel.size){showToast('이동할 조각을 고르세요');return;}
+    const goIdxs=c.parts.map((_,k)=>k).filter(k=>c.sel.has(k));
+    const stayIdxs=c.parts.map((_,k)=>k).filter(k=>!c.sel.has(k));
+    movedText=_joinReserveParts(c,goIdxs);
+    if(stayIdxs.length){
+      // 일부만 이동 — 안 고른 조각은 같은 항목(cid 유지)으로 보관함에 남김
+      t.text=_joinReserveParts(c,stayIdxs);
+      saveReserveTodos(todos);
+    }else{
+      addDelPending('todos',RESERVE_DK,t.cid);
+      todos.splice(_reserveMoveIdx,1);saveReserveTodos(todos);
+    }
+  }else{
+    // 예비 목록에서 제거 (삭제 의도 기록)
+    addDelPending('todos',RESERVE_DK,t.cid);
+    todos.splice(_reserveMoveIdx,1);saveReserveTodos(todos);
+  }
   // 선택한 날짜 투두에 추가
-  const newTodo={text:t.text,done:false,created:Date.now(),timeSection:_reserveSection,cid:genCid()};
+  const newTodo={text:movedText,done:false,created:Date.now(),timeSection:_reserveSection,cid:genCid()};
   const targetTodos=getTodos(val);targetTodos.push(newTodo);saveTodos(val,targetTodos);
   // 오늘 날짜면 화면도 갱신
   if(val===dateKey(currentDate))renderTodos();
   closeModal('reserve-date-modal');
-  _reserveMoveIdx=-1;_reserveSection='none';
+  _reserveMoveIdx=-1;_reserveSection='none';_reservePartCtx=null;
   renderReserveList();
   showToast(val+' 투두에 추가했어요 ✓');
 }

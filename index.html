@@ -195,6 +195,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .todo-frag-chip-row::-webkit-scrollbar{display:none;}
 .todo-frag-chip{flex-shrink:0;padding:5px 11px;border-radius:20px;border:1px solid var(--card-b);background:var(--card);font-size:var(--dow-label-size);color:var(--ts);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;white-space:nowrap;}
 .todo-frag-chip.used{opacity:0.4;}
+/* 보관함 날짜 지정 모달의 조각 선택 — DR 제안 칩과 같은 알약 칩, 선택된 조각은 보관함 분홍 활성색 */
+.todo-frag-chip.sel{background:var(--pal-pink-bg);color:var(--pal-pink-text);border-color:var(--pal-pink-border);font-weight:600;}
+.reserve-part-prefix{flex-shrink:0;align-self:center;font-size:var(--dow-label-size);color:var(--tm);}
 .reserve-section-btn.active{background:var(--pal-pink-bg);color:var(--pal-pink-text);border-color:var(--pal-pink-border);font-weight:600;}
 #reserve-filter-row .reserve-section-btn[data-filter="all"].active{background:var(--card);color:var(--tm);border-color:var(--card-b);font-weight:600;}
 #reserve-filter-row .reserve-section-btn[data-filter="shop"].active{background:var(--pal-orange-bg);color:var(--pal-orange-text);border-color:var(--pal-orange-border);}
@@ -519,7 +522,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .todo-kind-tabs button{flex:1;padding:12px 0;border:none;background:rgba(200,180,170,0.12);color:var(--tm);font-size:var(--dow-label-size);cursor:pointer;font-family:'DM Sans',sans-serif;transition:background .15s,color .15s;display:flex;align-items:center;justify-content:center;gap:5px;}
 .todo-kind-tabs button.active{background:var(--card);color:var(--tp);font-weight:600;}
 .chk{width:16px;height:16px;border-radius:5px;border:1.5px solid rgba(200,160,160,0.55);flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;}
-.todo-completed-time{font-size:var(--main-text-size);color:var(--ts);font-variant-numeric:tabular-nums;flex-shrink:0;cursor:pointer;white-space:nowrap;}
+.todo-completed-time{font-size:var(--main-text-size);color:var(--ts);font-variant-numeric:tabular-nums;width:2.95em;flex-shrink:0;cursor:pointer;white-space:nowrap;}
 .rt-time-editable{cursor:pointer;}
 /* 시간표 배너 — 도넛(실제 리듬 기록)+할일(투두 HH:MM) 리스트. 체크박스는 .chk 그대로 재사용. */
 .rt-body{display:flex;align-items:center;gap:12px;}
@@ -1861,6 +1864,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 <div class="modal-ov" id="reserve-date-modal" onclick="closeModal('reserve-date-modal',event)">
   <div class="modal">
     <div class="modal-title">날짜 지정</div>
+    <div class="todo-frag-chip-row" id="reserve-part-row" style="display:none;margin:0 0 12px;"></div>
     <div style="display:flex;gap:8px;margin-bottom:10px;">
       <button class="reserve-section-btn" id="rsec-morning" onclick="setReserveSection('morning')">오전</button>
       <button class="reserve-section-btn" id="rsec-afternoon" onclick="setReserveSection('afternoon')">오후</button>
