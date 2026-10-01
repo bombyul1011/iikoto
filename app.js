@@ -1170,13 +1170,31 @@ function isContentCarryOver(c,mk){
   if(isContentFinished(c)&&c.endDate&&c.endDate.slice(0,7)>=mk)return true;
   return false;
 }
+// 진행중 콘텐츠는 몇 달이 지나도 계속 노출돼야 하는데, 전월(prevMk) 한 달만 보면 시작월 +2개월부터 사라진다(예: 8월 시작 → 10월부터 안 보임).
+// prevMk의 콘텐츠에, 그보다 이전 달들(최대 CONTENT_CARRY_LOOKBACK_MONTHS개월, 로컬 보유분)에서 mk로 이월되는 항목(진행중 등)을 합쳐 반환.
+var CONTENT_CARRY_LOOKBACK_MONTHS=12; // var: 스크립트 로딩 순서와 무관하게 안전(const는 선언 전 호출 시 오류)
+function getPrevContentsWithCarry(prevMk,mk){
+  const base=getContents(prevMk);
+  const out=base.slice();
+  const seen=new Set(base.map(c=>c.cid||(c.cat+'|'+c.title+'|'+c.startDate)));
+  const [y,m]=prevMk.split('-').map(Number);
+  for(let i=1;i<=CONTENT_CARRY_LOOKBACK_MONTHS;i++){
+    getContents(monthKey(new Date(y,m-1-i,1))).forEach(c=>{
+      if(!isContentCarryOver(c,mk))return;
+      const key=c.cid||(c.cat+'|'+c.title+'|'+c.startDate);
+      if(seen.has(key))return;
+      seen.add(key);out.push(c);
+    });
+  }
+  return out;
+}
 function getContentsForReport(mk){
   // 음악: 등록일=완료일로 취급 — 시작월에만 노출/집계, 별도 상태표기 없음
   // 드라마/영화/책: 보는중인 동안은 관련된 모든 달에 노출되지만(상태:보는중), 집계(완료/중단 확정)는 끝난 달에서만 잡힘
   const [y,mo]=mk.split('-').map(Number);
   const prevMk=monthKey(new Date(y,mo-2,1));
   const cur=getContents(mk);
-  const prev=getContents(prevMk);
+  const prev=getPrevContentsWithCarry(prevMk,mk);
   const carry=prev.filter(c=>isContentCarryOver(c,mk)).map(c=>({...c,_carried:true}));
   const all=[...carry,...cur];
   // 콘텐츠 종류(드라마→책→영화→음악)별로 묶은 뒤, 그 안에서는 시작일 오름차순으로 정렬
@@ -1344,7 +1362,7 @@ function computeContentMonthlyList(y,mo){
     return c.status==='watching';
   };
   const prevMk=monthKey(new Date(y,mo-1,1));
-  return getContents(targetMk).filter(belongsHere).concat(getContents(prevMk).filter(belongsHere));
+  return getContents(targetMk).filter(belongsHere).concat(getPrevContentsWithCarry(prevMk,targetMk).filter(belongsHere));
 }
 function computeContentMonthlyByCat(y,mo){
   const list=computeContentMonthlyList(y,mo);
@@ -3557,6 +3575,17 @@ function getRecentMonthsContents(base){
       seen.add(key);out.push({...c,_mk:mk});
     });
   });
+  // 2개월 이상 전에 시작했지만 아직 진행중인 작품도 포함(안 넣으면 시작월 +2개월부터 목록에서 사라짐)
+  const curMk=monthKey(d);
+  for(let i=2;i<=CONTENT_CARRY_LOOKBACK_MONTHS+1;i++){
+    const mk=monthKey(new Date(d.getFullYear(),d.getMonth()-i,1));
+    getContents(mk).forEach(c=>{
+      if(!isContentCarryOver(c,curMk))return;
+      const key=c.cid||(c.cat+'|'+c.title+'|'+c.startDate);
+      if(seen.has(key))return;
+      seen.add(key);out.push({...c,_mk:mk});
+    });
+  }
   return out;
 }
 // Supabase에서 cat=music만 서버 필터링으로 직접 조회 — 저녁 플리(전체 기간 랜덤) 등 월 경계 없는 조회용
@@ -9320,7 +9349,7 @@ function renderContentTimeline(){
   const prevDateObj=new Date(_calYear,_calMonth-1,1);
   const prevMk=monthKey(prevDateObj);
   const contents=getContents(mk);
-  const prevContents=getContents(prevMk);
+  const prevContents=getPrevContentsWithCarry(prevMk,mk); // 전월 + 그 이전 달에서 이어지는 진행중 작품
   const headInner=document.getElementById('ctl-head-inner');
   const headDates=document.getElementById('ctl-head-dates');
   const rowsEl=document.getElementById('ctl-rows');
@@ -12770,7 +12799,7 @@ async function loadAndRenderWatchCal(){
   // 포스터/상태 매칭 — 드라마/영화/책은 같은 제목의 콘텐츠 항목(이번 달+전월, 진행중 포함)에서 poster/status를 찾아 붙임
   // cid도 함께 매칭해 붙임 — 콘텐츠탭 등록 원본과 연결해야 일자별 코멘트(cid 기준)를 저장할 수 있음
   const posterByTitle={},cidByTitle={},statusByTitle={};
-  [...getContents(mk),...getContents(prevMk)].forEach(c=>{
+  [...getContents(mk),...getPrevContentsWithCarry(prevMk,mk)].forEach(c=>{
     if(c.cat!=='music'&&c.title){posterByTitle[c.title]=c.poster||null;cidByTitle[c.title]=c.cid||null;statusByTitle[c.title]=c.status||null;}
   });
   Object.values(_wcalByDate).forEach(list=>list.forEach(it=>{
@@ -14595,4 +14624,230 @@ setTimeout(checkAndRecoverPushSubscription, 1500);
   _openFromNotificationUrl(); // 알림 탭으로 열린 경우(URL 파라미터)에만 팝업
 })();
 
+// ── 검색(메모·투두) ──
+// 서버 함수 search_records(글자 포함 검색, 그룹별 limit/offset, 기간 지정 시 날짜 없는 보관함 자동 제외)만 호출 — 기기 데이터는 훑지 않으므로 앱 속도에 영향 없음.
+// 전체 타입 보기는 메모/투두 각 10건씩, 타입 칩을 고르면 30건씩 "더 보기". 칩 건수는 항상 "전체 조회"의 grp_total에서 가져옴.
+// 타입별 이동: 메모·투두·일정·시간표는 해당 날짜 오늘탭(jumpToDailyTab), 보관함은 보관함 시트. 식사 등 새 타입은 서버 함수 SQL과 SR_BADGE/이동 분기만 추가하면 됨.
+var SEARCH_PAGE=30,SEARCH_ALL_LIMIT=10,SEARCH_MIN=2;
+var _srType='all',_srPeriod='all',_srSub='all',_srSeq=0,_srTimer=null,_srState='idle';
+var _srAllRows=[],_srCnt={memo:0,todo:0},_srListRows=[],_srListTotal=0,_srQ='';
+var SR_SUB_KINDS={all:['todo','timetable','event','reserve'],todo:['todo'],event:['event'],timetable:['timetable']};
+var SR_BADGE={memo:'메모',todo:'투두',event:'일정',timetable:'시간표',reserve:'보관함'};
+function _srKinds(){
+  if(_srType==='memo')return ['memo'];
+  if(_srType==='todo')return SR_SUB_KINDS[_srSub]||SR_SUB_KINDS.all;
+  return null;
+}
+function _srPeriodRange(){
+  if(_srPeriod==='all')return {from:null,to:null};
+  const d=new Date();d.setMonth(d.getMonth()-(_srPeriod==='1m'?1:3));
+  return {from:dateKey(d),to:null};
+}
+function _srFetch(q,kinds,limit,offset){
+  const r=_srPeriodRange();
+  return supaFetch('rpc/search_records','POST',{p_q:q,p_kinds:kinds,p_from:r.from,p_to:r.to,p_limit:limit,p_offset:offset});
+}
+function openSearch(){
+  _srType='all';_srPeriod='all';_srSub='all';_srSeq++;_srState='idle';_srQ='';
+  _srAllRows=[];_srListRows=[];_srListTotal=0;_srCnt={memo:0,todo:0};
+  const inp=document.getElementById('sr-inp');inp.value='';
+  document.getElementById('sr-clear').style.display='none';
+  document.getElementById('search-ov').classList.add('on');
+  renderSearchChips();renderSearchBody();
+  inp.focus();
+}
+function closeSearch(){
+  clearTimeout(_srTimer);_srSeq++;
+  const inp=document.getElementById('sr-inp');if(inp)inp.blur();
+  document.getElementById('search-ov').classList.remove('on');
+}
+function clearSearchInput(){
+  const inp=document.getElementById('sr-inp');inp.value='';
+  document.getElementById('sr-clear').style.display='none';
+  inp.focus();onSearchInput();
+}
+function onSearchInput(){
+  const v=document.getElementById('sr-inp').value;
+  document.getElementById('sr-clear').style.display=v?'':'none';
+  clearTimeout(_srTimer);
+  _srTimer=setTimeout(runSearch,400);
+}
+function onSearchKey(e){
+  if(e.isComposing||e.keyCode===229)return;
+  if(e.key==='Enter'){
+    e.preventDefault();clearTimeout(_srTimer);
+    _srCommitRecent(e.target.value);
+    runSearch();e.target.blur();
+  }
+}
+async function runSearch(){
+  const q=(document.getElementById('sr-inp').value||'').trim();
+  const seq=++_srSeq;
+  _srQ=q;
+  if(q.length<SEARCH_MIN){_srState='idle';renderSearchChips();renderSearchBody();return;}
+  if(!navigator.onLine){_srState='offline';renderSearchChips();renderSearchBody();return;}
+  _srState='loading';renderSearchBody();
+  // 건수·전체 보기용 조회(전체 타입일 땐 10건, 타입 칩 선택 중엔 건수만 필요하므로 1건)
+  const all=await _srFetch(q,null,_srType==='all'?SEARCH_ALL_LIMIT:1,0);
+  if(seq!==_srSeq)return;
+  if(!all){_srState='fail';renderSearchChips();renderSearchBody();return;}
+  _srAllRows=all;
+  _srCnt={memo:0,todo:0};
+  all.forEach(r=>{_srCnt[r.src]=Math.max(_srCnt[r.src]||0,Number(r.grp_total)||0);});
+  _srListRows=[];_srListTotal=0;
+  if(_srType!=='all'){
+    const list=await _srFetch(q,_srKinds(),SEARCH_PAGE,0);
+    if(seq!==_srSeq)return;
+    if(!list){_srState='fail';renderSearchChips();renderSearchBody();return;}
+    _srListRows=list;_srListTotal=list.length?Number(list[0].grp_total)||list.length:0;
+  }
+  _srState='ok';renderSearchChips();renderSearchBody();
+}
+function setSrType(t){_srType=t;_srSub='all';renderSearchChips();if(_srQ.length>=SEARCH_MIN)runSearch();}
+function setSrPeriod(p){_srPeriod=p;renderSearchChips();if(_srQ.length>=SEARCH_MIN)runSearch();}
+function setSrSub(k){_srSub=k;renderSearchChips();if(_srQ.length>=SEARCH_MIN)runSearch();}
+async function searchLoadMore(){
+  const seq=_srSeq;
+  const res=await _srFetch(_srQ,_srKinds(),SEARCH_PAGE,_srListRows.length);
+  if(seq!==_srSeq||!res)return;
+  _srListRows=_srListRows.concat(res);
+  renderSearchBody();
+}
+function renderSearchChips(){
+  const ok=_srState==='ok';
+  const tot=_srCnt.memo+_srCnt.todo;
+  const chip=(on,label,fn)=>`<button type="button" class="sr-chip${on?' on':''}" onclick="${fn}">${label}</button>`;
+  const n=v=>ok?` ${v}`:'';
+  document.getElementById('sr-chips-type').innerHTML=
+    chip(_srType==='all','전체'+n(tot),"setSrType('all')")+
+    chip(_srType==='memo','메모'+n(_srCnt.memo),"setSrType('memo')")+
+    chip(_srType==='todo','투두'+n(_srCnt.todo),"setSrType('todo')");
+  document.getElementById('sr-chips-period').innerHTML=
+    chip(_srPeriod==='all','전체 기간',"setSrPeriod('all')")+
+    chip(_srPeriod==='1m','1개월',"setSrPeriod('1m')")+
+    chip(_srPeriod==='3m','3개월',"setSrPeriod('3m')");
+  const sub=document.getElementById('sr-chips-sub');
+  sub.style.display=_srType==='todo'?'flex':'none';
+  sub.innerHTML=
+    chip(_srSub==='all','전체',"setSrSub('all')")+
+    chip(_srSub==='todo','투두',"setSrSub('todo')")+
+    chip(_srSub==='event','일정',"setSrSub('event')")+
+    chip(_srSub==='timetable','시간표',"setSrSub('timetable')");
+}
+function _srSnippet(t,q){
+  t=(t||'').replace(/\s+/g,' ').trim();
+  const i=t.toLowerCase().indexOf(q.toLowerCase());
+  let s=t,pre='';
+  if(t.length>140&&i>60){s=t.slice(i-40);pre='…';}
+  if(s.length>180)s=s.slice(0,180)+'…';
+  return pre+s;
+}
+function _srHl(text,q){
+  if(!q)return escapeHtml(text);
+  const low=text.toLowerCase(),ql=q.toLowerCase();
+  let out='',pos=0,i;
+  while((i=low.indexOf(ql,pos))>=0){
+    out+=escapeHtml(text.slice(pos,i))+'<span class="sr-hl">'+escapeHtml(text.slice(i,i+q.length))+'</span>';
+    pos=i+q.length;
+  }
+  return out+escapeHtml(text.slice(pos));
+}
+function _srDateLabel(dk){
+  if(dk==='reserve')return '보관함';
+  const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(dk||'');if(!m)return dk||'';
+  const dow=['일','월','화','수','목','금','토'][new Date(+m[1],+m[2]-1,+m[3]).getDay()];
+  return `${m[1]}.${m[2]}.${m[3]} (${dow})`;
+}
+function _srCardHtml(r,q){
+  const sub=r.sub==='memo'?'memo':r.sub;
+  const time=r.memo_time||r.event_time||'';
+  let extra=time?` · ${escapeHtml(time)}`:'';
+  if(r.sub==='event'&&r.event_end_date&&r.event_end_date!==r.date_key){
+    const e=/^\d{4}-(\d{2})-(\d{2})$/.exec(r.event_end_date);
+    if(e)extra+=` ~ ${+e[1]}/${+e[2]}`;
+  }
+  const badgeCls=r.src==='memo'?'sr-badge memo':'sr-badge';
+  return `<div class="sr-card" onclick="openSearchResult('${r.date_key}','${sub}')">
+    <div class="sr-meta"><span>${_srDateLabel(r.date_key)}${extra}</span><span class="${badgeCls}">${SR_BADGE[sub]||''}</span></div>
+    <div class="sr-txt${r.done?' done':''}">${_srHl(_srSnippet(r.txt,q),q)}</div></div>`;
+}
+function renderSearchBody(){
+  const body=document.getElementById('sr-body');if(!body)return;
+  const q=_srQ;
+  if(_srState==='loading'){body.innerHTML='<div class="sr-empty">검색 중…</div>';return;}
+  if(_srState==='offline'){body.innerHTML='<div class="sr-empty">오프라인에서는 검색할 수 없어요</div>';return;}
+  if(_srState==='fail'){body.innerHTML='<div class="sr-empty">검색에 실패했어요<br>네트워크를 확인하고 다시 시도해 주세요</div>';return;}
+  if(_srState!=='ok'){
+    const rec=_srRecents();
+    const q0=(document.getElementById('sr-inp').value||'').trim();
+    let h='';
+    if(rec.length){
+      h+=`<div class="sr-recent-hd"><span>최근 검색어</span><span style="cursor:pointer;" onclick="clearSearchRecents()">전체 삭제</span></div><div class="sr-recent-row">`+
+        rec.map((r,i)=>`<button type="button" class="sr-chip" onclick="searchRecentPick(${i})">${escapeHtml(r)}</button>`).join('')+`</div>`;
+    }
+    h+=q0.length===1?'<div class="sr-empty">2글자 이상 입력해 주세요</div>':'<div class="sr-empty">2글자 이상 입력하면 검색해요<br><span style="font-size:var(--dow-label-size);">메모와 투두 전체 기록에서 찾아요</span></div>';
+    body.innerHTML=h;return;
+  }
+  if(_srType==='all'){
+    const memo=_srAllRows.filter(r=>r.src==='memo'),todo=_srAllRows.filter(r=>r.src==='todo');
+    if(!memo.length&&!todo.length){body.innerHTML=`<div class="sr-empty">일치하는 기록이 없어요${_srPeriod!=='all'?'<br>기간을 늘려 보세요':''}</div>`;return;}
+    let h='';
+    [['메모','memo',memo],['투두','todo',todo]].forEach(g=>{
+      if(!g[2].length)return;
+      const total=_srCnt[g[1]];
+      h+=`<div class="sr-gh">${g[0]} ${total}건</div>`+g[2].map(r=>_srCardHtml(r,q)).join('');
+      if(total>g[2].length)h+=`<div class="sr-more" onclick="setSrType('${g[1]}')">${g[0]} ${total-g[2].length}건 더 보기</div>`;
+    });
+    body.innerHTML=h;return;
+  }
+  if(!_srListRows.length){body.innerHTML=`<div class="sr-empty">일치하는 기록이 없어요${_srPeriod!=='all'?'<br>기간을 늘려 보세요':''}</div>`;return;}
+  let h=_srListRows.map(r=>_srCardHtml(r,q)).join('');
+  if(_srListTotal>_srListRows.length)h+=`<div class="sr-more" onclick="searchLoadMore()">${_srListTotal-_srListRows.length}건 더 보기</div>`;
+  body.innerHTML=h;
+}
+function openSearchResult(dk,sub){
+  _srCommitRecent(_srQ);
+  closeSearch();
+  if(sub==='reserve'){openReserveSheet();return;}
+  jumpToDailyTab(dk);
+}
+function _srRecents(){const r=S.get('search_recent');return Array.isArray(r)?r:[];}
+function _srCommitRecent(q){
+  q=(q||'').trim();if(q.length<SEARCH_MIN)return;
+  const r=_srRecents().filter(x=>x!==q);r.unshift(q);
+  S.set('search_recent',r.slice(0,8));
+}
+function searchRecentPick(i){
+  const q=_srRecents()[i];if(q==null)return;
+  const inp=document.getElementById('sr-inp');inp.value=q;
+  document.getElementById('sr-clear').style.display='';
+  runSearch();
+}
+function clearSearchRecents(){S.set('search_recent',[]);renderSearchBody();}
 
+// ── 상단바 오른쪽 펼침 메뉴(검색/설정) ──
+// 톱니(top-gear-btn)가 메뉴 트리거. 펼쳐지면 톱니는 닫기(✕)로 바뀌고 허브·독서 아이콘 자리에 검색·설정이 나타남(CSS .menu-open).
+// 닫기 버튼, 항목 선택, 메뉴 밖 탭 모두 닫힘.
+var _topMenuOpen=false;
+function _renderTopMenu(){
+  const bar=document.querySelector('.topbar-right');if(bar)bar.classList.toggle('menu-open',_topMenuOpen);
+  const btn=document.getElementById('top-gear-btn'),ico=document.getElementById('top-gear-ico');
+  if(btn)btn.classList.toggle('menu-on',_topMenuOpen);
+  if(ico){
+    ico.className='ti '+(_topMenuOpen?'ti-x':'ti-settings-2');
+    ico.style.color=_topMenuOpen?'var(--pal-pink-text)':'var(--tm)';
+  }
+}
+function toggleTopMenu(){_topMenuOpen=!_topMenuOpen;_renderTopMenu();}
+function closeTopMenu(){if(!_topMenuOpen)return;_topMenuOpen=false;_renderTopMenu();}
+function openSearchFromMenu(){closeTopMenu();openSearch();}
+function openSettingsFromMenu(){closeTopMenu();openSettings();}
+(function(){
+  const outside=e=>{
+    if(!_topMenuOpen)return;
+    if(e.target.closest&&e.target.closest('#top-gear-btn,.top-menu-item'))return;
+    closeTopMenu();
+  };
+  document.addEventListener('click',outside);
+  document.addEventListener('touchstart',outside,{passive:true});
+})();

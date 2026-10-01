@@ -145,15 +145,22 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .topbar-row1{display:flex;align-items:center;justify-content:space-between;padding:env(safe-area-inset-top) 18px 4px;} /* 상단 여백 = 안전영역만(default 상태바 방식에서는 0) — iOS 27 대응으로 status-bar-style을 default로 바꾼 뒤 14px 하한 제거 */
 .topbar-logo{height:32px;width:auto;}
 .topbar-right{display:flex;align-items:center;gap:6px;}
-.date-nav{display:flex;align-items:center;gap:4px;}
+.date-nav{display:flex;align-items:center;gap:2px;}
 /* 상단 날짜 네비게이터 (예: "2026.8.15.토" 배너) — 배경은 하드코딩(현재 0.75), .vtab과 톤 맞춰 조정한 값 */
 .date-pill{background:rgba(255,250,240,0.75);border:1px solid var(--inp-b);border-radius:20px;padding:5px 11px;font-size:var(--dow-label-size);color:var(--ts);cursor:pointer;user-select:none;white-space:nowrap;}
-.nav-arr{width:26px;height:26px;background:rgba(255,250,240,0.75);border:1px solid var(--inp-b);border-radius:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+.nav-arr{width:20px;height:26px;background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;position:relative;}
+.nav-arr::before{content:'';position:absolute;inset:-4px -6px;} /* 배경이 없어진 만큼 터치 영역은 눈에 보이는 폭(20px)보다 넓게(약 32px) */
 .nav-arr:active{opacity:.7;}
 .icon-btn{width:26px;height:26px;background:var(--card);border:1px solid var(--card-b);border-radius:9px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
 .reading-icon-btn{background:var(--grad-pinkyellow);border:1px solid rgba(255,185,205,0.55);box-shadow:0 2px 10px rgba(200,120,140,0.12);position:relative;}
 .reading-icon-btn.sw-active{background:linear-gradient(135deg,#ffd1e2,#ffe6b8,#e6e1f5,#ffd1e2);background-size:300% 300%;animation:bannerShine 3s ease infinite;}
 .icon-btn:active{opacity:.7;}
+/* 상단바 오른쪽 펼침 메뉴 — 톱니를 누르면 허브·독서 아이콘 자리에 검색/설정이 펼쳐지고(허브·독서는 잠시 숨김), 닫으면 원래대로 */
+.top-menu-item{display:none;}
+.topbar-right.menu-open .hub-icon-btn,.topbar-right.menu-open .reading-icon-btn{display:none;}
+.topbar-right.menu-open .top-menu-item{display:flex;animation:topMenuIn .22s ease-out;}
+.icon-btn.menu-on{background:var(--pal-pink-bg);border-color:transparent;}
+@keyframes topMenuIn{from{opacity:0;transform:translateX(-6px);}to{opacity:1;transform:none;}}
 
 /* ── TABS (오늘/주간/월간 상단 뷰 전환탭) ── */
 .view-tabs{display:flex;gap:6px;padding:0 18px 10px;flex-shrink:0;}
@@ -878,6 +885,30 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 /* ── SETTINGS ── */
 .settings-ov{position:fixed;inset:0;margin:0 auto;max-width:430px;z-index:8000;background:var(--bg);display:none;flex-direction:column;overflow-y:auto;}
 .settings-ov.on{display:flex;}
+/* 검색 전체 화면 — 설정 오버레이와 같은 구조. 결과는 서버 search_records 함수 응답만 사용(기기 데이터 훑지 않음) */
+.search-ov{position:fixed;inset:0;margin:0 auto;max-width:430px;z-index:8100;background:var(--bg);display:none;flex-direction:column;}
+.search-ov.on{display:flex;}
+.sr-hdr{padding:calc(env(safe-area-inset-top) + 10px) 18px 8px;display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.sr-box{flex:1;display:flex;align-items:center;gap:8px;height:38px;padding:0 12px;border-radius:12px;background:var(--inp);border:1px solid var(--inp-b);}
+.sr-inp{flex:1;min-width:0;border:none;background:transparent;font-size:16px;color:var(--tp);outline:none;padding:0;font-family:inherit;-webkit-appearance:none;appearance:none;}
+.sr-cancel{font-size:var(--main-text-size);color:var(--ts);cursor:pointer;white-space:nowrap;}
+.sr-chips{display:flex;flex-wrap:nowrap;gap:5px;padding:0 18px 8px;overflow-x:auto;flex-shrink:0;touch-action:pan-x;scrollbar-width:none;-ms-overflow-style:none;}
+.sr-chips::-webkit-scrollbar{display:none;}
+.sr-chip{flex-shrink:0;padding:5px 11px;border-radius:20px;border:1px solid var(--card-b);background:var(--card);font-size:var(--dow-label-size);color:var(--ts);cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;}
+.sr-chip.on{background:var(--pal-pink-bg);color:var(--pal-pink-text);border-color:var(--pal-pink-border);font-weight:600;}
+.sr-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:calc(env(safe-area-inset-bottom) + 20px);border-top:1px solid rgba(var(--divider-rgb),0.25);}
+.sr-gh{font-size:var(--dow-label-size);color:var(--tm);padding:12px 20px 4px;}
+.sr-card{padding:10px 20px;border-bottom:1px solid rgba(var(--divider-rgb),0.25);cursor:pointer;}
+.sr-meta{font-size:var(--dow-label-size);color:var(--ts);margin-bottom:3px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.sr-badge{padding:0 7px;border-radius:10px;border:1px solid var(--card-b);font-size:11px;color:var(--ts);}
+.sr-badge.memo{background:var(--pal-pink-bg);color:var(--pal-pink-text);border-color:transparent;}
+.sr-txt{font-size:var(--main-text-size);color:var(--tp);line-height:1.5;word-break:break-word;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;}
+.sr-txt.done{opacity:0.6;}
+.sr-hl{background:var(--pal-pink-bg);color:var(--pal-pink-text);border-radius:3px;padding:0 1px;}
+.sr-more{padding:12px 20px;font-size:var(--dow-label-size);color:var(--pal-pink-text);cursor:pointer;border-bottom:1px solid rgba(var(--divider-rgb),0.25);}
+.sr-empty{padding:56px 24px;text-align:center;color:var(--tm);font-size:var(--main-text-size);line-height:1.7;}
+.sr-recent-hd{display:flex;justify-content:space-between;padding:12px 20px 4px;font-size:var(--dow-label-size);color:var(--tm);}
+.sr-recent-row{display:flex;flex-wrap:wrap;gap:6px;padding:6px 20px 14px;}
 .settings-hdr{padding:env(safe-area-inset-top) 20px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid rgba(var(--divider-rgb),0.25);flex-shrink:0;}
 .settings-back{width:36px;height:36px;background:var(--card);border:1px solid var(--card-b);border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .settings-ttl{font-size:18px;font-weight:500;color:var(--tp);}
@@ -1555,21 +1586,27 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="topbar-right">
         <div class="date-nav">
           <div class="nav-arr" id="btn-prev" onclick="shiftDay(-1)">
-            <i class="ti ti-chevron-left" style="font-size:10px;color:var(--tm);" aria-hidden="true"></i>
+            <i class="ti ti-chevron-left" style="font-size:14px;color:var(--ts);" aria-hidden="true"></i>
           </div>
           <span class="date-pill" id="js-date" onclick="goToday()"></span>
           <div class="nav-arr" id="btn-next" onclick="shiftDay(1)">
-            <i class="ti ti-chevron-right" style="font-size:10px;color:var(--tm);" aria-hidden="true"></i>
+            <i class="ti ti-chevron-right" style="font-size:14px;color:var(--ts);" aria-hidden="true"></i>
           </div>
         </div>
-        <div class="icon-btn" onclick="openSettings()">
-          <i class="ti ti-settings-2" style="font-size:16px;color:var(--tm);" aria-hidden="true"></i>
+        <div class="icon-btn" id="top-gear-btn" onclick="toggleTopMenu()" aria-label="메뉴">
+          <i class="ti ti-settings-2" id="top-gear-ico" style="font-size:16px;color:var(--tm);" aria-hidden="true"></i>
         </div>
         <div class="icon-btn hub-icon-btn" onclick="openContentHub()">
           <i class="ti ti-clover" style="font-size:17px;color:var(--pal-mintlime);" aria-hidden="true"></i>
         </div>
         <div class="icon-btn reading-icon-btn" onclick="openReading()">
           <i class="ti ti-macro" style="font-size:16px;color:var(--pal-mauvepink);" aria-hidden="true"></i>
+        </div>
+        <div class="icon-btn top-menu-item" id="top-menu-search" onclick="openSearchFromMenu()" aria-label="검색">
+          <i class="ti ti-search" style="font-size:16px;color:var(--ts);" aria-hidden="true"></i>
+        </div>
+        <div class="icon-btn top-menu-item" id="top-menu-settings" onclick="openSettingsFromMenu()" aria-label="설정">
+          <i class="ti ti-settings-2" style="font-size:16px;color:var(--ts);" aria-hidden="true"></i>
         </div>
       </div>
     </div>
@@ -2395,6 +2432,22 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 </div>
 
 <!-- SETTINGS -->
+<!-- SEARCH -->
+<div class="search-ov" id="search-ov">
+  <div class="sr-hdr">
+    <div class="sr-box">
+      <i class="ti ti-search" style="font-size:18px;color:var(--ts);" aria-hidden="true"></i>
+      <input id="sr-inp" class="sr-inp" type="search" enterkeyhint="search" placeholder="메모·투두 검색" autocomplete="off" autocorrect="off" spellcheck="false" oninput="onSearchInput()" onkeydown="onSearchKey(event)">
+      <i id="sr-clear" class="ti ti-circle-x" style="font-size:18px;color:var(--tm);cursor:pointer;display:none;" onclick="clearSearchInput()" aria-label="지우기"></i>
+    </div>
+    <span class="sr-cancel" onclick="closeSearch()">취소</span>
+  </div>
+  <div class="sr-chips" id="sr-chips-type"></div>
+  <div class="sr-chips" id="sr-chips-period"></div>
+  <div class="sr-chips" id="sr-chips-sub" style="display:none;"></div>
+  <div class="sr-body" id="sr-body" ontouchmove="document.getElementById('sr-inp').blur()"></div>
+</div>
+
 <div class="settings-ov" id="settings-ov">
   <div class="settings-hdr" style="padding-top:env(safe-area-inset-top);">
     <div class="settings-back" onclick="closeSettings()">
