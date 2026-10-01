@@ -128,6 +128,12 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .sp-sub{font-family:'Comfortaa',cursive;font-size:var(--dow-label-size);color:var(--tm);letter-spacing:3.5px;text-transform:uppercase;opacity:0;animation:fadeUp .5s .6s ease forwards;}
 .sp-dots{display:flex;gap:7px;margin-top:14px;opacity:0;animation:fadeIn .4s 1.05s ease forwards;}
 .sp-dot{width:6px;height:6px;border-radius:50%;}
+#splash.bday .sp-dots{gap:10px;margin-top:4px;opacity:1;animation:none;}
+#splash.bday .sp-dots i{font-size:22px;opacity:0;animation:bdPop .45s forwards;}
+.bd-cf{position:absolute;top:-14px;width:7px;height:11px;opacity:0;animation:bdFall 3.2s linear infinite;pointer-events:none;}
+@keyframes bdPop{0%{opacity:0;transform:scale(.4);}70%{opacity:1;transform:scale(1.15);}100%{opacity:1;transform:scale(1);}}
+@keyframes bdFall{0%{opacity:0;transform:translateY(0) rotate(0);}10%{opacity:1;}100%{opacity:1;transform:translateY(110vh) rotate(540deg);}}
+@media (prefers-reduced-motion:reduce){.bd-cf{display:none;}}
 @keyframes fadeUp{to{opacity:1;transform:translateY(0);}}
 @keyframes fadeIn{to{opacity:1;}}
 
@@ -1389,7 +1395,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .home-hcard-time{font-size:var(--dow-label-size);color:var(--tm);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;}
 .home-hcard-greeting{font-size:22px;font-weight:500;color:var(--tp);line-height:1.25;margin-bottom:8px;}
 .home-hcard-sub{font-size:var(--main-text-size);color:var(--ts);line-height:1.7;min-height:40px;}
-.home-hcard-divider{height:1px;background:rgba(200,170,160,0.20);margin:12px 0 4px;}
+.home-hcard.birthday{background:radial-gradient(circle at 12% 30%,#f5c6c6 0 3px,transparent 4px),radial-gradient(circle at 88% 70%,#b8ddd4 0 3px,transparent 4px),radial-gradient(circle at 70% 18%,#c2d8ef 0 3px,transparent 4px),radial-gradient(circle at 30% 85%,#f5d98a 0 3px,transparent 4px),radial-gradient(circle at 55% 60%,#e8b4c8 0 2px,transparent 3px),linear-gradient(135deg,rgba(255,222,226,0.85),rgba(255,240,205,0.75));border:1px solid rgba(245,198,198,0.70);} /* 생일 당일 인사카드(시간대별 배경 대신) — 파스텔 색종이 점 + 우상단 케이크 3개 */
+.home-hcard.birthday .home-hcard-time{color:#a3897c;}
+.home-hcard.birthday .home-hcard-greeting{color:#6b5248;}
+.home-hcard.birthday .home-hcard-sub{color:#8d7468;}
+.home-hcard.birthday #home-solar-term-line{color:#a3897c;}
+.home-hcard-cakes{display:none;position:absolute;right:14px;top:12px;gap:4px;}
+.home-hcard.birthday .home-hcard-cakes{display:flex;}
+.home-hcard-cakes i{font-size:18px;}
 .home-habit-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
 .home-habit-dot.mint{background:rgba(140,210,200,.85);}
 .home-habit-dot.pink{background:rgba(var(--pal-pink-rgb),.42);}
@@ -1514,6 +1527,24 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div class="sp-dot" style="background:rgba(194,216,239,.55)"></div>
   </div>
 </div>
+<script>
+/* 생일 당일 스플래시 — 앱 코드(app.js)보다 먼저 떠야 해서 localStorage 사본(iikoto_birthday, 'MM-DD')만 읽는다. 판정 규칙은 app.js isBirthdayDk와 동일(2/29생은 평년 2/28). */
+(function(){try{
+  var b=localStorage.getItem('iikoto_birthday');if(!b)return;
+  var d=new Date(),y=d.getFullYear(),md=('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);
+  var leap=(y%4===0&&y%100!==0)||y%400===0;
+  if(!(md===b||(b==='02-29'&&!leap&&md==='02-28')))return;
+  var s=document.getElementById('splash');if(!s)return;
+  s.classList.add('bday');
+  var sub=s.querySelector('.sp-sub');if(sub)sub.textContent='happy birthday';
+  var cols=['#f5c6c6','#b8ddd4','#c2d8ef'];
+  var dots=s.querySelector('.sp-dots');
+  if(dots)dots.innerHTML=cols.map(function(c,i){return '<i class="ti ti-cake" aria-hidden="true" style="color:'+c+';animation-delay:'+(1.05+i*0.2).toFixed(2)+'s"></i>';}).join('');
+  var cc=['#f5c6c6','#b8ddd4','#c2d8ef','#f5d98a','#e8b4c8'],h='';
+  for(var i=0;i<16;i++){h+='<span class="bd-cf" style="left:'+(4+i*6)+'%;background:'+cc[i%5]+';animation-delay:'+((i*0.37)%3).toFixed(2)+'s;animation-duration:'+(2.6+(i%4)*0.5).toFixed(1)+'s"></span>';}
+  s.insertAdjacentHTML('beforeend',h);
+}catch(e){}})();
+</script>
 
 <div id="app">
 
@@ -1555,13 +1586,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <!-- HOME -->
     <div class="view" id="v-home">
       <div id="home-header-card" class="home-hcard morning">
+        <div class="home-hcard-cakes" aria-hidden="true"><i class="ti ti-cake" style="color:#e9a9a9"></i><i class="ti ti-cake" style="color:#8fc4b6"></i><i class="ti ti-cake" style="color:#8fb4dc"></i></div>
         <div class="home-hcard-time">
           <span id="home-time"></span>
         </div>
         <div id="home-solar-term-line" style="font-size:var(--dow-label-size);margin:-2px 0 6px;display:none;"></div>
         <div class="home-hcard-greeting" id="home-greeting">좋은 아침이에요</div>
         <div class="home-hcard-sub" id="home-greeting-sub"></div>
-        <div class="home-hcard-divider"></div>
       </div>
       <div id="home-body"></div>
     </div>
@@ -2510,6 +2541,16 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
             class="settings-btn-small">
             키 삭제
           </button>
+        </div>
+        <div class="settings-item">
+          <span class="settings-item-lbl">생일 <span style="font-size:var(--dow-label-size);color:var(--tm);">월·일만 사용</span></span>
+          <span style="display:flex;align-items:center;gap:8px;">
+            <span style="position:relative;display:inline-block;">
+              <span class="settings-item-val" id="birthday-val">미설정</span>
+              <input type="date" id="birthday-inp" onchange="saveBirthdayFromInput(this.value)" aria-label="생일 선택" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;">
+            </span>
+            <button class="settings-btn-small" id="birthday-clear" style="display:none;" onclick="clearBirthday()">지우기</button>
+          </span>
         </div>
         <div class="settings-item" style="flex-direction:column;align-items:flex-start;gap:8px;">
           <span class="settings-item-lbl">나에 대해</span>

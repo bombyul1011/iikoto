@@ -509,7 +509,7 @@ function _countExerciseInWeek(wk){
   return count;
 }
 // 완결된 주(지난주부터 역산, 최대 4주)를 훑어 "연속으로 주3회 이상 채운 주가 몇 주째인지" 계산.
-// 한 주라도 3회 미만이면 그 지점에서 스트릭 종료. 그 주에 오프 기간이 하루라도 끼면 평가 대상에서 제외(건너뜀) — 스트릭이 끊기지도, 유지되지도 않고 그냥 스킵.
+// 한 주라도 3회 미만이면 그 지점에서 스트릭 종료. 그 주에 오프 기간이 하루라도 끼면 그 지점에서 스트릭 종료(2026-10-01 변경 — 예전엔 건너뜀, 지금은 습관 연속일과 동일하게 끊김) — 스트릭이 끊기지도, 유지되지도 않고 그냥 스킵.
 function _exerciseWeekStreak(){
   const now=new Date();
   let streak=0;
@@ -519,7 +519,7 @@ function _exerciseWeekStreak(){
     const wkStart=new Date(wk.replace('week:',''));
     let hasVacationDay=false;
     for(let d=0;d<7;d++){const dd=new Date(wkStart);dd.setDate(wkStart.getDate()+d);if(isVacationDate(dd)){hasVacationDay=true;break;}}
-    if(hasVacationDay)continue; // 오프가 낀 주는 스트릭 판정에서 제외
+    if(hasVacationDay)break; // 오프가 낀 주에서 연속 종료 — 습관 연속일(getHabitStreak)과 같은 규칙(2026-10-01: 건너뛰기→끊김으로 통일)
     if(_countExerciseInWeek(wk)>=3)streak++;
     else break;
   }
@@ -1951,7 +1951,8 @@ async function fetchHomeWeather(section){
   // 오프 기간 판정 — 오프면 세분화된 subSec 대신 section(4단계: dawn/morning/afternoon/night)만으로 캐시 키를 잡아 호출 횟수를 7→4로 줄임.
   const vacationEvent=getActiveMultiDayEvents(dk).find(ev=>ev.isVacation)||null;
   const subSecRaw=getSubSection();
-  const subSec=vacationEvent?section:subSecRaw; // 오프 기간엔 4단계로 캐시 키 축소
+  const isBdayGreet=isTodayBirthday(); // 생일 당일 — 캐시 키를 별도('bday_'+section)로 잡아 평소/오프 인사 캐시와 섞이지 않게 함
+  const subSec=isBdayGreet?('bday_'+section):(vacationEvent?section:subSecRaw); // 오프 기간엔 4단계로 캐시 키 축소
 
   // 인사 캐시 유효하면 바로 표시 (sub-section 기준, dawn 포함 7분류 — 오프 기간은 위에서 4분류로 축소됨)
   if(_greetingCache&&_greetingCache.subSection===subSec){
@@ -2036,7 +2037,10 @@ async function fetchHomeWeather(section){
 
   let dataContext,sys;
 
-  if(vacationEvent){
+  if(isBdayGreet){
+    // 생일 당일 — 오프 기간과 겹쳐도 생일 프롬프트가 우선(일정명은 프롬프트 안에서 한 번 녹임)
+    ({dataContext,sys}=buildBirthdayGreetingPrompt(section,vacationEvent,weather,dataDate,dk,allMemos));
+  } else if(vacationEvent){
     // 오프 기간 — 위에서 이미 계산된 데이터(todos/allMemos 등)는 쓰지 않고 전용 프롬프트로 대체
     ({dataContext,sys}=buildVacationGreetingPrompt(section,vacationEvent,weather,dataDate,dk,allMemos));
   } else if(section==='dawn'){
@@ -2183,6 +2187,101 @@ function goHome(fromSwipe){
 }
 let _todoPartModeIdx=-1;
 
+// ── 생일 (2026-10-01) ──
+// 생일은 설정탭에서 직접 입력(월/일만, 연도 없음). 앱 코드보다 먼저 도는 스플래시가 읽어야 해서 localStorage 사본이 필수이고,
+// 서버(send-alerts 아침 브리핑)용으로 user_settings.birthday('MM-DD')에도 저장한다. 2/29생은 평년에 2/28에 축하.
+const BIRTHDAY_LS_KEY='iikoto_birthday';
+const BIRTHDAY_CALL_NAME='봄이님'; // 생일 인사에 쓰는 호칭 — 서버(send-alerts)의 생일 알림 문구에도 같은 호칭이 들어 있음
+function getBirthdayMD(){try{return localStorage.getItem(BIRTHDAY_LS_KEY)||'';}catch(e){return '';}}
+function isBirthdayDk(dk){
+  const b=getBirthdayMD();if(!b||!dk)return false;
+  const md=dk.slice(5);
+  if(md===b)return true;
+  if(b==='02-29'){const y=+dk.slice(0,4);const leap=(y%4===0&&y%100!==0)||y%400===0;return !leap&&md==='02-28';}
+  return false;
+}
+function isTodayBirthday(){return isBirthdayDk(dateKey(new Date()));}
+function _fmtBirthdayLabel(md){
+  const m=/^(\d\d)-(\d\d)$/.exec(md||'');
+  return m?`${+m[1]}월 ${+m[2]}일`:'미설정';
+}
+// 날짜 pill — 보고 있는 날짜가 생일이면 케이크 아이콘을 붙임(과거/미래로 넘겨도 생일 날짜면 표시)
+function renderDatePill(){
+  const d=currentDate;
+  const el=document.getElementById('js-date');
+  if(!el)return;
+  el.textContent=`${d.getFullYear()}. ${d.getMonth()+1}. ${d.getDate()}. ${DAYS[d.getDay()]}`;
+  if(isBirthdayDk(dateKey(d))){
+    const i=document.createElement('i');
+    i.className='ti ti-cake';i.setAttribute('aria-hidden','true');
+    i.style.cssText='font-size:13px;margin-left:5px;color:#e0a0a0;vertical-align:-1px;';
+    el.appendChild(i);
+  }
+}
+function _refreshBirthdayUI(){
+  const md=getBirthdayMD();
+  const v=document.getElementById('birthday-val');if(v)v.textContent=_fmtBirthdayLabel(md);
+  const inp=document.getElementById('birthday-inp');if(inp)inp.value=md?('2000-'+md):'';
+  const clr=document.getElementById('birthday-clear');if(clr)clr.style.display=md?'inline-block':'none';
+  renderDatePill();
+  renderHome(); // 인사카드 배경·제목·AI 문구 즉시 반영(생일 당일이 아니면 평소 모습 그대로)
+}
+async function saveBirthdayFromInput(val){ // val: 'YYYY-MM-DD'(연도는 버림)
+  if(!/^\d{4}-\d\d-\d\d$/.test(val||''))return;
+  const md=val.slice(5);
+  try{localStorage.setItem(BIRTHDAY_LS_KEY,md);}catch(e){}
+  _refreshBirthdayUI();
+  try{await supaUpsert('user_settings','id',[{id:true,birthday:md}]);}catch(e){}
+  if(_cachedUserSettings)_cachedUserSettings.birthday=md;
+}
+async function clearBirthday(){
+  try{localStorage.removeItem(BIRTHDAY_LS_KEY);}catch(e){}
+  _refreshBirthdayUI();
+  try{await supaUpsert('user_settings','id',[{id:true,birthday:null}]);}catch(e){}
+  if(_cachedUserSettings)_cachedUserSettings.birthday=null;
+}
+// 앱 시작 시 서버 값으로 로컬 사본을 맞춤(다른 기기에서 입력했거나 새로 설치한 경우) — 달라졌을 때만 화면 갱신
+async function syncBirthdayFromServer(){
+  const st=await getUserSettings().catch(()=>null);
+  if(!st)return;
+  const sv=st.birthday||'';
+  if(sv===getBirthdayMD())return;
+  try{if(sv)localStorage.setItem(BIRTHDAY_LS_KEY,sv);else localStorage.removeItem(BIRTHDAY_LS_KEY);}catch(e){}
+  _refreshBirthdayUI();
+}
+// ── 생일 당일 인사배너 전용 프롬프트 ── 오프 전용 프롬프트(buildVacationGreetingPrompt)와 같은 형식의 {dataContext,sys} 반환.
+// 평가성 정보(할일/습관/리듬)는 배제하고 축하만. 오프 기간(여행 등)과 겹치면 그 일정명을 한 번 녹임.
+function buildBirthdayGreetingPrompt(section,vacationEvent,weather,dataDate,dk,allMemos){
+  const weatherDesc=weather?`(참고용, 수치 그대로 출력 금지) 날씨: ${weather.icon} ${weather.temp}도`:'날씨 정보 없음';
+  const pickedMemos=section==='dawn'?[]:_pickRandom(allMemos,3); // 새벽엔 dk가 전날이라 메모 제외
+  const now=new Date();
+  const sectionLabel={dawn:'새벽(자정을 막 넘겨 생일이 시작된 시점)',morning:'아침',afternoon:'오후',night:'저녁'};
+  const dataContext=[
+    `오늘은 ${_HOME_DAYS[now.getDay()]}요일이고, ${BIRTHDAY_CALL_NAME}의 생일이에요.`,
+    weatherDesc,
+    getUserProfileContext(),
+    vacationEvent?`(참고용, 출력 금지) 지금은 "${vacationEvent.text}" 일정 중이에요(${vacationEvent.dayIndex}일째, 총 ${vacationEvent.totalDays}일).`:'',
+    pickedMemos.length?`오늘 메모: ${pickedMemos.join(' / ')}`:''
+  ].filter(Boolean).join('\n');
+  const sys=`당신은 날씨와 하루의 결을 살필 줄 아는 따뜻한 하루 비서예요. 오늘은 사용자의 생일이에요. ${sectionLabel[section]} 시점에 어울리는 짧은 생일 축하 인사를 건네요.
+
+**분량 제한 (반드시 지킬 것):**
+- 최대 3-4문장, 전체 공백 포함 150자 이내.
+
+**생일 전용 원칙:**
+- 첫 문장은 생일을 진심으로 축하하는 말로 시작해요. 호칭은 "${BIRTHDAY_CALL_NAME}"을 쓰되 한 번만.
+- 할일 완료/미완료, 습관 체크, 리듬(시간 기록) 등 "얼마나 했는지"를 나타내는 평가성 정보는 절대 언급하지 말 것 — 오늘은 평가 없이 축하만.
+- 나이나 "몇 번째 생일"은 알 수 없으니 언급하지 말 것.
+${vacationEvent?`- 일정명(${vacationEvent.text})과 지금 그 시간 속에 있다는 사실을 자연스럽게 한 번 녹여내요(기계적인 "n일째" 표현은 금지).\n`:''}- 오늘은 온전히 본인을 위한 날이라는 느긋하고 포근한 분위기로. 서두르거나 재촉하는 말은 금지.
+
+기타 규칙:
+${GREETING_WEATHER_SEASON_RULE('날씨/계절/메모 등에서 느껴지는 분위기를 한 줄 정도 자연스럽게 녹여요.')}
+${GREETING_CONDITION_RULE}
+${GREETING_OUTPUT_RULE}
+- 이모지 1-2개 (🎂 🎉 같은 축하 이모지 가능)`;
+  return {dataContext,sys};
+}
+
 function getSection(){
   const slot=getHomeTimeSlot();
   if(slot==='dawn')return 'dawn';
@@ -2194,9 +2293,10 @@ function getSection(){
 function renderHome(){
   const now=new Date();
   const section=getSection();
+  const isBday=isTodayBirthday();
   const hcard=document.getElementById('home-header-card');
   if(hcard){
-    hcard.className='home-hcard '+section;
+    hcard.className='home-hcard '+(isBday?'birthday':section); // 생일엔 시간대별 배경 대신 생일 배경(index.html .home-hcard.birthday)
   }
   const h=now.getHours(),m=now.getMinutes();
   const ap=h<12?'오전':'오후';
@@ -2223,7 +2323,9 @@ function renderHome(){
   };
   const greetEl=document.getElementById('home-greeting');
   if(greetEl){
-    const pool=greetingPool[section]||['좋은 하루예요'];
+    const pool=isBday
+      ?['생일 축하해요, '+BIRTHDAY_CALL_NAME,BIRTHDAY_CALL_NAME+', 생일 축하해요','오늘은 '+BIRTHDAY_CALL_NAME+'의 날이에요']
+      :(greetingPool[section]||['좋은 하루예요']);
     greetEl.textContent=pool[Math.floor(Math.random()*pool.length)];
   }
   const subEl=document.getElementById('home-greeting-sub');
@@ -3046,7 +3148,7 @@ function _invalidateVacationCache(){
 // 특정 날짜(dk)를 범위(startDate~eventEndDate)로 품고 있는 연속일정을 전부 찾아 반환.
 // 연속일정 row는 시작일의 date_key에만 저장되므로, 최근 MULTIDAY_LOOKBACK_DAYS일 이내를 거슬러 올라가며 훑는다.
 // 반환 각 항목에 dayIndex(오늘이 며칠차인지, 1부터 시작)와 totalDays(총 며칠짜리인지)를 덧붙여준다.
-const MULTIDAY_LOOKBACK_DAYS=14; // 실사용상 최대 연속일정 길이를 넉넉히 잡은 상한
+const MULTIDAY_LOOKBACK_DAYS=45; // 연속일정 최대 길이 상한(일) — 이 값보다 긴 일정은 뒷부분이 오프/연속일정으로 인식되지 않음. 날짜별 캐시 덕에 늘려도 부하 작음(2026-10-01: 14→45)
 function getActiveMultiDayEvents(dk){
   const target=new Date(dk+'T00:00:00');
   const result=[];
@@ -4066,8 +4168,7 @@ function refreshIfTabOpen(viewId,loadFn){
 }
 function updateDateUI(){
   const d=currentDate;
-  const el=document.getElementById('js-date');
-  if(el)el.textContent=`${d.getFullYear()}. ${d.getMonth()+1}. ${d.getDate()}. ${DAYS[d.getDay()]}`;
+  renderDatePill(); // 날짜 텍스트 + (생일이면) 케이크 아이콘
   const nxt=document.getElementById('btn-next');
   if(nxt){
     const limit=new Date();limit.setDate(limit.getDate()+6);limit.setHours(23,59,59,999);
@@ -4902,6 +5003,7 @@ function _collectQuestionConds(dk){
   if(day>=last-4)list.push('month_end');
   list.push('month_'+mo);
   list.push('season_'+(mo>=3&&mo<=5?'spring':mo>=6&&mo<=8?'summer':mo>=9&&mo<=11?'autumn':'winter'));
+  if(isBirthdayDk(dk))list.push('birthday'); // 생일 당일 — 서버 pick_memo_prompt가 이 조건이 있으면 생일 질문을 최우선으로 뽑음
   const prev=new Date(d);prev.setDate(prev.getDate()-1);
   const prevDk=dateKey(prev);
   // 콘텐츠(전날+당일 감상 기록 중 가장 최근)
@@ -11269,19 +11371,20 @@ function renderWeeklyHabitBox(){
     const rgbaBg=getHabitColorSoft(h.color);
     const rgbaBorder=getHabitColorBorder(h.color);
     const rgbaText=getHabitColorText(h.color);
-    let cnt=0,dotsHtml='';
+    let cnt=0,offCnt=0,dotsHtml='';
     for(let d=0;d<7;d++){
       const dDate=new Date(mon);dDate.setDate(mon.getDate()+d);
       const dDk=dateKey(dDate);
-      const on=!isVacationDate(dDk)&&!!checks[h.id+'-'+d]; // 오프 기간은 기존 미체크와 동일하게 처리(주간배너는 원래 활성/비활성 개념 없음, 월간과 달리 분모·스타일 변경 없이 유지)
-      if(on)cnt++;
+      const isVac=isVacationDate(dDk);
+      const on=!!checks[h.id+'-'+d]; // 오프 날도 체크 기록이 있으면 색은 보여줌(월간 히트맵과 동일) — 단 흐리게 표시하고 카운트·분모에서는 제외(2026-10-01)
+      if(isVac)offCnt++;else if(on)cnt++;
       const isToday=d===todayDow;
       const borderColor=on?rgbaBorder:'rgba(var(--divider-rgb),0.5)';
       const borderWidth=isToday?'2px':'1.3px';
       const bg=on?rgbaBg:'none';
-      dotsHtml+='<div class="hw-dot-wrap"><div class="hw-dot" style="background:'+bg+';border-color:'+borderColor+';border-width:'+borderWidth+';"></div></div>';
+      dotsHtml+='<div class="hw-dot-wrap"'+(isVac?' style="opacity:0.4;"':'')+'><div class="hw-dot" style="background:'+bg+';border-color:'+borderColor+';border-width:'+borderWidth+';"></div></div>';
     }
-    html+='<div class="hw-row"><div class="hw-name"><span class="hw-name-dot" style="background:'+rgbaBg+';"></span>'+h.name+'</div><div class="hw-dots">'+dotsHtml+'</div><div class="hw-streak">'+cnt+'/7</div></div>';
+    html+='<div class="hw-row"><div class="hw-name"><span class="hw-name-dot" style="background:'+rgbaBg+';"></span>'+h.name+'</div><div class="hw-dots">'+dotsHtml+'</div><div class="hw-streak">'+(offCnt>=7?'–':cnt+'/'+(7-offCnt))+'</div></div>';
   });
   el.innerHTML=html;
 }
@@ -11555,6 +11658,7 @@ function openSettings(){
   renderSettingsHabitSection();
   refreshPushStatusUI();
   renderSettingsAlertSection();
+  { const md=getBirthdayMD();const v=document.getElementById('birthday-val');if(v)v.textContent=_fmtBirthdayLabel(md);const inp=document.getElementById('birthday-inp');if(inp)inp.value=md?('2000-'+md):'';const clr=document.getElementById('birthday-clear');if(clr)clr.style.display=md?'inline-block':'none'; }
   document.getElementById('settings-ov').classList.add('on');
 }
 // 설정탭 알림 시각 3종(아침브리핑/저녁마무리/남은할일) + 개별 온오프 6종 UI — user_settings를 직접 조회해 채움.
@@ -14529,6 +14633,7 @@ setTimeout(checkAndRecoverPushSubscription, 1500);
   // 1시간 리마인드 알림으로 콜드 스타트된 경우 — 스플래시가 완전히 사라진 뒤에만 메모 모달을 띄운다(2026-09-17).
   // _openFromNotificationUrl(URL 파라미터 기반, 폴백 경로)이 뭔가 처리했으면 checkPendingAlerts를
   // 건너뛴다 — 안 그러면 같은 알림에 대해 두 시스템이 각각 팝업을 열려고 해서 경합이 생길 수 있음.
+  syncBirthdayFromServer(); // 서버에 저장된 생일을 로컬 사본(스플래시용)과 맞춤
   _openFromNotificationUrl(); // [2026-10-01] 알림 탭으로 열린 경우(URL 파라미터)에만 팝업 — 자동 폴링(checkPendingAlerts) 폴백은 제거
 })();
 
