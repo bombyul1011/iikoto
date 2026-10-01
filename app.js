@@ -2227,7 +2227,12 @@ function _syncBirthdaySelects(){
   }
   _fillBirthdayDayOptions(m,d);
   ms.value=m?String(m):'';
+  _markBdayEmpty();
   const clr=document.getElementById('birthday-clear');if(clr)clr.style.display=md?'inline-block':'none';
+}
+// 값이 비어 있는 선택칸은 .empty(테두리 없는 글자만)로 표시
+function _markBdayEmpty(){
+  ['birthday-month','birthday-day'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.toggle('empty',!el.value);});
 }
 function _fillBirthdayDayOptions(m,selDay){
   const ds=document.getElementById('birthday-day');if(!ds)return;
@@ -2239,9 +2244,10 @@ function onBirthdayMonthChange(){
   const m=+document.getElementById('birthday-month').value||0;
   const prevDay=+document.getElementById('birthday-day').value||0;
   _fillBirthdayDayOptions(m,prevDay); // 이전에 고른 일이 새 월의 말일을 넘으면 비워짐(예: 31일 → 4월)
+  _markBdayEmpty();
   _commitBirthdaySelects();
 }
-function onBirthdayDayChange(){_commitBirthdaySelects();}
+function onBirthdayDayChange(){_markBdayEmpty();_commitBirthdaySelects();}
 function _commitBirthdaySelects(){
   const m=+document.getElementById('birthday-month').value||0;
   const d=+document.getElementById('birthday-day').value||0;

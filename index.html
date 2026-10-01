@@ -906,7 +906,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .settings-item:last-child{border-bottom:none;}
 .settings-item-lbl{font-size:var(--main-text-size);color:var(--tp);}
 .settings-item-val{font-size:var(--dow-label-size);color:var(--tm);}
-.bday-sel{appearance:none;-webkit-appearance:none;font-family:'DM Sans',sans-serif;font-size:var(--main-text-size);color:var(--tp);background:transparent;border:1px solid rgba(var(--divider-rgb),0.40);border-radius:10px;padding:6px 10px;text-align:center;text-align-last:center;min-width:56px;} /* 생일 월/일 선택 — iOS에서 휠 피커로 열림 */
+.bday-sel{appearance:none;-webkit-appearance:none;font-family:'DM Sans',sans-serif;font-size:var(--main-text-size);color:var(--tp);background:transparent;border:1px solid rgba(var(--divider-rgb),0.40);border-radius:10px;padding:6px 10px;text-align:center;text-align-last:center;min-width:44px;-webkit-tap-highlight-color:transparent;outline:none;box-shadow:none;margin:0;}
+.bday-sel:focus,.bday-sel:focus-visible,.bday-sel:active{outline:none;box-shadow:none;}
+.bday-sel.empty{border-color:transparent;color:var(--tm);background:transparent;} /* 미선택 상태 — 테두리 없이 "월"/"일" 글자만(빈 박스처럼 보이지 않게) */ /* 생일 월/일 선택 — iOS에서 휠 피커로 열림 */
 
 
 /* ── API SEARCH ── */
@@ -2546,8 +2548,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div class="settings-item">
           <span class="settings-item-lbl">생일</span>
           <span style="display:flex;align-items:center;gap:6px;white-space:nowrap;">
-            <select id="birthday-month" class="bday-sel" onchange="onBirthdayMonthChange()" aria-label="생일 월"></select>
-            <select id="birthday-day" class="bday-sel" onchange="onBirthdayDayChange()" aria-label="생일 일"></select>
+            <select id="birthday-month" class="bday-sel empty" onchange="onBirthdayMonthChange()" aria-label="생일 월"><option value="">월</option><option value="1">1월</option><option value="2">2월</option><option value="3">3월</option><option value="4">4월</option><option value="5">5월</option><option value="6">6월</option><option value="7">7월</option><option value="8">8월</option><option value="9">9월</option><option value="10">10월</option><option value="11">11월</option><option value="12">12월</option></select>
+            <select id="birthday-day" class="bday-sel empty" onchange="onBirthdayDayChange()" aria-label="생일 일"><option value="">일</option><option value="1">1일</option><option value="2">2일</option><option value="3">3일</option><option value="4">4일</option><option value="5">5일</option><option value="6">6일</option><option value="7">7일</option><option value="8">8일</option><option value="9">9일</option><option value="10">10일</option><option value="11">11일</option><option value="12">12일</option><option value="13">13일</option><option value="14">14일</option><option value="15">15일</option><option value="16">16일</option><option value="17">17일</option><option value="18">18일</option><option value="19">19일</option><option value="20">20일</option><option value="21">21일</option><option value="22">22일</option><option value="23">23일</option><option value="24">24일</option><option value="25">25일</option><option value="26">26일</option><option value="27">27일</option><option value="28">28일</option><option value="29">29일</option><option value="30">30일</option><option value="31">31일</option></select>
             <button class="settings-btn-small" id="birthday-clear" style="display:none;width:auto;padding:6px 12px;white-space:nowrap;" onclick="clearBirthday()">지우기</button>
           </span>
         </div>
@@ -2711,7 +2713,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   </div>
 </div>
 
-<script src="app.js"></script>
+<script src="app.js?v=20261001b"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
 
 </body>
 </html>
