@@ -28,12 +28,13 @@ async function chaeumFetch(path){
 
 // ── 날짜 유틸 (iikoto와 동일 규칙) ──
 function pad(n){return String(n).padStart(2,'0');}
+// 연속일정(오프 포함) 시작일을 거슬러 찾는 최대 일수 — 본앱 app.js의 MULTIDAY_LOOKBACK_DAYS와 같은 값으로 유지(이보다 긴 일정의 뒷부분은 인식되지 않음).
+const MULTIDAY_LOOKBACK_DAYS=45;
 // [2026-09-25] 오프 기간(is_vacation=true인 연속일정) — 본앱 isVacationDate와 동일 개념을 읽기 전용 구조에 맞게 이식.
 // 본앱은 로컬 캐시를 순회하지만, 아카이브는 서버 쿼리 기반이라 "그 탭이 보는 날짜 범위" 하나로 한 번만 조회해
 // 결과 배열(vacationRanges)을 각 통계 함수가 인자로 받아 판정하는 방식으로 통일(_isHabitActiveOn과 동일 패턴).
 // startDk~endDk 범위와 겹치는 연속일정만 가져오면 되므로, 시작일이 (endDk 이전)이고 종료일이 (startDk 이후)인 것만 필터.
 async function fetchVacationRanges(startDk,endDk){
-  const MULTIDAY_LOOKBACK_DAYS=14; // 연속일정 시작일이 조회 범위보다 앞설 수 있어 본앱과 동일하게 룩백
   const lookbackStartDk=dateKey(new Date(new Date(startDk+'T00:00:00').getTime()-(MULTIDAY_LOOKBACK_DAYS-1)*86400000));
   // date_key<=endDk는 서버 쿼리에서 이미 걸렀으므로, 클라이언트에서는 "종료일이 조회 시작일 이후"만 추가로 확인하면 됨
   // (서버 쿼리만으론 event_end_date>=startDk를 함께 표현하기 번거로워 룩백으로 넓게 가져온 뒤 여기서 정밀하게 거름).
@@ -984,13 +985,12 @@ async function renderTodayMemos(dk,contents,finalReviews){
   // 콘텐츠 메모도 같은 정렬 기준(toSortKey)으로 섞어서 전체를 하나의 시간순 목록으로 만듦.
   const memos=[...(memosRaw||[]),...contentNotes].sort((a,b)=>toSortKey(a.memo_time)-toSortKey(b.memo_time));
   el.innerHTML=memos.map(m=>{
-    const isSeed=m.type==='seed';
     let todClass='';
-    if(!isSeed&&m.memo_time){
+    if(m.memo_time){
       const h=parseInt(m.memo_time.split(':')[0],10);
       todClass=h>=5&&h<12?' tod-morning':h>=12&&h<18?' tod-afternoon':' tod-night';
     }
-    const timeHtml=isSeed?'<i class="ti ti-seeding seed-ico" aria-hidden="true"></i>':(m.memo_time||'');
+    const timeHtml=m.memo_time||'';
     if(m.isContentNote){
       const meta=WCAL_CAT_META[m.contentCat]||{icon:'ti-stack-2',color:'rgba(150,150,150,1)'};
       const posterStyle=m.contentPoster?`background-image:url('${m.contentPoster}');`:`background:${meta.color};display:flex;align-items:center;justify-content:center;`;
@@ -1001,11 +1001,11 @@ async function renderTodayMemos(dk,contents,finalReviews){
     // 질문 알림에 사진으로 답한 경우도 있어(본앱과 동일) 답변 위에 "Q." 줄을 함께 붙임(2026-09-25).
     if(m.photo_url){
       const txt=(m.question?`<span class="memo-q">Q. ${escapeHtml(m.question)}</span>`:'')+escapeHtml(m.text||'');
-      return `<div class="memo-item${isSeed?' memo-seed':(m.question?' memo-question':todClass)}"><div class="memo-time">${timeHtml}</div><div class="memo-txt memo-txt-photo"><div class="memo-photo-wrap"><div class="memo-photo-placeholder"><i class="ti ti-photo" aria-hidden="true"></i></div><img class="memo-photo-thumb memo-photo-thumb-static" src="${m.photo_url}" alt="" loading="lazy" onload="this.classList.add('loaded');this.previousElementSibling.classList.add('hide');" onerror="this.previousElementSibling.classList.add('hide');"></div><span class="memo-photo-text">${txt}</span></div></div>`;
+      return `<div class="memo-item${m.question?' memo-question':todClass}"><div class="memo-time">${timeHtml}</div><div class="memo-txt memo-txt-photo"><div class="memo-photo-wrap"><div class="memo-photo-placeholder"><i class="ti ti-photo" aria-hidden="true"></i></div><img class="memo-photo-thumb memo-photo-thumb-static" src="${m.photo_url}" alt="" loading="lazy" onload="this.classList.add('loaded');this.previousElementSibling.classList.add('hide');" onerror="this.previousElementSibling.classList.add('hide');"></div><span class="memo-photo-text">${txt}</span></div></div>`;
     }
     // 오늘의 질문(question) — 답변 위에 흐린 "Q. 질문" 한 줄을 붙이고, 세로선을 라임으로 구분(본앱과 동일, 2026-09-25).
     const qHtml=m.question?`<span class="memo-q">Q. ${escapeHtml(m.question)}</span>`:'';
-    return `<div class="memo-item${isSeed?' memo-seed':(m.question?' memo-question':todClass)}"><div class="memo-time">${timeHtml}</div><div class="memo-txt">${qHtml}${escapeHtml(m.text)}</div></div>`;
+    return `<div class="memo-item${m.question?' memo-question':todClass}"><div class="memo-time">${timeHtml}</div><div class="memo-txt">${qHtml}${escapeHtml(m.text)}</div></div>`;
   }).join('');
   // 정렬 순서는 그대로(시간순) 두고, 첫 화면 노출은 최신(마지막) 메모가 보이도록 스크롤을 맨 아래로
   el.scrollTop=el.scrollHeight;
@@ -6152,9 +6152,8 @@ async function loadTimelineTab(){
   document.getElementById('tl-dow').textContent=DOW[_selectedDate.getDay()]+'요일';
 
   // 연속일정(며칠짜리 일정)은 시작일의 date_key에만 저장되므로, 오늘 하루치 조회로는 잡히지 않는다.
-  // 본앱 getActiveMultiDayEvents와 동일 원칙(최근 14일 lookback) — 여기선 로컬 캐시가 없어 날짜별 순회 대신
+  // 본앱 getActiveMultiDayEvents와 동일 원칙(최근 MULTIDAY_LOOKBACK_DAYS일 lookback) — 여기선 로컬 캐시가 없어 날짜별 순회 대신
   // 범위 쿼리 한 번으로 가져온 뒤 JS에서 "오늘을 포함하는 것"만 걸러 dayIndex/totalDays를 계산한다(2026-09-25).
-  const MULTIDAY_LOOKBACK_DAYS=14;
   const lookbackStartDk=dateKey(new Date(new Date(dk+'T00:00:00').getTime()-(MULTIDAY_LOOKBACK_DAYS-1)*86400000));
 
   const [todos,sleepRows,habits,habitChecks,meals,contents,rblocks,todayManualRows,onelineRows,morningChecks,multidayRows,finalReviewRows]=await Promise.all([
