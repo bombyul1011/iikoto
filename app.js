@@ -78,7 +78,7 @@ function renderHomeBody(section){
     body.appendChild(makeTodayRhythmBanner());
   } else {
     // 저녁 공통 틀(파트1): [그날의 특수 배너] → 링 → 리듬배너 → (브리핑) → 독서카드
-    // 저녁 파트2(2026-09-06 개편): 인사카드 → 오늘의 독서 → 오늘의 문장 → (리포트 있는 날) 리포트 배너 → 오늘의 리듬기록
+    // 저녁 파트2: 인사카드 → 오늘의 독서 → 오늘의 문장 → (리포트 있는 날) 리포트 배너 → 오늘의 리듬기록
     function appendReportBannerIfAny(){
       if(isLastDayOfMonth){
         body.appendChild(makeLabel('🌿 이번 달 누계'));
@@ -101,7 +101,7 @@ function renderHomeBody(section){
       body.appendChild(makeBookCardWithCover());
       const quoteCard=makeTodayQuoteCard();
       if(quoteCard)body.appendChild(quoteCard);
-      appendReportBannerIfAny(); // 파트2 개편(2026-09-06): 문장 다음, 리듬기록 이전으로 이동
+      appendReportBannerIfAny(); // 파트2 개편: 문장 다음, 리듬기록 이전으로 이동
       body.appendChild(makeTodayRhythmBanner());
     }else{
       body.appendChild(makeHabitMiniCheckRow());
@@ -123,13 +123,13 @@ const RHYTHM_CATS={
   exercise:{label:'운동',color:'rgba(var(--pal-pink-rgb),0.80)',icon:'ti-run'},
   rest:{label:'휴식',color:'rgba(var(--pal-mint-rgb),0.55)',icon:'ti-armchair'},
   groom:{label:'단장',color:'rgba(var(--pal-orange-rgb),0.82)',icon:'ti-mood-spark'},
-  work:{label:'업무',color:'rgba(var(--pal-sky-rgb),0.45)',icon:'ti-keyboard'}, // 업무 존재감 살짝 올림(식사 아이콘과 겹쳐도 시인성 확인 완료), 2026-09-06
-  appointment:{label:'외출',color:'rgba(var(--pal-rose-rgb),0.25)',icon:'ti-bus'}, // 알파만 낮춤(채도는 원색 그대로), 외출도 지속시간이 길어 존재감 조절, 2026-09-04
+  work:{label:'업무',color:'rgba(var(--pal-sky-rgb),0.45)',icon:'ti-keyboard'}, // 업무 존재감 살짝 올림(식사 아이콘과 겹쳐도 시인성 확인 완료)
+  appointment:{label:'외출',color:'rgba(var(--pal-rose-rgb),0.25)',icon:'ti-bus'}, // 알파만 낮춤(채도는 원색 그대로), 외출도 지속시간이 길어 존재감 조절
   note:{label:'책상',color:'rgba(var(--pal-yellow-rgb),0.82)',icon:'ti-desk'},
   enjoy:{label:'감상',color:'rgba(var(--pal-lavender-rgb),0.80)',icon:'ti-stack-2'},
   home:{label:'살림',color:'rgba(var(--pal-lime-rgb),0.82)',icon:'ti-home'}
 };
-const RHYTHM_SLEEP_COLOR='rgba(var(--pal-warmgray-rgb),0.30)'; // 알파만 낮춤(채도는 원색 그대로), 2026-09-04
+const RHYTHM_SLEEP_COLOR='rgba(var(--pal-warmgray-rgb),0.30)'; // 알파만 낮춤(채도는 원색 그대로)
 const RHYTHM_MEAL_COLOR='rgba(var(--pal-green-rgb),0.90)';
 // 다음주 코멘트/제안 카드의 카테고리→아이콘 매핑 공용 베이스. 제안 카드(NEXT_WEEK_SUGGEST_CAT_ICON)만 '취미' 아이콘이 추가로 필요해 확장해 사용.
 const NEXT_WEEK_CAT_ICON={
@@ -226,11 +226,8 @@ async function _syncManyDown(table,dks,pendingKey,mapFn,setFn){
     setFn(dk,byDk[dk].map(mapFn));
   });
 }
-// todos 서버 행 → 로컬 객체 매핑을 한 곳으로 통합(2026-09-30) — 예전엔 syncTodosDown/syncTodosDownMany/
-// syncMonthRange 세 곳에 이 매핑을 각자 따로 써놨는데, 필드가 하나 추가될 때마다 세 곳을 다 고쳐야 했고
-// 한 곳(syncMonthRange)만 놓쳐서 recur_rule_cid 등 6개 필드가 누락된 채 로컬을 덮어쓰는 버그가 있었다
-// (반복투두 "바레 예약"이 앱을 처음 열면 반복 설정이 풀려 보이다가 한참 뒤에야 복구되던 현상의 원인).
-// 앞으로 todos 필드가 늘어나면 이 함수 하나만 고치면 세 경로 모두에 반영된다.
+// todos 서버 행 → 로컬 객체 매핑을 한 곳에 모은 공용 함수 — 다운로드 경로 3곳(syncTodosDown/syncTodosDownMany/syncMonthRange)이 모두 이걸 쓴다.
+// todos 필드가 늘어나면 이 함수 하나만 고치면 되고, 한 경로만 놓쳐 필드가 누락된 채 로컬을 덮어쓰는 사고를 막는다.
 function todoRowToLocal(r){
   return {text:r.text,done:r.done,created:r.created,timeSection:r.time_section||'none',cid:r.client_id||genCid(),strikeParts:r.strike_parts||[],strikeTimes:r.strike_times||{},completedAt:r.completed_at,sortOrder:(r.sort_order!=null?r.sort_order:undefined),isEvent:!!r.is_event,eventCat:r.event_cat||null,eventTime:r.event_time||null,eventEndDate:r.event_end_date||null,cat:r.cat||'todo',pinned:!!r.pinned,recurRuleCid:r.recur_rule_cid||undefined,alertTime:r.alert_time||null,eventAlertOn:!!r.event_alert_on,todoAlertOn:!!r.todo_alert_on,isVacation:!!r.is_vacation};
 }
@@ -245,7 +242,7 @@ function dedupeRecurTodos(list){
     return true;
   });
 }
-// 캘린더 월간뷰 전용 캐시(2026-09-30) — renderCalendar()의 칸 미리보기(배지/막대)가 오늘탭과 같은
+// 캘린더 월간뷰 전용 캐시 — renderCalendar()의 칸 미리보기(배지/막대)가 오늘탭과 같은
 // todos_* 저장소를 읽지 않도록 분리. syncMonthRange가 채워두며, 아직 한 번도 캐시되지 않은 날짜는
 // (예: 이번 달로 막 진입해 아직 syncMonthRange가 안 끝난 순간) 정식 todos_*로 폴백해 빈 칸으로
 // 보이는 것을 방지한다 — 캐시가 "더 부정확한" 상황은 없고, 기껏해야 "아직 없어서 정식 걸 대신 보여줌".
@@ -395,15 +392,14 @@ function saveRhythmBlock(){
   setTimeout(()=>{_rhythmSubmitting=false;},500);
 }
 // 리듬 블록 카테고리에 대응하는 습관(월간 결산용)을 자동으로 체크
-// 매핑은 HABIT_AUTO_RHYTHM_MAP(카탈로그 도입, 2026-09-05)에 정의 — 운동/케어(단장) 2개 카테고리 지원
-// (살림은 '정리' 칩 선택시에만 연결하는 별도 분기가 있어 이 공용 맵엔 포함하지 않음, 2026-09-12)
+// 매핑은 HABIT_AUTO_RHYTHM_MAP(카탈로그 도입)에 정의 — 운동/케어(단장) 2개 카테고리 지원
+// (살림은 '정리' 칩 선택시에만 연결하는 별도 분기가 있어 이 공용 맵엔 포함하지 않음)
 function autoCheckHabitFromRhythm(cat,dk,startTime){
   const habitId=HABIT_AUTO_RHYTHM_MAP[cat];if(!habitId)return;
   checkHabitDirect(habitId,dk,startTime);
 }
 // 습관 id를 지정해 직접 체크(이미 켜져 있으면 그대로 둠 - 수동으로 끈 걸 되돌리지 않기 위함).
-// [2026-09-05] 기존엔 습관 "이름"이 키였으나, 카탈로그 도입으로 습관마다 고유 id를 갖게 되어
-// 체크 데이터도 id 기준으로 저장 — 이름을 나중에 바꿔도 체크 기록이 끊기지 않음.
+// 체크 데이터는 습관 id 기준으로 저장 — 이름을 나중에 바꿔도 체크 기록이 끊기지 않음.
 // timeStr('HH:MM')을 넘기면 그 시각(예: 리듬 블록의 시작시간)을 기록하고, 없으면 현재 시각을 씀.
 // 이미 체크되어 있는 상태여도, 아직 시각 기록이 없다면 시각만은 보강해서 남긴다.
 // habitId 습관을 dk(날짜)에 체크 — 이미 체크+시각이 모두 있으면(다른 경로로 이미 기록된 경우) 아무것도 안 함.
@@ -446,11 +442,11 @@ function finishRhythmBlock(idx){
   if(cat==='exercise')scheduleExerciseStatAlert(blocks[idx].cid);
   refreshRhythmTrack();
   // 종료 시점 메모 제안 — 리듬블록에 입력된 텍스트(콘텐츠 제목 등)가 있으면 그걸 우선 표시,
-  // 없으면 기존처럼 카테고리 라벨·지속시간으로 폴백(_buildRhythmMemoTitle 공용 로직, 2026-09-18).
+  // 없으면 기존처럼 카테고리 라벨·지속시간으로 폴백(_buildRhythmMemoTitle 공용 로직).
   const title=_buildRhythmMemoTitle(cat,startStr,endStr,blocks[idx].text);
   if(title)openRhythmMemoModal(cat,_rhythmDk,title,'오늘 이 시간, 짧게 남겨볼까요?');
 }
-// 시작~종료(HH:MM) 사이 경과 분 — 자정 넘김 보정 포함. 리듬바 자정넘김 규칙(2026-09-09)과 동일 방식.
+// 시작~종료(HH:MM) 사이 경과 분 — 자정 넘김 보정 포함. 리듬바 자정넘김 규칙과 동일 방식.
 function _rhythmDurationMin(startStr,endStr){
   const [sh,sm]=startStr.split(':').map(Number),[eh,em]=endStr.split(':').map(Number);
   let dur=(eh*60+em)-(sh*60+sm);
@@ -459,7 +455,7 @@ function _rhythmDurationMin(startStr,endStr){
 }
 // 리듬블록 text에서 사람이 읽을 제목을 뽑는다 — "드라마 - 제목"/"영화 - 제목"/"독서 - 제목" 형태는
 // 접두어를 떼고 제목만, 접두어 없는 자유입력(운동/휴식 등 직접 타이핑)은 그대로, text 자체가
-// 없으면 null을 반환해 호출부가 카테고리 라벨로 폴백하게 한다(2026-09-17).
+// 없으면 null을 반환해 호출부가 카테고리 라벨로 폴백하게 한다.
 function _rhythmBlockDisplayTitle(text){
   if(!text||!text.trim())return null;
   const catPrefix={'드라마 - ':6,'영화 - ':5,'독서 - ':5};
@@ -468,7 +464,7 @@ function _rhythmBlockDisplayTitle(text){
 }
 // 리듬 메모 모달 제목 생성 — "카테고리 · 콘텐츠 제목"(text 있을 때) 또는 "카테고리 · 지속시간"(없을 때).
 // 종료 시점(finishRhythmBlock)/1시간 알림(_openFromNotificationUrl) 양쪽에서 동일 로직이라
-// 공용화(2026-09-18). endStr을 안 넘기면 현재 시각까지의 경과로 계산(아직 진행 중인 블록용).
+// 공용화. endStr을 안 넘기면 현재 시각까지의 경과로 계산(아직 진행 중인 블록용).
 function _buildRhythmMemoTitle(cat,startStr,endStr,text){
   const catInfo=RHYTHM_CATS[cat];
   if(!catInfo||!startStr)return null;
@@ -478,7 +474,7 @@ function _buildRhythmMemoTitle(cat,startStr,endStr,text){
   const displayTitle=_rhythmBlockDisplayTitle(text);
   return displayTitle?`${catInfo.label} · ${displayTitle}`:`${catInfo.label} · ${durLabel}`;
 }
-// ── 운동 리듬바 종료 통계 알림 (2026-09-08 설계) ──
+// ── 운동 리듬바 종료 통계 알림 ──
 // exercise 카테고리 블록을 종료할 때마다, 이번달 누적 횟수 + 주3회 목표 스트릭(완결된 주까지만 정확 계산,
 // 진행중인 이번주는 자연어로 유연하게 언급)을 조합해 종료 10분 뒤 알림 예약.
 // 로컬 캐시가 30일치라 스트릭 역산은 최대 4주(지난주부터)로 제한 — 그 이상은 서버 별도조회 필요해 범위 밖.
@@ -509,7 +505,7 @@ function _countExerciseInWeek(wk){
   return count;
 }
 // 완결된 주(지난주부터 역산, 최대 4주)를 훑어 "연속으로 주3회 이상 채운 주가 몇 주째인지" 계산.
-// 한 주라도 3회 미만이면 그 지점에서 스트릭 종료. 그 주에 오프 기간이 하루라도 끼면 그 지점에서 스트릭 종료(2026-10-01 변경 — 예전엔 건너뜀, 지금은 습관 연속일과 동일하게 끊김) — 스트릭이 끊기지도, 유지되지도 않고 그냥 스킵.
+// 한 주라도 3회 미만이면 그 지점에서 스트릭 종료. 그 주에 오프 기간이 하루라도 끼면 그 지점에서 스트릭 종료(습관 연속일과 같은 규칙).
 function _exerciseWeekStreak(){
   const now=new Date();
   let streak=0;
@@ -519,7 +515,7 @@ function _exerciseWeekStreak(){
     const wkStart=new Date(wk.replace('week:',''));
     let hasVacationDay=false;
     for(let d=0;d<7;d++){const dd=new Date(wkStart);dd.setDate(wkStart.getDate()+d);if(isVacationDate(dd)){hasVacationDay=true;break;}}
-    if(hasVacationDay)break; // 오프가 낀 주에서 연속 종료 — 습관 연속일(getHabitStreak)과 같은 규칙(2026-10-01: 건너뛰기→끊김으로 통일)
+    if(hasVacationDay)break; // 오프가 낀 주에서 연속 종료 — 습관 연속일(getHabitStreak)과 같은 규칙
     if(_countExerciseInWeek(wk)>=3)streak++;
     else break;
   }
@@ -549,7 +545,7 @@ async function scheduleExerciseStatAlert(blockCid){
 // 리듬바에서 블록을 직접 종료했을 때, 그 블록이 모닝플로우 카드로 시작된 것이면(blockCid 매칭)
 // 모닝플로우 쪽 status도 done으로 함께 갱신 — 오전 홈탭이 지나가버려 모닝플로우 화면에서 종료를 못 누르는
 // 경우(예: 외출이 오전 내내 안 끝남) 리듬바에서 종료해도 월간 카운트/통계에 정상 반영되도록.
-// (2026-09-04 추가 — 이게 없으면 리듬바 종료는 rhythm_blocks만 갱신하고 모닝플로우 picks는 영원히
+// (이게 없으면 리듬바 종료는 rhythm_blocks만 갱신하고 모닝플로우 picks는 영원히
 //  running으로 붕 떠서, "시작만 하고 종료 안 하면 미시작 취급" 정책과 어긋나는 상태가 됨)
 function syncMorningFlowOnRhythmBlockEnd(dk,blockCid,endStr){
   if(!blockCid)return;
@@ -574,7 +570,7 @@ function deleteRhythmBlock(idx){
   refreshRhythmTrack();
 }
 // 리듬탭에서 블록을 직접 삭제했을 때, 그 블록이 모닝플로우 카드로 시작된 것이면(blockCid 매칭)
-// 해당 pick을 통째로 지워 미시작(idle) 상태로 되돌림 — "등록한 리듬을 지운다 = 하려다가 안 했다"는 정책(2026-09-05).
+// 해당 pick을 통째로 지워 미시작(idle) 상태로 되돌림 — "등록한 리듬을 지운다 = 하려다가 안 했다"는 정책.
 function syncMorningFlowOnRhythmBlockDelete(dk,blockCid){
   if(!blockCid)return;
   const flow=getMorningFlow(dk);
@@ -613,7 +609,7 @@ function getDayCategoryDurations(dk){
   return dur;
 }
 // startDate부터 days일 동안의 카테고리(라벨)별 누적시간+발생일수 — 최근 7일 요약(computeWeeklyRhythmDur), 주간 리포트(이번주/지난주 비교),
-// 다음주 제안이 공용으로 사용(예전엔 리포트마다 같은 집계 루프를 따로 갖고 있었음).
+// 다음주 제안이 공용으로 사용.
 function sumCategoryDurations(startDate,days){
   const dur={},dayCount={};
   for(let i=0;i<days;i++){
@@ -653,7 +649,7 @@ function buildMonthlyRhythmBar(dur,dim,dayCount){
   });
   barHtml+='</div>';
   const listItems=order.filter(function(k){return (dur[k]||0)>0;})
-    .sort(function(a,b){return dur[b]-dur[a];}); // 누계 많은 순 정렬(2026-09-08)
+    .sort(function(a,b){return dur[b]-dur[a];}); // 누계 많은 순 정렬
   const listHtml=listItems.length?'<div class="mr-rhythm-list">'+listItems.map(function(k){
     const v=dur[k],days=(dayCount&&dayCount[k])||1,avg=v/days;
     return '<div class="mr-rhythm-item"><span class="dot" style="background:'+colorMap[k]+';"></span><span class="lbl">'+k+'</span><span class="val">누계 '+fmtDur(v)+' · 일평균 '+fmtDur(avg)+'</span></div>';
@@ -721,7 +717,7 @@ function buildDailyRhythmTrack(dk){
   dateRow.innerHTML='<span>'+(d.getMonth()+1)+'월 '+d.getDate()+'일 '+_HOME_DAYS[d.getDay()]+'요일</span><span class="w">'+(isToday?'오늘':'')+'</span>';
   outer.appendChild(dateRow);
   const wrap=document.createElement('div');wrap.className='rhythm-track';
-  const TOTAL_H=480; // 2026-09-05: 320→480으로 확대 — 시트 세로 공간을 넉넉히 써서 짧은 블록끼리 겹쳐 보이는 문제 완화
+  const TOTAL_H=480; // 320→480으로 확대 — 시트 세로 공간을 넉넉히 써서 짧은 블록끼리 겹쳐 보이는 문제 완화
   // 0~8시(자는 시간)는 절반 크기로 압축하고, 줄어든 만큼을 나머지 8~24시 구간에 균일하게 더해줌
   const NIGHT_END=480; // 8시(분)
   const H1=TOTAL_H/8; // 0~8시 구간이 차지하는 높이 (원래 1/4 → 절반인 1/8로)
@@ -739,7 +735,7 @@ function buildDailyRhythmTrack(dk){
   };
 
   // 시간 눈금 — 0~8시 압축구간은 눈금을 생략(그 구간엔 보통 수면만 있어 8시부터 표기해도 충분)하고 8시부터 2시간 간격으로.
-  // [2026-09-06] 24시 이후로 넘어가는 블록은 실제 끝시각까지 그대로 이어서 그리되(강제절단 없음),
+  // 24시 이후로 넘어가는 블록은 실제 끝시각까지 그대로 이어서 그리되(강제절단 없음),
   // 새벽 구간 자체엔 숫자 눈금을 따로 두지 않기로 함 — 24시까지만 표기하고 그 아래는 눈금 없이 이어짐.
   let html='';
   [8,10,12,14,16,18,20,22,24].forEach(function(h){
@@ -749,12 +745,10 @@ function buildDailyRhythmTrack(dk){
   });
 
   // 블록 통합 목록: 수면(자동) + 식사(자동,30분) + 수기 블록 — 공통 함수 computeRhythmBlocksRaw로 통일.
-  // [2026-09-06] 자정을 넘겨 끝나는 활동(예: 23:00~02:00)은 24시에서 잘라내지 않고 실제 종료시각까지
+  // 자정을 넘겨 끝나는 활동(예: 23:00~02:00)은 24시에서 잘라내지 않고 실제 종료시각까지
   // 그대로 이어서 그림(끝시각을 1440+분의 절대좌표로 확장) — 아카이브앱(renderTimelineTrack)과 동일 원칙.
-  // [2026-09-09 버그수정] 기존엔 eMin<=bk.start(같은 값 포함)를 자정 넘김으로 봐서, 시작~종료가 같은
-  // 분(1분 미만 스톱워치처럼 초 단위 차이만 있는 경우)이면 eMin===start가 되어 +1440이 잘못 적용되고
-  // 블록이 거의 24시간 길이로 부풀려 그려지는 문제가 있었음. "더 작을 때만"(<)으로 좁히고, 정확히
-  // 같은 값(진짜로 시작=끝, 즉 1분 미만이라 분 단위가 같은 경우)은 최소 1분 길이로만 보정.
+  // 자정 넘김 판정은 eMin<start일 때만 — 시작~종료가 같은 분(1분 미만 스톱워치처럼 초 단위 차이만 있는 경우)이면
+  // +1440을 적용하지 않고 최소 1분 길이로만 보정(안 그러면 블록이 거의 24시간 길이로 부풀려 그려짐).
   let blocks=computeRhythmBlocksRaw(dk).map(function(bk){
     let eMin=bk.end;
     if(eMin!=null){
@@ -782,7 +776,7 @@ function buildDailyRhythmTrack(dk){
     const stubEnd=bk.end!=null?bk.end:(isToday?(function(){const n=new Date();return n.getHours()*60+n.getMinutes();})():Math.min(bk.start+20,1440));
     const bh=Math.max(toY(stubEnd+offset)-by,16); // 라벨 텍스트가 최소한은 들어갈 높이 확보
     if(by+bh>maxBottom)maxBottom=by+bh;
-    // [2026-09-06] 텍스트 정렬 규칙 — 총 소요시간(진행중이면 현재까지 경과시간) 60분 이하는 중앙정렬(짧은
+    // 텍스트 정렬 규칙 — 총 소요시간(진행중이면 현재까지 경과시간) 60분 이하는 중앙정렬(짧은
     // 블록에서 텍스트가 상/하단에 쏠려 보이는 문제 방지 목적, 기존과 동일), 61분 이상은 상단정렬로 전환.
     // 긴 블록일수록 텍스트가 블록 중앙(화면 스크롤상 한참 아래)에 있으면 블록 시작 지점과 눈에 안 들어와
     // 매칭이 어려웠던 문제와, 점심식사처럼 짧은 블록이 긴 블록 한가운데 걸치는 문제를 함께 해결.
@@ -840,7 +834,7 @@ function getHabitMonthCount(habitId){
 }
 // 특정 습관의 "연속 체크일수" — 오늘(logicalDate)부터 거슬러 올라가며 하루라도 빠지면 중단.
 // 오늘은 아직 체크 전일 수 있어(아침 시간대 배너 용도) 오늘 제외하고 "어제부터" 계산.
-// 오프 기간이 스트릭 도중에 끼면 그 지점에서 끊긴 것으로 간주(건너뛰지 않고 새로 계산) — 2026-09-25 확정 규칙.
+// 오프 기간이 스트릭 도중에 끼면 그 지점에서 끊긴 것으로 간주(건너뛰지 않고 새로 계산).
 function getHabitStreak(habitId){
   let streak=0;
   const d=getLogicalDate();
@@ -855,7 +849,7 @@ function getHabitStreak(habitId){
   return streak;
 }
 // 습관 동력 배너 헤드라인 — 스트릭(연속기록) > 어제실적 > 이번달누적 순으로 그날 보여줄 수 있는
-// 가장 힘있는 정보 하나를 규칙 기반으로 고름(2026-09-06). API 없이 순수 계산.
+// 가장 힘있는 정보 하나를 규칙 기반으로 고름. API 없이 순수 계산.
 function _habitMotivationLine(habits){
   if(!habits.length)return null;
   // 1순위: 스트릭 2일 이상인 습관 중 가장 긴 것
@@ -911,7 +905,7 @@ function makeRhythmBanner(lineText,builderFn,extraClass,fontSize,dk){
   b.addEventListener('click',function(){openHomeDetailSheet(lineText,builderFn);});
   return b;
 }
-// 홈탭 4개 시간대(아침/오후/새벽/저녁) 모두 "오늘의 리듬 기록" 배너를 동일한 인자로 붙이므로 공용 헬퍼로 통일(2026-08-30).
+// 홈탭 4개 시간대(아침/오후/새벽/저녁) 모두 "오늘의 리듬 기록" 배너를 동일한 인자로 붙이므로 공용 헬퍼로 통일.
 function makeTodayRhythmBanner(){
   const dk=dateKey(getLogicalDate());
   return makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dk);},'rhythm-soft',12.5,dk);
@@ -977,7 +971,7 @@ function _initBriefingCache(){
 // "잠들고 일어나야 하루가 시작된다"는 생활 개념과 맞춰, 새벽(dawn)이 하루의 끝에 오도록 배치.
 // 이 값은 홈탭이 그때그때 어떤 카드/배너를 보여줄지 정하는 화면 판정 전용이며,
 // 기록이 어느 날짜에 소속되는지는 별개 개념(DAWN_CUTOFF_MIN/getLogicalDate, 아래쪽 데이터 유틸 섹션 참고).
-// getSection/getSubSection은 모두 이 함수에서 파생되므로 서로 어긋날 수 없음(getGreetingSubSection은 getSubSection과 완전 중복이라 2026-08-30 통합·제거).
+// getSection/getSubSection은 모두 이 함수에서 파생되므로 서로 어긋날 수 없음.
 function getHomeTimeSlot(){
   const h=new Date().getHours();
   if(h<4)return 'dawn';
@@ -999,7 +993,7 @@ _initBriefingCache();
 // ─ Claude API 유틸
 function getClaudeKey(){return S.get('claude_api_key')||'';}
 // 설정에서 사용자가 직접 입력한 개인정보(성향, 상황 등) — 모든 AI 생성 프롬프트에 공통으로 참고시킴.
-// 빈 값이면 빈 문자열 반환(dataContext 배열에서 .filter(Boolean)으로 자연히 제외됨).
+// 빈 값이면 빈 문자열 반환(dataContext 배열에서.filter(Boolean)으로 자연히 제외됨).
 function getUserProfileContext(){
   const p=(S.get('user_profile')||'').trim();
   return p?`사용자에 대한 참고 정보(직접 입력함): ${p}`:'';
@@ -1106,11 +1100,11 @@ async function renderDiaryMonthSheet(){
   }
 }
 // 콘텐츠 완결 판정 — 2종. 조회/렌더링용은 콘텐츠 객체를 받고, 등록 모달의 저장 직전 로직처럼
-// 아직 객체가 아닌 상태 문자열만 있는 지점은 문자열 버전을 씀. 9곳에 흩어져 있던 동일 조건을 통합(2026-08-31).
+// 아직 객체가 아닌 상태 문자열만 있는 지점은 문자열 버전을 씀.
 // 음악은 이 판정 대상이 아님(진행/완결 개념 자체가 없음, 항상 status 없이 등록일만 사용).
 // 리듬블록 하나가 특정 콘텐츠(cid+title+cat)의 감상 기록인지 판정하는 공용 헬퍼 — content_cid 매칭 우선,
 // content_cid가 없는 과거 블록만 텍스트 매칭("{카테고리} - {title}")으로 폴백.
-// getWatchedDaysInMonth/computeWatchSummary 양쪽이 공유(2026-09-26 방영중 개편 시 통합).
+// getWatchedDaysInMonth/computeWatchSummary 양쪽이 공유.
 function _isContentWatchBlock(b,cid,title,cat){
   if(b.cat!=='enjoy')return false;
   if(cid&&b.contentCid)return b.contentCid===cid;
@@ -1141,7 +1135,7 @@ function groupConsecutiveDays(days){
   return groups;
 }
 function isContentFinished(c){return c.status==='done'||c.status==='stopped';}
-// 완결 확정 시점에 1회 계산하는 감상 요약(2026-09-26 방영중 개편 시 도입) — watchedDaysCount(실제 감상일수)/
+// 완결 확정 시점에 1회 계산하는 감상 요약 — watchedDaysCount(실제 감상일수)/
 // watchSpanDays(시작~종료 전체일수)/watchedSeconds(총 감상시간) 3개를 리듬블록에서 스캔해 스냅샷으로 저장.
 // 이후 리듬블록이 삭제/수정돼도 이 값은 그대로 유지됨(재계산은 다시 완결 처리할 때만). 음악은 대상 아님(호출부에서 이미 제외).
 function computeWatchSummary(cat,cid,title,startDate,endDate){
@@ -1224,7 +1218,7 @@ function computeRawStatsForRange(y,mo,lastDay,light){
     const checks=getHabitChecks(weekKey(date));
     if(!isVac){
       habits.forEach(h=>{
-        if(!_isHabitActiveOn(h,dk))return; // 2026-09-06: 비활성 기간(시작 전/archive 이후)은 달성률 분모에서 제외
+        if(!_isHabitActiveOn(h,dk))return; // 비활성 기간(시작 전/archive 이후)은 달성률 분모에서 제외
         ht++;if(checks[`${h.id}-${dow}`])hc++;
       });
       const dd=getDayCategoryDurations(dk);
@@ -1360,7 +1354,7 @@ function computeContentMonthlyByCat(y,mo){
 }
 const CONTENT_CAT_LABEL={drama:'드라마',book:'책',movie:'영화',music:'음악'};
 // 카테고리별 콘텐츠 카드 마크업 — 콘텐츠 허브의 월별 아카이브가 씀(리스트형/그리드형 공통 톤)
-// 시작~종료 기간 라벨 — 태블릿 아카이브 앱과 동일 규칙(2026-08-25 참고 반영)
+// 시작~종료 기간 라벨 — 태블릿 아카이브 앱과 동일 규칙
 // 시작/종료가 다르면 범위로, 같으면(음악처럼 하루짜리) 단일 날짜만
 function _cmrPeriodLabel(c){
   const s=c.startDate,e=c.endDate;
@@ -1399,7 +1393,7 @@ function _cmrDetailBodyHtml(c,wcalNotes,flat,showHead){
       <div class="cmr-progress-label">${cur}/${c.totalUnit}${unitLabel}</div>
     </div>`;
   }else if(showHead&&c.cat==='book'&&c.status==='watching'){
-    // 통합 이후(2026-08-29) 책 진행률도 contents 항목 자체(totalUnit/currentUnit/unitLabel)에 있음 — drama/movie와 동일 패턴.
+    // 통합 이후 책 진행률도 contents 항목 자체(totalUnit/currentUnit/unitLabel)에 있음 — drama/movie와 동일 패턴.
     if(c.unitLabel==='percent'&&c.currentUnit!=null){
       const pct=Math.min(100,Math.round(c.currentUnit||0));
       progressHtml=`<div class="cmr-progress-bar">
@@ -1415,7 +1409,7 @@ function _cmrDetailBodyHtml(c,wcalNotes,flat,showHead){
       </div>`;
     }
   }
-  // 감상 요약(완결 확정 시점 스냅샷) — showHead(그리드 상세)에서만, 값 없으면 표시 안 함(2026-09-26).
+  // 감상 요약(완결 확정 시점 스냅샷) — showHead(그리드 상세)에서만, 값 없으면 표시 안 함.
   const watchSummary=showHead?formatWatchSummary(c):null;
   const watchSummaryHtml=watchSummary?`<div class="cmr-watch-summary"><i class="ti ti-clock" aria-hidden="true"></i> ${escapeHtml(watchSummary)}</div>`:'';
   const finalPartHtml=c.review?`<div class="cmr-review-final${flat?' flat':''}"><span class="cmr-review-final-lbl">Comment :</span> ${escapeHtml(c.review)}</div>`:'';
@@ -1432,7 +1426,6 @@ function _cmrDetailBodyHtml(c,wcalNotes,flat,showHead){
 }
 // 카테고리별 리스트형(제목+별점+코멘트 아이콘, 한 줄씩) — 드라마/영화/책의 기본 표시 형태
 // 카테고리별 그리드형 — 음악(항상 그리드)과 드라마/영화/책(토글 시 그리드)이 공유하는 렌더러.
-// 예전엔 음악 전용/콘텐츠 전용으로 거의 동일한 로직이 중복돼 있던 것을 통합(2026-08-25).
 const CGRID_COLS=5; // 화면이 좁으면 CSS에서 4열로 줄어듦(auto-fit 미사용, 반응형 필요시 조정)
 let _gridActiveCid=null;
 function renderMusicGridSection(musicList){
@@ -1678,7 +1671,7 @@ function openWeeklyReviewSheet(){
   openSheet('weekly-review-sheet');
   loadWeeklyReviewFor(_thisWeekSundayDk());
 }
-// 주간 요약의 fallback(AI 없이 기록만 나열한 버전) 판별 — 실패한 결과를 성공한 요약처럼 캐시(로컬+서버)하면 그 주는 영구히 fallback으로 굳어버림(2026-09-20 발생).
+// 주간 요약의 fallback(AI 없이 기록만 나열한 버전) 판별 — 실패한 결과를 성공한 요약처럼 캐시(로컬+서버)하면 그 주는 영구히 fallback으로 굳어버림.
 // 그래서 fallback은 화면에만 보여주고 캐시에 저장/재사용하지 않음. 뒤쪽 조건은 마커 도입 전에 이미 캐시된 옛 fallback을 걸러내기 위한 것.
 function _isWeeklyFallback(html){return !!html&&(html.includes('data-wk-fallback')||html.includes('font-weight:600;color:rgba(80,140,200,0.9);">이번 주 기록 요약'));}
 async function makeWeeklySummaryCard(){
@@ -1887,7 +1880,7 @@ const GREETING_OUTPUT_RULE=`- 반드시 ~해요, ~이에요, ~어요 체의 정�
 const GREETING_WEATHER_SEASON_RULE=(extra)=>`- ${extra} 단, 날씨(온도, 맑음/흐림 등)와 현재 시각(몇 시, 오전/오후)은 화면 상단에 이미 별도로 표시되고 있으니, 본문에 숫자나 문장으로 다시 적지 말 것 — "26도", "오후 4시" 같은 표현 절대 금지.
 - 현재 월(${new Date().getMonth()+1}월)을 반드시 참고해서 계절 언급 시 오류 없도록.`;
 
-// ── 오프 기간 전용 인사배너 프롬프트 ── (2026-09-25)
+// ── 오프 기간 전용 인사배너 프롬프트 ──
 // 평소 fetchHomeWeather의 dawn/morning/afternoon/night 4개 분기가 각자 할일완료/습관/리듬 비중 등
 // "얼마나 했는지" 평가성 정보를 프롬프트에 넣는데, 오프 기간엔 그 정보 자체를 아예 배제해야 해서
 // 별도 함수로 격리(자주 쓰이는 기능이 아니므로 기존 4개 분기 안에 흩어 넣지 않고 한 곳에 모음).
@@ -2187,7 +2180,7 @@ function goHome(fromSwipe){
 }
 let _todoPartModeIdx=-1;
 
-// ── 생일 (2026-10-01) ──
+// ── 생일 ──
 // 생일은 설정탭에서 직접 입력(월/일만, 연도 없음). 앱 코드보다 먼저 도는 스플래시가 읽어야 해서 localStorage 사본이 필수이고,
 // 서버(send-alerts 아침 브리핑)용으로 user_settings.birthday('MM-DD')에도 저장한다. 2/29생은 평년에 2/28에 축하.
 const BIRTHDAY_LS_KEY='iikoto_birthday';
@@ -2230,7 +2223,7 @@ function _syncBirthdaySelects(){
   _markBdayEmpty();
   const clr=document.getElementById('birthday-clear');if(clr)clr.style.display=md?'inline-block':'none';
 }
-// 값이 비어 있는 선택칸은 .empty(테두리 없는 글자만)로 표시
+// 값이 비어 있는 선택칸은.empty(테두리 없는 글자만)로 표시
 function _markBdayEmpty(){
   ['birthday-month','birthday-day'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.toggle('empty',!el.value);});
 }
@@ -2259,27 +2252,26 @@ function _refreshBirthdayUI(){
   renderDatePill();
   renderHome(); // 인사카드 배경·제목·AI 문구 즉시 반영(생일 당일이 아니면 평소 모습 그대로)
 }
-async function saveBirthdayMD(md){ // md: 'MM-DD'
-  if(!/^\d\d-\d\d$/.test(md||''))return;
-  if(md===getBirthdayMD())return;
-  try{localStorage.setItem(BIRTHDAY_LS_KEY,md);}catch(e){}
+// 로컬 사본(스플래시가 앱 코드보다 먼저 읽음) 쓰기/지우기 — 저장·삭제·서버 동기화가 공용으로 사용
+function _setBirthdayLocal(md){try{if(md)localStorage.setItem(BIRTHDAY_LS_KEY,md);else localStorage.removeItem(BIRTHDAY_LS_KEY);}catch(e){}}
+async function _persistBirthday(md){ // md: 'MM-DD' | null(삭제) — 로컬 → 화면 → 서버 순으로 즉시 반영
+  _setBirthdayLocal(md);
   _refreshBirthdayUI();
   try{await supaUpsert('user_settings','id',[{id:true,birthday:md}]);}catch(e){}
   if(_cachedUserSettings)_cachedUserSettings.birthday=md;
 }
-async function clearBirthday(){
-  try{localStorage.removeItem(BIRTHDAY_LS_KEY);}catch(e){}
-  _refreshBirthdayUI();
-  try{await supaUpsert('user_settings','id',[{id:true,birthday:null}]);}catch(e){}
-  if(_cachedUserSettings)_cachedUserSettings.birthday=null;
+async function saveBirthdayMD(md){ // md: 'MM-DD'
+  if(!/^\d\d-\d\d$/.test(md||'')||md===getBirthdayMD())return;
+  await _persistBirthday(md);
 }
+function clearBirthday(){return _persistBirthday(null);}
 // 앱 시작 시 서버 값으로 로컬 사본을 맞춤(다른 기기에서 입력했거나 새로 설치한 경우) — 달라졌을 때만 화면 갱신
 async function syncBirthdayFromServer(){
   const st=await getUserSettings().catch(()=>null);
   if(!st)return;
   const sv=st.birthday||'';
   if(sv===getBirthdayMD())return;
-  try{if(sv)localStorage.setItem(BIRTHDAY_LS_KEY,sv);else localStorage.removeItem(BIRTHDAY_LS_KEY);}catch(e){}
+  _setBirthdayLocal(sv);
   _refreshBirthdayUI();
 }
 // ── 생일 당일 인사배너 전용 프롬프트 ── 오프 전용 프롬프트(buildVacationGreetingPrompt)와 같은 형식의 {dataContext,sys} 반환.
@@ -2498,8 +2490,8 @@ function getCatBarColor(cat){
 function getCatDotColor(cat){
   return CONTENT_DOT_COLOR[cat]||'var(--tm)';
 }
-const HABIT_COLORS=['pink','lavender','yellow','lime','orange','sky','warmgray']; // [2026-09-06] 각 습관과 연동된 리듬 카테고리 색상에 맞춰 전면 재배정(아래 카탈로그 주석 참고). 커스텀 습관 순환 배정용 팔레트 순서는 이제 이 배열 순서를 그대로 따름.
-// [2026-09-06] 습관 색상을 연동된 리듬 카테고리 색과 통일 — 리듬바(캘린더/타임라인 등 앱 전역)의
+const HABIT_COLORS=['pink','lavender','yellow','lime','orange','sky','warmgray']; // 각 습관과 연동된 리듬 카테고리 색상에 맞춰 전면 재배정(아래 카탈로그 주석 참고). 커스텀 습관 순환 배정용 팔레트 순서는 이제 이 배열 순서를 그대로 따름.
+// 습관 색상을 연동된 리듬 카테고리 색과 통일 — 리듬바(캘린더/타임라인 등 앱 전역)의
 // 색이 곧 그 활동을 대표하는 색이므로, 습관 그리드에서도 같은 색이 나오면 "이 색=이 활동"이라는
 // 인지가 한 번에 이어짐. 매칭 근거: 운동↔리듬exercise(pink), 정리↔리듬home(lime),
 // 케어↔리듬groom/단장(orange), 일기↔리듬note/책상(yellow), 독서↔리듬enjoy/감상(lavender).
@@ -2543,7 +2535,7 @@ async function syncHabitGoalsDown(){
 // 리듬 카테고리 → 습관 id 자동체크 매핑. 여기 추가되는 카테고리는 그 리듬블록이 생성되는 순간
 // 자동으로 해당 습관이 체크됨(이미 켜져 있으면 그대로 둠 — 수동으로 끈 걸 되살리지 않기 위함, checkHabitDirect 참고).
 const HABIT_AUTO_RHYTHM_MAP={exercise:'exercise',groom:'care'}; // home(살림)은 '정리' 칩 선택시에만 연결하는 별도 분기(rhythm 등록 함수 내)로 처리 — 여기 넣으면 세탁/주방도 걸려버림
-const DEFAULT_HABITS=[{id:'exercise',name:'운동',color:'pink'},{id:'reading',name:'독서',color:'lavender'},{id:'diary',name:'일기',color:'yellow'},{id:'tidy',name:'정리',color:'lime'}]; // [2026-09-06] 카탈로그 색상 재배정에 맞춰 정정
+const DEFAULT_HABITS=[{id:'exercise',name:'운동',color:'pink'},{id:'reading',name:'독서',color:'lavender'},{id:'diary',name:'일기',color:'yellow'},{id:'tidy',name:'정리',color:'lime'}]; // 카탈로그 색상 재배정에 맞춰 정정
 // 기존 데이터(이름만 있고 id가 없는 습관)에 처음 한 번만 id를 부여하는 마이그레이션.
 // 카탈로그와 이름이 일치하면 그 카탈로그 id를 그대로 부여(기존에 쌓인 이름 기반 체크 기록과 자연스럽게 이어짐)하고,
 // 카탈로그에 없는 이름이면 새 랜덤 id를 발급해 커스텀 습관으로 전환.
@@ -2567,7 +2559,7 @@ function _migrateHabitIds(){
 }
 // habits 목록에 id가 처음 부여되는 그 순간, localStorage에 흩어진 주차별 체크 데이터
 // (hc:YYYY-Www, hcTime:YYYY-Www 안의 '이름-요일' 형태 키)를 새 id 기준 키로 옮김.
-// 서버(habit_checks 테이블)의 habit_name 컬럼도 2026-09-05에 동일한 매핑으로 이미 일괄 변경해둠 —
+// 서버(habit_checks 테이블)의 habit_name 컬럼도 동일한 매핑으로 이미 일괄 변경해둠 —
 // 이 함수는 그 서버 변경과 짝을 맞추는 로컬 쪽 처리.
 function _migrateHabitCheckKeys(nameToId){
   const renames=Object.entries(nameToId).filter(([name,id])=>name!==id);
@@ -2594,7 +2586,7 @@ function _migrateHabitCheckKeys(nameToId){
   }
 }
 // 습관명은 자유 텍스트라 완전 자동매칭엔 한계가 있음 — 이름에 특정 키워드가 포함되면 아이콘을 붙이고, 매칭 안 되면 아이콘 없이 텍스트만 표시
-// [2026-09-06] 리듬 카테고리와 통일된 새 색상 배정에 맞춤(HABIT_CATALOG 참고)
+// 리듬 카테고리와 통일된 새 색상 배정에 맞춤(HABIT_CATALOG 참고)
 const HABIT_ICON_RULES=[
   {keywords:['운동','헬스','필라테스','런닝','러닝','조깅'],icon:'ti-run'},
   {keywords:['독서','책'],icon:'ti-book'},
@@ -2607,13 +2599,13 @@ function getHabitIcon(name){
   return rule?rule.icon:null;
 }
 // 습관 아이콘 통합 조회 — 카탈로그 습관이면 카탈로그 아이콘, 커스텀 습관이면 이름 키워드매칭 폴백.
-// [2026-09-06 정리] 호출부 4곳(makeHabitStreakRow/makeHabitMiniCheckRow/renderHabitMonthly/
+// 호출부 4곳(makeHabitStreakRow/makeHabitMiniCheckRow/renderHabitMonthly/
 // renderDailyHabitCheck)에 동일 로직이 문법만 다르게(?: vs ?.||) 중복돼 있던 것을 이 헬퍼로 통일.
 function getHabitIconFor(h){
   const catalogItem=getHabitCatalogItem(h.id);
   return catalogItem?catalogItem.icon:getHabitIcon(h.name);
 }
-// [2026-09-06 정리] 습관은 생성 시 항상 color를 갖도록 보장되므로(카탈로그/커스텀 공통) 유일한
+// 습관은 생성 시 항상 color를 갖도록 보장되므로(카탈로그/커스텀 공통) 유일한
 // 호출부(makeHabitStreakRow)에서 habitColor가 없는 경우는 실제로 발생하지 않음 — 이름 키워드매칭
 // 폴백 분기(구버전 HABIT_ICON_RULES.color)는 죽은 코드였음, 제거하고 팔레트 조회로 단순화.
 function getHabitIconColor(habitColor){
@@ -2645,7 +2637,7 @@ const SOLAR_TERMS_BY_YEAR={
     {key:'2026-07-23',name:'대서',hanja:'大暑'},
     {key:'2026-08-07',name:'입추',hanja:'立秋'},
     {key:'2026-08-23',name:'처서',hanja:'處暑'},
-    {key:'2026-09-07',name:'백로',hanja:'白露'}, // [2026-09-07] 9/8→9/7로 정정, 한국천문연구원 기준 절입 9/7 23:41
+    {key:'2026-09-07',name:'백로',hanja:'白露'}, // 9/8→9/7로 정정, 한국천문연구원 기준 절입 9/7 23:41
     {key:'2026-09-23',name:'추분',hanja:'秋分'},
     {key:'2026-10-08',name:'한로',hanja:'寒露'},
     {key:'2026-10-23',name:'상강',hanja:'霜降'},
@@ -2731,7 +2723,7 @@ function _dawnTimeToMin(t){if(!t)return null;const p=t.split(':');return parseIn
 const toMin=_dawnTimeToMin;
 // 수면 그래프 축 전용 시각→분 변환 — 정오(720분) 이후 값은 "그 전날 밤"으로 보고 음수로 뒤집음.
 // (예: 23:30 취침 → -30, 07:00 기상 → 420 — 자정을 가로지르는 취침~기상 구간을 하나의 축 위에 표시하기 위함)
-// [t[0],t[1]] 형태(시,분 배열)를 받음 — HH:MM 문자열은 .split(':').map(Number)로 변환 후 전달.
+// [t[0],t[1]] 형태(시,분 배열)를 받음 — HH:MM 문자열은.split(':').map(Number)로 변환 후 전달.
 function sleepAxisMin(t){
   let mm=t[0]*60+t[1];
   if(mm>=720)mm-=1440;
@@ -2816,7 +2808,7 @@ async function supaUpsert(path,onConflict,body){
 // 목적: API 키가 있는 기기(주로 모바일)가 생성한 AI 문구를, 키가 없는 기기(주로 PC)도 그대로 볼 수 있게 서버에 저장.
 // 용량이 매우 작아(텍스트 위주, 무료 플랜 500MB 기준 수십 년치 여유) 리포트류(weekly/monthly/nutricomment 등)는 만료/삭제 없이 영구 보관.
 // 단, greeting_*(홈탭 인사카드)만은 예외 — 그날 그 시간대(subSection)에만 조회되고 이후 다시 읽히지 않는 순수 캐시라
-// 오래된 것을 남겨둘 이유가 없음(아래 cleanupOldGreetingCache 참고, 2026-08-30).
+// 오래된 것을 남겨둘 이유가 없음(아래 cleanupOldGreetingCache 참고).
 async function aiCacheGet(cacheKey){
   const rows=await supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent(cacheKey)}&select=content`);
   if(!rows||!rows.length)return null;
@@ -2842,10 +2834,9 @@ async function syncAlertFor(sourceType,sourceCid,dk,timeHHMM,title){
 }
 // syncAlertFor는 "그날 HH:MM"만 다루는데, 종료-N분후처럼 임의의 절대 시각(Date 객체)에
 // title+body 둘 다 채워 예약해야 하는 알림(운동 통계 등)엔 안 맞아 별도 저수준 헬퍼로 분리.
-// alertAtDate: Date 객체(로컬 시각) — ISO 변환 시 기기의 실제 시간대 오프셋을 반영(시차 대응, 2026-09-08).
+// alertAtDate: Date 객체(로컬 시각) — ISO 변환 시 기기의 실제 시간대 오프셋을 반영(시차 대응).
 // upsert 실행부는 여기 하나뿐 — syncAlertFor도 이 함수를 거쳐가므로 alerts insert 경로가 단일화됨.
-// 오프셋은 기기의 현재 시간대를 그대로 반영(getTimezoneOffset, 분 단위·부호 반대) — 예전엔 +09:00 고정이라
-// 해외에서 로컬 시각과 실제 예약 시각이 시차만큼 어긋나는 문제가 있었음(2026-09-08 발견, 시차 대응으로 수정).
+// 오프셋은 기기의 현재 시간대를 그대로 반영(getTimezoneOffset, 분 단위·부호 반대) — +09:00 고정이면 해외에서 로컬 시각과 실제 예약 시각이 시차만큼 어긋남.
 async function scheduleAlertAt(sourceType,sourceCid,alertAtDate,title,body){
   if(!sourceCid)return;
   const d=alertAtDate;
@@ -2867,14 +2858,16 @@ function clearTodoAlerts(isEvent,cid){
   if(!isEvent)deleteAlertFor('todo_snooze',cid);
 }
 // ── 알림 시각 설정(user_settings) — 서버 send-alerts Edge Function이 이 값과 지금 시각을 비교해
-// 아침브리핑/남은할일+습관/수면/저녁마무리 4종의 발송 시각을 판단(리듬 진행중/주간·월말 리포트는 고정).
+// 아침브리핑 발송 시각과 종류별 온오프(enabled)를 판단. 취침(23:00)·수면 점수 미등록(09:00)·오늘의 질문(19:30)·
+// 리포트(22:00)는 시각 고정이고 리듬 진행중은 경과시간 기준. remaining_todo_time은 알림이 아니라 스누즈 "오늘 저녁" 시각 용도로만 남음.
+// birthday('MM-DD')도 이 테이블에 저장 — 서버가 생일 아침 브리핑 문구에 사용.
 // row가 항상 1개뿐인 단일설정 테이블이라 로컬 캐시 없이 매번 직접 조회/저장(불일치 걱정 없음).
 async function getUserSettings(){
   const rows=await supaFetch('user_settings?id=eq.true');
   return (rows&&rows[0])||null;
 }
 // 스누즈 팝업 전용 캐시 — user_settings는 거의 안 바뀌는 값(알림 시각 설정)이라, 앱이 켜져 있는 동안은
-// 매번 새로 fetch하지 않고 재사용(2026-09-26).
+// 매번 새로 fetch하지 않고 재사용.
 let _cachedUserSettings=null;
 async function getUserSettingsCached(){
   if(_cachedUserSettings)return _cachedUserSettings;
@@ -2885,7 +2878,7 @@ async function getUserSettingsCached(){
 async function setUserSettingTime(field,timeStr){
   await supaUpsert('user_settings','id',[{id:true,[field]:timeStr}]);
 }
-// ── 할일 알림 스누즈 (2026-09-20) ──
+// ── 할일 알림 스누즈 ──
 // 할일 알림('todo'/'todo_snooze')을 누르면 ?snooze=<cid>로 앱이 열려 메모 유도와 같은 모양의 팝업이 뜨고, 30분/1시간/오늘 저녁/내일 아침 중 골라 다시 알림을 예약.
 // 스누즈는 원래 알림과 별개의 임시 알림('todo_snooze', 할일당 1개 — 다시 미루면 덮어씀)이라 할일의 알림 시각 설정은 바뀌지 않음.
 // 정리: 완료/삭제/알림 시각 변경(clearTodoAlerts, 수정 저장부) + 서버가 발송 직전에 완료 여부를 한 번 더 확인.
@@ -2901,7 +2894,7 @@ function _findTodoByCid(cid){
   return null;
 }
 // 로컬에 없을 때(다른 기기에서 등록/완료돼 아직 동기화 전, 또는 백그라운드에서 알림만 먼저 도착한 경우)
-// 서버에서 직접 조회하는 폴백 — 리듬 메모 알림(_openFromNotificationUrl)과 동일한 패턴(2026-09-26 추가).
+// 서버에서 직접 조회하는 폴백 — 리듬 메모 알림(_openFromNotificationUrl)과 동일한 패턴.
 // 스누즈 팝업이 실제로 쓰는 최소 필드(text/done/isEvent)만 매핑.
 async function _findTodoByCidRemote(cid){
   const local=_findTodoByCid(cid);
@@ -2914,7 +2907,7 @@ async function _findTodoByCidRemote(cid){
   }catch(e){return null;}
 }
 // 스누즈 칩 목록 — 오늘 저녁/내일 아침 시각은 user_settings의 remaining_todo_time·morning_briefing_time을 그대로 읽음(없으면 19:30/08:00).
-// [2026-10-01] 남은 할일 알림 자체는 폐지돼 설정탭에서 이 시각을 바꿀 수 없음 — 컬럼값(19:30)은 "오늘 저녁" 스누즈 시각 용도로만 남겨둔 것.
+// 남은 할일 알림은 폐지돼 이 시각은 설정탭에서 바꿀 수 없음 — 컬럼값(19:30)은 "오늘 저녁" 스누즈 시각 용도로만 남겨둔 것.
 // 오늘 저녁이 이미 지났으면 그 칩은 뺌. 새벽 0~4시는 아직 "어젯밤"이라 내일 아침 = 오늘 아침.
 function _snoozeTargets(settings){
   const now=new Date();
@@ -2932,7 +2925,7 @@ function _snoozeTargets(settings){
 }
 async function openSnoozePopup(cid){
   // 할일 조회(로컬 우선, 없으면 서버)와 설정 조회를 병렬로 — 백그라운드 탭에서 순차 fetch 시 지연이 누적돼
-  // 팝업이 안 뜨는 문제가 있었음(2026-09-26). 설정은 캐시 재사용으로 왕복을 하나 더 줄임.
+  // 팝업이 안 뜨는 문제가 있었음. 설정은 캐시 재사용으로 왕복을 하나 더 줄임.
   const [found,settings]=await Promise.all([_findTodoByCidRemote(cid),getUserSettingsCached()]);
   if(!found||found.todo.isEvent){showToast('찾을 수 없는 할일이에요');return;}
   if(found.todo.done){showToast('이미 끝낸 할일이에요');return;}
@@ -2971,7 +2964,7 @@ async function syncUserTimezoneIfChanged(){
 }
 // 일정/할일 객체(또는 관련 필드를 담은 임시 객체)에서 "알림 발송 기준 시각"을 뽑는 공용 로직.
 // 일정은 eventAlertOn+eventTime, 할일은 todoAlertOn+alertTime — 온오프가 꺼져 있으면 시간이 있어도 null.
-// 저장/완료체크/이동 등 3곳에서 동일 계산을 하던 것을 통합(중복 제거, 2026-09-08).
+// 저장/완료체크/이동 등 3곳에서 동일 계산을 하던 것을 통합(중복 제거).
 function alertBasisTimeFor(t){
   return t.isEvent?(t.eventAlertOn?t.eventTime:null):(t.todoAlertOn?t.alertTime:null);
 }
@@ -3054,7 +3047,7 @@ function compareTodoOrder(a,b){
 // 구분하지 않는다 — 남는 표식은 어느 규칙에서 나왔는지 가리키는 recurRuleCid 필드 하나뿐.
 // 실체화는 서버(materialize-recurring Edge Function, 매일 자정 직후 cron)가 전담한다 — 클라이언트가
 // 각자 판정+저장하던 예전 방식은 여러 기기/여러 sync 경로가 동시에 같은 날짜를 실체화하려 들며 경합이
-// 반복적으로 발생해 폐기했다(2026-09-27 재설계).
+// 반복적으로 발생해 폐기했다.
 function getRecurringItems(){return S.get('recurring_items')||[];}
 function saveRecurringItems(v){S.set('recurring_items',v);autoSync('recurringItems',null);}
 // 특정 규칙(ruleCid)이 특정 날짜(dk)에 실체화되지 않도록 막는 예외 — "오늘만 삭제"에서만 씀.
@@ -3101,7 +3094,7 @@ function _isRuleDueOn(rule,dk){
 }
 // 방금 등록한 규칙 하나가 오늘(dk) 해당되면, 서버 cron(다음 자정)을 기다리지 않고 그 자리에서
 // todos에 1건만 즉시 만들어 넣음 — cid는 서버와 동일한 결정적 패턴(규칙cid_dk)이라, 다음 자정에
-// 서버 cron이 같은 dk를 다시 훑어도 "이미 있음"으로 보고 중복 생성하지 않음(2026-09-27).
+// 서버 cron이 같은 dk를 다시 훑어도 "이미 있음"으로 보고 중복 생성하지 않음.
 function _materializeTodayIfDue(rule,dk){
   if(!_isRuleDueOn(rule,dk))return;
   const todos=getTodos(dk);
@@ -3113,13 +3106,9 @@ function _materializeTodayIfDue(rule,dk){
   });
   saveTodos(dk,todos);
 }
-// (2026-09-27 재설계) 반복 규칙을 실제 todos 레코드로 만드는 일("실체화")은 이제 클라이언트가
-// 하지 않는다 — 서버의 materialize-recurring Edge Function이 하루 한 번(cron) 전담해서 처리하고,
-// 클라이언트는 그 결과인 todos를 그냥 받아서 읽기만 한다. 예전엔 getTodos(dk) 호출 시마다 클라이언트가
-// 직접 판정+저장까지 했는데, 여러 기기·여러 sync 경로가 동시에 같은 날짜를 실체화하려 들면서 경합이
-// 반복적으로 발생했었다(반복 규칙이 풀리거나 recur_rule_cid가 null로 남는 등 — 2026-09-07/09-16/09-27
-// 세 차례 재발). 실체화 주체를 서버 하나로 좁히면 "여러 주체가 동시에 같은 작업을 한다"는 경합의
-// 전제 자체가 없어진다 — 클라이언트 쪽엔 이제 반복 판정 로직, 락, 캐시, 업로드 추적이 전혀 필요 없다.
+// 반복 규칙을 실제 todos 레코드로 만드는 일("실체화")은 클라이언트가 하지 않는다 — 서버의 materialize-recurring Edge Function이 하루 한 번(cron) 전담하고,
+// 클라이언트는 그 결과인 todos를 읽기만 한다. 클라이언트가 getTodos(dk)마다 직접 판정+저장하던 방식은 여러 기기·sync 경로의 동시 실체화로 경합이 반복돼
+// (반복 규칙이 풀리거나 recur_rule_cid가 null로 남는 등) 폐기했다. 주체를 서버 하나로 좁혀 경합의 전제가 없으므로 클라이언트엔 반복 판정·락·캐시·업로드 추적이 필요 없다.
 function getTodos(dk){return S.get(S.key('todos',dk))||[];}
 getTodos.raw=getTodos; // 과거엔 실체화 재귀 방지를 위해 별도였음 — 이제 getTodos 자체가 순수 읽기라 완전히 동일.
 
@@ -3129,7 +3118,7 @@ getTodos.raw=getTodos; // 과거엔 실체화 재귀 방지를 위해 별도였�
 // 반환: 이 주에 걸치는 각 이벤트의 {left,width,row,clipStart,clipEnd,...ev} — left/width는 칸(cell) 단위 정수(0~6, 1~7), row는 겹칠 때 세로 순번(0부터).
 // 겹침 배정은 "실사용상 거의 겹치지 않는다"는 전제로 단순하게: 이미 배정된 row들과 구간이 겹치면 다음 row로.
 // weekDates는 항상 실제 날짜 7개(전달/다음달 칸 포함)여야 함 — 예전엔 이번 달 밖 칸을 센티널 문자열로 채웠는데,
-// 첫 주 첫 칸이 센티널이면 weekStart가 센티널이 되어 문자열 비교에서 그 주의 연속일정이 전부 누락되던 버그가 있었음(2026-09-19 수정).
+// 첫 주 첫 칸이 센티널이면 weekStart가 센티널이 되어 문자열 비교에서 그 주의 연속일정이 전부 누락되던 버그가 있었음.
 function computeWeekBars(weekDates,multidayEvents){
   const weekStart=weekDates[0],weekEnd=weekDates[6];
   const barsInWeek=[];
@@ -3158,7 +3147,7 @@ function computeWeekBars(weekDates,multidayEvents){
 // ── 오프 기간(is_vacation) 공용 판별 함수 ──
 // 특정 날짜(dk)가 is_vacation=true인 연속일정 범위 안에 있는지 체크. 통계/진행률 계산에서 해당 날짜를
 // 분모/스트릭 판정에서 빼는 용도로만 쓰이며, 기능 자체를 막는 데는 쓰지 않는다(기능은 항상 그대로 열려있음).
-// 월간 통계 루프 등에서 날짜마다 반복 호출되므로, getActiveMultiDayEvents(내부적으로 최대 14일을 매번 역탐색하는 무거운 함수)를
+// 월간 통계 루프 등에서 날짜마다 반복 호출되므로, getActiveMultiDayEvents(내부적으로 최대 MULTIDAY_LOOKBACK_DAYS일을 매번 역탐색하는 무거운 함수)를
 // 매번 부르지 않도록 "그 오프 일정이 속한 시작일(dk)" 단위로 결과를 캐싱한다. 캐시는 앱 로드 세션 동안만 유지(새로고침 시 초기화)되며,
 // 습관체크/리듬 등 다른 캐시와 마찬가지로 데이터 자체가 아니라 조회 결과만 캐싱하므로 sync가 로컬 데이터를 갱신하면 자동으로 최신 상태를 다시 계산함.
 const _vacationDateCache={};
@@ -3181,7 +3170,7 @@ function _invalidateVacationCache(){
 // 특정 날짜(dk)를 범위(startDate~eventEndDate)로 품고 있는 연속일정을 전부 찾아 반환.
 // 연속일정 row는 시작일의 date_key에만 저장되므로, 최근 MULTIDAY_LOOKBACK_DAYS일 이내를 거슬러 올라가며 훑는다.
 // 반환 각 항목에 dayIndex(오늘이 며칠차인지, 1부터 시작)와 totalDays(총 며칠짜리인지)를 덧붙여준다.
-const MULTIDAY_LOOKBACK_DAYS=45; // 연속일정 최대 길이 상한(일) — 이 값보다 긴 일정은 뒷부분이 오프/연속일정으로 인식되지 않음. 날짜별 캐시 덕에 늘려도 부하 작음(2026-10-01: 14→45)
+const MULTIDAY_LOOKBACK_DAYS=45; // 연속일정 최대 길이 상한(일) — 이 값보다 긴 일정은 뒷부분이 오프/연속일정으로 인식되지 않음. 날짜별 캐시 덕에 늘려도 부하 작음
 function getActiveMultiDayEvents(dk){
   const target=new Date(dk+'T00:00:00');
   const result=[];
@@ -3236,7 +3225,7 @@ function saveTodos(dk,v){
 // 편집이 아니라 시스템이 자동으로 채워넣는 것이라, "서버가 이 로컬 수정사항을 덮어쓰면 안 됨"을 뜻하는
 // todos_pending과 의미가 다름. 이 플래그가 세워진 채 업로드가 한 번이라도 실패(오프라인 등)하면 이후
 // syncTodosDown이 서버값 반영 자체를 계속 건너뛰게 되어, 서버 데이터가 정상이어도 로컬(recurRuleCid가
-// 빠진 옛 캐시 등)이 영영 안 고쳐지는 문제가 실사용에서 발생함(2026-09-07) — 그래서 별도로 분리.
+// 빠진 옛 캐시 등)이 영영 안 고쳐지는 문제가 실사용에서 발생함 — 그래서 별도로 분리.
 function saveTodosRaw(dk,v){
   S.set(S.key('todos',dk),v);
   autoSync('todos',dk); // pending 플래그 없이 조용히 업로드 시도 — 실패해도 다음 sync down이 정상적으로 서버값을 반영할 수 있음
@@ -3342,7 +3331,7 @@ function patchMealField(dk,key,field,value){
   autoSync('meals_field',dk);
   if(dk===dateKey(currentDate))renderTodayMeal();
 }
-// ── 독서(reading_books) → contents 통합 어댑터 (2026-08-29) ──
+// ── 독서(reading_books) → contents 통합 어댑터 ──
 // book은 이제 별도 테이블이 아니라 contents의 cat='book' 항목. 기존 37곳 호출부가 기대하는
 // book shape({cid,title,status:'reading'|'done'|'paused',pages,totalPages,seconds,unit,percent,
 // todayDate,todayStart,poster,author,created,completedAt,linkedContent,contentMk,contentTitle})는
@@ -3554,7 +3543,7 @@ function getContents(mk){
   return arr;
 }
 // 이번달+지난달 콘텐츠를 합쳐 반환(중복 제거, 각 항목에 _mk=월키 부여) — 월초에 지난달부터 이어지는 진행중 콘텐츠를 놓치지 않기 위한 공용 조회.
-// 진행중 작품 목록/질문 상황 조건이 같은 조회를 각자 반복하던 것을 통합(2026-09-19).
+// 진행중 작품 목록/질문 상황 조건이 같은 조회를 각자 반복하던 것을 통합.
 function getRecentMonthsContents(base){
   const d=base||new Date();
   const seen=new Set(),out=[];
@@ -3574,13 +3563,13 @@ async function fetchAllMusicContents(){
   return rows.map(r=>({cat:r.content_cat,title:r.title,startDate:r.start_date,endDate:r.end_date,status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',musicUrl:r.music_url||null,album:r.album||null,releaseYear:r.release_year||null,notes:r.notes||[],reviewSavedDk:r.review_saved_dk||null,reviewSavedTime:r.review_saved_time||null,created:r.created,cid:r.client_id}));
 }
 // 리듬탭 폼/모닝플로우 칩 선택지 — 카테고리별 [{label,cid?}]. 감상=진행중 드라마·영화(cid로 콘텐츠 연동), 외출=오늘 일정,
-// 업무=오늘 업무 일정+재택/외근, 그 외=공용 서브선택 목록(RHYTHM_QUICK_CHOICES). 칩이 나오는 모든 곳이 이 함수 하나를 씀(2026-09-19).
+// 업무=오늘 업무 일정+재택/외근, 그 외=공용 서브선택 목록(RHYTHM_QUICK_CHOICES). 칩이 나오는 모든 곳이 이 함수 하나를 씀.
 function getRhythmChipOptions(cat){
   if(cat==='enjoy')return _getOngoingWatchingWithCid().slice(0,4).map(c=>({label:(c.cat==='drama'?'드라마':'영화')+' - '+c.title,cid:c.cid}));
   const events=(cat==='appointment'||cat==='work')?getTodayEventChipTitles(cat).map(t=>({label:t})):[];
   return events.concat((RHYTHM_QUICK_CHOICES[cat]||[]).map(x=>({label:x.label})));
 }
-// 리듬바/모닝플로우 칩용 — 오늘 일정 중 조건에 맞는 것의 제목 목록(시간순, 시간 없는 일정은 뒤). 리듬탭 칩과 모닝플로우 외출 칩이 공용으로 사용(2026-09-19 통합).
+// 리듬바/모닝플로우 칩용 — 오늘 일정 중 조건에 맞는 것의 제목 목록(시간순, 시간 없는 일정은 뒤). 리듬탭 칩과 모닝플로우 외출 칩이 공용으로 사용.
 // kind 'appointment'(외출): 업무가 아닌 "시간이 지정된" 일정 — 시간창(±60분)은 없앴음(일찍 출발해도 뜨도록). 하루종일 일정(생일/기념일 등)은 노이즈라 제외.
 // kind 'work'(업무): 업무 카테고리 일정 전부(시간 무관) — 며칠 이어지는 업무 일정도 오늘을 지나는 중이면 포함.
 function getTodayEventChipTitles(kind){
@@ -3635,18 +3624,18 @@ async function syncTodosDown(dk){
   S.set(S.key('todos',dk),deduped);
   // 다른 기기에서 온 변경사항 중 연속일정(오프 여부 포함)이 있으면 isVacationDate 캐시도 함께 무효화 —
   // 로컬 직접 저장/삭제 때만 무효화하던 기존 처리가 sync down 경로를 놓쳐, 다른 기기에서 바꾼 오프 상태가
-  // 이 기기에서 캐시된 옛 판정으로 계속 보이는 문제가 있었음(2026-09-25 확인).
+  // 이 기기에서 캐시된 옛 판정으로 계속 보이는 문제가 있었음.
   if(deduped.some(t=>t.isEvent&&t.eventEndDate))_invalidateVacationCache();
   renderTodos();
 }
 // 같은 dk에 대한 업로드가 동시에(재진입) 실행되는 것을 막는 락 — saveTodos의 즉시 업로드(autoSync)와
 // 탭 전환/주기 동기화(syncAll)가 같은 dk를 거의 동시에 올리면, 두 개의 upsert 요청이 겹쳐 서버가
-// "ON CONFLICT DO UPDATE cannot affect row a second time"로 거부하는 경합이 있었음(2026-09-07 확인).
-// [2026-09-16 개선] 기존엔 이미 진행 중인 업로드가 있으면 새로 시작하지 않고 그 결과를 그대로 기다렸다가
+// "ON CONFLICT DO UPDATE cannot affect row a second time"로 거부하는 경합이 있었음.
+// 기존엔 이미 진행 중인 업로드가 있으면 새로 시작하지 않고 그 결과를 그대로 기다렸다가
 // 반환했으나, 이 경우 락에 걸린 호출이 "자신이 요청한 시점 이후의 로컬 변경(삭제 등)"을 서버에 반영하지
 // 못한 채 남의 결과를 그대로 돌려받는 유실이 발생함(삭제 addDelPending 직후 saveTodos→syncTodosUp이
 // 락에 걸리면, 그 삭제가 반영 안 된 이전 업로드 결과를 "성공"으로 착각해 todos_pending을 꺼버림 —
-// 2026-09-16 "바레 상담" 재발 사건으로 확정). 요청 병합(coalescing) 방식으로 교체: 락에 걸린 동안 들어온
+// 실제 재발 사건으로 확정). 요청 병합(coalescing) 방식으로 교체: 락에 걸린 동안 들어온
 // 요청은 진행 중인 작업이 끝난 뒤 반드시 한 번 더(그 시점의 최신 로컬 상태로) 실행되도록 큐잉한다.
 const _syncingTodosUpDk=new Map(); // dk → 현재 실행 중인 Promise
 const _pendingTodosUpDk=new Map(); // dk → 완료 후 한 번 더 실행 예약된 Promise(대기자들이 공유)
@@ -3746,10 +3735,10 @@ async function syncHabitsDown(){
   const rows=await supaFetch('habits?order=sort_order');
   if(!rows)return;
   if(rows.length===0&&getHabits().length>0){syncHabitsUp();return;}
-  // [2026-09-05] habit_id(카탈로그 id)/custom/archived_at도 함께 복원 — 이걸 빠뜨리면 동기화할 때마다
+  // habit_id(카탈로그 id)/custom/archived_at도 함께 복원 — 이걸 빠뜨리면 동기화할 때마다
   // 로컬의 id가 사라져 _migrateHabitIds가 매번 다시 돌고, 특히 커스텀 습관은 매번 새 랜덤 id를 받아
   // 과거 체크 기록과 끊기는 문제가 생김.
-  // [2026-09-06 periods 전환] 활성/비활성 이력을 periods(jsonb 배열) 컬럼 하나로 관리 —
+  // 활성/비활성 이력을 periods(jsonb 배열) 컬럼 하나로 관리 —
   // 온오프를 반복해도 각 활성 구간이 독립적으로 누적 보존됨(구간 배열 push/close 방식).
   // 구버전 컬럼(archived_at/created_at_key)만 있는 예전 서버 데이터는 폴백으로 단일구간 변환.
   if(rows.length>0)S.set('habits',rows.map(r=>{
@@ -3757,7 +3746,7 @@ async function syncHabitsDown(){
     if(r.habit_id)h.id=r.habit_id;
     if(r.custom)h.custom=true;
     if(r.periods&&r.periods.length)h.periods=r.periods;
-    else if(r.created_at_key||r.archived_at)h.periods=[{start:r.created_at_key||null,end:r.archived_at||null}]; // 구버전 폴백(archived_at만 있어도 처리 — 2026-09-06 영양제 케이스 재발 방지)
+    else if(r.created_at_key||r.archived_at)h.periods=[{start:r.created_at_key||null,end:r.archived_at||null}]; // 구버전 폴백(archived_at만 있어도 처리 — 영양제 케이스 재발 방지)
     return h;
   }));
 }
@@ -3779,7 +3768,7 @@ async function syncHabitsUp(){
 // 원본 규칙(recurring_items)만 다룸 — 완료체크/실체화 여부는 이제 todos 자체에 있으므로 별도 sync 불필요.
 // 서버가 0개를 반환하면 그대로 로컬도 0개로 맞춘다 — 예전엔 "로컬에 남아있으면 서버가 잘못 비워진 걸로
 // 보고 되살린다"는 방어 로직이 있었는데, 이게 오히려 다른 기기가 방금 정상적으로 전부 삭제한 경우와
-// 구분을 못 해 그 삭제를 무효화시키는 사고를 만들 수 있었음(2026-09-27 점검 중 발견, 실제 재현 사례는
+// 구분을 못 해 그 삭제를 무효화시키는 사고를 만들 수 있었음(실제 재현 사례는
 // 없었지만 구조적으로 위험). 서버가 규칙의 유일한 원본이므로 그 값을 그대로 신뢰.
 async function syncRecurringItemsDown(){
   const rows=await supaFetch('recurring_items?order=sort_order');
@@ -3855,7 +3844,7 @@ async function syncHCUp(wk){
   const checks=getHabitChecks(wk);const ws=wk.replace('week:','');
   const times=getHabitCheckTimes(wk);
   const rows=[];const mon=new Date(ws);
-  // [2026-09-05] 키 앞부분은 원래 습관 "이름"이었으나 카탈로그 도입 후 습관 "id"로 바뀜(예: 'exercise-3').
+  // 키 앞부분은 원래 습관 "이름"이었으나 카탈로그 도입 후 습관 "id"로 바뀜(예: 'exercise-3').
   // 서버 컬럼명(habit_name)은 그대로 두고 담기는 값만 id로 바뀐 것 — 별도 변경 없이 자연히 호환됨.
   Object.keys(checks).filter(k=>checks[k]).forEach(k=>{
     const parts=k.split('-');const dow=parseInt(parts[parts.length-1]);
@@ -4008,7 +3997,7 @@ async function autoSync(type,key){
 // delCids 기반 삭제(syncListUpSafe) 패턴을 쓰는 타입 공통 재시도 헬퍼 — pending 플래그가 서 있거나
 // delPending 큐(delType,dk)에 남은 항목이 있으면 업로드를 재시도하고, 성공했을 때만 pending 플래그를
 // 끈다. todos에서 "재시도 게이트가 delPending을 안 봐서 삭제가 영영 재시도 안 됨" 버그가 있었는데
-// (2026-09-16), 같은 패턴을 쓰는 memos/contents/rblocks도 동일한 사각지대를 갖고 있어 공통화함 —
+// 같은 패턴을 쓰는 memos/contents/rblocks도 동일한 사각지대를 갖고 있어 공통화함 —
 // 새 타입이 추가돼도 이 헬퍼를 쓰면 delPending 누락 문제가 구조적으로 재발하지 않음.
 function pushDelPendingAwareUpTask(upTasks,pendingKey,delType,dk,upFn){
   if(S.get(pendingKey)||getDelPendingCids(delType,dk).length){
@@ -4027,9 +4016,9 @@ async function syncAll(){
   const upTasks=[];
   // pending 플래그는 각 syncXxxUp이 성공(ok)했을 때만 끈다. 예전엔 무조건 껐는데, 업로드 실패 시에도
   // pending이 꺼져 뒤이은 Down 단계가 서버의 옛 값으로 로컬을 덮어쓰는 데이터 유실 버그가 있었다
-  // (2026-09-14, PC 완료체크가 모바일 미반영 후 새로고침 시 PC도 미체크로 되돌아간 사례).
+  // (PC 완료체크가 모바일 미반영 후 새로고침 시 PC도 미체크로 되돌아간 사례).
   // todos/memos/contents/rblocks — delCids 기반 삭제 패턴 공통 타입. pending 플래그 또는 delPending
-  // 큐 중 하나라도 남아있으면 재시도(2026-09-16, 공통 헬퍼로 4곳 통일 — 개별 사각지대 재발 방지).
+  // 큐 중 하나라도 남아있으면 재시도(공통 헬퍼로 4곳 통일 — 개별 사각지대 재발 방지).
   pushDelPendingAwareUpTask(upTasks,S.key('todos_pending',dk),'todos',dk,()=>syncTodosUp(dk));
   pushDelPendingAwareUpTask(upTasks,S.key('memos_pending',dk),'memos',dk,()=>syncMemosUp(dk));
   if((S.get(S.key('meals_fields_pending',dk))||[]).length)upTasks.push(syncMealsUp(dk));
@@ -4050,7 +4039,7 @@ async function syncAll(){
   for(let i=0;i<2;i++){const d=new Date(now);d.setDate(now.getDate()-i);mflowDks.push(dateKey(d));}
   // Down (Supabase → 로컬)
   // 반복 규칙(recurring_items)/스킵기록(recurring_exceptions)은 todos보다 먼저 로컬에 반영되어야 함 —
-  // (2026-09-27 재설계 이후) 실체화 자체는 서버(materialize-recurring cron)가 전담하지만, "오늘만 삭제"
+  // 실체화 자체는 서버(materialize-recurring cron)가 전담하지만, "오늘만 삭제"
   // 등 클라이언트가 화면에 보여줄 스킵 상태는 여전히 로컬에도 필요해서, todos보다 먼저 받아둬야 화면이
   // 일시적으로 어긋나지 않음. 병렬 Promise.all 안에서는 응답 순서가 보장되지 않으므로, 이 두 개만
   // await로 먼저 끝내고 나머지를 병렬로 진행.
@@ -4087,11 +4076,11 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator
 // 주기적 pending 재시도 타이머 — online/visibilitychange 이벤트에만 의존하면, 앱을 화면 전환 없이
 // 켜둔 채 두거나(예: 오늘 탭만 계속 보고 있는 경우) 업로드가 실패한 순간 마침 두 이벤트 다 안 걸리면
 // pending이 남은 채로 재시도 기회 자체가 영영 안 옴 — 로컬 수정사항이 서버에 끝내 안 올라가는 근본
-// 원인(2026-09-15 확인). 2분마다 남은 pending이 있는지만 가볍게 확인해 자동 재시도.
+// 원인. 2분마다 남은 pending이 있는지만 가볍게 확인해 자동 재시도.
 function hasAnyPendingSync(){
   const dk=dateKey(currentDate),mk=monthKey(currentDate),wk=weekKey(new Date());
   // delCids 기반 삭제 패턴 4종(todos/memos/contents/rblocks) 모두 pending 플래그와 delPending 큐를
-  // 함께 확인 — 이 게이트에서 빠지면 syncAll 자체가 안 불려 아래 syncAll 내부 재시도까지 도달 못 함(2026-09-16).
+  // 함께 확인 — 이 게이트에서 빠지면 syncAll 자체가 안 불려 아래 syncAll 내부 재시도까지 도달 못 함.
   return !!(S.get(S.key('todos_pending',dk))||getDelPendingCids('todos',dk).length||
     S.get(S.key('memos_pending',dk))||getDelPendingCids('memos',dk).length||
     (S.get(S.key('meals_fields_pending',dk))||[]).length||S.get(S.key('sleep_pending',dk))||
@@ -4183,7 +4172,7 @@ function hideSplash(){
   const s=document.getElementById('splash');
   if(!s||s.classList.contains('hide'))return;
   s.classList.add('hide');
-  // [테스트 2026-09-19] 예전엔 opacity 0 + pointer-events none으로 계속 남겨 배경 역할을 유지했으나,
+  // 예전엔 opacity 0 + pointer-events none으로 계속 남겨 배경 역할을 유지했으나,
   // 이제 배경은 #bg-fixed가 담당하므로 페이드아웃(0.6s)이 끝난 뒤 display:none으로 완전히 뺀다.
   // 화면 전체를 덮는 불투명 fixed 레이어가 opacity 0으로 남아 있으면 iOS 26이 상단(상태바) 영역을
   // 이 레이어 기준으로 처리해 헤더가 뿌옇게 보일 수 있다는 가설 검증용. s.remove()는 여전히 쓰지 않음.
@@ -4259,7 +4248,7 @@ document.querySelectorAll('.vtab').forEach(b=>b.addEventListener('click',()=>{
 // ── 탭 전환 스와이프 (오늘 ↔ 주간 ↔ 월간 ↔ 홈)
 // 콘텐츠 카드(투두, 메모, 캘린더 제외, 목표, 통계 등) 안에서 시작된 터치는 기존 카드 내부 제스처와
 // 충돌 방지를 위해 스와이프 판정에서 제외. 카드 사이 여백 배경 및 캘린더 영역에서만 동작.
-// 캘린더(.cal-day, .cal-grid)는 클릭 선택 외 별도 제스처가 없어 예외적으로 스와이프 허용.
+// 캘린더(.cal-day,.cal-grid)는 클릭 선택 외 별도 제스처가 없어 예외적으로 스와이프 허용.
 (function(){
   const TAB_ORDER=['daily','weekly','monthly'];
   const SWIPE_EXCLUDE_SELECTOR='.card,.pace-card,.report-banner,.weekly-review-banner,.wrb-wrap,textarea,input,.todo-part,.habit-check-box,.recipe,.rhythm-track,.rhythm-add-form,.mf-hero';
@@ -4469,11 +4458,11 @@ function renderSleepAvgMarkers(avg){
   if(compareEl){compareEl.textContent=avg.compareText;compareEl.style.display='';}
 }
 // ── 시간 휠 피커 공용 유틸 (취침/기상/리듬/메모/일정/식사/메모수정 7곳 공유) ──
-// [2026-09-05 재작성] 값 전체(시 24개/분 60개)를 한번만 DOM에 렌더해두고 translateY로만 스크롤.
+// 값 전체(시 24개/분 60개)를 한번만 DOM에 렌더해두고 translateY로만 스크롤.
 // 손을 뗄 때 속도(velocity) 기반 관성 + 40px 그리드 스냅 — 네이티브 iOS 피커 방식.
 // 매 프레임(rAF) 위치를 계산해 가운데 항목에만 sel, 그 위아래에만 near를 갱신하므로
 // 이전처럼 손 뗄 때 DOM을 통째로 다시 그리며 끊기는 지점이 없음.
-// [2026-09-05 추가] PC(마우스 포인터, 터치 없음) 환경에서는 롤링 휠 대신 시:분 숫자 입력창으로 대체 —
+// PC(마우스 포인터, 터치 없음) 환경에서는 롤링 휠 대신 시:분 숫자 입력창으로 대체 —
 // 롤링은 모바일 터치에 최적화된 동작이라 마우스로는 불편함. 판별은 진입 시 한 번만(_isPcTimeInput),
 // 롤링 쪽 로직(관성/스냅 등)은 전혀 건드리지 않고 렌더링 갈림길만 추가.
 function _isPcTimeInput(){
@@ -4556,7 +4545,7 @@ function _twAttach(trackId,onSelect){
   const MAX_VELOCITY=2.5; // 한 프레임(16.67ms 기준) 당 최대 이동 인덱스 — 이 값보다 크면 dt가 비정상적으로
                             // 짧게 측정된 것(이벤트가 몰려 들어온 경우 등)이라 판단하고 상한을 씌움.
                             // 이게 없으면 살짝만 움직여도 속도가 폭발적으로 커져 트랙 끝까지 튕겨나가는
-                            // 버그(2026-09-12 발견)가 생김.
+                            // 버그(발견)가 생김.
   let dragging=false,startY=0,startIdx=0,lastY=0,lastT=0,velocity=0;
   function start(y){
     if(track._twRaf)cancelAnimationFrame(track._twRaf);
@@ -4597,7 +4586,7 @@ function _twAttach(trackId,onSelect){
 }
 // 공용 휠 렌더러 — hourTrackId/minTrackId/inpId/wrapId를 넘기면 어떤 시간 인풋에도 붙일 수 있음.
 // wrap은 트랙 id로 역추적(closest)하지 않고 wrapId로 직접 찾음 — PC 모드에서는 트랙 엘리먼트 자체가
-// DOM에서 사라지므로(PC 입력 UI로 교체됨), 트랙 기준 closest는 재렌더 시 null 참조로 깨짐(2026-09-05 발견).
+// DOM에서 사라지므로(PC 입력 UI로 교체됨), 트랙 기준 closest는 재렌더 시 null 참조로 깨짐.
 function _renderTimeWheelFor(hourTrackId,minTrackId,inpId,wrapId){
   const cur=document.getElementById(inpId).value||'';
   const m=cur.match(/^(\d{1,2}):(\d{1,2})$/);
@@ -4632,7 +4621,7 @@ function _renderTimeWheelFor(hourTrackId,minTrackId,inpId,wrapId){
 function _renderPcTimeInput(wrap,inpId,h,mi){
   if(wrap.dataset.pcMode==='1'){
     // 이미 PC 입력 UI면 마크업은 재사용하되, 새로 열린 항목의 실제 값으로 입력창을 갱신해야 함
-    // (이 갱신이 빠져있어 여러 항목을 연달아 열 때 이전 값이 그대로 남아있던 버그, 2026-09-13 수정).
+    // (이 갱신이 빠져있어 여러 항목을 연달아 열 때 이전 값이 그대로 남아있던 버그).
     const hEl=document.getElementById('tw-pc-hour'),mEl=document.getElementById('tw-pc-min');
     if(hEl&&mEl){
       hEl.value=pad(h);mEl.value=pad(mi);
@@ -4758,11 +4747,11 @@ function _resizeImageToWebp(file,maxDim){
   });
 }
 // 신규 작성형 사진 첨부(1장, 미리보기, 취소) 컨트롤러 팩토리 — 오늘탭 인라인 메모와 리듬 메모
-// 제안 모달이 완전히 동일한 로직(리사이즈→로컬미리보기→해제)을 각자 복붙해 갖고 있던 것을 통합
-// (2026-09-18). "기존 사진+삭제 의도"까지 다루는 수정 모달(memo-edit-*)은 책임이 달라 별도 유지.
+// 제안 모달이 완전히 동일한 로직(리사이즈→로컬미리보기→해제)을 각자 복붙해 갖고 있던 것을 통합.
+// "기존 사진+삭제 의도"까지 다루는 수정 모달(memo-edit-*)은 책임이 달라 별도 유지.
 // opts.wrapClass가 있으면 썸네일을 그 클래스로 감싼 wrap 안에 넣는다(72px 정사각+오버레이 X버튼형,
 // 리듬 메모가 이 형태). 없으면 기존 오늘탭 인라인처럼 img/clear를 나란히 넣는다.
-// opts.toggleBtnId가 있으면 사진 첨부 여부에 따라 그 버튼에 .on 클래스를 토글(아이콘 흐림 처리).
+// opts.toggleBtnId가 있으면 사진 첨부 여부에 따라 그 버튼에.on 클래스를 토글(아이콘 흐림 처리).
 function _makePendingPhotoController(previewRowId,thumbClass,clearClass,opts){
   opts=opts||{};
   const state={photo:null};
@@ -4983,16 +4972,15 @@ function closePhotoViewer(ev){
 }
 // ── 리듬 활동 메모 제안 모달 (종료 시점 팝업 / 1시간 알림 클릭 공용) ──
 // 카테고리 구분은 RHYTHM_CATS[cat]의 color/icon/label을 그대로 사용 — 별도 색상 테이블 불필요.
-// 사진 첨부는 공용 _makePendingPhotoController(_rmemoPhotoCtl, 위에 정의)를 사용(2026-09-18 통합).
+// 사진 첨부는 공용 _makePendingPhotoController(_rmemoPhotoCtl, 위에 정의)를 사용.
 let _rmemoCtx=null; // {dk, cat, (question일 때) question/qId/qKind} — 저장 시 어느 날짜의 오늘탭 메모에 넣을지
 const RMEMO_SPECIAL_CATS={
   sleep:{icon:'ti-moon',color:RHYTHM_SLEEP_COLOR,placeholder:'오늘 하루를 남겨보세요'}, // 리듬 수면 구간 색 재사용
-  noon:{icon:'ti-sun',color:'rgba(var(--pal-yellow-rgb),0.82)',placeholder:'지금 컨디션이나 오후 계획을 남겨보세요'},
   question:{icon:'ti-sparkles',color:'rgba(var(--pal-lime-rgb),0.80)',placeholder:'떠오르는 대로 답을 남겨보세요'} // 메모 배너의 질문답변 세로선(연두)과 같은 색
 };
 function openRhythmMemoModal(cat,dk,title,body){
   const catInfo=RHYTHM_CATS[cat];
-  const look=catInfo||RMEMO_SPECIAL_CATS[cat]; // 리듬 8종 또는 특수(취침 회고/점심 후/오늘의 질문) — 둘 다 {color,icon}을 가짐
+  const look=catInfo||RMEMO_SPECIAL_CATS[cat]; // 리듬 8종 또는 특수(취침 회고/오늘의 질문) — 둘 다 {color,icon}을 가짐
   const iconWrap=document.getElementById('rmemo-icon');
   const iconI=document.getElementById('rmemo-icon-i');
   const submitBtn=document.getElementById('rmemo-submit-btn');
@@ -5016,7 +5004,7 @@ function openRhythmMemoModal(cat,dk,title,body){
   clearRhythmMemoPhotoPreview();
   document.getElementById('rhythm-memo-ov').classList.add('on');
 }
-// ══ 오늘의 질문 (2026-09-19) ══
+// ══ 오늘의 질문 ══
 // 서버 memo_prompts 풀에서 질문 1개를 받아 메모 모달(rhythm-memo-ov)에 띄움. 앱은 "오늘 쓸 수 있는 상황 조건 이름"만 서버에 보내고
 // (실제 값은 보내지 않음), 받은 질문의 {빈칸}은 로컬 데이터로 직접 채움. 답변을 저장하는 순간 서버에서 사용 처리.
 const QUESTION_FALLBACK_TEXT='오늘 하루는 어땠나요?'; // 서버 연결 실패/풀 소진 시 기본 문구
@@ -5345,7 +5333,7 @@ function confirmTime(){
   // getLogicalDate()(지금 이 순간의 실제 오늘)를 쓰면, 다음날 이후 화면을 과거 날짜로 옮겨 소급 입력할 때
   // dk와 어긋나 자동마감 대상 범위([오늘,어제] 단 이틀)를 벗어나 버리는 버그가 있었음.
   if(_sleepTarget==='sleep'){autoCloseUnfinishedRhythmBlocks(dk,v);refreshRhythmTrack();}
-  // "아침기상" 습관 자동체크(2026-09-05) — 목표시각이 설정돼 있고, 이번에 확정한 기상시각이
+  // "아침기상" 습관 자동체크 — 목표시각이 설정돼 있고, 이번에 확정한 기상시각이
   // 그 이내면 자동으로 체크. 목표시각을 늦게 넘겨 일어난 날은 자동체크하지 않되(정직하게 반영),
   // 이미 다른 방법(수기)으로 체크해둔 걸 자동판단이 강제로 끄지는 않음 — checkHabitDirect의
   // "이미 켜져있으면 그대로 둠" 원칙과 별개로, 여기선 애초에 목표시각 밖이면 호출 자체를 안 함.
@@ -5503,7 +5491,7 @@ function renderTodos(){
       // 반복 항목도 조각모드(취소선 토글)는 일반 투두와 동일하게 지원 — attachTodoSwipeMode 내부에서
       // isRecurring 여부에 따라 "내일도 복사"만 별도로 막는다(중복 생성 방지, 토스트 안내로 처리).
       attachTodoSwipeMode(el,i,hasMultipleParts,!!t.recurRuleCid);
-      // PC 우클릭으로 조각모드 진입(2026-09-29) — 모바일 왼쪽 스와이프(dx<-15)와 동일한 진입 동작을
+      // PC 우클릭으로 조각모드 진입 — 모바일 왼쪽 스와이프(dx<-15)와 동일한 진입 동작을
       // PC에서 우클릭으로 대체. 마우스 환경에서는 pointermove 기반 드래그 임계값이 미세한 손떨림과
       // 구분이 안 돼 setPointerCapture가 잘못 걸리는 경우가 있었고(엉뚱하게 "내일로 복사"가 실행되거나
       // 조각모드가 안 열리는 오작동), contextmenu는 그 드래그 경로를 아예 타지 않아 이 문제와 무관하다.
@@ -5541,7 +5529,7 @@ function parseScheduleTodos(dk,todos){
     items.push({i:i,cid:t.cid,time:m[1].padStart(2,'0')+':'+m[2],min:hh*60+mm,label:m[3],done:t.done,todoAlertOn:t.todoAlertOn,alertTime:t.alertTime});
   });
   // 정렬 우선순위: ①지연(시각이 이미 지났는데 미완료 — 가장 급함) → ②아직 안 온 시각(가까운 순) → ③완료(맨 뒤).
-  // 기존엔 지난 시각도 "다음날 것"으로 계산해 남은 시간이 커져버려, 정작 제일 급한 지연 항목이 뒤로 밀리는 문제가 있었음(2026-09-01).
+  // 기존엔 지난 시각도 "다음날 것"으로 계산해 남은 시간이 커져버려, 정작 제일 급한 지연 항목이 뒤로 밀리는 문제가 있었음.
   items.sort((a,b)=>{
     if(a.done!==b.done)return a.done?1:-1;
     if(!a.done&&nowMin!=null){
@@ -5578,7 +5566,7 @@ function renderScheduleDonut(dk){
   });
   wrap.innerHTML=`<svg viewBox="0 0 58 58">${circles}</svg>`;
 }
-// 시간표 리스트 — 텍스트만 노출, 체크박스는 기존 .chk/toggleTodo() 그대로 재사용(별도 저장/토글 로직 없음).
+// 시간표 리스트 — 텍스트만 노출, 체크박스는 기존.chk/toggleTodo() 그대로 재사용(별도 저장/토글 로직 없음).
 // items는 parseScheduleTodos가 이미 "미완료 중 가장 가까운 것 최상단" 순으로 정렬해 반환하므로,
 // 맨 앞의 미완료 항목(0번 인덱스)만 진행중(current)으로 강조 — 매 항목마다 배열을 다시 훑을 필요 없음.
 function renderScheduleList(dk,items){
@@ -5636,7 +5624,7 @@ function renderEventList(dk,todos){
   else if(_todayBannerMode)mode=_todayBannerMode; // 사용자가 이미 수동 전환한 경우 그대로 유지
   else{
     // 지연 감지 우선: 시각이 이미 지났는데 아직 체크 안 된 시간표 항목이 하나라도 있으면, 그 일이 밀리고 있을
-    // 가능성이 있으므로 무조건 시간표를 먼저 보여줌(2026-09-01). 지연 항목이 없으면 기존처럼 "각자 카테고리에서
+    // 가능성이 있으므로 무조건 시간표를 먼저 보여줌. 지연 항목이 없으면 기존처럼 "각자 카테고리에서
     // 가장 가까운(아직 안 지난) 항목 시각끼리 비교, 더 가까운 쪽" 규칙 그대로 적용.
     const nowMin=_nowMinIfToday(dk)??0;
     const hasOverdueSchedule=scheduleItems.some(it=>!it.done&&it.min<nowMin);
@@ -5697,8 +5685,8 @@ function renderEventList(dk,todos){
     // 일정 텍스트는 투두의 '조각 나누기' 기능이 필요 없어 단순 escape만 함(renderTodoTextParts를 쓰면 내부 클릭 핸들러가 투두 인덱스를 잘못 참조해 엉뚱한 투두가 열리는 문제가 있었음)
     const textHtml=escapeHtml(ev.text);
     const recurIconHtml=ev.recurRuleCid?'<i class="ti ti-repeat ico-sz-11" style="color:var(--tm);flex-shrink:0;margin-right:2px;" aria-hidden="true" title="반복"></i>':'';
-    const dayLabel=ev.isVacation?'Off':'Day'; // 오프 기간 연속일정은 "Day n" 대신 "Off n" — 배경 없이 텍스트만 교체, 색은 공용 로즈 팔레트로 구분(2026-09-25)
-    const rightBadge=ev.eventEndDate?`<span class="event-time"${ev.isVacation?' style="color:var(--off-badge-text);"':''}>${dayLabel} ${ev.dayIndex}</span>`:(ev.eventTime?`<span class="event-time">${ev.eventTime}</span>`:''); // 연속일정 며칠차 — 배지 스타일 제거, 시간 표기와 동일한 톤으로 "Day n" 표기 (2026-09-24). 오프 색은 --off-badge-text 참조(값은 index.html :root에서 단일 관리)
+    const dayLabel=ev.isVacation?'Off':'Day'; // 오프 기간 연속일정은 "Day n" 대신 "Off n" — 배경 없이 텍스트만 교체, 색은 공용 로즈 팔레트로 구분
+    const rightBadge=ev.eventEndDate?`<span class="event-time"${ev.isVacation?' style="color:var(--off-badge-text);"':''}>${dayLabel} ${ev.dayIndex}</span>`:(ev.eventTime?`<span class="event-time">${ev.eventTime}</span>`:''); // 연속일정 며칠차 — 배지 스타일 제거, 시간 표기와 동일한 톤으로 "Day n" 표기. 오프 색은 --off-badge-text 참조(값은 index.html :root에서 단일 관리)
     el.innerHTML=`<i class="ti ${ec.icon}" style="font-size:14px;color:${ec.textColor};flex-shrink:0;" title="${ec.label}" aria-hidden="true"></i><span class="event-txt">${textHtml}</span>${recurIconHtml}${rightBadge}`;
     list.appendChild(el);
   });
@@ -5736,7 +5724,7 @@ function parseTodoTextParts(text){
 // 투두 텍스트를 조각내어 렌더링. strikeParts에 포함된 조각 인덱스는 취소선 처리.
 // 조각 모드일 때 항목 끝에 "미체크 조각 전부 내일로 복사" 버튼 하나를 노출.
 // 클릭 처리는 여기서 onclick 문자열을 조립하지 않음 — 대신 각 조각/접두어 스팬에 data-part-idx만
-// 남겨두고, 실제 클릭 판정은 attachTodoItemClick(부모 .todo-item 하나에만 리스너)이 위임 처리한다.
+// 남겨두고, 실제 클릭 판정은 attachTodoItemClick(부모.todo-item 하나에만 리스너)이 위임 처리한다.
 // (예전엔 조각마다 onclick="onTodoPartClick(...)" 문자열을 조립했는데, 텍스트에 따옴표가 섞이면
 // 깨질 수 있고, 반복/일반 분기마다 별도 문자열을 만들어야 해서 케이스가 늘수록 복잡해지는 구조였음.
 // 지금은 데이터 속성만 남기고 판단은 attachTodoItemClick 한 곳에서 한다.)
@@ -5765,7 +5753,7 @@ function renderTodoTextParts(text,strikeParts,todoIdx){
 // ── 투두 항목 하나(.todo-item)에 클릭 처리를 위임하는 단일 진입점 ──
 // 예전엔 조각(.todo-part)마다 인라인 onclick으로 openTodoSheet/openRecurringItemSheet를 직접 호출했는데,
 // 그러면 "반복인지 아닌지"를 렌더링 시점마다 문자열로 미리 결정해둬야 했고, 부모(.todo-txt)에 별도로
-// 달아둔 반복용 리스너는 자식의 stopPropagation에 막혀 애초에 실행되지 못하는 버그(2026-09-07)가 있었음.
+// 달아둔 반복용 리스너는 자식의 stopPropagation에 막혀 애초에 실행되지 못하는 버그가 있었음.
 // 지금은 이벤트가 항상 이 리스너 하나로만 들어오므로 그 경합 자체가 구조적으로 발생할 수 없다.
 // isRecurring: el.dataset.recur==='1' 여부로 렌더 시점에 이미 심어둔 값을 그대로 사용.
 function attachTodoItemClick(el,idx,cid){
@@ -6163,7 +6151,7 @@ const MORNING_FLOW_ENJOY_SUB=[
   {key:'read',label:'독서',icon:'ti-book'},
   {key:'content',label:'콘텐츠',icon:'ti-device-tv'}
 ];
-// 서브선택 상수 — 모닝플로우 카드와 리듬탭 빠른선택 칩이 공용으로 참조(2026-09-19 통합).
+// 서브선택 상수 — 모닝플로우 카드와 리듬탭 빠른선택 칩이 공용으로 참조.
 // 종류 추가/수정 시 이 한 곳만 고치면 두 화면(모닝플로우 서브칩, 리듬탭 빠른선택)에 자동 반영됨.
 const RHYTHM_EXERCISE_SUB=[
   {key:'hometraining',label:'홈트'},
@@ -6237,15 +6225,15 @@ function _mfDurationMin(startStr,endStr){
   if(endMin<startMin)endMin+=1440;
   return endMin-startMin;
 }
-// 모닝플로우 저장 구조(2026-09-20 복수 슬롯 개편): flow.picks = {슬롯id: {key(카드), sub, title, text, status, t(생성시각), blockCid, ...}}.
-// 같은 카드도 슬롯을 여러 개 만들 수 있음(예: 업무+외출). 옛 구조(카드별 pick + flow.etc/enjoy/... 별도 상태)는 서버 기록을 일괄 변환하고 변환 코드도 제거함(2026-09-20).
+// 모닝플로우 저장 구조: flow.picks = {슬롯id: {key(카드), sub, title, text, status, t(생성시각), blockCid,...}}.
+// 같은 카드도 슬롯을 여러 개 만들 수 있음(예: 업무+외출). 옛 구조(카드별 pick + flow.etc/enjoy/... 별도 상태)는 서버 기록을 일괄 변환하고 변환 코드도 제거함.
 function getMorningFlow(dk){return S.get('mflow_'+dk)||{picks:{}};}
 // 슬롯 목록(생성순) — flow.picks의 값에 id를 붙인 사본. 수정은 항상 flow.picks[id]에 해야 함.
 function _mfSlots(flow){return Object.keys(flow.picks).map(id=>({...flow.picks[id],id})).sort((a,b)=>(a.t||0)-(b.t||0));}
 // 같은 카드의 다른 슬롯이 진행중이면 새로 시작할 수 없음(같은 카드 안에서는 순차 진행).
 function _mfSiblingRunning(flow,id){const me=flow.picks[id];return Object.keys(flow.picks).some(k=>k!==id&&flow.picks[k].key===me.key&&flow.picks[k].status==='running');}
 const MF_BLOCKED_MSG='같은 카드는 하나가 끝나야 다음을 시작할 수 있어요';
-// [2026-09-05] 모닝플로우 카드의 시작/종료 시각은 더 이상 flow.picks에 별도 저장하지 않고
+// 모닝플로우 카드의 시작/종료 시각은 더 이상 flow.picks에 별도 저장하지 않고
 // 항상 연결된 리듬블록(blockCid)에서 직접 읽어옴 — 리듬탭에서 시간을 수정해도 즉시 반영되고,
 // "복제된 값이 원본과 어긋나는" 불일치가 구조적으로 사라짐.
 // 블록이 삭제된 경우(null 리턴) 호출부에서 해당 pick을 idle로 되돌리는 처리를 함께 함.
@@ -6253,7 +6241,7 @@ function _mfBlockFor(dk,blockCid){
   if(!blockCid)return null;
   return getRhythmBlocks(dk).find(b=>b.cid===blockCid)||null;
 }
-// 감상 칩(독서/콘텐츠 여러 개 중 고르기) 표기용 — 6자 넘으면 5자+…로 축약(2026-09-05).
+// 감상 칩(독서/콘텐츠 여러 개 중 고르기) 표기용 — 6자 넘으면 5자+…로 축약.
 function _mfShortTitle(title){
   return title.length>6?title.slice(0,5)+'…':title;
 }
@@ -6273,7 +6261,7 @@ function getMorningFlowMonthCounts(mk){
   return counts;
 }
 // pending 플래그: Up이 아직 서버에 반영 안 된 로컬 변경사항이 있으면 syncMorningFlowDown이 그 날짜를 덮어쓰지 않도록 방지
-// (기존엔 autoSync가 완료를 기다리지 않고 fire-and-forget이라, 새로고침 시 syncAll의 Down이 먼저 실행되며 방금 로컬에 저장한 진행상태를 서버의 옛 데이터로 되돌리는 버그가 있었음 — 2026-09-03 수정)
+// (기존엔 autoSync가 완료를 기다리지 않고 fire-and-forget이라, 새로고침 시 syncAll의 Down이 먼저 실행되며 방금 로컬에 저장한 진행상태를 서버의 옛 데이터로 되돌리는 버그가 있었음)
 function saveMorningFlow(dk,data){data._localTs=Date.now();S.set('mflow_'+dk,data);S.set(S.key('mflow_pending',dk),true);autoSync('mflow',dk);}
 async function syncMorningFlowUp(dk){
   const flow=getMorningFlow(dk);
@@ -6301,7 +6289,7 @@ async function syncMorningFlowDown(dk){
   if((r.client_ts||0)<=(local._localTs||0)&&(local._localTs||0)>0)return;
   S.set('mflow_'+dk,{picks:r.picks||{},_localTs:r.client_ts||Date.now()});
 }
-// ── 슬롯 조작(2026-09-20) ──
+// ── 슬롯 조작 ──
 let _mfSelId=null; // 화면에서 펼쳐 둔 슬롯 id(저장하지 않는 화면 상태)
 let _mfLpFired=false; // 길게 눌러 삭제가 방금 발동했는지(뒤따르는 click 무시용)
 function _mfNewSlotId(flow){let id;do{id='s'+Date.now().toString(36)+Math.floor(Math.random()*36).toString(36);}while(flow.picks[id]);return id;}
@@ -6398,7 +6386,7 @@ function _startMorningFlowRhythm(id,targetCid,mk,subKey){
   // 휴식/운동/정리/기타(업무·외출)/책상(일기·노트정리·개인작업) — 리듬블록을 end 없이 직접 생성해두고 종료 시 채우는 방식(콘텐츠 시청 스톱워치와 동일 패턴).
   const card=MORNING_FLOW_CARDS.find(c=>c.key===key);
   const rhythmCat=key==='etc'?_mfSubMeta('etc',subKey)?.rhythmCat:card.rhythmCat;
-  // label: 카테고리 라벨과 구분되는 "진짜 세부정보"가 있을 때만 채움(기타는 고른 제목, 나머지는 종류 이름) — 카테고리 라벨과 중복되는 "업무 · 업무" 방지(2026-09-18).
+  // label: 카테고리 라벨과 구분되는 "진짜 세부정보"가 있을 때만 채움(기타는 고른 제목, 나머지는 종류 이름) — 카테고리 라벨과 중복되는 "업무 · 업무" 방지.
   const label=key==='etc'?(s.title||''):(_mfSubMeta(key,subKey)?.label||'');
   const now=Date.now();
   const startMin=new Date(now).getHours()*60+new Date(now).getMinutes();
@@ -6406,7 +6394,7 @@ function _startMorningFlowRhythm(id,targetCid,mk,subKey){
   const blockCid=genCid();
   const blocks=getRhythmBlocks(dk);
   blocks.push({cat:rhythmCat,start:startStr,end:'',text:label,created:now,cid:blockCid});
-  saveRhythmBlocks(dk,blocks); // saveRhythmBlocks 내부에서 이미 autoSync('rblocks',dk) 호출 — 중복 호출 금지(2026-09-13 정리)
+  saveRhythmBlocks(dk,blocks); // saveRhythmBlocks 내부에서 이미 autoSync('rblocks',dk) 호출 — 중복 호출 금지
   if(rhythmCat==='home'){
     if(subKey==='clean')checkHabitDirect('tidy',dk,startStr); // 살림 중 '정리' 칩일 때만 습관 연결 — 세탁/주방은 제외(리듬탭 수기등록과 동일 규칙)
   }else{
@@ -6426,7 +6414,7 @@ function endMorningFlowSlot(id){
   const s=flow.picks[id];
   if(!s||s.status!=='running')return;
   if(s.key==='enjoy'){
-    // 1분 미만 자동삭제 로직 완전 제거(2026-09-03) — 몇 초든 시작~종료 구간을 그대로 기록, 다른 카테고리와 동일 규칙.
+    // 1분 미만 자동삭제 로직 완전 제거 — 몇 초든 시작~종료 구간을 그대로 기록, 다른 카테고리와 동일 규칙.
     if(s.sub==='read')toggleStopwatch();
     else if(s.sub==='content')stopContentStopwatch();
     else return;
@@ -6438,7 +6426,7 @@ function endMorningFlowSlot(id){
       let endMin=endD.getHours()*60+endD.getMinutes();
       if(dateKey(getLogicalDate(endD.getTime()))!==dk)endMin+=1440;
       blocks[idx].end=minToHHMM(endMin%1440);
-      saveRhythmBlocks(dk,blocks); // saveRhythmBlocks 내부에서 이미 autoSync('rblocks',dk) 호출 — 중복 호출 금지(2026-09-13 정리)
+      saveRhythmBlocks(dk,blocks); // saveRhythmBlocks 내부에서 이미 autoSync('rblocks',dk) 호출 — 중복 호출 금지
     }
   }
   flow.picks[id]={...s,status:'done'};
@@ -6533,8 +6521,8 @@ function _mfPanelHtml(dk,flow,slot,c){
 function makeMorningFlowCard(){
   const dk=dateKey(getLogicalDate());
   const flow=getMorningFlow(dk);
-  // [2026-09-05] 리듬탭에서 blockCid로 연결된 리듬블록을 직접 지워버린 경우 — "하려다가 안 한 것"으로 보고 해당 슬롯을 통째로 지움.
-  // [2026-09-13] done인데 blockCid가 애초에 없는 케이스는 정상 흐름에선 없음(자유입력은 리듬 연동이 없어 blockCid가 없는 게 정상이라 제외).
+  // 리듬탭에서 blockCid로 연결된 리듬블록을 직접 지워버린 경우 — "하려다가 안 한 것"으로 보고 해당 슬롯을 통째로 지움.
+  // done인데 blockCid가 애초에 없는 케이스는 정상 흐름에선 없음(자유입력은 리듬 연동이 없어 blockCid가 없는 게 정상이라 제외).
   let _flowPruned=false;
   Object.keys(flow.picks).forEach(id=>{
     const p=flow.picks[id];
@@ -6682,7 +6670,7 @@ function _paceTopRhythmCat(dk){
 }
 
 // ══════════════════════════════════════════════════════════
-// 오후 홈탭 "오늘의 흐름" 카드 (2026-09-04 개편 — 기존 무거운 오후 통계카드를 대체)
+// 오후 홈탭 "오늘의 흐름" 카드 (기존 무거운 오후 통계카드를 대체)
 // 12~19시 가로 타임라인(식사/할일완료/일정/리듬 4종 마커, 외출 리듬은 일정과 중복 잦아 제외)
 // + 완료개수·평소(최근7일)비교 + 오후 남은 할일(탭 이동) + 최근7일 인사이트 한 줄
 // ══════════════════════════════════════════════════════════
@@ -7369,7 +7357,7 @@ function toggleTodoAt(dk,i,expectedCid){
     fillRemainingTodoStrikeParts(target,now);
     // 시간표 형식(맨 앞 "HH:MM ")이면 텍스트 앞머리를 실제 체크 시각으로 교체 — 수기 등록 시각과 실제 완료 시각이
     // 다를 때(예: 08:00 약먹기를 09:15에 체크) 시간표에 실제 시각이 반영되도록 함. 원본은 잠깐 백업해뒀다가
-    // 체크 해제 시 그대로 복원(2026-09-01).
+    // 체크 해제 시 그대로 복원.
     const m=(target.text||'').match(SCHEDULE_TIME_RE);
     if(m){
       target.scheduleOrigText=target.text;
@@ -7620,7 +7608,7 @@ function closeTodoModal(e){
   modal.classList.remove('on');
   hideTodoFragChips();
 }
-// DR 조각 자동제안(2026-09-29) — 실사용 데이터 기준 "DR >" 뒤에 반복 등장한 상위 조각.
+// DR 조각 자동제안 — 실사용 데이터 기준 "DR >" 뒤에 반복 등장한 상위 조각.
 // 서버 투두 텍스트 분석 결과 블로그 43회/인스타 39회/카페 21회/영상 6회/드라이브 5회로 압도적 상위라 이 5개만 고정.
 // 이후 사용 패턴이 바뀌면 이 배열만 조정하면 됨(자동 집계 아님 — 하드코딩이 더 예측 가능하고 단순해 이 방식으로 결정).
 const DR_FRAG_SUGGESTIONS=['블로그','인스타','카페','영상','드라이브'];
@@ -8036,7 +8024,7 @@ function deleteTodoFromModal(){
 // 반복 투두/일정 규칙 등록 — 모달의 반복 설정(dataset)을 rule 객체로 조립해 recurring_items(원본 규칙)에 저장.
 // 앞으로의 날짜들은 서버(materialize-recurring cron, 매일 자정 직후 실행)가 알아서 채워 넣지만, "오늘"이
 // 해당 요일/간격이면 다음 자정까지 기다리지 않고 이 자리에서 바로 1건만 만들어 화면에 보이게 함
-// (_materializeTodayIfDue, 2026-09-27) — 등록하자마자 오늘 목록에 안 보이면 등록이 실패한 것처럼
+// (_materializeTodayIfDue) — 등록하자마자 오늘 목록에 안 보이면 등록이 실패한 것처럼
 // 보일 수 있어서 둔 예외이고, 그 외 모든 날짜는 서버 전담.
 function confirmRecurringTodo(text){
   const modal=document.getElementById('todo-modal');
@@ -8210,7 +8198,7 @@ function eventSheetEdit(){
 function eventSheetDelete(){
   closeSheet('event-sheet');
   if(!removeTodoByCid(_eventSheetDk,_eventSheetCid))return;
-  syncCalCacheFromTodos(_eventSheetDk); // 2026-09-30: 캘린더 일정 삭제도 캐시 즉시 반영
+  syncCalCacheFromTodos(_eventSheetDk); // 캘린더 일정 삭제도 캐시 즉시 반영
   renderTodos();
   if(document.getElementById('monthly-cal'))renderCalendar();
 }
@@ -8228,7 +8216,7 @@ function recurSheetSkipToday(){
   if(!_recurSheetTodoCid||!_recurSheetDk)return;
   removeTodoByCid(_recurSheetDk,_recurSheetTodoCid);
   addRecurSkip(_recurSheetRuleCid,_recurSheetDk);
-  syncCalCacheFromTodos(_recurSheetDk); // 2026-09-30: 오늘만삭제도 캘린더 캐시를 같이 갱신 — 안 하면
+  syncCalCacheFromTodos(_recurSheetDk); // 오늘만삭제도 캘린더 캐시를 같이 갱신 — 안 하면
   // 지운 항목이 캘린더 탭 재진입 전까지 그 날짜 칸에 그대로 남아있는 것처럼 보일 수 있음.
   renderTodos();
   if(document.getElementById('monthly-cal'))renderCalendar();
@@ -8262,7 +8250,7 @@ async function recurSheetDeleteAll(){
     const filtered=todos.filter(t=>t.recurRuleCid!==_recurSheetRuleCid);
     if(filtered.length!==todos.length){
       saveTodos.raw(dk,filtered);
-      syncCalCacheFromTodos(dk); // 2026-09-30: 이 날짜의 캘린더 캐시도 같이 갱신 — 안 하면 전체삭제한
+      syncCalCacheFromTodos(dk); // 이 날짜의 캘린더 캐시도 같이 갱신 — 안 하면 전체삭제한
       // 반복 일정이 캘린더 탭 재진입 전까지 미리보기 칸에 그대로 남아있는 것처럼 보이는 버그가 있었음.
     }
   }
@@ -8290,7 +8278,7 @@ function confirmRecurEditText(){
   const item=todos.find(t=>t.cid===_recurSheetTodoCid);
   if(item){item.text=text;saveTodos(_recurSheetDk,todos);}
   closeModal('recur-edit-text-modal');
-  syncCalCacheFromTodos(_recurSheetDk); // 2026-09-30: 오늘만 텍스트 수정도 캐시 즉시 반영
+  syncCalCacheFromTodos(_recurSheetDk); // 오늘만 텍스트 수정도 캐시 즉시 반영
   renderTodos();
   if(document.getElementById('monthly-cal'))renderCalendar();
 }
@@ -8622,7 +8610,7 @@ function openSeedArchive(){
   openModal('seed-archive-modal');
 }
 // 날짜 전환 공용 헬퍼 — currentDate를 dk로 바꾸고 오늘탭으로 전환. 씨앗모아보기/월간탭 상세보기 등
-// 여러 진입점에서 공유(2026-09-11 중복 제거 통합).
+// 여러 진입점에서 공유.
 function _gotoDailyTab(dk){
   const parts=dk.split('-').map(Number);
   currentDate=new Date(parts[0],parts[1]-1,parts[2]);
@@ -8672,7 +8660,7 @@ let _photoArchiveIdx=-1; // 뷰어에서 현재 보고 있는 사진의 _photoAr
 function openPhotoArchiveItem(i){
   const r=_photoArchiveResults[i];if(!r)return;
   // 그리드 모달(z-index 9999)을 닫지 않고 그대로 둔 채 뷰어(z-index 10001)를 그 위에 연다 —
-  // 뷰어를 닫으면(closePhotoViewer) 자연스럽게 그리드로 돌아가도록 하기 위함(2026-09-17).
+  // 뷰어를 닫으면(closePhotoViewer) 자연스럽게 그리드로 돌아가도록 하기 위함.
   _photoArchiveIdx=i;
   const d=new Date(r.dk+'T00:00:00');
   const meta=`${d.getMonth()+1}월 ${d.getDate()}일 ${_HOME_DAYS[d.getDay()]}요일 · ${r.time||''}`;
@@ -8702,7 +8690,7 @@ const WC_COLORS_BORDER=[
   'var(--pal-sky-border)','var(--pal-lavender-border)','var(--pal-rose-border)'
 ];
 function getWChallenge(wk){return S.get('wchallenge_'+wk)||[];}
-// 요일 체크/텍스트 입력 즉시 서버 반영(2026-09-27) — 예전엔 pending 플래그만 세우고 실제 업로드는
+// 요일 체크/텍스트 입력 즉시 서버 반영 — 예전엔 pending 플래그만 세우고 실제 업로드는
 // 탭 전환(syncOnTabEnter)이나 2분 주기 syncAll에 맡겼는데, PC/모바일 1인 양방향 사용 환경에서
 // "체크했는데 바로 다른 기기에 안 보임" 문제가 있었음. apiSearchDebounce(TMDB 검색창)와 동일한
 // clearTimeout+setTimeout 디바운스 패턴을 재사용 — 연속 클릭/타이핑 중엔 요청을 쌓지 않고,
@@ -9328,7 +9316,7 @@ function buildWeekStrip(){
 // ██ 오늘탭 (4/4 — 나머지는 시간대팝업, SLEEP~아침파트2, MEMO, 예비투두 부근) — HABIT/CONTENT TIMELINE ██
 // ══════════════════════════════════════════════════════════
 // ── HABIT
-// [2026-09-05] 습관 편집(구 habit-modal, 줄바꿈 텍스트박스)은 설정탭 "해빗" 코너로 완전히 이전됨.
+// 습관 편집(구 habit-modal, 줄바꿈 텍스트박스)은 설정탭 "해빗" 코너로 완전히 이전됨.
 // renderSettingsHabitSection/toggleCatalogHabit/toggleCustomHabit/addCustomHabitFromSettings 참고.
 
 // ── CONTENT TIMELINE
@@ -9374,7 +9362,7 @@ function renderContentTimeline(){
     }).map(c=>({...c,_carried:true}));
     const all=[...carry,...items];
 
-    // watching(진행중, 음악 제외)은 실제 감상일 기준 세그먼트 여러 개로 펼침 — isAiring 개념 폐기(2026-09-26),
+    // watching(진행중, 음악 제외)은 실제 감상일 기준 세그먼트 여러 개로 펼침 — isAiring 개념 폐기,
     // 대신 모든 watching에 동일 적용. 연속 감상일만 이어붙이고, 하루라도 비면 별도 세그먼트(트랙 배치 대상 독립).
     // done/stopped는 기존과 완전히 동일하게 시작일~종료일 통짜 하나.
     let laid=[];
@@ -9460,7 +9448,7 @@ function renderContentTimeline(){
         }
         const dispEnd=Math.max(endD,dispStart);
         const span=dispEnd-dispStart+1,w=span*20+(span-1)*2;
-        // isAiring 개념 폐기(2026-09-26) — watching 세그먼트도 완결작과 동일한 ctl-block으로 그리되
+        // isAiring 개념 폐기 — watching 세그먼트도 완결작과 동일한 ctl-block으로 그리되
         // 사선 스트라이프(진행중 표시)만 얹음. 세그먼트는 laid 단계에서 이미 "실제 감상 구간"으로
         // 쪼개져 있으므로 여기서는 통짜 막대와 렌더링 로직 차이가 없음(문자열 잘림도 기존과 동일하게 ellipsis 처리).
         const block=document.createElement('div');block.className=`ctl-block ${cat}`;
@@ -9656,7 +9644,7 @@ function openContentModal(cat,item=null,mk=null,onSaved=null){
   // 수정(edit) 모드에서 기존에 저장된 값이 있으면 그대로 힌트로 표시하고, 검색해서 새로 선택하면 자동으로 덮어씀.
   _selectedTotalUnit=item?.totalUnit||null;
   renderCmProgressHint();
-  // 완결 콘텐츠라면 저장된 감상 요약을 모달 하단에 표시(방영중/isAiring 개념 폐기, 2026-09-26)
+  // 완결 콘텐츠라면 저장된 감상 요약을 모달 하단에 표시(방영중/isAiring 개념 폐기)
   renderCmWatchSummary(item);
   openModal('content-modal');setTimeout(()=>document.getElementById('cm-title').focus(),100);
 }
@@ -9766,7 +9754,7 @@ function confirmContent(){
     const reviewChanged=idx>=0&&review!==(oldContents[idx].review||'');
     const reviewSavedDk=review?(reviewChanged?dateKey(getLogicalDate()):(idx>=0?oldContents[idx].reviewSavedDk:null)):null;
     const reviewSavedTime=review?(reviewChanged?(String(new Date().getHours()).padStart(2,'0')+':'+String(new Date().getMinutes()).padStart(2,'0')):(idx>=0?oldContents[idx].reviewSavedTime:null)):null;
-    // 방금 완결(done/stopped)로 새로 전환된 경우에만 감상 요약을 1회 계산해 스냅샷 저장(2026-09-26).
+    // 방금 완결(done/stopped)로 새로 전환된 경우에만 감상 요약을 1회 계산해 스냅샷 저장.
     // 이미 완결 상태였다가 재수정하는 경우는 기존 값을 유지(재계산 안 함) — 되돌렸다 다시 완결하면 그때 새로 계산.
     const wasFinished=idx>=0&&isFinishedStatus(oldContents[idx].status);
     const nowFinished=isFinishedStatus(status);
@@ -9859,9 +9847,9 @@ function openContentProgressModal(cid,watchedNow,secondsWatched){
   _cpgDoneConfirmCid=null;_cpgDoneConfirmMk=null;
   openModal('content-progress-modal');
 }
-// 감상 메모 저장 공용 헬퍼 — contents 항목 자체의 notes[] 배열에 직접 저장(구 goal_notes/wcal_note 방식에서 통합, 2026-08-29).
+// 감상 메모 저장 공용 헬퍼 — contents 항목 자체의 notes[] 배열에 직접 저장(구 goal_notes/wcal_note 방식에서 통합).
 // cat: 콘텐츠 카테고리('movie'|'drama'|'book' 등) — 책도 여기 합류해 코멘트 모아보기 타임라인에 함께 노출됨(독서코너 자체엔 별도 노출 안 함).
-// replace=true면 기존 notes를 전부 지우고 이 한 건으로 교체(음악처럼 "곡당 메모 1개"만 유지하는 카테고리용, 2026-09-13).
+// replace=true면 기존 notes를 전부 지우고 이 한 건으로 교체(음악처럼 "곡당 메모 1개"만 유지하는 카테고리용).
 function pushContentNote(cid,title,cat,text,replace){
   const trimmed=(text||'').trim();
   const found=_findContentByCidNearMk(cid,_chArchiveMk||monthKey(new Date()));
@@ -9896,7 +9884,7 @@ function confirmContentProgress(){
   const beforeUnit=c.currentUnit||0;
   c.currentUnit=Math.max(0,Math.min(val,c.totalUnit||val));
   saveContents(found.mk,found.list);
-  // 감상달력 일자별 진행률 로그(content_daily_log) — 2026-09-11 독서 전용에서 책/드라마/영화 공용으로 확장.
+  // 감상달력 일자별 진행률 로그(content_daily_log) — 독서 전용에서 책/드라마/영화 공용으로 확장.
   // 기존 콘텐츠 이력은 소급 없이 오늘 이 저장 시점부터 새로 쌓임(독서와 동일한 amountRead=증가분 방식).
   const amountRead=Math.max(0,c.currentUnit-beforeUnit);
   const logUnit=c.cat==='drama'?'episode':'minute';
@@ -9962,12 +9950,12 @@ function confirmContentProgressDone(){
   renderCwatchMainCard();
 }
 // ══════════════════════════════════════════════════════════
-// ██ 즉시커밋 스톱워치 공용 팩토리 (2026-09-13 재설계) ██
+// ██ 즉시커밋 스톱워치 공용 팩토리 ██
 // ══════════════════════════════════════════════════════════
 // 독서(_sw*)/콘텐츠(_csw*) 스톱워치 공용 팩토리. 이전엔 "시작 시 상태만 세팅 → 60초 뒤 타이머로
-// 리듬블록 커밋(시작시각 소급등록)" 방식(2026-09-09j)이었으나, 60초 지연 구간에서 화면이 오래
-// 꺼졌다 켜지며 다른 sync 흐름과 겹치는 경합으로 content_cid가 누락되는 버그가 발견됨(2026-09-12
-// 밤). 지연 커밋 자체가 경합의 원인이라 판단해, 시작 즉시 리듬블록을 생성하는 방식으로 재설계.
+// 리듬블록 커밋(시작시각 소급등록)" 방식이었으나, 60초 지연 구간에서 화면이 오래
+// 꺼졌다 켜지며 다른 sync 흐름과 겹치는 경합으로 content_cid가 누락되는 버그가 발견됨
+// 지연 커밋 자체가 경합의 원인이라 판단해, 시작 즉시 리듬블록을 생성하는 방식으로 재설계.
 // 오탭 방지(짧으면 자동삭제) 기능은 넣지 않음 — 과거 "즉시생성+짧으면 자동삭제" 방식을 시도했다가
 // 생성 upsert와 삭제 요청이 sync에서 서로 경합해 삭제가 무효화(삭제한 게 되살아남)되는 문제로
 // 폐기된 이력이 있음. 오탭했다면 리듬탭에서 직접 스와이프 삭제(deleteRhythmBlock)하면 됨 — 자동
@@ -10038,7 +10026,7 @@ function createInstantCommitStopwatch(config){
     if(hasTicker){clearInterval(st.tickInterval);st.tickInterval=null;}
     if(persistKey)try{localStorage.removeItem(persistKey);}catch(e){}
     st.running=false;st.startTs=0;st.cid=null;st.blockCid=null;st.seconds=0;
-    // 오탭 방지 로직 없음(2026-09-13) — 몇 초를 했든 항상 end를 채워 정상 종료. 실수로 눌렀다면
+    // 오탭 방지 로직 없음 — 몇 초를 했든 항상 end를 채워 정상 종료. 실수로 눌렀다면
     // 리듬탭에서 직접 스와이프 삭제하면 됨(deleteRhythmBlock, 기존 UI 그대로). 예전에 "즉시생성+
     // 짧으면 자동삭제" 방식을 시도했다가 생성 upsert와 삭제 요청이 경합해 삭제가 무효화(되살아남)되는
     // 문제로 폐기된 이력이 있어, 자동삭제 자체를 다시 두지 않기로 함 — 오탭 처리를 사용자 수동
@@ -10063,7 +10051,7 @@ function createInstantCommitStopwatch(config){
       const saved=JSON.parse(raw);
       if(!saved||!saved.startTs||!saved.cid){
         // cid 없이 저장된 손상된 값이면 복원하지 않고 정리 — cid 없는 "진행중" 유령 상태로
-        // 복원되면 종료해도 리듬블록이 없어 아무 반응 없는 것처럼 보이는 UI 불일치가 생김(2026-09-13 보강).
+        // 복원되면 종료해도 리듬블록이 없어 아무 반응 없는 것처럼 보이는 UI 불일치가 생김.
         if(raw)try{localStorage.removeItem(persistKey);}catch(e){}
         return;
       }
@@ -10085,7 +10073,7 @@ function createInstantCommitStopwatch(config){
 // 스톱워치가 아닌 시작/종료 원탭 방식: 시작 탭에서 리듬블록을 end 없이 생성해두고,
 // 종료 탭에서 end를 채워 마감 + 진행률·메모 모달을 연다. 초단위 표시가 없어 setInterval/화면복귀 보정이 불필요해짐.
 const CSW_PERSIST_KEY='iikoto_content_watch_start';
-// [2026-09-13 재설계] 실제 상태는 팩토리(_cswSw.state)가 들고 있고, 아래 _csw* 전역들은
+// 실제 상태는 팩토리(_cswSw.state)가 들고 있고, 아래 _csw* 전역들은
 // 기존 호출부(1235, 5655, 9232~9267, 11041~11123줄 등)가 그대로 읽을 수 있도록 각 콜백
 // 시점에 동기화해주는 얕은 미러(mirror) 변수. 값의 소유자는 항상 _cswSw.state 쪽.
 let _cswRunning=false,_cswCid=null,_cswCat=null,_cswTitle=null,_cswMk=null,_cswStartTs=0,_cswBlockCid=null;
@@ -10137,10 +10125,10 @@ const _cswSw=createInstantCommitStopwatch({
     _cswSyncMirror(st);
     refreshContentHubViews();
     renderCwatchMainCard();
-    openContentProgressModal(info.cid,minutesWatched,info.seconds); // 2026-09-13: 시간 문턱 없이 항상 띄움(리듬블록도 항상 생성되므로 일관되게)
+    openContentProgressModal(info.cid,minutesWatched,info.seconds); // 시간 문턱 없이 항상 띄움(리듬블록도 항상 생성되므로 일관되게)
   }
 });
-// 시청 시작 확인 단계 — 포스터를 눌러 바로 스톱워치가 시작되면 실수 탭·연타 시 리듬 블록이 중복 생성될 위험이 있어(2026-09-01),
+// 시청 시작 확인 단계 — 포스터를 눌러 바로 스톱워치가 시작되면 실수 탭·연타 시 리듬 블록이 중복 생성될 위험이 있어,
 // 포스터 탭 → 그 작품 하나만 남은 확인 배너("시작" 버튼 포함) → 버튼을 눌러야 실제 시작되는 2단계로 분리.
 // 진행중(_cswRunning)일 때는 이 확인 단계를 거치지 않고 바로 종료로 이어짐(기존 동작 유지).
 let _cswPendingCid=null,_cswPendingMk=null;
@@ -10149,7 +10137,7 @@ let _cswPendingCid=null,_cswPendingMk=null;
 // ── 시청 시작 선택 시트 — 진행중 드라마/영화 중 골라 스톱워치 시작, 없으면 새로 등록 후 바로 시작 ──
 function _getOngoingWatchingWithCid(){
   return getRecentMonthsContents().filter(c=>c.status==='watching'&&(c.cat==='drama'||c.cat==='movie'))
-    .sort((a,b)=>(b.lastActivityAt||0)-(a.lastActivityAt||0)); // 최근 본 작품 우선노출(2026-09-09)
+    .sort((a,b)=>(b.lastActivityAt||0)-(a.lastActivityAt||0)); // 최근 본 작품 우선노출
 }
 function openWatchPicker(){
   const list=_getOngoingWatchingWithCid();
@@ -10170,8 +10158,8 @@ function openWatchPicker(){
 function openWatchNewContentPicker(){openSheet('watch-new-cat-sheet');}
 // 콘텐츠 코너 메인 상단 카드 — 독서코너 rd-top과 같은 급으로 상시 노출. 재생 중이면 실시간 경과시간+정지, 아니면 시작 유도.
 // 시작 전 상태는 두 단계: ①포스터 탭 → 그 작품 하나만 남기고 "시작" 버튼이 있는 확인 배너로 전환, ②버튼을 눌러야 실제 스톱워치 시작.
-// 포스터 자체엔 onclick으로 바로 시작을 걸지 않아 실수 탭·연타로 인한 리듬 블록 중복 생성을 원천 차단(2026-09-01).
-// 포스터/진행률바 HTML은 아래 두 헬퍼로 통일 — 시청중·선택됨·단일·병렬 4가지 상태가 각자 따로 만들던 동일 마크업을 하나로 묶음(2026-09-03 리팩터).
+// 포스터 자체엔 onclick으로 바로 시작을 걸지 않아 실수 탭·연타로 인한 리듬 블록 중복 생성을 원천 차단.
+// 포스터/진행률바 HTML은 아래 두 헬퍼로 통일 — 시청중·선택됨·단일·병렬 4가지 상태가 각자 따로 만들던 동일 마크업을 하나로 묶음.
 function _cswPosterHtml(c,size){
   size=size||52;
   const meta=CAT_ICON_META[c.cat]||CAT_ICON_META.drama;
@@ -10179,7 +10167,7 @@ function _cswPosterHtml(c,size){
     ?`<img class="rd-top-cover" src="${c.poster}" style="width:${size}px;height:${Math.round(size*76/52)}px;object-fit:cover;">`
     :`<div class="rd-top-cover" style="width:${size}px;height:${Math.round(size*76/52)}px;background:${meta.color};display:flex;align-items:center;justify-content:center;"><i class="ti ${meta.icon}" style="font-size:22px;color:#fff;" aria-hidden="true"></i></div>`;
 }
-// 진행률 데이터(totalUnit)가 없으면 null — 독서코너 _rdProgressBarHtml과 동일 규칙(2026-09-03).
+// 진행률 데이터(totalUnit)가 없으면 null — 독서코너 _rdProgressBarHtml과 동일 규칙.
 function _cswProgressBarHtml(c,compact){
   if(!c||!c.totalUnit)return null;
   const cur=Math.min(c.currentUnit||0,c.totalUnit);
@@ -10216,7 +10204,7 @@ function renderCwatchMainCard(){
     return;
   }
   // 확인 단계 — 포스터를 눌러 이 작품 하나가 선택된 상태. ongoing.length===1 카드와 동일한 모양으로 보여주되,
-  // 재생 링(cswRingSvg)만 실제 시작 트리거 — 포스터/제목 영역을 눌러도 아무 동작 없어 실수 시작을 방지(2026-09-01).
+  // 재생 링(cswRingSvg)만 실제 시작 트리거 — 포스터/제목 영역을 눌러도 아무 동작 없어 실수 시작을 방지.
   if(_cswPendingCid){
     const found=_findContentByCidNearMk(_cswPendingCid,_cswPendingMk||_chArchiveMk||monthKey(new Date()));
     const c=found?found.list[found.idx]:null;
@@ -10264,7 +10252,7 @@ function renderCwatchMainCard(){
   }else{
     el.innerHTML=`<div class="rd-top" style="margin-bottom:14px;"><div class="rd-top-inner">`+buildSwipeCardHtml(ongoing,c=>{
       // 1개일 때(위 ongoing.length===1 분기)와 동일한 마크업 그대로 재사용 — 스톱워치 링(cswRingSvg) 포함.
-      // 이전엔 별도 인라인 스타일로 새로 짜면서 스톱워치 링 자체가 누락되어 있었음(2026-09-09 수정).
+      // 이전엔 별도 인라인 스타일로 새로 짜면서 스톱워치 링 자체가 누락되어 있었음.
       const progressHtml=_cswProgressBarHtml(c)||'';
       return `<div class="rd-top-main" onclick="selectPendingWatch('${c.cid}','${c._mk}')" style="cursor:pointer;">
           ${_cswPosterHtml(c)}
@@ -10289,7 +10277,7 @@ function watchPickNewContentCat(cat){
   openContentModal(cat,null,monthKey(new Date()),function(newCid){toggleContentStopwatch(newCid,monthKey(new Date()));});
 }
 function minToHHMM(mins){mins=((mins%1440)+1440)%1440;const h=Math.floor(mins/60),m=mins%60;return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');}
-// [2026-09-09k 코드 정리] 독서/콘텐츠 스톱워치의 "60초 커밋" 로직이 리듬블록 생성 + 모닝플로우
+// 독서/콘텐츠 스톱워치의 "60초 커밋" 로직이 리듬블록 생성 + 모닝플로우
 // blockCid 연결 부분에서 거의 완전히 동일하게 중복돼 있던 것을 공용 헬퍼로 통합. 각 스톱워치는
 // 라벨 문구, 습관체크 여부, 최근활동 갱신 방식만 다르므로 그 차이는 옵션(opts)으로 받는다.
 // opts: {text, contentCid, dk, startMin, checkReadingHabit}
@@ -10300,7 +10288,7 @@ function _commitEnjoyRhythmBlock(opts){
   const blocks=getRhythmBlocks(dk);
   blocks.push({cat:'enjoy',start:minToHHMM(startMin),end:'',text,created:Date.now(),cid:blockCid,contentCid});
   saveRhythmBlocks(dk,blocks); // saveRhythmBlocks 내부에서 이미 autoSync('rblocks',dk) 호출 — 중복 호출 금지
-  // 안전장치(2026-09-13): cid 없이 감상 리듬블록이 커밋되는 경우는 정상 흐름에선 없어야 하나,
+  // 안전장치: cid 없이 감상 리듬블록이 커밋되는 경우는 정상 흐름에선 없어야 하나,
   // 혹시라도 재발하면 조용히 묻히지 않도록 눈에 띄게 남김. 블록 자체는 그대로 생성해 감상시간
   // 데이터는 보존(삭제/차단하지 않음) — 다만 콘텐츠 연동만 못 하는 상태로 남는 걸 감지하기 위함.
   if(!contentCid){
@@ -10328,7 +10316,7 @@ function stopContentStopwatch(){_cswSw.stop();}
 // 새로고침·앱 재시작으로 메모리 상태가 초기화돼도 시청중 표시를 이어감(초단위 표시가 없어 setInterval 재개는 불필요)
 _cswSw.restoreFromStorage();
 // 콘텐츠 등록/수정(cat='book') 직후 독서코너 진행률 초기값을 세팅. 이제 book이 곧 contents 항목이므로
-// cid로 직접 찾아 반영 — title 매칭을 없애 연결 끊김 버그 클래스를 원천 차단(2026-08-29).
+// cid로 직접 찾아 반영 — title 매칭을 없애 연결 끊김 버그 클래스를 원천 차단.
 // status: 'done'|'stopped'|그 외(진행중) → book.status: 'done'|'paused'|'reading'
 function syncContentToReadingBook(cid,title,status,poster,author,mk,unit,totalPages){
   const STATUS_MAP={done:'done',stopped:'paused'};
@@ -10350,7 +10338,7 @@ function syncContentToReadingBook(cid,title,status,poster,author,mk,unit,totalPa
   saveContents(found.mk,found.list);
 }
 // 콘텐츠 삭제 시 그 작품을 가리키던 리듬 블록(cat='enjoy', contentCid로 연결)도 함께 정리 —
-// 콘텐츠만 지우고 리듬 블록을 그대로 두면 감상달력·아카이브 등 리듬 기반 조회에 고아 데이터로 계속 남는 문제가 있었음(2026-09-01).
+// 콘텐츠만 지우고 리듬 블록을 그대로 두면 감상달력·아카이브 등 리듬 기반 조회에 고아 데이터로 계속 남는 문제가 있었음.
 // startDate~endDate(또는 없으면 created 기준 앞뒤 여유) 범위만 순회 — 콘텐츠가 걸쳐있을 수 있는 날짜만 확인해 불필요한 전체 스캔 방지.
 function deleteRhythmBlocksByContentCid(cid,startDate,endDate){
   if(!cid)return;
@@ -10379,7 +10367,7 @@ function deleteContent(){
     addDelPending('contents',mk,deletedItem.cid);
     contents.splice(idx,1);
     if(deletedItem.cid)deleteRhythmBlocksByContentCid(deletedItem.cid,deletedItem.startDate,deletedItem.endDate);
-    // book 카테고리도 이 항목 자체가 book이므로(2026-08-29 통합) 별도 삭제 불필요 — contents.splice로 이미 끝남
+    // book 카테고리도 이 항목 자체가 book이므로 별도 삭제 불필요 — contents.splice로 이미 끝남
   }
   saveContents(mk,contents);closeModal('content-modal');renderContentTimeline();
 }
@@ -10584,15 +10572,15 @@ function hideApiResults(){const el=document.getElementById('api-results');if(el)
 // ██ 월간탭 (3/3 — 나머지는 MONTHLY REPORT 부근, API SEARCH 부근) — HABIT MONTHLY/CALENDAR/MONTHLY STAT BAR ██
 // ══════════════════════════════════════════════════════════
 // ── HABIT MONTHLY
-// [2026-09-06] 습관마다 실제 "추적 중이던 기간"만 체크 대상으로 보고, 그 밖의 날짜(시작 전/일시중단/archive 이후)는
+// 습관마다 실제 "추적 중이던 기간"만 체크 대상으로 보고, 그 밖의 날짜(시작 전/일시중단/archive 이후)는
 // 비활성 칸으로 표시 — 온오프를 몇 번 반복하든 그리드가 항상 정직하게 실제 추적 여부만 보여줌.
-// [2026-09-06 개선] createdAt/archivedAt 단일 값 방식은 재활성화할 때마다 과거 활성 구간(과거 createdAt)이
+// createdAt/archivedAt 단일 값 방식은 재활성화할 때마다 과거 활성 구간(과거 createdAt)이
 // 통째로 덮어써져 사라지는 문제가 있었음(예: 6월부터 하던 습관을 9월에 껐다 10월에 다시 켜면, 6~9월 실적이
 // 통계에서 빠져버림) — periods(구간 배열, [{start,end}], end:null=진행중)로 전환해 온오프를 반복해도
 // 각 활성 구간이 독립적으로 누적 보존되도록 함. 구버전 createdAt/archivedAt만 있는 습관은 폴백으로 처리.
 function _habitPeriods(h){
   if(h.periods&&h.periods.length)return h.periods;
-  // [2026-09-06 폴백 보강] createdAt(start)이 없어도 archivedAt(end)만 있는 경우를 놓치면
+  // createdAt(start)이 없어도 archivedAt(end)만 있는 경우를 놓치면
   // "구간 정보 없음"으로 오판되어 무조건 활성 처리됨 — start 없이 end만 있어도 폴백 구간을 만든다.
   if(h.createdAt||h.archivedAt)return [{start:h.createdAt||null,end:h.archivedAt||null}];
   return [];
@@ -10600,13 +10588,13 @@ function _habitPeriods(h){
 function _isHabitActiveOn(h,dk){
   const periods=_habitPeriods(h);
   if(!periods.length)return true; // 구간 정보가 아예 없으면(아주 오래된 데이터) 항상 활성으로 간주
-  // [2026-09-06 경계 수정] end에는 "비활성화한 당일"(_applyHabitToggle에서 today로 기록)이 저장되므로,
+  // end에는 "비활성화한 당일"(_applyHabitToggle에서 today로 기록)이 저장되므로,
   // end 당일부터는 비활성으로 쳐야 함 — dk<p.end (당일 미포함)로 판정. 이전엔 dk<=p.end라 종료 당일까지
   // 활성으로 잘못 포함되어(달성률 분모/월간 캘린더 모두) 비활성화 당일 하루가 통계에 남아있었음.
   return periods.some(p=>(!p.start||dk>=p.start)&&(!p.end||dk<p.end));
 }
 function renderHabitMonthly(){
-  const habits=getActiveHabits(),y=_calYear,mo=_calMonth; // 2026-09-06: archive(목록에서 제외)한 습관은 월간에서도 노출 안 함
+  const habits=getActiveHabits(),y=_calYear,mo=_calMonth; // archive(목록에서 제외)한 습관은 월간에서도 노출 안 함
   const dim=new Date(y,mo+1,0).getDate();
   const el=document.getElementById('habit-monthly');if(!el)return;
   el.innerHTML='';
@@ -10691,7 +10679,7 @@ async function syncMonthRange(y,mo){
   }
   if(tRows){
     const byDate={};
-    // 2026-09-30: todoRowToLocal 공용 함수로 통합(필드 누락 버그 방지) + 캘린더 전용 캐시(cal_todos_cache_*)로
+    // todoRowToLocal 공용 함수로 통합(필드 누락 버그 방지) + 캘린더 전용 캐시(cal_todos_cache_*)로
     // 저장처 분리. 예전엔 여기서 정식 todos_* 자리를 직접 덮어써서, 오늘탭이 쓰는 저장소와 캘린더가
     // 경쟁하며 서로 다른 시점에 서로 다른 완성도로 같은 자리를 채우는 구조였다(반복투두가 일시적으로
     // 풀려 보이던 버그의 근본 원인). 캘린더 미리보기(칸의 배지/막대)는 이제 이 캐시만 읽고, 오늘탭이
@@ -10835,7 +10823,7 @@ function renderCalendar(){
       const cdk=cellDkOf(cellIdx); // 이 칸의 실제 날짜(전달/다음달 칸이면 그쪽 날짜)
       const numLabel=inMonth?d:parseInt(cdk.slice(8,10),10);
       // 1일 앞·말일 뒤 남는 칸: 전달/다음달 날짜를 흐리게 표시하고 일정(배지/막대)도 함께 노출하되,
-      // 칸 자체는 클릭 불가(기록·상세는 그 달로 이동해서 보도록) — 일정 배지는 자체 클릭으로 열림(2026-09-19)
+      // 칸 자체는 클릭 불가(기록·상세는 그 달로 이동해서 보도록) — 일정 배지는 자체 클릭으로 열림
       const isToday2=inMonth&&today.getFullYear()===y&&today.getMonth()===mo&&today.getDate()===d;
       const isSel=inMonth&&_calSelectedDay===d;
       let cls='cal-day';if(!inMonth)cls+=' other-month';if(isToday2)cls+=' today';if(isSel)cls+=' selected';if(hasRecord[d])cls+=' has-record';if(hasPending[d])cls+=' has-pending';
@@ -10884,7 +10872,7 @@ function calDayClick(d){
   renderCalendar();
   if(!_calSelectedDay){const el=document.getElementById('cal-detail');if(el)el.innerHTML='';}
 }
-// 하루 상세 HTML 생성 — 월간탭(renderCalDetail)에서 사용. [2026-09-06] 밀도의 숲 기능 완전 제거로 공유 대상이던 makeDaySummaryEl도 함께 삭제됨.
+// 하루 상세 HTML 생성 — 월간탭(renderCalDetail)에서 사용.
 function buildDayDetailHtml(dk){
   const allMemos=getMemos(dk);const todos=getTodos(dk);const doneTodos=todos.filter(t=>t.done);const sleep=getSleep(dk);
   const meals=getMeals(dk);
@@ -10990,7 +10978,7 @@ function renderCalDetail(d){
   setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'nearest'}),100);
 }
 // 완료/예정 투두 펼침 토글 공용 헬퍼 — rowsPrefix/summaryPrefix의 DOM id 규칙과 label만 다르고
-// 나머지 로직은 동일해 통합(2026-09-11 중복 제거).
+// 나머지 로직은 동일해 통합.
 // dk 날짜의 미완료 투두를 "시간표(텍스트에 HH:MM 있음, 시간순) → 시간대 미설정 투두(오전/오후/저녁/미정 순)"로 정렬해 표시용 배열 반환
 const _CAL_TS_ORDER={morning:0,afternoon:1,night:2,none:3};
 function _calSortPendingTodos(todos){
@@ -11222,9 +11210,9 @@ function recordMealTime(dk,k){
   const now=new Date();
   patchMealField(dk,k,'time',`${pad(now.getHours())}:${pad(now.getMinutes())}`);
 }
-// [2026-09-06] 카탈로그 도입으로 4색→7색 확장(lavender/orange/warmgray 추가) — 각 팔레트는 index.html의
+// 카탈로그 도입으로 4색→7색 확장(lavender/orange/warmgray 추가) — 각 팔레트는 index.html의
 // --pal-*-bg/text/border 변수가 실제로 존재하는 것만 사용(peach는 존재하지 않아 orange로 대체).
-// [2026-09-06] 습관 색상을 리듬 카테고리와 통일하며 lime 추가(정리↔리듬home). mint는 더 이상 습관에서 안 쓰지만
+// 습관 색상을 리듬 카테고리와 통일하며 lime 추가(정리↔리듬home). mint는 더 이상 습관에서 안 쓰지만
 // 매핑 자체는 남겨둠(과거 데이터 호환 — 예전에 mint로 저장된 커스텀 습관이 있을 수 있음).
 const HABIT_COLOR_BG={mint:'var(--pal-mint-bg)',pink:'var(--pal-pink-bg)',sky:'var(--pal-sky-bg)',yellow:'var(--pal-yellow-bg)',lavender:'var(--pal-lavender-bg)',orange:'var(--pal-orange-bg)',warmgray:'var(--pal-warmgray-bg)',lime:'var(--pal-lime-bg)'};
 const HABIT_COLOR_TEXT={mint:'var(--pal-mint-text)',pink:'var(--pal-pink-text)',sky:'var(--pal-sky-text)',yellow:'var(--pal-yellow-text)',lavender:'var(--pal-lavender-text)',orange:'var(--pal-orange-text)',warmgray:'var(--pal-warmgray-text)',lime:'var(--pal-lime-text)'};
@@ -11284,10 +11272,10 @@ function loadDaily(){
 // 주간탭 리듬 취합 — 월간 리포트와 동일한 방식(카테고리별 누적시간 비율 막대 + 상위 항목 리스트)으로 간소화.
 // 기존엔 7일치 가로 시간축 바 + 요일별 흐름보기가 있었으나, 그 상세 조회는 아카이브앱으로 이관하고
 // 본앱엔 "이번주 어디에 시간을 많이 썼는지"만 가볍게 보여주는 요약 + 오늘 리듬 입력 진입점만 남김
-// (2026-09-08 간소화 — computeRhythmSegsForDay/renderRhythmBarHtml/흐름보기 등 시간축 계산 로직 전량 제거).
+// (computeRhythmSegsForDay/renderRhythmBarHtml/흐름보기 등 시간축 계산 로직 전량 제거).
 // 최근 7일(오늘 포함) 카테고리별 누적시간+발생일수 — getDayCategoryDurations(기존 공용 유틸)를 7일 돌며 합산.
 // 수면/식사는 buildMonthlyRhythmBar 쪽에서 이미 활동 카테고리(RHYTHM_CATS)만 추리므로 자동 제외됨.
-// 기존엔 월~오늘(주초반엔 표본이 1~2일뿐)이었으나, 홈탭 오늘의 흐름 인사이트와 동일하게 항상 최근 7일 고정 윈도우로 통일(2026-09-08).
+// 기존엔 월~오늘(주초반엔 표본이 1~2일뿐)이었으나, 홈탭 오늘의 흐름 인사이트와 동일하게 항상 최근 7일 고정 윈도우로 통일.
 // dayCount(카테고리별 실제 발생일수)는 computeRawStatsForRange(월간리포트)와 동일 기준(dd[k]>0인 날만 카운트)으로 별도 집계 — 이게 없으면 buildMonthlyRhythmBar의 일평균이 누계와 같아짐.
 function computeWeeklyRhythmDur(){
   const start=new Date();start.setDate(start.getDate()-6); // 오늘 포함 최근 7일
@@ -11409,7 +11397,7 @@ function renderWeeklyHabitBox(){
       const dDate=new Date(mon);dDate.setDate(mon.getDate()+d);
       const dDk=dateKey(dDate);
       const isVac=isVacationDate(dDk);
-      const on=!!checks[h.id+'-'+d]; // 오프 날도 체크 기록이 있으면 색은 보여줌(월간 히트맵과 동일) — 단 흐리게 표시하고 카운트·분모에서는 제외(2026-10-01)
+      const on=!!checks[h.id+'-'+d]; // 오프 날도 체크 기록이 있으면 색은 보여줌(월간 히트맵과 동일) — 단 흐리게 표시하고 카운트·분모에서는 제외
       if(isVac)offCnt++;else if(on)cnt++;
       const isToday=d===todayDow;
       const borderColor=on?rgbaBorder:'rgba(var(--divider-rgb),0.5)';
@@ -11692,9 +11680,10 @@ function openSettings(){
   refreshPushStatusUI();
   renderSettingsAlertSection();
   _syncBirthdaySelects();
+  document.querySelectorAll('.settings-sec.open').forEach(e=>e.classList.remove('open')); // 열 때마다 모든 섹션 접힌 상태로
   document.getElementById('settings-ov').classList.add('on');
 }
-// 설정탭 알림 시각 3종(아침브리핑/저녁마무리/남은할일) + 개별 온오프 6종 UI — user_settings를 직접 조회해 채움.
+// 설정탭 알림 시각(아침브리핑) + 개별 온오프 UI — user_settings를 직접 조회해 채움.
 // 전체 push 구독이 꺼져있으면(getExistingPushSubscription 없음) 개별 토글은 값 유지한 채 시각적으로만 비활성화.
 // ALERT_TIME_FIELD_MAP/ALERT_ENABLED_FIELD_MAP은 렌더링과 토글 양쪽에서 쓰여 아래 공용 상수로 뽑음(중복 정의 제거).
 const ALERT_TIME_FIELD_MAP={morning:'morning_briefing_time'};
@@ -11719,14 +11708,9 @@ async function renderSettingsAlertSection(){
   const remainEl=document.getElementById('question-remaining-lbl');
   if(remainEl)supaFetch('rpc/count_available_memo_prompts','POST',{}).then(n=>{remainEl.textContent=(typeof n==='number')?`${n}개`:'-';});
 }
+// 설정탭 섹션 접기/펼치기 — #sec-<id>에 open 클래스를 토글(index.html.settings-sec). 설정을 열 때마다 모두 접힌 상태로 시작.
+function toggleSettingsSection(id){const el=document.getElementById('sec-'+id);if(el)el.classList.toggle('open');}
 // 아코디언 헤더 클릭 — 알림 섹션에 우선 적용, 추후 다른 설정 카드에도 같은 id 규칙(settings-acc-<key>)으로 재사용 예정.
-function toggleSettingsAccordion(key){
-  const body=document.getElementById('settings-acc-'+key);
-  const header=body&&body.previousElementSibling;
-  if(!body)return;
-  body.classList.toggle('open');
-  if(header)header.classList.toggle('open');
-}
 // 개별 알림 온오프 토글 — 전체 push가 꺼져있으면(비활성 표시 상태) 클릭 무시.
 async function toggleAlertEnabled(kind){
   const toggle=document.getElementById('alert-toggle-'+kind);
@@ -11746,12 +11730,12 @@ function openAlertTimePickerFor(kind){
   openModal('time-modal');
   renderTimeWheel();
 }
-// [2026-09-06 저장버튼 도입] "항목 선택" 칩은 탭 즉시 실제 저장(saveHabits)하지 않고, 이 임시 배열(_habitEditDraft)만
+// "항목 선택" 칩은 탭 즉시 실제 저장(saveHabits)하지 않고, 이 임시 배열(_habitEditDraft)만
 // 바꾼 뒤 화면만 다시 그림 — 실수로 잘못 누른 칩이 바로 서버까지 반영되던 문제를 막고, "저장" 버튼을 눌러야만
 // 실제 반영+동기화(saveHabits)가 실행되도록 해서 한 번 더 확인할 기회를 줌.
 let _habitEditDraft=null;
 function _resetHabitEditDraft(){_habitEditDraft=getHabits().map(h=>({...h,periods:_habitPeriods(h).map(p=>({...p}))}));}
-// [2026-09-05] 설정탭 해빗 코너 — 카탈로그 칩(토글) + 직접입력 습관 + 아침기상 목표시각.
+// 설정탭 해빗 코너 — 카탈로그 칩(토글) + 직접입력 습관 + 아침기상 목표시각.
 // 기존에 오늘탭 하단에 있던 "+ 항목 편집"(habit-modal, 줄바꿈 텍스트박스) 방식을 완전히 대체.
 function renderSettingsHabitSection(){
   const chipsWrap=document.getElementById('settings-habit-catalog-chips');
@@ -11786,7 +11770,7 @@ function renderSettingsHabitSection(){
     saveBtn.textContent=dirty?'저장 (변경사항 있음)':'저장됨';
   }
 }
-// [2026-09-06 periods 전환] 활성/비활성 전환 시 구간 배열에 push/close만 하는 공용 헬퍼.
+// 활성/비활성 전환 시 구간 배열에 push/close만 하는 공용 헬퍼.
 // 이미 열린 구간이 있는데 또 켜기(중복 시작) / 이미 닫힌 상태인데 또 끄기(중복 종료) 시도는
 // 조용히 무시 — 더블탭 등 실수로 같은 토글이 연속 호출돼도 구간이 꼬이지 않도록 방어.
 // 같은 날 안에서 껐다가 다시 켜는 것(오전 끄기→오후 켜기)은 정상 케이스로 허용 — 이 경우 하루짜리
@@ -11803,7 +11787,7 @@ function _applyHabitToggle(h){
   const {createdAt,archivedAt,...rest}=h; // 구버전 필드는 정리(더 이상 이중 관리 안 함)
   return {...rest,periods};
 }
-// 카탈로그 칩 토글 — [2026-09-06 저장버튼 도입] 이제 실제 저장은 하지 않고 _habitEditDraft만 변경.
+// 카탈로그 칩 토글 — 이제 실제 저장은 하지 않고 _habitEditDraft만 변경.
 // 이미 등록돼 있으면(archive 여부 무관) 있는/없는 상태를 뒤집고, 아예 처음 켜는 것이면 카탈로그 정의로 새로 추가.
 function toggleCatalogHabit(catalogId){
   if(!_habitEditDraft)_resetHabitEditDraft();
@@ -11824,7 +11808,7 @@ function toggleCustomHabit(habitId){
   _habitEditDraft[idx]=_applyHabitToggle(_habitEditDraft[idx]);
   renderSettingsHabitSection();
 }
-// [2026-09-06] "저장" 버튼 — 여기서만 실제 saveHabits(서버 동기화 포함)가 실행됨.
+// "저장" 버튼 — 여기서만 실제 saveHabits(서버 동기화 포함)가 실행됨.
 // 칩을 아무리 눌러도 이 버튼을 눌러야 확정되므로, 실수로 잘못 누른 칩은 설정탭을 그냥 닫으면(재진입 시
 // _resetHabitEditDraft로 초기화됨) 아무 영향 없이 취소됨.
 function saveHabitEdits(){
@@ -11897,7 +11881,7 @@ let _rdOpenCid=null;
 let _rdDoneQuoteBookCid=null;
 let _rdDoneCommentBookCid=null;
 let _rdSheetBookCid=null;
-// [2026-09-13 재설계] 실제 상태는 팩토리(_swSw.state)가 들고 있고, 아래 _sw* 전역들은
+// 실제 상태는 팩토리(_swSw.state)가 들고 있고, 아래 _sw* 전역들은
 // 기존 호출부(2068, 5654, 11093~11322, 11756, 13082, 13200~13210줄 등)가 그대로 읽을 수 있도록
 // 각 콜백 시점에 동기화해주는 얕은 미러(mirror) 변수. 값의 소유자는 항상 _swSw.state 쪽.
 // (콘텐츠 스톱워치 _cswSw와 동일한 팩토리 재사용 — createInstantCommitStopwatch 정의부 참조)
@@ -11953,7 +11937,7 @@ const _swSw=createInstantCommitStopwatch({
     _swSyncMirror(st);
     renderRdTop();
     renderRdQuotes(); // 스톱워치 종료로 선택 대상이 바뀌므로(1권이면 그 책, 2권 이상이면 재선택 대기) 문장수집도 함께 갱신
-    openProgressModal(info.cid,info.seconds); // 2026-09-13: 시간 문턱 없이 항상 띄움(리듬블록도 항상 생성되므로 일관되게)
+    openProgressModal(info.cid,info.seconds); // 시간 문턱 없이 항상 띄움(리듬블록도 항상 생성되므로 일관되게)
   },
   onRestored:function(st,saved){
     st.title=saved.title||'';
@@ -11972,9 +11956,9 @@ function openReading(){
 }
 function closeReading(){
   document.getElementById('reading-ov').classList.remove('on');
-  _rdPendingCid=null; // 코너를 나가면 선택 상태 초기화 — 다시 들어오면 병렬 카드가 미선택 상태로 시작(2026-09-03)
+  _rdPendingCid=null; // 코너를 나가면 선택 상태 초기화 — 다시 들어오면 병렬 카드가 미선택 상태로 시작
 }
-// 코너 상단 "독서" 라벨 탭 — 나갔다 들어오지 않아도 바로 선택 초기화(2026-09-03). 스톱워치 진행중일 땐 무의미하므로 무시.
+// 코너 상단 "독서" 라벨 탭 — 나갔다 들어오지 않아도 바로 선택 초기화. 스톱워치 진행중일 땐 무의미하므로 무시.
 function resetReadingSelection(){
   if(_swRunning)return;
   _rdPendingCid=null;
@@ -12000,9 +11984,9 @@ function openContentHub(){
 }
 function closeContentHub(){
   document.getElementById('content-hub-ov').classList.remove('on');
-  _cswPendingCid=null;_cswPendingMk=null; // 코너를 나가면 선택 상태 초기화 — 다시 들어오면 병렬 카드가 미선택 상태로 시작(2026-09-03)
+  _cswPendingCid=null;_cswPendingMk=null; // 코너를 나가면 선택 상태 초기화 — 다시 들어오면 병렬 카드가 미선택 상태로 시작
 }
-// 코너 상단 "콘텐츠" 라벨 탭 — 나갔다 들어오지 않아도 바로 선택 초기화(2026-09-03). 스톱워치 진행중일 땐 무의미하므로 무시.
+// 코너 상단 "콘텐츠" 라벨 탭 — 나갔다 들어오지 않아도 바로 선택 초기화. 스톱워치 진행중일 땐 무의미하므로 무시.
 function resetContentWatchSelection(){
   if(_cswRunning)return;
   _cswPendingCid=null;_cswPendingMk=null;
@@ -12056,7 +12040,7 @@ function restoreStopwatchUI(){
 }
 // running=true(이미 이 책으로 스톱워치가 도는 중)면 시작 즉시 재생 상태로 그림 — restoreStopwatchUI가 다시 덧씌움.
 // gradient id는 cid로 유일하게 만듦 — 두 슬라이드가 동시에 렌더되면 <linearGradient id="rdSwGrad">가
-// 중복되어 두 번째 인스턴스의 렌더링이 깨지는 문제가 있었음(2026-09-09d). rd-sw-ring-wrap 등은 다른
+// 중복되어 두 번째 인스턴스의 렌더링이 깨지는 문제가 있었음. rd-sw-ring-wrap 등은 다른
 // 코드에서 getElementById로 참조하므로, 실제 running인 인스턴스에만 부여.
 function swRingSvg(cid,running){
   const gradId=`rdSwGrad-${cid}`;
@@ -12092,7 +12076,7 @@ function cswRingSvg(cid,mk,running){
 // <div class="rd-top-inner">이 함수 호출 결과</div></div>로 직접 감쌈). 도트는 패널 위가 아니라
 // 아래(진행률바 밑)에 둬서, 바깥 그라데이션 테두리(.rd-top)가 도트까지 포함해 위로 튀어나오지 않고
 // 카드 하나만 딱 감싸도록 함(1개일 때와 동일한 테두리 모양 유지).
-// 구조 재설계(2026-09-09e): 스와이프+트랙+transform 방식(및 그 이전의 scroll-snap 방식)을 완전히
+// 구조 재설계: 스와이프+트랙+transform 방식(및 그 이전의 scroll-snap 방식)을 완전히
 // 버리고 도트 탭 전환 방식으로 교체. 두 슬라이드가 같은 트랙에 나란히 존재하는 구조 자체가 트랙 폭
 // 계산이나 클리핑 경계에서 반복적으로 렌더링 아티팩트(옆 카드 경계가 새어나오는 세로줄)를 일으켜서,
 // 그 구조를 없앰 — 각 슬라이드는 완전히 독립된 블록이고 항상 1개만 display:block, 나머지는
@@ -12108,11 +12092,11 @@ function buildSwipeCardHtml(items,buildSingleHtml){
   </div>`;
 }
 // 렌더 직후 호출 — 도트 영역 어디를 눌러도(작은 점 하나를 정확히 노리지 않아도) 다음 슬라이드로
-// 순환 전환. 개별 도트 클릭 판정 대신 .sw-card-dots 전체를 탭 영역으로 씀(2026-09-09f).
+// 순환 전환. 개별 도트 클릭 판정 대신.sw-card-dots 전체를 탭 영역으로 씀.
 // onChange(idx) 콜백은 슬라이드가 바뀔 때마다 호출됨 — 독서허브처럼 "지금 보이는 카드"를 다른
 // 영역(문장수집 등)이 함께 참조하는 경우, 이 콜백에서 그 상태를 갱신해야 함. 이전엔 도트 전환이
 // display만 바꾸고 아무 콜백이 없어서, 카드로는 책이 넘어가도 문장수집은 이전 책 기준에 멈춰있는
-// 불일치가 있었음(2026-09-09 오류 리포트).
+// 불일치가 있었음.
 function bindSwipeCard(wrapId,onChange){
   const wrap=document.getElementById(wrapId)?.querySelector('.sw-card');
   if(!wrap)return;
@@ -12139,9 +12123,9 @@ function bindSwipeCard(wrapId,onChange){
 // 진행중(status==='reading') 책 목록 — 콘텐츠의 _getOngoingWatchingWithCid와 동일한 역할.
 function _getOngoingReadingWithCid(){
   return getBooks().filter(b=>b.status==='reading'&&b.cid)
-    .sort((a,b)=>(b.lastActivityAt||0)-(a.lastActivityAt||0)); // 최근 활동한 책 우선노출(2026-09-09)
+    .sort((a,b)=>(b.lastActivityAt||0)-(a.lastActivityAt||0)); // 최근 활동한 책 우선노출
 }
-// 진행률 바 + 오늘 읽은 구간 표시 — 여러 책에서 반복 쓰이므로 분리(2026-09-03, 병렬독서 지원 리팩터).
+// 진행률 바 + 오늘 읽은 구간 표시 — 여러 책에서 반복 쓰이므로 분리.
 // 진행률 데이터(퍼센트 단위이거나 총 페이지가 있음)가 없으면 null 반환 — 콘텐츠 코너(totalUnit 없으면 문구 폴백)와 동일한 규칙.
 function _rdProgressBarHtml(book){
   const hasData=book.unit==='percent'||!!book.totalPages;
@@ -12184,7 +12168,7 @@ let _rdPendingCid=null;
 function selectPendingRead(cid){
   _rdPendingCid=cid;
   renderRdTop();
-  renderRdQuotes(); // 병렬독서 중 선택 대상이 바뀌면 문장수집도 그 책 기준으로 갱신(2026-09-03)
+  renderRdQuotes(); // 병렬독서 중 선택 대상이 바뀌면 문장수집도 그 책 기준으로 갱신
 }
 // 지금 화면(rd-top)에 표시 중인 "선택된 책" 하나를 반환 — 문장수집 등 다른 영역도 이 기준을 그대로 따름.
 // 우선순위: 스톱워치 진행중인 책 > 방금 선택(pending)한 책 > 진행중인 책이 1권뿐이면 그 책 > 없음(2권 이상인데 아직 선택 안 함).
@@ -12223,16 +12207,16 @@ function renderRdTop(){
   }else if(ongoing.length===1){
     el.innerHTML=_rdTopSingleHtml(ongoing[0],false);
   }else{
-    // 콘텐츠허브(renderCwatchMainCard)와 동일 패턴: 바깥을 .rd-top-inner로 한 번만 감싸고,
-    // 슬라이드에는 카드 내용물(_rdTopInnerBodyHtml, .rd-top-inner 껍데기 제외)만 넣음 — 이렇게 해야
+    // 콘텐츠허브(renderCwatchMainCard)와 동일 패턴: 바깥을.rd-top-inner로 한 번만 감싸고,
+    // 슬라이드에는 카드 내용물(_rdTopInnerBodyHtml,.rd-top-inner 껍데기 제외)만 넣음 — 이렇게 해야
     // 도트가 카드 안쪽(진행률바 밑)에 들어가고 바깥 그라데이션 테두리가 1개일 때와 똑같이 카드 하나만
-    // 딱 감싸게 됨(이전엔 _rdTopSingleHtml 전체를 슬라이드에 넣어 .rd-top-inner가 중첩되며 테두리가
-    // 도트까지 포함해 위로 튀어나오는 문제가 있었음, 2026-09-09 재수정).
+    // 딱 감싸게 됨(이전엔 _rdTopSingleHtml 전체를 슬라이드에 넣어.rd-top-inner가 중첩되며 테두리가
+    // 도트까지 포함해 위로 튀어나오는 문제가 있었음).
     el.innerHTML=`<div class="rd-top-inner">`+buildSwipeCardHtml(ongoing,book=>{
       return `<div onclick="selectPendingRead('${book.cid}')" style="cursor:pointer;">${_rdTopInnerBodyHtml(book,false)}</div>`;
     })+`</div>`;
     // 도트로 슬라이드가 바뀔 때마다 그 책을 "선택된 책"으로 반영 — 이전엔 이 콜백이 없어서 도트로
-    // 카드는 넘어가도 문장수집(renderRdQuotes)이 이전 책 기준에 멈춰있는 불일치가 있었음(2026-09-09).
+    // 카드는 넘어가도 문장수집(renderRdQuotes)이 이전 책 기준에 멈춰있는 불일치가 있었음.
     bindSwipeCard('rd-top',idx=>{
       const book=ongoing[idx];
       if(book){_rdPendingCid=book.cid;renderRdQuotes();}
@@ -12249,7 +12233,7 @@ function renderRdQuotes(){
   const listEl=document.getElementById('rd-quote-list');if(!listEl)return;
   const foldEl=document.getElementById('rd-quote-fold');
   const cur=_rdSelectedBook();
-  // cur가 null인 경우는 두 가지를 반드시 구분해야 함(2026-09-09 오류 리포트: "책이 바뀌면 문장수집이
+  // cur가 null인 경우는 두 가지를 반드시 구분해야 함(오류 리포트: "책이 바뀌면 문장수집이
   // 연결 안 된다"는 문제가 실은 이 두 경우가 똑같이 빈 목록으로 보여서 데이터가 날아간 것처럼
   // 오인되게 만들었음) — ①진행중인 책이 아예 없음 ②진행중인 책이 2권 이상인데 아직 카드에서
   // 선택하지 않음(_rdSelectedBook 우선순위 규칙상 이 경우 의도적으로 null). ②는 데이터 유실이
@@ -12535,7 +12519,7 @@ function estimateRemainingReadingSessions(book,sessionCount){
   return {sessions,ready:true,remainingSessions};
 }
 // book에 연결된 contents 항목(startDate/endDate)을 찾아 읽는중="며칠째", 다읽음="며칠간" 문구를 만듦.
-// 통합 이후(2026-08-29) book은 항상 contents 항목이므로 cid로 직접 찾음.
+// 통합 이후 book은 항상 contents 항목이므로 cid로 직접 찾음.
 function getBookDurationLabel(book){
   const found=_findContentByCidNearMkInRange(book.cid,_BOOK_SCAN_MONTHS);
   const item=found?found.list[found.idx]:null;
@@ -12614,13 +12598,13 @@ function setBookStatus(cid,status,review){
   book.status=status;
   if(status==='done')book.completedAt=dateKey(new Date());
   if(review){book.stars=review.stars||0;book.review=review.review||'';}
-  upsertBookLocal(book); // book이 곧 contents 항목이므로 이 호출 하나로 contents 반영까지 끝남(2026-08-29, 구 syncReadingBookToContent 제거)
+  upsertBookLocal(book); // book이 곧 contents 항목이므로 이 호출 하나로 contents 반영까지 끝남(구 syncReadingBookToContent 제거)
   renderReadingHub();
   renderContentTimeline();
 }
 function removeBook(cid){
   if(_rdOpenCid===cid)_rdOpenCid=null;
-  deleteBookLocal(cid); // book이 곧 contents 항목이므로 이 호출 하나로 contents 삭제까지 끝남(2026-08-29)
+  deleteBookLocal(cid); // book이 곧 contents 항목이므로 이 호출 하나로 contents 삭제까지 끝남
   renderReadingHub(); // 아카이브 리스트뿐 아니라 상단(진행중 표시/커버 등)까지 즉시 갱신
   renderContentTimeline();
 }
@@ -12629,7 +12613,7 @@ function removeBook(cid){
 // ══════════════════════════════════════════════════════════
 // ── 진행률 입력 모달
 let _pgBookCid=null,_pgUnit='pages',_pgSeconds=0,_pgStartVal=0;
-// cid: 병렬독서 지원(2026-09-03)으로 어느 책의 진행률인지 항상 명시. 진행바 직접 클릭(0초)도 cid를 함께 넘김.
+// cid: 병렬독서 지원으로 어느 책의 진행률인지 항상 명시. 진행바 직접 클릭(0초)도 cid를 함께 넘김.
 function openProgressModal(cid,seconds){
   const book=getBooks().find(b=>b.cid===cid);
   if(!book){if(seconds>0){_swSeconds=0;}return;} // 대상 책이 없으면(정상 흐름에서 거의 발생 안 함) 조용히 무시
@@ -12658,7 +12642,7 @@ function openProgressModal(cid,seconds){
   setTimeout(()=>document.getElementById('pg-end-inp').focus(),100);
 }
 // ── 일자별 콘텐츠 진행률 로그 (감상달력용) — 진행률 저장 시점에만 기록됨.
-// 2026-09-11: reading_daily_log→content_daily_log로 통합, 책 전용에서 책/드라마/영화 공용으로 확장.
+// reading_daily_log→content_daily_log로 통합, 책 전용에서 책/드라마/영화 공용으로 확장.
 // 같은 날 여러 세션(스톱워치 여러 번)이면 client_id를 date_key+cid로 고정해 upsert로 누적.
 function getContentDailyLog(dk){return S.get(S.key('cdlog',dk))||[];}
 function saveContentDailyLog(dk,arr){
@@ -12693,13 +12677,13 @@ async function syncContentDailyLogUp(dk){
   })));
   return ok;
 }
-// _rdProgressLabel — 콘텐츠 감상달력(renderWatchCalDetail)의 책 진행률 표시에서도 재사용(2026-09-11 독서달력 폐기 이후 잔존).
+// _rdProgressLabel — 콘텐츠 감상달력(renderWatchCalDetail)의 책 진행률 표시에서도 재사용.
 function _rdProgressLabel(unit,percentAfter,pagesAfter){
   if(unit==='percent')return (percentAfter!=null?percentAfter:0)+'%';
   return (pagesAfter!=null?pagesAfter:0)+'p';
 }
 // 카테고리별 일일 진행 로그(dailyLog)를 "35% · +5%" 같은 한 줄 텍스트로 변환 — 일자별 상세화면(renderWcalDayDetail)과
-// 코멘트 모아보기(_chNoteRowHtml)가 동일 포맷을 쓰도록 공용 헬퍼로 분리(2026-09-12).
+// 코멘트 모아보기(_chNoteRowHtml)가 동일 포맷을 쓰도록 공용 헬퍼로 분리.
 function _chDailyLogMetaText(cat,log){
   if(!log)return '';
   let progText='',amountText='';
@@ -12708,7 +12692,7 @@ function _chDailyLogMetaText(cat,log){
   amountText=log.amount_read>0?(log.unit==='percent'?`+${log.amount_read}%`:`+${log.amount_read}${cat==='drama'?'화':(cat==='book'?'p':'분')}`):'';
   return [progText,amountText].filter(Boolean).join(' · ');
 }
-// 코멘트 모아보기 전용 — 독서는 증감률+감상시간, 드라마/영화는 감상시간만 노출(2026-09-12).
+// 코멘트 모아보기 전용 — 독서는 증감률+감상시간, 드라마/영화는 감상시간만 노출.
 // _chDailyLogMetaText(상세화면과 공용)는 그대로 두고, 이 시트에서만 카테고리별로 항목을 추리는 얇은 래퍼.
 function _chNoteMetaText(cat,log){
   if(!log)return '';
@@ -12739,7 +12723,7 @@ let _wcalCollapsed=false; // 달력 접기/펼치기 — 접으면 이번 주 7�
 function _wcalRefresh(){
   const mk=monthKey(_wcalDate);
   const prevMk=monthKey(new Date(_wcalDate.getFullYear(),_wcalDate.getMonth()-1,1));
-  // 감상 메모가 contents.notes[]로 통합되어(2026-08-29) 서버 반영을 위해 contents도 함께 내려받음.
+  // 감상 메모가 contents.notes[]로 통합되어 서버 반영을 위해 contents도 함께 내려받음.
   // 정주행 등으로 지난달에 걸친 항목의 메모도 있을 수 있어 이전 달도 함께.
   Promise.all([syncWcalManualDown(mk),syncContentsDown(mk),syncContentsDown(prevMk)]).then(loadAndRenderWatchCal);
   loadAndRenderWatchCal();
@@ -12955,7 +12939,7 @@ function renderWatchCalDetail(){
     const progAmountText=_chDailyLogMetaText(it.cat,log);
     const metaLine=[progAmountText,timeText].filter(Boolean).join(' · ');
     const metaHtml=metaLine?`<div style="font-size:var(--dow-label-size);color:var(--ts);margin-top:2px;">${metaLine}</div>`:'';
-    // 독서 전용 공유카드 — 구 독서달력(2026-09-11 폐기)에 있던 진입점을 여기로 이전. 그날 진행률 로그(dailyLog)가 있는 책만 노출.
+    // 독서 전용 공유카드 — 구 독서달력(폐기)에 있던 진입점을 여기로 이전. 그날 진행률 로그(dailyLog)가 있는 책만 노출.
     const shareBtnHtml=(it.cat==='book'&&log)?`<span onclick="event.stopPropagation();openTodayReadingShareModal('${it.cid}','${log.unit}',${log.percent_after!=null?log.percent_after:'null'},${log.unit_after!=null?log.unit_after:'null'},${log.seconds||0},'${dk}')" title="공유 이미지" style="cursor:pointer;color:var(--ts);opacity:0.75;flex-shrink:0;padding:4px;"><i class="ti ti-share-2 ico-sz-14" aria-hidden="true"></i></span>`:'';
     return `<div style="padding:7px 0;">
       <div style="display:flex;align-items:center;gap:10px;">
@@ -12991,7 +12975,7 @@ function wcalSelectDay(dk){
 }
 
 // ── 일자별 감상 코멘트 (콘텐츠탭 등록 원본의 cid 기준으로만 연결 — 별점/총평(contents.review)과는 별개의 가벼운 기록) ──
-// 저장 위치: contents 항목 자체의 notes[] 배열(구 goal_notes/wcal_note 월별 저장소에서 통합, 2026-08-29).
+// 저장 위치: contents 항목 자체의 notes[] 배열(구 goal_notes/wcal_note 월별 저장소에서 통합).
 // note 형태: {dk,title,cat,text,time,updatedAt} — cid는 소속된 contents 항목으로 이미 결정되므로 note 자체엔 저장 안 함.
 // 특정 cid+날짜에 남긴 코멘트 하나 조회(같은 cid+날짜는 1개로 취급 — 그날 감상에 대한 메모는 계속 이어 써서 수정하는 형태)
 function getWcalNoteFor(cid,dk){
@@ -13030,7 +13014,7 @@ function saveWcalNote(cid,dk,idx){
   if(i>=0)c.notes[i]=entry;else c.notes.push(entry);
   saveContents(found.mk,found.list);
   renderWcalNoteRow(idx,cid,dk,entry,false);
-  refreshOtherContentHubViews(); // 월별 아카이브 그리드/코멘트 모아보기가 열려있으면 즉시 반영(2026-09-26)
+  refreshOtherContentHubViews(); // 월별 아카이브 그리드/코멘트 모아보기가 열려있으면 즉시 반영
 }
 function deleteWcalNote(cid,dk,idx){
   const found=_findContentByCidNearMk(cid,dk.slice(0,7));
@@ -13051,7 +13035,7 @@ function renderWcalNoteRow(idx,cid,dk,note,editing){
 
 // ── 감상 기록 수동 추가분 — 등록 UI는 삭제됨. 과거에 이미 저장된 데이터를 감상 캘린더가 계속 읽고 동기화하기 위해 이 저장소 접근 함수만 유지.
 // 저장 위치: 새 테이블 없이 goal_notes를 wchallenge와 동일한 범용 저장소 패턴으로 재사용.
-// key: 'wcal_manual_YYYY-MM', lines: [{cat,title,dk}, ...] — 월별로 나눠 저장해 한 항목이 비대해지지 않게 함.
+// key: 'wcal_manual_YYYY-MM', lines: [{cat,title,dk},...] — 월별로 나눠 저장해 한 항목이 비대해지지 않게 함.
 function getWcalManual(mk){return S.get('wcal_manual_'+mk)||[];}
 async function syncWcalManualDown(mk){
   const key='wcal_manual_'+mk;
@@ -13089,11 +13073,11 @@ function renderChHubMonthBanners(){
   el.innerHTML=html;
 }
 // 선택된 달의 콘텐츠 목록(월간 카테고리별 집계) — renderContentAsGridHtml이 각 항목 코멘트 아이콘에 완결 총평+감상 중 메모를 함께 보여줌
-// 그리드형으로 통일(2026-09-08) — 리스트형(renderContentByCatHtml)은 실사용 저조로 완전 제거, 음악도 원래부터 항상 그리드였음
+// 그리드형으로 통일 — 리스트형(renderContentByCatHtml)은 실사용 저조로 완전 제거, 음악도 원래부터 항상 그리드였음
 // 콘텐츠허브 내에서 감상 기록이 바뀔 때(스톱워치 종료, 진행률 저장, 완결 전환, 감상 캘린더의
 // 감상메모 등록/수정/삭제) 호출 — 콘텐츠허브 안의 여러 뷰가 같은 contents.notes[]를 각자 따로
 // 그리기 때문에, 한 곳에서 메모를 바꾸면 다른 곳(월별 아카이브 그리드, 코멘트 모아보기)은
-// 나갔다 들어오기 전엔 반영이 안 되던 문제가 있었음(2026-09-26, 감상 캘린더의 wcal-note 저장이
+// 나갔다 들어오기 전엔 반영이 안 되던 문제가 있었음(감상 캘린더의 wcal-note 저장이
 // 이 함수를 안 쓰고 있던 게 원인). 각 뷰는 현재 열려있을 때만 갱신 — 닫혀있으면 다음에 열 때
 // 어차피 새로 불러오므로 불필요한 연산 방지.
 function refreshContentHubViews(){
@@ -13105,7 +13089,7 @@ function refreshContentHubViews(){
 // 감상 캘린더 자체(감상메모를 방금 입력한 그 화면)는 이미 로컬에서 갱신돼 있으므로 제외하고,
 // 콘텐츠허브 안의 "다른" 노출 영역(월별 아카이브 그리드, 코멘트 모아보기)만 갱신할 때 씀 —
 // 감상 캘린더에서 감상메모를 등록/수정/삭제한 직후처럼, 그 화면을 무겁게(서버 재조회 포함) 다시
-// 그릴 필요 없이 다른 곳만 최신 상태로 맞추면 되는 경우(2026-09-26).
+// 그릴 필요 없이 다른 곳만 최신 상태로 맞추면 되는 경우.
 function refreshOtherContentHubViews(){
   if(!document.getElementById('content-hub-ov')?.classList.contains('on'))return;
   if(_chArchiveMk)chExpandMonth(_chArchiveMk);
@@ -13126,13 +13110,13 @@ function chExpandMonth(mk){
 // 날짜순: 완결 코멘트는 카드, 감상 메모는 그 아래 곁가지로 — 시간 흐름이 기준축.
 // 작품별: 작품 카드 하나에 완결 총평 + 그 작품에 남긴 감상 메모들을 날짜순으로 접어 넣음 — 작품이 기준축.
 let _chSelectedMonth=monthKey(new Date()); // 코멘트 모아보기 — 현재 선택된 월(YYYY-MM), 칩으로 전환
-// 선택된 월 하나만 수집(효율성 — 전체 기간을 한번에 불러오지 않음, 2026-09-12 월별 칩 도입)
+// 선택된 월 하나만 수집(효율성 — 전체 기간을 한번에 불러오지 않음)
 // finals(완결 총평)·notes(감상 메모)·logs(일자별 진행률+감상시간)를 함께 반환
 async function _chCollectNoteSource(mk){
   mk=mk||_chSelectedMonth;
   await syncMonthRange(parseInt(mk.slice(0,4),10),parseInt(mk.slice(5,7),10)-1); // 그 달 콘텐츠/리듬블록을 로컬에 채워둠(달력과 동일한 소스)
   const finals=[]; // {cid,cat,title,poster,stars,review,dk} — status가 done/stopped(=완결 처리됨)인 작품 전부 포함,
-  // review/stars는 있을 수도 없을 수도 있음(완결 배지 판정은 status 기준, 총평 텍스트 유무와 별개)(2026-09-09 수정)
+  // review/stars는 있을 수도 없을 수도 있음(완결 배지 판정은 status 기준, 총평 텍스트 유무와 별개)
   const notes=[]; // {cid,cat,title,dk,text,updatedAt} — poster는 저장 안 하므로 소속 contents 항목의 값을 붙임
   const contentByCid={}; // cid → {cat,title,poster} — 로그 병합 시 제목/포스터 조회용
   getContents(mk).forEach(c=>{
@@ -13148,7 +13132,7 @@ async function _chCollectNoteSource(mk){
   const fromDk=`${mk}-01`,toDk=`${mk}-${pad(daysInMonth)}`;
   const logRows=await supaFetch(`content_daily_log?date_key=gte.${fromDk}&date_key=lte.${toDk}&order=date_key`)||[];
   // 카테고리별 감상시간(리듬블록) — 독서/드라마/영화는 그날의 enjoy 리듬블록 합산 시간을 구해 로그에 얹음.
-  // 독서: 증감률+시간, 드라마/영화: 시간만 노출(2026-09-12) — 표시 여부는 렌더 함수(_chDailyLogMetaText)에서 처리.
+  // 독서: 증감률+시간, 드라마/영화: 시간만 노출 — 표시 여부는 렌더 함수(_chDailyLogMetaText)에서 처리.
   const catPrefix={drama:'드라마 - ',movie:'영화 - ',book:'독서 - '};
   const timeCache={}; // dk|cid -> "HH:MM-HH:MM, ... (총 N분)"
   function timeTextFor(dk,cat,title){
@@ -13194,7 +13178,7 @@ function openContentNoteTimeline(){
   openSheet('content-note-timeline-sheet');
   renderContentNoteTimeline();
 }
-// 최근 6개월치 칩만 노출 — 그 밖의 달은 이 시트에서 보지 않음(2026-09-12, 전체기간 로딩 대신 월별 조회로 전환)
+// 최근 6개월치 칩만 노출 — 그 밖의 달은 이 시트에서 보지 않음(전체기간 로딩 대신 월별 조회로 전환)
 function renderChNoteMonthChips(){
   const wrap=document.getElementById('ch-note-timeline-month-chips');if(!wrap)return;
   const now=new Date();
@@ -13335,7 +13319,7 @@ function _chFinalRowHtml(f){
   const m=WCAL_CAT_META[f.cat]||{color:'var(--tm)'};
   const posterHtml=_wcalPosterThumbHtml(f.cat,f.poster);
   // 도트는 항상 카테고리 지정색(인라인 style) — 완결 여부는 옆의 '완' 배지(ch-tlA-badge-final, 옐로우 고정색)로 구분.
-  // 예전엔 .ch-tlA-dot.final 클래스로도 색을 주려 했으나 인라인 style에 항상 가려지는 죽은 규칙이라 제거함(2026-09-12).
+  // 예전엔.ch-tlA-dot.final 클래스로도 색을 주려 했으나 인라인 style에 항상 가려지는 죽은 규칙이라 제거함.
   const progAmountText=_chNoteMetaText(f.cat,f.log);
   const metaHtml=progAmountText?`<div class="ch-tlA-meta">${progAmountText}</div>`:'';
   return `<div class="ch-tlA-row">
@@ -13356,10 +13340,10 @@ function _chFinalRowHtml(f){
 }
 // 날짜순 뷰의 감상 메모 — 완결과 동일한 구조(포스터+한 줄 타이틀), 배지 대신 카테고리 태그만
 // showTime: 그날 항목이 여러 개일 때만 작성 시각을 곁들여 순서를 짚어줌
-// n.log: 그날 진행률 로그(content_daily_log) — 코멘트 없이 진행률만 있는 날도 이 로그로 한 줄 표시됨(2026-09-12)
-// 도트를 잇는 세로선은 .ch-tlA-row::before(position:absolute, row 자신 기준 top/bottom)가 그려서
+// n.log: 그날 진행률 로그(content_daily_log) — 코멘트 없이 진행률만 있는 날도 이 로그로 한 줄 표시됨
+// 도트를 잇는 세로선은.ch-tlA-row::before(position:absolute, row 자신 기준 top/bottom)가 그려서
 // row 높이가 가변이어도 자동으로 다음 도트까지 이어짐 — 마지막 행은 CSS :last-child가 자동으로 선을 숨김
-// (아카이브앱 tablet.js/html의 코멘트 모아보기 구현을 그대로 이식, 2026-09-12)
+// (아카이브앱 tablet.js/html의 코멘트 모아보기 구현을 그대로 이식)
 function _chNoteRowHtml(n,showTime){
   const m=WCAL_CAT_META[n.cat]||{label:'',color:'var(--tm)'};
   const posterHtml=_wcalPosterThumbHtml(n.cat,n.poster);
@@ -14104,7 +14088,7 @@ function confirmProgress(){
   const _amountRead=Math.max(0,endVal-_pgStartVal);
   logContentDaily(book.cid,today,_amountRead,_pgSeconds,_pgUnit,book.percent,book.pages);
   markReadingActivityToday();
-  // 통합 이후(2026-08-29) book.cid가 곧 연결된 contents 항목의 cid이므로 별도 매칭 불필요.
+  // 통합 이후 book.cid가 곧 연결된 contents 항목의 cid이므로 별도 매칭 불필요.
   pushContentNote(book.cid,book.contentTitle||book.title,'book',document.getElementById('pg-note-inp')?.value);
   // 독서 습관체크는 스톱워치 종료 시점(autoLogReadingRhythm)에서만 처리 —
   // 진행바를 직접 클릭해 페이지/퍼센트만 입력한 경우는 습관체크하지 않음.
@@ -14148,7 +14132,7 @@ function confirmReadingProgressDone(){
   closeModal('progress-modal');
   setBookStatus(cid,'done',{stars,review}); // 상태전환 공용 경로 — 콘텐츠 연동(syncReadingBookToContent)까지 함께 처리됨
 }
-// [2026-09-13 재설계] 시작 즉시 리듬블록을 생성(지연 없음), 종료 시 몇 초를 했든 항상 end를
+// 시작 즉시 리듬블록을 생성(지연 없음), 종료 시 몇 초를 했든 항상 end를
 // 채워 정상 기록으로 마감 — 오탭 방지용 자동삭제는 두지 않음(사용 이력 참조: 즉시생성+자동삭제
 // 시도 시 생성/삭제 sync 경합으로 삭제가 무효화된 이력 있음). 실수로 눌렀다면 리듬탭에서 직접
 // 삭제(deleteRhythmBlock). 실제 로직(연타방지 락, 복원 포함)은 createInstantCommitStopwatch 정의부 참조.
@@ -14157,7 +14141,7 @@ function toggleStopwatch(cid){
   _swSw.toggle(cid);
 }
 // 시작 시 생성해둔 리듬블록(blockCid)을 찾아 end만 채움 — 다른 카테고리(운동/휴식 등)와 동일 규칙.
-// minToHHMM은 콘텐츠 시청 스톱워치 쪽(파일 하단)에 정의된 전역 함수를 그대로 재사용(중복 정의 제거, 2026-08-30)
+// minToHHMM은 콘텐츠 시청 스톱워치 쪽(파일 하단)에 정의된 전역 함수를 그대로 재사용(중복 정의 제거)
 function autoLogReadingRhythm(blockCid,startTs,endTs){
   if(!blockCid||!startTs||!endTs)return;
   const dk=dateKey(getLogicalDate(startTs));
@@ -14373,104 +14357,26 @@ loadDaily();
 // 리마인드 알림 클릭 시 URL에 실려온 메모 유도 파라미터를 읽어 메모 제안 모달을 자동으로 연다.
 // - memo=rhythm&cid=xxx: 리듬 1/3시간 진행중 알림 — 해당 리듬블록을 찾아 그 카테고리로 연다.
 //   로컬 30일 캐시 범위 밖(예: 자정을 넘겨 어제 블록인 경우)일 수 있어, 못 찾으면 서버에서 직접 조회.
-// - memo=sleep / memo=noon: 23시 취침 회고 / 13시 점심 후 — 리듬블록에 종속되지 않는 단독 메모라 조회 없이 바로 연다(MEMO_URL_DEFAULT_COPY).
-// - memo=question: 19:30 오늘의 질문 — openQuestionMemo가 서버 풀에서 질문을 뽑아 연다(2026-09-19).
+// - memo=sleep: 23시 취침 회고 — 리듬블록에 종속되지 않는 단독 메모라 조회 없이 바로 연다(MEMO_URL_DEFAULT_COPY).
+// - memo=question: 19:30 오늘의 질문 — openQuestionMemo가 서버 풀에서 질문을 뽑아 연다.
+// - memo=sleepscore: 09:00 수면 점수 미등록 — 점수 입력창(promptSleepScore)을 연다. 그 사이 등록했으면 열지 않음.
+// - snooze=<cid>: 할일/스누즈 알림 — 스누즈 시트(openSnoozePopup).
 // 알림 클릭으로 열리는 단독 메모(리듬블록에 종속되지 않음)의 기본 문구 — 서버가 t/b를 실어 보내면 그 문구를, 없으면 이 문구를 표시.
 const MEMO_URL_DEFAULT_COPY={
-  sleep:['오늘 하루는 어땠나요?','잠들기 전, 오늘을 짧게 남겨보세요.'],
-  noon:['식사 후 나른한 시간이에요','지금 컨디션이나 오후 계획을 한 줄 남겨볼까요?']
+  sleep:['오늘 하루는 어땠나요?','잠들기 전, 오늘을 짧게 남겨보세요.']
 };
-// ── 포그라운드 복귀 시 서버 폴링 방식 (2026-09-26 재설계) ──
-// notificationclick 이벤트가 iOS PWA 백그라운드 조건에서 발화하지 않는 사례가 있어(진단 완료 —
-// sw.js 핸들러 진입 로그 자체가 안 찍힘, 웹사이트 데이터 완전 삭제 후 재설치해도 재현됨),
-// 알림 클릭에 의존하지 않고 "앱이 포그라운드로 돌아올 때마다 서버에 처리 안 된 알림이 있는지
-// 물어보고 그 자리에서 팝업을 띄우는" 방식으로 전환. alerts.opened 컬럼으로 중복 방지.
-// URL 기반 _openFromNotificationUrl()은 당분간 보존(?snooze=/?memo= 링크를 다른 경로로 직접
-// 받는 경우 — 예: 알림 자체가 새 창을 여는 데는 성공한 극히 드문 케이스 — 대비 폴백으로 유지).
-let _pendingAlertCheckInFlight=false;
-async function checkPendingAlerts(){
-  if(_pendingAlertCheckInFlight)return; // 중복 호출(연속 visibilitychange 등) 방지
-  if(!navigator.onLine)return;
-  _pendingAlertCheckInFlight=true;
-  try{
-    const rows=await supaFetch(`alerts?sent=eq.true&opened=eq.false&order=alert_at.desc&limit=5`);
-    if(!rows||!rows.length)return;
-    // 여러 개 밀려있어도 한 번에 하나만 팝업(가장 최근 것) — 나머지는 opened만 표시해 다음에 또 안 뜨게 함.
-    const target=rows[0];
-    const rest=rows.slice(1);
-    // opened 표시를 먼저 하고 팝업을 연다 — 순서를 반대로 하면 _openPopupForAlert 도중 예외가
-    // 나거나 사용자가 팝업을 보기 전에 앱을 다시 백그라운드로 보내는 등의 경우, opened가 영영
-    // true로 안 찍혀서 매번 포그라운드 전환마다 같은 알림이 반복해서 뜨는 문제가 생길 수 있음.
-    // "팝업을 한 번 못 볼 수 있음"이 "팝업이 무한 반복됨"보다 안전한 실패 모드라 이 순서를 택함(2026-09-26).
-    const allIds=[target.id,...rest.map(r=>r.id)];
-    await supaFetch(`alerts?id=in.(${allIds.join(',')})`,'PATCH',{opened:true});
-    await _openPopupForAlert(target);
-  }catch(err){ /* 실패해도 다음 포그라운드 복귀 때 재시도되므로 조용히 무시 */ }
-  finally{ _pendingAlertCheckInFlight=false; }
-}
-// source_type별로 알맞은 팝업을 연다 — send-alerts의 url 생성 분기와 1:1 대응.
-async function _openPopupForAlert(alert){
-  const type=alert.source_type;
-  const todayDk=dateKey(new Date());
-  if(type==='todo'||type==='todo_snooze'){
-    const cid=alert.link_cid||alert.source_cid;
-    if(cid)openSnoozePopup(cid);
-    return;
-  }
-  if(type==='sleep_alert'){
-    const copy=MEMO_URL_DEFAULT_COPY.sleep;
-    openRhythmMemoModal('sleep',todayDk,alert.title||copy[0],alert.body||copy[1]);
-    return;
-  }
-  if(type==='noon_memo'){
-    openRhythmMemoModal('noon',todayDk,alert.title||MEMO_URL_DEFAULT_COPY.noon[0],alert.body||MEMO_URL_DEFAULT_COPY.noon[1]);
-    return;
-  }
-  if(type==='question_alert'){
-    openQuestionMemo(todayDk);
-    return;
-  }
-  if(type==='sleep_score_missing'){
-    if(getSleepScore(todayDk)==null)promptSleepScore(todayDk); // 그 사이 등록했으면 팝업 생략
-    return;
-  }
-  if(type==='rhythm_ongoing'){
-    const cid=alert.link_cid||alert.source_cid;
-    if(!cid)return;
-    let found=null,foundDk=null;
-    for(let i=0;i<2;i++){
-      const d=new Date();d.setDate(d.getDate()-i);
-      const dk=dateKey(d);
-      const b=getRhythmBlocks(dk).find(x=>x.cid===cid);
-      if(b){found=b;foundDk=dk;break;}
-    }
-    if(!found){
-      const rowsR=await supaFetch(`rhythm_blocks?client_id=eq.${encodeURIComponent(cid)}&limit=1`);
-      if(rowsR&&rowsR[0]){found=rhythmBlockRowToLocal(rowsR[0]);foundDk=rowsR[0].date_key;}
-    }
-    if(!found||!found.cat)return;
-    const title=_buildRhythmMemoTitle(found.cat,found.start,found.end,found.text);
-    if(!title)return;
-    openRhythmMemoModal(found.cat,foundDk||todayDk,title,'지금 이 순간을 기록해보세요.');
-    return;
-  }
-  // morning_briefing/remaining_todo/evening_wrap/weekly_report/monthly_report 등은 팝업 없이
-  // 앱이 열리는 것만으로 충분 — 별도 처리 없음.
-}
-// 포그라운드로 돌아올 때마다 체크: 앱 최초 로드 시(스플래시 이후)와, 이후 탭 전환/화면 켜짐 등으로
-// 다시 보이게 될 때마다. visibilitychange가 iOS PWA에서 notificationclick보다 훨씬 안정적으로 fire됨.
-// [2026-10-01] 위 자동 트리거(visibilitychange/pageshow)는 제거 — 알림을 누르지 않아도 앱에 들어올 때마다
-// 안 본 알림의 팝업이 뜨던 문제. 이제 팝업은 "알림을 눌러 열린 경우"에만 뜬다: 서버가 Declarative Web Push(iOS 18.4+)로
-// navigate URL(?memo=…&aid=…)을 실어 보내고, 알림 탭 시 iOS가 그 URL로 앱을 열면 아래 _openFromNotificationUrl이 팝업을 띄움.
-// checkPendingAlerts/_openPopupForAlert는 호출부 없이 남겨둠(선언형 푸시가 동작 안 할 때 폴링 방식으로 되돌리는 용도).
-
+// ── 알림 탭 → 팝업 ──
+// 예전엔 iOS PWA 백그라운드에서 notificationclick이 발화하지 않아, 앱이 포그라운드로 돌아올 때마다 서버에서 안 본 알림을 폴링해
+// 팝업을 띄웠다(알림을 안 눌러도 들어올 때마다 뜨는 문제). 지금은 서버(send-alerts)가 Declarative Web Push(iOS 18.4+)로
+// navigate URL(?snooze=/?memo=…&aid=…)을 실어 보내고, 알림을 탭하면 앱이 백그라운드/종료여도 iOS가 그 URL로 앱을 열어준다.
+// 아래 함수가 그 URL을 읽어 팝업을 띄우고, aid로 alerts.opened에 "탭해서 열림"을 기록한다(팝업 없는 알림도 aid만 있으면 기록).
 async function _openFromNotificationUrl(){
   const params=new URLSearchParams(location.search);
   const snoozeCid=params.get('snooze'); // 할일 알림 — 스누즈 시트
   const memoType=params.get('memo');
   const aid=params.get('aid'); // 알림 row id — 알림을 눌러 열렸음을 alerts.opened에 기록(이제 "열림" = 실제로 탭해서 들어옴)
   const markAlertOpened=()=>{ if(aid)Promise.resolve(supaFetch(`alerts?id=eq.${encodeURIComponent(aid)}`,'PATCH',{opened:true})).catch(()=>{}); };
-  if(!snoozeCid&&!['rhythm','sleep','noon','question','sleepscore'].includes(memoType)){
+  if(!snoozeCid&&!['rhythm','sleep','question','sleepscore'].includes(memoType)){
     if(aid){markAlertOpened();history.replaceState(null,'',location.pathname);} // 팝업 없는 알림(아침 브리핑·리포트 등)도 탭으로 열렸음은 기록
     return false;
   }
@@ -14483,7 +14389,7 @@ async function _openFromNotificationUrl(){
   if(memoType==='question'){openQuestionMemo(todayDk);return true;} // 질문은 알림에 싣지 않고 앱이 풀에서 직접 뽑음
   if(memoType==='sleepscore'){if(getSleepScore(todayDk)==null)promptSleepScore(todayDk);return true;} // 그 사이 등록했으면 팝업 생략
   const cid=params.get('cid');
-  if(!cid)return true; // memo=rhythm인데 cid가 없는 이상 케이스 — URL은 이미 처리(정리)했으니 폴링으로 재시도할 필요 없음
+  if(!cid)return true; // memo=rhythm인데 cid가 없는 이상 케이스 — URL은 이미 처리(정리)했으니 더 할 일 없음
   let found=null,foundDk=null;
   for(let i=0;i<2;i++){ // 자정을 막 넘긴 경우까지 고려해 오늘/어제 두 날짜만 로컬에서 우선 탐색
     const d=new Date();d.setDate(d.getDate()-i);
@@ -14541,7 +14447,7 @@ async function initSync(){
     // 아래 각 syncXxxUp 호출은 반환값(성공 여부)을 확인해 성공했을 때만 pending을 끄고 uploadedDates에
     // 표시한다. 예전엔 무조건 껐는데, 업로드가 실패(오프라인 전환 순간 등)해도 pending이 꺼지고
     // uploadedDates에 찍혀 아래 pastDown 대상에서도 빠져버려, "Up도 실패, Down도 스킵"으로 로컬 변경사항이
-    // 통째로 유실되는 경로가 있었음(2026-09-15, 기기간 체크 상태가 반복적으로 되돌아가던 문제와 연결).
+    // 통째로 유실되는 경로가 있었음(기기간 체크 상태가 반복적으로 되돌아가던 문제와 연결).
     if(S.get(S.key('todos_pending',dk))){
       if(await syncTodosUp(dk)){S.set(S.key('todos_pending',dk),false);didUp=true;}
     }
@@ -14557,7 +14463,7 @@ async function initSync(){
     if(didUp)uploadedDates[dk]=true;
   }
   // 오늘 날짜는 다른 모든 동기화(wchallenge/습관/모닝플로우/콘텐츠/하루한줄/월간캘린더 등)보다
-  // 먼저, 확실하게 최신화한다(2026-09-30, 3번 안정화). 예전엔 이 갱신이 그 부수 작업들 전부가
+  // 먼저, 확실하게 최신화한다(3번 안정화). 예전엔 이 갱신이 그 부수 작업들 전부가
   // 끝난 뒤에야 실행돼서, 초기 로딩 시 화면이 "오래된 로컬 캐시"로 먼저 그려진 채 한참(때로는
   // 수 분) 동안 정확한 값으로 안 바뀌는 지연이 있었다(반복투두 아이콘이 늦게 나타나던 현상의
   // 체감 시간 대부분이 여기서 비롯됨 — 근본 원인인 필드 누락은 이미 앞서 고쳤지만, 정상 필드라도
@@ -14663,11 +14569,9 @@ setTimeout(checkAndRecoverPushSubscription, 1500);
     await new Promise(res=>setTimeout(res,100));
   }
   hideSplash();
-  // 1시간 리마인드 알림으로 콜드 스타트된 경우 — 스플래시가 완전히 사라진 뒤에만 메모 모달을 띄운다(2026-09-17).
-  // _openFromNotificationUrl(URL 파라미터 기반, 폴백 경로)이 뭔가 처리했으면 checkPendingAlerts를
-  // 건너뛴다 — 안 그러면 같은 알림에 대해 두 시스템이 각각 팝업을 열려고 해서 경합이 생길 수 있음.
+  // 1시간 리마인드 알림으로 콜드 스타트된 경우 — 스플래시가 완전히 사라진 뒤에만 메모 모달을 띄운다.
   syncBirthdayFromServer(); // 서버에 저장된 생일을 로컬 사본(스플래시용)과 맞춤
-  _openFromNotificationUrl(); // [2026-10-01] 알림 탭으로 열린 경우(URL 파라미터)에만 팝업 — 자동 폴링(checkPendingAlerts) 폴백은 제거
+  _openFromNotificationUrl(); // 알림 탭으로 열린 경우(URL 파라미터)에만 팝업
 })();
 
 

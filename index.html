@@ -30,11 +30,11 @@ html{height:100%;min-height:calc(100% + env(safe-area-inset-top));background:var
 #bg-fixed{position:fixed;inset:0;z-index:0;background:var(--bg);}
 body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;background:var(--bg);}
 
-/* ══ PALETTE — 앱 공용 8색 컬러 팔레트 (2026-08-16 통합) ══
-   목적: 주간목표 요일체크/습관/일정·보관함/메모시간대/콘텐츠기록/투두시간대 등
-   앱 전역에 흩어져 있던 색상들을 이 8색 하나로 순차 통합.
-   각 색상은 4종 세트: -rgb(base) / -bg(연한배경,~0.28) / -border(테두리,~0.55) / -text(진한텍스트) / -solid(진한배경+흰글자용)
-   값을 바꿀 땐 이 블록만 수정하면 됨(각 코너는 여기 변수를 참조하도록 순차 교체 예정) */
+/* ══ PALETTE — 앱 공용 8색 컬러 팔레트 ══
+ 목적: 주간목표 요일체크/습관/일정·보관함/메모시간대/콘텐츠기록/투두시간대 등
+ 앱 전역에 흩어져 있던 색상들을 이 8색 하나로 순차 통합.
+ 각 색상은 4종 세트: -rgb(base) / -bg(연한배경,~0.28) / -border(테두리,~0.55) / -text(진한텍스트) / -solid(진한배경+흰글자용)
+ 값을 바꿀 땐 이 블록만 수정하면 됨(각 코너는 여기 변수를 참조하도록 순차 교체 예정) */
 :root{
   --pal-warmgray-rgb:195,180,168;--pal-warmgray-bg:rgba(195,180,168,0.55);--pal-warmgray-border:rgba(160,148,138,0.55);--pal-warmgray-text:rgba(128,118,108,0.95);
   --pal-pink-rgb:255,175,200;--pal-pink-bg:rgba(255,175,200,0.38);--pal-pink-border:rgba(214,90,140,0.55);--pal-pink-text:rgba(178,60,105,0.9);
@@ -44,18 +44,18 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --pal-sky-rgb:170,208,228;--pal-sky-bg:rgba(170,208,228,0.55);--pal-sky-border:rgba(75,145,180,0.55);--pal-sky-text:rgba(45,105,140,0.95);
   --pal-lavender-rgb:210,175,225;--pal-lavender-bg:rgba(210,175,225,0.55);--pal-lavender-border:rgba(160,105,180,0.55);--pal-lavender-text:rgba(130,75,150,0.95);
   --pal-lime-rgb:200,220,140;--pal-lime-bg:rgba(200,220,140,0.55);--pal-lime-border:rgba(135,165,60,0.55);--pal-lime-text:rgba(95,120,35,0.95);
-  --pal-rose-rgb:230,126,126;--pal-rose-bg:rgba(230,126,126,0.52);--pal-rose-border:rgba(205,95,95,0.55);--pal-rose-text:rgba(165,60,60,0.95); /* 2026-09-04 채도 x1.3 강화 — 외출용으로 칙칙하지 않게 */
-  --off-badge-text:rgba(165,60,60,0.7); /* 오늘탭 "Off n" 표기 전용 — pal-rose-text와 같은 RGB에 알파만 낮춰 캘린더 일요일 색(rgba(205,95,95,0.9))과 톤을 맞춤, 2026-09-25 */
-  --pal-green-rgb:95,175,130; /* 청록빛 그린 — mint(민트그린)와 구분되는 진한 톤, 2026-09-04 리듬 식사색(RHYTHM_MEAL_COLOR) 전용 — rgba(var(--pal-green-rgb),알파) 형태로만 참조되므로 bg/border/text 파생 변수는 두지 않음 */
-  --pal-mintlime:rgb(102,160,85); /* 민트+연두 중간톤 — 문장저장/문장코멘트/영양제/인용구칩 4곳 통합용, 2026-08-16 */
+  --pal-rose-rgb:230,126,126;--pal-rose-bg:rgba(230,126,126,0.52);--pal-rose-border:rgba(205,95,95,0.55);--pal-rose-text:rgba(165,60,60,0.95); /* 채도 x1.3 강화 — 외출용으로 칙칙하지 않게 */
+  --off-badge-text:rgba(165,60,60,0.7); /* 오늘탭 "Off n" 표기 전용 — pal-rose-text와 같은 RGB에 알파만 낮춰 캘린더 일요일 색(rgba(205,95,95,0.9))과 톤을 맞춤 */
+  --pal-green-rgb:95,175,130; /* 청록빛 그린 — mint(민트그린)와 구분되는 진한 톤리듬 식사색(RHYTHM_MEAL_COLOR) 전용 — rgba(var(--pal-green-rgb),알파) 형태로만 참조되므로 bg/border/text 파생 변수는 두지 않음 */
+  --pal-mintlime:rgb(102,160,85); /* 민트+연두 중간톤 — 문장저장/문장코멘트/영양제/인용구칩 4곳 통합용 */
   --grad-pinkyellow:linear-gradient(120deg,rgba(255,210,230,0.80),rgba(255,230,200,0.70)); /* 핑크-옐로 카드 그라디언트 — reading-icon-btn 기준값, mr-goal-card는 알파만 더 연하게 별도 지정 */
-  --grad-mintyellow:linear-gradient(135deg,rgba(210,244,225,0.85),rgba(248,245,200,0.85),rgba(212,242,222,0.85)); /* 민트-옐로 3색 그라디언트 — weekly-review-banner-inner/report-banner-inner/quote-chip-inner 공용, 2026-08-16 통합 */
-  --pal-mauvepink:rgb(198,116,149); /* 모브핑크 — 다음주목표/glass오늘표시/뮤직재생/glass캘린더오늘 4곳 통합용, 2026-08-16 */
+  --grad-mintyellow:linear-gradient(135deg,rgba(210,244,225,0.85),rgba(248,245,200,0.85),rgba(212,242,222,0.85)); /* 민트-옐로 3색 그라디언트 — weekly-review-banner-inner/report-banner-inner/quote-chip-inner 공용 */
+  --pal-mauvepink:rgb(198,116,149); /* 모브핑크 — 다음주목표/glass오늘표시/뮤직재생/glass캘린더오늘 4곳 통합용 */
   --rainbow-done:linear-gradient(120deg,#ffd28a,#ffb0c8,#c9a8ff,#9fd8ff,#ffd28a); /* 완독 축하 버튼 테두리 + 공용 팝업(.rhythm-memo-card) 상단띠·스누즈 완료 버튼 테두리 공용 */
   --rainbow-bead:linear-gradient(270deg,#ffb0c8,#ffd28a,#bdf0c4,#9fd8ff,#c9a8ff,#ffb0c8); /* 진행바 구슬 애니메이션 — rd-progress-bead 전용 */
 }
 /* ══ EVENT CATEGORY COLORS — 단일 소스. 값 변경 시 여기만 고치면 JS(EVENT_CATS)·모달버튼·캘린더배지에 모두 반영됨 ══
-   2026-08-16: 공용 팔레트(--pal-*) 참조로 전환 — 약속=라벤더, 개인=옐로, 업무=민트, 기타=웜그레이 */
+ 공용 팔레트(--pal-*) 참조로 전환 — 약속=라벤더, 개인=옐로, 업무=민트, 기타=웜그레이 */
 :root{
   --ev-schedule-text:var(--pal-lavender-text);--ev-schedule-bg:var(--pal-lavender-bg);--ev-schedule-border:var(--pal-lavender-border);
   --ev-personal-text:var(--pal-yellow-text);--ev-personal-bg:var(--pal-yellow-bg);--ev-personal-border:var(--pal-yellow-border);
@@ -68,8 +68,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --dow-label-size:12px; /* 서브텍스트 사이즈 — 요일(월화수목금토일) 라벨에서 시작해 각종 보조 텍스트(날짜/카테고리, 필터탭, 코멘트보기 등)까지 두루 쓰이는 공용 크기. 앞으로 "서브텍스트 사이즈"가 필요한 곳은 전부 이 변수를 끌어다 쓰기 */
   --dow-label-size-2:11px; /* dow-label-size 파생 실험용 — 현재는 월간캘린더 연속일정 바(.cal-event-bar)·하루짜리 배지(.cal-event-badge) 폰트 사이즈 테스트 전용 */
   --dow-label-size-3:10px; /* dow-label-size-2보다 한 단계 더 작은 실험용 — 동일 용도 */
-  --rt-fill-label-size:calc(var(--dow-label-size) + 1px); /* 홈탭 리듬바(.rt-fill-label) 전용 — dow-label-size 파생이라 추후 전체 폰트스케일 조정 시 함께 움직임, 2026-09-06 */
-  --xs-label-size:calc(var(--dow-label-size) - 1px); /* dow-label-size보다 한 단계 작은 라벨 전용(별점/상태/범례 등 10~11px대 텍스트를 여기로 통합, 2026-09-25) — 텍스트 스케일 조정 시 함께 움직임 */
+  --rt-fill-label-size:calc(var(--dow-label-size) + 1px); /* 홈탭 리듬바(.rt-fill-label) 전용 — dow-label-size 파생이라 추후 전체 폰트스케일 조정 시 함께 움직임 */
+  --xs-label-size:calc(var(--dow-label-size) - 1px); /* dow-label-size보다 한 단계 작은 라벨 전용(별점/상태/범례 등 10~11px대 텍스트를 여기로 통합) — 텍스트 스케일 조정 시 함께 움직임 */
   --sleep-warmgray:#8a8078; /* 수면카드 전용 웜그레이 — 남색 강조색을 제외한 시간표기/아이콘 전부가 참조. CSS 클래스(sleep-*) 7곳 + JS 인라인 스타일 4곳(5376/5405/6192/6197 근처) 동일 색 사용 중 */
   --sleep-warmgray-strong:#6b6259; /* 취침/기상/총수면시간 전용 — sleep-warmgray보다 더 진한 값. sleep-time-val, sleep-top-num/unit, sleep-collapsed-time/dur 5곳이 참조 */
   --graph-track-color:rgba(var(--divider-rgb),0.25); /* 그래프/진행바 공용 기준선·트랙 색 — rd-progress-track(독서 진행바) 등에서 참조 */
@@ -78,11 +78,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --tp:#6b5248;--ts:#a3897c;--tm:#d4bcb0;
   --card:rgba(255,250,240,0.75);--card-b:rgba(230,200,140,0.40);
   --empty-bg:rgba(210,190,175,0.20); /* 시간표 도넛 — 리듬 기록 없는 빈 시간 구간 배경 */
-  --card-p:rgba(var(--pal-pink-rgb),0.15);--card-pb:rgba(var(--pal-pink-rgb),0.32); /* 메모 배너 — pink-bg보다 더 옅은 농도(0.15)로 별도 조정됨, 2026-08-16 공용팔레트 참조로 전환, 테두리는 투두/식사와 동일하게 알파 개별조정 */
+  --card-p:rgba(var(--pal-pink-rgb),0.15);--card-pb:rgba(var(--pal-pink-rgb),0.32); /* 메모 배너 — pink-bg보다 더 옅은 농도(0.15)로 별도 조정됨공용팔레트 참조로 전환, 테두리는 투두/식사와 동일하게 알파 개별조정 */
   --card-m:rgba(200,240,235,0.42);--card-mb:rgba(160,220,215,0.55);
-  --card-y:rgba(var(--pal-yellow-rgb),0.22);--card-yb:rgba(var(--pal-yellow-rgb),0.32); /* 투두 배너 — 2026-08-16 공용팔레트 참조로 전환, 알파를 기존톤에 맞춰 재조정 */
-  --card-s:rgba(var(--pal-lime-rgb),0.30);--card-sb:rgba(var(--pal-lime-rgb),0.45); /* 식사 배너 — 2026-08-16 연두로 전환(ID셀렉터 #daily-meal-card가 우선 적용되던 문제 해결) */
-  /* --acc, --acc-soft 2026-08-17 완전 제거 — 오늘날짜/강조색은 로즈(오늘 표기류) 또는 pal-pink(일반 강조/액션류)로 분할 통합됨 */
+  --card-y:rgba(var(--pal-yellow-rgb),0.22);--card-yb:rgba(var(--pal-yellow-rgb),0.32); /* 투두 배너 — 공용팔레트 참조로 전환, 알파를 기존톤에 맞춰 재조정 */
+  --card-s:rgba(var(--pal-lime-rgb),0.30);--card-sb:rgba(var(--pal-lime-rgb),0.45); /* 식사 배너 — 연두로 전환(ID셀렉터 #daily-meal-card가 우선 적용되던 문제 해결) */
+  /* --acc, --acc-soft 완전 제거 — 오늘날짜/강조색은 로즈(오늘 표기류) 또는 pal-pink(일반 강조/액션류)로 분할 통합됨 */
   --sheet:linear-gradient(160deg,#fdf3ec,#fef7e8);
   --modal:linear-gradient(145deg,#fdf3ec,#fef7e8);
   --inp:rgba(255,250,240,0.82);--inp-b:rgba(255,210,200,0.42);
@@ -107,7 +107,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --card-m:var(--card);--card-mb:rgba(135,205,195,0.55);
   --card-y:var(--card);--card-yb:rgba(250,215,100,0.62);
   --card-s:var(--card);--card-sb:rgba(150,180,225,0.55);
-  /* --acc, --acc-soft 2026-08-17 완전 제거 — glass 전용 강조색(황토톤)도 사용처 없어져 함께 삭제 */
+  /* --acc, --acc-soft 완전 제거 — glass 전용 강조색(황토톤)도 사용처 없어져 함께 삭제 */
   --sheet:linear-gradient(160deg,#f8f5ee,#fbf8f1);
   --modal:linear-gradient(145deg,#f8f5ee,#fbf8f1);
   --inp:rgba(255,255,255,0.50);--inp-b:rgba(220,205,180,0.40);
@@ -121,7 +121,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 [data-theme="glass"] .quote-soft{filter:none;}
 
 /* ══ SPLASH ══ */
-#splash{position:fixed;inset:0;z-index:9999;background:#fef2e4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;transition:opacity .6s,transform .6s;} /* Safari 상단바 색 스캔이 그라디언트(--bg)를 못 읽는 문제 대응 — 최초 로드 시 화면 전체를 덮는 스플래시부터 단색으로. 색은 --bg 그라디언트 3색 균등평균(2026-09-25, 기존 #fdf0e8이 핑크에 치우쳐 조정) */
+#splash{position:fixed;inset:0;z-index:9999;background:#fef2e4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;transition:opacity .6s,transform .6s;} /* Safari 상단바 색 스캔이 그라디언트(--bg)를 못 읽는 문제 대응 — 최초 로드 시 화면 전체를 덮는 스플래시부터 단색으로. 색은 --bg 그라디언트 3색 균등평균 */
 [data-theme="glass"] #splash{background:#f7f4ee;}
 #splash.hide{opacity:0;transform:scale(1.04);pointer-events:none;}
 .sp-logo{width:200px;height:auto;opacity:0;transform:translateY(14px);animation:fadeUp .7s .2s cubic-bezier(.22,.8,.44,1) forwards;}
@@ -142,7 +142,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 /* ── TOPBAR ── */
 .topbar{flex-shrink:0;display:flex;flex-direction:column;background:transparent;}
-.topbar-row1{display:flex;align-items:center;justify-content:space-between;padding:env(safe-area-inset-top) 18px 4px;} /* 상단 여백 = 안전영역만(default 상태바 방식에서는 0) — iOS 27 대응으로 status-bar-style을 default로 바꾼 뒤 14px 하한 제거 (2026-09-19) */
+.topbar-row1{display:flex;align-items:center;justify-content:space-between;padding:env(safe-area-inset-top) 18px 4px;} /* 상단 여백 = 안전영역만(default 상태바 방식에서는 0) — iOS 27 대응으로 status-bar-style을 default로 바꾼 뒤 14px 하한 제거 */
 .topbar-logo{height:32px;width:auto;}
 .topbar-right{display:flex;align-items:center;gap:6px;}
 .date-nav{display:flex;align-items:center;gap:4px;}
@@ -190,7 +190,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .slabel-search-btn{background:none;border:none;padding:2px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--tm);opacity:.7;}
 .slabel-search-btn:active{opacity:1;}
 .reserve-section-btn{flex:1;padding:7px 0;border-radius:10px;border:1px solid var(--card-b);background:var(--card);font-size:var(--dow-label-size);color:var(--tm);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;}
-/* DR 조각 자동제안 칩(2026-09-29) — "DR >" 입력 감지 시에만 나타남, 빈도 상위 조각(블로그/인스타/카페/영상/드라이브)을 탭 한 번으로 이어붙임 */
+/* DR 조각 자동제안 칩 — "DR >" 입력 감지 시에만 나타남, 빈도 상위 조각(블로그/인스타/카페/영상/드라이브)을 탭 한 번으로 이어붙임 */
 .todo-frag-chip-row{display:flex;flex-wrap:nowrap;gap:5px;margin:8px 0 12px;overflow-x:auto;touch-action:pan-x;-ms-overflow-style:none;scrollbar-width:none;}
 .todo-frag-chip-row::-webkit-scrollbar{display:none;}
 .todo-frag-chip{flex-shrink:0;padding:5px 11px;border-radius:20px;border:1px solid var(--card-b);background:var(--card);font-size:var(--dow-label-size);color:var(--ts);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;white-space:nowrap;}
@@ -364,11 +364,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .settings-btn-small{width:100%;padding:7px;border-radius:10px;border:1px solid rgba(var(--divider-rgb),0.40);background:transparent;color:var(--tm);font-family:'DM Sans',sans-serif;font-size:var(--dow-label-size);cursor:pointer;}
 .settings-key-inp{margin-bottom:0;font-size:var(--dow-label-size);width:100%;font-family:monospace;}
 /* 설정탭 공용 아코디언 — 알림 섹션에 먼저 적용, 추후 다른 설정 카드에도 재사용 예정 */
-.settings-acc-header{display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;}
-.settings-acc-header .ti{transition:transform .2s ease;color:var(--tm);}
-.settings-acc-header.open .ti{transform:rotate(180deg);}
-.settings-acc-body{max-height:0;overflow:hidden;transition:max-height .25s ease;}
-.settings-acc-body.open{max-height:600px;}
 .settings-acc-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid rgba(var(--divider-rgb),0.30);}
 .settings-acc-row:first-child{border-top:none;}
 .settings-acc-time{cursor:pointer;font-weight:600;color:var(--tp);}
@@ -574,13 +569,13 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .memo-bub.tod-night{background:rgba(var(--pal-lavender-rgb),0.06);border-left-color:rgba(var(--pal-lavender-rgb),0.28);}
 .memo-bub.memo-bub-seed{background:rgba(var(--pal-mint-rgb),0.06);border-left-color:rgba(var(--pal-mint-rgb),0.30);}
 .memo-bub.memo-bub-content{background:rgba(var(--pal-sky-rgb),0.07);border-left-color:rgba(var(--pal-sky-rgb),0.35);padding:6px 10px;cursor:default;}
-.memo-bub.memo-bub-question{background:rgba(var(--pal-lime-rgb),0.08);border-left-color:rgba(var(--pal-lime-rgb),0.55);} /* 오늘의 질문 답변 — 연두, 옅은 색이라 선 알파를 높임(2026-09-19) */
+.memo-bub.memo-bub-question{background:rgba(var(--pal-lime-rgb),0.08);border-left-color:rgba(var(--pal-lime-rgb),0.55);} /* 오늘의 질문 답변 — 연두, 옅은 색이라 선 알파를 높임 */
 .memo-content-head{display:flex;align-items:center;gap:5px;margin-bottom:2px;}
 .memo-content-icon{font-size:13px;color:var(--pal-sky-text);flex-shrink:0;}
 .memo-content-title{font-size:12.5px;font-weight:500;color:var(--pal-sky-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .memo-content-poster{width:24px;height:24px;border-radius:5px;flex-shrink:0;overflow:hidden;background:var(--card2,rgba(210,190,175,0.20));}
 .memo-content-poster img{width:100%;height:100%;object-fit:cover;display:block;}
-.memo-q{display:block;font-size:calc(var(--main-text-size) - 1px);color:var(--ts);line-height:1.35;margin-bottom:3px;} /* 오늘의 질문 — 답변 위 흐린 한 줄(Q.), 2026-09-19 */
+.memo-q{display:block;font-size:calc(var(--main-text-size) - 1px);color:var(--ts);line-height:1.35;margin-bottom:3px;} /* 오늘의 질문 — 답변 위 흐린 한 줄(Q.) */
 .rmemo-reroll{align-items:center;gap:4px;width:fit-content;margin:2px auto 4px;padding:4px 10px;background:none;border:none;color:var(--ts);font-size:var(--dow-label-size);cursor:pointer;}
 .rmemo-reroll:disabled{opacity:.4;}
 .memo-content-body{font-size:var(--main-text-size);color:var(--tp);line-height:1.4;}
@@ -609,10 +604,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 .photo-viewer-ov{position:fixed;inset:0;background:rgba(30,20,18,.82);z-index:10001;display:none;align-items:center;justify-content:center;padding:20px;}
 .photo-viewer-ov.on{display:flex;}
-/* 딤은 background-color가 아니라 background-image로 — iOS 26+는 화면 상단에 닿는 fixed 레이어의 배경색으로 상태바 영역을 칠하므로(app.js hideSplash 주석 참고), 반투명 딤이 상태바를 물들이지 않고 #bg-fixed(앱컬러)가 기준으로 남게 함 (2026-09-21) */
+/* 딤은 background-color가 아니라 background-image로 — iOS 26+는 화면 상단에 닿는 fixed 레이어의 배경색으로 상태바 영역을 칠하므로(app.js hideSplash 주석 참고), 반투명 딤이 상태바를 물들이지 않고 #bg-fixed(앱컬러)가 기준으로 남게 함 */
 .rhythm-memo-ov{position:fixed;inset:0;background:linear-gradient(rgba(140,105,95,.38),rgba(140,105,95,.38));z-index:10001;display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(10px);}
 .rhythm-memo-ov.on{display:flex;}
-.rhythm-memo-card{width:100%;max-width:320px;background:linear-gradient(160deg,#fffafb,#fffbf3);border-radius:20px;padding:22px 18px 18px;box-shadow:0 10px 30px rgba(190,110,120,.2);position:relative;overflow:hidden;} /* 스누즈·메모유도·질문 팝업 공용 — 2026-09-21 화사한 핑크화이트 카드로 개편 */
+.rhythm-memo-card{width:100%;max-width:320px;background:linear-gradient(160deg,#fffafb,#fffbf3);border-radius:20px;padding:22px 18px 18px;box-shadow:0 10px 30px rgba(190,110,120,.2);position:relative;overflow:hidden;} /* 스누즈·메모유도·질문 팝업 공용 — 화사한 핑크화이트 카드 */
 .rhythm-memo-card::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:var(--rainbow-done);} /* 상단 무지개띠 — 완독 버튼과 같은 공용 변수 */
 .rhythm-memo-close{position:absolute;top:10px;right:10px;width:26px;height:26px;border-radius:13px;background:rgba(107,82,72,.08);border:none;display:flex;align-items:center;justify-content:center;color:var(--ts);cursor:pointer;}
 .rhythm-memo-icon{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:6px auto 10px;}
@@ -700,9 +695,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .ctl-cat-fixed{width:60px;flex-shrink:0;font-size:var(--dow-label-size);color:var(--ts);cursor:pointer;padding-right:4px;-webkit-tap-highlight-color:rgba(var(--pal-pink-rgb),0.20);user-select:none;}
 .ctl-cat-fixed span span:last-child{text-decoration:underline dotted;text-decoration-color:rgba(150,130,120,0.35);text-underline-offset:2px;}
 .ctl-cat-fixed.ctl-cat-sub{cursor:default;text-decoration:none;opacity:0.35;}
-.ctl-date-scroll{flex:1;overflow-x:auto;touch-action:pan-x;}
+.ctl-date-scroll{flex:1;overflow-x:auto;touch-action:pan-x;-ms-overflow-style:none;scrollbar-width:none;}
 .ctl-date-scroll::-webkit-scrollbar{display:none;}
-.ctl-date-scroll{-ms-overflow-style:none;scrollbar-width:none;}
+
 .ctl-date-inner{display:flex;gap:2px;}
 .ctl-cell{width:20px;height:20px;flex-shrink:0;border-radius:4px;background:none;border:0.5px dashed rgba(var(--divider-rgb),0.3);box-sizing:border-box;}
 .ctl-block{height:20px;border-radius:5px;display:flex;align-items:center;padding:0 6px;font-size:var(--dow-label-size);color:var(--tp);flex-shrink:0;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;-webkit-tap-highlight-color:rgba(var(--pal-pink-rgb),0.20);user-select:none;}
@@ -734,9 +729,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 #monthly-cal .cal-event-bar.bar-round-l{border-top-left-radius:4px;border-bottom-left-radius:4px;margin-left:0;width:calc(100% + 1px);} /* 실제 시작 칸은 왼쪽 끝을 하루짜리 배지(.cal-event-badge, 칸 안쪽 1px 여백)와 같은 선에 맞춤 — 이어지는 쪽(오른쪽)만 옆 칸으로 1px 번지게 유지 */
 #monthly-cal .cal-event-bar.bar-round-r{border-top-right-radius:4px;border-bottom-right-radius:4px;margin-right:0;width:calc(100% + 1px);} /* 실제 끝 칸은 오른쪽 끝을 배지와 같은 선에 맞춤 */
 #monthly-cal .cal-event-bar.bar-round-l.bar-round-r{width:100%;} /* 하루 칸 안에서 시작+끝인 막대(주 안 1칸짜리)는 양쪽 다 배지와 동일 폭 */
-#monthly-cal .cal-event-bar.ev-schedule{background:rgba(161,120,176,0.80);} /* lavender 반전 +25% 밝게, 2026-09-04 */
+#monthly-cal .cal-event-bar.ev-schedule{background:rgba(161,120,176,0.80);} /* lavender 반전 +25% 밝게 */
 #monthly-cal .cal-event-bar.ev-personal{background:rgba(235,180,20,0.80);}
-#monthly-cal .cal-event-bar.ev-work{background:rgba(98,142,169,0.85);} /* mint→sky 교체 +25% 밝게, 2026-09-04 */
+#monthly-cal .cal-event-bar.ev-work{background:rgba(98,142,169,0.85);} /* mint→sky 교체 +25% 밝게 */
 #monthly-cal .cal-event-bar.ev-etc{background:rgba(128,118,108,0.60);}
 .cal-day-name{text-align:center;font-size:10px;color:var(--tm);padding:0 0 10px;}
 .cal-day{display:flex;flex-direction:column;align-items:center;padding:4px 2px 8px;cursor:pointer;position:relative;}
@@ -747,7 +742,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 #monthly-cal .cal-num{width:24px;height:24px;font-size:12px;margin-bottom:2px;}
 #monthly-cal .cal-day.has-record .cal-num{background:rgba(200,176,168,0.12);}
 /* 미래 날짜에 등록된 미완료 투두(할일/시간표 포함) 존재 표시 — 과거 has-record(채움)와 구분되도록 테두리만, 존재감 최소화 */
-#monthly-cal .cal-day.other-month .cal-event-bar,#monthly-cal .cal-day.other-month .cal-event-badge,#monthly-cal .cal-day.other-month .cal-event-more{opacity:.5;} /* 전달/다음달 칸의 일정은 흐리게 — 이번 달과 구분(2026-09-19) */
+#monthly-cal .cal-day.other-month .cal-event-bar,#monthly-cal .cal-day.other-month .cal-event-badge,#monthly-cal .cal-day.other-month .cal-event-more{opacity:.5;} /* 전달/다음달 칸의 일정은 흐리게 — 이번 달과 구분 */
 #monthly-cal .cal-day.has-pending .cal-num{border:1px dashed rgba(200,176,168,0.45);}
 #monthly-cal .cal-day.today .cal-num{background:rgba(205,95,95,0.65);color:#fff;}
 #monthly-cal .cal-day.selected .cal-num{background:rgba(230,150,150,0.24);color:rgba(180,90,90,0.90);}
@@ -763,7 +758,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cal-day.today .cal-num{background:rgba(230,150,150,0.24);color:rgba(180,90,90,0.90);border:1.5px solid rgba(230,150,150,0.65);}
 .cal-day.selected .cal-num{background:rgba(230,150,150,0.24);color:rgba(180,90,90,0.90);}
 .cal-day.other-month .cal-num{color:rgba(200,180,175,.38);}
-/* 일요일(7번째 열)만 빨간색 — 월간탭 달력과 날짜선택 팝업 달력 공통(둘 다 .cal-grid 직계 자식이 7열로 흐르는 구조라 7n번째=일요일). 오늘/선택 칸은 각자 색 규칙 유지, 전달·다음달 칸은 옅은 빨강 (2026-09-19) */
+/* 일요일(7번째 열)만 빨간색 — 월간탭 달력과 날짜선택 팝업 달력 공통(둘 다.cal-grid 직계 자식이 7열로 흐르는 구조라 7n번째=일요일). 오늘/선택 칸은 각자 색 규칙 유지, 전달·다음달 칸은 옅은 빨강 */
 .cal-grid > .cal-day-name:nth-child(7n){color:rgba(205,100,100,.8);}
 .cal-grid > .cal-day:nth-child(7n):not(.other-month):not(.today):not(.selected) .cal-num{color:rgba(205,95,95,.9);}
 .cal-grid > .cal-day.other-month:nth-child(7n) .cal-num{color:rgba(205,110,110,.35);}
@@ -852,7 +847,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .tw-fade-top,.tw-fade-bottom{position:absolute;left:0;right:0;height:34px;pointer-events:none;z-index:2;}
 .tw-fade-top{top:0;background:linear-gradient(180deg,var(--modal) 10%,rgba(0,0,0,0));}
 .tw-fade-bottom{bottom:0;background:linear-gradient(0deg,var(--modal) 10%,rgba(0,0,0,0));}
-/* PC(마우스 포인터) 환경 전용 — 롤링 휠 대신 노출되는 시:분 숫자 입력. 롤링과 동일한 자리(.tw-wrap)에 렌더되며 톤은 --inp/--tp 등 앱 공용 변수 재사용(2026-09-05). */
+/* PC(마우스 포인터) 환경 전용 — 롤링 휠 대신 노출되는 시:분 숫자 입력. 롤링과 동일한 자리(.tw-wrap)에 렌더되며 톤은 --inp/--tp 등 앱 공용 변수 재사용. */
 .tw-pc-input-row{display:flex;align-items:center;gap:6px;}
 .tw-pc-input{width:44px;height:48px;font-size:19px;font-weight:600;text-align:center;color:var(--tp);background:var(--inp);border:1px solid var(--inp-b);border-radius:12px;font-variant-numeric:tabular-nums;box-sizing:border-box;-moz-appearance:textfield;}
 .tw-pc-input::-webkit-inner-spin-button,.tw-pc-input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
@@ -890,8 +885,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .settings-back{width:36px;height:36px;background:var(--card);border:1px solid var(--card-b);border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .settings-ttl{font-size:18px;font-weight:500;color:var(--tp);}
 .settings-body{padding:20px;display:flex;flex-direction:column;gap:20px;}
-.settings-slbl{font-size:var(--dow-label-size);color:var(--tm);letter-spacing:3px;text-transform:uppercase;margin:18px 0 10px;}
-.settings-card{background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:16px;}
+/* 설정탭 섹션 접이식 — 제목 행만 보이고 탭하면 본문이 펼쳐짐. 한 번에 여러 섹션을 열어둘 수 있음. */
+.settings-sec{background:var(--card);border:1px solid var(--card-b);border-radius:16px;overflow:hidden;}
+.settings-sec-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;}
+.settings-sec-hdr .ti{transition:transform .2s ease;color:var(--tm);}
+.settings-sec.open .settings-sec-hdr .ti{transform:rotate(180deg);}
+.settings-sec-body{display:none;padding:0 16px 16px;border-top:1px solid rgba(var(--divider-rgb),0.25);}
+.settings-sec.open .settings-sec-body{display:block;}
+.settings-acc-fixed{font-size:var(--dow-label-size);color:var(--tm);white-space:nowrap;} /* 고정 시각/조건 표시(수정 불가) */
 .color-themes{display:flex;gap:10px;flex-wrap:wrap;}
 .ctheme-btn{width:52px;height:52px;border-radius:14px;cursor:pointer;border:3px solid transparent;transition:all .15s;display:flex;align-items:center;justify-content:center;font-size:14px;color:transparent;}
 .ctheme-btn.on{border-color:rgba(205,95,95,0.75);color:white;text-shadow:0 1px 3px rgba(0,0,0,.3);}
@@ -956,14 +957,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rd-top-title{font-size:15px;font-weight:600;color:var(--tp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .rd-top-author{font-size:var(--dow-label-size);color:var(--tm);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .sw-card{position:relative;}
-/* 탭 전환 방식(2026-09-09e) — 슬라이드가 동시에 1개만 레이아웃에 존재(display:block/none)하므로
-   트랙/클리핑 경계 자체가 필요 없음. 이전의 스와이프+트랙+transform 구조가 반복적으로 렌더링
-   아티팩트(옆 카드 경계가 새어나오는 세로줄)를 일으켜서 구조를 단순화함. */
+/* 탭 전환 방식 — 슬라이드가 동시에 1개만 레이아웃에 존재(display:block/none)하므로
+ 트랙/클리핑 경계 자체가 필요 없음. 이전의 스와이프+트랙+transform 구조가 반복적으로 렌더링
+ 아티팩트(옆 카드 경계가 새어나오는 세로줄)를 일으켜서 구조를 단순화함. */
 .sw-card-panels{position:relative;}
 .sw-card-slide{box-sizing:border-box;}
 .sw-card-dots{display:flex;justify-content:center;align-items:center;gap:5px;margin-top:10px;cursor:pointer;position:relative;}
 /* 탭 히트 영역만 위아래로 넓힘(레이아웃 높이엔 영향 없는 절대배치) — 배너 세로 길이가 1권일 때와
-   동일하게 유지되도록 실제 박스 크기는 그대로 두고, 터치 판정 범위만 :: before로 확장(2026-09-09g). */
+ 동일하게 유지되도록 실제 박스 크기는 그대로 두고, 터치 판정 범위만 :: before로 확장. */
 .sw-card-dots::before{content:'';position:absolute;left:0;right:0;top:-8px;bottom:-8px;}
 .sw-card-dot{width:5px;height:5px;border-radius:50%;background:var(--card-b);transition:background .2s;cursor:pointer;}
 .sw-card-dot.on{background:var(--tp);}
@@ -997,7 +998,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .mf-card-icon{font-size:18px;margin-bottom:2px;}
 .mf-card-label{font-size:var(--dow-label-size-2);color:var(--ts);}
 .mf-card-count{font-size:var(--dow-label-size-3);color:var(--tm);margin-top:1px;}
-/* 오늘의 슬롯(2026-09-20 복수 슬롯 개편) — 그리드 카드를 누를 때마다 원형 아이콘이 하나씩 추가됨. 시작 전(테두리만)/진행중(옅은 색+깜빡임)/완료(꽉 채움), 길게 누르면 삭제 */
+/* 오늘의 슬롯 — 그리드 카드를 누를 때마다 원형 아이콘이 하나씩 추가됨. 시작 전(테두리만)/진행중(옅은 색+깜빡임)/완료(꽉 채움), 길게 누르면 삭제 */
 .mf-slots{display:flex;flex-wrap:wrap;gap:12px;margin-top:16px;align-items:center;justify-content:center;}
 .mf-slot{width:38px;height:38px;border-radius:50%;border:1.5px solid rgba(var(--mf-rgb),0.9);color:rgb(var(--mf-rgb));display:flex;align-items:center;justify-content:center;font-size:19px;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:manipulation;transition:background .18s;}
 .mf-slot.running{background:rgba(var(--mf-rgb),0.30);animation:mfSlotPulse 1.4s ease-in-out infinite;}
@@ -1019,7 +1020,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .pace-title{font-size:var(--dow-label-size);color:var(--tm);margin-bottom:10px;display:flex;align-items:center;gap:5px;}
 .pace-divider{height:1px;background:rgba(var(--divider-rgb),0.25);margin:16px 0;}
 
-/* ── 오후 홈탭 "오늘의 흐름" 카드(2026-09-04 개편) ── */
+/* ── 오후 홈탭 "오늘의 흐름" 카드 ── */
 :root{
   --src-event:var(--pal-lavender-bg);--src-event-text:var(--pal-lavender-text);
   --src-todo:var(--pal-mint-bg);--src-todo-text:var(--pal-mint-text);
@@ -1447,9 +1448,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rt-hourlabel{position:absolute;left:0;width:28px;text-align:right;font-size:var(--dow-label-size-3);color:var(--tm);transform:translateY(-50%);}
 .rt-fill{position:absolute;left:44px;right:0;border-radius:4px;display:flex;align-items:center;justify-content:space-between;padding:0 8px;box-sizing:border-box;overflow:hidden;}
 .rt-fill::before{content:'';position:absolute;inset:0;background:rgba(255,250,240,0.22);border-radius:4px;pointer-events:none;}
-/* [2026-09-06] 총 소요시간 61분 이상인 블록은 텍스트를 상단정렬로 전환 — 긴 블록 한가운데 짧은 블록(점심
-   식사 등)이 걸쳐 텍스트가 부딪히는 문제 방지. 60분 이하는 기존 중앙정렬(짧은 블록에서 텍스트가 상/하단
-   으로 쏠려 보이는 문제 방지 목적) 유지. */
+/* 총 소요시간 61분 이상인 블록은 텍스트를 상단정렬로 전환 — 긴 블록 한가운데 짧은 블록(점심
+ 식사 등)이 걸쳐 텍스트가 부딪히는 문제 방지. 60분 이하는 기존 중앙정렬(짧은 블록에서 텍스트가 상/하단
+ 으로 쏠려 보이는 문제 방지 목적) 유지. */
 .rt-fill.rt-fill-top{align-items:flex-start;padding-top:6px;}
 .rt-fill-label{position:relative;font-size:var(--rt-fill-label-size);font-weight:500;color:var(--tp);display:flex;align-items:center;gap:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1;}
 .rt-fill-time{position:relative;flex-shrink:0;font-size:var(--dow-label-size);color:var(--tp);font-variant-numeric:tabular-nums;font-family:'DM Sans',sans-serif;margin-left:6px;}
@@ -1483,8 +1484,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .rhythm-content-picker-swipe::-webkit-scrollbar{display:none;}
 .rhythm-content-picker-swipe .rhythm-content-chip{flex-shrink:0;}
 .rhythm-content-chip{font-size:var(--dow-label-size);color:var(--tp);background:var(--card);border:1px solid var(--card-b);border-radius:9px;padding:6px 10px;cursor:pointer;white-space:nowrap;transition:all .15s;}
-/* 설정탭 해빗 카탈로그 전용 — 4열 그리드로 고정해 7개 항목이 4개+3개 두 줄로 가지런히 배치되게 함(2026-09-06).
-   칩 자체는 .rhythm-content-chip 스타일을 그대로 쓰되, 이 그리드 안에서는 폭을 셀에 맞춰 늘림. */
+/* 설정탭 해빗 카탈로그 전용 — 4열 그리드로 고정해 7개 항목이 4개+3개 두 줄로 가지런히 배치되게 함.
+ 칩 자체는.rhythm-content-chip 스타일을 그대로 쓰되, 이 그리드 안에서는 폭을 셀에 맞춰 늘림. */
 .settings-habit-chip-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
 .settings-habit-chip-grid .rhythm-content-chip{width:100%;box-sizing:border-box;text-align:center;white-space:normal;}
 .rhythm-content-chip.sel{border:1.6px solid var(--sel-color,rgba(190,160,230,0.75));background:var(--sel-bg,rgba(190,160,230,0.14));color:var(--tp);font-weight:600;}
@@ -2428,123 +2429,12 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <span class="settings-ttl">설정</span>
   </div>
   <div class="settings-body">
-    <div>
-      <div class="settings-slbl">테마</div>
-      <div class="settings-card">
-        <div class="settings-slbl">컬러 테마</div>
-        <div class="color-themes">
-          <div class="ctheme-btn on" id="ct-light" style="background:linear-gradient(135deg,#fdf0e8,#fde8f0)" onclick="setTheme('light',this)">✓</div>
-          <div class="ctheme-btn" id="ct-glass" style="background:linear-gradient(135deg,#f7f4ee,#f3f1ec)" onclick="setTheme('glass',this)">✓</div>
-        </div>
+    <div class="settings-sec" id="sec-profile">
+      <div class="settings-sec-hdr" onclick="toggleSettingsSection('profile')">
+        <span class="settings-item-lbl">내 정보</span>
+        <i class="ti ti-chevron-down" aria-hidden="true"></i>
       </div>
-    </div>
-    <div>
-      <div class="settings-slbl">알림</div>
-      <div class="settings-card">
-        <div class="settings-item-lbl" style="margin-bottom:8px;" id="push-status-lbl">알림이 꺼져 있어요</div>
-        <button class="settings-btn-fill" id="push-toggle-btn" style="width:100%;" onclick="togglePushSubscription()">알림 켜기</button>
-        <div class="settings-acc-header" style="margin-top:14px;" onclick="toggleSettingsAccordion('alert-detail')">
-          <span class="settings-item-lbl">알림 종류 관리</span>
-          <i class="ti ti-chevron-down" aria-hidden="true"></i>
-        </div>
-        <div class="settings-acc-body" id="settings-acc-alert-detail">
-          <div style="padding-top:10px;display:flex;flex-direction:column;">
-            <div class="settings-acc-row">
-              <span class="settings-item-lbl">아침 브리핑</span>
-              <div style="display:flex;align-items:center;gap:10px;">
-                <span class="settings-acc-time" id="alert-time-morning" onclick="openAlertTimePickerFor('morning')">--:--</span>
-                <div class="settings-toggle" id="alert-toggle-morning" onclick="toggleAlertEnabled('morning')"></div>
-              </div>
-            </div>
-            <div class="settings-acc-row">
-              <span class="settings-item-lbl">수면 시간 (23:00 고정)</span>
-              <div class="settings-toggle" id="alert-toggle-sleep" onclick="toggleAlertEnabled('sleep')"></div>
-            </div>
-            <div class="settings-acc-row">
-              <span class="settings-item-lbl">리듬 진행중 리마인드 (60분 고정)</span>
-              <div class="settings-toggle" id="alert-toggle-rhythm" onclick="toggleAlertEnabled('rhythm')"></div>
-            </div>
-            <div class="settings-acc-row">
-              <span class="settings-item-lbl">주간·월말 리포트 (22:00 고정)</span>
-              <div class="settings-toggle" id="alert-toggle-report" onclick="toggleAlertEnabled('report')"></div>
-            </div>
-            <div class="settings-acc-row">
-              <span class="settings-item-lbl">운동 통계 (종료 10분 후)</span>
-              <div class="settings-toggle" id="alert-toggle-exercise" onclick="toggleAlertEnabled('exercise')"></div>
-            </div>
-            <div class="settings-acc-row">
-              <span class="settings-item-lbl">수면 점수 미등록 (09:00 고정)</span>
-              <div class="settings-toggle" id="alert-toggle-sleepscore" onclick="toggleAlertEnabled('sleepscore')"></div>
-            </div>
-            <div class="settings-acc-row">
-              <span class="settings-item-lbl">오늘의 질문 (19:30 고정)</span>
-              <div class="settings-toggle" id="alert-toggle-question" onclick="toggleAlertEnabled('question')"></div>
-            </div>
-            <div class="settings-acc-row">
-              <span class="settings-item-lbl">오늘의 질문 남은 개수</span>
-              <span class="settings-acc-time" id="question-remaining-lbl" style="cursor:default;">-</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div>
-      <div class="settings-slbl">글자 크기</div>
-      <div class="settings-card">
-        <div class="text-scale-ctrl">
-          <button class="text-scale-step" id="tsc-dec" onclick="stepTextScale(-1)">A-</button>
-          <div class="text-scale-dots" id="tsc-dots">
-            <span class="text-scale-dot" id="tsc-dot--1"></span>
-            <span class="text-scale-dot" id="tsc-dot-0"></span>
-            <span class="text-scale-dot" id="tsc-dot-1"></span>
-          </div>
-          <button class="text-scale-step" id="tsc-inc" onclick="stepTextScale(1)">A+</button>
-        </div>
-      </div>
-    </div>
-    <div>
-      <div class="settings-slbl">해빗</div>
-      <div class="settings-card">
-        <div class="settings-item-lbl" style="margin-bottom:8px;">항목 선택</div>
-        <div id="settings-habit-catalog-chips" class="settings-habit-chip-grid" style="margin-bottom:14px;"></div>
-        <div class="settings-item-lbl" style="margin-bottom:8px;">직접 추가</div>
-        <div style="display:flex;gap:8px;margin-bottom:14px;">
-          <input type="text" id="settings-habit-custom-inp" class="modal-inp" placeholder="예: 베란다 식물 물주기" style="margin-bottom:0;flex:1;" autocomplete="off">
-          <button class="settings-btn-fill" style="width:auto;padding:0 16px;" onclick="addCustomHabitFromSettings()">추가</button>
-        </div>
-        <div id="settings-habit-goal-wake-wrap" style="display:none;border-top:1px solid var(--card-b);padding-top:12px;margin-bottom:14px;">
-          <div class="settings-item-lbl" style="margin-bottom:8px;">아침기상 목표시각</div>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <input type="text" id="settings-habit-wake-goal-inp" class="modal-inp time-inp" style="margin-bottom:0;width:110px;" placeholder="07:30" readonly onclick="openTimeModalForHabitGoal()">
-            <span style="font-size:var(--dow-label-size);color:var(--tm);">이내 기상 시 자동 체크</span>
-          </div>
-        </div>
-        <button id="settings-habit-save-btn" class="settings-btn-fill" style="width:100%;" onclick="saveHabitEdits()">저장됨</button>
-      </div>
-    </div>
-    <div>
-      <div class="settings-slbl">백업</div>
-      <div class="settings-card">
-        <div class="settings-item" onclick="downloadFullJSONBackup()" style="cursor:pointer;"><span class="settings-item-lbl"><i class="ti ti-download ico-inline-15tp" aria-hidden="true"></i>전체 데이터 백업 (JSON)</span><i class="ti ti-chevron-right sub-tm-13" aria-hidden="true"></i></div>
-      </div>
-    </div>
-    <div>
-      <div class="settings-slbl">Claude API</div>
-      <div class="settings-card">
-        <div class="settings-item" style="flex-direction:column;align-items:flex-start;gap:8px;padding-bottom:12px;">
-          <span class="settings-item-lbl">API 키</span>
-          <input type="text" id="claude-api-key-inp" class="modal-inp settings-key-inp"
-            placeholder="sk-ant-api03-..."
-            autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-          <button onclick="saveClaudeKey()"
-            class="settings-btn-fill">
-            저장
-          </button>
-          <button onclick="clearClaudeKey()"
-            class="settings-btn-small">
-            키 삭제
-          </button>
-        </div>
+      <div class="settings-sec-body">
         <div class="settings-item">
           <span class="settings-item-lbl">생일</span>
           <span style="display:flex;align-items:center;gap:6px;white-space:nowrap;">
@@ -2564,18 +2454,164 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
             저장
           </button>
         </div>
+      </div>
+    </div>
+    <div class="settings-sec" id="sec-alert">
+      <div class="settings-sec-hdr" onclick="toggleSettingsSection('alert')">
+        <span class="settings-item-lbl">알림</span>
+        <i class="ti ti-chevron-down" aria-hidden="true"></i>
+      </div>
+      <div class="settings-sec-body">
+        <div class="settings-item-lbl" style="margin:12px 0 8px;" id="push-status-lbl">알림이 꺼져 있어요</div>
+        <button class="settings-btn-fill" id="push-toggle-btn" style="width:100%;" onclick="togglePushSubscription()">알림 켜기</button>
+        <div id="settings-acc-alert-detail" style="margin-top:12px;">
+            <div class="settings-acc-row">
+              <span class="settings-item-lbl">아침 브리핑</span>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span class="settings-acc-time" id="alert-time-morning" onclick="openAlertTimePickerFor('morning')">--:--</span><div class="settings-toggle" id="alert-toggle-morning" onclick="toggleAlertEnabled('morning')"></div>
+              </div>
+            </div>
+            <div class="settings-acc-row">
+              <span class="settings-item-lbl">수면 점수 미등록</span>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span class="settings-acc-fixed">09:00</span><div class="settings-toggle" id="alert-toggle-sleepscore" onclick="toggleAlertEnabled('sleepscore')"></div>
+              </div>
+            </div>
+            <div class="settings-acc-row">
+              <span class="settings-item-lbl">오늘의 질문</span>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span class="settings-acc-fixed">19:30</span><div class="settings-toggle" id="alert-toggle-question" onclick="toggleAlertEnabled('question')"></div>
+              </div>
+            </div>
+            <div class="settings-acc-row">
+              <span class="settings-item-lbl">취침 알림</span>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span class="settings-acc-fixed">23:00</span><div class="settings-toggle" id="alert-toggle-sleep" onclick="toggleAlertEnabled('sleep')"></div>
+              </div>
+            </div>
+            <div class="settings-acc-row">
+              <span class="settings-item-lbl">주간·월말 리포트</span>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span class="settings-acc-fixed">22:00</span><div class="settings-toggle" id="alert-toggle-report" onclick="toggleAlertEnabled('report')"></div>
+              </div>
+            </div>
+            <div class="settings-acc-row">
+              <span class="settings-item-lbl">리듬 진행중 리마인드</span>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span class="settings-acc-fixed">1시간·3시간</span><div class="settings-toggle" id="alert-toggle-rhythm" onclick="toggleAlertEnabled('rhythm')"></div>
+              </div>
+            </div>
+            <div class="settings-acc-row">
+              <span class="settings-item-lbl">운동 통계</span>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span class="settings-acc-fixed">종료 10분 후</span><div class="settings-toggle" id="alert-toggle-exercise" onclick="toggleAlertEnabled('exercise')"></div>
+              </div>
+            </div>
+            <div class="settings-acc-row" style="margin-top:4px;">
+              <span class="settings-item-lbl" style="color:var(--tm);">오늘의 질문 남은 개수</span>
+              <span class="settings-acc-time" id="question-remaining-lbl" style="cursor:default;">-</span>
+            </div>
+        </div>
+      </div>
+    </div>
+    <div class="settings-sec" id="sec-habit">
+      <div class="settings-sec-hdr" onclick="toggleSettingsSection('habit')">
+        <span class="settings-item-lbl">해빗</span>
+        <i class="ti ti-chevron-down" aria-hidden="true"></i>
+      </div>
+      <div class="settings-sec-body">
+
+        <div class="settings-item-lbl" style="margin:12px 0 8px;">항목 선택</div>
+        <div id="settings-habit-catalog-chips" class="settings-habit-chip-grid" style="margin-bottom:14px;"></div>
+        <div class="settings-item-lbl" style="margin-bottom:8px;">직접 추가</div>
+        <div style="display:flex;gap:8px;margin-bottom:14px;">
+          <input type="text" id="settings-habit-custom-inp" class="modal-inp" placeholder="예: 베란다 식물 물주기" style="margin-bottom:0;flex:1;" autocomplete="off">
+          <button class="settings-btn-fill" style="width:auto;padding:0 16px;" onclick="addCustomHabitFromSettings()">추가</button>
+        </div>
+        <div id="settings-habit-goal-wake-wrap" style="display:none;border-top:1px solid var(--card-b);padding-top:12px;margin-bottom:14px;">
+          <div class="settings-item-lbl" style="margin-bottom:8px;">아침기상 목표시각</div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <input type="text" id="settings-habit-wake-goal-inp" class="modal-inp time-inp" style="margin-bottom:0;width:110px;" placeholder="07:30" readonly onclick="openTimeModalForHabitGoal()">
+            <span style="font-size:var(--dow-label-size);color:var(--tm);">이내 기상 시 자동 체크</span>
+          </div>
+        </div>
+        <button id="settings-habit-save-btn" class="settings-btn-fill" style="width:100%;" onclick="saveHabitEdits()">저장됨</button>
+      
+      </div>
+    </div>
+    <div class="settings-sec" id="sec-display">
+      <div class="settings-sec-hdr" onclick="toggleSettingsSection('display')">
+        <span class="settings-item-lbl">화면</span>
+        <i class="ti ti-chevron-down" aria-hidden="true"></i>
+      </div>
+      <div class="settings-sec-body">
+        <div class="settings-item-lbl" style="margin:12px 0 8px;">컬러 테마</div>
+        <div class="color-themes">
+          <div class="ctheme-btn on" id="ct-light" style="background:linear-gradient(135deg,#fdf0e8,#fde8f0)" onclick="setTheme('light',this)">✓</div>
+          <div class="ctheme-btn" id="ct-glass" style="background:linear-gradient(135deg,#f7f4ee,#f3f1ec)" onclick="setTheme('glass',this)">✓</div>
+        </div>
+        <div class="settings-item-lbl" style="margin:18px 0 8px;">글자 크기</div>
+        <div class="text-scale-ctrl">
+          <button class="text-scale-step" id="tsc-dec" onclick="stepTextScale(-1)">A-</button>
+          <div class="text-scale-dots" id="tsc-dots">
+            <span class="text-scale-dot" id="tsc-dot--1"></span>
+            <span class="text-scale-dot" id="tsc-dot-0"></span>
+            <span class="text-scale-dot" id="tsc-dot-1"></span>
+          </div>
+          <button class="text-scale-step" id="tsc-inc" onclick="stepTextScale(1)">A+</button>
+        </div>
+      </div>
+    </div>
+    <div class="settings-sec" id="sec-data">
+      <div class="settings-sec-hdr" onclick="toggleSettingsSection('data')">
+        <span class="settings-item-lbl">데이터</span>
+        <i class="ti ti-chevron-down" aria-hidden="true"></i>
+      </div>
+      <div class="settings-sec-body">
+
+        <div class="settings-item" onclick="downloadFullJSONBackup()" style="cursor:pointer;"><span class="settings-item-lbl"><i class="ti ti-download ico-inline-15tp" aria-hidden="true"></i>전체 데이터 백업 (JSON)</span><i class="ti ti-chevron-right sub-tm-13" aria-hidden="true"></i></div>
+      
+      </div>
+    </div>
+    <div class="settings-sec" id="sec-api">
+      <div class="settings-sec-hdr" onclick="toggleSettingsSection('api')">
+        <span class="settings-item-lbl">Claude API</span>
+        <i class="ti ti-chevron-down" aria-hidden="true"></i>
+      </div>
+      <div class="settings-sec-body">
+        <div class="settings-item" style="flex-direction:column;align-items:flex-start;gap:8px;padding-bottom:12px;">
+          <span class="settings-item-lbl">API 키</span>
+          <input type="text" id="claude-api-key-inp" class="modal-inp settings-key-inp"
+            placeholder="sk-ant-api03-..."
+            autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          <button onclick="saveClaudeKey()"
+            class="settings-btn-fill">
+            저장
+          </button>
+          <button onclick="clearClaudeKey()"
+            class="settings-btn-small">
+            키 삭제
+          </button>
+        </div>
         <div class="settings-item">
           <span style="font-size:var(--dow-label-size);color:var(--tm);" id="claude-key-status">날씨 인사 · 주간 루틴 · 일정 요약에 사용돼요</span>
         </div>
       </div>
     </div>
-    <div>
-      <div class="settings-slbl">앱 정보</div>
-      <div class="settings-card">
-        <div class="settings-item"><span class="settings-item-lbl">버전</span><span class="settings-item-val">2.11</span></div>
-        <div class="settings-item"><span class="settings-item-lbl">2.11 주요 업데이트</span><span class="settings-item-val">반복 할일 구조 재설계(서버 실체화로 안정성 개선)</span></div>
+    <div class="settings-sec" id="sec-about">
+      <div class="settings-sec-hdr" onclick="toggleSettingsSection('about')">
+        <span class="settings-item-lbl">앱 정보</span>
+        <i class="ti ti-chevron-down" aria-hidden="true"></i>
+      </div>
+      <div class="settings-sec-body">
+        <div class="settings-item"><span class="settings-item-lbl">버전</span><span class="settings-item-val">2.16</span></div>
+        <div class="settings-item" style="flex-direction:column;align-items:flex-start;gap:6px;">
+          <span class="settings-item-lbl">최근 업데이트</span>
+          <span class="settings-item-val" style="line-height:1.7;">알림 개편 — 알림을 탭하면 백그라운드에서도 팝업이 열려요<br>수면 점수 미등록 알림 · 생일 축하 추가<br>오프모드 통계·주간 습관 박스 보완 · 설정탭·코드 정리</span>
+        </div>
       </div>
     </div>
+  
   </div>
 </div>
 
@@ -2713,7 +2749,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   </div>
 </div>
 
-<script src="app.js?v=20261001b"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
+<script src="app.js?v=20261001e"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
 
 </body>
 </html>
