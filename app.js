@@ -2201,10 +2201,6 @@ function isBirthdayDk(dk){
   return false;
 }
 function isTodayBirthday(){return isBirthdayDk(dateKey(new Date()));}
-function _fmtBirthdayLabel(md){
-  const m=/^(\d\d)-(\d\d)$/.exec(md||'');
-  return m?`${+m[1]}월 ${+m[2]}일`:'미설정';
-}
 // 날짜 pill — 보고 있는 날짜가 생일이면 케이크 아이콘을 붙임(과거/미래로 넘겨도 생일 날짜면 표시)
 function renderDatePill(){
   const d=currentDate;
@@ -2218,17 +2214,48 @@ function renderDatePill(){
     el.appendChild(i);
   }
 }
-function _refreshBirthdayUI(){
+// 설정탭 생일 입력 — 월/일 <select> 2개(iOS에선 휠 피커). 연도 없는 값이라 달력 대신 이 방식을 씀.
+// 일 목록은 월에 맞춰 다시 만들고(2월은 29일까지 — 2/29생은 평년 2/28에 축하), 월·일이 둘 다 골라지면 바로 저장한다.
+const _BDAY_MAX_DAYS=[0,31,29,31,30,31,30,31,31,30,31,30,31];
+function _syncBirthdaySelects(){
+  const ms=document.getElementById('birthday-month'),ds=document.getElementById('birthday-day');
+  if(!ms||!ds)return;
   const md=getBirthdayMD();
-  const v=document.getElementById('birthday-val');if(v)v.textContent=_fmtBirthdayLabel(md);
-  const inp=document.getElementById('birthday-inp');if(inp)inp.value=md?('2000-'+md):'';
+  const m=md?+md.slice(0,2):0,d=md?+md.slice(3):0;
+  if(!ms.options.length){
+    ms.innerHTML='<option value="">월</option>'+Array.from({length:12},(_,i)=>`<option value="${i+1}">${i+1}월</option>`).join('');
+  }
+  _fillBirthdayDayOptions(m,d);
+  ms.value=m?String(m):'';
   const clr=document.getElementById('birthday-clear');if(clr)clr.style.display=md?'inline-block':'none';
+}
+function _fillBirthdayDayOptions(m,selDay){
+  const ds=document.getElementById('birthday-day');if(!ds)return;
+  const max=m?_BDAY_MAX_DAYS[m]:31;
+  ds.innerHTML='<option value="">일</option>'+Array.from({length:max},(_,i)=>`<option value="${i+1}">${i+1}일</option>`).join('');
+  ds.value=(selDay&&selDay<=max)?String(selDay):'';
+}
+function onBirthdayMonthChange(){
+  const m=+document.getElementById('birthday-month').value||0;
+  const prevDay=+document.getElementById('birthday-day').value||0;
+  _fillBirthdayDayOptions(m,prevDay); // 이전에 고른 일이 새 월의 말일을 넘으면 비워짐(예: 31일 → 4월)
+  _commitBirthdaySelects();
+}
+function onBirthdayDayChange(){_commitBirthdaySelects();}
+function _commitBirthdaySelects(){
+  const m=+document.getElementById('birthday-month').value||0;
+  const d=+document.getElementById('birthday-day').value||0;
+  if(!m||!d)return; // 둘 다 골라졌을 때만 저장
+  saveBirthdayMD(String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0'));
+}
+function _refreshBirthdayUI(){
+  _syncBirthdaySelects();
   renderDatePill();
   renderHome(); // 인사카드 배경·제목·AI 문구 즉시 반영(생일 당일이 아니면 평소 모습 그대로)
 }
-async function saveBirthdayFromInput(val){ // val: 'YYYY-MM-DD'(연도는 버림)
-  if(!/^\d{4}-\d\d-\d\d$/.test(val||''))return;
-  const md=val.slice(5);
+async function saveBirthdayMD(md){ // md: 'MM-DD'
+  if(!/^\d\d-\d\d$/.test(md||''))return;
+  if(md===getBirthdayMD())return;
   try{localStorage.setItem(BIRTHDAY_LS_KEY,md);}catch(e){}
   _refreshBirthdayUI();
   try{await supaUpsert('user_settings','id',[{id:true,birthday:md}]);}catch(e){}
@@ -11658,7 +11685,7 @@ function openSettings(){
   renderSettingsHabitSection();
   refreshPushStatusUI();
   renderSettingsAlertSection();
-  { const md=getBirthdayMD();const v=document.getElementById('birthday-val');if(v)v.textContent=_fmtBirthdayLabel(md);const inp=document.getElementById('birthday-inp');if(inp)inp.value=md?('2000-'+md):'';const clr=document.getElementById('birthday-clear');if(clr)clr.style.display=md?'inline-block':'none'; }
+  _syncBirthdaySelects();
   document.getElementById('settings-ov').classList.add('on');
 }
 // 설정탭 알림 시각 3종(아침브리핑/저녁마무리/남은할일) + 개별 온오프 6종 UI — user_settings를 직접 조회해 채움.

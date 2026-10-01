@@ -906,6 +906,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .settings-item:last-child{border-bottom:none;}
 .settings-item-lbl{font-size:var(--main-text-size);color:var(--tp);}
 .settings-item-val{font-size:var(--dow-label-size);color:var(--tm);}
+.bday-sel{appearance:none;-webkit-appearance:none;font-family:'DM Sans',sans-serif;font-size:var(--main-text-size);color:var(--tp);background:transparent;border:1px solid rgba(var(--divider-rgb),0.40);border-radius:10px;padding:6px 10px;text-align:center;text-align-last:center;min-width:56px;} /* 생일 월/일 선택 — iOS에서 휠 피커로 열림 */
 
 
 /* ── API SEARCH ── */
@@ -2543,13 +2544,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           </button>
         </div>
         <div class="settings-item">
-          <span class="settings-item-lbl">생일 <span style="font-size:var(--dow-label-size);color:var(--tm);">월·일만 사용</span></span>
-          <span style="display:flex;align-items:center;gap:8px;">
-            <span style="position:relative;display:inline-block;">
-              <span class="settings-item-val" id="birthday-val">미설정</span>
-              <input type="date" id="birthday-inp" onchange="saveBirthdayFromInput(this.value)" aria-label="생일 선택" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;">
-            </span>
-            <button class="settings-btn-small" id="birthday-clear" style="display:none;" onclick="clearBirthday()">지우기</button>
+          <span class="settings-item-lbl">생일</span>
+          <span style="display:flex;align-items:center;gap:6px;white-space:nowrap;">
+            <select id="birthday-month" class="bday-sel" onchange="onBirthdayMonthChange()" aria-label="생일 월"></select>
+            <select id="birthday-day" class="bday-sel" onchange="onBirthdayDayChange()" aria-label="생일 일"></select>
+            <button class="settings-btn-small" id="birthday-clear" style="display:none;width:auto;padding:6px 12px;white-space:nowrap;" onclick="clearBirthday()">지우기</button>
           </span>
         </div>
         <div class="settings-item" style="flex-direction:column;align-items:flex-start;gap:8px;">
