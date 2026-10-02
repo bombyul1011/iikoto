@@ -8453,16 +8453,15 @@ function getContentMemoItemsForDate(dk){
   const prevMk=monthKey(new Date(y,m-2,1));
   const seen=new Set();
   const items=[]; // {kind:'note'|'final',cid,cat,title,poster,text,time}
-  [mk,prevMk].forEach(searchMk=>{
-    getContents(searchMk).forEach(c=>{
-      if(seen.has(c.cid))return;seen.add(c.cid);
-      (c.notes||[]).forEach(n=>{
-        if(n.dk===dk)items.push({kind:'note',cid:c.cid,cat:c.cat,title:n.title||c.title||'',text:n.text||'',time:n.time||''});
-      });
-      if(c.cat!=='music'&&c.review&&c.reviewSavedDk===dk){
-        items.push({kind:'final',cid:c.cid,cat:c.cat,title:c.title||'',poster:c.poster||null,text:c.review,time:c.reviewSavedTime||''});
-      }
+  // 해당 월 + 전월 + 그 이전 달에서 이어지는 작품(시작월 +2개월 이상 지난 진행중 작품의 메모도 포함)
+  [...getContents(mk),...getPrevContentsWithCarry(prevMk,mk)].forEach(c=>{
+    if(seen.has(c.cid))return;seen.add(c.cid);
+    (c.notes||[]).forEach(n=>{
+      if(n.dk===dk)items.push({kind:'note',cid:c.cid,cat:c.cat,title:n.title||c.title||'',text:n.text||'',time:n.time||''});
     });
+    if(c.cat!=='music'&&c.review&&c.reviewSavedDk===dk){
+      items.push({kind:'final',cid:c.cid,cat:c.cat,title:c.title||'',poster:c.poster||null,text:c.review,time:c.reviewSavedTime||''});
+    }
   });
   return items;
 }
@@ -9727,6 +9726,25 @@ function toggleCDone(){
 function toggleCStop(){
   setCStatus(_contentCtx.status==='stopped'?'watching':'stopped');
 }
+// 새 음악 등록 직후 "애플뮤직에서 열까요?" 확인 토스트 — 5초 뒤 자동으로 사라짐. 열기는 음악 카드의 재생 버튼과 같은 방식(링크 이동).
+var _newMusicUrlForToast=null,_pendingMusicUrl=null,_musicToastTimer=null;
+function showMusicOpenToast(url){
+  const t=document.getElementById('music-open-toast');if(!t||!url)return;
+  _pendingMusicUrl=url;
+  clearTimeout(_musicToastTimer);
+  t.classList.add('on');
+  _musicToastTimer=setTimeout(hideMusicOpenToast,5000);
+}
+function hideMusicOpenToast(){
+  clearTimeout(_musicToastTimer);
+  const t=document.getElementById('music-open-toast');if(t)t.classList.remove('on');
+  _pendingMusicUrl=null;
+}
+function openMusicFromToast(){
+  const u=_pendingMusicUrl;
+  hideMusicOpenToast();
+  if(u)window.location.href=u;
+}
 function confirmContent(){
   if(_contentSubmitting)return;
   const title=document.getElementById('cm-title').value.trim();if(!title)return;
@@ -9802,6 +9820,7 @@ function confirmContent(){
     const watchSummaryFields=(isFinishedStatus(status)&&_contentCtx.cat!=='music')?computeWatchSummary(_contentCtx.cat,newCid,title,startDate,endDate):{};
     contents.push({cat:_contentCtx.cat,title,startDate,endDate,status,review,stars,poster,author,musicUrl,album,releaseYear,totalUnit,currentUnit,reviewSavedDk,reviewSavedTime,created:Date.now(),cid:newCid,...watchSummaryFields});
     saveContents(newMk,contents);
+    if(_contentCtx.cat==='music'&&musicUrl)_newMusicUrlForToast=musicUrl; // 새로 등록한 음악만 — 수정 저장에는 안 띄움
     if(_contentCtx.onSaved){const cb=_contentCtx.onSaved;_contentCtx.onSaved=null;setTimeout(()=>cb(newCid),0);}
   }
   if(_contentCtx.cat==='music'&&savedCid){
@@ -9809,6 +9828,7 @@ function confirmContent(){
     setMusicContentNote(savedCid,title,musicNoteEl?musicNoteEl.value:'');
   }
   closeModal('content-modal');renderContentTimeline();
+  if(_newMusicUrlForToast){showMusicOpenToast(_newMusicUrlForToast);_newMusicUrlForToast=null;}
   if(_contentCtx.cat==='book'&&savedCid){
     const bookUnit=_cmUnit||'percent';
     const bookTotalPages=bookUnit==='pages'?(parseInt(document.getElementById('cm-total-pages').value,10)||null):null;
@@ -9817,11 +9837,12 @@ function confirmContent(){
   setTimeout(()=>{_contentSubmitting=false;},500);
 }
 // cid로 실제 저장 버킷(month_key)을 찾음 — 콘텐츠는 시작월에 저장되지만, 화면엔 진행중 이월분이 섞여 보일 수 있어
-// 현재 보고 있는 달(mk)과 그 전월 둘 다 뒤짐(computeContentMonthlyList와 동일한 탐색 범위).
+// 현재 보고 있는 달(mk)부터 거슬러 올라가며 뒤짐(아래 함수 주석 참고).
 function _findContentByCidNearMk(cid,mk){
   const [y,m]=mk.split('-').map(Number);
-  const prevMk=monthKey(new Date(y,m-2,1));
-  for(const searchMk of [mk,prevMk]){
+  // mk → 전월 → 그 이전 달 순으로 최대 CONTENT_CARRY_LOOKBACK_MONTHS+1개월 전까지(시작월 +2개월 이상 지난 진행중 작품도 찾도록)
+  for(let i=0;i<=CONTENT_CARRY_LOOKBACK_MONTHS+1;i++){
+    const searchMk=i===0?mk:monthKey(new Date(y,m-1-i,1));
     const list=getContents(searchMk);
     const idx=list.findIndex(c=>c.cid===cid);
     if(idx>=0)return{mk:searchMk,list,idx};
@@ -10406,36 +10427,49 @@ async function apiSearch(q){
     else await searchTMDB(q,cat,resultsEl);
   }catch(e){resultsEl.innerHTML='<div class="api-loading">검색 실패 — 직접 입력해주세요</div>';}
 }
-function searchITunes(q,el){
-  return new Promise((resolve)=>{
-    const cbName='_itunesCb'+Date.now();
+// 음악 검색 — 한국 스토어(country=KR)를 먼저 시도하고, 0건이거나 실패하면 country 없이(미국 스토어) 재시도.
+// 2026-09에 KR이 song 검색에서 resultCount:0을 반환해 임시로 뺐던 것 — 복구 여부를 사람이 확인할 필요 없이 앱이 매번 스스로 판단하게 함.
+// KR이 비었는데 미국은 결과가 있었다면 이번 세션에는 KR 시도를 생략(검색 지연 방지), 앱을 다시 열면 KR을 한 번 더 시도해 복구를 자동 감지.
+// 곡 링크는 어느 스토어든 item.trackViewUrl(애플뮤직 링크)을 그대로 사용.
+var _itunesKrBroken=false,_itunesSeq=0;
+function _itunesJsonp(q,country){
+  return new Promise(resolve=>{
+    const cbName='_itunesCb'+(++_itunesSeq)+'_'+Date.now();
     const cleanup=()=>{delete window[cbName];const s=document.getElementById(cbName);if(s)s.remove();};
-    const timer=setTimeout(()=>{cleanup();el.innerHTML='<div class="api-loading">검색 실패 — 직접 입력해주세요</div>';resolve();},6000);
-    window[cbName]=function(data){
-      clearTimeout(timer);cleanup();
-      const results=(data.results||[]).slice(0,6);
-      if(!results.length){el.innerHTML='<div class="api-loading">결과 없음</div>';resolve();return;}
-      el.innerHTML='';
-      results.forEach(item=>{
-        const title=item.trackName||'';
-        const artist=item.artistName||'';
-        const date=(item.releaseDate||'').slice(0,4);
-        const album=item.collectionName||'';
-        const poster=item.artworkUrl100||null;
-        const div=document.createElement('div');div.className='api-result-item';
-        div.innerHTML=poster?`<img class="api-result-poster" src="${poster}" alt="">`:`<div class="api-result-poster-placeholder">♩</div>`;
-        div.innerHTML+=`<div class="api-result-info"><div class="api-result-title">${title}</div><div class="api-result-sub">${artist}${date?' · '+date:''}</div></div>`;
-        div.addEventListener('click',()=>selectApiResult(title,poster,artist,date,item.trackViewUrl||null,null,album));el.appendChild(div);
-      });
-      resolve();
-    };
+    const timer=setTimeout(()=>{cleanup();resolve(null);},5000);
+    window[cbName]=function(data){clearTimeout(timer);cleanup();resolve((data&&data.results)||[]);};
     const script=document.createElement('script');
     script.id=cbName;
-    // country=KR 파라미터를 넣으면 iTunes Search API가 song 검색에서 resultCount:0을 반환하는 문제 확인(2026-09)
-    // country 생략 시(미국 스토어 기준) 정상 결과 반환 — 곡명/아티스트/앨범/발매연도/커버 등 필요한 필드는 동일하게 제공됨
-    script.src=`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=song&limit=6&callback=${cbName}`;
-    script.onerror=()=>{clearTimeout(timer);cleanup();el.innerHTML='<div class="api-loading">검색 실패 — 직접 입력해주세요</div>';resolve();};
+    script.src=`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=song&limit=6${country?'&country='+country:''}&callback=${cbName}`;
+    script.onerror=()=>{clearTimeout(timer);cleanup();resolve(null);};
     document.body.appendChild(script);
+  });
+}
+async function searchITunes(q,el){
+  let results=null,krTried=false;
+  if(!_itunesKrBroken){
+    krTried=true;
+    results=await _itunesJsonp(q,'KR');
+  }
+  if(!results||!results.length){
+    const us=await _itunesJsonp(q,null);
+    if(us&&us.length&&krTried)_itunesKrBroken=true; // KR은 비었는데 미국은 결과 있음 → 이번 세션엔 KR 생략
+    results=us;
+  }
+  if(results===null){el.innerHTML='<div class="api-loading">검색 실패 — 직접 입력해주세요</div>';return;}
+  results=results.slice(0,6);
+  if(!results.length){el.innerHTML='<div class="api-loading">결과 없음</div>';return;}
+  el.innerHTML='';
+  results.forEach(item=>{
+    const title=item.trackName||'';
+    const artist=item.artistName||'';
+    const date=(item.releaseDate||'').slice(0,4);
+    const album=item.collectionName||'';
+    const poster=item.artworkUrl100||null;
+    const div=document.createElement('div');div.className='api-result-item';
+    div.innerHTML=poster?`<img class="api-result-poster" src="${poster}" alt="">`:`<div class="api-result-poster-placeholder">♩</div>`;
+    div.innerHTML+=`<div class="api-result-info"><div class="api-result-title">${title}</div><div class="api-result-sub">${artist}${date?' · '+date:''}</div></div>`;
+    div.addEventListener('click',()=>selectApiResult(title,poster,artist,date,item.trackViewUrl||null,null,album));el.appendChild(div);
   });
 }
 async function searchTMDB(q,cat,el){
