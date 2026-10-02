@@ -1170,31 +1170,31 @@ function isContentCarryOver(c,mk){
   if(isContentFinished(c)&&c.endDate&&c.endDate.slice(0,7)>=mk)return true;
   return false;
 }
-// 진행중 콘텐츠는 몇 달이 지나도 계속 노출돼야 하는데, 전월(prevMk) 한 달만 보면 시작월 +2개월부터 사라진다(예: 8월 시작 → 10월부터 안 보임).
-// prevMk의 콘텐츠에, 그보다 이전 달들(최대 CONTENT_CARRY_LOOKBACK_MONTHS개월, 로컬 보유분)에서 mk로 이월되는 항목(진행중 등)을 합쳐 반환.
+// ── 진행중 콘텐츠 이월 조회(월 경계 처리) ──
+// 진행중 콘텐츠는 몇 달이 지나도 계속 노출돼야 한다. "이번 달+전월"만 보면 시작월+2개월부터 사라지므로(예: 8월 시작 → 10월부터 안 보임)
+// 전월 전체 + 그 이전 달(최대 CONTENT_CARRY_LOOKBACK_MONTHS개월, 기기에 있는 분)에서 이월되는 항목까지 한 곳에서 모아 모든 조회가 같은 규칙을 쓰게 함.
 var CONTENT_CARRY_LOOKBACK_MONTHS=12; // var: 스크립트 로딩 순서와 무관하게 안전(const는 선언 전 호출 시 오류)
-function getPrevContentsWithCarry(prevMk,mk){
-  const base=getContents(prevMk);
-  const out=base.slice();
-  const seen=new Set(base.map(c=>c.cid||(c.cat+'|'+c.title+'|'+c.startDate)));
-  const [y,m]=prevMk.split('-').map(Number);
-  for(let i=1;i<=CONTENT_CARRY_LOOKBACK_MONTHS;i++){
-    getContents(monthKey(new Date(y,m-1-i,1))).forEach(c=>{
-      if(!isContentCarryOver(c,mk))return;
-      const key=c.cid||(c.cat+'|'+c.title+'|'+c.startDate);
-      if(seen.has(key))return;
-      seen.add(key);out.push(c);
-    });
-  }
+function _contentKey(c){return c.cid||(c.cat+'|'+c.title+'|'+c.startDate);}
+// mk 이전 달 n개의 월키(가까운 달부터). 예: ('2026-10',3) → ['2026-09','2026-08','2026-07']
+function _monthKeysBack(mk,n){
+  const [y,m]=mk.split('-').map(Number);
+  return Array.from({length:n},(_,i)=>monthKey(new Date(y,m-2-i,1)));
+}
+// [{c,mk}] — 전월의 모든 콘텐츠 + 그 이전 달에서 mk로 이월되는 콘텐츠(중복 제거). mk는 해당 콘텐츠가 저장된 월.
+function _prevAndCarriedContents(mk){
+  const [prevMk,...older]=_monthKeysBack(mk,CONTENT_CARRY_LOOKBACK_MONTHS+1);
+  const seen=new Set(),out=[];
+  const add=(c,m)=>{const k=_contentKey(c);if(seen.has(k))return;seen.add(k);out.push({c,mk:m});};
+  getContents(prevMk).forEach(c=>add(c,prevMk));
+  older.forEach(m=>getContents(m).forEach(c=>{if(isContentCarryOver(c,mk))add(c,m);}));
   return out;
 }
+function getPrevContentsWithCarry(mk){return _prevAndCarriedContents(mk).map(x=>x.c);}
 function getContentsForReport(mk){
   // 음악: 등록일=완료일로 취급 — 시작월에만 노출/집계, 별도 상태표기 없음
   // 드라마/영화/책: 보는중인 동안은 관련된 모든 달에 노출되지만(상태:보는중), 집계(완료/중단 확정)는 끝난 달에서만 잡힘
-  const [y,mo]=mk.split('-').map(Number);
-  const prevMk=monthKey(new Date(y,mo-2,1));
   const cur=getContents(mk);
-  const prev=getPrevContentsWithCarry(prevMk,mk);
+  const prev=getPrevContentsWithCarry(mk);
   const carry=prev.filter(c=>isContentCarryOver(c,mk)).map(c=>({...c,_carried:true}));
   const all=[...carry,...cur];
   // 콘텐츠 종류(드라마→책→영화→음악)별로 묶은 뒤, 그 안에서는 시작일 오름차순으로 정렬
@@ -1361,8 +1361,7 @@ function computeContentMonthlyList(y,mo){
     if(isContentFinished(c))return isContentEndedInMonth(c,targetMk);
     return c.status==='watching';
   };
-  const prevMk=monthKey(new Date(y,mo-1,1));
-  return getContents(targetMk).filter(belongsHere).concat(getPrevContentsWithCarry(prevMk,targetMk).filter(belongsHere));
+  return getContents(targetMk).filter(belongsHere).concat(getPrevContentsWithCarry(targetMk).filter(belongsHere));
 }
 function computeContentMonthlyByCat(y,mo){
   const list=computeContentMonthlyList(y,mo);
@@ -2557,55 +2556,6 @@ async function syncHabitGoalsDown(){
 // 자동으로 해당 습관이 체크됨(이미 켜져 있으면 그대로 둠 — 수동으로 끈 걸 되살리지 않기 위함, checkHabitDirect 참고).
 const HABIT_AUTO_RHYTHM_MAP={exercise:'exercise',groom:'care'}; // home(살림)은 '정리' 칩 선택시에만 연결하는 별도 분기(rhythm 등록 함수 내)로 처리 — 여기 넣으면 세탁/주방도 걸려버림
 const DEFAULT_HABITS=[{id:'exercise',name:'운동',color:'pink'},{id:'reading',name:'독서',color:'lavender'},{id:'diary',name:'일기',color:'yellow'},{id:'tidy',name:'정리',color:'lime'}]; // 카탈로그 색상 재배정에 맞춰 정정
-// 기존 데이터(이름만 있고 id가 없는 습관)에 처음 한 번만 id를 부여하는 마이그레이션.
-// 카탈로그와 이름이 일치하면 그 카탈로그 id를 그대로 부여(기존에 쌓인 이름 기반 체크 기록과 자연스럽게 이어짐)하고,
-// 카탈로그에 없는 이름이면 새 랜덤 id를 발급해 커스텀 습관으로 전환.
-function _migrateHabitIds(){
-  const habits=S.get('habits');
-  if(!habits)return; // 완전 신규 사용자는 DEFAULT_HABITS를 그대로 쓰므로 마이그레이션 불필요
-  let changed=false;
-  const nameToId={}; // 체크 데이터 키 치환에 재사용 — 예: {'운동':'exercise','독서':'reading',...}
-  const migrated=habits.map(h=>{
-    if(h.id){nameToId[h.name]=h.id;return h;} // 이미 마이그레이션된 습관
-    changed=true;
-    const catalogMatch=HABIT_CATALOG.find(c=>c.label===h.name);
-    const id=catalogMatch?catalogMatch.id:'custom_'+genCid();
-    nameToId[h.name]=id;
-    return {...h,id,custom:!catalogMatch};
-  });
-  if(changed){
-    saveHabits(migrated);
-    _migrateHabitCheckKeys(nameToId); // 체크 데이터(hc:*, hcTime:*) 안의 '운동-3' 같은 키도 함께 옮김
-  }
-}
-// habits 목록에 id가 처음 부여되는 그 순간, localStorage에 흩어진 주차별 체크 데이터
-// (hc:YYYY-Www, hcTime:YYYY-Www 안의 '이름-요일' 형태 키)를 새 id 기준 키로 옮김.
-// 서버(habit_checks 테이블)의 habit_name 컬럼도 동일한 매핑으로 이미 일괄 변경해둠 —
-// 이 함수는 그 서버 변경과 짝을 맞추는 로컬 쪽 처리.
-function _migrateHabitCheckKeys(nameToId){
-  const renames=Object.entries(nameToId).filter(([name,id])=>name!==id);
-  if(!renames.length)return; // 바뀐 이름이 하나도 없으면(전부 이미 id와 이름이 같음) 손댈 것 없음
-  for(let i=0;i<localStorage.length;i++){
-    const key=localStorage.key(i);
-    if(!key||!(key.startsWith('hc:')||key.startsWith('hcTime:')))continue;
-    let obj;
-    try{obj=JSON.parse(localStorage.getItem(key));}catch(e){continue;}
-    if(!obj||typeof obj!=='object')continue;
-    let touched=false;
-    const next={};
-    Object.keys(obj).forEach(k=>{
-      // 'k'는 '이름-요일' 형태 — 마지막 '-' 기준으로 요일 숫자를 분리하고 앞부분(이름)만 치환 대상으로 봄
-      const m=k.match(/^(.+)-(\d)$/);
-      if(m&&nameToId[m[1]]&&nameToId[m[1]]!==m[1]){
-        next[nameToId[m[1]]+'-'+m[2]]=obj[k];
-        touched=true;
-      }else{
-        next[k]=obj[k];
-      }
-    });
-    if(touched)localStorage.setItem(key,JSON.stringify(next));
-  }
-}
 // 습관명은 자유 텍스트라 완전 자동매칭엔 한계가 있음 — 이름에 특정 키워드가 포함되면 아이콘을 붙이고, 매칭 안 되면 아이콘 없이 텍스트만 표시
 // 리듬 카테고리와 통일된 새 색상 배정에 맞춤(HABIT_CATALOG 참고)
 const HABIT_ICON_RULES=[
@@ -3509,14 +3459,13 @@ function getReadingStreak(){
   }
   return streak;
 }
-function getHabits(){_migrateHabitIds();return S.get('habits')||DEFAULT_HABITS;}
+function getHabits(){return S.get('habits')||DEFAULT_HABITS;}
 function saveHabits(v){S.set('habits',v);autoSync('habits',null);}
 // _habitPeriods/_isHabitActiveOn 정의는 파일 하단(HABIT MONTHLY 섹션)에 있음 — function 선언 호이스팅으로 순서 무관 동작.
-// periods도 createdAt도 전혀 없는 아주 오래된 습관(구간 이력 도입 이전부터 있던 데이터)은 "정보 없음"이지
-// "꺼짐"이 아니므로, 이 경우엔 archivedAt 유무만으로 최소 판정(archivedAt이 있으면 꺼짐, 없으면 켜짐).
+// 구간(periods)이 비어 있으면 "정보 없음"이지 "꺼짐"이 아니므로 켜짐으로 본다.
 function _isHabitCurrentlyOn(h){
   const p=_habitPeriods(h);
-  if(!p.length)return !h.archivedAt;
+  if(!p.length)return true;
   const last=p[p.length-1];
   return !!last&&!last.end;
 }
@@ -3566,26 +3515,14 @@ function getContents(mk){
 // 이번달+지난달 콘텐츠를 합쳐 반환(중복 제거, 각 항목에 _mk=월키 부여) — 월초에 지난달부터 이어지는 진행중 콘텐츠를 놓치지 않기 위한 공용 조회.
 // 진행중 작품 목록/질문 상황 조건이 같은 조회를 각자 반복하던 것을 통합.
 function getRecentMonthsContents(base){
-  const d=base||new Date();
+  const curMk=monthKey(base||new Date());
+  const prevMk=_monthKeysBack(curMk,1)[0];
+  const pc=_prevAndCarriedContents(curMk);
   const seen=new Set(),out=[];
-  [monthKey(new Date(d.getFullYear(),d.getMonth()-1,1)),monthKey(d)].forEach(mk=>{
-    getContents(mk).forEach(c=>{
-      const key=c.cid||(c.cat+'|'+c.title+'|'+c.startDate);
-      if(seen.has(key))return;
-      seen.add(key);out.push({...c,_mk:mk});
-    });
-  });
-  // 2개월 이상 전에 시작했지만 아직 진행중인 작품도 포함(안 넣으면 시작월 +2개월부터 목록에서 사라짐)
-  const curMk=monthKey(d);
-  for(let i=2;i<=CONTENT_CARRY_LOOKBACK_MONTHS+1;i++){
-    const mk=monthKey(new Date(d.getFullYear(),d.getMonth()-i,1));
-    getContents(mk).forEach(c=>{
-      if(!isContentCarryOver(c,curMk))return;
-      const key=c.cid||(c.cat+'|'+c.title+'|'+c.startDate);
-      if(seen.has(key))return;
-      seen.add(key);out.push({...c,_mk:mk});
-    });
-  }
+  const add=(c,m)=>{const k=_contentKey(c);if(seen.has(k))return;seen.add(k);out.push({...c,_mk:m});};
+  pc.filter(x=>x.mk===prevMk).forEach(x=>add(x.c,x.mk));
+  getContents(curMk).forEach(c=>add(c,curMk));
+  pc.filter(x=>x.mk!==prevMk).forEach(x=>add(x.c,x.mk));
   return out;
 }
 // Supabase에서 cat=music만 서버 필터링으로 직접 조회 — 저녁 플리(전체 기간 랜덤) 등 월 경계 없는 조회용
@@ -3767,18 +3704,15 @@ async function syncHabitsDown(){
   const rows=await supaFetch('habits?order=sort_order');
   if(!rows)return;
   if(rows.length===0&&getHabits().length>0){syncHabitsUp();return;}
-  // habit_id(카탈로그 id)/custom/archived_at도 함께 복원 — 이걸 빠뜨리면 동기화할 때마다
-  // 로컬의 id가 사라져 _migrateHabitIds가 매번 다시 돌고, 특히 커스텀 습관은 매번 새 랜덤 id를 받아
-  // 과거 체크 기록과 끊기는 문제가 생김.
+  // habit_id(카탈로그 id)/custom도 함께 복원 — 이걸 빠뜨리면 로컬의 id가 사라져
+  // 습관과 과거 체크 기록(id 기반 키)의 연결이 끊김.
   // 활성/비활성 이력을 periods(jsonb 배열) 컬럼 하나로 관리 —
   // 온오프를 반복해도 각 활성 구간이 독립적으로 누적 보존됨(구간 배열 push/close 방식).
-  // 구버전 컬럼(archived_at/created_at_key)만 있는 예전 서버 데이터는 폴백으로 단일구간 변환.
   if(rows.length>0)S.set('habits',rows.map(r=>{
     const h={name:r.name,color:r.color};
     if(r.habit_id)h.id=r.habit_id;
     if(r.custom)h.custom=true;
     if(r.periods&&r.periods.length)h.periods=r.periods;
-    else if(r.created_at_key||r.archived_at)h.periods=[{start:r.created_at_key||null,end:r.archived_at||null}]; // 구버전 폴백(archived_at만 있어도 처리 — 영양제 케이스 재발 방지)
     return h;
   }));
 }
@@ -6230,7 +6164,7 @@ function getMorningFlowMonthCounts(mk){
     if(isVacationDate(dk))continue; // 오프 기간은 모닝플로우 월간 카운트에서 제외
     const flow=S.get(k);
     if(!flow||!flow.picks)continue;
-    Object.keys(flow.picks).forEach(pk=>{const p=flow.picks[pk];const ck=(p&&p.key)||pk;if(counts[ck]!==undefined&&p&&p.status==='done')counts[ck]++;}); // 슬롯의 key가 카드. 옛 구조로 기기에 남은 과거 로컬 기록(id=카드key)도 세도록 pk 폴백(이번 달이 지나면 불필요)
+    Object.keys(flow.picks).forEach(pk=>{const p=flow.picks[pk];if(p&&counts[p.key]!==undefined&&p.status==='done')counts[p.key]++;}); // 슬롯의 key가 카드
   }
   return counts;
 }
@@ -7605,21 +7539,22 @@ function onTodoModalInpInput(e){
 // 후보 목록은 등록창을 처음 입력할 때 한 번만 만들고(openTodoModal에서 초기화), 글자마다 하는 일은 이 목록 필터링뿐.
 // 제외: 일정, 반복 규칙으로 생긴 항목, "DR >" 문장(DR 조각 칩이 담당), 지금 보는 날짜에 이미 있는 문장. 앞의 "HH:MM "은 떼고 비교.
 // 2글자 미만은 제안 안 함(한글 조합 중 깜빡임·후보 과다 방지).
+var TODO_AC_DAYS=30,TODO_AC_MIN=2,TODO_AC_MAX=3; // 후보 수집 기간(일) / 제안 시작 글자 수 / 최대 제안 수
 let _todoAcIndex=null,_todoAcShown=[],_todoAcPrefix='';
 function _buildTodoAcIndex(){
   const map=new Map();
   const viewDk=dateKey(currentDate);
   const todayTexts=new Set(getTodos(viewDk).map(t=>_todoAcNorm(t.text)));
-  for(let i=0;i<30;i++){
+  for(let i=0;i<TODO_AC_DAYS;i++){
     const d=new Date();d.setDate(d.getDate()-i);
     const dk=dateKey(d);
     getTodos(dk).forEach(t=>{
       if(t.isEvent||t.recurRuleCid)return;
       const txt=_todoAcNorm(t.text);
-      if(txt.length<2||/^DR\s*>/.test(txt)||todayTexts.has(txt))return;
+      if(txt.length<TODO_AC_MIN||/^DR\s*>/.test(txt)||todayTexts.has(txt))return;
       const cur=map.get(txt);
       if(cur){cur.n++;if(i<cur.ago)cur.ago=i;}
-      else map.set(txt,{t:txt,n:1,ago:i});
+      else map.set(txt,{t:txt,l:txt.toLowerCase(),n:1,ago:i});
     });
   }
   return Array.from(map.values());
@@ -7637,16 +7572,16 @@ function renderTodoAutoChips(v){
   const tm=(v||'').trim().match(/^(\d{1,2}:\d{2})\s+(.*)$/);
   _todoAcPrefix=tm?tm[1]+' ':'';
   const q=(tm?tm[2]:(v||'')).trim().toLowerCase();
-  if(modal?.dataset.kind==='event'||q.length<2){hideTodoFragChips();return;}
+  if(modal?.dataset.kind==='event'||q.length<TODO_AC_MIN){hideTodoFragChips();return;}
   if(!_todoAcIndex)_todoAcIndex=_buildTodoAcIndex();
   const hits=[];
   _todoAcIndex.forEach(c=>{
-    const k=c.t.toLowerCase().indexOf(q);
-    if(k<0||c.t.toLowerCase()===q)return;
-    hits.push({c,k,p:k===0?0:1});
+    const k=c.l.indexOf(q);
+    if(k<0||c.l===q)return;
+    hits.push({c,p:k===0?0:1}); // 앞부분 일치(0)가 단어 포함 일치(1)보다 먼저
   });
-  hits.sort((a,b)=>a.p-b.p||b.c.n-a.c.n||a.c.ago-b.c.ago);
-  _todoAcShown=hits.slice(0,3).map(h=>h.c.t);
+  hits.sort((a,b)=>a.p-b.p||b.c.n-a.c.n||a.c.ago-b.c.ago); // 그다음 많이 쓴 순, 같으면 최근 순
+  _todoAcShown=hits.slice(0,TODO_AC_MAX).map(h=>h.c.t);
   if(!_todoAcShown.length){hideTodoFragChips();return;}
   row.style.display='flex';
   row.innerHTML=_todoAcShown.map((txt,i)=>{
@@ -8449,12 +8384,10 @@ let _deletedMemo=null,_undoTimer=null,_memoSwipeIdx=-1;
 // 완결 총평은 음악 제외(콘텐츠허브 로그 모음 시트와 동일 기준, WCAL_CAT_META 참고).
 function getContentMemoItemsForDate(dk){
   const mk=dk.slice(0,7);
-  const [y,m]=mk.split('-').map(Number);
-  const prevMk=monthKey(new Date(y,m-2,1));
   const seen=new Set();
   const items=[]; // {kind:'note'|'final',cid,cat,title,poster,text,time}
   // 해당 월 + 전월 + 그 이전 달에서 이어지는 작품(시작월 +2개월 이상 지난 진행중 작품의 메모도 포함)
-  [...getContents(mk),...getPrevContentsWithCarry(prevMk,mk)].forEach(c=>{
+  [...getContents(mk),...getPrevContentsWithCarry(mk)].forEach(c=>{
     if(seen.has(c.cid))return;seen.add(c.cid);
     (c.notes||[]).forEach(n=>{
       if(n.dk===dk)items.push({kind:'note',cid:c.cid,cat:c.cat,title:n.title||c.title||'',text:n.text||'',time:n.time||''});
@@ -9348,7 +9281,7 @@ function renderContentTimeline(){
   const prevDateObj=new Date(_calYear,_calMonth-1,1);
   const prevMk=monthKey(prevDateObj);
   const contents=getContents(mk);
-  const prevContents=getPrevContentsWithCarry(prevMk,mk); // 전월 + 그 이전 달에서 이어지는 진행중 작품
+  const prevContents=getPrevContentsWithCarry(mk); // 전월 + 그 이전 달에서 이어지는 진행중 작품
   const headInner=document.getElementById('ctl-head-inner');
   const headDates=document.getElementById('ctl-head-dates');
   const rowsEl=document.getElementById('ctl-rows');
@@ -9606,7 +9539,11 @@ function openMusicGroupModal(items,mk){
   openModal('music-group-modal');
 }
 function openContentModal(cat,item=null,mk=null,onSaved=null){
-  _contentCtx={cat,item,mk:mk||calMonthKey(),mode:item?'edit':'add',onSaved};
+  // 수정/삭제는 항목이 실제로 저장된 월(_contentCtx.mk) 기준으로 동작한다. 넘어온 mk는 힌트일 뿐이므로(이월된 오래된 진행중 작품은 전월이 아닌 더 이전 달에 저장돼 있음)
+  // cid로 실제 저장 월을 찾아 쓴다. 못 찾으면(새 항목 등) 힌트를 그대로 사용.
+  const hintMk=mk||calMonthKey();
+  const found=(item&&item.cid)?_findContentByCidNearMk(item.cid,item._mk||hintMk):null;
+  _contentCtx={cat,item,mk:found?found.mk:hintMk,mode:item?'edit':'add',onSaved};
   document.getElementById('cm-title').value=item?.title||'';
   _selectedPoster=null;_selectedAuthor=null;_selectedMusicUrl=item?.musicUrl||null;
   _selectedAlbum=item?.album||null;_selectedReleaseYear=item?.releaseYear||null;
@@ -9839,10 +9776,8 @@ function confirmContent(){
 // cid로 실제 저장 버킷(month_key)을 찾음 — 콘텐츠는 시작월에 저장되지만, 화면엔 진행중 이월분이 섞여 보일 수 있어
 // 현재 보고 있는 달(mk)부터 거슬러 올라가며 뒤짐(아래 함수 주석 참고).
 function _findContentByCidNearMk(cid,mk){
-  const [y,m]=mk.split('-').map(Number);
-  // mk → 전월 → 그 이전 달 순으로 최대 CONTENT_CARRY_LOOKBACK_MONTHS+1개월 전까지(시작월 +2개월 이상 지난 진행중 작품도 찾도록)
-  for(let i=0;i<=CONTENT_CARRY_LOOKBACK_MONTHS+1;i++){
-    const searchMk=i===0?mk:monthKey(new Date(y,m-1-i,1));
+  // mk → 전월 → 그 이전 달 순으로(시작월+2개월 이상 지난 진행중 작품도 찾도록 CONTENT_CARRY_LOOKBACK_MONTHS+1개월 전까지)
+  for(const searchMk of [mk,..._monthKeysBack(mk,CONTENT_CARRY_LOOKBACK_MONTHS+1)]){
     const list=getContents(searchMk);
     const idx=list.findIndex(c=>c.cid===cid);
     if(idx>=0)return{mk:searchMk,list,idx};
@@ -10436,7 +10371,7 @@ function _itunesJsonp(q,country){
   return new Promise(resolve=>{
     const cbName='_itunesCb'+(++_itunesSeq)+'_'+Date.now();
     const cleanup=()=>{delete window[cbName];const s=document.getElementById(cbName);if(s)s.remove();};
-    const timer=setTimeout(()=>{cleanup();resolve(null);},5000);
+    const timer=setTimeout(()=>{cleanup();window[cbName]=function(){delete window[cbName];};resolve(null);},5000); // 늦게 오는 응답은 무시
     window[cbName]=function(data){clearTimeout(timer);cleanup();resolve((data&&data.results)||[]);};
     const script=document.createElement('script');
     script.id=cbName;
@@ -10625,13 +10560,9 @@ function hideApiResults(){const el=document.getElementById('api-results');if(el)
 // createdAt/archivedAt 단일 값 방식은 재활성화할 때마다 과거 활성 구간(과거 createdAt)이
 // 통째로 덮어써져 사라지는 문제가 있었음(예: 6월부터 하던 습관을 9월에 껐다 10월에 다시 켜면, 6~9월 실적이
 // 통계에서 빠져버림) — periods(구간 배열, [{start,end}], end:null=진행중)로 전환해 온오프를 반복해도
-// 각 활성 구간이 독립적으로 누적 보존되도록 함. 구버전 createdAt/archivedAt만 있는 습관은 폴백으로 처리.
+// 각 활성 구간이 독립적으로 누적 보존되도록 함.
 function _habitPeriods(h){
-  if(h.periods&&h.periods.length)return h.periods;
-  // createdAt(start)이 없어도 archivedAt(end)만 있는 경우를 놓치면
-  // "구간 정보 없음"으로 오판되어 무조건 활성 처리됨 — start 없이 end만 있어도 폴백 구간을 만든다.
-  if(h.createdAt||h.archivedAt)return [{start:h.createdAt||null,end:h.archivedAt||null}];
-  return [];
+  return (h.periods&&h.periods.length)?h.periods:[];
 }
 function _isHabitActiveOn(h,dk){
   const periods=_habitPeriods(h);
@@ -11832,8 +11763,7 @@ function _applyHabitToggle(h){
   }else{
     last.end=today; // 현재 활성 상태 → 마지막 구간 닫기(끄기)
   }
-  const {createdAt,archivedAt,...rest}=h; // 구버전 필드는 정리(더 이상 이중 관리 안 함)
-  return {...rest,periods};
+  return {...h,periods};
 }
 // 카탈로그 칩 토글 — 이제 실제 저장은 하지 않고 _habitEditDraft만 변경.
 // 이미 등록돼 있으면(archive 여부 무관) 있는/없는 상태를 뒤집고, 아예 처음 켜는 것이면 카탈로그 정의로 새로 추가.
@@ -12833,7 +12763,7 @@ async function loadAndRenderWatchCal(){
   // 포스터/상태 매칭 — 드라마/영화/책은 같은 제목의 콘텐츠 항목(이번 달+전월, 진행중 포함)에서 poster/status를 찾아 붙임
   // cid도 함께 매칭해 붙임 — 콘텐츠탭 등록 원본과 연결해야 일자별 코멘트(cid 기준)를 저장할 수 있음
   const posterByTitle={},cidByTitle={},statusByTitle={};
-  [...getContents(mk),...getPrevContentsWithCarry(prevMk,mk)].forEach(c=>{
+  [...getContents(mk),...getPrevContentsWithCarry(mk)].forEach(c=>{
     if(c.cat!=='music'&&c.title){posterByTitle[c.title]=c.poster||null;cidByTitle[c.title]=c.cid||null;statusByTitle[c.title]=c.status||null;}
   });
   Object.values(_wcalByDate).forEach(list=>list.forEach(it=>{
@@ -14395,7 +14325,6 @@ function setReserveSection(s){
     if(!btn)return;
     btn.classList.toggle('active',k===s);
   });
-  // 기본 active 상태가 취소되지 않도록 none 버튼 클래스 보정
 }
 function confirmReserveMove(){
   const val=document.getElementById('reserve-date-inp').value;
@@ -14403,25 +14332,21 @@ function confirmReserveMove(){
   const todos=getReserveTodos();
   const t=todos[_reserveMoveIdx];if(!t)return;
   const c=_reservePartCtx;
-  let movedText=t.text;
+  let movedText=t.text,stayText=null; // stayText: 보관함에 남길 텍스트(조각을 일부만 보낼 때만 있음)
   if(c){
     if(!c.sel.size){showToast('이동할 조각을 고르세요');return;}
-    const goIdxs=c.parts.map((_,k)=>k).filter(k=>c.sel.has(k));
-    const stayIdxs=c.parts.map((_,k)=>k).filter(k=>!c.sel.has(k));
-    movedText=_joinReserveParts(c,goIdxs);
-    if(stayIdxs.length){
-      // 일부만 이동 — 안 고른 조각은 같은 항목(cid 유지)으로 보관함에 남김
-      t.text=_joinReserveParts(c,stayIdxs);
-      saveReserveTodos(todos);
-    }else{
-      addDelPending('todos',RESERVE_DK,t.cid);
-      todos.splice(_reserveMoveIdx,1);saveReserveTodos(todos);
-    }
-  }else{
-    // 예비 목록에서 제거 (삭제 의도 기록)
-    addDelPending('todos',RESERVE_DK,t.cid);
-    todos.splice(_reserveMoveIdx,1);saveReserveTodos(todos);
+    const all=c.parts.map((_,k)=>k);
+    movedText=_joinReserveParts(c,all.filter(k=>c.sel.has(k)));
+    const stay=all.filter(k=>!c.sel.has(k));
+    if(stay.length)stayText=_joinReserveParts(c,stay);
   }
+  if(stayText!==null){
+    t.text=stayText; // 안 고른 조각은 같은 항목(cid 유지)으로 보관함에 남김
+  }else{
+    addDelPending('todos',RESERVE_DK,t.cid); // 전부 이동 — 보관함에서 제거(삭제 의도 기록)
+    todos.splice(_reserveMoveIdx,1);
+  }
+  saveReserveTodos(todos);
   // 선택한 날짜 투두에 추가
   const newTodo={text:movedText,done:false,created:Date.now(),timeSection:_reserveSection,cid:genCid()};
   const targetTodos=getTodos(val);targetTodos.push(newTodo);saveTodos(val,targetTodos);
@@ -14667,6 +14592,10 @@ var _srType='all',_srPeriod='all',_srSub='all',_srSeq=0,_srTimer=null,_srState='
 var _srAllRows=[],_srCnt={memo:0,todo:0},_srListRows=[],_srListTotal=0,_srQ='';
 var SR_SUB_KINDS={all:['todo','timetable','event','reserve'],todo:['todo'],event:['event'],timetable:['timetable']};
 var SR_BADGE={memo:'메모',todo:'투두',event:'일정',timetable:'시간표',reserve:'보관함'};
+// 상태를 바꾸고 칩·본문을 함께 다시 그림 / 조회 결과 초기화 / 조건(타입·기간·종류)이 바뀌었을 때 칩을 갱신하고 재조회
+function _srSetState(st){_srState=st;renderSearchChips();renderSearchBody();}
+function _srClearResults(){_srAllRows=[];_srListRows=[];_srListTotal=0;_srCnt={memo:0,todo:0};}
+function _srRerun(){renderSearchChips();if(_srQ.length>=SEARCH_MIN)runSearch();}
 function _srKinds(){
   if(_srType==='memo')return ['memo'];
   if(_srType==='todo')return SR_SUB_KINDS[_srSub]||SR_SUB_KINDS.all;
@@ -14682,12 +14611,12 @@ function _srFetch(q,kinds,limit,offset){
   return supaFetch('rpc/search_records','POST',{p_q:q,p_kinds:kinds,p_from:r.from,p_to:r.to,p_limit:limit,p_offset:offset});
 }
 function openSearch(){
-  _srType='all';_srPeriod='all';_srSub='all';_srSeq++;_srState='idle';_srQ='';
-  _srAllRows=[];_srListRows=[];_srListTotal=0;_srCnt={memo:0,todo:0};
+  _srType='all';_srPeriod='all';_srSub='all';_srSeq++;_srQ='';
+  _srClearResults();
   const inp=document.getElementById('sr-inp');inp.value='';
   document.getElementById('sr-clear').style.display='none';
   document.getElementById('search-ov').classList.add('on');
-  renderSearchChips();renderSearchBody();
+  _srSetState('idle');
   inp.focus();
 }
 function closeSearch(){
@@ -14718,28 +14647,27 @@ async function runSearch(){
   const q=(document.getElementById('sr-inp').value||'').trim();
   const seq=++_srSeq;
   _srQ=q;
-  if(q.length<SEARCH_MIN){_srState='idle';renderSearchChips();renderSearchBody();return;}
-  if(!navigator.onLine){_srState='offline';renderSearchChips();renderSearchBody();return;}
+  if(q.length<SEARCH_MIN)return _srSetState('idle');
+  if(!navigator.onLine)return _srSetState('offline');
   _srState='loading';renderSearchBody();
-  // 건수·전체 보기용 조회(전체 타입일 땐 10건, 타입 칩 선택 중엔 건수만 필요하므로 1건)
+  // 건수(칩)와 전체 보기용 조회 — 전체 타입일 땐 그룹별 10건을 그대로 쓰고, 타입 칩 선택 중엔 건수만 필요해서 1건만 받음
   const all=await _srFetch(q,null,_srType==='all'?SEARCH_ALL_LIMIT:1,0);
   if(seq!==_srSeq)return;
-  if(!all){_srState='fail';renderSearchChips();renderSearchBody();return;}
+  if(!all)return _srSetState('fail');
+  _srClearResults();
   _srAllRows=all;
-  _srCnt={memo:0,todo:0};
   all.forEach(r=>{_srCnt[r.src]=Math.max(_srCnt[r.src]||0,Number(r.grp_total)||0);});
-  _srListRows=[];_srListTotal=0;
   if(_srType!=='all'){
     const list=await _srFetch(q,_srKinds(),SEARCH_PAGE,0);
     if(seq!==_srSeq)return;
-    if(!list){_srState='fail';renderSearchChips();renderSearchBody();return;}
+    if(!list)return _srSetState('fail');
     _srListRows=list;_srListTotal=list.length?Number(list[0].grp_total)||list.length:0;
   }
-  _srState='ok';renderSearchChips();renderSearchBody();
+  _srSetState('ok');
 }
-function setSrType(t){_srType=t;_srSub='all';renderSearchChips();if(_srQ.length>=SEARCH_MIN)runSearch();}
-function setSrPeriod(p){_srPeriod=p;renderSearchChips();if(_srQ.length>=SEARCH_MIN)runSearch();}
-function setSrSub(k){_srSub=k;renderSearchChips();if(_srQ.length>=SEARCH_MIN)runSearch();}
+function setSrType(t){_srType=t;_srSub='all';_srRerun();}
+function setSrPeriod(p){_srPeriod=p;_srRerun();}
+function setSrSub(k){_srSub=k;_srRerun();}
 async function searchLoadMore(){
   const seq=_srSeq;
   const res=await _srFetch(_srQ,_srKinds(),SEARCH_PAGE,_srListRows.length);
@@ -14796,7 +14724,6 @@ function _srMonthLabel(dk){
 }
 // 카드 윗줄은 날짜(+시각)만. 메모·일반 투두는 섹션 제목 알약이 이미 종류를 알려주므로 배지 생략, 시간표·일정만 노랑 배지.
 function _srCardHtml(r,q){
-  const sub=r.sub==='memo'?'memo':r.sub;
   const time=r.memo_time||r.event_time||'';
   let meta=r.date_key==='reserve'?'':_srShortDate(r.date_key)+(time?` · ${escapeHtml(time)}`:'');
   if(r.sub==='event'&&r.event_end_date&&r.event_end_date!==r.date_key){
@@ -14805,11 +14732,11 @@ function _srCardHtml(r,q){
   }
   const badge=(r.sub==='timetable'||r.sub==='event')?`<span class="sr-badge todo">${SR_BADGE[r.sub]}</span>`:'';
   const metaHtml=(meta||badge)?`<div class="sr-meta"><span>${meta}</span>${badge}</div>`:'';
-  return `<div class="sr-card" onclick="openSearchResult('${r.date_key}','${sub}')">${metaHtml}
+  return `<div class="sr-card" onclick="openSearchResult('${r.date_key}','${r.sub}')">${metaHtml}
     <div class="sr-txt${r.done?' done':''}">${_srHl(_srSnippet(r.txt,q),q,r.src)}</div></div>`;
 }
 function _srSecHead(src,total){
-  return `<div class="sr-gh"><span class="sr-badge ${src==='memo'?'memo':'todo'}">${src==='memo'?'메모':'투두'}</span><span>${total}건</span></div>`;
+  return `<div class="sr-gh"><span class="sr-badge ${src}">${SR_BADGE[src]}</span><span>${total}건</span></div>`;
 }
 // 월이 바뀔 때마다 "───── 2026년 10월" 구분줄(글자는 오른쪽). 보관함은 날짜가 없어 마지막에 "보관함" 줄로 묶임.
 function _srGroupHtml(rows,q){
