@@ -14713,19 +14713,18 @@ async function searchLoadMore(){
   _srListRows=_srListRows.concat(res);
   renderSearchBody();
 }
+function cycleSrPeriod(){const o=['all','1m','3m'];setSrPeriod(o[(o.indexOf(_srPeriod)+1)%3]);}
 function renderSearchChips(){
   const ok=_srState==='ok';
   const tot=_srCnt.memo+_srCnt.todo;
   const chip=(on,label,fn)=>`<button type="button" class="sr-chip${on?' on':''}" onclick="${fn}">${label}</button>`;
   const n=v=>ok?` ${v}`:'';
+  const perLbl={all:'전체 기간','1m':'1개월','3m':'3개월'}[_srPeriod];
   document.getElementById('sr-chips-type').innerHTML=
     chip(_srType==='all','전체'+n(tot),"setSrType('all')")+
     chip(_srType==='memo','메모'+n(_srCnt.memo),"setSrType('memo')")+
-    chip(_srType==='todo','투두'+n(_srCnt.todo),"setSrType('todo')");
-  document.getElementById('sr-chips-period').innerHTML=
-    chip(_srPeriod==='all','전체 기간',"setSrPeriod('all')")+
-    chip(_srPeriod==='1m','1개월',"setSrPeriod('1m')")+
-    chip(_srPeriod==='3m','3개월',"setSrPeriod('3m')");
+    chip(_srType==='todo','투두'+n(_srCnt.todo),"setSrType('todo')")+
+    `<button type="button" class="sr-chip sr-per" onclick="cycleSrPeriod()">${perLbl}<i class="ti ti-chevron-down" style="font-size:12px;" aria-hidden="true"></i></button>`;
   const sub=document.getElementById('sr-chips-sub');
   sub.style.display=_srType==='todo'?'flex':'none';
   sub.innerHTML=
@@ -14742,34 +14741,51 @@ function _srSnippet(t,q){
   if(s.length>180)s=s.slice(0,180)+'…';
   return pre+s;
 }
-function _srHl(text,q){
+function _srHl(text,q,cls){
   if(!q)return escapeHtml(text);
   const low=text.toLowerCase(),ql=q.toLowerCase();
   let out='',pos=0,i;
   while((i=low.indexOf(ql,pos))>=0){
-    out+=escapeHtml(text.slice(pos,i))+'<span class="sr-hl">'+escapeHtml(text.slice(i,i+q.length))+'</span>';
+    out+=escapeHtml(text.slice(pos,i))+'<span class="sr-hl'+(cls==='todo'?' todo':'')+'">'+escapeHtml(text.slice(i,i+q.length))+'</span>';
     pos=i+q.length;
   }
   return out+escapeHtml(text.slice(pos));
 }
-function _srDateLabel(dk){
-  if(dk==='reserve')return '보관함';
-  const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(dk||'');if(!m)return dk||'';
-  const dow=['일','월','화','수','목','금','토'][new Date(+m[1],+m[2]-1,+m[3]).getDay()];
-  return `${m[1]}.${m[2]}.${m[3]} (${dow})`;
+function _srShortDate(dk){
+  const m=/^\d{4}-(\d{2})-(\d{2})$/.exec(dk||'');if(!m)return '';
+  const y=+dk.slice(0,4),dow=['일','월','화','수','목','금','토'][new Date(y,+m[1]-1,+m[2]).getDay()];
+  return `${m[1]}.${m[2]} (${dow})`;
 }
+function _srMonthLabel(dk){
+  const m=/^(\d{4})-(\d{2})-\d{2}$/.exec(dk||'');
+  return m?`${m[1]}년 ${+m[2]}월`:'보관함';
+}
+// 카드 윗줄은 날짜(+시각)만. 메모·일반 투두는 섹션 제목 알약이 이미 종류를 알려주므로 배지 생략, 시간표·일정만 노랑 배지.
 function _srCardHtml(r,q){
   const sub=r.sub==='memo'?'memo':r.sub;
   const time=r.memo_time||r.event_time||'';
-  let extra=time?` · ${escapeHtml(time)}`:'';
+  let meta=r.date_key==='reserve'?'':_srShortDate(r.date_key)+(time?` · ${escapeHtml(time)}`:'');
   if(r.sub==='event'&&r.event_end_date&&r.event_end_date!==r.date_key){
     const e=/^\d{4}-(\d{2})-(\d{2})$/.exec(r.event_end_date);
-    if(e)extra+=` ~ ${+e[1]}/${+e[2]}`;
+    if(e)meta+=` ~ ${+e[1]}/${+e[2]}`;
   }
-  const badgeCls=r.src==='memo'?'sr-badge memo':'sr-badge';
-  return `<div class="sr-card" onclick="openSearchResult('${r.date_key}','${sub}')">
-    <div class="sr-meta"><span>${_srDateLabel(r.date_key)}${extra}</span><span class="${badgeCls}">${SR_BADGE[sub]||''}</span></div>
-    <div class="sr-txt${r.done?' done':''}">${_srHl(_srSnippet(r.txt,q),q)}</div></div>`;
+  const badge=(r.sub==='timetable'||r.sub==='event')?`<span class="sr-badge todo">${SR_BADGE[r.sub]}</span>`:'';
+  const metaHtml=(meta||badge)?`<div class="sr-meta"><span>${meta}</span>${badge}</div>`:'';
+  return `<div class="sr-card" onclick="openSearchResult('${r.date_key}','${sub}')">${metaHtml}
+    <div class="sr-txt${r.done?' done':''}">${_srHl(_srSnippet(r.txt,q),q,r.src)}</div></div>`;
+}
+function _srSecHead(src,total){
+  return `<div class="sr-gh"><span class="sr-badge ${src==='memo'?'memo':'todo'}">${src==='memo'?'메모':'투두'}</span><span>${total}건</span></div>`;
+}
+// 월이 바뀔 때마다 "───── 2026년 10월" 구분줄(글자는 오른쪽). 보관함은 날짜가 없어 마지막에 "보관함" 줄로 묶임.
+function _srGroupHtml(rows,q){
+  let h='',cur=null;
+  rows.forEach(r=>{
+    const m=_srMonthLabel(r.date_key);
+    if(m!==cur){cur=m;h+=`<div class="sr-mon"><span>${m}</span></div>`;}
+    h+=_srCardHtml(r,q);
+  });
+  return h;
 }
 function renderSearchBody(){
   const body=document.getElementById('sr-body');if(!body)return;
@@ -14788,20 +14804,21 @@ function renderSearchBody(){
     h+=q0.length===1?'<div class="sr-empty">2글자 이상 입력해 주세요</div>':'<div class="sr-empty">2글자 이상 입력하면 검색해요<br><span style="font-size:var(--dow-label-size);">메모와 투두 전체 기록에서 찾아요</span></div>';
     body.innerHTML=h;return;
   }
+  const none=`<div class="sr-empty">일치하는 기록이 없어요${_srPeriod!=='all'?'<br>기간을 늘려 보세요':''}</div>`;
   if(_srType==='all'){
     const memo=_srAllRows.filter(r=>r.src==='memo'),todo=_srAllRows.filter(r=>r.src==='todo');
-    if(!memo.length&&!todo.length){body.innerHTML=`<div class="sr-empty">일치하는 기록이 없어요${_srPeriod!=='all'?'<br>기간을 늘려 보세요':''}</div>`;return;}
+    if(!memo.length&&!todo.length){body.innerHTML=none;return;}
     let h='';
-    [['메모','memo',memo],['투두','todo',todo]].forEach(g=>{
+    [['memo','메모',memo],['todo','투두',todo]].forEach(g=>{
       if(!g[2].length)return;
-      const total=_srCnt[g[1]];
-      h+=`<div class="sr-gh">${g[0]} ${total}건</div>`+g[2].map(r=>_srCardHtml(r,q)).join('');
-      if(total>g[2].length)h+=`<div class="sr-more" onclick="setSrType('${g[1]}')">${g[0]} ${total-g[2].length}건 더 보기</div>`;
+      const total=_srCnt[g[0]];
+      h+=_srSecHead(g[0],total)+_srGroupHtml(g[2],q);
+      if(total>g[2].length)h+=`<div class="sr-more" onclick="setSrType('${g[0]}')">${g[1]} ${total-g[2].length}건 더 보기</div>`;
     });
     body.innerHTML=h;return;
   }
-  if(!_srListRows.length){body.innerHTML=`<div class="sr-empty">일치하는 기록이 없어요${_srPeriod!=='all'?'<br>기간을 늘려 보세요':''}</div>`;return;}
-  let h=_srListRows.map(r=>_srCardHtml(r,q)).join('');
+  if(!_srListRows.length){body.innerHTML=none;return;}
+  let h=_srSecHead(_srType,_srListTotal)+_srGroupHtml(_srListRows,q);
   if(_srListTotal>_srListRows.length)h+=`<div class="sr-more" onclick="searchLoadMore()">${_srListTotal-_srListRows.length}건 더 보기</div>`;
   body.innerHTML=h;
 }

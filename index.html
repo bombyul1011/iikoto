@@ -895,16 +895,22 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .sr-chips{display:flex;flex-wrap:nowrap;gap:5px;padding:0 18px 8px;overflow-x:auto;flex-shrink:0;touch-action:pan-x;scrollbar-width:none;-ms-overflow-style:none;}
 .sr-chips::-webkit-scrollbar{display:none;}
 .sr-chip{flex-shrink:0;padding:5px 11px;border-radius:20px;border:1px solid var(--card-b);background:var(--card);font-size:var(--dow-label-size);color:var(--ts);cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;}
-.sr-chip.on{background:var(--pal-pink-bg);color:var(--pal-pink-text);border-color:var(--pal-pink-border);font-weight:600;}
+.sr-chip.on{background:var(--pal-pink-bg);color:var(--pal-pink-text);border-color:var(--pal-pink-border);font-weight:600;} /* 타입 칩(전체/메모/투두) = 분홍 */
+.sr-chip.sr-per{margin-left:auto;display:flex;align-items:center;gap:3px;background:var(--pal-sky-bg);color:var(--pal-sky-text);border-color:var(--pal-sky-border);font-weight:600;} /* 기간 칩 = 하늘색, 타입 칩 줄 오른쪽 끝 — 탭할 때마다 전체→1개월→3개월 순환 */
 .sr-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:calc(env(safe-area-inset-bottom) + 20px);border-top:1px solid rgba(var(--divider-rgb),0.25);}
-.sr-gh{font-size:var(--dow-label-size);color:var(--tm);padding:12px 20px 4px;}
-.sr-card{padding:10px 20px;border-bottom:1px solid rgba(var(--divider-rgb),0.25);cursor:pointer;}
+.sr-gh{display:flex;align-items:center;gap:6px;font-size:var(--dow-label-size);color:var(--ts);padding:12px 20px 2px;}
+.sr-gh .sr-badge{font-size:var(--dow-label-size);padding:1px 10px;}
+.sr-mon{display:flex;align-items:center;gap:8px;padding:8px 20px 2px;font-size:var(--dow-label-size);color:var(--tm);}
+.sr-mon::before{content:'';flex:1;height:1px;background:rgba(var(--divider-rgb),0.35);} /* 구분선은 왼쪽, 월 글자는 오른쪽 */
+.sr-card{padding:8px 20px 10px;cursor:pointer;}
 .sr-meta{font-size:var(--dow-label-size);color:var(--ts);margin-bottom:3px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
 .sr-badge{padding:0 7px;border-radius:10px;border:1px solid var(--card-b);font-size:11px;color:var(--ts);}
 .sr-badge.memo{background:var(--pal-pink-bg);color:var(--pal-pink-text);border-color:transparent;}
+.sr-badge.todo{background:var(--pal-yellow-bg);color:var(--pal-yellow-text);border-color:transparent;}
 .sr-txt{font-size:var(--main-text-size);color:var(--tp);line-height:1.5;word-break:break-word;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;}
 .sr-txt.done{opacity:0.6;}
-.sr-hl{background:var(--pal-pink-bg);color:var(--pal-pink-text);border-radius:3px;padding:0 1px;}
+.sr-hl{background:var(--pal-pink-bg);color:var(--pal-pink-text);border-radius:3px;padding:0 1px;} /* 메모 키워드 = 분홍(메모 카드색) */
+.sr-hl.todo{background:var(--pal-yellow-bg);color:var(--pal-yellow-text);} /* 투두 키워드 = 노랑(투두 배너색) */
 .sr-more{padding:12px 20px;font-size:var(--dow-label-size);color:var(--pal-pink-text);cursor:pointer;border-bottom:1px solid rgba(var(--divider-rgb),0.25);}
 .sr-empty{padding:56px 24px;text-align:center;color:var(--tm);font-size:var(--main-text-size);line-height:1.7;}
 .sr-recent-hd{display:flex;justify-content:space-between;padding:12px 20px 4px;font-size:var(--dow-label-size);color:var(--tm);}
@@ -2443,7 +2449,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <span class="sr-cancel" onclick="closeSearch()">취소</span>
   </div>
   <div class="sr-chips" id="sr-chips-type"></div>
-  <div class="sr-chips" id="sr-chips-period"></div>
   <div class="sr-chips" id="sr-chips-sub" style="display:none;"></div>
   <div class="sr-body" id="sr-body" ontouchmove="document.getElementById('sr-inp').blur()"></div>
 </div>
