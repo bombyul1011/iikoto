@@ -50,7 +50,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --pal-mintlime:rgb(102,160,85); /* 민트+연두 중간톤 — 문장저장/문장코멘트/영양제/인용구칩 4곳 통합용 */
   --grad-pinkyellow:linear-gradient(120deg,rgba(255,210,230,0.80),rgba(255,230,200,0.70)); /* 핑크-옐로 카드 그라디언트 — reading-icon-btn 기준값, mr-goal-card는 알파만 더 연하게 별도 지정 */
   --grad-mintyellow:linear-gradient(135deg,rgba(210,244,225,0.85),rgba(248,245,200,0.85),rgba(212,242,222,0.85)); /* 민트-옐로 3색 그라디언트 — weekly-review-banner-inner/report-banner-inner/quote-chip-inner 공용 */
-  --pal-mauvepink:rgb(198,116,149); /* 모브핑크 — 다음주목표/glass오늘표시/뮤직재생/glass캘린더오늘 4곳 통합용 */
+  --pal-mauvepink:rgb(198,116,149); /* 모브핑크 — glass오늘표시/뮤직재생/glass캘린더오늘 3곳 통합용 */
   --rainbow-done:linear-gradient(120deg,#ffd28a,#ffb0c8,#c9a8ff,#9fd8ff,#ffd28a); /* 완독 축하 버튼 테두리 + 공용 팝업(.rhythm-memo-card) 상단띠·스누즈 완료 버튼 테두리 공용 */
   --rainbow-bead:linear-gradient(270deg,#ffb0c8,#ffd28a,#bdf0c4,#9fd8ff,#c9a8ff,#ffb0c8); /* 진행바 구슬 애니메이션 — rd-progress-bead 전용 */
 }
@@ -215,18 +215,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 #reserve-filter-row .reserve-section-btn[data-filter="todo"].active{background:var(--pal-mint-bg);color:var(--pal-mint-text);border-color:var(--pal-mint-border);}
 #reserve-filter-row .reserve-section-btn[data-filter="etc"].active{background:var(--pal-warmgray-bg);color:var(--pal-warmgray-text);border-color:var(--pal-warmgray-border);}
 .goal-section-title{display:inline-flex;align-items:center;gap:5px;font-size:var(--main-text-size);font-weight:500;letter-spacing:.04em;background:linear-gradient(120deg,rgba(250,215,100,0.55),rgba(255,235,170,0.48));color:#8a6c20;border-radius:10px;padding:5px 13px;margin:14px 0 10px 0;border:1px solid rgba(250,205,90,0.55);box-shadow:0 2px 10px rgba(200,150,50,0.12);}
-.nwf-item{display:flex;flex-direction:column;gap:6px;background:var(--card);border:1px solid var(--card-b);border-radius:14px;padding:12px 13px;margin-bottom:9px;box-shadow:0 2px 14px rgba(0,0,0,0.05),inset 0 1px 0 rgba(255,250,240,0.65);}
-.nwf-item-head{display:flex;align-items:center;gap:7px;}
-.nwf-item-icon{font-size:14px;color:var(--pal-mauvepink);flex-shrink:0;}
-.nwf-item-goal{font-size:var(--dow-label-size);font-weight:600;color:var(--pal-mauvepink);}
-.nwf-item-text{font-size:var(--main-text-size);line-height:1.55;color:var(--tp);}
-[data-theme="glass"] .nwf-item{background:rgba(253,251,245,0.92);}
-[data-theme="glass"] .nwf-item-icon,[data-theme="glass"] .nwf-item-goal{color:var(--pal-mauvepink);}
-.nwf-adopt-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px;padding-top:9px;border-top:1px dashed var(--card-b);}
-.nwf-goal-preview{font-size:var(--dow-label-size);color:var(--tp);opacity:0.75;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.nwf-adopt-btn{flex-shrink:0;font-size:var(--dow-label-size);font-weight:600;color:var(--pal-mauvepink);background:rgba(232,164,187,0.12);border:1px solid rgba(232,164,187,0.45);border-radius:20px;padding:6px 13px;cursor:pointer;white-space:nowrap;}
-.nwf-adopt-btn:active{opacity:0.7;}
-.nwf-adopt-btn.adopted{color:var(--tp);opacity:0.55;background:transparent;border-color:var(--card-b);cursor:default;}
 
 /* ── 감상 캘린더 (실제 감상 날짜에 포스터를 꽂는 달력형 뷰) ── */
 .wcal-filter-chips{display:flex;gap:6px;margin-bottom:14px;overflow-x:auto;}
@@ -654,6 +642,17 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .undo-toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%) translateY(16px);background:rgba(60,40,40,.90);color:white;font-size:var(--dow-label-size);padding:9px 18px;border-radius:20px;display:flex;align-items:center;gap:10px;opacity:0;transition:all .25s;z-index:10500;pointer-events:none;backdrop-filter:blur(8px);}
 .undo-toast.on{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto;}
 .undo-btn{font-size:var(--dow-label-size);color:rgba(255,200,180,.90);font-weight:500;cursor:pointer;}
+.wk-nav{display:flex;align-items:center;} /* 주간 목표 카드 제목줄 오른쪽: 주 이동 ‹ 라벨 › */
+.wk-arr{width:30px;height:30px;display:flex;align-items:center;justify-content:center;color:var(--ts);font-size:14px;cursor:pointer;}
+.wk-arr.off{opacity:.3;pointer-events:none;}
+.wk-lbl{font-size:var(--dow-label-size);color:var(--ts);min-width:58px;text-align:center;cursor:pointer;}
+.overlap-toast{flex-direction:column;align-items:stretch;gap:6px;padding:11px 18px 0;border-radius:16px;overflow:hidden;min-width:232px;} /* 두 줄 토스트: 1줄 안내, 2줄 버튼, 맨 아래 8초 진행바 */
+.ot-msg{font-size:var(--dow-label-size);line-height:1.5;}
+.ot-sub{margin-left:6px;opacity:.7;}
+.ot-btns{display:flex;gap:18px;padding:2px 0 10px;}
+.ot-keep{color:rgba(255,255,255,.75);font-weight:400;}
+.ot-bar{height:3px;margin:0 -18px;background:rgba(255,255,255,.14);}
+.ot-bar i{display:block;height:100%;background:rgba(255,200,180,.90);transform-origin:left;transform:scaleX(1);}
 .memo-input-row{margin-top:12px;padding-top:11px;display:flex;gap:7px;align-items:center;}
 .stamp-btn{width:38px;height:38px;background:var(--card);border:1px solid var(--card-b);border-radius:11px;padding:0;font-size:var(--dow-label-size);color:var(--ts);display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:'DM Sans',sans-serif;flex-shrink:0;}
 .memo-field{flex:1;height:38px;box-sizing:border-box;background:rgba(255,250,240,.30);border:1.5px dashed color-mix(in srgb, var(--tp) 20%, transparent);border-radius:11px;padding:8px 12px;font-size:16px;color:var(--tp);font-family:'DM Sans',sans-serif;outline:none;resize:none;line-height:1.3;max-height:100px;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none;} /* PC(macOS "항상 표시" 스크롤바 설정)에서 텍스트가 거의 없어도 세로 스크롤바가 보이던 문제 — 모바일은 원래 오버레이라 안 보였음. 숨겨도 스크롤 자체는 그대로 동작 */
@@ -685,7 +684,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .wchallenge-days{display:flex;gap:5px;padding:2px 0 0 2px;}
 .wchallenge-day{width:26px;height:26px;border-radius:50%;border:1.5px dashed rgba(var(--divider-rgb),0.38);background:none;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:var(--tm);cursor:pointer;transition:all 0.2s;font-family:'DM Sans',sans-serif;letter-spacing:0;}
 .wchallenge-day.on{border-style:solid;}
-.wchallenge-add{display:flex;align-items:center;gap:6px;padding:8px 2px 2px;color:var(--ts);font-size:var(--dow-label-size);cursor:pointer;background:none;border:none;font-family:'DM Sans',sans-serif;}
 
 /* ── WEEK STRIP (주간탭 상단 날짜 네비게이터 — 월~일 7칸, "day-btn") ── */
 .week-strip{display:flex;gap:5px;margin-bottom:12px;}
@@ -1333,7 +1331,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 }
 [data-theme="glass"] .day-btn.today{background:rgba(255,253,248,.9);border:1px solid rgba(230,185,110,0.55);box-shadow:0 4px 14px rgba(0,0,0,0.08),inset 0 1px 0 rgba(255,253,248,0.7);}
 [data-theme="glass"] .rd-tab.on{background:rgba(232,164,187,0.18);border-color:rgba(232,164,187,0.40);}
-[data-theme="glass"] #nextweek-sheet .goal-section-title{background:linear-gradient(120deg,rgba(248,212,225,0.55),rgba(250,225,235,0.48));color:var(--pal-mauvepink);border:1.4px solid rgba(232,164,187,0.50);}
 [data-theme="glass"] .chk.on{background:rgba(250,215,100,0.55);border-color:rgba(250,215,100,0.78);}
 [data-theme="glass"] .cal-day.today .cal-num{background:rgba(198,116,149,0.85);}
 [data-theme="glass"] .cal-day.selected .cal-num{background:rgba(232,164,187,0.24);color:var(--pal-mauvepink);}
@@ -1773,7 +1770,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <!-- 주간 목표 카드 — 일반 공용 .card 클래스 사용(id=wchallenge-card). 배경 진하기는 --card 변수(라이트테마 0.60) -->
       <div class="card" id="wchallenge-card" style="padding:14px 15px 10px;margin-bottom:7px;">
         <div style="display:flex;align-items:center;justify-content:space-between;">
-          <div class="goal-section-title" id="wchallenge-title" style="margin-top:0;"><i class="ti ti-flag-3" id="wchallenge-icon" class="ico-13" aria-hidden="true"></i> 주간 목표</div>
+          <div class="goal-section-title" id="wchallenge-title" style="margin-top:0;"><i class="ti ti-flag-3" aria-hidden="true"></i> 주간 목표</div>
+          <div class="wk-nav" id="wk-nav"></div>
         </div>
         <div class="goal-wrap" id="weekly-goal-wrap"></div>
       </div>
@@ -1784,7 +1782,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       </div>
       <div class="slabel" style="margin-top:20px;">리듬 모아보기</div>
       <div class="card" id="weekly-rhythm-bars"></div>
-      <div class="slabel" style="margin-top:20px;">이번주 해빗</div>
+      <div class="slabel" id="weekly-habit-label" style="margin-top:20px;">이번주 해빗</div>
       <div class="habit-week-box" id="weekly-habit-box"></div>
     </div>
 
@@ -1871,6 +1869,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 
 <!-- TODO COPY CONFIRM TOAST -->
 <div class="undo-toast" id="todo-copy-confirm-toast">내일로 복사할까요? <span class="undo-btn" onclick="confirmTodoCopyToast()">네</span></div>
+<div class="undo-toast overlap-toast" id="rhythm-overlap-toast"><div class="ot-msg" id="rhythm-overlap-msg"></div><div class="ot-btns"><span class="undo-btn" onclick="overlapToastEnd()">지금 종료</span><span class="undo-btn ot-keep" onclick="overlapToastKeep()">둘 다 유지</span></div><div class="ot-bar"><i id="rhythm-overlap-bar"></i></div></div>
 <div class="undo-toast" id="music-open-toast">애플뮤직에서 열까요? <span class="undo-btn" onclick="openMusicFromToast()">열기</span></div>
 
 <!-- READING PROGRESS DONE CONFIRM TOAST -->
@@ -2017,28 +2016,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
     <div class="sheet-handle"></div>
     <div style="padding:0 20px 24px;">
       <div id="diary-month-content"></div>
-    </div>
-  </div>
-</div>
-
-<!-- NEXT WEEK CHALLENGE SHEET -->
-<div class="overlay" id="nextweek-sheet" onclick="closeSheet('nextweek-sheet',event)">
-  <div class="bsheet" style="max-height:85vh;overflow-y:auto;" onclick="event.stopPropagation()">
-    <div class="sheet-handle"></div>
-    <div style="padding:0 20px 24px;">
-      <div class="goal-section-title" id="nextweek-sheet-title" style="margin-top:0;">◉ 다음 주 챌린지 준비하기</div>
-      <div id="nextweek-challenge-wrap"></div>
-    </div>
-  </div>
-</div>
-
-<!-- NEXT WEEK CHALLENGE FEEDBACK SHEET (nextweek-sheet 위에 쌓이는 시트) -->
-<div class="overlay" id="nextweek-feedback-sheet" style="z-index:301;" onclick="closeSheet('nextweek-feedback-sheet',event)">
-  <div class="bsheet" style="max-height:80vh;overflow-y:auto;" onclick="event.stopPropagation()">
-    <div class="sheet-handle"></div>
-    <div style="padding:0 20px 24px;">
-      <div class="goal-section-title" style="margin-top:0;">◉ 다음주 목표 제안받기</div>
-      <div id="nextweek-feedback-content"></div>
     </div>
   </div>
 </div>

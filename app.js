@@ -131,12 +131,6 @@ const RHYTHM_CATS={
 };
 const RHYTHM_SLEEP_COLOR='rgba(var(--pal-warmgray-rgb),0.30)'; // 알파만 낮춤(채도는 원색 그대로)
 const RHYTHM_MEAL_COLOR='rgba(var(--pal-green-rgb),0.90)';
-// 다음주 코멘트/제안 카드의 카테고리→아이콘 매핑 공용 베이스. 제안 카드(NEXT_WEEK_SUGGEST_CAT_ICON)만 '취미' 아이콘이 추가로 필요해 확장해 사용.
-const NEXT_WEEK_CAT_ICON={
-  '운동':'ti-run','식사':'ti-salad','수면':'ti-moon','공부':'ti-book',
-  '업무':'ti-briefcase','마음가짐':'ti-heart','습관':'ti-repeat'
-};
-const NEXT_WEEK_SUGGEST_CAT_ICON={...NEXT_WEEK_CAT_ICON,'취미':'ti-stack-2'};
 // 리듬 카테고리 분류 설명 — AI 프롬프트에서 시간 사용 데이터를 다룰 때 카테고리 오분류(예: 업무↔책상, 휴식↔감상)를 줄이기 위해 공통으로 붙이는 한 줄 설명.
 const RHYTHM_CAT_GUIDE='(카테고리 참고: 운동=홈트/헬스장/러닝 등, 휴식=낮잠/멍때리기/게임 등 목적 없이 흘려보내는 시간, 단장=기상 후 스트레칭·씻기·스킨케어 등 몸을 준비하는 루틴이나 취침 전 씻고 정돈하는 루틴, 그리고 다음날/다음 일정을 위해 미리 손 써두는 시간(여행 짐 챙기기, 다음날 식사 미리 준비해두기 등)까지 포함 — 지금 당장이 아니라 다가올 시간을 위해 준비하는 행위 전반(휴식과 구분됨), 업무=주로 노트북으로 하는 작업(가끔 외근 포함), 외출=지인과의 약속이나 혼자 가는 카페/산책 등, 책상=일기·공부·앱 정비·노트정리 등 책상에서 하는 작업, 감상=드라마·독서·영화, 정리=청소·빨래 등 집안 정리)';
 function getRhythmColor(key){
@@ -370,13 +364,15 @@ function saveRhythmBlock(){
   const text=t?t.value.trim():'';
   const blocks=getRhythmBlocks(_rhythmDk);
   const isNew=_rhythmEditIdx==null;
+  let newCid=null;
   // enjoy(감상) 카테고리이고 콘텐츠 칩으로 선택한 경우에만 contentCid를 붙임 — 직접입력/타 카테고리는 undefined 그대로(불필요한 null 남기지 않음)
   const contentCid=(cat==='enjoy'&&_rhythmFormCid)?_rhythmFormCid:undefined;
   if(_rhythmEditIdx!=null&&blocks[_rhythmEditIdx]){
     const old=blocks[_rhythmEditIdx];
     blocks[_rhythmEditIdx]={cat:cat,start:start,end:end||'',text:text,created:old.created,cid:old.cid||genCid(),contentCid:contentCid!==undefined?contentCid:old.contentCid};
   }else{
-    blocks.push({cat:cat,start:start,end:end||'',text:text,created:Date.now(),cid:genCid(),contentCid:contentCid});
+    newCid=genCid();
+    blocks.push({cat:cat,start:start,end:end||'',text:text,created:Date.now(),cid:newCid,contentCid:contentCid});
   }
   saveRhythmBlocks(_rhythmDk,blocks);
   if(isNew){
@@ -389,6 +385,7 @@ function saveRhythmBlock(){
   }
   _rhythmFormOpen=false;_resetRhythmForm();
   refreshRhythmTrack();
+  if(isNew&&!end)checkRhythmOverlapOnStart(_rhythmDk,newCid); // 종료 시각 없이 "시작"으로 만든 새 막대만 겹침 확인(과거 구간 수기 입력은 제외)
   setTimeout(()=>{_rhythmSubmitting=false;},500);
 }
 // 리듬 블록 카테고리에 대응하는 습관(월간 결산용)을 자동으로 체크
@@ -2733,6 +2730,74 @@ function showToast(msg){
   clearTimeout(_toastTimer);
   _toastTimer=setTimeout(function(){t.classList.remove('on');},2200);
 }
+
+// ── 리듬 겹침 알림 토스트 ──
+// 새 막대를 "시작"(종료 시각 없이 생성)한 직후, 아직 끝나지 않은 다른 막대가 있으면 두 줄 토스트로 묻는다.
+// - 식사는 별도 테이블(meals)이라 리듬블록이 아니므로 자연히 제외. 진행 중인 쪽이 업무·외출이면 묻지 않고 유지.
+// - 아무것도 안 누르면 8초 뒤 사라지고 둘 다 유지(기본값). [지금 종료]는 이전 막대를 지금 시각으로 닫음.
+// - 호출부 3곳: 리듬탭 수기 시작(saveRhythmBlock) / 모닝플로우 슬롯 시작 / 감상·독서 스톱워치 시작(_commitEnjoyRhythmBlock).
+const RHYTHM_OVERLAP_SKIP_CATS=['work','appointment'];
+const RHYTHM_OVERLAP_TOAST_MS=8000;
+let _overlapTimer=null,_overlapCtx=null;
+function checkRhythmOverlapOnStart(dk,newCid){
+  const prevDk=dateKey(new Date(parseDk(dk).getTime()-86400000)); // 자정을 넘겨 이어진 어제 막대까지 확인
+  let found=null;
+  [prevDk,dk].forEach(function(d){
+    getRhythmBlocks(d).forEach(function(b){
+      if(!b||b.cid===newCid||b.end)return; // 이미 끝난 막대·방금 만든 막대는 제외
+      if(!RHYTHM_CATS[b.cat]||RHYTHM_OVERLAP_SKIP_CATS.indexOf(b.cat)>=0)return;
+      found={dk:d,block:b}; // 마지막(가장 최근 날짜) 것을 대표로
+    });
+  });
+  if(!found)return;
+  showOverlapToast(found.dk,found.block);
+}
+function showOverlapToast(dk,block){
+  const t=document.getElementById('rhythm-overlap-toast');
+  const msg=document.getElementById('rhythm-overlap-msg');
+  const bar=document.getElementById('rhythm-overlap-bar');
+  if(!t||!msg||!bar)return;
+  const name=_rhythmBlockDisplayTitle(block.text)||RHYTHM_CATS[block.cat].label;
+  msg.textContent=name+' 진행 중이에요';
+  const sub=document.createElement('span');
+  sub.className='ot-sub';
+  sub.textContent=block.start+'부터';
+  msg.appendChild(sub);
+  _overlapCtx={dk:dk,cid:block.cid};
+  clearTimeout(_overlapTimer);
+  bar.style.transition='none';
+  bar.style.transform='scaleX(1)';
+  void bar.offsetWidth; // 리플로우로 초기 상태를 확정한 뒤 줄어드는 애니메이션 시작
+  bar.style.transition='transform '+RHYTHM_OVERLAP_TOAST_MS+'ms linear';
+  bar.style.transform='scaleX(0)';
+  t.classList.add('on');
+  _overlapTimer=setTimeout(hideOverlapToast,RHYTHM_OVERLAP_TOAST_MS);
+}
+function hideOverlapToast(){
+  clearTimeout(_overlapTimer);
+  _overlapCtx=null;
+  const t=document.getElementById('rhythm-overlap-toast');
+  if(t)t.classList.remove('on');
+}
+function overlapToastKeep(){hideOverlapToast();}
+function overlapToastEnd(){
+  const c=_overlapCtx;
+  hideOverlapToast();
+  if(!c)return;
+  // 감상·독서 스톱워치가 돌고 있는 막대는 스톱워치 종료 로직(종료 시각 기록·연동 정리)을 그대로 따른다.
+  if(_cswRunning&&_cswBlockCid===c.cid){stopContentStopwatch();return;}
+  if(_swRunning&&_swBlockCid===c.cid){toggleStopwatch();return;}
+  const blocks=getRhythmBlocks(c.dk);
+  const idx=blocks.findIndex(function(b){return b.cid===c.cid;});
+  if(idx<0||blocks[idx].end)return;
+  const n=new Date();
+  blocks[idx].end=pad(n.getHours())+':'+pad(n.getMinutes());
+  delete blocks[idx].autoClosed;
+  saveRhythmBlocks(c.dk,blocks);
+  syncMorningFlowOnRhythmBlockEnd(c.dk,c.cid,blocks[idx].end); // 모닝플로우로 시작한 막대면 pick도 done으로
+  if(blocks[idx].cat==='exercise')scheduleExerciseStatAlert(c.cid);
+  refreshRhythmTrack();
+}
 function dateKey(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;}
 function monthKey(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;}
 function weekKey(d){const m=new Date(d);m.setDate(d.getDate()-((d.getDay()+6)%7));return `week:${dateKey(m)}`;}
@@ -4167,6 +4232,7 @@ function updateDateUI(){
   if(typeof loadDaily==='function')loadDaily();
   // 월간탭이 열려있는 상태면 네비게이터 이동을 즉시 반영 (다시 탭 클릭 안 해도 되게)
   refreshIfTabOpen('v-monthly',loadMonthly);
+  refreshIfTabOpen('v-weekly',loadWeekly); // 주간탭이 열려있으면 네비게이터 이동에 맞춰 해당 주로 전환
 }
 function shiftDay(n){
   const d=new Date(currentDate);d.setDate(d.getDate()+n);
@@ -4184,7 +4250,7 @@ function goToday(){
 
 // ── TABS
 function switchToTab(v,direction){
-  if(v==='daily'){currentDate=new Date();updateDateUI();} // 오늘탭 진입 시 항상 오늘 날짜로(네비게이터의 goToday와 동일 동작) + 상단 날짜표시 갱신
+  if(v==='daily'||v==='weekly'){currentDate=new Date();updateDateUI();} // 오늘탭 진입 시 항상 오늘 날짜로(네비게이터의 goToday와 동일 동작) + 상단 날짜표시 갱신
   document.querySelectorAll('.vtab').forEach(t=>t.classList.toggle('on',t.dataset.v===v));
   document.querySelectorAll('.view').forEach(vw=>vw.classList.toggle('on',vw.id===`v-${v}`));
   document.querySelector('.scroll').scrollTop=0;
@@ -6313,6 +6379,7 @@ function _startMorningFlowRhythm(id,targetCid,mk,subKey){
   saveMorningFlow(dk,flow);
   refreshMorningFlowCard();
   refreshRhythmTrack();
+  checkRhythmOverlapOnStart(dk,blockCid);
 }
 // 슬롯 종료 — 독서/콘텐츠는 각자의 종료 로직(진행률 모달까지)을 그대로 재사용, 나머지는 리듬블록 end만 채움.
 // 시각(startStr/endStr)은 저장하지 않음 — status와 연결고리(blockCid/cid)만 남기고, 실제 시:분 표시는 화면 렌더 시점에 리듬블록을 조회해서 채움(_mfBlockFor).
@@ -7072,13 +7139,10 @@ function makeBookCardWithCover(){
   </div>`;
   return wrap;
 }
-// 오늘 이전 날짜의 nextweek_suggest 캐시 자동 삭제 (누적 방지)
+// 날짜별 AI 캐시 자동 정리 (누적 방지)
 (function(){
   try{
     const today=dateKey(getLogicalDate());
-    Object.keys(localStorage).forEach(k=>{
-      if(k.startsWith('nextweek_suggest_')&&!k.includes(today))localStorage.removeItem(k);
-    });
     // weekly_summary_는 하루 단위 캐시라 매주 새 키가 생김 — 2주(14일) 지난 것만 정리해 최근 2주치는 남겨둠
     const todayMs=new Date(today).getTime();
     Object.keys(localStorage).forEach(k=>{
@@ -8654,49 +8718,7 @@ function saveWChallenge(wk,data){
   },800);
 }
 
-function nextWeekKey(){const d=new Date();d.setDate(d.getDate()+7);return weekKey(d);}
 function lastWeekKey(){const d=new Date();d.setDate(d.getDate()-7);return weekKey(d);}
-async function openNextWeekChallengeSheet(){
-  openSheet('nextweek-sheet');
-  const wk=nextWeekKey();
-  if(navigator.onLine){
-    const now=new Date();
-    const mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7));
-    const dks=[];for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);dks.push(dateKey(d));}
-    // AI 요약을 만들기 전에, 다른 기기에서 방금 체크했을 수 있는 이번 주 데이터를 먼저 최신화
-    await Promise.all([
-      syncWChallengeDown(wk),
-      syncHCDown(weekKey(now)),
-      ...dks.map(dk=>syncTodosDown(dk)),
-      ...dks.map(dk=>syncMemosDown(dk)),
-      ...dks.map(dk=>syncSleepDown(dk))
-    ]);
-  }
-  renderWeeklyChallenge(wk,'nextweek-challenge-wrap');
-  setupNextWeekFeedbackToggle();
-}
-// 일요일 19시 이후엔 다음 주 챌린지 준비 시트 상단 타이틀이 클릭 가능한 배너로 바뀌어
-// nextweek-feedback-sheet(같은 시트 위에 쌓이는 점검 코멘트 화면)를 열 수 있음.
-// 그 외 시간대(목~토, 일요일 19시 이전)엔 기존처럼 클릭 불가한 일반 타이틀로 유지.
-function setupNextWeekFeedbackToggle(){
-  const titleEl=document.getElementById('nextweek-sheet-title');
-  if(!titleEl)return;
-  const now=new Date();
-  const isSundayEvening=now.getDay()===0&&now.getHours()>=19;
-  if(isSundayEvening){
-    titleEl.className='report-banner rhythm-soft';
-    titleEl.style.margin='0 0 12px';
-    titleEl.innerHTML='<div class="report-banner-inner" style="justify-content:flex-start;gap:5px;"><div class="report-banner-line" style="white-space:nowrap;"><i class="ti ti-flag-heart ico-inline-13" aria-hidden="true"></i>다음주 목표 제안받기</div></div>';
-    titleEl.style.cursor='pointer';
-    titleEl.onclick=openNextWeekFeedbackSheet;
-  }else{
-    titleEl.className='goal-section-title';
-    titleEl.style.margin='0';
-    titleEl.innerHTML='◉ 다음 주 챌린지 준비하기';
-    titleEl.style.cursor='default';
-    titleEl.onclick=null;
-  }
-}
 // ── 지난주 목표 돌아보기 (월요일 전용) ──
 // 일요일 밤 주간리뷰와 겹치지 않도록, 순수하게 "지난주 지정했던 챌린지"에 초점을 맞춘 리포트.
 // 단순 달성일수(X/7일) 나열이 아니라, 지난주 메모 원문에서 각 챌린지와 관련된 노력의 흔적을 찾아 코멘트함.
@@ -8810,54 +8832,6 @@ ${RHYTHM_CAT_GUIDE}
   const bodyHtml=rest.map(l=>`<div style="margin:8px 0;">${l.trim()}</div>`).join('');
   return headlineHtml+bodyHtml;
 }
-// 일요일 19시 이후 nextweek-sheet 타이틀 배너를 누르면 열리는 확장 목표 제안 시트.
-// (구) "다음주 챌린지 점검하기"를 대체 — 사용자가 입력한 목표에 코멘트만 달던 방식에서,
-// 이번주 리듬+메모+최근 8주 챌린지 이력을 종합해 AI가 먼저 2~3개 목표 후보를 제안하는 방식으로 변경.
-// 이미 다음주 챌린지를 입력해뒀어도 무관하게 항상 제안하며, 채택 시 기존 목록에 "추가"만 됨(덮어쓰지 않음).
-async function openNextWeekFeedbackSheet(){
-  openSheet('nextweek-feedback-sheet');
-  const wk=nextWeekKey();
-  const content=document.getElementById('nextweek-feedback-content');
-  const cacheKey='nextweek_suggest_'+wk;
-  const cached=S.get(cacheKey);
-  if(cached){content.innerHTML=cached;bindNextWeekSuggestButtons(wk);return;}
-  content.innerHTML='<div class="sheet-loading-msg">다음주를 위한 목표를 살펴보는 중이에요.. 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">약 10-20초 소요돼요</span></div>';
-  const serverHtml=await aiCacheGet(cacheKey);
-  if(serverHtml){S.set(cacheKey,serverHtml);content.innerHTML=serverHtml;bindNextWeekSuggestButtons(wk);return;}
-  if(!getClaudeKey()){
-    content.innerHTML='<div class="sheet-loading-msg">아직 준비 중이에요 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">다른 기기에서 먼저 열어보시면 여기서도 볼 수 있어요</span></div>';
-    return;
-  }
-  const html=await buildNextWeekSuggestHtml(wk);
-  if(html){
-    S.set(cacheKey,html);
-    aiCacheSet(cacheKey,html);
-    content.innerHTML=html;
-    bindNextWeekSuggestButtons(wk);
-  }
-  else content.innerHTML='<div class="sheet-loading-msg">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
-}
-// 제안 카드의 "이걸로 정하기" 버튼 클릭 시 — 기존 다음주 챌린지 목록에 추가(덮어쓰지 않음).
-// 캐시된 HTML을 innerHTML로 꽂은 뒤라 버튼에 이벤트가 없으므로, 렌더 직후 매번 다시 바인딩.
-function bindNextWeekSuggestButtons(wk){
-  const wrap=document.getElementById('nextweek-feedback-content');
-  if(!wrap)return;
-  wrap.querySelectorAll('.nwf-adopt-btn').forEach(btn=>{
-    btn.onclick=()=>{
-      if(btn.dataset.adopted==='1')return; // 중복 클릭 방지
-      const text=btn.dataset.goalText;
-      if(!text)return;
-      const existing=getWChallenge(wk);
-      saveWChallenge(wk,[...existing,{text,days:[false,false,false,false,false,false,false]}]);
-      btn.dataset.adopted='1';
-      btn.textContent='추가됨';
-      btn.classList.add('adopted');
-      // 다음주 챌린지 준비 화면(nextweek-challenge-wrap)이 같은 시트 아래 깔려있으므로 반영해둠 —
-      // 점검 시트를 닫고 돌아갔을 때 바로 보이도록.
-      renderWeeklyChallenge(wk,'nextweek-challenge-wrap');
-    };
-  });
-}
 // 주간 미니통계의 메모 아이콘(월요일 하루 동안만 활성화, isReportDay 기준)을 누르면 열리는 시트.
 // 그 주(월~일) 메모를 모두 모아 AI에 넘겨, 이번 주 메모에 드러난 화두/톤을 짧게 정리해줌.
 // 월간(약 200개)보다 데이터량이 적당해(대개 30~50개) 요약이 뭉개지지 않음.
@@ -8945,128 +8919,15 @@ async function buildWeeklyMemoReportHtml(wk){
   }catch(e){return null;}
 }
 
-// ── 다음 주 확장 목표 제안 (구 "챌린지 점검" 대체) ──
-// 이번주 리듬(카테고리별 시간+전주 대비 변화), 이번주 메모(요일별 샘플), 최근 8주 챌린지 이력(텍스트+체크+본인 주석 원문)을
-// 함께 넘겨 AI가 2~3개의 새 목표 후보를 제안. 사용자가 이미 입력해둔 다음주 챌린지 유무와 무관하게 항상 제안하며,
-// 채택 시 기존 목록에 추가되는 방식(덮어쓰지 않음)이라 여기선 순수 제안 생성만 담당.
-async function buildNextWeekSuggestHtml(wk){
-  const key=getClaudeKey();
-  if(!key)return '<div class="sheet-loading-msg">설정에서 Claude API 키를 입력하면 분석을 받을 수 있어요</div>';
-
-  const evenSample=(arr,n)=>{
-    if(arr.length<=n)return arr;
-    const result=[];
-    for(let i=0;i<n;i++){
-      const idx=Math.round(i*(arr.length-1)/(n-1));
-      result.push(arr[idx]);
-    }
-    return [...new Set(result)];
-  };
-
-  // 이번주(월~일, 방금 끝난 주) 리듬+메모 수집 — makeWeeklySummaryCard와 동일 기준으로 "그 주 일요일" 역산
-  const sundayDk=_thisWeekSundayDk();
-  const now=new Date(sundayDk+'T00:00:00');
-  const weekStart=new Date(now);weekStart.setDate(now.getDate()-6);
-
-  const allMemosWithDay=[];
-  for(let i=0;i<7;i++){
-    const d=new Date(weekStart);d.setDate(weekStart.getDate()+i);
-    const dk=dateKey(d);
-    const dayName=_HOME_DAYS[d.getDay()]+'요일';
-    const memos=getMemos(dk);
-    const dayTexts=memos.map(m=>m.text).filter(Boolean);
-    evenSample(dayTexts,8).forEach(t=>allMemosWithDay.push(`${dayName}: ${t}`));
-  }
-  const rhythmDurThis=sumCategoryDurations(weekStart,7).dur; // 공용 util(라벨 기준)
-  const rhythmText=Object.values(RHYTHM_CATS).map(c=>{
-    const min=rhythmDurThis[c.label]||0;
-    if(min<10)return null;
-    const h=(min/60).toFixed(1).replace(/\.0$/,'');
-    return `${c.label} ${h}시간`;
-  }).filter(Boolean).join(', ');
-
-  // 최근 8주 챌린지 이력 — 텍스트(괄호 속 본인 주석 포함 원문 그대로)+체크일수, 최근 주가 위로 오게
-  const historyLines=[];
-  for(let i=1;i<=8;i++){
-    const d=new Date();d.setDate(d.getDate()-7*i);
-    const pastWk=weekKey(d);
-    const pastItems=getWChallenge(pastWk).filter(it=>it.text&&it.text.trim());
-    pastItems.forEach(it=>historyLines.push(`"${it.text}" — ${it.days.filter(Boolean).length}/7일 체크`));
-  }
-  // 이미 입력해둔 다음주 챌린지(있다면) — 덮어쓰지 않고 참고만 하도록 별도로 전달
-  const alreadySet=getWChallenge(wk).filter(it=>it.text&&it.text.trim());
-  const alreadySetText=alreadySet.map(it=>`"${it.text}"`).join(', ');
-
-  const dataContext=[
-    getUserProfileContext(),
-    rhythmText?`지난 한 주간 리듬 기록(카테고리별 누적 시간):\n${rhythmText}`:'지난 한 주 리듬 기록 부족',
-    allMemosWithDay.length?`지난 한 주간 메모(요일별로 시간대 고르게 샘플링):\n${allMemosWithDay.join('\n')}`:'지난 한 주 메모 없음',
-    historyLines.length?`최근 몇 주간의 챌린지 이력(텍스트에 남긴 본인 메모 포함, 원문 그대로):\n${historyLines.join('\n')}`:'과거 챌린지 이력 없음(처음 시작)',
-    alreadySetText?`사용자가 이미 다음 주 챌린지로 입력해둔 목표(참고만 — 여기 제안은 이걸 대체하지 않고 추가되는 것):\n${alreadySetText}`:null
-  ].filter(Boolean).join('\n\n');
-
-  const sys=`당신은 따뜻한 생활 코치예요. 지난 한 주간의 리듬 기록과 메모, 그리고 최근 몇 주간의 챌린지 이력을 참고해서,
-다음 주에 시도해볼 만한 새로운 목표 후보를 2~3개 제안해요.
-
-${RHYTHM_CAT_GUIDE}
-
-**핵심 판단 방식:**
-1. 행동 변화(리듬 기록)와 본인 언급(메모)이 함께 나타나는 지점을 우선적으로 살펴보세요. 예를 들어 특정 활동이 늘거나 줄었고, 메모에서도 그와 관련된 언급이 반복된다면 그게 가장 근거가 뚜렷한 제안 후보예요.
-2. 최근 챌린지 이력도 함께 보세요. 특히 목표 텍스트에 사용자가 직접 남긴 괄호 메모나 정황(예: 중단 사유, 톤 변화)이 있다면 그걸 가장 중요한 단서로 삼으세요. 최근 저조했거나 중단된 흐름이 있다면, 무작정 강도를 올리는 제안 대신 지금 상황에 맞게 문턱을 낮춘 제안을 하세요. 반대로 꾸준히 잘 되고 있는 흐름이라면 한 단계 확장하는 제안을 해도 좋아요.
-3. 최근 8주 이력과 문자 그대로 겹치는 제안은 하지 마세요. 다만 같은 결을 잇되 강도나 접근 방식을 조정한 제안(예: 이전이 "헬스장 가기"였다면 "밥먹고 5분 걷기")은 괜찮습니다.
-4. 서로 다른 영역에서 2~3개를 고르게 제안하세요(같은 주제로 쏠리지 않게). 단, 최근 흐름상 특정 주제(예: 몸 상태, 컨디션 관리)가 명백히 우선순위가 높아 보인다면 그 주제를 하나는 반드시 포함하세요.
-
-**절대 원칙:**
-- "실패", "부족", "아쉽다" 같은 부정적 평가 금지.
-- 과거 기록을 세세하게 거론하지 마세요(정확한 날짜, 체크 횟수를 콕 집어 말하지 않기). "최근 며칠 어려움이 있었던 것 같아요" 정도로 뭉뚱그려 언급하는 수준까지만.
-- 근거 없이 지어내지 마세요. 데이터에서 실제로 확인되는 흐름만 근거로 삼으세요.
-- 반드시 ~해요, ~이에요, ~어요 체의 정감있는 존댓말만 사용. 반말 절대 금지. 이름 호칭 없음.
-- 이모지, 마크다운 기호 사용 금지.
-
-**출력 형식(반드시 준수):**
-각 제안마다 정확히 다음 형식의 한 줄로 시작하세요:
-[카테고리] 제목 :: 근거와 제안 이유(1~2문장) :: 실제 챌린지 문구
-
-카테고리는 다음 중 성격에 가장 가까운 것 하나만 골라 대괄호 안에 그대로 쓰세요: 운동, 식사, 수면, 공부, 업무, 마음가짐, 습관, 취미
-세 번째 필드(실제 챌린지 문구)는 다음 주 챌린지 목록에 그대로 등록될 짧고 명확한 문장이어야 해요(코멘트 없이 행동 자체만).
-예:
-[운동] 문턱 낮춰 다시 시작 :: 최근 며칠 운동 흐름이 잠시 끊겼던 것 같아요. 다시 습관을 만드는 시기엔 강도보다 재진입 자체가 중요할 수 있어요 :: 밥먹고 5분 걷기
-
-제안 개수만큼(2~3줄) 줄을 만드세요. 각 제안은 한 줄(문단) 안에서만 내용을 이어가고 다음 줄로 넘어가면 안 돼요.`;
-
-  const reply=await callClaude(sys,[{role:'user',content:dataContext}],700);
-  if(!reply||reply.startsWith('__ERR__'))return null;
-
-  const lines=reply.trim().split('\n').filter(l=>l.trim());
-  return lines.map(l=>{
-    const m=l.trim().match(/^\[(.+?)\]\s*(.+?)\s*::\s*(.+?)\s*::\s*(.+)$/);
-    if(!m)return '';
-    const cat=m[1].trim(),title=m[2].trim(),reason=m[3].trim(),goalText=m[4].trim();
-    const icon=NEXT_WEEK_SUGGEST_CAT_ICON[cat]||'ti-sparkles';
-    return `<div class="nwf-item">
-      <div class="nwf-item-head"><i class="ti ${icon} nwf-item-icon" aria-hidden="true"></i><span class="nwf-item-goal">${escapeHtml(title)}</span></div>
-      <span class="nwf-item-text">${escapeHtml(reason)}</span>
-      <div class="nwf-adopt-row">
-        <span class="nwf-goal-preview">${escapeHtml(goalText)}</span>
-        <button type="button" class="nwf-adopt-btn" data-goal-text="${escapeHtml(goalText)}">이걸로 정하기</button>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-// 목요일(4)부터 일요일까지 "이번 주도 화이팅" 카드의 깃발 아이콘을 flag-plus로 교체 —
-// 클릭하면 기존 다음 주 챌린지 시트(openNextWeekChallengeSheet)가 열려 다음 주 목표를 미리 입력 가능.
-// 저장은 nextWeekKey() 기준 별도 키라 다음 주 월요일이 되면 자동으로 "이번 주" 목표로 반영됨.
-// 월요일(1)엔 지난주 목표 돌아보기(openChallengeReviewSheet)로 전환 — "오늘의 리듬 기록" 배너(report-banner rhythm-soft)와
-// 완전히 동일한 배경/테두리 스타일을 그대로 가져다 씀. 요일 판단은 new Date() 기준(자정 경계, 주간탭 표준)이라
-// 자정이 지나 주간탭이 다음 주로 넘어가는 순간 차주입력창(ti-flag-plus)도 함께 내려감 — 새벽4시(getLogicalDate) 기준이면
-// 일요일 자정~4시 사이 주간탭은 이미 다음주인데 배너만 구주 상태로 남아 불필요한 API 제안이 발생하던 문제 수정.
+// 주간 목표 카드 제목줄 — 월요일(이번 주를 보고 있을 때)엔 지난주 목표 돌아보기(openChallengeReviewSheet) 배너로 전환,
+// 그 외엔 일반 제목. "오늘 report-banner rhythm-soft" 배너와 동일한 배경/테두리 스타일을 그대로 가져다 씀.
+// 다음 주 목표는 주간탭을 다음 주로 넘겨(카드의 ›) 직접 적어둔다 — 별도 준비 시트·AI 제안은 없앴음.
+// 요일 판단은 new Date() 기준(자정 경계, 주간탭 표준).
 function setupWeeklyChallengeToggle(){
   const titleEl=document.getElementById('wchallenge-title');
   if(!titleEl)return;
   const dow=new Date().getDay();
-  const isPrepWindow=dow===4||dow===5||dow===6||dow===0; // 목,금,토,일
-  const isMonday=dow===1;
+  const isMonday=dow===1&&weeklyWeekOffset()===0; // 월요일 "지난주 목표 돌아보기" 배너는 이번 주를 보고 있을 때만
   titleEl.onclick=null;
   titleEl.style.cursor='default';
   if(isMonday){
@@ -9078,25 +8939,16 @@ function setupWeeklyChallengeToggle(){
     titleEl.innerHTML='<div class="report-banner-inner" style="padding:5px 13px;border-radius:8.5px;justify-content:flex-start;gap:5px;"><div class="report-banner-line" style="font-size:11px;white-space:nowrap;"><i class="ti ti-flag-heart ico-inline-13" aria-hidden="true"></i>지난주 목표 돌아보기</div></div>';
     titleEl.style.cursor='pointer';
     titleEl.onclick=openChallengeReviewSheet;
-    renderWeeklyChallenge(weekKey(new Date()),'weekly-goal-wrap');
+    renderWeeklyChallenge(weekKey(getWeeklyBase()),'weekly-goal-wrap');
     renderWeeklyStatBar();
     return;
   }
   // 월요일이 아니면 원래 구조(goal-section-title + 아이콘)로 복원
   titleEl.className='goal-section-title';
   titleEl.style.margin='0';
-  titleEl.innerHTML='<i class="ti ti-flag-3" id="wchallenge-icon" class="ico-13" aria-hidden="true"></i> 주간 목표';
-  const iconEl=document.getElementById('wchallenge-icon');
-  if(isPrepWindow){
-    iconEl.className='ti ti-flag-plus';
-    titleEl.title='다음 주 목표 미리 준비하기';
-    titleEl.style.cursor='pointer';
-    titleEl.onclick=openNextWeekChallengeSheet;
-  }else{
-    iconEl.className='ti ti-flag-3';
-    titleEl.title='';
-  }
-  renderWeeklyChallenge(weekKey(new Date()),'weekly-goal-wrap');
+  titleEl.innerHTML='<i class="ti ti-flag-3" aria-hidden="true"></i> 주간 목표';
+  titleEl.title='';
+  renderWeeklyChallenge(weekKey(getWeeklyBase()),'weekly-goal-wrap');
   renderWeeklyStatBar();
 }
 function renderWeeklyChallenge(wk,containerId){
@@ -9156,20 +9008,7 @@ function renderWeeklyChallenge(wk,containerId){
       row.appendChild(inpRow);row.appendChild(daysRow);wrap.appendChild(row);
     });
 
-    // 항목 추가는 weekly-goal-wrap에서는 입력창 Enter로만 처리 (상단 target-arrow 아이콘은 항상 주간 목표 모아보기로 연결됨).
-    // nextweek-challenge-wrap(다음 주 챌린지 준비 시트)에서는 여전히 "+항목 추가" 버튼 사용.
-    const useTopAddBtn=containerId==='weekly-goal-wrap';
-    const doAdd=()=>{
-      items.push({text:'',days:[false,false,false,false,false,false,false]});
-      save();renderItems();
-      setTimeout(()=>{const inps=wrap.querySelectorAll('.wchallenge-inp');if(inps[items.length-1])inps[items.length-1].focus();},50);
-    };
-    if(!useTopAddBtn&&items.length<4){
-      const addBtn=document.createElement('button');addBtn.className='wchallenge-add';
-      addBtn.innerHTML='<span style="font-size:16px;line-height:1;">+</span> 항목 추가';
-      addBtn.addEventListener('click',doAdd);
-      wrap.appendChild(addBtn);
-    }
+    // 항목 추가는 입력창 Enter로만 처리 (상단 target-arrow 아이콘은 주간 목표 모아보기로 연결됨).
   }
   renderItems();
 }
@@ -9238,8 +9077,8 @@ function _rhythmRingSvg(dk,dateNum,isToday){
   return '<div class="ring-wrap"><svg viewBox="0 0 34 34" width="34" height="34">'+circles+'</svg><span class="ring-num'+(isToday?' today-num':'')+'">'+dateNum+'</span></div>';
 }
 function buildWeekStrip(){
-  const now=new Date(),dow=now.getDay();
-  const mon=new Date(now);mon.setDate(now.getDate()-((dow+6)%7));
+  const now=new Date();
+  const mon=getWeeklyMon();
   const strip=document.getElementById('week-strip');if(!strip)return;
   strip.innerHTML='';
   for(let i=0;i<7;i++){
@@ -10258,6 +10097,7 @@ function _commitEnjoyRhythmBlock(opts){
   const blocks=getRhythmBlocks(dk);
   blocks.push({cat:'enjoy',start:minToHHMM(startMin),end:'',text,created:Date.now(),cid:blockCid,contentCid});
   saveRhythmBlocks(dk,blocks); // saveRhythmBlocks 내부에서 이미 autoSync('rblocks',dk) 호출 — 중복 호출 금지
+  checkRhythmOverlapOnStart(dk,blockCid);
   // 안전장치: cid 없이 감상 리듬블록이 커밋되는 경우는 정상 흐름에선 없어야 하나,
   // 혹시라도 재발하면 조용히 묻히지 않도록 눈에 띄게 남김. 블록 자체는 그대로 생성해 감상시간
   // 데이터는 보존(삭제/차단하지 않음) — 다만 콘텐츠 연동만 못 하는 상태로 남는 걸 감지하기 위함.
@@ -11055,7 +10895,7 @@ function renderMonthlyStatBar(){
 // 주간탭 미니 통계바 — renderMonthlyStatBar와 동일한 원칙(콘텐츠는 완료+종료일 기준)을 주 단위로 적용.
 function renderWeeklyStatBar(){
   const el=document.getElementById('weekly-stat-bar');if(!el)return;
-  const wk=weekKey(new Date());
+  const wk=weekKey(getWeeklyBase());
   const wkStart=new Date(wk.replace('week:',''));
   let memos=0,todos=0,hc=0,ht=0,sleepMin=0,sleepCnt=0;
   const habits=getHabits();
@@ -11093,7 +10933,7 @@ function renderWeeklyStatBar(){
   const wkAvgSleep=sleepCnt>0?(sleepMin/sleepCnt/60).toFixed(1):'-';
   const now=new Date();
   // 주간목표 한주 리포트와 동일하게 "그 주가 끝난 뒤" 월요일 하루 동안만 노출
-  const isReportDay=now.getDay()===1;
+  const isReportDay=now.getDay()===1&&weeklyWeekOffset()===0;
   const memoItemClass=isReportDay?'sbar-item sbar-item-active':'sbar-item';
   const memoItemAttr=isReportDay?`onclick="openWeeklyMemoReport()" title="이번 주 메모 리포트 보기"`:'';
   el.innerHTML=`<div class="stat-bar-wrap" style="border-top:none;margin-top:0;">
@@ -11127,8 +10967,8 @@ function saveDailyOneLine(dk,text){
 }
 function renderDailyOneLineWeek(){
   const el=document.getElementById('daily-oneline-list');if(!el)return;
-  const now=new Date(),dow=now.getDay();
-  const mon=new Date(now);mon.setDate(now.getDate()-((dow+6)%7));
+  const now=new Date();
+  const mon=getWeeklyMon();
   el.innerHTML='';
   for(let i=0;i<7;i++){
     const d=new Date(mon);d.setDate(mon.getDate()+i);
@@ -11257,7 +11097,8 @@ function loadDaily(){
 // 기존엔 월~오늘(주초반엔 표본이 1~2일뿐)이었으나, 홈탭 오늘의 흐름 인사이트와 동일하게 항상 최근 7일 고정 윈도우로 통일.
 // dayCount(카테고리별 실제 발생일수)는 computeRawStatsForRange(월간리포트)와 동일 기준(dd[k]>0인 날만 카운트)으로 별도 집계 — 이게 없으면 buildMonthlyRhythmBar의 일평균이 누계와 같아짐.
 function computeWeeklyRhythmDur(){
-  const start=new Date();start.setDate(start.getDate()-6); // 오늘 포함 최근 7일
+  if(weeklyWeekOffset()!==0)return sumCategoryDurations(getWeeklyMon(),7); // 다른 주를 보는 중이면 그 주 월~일
+  const start=new Date();start.setDate(start.getDate()-6); // 이번 주는 오늘 포함 최근 7일
   return sumCategoryDurations(start,7);
 }
 // 최대 5위까지만 — buildMonthlyRhythmBar는 전체를 다 나열하므로, 상위 5개만 골라 같은 형식으로 재구성.
@@ -11272,7 +11113,7 @@ function buildWeeklyRhythmBarTop5(dur,dayCount){
 function renderWeeklyRhythmBars(){
   const el=document.getElementById('weekly-rhythm-bars');if(!el)return;
   const {dur,dayCount}=computeWeeklyRhythmDur();
-  const barHtml=Object.keys(dur).length?buildWeeklyRhythmBarTop5(dur,dayCount):'<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:12px 0;">최근 7일간 기록된 리듬이 없어요</div>';
+  const barHtml=Object.keys(dur).length?buildWeeklyRhythmBarTop5(dur,dayCount):'<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:12px 0;">'+(weeklyWeekOffset()===0?'최근 7일간':'이 주에')+' 기록된 리듬이 없어요</div>';
   let html='<div class="wrb-wrap"><div class="wrb-summary" onclick="toggleWeeklyRhythmForm()" style="cursor:pointer;">'+barHtml+'</div>';
   if(_weeklyRhythmFormOpen){
     html+='<div class="wrb-form-slot" id="wrb-today-form"></div>';
@@ -11349,21 +11190,72 @@ function buildRhythmFormEl(showOngoingList){
   return wrap;
 }
 // ── 주간탭 전체 로드 진입점 ──
+
+// ── 주간탭 주 이동 ──
+// 주간탭이 보여주는 주는 상단 날짜 네비게이터와 같은 currentDate로 정한다(별도 상태 없음).
+// - 주간탭에 들어올 때(switchToTab)는 항상 오늘로 리셋 → 현재 주(오늘탭 진입 때와 같은 규칙).
+// - 상단 네비게이터(shiftDay)나 주간 목표 카드의 ‹ › 로 날짜를 옮기면 해당 주로 전환(updateDateUI가 주간탭도 갱신).
+// - 이동 범위: 과거는 제한 없음, 미래는 다음 주까지(다음 주 주간 목표를 미리 적어둘 수 있음).
+function _monOf(d){const m=new Date(d);m.setDate(m.getDate()-((m.getDay()+6)%7));m.setHours(0,0,0,0);return m;}
+function getWeeklyBase(){return new Date(currentDate);}
+function getWeeklyMon(){return _monOf(currentDate);}
+function weeklyWeekOffset(){return Math.round((getWeeklyMon()-_monOf(new Date()))/604800000);} // 0=이번주, -1=지난주, 1=다음주
+function shiftWeek(n){
+  const d=new Date(currentDate);d.setDate(d.getDate()+7*n);
+  const maxMon=_monOf(new Date());maxMon.setDate(maxMon.getDate()+7);
+  if(_monOf(d)>maxMon)return;
+  currentDate=d;updateDateUI();
+}
+function goThisWeek(){currentDate=new Date();updateDateUI();}
+function renderWeekNav(){
+  const el=document.getElementById('wk-nav');if(!el)return;
+  const off=weeklyWeekOffset();
+  const mon=getWeeklyMon(),sun=new Date(mon);sun.setDate(mon.getDate()+6);
+  const f=d=>(d.getMonth()+1)+'/'+d.getDate();
+  const label=off===0?'이번주':off===-1?'지난주':off===1?'다음주':f(mon)+'~'+f(sun);
+  el.innerHTML='<span class="wk-arr" onclick="shiftWeek(-1)" aria-label="이전 주"><i class="ti ti-chevron-left" aria-hidden="true"></i></span>'+
+    '<span class="wk-lbl" onclick="goThisWeek()">'+label+'</span>'+
+    '<span class="wk-arr'+(off>=1?' off':'')+'" onclick="shiftWeek(1)" aria-label="다음 주"><i class="ti ti-chevron-right" aria-hidden="true"></i></span>';
+}
+// 이번 주가 아닌 주를 열면 그 주 데이터(다른 기기에서 쓴 것 포함)를 서버에서 한 번 받아 다시 그림.
+// 같은 주는 60초 안에 다시 받지 않고, 입력 중이면 화면을 갈아엎지 않음.
+const _weeklySyncedAt={};let _weeklySyncSeq=0;
+async function syncWeeklyViewData(){
+  if(weeklyWeekOffset()===0||!navigator.onLine)return;
+  const mon=getWeeklyMon(),wk=weekKey(mon);
+  if(Date.now()-(_weeklySyncedAt[wk]||0)<60000)return;
+  _weeklySyncedAt[wk]=Date.now();
+  const dks=[];for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);dks.push(dateKey(d));}
+  const sun=new Date(mon);sun.setDate(mon.getDate()+6);
+  const seq=++_weeklySyncSeq;
+  const jobs=[syncWChallengeDown(wk),syncHCDown(wk),syncRhythmBlocksDownMany(dks),syncOnelineMonthRange(mon.getFullYear(),mon.getMonth()),
+    ...dks.map(dk=>syncTodosDown(dk)),...dks.map(dk=>syncMemosDown(dk)),...dks.map(dk=>syncSleepDown(dk))];
+  if(sun.getMonth()!==mon.getMonth())jobs.push(syncOnelineMonthRange(sun.getFullYear(),sun.getMonth()));
+  try{await Promise.all(jobs);}catch(e){}
+  if(seq!==_weeklySyncSeq||weekKey(getWeeklyBase())!==wk)return; // 그 사이 다른 주로 옮겼으면 무시
+  const ae=document.activeElement;
+  if(ae&&ae.closest&&ae.closest('#v-weekly')&&/INPUT|TEXTAREA/.test(ae.tagName))return;
+  buildWeekStrip();renderDailyOneLineWeek();renderWeeklyRhythmBars();renderWeeklyHabitBox();setupWeeklyChallengeToggle();
+}
 function loadWeekly(){
+  renderWeekNav();
   buildWeekStrip();
   setupWeeklyChallengeToggle();
   renderDailyOneLineWeek();
   renderWeeklyRhythmBars();
   renderWeeklyHabitBox();
+  syncWeeklyViewData(); // 이번 주가 아닐 때만 동작
 }
 function renderWeeklyHabitBox(){
   const el=document.getElementById('weekly-habit-box');if(!el)return;
+  const hl=document.getElementById('weekly-habit-label');
+  if(hl){const o=weeklyWeekOffset();hl.textContent=o===0?'이번주 해빗':o===-1?'지난주 해빗':o===1?'다음주 해빗':'해빗';}
   const habits=getActiveHabits();
   if(!habits.length){el.innerHTML='<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:8px 0;">습관을 추가해보세요</div>';return;}
   const now=new Date();
-  const wk=weekKey(now);
-  const mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7));
-  const todayDow=(now.getDay()+6)%7;
+  const wk=weekKey(getWeeklyBase());
+  const mon=getWeeklyMon();
+  const todayDow=weeklyWeekOffset()===0?(now.getDay()+6)%7:-1; // 다른 주에는 "오늘" 강조 없음
   const checks=getHabitChecks(wk);
   const dayLabels=['월','화','수','목','금','토','일'];
   let html='<div class="hw-daylabels">'+dayLabels.map(d=>'<span>'+d+'</span>').join('')+'</div>';
