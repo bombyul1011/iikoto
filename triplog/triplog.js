@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-var VER='2026.10.06-4';
+var VER='2026.10.06-10';
 var SUPA_URL='https://vqvpzrxmtpryzhontlxc.supabase.co';
 var SUPA_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdnB6cnhtdHByeXpob250bHhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTgxMjksImV4cCI6MjA5NjYzNDEyOX0.pbtq1UMPC7ylYM1H2xVa19C1TFlceLmEfEtkz3WK2VI';
 var LSP='triplog:';
@@ -35,7 +35,7 @@ function navUrl(q){return 'https://www.google.com/maps/dir/?api=1&destination='+
 
 /* ---------- state ---------- */
 var cfg=lget('cfg',{key:'',tripId:''});
-var UI={tab:lget('tab','today'),sched:null,clFilter:'all',spCity:null,spCat:'all',cond:{},sheet:null,edit:null,status:'',keyBad:false,addExp:false,addSpot:false,vd:null,addTs:{},editVal:null,timeEdit:null,evTimeEdit:null,expDraft:null,evDraft:null};
+var UI={tab:lget('tab','today'),sched:null,clFilter:'today',spCity:null,spCat:'all',cond:{},sheet:null,edit:null,status:'',keyBad:false,addExp:false,addSpot:false,vd:null,addTs:{},editVal:null,timeEdit:null,evTimeEdit:null,expDraft:null,evDraft:null,payDraft:null,spDraft:null,wkAnim:null,undoFn:null,toastT:null};
 var M=null,CL={items:[]},MEMOS=[],WX=lget('wx',{}),Q=lget('q',[]),TRIPS=lget('trips',[]);
 function saveQ(){lset('q',Q)}
 function loadTrip(){
@@ -260,7 +260,8 @@ function memoHtml(list){
     return '<div class="mrow"><div class="mt">'+esc(m.memo_time||'')+'</div><div class="mb">'+(m.question?'<div class="small muted" style="margin-bottom:2px">'+esc(m.question)+'</div>':'')+esc(m.text||'').replace(/\n/g,'<br>')+img+'</div></div>';
   }).join('');
 }
-function toast(t){var el=document.getElementById('toast');el.innerHTML='<div class="toast">'+esc(t)+'</div>';setTimeout(function(){el.innerHTML=''},2200)}
+function toast(t){var el=document.getElementById('toast');el.innerHTML='<div class="toast">'+esc(t)+'</div>';clearTimeout(UI.toastT);UI.toastT=setTimeout(function(){el.innerHTML=''},2200)}
+function toastUndo(t,fn){var el=document.getElementById('toast');UI.undoFn=fn;el.innerHTML='<div class="toast"><span>'+esc(t)+'</span><button class="tundo" data-act="undo">되돌리기</button></div>';clearTimeout(UI.toastT);UI.toastT=setTimeout(function(){el.innerHTML='';UI.undoFn=null},5000)}
 
 /* ---------- checklist helpers ---------- */
 var TSO={morning:0,afternoon:1,night:2,none:3};
@@ -270,10 +271,14 @@ function hhmm(ms){var d=new Date(ms);return pad(d.getHours())+':'+pad(d.getMinut
 function setTimeOnly(baseMs,v){var d=new Date(baseMs),p=v.split(':');d.setHours(+p[0],+p[1],0,0);return d.getTime()}
 function tsChips(act,key,sel,extra){
   return '<div class="tsc">'+['morning','afternoon','night','none'].map(function(v){
-    return '<button class="chip tsb'+(sel===v?' on':'')+'" data-act="'+act+'" data-v="'+v+'"'+(key?' data-key="'+ea(key)+'"':'')+(extra||'')+' aria-pressed="'+(sel===v)+'">'+TSL[v]+'</button>';
+    return '<button class="tschip tsb ts-'+v+(sel===v?' on':'')+'" data-act="'+act+'" data-v="'+v+'"'+(key?' data-key="'+ea(key)+'"':'')+(extra||'')+' aria-pressed="'+(sel===v)+'">'+TSL[v]+'</button>';
   }).join('')+'</div>';
 }
-function clRow(it){
+function clRow(it,ro){
+  if(ro){
+    var ctr=(it.done&&it.completedAt)?'<span class="ct">'+hhmm(it.completedAt)+'</span>':'';
+    return '<div class="ck ro'+(it.done?' done':'')+'"><input type="checkbox" disabled '+(it.done?'checked':'')+' aria-label="'+ea(it.t)+'"><span class="tx">'+esc(it.t)+'</span>'+ctr+'</div>';
+  }
   if(UI.edit===it.id){
     var val=UI.editVal!=null?UI.editVal:it.t;
     return '<div class="ckedit"><div class="ck" style="border-bottom:0"><input type="checkbox" disabled aria-hidden="true"><input class="edit" data-id="'+ea(it.id)+'" value="'+ea(val)+'" aria-label="항목 수정"><button class="mini" data-act="edit-ok" data-id="'+ea(it.id)+'" aria-label="저장">'+ic('check',18)+'</button></div>'+tsChips('edits',null,it.ts||'none',' data-id="'+ea(it.id)+'"')+'</div>';
@@ -286,7 +291,7 @@ function clRow(it){
   }
   return '<div class="ck'+(it.done?' done':'')+'"><input type="checkbox" data-act="ck" data-id="'+ea(it.id)+'" '+(it.done?'checked':'')+' aria-label="'+ea(it.t)+'"><span class="tx">'+esc(it.t)+'</span>'+ct+'<button class="mini" data-act="edit" data-id="'+ea(it.id)+'" aria-label="수정">'+ic('pen',16)+'</button><button class="mini" data-act="del" data-id="'+ea(it.id)+'" aria-label="삭제">'+ic('x',16)+'</button></div>';
 }
-function clList(items){
+function clList(items,ro){
   var und=items.filter(function(i){return !i.done}).sort(function(a,b){
     var d=TSO[a.ts||'none']-TSO[b.ts||'none'];return d||((a.created||0)-(b.created||0));
   });
@@ -294,8 +299,8 @@ function clList(items){
   var secs={};und.forEach(function(i){secs[i.ts||'none']=1});
   var ks=Object.keys(secs),multi=ks.length>1||(ks.length===1&&ks[0]!=='none');
   var h='',cur=null;
-  und.forEach(function(i){var sc=i.ts||'none';if(multi&&sc!==cur){h+='<div class="tshead">'+TSL[sc]+'</div>';cur=sc}h+=clRow(i)});
-  return h+dn.map(clRow).join('');
+  und.forEach(function(i){var sc=i.ts||'none';if(multi&&sc!==cur){h+='<div class="tshead ts-'+sc+'">'+TSL[sc]+'</div>';cur=sc}h+=clRow(i,ro)});
+  return h+dn.map(function(i){return clRow(i,ro)}).join('');
 }
 function clAddRow(key){
   var sel=UI.addTs[key]||'none';
@@ -322,12 +327,12 @@ function evBody(e){
 function evRow(e,cc){
   var d=e.d,done=!!d.done;
   var lab=done&&d.doneAt?hhmm(d.doneAt):(d.time||SLOTL[d.slot]||'');
-  var tcol=(done&&d.doneAt)?'<button class="evt done" data-act="evtime" data-id="'+ea(e.cid)+'" aria-label="완료 시각 수정">'+esc(lab)+'</button>':'<span class="evt">'+esc(lab)+'</span>';
+  var tcol=(done&&d.doneAt)?'<button class="evt done" data-act="evtime" data-id="'+ea(e.cid)+'" aria-label="완료 시각 수정">'+esc(lab)+'</button>':'<button class="evt" disabled tabindex="-1" aria-hidden="true">'+esc(lab)+'</button>';
   return '<div class="ev" style="--cc:'+cc[2]+'">'+tcol+'<button class="evdot" data-act="evck" data-id="'+ea(e.cid)+'" aria-pressed="'+done+'" aria-label="'+ea(d.title)+' 완료"><span class="dotv"></span></button><div class="c"><div class="card sm'+(done?' evdone':'')+'">'+evBody(e)+'</div></div></div>';
 }
 function memoEv(m){
   var img=m.photo_url&&/^https?:/.test(m.photo_url)?'<img loading="lazy" alt="메모 사진" src="'+ea(m.photo_url)+'">':'';
-  return '<div class="ev mev"><span class="evt">'+esc(m.memo_time||'')+'</span><span class="evdot memodot"><span class="mdot"></span></span><div class="c"><div class="memoc">'+ic('notes',14)+'<span>'+esc(m.text||'').replace(/\n/g,'<br>')+'</span>'+img+'</div></div></div>';
+  return '<div class="ev mev"><button class="evt" disabled tabindex="-1" aria-hidden="true">'+esc(m.memo_time||'')+'</button><span class="evdot memodot"><span class="mdot"></span></span><div class="c"><div class="memoc">'+ic('notes',14)+'<span>'+esc(m.text||'').replace(/\n/g,'<br>')+'</span>'+img+'</div></div></div>';
 }
 function effTimes(ev){
   var def={am:'09:00',noon:'12:00',pm:'15:00',eve:'19:00'},prev='00:00',out=[];
@@ -362,10 +367,18 @@ function slotUi(d,sl){
   return h+'</div>';
 }
 function viewDate(){return clampDate(UI.vd||today())}
+function periodOf(t){
+  var m=String(t||'').match(/^(\d{1,2}):(\d{2})/);if(!m)return 'afternoon';
+  var v=(+m[1])*60+(+m[2]);
+  if(v>=7*60&&v<12*60)return 'morning';
+  if(v>=12*60&&v<18*60)return 'afternoon';
+  return 'night';
+}
 function wxLine(d){
   var w=wxOf(d);if(!w)return '';
   return '<div class="wxl">'+ic(w.sun?'sun':'cloud',14)+(w.sun?'맑음':'흐림')+' '+Math.round(w.tmax)+'°/'+Math.round(w.tmin)+'°'+(w.pp!=null?' · 강수 '+w.pp+'%':'')+'</div>';
 }
+function ctitle(t,right){return '<div class="ctitle"><b>'+t+'</b>'+(right?'<span class="cinfo">'+right+'</span>':'')+'</div>'}
 function screenToday(){
   var t=trip();if(!t)return empty();
   var td=today(),vd=viewDate(),before=td<t.start,after=td>t.end;
@@ -373,8 +386,8 @@ function screenToday(){
   var s=stayOf(vd),cid=cityOfDate(vd);
   var dayLabel=(before&&vd===t.start)?'D-'+Math.round((parse(t.start)-parse(td))/86400000):(after&&vd===t.end?'여행 종료':'DAY '+idx+' / '+N);
   var h='<div class="row between"><button class="btn" style="border:0;background:transparent;padding:0;font-weight:700;font-size:14px" data-act="sheet" data-v="trips">'+esc(t.title)+' '+ic('chevd',16)+'</button>'+syncBtn()+'</div>';
-  h+='<div class="row between" style="align-items:flex-start"><div><div class="dtitle"><button class="dnav'+(idx<=1?' off':'')+'" data-act="dprev" aria-label="전날">'+ic('chevl',18)+'</button><span class="dnum">'+md(vd)+' <span class="dwd">'+wd(vd)+'</span></span><button class="dnav'+(idx>=N?' off':'')+'" data-act="dnext" aria-label="다음날">'+ic('chevr',18)+'</button></div>'+
-    '<div class="row" style="margin-top:4px">'+cityChip(cid)+(s?'<span class="small muted">'+esc(s.d.name)+'</span>':'')+'</div>'+wxLine(vd)+'</div>'+chip(dayLabel,'ln')+'</div>';
+  h+='<div class="row between" style="align-items:flex-start"><div><div class="dtitle"><button class="dnav'+(idx<=1?' off':'')+'" data-act="dprev" aria-label="전날">'+ic('chevl',18)+'</button><span class="dnum"><span class="dgr'+(vd===td?' on':'')+'">'+md(vd)+'</span> <span class="dwd">'+wd(vd)+'</span></span><button class="dnav'+(idx>=N?' off':'')+'" data-act="dnext" aria-label="다음날">'+ic('chevr',18)+'</button></div>'+
+    '<div class="row" style="margin-top:4px">'+cityChip(cid)+(s?'<span class="small muted">'+esc(s.d.name)+'</span>':'')+'</div></div><div class="hdr-r">'+chip(dayLabel,'ln')+wxLine(vd)+'</div></div>';
   if(UI.keyBad)h+=card('<b>데이터를 불러오지 못했어요</b><div class="small muted" style="margin-top:4px">접근 키가 맞지 않을 수 있어요.</div><button class="btn" style="margin-top:10px" data-act="sheet" data-v="key">키 다시 입력</button>');
   var note=(t.dayNotes||{})[vd];if(note)h+='<div>'+chip(esc(note),'pn')+'</div>';
   var ev=eventsOf(vd),next=null;
@@ -384,19 +397,21 @@ function screenToday(){
   }else if(ev.length)next=ev[ev.length-1];
   if(next){
     var d=next.d;
-    h+=card('<div class="row between"><span class="small" style="font-weight:700;color:var(--sel-tx);letter-spacing:.04em">다음 일정</span>'+(d.time?chip(esc(d.time),'pn'):chip(esc(SLOTL[d.slot]||''),'ln'))+'</div><div style="font-family:var(--serif);font-size:23px;font-weight:700;margin-top:8px">'+esc(d.title)+'</div>'+(d.desc?'<div style="font-size:14px;color:var(--sub);margin-top:6px;line-height:1.5">'+esc(d.desc)+'</div>':'')+'<div class="row" style="margin-top:14px">'+(d.map?'<a class="btn pri" style="text-decoration:none" href="'+ea(mapUrl(d.map))+'" target="_blank" rel="noopener">'+ic('pin',18)+'지도에서 열기</a>':'')+(d.nav&&d.map?'<a class="ibtn" style="width:48px;height:48px" aria-label="길찾기(대중교통)" href="'+ea(navUrl(d.map))+'" target="_blank" rel="noopener">'+ic('nav',20)+'</a>':'')+'</div>');
+    var tm=d.time?ic('clock',13)+' '+esc(d.time):esc(SLOTL[d.slot]||'');
+    var per=periodOf(d.time||SLOTDEF[d.slot]||'12:00');
+    h+='<div class="card bn bn-'+per+'">'+ctitle('다음 일정',tm)+'<div style="font-family:var(--serif);font-size:23px;font-weight:700;line-height:1.3;color:var(--bn-t)">'+esc(d.title)+'</div>'+(d.desc?'<div style="font-size:14px;color:var(--bn-s);margin-top:6px;line-height:1.5">'+esc(d.desc)+'</div>':'')+
+      ((d.map)?'<div class="row" style="margin-top:14px"><a class="btn" style="flex:1;text-decoration:none" href="'+ea(mapUrl(d.map))+'" target="_blank" rel="noopener">'+ic('pin',17)+'지도에서 열기</a>'+(d.nav?'<a class="ibtn" aria-label="길찾기(대중교통)" href="'+ea(navUrl(d.map))+'" target="_blank" rel="noopener">'+ic('nav',20)+'</a>':'')+'</div>':'')+'</div>';
   }
   var w=wxOf(vd),conds=ev.filter(function(e){return e.d.cond});
   if(conds.length){
     var rec=w?(w.sun?'sun':'cloud'):null,sel=UI.cond[vd]||rec||'sun';
-    var inner='<div class="lbl">날씨에 따라</div>'+seg('cond',[['sun','맑음','sun'],['cloud','흐림','cloud']],sel,'data-date="'+vd+'"');
-    if(rec)inner+='<div class="small muted" style="margin-top:8px">예보 기준 추천: '+(rec==='sun'?'맑음':'흐림')+'</div>';
+    var inner=ctitle('날씨에 따라',rec?'예보 추천 · '+(rec==='sun'?'맑음':'흐림'):'')+seg('cond',[['sun','맑음','sun'],['cloud','흐림','cloud']],sel,'data-date="'+vd+'"');
     conds.filter(function(e){return e.d.cond===sel}).forEach(function(e){inner+='<div style="margin-top:10px;font-size:14px;line-height:1.55"><b>'+esc(e.d.time||'')+' '+esc(e.d.title)+'</b><br><span class="muted">'+esc(e.d.desc||'')+'</span>'+(e.d.link?' <a href="'+ea(e.d.link.url)+'" target="_blank" rel="noopener">'+esc(e.d.link.label)+'</a>':'')+'</div>'});
     h+=card(inner);
   }
   var sl=slotsOf(vd);
   if(sl.length){
-    var ph='<div class="lbl">오늘의 플랜</div>';
+    var ph=ctitle('오늘의 플랜');
     sl.forEach(function(sx){var ch=choiceOf(vd,sx.key);var sel2=ch&&ch.d.plan;
       if(sel2==='custom')ph+='<div style="margin-bottom:8px"><b>'+esc(sx.label)+'</b><div class="small">'+esc(ch.d.text||'(비어 있음)')+'</div></div>';
       else if(sel2&&sel2!=='none')ph+='<div style="margin-bottom:8px"><div class="small muted">'+esc(sx.label)+'</div>'+planDetail(sel2)+'</div>';
@@ -405,36 +420,25 @@ function screenToday(){
   }
   var items=clItems(vd).concat(vd===preDate()?clItems('pre'):[]);
   var done=items.filter(function(i){return i.done}).length;
-  h+=card('<div class="row between" style="margin-bottom:10px"><b style="font-size:15px">체크리스트</b><span class="small muted">'+done+' / '+items.length+'</span></div>'+bar(items.length?done/items.length*100:0)+'<div style="margin-top:6px">'+clList(items)+'</div>'+clAddRow(vd));
+  h+=card(ctitle('체크리스트',done+' / '+items.length)+(items.length?bar(done/items.length*100)+'<div style="margin-top:6px">'+clList(items,true)+'</div>':'<div class="small muted">등록된 항목이 없어요. 체크 탭에서 추가해요.</div>'));
   var exs=localList().filter(function(x){return x.d.date===vd}).sort(function(a,b){return String(b.d.time||'')<String(a.d.time||'')?-1:1});
-  var xinfo=sumInfo(exs);
-  h+=card('<div class="row between" style="margin-bottom:6px"><b style="font-size:15px">'+(vd===td?'오늘 지출':md(vd)+' 지출')+'</b>'+(exs.length?'<span class="small muted">'+sumLabel(xinfo)+'</span>':'')+'</div>'+(exs.length?exs.slice(0,3).map(expRow).join('')+(exs.length>3?'<div class="small muted" style="padding-top:6px">외 '+(exs.length-3)+'건 · 경비 탭에서 전체 보기</div>':''):'<div class="small muted">아직 지출 기록이 없어요.</div>')+'<button class="btn" style="margin-top:10px;width:100%" data-act="exp-new">'+ic('plus',16)+'지출 추가</button>');
-  h+=card('<div class="lbl">이날의 메모 · iikoto</div>'+memoHtml(memosOf(vd)));
+  h+=card(ctitle(vd===td?'오늘 지출':md(vd)+' 지출',exs.length?sumLabel(sumInfo(exs)):'')+(exs.length?exs.slice(0,3).map(function(x){return expRow(x,true)}).join('')+(exs.length>3?'<div class="small muted" style="padding-top:6px">외 '+(exs.length-3)+'건 · 경비 탭에서 전체 보기</div>':''):'<div class="small muted">아직 지출 기록이 없어요.</div>'));
+  h+=card(ctitle('이날의 메모 · iikoto')+memoHtml(memosOf(vd)));
   return h;
 }
-function dayProgress(d){
-  var ev=eventsOf(d),it=clItems(d).concat(d===preDate()?clItems('pre'):[]);
-  var tot=ev.length+it.length;if(!tot)return 0;
-  var dn=ev.filter(function(e){return e.d.done}).length+it.filter(function(i){return i.done}).length;
-  return dn/tot*100;
-}
-function ringSvg(col,prog){
-  var id=col.replace(/\.\d+\)$/,'.4)');
-  var c='<circle cx="17" cy="17" r="13.5" fill="none" stroke="var(--empty-bg)" stroke-width="4"/><circle cx="17" cy="17" r="13.5" fill="none" stroke="'+id+'" stroke-width="4" pathLength="100" style="stroke-dasharray:100 100;transform:rotate(-90deg);transform-origin:17px 17px"/>';
-  if(prog>0)c+='<circle cx="17" cy="17" r="13.5" fill="none" stroke="'+col+'" stroke-width="4" pathLength="100" stroke-linecap="round" style="stroke-dasharray:'+Math.min(100,prog).toFixed(1)+' 100;transform:rotate(-90deg);transform-origin:17px 17px"/>';
-  return '<svg viewBox="0 0 34 34" width="34" height="34" aria-hidden="true">'+c+'</svg>';
-}
+function weekStartOf(x){var d=parse(x);return addDays(x,-((d.getDay()+6)%7))}
 function screenSched(){
   var t=trip();if(!t)return empty();
   var dates=tripDates();
   var d=UI.sched&&dates.indexOf(UI.sched)>=0?UI.sched:clampDate(today());
   UI.sched=d;
   var h=titleBar('일정',md(t.start)+' – '+md(t.end)+' · '+(dates.length-1)+'박 '+dates.length+'일');
-  h+='<div class="week-strip" id="strip">';
-  dates.forEach(function(x){
-    var col=cityCol(cityOfDate(x))[2];
-    h+='<button class="day-btn'+(x===d?' sel':'')+'" data-act="date" data-v="'+x+'" aria-pressed="'+(x===d)+'" aria-label="'+md(x)+' '+wd(x)+'"><div class="ring-wrap">'+ringSvg(col,dayProgress(x))+'<span class="ring-num'+(x===today()?' today-num':'')+'">'+(+x.slice(8))+'</span></div><div class="day-name">'+wd(x)+'</div></button>';
-  });
+  var ws=weekStartOf(d),we=addDays(ws,6);
+  h+='<div class="wk'+(UI.wkAnim?' slide-'+UI.wkAnim:'')+'" id="strip">';UI.wkAnim=null;
+  for(var k=0;k<7;k++){
+    var x=addDays(ws,k),on=x>=t.start&&x<=t.end,col=on?cityCol(cityOfDate(x))[2]:'transparent';
+    h+='<button class="day-btn'+(x===d?' sel':'')+(on?'':' off')+'" data-act="date" data-v="'+x+'" '+(on?'':'disabled ')+'aria-pressed="'+(x===d)+'" aria-label="'+md(x)+' '+wd(x)+'"><span class="dbar" style="background:'+col+'"></span><span class="dnumc'+(x===today()?' today-num':'')+'">'+(+x.slice(8))+'</span><span class="day-name">'+wd(x)+'</span></button>';
+  }
   h+='</div>';
   var s=stayOf(d),cid=cityOfDate(d);
   h+='<div class="row" style="min-height:44px">'+cityChip(cid)+(s?'<span class="grow small muted">'+esc(s.d.name)+' · '+md(s.d.checkin)+' – '+md(s.d.checkout)+'</span>':'<span class="grow"></span>')+(s?icoMap(s.d.map||s.d.name):'')+'</div>';
@@ -460,16 +464,18 @@ function checkGroups(){
 }
 function screenCheck(){
   var t=trip();if(!t)return empty();
-  var all=CL.items,done=all.filter(function(i){return i.done}).length,left=all.length-done;
-  var td=today();var tl=all.filter(function(i){return !i.done&&!i.pre&&i.date===td}).length;
-  var circ=2*Math.PI*31,off=circ*(all.length?done/all.length:0);
-  var ring='<svg width="76" height="76" viewBox="0 0 76 76" aria-hidden="true"><circle cx="38" cy="38" r="31" fill="none" stroke="rgba(195,175,168,.3)" stroke-width="8"/><circle cx="38" cy="38" r="31" fill="none" stroke="rgb(160,105,180)" stroke-width="8" stroke-linecap="round" stroke-dasharray="'+off.toFixed(1)+' '+circ.toFixed(1)+'" transform="rotate(-90 38 38)"/><text x="38" y="44" text-anchor="middle" font-size="17" font-weight="700" fill="rgb(92,86,80)">'+done+'/'+all.length+'</text></svg>';
+  var all=CL.items,doneAll=all.filter(function(i){return i.done}).length;
+  var td=today(),vd=viewDate();
+  var dayItems=clItems(vd).concat(vd===preDate()?clItems('pre'):[]);
+  var done=dayItems.filter(function(i){return i.done}).length,left=dayItems.length-done;
+  var circ=2*Math.PI*31,off=circ*(dayItems.length?done/dayItems.length:0);
+  var ring='<svg width="76" height="76" viewBox="0 0 76 76" aria-hidden="true"><circle cx="38" cy="38" r="31" fill="none" stroke="rgba(195,175,168,.3)" stroke-width="8"/><circle cx="38" cy="38" r="31" fill="none" stroke="rgb(160,105,180)" stroke-width="8" stroke-linecap="round" stroke-dasharray="'+off.toFixed(1)+' '+circ.toFixed(1)+'" transform="rotate(-90 38 38)"/><text x="38" y="44" text-anchor="middle" font-size="17" font-weight="700" fill="rgb(92,86,80)">'+done+'/'+dayItems.length+'</text></svg>';
   var h=titleBar('체크리스트',null,syncBtn());
-  h+=card('<div class="row" style="gap:16px">'+ring+'<div class="grow"><b style="font-size:15px">남은 항목 '+left+'개</b><div class="small muted" style="margin-top:4px">오늘 '+tl+'개 · iikoto 오늘탭 투두와 동기화</div></div></div>');
-  h+=seg('clf',[['all','전체'],['today','오늘'],['left','남은 것']],UI.clFilter);
+  h+=card('<div class="row" style="gap:16px">'+ring+'<div class="grow"><b style="font-size:15px">'+(vd===td?'오늘':md(vd))+' 남은 항목 '+left+'개</b><div class="small muted" style="margin-top:4px">전체 '+all.length+'개 중 '+doneAll+'개 완료 · iikoto 투두와 동기화</div></div></div>');
+  h+=seg('clf',[['today','오늘'],['all','전체'],['left','남은 것']],UI.clFilter);
   var f=UI.clFilter;
   checkGroups().forEach(function(g){
-    if(f==='today'&&g.date!==td)return;
+    if(f==='today'&&g.date!==vd)return;
     var items=clItems(g.key);
     if(f==='left'&&!items.filter(function(x){return !x.done}).length)return;
     var chp=g.pre?chip(md(g.date)+' · iikoto','ln'):cityChip(cityOfDate(g.date));
@@ -493,6 +499,14 @@ function fetchFx(force){
   }catch(e){}
 }
 function rate2(){return (Math.round(fx()*100)/100).toString()}
+function fxCardHtml(){
+  var f=fxGet(),auto=f.auto!==false;
+  var info=auto?(f.base?'기준일 '+md(f.date||today())+' · 유럽중앙은행 참고 환율 '+(Math.round(f.base*100)/100)+'원'+(f.adj?' + 보정 '+f.adj+'%':''):'자동 환율을 아직 가져오지 못했어요 · 임시값 사용 중'):'직접 입력한 환율이에요';
+  return '<div class="row between"><b style="font-size:14px">환율 1엔</b><span class="row" style="gap:6px"><input class="fld" style="flex:none;width:84px;height:40px;text-align:right" inputmode="decimal" data-fx="1" value="'+rate2()+'" aria-label="환율"><span class="muted">원</span></span></div>'+
+    '<div style="margin-top:10px">'+seg('fxmode',[['auto','자동'],['manual','수동']],auto?'auto':'manual')+'</div>'+
+    (auto?'<div class="row between" style="margin-top:10px"><span class="small muted">카드·환전 수수료 보정</span><span class="row" style="gap:6px"><input class="fld" style="flex:none;width:64px;height:40px;text-align:right" inputmode="decimal" data-fxadj="1" value="'+(f.adj||0)+'" aria-label="보정 퍼센트"><span class="muted">%</span></span></div>':'')+
+    '<div class="small muted" style="margin-top:8px;line-height:1.5">'+info+'<br>실제 환전·카드 결제 환율과 다를 수 있어요.</div>';
+}
 function amtHtml(e){
   var d=e.d;
   if(d.currency==='JPY')return '<div style="font-size:15px;font-weight:700">¥'+won(d.amount)+'</div><div class="small muted">≈ '+won(d.amount*fx())+'원</div>';
@@ -504,11 +518,11 @@ function sumLabel(i){if(i.jpy&&i.krw)return '¥'+won(i.jpy)+' + '+won(i.krw)+'�
 function localList(){return M.expenses.filter(function(e){return e.d.local})}
 function refList(cid){return localList().filter(function(e){return e.d.ref&&e.d.ref.cid===cid})}
 function spentLine(cid){var l=refList(cid);if(!l.length)return '';return '<div class="small" style="margin-top:6px;color:var(--sub)">'+ic('cash',14)+' 지출 '+sumLabel(sumInfo(l))+'</div>'}
-function expRow(e){
+function expRow(e,ro){
   var d=e.d,pay=PAY[d.pay],krw=d.currency==='KRW';
   var sub=[];if(d.ref&&d.ref.name&&d.ref.name!==d.name)sub.push(d.ref.name);if(pay)sub.push(pay[0]);if(krw)sub.push('원화 결제');
   var amt=krw?'<div style="font-size:14px;font-weight:700">'+won(d.amount)+'원</div>':'<div style="font-size:14px;font-weight:700">¥'+won(d.amount)+'</div><div class="small muted">≈'+won(d.amount*fx())+'원</div>';
-  return '<div class="xrow"><span class="xt">'+esc(d.time||'')+'</span><span class="xi">'+ic(ECATI[d.ecat]||'dots',16)+'</span><div class="grow"><div style="font-size:14px;line-height:1.35">'+esc(d.name)+'</div>'+(sub.length?'<div class="small muted">'+esc(sub.join(' · '))+'</div>':'')+'</div><div style="text-align:right">'+amt+'</div><button class="ico" data-act="expedit" data-id="'+ea(e.cid)+'" aria-label="수정">'+ic('pen',16)+'</button></div>';
+  return '<div class="xrow"><span class="xt">'+esc(d.time||'')+'</span><span class="xi">'+ic(ECATI[d.ecat]||'dots',16)+'</span><div class="grow"><div style="font-size:14px;line-height:1.35">'+esc(d.name)+'</div>'+(sub.length?'<div class="small muted">'+esc(sub.join(' · '))+'</div>':'')+'</div><div style="text-align:right">'+amt+'</div>'+(ro?'':'<button class="ico" data-act="expedit" data-id="'+ea(e.cid)+'" aria-label="수정">'+ic('pen',16)+'</button>')+'</div>';
 }
 function screenBudget(){
   var t=trip();if(!t)return empty();
@@ -527,7 +541,7 @@ function screenBudget(){
   var fixedItems=items.filter(function(x){return !x.o.d.local});
   var paidN=fixedItems.filter(function(x){return x.o.d.paid}).length;
   var h=titleBar('경비','결제 '+paidN+' / '+fixedItems.length+'건 · 현지 '+localList().length+'건');
-  h+=card('<div class="lbl" style="margin-bottom:4px">결제 완료 (원화)</div><div style="font-family:var(--serif);font-size:36px;font-weight:700">'+won(krwPaid)+'<span style="font-size:18px;color:var(--sub)">원</span></div>'+
+  h+=card('<div class="row between" style="margin-bottom:2px"><div class="lbl" style="margin-bottom:0">결제 완료 (원화)</div><button class="fxtap" data-act="sheet" data-v="fx" aria-label="환율 보기">1엔 = '+rate2()+'원 '+ic('chevd',14)+'</button></div><div style="font-family:var(--serif);font-size:36px;font-weight:700">'+won(krwPaid)+'<span style="font-size:18px;color:var(--sub)">원</span></div>'+
     '<div class="gantt"><span style="flex:'+(air||0.001)+';background:'+CH[0]+'"></span><span style="flex:'+(stay||0.001)+';background:'+CH[1]+'"></span><span style="flex:'+(etc||0.001)+';background:'+CH[2]+'"></span><span style="flex:'+(localEst||0.001)+';background:'+CH[3]+'"></span></div>'+
     '<div class="legend"><span><i style="background:'+CH[0]+'"></i>항공 '+won(air)+'</span><span><i style="background:'+CH[1]+'"></i>숙소 '+won(stay)+'</span><span><i style="background:'+CH[2]+'"></i>기타 '+won(etc)+'</span><span><i style="background:'+CH[3]+'"></i>현지 ≈'+won(localEst)+'</span></div>'+
     '<div class="row between" style="margin-top:12px;font-size:13px"><span class="muted">현지 지출 (엔화)</span><b>¥'+won(jpyPaid)+' <span class="muted" style="font-weight:400">≈ '+won(jpyKrw)+'원</span></b></div>'+(localKrw?'<div class="row between" style="margin-top:6px;font-size:13px"><span class="muted">현지 지출 (원화 결제)</span><b>'+won(localKrw)+'원</b></div>':'')+
@@ -537,12 +551,6 @@ function screenBudget(){
   var cs={};localList().forEach(function(e){cs[e.d.ecat||'etc']=(cs[e.d.ecat||'etc']||0)+xKrw(e)});
   var ck=Object.keys(ECAT).filter(function(k){return cs[k]});
   if(ck.length)h+='<div class="chips">'+ck.map(function(k){return chip(ic(ECATI[k],14)+' '+ECAT[k]+' ≈'+won(cs[k])+'원','ln')}).join('')+'</div>';
-  var f=fxGet(),auto=f.auto!==false;
-  var info=auto?(f.base?'기준일 '+md(f.date||today())+' · 유럽중앙은행 참고 환율 '+(Math.round(f.base*100)/100)+'원'+(f.adj?' + 보정 '+f.adj+'%':''):'자동 환율을 아직 가져오지 못했어요 · 임시값 사용 중'):'직접 입력한 환율이에요';
-  h+=card('<div class="row between"><b style="font-size:14px">환율 1엔</b><span class="row" style="gap:6px"><input class="fld" style="flex:none;width:84px;height:40px;text-align:right" inputmode="decimal" data-fx="1" value="'+rate2()+'" aria-label="환율"><span class="muted">원</span></span></div>'+
-    '<div style="margin-top:10px">'+seg('fxmode',[['auto','자동'],['manual','수동']],auto?'auto':'manual')+'</div>'+
-    (auto?'<div class="row between" style="margin-top:10px"><span class="small muted">카드·환전 수수료 보정</span><span class="row" style="gap:6px"><input class="fld" style="flex:none;width:64px;height:40px;text-align:right" inputmode="decimal" data-fxadj="1" value="'+(f.adj||0)+'" aria-label="보정 퍼센트"><span class="muted">%</span></span></div>':'')+
-    '<div class="small muted" style="margin-top:8px;line-height:1.5">'+info+'<br>실제 환전·카드 결제 환율과 다를 수 있어요.</div>','sm');
   var byDay={};localList().forEach(function(e){(byDay[e.d.date]=byDay[e.d.date]||[]).push(e)});
   var days=Object.keys(byDay).sort().reverse();
   if(days.length){
@@ -550,16 +558,16 @@ function screenBudget(){
     days.forEach(function(d){
       var sl=sumLabel(sumInfo(byDay[d]));
       var list=byDay[d].slice().sort(function(a,b){return String(b.d.time||'')<String(a.d.time||'')?-1:1});
-      h+=card('<div class="row between" style="margin-bottom:2px"><b>'+md(d)+' '+wd(d)+'</b><span class="small muted">'+sl+'</span></div>'+list.map(expRow).join(''),'sm');
+      h+=card('<div class="row between" style="margin-bottom:2px"><b>'+md(d)+' '+wd(d)+'</b><span class="small muted">'+sl+'</span></div>'+list.map(function(e){return expRow(e)}).join(''),'sm');
     });
   }
   var iconOf=function(x){var d=x.o.d;return x.k==='stay'?'bed':(d.cat==='air'?'plane':(d.cat==='sim'?'sim':(d.cat==='transport'?'bus':'tag')))};
   var fixed=fixedItems.slice();
   fixed.sort(function(a,b){return (a.o.d.currency==='JPY'?1:0)-(b.o.d.currency==='JPY'?1:0)});
-  if(fixed.length)h+='<div class="lbl" style="margin:6px 0 0">사전 결제 · 예정</div>';
+  if(fixed.length)h+='<div class="lbl" style="margin:6px 0 0">사전 결제 · 예정</div><div class="small muted" style="margin-top:-8px">예정 칩을 누르면 결제완료로 바뀌어요. 금액이 다르면 항목을 눌러 고쳐요.</div>';
   fixed.forEach(function(x){
     var d=x.o.d,c=x.k==='stay'?cityCol(d.city)[2]:null;
-    h+=card('<div class="row" style="gap:12px"><span class="ibtn" style="color:var(--sel-tx)">'+ic(iconOf(x),22)+'</span><div class="grow"><div class="row" style="gap:6px">'+(c?'<i style="width:10px;height:10px;border-radius:50%;background:'+c+';display:inline-block"></i>':'')+'<b style="font-size:15px">'+esc(d.name)+'</b></div><div class="small muted" style="margin-top:3px;line-height:1.45">'+esc(x.k==='stay'?(d.nights+'박 · '+md(d.checkin)+' – '+md(d.checkout)+(d.note?' · '+d.note:'')):(d.note||''))+'</div></div><div style="text-align:right">'+amtHtml(x.o)+'<button class="chip '+(d.paid?'ok':'pn')+'" style="margin-top:4px" data-act="paid" data-k="'+x.k+'" data-id="'+ea(x.o.cid)+'">'+(d.paid?'결제완료':'예정')+'</button></div></div>','sm');
+    h+=card('<div class="row" style="gap:12px"><span class="ibtn" style="color:var(--sel-tx)">'+ic(iconOf(x),22)+'</span><div class="grow"><div class="row" style="gap:6px">'+(c?'<i style="width:10px;height:10px;border-radius:50%;background:'+c+';display:inline-block"></i>':'')+'<b style="font-size:15px">'+esc(d.name)+'</b></div><div class="small muted" style="margin-top:3px;line-height:1.45">'+esc(x.k==='stay'?(d.nights+'박 · '+md(d.checkin)+' – '+md(d.checkout)+(d.note?' · '+d.note:'')):(d.note||''))+'</div></div><div style="text-align:right">'+amtHtml(x.o)+'<button class="chip '+(d.paid?'ok':'pn')+'" style="margin-top:4px" data-act="paid" data-k="'+x.k+'" data-id="'+ea(x.o.cid)+'">'+(d.paid?'결제완료':'예정')+'</button></div></div>','sm').replace('<div class="card sm">','<div class="card sm" style="cursor:pointer" data-act="payedit" data-k="'+x.k+'" data-id="'+ea(x.o.cid)+'">');
   });
   return h;
 }
@@ -575,11 +583,11 @@ function screenSpots(){
     var d=s.d,memo=MEMOS.filter(function(m){return m.text&&m.text.indexOf(d.name)>=0})[0];
     h+=card('<div class="row" style="align-items:flex-start"><div class="grow"><div class="row" style="flex-wrap:wrap"><b style="font-size:16px'+(spotState(d)==='done'?';color:var(--sub)':'')+'">'+esc(d.name)+'</b>'+chip(esc(CAT[d.cat]||''),'ln')+(d.tags||[]).map(function(x){return chip(esc(x),'pn')}).join('')+'</div><div class="small muted" style="margin-top:4px;line-height:1.45">'+esc(d.desc||'')+'</div>'+spentLine(s.cid)+'</div>'+mapBtn(d.map||d.name)+navBtn(d.map||d.name)+'</div>'+schedLine(s)+(memo?'<div class="small" style="margin-top:8px">iikoto 메모 · '+esc(memo.date_key.slice(5))+' · '+esc((memo.text||'').slice(0,60))+'</div>':'')+
       '<div class="seg" style="margin-top:10px">'+STATE.map(function(st){return '<button data-act="sp-state" data-id="'+ea(s.cid)+'" data-v="'+st[0]+'" aria-pressed="'+(spotState(d)===st[0])+'" class="'+(spotState(d)===st[0]?'on':'')+'">'+st[1]+'</button>'}).join('')+'</div>'+
-      '<div class="row between"><button class="btn sm" data-act="spot2ev" data-id="'+ea(s.cid)+'">'+ic('calplus',16)+'일정에 넣기</button><button class="btn" style="border:0;background:transparent;color:var(--sub);font-size:12px" data-act="sp-del" data-id="'+ea(s.cid)+'">삭제</button></div>');
+      '<div class="row" style="justify-content:flex-end;gap:0;margin-top:2px"><button class="ico" data-act="spedit" data-id="'+ea(s.cid)+'" aria-label="수정">'+ic('pen',18)+'</button><button class="ico" data-act="spot2ev" data-id="'+ea(s.cid)+'" aria-label="일정에 넣기">'+ic('calplus',18)+'</button><button class="ico" style="color:var(--sub)" data-act="sp-del" data-id="'+ea(s.cid)+'" aria-label="삭제">'+ic('trash',18)+'</button></div>');
   });
   if(!list.length)h+='<div class="muted small" style="text-align:center;padding:10px">이 분류에는 아직 없어요</div>';
   if(UI.addSpot){
-    h+=card('<div class="lbl">스팟 추가</div><input class="fld" id="s_name" placeholder="이름" aria-label="이름" style="width:100%"><div class="row" style="margin-top:8px"><select class="fld" id="s_cat" aria-label="분류">'+Object.keys(CAT).map(function(k){return '<option value="'+k+'">'+CAT[k]+'</option>'}).join('')+'</select></div><input class="fld" id="s_desc" placeholder="한 줄 설명 (선택)" aria-label="설명" style="width:100%;margin-top:8px"><div class="row" style="margin-top:10px"><button class="btn pri" style="width:auto;flex:1" data-act="sp-save">저장</button><button class="btn" data-act="sp-cancel">취소</button></div>');
+    h+=card('<div class="lbl">스팟 추가</div><input class="fld" id="s_name" placeholder="이름" aria-label="이름" style="width:100%"><div class="row" style="margin-top:8px"><select class="fld" id="s_cat" aria-label="분류">'+Object.keys(CAT).map(function(k){return '<option value="'+k+'">'+CAT[k]+'</option>'}).join('')+'</select></div><input class="fld" id="s_desc" placeholder="한 줄 설명 (선택)" aria-label="설명" style="width:100%;margin-top:8px"><input class="fld" id="s_map" placeholder="지도 검색어 (비우면 이름으로 검색)" aria-label="지도 검색어" style="width:100%;margin-top:8px"><div class="row" style="margin-top:10px"><button class="btn pri" style="width:auto;flex:1" data-act="sp-save">저장</button><button class="btn" data-act="sp-cancel">취소</button></div>');
   }else h+='<button class="btn" data-act="sp-new">'+ic('plus',16)+'스팟 추가</button>';
   return h;
 }
@@ -602,46 +610,51 @@ function sheetHtml(){
     body+=card('<div class="row between"><span class="small muted">앱 버전 '+VER+'</span><button class="btn" data-act="sheet" data-v="key">키 변경</button></div>');
   }else if(v==='exp'){
     var dr=UI.expDraft||{};
-    var opts='<option value="">연결 안 함</option>';
-    var dd=dr.date||today();
-    var evs=eventsOf(dd).filter(function(e){return e.d.title});
-    if(evs.length){opts+='<optgroup label="'+md(dd)+' 일정">'+evs.map(function(e){return '<option value="event:'+ea(e.cid)+'"'+(dr.ref==='event:'+e.cid?' selected':'')+'>'+esc(e.d.title)+'</option>'}).join('')+'</optgroup>'}
-    var cc=cityOfDate(dd),cl=(trip().cities||[]).slice().sort(function(a,b){return (a.id===cc?0:1)-(b.id===cc?0:1)});
-    cl.forEach(function(c){
-      var sps=M.spots.filter(function(sp){return sp.d.city===c.id});
-      if(sps.length)opts+='<optgroup label="'+esc(c.name)+' 스팟">'+sps.map(function(sp){return '<option value="spot:'+ea(sp.cid)+'"'+(dr.ref==='spot:'+sp.cid?' selected':'')+'>'+esc(sp.d.name)+'</option>'}).join('')+'</optgroup>';
-    });
     body='<div class="row between"><h1 style="font-size:22px">'+(dr.id?'지출 수정':'지출 추가')+'</h1><button class="btn" style="border:0;background:transparent" data-act="sheet-close" aria-label="닫기">'+ic('x',20)+'</button></div>'+
        '<div class="tsc" style="margin:0">'+[['JPY','¥ 엔화'],['KRW','₩ 원화']].map(function(c){return '<button class="chip tsb'+((dr.cur||'JPY')===c[0]?' on':'')+'" data-act="expcur" data-v="'+c[0]+'" aria-pressed="'+((dr.cur||'JPY')===c[0])+'">'+c[1]+'</button>'}).join('')+'</div>'+
       '<div class="amtbox"><span class="yen" id="x_sym">'+((dr.cur||'JPY')==='KRW'?'₩':'¥')+'</span><input id="x_amt" inputmode="numeric" autocomplete="off" placeholder="0" aria-label="금액" value="'+ea(dr.amt||'')+'"></div><div class="small muted" id="x_krw" style="margin-top:-6px">'+expLine(dr.cur||'JPY',dr.amt)+'</div>'+
       '<div><div class="lbl">분류</div><div class="tsc" style="margin-top:0">'+Object.keys(ECAT).map(function(k){return '<button class="chip tsb'+(dr.cat===k?' on':'')+'" data-act="expcat" data-v="'+k+'" aria-pressed="'+(dr.cat===k)+'">'+ic(ECATI[k],15)+ECAT[k]+'</button>'}).join('')+'</div></div>'+
       '<div><div class="lbl">결제수단</div><div class="tsc" style="margin-top:0">'+Object.keys(PAY).map(function(k){return '<button class="chip tsb'+(dr.pay===k?' on':'')+'" data-act="exppay" data-v="'+k+'" aria-pressed="'+(dr.pay===k)+'">'+ic(PAY[k][1],15)+PAY[k][0]+'</button>'}).join('')+'</div></div>'+
-      '<div><div class="lbl">장소 연결 (선택)</div><select class="fld" id="x_ref" data-expref="1" style="width:100%" aria-label="장소 연결">'+opts+'</select></div>'+
-      '<div><div class="lbl">내용 (선택)</div><input class="fld" id="x_name" style="width:100%" placeholder="예: 나폴리탄 런치" aria-label="내용" value="'+ea(dr.name||'')+'"></div>'+
-      '<div class="row" style="align-items:flex-start"><div class="grow"><div class="lbl">날짜</div><input class="fld" id="x_date" type="date" style="width:100%" value="'+ea(dr.date||'')+'" aria-label="날짜"></div><div class="grow"><div class="lbl">시간</div><input class="fld" id="x_time" type="time" style="width:100%" value="'+ea(dr.time||'')+'" aria-label="시간"></div></div>'+
+      '<div><div class="lbl">내용 · 장소 (선택)</div><input class="fld" id="x_name" style="width:100%" placeholder="이름을 치거나 아래에서 고르세요" autocomplete="off" aria-label="내용" value="'+ea(dr.name||'')+'"><div id="x_sug">'+xSugHtml(dr)+'</div></div>'+
+      '<div class="dt2"><div><div class="lbl">날짜</div><input class="fld" id="x_date" type="date" style="width:100%" value="'+ea(dr.date||'')+'" aria-label="날짜"></div><div><div class="lbl">시간</div><input class="fld" id="x_time" type="time" style="width:100%" value="'+ea(dr.time||'')+'" aria-label="시간"></div></div>'+
       '<div class="row"><button class="btn pri" style="flex:1" data-act="exp-save">저장</button>'+(dr.id?'<button class="btn" data-act="exp-del" data-id="'+ea(dr.id)+'">삭제</button>':'')+'</div>';
   }else if(v==='ev'){
     var ed=UI.evDraft||{};
-    var sopts='<option value="">직접 입력</option>';
-    var ccx=cityOfDate(ed.date||today()),cls=(trip().cities||[]).slice().sort(function(a,b){return (a.id===ccx?0:1)-(b.id===ccx?0:1)});
-    cls.forEach(function(c){
-      var sps=M.spots.filter(function(sp){return sp.d.city===c.id});
-      if(sps.length)sopts+='<optgroup label="'+esc(c.name)+' 스팟">'+sps.map(function(sp){return '<option value="'+ea(sp.cid)+'"'+(ed.spot===sp.cid?' selected':'')+'>'+esc(sp.d.name)+'</option>'}).join('')+'</optgroup>';
-    });
     body='<div class="row between"><h1 style="font-size:22px">'+(ed.id?'일정 수정':'일정 추가')+'</h1><button class="btn" style="border:0;background:transparent" data-act="sheet-close" aria-label="닫기">'+ic('x',20)+'</button></div>'+
-      '<div><div class="lbl">스팟에서 고르기 (선택)</div><select class="fld" id="ev_spot" data-evspot="1" style="width:100%" aria-label="스팟 선택">'+sopts+'</select></div>'+
-      '<div><div class="lbl">제목</div><input class="fld" id="ev_title" style="width:100%" placeholder="예: 長崎次郎喫茶室" aria-label="제목" value="'+ea(ed.title||'')+'"></div>'+
-      '<div class="row" style="align-items:flex-start"><div class="grow"><div class="lbl">날짜</div><input class="fld" id="ev_date" type="date" style="width:100%" value="'+ea(ed.date||'')+'" aria-label="날짜"></div><div class="grow"><div class="lbl">시간 (선택)</div><input class="fld" id="ev_time" data-evtime="1" type="time" style="width:100%" value="'+ea(ed.time||'')+'" aria-label="시간"></div></div>'+
+      '<div><div class="lbl">제목</div><input class="fld" id="ev_title" style="width:100%" placeholder="이름을 치면 스팟이 떠요" aria-label="제목" autocomplete="off" value="'+ea(ed.title||'')+'"><div id="ev_sug">'+evSugHtml(ed)+'</div></div>'+
+      '<div class="dt2"><div><div class="lbl">날짜</div><input class="fld" id="ev_date" type="date" style="width:100%" value="'+ea(ed.date||'')+'" aria-label="날짜"></div><div><div class="lbl">시간 (선택)</div><input class="fld" id="ev_time" data-evtime="1" type="time" style="width:100%" value="'+ea(ed.time||'')+'" aria-label="시간"></div></div>'+
       '<div><div class="lbl">시간대</div><div class="tsc" style="margin-top:0">'+['am','noon','pm','eve'].map(function(k){return '<button class="chip tsb'+(ed.slot===k?' on':'')+'" data-act="evslot" data-v="'+k+'" aria-pressed="'+(ed.slot===k)+'">'+SLOTL[k]+'</button>'}).join('')+'</div></div>'+
       '<div><div class="lbl">설명 (선택)</div><input class="fld" id="ev_desc" style="width:100%" placeholder="예: 오픈 시간에 방문" aria-label="설명" value="'+ea(ed.desc||'')+'"></div>'+
-      '<div><div class="lbl">지도 연결</div><div class="tsc" style="margin-top:0">'+[[true,'지도·길찾기 버튼 표시'],[false,'표시 안 함']].map(function(c){return '<button class="chip tsb'+((ed.mapOn!==false)===c[0]?' on':'')+'" data-act="evmap" data-v="'+c[0]+'" aria-pressed="'+((ed.mapOn!==false)===c[0])+'">'+c[1]+'</button>'}).join('')+'</div><div class="lbl" style="margin-top:10px">검색어 (비우면 제목으로 검색)</div><div class="row"><input class="fld" id="ev_map" style="flex:1" placeholder="가게·장소 이름 또는 주소" aria-label="지도 검색어" value="'+ea(ed.map||'')+'"><button class="btn" data-act="evmapcheck">'+ic('pin',16)+'확인</button></div></div>'+
-      '<div><div class="lbl">날씨 조건</div><div class="tsc" style="margin-top:0">'+[['','없음'],['sun','맑을 때'],['cloud','흐릴 때']].map(function(c){return '<button class="chip tsb'+((ed.cond||'')===c[0]?' on':'')+'" data-act="evcond" data-v="'+c[0]+'" aria-pressed="'+((ed.cond||'')===c[0])+'">'+c[1]+'</button>'}).join('')+'</div></div>'+
+      '<div><div class="lbl">지도 연결</div><div class="tsc" style="margin-top:0">'+[[true,'지도·길찾기 버튼 표시'],[false,'표시 안 함']].map(function(c){return '<button class="chip tsb'+((ed.mapOn!==false)===c[0]?' on':'')+'" data-act="evmap" data-v="'+c[0]+'" aria-pressed="'+((ed.mapOn!==false)===c[0])+'">'+c[1]+'</button>'}).join('')+'</div><div class="lbl" style="margin-top:10px">검색어 (비우면 제목으로 검색)</div><div class="row"><input class="fld" id="ev_map" style="flex:1" placeholder="가게·장소 이름 또는 주소" aria-label="지도 검색어" value="'+ea(ed.map||'')+'"><a class="btn" data-mapcheck="1" href="#" target="_blank" rel="noopener" style="text-decoration:none">'+ic('pin',16)+'확인</a></div></div>'+
       '<div class="row"><button class="btn pri" style="flex:1" data-act="ev-save">저장</button>'+(ed.id?'<button class="btn" data-act="ev-del" data-id="'+ea(ed.id)+'">삭제</button>':'')+'</div>';
+  }else if(v==='fx'){
+    body='<div class="row between"><h1 style="font-size:22px">현재 환율</h1><button class="btn" style="border:0;background:transparent" data-act="sheet-close" aria-label="닫기">'+ic('x',20)+'</button></div>'+card(fxCardHtml(),'');
+  }else if(v==='pay'){
+    var pd=UI.payDraft||{};
+    body='<div class="row between"><h1 style="font-size:22px">결제 항목 수정</h1><button class="btn" style="border:0;background:transparent" data-act="sheet-close" aria-label="닫기">'+ic('x',20)+'</button></div>'+
+      '<div style="font-size:15px;font-weight:700">'+esc(pd.name||'')+'</div>'+
+      '<div class="tsc" style="margin:0">'+[['KRW','₩ 원화'],['JPY','¥ 엔화']].map(function(c){return '<button class="chip tsb'+(pd.cur===c[0]?' on':'')+'" data-act="paycur" data-v="'+c[0]+'" aria-pressed="'+(pd.cur===c[0])+'">'+c[1]+'</button>'}).join('')+'</div>'+
+      '<div class="amtbox"><span class="yen" id="p_sym">'+(pd.cur==='KRW'?'₩':'¥')+'</span><input id="p_amt" inputmode="numeric" autocomplete="off" placeholder="0" aria-label="금액" value="'+ea(pd.amt||'')+'"></div>'+
+      '<div><div class="lbl">상태</div><div class="tsc" style="margin-top:0">'+[[false,'예정'],[true,'결제완료']].map(function(c){return '<button class="chip tsb'+((!!pd.paid)===c[0]?' on':'')+'" data-act="paystat" data-v="'+c[0]+'" aria-pressed="'+((!!pd.paid)===c[0])+'">'+c[1]+'</button>'}).join('')+'</div></div>'+
+      '<div class="small muted">실제 결제 금액이 다르면 금액을 고치고 "결제완료"로 바꾸세요.</div>'+
+      '<div class="row"><button class="btn pri" style="flex:1" data-act="pay-save">저장</button>'+(pd.k==='exp'?'<button class="btn" data-act="pay-del">삭제</button>':'')+'</div>';
+  }else if(v==='spedit'){
+    var sd=UI.spDraft||{};
+    var sp0=M.spots.filter(function(x){return x.cid===sd.id})[0];
+    if(!sp0)return '';
+    body='<div class="row between"><h1 style="font-size:22px">스팟 수정</h1><button class="btn" style="border:0;background:transparent" data-act="sheet-close" aria-label="닫기">'+ic('x',20)+'</button></div>'+
+      '<div><div class="lbl">이름</div><input class="fld" id="sp_name" style="width:100%" aria-label="이름" autocomplete="off" value="'+ea(sd.name||'')+'"></div>'+
+      '<div><div class="lbl">분류</div><div class="tsc" style="margin-top:0">'+Object.keys(CAT).map(function(k){return '<button class="chip tsb'+(sd.cat===k?' on':'')+'" data-act="spcatpick" data-v="'+k+'" aria-pressed="'+(sd.cat===k)+'">'+CAT[k]+'</button>'}).join('')+'</div></div>'+
+      '<div><div class="lbl">도시</div><div class="tsc" style="margin-top:0">'+(trip().cities||[]).map(function(c){return '<button class="chip tsb'+(sd.city===c.id?' on':'')+'" data-act="spcitypick" data-v="'+ea(c.id)+'" aria-pressed="'+(sd.city===c.id)+'">'+esc(c.name)+'</button>'}).join('')+'</div></div>'+
+      '<div><div class="lbl">설명 (선택)</div><input class="fld" id="sp_desc" style="width:100%" aria-label="설명" value="'+ea(sd.desc||'')+'"></div>'+
+      '<div><div class="lbl">지도 검색어 (비우면 이름으로 검색)</div><div class="row"><input class="fld" id="sp_map" style="flex:1" placeholder="가게·장소 이름 또는 주소" aria-label="지도 검색어" value="'+ea(sd.map||'')+'"><a class="btn" data-mapcheck="sp" href="#" target="_blank" rel="noopener" style="text-decoration:none">'+ic('pin',16)+'확인</a></div></div>'+
+      '<div class="small muted">이름을 바꾸면 이 스팟과 연결된 일정의 제목도 같이 바뀌어요.</div>'+
+      '<div class="row"><button class="btn pri" style="flex:1" data-act="spedit-save">저장</button></div>';
   }else if(v==='tripedit'){
     var t=trip();if(!t)return '';
     body='<div class="row between"><h1 style="font-size:22px">여행 정보 수정</h1><button class="btn" style="border:0;background:transparent" data-act="sheet" data-v="trips" aria-label="뒤로">'+ic('x',20)+'</button></div>'+
       '<div><div class="lbl">여행명</div><input class="fld" id="te_title" style="width:100%" value="'+ea(t.title||'')+'" aria-label="여행명"></div>'+
-      '<div class="row" style="align-items:flex-start"><div class="grow"><div class="lbl">시작일</div><input class="fld" id="te_start" type="date" style="width:100%" value="'+ea(t.start||'')+'" aria-label="시작일"></div><div class="grow"><div class="lbl">종료일</div><input class="fld" id="te_end" type="date" style="width:100%" value="'+ea(t.end||'')+'" aria-label="종료일"></div></div>'+
+      '<div class="dt2"><div><div class="lbl">시작일</div><input class="fld" id="te_start" type="date" style="width:100%" value="'+ea(t.start||'')+'" aria-label="시작일"></div><div><div class="lbl">종료일</div><input class="fld" id="te_end" type="date" style="width:100%" value="'+ea(t.end||'')+'" aria-label="종료일"></div></div>'+
       '<div><div class="lbl">상태</div><select class="fld" id="te_status" style="width:100%" aria-label="상태">'+[['planned','계획'],['active','진행 중'],['done','완료']].map(function(o){return '<option value="'+o[0]+'"'+(t.status===o[0]?' selected':'')+'>'+o[1]+'</option>'}).join('')+'</select></div>'+
       '<div><div class="lbl">도시 이름</div>'+(t.cities||[]).map(function(c,i){return '<input class="fld te_city" data-i="'+i+'" style="width:100%;margin-bottom:6px" value="'+ea(c.name)+'" aria-label="도시 이름">'}).join('')+'</div>'+
       '<div class="small muted">기간을 바꿔도 이미 입력한 일정의 날짜는 그대로 남아요. 범위 밖 날짜는 화면에 나오지 않아요.</div>'+
@@ -696,7 +709,7 @@ function updateExpLine(){var a=document.getElementById('x_amt'),k=document.getEl
 function openExp(id){
   var base={id:null,cur:'JPY',cat:'food',pay:'card',amt:'',name:'',ref:'',date:today(),time:nowHM()};
   if(id){var ex=M.expenses.filter(function(x){return x.cid===id})[0];if(ex){var d=ex.d;base={id:ex.cid,cur:d.currency==='KRW'?'KRW':'JPY',cat:d.ecat||'etc',pay:d.pay||'card',amt:String(d.amount),name:d.name||'',ref:d.ref?d.ref.t+':'+d.ref.cid:'',date:d.date||today(),time:d.time||nowHM()}}}
-  UI.expDraft=base;UI.sheet='exp';render();
+  UI.expDraft=base;UI.sheet='exp';render();persistDraft();
   var a=document.getElementById('x_amt');if(a&&!id)a.focus();
 }
 function refInfo(val){
@@ -709,14 +722,14 @@ function saveExp(){
   var dr=UI.expDraft||{};
   var amt=parseInt((document.getElementById('x_amt').value||'').replace(/[^0-9]/g,''),10);
   if(!amt){toast('금액을 입력해 주세요');return}
-  var ri=refInfo(document.getElementById('x_ref').value);
+  var ri=refInfo(dr.ref);
   var nm=(document.getElementById('x_name').value||'').trim()||(ri?ri.name:'')||ECAT[dr.cat||'etc'];
   var date=document.getElementById('x_date').value||today(),time=document.getElementById('x_time').value||nowHM();
   var data={cat:'local',name:nm,amount:amt,currency:(dr.cur==='KRW'?'KRW':'JPY'),paid:true,local:true,date:date,time:time,ecat:dr.cat||'etc',pay:dr.pay||'card'};
   if(ri)data.ref={t:ri.t,cid:ri.cid,name:ri.name};
   var o=dr.id?M.expenses.filter(function(x){return x.cid===dr.id})[0]:null;
   if(o){o.d=data;o.date=date}else{o={cid:'exp_'+genCid(),date:date,sort:Date.now()%100000000,d:data};M.expenses.push(o)}
-  tiUp('expense',o);UI.sheet=null;UI.expDraft=null;render();toast('저장했어요');
+  tiUp('expense',o);UI.sheet=null;UI.expDraft=null;clearDraft();render();toast('저장했어요');
 }
 var SLOTDEF={am:'09:00',noon:'12:00',pm:'15:00',eve:'19:00'};
 function timeToSlot(t){var h=parseInt(String(t).split(':')[0],10);if(isNaN(h))return 'pm';return h<11?'am':(h<14?'noon':(h<18?'pm':'eve'))}
@@ -753,7 +766,7 @@ function openEv(id,date,spotCid){
     var sp=M.spots.filter(function(x){return x.cid===spotCid})[0];
     if(sp){var catSlot={meal:'noon',cafe:'pm',sight:'pm',snack:'pm'};base.spot=sp.cid;base.title=sp.d.name;base.desc=sp.d.desc||'';base.map=sp.d.map||sp.d.name;base.slot=catSlot[sp.d.cat]||'pm'}
   }
-  UI.evDraft=base;UI.sheet='ev';render();
+  UI.evDraft=base;UI.sheet='ev';render();persistDraft();
 }
 function saveEv(){
   var dr=UI.evDraft||{};
@@ -765,13 +778,10 @@ function saveEv(){
   var map=(document.getElementById('ev_map').value||'').trim();
   if(dr.mapOn===false)map='';else if(!map)map=title;
   var desc=(document.getElementById('ev_desc').value||'').trim();
-  var cond=dr.cond||'';
   var old=dr.id?findEvent(dr.id):null;
   var d=old?JSON.parse(JSON.stringify(old.d)):{tags:[]};
   d.city=cityOfDate(date);d.title=title;d.desc=desc||undefined;d.time=time||undefined;d.slot=slot;
-  d.map=map||undefined;d.nav=!!map;d.cond=cond||undefined;
-  d.tags=(d.tags||[]).filter(function(t){return t!=='맑을 때'&&t!=='흐릴 때'});
-  if(cond)d.tags.push(cond==='sun'?'맑을 때':'흐릴 때');
+  d.map=map||undefined;d.nav=!!map;
   if(dr.spot)d.spot=dr.spot;else delete d.spot;
   Object.keys(d).forEach(function(k){if(d[k]===undefined)delete d[k]});
   var e=old;
@@ -779,16 +789,110 @@ function saveEv(){
   else e={cid:'ev_'+date+'_'+genCid(),date:date,sort:0,d:d};
   insertEvent(date,e);
   var t=trip();if(t&&(date<t.start||date>t.end))toast('여행 기간 밖의 날짜예요. 기간을 넓히면 보여요');
-  UI.sched=date;UI.sheet=null;UI.evDraft=null;render();if(!(t&&(date<t.start||date>t.end)))toast('저장했어요');
+  UI.sched=date;UI.sheet=null;UI.evDraft=null;clearDraft();render();if(!(t&&(date<t.start||date>t.end)))toast('저장했어요');
+}
+function placedSpotCids(){var m={};Object.keys(M.events).forEach(function(d){M.events[d].forEach(function(e){var sp=spotOfEvent(e);if(sp)m[sp.cid]=1})});return m}
+function normQ(t){return String(t||'').toLowerCase().replace(/\s+/g,'')}
+function evSugHtml(ed){
+  var q=normQ(ed.title),cc=cityOfDate(ed.date||today());
+  var linked=ed.spot?M.spots.filter(function(x){return x.cid===ed.spot})[0]:null;
+  var h='';
+  if(linked)h+='<div class="tsc" style="margin-top:8px"><button class="tschip on" data-act="evunlink" aria-label="스팟 연결 해제">'+ic('pin',14)+' '+esc(linked.d.name)+' · 연결됨 ×</button></div>';
+  var list,label;
+  if(q){
+    list=M.spots.filter(function(sp){
+      if(linked&&sp.cid===linked.cid)return false;
+      return normQ(sp.d.name+' '+(sp.d.desc||'')+' '+(sp.d.map||'')).indexOf(q)>=0;
+    });label='스팟 후보';
+  }else{
+    var placed=placedSpotCids();
+    list=M.spots.filter(function(sp){return sp.d.city===cc&&spotState(sp.d)==='go'&&!placed[sp.cid]});
+    label='아직 일정에 안 넣은 갈 곳 · '+cityName(cc);
+  }
+  list=list.slice().sort(function(a,b){return (a.d.city===cc?0:1)-(b.d.city===cc?0:1)}).slice(0,5);
+  if(list.length)h+='<div class="small muted" style="margin:10px 0 6px">'+esc(label)+'</div><div class="tsc" style="margin-top:0">'+list.map(function(sp){return '<button class="tschip" data-act="evpick" data-id="'+ea(sp.cid)+'">'+esc(sp.d.name)+'</button>'}).join('')+'</div>';
+  else if(q&&!linked)h+='<div class="small muted" style="margin-top:8px">일치하는 스팟이 없어요 · 그대로 일정으로 저장돼요</div>';
+  return h;
+}
+function refreshSug(){var sg=document.getElementById('ev_sug');if(sg&&UI.evDraft)sg.innerHTML=evSugHtml(UI.evDraft)}
+function swipeWeek(dir){
+  var t=trip();if(!t)return;
+  var cur=UI.sched||clampDate(today()),tg=addDays(cur,dir*7);
+  if(tg<t.start)tg=t.start;if(tg>t.end)tg=t.end;
+  if(weekStartOf(tg)===weekStartOf(cur))return;
+  UI.sched=tg;UI.wkAnim=dir>0?'l':'r';render();
+}
+var swipeX=null,swipeY=null;
+function onTouchStart(e){var st=e.target.closest&&e.target.closest('#strip');if(!st){swipeX=null;return}var p=(e.touches&&e.touches[0])||e;swipeX=p.clientX;swipeY=p.clientY}
+function onTouchEnd(e){
+  if(swipeX==null)return;
+  var p=(e.changedTouches&&e.changedTouches[0])||e,dx=p.clientX-swipeX,dy=p.clientY-swipeY;swipeX=null;
+  if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)*1.5)swipeWeek(dx<0?1:-1);
+}
+function nowMin(){var d=new Date();return d.getHours()*60+d.getMinutes()}
+function hmMin(t){var p=String(t).split(':');return (+p[0])*60+(+p[1]||0)}
+function spotCatToEcat(c){return ({meal:'food',cafe:'cafe',sight:'entry',snack:'food'})[c]||null}
+function xSugHtml(dr){
+  var q=normQ(dr.name),date=dr.date||today(),cc=cityOfDate(date);
+  var linked=refInfo(dr.ref);
+  var h='';
+  if(linked)h+='<div class="tsc" style="margin-top:8px"><button class="tschip on" data-act="xunlink" aria-label="장소 연결 해제">'+ic('pin',14)+' '+esc(linked.name)+' · 연결됨 ×</button></div>';
+  var evs=eventsOf(date).filter(function(e){return e.d.title}),eff=effTimes(eventsOf(date)),list=[],label='';
+  if(q){
+    var seen={};
+    evs.forEach(function(e){if(normQ(e.d.title+' '+(e.d.desc||'')).indexOf(q)>=0&&!(linked&&linked.cid===e.cid)){list.push({ref:'event:'+e.cid,name:e.d.title,tag:'일정'});var sp=spotOfEvent(e);if(sp)seen[sp.cid]=1}});
+    M.spots.filter(function(sp){return !seen[sp.cid]&&!(linked&&linked.cid===sp.cid)&&normQ(sp.d.name+' '+(sp.d.desc||'')+' '+(sp.d.map||'')).indexOf(q)>=0}).sort(function(a,b){return (a.d.city===cc?0:1)-(b.d.city===cc?0:1)}).forEach(function(sp){list.push({ref:'spot:'+sp.cid,name:sp.d.name,tag:'스팟'})});
+    label='일정·스팟 후보';
+  }else{
+    var all=eventsOf(date),idx={};all.forEach(function(e,i){idx[e.cid]=i});
+    var withPlace=evs.filter(function(e){return !!e.d.map});
+    var isToday=date===today(),nm=nowMin();
+    withPlace.sort(function(a,b){
+      if(isToday){var da=Math.abs(hmMin(eff[idx[a.cid]])-nm),db=Math.abs(hmMin(eff[idx[b.cid]])-nm);if(da!==db)return da-db}
+      return idx[a.cid]-idx[b.cid];
+    });
+    withPlace.forEach(function(e){if(!(linked&&linked.cid===e.cid))list.push({ref:'event:'+e.cid,name:e.d.title,tag:''})});
+    label=isToday?'지금 가까운 일정에서 고르기':md(date)+' 일정에서 고르기';
+    if(!list.length){
+      M.spots.filter(function(sp){return sp.d.city===cc&&spotState(sp.d)==='go'}).slice(0,5).forEach(function(sp){list.push({ref:'spot:'+sp.cid,name:sp.d.name,tag:'스팟'})});
+      label='이 날짜엔 일정이 없어요 · '+cityName(cc)+' 갈 곳';
+    }
+  }
+  list=list.slice(0,5);
+  if(list.length)h+='<div class="small muted" style="margin:10px 0 6px">'+esc(label)+'</div><div class="tsc" style="margin-top:0">'+list.map(function(x){return '<button class="tschip" data-act="xpick" data-ref="'+ea(x.ref)+'" data-name="'+ea(x.name)+'">'+esc(x.name)+'</button>'}).join('')+'</div>';
+  else if(q&&!linked)h+='<div class="small muted" style="margin-top:8px">일치하는 일정·스팟이 없어요 · 내용만 저장돼요</div>';
+  return h;
+}
+function refreshXSug(){var sg=document.getElementById('x_sug');if(sg&&UI.expDraft)sg.innerHTML=xSugHtml(UI.expDraft)}
+function persistDraft(){
+  try{
+    var g=function(id){var x=document.getElementById(id);return x?x.value:null};
+    if(UI.sheet==='ev'&&UI.evDraft){var d=UI.evDraft;if(g('ev_title')!=null){d.title=g('ev_title');d.date=g('ev_date');d.time=g('ev_time');d.desc=g('ev_desc');d.map=g('ev_map');d.spot=g('ev_spot')||d.spot}lset('draft',{k:'ev',d:d,t:Date.now()})}
+    else if(UI.sheet==='exp'&&UI.expDraft){var x=UI.expDraft;if(g('x_amt')!=null){x.amt=g('x_amt');x.name=g('x_name');x.date=g('x_date');x.time=g('x_time')}lset('draft',{k:'exp',d:x,t:Date.now()})}
+  }catch(e){}
+}
+function clearDraft(){lset('draft',null)}
+function restoreDraft(){
+  var dft=lget('draft',null);
+  if(!dft||!M||Date.now()-dft.t>2*3600*1000){clearDraft();return}
+  if(dft.k==='ev'){UI.evDraft=dft.d;UI.sheet='ev'}else if(dft.k==='exp'){UI.expDraft=dft.d;UI.sheet='exp'}else return;
+  render();
 }
 function onClick(e){
+  var mc=e.target.closest&&e.target.closest('[data-mapcheck]');
+  if(mc){
+    var isSp=mc.getAttribute('data-mapcheck')==='sp';
+    var q0=isSp?((document.getElementById('sp_map').value||'').trim()||(document.getElementById('sp_name').value||'').trim()):((document.getElementById('ev_map').value||'').trim()||(document.getElementById('ev_title').value||'').trim());
+    if(!q0){e.preventDefault();toast('제목이나 검색어를 먼저 입력해 주세요');return}
+    if(!isSp)persistDraft();mc.href=mapUrl(q0);return;
+  }
   var el=e.target.closest('[data-act]');if(!el)return;
   var a=el.getAttribute('data-act'),v=el.getAttribute('data-v'),id=el.getAttribute('data-id');
-  if(a==='sheet-bg'){if(e.target===el){UI.sheet=null;render()}return}
+  if(a==='sheet-bg'){if(e.target===el){UI.sheet=null;UI.expDraft=null;UI.evDraft=null;clearDraft();render()}return}
   switch(a){
     case 'tab':UI.tab=v;lset('tab',v);render();document.getElementById('screen').scrollTop=0;break;
     case 'sheet':UI.sheet=v;render();break;
-    case 'sheet-close':UI.sheet=null;render();break;
+    case 'sheet-close':UI.sheet=null;UI.expDraft=null;UI.evDraft=null;clearDraft();render();break;
     case 'sync':pull(true).then(function(){toast('동기화했어요')});break;
     case 'date':UI.sched=v;render();break;
     case 'cond':UI.cond[el.getAttribute('data-date')]=v;render();break;
@@ -802,21 +906,81 @@ function onClick(e){
     case 'paid':{var arr=el.getAttribute('data-k')==='stay'?M.stays:M.expenses;arr.forEach(function(o){if(o.cid===id){o.d.paid=!o.d.paid;tiUp(el.getAttribute('data-k')==='stay'?'stay':'expense',o)}});render();break}
     case 'exp-new':openExp(null);break;
     case 'expedit':openExp(id);break;
+    case 'xpick':{
+      var xref=el.getAttribute('data-ref'),xnm=el.getAttribute('data-name');
+      if(UI.expDraft){
+        UI.expDraft.ref=xref;UI.expDraft.name=xnm;
+        var xin=document.getElementById('x_name');if(xin)xin.value=xnm;
+        var xi=refInfo(xref),guess=null;
+        if(xi&&xi.t==='spot'){var xsp=M.spots.filter(function(q){return q.cid===xi.cid})[0];if(xsp)guess=spotCatToEcat(xsp.d.cat)}
+        else if(xi&&xi.t==='event'){var xe=findEvent(xi.cid),xs=xe?spotOfEvent(xe):null;if(xs)guess=spotCatToEcat(xs.d.cat)}
+        if(guess){UI.expDraft.cat=guess;Array.prototype.forEach.call(document.querySelectorAll('[data-act="expcat"]'),function(b){var on=b.getAttribute('data-v')===guess;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on)})}
+        refreshXSug();persistDraft();
+      }
+      break}
+    case 'xunlink':{if(UI.expDraft){UI.expDraft.ref='';refreshXSug();persistDraft()}break}
     case 'expcat':{if(UI.expDraft)UI.expDraft.cat=v;Array.prototype.forEach.call(el.parentNode.querySelectorAll('.tsb'),function(b){var on=b===el;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on)});break}
     case 'exppay':{if(UI.expDraft)UI.expDraft.pay=v;Array.prototype.forEach.call(el.parentNode.querySelectorAll('.tsb'),function(b){var on=b===el;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on)});break}
     case 'expcur':{if(UI.expDraft)UI.expDraft.cur=v;Array.prototype.forEach.call(el.parentNode.querySelectorAll('.tsb'),function(b){var on=b===el;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on)});var sy=document.getElementById('x_sym');if(sy)sy.textContent=v==='KRW'?'₩':'¥';updateExpLine();break}
+    case 'payedit':{var parr=el.getAttribute('data-k')==='stay'?M.stays:M.expenses;var po=parr.filter(function(o){return o.cid===id})[0];if(po){UI.payDraft={k:el.getAttribute('data-k'),id:id,name:po.d.name,amt:String(po.d.amount),cur:po.d.currency==='JPY'?'JPY':'KRW',paid:!!po.d.paid};UI.sheet='pay';render()}break}
+    case 'paycur':{if(UI.payDraft)UI.payDraft.cur=v;Array.prototype.forEach.call(el.parentNode.querySelectorAll('.tsb'),function(b){var on=b===el;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on)});var ps=document.getElementById('p_sym');if(ps)ps.textContent=v==='KRW'?'₩':'¥';break}
+    case 'paystat':{if(UI.payDraft)UI.payDraft.paid=(v==='true');Array.prototype.forEach.call(el.parentNode.querySelectorAll('.tsb'),function(b){var on=b===el;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on)});break}
+    case 'pay-save':{
+      var pdr=UI.payDraft;if(!pdr)break;
+      var pa=parseInt((document.getElementById('p_amt').value||'').replace(/[^0-9]/g,''),10);
+      if(!pa){toast('금액을 입력해 주세요');break}
+      var pArr=pdr.k==='stay'?M.stays:M.expenses;var pObj=pArr.filter(function(o){return o.cid===pdr.id})[0];
+      if(pObj){pObj.d.amount=pa;pObj.d.currency=pdr.cur;pObj.d.paid=!!pdr.paid;tiUp(pdr.k==='stay'?'stay':'expense',pObj)}
+      UI.sheet=null;UI.payDraft=null;render();toast('저장했어요');break}
+    case 'pay-del':{var pd2=UI.payDraft;if(pd2&&pd2.k==='exp'){var po2=M.expenses.filter(function(o){return o.cid===pd2.id})[0];if(po2){M.expenses=M.expenses.filter(function(o){return o.cid!==pd2.id});tiDel(po2)}}UI.sheet=null;UI.payDraft=null;render();break}
     case 'exp-save':saveExp();break;
     case 'exp-del':{var ex=M.expenses.filter(function(x){return x.cid===id})[0];if(ex){M.expenses=M.expenses.filter(function(x){return x.cid!==id});tiDel(ex)}UI.sheet=null;UI.expDraft=null;render();break}
     case 'fxmode':{var f0=fxGet();if(v==='auto'){f0.auto=true;tiUp('trip',M.trip);fetchFx(true)}else{f0.auto=false;tiUp('trip',M.trip)}render();break}
     case 'spc':UI.spCity=v;render();break;
     case 'spcat':UI.spCat=v;render();break;
-    case 'sp-state':M.spots.forEach(function(s){if(s.cid===id){s.d.state=v;tiUp('spot',s)}});render();break;
+    case 'spedit':{
+      var spe=M.spots.filter(function(q){return q.cid===id})[0];
+      if(spe){UI.spDraft={id:spe.cid,name:spe.d.name,cat:spe.d.cat||'meal',city:spe.d.city,desc:spe.d.desc||'',map:(spe.d.map&&spe.d.map!==spe.d.name)?spe.d.map:''};UI.sheet='spedit';render()}
+      break}
+    case 'spcatpick':{if(UI.spDraft)UI.spDraft.cat=v;Array.prototype.forEach.call(el.parentNode.querySelectorAll('.tsb'),function(b){var on=b===el;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on)});break}
+    case 'spcitypick':{if(UI.spDraft)UI.spDraft.city=v;Array.prototype.forEach.call(el.parentNode.querySelectorAll('.tsb'),function(b){var on=b===el;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on)});break}
+    case 'spedit-save':{
+      var sdr=UI.spDraft;if(!sdr)break;
+      var sps=M.spots.filter(function(q){return q.cid===sdr.id})[0];if(!sps)break;
+      var nn=(document.getElementById('sp_name').value||'').trim();
+      if(!nn){toast('이름을 입력해 주세요');break}
+      var ndesc=(document.getElementById('sp_desc').value||'').trim(),nmap=(document.getElementById('sp_map').value||'').trim()||nn;
+      var oldName=sps.d.name,oldMap=sps.d.map;
+      if(nn!==oldName){
+        Object.keys(M.events).forEach(function(dk){M.events[dk].forEach(function(e){
+          var linkedByName=(e.d.title||'').trim()===oldName;
+          if(e.d.spot===sps.cid||linkedByName){
+            var chg=false;
+            if(linkedByName){e.d.title=nn;chg=true}
+            if(!e.d.spot){e.d.spot=sps.cid;chg=true}
+            if(e.d.map&&(e.d.map===oldMap||e.d.map===oldName)){e.d.map=nmap;chg=true}
+            if(chg)tiUp('event',e);
+          }
+        })});
+      }
+      sps.d.name=nn;sps.d.cat=sdr.cat;sps.d.city=sdr.city;sps.d.map=nmap;
+      if(ndesc)sps.d.desc=ndesc;else delete sps.d.desc;
+      tiUp('spot',sps);
+      UI.sheet=null;UI.spDraft=null;render();toast('저장했어요');break}
+    case 'sp-state':{
+      var spx=M.spots.filter(function(q){return q.cid===id})[0];
+      if(spx&&spotState(spx.d)!==v){
+        var prevSt=spx.d.state;spx.d.state=v;tiUp('spot',spx);render();
+        toastUndo('"'+spx.d.name+'" '+(v==='done'?'다녀옴':'갈 곳')+'으로 바꿨어요',function(){spx.d.state=prevSt;tiUp('spot',spx);render()});
+      }
+      break}
+    case 'undo':{var uf=UI.undoFn;UI.undoFn=null;document.getElementById('toast').innerHTML='';clearTimeout(UI.toastT);if(uf)uf();break}
     case 'sp-del':{var sp=M.spots.filter(function(x){return x.cid===id})[0];if(sp){M.spots=M.spots.filter(function(x){return x.cid!==id});tiDel(sp);render()}break}
     case 'sp-new':UI.addSpot=true;render();break;
     case 'sp-cancel':UI.addSpot=false;render();break;
     case 'sp-save':{
       var nm2=(document.getElementById('s_name').value||'').trim();if(!nm2){toast('이름을 입력해 주세요');break}
-      var so={cid:'spot_'+genCid(),date:null,sort:Date.now()%100000000,d:{city:UI.spCity,cat:document.getElementById('s_cat').value,name:nm2,desc:(document.getElementById('s_desc').value||'').trim(),state:'cand',map:nm2}};
+      var so={cid:'spot_'+genCid(),date:null,sort:Date.now()%100000000,d:{city:UI.spCity,cat:document.getElementById('s_cat').value,name:nm2,desc:(document.getElementById('s_desc').value||'').trim(),state:'go',map:(document.getElementById('s_map').value||'').trim()||nm2}};
       M.spots.push(so);tiUp('spot',so);UI.addSpot=false;render();break}
     case 'key-save':{
       var k=(document.getElementById('k_in').value||'').trim();if(!k){toast('키를 입력해 주세요');break}
@@ -828,10 +992,22 @@ function onClick(e){
     case 'evnew':openEv(null,el.getAttribute('data-date'));break;
     case 'evedit':openEv(id);break;
     case 'spot2ev':openEv(null,UI.sched||clampDate(today()),id);break;
+    case 'evpick':{
+      var psp=M.spots.filter(function(x){return x.cid===id})[0];
+      if(psp&&UI.evDraft){
+        UI.evDraft.spot=psp.cid;UI.evDraft.title=psp.d.name;
+        var pti=document.getElementById('ev_title'),pma=document.getElementById('ev_map'),pde=document.getElementById('ev_desc');
+        if(pti)pti.value=psp.d.name;
+        if(pma&&!pma.value.trim())pma.value=psp.d.map||psp.d.name;
+        if(pde&&!pde.value.trim())pde.value=psp.d.desc||'';
+        var pcs=({meal:'noon',cafe:'pm',sight:'pm',snack:'pm'})[psp.d.cat];
+        if(pcs&&!document.getElementById('ev_time').value){UI.evDraft.slot=pcs;Array.prototype.forEach.call(document.querySelectorAll('[data-act="evslot"]'),function(b){var on=b.getAttribute('data-v')===pcs;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on)})}
+        refreshSug();persistDraft();
+      }
+      break}
+    case 'evunlink':{if(UI.evDraft){UI.evDraft.spot='';refreshSug();persistDraft()}break}
     case 'evslot':{if(UI.evDraft)UI.evDraft.slot=v;Array.prototype.forEach.call(el.parentNode.querySelectorAll('.tsb'),function(b){var on=b===el;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on)});break}
-    case 'evcond':{if(UI.evDraft)UI.evDraft.cond=v;Array.prototype.forEach.call(el.parentNode.querySelectorAll('.tsb'),function(b){var on=b===el;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on)});break}
     case 'evmap':{if(UI.evDraft)UI.evDraft.mapOn=(v==='true');Array.prototype.forEach.call(el.parentNode.querySelectorAll('.tsb'),function(b){var on=b===el;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on)});break}
-    case 'evmapcheck':{var q=(document.getElementById('ev_map').value||'').trim()||(document.getElementById('ev_title').value||'').trim();if(!q){toast('제목이나 검색어를 먼저 입력해 주세요');break}window.open(mapUrl(q),'_blank');break}
     case 'ev-save':saveEv();break;
     case 'ev-del':{var ex2=findEvent(id);if(ex2){removeEvent(ex2);tiDel(ex2)}UI.sheet=null;UI.evDraft=null;render();toast('삭제했어요');break}
     case 'dprev':UI.vd=addDays(viewDate(),-1);render();break;
@@ -850,9 +1026,12 @@ function onClick(e){
       UI.vd=null;UI.sched=null;UI.sheet='trips';render();toast('저장했어요');break}
     case 'export':doExport();break;
   }
+  if(a==='evslot'||a==='evmap'||a==='expcat'||a==='exppay'||a==='expcur')persistDraft();
 }
 function onChange(e){
   var el=e.target;
+  if(el.id==='x_date'&&UI.expDraft){UI.expDraft.date=el.value;refreshXSug();persistDraft();return}
+  if(el.id==='ev_date'&&UI.evDraft){UI.evDraft.date=el.value;refreshSug();persistDraft();return}
   if(el.classList&&el.classList.contains('evtin')){
     var evx=findEvent(el.getAttribute('data-id'));
     if(evx&&evx.d.doneAt&&/^\d{1,2}:\d{2}$/.test(el.value)){evx.d.doneAt=setTimeOnly(evx.d.doneAt,el.value);tiUp('event',evx)}
@@ -890,7 +1069,7 @@ function onChange(e){
     var ri=refInfo(el.value),nin=document.getElementById('x_name');
     if(ri&&nin&&!nin.value.trim())nin.value=ri.name;
     if(UI.expDraft)UI.expDraft.ref=el.value;
-    return;
+    persistDraft();return;
   }
   if(el.hasAttribute('data-fxadj')){
     var ad=parseFloat(String(el.value).replace(',','.'));var ff=fxGet();
@@ -947,10 +1126,14 @@ function boot(){
   document.addEventListener('click',onClick);
   document.addEventListener('change',onChange);
   document.addEventListener('keydown',onKey);
-  document.addEventListener('input',function(e){var el=e.target;if(el&&el.id==='x_amt'){var n=parseInt(String(el.value).replace(/[^0-9]/g,''),10)||0;updateExpLine()}});
+  document.addEventListener('touchstart',onTouchStart,{passive:true});
+  document.addEventListener('touchend',onTouchEnd,{passive:true});
+  document.addEventListener('input',function(e){var el=e.target;if(el&&el.id==='x_amt'){var n=parseInt(String(el.value).replace(/[^0-9]/g,''),10)||0;updateExpLine()}if(el&&el.id==='ev_title'&&UI.evDraft){UI.evDraft.title=el.value;refreshSug()}if(el&&el.id==='x_name'&&UI.expDraft){UI.expDraft.name=el.value;refreshXSug()}if(el&&el.id&&(el.id.indexOf('ev_')===0||el.id.indexOf('x_')===0))persistDraft()});
   document.addEventListener('focusout',onBlur);
   loadTrip();
   render();
+  restoreDraft();
+  window.addEventListener('pageshow',function(e){if(e.persisted){render();pull()}});
   if(!cfg.key){UI.sheet='key';render()}
   else{
     loadTrips().then(function(){if(!M)loadTrip();render();return pull(true)});
@@ -962,6 +1145,6 @@ function boot(){
     navigator.serviceWorker.register('triplog-sw.js?v='+VER,{scope:'./'}).catch(function(){});
   }
 }
-window.__triplog={pull:pull,flush:flush,state:function(){return {UI:UI,M:M,CL:CL,Q:Q,cfg:cfg}},render:render};
+window.__triplog={periodOf:periodOf,pull:pull,flush:flush,state:function(){return {UI:UI,M:M,CL:CL,Q:Q,cfg:cfg}},render:render};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();
