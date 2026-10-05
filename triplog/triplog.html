@@ -126,10 +126,9 @@ select.fld{background:rgba(255,255,255,.7)}
 .chip.tsb.on{background:var(--sb,var(--sel-bg));border-color:var(--sbd,var(--sel-bd));color:var(--st,var(--sel-tx));font-weight:700}
 .tshead{font-size:11px;font-weight:700;color:var(--sub);letter-spacing:.04em;padding:10px 0 0}
 .ck .ct{border:0;background:transparent;font-size:12px;color:var(--sub);min-height:44px;padding:0 4px;font-variant-numeric:tabular-nums}
-.ck input.ctin{width:96px;height:36px;border:1px solid var(--sel-bd);border-radius:8px;background:rgba(255,255,255,.7);font-size:16px;padding:0 6px}
 .ckedit{border-bottom:1px solid var(--line);padding-bottom:10px}
 
-.day-btn{flex:1 0 38px;display:flex;flex-direction:column;align-items:center;gap:1px;padding:5px 0;border-radius:12px;border:1px solid rgba(255,210,200,.28);background:rgba(255,250,240,.5);color:var(--tx);transition:all .15s;min-height:44px}
+.day-btn{position:relative;flex:1 0 38px;display:flex;flex-direction:column;align-items:center;gap:1px;padding:5px 0;border-radius:12px;border:1px solid rgba(255,210,200,.28);background:rgba(255,250,240,.5);color:var(--tx);transition:all .15s;min-height:44px}
 .day-btn.sel{background:rgba(255,253,248,.9);border:1px solid rgba(230,185,110,.55);box-shadow:0 4px 14px rgba(0,0,0,.08),inset 0 1px 0 rgba(255,253,248,.7)}
 .day-name{font-size:12px;color:var(--sub)}
 .tl{position:relative;display:flex;flex-direction:column;gap:10px}
@@ -148,7 +147,6 @@ select.fld{background:rgba(255,255,255,.7)}
 .memoc .ti{margin-top:3px;color:var(--sub)}
 .memoc>span{flex:1;min-width:0}
 .memoc img{max-width:100%;border-radius:10px;display:block;margin-top:4px;flex-basis:100%}
-.ev input.evtin{height:36px;border:1px solid var(--sel-bd);border-radius:8px;background:rgba(255,255,255,.7);font-size:16px;padding:0 6px}
 
 .amtbox{display:flex;align-items:center;gap:8px;border:1.4px solid var(--cardb);border-radius:16px;background:var(--card);padding:6px 16px;box-shadow:var(--shadow)}
 .amtbox .yen{font-family:var(--serif);font-size:26px;color:var(--sub)}
@@ -167,8 +165,11 @@ select.fld{background:rgba(255,255,255,.7)}
 /* 날짜·시간 입력 겹침 방지 */
 .dt2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
 .dt2>div{min-width:0}
-.dt2 .fld{width:100%;min-width:0;max-width:100%;padding:0 10px;text-align:left}
-input[type=date].fld,input[type=time].fld{display:block;-webkit-appearance:none;appearance:none;min-width:0;max-width:100%;box-sizing:border-box}
+.dfld{position:relative;display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-width:0;height:44px;border:1px solid var(--inpb);border-radius:12px;background:var(--inp);padding:0 12px 0 14px;font-size:16px;color:var(--tx);overflow:hidden}
+.dfld .dv{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.dfld .dv.ph{color:var(--sub);opacity:.7}
+.dfld .dinp{position:absolute;top:0;left:0;width:100%;height:100%;margin:0;padding:0;border:0;opacity:0;-webkit-appearance:none;appearance:none;font-size:16px;background:transparent}
+.dfld.sm{width:104px;height:36px;border-radius:9px;border-color:var(--sel-bd);background:rgba(255,255,255,.7);font-size:15px;padding:0 8px 0 10px}
 /* 체크리스트 칩: 네모 · 존재감 낮게 / 시간대 색(본앱: 오전 yellow · 오후 rose · 저녁 lavender) */
 :root{--c-morning:rgb(135,99,0);--c-afternoon:rgb(142,51,51);--c-night:rgb(120,69,139)}
 .tschip{border-radius:7px;min-height:34px;padding:0 11px;font-size:13px;font-weight:400;background:transparent;border:1px solid var(--line);color:var(--sub);cursor:pointer;display:inline-flex;align-items:center;white-space:nowrap}
@@ -180,11 +181,12 @@ input[type=date].fld,input[type=time].fld{display:block;-webkit-appearance:none;
 .tshead.ts-morning{color:var(--c-morning)}
 .tshead.ts-afternoon{color:var(--c-afternoon)}
 .tshead.ts-night{color:var(--c-night)}
-.ck.ro .ct{display:inline-block;padding:0 4px;font-size:12px;color:var(--sub);font-variant-numeric:tabular-nums}
+.ck.ro .ct{display:flex;align-items:center;min-height:44px;padding:0 4px;font-size:12px;color:var(--sub);font-variant-numeric:tabular-nums}
 .ck.ro input[type=checkbox]:disabled{opacity:1}
 /* 일정 탭: 월~일 주 단위 + 가로바 */
 .wk{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
 .wk .day-btn{flex:none;min-height:62px;padding:7px 0 5px;gap:0;align-items:center}
+.dbadge{position:absolute;top:-6px;right:-4px;box-shadow:0 0 0 2px #f6f3ee;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:rgba(160,105,180,.88);color:#fff;font-size:10px;font-weight:700;line-height:16px;text-align:center}
 .dbar{display:block;width:22px;height:3px;border-radius:2px;margin-bottom:5px}
 .dnumc{font-size:15px;font-weight:500;color:var(--tx);line-height:1.2}
 .dnumc.today-num{color:rgba(180,90,90,.9)}
@@ -196,8 +198,6 @@ input[type=date].fld,input[type=time].fld{display:block;-webkit-appearance:none;
 .ev button.evt.done{color:var(--sel-tx);-webkit-text-fill-color:var(--sel-tx);cursor:pointer}
 .fxtap{background:transparent;border:0;color:var(--sub);font-size:12px;display:inline-flex;align-items:center;gap:3px;min-height:36px;padding:0}
 
-/* 오늘 날짜 그라데이션 (비행기 창 노을 톤: rose → yellow → lavender) */
-.dgr.on{background:linear-gradient(100deg,#cf5f58 0%,#d98a1f 48%,#8f5bb5 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;filter:drop-shadow(0 2px 6px rgba(217,138,31,.16))}
 
 @keyframes slideL{from{transform:translateX(26px);opacity:.3}to{transform:none;opacity:1}}
 @keyframes slideR{from{transform:translateX(-26px);opacity:.3}to{transform:none;opacity:1}}
@@ -207,9 +207,9 @@ input[type=date].fld,input[type=time].fld{display:block;-webkit-appearance:none;
 
 /* 다음 일정 배너: 시간대별 파스텔 그라데이션 (아침 07–12 · 오후 12–18 · 밤 18–24/00–07) */
 .card.bn{border:1.4px solid transparent;background-origin:border-box;box-shadow:0 6px 16px rgba(150,140,120,.16);color:var(--bn-t)}
-.card.bn-morning{--bn-t:#44502a;--bn-s:#5a6638;background:linear-gradient(135deg,#e4f3d6 0%,#fff2c2 52%,#ffe1cc 100%)}
-.card.bn-afternoon{--bn-t:#6a3a30;--bn-s:#7a4a3e;background:linear-gradient(135deg,#ffe3c9 0%,#fbcfd6 52%,#e7d3f0 100%)}
-.card.bn-night{--bn-t:#33305f;--bn-s:#463f78;background:linear-gradient(135deg,#bfc8ec 0%,#d5c5ea 52%,#f1cde0 100%)}
+.card.bn-morning{--bn-t:#5f3e1f;--bn-s:#7a5530;background:linear-gradient(135deg,rgba(255,205,175,.72),rgba(255,235,180,.55)),rgba(255,253,248,.5)}
+.card.bn-afternoon{--bn-t:#6e3447;--bn-s:#86495c;background:linear-gradient(135deg,rgba(255,220,235,.65),rgba(255,235,200,.6)),rgba(255,253,248,.5)}
+.card.bn-night{--bn-t:#3d3470;--bn-s:#51478a;background:linear-gradient(135deg,rgba(225,215,250,.65),rgba(255,210,230,.55)),rgba(255,253,248,.5)}
 .card.bn .ctitle b{color:var(--bn-t)}
 .card.bn .ctitle .cinfo{color:var(--bn-t);font-weight:700}
 .card.bn .btn,.card.bn .ibtn{background:rgba(255,253,248,.72);border-color:transparent;color:var(--bn-t)}
@@ -219,6 +219,6 @@ input[type=date].fld,input[type=time].fld{display:block;-webkit-appearance:none;
 <div id="bg-fixed"></div>
 <div id="app"><div id="topsafe"></div><div id="pin"></div><main id="screen"></main><nav id="tabbar" aria-label="하단 탭"></nav></div>
 <div id="sheet"></div><div id="toast"></div>
-<script src="triplog.js?v=2026.10.06-12"></script>
+<script src="triplog.js?v=2026.10.06-13"></script>
 </body>
 </html>
