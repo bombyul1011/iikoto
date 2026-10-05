@@ -1,0 +1,10 @@
+{
+  "name": "triplog",
+  "short_name": "triplog",
+  "start_url": "./triplog.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#faf8ee",
+  "theme_color": "#faf8ee",
+  "lang": "ko"
+}
