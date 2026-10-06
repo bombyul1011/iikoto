@@ -41,7 +41,7 @@ input,select,textarea{font:inherit;font-size:16px;color:var(--tx)}
 a{color:var(--sel-tx)}
 #app{position:relative;z-index:1;max-width:480px;margin:0 auto;height:100vh;height:-webkit-fill-available;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
 #topsafe{height:env(safe-area-inset-top);flex:none}
-#pin{flex:none;padding:12px 20px 0;display:flex;flex-direction:column;gap:14px}
+#pin{flex:none;padding:12px 20px 0;display:flex;flex-direction:column;gap:8px}
 #pin:empty{display:none}
 #pin>*{flex:none}
 #screen{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:12px 20px 24px;display:flex;flex-direction:column;gap:14px}
@@ -55,7 +55,9 @@ h1 .hl{background:linear-gradient(transparent 62%,var(--hl) 62%);padding:0 3px;m
 .bdg{display:inline-flex;align-items:center;justify-content:center;border-radius:30%;flex:none}
 h1{margin:0;font-family:var(--serif);font-size:28px;font-weight:700;line-height:1.2}
 .sub{font-size:13px;color:var(--sub);margin-top:4px}
-.titlebar{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;min-height:44px}
+.titlebar{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;min-height:34px;margin-top:-4px}
+.titlebar .syncst{min-height:0;padding-bottom:3px}
+.titlebar .prebtn{margin:-6px 0 -4px}  /* 터치 영역(44px)은 유지하고 줄 높이에는 덜 반영 */
 .fab{width:46px;height:46px;flex:none;border-radius:50%;border:1px solid var(--yel-bd);background:var(--yel-bg);color:var(--yel-tx);display:flex;align-items:center;justify-content:center;padding:0;box-shadow:0 3px 10px rgba(235,180,20,.25)}
 .card{background:var(--card);border:1.4px solid var(--cardb);border-radius:18px;padding:16px;box-shadow:var(--shadow)}
 .card.sm{padding:12px}
@@ -124,7 +126,8 @@ select.fld{background:rgba(255,255,255,.7)}
 .mrow:last-child{border-bottom:0}
 .mrow .mt{width:44px;flex:none;font-size:12px;font-weight:700;color:var(--sub);font-variant-numeric:tabular-nums;padding-top:3px}
 .mrow .mb{flex:1;min-width:0;font-size:14px;line-height:1.55}
-.mrow .mb img{max-width:100%;border-radius:12px;margin-top:8px;display:block}
+.mrow .mb.mpw{display:flex;gap:10px;align-items:flex-start}
+.mtx{flex:1;min-width:0}
 .tsc{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
 .tsc.hscroll{flex-wrap:nowrap;overflow-x:auto;padding:2px;margin-left:-2px;margin-right:-2px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .tsc.hscroll::-webkit-scrollbar{display:none}
@@ -154,7 +157,6 @@ select.fld{background:rgba(255,255,255,.7)}
 .memoc{display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap;padding:9px 12px;border-radius:12px;border:1px dashed var(--cardb);background:rgba(255,253,248,.35);font-size:13px;line-height:1.5;color:var(--tx)}
 .memoc .ti{margin-top:3px;color:var(--sub)}
 .memoc>span{flex:1;min-width:0}
-.memoc img{max-width:100%;border-radius:10px;display:block;margin-top:4px;flex-basis:100%}
 
 .amtbox{display:flex;align-items:center;gap:8px;border:1.4px solid var(--cardb);border-radius:16px;background:var(--card);padding:6px 16px;box-shadow:var(--shadow)}
 .amtbox .yen{font-family:var(--serif);font-size:26px;color:var(--sub)}
@@ -245,6 +247,28 @@ input:focus,textarea:focus,select:focus{outline:none;box-shadow:none}
 .tbr1 .syncst{min-height:34px}
 .tbw{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--sub);white-space:nowrap;min-height:26px;margin-top:-4px}
 
+/* 사진 메모: 본앱과 같은 작은 정사각 썸네일(탭하면 폴라로이드로 크게) */
+.mph{position:relative;display:block;flex:none;width:52px;height:52px;border-radius:8px;overflow:hidden;background:rgba(210,190,175,.2)}
+.mphb{position:absolute;inset:0;width:100%;height:100%;border:0;padding:0;background:transparent;display:block}
+.mphb .ti{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:var(--sub);transition:opacity .2s}
+.mphb .ti.hide{opacity:0}
+.mphi{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .25s ease}
+.mphi.loaded{opacity:1}
+.pstrip{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 -20px;padding:2px 20px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
+.pstrip::-webkit-scrollbar{display:none}
+.pstrip .mph{border-radius:10px;scroll-snap-align:start}
+.memoc .mph{width:44px;height:44px}
+.pv{position:fixed;inset:0;z-index:40;display:none;align-items:center;justify-content:center;padding:20px;background-image:linear-gradient(rgba(30,20,18,.82),rgba(30,20,18,.82))}
+.pv.on{display:flex}
+.pvcard{width:100%;max-width:330px;max-height:88vh;display:flex;flex-direction:column}
+.pvframe{position:relative;width:100%;background:#fffdf9;border-radius:6px;padding:12px 12px 18px;box-shadow:0 8px 28px rgba(0,0,0,.35);transform:rotate(-.6deg);overflow-y:auto}
+.pvimgw{position:relative;width:100%;aspect-ratio:1/1;border-radius:3px;overflow:hidden;background:#000}
+.pvimg{width:100%;height:100%;display:block;object-fit:cover}
+.pvx{position:absolute;top:10px;right:10px;width:30px;height:30px;border-radius:15px;border:0;background:rgba(30,20,18,.45);color:#fdf3ec;display:flex;align-items:center;justify-content:center;z-index:2;padding:0}
+.pvmeta{padding-top:12px;text-align:center}
+.pvdate{font-size:12px;color:var(--sub);letter-spacing:.04em;margin-bottom:8px}
+.pvtext{font-family:var(--serif);font-size:14px;line-height:1.65;color:var(--tx);word-break:keep-all;white-space:pre-wrap}
+
 @keyframes slideL{from{transform:translateX(26px);opacity:.3}to{transform:none;opacity:1}}
 @keyframes slideR{from{transform:translateX(-26px);opacity:.3}to{transform:none;opacity:1}}
 .wk.slide-l{animation:slideL .22s ease-out}
@@ -308,7 +332,7 @@ input:focus,textarea:focus,select:focus{outline:none;box-shadow:none}
 <body>
 <div id="bg-fixed"></div>
 <div id="app"><div id="topsafe"></div><div id="pin"></div><main id="screen"></main><nav id="tabbar" aria-label="하단 탭"></nav></div>
-<div id="sheet"></div><div id="toast"></div><div id="picker"></div>
-<script src="iitabi.js?v=2026.10.06-27"></script>
+<div id="sheet"></div><div id="toast"></div><div id="picker"></div><div id="pv" class="pv"></div>
+<script src="iitabi.js?v=2026.10.06-30"></script>
 </body>
 </html>

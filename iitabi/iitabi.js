@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-var VER='2026.10.06-27';
+var VER='2026.10.06-30';
 var SUPA_URL='https://vqvpzrxmtpryzhontlxc.supabase.co';
 var SUPA_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdnB6cnhtdHByeXpob250bHhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTgxMjksImV4cCI6MjA5NjYzNDEyOX0.pbtq1UMPC7ylYM1H2xVa19C1TFlceLmEfEtkz3WK2VI';
 var LSP='iitabi:';
@@ -132,12 +132,12 @@ function sf(path,method,body,prefer){
   if(prefer)h['Prefer']=prefer;
   return fetch(SUPA_URL+'/rest/v1/'+path,{method:method||'GET',headers:h,body:body?JSON.stringify(body):undefined}).then(function(r){
     if(!r.ok)return r.text().then(function(t){console.warn('iitabi supa',r.status,path,t);return null});
-    if(method&&method!=='GET')return true;
+    if(method&&method!=='GET')return (prefer&&prefer.indexOf('return=representation')>=0)?r.json():true;
     return r.json();
   }).catch(function(){return null});
 }
 /* 큐: 전송 중인 작업(inflight)은 끝난 뒤 자기 자신만 큐에서 빠진다. 같은 대상의 새 작업은 그 뒤에 쌓인다. */
-var flushing=false,inflight=null;
+var flushing=false,inflight=null,needPull=false;
 function qWaiting(t,cid,op){return Q.some(function(o){return o!==inflight&&o.t===t&&o.cid===cid&&o.op===op})}
 function qDrop(fn){Q=Q.filter(function(o){return o===inflight||!fn(o)})}
 function tiUp(kind,o){
@@ -180,13 +180,17 @@ function flush(){
       if(!it)p=Promise.resolve(true);
       else p=sf('todos?on_conflict=date_key,client_id','POST',[{date_key:clDate(clKey(it)),text:it.t,done:!!it.done,created:it.created,client_id:it.id,time_section:it.ts||'none',cat:'todo',completed_at:it.done?(it.completedAt||Date.now()):null,is_event:false}],'resolution=ignore-duplicates,return=minimal');
     }else if(op.t==='td'&&op.op==='upd'){
-      p=sf('todos?client_id=eq.'+enc(op.cid)+'&date_key=eq.'+op.date,'PATCH',op.f,'return=minimal');
+      p=sf('todos?client_id=eq.'+enc(op.cid),'PATCH',op.f,'return=representation').then(function(rows){
+        if(rows===null)return null;                     // 네트워크 실패 → 큐에 남겨 재시도
+        if(Array.isArray(rows)&&!rows.length)needPull=true;  // 서버에 그 항목이 없음(본앱에서 삭제·이동) → 서버 기준으로 다시 맞춤
+        return true;
+      });
     }else if(op.t==='td'&&op.op==='del'){
-      p=sf('todos?client_id=eq.'+enc(op.cid)+'&date_key=eq.'+op.date,'DELETE');
+      p=sf('todos?client_id=eq.'+enc(op.cid),'DELETE');
     }else p=Promise.resolve(true);
     return p.then(function(ok){inflight=null;if(!ok)return;var i=Q.indexOf(op);if(i>=0)Q.splice(i,1);saveQ();return next()});
   }
-  function end(){flushing=false;inflight=null;setStatus()}
+  function end(){flushing=false;inflight=null;setStatus();if(needPull&&!Q.length){needPull=false;pull(true)}}
   return next().then(end,end);
 }
 function renderSafe(){if(!typing())render()}
@@ -336,13 +340,29 @@ function topBar(){
 }
 function bar(p){return '<div class="bar"><i style="width:'+Math.max(0,Math.min(100,p))+'%"></i></div>'}
 function memosOf(d){return MEMOS.filter(function(m){return m.date_key===d})}
+function hasPhoto(m){return !!(m.photo_url&&/^https?:/.test(m.photo_url))}
+function photoThumb(m,size){
+  return '<span class="mph" style="'+(size?'width:'+size+'px;height:'+size+'px':'')+'"><button class="mphb" data-act="photo" data-id="'+ea(m.client_id||'')+'" aria-label="사진 크게 보기">'+ic('photo',20)+'<img class="mphi" loading="lazy" decoding="async" alt="" src="'+ea(m.photo_url)+'"></button></span>';
+}
+function memoText(m){return (m.question?'<div class="small muted" style="margin-bottom:2px">'+esc(m.question)+'</div>':'')+(m.text?esc(m.text).replace(/\n/g,'<br>'):(hasPhoto(m)?'<span class="muted">사진</span>':''))}
 function memoHtml(list){
   if(!list.length)return '<div class="small muted">iikoto에서 쓴 메모가 여기에 시간순으로 보여요. (읽기 전용)</div>';
   return list.slice().sort(byMemoTime).map(function(m){
-    var img=m.photo_url&&/^https?:/.test(m.photo_url)?'<img loading="lazy" alt="메모 사진" src="'+ea(m.photo_url)+'">':'';
-    return '<div class="mrow"><div class="mt">'+esc(m.memo_time||'')+'</div><div class="mb">'+(m.question?'<div class="small muted" style="margin-bottom:2px">'+esc(m.question)+'</div>':'')+esc(m.text||'').replace(/\n/g,'<br>')+img+'</div></div>';
+    return '<div class="mrow"><div class="mt">'+esc(m.memo_time||'')+'</div>'+(hasPhoto(m)?'<div class="mb mpw">'+photoThumb(m)+'<span class="mtx">'+memoText(m)+'</span></div>':'<div class="mb">'+memoText(m)+'</div>')+'</div>';
   }).join('');
 }
+function onThumb(e){var t=e.target;if(!t||!t.classList||!t.classList.contains('mphi'))return;if(e.type==='load')t.classList.add('loaded');var p=t.parentNode.querySelector('.ti');if(p)p.classList.add('hide')}
+function photoStrip(vd){
+  var ps=memosOf(vd).filter(hasPhoto).sort(byMemoTime);if(!ps.length)return '';
+  return card(ctitle('사진',ps.length+'장',['photo','sky'])+'<div class="pstrip">'+ps.map(function(m){return photoThumb(m,72)}).join('')+'</div>','flat');
+}
+function showPhoto(m){
+  var el=document.getElementById('pv');
+  var meta=md(m.date_key)+' '+wd(m.date_key)+(m.memo_time?' · '+m.memo_time:'');
+  el.innerHTML='<div class="pvcard" data-act="pvkeep"><div class="pvframe"><div class="pvimgw"><button class="pvx" data-act="pvclose" aria-label="닫기">'+ic('x',16)+'</button><img class="pvimg" alt="" src="'+ea(m.photo_url)+'"></div><div class="pvmeta"><div class="pvdate">'+esc(meta)+'</div><div class="pvtext">'+esc(m.text||'')+'</div></div></div></div>';
+  el.setAttribute('data-act','pvclose');el.className='pv on';
+}
+function closePhoto(){var el=document.getElementById('pv');el.className='pv';el.innerHTML='';el.removeAttribute('data-act')}
 function toast(t){var el=document.getElementById('toast');el.innerHTML='<div class="toast">'+esc(t)+'</div>';clearTimeout(UI.toastT);UI.toastT=setTimeout(function(){el.innerHTML=''},2200)}
 function toastUndo(t,fn){var el=document.getElementById('toast');UI.undoFn=fn;el.innerHTML='<div class="toast"><span>'+esc(t)+'</span><button class="tundo" data-act="undo">되돌리기</button></div>';clearTimeout(UI.toastT);UI.toastT=setTimeout(function(){el.innerHTML='';UI.undoFn=null},5000)}
 
@@ -415,8 +435,7 @@ function evRow(e,cc){
   return '<div class="ev" style="--cc:'+cc[1]+'">'+tcol+'<button class="evdot" data-act="evck" data-id="'+ea(e.cid)+'" aria-pressed="'+done+'" aria-label="'+ea(d.title)+' 완료"><span class="dotv"></span></button><div class="c"><div class="card sm'+(done?' evdone':'')+'">'+evBody(e)+'</div></div></div>';
 }
 function memoEv(m){
-  var img=m.photo_url&&/^https?:/.test(m.photo_url)?'<img loading="lazy" alt="메모 사진" src="'+ea(m.photo_url)+'">':'';
-  return '<div class="ev mev"><button class="evt" disabled tabindex="-1" aria-hidden="true">'+esc(m.memo_time||'')+'</button><span class="evdot memodot"><span class="mdot"></span></span><div class="c"><div class="memoc">'+ic('notes',14)+'<span>'+esc(m.text||'').replace(/\n/g,'<br>')+'</span>'+img+'</div></div></div>';
+  return '<div class="ev mev"><button class="evt" disabled tabindex="-1" aria-hidden="true">'+esc(m.memo_time||'')+'</button><span class="evdot memodot"><span class="mdot"></span></span><div class="c"><div class="memoc">'+(hasPhoto(m)?photoThumb(m,44):ic('notes',14))+'<span>'+memoText(m)+'</span></div></div></div>';
 }
 function effTimes(ev){
   var def={am:'09:00',noon:'12:00',pm:'15:00',eve:'19:00'},prev='00:00',out=[];
@@ -498,6 +517,7 @@ function screenToday(){
   var exs=localList().filter(function(x){return x.d.date===vd}).sort(byTimeDesc);
   h+=card(ctitle('지출',exs.length?sumLabel(sumInfo(exs)):'',['wallet','mint'])+(exs.length?exs.slice(0,3).map(function(x){return expRow(x,true)}).join('')+(exs.length>3?'<div class="small muted" style="padding-top:6px">외 '+(exs.length-3)+'건 · 경비 탭에서 전체 보기</div>':''):'<div class="small muted">아직 지출 기록이 없어요.</div>'),'flat');
   h+=card(ctitle('메모',null,['notes','rose'])+memoHtml(memosOf(vd)),'flat');
+  h+=photoStrip(vd);
   return h;
 }
 function weekStrip(d,act,badge){
@@ -521,7 +541,6 @@ function screenSched(){
   var s=stayOf(d),cid=cityOfDate(d);
   h+='<div class="row" style="min-height:44px">'+cityChip(cid)+(s?'<span class="grow small muted">'+esc(s.d.name)+' · '+md(s.d.checkin)+' – '+md(s.d.checkout)+'</span>':'<span class="grow"></span>')+(s?icoMap(s.d.map||s.d.name):'')+'</div>';
   var note=(t.dayNotes||{})[d];if(note)h+='<div>'+chip(esc(note),'pn')+'</div>';
-  var w=wxOf(d);if(w)h+='<div class="small muted">'+(w.sun?'맑음 예상':'흐림 예상')+' · '+Math.round(w.tmax)+'°/'+Math.round(w.tmin)+'°'+(w.pp!=null?' · 강수 '+w.pp+'%':'')+'</div>';
   h+=timelineHtml(d);
   h+='<button class="btn" style="width:100%" data-act="evnew" data-date="'+d+'">'+ic('plus',16)+'일정 추가</button>';
   slotsOf(d).forEach(function(sl){h+=slotUi(d,sl)});
@@ -1019,6 +1038,9 @@ function onClick(e){
     case 'sync':pull(true).then(function(){toast('동기화했어요')});break;
     case 'date':UI.sched=v;render();break;
     case 'cdate':UI.clDate=v;UI.clPre=false;render();break;
+    case 'photo':{var pm=MEMOS.filter(function(x){return x.client_id===id})[0];if(pm&&hasPhoto(pm))showPhoto(pm);break}
+    case 'pvclose':closePhoto();break;
+    case 'pvkeep':break;
     case 'clpre':UI.clPre=!UI.clPre;render();break;
     case 'goiikoto':window.location.href='https://bombyul1011.github.io/iikoto/';break;  // 채움로그와 같은 방식: 같은 창에서 본앱으로 이동
     case 'pick':{
@@ -1233,6 +1255,8 @@ function doImport(file){
 /* ---------- boot ---------- */
 function boot(){
   document.addEventListener('click',onClick);
+  // 이미지 load/error는 버블링하지 않아 캡처로 받는다(썸네일 페이드인)
+  document.addEventListener('load',onThumb,true);document.addEventListener('error',onThumb,true);
   document.addEventListener('change',onChange);
   document.addEventListener('keydown',onKey);
   document.addEventListener('touchstart',onTouchStart,{passive:true});
