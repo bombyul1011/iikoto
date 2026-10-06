@@ -210,13 +210,9 @@ select.fld{background:rgba(255,255,255,.7)}
 .fxtap{background:transparent;border:0;color:var(--sub);font-size:12px;display:inline-flex;align-items:center;gap:3px;min-height:36px;padding:0}
 
 /* 상단바(여행명 · 기간 · DAY · 동기화 · 이이코토) / 평평한 섹션 / 카드 없는 타임라인 */
-.topbar{display:flex;align-items:center;gap:5px;min-height:44px;margin:-8px 0 -6px}
-.tbn{flex:1;min-width:0;display:flex;align-items:center;gap:2px;border:0;background:transparent;padding:0;min-height:44px;font-weight:700;font-size:14px;text-align:left}
-.tbn .tbt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.tbn .ti{flex:none}
 .tbd{flex:none;font-size:12px;color:var(--sub);white-space:nowrap;font-variant-numeric:tabular-nums}
 .syncst.ico{font-size:0;gap:0;width:22px;min-width:22px;justify-content:center;flex:none}
-.tbi{flex:none;width:26px;height:44px;border:0;background:transparent;padding:0;margin-right:-4px;display:flex;align-items:center;justify-content:center}
+.tbi{flex:none;width:26px;height:34px;border:0;background:transparent;padding:0;margin-right:-4px;display:flex;align-items:center;justify-content:center}
 .card.flat{background:transparent;border:0;border-top:1px solid var(--line);border-radius:0;box-shadow:none;padding:14px 0 0}
 .card.sm.flat{padding:12px 0 0}
 .tl{gap:4px}
@@ -241,6 +237,17 @@ select.fld{background:rgba(255,255,255,.7)}
 input,textarea,select,button,a{outline:none;-webkit-tap-highlight-color:transparent}
 input:focus,textarea:focus,select:focus{outline:none;box-shadow:none}
 .addrow input:focus,.fld:focus,input.edit:focus{border-color:var(--sel-bd)}
+
+.topbar{display:flex;align-items:stretch;justify-content:space-between;gap:10px;margin:-6px 0 -4px}
+.tbl{display:flex;flex-direction:column;justify-content:space-between;min-width:0;flex:1}
+.tblogo{height:26px;width:auto;align-self:flex-start;display:block;margin-top:4px;cursor:pointer}
+.tbn{min-width:0;display:flex;align-items:center;gap:2px;border:0;background:transparent;padding:0;min-height:34px;font-weight:700;font-size:14px;text-align:left}
+.tbn .tbt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tbn .ti{flex:none}
+.tbr{display:flex;flex-direction:column;align-items:flex-end;justify-content:space-between;flex:none}
+.tbr1{display:flex;align-items:center;gap:6px;min-height:36px}
+.tbr1 .syncst{min-height:34px}
+.tbw{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--sub);white-space:nowrap;min-height:34px}
 
 @keyframes slideL{from{transform:translateX(26px);opacity:.3}to{transform:none;opacity:1}}
 @keyframes slideR{from{transform:translateX(-26px);opacity:.3}to{transform:none;opacity:1}}
@@ -301,6 +308,6 @@ input:focus,textarea:focus,select:focus{outline:none;box-shadow:none}
 <div id="bg-fixed"></div>
 <div id="app"><div id="topsafe"></div><div id="pin"></div><main id="screen"></main><nav id="tabbar" aria-label="하단 탭"></nav></div>
 <div id="sheet"></div><div id="toast"></div><div id="picker"></div>
-<script src="iitabi.js?v=2026.10.06-20"></script>
+<script src="iitabi.js?v=2026.10.06-21"></script>
 </body>
 </html>
