@@ -1,13 +1,13 @@
 (function(){
 'use strict';
-var VER='2026.10.06-30';
+var VER='2026.10.06-31';
 var SUPA_URL='https://vqvpzrxmtpryzhontlxc.supabase.co';
 var SUPA_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdnB6cnhtdHByeXpob250bHhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTgxMjksImV4cCI6MjA5NjYzNDEyOX0.pbtq1UMPC7ylYM1H2xVa19C1TFlceLmEfEtkz3WK2VI';
 var LSP='iitabi:';
 try{Object.keys(localStorage).forEach(function(k){if(k.indexOf('triplog:')===0&&localStorage.getItem('iitabi:'+k.slice(8))==null)localStorage.setItem('iitabi:'+k.slice(8),localStorage.getItem(k))})}catch(e){}  // 이름 변경 전 저장값을 한 번 옮겨 온다
 function lget(k,d){try{var v=localStorage.getItem(LSP+k);return v==null?d:JSON.parse(v)}catch(e){return d}}
 function lset(k,v){try{localStorage.setItem(LSP+k,JSON.stringify(v))}catch(e){}}
-/* 색 팔레트: [글자, 배경, 진한색, 테두리]. 도시·분류·탭 색이 전부 여기서 나온다 */
+/* 색 팔레트: [글자, 배경, 진한색, 테두리] — 도시·분류·탭 색의 단일 출처 */
 var PAL={
   rose:['rgb(142,51,51)','rgba(230,126,126,.52)','rgba(205,95,95,.85)','rgba(205,95,95,.55)'],
   sky:['rgb(41,97,130)','rgba(170,208,228,.55)','rgba(75,145,180,.85)','rgba(75,145,180,.55)'],
