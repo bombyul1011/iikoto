@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-var VER='2026.10.06-34';
+var VER='2026.10.06-35';
 var SUPA_URL='https://vqvpzrxmtpryzhontlxc.supabase.co';
 var SUPA_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdnB6cnhtdHByeXpob250bHhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTgxMjksImV4cCI6MjA5NjYzNDEyOX0.pbtq1UMPC7ylYM1H2xVa19C1TFlceLmEfEtkz3WK2VI';
 var LSP='iitabi:';
@@ -490,9 +490,9 @@ function screenToday(){
   var ev=eventsOf(vd),next=nextEventOf(vd);
   if(next){
     var d=next.d;
-    var tm=d.time?ic('clock',13)+' '+esc(d.time):esc(SLOTL[d.slot]||'');
+    var ckb=d.done?'<span class="bnck on" aria-label="완료한 일정">'+ic('check',17)+'</span>':'<button class="bnck" data-act="bnck" data-id="'+ea(next.cid)+'" aria-label="'+ea(d.title)+' 완료">'+ic('check',17)+'</button>';
     var per=periodOf(d.time||SLOTDEF[d.slot]||'12:00');
-    h+='<div class="card bn bn-'+per+'">'+ctitle('다음 일정',tm)+'<div style="font-family:var(--serif);font-size:19px;font-weight:700;line-height:1.3;color:var(--bn-t)">'+esc(d.title)+'</div>'+(d.desc?'<div style="font-size:13px;color:var(--bn-s);margin-top:5px;line-height:1.5">'+esc(d.desc)+'</div>':'')+
+    h+='<div class="card bn bn-'+per+'">'+ctitle('다음 일정',ckb)+'<div style="font-family:var(--serif);font-size:19px;font-weight:700;line-height:1.3;color:var(--bn-t)">'+esc(d.title)+'</div>'+(d.desc?'<div style="font-size:13px;color:var(--bn-s);margin-top:5px;line-height:1.5">'+esc(d.desc)+'</div>':'')+
       ((d.map)?'<div class="row" style="margin-top:14px"><a class="btn" style="flex:1;text-decoration:none" href="'+ea(mapUrl(d.map))+'" target="_blank" rel="noopener">'+ic('pin',17)+'지도에서 열기</a>'+(d.nav?'<a class="ibtn" aria-label="길찾기(대중교통)" href="'+ea(navUrl(d.map))+'" target="_blank" rel="noopener">'+ic('nav',20)+'</a>':'')+'</div>':'')+'</div>';
   }
   var w=wxOf(vd),conds=ev.filter(function(e){return e.d.cond});
@@ -1187,6 +1187,13 @@ function onClick(e){
       loadTrips().then(function(){loadTrip();return pull(true)}).then(function(){render();toast(M?'불러왔어요':'데이터를 찾지 못했어요')});break}
     case 'trip-open':{cfg.tripId=id;lset('cfg',cfg);UI.sheet=null;loadTrip();render();pull(true);break}
     case 'evck':{var ev0=findEvent(id);if(ev0){ev0.d.done=!ev0.d.done;if(ev0.d.done)ev0.d.doneAt=Date.now();else{delete ev0.d.doneAt}tiUp('event',ev0);render()}break}
+    case 'bnck':{
+      var bev=findEvent(id);
+      if(bev&&!bev.d.done){
+        bev.d.done=true;bev.d.doneAt=Date.now();tiUp('event',bev);render();
+        toastUndo('"'+bev.d.title+'" 완료했어요',function(){bev.d.done=false;delete bev.d.doneAt;tiUp('event',bev);render()});
+      }
+      break}
     case 'evtime':{var evt=findEvent(id);if(evt&&evt.d.doneAt)openPicker('time',hhmm(evt.d.doneAt),'완료 시각',function(val){var e2=findEvent(id);if(e2&&val){e2.d.doneAt=setTimeOnly(e2.d.doneAt,val);tiUp('event',e2);render()}});break}
     case 'evnew':openEv(null,el.getAttribute('data-date'));break;
     case 'evedit':openEv(id);break;
