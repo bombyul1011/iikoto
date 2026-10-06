@@ -1187,8 +1187,8 @@ function _prevAndCarriedContents(mk){
   return out;
 }
 function getPrevContentsWithCarry(mk){return _prevAndCarriedContents(mk).map(x=>x.c);}
-// mk 월 화면용 — 그 달에 저장된 콘텐츠 + 전월 전체 + 이전 달에서 이월되는 콘텐츠(중복 제거).
-// 콘텐츠는 "시작한 달"에 저장되므로, 월별로 읽는 화면은 이 함수로 이월분을 함께 봐야 지난달에 시작해 이번 달에 끝난 작품을 놓치지 않음.
+// 월별 화면 공용 조회 — mk 달에 저장된 콘텐츠 + 전월 전체 + 그 이전 달에서 이월되는 콘텐츠(중복 제거).
+// 콘텐츠는 시작한 달 버킷에 저장되므로, 월 단위로 읽는 화면은 이 함수를 써야 지난달에 시작해 이번 달에 끝난 작품이 빠지지 않음.
 function getContentsWithCarry(mk){
   const seen=new Set(),out=[];
   [...getContents(mk),...getPrevContentsWithCarry(mk)].forEach(c=>{
@@ -1196,8 +1196,8 @@ function getContentsWithCarry(mk){
   });
   return out;
 }
-// 총평(review)을 저장하는 순간의 기준일(논리적 날짜)+시각 — 오늘탭 메모 배너가 "이 날 남긴 총평"을 가려내는 기준.
-// 콘텐츠 등록/수정창·진행 완결창·독서 완독 경로가 모두 이 함수 하나를 씀.
+// 총평(review) 저장 시점 스탬프 — 논리적 날짜(새벽 4시 기준)와 HH:MM. 오늘탭 메모 배너가 그날 남긴 총평을 가려내는 기준값.
+// 콘텐츠 등록/수정창, 진행 완결창, 독서 완독 경로 모두 이 함수 하나를 공유.
 function _reviewStampNow(){
   const d=new Date();
   return {dk:dateKey(getLogicalDate()),time:String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')};
@@ -3489,7 +3489,7 @@ function upsertBookLocal(book){
     list.push(item);
   }
   const newStatus=_BOOK_STATUS_TO_CONTENT[book.status]||item.status;
-  const wasFinished=!isNew&&isFinishedStatus(item.status); // 이번 호출로 방금 완결되는지 판단용(아래 감상 요약 1회 계산)
+  const wasFinished=!isNew&&isFinishedStatus(item.status); // 방금 완결로 전환되는지 판별(아래 감상 요약을 1회만 계산하기 위함)
   if(newStatus==='watching')item.endDate=null;
   else if(item.status!=='watching'||item.endDate==null)item.endDate=item.endDate||dateKey(getLogicalDate()); // watching→done/stopped 전환 시에만 종료일 채움(새벽 4시 전은 전날), 이미 종료된 건 유지
   item.status=newStatus;
@@ -3506,7 +3506,7 @@ function upsertBookLocal(book){
     item.review=book.review;
   }
   if(book.status==='done'&&!item.endDate)item.endDate=book.completedAt||dateKey(getLogicalDate());
-  if(isFinishedStatus(newStatus)&&!wasFinished)Object.assign(item,computeWatchSummary('book',item.cid,item.title,item.startDate,item.endDate)); // 완결 감상 요약 스냅샷(1회)
+  if(isFinishedStatus(newStatus)&&!wasFinished)Object.assign(item,computeWatchSummary('book',item.cid,item.title,item.startDate,item.endDate)); // 완결 시점 감상 요약 스냅샷(전환 시 1회)
   saveContents(found?found.mk:targetMk,found?found.list:list);
 }
 // _findContentByCidNearMk는 최근 2개월만 보므로, 서재 전체(완독 포함 넉넉한 범위)를 찾을 때 쓰는 확장판.
@@ -13028,8 +13028,8 @@ async function _chCollectNoteSource(mk){
   // review/stars는 있을 수도 없을 수도 있음(완결 배지 판정은 status 기준, 총평 텍스트 유무와 별개)
   const notes=[]; // {cid,cat,title,dk,text,updatedAt} — poster는 저장 안 하므로 소속 contents 항목의 값을 붙임
   const contentByCid={}; // cid → {cat,title,poster} — 로그 병합 시 제목/포스터 조회용
-  // 콘텐츠는 시작한 달에 저장되므로 이월분(지난달에 시작해 이번 달에 완결/감상한 작품)까지 함께 보고,
-  // 어느 달 칩에 나올지는 저장된 달이 아니라 실제 날짜(완결일/메모 날짜)로 가림.
+  // 이월분(지난달에 시작해 이번 달에 완결/감상한 작품)까지 함께 읽고,
+  // 어느 달 칩에 나올지는 저장된 달이 아니라 실제 날짜(완결일·메모 날짜)로 판단.
   getContentsWithCarry(mk).forEach(c=>{
     const finalDk=c.endDate||c.startDate||'';
     if(c.cat!=='music'&&isFinishedStatus(c.status)&&finalDk.slice(0,7)===mk){
