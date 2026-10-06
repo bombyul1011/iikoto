@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-var VER='2026.10.06-46';
+var VER='2026.10.06-48';
 var SUPA_URL='https://vqvpzrxmtpryzhontlxc.supabase.co';
 var SUPA_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdnB6cnhtdHByeXpob250bHhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTgxMjksImV4cCI6MjA5NjYzNDEyOX0.pbtq1UMPC7ylYM1H2xVa19C1TFlceLmEfEtkz3WK2VI';
 var LSP='iitabi:';
@@ -1158,7 +1158,8 @@ function onClick(e){
     case 'add':{var key=el.getAttribute('data-key'),ai=document.querySelector('input[data-add="'+key+'"]');addPrompt(key,ai?ai.value:'');break}
     case 'clts':if(UI.clDraft){UI.clDraft.ts=v;render()}break
     case 'cl-save':{var cd=UI.clDraft;if(cd){UI.sheet=null;UI.clDraft=null;addCl(cd.key,cd.t,cd.ts,cd.at,cd.ao)}break}
-    case 'alpick':{if(id)keepEdit();var ai3=id?findCl(id):UI.clDraft,cur3=ai3&&ai3.at||'';openPicker('time',cur3||'09:00','알림 시각',function(val){if(!val)return;if(id){var x3=findCl(id);if(x3){setItemAlert(x3,val,true);render()}}else if(UI.clDraft){UI.clDraft.at=val;UI.clDraft.ao=true;render()}});break}
+    case 'alpick':{if(id){keepEdit();BLURSKIP=true;try{if(document.activeElement&&document.activeElement.blur)document.activeElement.blur()}catch(e){}BLURSKIP=false}  /* 수정 중이면 키보드를 내려 시간 휠이 가리지 않게(수정 상태는 유지) */
+    var ai3=id?findCl(id):UI.clDraft,cur3=ai3&&ai3.at||'';openPicker('time',cur3||'09:00','알림 시각',function(val){if(!val)return;if(id){var x3=findCl(id);if(x3){setItemAlert(x3,val,true);render()}}else if(UI.clDraft){UI.clDraft.at=val;UI.clDraft.ao=true;render()}});break}
     case 'albell':{if(id)keepEdit();var ai4=id?findCl(id):UI.clDraft;if(!ai4)break;if(!ai4.at){el.nextElementSibling&&el.nextElementSibling.click();break}if(id){setItemAlert(ai4,ai4.at,!ai4.ao)}else ai4.ao=!ai4.ao;render();break}
     case 'alclr':{if(id){keepEdit();var x5=findCl(id);if(x5)setItemAlert(x5,'',false)}else if(UI.clDraft){UI.clDraft.at='';UI.clDraft.ao=false}render();break}
     case 'exp-new':openExp(null);break;
@@ -1324,7 +1325,10 @@ function onKey(e){
     else if(el.classList&&el.classList.contains('edit')){e.preventDefault();commitEdit(el.getAttribute('data-id'),el.value)}
   }else if(e.key==='Escape'&&el.classList&&el.classList.contains('edit')){UI.edit=null;render()}
 }
-function onBlur(e){var el=e.target;if(el.classList&&el.classList.contains('edit'))commitEdit(el.getAttribute('data-id'),el.value)}
+var BLURSKIP=false,EDITTAP=0;
+/* 수정 중 같은 수정 영역(칩·알림 줄·확인)을 누르면 입력창 포커스가 먼저 빠지는데, 이때 수정 상태를 닫아 버리면 누른 버튼이 사라져 동작하지 않는다 → 그 직후의 포커스 이탈은 무시 */
+function markEditTap(e){var t=e.target;EDITTAP=(t&&t.closest&&t.closest('.ckedit')&&!t.closest('input'))?Date.now():0}
+function onBlur(e){if(BLURSKIP||Date.now()-EDITTAP<900)return;var el=e.target;if(el.classList&&el.classList.contains('edit'))commitEdit(el.getAttribute('data-id'),el.value)}
 
 /* ---------- backup ---------- */
 function doExport(){
@@ -1368,6 +1372,7 @@ function boot(){
   document.addEventListener('touchend',onTouchEnd,{passive:true});
   document.addEventListener('input',function(e){var el=e.target;if(el&&el.hasAttribute&&el.hasAttribute('data-add'))UI.addTxt[el.getAttribute('data-add')]=el.value;if(el&&el.id==='x_amt')updateExpLine();if(el&&el.id==='ev_title'&&UI.evDraft){UI.evDraft.title=el.value;refreshSug()}if(el&&el.id==='x_name'&&UI.expDraft){UI.expDraft.name=el.value;refreshXSug()}if(el&&el.id&&(el.id.indexOf('ev_')===0||el.id.indexOf('x_')===0))persistDraft()});
   document.addEventListener('focusout',onBlur);
+  document.addEventListener('touchstart',markEditTap,{passive:true,capture:true});document.addEventListener('mousedown',markEditTap,true);
   loadTrip();
   render();
   restoreDraft();
