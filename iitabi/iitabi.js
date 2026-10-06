@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-var VER='2026.10.06-38';
+var VER='2026.10.06-42';
 var SUPA_URL='https://vqvpzrxmtpryzhontlxc.supabase.co';
 var SUPA_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdnB6cnhtdHByeXpob250bHhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTgxMjksImV4cCI6MjA5NjYzNDEyOX0.pbtq1UMPC7ylYM1H2xVa19C1TFlceLmEfEtkz3WK2VI';
 var LSP='iitabi:';
@@ -64,7 +64,7 @@ function byMemoTime(a,b){var x=String(a.memo_time||'99:99'),y=String(b.memo_time
 /* ---------- state ---------- */
 var cfg=lget('cfg',{key:'',tripId:''});
 var PK=null;  // 열려 있는 날짜·시간 선택 모달 상태
-var UI={tab:'today',sched:null,clDate:null,spCity:null,spCat:'all',cond:{},sheet:null,edit:null,status:'',syncAt:null,keyBad:false,addSpot:false,vd:null,addTxt:{},popKey:null,editVal:null,expDraft:null,evDraft:null,payDraft:null,spDraft:null,wkAnim:null,undoFn:null,toastT:null};
+var UI={tab:'today',sched:null,clDate:null,spCity:null,spCat:'all',sheet:null,edit:null,status:'',syncAt:null,keyBad:false,addSpot:false,vd:null,addTxt:{},popKey:null,editVal:null,expDraft:null,evDraft:null,payDraft:null,spDraft:null,wkAnim:null,undoFn:null,toastT:null};
 var PINH='';  // 화면 상단에 고정할 HTML(일정·경비 탭). render()가 #pin에 넣는다
 var M=null,CL={items:[]},MEMOS=[],WX={},Q=lget('q',[]),TRIPS=lget('trips',[]);
 function saveQ(){lset('q',Q)}
@@ -456,10 +456,17 @@ function effTimes(ev){
   ev.forEach(function(e){var t=e.d.time||def[e.d.slot]||prev;if(t<prev)t=prev;out.push(t);prev=t});
   return out;
 }
+/* 타임라인 표시용 시각: 화면 라벨에 보이는 시각(완료한 일정은 완료 시각)과 같은 기준으로 메모와 줄을 세운다.
+   (저장·삽입 순서용 effTimes는 그대로 두고, 화면 배치에만 쓴다) */
+function dispTimes(ev){
+  var def={am:'09:00',noon:'12:00',pm:'15:00',eve:'19:00'},prev='00:00',out=[];
+  ev.forEach(function(e){var d=e.d,t=(d.done&&d.doneAt)?hhmm(d.doneAt):(d.time||def[d.slot]||prev);if(t<prev)t=prev;out.push(t);prev=t});
+  return out;
+}
 function timelineHtml(d){
   var ev=eventsOf(d),ms=memosOf(d).slice().sort(byMemoTime);
   if(!ev.length&&!ms.length)return '';
-  var cc=cityCol(cityOfDate(d)),eff=effTimes(ev),mi=0,h='<div class="tl">';
+  var cc=cityCol(cityOfDate(d)),eff=dispTimes(ev),mi=0,h='<div class="tl">';
   function pushMemos(limit){while(mi<ms.length&&(limit==null||String(ms[mi].memo_time||'99:99')<limit)){h+=memoEv(ms[mi]);mi++}}
   ev.forEach(function(e,i){pushMemos(eff[i]);h+=evRow(e,cc,eff[i])});
   pushMemos(null);
@@ -508,13 +515,6 @@ function screenToday(){
     var per=periodOf(d.time||SLOTDEF[d.slot]||'12:00');
     h+='<div class="card bn bn-'+per+'">'+ctitle(ev[ev.length-1]===next?'마지막 일정':'다음 일정',ckb)+'<div style="font-family:var(--serif);font-size:19px;font-weight:700;line-height:1.3;color:var(--bn-t)">'+esc(d.title)+'</div>'+(d.desc?'<div style="font-size:13px;color:var(--bn-s);margin-top:5px;line-height:1.5">'+esc(d.desc)+'</div>':'')+
       ((d.map)?'<div class="row" style="margin-top:14px"><a class="btn" style="flex:1;text-decoration:none" href="'+ea(mapUrl(d.map))+'" target="_blank" rel="noopener">'+ic('pin',17)+'지도에서 열기</a>'+(d.nav?'<a class="ibtn" aria-label="길찾기(대중교통)" href="'+ea(navUrl(d.map))+'" target="_blank" rel="noopener">'+ic('nav',20)+'</a>':'')+'</div>':'')+'</div>';
-  }
-  var w=wxOf(vd),conds=ev.filter(function(e){return e.d.cond});
-  if(conds.length){
-    var rec=w?(w.sun?'sun':'cloud'):null,sel=UI.cond[vd]||rec||'sun';
-    var inner=ctitle('날씨에 따라',rec?'예보 추천 · '+(rec==='sun'?'맑음':'흐림'):'',['sun','yel'])+seg('cond',[['sun','맑음','sun','yel'],['cloud','흐림','cloud','sky']],sel,'data-date="'+vd+'"');
-    conds.filter(function(e){return e.d.cond===sel}).forEach(function(e){inner+='<div style="margin-top:10px;font-size:14px;line-height:1.55"><b>'+esc(e.d.time||'')+' '+esc(e.d.title)+'</b><br><span class="muted">'+esc(e.d.desc||'')+'</span>'+(e.d.link?' <a href="'+ea(e.d.link.url)+'" target="_blank" rel="noopener">'+esc(e.d.link.label)+'</a>':'')+'</div>'});
-    h+=card(inner,'flat');
   }
   var sl=slotsOf(vd);
   if(sl.length){
@@ -912,8 +912,8 @@ function removeEvent(e){
   M.events[d]=list;
 }
 function openEv(id,date,spotCid){
-  var base={id:null,date:date||UI.sched||clampDate(today()),slot:'pm',cond:'',spot:'',title:'',desc:'',map:'',time:'',mapOn:true};
-  if(id){var e=findEvent(id);if(e){var d=e.d;base={id:e.cid,mapOn:!!d.map,date:e.date,slot:d.slot||'pm',cond:d.cond||'',spot:d.spot||(spotOfEvent(e)?spotOfEvent(e).cid:''),title:d.title||'',desc:d.desc||'',map:d.map||'',time:d.time||''}}}
+  var base={id:null,date:date||UI.sched||clampDate(today()),slot:'pm',spot:'',title:'',desc:'',map:'',time:'',mapOn:true};
+  if(id){var e=findEvent(id);if(e){var d=e.d;base={id:e.cid,mapOn:!!d.map,date:e.date,slot:d.slot||'pm',spot:d.spot||(spotOfEvent(e)?spotOfEvent(e).cid:''),title:d.title||'',desc:d.desc||'',map:d.map||'',time:d.time||''}}}
   else if(spotCid){
     var sp=byCid(M.spots,spotCid);
     if(sp){base.spot=sp.cid;base.title=sp.d.name;base.desc=sp.d.desc||'';base.map=sp.d.map||sp.d.name;base.slot=SPOT_SLOT[sp.d.cat]||'pm'}
@@ -935,6 +935,7 @@ function saveEv(){
   d.city=cityOfDate(date);d.title=title;d.desc=desc||undefined;d.time=time||undefined;d.slot=slot;
   d.map=map||undefined;d.nav=!!map;
   if(dr.spot)d.spot=dr.spot;else delete d.spot;
+  delete d.cond;
   Object.keys(d).forEach(function(k){if(d[k]===undefined)delete d[k]});
   var e=old;
   if(e){removeEvent(e);e.date=date;e.d=d}
@@ -983,9 +984,13 @@ function swipeWeek(dir){
 }
 var swipeX=null,swipeY=null;
 /* ---------- 탭 이동(하단 메뉴·쓸어넘기기 공용) ---------- */
+function resetView(){  // 탭을 옮길 때마다 '오늘 기준'으로 다시 연다(마지막에 본 날짜·도시·분류는 기억하지 않음)
+  UI.vd=null;UI.sched=null;UI.clDate=null;UI.clPre=false;UI.spCat='all';
+  var t=trip(),c=curCity();UI.spCity=(t&&t.cities.some(function(x){return x.id===c}))?c:null;
+}
 function goTab(v,dir){
   var sc=document.getElementById('screen');
-  UI.tab=v;render();sc.scrollTop=0;
+  resetView();UI.tab=v;render();sc.scrollTop=0;
   if(v==='sched')focusNowLine();
   if(dir){  // 쓸어서 이동했을 때만 살짝 밀려 들어오는 효과(본앱과 같은 방식)
     sc.classList.remove('tab-enter-from-left','tab-enter-from-right');void sc.offsetWidth;
@@ -1118,7 +1123,6 @@ function onClick(e){
     case 'pk-ok':{var pk2=PK;if(!pk2)break;var pval=pk2.type==='time'?pad(pk2.h)+':'+pad(pk2.mi*5):pk2.sel;closePicker();if(pk2.onOk)pk2.onOk(pval);break}
     case 'pk-day':if(PK){PK.sel=v;renderPicker()}break;
     case 'pk-prev':case 'pk-next':if(PK){PK.m+=(a==='pk-next'?1:-1);if(PK.m<0){PK.m=11;PK.y--}else if(PK.m>11){PK.m=0;PK.y++}renderPicker()}break;
-    case 'cond':UI.cond[el.getAttribute('data-date')]=v;render();break;
     case 'plan':setChoice(el.getAttribute('data-date'),el.getAttribute('data-slot'),v);break;
         case 'ck':{var it=findCl(id);if(it){it.done=el.checked;it.completedAt=it.done?Date.now():null;tdUpd(it,{done:it.done,completed_at:it.completedAt});render()}break}
     case 'edit':UI.edit=id;UI.editVal=null;render();break;
