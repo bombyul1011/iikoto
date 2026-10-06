@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-var VER='2026.10.06-32';
+var VER='2026.10.06-34';
 var SUPA_URL='https://vqvpzrxmtpryzhontlxc.supabase.co';
 var SUPA_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdnB6cnhtdHByeXpob250bHhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTgxMjksImV4cCI6MjA5NjYzNDEyOX0.pbtq1UMPC7ylYM1H2xVa19C1TFlceLmEfEtkz3WK2VI';
 var LSP='iitabi:';
@@ -323,15 +323,13 @@ function topWx(){
   return ic(w.sun?'sun':'cloud',15,pcol(w.sun?'orange':'sky')[2])+'<span>'+(diff?esc(cityName(id))+' · ':'')+(w.sun?'맑음':'흐림')+' '+Math.round(w.tmax)+'°/'+Math.round(w.tmin)+'°'+(w.pp!=null?' · 강수 '+w.pp+'%':'')+'</span>';
 }
 function dayPill(){var t=trip(),td=today();if(!t)return '';if(td<t.start)return 'D-'+Math.round((parse(t.start)-parse(td))/86400000);if(td>t.end)return '여행 종료';var dts=tripDates();return 'DAY '+(dts.indexOf(td)+1)+' / '+dts.length}
+/* 오늘 카드에 올릴 일정: 아직 완료하지 않은 일정 중 시각이 가장 빠른 것(시각이 지났어도 미완료면 그대로 유지).
+   전부 완료했다면 마지막 일정을 보여준다. */
 function nextEventOf(vd){
-  var ev=eventsOf(vd),next=null;
-  var pend=ev.filter(function(e){return !e.d.done});
-  if(pend.length){
-    if(vd===today()){var p=-1;pend.forEach(function(e,i){if(e.d.time&&e.d.time<=nowHM())p=i});next=pend[p+1]||pend[0]}else next=pend[0];
-  }else if(ev.length)next=ev[ev.length-1];
-  return next;
+  var ev=eventsOf(vd),pend=ev.filter(function(e){return !e.d.done});
+  return pend[0]||ev[ev.length-1]||null;
 }
-function topPeriod(){var n=nextEventOf(today());return periodOf((n&&(n.d.time||SLOTDEF[n.d.slot]))||nowHM())}   // 배너와 같은 기준(다음 일정의 시간대)
+function topPeriod(){var e=nextEventOf(today());return periodOf((e&&(e.d.time||SLOTDEF[e.d.slot]))||nowHM())}   // 배너와 같은 기준(다음 일정의 시간대)
 function topBar(){
   var t=trip();if(!t)return '';
   var rng=md(t.start)+'–'+(t.start.slice(5,7)===t.end.slice(5,7)?(+t.end.slice(8)):md(t.end));
