@@ -1187,6 +1187,21 @@ function _prevAndCarriedContents(mk){
   return out;
 }
 function getPrevContentsWithCarry(mk){return _prevAndCarriedContents(mk).map(x=>x.c);}
+// mk 월 화면용 — 그 달에 저장된 콘텐츠 + 전월 전체 + 이전 달에서 이월되는 콘텐츠(중복 제거).
+// 콘텐츠는 "시작한 달"에 저장되므로, 월별로 읽는 화면은 이 함수로 이월분을 함께 봐야 지난달에 시작해 이번 달에 끝난 작품을 놓치지 않음.
+function getContentsWithCarry(mk){
+  const seen=new Set(),out=[];
+  [...getContents(mk),...getPrevContentsWithCarry(mk)].forEach(c=>{
+    const k=_contentKey(c);if(seen.has(k))return;seen.add(k);out.push(c);
+  });
+  return out;
+}
+// 총평(review)을 저장하는 순간의 기준일(논리적 날짜)+시각 — 오늘탭 메모 배너가 "이 날 남긴 총평"을 가려내는 기준.
+// 콘텐츠 등록/수정창·진행 완결창·독서 완독 경로가 모두 이 함수 하나를 씀.
+function _reviewStampNow(){
+  const d=new Date();
+  return {dk:dateKey(getLogicalDate()),time:String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')};
+}
 function getContentsForReport(mk){
   // 음악: 등록일=완료일로 취급 — 시작월에만 노출/집계, 별도 상태표기 없음
   // 드라마/영화/책: 보는중인 동안은 관련된 모든 달에 노출되지만(상태:보는중), 집계(완료/중단 확정)는 끝난 달에서만 잡힘
@@ -3467,14 +3482,16 @@ function upsertBookLocal(book){
   const targetMk=book.contentMk||(found?found.mk:monthKey(now));
   const list=getContents(targetMk);
   let item=found?found.list[found.idx]:list.find(c=>c.cid===book.cid);
+  const isNew=!item;
   if(!item){
     item={cid:book.cid,cat:'book',title:book.contentTitle||book.title,status:_BOOK_STATUS_TO_CONTENT[book.status]||'watching',
       startDate:dateKey(now),poster:book.poster||null,author:book.author||'',review:'',stars:0,notes:[],created:book.created||Date.now()};
     list.push(item);
   }
   const newStatus=_BOOK_STATUS_TO_CONTENT[book.status]||item.status;
+  const wasFinished=!isNew&&isFinishedStatus(item.status); // 이번 호출로 방금 완결되는지 판단용(아래 감상 요약 1회 계산)
   if(newStatus==='watching')item.endDate=null;
-  else if(item.status!=='watching'||item.endDate==null)item.endDate=item.endDate||dateKey(now); // watching→done/stopped 전환 시에만 종료일 채움, 이미 종료된 건 유지
+  else if(item.status!=='watching'||item.endDate==null)item.endDate=item.endDate||dateKey(getLogicalDate()); // watching→done/stopped 전환 시에만 종료일 채움(새벽 4시 전은 전날), 이미 종료된 건 유지
   item.status=newStatus;
   item.unitLabel=book.unit||'pages';
   item.currentUnit=book.unit==='pages'?(book.pages||0):(book.percent||0);
@@ -3483,8 +3500,13 @@ function upsertBookLocal(book){
   if(book.poster)item.poster=book.poster;
   if(book.author)item.author=book.author;
   if(book.stars)item.stars=book.stars;
-  if(book.review)item.review=book.review;
-  if(book.status==='done'&&!item.endDate)item.endDate=book.completedAt||dateKey(now);
+  if(book.review){
+    // 총평 텍스트가 실제로 바뀐 경우에만 저장 시점을 새로 찍음 — 등록/수정창과 같은 규칙(오늘탭 메모 배너 기준일)
+    if(book.review!==item.review){const st=_reviewStampNow();item.reviewSavedDk=st.dk;item.reviewSavedTime=st.time;}
+    item.review=book.review;
+  }
+  if(book.status==='done'&&!item.endDate)item.endDate=book.completedAt||dateKey(getLogicalDate());
+  if(isFinishedStatus(newStatus)&&!wasFinished)Object.assign(item,computeWatchSummary('book',item.cid,item.title,item.startDate,item.endDate)); // 완결 감상 요약 스냅샷(1회)
   saveContents(found?found.mk:targetMk,found?found.list:list);
 }
 // _findContentByCidNearMk는 최근 2개월만 보므로, 서재 전체(완독 포함 넉넉한 범위)를 찾을 때 쓰는 확장판.
@@ -8463,11 +8485,9 @@ let _deletedMemo=null,_undoTimer=null,_memoSwipeIdx=-1;
 // 완결 총평은 음악 제외(콘텐츠허브 로그 모음 시트와 동일 기준, WCAL_CAT_META 참고).
 function getContentMemoItemsForDate(dk){
   const mk=dk.slice(0,7);
-  const seen=new Set();
   const items=[]; // {kind:'note'|'final',cid,cat,title,poster,text,time}
   // 해당 월 + 전월 + 그 이전 달에서 이어지는 작품(시작월 +2개월 이상 지난 진행중 작품의 메모도 포함)
-  [...getContents(mk),...getPrevContentsWithCarry(mk)].forEach(c=>{
-    if(seen.has(c.cid))return;seen.add(c.cid);
+  getContentsWithCarry(mk).forEach(c=>{
     (c.notes||[]).forEach(n=>{
       if(n.dk===dk)items.push({kind:'note',cid:c.cid,cat:c.cat,title:n.title||c.title||'',text:n.text||'',time:n.time||''});
     });
@@ -9575,8 +9595,8 @@ function confirmContent(){
     const idx=oldContents.findIndex(c=>c.cid===_contentCtx.item.cid);
     // review 텍스트가 실제로 바뀐 경우에만 저장 시점(오늘탭 메모 배너 기준일)을 새로 찍음 — 다른 필드만 고친 경우는 기존 시점 유지.
     const reviewChanged=idx>=0&&review!==(oldContents[idx].review||'');
-    const reviewSavedDk=review?(reviewChanged?dateKey(getLogicalDate()):(idx>=0?oldContents[idx].reviewSavedDk:null)):null;
-    const reviewSavedTime=review?(reviewChanged?(String(new Date().getHours()).padStart(2,'0')+':'+String(new Date().getMinutes()).padStart(2,'0')):(idx>=0?oldContents[idx].reviewSavedTime:null)):null;
+    const reviewSavedDk=review?(reviewChanged?_reviewStampNow().dk:(idx>=0?oldContents[idx].reviewSavedDk:null)):null;
+    const reviewSavedTime=review?(reviewChanged?_reviewStampNow().time:(idx>=0?oldContents[idx].reviewSavedTime:null)):null;
     // 방금 완결(done/stopped)로 새로 전환된 경우에만 감상 요약을 1회 계산해 스냅샷 저장.
     // 이미 완결 상태였다가 재수정하는 경우는 기존 값을 유지(재계산 안 함) — 되돌렸다 다시 완결하면 그때 새로 계산.
     const wasFinished=idx>=0&&isFinishedStatus(oldContents[idx].status);
@@ -9605,8 +9625,8 @@ function confirmContent(){
     const contents=getContents(newMk);
     const newCid=genCid();
     savedCid=newCid;
-    const reviewSavedDk=review?dateKey(getLogicalDate()):null;
-    const reviewSavedTime=review?(String(new Date().getHours()).padStart(2,'0')+':'+String(new Date().getMinutes()).padStart(2,'0')):null;
+    const reviewSavedDk=review?_reviewStampNow().dk:null;
+    const reviewSavedTime=review?_reviewStampNow().time:null;
     // 신규 등록인데 처음부터 완결 상태로 저장하는 경우(과거 콘텐츠 수기 등록 등)도 감상 요약 계산 대상.
     const watchSummaryFields=(isFinishedStatus(status)&&_contentCtx.cat!=='music')?computeWatchSummary(_contentCtx.cat,newCid,title,startDate,endDate):{};
     contents.push({cat:_contentCtx.cat,title,startDate,endDate,status,review,stars,poster,author,musicUrl,album,releaseYear,totalUnit,currentUnit,reviewSavedDk,reviewSavedTime,created:Date.now(),cid:newCid,...watchSummaryFields});
@@ -9760,14 +9780,18 @@ function confirmContentProgressDone(){
   const reviewEl=document.getElementById('cpg-done-review');
   const stars=starsEl?(parseFloat(starsEl.value)||0):0;
   const review=reviewEl?reviewEl.value.trim():'';
+  const wasFinished=isFinishedStatus(c.status);
   c.status='done';
   c.endDate=dateKey(getLogicalDate());
   if(stars)c.stars=stars;
   if(review){
+    const st=_reviewStampNow();
     c.review=review;
-    c.reviewSavedDk=dateKey(getLogicalDate());
-    c.reviewSavedTime=String(new Date().getHours()).padStart(2,'0')+':'+String(new Date().getMinutes()).padStart(2,'0');
+    c.reviewSavedDk=st.dk;
+    c.reviewSavedTime=st.time;
   }
+  // 완결 확정 시점의 감상 요약 스냅샷 — 등록/수정창 완결과 같은 규칙(방금 완결로 전환된 경우에만 1회 계산, 음악 제외)
+  if(!wasFinished&&c.cat!=='music')Object.assign(c,computeWatchSummary(c.cat,c.cid,c.title,c.startDate,c.endDate));
   saveContents(found.mk,found.list);
   chExpandMonth(_chArchiveMk||found.mk);
   refreshContentHubViews();
@@ -12481,7 +12505,7 @@ function toggleBookDetail(cid){_rdOpenCid=_rdOpenCid===cid?null:cid;_rdDoneQuote
 function setBookStatus(cid,status,review){
   const book=getBooks().find(b=>b.cid===cid);if(!book)return;
   book.status=status;
-  if(status==='done')book.completedAt=dateKey(new Date());
+  if(status==='done')book.completedAt=dateKey(getLogicalDate());
   if(review){book.stars=review.stars||0;book.review=review.review||'';}
   upsertBookLocal(book); // book이 곧 contents 항목이므로 이 호출 하나로 contents 반영까지 끝남(구 syncReadingBookToContent 제거)
   renderReadingHub();
@@ -12658,7 +12682,7 @@ async function loadAndRenderWatchCal(){
   // contents의 종료일(없으면 시작일)로 폴백. 리듬 기록이 있는 영화는 그 실제 감상일이 더 정확하므로 폴백 대상에서 제외.
   const moviesCapturedByRhythm=new Set();
   Object.values(_wcalByDate).forEach(list=>list.forEach(it=>{if(it.cat==='movie')moviesCapturedByRhythm.add(it.title);}));
-  getContents(mk).filter(c=>c.cat==='movie').forEach(c=>{
+  getContentsWithCarry(mk).filter(c=>c.cat==='movie').forEach(c=>{
     if(moviesCapturedByRhythm.has(c.title))return;
     const fallbackDk=c.endDate||c.startDate;
     if(fallbackDk&&fallbackDk.slice(0,7)===mk)push(fallbackDk,{cat:'movie',title:c.title});
@@ -12670,7 +12694,7 @@ async function loadAndRenderWatchCal(){
   // 포스터/상태 매칭 — 드라마/영화/책은 같은 제목의 콘텐츠 항목(이번 달+전월, 진행중 포함)에서 poster/status를 찾아 붙임
   // cid도 함께 매칭해 붙임 — 콘텐츠탭 등록 원본과 연결해야 일자별 코멘트(cid 기준)를 저장할 수 있음
   const posterByTitle={},cidByTitle={},statusByTitle={};
-  [...getContents(mk),...getPrevContentsWithCarry(mk)].forEach(c=>{
+  getContentsWithCarry(mk).forEach(c=>{
     if(c.cat!=='music'&&c.title){posterByTitle[c.title]=c.poster||null;cidByTitle[c.title]=c.cid||null;statusByTitle[c.title]=c.status||null;}
   });
   Object.values(_wcalByDate).forEach(list=>list.forEach(it=>{
@@ -13004,11 +13028,14 @@ async function _chCollectNoteSource(mk){
   // review/stars는 있을 수도 없을 수도 있음(완결 배지 판정은 status 기준, 총평 텍스트 유무와 별개)
   const notes=[]; // {cid,cat,title,dk,text,updatedAt} — poster는 저장 안 하므로 소속 contents 항목의 값을 붙임
   const contentByCid={}; // cid → {cat,title,poster} — 로그 병합 시 제목/포스터 조회용
-  getContents(mk).forEach(c=>{
-    if(c.cat!=='music'&&(c.status==='done'||c.status==='stopped')){
-      finals.push({cid:c.cid,cat:c.cat,title:c.title,poster:c.poster||null,stars:c.stars||0,review:c.review||'',dk:c.endDate||c.startDate||''});
+  // 콘텐츠는 시작한 달에 저장되므로 이월분(지난달에 시작해 이번 달에 완결/감상한 작품)까지 함께 보고,
+  // 어느 달 칩에 나올지는 저장된 달이 아니라 실제 날짜(완결일/메모 날짜)로 가림.
+  getContentsWithCarry(mk).forEach(c=>{
+    const finalDk=c.endDate||c.startDate||'';
+    if(c.cat!=='music'&&isFinishedStatus(c.status)&&finalDk.slice(0,7)===mk){
+      finals.push({cid:c.cid,cat:c.cat,title:c.title,poster:c.poster||null,stars:c.stars||0,review:c.review||'',dk:finalDk});
     }
-    (c.notes||[]).forEach(n=>notes.push({...n,cid:c.cid,poster:c.poster||null}));
+    (c.notes||[]).forEach(n=>{if((n.dk||'').slice(0,7)===mk)notes.push({...n,cid:c.cid,poster:c.poster||null});});
     if(c.cid)contentByCid[c.cid]={cat:c.cat,title:c.title,poster:c.poster||null};
   });
   // 일자별 진행률 로그(content_daily_log) — 감상달력 일자별 상세화면(renderWcalDayDetail)과 동일한 소스.
@@ -13020,12 +13047,14 @@ async function _chCollectNoteSource(mk){
   // 독서: 증감률+시간, 드라마/영화: 시간만 노출 — 표시 여부는 렌더 함수(_chDailyLogMetaText)에서 처리.
   const catPrefix={drama:'드라마 - ',movie:'영화 - ',book:'독서 - '};
   const timeCache={}; // dk|cid -> "HH:MM-HH:MM, ... (총 N분)"
+  const blocksByDk={}; // 이월 작품까지 훑으므로 같은 날 리듬블록을 작품마다 다시 읽지 않도록 날짜별로 한 번만 읽음
   function timeTextFor(dk,cat,title){
     const key=dk+'|'+cat+'|'+title;
     if(timeCache[key]!==undefined)return timeCache[key];
     if(!catPrefix[cat]){timeCache[key]='';return '';}
     const target=catPrefix[cat]+title;
-    const sessionBlocks=getRhythmBlocks(dk).filter(b=>b.cat==='enjoy'&&b.text===target);
+    const dayBlocks=blocksByDk[dk]||(blocksByDk[dk]=getRhythmBlocks(dk));
+    const sessionBlocks=dayBlocks.filter(b=>b.cat==='enjoy'&&b.text===target);
     const sessionRanges=sessionBlocks.map(b=>`${b.start}-${b.end}`);
     const totalMin=sessionBlocks.reduce((sum,b)=>{let m=toMin(b.end)-toMin(b.start);if(m<0)m+=1440;return sum+Math.max(0,m);},0);
     const text=sessionRanges.length?`${sessionRanges.join(', ')} (총 ${totalMin}분)`:'';
