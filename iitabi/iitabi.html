@@ -131,6 +131,15 @@ select.fld{background:rgba(255,255,255,.7)}
 .mrow .mb{flex:1;min-width:0;font-size:14px;line-height:1.55}
 .mrow .mb.mpw{display:flex;gap:10px;align-items:flex-start}
 .mtx{flex:1;min-width:0}
+/* 체크리스트 알림 줄(등록 시트·수정) */
+.alrow{height:46px;border:1px solid rgba(220,205,180,.8);border-radius:10px;background:rgba(255,255,255,.6);display:flex;align-items:center;gap:4px;padding:0 6px 0 4px}
+.alrow button{border:0;background:transparent;padding:0;display:flex;align-items:center;justify-content:center}
+.alrow .albtn{width:38px;height:38px;color:#a89a8c}
+.alrow .altx{flex:1;height:38px;justify-content:flex-start;font-size:14px;color:#a89a8c}
+.alrow .alx{width:38px;height:38px;color:#a89a8c}
+.alrow.has .altx{color:var(--tx)}
+.alrow.on .albtn{color:rgb(120,69,139)}
+.belt{display:inline-flex;align-items:center;gap:2px;font-size:11px;color:rgb(120,69,139);font-variant-numeric:tabular-nums;flex:none}
 .tsc{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
 .tsc.hscroll{flex-wrap:nowrap;overflow-x:auto;padding:2px;margin-left:-2px;margin-right:-2px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .tsc.hscroll::-webkit-scrollbar{display:none}
@@ -340,6 +349,6 @@ input:focus,textarea:focus,select:focus{outline:none;box-shadow:none}
 <div id="bg-fixed"></div>
 <div id="app"><div id="topsafe"></div><div id="pin"></div><main id="screen"></main><nav id="tabbar" aria-label="하단 탭"></nav></div>
 <div id="sheet"></div><div id="toast"></div><div id="picker"></div>
-<script src="iitabi.js?v=2026.10.06-42"></script>
+<script src="iitabi.js?v=2026.10.06-45"></script>
 </body>
 </html>

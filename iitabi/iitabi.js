@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-var VER='2026.10.06-42';
+var VER='2026.10.06-45';
 var SUPA_URL='https://vqvpzrxmtpryzhontlxc.supabase.co';
 var SUPA_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdnB6cnhtdHByeXpob250bHhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTgxMjksImV4cCI6MjA5NjYzNDEyOX0.pbtq1UMPC7ylYM1H2xVa19C1TFlceLmEfEtkz3WK2VI';
 var LSP='iitabi:';
@@ -57,7 +57,7 @@ function typing(){if(UI.popKey||PK)return true;var ae=document.activeElement;ret
 function pickOn(el){Array.prototype.forEach.call(el.parentNode.querySelectorAll('.tsb'),function(b){var on=b===el;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on)})}
 function setPick(act,v){Array.prototype.forEach.call(document.querySelectorAll('[data-act="'+act+'"]'),function(b){var on=b.getAttribute('data-v')===v;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on)})}
 function shead(t,act,v,label){return '<div class="row between"><h1 style="font-size:22px">'+esc(t)+'</h1><button class="btn" style="border:0;background:transparent" data-act="'+(act||'sheet-close')+'"'+(v?' data-v="'+v+'"':'')+' aria-label="'+(label||'닫기')+'">'+ic('x',20)+'</button></div>'}
-function closeSheet(){UI.sheet=null;UI.expDraft=null;UI.evDraft=null;UI.payDraft=null;UI.spDraft=null;clearDraft();render()}
+function closeSheet(){UI.sheet=null;UI.expDraft=null;UI.evDraft=null;UI.payDraft=null;UI.spDraft=null;UI.clDraft=null;clearDraft();render()}
 function byTimeDesc(a,b){return String(b.d.time||'')<String(a.d.time||'')?-1:1}
 function byMemoTime(a,b){var x=String(a.memo_time||'99:99'),y=String(b.memo_time||'99:99');return x<y?-1:(x>y?1:0)}
 
@@ -157,12 +157,25 @@ function clDate(key){return key==='pre'?preDate():key}
 function newClId(key){return prefix()+(key==='pre'?'pre_':'d'+key.replace(/-/g,'').slice(4)+'_')+genCid()}
 function tiUndoDel(o){qDrop(function(x){return x.t==='ti'&&x.op==='del'&&x.cid===o.cid})}
 function tdUndoDel(it){qDrop(function(x){return x.t==='td'&&x.op==='del'&&x.cid===it.id});CL.items.push(it);tdAdd(it)}
-function tdAdd(it){Q.push({t:'td',op:'add',cid:it.id});saveQ();saveCL();flush()}
+function alIso(dk,hm){  // 그날 HH:MM → 기기 시간대 오프셋을 반영한 ISO(본앱 scheduleAlertAt과 같은 방식)
+  var p=dk.split('-').map(Number),h=hm.split(':').map(Number),d=new Date(p[0],p[1]-1,p[2],h[0],h[1],0),off=-d.getTimezoneOffset(),sg=off>=0?'+':'-';
+  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes())+':00'+sg+pad(Math.floor(Math.abs(off)/60))+':'+pad(Math.abs(off)%60);
+}
+/* 알림 예약 정리: 켜져 있고 미완료면 예약(덮어쓰기), 아니면 — 이전에 알림이 있었던 경우에만 — 예약·스누즈 삭제 */
+function alUpdate(it,had){
+  qDrop(function(x){return x.t==='al'&&x.cid===it.id});
+  if(it.at&&it.ao&&!it.done&&!it.pre)Q.push({t:'al',op:'up',cid:it.id,iso:alIso(clDate(clKey(it)),it.at),title:it.t});
+  else if(had)Q.push({t:'al',op:'del',cid:it.id});
+  saveQ();flush();
+}
+function setItemAlert(it,at,ao){var had=!!it.at;it.at=at||'';it.ao=!!(at&&ao);tdUpd(it,{alert_time:it.at||null,todo_alert_on:it.ao});alUpdate(it,had)}
+function tdAdd(it){Q.push({t:'td',op:'add',cid:it.id});saveQ();saveCL();flush();if(it.at)alUpdate(it,false)}
 function tdUpd(it,f){if(qWaiting('td',it.id,'add')){saveCL();return}Q.push({t:'td',op:'upd',cid:it.id,date:it.date,f:f});saveQ();saveCL();flush()}
 function tdDel(it){
   var had=qWaiting('td',it.id,'add');
-  qDrop(function(x){return x.t==='td'&&x.cid===it.id});
+  qDrop(function(x){return (x.t==='td'||x.t==='al')&&x.cid===it.id});
   if(!had)Q.push({t:'td',op:'del',cid:it.id,date:it.date});
+  if(it.at)Q.push({t:'al',op:'del',cid:it.id});
   saveQ();saveCL();flush();
 }
 function flush(){
@@ -178,7 +191,7 @@ function flush(){
     }else if(op.t==='td'&&op.op==='add'){
       var it=findCl(op.cid);
       if(!it)p=Promise.resolve(true);
-      else p=sf('todos?on_conflict=date_key,client_id','POST',[{date_key:clDate(clKey(it)),text:it.t,done:!!it.done,created:it.created,client_id:it.id,time_section:it.ts||'none',cat:'todo',completed_at:it.done?(it.completedAt||Date.now()):null,is_event:false}],'resolution=ignore-duplicates,return=minimal');
+      else p=sf('todos?on_conflict=date_key,client_id','POST',[{date_key:clDate(clKey(it)),text:it.t,done:!!it.done,created:it.created,client_id:it.id,time_section:it.ts||'none',cat:'todo',completed_at:it.done?(it.completedAt||Date.now()):null,is_event:false,alert_time:it.at||null,todo_alert_on:!!(it.at&&it.ao)}],'resolution=ignore-duplicates,return=minimal');
     }else if(op.t==='td'&&op.op==='upd'){
       p=sf('todos?client_id=eq.'+enc(op.cid),'PATCH',op.f,'return=representation').then(function(rows){
         if(rows===null)return null;                     // 네트워크 실패 → 큐에 남겨 재시도
@@ -187,6 +200,11 @@ function flush(){
       });
     }else if(op.t==='td'&&op.op==='del'){
       p=sf('todos?client_id=eq.'+enc(op.cid),'DELETE');
+    }else if(op.t==='al'){  // 이이코토 알림 예약 — 본앱과 같은 alerts 행(source_type 'todo'). 계속 실패하면 큐가 막히지 않게 3번 뒤 포기
+      p=(op.op==='up'
+        ?sf('alerts?on_conflict=source_type,source_cid','POST',[{source_type:'todo',source_cid:op.cid,alert_at:op.iso,title:op.title||'',body:null,sent:false}],'resolution=merge-duplicates,return=minimal')
+        :sf('alerts?source_type=in.(todo,todo_snooze)&source_cid=eq.'+enc(op.cid),'DELETE')
+      ).then(function(r){if(r)return true;op.fails=(op.fails||0)+1;if(op.fails>=3){toast('알림 예약에 실패했어요');return true}return null});
     }else p=Promise.resolve(true);
     return p.then(function(ok){inflight=null;if(!ok)return;var i=Q.indexOf(op);if(i>=0)Q.splice(i,1);saveQ();return next()});
   }
@@ -223,10 +241,10 @@ function pull(force){
   });
 }
 function pullTodos(){
-  return sf('todos?client_id=like.'+enc(prefix())+'*&select=client_id,date_key,text,done,created,completed_at,time_section&order=created').then(function(rows){
+  return sf('todos?client_id=like.'+enc(prefix())+'*&select=client_id,date_key,text,done,created,completed_at,time_section,alert_time,todo_alert_on&order=created').then(function(rows){
     if(!rows||Q.some(function(o){return o.t==='td'}))return;
     var pre=prefix()+'pre_';
-    CL.items=rows.map(function(r){var isPre=r.client_id.indexOf(pre)===0;return {id:r.client_id,date:r.date_key,pre:isPre,t:r.text,ts:r.time_section||'none',done:!!r.done,created:r.created,completedAt:r.completed_at}});
+    CL.items=rows.map(function(r){var isPre=r.client_id.indexOf(pre)===0;return {id:r.client_id,date:r.date_key,pre:isPre,t:r.text,ts:r.time_section||'none',done:!!r.done,created:r.created,completedAt:r.completed_at,at:r.alert_time||'',ao:!!r.todo_alert_on}});
     saveCL();
     var t=trip();
     if(t&&!t.cl_seeded&&!rows.length)seedChecklist();
@@ -391,20 +409,26 @@ function tsChips(act,key,sel,extra){
     return '<button class="tschip tsb ts-'+v+(sel===v?' on':'')+'" data-act="'+act+'" data-v="'+v+'"'+(key?' data-key="'+ea(key)+'"':'')+(extra||'')+' aria-pressed="'+(sel===v)+'">'+TSL[v]+'</button>';
   }).join('')+'</div>';
 }
+function keepEdit(){var e=document.querySelector('input.edit');if(e)UI.editVal=e.value}  // 수정 중 글자를 알림 줄 조작으로 잃지 않게
+function bellTag(it){return (it.at&&it.ao&&!it.done)?'<span class="belt">'+ic('bell',13)+it.at+'</span>':''}
+function alRow(at,ao,id){
+  var i=ea(id||'');
+  return '<div class="alrow'+(at?' has':'')+(at&&ao?' on':'')+'"><button class="albtn" data-act="albell" data-id="'+i+'" aria-label="알림 켜기 끄기">'+ic(at&&!ao?'bell-off':'bell',20)+'</button><button class="altx" data-act="alpick" data-id="'+i+'">'+(at||'알림 없음')+'</button>'+(at?'<button class="alx" data-act="alclr" data-id="'+i+'" aria-label="알림 지우기">'+ic('x',16)+'</button>':'')+'</div>';
+}
 function clRow(it,ro){
   if(ro){
     var ctr=(it.done&&it.completedAt)?'<span class="ct">'+hhmm(it.completedAt)+'</span>':'';
-    return '<div class="ck ro'+(it.done?' done':'')+'"><input type="checkbox" '+(ro==='ck'?'data-act="ck" data-id="'+ea(it.id)+'"':'disabled')+' '+(it.done?'checked':'')+' aria-label="'+ea(it.t)+'"><span class="tx">'+esc(it.t)+'</span>'+ctr+'</div>';
+    return '<div class="ck ro'+(it.done?' done':'')+'"><input type="checkbox" '+(ro==='ck'?'data-act="ck" data-id="'+ea(it.id)+'"':'disabled')+' '+(it.done?'checked':'')+' aria-label="'+ea(it.t)+'"><span class="tx">'+esc(it.t)+'</span>'+bellTag(it)+ctr+'</div>';
   }
   if(UI.edit===it.id){
     var val=UI.editVal!=null?UI.editVal:it.t;
-    return '<div class="ckedit"><div class="ck" style="border-bottom:0"><input type="checkbox" disabled aria-hidden="true"><input class="edit" data-id="'+ea(it.id)+'" value="'+ea(val)+'" aria-label="항목 수정"><button class="mini" data-act="edit-ok" data-id="'+ea(it.id)+'" aria-label="저장">'+ic('check',18)+'</button></div>'+tsChips('edits',null,it.ts||'none',' data-id="'+ea(it.id)+'"')+'</div>';
+    return '<div class="ckedit"><div class="ck" style="border-bottom:0"><input type="checkbox" disabled aria-hidden="true"><input class="edit" data-id="'+ea(it.id)+'" value="'+ea(val)+'" aria-label="항목 수정"><button class="mini" data-act="edit-ok" data-id="'+ea(it.id)+'" aria-label="저장">'+ic('check',18)+'</button></div>'+tsChips('edits',null,it.ts||'none',' data-id="'+ea(it.id)+'"')+(it.pre?'':alRow(it.at,it.ao,it.id))+'</div>';
   }
   var ct='';
   if(it.done&&it.completedAt){
     ct='<button class="ct" data-act="ctime" data-id="'+ea(it.id)+'" aria-label="완료 시각 수정">'+hhmm(it.completedAt)+'</button>';
   }
-  return '<div class="ck'+(it.done?' done':'')+'"><input type="checkbox" data-act="ck" data-id="'+ea(it.id)+'" '+(it.done?'checked':'')+' aria-label="'+ea(it.t)+'"><span class="tx">'+esc(it.t)+'</span>'+ct+'<button class="mini" data-act="edit" data-id="'+ea(it.id)+'" aria-label="수정">'+ic('pen',16)+'</button><button class="mini" data-act="del" data-id="'+ea(it.id)+'" aria-label="삭제">'+ic('x',16)+'</button></div>';
+  return '<div class="ck'+(it.done?' done':'')+'"><input type="checkbox" data-act="ck" data-id="'+ea(it.id)+'" '+(it.done?'checked':'')+' aria-label="'+ea(it.t)+'"><span class="tx">'+esc(it.t)+'</span>'+bellTag(it)+ct+'<button class="mini" data-act="edit" data-id="'+ea(it.id)+'" aria-label="수정">'+ic('pen',16)+'</button><button class="mini" data-act="del" data-id="'+ea(it.id)+'" aria-label="삭제">'+ic('x',16)+'</button></div>';
 }
 function clList(items,ro){
   var und=items.filter(function(i){return !i.done}).sort(function(a,b){
@@ -419,15 +443,13 @@ function clList(items,ro){
 }
 function clAddRow(key){
   var v=UI.addTxt[key]||'';
-  return '<div class="addwrap"><div class="addrow"><input data-add="'+ea(key)+'" value="'+ea(v)+'" placeholder="항목 추가" aria-label="항목 추가"><button class="btn addbtn" data-act="add" data-key="'+ea(key)+'" aria-label="추가" aria-haspopup="true">'+ic('plus',22)+'</button></div>'+
-    '<div class="fpop" data-pop="'+ea(key)+'" hidden>'+['morning','afternoon','night','none'].map(function(t){return '<button class="tschip ts-'+t+' on" data-act="addts" data-key="'+ea(key)+'" data-v="'+t+'">'+TSL[t]+'</button>'}).join('')+'</div></div>';
+  return '<div class="addwrap"><div class="addrow"><input data-add="'+ea(key)+'" value="'+ea(v)+'" placeholder="항목 추가" aria-label="항목 추가"><button class="btn addbtn" data-act="add" data-key="'+ea(key)+'" aria-label="추가">'+ic('plus',22)+'</button></div></div>';
 }
 function closePop(){var p=document.querySelector('.fpop:not([hidden])');if(p)p.hidden=true;UI.popKey=null}
 function addPrompt(key,val){
   if(!(val||'').trim()){toast('항목을 입력해 주세요');return}
-  var p=document.querySelector('.fpop[data-pop="'+key+'"]');if(!p)return;
-  var open=p.hidden;closePop();
-  if(open){p.hidden=false;UI.popKey=key}
+  if(key==='pre'){addCl(key,val,'none');return}  // 사전준비는 시간대·알림 없이 텍스트만
+  UI.clDraft={key:key,t:val.trim(),ts:'none',at:'',ao:false};UI.sheet='cl';render();  // 날짜 항목은 시트에서 시간대·알림을 고르고 등록(기본 지정없음)
 }
 
 /* ---------- screens ---------- */
@@ -706,6 +728,9 @@ function sheetHtml(){
     body+=card('<b style="font-size:15px">새 여행 만들기</b><div class="small muted" style="margin-top:4px">템플릿·복제는 다녀온 뒤 추가할 예정이에요. 지금은 가져오기로 만들 수 있어요.</div>');
     body+=card('<div class="lbl">백업 · 복원</div><div class="row"><button class="btn" data-act="export">'+ic('dl',16)+'백업 내보내기</button><label class="btn" style="cursor:pointer">'+ic('ul',16)+'가져오기<input type="file" id="imp" accept="application/json,.json" style="display:none"></label></div>');
     body+=card('<div class="row between"><span class="small muted">앱 버전 '+VER+'</span><button class="btn" data-act="sheet" data-v="key">키 변경</button></div>');
+  }else if(v==='cl'){
+    var cdr=UI.clDraft||{ts:'none'};
+    body=shead(cdr.t||'체크리스트 추가')+tsChips('clts',null,cdr.ts||'none')+alRow(cdr.at,cdr.ao,'')+'<button class="btn pri" data-act="cl-save">등록</button>';
   }else if(v==='exp'){
     var dr=UI.expDraft||{};
     body=shead((dr.id?'지출 수정':'지출 추가'))+
@@ -846,12 +871,12 @@ function findCl(id){for(var i=0;i<CL.items.length;i++){if(CL.items[i].id===id)re
 function commitEdit(id,val){
   if(UI.edit!==id)return;
   val=(val||'').trim();var it=findCl(id);
-  if(it&&val&&val!==it.t){it.t=val;tdUpd(it,{text:val})}
+  if(it&&val&&val!==it.t){it.t=val;tdUpd(it,{text:val});if(it.at&&it.ao&&!it.done)alUpdate(it,true)}
   UI.edit=null;UI.editVal=null;render();
 }
-function addCl(key,val,ts){
+function addCl(key,val,ts,at,ao){
   val=(val||'').trim();if(!val)return;
-  var it={id:newClId(key),date:clDate(key),pre:key==='pre',t:val,ts:ts||'none',done:false,created:Date.now()};
+  var it={id:newClId(key),date:clDate(key),pre:key==='pre',t:val,ts:ts||'none',done:false,created:Date.now(),at:key==='pre'?'':(at||''),ao:key==='pre'?false:!!(at&&ao)};
   CL.items.push(it);tdAdd(it);delete UI.addTxt[key];render();
   var ni=document.querySelector('input[data-add="'+key+'"]');if(ni)ni.focus();
 }
@@ -1009,6 +1034,8 @@ function nearestLine(){
 function focusNowLine(){
   if(UI.sched!==today())return;
   var el=nearestLine(),sc=document.getElementById('screen');if(!el)return;
+  var first=document.querySelector('#screen .tl .ev[data-t]'),ft=first&&first.getAttribute('data-t');
+  if(ft&&/^\d{1,2}:\d{2}$/.test(ft)&&nowMin()<hmMin(ft))return;  // 첫 일정 전에는 내리지 않고 맨 위부터 보여준다
   sc.scrollTop+=el.getBoundingClientRect().top-sc.getBoundingClientRect().top-40;  // 바로 앞 줄이 조금 보이도록 여유를 둔다
 }
 /* 화면을 좌우로 쓸면 옆 탭으로 이동. 가로로 움직이는 영역(칩·사진 줄)이나 입력창, 열린 시트에서는 반응하지 않는다 */
@@ -1124,12 +1151,16 @@ function onClick(e){
     case 'pk-day':if(PK){PK.sel=v;renderPicker()}break;
     case 'pk-prev':case 'pk-next':if(PK){PK.m+=(a==='pk-next'?1:-1);if(PK.m<0){PK.m=11;PK.y--}else if(PK.m>11){PK.m=0;PK.y++}renderPicker()}break;
     case 'plan':setChoice(el.getAttribute('data-date'),el.getAttribute('data-slot'),v);break;
-        case 'ck':{var it=findCl(id);if(it){it.done=el.checked;it.completedAt=it.done?Date.now():null;tdUpd(it,{done:it.done,completed_at:it.completedAt});render()}break}
+        case 'ck':{var it=findCl(id);if(it){it.done=el.checked;it.completedAt=it.done?Date.now():null;tdUpd(it,{done:it.done,completed_at:it.completedAt});if(it.at)alUpdate(it,true);render()}break}
     case 'edit':UI.edit=id;UI.editVal=null;render();break;
     case 'edit-ok':{var inp=document.querySelector('input.edit');commitEdit(id,inp?inp.value:'');break}
     case 'del':{var it2=findCl(id);if(it2){CL.items=CL.items.filter(function(x){return x.id!==id});tdDel(it2);render();toastUndo('항목을 삭제했어요',function(){tdUndoDel(it2);render()})}break}
     case 'add':{var key=el.getAttribute('data-key'),ai=document.querySelector('input[data-add="'+key+'"]');addPrompt(key,ai?ai.value:'');break}
-    case 'addts':{var key2=el.getAttribute('data-key'),ai2=document.querySelector('input[data-add="'+key2+'"]');addCl(key2,ai2?ai2.value:'',v);break}
+    case 'clts':if(UI.clDraft){UI.clDraft.ts=v;render()}break
+    case 'cl-save':{var cd=UI.clDraft;if(cd){UI.sheet=null;UI.clDraft=null;addCl(cd.key,cd.t,cd.ts,cd.at,cd.ao)}break}
+    case 'alpick':{if(id)keepEdit();var ai3=id?findCl(id):UI.clDraft,cur3=ai3&&ai3.at||'';openPicker('time',cur3||'09:00','알림 시각',function(val){if(!val)return;if(id){var x3=findCl(id);if(x3){setItemAlert(x3,val,true);render()}}else if(UI.clDraft){UI.clDraft.at=val;UI.clDraft.ao=true;render()}});break}
+    case 'albell':{if(id)keepEdit();var ai4=id?findCl(id):UI.clDraft;if(!ai4)break;if(!ai4.at){el.nextElementSibling&&el.nextElementSibling.click();break}if(id){setItemAlert(ai4,ai4.at,!ai4.ao)}else ai4.ao=!ai4.ao;render();break}
+    case 'alclr':{if(id){keepEdit();var x5=findCl(id);if(x5)setItemAlert(x5,'',false)}else if(UI.clDraft){UI.clDraft.at='';UI.clDraft.ao=false}render();break}
     case 'exp-new':openExp(null);break;
     case 'expedit':openExp(id);break;
     case 'xpick':{
@@ -1340,7 +1371,7 @@ function boot(){
   loadTrip();
   render();
   restoreDraft();
-  window.addEventListener('pageshow',function(e){if(e.persisted){render();pull()}});
+  window.addEventListener('pageshow',function(e){if(e.persisted)location.reload()});  // 이이코토 등 다른 페이지에서 뒤로 돌아오면(캐시 복원) 하단바가 내려가 보이는 문제 — 완전히 새로 불러온다(전송 대기 중인 작업은 기기에 저장돼 있어 유지됨)
   if(!cfg.key){UI.sheet='key';render()}
   else{
     loadTrips().then(function(){if(!M)loadTrip();render();return pull(true)});
