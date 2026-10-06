@@ -57,7 +57,7 @@ h1{margin:0;font-family:var(--serif);font-size:28px;font-weight:700;line-height:
 .sub{font-size:13px;color:var(--sub);margin-top:4px}
 .titlebar{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;min-height:34px;margin-top:-4px}
 .titlebar .syncst{min-height:0;padding-bottom:3px}
-.titlebar .prebtn{margin:-6px 0 -4px}  /* 터치 영역(44px)은 유지하고 줄 높이에는 덜 반영 */
+.titlebar .prebtn{margin:-3px -6px -3px 0}  /* 터치 영역(40px)은 유지하고 줄 높이에는 덜 반영 */
 .fab{width:46px;height:46px;flex:none;border-radius:50%;border:1px solid var(--yel-bd);background:var(--yel-bg);color:var(--yel-tx);display:flex;align-items:center;justify-content:center;padding:0;box-shadow:0 3px 10px rgba(235,180,20,.25)}
 .card{background:var(--card);border:1.4px solid var(--cardb);border-radius:18px;padding:16px;box-shadow:var(--shadow)}
 .card.sm{padding:12px}
@@ -117,8 +117,10 @@ select.fld{background:rgba(255,255,255,.7)}
 .syncst{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--sub);background:transparent;border:0;padding:0;min-height:44px}
 
 .dtitle{display:flex;align-items:center;gap:0}
-.dnum{font-family:var(--serif);font-size:38px;font-weight:700;line-height:1.1;padding:0 4px}
-.dnum .dwd{font-size:20px;font-weight:400;color:var(--sub)}
+.sunl{display:flex;align-items:center;justify-content:center;gap:5px;margin-top:6px;font-size:12px;color:var(--sub);font-variant-numeric:tabular-nums}
+.sunl i:nth-of-type(2){margin-left:8px}
+.dnum{font-family:var(--serif);font-size:30px;font-weight:700;line-height:1.1;padding:0 4px}
+.dnum .dwd{font-size:16px;font-weight:400;color:var(--sub)}
 .dnav{width:32px;height:44px;border:0;background:transparent;color:var(--sub);opacity:.5;padding:0;display:flex;align-items:center;justify-content:center}
 .dnav.off{opacity:.18;pointer-events:none}
 .mrow{display:flex;gap:10px;padding:10px 0}
@@ -227,7 +229,9 @@ select.fld{background:rgba(255,255,255,.7)}
 
 .fab.sm{width:36px;height:36px;box-shadow:0 2px 6px rgba(235,180,20,.22)}
 .card.flat.nb{border-top:0;padding-top:0}
-.prebtn{flex:none}
+.prebtn{flex:none;position:relative;width:40px;height:40px;border:0;background:transparent;color:var(--sub);padding:0;display:flex;align-items:center;justify-content:center}
+.prebtn.on{color:var(--sel-tx)}
+.prebtn .cb{position:absolute;top:3px;right:2px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--sel-tx);color:#fff;font-size:10px;font-weight:700;line-height:16px;text-align:center}
 /* 사파리 기본 파란 포커스 테두리 제거(입력창은 테두리 색으로만 표시) */
 input,textarea,select,button,a{outline:none;-webkit-tap-highlight-color:transparent}
 input:focus,textarea:focus,select:focus{outline:none;box-shadow:none}
@@ -331,6 +335,6 @@ input:focus,textarea:focus,select:focus{outline:none;box-shadow:none}
 <div id="bg-fixed"></div>
 <div id="app"><div id="topsafe"></div><div id="pin"></div><main id="screen"></main><nav id="tabbar" aria-label="하단 탭"></nav></div>
 <div id="sheet"></div><div id="toast"></div><div id="picker"></div>
-<script src="iitabi.js?v=2026.10.06-35"></script>
+<script src="iitabi.js?v=2026.10.06-37"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-var VER='2026.10.06-35';
+var VER='2026.10.06-37';
 var SUPA_URL='https://vqvpzrxmtpryzhontlxc.supabase.co';
 var SUPA_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdnB6cnhtdHByeXpob250bHhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTgxMjksImV4cCI6MjA5NjYzNDEyOX0.pbtq1UMPC7ylYM1H2xVa19C1TFlceLmEfEtkz3WK2VI';
 var LSP='iitabi:';
@@ -248,25 +248,34 @@ function pullMemos(){
     if(!rows)return;MEMOS=rows;lset('memos:'+cfg.tripId,MEMOS);
   });
 }
+function hmOf(s){return s&&/T\d{2}:\d{2}/.test(s)?s.slice(s.indexOf('T')+1,s.indexOf('T')+6):null}
+function wxHasSun(){var d=WX.d;if(!d)return false;return Object.keys(d).every(function(c){return Object.keys(d[c]).some(function(k){return d[c][k].sr})})}  // 일출·일몰이 없는 예전 저장분이면 다시 받는다
 function pullWeather(){
   var t=trip();if(!t)return;
   var last=lget('wxAt:'+cfg.tripId,0);
-  if(Date.now()-last<3*3600*1000&&WX.d)return;
+  if(Date.now()-last<3*3600*1000&&WX.d&&wxHasSun())return;
   var done=0;var out={};
   t.cities.forEach(function(c){
-    var u='https://api.open-meteo.com/v1/forecast?latitude='+c.lat+'&longitude='+c.lng+'&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunshine_duration,daylight_duration&timezone=Asia%2FTokyo&forecast_days=16';
+    var u='https://api.open-meteo.com/v1/forecast?latitude='+c.lat+'&longitude='+c.lng+'&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunshine_duration,daylight_duration,sunrise,sunset&timezone=auto&forecast_days=16';
     fetch(u).then(function(r){return r.ok?r.json():null}).then(function(j){
       if(j&&j.daily){j.daily.time.forEach(function(d,i){
         var sun=j.daily.sunshine_duration?j.daily.sunshine_duration[i]:null,dl=j.daily.daylight_duration?j.daily.daylight_duration[i]:null;
         var pp=j.daily.precipitation_probability_max?j.daily.precipitation_probability_max[i]:null;
         var ratio=(sun!=null&&dl)?sun/dl:null;
         var good=(pp==null||pp<=40)&&(ratio==null||ratio>=0.5);
-        (out[c.id]=out[c.id]||{})[d]={tmax:j.daily.temperature_2m_max[i],tmin:j.daily.temperature_2m_min[i],pp:pp,ratio:ratio,sun:good};
+        (out[c.id]=out[c.id]||{})[d]={tmax:j.daily.temperature_2m_max[i],tmin:j.daily.temperature_2m_min[i],pp:pp,ratio:ratio,sun:good,sr:hmOf(j.daily.sunrise&&j.daily.sunrise[i]),ss:hmOf(j.daily.sunset&&j.daily.sunset[i])};
       })}
     }).catch(function(){}).then(function(){
       done++;if(done===t.cities.length){WX={d:out};lset('wx:'+cfg.tripId,WX);lset('wxAt:'+cfg.tripId,Date.now());renderSafe()}
     });
   });
+}
+/* 일출·일몰: 오늘은 현재 위치 기준 도시, 다른 날은 그날 일정의 도시 기준(현재 도시와 일정 도시가 다르면 도시 이름을 붙인다) */
+function sunLine(vd){
+  var id=vd===today()?curCity():cityOfDate(vd),w=WX.d&&WX.d[id]&&WX.d[id][vd];
+  if(!w||!w.sr||!w.ss)return '';
+  var name=id!==cityOfDate(vd)?'<span>'+esc(cityName(id))+' ·</span>':'';
+  return '<div class="sunl">'+name+ic('sunrise',15,pcol('orange')[2])+'<span>일출 '+w.sr+'</span>'+ic('sunset',15,pcol('pink')[2])+'<span>일몰 '+w.ss+'</span></div>';
 }
 function wxOf(d){var c=cityOfDate(d);return WX.d&&WX.d[c]&&WX.d[c][d]||null}
 function loadTrips(){
@@ -484,7 +493,7 @@ function screenToday(){
   var s=stayOf(vd),cid=cityOfDate(vd);
   var h='';
   h+='<div style="display:flex;flex-direction:column;align-items:center"><div class="dtitle"><button class="dnav'+(idx<=1?' off':'')+'" '+(idx<=1?'disabled ':'')+'data-act="dprev" aria-label="전날">'+ic('chevl',18)+'</button><span class="dnum"><span>'+md(vd)+'</span> <span class="dwd">'+wd(vd)+'</span></span><button class="dnav'+(idx>=N?' off':'')+'" '+(idx>=N?'disabled ':'')+'data-act="dnext" aria-label="다음날">'+ic('chevr',18)+'</button></div>'+
-    '<div class="row" style="margin-top:4px;justify-content:center">'+cityChip(cid)+(s?'<span class="small muted">'+esc(s.d.name)+'</span>':'')+'</div></div>';
+    '<div class="row" style="margin-top:4px;justify-content:center">'+cityChip(cid)+(s?'<span class="small muted">'+esc(s.d.name)+'</span>':'')+'</div>'+sunLine(vd)+'</div>';
   if(UI.keyBad)h+=card('<b>데이터를 불러오지 못했어요</b><div class="small muted" style="margin-top:4px">접근 키가 맞지 않을 수 있어요.</div><button class="btn" style="margin-top:10px" data-act="sheet" data-v="key">키 다시 입력</button>');
   var note=(t.dayNotes||{})[vd];if(note)h+='<div>'+chip(esc(note),'pn')+'</div>';
   var ev=eventsOf(vd),next=nextEventOf(vd);
@@ -492,7 +501,7 @@ function screenToday(){
     var d=next.d;
     var ckb=d.done?'<span class="bnck on" aria-label="완료한 일정">'+ic('check',17)+'</span>':'<button class="bnck" data-act="bnck" data-id="'+ea(next.cid)+'" aria-label="'+ea(d.title)+' 완료">'+ic('check',17)+'</button>';
     var per=periodOf(d.time||SLOTDEF[d.slot]||'12:00');
-    h+='<div class="card bn bn-'+per+'">'+ctitle('다음 일정',ckb)+'<div style="font-family:var(--serif);font-size:19px;font-weight:700;line-height:1.3;color:var(--bn-t)">'+esc(d.title)+'</div>'+(d.desc?'<div style="font-size:13px;color:var(--bn-s);margin-top:5px;line-height:1.5">'+esc(d.desc)+'</div>':'')+
+    h+='<div class="card bn bn-'+per+'">'+ctitle(ev[ev.length-1]===next?'마지막 일정':'다음 일정',ckb)+'<div style="font-family:var(--serif);font-size:19px;font-weight:700;line-height:1.3;color:var(--bn-t)">'+esc(d.title)+'</div>'+(d.desc?'<div style="font-size:13px;color:var(--bn-s);margin-top:5px;line-height:1.5">'+esc(d.desc)+'</div>':'')+
       ((d.map)?'<div class="row" style="margin-top:14px"><a class="btn" style="flex:1;text-decoration:none" href="'+ea(mapUrl(d.map))+'" target="_blank" rel="noopener">'+ic('pin',17)+'지도에서 열기</a>'+(d.nav?'<a class="ibtn" aria-label="길찾기(대중교통)" href="'+ea(navUrl(d.map))+'" target="_blank" rel="noopener">'+ic('nav',20)+'</a>':'')+'</div>':'')+'</div>';
   }
   var w=wxOf(vd),conds=ev.filter(function(e){return e.d.cond});
@@ -511,7 +520,7 @@ function screenToday(){
     });
     h+=card(ph,'flat');
   }
-  var items=clItems(vd).concat(vd===preDate()?clItems('pre'):[]);
+  var items=clItems(vd);
   var done=items.filter(function(i){return i.done}).length;
   h+=card(ctitle('체크리스트',done+' / '+items.length,['list-check','lav'])+(items.length?bar(done/items.length*100)+'<div style="margin-top:6px">'+clList(items,'ck')+'</div>':'<div class="small muted">등록된 항목이 없어요. 체크 탭에서 추가해요.</div>'),'flat nb');
   var exs=localList().filter(function(x){return x.d.date===vd}).sort(byTimeDesc);
@@ -560,7 +569,7 @@ function screenCheck(){
   var dates=tripDates(),d=UI.clDate&&dates.indexOf(UI.clDate)>=0?UI.clDate:clampDate(today());
   UI.clDate=d;
   var pn=clItems('pre'),pl=pn.filter(function(i){return !i.done}).length;
-  var preBtn='<button class="btn sm prebtn'+(UI.clPre?' on':'')+'" style="'+selVars('lav')+'" data-act="clpre" aria-pressed="'+(!!UI.clPre)+'">'+ic('luggage',16)+'사전준비'+(pl?' '+pl:'')+'</button>';
+  var preBtn='<button class="prebtn'+(UI.clPre?' on':'')+'" data-act="clpre" aria-pressed="'+(!!UI.clPre)+'" aria-label="사전준비'+(pl?' '+pl+'개 남음':'')+'">'+ic('luggage',22)+(pl?'<span class="cb">'+pl+'</span>':'')+'</button>';
   PINH=titleBar('체크리스트',null,preBtn,'lav')+weekStrip(d,'cdate',dayLeft);
   var h='';
   if(UI.clPre)h+=clCard('사전준비','pre',chip(md(preDate())+' · iikoto','ln'),pn);
