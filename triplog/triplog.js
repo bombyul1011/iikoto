@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-var VER='2026.10.06-14';
+var VER='2026.10.06-15';
 var SUPA_URL='https://vqvpzrxmtpryzhontlxc.supabase.co';
 var SUPA_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdnB6cnhtdHByeXpob250bHhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTgxMjksImV4cCI6MjA5NjYzNDEyOX0.pbtq1UMPC7ylYM1H2xVa19C1TFlceLmEfEtkz3WK2VI';
 var LSP='triplog:';
@@ -31,7 +31,7 @@ var ECATC={food:'orange',cafe:'pink',move:'sky',shop:'lav',entry:'lime',etc:'gra
 var TABC={today:'orange',sched:'sky',check:'lav',budget:'mint',spots:'rose'};
 var ECAT={food:'식사',cafe:'카페',move:'교통',shop:'쇼핑',entry:'입장',etc:'기타'};
 var ECATI={food:'tools-kitchen-2',cafe:'coffee',move:'train',shop:'shopping-bag',entry:'ticket',etc:'dots'};
-var TI={sun:'sun',cal:'calendar',chk:'list-check',wal:'wallet',pin:'map-pin',nav:'navigation',chevd:'chevron-down',chevr:'chevron-right',chevl:'chevron-left',plus:'plus',pen:'pencil',x:'x',check:'check',cloud:'cloud',cloudok:'cloud-check',cloudoff:'cloud-off',refresh:'refresh',ext:'external-link',plane:'plane',bed:'bed',sim:'device-sim',bus:'bus',tag:'tag',checkc:'circle-check',trash:'trash',dl:'download',ul:'upload',clock:'clock',notes:'notes',calplus:'calendar-plus'};
+var TI={flower:'flower',sun:'sun',cal:'calendar',chk:'list-check',wal:'wallet',pin:'map-pin',nav:'navigation',chevd:'chevron-down',chevr:'chevron-right',chevl:'chevron-left',plus:'plus',pen:'pencil',x:'x',check:'check',cloud:'cloud',cloudok:'cloud-check',cloudoff:'cloud-off',refresh:'refresh',ext:'external-link',plane:'plane',bed:'bed',sim:'device-sim',bus:'bus',tag:'tag',checkc:'circle-check',trash:'trash',dl:'download',ul:'upload',clock:'clock',notes:'notes',calplus:'calendar-plus'};
 function ic(n,s,c){return '<i class="ti ti-'+(TI[n]||n)+'" aria-hidden="true" style="font-size:'+(s||20)+'px;'+(c?'color:'+c+';':'')+'"></i>'}
 function esc(t){return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 function ea(t){return esc(t).replace(/"/g,'&quot;')}
@@ -367,7 +367,7 @@ function evBody(e){
   var d=e.d;
   var tags=(d.tags||[]).map(function(t){return chip(esc(t),'pn')}).join(' ');
   var link=d.link?'<a class="small" style="display:inline-flex;align-items:center;gap:4px;min-height:36px;font-weight:700" href="'+ea(d.link.url)+'" target="_blank" rel="noopener">'+ic('ext',14)+esc(d.link.label)+'</a>':'';
-  return '<div class="row" style="align-items:flex-start;gap:4px"><div class="grow"><h3 style="margin:0;font-size:15px;line-height:1.35">'+esc(d.title)+'</h3>'+(d.desc?'<p style="margin:3px 0 0;font-size:13px;color:var(--sub);line-height:1.45">'+esc(d.desc)+'</p>':'')+(tags?'<div class="chips" style="margin-top:8px">'+tags+'</div>':'')+(d.alt?'<p style="margin:6px 0 0;font-size:12px;color:var(--sub)">'+esc(d.alt)+'</p>':'')+spentLine(e.cid)+link+'</div><div class="icos"><button class="ico" data-act="evedit" data-id="'+ea(e.cid)+'" aria-label="일정 수정">'+ic('pen',16)+'</button>'+(d.map?icoMap(d.map):'')+(d.nav&&d.map?icoNav(d.map):'')+'</div></div>';
+  return '<div class="row" style="align-items:flex-start;gap:2px"><div class="grow"><h3 style="margin:0;font-size:15px;line-height:1.35">'+esc(d.title)+'</h3>'+(d.desc?'<p style="margin:3px 0 0;font-size:13px;color:var(--sub);line-height:1.45">'+esc(d.desc)+'</p>':'')+(tags?'<div class="chips" style="margin-top:8px">'+tags+'</div>':'')+(d.alt?'<p style="margin:6px 0 0;font-size:12px;color:var(--sub)">'+esc(d.alt)+'</p>':'')+spentLine(e.cid)+link+'</div><div class="icos"><button class="ico" data-act="evedit" data-id="'+ea(e.cid)+'" aria-label="일정 수정">'+ic('pen',16)+'</button>'+(d.map?icoMap(d.map):'')+(d.nav&&d.map?icoNav(d.map):'')+'</div></div>';
 }
 function evRow(e,cc){
   var d=e.d,done=!!d.done;
@@ -443,7 +443,7 @@ function screenToday(){
     var d=next.d;
     var tm=d.time?ic('clock',13)+' '+esc(d.time):esc(SLOTL[d.slot]||'');
     var per=periodOf(d.time||SLOTDEF[d.slot]||'12:00');
-    h+='<div class="card bn bn-'+per+'">'+ctitle('다음 일정',tm)+'<div style="font-family:var(--serif);font-size:23px;font-weight:700;line-height:1.3;color:var(--bn-t)">'+esc(d.title)+'</div>'+(d.desc?'<div style="font-size:14px;color:var(--bn-s);margin-top:6px;line-height:1.5">'+esc(d.desc)+'</div>':'')+
+    h+='<div class="card bn bn-'+per+'">'+ctitle('다음 일정',tm)+'<div style="font-family:var(--serif);font-size:19px;font-weight:700;line-height:1.3;color:var(--bn-t)">'+esc(d.title)+'</div>'+(d.desc?'<div style="font-size:13px;color:var(--bn-s);margin-top:5px;line-height:1.5">'+esc(d.desc)+'</div>':'')+
       ((d.map)?'<div class="row" style="margin-top:14px"><a class="btn" style="flex:1;text-decoration:none" href="'+ea(mapUrl(d.map))+'" target="_blank" rel="noopener">'+ic('pin',17)+'지도에서 열기</a>'+(d.nav?'<a class="ibtn" aria-label="길찾기(대중교통)" href="'+ea(navUrl(d.map))+'" target="_blank" rel="noopener">'+ic('nav',20)+'</a>':'')+'</div>':'')+'</div>';
   }
   var w=wxOf(vd),conds=ev.filter(function(e){return e.d.cond});
@@ -539,21 +539,21 @@ function fxCardHtml(){
     (auto?'<div class="row between" style="margin-top:10px"><span class="small muted">카드·환전 수수료 보정</span><span class="row" style="gap:6px"><input class="fld" style="flex:none;width:64px;height:40px;text-align:right" inputmode="decimal" data-fxadj="1" value="'+(f.adj||0)+'" aria-label="보정 퍼센트"><span class="muted">%</span></span></div>':'')+
     '<div class="small muted" style="margin-top:8px;line-height:1.5">'+info+'<br>실제 환전·카드 결제 환율과 다를 수 있어요.</div>';
 }
-function amtHtml(e){
-  var d=e.d;
-  if(d.currency==='JPY')return '<div style="font-size:15px;font-weight:700">¥'+won(d.amount)+'</div><div class="small muted">≈ '+won(d.amount*fx())+'원</div>';
-  return '<div style="font-size:15px;font-weight:700">'+won(d.amount)+'원</div>';
+function amtPair(d){
+  if(d.currency==='JPY')return '<div class="amt"><b>'+won(d.amount*fx())+'원</b><span class="yen">¥'+won(d.amount)+'</span></div>';
+  return '<div class="amt"><b>'+won(d.amount)+'원</b></div>';
 }
+function amtHtml(e){return amtPair(e.d)}
 function xKrw(e){return e.d.currency==='KRW'?e.d.amount:e.d.amount*fx()}
 function sumInfo(list){var j=0,k=0;list.forEach(function(e){if(e.d.currency==='KRW')k+=e.d.amount;else j+=e.d.amount});return {jpy:j,krw:k,est:j*fx()+k}}
-function sumLabel(i){if(i.jpy&&i.krw)return '¥'+won(i.jpy)+' + '+won(i.krw)+'원 ≈ '+won(i.est)+'원';if(i.jpy)return '¥'+won(i.jpy)+' ≈ '+won(i.est)+'원';return won(i.krw)+'원'}
+function sumLabel(i){return '<b style="color:var(--tx)">'+won(i.est)+'원</b>'+(i.jpy?' <span class="yen">¥'+won(i.jpy)+'</span>':'')}
 function localList(){return M.expenses.filter(function(e){return e.d.local})}
 function refList(cid){return localList().filter(function(e){return e.d.ref&&e.d.ref.cid===cid})}
 function spentLine(cid){var l=refList(cid);if(!l.length)return '';return '<div class="small" style="margin-top:6px;color:var(--sub)">'+ic('cash',14)+' 지출 '+sumLabel(sumInfo(l))+'</div>'}
 function expRow(e,ro){
   var d=e.d,krw=d.currency==='KRW';
   var sub=[];if(d.ref&&d.ref.name&&d.ref.name!==d.name)sub.push(d.ref.name);if(krw)sub.push('원화 결제');
-  var amt=krw?'<div style="font-size:14px;font-weight:700">'+won(d.amount)+'원</div>':'<div style="font-size:14px;font-weight:700">¥'+won(d.amount)+'</div><div class="small muted">≈'+won(d.amount*fx())+'원</div>';
+  var amt=amtPair(d);
   return '<div class="xrow"><span class="xt">'+esc(d.time||'')+'</span><span class="xi">'+bdg(ECATI[d.ecat]||'dots',ECATC[d.ecat]||'gray',30)+'</span><div class="grow"><div style="font-size:14px;line-height:1.35">'+esc(d.name)+'</div>'+(sub.length?'<div class="small muted">'+esc(sub.join(' · '))+'</div>':'')+'</div><div style="text-align:right">'+amt+'</div>'+(ro?'':'<button class="ico" data-act="expedit" data-id="'+ea(e.cid)+'" aria-label="수정">'+ic('pen',16)+'</button>')+'</div>';
 }
 function screenBudget(){
@@ -569,12 +569,11 @@ function screenBudget(){
   var h=titleBar('경비','사전 결제 '+items.length+'건 · 현지 '+localList().length+'건','<button class="fab" data-act="exp-new" aria-label="지출 추가">'+ic('plus',24)+'</button>','mint');
   h+=card('<div class="row between" style="margin-bottom:2px"><div class="lbl" style="margin-bottom:0">총 지출</div><button class="fxtap" data-act="sheet" data-v="fx" aria-label="환율 보기">1엔 = '+rate2()+'원 '+ic('chevd',14)+'</button></div><div style="font-family:var(--serif);font-size:36px;font-weight:700">'+won(total)+'<span style="font-size:18px;color:var(--sub)">원</span></div>'+
     '<div class="gantt"><span style="flex:'+(air||0.001)+';background:'+CH[0]+'"></span><span style="flex:'+(stay||0.001)+';background:'+CH[1]+'"></span><span style="flex:'+(etc||0.001)+';background:'+CH[2]+'"></span><span style="flex:'+(local||0.001)+';background:'+CH[3]+'"></span></div>'+
-    '<div class="legend"><span><i style="background:'+CH[0]+'"></i>항공 '+won(air)+'</span><span><i style="background:'+CH[1]+'"></i>숙소 '+won(stay)+'</span><span><i style="background:'+CH[2]+'"></i>기타 '+won(etc)+'</span><span><i style="background:'+CH[3]+'"></i>현지 '+won(local)+'</span></div>'+
-    '<div class="small muted" style="margin-top:10px">엔화는 위 환율로 환산한 대략 금액이에요.</div>');
+    '<div class="legend"><span><i style="background:'+CH[0]+'"></i>항공 '+won(air)+'</span><span><i style="background:'+CH[1]+'"></i>숙소 '+won(stay)+'</span><span><i style="background:'+CH[2]+'"></i>기타 '+won(etc)+'</span><span><i style="background:'+CH[3]+'"></i>현지 '+won(local)+'</span></div>');
   PINH=h;h='';
   var cs={};localList().forEach(function(e){cs[e.d.ecat||'etc']=(cs[e.d.ecat||'etc']||0)+xKrw(e)});
   var ck=Object.keys(ECAT).filter(function(k){return cs[k]});
-  if(ck.length)h+='<div class="chips">'+ck.map(function(k){return chip(ic(ECATI[k],14)+' '+ECAT[k]+' ≈'+won(cs[k])+'원','',tint(ECATC[k]))}).join('')+'</div>';
+  if(ck.length)h+='<div class="chips">'+ck.map(function(k){return chip(ic(ECATI[k],14)+' '+ECAT[k]+' '+won(cs[k])+'원','',tint(ECATC[k]))}).join('')+'</div>';
   var byDay={};localList().forEach(function(e){(byDay[e.d.date]=byDay[e.d.date]||[]).push(e)});
   var days=Object.keys(byDay).sort().reverse();
   if(days.length){
@@ -588,7 +587,7 @@ function screenBudget(){
   var iconOf=function(x){var d=x.o.d;return x.k==='stay'?'bed':(d.cat==='air'?'plane':(d.cat==='sim'?'sim':(d.cat==='transport'?'bus':'tag')))};
   var fixed=items.slice();
   fixed.sort(function(a,b){return (a.o.d.currency==='JPY'?1:0)-(b.o.d.currency==='JPY'?1:0)});
-  if(fixed.length)h+='<div class="lbl" style="margin:6px 0 0">사전 결제</div><div class="small muted" style="margin-top:-8px">금액이 다르면 항목을 눌러 고쳐요.</div>';
+  if(fixed.length)h+='<div class="lbl" style="margin:6px 0 0">사전 결제</div>';
   fixed.forEach(function(x){
     var d=x.o.d,c=x.k==='stay'?cityCol(d.city)[1]:null;
     h+=card('<div class="row" style="gap:12px">'+bdg(iconOf(x),x.k==='stay'?'lav':(d.cat==='air'?'sky':'orange'),42)+'<div class="grow"><div class="row" style="gap:6px">'+(c?'<i style="width:10px;height:10px;border-radius:50%;background:'+c+';display:inline-block"></i>':'')+'<b style="font-size:15px">'+esc(d.name)+'</b></div><div class="small muted" style="margin-top:3px;line-height:1.45">'+esc(x.k==='stay'?(d.nights+'박 · '+md(d.checkin)+' – '+md(d.checkout)+(d.note?' · '+d.note:'')):(d.note||''))+'</div></div><div style="text-align:right">'+amtHtml(x.o)+'</div></div>','sm').replace('<div class="card sm">','<div class="card sm" style="cursor:pointer" data-act="payedit" data-k="'+x.k+'" data-id="'+ea(x.o.cid)+'">');
@@ -640,7 +639,7 @@ function sheetHtml(){
     body=shead((dr.id?'지출 수정':'지출 추가'))+
        '<div class="tsc" style="margin:0">'+[['JPY','¥ 엔화'],['KRW','₩ 원화']].map(function(c){return '<button class="chip tsb'+((dr.cur||'JPY')===c[0]?' on':'')+'" data-act="expcur" data-v="'+c[0]+'" aria-pressed="'+((dr.cur||'JPY')===c[0])+'">'+c[1]+'</button>'}).join('')+'</div>'+
       '<div class="amtbox"><span class="yen" id="x_sym">'+curSym(dr.cur||'JPY')+'</span><input id="x_amt" inputmode="numeric" autocomplete="off" placeholder="0" aria-label="금액" value="'+ea(dr.amt||'')+'"></div><div class="small muted" id="x_krw" style="margin-top:-6px">'+expLine(dr.cur||'JPY',dr.amt)+'</div>'+
-      '<div><div class="lbl">분류</div><div class="tsc" style="margin-top:0">'+Object.keys(ECAT).map(function(k){return '<button class="chip tsb'+(dr.cat===k?' on':'')+'" data-act="expcat" data-v="'+k+'" style="'+selVars(ECATC[k])+'" aria-pressed="'+(dr.cat===k)+'">'+ic(ECATI[k],15,pcol(ECATC[k])[2])+ECAT[k]+'</button>'}).join('')+'</div></div>'+
+      '<div><div class="lbl">분류</div><div class="tsc hscroll" style="margin-top:0">'+Object.keys(ECAT).map(function(k){return '<button class="chip tsb'+(dr.cat===k?' on':'')+'" data-act="expcat" data-v="'+k+'" style="'+selVars(ECATC[k])+'" aria-pressed="'+(dr.cat===k)+'">'+ic(ECATI[k],15,pcol(ECATC[k])[2])+ECAT[k]+'</button>'}).join('')+'</div></div>'+
       '<div><div class="lbl">내용 · 장소 (선택)</div><input class="fld" id="x_name" style="width:100%" placeholder="이름을 치거나 아래에서 고르세요" autocomplete="off" aria-label="내용" value="'+ea(dr.name||'')+'"><div id="x_sug">'+xSugHtml(dr)+'</div></div>'+
       '<div class="dt2"><div><div class="lbl">날짜</div>'+dfld('date','x_date',dr.date,'날짜')+'</div><div><div class="lbl">시간</div>'+dfld('time','x_time',dr.time,'시간')+'</div></div>'+
       '<div class="row"><button class="btn pri" style="flex:1" data-act="exp-save">저장</button>'+(dr.id?'<button class="btn" data-act="exp-del" data-id="'+ea(dr.id)+'">삭제</button>':'')+'</div>';
@@ -703,7 +702,8 @@ function render(){
   }catch(e){console.error(e);h=card('<b>화면을 그리지 못했어요</b><div class="small muted">'+esc(e.message)+'</div>')}
   sc.innerHTML=h;
   document.getElementById('pin').innerHTML=PINH;
-  document.getElementById('tabbar').innerHTML=TABS.map(function(t){var c=pcol(TABC[t[0]]);return '<button data-act="tab" data-v="'+t[0]+'" class="'+(UI.tab===t[0]?'on':'')+'" aria-current="'+(UI.tab===t[0]?'page':'false')+'" style="--tc:'+c[0]+';--ts:'+c[2]+'"><span class="tabi">'+ic(t[2],24)+'</span><span>'+t[1]+'</span></button>'}).join('');
+  document.getElementById('tabbar').innerHTML=TABS.map(function(t){var c=pcol(TABC[t[0]]);return '<button data-act="tab" data-v="'+t[0]+'" class="'+(UI.tab===t[0]?'on':'')+'" aria-current="'+(UI.tab===t[0]?'page':'false')+'" style="--tc:'+c[0]+';--ts:'+c[2]+'"><span class="tabi">'+ic(t[2],24)+'</span><span>'+t[1]+'</span></button>'}).join('')+
+    '<button class="tablink" data-act="goiikoto" aria-label="이이코토 열기"><span class="tabi">'+ic('flower',24)+'</span><span>이이코토</span></button>';
   document.getElementById('bg-fixed').style.setProperty('--glow',pcol(TABC[UI.tab]||'orange')[1].replace(/,[\d.]+\)$/,',.26)'));
   document.getElementById('sheet').innerHTML=sheetHtml();
   if(UI.edit){var ei=document.querySelector('input.edit');if(ei&&document.activeElement!==ei){ei.focus();ei.select()}}
@@ -784,12 +784,13 @@ function setChoice(d,slot,v){
   else ch.d.plan=v;
   tiUp('choice',ch);render();
 }
-function expLine(cur,amt){var n=parseAmt(amt);return cur==='KRW'?'원화로 결제한 금액이에요 · 환산 없이 그대로 합산돼요':'≈ '+won(n*fx())+'원 (1엔 = '+rate2()+'원)'}
+function expLine(cur,amt){var n=parseAmt(amt);return cur==='KRW'?'원화로 결제한 금액이에요 · 환산 없이 그대로 합산돼요':won(n*fx())+'원 · 1엔 = '+rate2()+'원'}
 function updateExpLine(){var a=document.getElementById('x_amt'),k=document.getElementById('x_krw');if(k)k.textContent=expLine((UI.expDraft&&UI.expDraft.cur)||'JPY',a?a.value:'0')}
 function openExp(id){
   var base={id:null,cur:'JPY',cat:'food',amt:'',name:'',ref:'',date:today(),time:nowHM()};
   if(id){var ex=byCid(M.expenses,id);if(ex){var d=ex.d;base={id:ex.cid,cur:d.currency==='KRW'?'KRW':'JPY',cat:d.ecat||'etc',amt:String(d.amount),name:d.name||'',ref:d.ref?d.ref.t+':'+d.ref.cid:'',date:d.date||today(),time:d.time||nowHM()}}}
   UI.expDraft=base;UI.sheet='exp';render();persistDraft();
+  var sc=document.querySelector('.tsc.hscroll .chip.on');if(sc&&sc.scrollIntoView)sc.scrollIntoView({inline:'center',block:'nearest'});
   var a=document.getElementById('x_amt');if(a&&!id)a.focus();
 }
 function refInfo(val){
@@ -978,6 +979,7 @@ function onClick(e){
     case 'sync':pull(true).then(function(){toast('동기화했어요')});break;
     case 'date':UI.sched=v;render();break;
     case 'cdate':UI.clDate=v;render();break;
+    case 'goiikoto':window.location.href='https://bombyul1011.github.io/iikoto/';break;  // 채움로그와 같은 방식: 같은 창에서 본앱으로 이동
     case 'pick':{
       var pid=el.getAttribute('data-for'),ptype=el.getAttribute('data-pk'),pinp=document.getElementById(pid);
       openPicker(ptype,pinp?pinp.value:'',ptype==='date'?'날짜 선택':'시간 선택',function(val){

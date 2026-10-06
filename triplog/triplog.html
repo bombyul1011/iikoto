@@ -48,6 +48,8 @@ a{color:var(--sel-tx)}
 #screen>*{flex:none}
 #tabbar{flex:none;display:flex;background:transparent;border-top:1px solid rgba(200,175,140,.45);padding:6px 8px calc(8px + env(safe-area-inset-bottom));z-index:5}
 #tabbar button{flex:1;min-height:50px;border:0;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:500;color:var(--sub);padding:0}
+#tabbar .tablink{position:relative}
+#tabbar .tablink:before{content:'';position:absolute;left:0;top:10px;bottom:10px;width:1px;background:rgba(200,175,140,.45)}
 #tabbar button.on{color:var(--tc,var(--sel-tx));font-weight:700}
 #tabbar .tabi{height:28px;display:flex;align-items:center;justify-content:center}
 #tabbar button.on .tabi .ti{color:var(--ts)}
@@ -128,6 +130,9 @@ select.fld{background:rgba(255,255,255,.7)}
 .mrow .mb{flex:1;min-width:0;font-size:14px;line-height:1.55}
 .mrow .mb img{max-width:100%;border-radius:12px;margin-top:8px;display:block}
 .tsc{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.tsc.hscroll{flex-wrap:nowrap;overflow-x:auto;padding:2px;margin-left:-2px;margin-right:-2px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.tsc.hscroll::-webkit-scrollbar{display:none}
+.tsc.hscroll .chip{flex:none;white-space:nowrap}
 .chip.tsb{background:var(--chip);border:1px solid var(--cardb);color:var(--sub);min-height:36px;padding:0 14px;font-size:13px;cursor:pointer}
 .chip.tsb.on{background:var(--sb,var(--sel-bg));border-color:var(--sbd,var(--sel-bd));color:var(--st,var(--sel-tx));font-weight:700}
 .tshead{font-size:11px;font-weight:700;color:var(--sub);letter-spacing:.04em;padding:10px 0 0}
@@ -147,7 +152,8 @@ select.fld{background:rgba(255,255,255,.7)}
 .ev .mdot{display:block;width:7px;height:7px;border-radius:50%;background:var(--sub);opacity:.55}
 .ev .c{flex:1;min-width:0}
 .card.evdone h3{color:var(--sub)}
-.icos{display:flex;flex:none;margin:-4px -6px 0 0}
+.icos{display:flex;flex:none;margin:-4px -8px 0 0}
+.icos .ico{width:26px}
 .ico{width:34px;height:44px;border:0;background:transparent;color:var(--sel-tx);opacity:.85;padding:0;display:flex;align-items:center;justify-content:center;text-decoration:none;flex:none}
 .memoc{display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap;padding:9px 12px;border-radius:12px;border:1px dashed var(--cardb);background:rgba(255,253,248,.35);font-size:13px;line-height:1.5;color:var(--tx)}
 .memoc .ti{margin-top:3px;color:var(--sub)}
@@ -160,6 +166,9 @@ select.fld{background:rgba(255,255,255,.7)}
 .xrow{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--line)}
 .xrow:last-child{border-bottom:0}
 .xrow .xt{width:40px;flex:none;font-size:12px;font-weight:700;color:var(--sub);font-variant-numeric:tabular-nums}
+.amt{display:flex;align-items:baseline;justify-content:flex-end;gap:5px;white-space:nowrap}
+.amt b{font-size:14px;font-weight:700}
+.yen{font-size:11px;font-weight:400;color:var(--sub);font-variant-numeric:tabular-nums}
 .xrow .xi{width:30px;flex:none;display:flex;justify-content:center}
 
 /* 카드 제목 통일 */
@@ -262,6 +271,6 @@ select.fld{background:rgba(255,255,255,.7)}
 <div id="bg-fixed"></div>
 <div id="app"><div id="topsafe"></div><div id="pin"></div><main id="screen"></main><nav id="tabbar" aria-label="하단 탭"></nav></div>
 <div id="sheet"></div><div id="toast"></div><div id="picker"></div>
-<script src="triplog.js?v=2026.10.06-14"></script>
+<script src="triplog.js?v=2026.10.06-15"></script>
 </body>
 </html>
