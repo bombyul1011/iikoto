@@ -1,0 +1,24 @@
+{
+  "name": "iitabi",
+  "short_name": "iitabi",
+  "start_url": "./iitabi.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#faf8ee",
+  "theme_color": "#faf8ee",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
