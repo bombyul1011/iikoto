@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-var VER='2026.10.06-45';
+var VER='2026.10.06-46';
 var SUPA_URL='https://vqvpzrxmtpryzhontlxc.supabase.co';
 var SUPA_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdnB6cnhtdHByeXpob250bHhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTgxMjksImV4cCI6MjA5NjYzNDEyOX0.pbtq1UMPC7ylYM1H2xVa19C1TFlceLmEfEtkz3WK2VI';
 var LSP='iitabi:';
@@ -803,7 +803,7 @@ function render(){
   document.getElementById('tabbar').innerHTML=TABS.map(function(t){var c=pcol(TABC[t[0]]);return '<button data-act="tab" data-v="'+t[0]+'" class="'+(UI.tab===t[0]?'on':'')+'" aria-current="'+(UI.tab===t[0]?'page':'false')+'" style="--tc:'+c[0]+';--ts:'+c[2]+'"><span class="tabi">'+ic(t[2],24)+'</span><span>'+t[1]+'</span></button>'}).join('');
   document.getElementById('bg-fixed').style.setProperty('--glow',pcol(TABC[UI.tab]||'orange')[1].replace(/,[\d.]+\)$/,',.26)'));
   document.getElementById('sheet').innerHTML=sheetHtml();
-  if(UI.edit){var ei=document.querySelector('input.edit');if(ei&&document.activeElement!==ei){ei.focus();ei.select()}}
+  if(UI.edit){var ei=document.querySelector('input.edit');if(ei&&document.activeElement!==ei){ei.focus();var el2=ei.value.length;try{ei.setSelectionRange(el2,el2)}catch(e){}} /* 전체 선택(파란 드래그) 대신 글 끝에 커서만 */}
   sc.scrollTop=y;
   fitMemoList();
   var ml1=sc.querySelector('.memolist.scroll');if(ml1&&mly)ml1.scrollTop=mly;
