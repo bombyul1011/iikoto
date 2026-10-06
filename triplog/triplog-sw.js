@@ -1,6 +1,6 @@
 /* triplog service worker — 앱 파일만 캐시(오프라인 열기). 데이터 요청은 건드리지 않음.
    VER는 triplog.html의 triplog.js?v= 값, triplog.js의 VER와 반드시 같이 올린다. */
-var VER='2026.10.06-13';
+var VER='2026.10.06-14';
 var CACHE='triplog-'+VER;
 var SHELL=['./triplog.html','./triplog.js?v='+VER,'./manifest.webmanifest'];
 var TABLER=['https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css','https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/fonts/tabler-icons.woff2?v3.31.0'];
