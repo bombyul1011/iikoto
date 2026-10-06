@@ -195,6 +195,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .slabel-row{display:flex;align-items:center;justify-content:space-between;margin:14px 2px 7px 2px;}
 .slabel-row .slabel{margin:0;}
 .slabel-search-btn{background:none;border:none;padding:2px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--tm);opacity:.7;}
+.iitabi-link{background:none;border:none;padding:0;display:flex;align-items:center;gap:4px;cursor:pointer;color:var(--tm);opacity:.85;position:relative;} /* 오늘 일정 제목줄 오른쪽 iitabi 링크 — 테두리·배경 없이 아이콘+글자만 */
+.iitabi-link::after{content:'';position:absolute;inset:-9px -8px;}
+.iitabi-link span{font-family:'Bareonbatang',serif;font-style:italic;font-weight:400;font-size:13px;line-height:1;letter-spacing:.02em;}
 .slabel-search-btn:active{opacity:1;}
 .reserve-section-btn{flex:1;padding:7px 0;border-radius:10px;border:1px solid var(--card-b);background:var(--card);font-size:var(--dow-label-size);color:var(--tm);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;}
 /* DR 조각 자동제안 칩 — "DR >" 입력 감지 시에만 나타남, 빈도 상위 조각(블로그/인스타/카페/영상/드라이브)을 탭 한 번으로 이어붙임 */
@@ -1709,6 +1712,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div id="event-section" style="display:none;">
         <div class="slabel-row">
           <div class="slabel" id="event-section-label" onclick="toggleTodayBannerMode()">오늘 일정</div>
+          <button class="iitabi-link" id="iitabi-link" onclick="openIitabi()" style="display:none;" aria-label="iitabi 열기"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 10h4a2 2 0 0 1 0 4h-4l-4 7h-3l2 -7h-4l-2 2h-3l2 -4l-2 -4h3l2 2h4l-2 -7h3z"/></svg><span>iitabi</span></button>
         </div>
         <div class="card" id="event-card">
           <div id="event-list"></div>

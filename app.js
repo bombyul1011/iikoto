@@ -5573,6 +5573,35 @@ function toggleTodayBannerMode(){
   _todayBannerMode=_todayBannerMode==='event'?'schedule':'event';
   renderTodos();
 }
+// ── iitabi(여행앱) 진입 링크 ──
+// 오늘 일정 제목줄 오른쪽에 "✈ iitabi" 링크를 노출 — iitabi가 쓰는 여행 정보(trip_items, kind='trip')의 기간 안일 때만.
+// 별도 설정·컬럼 없음: iitabi에서 여행을 만들면 자동으로 나타나고, 기간이 끝나거나 상태가 active가 아니면 사라진다.
+// 여행 목록은 기기에 캐시해두고(6시간) 오프라인에서도 마지막 값으로 판단한다.
+const IITABI_URL='iitabi/iitabi.html';
+const IITABI_TRIPS_TTL_MS=6*3600*1000;
+let _iitabiFetching=false;
+function _iitabiTrips(){const c=S.get('iitabi_trips');return (c&&Array.isArray(c.list))?c.list:[];}
+function isIitabiActiveOn(dk){return _iitabiTrips().some(t=>t.status==='active'&&t.start&&t.end&&dk>=t.start&&dk<=t.end);}
+async function refreshIitabiTrips(){
+  if(_iitabiFetching||!navigator.onLine)return;
+  const c=S.get('iitabi_trips');
+  if(c&&Date.now()-c.at<IITABI_TRIPS_TTL_MS)return;
+  _iitabiFetching=true;
+  try{
+    const rows=await supaFetch('trip_items?kind=eq.trip&deleted_at=is.null&select=trip_id,data');
+    if(!rows)return; // 실패 시 기존 캐시 유지, 다음 렌더 때 재시도
+    const list=rows.map(r=>{const d=r.data||{};return {id:r.trip_id,start:d.start||'',end:d.end||'',status:d.status||''};});
+    const changed=JSON.stringify(list)!==JSON.stringify(_iitabiTrips());
+    S.set('iitabi_trips',{at:Date.now(),list});
+    if(changed)refreshIfTabOpen('v-daily',renderTodos);
+  }finally{_iitabiFetching=false;}
+}
+function syncIitabiLink(){
+  const btn=document.getElementById('iitabi-link');if(!btn)return;
+  btn.style.display=isIitabiActiveOn(dateKey(getLogicalDate()))?'flex':'none';
+}
+// iitabi는 같은 도메인의 하위 폴더 — 같은 창에서 이동(iitabi 쪽 goiikoto 버튼이 돌아오는 길).
+function openIitabi(){window.location.href=IITABI_URL;}
 // 오늘 일정 배너 — 체크박스 없이 아이콘(카테고리)-일정명-시간(오른쪽 끝) 배치. 일정도 시간표도 없으면 섹션 자체를 숨김.
 function renderEventList(dk,todos){
   const section=document.getElementById('event-section');
@@ -5580,6 +5609,7 @@ function renderEventList(dk,todos){
   const label=document.getElementById('event-section-label');
   const scheduleBody=document.getElementById('schedule-body');
   if(!section||!list)return;
+  refreshIitabiTrips(); // 6시간 캐시 — 대부분 즉시 반환
   // 하루짜리 일정(오늘 date_key에 저장된 것) — 연속일정(eventEndDate 있는 것)은 여기서 제외하고 아래서 별도 병합.
   // 반복으로 생성된 일정도 이미 todos 배열의 평범한 원소라 별도 조회 없이 여기 자연히 포함됨(recurRuleCid로만 구분).
   const events=todos.filter(t=>t.isEvent&&!t.eventEndDate);
@@ -5588,8 +5618,16 @@ function renderEventList(dk,todos){
   const all=[...events,...multiday];
   const scheduleItems=parseScheduleTodos(dk,todos);
   const hasEvent=all.length>0,hasSchedule=scheduleItems.length>0;
-  if(!hasEvent&&!hasSchedule){section.style.display='none';list.innerHTML='';if(scheduleBody)scheduleBody.style.display='none';return;}
-  section.style.display='block';
+  const eventCard=document.getElementById('event-card');
+  if(!hasEvent&&!hasSchedule){
+    list.innerHTML='';if(scheduleBody)scheduleBody.style.display='none';
+    // 여행 중(iitabi 기간)엔 오늘을 보는 경우에 한해 일정이 없어도 제목줄(= iitabi 링크)만 남기고 빈 카드는 숨김
+    if(dk===dateKey(getLogicalDate())&&isIitabiActiveOn(dk)){section.style.display='block';if(eventCard)eventCard.style.display='none';if(label)label.textContent='오늘 일정';}
+    else section.style.display='none';
+    syncIitabiLink();return;
+  }
+  section.style.display='block';if(eventCard)eventCard.style.display='';
+  syncIitabiLink();
   // 날짜가 바뀌어 다시 보는 화면이면(다른 날짜 조회 후 복귀 등) 수동 전환 기록을 리셋 — 매 조회마다 새로 자동판단
   if(_todayBannerModeDk!==dk){_todayBannerMode=null;_todayBannerModeDk=dk;}
   let mode;
