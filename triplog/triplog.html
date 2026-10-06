@@ -55,7 +55,7 @@ h1 .hl{background:linear-gradient(transparent 62%,var(--hl) 62%);padding:0 3px;m
 .bdg{display:inline-flex;align-items:center;justify-content:center;border-radius:30%;flex:none}
 h1{margin:0;font-family:var(--serif);font-size:28px;font-weight:700;line-height:1.2}
 .sub{font-size:13px;color:var(--sub);margin-top:4px}
-.titlebar{display:flex;align-items:flex-end;justify-content:space-between;gap:8px}
+.titlebar{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;min-height:44px}
 .fab{width:46px;height:46px;flex:none;border-radius:50%;border:1px solid var(--yel-bd);background:var(--yel-bg);color:var(--yel-tx);display:flex;align-items:center;justify-content:center;padding:0;box-shadow:0 3px 10px rgba(235,180,20,.25)}
 .card{background:var(--card);border:1.4px solid var(--cardb);border-radius:18px;padding:16px;box-shadow:var(--shadow)}
 .card.sm{padding:12px}
@@ -95,8 +95,8 @@ h1{margin:0;font-family:var(--serif);font-size:28px;font-weight:700;line-height:
 .ck input[type=checkbox]{width:22px;height:22px;margin:0;accent-color:var(--sel-tx);flex:none}
 .ck.done .tx{text-decoration:line-through;color:var(--sub)}
 .ck .tx{flex:1;line-height:1.4}
-.ck .mini:last-child{margin-right:-6px}
-.ck .mini{width:30px;height:44px;border:0;background:transparent;color:var(--sub);padding:0;display:flex;align-items:center;justify-content:center}
+.ck .mini:last-child{margin-right:-4px}
+.ck .mini{width:24px;height:44px;border:0;background:transparent;color:var(--sub);padding:0;display:flex;align-items:center;justify-content:center}
 .ck input.edit{flex:1;min-width:0;height:40px;border:1px solid var(--sel-bd);border-radius:8px;padding:0 8px;background:rgba(255,255,255,.7);font-size:16px}
 .addrow{display:flex;gap:8px;margin-top:10px}
 .pill{display:inline-flex;align-items:center;gap:5px;min-height:40px;padding:0 15px;border-radius:999px;font-size:13px;font-weight:700;border:1px solid var(--yel-bd);background:var(--yel-bg);color:var(--yel-tx)}
@@ -163,11 +163,10 @@ select.fld{background:rgba(255,255,255,.7)}
 .amtbox input{flex:1;min-width:0;border:0;background:transparent;font-family:var(--serif);font-size:34px;font-weight:700;height:56px;text-align:right;outline:none;color:var(--tx)}
 .xrow{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--line)}
 .xrow:last-child{border-bottom:0}
-.xrow .xt{width:40px;flex:none;font-size:12px;font-weight:700;color:var(--sub);font-variant-numeric:tabular-nums}
 .amt{display:flex;align-items:baseline;justify-content:flex-end;gap:5px;white-space:nowrap}
 .amt b{font-size:14px;font-weight:700}
 .yen{font-size:11px;font-weight:400;color:var(--sub);font-variant-numeric:tabular-nums}
-.xrow .xi{width:30px;flex:none;display:flex;justify-content:center}
+.xrow .xi{width:34px;height:38px;flex:none;display:flex;align-items:center;justify-content:center;border:0;background:transparent;padding:0}
 
 /* 카드 제목 통일 */
 .ctitle{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
@@ -235,6 +234,14 @@ select.fld{background:rgba(255,255,255,.7)}
 .chips.cat::-webkit-scrollbar{display:none}
 .chips.cat .btn{flex:none}
 
+.fab.sm{width:36px;height:36px;box-shadow:0 2px 6px rgba(235,180,20,.22)}
+.card.flat.nb{border-top:0;padding-top:0}
+.prebtn{flex:none}
+/* 사파리 기본 파란 포커스 테두리 제거(입력창은 테두리 색으로만 표시) */
+input,textarea,select,button,a{outline:none;-webkit-tap-highlight-color:transparent}
+input:focus,textarea:focus,select:focus{outline:none;box-shadow:none}
+.addrow input:focus,.fld:focus,input.edit:focus{border-color:var(--sel-bd)}
+
 @keyframes slideL{from{transform:translateX(26px);opacity:.3}to{transform:none;opacity:1}}
 @keyframes slideR{from{transform:translateX(-26px);opacity:.3}to{transform:none;opacity:1}}
 .wk.slide-l{animation:slideL .22s ease-out}
@@ -294,6 +301,6 @@ select.fld{background:rgba(255,255,255,.7)}
 <div id="bg-fixed"></div>
 <div id="app"><div id="topsafe"></div><div id="pin"></div><main id="screen"></main><nav id="tabbar" aria-label="하단 탭"></nav></div>
 <div id="sheet"></div><div id="toast"></div><div id="picker"></div>
-<script src="triplog.js?v=2026.10.06-18"></script>
+<script src="triplog.js?v=2026.10.06-19"></script>
 </body>
 </html>

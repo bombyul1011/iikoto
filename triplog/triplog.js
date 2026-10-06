@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-var VER='2026.10.06-18';
+var VER='2026.10.06-19';
 var SUPA_URL='https://vqvpzrxmtpryzhontlxc.supabase.co';
 var SUPA_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdnB6cnhtdHByeXpob250bHhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTgxMjksImV4cCI6MjA5NjYzNDEyOX0.pbtq1UMPC7ylYM1H2xVa19C1TFlceLmEfEtkz3WK2VI';
 var LSP='triplog:';
@@ -19,7 +19,7 @@ var PAL={
   gray:['rgb(108,101,93)','rgba(195,175,168,.3)','rgba(150,135,125,.85)','rgba(195,175,168,.55)']};
 var CITYK=['rose','sky','mint','orange','pink','lime'];
 var CITYC=CITYK.map(function(k){return PAL[k]});
-var CH=[PAL.sky[1],PAL.lav[1],PAL.orange[1],PAL.yel[1]];  // 경비 그래프: 항공·숙소·기타·현지 (도시 알약과 같은 중간톤)
+var CH=[PAL.mint[1],PAL.rose[1],PAL.gray[3],PAL.yel[1]];  // 경비 그래프: 항공·숙소·기타·현지 (도시 알약과 같은 중간톤)
 var CAT={meal:'식사',cafe:'카페',sight:'명소',snack:'간식'};
 var SLOTL={am:'오전',noon:'점심',pm:'오후',eve:'저녁'};
 var SLOTDEF={am:'09:00',noon:'12:00',pm:'15:00',eve:'19:00'};
@@ -27,11 +27,11 @@ var SPOT_SLOT={meal:'noon',cafe:'pm',sight:'pm',snack:'pm'};
 var SPOT_ECAT={meal:'food',cafe:'cafe',sight:'entry',snack:'food'};
 var CATI={meal:'tools-kitchen-2',cafe:'coffee',sight:'camera',snack:'cookie'};
 var CATC={meal:'orange',cafe:'pink',sight:'lime',snack:'yel'};
-var ECATC={food:'orange',cafe:'pink',move:'sky',shop:'lav',entry:'lime',etc:'gray'};
+var ECATC={food:'orange',cafe:'pink',move:'sky',shop:'lav',conv:'yel',entry:'lime',etc:'gray'};
 var TABC={today:'orange',sched:'sky',check:'lav',budget:'mint',spots:'rose'};
-var ECAT={food:'식사',cafe:'카페',move:'교통',shop:'쇼핑',entry:'입장',etc:'기타'};
-var ECATI={food:'tools-kitchen-2',cafe:'coffee',move:'train',shop:'shopping-bag',entry:'ticket',etc:'dots'};
-var TI={flower:'flower',sun:'sun',cal:'calendar',chk:'list-check',wal:'wallet',pin:'map-pin',nav:'navigation',chevd:'chevron-down',chevr:'chevron-right',chevl:'chevron-left',plus:'plus',pen:'pencil',x:'x',check:'check',cloud:'cloud',cloudok:'cloud-check',cloudoff:'cloud-off',refresh:'refresh',ext:'external-link',plane:'plane',bed:'bed',sim:'device-sim',bus:'bus',tag:'tag',checkc:'circle-check',trash:'trash',dl:'download',ul:'upload',clock:'clock',notes:'notes',calplus:'calendar-plus'};
+var ECAT={food:'식사',cafe:'카페',move:'교통',shop:'쇼핑',conv:'편의점',entry:'관광',etc:'기타'};
+var ECATI={food:'tools-kitchen-2',cafe:'coffee',move:'train',shop:'shopping-bag',conv:'building-store',entry:'ticket',etc:'dots'};
+var TI={flower:'flower',sun:'sun',cal:'calendar',chk:'list-check',wal:'wallet',pin:'map-pin',nav:'navigation',chevd:'chevron-down',chevr:'chevron-right',chevl:'chevron-left',plus:'plus',pen:'pencil',x:'x',check:'check',cloud:'cloud',cloudok:'cloud-check',cloudoff:'cloud-off',refresh:'refresh',ext:'external-link',plane:'plane',bed:'bed',bus:'bus',tag:'tag',checkc:'circle-check',trash:'trash',dl:'download',ul:'upload',clock:'clock',notes:'notes',calplus:'calendar-plus'};
 function ic(n,s,c){return '<i class="ti ti-'+(TI[n]||n)+'" aria-hidden="true" style="font-size:'+(s||20)+'px;'+(c?'color:'+c+';':'')+'"></i>'}
 function esc(t){return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 function ea(t){return esc(t).replace(/"/g,'&quot;')}
@@ -63,7 +63,7 @@ function byMemoTime(a,b){var x=String(a.memo_time||'99:99'),y=String(b.memo_time
 /* ---------- state ---------- */
 var cfg=lget('cfg',{key:'',tripId:''});
 var PK=null;  // 열려 있는 날짜·시간 선택 모달 상태
-var UI={tab:lget('tab','today'),sched:null,clDate:null,spCity:null,spCat:'all',cond:{},sheet:null,edit:null,status:'',syncAt:null,keyBad:false,addSpot:false,vd:null,addTxt:{},popKey:null,editVal:null,expDraft:null,evDraft:null,payDraft:null,spDraft:null,wkAnim:null,undoFn:null,toastT:null};
+var UI={tab:'today',sched:null,clDate:null,spCity:null,spCat:'all',cond:{},sheet:null,edit:null,status:'',syncAt:null,keyBad:false,addSpot:false,vd:null,addTxt:{},popKey:null,editVal:null,expDraft:null,evDraft:null,payDraft:null,spDraft:null,wkAnim:null,undoFn:null,toastT:null};
 var PINH='';  // 화면 상단에 고정할 HTML(일정·경비 탭). render()가 #pin에 넣는다
 var M=null,CL={items:[]},MEMOS=[],WX={},Q=lget('q',[]),TRIPS=lget('trips',[]);
 function saveQ(){lset('q',Q)}
@@ -466,10 +466,10 @@ function screenToday(){
   }
   var items=clItems(vd).concat(vd===preDate()?clItems('pre'):[]);
   var done=items.filter(function(i){return i.done}).length;
-  h+=card(ctitle('체크리스트',done+' / '+items.length,['list-check','lav'])+(items.length?bar(done/items.length*100)+'<div style="margin-top:6px">'+clList(items,'ck')+'</div>':'<div class="small muted">등록된 항목이 없어요. 체크 탭에서 추가해요.</div>'),'flat');
+  h+=card(ctitle('체크리스트',done+' / '+items.length,['list-check','lav'])+(items.length?bar(done/items.length*100)+'<div style="margin-top:6px">'+clList(items,'ck')+'</div>':'<div class="small muted">등록된 항목이 없어요. 체크 탭에서 추가해요.</div>'),'flat nb');
   var exs=localList().filter(function(x){return x.d.date===vd}).sort(byTimeDesc);
-  h+=card(ctitle(vd===td?'오늘 지출':md(vd)+' 지출',exs.length?sumLabel(sumInfo(exs)):'',['wallet','mint'])+(exs.length?exs.slice(0,3).map(function(x){return expRow(x,true)}).join('')+(exs.length>3?'<div class="small muted" style="padding-top:6px">외 '+(exs.length-3)+'건 · 경비 탭에서 전체 보기</div>':''):'<div class="small muted">아직 지출 기록이 없어요.</div>'),'flat');
-  h+=card(ctitle('이날의 메모 · iikoto',null,['notes','rose'])+memoHtml(memosOf(vd)),'flat');
+  h+=card(ctitle('지출',exs.length?sumLabel(sumInfo(exs)):'',['wallet','mint'])+(exs.length?exs.slice(0,3).map(function(x){return expRow(x,true)}).join('')+(exs.length>3?'<div class="small muted" style="padding-top:6px">외 '+(exs.length-3)+'건 · 경비 탭에서 전체 보기</div>':''):'<div class="small muted">아직 지출 기록이 없어요.</div>'),'flat');
+  h+=card(ctitle('메모',null,['notes','rose'])+memoHtml(memosOf(vd)),'flat');
   return h;
 }
 function weekStrip(d,act,badge){
@@ -512,10 +512,12 @@ function screenCheck(){
   var t=trip();if(!t)return empty();
   var dates=tripDates(),d=UI.clDate&&dates.indexOf(UI.clDate)>=0?UI.clDate:clampDate(today());
   UI.clDate=d;
-  PINH=titleBar('체크리스트',null,null,'lav')+weekStrip(d,'cdate',dayLeft);
+  var pn=clItems('pre'),pl=pn.filter(function(i){return !i.done}).length;
+  var preBtn='<button class="btn sm prebtn'+(UI.clPre?' on':'')+'" style="'+selVars('lav')+'" data-act="clpre" aria-pressed="'+(!!UI.clPre)+'">'+ic('luggage',16)+'사전준비'+(pl?' '+pl:'')+'</button>';
+  PINH=titleBar('체크리스트',null,preBtn,'lav')+weekStrip(d,'cdate',dayLeft);
   var h='';
-  if(d===preDate())h+=clCard('여행 전','pre',chip(md(preDate())+' · iikoto','ln'),clItems('pre'));
-  h+=clCard(md(d)+' '+wd(d),d,(d===today()?chip('오늘','pn')+' ':'')+cityChip(cityOfDate(d)),clItems(d));
+  if(UI.clPre)h+=clCard('사전준비','pre',chip(md(preDate())+' · iikoto','ln'),pn);
+  else h+=clCard(md(d)+' '+wd(d),d,(d===today()?chip('오늘','pn')+' ':'')+cityChip(cityOfDate(d)),clItems(d));
   return h;
 }
 function fxGet(){var t=trip();if(!t)return {JPY:9};if(!t.fx)t.fx={JPY:9};return t.fx}
@@ -556,7 +558,9 @@ function expRow(e,ro){
   var d=e.d,krw=d.currency==='KRW';
   var sub=[];if(d.ref&&d.ref.name&&d.ref.name!==d.name)sub.push(d.ref.name);if(krw)sub.push('원화 결제');
   var amt=amtPair(d);
-  return '<div class="xrow"><span class="xt">'+esc(d.time||'')+'</span><span class="xi">'+bdg(ECATI[d.ecat]||'dots',ECATC[d.ecat]||'gray',30)+'</span><div class="grow"><div style="font-size:14px;line-height:1.35">'+esc(d.name)+'</div>'+(sub.length?'<div class="small muted">'+esc(sub.join(' · '))+'</div>':'')+'</div><div style="text-align:right">'+amt+'</div>'+(ro?'':'<button class="ico" data-act="expedit" data-id="'+ea(e.cid)+'" aria-label="수정">'+ic('pen',16)+'</button>')+'</div>';
+  var ico=ic(ECATI[d.ecat]||'dots',22,pcol(ECATC[d.ecat]||'gray')[2]);
+  var lead=ro?'<span class="xi">'+ico+'</span>':'<button class="xi" data-act="expedit" data-id="'+ea(e.cid)+'" aria-label="수정">'+ico+'</button>';
+  return '<div class="xrow">'+lead+'<div class="grow"><div style="font-size:14px;line-height:1.35">'+esc(d.name)+'</div>'+(sub.length?'<div class="small muted">'+esc(sub.join(' · '))+'</div>':'')+'</div><div style="text-align:right">'+amt+'</div></div>';
 }
 function screenBudget(){
   var t=trip();if(!t)return empty();
@@ -568,8 +572,8 @@ function screenBudget(){
   items.forEach(function(x){var v=xKrw(x.o);if(x.k==='stay')stay+=v;else if(x.o.d.cat==='air')air+=v;else etc+=v});
   localList().forEach(function(e){local+=xKrw(e)});
   var total=air+stay+etc+local;
-  var h=titleBar('경비','사전 결제 '+items.length+'건 · 현지 '+localList().length+'건','<button class="fab" data-act="exp-new" aria-label="지출 추가">'+ic('plus',24)+'</button>','mint');
-  h+=card('<div class="row between" style="margin-bottom:2px"><div class="lbl" style="margin-bottom:0">총 지출</div><button class="fxtap" data-act="sheet" data-v="fx" aria-label="환율 보기">1엔 = '+rate2()+'원 '+ic('chevd',14)+'</button></div><div style="font-family:var(--serif);font-size:36px;font-weight:700">'+won(total)+'<span style="font-size:18px;color:var(--sub)">원</span></div>'+
+  var h=titleBar('경비',null,'<button class="fab sm" data-act="exp-new" aria-label="지출 추가">'+ic('plus',20)+'</button>','mint');
+  h+=card('<div class="row between" style="margin-bottom:2px"><div class="lbl" style="margin-bottom:0">총 지출</div><button class="fxtap" data-act="sheet" data-v="fx" aria-label="환율 보기">1엔 = '+rate2()+'원 '+ic('chevd',14)+'</button></div><div class="row between" style="align-items:baseline"><div style="font-family:var(--serif);font-size:36px;font-weight:700">'+won(total)+'<span style="font-size:18px;color:var(--sub)">원</span></div><span class="yen" style="font-size:14px">¥'+won(Math.round(total/fx()))+'</span></div>'+
     '<div class="gantt"><span style="flex:'+(air||0.001)+';background:'+CH[0]+'"></span><span style="flex:'+(stay||0.001)+';background:'+CH[1]+'"></span><span style="flex:'+(etc||0.001)+';background:'+CH[2]+'"></span><span style="flex:'+(local||0.001)+';background:'+CH[3]+'"></span></div>'+
     '<div class="legend"><span><i style="background:'+CH[0]+'"></i>항공 '+won(air)+'</span><span><i style="background:'+CH[1]+'"></i>숙소 '+won(stay)+'</span><span><i style="background:'+CH[2]+'"></i>기타 '+won(etc)+'</span><span><i style="background:'+CH[3]+'"></i>현지 '+won(local)+'</span></div>');
   PINH=h;h='';
@@ -586,13 +590,13 @@ function screenBudget(){
       h+=card('<div class="row between" style="margin-bottom:2px"><b>'+md(d)+' '+wd(d)+'</b><span class="small muted">'+sl+'</span></div>'+list.map(function(e){return expRow(e)}).join(''),'sm flat');
     });
   }
-  var iconOf=function(x){var d=x.o.d;return x.k==='stay'?'bed':(d.cat==='air'?'plane':(d.cat==='sim'?'sim':(d.cat==='transport'?'bus':'tag')))};
+  var iconOf=function(x){var d=x.o.d;return x.k==='stay'?'bed':(d.cat==='air'?'plane':(d.cat==='transport'?'bus':'dots'))};
   var fixed=items.slice();
   fixed.sort(function(a,b){return (a.o.d.currency==='JPY'?1:0)-(b.o.d.currency==='JPY'?1:0)});
   if(fixed.length)h+='<div class="lbl" style="margin:6px 0 0">사전 결제</div>';
   fixed.forEach(function(x){
     var d=x.o.d,c=x.k==='stay'?cityCol(d.city)[1]:null;
-    h+=card('<div class="row" style="gap:12px">'+bdg(iconOf(x),x.k==='stay'?'lav':(d.cat==='air'?'sky':'orange'),42)+'<div class="grow"><div class="row" style="gap:6px">'+(c?'<i style="width:10px;height:10px;border-radius:50%;background:'+c+';display:inline-block"></i>':'')+'<b style="font-size:15px">'+esc(d.name)+'</b></div><div class="small muted" style="margin-top:3px;line-height:1.45">'+esc(x.k==='stay'?(d.nights+'박 · '+md(d.checkin)+' – '+md(d.checkout)+(d.note?' · '+d.note:'')):(d.note||''))+'</div></div><div style="text-align:right">'+amtHtml(x.o)+'</div></div>','sm flat').replace('<div class="card sm flat">','<div class="card sm flat" style="cursor:pointer" data-act="payedit" data-k="'+x.k+'" data-id="'+ea(x.o.cid)+'">');
+    h+=card('<div class="row" style="gap:12px">'+'<span class="xi" style="width:34px">'+ic(iconOf(x),24,pcol(x.k==='stay'?'rose':(d.cat==='air'?'mint':'gray'))[2])+'</span>'+'<div class="grow"><div class="row" style="gap:6px">'+(c?'<i style="width:10px;height:10px;border-radius:50%;background:'+c+';display:inline-block"></i>':'')+'<b style="font-size:15px">'+esc(d.name)+'</b></div><div class="small muted" style="margin-top:3px;line-height:1.45">'+esc(x.k==='stay'?(d.nights+'박 · '+md(d.checkin)+' – '+md(d.checkout)+(d.note?' · '+d.note:'')):(d.note||''))+'</div></div><div style="text-align:right">'+amtHtml(x.o)+'</div></div>','sm flat').replace('<div class="card sm flat">','<div class="card sm flat" style="cursor:pointer" data-act="payedit" data-k="'+x.k+'" data-id="'+ea(x.o.cid)+'">');
   });
   return h;
 }
@@ -730,11 +734,11 @@ function openPicker(type,value,title,onOk,opt){
   }
   renderPicker();
 }
-function openChoice(title,msg,btns){PK={type:'choice',title:title,msg:msg,btns:btns};renderPicker()}
+function openChoice(title,msg,btns,row){PK={type:'choice',title:title,msg:msg,btns:btns,row:!!row};renderPicker()}
 function closePicker(){PK=null;var el=document.getElementById('picker');if(el)el.innerHTML=''}
 function pickerHtml(){
   if(!PK)return '';
-  if(PK.type==='choice')return '<div class="pov" data-act="pk-bg"><div class="pmodal" role="alertdialog" aria-modal="true"><div class="pttl">'+esc(PK.title)+'</div><div style="font-size:14px;line-height:1.55;color:var(--tx)">'+esc(PK.msg)+'</div><div class="pstack">'+PK.btns.map(function(b,i){return '<button class="pbtn '+(b.cls||'')+'" data-act="pk-btn" data-i="'+i+'">'+esc(b.t)+'</button>'}).join('')+'</div></div></div>';
+  if(PK.type==='choice')return '<div class="pov" data-act="pk-bg"><div class="pmodal" role="alertdialog" aria-modal="true"><div class="pttl">'+esc(PK.title)+'</div><div style="font-size:14px;line-height:1.55;color:var(--tx)">'+esc(PK.msg)+'</div><div class="'+(PK.row?'pact':'pstack')+'">'+PK.btns.map(function(b,i){return '<button class="pbtn '+(b.cls||'')+'" data-act="pk-btn" data-i="'+i+'">'+esc(b.t)+'</button>'}).join('')+'</div></div></div>';
   var acts='<div class="pact"><button class="pbtn" data-act="pk-cancel">취소</button>'+(PK.clearable?'<button class="pbtn" data-act="pk-clear">지우기</button>':'')+'<button class="pbtn ok" data-act="pk-ok">확인</button></div>';
   if(PK.type==='time'){
     var hs='',ms='',i;
@@ -984,7 +988,8 @@ function onClick(e){
     case 'sheet-close':closeSheet();break;
     case 'sync':pull(true).then(function(){toast('동기화했어요')});break;
     case 'date':UI.sched=v;render();break;
-    case 'cdate':UI.clDate=v;render();break;
+    case 'cdate':UI.clDate=v;UI.clPre=false;render();break;
+    case 'clpre':UI.clPre=!UI.clPre;render();break;
     case 'goiikoto':window.location.href='https://bombyul1011.github.io/iikoto/';break;  // 채움로그와 같은 방식: 같은 창에서 본앱으로 이동
     case 'pick':{
       var pid=el.getAttribute('data-for'),ptype=el.getAttribute('data-pk'),pinp=document.getElementById(pid);
@@ -1074,7 +1079,7 @@ function onClick(e){
       openChoice(spm.d.name,'이 스팟을 어떻게 할까요?',[
         {t:'수정',cls:'ok',fn:function(){UI.spDraft={id:spm.cid,name:spm.d.name,cat:spm.d.cat||'meal',city:spm.d.city,desc:spm.d.desc||'',map:(spm.d.map&&spm.d.map!==spm.d.name)?spm.d.map:''};UI.sheet='spedit';render()}},
         {t:'삭제',cls:'warn',fn:function(){M.spots=M.spots.filter(function(x){return x.cid!==spm.cid});tiDel(spm);render();toastUndo('"'+spm.d.name+'" 삭제했어요',function(){tiUndoDel(spm);M.spots.push(spm);tiUp('spot',spm);render()})}},
-        {t:'취소',fn:function(){}}]);
+        {t:'취소',fn:function(){}}],true);
       break}
     case 'sp-del':{var sp=byCid(M.spots,id);if(sp){M.spots=M.spots.filter(function(x){return x.cid!==id});tiDel(sp);render();toastUndo('"'+sp.d.name+'" 삭제했어요',function(){tiUndoDel(sp);M.spots.push(sp);tiUp('spot',sp);render()})}break}
     case 'sp-new':UI.addSpot=true;render();break;
