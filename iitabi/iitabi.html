@@ -28,7 +28,8 @@
   /* 선택 강조 = pal-lavender, 실행/강조 칩 = pal-yellow (iikoto --pal-* 토큰) */
   --sel-bg:rgba(210,175,225,.55);--sel-bd:rgba(160,105,180,.55);--sel-tx:rgb(120,69,139);--sel-solid:rgba(160,105,180,.75);
   --yel-bg:rgba(255,225,120,.6);--yel-bd:rgba(235,180,20,.55);--yel-tx:rgb(135,99,0);
-  --sans:'DM Sans','Apple SD Gothic Neo','Noto Sans KR',sans-serif;--serif:'Bareonbatang','Noto Serif KR',serif}
+  --sans:'DM Sans','Apple SD Gothic Neo','Noto Sans KR',sans-serif;--serif:'Bareonbatang','Noto Serif KR',serif;
+  --c-morning:rgb(135,99,0);--c-afternoon:rgb(142,51,51);--c-night:rgb(120,69,139)}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html{height:100%;min-height:calc(100% + env(safe-area-inset-top));background:var(--bg);background-color:#f6f3ee}
 html,body{word-break:keep-all;overflow-wrap:break-word;margin:0;color:var(--tx);font-family:var(--sans);-webkit-text-size-adjust:100%;-webkit-font-smoothing:antialiased;touch-action:manipulation}
@@ -178,7 +179,6 @@ select.fld{background:rgba(255,255,255,.7)}
 .dfld .dv{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
 .dfld .dv.ph{color:var(--sub);opacity:.7}
 /* 체크리스트 칩: 네모 · 존재감 낮게 / 시간대 색(본앱: 오전 yellow · 오후 rose · 저녁 lavender) */
-:root{--c-morning:rgb(135,99,0);--c-afternoon:rgb(142,51,51);--c-night:rgb(120,69,139)}
 .tschip{border-radius:7px;min-height:34px;padding:0 11px;font-size:13px;font-weight:400;background:transparent;border:1px solid var(--line);color:var(--sub);cursor:pointer;display:inline-flex;align-items:center;white-space:nowrap}
 .tschip.on{background:rgba(195,175,168,.14);border-color:var(--cardb);color:var(--tx);font-weight:500}
 .tschip.on.ts-morning{background:rgba(255,225,120,.6);border-color:rgba(235,180,20,.55);color:var(--c-morning)}
@@ -335,6 +335,6 @@ input:focus,textarea:focus,select:focus{outline:none;box-shadow:none}
 <div id="bg-fixed"></div>
 <div id="app"><div id="topsafe"></div><div id="pin"></div><main id="screen"></main><nav id="tabbar" aria-label="하단 탭"></nav></div>
 <div id="sheet"></div><div id="toast"></div><div id="picker"></div>
-<script src="iitabi.js?v=2026.10.06-37"></script>
+<script src="iitabi.js?v=2026.10.06-38"></script>
 </body>
 </html>

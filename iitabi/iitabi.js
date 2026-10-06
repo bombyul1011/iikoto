@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-var VER='2026.10.06-37';
+var VER='2026.10.06-38';
 var SUPA_URL='https://vqvpzrxmtpryzhontlxc.supabase.co';
 var SUPA_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdnB6cnhtdHByeXpob250bHhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTgxMjksImV4cCI6MjA5NjYzNDEyOX0.pbtq1UMPC7ylYM1H2xVa19C1TFlceLmEfEtkz3WK2VI';
 var LSP='iitabi:';
@@ -82,7 +82,7 @@ function buildModel(rows){
   rows.forEach(function(r){
     var o={cid:r.client_id,date:r.date_key||null,sort:r.sort_order||0,d:r.data||{}};
     switch(r.kind){
-      case 'trip':m.trip=o;break;
+      case 'trip':if(!Array.isArray(o.d.cities))o.d.cities=[];m.trip=o;break;
       case 'stay':m.stays.push(o);break;
       case 'event':(m.events[r.date_key]=m.events[r.date_key]||[]).push(o);break;
       case 'plan':m.plans[o.d.id]=o;break;
@@ -217,7 +217,7 @@ function pull(force){
       if(Q.length){setStatus();return}  // 받는 사이 새로 고친 내용이 있으면 덮어쓰지 않고 다음 동기화로 넘김
       M=buildModel(rows);saveRows();
       return pullTodos().then(function(){return pullMemos()}).then(function(){
-        UI.syncAt=Date.now();setStatus();renderSafe();pullWeather();fetchFx();
+        UI.syncAt=Date.now();setStatus();renderSafe();pullWeather();fetchFx();locateCity();
       });
     });
   });
@@ -251,14 +251,14 @@ function pullMemos(){
 function hmOf(s){return s&&/T\d{2}:\d{2}/.test(s)?s.slice(s.indexOf('T')+1,s.indexOf('T')+6):null}
 function wxHasSun(){var d=WX.d;if(!d)return false;return Object.keys(d).every(function(c){return Object.keys(d[c]).some(function(k){return d[c][k].sr})})}  // 일출·일몰이 없는 예전 저장분이면 다시 받는다
 function pullWeather(){
-  var t=trip();if(!t)return;
+  var t=trip();if(!t||!t.cities.length)return;
   var last=lget('wxAt:'+cfg.tripId,0);
   if(Date.now()-last<3*3600*1000&&WX.d&&wxHasSun())return;
-  var done=0;var out={};
+  var fin=0,got=0,out={};
   t.cities.forEach(function(c){
     var u='https://api.open-meteo.com/v1/forecast?latitude='+c.lat+'&longitude='+c.lng+'&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunshine_duration,daylight_duration,sunrise,sunset&timezone=auto&forecast_days=16';
     fetch(u).then(function(r){return r.ok?r.json():null}).then(function(j){
-      if(j&&j.daily){j.daily.time.forEach(function(d,i){
+      if(j&&j.daily&&j.daily.time){got++;j.daily.time.forEach(function(d,i){
         var sun=j.daily.sunshine_duration?j.daily.sunshine_duration[i]:null,dl=j.daily.daylight_duration?j.daily.daylight_duration[i]:null;
         var pp=j.daily.precipitation_probability_max?j.daily.precipitation_probability_max[i]:null;
         var ratio=(sun!=null&&dl)?sun/dl:null;
@@ -266,7 +266,12 @@ function pullWeather(){
         (out[c.id]=out[c.id]||{})[d]={tmax:j.daily.temperature_2m_max[i],tmin:j.daily.temperature_2m_min[i],pp:pp,ratio:ratio,sun:good,sr:hmOf(j.daily.sunrise&&j.daily.sunrise[i]),ss:hmOf(j.daily.sunset&&j.daily.sunset[i])};
       })}
     }).catch(function(){}).then(function(){
-      done++;if(done===t.cities.length){WX={d:out};lset('wx:'+cfg.tripId,WX);lset('wxAt:'+cfg.tripId,Date.now());renderSafe()}
+      fin++;if(fin<t.cities.length)return;
+      if(!got)return;   // 전부 실패(오프라인 등): 기존 날씨를 그대로 두고 다음에 다시 시도
+      var merged={};Object.keys(WX.d||{}).forEach(function(k){merged[k]=WX.d[k]});Object.keys(out).forEach(function(k){merged[k]=out[k]});  // 받은 도시만 갱신
+      WX={d:merged};lset('wx:'+cfg.tripId,WX);
+      if(got===t.cities.length)lset('wxAt:'+cfg.tripId,Date.now());   // 일부만 받았으면 다음 기회에 나머지를 다시 받는다
+      renderSafe();
     });
   });
 }
@@ -437,14 +442,14 @@ function evBody(e){
   var link=d.link?'<a class="small" style="display:inline-flex;align-items:center;gap:4px;min-height:36px;font-weight:700" href="'+ea(d.link.url)+'" target="_blank" rel="noopener">'+ic('ext',14)+esc(d.link.label)+'</a>':'';
   return '<div class="row" style="align-items:flex-start;gap:2px"><div class="grow"><h3 style="margin:0;font-size:15px;line-height:1.35">'+esc(d.title)+'</h3>'+(d.desc?'<p style="margin:3px 0 0;font-size:13px;color:var(--sub);line-height:1.45">'+esc(d.desc)+'</p>':'')+(tags?'<div class="chips" style="margin-top:8px">'+tags+'</div>':'')+(d.alt?'<p style="margin:6px 0 0;font-size:12px;color:var(--sub)">'+esc(d.alt)+'</p>':'')+spentLine(e.cid)+link+'</div><div class="icos"><button class="ico" data-act="evedit" data-id="'+ea(e.cid)+'" aria-label="일정 수정">'+ic('pen',16)+'</button>'+(d.map?icoMap(d.map):'')+(d.nav&&d.map?icoNav(d.map):'')+'</div></div>';
 }
-function evRow(e,cc){
+function evRow(e,cc,at){
   var d=e.d,done=!!d.done;
   var lab=done&&d.doneAt?hhmm(d.doneAt):(d.time||SLOTL[d.slot]||'');
   var tcol=(done&&d.doneAt)?'<button class="evt done" data-act="evtime" data-id="'+ea(e.cid)+'" aria-label="완료 시각 수정">'+esc(lab)+'</button>':'<button class="evt" disabled tabindex="-1" aria-hidden="true">'+esc(lab)+'</button>';
-  return '<div class="ev" style="--cc:'+cc[1]+'">'+tcol+'<button class="evdot" data-act="evck" data-id="'+ea(e.cid)+'" aria-pressed="'+done+'" aria-label="'+ea(d.title)+' 완료"><span class="dotv"></span></button><div class="c"><div class="card sm'+(done?' evdone':'')+'">'+evBody(e)+'</div></div></div>';
+  return '<div class="ev" data-t="'+ea(at||'')+'" style="--cc:'+cc[1]+'">'+tcol+'<button class="evdot" data-act="evck" data-id="'+ea(e.cid)+'" aria-pressed="'+done+'" aria-label="'+ea(d.title)+' 완료"><span class="dotv"></span></button><div class="c"><div class="card sm'+(done?' evdone':'')+'">'+evBody(e)+'</div></div></div>';
 }
 function memoEv(m){
-  return '<div class="ev mev" data-t="'+esc(m.memo_time||'')+'"><button class="evt" disabled tabindex="-1" aria-hidden="true">'+esc(m.memo_time||'')+'</button><span class="evdot memodot"><span class="mdot"></span></span><div class="c"><div class="memoc">'+(hasPhoto(m)?photoThumb(m,44):ic('notes',14))+'<span>'+memoText(m)+'</span></div></div></div>';
+  return '<div class="ev mev" data-t="'+ea(m.memo_time||'')+'"><button class="evt" disabled tabindex="-1" aria-hidden="true">'+esc(m.memo_time||'')+'</button><span class="evdot memodot"><span class="mdot"></span></span><div class="c"><div class="memoc">'+(hasPhoto(m)?photoThumb(m,44):ic('notes',14))+'<span>'+memoText(m)+'</span></div></div></div>';
 }
 function effTimes(ev){
   var def={am:'09:00',noon:'12:00',pm:'15:00',eve:'19:00'},prev='00:00',out=[];
@@ -456,7 +461,7 @@ function timelineHtml(d){
   if(!ev.length&&!ms.length)return '';
   var cc=cityCol(cityOfDate(d)),eff=effTimes(ev),mi=0,h='<div class="tl">';
   function pushMemos(limit){while(mi<ms.length&&(limit==null||String(ms[mi].memo_time||'99:99')<limit)){h+=memoEv(ms[mi]);mi++}}
-  ev.forEach(function(e,i){pushMemos(eff[i]);h+=evRow(e,cc).replace('<div class="ev"','<div class="ev" data-t="'+eff[i]+'"')});
+  ev.forEach(function(e,i){pushMemos(eff[i]);h+=evRow(e,cc,eff[i])});
   pushMemos(null);
   return h+'</div>';
 }
@@ -768,7 +773,8 @@ function render(){
     else h=screenSpots();
   }catch(e){console.error(e);h=card('<b>화면을 그리지 못했어요</b><div class="small muted">'+esc(e.message)+'</div>')}
   sc.innerHTML=h;
-  document.getElementById('pin').innerHTML=topBar()+PINH;
+  var tb='';try{tb=topBar()}catch(e){console.error(e)}   // 상단바 문제로 화면 전체가 멈추지 않게
+  document.getElementById('pin').innerHTML=tb+PINH;
   document.getElementById('tabbar').innerHTML=TABS.map(function(t){var c=pcol(TABC[t[0]]);return '<button data-act="tab" data-v="'+t[0]+'" class="'+(UI.tab===t[0]?'on':'')+'" aria-current="'+(UI.tab===t[0]?'page':'false')+'" style="--tc:'+c[0]+';--ts:'+c[2]+'"><span class="tabi">'+ic(t[2],24)+'</span><span>'+t[1]+'</span></button>'}).join('');
   document.getElementById('bg-fixed').style.setProperty('--glow',pcol(TABC[UI.tab]||'orange')[1].replace(/,[\d.]+\)$/,',.26)'));
   document.getElementById('sheet').innerHTML=sheetHtml();
@@ -794,6 +800,7 @@ function openPicker(type,value,title,onOk,opt){
 }
 function spotEditOpen(sp){UI.spDraft={id:sp.cid,name:sp.d.name,cat:sp.d.cat||'meal',city:sp.d.city,desc:sp.d.desc||'',map:(sp.d.map&&sp.d.map!==sp.d.name)?sp.d.map:''};UI.sheet='spedit';render()}
 function spotDelete(sp){M.spots=M.spots.filter(function(x){return x.cid!==sp.cid});tiDel(sp);render();toastUndo('"'+sp.d.name+'" 삭제했어요',function(){tiUndoDel(sp);M.spots.push(sp);tiUp('spot',sp);render()})}
+function evSetDone(e,on){e.d.done=on;if(on)e.d.doneAt=Date.now();else delete e.d.doneAt;tiUp('event',e);render()}
 function openChoice(title,msg,btns,row){PK={type:'choice',title:title,msg:msg,btns:btns,row:!!row};renderPicker()}
 function closePicker(){PK=null;var el=document.getElementById('picker');if(el)el.innerHTML=''}
 function pickerHtml(){
@@ -1002,7 +1009,7 @@ function focusNowLine(){
 /* 화면을 좌우로 쓸면 옆 탭으로 이동. 가로로 움직이는 영역(칩·사진 줄)이나 입력창, 열린 시트에서는 반응하지 않는다 */
 var swipeTab=null;
 function swipeBlocked(t){
-  if(UI.sheet||PK||document.getElementById('picker').innerHTML)return true;
+  if(UI.sheet||PK||document.getElementById('picker').innerHTML.trim())return true;
   for(var el=t;el&&el.id!=='screen';el=el.parentElement){
     var tag=el.tagName;if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||el.isContentEditable)return true;
     if(el.scrollWidth>el.clientWidth+2){var ox=getComputedStyle(el).overflowX;if(ox==='auto'||ox==='scroll')return true}
@@ -1019,7 +1026,7 @@ function onTabTouchEnd(e){
   var dx=p.clientX-s.x,dy=p.clientY-s.y;
   if(Math.abs(dx)<70||Math.abs(dx)<Math.abs(dy)*1.3)return;   // 세로로 스크롤하려던 움직임은 무시
   var i=TABS.map(function(t){return t[0]}).indexOf(UI.tab),n=dx<0?i+1:i-1;
-  if(n<0||n>=TABS.length)return;
+  if(i<0||n<0||n>=TABS.length)return;
   goTab(TABS[n][0],dx<0?'left':'right');
 }
 function onTouchStart(e){var st=e.target.closest&&e.target.closest('#strip');if(!st){swipeX=null;return}var p=(e.touches&&e.touches[0])||e;swipeX=p.clientX;swipeY=p.clientY}
@@ -1195,12 +1202,12 @@ function onClick(e){
       cfg.key=k;lset('cfg',cfg);UI.sheet=null;UI.keyBad=false;
       loadTrips().then(function(){loadTrip();return pull(true)}).then(function(){render();toast(M?'불러왔어요':'데이터를 찾지 못했어요')});break}
     case 'trip-open':{cfg.tripId=id;lset('cfg',cfg);UI.sheet=null;loadTrip();render();pull(true);break}
-    case 'evck':{var ev0=findEvent(id);if(ev0){ev0.d.done=!ev0.d.done;if(ev0.d.done)ev0.d.doneAt=Date.now();else{delete ev0.d.doneAt}tiUp('event',ev0);render()}break}
+    case 'evck':{var ev0=findEvent(id);if(ev0)evSetDone(ev0,!ev0.d.done);break}
     case 'bnck':{
       var bev=findEvent(id);
       if(bev&&!bev.d.done){
-        bev.d.done=true;bev.d.doneAt=Date.now();tiUp('event',bev);render();
-        toastUndo('"'+bev.d.title+'" 완료했어요',function(){bev.d.done=false;delete bev.d.doneAt;tiUp('event',bev);render()});
+        evSetDone(bev,true);
+        toastUndo('"'+bev.d.title+'" 완료했어요',function(){var e2=findEvent(id);if(e2&&e2.d.done)evSetDone(e2,false)});  // 그사이 서버에서 다시 받아와도 안전하게 id로 찾는다
       }
       break}
     case 'evtime':{var evt=findEvent(id);if(evt&&evt.d.doneAt)openPicker('time',hhmm(evt.d.doneAt),'완료 시각',function(val){var e2=findEvent(id);if(e2&&val){e2.d.doneAt=setTimeOnly(e2.d.doneAt,val);tiUp('event',e2);render()}});break}
@@ -1337,6 +1344,8 @@ function boot(){
   document.addEventListener('visibilitychange',function(){if(!document.hidden){pull();locateCity()}});
   locateCity();
   window.addEventListener('online',function(){pull(true)});
+  window.addEventListener('resize',fitMemoList);
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(fitMemoList);
   setInterval(function(){if(!document.hidden)pull()},90000);
   if('serviceWorker' in navigator&&/\/(iitabi|triplog)\//.test(location.pathname)){
     navigator.serviceWorker.register('iitabi-sw.js?v='+VER,{scope:'./'}).catch(function(){});
