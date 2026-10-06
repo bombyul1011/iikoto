@@ -194,6 +194,7 @@ select.fld{background:rgba(255,255,255,.7)}
 .tshead.ts-night{color:var(--c-night)}
 .ck.ro .ct{display:flex;align-items:center;min-height:44px;padding:0 4px;font-size:12px;color:var(--sub);font-variant-numeric:tabular-nums}
 .ck.ro input[type=checkbox]:disabled{opacity:1}
+.ck.ro input[type=checkbox]:not(:disabled){cursor:pointer}
 /* 일정 탭: 월~일 주 단위 + 가로바 */
 .wk{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
 .wk .day-btn{flex:none;min-height:62px;padding:7px 0 5px;gap:0;align-items:center}
@@ -210,17 +211,29 @@ select.fld{background:rgba(255,255,255,.7)}
 .fxtap{background:transparent;border:0;color:var(--sub);font-size:12px;display:inline-flex;align-items:center;gap:3px;min-height:36px;padding:0}
 
 /* 상단바(여행명 · 기간 · DAY · 동기화 · 이이코토) / 평평한 섹션 / 카드 없는 타임라인 */
-.topbar{display:flex;align-items:center;gap:8px;min-height:44px;margin:-8px 0 -6px}
+.topbar{display:flex;align-items:center;gap:5px;min-height:44px;margin:-8px 0 -6px}
 .tbn{flex:1;min-width:0;display:flex;align-items:center;gap:2px;border:0;background:transparent;padding:0;min-height:44px;font-weight:700;font-size:14px;text-align:left}
 .tbn .tbt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tbn .ti{flex:none}
 .tbd{flex:none;font-size:12px;color:var(--sub);white-space:nowrap;font-variant-numeric:tabular-nums}
-.syncst.ico{font-size:0;gap:0;min-width:28px;justify-content:center;flex:none}
-.tbi{flex:none;width:34px;height:44px;border:0;background:transparent;padding:0;margin-right:-6px;display:flex;align-items:center;justify-content:center}
+.syncst.ico{font-size:0;gap:0;width:22px;min-width:22px;justify-content:center;flex:none}
+.tbi{flex:none;width:26px;height:44px;border:0;background:transparent;padding:0;margin-right:-4px;display:flex;align-items:center;justify-content:center}
 .card.flat{background:transparent;border:0;border-top:1px solid var(--line);border-radius:0;box-shadow:none;padding:14px 0 0}
 .card.sm.flat{padding:12px 0 0}
 .tl{gap:4px}
 .tl .card.sm{background:transparent;border:0;border-radius:0;box-shadow:none;padding:12px 0 6px}
+
+.splist{display:flex;flex-direction:column}
+.sprow{display:flex;gap:11px;align-items:flex-start;padding:14px 0 6px;border-top:1px solid var(--line)}
+.sprow:first-child{border-top:0;padding-top:4px}
+.spadd{width:36px;height:36px;flex:none;border-radius:50%;background:var(--yel-bg);border:1px solid var(--yel-bd);color:var(--yel-tx);opacity:1;margin-right:-2px}
+.spbar{display:flex;align-items:center;min-height:34px}
+.spbar .ico{width:30px;height:34px}
+.spbar .ico:last-child{margin-right:-6px}
+.frow{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:48px;border:0;border-top:1px solid var(--line);background:transparent;padding:0;font-size:13px;color:var(--sub);text-align:left}
+.chips.cat{flex-wrap:nowrap;overflow-x:auto;margin:0 -20px;padding:0 20px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.chips.cat::-webkit-scrollbar{display:none}
+.chips.cat .btn{flex:none}
 
 @keyframes slideL{from{transform:translateX(26px);opacity:.3}to{transform:none;opacity:1}}
 @keyframes slideR{from{transform:translateX(-26px);opacity:.3}to{transform:none;opacity:1}}
@@ -281,6 +294,6 @@ select.fld{background:rgba(255,255,255,.7)}
 <div id="bg-fixed"></div>
 <div id="app"><div id="topsafe"></div><div id="pin"></div><main id="screen"></main><nav id="tabbar" aria-label="하단 탭"></nav></div>
 <div id="sheet"></div><div id="toast"></div><div id="picker"></div>
-<script src="triplog.js?v=2026.10.06-16"></script>
+<script src="triplog.js?v=2026.10.06-18"></script>
 </body>
 </html>

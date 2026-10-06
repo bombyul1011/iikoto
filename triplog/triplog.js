@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-var VER='2026.10.06-16';
+var VER='2026.10.06-18';
 var SUPA_URL='https://vqvpzrxmtpryzhontlxc.supabase.co';
 var SUPA_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdnB6cnhtdHByeXpob250bHhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTgxMjksImV4cCI6MjA5NjYzNDEyOX0.pbtq1UMPC7ylYM1H2xVa19C1TFlceLmEfEtkz3WK2VI';
 var LSP='triplog:';
@@ -323,7 +323,7 @@ function tsChips(act,key,sel,extra){
 function clRow(it,ro){
   if(ro){
     var ctr=(it.done&&it.completedAt)?'<span class="ct">'+hhmm(it.completedAt)+'</span>':'';
-    return '<div class="ck ro'+(it.done?' done':'')+'"><input type="checkbox" disabled '+(it.done?'checked':'')+' aria-label="'+ea(it.t)+'"><span class="tx">'+esc(it.t)+'</span>'+ctr+'</div>';
+    return '<div class="ck ro'+(it.done?' done':'')+'"><input type="checkbox" '+(ro==='ck'?'data-act="ck" data-id="'+ea(it.id)+'"':'disabled')+' '+(it.done?'checked':'')+' aria-label="'+ea(it.t)+'"><span class="tx">'+esc(it.t)+'</span>'+ctr+'</div>';
   }
   if(UI.edit===it.id){
     var val=UI.editVal!=null?UI.editVal:it.t;
@@ -466,7 +466,7 @@ function screenToday(){
   }
   var items=clItems(vd).concat(vd===preDate()?clItems('pre'):[]);
   var done=items.filter(function(i){return i.done}).length;
-  h+=card(ctitle('체크리스트',done+' / '+items.length,['list-check','lav'])+(items.length?bar(done/items.length*100)+'<div style="margin-top:6px">'+clList(items,true)+'</div>':'<div class="small muted">등록된 항목이 없어요. 체크 탭에서 추가해요.</div>'),'flat');
+  h+=card(ctitle('체크리스트',done+' / '+items.length,['list-check','lav'])+(items.length?bar(done/items.length*100)+'<div style="margin-top:6px">'+clList(items,'ck')+'</div>':'<div class="small muted">등록된 항목이 없어요. 체크 탭에서 추가해요.</div>'),'flat');
   var exs=localList().filter(function(x){return x.d.date===vd}).sort(byTimeDesc);
   h+=card(ctitle(vd===td?'오늘 지출':md(vd)+' 지출',exs.length?sumLabel(sumInfo(exs)):'',['wallet','mint'])+(exs.length?exs.slice(0,3).map(function(x){return expRow(x,true)}).join('')+(exs.length>3?'<div class="small muted" style="padding-top:6px">외 '+(exs.length-3)+'건 · 경비 탭에서 전체 보기</div>':''):'<div class="small muted">아직 지출 기록이 없어요.</div>'),'flat');
   h+=card(ctitle('이날의 메모 · iikoto',null,['notes','rose'])+memoHtml(memosOf(vd)),'flat');
@@ -607,16 +607,21 @@ function screenSpots(){
   var inCity=M.spots.filter(function(s){return s.d.city===city});
   var list=inCity.filter(function(s){return !placed[s.cid]&&(UI.spCat==='all'||s.d.cat===UI.spCat)}).sort(function(a,b){return (a.sort||0)-(b.sort||0)});
   var placedN=inCity.filter(function(s){return placed[s.cid]}).length;
+  var rows='';
   list.forEach(function(s){
     var d=s.d,memo=MEMOS.filter(function(m){return m.text&&m.text.indexOf(d.name)>=0})[0];
-    h+=card('<div class="row" style="align-items:flex-start">'+bdg(CATI[d.cat]||'pin',CATC[d.cat]||'gray',42)+'<div class="grow"><div class="row" style="flex-wrap:wrap"><b style="font-size:16px">'+esc(d.name)+'</b>'+(d.tags||[]).map(function(x){return chip(esc(x),'pn')}).join('')+'</div><div class="small muted" style="margin-top:4px;line-height:1.45">'+esc(d.desc||'')+'</div>'+spentLine(s.cid)+'</div>'+mapBtn(d.map||d.name)+navBtn(d.map||d.name)+'</div>'+(memo?'<div class="small" style="margin-top:8px">iikoto 메모 · '+esc(memo.date_key.slice(5))+' · '+esc((memo.text||'').slice(0,60))+'</div>':'')+
-      '<div class="row between" style="margin-top:12px"><button class="pill" data-act="spot2ev" data-id="'+ea(s.cid)+'">'+ic('calplus',16)+'일정에 넣기</button><span class="row" style="gap:0"><button class="ico" data-act="spedit" data-id="'+ea(s.cid)+'" aria-label="수정">'+ic('pen',18)+'</button><button class="ico" style="color:var(--sub)" data-act="sp-del" data-id="'+ea(s.cid)+'" aria-label="삭제">'+ic('trash',18)+'</button></span></div>');
+    rows+='<div class="sprow">'+bdg(CATI[d.cat]||'pin',CATC[d.cat]||'gray',36)+'<div class="grow"><div class="row" style="align-items:flex-start;gap:6px"><div class="grow"><div class="row" style="flex-wrap:wrap;gap:6px;min-height:36px"><b style="font-size:15px">'+esc(d.name)+'</b>'+(d.tags||[]).map(function(x){return chip(esc(x),'pn')}).join('')+'</div></div><button class="ico spadd" data-act="spot2ev" data-id="'+ea(s.cid)+'" aria-label="일정에 넣기">'+ic('calplus',19)+'</button></div>'+
+      (d.desc?'<div class="small muted" style="margin-top:-4px;line-height:1.45">'+esc(d.desc)+'</div>':'')+
+      (memo?'<div class="small" style="margin-top:6px">iikoto 메모 · '+esc(memo.date_key.slice(5))+' · '+esc((memo.text||'').slice(0,60))+'</div>':'')+
+      '<div class="spbar"><span class="grow">'+spentLine(s.cid)+'</span>'+icoMap(d.map||d.name)+(d.map||d.name?icoNav(d.map||d.name):'')+'<button class="ico" style="color:var(--sub)" data-act="spmore" data-id="'+ea(s.cid)+'" aria-label="더보기">'+ic('dots',18)+'</button></div></div></div>';
   });
-  if(!list.length)h+='<div class="muted small" style="text-align:center;padding:10px">'+(placedN?'일정에 안 넣은 곳이 없어요':'이 분류에는 아직 없어요')+'</div>';
-  if(placedN)h+='<button class="btn" style="width:100%;color:var(--sub)" data-act="tab" data-v="sched">'+ic('cal',16)+'일정에 넣은 곳 '+placedN+'곳 · 일정 탭에서 보기'+ic('chevr',14)+'</button>';
+  if(!list.length)rows+='<div class="muted small" style="text-align:center;padding:14px 0">'+(placedN?'일정에 안 넣은 곳이 없어요':'이 분류에는 아직 없어요')+'</div>';
+  if(placedN)rows+='<button class="frow" data-act="tab" data-v="sched"><span>'+ic('cal',16)+' 일정에 넣은 곳 '+placedN+'곳</span>'+ic('chevr',14)+'</button>';
+  if(!UI.addSpot)rows+='<button class="frow" style="color:var(--sel-tx);font-weight:500" data-act="sp-new"><span>'+ic('plus',16)+' 스팟 추가</span></button>';
+  h+='<div class="splist">'+rows+'</div>';
   if(UI.addSpot){
     h+=card('<div class="lbl">스팟 추가</div><input class="fld" id="s_name" placeholder="이름" aria-label="이름" style="width:100%"><div class="row" style="margin-top:8px"><select class="fld" id="s_cat" aria-label="분류">'+Object.keys(CAT).map(function(k){return '<option value="'+k+'">'+CAT[k]+'</option>'}).join('')+'</select></div><input class="fld" id="s_desc" placeholder="한 줄 설명 (선택)" aria-label="설명" style="width:100%;margin-top:8px"><input class="fld" id="s_map" placeholder="지도 검색어 (비우면 이름으로 검색)" aria-label="지도 검색어" style="width:100%;margin-top:8px"><div class="row" style="margin-top:10px"><button class="btn pri" style="width:auto;flex:1" data-act="sp-save">저장</button><button class="btn" data-act="sp-cancel">취소</button></div>');
-  }else h+='<button class="btn" data-act="sp-new">'+ic('plus',16)+'스팟 추가</button>';
+  }
   return h;
 }
 function empty(){
@@ -1064,6 +1069,13 @@ function onClick(e){
       tiUp('spot',sps);
       UI.sheet=null;UI.spDraft=null;render();toast('저장했어요');break}
     case 'undo':{var uf=UI.undoFn;UI.undoFn=null;document.getElementById('toast').innerHTML='';clearTimeout(UI.toastT);if(uf)uf();break}
+    case 'spmore':{
+      var spm=byCid(M.spots,id);if(!spm)break;
+      openChoice(spm.d.name,'이 스팟을 어떻게 할까요?',[
+        {t:'수정',cls:'ok',fn:function(){UI.spDraft={id:spm.cid,name:spm.d.name,cat:spm.d.cat||'meal',city:spm.d.city,desc:spm.d.desc||'',map:(spm.d.map&&spm.d.map!==spm.d.name)?spm.d.map:''};UI.sheet='spedit';render()}},
+        {t:'삭제',cls:'warn',fn:function(){M.spots=M.spots.filter(function(x){return x.cid!==spm.cid});tiDel(spm);render();toastUndo('"'+spm.d.name+'" 삭제했어요',function(){tiUndoDel(spm);M.spots.push(spm);tiUp('spot',spm);render()})}},
+        {t:'취소',fn:function(){}}]);
+      break}
     case 'sp-del':{var sp=byCid(M.spots,id);if(sp){M.spots=M.spots.filter(function(x){return x.cid!==id});tiDel(sp);render();toastUndo('"'+sp.d.name+'" 삭제했어요',function(){tiUndoDel(sp);M.spots.push(sp);tiUp('spot',sp);render()})}break}
     case 'sp-new':UI.addSpot=true;render();break;
     case 'sp-cancel':UI.addSpot=false;render();break;
