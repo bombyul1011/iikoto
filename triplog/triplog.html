@@ -48,8 +48,6 @@ a{color:var(--sel-tx)}
 #screen>*{flex:none}
 #tabbar{flex:none;display:flex;background:transparent;border-top:1px solid rgba(200,175,140,.45);padding:6px 8px calc(8px + env(safe-area-inset-bottom));z-index:5}
 #tabbar button{flex:1;min-height:50px;border:0;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:500;color:var(--sub);padding:0}
-#tabbar .tablink{position:relative}
-#tabbar .tablink:before{content:'';position:absolute;left:0;top:10px;bottom:10px;width:1px;background:rgba(200,175,140,.45)}
 #tabbar button.on{color:var(--tc,var(--sel-tx));font-weight:700}
 #tabbar .tabi{height:28px;display:flex;align-items:center;justify-content:center}
 #tabbar button.on .tabi .ti{color:var(--ts)}
@@ -211,6 +209,18 @@ select.fld{background:rgba(255,255,255,.7)}
 .ev button.evt.done{color:var(--sel-tx);-webkit-text-fill-color:var(--sel-tx);cursor:pointer}
 .fxtap{background:transparent;border:0;color:var(--sub);font-size:12px;display:inline-flex;align-items:center;gap:3px;min-height:36px;padding:0}
 
+/* 상단바(여행명 · 기간 · DAY · 동기화 · 이이코토) / 평평한 섹션 / 카드 없는 타임라인 */
+.topbar{display:flex;align-items:center;gap:8px;min-height:44px;margin:-8px 0 -6px}
+.tbn{flex:1;min-width:0;display:flex;align-items:center;gap:2px;border:0;background:transparent;padding:0;min-height:44px;font-weight:700;font-size:14px;text-align:left}
+.tbn .tbt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tbn .ti{flex:none}
+.tbd{flex:none;font-size:12px;color:var(--sub);white-space:nowrap;font-variant-numeric:tabular-nums}
+.syncst.ico{font-size:0;gap:0;min-width:28px;justify-content:center;flex:none}
+.tbi{flex:none;width:34px;height:44px;border:0;background:transparent;padding:0;margin-right:-6px;display:flex;align-items:center;justify-content:center}
+.card.flat{background:transparent;border:0;border-top:1px solid var(--line);border-radius:0;box-shadow:none;padding:14px 0 0}
+.card.sm.flat{padding:12px 0 0}
+.tl{gap:4px}
+.tl .card.sm{background:transparent;border:0;border-radius:0;box-shadow:none;padding:12px 0 6px}
 
 @keyframes slideL{from{transform:translateX(26px);opacity:.3}to{transform:none;opacity:1}}
 @keyframes slideR{from{transform:translateX(-26px);opacity:.3}to{transform:none;opacity:1}}
@@ -271,6 +281,6 @@ select.fld{background:rgba(255,255,255,.7)}
 <div id="bg-fixed"></div>
 <div id="app"><div id="topsafe"></div><div id="pin"></div><main id="screen"></main><nav id="tabbar" aria-label="하단 탭"></nav></div>
 <div id="sheet"></div><div id="toast"></div><div id="picker"></div>
-<script src="triplog.js?v=2026.10.06-15"></script>
+<script src="triplog.js?v=2026.10.06-16"></script>
 </body>
 </html>
