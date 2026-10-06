@@ -1,7 +1,7 @@
 {
-  "name": "triplog",
-  "short_name": "triplog",
-  "start_url": "./triplog.html",
+  "name": "iitabi",
+  "short_name": "iitabi",
+  "start_url": "./iitabi.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#faf8ee",
