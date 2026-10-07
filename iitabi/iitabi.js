@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-var VER='2026.10.06-50';
+var VER='2026.10.06-54';
 var SUPA_URL='https://vqvpzrxmtpryzhontlxc.supabase.co';
 var SUPA_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdnB6cnhtdHByeXpob250bHhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTgxMjksImV4cCI6MjA5NjYzNDEyOX0.pbtq1UMPC7ylYM1H2xVa19C1TFlceLmEfEtkz3WK2VI';
 var LSP='iitabi:';
@@ -493,13 +493,40 @@ function sortShown(ev){
   return ev.map(function(e,i){var d=e.d,k=(d.done&&d.doneAt)?hhmm(d.doneAt):(d.time||def[d.slot]||prev);prev=k;return {e:e,k:k,i:i}})
     .sort(function(a,b){return a.k<b.k?-1:(a.k>b.k?1:a.i-b.i)}).map(function(x){return x.e});
 }
+/* 이날 완료한 체크리스트 항목(완료 시각이 있는 것만) — 타임라인에 가벼운 한 줄로 섞어 보여준다 */
+function doneChecksOf(d){return (CL.items||[]).filter(function(i){return !i.pre&&i.date===d&&i.done&&i.completedAt})}
+function ckEv(i){
+  var tm=hhmm(i.completedAt);
+  return '<div class="ev mev ckev" data-t="'+tm+'"><button class="evt" disabled tabindex="-1" aria-hidden="true">'+tm+'</button><span class="evdot memodot"><span class="ckdot">'+ic('check',11)+'</span></span><div class="c"><div class="cktx">'+esc(i.t)+'</div></div></div>';
+}
+/* 일정에 연동하지 않은 현지 지출(연동된 건 일정 카드 안 '지출' 줄에 이미 나온다)을 결제 시각 자리에 한 줄로 */
+function freePaysOf(d){return localList().filter(function(x){return x.d.date===d&&!(x.d.ref&&x.d.ref.cid)})}
+function payEv(x){
+  var d=x.d,tm=d.time||'',jpy=d.currency!=='KRW',
+      amt=jpy?'¥'+won(d.amount)+' <span class="payk">'+won(d.amount*fx())+'원</span>':won(d.amount)+'원',
+      ico=ic(ECATI[d.ecat]||'dots',13,'#fff'),bg=pcol(ECATC[d.ecat]||'gray')[2];
+  return '<div class="ev mev ckev" data-t="'+ea(tm)+'"><button class="evt" disabled tabindex="-1" aria-hidden="true">'+esc(tm)+'</button><span class="evdot memodot"><span class="ckdot" style="background:'+bg+'">'+ico+'</span></span><div class="c"><div class="cktx">'+esc(d.name)+' <span class="payamt">'+amt+'</span></div></div></div>';
+}
+function tlFilterHtml(){
+  var f=UI.tlf||{};
+  function b(k,label,ico){var on=f[k]!==false;return '<button class="tlfb k-'+k+(on?' on':'')+'" data-act="tlf" data-v="'+k+'" aria-pressed="'+on+'">'+ic(ico,15)+label+'</button>'}
+  return '<div class="tlf" role="group" aria-label="타임라인 표시 종류">'+b('e','일정','calendar')+b('m','메모','notes')+b('c','체크','checklist')+b('p','결제','cash')+'</div>';
+}
 function timelineHtml(d){
-  var ev=sortShown(eventsOf(d)),ms=memosOf(d).slice().sort(byMemoTime);
-  if(!ev.length&&!ms.length)return '';
-  var cc=cityCol(cityOfDate(d)),eff=dispTimes(ev),mi=0,h='<div class="tl">';
-  function pushMemos(limit){while(mi<ms.length&&(limit==null||String(ms[mi].memo_time||'99:99')<limit)){h+=memoEv(ms[mi]);mi++}}
-  ev.forEach(function(e,i){pushMemos(eff[i]);h+=evRow(e,cc,eff[i])});
-  pushMemos(null);
+  var allEv=eventsOf(d),allMs=memosOf(d),allCk=doneChecksOf(d),allPay=freePaysOf(d);
+  if(!allEv.length&&!allMs.length&&!allCk.length&&!allPay.length)return '';
+  var f=UI.tlf||{};
+  var ev=f.e===false?[]:sortShown(allEv),ex=[];
+  if(f.m!==false)allMs.forEach(function(m){ex.push({t:String(m.memo_time||'99:99'),h:memoEv(m)})});
+  if(f.c!==false)allCk.forEach(function(i){ex.push({t:hhmm(i.completedAt),h:ckEv(i)})});
+  if(f.p!==false)allPay.forEach(function(x){ex.push({t:String(x.d.time||'99:99'),h:payEv(x)})});
+  ex=ex.map(function(x,i){x.i=i;return x}).sort(function(a,b){return a.t<b.t?-1:(a.t>b.t?1:a.i-b.i)});
+  var cc=cityCol(cityOfDate(d)),eff=dispTimes(ev),xi=0,h=tlFilterHtml();
+  if(!ev.length&&!ex.length)return h+'<div class="small muted" style="text-align:center;padding:22px 0">표시할 종류를 하나 이상 켜 주세요</div>';
+  h+='<div class="tl">';
+  function pushEx(limit){while(xi<ex.length&&(limit==null||ex[xi].t<limit)){h+=ex[xi].h;xi++}}
+  ev.forEach(function(e,i){pushEx(eff[i]);h+=evRow(e,cc,eff[i])});
+  pushEx(null);
   return h+'</div>';
 }
 function planDetail(pid){
@@ -535,7 +562,7 @@ function screenToday(){
   var s=stayOf(vd),cid=cityOfDate(vd);
   var h='';
   h+='<div style="display:flex;flex-direction:column;align-items:center"><div class="dtitle"><button class="dnav'+(idx<=1?' off':'')+'" '+(idx<=1?'disabled ':'')+'data-act="dprev" aria-label="전날">'+ic('chevl',18)+'</button><span class="dnum"><span>'+md(vd)+'</span> <span class="dwd">'+wd(vd)+'</span></span><button class="dnav'+(idx>=N?' off':'')+'" '+(idx>=N?'disabled ':'')+'data-act="dnext" aria-label="다음날">'+ic('chevr',18)+'</button></div>'+
-    '<div class="row" style="margin-top:4px;justify-content:center">'+cityChip(cid)+(s?'<span class="small muted">'+esc(s.d.name)+'</span>':'')+'</div>'+sunLine(vd)+'</div>';
+    '<div class="row" style="margin-top:4px;justify-content:center">'+cityChip(cid)+(s?'<a class="small muted stayln" aria-label="숙소까지 길찾기(대중교통)" href="'+ea(navUrl(s.d.map||s.d.name))+'" target="_blank" rel="noopener">'+esc(s.d.name)+'</a>':'')+'</div>'+sunLine(vd)+'</div>';
   if(UI.keyBad)h+=card('<b>데이터를 불러오지 못했어요</b><div class="small muted" style="margin-top:4px">접근 키가 맞지 않을 수 있어요.</div><button class="btn" style="margin-top:10px" data-act="sheet" data-v="key">키 다시 입력</button>');
   var note=(t.dayNotes||{})[vd];if(note)h+='<div>'+chip(esc(note),'pn')+'</div>';
   var ev=eventsOf(vd),next=nextEventOf(vd);
@@ -650,8 +677,8 @@ function expRow(e,ro){
   var sub=[];if(d.ref&&d.ref.name&&d.ref.name!==d.name)sub.push(d.ref.name);if(krw)sub.push('원화 결제');
   var amt=amtPair(d);
   var ico=ic(ECATI[d.ecat]||'dots',22,pcol(ECATC[d.ecat]||'gray')[2]);
-  var lead=ro?'<span class="xi">'+ico+'</span>':'<button class="xi" data-act="expedit" data-id="'+ea(e.cid)+'" aria-label="수정">'+ico+'</button>';
-  return '<div class="xrow">'+lead+'<div class="grow"><div style="font-size:14px;line-height:1.35">'+esc(d.name)+'</div>'+(sub.length?'<div class="small muted">'+esc(sub.join(' · '))+'</div>':'')+'</div><div style="text-align:right">'+amt+'</div></div>';
+  var lead='<span class="xi">'+ico+'</span>';
+  return '<div class="xrow'+(ro?'':' tap')+'"'+(ro?'':' data-act="expedit" data-id="'+ea(e.cid)+'" role="button" tabindex="0" aria-label="'+ea(d.name)+' 수정"')+'>'+lead+'<div class="grow"><div style="font-size:14px;line-height:1.35">'+esc(d.name)+'</div>'+(sub.length?'<div class="small muted">'+esc(sub.join(' · '))+'</div>':'')+'</div><div style="text-align:right">'+amt+'</div></div>';
 }
 function screenBudget(){
   var t=trip();if(!t)return empty();
@@ -1018,7 +1045,7 @@ function swipeWeek(dir){
 var swipeX=null,swipeY=null;
 /* ---------- 탭 이동(하단 메뉴·쓸어넘기기 공용) ---------- */
 function resetView(){  // 탭을 옮길 때마다 '오늘 기준'으로 다시 연다(마지막에 본 날짜·도시·분류는 기억하지 않음)
-  UI.vd=null;UI.sched=null;UI.clDate=null;UI.clPre=false;UI.spCat='all';
+  UI.vd=null;UI.sched=null;UI.clDate=null;UI.clPre=false;UI.spCat='all';UI.tlf=null;
   var t=trip(),c=curCity();UI.spCity=(t&&t.cities.some(function(x){return x.id===c}))?c:null;
 }
 function goTab(v,dir){
@@ -1164,6 +1191,7 @@ function onClick(e){
     case 'edit-ok':{var inp=document.querySelector('input.edit');commitEdit(id,inp?inp.value:'');break}
     case 'del':{var it2=findCl(id);if(it2){CL.items=CL.items.filter(function(x){return x.id!==id});tdDel(it2);render();toastUndo('항목을 삭제했어요',function(){tdUndoDel(it2);render()})}break}
     case 'add':{var key=el.getAttribute('data-key'),ai=document.querySelector('input[data-add="'+key+'"]');addPrompt(key,ai?ai.value:'');break}
+    case 'tlf':{UI.tlf=UI.tlf||{};UI.tlf[v]=UI.tlf[v]===false;render();break}
     case 'clts':if(UI.clDraft){UI.clDraft.ts=v;render()}break
     case 'cl-save':{var cd=UI.clDraft;if(cd){UI.sheet=null;UI.clDraft=null;addCl(cd.key,cd.t,cd.ts,cd.at,cd.ao)}break}
     case 'alpick':{if(id){keepEdit();BLURSKIP=true;try{if(document.activeElement&&document.activeElement.blur)document.activeElement.blur()}catch(e){}BLURSKIP=false}  /* 수정 중이면 키보드를 내려 시간 휠이 가리지 않게(수정 상태는 유지) */

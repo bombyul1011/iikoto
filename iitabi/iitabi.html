@@ -253,6 +253,21 @@ body,#app{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 input,textarea{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default;caret-color:var(--sel-tx)}
 ::selection{background:rgba(210,175,225,.45);color:inherit}
 .ckedit .alrow{margin-top:12px}
+/* 타임라인: 완료한 체크 한 줄 + 표시 종류 필터 */
+.xrow.tap{cursor:pointer}
+.ev.ckev{--mc:11px}
+.ckdot{width:15px;height:15px;border-radius:5px;background:var(--sel-solid);color:#fff;display:flex;align-items:center;justify-content:center}
+.cktx{font-size:13px;line-height:22px;color:var(--sub)}
+.tlf{display:flex;gap:6px;justify-content:flex-end}
+.tlfb{min-height:34px;padding:0 11px;border-radius:99px;border:1px solid var(--cardb);background:transparent;color:var(--sub);font-family:inherit;font-size:12px;display:inline-flex;align-items:center;gap:4px;opacity:.75}
+.tlfb.on{opacity:1;color:var(--tx);background:rgba(195,175,168,.2)}
+.tlfb.on.k-e{background:rgba(170,208,228,.55);border-color:rgba(75,145,180,.55);color:rgb(41,97,130)}
+.tlfb.on.k-c{background:var(--sel-bg);border-color:var(--sel-bd);color:var(--sel-tx)}
+.tlfb.on.k-p{background:rgba(145,210,175,.55);border-color:rgba(70,155,110,.55);color:rgb(34,103,68)}
+.payamt{color:var(--tx);font-variant-numeric:tabular-nums;margin-left:4px}
+.payk{color:var(--sub);font-size:12px;margin-left:2px}
+
+.stayln{display:inline-flex;align-items:center;min-height:44px;padding:0 4px;color:var(--sub);text-decoration:underline;text-decoration-color:rgba(150,135,125,.4);text-underline-offset:4px}
 
 input:focus,textarea:focus,select:focus{outline:none;box-shadow:none}
 .addrow input:focus,.fld:focus,input.edit:focus{border-color:var(--sel-bd)}
@@ -355,6 +370,6 @@ input:focus,textarea:focus,select:focus{outline:none;box-shadow:none}
 <div id="bg-fixed"></div>
 <div id="app"><div id="topsafe"></div><div id="pin"></div><main id="screen"></main><nav id="tabbar" aria-label="하단 탭"></nav></div>
 <div id="sheet"></div><div id="toast"></div><div id="picker"></div>
-<script src="iitabi.js?v=2026.10.06-50"></script>
+<script src="iitabi.js?v=2026.10.06-54"></script>
 </body>
 </html>
