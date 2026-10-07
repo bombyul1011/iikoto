@@ -1,10 +1,10 @@
 (function(){
 'use strict';
-var VER='2026.10.06-59';
+/* 버전은 iitabi.html의 <script src="iitabi.js?v=…"> 한 곳에서만 올린다(서비스 워커·화면 표시는 여기서 읽어 쓴다) */
+var VER=(function(){try{return new URL(document.currentScript.src).searchParams.get('v')||'dev'}catch(e){return 'dev'}})();
 var SUPA_URL='https://vqvpzrxmtpryzhontlxc.supabase.co';
 var SUPA_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdnB6cnhtdHByeXpob250bHhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTgxMjksImV4cCI6MjA5NjYzNDEyOX0.pbtq1UMPC7ylYM1H2xVa19C1TFlceLmEfEtkz3WK2VI';
 var LSP='iitabi:';
-try{Object.keys(localStorage).forEach(function(k){if(k.indexOf('triplog:')===0&&localStorage.getItem('iitabi:'+k.slice(8))==null)localStorage.setItem('iitabi:'+k.slice(8),localStorage.getItem(k))})}catch(e){}  // 이름 변경 전 저장값을 한 번 옮겨 온다
 function lget(k,d){try{var v=localStorage.getItem(LSP+k);return v==null?d:JSON.parse(v)}catch(e){return d}}
 function lset(k,v){try{localStorage.setItem(LSP+k,JSON.stringify(v))}catch(e){}}
 /* 색 팔레트: [글자, 배경, 진한색, 테두리] — 도시·분류·탭 색의 단일 출처 */
@@ -53,18 +53,19 @@ function navUrl(q){return 'https://www.google.com/maps/dir/?api=1&destination='+
 function byCid(arr,id){for(var i=0;i<arr.length;i++){if(arr[i].cid===id)return arr[i]}return null}
 function parseAmt(v){return parseInt(String(v==null?'':v).replace(/[^0-9]/g,''),10)||0}
 function curSym(c){return c==='KRW'?'₩':'¥'}
-function typing(){if(UI.popKey||PK)return true;var ae=document.activeElement;return !!(ae&&((ae.tagName==='INPUT'&&ae.type!=='checkbox'&&ae.type!=='radio')||ae.tagName==='TEXTAREA'||ae.tagName==='SELECT'))}
+function typing(){if(PK)return true;var ae=document.activeElement;return !!(ae&&((ae.tagName==='INPUT'&&ae.type!=='checkbox'&&ae.type!=='radio')||ae.tagName==='TEXTAREA'||ae.tagName==='SELECT'))}
 function pickOn(el){Array.prototype.forEach.call(el.parentNode.querySelectorAll('.tsb'),function(b){var on=b===el;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on)})}
 function setPick(act,v){Array.prototype.forEach.call(document.querySelectorAll('[data-act="'+act+'"]'),function(b){var on=b.getAttribute('data-v')===v;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on)})}
 function shead(t,act,v,label){return '<div class="row between"><h1 style="font-size:22px">'+esc(t)+'</h1><button class="btn" style="border:0;background:transparent" data-act="'+(act||'sheet-close')+'"'+(v?' data-v="'+v+'"':'')+' aria-label="'+(label||'닫기')+'">'+ic('x',20)+'</button></div>'}
-function closeSheet(){UI.sheet=null;UI.expDraft=null;UI.evDraft=null;UI.payDraft=null;UI.spDraft=null;UI.clDraft=null;clearDraft();render()}
+function endSheet(){UI.sheet=null;UI.expDraft=UI.evDraft=UI.payDraft=UI.spDraft=UI.clDraft=null;clearDraft()}  // 열린 시트와 작성 중 내용을 모두 비운다(화면은 호출 쪽에서 그림)
+function closeSheet(){endSheet();render()}
 function byTimeDesc(a,b){return String(b.d.time||'')<String(a.d.time||'')?-1:1}
 function byMemoTime(a,b){var x=String(a.memo_time||'99:99'),y=String(b.memo_time||'99:99');return x<y?-1:(x>y?1:0)}
 
 /* ---------- state ---------- */
 var cfg=lget('cfg',{key:'',tripId:''});
 var PK=null;  // 열려 있는 날짜·시간 선택 모달 상태
-var UI={tab:'today',sched:null,clDate:null,spCity:null,spCat:'all',sheet:null,edit:null,status:'',syncAt:null,keyBad:false,addSpot:false,vd:null,addTxt:{},popKey:null,editVal:null,expDraft:null,evDraft:null,payDraft:null,spDraft:null,wkAnim:null,undoFn:null,toastT:null};
+var UI={tab:'today',sched:null,clDate:null,spCity:null,spCat:'all',sheet:null,edit:null,status:'',syncAt:null,keyBad:false,addSpot:false,vd:null,addTxt:{},editVal:null,expDraft:null,evDraft:null,payDraft:null,spDraft:null,wkAnim:null,undoFn:null,toastT:null};
 var PINH='';  // 화면 상단에 고정할 HTML(일정·경비 탭). render()가 #pin에 넣는다
 var M=null,CL={items:[]},MEMOS=[],WX={},Q=lget('q',[]),TRIPS=lget('trips',[]);
 function saveQ(){lset('q',Q)}
@@ -300,7 +301,6 @@ function sunLine(vd){
   var name=id!==cityOfDate(vd)?'<span>'+esc(cityName(id))+' ·</span>':'';
   return '<div class="sunl">'+name+ic('sunrise',15,pcol('orange')[2])+'<span>일출 '+w.sr+'</span>'+ic('sunset',15,pcol('pink')[2])+'<span>일몰 '+w.ss+'</span></div>';
 }
-function wxOf(d){var c=cityOfDate(d);return WX.d&&WX.d[c]&&WX.d[c][d]||null}
 function loadTrips(){
   return sf('trip_items?kind=eq.trip&deleted_at=is.null&select=trip_id,data&order=created_at.desc').then(function(rows){
     if(!rows)return;TRIPS=rows;lset('trips',TRIPS);
@@ -450,9 +450,8 @@ function clList(items,ro){
 }
 function clAddRow(key){
   var v=UI.addTxt[key]||'';
-  return '<div class="addwrap"><div class="addrow"><input data-add="'+ea(key)+'" value="'+ea(v)+'" placeholder="항목 추가" aria-label="항목 추가"><button class="btn addbtn" data-act="add" data-key="'+ea(key)+'" aria-label="추가">'+ic('plus',22)+'</button></div></div>';
+  return '<div class="addrow"><input data-add="'+ea(key)+'" value="'+ea(v)+'" placeholder="항목 추가" aria-label="항목 추가"><button class="btn addbtn" data-act="add" data-key="'+ea(key)+'" aria-label="추가">'+ic('plus',22)+'</button></div>';
 }
-function closePop(){var p=document.querySelector('.fpop:not([hidden])');if(p)p.hidden=true;UI.popKey=null}
 function addPrompt(key,val){
   if(!(val||'').trim()){toast('항목을 입력해 주세요');return}
   if(key==='pre'){addCl(key,val,'none');return}  // 사전준비는 시간대·알림 없이 텍스트만
@@ -481,21 +480,21 @@ function memoEv(m){
   return '<div class="ev mev" data-t="'+ea(m.memo_time||'')+'"><button class="evt" disabled tabindex="-1" aria-hidden="true">'+esc(m.memo_time||'')+'</button><span class="evdot memodot"><span class="mdot"></span></span><div class="c"><div class="memoc">'+(hasPhoto(m)?photoThumb(m,44):ic('notes',14))+'<span>'+memoText(m)+'</span></div></div></div>';
 }
 function effTimes(ev){
-  var def={am:'09:00',noon:'12:00',pm:'15:00',eve:'19:00'},prev='00:00',out=[];
+  var def=SLOTDEF,prev='00:00',out=[];
   ev.forEach(function(e){var t=e.d.time||def[e.d.slot]||prev;if(t<prev)t=prev;out.push(t);prev=t});
   return out;
 }
 /* 타임라인 표시용 시각: 화면 라벨에 보이는 시각(완료한 일정은 완료 시각)과 같은 기준으로 메모와 줄을 세운다.
    (저장·삽입 순서용 effTimes는 그대로 두고, 화면 배치에만 쓴다) */
 function dispTimes(ev){
-  var def={am:'09:00',noon:'12:00',pm:'15:00',eve:'19:00'},prev='00:00',out=[];
+  var def=SLOTDEF,prev='00:00',out=[];
   ev.forEach(function(e){var d=e.d,t=(d.done&&d.doneAt)?hhmm(d.doneAt):(d.time||def[d.slot]||prev);if(t<prev)t=prev;out.push(t);prev=t});
   return out;
 }
 /* 화면에 보이는 시각(완료한 일정은 완료 시각, 아니면 예정 시각·시간대 기본값) 순으로 줄을 세운다.
    서버에 저장된 순서는 바꾸지 않는다 — 예정 시각 없이 시간대만 있는 일정을 일찍 마치면 라벨(13:19)이 앞 줄(13:50)보다 이르게 보이던 문제 */
 function sortShown(ev){
-  var def={am:'09:00',noon:'12:00',pm:'15:00',eve:'19:00'},prev='00:00';
+  var def=SLOTDEF,prev='00:00';
   return ev.map(function(e,i){var d=e.d,k=(d.done&&d.doneAt)?hhmm(d.doneAt):(d.time||def[d.slot]||prev);prev=k;return {e:e,k:k,i:i}})
     .sort(function(a,b){return a.k<b.k?-1:(a.k>b.k?1:a.i-b.i)}).map(function(x){return x.e});
 }
@@ -672,7 +671,6 @@ function amtPair(d){
   if(d.currency==='JPY')return '<div class="amt"><b>'+won(d.amount*fx())+'원</b><span class="yen">¥'+won(d.amount)+'</span></div>';
   return '<div class="amt"><b>'+won(d.amount)+'원</b></div>';
 }
-function amtHtml(e){return amtPair(e.d)}
 function xKrw(e){return e.d.currency==='KRW'?e.d.amount:e.d.amount*fx()}
 function sumInfo(list){var j=0,k=0;list.forEach(function(e){if(e.d.currency==='KRW')k+=e.d.amount;else j+=e.d.amount});return {jpy:j,krw:k,est:j*fx()+k}}
 function sumLabel(i){return '<b style="color:var(--tx)">'+won(i.est)+'원</b>'+(i.jpy?' <span class="yen">¥'+won(i.jpy)+'</span>':'')}
@@ -721,7 +719,7 @@ function screenBudget(){
   if(fixed.length)h+='<div class="lbl" style="margin:6px 0 0">사전 결제</div>';
   fixed.forEach(function(x){
     var d=x.o.d,c=x.k==='stay'?cityCol(d.city)[1]:null;
-    h+=card('<div class="row" style="gap:12px">'+'<span class="xi" style="width:34px">'+ic(iconOf(x),24,pcol(x.k==='stay'?'rose':(d.cat==='air'?'mint':'gray'))[2])+'</span>'+'<div class="grow"><div class="row" style="gap:6px">'+(c?'<i style="width:10px;height:10px;border-radius:50%;background:'+c+';display:inline-block"></i>':'')+'<b style="font-size:15px">'+esc(d.name)+'</b></div><div class="small muted" style="margin-top:3px;line-height:1.45">'+esc(x.k==='stay'?(d.nights+'박 · '+md(d.checkin)+' – '+md(d.checkout)+(d.note?' · '+d.note:'')):(d.note||''))+'</div></div><div style="text-align:right">'+amtHtml(x.o)+'</div></div>','sm flat').replace('<div class="card sm flat">','<div class="card sm flat" style="cursor:pointer" data-act="payedit" data-k="'+x.k+'" data-id="'+ea(x.o.cid)+'">');
+    h+=card('<div class="row" style="gap:12px">'+'<span class="xi" style="width:34px">'+ic(iconOf(x),24,pcol(x.k==='stay'?'rose':(d.cat==='air'?'mint':'gray'))[2])+'</span>'+'<div class="grow"><div class="row" style="gap:6px">'+(c?'<i style="width:10px;height:10px;border-radius:50%;background:'+c+';display:inline-block"></i>':'')+'<b style="font-size:15px">'+esc(d.name)+'</b></div><div class="small muted" style="margin-top:3px;line-height:1.45">'+esc(x.k==='stay'?(d.nights+'박 · '+md(d.checkin)+' – '+md(d.checkout)+(d.note?' · '+d.note:'')):(d.note||''))+'</div></div><div style="text-align:right">'+amtPair(x.o.d)+'</div></div>','sm flat').replace('<div class="card sm flat">','<div class="card sm flat" style="cursor:pointer" data-act="payedit" data-k="'+x.k+'" data-id="'+ea(x.o.cid)+'">');
   });
   return h;
 }
@@ -830,7 +828,7 @@ function sheetHtml(){
 var TABS=[['today','오늘','sun'],['sched','일정','cal'],['check','체크','chk'],['budget','경비','wal'],['spots','스팟','pin']];
 function render(){
   var sc=document.getElementById('screen'),y=sc.scrollTop,mly=Array.prototype.map.call(sc.querySelectorAll('.fitlist.scroll'),function(x){return x.scrollTop});
-  var h='';PINH='';UI.popKey=null;
+  var h='';PINH='';
   try{
     if(!M)h=empty();
     else if(UI.tab==='today')h=screenToday();
@@ -844,7 +842,8 @@ function render(){
   document.getElementById('pin').innerHTML=tb+PINH;
   document.getElementById('tabbar').innerHTML=TABS.map(function(t){var c=pcol(TABC[t[0]]);return '<button data-act="tab" data-v="'+t[0]+'" class="'+(UI.tab===t[0]?'on':'')+'" aria-current="'+(UI.tab===t[0]?'page':'false')+'" style="--tc:'+c[0]+';--ts:'+c[2]+'"><span class="tabi">'+ic(t[2],24)+'</span><span>'+t[1]+'</span></button>'}).join('');
   document.getElementById('bg-fixed').style.setProperty('--glow',pcol(TABC[UI.tab]||'orange')[1].replace(/,[\d.]+\)$/,',.26)'));
-  document.getElementById('sheet').innerHTML=sheetHtml();
+  var shh=sheetHtml();if(UI.sheet&&!shh)UI.sheet=null;  // 열려 있던 대상이 동기화로 사라진 경우 쓸기·입력이 막히지 않게
+  document.getElementById('sheet').innerHTML=shh;
   if(UI.edit){var ei=document.querySelector('input.edit');if(ei&&document.activeElement!==ei){ei.focus();var el2=ei.value.length;try{ei.setSelectionRange(el2,el2)}catch(e){}} /* 전체 선택(파란 드래그) 대신 글 끝에 커서만 */}
   sc.scrollTop=y;
   fitMemoList();
@@ -955,7 +954,7 @@ function saveExp(){
   if(ri)data.ref={t:ri.t,cid:ri.cid,name:ri.name};
   var o=dr.id?byCid(M.expenses,dr.id):null;
   if(o){o.d=data;o.date=date}else{o={cid:'exp_'+genCid(),date:date,sort:Date.now()%100000000,d:data};M.expenses.push(o)}
-  tiUp('expense',o);UI.sheet=null;UI.expDraft=null;clearDraft();render();toast('저장했어요');
+  tiUp('expense',o);endSheet();render();toast('저장했어요');
 }
 function timeToSlot(t){var h=parseInt(String(t).split(':')[0],10);if(isNaN(h))return 'pm';return h<11?'am':(h<14?'noon':(h<18?'pm':'eve'))}
 function spotOfEvent(e){
@@ -1010,7 +1009,7 @@ function saveEv(){
   else e={cid:'ev_'+date+'_'+genCid(),date:date,sort:0,d:d};
   insertEvent(date,e);
   var t=trip();if(t&&(date<t.start||date>t.end))toast('여행 기간 밖의 날짜예요. 기간을 넓히면 보여요');
-  UI.sched=date;UI.sheet=null;UI.evDraft=null;clearDraft();render();if(!(t&&(date<t.start||date>t.end)))toast('저장했어요');
+  UI.sched=date;endSheet();render();if(!(t&&(date<t.start||date>t.end)))toast('저장했어요');
 }
 function delEvent(e,sp){
   removeEvent(e);tiDel(e);
@@ -1160,8 +1159,250 @@ function restoreDraft(){
   if(dft.k==='ev'){UI.evDraft=dft.d;UI.sheet='ev'}else if(dft.k==='exp'){UI.expDraft=dft.d;UI.sheet='exp'}else return;
   render();
 }
+/* ---------- 클릭 동작 표: data-act 값 → 처리 함수 (각 함수가 자기 지역변수를 가진다) ---------- */
+function pkMonth(el,v,id){var a=el.getAttribute('data-act');if(!PK)return;PK.m+=(a==='pk-next'?1:-1);if(PK.m<0){PK.m=11;PK.y--}else if(PK.m>11){PK.m=0;PK.y++}renderPicker()}
+function delWithUndo(o,label,list,kind){  // 지출·결제 항목 삭제 + 5초 되돌리기
+  M[list]=M[list].filter(function(x){return x.cid!==o.cid});tiDel(o);render();
+  toastUndo(label,function(){tiUndoDel(o);M[list].push(o);tiUp(kind,o);render()});
+}
+var ACT={
+  'tab':function(el,v){goTab(v)},
+  'sheet':function(el,v){UI.sheet=v;render()},
+  'sheet-close':function(){closeSheet()},
+  'sync':function(){pull(true).then(function(){toast('동기화했어요')})},
+  'date':function(el,v){UI.sched=v;render()},
+  'cdate':function(el,v){UI.clDate=v;UI.clPre=false;render()},
+  'clpre':function(){UI.clPre=!UI.clPre;render()},
+  'goiikoto':function(){window.location.href='https://bombyul1011.github.io/iikoto/'},  // 같은 창에서 본앱으로 이동
+  'pick':function(el){
+    var pid=el.getAttribute('data-for'),ptype=el.getAttribute('data-pk'),pinp=document.getElementById(pid);
+    openPicker(ptype,pinp?pinp.value:'',ptype==='date'?'날짜 선택':'시간 선택',function(val){
+      var t2=document.getElementById(pid);if(!t2)return;
+      t2.value=val;syncDF(t2);t2.dispatchEvent(new Event('change',{bubbles:true}));persistDraft();
+    },{clearable:!!el.getAttribute('data-clr')});
+  },
+  'pk-cancel':function(){closePicker()},
+  'pk-btn':function(el){var pk=PK,i=+el.getAttribute('data-i');closePicker();if(pk&&pk.btns&&pk.btns[i]&&pk.btns[i].fn)pk.btns[i].fn()},
+  'pk-clear':function(){var pk=PK;closePicker();if(pk&&pk.onOk)pk.onOk('')},
+  'pk-ok':function(){
+    var pk=PK;if(!pk)return;
+    var val=pk.type==='time'?pad(pk.h)+':'+pad(pk.mi*5):pk.sel;
+    closePicker();if(pk.onOk)pk.onOk(val);
+  },
+  'pk-day':function(el,v){if(PK){PK.sel=v;renderPicker()}},
+  'pk-prev':pkMonth,
+  'pk-next':pkMonth,
+  'plan':function(el,v){setChoice(el.getAttribute('data-date'),el.getAttribute('data-slot'),v)},
+
+  /* 체크리스트 */
+  'ck':function(el,v,id){
+    var it=findCl(id);if(!it||it.done===el.checked)return;  // 클릭·change가 겹쳐 두 번 와도 한 번만 처리
+    it.done=el.checked;it.completedAt=it.done?Date.now():null;
+    tdUpd(it,{done:it.done,completed_at:it.completedAt});
+    if(it.at)alUpdate(it,true);
+    render();
+  },
+  'edit':function(el,v,id){UI.edit=id;UI.editVal=null;render()},
+  'edit-ok':function(el,v,id){var inp=document.querySelector('input.edit');commitEdit(id,inp?inp.value:'')},
+  'edits':function(el,v,id){
+    var ein=document.querySelector('input.edit');UI.editVal=ein?ein.value:null;
+    var it=findCl(id);if(it){it.ts=v;tdUpd(it,{time_section:v})}
+    render();
+  },
+  'del':function(el,v,id){
+    var it=findCl(id);if(!it)return;
+    CL.items=CL.items.filter(function(x){return x.id!==id});tdDel(it);render();
+    toastUndo('항목을 삭제했어요',function(){tdUndoDel(it);render()});
+  },
+  'add':function(el){var key=el.getAttribute('data-key'),inp=document.querySelector('input[data-add="'+key+'"]');addPrompt(key,inp?inp.value:'')},
+  'ctime':function(el,v,id){
+    var it=findCl(id);if(!it||!it.completedAt)return;
+    openPicker('time',hhmm(it.completedAt),'완료 시각',function(val){
+      var c=findCl(id);if(c&&val){c.completedAt=setTimeOnly(c.completedAt||Date.now(),val);tdUpd(c,{completed_at:c.completedAt});render()}
+    });
+  },
+  'clcat':function(el,v,id){
+    if(id){keepEdit();var it=findCl(id);if(it){it.cat=v;tdUpd(it,{cat:v})}}
+    else if(UI.clDraft)UI.clDraft.cat=v;
+    render();
+  },
+  'clts':function(el,v){if(UI.clDraft){UI.clDraft.ts=v;render()}},
+  'cl-save':function(){var cd=UI.clDraft;if(!cd)return;endSheet();addCl(cd.key,cd.t,cd.ts,cd.at,cd.ao,cd.cat)},
+  'alpick':function(el,v,id){
+    if(id){keepEdit();BLURSKIP=true;try{if(document.activeElement&&document.activeElement.blur)document.activeElement.blur()}catch(e){}BLURSKIP=false}  // 수정 중이면 키보드를 내려 시간 휠이 가리지 않게(수정 상태는 유지)
+    var it=id?findCl(id):UI.clDraft,cur=it&&it.at||'';
+    openPicker('time',cur||'09:00','알림 시각',function(val){
+      if(!val)return;
+      if(id){var x=findCl(id);if(x){setItemAlert(x,val,true);render()}}
+      else if(UI.clDraft){UI.clDraft.at=val;UI.clDraft.ao=true;render()}
+    });
+  },
+  'albell':function(el,v,id){
+    if(id)keepEdit();
+    var it=id?findCl(id):UI.clDraft;if(!it)return;
+    if(!it.at){if(el.nextElementSibling)el.nextElementSibling.click();return}
+    if(id)setItemAlert(it,it.at,!it.ao);else it.ao=!it.ao;
+    render();
+  },
+  'alclr':function(el,v,id){
+    if(id){keepEdit();var x=findCl(id);if(x)setItemAlert(x,'',false)}
+    else if(UI.clDraft){UI.clDraft.at='';UI.clDraft.ao=false}
+    render();
+  },
+  'tlf':function(el,v){UI.tlf=UI.tlf||{};UI.tlf[v]=UI.tlf[v]===false;render()},
+
+  /* 경비 */
+  'exp-new':function(){openExp(null)},
+  'expedit':function(el,v,id){openExp(id)},
+  'exp-save':function(){saveExp()},
+  'exp-del':function(el,v,id){
+    var ex=byCid(M.expenses,id);
+    if(ex)delWithUndo(ex,'지출을 삭제했어요','expenses','expense');
+    closeSheet();
+  },
+  'xpick':function(el){
+    var ref=el.getAttribute('data-ref'),nm=el.getAttribute('data-name');
+    if(!UI.expDraft)return;
+    UI.expDraft.ref=ref;UI.expDraft.name=nm;
+    var inp=document.getElementById('x_name');if(inp)inp.value=nm;
+    var info=refInfo(ref),guess=null;
+    if(info&&info.t==='spot'){var sp=byCid(M.spots,info.cid);if(sp)guess=SPOT_ECAT[sp.d.cat]}
+    else if(info&&info.t==='event'){var ev=findEvent(info.cid),es=ev?spotOfEvent(ev):null;if(es)guess=SPOT_ECAT[es.d.cat]}
+    if(guess){UI.expDraft.cat=guess;setPick('expcat',guess)}
+    refreshXSug();persistDraft();
+  },
+  'xunlink':function(){if(UI.expDraft){UI.expDraft.ref='';refreshXSug();persistDraft()}},
+  'expcat':function(el,v){if(UI.expDraft)UI.expDraft.cat=v;pickOn(el)},
+  'expcur':function(el,v){if(UI.expDraft)UI.expDraft.cur=v;pickOn(el);var sy=document.getElementById('x_sym');if(sy)sy.textContent=curSym(v);updateExpLine()},
+  'payedit':function(el,v,id){
+    var k=el.getAttribute('data-k'),po=byCid(k==='stay'?M.stays:M.expenses,id);if(!po)return;
+    UI.payDraft={k:k,id:id,name:po.d.name,amt:String(po.d.amount),cur:po.d.currency==='JPY'?'JPY':'KRW'};UI.sheet='pay';render();
+  },
+  'paycur':function(el,v){if(UI.payDraft)UI.payDraft.cur=v;pickOn(el);var ps=document.getElementById('p_sym');if(ps)ps.textContent=curSym(v)},
+  'pay-save':function(){
+    var pd=UI.payDraft;if(!pd)return;
+    var amt=parseAmt(document.getElementById('p_amt').value);
+    if(!amt){toast('금액을 입력해 주세요');return}
+    var po=byCid(pd.k==='stay'?M.stays:M.expenses,pd.id);
+    if(po){po.d.amount=amt;po.d.currency=pd.cur;tiUp(pd.k==='stay'?'stay':'expense',po)}
+    endSheet();render();toast('저장했어요');
+  },
+  'pay-del':function(){
+    var pd=UI.payDraft,po=(pd&&pd.k==='exp')?byCid(M.expenses,pd.id):null;
+    if(po)delWithUndo(po,'결제 항목을 삭제했어요','expenses','expense');
+    closeSheet();
+  },
+  'fxmode':function(el,v){var f=fxGet();if(v==='auto'){f.auto=true;tiUp('trip',M.trip);fetchFx(true)}else{f.auto=false;tiUp('trip',M.trip)}render()},
+
+  /* 스팟 */
+  'spc':function(el,v){UI.spCity=v;render()},
+  'spcat':function(el,v){UI.spCat=v;render()},
+  'spcatpick':function(el,v){if(UI.spDraft)UI.spDraft.cat=v;pickOn(el)},
+  'spcitypick':function(el,v){if(UI.spDraft)UI.spDraft.city=v;pickOn(el)},
+  'spmore':function(el,v,id){
+    var sp=byCid(M.spots,id);if(!sp)return;
+    openChoice(sp.d.name,'이 스팟을 어떻게 할까요?',[
+      {t:'수정',cls:'ok',fn:function(){spotEditOpen(sp)}},
+      {t:'삭제',cls:'warn',fn:function(){spotDelete(sp)}},
+      {t:'취소',fn:function(){}}],true);
+  },
+  'sp-new':function(){UI.addSpot=true;render()},
+  'sp-cancel':function(){UI.addSpot=false;render()},
+  'sp-save':function(){
+    var nm=(document.getElementById('s_name').value||'').trim();if(!nm){toast('이름을 입력해 주세요');return}
+    var so={cid:'spot_'+genCid(),date:null,sort:Date.now()%100000000,d:{city:UI.spCity,cat:document.getElementById('s_cat').value,name:nm,desc:(document.getElementById('s_desc').value||'').trim(),map:(document.getElementById('s_map').value||'').trim()||nm}};
+    M.spots.push(so);tiUp('spot',so);UI.addSpot=false;render();
+  },
+  'spedit-save':function(){
+    var sd=UI.spDraft;if(!sd)return;
+    var sp=byCid(M.spots,sd.id);if(!sp)return;
+    var nn=(document.getElementById('sp_name').value||'').trim();
+    if(!nn){toast('이름을 입력해 주세요');return}
+    var ndesc=(document.getElementById('sp_desc').value||'').trim(),nmap=(document.getElementById('sp_map').value||'').trim()||nn;
+    var oldName=sp.d.name,oldMap=sp.d.map;
+    if(nn!==oldName){  // 이름을 바꾸면 이 스팟과 연결된 일정의 제목·지도 검색어도 같이 바꾼다
+      Object.keys(M.events).forEach(function(dk){M.events[dk].forEach(function(e){
+        var byName=(e.d.title||'').trim()===oldName;
+        if(e.d.spot!==sp.cid&&!byName)return;
+        var chg=false;
+        if(byName){e.d.title=nn;chg=true}
+        if(!e.d.spot){e.d.spot=sp.cid;chg=true}
+        if(e.d.map&&(e.d.map===oldMap||e.d.map===oldName)){e.d.map=nmap;chg=true}
+        if(chg)tiUp('event',e);
+      })});
+    }
+    sp.d.name=nn;sp.d.cat=sd.cat;sp.d.city=sd.city;sp.d.map=nmap;
+    if(ndesc)sp.d.desc=ndesc;else delete sp.d.desc;
+    tiUp('spot',sp);
+    endSheet();render();toast('저장했어요');
+  },
+
+  /* 일정 */
+  'evck':function(el,v,id){var e=findEvent(id);if(e)evSetDone(e,!e.d.done)},
+  'bnck':function(el,v,id){
+    var e=findEvent(id);if(!e||e.d.done)return;
+    evSetDone(e,true);
+    toastUndo('"'+e.d.title+'" 완료했어요',function(){var e2=findEvent(id);if(e2&&e2.d.done)evSetDone(e2,false)});  // 그사이 서버에서 다시 받아와도 안전하게 id로 찾는다
+  },
+  'evtime':function(el,v,id){
+    var e=findEvent(id);if(!e||!e.d.doneAt)return;
+    openPicker('time',hhmm(e.d.doneAt),'완료 시각',function(val){
+      var e2=findEvent(id);if(e2&&val){e2.d.doneAt=setTimeOnly(e2.d.doneAt,val);tiUp('event',e2);render()}
+    });
+  },
+  'evnew':function(el){openEv(null,el.getAttribute('data-date'))},
+  'evedit':function(el,v,id){openEv(id)},
+  'spot2ev':function(el,v,id){openEv(null,UI.sched||clampDate(today()),id)},
+  'evpick':function(el,v,id){
+    var sp=byCid(M.spots,id);if(!sp||!UI.evDraft)return;
+    UI.evDraft.spot=sp.cid;UI.evDraft.title=sp.d.name;
+    var ti=document.getElementById('ev_title'),ma=document.getElementById('ev_map'),de=document.getElementById('ev_desc');
+    if(ti)ti.value=sp.d.name;
+    if(ma&&!ma.value.trim())ma.value=sp.d.map||sp.d.name;
+    if(de&&!de.value.trim())de.value=sp.d.desc||'';
+    var slot=SPOT_SLOT[sp.d.cat];
+    if(slot&&!document.getElementById('ev_time').value){UI.evDraft.slot=slot;setPick('evslot',slot)}
+    refreshSug();persistDraft();
+  },
+  'evunlink':function(){if(UI.evDraft){UI.evDraft.spot='';refreshSug();persistDraft()}},
+  'evslot':function(el,v){if(UI.evDraft)UI.evDraft.slot=v;pickOn(el)},
+  'evmap':function(el,v){if(UI.evDraft)UI.evDraft.mapOn=(v==='true');pickOn(el)},
+  'ev-save':function(){saveEv()},
+  'ev-del':function(el,v,id){
+    var e=findEvent(id);if(!e)return;
+    var sp=spotOfEvent(e);
+    if(sp&&linkedEvents(sp).length===1){
+      openChoice('일정 삭제','"'+e.d.title+'"은(는) 스팟에서 넣은 일정이에요. 삭제하면 스팟 목록으로 돌아가요.',[
+        {t:'스팟 목록으로 돌려놓기',cls:'ok',fn:function(){delEvent(e,null)}},
+        {t:'스팟도 같이 삭제',cls:'warn',fn:function(){delEvent(e,sp)}},
+        {t:'취소',fn:function(){}}]);
+    }else delEvent(e,null);
+  },
+  'dprev':function(){UI.vd=addDays(viewDate(),-1);render()},
+  'dnext':function(){UI.vd=addDays(viewDate(),1);render()},
+
+  /* 설정·여행 */
+  'undo':function(){var uf=UI.undoFn;UI.undoFn=null;document.getElementById('toast').innerHTML='';clearTimeout(UI.toastT);if(uf)uf()},
+  'key-save':function(){
+    var k=(document.getElementById('k_in').value||'').trim();if(!k){toast('키를 입력해 주세요');return}
+    cfg.key=k;lset('cfg',cfg);UI.sheet=null;UI.keyBad=false;
+    loadTrips().then(function(){loadTrip();return pull(true)}).then(function(){render();toast(M?'불러왔어요':'데이터를 찾지 못했어요')});
+  },
+  'trip-open':function(el,v,id){cfg.tripId=id;lset('cfg',cfg);UI.sheet=null;loadTrip();render();pull(true)},
+  'trip-save':function(){
+    var t=trip(),ttl=(document.getElementById('te_title').value||'').trim(),st=document.getElementById('te_start').value,en=document.getElementById('te_end').value;
+    if(!ttl){toast('여행명을 입력해 주세요');return}
+    if(!st||!en||en<st){toast('기간을 확인해 주세요');return}
+    t.title=ttl;t.start=st;t.end=en;t.status=document.getElementById('te_status').value;
+    Array.prototype.forEach.call(document.querySelectorAll('.te_city'),function(ci){var c=t.cities[+ci.getAttribute('data-i')],nm=(ci.value||'').trim();if(c&&nm)c.name=nm});
+    tiUp('trip',M.trip);
+    TRIPS=TRIPS.map(function(r){return r.trip_id===cfg.tripId?{trip_id:r.trip_id,data:t}:r});lset('trips',TRIPS);
+    UI.vd=null;UI.sched=null;UI.sheet='trips';render();toast('저장했어요');
+  },
+  'export':function(){doExport()}
+};
+var DRAFT_ACT={evslot:1,evmap:1,expcat:1,expcur:1};  // 이 동작 뒤에는 작성 중인 시트 내용을 기기에 임시 저장
 function onClick(e){
-  if(UI.popKey&&!(e.target.closest&&(e.target.closest('.fpop')||e.target.closest('[data-act="add"]'))))closePop();
   var mc=e.target.closest&&e.target.closest('[data-mapcheck]');
   if(mc){
     var isSp=mc.getAttribute('data-mapcheck')==='sp';
@@ -1170,176 +1411,12 @@ function onClick(e){
     if(!isSp)persistDraft();mc.href=mapUrl(q0);return;
   }
   var el=e.target.closest('[data-act]');if(!el)return;
-  var a=el.getAttribute('data-act'),v=el.getAttribute('data-v'),id=el.getAttribute('data-id');
-  if(a==='sheet-bg'){if(e.target===el)closeSheet();return}
+  var a=el.getAttribute('data-act');
+  if(a==='sheet-bg'){if(e.target===el)closeSheet();return}   // 시트·모달 바깥 배경을 눌렀을 때만 닫는다
   if(a==='pk-bg'){if(e.target===el)closePicker();return}
-  switch(a){
-    case 'tab':goTab(v);break;
-    case 'sheet':UI.sheet=v;render();break;
-    case 'sheet-close':closeSheet();break;
-    case 'sync':pull(true).then(function(){toast('동기화했어요')});break;
-    case 'date':UI.sched=v;render();break;
-    case 'cdate':UI.clDate=v;UI.clPre=false;render();break;
-    case 'clpre':UI.clPre=!UI.clPre;render();break;
-    case 'goiikoto':window.location.href='https://bombyul1011.github.io/iikoto/';break;  // 채움로그와 같은 방식: 같은 창에서 본앱으로 이동
-    case 'pick':{
-      var pid=el.getAttribute('data-for'),ptype=el.getAttribute('data-pk'),pinp=document.getElementById(pid);
-      openPicker(ptype,pinp?pinp.value:'',ptype==='date'?'날짜 선택':'시간 선택',function(val){
-        var t2=document.getElementById(pid);if(!t2)return;
-        t2.value=val;syncDF(t2);t2.dispatchEvent(new Event('change',{bubbles:true}));persistDraft();
-      },{clearable:!!el.getAttribute('data-clr')});
-      break}
-    case 'pk-cancel':closePicker();break;
-    case 'pk-btn':{var pkb=PK,bi=+el.getAttribute('data-i');closePicker();if(pkb&&pkb.btns&&pkb.btns[bi]&&pkb.btns[bi].fn)pkb.btns[bi].fn();break}
-    case 'pk-clear':{var pk1=PK;closePicker();if(pk1&&pk1.onOk)pk1.onOk('');break}
-    case 'pk-ok':{var pk2=PK;if(!pk2)break;var pval=pk2.type==='time'?pad(pk2.h)+':'+pad(pk2.mi*5):pk2.sel;closePicker();if(pk2.onOk)pk2.onOk(pval);break}
-    case 'pk-day':if(PK){PK.sel=v;renderPicker()}break;
-    case 'pk-prev':case 'pk-next':if(PK){PK.m+=(a==='pk-next'?1:-1);if(PK.m<0){PK.m=11;PK.y--}else if(PK.m>11){PK.m=0;PK.y++}renderPicker()}break;
-    case 'plan':setChoice(el.getAttribute('data-date'),el.getAttribute('data-slot'),v);break;
-        case 'ck':{var it=findCl(id);if(it){it.done=el.checked;it.completedAt=it.done?Date.now():null;tdUpd(it,{done:it.done,completed_at:it.completedAt});if(it.at)alUpdate(it,true);render()}break}
-    case 'edit':UI.edit=id;UI.editVal=null;render();break;
-    case 'edit-ok':{var inp=document.querySelector('input.edit');commitEdit(id,inp?inp.value:'');break}
-    case 'del':{var it2=findCl(id);if(it2){CL.items=CL.items.filter(function(x){return x.id!==id});tdDel(it2);render();toastUndo('항목을 삭제했어요',function(){tdUndoDel(it2);render()})}break}
-    case 'add':{var key=el.getAttribute('data-key'),ai=document.querySelector('input[data-add="'+key+'"]');addPrompt(key,ai?ai.value:'');break}
-    case 'tlf':{UI.tlf=UI.tlf||{};UI.tlf[v]=UI.tlf[v]===false;render();break}
-    case 'clcat':{if(id){keepEdit();var cx=findCl(id);if(cx){cx.cat=v;tdUpd(cx,{cat:v})}}else if(UI.clDraft)UI.clDraft.cat=v;render();break}
-    case 'clts':if(UI.clDraft){UI.clDraft.ts=v;render()}break
-    case 'cl-save':{var cd=UI.clDraft;if(cd){UI.sheet=null;UI.clDraft=null;addCl(cd.key,cd.t,cd.ts,cd.at,cd.ao,cd.cat)}break}
-    case 'alpick':{if(id){keepEdit();BLURSKIP=true;try{if(document.activeElement&&document.activeElement.blur)document.activeElement.blur()}catch(e){}BLURSKIP=false}  /* 수정 중이면 키보드를 내려 시간 휠이 가리지 않게(수정 상태는 유지) */
-    var ai3=id?findCl(id):UI.clDraft,cur3=ai3&&ai3.at||'';openPicker('time',cur3||'09:00','알림 시각',function(val){if(!val)return;if(id){var x3=findCl(id);if(x3){setItemAlert(x3,val,true);render()}}else if(UI.clDraft){UI.clDraft.at=val;UI.clDraft.ao=true;render()}});break}
-    case 'albell':{if(id)keepEdit();var ai4=id?findCl(id):UI.clDraft;if(!ai4)break;if(!ai4.at){el.nextElementSibling&&el.nextElementSibling.click();break}if(id){setItemAlert(ai4,ai4.at,!ai4.ao)}else ai4.ao=!ai4.ao;render();break}
-    case 'alclr':{if(id){keepEdit();var x5=findCl(id);if(x5)setItemAlert(x5,'',false)}else if(UI.clDraft){UI.clDraft.at='';UI.clDraft.ao=false}render();break}
-    case 'exp-new':openExp(null);break;
-    case 'expedit':openExp(id);break;
-    case 'xpick':{
-      var xref=el.getAttribute('data-ref'),xnm=el.getAttribute('data-name');
-      if(UI.expDraft){
-        UI.expDraft.ref=xref;UI.expDraft.name=xnm;
-        var xin=document.getElementById('x_name');if(xin)xin.value=xnm;
-        var xi=refInfo(xref),guess=null;
-        if(xi&&xi.t==='spot'){var xsp=byCid(M.spots,xi.cid);if(xsp)guess=SPOT_ECAT[xsp.d.cat]}
-        else if(xi&&xi.t==='event'){var xe=findEvent(xi.cid),xs=xe?spotOfEvent(xe):null;if(xs)guess=SPOT_ECAT[xs.d.cat]}
-        if(guess){UI.expDraft.cat=guess;setPick('expcat',guess)}
-        refreshXSug();persistDraft();
-      }
-      break}
-    case 'xunlink':{if(UI.expDraft){UI.expDraft.ref='';refreshXSug();persistDraft()}break}
-    case 'expcat':{if(UI.expDraft)UI.expDraft.cat=v;pickOn(el);break}
-    case 'expcur':{if(UI.expDraft)UI.expDraft.cur=v;pickOn(el);var sy=document.getElementById('x_sym');if(sy)sy.textContent=curSym(v);updateExpLine();break}
-    case 'payedit':{var parr=el.getAttribute('data-k')==='stay'?M.stays:M.expenses;var po=byCid(parr,id);if(po){UI.payDraft={k:el.getAttribute('data-k'),id:id,name:po.d.name,amt:String(po.d.amount),cur:po.d.currency==='JPY'?'JPY':'KRW'};UI.sheet='pay';render()}break}
-    case 'paycur':{if(UI.payDraft)UI.payDraft.cur=v;pickOn(el);var ps=document.getElementById('p_sym');if(ps)ps.textContent=curSym(v);break}
-    case 'pay-save':{
-      var pdr=UI.payDraft;if(!pdr)break;
-      var pa=parseAmt(document.getElementById('p_amt').value);
-      if(!pa){toast('금액을 입력해 주세요');break}
-      var pArr=pdr.k==='stay'?M.stays:M.expenses;var pObj=byCid(pArr,pdr.id);
-      if(pObj){pObj.d.amount=pa;pObj.d.currency=pdr.cur;tiUp(pdr.k==='stay'?'stay':'expense',pObj)}
-      UI.sheet=null;UI.payDraft=null;render();toast('저장했어요');break}
-    case 'pay-del':{var pd2=UI.payDraft,po2=null;if(pd2&&pd2.k==='exp'){po2=byCid(M.expenses,pd2.id);if(po2){M.expenses=M.expenses.filter(function(o){return o.cid!==pd2.id});tiDel(po2)}}closeSheet();if(po2)toastUndo('결제 항목을 삭제했어요',function(){tiUndoDel(po2);M.expenses.push(po2);tiUp('expense',po2);render()});break}
-    case 'exp-save':saveExp();break;
-    case 'exp-del':{var ex=byCid(M.expenses,id);if(ex){M.expenses=M.expenses.filter(function(x){return x.cid!==id});tiDel(ex)}closeSheet();if(ex)toastUndo('지출을 삭제했어요',function(){tiUndoDel(ex);M.expenses.push(ex);tiUp('expense',ex);render()});break}
-    case 'fxmode':{var f0=fxGet();if(v==='auto'){f0.auto=true;tiUp('trip',M.trip);fetchFx(true)}else{f0.auto=false;tiUp('trip',M.trip)}render();break}
-    case 'spc':UI.spCity=v;render();break;
-    case 'spcat':UI.spCat=v;render();break;
-    case 'spcatpick':{if(UI.spDraft)UI.spDraft.cat=v;pickOn(el);break}
-    case 'spcitypick':{if(UI.spDraft)UI.spDraft.city=v;pickOn(el);break}
-    case 'spedit-save':{
-      var sdr=UI.spDraft;if(!sdr)break;
-      var sps=byCid(M.spots,sdr.id);if(!sps)break;
-      var nn=(document.getElementById('sp_name').value||'').trim();
-      if(!nn){toast('이름을 입력해 주세요');break}
-      var ndesc=(document.getElementById('sp_desc').value||'').trim(),nmap=(document.getElementById('sp_map').value||'').trim()||nn;
-      var oldName=sps.d.name,oldMap=sps.d.map;
-      if(nn!==oldName){
-        Object.keys(M.events).forEach(function(dk){M.events[dk].forEach(function(e){
-          var linkedByName=(e.d.title||'').trim()===oldName;
-          if(e.d.spot===sps.cid||linkedByName){
-            var chg=false;
-            if(linkedByName){e.d.title=nn;chg=true}
-            if(!e.d.spot){e.d.spot=sps.cid;chg=true}
-            if(e.d.map&&(e.d.map===oldMap||e.d.map===oldName)){e.d.map=nmap;chg=true}
-            if(chg)tiUp('event',e);
-          }
-        })});
-      }
-      sps.d.name=nn;sps.d.cat=sdr.cat;sps.d.city=sdr.city;sps.d.map=nmap;
-      if(ndesc)sps.d.desc=ndesc;else delete sps.d.desc;
-      tiUp('spot',sps);
-      UI.sheet=null;UI.spDraft=null;render();toast('저장했어요');break}
-    case 'undo':{var uf=UI.undoFn;UI.undoFn=null;document.getElementById('toast').innerHTML='';clearTimeout(UI.toastT);if(uf)uf();break}
-    case 'spmore':{
-      var spm=byCid(M.spots,id);if(!spm)break;
-      openChoice(spm.d.name,'이 스팟을 어떻게 할까요?',[
-        {t:'수정',cls:'ok',fn:function(){spotEditOpen(spm)}},
-        {t:'삭제',cls:'warn',fn:function(){spotDelete(spm)}},
-        {t:'취소',fn:function(){}}],true);
-      break}
-    case 'sp-new':UI.addSpot=true;render();break;
-    case 'sp-cancel':UI.addSpot=false;render();break;
-    case 'sp-save':{
-      var nm2=(document.getElementById('s_name').value||'').trim();if(!nm2){toast('이름을 입력해 주세요');break}
-      var so={cid:'spot_'+genCid(),date:null,sort:Date.now()%100000000,d:{city:UI.spCity,cat:document.getElementById('s_cat').value,name:nm2,desc:(document.getElementById('s_desc').value||'').trim(),map:(document.getElementById('s_map').value||'').trim()||nm2}};
-      M.spots.push(so);tiUp('spot',so);UI.addSpot=false;render();break}
-    case 'key-save':{
-      var k=(document.getElementById('k_in').value||'').trim();if(!k){toast('키를 입력해 주세요');break}
-      cfg.key=k;lset('cfg',cfg);UI.sheet=null;UI.keyBad=false;
-      loadTrips().then(function(){loadTrip();return pull(true)}).then(function(){render();toast(M?'불러왔어요':'데이터를 찾지 못했어요')});break}
-    case 'trip-open':{cfg.tripId=id;lset('cfg',cfg);UI.sheet=null;loadTrip();render();pull(true);break}
-    case 'evck':{var ev0=findEvent(id);if(ev0)evSetDone(ev0,!ev0.d.done);break}
-    case 'bnck':{
-      var bev=findEvent(id);
-      if(bev&&!bev.d.done){
-        evSetDone(bev,true);
-        toastUndo('"'+bev.d.title+'" 완료했어요',function(){var e2=findEvent(id);if(e2&&e2.d.done)evSetDone(e2,false)});  // 그사이 서버에서 다시 받아와도 안전하게 id로 찾는다
-      }
-      break}
-    case 'evtime':{var evt=findEvent(id);if(evt&&evt.d.doneAt)openPicker('time',hhmm(evt.d.doneAt),'완료 시각',function(val){var e2=findEvent(id);if(e2&&val){e2.d.doneAt=setTimeOnly(e2.d.doneAt,val);tiUp('event',e2);render()}});break}
-    case 'evnew':openEv(null,el.getAttribute('data-date'));break;
-    case 'evedit':openEv(id);break;
-    case 'spot2ev':openEv(null,UI.sched||clampDate(today()),id);break;
-    case 'evpick':{
-      var psp=byCid(M.spots,id);
-      if(psp&&UI.evDraft){
-        UI.evDraft.spot=psp.cid;UI.evDraft.title=psp.d.name;
-        var pti=document.getElementById('ev_title'),pma=document.getElementById('ev_map'),pde=document.getElementById('ev_desc');
-        if(pti)pti.value=psp.d.name;
-        if(pma&&!pma.value.trim())pma.value=psp.d.map||psp.d.name;
-        if(pde&&!pde.value.trim())pde.value=psp.d.desc||'';
-        var pcs=SPOT_SLOT[psp.d.cat];
-        if(pcs&&!document.getElementById('ev_time').value){UI.evDraft.slot=pcs;setPick('evslot',pcs)}
-        refreshSug();persistDraft();
-      }
-      break}
-    case 'evunlink':{if(UI.evDraft){UI.evDraft.spot='';refreshSug();persistDraft()}break}
-    case 'evslot':{if(UI.evDraft)UI.evDraft.slot=v;pickOn(el);break}
-    case 'evmap':{if(UI.evDraft)UI.evDraft.mapOn=(v==='true');pickOn(el);break}
-    case 'ev-save':saveEv();break;
-    case 'ev-del':{
-      var ex2=findEvent(id);if(!ex2)break;
-      var lsp2=spotOfEvent(ex2);
-      if(lsp2&&linkedEvents(lsp2).length===1){
-        openChoice('일정 삭제','"'+ex2.d.title+'"은(는) 스팟에서 넣은 일정이에요. 삭제하면 스팟 목록으로 돌아가요.',[
-          {t:'스팟 목록으로 돌려놓기',cls:'ok',fn:function(){delEvent(ex2,null)}},
-          {t:'스팟도 같이 삭제',cls:'warn',fn:function(){delEvent(ex2,lsp2)}},
-          {t:'취소',fn:function(){}}]);
-      }else delEvent(ex2,null);
-      break}
-    case 'dprev':UI.vd=addDays(viewDate(),-1);render();break;
-    case 'dnext':UI.vd=addDays(viewDate(),1);render();break;
-    case 'edits':{var ein=document.querySelector('input.edit');UI.editVal=ein?ein.value:null;var eit=findCl(id);if(eit){eit.ts=v;tdUpd(eit,{time_section:v})}render();break}
-    case 'ctime':{var cti=findCl(id);if(cti&&cti.completedAt)openPicker('time',hhmm(cti.completedAt),'완료 시각',function(val){var c2=findCl(id);if(c2&&val){c2.completedAt=setTimeOnly(c2.completedAt||Date.now(),val);tdUpd(c2,{completed_at:c2.completedAt});render()}});break}
-    case 'trip-save':{
-      var t=trip(),ttl=(document.getElementById('te_title').value||'').trim(),st=document.getElementById('te_start').value,en=document.getElementById('te_end').value;
-      if(!ttl){toast('여행명을 입력해 주세요');break}
-      if(!st||!en||en<st){toast('기간을 확인해 주세요');break}
-      t.title=ttl;t.start=st;t.end=en;t.status=document.getElementById('te_status').value;
-      Array.prototype.forEach.call(document.querySelectorAll('.te_city'),function(ci){var c=t.cities[+ci.getAttribute('data-i')];var nm=(ci.value||'').trim();if(c&&nm)c.name=nm});
-      tiUp('trip',M.trip);
-      TRIPS=TRIPS.map(function(r){return r.trip_id===cfg.tripId?{trip_id:r.trip_id,data:t}:r});lset('trips',TRIPS);
-      UI.vd=null;UI.sched=null;UI.sheet='trips';render();toast('저장했어요');break}
-    case 'export':doExport();break;
-  }
-  if(a==='evslot'||a==='evmap'||a==='expcat'||a==='expcur')persistDraft();
+  var h=ACT[a];if(!h)return;
+  h(el,el.getAttribute('data-v'),el.getAttribute('data-id'));
+  if(DRAFT_ACT[a])persistDraft();
 }
 function onChange(e){
   var el=e.target;
@@ -1394,7 +1471,7 @@ function doImport(file){
   rd.onload=function(){
     try{
       var j=JSON.parse(rd.result);
-      if((j.format!=='iitabi-backup'&&j.format!=='triplog-backup')||!j.rows||!j.trip_id)throw new Error('형식이 달라요');
+      if(j.format!=='iitabi-backup'||!j.rows||!j.trip_id)throw new Error('형식이 달라요');
       var rows=j.rows.map(function(r){return {trip_id:j.trip_id,kind:r.kind,client_id:r.client_id,date_key:r.date_key||null,sort_order:r.sort_order||0,data:r.data||{}}});
       sf('trip_items?on_conflict=trip_id,client_id','POST',rows,'resolution=merge-duplicates,return=minimal').then(function(ok){
         if(!ok){toast('가져오기에 실패했어요');return}
@@ -1434,7 +1511,7 @@ function boot(){
   window.addEventListener('resize',fitMemoList);
   if(document.fonts&&document.fonts.ready)document.fonts.ready.then(fitMemoList);
   setInterval(function(){if(!document.hidden)pull()},90000);
-  if('serviceWorker' in navigator&&/\/(iitabi|triplog)\//.test(location.pathname)){
+  if('serviceWorker' in navigator&&/\/iitabi\//.test(location.pathname)){
     navigator.serviceWorker.register('iitabi-sw.js?v='+VER,{scope:'./'}).catch(function(){});
   }
 }
