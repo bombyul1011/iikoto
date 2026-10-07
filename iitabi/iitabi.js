@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-var VER='2026.10.06-57';
+var VER='2026.10.06-58';
 var SUPA_URL='https://vqvpzrxmtpryzhontlxc.supabase.co';
 var SUPA_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdnB6cnhtdHByeXpob250bHhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTgxMjksImV4cCI6MjA5NjYzNDEyOX0.pbtq1UMPC7ylYM1H2xVa19C1TFlceLmEfEtkz3WK2VI';
 var LSP='iitabi:';
@@ -1138,7 +1138,8 @@ function xSugHtml(dr){
       label='이 날짜엔 일정이 없어요 · '+cityName(cc)+' 스팟';
     }
   }
-  var shops=(CL.items||[]).filter(function(i){return !i.pre&&i.date===date&&i.cat==='shop'&&i.done&&!(linked&&linked.cid===i.id)&&(!q||normQ(i.t).indexOf(q)>=0)}).map(function(i){return {ref:'check:'+i.id,name:i.t,tag:'체크'}});
+  var shops=(CL.items||[]).filter(function(i){return !i.pre&&i.date===date&&i.cat==='shop'&&i.done&&!(linked&&linked.cid===i.id)})  // 그날 완료한 쇼핑 체크는 몇 개 안 되므로 이름이 달라도(예: 체크 '치약이랑 핸드크림 작은거' ↔ 결제 '치약, 핸드크림') 모두 보여주고, 이름이 맞는 것을 앞으로
+    .map(function(i){return {ref:'check:'+i.id,name:i.t,tag:'체크',m:(q&&normQ(i.t).indexOf(q)>=0)?0:1}}).sort(function(x,y){return x.m-y.m});
   list=shops.concat(list).slice(0,5);
   if(list.length)h+='<div class="small muted" style="margin:10px 0 6px">'+esc(label)+'</div><div class="tsc" style="margin-top:0">'+list.map(function(x){return '<button class="tschip" data-act="xpick" data-ref="'+ea(x.ref)+'" data-name="'+ea(x.name)+'">'+(x.tag==='체크'?ic('shopping-cart',14)+' ':'')+esc(x.name)+'</button>'}).join('')+'</div>';
   else if(q&&!linked)h+='<div class="small muted" style="margin-top:8px">일치하는 일정·스팟이 없어요 · 내용만 저장돼요</div>';
