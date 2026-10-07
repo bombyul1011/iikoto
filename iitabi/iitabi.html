@@ -267,7 +267,7 @@ input,textarea{-webkit-user-select:text;user-select:text;-webkit-touch-callout:d
 .payamt{color:var(--tx);font-variant-numeric:tabular-nums;margin-left:4px}
 .payk{color:var(--sub);font-size:12px;margin-left:2px}
 
-.stayln{display:inline-flex;align-items:center;min-height:44px;padding:0 4px;color:var(--sub);text-decoration:underline;text-decoration-color:rgba(150,135,125,.4);text-underline-offset:4px}
+.stayln{display:inline-block;padding:13px 6px;margin:-13px -6px;color:var(--sub);text-decoration:none}  /* 터치 영역은 44px 가량 유지하되 레이아웃 높이는 글자 높이 그대로(위아래 여백이 넓어지지 않게) */
 
 input:focus,textarea:focus,select:focus{outline:none;box-shadow:none}
 .addrow input:focus,.fld:focus,input.edit:focus{border-color:var(--sel-bd)}
@@ -370,6 +370,6 @@ input:focus,textarea:focus,select:focus{outline:none;box-shadow:none}
 <div id="bg-fixed"></div>
 <div id="app"><div id="topsafe"></div><div id="pin"></div><main id="screen"></main><nav id="tabbar" aria-label="하단 탭"></nav></div>
 <div id="sheet"></div><div id="toast"></div><div id="picker"></div>
-<script src="iitabi.js?v=2026.10.06-54"></script>
+<script src="iitabi.js?v=2026.10.06-56"></script>
 </body>
 </html>
