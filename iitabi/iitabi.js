@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-var VER='2026.10.06-58';
+var VER='2026.10.06-59';
 var SUPA_URL='https://vqvpzrxmtpryzhontlxc.supabase.co';
 var SUPA_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdnB6cnhtdHByeXpob250bHhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTgxMjksImV4cCI6MjA5NjYzNDEyOX0.pbtq1UMPC7ylYM1H2xVa19C1TFlceLmEfEtkz3WK2VI';
 var LSP='iitabi:';
@@ -411,7 +411,7 @@ function tsChips(act,key,sel,extra){
   }).join('')+'</div>';
 }
 var CATS=[['todo','flag-3','할일'],['shop','shopping-cart','쇼핑'],['etc','dots','기타']];
-function catTag(it){return it.cat==='shop'?'<span class="catic">'+ic('shopping-cart',14)+'</span>':''}
+function shopCls(it){return it.cat==='shop'?' class="shopck"':''}  // 쇼핑 항목은 체크 칸이 장바구니 아이콘
 function catTrio(sel,id){
   sel=sel||'todo';
   return '<span class="cattrio" role="group" aria-label="카테고리">'+CATS.map(function(c){return '<button class="'+c[0]+(sel===c[0]?' on':'')+'" data-act="clcat" data-v="'+c[0]+'" data-id="'+ea(id||'')+'" aria-label="'+c[2]+'" aria-pressed="'+(sel===c[0])+'">'+ic(c[1],18)+'</button>'}).join('')+'</span>';
@@ -425,7 +425,7 @@ function alRow(at,ao,id){
 function clRow(it,ro){
   if(ro){
     var ctr=(it.done&&it.completedAt)?'<span class="ct">'+hhmm(it.completedAt)+'</span>':'';
-    return '<div class="ck ro'+(it.done?' done':'')+'"><input type="checkbox" '+(ro==='ck'?'data-act="ck" data-id="'+ea(it.id)+'"':'disabled')+' '+(it.done?'checked':'')+' aria-label="'+ea(it.t)+'"><span class="tx">'+catTag(it)+esc(it.t)+'</span>'+bellTag(it)+ctr+'</div>';
+    return '<div class="ck ro'+(it.done?' done':'')+'"><input type="checkbox"'+shopCls(it)+' '+(ro==='ck'?'data-act="ck" data-id="'+ea(it.id)+'"':'disabled')+' '+(it.done?'checked':'')+' aria-label="'+ea(it.t)+'"><span class="tx">'+esc(it.t)+'</span>'+bellTag(it)+ctr+'</div>';
   }
   if(UI.edit===it.id){
     var val=UI.editVal!=null?UI.editVal:it.t;
@@ -435,7 +435,7 @@ function clRow(it,ro){
   if(it.done&&it.completedAt){
     ct='<button class="ct" data-act="ctime" data-id="'+ea(it.id)+'" aria-label="완료 시각 수정">'+hhmm(it.completedAt)+'</button>';
   }
-  return '<div class="ck'+(it.done?' done':'')+'"><input type="checkbox" data-act="ck" data-id="'+ea(it.id)+'" '+(it.done?'checked':'')+' aria-label="'+ea(it.t)+'"><span class="tx">'+catTag(it)+esc(it.t)+'</span>'+bellTag(it)+ct+'<button class="mini" data-act="edit" data-id="'+ea(it.id)+'" aria-label="수정">'+ic('pen',16)+'</button><button class="mini" data-act="del" data-id="'+ea(it.id)+'" aria-label="삭제">'+ic('x',16)+'</button></div>';
+  return '<div class="ck'+(it.done?' done':'')+'"><input type="checkbox"'+shopCls(it)+' data-act="ck" data-id="'+ea(it.id)+'" '+(it.done?'checked':'')+' aria-label="'+ea(it.t)+'"><span class="tx">'+esc(it.t)+'</span>'+bellTag(it)+ct+'<button class="mini" data-act="edit" data-id="'+ea(it.id)+'" aria-label="수정">'+ic('pen',16)+'</button><button class="mini" data-act="del" data-id="'+ea(it.id)+'" aria-label="삭제">'+ic('x',16)+'</button></div>';
 }
 function clList(items,ro){
   var und=items.filter(function(i){return !i.done}).sort(function(a,b){
@@ -503,7 +503,7 @@ function sortShown(ev){
 function doneChecksOf(d){return (CL.items||[]).filter(function(i){return !i.pre&&i.date===d&&i.done&&i.completedAt})}
 function ckEv(i){
   var tm=hhmm(i.completedAt);
-  return '<div class="ev mev ckev" data-t="'+tm+'"><button class="evt" disabled tabindex="-1" aria-hidden="true">'+tm+'</button><span class="evdot memodot"><span class="ckdot">'+ic('check',11)+'</span></span><div class="c"><div class="cktx">'+catTag(i)+esc(i.t)+'</div>'+ckSpent(i.id)+'</div></div>';
+  return '<div class="ev mev ckev" data-t="'+tm+'"><button class="evt" disabled tabindex="-1" aria-hidden="true">'+tm+'</button><span class="evdot memodot"><span class="ckdot'+(i.cat==='shop'?' shop':'')+'">'+ic(i.cat==='shop'?'shopping-cart':'check',11)+'</span></span><div class="c"><div class="cktx">'+esc(i.t)+'</div>'+ckSpent(i.id)+'</div></div>';
 }
 function ckSpent(cid){var l=refList(cid);if(!l.length)return '';return '<div class="small" style="color:var(--sub);margin-top:1px">'+ic('cash',13)+' 지출 '+sumLabel(sumInfo(l))+'</div>'}
 /* 일정에 연동하지 않은 현지 지출(연동된 건 일정 카드 안 '지출' 줄에 이미 나온다)을 결제 시각 자리에 한 줄로 */
