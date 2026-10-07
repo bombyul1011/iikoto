@@ -255,6 +255,13 @@ input,textarea{-webkit-user-select:text;user-select:text;-webkit-touch-callout:d
 .ckedit .alrow{margin-top:12px}
 /* 타임라인: 완료한 체크 한 줄 + 표시 종류 필터 */
 .xrow.tap{cursor:pointer}
+.cattrio{display:inline-flex;border:1px solid var(--cardb);border-radius:10px;overflow:hidden;flex:none}
+.cattrio button{width:38px;height:36px;border:0;border-radius:0;background:transparent;color:var(--sub);display:inline-flex;align-items:center;justify-content:center;padding:0;font-family:inherit}
+.cattrio button.on.todo{background:var(--sel-bg);color:var(--sel-tx)}
+.cattrio button.on.shop{background:rgba(255,190,130,.58);color:rgb(147,71,14)}
+.cattrio button.on.etc{background:rgba(195,175,168,.3);color:var(--tx)}
+.catrow{display:flex;justify-content:flex-end;margin-top:10px}
+.catic{display:inline-block;vertical-align:-2px;margin-right:5px;color:rgb(147,71,14)}
 .ev.ckev{--mc:11px}
 .ckdot{width:15px;height:15px;border-radius:5px;background:var(--sel-solid);color:#fff;display:flex;align-items:center;justify-content:center}
 .cktx{font-size:13px;line-height:22px;color:var(--sub)}
@@ -370,6 +377,6 @@ input:focus,textarea:focus,select:focus{outline:none;box-shadow:none}
 <div id="bg-fixed"></div>
 <div id="app"><div id="topsafe"></div><div id="pin"></div><main id="screen"></main><nav id="tabbar" aria-label="하단 탭"></nav></div>
 <div id="sheet"></div><div id="toast"></div><div id="picker"></div>
-<script src="iitabi.js?v=2026.10.06-56"></script>
+<script src="iitabi.js?v=2026.10.06-57"></script>
 </body>
 </html>
