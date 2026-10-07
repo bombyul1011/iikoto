@@ -67,15 +67,16 @@ var cfg=lget('cfg',{key:'',tripId:''});
 var PK=null;  // 열려 있는 날짜·시간 선택 모달 상태
 var UI={tab:'today',sched:null,clDate:null,spCity:null,spCat:'all',sheet:null,edit:null,status:'',syncAt:null,keyBad:false,addSpot:false,vd:null,addTxt:{},editVal:null,expDraft:null,evDraft:null,payDraft:null,spDraft:null,wkAnim:null,undoFn:null,toastT:null};
 var PINH='';  // 화면 상단에 고정할 HTML(일정·경비 탭). render()가 #pin에 넣는다
-var M=null,CL={items:[]},MEMOS=[],WX={},Q=lget('q',[]),TRIPS=lget('trips',[]);
+var M=null,CL={items:[]},MEMOS=[],WX={},MIR={},Q=lget('q',[]),TRIPS=lget('trips',[]);  // MIR: 이이코토 시간표로 보낸 일정 {이름표:{date}}
 function saveQ(){lset('q',Q)}
 function loadTrip(){
-  if(!cfg.tripId){M=null;CL={items:[]};MEMOS=[];WX={};return}
+  if(!cfg.tripId){M=null;CL={items:[]};MEMOS=[];WX={};MIR={};return}
   var rows=lget('rows:'+cfg.tripId,null);
   M=rows?buildModel(rows):null;
   CL=lget('cl:'+cfg.tripId,{items:[]});
   MEMOS=lget('memos:'+cfg.tripId,[]);
   WX=lget('wx:'+cfg.tripId,{});
+  MIR=lget('mir:'+cfg.tripId,{});
 }
 function buildModel(rows){
   var m={trip:null,stays:[],events:{},plans:{},choices:{},spots:[],expenses:[]};
@@ -145,11 +146,13 @@ function tiUp(kind,o){
   qDrop(function(x){return x.t==='ti'&&x.op==='up'&&x.cid===o.cid});
   Q.push({t:'ti',op:'up',trip:cfg.tripId,kind:kind,cid:o.cid,date:o.date||null,sort:o.sort||0,data:o.d});
   saveQ();saveRows();flush();
+  if(kind==='expense')syncPayMemos();
 }
 function tiDel(o){
   qDrop(function(x){return x.t==='ti'&&x.cid===o.cid});
   Q.push({t:'ti',op:'del',trip:cfg.tripId,cid:o.cid});
   saveQ();saveRows();flush();
+  if(o.d&&o.d.local)syncPayMemos();
 }
 function prefix(){var t=trip();return (t&&t.cl_prefix)||('iitabi_'+cfg.tripId+'_')}
 function clKey(it){return it.pre?'pre':it.date}
@@ -158,6 +161,53 @@ function clDate(key){return key==='pre'?preDate():key}
 function newClId(key){return prefix()+(key==='pre'?'pre_':'d'+key.replace(/-/g,'').slice(4)+'_')+genCid()}
 function tiUndoDel(o){qDrop(function(x){return x.t==='ti'&&x.op==='del'&&x.cid===o.cid})}
 function tdUndoDel(it){qDrop(function(x){return x.t==='td'&&x.op==='del'&&x.cid===it.id});CL.items.push(it);tdAdd(it)}
+/* ---------- 이이코토 반영: 완료한 일정 → 시간표 투두 / 하루 지출 → 메모 한 줄 ----------
+   이름표(client_id) 접두사로 이이타비가 만든 행을 구분한다. 체크리스트 접두사(iitabi_여행ID_)와 첫 글자부터 달라 서로 섞이지 않고,
+   지출 메모는 이이타비가 메모를 받아올 때 접두사로 걸러 화면에 다시 나오지 않는다. 이이코토 쪽 코드는 건드리지 않는다. */
+var TV_PRE='tv-iitabi-',PAY_PRE='pay-iitabi-',PAY_HOUR=23;
+function qMir(t,cid){qDrop(function(x){return x.t===t&&x.cid===cid})}
+function saveMir(){if(cfg.tripId)lset('mir:'+cfg.tripId,MIR)}
+/* 일정 완료 → 이이코토 시간표 항목("HH:MM 제목", 완료 상태·완료 시각). 완료 해제·삭제면 지운다 */
+function mirrorEvent(e){
+  var cid=TV_PRE+e.cid,prev=MIR[cid];
+  if(e.d.done&&e.d.doneAt){
+    qMir('tv',cid);
+    if(prev&&prev.date!==e.date)Q.push({t:'tv',op:'del',cid:cid});  // 날짜를 옮겼으면 옛 날짜 행을 먼저 지운다
+    Q.push({t:'tv',op:'up',cid:cid,date:e.date,text:hhmm(e.d.doneAt)+' '+e.d.title,at:e.d.doneAt});
+    MIR[cid]={date:e.date};
+  }else if(prev){qMir('tv',cid);Q.push({t:'tv',op:'del',cid:cid});delete MIR[cid]}
+  else return;
+  saveQ();saveMir();flush();
+}
+function mirrorDel(e){
+  var cid=TV_PRE+e.cid;if(!MIR[cid])return;
+  qMir('tv',cid);Q.push({t:'tv',op:'del',cid:cid});delete MIR[cid];saveQ();saveMir();flush();
+}
+function mirrorAll(){
+  var n=0;
+  Object.keys(M.events).forEach(function(d){M.events[d].forEach(function(e){if(e.d.done&&e.d.doneAt){delete MIR[TV_PRE+e.cid];mirrorEvent(e);n++}})});
+  return n;
+}
+/* 하루 지출 → 그날 23시 이후(앱을 열 때) 메모 한 줄. 지나간 날은 밀린 것도 한꺼번에 채운다.
+   마지막으로 보낸 글을 기억해 두고 지출이 바뀔 때만 다시 보낸다(이이코토에서 지운 메모는 그날 지출이 바뀌기 전엔 되살리지 않는다) */
+function payMemoText(list){
+  var i=sumInfo(list);
+  return '💴 오늘 지출 '+(i.jpy?'약 '+won(i.est)+'원 (¥'+won(i.jpy)+')':won(i.est)+'원')+' · '+list.length+'건';
+}
+function syncPayMemos(){
+  if(!M||!cfg.tripId)return;
+  var td=today(),hour=new Date().getHours(),PM=lget('pm:'+cfg.tripId,{}),changed=false;
+  tripDates().forEach(function(d){
+    if(d>td||(d===td&&hour<PAY_HOUR))return;
+    var list=localList().filter(function(x){return x.d.date===d}),text=list.length?payMemoText(list):'';
+    if((PM[d]||'')===text)return;
+    var cid=PAY_PRE+d,p=parse(d);p.setHours(PAY_HOUR,0,0,0);
+    qMir('pm',cid);
+    Q.push(text?{t:'pm',op:'up',cid:cid,date:d,text:text,time:pad(PAY_HOUR)+':00',created:p.getTime()}:{t:'pm',op:'del',cid:cid});
+    PM[d]=text;changed=true;
+  });
+  if(changed){lset('pm:'+cfg.tripId,PM);saveQ();flush()}
+}
 function alIso(dk,hm){  // 그날 HH:MM → 기기 시간대 오프셋을 반영한 ISO(본앱 scheduleAlertAt과 같은 방식)
   var p=dk.split('-').map(Number),h=hm.split(':').map(Number),d=new Date(p[0],p[1]-1,p[2],h[0],h[1],0),off=-d.getTimezoneOffset(),sg=off>=0?'+':'-';
   return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes())+':00'+sg+pad(Math.floor(Math.abs(off)/60))+':'+pad(Math.abs(off)%60);
@@ -206,6 +256,14 @@ function flush(){
         ?sf('alerts?on_conflict=source_type,source_cid','POST',[{source_type:'todo',source_cid:op.cid,alert_at:op.iso,title:op.title||'',body:null,sent:false}],'resolution=merge-duplicates,return=minimal')
         :sf('alerts?source_type=in.(todo,todo_snooze)&source_cid=eq.'+enc(op.cid),'DELETE')
       ).then(function(r){if(r)return true;op.fails=(op.fails||0)+1;if(op.fails>=3){toast('알림 예약에 실패했어요');return true}return null});
+    }else if(op.t==='tv'&&op.op==='up'){  // 이이코토 시간표 투두(완료 상태)
+      p=sf('todos?on_conflict=date_key,client_id','POST',[{date_key:op.date,text:op.text,done:true,created:op.at,client_id:op.cid,time_section:'none',cat:'todo',completed_at:op.at,is_event:false}],'resolution=merge-duplicates,return=minimal');
+    }else if(op.t==='tv'&&op.op==='del'){
+      p=sf('todos?client_id=eq.'+enc(op.cid),'DELETE');
+    }else if(op.t==='pm'&&op.op==='up'){  // 이이코토 메모(하루 지출 한 줄)
+      p=sf('memos?on_conflict=date_key,client_id','POST',[{date_key:op.date,memo_time:op.time,text:op.text,created:op.created,client_id:op.cid,photo_url:null,question:null}],'resolution=merge-duplicates,return=minimal');
+    }else if(op.t==='pm'&&op.op==='del'){
+      p=sf('memos?client_id=eq.'+enc(op.cid),'DELETE');
     }else p=Promise.resolve(true);
     return p.then(function(ok){inflight=null;if(!ok)return;var i=Q.indexOf(op);if(i>=0)Q.splice(i,1);saveQ();return next()});
   }
@@ -236,7 +294,7 @@ function pull(force){
       if(Q.length){setStatus();return}  // 받는 사이 새로 고친 내용이 있으면 덮어쓰지 않고 다음 동기화로 넘김
       M=buildModel(rows);saveRows();
       return pullTodos().then(function(){return pullMemos()}).then(function(){
-        UI.syncAt=Date.now();setStatus();renderSafe();pullWeather();fetchFx();locateCity();
+        UI.syncAt=Date.now();setStatus();renderSafe();pullWeather();fetchFx();locateCity();syncPayMemos();
       });
     });
   });
@@ -264,7 +322,7 @@ function pullMemos(){
   var t=trip();if(!t)return Promise.resolve();
   var ds_=tripDates().join(',');
   return sf('memos?date_key=in.('+ds_+')&select=client_id,date_key,memo_time,text,photo_url,question,created&order=created').then(function(rows){
-    if(!rows)return;MEMOS=rows;lset('memos:'+cfg.tripId,MEMOS);
+    if(!rows)return;MEMOS=rows.filter(function(r){return String(r.client_id||'').indexOf(PAY_PRE)!==0});lset('memos:'+cfg.tripId,MEMOS);  // 이이타비가 만든 지출 메모는 화면에 다시 보이지 않게
   });
 }
 function hmOf(s){return s&&/T\d{2}:\d{2}/.test(s)?s.slice(s.indexOf('T')+1,s.indexOf('T')+6):null}
@@ -378,7 +436,7 @@ function memoText(m){return (m.question?'<div class="small muted" style="margin-
 function memoHtml(list){
   if(!list.length)return '<div class="small muted">iikoto에서 쓴 메모가 여기에 시간순으로 보여요. (읽기 전용)</div>';
   var sorted=list.slice().sort(byMemoTime);
-  return '<div class="memolist fitlist'+(sorted.length>MEMO_VISIBLE?' scroll':'')+'" data-vis="'+MEMO_VISIBLE+'">'+sorted.map(function(m){
+  return '<div class="memolist fitlist'+(sorted.length>MEMO_VISIBLE?' scroll':'')+'" data-end="1" data-vis="'+MEMO_VISIBLE+'">'+sorted.map(function(m){
     return '<div class="mrow"><div class="mt">'+esc(m.memo_time||'')+'</div>'+(hasPhoto(m)?'<div class="mb mpw">'+photoThumb(m)+'<span class="mtx">'+memoText(m)+'</span></div>':'<div class="mb">'+memoText(m)+'</div>')+'</div>';
   }).join('')+'</div>';
 }
@@ -767,6 +825,7 @@ function sheetHtml(){
     TRIPS.forEach(function(r){var d=r.data||{};body+=card('<div class="row between">'+chip(d.status==='active'?'진행 중':(d.status==='done'?'완료':'계획'),d.status==='active'?'ok':'ln')+(r.trip_id===cur?'<span class="small muted">현재</span>':'')+'</div><div style="font-family:var(--serif);font-size:22px;font-weight:700;margin-top:8px">'+esc(d.title||r.trip_id)+'</div><div class="small muted" style="margin-top:4px">'+esc((d.start||'')+' – '+(d.end||''))+'</div>'+(r.trip_id===cur?'<button class="btn" style="margin-top:12px;width:100%" data-act="sheet" data-v="tripedit">'+ic('pen',16)+'여행 정보 수정</button>':'<button class="btn pri" style="margin-top:12px" data-act="trip-open" data-id="'+ea(r.trip_id)+'">열기</button>'))});
     body+=card('<b style="font-size:15px">새 여행 만들기</b><div class="small muted" style="margin-top:4px">템플릿·복제는 다녀온 뒤 추가할 예정이에요. 지금은 가져오기로 만들 수 있어요.</div>');
     body+=card('<div class="lbl">백업 · 복원</div><div class="row"><button class="btn" data-act="export">'+ic('dl',16)+'백업 내보내기</button><label class="btn" style="cursor:pointer">'+ic('ul',16)+'가져오기<input type="file" id="imp" accept="application/json,.json" style="display:none"></label></div>');
+    body+=card('<div class="lbl">이이코토 반영</div><div class="small muted" style="line-height:1.5;margin-bottom:10px">완료한 일정은 이이코토 시간표로, 하루 지출은 '+PAY_HOUR+'시 이후 앱을 열 때 메모 한 줄로 자동 반영돼요.</div><button class="btn" data-act="mirror-all">'+ic('refresh',16)+'완료한 일정 다시 보내기</button>');
     body+=card('<div class="row between"><span class="small muted">앱 버전 '+VER+'</span><button class="btn" data-act="sheet" data-v="key">키 변경</button></div>');
   }else if(v==='cl'){
     var cdr=UI.clDraft||{ts:'none'};
@@ -825,9 +884,12 @@ function sheetHtml(){
 }
 
 /* ---------- render ---------- */
+var LASTSIG='';
 var TABS=[['today','오늘','sun'],['sched','일정','cal'],['check','체크','chk'],['budget','경비','wal'],['spots','스팟','pin']];
 function render(){
   var sc=document.getElementById('screen'),y=sc.scrollTop,mly=Array.prototype.map.call(sc.querySelectorAll('.fitlist.scroll'),function(x){return x.scrollTop});
+  var ml=sc.querySelector('.fitlist.scroll[data-end]'),mAtEnd=!!ml&&ml.scrollTop+ml.clientHeight>=ml.scrollHeight-4;  // 메모 목록을 맨 아래(최신)까지 보고 있었는지
+  var sig=UI.tab+'|'+viewDate(),sameView=sig===LASTSIG;LASTSIG=sig;
   var h='';PINH='';
   try{
     if(!M)h=empty();
@@ -847,7 +909,10 @@ function render(){
   if(UI.edit){var ei=document.querySelector('input.edit');if(ei&&document.activeElement!==ei){ei.focus();var el2=ei.value.length;try{ei.setSelectionRange(el2,el2)}catch(e){}} /* 전체 선택(파란 드래그) 대신 글 끝에 커서만 */}
   sc.scrollTop=y;
   fitMemoList();
-  Array.prototype.forEach.call(sc.querySelectorAll('.fitlist.scroll'),function(x,i){if(mly[i])x.scrollTop=mly[i]});
+  Array.prototype.forEach.call(sc.querySelectorAll('.fitlist.scroll'),function(x,i){
+    if(x.hasAttribute('data-end')){if(!sameView||mAtEnd)x.scrollTop=x.scrollHeight;else if(mly[i])x.scrollTop=mly[i]}  // 메모는 시간순 그대로, 처음 열 때·맨 아래를 보던 중이면 최신(맨 아래)부터 보이게
+    else if(mly[i])x.scrollTop=mly[i];
+  });
 }
 
 /* ---------- 날짜·시간 선택 모달 (iikoto 본앱의 가운데 모달 · 시간 휠 · 월 달력과 같은 구성) ---------- */
@@ -866,7 +931,7 @@ function openPicker(type,value,title,onOk,opt){
 }
 function spotEditOpen(sp){UI.spDraft={id:sp.cid,name:sp.d.name,cat:sp.d.cat||'meal',city:sp.d.city,desc:sp.d.desc||'',map:(sp.d.map&&sp.d.map!==sp.d.name)?sp.d.map:''};UI.sheet='spedit';render()}
 function spotDelete(sp){M.spots=M.spots.filter(function(x){return x.cid!==sp.cid});tiDel(sp);render();toastUndo('"'+sp.d.name+'" 삭제했어요',function(){tiUndoDel(sp);M.spots.push(sp);tiUp('spot',sp);render()})}
-function evSetDone(e,on){e.d.done=on;if(on)e.d.doneAt=Date.now();else delete e.d.doneAt;tiUp('event',e);render()}
+function evSetDone(e,on){e.d.done=on;if(on)e.d.doneAt=Date.now();else delete e.d.doneAt;tiUp('event',e);mirrorEvent(e);render()}
 function openChoice(title,msg,btns,row){PK={type:'choice',title:title,msg:msg,btns:btns,row:!!row};renderPicker()}
 function closePicker(){PK=null;var el=document.getElementById('picker');if(el)el.innerHTML=''}
 function pickerHtml(){
@@ -1007,15 +1072,15 @@ function saveEv(){
   var e=old;
   if(e){removeEvent(e);e.date=date;e.d=d}
   else e={cid:'ev_'+date+'_'+genCid(),date:date,sort:0,d:d};
-  insertEvent(date,e);
+  insertEvent(date,e);mirrorEvent(e);
   var t=trip();if(t&&(date<t.start||date>t.end))toast('여행 기간 밖의 날짜예요. 기간을 넓히면 보여요');
   UI.sched=date;endSheet();render();if(!(t&&(date<t.start||date>t.end)))toast('저장했어요');
 }
 function delEvent(e,sp){
-  removeEvent(e);tiDel(e);
+  removeEvent(e);tiDel(e);mirrorDel(e);
   if(sp){M.spots=M.spots.filter(function(x){return x.cid!==sp.cid});tiDel(sp)}
   closeSheet();
-  toastUndo(sp?'일정과 스팟을 삭제했어요':'일정을 삭제했어요',function(){tiUndoDel(e);insertEvent(e.date,e);if(sp){tiUndoDel(sp);M.spots.push(sp);tiUp('spot',sp)}render()});
+  toastUndo(sp?'일정과 스팟을 삭제했어요':'일정을 삭제했어요',function(){tiUndoDel(e);insertEvent(e.date,e);mirrorEvent(e);if(sp){tiUndoDel(sp);M.spots.push(sp);tiUp('spot',sp)}render()});
 }
 function placedSpotCids(){var m={};Object.keys(M.events).forEach(function(d){M.events[d].forEach(function(e){var sp=spotOfEvent(e);if(sp)m[sp.cid]=1})});return m}
 function normQ(t){return String(t||'').toLowerCase().replace(/\s+/g,'')}
@@ -1328,7 +1393,7 @@ var ACT={
         if(byName){e.d.title=nn;chg=true}
         if(!e.d.spot){e.d.spot=sp.cid;chg=true}
         if(e.d.map&&(e.d.map===oldMap||e.d.map===oldName)){e.d.map=nmap;chg=true}
-        if(chg)tiUp('event',e);
+        if(chg){tiUp('event',e);mirrorEvent(e)}
       })});
     }
     sp.d.name=nn;sp.d.cat=sd.cat;sp.d.city=sd.city;sp.d.map=nmap;
@@ -1347,7 +1412,7 @@ var ACT={
   'evtime':function(el,v,id){
     var e=findEvent(id);if(!e||!e.d.doneAt)return;
     openPicker('time',hhmm(e.d.doneAt),'완료 시각',function(val){
-      var e2=findEvent(id);if(e2&&val){e2.d.doneAt=setTimeOnly(e2.d.doneAt,val);tiUp('event',e2);render()}
+      var e2=findEvent(id);if(e2&&val){e2.d.doneAt=setTimeOnly(e2.d.doneAt,val);tiUp('event',e2);mirrorEvent(e2);render()}
     });
   },
   'evnew':function(el){openEv(null,el.getAttribute('data-date'))},
@@ -1399,6 +1464,7 @@ var ACT={
     TRIPS=TRIPS.map(function(r){return r.trip_id===cfg.tripId?{trip_id:r.trip_id,data:t}:r});lset('trips',TRIPS);
     UI.vd=null;UI.sched=null;UI.sheet='trips';render();toast('저장했어요');
   },
+  'mirror-all':function(){var n=M?mirrorAll():0;syncPayMemos();toast(n?'완료한 일정 '+n+'건을 이이코토로 보냈어요':'보낼 완료 일정이 없어요')},
   'export':function(){doExport()}
 };
 var DRAFT_ACT={evslot:1,evmap:1,expcat:1,expcur:1};  // 이 동작 뒤에는 작성 중인 시트 내용을 기기에 임시 저장
@@ -1500,12 +1566,13 @@ function boot(){
   loadTrip();
   render();
   restoreDraft();
+  syncPayMemos();
   window.addEventListener('pageshow',function(e){if(e.persisted)location.reload()});  // 이이코토 등 다른 페이지에서 뒤로 돌아오면(캐시 복원) 하단바가 내려가 보이는 문제 — 완전히 새로 불러온다(전송 대기 중인 작업은 기기에 저장돼 있어 유지됨)
   if(!cfg.key){UI.sheet='key';render()}
   else{
     loadTrips().then(function(){if(!M)loadTrip();render();return pull(true)});
   }
-  document.addEventListener('visibilitychange',function(){if(!document.hidden){pull();locateCity()}});
+  document.addEventListener('visibilitychange',function(){if(!document.hidden){pull();locateCity();syncPayMemos()}});
   locateCity();
   window.addEventListener('online',function(){pull(true)});
   window.addEventListener('resize',fitMemoList);
