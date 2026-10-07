@@ -369,12 +369,40 @@ input:focus,textarea:focus,select:focus{box-shadow:none}
 .tw-fade-top,.tw-fade-bottom{position:absolute;left:0;right:0;height:34px;pointer-events:none;z-index:2}
 .tw-fade-top{top:0;background:linear-gradient(180deg,#f9f6ef 10%,rgba(249,246,239,0))}
 .tw-fade-bottom{bottom:0;background:linear-gradient(0deg,#f9f6ef 10%,rgba(249,246,239,0))}
+
+/* 사진첩: 인스타처럼 한 줄기 그리드 + 지역·날짜 칩 / 뷰어는 이이코토 본앱 사진 뷰어와 같은 모양 */
+#album{position:fixed;inset:0;z-index:9;display:none;background:var(--bg);background-color:#f6f3ee}
+#album.on{display:block}
+.alb{max-width:480px;margin:0 auto;height:100%;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top)}
+.alh{flex:none;display:flex;align-items:center;gap:4px;padding:10px 20px 4px 6px}
+.alh h1{flex:1;font-size:22px}
+.abk{width:44px;height:44px;border:0;background:transparent;color:var(--sel-tx);display:flex;align-items:center;justify-content:center;padding:0;flex:none}
+.alchips{flex:none;padding:4px 20px 10px;display:flex;flex-direction:column;gap:6px}
+.alchips .tsc{margin-top:0}
+.alsc{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:calc(16px + env(safe-area-inset-bottom))}
+.algrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px}
+.alt{position:relative;display:block;aspect-ratio:1;overflow:hidden;border:0;border-radius:0;padding:0;background:rgba(210,190,175,.2)}
+.alt .ti{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:var(--sub);transition:opacity .2s}
+.alt .ti.hide{opacity:0}
+.alemp{text-align:center;color:var(--sub);font-size:13px;line-height:1.6;padding:60px 20px}
+#albview{position:fixed;inset:0;z-index:40;display:none}
+#albview.on{display:block}
+.pvo{position:absolute;inset:0;background:rgba(30,20,18,.82);display:flex;align-items:center;justify-content:center;padding:20px}
+.pvc{width:100%;max-width:330px;max-height:88vh;display:flex;flex-direction:column}
+.pvf{position:relative;width:100%;background:#fffdf9;border-radius:6px;padding:12px 12px 18px;box-shadow:0 8px 28px rgba(0,0,0,.35);transform:rotate(-.6deg);overflow-y:auto}
+.pvw{position:relative;width:100%;aspect-ratio:1/1;border-radius:3px;overflow:hidden;background:#2a201d}
+.pvw .ti{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:#d9cfc6;transition:opacity .2s}
+.pvw .ti.hide{opacity:0}
+.pvx{position:absolute;top:10px;right:10px;width:26px;height:26px;border-radius:14px;background:rgba(30,20,18,.45);border:0;display:flex;align-items:center;justify-content:center;color:#fdf3ec;padding:0;z-index:2}
+.pvd{padding-top:12px;text-align:center;font-size:12px;color:var(--sub);letter-spacing:.04em;margin-bottom:8px}
+.pvt{text-align:center;color:var(--tx);font-family:var(--serif);font-size:15px;line-height:1.65;word-break:keep-all}
+.pvh{margin-top:12px;text-align:center;font-size:12px;color:#d9cfc6}
 </style>
 </head>
 <body>
 <div id="bg-fixed"></div>
 <div id="app"><div id="topsafe"></div><div id="pin"></div><main id="screen"></main><nav id="tabbar" aria-label="하단 탭"></nav></div>
-<div id="sheet"></div><div id="toast"></div><div id="picker"></div>
-<script src="iitabi.js?v=2026.10.07-62"></script>
+<div id="sheet"></div><div id="toast"></div><div id="picker"></div><div id="album"></div><div id="albview"></div>
+<script src="iitabi.js?v=2026.10.07-63"></script>
 </body>
 </html>

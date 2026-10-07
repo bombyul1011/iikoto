@@ -423,7 +423,7 @@ function topPeriod(){var e=nextEventOf(today());return periodOf((e&&(e.d.time||S
 function topBar(){
   var t=trip();if(!t)return '';
   var rng=md(t.start)+'–'+(t.start.slice(5,7)===t.end.slice(5,7)?(+t.end.slice(8)):md(t.end));
-  return '<div class="topbar bn-'+topPeriod()+'"><div class="tbl"><span class="tblogo" role="img" aria-label="iitabi" data-act="tab" data-v="today"></span><button class="tbn" data-act="sheet" data-v="trips" aria-label="여행 목록"><span class="tbt">'+esc(t.title)+'</span>'+ic('chevd',14)+'</button></div>'+
+  return '<div class="topbar bn-'+topPeriod()+'"><div class="tbl"><span class="tblogo" role="button" tabindex="0" aria-label="사진첩 열기" data-act="album"></span><button class="tbn" data-act="sheet" data-v="trips" aria-label="여행 목록"><span class="tbt">'+esc(t.title)+'</span>'+ic('chevd',14)+'</button></div>'+
     '<div class="tbr"><div class="tbr1"><span class="tbd">'+rng+'</span>'+chip(esc(dayPill()),'',tint('sky'))+'<button class="syncst ico" data-act="sync" id="sync" aria-label="지금 동기화">'+syncHtml()+'</button><button class="tbi" data-act="goiikoto" aria-label="이이코토 열기">'+ic('macro',22,PAL.pink[2])+'</button></div><div class="tbw">'+topWx()+'</div></div></div>';
 }
 function bar(p){return '<div class="bar"><i style="width:'+Math.max(0,Math.min(100,p))+'%"></i></div>'}
@@ -909,6 +909,7 @@ function render(){
   if(UI.edit){var ei=document.querySelector('input.edit');if(ei&&document.activeElement!==ei){ei.focus();var el2=ei.value.length;try{ei.setSelectionRange(el2,el2)}catch(e){}} /* 전체 선택(파란 드래그) 대신 글 끝에 커서만 */}
   sc.scrollTop=y;
   fitMemoList();
+  if(UI.album)renderAlbum(false);   // 동기화로 사진이 바뀌었을 때만 다시 그린다
   Array.prototype.forEach.call(sc.querySelectorAll('.fitlist.scroll'),function(x,i){
     if(x.hasAttribute('data-end')){if(!sameView||mAtEnd)x.scrollTop=x.scrollHeight;else if(mly[i])x.scrollTop=mly[i]}  // 메모는 시간순 그대로, 처음 열 때·맨 아래를 보던 중이면 최신(맨 아래)부터 보이게
     else if(mly[i])x.scrollTop=mly[i];
@@ -1224,6 +1225,69 @@ function restoreDraft(){
   if(dft.k==='ev'){UI.evDraft=dft.d;UI.sheet='ev'}else if(dft.k==='exp'){UI.expDraft=dft.d;UI.sheet='exp'}else return;
   render();
 }
+/* ---------- 사진첩 ----------
+   사진은 이이코토 메모에 올린 것을 읽기 전용으로 모아 보여준다. 최신순 한 줄기 그리드 + 지역·날짜 칩(둘 다 걸 수 있음).
+   사진을 누르면 이이코토 본앱과 같은 폴라로이드 뷰어(좌우로 밀어 넘기기: 왼쪽으로 밀면 더 최신, 오른쪽으로 밀면 더 오래된 사진) */
+var ALBSIG='';
+function albumAll(){
+  return MEMOS.filter(hasPhoto).map(function(m){return {m:m,city:cityOfDate(m.date_key)}}).sort(function(a,b){
+    var x=a.m.date_key+(a.m.memo_time||''),y=b.m.date_key+(b.m.memo_time||'');return x<y?1:(x>y?-1:0)});
+}
+function albumList(){
+  var A=UI.album;if(!A)return [];
+  return albumAll().filter(function(p){return (A.city==='all'||p.city===A.city)&&(A.date==='all'||p.m.date_key===A.date)});
+}
+function albumHtml(){
+  var A=UI.album,all=albumAll(),t=trip();
+  var inCity=all.filter(function(p){return A.city==='all'||p.city===A.city}),dates=[];
+  inCity.forEach(function(p){if(dates.indexOf(p.m.date_key)<0)dates.push(p.m.date_key)});   // 사진이 있는 날만, 최신 날짜부터
+  if(A.date!=='all'&&dates.indexOf(A.date)<0)A.date='all';
+  var list=albumList(),cnt={};all.forEach(function(p){cnt[p.city]=(cnt[p.city]||0)+1});
+  var cc='<button class="chip tsb'+(A.city==='all'?' on':'')+'" data-act="albcity" data-v="all" aria-pressed="'+(A.city==='all')+'">전체 '+all.length+'</button>'+
+    ((t&&t.cities)||[]).map(function(c){var on=A.city===c.id;return '<button class="chip tsb'+(on?' on':'')+'" data-act="albcity" data-v="'+ea(c.id)+'" style="'+selVars(cityKey(c.id))+'" aria-pressed="'+on+'">'+esc(c.name)+' '+(cnt[c.id]||0)+'</button>'}).join('');
+  var dc='<button class="chip tsb'+(A.date==='all'?' on':'')+'" data-act="albdate" data-v="all" aria-pressed="'+(A.date==='all')+'">모든 날짜</button>'+
+    dates.map(function(d){var on=A.date===d;return '<button class="chip tsb'+(on?' on':'')+'" data-act="albdate" data-v="'+d+'" aria-pressed="'+on+'">'+md(d)+'</button>'}).join('');
+  var grid=list.length?'<div class="algrid">'+list.map(function(p,i){
+    return '<button class="alt" data-act="albopen" data-i="'+i+'" aria-label="'+ea(md(p.m.date_key)+' '+(p.m.memo_time||'')+' 사진')+'">'+ic('photo',18)+'<img class="mphi" loading="lazy" decoding="async" alt="" src="'+ea(p.m.photo_url)+'"></button>';
+  }).join('')+'</div>':'<div class="alemp">'+(all.length?'이 조건에 맞는 사진이 없어요':'아직 사진이 없어요<br>이이코토 메모에 올린 사진이 여기 모여요')+'</div>';
+  return '<div class="alb"><div class="alh"><button class="abk" data-act="albclose" aria-label="사진첩 닫기">'+ic('chevl',24)+'</button><h1>사진첩</h1><span class="small muted">'+list.length+'장</span></div>'+
+    '<div class="alchips"><div class="tsc hscroll">'+cc+'</div><div class="tsc hscroll">'+dc+'</div></div><div class="alsc" id="alsc">'+grid+'</div></div>';
+}
+function renderAlbum(force){
+  var el=document.getElementById('album');if(!el)return;
+  var A=UI.album;
+  if(!A){el.classList.remove('on');el.innerHTML='';ALBSIG='';return}
+  var sig=A.city+'|'+A.date+'|'+albumList().map(function(p){return p.m.photo_url}).join(',')+'|'+((trip()||{}).cities||[]).length;
+  if(!force&&sig===ALBSIG)return;
+  ALBSIG=sig;
+  var old=document.getElementById('alsc'),y=old?old.scrollTop:0,xs=Array.prototype.map.call(el.querySelectorAll('.tsc.hscroll'),function(r){return r.scrollLeft});
+  el.innerHTML=albumHtml();el.classList.add('on');
+  var sc=document.getElementById('alsc');if(sc)sc.scrollTop=force?0:y;   // 칩을 바꾸면 맨 위부터, 동기화로 다시 그릴 땐 보던 자리 유지
+  Array.prototype.forEach.call(el.querySelectorAll('.tsc.hscroll'),function(r,i){if(!force&&xs[i])r.scrollLeft=xs[i]});
+  if(A.v>=0&&A.v>=albumList().length)albumView(-1);
+}
+function albumView(i){
+  var A=UI.album,el=document.getElementById('albview');if(!A||!el)return;
+  var list=albumList(),p=list[i];
+  if(!p){A.v=-1;el.classList.remove('on');el.innerHTML='';return}
+  A.v=i;
+  var m=p.m,d=parse(m.date_key);
+  var meta=(d.getMonth()+1)+'월 '+d.getDate()+'일 '+wd(m.date_key)+'요일'+(m.memo_time?' · '+m.memo_time:'')+(p.city?' · '+cityName(p.city):'');
+  el.innerHTML='<div class="pvo" data-act="albvbg"><div class="pvc"><div class="pvf"><div class="pvw">'+ic('photo',26)+'<img class="mphi" alt="" src="'+ea(m.photo_url)+'"><button class="pvx" data-act="albvclose" aria-label="닫기">'+ic('x',14)+'</button></div>'+
+    '<div class="pvd">'+esc(meta)+'</div><div class="pvt">'+(m.text?esc(m.text).replace(/\n/g,'<br>'):'')+'</div></div>'+
+    '<div class="pvh">'+(list.length>1?'좌우로 밀어 넘기기 · ':'')+(i+1)+' / '+list.length+'</div></div></div>';
+  el.classList.add('on');
+  [i-1,i+1].forEach(function(k){if(list[k]){var im=new Image();im.src=list[k].m.photo_url}});   // 이웃 사진을 미리 받아 넘길 때 바로 뜨게
+}
+function albumNav(dir){var A=UI.album;if(!A||A.v<0)return;var n=A.v+dir;if(n<0||n>=albumList().length)return;albumView(n)}
+var avS=null;
+function onAvStart(e){if(!UI.album||UI.album.v<0||!e.touches||e.touches.length!==1)return;avS={x:e.touches[0].clientX,y:e.touches[0].clientY}}
+function onAvEnd(e){
+  if(!avS)return;var s=avS;avS=null;var p=e.changedTouches&&e.changedTouches[0];if(!p)return;
+  var dx=p.clientX-s.x,dy=p.clientY-s.y;
+  if(Math.abs(dx)<50||Math.abs(dx)<Math.abs(dy)*1.3)return;   // 세로 스크롤 의도는 무시
+  albumNav(dx<0?-1:1);   // 이이코토 본앱과 같은 방향
+}
 /* ---------- 클릭 동작 표: data-act 값 → 처리 함수 (각 함수가 자기 지역변수를 가진다) ---------- */
 function pkMonth(el,v,id){var a=el.getAttribute('data-act');if(!PK)return;PK.m+=(a==='pk-next'?1:-1);if(PK.m<0){PK.m=11;PK.y--}else if(PK.m>11){PK.m=0;PK.y++}renderPicker()}
 function delWithUndo(o,label,list,kind){  // 지출·결제 항목 삭제 + 5초 되돌리기
@@ -1465,6 +1529,12 @@ var ACT={
     UI.vd=null;UI.sched=null;UI.sheet='trips';render();toast('저장했어요');
   },
   'mirror-all':function(){var n=M?mirrorAll():0;syncPayMemos();toast(n?'완료한 일정 '+n+'건을 이이코토로 보냈어요':'보낼 완료 일정이 없어요')},
+  'album':function(){UI.album={city:'all',date:'all',v:-1};renderAlbum(true)},
+  'albclose':function(){albumView(-1);UI.album=null;renderAlbum(true)},
+  'albcity':function(el,v){UI.album.city=v;UI.album.date='all';renderAlbum(true)},
+  'albdate':function(el,v){UI.album.date=v;renderAlbum(true)},
+  'albopen':function(el){albumView(+el.getAttribute('data-i'))},
+  'albvclose':function(){albumView(-1)},
   'export':function(){doExport()}
 };
 var DRAFT_ACT={evslot:1,evmap:1,expcat:1,expcur:1};  // 이 동작 뒤에는 작성 중인 시트 내용을 기기에 임시 저장
@@ -1480,6 +1550,7 @@ function onClick(e){
   var a=el.getAttribute('data-act');
   if(a==='sheet-bg'){if(e.target===el)closeSheet();return}   // 시트·모달 바깥 배경을 눌렀을 때만 닫는다
   if(a==='pk-bg'){if(e.target===el)closePicker();return}
+  if(a==='albvbg'){if(e.target===el)albumView(-1);return}   // 뷰어 바깥 어두운 곳을 눌렀을 때만 닫는다
   var h=ACT[a];if(!h)return;
   h(el,el.getAttribute('data-v'),el.getAttribute('data-id'));
   if(DRAFT_ACT[a])persistDraft();
@@ -1558,6 +1629,7 @@ function boot(){
   document.addEventListener('change',onChange);
   document.addEventListener('keydown',onKey);
   var scr=document.getElementById('screen');scr.addEventListener('touchstart',onTabTouchStart,{passive:true});scr.addEventListener('touchend',onTabTouchEnd,{passive:true});
+  var av=document.getElementById('albview');av.addEventListener('touchstart',onAvStart,{passive:true});av.addEventListener('touchend',onAvEnd,{passive:true});
   document.addEventListener('touchstart',onTouchStart,{passive:true});
   document.addEventListener('touchend',onTouchEnd,{passive:true});
   document.addEventListener('input',function(e){var el=e.target;if(el&&el.hasAttribute&&el.hasAttribute('data-add'))UI.addTxt[el.getAttribute('data-add')]=el.value;if(el&&el.id==='x_amt')updateExpLine();if(el&&el.id==='ev_title'&&UI.evDraft){UI.evDraft.title=el.value;refreshSug()}if(el&&el.id==='x_name'&&UI.expDraft){UI.expDraft.name=el.value;refreshXSug()}if(el&&el.id&&(el.id.indexOf('ev_')===0||el.id.indexOf('x_')===0))persistDraft()});
