@@ -282,8 +282,8 @@ input:focus,textarea:focus,select:focus{outline:none;box-shadow:none}
 /* 세부 항목 구분선: 섹션 구분선(실선)과 구별되는 듬성듬성한 연한 점선 */
 .ck,.mrow,.xrow,.dotsep{background-image:var(--dots);background-size:var(--dots-sz);background-repeat:repeat-x;background-position:left bottom}  /* 같은 성격 목록의 세부 구분선(체크·메모·지출 등)은 이 한 곳에서만 정의 */
 .ck:last-of-type,.mrow:last-child,.xrow:last-child{background-image:none}
-.memolist.scroll{position:relative;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;scrollbar-width:none}
-.memolist.scroll::-webkit-scrollbar{display:none}
+.fitlist.scroll{position:relative;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.fitlist.scroll::-webkit-scrollbar{display:none}
 @keyframes tabEnterFromRight{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:translateX(0)}}
 @keyframes tabEnterFromLeft{from{opacity:0;transform:translateX(-16px)}to{opacity:1;transform:translateX(0)}}
 #screen.tab-enter-from-right{animation:tabEnterFromRight .25s ease-out}
@@ -355,6 +355,6 @@ input:focus,textarea:focus,select:focus{outline:none;box-shadow:none}
 <div id="bg-fixed"></div>
 <div id="app"><div id="topsafe"></div><div id="pin"></div><main id="screen"></main><nav id="tabbar" aria-label="하단 탭"></nav></div>
 <div id="sheet"></div><div id="toast"></div><div id="picker"></div>
-<script src="iitabi.js?v=2026.10.06-48"></script>
+<script src="iitabi.js?v=2026.10.06-50"></script>
 </body>
 </html>

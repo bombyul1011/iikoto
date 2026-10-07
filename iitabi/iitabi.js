@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-var VER='2026.10.06-48';
+var VER='2026.10.06-50';
 var SUPA_URL='https://vqvpzrxmtpryzhontlxc.supabase.co';
 var SUPA_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdnB6cnhtdHByeXpob250bHhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTgxMjksImV4cCI6MjA5NjYzNDEyOX0.pbtq1UMPC7ylYM1H2xVa19C1TFlceLmEfEtkz3WK2VI';
 var LSP='iitabi:';
@@ -378,16 +378,17 @@ function memoText(m){return (m.question?'<div class="small muted" style="margin-
 function memoHtml(list){
   if(!list.length)return '<div class="small muted">iikoto에서 쓴 메모가 여기에 시간순으로 보여요. (읽기 전용)</div>';
   var sorted=list.slice().sort(byMemoTime);
-  return '<div class="memolist'+(sorted.length>MEMO_VISIBLE?' scroll':'')+'">'+sorted.map(function(m){
+  return '<div class="memolist fitlist'+(sorted.length>MEMO_VISIBLE?' scroll':'')+'" data-vis="'+MEMO_VISIBLE+'">'+sorted.map(function(m){
     return '<div class="mrow"><div class="mt">'+esc(m.memo_time||'')+'</div>'+(hasPhoto(m)?'<div class="mb mpw">'+photoThumb(m)+'<span class="mtx">'+memoText(m)+'</span></div>':'<div class="mb">'+memoText(m)+'</div>')+'</div>';
   }).join('')+'</div>';
 }
 var MEMO_VISIBLE=5;
 /* 6번째 메모가 살짝 비쳐 보이는 높이로 맞춘다(쓸어서 더 볼 수 있다는 신호). 줄 높이는 글 길이에 따라 달라 렌더 후 측정한다 */
-function fitMemoList(){
-  var l=document.querySelector('.memolist.scroll');if(!l)return;
-  var r=l.children[MEMO_VISIBLE];if(!r)return;
-  l.style.maxHeight=(r.offsetTop+22)+'px';
+function fitMemoList(){  // 메모·지출처럼 '몇 개만 보이고 나머지는 스크롤'인 목록 전부에 적용
+  Array.prototype.forEach.call(document.querySelectorAll('.fitlist.scroll'),function(l){
+    var r=l.children[+l.getAttribute('data-vis')||MEMO_VISIBLE];if(!r)return;
+    l.style.maxHeight=(r.offsetTop+22)+'px';
+  });
 }
 function onThumb(e){var t=e.target;if(!t||!t.classList||!t.classList.contains('mphi'))return;if(e.type==='load')t.classList.add('loaded');var p=t.parentNode.querySelector('.ti');if(p)p.classList.add('hide')}
 function photoStrip(){
@@ -485,8 +486,15 @@ function dispTimes(ev){
   ev.forEach(function(e){var d=e.d,t=(d.done&&d.doneAt)?hhmm(d.doneAt):(d.time||def[d.slot]||prev);if(t<prev)t=prev;out.push(t);prev=t});
   return out;
 }
+/* 화면에 보이는 시각(완료한 일정은 완료 시각, 아니면 예정 시각·시간대 기본값) 순으로 줄을 세운다.
+   서버에 저장된 순서는 바꾸지 않는다 — 예정 시각 없이 시간대만 있는 일정을 일찍 마치면 라벨(13:19)이 앞 줄(13:50)보다 이르게 보이던 문제 */
+function sortShown(ev){
+  var def={am:'09:00',noon:'12:00',pm:'15:00',eve:'19:00'},prev='00:00';
+  return ev.map(function(e,i){var d=e.d,k=(d.done&&d.doneAt)?hhmm(d.doneAt):(d.time||def[d.slot]||prev);prev=k;return {e:e,k:k,i:i}})
+    .sort(function(a,b){return a.k<b.k?-1:(a.k>b.k?1:a.i-b.i)}).map(function(x){return x.e});
+}
 function timelineHtml(d){
-  var ev=eventsOf(d),ms=memosOf(d).slice().sort(byMemoTime);
+  var ev=sortShown(eventsOf(d)),ms=memosOf(d).slice().sort(byMemoTime);
   if(!ev.length&&!ms.length)return '';
   var cc=cityCol(cityOfDate(d)),eff=dispTimes(ev),mi=0,h='<div class="tl">';
   function pushMemos(limit){while(mi<ms.length&&(limit==null||String(ms[mi].memo_time||'99:99')<limit)){h+=memoEv(ms[mi]);mi++}}
@@ -551,7 +559,7 @@ function screenToday(){
   var done=items.filter(function(i){return i.done}).length;
   h+=card(ctitle('체크리스트',done+' / '+items.length,['list-check','lav'])+(items.length?bar(done/items.length*100)+'<div style="margin-top:6px">'+clList(items,'ck')+'</div>':'<div class="small muted">등록된 항목이 없어요. 체크 탭에서 추가해요.</div>'),'flat nb');
   var exs=localList().filter(function(x){return x.d.date===vd}).sort(byTimeDesc);
-  h+=card(ctitle('지출',exs.length?sumLabel(sumInfo(exs)):'',['wallet','mint'])+(exs.length?exs.slice(0,3).map(function(x){return expRow(x,true)}).join('')+(exs.length>3?'<div class="small muted" style="padding-top:6px">외 '+(exs.length-3)+'건 · 경비 탭에서 전체 보기</div>':''):'<div class="small muted">아직 지출 기록이 없어요.</div>'),'flat');
+  h+=card(ctitle('지출',exs.length?sumLabel(sumInfo(exs)):'',['wallet','mint'])+(exs.length?'<div class="fitlist'+(exs.length>3?' scroll':'')+'" data-vis="3">'+exs.map(function(x){return expRow(x,true)}).join('')+'</div>':'<div class="small muted">아직 지출 기록이 없어요.</div>'),'flat');
   h+=card(ctitle('메모',null,['notes','rose'])+memoHtml(memosOf(vd)),'flat');
   h+=photoStrip();
   return h;
@@ -787,7 +795,7 @@ function sheetHtml(){
 /* ---------- render ---------- */
 var TABS=[['today','오늘','sun'],['sched','일정','cal'],['check','체크','chk'],['budget','경비','wal'],['spots','스팟','pin']];
 function render(){
-  var sc=document.getElementById('screen'),y=sc.scrollTop,ml0=sc.querySelector('.memolist.scroll'),mly=ml0?ml0.scrollTop:0;
+  var sc=document.getElementById('screen'),y=sc.scrollTop,mly=Array.prototype.map.call(sc.querySelectorAll('.fitlist.scroll'),function(x){return x.scrollTop});
   var h='';PINH='';UI.popKey=null;
   try{
     if(!M)h=empty();
@@ -806,7 +814,7 @@ function render(){
   if(UI.edit){var ei=document.querySelector('input.edit');if(ei&&document.activeElement!==ei){ei.focus();var el2=ei.value.length;try{ei.setSelectionRange(el2,el2)}catch(e){}} /* 전체 선택(파란 드래그) 대신 글 끝에 커서만 */}
   sc.scrollTop=y;
   fitMemoList();
-  var ml1=sc.querySelector('.memolist.scroll');if(ml1&&mly)ml1.scrollTop=mly;
+  Array.prototype.forEach.call(sc.querySelectorAll('.fitlist.scroll'),function(x,i){if(mly[i])x.scrollTop=mly[i]});
 }
 
 /* ---------- 날짜·시간 선택 모달 (iikoto 본앱의 가운데 모달 · 시간 휠 · 월 달력과 같은 구성) ---------- */
