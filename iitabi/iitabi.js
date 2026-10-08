@@ -522,11 +522,16 @@ function slotsOf(d){var t=trip();return (t&&t.planSlots&&t.planSlots[d])||[]}
 function choiceOf(d,slot){return M&&M.choices[d+'|'+slot]||null}
 function planOf(id){return M&&M.plans[id]||null}
 function findEvent(cid){var r=null;Object.keys(M.events).forEach(function(d){M.events[d].forEach(function(e){if(e.cid===cid)r=e})});return r}
+/* 코멘트: 예전 설명·태그(맛집 등)·대안 문구를 하나로 합친 일정 메모. 아직 코멘트로 저장하지 않은 일정은 옛 값을 합쳐서 보여주고, 수정해 저장하면 코멘트 하나로 정리된다 */
+function evComment(d){
+  var c=d.comment!==undefined?(d.comment||''):((d.tags||[]).join(' · ')+((d.tags||[]).length&&d.alt?'\n':'')+(d.alt||''));
+  return [d.desc||'',c].filter(Boolean).join('\n');
+}
 function evBody(e){
   var d=e.d;
-  var tags=(d.tags||[]).map(function(t){return chip(esc(t),'pn')}).join(' ');
+  var cm=evComment(d);
   var link=d.link?'<a class="small" style="display:inline-flex;align-items:center;gap:4px;min-height:36px;font-weight:700" href="'+ea(d.link.url)+'" target="_blank" rel="noopener">'+ic('ext',14)+esc(d.link.label)+'</a>':'';
-  return '<div class="row" style="align-items:flex-start;gap:2px"><div class="grow"><h3 style="margin:0;font-size:15px;line-height:1.35">'+esc(d.title)+'</h3>'+(d.desc?'<p style="margin:3px 0 0;font-size:13px;color:var(--sub);line-height:1.45">'+esc(d.desc)+'</p>':'')+(tags?'<div class="chips" style="margin-top:8px">'+tags+'</div>':'')+(d.alt?'<p style="margin:6px 0 0;font-size:12px;color:var(--sub)">'+esc(d.alt)+'</p>':'')+spentLine(e.cid)+link+'</div><div class="icos"><button class="ico" data-act="evedit" data-id="'+ea(e.cid)+'" aria-label="일정 수정">'+ic('pen',16)+'</button>'+(d.map?icoMap(d.map):'')+(d.nav&&d.map?icoNav(d.map):'')+'</div></div>';
+  return '<div class="row" style="align-items:flex-start;gap:2px"><div class="grow"><h3 style="margin:0;font-size:15px;line-height:1.35">'+esc(d.title)+'</h3>'+(cm?'<p style="margin:3px 0 0;font-size:13px;color:var(--sub);line-height:1.45;white-space:pre-line">'+esc(cm)+'</p>':'')+spentLine(e.cid)+link+'</div><div class="icos"><button class="ico" data-act="evedit" data-id="'+ea(e.cid)+'" aria-label="일정 수정">'+ic('pen',16)+'</button>'+(d.map?icoMap(d.map):'')+(d.nav&&d.map?icoNav(d.map):'')+'</div></div>';
 }
 function evRow(e,cc,at){
   var d=e.d,done=!!d.done;
@@ -634,7 +639,7 @@ function screenToday(){
     var d=next.d;
     var ckb=d.done?'<span class="bnck on" aria-label="완료한 일정">'+ic('check',17)+'</span>':'<button class="bnck" data-act="bnck" data-id="'+ea(next.cid)+'" aria-label="'+ea(d.title)+' 완료">'+ic('check',17)+'</button>';
     var per=periodOf(d.time||SLOTDEF[d.slot]||'12:00');
-    h+='<div class="card bn bn-'+per+'">'+ctitle(ev[ev.length-1]===next?'마지막 일정':'다음 일정',ckb)+'<div style="font-family:var(--serif);font-size:19px;font-weight:700;line-height:1.3;color:var(--bn-t)">'+esc(d.title)+'</div>'+(d.desc?'<div style="font-size:13px;color:var(--bn-s);margin-top:5px;line-height:1.5">'+esc(d.desc)+'</div>':'')+
+    h+='<div class="card bn bn-'+per+'">'+ctitle(ev[ev.length-1]===next?'마지막 일정':'다음 일정',ckb)+'<div style="font-family:var(--serif);font-size:19px;font-weight:700;line-height:1.3;color:var(--bn-t)">'+esc(d.title)+'</div>'+(evComment(d)?'<div style="font-size:13px;color:var(--bn-s);margin-top:5px;line-height:1.5;white-space:pre-line">'+esc(evComment(d))+'</div>':'')+
       ((d.map)?'<div class="row" style="margin-top:14px"><a class="btn" style="flex:1;text-decoration:none" href="'+ea(mapUrl(d.map))+'" target="_blank" rel="noopener">'+ic('pin',17)+'지도에서 열기</a>'+(d.nav?'<a class="ibtn" aria-label="길찾기(대중교통)" href="'+ea(navUrl(d.map))+'" target="_blank" rel="noopener">'+ic('nav',20)+'</a>':'')+'</div>':'')+'</div>';
   }
   var sl=slotsOf(vd);
@@ -845,7 +850,7 @@ function sheetHtml(){
       '<div><div class="lbl">제목</div><input class="fld" id="ev_title" style="width:100%" placeholder="이름을 치면 스팟이 떠요" aria-label="제목" autocomplete="off" value="'+ea(ed.title||'')+'"><div id="ev_sug">'+evSugHtml(ed)+'</div></div>'+
       '<div class="dt2"><div><div class="lbl">날짜</div>'+dfld('date','ev_date',ed.date,'날짜')+'</div><div><div class="lbl">시간 (선택)</div>'+dfld('time','ev_time',ed.time,'시간','data-evtime="1"',true)+'</div></div>'+
       '<div><div class="lbl">시간대</div><div class="tsc" style="margin-top:0">'+['am','noon','pm','eve'].map(function(k){return '<button class="chip tsb'+(ed.slot===k?' on':'')+'" data-act="evslot" data-v="'+k+'" aria-pressed="'+(ed.slot===k)+'">'+SLOTL[k]+'</button>'}).join('')+'</div></div>'+
-      '<div><div class="lbl">설명 (선택)</div><input class="fld" id="ev_desc" style="width:100%" placeholder="예: 오픈 시간에 방문" aria-label="설명" value="'+ea(ed.desc||'')+'"></div>'+
+      '<div><div class="lbl">코멘트 (선택)</div><textarea class="fld" id="ev_comment" rows="2" style="width:100%;resize:none" placeholder="예: 오픈 시간에 방문 · 비 오면 ○○로 대체 · 맛집" aria-label="코멘트">'+esc(ed.comment||'')+'</textarea></div>'+
       '<div><div class="lbl">지도 연결</div><div class="tsc" style="margin-top:0">'+[[true,'지도·길찾기 버튼 표시'],[false,'표시 안 함']].map(function(c){return '<button class="chip tsb'+((ed.mapOn!==false)===c[0]?' on':'')+'" data-act="evmap" data-v="'+c[0]+'" aria-pressed="'+((ed.mapOn!==false)===c[0])+'">'+c[1]+'</button>'}).join('')+'</div><div class="lbl" style="margin-top:10px">검색어 (비우면 제목으로 검색)</div><div class="row"><input class="fld" id="ev_map" style="flex:1" placeholder="가게·장소 이름 또는 주소" aria-label="지도 검색어" value="'+ea(ed.map||'')+'"><a class="btn" data-mapcheck="1" href="#" target="_blank" rel="noopener" style="text-decoration:none">'+ic('pin',16)+'확인</a></div></div>'+
       '<div class="row"><button class="btn pri" style="flex:1" data-act="ev-save">저장</button>'+(ed.id?'<button class="btn" data-act="ev-del" data-id="'+ea(ed.id)+'">삭제</button>':'')+'</div>';
   }else if(v==='fx'){
@@ -1045,11 +1050,11 @@ function removeEvent(e){
   M.events[d]=list;
 }
 function openEv(id,date,spotCid){
-  var base={id:null,date:date||UI.sched||clampDate(today()),slot:'pm',spot:'',title:'',desc:'',map:'',time:'',mapOn:true};
-  if(id){var e=findEvent(id);if(e){var d=e.d;base={id:e.cid,mapOn:!!d.map,date:e.date,slot:d.slot||'pm',spot:d.spot||(spotOfEvent(e)?spotOfEvent(e).cid:''),title:d.title||'',desc:d.desc||'',map:d.map||'',time:d.time||''}}}
+  var base={id:null,date:date||UI.sched||clampDate(today()),slot:'pm',spot:'',title:'',comment:'',map:'',time:'',mapOn:true};
+  if(id){var e=findEvent(id);if(e){var d=e.d;base={id:e.cid,mapOn:!!d.map,date:e.date,slot:d.slot||'pm',spot:d.spot||(spotOfEvent(e)?spotOfEvent(e).cid:''),title:d.title||'',comment:evComment(d),map:d.map||'',time:d.time||''}}}
   else if(spotCid){
     var sp=byCid(M.spots,spotCid);
-    if(sp){base.spot=sp.cid;base.title=sp.d.name;base.desc=sp.d.desc||'';base.map=sp.d.map||sp.d.name;base.slot=SPOT_SLOT[sp.d.cat]||'pm'}
+    if(sp){base.spot=sp.cid;base.title=sp.d.name;base.comment=sp.d.desc||'';base.map=sp.d.map||sp.d.name;base.slot=SPOT_SLOT[sp.d.cat]||'pm'}
   }
   UI.evDraft=base;UI.sheet='ev';render();persistDraft();
 }
@@ -1062,11 +1067,12 @@ function saveEv(){
   var slot=dr.slot||(time?timeToSlot(time):'pm');
   var map=(document.getElementById('ev_map').value||'').trim();
   if(dr.mapOn===false)map='';else if(!map)map=title;
-  var desc=(document.getElementById('ev_desc').value||'').trim();
+  var comment=(document.getElementById('ev_comment').value||'').trim();
   var old=dr.id?findEvent(dr.id):null;
-  var d=old?JSON.parse(JSON.stringify(old.d)):{tags:[]};
-  d.city=cityOfDate(date);d.title=title;d.desc=desc||undefined;d.time=time||undefined;d.slot=slot;
+  var d=old?JSON.parse(JSON.stringify(old.d)):{};
+  d.city=cityOfDate(date);d.title=title;d.time=time||undefined;d.slot=slot;
   d.map=map||undefined;d.nav=!!map;
+  d.comment=comment||undefined;delete d.desc;delete d.tags;delete d.alt;   // 예전 설명·태그·대안 문구는 코멘트로 합쳐졌으니 정리한다
   if(dr.spot)d.spot=dr.spot;else delete d.spot;
   delete d.cond;
   Object.keys(d).forEach(function(k){if(d[k]===undefined)delete d[k]});
@@ -1185,7 +1191,7 @@ function xSugHtml(dr){
   var evs=eventsOf(date).filter(function(e){return e.d.title}),eff=effTimes(eventsOf(date)),list=[],label='';
   if(q){
     var seen={};
-    evs.forEach(function(e){if(normQ(e.d.title+' '+(e.d.desc||'')).indexOf(q)>=0&&!(linked&&linked.cid===e.cid)){list.push({ref:'event:'+e.cid,name:e.d.title,tag:'일정'});var sp=spotOfEvent(e);if(sp)seen[sp.cid]=1}});
+    evs.forEach(function(e){if(normQ(e.d.title+' '+evComment(e.d)).indexOf(q)>=0&&!(linked&&linked.cid===e.cid)){list.push({ref:'event:'+e.cid,name:e.d.title,tag:'일정'});var sp=spotOfEvent(e);if(sp)seen[sp.cid]=1}});
     M.spots.filter(function(sp){return !seen[sp.cid]&&!(linked&&linked.cid===sp.cid)&&normQ(sp.d.name+' '+(sp.d.desc||'')+' '+(sp.d.map||'')).indexOf(q)>=0}).sort(function(a,b){return (a.d.city===cc?0:1)-(b.d.city===cc?0:1)}).forEach(function(sp){list.push({ref:'spot:'+sp.cid,name:sp.d.name,tag:'스팟'})});
     label='일정·스팟 후보';
   }else{
@@ -1214,7 +1220,7 @@ function refreshXSug(){var sg=document.getElementById('x_sug');if(sg&&UI.expDraf
 function persistDraft(){
   try{
     var g=function(id){var x=document.getElementById(id);return x?x.value:null};
-    if(UI.sheet==='ev'&&UI.evDraft){var d=UI.evDraft;if(g('ev_title')!=null){d.title=g('ev_title');d.date=g('ev_date');d.time=g('ev_time');d.desc=g('ev_desc');d.map=g('ev_map');}lset('draft',{k:'ev',d:d,t:Date.now()})}
+    if(UI.sheet==='ev'&&UI.evDraft){var d=UI.evDraft;if(g('ev_title')!=null){d.title=g('ev_title');d.date=g('ev_date');d.time=g('ev_time');d.comment=g('ev_comment');d.map=g('ev_map');}lset('draft',{k:'ev',d:d,t:Date.now()})}
     else if(UI.sheet==='exp'&&UI.expDraft){var x=UI.expDraft;if(g('x_amt')!=null){x.amt=g('x_amt');x.name=g('x_name');x.date=g('x_date');x.time=g('x_time')}lset('draft',{k:'exp',d:x,t:Date.now()})}
   }catch(e){}
 }
@@ -1249,13 +1255,13 @@ function albumHtml(){
   var list=albumList(),cnt={};all.forEach(function(p){cnt[p.city]=(cnt[p.city]||0)+1});
   var cc='<button class="chip tsb'+(A.city==='all'?' on':'')+'" data-act="albcity" data-v="all" aria-pressed="'+(A.city==='all')+'">전체 '+all.length+'</button>'+
     ((t&&t.cities)||[]).map(function(c){var on=A.city===c.id;return '<button class="chip tsb'+(on?' on':'')+'" data-act="albcity" data-v="'+ea(c.id)+'" style="'+selVars(cityKey(c.id))+'" aria-pressed="'+on+'">'+esc(c.name)+' '+(cnt[c.id]||0)+'</button>'}).join('');
-  var dc='<button class="chip tsb'+(A.date==='all'?' on':'')+'" data-act="albdate" data-v="all" aria-pressed="'+(A.date==='all')+'">모든 날짜</button>'+
-    dates.map(function(d){var on=A.date===d;return '<button class="chip tsb'+(on?' on':'')+'" data-act="albdate" data-v="'+d+'" aria-pressed="'+on+'">'+md(d)+'</button>'}).join('');
+  var db=A.date!=='all'?'<span class="chip tsb on dsel"><button data-act="albdates" aria-label="날짜 바꾸기">'+md(A.date)+'</button><button data-act="albdate" data-v="all" aria-label="날짜 해제">'+ic('x',13)+'</button></span>'
+    :'<button class="chip tsb dbtn" data-act="albdates" aria-label="날짜 고르기">날짜 '+ic('chevd',14)+'</button>';   // 날짜는 버튼 하나로 줄이고, 고르면 선택한 날짜가 그 자리에 표시
   var grid=list.length?'<div class="algrid">'+list.map(function(p,i){
     return '<button class="alt" data-act="albopen" data-i="'+i+'" aria-label="'+ea(md(p.m.date_key)+' '+(p.m.memo_time||'')+' 사진')+'">'+ic('photo',18)+'<img class="mphi" loading="lazy" decoding="async" alt="" src="'+ea(p.m.photo_url)+'"></button>';
   }).join('')+'</div>':'<div class="alemp">'+(all.length?'이 조건에 맞는 사진이 없어요':'아직 사진이 없어요<br>이이코토 메모에 올린 사진이 여기 모여요')+'</div>';
   return '<div class="alb"><div class="alh"><button class="abk" data-act="albclose" aria-label="사진첩 닫기">'+ic('chevl',24)+'</button><h1>사진첩</h1><span class="small muted">'+list.length+'장</span></div>'+
-    '<div class="alchips"><div class="tsc hscroll">'+cc+'</div><div class="tsc hscroll">'+dc+'</div></div><div class="alsc" id="alsc">'+grid+'</div></div>';
+    '<div class="alchips"><div class="tsc hscroll">'+cc+'</div>'+db+'</div><div class="alsc" id="alsc">'+grid+'</div></div>';
 }
 function renderAlbum(force){
   var el=document.getElementById('album');if(!el)return;
@@ -1288,7 +1294,7 @@ function albumNav(dir){var A=UI.album;if(!A||A.v<0)return;var n=A.v+dir;if(n<0||
 var avS=null;
 function onAvStart(e){if(!UI.album||UI.album.v<0||!e.touches||e.touches.length!==1)return;avS={x:e.touches[0].clientX,y:e.touches[0].clientY}}
 var ebS=null;   // 사진첩 목록: 왼쪽 가장자리에서 오른쪽으로 쓸면 뒤로(iOS 뒤로가기 제스처와 같음)
-function onEdgeStart(e){if(!UI.album||UI.album.v>=0||!e.touches||e.touches.length!==1){ebS=null;return}var x=e.touches[0].clientX;ebS=x<=28?{x:x,y:e.touches[0].clientY}:null}
+function onEdgeStart(e){if(!UI.album||UI.album.v>=0||PK||!e.touches||e.touches.length!==1){ebS=null;return}var x=e.touches[0].clientX;ebS=x<=28?{x:x,y:e.touches[0].clientY}:null}
 function onEdgeEnd(e){if(!ebS)return;var s=ebS;ebS=null;var p=e.changedTouches&&e.changedTouches[0];if(!p)return;var dx=p.clientX-s.x,dy=p.clientY-s.y;if(dx>70&&dx>Math.abs(dy)*1.3)albBack()}
 function onAvEnd(e){
   if(!avS)return;var s=avS;avS=null;var p=e.changedTouches&&e.changedTouches[0];if(!p)return;
@@ -1494,7 +1500,7 @@ var ACT={
   'evpick':function(el,v,id){
     var sp=byCid(M.spots,id);if(!sp||!UI.evDraft)return;
     UI.evDraft.spot=sp.cid;UI.evDraft.title=sp.d.name;
-    var ti=document.getElementById('ev_title'),ma=document.getElementById('ev_map'),de=document.getElementById('ev_desc');
+    var ti=document.getElementById('ev_title'),ma=document.getElementById('ev_map'),de=document.getElementById('ev_comment');
     if(ti)ti.value=sp.d.name;
     if(ma&&!ma.value.trim())ma.value=sp.d.map||sp.d.name;
     if(de&&!de.value.trim())de.value=sp.d.desc||'';
@@ -1542,6 +1548,14 @@ var ACT={
   'albclose':function(){albBack()},
   'albcity':function(el,v){UI.album.city=v;UI.album.date='all';renderAlbum(true)},
   'albdate':function(el,v){UI.album.date=v;renderAlbum(true)},
+  'albdates':function(){   // 사진이 있는 날짜만 목록으로 보여준다(현재 지역 기준)
+    var A=UI.album,cnt={},order=[],n=0;
+    albumAll().forEach(function(p){if(A.city!=='all'&&p.city!==A.city)return;var k=p.m.date_key;if(!cnt[k]){cnt[k]=0;order.push(k)}cnt[k]++;n++});
+    var btns=[{t:'모든 날짜 · '+n+'장',cls:A.date==='all'?'ok':'',fn:function(){UI.album.date='all';renderAlbum(true)}}];
+    order.forEach(function(k){btns.push({t:md(k)+' '+wd(k)+' · '+cnt[k]+'장',cls:A.date===k?'ok':'',fn:function(){UI.album.date=k;renderAlbum(true)}})});
+    btns.push({t:'취소',fn:function(){}});
+    openChoice('날짜 선택','',btns);
+  },
   'albopen':function(el){albumView(+el.getAttribute('data-i'))},
   'albvclose':function(){albBack()},
   'export':function(){doExport()}
