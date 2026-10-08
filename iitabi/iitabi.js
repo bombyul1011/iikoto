@@ -57,7 +57,7 @@ function typing(){if(PK)return true;var ae=document.activeElement;return !!(ae&&
 function pickOn(el){Array.prototype.forEach.call(el.parentNode.querySelectorAll('.tsb'),function(b){var on=b===el;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on)})}
 function setPick(act,v){Array.prototype.forEach.call(document.querySelectorAll('[data-act="'+act+'"]'),function(b){var on=b.getAttribute('data-v')===v;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on)})}
 function shead(t,act,v,label){return '<div class="row between"><h1 style="font-size:22px">'+esc(t)+'</h1><button class="btn" style="border:0;background:transparent" data-act="'+(act||'sheet-close')+'"'+(v?' data-v="'+v+'"':'')+' aria-label="'+(label||'닫기')+'">'+ic('x',20)+'</button></div>'}
-function endSheet(){UI.sheet=null;UI.expDraft=UI.evDraft=UI.payDraft=UI.spDraft=UI.clDraft=null;clearDraft()}  // 열린 시트와 작성 중 내용을 모두 비운다(화면은 호출 쪽에서 그림)
+function endSheet(){UI.sheet=null;UI.expDraft=UI.evDraft=UI.payDraft=UI.spDraft=UI.clDraft=UI.stDraft=null;clearDraft()}  // 열린 시트와 작성 중 내용을 모두 비운다(화면은 호출 쪽에서 그림)
 function closeSheet(){endSheet();render()}
 function byTimeDesc(a,b){return String(b.d.time||'')<String(a.d.time||'')?-1:1}
 function byMemoTime(a,b){var x=String(a.memo_time||'99:99'),y=String(b.memo_time||'99:99');return x<y?-1:(x>y?1:0)}
@@ -186,6 +186,7 @@ function mirrorDel(e){
 function mirrorAll(){
   var n=0;
   Object.keys(M.events).forEach(function(d){M.events[d].forEach(function(e){if(e.d.done&&e.d.doneAt){delete MIR[TV_PRE+e.cid];mirrorEvent(e);n++}})});
+  M.stays.forEach(function(s){['in','out'].forEach(function(k){if(s.d[k+'Done']&&s.d[k+'At']){var e=stEv(s,k);delete MIR[TV_PRE+e.cid];mirrorEvent(e);n++}})});
   return n;
 }
 /* 하루 지출 → 그날 23시 이후(앱을 열 때) 메모 한 줄. 지나간 날은 밀린 것도 한꺼번에 채운다.
@@ -533,7 +534,29 @@ function evBody(e){
   var link=d.link?'<a class="small" style="display:inline-flex;align-items:center;gap:4px;min-height:36px;font-weight:700" href="'+ea(d.link.url)+'" target="_blank" rel="noopener">'+ic('ext',14)+esc(d.link.label)+'</a>':'';
   return '<div class="row" style="align-items:flex-start;gap:2px"><div class="grow"><h3 style="margin:0;font-size:15px;line-height:1.35">'+esc(d.title)+'</h3>'+(cm?'<p style="margin:3px 0 0;font-size:13px;color:var(--sub);line-height:1.45;white-space:pre-line">'+esc(cm)+'</p>':'')+spentLine(e.cid)+link+'</div><div class="icos"><button class="ico" data-act="evedit" data-id="'+ea(e.cid)+'" aria-label="일정 수정">'+ic('pen',16)+'</button>'+(d.map?icoMap(d.map):'')+(d.nav&&d.map?icoNav(d.map):'')+'</div></div>';
 }
+/* 숙소 → 체크인/체크아웃 일정: 숙소 데이터에서 그날 일정 줄을 만들어 낸다(따로 저장하지 않음). 완료 상태·시각만 숙소에 저장 */
+var STC='#d9722b';
+function stEv(s,k){
+  var x=s.d,i=k==='in';
+  return {cid:'st'+k+'-'+s.cid,date:i?x.checkin:x.checkout,stay:s.cid,k:k,d:{title:(i?'체크인 · ':'체크아웃 · ')+x.name,time:(i?x.inTime:x.outTime)||(i?'15:00':'11:00'),map:x.map||x.name,done:!!x[k+'Done'],doneAt:x[k+'At']}};
+}
+function stayEvs(d){
+  var r=[];
+  (M&&M.stays||[]).forEach(function(s){if(s.d.checkout===d)r.push(stEv(s,'out'));if(s.d.checkin===d)r.push(stEv(s,'in'))});
+  return r;
+}
+function stSetDone(s,k,on){
+  if(on){s.d[k+'Done']=true;s.d[k+'At']=Date.now()}else{delete s.d[k+'Done'];delete s.d[k+'At']}
+  tiUp('stay',s);mirrorEvent(stEv(s,k));render();
+}
+function stayRow(e,at){
+  var d=e.d,done=!!d.done,s=byCid(M.stays,e.stay);
+  var lab=done&&d.doneAt?hhmm(d.doneAt):d.time;
+  var tcol=done&&d.doneAt?'<button class="evt done" data-act="sttime" data-id="'+ea(e.stay)+'" data-v="'+e.k+'" aria-label="완료 시각 수정">'+esc(lab)+'</button>':'<button class="evt" disabled tabindex="-1" aria-hidden="true">'+esc(lab)+'</button>';
+  return '<div class="ev" data-t="'+ea(at||'')+'" style="--cc:'+STC+'">'+tcol+'<button class="evdot" data-act="stck" data-id="'+ea(e.stay)+'" data-v="'+e.k+'" aria-pressed="'+done+'" aria-label="'+ea(d.title)+' 완료"><span class="dotv"></span></button><div class="c"><div class="card sm stcard'+(done?' evdone':'')+'"><div class="row" style="align-items:flex-start;gap:2px"><div class="grow"><h3 style="margin:0;font-size:15px;line-height:1.35">'+ic('bed',15,STC)+' '+esc(d.title)+'</h3>'+(s&&s.d.note?'<p style="margin:3px 0 0;font-size:13px;color:var(--sub);line-height:1.45;white-space:pre-line">'+esc(s.d.note)+'</p>':'')+'</div><div class="icos"><button class="ico" data-act="stedit" data-id="'+ea(e.stay)+'" aria-label="숙소 수정">'+ic('pen',16)+'</button>'+icoMap(d.map)+icoNav(d.map)+'</div></div></div></div></div>';
+}
 function evRow(e,cc,at){
+  if(e.stay)return stayRow(e,at);
   var d=e.d,done=!!d.done;
   var lab=done&&d.doneAt?hhmm(d.doneAt):(d.time||SLOTL[d.slot]||'');
   var tcol=(done&&d.doneAt)?'<button class="evt done" data-act="evtime" data-id="'+ea(e.cid)+'" aria-label="완료 시각 수정">'+esc(lab)+'</button>':'<button class="evt" disabled tabindex="-1" aria-hidden="true">'+esc(lab)+'</button>';
@@ -583,9 +606,15 @@ function tlFilterHtml(){
 }
 function timelineHtml(d){
   var allEv=eventsOf(d),allMs=memosOf(d),allCk=doneChecksOf(d),allPay=freePaysOf(d);
-  if(!allEv.length&&!allMs.length&&!allCk.length&&!allPay.length)return '';
+  var allSt=stayEvs(d);
+  if(!allEv.length&&!allMs.length&&!allCk.length&&!allPay.length&&!allSt.length)return '';
   var f=UI.tlf||{};
   var ev=f.e===false?[]:sortShown(allEv),ex=[];
+  if(f.e!==false)allSt.forEach(function(x){
+    var k=(x.d.done&&x.d.doneAt)?hhmm(x.d.doneAt):x.d.time,ef=dispTimes(ev),at=ev.length;
+    for(var j=0;j<ef.length;j++){if(ef[j]>k){at=j;break}}
+    ev.splice(at,0,x);
+  });
   if(f.m!==false)allMs.forEach(function(m){ex.push({t:String(m.memo_time||'99:99'),h:memoEv(m)})});
   if(f.c!==false)allCk.forEach(function(i){ex.push({t:hhmm(i.completedAt),h:ckEv(i)})});
   if(f.p!==false)allPay.forEach(function(x){ex.push({t:String(x.d.time||'99:99'),h:payEv(x)})});
@@ -679,10 +708,10 @@ function screenSched(){
   h+=weekStrip(d,'date');
   PINH=h;h='';
   var s=stayOf(d),cid=cityOfDate(d);
-  h+='<div class="row" style="min-height:44px">'+cityChip(cid)+(s?'<span class="grow small muted">'+esc(s.d.name)+' · '+md(s.d.checkin)+' – '+md(s.d.checkout)+'</span>':'<span class="grow"></span>')+(s?icoMap(s.d.map||s.d.name):'')+'</div>';
+  h+='<div class="row" style="min-height:44px">'+cityChip(cid)+(s?'<span class="grow small muted">'+esc(s.d.name)+' · '+md(s.d.checkin)+' – '+md(s.d.checkout)+'</span>':'<span class="grow"></span>')+(s?'<button class="ico" data-act="stedit" data-id="'+ea(s.cid)+'" aria-label="숙소 수정">'+ic('pen',16)+'</button>'+icoMap(s.d.map||s.d.name):'')+'</div>';
   var note=(t.dayNotes||{})[d];if(note)h+='<div>'+chip(esc(note),'pn')+'</div>';
   h+=timelineHtml(d);
-  h+='<button class="btn" style="width:100%" data-act="evnew" data-date="'+d+'">'+ic('plus',16)+'일정 추가</button>';
+  h+='<div class="row"><button class="btn" style="flex:1" data-act="evnew" data-date="'+d+'">'+ic('plus',16)+'일정 추가</button><button class="btn" data-act="stnew" data-date="'+d+'">'+ic('bed',16)+'숙소 추가</button></div>';
   slotsOf(d).forEach(function(sl){h+=slotUi(d,sl)});
   return h;
 }
@@ -856,6 +885,16 @@ function sheetHtml(){
       '<div><div class="lbl">코멘트 (선택)</div><textarea class="fld" id="ev_comment" rows="2" style="width:100%;resize:none" placeholder="예: 오픈 시간에 방문 · 비 오면 ○○로 대체 · 맛집" aria-label="코멘트">'+esc(ed.comment||'')+'</textarea></div>'+
       '<div><div class="lbl">지도 연결</div><div class="tsc" style="margin-top:0">'+[[true,'지도·길찾기 버튼 표시'],[false,'표시 안 함']].map(function(c){return '<button class="chip tsb'+((ed.mapOn!==false)===c[0]?' on':'')+'" data-act="evmap" data-v="'+c[0]+'" aria-pressed="'+((ed.mapOn!==false)===c[0])+'">'+c[1]+'</button>'}).join('')+'</div><div class="lbl" style="margin-top:10px">검색어 (비우면 제목으로 검색)</div><div class="row"><input class="fld" id="ev_map" style="flex:1" placeholder="가게·장소 이름 또는 주소" aria-label="지도 검색어" value="'+ea(ed.map||'')+'"><a class="btn" data-mapcheck="1" href="#" target="_blank" rel="noopener" style="text-decoration:none">'+ic('pin',16)+'확인</a></div></div>'+
       '<div class="row"><button class="btn pri" style="flex:1" data-act="ev-save">저장</button>'+(ed.id?'<button class="btn" data-act="ev-del" data-id="'+ea(ed.id)+'">삭제</button>':'')+'</div>';
+  }else if(v==='stay'){
+    var sd2=UI.stDraft||{},tc=(trip()&&trip().cities)||[];
+    body=shead(sd2.id?'숙소 수정':'숙소 추가')+
+      '<div><div class="lbl">숙소 이름</div><input class="fld" id="st_name" style="width:100%" placeholder="호텔·료칸 이름" aria-label="숙소 이름" autocomplete="off" value="'+ea(sd2.name||'')+'"></div>'+
+      '<div><div class="lbl">도시</div><div class="tsc" style="margin-top:0">'+tc.map(function(c){return '<button class="chip tsb'+(sd2.city===c.id?' on':'')+'" data-act="stcity" data-v="'+ea(c.id)+'" aria-pressed="'+(sd2.city===c.id)+'">'+esc(c.name)+'</button>'}).join('')+'</div></div>'+
+      '<div class="dt2"><div><div class="lbl">체크인</div>'+dfld('date','st_in',sd2.checkin,'체크인 날짜')+'</div><div><div class="lbl">체크인 시간</div>'+dfld('time','st_int',sd2.inTime,'체크인 시간')+'</div></div>'+
+      '<div class="dt2"><div><div class="lbl">체크아웃</div>'+dfld('date','st_out',sd2.checkout,'체크아웃 날짜')+'</div><div><div class="lbl">체크아웃 시간</div>'+dfld('time','st_outt',sd2.outTime,'체크아웃 시간')+'</div></div>'+
+      '<div><div class="lbl">지도 검색어 (비우면 이름으로 검색)</div><input class="fld" id="st_map" style="width:100%" placeholder="주소 또는 장소 이름" aria-label="지도 검색어" value="'+ea(sd2.map||'')+'"></div>'+
+      '<div><div class="lbl">메모 (선택)</div><textarea class="fld" id="st_note" rows="2" style="width:100%;resize:none" placeholder="예: 조식 7시 · 짐 맡기기 가능" aria-label="메모">'+esc(sd2.note||'')+'</textarea></div>'+
+      '<div class="row"><button class="btn pri" style="flex:1" data-act="st-save">저장</button>'+(sd2.id?'<button class="btn" data-act="st-del" data-id="'+ea(sd2.id)+'">삭제</button>':'')+'</div>';
   }else if(v==='fx'){
     body=shead('현재 환율')+card(fxCardHtml(),'');
   }else if(v==='pay'){
@@ -1085,6 +1124,36 @@ function saveEv(){
   insertEvent(date,e);mirrorEvent(e);
   var t=trip();if(t&&(date<t.start||date>t.end))toast('여행 기간 밖의 날짜예요. 기간을 넓히면 보여요');
   UI.sched=date;endSheet();render();if(!(t&&(date<t.start||date>t.end)))toast('저장했어요');
+}
+function openStay(id,date){
+  var t=trip(),s=id?byCid(M.stays,id):null,x=s?s.d:null;
+  UI.stDraft=x?{id:s.cid,name:x.name||'',city:x.city||'',checkin:x.checkin||'',checkout:x.checkout||'',inTime:x.inTime||'',outTime:x.outTime||'',map:x.map||'',note:x.note||''}
+    :{id:null,name:'',city:cityOfDate(date||UI.sched||clampDate(today())),checkin:date||UI.sched||clampDate(today()),checkout:addDays(date||UI.sched||clampDate(today()),1),inTime:'',outTime:'',map:'',note:''};
+  UI.sheet='stay';render();
+}
+function saveStay(){
+  var dr=UI.stDraft||{},g=function(i){var el=document.getElementById(i);return el?(el.value||'').trim():''};
+  var name=g('st_name'),ci=g('st_in'),co=g('st_out');
+  if(!name){toast('숙소 이름을 입력해 주세요');return}
+  if(!ci||!co){toast('체크인·체크아웃 날짜를 골라 주세요');return}
+  if(co<=ci){toast('체크아웃은 체크인보다 뒤여야 해요');return}
+  var old=dr.id?byCid(M.stays,dr.id):null,s=old||{cid:'stay_'+genCid(),date:null,sort:0,d:{}};
+  var d=s.d;
+  d.name=name;d.city=dr.city||cityOfDate(ci);d.checkin=ci;d.checkout=co;
+  d.nights=Math.round((Date.parse(co)-Date.parse(ci))/864e5);
+  d.inTime=g('st_int')||undefined;d.outTime=g('st_outt')||undefined;
+  d.map=g('st_map')||undefined;d.note=g('st_note')||undefined;
+  Object.keys(d).forEach(function(k){if(d[k]===undefined)delete d[k]});
+  if(!old)M.stays.push(s);
+  tiUp('stay',s);
+  ['in','out'].forEach(function(k){mirrorEvent(stEv(s,k))});   // 완료한 체크인·체크아웃이면 이름·날짜 변경을 이이코토에 반영
+  UI.sched=ci;endSheet();render();toast('저장했어요');
+}
+function delStay(s){
+  M.stays=M.stays.filter(function(x){return x.cid!==s.cid});tiDel(s);
+  ['in','out'].forEach(function(k){mirrorDel(stEv(s,k))});
+  closeSheet();
+  toastUndo('숙소를 삭제했어요',function(){tiUndoDel(s);M.stays.push(s);tiUp('stay',s);['in','out'].forEach(function(k){mirrorEvent(stEv(s,k))});render()});
 }
 function delEvent(e,sp){
   removeEvent(e);tiDel(e);mirrorDel(e);
@@ -1515,6 +1584,18 @@ var ACT={
   'evunlink':function(){if(UI.evDraft){UI.evDraft.spot='';refreshSug();persistDraft()}},
   'evslot':function(el,v){if(UI.evDraft)UI.evDraft.slot=v;pickOn(el)},
   'evmap':function(el,v){if(UI.evDraft)UI.evDraft.mapOn=(v==='true');pickOn(el)},
+  'stck':function(el,v,id){var s=byCid(M.stays,id);if(s)stSetDone(s,v,!s.d[v+'Done'])},
+  'sttime':function(el,v,id){
+    var s=byCid(M.stays,id);if(!s||!s.d[v+'At'])return;
+    openPicker('time',hhmm(s.d[v+'At']),'완료 시각',function(val){
+      var s2=byCid(M.stays,id);if(s2&&val){s2.d[v+'At']=setTimeOnly(s2.d[v+'At'],val);tiUp('stay',s2);mirrorEvent(stEv(s2,v));render()}
+    });
+  },
+  'stedit':function(el,v,id){openStay(id)},
+  'stnew':function(el){openStay(null,el.getAttribute('data-date'))},
+  'stcity':function(el,v){if(UI.stDraft)UI.stDraft.city=v;pickOn(el)},
+  'st-save':function(){saveStay()},
+  'st-del':function(el,v,id){var s=byCid(M.stays,id);if(s)delStay(s)},
   'ev-save':function(){saveEv()},
   'ev-del':function(el,v,id){
     var e=findEvent(id);if(!e)return;
