@@ -764,12 +764,15 @@ function screenBudget(){
     '<div class="legend"><span><i style="background:'+CH[0]+'"></i>항공 '+won(air)+'</span><span><i style="background:'+CH[1]+'"></i>숙소 '+won(stay)+'</span><span><i style="background:'+CH[2]+'"></i>기타 '+won(etc)+'</span><span><i style="background:'+CH[3]+'"></i>현지 '+won(local)+'</span></div>');
   PINH=h;h='';
   var cs={};localList().forEach(function(e){cs[e.d.ecat||'etc']=(cs[e.d.ecat||'etc']||0)+xKrw(e)});
-  var ck=Object.keys(ECAT).filter(function(k){return cs[k]});
-  if(ck.length)h+='<div class="chips">'+ck.map(function(k){return chip(ic(ECATI[k],14)+' '+ECAT[k]+' '+won(cs[k])+'원','',tint(ECATC[k]))}).join('')+'</div>';
-  var byDay={};localList().forEach(function(e){(byDay[e.d.date]=byDay[e.d.date]||[]).push(e)});
+  var ck=Object.keys(ECAT).filter(function(k){return cs[k]}).sort(function(a,b){return cs[b]-cs[a]});   // 금액 큰 순
+  var xs=UI.xcat||{};Object.keys(xs).forEach(function(k){if(!cs[k])delete xs[k]});UI.xcat=xs;   // 필터로 켠 카테고리(여러 개 가능, 없어진 것은 정리)
+  var xon=Object.keys(xs).length>0;
+  if(ck.length)h+='<div class="cgrid">'+ck.map(function(k){var on=!!xs[k];return '<button class="cch'+(on?' on':(xon?' off':''))+'" data-act="xcatf" data-v="'+k+'" aria-pressed="'+on+'" aria-label="'+ea(ECAT[k]+' '+won(cs[k])+'원 — 누르면 이 카테고리만 보기')+'" style="'+tint(ECATC[k])+'">'+ic(ECATI[k],18)+'<b>'+won(cs[k])+'</b></button>'}).join('')+'</div>';   // 카테고리 합산 겸 필터 칩: 아이콘 위·금액 아래, 한 줄에 4칸
+  var shown=localList().filter(function(e){return !xon||xs[e.d.ecat||'etc']});
+  var byDay={};shown.forEach(function(e){(byDay[e.d.date]=byDay[e.d.date]||[]).push(e)});
   var days=Object.keys(byDay).sort().reverse();
   if(days.length){
-    h+='<div class="lbl" style="margin:6px 0 0">현지 지출 · 엔화 기준 (추정 원)</div>';
+    h+='<div class="lbl" style="margin:6px 0 0">'+(xon?'선택한 카테고리 · '+sumLabel(sumInfo(shown))+' · '+shown.length+'건':'현지 지출 · 엔화 기준 (추정 원)')+'</div>';
     days.forEach(function(d){
       var sl=sumLabel(sumInfo(byDay[d]));
       var list=byDay[d].slice().sort(byTimeDesc);
@@ -1416,6 +1419,7 @@ var ACT={
     refreshXSug();persistDraft();
   },
   'xunlink':function(){if(UI.expDraft){UI.expDraft.ref='';refreshXSug();persistDraft()}},
+  'xcatf':function(el,v){var x=UI.xcat=UI.xcat||{};if(x[v])delete x[v];else x[v]=1;render()},
   'expcat':function(el,v){if(UI.expDraft)UI.expDraft.cat=v;pickOn(el)},
   'expcur':function(el,v){if(UI.expDraft)UI.expDraft.cur=v;pickOn(el);var sy=document.getElementById('x_sym');if(sy)sy.textContent=curSym(v);updateExpLine()},
   'payedit':function(el,v,id){

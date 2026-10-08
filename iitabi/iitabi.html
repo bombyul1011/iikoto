@@ -84,6 +84,11 @@ h1{margin:0;font-family:var(--serif);font-size:28px;font-weight:700;line-height:
 .seg button.on{background:var(--sb,var(--sel-bg));border-color:var(--sbd,var(--sel-bd));color:var(--st,var(--sel-tx));font-weight:700}
 .sdot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
 .chips{display:flex;gap:8px;flex-wrap:wrap}
+.cgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.cch{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 2px 7px;border:1px solid transparent;border-radius:14px;font-size:12px;line-height:1.2;min-width:0;margin:0;transition:opacity .15s,box-shadow .15s}
+.cch.on{box-shadow:0 0 0 2px currentColor}
+.cch.off{opacity:.4}
+.cch b{font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums}
 .bar{height:8px;border-radius:999px;background:var(--track);overflow:hidden}
 .bar i{display:block;height:100%;border-radius:999px;background:var(--sel-solid)}
 .plan{flex:1;min-width:0;text-align:left;padding:12px;border-radius:14px;border:1px solid var(--cardb);background:var(--card);min-height:96px;display:flex;flex-direction:column;gap:6px}
@@ -407,6 +412,6 @@ input:focus,textarea:focus,select:focus{box-shadow:none}
 <div id="bg-fixed"></div>
 <div id="app"><div id="topsafe"></div><div id="pin"></div><main id="screen"></main><nav id="tabbar" aria-label="하단 탭"></nav></div>
 <div id="sheet"></div><div id="toast"></div><div id="picker"></div><div id="album"></div><div id="albview"></div>
-<script src="iitabi.js?v=2026.10.07-68"></script>
+<script src="iitabi.js?v=2026.10.07-70"></script>
 </body>
 </html>
