@@ -764,7 +764,7 @@ function screenBudget(){
     '<div class="legend"><span><i style="background:'+CH[0]+'"></i>항공 '+won(air)+'</span><span><i style="background:'+CH[1]+'"></i>숙소 '+won(stay)+'</span><span><i style="background:'+CH[2]+'"></i>기타 '+won(etc)+'</span><span><i style="background:'+CH[3]+'"></i>현지 '+won(local)+'</span></div>');
   PINH=h;h='';
   var cs={};localList().forEach(function(e){cs[e.d.ecat||'etc']=(cs[e.d.ecat||'etc']||0)+xKrw(e)});
-  var ck=Object.keys(ECAT).filter(function(k){return cs[k]}).sort(function(a,b){return cs[b]-cs[a]});   // 금액 큰 순
+  var ck=Object.keys(ECAT).filter(function(k){return cs[k]}).sort(function(a,b){return a==='etc'?1:b==='etc'?-1:cs[b]-cs[a]});   // 금액 큰 순, 기타는 항상 맨 뒤
   var xs=UI.xcat||{};Object.keys(xs).forEach(function(k){if(!cs[k])delete xs[k]});UI.xcat=xs;   // 필터로 켠 카테고리(여러 개 가능, 없어진 것은 정리)
   var xon=Object.keys(xs).length>0;
   if(ck.length)h+='<div class="cgrid">'+ck.map(function(k){var on=!!xs[k];return '<button class="cch'+(on?' on':(xon?' off':''))+'" data-act="xcatf" data-v="'+k+'" aria-pressed="'+on+'" aria-label="'+ea(ECAT[k]+' '+won(cs[k])+'원 — 누르면 이 카테고리만 보기')+'" style="'+tint(ECATC[k])+'">'+ic(ECATI[k],16)+'<b>'+(cs[k]>=1000000?Math.round(cs[k]/10000)+'만':won(cs[k]))+'</b></button>'}).join('')+'</div>';   // 카테고리 합산 겸 필터 칩: 아이콘 위·금액 아래, 한 줄에 4칸
