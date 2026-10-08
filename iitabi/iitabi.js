@@ -416,8 +416,9 @@ function topWx(){
 function dayPill(){var t=trip(),td=today();if(!t)return '';if(td<t.start)return 'D-'+Math.round((parse(t.start)-parse(td))/86400000);if(td>t.end)return '여행 종료';var dts=tripDates();return 'DAY '+(dts.indexOf(td)+1)+' / '+dts.length}
 /* 오늘 카드에 올릴 일정: 아직 완료하지 않은 일정 중 시각이 가장 빠른 것(시각이 지났어도 미완료면 그대로 유지).
    전부 완료했다면 마지막 일정을 보여준다. */
+function dayEvents(vd){return sortShown(eventsOf(vd).concat(stayEvs(vd)))}  // 일정 + 숙소 체크인·체크아웃을 화면 시각 순으로
 function nextEventOf(vd){
-  var ev=eventsOf(vd),pend=ev.filter(function(e){return !e.d.done});
+  var ev=dayEvents(vd),pend=ev.filter(function(e){return !e.d.done});
   return pend[0]||ev[ev.length-1]||null;
 }
 function topPeriod(){var e=nextEventOf(today());return periodOf((e&&(e.d.time||SLOTDEF[e.d.slot]))||nowHM())}   // 배너와 같은 기준(다음 일정의 시간대)
@@ -535,7 +536,7 @@ function evBody(e){
   return '<div class="row" style="align-items:flex-start;gap:2px"><div class="grow"><h3 style="margin:0;font-size:15px;line-height:1.35">'+esc(d.title)+'</h3>'+(cm?'<p style="margin:3px 0 0;font-size:13px;color:var(--sub);line-height:1.45;white-space:pre-line">'+esc(cm)+'</p>':'')+spentLine(e.cid)+link+'</div><div class="icos"><button class="ico" data-act="evedit" data-id="'+ea(e.cid)+'" aria-label="일정 수정">'+ic('pen',16)+'</button>'+(d.map?icoMap(d.map):'')+(d.nav&&d.map?icoNav(d.map):'')+'</div></div>';
 }
 /* 숙소 → 체크인/체크아웃 일정: 숙소 데이터에서 그날 일정 줄을 만들어 낸다(따로 저장하지 않음). 완료 상태·시각만 숙소에 저장 */
-var STC='#d9722b';
+var STC=PAL.yel[2];  // 숙소 색 = 앱 노랑(yel) 중간톤
 function stEv(s,k){
   var x=s.d,i=k==='in';
   return {cid:'st'+k+'-'+s.cid,date:i?x.checkin:x.checkout,stay:s.cid,k:k,d:{title:(i?'체크인 · ':'체크아웃 · ')+x.name,time:(i?x.inTime:x.outTime)||(i?'15:00':'11:00'),map:x.map||x.name,done:!!x[k+'Done'],doneAt:x[k+'At']}};
@@ -663,13 +664,13 @@ function screenToday(){
     '<div class="row" style="margin-top:4px;justify-content:center">'+cityChip(cid)+(s?'<a class="small muted stayln" aria-label="숙소까지 길찾기(대중교통)" href="'+ea(navUrl(s.d.map||s.d.name))+'" target="_blank" rel="noopener">'+esc(s.d.name)+'</a>':'')+'</div>'+sunLine(vd)+'</div>';
   if(UI.keyBad)h+=card('<b>데이터를 불러오지 못했어요</b><div class="small muted" style="margin-top:4px">접근 키가 맞지 않을 수 있어요.</div><button class="btn" style="margin-top:10px" data-act="sheet" data-v="key">키 다시 입력</button>');
   var note=(t.dayNotes||{})[vd];if(note)h+='<div>'+chip(esc(note),'pn')+'</div>';
-  var ev=eventsOf(vd),next=nextEventOf(vd);
+  var ev=dayEvents(vd),next=nextEventOf(vd),stx=next&&next.stay?byCid(M.stays,next.stay):null;
   if(next){
     var d=next.d;
-    var ckb=d.done?'<span class="bnck on" aria-label="완료한 일정">'+ic('check',17)+'</span>':'<button class="bnck" data-act="bnck" data-id="'+ea(next.cid)+'" aria-label="'+ea(d.title)+' 완료">'+ic('check',17)+'</button>';
+    var ckb=d.done?'<span class="bnck on" aria-label="완료한 일정">'+ic('check',17)+'</span>':'<button class="bnck" data-act="bnck" data-id="'+ea(next.stay||next.cid)+'"'+(next.stay?' data-v="'+next.k+'"':'')+' aria-label="'+ea(d.title)+' 완료">'+ic('check',17)+'</button>';
     var per=periodOf(d.time||SLOTDEF[d.slot]||'12:00');
-    h+='<div class="card bn bn-'+per+'">'+ctitle(ev[ev.length-1]===next?'마지막 일정':'다음 일정',ckb)+'<div style="font-family:var(--serif);font-size:19px;font-weight:700;line-height:1.3;color:var(--bn-t)">'+esc(d.title)+'</div>'+(evComment(d)?'<div style="font-size:13px;color:var(--bn-s);margin-top:5px;line-height:1.5;white-space:pre-line">'+esc(evComment(d))+'</div>':'')+
-      ((d.map)?'<div class="row" style="margin-top:14px"><a class="btn" style="flex:1;text-decoration:none" href="'+ea(mapUrl(d.map))+'" target="_blank" rel="noopener">'+ic('pin',17)+'지도에서 열기</a>'+(d.nav?'<a class="ibtn" aria-label="길찾기(대중교통)" href="'+ea(navUrl(d.map))+'" target="_blank" rel="noopener">'+ic('nav',20)+'</a>':'')+'</div>':'')+'</div>';
+    h+='<div class="card bn bn-'+per+'">'+ctitle(ev[ev.length-1].cid===next.cid?'마지막 일정':'다음 일정',ckb)+'<div style="font-family:var(--serif);font-size:19px;font-weight:700;line-height:1.3;color:var(--bn-t)">'+(stx?ic('bed',18,STC)+' ':'')+esc(d.title)+'</div>'+(((stx?(stx.d.note||''):evComment(d)))?'<div style="font-size:13px;color:var(--bn-s);margin-top:5px;line-height:1.5;white-space:pre-line">'+esc(stx?(stx.d.note||''):evComment(d))+'</div>':'')+
+      ((d.map)?'<div class="row" style="margin-top:14px"><a class="btn" style="flex:1;text-decoration:none" href="'+ea(mapUrl(d.map))+'" target="_blank" rel="noopener">'+ic('pin',17)+'지도에서 열기</a>'+((d.nav||stx)?'<a class="ibtn" aria-label="길찾기(대중교통)" href="'+ea(navUrl(d.map))+'" target="_blank" rel="noopener">'+ic('nav',20)+'</a>':'')+'</div>':'')+'</div>';
   }
   var sl=slotsOf(vd);
   if(sl.length){
@@ -1557,6 +1558,12 @@ var ACT={
   /* 일정 */
   'evck':function(el,v,id){var e=findEvent(id);if(e)evSetDone(e,!e.d.done)},
   'bnck':function(el,v,id){
+    if(v==='in'||v==='out'){  // 숙소 체크인·체크아웃
+      var s=byCid(M.stays,id);if(!s||s.d[v+'Done'])return;
+      stSetDone(s,v,true);
+      toastUndo('"'+stEv(s,v).d.title+'" 완료했어요',function(){var s2=byCid(M.stays,id);if(s2&&s2.d[v+'Done'])stSetDone(s2,v,false)});
+      return;
+    }
     var e=findEvent(id);if(!e||e.d.done)return;
     evSetDone(e,true);
     toastUndo('"'+e.d.title+'" 완료했어요',function(){var e2=findEvent(id);if(e2&&e2.d.done)evSetDone(e2,false)});  // 그사이 서버에서 다시 받아와도 안전하게 id로 찾는다
