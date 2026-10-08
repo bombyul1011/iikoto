@@ -767,7 +767,7 @@ function screenBudget(){
   var ck=Object.keys(ECAT).filter(function(k){return cs[k]}).sort(function(a,b){return cs[b]-cs[a]});   // 금액 큰 순
   var xs=UI.xcat||{};Object.keys(xs).forEach(function(k){if(!cs[k])delete xs[k]});UI.xcat=xs;   // 필터로 켠 카테고리(여러 개 가능, 없어진 것은 정리)
   var xon=Object.keys(xs).length>0;
-  if(ck.length)h+='<div class="cgrid">'+ck.map(function(k){var on=!!xs[k];return '<button class="cch'+(on?' on':(xon?' off':''))+'" data-act="xcatf" data-v="'+k+'" aria-pressed="'+on+'" aria-label="'+ea(ECAT[k]+' '+won(cs[k])+'원 — 누르면 이 카테고리만 보기')+'" style="'+tint(ECATC[k])+'">'+ic(ECATI[k],18)+'<b>'+won(cs[k])+'</b></button>'}).join('')+'</div>';   // 카테고리 합산 겸 필터 칩: 아이콘 위·금액 아래, 한 줄에 4칸
+  if(ck.length)h+='<div class="cgrid">'+ck.map(function(k){var on=!!xs[k];return '<button class="cch'+(on?' on':(xon?' off':''))+'" data-act="xcatf" data-v="'+k+'" aria-pressed="'+on+'" aria-label="'+ea(ECAT[k]+' '+won(cs[k])+'원 — 누르면 이 카테고리만 보기')+'" style="'+tint(ECATC[k])+'">'+ic(ECATI[k],16)+'<b>'+(cs[k]>=1000000?Math.round(cs[k]/10000)+'만':won(cs[k]))+'</b></button>'}).join('')+'</div>';   // 카테고리 합산 겸 필터 칩: 아이콘 위·금액 아래, 한 줄에 4칸
   var shown=localList().filter(function(e){return !xon||xs[e.d.ecat||'etc']});
   var byDay={};shown.forEach(function(e){(byDay[e.d.date]=byDay[e.d.date]||[]).push(e)});
   var days=Object.keys(byDay).sort().reverse();
