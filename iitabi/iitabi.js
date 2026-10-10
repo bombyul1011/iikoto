@@ -614,8 +614,13 @@ function tlFilterHtml(){
   return '<div class="tlf" role="group" aria-label="타임라인 표시 종류">'+b('e','일정','calendar')+b('m','메모','notes')+b('c','체크','checklist')+b('p','결제','cash')+'</div>';
 }
 function planHead(d,slot){
-  var sel=planSel(d,slot);
-  return '<div class="plhd"><span class="plhl">'+esc(SLOTL[slot]||'')+'</span><span class="plcs">'+planLetters(d,slot).map(function(p){return '<button class="plc pl-'+p+(p===sel?' on':'')+'" data-act="plan" data-date="'+ea(d)+'" data-slot="'+slot+'" data-v="'+p+'" aria-pressed="'+(p===sel)+'" aria-label="'+esc(SLOTL[slot]||'')+' 플랜 '+p+'">'+p+'</button>'}).join('')+'</span></div>';
+  var L=planLetters(d,slot);if(L.length<2)return '';   // 플랜이 하나뿐이면 전환·확정 줄을 숨긴다
+  var sel=planSel(d,slot),sa=' data-date="'+ea(d)+'" data-slot="'+slot+'"',nm=esc(SLOTL[slot]||'');
+  return '<div class="plhd"><span class="plhl">'+nm+'</span><span class="plsw pl-'+sel+'">'
+    +'<button class="plar" data-act="plan" data-dir="-1"'+sa+' aria-label="'+nm+' 이전 플랜">‹</button>'
+    +'<button class="plnm" data-act="plan" data-dir="1"'+sa+' aria-label="'+nm+' 플랜 '+sel+', 누르면 다음 플랜">'+sel+'안</button>'
+    +'<button class="plar" data-act="plan" data-dir="1"'+sa+' aria-label="'+nm+' 다음 플랜">›</button>'
+    +'<button class="plok" data-act="plancf"'+sa+' aria-label="'+nm+' '+sel+'안으로 확정">'+ic('check',16)+'</button></span></div>';
 }
 function timelineHtml(d){
   var allEv=eventsOf(d).filter(planShown),allMs=memosOf(d),allCk=doneChecksOf(d),allPay=freePaysOf(d);
@@ -1039,6 +1044,43 @@ function setChoice(d,slot,v){
   else ch.d.plan=v;
   tiUp('choice',ch);render();
 }
+function planCycle(d,slot,dir){
+  var L=planLetters(d,slot);if(L.length<2)return;
+  var i=L.indexOf(planSel(d,slot));setChoice(d,slot,L[(i+dir+L.length)%L.length]);
+}
+/* 플랜 확정: 고른 플랜만 남기고 같은 시간대의 다른 플랜 일정은 지운다(이미 완료한 일정은 기록이라 남김). 남은 일정은 플랜 표시를 떼어 일반 일정이 된다.
+   되돌리기용 스냅샷을 돌려준다. 예비(R)는 건드리지 않는다 */
+function confirmPlan(d,slot,letter){
+  if(planLetters(d,slot).length<2)return null;
+  var snap={d:d,slot:slot,letter:letter,removed:[],stripped:[],choice:null},k=d+'|'+slot;
+  eventsOf(d).slice().forEach(function(e){
+    var p=e.d.plan;if(PLN.indexOf(p)<0||evSlot(e)!==slot)return;
+    if(p===letter||e.d.done){snap.stripped.push({cid:e.cid,plan:p});delete e.d.plan;tiUp('event',e)}
+    else{snap.removed.push(e);removeEvent(e);tiDel(e);mirrorDel(e)}
+  });
+  if(M.choices[k]){snap.choice=M.choices[k];delete M.choices[k];tiDel(snap.choice)}
+  return snap;
+}
+function undoConfirmPlan(snap){
+  snap.removed.forEach(function(e){tiUndoDel(e);insertEvent(e.date,e);mirrorEvent(e)});
+  snap.stripped.forEach(function(s){var e=findEvent(s.cid);if(e){e.d.plan=s.plan;tiUp('event',e)}});
+  if(snap.choice){tiUndoDel(snap.choice);M.choices[snap.d+'|'+snap.slot]=snap.choice;tiUp('choice',snap.choice)}
+  render();
+}
+/* 플랜 일정을 완료하거나 연동 지출이 생기면 그 플랜으로 자동 확정. 스냅샷 목록을 돌려준다 */
+function autoConfirmFor(evs){
+  var out=[],seen={};
+  evs.forEach(function(e){
+    var p=e.d.plan;if(PLN.indexOf(p)<0)return;
+    var key=e.date+'|'+evSlot(e)+'|'+p;if(seen[key])return;seen[key]=1;
+    var sn=confirmPlan(e.date,evSlot(e),p);if(sn)out.push(sn);
+  });
+  return out;
+}
+function planToast(msg,snaps,extra){
+  var t=msg+(snaps.length?' · '+snaps.map(function(s){return s.letter+'안'}).join('·')+'으로 확정했어요':'');
+  toastUndo(t,function(){snaps.forEach(undoConfirmPlan);if(extra)extra();render()});
+}
 /* ---------- 금액 키패드(+ −): 사파리 숫자 키보드 대신 하단에서 올라오는 앱 전용 패드 ---------- */
 function padFmt(n){return Number(n).toLocaleString('ko-KR')}
 function padEval(s){
@@ -1112,10 +1154,9 @@ function saveExp(){
   var auto=(!dr.id||(data.ref&&data.ref.cid!==prevRef))?autoDoneByExpense(data):[];   // 새 지출이거나 연동 대상을 새로 고른 경우만
   endSheet();render();
   if(auto.length){
-    var first=findEvent(auto[0].cid);
-    toastUndo('저장했어요 · '+(auto.length===1&&first?'"'+first.d.title+'" 일정도 완료했어요':auto.length+'개 일정도 완료했어요'),function(){
+    var first=findEvent(auto[0].cid),pl=auto.plans||[];
+    planToast('저장했어요 · '+(auto.length===1&&first?'"'+first.d.title+'" 일정도 완료했어요':auto.length+'개 일정도 완료했어요'),pl,function(){
       auto.forEach(function(a){var e2=findEvent(a.cid);if(!e2)return;delete e2.d.done;delete e2.d.doneAt;if(a.plan)e2.d.plan=a.plan;tiUp('event',e2);mirrorEvent(e2)});
-      render();
     });
   }else toast('저장했어요');
 }
@@ -1134,6 +1175,8 @@ function autoDoneByExpense(data){
     if(e.d.plan==='R')delete e.d.plan;
     e.d.done=true;e.d.doneAt=at;tiUp('event',e);mirrorEvent(e);
   });
+  var nd={};out.forEach(function(o){nd[o.cid]=1});
+  out.plans=autoConfirmFor(list.filter(function(e){return nd[e.cid]}));   // 플랜 일정이면 그 플랜으로 자동 확정
   return out;
 }
 function timeToSlot(t){var h=parseInt(String(t).split(':')[0],10);if(isNaN(h))return 'pm';return h<11?'am':(h<14?'noon':(h<18?'pm':'eve'))}
@@ -1476,7 +1519,12 @@ var ACT={
   'pk-day':function(el,v){if(PK){PK.sel=v;renderPicker()}},
   'pk-prev':pkMonth,
   'pk-next':pkMonth,
-  'plan':function(el,v){setChoice(el.getAttribute('data-date'),el.getAttribute('data-slot'),v)},
+  'plan':function(el){planCycle(el.getAttribute('data-date'),el.getAttribute('data-slot'),parseInt(el.getAttribute('data-dir'),10)||1)},
+  'plancf':function(el){
+    var d=el.getAttribute('data-date'),sl=el.getAttribute('data-slot'),L=planSel(d,sl);
+    var sn=confirmPlan(d,sl,L);if(!sn)return;render();
+    toastUndo(L+'안으로 확정했어요',function(){undoConfirmPlan(sn)});
+  },
 
   /* 체크리스트 */
   'ck':function(el,v,id){
@@ -1623,7 +1671,11 @@ var ACT={
   },
 
   /* 일정 */
-  'evck':function(el,v,id){var e=findEvent(id);if(e)evSetDone(e,!e.d.done)},
+  'evck':function(el,v,id){
+    var e=findEvent(id);if(!e)return;
+    var on=!e.d.done;evSetDone(e,on);
+    if(on){var sn=autoConfirmFor([e]);if(sn.length){render();planToast('"'+e.d.title+'" 완료했어요',sn,function(){var e2=findEvent(id);if(e2&&e2.d.done)evSetDone(e2,false)})}}
+  },
   'bnck':function(el,v,id){
     if(v==='in'||v==='out'){  // 숙소 체크인·체크아웃
       var s=byCid(M.stays,id);if(!s||s.d[v+'Done'])return;
@@ -1633,7 +1685,8 @@ var ACT={
     }
     var e=findEvent(id);if(!e||e.d.done)return;
     evSetDone(e,true);
-    toastUndo('"'+e.d.title+'" 완료했어요',function(){var e2=findEvent(id);if(e2&&e2.d.done)evSetDone(e2,false)});  // 그사이 서버에서 다시 받아와도 안전하게 id로 찾는다
+    var sn2=autoConfirmFor([e]);if(sn2.length)render();
+    planToast('"'+e.d.title+'" 완료했어요',sn2,function(){var e2=findEvent(id);if(e2&&e2.d.done)evSetDone(e2,false)});  // 그사이 서버에서 다시 받아와도 안전하게 id로 찾는다
   },
   'evtime':function(el,v,id){
     var e=findEvent(id);if(!e||!e.d.doneAt)return;
