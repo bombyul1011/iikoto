@@ -91,14 +91,6 @@ h1{margin:0;font-family:var(--serif);font-size:28px;font-weight:700;line-height:
 .cch.off{opacity:.4}
 .bar{height:8px;border-radius:999px;background:var(--track);overflow:hidden}
 .bar i{display:block;height:100%;border-radius:999px;background:var(--sel-solid)}
-.plan{flex:1;min-width:0;text-align:left;padding:12px;border-radius:14px;border:1px solid var(--cardb);background:var(--card);min-height:96px;display:flex;flex-direction:column;gap:6px}
-.plan.on{background:var(--sel-bg);border:1.4px solid var(--sel-bd)}
-.plan.on>span:last-child{color:var(--sel-tx)}
-.plan b{font-size:14px}
-.plan span{font-size:12px;color:var(--sub);line-height:1.45}
-.pl{margin-top:10px;padding:10px 12px;border-radius:12px;background:rgba(255,253,248,.6);border:1px solid var(--cardb);font-size:13px}
-.pl ul{margin:6px 0 0;padding-left:0;list-style:none}
-.pl li{display:flex;align-items:center;gap:8px;padding:4px 0;line-height:1.45}
 .ck{display:flex;align-items:center;gap:10px;min-height:44px;font-size:14px}
 .ck input[type=checkbox]{width:22px;height:22px;margin:0;accent-color:var(--sel-tx);flex:none}
 .ck.done .tx{text-decoration:line-through;color:var(--sub)}
@@ -406,12 +398,27 @@ input:focus,textarea:focus,select:focus{box-shadow:none}
 .pvd{padding-top:12px;text-align:center;font-size:12px;color:var(--sub);letter-spacing:.04em;margin-bottom:8px}
 .pvt{text-align:center;color:var(--tx);font-family:var(--serif);font-size:15px;line-height:1.65;word-break:keep-all}
 .pvh{margin-top:12px;text-align:center;font-size:12px;color:#d9cfc6}
+/* 플랜 A·B·C: 시간대 제목줄 칩 · 예비 */
+.pl-A{--sb:rgba(210,175,225,.55);--sbd:rgba(160,105,180,.55);--st:rgb(120,69,139)}
+.pl-B{--sb:rgba(145,210,175,.55);--sbd:rgba(70,155,110,.55);--st:rgb(34,103,68)}
+.pl-C{--sb:rgba(255,190,130,.58);--sbd:rgba(214,125,45,.55);--st:rgb(147,71,14)}
+.pl-R{--sb:rgba(195,175,168,.28);--sbd:rgba(150,135,125,.4);--st:var(--tx)}
+.plhd{display:flex;align-items:center;gap:6px;margin-top:8px}
+.plhl{width:44px;flex:none;margin-right:34px;text-align:right;font-size:12px;font-weight:700;color:var(--sub)}
+.plc{position:relative;min-width:36px;height:30px;padding:0 10px;border-radius:10px;border:1px solid var(--cardb);background:var(--chip);color:var(--sub);font-size:13px;font-weight:500}
+.plc:after{content:'';position:absolute;inset:-7px -3px}
+.plc.on{background:var(--sb);border-color:var(--sbd);color:var(--st);font-weight:700}
+.pc{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;border-radius:6px;border:1px solid var(--sbd);background:var(--sb);color:var(--st);font-size:11px;font-weight:700;flex:none}
+.pcr{position:relative;display:inline-flex;align-items:center;height:20px;padding:0 8px;margin-right:6px;border-radius:99px;border:1px solid rgba(150,135,125,.4);background:rgba(195,175,168,.25);color:var(--sub);font-family:inherit;font-size:11px;font-weight:500;vertical-align:1px}
+.pcr:after{content:'';position:absolute;inset:-12px -6px}
+.ev.rsv .c{opacity:.55}
+.bnpl{margin-top:10px;display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 10px 0 7px;border:0;border-radius:99px;background:rgba(255,253,248,.62);color:var(--bn-t);font-family:inherit;font-size:12.5px;font-weight:700}
 </style>
 </head>
 <body>
 <div id="bg-fixed"></div>
 <div id="app"><div id="topsafe"></div><div id="pin"></div><main id="screen"></main><nav id="tabbar" aria-label="하단 탭"></nav></div>
 <div id="sheet"></div><div id="toast"></div><div id="picker"></div><div id="album"></div><div id="albview"></div>
-<script src="iitabi.js?v=2026.10.09-74"></script>
+<script src="iitabi.js?v=2026.10.10-76"></script>
 </body>
 </html>

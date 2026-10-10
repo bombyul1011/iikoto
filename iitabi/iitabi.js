@@ -79,7 +79,7 @@ function loadTrip(){
   MIR=lget('mir:'+cfg.tripId,{});
 }
 function buildModel(rows){
-  var m={trip:null,stays:[],events:{},plans:{},choices:{},spots:[],expenses:[]};
+  var m={trip:null,stays:[],events:{},choices:{},spots:[],expenses:[]};
   rows=rows.slice().sort(function(a,b){return (a.sort_order||0)-(b.sort_order||0)});
   rows.forEach(function(r){
     var o={cid:r.client_id,date:r.date_key||null,sort:r.sort_order||0,d:r.data||{}};
@@ -87,7 +87,6 @@ function buildModel(rows){
       case 'trip':if(!Array.isArray(o.d.cities))o.d.cities=[];m.trip=o;break;
       case 'stay':m.stays.push(o);break;
       case 'event':(m.events[r.date_key]=m.events[r.date_key]||[]).push(o);break;
-      case 'plan':m.plans[o.d.id]=o;break;
       case 'choice':m.choices[r.date_key+'|'+o.d.slot]=o;break;
       case 'spot':m.spots.push(o);break;
       case 'expense':m.expenses.push(o);break;
@@ -101,7 +100,6 @@ function modelRows(){
   if(M.trip)p('trip',M.trip);
   M.stays.forEach(function(o){p('stay',o)});
   Object.keys(M.events).forEach(function(d){M.events[d].forEach(function(o){p('event',o)})});
-  Object.keys(M.plans).forEach(function(k){p('plan',M.plans[k])});
   Object.keys(M.choices).forEach(function(k){p('choice',M.choices[k])});
   M.spots.forEach(function(o){p('spot',o)});
   M.expenses.forEach(function(o){p('expense',o)});
@@ -416,7 +414,7 @@ function topWx(){
 function dayPill(){var t=trip(),td=today();if(!t)return '';if(td<t.start)return 'D-'+Math.round((parse(t.start)-parse(td))/86400000);if(td>t.end)return '여행 종료';var dts=tripDates();return 'DAY '+(dts.indexOf(td)+1)+' / '+dts.length}
 /* 오늘 카드에 올릴 일정: 아직 완료하지 않은 일정 중 시각이 가장 빠른 것(시각이 지났어도 미완료면 그대로 유지).
    전부 완료했다면 마지막 일정을 보여준다. */
-function dayEvents(vd){return sortShown(eventsOf(vd).concat(stayEvs(vd)))}  // 일정 + 숙소 체크인·체크아웃을 화면 시각 순으로
+function dayEvents(vd){return sortShown(activeEvs(vd).concat(stayEvs(vd)))}  // 일정 + 숙소 체크인·체크아웃을 화면 시각 순으로
 function nextEventOf(vd){
   var ev=dayEvents(vd),pend=ev.filter(function(e){return !e.d.done});
   return pend[0]||ev[ev.length-1]||null;
@@ -520,9 +518,16 @@ function addPrompt(key,val){
 
 /* ---------- screens ---------- */
 function eventsOf(d){return (M&&M.events[d])||[]}
-function slotsOf(d){var t=trip();return (t&&t.planSlots&&t.planSlots[d])||[]}
+/* 플랜(A·B·C): 같은 날 같은 시간대의 일정을 A/B/C로 나눠 등록해 두면 시간대 제목 옆 칩으로 하나씩만 보인다(기본 A).
+   고른 플랜은 choice 행(날짜|시간대 → 플랜 글자)에 저장한다. 예비(R)는 연하게 남아 있다가 칩을 누르면 본 일정이 된다.
+   완료한 일정은 플랜을 바꿔도 그대로 보인다. */
+var PLN=['A','B','C'];
+function evSlot(e){return e.d.slot||'pm'}
 function choiceOf(d,slot){return M&&M.choices[d+'|'+slot]||null}
-function planOf(id){return M&&M.plans[id]||null}
+function planLetters(d,slot){var u={};eventsOf(d).forEach(function(e){var p=e.d.plan;if(PLN.indexOf(p)>=0&&evSlot(e)===slot)u[p]=1});return PLN.filter(function(p){return u[p]})}
+function planSel(d,slot){var L=planLetters(d,slot);if(!L.length)return '';var c=choiceOf(d,slot),p=c&&c.d.plan;return L.indexOf(p)>=0?p:L[0]}
+function planShown(e){var p=e.d.plan;if(PLN.indexOf(p)<0||e.d.done)return true;return planSel(e.date,evSlot(e))===p}
+function activeEvs(d){return eventsOf(d).filter(function(e){return e.d.plan!=='R'&&planShown(e)})}   // 다음 일정·완료 대상: 고른 플랜 + 공통만(예비 제외)
 function findEvent(cid){var r=null;Object.keys(M.events).forEach(function(d){M.events[d].forEach(function(e){if(e.cid===cid)r=e})});return r}
 /* 코멘트: 예전 설명·태그(맛집 등)·대안 문구를 하나로 합친 일정 메모. 아직 코멘트로 저장하지 않은 일정은 옛 값을 합쳐서 보여주고, 수정해 저장하면 코멘트 하나로 정리된다 */
 function evComment(d){
@@ -533,7 +538,7 @@ function evBody(e){
   var d=e.d;
   var cm=evComment(d);
   var link=d.link?'<a class="small" style="display:inline-flex;align-items:center;gap:4px;min-height:36px;font-weight:700" href="'+ea(d.link.url)+'" target="_blank" rel="noopener">'+ic('ext',14)+esc(d.link.label)+'</a>':'';
-  return '<div class="row" style="align-items:flex-start;gap:2px"><div class="grow"><h3 style="margin:0;font-size:15px;line-height:1.35">'+esc(d.title)+'</h3>'+(cm?'<p style="margin:3px 0 0;font-size:13px;color:var(--sub);line-height:1.45;white-space:pre-line">'+esc(cm)+'</p>':'')+spentLine(e.cid)+link+'</div><div class="icos"><button class="ico" data-act="evedit" data-id="'+ea(e.cid)+'" aria-label="일정 수정">'+ic('pen',16)+'</button>'+(d.map?icoMap(d.map):'')+(d.nav&&d.map?icoNav(d.map):'')+'</div></div>';
+  return '<div class="row" style="align-items:flex-start;gap:2px"><div class="grow"><h3 style="margin:0;font-size:15px;line-height:1.35">'+(d.plan==='R'?'<button class="pcr" data-act="evprom" data-id="'+ea(e.cid)+'" aria-label="예비 해제(본 일정으로)">예비</button>':'')+esc(d.title)+'</h3>'+(cm?'<p style="margin:3px 0 0;font-size:13px;color:var(--sub);line-height:1.45;white-space:pre-line">'+esc(cm)+'</p>':'')+spentLine(e.cid)+link+'</div><div class="icos"><button class="ico" data-act="evedit" data-id="'+ea(e.cid)+'" aria-label="일정 수정">'+ic('pen',16)+'</button>'+(d.map?icoMap(d.map):'')+(d.nav&&d.map?icoNav(d.map):'')+'</div></div>';
 }
 /* 숙소 → 체크인/체크아웃 일정: 숙소 데이터에서 그날 일정 줄을 만들어 낸다(따로 저장하지 않음). 완료 상태·시각만 숙소에 저장 */
 var STC=PAL.yel[2];  // 숙소 색 = 앱 노랑(yel) 중간톤
@@ -561,7 +566,7 @@ function evRow(e,cc,at){
   var d=e.d,done=!!d.done;
   var lab=done&&d.doneAt?hhmm(d.doneAt):(d.time||SLOTL[d.slot]||'');
   var tcol=(done&&d.doneAt)?'<button class="evt done" data-act="evtime" data-id="'+ea(e.cid)+'" aria-label="완료 시각 수정">'+esc(lab)+'</button>':'<button class="evt" disabled tabindex="-1" aria-hidden="true">'+esc(lab)+'</button>';
-  return '<div class="ev" data-t="'+ea(at||'')+'" style="--cc:'+cc[1]+'">'+tcol+'<button class="evdot" data-act="evck" data-id="'+ea(e.cid)+'" aria-pressed="'+done+'" aria-label="'+ea(d.title)+' 완료"><span class="dotv"></span></button><div class="c"><div class="card sm'+(done?' evdone':'')+'">'+evBody(e)+'</div></div></div>';
+  return '<div class="ev'+(d.plan==='R'&&!done?' rsv':'')+'" data-t="'+ea(at||'')+'" style="--cc:'+cc[1]+'">'+tcol+'<button class="evdot" data-act="evck" data-id="'+ea(e.cid)+'" aria-pressed="'+done+'" aria-label="'+ea(d.title)+' 완료"><span class="dotv"></span></button><div class="c"><div class="card sm'+(done?' evdone':'')+'">'+evBody(e)+'</div></div></div>';
 }
 function memoEv(m){
   return '<div class="ev mev" data-t="'+ea(m.memo_time||'')+'"><button class="evt" disabled tabindex="-1" aria-hidden="true">'+esc(m.memo_time||'')+'</button><span class="evdot memodot"><span class="mdot"></span></span><div class="c"><div class="memoc">'+(hasPhoto(m)?photoThumb(m,44):ic('notes',14))+'<span>'+memoText(m)+'</span></div></div></div>';
@@ -605,8 +610,12 @@ function tlFilterHtml(){
   function b(k,label,ico){var on=f[k]!==false;return '<button class="tlfb k-'+k+(on?' on':'')+'" data-act="tlf" data-v="'+k+'" aria-pressed="'+on+'">'+ic(ico,15)+label+'</button>'}
   return '<div class="tlf" role="group" aria-label="타임라인 표시 종류">'+b('e','일정','calendar')+b('m','메모','notes')+b('c','체크','checklist')+b('p','결제','cash')+'</div>';
 }
+function planHead(d,slot){
+  var sel=planSel(d,slot);
+  return '<div class="plhd"><span class="plhl">'+esc(SLOTL[slot]||'')+'</span>'+planLetters(d,slot).map(function(p){return '<button class="plc pl-'+p+(p===sel?' on':'')+'" data-act="plan" data-date="'+ea(d)+'" data-slot="'+slot+'" data-v="'+p+'" aria-pressed="'+(p===sel)+'" aria-label="'+esc(SLOTL[slot]||'')+' 플랜 '+p+'">'+p+'</button>'}).join('')+'</div>';
+}
 function timelineHtml(d){
-  var allEv=eventsOf(d),allMs=memosOf(d),allCk=doneChecksOf(d),allPay=freePaysOf(d);
+  var allEv=eventsOf(d).filter(planShown),allMs=memosOf(d),allCk=doneChecksOf(d),allPay=freePaysOf(d);
   var allSt=stayEvs(d);
   if(!allEv.length&&!allMs.length&&!allCk.length&&!allPay.length&&!allSt.length)return '';
   var f=UI.tlf||{};
@@ -624,26 +633,13 @@ function timelineHtml(d){
   if(!ev.length&&!ex.length)return h+'<div class="small muted" style="text-align:center;padding:22px 0">표시할 종류를 하나 이상 켜 주세요</div>';
   h+='<div class="tl">';
   function pushEx(limit){while(xi<ex.length&&(limit==null||ex[xi].t<limit)){h+=ex[xi].h;xi++}}
-  ev.forEach(function(e,i){pushEx(eff[i]);h+=evRow(e,cc,eff[i])});
-  pushEx(null);
-  return h+'</div>';
-}
-function planDetail(pid){
-  var p=planOf(pid);if(!p)return '';
-  var pd=p.d;
-  var steps=(pd.steps||[]).map(function(s){return '<li><span class="grow">'+esc(s.t)+'</span>'+(s.map?icoMap(s.map):'')+'</li>'}).join('');
-  return '<div class="pl"><b>'+esc(pd.title)+'</b><div class="small muted">'+esc(pd.summary||'')+'</div><ul>'+steps+'</ul>'+(pd.note?'<div class="small" style="margin-top:6px;color:var(--yel-tx)">'+esc(pd.note)+'</div>':'')+'</div>';
-}
-function slotUi(d,sl){
-  var ch=choiceOf(d,sl.key),sel=ch?ch.d.plan:null;
-  var h='<div><div class="lbl">'+esc(sl.label)+'</div><div class="row" style="align-items:stretch">';
-  sl.opts.forEach(function(pid){
-    var p=planOf(pid);if(!p)return;
-    h+='<button class="plan'+(sel===pid?' on':'')+'" data-act="plan" data-date="'+d+'" data-slot="'+sl.key+'" data-v="'+pid+'" aria-pressed="'+(sel===pid)+'"><span class="row between" style="color:var(--tx)"><b>'+esc(p.d.n)+'</b>'+(sel===pid?ic('checkc',20,'var(--sel-tx)'):'')+'</span><span>'+esc(p.d.title)+'</span></button>';
+  var hd={};
+  ev.forEach(function(e,i){
+    pushEx(eff[i]);
+    if(!e.stay&&PLN.indexOf(e.d.plan)>=0){var sl=evSlot(e);if(!hd[sl]){hd[sl]=1;h+=planHead(d,sl)}}   // 시간대의 첫 플랜 일정 앞에 A·B 칩 제목줄
+    h+=evRow(e,cc,eff[i]);
   });
-  h+='</div><div class="row" style="margin-top:8px"><button class="btn sm'+(sel==='custom'?' on':'')+'" data-act="plan" data-date="'+d+'" data-slot="'+sl.key+'" data-v="custom">'+ic('pen',16)+'직접 입력</button><button class="btn sm'+(!sel||sel==='none'?' on':'')+'" data-act="plan" data-date="'+d+'" data-slot="'+sl.key+'" data-v="none">선택 안 함</button></div>';
-  if(sel==='custom')h+='<div class="pl"><textarea class="fld" data-cust="'+d+'|'+sl.key+'" placeholder="자유롭게 적어두세요 (장소, 메모)" aria-label="직접 입력">'+esc(ch.d.text||'')+'</textarea></div>';
-  else if(sel&&sel!=='none')h+=planDetail(sel);
+  pushEx(null);
   return h+'</div>';
 }
 function viewDate(){return clampDate(UI.vd||today())}
@@ -654,6 +650,13 @@ function periodOf(t){
   if(h<4)return 'dawn';if(h<12)return 'morning';if(h<16)return 'day';if(h<19)return 'afternoon';return 'night';
 }
 function ctitle(t,right,ico){return '<div class="ctitle"><b>'+(ico?bdg(ico[0],ico[1],22):'')+t+'</b>'+(right?'<span class="cinfo">'+right+'</span>':'')+'</div>'}
+/* 다음 일정이 플랜 일정이면 어느 플랜인지 보여주고, 아직 직접 고르지 않았다면(기본 A) 일정탭으로 가서 고르게 안내 */
+function bnPlan(e,vd){
+  if(!e||e.stay||PLN.indexOf(e.d.plan)<0)return '';
+  var sl=evSlot(e),L=planLetters(vd,sl);if(L.length<2)return '';
+  var set=!!choiceOf(vd,sl);
+  return '<button class="bnpl" data-act="planjump" data-date="'+ea(vd)+'"><span class="pc pl-'+e.d.plan+'">'+e.d.plan+'</span>'+(set?'플랜 '+e.d.plan+' 진행 중':'플랜 '+e.d.plan+'(기본) · 다른 플랜 고르기')+ic('chevr',14)+'</button>';
+}
 function screenToday(){
   var t=trip();if(!t)return empty();
   var vd=viewDate();
@@ -669,17 +672,8 @@ function screenToday(){
     var d=next.d;
     var ckb=d.done?'<span class="bnck on" aria-label="완료한 일정">'+ic('check',17)+'</span>':'<button class="bnck" data-act="bnck" data-id="'+ea(next.stay||next.cid)+'"'+(next.stay?' data-v="'+next.k+'"':'')+' aria-label="'+ea(d.title)+' 완료">'+ic('check',17)+'</button>';
     var per=periodOf(d.time||SLOTDEF[d.slot]||'12:00');
-    h+='<div class="card bn bn-'+per+'">'+ctitle(ev[ev.length-1].cid===next.cid?'마지막 일정':'다음 일정',ckb)+'<div style="font-family:var(--serif);font-size:19px;font-weight:700;line-height:1.3;color:var(--bn-t)">'+(stx?ic('bed',18,STC)+' ':'')+esc(d.title)+'</div>'+(((stx?(stx.d.note||''):evComment(d)))?'<div style="font-size:13px;color:var(--bn-s);margin-top:5px;line-height:1.5;white-space:pre-line">'+esc(stx?(stx.d.note||''):evComment(d))+'</div>':'')+
+    h+='<div class="card bn bn-'+per+'">'+ctitle(ev[ev.length-1].cid===next.cid?'마지막 일정':'다음 일정',ckb)+'<div style="font-family:var(--serif);font-size:19px;font-weight:700;line-height:1.3;color:var(--bn-t)">'+(stx?ic('bed',18,STC)+' ':'')+esc(d.title)+'</div>'+(((stx?(stx.d.note||''):evComment(d)))?'<div style="font-size:13px;color:var(--bn-s);margin-top:5px;line-height:1.5;white-space:pre-line">'+esc(stx?(stx.d.note||''):evComment(d))+'</div>':'')+bnPlan(next,vd)+
       ((d.map)?'<div class="row" style="margin-top:14px"><a class="btn" style="flex:1;text-decoration:none" href="'+ea(mapUrl(d.map))+'" target="_blank" rel="noopener">'+ic('pin',17)+'지도에서 열기</a>'+((d.nav||stx)?'<a class="ibtn" aria-label="길찾기(대중교통)" href="'+ea(navUrl(d.map))+'" target="_blank" rel="noopener">'+ic('nav',20)+'</a>':'')+'</div>':'')+'</div>';
-  }
-  var sl=slotsOf(vd);
-  if(sl.length){
-    var ph=ctitle('오늘의 플랜',null,['route','sky']);
-    sl.forEach(function(sx){var ch=choiceOf(vd,sx.key);var sel2=ch&&ch.d.plan;
-      if(sel2==='custom')ph+='<div style="margin-bottom:8px"><b>'+esc(sx.label)+'</b><div class="small">'+esc(ch.d.text||'(비어 있음)')+'</div></div>';
-      else if(sel2&&sel2!=='none')ph+='<div style="margin-bottom:8px"><div class="small muted">'+esc(sx.label)+'</div>'+planDetail(sel2)+'</div>';
-    });
-    h+=card(ph,'flat');
   }
   var items=clItems(vd);
   var done=items.filter(function(i){return i.done}).length;
@@ -713,7 +707,6 @@ function screenSched(){
   var note=(t.dayNotes||{})[d];if(note)h+='<div>'+chip(esc(note),'pn')+'</div>';
   h+=timelineHtml(d);
   h+='<div class="row"><button class="btn" style="flex:1" data-act="evnew" data-date="'+d+'">'+ic('plus',16)+'일정 추가</button><button class="btn" data-act="stnew" data-date="'+d+'">'+ic('bed',16)+'숙소 추가</button></div>';
-  slotsOf(d).forEach(function(sl){h+=slotUi(d,sl)});
   return h;
 }
 function dayLeft(d){
@@ -883,6 +876,7 @@ function sheetHtml(){
       '<div><div class="lbl">제목</div><input class="fld" id="ev_title" style="width:100%" placeholder="이름을 치면 스팟이 떠요" aria-label="제목" autocomplete="off" value="'+ea(ed.title||'')+'"><div id="ev_sug">'+evSugHtml(ed)+'</div></div>'+
       '<div class="dt2"><div><div class="lbl">날짜</div>'+dfld('date','ev_date',ed.date,'날짜')+'</div><div><div class="lbl">시간 (선택)</div>'+dfld('time','ev_time',ed.time,'시간','data-evtime="1"',true)+'</div></div>'+
       '<div><div class="lbl">시간대</div><div class="tsc" style="margin-top:0">'+['am','noon','pm','eve'].map(function(k){return '<button class="chip tsb'+(ed.slot===k?' on':'')+'" data-act="evslot" data-v="'+k+'" aria-pressed="'+(ed.slot===k)+'">'+SLOTL[k]+'</button>'}).join('')+'</div></div>'+
+      '<div><div class="lbl">플랜</div><div class="tsc" style="margin-top:0">'+[['','없음'],['A','A'],['B','B'],['C','C'],['R','예비']].map(function(c){var on=(ed.plan||'')===c[0];return '<button class="chip tsb'+(c[0]?' pl-'+c[0]:'')+(on?' on':'')+'" data-act="evplan" data-v="'+c[0]+'" aria-pressed="'+on+'">'+c[1]+'</button>'}).join('')+'</div><div class="small muted" style="margin-top:6px;line-height:1.5">같은 시간대를 A·B로 나눠 등록하면 하나씩만 보여요 · 예비는 연하게 남아 있다가 칩을 누르면 본 일정이 돼요</div></div>'+
       '<div><div class="lbl">코멘트 (선택)</div><textarea class="fld" id="ev_comment" rows="2" style="width:100%;resize:none" placeholder="예: 오픈 시간에 방문 · 비 오면 ○○로 대체 · 맛집" aria-label="코멘트">'+esc(ed.comment||'')+'</textarea></div>'+
       '<div><div class="lbl">지도 연결</div><div class="tsc" style="margin-top:0">'+[[true,'지도·길찾기 버튼 표시'],[false,'표시 안 함']].map(function(c){return '<button class="chip tsb'+((ed.mapOn!==false)===c[0]?' on':'')+'" data-act="evmap" data-v="'+c[0]+'" aria-pressed="'+((ed.mapOn!==false)===c[0])+'">'+c[1]+'</button>'}).join('')+'</div><div class="lbl" style="margin-top:10px">검색어 (비우면 제목으로 검색)</div><div class="row"><input class="fld" id="ev_map" style="flex:1" placeholder="가게·장소 이름 또는 주소" aria-label="지도 검색어" value="'+ea(ed.map||'')+'"><a class="btn" data-mapcheck="1" href="#" target="_blank" rel="noopener" style="text-decoration:none">'+ic('pin',16)+'확인</a></div></div>'+
       '<div class="row"><button class="btn pri" style="flex:1" data-act="ev-save">저장</button>'+(ed.id?'<button class="btn" data-act="ev-del" data-id="'+ea(ed.id)+'">삭제</button>':'')+'</div>';
@@ -1037,7 +1031,7 @@ function addCl(key,val,ts,at,ao,cat){
 }
 function setChoice(d,slot,v){
   var k=d+'|'+slot,ch=M.choices[k];
-  if(!ch){ch={cid:'choice_'+d+'_'+slot,date:d,sort:0,d:{slot:slot,plan:v,text:''}};M.choices[k]=ch}
+  if(!ch){ch={cid:'choice_'+d+'_'+slot,date:d,sort:0,d:{slot:slot,plan:v}};M.choices[k]=ch}
   else ch.d.plan=v;
   tiUp('choice',ch);render();
 }
@@ -1093,8 +1087,8 @@ function removeEvent(e){
   M.events[d]=list;
 }
 function openEv(id,date,spotCid){
-  var base={id:null,date:date||UI.sched||clampDate(today()),slot:'pm',spot:'',title:'',comment:'',map:'',time:'',mapOn:true};
-  if(id){var e=findEvent(id);if(e){var d=e.d;base={id:e.cid,mapOn:!!d.map,date:e.date,slot:d.slot||'pm',spot:d.spot||(spotOfEvent(e)?spotOfEvent(e).cid:''),title:d.title||'',comment:evComment(d),map:d.map||'',time:d.time||''}}}
+  var base={id:null,date:date||UI.sched||clampDate(today()),slot:'pm',plan:'',spot:'',title:'',comment:'',map:'',time:'',mapOn:true};
+  if(id){var e=findEvent(id);if(e){var d=e.d;base={id:e.cid,mapOn:!!d.map,date:e.date,slot:d.slot||'pm',plan:d.plan||'',spot:d.spot||(spotOfEvent(e)?spotOfEvent(e).cid:''),title:d.title||'',comment:evComment(d),map:d.map||'',time:d.time||''}}}
   else if(spotCid){
     var sp=byCid(M.spots,spotCid);
     if(sp){base.spot=sp.cid;base.title=sp.d.name;base.comment=sp.d.desc||'';base.map=sp.d.map||sp.d.name;base.slot=SPOT_SLOT[sp.d.cat]||'pm'}
@@ -1117,6 +1111,7 @@ function saveEv(){
   d.map=map||undefined;d.nav=!!map;
   d.comment=comment||undefined;delete d.desc;delete d.tags;delete d.alt;   // 예전 설명·태그·대안 문구는 코멘트로 합쳐졌으니 정리한다
   if(dr.spot)d.spot=dr.spot;else delete d.spot;
+  if(dr.plan)d.plan=dr.plan;else delete d.plan;
   delete d.cond;
   Object.keys(d).forEach(function(k){if(d[k]===undefined)delete d[k]});
   var e=old;
@@ -1261,14 +1256,14 @@ function xSugHtml(dr){
   var linked=refInfo(dr.ref);
   var h='';
   if(linked)h+='<div class="tsc" style="margin-top:8px"><button class="tschip on" data-act="xunlink" aria-label="장소 연결 해제">'+ic('pin',14)+' '+esc(linked.name)+' · 연결됨 ×</button></div>';
-  var evs=eventsOf(date).filter(function(e){return e.d.title}),eff=effTimes(eventsOf(date)),list=[],label='';
+  var shown=eventsOf(date).filter(planShown),evs=shown.filter(function(e){return e.d.title}),eff=effTimes(shown),list=[],label='';
   if(q){
     var seen={};
     evs.forEach(function(e){if(normQ(e.d.title+' '+evComment(e.d)).indexOf(q)>=0&&!(linked&&linked.cid===e.cid)){list.push({ref:'event:'+e.cid,name:e.d.title,tag:'일정'});var sp=spotOfEvent(e);if(sp)seen[sp.cid]=1}});
     M.spots.filter(function(sp){return !seen[sp.cid]&&!(linked&&linked.cid===sp.cid)&&normQ(sp.d.name+' '+(sp.d.desc||'')+' '+(sp.d.map||'')).indexOf(q)>=0}).sort(function(a,b){return (a.d.city===cc?0:1)-(b.d.city===cc?0:1)}).forEach(function(sp){list.push({ref:'spot:'+sp.cid,name:sp.d.name,tag:'스팟'})});
     label='일정·스팟 후보';
   }else{
-    var all=eventsOf(date),idx={};all.forEach(function(e,i){idx[e.cid]=i});
+    var all=shown,idx={};all.forEach(function(e,i){idx[e.cid]=i});
     var withPlace=evs.filter(function(e){return !!e.d.map});
     var isToday=date===today(),nm=nowMin();
     withPlace.sort(function(a,b){
@@ -1590,6 +1585,16 @@ var ACT={
   },
   'evunlink':function(){if(UI.evDraft){UI.evDraft.spot='';refreshSug();persistDraft()}},
   'evslot':function(el,v){if(UI.evDraft)UI.evDraft.slot=v;pickOn(el)},
+  'evplan':function(el,v){if(UI.evDraft)UI.evDraft.plan=v;pickOn(el)},
+  'evprom':function(el,v,id){   // 예비 칩 → 본 일정
+    var e=findEvent(id);if(!e||e.d.plan!=='R')return;
+    delete e.d.plan;tiUp('event',e);render();
+    toastUndo('"'+e.d.title+'" 본 일정으로 올렸어요',function(){var e2=findEvent(id);if(e2&&!e2.d.plan){e2.d.plan='R';tiUp('event',e2);render()}});
+  },
+  'planjump':function(el){   // 오늘탭 안내 → 그날 일정탭
+    var dd=el.getAttribute('data-date');resetView();UI.sched=dd;UI.tab='sched';render();
+    var sc=document.getElementById('screen');if(sc)sc.scrollTop=0;
+  },
   'evmap':function(el,v){if(UI.evDraft)UI.evDraft.mapOn=(v==='true');pickOn(el)},
   'stck':function(el,v,id){var s=byCid(M.stays,id);if(s)stSetDone(s,v,!s.d[v+'Done'])},
   'sttime':function(el,v,id){
@@ -1652,7 +1657,7 @@ var ACT={
   'albvclose':function(){albBack()},
   'export':function(){doExport()}
 };
-var DRAFT_ACT={evslot:1,evmap:1,expcat:1,expcur:1};  // 이 동작 뒤에는 작성 중인 시트 내용을 기기에 임시 저장
+var DRAFT_ACT={evslot:1,evplan:1,evmap:1,expcat:1,expcur:1};  // 이 동작 뒤에는 작성 중인 시트 내용을 기기에 임시 저장
 function onClick(e){
   var mc=e.target.closest&&e.target.closest('[data-mapcheck]');
   if(mc){
@@ -1676,10 +1681,6 @@ function onChange(e){
   if(el.id==='ev_date'&&UI.evDraft){UI.evDraft.date=el.value;refreshSug();persistDraft();return}
   if(el.matches&&el.matches('input[data-act="ck"]'))return onClick({target:el});
   if(el.id==='imp'){doImport(el.files&&el.files[0]);return}
-  if(el.hasAttribute('data-cust')){
-    var p=el.getAttribute('data-cust').split('|'),ch=M.choices[p[0]+'|'+p[1]];
-    if(ch){ch.d.text=el.value;tiUp('choice',ch)}return;
-  }
   if(el.hasAttribute('data-evtime')){
     if(el.value&&UI.evDraft){var sl=timeToSlot(el.value);UI.evDraft.slot=sl;setPick('evslot',sl)}
     return;
