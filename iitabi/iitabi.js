@@ -1106,9 +1106,35 @@ function saveExp(){
   var date=document.getElementById('x_date').value||today(),time=document.getElementById('x_time').value||nowHM();
   var data={cat:'local',name:nm,amount:amt,currency:(dr.cur==='KRW'?'KRW':'JPY'),paid:true,local:true,date:date,time:time,ecat:dr.cat||'etc'};
   if(ri)data.ref={t:ri.t,cid:ri.cid,name:ri.name};
-  var o=dr.id?byCid(M.expenses,dr.id):null;
+  var o=dr.id?byCid(M.expenses,dr.id):null,prevRef=o&&o.d.ref?o.d.ref.cid:'';
   if(o){o.d=data;o.date=date}else{o={cid:'exp_'+genCid(),date:date,sort:Date.now()%100000000,d:data};M.expenses.push(o)}
-  tiUp('expense',o);endSheet();render();toast('저장했어요');
+  tiUp('expense',o);
+  var auto=(!dr.id||(data.ref&&data.ref.cid!==prevRef))?autoDoneByExpense(data):[];   // 새 지출이거나 연동 대상을 새로 고른 경우만
+  endSheet();render();
+  if(auto.length){
+    var first=findEvent(auto[0].cid);
+    toastUndo('저장했어요 · '+(auto.length===1&&first?'"'+first.d.title+'" 일정도 완료했어요':auto.length+'개 일정도 완료했어요'),function(){
+      auto.forEach(function(a){var e2=findEvent(a.cid);if(!e2)return;delete e2.d.done;delete e2.d.doneAt;if(a.plan)e2.d.plan=a.plan;tiUp('event',e2);mirrorEvent(e2)});
+      render();
+    });
+  }else toast('저장했어요');
+}
+/* 연동 지출이 생기면 그 일정을 결제 시각에 맞춰 자동 완료한다(같은 날짜의 아직 안 한 일정만). 스팟에 연동했다면 그날 그 스팟으로 잡아 둔 일정.
+   예비 일정에서 결제했다면 실제로 간 것이니 본 일정으로 올린다. 완료 해제·삭제는 평소처럼 직접 */
+function autoDoneByExpense(data){
+  var r=data.ref;if(!r||!data.date||data.date>today())return [];
+  var list=[];
+  if(r.t==='event'){var e0=findEvent(r.cid);if(e0&&e0.date===data.date)list.push(e0)}
+  else if(r.t==='spot'){var sp=byCid(M.spots,r.cid);if(sp)eventsOf(data.date).filter(planShown).forEach(function(x){if(spotOfEvent(x)===sp)list.push(x)})}
+  var at=new Date(data.date+'T'+(data.time||'00:00')+':00').getTime();if(isNaN(at)||at>Date.now())at=Date.now();
+  var out=[];
+  list.forEach(function(e){
+    if(e.d.done)return;
+    out.push({cid:e.cid,plan:e.d.plan==='R'?'R':''});
+    if(e.d.plan==='R')delete e.d.plan;
+    e.d.done=true;e.d.doneAt=at;tiUp('event',e);mirrorEvent(e);
+  });
+  return out;
 }
 function timeToSlot(t){var h=parseInt(String(t).split(':')[0],10);if(isNaN(h))return 'pm';return h<11?'am':(h<14?'noon':(h<18?'pm':'eve'))}
 function spotOfEvent(e){
