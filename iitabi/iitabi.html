@@ -403,22 +403,42 @@ input:focus,textarea:focus,select:focus{box-shadow:none}
 .pl-B{--sb:rgba(145,210,175,.55);--sbd:rgba(70,155,110,.55);--st:rgb(34,103,68)}
 .pl-C{--sb:rgba(255,190,130,.58);--sbd:rgba(214,125,45,.55);--st:rgb(147,71,14)}
 .pl-R{--sb:rgba(195,175,168,.28);--sbd:rgba(150,135,125,.4);--st:var(--tx)}
-.plhd{display:flex;align-items:center;gap:6px;margin-top:8px}
-.plhl{width:44px;flex:none;margin-right:34px;text-align:right;font-size:12px;font-weight:700;color:var(--sub)}
+.plhd{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:8px}
+.plhl{width:44px;flex:none;text-align:right;font-size:12px;font-weight:700;color:var(--sub)}
+.plcs{display:flex;gap:6px}
 .plc{position:relative;min-width:36px;height:30px;padding:0 10px;border-radius:10px;border:1px solid var(--cardb);background:var(--chip);color:var(--sub);font-size:13px;font-weight:500}
 .plc:after{content:'';position:absolute;inset:-7px -3px}
 .plc.on{background:var(--sb);border-color:var(--sbd);color:var(--st);font-weight:700}
 .pc{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;border-radius:6px;border:1px solid var(--sbd);background:var(--sb);color:var(--st);font-size:11px;font-weight:700;flex:none}
 .pcr{position:relative;display:inline-flex;align-items:center;height:20px;padding:0 8px;margin-right:6px;border-radius:99px;border:1px solid rgba(150,135,125,.4);background:rgba(195,175,168,.25);color:var(--sub);font-family:inherit;font-size:11px;font-weight:500;vertical-align:1px}
 .pcr:after{content:'';position:absolute;inset:-12px -6px}
+.rsvt{display:inline-flex;align-items:center;gap:4px;min-height:28px;padding:0;border:0;background:transparent;color:var(--tx);font:inherit;font-size:15px;line-height:1.35;text-align:left}
+.rsvt .ti{color:var(--sub);flex:none}
 .ev.rsv .c{opacity:.55}
 .bnpl{margin-top:10px;display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 10px 0 7px;border:0;border-radius:99px;background:rgba(255,253,248,.62);color:var(--bn-t);font-family:inherit;font-size:12.5px;font-weight:700}
+/* 금액 키패드: 하단에서 올라오는 앱 전용 패드 */
+.amtbox{cursor:pointer}
+.amtbox input{pointer-events:none}
+.amtbox.act{border-color:var(--sel-bd);box-shadow:0 0 0 3px rgba(210,175,225,.35),var(--shadow)}
+.amtcalc{width:30px;height:30px;flex:none;border-radius:9px;background:var(--sel-bg);border:1px solid var(--sel-bd);color:var(--sel-tx);display:flex;align-items:center;justify-content:center}
+#numpad{position:fixed;left:0;right:0;bottom:0;z-index:12;display:flex;justify-content:center;pointer-events:none}
+#numpad:empty{display:none}
+.npad{pointer-events:auto;width:100%;max-width:480px;background:linear-gradient(160deg,#f1ece2,#f6f2e9);border-top:1px solid rgba(200,175,140,.45);padding:10px 12px calc(14px + env(safe-area-inset-bottom));box-shadow:0 -8px 30px rgba(0,0,0,.12);animation:padUp .22s ease-out}
+@keyframes padUp{from{transform:translateY(100%)}to{transform:none}}
+.npk{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.npk button{min-height:46px;border-radius:12px;border:1px solid var(--cardb);background:var(--chip);color:var(--tx);font-family:inherit;font-size:20px;font-variant-numeric:tabular-nums;padding:0}
+.npk button:active{transform:scale(.96);background:rgba(255,253,248,.95)}
+.npk .op{background:var(--sel-bg);border-color:var(--sel-bd);color:var(--sel-tx);font-weight:700}
+.npk .fn{color:var(--sub);font-size:16px}
+.npk .done{background:var(--yel-bg);border-color:var(--yel-bd);color:var(--yel-tx);font-weight:700;font-size:15px}
+body.padopen .sheetwrap{padding-bottom:var(--padh,0px)}
+body.padopen .sheet{max-height:calc(100vh - var(--padh,0px) - 16px);max-height:calc(100dvh - var(--padh,0px) - 16px)}
 </style>
 </head>
 <body>
 <div id="bg-fixed"></div>
 <div id="app"><div id="topsafe"></div><div id="pin"></div><main id="screen"></main><nav id="tabbar" aria-label="하단 탭"></nav></div>
-<div id="sheet"></div><div id="toast"></div><div id="picker"></div><div id="album"></div><div id="albview"></div>
-<script src="iitabi.js?v=2026.10.10-76"></script>
+<div id="sheet"></div><div id="toast"></div><div id="picker"></div><div id="album"></div><div id="albview"></div><div id="numpad"></div>
+<script src="iitabi.js?v=2026.10.10-78"></script>
 </body>
 </html>

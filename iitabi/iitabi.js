@@ -57,7 +57,7 @@ function typing(){if(PK)return true;var ae=document.activeElement;return !!(ae&&
 function pickOn(el){Array.prototype.forEach.call(el.parentNode.querySelectorAll('.tsb'),function(b){var on=b===el;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on)})}
 function setPick(act,v){Array.prototype.forEach.call(document.querySelectorAll('[data-act="'+act+'"]'),function(b){var on=b.getAttribute('data-v')===v;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on)})}
 function shead(t,act,v,label){return '<div class="row between"><h1 style="font-size:22px">'+esc(t)+'</h1><button class="btn" style="border:0;background:transparent" data-act="'+(act||'sheet-close')+'"'+(v?' data-v="'+v+'"':'')+' aria-label="'+(label||'닫기')+'">'+ic('x',20)+'</button></div>'}
-function endSheet(){UI.sheet=null;UI.expDraft=UI.evDraft=UI.payDraft=UI.spDraft=UI.clDraft=UI.stDraft=null;clearDraft()}  // 열린 시트와 작성 중 내용을 모두 비운다(화면은 호출 쪽에서 그림)
+function endSheet(){if(PAD){PAD=null;padRender()}UI.sheet=null;UI.expDraft=UI.evDraft=UI.payDraft=UI.spDraft=UI.clDraft=UI.stDraft=null;clearDraft()}  // 열린 시트와 작성 중 내용을 모두 비운다(화면은 호출 쪽에서 그림)
 function closeSheet(){endSheet();render()}
 function byTimeDesc(a,b){return String(b.d.time||'')<String(a.d.time||'')?-1:1}
 function byMemoTime(a,b){var x=String(a.memo_time||'99:99'),y=String(b.memo_time||'99:99');return x<y?-1:(x>y?1:0)}
@@ -65,6 +65,7 @@ function byMemoTime(a,b){var x=String(a.memo_time||'99:99'),y=String(b.memo_time
 /* ---------- state ---------- */
 var cfg=lget('cfg',{key:'',tripId:''});
 var PK=null;  // 열려 있는 날짜·시간 선택 모달 상태
+var PAD=null;  // 열려 있는 금액 키패드 상태 {id:금액칸 id, expr:'1200+850'}
 var UI={tab:'today',sched:null,clDate:null,spCity:null,spCat:'all',sheet:null,edit:null,status:'',syncAt:null,keyBad:false,addSpot:false,vd:null,addTxt:{},editVal:null,expDraft:null,evDraft:null,payDraft:null,spDraft:null,wkAnim:null,undoFn:null,toastT:null};
 var PINH='';  // 화면 상단에 고정할 HTML(일정·경비 탭). render()가 #pin에 넣는다
 var M=null,CL={items:[]},MEMOS=[],WX={},MIR={},Q=lget('q',[]),TRIPS=lget('trips',[]);  // MIR: 이이코토 시간표로 보낸 일정 {이름표:{date}}
@@ -538,7 +539,9 @@ function evBody(e){
   var d=e.d;
   var cm=evComment(d);
   var link=d.link?'<a class="small" style="display:inline-flex;align-items:center;gap:4px;min-height:36px;font-weight:700" href="'+ea(d.link.url)+'" target="_blank" rel="noopener">'+ic('ext',14)+esc(d.link.label)+'</a>':'';
-  return '<div class="row" style="align-items:flex-start;gap:2px"><div class="grow"><h3 style="margin:0;font-size:15px;line-height:1.35">'+(d.plan==='R'?'<button class="pcr" data-act="evprom" data-id="'+ea(e.cid)+'" aria-label="예비 해제(본 일정으로)">예비</button>':'')+esc(d.title)+'</h3>'+(cm?'<p style="margin:3px 0 0;font-size:13px;color:var(--sub);line-height:1.45;white-space:pre-line">'+esc(cm)+'</p>':'')+spentLine(e.cid)+link+'</div><div class="icos"><button class="ico" data-act="evedit" data-id="'+ea(e.cid)+'" aria-label="일정 수정">'+ic('pen',16)+'</button>'+(d.map?icoMap(d.map):'')+(d.nav&&d.map?icoNav(d.map):'')+'</div></div>';
+  var rsv=d.plan==='R',open=!rsv||!!(UI.rsvOpen&&UI.rsvOpen[e.cid]);   // 예비는 제목만 보이고, 제목을 누르면 상세(코멘트·버튼)가 펼쳐진다
+  var title=rsv?'<button class="pcr" data-act="evprom" data-id="'+ea(e.cid)+'" aria-label="예비 해제(본 일정으로)">예비</button><button class="rsvt" data-act="rsvtog" data-id="'+ea(e.cid)+'" aria-expanded="'+open+'">'+esc(d.title)+ic(open?'chevd':'chevr',14)+'</button>':esc(d.title);
+  return '<div class="row" style="align-items:flex-start;gap:2px"><div class="grow"><h3 style="margin:0;font-size:15px;line-height:1.35">'+title+'</h3>'+(open&&cm?'<p style="margin:3px 0 0;font-size:13px;color:var(--sub);line-height:1.45;white-space:pre-line">'+esc(cm)+'</p>':'')+(open?spentLine(e.cid)+link:'')+'</div>'+(open?'<div class="icos"><button class="ico" data-act="evedit" data-id="'+ea(e.cid)+'" aria-label="일정 수정">'+ic('pen',16)+'</button>'+(d.map?icoMap(d.map):'')+(d.nav&&d.map?icoNav(d.map):'')+'</div>':'')+'</div>';
 }
 /* 숙소 → 체크인/체크아웃 일정: 숙소 데이터에서 그날 일정 줄을 만들어 낸다(따로 저장하지 않음). 완료 상태·시각만 숙소에 저장 */
 var STC=PAL.yel[2];  // 숙소 색 = 앱 노랑(yel) 중간톤
@@ -612,7 +615,7 @@ function tlFilterHtml(){
 }
 function planHead(d,slot){
   var sel=planSel(d,slot);
-  return '<div class="plhd"><span class="plhl">'+esc(SLOTL[slot]||'')+'</span>'+planLetters(d,slot).map(function(p){return '<button class="plc pl-'+p+(p===sel?' on':'')+'" data-act="plan" data-date="'+ea(d)+'" data-slot="'+slot+'" data-v="'+p+'" aria-pressed="'+(p===sel)+'" aria-label="'+esc(SLOTL[slot]||'')+' 플랜 '+p+'">'+p+'</button>'}).join('')+'</div>';
+  return '<div class="plhd"><span class="plhl">'+esc(SLOTL[slot]||'')+'</span><span class="plcs">'+planLetters(d,slot).map(function(p){return '<button class="plc pl-'+p+(p===sel?' on':'')+'" data-act="plan" data-date="'+ea(d)+'" data-slot="'+slot+'" data-v="'+p+'" aria-pressed="'+(p===sel)+'" aria-label="'+esc(SLOTL[slot]||'')+' 플랜 '+p+'">'+p+'</button>'}).join('')+'</span></div>';
 }
 function timelineHtml(d){
   var allEv=eventsOf(d).filter(planShown),allMs=memosOf(d),allCk=doneChecksOf(d),allPay=freePaysOf(d);
@@ -865,7 +868,7 @@ function sheetHtml(){
     var dr=UI.expDraft||{};
     body=shead((dr.id?'지출 수정':'지출 추가'))+
        '<div class="tsc" style="margin:0">'+[['JPY','¥ 엔화'],['KRW','₩ 원화']].map(function(c){return '<button class="chip tsb'+((dr.cur||'JPY')===c[0]?' on':'')+'" data-act="expcur" data-v="'+c[0]+'" aria-pressed="'+((dr.cur||'JPY')===c[0])+'">'+c[1]+'</button>'}).join('')+'</div>'+
-      '<div class="amtbox"><span class="yen" id="x_sym">'+curSym(dr.cur||'JPY')+'</span><input id="x_amt" inputmode="numeric" autocomplete="off" placeholder="0" aria-label="금액" value="'+ea(dr.amt||'')+'"></div><div class="small muted" id="x_krw" style="margin-top:-6px">'+expLine(dr.cur||'JPY',dr.amt)+'</div>'+
+      '<div class="amtbox" data-act="amtopen" data-id="x_amt"><span class="yen" id="x_sym">'+curSym(dr.cur||'JPY')+'</span><input id="x_amt" type="text" inputmode="none" readonly tabindex="-1" autocomplete="off" placeholder="0" aria-label="금액" value="'+ea(dr.amt?padFmt(parseAmt(dr.amt)):'')+'"><span class="amtcalc">'+ic('calculator',17)+'</span></div><div class="small muted amtexpr" data-expr-for="x_amt" style="display:none;margin-top:-6px"></div><div class="small muted" id="x_krw" style="margin-top:-6px">'+expLine(dr.cur||'JPY',dr.amt)+'</div>'+
       '<div><div class="lbl">분류</div><div class="tsc hscroll" style="margin-top:0">'+Object.keys(ECAT).map(function(k){return '<button class="chip tsb'+(dr.cat===k?' on':'')+'" data-act="expcat" data-v="'+k+'" style="'+selVars(ECATC[k])+'" aria-pressed="'+(dr.cat===k)+'">'+ic(ECATI[k],15,pcol(ECATC[k])[2])+ECAT[k]+'</button>'}).join('')+'</div></div>'+
       '<div><div class="lbl">내용 · 장소 (선택)</div><input class="fld" id="x_name" style="width:100%" placeholder="이름을 치거나 아래에서 고르세요" autocomplete="off" aria-label="내용" value="'+ea(dr.name||'')+'"><div id="x_sug">'+xSugHtml(dr)+'</div></div>'+
       '<div class="dt2"><div><div class="lbl">날짜</div>'+dfld('date','x_date',dr.date,'날짜')+'</div><div><div class="lbl">시간</div>'+dfld('time','x_time',dr.time,'시간')+'</div></div>'+
@@ -897,7 +900,7 @@ function sheetHtml(){
     body=shead('결제 항목 수정')+
       '<div style="font-size:15px;font-weight:700">'+esc(pd.name||'')+'</div>'+
       '<div class="tsc" style="margin:0">'+[['KRW','₩ 원화'],['JPY','¥ 엔화']].map(function(c){return '<button class="chip tsb'+(pd.cur===c[0]?' on':'')+'" data-act="paycur" data-v="'+c[0]+'" aria-pressed="'+(pd.cur===c[0])+'">'+c[1]+'</button>'}).join('')+'</div>'+
-      '<div class="amtbox"><span class="yen" id="p_sym">'+curSym(pd.cur)+'</span><input id="p_amt" inputmode="numeric" autocomplete="off" placeholder="0" aria-label="금액" value="'+ea(pd.amt||'')+'"></div>'+
+      '<div class="amtbox" data-act="amtopen" data-id="p_amt"><span class="yen" id="p_sym">'+curSym(pd.cur)+'</span><input id="p_amt" type="text" inputmode="none" readonly tabindex="-1" autocomplete="off" placeholder="0" aria-label="금액" value="'+ea(pd.amt?padFmt(parseAmt(pd.amt)):'')+'"><span class="amtcalc">'+ic('calculator',17)+'</span></div><div class="small muted amtexpr" data-expr-for="p_amt" style="display:none"></div>'+
       '<div class="small muted">금액이 다르면 고쳐 주세요.</div>'+
       '<div class="row"><button class="btn pri" style="flex:1" data-act="pay-save">저장</button>'+(pd.k==='exp'?'<button class="btn" data-act="pay-del">삭제</button>':'')+'</div>';
   }else if(v==='spedit'){
@@ -952,6 +955,7 @@ function render(){
   sc.scrollTop=y;
   fitMemoList();
   if(UI.album)renderAlbum(false);   // 동기화로 사진이 바뀌었을 때만 다시 그린다
+  if(PAD){var pa=document.getElementById(PAD.id);if(pa){padPaint();var pb=pa.closest('.amtbox');if(pb)pb.classList.add('act')}else{PAD=null;padRender()}}
   Array.prototype.forEach.call(sc.querySelectorAll('.fitlist.scroll'),function(x,i){
     if(x.hasAttribute('data-end')){if(!sameView||mAtEnd)x.scrollTop=x.scrollHeight;else if(mly[i])x.scrollTop=mly[i]}  // 메모는 시간순 그대로, 처음 열 때·맨 아래를 보던 중이면 최신(맨 아래)부터 보이게
     else if(mly[i])x.scrollTop=mly[i];
@@ -1035,6 +1039,48 @@ function setChoice(d,slot,v){
   else ch.d.plan=v;
   tiUp('choice',ch);render();
 }
+/* ---------- 금액 키패드(+ −): 사파리 숫자 키보드 대신 하단에서 올라오는 앱 전용 패드 ---------- */
+function padFmt(n){return Number(n).toLocaleString('ko-KR')}
+function padEval(s){
+  var t=String(s).match(/\d+|[+\-]/g);if(!t)return null;
+  while(t.length&&/[+\-]/.test(t[t.length-1]))t.pop();   // 끝에 남은 연산자는 무시
+  if(!t.length)return null;
+  var r=parseInt(t[0],10);if(isNaN(r))return null;
+  for(var i=1;i<t.length;i+=2){var n=parseInt(t[i+1],10);if(isNaN(n))break;r=t[i]==='+'?r+n:r-n}
+  return r;
+}
+function padRender(){
+  var el=document.getElementById('numpad');if(!el)return;
+  if(!PAD){el.innerHTML='';document.body.classList.remove('padopen');document.documentElement.style.removeProperty('--padh');return}
+  function k(v,l,c,al){return '<button class="'+(c||'')+'" data-act="padk" data-v="'+v+'" aria-label="'+(al||l||v)+'">'+(l||v)+'</button>'}
+  el.innerHTML='<div class="npad"><div class="npk">'+k('7')+k('8')+k('9')+k('B','⌫','fn','지우기')+k('4')+k('5')+k('6')+k('-','−','op','빼기')+k('1')+k('2')+k('3')+k('+','+','op','더하기')+k('C','C','fn','모두 지우기')+k('0')+k('00')+'<button class="done" data-act="padok">완료</button></div></div>';
+  document.body.classList.add('padopen');
+  document.documentElement.style.setProperty('--padh',el.firstChild.offsetHeight+'px');
+}
+function padPaint(){
+  if(!PAD)return;
+  var a=document.getElementById(PAD.id),r=padEval(PAD.expr),n=(r==null||r<0)?0:r;
+  if(a)a.value=n?padFmt(n):'';
+  var ex=document.querySelector('[data-expr-for="'+PAD.id+'"]'),has=/[+\-]/.test(PAD.expr);
+  if(ex){ex.style.display=has?'':'none';ex.textContent=has?PAD.expr.replace(/\d+/g,function(m){return padFmt(+m)}).replace(/[+\-]/g,function(m){return ' '+(m==='-'?'−':'+')+' '}):''}
+  if(PAD.id==='x_amt')updateExpLine();
+  persistDraft();
+}
+function openPad(id){
+  var a=document.getElementById(id);if(!a)return;
+  PAD={id:id,expr:String(parseAmt(a.value)||'')};
+  var box=a.closest('.amtbox');if(box)box.classList.add('act');
+  padRender();
+  if(box&&box.scrollIntoView)setTimeout(function(){box.scrollIntoView({block:'nearest',behavior:'smooth'})},60);   // 키패드에 가리지 않게
+}
+function closePad(){
+  if(!PAD)return;
+  var r=padEval(PAD.expr);PAD.expr=(r==null||r<0)?'':String(r);   // 식은 한 숫자로 접는다
+  padPaint();
+  var ex=document.querySelector('[data-expr-for="'+PAD.id+'"]');if(ex)ex.style.display='none';
+  Array.prototype.forEach.call(document.querySelectorAll('.amtbox.act'),function(b){b.classList.remove('act')});
+  PAD=null;padRender();
+}
 function expLine(cur,amt){var n=parseAmt(amt);return cur==='KRW'?'원화로 결제한 금액이에요 · 환산 없이 그대로 합산돼요':won(n*fx())+'원 · 1엔 = '+rate2()+'원'}
 function updateExpLine(){var a=document.getElementById('x_amt'),k=document.getElementById('x_krw');if(k)k.textContent=expLine((UI.expDraft&&UI.expDraft.cur)||'JPY',a?a.value:'0')}
 function openExp(id){
@@ -1042,7 +1088,7 @@ function openExp(id){
   if(id){var ex=byCid(M.expenses,id);if(ex){var d=ex.d;base={id:ex.cid,cur:d.currency==='KRW'?'KRW':'JPY',cat:d.ecat||'etc',amt:String(d.amount),name:d.name||'',ref:d.ref?d.ref.t+':'+d.ref.cid:'',date:d.date||today(),time:d.time||nowHM()}}}
   UI.expDraft=base;UI.sheet='exp';render();persistDraft();
   var sc=document.querySelector('.tsc.hscroll .chip.on');if(sc&&sc.scrollIntoView)sc.scrollIntoView({inline:'center',block:'nearest'});
-  var a=document.getElementById('x_amt');if(a&&!id)a.focus();
+  if(!id)openPad('x_amt');
 }
 function refInfo(val){
   if(!val)return null;var p=val.split(':'),t=p[0],cid=p.slice(1).join(':');
@@ -1192,7 +1238,7 @@ function swipeWeek(dir){
 var swipeX=null,swipeY=null;
 /* ---------- 탭 이동(하단 메뉴·쓸어넘기기 공용) ---------- */
 function resetView(){  // 탭을 옮길 때마다 '오늘 기준'으로 다시 연다(마지막에 본 날짜·도시·분류는 기억하지 않음)
-  UI.vd=null;UI.sched=null;UI.clDate=null;UI.clPre=false;UI.spCat='all';UI.tlf=null;
+  UI.vd=null;UI.sched=null;UI.clDate=null;UI.clPre=false;UI.spCat='all';UI.tlf=null;UI.rsvOpen=null;
   var t=trip(),c=curCity();UI.spCity=(t&&t.cities.some(function(x){return x.id===c}))?c:null;
 }
 function goTab(v,dir){
@@ -1586,6 +1632,23 @@ var ACT={
   'evunlink':function(){if(UI.evDraft){UI.evDraft.spot='';refreshSug();persistDraft()}},
   'evslot':function(el,v){if(UI.evDraft)UI.evDraft.slot=v;pickOn(el)},
   'evplan':function(el,v){if(UI.evDraft)UI.evDraft.plan=v;pickOn(el)},
+  'amtopen':function(el,v,id){if(PAD&&PAD.id===id)closePad();else openPad(id)},
+  'padok':function(){closePad()},
+  'padk':function(el,v){
+    if(!PAD)return;
+    var x=PAD.expr;
+    if(v==='C')x='';
+    else if(v==='B')x=x.slice(0,-1);
+    else if(v==='+'||v==='-'){if(!x)return;x=x.replace(/[+\-]$/,'')+v}
+    else{
+      if(v==='00'&&(!x||/[+\-]$/.test(x)))return;
+      if(x.length>=18)return;
+      if(/(^|[+\-])0$/.test(x))x=x.slice(0,-1);   // 맨 앞 0 방지
+      x+=v;
+    }
+    PAD.expr=x;padPaint();
+  },
+  'rsvtog':function(el,v,id){UI.rsvOpen=UI.rsvOpen||{};UI.rsvOpen[id]=!UI.rsvOpen[id];render()},
   'evprom':function(el,v,id){   // 예비 칩 → 본 일정
     var e=findEvent(id);if(!e||e.d.plan!=='R')return;
     delete e.d.plan;tiUp('event',e);render();
@@ -1659,6 +1722,7 @@ var ACT={
 };
 var DRAFT_ACT={evslot:1,evplan:1,evmap:1,expcat:1,expcur:1};  // 이 동작 뒤에는 작성 중인 시트 내용을 기기에 임시 저장
 function onClick(e){
+  if(PAD&&!(e.target.closest&&e.target.closest('#numpad,.amtbox')))closePad();   // 다른 곳을 누르면 계산된 값으로 확정하고 내려간다
   var mc=e.target.closest&&e.target.closest('[data-mapcheck]');
   if(mc){
     var isSp=mc.getAttribute('data-mapcheck')==='sp';
