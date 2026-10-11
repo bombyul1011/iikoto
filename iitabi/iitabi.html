@@ -198,7 +198,7 @@ select.fld{background:rgba(255,255,255,.7)}
 .ck.ro input[type=checkbox]:disabled{opacity:1}
 .ck.ro input[type=checkbox]:not(:disabled){cursor:pointer}
 /* 일정 탭: 월~일 주 단위 + 가로바 */
-.wk{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+.wk{-webkit-user-select:none;user-select:none;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
 .wk .day-btn{flex:none;min-height:62px;padding:7px 0 5px;gap:0;align-items:center}
 .dbadge{position:absolute;top:-6px;right:-4px;box-shadow:0 0 0 2px #f6f3ee;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:rgba(160,105,180,.88);color:#fff;font-size:10px;font-weight:700;line-height:16px;text-align:center}
 .dbar{display:block;width:22px;height:3px;border-radius:2px;margin-bottom:5px}
@@ -441,6 +441,6 @@ body.padopen .sheet{max-height:calc(100vh - var(--padh,0px) - 16px);max-height:c
 <div id="bg-fixed"></div>
 <div id="app"><div id="topsafe"></div><div id="pin"></div><main id="screen"></main><nav id="tabbar" aria-label="하단 탭"></nav></div>
 <div id="sheet"></div><div id="toast"></div><div id="picker"></div><div id="album"></div><div id="albview"></div><div id="numpad"></div>
-<script src="iitabi.js?v=2026.10.11-83"></script>
+<script src="iitabi.js?v=2026.10.11-84"></script>
 </body>
 </html>

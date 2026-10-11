@@ -1369,7 +1369,16 @@ function onTouchStart(e){var st=e.target.closest&&e.target.closest('#strip');if(
 function onTouchEnd(e){
   if(swipeX==null)return;
   var p=(e.changedTouches&&e.changedTouches[0])||e,dx=p.clientX-swipeX,dy=p.clientY-swipeY;swipeX=null;
-  if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)*1.5)swipeWeek(dx<0?1:-1);
+  if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)*1.5){swipeWeek(dx<0?1:-1);return true}
+}
+/* PC: 주간 줄을 마우스로 끌어 넘기기(터치 쓸기와 같은 동작). 끌고 놓을 때 날짜가 눌리지 않게 직후 클릭은 무시 */
+var dragAt=0;
+function onMouseUp(e){if(e.button===0&&onTouchEnd(e))dragAt=Date.now()}
+/* PC: ← → 키로 이전·다음 주(일정·체크 탭). 입력 중이거나 시트·선택창·사진첩이 열려 있으면 반응하지 않는다 */
+function onArrowKey(e){
+  if((e.key!=='ArrowLeft'&&e.key!=='ArrowRight')||e.altKey||e.ctrlKey||e.metaKey||e.shiftKey)return false;
+  if((UI.tab!=='sched'&&UI.tab!=='check')||typing()||UI.sheet||UI.album||PK||document.getElementById('picker').innerHTML.trim())return false;
+  e.preventDefault();swipeWeek(e.key==='ArrowRight'?1:-1);return true;
 }
 function nowMin(){var d=new Date();return d.getHours()*60+d.getMinutes()}
 function hmMin(t){var p=String(t).split(':');return (+p[0])*60+(+p[1]||0)}
@@ -1808,6 +1817,7 @@ var ACT={
 };
 var DRAFT_ACT={evslot:1,evplan:1,evmap:1,expcat:1,expcur:1};  // 이 동작 뒤에는 작성 중인 시트 내용을 기기에 임시 저장
 function onClick(e){
+  if(Date.now()-dragAt<350){if(e.preventDefault){e.preventDefault();e.stopPropagation()}return}   // 마우스로 주간 줄을 끈 직후의 클릭
   if(PAD&&!(e.target.closest&&e.target.closest('#numpad,.amtbox')))closePad();   // 다른 곳을 누르면 계산된 값으로 확정하고 내려간다
   var mc=e.target.closest&&e.target.closest('[data-mapcheck]');
   if(mc){
@@ -1847,6 +1857,7 @@ function onChange(e){
   }
 }
 function onKey(e){
+  if(onArrowKey(e))return;
   var el=e.target;
   if(e.key==='Enter'&&!e.isComposing){
     if(el.hasAttribute&&el.hasAttribute('data-add')){e.preventDefault();addPrompt(el.getAttribute('data-add'),el.value)}
@@ -1900,6 +1911,7 @@ function boot(){
   var ab=document.getElementById('album');ab.addEventListener('touchstart',onEdgeStart,{passive:true});ab.addEventListener('touchend',onEdgeEnd,{passive:true});
   document.addEventListener('touchstart',onTouchStart,{passive:true});
   document.addEventListener('touchend',onTouchEnd,{passive:true});
+  document.addEventListener('mousedown',function(e){if(e.button===0)onTouchStart(e)});document.addEventListener('mouseup',onMouseUp);
   document.addEventListener('input',function(e){var el=e.target;if(el&&el.hasAttribute&&el.hasAttribute('data-add'))UI.addTxt[el.getAttribute('data-add')]=el.value;if(el&&el.id==='x_amt')updateExpLine();if(el&&el.id==='ev_title'&&UI.evDraft){UI.evDraft.title=el.value;refreshSug()}if(el&&el.id==='x_name'&&UI.expDraft){UI.expDraft.name=el.value;refreshXSug()}if(el&&el.id&&(el.id.indexOf('ev_')===0||el.id.indexOf('x_')===0))persistDraft()});
   document.addEventListener('focusout',onBlur);
   document.addEventListener('touchstart',markEditTap,{passive:true,capture:true});document.addEventListener('mousedown',markEditTap,true);
