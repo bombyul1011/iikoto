@@ -128,14 +128,16 @@ function cityOfDate(d){var s=stayOf(d);return s?s.d.city:(trip()&&trip().cities[
 function clampDate(d){var t=trip();if(!t)return d;if(d<t.start)return t.start;if(d>t.end)return t.end;return d}
 
 /* ---------- api ---------- */
+var lastSt=0;   // 마지막 요청의 HTTP 상태(0 = 네트워크 실패) — 큐가 영구 거절(4xx)과 일시 실패를 구분하는 데 쓴다
 function sf(path,method,body,prefer){
   var h={'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','x-client-info':'iitabi|'+(cfg.key||'')};
   if(prefer)h['Prefer']=prefer;
   return fetch(SUPA_URL+'/rest/v1/'+path,{method:method||'GET',headers:h,body:body?JSON.stringify(body):undefined}).then(function(r){
+    lastSt=r.status;
     if(!r.ok)return r.text().then(function(t){console.warn('iitabi supa',r.status,path,t);return null});
     if(method&&method!=='GET')return (prefer&&prefer.indexOf('return=representation')>=0)?r.json():true;
     return r.json();
-  }).catch(function(){return null});
+  }).catch(function(){lastSt=0;return null});
 }
 /* 큐: 전송 중인 작업(inflight)은 끝난 뒤 자기 자신만 큐에서 빠진다. 같은 대상의 새 작업은 그 뒤에 쌓인다. */
 var flushing=false,inflight=null,needPull=false;
@@ -265,7 +267,14 @@ function flush(){
     }else if(op.t==='pm'&&op.op==='del'){
       p=sf('memos?client_id=eq.'+enc(op.cid),'DELETE');
     }else p=Promise.resolve(true);
-    return p.then(function(ok){inflight=null;if(!ok)return;var i=Q.indexOf(op);if(i>=0)Q.splice(i,1);saveQ();return next()});
+    return p.then(function(ok){
+      inflight=null;
+      if(!ok){   // 서버가 형식·권한 문제로 계속 거절하는 작업(400·404·409·422)이 큐 맨 앞에서 모든 동기화를 막지 않게, 3번 뒤 버린다
+        if(!(lastSt>=400&&lastSt<500&&lastSt!==401&&lastSt!==403&&lastSt!==408&&lastSt!==429))return;
+        op.fails=(op.fails||0)+1;if(op.fails<3){saveQ();return}
+        console.warn('iitabi: 계속 거절되어 건너뜀',op);toast('저장하지 못한 항목이 있어 건너뛰었어요');
+      }
+      var i=Q.indexOf(op);if(i>=0)Q.splice(i,1);saveQ();return next()});
   }
   function end(){flushing=false;inflight=null;setStatus();if(needPull&&!Q.length){needPull=false;pull(true)}}
   return next().then(end,end);
@@ -529,7 +538,7 @@ function planLetters(d,slot){var u={};eventsOf(d).forEach(function(e){var p=e.d.
 function planSel(d,slot){var L=planLetters(d,slot);if(!L.length)return '';var c=choiceOf(d,slot),p=c&&c.d.plan;return L.indexOf(p)>=0?p:L[0]}
 function planShown(e){var p=e.d.plan;if(PLN.indexOf(p)<0||e.d.done)return true;return planSel(e.date,evSlot(e))===p}
 function activeEvs(d){return eventsOf(d).filter(function(e){return e.d.plan!=='R'&&planShown(e)})}   // 다음 일정·완료 대상: 고른 플랜 + 공통만(예비 제외)
-function findEvent(cid){var r=null;Object.keys(M.events).forEach(function(d){M.events[d].forEach(function(e){if(e.cid===cid)r=e})});return r}
+function findEvent(cid){var r=null;if(!M)return null;Object.keys(M.events).forEach(function(d){M.events[d].forEach(function(e){if(e.cid===cid)r=e})});return r}
 /* 코멘트: 예전 설명·태그(맛집 등)·대안 문구를 하나로 합친 일정 메모. 아직 코멘트로 저장하지 않은 일정은 옛 값을 합쳐서 보여주고, 수정해 저장하면 코멘트 하나로 정리된다 */
 function evComment(d){
   var c=d.comment!==undefined?(d.comment||''):((d.tags||[]).join(' · ')+((d.tags||[]).length&&d.alt?'\n':'')+(d.alt||''));
@@ -571,33 +580,31 @@ function evRow(e,cc,at){
   var tcol=(done&&d.doneAt)?'<button class="evt done" data-act="evtime" data-id="'+ea(e.cid)+'" aria-label="완료 시각 수정">'+esc(lab)+'</button>':'<button class="evt" disabled tabindex="-1" aria-hidden="true">'+esc(lab)+'</button>';
   return '<div class="ev'+(d.plan==='R'&&!done?' rsv':'')+'" data-t="'+ea(at||'')+'" style="--cc:'+cc[1]+'">'+tcol+'<button class="evdot" data-act="evck" data-id="'+ea(e.cid)+'" aria-pressed="'+done+'" aria-label="'+ea(d.title)+' 완료"><span class="dotv"></span></button><div class="c"><div class="card sm'+(done?' evdone':'')+'">'+evBody(e)+'</div></div></div>';
 }
+/* 타임라인의 가벼운 한 줄(메모·체크·결제)이 공유하는 뼈대: 시각 · 점 · 내용 */
+function miniEv(cls,tm,dot,body){return '<div class="ev mev'+cls+'" data-t="'+ea(tm)+'"><button class="evt" disabled tabindex="-1" aria-hidden="true">'+esc(tm)+'</button><span class="evdot memodot">'+dot+'</span><div class="c">'+body+'</div></div>'}
 function memoEv(m){
-  return '<div class="ev mev" data-t="'+ea(m.memo_time||'')+'"><button class="evt" disabled tabindex="-1" aria-hidden="true">'+esc(m.memo_time||'')+'</button><span class="evdot memodot"><span class="mdot"></span></span><div class="c"><div class="memoc">'+(hasPhoto(m)?photoThumb(m,44):ic('notes',14))+'<span>'+memoText(m)+'</span></div></div></div>';
+  return miniEv('',m.memo_time||'','<span class="mdot"></span>','<div class="memoc">'+(hasPhoto(m)?photoThumb(m,44):ic('notes',14))+'<span>'+memoText(m)+'</span></div>');
 }
-function effTimes(ev){
-  var def=SLOTDEF,prev='00:00',out=[];
-  ev.forEach(function(e){var t=e.d.time||def[e.d.slot]||prev;if(t<prev)t=prev;out.push(t);prev=t});
+/* 줄 하나의 시각 키: 완료했으면 완료 시각(화면 라벨과 같은 기준)이 있으면 그것, 아니면 예정 시각 → 시간대 기본값 → 앞 줄 시각 */
+function evKey(d,prev,shown){return (shown&&d.done&&d.doneAt)?hhmm(d.doneAt):(d.time||SLOTDEF[d.slot]||prev)}
+function timesOf(ev,shown){
+  var prev='00:00',out=[];
+  ev.forEach(function(e){var t=evKey(e.d,prev,shown);if(t<prev)t=prev;out.push(t);prev=t});
   return out;
 }
-/* 타임라인 표시용 시각: 화면 라벨에 보이는 시각(완료한 일정은 완료 시각)과 같은 기준으로 메모와 줄을 세운다.
-   (저장·삽입 순서용 effTimes는 그대로 두고, 화면 배치에만 쓴다) */
-function dispTimes(ev){
-  var def=SLOTDEF,prev='00:00',out=[];
-  ev.forEach(function(e){var d=e.d,t=(d.done&&d.doneAt)?hhmm(d.doneAt):(d.time||def[d.slot]||prev);if(t<prev)t=prev;out.push(t);prev=t});
-  return out;
-}
-/* 화면에 보이는 시각(완료한 일정은 완료 시각, 아니면 예정 시각·시간대 기본값) 순으로 줄을 세운다.
-   서버에 저장된 순서는 바꾸지 않는다 — 예정 시각 없이 시간대만 있는 일정을 일찍 마치면 라벨(13:19)이 앞 줄(13:50)보다 이르게 보이던 문제 */
+function effTimes(ev){return timesOf(ev,false)}   // 저장·삽입 순서용
+function dispTimes(ev){return timesOf(ev,true)}   // 화면 배치용(완료한 일정은 완료 시각)
+/* 화면에 보이는 시각 순으로 줄을 세운다. 서버에 저장된 순서는 바꾸지 않는다 —
+   예정 시각 없이 시간대만 있는 일정을 일찍 마치면 라벨(13:19)이 앞 줄(13:50)보다 이르게 보이던 문제 */
 function sortShown(ev){
-  var def=SLOTDEF,prev='00:00';
-  return ev.map(function(e,i){var d=e.d,k=(d.done&&d.doneAt)?hhmm(d.doneAt):(d.time||def[d.slot]||prev);prev=k;return {e:e,k:k,i:i}})
+  var prev='00:00';
+  return ev.map(function(e,i){var k=evKey(e.d,prev,true);prev=k;return {e:e,k:k,i:i}})
     .sort(function(a,b){return a.k<b.k?-1:(a.k>b.k?1:a.i-b.i)}).map(function(x){return x.e});
 }
 /* 이날 완료한 체크리스트 항목(완료 시각이 있는 것만) — 타임라인에 가벼운 한 줄로 섞어 보여준다 */
 function doneChecksOf(d){return (CL.items||[]).filter(function(i){return !i.pre&&i.date===d&&i.done&&i.completedAt})}
 function ckEv(i){
-  var tm=hhmm(i.completedAt);
-  return '<div class="ev mev ckev" data-t="'+tm+'"><button class="evt" disabled tabindex="-1" aria-hidden="true">'+tm+'</button><span class="evdot memodot"><span class="ckdot'+(i.cat==='shop'?' shop':'')+'">'+ic(i.cat==='shop'?'shopping-cart':'check',11)+'</span></span><div class="c"><div class="cktx">'+esc(i.t)+'</div>'+ckSpent(i.id)+'</div></div>';
+  return miniEv(' ckev',hhmm(i.completedAt),'<span class="ckdot'+(i.cat==='shop'?' shop':'')+'">'+ic(i.cat==='shop'?'shopping-cart':'check',11)+'</span>','<div class="cktx">'+esc(i.t)+'</div>'+ckSpent(i.id));
 }
 function ckSpent(cid){var l=refList(cid);if(!l.length)return '';return '<div class="small" style="color:var(--sub);margin-top:1px">'+ic('cash',13)+' 지출 '+sumLabel(sumInfo(l))+'</div>'}
 /* 일정에 연동하지 않은 현지 지출(연동된 건 일정 카드 안 '지출' 줄에 이미 나온다)을 결제 시각 자리에 한 줄로 */
@@ -606,7 +613,7 @@ function payEv(x){
   var d=x.d,tm=d.time||'',jpy=d.currency!=='KRW',
       amt=jpy?'¥'+won(d.amount)+' <span class="payk">'+won(d.amount*fx())+'원</span>':won(d.amount)+'원',
       ico=ic(ECATI[d.ecat]||'dots',13,'#fff'),bg=pcol(ECATC[d.ecat]||'gray')[2];
-  return '<div class="ev mev ckev" data-t="'+ea(tm)+'"><button class="evt" disabled tabindex="-1" aria-hidden="true">'+esc(tm)+'</button><span class="evdot memodot"><span class="ckdot" style="background:'+bg+'">'+ico+'</span></span><div class="c"><div class="cktx">'+esc(d.name)+' <span class="payamt">'+amt+'</span></div></div></div>';
+  return miniEv(' ckev',tm,'<span class="ckdot" style="background:'+bg+'">'+ico+'</span>','<div class="cktx">'+esc(d.name)+' <span class="payamt">'+amt+'</span></div>');
 }
 function tlFilterHtml(){
   var f=UI.tlf||{};
@@ -1095,7 +1102,7 @@ function padRender(){
   var el=document.getElementById('numpad');if(!el)return;
   if(!PAD){el.innerHTML='';document.body.classList.remove('padopen');document.documentElement.style.removeProperty('--padh');return}
   function k(v,l,c,al){return '<button class="'+(c||'')+'" data-act="padk" data-v="'+v+'" aria-label="'+(al||l||v)+'">'+(l||v)+'</button>'}
-  el.innerHTML='<div class="npad"><div class="npk">'+k('7')+k('8')+k('9')+k('B','⌫','fn','지우기')+k('4')+k('5')+k('6')+k('-','−','op','빼기')+k('1')+k('2')+k('3')+k('+','+','op','더하기')+k('C','C','fn','모두 지우기')+k('0')+k('00')+'<button class="done" data-act="padok">완료</button></div></div>';
+  el.innerHTML='<div class="npad"><div class="npk">'+k('1')+k('2')+k('3')+k('B',ic('backspace',22),'fn','지우기')+k('4')+k('5')+k('6')+k('-','−','op','빼기')+k('7')+k('8')+k('9')+k('+','+','op','더하기')+k('C','C','fn','모두 지우기')+k('0')+k('00')+'<button class="done" data-act="padok">완료</button></div></div>';
   document.body.classList.add('padopen');
   document.documentElement.style.setProperty('--padh',el.firstChild.offsetHeight+'px');
 }
@@ -1815,7 +1822,8 @@ function onClick(e){
   if(a==='pk-bg'){if(e.target===el)closePicker();return}
   if(a==='albvbg'){if(e.target===el)albBack();return}   // 뷰어 바깥 어두운 곳을 눌렀을 때만 닫는다
   var h=ACT[a];if(!h)return;
-  h(el,el.getAttribute('data-v'),el.getAttribute('data-id'));
+  try{h(el,el.getAttribute('data-v'),el.getAttribute('data-id'))}
+  catch(err){console.error('iitabi action',a,err);toast('문제가 생겼어요. 다시 시도해 주세요')}   // 한 동작의 오류가 화면 전체를 멈추지 않게
   if(DRAFT_ACT[a])persistDraft();
 }
 function onChange(e){
@@ -1914,6 +1922,6 @@ function boot(){
     navigator.serviceWorker.register('iitabi-sw.js?v='+VER,{scope:'./'}).catch(function(){});
   }
 }
-window.__iitabi={periodOf:periodOf,pull:pull,flush:flush,state:function(){return {UI:UI,M:M,CL:CL,Q:Q,cfg:cfg}},render:render};
+if(/[?&]debug=1/.test(location.search))window.__iitabi={periodOf:periodOf,pull:pull,flush:flush,state:function(){return {UI:UI,M:M,CL:CL,Q:Q,cfg:cfg}},render:render};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();
