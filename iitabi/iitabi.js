@@ -304,7 +304,7 @@ function pull(force){
       if(Q.length){setStatus();return}  // 받는 사이 새로 고친 내용이 있으면 덮어쓰지 않고 다음 동기화로 넘김
       M=buildModel(rows);saveRows();
       return pullTodos().then(function(){return pullMemos()}).then(function(){
-        UI.syncAt=Date.now();setStatus();renderSafe();pullWeather();fetchFx();locateCity();syncPayMemos();diaryAuto();
+        UI.syncAt=Date.now();setStatus();renderSafe();pullWeather();fetchFx();locateCity();syncPayMemos();diarySync();
       });
     });
   });
@@ -2129,6 +2129,11 @@ function diaryAuto(force){
     var todo=diaryTodo();DG.total=todo.length;DG.n=0;
     return todo.reduce(function(pr,d){return pr.then(function(){DG.cur=d;repaintDiary();return diaryGen1(d).then(function(){DG.n++;repaintDiary()})})},Promise.resolve()).then(function(){if(DG.total)toast('일기를 모두 만들었어요')});
   }).then(function(){DG.run=false;DG.cur='';repaintDiary()},function(e){DG.run=false;DG.fail=true;DG.cur='';repaintDiary();toast('일기 만들기를 멈췄어요: '+e.message)});
+}
+/* 키가 없는 기기(모바일 등)도 서버에 저장된 일기를 받아 와야 한다 — 받아 오는 일은 키와 무관하게 동기화 때마다 */
+function diarySync(){
+  if(!isPost())return;
+  diaryPull().then(function(ok){if(ok)repaintDiary();diaryAuto()});
 }
 function dphoto(m){return '<figure class="dfig"><button class="dph" data-act="dphoto" data-id="'+ea(m.client_id)+'" aria-label="사진 크게 보기"><img class="dimg" loading="lazy" decoding="async" alt="" src="'+ea(m.photo_url)+'"></button><figcaption>'+esc(m.memo_time||'')+'</figcaption></figure>'}
 function screenDiary(){
