@@ -1536,6 +1536,8 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 /* ── 주간 가로 리듬바 (블록 모델) ── */
 .wrb-wrap{display:flex;flex-direction:column;gap:13px;padding:2px 0;}
 .wrb-summary{padding:4px 0;}
+.wrb-note{font-size:var(--dow-label-size);color:var(--tm);text-align:center;line-height:1.5;padding:12px 0;} /* 주간 리듬 배너 빈 상태 안내 / 기록이 적을 때 하단 안내(.sub) */
+.wrb-note.sub{padding:12px 0 2px;}
 .wrb-form-slot{margin:2px 0 4px 0;padding:10px 12px;background:rgba(158,128,149,0.04);border-radius:12px;}
 .rhythm-track-ongoing{margin-bottom:8px;}
 .rhythm-track-ongoing .rt-row{display:flex;align-items:center;gap:7px;font-size:var(--dow-label-size);color:var(--tp);padding:5px 0;white-space:normal;}
@@ -2763,7 +2765,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   </div>
 </div>
 
-<script src="app.js?v=20261013a"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
+<script src="app.js?v=20261014a"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
 
 </body>
 </html>

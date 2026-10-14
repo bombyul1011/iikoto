@@ -133,6 +133,8 @@ const RHYTHM_SLEEP_COLOR='rgba(var(--pal-warmgray-rgb),0.30)'; // 알파만 낮�
 const RHYTHM_MEAL_COLOR='rgba(var(--pal-green-rgb),0.90)';
 // 리듬 카테고리 분류 설명 — AI 프롬프트에서 시간 사용 데이터를 다룰 때 카테고리 오분류(예: 업무↔책상, 휴식↔감상)를 줄이기 위해 공통으로 붙이는 한 줄 설명.
 const RHYTHM_CAT_GUIDE='(카테고리 참고: 운동=홈트/헬스장/러닝 등, 휴식=낮잠/멍때리기/게임 등 목적 없이 흘려보내는 시간, 단장=기상 후 스트레칭·씻기·스킨케어 등 몸을 준비하는 루틴이나 취침 전 씻고 정돈하는 루틴, 그리고 다음날/다음 일정을 위해 미리 손 써두는 시간(여행 짐 챙기기, 다음날 식사 미리 준비해두기 등)까지 포함 — 지금 당장이 아니라 다가올 시간을 위해 준비하는 행위 전반(휴식과 구분됨), 업무=주로 노트북으로 하는 작업(가끔 외근 포함), 외출=지인과의 약속이나 혼자 가는 카페/산책 등, 책상=일기·공부·앱 정비·노트정리 등 책상에서 하는 작업, 감상=드라마·독서·영화, 정리=청소·빨래 등 집안 정리)';
+// 활동 카테고리 라벨 목록(수면·식사 제외) — 리듬 막대/집계가 "활동"을 가를 때 공통으로 씀.
+function rhythmActivityLabels(){return Object.values(RHYTHM_CATS).map(function(c){return c.label;});}
 function getRhythmColor(key){
   if(key==='_sleep')return RHYTHM_SLEEP_COLOR;
   if(key==='_meal')return RHYTHM_MEAL_COLOR;
@@ -609,16 +611,23 @@ function getDayCategoryDurations(dk){
 // 다음주 제안이 공용으로 사용.
 function sumCategoryDurations(startDate,days){
   const dur={},dayCount={};
+  const actLabels=rhythmActivityLabels();
+  let activeDays=0; // 활동 리듬(수면·식사 제외)이 한 건이라도 잡힌 날 수 — 오프 날은 아래서 건너뛰므로 자동으로 빠짐
   for(let i=0;i<days;i++){
     const d=new Date(startDate);d.setDate(startDate.getDate()+i);
     if(isVacationDate(d))continue; // 오프 기간은 리듬 집계(주간/월간 바)에서 제외 — buildMonthlyRhythmBar·computeWeeklyRhythmDur 공통 반영
     const dd=getDayCategoryDurations(dateKey(d));
+    let hasActivity=false;
     Object.keys(dd).forEach(function(k){
       dur[k]=(dur[k]||0)+dd[k];
-      if(dd[k]>0)dayCount[k]=(dayCount[k]||0)+1;
+      if(dd[k]>0){
+        dayCount[k]=(dayCount[k]||0)+1;
+        if(actLabels.indexOf(k)>=0)hasActivity=true;
+      }
     });
+    if(hasActivity)activeDays++;
   }
-  return {dur,dayCount};
+  return {dur,dayCount,activeDays};
 }
 function fmtDur(min){
   const h=Math.floor(min/60),m=Math.round(min%60);
@@ -633,7 +642,7 @@ function durSummaryLine(dur){
 }
 function buildMonthlyRhythmBar(dur,dim,dayCount){
   // 막대는 활동 카테고리끼리만 비교 (수면은 이미 상단 통계에 평균값으로 따로 표시됨, 식사는 시간 기록 단위가 아니라 비교 의미가 적음)
-  const order=Object.values(RHYTHM_CATS).map(function(c){return c.label;});
+  const order=rhythmActivityLabels();
   const colorMap={};
   Object.keys(RHYTHM_CATS).forEach(function(k){colorMap[RHYTHM_CATS[k].label]=getRhythmColor(k);});
   const total=order.reduce(function(s,k){return s+(dur[k]||0);},0);
@@ -11142,17 +11151,38 @@ function computeWeeklyRhythmDur(){
 }
 // 최대 5위까지만 — buildMonthlyRhythmBar는 전체를 다 나열하므로, 상위 5개만 골라 같은 형식으로 재구성.
 function buildWeeklyRhythmBarTop5(dur,dayCount){
-  const order=Object.values(RHYTHM_CATS).map(function(c){return c.label;});
+  const order=rhythmActivityLabels();
   const top5=order.filter(function(k){return (dur[k]||0)>0;})
     .sort(function(a,b){return dur[b]-dur[a];}).slice(0,5);
   const trimmedDur={},trimmedDayCount={};
   top5.forEach(function(k){trimmedDur[k]=dur[k];trimmedDayCount[k]=dayCount[k];});
   return buildMonthlyRhythmBar(trimmedDur,false,trimmedDayCount);
 }
+// 주간 리듬 배너 안내 문구 — 7일 중 활동 리듬이 잡힌 날이 적을 때(0~WEEKLY_RHYTHM_SPARSE_MAX_DAYS일) 얹는 다정한 권유 한 줄.
+// 오프 같은 특정 상황을 언급하지 않고 어떤 이유로든 기록이 적은 주에 두루 쓰이도록 씀. 문구(콘텐츠)는 이 배열에서만 수정.
+const WEEKLY_RHYTHM_SPARSE_MAX_DAYS=3;
+const WEEKLY_RHYTHM_NUDGES=[
+  '요즘 하루를 어떻게 보내고 계신가요? 짧게라도 남겨보세요.',
+  '오늘은 어떤 하루였는지, 한 줄만 기록해볼까요?',
+  '기록이 쌓일수록 내 시간의 모양이 또렷해져요.',
+  '바쁜 날도 느긋한 날도, 오늘의 시간을 살짝 담아두어요.',
+  '요즘 시간을 어디에 쓰고 계신지 궁금해요. 가볍게 남겨봐요.',
+  '작은 기록 하나가 이번 주를 더 따뜻하게 기억하게 해줘요.',
+  '지금 하고 있는 일을 한 번 눌러 기록해볼까요?'
+];
 function renderWeeklyRhythmBars(){
   const el=document.getElementById('weekly-rhythm-bars');if(!el)return;
-  const {dur,dayCount}=computeWeeklyRhythmDur();
-  const barHtml=Object.keys(dur).length?buildWeeklyRhythmBarTop5(dur,dayCount):'<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:12px 0;">'+(weeklyWeekOffset()===0?'최근 7일간':'이 주에')+' 기록된 리듬이 없어요</div>';
+  const {dur,dayCount,activeDays}=computeWeeklyRhythmDur();
+  const isCurrent=weeklyWeekOffset()===0; // 최근 7일(현재) 창에서만 "기록해보세요" 권유 — 지난/다음 주는 오늘 리듬을 못 채우는 화면이라 사실 안내만
+  const nudge=WEEKLY_RHYTHM_NUDGES[dateSeedIndex(dateKey(getLogicalDate()),WEEKLY_RHYTHM_NUDGES.length)]; // 같은 날엔 같은 문구
+  let barHtml;
+  if(!activeDays){
+    // 수면·식사만 있는 날은 dur에 키가 생기지만 막대는 활동 카테고리만 그리므로, dur 키 유무가 아니라 "활동이 잡힌 날 수"로 빈 상태를 판단
+    barHtml='<div class="wrb-note">'+(isCurrent?nudge:'이 주에 기록된 리듬이 없어요')+'</div>';
+  }else{
+    barHtml=buildWeeklyRhythmBarTop5(dur,dayCount);
+    if(activeDays<=WEEKLY_RHYTHM_SPARSE_MAX_DAYS)barHtml+='<div class="wrb-note sub">'+activeDays+'일치 기록이에요.'+(isCurrent?' '+nudge:'')+'</div>';
+  }
   let html='<div class="wrb-wrap"><div class="wrb-summary" onclick="toggleWeeklyRhythmForm()" style="cursor:pointer;">'+barHtml+'</div>';
   if(_weeklyRhythmFormOpen){
     html+='<div class="wrb-form-slot" id="wrb-today-form"></div>';
