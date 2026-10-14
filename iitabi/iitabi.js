@@ -29,7 +29,7 @@ var SPOT_ECAT={meal:'food',cafe:'cafe',sight:'entry',snack:'food'};
 var CATI={meal:'tools-kitchen-2',cafe:'coffee',sight:'camera',snack:'cookie'};
 var CATC={meal:'orange',cafe:'pink',sight:'lime',snack:'yel'};
 var ECATC={food:'orange',cafe:'pink',move:'sky',shop:'lav',conv:'yel',entry:'lime',etc:'gray'};
-var TABC={today:'orange',sched:'sky',check:'lav',budget:'mint',spots:'rose'};
+var TABC={today:'orange',sched:'sky',check:'lav',budget:'mint',spots:'rose',recap:'orange',diary:'rose',photos:'sky'};
 var ECAT={food:'식사',cafe:'카페',move:'교통',shop:'쇼핑',conv:'편의점',entry:'관광',etc:'기타'};
 var ECATI={food:'tools-kitchen-2',cafe:'coffee',move:'train',shop:'shopping-bag',conv:'building-store',entry:'ticket',etc:'dots'};
 var TI={sun:'sun',cal:'calendar',chk:'list-check',wal:'wallet',pin:'map-pin',nav:'navigation',chevd:'chevron-down',chevr:'chevron-right',chevl:'chevron-left',plus:'plus',pen:'pencil',x:'x',check:'check',cloud:'cloud',cloudok:'cloud-check',cloudoff:'cloud-off',refresh:'refresh',ext:'external-link',plane:'plane',bed:'bed',bus:'bus',checkc:'circle-check',dl:'download',ul:'upload',clock:'clock',notes:'notes',calplus:'calendar-plus'};
@@ -71,11 +71,12 @@ var PINH='';  // 화면 상단에 고정할 HTML(일정·경비 탭). render()�
 var M=null,CL={items:[]},MEMOS=[],WX={},MIR={},Q=lget('q',[]),TRIPS=lget('trips',[]);  // MIR: 이이코토 시간표로 보낸 일정 {이름표:{date}}
 function saveQ(){lset('q',Q)}
 function loadTrip(){
-  if(!cfg.tripId){M=null;CL={items:[]};MEMOS=[];WX={};MIR={};return}
+  if(!cfg.tripId){M=null;CL={items:[]};MEMOS=[];WX={};MIR={};DIARY={};return}
   var rows=lget('rows:'+cfg.tripId,null);
   M=rows?buildModel(rows):null;
   CL=lget('cl:'+cfg.tripId,{items:[]});
   MEMOS=lget('memos:'+cfg.tripId,[]);
+  DIARY=lget('diary:'+cfg.tripId,{});
   WX=lget('wx:'+cfg.tripId,{});
   MIR=lget('mir:'+cfg.tripId,{});
 }
@@ -303,7 +304,7 @@ function pull(force){
       if(Q.length){setStatus();return}  // 받는 사이 새로 고친 내용이 있으면 덮어쓰지 않고 다음 동기화로 넘김
       M=buildModel(rows);saveRows();
       return pullTodos().then(function(){return pullMemos()}).then(function(){
-        UI.syncAt=Date.now();setStatus();renderSafe();pullWeather();fetchFx();locateCity();syncPayMemos();
+        UI.syncAt=Date.now();setStatus();renderSafe();pullWeather();fetchFx();locateCity();syncPayMemos();diaryAuto();
       });
     });
   });
@@ -421,7 +422,7 @@ function topWx(){
   var diff=id!==cityOfDate(today());
   return ic(w.sun?'sun':'cloud',15,pcol(w.sun?'orange':'sky')[2])+'<span>'+(diff?esc(cityName(id))+' · ':'')+(w.sun?'맑음':'흐림')+' '+Math.round(w.tmax)+'°/'+Math.round(w.tmin)+'°'+(w.pp!=null?' · 강수 '+w.pp+'%':'')+'</span>';
 }
-function dayPill(){var t=trip(),td=today();if(!t)return '';if(td<t.start)return 'D-'+Math.round((parse(t.start)-parse(td))/86400000);if(td>t.end)return '여행 종료';var dts=tripDates();return 'DAY '+(dts.indexOf(td)+1)+' / '+dts.length}
+function dayPill(){var t=trip(),td=today();if(!t)return '';if(td<t.start)return 'D-'+Math.round((parse(t.start)-parse(td))/86400000);if(td>t.end)return '여행 종료 · D+'+Math.round((parse(td)-parse(t.end))/86400000);var dts=tripDates();return 'DAY '+(dts.indexOf(td)+1)+' / '+dts.length}
 /* 오늘 카드에 올릴 일정: 아직 완료하지 않은 일정 중 시각이 가장 빠른 것(시각이 지났어도 미완료면 그대로 유지).
    전부 완료했다면 마지막 일정을 보여준다. */
 function dayEvents(vd){return sortShown(activeEvs(vd).concat(stayEvs(vd)))}  // 일정 + 숙소 체크인·체크아웃을 화면 시각 순으로
@@ -578,7 +579,7 @@ function evRow(e,cc,at){
   var d=e.d,done=!!d.done;
   var lab=done&&d.doneAt?hhmm(d.doneAt):(d.time||SLOTL[d.slot]||'');
   var tcol=(done&&d.doneAt)?'<button class="evt done" data-act="evtime" data-id="'+ea(e.cid)+'" aria-label="완료 시각 수정">'+esc(lab)+'</button>':'<button class="evt" disabled tabindex="-1" aria-hidden="true">'+esc(lab)+'</button>';
-  return '<div class="ev'+(d.plan==='R'&&!done?' rsv':'')+'" data-t="'+ea(at||'')+'" style="--cc:'+cc[1]+'">'+tcol+'<button class="evdot" data-act="evck" data-id="'+ea(e.cid)+'" aria-pressed="'+done+'" aria-label="'+ea(d.title)+' 완료"><span class="dotv"></span></button><div class="c"><div class="card sm'+(done?' evdone':'')+'">'+evBody(e)+'</div></div></div>';
+  return '<div class="ev'+(d.plan==='R'&&!done?' rsv':'')+'" data-t="'+ea(at||'')+'" style="--cc:'+cc[1]+'">'+tcol+'<button class="evdot" data-act="evck" data-id="'+ea(e.cid)+'" aria-pressed="'+done+'" aria-label="'+ea(d.title)+' 완료"><span class="dotv"></span></button><div class="c"><div class="card sm'+(done?' evdone':(isPost()?' evmiss':''))+'">'+evBody(e)+'</div></div></div>';
 }
 /* 타임라인의 가벼운 한 줄(메모·체크·결제)이 공유하는 뼈대: 시각 · 점 · 내용 */
 function miniEv(cls,tm,dot,body){return '<div class="ev mev'+cls+'" data-t="'+ea(tm)+'"><button class="evt" disabled tabindex="-1" aria-hidden="true">'+esc(tm)+'</button><span class="evdot memodot">'+dot+'</span><div class="c">'+body+'</div></div>'}
@@ -714,14 +715,15 @@ function screenSched(){
   var dates=tripDates();
   var d=UI.sched&&dates.indexOf(UI.sched)>=0?UI.sched:clampDate(today());
   UI.sched=d;
-  var h=titleBar('일정',null,'<span class="syncst" style="cursor:default">'+(dates.length-1)+'박 '+dates.length+'일</span>','sky');
+  var h=titleBar('일정',null,'<span class="row" style="gap:8px">'+(isPost()?lockChip():'')+'<span class="syncst" style="cursor:default">'+(dates.length-1)+'박 '+dates.length+'일</span></span>','sky');
   h+=weekStrip(d,'date');
   PINH=h;h='';
   var s=stayOf(d),cid=cityOfDate(d);
-  h+='<div class="row" style="min-height:44px">'+cityChip(cid)+(s?'<span class="grow small muted">'+esc(s.d.name)+' · '+md(s.d.checkin)+' – '+md(s.d.checkout)+'</span>':'<span class="grow"></span>')+(s?'<button class="ico" data-act="stedit" data-id="'+ea(s.cid)+'" aria-label="숙소 수정">'+ic('pen',16)+'</button>'+icoMap(s.d.map||s.d.name):'')+'</div>';
+  h+='<div class="row" style="min-height:44px">'+cityChip(cid)+(s?'<span class="grow small muted">'+esc(s.d.name)+' · '+md(s.d.checkin)+' – '+md(s.d.checkout)+'</span>':'<span class="grow"></span>')+(s?(isPost()?'':'<button class="ico" data-act="stedit" data-id="'+ea(s.cid)+'" aria-label="숙소 수정">'+ic('pen',16)+'</button>')+icoMap(s.d.map||s.d.name):'')+'</div>';
   var note=(t.dayNotes||{})[d];if(note)h+='<div>'+chip(esc(note),'pn')+'</div>';
+  if(isPost()){var ds=dayStat(d),dp=dayPhotos(d).length,dsp=daySpend(d);h+='<div class="small muted" style="line-height:1.5">일정 <b style="color:var(--tx)">'+ds.done+' / '+ds.n+' 완료</b>'+(dp?' · 사진 '+dp+'장':'')+(dsp?' · 지출 <b style="color:var(--tx)">'+won(dsp)+'원</b>':'')+'</div>'}
   h+=timelineHtml(d);
-  h+='<div class="row"><button class="btn" style="flex:1" data-act="evnew" data-date="'+d+'">'+ic('plus',16)+'일정 추가</button><button class="btn" data-act="stnew" data-date="'+d+'">'+ic('bed',16)+'숙소 추가</button></div>';
+  if(!isPost())h+='<div class="row"><button class="btn" style="flex:1" data-act="evnew" data-date="'+d+'">'+ic('plus',16)+'일정 추가</button><button class="btn" data-act="stnew" data-date="'+d+'">'+ic('bed',16)+'숙소 추가</button></div>';
   return h;
 }
 function dayLeft(d){
@@ -796,11 +798,12 @@ function screenBudget(){
   items.forEach(function(x){var v=xKrw(x.o);if(x.k==='stay')stay+=v;else if(x.o.d.cat==='air')air+=v;else etc+=v});
   localList().forEach(function(e){local+=xKrw(e)});
   var total=air+stay+etc+local;
-  var h=titleBar('경비',null,'<button class="fab sm" data-act="exp-new" aria-label="지출 추가">'+ic('plus',20)+'</button>','mint');
+  var h=titleBar('경비',null,isPost()?lockChip():'<button class="fab sm" data-act="exp-new" aria-label="지출 추가">'+ic('plus',20)+'</button>','mint');
   h+=card('<div class="row between" style="margin-bottom:2px"><div class="lbl" style="margin-bottom:0">총 지출</div><button class="fxtap" data-act="sheet" data-v="fx" aria-label="환율 보기">1엔 = '+rate2()+'원 '+ic('chevd',14)+'</button></div><div class="row between" style="align-items:baseline"><div style="font-family:var(--serif);font-size:36px;font-weight:700">'+won(total)+'<span style="font-size:18px;color:var(--sub)">원</span></div><span class="yen" style="font-size:14px">¥'+won(Math.round(total/fx()))+'</span></div>'+
     '<div class="gantt"><span style="flex:'+(air||0.001)+';background:'+CH[0]+'"></span><span style="flex:'+(stay||0.001)+';background:'+CH[1]+'"></span><span style="flex:'+(etc||0.001)+';background:'+CH[2]+'"></span><span style="flex:'+(local||0.001)+';background:'+CH[3]+'"></span></div>'+
     '<div class="legend"><span><i style="background:'+CH[0]+'"></i>항공 '+won(air)+'</span><span><i style="background:'+CH[1]+'"></i>숙소 '+won(stay)+'</span><span><i style="background:'+CH[2]+'"></i>기타 '+won(etc)+'</span><span><i style="background:'+CH[3]+'"></i>현지 '+won(local)+'</span></div>');
   PINH=h;h='';
+  if(isPost())h+=budgetPostMid();else{
   var cs={};localList().forEach(function(e){cs[e.d.ecat||'etc']=(cs[e.d.ecat||'etc']||0)+xKrw(e)});
   var ck=Object.keys(ECAT).filter(function(k){return cs[k]}).sort(function(a,b){return a==='etc'?1:b==='etc'?-1:cs[b]-cs[a]});   // 금액 큰 순, 기타는 항상 맨 뒤
   var xs=UI.xcat||{};Object.keys(xs).forEach(function(k){if(!cs[k])delete xs[k]});UI.xcat=xs;   // 필터로 켠 카테고리(여러 개 가능, 없어진 것은 정리)
@@ -816,6 +819,7 @@ function screenBudget(){
       var list=byDay[d].slice().sort(byTimeDesc);
       h+=card('<div class="row between" style="margin-bottom:2px"><b>'+md(d)+' '+wd(d)+'</b><span class="small muted">'+sl+'</span></div>'+list.map(function(e){return expRow(e)}).join(''),'sm flat');
     });
+  }
   }
   var iconOf=function(x){var d=x.o.d;return x.k==='stay'?'bed':(d.cat==='air'?'plane':(d.cat==='transport'?'bus':'dots'))};
   var fixed=items.slice();
@@ -872,7 +876,11 @@ function sheetHtml(){
     body+=card('<b style="font-size:15px">새 여행 만들기</b><div class="small muted" style="margin-top:4px">템플릿·복제는 다녀온 뒤 추가할 예정이에요. 지금은 가져오기로 만들 수 있어요.</div>');
     body+=card('<div class="lbl">백업 · 복원</div><div class="row"><button class="btn" data-act="export">'+ic('dl',16)+'백업 내보내기</button><label class="btn" style="cursor:pointer">'+ic('ul',16)+'가져오기<input type="file" id="imp" accept="application/json,.json" style="display:none"></label></div>');
     body+=card('<div class="lbl">이이코토 반영</div><div class="small muted" style="line-height:1.5;margin-bottom:10px">완료한 일정은 이이코토 시간표로, 하루 지출은 '+PAY_HOUR+'시 이후 앱을 열 때 메모 한 줄로 자동 반영돼요.</div><button class="btn" data-act="mirror-all">'+ic('refresh',16)+'완료한 일정 다시 보내기</button>');
+    body+=aiCardHtml();
     body+=card('<div class="row between"><span class="small muted">앱 버전 '+VER+'</span><button class="btn" data-act="sheet" data-v="key">키 변경</button></div>');
+  }else if(v==='diaryedit'){
+    var de=UI.dDraft;if(!de)return '';
+    body=shead('일기 고치기')+'<div><div class="lbl">제목</div><input class="fld" id="de_title" style="width:100%" autocomplete="off" aria-label="제목" value="'+ea(de.title)+'"></div><div><div class="lbl">본문 · 문단은 빈 줄로 나눠요</div><textarea class="fld" id="de_text" rows="14" style="width:100%;resize:vertical;font-family:var(--serif);line-height:1.8" aria-label="본문">'+esc(de.text)+'</textarea></div><div class="row"><button class="btn pri" style="flex:1" data-act="dedit-save">저장</button></div>';
   }else if(v==='cl'){
     var cdr=UI.clDraft||{ts:'none'};
     body='<div class="row" style="gap:8px"><h1 style="font-size:22px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(cdr.t||'체크리스트 추가')+'</h1>'+catTrio(cdr.cat,'')+'<button class="btn" style="border:0;background:transparent" data-act="sheet-close" aria-label="닫기">'+ic('x',20)+'</button></div>'+tsChips('clts',null,cdr.ts||'none')+alRow(cdr.at,cdr.ao,'')+'<button class="btn pri" data-act="cl-save">등록</button>';
@@ -946,6 +954,8 @@ var TABS=[['today','오늘','sun'],['sched','일정','cal'],['check','체크','c
 function render(){
   var sc=document.getElementById('screen'),y=sc.scrollTop,mly=Array.prototype.map.call(sc.querySelectorAll('.fitlist.scroll'),function(x){return x.scrollTop});
   var ml=sc.querySelector('.fitlist.scroll[data-end]'),mAtEnd=!!ml&&ml.scrollTop+ml.clientHeight>=ml.scrollHeight-4;  // 메모 목록을 맨 아래(최신)까지 보고 있었는지
+  var tl=tabs();if(!tl.some(function(x){return x[0]===UI.tab}))UI.tab=tl[0][0];
+  document.body.classList.toggle('post',isPost());
   var sig=UI.tab+'|'+viewDate(),sameView=sig===LASTSIG;LASTSIG=sig;
   var h='';PINH='';
   try{
@@ -954,12 +964,15 @@ function render(){
     else if(UI.tab==='sched')h=screenSched();
     else if(UI.tab==='check')h=screenCheck();
     else if(UI.tab==='budget')h=screenBudget();
+    else if(UI.tab==='recap')h=screenRecap();
+    else if(UI.tab==='diary')h=screenDiary();
+    else if(UI.tab==='photos')h=screenPhotos();
     else h=screenSpots();
   }catch(e){console.error(e);h=card('<b>화면을 그리지 못했어요</b><div class="small muted">'+esc(e.message)+'</div>')}
   sc.innerHTML=h;
   var tb='';try{tb=topBar()}catch(e){console.error(e)}   // 상단바 문제로 화면 전체가 멈추지 않게
   document.getElementById('pin').innerHTML=tb+PINH;
-  document.getElementById('tabbar').innerHTML=TABS.map(function(t){var c=pcol(TABC[t[0]]);return '<button data-act="tab" data-v="'+t[0]+'" class="'+(UI.tab===t[0]?'on':'')+'" aria-current="'+(UI.tab===t[0]?'page':'false')+'" style="--tc:'+c[0]+';--ts:'+c[2]+'"><span class="tabi">'+ic(t[2],24)+'</span><span>'+t[1]+'</span></button>'}).join('');
+  document.getElementById('tabbar').innerHTML=tabs().map(function(t){var c=pcol(TABC[t[0]]);return '<button data-act="tab" data-v="'+t[0]+'" class="'+(UI.tab===t[0]?'on':'')+'" aria-current="'+(UI.tab===t[0]?'page':'false')+'" style="--tc:'+c[0]+';--ts:'+c[2]+'"><span class="tabi">'+ic(t[2],24)+'</span><span>'+t[1]+'</span></button>'}).join('');
   document.getElementById('bg-fixed').style.setProperty('--glow',pcol(TABC[UI.tab]||'orange')[1].replace(/,[\d.]+\)$/,',.26)'));
   var shh=sheetHtml();if(UI.sheet&&!shh)UI.sheet=null;  // 열려 있던 대상이 동기화로 사라진 경우 쓸기·입력이 막히지 않게
   document.getElementById('sheet').innerHTML=shh;
@@ -1305,8 +1318,8 @@ function evSugHtml(ed){
 function refreshSug(){var sg=document.getElementById('ev_sug');if(sg&&UI.evDraft)sg.innerHTML=evSugHtml(UI.evDraft)}
 function swipeWeek(dir){
   var t=trip();if(!t)return;
-  var key=UI.tab==='check'?'clDate':'sched';
-  var cur=UI[key]||clampDate(today()),tg=addDays(cur,dir*7);
+  var key=UI.tab==='check'?'clDate':(UI.tab==='diary'?'dsel':'sched');
+  var cur=UI[key]||(key==='dsel'?tripDates()[0]:clampDate(today())),tg=addDays(cur,dir*7);
   if(tg<t.start)tg=t.start;if(tg>t.end)tg=t.end;
   if(weekStartOf(tg)===weekStartOf(cur))return;
   UI[key]=tg;UI.wkAnim=dir>0?'l':'r';render();
@@ -1361,9 +1374,9 @@ function onTabTouchEnd(e){
   var p=e.changedTouches&&e.changedTouches[0];if(!p)return;
   var dx=p.clientX-s.x,dy=p.clientY-s.y;
   if(Math.abs(dx)<70||Math.abs(dx)<Math.abs(dy)*1.3)return;   // 세로로 스크롤하려던 움직임은 무시
-  var i=TABS.map(function(t){return t[0]}).indexOf(UI.tab),n=dx<0?i+1:i-1;
-  if(i<0||n<0||n>=TABS.length)return;
-  goTab(TABS[n][0],dx<0?'left':'right');
+  var tl=tabs(),i=tl.map(function(t){return t[0]}).indexOf(UI.tab),n=dx<0?i+1:i-1;
+  if(i<0||n<0||n>=tl.length)return;
+  goTab(tl[n][0],dx<0?'left':'right');
 }
 function onTouchStart(e){var st=e.target.closest&&e.target.closest('#strip');if(!st){swipeX=null;return}var p=(e.touches&&e.touches[0])||e;swipeX=p.clientX;swipeY=p.clientY}
 function onTouchEnd(e){
@@ -1435,7 +1448,7 @@ function restoreDraft(){
    사진을 누르면 이이코토 본앱과 같은 모양의 폴라로이드 뷰어(좌우로 밀어 넘기기: 왼쪽으로 밀면 더 오래된 사진, 오른쪽으로 밀면 더 최신 사진) */
 var ALBSIG='',ALBH=0;   // ALBH: 사진첩이 쌓아 둔 브라우저 기록 수(사진첩 1 + 뷰어 1) — 시스템 뒤로가기·가장자리 쓸기와 같은 길로 닫히게 한다
 function albPush(){try{history.pushState({iitabiAlb:1},'');ALBH++}catch(e){}}
-function albPop(){var A=UI.album;if(!A)return;if(A.v>=0)albumView(-1);else{UI.album=null;renderAlbum(true)}}   // 기록은 이미 뒤로 갔을 때 화면만 닫는다
+function albPop(){var A=UI.album;if(!A)return;if(A.v>=0){albumView(-1);if(A.tab){UI.album=null;renderAlbum(true)}}else{UI.album=null;renderAlbum(true)}}   // 기록은 이미 뒤로 갔을 때 화면만 닫는다
 function albBack(){if(!UI.album)return;if(ALBH>0){try{history.back();return}catch(e){}}albPop()}   // 맨 위 겹(뷰어 → 사진첩 순)부터 한 겹 닫기
 window.addEventListener('popstate',function(){if(ALBH>0){ALBH--;albPop()}});
 function albumAll(){
@@ -1465,7 +1478,7 @@ function albumHtml(){
 function renderAlbum(force){
   var el=document.getElementById('album');if(!el)return;
   var A=UI.album;
-  if(!A){el.classList.remove('on');el.innerHTML='';ALBSIG='';return}
+  if(!A||A.tab){el.classList.remove('on');el.innerHTML='';ALBSIG='';return}   // 사진 탭에서 연 뷰어는 사진첩 화면 없이 사진만 띄운다
   var sig=A.city+'|'+A.date+'|'+albumList().map(function(p){return p.m.photo_url}).join(',')+'|'+((trip()||{}).cities||[]).length;
   if(!force&&sig===ALBSIG)return;
   ALBSIG=sig;
@@ -1510,6 +1523,58 @@ function delWithUndo(o,label,list,kind){  // 지출·결제 항목 삭제 + 5초
 }
 var ACT={
   'tab':function(el,v){goTab(v)},
+  'ddate':function(el,v){UI.dsel=v;render()},
+  'rdiary':function(){UI.dsel=tripDates()[0];goTab('diary')},
+  'rday':function(el,v){UI.dsel=v;goTab('diary')},
+  'xday':function(el,v){UI.xday=(UI.xday===v)?'none':v;render()},
+  'drawtog':function(){var D=UI.draw=UI.draw||{};D[UI.dsel]=!D[UI.dsel];render()},
+  'phcity':function(el,v){UI.ph=UI.ph||{city:'all',date:'all'};UI.ph.city=v;UI.ph.date='all';render();document.getElementById('screen').scrollTop=0},
+  'phdate':function(el,v){UI.ph.date=v;render();document.getElementById('screen').scrollTop=0},
+  'phdates':function(){
+    var P=UI.ph,cnt={},order=[],n=0;
+    albumAll().forEach(function(p){if(P.city!=='all'&&p.city!==P.city)return;var k=p.m.date_key;if(!cnt[k]){cnt[k]=0;order.push(k)}cnt[k]++;n++});
+    var btns=[{t:'모든 날짜 · '+n+'장',cls:P.date==='all'?'ok':'',fn:function(){UI.ph.date='all';render()}}];
+    order.forEach(function(k){btns.push({t:md(k)+' '+wd(k)+' · '+cnt[k]+'장',cls:P.date===k?'ok':'',fn:function(){UI.ph.date=k;render();document.getElementById('screen').scrollTop=0}})});
+    btns.push({t:'취소',fn:function(){}});
+    openChoice('날짜 선택','',btns);
+  },
+  'phopen':function(el,v){var P=UI.ph||{city:'all',date:'all'};UI.album={tab:true,city:P.city,date:P.date,v:-1};albumView(+v)},
+  'dphoto':function(el,v,id){openDayPhoto(id)},
+  'dgen':function(){
+    if(!AI.key){UI.sheet='trips';render();return}
+    var d=UI.dsel;UI.dbusy=UI.dbusy||{};UI.dbusy[d]=true;render();
+    diaryPull().then(function(ok){if(DIARY[d])return;return diaryGen1(d)}).then(function(){UI.dbusy[d]=false;render()},function(e){UI.dbusy[d]=false;render();toast('일기를 만들지 못했어요: '+e.message)});
+  },
+  'dregen':function(){
+    var d=UI.dsel;
+    if(!AI.key){UI.sheet='trips';render();return}
+    openChoice('일기를 다시 쓸까요?','지금 일기가 새 글로 바뀌어요. 직접 고친 내용도 사라져요.',[{t:'다시 쓰기',cls:'ok',fn:function(){
+      UI.dbusy=UI.dbusy||{};UI.dbusy[d]=true;render();
+      diaryGen1(d,true).then(function(){UI.dbusy[d]=false;render();toast('다시 썼어요')},function(e){UI.dbusy[d]=false;render();toast('일기를 만들지 못했어요: '+e.message)});
+    }},{t:'취소',fn:function(){}}]);
+  },
+  'dedit':function(){
+    var o=DIARY[UI.dsel];if(!o)return;
+    UI.dDraft={d:UI.dsel,title:o.title,text:o.paras.map(function(p){return p.t}).join('\n\n')};UI.sheet='diaryedit';render();
+  },
+  'dedit-save':function(){
+    var D=UI.dDraft,o=DIARY[D.d];if(!o)return;
+    var title=(document.getElementById('de_title').value||'').trim(),text=(document.getElementById('de_text').value||'').trim();
+    if(!title||!text){toast('제목과 본문을 채워 주세요');return}
+    var ps=text.split(/\n\s*\n/).map(function(x){return x.trim()}).filter(Boolean).map(function(t2,i){var op=o.paras[Math.min(i,o.paras.length-1)];return {t:t2,p:i<o.paras.length?(op.p||[]):[]}});
+    var n={title:title,paras:ps,at:Date.now(),model:o.model,edited:true};
+    diaryPut(D.d,n,true).then(function(){DIARY[D.d]=n;saveDiary();UI.dDraft=null;closeSheet();toast('저장했어요')},function(e){toast(e.message)});
+  },
+  'aisave':function(){
+    AI.key=(document.getElementById('ai_key').value||'').trim();AI.model=(document.getElementById('ai_model').value||'').trim()||'claude-sonnet-5-5';AI.auto=document.getElementById('ai_auto').checked;saveAI();
+    DG.fail=false;toast('저장했어요');diaryAuto();render();
+  },
+  'aigen':function(){
+    AI.key=(document.getElementById('ai_key').value||'').trim();AI.model=(document.getElementById('ai_model').value||'').trim()||'claude-sonnet-5-5';saveAI();
+    if(!AI.key){toast('API 키를 먼저 넣어 주세요');return}
+    if(!isPost()){toast('여행이 끝난 다음 날부터 만들 수 있어요');return}
+    DG.fail=false;diaryAuto(true);render();
+  },
   'sheet':function(el,v){UI.sheet=v;render()},
   'sheet-close':function(){closeSheet()},
   'sync':function(){pull(true).then(function(){toast('동기화했어요')})},
@@ -1799,7 +1864,7 @@ var ACT={
     UI.vd=null;UI.sched=null;UI.sheet='trips';render();toast('저장했어요');
   },
   'mirror-all':function(){var n=M?mirrorAll():0;syncPayMemos();toast(n?'완료한 일정 '+n+'건을 이이코토로 보냈어요':'보낼 완료 일정이 없어요')},
-  'album':function(){UI.album={city:'all',date:'all',v:-1};albPush();renderAlbum(true)},
+  'album':function(){if(isPost()){goTab('photos');return}UI.album={city:'all',date:'all',v:-1};albPush();renderAlbum(true)},
   'albclose':function(){albBack()},
   'albcity':function(el,v){UI.album.city=v;UI.album.date='all';renderAlbum(true)},
   'albdate':function(el,v){UI.album.date=v;renderAlbum(true)},
@@ -1831,6 +1896,7 @@ function onClick(e){
   if(a==='sheet-bg'){if(e.target===el)closeSheet();return}   // 시트·모달 바깥 배경을 눌렀을 때만 닫는다
   if(a==='pk-bg'){if(e.target===el)closePicker();return}
   if(a==='albvbg'){if(e.target===el)albBack();return}   // 뷰어 바깥 어두운 곳을 눌렀을 때만 닫는다
+  if(RO_ACTS[a]&&isPost())return;   // 지난 여행은 보기 전용
   var h=ACT[a];if(!h)return;
   try{h(el,el.getAttribute('data-v'),el.getAttribute('data-id'))}
   catch(err){console.error('iitabi action',a,err);toast('문제가 생겼어요. 다시 시도해 주세요')}   // 한 동작의 오류가 화면 전체를 멈추지 않게
@@ -1897,6 +1963,214 @@ function doImport(file){
     }catch(e){toast('가져오기 실패: '+e.message)}
   };
   rd.readAsText(file);
+}
+
+/* ---------- 여행 후 모드 (여행이 끝난 다음 날부터) ---------- */
+function isPost(){var t=trip();return !!(t&&today()>t.end)}
+var TABS_P=[['recap','회고','history'],['sched','일정','cal'],['budget','경비','wal'],['diary','일기','notebook'],['photos','사진','photo']];
+function tabs(){return isPost()?TABS_P:TABS}
+var RO_ACTS={evck:1,evtime:1,evedit:1,stck:1,sttime:1,stedit:1,evnew:1,stnew:1,plan:1,plancf:1,'exp-new':1,expedit:1,evprom:1};   // 지난 여행은 보기 전용
+function lockChip(){return chip(ic('lock',13)+'보기 전용','ln')}
+function dayStat(d){var ev=activeEvs(d),n=0;ev.forEach(function(e){if(e.d.done)n++});return {n:ev.length,done:n}}
+function daySpend(d){var s=0;localList().forEach(function(e){if(e.d.date===d)s+=xKrw(e)});return Math.round(s)}
+function dayPhotos(d){return memosOf(d).filter(hasPhoto)}
+function budgetSum(){
+  var air=0,stay=0,etc=0,local=0;
+  M.stays.forEach(function(s){if(s.d.paid)stay+=xKrw(s)});
+  M.expenses.forEach(function(e){if(!e.d.local&&e.d.paid){var v=xKrw(e);if(e.d.cat==='air')air+=v;else etc+=v}});
+  localList().forEach(function(e){local+=xKrw(e)});
+  return {air:air,stay:stay,etc:etc,local:local,total:air+stay+etc+local};
+}
+function totalCardHtml(link){
+  var b=budgetSum();
+  var rt=link?'<button class="fxtap" data-act="tab" data-v="budget" aria-label="경비 탭으로">경비 자세히 '+ic('chevr',14)+'</button>':'<button class="fxtap" data-act="sheet" data-v="fx" aria-label="환율 보기">1엔 = '+rate2()+'원 '+ic('chevd',14)+'</button>';
+  return card('<div class="row between" style="margin-bottom:2px"><div class="lbl" style="margin-bottom:0">총 지출</div>'+rt+'</div><div class="row between" style="align-items:baseline"><div style="font-family:var(--serif);font-size:36px;font-weight:700">'+won(b.total)+'<span style="font-size:18px;color:var(--sub)">원</span></div><span class="yen" style="font-size:14px">¥'+won(Math.round(b.total/fx()))+'</span></div>'+
+    '<div class="gantt"><span style="flex:'+(b.air||0.001)+';background:'+CH[0]+'"></span><span style="flex:'+(b.stay||0.001)+';background:'+CH[1]+'"></span><span style="flex:'+(b.etc||0.001)+';background:'+CH[2]+'"></span><span style="flex:'+(b.local||0.001)+';background:'+CH[3]+'"></span></div>'+
+    '<div class="legend"><span><i style="background:'+CH[0]+'"></i>항공 '+won(b.air)+'</span><span><i style="background:'+CH[1]+'"></i>숙소 '+won(b.stay)+'</span><span><i style="background:'+CH[2]+'"></i>기타 '+won(b.etc)+'</span><span><i style="background:'+CH[3]+'"></i>현지 '+won(b.local)+'</span></div>');
+}
+
+/* 회고 탭 */
+function screenRecap(){
+  var t=trip();if(!t)return empty();
+  var dates=tripDates(),cd={},order=[],evN=0,evD=0,places={};
+  dates.forEach(function(d){
+    var c=cityOfDate(d);if(!cd[c]){cd[c]=0;order.push(c)}cd[c]++;
+    var s=dayStat(d);evN+=s.n;evD+=s.done;
+    activeEvs(d).forEach(function(e){if(e.d.done&&e.d.map)places[e.d.map]=1});
+  });
+  var all=albumAll();
+  var h=titleBar('회고',null,'','orange');
+  var hero='<div class="rhero"><div class="small" style="font-weight:700">여행이 끝났어요</div><div class="rtit">다녀왔어요, '+esc(t.title)+'</div><div class="small" style="margin-top:6px;line-height:1.55">'+md(t.start)+' – '+md(t.end)+' · '+(dates.length-1)+'박 '+dates.length+'일<br>'+esc(order.map(cityName).join(' → '))+'</div>'+
+    '<div class="row" style="margin-top:16px"><button class="btn rbtn" style="flex:1" data-act="rdiary">일기 읽기 '+ic('chevr',16)+'</button></div></div>';
+  PINH='';
+  h=hero+totalCardHtml(true);
+  function tile(l,v,u){return '<div class="card sm rtile"><div class="small muted">'+l+'</div><div class="rnum">'+v+'<span>'+u+'</span></div></div>'}
+  h+='<div class="rtiles">'+tile('완료한 일정',evD,' / '+evN)+tile('다녀온 곳',Object.keys(places).length,'곳')+tile('사진',all.length,'장')+'</div>';
+  h+='<div class="rsec"><b class="lbl">도시별 머문 날</b><div class="row" style="flex-wrap:wrap;gap:8px">'+order.map(function(c){var cc=cityCol(c);return chip(esc(cityName(c))+' · '+cd[c]+'일','','color:'+cc[0]+';background:'+cc[1]+';border-color:'+cc[3]+';font-size:13px;padding:6px 12px')}).join('')+'</div></div>';
+  var pc={},best=null;all.forEach(function(p){pc[p.m.date_key]=(pc[p.m.date_key]||0)+1});
+  Object.keys(pc).sort().forEach(function(d){if(!best||pc[d]>pc[best])best=d});
+  if(best){
+    var ps=all.filter(function(p){return p.m.date_key===best}).slice(0,3);
+    h+='<div class="rsec"><div class="row between"><b class="lbl" style="margin:0">사진이 가장 많은 날</b><span class="small muted">'+md(best)+' ('+wd(best)+') · '+pc[best]+'장</span></div><div class="rthumbs">'+ps.map(function(p){return '<span class="rth">'+ic('photo',18)+'<img class="mphi" loading="lazy" decoding="async" alt="" src="'+ea(p.m.photo_url)+'"></span>'}).join('')+'</div><button class="rlink" data-act="rday" data-v="'+best+'">이날 일기 보기 '+ic('chevr',14)+'</button></div>';
+  }
+  h+='<button class="rrow" data-act="sheet" data-v="trips"><span><b>새 여행 만들기</b><span class="small muted">여행 목록에서 새 여행을 시작해요</span></span>'+ic('chevr',16)+'</button>';
+  return h;
+}
+
+/* 경비 탭(지난 여행): 카테고리 → 날짜별 막대 → 눌러서 펼치는 내역 */
+function budgetPostMid(){
+  var list=localList(),cs={},tot=0,h='';
+  list.forEach(function(e){var k=e.d.ecat||'etc',v=xKrw(e);cs[k]=(cs[k]||0)+v;tot+=v});
+  var ck=Object.keys(ECAT).filter(function(k){return cs[k]}).sort(function(a,b){return a==='etc'?1:b==='etc'?-1:cs[b]-cs[a]});
+  var mx=0;ck.forEach(function(k){if(cs[k]>mx)mx=cs[k]});
+  if(ck.length){
+    h+='<div class="row between" style="margin-top:6px"><b class="lbl" style="margin:0">카테고리별 현지 지출</b><span class="small muted">합계 '+won(tot)+'원</span></div><div class="crows">';
+    ck.forEach(function(k){
+      var c=pcol(ECATC[k]);
+      h+='<div class="crow"><span class="xi" style="width:30px">'+ic(ECATI[k],22,c[2])+'</span><div class="grow"><div class="row between" style="font-size:13px;margin-bottom:4px"><span>'+ECAT[k]+'</span><span><b>'+won(cs[k])+'원</b> <span class="small muted">'+Math.round(cs[k]/tot*100)+'%</span></span></div><div class="cbar"><i style="width:'+Math.max(2,Math.round(cs[k]/mx*100))+'%;background:'+c[1]+'"></i></div></div></div>';
+    });
+    h+='</div>';
+  }
+  var dates=tripDates(),sums=dates.map(daySpend),top=0;
+  sums.forEach(function(v,i){if(v>sums[top])top=i});
+  var sel=UI.xday&&(UI.xday==='none'||dates.indexOf(UI.xday)>=0)?UI.xday:dates[top];
+  var mxd=Math.max.apply(null,sums.concat([1]));
+  h+='<div class="rsec" style="border-top:1px solid var(--cardb);padding-top:14px"><div class="row between"><b class="lbl" style="margin:0">날짜별 현지 지출</b><span class="small muted">단위 만원</span></div><div class="small muted" style="margin-top:2px">날짜를 누르면 내역이 펼쳐져요</div><div class="dchart">'+
+    dates.map(function(d,i){var on=d===sel,v=sums[i];return '<button class="dcol'+(on?' on':'')+'" data-act="xday" data-v="'+d+'" aria-expanded="'+on+'" aria-label="'+md(d)+' '+won(v)+'원 내역 '+(on?'접기':'열기')+'"><span class="dv">'+(Math.round(v/1000)/10)+'</span><span class="dbarw"><i style="height:'+Math.max(3,Math.round(v/mxd*110))+'px"></i></span><span class="dl">'+md(d)+'</span></button>'}).join('')+'</div>';
+  var avg=dates.length?Math.round(tot/dates.length):0;
+  h+='<div class="small muted" style="margin-top:8px">가장 많이 쓴 날 <b style="color:var(--tx)">'+md(dates[top])+' · '+won(sums[top])+'원</b> · 하루 평균 '+won(avg)+'원</div>';
+  if(sel!=='none'){
+    var dl=list.filter(function(e){return e.d.date===sel}).sort(function(a,b){return String(a.d.time||'')<String(b.d.time||'')?-1:1});
+    h+='<div class="dpanel"><div class="row between" style="margin-bottom:2px"><b>'+md(sel)+' '+wd(sel)+' <span class="small muted" style="font-weight:400">· '+dl.length+'건</span></b><span class="small muted">'+sumLabel(sumInfo(dl))+'</span></div>'+(dl.length?dl.map(function(e){return expRow(e,true)}).join(''):'<div class="small muted" style="padding:10px 0">이날은 현지 지출이 없어요</div>')+'</div>';
+  }
+  return h+'</div>';
+}
+
+/* 사진 탭 */
+function screenPhotos(){
+  var t=trip();if(!t)return empty();
+  var P=UI.ph=UI.ph||{city:'all',date:'all'},all=albumAll(),cnt={};
+  all.forEach(function(p){cnt[p.city]=(cnt[p.city]||0)+1});
+  var list=all.filter(function(p){return (P.city==='all'||p.city===P.city)&&(P.date==='all'||p.m.date_key===P.date)});
+  if(P.date!=='all'&&!list.length){P.date='all';list=all.filter(function(p){return P.city==='all'||p.city===P.city})}
+  var cc='<button class="chip tsb'+(P.city==='all'?' on':'')+'" data-act="phcity" data-v="all" aria-pressed="'+(P.city==='all')+'">전체 '+all.length+'</button>'+(t.cities||[]).map(function(c){var on=P.city===c.id;return '<button class="chip tsb'+(on?' on':'')+'" data-act="phcity" data-v="'+ea(c.id)+'" style="'+selVars(cityKey(c.id))+'" aria-pressed="'+on+'">'+esc(c.name)+' '+(cnt[c.id]||0)+'</button>'}).join('');
+  var db=P.date!=='all'?'<span class="chip tsb on dsel"><button data-act="phdates" aria-label="날짜 바꾸기">'+md(P.date)+'</button><button data-act="phdate" data-v="all" aria-label="날짜 해제">'+ic('x',13)+'</button></span>':'<button class="chip tsb dbtn" data-act="phdates" aria-label="날짜 고르기">날짜 '+ic('chevd',14)+'</button>';
+  PINH=titleBar('사진',list.length+'장',null,'sky')+'<div class="alchips"><div class="tsc hscroll">'+cc+'</div>'+db+'</div>';
+  if(!list.length)return '<div class="alemp">'+(all.length?'이 조건에 맞는 사진이 없어요':'아직 사진이 없어요<br>이이코토 메모에 올린 사진이 여기 모여요')+'</div>';
+  var h='',cur='',i=0;
+  list.forEach(function(p,idx){
+    var d=p.m.date_key;
+    if(d!==cur){if(cur)h+='</div></div>';cur=d;var n=list.filter(function(q){return q.m.date_key===d}).length;h+='<div class="pgrp"><div class="row between" style="margin-bottom:6px"><b>'+md(d)+' '+wd(d)+'</b><span class="small muted">'+n+'장</span></div><div class="algrid">'}
+    h+='<button class="alt" data-act="phopen" data-i="'+idx+'" aria-label="'+ea(md(d)+' '+(p.m.memo_time||'')+' 사진')+'">'+ic('photo',18)+'<img class="mphi" loading="lazy" decoding="async" alt="" src="'+ea(p.m.photo_url)+'"></button>';
+  });
+  return h+'</div></div>';
+}
+
+/* ---------- AI 일기 ----------
+   여행이 끝난 뒤(isPost) 하루 단위로 한 번만 만들어 이이코토 서버의 캐시 테이블(ai_cache)에 고정 저장한다.
+   키 'iitabi_diary_<여행>_<날짜>' · 내용은 JSON {title, paras:[{t,p:[사진 메모 id]}], at, model, edited?} · 만료 없음 */
+var AI=lget('ai',{key:'',model:'claude-sonnet-5-5',auto:true});
+function saveAI(){lset('ai',AI)}
+var DIARY={},DG={run:false,fail:false,cur:'',n:0,total:0};
+function saveDiary(){if(cfg.tripId)lset('diary:'+cfg.tripId,DIARY)}
+function dKey(d){return 'iitabi_diary_'+cfg.tripId+'_'+d}
+function diaryMemos(d){return memosOf(d).filter(function(m){return String(m.text||'').trim()||hasPhoto(m)}).slice().sort(byMemoTime)}
+function memoByCid(id){for(var i=0;i<MEMOS.length;i++){if(MEMOS[i].client_id===id)return MEMOS[i]}return null}
+var DSYS='너는 여행 중인 본인이 되어 하루를 돌아보는 일기를 쓴다. 입력으로 그날의 일정, 지출, 그리고 본인이 직접 남긴 메모가 시간순으로 주어진다.\n규칙:\n1. 1인칭 일기체(~했다, ~이다)로 쓴다.\n2. 메모와 일정에 있는 사실과 감정만 쓴다. 없는 장소·사건·감상·날씨를 지어내지 않는다.\n3. 시간 흐름에 따라 4~7개 문단, 전체 700~1400자로 쓴다. 메모의 말투와 감정의 결은 살리되 욕설과 거친 표현은 순화한다.\n4. 사진이 달린 메모는 [사진 P번호]로 표시돼 있다. 그 사진과 어울리는 내용이 나오는 문단의 photos에 번호를 넣는다.\n5. 제목은 20자 이내로, 그날의 가장 기억에 남는 장면이나 분위기를 담는다.\n6. 일정 중 (못 감)은 가지 못한 것이다. 메모에 언급이 있을 때만 쓴다. 지출 금액은 메모에 있을 때만 쓴다.\n출력은 아래 JSON 하나만, 다른 설명이나 코드블록 없이:\n{"title":"제목","paragraphs":[{"text":"문단","photos":["P1"]}]}';
+function diaryPrompt(d){
+  var ph=[],lines=[],t=trip();
+  diaryMemos(d).forEach(function(m){var tag='';if(hasPhoto(m)){ph.push(m);tag='[사진 P'+ph.length+'] '}lines.push((m.memo_time||'--:--')+' '+tag+String(m.text||'').trim())});
+  var ev=sortShown(activeEvs(d)).map(function(e){return ((e.d.done&&e.d.doneAt)?hhmm(e.d.doneAt):(e.d.time||SLOTL[e.d.slot]||''))+' '+e.d.title+(e.d.done?' (완료)':' (못 감)')});
+  var sp=daySpend(d);
+  return {text:'날짜: '+d+' ('+wd(d)+'요일) · 여행 '+(tripDates().indexOf(d)+1)+'일째\n여행: '+t.title+'\n도시: '+cityName(cityOfDate(d))+'\n\n[일정]\n'+(ev.join('\n')||'(없음)')+'\n\n[지출]\n'+(sp?'약 '+won(sp)+'원':'(없음)')+'\n\n[내가 남긴 메모]\n'+lines.join('\n'),photos:ph};
+}
+function diaryParse(s,ph){
+  var a=s.indexOf('{'),b=s.lastIndexOf('}');if(a<0||b<a)throw new Error('응답 형식이 달라요');
+  var j=JSON.parse(s.slice(a,b+1));
+  var ps=(j.paragraphs||[]).map(function(p){
+    var ids=(p.photos||[]).map(function(x){var n=parseInt(String(x).replace(/\D/g,''),10);return ph[n-1]?ph[n-1].client_id:null}).filter(Boolean);
+    return {t:String(p.text||'').trim(),p:ids};
+  }).filter(function(p){return p.t});
+  if(!ps.length||!j.title)throw new Error('빈 응답이에요');
+  return {title:String(j.title).trim(),paras:ps};
+}
+function aiCall(sys,user){
+  return fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':AI.key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:AI.model||'claude-sonnet-5-5',max_tokens:2500,system:sys,messages:[{role:'user',content:user}]})})
+    .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error((j&&j.error&&j.error.message)||('HTTP '+r.status));return j},function(){throw new Error('HTTP '+r.status)})},function(){throw new Error('네트워크 오류')});
+}
+function diaryPut(d,o,overwrite){
+  return sf('ai_cache?on_conflict=cache_key','POST',[{cache_key:dKey(d),content:JSON.stringify(o),expires_at:null}],'resolution='+(overwrite?'merge':'ignore')+'-duplicates,return=minimal').then(function(ok){if(!ok)throw new Error('서버에 저장하지 못했어요')});
+}
+function diaryGen1(d,overwrite){
+  var pr=diaryPrompt(d);
+  return aiCall(DSYS,pr.text).then(function(j){
+    var o=diaryParse((j.content||[]).map(function(c){return c.text||''}).join(''),pr.photos);
+    o.at=Date.now();o.model=AI.model;
+    return diaryPut(d,o,overwrite).then(function(){DIARY[d]=o;saveDiary()});
+  });
+}
+function diaryPull(){
+  if(!cfg.tripId)return Promise.resolve(false);
+  var pre='iitabi_diary_'+cfg.tripId+'_';
+  return sf('ai_cache?cache_key=like.'+enc(pre+'*')+'&select=cache_key,content').then(function(rows){
+    if(!rows)return false;
+    rows.forEach(function(r){var d=String(r.cache_key).slice(pre.length);try{DIARY[d]=JSON.parse(r.content)}catch(e){}});
+    saveDiary();UI.dpulled=true;return true;
+  });
+}
+function diaryTodo(){return tripDates().filter(function(d){return !DIARY[d]&&diaryMemos(d).length})}
+function repaintDiary(){if(UI.tab==='diary'||UI.sheet==='trips')renderSafe()}
+function diaryAuto(force){
+  if(DG.run||!isPost()||!AI.key||!M||!navigator.onLine)return;
+  if(!force&&(AI.auto===false||DG.fail))return;
+  DG.run=true;DG.fail=false;
+  (UI.dpulled?Promise.resolve(true):diaryPull()).then(function(ok){
+    if(ok===false)return;   // 서버에 이미 있는지 확인하지 못하면 중복 생성을 막으려고 멈춘다
+    var todo=diaryTodo();DG.total=todo.length;DG.n=0;
+    return todo.reduce(function(pr,d){return pr.then(function(){DG.cur=d;repaintDiary();return diaryGen1(d).then(function(){DG.n++;repaintDiary()})})},Promise.resolve()).then(function(){if(DG.total)toast('일기를 모두 만들었어요')});
+  }).then(function(){DG.run=false;DG.cur='';repaintDiary()},function(e){DG.run=false;DG.fail=true;DG.cur='';repaintDiary();toast('일기 만들기를 멈췄어요: '+e.message)});
+}
+function dphoto(m){return '<figure class="dfig"><button class="dph" data-act="dphoto" data-id="'+ea(m.client_id)+'" aria-label="사진 크게 보기"><img class="dimg" loading="lazy" decoding="async" alt="" src="'+ea(m.photo_url)+'"></button><figcaption>'+esc(m.memo_time||'')+'</figcaption></figure>'}
+function screenDiary(){
+  var t=trip();if(!t)return empty();
+  var dates=tripDates(),d=UI.dsel&&dates.indexOf(UI.dsel)>=0?UI.dsel:dates[0];UI.dsel=d;
+  var right=DG.run?'<span class="chip" style="'+tint('rose')+'">'+ic('loader-2',13)+'일기 쓰는 중 '+Math.min(DG.n+1,DG.total)+'/'+DG.total+'</span>':'';
+  PINH=titleBar('일기','그날 남긴 메모로 쓴 하루 일기',right,'rose')+weekStrip(d,'ddate');
+  var o=DIARY[d],ms=diaryMemos(d),ph=dayPhotos(d),st=dayStat(d),sp=daySpend(d),n=dates.indexOf(d)+1;
+  var head='<div class="row" style="gap:8px"><span class="dday">DAY '+n+'</span><b style="font-size:14px">'+md(d)+' '+wd(d)+'</b><span style="margin-left:auto">'+cityChip(cityOfDate(d))+'</span></div>';
+  var chips='<div class="row" style="flex-wrap:wrap;gap:6px">'+chip('메모 '+ms.length,'ln')+(ph.length?chip('사진 '+ph.length+'장','ln'):'')+(st.n?chip('일정 '+st.done+'/'+st.n,'ln'):'')+(sp?chip('지출 '+won(sp)+'원','ln'):'')+'</div>';
+  var busy=(DG.run&&DG.cur===d)||(UI.dbusy&&UI.dbusy[d]);
+  var h='';
+  if(o){
+    var used={},body='';
+    o.paras.forEach(function(p){body+='<p>'+esc(p.t)+'</p>';(p.p||[]).forEach(function(id){var m=memoByCid(id);if(m&&hasPhoto(m)&&!used[id]){used[id]=1;body+=dphoto(m)}})});
+    ph.forEach(function(m){if(!used[m.client_id])body+=dphoto(m)});
+    h+='<div class="card dia">'+head+'<h2>'+esc(o.title)+'</h2><div class="row dtools"><span class="chip dtag">'+(o.edited?'직접 고침':'메모로 자동 작성')+'</span><span class="grow"></span><button class="dtb" data-act="dedit" aria-label="일기 고치기">'+ic('pen',15)+'고치기</button><button class="dtb" data-act="dregen" aria-label="일기 다시 쓰기"'+(busy?' disabled':'')+'>'+ic('refresh',15)+(busy?'쓰는 중':'다시 쓰기')+'</button></div><div class="dbody">'+body+'</div>'+chips+
+      '<button class="draw" data-act="drawtog" aria-expanded="'+!!(UI.draw&&UI.draw[d])+'">내가 남긴 원문 메모 '+ms.length+'개 '+(UI.draw&&UI.draw[d]?'접기':'보기')+ic(UI.draw&&UI.draw[d]?'chevron-up':'chevd',14)+'</button>'+
+      (UI.draw&&UI.draw[d]?'<div class="memolist">'+ms.map(function(m){return '<div class="mrow"><div class="mt">'+esc(m.memo_time||'')+'</div>'+(hasPhoto(m)?'<div class="mb mpw">'+photoThumb(m)+'<span class="mtx">'+memoText(m)+'</span></div>':'<div class="mb">'+memoText(m)+'</div>')+'</div>'}).join('')+'</div>':'')+'</div>';
+  }else{
+    var msg;
+    if(!ms.length)msg='<div class="small muted">이날은 남긴 메모가 없어서 일기를 만들 수 없어요.</div>';
+    else if(busy)msg='<div class="small muted">'+ic('loader-2',14)+' 일기를 쓰는 중이에요…</div>';
+    else if(!AI.key)msg='<div class="small muted" style="line-height:1.5">API 키를 넣으면 이날 메모로 일기를 써 줘요.</div><div class="row" style="margin-top:10px"><button class="btn" data-act="sheet" data-v="trips">설정 열기</button></div>';
+    else msg='<div class="small muted">아직 이 날의 일기가 없어요.</div><div class="row" style="margin-top:10px"><button class="btn pri" data-act="dgen">이날 일기 만들기</button></div>';
+    h+='<div class="card dia">'+head+'<div style="padding:14px 0 6px">'+msg+'</div>'+(ph.length?'<div class="dbody">'+ph.map(dphoto).join('')+'</div>':'')+chips+'</div>';
+  }
+  return h;
+}
+function openDayPhoto(cid){
+  var m=memoByCid(cid);if(!m)return;
+  UI.album={tab:true,city:'all',date:m.date_key,v:-1};
+  var l=albumList();for(var i=0;i<l.length;i++){if(l[i].m.client_id===cid){albumView(i);return}}
+}
+function aiCardHtml(){
+  var done=0,tot=tripDates().filter(function(d){return diaryMemos(d).length}).length;tripDates().forEach(function(d){if(DIARY[d])done++});
+  return card('<div class="lbl">AI 일기</div><div class="small muted" style="line-height:1.5;margin-bottom:10px">여행이 끝나면 하루씩 남긴 메모로 일기를 한 번만 만들어 서버에 저장해요. 키는 이 기기에만 저장돼요.</div>'+
+    '<input class="fld" id="ai_key" type="password" autocomplete="off" placeholder="Anthropic API 키 (sk-ant-…)" aria-label="Anthropic API 키" value="'+ea(AI.key||'')+'" style="width:100%;margin-bottom:8px">'+
+    '<input class="fld" id="ai_model" type="text" autocomplete="off" aria-label="모델" value="'+ea(AI.model||'claude-sonnet-5-5')+'" style="width:100%;margin-bottom:4px">'+
+    '<label class="row" style="min-height:44px;gap:10px;font-size:14px"><input type="checkbox" id="ai_auto"'+(AI.auto!==false?' checked':'')+' style="width:20px;height:20px"> 여행이 끝나면 자동으로 만들기</label>'+
+    '<div class="small muted" style="margin:2px 0 10px">'+(isPost()?'만든 일기 '+done+' / '+tot+'일'+(DG.run?' · 쓰는 중 '+Math.min(DG.n+1,DG.total)+'/'+DG.total:'')+(DG.fail?' · 멈췄어요':''):'여행이 끝난 다음 날부터 만들어요')+'</div>'+
+    '<div class="row"><button class="btn pri" style="flex:1" data-act="aisave">저장</button><button class="btn" data-act="aigen">빠진 날 만들기</button></div>');
 }
 
 /* ---------- boot ---------- */
