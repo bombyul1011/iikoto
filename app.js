@@ -36,6 +36,38 @@ async function maybeBackfillWeeklyReview(){
   }catch(e){}
   finally{_backfillInFlight=false;}
 }
+// 월요일 한정 — 지난주 목표 돌아보기·메모 리포트가 없으면 주간요약과 같은 방식으로 조용히 생성(완료 시 토스트만).
+let _backfillMonReportsInFlight=false;
+let _backfillMonReportsDoneWk=null;
+let _backfillMonReportsRetryAt=0; // 실패 시 5분 뒤부터 재시도(API 반복 호출 방지)
+async function _backfillWeeklyReportCache(cacheKey,build){ // 'have'|'made'|'skip'|'fail'
+  if(S.get(cacheKey))return 'have';
+  const serverHtml=await aiCacheGet(cacheKey);
+  if(serverHtml){S.set(cacheKey,serverHtml);return 'have';}
+  const html=await build();
+  if(!html)return 'fail';
+  if(html.includes('sheet-loading-msg'))return 'skip'; // 목표/메모/키 없음 안내문 — 캐시하지 않음
+  S.set(cacheKey,html);aiCacheSet(cacheKey,html);
+  return 'made';
+}
+async function maybeBackfillMondayReports(){
+  if(_backfillMonReportsInFlight||!getClaudeKey()||Date.now()<_backfillMonReportsRetryAt)return;
+  const prev=getLogicalDate();prev.setDate(prev.getDate()-1);
+  const wk=weekKey(prev); // 논리적 월요일의 전날 → 지난주 키
+  if(_backfillMonReportsDoneWk===wk)return;
+  _backfillMonReportsInFlight=true;
+  try{
+    const jobs=[['목표 돌아보기','challenge_review_',buildChallengeReviewHtml],['메모 리포트','weekly_memo_report_',buildWeeklyMemoReportHtml]];
+    const made=[];let failed=false;
+    for(const [name,prefix,build] of jobs){
+      const r=await _backfillWeeklyReportCache(prefix+wk,()=>build(wk));
+      if(r==='made')made.push(name);else if(r==='fail')failed=true;
+    }
+    if(failed)_backfillMonReportsRetryAt=Date.now()+5*60*1000;else _backfillMonReportsDoneWk=wk;
+    if(made.length)showToast('지난주 '+made.join('·')+'가 준비됐어요 🌿');
+  }catch(e){}
+  finally{_backfillMonReportsInFlight=false;}
+}
 function appendSundayGenerateBanner(body){
   const banner=document.createElement('div');
   banner.className='weekly-review-banner';
@@ -59,7 +91,7 @@ function renderHomeBody(section){
   const isLastDayOfMonth=(()=>{const t=new Date(_ld);t.setDate(_ld.getDate()+1);return t.getDate()===1;})()&&_isLateNightOrDawn;
   // 월요일 한정 놓친 주간요약 보완 — 일요일 22시(생성 시점)를 놓쳐서 지난주 캐시가 없으면
   // 배너 없이 조용히 백그라운드 생성 후 토스트만 알림. 화면엔 아무것도 띄우지 않음(조회는 아카이브앱에서).
-  if(_ldDay===1)maybeBackfillWeeklyReview();
+  if(_ldDay===1){maybeBackfillWeeklyReview();maybeBackfillMondayReports();}
 
   if(section==='morning'){
     // 아침 루틴(굿모닝) 카드 — 카드 그리드 + 오늘의 슬롯
