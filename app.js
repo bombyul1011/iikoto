@@ -4717,7 +4717,7 @@ function _renderPcTimeInput(wrap,inpId,h,mi){
   if(wrap.dataset.pcMode==='1'){
     // 이미 PC 입력 UI면 마크업은 재사용하되, 새로 열린 항목의 실제 값으로 입력창을 갱신해야 함
     // (이 갱신이 빠져있어 여러 항목을 연달아 열 때 이전 값이 그대로 남아있던 버그).
-    const hEl=document.getElementById('tw-pc-hour'),mEl=document.getElementById('tw-pc-min');
+    const hEl=wrap.querySelector('.tw-pc-hour'),mEl=wrap.querySelector('.tw-pc-min'); // id가 아닌 wrap 안에서 찾음(휠이 2곳이라 id가 겹치면 다른 휠의 입력창을 집음)
     if(hEl&&mEl){
       hEl.value=pad(h);mEl.value=pad(mi);
       document.getElementById(inpId).value=pad(h)+':'+pad(mi);
@@ -4727,11 +4727,11 @@ function _renderPcTimeInput(wrap,inpId,h,mi){
   wrap.dataset.pcMode='1';
   wrap.innerHTML=`
     <div class="tw-pc-input-row">
-      <input type="number" class="tw-pc-input" id="tw-pc-hour" min="0" max="23" value="${pad(h)}" inputmode="numeric">
+      <input type="number" class="tw-pc-input tw-pc-hour" min="0" max="23" value="${pad(h)}" inputmode="numeric">
       <span class="tw-colon">:</span>
-      <input type="number" class="tw-pc-input" id="tw-pc-min" min="0" max="59" value="${pad(mi)}" inputmode="numeric">
+      <input type="number" class="tw-pc-input tw-pc-min" min="0" max="59" value="${pad(mi)}" inputmode="numeric">
     </div>`;
-  const hEl=document.getElementById('tw-pc-hour'),mEl=document.getElementById('tw-pc-min');
+  const hEl=wrap.querySelector('.tw-pc-hour'),mEl=wrap.querySelector('.tw-pc-min');
   const sync=()=>{
     let hv=Math.max(0,Math.min(23,parseInt(hEl.value,10)||0));
     let mv=Math.max(0,Math.min(59,parseInt(mEl.value,10)||0));
@@ -4744,6 +4744,9 @@ function _renderPcTimeInput(wrap,inpId,h,mi){
   };
   hEl.addEventListener('input',sync);
   mEl.addEventListener('input',sync);
+  // 포커스(자동 이동 포함) 시 기존 값을 전체 선택 — 안 그러면 이어 붙어서 "30"+"4"=304 → 59로 보정되는 엉뚱한 시간이 됨
+  hEl.addEventListener('focus',()=>hEl.select());
+  mEl.addEventListener('focus',()=>mEl.select());
   hEl.addEventListener('blur',()=>onBlurPad(hEl,23));
   mEl.addEventListener('blur',()=>onBlurPad(mEl,59));
   // 시 필드에서 2자리 다 채우면 자동으로 분 필드로 포커스 이동(네이티브 time input과 유사한 사용감)
@@ -14826,4 +14829,80 @@ function openSettingsFromMenu(){closeTopMenu();openSettings();}
   };
   document.addEventListener('click',outside);
   document.addEventListener('touchstart',outside,{passive:true});
+})();
+
+// ── 앱 공용 숫자패드 — [data-numpad] 입력창(readonly)에 iOS 기본 숫자키보드 대신 앱 톤의 키패드를 띄움.
+// 열릴 때 기존 값은 "교체 대기"(np-fresh) 상태 → 첫 숫자를 누르면 덮어쓰고, 이후부터 이어 입력. 값 변경은 input 이벤트로 알림.
+const NumPad=(()=>{
+  let pad=null,inp=null,fresh=false;
+  const KEYS=['1','2','3','4','5','6','7','8','9','C','0','⌫'];
+  function build(){
+    pad=document.createElement('div');
+    pad.className='numpad';
+    pad.innerHTML='<div class="numpad-grid">'+KEYS.map(k=>`<button type="button" class="np-key${(k==='C'||k==='⌫')?' fn':''}" data-k="${k}">${k==='C'?'지움':k}</button>`).join('')+'</div><button type="button" class="mbtn ok" data-k="done">완료</button>';
+    pad.addEventListener('click',e=>{const b=e.target.closest('[data-k]');if(b)press(b.dataset.k);});
+    document.body.appendChild(pad);
+  }
+  function setVal(v){
+    inp.value=v;
+    inp.dispatchEvent(new Event('input',{bubbles:true}));
+  }
+  function setFresh(f){fresh=f;if(inp)inp.classList.toggle('np-fresh',f);}
+  function press(k){
+    if(!inp)return;
+    if(k==='done'){close();return;}
+    if(k==='⌫'){setFresh(false);setVal(inp.value.slice(0,-1));return;}
+    if(k==='C'){setFresh(false);setVal('');return;}
+    let v=(fresh?'':inp.value)+k;
+    setFresh(false);
+    v=v.replace(/^0+(?=\d)/,'');
+    if(inp.maxLength>0)v=v.slice(0,inp.maxLength);
+    const mx=parseInt(inp.max,10);
+    if(!isNaN(mx)&&parseInt(v,10)>mx)v=String(mx);
+    setVal(v);
+  }
+  // 패드가 가리는 만큼 입력창이 든 모달/시트를 위로 밀어 올림(닫으면 복원)
+  function shiftHost(){
+    const host=inp&&inp.closest('.modal,.bsheet');
+    if(!host)return;
+    host.style.translate='';
+    const over=inp.getBoundingClientRect().bottom+16-(window.innerHeight-pad.offsetHeight);
+    if(over>0){host.style.transition='translate .26s';host.style.translate='0 -'+over+'px';}
+  }
+  function open(el){
+    if(!pad)build();
+    if(inp===el&&pad.classList.contains('on'))return;
+    if(inp&&inp!==el)release();
+    inp=el;
+    el.classList.add('np-on');
+    setFresh(!!el.value);
+    pad.classList.add('on');
+    shiftHost();
+  }
+  function release(){
+    if(!inp)return;
+    inp.classList.remove('np-on','np-fresh');
+    const host=inp.closest('.modal,.bsheet');
+    if(host)host.style.translate='';
+  }
+  function close(){
+    if(!pad||!inp)return;
+    release();
+    pad.classList.remove('on');
+    inp=null;
+  }
+  document.addEventListener('focusin',e=>{const t=e.target;if(t.matches&&t.matches('[data-numpad]'))open(t);});
+  document.addEventListener('click',e=>{ // 캡처 단계 — 안쪽 요소가 stopPropagation 해도 동작. 버튼 클릭 자체는 그대로 진행됨
+    const t=e.target;
+    if(t.closest&&t.closest('[data-numpad]'))open(t.closest('[data-numpad]'));
+    else if(pad&&pad.classList.contains('on')&&!pad.contains(t))close();
+  },true);
+  document.addEventListener('keydown',e=>{ // PC 물리 키보드 지원
+    if(!inp)return;
+    if(/^\d$/.test(e.key))press(e.key);
+    else if(e.key==='Backspace')press('⌫');
+    else if(e.key==='Enter'||e.key==='Escape')close();
+    else return;
+    e.preventDefault();
+  });
 })();

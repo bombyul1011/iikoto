@@ -863,6 +863,17 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .tw-pc-input:focus{outline:none;border-color:var(--sel-color,rgba(190,160,230,0.75));}
 .todo-pinned-btn{flex-shrink:0;width:24px;height:24px;background:none;border:none;padding:0;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:19px;color:var(--pal-warmgray-border);transition:all .15s;}
 .todo-pinned-btn.on{color:var(--pal-orange-border);}
+/* 앱 공용 숫자패드 — [data-numpad] 입력창에 iOS 기본 숫자키보드 대신 노출(JS: NumPad) */
+[data-numpad]{cursor:pointer;caret-color:transparent;}
+[data-numpad].np-on{box-shadow:0 0 0 2px rgba(190,160,230,.55);}
+[data-numpad].np-fresh{color:var(--ts);}
+.numpad{position:fixed;left:0;right:0;bottom:0;z-index:10000;max-width:430px;margin:0 auto;background:var(--sheet);border-radius:22px 22px 0 0;padding:14px 16px max(16px,env(safe-area-inset-bottom));box-shadow:0 -4px 32px rgba(0,0,0,.14);box-sizing:border-box;transform:translateY(105%);transition:transform .26s cubic-bezier(.32,.72,0,1);touch-action:manipulation;}
+.numpad.on{transform:translateY(0);}
+.numpad-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;}
+.np-key{height:48px;border-radius:14px;border:1px solid var(--inp-b);background:var(--inp);color:var(--tp);font-size:20px;font-weight:500;font-family:'DM Sans',sans-serif;font-variant-numeric:tabular-nums;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .1s;}
+.np-key:active{background:rgba(var(--pal-pink-rgb),0.28);}
+.np-key.fn{font-size:var(--dow-label-size);color:var(--ts);}
+.numpad .mbtn{width:100%;}
 .modal-inp::placeholder{color:var(--tm);}
 /* 숫자입력창 스피너 색 보정 — 화살표 모양은 브라우저 기본, 색조만 필터로 앱 톤에 맞춤. modal-inp: 콘텐츠 진행률/책 전체페이지 입력, pg-box-inp: 독서 진행률 입력 */
 .modal-inp::-webkit-inner-spin-button,.modal-inp::-webkit-outer-spin-button,
@@ -2114,7 +2125,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 <div class="modal-ov" id="sleep-score-modal" onclick="closeModal('sleep-score-modal',event)">
   <div class="modal" style="max-width:220px;">
     <div class="modal-title" style="text-align:center;">오늘 수면 점수</div>
-    <input type="text" inputmode="numeric" maxlength="3" placeholder="0~100" class="modal-inp time-inp" id="sleep-score-inp">
+    <input type="text" inputmode="none" readonly data-numpad maxlength="3" placeholder="0~100" class="modal-inp time-inp" id="sleep-score-inp">
     <div class="modal-actions">
       <button class="mbtn cancel" onclick="closeModal('sleep-score-modal')">취소</button>
       <button class="mbtn ok" onclick="confirmSleepScore()">저장</button>
@@ -2190,7 +2201,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         </div>
         <div class="todo-recur-n-row" id="todo-recur-n-row" style="display:none;">
           <span class="todo-recur-inline-label">며칠마다</span>
-          <input type="text" inputmode="numeric" maxlength="3" id="todo-recur-n-inp" class="todo-recur-num-inp" placeholder="1" value="1" oninput="onRecurDailyNInput()">
+          <input type="text" inputmode="none" readonly data-numpad maxlength="3" id="todo-recur-n-inp" class="todo-recur-num-inp" placeholder="1" value="1" oninput="onRecurDailyNInput()">
           <span class="todo-recur-inline-label">일 (1이면 매일)</span>
         </div>
         <div class="todo-recur-days-row" id="todo-recur-days-row" style="display:none;">
@@ -2208,7 +2219,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         </div>
         <div class="todo-recur-monthday-row" id="todo-recur-monthday-row" style="display:none;">
           <span class="todo-recur-inline-label">매월</span>
-          <input type="text" inputmode="numeric" maxlength="2" id="todo-recur-monthday-inp" class="todo-recur-num-inp" placeholder="15">
+          <input type="text" inputmode="none" readonly data-numpad maxlength="2" id="todo-recur-monthday-inp" class="todo-recur-num-inp" placeholder="15">
           <span class="todo-recur-inline-label">일</span>
         </div>
         <div class="todo-recur-end-row" id="todo-recur-end-row">
@@ -2352,7 +2363,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         <div class="rd-unit-btn on" id="cm-unit-percent" onclick="setCmUnit('percent')">퍼센트로 기록</div>
         <div class="rd-unit-btn" id="cm-unit-pages" onclick="setCmUnit('pages')">페이지로 기록</div>
       </div>
-      <input class="modal-inp" id="cm-total-pages" type="number" inputmode="numeric" placeholder="전체 페이지 수 (선택)" style="margin-top:8px;display:none;">
+      <input class="modal-inp" id="cm-total-pages" type="text" inputmode="none" readonly data-numpad maxlength="5" placeholder="전체 페이지 수 (선택)" style="margin-top:8px;display:none;">
     </div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;" id="cm-star-row">
       <span style="font-size:var(--dow-label-size);color:var(--tm);white-space:nowrap;">별점</span>
@@ -2375,7 +2386,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   <div class="modal" style="max-width:300px;" onclick="event.stopPropagation()">
     <div class="modal-title" id="cpg-title">진행률 입력</div>
     <div style="font-size:var(--dow-label-size);color:var(--tm);margin-bottom:10px;" id="cpg-sub"></div>
-    <input class="modal-inp" id="cpg-inp" type="number" inputmode="numeric" placeholder="0" onfocus="this.value=''">
+    <input class="modal-inp" id="cpg-inp" type="text" inputmode="none" readonly data-numpad maxlength="4" placeholder="0">
     <textarea id="cpg-note-inp" class="rhythm-memo-inp" style="margin-top:8px;min-height:44px;" placeholder="오늘 본 것에서 인상적이었던 순간을 가볍게 남겨보세요 (선택)"></textarea>
     <div id="cpg-done-confirm" style="display:none;"></div>
     <div class="modal-actions" id="cpg-modal-actions">
@@ -2752,7 +2763,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       <div class="pg-arrow">→</div>
       <div class="pg-box">
         <div class="pg-box-lbl">종료</div>
-        <input class="pg-box-inp" id="pg-end-inp" type="number" inputmode="numeric">
+        <input class="pg-box-inp" id="pg-end-inp" type="text" inputmode="none" readonly data-numpad maxlength="5">
       </div>
     </div>
     <div class="pg-total" id="pg-total"></div>
@@ -2765,7 +2776,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   </div>
 </div>
 
-<script src="app.js?v=20261014b"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
+<script src="app.js?v=20261018b"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
 
 </body>
 </html>
