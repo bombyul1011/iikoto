@@ -58,14 +58,18 @@ async function maybeBackfillMondayReports(){
   _backfillMonReportsInFlight=true;
   try{
     const jobs=[['목표 돌아보기','challenge_review_',buildChallengeReviewHtml],['메모 리포트','weekly_memo_report_',buildWeeklyMemoReportHtml]];
-    const made=[];let failed=false;
+    const made=[],failedNames=[];
     for(const [name,prefix,build] of jobs){
-      const r=await _backfillWeeklyReportCache(prefix+wk,()=>build(wk));
-      if(r==='made')made.push(name);else if(r==='fail')failed=true;
+      let r;
+      try{r=await _backfillWeeklyReportCache(prefix+wk,()=>build(wk));}
+      catch(e){console.error('월요일 리포트 생성 오류',name,e);_lastAiError=String((e&&e.message)||e);r='fail';} // 한 건이 터져도 다음 건은 계속 진행
+      if(r==='made')made.push(name);else if(r==='fail')failedNames.push(name);
+      else console.log('월요일 리포트',name,r); // have/skip — 조용히
     }
-    if(failed)_backfillMonReportsRetryAt=Date.now()+5*60*1000;else _backfillMonReportsDoneWk=wk;
+    if(failedNames.length)_backfillMonReportsRetryAt=Date.now()+5*60*1000;else _backfillMonReportsDoneWk=wk;
     if(made.length)showToast('지난주 '+made.join('·')+'가 준비됐어요 🌿');
-  }catch(e){}
+    if(failedNames.length)showToast('지난주 '+failedNames.join('·')+' 생성이 안 됐어요'+(_lastAiError?' ('+_lastAiError+')':''));
+  }catch(e){console.error('월요일 리포트 생성 오류',e);}
   finally{_backfillMonReportsInFlight=false;}
 }
 function appendSundayGenerateBanner(body){
@@ -14835,11 +14839,11 @@ function openSettingsFromMenu(){closeTopMenu();openSettings();}
 // 열릴 때 기존 값은 "교체 대기"(np-fresh) 상태 → 첫 숫자를 누르면 덮어쓰고, 이후부터 이어 입력. 값 변경은 input 이벤트로 알림.
 const NumPad=(()=>{
   let pad=null,inp=null,fresh=false;
-  const KEYS=['1','2','3','4','5','6','7','8','9','C','0','⌫'];
+  const KEYS=['1','2','3','4','5','6','7','8','9','','0','⌫'];
   function build(){
     pad=document.createElement('div');
     pad.className='numpad';
-    pad.innerHTML='<div class="numpad-grid">'+KEYS.map(k=>`<button type="button" class="np-key${(k==='C'||k==='⌫')?' fn':''}" data-k="${k}">${k==='C'?'지움':k}</button>`).join('')+'</div><button type="button" class="mbtn ok" data-k="done">완료</button>';
+    pad.innerHTML='<div class="numpad-grid">'+KEYS.map(k=>k===''?'<span></span>':`<button type="button" class="np-key${k==='⌫'?' fn':''}" data-k="${k}">${k==='⌫'?'<i class="ti ti-backspace" aria-label="지우기"></i>':k}</button>`).join('')+'</div><button type="button" class="mbtn ok" data-k="done">완료</button>';
     pad.addEventListener('click',e=>{const b=e.target.closest('[data-k]');if(b)press(b.dataset.k);});
     document.body.appendChild(pad);
   }
@@ -14852,7 +14856,6 @@ const NumPad=(()=>{
     if(!inp)return;
     if(k==='done'){close();return;}
     if(k==='⌫'){setFresh(false);setVal(inp.value.slice(0,-1));return;}
-    if(k==='C'){setFresh(false);setVal('');return;}
     let v=(fresh?'':inp.value)+k;
     setFresh(false);
     v=v.replace(/^0+(?=\d)/,'');
@@ -14861,13 +14864,19 @@ const NumPad=(()=>{
     if(!isNaN(mx)&&parseInt(v,10)>mx)v=String(mx);
     setVal(v);
   }
-  // 패드가 가리는 만큼 입력창이 든 모달/시트를 위로 밀어 올림(닫으면 복원)
+  // 패드가 가리는 만큼 입력창이 든 모달/시트를 위로 밀어 올림(닫으면 복원).
+  // 모달 아래끝이 패드 위에 오도록 맞추되, 모달이 너무 커서 위가 잘리면 입력창이 보이는 선까지만 올림.
   function shiftHost(){
     const host=inp&&inp.closest('.modal,.bsheet');
     if(!host)return;
-    host.style.translate='';
-    const over=inp.getBoundingClientRect().bottom+16-(window.innerHeight-pad.offsetHeight);
-    if(over>0){host.style.transition='translate .26s';host.style.translate='0 -'+over+'px';}
+    host.style.transition='none';host.style.translate='';
+    const padTop=window.innerHeight-pad.offsetHeight-12;
+    const hr=host.getBoundingClientRect();
+    let sh=Math.min(hr.bottom-padTop,Math.max(0,hr.top-8)); // 모달 전체가 패드 위로 오는 이동량(위쪽은 화면 밖으로 안 나가게 제한)
+    sh=Math.max(sh,inp.getBoundingClientRect().bottom+8-padTop); // 그래도 입력창은 반드시 패드 위
+    host.getBoundingClientRect(); // 리플로우 — transition 'none' 상태를 확정
+    host.style.transition='translate .26s';
+    if(sh>0)host.style.translate='0 -'+sh+'px';
   }
   function open(el){
     if(!pad)build();

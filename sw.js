@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.20-numpad';
+const CACHE = 'iikoto-v2.22-report-diag';
 const ASSETS = [
   './',
   './index.html'

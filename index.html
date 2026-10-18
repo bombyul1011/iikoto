@@ -872,7 +872,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .numpad-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;}
 .np-key{height:48px;border-radius:14px;border:1px solid var(--inp-b);background:var(--inp);color:var(--tp);font-size:20px;font-weight:500;font-family:'DM Sans',sans-serif;font-variant-numeric:tabular-nums;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .1s;}
 .np-key:active{background:rgba(var(--pal-pink-rgb),0.28);}
-.np-key.fn{font-size:var(--dow-label-size);color:var(--ts);}
+.np-key.fn{font-size:24px;color:var(--ts);display:flex;align-items:center;justify-content:center;}
 .numpad .mbtn{width:100%;}
 .modal-inp::placeholder{color:var(--tm);}
 /* 숫자입력창 스피너 색 보정 — 화살표 모양은 브라우저 기본, 색조만 필터로 앱 톤에 맞춤. modal-inp: 콘텐츠 진행률/책 전체페이지 입력, pg-box-inp: 독서 진행률 입력 */
@@ -2776,7 +2776,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   </div>
 </div>
 
-<script src="app.js?v=20261018b"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
+<script src="app.js?v=20261019a"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
 
 </body>
 </html>
