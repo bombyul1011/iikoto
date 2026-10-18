@@ -13,64 +13,49 @@ function _thisWeekSundayDk(){
   return dateKey(d);
 }
 // 일요일 22시(생성 시점) 전용 배너 — 클릭 시 없으면 새로 생성(openWeeklyReviewSheet).
-// 월요일 한정 — 지난주(그 주 일요일) 요약이 아직 없으면(=일요일 22시 생성을 놓친 경우) 조용히 생성.
-// 화면에 배너를 띄우지 않고, 완료 시 토스트로만 알림(조회는 아카이브앱). 중복 실행 방지용 플래그 포함.
-let _backfillInFlight=false;
-async function maybeBackfillWeeklyReview(){
-  if(_backfillInFlight)return;
-  const dk=_thisWeekSundayDk();
-  const cacheKey='weekly_summary_'+dk;
-  const localCached=S.get(cacheKey);
-  if(localCached&&!_isWeeklyFallback(localCached))return; // 이미 있음(정상 생성됨) — 아무 일도 하지 않음
-  if(!getClaudeKey())return; // 생성 불가 환경이면 조용히 스킵
-  _backfillInFlight=true;
-  try{
-    const serverHtml=await aiCacheGet(cacheKey);
-    if(serverHtml&&!_isWeeklyFallback(serverHtml)){S.set(cacheKey,serverHtml);return;} // 다른 기기에서 이미 생성된 경우 — 토스트 없이 조용히 캐싱만
-    const html=await makeWeeklySummaryCard();
-    if(html&&!_isWeeklyFallback(html)){
-      S.set(cacheKey,html);
-      aiCacheSet(cacheKey,html);
-      showToast('지난주 요약이 준비됐어요 🌿');
-    }
-  }catch(e){}
-  finally{_backfillInFlight=false;}
-}
-// 월요일 한정 — 지난주 목표 돌아보기·메모 리포트가 없으면 주간요약과 같은 방식으로 조용히 생성(완료 시 토스트만).
-let _backfillMonReportsInFlight=false;
-let _backfillMonReportsDoneWk=null;
-let _backfillMonReportsRetryAt=0; // 실패 시 5분 뒤부터 재시도(API 반복 호출 방지)
-async function _backfillWeeklyReportCache(cacheKey,build){ // 'have'|'made'|'skip'|'fail'
-  if(S.get(cacheKey))return 'have';
-  const serverHtml=await aiCacheGet(cacheKey);
-  if(serverHtml){S.set(cacheKey,serverHtml);return 'have';}
+// 월요일 한정 — 지난주 리포트 3종(주간 요약·목표 돌아보기·메모 리포트) 중 없는 것을 한 흐름으로 조용히 생성.
+// 일요일 밤 생성을 놓쳤거나(요약), 월요일 수동 생성 버튼을 안 누른 경우(목표·메모)를 보완하며 완료 시 토스트만 띄움(조회는 각 시트/아카이브앱).
+// 홈 화면을 열어야만 도는 구조가 아니라, 앱 시작 동기화(initSync) 직후와 화면 복귀 시에 호출됨 — 기본 화면이 오늘탭이라도 동작.
+let _backfillReportsInFlight=false;
+let _backfillReportsDoneWk=null;
+let _backfillReportsRetryAt=0; // 실패 시 5분 뒤부터 재시도(API 반복 호출 방지)
+async function _backfillReportCache(cacheKey,build,isBad){ // 'have'|'made'|'skip'|'fail'
+  const ok=h=>!!h&&!(isBad&&isBad(h));
+  if(ok(S.get(cacheKey)))return 'have';
+  const serverHtml=await aiCacheGet(cacheKey); // 다른 기기에서 이미 만든 경우 — 토스트 없이 캐싱만
+  if(ok(serverHtml)){S.set(cacheKey,serverHtml);return 'have';}
   const html=await build();
-  if(!html)return 'fail';
-  if(html.includes('sheet-loading-msg'))return 'skip'; // 목표/메모/키 없음 안내문 — 캐시하지 않음
+  if(!ok(html))return 'fail';
+  if(html.includes('sheet-loading-msg'))return 'skip'; // 목표/메모 없음 안내문 — 캐시하지 않음
   S.set(cacheKey,html);aiCacheSet(cacheKey,html);
   return 'made';
 }
-async function maybeBackfillMondayReports(){
-  if(_backfillMonReportsInFlight||!getClaudeKey()||Date.now()<_backfillMonReportsRetryAt)return;
+async function maybeBackfillWeeklyReports(){
+  if(_backfillReportsInFlight||!getClaudeKey()||Date.now()<_backfillReportsRetryAt)return;
+  if(new Date().getDay()!==1||getLogicalDate().getDay()!==1)return; // 새벽 4시 이후의 월요일만(화요일 0~4시 등 경계 오작동 방지)
   const prev=getLogicalDate();prev.setDate(prev.getDate()-1);
-  const wk=weekKey(prev); // 논리적 월요일의 전날 → 지난주 키
-  if(_backfillMonReportsDoneWk===wk)return;
-  _backfillMonReportsInFlight=true;
+  const wk=weekKey(prev); // 월요일의 전날(일요일) → 지난주 키
+  if(_backfillReportsDoneWk===wk)return;
+  _backfillReportsInFlight=true;
   try{
-    const jobs=[['목표 돌아보기','challenge_review_',buildChallengeReviewHtml],['메모 리포트','weekly_memo_report_',buildWeeklyMemoReportHtml]];
+    const jobs=[
+      ['요약','weekly_summary_'+_thisWeekSundayDk(),makeWeeklySummaryCard,_isWeeklyFallback],
+      ['목표 돌아보기','challenge_review_'+wk,()=>buildChallengeReviewHtml(wk)],
+      ['메모 리포트','weekly_memo_report_'+wk,()=>buildWeeklyMemoReportHtml(wk)]
+    ];
     const made=[],failedNames=[];
-    for(const [name,prefix,build] of jobs){
+    for(const [name,cacheKey,build,isBad] of jobs){
       let r;
-      try{r=await _backfillWeeklyReportCache(prefix+wk,()=>build(wk));}
-      catch(e){console.error('월요일 리포트 생성 오류',name,e);_lastAiError=String((e&&e.message)||e);r='fail';} // 한 건이 터져도 다음 건은 계속 진행
+      try{r=await _backfillReportCache(cacheKey,build,isBad);}
+      catch(e){console.error('주간 리포트 자동 생성 오류',name,e);_lastAiError=String((e&&e.message)||e);r='fail';} // 한 건이 터져도 다음 건은 계속
       if(r==='made')made.push(name);else if(r==='fail')failedNames.push(name);
-      else console.log('월요일 리포트',name,r); // have/skip — 조용히
+      else console.log('주간 리포트 자동 생성',name,r);
     }
-    if(failedNames.length)_backfillMonReportsRetryAt=Date.now()+5*60*1000;else _backfillMonReportsDoneWk=wk;
+    if(failedNames.length)_backfillReportsRetryAt=Date.now()+5*60*1000;else _backfillReportsDoneWk=wk;
     if(made.length)showToast('지난주 '+made.join('·')+'가 준비됐어요 🌿');
     if(failedNames.length)showToast('지난주 '+failedNames.join('·')+' 생성이 안 됐어요'+(_lastAiError?' ('+_lastAiError+')':''));
-  }catch(e){console.error('월요일 리포트 생성 오류',e);}
-  finally{_backfillMonReportsInFlight=false;}
+  }catch(e){console.error('주간 리포트 자동 생성 오류',e);}
+  finally{_backfillReportsInFlight=false;}
 }
 function appendSundayGenerateBanner(body){
   const banner=document.createElement('div');
@@ -93,9 +78,6 @@ function renderHomeBody(section){
   const _ldDay=_ld.getDay(); // 논리적 요일(새벽 4시 컷) — 물리적 getDay() 대신 사용, 새벽 0~4시 구간 오작동 방지
   const isSundayNight2=_ldDay===0&&getSubSection()==='night_2';
   const isLastDayOfMonth=(()=>{const t=new Date(_ld);t.setDate(_ld.getDate()+1);return t.getDate()===1;})()&&_isLateNightOrDawn;
-  // 월요일 한정 놓친 주간요약 보완 — 일요일 22시(생성 시점)를 놓쳐서 지난주 캐시가 없으면
-  // 배너 없이 조용히 백그라운드 생성 후 토스트만 알림. 화면엔 아무것도 띄우지 않음(조회는 아카이브앱에서).
-  if(_ldDay===1){maybeBackfillWeeklyReview();maybeBackfillMondayReports();}
 
   if(section==='morning'){
     // 아침 루틴(굿모닝) 카드 — 카드 그리드 + 오늘의 슬롯
@@ -14151,6 +14133,7 @@ function updateStopwatchDisplay(){
   if(ringEl)ringEl.setAttribute('stroke-dashoffset',offset);
 }
 document.addEventListener('visibilitychange',function(){
+  if(!document.hidden&&_initSyncDone)setTimeout(maybeBackfillWeeklyReports,1500); // 앱을 켜둔 채 월요일이 된 경우 복귀 시 보완
   if(!document.hidden&&_swRunning)updateStopwatchDisplay(); // 화면 복귀 즉시 정확한 시간으로 보정 (독서 전용 — 콘텐츠 시청은 초단위 표시가 없어 보정 불필요)
 });
 
@@ -14571,6 +14554,7 @@ async function initSync(){
   refreshIfTabOpen('v-weekly',loadWeekly);
   refreshIfTabOpen('v-monthly',loadMonthly);
   _initSyncDone=true;
+  maybeBackfillWeeklyReports(); // 지난주 리포트 보완 생성(월요일 한정) — 동기화로 지난주 데이터가 최신이 된 직후
 }
 setTimeout(initSync, 500);
 setTimeout(checkAndRecoverPushSubscription, 1500);

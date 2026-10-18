@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.22-report-diag';
+const CACHE = 'iikoto-v2.23-report-backfill';
 const ASSETS = [
   './',
   './index.html'
