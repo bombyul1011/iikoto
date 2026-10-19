@@ -9673,7 +9673,7 @@ function confirmContent(){
   if(_contentCtx.cat==='book'&&savedCid){
     const bookUnit=_cmUnit||'percent';
     const bookTotalPages=bookUnit==='pages'?(parseInt(document.getElementById('cm-total-pages').value,10)||null):null;
-    syncContentToReadingBook(savedCid,title,status,poster,author,newMk,bookUnit,bookTotalPages);
+    syncContentToReadingBook(savedCid,poster,author,bookUnit,bookTotalPages);
   }
   setTimeout(()=>{_contentSubmitting=false;},500);
 }
@@ -10196,10 +10196,9 @@ function stopContentStopwatch(){_cswSw.stop();}
 _cswSw.restoreFromStorage();
 // 콘텐츠 등록/수정(cat='book') 직후 독서코너 진행률 초기값을 세팅. 이제 book이 곧 contents 항목이므로
 // cid로 직접 찾아 반영 — title 매칭을 없애 연결 끊김 버그 클래스를 원천 차단.
-// status: 'done'|'stopped'|그 외(진행중) → book.status: 'done'|'paused'|'reading'
-function syncContentToReadingBook(cid,title,status,poster,author,mk,unit,totalPages){
-  const STATUS_MAP={done:'done',stopped:'paused'};
-  const bookStatus=STATUS_MAP[status]||'reading';
+// 상태(status/endDate)는 confirmContent가 이미 contents에 저장했으므로 여기서 건드리지 않음 — 독서코너 전용 필드(단위·총량·표지·저자)만 맞춤.
+// (예전엔 여기서 status를 book 용어 'paused'로 덮어써서 contents에 없는 상태값이 저장되고, 중단 책이 '읽는중'으로 보이던 버그가 있었음)
+function syncContentToReadingBook(cid,poster,author,unit,totalPages){
   const found=_findContentByCidNearMkInRange(cid,_BOOK_SCAN_MONTHS);
   if(!found)return; // 방금 저장한 콘텐츠가 아직 로컬에 없을 리 없지만, 방어적으로 스킵
   const c=found.list[found.idx];
@@ -10207,13 +10206,11 @@ function syncContentToReadingBook(cid,title,status,poster,author,mk,unit,totalPa
   // 이미 진행 중이던 책이면 기존 진행률(currentUnit/readSeconds)은 보존하고 상태/메타만 갱신.
   // 신규거나 단위가 바뀌면 currentUnit을 리셋(기존 upsertBookLocal 신규 생성 로직과 동일한 취지).
   if(c.unitLabel!==finalUnit){c.currentUnit=0;}
-  c.status=STATUS_MAP[status]||'watching';
   c.unitLabel=finalUnit;
   c.totalUnit=finalUnit==='pages'?(totalPages||null):100;
   if(!c.readSeconds)c.readSeconds=0;
   if(poster)c.poster=poster;
   if(author)c.author=author;
-  if(bookStatus==='done'&&!c.endDate)c.endDate=dateKey(new Date());
   saveContents(found.mk,found.list);
 }
 // 콘텐츠 삭제 시 그 작품을 가리키던 리듬 블록(cat='enjoy', contentCid로 연결)도 함께 정리 —
@@ -12882,7 +12879,7 @@ function renderWatchCalDetail(){
     const posterHtml=_wcalPosterThumbHtml(it.cat,it.poster);
     const hasNote=it.cid&&!!getWcalNoteFor(it.cid,dk);
     const noteBtnHtml=it.cid?`<span class="wcal-note-icon${hasNote?' has':''}" onclick="openWcalNoteInput('${it.cid}','${dk}',${idx})" title="코멘트"><i class="ti ti-message-circle ico-sz-13" aria-hidden="true"></i></span>`:'';
-    const statusBadgeHtml=it.status==='watching'?'<span class="wcal-status-badge watching">진행중</span>':(it.status==='done'?'<span class="wcal-status-badge done">완결</span>':'');
+    const statusBadgeHtml=it.status==='watching'?'<span class="wcal-status-badge watching">진행중</span>':(it.status==='done'?'<span class="wcal-status-badge done">완결</span>':(it.status==='stopped'?'<span class="wcal-status-badge stopped">중단</span>':''));
     const noteRowHtml=`<div id="wcal-note-row-${idx}"></div>`;
     // 감상시간 — 리듬블록(그날 세션 시작~종료), 독서달력과 동일한 방식. 음악은 리듬블록 기반이 아니라 제외.
     let timeText='';
