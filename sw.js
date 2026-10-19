@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.24-content-stop';
+const CACHE = 'iikoto-v2.25-cleanup';
 const ASSETS = [
   './',
   './index.html'

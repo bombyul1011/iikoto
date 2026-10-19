@@ -864,7 +864,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .todo-pinned-btn{flex-shrink:0;width:24px;height:24px;background:none;border:none;padding:0;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:19px;color:var(--pal-warmgray-border);transition:all .15s;}
 .todo-pinned-btn.on{color:var(--pal-orange-border);}
 /* 앱 공용 숫자패드 — [data-numpad] 입력창에 iOS 기본 숫자키보드 대신 노출(JS: NumPad) */
-[data-numpad]{cursor:pointer;caret-color:transparent;}
+[data-numpad]{cursor:pointer;}
 [data-numpad].np-on{box-shadow:0 0 0 2px rgba(190,160,230,.55);}
 [data-numpad].np-fresh{color:var(--ts);}
 .numpad{position:fixed;left:0;right:0;bottom:0;z-index:10000;max-width:430px;margin:0 auto;background:var(--sheet);border-radius:22px 22px 0 0;padding:14px 16px max(16px,env(safe-area-inset-bottom));box-shadow:0 -4px 32px rgba(0,0,0,.14);box-sizing:border-box;transform:translateY(105%);transition:transform .26s cubic-bezier(.32,.72,0,1);touch-action:manipulation;}
@@ -2777,7 +2777,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   </div>
 </div>
 
-<script src="app.js?v=20261019c"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
+<script src="app.js?v=20261019d"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
 
 </body>
 </html>

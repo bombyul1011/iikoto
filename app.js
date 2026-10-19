@@ -46,6 +46,7 @@ async function maybeBackfillWeeklyReports(){
     const made=[],failedNames=[];
     for(const [name,cacheKey,build,isBad] of jobs){
       let r;
+      _lastAiError=''; // 이전 호출의 사유가 이번 실패 토스트에 섞이지 않게
       try{r=await _backfillReportCache(cacheKey,build,isBad);}
       catch(e){console.error('주간 리포트 자동 생성 오류',name,e);_lastAiError=String((e&&e.message)||e);r='fail';} // 한 건이 터져도 다음 건은 계속
       if(r==='made')made.push(name);else if(r==='fail')failedNames.push(name);
@@ -57,6 +58,7 @@ async function maybeBackfillWeeklyReports(){
   }catch(e){console.error('주간 리포트 자동 생성 오류',e);}
   finally{_backfillReportsInFlight=false;}
 }
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&_initSyncDone)setTimeout(maybeBackfillWeeklyReports,1500);}); // 앱을 켜둔 채 월요일이 된 경우 복귀 시 보완
 function appendSundayGenerateBanner(body){
   const banner=document.createElement('div');
   banner.className='weekly-review-banner';
@@ -11393,7 +11395,7 @@ function loadMonthly(){
 
 // ── MODAL / SHEET HELPERS
 function openModal(id){const el=document.getElementById(id);document.body.appendChild(el);el.classList.add('on');}
-function closeModal(id,e){if(!e||e.target===document.getElementById(id))document.getElementById(id).classList.remove('on');}
+function closeModal(id,e){if(!e||e.target===document.getElementById(id)){document.getElementById(id).classList.remove('on');NumPad.close();}}
 function getMealWishlist(){return getGoal('wishlist:meal').filter(l=>l&&l.trim());}
 function saveMealWishlist(arr){saveGoal('wishlist:meal',arr.length?arr:['']);}
 function toggleMealWishlist(){
@@ -14130,7 +14132,6 @@ function updateStopwatchDisplay(){
   if(ringEl)ringEl.setAttribute('stroke-dashoffset',offset);
 }
 document.addEventListener('visibilitychange',function(){
-  if(!document.hidden&&_initSyncDone)setTimeout(maybeBackfillWeeklyReports,1500); // 앱을 켜둔 채 월요일이 된 경우 복귀 시 보완
   if(!document.hidden&&_swRunning)updateStopwatchDisplay(); // 화면 복귀 즉시 정확한 시간으로 보정 (독서 전용 — 콘텐츠 시청은 초단위 표시가 없어 보정 불필요)
 });
 
@@ -14818,7 +14819,7 @@ function openSettingsFromMenu(){closeTopMenu();openSettings();}
 
 // ── 앱 공용 숫자패드 — [data-numpad] 입력창(readonly)에 iOS 기본 숫자키보드 대신 앱 톤의 키패드를 띄움.
 // 열릴 때 기존 값은 "교체 대기"(np-fresh) 상태 → 첫 숫자를 누르면 덮어쓰고, 이후부터 이어 입력. 값 변경은 input 이벤트로 알림.
-const NumPad=(()=>{
+var NumPad=(()=>{ // var: 스크립트 로딩 순서와 무관하게 closeModal에서 안전하게 참조
   let pad=null,inp=null,fresh=false;
   const KEYS=['1','2','3','4','5','6','7','8','9','','0','⌫'];
   function build(){
@@ -14889,10 +14890,13 @@ const NumPad=(()=>{
   },true);
   document.addEventListener('keydown',e=>{ // PC 물리 키보드 지원
     if(!inp)return;
+    const t=e.target;
+    if(t!==inp&&(t.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)))return; // 같은 모달의 메모칸 등 다른 입력 중엔 가로채지 않음
     if(/^\d$/.test(e.key))press(e.key);
     else if(e.key==='Backspace')press('⌫');
     else if(e.key==='Enter'||e.key==='Escape')close();
     else return;
     e.preventDefault();
   });
+  return{close};
 })();
