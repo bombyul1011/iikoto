@@ -11418,6 +11418,7 @@ let _calDiffs=[];          // status가 open/ignored인 차이 목록
 let _calDiffMeta=null;     // calendar_sync_meta 한 줄(마지막 확인 시각 등)
 let _calDiffBusy=false;    // 버튼 연타/동시 처리 방지
 let _calDiffRefreshing=false;
+const APP_BUILD='v2.55 · 20261021f'; // 차이 시트 맨 아래에 표시 — 기기에 올라간 앱 파일이 최신인지 확인하는 용도(index.html의 app.js?v= 값과 함께 올림)
 let _calRules=null;        // calendar_sync_rules 한 줄(자동 동기화 on/off, 제외 단어, 캘린더별 on/off)
 const CAL_DIFF_CAL={schedule:{label:'스케줄',cat:'schedule',vac:false},travel:{label:'여행',cat:'personal',vac:true},work:{label:'업무',cat:'work',vac:false}};
 const CAL_DIFF_KIND={apple_only:'애플에만 있음',changed:'다름',iikoto_only:'iikoto에만 있음'};
@@ -11532,6 +11533,7 @@ function renderCalDiffSheet(){
   // 연동 규칙(접힘) — 무엇을 자동으로 가져올지
   h+=`<div class="cdf-sec" onclick="calDiffToggleSec('rules')">연동 규칙 <i class="ti ti-chevron-${_cdOpenSecs.rules?'up':'down'}" aria-hidden="true"></i></div>`;
   if(_cdOpenSecs.rules)h+=_cdRulesHtml();
+  h+=`<div class="cdf-ver">앱 ${APP_BUILD}</div>`;
   el.innerHTML=h;
   el.scrollTop=keepScroll;
   if(keepWord||keepFocus){

@@ -1,6 +1,6 @@
 <!DOCTYPE html>
-<!-- build: 20261021-05 -->
-<!-- iikoto v2.54-wake-score -->
+<!-- build: 20261021-06 -->
+<!-- iikoto v2.55-ver-label -->
 <!-- 사진 업로드/조회/삭제는 별도 파일 worker-photo-proxy.js(Cloudflare Worker)가 담당 — 여기 수정만으로는 반영 안 됨, 필요시 그 파일도 함께 요청할 것 -->
 <html lang="ko">
 <head>
@@ -837,6 +837,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cdf-btn.main{background:rgba(255,175,200,0.28);color:var(--pal-pink-text);border-color:transparent;font-weight:500;}
 .cdf-btn:active{opacity:.6;}
 .cdf-warn{margin:8px 16px 0;padding:8px 10px;border-radius:10px;font-size:12px;line-height:1.4;background:rgba(255,175,200,0.20);color:var(--pal-pink-text);}
+.cdf-ver{text-align:center;font-size:10px;color:var(--tm);opacity:.6;padding:10px 0 2px;}
 .cdf-log{margin:0 16px;padding:8px 4px;font-size:12px;color:var(--ts);border-bottom:1px dashed rgba(var(--divider-rgb),0.20);}
 .cdf-rules{margin:0 16px;padding:8px 4px 4px;}
 .cdf-rule-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;font-size:13px;color:var(--tp);}
@@ -2825,7 +2826,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   </div>
 </div>
 
-<script src="app.js?v=20261021e"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
+<script src="app.js?v=20261021f"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
 
 </body>
 </html>

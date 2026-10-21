@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.30-wakescore';
+const CACHE = 'iikoto-v2.31-verlabel';
 const ASSETS = [
   './',
   './index.html'
