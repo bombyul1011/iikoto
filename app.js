@@ -4152,6 +4152,8 @@ async function syncAll(){
   if(oldDawnCard&&document.getElementById('v-home')&&document.getElementById('v-home').classList.contains('on')){
     oldDawnCard.replaceWith(makeDawnRecapCard());
   }
+  // 애플 캘린더 → iikoto 자동 동기화: 앱의 기존 동기화 시점에 얹되 5분 간격 제한(조용히, 바뀐 게 있을 때만 알림)
+  syncAppleCalendar({silent:true});
 }
 window.addEventListener('online',()=>syncAll());
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
@@ -4172,6 +4174,8 @@ function hasAnyPendingSync(){
 setInterval(()=>{
   if(navigator.onLine&&!window._restoring&&hasAnyPendingSync())syncAll();
 },120000);
+// 앱을 켜 둔 채 가만히 있어도 애플 캘린더 변경이 들어오도록 5분마다 확인(화면이 보일 때만, 내부에서 5분 간격 제한)
+setInterval(()=>{if(!document.hidden)syncAppleCalendar({silent:true});},300000);
 // 탭 전환(같은 화면 안에서 오늘↔주간↔월간↔홈 이동) 시에도 최신 서버 데이터 반영 —
 // PC/모바일 번갈아 사용 시 다른 기기에서 바꾼 값이 탭 이동만으로 보이도록.
 // 8초 debounce로 연속 탭 클릭 시 요청 폭주 방지.
@@ -10723,12 +10727,10 @@ function renderCalendar(){
   // 총 슬롯 수(배지+bar 합쳐서 실제 보이는 줄) 상한 — 셀 높이를 넘지 않도록 2줄까지만 텍스트로, 나머지는 "+n개"
   const MAX_VISIBLE_SLOTS=2;
   // 애플 캘린더와 차이가 있는 날짜(열려 있는 항목만) — 날짜 칸에 작은 점 하나로 표시
-  const diffDays={};
-  _cdOpen().forEach(x=>{const k=x.kind==='iikoto_only'?x.iikoto_date:(x.apple_date||x.date_key);if(k)diffDays[k]=true;});
   let h=`<div style="padding:4px 2px 0;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
       <div class="nav-arr" onclick="calShiftMonth(-1)"><i class="ti ti-chevron-left" style="font-size:10px;color:var(--tm);" aria-hidden="true"></i></div>
-      <span style="font-size:15px;font-weight:500;color:var(--tp);position:relative;">${y}년 ${mo+1}월${calDiffIconHtml()}</span>
+      <span style="font-size:15px;font-weight:500;color:var(--tp);position:relative;">${y}년 ${mo+1}월${calSyncIconHtml()}</span>
       <div class="nav-arr" onclick="calShiftMonth(1)"><i class="ti ti-chevron-right" style="font-size:10px;color:var(--tm);" aria-hidden="true"></i></div>
     </div>
     <div class="cal-grid cal-day-name-row">`;
@@ -10782,8 +10784,7 @@ function renderCalendar(){
       // "+n개"는 하루짜리 중 안 보인 것만 카운트(bar 자체는 항상 보이므로 미노출分에서 제외)
       const hiddenCount=(evs?evs.length-evsShown.length:0);
       if(hiddenCount>0)badges+=`<div class="cal-event-more">+${hiddenCount}개</div>`;
-      const diffDot=diffDays[cdk]?'<span class="cal-diff-dot"></span>':'';
-      h+=`<div class="${cls}"${inMonth?` onclick="calDayClick(${d})"`:' style="cursor:default;"'}>${diffDot}<div class="cal-num">${numLabel}</div>${barsHtml}${badges}</div>`;
+      h+=`<div class="${cls}"${inMonth?` onclick="calDayClick(${d})"`:' style="cursor:default;"'}><div class="cal-num">${numLabel}</div>${barsHtml}${badges}</div>`;
     }
   }
   h+=`</div></div>`;
@@ -10791,10 +10792,6 @@ function renderCalendar(){
   if(_calSelectedDay)renderCalDetail(_calSelectedDay);
 }
 // 월 제목 옆 아이콘 — 평소엔 거의 안 보이게 옅게, 열린 차이가 있을 때만 작은 숫자 동그라미
-function calDiffIconHtml(){
-  const n=_cdBadgeCount();
-  return `<span class="cal-diff-btn${n?' has':''}" onclick="event.stopPropagation();openCalDiffSheet();" aria-label="애플 캘린더와 차이"><i class="ti ti-arrows-exchange" aria-hidden="true"></i>${n?`<span class="cal-diff-badge">${n>99?'99+':n}</span>`:''}</span>`;
-}
 function calDayClick(d){
   _calSelectedDay=(_calSelectedDay===d)?null:d;
   renderCalendar();
@@ -11410,160 +11407,122 @@ function renderWeeklyHabitBox(){
   });
   el.innerHTML=html;
 }
-// ── 애플 캘린더 ↔ iikoto 차이 (1단계) ──
-// 서버(Edge Function compare-calendars)가 애플 캘린더(iCloud 공개 링크 3개)와 iikoto 일정을 비교해 calendar_diffs 테이블에 저장해 둠.
-// 앱은 그 결과를 읽어 (1) 월 제목 옆 아주 옅은 아이콘+개수, (2) 차이 있는 날짜의 작은 점, (3) 누르면 뜨는 시트로 보여주고,
-// 항목마다 [iikoto에 추가] / [애플 기준으로 수정] / [무시]를 고르게 한다. 방향은 애플 → iikoto 한쪽뿐(애플 쪽은 절대 안 건드림).
-let _calDiffs=[];          // status가 open/ignored인 차이 목록
-let _calDiffMeta=null;     // calendar_sync_meta 한 줄(마지막 확인 시각 등)
-let _calDiffBusy=false;    // 버튼 연타/동시 처리 방지
-let _calDiffRefreshing=false;
-const APP_BUILD='v2.55 · 20261021f'; // 차이 시트 맨 아래에 표시 — 기기에 올라간 앱 파일이 최신인지 확인하는 용도(index.html의 app.js?v= 값과 함께 올림)
-let _calRules=null;        // calendar_sync_rules 한 줄(자동 동기화 on/off, 제외 단어, 캘린더별 on/off)
-const CAL_DIFF_CAL={schedule:{label:'스케줄',cat:'schedule',vac:false},travel:{label:'여행',cat:'personal',vac:true},work:{label:'업무',cat:'work',vac:false}};
-const CAL_DIFF_KIND={apple_only:'애플에만 있음',changed:'다름',iikoto_only:'iikoto에만 있음'};
+// ── 애플 캘린더 → iikoto 동기화 ──
+// 애플 캘린더(iCloud 공개 링크 3개)가 원본이고 iikoto는 한 방향으로 따라간다(애플 쪽은 절대 안 건드림).
+// 실제 비교·반영은 서버(Edge Function compare-calendars)가 하고, 앱은 (1) 월 제목 옆 ⇄ 버튼으로 지금 바로 요청하거나
+// (2) 앱의 기존 동기화 시점(syncAll: 앱 열 때·화면 복귀·탭 이동)에 5분 간격 제한을 두고 조용히 요청한 뒤, 바뀐 일정만 로컬에 다시 받아온다.
+// ⇄ 버튼을 길게 누르면 연동 규칙(제외 단어·캘린더별 on/off) 시트가 열린다.
+let _calSyncBusy=false;
+let _calSyncLast=0;
+const CAL_SYNC_MIN_MS=5*60*1000; // 조용한 자동 동기화의 최소 간격(버튼은 제한 없음)
+const APP_BUILD='v2.56 · 20261021g'; // 규칙 시트 맨 아래에 표시 — 기기에 올라간 앱 파일이 최신인지 확인하는 용도(index.html의 app.js?v= 값과 함께 올림)
+let _calRules=null;        // calendar_sync_rules 한 줄(제외 단어, 캘린더별 on/off)
+let _calSyncMeta=null;     // calendar_sync_meta 한 줄(마지막 확인 시각)
+const CAL_SYNC_CAL={schedule:'스케줄',travel:'여행',work:'업무'};
 function _cdEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function _cdNorm(s){return String(s||'').normalize('NFKC').toLowerCase().replace(/[\s\u200b-\u200d\ufeff]+/g,'');} // 서버 함수의 norm과 동일 규칙
-function _cdDateLabel(dk,endDk){
-  if(!dk)return '';
-  const f=k=>{const d=parseDk(k);return `${d.getMonth()+1}/${d.getDate()}(${'일월화수목금토'[d.getDay()]})`;};
-  return endDk&&endDk>dk?`${f(dk)}~${f(endDk).replace(/\(.\)/,'')}`:f(dk);
+function _cdNorm(s){return String(s||'').normalize('NFKC').toLowerCase().replace(/[\s​-‍﻿]+/g,'');} // 서버 함수의 norm과 동일 규칙
+function calSyncIconHtml(){
+  return `<span class="cal-sync-btn${_calSyncBusy?' spin':''}" id="cal-sync-btn" onclick="event.stopPropagation();calSyncTap();" onpointerdown="event.stopPropagation();calSyncPress();" onpointerup="calSyncRelease()" onpointerleave="calSyncRelease()" onpointercancel="calSyncRelease()" oncontextmenu="return false;" aria-label="애플 캘린더와 동기화"><i class="ti ti-arrows-exchange" aria-hidden="true"></i></span>`;
 }
-function _cdOpen(){return _calDiffs.filter(x=>x.status==='open');}
-// 월 제목 옆 아이콘에 붙는 숫자 — "애플에만 있음/다름"만 센다(iikoto에만 있는 건 참고용이라 숫자에서 제외)
-function _cdBadgeCount(){return _cdOpen().filter(x=>x.kind!=='iikoto_only').length;}
-async function loadCalDiffs(){
+function _calSyncSpin(on){
+  const el=document.getElementById('cal-sync-btn');
+  if(el)el.classList.toggle('spin',!!on);
+}
+// 길게 누르면 규칙 시트, 짧게 누르면 동기화
+let _calPressTimer=null,_calLongFired=false;
+function calSyncPress(){
+  _calLongFired=false;clearTimeout(_calPressTimer);
+  _calPressTimer=setTimeout(()=>{_calLongFired=true;openCalRuleSheet();},600);
+}
+function calSyncRelease(){clearTimeout(_calPressTimer);}
+function calSyncTap(){
+  if(_calLongFired){_calLongFired=false;return;}
+  syncAppleCalendar({silent:false});
+}
+// opts.silent=true: 자동(조용히, 5분 간격 제한, 바뀐 게 있을 때만 알림) / false: 버튼(항상 서버 확인 + 로컬 다시 받기 + 알림)
+async function syncAppleCalendar(opts){
+  const silent=!!(opts&&opts.silent);
+  if(_calSyncBusy)return;
+  if(!navigator.onLine){if(!silent)showToast('오프라인이에요');return;}
+  if(silent&&(Date.now()-_calSyncLast<CAL_SYNC_MIN_MS||window._restoring))return;
+  _calSyncBusy=true;_calSyncLast=Date.now();_calSyncSpin(true);
+  try{
+    const res=await fetch(SUPA_URL+'/functions/v1/compare-calendars',{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}});
+    let j=null;try{j=await res.json();}catch(e){}
+    if(!res.ok||!j||j.ok===false){if(!silent)showToast('애플 캘린더를 확인하지 못했어요');return;}
+    const a=j.auto||{added:0,updated:0,deleted:0};
+    const changed=(a.added||0)+(a.updated||0)+(a.deleted||0)>0;
+    // 서버가 일정을 추가·수정·삭제했을 수 있으니 바뀐 게 있거나 버튼으로 눌렀을 때만 앞으로 40일치를 다시 받아 달력에 반영
+    if(changed||!silent){
+      try{
+        Object.keys(_monthSynced).forEach(k=>delete _monthSynced[k]);
+        const dks=[];for(let i=0;i<=40;i++){const d=new Date();d.setDate(d.getDate()+i);dks.push(dateKey(d));}
+        await syncTodosDownMany(dks);
+        await syncMonthRange(_calYear,_calMonth);
+      }catch(e){console.warn('syncAppleCalendar resync',e);}
+      if(document.getElementById('v-monthly')?.classList.contains('on'))renderCalendar();
+      try{loadDaily();}catch(e){}
+    }
+    if(changed||!silent){
+      if(j.throttled)showToast('방금 확인했어요');
+      else showToast(`동기화했어요 (추가 ${a.added||0} · 수정 ${a.updated||0} · 삭제 ${a.deleted||0})`);
+    }
+  }catch(e){
+    console.warn('syncAppleCalendar',e);
+    if(!silent)showToast('애플 캘린더를 확인하지 못했어요');
+  }finally{
+    _calSyncBusy=false;_calSyncSpin(false);
+  }
+}
+// ── 연동 규칙 시트(길게 누르기) ──
+async function loadCalRules(){
   if(!navigator.onLine)return;
-  const [rows,meta,rules]=await Promise.all([
-    supaFetch('calendar_diffs?status=in.(open,ignored)&order=date_key,apple_time'),
+  const [meta,rules]=await Promise.all([
     supaFetch('calendar_sync_meta?id=eq.true'),
     supaFetch('calendar_sync_rules?id=eq.true')
   ]);
-  if(rows===null)return; // 연결 실패 — 기존 표시 유지
-  _calDiffs=rows;
-  _calDiffMeta=(meta&&meta[0])||_calDiffMeta;
+  if(meta&&meta[0])_calSyncMeta=meta[0];
   if(rules&&rules[0])_calRules=rules[0];
-  if(document.getElementById('monthly-cal'))renderCalendar();
-  if(document.getElementById('cal-diff-sheet')?.classList.contains('on'))renderCalDiffSheet();
+  if(document.getElementById('cal-rule-sheet')?.classList.contains('on'))renderCalRuleSheet();
 }
-function openCalDiffSheet(){
-  renderCalDiffSheet();
-  openSheet('cal-diff-sheet');
-  loadCalDiffs(); // 열 때 최신으로 한 번 더 읽음
+function openCalRuleSheet(){
+  renderCalRuleSheet();
+  openSheet('cal-rule-sheet');
+  loadCalRules();
 }
-function _cdTimeStr(t,allDay){return allDay?'종일':(t||'시간 없음');}
-function _cdRowHtml(x,mode){
-  const calLabel=(CAL_DIFF_CAL[x.cal]||{}).label||'';
-  const dateStr=_cdDateLabel(x.kind==='iikoto_only'?x.iikoto_date:(x.apple_date||x.date_key),x.kind==='apple_only'?x.end_date:null);
-  const title=x.kind==='iikoto_only'?x.iikoto_title:x.apple_title;
-  const time=x.kind==='iikoto_only'?(x.iikoto_time||''):(x.apple_all_day?'종일':(x.apple_time||''));
-  let note='';
-  if(x.kind==='changed')note=_cdEsc(x.note||'');
-  else if(x.kind==='apple_only')note=`${_cdEsc(calLabel)} 캘린더${x.cal==='travel'?' · 오프로 추가':''}`;
-  else note='애플에서 찾지 못했어요';
-  const tagCls=x.kind==='apple_only'?'sky':(x.kind==='changed'?'rose':'mute');
-  let btns='';
-  if(mode==='ignored')btns=`<button class="cdf-btn" onclick="calDiffReopen('${x.id}')">다시 보기</button>`;
-  else if(x.kind==='apple_only')btns=`<button class="cdf-btn main" onclick="calDiffAdd('${x.id}')">iikoto에 추가</button><button class="cdf-btn" onclick="calDiffIgnore('${x.id}')">무시</button>`;
-  else if(x.kind==='changed')btns=`<button class="cdf-btn main" onclick="calDiffApply('${x.id}')">애플 기준으로 수정</button><button class="cdf-btn" onclick="calDiffIgnore('${x.id}')">무시</button>`;
-  else btns=`<button class="cdf-btn" onclick="calDiffIgnore('${x.id}')">무시</button>`;
-  return `<div class="cdf-row" id="cdf-${x.id}">
-    <div class="cdf-top"><span class="cdf-date">${_cdEsc(dateStr)}</span><span class="cdf-tag ${tagCls}">${CAL_DIFF_KIND[x.kind]||''}</span></div>
-    <div class="cdf-title">${_cdEsc(title)}${time?`<span class="cdf-time">${_cdEsc(time)}</span>`:''}</div>
-    <div class="cdf-note">${note}</div>
-    <div class="cdf-btns">${btns}</div>
-  </div>`;
-}
-// 시트에 떠 있는 항목이 그사이 서버에서 이미 정리됐을 수 있음(자동 반영·다른 기기) — 누르기 직전에 아직 열려 있는지 확인
-async function _cdFresh(id){
-  const rows=await supaFetch(`calendar_diffs?id=eq.${encodeURIComponent(id)}&select=status`);
-  if(rows===null)return true; // 확인 자체가 실패하면 막지 않음(이후 저장 단계에서 실패로 드러남)
-  if(rows.length&&rows[0].status==='open')return true;
-  showToast('이미 정리된 항목이에요');
-  loadCalDiffs();
-  return false;
-}
-let _cdOpenSecs={}; // 접힘/펼침 상태(시트를 다시 그려도 유지)
-function calDiffToggleSec(k){_cdOpenSecs[k]=!_cdOpenSecs[k];renderCalDiffSheet();}
-function renderCalDiffSheet(){
-  const el=document.getElementById('cal-diff-body');if(!el)return;
-  // 다시 그려도 스크롤 위치와 입력 중이던 단어가 유지되도록 기억해 둠
-  const keepScroll=el.scrollTop;
-  const wInp=document.getElementById('cdf-word-inp');
-  const keepWord=wInp?wInp.value:'';const keepFocus=!!wInp&&document.activeElement===wInp;
-  const open=_cdOpen();
-  const main=open.filter(x=>x.kind!=='iikoto_only');
-  const mine=open.filter(x=>x.kind==='iikoto_only');
-  const ign=_calDiffs.filter(x=>x.status==='ignored');
-  let last='아직 확인 전';
-  if(_calDiffMeta&&_calDiffMeta.last_run_at){
-    const d=new Date(_calDiffMeta.last_run_at);
-    last=`마지막 확인 ${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`+(_calDiffMeta.last_ok===false?' (일부 실패)':'');
+function renderCalRuleSheet(){
+  const el=document.getElementById('cal-rule-body');if(!el)return;
+  let last='아직 확인 기록이 없어요';
+  if(_calSyncMeta&&_calSyncMeta.last_run_at){
+    const d=new Date(_calSyncMeta.last_run_at);
+    last=`마지막 확인 ${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`+(_calSyncMeta.last_ok===false?' (일부 실패)':'');
   }
-  let h=`<div class="cdf-head"><div><div class="cdf-h1">애플 캘린더와 차이 ${main.length}</div><div class="cdf-h2">${_calDiffRefreshing?'확인하는 중…':_cdEsc(last)}</div></div>
-    <button class="cdf-refresh${_calDiffRefreshing?' spin':''}" onclick="refreshCalDiffs()" aria-label="다시 확인"><i class="ti ti-refresh" aria-hidden="true"></i></button></div>`;
-  // 서버가 안전장치로 멈췄거나 일부 실패했을 때 알림
-  const au=(_calDiffMeta&&_calDiffMeta.last_summary&&_calDiffMeta.last_summary.auto)||{};
-  const warns=[];
-  if(au.deleteBlocked)warns.push('애플에서 한꺼번에 많이 지워진 것으로 보여 자동 삭제를 멈췄어요. 애플 캘린더를 확인해 주세요.');
-  if(au.userDeleteBlocked)warns.push('iikoto에서 한꺼번에 많이 지워진 것으로 보여 "다시 안 가져오기" 기록을 멈췄어요.');
-  if(au.linkedReadFailed)warns.push('연동된 일정을 읽지 못해 이번 자동 반영을 건너뛰었어요.');
-  if(au.errors)warns.push(`일부 반영에 실패했어요(${au.errors}건). 다음 확인 때 다시 시도해요.`);
-  if(_calDiffMeta&&_calDiffMeta.last_ok===false&&!warns.length)warns.push('일부 캘린더를 읽지 못했어요. 다음 확인 때 다시 시도해요.');
-  warns.forEach(w=>{h+=`<div class="cdf-warn">${_cdEsc(w)}</div>`;});
-  if(!main.length)h+=`<div class="cdf-empty">${_calDiffMeta?'앞으로 30일은 애플 캘린더와 같아요 ✓':'불러오는 중…'}</div>`;
-  else h+=main.map(x=>_cdRowHtml(x,'open')).join('');
-  if(mine.length){
-    h+=`<div class="cdf-sec" onclick="calDiffToggleSec('mine')">iikoto에만 있는 일정 ${mine.length}건 <i class="ti ti-chevron-${_cdOpenSecs.mine?'up':'down'}" aria-hidden="true"></i></div>`;
-    if(_cdOpenSecs.mine)h+=mine.map(x=>_cdRowHtml(x,'open')).join('');
-  }
-  const recent=(_calDiffMeta&&_calDiffMeta.last_summary&&_calDiffMeta.last_summary.recent_changes)||[];
-  if(recent.length){
-    h+=`<div class="cdf-sec" onclick="calDiffToggleSec('recent')">최근 자동 반영 ${recent.length}건 <i class="ti ti-chevron-${_cdOpenSecs.recent?'up':'down'}" aria-hidden="true"></i></div>`;
-    if(_cdOpenSecs.recent)h+=recent.map(c=>{
-      const d=new Date(c.at);
-      const lab={added:'추가',updated:'수정',deleted:'삭제'}[c.kind]||c.kind;
-      return `<div class="cdf-log"><span class="cdf-tag ${c.kind==='deleted'?'rose':(c.kind==='added'?'sky':'mute')}">${lab}</span> ${_cdEsc(_cdDateLabel(c.date))} ${_cdEsc(c.title)}${c.note?` <span class="cdf-time">${_cdEsc(c.note)}</span>`:''}<span class="cdf-time" style="float:right;">${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}</span></div>`;
-    }).join('');
-  }
-  if(ign.length){
-    h+=`<div class="cdf-sec" onclick="calDiffToggleSec('ign')">무시한 항목 ${ign.length}건 보기 <i class="ti ti-chevron-${_cdOpenSecs.ign?'up':'down'}" aria-hidden="true"></i></div>`;
-    if(_cdOpenSecs.ign)h+=ign.map(x=>_cdRowHtml(x,'ignored')).join('');
-  }
-  // 연동 규칙(접힘) — 무엇을 자동으로 가져올지
-  h+=`<div class="cdf-sec" onclick="calDiffToggleSec('rules')">연동 규칙 <i class="ti ti-chevron-${_cdOpenSecs.rules?'up':'down'}" aria-hidden="true"></i></div>`;
-  if(_cdOpenSecs.rules)h+=_cdRulesHtml();
+  let h=`<div class="cdf-head"><div><div class="cdf-h1">애플 캘린더 연동</div><div class="cdf-h2">${_cdEsc(last)}</div></div></div>`;
+  h+=_calRules?_cdRulesHtml():'<div class="cdf-note" style="padding:20px;text-align:center;">불러오는 중…</div>';
   h+=`<div class="cdf-ver">앱 ${APP_BUILD}</div>`;
   el.innerHTML=h;
-  el.scrollTop=keepScroll;
-  if(keepWord||keepFocus){
-    const ni=document.getElementById('cdf-word-inp');
-    if(ni){ni.value=keepWord;if(keepFocus)ni.focus();}
-  }
 }
 function _cdRulesHtml(){
   const r=_calRules;
-  if(!r)return '<div class="cdf-empty">불러오는 중…</div>';
   const ce=r.cal_enabled||{};
   const words=(r.exclude_words||[]).map((w,i)=>`<span class="cdf-chip">${_cdEsc(w)}<i class="ti ti-x" onclick="calRuleDelWord(${i})" aria-hidden="true"></i></span>`).join('');
-  const calBtn=(k,label)=>`<button class="cdf-btn${ce[k]!==false?' main':''}" onclick="calRuleToggleCal('${k}')">${label} ${ce[k]!==false?'켬':'끔'}</button>`;
+  const calBtn=k=>`<button class="cdf-btn${ce[k]!==false?' main':''}" onclick="calRuleToggleCal('${k}')">${CAL_SYNC_CAL[k]} ${ce[k]!==false?'켬':'끔'}</button>`;
   return `<div class="cdf-rules">
-    <div class="cdf-rule-row"><span>자동 동기화</span><button class="cdf-btn${r.auto_sync?' main':''}" onclick="calRuleToggleAuto()">${r.auto_sync?'켬':'끔'}</button></div>
-    <div class="cdf-rule-row"><span>가져올 캘린더</span><span style="display:flex;gap:6px;">${calBtn('schedule','스케줄')}${calBtn('travel','여행')}${calBtn('work','업무')}</span></div>
-    <div class="cdf-rule-lab">제외 단어 <span class="cdf-time">제목에 들어 있으면 가져오지 않아요</span></div>
-    <div class="cdf-chips">${words||'<span class="cdf-time">없음</span>'}</div>
+    <div class="cdf-rule-lab">가져올 캘린더</div>
+    <div class="cdf-btns">${calBtn('schedule')}${calBtn('travel')}${calBtn('work')}</div>
+    <div class="cdf-rule-lab">제목에 있으면 가져오지 않는 단어</div>
+    <div class="cdf-chips">${words||'<span class="cdf-note">없음</span>'}</div>
     <div class="cdf-add"><input id="cdf-word-inp" type="text" placeholder="단어 추가" autocomplete="off" onkeydown="if(event.isComposing||event.keyCode===229)return;if(event.key==='Enter'){event.preventDefault();calRuleAddWord();}"><button class="cdf-btn main" onclick="calRuleAddWord()">추가</button></div>
-    <div class="cdf-note" style="margin-top:8px;">제목에 <b>${_cdEsc(r.pending_mark||'?')}</b>가 있으면 미정으로 보고 가져오지 않아요. 이미 가져온 일정에 ${_cdEsc(r.pending_mark||'?')}를 붙이면 iikoto에서도 지워져요. 규칙은 다음 확인 때(또는 ⟳) 적용돼요.</div>
+    <div class="cdf-note" style="margin-top:8px;">제목에 <b>${_cdEsc(r.pending_mark||'?')}</b>가 있으면 미정으로 보고 가져오지 않아요. 이미 가져온 일정에 ${_cdEsc(r.pending_mark||'?')}를 붙이면 iikoto에서도 지워져요. 규칙은 다음 동기화 때 적용돼요.</div>
   </div>`;
 }
 async function _cdSaveRules(patch){
   const ok=await supaFetch('calendar_sync_rules?id=eq.true','PATCH',{...patch,updated_at:new Date().toISOString()});
   if(ok===null){showToast('저장에 실패했어요');return false;}
   _calRules={..._calRules,...patch};
-  renderCalDiffSheet();
+  renderCalRuleSheet();
   return true;
 }
-function calRuleToggleAuto(){if(_calRules)_cdSaveRules({auto_sync:!_calRules.auto_sync});}
 function calRuleToggleCal(k){if(!_calRules)return;const ce={...(_calRules.cal_enabled||{})};ce[k]=ce[k]===false;_cdSaveRules({cal_enabled:ce});}
 function calRuleAddWord(){
   if(!_calRules)return;
@@ -11573,138 +11532,6 @@ function calRuleAddWord(){
   list.push(w);_cdSaveRules({exclude_words:list});
 }
 function calRuleDelWord(i){if(!_calRules)return;const list=[...(_calRules.exclude_words||[])];list.splice(i,1);_cdSaveRules({exclude_words:list});}
-// 연동 장부 기록 — 서버가 '이 애플 일정은 이 iikoto 일정과 같다 / 다시 가져오지 않는다'를 기억하는 곳
-async function _cdLink(appleKey,fields){
-  if(!appleKey)return;
-  await supaUpsert('calendar_links','apple_key',[{apple_key:appleKey,updated_at:new Date().toISOString(),...fields}]);
-}
-// 지금 바로 다시 비교 — 서버 함수를 직접 호출(자동 확인은 하루 두 번 따로 돎)
-async function refreshCalDiffs(){
-  if(_calDiffRefreshing)return;
-  if(!navigator.onLine){showToast('오프라인이에요');return;}
-  _calDiffRefreshing=true;renderCalDiffSheet();
-  try{
-    const res=await fetch(SUPA_URL+'/functions/v1/compare-calendars',{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}});
-    if(!res.ok)showToast('확인에 실패했어요');
-  }catch(e){showToast('확인에 실패했어요');}
-  _calDiffRefreshing=false;
-  await loadCalDiffs();
-  // 서버가 일정을 자동으로 추가·수정·삭제했을 수 있으니, 앞으로 40일치 일정을 서버에서 다시 받아 달력에 반영
-  try{
-    Object.keys(_monthSynced).forEach(k=>delete _monthSynced[k]);
-    const dks=[];for(let i=0;i<=40;i++){const d=new Date();d.setDate(d.getDate()+i);dks.push(dateKey(d));}
-    await syncTodosDownMany(dks);
-    await syncMonthRange(_calYear,_calMonth);
-  }catch(e){console.warn('refreshCalDiffs resync',e);}
-  renderCalendar();
-  renderCalDiffSheet();
-}
-async function _cdSetStatus(id,status){
-  const ok=await supaFetch(`calendar_diffs?id=eq.${encodeURIComponent(id)}`,'PATCH',{status,updated_at:new Date().toISOString()});
-  const x=_calDiffs.find(v=>v.id===id);
-  if(x&&ok!==null)x.status=status;
-  return ok!==null;
-}
-async function calDiffIgnore(id){
-  if(_calDiffBusy)return;_calDiffBusy=true;
-  try{
-    if(!await _cdFresh(id))return;
-    // 애플에만 있는 일정을 무시하면 서버도 다시 가져오지 않도록 장부에 '건너뜀'으로 기록
-    const x0=_calDiffs.find(v=>v.id===id);
-    if(x0&&x0.kind==='apple_only'&&x0.apple_uid)await _cdLink(x0.apple_uid,{cal:x0.cal,todo_cid:null,todo_date:x0.apple_date||x0.date_key,title:x0.apple_title,state:'skipped',reason:'ignored'});
-    if(await _cdSetStatus(id,'ignored')){showToast('무시했어요');}
-    else showToast('저장에 실패했어요');
-  }finally{_calDiffBusy=false;renderCalDiffSheet();renderCalendar();}
-}
-async function calDiffReopen(id){
-  if(_calDiffBusy)return;_calDiffBusy=true;
-  try{
-    const x0=_calDiffs.find(v=>v.id===id);
-    if(x0&&x0.kind==='apple_only'&&x0.apple_uid)await supaFetch(`calendar_links?apple_key=eq.${encodeURIComponent(x0.apple_uid)}&state=eq.skipped`,'DELETE');
-    await _cdSetStatus(id,'open');
-  }finally{_calDiffBusy=false;}
-  renderCalDiffSheet();renderCalendar();
-}
-// 애플에만 있는 일정 → iikoto에 새 일정으로 추가
-async function calDiffAdd(id){
-  const x=_calDiffs.find(v=>v.id===id);
-  if(!x||x.kind!=='apple_only'||_calDiffBusy)return;
-  _calDiffBusy=true;
-  try{
-    if(!await _cdFresh(id))return;
-    const dk=x.apple_date||x.date_key;
-    await syncTodosDown(dk); // 그 날짜 로컬이 낡았을 수 있어 서버값을 먼저 받아옴(업로드 대기중 수정이 있으면 건드리지 않음)
-    const list=getTodos(dk);
-    const nt=_cdNorm(x.apple_title);
-    // 같은 날 같은 제목의 일정이 이미 있으면 새로 만들지 않고 해결 처리 — 중복 방지
-    if(list.some(t=>t.isEvent&&_cdNorm(parseTodoTextParts(t.text).parts[0]||t.text)===nt)){
-      await _cdSetStatus(id,'resolved');
-      showToast('이미 같은 일정이 있어요');
-      return;
-    }
-    const map=CAL_DIFF_CAL[x.cal]||CAL_DIFF_CAL.schedule;
-    const endDk=(x.end_date&&x.end_date>dk)?x.end_date:null;
-    const time=x.apple_all_day?null:(x.apple_time||null);
-    const cid=genCid();
-    list.push({text:x.apple_title,done:false,created:Date.now(),timeSection:'none',isEvent:true,eventCat:map.cat,eventTime:time,eventEndDate:endDk,cid,strikeParts:[],strikeTimes:{},pinned:false,alertTime:null,eventAlertOn:false,todoAlertOn:false,isVacation:!!(map.vac&&endDk)});
-    saveTodos(dk,list);
-    if(endDk)_invalidateVacationCache();
-    syncCalCacheFromTodos(dk);
-    await _cdLink(x.apple_uid,{cal:x.cal,todo_cid:cid,todo_date:dk,title:x.apple_title,state:'active'});
-    await _cdSetStatus(id,'resolved');
-    showToast('iikoto에 추가했어요');
-  }catch(e){
-    console.warn('calDiffAdd',e);showToast('추가에 실패했어요');
-  }finally{_calDiffBusy=false;renderCalDiffSheet();renderCalendar();}
-}
-// 다른 항목 → 애플 기준으로 iikoto 일정을 고침(제목·시간·날짜·종료일)
-async function calDiffApply(id){
-  const x=_calDiffs.find(v=>v.id===id);
-  if(!x||x.kind!=='changed'||_calDiffBusy)return;
-  _calDiffBusy=true;
-  try{
-    if(!await _cdFresh(id))return;
-    const oldDk=x.iikoto_date;
-    const newDk=x.apple_date||oldDk;
-    await syncTodosDown(oldDk);
-    const oldList=getTodos(oldDk);
-    const idx=oldList.findIndex(t=>t.cid===x.iikoto_cid);
-    if(idx<0){showToast('iikoto에서 그 일정을 못 찾았어요');return;}
-    const ev=oldList[idx];
-    if(ev.recurRuleCid&&newDk!==oldDk){showToast('반복 일정은 날짜를 직접 고쳐 주세요');return;}
-    const hadEnd=!!ev.eventEndDate;
-    // 제목은 정규화 기준으로 실제 다를 때만 교체(공백/대소문자 차이로 쓸데없이 덮어쓰지 않음)
-    const curTitle=parseTodoTextParts(ev.text).parts[0]||ev.text;
-    if(_cdNorm(curTitle)!==_cdNorm(x.apple_title)&&_cdNorm(ev.text)!==_cdNorm(x.apple_title))ev.text=x.apple_title;
-    ev.eventTime=x.apple_all_day?null:(x.apple_time||null);
-    const endDk=(x.end_date&&x.end_date>newDk)?x.end_date:null;
-    ev.eventEndDate=endDk;
-    if(!endDk)ev.isVacation=false;
-    if(newDk!==oldDk){
-      addDelPending('todos',oldDk,ev.cid);
-      oldList.splice(idx,1);
-      saveTodos(oldDk,oldList);
-      await syncTodosDown(newDk);
-      const nl=getTodos(newDk);
-      nl.push(ev);
-      saveTodos(newDk,nl);
-      syncCalCacheFromTodos(oldDk);syncCalCacheFromTodos(newDk);
-    }else{
-      saveTodos(oldDk,oldList);
-      syncCalCacheFromTodos(oldDk);
-    }
-    if(hadEnd||endDk)_invalidateVacationCache();
-    // 알림: 시간이 바뀌었을 수 있으니 예약을 새 값으로 맞춤(알림을 켜둔 일정만 실제 예약이 남고, 아니면 정리)
-    const basis=alertBasisTimeFor(ev);
-    if(basis)await syncAlertFor('event',ev.cid,newDk,basis,ev.text);
-    else await deleteAlertFor('event',ev.cid);
-    await _cdLink(x.apple_uid,{cal:x.cal,todo_cid:ev.cid,todo_date:newDk,title:x.apple_title,state:'active'});
-    await _cdSetStatus(id,'resolved');
-    showToast('애플 기준으로 고쳤어요');
-  }catch(e){
-    console.warn('calDiffApply',e);showToast('수정에 실패했어요');
-  }finally{_calDiffBusy=false;renderCalDiffSheet();renderCalendar();}
-}
 // ── 월간탭 전체 로드 진입점 ──
 function loadMonthly(){
   const _ld0=currentDate; // 날짜 네비게이터가 가리키는 날짜 기준으로 월간탭 진입 (기존: 항상 오늘 기준)
@@ -11718,7 +11545,6 @@ function loadMonthly(){
   updateReportBannerLabel();
   updateDiaryBannerLabel();
   const sy=_calYear,smo=_calMonth;
-  loadCalDiffs(); // 애플 캘린더와의 차이 목록(서버가 저장해 둔 결과)을 읽어 아이콘/점 갱신
   syncOnelineMonthRange(sy,smo).then(fetched=>{
     if(fetched&&_calYear===sy&&_calMonth===smo)updateDiaryBannerLabel();
   });

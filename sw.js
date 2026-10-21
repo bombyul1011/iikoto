@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.31-verlabel';
+const CACHE = 'iikoto-v2.32-calsync';
 const ASSETS = [
   './',
   './index.html'
