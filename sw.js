@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.28-caldelfix';
+const CACHE = 'iikoto-v2.30-wakescore';
 const ASSETS = [
   './',
   './index.html'

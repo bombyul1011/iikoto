@@ -4772,6 +4772,7 @@ function setNow(t){
   // 예전엔 getLogicalDate()(지금 이 순간의 실제 오늘)를 썼는데, 사용자가 다음날 이후에 화면을 과거 날짜로
   // 옮겨 소급 입력하는 경우 dk와 어긋나서 자동마감 대상 범위([오늘,어제] 단 이틀)를 벗어나 버리는 버그가 있었음.
   if(t==='sleep'){autoCloseUnfinishedRhythmBlocks(dk,v);refreshRhythmTrack();}
+  else maybePromptSleepScoreAfterWake(dk);
 }
 function openTimeModal(t){
   _sleepTarget=t;
@@ -5415,6 +5416,7 @@ function confirmTime(){
   if(_sleepTarget==='wake'){
     const goal=getHabitGoal('wake');
     if(goal&&goal.goalTime&&v<=goal.goalTime)checkHabitDirect('wake',dk,v);
+    maybePromptSleepScoreAfterWake(dk);
   }
 }
 
@@ -6627,6 +6629,13 @@ function promptSleepScore(dk){
   if(inp)inp.value=cur!=null?String(cur):'';
   openModal('sleep-score-modal');
   setTimeout(()=>{if(inp)inp.focus();},80);
+}
+// 기상 시각을 등록한 직후 호출 — 그날 수면 점수가 아직 없으면 점수 입력창을 바로 띄움(09:00 미등록 알림을 기다리지 않아도 됨).
+// 오늘(논리적 하루, 04:00 기준)을 보고 있을 때만 띄움 — 과거 날짜를 소급 수정할 때는 방해하지 않음. 취소하면 그대로 닫히고, 09:00 알림은 기존대로 동작.
+function maybePromptSleepScoreAfterWake(dk){
+  if(getSleepScore(dk)!=null)return;
+  if(dk!==dateKey(getLogicalDate()))return;
+  setTimeout(()=>{if(getSleepScore(dk)==null)promptSleepScore(dk);},300); // 시간 모달이 닫히는 동안 잠깐 기다렸다가 열어 모달이 겹치지 않게 함
 }
 function confirmSleepScore(){
   const inp=document.getElementById('sleep-score-inp');
@@ -11413,7 +11422,7 @@ let _calRules=null;        // calendar_sync_rules 한 줄(자동 동기화 on/of
 const CAL_DIFF_CAL={schedule:{label:'스케줄',cat:'schedule',vac:false},travel:{label:'여행',cat:'personal',vac:true},work:{label:'업무',cat:'work',vac:false}};
 const CAL_DIFF_KIND={apple_only:'애플에만 있음',changed:'다름',iikoto_only:'iikoto에만 있음'};
 function _cdEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function _cdNorm(s){return String(s||'').normalize('NFKC').toLowerCase().replace(/\s+/g,'');}
+function _cdNorm(s){return String(s||'').normalize('NFKC').toLowerCase().replace(/[\s\u200b-\u200d\ufeff]+/g,'');} // 서버 함수의 norm과 동일 규칙
 function _cdDateLabel(dk,endDk){
   if(!dk)return '';
   const f=k=>{const d=parseDk(k);return `${d.getMonth()+1}/${d.getDate()}(${'일월화수목금토'[d.getDay()]})`;};
@@ -11464,10 +11473,23 @@ function _cdRowHtml(x,mode){
     <div class="cdf-btns">${btns}</div>
   </div>`;
 }
+// 시트에 떠 있는 항목이 그사이 서버에서 이미 정리됐을 수 있음(자동 반영·다른 기기) — 누르기 직전에 아직 열려 있는지 확인
+async function _cdFresh(id){
+  const rows=await supaFetch(`calendar_diffs?id=eq.${encodeURIComponent(id)}&select=status`);
+  if(rows===null)return true; // 확인 자체가 실패하면 막지 않음(이후 저장 단계에서 실패로 드러남)
+  if(rows.length&&rows[0].status==='open')return true;
+  showToast('이미 정리된 항목이에요');
+  loadCalDiffs();
+  return false;
+}
 let _cdOpenSecs={}; // 접힘/펼침 상태(시트를 다시 그려도 유지)
 function calDiffToggleSec(k){_cdOpenSecs[k]=!_cdOpenSecs[k];renderCalDiffSheet();}
 function renderCalDiffSheet(){
   const el=document.getElementById('cal-diff-body');if(!el)return;
+  // 다시 그려도 스크롤 위치와 입력 중이던 단어가 유지되도록 기억해 둠
+  const keepScroll=el.scrollTop;
+  const wInp=document.getElementById('cdf-word-inp');
+  const keepWord=wInp?wInp.value:'';const keepFocus=!!wInp&&document.activeElement===wInp;
   const open=_cdOpen();
   const main=open.filter(x=>x.kind!=='iikoto_only');
   const mine=open.filter(x=>x.kind==='iikoto_only');
@@ -11479,6 +11501,15 @@ function renderCalDiffSheet(){
   }
   let h=`<div class="cdf-head"><div><div class="cdf-h1">애플 캘린더와 차이 ${main.length}</div><div class="cdf-h2">${_calDiffRefreshing?'확인하는 중…':_cdEsc(last)}</div></div>
     <button class="cdf-refresh${_calDiffRefreshing?' spin':''}" onclick="refreshCalDiffs()" aria-label="다시 확인"><i class="ti ti-refresh" aria-hidden="true"></i></button></div>`;
+  // 서버가 안전장치로 멈췄거나 일부 실패했을 때 알림
+  const au=(_calDiffMeta&&_calDiffMeta.last_summary&&_calDiffMeta.last_summary.auto)||{};
+  const warns=[];
+  if(au.deleteBlocked)warns.push('애플에서 한꺼번에 많이 지워진 것으로 보여 자동 삭제를 멈췄어요. 애플 캘린더를 확인해 주세요.');
+  if(au.userDeleteBlocked)warns.push('iikoto에서 한꺼번에 많이 지워진 것으로 보여 "다시 안 가져오기" 기록을 멈췄어요.');
+  if(au.linkedReadFailed)warns.push('연동된 일정을 읽지 못해 이번 자동 반영을 건너뛰었어요.');
+  if(au.errors)warns.push(`일부 반영에 실패했어요(${au.errors}건). 다음 확인 때 다시 시도해요.`);
+  if(_calDiffMeta&&_calDiffMeta.last_ok===false&&!warns.length)warns.push('일부 캘린더를 읽지 못했어요. 다음 확인 때 다시 시도해요.');
+  warns.forEach(w=>{h+=`<div class="cdf-warn">${_cdEsc(w)}</div>`;});
   if(!main.length)h+=`<div class="cdf-empty">${_calDiffMeta?'앞으로 30일은 애플 캘린더와 같아요 ✓':'불러오는 중…'}</div>`;
   else h+=main.map(x=>_cdRowHtml(x,'open')).join('');
   if(mine.length){
@@ -11502,6 +11533,11 @@ function renderCalDiffSheet(){
   h+=`<div class="cdf-sec" onclick="calDiffToggleSec('rules')">연동 규칙 <i class="ti ti-chevron-${_cdOpenSecs.rules?'up':'down'}" aria-hidden="true"></i></div>`;
   if(_cdOpenSecs.rules)h+=_cdRulesHtml();
   el.innerHTML=h;
+  el.scrollTop=keepScroll;
+  if(keepWord||keepFocus){
+    const ni=document.getElementById('cdf-word-inp');
+    if(ni){ni.value=keepWord;if(keepFocus)ni.focus();}
+  }
 }
 function _cdRulesHtml(){
   const r=_calRules;
@@ -11570,6 +11606,7 @@ async function _cdSetStatus(id,status){
 async function calDiffIgnore(id){
   if(_calDiffBusy)return;_calDiffBusy=true;
   try{
+    if(!await _cdFresh(id))return;
     // 애플에만 있는 일정을 무시하면 서버도 다시 가져오지 않도록 장부에 '건너뜀'으로 기록
     const x0=_calDiffs.find(v=>v.id===id);
     if(x0&&x0.kind==='apple_only'&&x0.apple_uid)await _cdLink(x0.apple_uid,{cal:x0.cal,todo_cid:null,todo_date:x0.apple_date||x0.date_key,title:x0.apple_title,state:'skipped',reason:'ignored'});
@@ -11592,6 +11629,7 @@ async function calDiffAdd(id){
   if(!x||x.kind!=='apple_only'||_calDiffBusy)return;
   _calDiffBusy=true;
   try{
+    if(!await _cdFresh(id))return;
     const dk=x.apple_date||x.date_key;
     await syncTodosDown(dk); // 그 날짜 로컬이 낡았을 수 있어 서버값을 먼저 받아옴(업로드 대기중 수정이 있으면 건드리지 않음)
     const list=getTodos(dk);
@@ -11623,6 +11661,7 @@ async function calDiffApply(id){
   if(!x||x.kind!=='changed'||_calDiffBusy)return;
   _calDiffBusy=true;
   try{
+    if(!await _cdFresh(id))return;
     const oldDk=x.iikoto_date;
     const newDk=x.apple_date||oldDk;
     await syncTodosDown(oldDk);
