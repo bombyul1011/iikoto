@@ -8292,22 +8292,41 @@ function openEventSheet(dk,cid,title){
   document.getElementById('event-sheet-title').textContent=title||'';
   openSheet('event-sheet');
 }
-function eventSheetEdit(){
+async function eventSheetEdit(){
   closeSheet('event-sheet');
   if(!_eventSheetDk||!_eventSheetCid)return;
-  const todos=getTodos(_eventSheetDk);
-  const idx=todos.findIndex(t=>t.cid===_eventSheetCid);
-  if(idx<0)return;
+  let todos=getTodos(_eventSheetDk);
+  let idx=todos.findIndex(t=>t.cid===_eventSheetCid);
+  if(idx<0){ // 달력 미리보기 캐시에만 있고 정식 저장소엔 아직 없는 일정(서버가 자동 추가한 일정 등) — 서버에서 받아 다시 찾음
+    await syncTodosDown(_eventSheetDk);
+    todos=getTodos(_eventSheetDk);
+    idx=todos.findIndex(t=>t.cid===_eventSheetCid);
+  }
+  if(idx<0){showToast('이미 없는 일정이에요');syncCalCacheFromTodos(_eventSheetDk);if(document.getElementById('monthly-cal'))renderCalendar();return;}
   if(_eventSheetDk===dateKey(currentDate)){
     openTodoModal(idx); // 오늘 날짜(=시작일)면 currentDate 전환 불필요, 바로 편집
   }else{
     openEventEditFromCalendar(new Date(_eventSheetDk+'T00:00:00').getDate(),idx,new Date(_eventSheetDk+'T00:00:00').getFullYear(),new Date(_eventSheetDk+'T00:00:00').getMonth());
   }
 }
-function eventSheetDelete(){
+async function eventSheetDelete(){
   closeSheet('event-sheet');
-  if(!removeTodoByCid(_eventSheetDk,_eventSheetCid))return;
-  syncCalCacheFromTodos(_eventSheetDk); // 캘린더 일정 삭제도 캐시 즉시 반영
+  const dk=_eventSheetDk,cid=_eventSheetCid;
+  if(!dk||!cid)return;
+  let ok=removeTodoByCid(dk,cid);
+  if(!ok){ // 정식 저장소에 없음 — 서버에서 그 날짜를 받아 다시 시도(서버가 자동 추가한 일정 등)
+    await syncTodosDown(dk);
+    ok=removeTodoByCid(dk,cid);
+  }
+  if(!ok){ // 서버에도 없는 유령 일정 — 달력 미리보기 캐시에서만 치움
+    const left=(S.get(S.key('cal_todos_cache',dk))||[]).filter(t=>t.cid!==cid);
+    S.set(S.key('cal_todos_cache',dk),left);
+    _invalidateVacationCache();
+    showToast('남아 있던 표시를 지웠어요');
+    if(document.getElementById('monthly-cal'))renderCalendar();
+    return;
+  }
+  syncCalCacheFromTodos(dk); // 캘린더 일정 삭제도 캐시 즉시 반영
   renderTodos();
   if(document.getElementById('monthly-cal'))renderCalendar();
 }
@@ -10573,12 +10592,16 @@ async function syncMonthRange(y,mo){
     // 쓰는 정식 todos_*는 여기서 더 이상 건드리지 않는다 — 날짜 클릭 시 뜨는 상세 화면은 지금처럼
     // 정식 todos_*를 그대로 읽으므로 항상 실시간 정확도를 유지한다(변경 없음).
     tRows.forEach(r=>{if(r.date_key===RESERVE_DK)return;/* 예비투두 관련 로직은 파일 하단 RESERVE_DK 블록(getReserveTodos 등) 참고 */(byDate[r.date_key]=byDate[r.date_key]||[]).push(todoRowToLocal(r));});
-    Object.keys(byDate).forEach(dk=>{
+    // 서버에 그 날짜 일정이 하나도 없으면 byDate에 키 자체가 없어 예전엔 캐시가 갱신되지 않고 낡은 값이 남았음 —
+    // 다른 기기·서버에서 지워진 일정이 달력에 유령처럼 계속 보이고 삭제도 안 되던 원인. 월 전체 날짜를 돌며 빈 날짜는 빈 목록으로 맞춤.
+    for(let dd=1;dd<=daysInMonth;dd++){
+      const dk=`${y}-${pad(mo+1)}-${pad(dd)}`;
+      if(dk===RESERVE_DK)continue;
       // pending(오늘탭에서 이미 만든 미업로드 로컬 수정)이 있는 날짜는 정식 쪽이 항상 더 최신이므로
       // 캐시도 그 정식 값을 그대로 따라가게 함 — 캐시가 낡은 서버값으로 미리보기를 잘못 그리는 것 방지.
-      const src=S.get(S.key('todos_pending',dk))?getTodos(dk):dedupeRecurTodos(byDate[dk]);
+      const src=S.get(S.key('todos_pending',dk))?getTodos(dk):dedupeRecurTodos(byDate[dk]||[]);
       S.set(S.key('cal_todos_cache',dk),src);
-    });
+    }
   }
   if(sRows)sRows.forEach(r=>{if(!S.get(S.key('sleep_pending',r.date_key)))S.set(S.key('sleep',r.date_key),sleepRowToLocal(r));});
   if(mlRows)mlRows.forEach(r=>{
