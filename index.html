@@ -1,6 +1,6 @@
 <!DOCTYPE html>
-<!-- build: 20260904-03 -->
-<!-- iikoto v2.49-rhythm-track-fill -->
+<!-- build: 20261021-02 -->
+<!-- iikoto v2.51-cal-autosync -->
 <!-- 사진 업로드/조회/삭제는 별도 파일 worker-photo-proxy.js(Cloudflare Worker)가 담당 — 여기 수정만으로는 반영 안 됨, 필요시 그 파일도 함께 요청할 것 -->
 <html lang="ko">
 <head>
@@ -807,6 +807,45 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .overlay.on .bsheet{transform:translateY(0);}
 .sheet-handle{width:36px;height:4px;background:rgba(var(--divider-rgb),.38);border-radius:2px;margin:12px auto 16px;}
 .sheet-title{font-size:var(--main-text-size);font-weight:500;color:var(--ts);padding:0 20px 12px;border-bottom:1px solid rgba(var(--divider-rgb),0.25);}
+/* ── 애플 캘린더와 차이: 월 제목 옆 아이콘 / 날짜 점 / 시트 ── */
+.cal-diff-btn{position:absolute;left:100%;top:50%;transform:translateY(-50%);margin-left:4px;padding:6px 6px;display:inline-flex;align-items:center;cursor:pointer;color:var(--tm);opacity:.32;font-size:13px;line-height:1;}
+.cal-diff-btn.has{opacity:.75;}
+.cal-diff-btn:active{opacity:1;}
+.cal-diff-badge{position:absolute;top:0;right:-4px;min-width:13px;height:13px;padding:0 3px;box-sizing:border-box;border-radius:7px;background:var(--pal-sky-border);color:#fff;font-size:8px;line-height:13px;text-align:center;font-weight:500;}
+#monthly-cal .cal-diff-dot{position:absolute;top:5px;left:calc(50% + 11px);width:4px;height:4px;border-radius:50%;background:var(--pal-sky-border);pointer-events:none;}
+#cal-diff-body{overflow-y:auto;max-height:68vh;padding:0 0 8px;-webkit-overflow-scrolling:touch;}
+.cdf-head{display:flex;align-items:center;justify-content:space-between;padding:0 20px 10px;border-bottom:1px solid rgba(var(--divider-rgb),0.25);}
+.cdf-h1{font-size:var(--main-text-size);font-weight:500;color:var(--ts);}
+.cdf-h2{font-size:11px;color:var(--tm);margin-top:2px;}
+.cdf-refresh{background:none;border:none;color:var(--tm);font-size:18px;padding:6px;cursor:pointer;display:flex;}
+.cdf-refresh.spin i{animation:cdfspin .9s linear infinite;}
+@keyframes cdfspin{to{transform:rotate(360deg);}}
+.cdf-empty{padding:28px 20px;text-align:center;font-size:13px;color:var(--tm);}
+.cdf-row{margin:0 16px;padding:12px 4px;border-bottom:1px dashed rgba(var(--divider-rgb),0.20);}
+.cdf-top{display:flex;align-items:center;gap:8px;}
+.cdf-date{font-size:11px;color:var(--tm);}
+.cdf-tag{font-size:10px;padding:1px 7px;border-radius:8px;}
+.cdf-tag.sky{background:var(--pal-sky-bg);color:var(--pal-sky-text);}
+.cdf-tag.rose{background:rgba(255,175,200,0.28);color:var(--pal-pink-text);}
+.cdf-tag.mute{background:var(--inp);color:var(--tm);}
+.cdf-title{font-size:var(--main-text-size);color:var(--tp);margin-top:4px;}
+.cdf-time{font-size:11px;color:var(--tm);margin-left:6px;}
+.cdf-note{font-size:11px;color:var(--ts);margin-top:2px;}
+.cdf-note:empty{display:none;}
+.cdf-btns{display:flex;gap:6px;margin-top:8px;}
+.cdf-btn{padding:6px 12px;border-radius:10px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;background:var(--inp);color:var(--tm);border:1px solid var(--inp-b);}
+.cdf-btn.main{background:rgba(255,175,200,0.28);color:var(--pal-pink-text);border-color:transparent;font-weight:500;}
+.cdf-btn:active{opacity:.6;}
+.cdf-log{margin:0 16px;padding:8px 4px;font-size:12px;color:var(--ts);border-bottom:1px dashed rgba(var(--divider-rgb),0.20);}
+.cdf-rules{margin:0 16px;padding:8px 4px 4px;}
+.cdf-rule-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;font-size:13px;color:var(--tp);}
+.cdf-rule-lab{font-size:12px;color:var(--ts);margin:8px 0 6px;}
+.cdf-chips{display:flex;flex-wrap:wrap;gap:6px;}
+.cdf-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 6px 3px 10px;border-radius:10px;font-size:12px;background:var(--inp);color:var(--ts);border:1px solid var(--inp-b);}
+.cdf-chip i{font-size:12px;color:var(--tm);cursor:pointer;padding:2px;}
+.cdf-add{display:flex;gap:6px;margin-top:8px;}
+.cdf-add input{flex:1;min-width:0;padding:7px 10px;border-radius:10px;border:1px solid var(--inp-b);background:var(--inp);color:var(--tp);font-size:13px;font-family:inherit;}
+.cdf-sec{margin:0 16px;padding:12px 4px;font-size:12px;color:var(--tm);cursor:pointer;border-bottom:1px dashed rgba(var(--divider-rgb),0.20);}
 .sheet-item{display:flex;align-items:center;gap:12px;padding:14px 4px;margin:0 16px;border-bottom:1px dashed rgba(var(--divider-rgb),0.20);cursor:pointer;font-size:var(--main-text-size);color:var(--tp);}
 .reserve-item{display:flex;align-items:center;gap:9px;padding:5px 0;margin:0 16px;border-bottom:1px dashed rgba(var(--divider-rgb),0.20);font-size:var(--main-text-size);color:var(--tp);}
 .reserve-item .reserve-text{flex:1;cursor:pointer;padding:5px 0;}
@@ -2017,6 +2056,14 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   </div>
 </div>
 
+<!-- 애플 캘린더와 차이 시트 — 월간탭 제목 옆 아이콘으로 열림. 항목별 [iikoto에 추가]/[애플 기준으로 수정]/[무시] -->
+<div class="overlay" id="cal-diff-sheet" onclick="closeSheet('cal-diff-sheet',event)">
+  <div class="bsheet">
+    <div class="sheet-handle"></div>
+    <div id="cal-diff-body"></div>
+  </div>
+</div>
+
 <!-- MONTHLY REPORT SHEET -->
 <div class="overlay" id="monthly-report-sheet" onclick="closeSheet('monthly-report-sheet',event)">
   <div class="bsheet" style="max-height:85vh;overflow-y:auto;" onclick="event.stopPropagation()">
@@ -2777,7 +2824,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   </div>
 </div>
 
-<script src="app.js?v=20261019d"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
+<script src="app.js?v=20261021b"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
 
 </body>
 </html>
