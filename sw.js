@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.32-calsync';
+const CACHE = 'iikoto-v2.33-modalin';
 const ASSETS = [
   './',
   './index.html'

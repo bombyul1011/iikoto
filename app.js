@@ -6632,14 +6632,14 @@ function promptSleepScore(dk){
   const inp=document.getElementById('sleep-score-inp');
   if(inp)inp.value=cur!=null?String(cur):'';
   openModal('sleep-score-modal');
-  setTimeout(()=>{if(inp)inp.focus();},80);
+  setTimeout(()=>{if(inp)inp.focus();},320); // 모달이 먼저 부드럽게 나타난 뒤(애니메이션 끝난 뒤) 숫자패드가 올라오게 — 동시에 뜨면 급하게 느껴짐
 }
 // 기상 시각을 등록한 직후 호출 — 그날 수면 점수가 아직 없으면 점수 입력창을 바로 띄움(09:00 미등록 알림을 기다리지 않아도 됨).
 // 오늘(논리적 하루, 04:00 기준)을 보고 있을 때만 띄움 — 과거 날짜를 소급 수정할 때는 방해하지 않음. 취소하면 그대로 닫히고, 09:00 알림은 기존대로 동작.
 function maybePromptSleepScoreAfterWake(dk){
   if(getSleepScore(dk)!=null)return;
   if(dk!==dateKey(getLogicalDate()))return;
-  setTimeout(()=>{if(getSleepScore(dk)==null)promptSleepScore(dk);},300); // 시간 모달이 닫히는 동안 잠깐 기다렸다가 열어 모달이 겹치지 않게 함
+  setTimeout(()=>{if(getSleepScore(dk)==null)promptSleepScore(dk);},450); // 시간 모달이 닫히는 동안 잠깐 기다렸다가 열어 모달이 겹치지 않게 함
 }
 function confirmSleepScore(){
   const inp=document.getElementById('sleep-score-inp');
@@ -11415,7 +11415,7 @@ function renderWeeklyHabitBox(){
 let _calSyncBusy=false;
 let _calSyncLast=0;
 const CAL_SYNC_MIN_MS=5*60*1000; // 조용한 자동 동기화의 최소 간격(버튼은 제한 없음)
-const APP_BUILD='v2.56 · 20261021g'; // 규칙 시트 맨 아래에 표시 — 기기에 올라간 앱 파일이 최신인지 확인하는 용도(index.html의 app.js?v= 값과 함께 올림)
+const APP_BUILD='v2.57 · 20261023a'; // 규칙 시트 맨 아래에 표시 — 기기에 올라간 앱 파일이 최신인지 확인하는 용도(index.html의 app.js?v= 값과 함께 올림)
 let _calRules=null;        // calendar_sync_rules 한 줄(제외 단어, 캘린더별 on/off)
 let _calSyncMeta=null;     // calendar_sync_meta 한 줄(마지막 확인 시각)
 const CAL_SYNC_CAL={schedule:'스케줄',travel:'여행',work:'업무'};
@@ -15015,7 +15015,7 @@ var NumPad=(()=>{ // var: 스크립트 로딩 순서와 무관하게 closeModal�
     const host=inp&&inp.closest('.modal,.bsheet');
     if(!host)return;
     host.style.transition='none';host.style.translate='';
-    const padTop=window.innerHeight-pad.offsetHeight-12;
+    const padTop=window.innerHeight-pad.offsetHeight-28; // 모달 아래끝과 숫자패드 사이 여백
     const hr=host.getBoundingClientRect();
     let sh=Math.min(hr.bottom-padTop,Math.max(0,hr.top-8)); // 모달 전체가 패드 위로 오는 이동량(위쪽은 화면 밖으로 안 나가게 제한)
     sh=Math.max(sh,inp.getBoundingClientRect().bottom+8-padTop); // 그래도 입력창은 반드시 패드 위

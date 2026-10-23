@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- build: 20261021-07 -->
+<!-- build: 20261023-01 -->
 <!-- iikoto v2.56-cal-sync-btn -->
 <!-- 사진 업로드/조회/삭제는 별도 파일 worker-photo-proxy.js(Cloudflare Worker)가 담당 — 여기 수정만으로는 반영 안 됨, 필요시 그 파일도 함께 요청할 것 -->
 <html lang="ko">
@@ -863,7 +863,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .qc-comment-textarea{width:100%;box-sizing:border-box;font-size:var(--dow-label-size);padding:6px 8px;border-radius:8px;border:1px solid var(--card-b);background:var(--card);color:var(--tp);resize:none;min-height:44px;font-family:inherit;outline:none;}
 .qc-comment-textarea:focus{border-color:rgba(200,176,168,0.65);}
 .modal-ov{position:fixed;inset:0;background:rgba(60,40,35,.22);z-index:9999;display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px);}
-.modal-ov.on{display:flex;}
+.modal-ov.on{display:flex;animation:modalOvIn .22s ease-out;}
+.modal-ov.on .modal{animation:modalIn .3s cubic-bezier(.32,.72,0,1);}
+@keyframes modalOvIn{from{opacity:0;}to{opacity:1;}}
+@keyframes modalIn{from{opacity:0;transform:translateY(14px) scale(.97);}to{opacity:1;transform:none;}}
 .modal{width:calc(100% - 48px);max-width:300px;max-height:85vh;overflow-y:auto;background:var(--modal);border:1px solid rgba(255,255,255,.80);border-radius:22px;padding:22px 20px;box-shadow:0 8px 40px rgba(0,0,0,.18);box-sizing:border-box;}
 .modal-title{font-size:var(--main-text-size);font-weight:500;color:var(--ts);margin-bottom:16px;}
 .modal-inp{width:100%;background:var(--inp);border:1px solid var(--inp-b);border-radius:12px;padding:11px 14px;font-size:var(--main-text-size);color:var(--tp);font-family:'DM Sans',sans-serif;outline:none;margin-bottom:12px;}
@@ -2808,7 +2811,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   </div>
 </div>
 
-<script src="app.js?v=20261021g"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
+<script src="app.js?v=20261023a"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
 
 </body>
 </html>
