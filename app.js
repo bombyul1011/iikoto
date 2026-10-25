@@ -59,79 +59,38 @@ async function maybeBackfillWeeklyReports(){
   finally{_backfillReportsInFlight=false;}
 }
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&_initSyncDone)setTimeout(maybeBackfillWeeklyReports,1500);}); // 앱을 켜둔 채 월요일이 된 경우 복귀 시 보완
-function appendSundayGenerateBanner(body){
-  const banner=document.createElement('div');
-  banner.className='weekly-review-banner';
-  banner.innerHTML=`<div class="weekly-review-banner-inner">
-    <div class="weekly-review-banner-title"><i class="ti ti-sparkles ico-13" aria-hidden="true"></i> 주간 돌아보기 <i class="ti ti-sparkles ico-13" aria-hidden="true"></i></div>
-    <div class="weekly-review-banner-sub"><span>지난 한주간의 나는 어땠을까요?</span><span style="font-size:15px;opacity:0.6;"><i class="ti ti-chevron-up" aria-hidden="true"></i></span></div>
-  </div>`;
-  banner.addEventListener('click',openWeeklyReviewSheet);
-  body.appendChild(banner);
-}
 function renderHomeBody(section){
   const body=document.getElementById('home-body');
   if(!body)return;
   body.innerHTML='';
-  const _ld=getLogicalDate();
-  const _lh=new Date().getHours();
-  const _isLateNightOrDawn=_lh>=22||_lh<6; // 기간별 리포트(월간 중간·말일) 전용 — 파트2(22시)+새벽에만 노출
-  // 주간리포트 배너: 일요일 22시(night_2)에만 "생성 가능" 배너. 그 외 시점은 노출 없음(조회는 아카이브앱으로 분리됨).
-  const _ldDay=_ld.getDay(); // 논리적 요일(새벽 4시 컷) — 물리적 getDay() 대신 사용, 새벽 0~4시 구간 오작동 방지
-  const isSundayNight2=_ldDay===0&&getSubSection()==='night_2';
-  const isLastDayOfMonth=(()=>{const t=new Date(_ld);t.setDate(_ld.getDate()+1);return t.getDate()===1;})()&&_isLateNightOrDawn;
-
+  _aflStopTicker();
   if(section==='morning'){
-    // 아침 루틴(굿모닝) 카드 — 카드 그리드 + 오늘의 슬롯
+    // 아침: 모닝플로우 카드 → 평소의 나와 비교 → 습관 스트릭 → 리듬 기록 배너
     body.appendChild(makeMorningFlowCard());
+    const cmp=makeMorningCompareCard();
+    if(cmp)body.appendChild(cmp);
     body.appendChild(makeHabitStreakRow());
     body.appendChild(makeTodayRhythmBanner());
   } else if(section==='afternoon'){
-    body.appendChild(makeAfternoonHomeCard());
-    body.appendChild(makeTodayRhythmBanner());
+    // 오후: 지금(진행 중일 때만) → 오늘의 흐름 → 하단 빠른입력 독. 리듬 입력은 독의 ＋가 대신하므로 무지개 배너는 두지 않음.
+    const nowCard=makeAfternoonNowCard();
+    if(nowCard){body.appendChild(makeLabel('지금'));body.appendChild(nowCard);}
+    body.appendChild(makeLabel('오늘의 흐름'));
+    body.appendChild(makeAfternoonFlowCard());
+    const sp=document.createElement('div');sp.style.height='92px';body.appendChild(sp); // 독에 가려지지 않도록 여백
+    body.appendChild(makeAfternoonDock());
+    _aflStartTicker();
   } else if(section==='dawn'){
-    const dawnDk=dateKey(getLogicalDate());
-    const paceBanner=makeDawnPaceBanner(dawnDk);
-    if(paceBanner)body.appendChild(paceBanner);
-    body.appendChild(makeDawnRecapCard());
-    body.appendChild(makeLabel('오늘의 리듬'));
+    body.appendChild(makeDawnPage());
     body.appendChild(makeTodayRhythmBanner());
   } else {
-    // 저녁 공통 틀(파트1): [그날의 특수 배너] → 링 → 리듬배너 → (브리핑) → 독서카드
-    // 저녁 파트2: 인사카드 → 오늘의 독서 → 오늘의 문장 → (리포트 있는 날) 리포트 배너 → 오늘의 리듬기록
-    function appendReportBannerIfAny(){
-      if(isLastDayOfMonth){
-        body.appendChild(makeLabel('🌿 이번 달 누계'));
-        const rbanner=document.createElement('div');
-        rbanner.className='weekly-review-banner';
-        rbanner.innerHTML=`<div class="weekly-review-banner-inner">
-          <div class="weekly-review-banner-title">🌿 이번 달 누계 보기</div>
-          <div class="weekly-review-banner-sub"><span>한 달 동안의 기록을 모아봤어요</span><div class="report-banner-arrow" style="display:inline-flex;"><i class="ti ti-chevron-up ico-sz-15" aria-hidden="true"></i></div></div>
-        </div>`;
-        rbanner.addEventListener('click',openMonthlyReportSheet);
-        body.appendChild(rbanner);
-      } else if(isSundayNight2){
-        appendSundayGenerateBanner(body);
-      }
-    }
-    const isNight2=getSubSection()==='night_2';
-    if(!isNight2)appendReportBannerIfAny(); // 파트1은 원래 순서(맨 앞) 그대로 유지 — 건드리지 않음
-    if(isNight2){
-      body.appendChild(makeLabel('오늘의 독서'));
-      body.appendChild(makeBookCardWithCover());
-      const quoteCard=makeTodayQuoteCard();
-      if(quoteCard)body.appendChild(quoteCard);
-      appendReportBannerIfAny(); // 파트2 개편: 문장 다음, 리듬기록 이전으로 이동
-      body.appendChild(makeTodayRhythmBanner());
-    }else{
-      body.appendChild(makeHabitMiniCheckRow());
-      body.appendChild(makeChaeumBanner());
-      body.appendChild(makeLabel('저녁 플리'));
-      body.appendChild(makePlaylistMiniCard());
-      body.appendChild(makeTodayRhythmBanner());
-      // "오늘 마무리" 브리핑은 통합카드(상단 인삿말)가 흡수함
-      body.appendChild(makeEveningMiniStatCard());
-    }
+    // 저녁: [리포트 배너(일요일·말일 22시 이후)] → 오늘의 꽃 → 오늘 저녁엔 → 습관 → 리듬 기록
+    const reportBanner=makeEveningReportBanner();
+    if(reportBanner)body.appendChild(reportBanner);
+    body.appendChild(makeEveningFlowerCard());
+    body.appendChild(makeEveningContentRow());
+    body.appendChild(makeHabitMiniCheckRow());
+    body.appendChild(makeTodayRhythmBanner());
   }
 }
 
@@ -315,6 +274,7 @@ function refreshRhythmTrack(){
   }
   if(_weeklyRhythmFormOpen&&!_rhythmFormOpen)_weeklyRhythmFormOpen=false;
   if(document.getElementById('v-weekly')&&document.getElementById('v-weekly').classList.contains('on'))renderWeeklyRhythmBars();
+  refreshAfternoonHome(); // 오후 홈의 지금 카드·흐름 타임라인도 같이 갱신
 }
 function _resetRhythmForm(){
   _rhythmFormCat=null;_rhythmFormStart='';_rhythmFormEnd='';_rhythmFormText='';_rhythmFormCid=null;_rhythmEditIdx=null;
@@ -472,6 +432,8 @@ function _rhythmDurationMin(startStr,endStr){
   if(dur<0)dur+=1440;
   return dur;
 }
+// 리듬 블록의 소요 분 — 시작/종료 중 하나라도 없으면 0(진행 중 블록은 집계에서 제외).
+function _blockDurMin(b){return b&&b.start&&b.end?_rhythmDurationMin(b.start,b.end):0;}
 // 리듬블록 text에서 사람이 읽을 제목을 뽑는다 — "드라마 - 제목"/"영화 - 제목"/"독서 - 제목" 형태는
 // 접두어를 떼고 제목만, 접두어 없는 자유입력(운동/휴식 등 직접 타이핑)은 그대로, text 자체가
 // 없으면 null을 반환해 호출부가 카테고리 라벨로 폴백하게 한다.
@@ -3642,11 +3604,6 @@ function getRecentMonthsContents(base){
   return out;
 }
 // Supabase에서 cat=music만 서버 필터링으로 직접 조회 — 저녁 플리(전체 기간 랜덤) 등 월 경계 없는 조회용
-async function fetchAllMusicContents(){
-  const rows=await supaFetch(`contents?content_cat=eq.music&order=created`);
-  if(!rows)return [];
-  return rows.map(r=>({cat:r.content_cat,title:r.title,startDate:r.start_date,endDate:r.end_date,status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',musicUrl:r.music_url||null,album:r.album||null,releaseYear:r.release_year||null,notes:r.notes||[],reviewSavedDk:r.review_saved_dk||null,reviewSavedTime:r.review_saved_time||null,created:r.created,cid:r.client_id}));
-}
 // 리듬탭 폼/모닝플로우 칩 선택지 — 카테고리별 [{label,cid?}]. 감상=진행중 드라마·영화(cid로 콘텐츠 연동), 외출=오늘 일정,
 // 업무=오늘 업무 일정+재택/외근, 그 외=공용 서브선택 목록(RHYTHM_QUICK_CHOICES). 칩이 나오는 모든 곳이 이 함수 하나를 씀.
 function getRhythmChipOptions(cat){
@@ -4147,10 +4104,10 @@ async function syncAll(){
   refreshIfTabOpen('v-weekly',loadWeekly);
   refreshIfTabOpen('v-monthly',loadMonthly);
   if(_rhythmTrackEl&&document.body.contains(_rhythmTrackEl))refreshRhythmTrack();
-  // loadDaily()가 다시 그리지 못하는 새벽 리캡 카드(어제 투두/습관/수면 요약 등)를 최신 데이터로 교체
-  const oldDawnCard=document.getElementById('dawn-recap-card');
-  if(oldDawnCard&&document.getElementById('v-home')&&document.getElementById('v-home').classList.contains('on')){
-    oldDawnCard.replaceWith(makeDawnRecapCard());
+  // loadDaily()가 다시 그리지 못하는 새벽 "오늘의 한 페이지"를 최신 데이터로 교체
+  const oldDawnPage=document.getElementById('dawn-page');
+  if(oldDawnPage&&document.getElementById('v-home')&&document.getElementById('v-home').classList.contains('on')){
+    oldDawnPage.replaceWith(makeDawnPage());
   }
   // 애플 캘린더 → iikoto 자동 동기화: 앱의 기존 동기화 시점에 얹되 5분 간격 제한(조용히, 바뀐 게 있을 때만 알림)
   syncAppleCalendar({silent:true});
@@ -4338,7 +4295,7 @@ document.querySelectorAll('.vtab').forEach(b=>b.addEventListener('click',()=>{
 // 캘린더(.cal-day,.cal-grid)는 클릭 선택 외 별도 제스처가 없어 예외적으로 스와이프 허용.
 (function(){
   const TAB_ORDER=['daily','weekly','monthly'];
-  const SWIPE_EXCLUDE_SELECTOR='.card,.pace-card,.report-banner,.weekly-review-banner,.wrb-wrap,textarea,input,.todo-part,.habit-check-box,.recipe,.rhythm-track,.rhythm-add-form,.mf-hero';
+  const SWIPE_EXCLUDE_SELECTOR='.card,.report-banner,.ev-report,.ev-crow,.dw-quote,.wrb-wrap,textarea,input,.todo-part,.afl-dock,.habit-check-box,.recipe,.rhythm-track,.rhythm-add-form,.mf-hero';
   let startX=0,startY=0,startedInExcluded=false,tracking=false;
   function isInExcludedArea(target){
     // 캘린더 그리드 안쪽은 예외 허용(스와이프 가능) — 별도 제스처가 없으므로.
@@ -6183,7 +6140,7 @@ function confirmCopyWholeTodo(){
 }
 // ══════════════════════════════════════════════════════════
 // 굿모닝(모닝 플로우)
-// 카드 6개(휴식/운동/감상/책상/정리/기타)를 누를 때마다 "슬롯"(원형 아이콘)이 하나씩 추가됨(같은 카드도 여러 번, 감상만 1개) → 슬롯을 눌러 종류(서브선택)를 고르고
+// 카테고리 6개(휴식/운동/감상/책상/살림/기타) 아이콘을 누를 때마다 "슬롯"(원형 아이콘)이 하나씩 추가됨(같은 카드도 여러 번, 감상만 1개) → 슬롯을 눌러 종류(서브선택)를 고르고
 // 시작/종료(=리듬블록 자동 등록). 같은 카드 안에서는 하나가 끝나야 다음을 시작(순차), 길게 누르면 슬롯 삭제. 카드 밑 숫자는 이번 달 완료 횟수.
 // 감상(독서/콘텐츠)·책상(일기/노트정리/개인작업)·기타(업무/외출/자유입력)는 같은 패턴 — 슬롯 패널에서 서브선택 칩.
 // 서버 테이블: morning_flow_picks(date_key, picks jsonb=슬롯맵, etc jsonb=미사용 빈 객체, client_ts).
@@ -6242,38 +6199,13 @@ function _mfSlotLabel(slot,withTitle){
   const card=MORNING_FLOW_CARDS.find(c=>c.key===slot.key);
   return (withTitle&&slot.key==='etc'&&slot.title)||_mfSubMeta(slot.key,slot.sub)?.label||card.label;
 }
-// 오늘의 문구 — 선택 전/선택 후 두 세트, 날짜 기준 시드로 같은 날엔 같은 문구가 나오도록 고정(선택 전→후 전환 시 톤만 바뀜).
-const MORNING_FLOW_PHRASES_BEFORE=[
-  '오늘도 좋은 기운으로 하루를 열어봐요.','좋아하는 일로 오늘을 시작해볼까요?','오늘은 어떤 하루를 만들어볼까요?',
-  '기분 좋은 시작이 하루를 바꿔요.','오늘도 나에게 맞는 아침을 골라보세요.','새로운 하루, 무엇부터 시작해볼까요?',
-  '오늘의 에너지를 어디에 써볼까요?','하고 싶은 것부터 하나씩 시작해봐요.','가볍게 시작해도, 힘차게 시작해도 좋아요.',
-  '좋은 하루를 위한 첫 시간을 골라보세요.','오늘의 시작을 내가 골라볼까요?','움직여도 좋고, 쉬어도 좋은 아침이에요.',
-  '오늘도 하고 싶은 것부터 시작해요.'
-];
-const MORNING_FLOW_PHRASES_AFTER=[
-  '좋아요, 오늘은 이렇게 시작해볼게요.','오늘의 아침이 정해졌어요.','좋은 시작이에요. 이제 하나씩 해볼까요?',
-  '좋아요, 오늘도 나답게 시작해요.','오늘은 이 시간들로 채워볼게요.','오늘의 아침, 이렇게 보내볼까요?',
-  '내가 고른 아침으로 하루를 열어요.','좋아요. 오늘의 시작이 준비됐어요.','오늘의 리듬을 이렇게 만들어볼게요.',
-  '고른 것부터 하나씩 시작해봐요.','오늘 아침도 내가 원하는 모습으로.','오늘의 첫 장면을 골랐어요.',
-  '오늘의 시작이 조금 더 선명해졌어요.'
-];
 // 날짜(dk) 문자열을 시드로 한 결정적 해시 — 같은 날엔 항상 같은 값, len으로 나눈 나머지를 인덱스로 사용.
 // 오버플로우 없는 부호 없는 32비트 해시(>>>0) 방식으로 통일.
 function dateSeedIndex(dk,len){
   let seed=0;for(let i=0;i<dk.length;i++)seed=(seed*31+dk.charCodeAt(i))>>>0;
   return seed%len;
 }
-function _mfPhraseIndex(dk,len){
-  return dateSeedIndex(dk,len);
-}
 // HH:MM 두 시각의 분단위 소요시간 — 자정을 넘긴 경우(예: 23:50~00:10)도 고려해 종료가 시작보다 이르면 24시간을 더함.
-function _mfDurationMin(startStr,endStr){
-  const [sh,sm]=startStr.split(':').map(Number);
-  const [eh,em]=endStr.split(':').map(Number);
-  let startMin=sh*60+sm,endMin=eh*60+em;
-  if(endMin<startMin)endMin+=1440;
-  return endMin-startMin;
-}
 // 모닝플로우 저장 구조: flow.picks = {슬롯id: {key(카드), sub, title, text, status, t(생성시각), blockCid,...}}.
 // 같은 카드도 슬롯을 여러 개 만들 수 있음(예: 업무+외출). 옛 구조(카드별 pick + flow.etc/enjoy/... 별도 상태)는 서버 기록을 일괄 변환하고 변환 코드도 제거함.
 function getMorningFlow(dk){return S.get('mflow_'+dk)||{picks:{}};}
@@ -6488,14 +6420,13 @@ function refreshMorningFlowCard(){
   const old=document.getElementById('morning-flow-card');
   if(!old)return;
   old.replaceWith(makeMorningFlowCard());
+  const oc=document.getElementById('morning-compare-card');
+  if(oc){const nc=makeMorningCompareCard();if(nc)oc.replaceWith(nc);else oc.remove();}
 }
-// 서브선택 대기 행 — 슬롯의 카드명 옆에 종류 칩을 나란히 배치. 목록은 MF_SUB_LISTS, 줄바꿈 여부는 카드의 subWrap.
+// 서브선택 대기 행 — 패널 안에 "○○ 종류" 라벨과 종류 칩을 나란히. 목록은 MF_SUB_LISTS.
 function _mfSubPickRowHtml(c,id){
-  return `<div class="mf-start-row">
-      <div class="mf-start-icon" style="background:rgba(${c.colorRgb},0.18);"><i class="ti ${c.icon}" style="font-size:17px;color:rgb(${c.colorRgb});" aria-hidden="true"></i></div>
-      <div class="mf-label" style="flex:0 0 auto;">${c.label}</div>
-    <div class="mf-etc-chips" style="margin-top:0;flex:1;justify-content:flex-end;${c.subWrap?'flex-wrap:wrap;':''}">${MF_SUB_LISTS[c.key].map(x=>`<div class="mf-etc-chip" onclick="selectMorningFlowSub('${id}','${x.key}')">${x.label}</div>`).join('')}</div>
-  </div>`;
+  return `<div class="mf-sub-label">${c.label} 종류</div>
+    <div class="mf-etc-chips">${MF_SUB_LISTS[c.key].map(x=>`<div class="mf-etc-chip" onclick="selectMorningFlowSub('${id}','${x.key}')">${x.label}</div>`).join('')}</div>`;
 }
 // 세로형 행(아이콘+이름 위, 칩/입력 아래) — 감상 대상 고르기 / 기타 자유입력 / 업무·외출 제목 고르기 공용 마크업.
 function _mfStackedRowHtml(c,icon,label,bodyHtml){
@@ -6555,7 +6486,7 @@ function _mfPanelHtml(dk,flow,slot,c){
     statusText=linkedBlock&&linkedBlock.start?`${linkedBlock.start}부터 진행중`:'진행중';
     btnText='종료';btnOn=true;
   }else if(slot.status==='done'){
-    statusText=(linkedBlock&&linkedBlock.start&&linkedBlock.end)?`${linkedBlock.start}-${linkedBlock.end} · ${_mfDurationMin(linkedBlock.start,linkedBlock.end)}분`:'완료';
+    statusText=(linkedBlock&&linkedBlock.start&&linkedBlock.end)?`${linkedBlock.start}-${linkedBlock.end} · ${_rhythmDurationMin(linkedBlock.start,linkedBlock.end)}분`:'완료';
   }
   const btnHtml=slot.status==='done'
     ?`<i class="ti ti-check" style="font-size:16px;color:rgb(${c.colorRgb});" aria-hidden="true"></i>`
@@ -6566,7 +6497,7 @@ function _mfPanelHtml(dk,flow,slot,c){
     ${btnHtml}
   </div>`;
 }
-// 모닝플로우 카드 — 위: 카드 그리드(누르면 슬롯 추가, 숫자=이번 달 완료 횟수), 아래: 오늘의 슬롯(원형 아이콘) + 펼친 슬롯의 패널.
+// 모닝플로우 카드 — 가로 타임라인(기상 → 오늘 고른 슬롯들 → 아침식사) + 펼친 슬롯의 패널(종류 선택/시작·종료) + 6개 카테고리 아이콘(누르면 슬롯 추가, 숫자=이번 달 완료 횟수).
 // 슬롯 상태: 시작 전(테두리만) / 진행중(옅은 색+깜빡임) / 완료(꽉 채움). 길게 누르면 삭제.
 function makeMorningFlowCard(){
   const dk=dateKey(getLogicalDate());
@@ -6584,31 +6515,40 @@ function makeMorningFlowCard(){
   const slots=_mfSlots(flow);
   // 펼친 슬롯이 없거나 사라졌으면, 진행중인 슬롯이 있을 때 그걸 펼침(재진입 시 바로 종료 버튼이 보이도록)
   if(!slots.some(x=>x.id===_mfSelId))_mfSelId=(slots.find(x=>x.status==='running')||{}).id||null;
-  const phrases=slots.length?MORNING_FLOW_PHRASES_AFTER:MORNING_FLOW_PHRASES_BEFORE;
-  const phrase=phrases[_mfPhraseIndex(dk,phrases.length)];
 
   const hero=document.createElement('div');
   hero.className='mf-hero';
   hero.id='morning-flow-card';
-  const dateLabel=(dk.split('-')[1]|0)+'월 '+(dk.split('-')[2]|0)+'일';
   const monthCounts=getMorningFlowMonthCounts(dk.slice(0,7));
-  const gridHtml=MORNING_FLOW_CARDS.map(c=>`<div class="mf-card" onclick="addMorningFlowSlot('${c.key}')">
-      <i class="ti ${c.icon} mf-card-icon" style="color:rgb(${c.colorRgb});" aria-hidden="true"></i>
-      <span class="mf-card-label">${c.label}</span>
-      <span class="mf-card-count">${monthCounts[c.key]||0}</span>
-    </div>`).join('');
-  const slotsHtml=slots.length?`<div class="mf-slots">${slots.map(x=>{
+  // 타임라인 노드 — 앞 노드와의 연결선은 각 노드의 ::before가 그림(색은 노드 상태 클래스로 결정).
+  const sl=getSleep(dk);
+  const wakeNode=`<div class="mf-node ${sl.wake?'done':'idle'}" style="--mf-rgb:var(--pal-mint-rgb);"><span class="mf-circle ${sl.wake?'wake-on':'wake-off'}"><i class="ti ti-check" aria-hidden="true"></i></span><span class="mf-node-label">기상${sl.wake?' '+escapeHtml(sl.wake):''}</span></div>`;
+  const slotNodes=slots.map(x=>{
     const c=MORNING_FLOW_CARDS.find(cc=>cc.key===x.key);
     const icon=_mfSubMeta(x.key,x.sub)?.icon||c.icon;
-    return `<div class="mf-slot ${x.status}${x.id===_mfSelId?' sel':''}" data-id="${x.id}" style="--mf-rgb:${c.colorRgb};" role="button" tabindex="0" aria-label="${_mfSlotLabel(x,true)}"><i class="ti ${icon}" aria-hidden="true"></i></div>`;
-  }).join('')}</div>`:'';
+    let lab=_mfSlotLabel(x,true);
+    if(x.status==='done'){
+      const b=_mfBlockFor(dk,x.blockCid);
+      if(b&&b.start&&b.end)lab+=' '+_rhythmDurationMin(b.start,b.end)+'분';
+    }
+    return `<div class="mf-node ${x.status}${x.id===_mfSelId?' sel':''}" style="--mf-rgb:${c.colorRgb};"><span class="mf-circle mf-slot ${x.status}${x.id===_mfSelId?' sel':''}" data-id="${x.id}" style="--mf-rgb:${c.colorRgb};" role="button" tabindex="0" aria-label="${escapeAttr(_mfSlotLabel(x,true))}"><i class="ti ${icon}" aria-hidden="true"></i></span><span class="mf-node-label">${escapeHtml(lab)}</span></div>`;
+  }).join('');
+  const meal=getMeals(dk);
+  const ate=!!(meal.breakfast||meal.breakfast_time);
+  const mealNode=`<div class="mf-node ${ate?'done':'idle'}" style="--mf-rgb:var(--pal-orange-rgb);" onclick="switchToTab('daily')"><span class="mf-circle ${ate?'meal-on':'meal-off'}"><i class="ti ti-salad" aria-hidden="true"></i></span><span class="mf-node-label">아침식사${ate&&meal.breakfast_time?' '+escapeHtml(meal.breakfast_time):''}</span></div>`;
+  const picksHtml=MORNING_FLOW_CARDS.map(c=>`<div class="mf-pick" onclick="addMorningFlowSlot('${c.key}')">
+      <span class="mf-pick-tile" style="background:rgba(${c.colorRgb},0.30);color:rgb(${c.colorRgb});"><i class="ti ${c.icon}" aria-hidden="true"></i></span>
+      <span class="mf-pick-label">${c.label}</span>
+      <span class="mf-pick-count">${monthCounts[c.key]||0}회</span>
+    </div>`).join('');
   const sel=slots.find(x=>x.id===_mfSelId);
-  const panelHtml=sel?`<div class="mf-panel">${_mfPanelHtml(dk,flow,sel,MORNING_FLOW_CARDS.find(cc=>cc.key===sel.key))}<div class="mf-slot-del" onclick="deleteMorningFlowSlot('${sel.id}')">삭제</div></div>`:'';
+  const selCard=sel?MORNING_FLOW_CARDS.find(cc=>cc.key===sel.key):null;
+  const panelHtml=sel?`<div class="mf-panel" style="--mf-rgb:${selCard.colorRgb};">${_mfPanelHtml(dk,flow,sel,selCard)}<div class="mf-slot-del" onclick="deleteMorningFlowSlot('${sel.id}')">삭제</div></div>`:'';
   hero.innerHTML=`<div class="mf-hero-inner">
-    <div class="mf-hero-top-row"><div class="mf-hero-date">${dateLabel}</div></div>
-    <div class="mf-hero-line${slots.length?' picked':''}">${phrase}</div>
-    <div class="mf-grid">${gridHtml}</div>
-    ${slotsHtml}${panelHtml}
+    <div class="mf-head"><span class="mf-title">오늘의 아침</span></div>
+    <div class="mf-tl">${wakeNode}${slotNodes}${mealNode}</div>
+    ${panelHtml}
+    <div class="mf-picks">${picksHtml}</div>
   </div>`;
   // 슬롯 누르기(펼치기/접기) + 길게 누르기(삭제) — 슬롯은 렌더마다 다시 그려지므로 카드에 위임해서 처리.
   let lp=null;
@@ -6624,6 +6564,74 @@ function makeMorningFlowCard(){
     selectMorningFlowSlot(t.dataset.id);
   });
   return hero;
+}
+// 평소의 나와 비교 — 오늘 기상·첫 모닝플로우 시작이 최근 7일 평균 기상·첫 식사 시각과 어떻게 다른지를 문장 + 한 줄 점 그래프로.
+// 기록이 없는 항목은 문장·점이 빠지고, 오늘 기상 기록이 없으면 카드 자체를 그리지 않음. 그래프 범위는 05~12시.
+const MC_RANGE_START=5*60,MC_RANGE_END=12*60;
+function _mcPct(min){return Math.min(100,Math.max(0,(min-MC_RANGE_START)/(MC_RANGE_END-MC_RANGE_START)*100));}
+function _mcFmt(min){return Math.floor(min/60)+':'+String(Math.round(min%60)).padStart(2,'0');}
+// 그날 가장 이른 식사 시각(분) — 기록 없으면 null
+function _mcFirstMealMin(dk){
+  const m=getMeals(dk);
+  const v=['breakfast_time','lunch_time','dinner_time'].map(k=>_dawnTimeToMin(m[k])).filter(x=>x!=null);
+  return v.length?Math.min(...v):null;
+}
+function makeMorningCompareCard(){
+  const ld=getLogicalDate(),dk=dateKey(ld);
+  const sl=getSleep(dk);
+  const wake=_dawnTimeToMin(sl.wake);
+  if(wake==null)return null;
+  const win=getAvgSleepWindow(7);
+  const avgWake=win&&win.sampleCount>=3?win.wakeMin:null;
+  const avgScoreObj=getAvgSleepScore(7);
+  const avgScore=avgScoreObj&&avgScoreObj.sampleCount>=3?avgScoreObj.avg:null;
+  // 평균 첫 식사(최근 7일, 3일 이상 기록 있을 때만)
+  const meals=[];
+  for(let i=1;i<=7;i++){const d=new Date(ld);d.setDate(d.getDate()-i);const m=_mcFirstMealMin(dateKey(d));if(m!=null)meals.push(m);}
+  const avgMeal=meals.length>=3?meals.reduce((a,b)=>a+b,0)/meals.length:null;
+  const todayMeal=_mcFirstMealMin(dk);
+  // 오늘 첫 모닝플로우 시작 — 시작/진행/완료된 슬롯의 리듬블록 시작 시각 중 가장 이른 것
+  const flow=getMorningFlow(dk);
+  const fl=Object.keys(flow.picks).map(id=>{const p=flow.picks[id];const b=p.blockCid?_mfBlockFor(dk,p.blockCid):null;return b&&b.start?_dawnTimeToMin(b.start):null;}).filter(x=>x!=null);
+  const flowMin=fl.length?Math.min(...fl):null;
+  // 문장
+  const parts=[];
+  if(avgWake!=null){
+    const diff=Math.round(wake-avgWake);
+    parts.push(Math.abs(diff)<10?'평소와 비슷한 시간에 일어났어요.':'평소보다 '+fmtDur(Math.abs(diff))+(diff>0?' 늦게':' 일찍')+' 일어났어요.');
+  }
+  if(sl.score!=null&&avgScore!=null){
+    const d=sl.score-avgScore;
+    parts.push('수면 점수는 '+sl.score+'점으로 평균('+avgScore+'점)'+(Math.abs(d)<3?'과 비슷했어요.':d>0?'보다 높았어요.':'보다 낮았어요.'));
+  }
+  if(flowMin!=null&&flowMin>=wake)parts.push('일어나고 '+fmtDur(flowMin-wake)+' 뒤 모닝플로우를 시작했어요.');
+  // 그래프 — 위 줄: 평소(기상·첫 식사) 라벨, 아래 줄: 오늘(기상·모닝플로우·첫 식사) 라벨
+  const dot=(min,style)=>`<span class="mc-dot" style="left:${_mcPct(min)}%;${style}"></span>`;
+  let g='';
+  if(avgWake!=null)g+=`<span class="mc-lab top end" style="left:${_mcPct(avgWake)}%;">평소 기상 ${_mcFmt(avgWake)}</span>`;
+  if(avgMeal!=null)g+=`<span class="mc-lab top" style="left:${_mcPct(avgMeal)}%;">평소 첫 식사 ${_mcFmt(avgMeal)}</span>`;
+  g+=`<div class="mc-bar"></div>`;
+  if(avgWake!=null){
+    const l=Math.min(_mcPct(avgWake),_mcPct(wake)),w=Math.abs(_mcPct(wake)-_mcPct(avgWake));
+    g+=`<div class="mc-gap" style="left:${l}%;width:${w}%;background:${wake>avgWake?'rgba(230,126,126,.38)':'rgba(var(--pal-mint-rgb),.55)'};"></div>`;
+    g+=dot(avgWake,'border:2px dashed var(--tm);background:var(--card);');
+  }
+  if(avgMeal!=null)g+=dot(avgMeal,'border:2px dashed rgba(var(--pal-orange-rgb),.8);background:var(--card);');
+  g+=dot(wake,'border:2px solid var(--card);background:#e67e7e;');
+  if(flowMin!=null)g+=dot(flowMin,'border:2px solid var(--card);background:rgb(var(--pal-pink-rgb));');
+  if(todayMeal!=null)g+=dot(todayMeal,'border:2px solid var(--card);background:rgb(var(--pal-orange-rgb));');
+  g+=`<span class="mc-lab bot end" style="left:${_mcPct(wake)}%;color:#a53c3c;">오늘 기상 ${_mcFmt(wake)}</span>`;
+  if(flowMin!=null)g+=`<span class="mc-lab bot" style="left:${_mcPct(flowMin)}%;color:#9c2f5e;">모닝플로우 ${_mcFmt(flowMin)}</span>`;
+  // 오늘 첫 식사 라벨은 모닝플로우 라벨과 겹치지 않을 때만(점은 항상 표시)
+  if(todayMeal!=null&&(flowMin==null||_mcPct(todayMeal)-_mcPct(flowMin)>26))g+=`<span class="mc-lab bot" style="left:${_mcPct(todayMeal)}%;color:var(--pal-orange-text);">첫 식사 ${_mcFmt(todayMeal)}</span>`;
+  [6,11].forEach(h=>{g+=`<span class="mc-axis" style="left:${_mcPct(h*60)}%;">${h}시</span>`;});
+  const card=document.createElement('div');
+  card.id='morning-compare-card';
+  card.className='mc-card';
+  card.innerHTML=`<div class="mc-title"><i class="ti ti-chart-dots" aria-hidden="true"></i> 평소의 나와 비교</div>
+    ${parts.length?`<div class="mc-text">${escapeHtml(parts.join(' '))}</div>`:''}
+    <div class="mc-graph">${g}</div>`;
+  return card;
 }
 let _sleepScoreModalDk='';
 function promptSleepScore(dk){
@@ -6653,337 +6661,241 @@ function confirmSleepScore(){
   renderSleepAvgScoreBadge();
 }
 
-// 완료 개수 카운트 — 조각 단위. 조각이 있는 투두는 완료된 조각 수만큼, 조각 없는 투두는 done이면 1개로 센다.
-// (활동 분포 점 찍기와 동일한 단위로 통일 — 파트별로 하나씩 끝낼 때마다 카운트되는 게 실사용에 더 맞음)
-function _paceCountDoneUntilNow(dk,nowMinLimit){
-  const todos=getTodos(dk);
-  let count=0;
-  todos.forEach(t=>{
-    const st=t.strikeTimes||{};
-    const timeEntries=Object.entries(st).filter(([,v])=>typeof v==='number');
-    if(timeEntries.length){
-      // 조각 투두 — 완료된 조각마다 1개씩, nowMinLimit 있으면 해당 조각의 완료 시각으로 필터
-      timeEntries.forEach(([,ms])=>{
-        if(nowMinLimit==null){count++;return;}
-        const d=new Date(ms);
-        if(d.getHours()*60+d.getMinutes()<=nowMinLimit)count++;
-      });
-    }else if(t.done){
-      // 조각 없는 일반 투두 — done이면 1개
-      if(nowMinLimit==null){count++;return;}
-      if(!t.completedAt)return; // completedAt 없는 과거 데이터는 시각 비교 불가하므로 제외
-      const d=new Date(t.completedAt);
-      if(d.getHours()*60+d.getMinutes()<=nowMinLimit)count++;
-    }
-  });
-  return count;
-}
-function _paceHabitCheckedCount(dk,nowMinLimit){
-  const wk=weekKey(new Date(dk+'T00:00:00'));
-  const dow=(new Date(dk+'T00:00:00').getDay()+6)%7;
-  const habits=getHabits();
-  const checks=getHabitChecks(wk);
-  const times=getHabitCheckTimes(wk);
-  return habits.filter(h=>{
-    const key=h.id+'-'+dow;
-    if(!checks[key])return false;
-    if(nowMinLimit==null)return true; // 하루 전체 기준(지난주 물채우기 등)
-    const t=times[key];
-    if(!t)return false; // 시각 기록 없는 과거 체크는 시각 비교 불가하므로 제외
-    return _dawnTimeToMin(t)<=nowMinLimit;
-  }).length;
-}
-function _paceTopRhythmCat(dk){
-  const blocks=getRhythmBlocks(dk);
-  const dur={};
-  const catBlocks={}; // 카테고리별 블록 목록(메모 텍스트 탐색용)
-  const isToday=dk===dateKey(getLogicalDate());
-  const nowMin=isToday?(new Date().getHours()*60+new Date().getMinutes()):null;
-  blocks.forEach(b=>{
-    if(b.cat==='_sleep')return; // 수면은 항상 최장이라 최다카테고리 후보에서 제외
-    const s=_dawnTimeToMin(b.start);
-    if(s==null)return;
-    let e;
-    if(b.end){
-      e=_dawnTimeToMin(b.end);
-    }else if(isToday&&nowMin!=null){
-      // 진행중 블록(종료 미입력) — 오늘 데이터라면 현재 시각까지로 잠정 집계
-      e=nowMin;
-    }else{
-      return; // 오늘이 아닌데 종료가 없으면 집계 제외(과거 데이터 이상값 방어)
-    }
-    let d=e-s;if(d<0)d+=1440;
-    dur[b.cat]=(dur[b.cat]||0)+d;
-    (catBlocks[b.cat]=catBlocks[b.cat]||[]).push({...b,_dur:d});
-  });
-  const top=Object.keys(dur).sort((a,b)=>dur[b]-dur[a])[0];
-  if(!top)return null;
-  // 최다 카테고리 블록들 중 메모(text)가 있는 것 하나 — 가장 긴 블록 우선
-  const memoBlock=(catBlocks[top]||[]).filter(b=>b.text&&b.text.trim()).sort((a,b)=>b._dur-a._dur)[0];
-  const memo=memoBlock?memoBlock.text.trim():'';
-  if(RHYTHM_CATS[top])return {key:top,icon:RHYTHM_CATS[top].icon,color:RHYTHM_CATS[top].color,label:RHYTHM_CATS[top].label,memo};
-  if(top==='_meal')return {key:top,icon:'ti-tools-kitchen-3',color:RHYTHM_MEAL_COLOR,label:'식사',memo};
-  return null;
-}
-
 // ══════════════════════════════════════════════════════════
-// 오후 홈탭 "오늘의 흐름" 카드 (기존 무거운 오후 통계카드를 대체)
-// 12~19시 가로 타임라인(식사/할일완료/일정/리듬 4종 마커, 외출 리듬은 일정과 중복 잦아 제외)
-// + 완료개수·평소(최근7일)비교 + 오후 남은 할일(탭 이동) + 최근7일 인사이트 한 줄
+// 오후 홈탭 — 지금(진행 중 활동) 카드 + 오늘의 흐름(12~19시 비례 타임라인, 아카이브 오늘탭 방식) + 하단 빠른입력 독
 // ══════════════════════════════════════════════════════════
-const AFTERNOON_TL_START=12*60,AFTERNOON_TL_END=19*60;
-// 카테고리별(수면 제외) 당일 소요시간(분) 맵 — _paceTopRhythmCat과 동일 집계 로직을 재사용해 별도 함수로 분리.
-function _paceCatDurations(dk){
-  const blocks=getRhythmBlocks(dk);
-  const dur={};
-  const isToday=dk===dateKey(getLogicalDate());
-  const nowMin=isToday?(new Date().getHours()*60+new Date().getMinutes()):null;
-  blocks.forEach(b=>{
-    if(b.cat==='_sleep')return;
-    const s=_dawnTimeToMin(b.start);
-    if(s==null)return;
-    let e;
-    if(b.end)e=_dawnTimeToMin(b.end);
-    else if(isToday&&nowMin!=null)e=nowMin;
-    else return;
-    let d=e-s;if(d<0)d+=1440;
-    dur[b.cat]=(dur[b.cat]||0)+d;
-  });
-  return dur;
+const AFTERNOON_TL_START=12*60,AFTERNOON_TL_END=19*60; // '오늘의 흐름' 타임라인 범위(12~19시)
+const AFL_PX_H=56,AFL_TOP=8; // 1시간당 높이(px), 위쪽 여백
+function _aflY(min){return AFL_TOP+(Math.min(Math.max(min,AFTERNOON_TL_START),AFTERNOON_TL_END)-AFTERNOON_TL_START)*AFL_PX_H/60;}
+// 오른쪽 컬럼 항목 — 12~19시 범위의 일정/완료 할 일/습관 체크(공용 수집기 _dayDoneEvents 사용), 시각순.
+function _aflRightItems(dk){
+  return _dayDoneEvents(dk).filter(e=>e.min>=AFTERNOON_TL_START&&e.min<=AFTERNOON_TL_END).sort((a,b)=>a.min-b.min);
 }
-// 오늘 vs 최근 7일(오늘 제외) 비교 특징 문구 — 우선순위: ①최고/최저 기록 ②동률 ③카테고리 최다(업무·외출·운동 등) ④연속기록 ⑤기본(최다리듬 해석).
-// 하나만 골라 반환. 캐시 없이 매 렌더 시 로컬 데이터로 즉시 계산(가벼운 연산이라 실시간 반영).
-function _paceWeekInsight(dk){
-  const totals=[]; // 최근 7일(오늘 제외) 하루 총 완료량
+// 최근 7일 저녁 식사 시각 평균(분) — 3일 이상 기록이 있을 때만(없으면 null). "저녁 식사 예정" 표시 기준.
+function _aflAvgDinnerMin(dk){
+  const v=[];
   for(let i=1;i<=7;i++){
     const d=new Date(dk+'T00:00:00');d.setDate(d.getDate()-i);
-    totals.push(_paceCountDoneUntilNow(dateKey(d),null));
+    const t=getMeals(dateKey(d)).dinner_time;
+    const m=_dawnTimeToMin(t);
+    if(m!=null)v.push(m);
   }
-  const todayTotal=_paceCountDoneUntilNow(dk,null);
-  const maxPast=totals.length?Math.max(...totals):0;
-  const minPast=totals.length?Math.min(...totals):0;
-
-  if(todayTotal>maxPast&&todayTotal>0){
-    return {icon:'ti-sparkles',text:'최근 7일 중 오늘이 가장 활발한 하루예요'};
-  }
-  if(todayTotal===maxPast&&todayTotal>0){
-    return {icon:'ti-flame',text:'최근 7일 중 최고 기록과 동률이에요'};
-  }
-  if(todayTotal<minPast||(todayTotal===0&&minPast===0)){
-    return {icon:'ti-droplet',text:'오늘은 조금 여유로운 흐름이에요'};
-  }
-  // 카테고리 최다 — 오늘의 카테고리별 소요시간이 최근 7일 중 최댓값이면 언급(외출 제외)
-  const CAT_PHRASE={work:'업무',exercise:'운동',home:'살림',rest:'휴식',note:'책상',enjoy:'감상',groom:'단장'};
-  const todayDur=_paceCatDurations(dk);
-  for(const cat of Object.keys(CAT_PHRASE)){
-    const todayVal=todayDur[cat]||0;
-    if(todayVal<=0)continue;
-    let isMax=true;
-    for(let i=1;i<=7;i++){
-      const d=new Date(dk+'T00:00:00');d.setDate(d.getDate()-i);
-      const pastVal=(_paceCatDurations(dateKey(d))[cat])||0;
-      if(pastVal>todayVal){isMax=false;break;}
-    }
-    if(isMax)return {icon:'ti-sparkles',text:`이번 주 들어 ${CAT_PHRASE[cat]} 시간이 가장 긴 날이에요`};
-  }
-  // 연속 기록 — 최근 며칠 연속으로 어제보다 같거나 많았는지(느슨한 스트릭)
-  let streak=0;
-  let prev=todayTotal;
-  for(let i=0;i<totals.length;i++){
-    if(totals[i]<=prev){streak++;prev=totals[i];}else break;
-  }
-  if(streak>=3)return {icon:'ti-bolt',text:`${streak}일 연속 평소보다 활발하게 보내고 있어요`};
-
-  // 기본 — 최다 리듬 해석
-  const top=_paceTopRhythmCat(dk);
-  if(top){
-    const LABEL_PHRASE={work:'업무를 중심으로',exercise:'움직이는 시간이',home:'정리하는 시간이',rest:'여유로운 흐름이',note:'책상에 앉아있는 시간이',enjoy:'감상하는 시간이',groom:'단장하는 시간이',_meal:'식사가'};
-    const phrase=LABEL_PHRASE[top.key]||`${top.label}이`;
-    return {icon:'ti-droplet',text:`오늘은 ${phrase} 많은 하루예요`};
-  }
-  return {icon:'ti-droplet',text:'아직 하루의 흐름이 만들어지는 중이에요'};
+  return v.length>=3?Math.round(v.reduce((a,b)=>a+b,0)/v.length):null;
 }
-// 오늘 남은 오후 할 일(시간대 파트 기준) 개수 — timeSection==='afternoon', 미완료만(일정 제외).
-function _paceAfternoonRemainCount(dk){
-  const todos=getTodos(dk);
-  return todos.filter(t=>!t.isEvent&&!t.done&&t.timeSection==='afternoon').length;
-}
-// 타임라인에 얹을 이벤트 수집 — 식사/할일완료/일정/리듬(외출 제외) 4종, 12~19시 범위만.
-// 리듬은 시작 시각(순간)만 점으로 표시하고, 지속시간(면적)은 쓰지 않음(리듬탭과의 시각 언어 차별화).
-function _paceAfternoonTimelineItems(dk){
-  const items=[];
-  // 식사
-  const meals=getMeals(dk);
-  MEAL_KEYS.forEach(k=>{
-    const t=meals[k+'_time'];
-    if(!t)return;
-    const m=t.split(':');const min=parseInt(m[0],10)*60+parseInt(m[1],10);
-    if(min<AFTERNOON_TL_START||min>AFTERNOON_TL_END)return;
-    items.push({type:'meal',min,time:t,label:(MEAL_LABELS[k]||'식사')+(meals[k]?' · '+meals[k]:''),icon:'ti-tools-kitchen-3'});
-  });
-  // 할일 완료 + 일정(시간표 포함)
-  getTodos(dk).forEach(t=>{
-    if(t.isEvent){
-      if(!t.eventTime)return;
-      const m=t.eventTime.split(':');const min=parseInt(m[0],10)*60+parseInt(m[1],10);
-      if(min<AFTERNOON_TL_START||min>AFTERNOON_TL_END)return;
-      const {parts}=parseTodoTextParts(t.text);
-      items.push({type:'event',min,time:t.eventTime,label:parts[0]||t.text||'',icon:'ti-calendar-event'});
-      return;
-    }
-    const st=t.strikeTimes||{};
-    const timeEntries=Object.entries(st).filter(([,v])=>typeof v==='number');
-    if(timeEntries.length){
-      const {prefix,parts,hasPrefix}=parseTodoTextParts(t.text);
-      // 조각 텍스트만으로는 어떤 상위 항목(업무/취미 등)에 속한 조각인지 구분이 안 돼
-      // 접두어(카테고리)가 있으면 "접두어 · 조각" 형태로 함께 표기.
-      timeEntries.forEach(([idxStr,ms])=>{
-        const d=new Date(ms);const min=d.getHours()*60+d.getMinutes();
-        if(min<AFTERNOON_TL_START||min>AFTERNOON_TL_END)return;
-        const partText=parts[parseInt(idxStr,10)]||t.text||'';
-        const label=hasPrefix&&prefix?prefix+' · '+partText:partText;
-        items.push({type:'todo',min,time:minToHHMM(min),label,icon:'ti-check'});
-      });
-    }else if(t.done&&t.completedAt){
-      const d=new Date(t.completedAt);const min=d.getHours()*60+d.getMinutes();
-      if(min<AFTERNOON_TL_START||min>AFTERNOON_TL_END)return;
-      const {prefix,hasPrefix,parts}=parseTodoTextParts(t.text);
-      let label=hasPrefix&&prefix?prefix+' · '+(parts.join(' / ')||t.text||''):(t.text||'');
-      // 시간표(HH:MM 접두어) 형식으로 쓴 투두면 괄호( ) 안 부가설명은 제외하고 표기
-      const scheduleM=(t.scheduleOrigText||t.text||'').match(SCHEDULE_TIME_RE);
-      if(scheduleM)label=stripScheduleParens(hasPrefix&&prefix?prefix+' · '+scheduleM[3]:scheduleM[3]);
-      items.push({type:'todo',min,time:minToHHMM(min),label,icon:'ti-check'});
-    }
-  });
-  // 리듬 — 외출(appointment) 제외, 시작 시각만
-  getRhythmBlocks(dk).forEach(b=>{
-    if(b.cat==='_sleep'||b.cat==='appointment')return;
-    const cat=RHYTHM_CATS[b.cat];if(!cat)return;
-    const min=_dawnTimeToMin(b.start);
-    if(min==null||min<AFTERNOON_TL_START||min>AFTERNOON_TL_END)return;
-    items.push({type:'rhythm',min,time:b.start,label:(b.text&&b.text.trim())||cat.label+' 시작',icon:cat.icon});
-  });
-  // 습관 — 체크 시각(checked_time)이 기록된 것만, 12~19시 범위 안에서만 표시.
-  {
-    const wk=weekKey(new Date(dk+'T00:00:00'));
-    const dow=(new Date(dk+'T00:00:00').getDay()+6)%7;
-    const checks=getHabitChecks(wk);
-    const times=getHabitCheckTimes(wk);
-    getHabits().forEach(h=>{
-      const key=h.id+'-'+dow;
-      if(!checks[key]||!times[key])return;
-      const p=times[key].split(':');
-      const min=parseInt(p[0],10)*60+parseInt(p[1],10);
-      if(min<AFTERNOON_TL_START||min>AFTERNOON_TL_END)return;
-      items.push({type:'habit',min,time:times[key],label:h.name+' 체크',icon:getHabitIconFor(h)||'ti-repeat'});
-    });
+// 진행 중인 리듬 블록(시작만 있고 종료 없음) — 가장 최근 것의 인덱스(없으면 -1)
+function _aflOngoingIdx(blocks){
+  for(let i=blocks.length-1;i>=0;i--){
+    const b=blocks[i];
+    if(b.start&&!b.end&&RHYTHM_CATS[b.cat])return i;
   }
-  items.sort((a,b)=>a.min-b.min);
-  return items;
+  return -1;
 }
-const AFTERNOON_TL_COLORVAR={meal:'--src-meal',todo:'--src-todo',event:'--src-event',rhythm:'--src-rhythm',habit:'--src-habit'};
-const AFTERNOON_TL_TEXTVAR={meal:'--src-meal-text',todo:'--src-todo-text',event:'--src-event-text',rhythm:'--src-rhythm-text',habit:'--src-habit-text'};
-function makeAfternoonHomeCard(){
+function _aflOngoingBlock(dk){const bl=getRhythmBlocks(dk);return bl[_aflOngoingIdx(bl)]||null;}
+// 오후 홈이 화면에 있는 동안 1초마다 진행 타이머를 갱신하고, 1분마다 흐름 카드(현재 시각 선)를 다시 그림.
+// 오후 홈이 사라지면(다른 시간대로 전환·카드 제거) 스스로 멈춘다.
+let _aflTimer=null;
+function _aflUpdateTimer(){
+  const card=document.getElementById('afternoon-now-card'),el=document.getElementById('afl-now-timer');
+  if(!card||!el)return;
+  const sec=Math.max(0,Math.floor((Date.now()-Number(card.dataset.startMs))/1000));
+  el.textContent=[Math.floor(sec/3600),Math.floor(sec%3600/60),sec%60].map(v=>String(v).padStart(2,'0')).join(':');
+}
+function _aflStopTicker(){clearInterval(_aflTimer);_aflTimer=null;}
+function _aflStartTicker(){
+  _aflStopTicker();
+  _aflUpdateTimer();
+  let n=0;
+  _aflTimer=setInterval(()=>{
+    const flow=document.getElementById('afternoon-flow-card');
+    if(!flow){_aflStopTicker();return;}
+    _aflUpdateTimer();
+    if(++n%60===0&&!document.hidden)flow.replaceWith(makeAfternoonFlowCard());
+  },1000);
+}
+function makeAfternoonNowCard(){
   const dk=dateKey(getLogicalDate());
-  const now=new Date();
-  const nowMin=Math.min(Math.max(now.getHours()*60+now.getMinutes(),AFTERNOON_TL_START),AFTERNOON_TL_END);
-  const nowPct=(nowMin-AFTERNOON_TL_START)/(AFTERNOON_TL_END-AFTERNOON_TL_START)*100;
-
-  const items=_paceAfternoonTimelineItems(dk);
-  const todayDone=_paceCountDoneUntilNow(dk,null);
-  // 최근 7일(오늘 제외) 같은 "지금 시각까지" 평균 — 하루 중간 시점 비교의 공정성을 위해 nowMin 기준 절단 평균 사용.
-  const curNowMin=now.getHours()*60+now.getMinutes();
-  let sum=0,cnt=0;
-  for(let i=1;i<=7;i++){
-    const d=new Date(dk+'T00:00:00');d.setDate(d.getDate()-i);
-    sum+=_paceCountDoneUntilNow(dateKey(d),curNowMin);cnt++;
-  }
-  const avg=cnt?Math.round(sum/cnt):0;
-  const delta=todayDone-avg;
-  const deltaHtml=delta>0?`평소보다 +${delta}`:delta<0?`평소보다 ${delta}`:'평소와 비슷해요';
-  const deltaColorHtml=delta<0
-    ?'background:rgba(var(--pal-warmgray-rgb),0.28);color:var(--pal-warmgray-text);'
-    :'';
-
-  const insight=_paceWeekInsight(dk);
-  const remainCount=_paceAfternoonRemainCount(dk);
-
+  const b=_aflOngoingBlock(dk);
+  if(!b)return null;
+  const cat=RHYTHM_CATS[b.cat];
+  const title=cat.label+(b.text&&b.text.trim()&&b.text.trim()!==cat.label?' · '+b.text.trim():'');
+  const sm=_dawnTimeToMin(b.start);
+  const startMs=(function(){const d=new Date();d.setHours(Math.floor(sm/60),sm%60,0,0);if(d.getTime()>Date.now())d.setDate(d.getDate()-1);return d.getTime();})();
   const card=document.createElement('div');
-  card.className='pace-card';card.id='afternoon-home-card';
-
-  let markersHtml='';
-  items.forEach(it=>{
-    const pct=Math.min(100,Math.max(0,(it.min-AFTERNOON_TL_START)/(AFTERNOON_TL_END-AFTERNOON_TL_START)*100));
-    markersHtml+=`<div class="htl-marker" style="left:${pct}%;--mk-color:var(${AFTERNOON_TL_COLORVAR[it.type]});" title="${escapeHtml(it.time+' '+it.label)}"></div>`;
-  });
-
-  let listHtml='';
-  items.forEach(it=>{
-    listHtml+=`<div class="htl-list-row">
-      <span class="htl-list-time">${it.time}</span>
-      <span class="htl-list-dot" style="background:var(${AFTERNOON_TL_COLORVAR[it.type]});"></span>
-      <i class="ti ${it.icon} htl-list-icon" style="color:var(${AFTERNOON_TL_TEXTVAR[it.type]});" aria-hidden="true"></i>
-      <span class="htl-list-text${it.type==='event'?' emph':''}">${escapeHtml(it.label)}</span>
-    </div>`;
-  });
-
-  card.innerHTML=`<div class="pace-title"><i class="ti ti-clock ico-sz-13" aria-hidden="true"></i> 오늘의 흐름</div>
-    <div class="htl-track-wrap">
-      <div class="htl-track">
-        <div class="htl-fill" style="width:${nowPct}%;"></div>
-        ${markersHtml}
-        <div class="htl-now" style="left:${nowPct}%;"></div>
-      </div>
-      <div class="htl-labels">
-        <span style="left:0%;">12시</span>
-        <span style="left:14.3%;">13시</span>
-        <span style="left:28.6%;">14시</span>
-        <span style="left:42.9%;">15시</span>
-        <span style="left:57.1%;">16시</span>
-        <span style="left:71.4%;">17시</span>
-        <span style="left:85.7%;">18시</span>
-        <span style="left:100%;">19시</span>
-      </div>
-    </div>
-    ${items.length?`<div class="htl-legend">
-      <span class="htl-legend-item"><span class="htl-legend-dot" style="background:var(--src-event);"></span>일정</span>
-      <span class="htl-legend-item"><span class="htl-legend-dot" style="background:var(--src-todo);"></span>할일</span>
-      <span class="htl-legend-item"><span class="htl-legend-dot" style="background:var(--src-meal);"></span>식사</span>
-      <span class="htl-legend-item"><span class="htl-legend-dot" style="background:var(--src-rhythm);"></span>리듬</span>
-      <span class="htl-legend-item"><span class="htl-legend-dot" style="background:var(--src-habit);"></span>습관</span>
-    </div>
-    <div class="htl-list">${listHtml}</div>`:''}
-    <div class="pace-divider"></div>
-    <div class="pace-summary">
-      <span class="pace-summary-num">${todayDone}개</span><span class="pace-summary-sub">완료</span>
-      <span class="pace-summary-delta" style="${deltaColorHtml}">${deltaHtml}</span>
-    </div>
-    <div class="pace-remain-pill" onclick="switchToTab('daily')">
-      <div class="pace-remain-label"><i class="ti ti-list-check" aria-hidden="true"></i> 오후에 남은 할 일</div>
-      <div style="display:flex;align-items:center;gap:4px;">
-        <div class="pace-remain-num">${remainCount}개</div>
-        <i class="ti ti-chevron-right" style="font-size:13px;color:var(--tm);" aria-hidden="true"></i>
-      </div>
-    </div>
-    <div class="pace-insight"><i class="ti ${insight.icon}" aria-hidden="true"></i>${insight.text}</div>`;
+  card.className='afl-now';card.id='afternoon-now-card';
+  card.innerHTML=`<div class="afl-now-top"><span class="afl-now-pill"><span class="afl-now-dot"></span>진행 중</span><span class="afl-now-start">${escapeHtml(b.start)} 시작</span></div>
+    <div class="afl-now-title"><i class="ti ${cat.icon}" aria-hidden="true"></i>${escapeHtml(title)}</div>
+    <div class="afl-now-row"><div class="afl-now-timer" id="afl-now-timer">00:00:00</div>
+    <button class="afl-now-end" onclick="endAfternoonNow()" aria-label="종료하고 기록"><i class="ti ti-player-stop-filled" aria-hidden="true"></i></button></div>`;
+  card.dataset.startMs=startMs;
   return card;
 }
-// 저녁 파트1용 미니통계 카드 — 당일 기록 기준(완료 투두 / 체크 습관 / 오늘의 최다 리듬), 오후 통계카드보다 훨씬 컴팩트하게
-// 저녁 홈탭 — 오늘 활동 분포(점 타임라인) 카드. 내용 없으면 카드 자체를 만들지 않음.
-function makeEveningMiniStatCard(){
+// 진행 중 활동 종료 — 감상·독서 스톱워치가 돌고 있는 블록은 스톱워치 종료 로직을 그대로 따르고, 나머지는 종료 시각만 채움(overlapToastEnd와 동일 규칙).
+function endAfternoonNow(){
   const dk=dateKey(getLogicalDate());
-  const doneTodos=_paceCountDoneUntilNow(dk,null);
-  const checkedHabits=_paceHabitCheckedCount(dk);
-  const memoCount=getMemos(dk).length;
-  const topRhythm=_paceTopRhythmCat(dk);
-  const wrap=document.createElement('div');
-  wrap.style.cssText='display:flex;justify-content:center;align-items:center;gap:18px;padding:8px 4px;margin-bottom:10px;flex-wrap:wrap;';
-  wrap.innerHTML=
-    `<span style="display:flex;align-items:center;gap:5px;"><i class="ti ti-checks" style="font-size:15px;color:rgba(100,165,190,0.9);" aria-hidden="true"></i><span style="font-size:15px;font-weight:500;color:var(--tp);">${doneTodos}</span></span>`
-    +`<span style="display:flex;align-items:center;gap:5px;"><i class="ti ti-flame" style="font-size:15px;color:rgba(150,110,200,0.9);" aria-hidden="true"></i><span style="font-size:15px;font-weight:500;color:var(--tp);">${checkedHabits}</span></span>`
-    +`<span style="display:flex;align-items:center;gap:5px;"><i class="ti ti-notes" style="font-size:15px;color:rgba(190,150,30,0.9);" aria-hidden="true"></i><span style="font-size:15px;font-weight:500;color:var(--tp);">${memoCount}</span></span>`
-    +(topRhythm?`<span style="display:flex;align-items:center;"><i class="ti ${topRhythm.icon}" style="font-size:15px;color:${topRhythm.color};" aria-hidden="true"></i></span>`:'');
-  return wrap;
+  const blocks=getRhythmBlocks(dk);
+  const idx=_aflOngoingIdx(blocks);
+  if(idx<0)return;
+  const cid=blocks[idx].cid;
+  if(cid&&_cswRunning&&_cswBlockCid===cid)stopContentStopwatch();
+  else if(cid&&_swRunning&&_swBlockCid===cid)toggleStopwatch();
+  else{
+    const n=new Date();
+    blocks[idx].end=pad(n.getHours())+':'+pad(n.getMinutes());
+    delete blocks[idx].autoClosed;
+    saveRhythmBlocks(dk,blocks);
+    if(cid){
+      syncMorningFlowOnRhythmBlockEnd(dk,cid,blocks[idx].end);
+      if(blocks[idx].cat==='exercise')scheduleExerciseStatAlert(cid);
+    }
+    refreshRhythmTrack();
+  }
+  refreshAfternoonHome();
+}
+// 오후 홈이 화면에 있을 때만 본문 전체를 다시 그림(리듬/식사/할 일이 바뀐 직후 호출).
+function refreshAfternoonHome(){
+  if(document.getElementById('afternoon-flow-card'))renderHomeBody('afternoon');
+}
+function makeAfternoonFlowCard(){
+  const dk=dateKey(getLogicalDate());
+  const now=new Date();
+  const nowMin=now.getHours()*60+now.getMinutes();
+  const S0=AFTERNOON_TL_START,E0=AFTERNOON_TL_END;
+  const raw=computeRhythmBlocksRaw(dk);
+  const manual=getRhythmBlocks(dk);
+  let grid='';
+  for(let h=S0/60;h<=E0/60;h++){
+    const y=Math.round(_aflY(h*60));
+    grid+=`<div class="afl-gl" style="top:${y}px;"></div><div class="afl-hl" style="top:${y}px;">${h}</div>`;
+  }
+  // 리듬 막대 — 실제 길이만큼. 진행 중이면 지금까지, 범위 밖은 12~19시로 자름. 짧은 막대도 최소 높이 보장.
+  let bands='';
+  raw.filter(bk=>bk.kind==='manual').forEach(bk=>{
+    const s=bk.start,e=bk.end!=null&&bk.end>bk.start?bk.end:(bk.ongoing?nowMin:bk.start+20);
+    if(e<=S0||s>=E0)return;
+    const y1=_aflY(s),y2=_aflY(e);
+    const h=Math.max(y2-y1,24);
+    const cat=manual[bk.manualIdx]&&RHYTHM_CATS[manual[bk.manualIdx].cat];
+    const time=bk.ongoing?minToHHMM(s)+'~':minToHHMM(s)+'-'+minToHHMM(e%1440);
+    bands+=`<div class="afl-band${bk.ongoing?' ongoing':''}" style="top:${Math.round(y1)}px;height:${Math.round(h)}px;background-color:${bk.color};"><span class="afl-band-l">${cat?`<i class="ti ${cat.icon}" aria-hidden="true"></i>`:''}<span>${escapeHtml(bk.label)}</span></span><span class="afl-band-t">${time}</span></div>`;
+  });
+  // 식사 — 알약. 아직 안 먹은 저녁은 평소 저녁 시각(최근 7일 평균) 한 시간 전부터 점선 알약으로 예고.
+  let pills='';
+  raw.filter(bk=>bk.kind==='meal').forEach(bk=>{
+    if(bk.start<S0||bk.start>E0)return;
+    pills+=`<div class="afl-pill" style="top:${Math.round(_aflY(bk.start))}px;"><i class="ti ti-salad" aria-hidden="true"></i>${escapeHtml(bk.label)}</div>`;
+  });
+  const meals=getMeals(dk);
+  if(!(meals.dinner_time||meals.dinner)){
+    const avg=_aflAvgDinnerMin(dk);
+    if(avg!=null&&avg>=S0&&avg<=E0&&nowMin>=avg-60)pills+=`<div class="afl-pill plan" style="top:${Math.round(_aflY(avg))}px;"><i class="ti ti-salad" aria-hidden="true"></i>저녁 식사 예정</div>`;
+  }
+  // 오른쪽 컬럼 — 겹치면 아래로 밀어냄(밀린 만큼 트랙 높이도 늘려 넘치지 않게)
+  const ROW_H=36;let prevBottom=-Infinity,prevCy=null,right='';
+  _aflRightItems(dk).forEach(it=>{
+    const y=Math.max(_aflY(it.min)-8,prevBottom);
+    prevBottom=y+ROW_H;
+    if(prevCy!=null)right+=`<div class="afl-rline" style="top:${Math.round(prevCy)}px;height:${Math.round(y+8.5-prevCy)}px;"></div>`;
+    prevCy=y+8.5;
+    const mk=it.type==='todo'?'<span class="afl-ck"><i class="ti ti-check" aria-hidden="true"></i></span>':`<span class="afl-mk"><span class="afl-mk-dot ${it.type==='event'?'ev':'hb'}"></span></span>`;
+    right+=`<div class="afl-ritem" style="top:${Math.round(y)}px;">${mk}<div class="afl-rbody"><div class="afl-rtext">${escapeHtml(it.label)}</div><div class="afl-rtime">${it.time}</div></div></div>`;
+  });
+  const totalH=Math.round(Math.max(_aflY(E0)+10,prevBottom));
+  // 현재 시각 선(범위 안일 때) + 그 아래 흐리게
+  let nowHtml='';
+  if(nowMin>=S0&&nowMin<=E0){
+    const ny=Math.round(_aflY(nowMin));
+    nowHtml=`<div class="afl-future" style="top:${ny}px;"></div><div class="afl-now-line" style="top:${ny}px;"></div><div class="afl-now-pt" style="top:${ny+1}px;"></div>`;
+  }
+  const card=document.createElement('div');
+  card.className='afl-flow';card.id='afternoon-flow-card';
+  card.innerHTML=`<div class="afl-track" style="height:${totalH}px;">${grid}${bands}${pills}<div class="afl-right">${right}</div>${nowHtml}</div>`;
+  return card;
+}
+// ── 하단 빠른입력 독 — 식사 체크 / 메모 / 리듬 추가 / 남은 할 일 / Claude ──
+function makeAfternoonDock(){
+  const nav=document.createElement('nav');
+  nav.className='afl-dock';nav.setAttribute('aria-label','빠른 기록');
+  nav.innerHTML=`<button onclick="quickMealCheck()" aria-label="식사 체크"><i class="ti ti-tools-kitchen-2" aria-hidden="true"></i><span>식사</span></button>
+    <button onclick="openNewMemoFromHome()" aria-label="메모"><i class="ti ti-pencil" aria-hidden="true"></i><span>메모</span></button>
+    <button class="afl-dock-plus" onclick="openAfternoonRhythmSheet()" aria-label="리듬 기록 추가"><i class="ti ti-plus" aria-hidden="true"></i></button>
+    <button onclick="openAfternoonTodoSheet()" aria-label="남은 할 일"><i class="ti ti-checklist" aria-hidden="true"></i><span>할 일</span></button>
+    <a href="https://claude.ai/new" target="_blank" rel="noopener" aria-label="Claude 열기"><i class="ti ti-message-chatbot" aria-hidden="true"></i><span>Claude</span></a>`;
+  return nav;
+}
+function openAfternoonRhythmSheet(){
+  const dk=dateKey(getLogicalDate());
+  openHomeDetailSheet('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dk);});
+}
+// 식사 — 지금 시각에 가장 가까운 끼니(아침~10:30, 점심~14:30, 간식~17:00, 이후 저녁)를 정하고, 이미 기록된 끼니면 다음 미기록 끼니로. 토스트로 확인 후 시간만 체크.
+let _quickMealKey=null,_quickMealTimer=null;
+function _aflPickMealKey(dk){
+  const m=getMeals(dk);
+  const n=new Date();const t=n.getHours()*60+n.getMinutes();
+  const order=['breakfast','lunch','snack','dinner'];
+  let base=t<630?0:t<870?1:t<1020?2:3;
+  for(let i=0;i<order.length;i++){
+    const k=order[(base+i)%order.length];
+    if(!(m[k+'_time']||m[k]))return k;
+  }
+  return null;
+}
+function quickMealCheck(){
+  const dk=dateKey(getLogicalDate());
+  const k=_aflPickMealKey(dk);
+  if(!k){showToast('오늘 식사를 모두 기록했어요');return;}
+  _quickMealKey=k;
+  const t=document.getElementById('meal-quick-toast');
+  if(!t)return;
+  document.getElementById('meal-quick-msg').textContent=MEAL_LABELS[k]+' 식사를 지금 시각으로 체크할까요?';
+  clearTimeout(_quickMealTimer);
+  t.classList.add('on');
+  _quickMealTimer=setTimeout(()=>{t.classList.remove('on');_quickMealKey=null;},5000);
+}
+function confirmQuickMeal(){
+  const k=_quickMealKey;
+  clearTimeout(_quickMealTimer);
+  const t=document.getElementById('meal-quick-toast');if(t)t.classList.remove('on');
+  _quickMealKey=null;
+  if(!k)return;
+  recordMealTime(dateKey(getLogicalDate()),k);
+  showToast(MEAL_LABELS[k]+' 식사를 체크했어요');
+  refreshAfternoonHome();
+}
+// 메모 — 빈 메모를 저장하지 않고, 기존 메모 수정창을 "새 메모" 모드(editIdx=-1)로 연다. 확인할 때만 저장.
+function openNewMemoFromHome(){
+  const dk=dateKey(getLogicalDate());
+  const n=new Date();
+  const modal=document.getElementById('memo-edit-modal');
+  document.getElementById('memo-edit-inp').value='';
+  document.getElementById('memo-edit-time-inp').value=pad(n.getHours())+':'+pad(n.getMinutes());
+  modal.dataset.editIdx='-1';
+  modal.dataset.newDk=dk;
+  if(_memoEditPendingPhoto&&_memoEditPendingPhoto.localUrl)URL.revokeObjectURL(_memoEditPendingPhoto.localUrl);
+  _memoEditPendingPhoto=null;_memoEditRemovePhoto=false;_memoEditCurrentPhotoUrl=null;
+  renderMemoEditPhotoPreview(null);
+  openModal('memo-edit-modal');setTimeout(()=>document.getElementById('memo-edit-inp').focus(),100);
+}
+// 남은 할 일 시트 — 오늘 미완료 할 일(일정 제외)을 목록으로 보여주고, 누르면 기존 완료 처리(toggleTodoAt)로 체크.
+function _aflTodoRowsHtml(dk){
+  const rows=[];
+  getTodos(dk).forEach((t,i)=>{if(!t.isEvent&&!t.done)rows.push(`<div class="afl-todo-row" onclick="checkAfternoonTodo(${i},'${t.cid||''}')"><span class="afl-todo-ck"></span><span class="afl-todo-text">${escapeHtml(t.text||'')}</span></div>`);});
+  return rows.length?rows.join(''):'<div class="afl-todo-empty">남은 할 일이 없어요</div>';
+}
+function openAfternoonTodoSheet(){
+  const dk=dateKey(getLogicalDate());
+  openHomeDetailSheet('남은 할 일',function(){
+    const wrap=document.createElement('div');
+    wrap.id='afl-todo-sheet-list';
+    wrap.innerHTML=_aflTodoRowsHtml(dk);
+    return wrap;
+  });
+}
+function checkAfternoonTodo(i,cid){
+  const dk=dateKey(getLogicalDate());
+  toggleTodoAt(dk,i,cid); // 인덱스가 밀렸어도 cid로 다시 찾음(findTodoSafe)
+  const w=document.getElementById('afl-todo-sheet-list');
+  if(w)w.innerHTML=_aflTodoRowsHtml(dk);
+  refreshAfternoonHome();
 }
 // ── 채움로그 연동 배너 (읽기 전용 조회만 수행) ──
 async function fetchChaeumInProgress(){
@@ -7010,41 +6922,6 @@ async function fetchChaeumTimeline(limit){
     console.error('채움로그 타임라인 조회 실패',err);
     return [];
   }
-}
-function makeChaeumBanner(){
-  const wrap=document.createElement('div');wrap.id='chaeum-banner-wrap';
-  wrap.style.cssText=`background:${CHAEUM_TONE.bg};border:1px solid ${CHAEUM_TONE.line};border-radius:16px;padding:16px;margin-bottom:10px;`;
-  wrap.innerHTML=`<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
-      <i class="ti ti-leaf" style="font-size:14px;color:${CHAEUM_TONE.sage};" aria-hidden="true"></i>
-      <span style="font-size:var(--main-text-size);font-weight:600;color:${CHAEUM_TONE.ink};flex:1;">채움로그</span>
-    </div>
-    <div id="chaeum-banner-body" style="cursor:pointer;" onclick="openChaeumTimelineSheet()">
-      <div style="display:flex;align-items:center;gap:7px;">
-        <span style="font-size:var(--main-text-size);color:${CHAEUM_TONE.muted};">불러오는 중…</span>
-      </div>
-    </div>`;
-  fetchChaeumInProgress().then(row=>{
-    const body=document.getElementById('chaeum-banner-body');
-    if(!body)return;
-    if(!row){
-      body.innerHTML=`<div style="display:flex;align-items:center;gap:7px;">
-        <i class="ti ti-leaf" style="font-size:13px;flex-shrink:0;color:${CHAEUM_TONE.muted};" aria-hidden="true"></i>
-        <span style="font-size:var(--main-text-size);color:${CHAEUM_TONE.muted};">채움로그를 시작해보세요</span>
-      </div>`;
-      return;
-    }
-    const meta=CHAEUM_CAT_META[row.category]||{icon:'ti-tag',color:CHAEUM_TONE.sage};
-    body.innerHTML=`<div style="display:flex;gap:10px;align-items:center;">
-      <div style="width:36px;height:36px;border-radius:9px;background:${meta.color}22;flex-shrink:0;display:flex;align-items:center;justify-content:center;">
-        <i class="ti ${meta.icon}" style="font-size:16px;color:${meta.color};" aria-hidden="true"></i>
-      </div>
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:var(--main-text-size);font-weight:500;color:${CHAEUM_TONE.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(row.short_title||row.title||'')}</div>
-        <div style="font-size:var(--dow-label-size);color:${CHAEUM_TONE.subInk};">${escapeHtml(row.category||'')} · 진행중</div>
-      </div>
-    </div>`;
-  });
-  return wrap;
 }
 function openChaeumTimelineSheet(){
   let sheet=document.getElementById('chaeum-timeline-modal');
@@ -7102,64 +6979,131 @@ function toggleChaeumSummary(idx){
 }
 // 저녁 파트1용 저녁 플리 미니카드 — 전체 기간 등록된 음악(cat=music) 중 매일 하나씩 랜덤으로(날짜 기준 시드 고정, 하루 동안 유지) 노출.
 // Supabase에서 content_cat=eq.music으로 직접 필터링해 조회 — 로컬 월별 스캔 없이 단순하게.
-function makePlaylistMiniCard(){
-  const wrap=document.createElement('div');wrap.className='pace-card';
-  wrap.innerHTML='<div class="home-content-info" style="display:flex;align-items:center;gap:7px;">'
-    +'<i class="ti ti-music" style="font-size:13px;flex-shrink:0;color:var(--tm);" aria-hidden="true"></i>'
-    +'<span class="home-content-title" style="color:var(--tm);">불러오는 중...</span>'
-    +'</div>';
-  fetchAllMusicContents().then(allMusic=>{
-    if(!allMusic.length){
-      wrap.innerHTML='<div class="home-content-info" style="display:flex;align-items:center;gap:7px;">'
-        +'<i class="ti ti-music" style="font-size:13px;flex-shrink:0;color:var(--tm);" aria-hidden="true"></i>'
-        +'<span class="home-content-title" style="color:var(--tm);">아직 등록된 음악이 없어요</span>'
-        +'</div>';
-      return;
-    }
-    // 날짜 문자열을 시드로 한 결정적 랜덤 — 같은 날엔 계속 같은 곡, 자정 지나면 다음 곡
-    const dk=dateKey(getLogicalDate());
-    const idx=dateSeedIndex(dk,allMusic.length);
-    const item=allMusic[idx];
-    const musicRgb='160,105,180';
-    const coverInner=item.poster
-      ?`<img src="${item.poster}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;" alt="">`
-      :`<i class="ti ti-music" style="font-size:16px;color:rgba(136,120,171,0.75);" aria-hidden="true"></i>`;
-    const hasUrl=!!item.musicUrl;
-    wrap.innerHTML=`<div style="display:flex;gap:10px;align-items:center;">
-        <div style="width:40px;height:40px;border-radius:8px;background:rgba(160,105,180,0.18);flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden;">${coverInner}</div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:var(--main-text-size);font-weight:500;color:var(--tp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(item.title||'')}</div>
-          ${item.author?`<div style="font-size:var(--dow-label-size);color:var(--ts);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(item.author)}</div>`:''}
-        </div>
-        <div class="pl-item-play${hasUrl?'':' dim'}" style="background:rgba(${musicRgb},.18);border:1px solid rgba(${musicRgb},.45);flex-shrink:0;" ${hasUrl?`onclick="window.location.href='${item.musicUrl.replace(/'/g,"\\'")}'"`:''}><i class="ti ti-player-play-filled" style="color:rgba(${musicRgb},1);" aria-hidden="true"></i></div>
-      </div>`;
-  }).catch(()=>{
-    wrap.innerHTML='<div class="home-content-info" style="display:flex;align-items:center;gap:7px;">'
-      +'<i class="ti ti-music" style="font-size:13px;flex-shrink:0;color:var(--tm);" aria-hidden="true"></i>'
-      +'<span class="home-content-title" style="color:var(--tm);">불러오지 못했어요</span>'
-      +'</div>';
-  });
+// ══════════════════════════════════════════════════════════
+// ██ 저녁 홈 — 리포트 배너 / 오늘의 꽃 / 오늘 저녁엔 / (습관·리듬은 공용 카드) ██
+// ══════════════════════════════════════════════════════════
+// 일요일 22시 이후엔 주간 돌아보기, 말일 22시~새벽엔 이번 달 누계 배너를 인사카드 바로 아래에 띄움(그 외엔 null).
+// getLogicalDate()는 새벽 4시 컷이라 논리적 요일/말일 판정에 사용(물리적 getDay() 대신).
+function makeEveningReportBanner(){
+  const ld=getLogicalDate();
+  const h=new Date().getHours();
+  const lateNight=h>=22||h<6;
+  const nextDay=new Date(ld);nextDay.setDate(ld.getDate()+1);
+  const isLastDayOfMonth=nextDay.getDate()===1&&lateNight;
+  const isSundayNight=ld.getDay()===0&&getSubSection()==='night_2';
+  if(!isLastDayOfMonth&&!isSundayNight)return null;
+  const month=isLastDayOfMonth;
+  const b=document.createElement('div');b.className='ev-report';
+  b.innerHTML=`<span class="ev-report-ico"><i class="ti ${month?'ti-leaf':'ti-sparkles'}" aria-hidden="true"></i></span>
+    <span class="ev-report-txt"><span class="ev-report-title">${month?'이번 달 누계 보기':'주간 돌아보기'}</span><span class="ev-report-sub">${month?'한 달 동안의 기록을 모아봤어요':'지난 한주간의 나는 어땠을까요?'}</span></span>
+    <i class="ti ti-chevron-right ev-report-arrow" aria-hidden="true"></i>`;
+  b.addEventListener('click',month?openMonthlyReportSheet:openWeeklyReviewSheet);
+  return b;
+}
+// 수기 블록 하나의 소요시간(분) — 끝시각이 없으면(진행중) null
+// 수면 꽃잎 채움 정도 — 수면 점수(앱의 5단계 구간)를 따름. 점수가 없으면 기록 여부로 가득/비움.
+function _evSleepFrac(sl,sd){
+  if(sl&&sl.score!=null){
+    const sc=sl.score;
+    return sc<=50?0.25:sc<=65?0.45:sc<=78?0.65:sc<=89?0.85:1;
+  }
+  return sd!=null?1:0;
+}
+// 꽃잎 6장의 오늘 상태 — frac(0~1), 범례 값(val)
+function getEveningPetals(dk){
+  const sl=getSleep(dk),sd=sleepDurMin(sl);
+  const meals=getMeals(dk);
+  const mealCnt=['breakfast','lunch','dinner'].filter(k=>meals[k]||meals[k+'_time']).length;
+  const blocks=getRhythmBlocks(dk);
+  const sumMin=list=>list.reduce((a,b)=>a+_blockDurMin(b),0);
+  const exBlocks=blocks.filter(b=>b.cat==='exercise');
+  const rdBlocks=blocks.filter(b=>b.cat==='enjoy'&&b.text&&b.text.startsWith('독서'));
+  const exMin=sumMin(exBlocks),rdMin=sumMin(rdBlocks);
+  const habits=getActiveHabits();
+  const ld=getLogicalDate(),checks=getHabitChecks(weekKey(ld)),dow=(ld.getDay()+6)%7;
+  const habitDone=habits.filter(h=>checks[h.id+'-'+dow]).length;
+  const memoCnt=getMemos(dk).length;
+  return [
+    {label:'수면',pal:'sky',frac:_evSleepFrac(sl,sd),val:sd!=null?Math.floor(sd/60)+'h '+(sd%60)+'m':'—'},
+    {label:'식사',pal:'orange',frac:mealCnt/3,val:mealCnt+' / 3'},
+    {label:'운동',pal:'mint',frac:exBlocks.length?1:0,val:exBlocks.length?(exMin?exMin+'분':'진행 중'):'—'},
+    {label:'독서',pal:'lime',frac:rdBlocks.length?1:0,val:rdBlocks.length?(rdMin?rdMin+'분':'진행 중'):'—'},
+    {label:'습관',pal:'pink',frac:habits.length?habitDone/habits.length:0,val:habits.length?habitDone+' / '+habits.length:'—'},
+    {label:'기록',pal:'lavender',frac:memoCnt?1:0,val:memoCnt?'메모 '+memoCnt+'개':'—'}
+  ];
+}
+// 꽃 가운데 표정 — 채운 정도(6장 평균)에 따라. 낮은 구간도 화난/슬픈 얼굴 없이 무표정까지만.
+function _evMoodIcon(ratio){
+  if(ratio<0.30)return 'ti-mood-empty';
+  if(ratio<0.60)return 'ti-mood-smile';
+  if(ratio<0.85)return 'ti-mood-smile-beam';
+  return 'ti-mood-happy';
+}
+// 오늘의 꽃 — 왼쪽 꽃, 오른쪽 6개 기록 현황(반반)
+function makeEveningFlowerCard(){
+  const dk=dateKey(getLogicalDate());
+  const petals=getEveningPetals(dk);
+  const ratio=petals.reduce((a,p)=>a+p.frac,0)/petals.length;
+  const petalSvg=petals.map((p,i)=>{
+    const rot=i?` transform="rotate(${i*60} 120 120)"`:'';
+    const base=`cx="120" cy="72" rx="32" ry="38"${rot}`;
+    if(p.frac<=0)return `<ellipse ${base} fill="none" stroke="var(--pal-${p.pal}-border)" stroke-width="1.5" stroke-dasharray="5 4"></ellipse>`;
+    const a=p.frac>=1?0.9:0.25+0.6*p.frac;
+    return `<ellipse ${base} fill="rgba(var(--pal-${p.pal}-rgb),${a.toFixed(2)})" stroke="var(--pal-${p.pal}-border)" stroke-width="1.5"></ellipse>`;
+  }).join('');
+  const legend=petals.map(p=>{
+    const dot=p.frac<=0
+      ?`border:1px dashed var(--pal-${p.pal}-border);`
+      :`background:rgba(var(--pal-${p.pal}-rgb),${(p.frac>=1?0.95:0.30+0.5*p.frac).toFixed(2)});border:1px solid var(--pal-${p.pal}-border);`;
+    return `<div class="ev-leg"><span class="ev-leg-dot" style="${dot}"></span><span class="ev-leg-name">${p.label}</span><span class="ev-leg-val">${p.val}</span></div>`;
+  }).join('');
+  const wrap=document.createElement('div');
+  wrap.appendChild(makeLabel('오늘의 꽃'));
+  const card=document.createElement('div');card.className='ev-flower';
+  card.innerHTML=`<div class="ev-flower-art">
+      <svg width="150" height="150" viewBox="20 20 200 200" role="img" aria-label="오늘의 꽃: ${petals.map(p=>p.label+' '+p.val).join(', ')}">${petalSvg}<circle cx="120" cy="120" r="22" fill="var(--card)" stroke="var(--card-b)" stroke-width="1.5"></circle></svg>
+      <i class="ti ${_evMoodIcon(ratio)} ev-flower-mood" aria-hidden="true"></i>
+    </div>
+    <div class="ev-legend">${legend}</div>`;
+  wrap.appendChild(card);
   return wrap;
 }
-// 저녁 파트1용 독서 카드 B — 표지(또는 대체 아이콘)+진행바 포함, 넛지 문구는 우측 정렬로 기존 A와 동일 스타일
-function makeTodayQuoteCard(){
-  const quotes=getQuotes().filter(q=>q.text&&q.text.trim());
-  if(!quotes.length)return null;
-  // 그날 하루 동안은 같은 문장이 나오도록, 날짜 기반 시드로 고정 선택
-  const dk=dateKey(getLogicalDate());
-  const idx=dateSeedIndex(dk,quotes.length);
-  const q=quotes[idx];
-  const book=getBooks().find(b=>b.cid===q.bookCid);
-  const wrap=document.createElement('div');wrap.className='today-quote-wrap';
-  wrap.innerHTML=`<div class="today-quote-card" onclick="openReading()">
-    <div class="today-quote-title"><i class="ti ti-quote" aria-hidden="true"></i>오늘의 문장
-      <span onclick="event.stopPropagation();shareQuoteCard('${q.cid}')" title="공유 이미지" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:rgba(160,105,180,0.80);opacity:0.7;margin-left:auto;">
-        <i class="ti ti-share-2 ico-sz-11" aria-hidden="true"></i>
-      </span>
+// "오늘 저녁엔" 진행중 콘텐츠 한 줄 배너 — 정사각 액자(포스터, 없으면 종류 아이콘) + 종류/제목/진행바 + 알약 버튼
+function _evContentRow(o){
+  const el=document.createElement('div');el.className='ev-crow';
+  el.innerHTML=`<div class="ev-cframe" style="background:linear-gradient(140deg,rgba(var(--pal-${o.pal1}-rgb),0.95),rgba(var(--pal-${o.pal2}-rgb),0.85));">${o.poster?'<img alt="" loading="lazy">':`<i class="ti ${o.icon}" aria-hidden="true"></i>`}</div>
+    <div class="ev-cmid">
+      <div class="ev-ckick">${escapeHtml(o.kicker)}</div>
+      <div class="ev-ctitle">${escapeHtml(o.title)}</div>
+      ${o.pct!=null?`<div class="ev-cbar"><div style="width:${o.pct}%;background:rgba(var(--pal-${o.btnPal}-rgb),0.95);"></div></div>`:''}
     </div>
-    <div class="today-quote-text">${escapeHtml(q.text)}</div>
-    <div class="today-quote-footer"><span class="today-quote-source">${escapeHtml(book?book.title:'')}</span></div>
-  </div>`;
+    <button class="ev-cbtn" style="background:rgba(var(--pal-${o.btnPal}-rgb),0.32);border-color:var(--pal-${o.btnPal}-border);color:var(--pal-${o.btnPal}-text);">${o.btn}</button>`;
+  if(o.poster)el.querySelector('.ev-cframe img').src=o.poster;
+  el.querySelector('.ev-cbtn').addEventListener('click',o.onclick);
+  return el;
+}
+// 음악을 제외한 진행중 콘텐츠(독서·드라마/영화·채움로그)를 한 줄씩 쌓아서 보여줌
+function makeEveningContentRow(){
+  const wrap=document.createElement('div');
+  wrap.appendChild(makeLabel('오늘 저녁엔'));
+  const list=document.createElement('div');list.className='ev-clist';
+  const book=getBooks().find(b=>b.status==='reading');
+  list.appendChild(book
+    ?_evContentRow({poster:book.poster,icon:'ti-book',pal1:'sky',pal2:'lavender',kicker:'독서'+(book.author?' · '+book.author:''),title:book.title,pct:getBookProgressPct(book),btn:'이어 읽기',btnPal:'sky',onclick:()=>openReading()})
+    :_evContentRow({icon:'ti-book',pal1:'sky',pal2:'lavender',kicker:'독서',title:'새 책 찾기',btn:'책 고르기',btnPal:'sky',onclick:()=>openReading()}));
+  const watching=_getOngoingWatchingWithCid()[0];
+  if(watching){
+    const isDrama=watching.cat==='drama';
+    const pct=watching.totalUnit?Math.round(Math.min(watching.currentUnit||0,watching.totalUnit)/watching.totalUnit*100):null;
+    list.appendChild(_evContentRow({poster:watching.poster,icon:isDrama?'ti-device-tv':'ti-movie',pal1:'pink',pal2:'yellow',
+      kicker:(isDrama?'드라마':'영화')+(watching.totalUnit?' · 총 '+watching.totalUnit+(isDrama?'화':'분'):''),title:watching.title,pct:pct,btn:'이어 보기',btnPal:'pink',onclick:()=>openContentHub()}));
+  }
+  fetchChaeumInProgress().then(r=>{ // 채움로그 — 진행중인 세션이 있을 때만
+    if(!r)return;
+    list.appendChild(_evContentRow({icon:'ti-leaf',pal1:'lime',pal2:'yellow',kicker:'채움로그 · 진행중',title:r.short_title||r.title||'',
+      btn:'열기',btnPal:'lime',onclick:()=>openChaeumTimelineSheet()}));
+  });
+  wrap.appendChild(list);
   return wrap;
 }
 // book의 실제 진행률(%) — unitLabel이 'percent'면 book.percent를 그대로, 'pages'면 pages/totalPages로 직접 계산.
@@ -7168,58 +7112,6 @@ function getBookProgressPct(book){
   if(!book)return 0;
   if(book.unit==='pages')return book.totalPages?Math.max(0,Math.min(100,Math.round(book.pages/book.totalPages*100))):0;
   return book.percent||0;
-}
-// 날짜(dk) 문자열을 시드로 한 0~1 사이 의사난수 — 같은 날엔 항상 같은 값(하루종일 문구 고정),
-// 다음날엔 자연스럽게 다른 값이 나옴. 암호학적 용도 아님, 단순 문구 로테이션용.
-function _seededRandomByDk(dk){
-  let h=0;
-  for(let i=0;i<dk.length;i++){h=(h*31+dk.charCodeAt(i))|0;}
-  return (Math.abs(h)%1000)/1000;
-}
-// 독서카드 하단 문구 — 상황(스트릭/미독일수/완독률/예상잔여회차)별 후보를 모아 날짜시드로 하나 고정 선택.
-// 병렬독서 대비 "독서" 활동 전체 기준(특정 책이 아님)의 스트릭/미독일수를 사용.
-function _getBookNudgeText(book,pct){
-  const dk=dateKey(getLogicalDate());
-  const streak=getReadingActivityStreak(dk);
-  const idleDays=_daysSinceLastReading(dk);
-  const sessionCount=countReadingSessionsForBook(book);
-  const est=estimateRemainingReadingSessions(book,sessionCount);
-  const candidates=[];
-  if(streak>=2)candidates.push(`독서 ${streak}일째 이어가는 중이에요`);
-  if(streak===0&&idleDays>=2)candidates.push(`독서를 안 한 지 ${idleDays}일째예요`);
-  if(pct>0&&pct<100)candidates.push(`완독까지 ${100-pct}% 남았어요`);
-  if(est&&est.ready)candidates.push(`완독까지 약 ${est.remainingSessions}회 더 예상돼요`);
-  candidates.push('잠들기 전 15분 독서 어떠세요?'); // 위 조건에 하나도 안 걸리는 경우(막 시작한 책 등) 대비 기본 문구
-  const idx=Math.floor(_seededRandomByDk(dk+'|'+(book.cid||book.title))*candidates.length);
-  return candidates[idx];
-}
-function makeBookCardWithCover(){
-  const book=getBooks().find(b=>b.status==='reading');
-  const wrap=document.createElement('div');wrap.className='pace-card';
-  if(!book){
-    wrap.innerHTML='<div class="home-content-info" style="display:flex;align-items:center;gap:7px;">'
-      +'<i class="ti ti-book" style="font-size:13px;flex-shrink:0;color:var(--tm);" aria-hidden="true"></i>'
-      +'<span class="home-content-title" style="color:var(--tm);">오늘밤엔 새로운 책을 찾아보아요</span>'
-      +'</div>';
-    return wrap;
-  }
-  // book.percent는 퍼센트 단위(unitLabel==='percent')로 기록 중인 책만 채워짐 — 페이지 단위(pages)로
-  // 기록 중인 책은 percent가 항상 0이라, getBookProgressPct가 pages/totalPages로 직접 계산해줌.
-  const pct=getBookProgressPct(book);
-  const coverInner=book.poster
-    ?`<img src="${book.poster}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;" alt="">`
-    :`<i class="ti ti-book-2" style="font-size:20px;color:rgba(190,150,30,0.7);" aria-hidden="true"></i>`;
-  const nudgeText=_getBookNudgeText(book,pct);
-  wrap.innerHTML=`<div style="display:flex;gap:12px;">
-    <div style="width:52px;height:74px;border-radius:8px;background:linear-gradient(135deg,rgba(255,220,120,.6),rgba(255,200,150,.5));flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden;">${coverInner}</div>
-    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:6px;min-width:0;">
-      <div style="font-size:var(--main-text-size);font-weight:500;color:var(--tp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${book.title}</div>
-      ${book.author?`<div style="font-size:var(--dow-label-size);color:var(--ts);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${book.author}</div>`:''}
-      <div style="width:100%;height:4px;border-radius:2px;background:rgba(200,176,168,0.2);overflow:hidden;"><div style="width:${pct}%;height:100%;background:rgba(255,200,110,0.85);"></div></div>
-      <div style="text-align:right;"><span class="reading-nudge" onclick="openReading()" style="cursor:pointer;">${nudgeText}</span></div>
-    </div>
-  </div>`;
-  return wrap;
 }
 // 날짜별 AI 캐시 자동 정리 (누적 방지)
 (function(){
@@ -7250,43 +7142,49 @@ function makeBookCardWithCover(){
 // 논리적 하루(새벽 4시까지 전날 귀속) 기준 보정: 00:00~03:59 사이 실제 시계 시각은
 // 활동 분포 타임라인에서 24:00~27:59로 표시되어야 전날 마지막 구간(24시 옆)에 붙어 보임.
 function _paceAdjustMin(min){return toDawnAdjustedMin(min,PACE_DOT_RANGE_START);}
-function _paceDayEvents(dk){
-  const events=[];
+// 하루(dk)의 "시각이 찍힌" 활동 — 시간 지정 일정 / 완료한 할 일(조각 완료 포함) / 체크 시각이 기록된 습관.
+// 반환: [{type:'event'|'todo'|'habit', min:실제 시계 분, time:'HH:MM', label}] (정렬 안 함).
+// 새벽 활동 분포(_paceDayEvents)와 오후 '오늘의 흐름' 오른쪽 컬럼(_aflRightItems)이 공용으로 쓴다.
+function _dayDoneEvents(dk){
+  const out=[];
+  const add=(type,min,label)=>out.push({type,min,time:minToHHMM(min),label});
   getTodos(dk).forEach(t=>{
     if(t.isEvent){
-      // 일정은 완료 개념이 없어 eventTime(사용자가 지정한 시각)을 그대로 좌표로 사용. 시간 미지정 일정은 찍을 좌표가 없어 제외.
-      if(!t.eventTime)return;
-      const p=t.eventTime.split(':');
-      const {parts}=parseTodoTextParts(t.text);
-      events.push({type:'event',min:_paceAdjustMin(parseInt(p[0],10)*60+parseInt(p[1],10)),label:parts[0]||t.text||''});
+      // 일정은 완료 개념이 없어 eventTime(지정 시각)이 좌표. 시간 미지정 일정은 제외.
+      const min=toMin(t.eventTime);
+      if(min==null)return;
+      add('event',min,parseTodoTextParts(t.text).parts[0]||t.text||'');
       return;
     }
-    const st=t.strikeTimes||{};
-    const timeEntries=Object.entries(st).filter(([,v])=>typeof v==='number');
-    if(timeEntries.length){
-      // 조각 일부만 완료된 상태(항목 전체는 아직 done:false)여도, 완료된 조각은 점으로 찍혀야 함
-      const {parts}=parseTodoTextParts(t.text);
-      timeEntries.forEach(([idxStr,ms])=>{
-        const idx=parseInt(idxStr,10);
+    const {prefix,parts,hasPrefix}=parseTodoTextParts(t.text);
+    const withPrefix=txt=>hasPrefix&&prefix?prefix+' · '+txt:txt;
+    const timed=Object.entries(t.strikeTimes||{}).filter(([,v])=>typeof v==='number');
+    if(timed.length){
+      // 조각 일부만 완료된 상태(항목 전체는 아직 done:false)여도 완료된 조각은 기록됨
+      timed.forEach(([idx,ms])=>{
         const d=new Date(ms);
-        events.push({type:'todo',min:_paceAdjustMin(d.getHours()*60+d.getMinutes()),label:parts[idx]||t.text||''});
+        add('todo',d.getHours()*60+d.getMinutes(),withPrefix(parts[parseInt(idx,10)]||t.text||''));
       });
     }else if(t.done&&t.completedAt){
       const d=new Date(t.completedAt);
-      events.push({type:'todo',min:_paceAdjustMin(d.getHours()*60+d.getMinutes()),label:t.text||''});
+      // 시간표(HH:MM 접두어) 형식 투두는 괄호( ) 안 부가설명을 빼고 표기
+      const sm=(t.scheduleOrigText||t.text||'').match(SCHEDULE_TIME_RE);
+      const label=sm?stripScheduleParens(withPrefix(sm[3])):withPrefix(parts.join(' / ')||t.text||'');
+      add('todo',d.getHours()*60+d.getMinutes(),label);
     }
   });
-  const wk=weekKey(new Date(dk+'T00:00:00'));
-  const dow=(new Date(dk+'T00:00:00').getDay()+6)%7;
-  const habits=getHabits();
-  const checks=getHabitChecks(wk);
-  const times=getHabitCheckTimes(wk);
-  habits.forEach(h=>{
+  const d0=new Date(dk+'T00:00:00');
+  const wk=weekKey(d0),dow=(d0.getDay()+6)%7;
+  const checks=getHabitChecks(wk),times=getHabitCheckTimes(wk);
+  getHabits().forEach(h=>{
     const key=h.id+'-'+dow;
-    if(!checks[key]||!times[key])return;
-    const p=times[key].split(':');
-    events.push({type:'habit',min:_paceAdjustMin(parseInt(p[0],10)*60+parseInt(p[1],10)),label:h.name});
+    const min=checks[key]?toMin(times[key]):null;
+    if(min!=null)add('habit',min,h.name);
   });
+  return out;
+}
+function _paceDayEvents(dk){
+  const events=_dayDoneEvents(dk).map(e=>({type:e.type,min:_paceAdjustMin(e.min),label:e.label}));
   const mflow=getMorningFlow(dk);
   const mflowBlocks=getRhythmBlocks(dk);
   _mfSlots(mflow).forEach(p=>{
@@ -7294,7 +7192,7 @@ function _paceDayEvents(dk){
     let min=null;
     if(p.key==='enjoy'){
       const block=mflowBlocks.find(b=>b.contentCid===p.cid&&b.cat==='enjoy');
-      if(block){const sp=block.start.split(':');min=parseInt(sp[0],10)*60+parseInt(sp[1],10);}
+      if(block)min=toMin(block.start);
     }else if(p.startTs){
       const d=new Date(p.startTs);min=d.getHours()*60+d.getMinutes();
     }
@@ -7304,7 +7202,7 @@ function _paceDayEvents(dk){
   return events;
 }
 // 오늘 하루 활동 시각 분포 — 이벤트 수집→좌표변환→겹침 그룹핑까지의 공통 계산.
-// 새벽 시간대(별빛 스타일, makeDawnPaceBanner)가 이 결과를 사용한다.
+// 새벽 "오늘의 한 페이지"의 활동 분포(_dwDistHtml)가 이 결과를 사용한다.
 function _paceDotGroups(dk,rangeStart,rangeEnd){
   const rangeLen=rangeEnd-rangeStart;
   const events=_paceDayEvents(dk)
@@ -7337,35 +7235,176 @@ function _paceHourMarksHtml(rangeStart,rangeEnd,lineClass,labelClass){
 const PACE_DOT_RANGE_START=6*60; // 06:00
 const PACE_DOT_RANGE_END=24*60; // 24:00
 
-// 새벽 전용 별빛 활동분포 배너 — 인사카드(dawn 톤) 바로 아래 독립 배너로 노출.
-// 계산(_paceDotGroups)은 낮 버전과 공유하고, 렌더링(별빛 스타일)만 다름.
-const DAWN_STAR_COLORS=['#f2cf8e','#f0a5b0','#a8d4b3'];
-function makeDawnPaceBanner(dk){
-  const TRACK_H=42,BASE_Y=18;
+// ══════════════════════════════════════════════════════════
+// ██ 새벽 홈 — 오늘의 한 페이지 (활동 분포 / 하루의 모양 / 리듬 / 콘텐츠 / 오늘의 문장) ██
+// ══════════════════════════════════════════════════════════
+// 마무리 문구 — 같은 시(hour) 안에서는 고정, 시간이 지나면 다른 문구로 돌려씀
+const DAWN_CLOSING_LINES=[
+  '오늘은 이만 불을 꺼도 좋은 시간이에요.',
+  '오늘 하루도 수고했어요. 이제 푹 쉬어요.',
+  '남은 건 내일의 나에게 맡겨도 괜찮아요.',
+  '이만 눈을 감고 하루를 내려놓아요.',
+  '오늘의 페이지는 여기까지예요. 잘 자요.'
+];
+const DAWN_DOT_COLORS=['var(--pal-orange-border)','var(--pal-pink-border)','var(--pal-mint-border)'];
+// "하루의 모양" 문장 — API 없이 오늘 기록(수면 점수·기상 시각·가장 오래 머문 활동·식사/습관)으로 조립.
+// 같은 날엔 항상 같은 문장이 나오도록 문장 틀 선택은 날짜 시드로 고정.
+function _dwShapeText(dk,durByCat){
+  const pick=(arr,salt)=>arr[dateSeedIndex(dk+'|'+salt,arr.length)];
+  const sl=getSleep(dk)||{};
+  const parts=[];
+  // 1) 하루의 시작 — 수면 점수(없으면 수면 시간) + 평소 대비 기상 시각
+  const sd=sleepDurMin(sl);
+  let open='';
+  if(sl.score!=null){
+    const sc=sl.score;
+    open=sc>=90?pick([sc+'점으로 푹 잔 하루의 시작이었어요.','푹 자고 개운하게 시작한 하루였어요.'],'a')
+      :sc>=79?pick(['잘 쉬고 시작한 하루였어요.','잠을 든든히 채우고 시작한 하루였어요.'],'a')
+      :sc>=66?pick(['무난하게 시작한 하루였어요.','평소 같은 잠으로 시작한 하루였어요.'],'a')
+      :pick(['잠이 조금 아쉬운 채로 시작한 하루였어요.','조금 피곤하게 시작한 하루였어요.'],'a');
+  }else if(sd!=null){
+    open=fmtDur(sd)+' 자고 시작한 하루였어요.';
+  }
+  if(open&&sl.wake){
+    const w=_dawnTimeToMin(sl.wake),avg=getAvgSleepWindow(7);
+    if(w!=null&&avg){
+      const diff=w-avg.wakeMin;
+      if(Math.abs(diff)>=20&&Math.abs(diff)<600)open+=' 평소보다 '+fmtDur(Math.abs(diff))+(diff>0?' 늦게':' 일찍')+' 일어났어요.';
+    }
+  }
+  if(open)parts.push(open);
+  // 2) 가장 오래 머문 활동 — 없으면 완료한 할 일 수
+  const top=Object.keys(durByCat).sort((a,b)=>durByCat[b]-durByCat[a])[0];
+  if(top){
+    const n=RHYTHM_CATS[top].label,d=fmtDur(durByCat[top]);
+    parts.push(pick([n+'에 '+d+'쯤 머문 시간이 가장 길었어요.','하루 중 '+n+' 시간이 '+d+'쯤으로 가장 길었어요.'],'b'));
+  }else{
+    const doneCnt=getTodos(dk).filter(t=>t.done&&!t.isEvent).length;
+    if(doneCnt>0)parts.push('할 일 '+doneCnt+'개를 마무리했어요.');
+  }
+  // 3) 마무리 — 습관을 모두 챙겼으면 그것, 아니면 세 끼, 아니면 일부 습관
+  const habits=getActiveHabits(),ld=new Date(dk+'T00:00:00');
+  const checks=getHabitChecks(weekKey(ld)),dow=(ld.getDay()+6)%7;
+  const hDone=habits.filter(h=>checks[h.id+'-'+dow]).length;
+  const meals=getMeals(dk);
+  const mealCnt=['breakfast','lunch','dinner'].filter(k=>meals[k]||meals[k+'_time']).length;
+  if(habits.length&&hDone===habits.length)parts.push('습관도 모두 챙겼어요.');
+  else if(mealCnt===3)parts.push(pick(['식사도 든든히 챙긴 하루였어요.','아침, 점심, 저녁 모두 챙겨 먹었어요.'],'c'));
+  else if(hDone>0)parts.push('습관은 '+hDone+'개 챙겼어요.');
+  return parts.join(' ');
+}
+// 오늘 활동 분포 — 06~24시 활동(완료한 할 일·습관 체크·시간 있는 일정)을 점으로. 점 중심은 기준선(BASE_Y)에 맞춤.
+function _dwDistHtml(dk){
+  const TRACK_H=36,BASE_Y=14;
   const g=_paceDotGroups(dk,PACE_DOT_RANGE_START,PACE_DOT_RANGE_END);
-  if(!g)return null;
-  let dotsHtml='';let i=0;
+  if(!g)return '';
+  let dots='',i=0;
   g.groups.forEach(gr=>{
     const n=gr.items.length;
     gr.items.forEach((ev,idx)=>{
-      const offset=(idx-(n-1)/2)*g.MIN_GAP_PCT;
-      const x=Math.min(100,Math.max(0,gr.centerX+offset));
-      const color=DAWN_STAR_COLORS[i%DAWN_STAR_COLORS.length];
-      const size=5+(i%2); // 5px/6px 번갈아 — 반짝임에 미세한 크기 변주
-      const delay=((i*0.45)%2.6).toFixed(2);
-      dotsHtml+=`<div class="star-dot" style="left:${x}%;top:${BASE_Y}px;width:${size}px;height:${size}px;background:${color};color:${color};animation-delay:${delay}s;" title="${escapeHtml(ev.label)}"></div>`;
+      const x=Math.min(100,Math.max(0,gr.centerX+(idx-(n-1)/2)*g.MIN_GAP_PCT));
+      const c=DAWN_DOT_COLORS[i%DAWN_DOT_COLORS.length];
+      dots+=`<div class="dw-dot" style="left:${x}%;top:${BASE_Y}px;background:${c};color:${c};animation-delay:${((i*0.45)%2.6).toFixed(2)}s;" title="${escapeHtml(ev.label)}"></div>`;
       i++;
     });
   });
-  const hourMarks=_paceHourMarksHtml(PACE_DOT_RANGE_START,PACE_DOT_RANGE_END,'pace-dot-hourline-dawn','pace-dot-hourlabel-dawn');
-  const wrap=document.createElement('div');
-  wrap.className='dawn-pace-banner';
-  wrap.innerHTML=`<div class="pace-title-dawn"><span>✦</span> 오늘 활동 분포</div>
-    <div class="pace-dot-track-dawn" style="height:${TRACK_H}px;">
-      <div class="pace-dot-baseline-dawn" style="top:${BASE_Y}px;"></div>
-      ${hourMarks}
-      ${dotsHtml}
-    </div>`;
+  const marks=_paceHourMarksHtml(PACE_DOT_RANGE_START,PACE_DOT_RANGE_END,'dw-hl','dw-hlab');
+  return `<div class="dw-sec"><div class="dw-label"><i class="ti ti-sparkles" aria-hidden="true"></i> 오늘 활동 분포</div>
+    <div class="dw-track" style="height:${TRACK_H}px;"><div class="dw-base" style="top:${BASE_Y}px;"></div>${marks}${dots}</div></div>`;
+}
+// 오늘의 문장 — 수집한 문장 중 날짜 시드로 하루 한 개(같은 날엔 같은 문장). 책갈피 쪽지 모양.
+function _dwQuoteHtml(dk){
+  const quotes=getQuotes().filter(q=>q.text&&q.text.trim());
+  if(!quotes.length)return '';
+  const fixedCid=_dwFix(dk,'quote',()=>quotes[dateSeedIndex(dk,quotes.length)].cid);
+  const q=quotes.find(x=>x.cid===fixedCid)||quotes[dateSeedIndex(dk,quotes.length)];
+  const book=getBooks().find(b=>b.cid===q.bookCid);
+  const src=book?`<div class="dw-quote-src"><i class="ti ti-book" aria-hidden="true"></i>${escapeHtml(book.title)}${book.author?'<span>·</span>'+escapeHtml(book.author):''}</div>`:'';
+  return `<div class="dw-sec"><div class="dw-label dw-label-row"><span><i class="ti ti-quote" aria-hidden="true"></i> 오늘의 문장</span>
+      <span class="dw-share" onclick="shareQuoteCard('${q.cid}')" title="공유 이미지"><i class="ti ti-share-2" aria-hidden="true"></i></span></div>
+    <div class="dw-quote" onclick="openReading()"><span class="dw-quote-ribbon"></span><div class="dw-quote-text">${escapeHtml(q.text)}</div>${src}</div></div>`;
+}
+// 한 번 만든 문구는 그날 안에서 고정(하루의 모양·마무리 문구·오늘의 문장). 홈을 여러 번 열어도 바뀌지 않게 기기 저장소에 보관, 날이 바뀌면 새로 만든다.
+const DW_FIX_KEY='iikoto_dw_fix';
+function _dwFix(dk,field,make){
+  let st=null;
+  try{st=JSON.parse(localStorage.getItem(DW_FIX_KEY)||'null');}catch(e){}
+  if(!st||st.dk!==dk)st={dk};
+  if(st[field]!=null)return st[field];
+  const v=make();
+  if(v){st[field]=v;try{localStorage.setItem(DW_FIX_KEY,JSON.stringify(st));}catch(e){}}
+  return v;
+}
+// 기기 간 동기화 — ai_cache 테이블(key: dawnpage_날짜)에 올려 다른 기기도 같은 문구를 보게 한다. 서버 값이 있으면 서버 우선.
+const _dwSynced={};
+async function _dwSyncServer(dk){
+  if(_dwSynced[dk])return;_dwSynced[dk]=1;
+  const key='dawnpage_'+dk;
+  let st=null;try{st=JSON.parse(localStorage.getItem(DW_FIX_KEY)||'null');}catch(e){}
+  const server=await aiCacheGet(key);
+  if(server){
+    let sv=null;try{sv=JSON.parse(server);}catch(e){}
+    if(sv){
+      try{localStorage.setItem(DW_FIX_KEY,JSON.stringify({dk,shape:sv.shape,closing:sv.closing,quote:sv.quote}));}catch(e){}
+      const old=document.getElementById('dawn-page');
+      if(old&&(!st||st.dk!==dk||st.shape!==sv.shape||st.closing!==sv.closing||st.quote!==sv.quote))old.replaceWith(makeDawnPage());
+      return;
+    }
+  }
+  if(st&&st.dk===dk&&(st.shape||st.closing))aiCacheSet(key,JSON.stringify({shape:st.shape||null,closing:st.closing||null,quote:st.quote||null}));
+}
+function makeDawnPage(){
+  const wrap=document.createElement('div');wrap.id='dawn-page';
+  const ld=getLogicalDate(),dk=dateKey(ld);
+  const rblocks=getRhythmBlocks(dk);
+  // 리듬 시간분포(카테고리별 분 합산) — 수면은 제외
+  const durByCat={};let totalDur=0;
+  rblocks.forEach(b=>{const d=_blockDurMin(b);if(d>0&&RHYTHM_CATS[b.cat]){durByCat[b.cat]=(durByCat[b.cat]||0)+d;totalDur+=d;}});
+  let html=`<div class="dw-mast"><div class="dw-mast-l"><span class="dw-day">${ld.getDate()}</span>
+      <div class="dw-mast-t"><div class="dw-month">${ld.getMonth()+1}월 · ${_HOME_DAYS[ld.getDay()]}요일</div><div class="dw-sub">오늘은 어떤 하루였을까요?</div></div></div>
+      <i class="ti ti-moon dw-moon" aria-hidden="true"></i></div><div class="dw-rule"></div>`;
+  html+=_dwDistHtml(dk);
+  const shape=_dwFix(dk,'shape',()=>_dwShapeText(dk,durByCat));
+  if(shape)html+=`<div class="dw-sec"><div class="dw-label">하루의 모양</div><p class="dw-shape">${escapeHtml(shape)}</p></div>`;
+  const oneLine=getDailyOneLine(dk).trim();
+  if(oneLine)html+=`<div class="dw-sec"><div class="dw-label">하루를 마무리하며</div><p class="dw-oneline">${escapeHtml(oneLine)}</p></div>`;
+  if(totalDur>0){
+    html+=`<div class="dw-sec"><div class="dw-label"><i class="ti ti-rainbow" aria-hidden="true"></i> 오늘의 리듬</div><div class="recap-rhythm-bar-chart">`;
+    Object.keys(RHYTHM_CATS).forEach(k=>{
+      if(!durByCat[k])return;
+      html+=`<div class="recap-rhythm-bar-seg" style="width:${durByCat[k]/totalDur*100}%;background:${getRhythmColor(k)};"><i class="ti ${RHYTHM_CATS[k].icon}"></i></div>`;
+    });
+    html+=`</div><div class="recap-rhythm-chip-legend">`;
+    Object.keys(RHYTHM_CATS).forEach(k=>{
+      if(!durByCat[k])return;
+      html+=`<span><span class="dot" style="background:${getRhythmColor(k)};"></span>${RHYTHM_CATS[k].label} ${Math.floor(durByCat[k]/60)}h${durByCat[k]%60?' '+(durByCat[k]%60)+'m':''}</span>`;
+    });
+    html+=`</div></div>`;
+  }
+  // 오늘 본 콘텐츠 — 감상 블록 중 텍스트가 있는 것. "분류 - 제목" 형식이면 분할, 같은 작품은 시간 합산
+  const merged=new Map();
+  rblocks.filter(b=>b.cat==='enjoy'&&b.text).forEach(b=>{
+    const m=b.text.match(/^(.+?)\s*-\s*(.+)$/);
+    const cat=m?m[1].trim():'',title=m?m[2].trim():b.text,key=cat+'|'+title;
+    const cur=merged.get(key)||{cat,title,dur:0};
+    cur.dur+=_blockDurMin(b);merged.set(key,cur);
+  });
+  if(merged.size){
+    const catKey={'독서':'book','드라마':'drama','영화':'movie','음악':'music'};
+    html+=`<div class="dw-sec"><div class="dw-label"><i class="ti ${RHYTHM_CATS.enjoy.icon}" aria-hidden="true"></i> 오늘 본 콘텐츠</div>`;
+    merged.forEach(c=>{
+      const k=catKey[c.cat];
+      const dur=c.dur>0?(Math.floor(c.dur/60)?Math.floor(c.dur/60)+'h ':'')+(c.dur%60?c.dur%60+'m':''):'';
+      html+=`<div class="recap-content-item"><span class="cdot" style="background:${k?getCatDotColor(k):'rgba(190,160,230,0.55)'};"></span>${escapeHtml(c.cat||'감상')}<span class="ctime">${escapeHtml(c.title)}${dur?' · '+dur.trim():''}</span></div>`;
+    });
+    html+=`</div>`;
+  }
+  html+=_dwQuoteHtml(dk);
+  html+=`<div class="dw-closing">${_dwFix(dk,'closing',()=>DAWN_CLOSING_LINES[Math.floor(Math.random()*DAWN_CLOSING_LINES.length)])}</div>`;
+  _dwSyncServer(dk);
+  wrap.appendChild(makeLabel('오늘의 한 페이지'));
+  const art=document.createElement('article');art.className='dw-page';art.innerHTML=html;
+  wrap.appendChild(art);
   return wrap;
 }
 
@@ -7475,170 +7514,6 @@ function makeHabitMiniCheckRow(){
     });
     wrap.appendChild(badge);
   });
-  return wrap;
-}
-// 오늘(dk) 포함, 끊기지 않고 연속으로 독서 기록(감상 카테고리, 텍스트가 "독서"로 시작)이 있었던 날수.
-// 오늘 아직 안 읽었으면 어제부터 거슬러 셈(오늘 하루 공백만으로 스트릭이 0이 되지 않도록).
-// 책 단위가 아니라 "독서" 활동 전체 기준 — 여러 책을 병렬로 읽어도 하루에 하나만 읽었으면 스트릭 유지.
-function getReadingActivityStreak(dk){
-  const hasReadingOn=x=>getRhythmBlocks(x).some(b=>b.cat==='enjoy'&&b.text&&b.text.startsWith('독서'));
-  let cur=new Date(dk+'T00:00:00');
-  if(!hasReadingOn(dateKey(cur)))cur.setDate(cur.getDate()-1);
-  let streak=0;
-  for(let i=0;i<365;i++){
-    const ck=dateKey(cur);
-    if(hasReadingOn(ck)){streak++;cur.setDate(cur.getDate()-1);}
-    else break;
-  }
-  return streak;
-}
-// 주어진 날짜(dk)로부터 과거로 거슬러 올라가며 독서 기록(감상 카테고리, 텍스트가 "독서"로 시작)이
-// 마지막으로 있었던 날까지 며칠 지났는지 계산. 최대 90일까지만 탐색(그 이상은 사실상 의미 없어 상한).
-function _daysSinceLastReading(dk){
-  const d=new Date(dk+'T00:00:00');
-  for(let i=1;i<=90;i++){
-    const prev=new Date(d);prev.setDate(d.getDate()-i);
-    const prevDk=dateKey(prev);
-    const hasReading=getRhythmBlocks(prevDk).some(b=>b.cat==='enjoy'&&b.text&&b.text.startsWith('독서'));
-    if(hasReading)return i;
-  }
-  return 90;
-}
-
-function makeDawnRecapCard(){
-  const wrap=document.createElement('div');
-  wrap.id='dawn-recap-card';
-  const dk=dateKey(getLogicalDate());
-  const wk=weekKey(getLogicalDate());
-  const dow=(getLogicalDate().getDay()+6)%7;
-
-  const todos=getTodos(dk);
-  const doneTodos=todos.filter(t=>t.done);
-  const memos=getMemos(dk);
-  const habits=getHabits();
-  const checks=getHabitChecks(wk);
-  const doneHabits=habits.filter(hb=>checks[hb.id+'-'+dow]);
-  const sleep=getSleep(dk)||{};
-  const rblocks=getRhythmBlocks(dk);
-  const oneLine=getDailyOneLine(dk).trim();
-
-  // 수면: 어제 기록된 sleep~wake 시간 기준, 7.5시간을 만근으로
-  let sleepMin=null;
-  if(sleep.sleep&&sleep.wake){
-    const sv=_dawnTimeToMin(sleep.sleep),wv=_dawnTimeToMin(sleep.wake);
-    if(sv!=null&&wv!=null){sleepMin=wv-sv;if(sleepMin<0)sleepMin+=1440;}
-  }
-  const SLEEP_GOAL=450; // 7.5h
-  const sleepRatio=sleepMin!=null?Math.min(1,sleepMin/SLEEP_GOAL):0;
-  const sleepLabel=sleepMin!=null?((sleepMin/60).toFixed(1).replace(/\.0$/,'')+'h'+(sleepRatio>=1?'+':'')):'-';
-
-  // 습관 달성률
-  const habitPct=habits.length?Math.round(doneHabits.length/habits.length*100):0;
-
-  // 리듬 시간분포 (분 단위 합산, 카테고리별) — 수면은 위 도넛에서 이미 보여주므로 여기선 제외
-  const durByCat={};let totalDur=0;
-  rblocks.forEach(b=>{
-    const s=_dawnTimeToMin(b.start),e=_dawnTimeToMin(b.end);
-    if(s==null||e==null)return;
-    let dur=e-s;if(dur<0)dur+=1440;
-    if(dur<=0)return;
-    durByCat[b.cat]=(durByCat[b.cat]||0)+dur;totalDur+=dur;
-  });
-
-  // 독서 시간 (감상 카테고리 중 텍스트가 "독서"로 시작하는 블록 합산)
-  let readingMin=0;
-  rblocks.forEach(b=>{
-    if(b.cat!=='enjoy'||!b.text||!b.text.startsWith('독서'))return;
-    const s=_dawnTimeToMin(b.start),e=_dawnTimeToMin(b.end);
-    if(s==null||e==null)return;
-    let dur=e-s;if(dur<0)dur+=1440;
-    readingMin+=Math.max(0,dur);
-  });
-
-  // 오늘 본 콘텐츠 (감상 카테고리 전체 - 독서 포함, 텍스트 있는 것만)
-  // 텍스트가 "분류 - 제목" 형식이면 좌우로 분할 표시, 아니면 그대로 제목 자리에 노출
-  const contentItems=rblocks.filter(b=>b.cat==='enjoy'&&b.text)
-    .map(b=>{
-      const m=b.text.match(/^(.+?)\s*-\s*(.+)$/);
-      const parsed=m?{cat:m[1].trim(),title:m[2].trim()}:{cat:'',title:b.text};
-      return {...parsed,start:b.start,end:b.end};
-    })
-    .sort((a,b)=>(_dawnTimeToMin(a.start)||0)-(_dawnTimeToMin(b.start)||0));
-
-  const label=document.createElement('div');label.className='slabel';label.textContent='오늘 하루';
-  wrap.appendChild(label);
-
-  const card=document.createElement('div');card.className='day-recap-card';
-  let html='';
-
-  if(oneLine){
-    html+=`<div class="vow-recap-block"><div class="vow-recap-row"><div class="vow-recap-label">하루를 마무리하며</div><div class="vow-recap-text">${escapeHtml(oneLine)}</div></div></div>`;
-  }
-
-  html+=`<div class="recap-donut-row">
-    <div class="recap-donut-item"><div class="recap-donut-wrap"><svg width="88" height="48" viewBox="0 0 88 48">
-      <path d="M 6 44 A 38 38 0 0 1 82 44" fill="none" stroke="var(--graph-track-color)" stroke-width="7" stroke-linecap="round"/>
-      <path d="M 6 44 A 38 38 0 0 1 82 44" fill="none" class="recap-donut-habit-fg" stroke-width="7" stroke-dasharray="119.4" stroke-dashoffset="${119.4*(1-habitPct/100)}" stroke-linecap="round"/>
-    </svg><div class="recap-donut-label">${habitPct}%</div></div><div class="recap-donut-l">습관 달성</div></div>
-    <div class="recap-donut-item"><div class="recap-donut-wrap"><svg width="88" height="48" viewBox="0 0 88 48">
-      <path d="M 6 44 A 38 38 0 0 1 82 44" fill="none" stroke="var(--graph-track-color)" stroke-width="7" stroke-linecap="round"/>
-      <path d="M 6 44 A 38 38 0 0 1 82 44" fill="none" stroke="rgba(205,194,182,0.9)" stroke-width="7" stroke-dasharray="119.4" stroke-dashoffset="${119.4*(1-sleepRatio)}" stroke-linecap="round"/>
-    </svg><div class="recap-donut-label">${sleepLabel}</div></div><div class="recap-donut-l">수면</div></div>
-  </div>`;
-
-  if(totalDur>0){
-    html+=`<div class="day-recap-sec-title"><i class="ti ti-rainbow ico-sz-13" aria-hidden="true"></i> 오늘의 리듬</div>
-      <div class="recap-rhythm-bar-chart">`;
-    Object.keys(RHYTHM_CATS).forEach(k=>{
-      if(!durByCat[k])return;
-      html+=`<div class="recap-rhythm-bar-seg" style="width:${durByCat[k]/totalDur*100}%;background:${getRhythmColor(k)};"><i class="ti ${RHYTHM_CATS[k].icon}"></i></div>`;
-    });
-    html+=`</div><div class="recap-rhythm-chip-legend">`;
-    Object.keys(RHYTHM_CATS).forEach(k=>{
-      if(!durByCat[k])return;
-      html+=`<span><span class="dot" style="background:${getRhythmColor(k)};"></span>${RHYTHM_CATS[k].label} ${Math.floor(durByCat[k]/60)}h${durByCat[k]%60?' '+(durByCat[k]%60)+'m':''}</span>`;
-    });
-    html+=`</div>`;
-  }
-
-  if(contentItems.length||readingMin===0){
-    const catToKey=(cat)=>{
-      if(cat==='독서')return 'book';
-      if(cat==='드라마')return 'drama';
-      if(cat==='영화')return 'movie';
-      if(cat==='음악')return 'music';
-      return Object.keys(CAT_LABELS).find(k=>CAT_LABELS[k]===cat)||null;
-    };
-    html+=`<div class="day-recap-sec-title"><i class="ti ${RHYTHM_CATS.enjoy.icon}" style="font-size:12px;" aria-hidden="true"></i> 오늘 본 콘텐츠</div>`;
-    if(!contentItems.some(c=>c.cat==='독서')){
-      const readingLabel=readingMin>0?readingMin+'분':_daysSinceLastReading(dk)+'일째 안읽음';
-      html+=`<div class="recap-content-item"><span class="cdot" style="background:${getCatDotColor('book')};"></span>독서<span class="ctime">${readingLabel}</span></div>`;
-    }
-    // 같은 콘텐츠(카테고리+제목)를 여러 번 읽거나 봤을 경우 항목이 중복되지 않도록 병합.
-    // 시간(분)은 각 블록의 실제 재생시간을 합산해 표시.
-    const mergedContentMap=new Map();
-    contentItems.forEach(c=>{
-      const s=_dawnTimeToMin(c.start),e=_dawnTimeToMin(c.end);
-      let dur=0;
-      if(s!=null&&e!=null){dur=e-s;if(dur<0)dur+=1440;}
-      const mkey=(c.cat||'')+'|'+c.title;
-      if(mergedContentMap.has(mkey)){
-        const existing=mergedContentMap.get(mkey);
-        existing.dur+=Math.max(0,dur);
-      }else{
-        mergedContentMap.set(mkey,{cat:c.cat,title:c.title,dur:Math.max(0,dur)});
-      }
-    });
-    Array.from(mergedContentMap.values()).forEach(c=>{
-      const key=catToKey(c.cat);
-      const dotColor=key?getCatDotColor(key):'rgba(190,160,230,0.55)';
-      const durLabel=c.dur>0?`${Math.floor(c.dur/60)}h${c.dur%60?' '+(c.dur%60)+'m':''}`.replace(/^0h /,''):'';
-      html+=`<div class="recap-content-item"><span class="cdot" style="background:${dotColor};"></span>${c.cat||'감상'}<span class="ctime">${c.title}${durLabel?' · '+durLabel:''}</span></div>`;
-    });
-  }
-
-  card.innerHTML=html;
-  wrap.appendChild(card);
   return wrap;
 }
 // calMode(월간탭에서 다른 날짜를 임시로 열어 편집 중)였다면 원래 날짜로 복원하고 관련 화면을 다시 그림.
@@ -8678,6 +8553,23 @@ function confirmMemoEdit(){
   const text=document.getElementById('memo-edit-inp').value.trim();
   const time=padTime(document.getElementById('memo-edit-time-inp').value);
   const i=parseInt(document.getElementById('memo-edit-modal').dataset.editIdx||'0');
+  if(i===-1){ // 홈에서 연 새 메모 — 내용(글 또는 사진)이 있을 때만 저장
+    const ndk=document.getElementById('memo-edit-modal').dataset.newDk||dateKey(getLogicalDate());
+    const photo=_memoEditPendingPhoto;
+    if(text||photo){
+      const nm=getMemos(ndk);
+      const item={text,time:time||pad(new Date().getHours())+':'+pad(new Date().getMinutes()),created:Date.now(),cid:genCid()};
+      if(photo){item.photoLocalUrl=photo.localUrl;item.photoStatus='pending_upload';S.set(S.key('memos_pending',ndk),true);}
+      nm.push(item);
+      saveMemos(ndk,nm);
+      if(photo)queueMemoPhotoUpload(ndk,item.cid,photo.blob,photo.ext);
+      showToast('메모를 남겼어요');
+    }
+    closeModal('memo-edit-modal');
+    _memoEditPendingPhoto=null;_memoEditRemovePhoto=false;_memoEditCurrentPhotoUrl=null;
+    if(document.getElementById('memo-list'))renderMemos();
+    return;
+  }
   const dk=dateKey(currentDate),memos=getMemos(dk);
   const m=memos[i];
   if(m){

@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.33-modalin';
+const CACHE = 'iikoto-v2.34-home';
 const ASSETS = [
   './',
   './index.html'
@@ -25,16 +25,17 @@ self.addEventListener('fetch', e => {
   if(e.request.method !== 'GET') return;
   if(e.request.url.includes('workers.dev')) return;
 
+  // 네트워크 우선 — 성공한 응답만 캐시에 갱신하고, 오프라인이면 같은 요청 → 없으면 앱 셸('./') 순으로 폴백.
   e.respondWith(
     fetch(e.request)
       .then(res => {
-        const clone = res.clone();
-        caches.open(CACHE).then(c => c.put(e.request, clone));
+        if (res && res.ok) {
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone)).catch(() => {});
+        }
         return res;
       })
-      .catch(() => {
-        return caches.match(e.request) || caches.match('./');
-      })
+      .catch(() => caches.match(e.request).then(hit => hit || caches.match('./')))
   );
 });
 
