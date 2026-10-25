@@ -407,23 +407,42 @@ function checkHabitDirect(habitId,dk,timeStr){
   autoSync('hc',wk);
   if(document.getElementById('daily-habit-box'))renderDailyHabitCheck();
 }
-function finishRhythmBlock(idx){
-  const blocks=getRhythmBlocks(_rhythmDk);
-  if(!blocks[idx])return;
+// 리듬 블록의 종료 시각을 "지금"으로 채움 — 종료를 누르는 모든 경로(리듬탭 종료 버튼 / 겹침 토스트 / 오후 홈 진행중 카드 / 모닝플로우 슬롯 종료)가 공용으로 사용.
+// 종료 시각 기록, 자동종료 표시 해제(사용자가 직접 종료했으므로 이후 취침시각 재수정에 영향받지 않게 확정), 저장, 운동이면 종료 통계 알림 예약까지 한 번에.
+// force=true면 이미 종료된 블록도 다시 종료 시각을 덮어씀(리듬탭 종료 버튼 기존 동작). 반환: {cid,cat,start,end} | 대상이 없거나 이미 종료됐으면 null.
+function _fillRhythmBlockEndAt(dk,idx,force){
+  const blocks=getRhythmBlocks(dk);
+  const b=blocks[idx];
+  if(!b||(b.end&&!force))return null;
   const n=new Date();
-  const endStr=pad(n.getHours())+':'+pad(n.getMinutes());
-  const startStr=blocks[idx].start;
-  blocks[idx].end=endStr;
-  delete blocks[idx].autoClosed; // 사용자가 직접 종료했으므로 자동종료 표시를 지워 이후 취침시각 재수정에 영향받지 않게 확정
-  const cat=blocks[idx].cat;
-  saveRhythmBlocks(_rhythmDk,blocks);
-  syncMorningFlowOnRhythmBlockEnd(_rhythmDk,blocks[idx].cid,endStr); // 모닝플로우로 시작한 블록이면 picks도 done으로 동기화
-  if(cat==='exercise')scheduleExerciseStatAlert(blocks[idx].cid);
+  b.end=pad(n.getHours())+':'+pad(n.getMinutes());
+  delete b.autoClosed;
+  saveRhythmBlocks(dk,blocks); // saveRhythmBlocks 내부에서 이미 autoSync('rblocks',dk) 호출 — 중복 호출 금지
+  if(b.cat==='exercise'&&b.cid)scheduleExerciseStatAlert(b.cid);
+  return {cid:b.cid,cat:b.cat,start:b.start,end:b.end,text:b.text};
+}
+// 진행 중인 막대(블록 index)를 종료 — 감상·독서 스톱워치가 돌고 있는 막대는 스톱워치 종료 로직(종료 기록·연동 정리)을 그대로 따르고,
+// 나머지는 종료 시각을 채운 뒤 모닝플로우 연동 상태·리듬바를 갱신. 반환: 'stopwatch' | 'ended' | null(대상 없음/이미 종료).
+function endRhythmBlockNow(dk,idx){
+  const b=getRhythmBlocks(dk)[idx];
+  if(!b||b.end)return null;
+  if(b.cid&&_cswRunning&&_cswBlockCid===b.cid){stopContentStopwatch();return 'stopwatch';}
+  if(b.cid&&_swRunning&&_swBlockCid===b.cid){toggleStopwatch();return 'stopwatch';}
+  const r=_fillRhythmBlockEndAt(dk,idx);
+  if(!r)return null;
+  if(r.cid)syncMorningFlowOnRhythmBlockEnd(dk,r.cid,r.end); // 모닝플로우로 시작한 막대면 pick도 done으로
+  refreshRhythmTrack();
+  return 'ended';
+}
+function finishRhythmBlock(idx){
+  const r=_fillRhythmBlockEndAt(_rhythmDk,idx,true);
+  if(!r)return;
+  syncMorningFlowOnRhythmBlockEnd(_rhythmDk,r.cid,r.end); // 모닝플로우로 시작한 블록이면 picks도 done으로 동기화
   refreshRhythmTrack();
   // 종료 시점 메모 제안 — 리듬블록에 입력된 텍스트(콘텐츠 제목 등)가 있으면 그걸 우선 표시,
   // 없으면 기존처럼 카테고리 라벨·지속시간으로 폴백(_buildRhythmMemoTitle 공용 로직).
-  const title=_buildRhythmMemoTitle(cat,startStr,endStr,blocks[idx].text);
-  if(title)openRhythmMemoModal(cat,_rhythmDk,title,'오늘 이 시간, 짧게 남겨볼까요?');
+  const title=_buildRhythmMemoTitle(r.cat,r.start,r.end,r.text);
+  if(title)openRhythmMemoModal(r.cat,_rhythmDk,title,'오늘 이 시간, 짧게 남겨볼까요?');
 }
 // 시작~종료(HH:MM) 사이 경과 분 — 자정 넘김 보정 포함. 리듬바 자정넘김 규칙과 동일 방식.
 function _rhythmDurationMin(startStr,endStr){
@@ -442,6 +461,17 @@ function _rhythmBlockDisplayTitle(text){
   const catPrefix={'드라마 - ':6,'영화 - ':5,'독서 - ':5};
   for(const p in catPrefix){if(text.startsWith(p))return text.slice(catPrefix[p]);}
   return text;
+}
+// 감상(enjoy) 블록 text → {cat, label, title}. text는 "독서 - 책제목"/"드라마 - 제목"/"영화 - 제목"/"음악 - 제목" 형태이고,
+// 제목 없이 "독서"만 있는 경우(스톱워치 제목 없음)도 같은 분류로 봄. 접두어를 모르는 text는 cat=null, 전체를 title로 돌려줌.
+// 홈탭(저녁 독서 꽃잎·새벽 오늘 본 콘텐츠)이 같은 규칙을 쓰도록 한 곳에 둠.
+const ENJOY_TEXT_LABELS={'독서':'book','드라마':'drama','영화':'movie','음악':'music'};
+function parseEnjoyBlockText(text){
+  const t=(text||'').trim();
+  const m=t.match(/^(.+?)\s*-\s*(.+)$/);
+  if(m)return {cat:ENJOY_TEXT_LABELS[m[1].trim()]||null,label:m[1].trim(),title:m[2].trim()};
+  if(ENJOY_TEXT_LABELS[t])return {cat:ENJOY_TEXT_LABELS[t],label:t,title:''};
+  return {cat:null,label:'',title:t};
 }
 // 리듬 메모 모달 제목 생성 — "카테고리 · 콘텐츠 제목"(text 있을 때) 또는 "카테고리 · 지속시간"(없을 때).
 // 종료 시점(finishRhythmBlock)/1시간 알림(_openFromNotificationUrl) 양쪽에서 동일 로직이라
@@ -838,12 +868,12 @@ function getHabitStreak(habitId){
 }
 // 습관 동력 배너 헤드라인 — 스트릭(연속기록) > 어제실적 > 이번달누적 순으로 그날 보여줄 수 있는
 // 가장 힘있는 정보 하나를 규칙 기반으로 고름. API 없이 순수 계산.
-function _habitMotivationLine(habits){
+function _habitMotivationLine(habits,streaks){ // streaks: {습관id: 연속일수} — 호출부가 이미 구한 값을 넘겨 같은 계산을 두 번 하지 않음
   if(!habits.length)return null;
   // 1순위: 스트릭 2일 이상인 습관 중 가장 긴 것
   let best=null;
   habits.forEach(h=>{
-    const streak=getHabitStreak(h.id);
+    const streak=streaks[h.id]||0;
     if(streak>=2&&(!best||streak>best.streak))best={habit:h,streak};
   });
   if(best)return `${best.habit.name} ${best.streak}일 연속 이어가는 중`;
@@ -866,12 +896,14 @@ function makeHabitStreakRow(){
   const wrap=document.createElement('div');wrap.className='habit-streak-wrap';
   const habits=getActiveHabits();
   if(!habits.length){wrap.innerHTML='<div style="font-size:var(--dow-label-size);color:var(--tm);padding:8px 2px;width:100%;text-align:center;">습관을 추가해보세요</div>';return wrap;}
-  const motivationLine=_habitMotivationLine(habits);
+  const streaks={};
+  habits.forEach(h=>{streaks[h.id]=getHabitStreak(h.id);}); // 습관마다 한 번만 계산(최대 90일 거슬러 올라가며 저장소를 읽는 비교적 무거운 계산)
+  const motivationLine=_habitMotivationLine(habits,streaks);
   let html='';
   if(motivationLine)html+=`<div class="habit-motivation-line"><i class="ti ti-flame ico-inline-13" aria-hidden="true"></i>${escapeHtml(motivationLine)}</div>`;
   html+='<div class="habit-numbox-grid">';
   habits.forEach(function(h){
-    const streak=getHabitStreak(h.id);
+    const streak=streaks[h.id];
     const monthCount=getHabitMonthCount(h.id);
     // 스트릭 2일 이상이면 스트릭을, 아니면 기존처럼 이번달 누적을 표시 — 잘 이어가는 습관을 시각적으로 구분.
     const showStreak=streak>=2;
@@ -886,17 +918,17 @@ function makeHabitStreakRow(){
   wrap.innerHTML=html;
   return wrap;
 }
-function makeRhythmBanner(lineText,builderFn,extraClass,fontSize,dk){
-  const b=document.createElement('div');b.className='report-banner'+(extraClass?' '+extraClass:'');
-  const lineIcon=extraClass==='rhythm-soft'?'<i class="ti ti-rainbow ico-inline-13" aria-hidden="true"></i>':'';
-  b.innerHTML='<div class="report-banner-inner"><div class="report-banner-line"'+(fontSize?` style="font-size:${fontSize}px;"`:'')+'>'+lineIcon+lineText+'</div><div class="report-banner-arrow"><i class="ti ti-chevron-up ico-sz-15" aria-hidden="true"></i></div></div>';
-  b.addEventListener('click',function(){openHomeDetailSheet(lineText,builderFn);});
-  return b;
-}
-// 홈탭 4개 시간대(아침/오후/새벽/저녁) 모두 "오늘의 리듬 기록" 배너를 동일한 인자로 붙이므로 공용 헬퍼로 통일.
-function makeTodayRhythmBanner(){
+// 오늘의 리듬 기록 시트 — 홈 하단 무지개 배너(아침·저녁·새벽)와 오후 독의 ＋ 버튼이 같은 시트를 연다.
+function openTodayRhythmSheet(){
   const dk=dateKey(getLogicalDate());
-  return makeRhythmBanner('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dk);},'rhythm-soft',12.5,dk);
+  openHomeDetailSheet('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dk);});
+}
+// "오늘의 리듬 기록" 무지개 배너 — 아침·저녁·새벽 홈 맨 아래에 공통으로 붙음(오후 홈은 독의 ＋가 대신하므로 없음).
+function makeTodayRhythmBanner(){
+  const b=document.createElement('div');b.className='report-banner rhythm-soft';
+  b.innerHTML='<div class="report-banner-inner"><div class="report-banner-line" style="font-size:12.5px;"><i class="ti ti-rainbow ico-inline-13" aria-hidden="true"></i>오늘의 리듬 기록</div><div class="report-banner-arrow"><i class="ti ti-chevron-up ico-sz-15" aria-hidden="true"></i></div></div>';
+  b.addEventListener('click',openTodayRhythmSheet);
+  return b;
 }
 function openHomeDetailSheet(title,builderFn){
   const titleEl=document.getElementById('home-detail-sheet-title');
@@ -918,7 +950,6 @@ function openHomeDetailSheet(title,builderFn){
 // ══════════════════════════════════════════════════════════
 // ══ HOME ══
 const _HOME_DAYS=['일','월','화','수','목','금','토'];
-let _weatherCache=null,_weatherCacheTime=0;
 
 // localStorage 브리핑 캐시 헬퍼
 function _bcGet(subSec){
@@ -944,14 +975,21 @@ function _bcSet(subSec,val){
   }catch(e){}
 })();
 
-// 앱 시작 시 오늘 캐시 복원
+// 인사말 캐시(현재 슬롯 하나만 메모리에 보관, 같은 날 다른 슬롯은 localStorage 브리핑 캐시에서 복원).
+// 시작 시점에 미리 채우지 않고 조회할 때 읽는 방식 — 파일 위쪽에서 실행되는 초기화 코드가 아래쪽 상수(생일 등)에 기대지 않게 하기 위함.
 let _greetingCache=null;
-function _initBriefingCache(){
-  const subSec=getSubSection();
-  const gc=_bcGet(subSec+'_greeting');
-  if(gc){_greetingCache=gc;}
-  // 참고: 오프 기간엔 fetchHomeWeather가 subSec 대신 section(4단계)으로 캐시를 저장하므로,
-  // 이 초기 로드 시점엔 캐시 미스가 날 수 있음 — 치명적이지 않음(뒤이은 fetchHomeWeather가 정상 복구).
+function _greetingFromCache(key){
+  if(_greetingCache&&_greetingCache.subSection===key)return _greetingCache;
+  const c=_bcGet(key+'_greeting');
+  if(c&&c.subSection===key&&c.text){_greetingCache=c;return c;}
+  return null;
+}
+// 인사말 캐시 키 — renderHome(즉시 표시)과 인사 생성(loadHomeGreeting)이 같은 키를 쓰도록 한 곳에서 계산.
+// 평소엔 7분류(슬롯), 생일 당일은 'bday_'+section(평소·오프 캐시와 섞이지 않게), 오프 기간엔 4분류(section)로 축소해 호출 횟수를 줄임.
+function _greetingCacheKey(section){
+  if(isTodayBirthday())return 'bday_'+section;
+  const dk=dateKey(section==='dawn'?getLogicalDate():new Date()); // 새벽엔 방금 지나간 논리적 하루 기준
+  return getActiveMultiDayEvents(dk).some(ev=>ev.isVacation)?section:getHomeTimeSlot();
 }
 
 // ── 홈탭 전용 시간대 판정 (단일 소스) ──
@@ -959,21 +997,18 @@ function _initBriefingCache(){
 // "잠들고 일어나야 하루가 시작된다"는 생활 개념과 맞춰, 새벽(dawn)이 하루의 끝에 오도록 배치.
 // 이 값은 홈탭이 그때그때 어떤 카드/배너를 보여줄지 정하는 화면 판정 전용이며,
 // 기록이 어느 날짜에 소속되는지는 별개 개념(DAWN_CUTOFF_MIN/getLogicalDate, 아래쪽 데이터 유틸 섹션 참고).
-// getSection/getSubSection은 모두 이 함수에서 파생되므로 서로 어긋날 수 없음.
+// getSection은 이 함수에서 파생되므로 어긋날 수 없고, 오후 '오늘의 흐름' 시간 범위(AFTERNOON_TL_*)도 아래 경계표에서 가져온다.
+// 경계표 — [슬롯, 이 시각(시) 미만까지]. 새벽은 0~4시, 마지막 슬롯(night_2)은 24시까지.
+const HOME_SLOT_BOUNDS=[['dawn',4],['morning_1',9],['morning_2',12],['afternoon_1',16],['afternoon_2',19],['night_1',22],['night_2',24]];
+function _homeSlotStartHour(slot){ // 슬롯이 시작하는 시(경계표에서 바로 앞 슬롯의 끝)
+  const i=HOME_SLOT_BOUNDS.findIndex(b=>b[0]===slot);
+  return i>0?HOME_SLOT_BOUNDS[i-1][1]:0;
+}
 function getHomeTimeSlot(){
   const h=new Date().getHours();
-  if(h<4)return 'dawn';
-  if(h<9)return 'morning_1';
-  if(h<12)return 'morning_2';
-  if(h<16)return 'afternoon_1';
-  if(h<19)return 'afternoon_2';
-  if(h<22)return 'night_1';
+  for(const [slot,end] of HOME_SLOT_BOUNDS)if(h<end)return slot;
   return 'night_2';
 }
-function getSubSection(){
-  return getHomeTimeSlot();
-}
-_initBriefingCache();
 
 
 // ── HOME ACTION FUNCTIONS
@@ -1851,7 +1886,7 @@ ${RHYTHM_CAT_GUIDE}
   return fallbackHtml;
 }
 // ─ 날씨 + Claude 비서 브리핑
-let _homeWeatherCache=null; // {icon, temp, desc, lat, lon, fetchedAt}
+let _homeWeatherCache=null; // {icon, temp, code, fetchedAt}
 
 // WMO 날씨 코드 → [이모지, 짧은 한글 표현] — 홈 날씨 배지(아이콘)와 오늘의 질문 빈칸({날씨})이 공용으로 사용.
 const WMO_INFO={
@@ -1864,30 +1899,38 @@ const WMO_INFO={
   95:['⛈️','뇌우'],96:['⛈️','뇌우'],99:['⛈️','뇌우']
 };
 
-async function fetchWeatherData(){
-  // 30분 캐시
-  if(_homeWeatherCache&&Date.now()-_homeWeatherCache.fetchedAt<60*60*1000)return _homeWeatherCache;
-  return new Promise((resolve)=>{
-    if(!navigator.geolocation){resolve(null);return;}
+// 날씨 — 성공하면 60분 캐시. 동시에 여러 번 불려도 위치 요청은 하나만 보내고(_weatherInflight),
+// 위치 거부·실패 시엔 5분간 다시 시도하지 않아(_weatherFailAt) 홈에 들어올 때마다 위치 대기(최대 8초)가 반복되지 않게 한다.
+let _weatherInflight=null,_weatherFailAt=0;
+const WEATHER_TTL_MS=60*60*1000,WEATHER_RETRY_MS=5*60*1000;
+function fetchWeatherData(){
+  if(_homeWeatherCache&&Date.now()-_homeWeatherCache.fetchedAt<WEATHER_TTL_MS)return Promise.resolve(_homeWeatherCache);
+  if(_weatherInflight)return _weatherInflight;
+  if(Date.now()-_weatherFailAt<WEATHER_RETRY_MS)return Promise.resolve(_homeWeatherCache||null); // 최근 실패 — 옛 값이 있으면 그대로 사용
+  _weatherInflight=new Promise((resolve)=>{
+    const fail=()=>{_weatherFailAt=Date.now();resolve(_homeWeatherCache||null);};
+    if(!navigator.geolocation){fail();return;}
     navigator.geolocation.getCurrentPosition(async(pos)=>{
       try{
         const {latitude:lat,longitude:lon}=pos.coords;
         const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weathercode,apparent_temperature&timezone=auto`;
         const res=await fetch(url);
-        if(!res.ok){resolve(null);return;}
+        if(!res.ok){fail();return;}
         const data=await res.json();
         const cur=data.current;
         const code=cur.weathercode;
         const temp=Math.round(cur.temperature_2m);
         const icon=(WMO_INFO[code]||[])[0]||'🌡️';
         _homeWeatherCache={icon,temp,code,fetchedAt:Date.now()};
+        _weatherFailAt=0;
         resolve(_homeWeatherCache);
-      }catch(e){resolve(null);}
-    },(err)=>{resolve(null);},{timeout:8000});
-  });
+      }catch(e){fail();}
+    },()=>fail(),{timeout:8000});
+  }).finally(()=>{_weatherInflight=null;});
+  return _weatherInflight;
 }
 
-// 인사말 프롬프트 공통 규칙 — fetchHomeWeather의 dawn/night/morning·afternoon 세 분기에서
+// 인사말 프롬프트 공통 규칙 — loadHomeGreeting의 dawn/night/morning·afternoon 세 분기에서
 // 토씨까지 동일하게 반복되던 블록을 하나로 통일. 말투/컨디션 대응 규칙을 바꿀 땐 여기 한 곳만 고치면 됨.
 const GREETING_CONDITION_RULE=`- 메모에 담긴 컨디션(피곤함, 아픔, 특정 신체 상태 등)은 그 시점의 일시적 상황으로만 참고하고, 이를 근거로 "쉬어야 해요", "무리하지 마세요" 같은 조언이나 걱정을 반복적으로 얹지 말 것. 컨디션 언급이 여러 날 메모 조회 범위에 걸쳐 있어도 매번 다시 꺼내 강조하지 않기 — 특히 생리/월경처럼 주기적 신체 상태는 하루이틀 지나면 이미 지난 일로 간주하고 재언급하지 말 것.
 - 메모 속 컨디션 정보는 "오늘 어떤 하루였는지" 분위기를 파악하는 참고 재료일 뿐, 매번 되짚어 걱정하거나 지속 상태로 단정하는 근거로 쓰지 말 것.`;
@@ -1904,12 +1947,12 @@ const GREETING_WEATHER_SEASON_RULE=(extra)=>`- ${extra} 단, 날씨(온도, 맑�
 - 현재 월(${new Date().getMonth()+1}월)을 반드시 참고해서 계절 언급 시 오류 없도록.`;
 
 // ── 오프 기간 전용 인사배너 프롬프트 ──
-// 평소 fetchHomeWeather의 dawn/morning/afternoon/night 4개 분기가 각자 할일완료/습관/리듬 비중 등
+// 평소 loadHomeGreeting의 dawn/morning/afternoon/night 4개 분기가 각자 할일완료/습관/리듬 비중 등
 // "얼마나 했는지" 평가성 정보를 프롬프트에 넣는데, 오프 기간엔 그 정보 자체를 아예 배제해야 해서
 // 별도 함수로 격리(자주 쓰이는 기능이 아니므로 기존 4개 분기 안에 흩어 넣지 않고 한 곳에 모음).
 // section: 'dawn'|'morning'|'afternoon'|'night'. vacationEvent: {text,dayIndex,totalDays}(getActiveMultiDayEvents 반환 형식 그대로).
-// allMemos: 호출부(fetchHomeWeather)가 이미 구해둔 그날 메모 텍스트 배열 — 중복 조회 방지를 위해 그대로 전달받음.
-// 반환: {dataContext, sys} — 기존 dataContext/sys와 동일한 형식으로 fetchHomeWeather에 그대로 대입.
+// allMemos: 호출부(loadHomeGreeting)가 이미 구해둔 그날 메모 텍스트 배열 — 중복 조회 방지를 위해 그대로 전달받음.
+// 반환: {dataContext, sys} — 기존 dataContext/sys와 동일한 형식으로 loadHomeGreeting에 그대로 대입.
 function buildVacationGreetingPrompt(section,vacationEvent,weather,dataDate,dk,allMemos){
   const pickedMemos=_pickRandom(allMemos,5); // 오프 기간은 세분화된 subSec 조회 범위 대신 단순하게 최대 5개
   const weatherDesc=_greetingWeatherDesc(weather);
@@ -1945,52 +1988,76 @@ ${GREETING_OUTPUT_RULE}
   return {dataContext,sys};
 }
 
-async function fetchHomeWeather(section){
+// 인사말 + 날씨 배지 — 같은 슬롯에서 이미 생성 중이면 다시 부르지 않음(홈을 연달아 열어도 API 호출은 한 번).
+// 생성이 실패하면 3분간은 같은 슬롯에서 다시 시도하지 않고 기본 문구를 보여줌(키 오류·오프라인일 때 매번 호출·대기하는 것 방지).
+const _greetingBusy=new Set();
+let _greetingFail={key:'',at:0};
+const GREETING_RETRY_MS=3*60*1000;
+async function loadHomeGreeting(section){
+  const busyKey=getHomeTimeSlot()+'|'+section;
+  if(_greetingBusy.has(busyKey))return;
+  _greetingBusy.add(busyKey);
+  try{await _loadHomeGreeting(section);}
+  catch(e){console.error('인사말 생성 오류',e);}
+  finally{_greetingBusy.delete(busyKey);}
+}
+function _greetingDefaultText(section,weather){
+  const wStr=weather?weather.icon+' '+weather.temp+'° · ':'';
+  return {morning:wStr+'오늘 하루도 잘 부탁해요 🌿',afternoon:wStr+'오늘도 잘 해내고 있어요 ✨',night:wStr+'오늘 하루 고생 많았어요 🌙',dawn:'오늘도 하루를 잘 채워내셨어요. 편안한 밤 되세요.'}[section];
+}
+async function _loadHomeGreeting(section){
   const subEl=document.getElementById('home-greeting-sub');
   const weatherIconEl=document.getElementById('home-weather-icon');
 
   const key=getClaudeKey();
 
-  // 날씨 먼저 가져오기
+  // 캐시된 인사가 있으면 날씨를 기다리지 않고 먼저 보여줌(위치 응답이 늦어도 문구는 즉시 뜸)
+  const subSec=_greetingCacheKey(section);
+  const cachedGreeting=_greetingFromCache(subSec);
+  if(cachedGreeting&&subEl)subEl.textContent=cachedGreeting.text;
+
+  // 날씨 가져오기(아이콘 + 프롬프트 재료) — 위치 거부 시에도 5분 쿨다운 덕에 오래 붙잡지 않음
   const weather=await fetchWeatherData();
 
   // 날씨 아이콘 topbar에 표시
   if(weatherIconEl&&weather){
     weatherIconEl.textContent=' '+weather.icon+' '+weather.temp+'°';
   }
+  if(cachedGreeting)return;
 
   // 오늘 데이터 수집 — dawn(새벽)은 "방금 지나간 하루"를 돌아보는 시점이라 getLogicalDate() 기준(어제)으로 조회
   const now=new Date();
   const dataDate=section==='dawn'?getLogicalDate():now;
   const dk=dateKey(dataDate);
 
-  // 오프 기간 판정 — 오프면 세분화된 subSec 대신 section(4단계: dawn/morning/afternoon/night)만으로 캐시 키를 잡아 호출 횟수를 7→4로 줄임.
+  // 오프 기간·생일 당일 여부 — 캐시 키(subSec)는 위의 _greetingCacheKey가 이미 정함
   const vacationEvent=getActiveMultiDayEvents(dk).find(ev=>ev.isVacation)||null;
-  const subSecRaw=getSubSection();
-  const isBdayGreet=isTodayBirthday(); // 생일 당일 — 캐시 키를 별도('bday_'+section)로 잡아 평소/오프 인사 캐시와 섞이지 않게 함
-  const subSec=isBdayGreet?('bday_'+section):(vacationEvent?section:subSecRaw); // 오프 기간엔 4단계로 캐시 키 축소
-
-  // 인사 캐시 유효하면 바로 표시 (sub-section 기준, dawn 포함 7분류 — 오프 기간은 위에서 4분류로 축소됨)
-  if(_greetingCache&&_greetingCache.subSection===subSec){
-    if(subEl)subEl.textContent=_greetingCache.text;
-    return;
-  }
+  const isBdayGreet=isTodayBirthday();
 
   // Claude 키 없으면 서버 캐시 조회 → 있으면 그 문구 표시, 없으면 준비중 안내
   if(!key){
     if(subEl){
       const serverCacheKey='greeting_'+dateKey(new Date())+'_'+subSec;
       const cached=await aiCacheGet(serverCacheKey);
-      subEl.textContent=cached||'곧 준비될 거예요';
+      if(cached&&_greetingCacheKey(section)===subSec){ // 기다리는 사이 슬롯이 바뀌었으면 옛 문구를 덮어쓰지 않음
+        subEl.textContent=cached;
+        _greetingCache={text:cached,subSection:subSec,fetchedAt:Date.now()};
+        _bcSet(subSec+'_greeting',_greetingCache);
+      }else if(!cached){
+        subEl.textContent='곧 준비될 거예요';
+      }
     }
+    return;
+  }
+  // 최근에 같은 키로 생성이 실패했다면 다시 부르지 않음
+  if(_greetingFail.key===subSec&&Date.now()-_greetingFail.at<GREETING_RETRY_MS){
+    if(subEl)subEl.textContent=_greetingDefaultText(section,weather);
     return;
   }
 
   const wk=weekKey(dataDate);
   const dow=(dataDate.getDay()+6)%7;
   const todos=getTodos(dk);
-  const pendCount=todos.filter(t=>!t.done).length;
-  const doneCount=todos.filter(t=>t.done).length;
   const allMemos=getMemos(dk).map(m=>m.text).filter(Boolean);
   const sleep=getSleep(dk);
   const habits=getHabits();
@@ -2160,18 +2227,20 @@ ${GREETING_OUTPUT_RULE}
   const maxTok=section==='night'||section==='dawn'?320:280;
   const reply=await callClaude(sys,[{role:'user',content:dataContext}],maxTok);
 
-  if(subEl){
-    if(reply&&!reply.startsWith('__ERR__')){
-      const text=reply.trim();
-      subEl.textContent=text;
+  const ok=!!(reply&&!reply.startsWith('__ERR__')&&reply.trim());
+  if(ok){
+    const text=reply.trim();
+    // 캐시는 생성한 슬롯 키로 저장(응답을 기다리는 사이 슬롯이 바뀌었어도 옛 슬롯 키에 정확히 남음)
+    _greetingFail={key:'',at:0};
+    _bcSet(subSec+'_greeting',{text,subSection:subSec,fetchedAt:Date.now()});
+    aiCacheSet('greeting_'+dateKey(new Date())+'_'+subSec,text);
+    if(_greetingCacheKey(section)===subSec){
       _greetingCache={text,subSection:subSec,fetchedAt:Date.now()};
-      _bcSet(subSec+'_greeting',_greetingCache);
-      aiCacheSet('greeting_'+dateKey(new Date())+'_'+subSec,text);
-    } else {
-      const wStr=weather?weather.icon+' '+weather.temp+'° · ':'';
-      const defaults={morning:wStr+'오늘 하루도 잘 부탁해요 🌿',afternoon:wStr+'오늘도 잘 해내고 있어요 ✨',night:wStr+'오늘 하루 고생 많았어요 🌙',dawn:'오늘도 하루를 잘 채워내셨어요. 편안한 밤 되세요.'};
-      subEl.textContent=defaults[section];
+      if(subEl)subEl.textContent=text;
     }
+  }else{
+    _greetingFail={key:subSec,at:Date.now()};
+    if(subEl&&_greetingCacheKey(section)===subSec)subEl.textContent=_greetingDefaultText(section,weather);
   }
 }
 function _pickRandom(arr,n){
@@ -2338,19 +2407,44 @@ function getSection(){
   return 'night';
 }
 
+// 시간대별 인사 제목 후보 — 같은 날 같은 슬롯에서는 항상 같은 제목이 나오도록 날짜+슬롯을 시드로 고름
+// (홈을 다시 그릴 때마다 제목이 바뀌어 깜빡이는 것 방지. 슬롯이 바뀌면 새 제목).
+const HOME_GREETING_POOL={
+  morning:['좋은 아침이에요','오늘도 좋은 하루예요','활기찬 하루 보내요','상쾌한 아침이에요'],
+  afternoon:['잘 하고 있어요','오늘도 순항 중이에요','좋은 흐름이에요','한창인 하루예요'],
+  night:['오늘도 수고했어요','오늘 하루도 애쓰셨어요','하루를 잘 마무리해요','편안한 저녁 되세요'],
+  dawn:['오늘 하루도 잘 보내셨어요','하루를 잘 채워내셨어요','오늘도 무사히 지나갔어요','편안한 밤 되세요']
+};
+function _homeGreetingTitle(section,isBday){
+  const pool=isBday
+    ?['생일 축하해요, '+BIRTHDAY_CALL_NAME,BIRTHDAY_CALL_NAME+', 생일 축하해요','오늘은 '+BIRTHDAY_CALL_NAME+'의 날이에요']
+    :(HOME_GREETING_POOL[section]||['좋은 하루예요']);
+  return pool[dateSeedIndex(dateKey(getLogicalDate())+'|'+getHomeTimeSlot(),pool.length)];
+}
+// 상단 시계 줄(오전/오후 시:분 · 요일 · 날씨 배지 자리) — 날씨 배지 span은 loadHomeGreeting이 채우므로 이미 채워진 값은 보존.
+function updateHomeClock(){
+  const timeEl=document.getElementById('home-time');
+  if(!timeEl)return;
+  const now=new Date(),h=now.getHours();
+  const ap=h<12?'오전':'오후';
+  const hh=h%12||12;
+  const keep=document.getElementById('home-weather-icon');
+  const weatherTxt=keep?keep.textContent:'';
+  timeEl.innerHTML=ap+' '+hh+':'+String(now.getMinutes()).padStart(2,'0')+' · '+_HOME_DAYS[now.getDay()]+'요일 <span id="home-weather-icon"></span>';
+  const fresh=document.getElementById('home-weather-icon');
+  if(fresh)fresh.textContent=weatherTxt||(_homeWeatherCache?' '+_homeWeatherCache.icon+' '+_homeWeatherCache.temp+'°':'');
+}
+// 마지막으로 그린 슬롯 — 앱을 켜 둔 채 시간이 흘러 슬롯이 바뀐 걸 알아채기 위함
+let _homeRenderedSlot='';
 function renderHome(){
-  const now=new Date();
   const section=getSection();
   const isBday=isTodayBirthday();
+  _homeRenderedSlot=getHomeTimeSlot();
   const hcard=document.getElementById('home-header-card');
   if(hcard){
     hcard.className='home-hcard '+(isBday?'birthday':section); // 생일엔 시간대별 배경 대신 생일 배경(index.html .home-hcard.birthday)
   }
-  const h=now.getHours(),m=now.getMinutes();
-  const ap=h<12?'오전':'오후';
-  const hh=h===0?12:h>12?h-12:h;
-  const timeEl=document.getElementById('home-time');
-  if(timeEl)timeEl.innerHTML=ap+' '+hh+':'+String(m).padStart(2,'0')+' · '+_HOME_DAYS[now.getDay()]+'요일 <span id="home-weather-icon"></span>';
+  updateHomeClock();
   const termEl=document.getElementById('home-solar-term-line');
   if(termEl){
     const termInfo=getSolarTermLine();
@@ -2363,33 +2457,31 @@ function renderHome(){
       termEl.style.display='none';
     }
   }
-  const greetingPool={
-    morning:['좋은 아침이에요','오늘도 좋은 하루예요','활기찬 하루 보내요','상쾌한 아침이에요'],
-    afternoon:['잘 하고 있어요','오늘도 순항 중이에요','좋은 흐름이에요','한창인 하루예요'],
-    night:['오늘도 수고했어요','오늘 하루도 애쓰셨어요','하루를 잘 마무리해요','편안한 저녁 되세요'],
-    dawn:['오늘 하루도 잘 보내셨어요','하루를 잘 채워내셨어요','오늘도 무사히 지나갔어요','편안한 밤 되세요']
-  };
   const greetEl=document.getElementById('home-greeting');
-  if(greetEl){
-    const pool=isBday
-      ?['생일 축하해요, '+BIRTHDAY_CALL_NAME,BIRTHDAY_CALL_NAME+', 생일 축하해요','오늘은 '+BIRTHDAY_CALL_NAME+'의 날이에요']
-      :(greetingPool[section]||['좋은 하루예요']);
-    greetEl.textContent=pool[Math.floor(Math.random()*pool.length)];
-  }
+  if(greetEl)greetEl.textContent=_homeGreetingTitle(section,isBday);
   const subEl=document.getElementById('home-greeting-sub');
   // 캐시된 인사말이 있으면 로딩 문구 없이 바로 표시(깜빡임 방지), 없을 때만 로딩 문구
   if(subEl){
-    const subSec=getSubSection();
-    if(_greetingCache&&_greetingCache.subSection===subSec){
-      subEl.textContent=_greetingCache.text;
-    }else{
-      subEl.textContent='잠깐만요...';
-    }
+    const cached=_greetingFromCache(_greetingCacheKey(section));
+    subEl.textContent=cached?cached.text:'잠깐만요...';
   }
   renderHomeBody(section);
-  fetchHomeWeather(section);
+  loadHomeGreeting(section);
   const readingBtn=document.querySelector('.reading-icon-btn');
   if(readingBtn)readingBtn.classList.toggle('sw-active',_swRunning);
+}
+// 홈이 화면에 열려 있을 때만 최신 상태로 다시 그림 — 동기화가 끝난 직후(syncAll)와 앱 복귀(visibilitychange)에서 호출.
+// - 슬롯이 바뀌었으면(예: 오전에 켜 둔 앱을 오후에 다시 염) 인사카드·본문 전체를 새로 그림.
+// - 같은 슬롯이면 시계와 본문만 갱신. 홈 안에서 입력 중(칩 입력창 등)이면 입력이 날아가지 않게 본문은 건드리지 않음.
+function refreshHomeIfOpen(){
+  const vh=document.getElementById('v-home');
+  if(!vh||!vh.classList.contains('on'))return;
+  if(getHomeTimeSlot()!==_homeRenderedSlot){renderHome();return;}
+  updateHomeClock();
+  const body=document.getElementById('home-body');
+  const ae=document.activeElement;
+  if(body&&ae&&body.contains(ae)&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName))return;
+  renderHomeBody(getSection());
 }
 
 // ═══════════════════════════════════════
@@ -2491,20 +2583,6 @@ const CAT_ICON_META={
 };
 const CONTENT_BAR_COLOR={drama:'var(--pal-pink-text)',book:'var(--pal-yellow-text)',movie:'var(--pal-sky-text)',music:'var(--pal-lime-text)'};
 const CONTENT_DOT_COLOR={drama:'var(--pal-pink-border)',book:'var(--pal-yellow-border)',movie:'var(--pal-sky-border)',music:'var(--pal-lime-border)'};
-// 채움로그(별도 프로젝트) — 읽기 전용 조회만 수행
-const CHAEUM_SUPA_URL='https://sqeyoqpchiljvinuqxjf.supabase.co';
-const CHAEUM_SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNxZXlvcXBjaGlsanZpbnVxeGpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5ODY5NTksImV4cCI6MjEwMjU2Mjk1OX0.H_JNNYz7_eguAqds-Wm6cwK926U74aVPaS_XwGRKeB0';
-const CHAEUM_CAT_META={
-  '시사':{icon:'ti-news',color:'#DEB07E'},
-  '예술':{icon:'ti-palette',color:'#CA8080'},
-  '역사':{icon:'ti-hourglass',color:'#C2B9A9'},
-  '음악':{icon:'ti-music',color:'#B198C7'},
-  '영화':{icon:'ti-movie',color:'#8FB5D1'},
-  '건축':{icon:'ti-building',color:'#7E8DBE'},
-  '기타':{icon:'ti-tag',color:'#9AA79B'}
-};
-// 채움로그 앱톤(세이지 그린 계열) — 배너 전용 색상
-const CHAEUM_TONE={bg:'#F3EFE6',paper:'#F7F4EC',card:'#FDFBF6',sage:'#A6A583',line:'#E4DCC9',ink:'#5C5648',subInk:'#8A8270',muted:'#B5AC98'};
 // 콘텐츠 바/점(진한 톤, dawn 리포트 기반) 색상
 function getCatBarColor(cat){
   return CONTENT_BAR_COLOR[cat]||'var(--tm)';
@@ -2790,19 +2868,8 @@ function overlapToastEnd(){
   const c=_overlapCtx;
   hideOverlapToast();
   if(!c)return;
-  // 감상·독서 스톱워치가 돌고 있는 막대는 스톱워치 종료 로직(종료 시각 기록·연동 정리)을 그대로 따른다.
-  if(_cswRunning&&_cswBlockCid===c.cid){stopContentStopwatch();return;}
-  if(_swRunning&&_swBlockCid===c.cid){toggleStopwatch();return;}
-  const blocks=getRhythmBlocks(c.dk);
-  const idx=blocks.findIndex(function(b){return b.cid===c.cid;});
-  if(idx<0||blocks[idx].end)return;
-  const n=new Date();
-  blocks[idx].end=pad(n.getHours())+':'+pad(n.getMinutes());
-  delete blocks[idx].autoClosed;
-  saveRhythmBlocks(c.dk,blocks);
-  syncMorningFlowOnRhythmBlockEnd(c.dk,c.cid,blocks[idx].end); // 모닝플로우로 시작한 막대면 pick도 done으로
-  if(blocks[idx].cat==='exercise')scheduleExerciseStatAlert(c.cid);
-  refreshRhythmTrack();
+  const idx=getRhythmBlocks(c.dk).findIndex(function(b){return b.cid===c.cid;});
+  if(idx>=0)endRhythmBlockNow(c.dk,idx);
 }
 function dateKey(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;}
 function monthKey(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;}
@@ -2849,8 +2916,8 @@ async function supaUpsert(path,onConflict,body){
 // ── AI 캐시 (서버 공유) ──
 // 목적: API 키가 있는 기기(주로 모바일)가 생성한 AI 문구를, 키가 없는 기기(주로 PC)도 그대로 볼 수 있게 서버에 저장.
 // 용량이 매우 작아(텍스트 위주, 무료 플랜 500MB 기준 수십 년치 여유) 리포트류(weekly/monthly/nutricomment 등)는 만료/삭제 없이 영구 보관.
-// 단, greeting_*(홈탭 인사카드)만은 예외 — 그날 그 시간대(subSection)에만 조회되고 이후 다시 읽히지 않는 순수 캐시라
-// 오래된 것을 남겨둘 이유가 없음(아래 cleanupOldGreetingCache 참고).
+// 단, greeting_*(홈탭 인사카드)·dawnpage_*(새벽 페이지 고정 문구)는 예외 — 그날에만 조회되는 일일 캐시라
+// 오래된 것을 남겨둘 이유가 없음(아래 cleanupOldDailyCache 참고).
 async function aiCacheGet(cacheKey){
   const rows=await supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent(cacheKey)}&select=content`);
   if(!rows||!rows.length)return null;
@@ -3010,18 +3077,20 @@ async function syncUserTimezoneIfChanged(){
 function alertBasisTimeFor(t){
   return t.isEvent?(t.eventAlertOn?t.eventTime:null):(t.todoAlertOn?t.alertTime:null);
 }
-// 3일 지난 greeting_* 캐시 정리 — 앱 시작(스플래시) 시점에 호출.
-// 매번 서버에 삭제 요청을 보내지 않도록, 로컬에 마지막 정리 시각을 남겨 7일에 한 번만 실제로 실행.
-// (매일 돌리든 일주일에 한 번 돌리든 최종적으로 남는 데이터는 동일 — 실행 빈도만 낮춰 서버 부담을 줄임)
-const GREETING_CLEANUP_INTERVAL_MS=7*24*60*60*1000;
-const GREETING_CLEANUP_KEEP_DAYS=3;
-async function cleanupOldGreetingCache(){
+// 날짜가 붙는 일일 캐시(greeting_*, dawnpage_*)는 지난 뒤 다시 읽히지 않으므로 보관 기간이 지나면 서버에서 정리 — 앱 시작(스플래시) 시점에 호출.
+// 매번 삭제 요청을 보내지 않도록 로컬에 마지막 정리 시각을 남겨 7일에 한 번만 실제로 실행(최종적으로 남는 데이터는 같고 서버 부담만 줄임).
+// 주간/월간 리포트류(weekly_summary_/monthly_report_ 등)는 다시 열어보는 자료라 여기에 넣지 않고 영구 보관.
+const DAILY_CACHE_CLEANUP_INTERVAL_MS=7*24*60*60*1000;
+const DAILY_CACHE_PREFIXES=['greeting_','dawnpage_'];
+const DAILY_CACHE_KEEP_DAYS=3;
+async function cleanupOldDailyCache(){
   if(!navigator.onLine)return;
-  const last=S.get('greeting_cleanup_last')||0;
-  if(Date.now()-last<GREETING_CLEANUP_INTERVAL_MS)return;
-  const cutoff=new Date();cutoff.setDate(cutoff.getDate()-GREETING_CLEANUP_KEEP_DAYS);
-  const res=await supaFetch(`ai_cache?cache_key=like.greeting_*&created_at=lt.${cutoff.toISOString()}`,'DELETE');
-  if(res!==null)S.set('greeting_cleanup_last',Date.now()); // 실패 시 다음 시작 때 다시 시도하도록 시각 갱신 안 함
+  const last=S.get('daily_cache_cleanup_last')||0;
+  if(Date.now()-last<DAILY_CACHE_CLEANUP_INTERVAL_MS)return;
+  const cutoff=new Date(Date.now()-DAILY_CACHE_KEEP_DAYS*86400000).toISOString();
+  const results=await Promise.all(DAILY_CACHE_PREFIXES.map(prefix=>
+    supaFetch(`ai_cache?cache_key=like.${prefix}*&created_at=lt.${cutoff}`,'DELETE')));
+  if(results.every(r=>r!==null))S.set('daily_cache_cleanup_last',Date.now()); // 하나라도 실패하면 다음 시작 때 다시 시도
 }
 // ── 배열형(하루/월 단위 여러 행) 동기화: DELETE 후 POST가 아니라
 // upsert(추가/수정) + 로컬에서 사라진 항목만 개별 삭제로 처리.
@@ -4104,16 +4173,17 @@ async function syncAll(){
   refreshIfTabOpen('v-weekly',loadWeekly);
   refreshIfTabOpen('v-monthly',loadMonthly);
   if(_rhythmTrackEl&&document.body.contains(_rhythmTrackEl))refreshRhythmTrack();
-  // loadDaily()가 다시 그리지 못하는 새벽 "오늘의 한 페이지"를 최신 데이터로 교체
-  const oldDawnPage=document.getElementById('dawn-page');
-  if(oldDawnPage&&document.getElementById('v-home')&&document.getElementById('v-home').classList.contains('on')){
-    oldDawnPage.replaceWith(makeDawnPage());
-  }
+  // 홈이 열려 있으면 동기화로 받아온 최신 데이터(기상·식사·리듬·할 일 등)와 시간대로 홈을 다시 그림 — 시간대(아침/오후/저녁/새벽) 공통
+  refreshHomeIfOpen();
   // 애플 캘린더 → iikoto 자동 동기화: 앱의 기존 동기화 시점에 얹되 5분 간격 제한(조용히, 바뀐 게 있을 때만 알림)
   syncAppleCalendar({silent:true});
 }
 window.addEventListener('online',()=>syncAll());
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)setTimeout(syncAll,300);});
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden)return;
+  refreshHomeIfOpen(); // 앱으로 돌아온 즉시 로컬 데이터 기준으로 시계·시간대부터 맞춤(오프라인이어도 동작)
+  if(navigator.onLine)setTimeout(syncAll,300);
+});
 // 주기적 pending 재시도 타이머 — online/visibilitychange 이벤트에만 의존하면, 앱을 화면 전환 없이
 // 켜둔 채 두거나(예: 오늘 탭만 계속 보고 있는 경우) 업로드가 실패한 순간 마침 두 이벤트 다 안 걸리면
 // pending이 남은 채로 재시도 기회 자체가 영영 안 옴 — 로컬 수정사항이 서버에 끝내 안 올라가는 근본
@@ -6195,9 +6265,9 @@ const MF_SUB_LISTS={etc:MORNING_FLOW_ETC_SUB,enjoy:MORNING_FLOW_ENJOY_SUB,desk:R
 // 서브선택 항목({key,label,icon?,rhythmCat?}) 조회 — 라벨/아이콘/리듬카테고리를 한 곳에서 읽음.
 function _mfSubMeta(key,subKey){return (MF_SUB_LISTS[key]||[]).find(x=>x.key===subKey)||null;}
 // 슬롯의 화면 표시 이름 — 고른 종류(서브선택)가 있으면 그 이름, 없으면 카드 이름. withTitle이면 기타에서 고른 제목(일정/재택 등)을 우선.
+function _mfCard(key){return MORNING_FLOW_CARDS.find(c=>c.key===key)||null;}
 function _mfSlotLabel(slot,withTitle){
-  const card=MORNING_FLOW_CARDS.find(c=>c.key===slot.key);
-  return (withTitle&&slot.key==='etc'&&slot.title)||_mfSubMeta(slot.key,slot.sub)?.label||card.label;
+  return (withTitle&&slot.key==='etc'&&slot.title)||_mfSubMeta(slot.key,slot.sub)?.label||_mfCard(slot.key)?.label||'';
 }
 // 날짜(dk) 문자열을 시드로 한 결정적 해시 — 같은 날엔 항상 같은 값, len으로 나눈 나머지를 인덱스로 사용.
 // 오버플로우 없는 부호 없는 32비트 해시(>>>0) 방식으로 통일.
@@ -6210,7 +6280,7 @@ function dateSeedIndex(dk,len){
 // 같은 카드도 슬롯을 여러 개 만들 수 있음(예: 업무+외출). 옛 구조(카드별 pick + flow.etc/enjoy/... 별도 상태)는 서버 기록을 일괄 변환하고 변환 코드도 제거함.
 function getMorningFlow(dk){return S.get('mflow_'+dk)||{picks:{}};}
 // 슬롯 목록(생성순) — flow.picks의 값에 id를 붙인 사본. 수정은 항상 flow.picks[id]에 해야 함.
-function _mfSlots(flow){return Object.keys(flow.picks).map(id=>({...flow.picks[id],id})).sort((a,b)=>(a.t||0)-(b.t||0));}
+function _mfSlots(flow){return Object.keys(flow.picks).filter(id=>flow.picks[id]&&_mfCard(flow.picks[id].key)).map(id=>({...flow.picks[id],id})).sort((a,b)=>(a.t||0)-(b.t||0));} // 카드 목록에 없는 key(옛 버전·손상 데이터)는 그리지 않음
 // 같은 카드의 다른 슬롯이 진행중이면 새로 시작할 수 없음(같은 카드 안에서는 순차 진행).
 function _mfSiblingRunning(flow,id){const me=flow.picks[id];return Object.keys(flow.picks).some(k=>k!==id&&flow.picks[k].key===me.key&&flow.picks[k].status==='running');}
 const MF_BLOCKED_MSG='같은 카드는 하나가 끝나야 다음을 시작할 수 있어요';
@@ -6226,16 +6296,18 @@ function _mfBlockFor(dk,blockCid){
 function _mfShortTitle(title){
   return title.length>6?title.slice(0,5)+'…':title;
 }
-// 이번 달(1일~오늘) 로컬에 저장된 mflow_YYYY-MM-DD 전부를 훑어 카드별(key) 누적 완료 횟수 집계(슬롯 단위) — 그리드 카드 하단 표시용.
+// 이번 달(1일~오늘) 날짜별 mflow_YYYY-MM-DD를 읽어 카드별(key) 누적 완료 횟수 집계(슬롯 단위) — 그리드 카드 하단 표시용.
+// 저장소 전체 키를 훑지 않고 날짜별로 직접 읽음(앱이 오래될수록 키가 많아져도 슬롯 탭마다 느려지지 않게).
 function getMorningFlowMonthCounts(mk){
   const counts={};
   MORNING_FLOW_CARDS.forEach(c=>counts[c.key]=0);
-  for(let i=0;i<localStorage.length;i++){
-    const k=localStorage.key(i);
-    if(!k||!k.startsWith('mflow_')||!k.startsWith('mflow_'+mk))continue;
-    const dk=k.slice('mflow_'.length,'mflow_'.length+10); // 키 형식 mflow_YYYY-MM-DD
+  const [y,m]=mk.split('-').map(Number);
+  const today=new Date();
+  const last=(today.getFullYear()===y&&today.getMonth()+1===m)?today.getDate():new Date(y,m,0).getDate();
+  for(let day=1;day<=last;day++){
+    const dk=mk+'-'+pad(day);
     if(isVacationDate(dk))continue; // 오프 기간은 모닝플로우 월간 카운트에서 제외
-    const flow=S.get(k);
+    const flow=S.get('mflow_'+dk);
     if(!flow||!flow.picks)continue;
     Object.keys(flow.picks).forEach(pk=>{const p=flow.picks[pk];if(p&&counts[p.key]!==undefined&&p.status==='done')counts[p.key]++;}); // 슬롯의 key가 카드
   }
@@ -6401,15 +6473,8 @@ function endMorningFlowSlot(id){
     else if(s.sub==='content')stopContentStopwatch();
     else return;
   }else{
-    const blocks=getRhythmBlocks(dk);
-    const idx=blocks.findIndex(b=>b.cid===s.blockCid);
-    if(idx>=0){
-      const endD=new Date();
-      let endMin=endD.getHours()*60+endD.getMinutes();
-      if(dateKey(getLogicalDate(endD.getTime()))!==dk)endMin+=1440;
-      blocks[idx].end=minToHHMM(endMin%1440);
-      saveRhythmBlocks(dk,blocks); // saveRhythmBlocks 내부에서 이미 autoSync('rblocks',dk) 호출 — 중복 호출 금지
-    }
+    const idx=getRhythmBlocks(dk).findIndex(b=>b.cid===s.blockCid);
+    if(idx>=0)_fillRhythmBlockEndAt(dk,idx); // 운동이면 종료 통계 알림 예약까지 리듬탭 종료와 동일하게 처리
   }
   flow.picks[id]={...s,status:'done'};
   saveMorningFlow(dk,flow);
@@ -6438,8 +6503,8 @@ function _mfStackedRowHtml(c,icon,label,bodyHtml){
     ${bodyHtml}
   </div>`;
 }
-// 펼쳐진 슬롯의 패널 — 상태에 따라 종류 선택 → (감상 대상 / 자유입력 / 업무·외출 제목) → 시작·종료 행.
-function _mfPanelHtml(dk,flow,slot,c){
+// 펼쳐진 슬롯의 패널(보기 전용 — 데이터는 바꾸지 않음) — 상태에 따라 종류 선택 → (감상 대상 / 자유입력 / 업무·외출 제목) → 시작·종료 행.
+function _mfPanelHtml(dk,slot,c){
   const id=slot.id,sub=slot.sub;
   if(!sub)return _mfSubPickRowHtml(c,id);
   // 감상(독서/콘텐츠) 서브선택은 끝났지만 아직 대상(어떤 책/작품)을 안 고른 상태 — 칩으로 대상만 먼저 고르고, 시작 행이 뜨면 시작 버튼을 누르는 2단계 구조.
@@ -6455,12 +6520,7 @@ function _mfPanelHtml(dk,flow,slot,c){
       const meta=_mfSubMeta('enjoy',sub);
       return _mfStackedRowHtml(c,meta.icon,'감상 · '+meta.label,chipsHtml);
     }
-    // 1개뿐이면 고를 필요 없이 바로 그 항목을 대상으로 확정(칩 자체를 생략). 0개면 아래 공용 시작 행이 신규 등록 화면으로 안내.
-    if(ongoing.length===1){
-      slot.targetCid=ongoing[0].cid;slot.targetMk=sub==='content'?(ongoing[0]._mk||''):'';
-      flow.picks[id].targetCid=slot.targetCid;flow.picks[id].targetMk=slot.targetMk;
-      saveMorningFlow(dk,flow);
-    }
+    // 1개뿐이면 _mfReconcile이 이미 대상을 확정해 두었으므로 여기까지 오지 않음(칩 생략). 0개면 아래 공용 시작 행이 신규 등록 화면으로 안내.
   }
   if(slot.key==='etc'&&sub==='free'){
     const savedText=slot.text||'';
@@ -6497,6 +6557,33 @@ function _mfPanelHtml(dk,flow,slot,c){
     ${btnHtml}
   </div>`;
 }
+// 화면을 그리기 전에 슬롯 상태를 실제 기록(리듬블록·진행중 콘텐츠)에 맞춰 정리 — 그리는 함수들이 데이터를 바꾸지 않도록 변경은 모두 여기서만 한다.
+// ① 연결된 리듬블록을 리듬탭에서 직접 지운 경우 "하려다가 안 한 것"으로 보고 슬롯을 통째로 지움(자유입력은 리듬 연동이 없어 blockCid 없는 게 정상이라 제외).
+//    다른 기기 데이터가 아직 다 안 내려온 첫 동기화 도중에는 블록이 없어 보일 수 있으므로, 첫 동기화가 끝난 뒤(_initSyncDone)에만 지움.
+// ② 감상 슬롯에서 종류를 골랐는데 진행중 항목(책/작품)이 딱 1개면 고를 필요 없이 대상으로 바로 확정.
+function _mfReconcile(dk,flow){
+  let changed=false;
+  if(_initSyncDone&&!window._restoring){
+    Object.keys(flow.picks).forEach(id=>{
+      const p=flow.picks[id];
+      const blockGone=(p.status==='running'||p.status==='done')&&p.blockCid&&!_mfBlockFor(dk,p.blockCid);
+      const noRecordMade=p.status==='done'&&!p.blockCid&&p.sub!=='free';
+      if(blockGone||noRecordMade){delete flow.picks[id];changed=true;}
+    });
+  }
+  Object.keys(flow.picks).forEach(id=>{
+    const p=flow.picks[id];
+    if(p.key!=='enjoy'||p.status!=='idle'||p.targetCid||(p.sub!=='read'&&p.sub!=='content'))return;
+    const ongoing=p.sub==='read'?_getOngoingReadingWithCid():_getOngoingWatchingWithCid().filter(x=>x.cid);
+    if(ongoing.length===1){
+      p.targetCid=ongoing[0].cid;
+      p.targetMk=p.sub==='content'?(ongoing[0]._mk||''):'';
+      changed=true;
+    }
+  });
+  if(changed)saveMorningFlow(dk,flow);
+  return changed;
+}
 // 모닝플로우 카드 — 가로 타임라인(기상 → 오늘 고른 슬롯들 → 아침식사) + 펼친 슬롯의 패널(종류 선택/시작·종료) + 6개 카테고리 아이콘(누르면 슬롯 추가, 숫자=이번 달 완료 횟수).
 // 슬롯 상태: 시작 전(테두리만) / 진행중(옅은 색+깜빡임) / 완료(꽉 채움). 길게 누르면 삭제.
 function makeMorningFlowCard(){
@@ -6504,14 +6591,7 @@ function makeMorningFlowCard(){
   const flow=getMorningFlow(dk);
   // 리듬탭에서 blockCid로 연결된 리듬블록을 직접 지워버린 경우 — "하려다가 안 한 것"으로 보고 해당 슬롯을 통째로 지움.
   // done인데 blockCid가 애초에 없는 케이스는 정상 흐름에선 없음(자유입력은 리듬 연동이 없어 blockCid가 없는 게 정상이라 제외).
-  let _flowPruned=false;
-  Object.keys(flow.picks).forEach(id=>{
-    const p=flow.picks[id];
-    const blockGone=(p.status==='running'||p.status==='done')&&p.blockCid&&!_mfBlockFor(dk,p.blockCid);
-    const noRecordMade=p.status==='done'&&!p.blockCid&&p.sub!=='free';
-    if(blockGone||noRecordMade){delete flow.picks[id];_flowPruned=true;}
-  });
-  if(_flowPruned)saveMorningFlow(dk,flow);
+  _mfReconcile(dk,flow);
   const slots=_mfSlots(flow);
   // 펼친 슬롯이 없거나 사라졌으면, 진행중인 슬롯이 있을 때 그걸 펼침(재진입 시 바로 종료 버튼이 보이도록)
   if(!slots.some(x=>x.id===_mfSelId))_mfSelId=(slots.find(x=>x.status==='running')||{}).id||null;
@@ -6543,7 +6623,7 @@ function makeMorningFlowCard(){
     </div>`).join('');
   const sel=slots.find(x=>x.id===_mfSelId);
   const selCard=sel?MORNING_FLOW_CARDS.find(cc=>cc.key===sel.key):null;
-  const panelHtml=sel?`<div class="mf-panel" style="--mf-rgb:${selCard.colorRgb};">${_mfPanelHtml(dk,flow,sel,selCard)}<div class="mf-slot-del" onclick="deleteMorningFlowSlot('${sel.id}')">삭제</div></div>`:'';
+  const panelHtml=sel?`<div class="mf-panel" style="--mf-rgb:${selCard.colorRgb};">${_mfPanelHtml(dk,sel,selCard)}<div class="mf-slot-del" onclick="deleteMorningFlowSlot('${sel.id}')">삭제</div></div>`:'';
   hero.innerHTML=`<div class="mf-hero-inner">
     <div class="mf-head"><span class="mf-title">오늘의 아침</span></div>
     <div class="mf-tl">${wakeNode}${slotNodes}${mealNode}</div>
@@ -6664,7 +6744,7 @@ function confirmSleepScore(){
 // ══════════════════════════════════════════════════════════
 // 오후 홈탭 — 지금(진행 중 활동) 카드 + 오늘의 흐름(12~19시 비례 타임라인, 아카이브 오늘탭 방식) + 하단 빠른입력 독
 // ══════════════════════════════════════════════════════════
-const AFTERNOON_TL_START=12*60,AFTERNOON_TL_END=19*60; // '오늘의 흐름' 타임라인 범위(12~19시)
+const AFTERNOON_TL_START=_homeSlotStartHour('afternoon_1')*60,AFTERNOON_TL_END=HOME_SLOT_BOUNDS.find(b=>b[0]==='afternoon_2')[1]*60; // '오늘의 흐름' 타임라인 범위 = 오후 슬롯 범위(12~19시, 경계표 HOME_SLOT_BOUNDS에서 파생)
 const AFL_PX_H=56,AFL_TOP=8; // 1시간당 높이(px), 위쪽 여백
 function _aflY(min){return AFL_TOP+(Math.min(Math.max(min,AFTERNOON_TL_START),AFTERNOON_TL_END)-AFTERNOON_TL_START)*AFL_PX_H/60;}
 // 오른쪽 컬럼 항목 — 12~19시 범위의 일정/완료 할 일/습관 체크(공용 수집기 _dayDoneEvents 사용), 시각순.
@@ -6708,8 +6788,10 @@ function _aflStartTicker(){
   _aflTimer=setInterval(()=>{
     const flow=document.getElementById('afternoon-flow-card');
     if(!flow){_aflStopTicker();return;}
+    const vh=document.getElementById('v-home');
+    if(document.hidden||!vh||!vh.classList.contains('on'))return; // 홈이 안 보이는 동안(다른 탭·백그라운드)에는 그리지 않음 — 돌아오면 홈 진입/복귀 시 어차피 다시 그려짐
     _aflUpdateTimer();
-    if(++n%60===0&&!document.hidden)flow.replaceWith(makeAfternoonFlowCard());
+    if(++n%60===0)flow.replaceWith(makeAfternoonFlowCard());
   },1000);
 }
 function makeAfternoonNowCard(){
@@ -6729,26 +6811,12 @@ function makeAfternoonNowCard(){
   card.dataset.startMs=startMs;
   return card;
 }
-// 진행 중 활동 종료 — 감상·독서 스톱워치가 돌고 있는 블록은 스톱워치 종료 로직을 그대로 따르고, 나머지는 종료 시각만 채움(overlapToastEnd와 동일 규칙).
+// 진행 중 활동 종료 — 종료 규칙은 리듬 종료 공용 함수(endRhythmBlockNow)를 그대로 따름.
 function endAfternoonNow(){
   const dk=dateKey(getLogicalDate());
-  const blocks=getRhythmBlocks(dk);
-  const idx=_aflOngoingIdx(blocks);
+  const idx=_aflOngoingIdx(getRhythmBlocks(dk));
   if(idx<0)return;
-  const cid=blocks[idx].cid;
-  if(cid&&_cswRunning&&_cswBlockCid===cid)stopContentStopwatch();
-  else if(cid&&_swRunning&&_swBlockCid===cid)toggleStopwatch();
-  else{
-    const n=new Date();
-    blocks[idx].end=pad(n.getHours())+':'+pad(n.getMinutes());
-    delete blocks[idx].autoClosed;
-    saveRhythmBlocks(dk,blocks);
-    if(cid){
-      syncMorningFlowOnRhythmBlockEnd(dk,cid,blocks[idx].end);
-      if(blocks[idx].cat==='exercise')scheduleExerciseStatAlert(cid);
-    }
-    refreshRhythmTrack();
-  }
+  endRhythmBlockNow(dk,idx);
   refreshAfternoonHome();
 }
 // 오후 홈이 화면에 있을 때만 본문 전체를 다시 그림(리듬/식사/할 일이 바뀐 직후 호출).
@@ -6817,14 +6885,10 @@ function makeAfternoonDock(){
   nav.className='afl-dock';nav.setAttribute('aria-label','빠른 기록');
   nav.innerHTML=`<button onclick="quickMealCheck()" aria-label="식사 체크"><i class="ti ti-tools-kitchen-2" aria-hidden="true"></i><span>식사</span></button>
     <button onclick="openNewMemoFromHome()" aria-label="메모"><i class="ti ti-pencil" aria-hidden="true"></i><span>메모</span></button>
-    <button class="afl-dock-plus" onclick="openAfternoonRhythmSheet()" aria-label="리듬 기록 추가"><i class="ti ti-plus" aria-hidden="true"></i></button>
+    <button class="afl-dock-plus" onclick="openTodayRhythmSheet()" aria-label="리듬 기록 추가"><i class="ti ti-plus" aria-hidden="true"></i></button>
     <button onclick="openAfternoonTodoSheet()" aria-label="남은 할 일"><i class="ti ti-checklist" aria-hidden="true"></i><span>할 일</span></button>
     <a href="https://claude.ai/new" target="_blank" rel="noopener" aria-label="Claude 열기"><i class="ti ti-message-chatbot" aria-hidden="true"></i><span>Claude</span></a>`;
   return nav;
-}
-function openAfternoonRhythmSheet(){
-  const dk=dateKey(getLogicalDate());
-  openHomeDetailSheet('오늘의 리듬 기록',function(){return buildDailyRhythmTrackFresh(dk);});
 }
 // 식사 — 지금 시각에 가장 가까운 끼니(아침~10:30, 점심~14:30, 간식~17:00, 이후 저녁)를 정하고, 이미 기록된 끼니면 다음 미기록 끼니로. 토스트로 확인 후 시간만 체크.
 let _quickMealKey=null,_quickMealTimer=null;
@@ -6878,7 +6942,7 @@ function openNewMemoFromHome(){
 // 남은 할 일 시트 — 오늘 미완료 할 일(일정 제외)을 목록으로 보여주고, 누르면 기존 완료 처리(toggleTodoAt)로 체크.
 function _aflTodoRowsHtml(dk){
   const rows=[];
-  getTodos(dk).forEach((t,i)=>{if(!t.isEvent&&!t.done)rows.push(`<div class="afl-todo-row" onclick="checkAfternoonTodo(${i},'${t.cid||''}')"><span class="afl-todo-ck"></span><span class="afl-todo-text">${escapeHtml(t.text||'')}</span></div>`);});
+  getTodos(dk).forEach((t,i)=>{if(!t.isEvent&&!t.done)rows.push(`<div class="afl-todo-row" onclick="checkAfternoonTodo(${i},'${escapeAttr(t.cid||'')}')"><span class="afl-todo-ck"></span><span class="afl-todo-text">${escapeHtml(t.text||'')}</span></div>`);});
   return rows.length?rows.join(''):'<div class="afl-todo-empty">남은 할 일이 없어요</div>';
 }
 function openAfternoonTodoSheet(){
@@ -6897,100 +6961,17 @@ function checkAfternoonTodo(i,cid){
   if(w)w.innerHTML=_aflTodoRowsHtml(dk);
   refreshAfternoonHome();
 }
-// ── 채움로그 연동 배너 (읽기 전용 조회만 수행) ──
-async function fetchChaeumInProgress(){
-  try{
-    const res=await fetch(`${CHAEUM_SUPA_URL}/rest/v1/sessions?status=eq.in_progress&order=created_at.desc&limit=1`,{
-      headers:{'apikey':CHAEUM_SUPA_KEY,'Authorization':`Bearer ${CHAEUM_SUPA_KEY}`}
-    });
-    if(!res.ok)return null;
-    const rows=await res.json();
-    return rows[0]||null;
-  }catch(err){
-    console.error('채움로그 조회 실패',err);
-    return null;
-  }
-}
-async function fetchChaeumTimeline(limit){
-  try{
-    const res=await fetch(`${CHAEUM_SUPA_URL}/rest/v1/sessions?order=created_at.desc&limit=${limit||30}`,{
-      headers:{'apikey':CHAEUM_SUPA_KEY,'Authorization':`Bearer ${CHAEUM_SUPA_KEY}`}
-    });
-    if(!res.ok)return [];
-    return await res.json();
-  }catch(err){
-    console.error('채움로그 타임라인 조회 실패',err);
-    return [];
-  }
-}
-function openChaeumTimelineSheet(){
-  let sheet=document.getElementById('chaeum-timeline-modal');
-  if(!sheet){
-    sheet=document.createElement('div');
-    sheet.className='overlay';sheet.id='chaeum-timeline-modal';
-    sheet.setAttribute('onclick',"closeSheet('chaeum-timeline-modal',event)");
-    sheet.innerHTML=`<div class="bsheet" style="max-height:80vh;overflow-y:auto;background:${CHAEUM_TONE.paper||CHAEUM_TONE.bg};" onclick="event.stopPropagation()">
-      <div class="sheet-handle"></div>
-      <div style="padding:0 20px 20px;">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
-          <i class="ti ti-leaf" style="font-size:20px;color:${CHAEUM_TONE.sage};" aria-hidden="true"></i>
-          <span style="font-size:var(--main-text-size);font-weight:600;color:${CHAEUM_TONE.ink};flex:1;">채움로그 타임라인</span>
-        </div>
-        <div id="chaeum-timeline-list" style="display:flex;flex-direction:column;gap:2px;">불러오는 중…</div>
-      </div>
-    </div>`;
-    document.body.appendChild(sheet);
-  }
-  openSheet('chaeum-timeline-modal');
-  fetchChaeumTimeline(30).then(rows=>{
-    const list=document.getElementById('chaeum-timeline-list');
-    if(!list)return;
-    if(!rows.length){
-      list.innerHTML=`<div style="color:${CHAEUM_TONE.muted};padding:10px 0;font-size:var(--main-text-size);">아직 채운 기록이 없어요</div>`;
-      return;
-    }
-    list.innerHTML=rows.map((row,idx)=>{
-      const meta=CHAEUM_CAT_META[row.category]||{icon:'ti-tag',color:CHAEUM_TONE.sage};
-      const inProgress=row.status==='in_progress';
-      const hasSummary=!!row.brief_summary;
-      return `<div style="padding:9px 0;border-bottom:1px solid ${CHAEUM_TONE.line};">
-        <div style="display:flex;gap:10px;align-items:flex-start;${hasSummary?'cursor:pointer;':''}" ${hasSummary?`onclick="toggleChaeumSummary(${idx})"`:''}>
-          <div style="width:32px;height:32px;border-radius:8px;background:${meta.color}22;flex-shrink:0;display:flex;align-items:center;justify-content:center;margin-top:1px;">
-            <i class="ti ${meta.icon}" style="font-size:14px;color:${meta.color};" aria-hidden="true"></i>
-          </div>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:var(--main-text-size);font-weight:500;color:${CHAEUM_TONE.ink};">${escapeHtml(row.short_title||row.title||'')}${inProgress?` <span style="font-size:var(--dow-label-size);color:${CHAEUM_TONE.sage};">· 진행중</span>`:''}</div>
-            <div style="font-size:var(--dow-label-size);color:${CHAEUM_TONE.subInk};margin-top:2px;">${escapeHtml(row.date_key||'')} · ${escapeHtml(row.category||'')}</div>
-          </div>
-          ${hasSummary?`<i id="chaeum-sum-chevron-${idx}" class="ti ti-chevron-down" style="font-size:14px;color:${CHAEUM_TONE.muted};flex-shrink:0;margin-top:4px;transition:transform .2s;" aria-hidden="true"></i>`:''}
-        </div>
-        ${hasSummary?`<div id="chaeum-sum-${idx}" style="display:none;font-size:var(--dow-label-size);color:${CHAEUM_TONE.subInk};margin-top:6px;margin-left:42px;line-height:1.5;">${escapeHtml(row.brief_summary)}</div>`:''}
-      </div>`;
-    }).join('');
-  });
-}
-function toggleChaeumSummary(idx){
-  const box=document.getElementById(`chaeum-sum-${idx}`);
-  const chevron=document.getElementById(`chaeum-sum-chevron-${idx}`);
-  if(!box)return;
-  const open=box.style.display==='block';
-  box.style.display=open?'none':'block';
-  if(chevron)chevron.style.transform=open?'rotate(0deg)':'rotate(180deg)';
-}
-// 저녁 파트1용 저녁 플리 미니카드 — 전체 기간 등록된 음악(cat=music) 중 매일 하나씩 랜덤으로(날짜 기준 시드 고정, 하루 동안 유지) 노출.
-// Supabase에서 content_cat=eq.music으로 직접 필터링해 조회 — 로컬 월별 스캔 없이 단순하게.
 // ══════════════════════════════════════════════════════════
 // ██ 저녁 홈 — 리포트 배너 / 오늘의 꽃 / 오늘 저녁엔 / (습관·리듬은 공용 카드) ██
 // ══════════════════════════════════════════════════════════
-// 일요일 22시 이후엔 주간 돌아보기, 말일 22시~새벽엔 이번 달 누계 배너를 인사카드 바로 아래에 띄움(그 외엔 null).
-// getLogicalDate()는 새벽 4시 컷이라 논리적 요일/말일 판정에 사용(물리적 getDay() 대신).
+// 일요일 22시 이후엔 주간 돌아보기, 말일 22시 이후엔 이번 달 누계 배너를 인사카드 바로 아래에 띄움(그 외엔 null).
+// 저녁 홈(19~24시)에서만 그려지므로 "22시 이후" = night_2 슬롯. getLogicalDate()는 새벽 4시 컷이라 논리적 요일/말일 판정에 사용(물리적 getDay() 대신).
 function makeEveningReportBanner(){
+  if(getHomeTimeSlot()!=='night_2')return null;
   const ld=getLogicalDate();
-  const h=new Date().getHours();
-  const lateNight=h>=22||h<6;
   const nextDay=new Date(ld);nextDay.setDate(ld.getDate()+1);
-  const isLastDayOfMonth=nextDay.getDate()===1&&lateNight;
-  const isSundayNight=ld.getDay()===0&&getSubSection()==='night_2';
+  const isLastDayOfMonth=nextDay.getDate()===1;
+  const isSundayNight=ld.getDay()===0;
   if(!isLastDayOfMonth&&!isSundayNight)return null;
   const month=isLastDayOfMonth;
   const b=document.createElement('div');b.className='ev-report';
@@ -7000,7 +6981,6 @@ function makeEveningReportBanner(){
   b.addEventListener('click',month?openMonthlyReportSheet:openWeeklyReviewSheet);
   return b;
 }
-// 수기 블록 하나의 소요시간(분) — 끝시각이 없으면(진행중) null
 // 수면 꽃잎 채움 정도 — 수면 점수(앱의 5단계 구간)를 따름. 점수가 없으면 기록 여부로 가득/비움.
 function _evSleepFrac(sl,sd){
   if(sl&&sl.score!=null){
@@ -7017,7 +6997,7 @@ function getEveningPetals(dk){
   const blocks=getRhythmBlocks(dk);
   const sumMin=list=>list.reduce((a,b)=>a+_blockDurMin(b),0);
   const exBlocks=blocks.filter(b=>b.cat==='exercise');
-  const rdBlocks=blocks.filter(b=>b.cat==='enjoy'&&b.text&&b.text.startsWith('독서'));
+  const rdBlocks=blocks.filter(b=>b.cat==='enjoy'&&parseEnjoyBlockText(b.text).cat==='book');
   const exMin=sumMin(exBlocks),rdMin=sumMin(rdBlocks);
   const habits=getActiveHabits();
   const ld=getLogicalDate(),checks=getHabitChecks(weekKey(ld)),dow=(ld.getDay()+6)%7;
@@ -7039,17 +7019,18 @@ function _evMoodIcon(ratio){
   if(ratio<0.85)return 'ti-mood-smile-beam';
   return 'ti-mood-happy';
 }
+// 꽃잎 한 장 — 길쭉한 타원(위쪽 방향, 아래쪽은 가운데 원 아래로 겹침). 6장 모두 같은 길이·너비·간격(60°)으로 같은 모양을 돌려서 씀.
+const EV_PETAL_PATH='M120 29A24 47 0 0 1 120 123A24 47 0 0 1 120 29Z';
 // 오늘의 꽃 — 왼쪽 꽃, 오른쪽 6개 기록 현황(반반)
 function makeEveningFlowerCard(){
   const dk=dateKey(getLogicalDate());
   const petals=getEveningPetals(dk);
   const ratio=petals.reduce((a,p)=>a+p.frac,0)/petals.length;
   const petalSvg=petals.map((p,i)=>{
-    const rot=i?` transform="rotate(${i*60} 120 120)"`:'';
-    const base=`cx="120" cy="72" rx="32" ry="38"${rot}`;
-    if(p.frac<=0)return `<ellipse ${base} fill="none" stroke="var(--pal-${p.pal}-border)" stroke-width="1.5" stroke-dasharray="5 4"></ellipse>`;
+    const base=`d="${EV_PETAL_PATH}" transform="rotate(${i*60} 120 120)" stroke-linejoin="round"`;
+    if(p.frac<=0)return `<path ${base} fill="none" stroke="var(--pal-${p.pal}-border)" stroke-width="1.5" stroke-dasharray="5 4"></path>`;
     const a=p.frac>=1?0.9:0.25+0.6*p.frac;
-    return `<ellipse ${base} fill="rgba(var(--pal-${p.pal}-rgb),${a.toFixed(2)})" stroke="var(--pal-${p.pal}-border)" stroke-width="1.5"></ellipse>`;
+    return `<path ${base} fill="rgba(var(--pal-${p.pal}-rgb),${a.toFixed(2)})" stroke="var(--pal-${p.pal}-border)" stroke-width="1.5"></path>`;
   }).join('');
   const legend=petals.map(p=>{
     const dot=p.frac<=0
@@ -7057,7 +7038,7 @@ function makeEveningFlowerCard(){
       :`background:rgba(var(--pal-${p.pal}-rgb),${(p.frac>=1?0.95:0.30+0.5*p.frac).toFixed(2)});border:1px solid var(--pal-${p.pal}-border);`;
     return `<div class="ev-leg"><span class="ev-leg-dot" style="${dot}"></span><span class="ev-leg-name">${p.label}</span><span class="ev-leg-val">${p.val}</span></div>`;
   }).join('');
-  const wrap=document.createElement('div');
+  const wrap=document.createElement('div');wrap.id='evening-flower-card';
   wrap.appendChild(makeLabel('오늘의 꽃'));
   const card=document.createElement('div');card.className='ev-flower';
   card.innerHTML=`<div class="ev-flower-art">
@@ -7082,7 +7063,7 @@ function _evContentRow(o){
   el.querySelector('.ev-cbtn').addEventListener('click',o.onclick);
   return el;
 }
-// 음악을 제외한 진행중 콘텐츠(독서·드라마/영화·채움로그)를 한 줄씩 쌓아서 보여줌
+// 음악을 제외한 진행중 콘텐츠(독서·드라마/영화)를 한 줄씩 쌓아서 보여줌
 function makeEveningContentRow(){
   const wrap=document.createElement('div');
   wrap.appendChild(makeLabel('오늘 저녁엔'));
@@ -7098,11 +7079,6 @@ function makeEveningContentRow(){
     list.appendChild(_evContentRow({poster:watching.poster,icon:isDrama?'ti-device-tv':'ti-movie',pal1:'pink',pal2:'yellow',
       kicker:(isDrama?'드라마':'영화')+(watching.totalUnit?' · 총 '+watching.totalUnit+(isDrama?'화':'분'):''),title:watching.title,pct:pct,btn:'이어 보기',btnPal:'pink',onclick:()=>openContentHub()}));
   }
-  fetchChaeumInProgress().then(r=>{ // 채움로그 — 진행중인 세션이 있을 때만
-    if(!r)return;
-    list.appendChild(_evContentRow({icon:'ti-leaf',pal1:'lime',pal2:'yellow',kicker:'채움로그 · 진행중',title:r.short_title||r.title||'',
-      btn:'열기',btnPal:'lime',onclick:()=>openChaeumTimelineSheet()}));
-  });
   wrap.appendChild(list);
   return wrap;
 }
@@ -7384,18 +7360,16 @@ function makeDawnPage(){
   // 오늘 본 콘텐츠 — 감상 블록 중 텍스트가 있는 것. "분류 - 제목" 형식이면 분할, 같은 작품은 시간 합산
   const merged=new Map();
   rblocks.filter(b=>b.cat==='enjoy'&&b.text).forEach(b=>{
-    const m=b.text.match(/^(.+?)\s*-\s*(.+)$/);
-    const cat=m?m[1].trim():'',title=m?m[2].trim():b.text,key=cat+'|'+title;
-    const cur=merged.get(key)||{cat,title,dur:0};
+    const {cat,label,title}=parseEnjoyBlockText(b.text),key=label+'|'+title;
+    const cur=merged.get(key)||{cat,label,title,dur:0};
     cur.dur+=_blockDurMin(b);merged.set(key,cur);
   });
   if(merged.size){
-    const catKey={'독서':'book','드라마':'drama','영화':'movie','음악':'music'};
     html+=`<div class="dw-sec"><div class="dw-label"><i class="ti ${RHYTHM_CATS.enjoy.icon}" aria-hidden="true"></i> 오늘 본 콘텐츠</div>`;
     merged.forEach(c=>{
-      const k=catKey[c.cat];
       const dur=c.dur>0?(Math.floor(c.dur/60)?Math.floor(c.dur/60)+'h ':'')+(c.dur%60?c.dur%60+'m':''):'';
-      html+=`<div class="recap-content-item"><span class="cdot" style="background:${k?getCatDotColor(k):'rgba(190,160,230,0.55)'};"></span>${escapeHtml(c.cat||'감상')}<span class="ctime">${escapeHtml(c.title)}${dur?' · '+dur.trim():''}</span></div>`;
+      const tail=[c.title,dur.trim()].filter(Boolean).join(' · ');
+      html+=`<div class="recap-content-item"><span class="cdot" style="background:${c.cat?getCatDotColor(c.cat):'rgba(190,160,230,0.55)'};"></span>${escapeHtml(c.label||'감상')}<span class="ctime">${escapeHtml(tail)}</span></div>`;
     });
     html+=`</div>`;
   }
@@ -7477,14 +7451,11 @@ function toggleTodoAt(dk,i,expectedCid){
   }
 }
 
-// 투두/습관 체크 등으로 오늘 활동 분포가 바뀌었을 때 저녁 홈탭의 점 타임라인 카드를 새로 그려 교체.
-// 카드가 화면에 없으면(다른 화면이거나 데이터가 비어 카드 자체가 없던 경우) 조용히 무시.
-function refreshDotTimelineCard(){
-  const old=document.getElementById('home-dot-timeline-card');
-  if(!old)return;
-  const fresh=makeDotTimelineCard();
-  if(fresh)old.replaceWith(fresh);
-  else old.remove();
+// 습관을 체크하면 오늘의 꽃(습관 꽃잎)도 바로 바뀌어야 하므로 저녁 홈의 꽃 카드만 새로 그려 교체.
+// 카드가 화면에 없으면(다른 시간대 홈이거나 다른 화면이면) 조용히 무시.
+function refreshEveningFlowerCard(){
+  const old=document.getElementById('evening-flower-card');
+  if(old)old.replaceWith(makeEveningFlowerCard());
 }
 function makeHabitMiniCheckRow(){
   const wrap=document.createElement('div');
@@ -7508,7 +7479,7 @@ function makeHabitMiniCheckRow(){
       toggleHabitCheckWithTime(wk,h.id,dow,dateKey(_ld));
       const fresh=makeHabitMiniCheckRow();
       wrap.replaceWith(fresh);
-      refreshDotTimelineCard();
+      refreshEveningFlowerCard();
       if(document.getElementById('v-monthly')&&document.getElementById('v-monthly').classList.contains('on'))renderHabitMonthly();
       if(document.getElementById('v-weekly')&&document.getElementById('v-weekly').classList.contains('on'))renderWeeklyHabitBox();
     });
@@ -11307,11 +11278,12 @@ function renderWeeklyHabitBox(){
 let _calSyncBusy=false;
 let _calSyncLast=0;
 const CAL_SYNC_MIN_MS=5*60*1000; // 조용한 자동 동기화의 최소 간격(버튼은 제한 없음)
-const APP_BUILD='v2.57 · 20261023a'; // 규칙 시트 맨 아래에 표시 — 기기에 올라간 앱 파일이 최신인지 확인하는 용도(index.html의 app.js?v= 값과 함께 올림)
+const CAL_SYNC_TIMEOUT_MS=25000; // 서버 응답이 멈춰도 _calSyncBusy가 영영 안 풀려 이후 동기화가 전부 막히는 일을 방지
+// 규칙 시트 맨 아래에 표시 — 기기에 올라간 앱 파일이 최신인지 확인하는 용도. index.html의 <script src="app.js?v=…"> 값을 그대로 읽어 수동 갱신이 필요 없음
+const APP_BUILD=(()=>{const s=document.querySelector('script[src*="app.js"]');const m=s&&/[?&]v=([^&]+)/.exec(s.getAttribute('src'));return m?m[1]:'?';})();
 let _calRules=null;        // calendar_sync_rules 한 줄(제외 단어, 캘린더별 on/off)
 let _calSyncMeta=null;     // calendar_sync_meta 한 줄(마지막 확인 시각)
 const CAL_SYNC_CAL={schedule:'스케줄',travel:'여행',work:'업무'};
-function _cdEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function _cdNorm(s){return String(s||'').normalize('NFKC').toLowerCase().replace(/[\s​-‍﻿]+/g,'');} // 서버 함수의 norm과 동일 규칙
 function calSyncIconHtml(){
   return `<span class="cal-sync-btn${_calSyncBusy?' spin':''}" id="cal-sync-btn" onclick="event.stopPropagation();calSyncTap();" onpointerdown="event.stopPropagation();calSyncPress();" onpointerup="calSyncRelease()" onpointerleave="calSyncRelease()" onpointercancel="calSyncRelease()" oncontextmenu="return false;" aria-label="애플 캘린더와 동기화"><i class="ti ti-arrows-exchange" aria-hidden="true"></i></span>`;
@@ -11334,13 +11306,17 @@ function calSyncTap(){
 // opts.silent=true: 자동(조용히, 5분 간격 제한, 바뀐 게 있을 때만 알림) / false: 버튼(항상 서버 확인 + 로컬 다시 받기 + 알림)
 async function syncAppleCalendar(opts){
   const silent=!!(opts&&opts.silent);
-  if(_calSyncBusy)return;
+  if(_calSyncBusy){if(!silent)showToast('동기화 중이에요');return;}
   if(!navigator.onLine){if(!silent)showToast('오프라인이에요');return;}
   if(silent&&(Date.now()-_calSyncLast<CAL_SYNC_MIN_MS||window._restoring))return;
   _calSyncBusy=true;_calSyncLast=Date.now();_calSyncSpin(true);
   try{
-    const res=await fetch(SUPA_URL+'/functions/v1/compare-calendars',{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}});
-    let j=null;try{j=await res.json();}catch(e){}
+    const ctrl=new AbortController();const timer=setTimeout(()=>ctrl.abort(),CAL_SYNC_TIMEOUT_MS);
+    let res,j=null;
+    try{
+      res=await fetch(SUPA_URL+'/functions/v1/compare-calendars',{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY},signal:ctrl.signal});
+      j=await res.json().catch(()=>null);
+    }finally{clearTimeout(timer);}
     if(!res.ok||!j||j.ok===false){if(!silent)showToast('애플 캘린더를 확인하지 못했어요');return;}
     const a=j.auto||{added:0,updated:0,deleted:0};
     const changed=(a.added||0)+(a.updated||0)+(a.deleted||0)>0;
@@ -11389,7 +11365,7 @@ function renderCalRuleSheet(){
     const d=new Date(_calSyncMeta.last_run_at);
     last=`마지막 확인 ${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`+(_calSyncMeta.last_ok===false?' (일부 실패)':'');
   }
-  let h=`<div class="cdf-head"><div><div class="cdf-h1">애플 캘린더 연동</div><div class="cdf-h2">${_cdEsc(last)}</div></div></div>`;
+  let h=`<div class="cdf-head"><div><div class="cdf-h1">애플 캘린더 연동</div><div class="cdf-h2">${escapeHtml(last)}</div></div></div>`;
   h+=_calRules?_cdRulesHtml():'<div class="cdf-note" style="padding:20px;text-align:center;">불러오는 중…</div>';
   h+=`<div class="cdf-ver">앱 ${APP_BUILD}</div>`;
   el.innerHTML=h;
@@ -11397,7 +11373,7 @@ function renderCalRuleSheet(){
 function _cdRulesHtml(){
   const r=_calRules;
   const ce=r.cal_enabled||{};
-  const words=(r.exclude_words||[]).map((w,i)=>`<span class="cdf-chip">${_cdEsc(w)}<i class="ti ti-x" onclick="calRuleDelWord(${i})" aria-hidden="true"></i></span>`).join('');
+  const words=(r.exclude_words||[]).map((w,i)=>`<span class="cdf-chip">${escapeHtml(w)}<i class="ti ti-x" onclick="calRuleDelWord(${i})" aria-hidden="true"></i></span>`).join('');
   const calBtn=k=>`<button class="cdf-btn${ce[k]!==false?' main':''}" onclick="calRuleToggleCal('${k}')">${CAL_SYNC_CAL[k]} ${ce[k]!==false?'켬':'끔'}</button>`;
   return `<div class="cdf-rules">
     <div class="cdf-rule-lab">가져올 캘린더</div>
@@ -11405,11 +11381,16 @@ function _cdRulesHtml(){
     <div class="cdf-rule-lab">제목에 있으면 가져오지 않는 단어</div>
     <div class="cdf-chips">${words||'<span class="cdf-note">없음</span>'}</div>
     <div class="cdf-add"><input id="cdf-word-inp" type="text" placeholder="단어 추가" autocomplete="off" onkeydown="if(event.isComposing||event.keyCode===229)return;if(event.key==='Enter'){event.preventDefault();calRuleAddWord();}"><button class="cdf-btn main" onclick="calRuleAddWord()">추가</button></div>
-    <div class="cdf-note" style="margin-top:8px;">제목에 <b>${_cdEsc(r.pending_mark||'?')}</b>가 있으면 미정으로 보고 가져오지 않아요. 이미 가져온 일정에 ${_cdEsc(r.pending_mark||'?')}를 붙이면 iikoto에서도 지워져요. 규칙은 다음 동기화 때 적용돼요.</div>
+    <div class="cdf-note" style="margin-top:8px;">제목에 <b>${escapeHtml(r.pending_mark||'?')}</b>가 있으면 미정으로 보고 가져오지 않아요. 이미 가져온 일정에 ${escapeHtml(r.pending_mark||'?')}를 붙이면 iikoto에서도 지워져요. 규칙은 다음 동기화 때 적용돼요.</div>
   </div>`;
 }
+let _cdSaving=false; // 연타로 같은 옛 규칙 위에 두 번 덮어써 한쪽 변경이 사라지는 것 방지
 async function _cdSaveRules(patch){
-  const ok=await supaFetch('calendar_sync_rules?id=eq.true','PATCH',{...patch,updated_at:new Date().toISOString()});
+  if(_cdSaving)return false;
+  _cdSaving=true;
+  let ok;
+  try{ok=await supaFetch('calendar_sync_rules?id=eq.true','PATCH',{...patch,updated_at:new Date().toISOString()});}
+  finally{_cdSaving=false;}
   if(ok===null){showToast('저장에 실패했어요');return false;}
   _calRules={..._calRules,...patch};
   renderCalRuleSheet();
@@ -11678,7 +11659,6 @@ function clearClaudeKey(){
     if(inp){inp.value='';inp.placeholder='sk-ant-api03-...';}
     const statusEl=document.getElementById('claude-key-status');
     if(statusEl)statusEl.textContent='날씨 인사 · 주간 루틴 · 일정 요약에 사용돼요';
-    _weatherCache=null;
     showToast('삭제됐어요');
   }catch(e){}
 }
@@ -14466,7 +14446,7 @@ _swSw.restoreFromStorage();
 // online/visibilitychange 이벤트를 기다리지 않고 여기서 한 번 동기화를 실행해 최신 상태로 맞춘다.
 if(navigator.onLine){
   syncAll();
-  cleanupOldGreetingCache(); // fire-and-forget — 실패해도 다음 앱 시작 때 재시도되므로 await로 초기화를 막지 않음
+  cleanupOldDailyCache(); // fire-and-forget — 실패해도 다음 앱 시작 때 재시도되므로 await로 초기화를 막지 않음
   processPhotoR2DeleteQueue(); // 지난 세션에서 R2 삭제가 실패해 대기열에 남은 사진이 있으면 재시도
 }
 
@@ -14607,6 +14587,7 @@ async function initSync(){
   refreshIfTabOpen('v-weekly',loadWeekly);
   refreshIfTabOpen('v-monthly',loadMonthly);
   _initSyncDone=true;
+  refreshHomeIfOpen(); // 첫 동기화가 끝난 시점에 홈이 열려 있으면 받아온 최신 데이터로 다시 그림
   maybeBackfillWeeklyReports(); // 지난주 리포트 보완 생성(월요일 한정) — 동기화로 지난주 데이터가 최신이 된 직후
 }
 setTimeout(initSync, 500);
