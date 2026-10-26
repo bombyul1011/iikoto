@@ -6961,26 +6961,38 @@ function _evContentRow(o){
       <div class="ev-ctitle">${escapeHtml(o.title)}</div>
       ${o.pct!=null?`<div class="ev-cbar"><div style="width:${o.pct}%;background:rgba(var(--pal-${o.btnPal}-rgb),0.95);"></div></div>`:''}
     </div>
-    <button class="ev-cbtn" style="background:rgba(var(--pal-${o.btnPal}-rgb),0.32);border-color:var(--pal-${o.btnPal}-border);color:var(--pal-${o.btnPal}-text);">${o.btn}</button>`;
+    ${o.live
+      ?`<button class="ev-cbtn ev-cbtn-live${o.liveKind==='read'?' ev-cbtn-live-read':''}"><i class="ti ti-player-play-filled" aria-hidden="true"></i>${o.btn}</button>`
+      :`<button class="ev-cbtn" style="background:rgba(var(--pal-${o.btnPal}-rgb),0.32);border-color:var(--pal-${o.btnPal}-border);color:var(--pal-${o.btnPal}-text);">${o.btn}</button>`}`;
   if(o.poster)el.querySelector('.ev-cframe img').src=o.poster;
   el.querySelector('.ev-cbtn').addEventListener('click',o.onclick);
   return el;
 }
+// 시청 시작/종료/복원 때 홈 저녁 배너 줄만 제자리 교체(홈이 저녁 상태로 떠 있을 때만 존재)
+function _refreshEveningContentRow(){
+  const old=document.getElementById('evening-content-row');
+  if(old)old.replaceWith(makeEveningContentRow());
+}
 // 음악을 제외한 진행중 콘텐츠(독서·드라마/영화)를 한 줄씩 쌓아서 보여줌
 function makeEveningContentRow(){
-  const wrap=document.createElement('div');
+  const wrap=document.createElement('div');wrap.id='evening-content-row';
   wrap.appendChild(makeLabel('오늘 저녁엔'));
   const list=document.createElement('div');list.className='ev-clist';
-  const book=getBooks().find(b=>b.status==='reading');
+  const readingBooks=getBooks().filter(b=>b.status==='reading');
+  const book=(_swRunning&&_swBookCid&&readingBooks.find(b=>b.cid===_swBookCid))||readingBooks[0];
+  const bookLive=!!(book&&_swRunning&&_swBookCid===book.cid);
   list.appendChild(book
-    ?_evContentRow({poster:book.poster,icon:'ti-book',pal1:'sky',pal2:'lavender',kicker:'독서'+(book.author?' · '+book.author:''),title:book.title,pct:getBookProgressPct(book),btn:'이어 읽기',btnPal:'sky',onclick:()=>openReading()})
+    ?_evContentRow({poster:book.poster,icon:'ti-book',pal1:'sky',pal2:'lavender',kicker:'독서'+(book.author?' · '+book.author:''),title:book.title,pct:getBookProgressPct(book),btn:bookLive?'독서 중':'이어 읽기',live:bookLive,liveKind:'read',btnPal:'sky',onclick:()=>openReading()})
     :_evContentRow({icon:'ti-book',pal1:'sky',pal2:'lavender',kicker:'독서',title:'새 책 찾기',btn:'책 고르기',btnPal:'sky',onclick:()=>openReading()}));
-  const watching=_getOngoingWatchingWithCid()[0];
+  // 시청 스톱워치가 돌고 있으면 그 작품을 이 줄에 올리고(여러 편이어도), 버튼은 '시청 중' 라이브 표시로 바꿈
+  const ongoingW=_getOngoingWatchingWithCid();
+  const watching=(_cswRunning&&_cswCid&&ongoingW.find(c=>c.cid===_cswCid))||ongoingW[0];
   if(watching){
     const isDrama=watching.cat==='drama';
+    const isLive=!!(_cswRunning&&_cswCid&&_cswCid===watching.cid);
     const pct=watching.totalUnit?Math.round(Math.min(watching.currentUnit||0,watching.totalUnit)/watching.totalUnit*100):null;
     list.appendChild(_evContentRow({poster:watching.poster,icon:isDrama?'ti-device-tv':'ti-movie',pal1:'pink',pal2:'yellow',
-      kicker:(isDrama?'드라마':'영화')+(watching.totalUnit?' · 총 '+watching.totalUnit+(isDrama?'화':'분'):''),title:watching.title,pct:pct,btn:'이어 보기',btnPal:'pink',onclick:()=>openContentHub()}));
+      kicker:(isDrama?'드라마':'영화')+(watching.totalUnit?' · 총 '+watching.totalUnit+(isDrama?'화':'분'):''),title:watching.title,pct:pct,btn:isLive?'시청 중':'이어 보기',live:isLive,btnPal:'pink',onclick:()=>openContentHub()}));
   }
   wrap.appendChild(list);
   return wrap;
@@ -9787,6 +9799,7 @@ const _cswSw=createInstantCommitStopwatch({
     if(_chArchiveMk)chExpandMonth(_chArchiveMk);
     _cswSyncMirror(st);
     renderCwatchMainCard();
+    _refreshEveningContentRow();
   },
   onRestored:function(st,saved){
     // restoreFromStorage()가 st.running=true 등을 이미 확정한 뒤 호출 — 여기선 저장해둔 부가데이터만 채우고 렌더링.
@@ -9794,6 +9807,7 @@ const _cswSw=createInstantCommitStopwatch({
     document.querySelectorAll('.hub-icon-btn').forEach(el=>el.classList.add('cwatch-active'));
     _cswSyncMirror(st);
     renderCwatchMainCard();
+    _refreshEveningContentRow();
   },
   onStop:function(st,info){
     document.querySelectorAll('.hub-icon-btn').forEach(el=>el.classList.remove('cwatch-active'));
@@ -9802,6 +9816,7 @@ const _cswSw=createInstantCommitStopwatch({
     _cswSyncMirror(st);
     refreshContentHubViews();
     renderCwatchMainCard();
+    _refreshEveningContentRow();
     openContentProgressModal(info.cid,minutesWatched,info.seconds); // 시간 문턱 없이 항상 띄움(리듬블록도 항상 생성되므로 일관되게)
   }
 });
@@ -11823,11 +11838,13 @@ const _swSw=createInstantCommitStopwatch({
     }
     document.querySelector('.reading-icon-btn')?.classList.add('sw-active');
     _swSyncMirror(st);
+    _refreshEveningContentRow();
     renderRdTop(); // DOM 갱신은 이 한 곳에서만 — running=true로 다시 그려지며 spinning/id 등이 자동 반영됨
   },
   onStop:function(st,info){
     document.querySelector('.reading-icon-btn')?.classList.remove('sw-active');
     _swSyncMirror(st);
+    _refreshEveningContentRow();
     renderRdTop();
     renderRdQuotes(); // 스톱워치 종료로 선택 대상이 바뀌므로(1권이면 그 책, 2권 이상이면 재선택 대기) 문장수집도 함께 갱신
     openProgressModal(info.cid,info.seconds); // 시간 문턱 없이 항상 띄움(리듬블록도 항상 생성되므로 일관되게)
@@ -11836,6 +11853,7 @@ const _swSw=createInstantCommitStopwatch({
     st.title=saved.title||'';
     st.seconds=Math.floor((Date.now()-st.startTs)/1000);
     _swSyncMirror(st);
+    _refreshEveningContentRow();
     renderRdTop();
   }
 });

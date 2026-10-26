@@ -1241,6 +1241,9 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
 .ev-cbar{height:3px;border-radius:2px;background:rgba(var(--divider-rgb),0.30);overflow:hidden;margin-top:6px;}
 .ev-cbar div{height:100%;border-radius:2px;}
 .ev-cbtn{flex-shrink:0;height:40px;padding:0 14px;border-radius:20px;border:1px solid;font-size:var(--dow-label-size);font-weight:500;cursor:pointer;font-family:inherit;}
+.ev-cbtn-live{display:inline-flex;align-items:center;gap:5px;background:linear-gradient(135deg,#c9e6a8,#dcefb8,#b9e4d0,#c9e6a8);background-size:300% 300%;animation:bannerShine 3s ease infinite;border-color:rgba(120,160,100,0.45);color:#4a6e35;} /* 콘텐츠 허브 시청중(.hub-icon-btn.cwatch-active)과 같은 민트/연두 그라데이션 */
+.ev-cbtn-live i{font-size:12px;}
+.ev-cbtn-live.ev-cbtn-live-read{background:linear-gradient(135deg,#ffd1e2,#ffe6b8,#e6e1f5,#ffd1e2);background-size:300% 300%;border-color:rgba(214,150,170,0.5);color:#8a5a6a;} /* 독서 허브 아이콘(.reading-icon-btn.sw-active)과 같은 분홍/노랑/라벤더 그라데이션 */
 /* ===== 홈탭 새벽: 오늘의 한 페이지 ===== */
 .dw-page{display:flex;flex-direction:column;border-radius:16px;padding:16px 16px 14px;margin-bottom:10px;background:var(--card);border:1px solid var(--card-b);}
 .dw-mast{display:flex;align-items:center;justify-content:space-between;}
@@ -2785,7 +2788,7 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
   </div>
 </div>
 
-<script src="app.js?v=20261026e"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
+<script src="app.js?v=20261026g"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
 
 </body>
 </html>
