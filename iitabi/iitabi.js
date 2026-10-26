@@ -264,7 +264,7 @@ function flush(){
     }else if(op.t==='tv'&&op.op==='del'){
       p=sf('todos?client_id=eq.'+enc(op.cid),'DELETE');
     }else if(op.t==='pm'&&op.op==='up'){  // 이이코토 메모(하루 지출 한 줄)
-      p=sf('memos?on_conflict=date_key,client_id','POST',[{date_key:op.date,memo_time:op.time,text:op.text,created:op.created,client_id:op.cid,photo_url:null,question:null}],'resolution=merge-duplicates,return=minimal');
+      p=sf('memos?on_conflict=date_key,client_id','POST',[{date_key:op.date,memo_time:op.time,text:op.text,created:op.created,client_id:op.cid,photo_url:null}],'resolution=merge-duplicates,return=minimal');
     }else if(op.t==='pm'&&op.op==='del'){
       p=sf('memos?client_id=eq.'+enc(op.cid),'DELETE');
     }else p=Promise.resolve(true);
@@ -331,7 +331,7 @@ function seedChecklist(){
 function pullMemos(){
   var t=trip();if(!t)return Promise.resolve();
   var ds_=tripDates().join(',');
-  return sf('memos?date_key=in.('+ds_+')&select=client_id,date_key,memo_time,text,photo_url,question,created&order=created').then(function(rows){
+  return sf('memos?date_key=in.('+ds_+')&select=client_id,date_key,memo_time,text,photo_url,created&order=created').then(function(rows){
     if(!rows)return;MEMOS=rows.filter(function(r){return String(r.client_id||'').indexOf(PAY_PRE)!==0});lset('memos:'+cfg.tripId,MEMOS);  // 이이타비가 만든 지출 메모는 화면에 다시 보이지 않게
   });
 }
@@ -443,7 +443,7 @@ function hasPhoto(m){return !!(m.photo_url&&/^https?:/.test(m.photo_url))}
 function photoThumb(m,size){
   return '<span class="mph" style="'+(size?'width:'+size+'px;height:'+size+'px':'')+'">'+ic('photo',20)+'<img class="mphi" loading="lazy" decoding="async" alt="" src="'+ea(m.photo_url)+'"></span>';
 }
-function memoText(m){return (m.question?'<div class="small muted" style="margin-bottom:2px">'+esc(m.question)+'</div>':'')+(m.text?esc(m.text).replace(/\n/g,'<br>'):(hasPhoto(m)?'<span class="muted">사진</span>':''))}
+function memoText(m){return (m.text?esc(m.text).replace(/\n/g,'<br>'):(hasPhoto(m)?'<span class="muted">사진</span>':''))}
 function memoHtml(list){
   if(!list.length)return '<div class="small muted">iikoto에서 쓴 메모가 여기에 시간순으로 보여요. (읽기 전용)</div>';
   var sorted=list.slice().sort(byMemoTime);
