@@ -6794,14 +6794,27 @@ function _aflStartTicker(){
     if(++n%60===0)flow.replaceWith(makeAfternoonFlowCard());
   },1000);
 }
+// 진행 타이머의 시작 시각(ms). 블록의 start는 "HH:MM"(분 단위)라 그대로 쓰면 시작한 초만큼 이미 흐른 채로 보임 —
+// 블록 생성 시각(created)이 같은 HH:MM이면 "지금 시작"으로 만든 블록이므로 그 정확한 시각(초 포함)을 씀.
+// 시작 시각을 직접 고쳐 만든 블록(created와 분이 다름)은 예전처럼 그 분의 0초로 계산.
+function _aflStartMs(b){
+  const sm=_dawnTimeToMin(b.start);
+  const c=Number(b.created);
+  if(c>0&&c<=Date.now()){
+    const cd=new Date(c);
+    if(cd.getHours()*60+cd.getMinutes()===sm&&Date.now()-c<86400000)return c;
+  }
+  const d=new Date();d.setHours(Math.floor(sm/60),sm%60,0,0);
+  if(d.getTime()>Date.now())d.setDate(d.getDate()-1);
+  return d.getTime();
+}
 function makeAfternoonNowCard(){
   const dk=dateKey(getLogicalDate());
   const b=_aflOngoingBlock(dk);
   if(!b)return null;
   const cat=RHYTHM_CATS[b.cat];
   const title=cat.label+(b.text&&b.text.trim()&&b.text.trim()!==cat.label?' · '+b.text.trim():'');
-  const sm=_dawnTimeToMin(b.start);
-  const startMs=(function(){const d=new Date();d.setHours(Math.floor(sm/60),sm%60,0,0);if(d.getTime()>Date.now())d.setDate(d.getDate()-1);return d.getTime();})();
+  const startMs=_aflStartMs(b);
   const card=document.createElement('div');
   card.className='afl-now';card.id='afternoon-now-card';
   card.innerHTML=`<div class="afl-now-top"><span class="afl-now-pill"><span class="afl-now-dot"></span>진행 중</span><span class="afl-now-start">${escapeHtml(b.start)} 시작</span></div>
@@ -6890,7 +6903,7 @@ function makeAfternoonDock(){
     <a href="https://claude.ai/new" target="_blank" rel="noopener" aria-label="Claude 열기"><i class="ti ti-message-chatbot" aria-hidden="true"></i><span>Claude</span></a>`;
   return nav;
 }
-// 식사 — 지금 시각에 가장 가까운 끼니(아침~10:30, 점심~14:30, 간식~17:00, 이후 저녁)를 정하고, 이미 기록된 끼니면 다음 미기록 끼니로. 토스트로 확인 후 시간만 체크.
+// 식사 — 지금 시각에 가장 가까운 끼니(아침~10:30, 점심~14:30, 간식~17:00, 이후 저녁)를 정하고, 이미 시간이 체크된 끼니면 다음 미체크 끼니로. 토스트로 확인 후 시간만 체크(메뉴명은 건드리지 않음).
 let _quickMealKey=null,_quickMealTimer=null;
 function _aflPickMealKey(dk){
   const m=getMeals(dk);
@@ -6899,18 +6912,19 @@ function _aflPickMealKey(dk){
   let base=t<630?0:t<870?1:t<1020?2:3;
   for(let i=0;i<order.length;i++){
     const k=order[(base+i)%order.length];
-    if(!(m[k+'_time']||m[k]))return k;
+    if(!m[k+'_time'])return k; // 시간 체크 여부만 기준 — 메뉴명만 미리 적어둔(예정) 끼니도 체크 대상
   }
   return null;
 }
 function quickMealCheck(){
   const dk=dateKey(getLogicalDate());
   const k=_aflPickMealKey(dk);
-  if(!k){showToast('오늘 식사를 모두 기록했어요');return;}
+  if(!k){showToast('오늘 식사 시간을 모두 체크했어요');return;}
   _quickMealKey=k;
   const t=document.getElementById('meal-quick-toast');
   if(!t)return;
-  document.getElementById('meal-quick-msg').textContent=MEAL_LABELS[k]+' 식사를 지금 시각으로 체크할까요?';
+  const menu=(getMeals(dk)[k]||'').trim();
+  document.getElementById('meal-quick-msg').textContent=MEAL_LABELS[k]+(menu?'('+menu+')':'')+' 식사를 지금 시각으로 체크할까요?';
   clearTimeout(_quickMealTimer);
   t.classList.add('on');
   _quickMealTimer=setTimeout(()=>{t.classList.remove('on');_quickMealKey=null;},5000);
