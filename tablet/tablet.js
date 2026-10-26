@@ -998,14 +998,11 @@ async function renderTodayMemos(dk,contents,finalReviews){
       return `<div class="memo-item${todClass}"><div class="memo-time-col"><div class="memo-time">${timeHtml}</div><div class="memo-content-poster" style="${posterStyle}">${posterIcon}</div></div><div class="memo-txt memo-txt-content"><div class="memo-content-title">${escapeHtml(m.contentTitle)}</div><div class="memo-content-txt">${escapeHtml(m.text)}</div></div></div>`;
     }
     // 사진메모 — 본앱 renderMemos와 동일 조건(photo_url 존재)·마크업(52px 썸네일+텍스트, placeholder→로드 시 페이드인, 텍스트 없으면 "사진")
-    // 질문 알림에 사진으로 답한 경우도 있어(본앱과 동일) 답변 위에 "Q." 줄을 함께 붙임(2026-09-25).
     if(m.photo_url){
-      const txt=(m.question?`<span class="memo-q">Q. ${escapeHtml(m.question)}</span>`:'')+escapeHtml(m.text||'');
-      return `<div class="memo-item${m.question?' memo-question':todClass}"><div class="memo-time">${timeHtml}</div><div class="memo-txt memo-txt-photo"><div class="memo-photo-wrap"><div class="memo-photo-placeholder"><i class="ti ti-photo" aria-hidden="true"></i></div><img class="memo-photo-thumb memo-photo-thumb-static" src="${m.photo_url}" alt="" loading="lazy" onload="this.classList.add('loaded');this.previousElementSibling.classList.add('hide');" onerror="this.previousElementSibling.classList.add('hide');"></div><span class="memo-photo-text">${txt}</span></div></div>`;
+      const txt=escapeHtml(m.text||'');
+      return `<div class="memo-item${todClass}"><div class="memo-time">${timeHtml}</div><div class="memo-txt memo-txt-photo"><div class="memo-photo-wrap"><div class="memo-photo-placeholder"><i class="ti ti-photo" aria-hidden="true"></i></div><img class="memo-photo-thumb memo-photo-thumb-static" src="${m.photo_url}" alt="" loading="lazy" onload="this.classList.add('loaded');this.previousElementSibling.classList.add('hide');" onerror="this.previousElementSibling.classList.add('hide');"></div><span class="memo-photo-text">${txt}</span></div></div>`;
     }
-    // 오늘의 질문(question) — 답변 위에 흐린 "Q. 질문" 한 줄을 붙이고, 세로선을 라임으로 구분(본앱과 동일, 2026-09-25).
-    const qHtml=m.question?`<span class="memo-q">Q. ${escapeHtml(m.question)}</span>`:'';
-    return `<div class="memo-item${m.question?' memo-question':todClass}"><div class="memo-time">${timeHtml}</div><div class="memo-txt">${qHtml}${escapeHtml(m.text)}</div></div>`;
+    return `<div class="memo-item${todClass}"><div class="memo-time">${timeHtml}</div><div class="memo-txt">${escapeHtml(m.text)}</div></div>`;
   }).join('');
   // 정렬 순서는 그대로(시간순) 두고, 첫 화면 노출은 최신(마지막) 메모가 보이도록 스크롤을 맨 아래로
   el.scrollTop=el.scrollHeight;

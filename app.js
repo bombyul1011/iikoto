@@ -2915,7 +2915,7 @@ async function supaUpsert(path,onConflict,body){
 }
 // ── AI 캐시 (서버 공유) ──
 // 목적: API 키가 있는 기기(주로 모바일)가 생성한 AI 문구를, 키가 없는 기기(주로 PC)도 그대로 볼 수 있게 서버에 저장.
-// 용량이 매우 작아(텍스트 위주, 무료 플랜 500MB 기준 수십 년치 여유) 리포트류(weekly/monthly/nutricomment 등)는 만료/삭제 없이 영구 보관.
+// 용량이 매우 작아(텍스트 위주, 무료 플랜 500MB 기준 수십 년치 여유) 리포트류(weekly/monthly 등)는 만료/삭제 없이 영구 보관.
 // 단, greeting_*(홈탭 인사카드)·dawnpage_*(새벽 페이지 고정 문구)는 예외 — 그날에만 조회되는 일일 캐시라
 // 오래된 것을 남겨둘 이유가 없음(아래 cleanupOldDailyCache 참고).
 async function aiCacheGet(cacheKey){
@@ -3344,7 +3344,7 @@ function saveTodosRaw(dk,v){
 saveTodos.raw=saveTodosRaw;
 function getMemos(dk){return S.get(S.key('memos',dk))||[];}
 // memos 서버 row → 로컬 저장 포맷 변환 (down/월간프리페치 공통 사용)
-function memoRowToLocal(r){return {time:r.memo_time,text:r.text,created:r.created,cid:r.client_id||genCid(),photoUrl:r.photo_url||undefined,question:r.question||undefined};}
+function memoRowToLocal(r){return {time:r.memo_time,text:r.text,created:r.created,cid:r.client_id||genCid(),photoUrl:r.photo_url||undefined};}
 function saveMemos(dk,v){
   S.set(S.key('memos',dk),v);
   S.set(S.key('memos_pending',dk),true);
@@ -3801,7 +3801,7 @@ async function syncMemosUp(dk){
   if(ensureItemCids(memos))S.set(S.key('memos',dk),memos);
   const delCids=getDelPendingCids('memos',dk);
   const ok=await syncListUpSafe('memos',`date_key=eq.${dk}`,'date_key,client_id',memos,
-    m=>({date_key:dk,memo_time:m.time,text:m.text,created:m.created,client_id:m.cid,photo_url:m.photoUrl||null,question:m.question||null}),
+    m=>({date_key:dk,memo_time:m.time,text:m.text,created:m.created,client_id:m.cid,photo_url:m.photoUrl||null}),
     delCids);
   if(ok)delCids.forEach(cid=>removeDelPending('memos',dk,cid));
   // 이 날짜에 아직 R2 업로드가 끝나지 않은 사진(pending_upload)이 있으면, 방금 photo_url=null로
@@ -4045,7 +4045,7 @@ async function syncContentsDownRaw(mk){
       const matched=localNoCidByKey[key];
       if(matched){l=matched;delete localNoCidByKey[key];}
     }
-    const serverItem={cat:r.content_cat,title:r.title,startDate:r.start_date||(r.start_day?mk+'-'+pad(r.start_day):null),endDate:r.end_date||(r.end_day?mk+'-'+pad(r.end_day):null),status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',musicUrl:r.music_url||null,album:r.album||null,releaseYear:r.release_year||null,totalUnit:r.total_unit||null,currentUnit:r.current_unit||null,notes:r.notes||[],reviewSavedDk:r.review_saved_dk||null,reviewSavedTime:r.review_saved_time||null,unitLabel:r.unit_label||null,readSeconds:r.read_seconds||0,watchedDaysCount:r.watched_days_count||null,watchSpanDays:r.watch_span_days||null,watchedSeconds:r.watched_seconds||null,created:r.created,cid,updatedAt:r.updated_at,lastActivityAt:r.last_activity_at||0};
+    const serverItem={cat:r.content_cat,title:r.title,startDate:r.start_date,endDate:r.end_date,status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',musicUrl:r.music_url||null,album:r.album||null,releaseYear:r.release_year||null,totalUnit:r.total_unit||null,currentUnit:r.current_unit||null,notes:r.notes||[],reviewSavedDk:r.review_saved_dk||null,reviewSavedTime:r.review_saved_time||null,unitLabel:r.unit_label||null,readSeconds:r.read_seconds||0,watchedDaysCount:r.watched_days_count||null,watchSpanDays:r.watch_span_days||null,watchedSeconds:r.watched_seconds||null,created:r.created,cid,updatedAt:r.updated_at,lastActivityAt:r.last_activity_at||0};
     if(!l){merged.push(serverItem);return;}
     // 로컬/서버 둘 다 있으면 updated_at(서버) vs 로컬수정시각 비교, 서버가 더 최신이거나 로컬에 수정시각 기록이 없으면 서버값 채택
     const localTs=l.updatedAt?new Date(l.updatedAt).getTime():0;
@@ -5091,14 +5091,13 @@ function closePhotoViewer(ev){
 // ── 리듬 활동 메모 제안 모달 (종료 시점 팝업 / 1시간 알림 클릭 공용) ──
 // 카테고리 구분은 RHYTHM_CATS[cat]의 color/icon/label을 그대로 사용 — 별도 색상 테이블 불필요.
 // 사진 첨부는 공용 _makePendingPhotoController(_rmemoPhotoCtl, 위에 정의)를 사용.
-let _rmemoCtx=null; // {dk, cat, (question일 때) question/qId/qKind} — 저장 시 어느 날짜의 오늘탭 메모에 넣을지
+let _rmemoCtx=null; // {dk, cat} — 저장 시 어느 날짜의 오늘탭 메모에 넣을지
 const RMEMO_SPECIAL_CATS={
-  sleep:{icon:'ti-moon',color:RHYTHM_SLEEP_COLOR,placeholder:'오늘 하루를 남겨보세요'}, // 리듬 수면 구간 색 재사용
-  question:{icon:'ti-sparkles',color:'rgba(var(--pal-lime-rgb),0.80)',placeholder:'떠오르는 대로 답을 남겨보세요'} // 메모 배너의 질문답변 세로선(연두)과 같은 색
+  sleep:{icon:'ti-moon',color:RHYTHM_SLEEP_COLOR,placeholder:'오늘 하루를 남겨보세요'} // 리듬 수면 구간 색 재사용
 };
 function openRhythmMemoModal(cat,dk,title,body){
   const catInfo=RHYTHM_CATS[cat];
-  const look=catInfo||RMEMO_SPECIAL_CATS[cat]; // 리듬 8종 또는 특수(취침 회고/오늘의 질문) — 둘 다 {color,icon}을 가짐
+  const look=catInfo||RMEMO_SPECIAL_CATS[cat]; // 리듬 8종 또는 특수(취침 회고) — 둘 다 {color,icon}을 가짐
   const iconWrap=document.getElementById('rmemo-icon');
   const iconI=document.getElementById('rmemo-icon-i');
   const submitBtn=document.getElementById('rmemo-submit-btn');
@@ -5117,113 +5116,9 @@ function openRhythmMemoModal(cat,dk,title,body){
   document.getElementById('rmemo-body').textContent=body||'';
   document.getElementById('rmemo-inp').value='';
   document.getElementById('rmemo-inp').placeholder=catInfo?`${catInfo.label} 메모를 남겨보세요`:(RMEMO_SPECIAL_CATS[cat]?RMEMO_SPECIAL_CATS[cat].placeholder:'메모를 남겨보세요');
-  const rerollBtn=document.getElementById('rmemo-reroll');if(rerollBtn)rerollBtn.style.display=(cat==='question')?'flex':'none';
   _rmemoCtx={dk:dk||dateKey(currentDate),cat};
   clearRhythmMemoPhotoPreview();
   document.getElementById('rhythm-memo-ov').classList.add('on');
-}
-// ══ 오늘의 질문 ══
-// 서버 memo_prompts 풀에서 질문 1개를 받아 메모 모달(rhythm-memo-ov)에 띄움. 앱은 "오늘 쓸 수 있는 상황 조건 이름"만 서버에 보내고
-// (실제 값은 보내지 않음), 받은 질문의 {빈칸}은 로컬 데이터로 직접 채움. 답변을 저장하는 순간 서버에서 사용 처리.
-const QUESTION_FALLBACK_TEXT='오늘 하루는 어땠나요?'; // 서버 연결 실패/풀 소진 시 기본 문구
-let _qSessionExcl=[]; // 이번 모달 세션에서 이미 보여준 질문 id — "다른 질문 받기"에서 제외(소모는 아님)
-function _qcSleepDurStr(dk){const m=sleepDurMin(getSleep(dk));return m==null?'':fmtDur(m);}
-function _qcBlockTitle(b,dk){
-  const item=b.contentCid&&getRecentMonthsContents(new Date(dk+'T00:00:00')).find(c=>c.cid===b.contentCid);
-  return (item&&item.title)||(b.text||'').replace(/^\s*(드라마|영화|독서|책|음악)\s*-\s*/,'').trim();
-}
-// 이 날짜(dk)에 쓸 수 있는 상황 조건 이름 목록 + 빈칸에 채울 값. 콘텐츠는 밤늦게 보는 경우가 많아 전날+당일 기록을 함께 봄.
-function _collectQuestionConds(dk){
-  const d=new Date(dk+'T00:00:00');
-  const list=[],vals={};
-  const mo=d.getMonth()+1,day=d.getDate(),last=new Date(d.getFullYear(),mo,0).getDate();
-  list.push('dow_'+d.getDay());
-  if(day<=5)list.push('month_start');
-  if(day>=last-4)list.push('month_end');
-  list.push('month_'+mo);
-  list.push('season_'+(mo>=3&&mo<=5?'spring':mo>=6&&mo<=8?'summer':mo>=9&&mo<=11?'autumn':'winter'));
-  if(isBirthdayDk(dk))list.push('birthday'); // 생일 당일 — 서버 pick_memo_prompt가 이 조건이 있으면 생일 질문을 최우선으로 뽑음
-  const prev=new Date(d);prev.setDate(prev.getDate()-1);
-  const prevDk=dateKey(prev);
-  // 콘텐츠(전날+당일 감상 기록 중 가장 최근)
-  let contentTitle='';
-  for(const x of [prevDk,dk]){
-    const eb=getRhythmBlocks(x).filter(b=>b.cat==='enjoy');
-    if(eb.length){const t=_qcBlockTitle(eb[eb.length-1],x);if(t)contentTitle=t;}
-  }
-  if(contentTitle){list.push('content');vals['콘텐츠제목']=contentTitle.slice(0,30);}
-  // 운동(당일) — 종류 메모가 없으면 빈칸은 괄호째 생략됨
-  const dayBlocks=getRhythmBlocks(dk);
-  const ex=dayBlocks.filter(b=>b.cat==='exercise');
-  if(ex.length){list.push('exercise');vals['운동종류']=(ex[ex.length-1].text||'').trim().slice(0,14);}
-  // 외출(당일 외출 블록 + 제목: 블록 메모 → 오늘 일정 순)
-  const ap=dayBlocks.filter(b=>b.cat==='appointment');
-  if(ap.length){
-    let title=(ap[ap.length-1].text||'').trim();
-    if(!title){const ev=getTodos(dk).find(t=>t.isEvent);if(ev)title=(parseTodoTextParts(ev.text).parts[0]||ev.text||'').trim();}
-    if(title){list.push('outing');vals['일정제목']=title.slice(0,20);}
-  }
-  const dur=_qcSleepDurStr(dk);
-  if(dur){list.push('sleep');vals['수면시간']=dur;}
-  const weatherWord=dk===dateKey(new Date())&&_homeWeatherCache&&(WMO_INFO[_homeWeatherCache.code]||[])[1];
-  if(weatherWord){list.push('weather');vals['날씨']=weatherWord;}
-  const photoCnt=getMemos(dk).filter(m=>m.photoUrl||m.photoLocalUrl).length;
-  if(photoCnt>0){list.push('photo');vals['사진개수']=String(photoCnt);}
-  const doneCnt=getTodos(dk).filter(t=>!t.isEvent&&t.done).length;
-  if(doneCnt>0){list.push('todo');vals['완료개수']=String(doneCnt);}
-  return {list,vals};
-}
-// 질문 문장의 {빈칸}을 채움. 값이 빈 "({키})"는 괄호째 제거, 그 외 채우지 못한 빈칸이 남으면 null(다른 질문 재요청).
-function _fillQuestionBlanks(text,vals){
-  let out=text;
-  Object.keys(vals).forEach(k=>{
-    const v=vals[k];
-    if(v===''||v==null)out=out.split('({'+k+'})').join('');
-    else out=out.split('{'+k+'}').join(v);
-  });
-  return /\{[^}]+\}/.test(out)?null:out;
-}
-async function _pickMemoQuestion(dk){
-  const conds=_collectQuestionConds(dk);
-  const lastKind=S.get('mprompt_last_kind')||null;
-  let excl=_qSessionExcl.slice();
-  for(let i=0;i<4;i++){
-    const rows=await supaFetch('rpc/pick_memo_prompt','POST',{p_conds:conds.list,p_exclude:excl,p_last_kind:lastKind});
-    const r=rows&&rows[0];
-    if(!r)return null;
-    const filled=_fillQuestionBlanks(r.text,conds.vals);
-    if(filled)return {id:r.id,text:filled,kind:r.kind};
-    excl.push(r.id); // 이 기기 데이터로 채울 수 없는 질문 — 제외하고 다시 요청
-  }
-  return null;
-}
-// dk: 답을 저장할 날짜(오늘탭 버튼은 보고 있는 날짜, 알림 클릭은 오늘)
-async function openQuestionMemo(dk){
-  dk=dk||dateKey(currentDate);
-  _qSessionExcl=[];
-  openRhythmMemoModal('question',dk,'질문을 고르고 있어요…','');
-  _rmemoCtx.question=null;_rmemoCtx.qId=null;_rmemoCtx.qKind=null;
-  await _applyMemoQuestion(dk);
-}
-async function _applyMemoQuestion(dk){
-  const q=await _pickMemoQuestion(dk);
-  if(!_rmemoCtx||_rmemoCtx.cat!=='question')return; // 그 사이 창을 닫았거나 다른 모드로 열린 경우
-  const titleEl=document.getElementById('rmemo-title');
-  if(q){
-    _qSessionExcl.push(q.id);
-    _rmemoCtx.question=q.text;_rmemoCtx.qId=q.id;_rmemoCtx.qKind=q.kind;
-    if(titleEl)titleEl.textContent=q.text;
-  }else{
-    // 서버 연결 실패/풀 소진 — 기본 문구(사용 처리 없음)
-    _rmemoCtx.question=QUESTION_FALLBACK_TEXT;_rmemoCtx.qId=null;_rmemoCtx.qKind=null;
-    if(titleEl)titleEl.textContent=QUESTION_FALLBACK_TEXT;
-  }
-}
-async function rerollMemoQuestion(){
-  if(!_rmemoCtx||_rmemoCtx.cat!=='question')return;
-  const btn=document.getElementById('rmemo-reroll');if(btn)btn.disabled=true;
-  await _applyMemoQuestion(_rmemoCtx.dk);
-  if(btn)btn.disabled=false;
 }
 function closeRhythmMemoModal(ev){
   if(ev&&ev.target.closest('.rhythm-memo-card'))return;
@@ -5248,7 +5143,6 @@ function submitRhythmMemo(){
   const stamp=`${pad(n.getHours())}:${pad(n.getMinutes())}`;
   const memos=getMemos(dk);
   const item={text,time:stamp,created:Date.now(),cid:genCid()};
-  if(_rmemoCtx.question)item.question=_rmemoCtx.question; // 오늘의 질문 — 질문 문장을 메모에 복사 저장(서버 풀이 바뀌어도 그대로 남음)
   if(photo){
     item.photoLocalUrl=photo.localUrl;
     item.photoStatus='pending_upload';
@@ -5258,11 +5152,6 @@ function submitRhythmMemo(){
   saveMemos(dk,memos);
   if(photo)queueMemoPhotoUpload(dk,item.cid,photo.blob,photo.ext);
   if(dk===dateKey(currentDate))renderMemos();
-  // 질문은 "답변을 저장한 순간"에만 사용 처리(닫기/다른 질문 받기는 소모하지 않음). 서버 연결 실패 시 조용히 넘어감.
-  if(_rmemoCtx.qId!=null){
-    supaFetch('rpc/mark_memo_prompt_used','POST',{p_id:_rmemoCtx.qId});
-    if(_rmemoCtx.qKind)S.set('mprompt_last_kind',_rmemoCtx.qKind);
-  }
   closeRhythmMemoModal();
 }
 // 뷰어 좌우 스와이프로 이전/다음 사진 넘기기 — 배열 양끝에서는 자연스럽게 멈춤(순환 안 함).
@@ -8430,7 +8319,7 @@ function renderMemos(){
   const list=document.getElementById('memo-list');if(!list)return;
   // 콘텐츠 감상메모/완결총평(표시 전용) — 일반 memos와 같은 목록에 섞여 시간순 정렬됨.
   const contentItems=getContentMemoItemsForDate(dk);
-  const sig=dk+'|'+JSON.stringify(memos.map(m=>[m.cid,m.time,m.text,m.photoUrl,m.photoLocalUrl,m.photoStatus,m.photoErrorMsg,m.question]))+'|'+JSON.stringify(contentItems);
+  const sig=dk+'|'+JSON.stringify(memos.map(m=>[m.cid,m.time,m.text,m.photoUrl,m.photoLocalUrl,m.photoStatus,m.photoErrorMsg]))+'|'+JSON.stringify(contentItems);
   if(dk===_lastRenderedMemosDk&&sig===_lastRenderedMemosSig)return; // 내용 동일 — 깜빡임만 유발하므로 스킵
   _lastRenderedMemosDk=dk;_lastRenderedMemosSig=sig;
   list.innerHTML='';
@@ -8467,7 +8356,7 @@ function renderMemos(){
     const h=m.time?parseInt(m.time.split(':')[0],10):null;
     const tod=h==null?'':h>=5&&h<12?' tod-morning':h>=12&&h<18?' tod-afternoon':' tod-night';
     const hasPhoto=!!(m.photoUrl||m.photoLocalUrl);
-    const bub=document.createElement('div');bub.className='memo-bub'+(m.question?' memo-bub-question':tod)+(hasPhoto?' memo-bub-photo':'');
+    const bub=document.createElement('div');bub.className='memo-bub'+tod+(hasPhoto?' memo-bub-photo':'');
     bub.style.cursor='pointer';
     if(hasPhoto){
       const thumbSrc=m.photoUrl||m.photoLocalUrl;
@@ -8489,12 +8378,11 @@ function renderMemos(){
       });
       const txt=document.createElement('span');txt.className='memo-photo-text';
       const _ptxt=m.photoStatus==='upload_failed'?`⚠︎ 업로드 실패: ${m.photoErrorMsg||''}`:(m.text||'');
-      if(m.question&&m.photoStatus!=='upload_failed')txt.innerHTML=`<span class="memo-q">Q. ${escapeHtml(m.question)}</span>`+escapeHtml(_ptxt);
-      else txt.textContent=_ptxt;
+      txt.textContent=_ptxt;
       bub.appendChild(wrap);bub.appendChild(txt);
       bub.addEventListener('click',()=>{_memoSwipeIdx=i;openSheet('memo-sheet');});
     }else{
-      bub.innerHTML=(m.question?`<span class="memo-q">Q. ${escapeHtml(m.question)}</span>`:'')+(m.text||'');
+      bub.innerHTML=(m.text||'');
       bub.addEventListener('click',()=>{_memoSwipeIdx=i;openSheet('memo-sheet');});
     }
     const time=document.createElement('span');
@@ -11696,7 +11584,7 @@ function openSettings(){
 // 전체 push 구독이 꺼져있으면(getExistingPushSubscription 없음) 개별 토글은 값 유지한 채 시각적으로만 비활성화.
 // ALERT_TIME_FIELD_MAP/ALERT_ENABLED_FIELD_MAP은 렌더링과 토글 양쪽에서 쓰여 아래 공용 상수로 뽑음(중복 정의 제거).
 const ALERT_TIME_FIELD_MAP={morning:'morning_briefing_time'};
-const ALERT_ENABLED_FIELD_MAP={morning:'morning_enabled',sleep:'sleep_enabled',rhythm:'rhythm_enabled',report:'report_enabled',exercise:'exercise_stat_enabled',question:'question_enabled',sleepscore:'sleep_score_enabled'};
+const ALERT_ENABLED_FIELD_MAP={morning:'morning_enabled',sleep:'sleep_enabled',rhythm:'rhythm_enabled',report:'report_enabled',exercise:'exercise_stat_enabled',sleepscore:'sleep_score_enabled'};
 async function renderSettingsAlertSection(){
   const wrap=document.getElementById('settings-acc-alert-detail');
   if(!wrap)return;
@@ -11713,9 +11601,6 @@ async function renderSettingsAlertSection(){
     toggle.classList.toggle('on',!!settings[ALERT_ENABLED_FIELD_MAP[kind]]);
     toggle.classList.toggle('disabled',!pushOn); // 전체 알림 꺼져있으면 개별 토글은 값 유지+비활성 표시만
   });
-  // 오늘의 질문 풀에 남은 질문 수(미사용 + 재사용 가능한 날짜형) — 줄어들면 질문을 더 채워 넣을 때
-  const remainEl=document.getElementById('question-remaining-lbl');
-  if(remainEl)supaFetch('rpc/count_available_memo_prompts','POST',{}).then(n=>{remainEl.textContent=(typeof n==='number')?`${n}개`:'-';});
 }
 // 설정탭 섹션 접기/펼치기 — #sec-<id>에 open 클래스를 토글(index.html.settings-sec). 설정을 열 때마다 모두 접힌 상태로 시작.
 function toggleSettingsSection(id){const el=document.getElementById('sec-'+id);if(el)el.classList.toggle('open');}
@@ -13474,9 +13359,8 @@ function _loadPosterViaProxy(posterUrl){
   });
 }
 
-// ── 문장 카드: G(배경 따옴표형) / H(카드 인 카드형) — 배경은 항상 투명, H만 반투명 패널 사용
-// ── 문장 카드: G(로고형) / H(카드형, 가변 높이) — 배경은 항상 투명, H만 반투명 패널
-async function _drawQuoteCardG(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode,showComment){
+// ── 문장 카드: G(기본형) / H(카드형, 가변 높이) — 배경은 항상 투명, H만 반투명 패널
+async function _drawQuoteCardG(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,alignMode,fontSize,highlightMode,showComment){
   await _ensureBareonbatangLoaded();
   const isWhite=colorMode==='white';
   const textColor=isWhite?'#fff':'#5a4040';
@@ -13487,13 +13371,13 @@ async function _drawQuoteCardG(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
   const lineH=Math.round(fs*1.6);
   const contentW=W-176;
   const tx0=align==='center'?W/2:(align==='right'?W-88:88);
-  const ty=quoteMark?200:140;
+  const ty=140;
   // 형광펜은 G스타일 전용 장식이라 공용 파이프라인 밖에서 본문 줄 위치에 맞춰 먼저 그림
   const HIGHLIGHT_COLORS={yellow:'rgba(255,214,130,0.55)',pink:'rgba(230,140,160,0.38)',mint:'rgba(150,200,180,0.42)'};
   if(highlightMode&&HIGHLIGHT_COLORS[highlightMode]){
     ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
     const lines=_shareWrapText(ctx,q.text,contentW);
-    let hy=ty+(quoteMark?76:0);
+    let hy=ty;
     const padH=Math.round(fs*0.14);
     lines.forEach(line=>{
       const w=ctx.measureText(line).width;
@@ -13507,11 +13391,11 @@ async function _drawQuoteCardG(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
       hy+=lineH;
     });
   }
-  await _drawQuoteBody(ctx,{tx0,ty,contentW,align,footerAlign:'left',showInfo:false},q,book,textColor,subColor,isWhite,fontStyle,fs,quoteMark,showComment);
+  await _drawQuoteBody(ctx,{tx0,ty,contentW,align,footerAlign:'left',showInfo:false},q,book,textColor,subColor,isWhite,fontStyle,fs,showComment);
   // G스타일 footer는 로고+제목/작가 상하배치 고유 디자인이라 공용 파이프라인과 별도로 처리
   const showInfo=showBookInfo&&book;
   if(showInfo){
-    const bodyH=_measureQuoteBody(ctx,contentW,q,fs,quoteMark,showComment,false);
+    const bodyH=_measureQuoteBody(ctx,contentW,q,fs,showComment,false);
     let fty=ty+bodyH+30;
     const logoImg=await _loadReadingLogo('02',colorMode);
     const logoH=76,logoW=logoImg?logoH*(logoImg.width/logoImg.height):0;
@@ -13548,25 +13432,15 @@ function _drawPencilHeartIcon(ctx,x,y,size,color){
   ctx.restore();
 }
 
-// 문장카드 공용 파이프라인 — G/H/J가 배경·패널만 각자 그리고, 따옴표/본문/코멘트/footer는 이 함수가 전담
-// layout: {tx0, ty, contentW, align, footerAlign:'left'|'center', dashColor(footer 구분선 색, 옵션)}
-async function _drawQuoteBody(ctx,layout,q,book,textColor,subColor,isWhite,fontStyle,fs,quoteMark,showComment,footerDashColor){
+// 문장카드 공용 파이프라인 — G/H가 배경·패널만 각자 그리고, 본문/코멘트/footer는 이 함수가 전담
+// layout: {tx0, ty, contentW, align, footerAlign:'left', showInfo}
+async function _drawQuoteBody(ctx,layout,q,book,textColor,subColor,isWhite,fontStyle,fs,showComment){
   const {tx0,contentW,align}=layout;
   let ty=layout.ty;
   const lineH=Math.round(fs*1.6);
   // 줄바꿈 폭 측정은 실제 본문 폰트가 적용된 상태에서 이뤄져야 함 — 인용부호(64px) 등 다른 font 설정이 남아있으면 측정이 틀어짐
   ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
   const lines=_shareWrapText(ctx,q.text,contentW);
-  if(quoteMark){
-    ctx.save();
-    ctx.font="700 64px 'Apple SD Gothic Neo', 'Noto Sans Symbols', Georgia, serif";
-    ctx.textAlign=align;
-    ctx.textBaseline='alphabetic';
-    ctx.fillStyle=textColor;
-    ctx.fillText('\u275d',tx0,ty+56);
-    ctx.restore();
-    ty+=76;
-  }
   ctx.fillStyle=textColor;
   ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
   ctx.textBaseline='top';
@@ -13609,7 +13483,7 @@ async function _drawQuoteBody(ctx,layout,q,book,textColor,subColor,isWhite,fontS
   if(showInfo){
     const fy=ty+30;
     const fx0=layout.footerAlign==='center'?tx0-contentW/2:tx0;
-    ctx.strokeStyle=footerDashColor||(isWhite?'rgba(255,255,255,0.18)':'rgba(154,128,112,0.18)');
+    ctx.strokeStyle=isWhite?'rgba(255,255,255,0.18)':'rgba(154,128,112,0.18)';
     ctx.lineWidth=1;
     ctx.beginPath();ctx.moveTo(fx0,fy);ctx.lineTo(fx0+contentW,fy);ctx.stroke();
     ctx.font='600 26px "DM Sans",sans-serif';
@@ -13632,12 +13506,11 @@ async function _drawQuoteBody(ctx,layout,q,book,textColor,subColor,isWhite,fontS
   }
 }
 // 코멘트/footer 블록 높이를 미리 계산(가변 카드 높이용) — _drawQuoteBody와 동일한 규칙을 따름
-function _measureQuoteBody(ctx,contentW,q,fs,quoteMark,showComment,showInfo){
+function _measureQuoteBody(ctx,contentW,q,fs,showComment,showInfo){
   const lineH=Math.round(fs*1.6);
   ctx.font='400 '+fs+'px Bareonbatang, serif';
   const lines=_shareWrapText(ctx,q.text,contentW);
   let h=lines.length*lineH;
-  if(quoteMark)h+=76;
   const showCmt=showComment&&q.comment;
   if(showCmt){
     const cmtFs=27,labelFs=17,cmtLineH=Math.round(cmtFs*1.5),gapLabelToText=12;
@@ -13661,7 +13534,7 @@ function _sharePanelFillStroke(isWhite){
     stroke: isWhite?'rgba(255,255,255,0.35)':'rgba(255,255,255,0.6)'
   };
 }
-async function _drawQuoteCardH(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode,showComment,sidebarMode){
+async function _drawQuoteCardH(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,alignMode,fontSize,highlightMode,showComment,sidebarMode){
   await _ensureBareonbatangLoaded();
   const isWhite=colorMode==='white';
   const textColor=isWhite?'#fff':'#5a4040';
@@ -13678,7 +13551,7 @@ async function _drawQuoteCardH(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
   const padRight=48;
   const contentW=pw-padLeft-padRight;
   ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
-  const bodyH=_measureQuoteBody(ctx,contentW,q,fs,quoteMark,showComment,showInfo);
+  const bodyH=_measureQuoteBody(ctx,contentW,q,fs,showComment,showInfo);
   const padTop=56,padBottom=48;
   const ph=padTop+bodyH+padBottom;
   const py=(H-ph)/2;
@@ -13704,65 +13577,12 @@ async function _drawQuoteCardH(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,
     ctx.restore();
   }
   const tx0=align==='center'?px+padLeft+contentW/2:(align==='right'?px+pw-padRight:px+padLeft);
-  await _drawQuoteBody(ctx,{tx0,ty:py+padTop,contentW,align,footerAlign:'left',showInfo},q,book,textColor,subColor,isWhite,fontStyle,fs,quoteMark,showComment);
+  await _drawQuoteBody(ctx,{tx0,ty:py+padTop,contentW,align,footerAlign:'left',showInfo},q,book,textColor,subColor,isWhite,fontStyle,fs,showComment);
 }
-// J스타일: 완전 투명 배경 + 점선 테두리(흰색/현재색 전환은 기존 colorMode 토글 재사용) + 독서 로고 + 포인트 별 2개(고정 색)
-async function _drawQuoteCardJ(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode,showComment){
-  await _ensureBareonbatangLoaded();
-  const isWhite=colorMode==='white';
-  const textColor=isWhite?'#fff':'#5a4040';
-  const subColor=isWhite?'rgba(255,255,255,0.75)':'#9a8070';
-  const dashColor=isWhite?'rgba(255,255,255,0.85)':'rgba(90,64,64,0.75)'; // 다른 카드들과 동일한 #5a4040 계열로 통일 — 사진 위에서도 잘 보이도록
-  const fontStyle=italicMode?'italic ':'';
-  const align=alignMode||'center';
-  const showInfo=showBookInfo&&book;
-  const fs=fontSize||40;
-  const px=56,padX=48;
-  const pw=W-112;
-  const contentW=pw-padX*2;
-  ctx.font=fontStyle+'400 '+fs+'px Bareonbatang, serif';
-  const logoH=154; // 상단 독서 로고 자리 (로고 116px + 여백)
-  const bodyH=_measureQuoteBody(ctx,contentW,q,fs,false,showComment,showInfo); // J는 자체 상단 로고를 쓰므로 quoteMark 장식은 미사용
-  const padTop=48,padBottom=48;
-  const ph=padTop+logoH+bodyH+padBottom;
-  const py=(H-ph)/2;
-  // 배경 완전 투명 — fill 없이 점선 테두리만
-  const ix=px+12,iy=py+12,iw=pw-24,ih=ph-24,ir=20;
-  ctx.strokeStyle=dashColor;
-  ctx.lineWidth=2;
-  ctx.setLineDash([6,5]);
-  _roundRect(ctx,ix,iy,iw,ih,ir);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  // 포인트 별 2개 — 색은 항상 고정(테두리 색 전환과 무관하게 유지)
-  const STAR1_Y_PCT=0.28,STAR2_Y_PCT=0.86;
-  ctx.save();
-  ctx.translate(ix+iw,iy+ih*STAR1_Y_PCT);
-  ctx.fillStyle='rgba(240,200,80,0.9)';
-  ctx.font="28px 'Apple SD Gothic Neo', sans-serif";
-  ctx.textAlign='center';ctx.textBaseline='middle';
-  ctx.fillText('\u2726',0,0);
-  ctx.restore();
-  ctx.save();
-  ctx.translate(ix,iy+ih*STAR2_Y_PCT);
-  ctx.fillStyle='rgba(230,140,160,0.9)';
-  ctx.font="28px 'Apple SD Gothic Neo', sans-serif";
-  ctx.textAlign='center';ctx.textBaseline='middle';
-  ctx.fillText('\u2726',0,0);
-  ctx.restore();
-  // 상단 독서 로고
-  const logoImg=await _loadReadingLogo('02',colorMode);
-  if(logoImg){
-    const logoDrawH=116,logoDrawW=logoImg.width/logoImg.height*logoDrawH;
-    ctx.drawImage(logoImg,px+pw/2-logoDrawW/2,py+padTop,logoDrawW,logoDrawH);
-  }
-  const tx0=align==='center'?px+pw/2:(align==='right'?px+pw-padX:px+padX);
-  await _drawQuoteBody(ctx,{tx0,ty:py+padTop+logoH,contentW,align,footerAlign:'center',showInfo},q,book,textColor,subColor,isWhite,fontStyle,fs,false,showComment,dashColor);
-}
-const QUOTE_CARD_STYLES={G:{label:'로고형',draw:_drawQuoteCardG},H:{label:'카드형',draw:_drawQuoteCardH},J:{label:'점선형',draw:_drawQuoteCardJ}};
+const QUOTE_CARD_STYLES={G:{label:'기본형',draw:_drawQuoteCardG},H:{label:'카드형',draw:_drawQuoteCardH}};
 
 // ── 오늘의 기록 카드: A(미니멀 숫자형) / C(로고+텍스트형)
-async function _drawTodayCardA(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds,colorMode,dk){
+async function _drawTodayCardA(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds,colorMode,dk,showProgress){
   await _ensureBareonbatangLoaded();
   const isWhite=colorMode==='white';
   const textColor=isWhite?'#fff':'#5a4040';
@@ -13798,57 +13618,11 @@ async function _drawTodayCardA(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds
   ctx.fillStyle=subColor;
   const dispDate=dk?(parseInt(dk.slice(5,7),10)+'월 '+parseInt(dk.slice(8,10),10)+'일'):null;
   const timeStr=seconds?Math.floor(seconds/60)+'분':null;
-  const completeLine=[dispDate,progVal+progUnit,timeStr].filter(Boolean).join('  ·  ');
+  const completeLine=[dispDate,showProgress?progVal+progUnit:null,showProgress?timeStr:null].filter(Boolean).join('  ·  ');
   if(completeLine)ctx.fillText(completeLine,cx,ty);
 }
-// C: 로고01(80% 투명도) 왼쪽 + 오른쪽에 날짜 한 줄 / 책제목 한 줄 / 시간·독서량 한 줄 — 표지 이미지 불필요, CORS 문제 없음
-async function _drawTodayCardC(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds,colorMode,dk){
-  await _ensureBareonbatangLoaded();
-  const isWhite=colorMode==='white';
-  const textColor=isWhite?'#fff':'#5a4040';
-  const subColor=isWhite?'rgba(255,255,255,0.7)':'#9a8070';
-  const logoImg=await _loadReadingLogo('02',colorMode);
-  const logoH=280,logoW=logoImg?logoH*(logoImg.width/logoImg.height):0;
-  const logoX=90,logoY=(H-logoH)/2;
-  if(logoImg)ctx.drawImage(logoImg,logoX,logoY,logoW,logoH);
-  const tx=logoX+logoW+28;
-  const tw=W-tx-88;
-  ctx.textAlign='left';
-  ctx.textBaseline='top';
-  const dispDate=dk?(parseInt(dk.slice(5,7),10)+'월 '+parseInt(dk.slice(8,10),10)+'일'):'';
-  const timeStr=seconds?Math.floor(seconds/60)+'분':null;
-  const progVal=unit==='percent'?(percentAfter!=null?percentAfter:0):(pagesAfter!=null?pagesAfter:0);
-  const progUnit=unit==='percent'?'%':'p';
-  const metaLine=[timeStr,progVal+progUnit].filter(Boolean).join('  ·  ');
-  // 세 줄(날짜/제목/시간·독서량)의 전체 높이를 계산해 로고 세로 중앙에 맞춤 — 로고가 커진 만큼 텍스트도 확대
-  ctx.font='400 56px Bareonbatang, serif';
-  const titleLines=_shareWrapText(ctx,book.title,tw).slice(0,2);
-  const firstTitleLineW=titleLines.length?ctx.measureText(titleLines[0]).width:0;
-  const dateH=32,titleLineH=73,gapAfterDate=20,gapAfterTitle=18,metaH=44;
-  const totalH=dateH+gapAfterDate+titleLines.length*titleLineH+gapAfterTitle+metaH;
-  let ty=logoY+(logoH-totalH)/2;
-  ctx.font='500 30px "DM Sans",sans-serif';
-  ctx.fillStyle=subColor;
-  ctx.fillText(dispDate,tx,ty);
-  if(book.author){
-    ctx.font='400 26px "DM Sans",sans-serif';
-    ctx.textAlign='right';
-    // DM Sans(26px)는 Bareonbatang(56px)보다 글자 상단 여백이 작아 top 기준시 더 아래로 보임 — 시각적 베이스라인을 제목 첫 줄에 맞춰 보정
-    ctx.fillText(book.author,tx+firstTitleLineW,ty+3);
-    ctx.textAlign='left';
-  }
-  ty+=dateH+gapAfterDate;
-  ctx.font='400 56px Bareonbatang, serif';
-  ctx.fillStyle=textColor;
-  // Bareonbatang(세리프)은 좌측 사이드 베어링이 커서 DM Sans 줄과 나란히 두면 오른쪽으로 밀려 보임 — 시각 보정
-  titleLines.forEach(line=>{ctx.fillText(line,tx-8,ty);ty+=titleLineH;});
-  ty+=gapAfterTitle;
-  ctx.font='600 38px "DM Sans",sans-serif';
-  ctx.fillStyle=subColor;
-  ctx.fillText(metaLine,tx,ty);
-}
 // D: 표지형 — 왼쪽 책 표지(프록시 경유 로드) + 오른쪽 날짜/제목/시간·진행률. 표지는 흰색 전환 시에도 그대로, 텍스트 색만 전환
-async function _drawTodayCardD(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds,colorMode,dk){
+async function _drawTodayCardD(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds,colorMode,dk,showProgress){
   await _ensureBareonbatangLoaded();
   const isWhite=colorMode==='white';
   const textColor=isWhite?'#fff':'#5a4040';
@@ -13881,7 +13655,7 @@ async function _drawTodayCardD(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds
   const timeStr=seconds?Math.floor(seconds/60)+'분':null;
   const progVal=unit==='percent'?(percentAfter!=null?percentAfter:0):(pagesAfter!=null?pagesAfter:0);
   const progUnit=unit==='percent'?'%':'p';
-  const metaLine=[timeStr,progVal+progUnit].filter(Boolean).join('  ·  ');
+  const metaLine=showProgress?[timeStr,progVal+progUnit].filter(Boolean).join('  ·  '):'';
   ctx.font='400 56px Bareonbatang, serif';
   const titleLines=_shareWrapText(ctx,book.title,tw).slice(0,2);
   const dateH=32,titleLineH=73,gapAfterDate=20,gapAfterTitle=18,metaH=44;
@@ -13913,23 +13687,23 @@ async function _drawTodayCardD(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds
   ctx.fillStyle=isWhite?'rgba(255,255,255,0.55)':'rgba(154,128,112,0.6)';
   ctx.fillText('iikoto',rightEdge,ty+4);
 }
-const TODAY_CARD_STYLES={A:{label:'숫자형',draw:_drawTodayCardA},C:{label:'로고형',draw:_drawTodayCardC},D:{label:'표지형',draw:_drawTodayCardD}};
+const TODAY_CARD_STYLES={A:{label:'숫자형',draw:_drawTodayCardA},D:{label:'표지형',draw:_drawTodayCardD}};
 
 // ── 공유 모달 공통: 캔버스 생성 → 앱 배경 위에 미리보기 표시 → 스타일 선택 → 복사
-async function _buildQuoteCanvas(styleKey,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode,showComment,sidebarMode){
+async function _buildQuoteCanvas(styleKey,q,book,colorMode,showBookInfo,italicMode,alignMode,fontSize,highlightMode,showComment,sidebarMode){
   const W=1080,H=1350;
   const canvas=document.createElement('canvas');
   canvas.width=W;canvas.height=H;
   const ctx=canvas.getContext('2d');
-  await QUOTE_CARD_STYLES[styleKey].draw(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,quoteMark,alignMode,fontSize,highlightMode,showComment,sidebarMode);
+  await QUOTE_CARD_STYLES[styleKey].draw(ctx,W,H,q,book,colorMode,showBookInfo,italicMode,alignMode,fontSize,highlightMode,showComment,sidebarMode);
   return canvas;
 }
-async function _buildTodayCanvas(styleKey,book,unit,percentAfter,pagesAfter,seconds,colorMode,dk){
+async function _buildTodayCanvas(styleKey,book,unit,percentAfter,pagesAfter,seconds,colorMode,dk,showProgress){
   const W=1080,H=1350;
   const canvas=document.createElement('canvas');
   canvas.width=W;canvas.height=H;
   const ctx=canvas.getContext('2d');
-  await TODAY_CARD_STYLES[styleKey].draw(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds,colorMode,dk);
+  await TODAY_CARD_STYLES[styleKey].draw(ctx,W,H,book,unit,percentAfter,pagesAfter,seconds,colorMode,dk,showProgress);
   return canvas;
 }
 let _shareModalCtx=null; // {kind:'quote'|'today', args:[...], styleKey, colorMode, showBookInfo, italicMode}
@@ -13940,9 +13714,9 @@ function _closeShareModal(){
 }
 async function _buildCurrentShareCanvas(){
   const ctx=_shareModalCtx;if(!ctx)return null;
-  if(ctx.kind==='quote')return await _buildQuoteCanvas(ctx.styleKey,ctx.args[0],ctx.args[1],ctx.colorMode,ctx.showBookInfo,ctx.italicMode,ctx.quoteMark,ctx.alignMode,ctx.fontSize,ctx.highlightMode,ctx.showComment,ctx.sidebarMode);
+  if(ctx.kind==='quote')return await _buildQuoteCanvas(ctx.styleKey,ctx.args[0],ctx.args[1],ctx.colorMode,ctx.showBookInfo,ctx.italicMode,ctx.alignMode,ctx.fontSize,ctx.highlightMode,ctx.showComment,ctx.sidebarMode);
   const [book,unit,percentAfter,pagesAfter,seconds,dk]=ctx.args;
-  return await _buildTodayCanvas(ctx.styleKey,book,unit,percentAfter,pagesAfter,seconds,ctx.colorMode,dk);
+  return await _buildTodayCanvas(ctx.styleKey,book,unit,percentAfter,pagesAfter,seconds,ctx.colorMode,dk,ctx.showProgress);
 }
 function _shareIconBtn(active,onclick,inner,title){
   return `<button onclick="${onclick}" title="${title||''}" style="width:33px;height:33px;flex-shrink:0;border-radius:10px;border:none;background:transparent;color:${active?'var(--pal-pink-text)':'var(--ts)'};display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;opacity:${active?1:0.55};transition:all .15s;">${inner}</button>`;
@@ -13960,29 +13734,8 @@ function _cycleAlignMode(){
   _shareModalCtx.alignMode=c[(c.indexOf(_shareModalCtx.alignMode)+1)%c.length];
   _renderShareModal();
 }
-// 인용부호 토글 — 켤 때는 자동으로 중앙정렬(따옴표 스타일에 어울림), 끌 때는 이전 정렬로 복귀.
 function _selectShareStyle(k){
-  const ctx=_shareModalCtx;
-  const wasJ=ctx.styleKey==='J';
-  ctx.styleKey=k;
-  // J(점선형)은 기본 노출이 중앙정렬 — 진입 시 이전 정렬 백업 후 중앙으로, 이탈 시 복귀
-  if(k==='J'&&!wasJ){
-    ctx._prevAlignMode=ctx.alignMode||'left';
-    ctx.alignMode='center';
-  }else if(k!=='J'&&wasJ){
-    ctx.alignMode=ctx._prevAlignMode||'left';
-  }
-  _renderShareModal();
-}
-function _toggleQuoteMark(){
-  const ctx=_shareModalCtx;
-  ctx.quoteMark=!ctx.quoteMark;
-  if(ctx.quoteMark){
-    ctx._prevAlignMode=ctx.alignMode||'left';
-    ctx.alignMode='center';
-  }else{
-    ctx.alignMode=ctx._prevAlignMode||'left';
-  }
+  _shareModalCtx.styleKey=k;
   _renderShareModal();
 }
 function _cycleCommentStyle(){
@@ -14024,8 +13777,8 @@ async function _renderShareModal(){
   const hasComment=ctx.kind==='quote'&&ctx.args[0]&&ctx.args[0].comment;
   const commentToggle=hasComment?_shareIconBtn(!!ctx.showComment,`_cycleCommentStyle();`,
     `<i class="ti ti-message-circle" aria-hidden="true"></i>`,ctx.showComment==='label'?'코멘트: 라벨형 (탭하면 세로바형)':(ctx.showComment==='bar'?'코멘트: 세로바형 (탭하면 끄기)':'코멘트 표시')):'';
-  const quoteMarkToggle=ctx.kind==='quote'?_shareIconBtn(!!ctx.quoteMark,`_toggleQuoteMark();`,
-    `<span style="font-family:'DM Sans',sans-serif;font-weight:600;font-size:18px;">\u275d</span>`,ctx.quoteMark?'인용부호 끄기':'인용부호 켜기'):'';
+  const progressToggle=ctx.kind==='today'?_shareIconBtn(!!ctx.showProgress,`_shareModalCtx.showProgress=!_shareModalCtx.showProgress;_renderShareModal();`,
+    `<i class="ti ti-percentage" aria-hidden="true"></i>`,ctx.showProgress?'진행률·시간 끄기':'진행률·시간 표시'):'';
   const ALIGN_ICON={left:'left',center:'center',right:'right'};
   const curAlign=ctx.alignMode||'left';
   const alignToggle=ctx.kind==='quote'?_shareIconBtn(true,`_cycleAlignMode();`,
@@ -14042,7 +13795,7 @@ async function _renderShareModal(){
   // 사이드바 토글 — 카드형(H)에서만 노출, 왼쪽 사이드바+마름모 포인트 추가
   const sidebarToggle=(ctx.kind==='quote'&&ctx.styleKey==='H')?_shareIconBtn(!!ctx.sidebarMode,`_shareModalCtx.sidebarMode=!_shareModalCtx.sidebarMode;_renderShareModal();`,
     `<i class="ti ti-layout-sidebar" aria-hidden="true"></i>`,ctx.sidebarMode?'사이드바 끄기':'사이드바 켜기'):'';
-  const iconRow=[colorSwatch,fontToggle,alignToggle,bookToggle,commentToggle,quoteMarkToggle,sidebarToggle,highlightToggle,fontSizeDown,fontSizeUp].filter(Boolean).join('');
+  const iconRow=[colorSwatch,progressToggle,fontToggle,alignToggle,bookToggle,commentToggle,sidebarToggle,highlightToggle,fontSizeDown,fontSizeUp].filter(Boolean).join('');
   ov.innerHTML=`<div style="background:var(--sheet);border-radius:26px;padding:22px;width:min(90vw,420px);max-height:88vh;overflow-y:auto;box-sizing:border-box;" onclick="event.stopPropagation();">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
       <div style="font-weight:600;font-size:15px;color:var(--tp);">공유 이미지</div>
@@ -14068,12 +13821,12 @@ async function _confirmShareCopy(){
 async function shareQuoteCard(quoteCid){
   const q=getQuotes().find(x=>x.cid===quoteCid);if(!q)return;
   const book=getBooks().find(b=>b.cid===q.bookCid);
-  _shareModalCtx={kind:'quote',args:[q,book],styleKey:'G',colorMode:'brown',showBookInfo:false,italicMode:false,quoteMark:false,alignMode:'left',fontSize:40,highlightMode:null,showComment:q.comment?'label':null,sidebarMode:false};
+  _shareModalCtx={kind:'quote',args:[q,book],styleKey:'G',colorMode:'brown',showBookInfo:false,italicMode:false,alignMode:'left',fontSize:40,highlightMode:null,showComment:q.comment?'label':null,sidebarMode:false};
   await _renderShareModal();
 }
 async function openTodayReadingShareModal(bookCid,unit,percentAfter,pagesAfter,seconds,dk){
   const book=getBooks().find(b=>b.cid===bookCid);if(!book)return;
-  _shareModalCtx={kind:'today',args:[book,unit,percentAfter,pagesAfter,seconds,dk],styleKey:'A',colorMode:'brown'};
+  _shareModalCtx={kind:'today',args:[book,unit,percentAfter,pagesAfter,seconds,dk],styleKey:'A',colorMode:'brown',showProgress:false};
   await _renderShareModal();
 }
 function setPgUnit(u){
@@ -14412,7 +14165,6 @@ loadDaily();
 // - memo=rhythm&cid=xxx: 리듬 1/3시간 진행중 알림 — 해당 리듬블록을 찾아 그 카테고리로 연다.
 //   로컬 30일 캐시 범위 밖(예: 자정을 넘겨 어제 블록인 경우)일 수 있어, 못 찾으면 서버에서 직접 조회.
 // - memo=sleep: 23시 취침 회고 — 리듬블록에 종속되지 않는 단독 메모라 조회 없이 바로 연다. 서버가 t/b를 실어 보내면 그 문구, 없으면 기본 문구.
-// - memo=question: 19:30 오늘의 질문 — openQuestionMemo가 서버 풀에서 질문을 뽑아 연다.
 // - memo=sleepscore: 09:00 수면 점수 미등록 — 점수 입력창(promptSleepScore)을 연다. 그 사이 등록했으면 열지 않음.
 const MEMO_URL_DEFAULT_COPY={
   sleep:['오늘 하루는 어땠나요?','잠들기 전, 오늘을 짧게 남겨보세요.']
@@ -14423,14 +14175,13 @@ async function _openFromNotificationUrl(){
   const memoType=params.get('memo');
   const aid=params.get('aid'); // 알림 row id — 알림을 눌러 열렸음을 alerts.opened에 기록(이제 "열림" = 실제로 탭해서 들어옴)
   const markAlertOpened=()=>{ if(aid)Promise.resolve(supaFetch(`alerts?id=eq.${encodeURIComponent(aid)}`,'PATCH',{opened:true})).catch(()=>{}); };
-  const hasPopup=!!snoozeCid||['rhythm','sleep','question','sleepscore'].includes(memoType);
+  const hasPopup=!!snoozeCid||['rhythm','sleep','sleepscore'].includes(memoType);
   if(aid||hasPopup){markAlertOpened();history.replaceState(null,'',location.pathname);} // 처리 후 URL 정리(뒤로가기/새로고침 시 재실행 방지) — 팝업 없는 알림(아침 브리핑·리포트 등)도 탭으로 열렸음은 기록
   if(!hasPopup)return false;
   if(snoozeCid){openSnoozePopup(snoozeCid);return true;}
   const todayDk=dateKey(new Date());
   const copy=MEMO_URL_DEFAULT_COPY[memoType];
   if(copy){openRhythmMemoModal(memoType,todayDk,params.get('t')||copy[0],params.get('b')||copy[1]);return true;}
-  if(memoType==='question'){openQuestionMemo(todayDk);return true;} // 질문은 알림에 싣지 않고 앱이 풀에서 직접 뽑음
   if(memoType==='sleepscore'){if(getSleepScore(todayDk)==null)promptSleepScore(todayDk);return true;} // 그 사이 등록했으면 팝업 생략
   const cid=params.get('cid');
   if(!cid)return true; // memo=rhythm인데 cid가 없는 이상 케이스 — URL은 이미 처리(정리)했으니 더 할 일 없음
