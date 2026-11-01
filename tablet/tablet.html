@@ -220,13 +220,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .card-lbl i{font-size:var(--fs-lg);}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;align-items:stretch;}
 .grid2>.card{min-width:0;}
-/* 목표(3줄 기준)+습관 카드 왼쪽 세로 스택과, 오른쪽 채움로그(스크롤)의 기준 높이를 명확히 고정.
-   이전엔 min-height라 채움로그 내용이 길어지면 grid 전체가 늘어나며 옆의 목표/습관 카드까지 함께 커지는 문제가 있었음
-   — height로 고정해 왼쪽 두 카드는 항상 이 높이 안에서 반반 나눠 갖고, 채움로그는 그 안에서 스크롤(2026-08-22 확정). */
-.month-top-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:16px;align-items:stretch;height:270px;}
+/* 목표(3줄 기준)+습관 카드 세로 스택의 기준 높이를 고정 — 두 카드는 이 높이 안에서 반반 나눠 가짐.
+   [2026-11-01] 오른쪽 채움로그 카드를 없애면서 1열(전체 폭)로 변경. */
+.month-top-grid{display:grid;grid-template-columns:1fr;gap:13px;margin-bottom:16px;align-items:stretch;height:270px;}
 .month-top-left{display:flex;flex-direction:column;gap:13px;height:100%;}
 .month-top-left .card{flex:1;min-height:0;display:flex;flex-direction:column;margin-bottom:0;overflow:hidden;}
-.month-top-right{min-height:0;height:100%;margin-bottom:0;}
 .card.month-compact{padding:14px 16px 12px;}
 .card.month-compact .card-lbl{margin-bottom:8px;flex-shrink:0;}
 .month-goals-box{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;justify-content:center;}
@@ -809,23 +807,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .cgrid-section-label{grid-column:1/-1;font-size:var(--fs-sm);font-weight:600;color:var(--tm);margin:12px 0 2px;}
 .cgrid-section-label:first-child{margin-top:0;}
 
-/* 채움 로그 타임라인 — 이이코토 본앱 chaeum-log-* 디자인 그대로 차용(세로 점+선 타임라인) */
-.chaeum-log-card{display:flex;flex-direction:column;overflow:hidden;}
-.chaeum-log-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;flex-shrink:0;}
-.chaeum-log-hdr .chaeum-log-title{font-size:var(--fs-title);font-weight:600;color:var(--tp);display:flex;align-items:center;gap:6px;margin-bottom:0;}
-.chaeum-log-hdr .chaeum-log-title i{font-size:var(--fs-lg);color:rgba(var(--pal-mint-rgb),1);}
-.chaeum-log-tl{position:relative;padding-left:2px;overflow-y:auto;flex:1;min-height:0;}
-.chaeum-log-item{position:relative;display:flex;gap:10px;padding:0 0 16px;}
-.chaeum-log-item:last-child{padding-bottom:4px;}
-.chaeum-log-date{width:30px;flex-shrink:0;font-size:var(--fs-sm);color:var(--tm);padding-top:1px;font-variant-numeric:tabular-nums;text-align:right;}
-.chaeum-log-line-wrap{position:relative;width:8px;flex-shrink:0;display:flex;justify-content:center;}
-.chaeum-log-line-wrap::before{content:'';position:absolute;top:11px;bottom:-16px;width:1px;background:rgba(var(--divider-rgb),0.35);}
-.chaeum-log-item:last-child .chaeum-log-line-wrap::before{display:none;}
-.chaeum-log-dot{width:7px;height:7px;border-radius:50%;background:rgba(var(--pal-mint-rgb),1);margin-top:5px;flex-shrink:0;z-index:1;}
-.chaeum-log-dot.ing{background:transparent;border:1.4px solid var(--tm);}
-.chaeum-log-txt{flex:1;min-width:0;}
-.chaeum-log-txt-title{font-size:var(--fs-body);color:var(--tp);line-height:1.5;}
-.chaeum-log-txt-cat{font-size:var(--fs-sm);color:rgba(var(--pal-mint-rgb),1);margin-top:3px;}
 
 /* ── 리포트 오버레이 패널 ── */
 .report-overlay{position:fixed;inset:0;background:rgba(60,45,40,0.35);display:none;align-items:center;justify-content:center;z-index:200;}
@@ -1245,9 +1226,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   /* 이번 달 수집문장 — 책 표지 포스터 숨기고 텍스트 공간 확보 */
   .mq-book-cover,.mq-book-cover-fallback{display:none;}
 
-  /* 채움로그 카드 숨김(월간탭 상단 그리드는 위 공통 규칙으로 이미 1열이라, 이 카드만 빼면
-     남은 목표+습관 카드가 자연스럽게 세로로 쌓임) */
-  #month-top-right{display:none;}
 
   /* ══════════════════════════════════════════════════════
      리포트탭 — 월간종합
@@ -1582,7 +1560,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   font-size:13px;
   color:var(--ts);}
 .habit-spark{display:block;width:100%;height:26px;margin-top:10px;position:relative;z-index:1;}
-/* ===== Bento/Trend style extension for content/rhythm/sleep/chaeum ===== */
+/* ===== Bento/Trend style extension for content/rhythm/sleep ===== */
 /* 공용 Layout */
 .tab-intro{padding:8px 2px 22px;}
 .tab-intro-kicker{font-size:13px;letter-spacing:.15em;font-weight:700;color:var(--tm);margin-bottom:10px;text-transform:uppercase;}
@@ -1710,7 +1688,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .donut-svg-center{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;}
 .donut-svg-center b{font-size:22px; color:var(--tp); font-weight:700; line-height:1;}
 .donut-svg-center span{font-size:13px; color:var(--ts);}
-/* ----- CHAEUM TAB STYLES ----- 옛 index-* 클래스는 chaeum-log-*로 리네이밍되어 대체됨(2026-09-25 정리) */
 
 /* ══════════════════════════════════════════════════════════
    연간탭 — 리듬/수면 서브탭 신규 클래스 (목업v6에서 이식)
@@ -1936,7 +1913,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
           <div class="card goal-hcard month-compact"><div class="card-lbl"><i class="ti ti-flag-3" style="color:rgba(var(--pal-pink-text-rgb),0.85);" aria-hidden="true"></i>이번 달 목표</div><div id="month-goals" class="month-goals-box"></div></div>
           <div class="card month-compact" style="overflow:hidden;"><div class="card-lbl"><i class="ti ti-chart-donut" style="color:rgba(var(--pal-mint-rgb),1);" aria-hidden="true"></i>습관 모아보기</div><div id="month-habits" style="flex:1;min-height:0;overflow-y:auto;"></div></div>
         </div>
-        <div class="card chaeum-log-card month-top-right" id="month-top-right"><div class="chaeum-log-hdr"><div class="chaeum-log-title"><i class="ti ti-clover" aria-hidden="true"></i>채움 로그</div></div><div class="chaeum-log-tl" id="chaeum-log-tl"></div></div>
       </div>
       <div class="top-row">
         <div class="card wcal-card">
@@ -2197,6 +2173,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   </div>
 </div>
 
-<script src="tablet.js?v=1792998041"></script>
+<script src="tablet.js?v=1793521847"></script>
 </body>
 </html>

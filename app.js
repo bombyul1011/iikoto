@@ -8799,11 +8799,45 @@ async function buildWeeklyMemoReportHtml(wk){
 // 그 외엔 일반 제목. "오늘 report-banner rhythm-soft" 배너와 동일한 배경/테두리 스타일을 그대로 가져다 씀.
 // 다음 주 목표는 주간탭을 다음 주로 넘겨(카드의 ›) 직접 적어둔다 — 별도 준비 시트·AI 제안은 없앴음.
 // 요일 판단은 new Date() 기준(자정 경계, 주간탭 표준).
+// 지난주에 지정한 목표가 하나라도 있는지(로컬 기준). 비어 있으면 돌아볼 내용이 없으므로 월요일 배너를 띄우지 않는다.
+function hasLastWeekChallenge(){
+  return getWChallenge(lastWeekKey()).some(it=>it&&it.text&&it.text.trim());
+}
+// 앱 동기화(initSync·주간탭 동기화)는 "이번 주" 목표만 내려받는다. 이 기기에 지난주 목표가 로컬에 없을 뿐 서버엔 있을 수 있으므로
+// (새 기기·저장공간 초기화 직후 등) 로컬이 비어 있을 때만 서버를 한 번 확인해, 있으면 배너 상태를 다시 판정한다.
+// 확인이 끝난 주(성공·서버에 없음)는 같은 주에 다시 묻지 않고, 오프라인·실패는 완료로 치지 않아 다음 기회에 재시도한다.
+let _lastWkChallengeProbedWk=null,_lastWkChallengeProbing=false;
+async function _probeLastWeekChallenge(){
+  const wk=lastWeekKey();
+  if(_lastWkChallengeProbing||_lastWkChallengeProbedWk===wk)return;
+  if(typeof navigator!=='undefined'&&navigator.onLine===false)return;
+  _lastWkChallengeProbing=true;
+  try{
+    const rows=await supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wchallenge_'+wk)}`);
+    if(!rows)return; // 네트워크 실패 — 완료 처리하지 않음
+    _lastWkChallengeProbedWk=wk;
+    if(rows.length&&Array.isArray(rows[0].lines)&&!S.get('wchallenge_pending_'+wk)&&!hasLastWeekChallenge()){
+      S.set('wchallenge_'+wk,rows[0].lines); // 로컬에 변경이 없을 때만 서버 값을 받아 둠(pending이면 로컬 우선)
+    }
+  }catch(e){return;}
+  finally{_lastWkChallengeProbing=false;}
+  // 서버에서 목표를 받아와 배너 대상이 됐을 때만 다시 그림(입력 중이면 건드리지 않고 다음 갱신에 반영)
+  const titleEl=document.getElementById('wchallenge-title');
+  const weeklyView=document.getElementById('v-weekly');
+  if(!titleEl||!weeklyView||!weeklyView.classList.contains('on'))return;
+  if(titleEl.classList.contains('wchallenge-review-tag')||!hasLastWeekChallenge())return;
+  const ae=document.activeElement;
+  if(ae&&ae.closest&&ae.closest('#weekly-goal-wrap')&&/INPUT|TEXTAREA/.test(ae.tagName))return;
+  setupWeeklyChallengeToggle();
+}
 function setupWeeklyChallengeToggle(){
   const titleEl=document.getElementById('wchallenge-title');
   if(!titleEl)return;
   const dow=new Date().getDay();
-  const isMonday=dow===1&&weeklyWeekOffset()===0; // 월요일 "지난주 목표 돌아보기" 배너는 이번 주를 보고 있을 때만
+  const mondayThisWeek=dow===1&&weeklyWeekOffset()===0; // 월요일 "지난주 목표 돌아보기" 배너는 이번 주를 보고 있을 때만
+  // 지난주 목표가 없었다면 돌아볼 내용이 없으므로 배너로 바꾸지 않고 평소 "주간 목표" 제목을 유지
+  const isMonday=mondayThisWeek&&hasLastWeekChallenge();
+  if(mondayThisWeek&&!isMonday)_probeLastWeekChallenge(); // 로컬에만 없는 경우 대비 — 서버를 한 번 확인(비동기, 끝나면 필요 시 재판정)
   titleEl.onclick=null;
   titleEl.style.cursor='default';
   if(isMonday){
@@ -8822,6 +8856,7 @@ function setupWeeklyChallengeToggle(){
   // 월요일이 아니면 원래 구조(goal-section-title + 아이콘)로 복원
   titleEl.className='goal-section-title';
   titleEl.style.margin='0';
+  titleEl.style.display='';titleEl.style.borderRadius=''; // 배너 상태에서 남은 인라인 스타일 제거
   titleEl.innerHTML='<i class="ti ti-flag-3" aria-hidden="true"></i> 주간 목표';
   titleEl.title='';
   renderWeeklyChallenge(weekKey(getWeeklyBase()),'weekly-goal-wrap');

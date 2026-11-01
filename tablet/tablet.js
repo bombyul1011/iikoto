@@ -7,20 +7,10 @@
 
 const SUPA_URL='https://vqvpzrxmtpryzhontlxc.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdnB6cnhtdHByeXpob250bHhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTgxMjksImV4cCI6MjA5NjYzNDEyOX0.pbtq1UMPC7ylYM1H2xVa19C1TFlceLmEfEtkz3WK2VI';
-const CHAEUM_SUPA_URL='https://sqeyoqpchiljvinuqxjf.supabase.co';
-const CHAEUM_SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNxZXlvcXBjaGlsanZpbnVxeGpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5ODY5NTksImV4cCI6MjEwMjU2Mjk1OX0.H_JNNYz7_eguAqds-Wm6cwK926U74aVPaS_XwGRKeB0';
 
 async function supaFetch(path){
   try{
     const res=await fetch(SUPA_URL+'/rest/v1/'+path,{headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}});
-    if(!res.ok)return null;
-    return await res.json();
-  }catch(e){return null;}
-}
-// 채움로그(chaeumlog) — 별도 Supabase 프로젝트, 읽기 전용 연동
-async function chaeumFetch(path){
-  try{
-    const res=await fetch(CHAEUM_SUPA_URL+'/rest/v1/'+path,{headers:{'apikey':CHAEUM_SUPA_KEY,'Authorization':'Bearer '+CHAEUM_SUPA_KEY}});
     if(!res.ok)return null;
     return await res.json();
   }catch(e){return null;}
@@ -2153,7 +2143,6 @@ async function loadMonthTab(){
     renderMonthStatBar(y,mo,habitsData),
     renderMonthQuotes(y,mo),
     renderMonthContentGrid(y,mo,contentsData),
-    renderChaeumLogTablet(),
     renderWatchCal(contentsData),
     _cgridMode==='timeline'?renderContentNoteTimeline(contentsData):Promise.resolve()
   ]);
@@ -2893,34 +2882,6 @@ function renderWatchCalGrid(){
 }
 
 
-// ── 채움 로그 타임라인(월간탭, 독서달력 옆) — 이이코토 본앱 chaeum-log-tl 디자인 그대로, 읽기 전용 요약 리스트 ──
-function chaeumDateShort(dk){
-  const m=(dk||'').match(/^\d{4}-(\d{2})-(\d{2})/);
-  return m?m[1]+'.'+m[2]:(dk||'');
-}
-async function renderChaeumLogTablet(){
-  const tlEl=document.getElementById('chaeum-log-tl');
-  if(!tlEl)return;
-  const sessions=await chaeumFetch('sessions?select=id,date_key,category,title,status&order=created_at.desc&limit=10');
-  if(sessions==null){
-    tlEl.innerHTML='<div class="empty-msg">채움 기록을 불러오지 못했어요</div>';
-    return;
-  }
-  if(!sessions.length){
-    tlEl.innerHTML='<div class="empty-msg">아직 채움 기록이 없어요</div>';
-    return;
-  }
-  tlEl.innerHTML=sessions.map(s=>
-    `<div class="chaeum-log-item">`+
-      `<div class="chaeum-log-date">${chaeumDateShort(s.date_key)}</div>`+
-      `<div class="chaeum-log-line-wrap"><div class="chaeum-log-dot${s.status==='completed'?'':' ing'}"></div></div>`+
-      `<div class="chaeum-log-txt">`+
-        `<div class="chaeum-log-txt-title">${escapeHtml(s.title||'')}</div>`+
-        `<div class="chaeum-log-txt-cat">${escapeHtml(s.category||'')}</div>`+
-      `</div>`+
-    `</div>`
-  ).join('');
-}
 
 // ══════════════════════════════════════════════════════════
 // 설정탭 — 글자 크기 조절(작게/기본/크게 3단계, 본앱과 동일한 textScale 저장 키/step 체계)
@@ -4910,7 +4871,6 @@ function renderYrKeywordCloud(ctx){
     <div class="yr-kw-summary"><i class="ti ti-quote" aria-hidden="true"></i> ${top[0][1]?escapeHtml(top[0][0]):''}${top[1]?', '+escapeHtml(top[1][0]):''}${top[2]?', '+escapeHtml(top[2][0]):''} 같은 단어가 자주 등장했어요.</div>`;
 }
 
-// 4분할 지표그리드(습관/콘텐츠/리듬/채움로그) — 클릭 시 해당 서브탭으로 이동
 // ── 습관별(카테고리 없음, 습관 자체가 4개 구분) 누적 달성률 계산 — 전체요약 요약카드용 독립 헬퍼.
 // renderYrHabitTab의 habitStats 계산과 동일 기준(습관별 최초 기록월부터, 월간 달성률 평균)이지만
 // 전체요약이 습관탭보다 먼저 렌더링되므로 별도로 값만 가볍게 계산.
