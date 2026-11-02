@@ -1599,7 +1599,7 @@ async function loadMonthlyReportContent(){
   </div>` : '';
   const contentsHtml=stats.contentsList.length?`<div class="mr-card">
     <div class="mr-sec-title"><i class="ti ti-stack-2 ico-12" aria-hidden="true"></i> 콘텐츠 기록</div>
-    ${stats.contentsList.map(c=>`<div class="mr-wc-line"><span class="txt"><span style="display:inline-block;width:7px;height:7px;border-radius:2px;background:${getCatDotColor(c.cat)};margin-right:6px;"></span>${c.title}</span><span class="pct" style="color:var(--tm);font-weight:400;">${cStatusLabel(c)}</span></div>`).join('')}
+    ${stats.contentsList.map(c=>`<div class="mr-wc-line"><span class="txt"><span style="display:inline-block;width:7px;height:7px;border-radius:2px;background:${getCatDotColor(c.cat)};margin-right:6px;"></span>${escapeHtml(c.title)}</span><span class="pct" style="color:var(--tm);font-weight:400;">${cStatusLabel(c)}</span></div>`).join('')}
   </div>` : `<div class="mr-card"><div class="mr-sec-title"><i class="ti ti-stack-2 ico-12" aria-hidden="true"></i> 콘텐츠 기록</div><div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:8px 0;">이 달엔 기록한 콘텐츠가 없어요</div></div>`;
 
   el.innerHTML=`${goalHtml}<div id="mr-ai-slot"></div>${statsHtml}${rhythmHtml}${contentsHtml}`;
@@ -2667,7 +2667,11 @@ function getHabitIconColor(habitColor){
 // ── STORAGE
 const S={
   get:k=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):null;}catch(e){return null;}},
-  set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(e){if(e.name==='QuotaExceededError'||e.code===22){console.warn('저장 공간 부족 — 오래된 사진 메모 정리를 권장합니다');}else{console.warn('storage:',e);}}},
+  set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(e){if(e.name==='QuotaExceededError'||e.code===22){console.warn('저장 공간 부족 — 오래된 사진 메모 정리를 권장합니다');
+    // 조용히 저장이 실패하면 데이터가 사라진 줄 모르고 지나가므로, 1분에 한 번만 알려준다.
+    const now=Date.now();
+    if(!S._quotaWarnAt||now-S._quotaWarnAt>60000){S._quotaWarnAt=now;try{showToast('기기 저장 공간이 가득 차 일부 기록이 저장되지 않았어요');}catch(_){}}
+  }else{console.warn('storage:',e);}}},
   key:(...a)=>a.join(':')
 };
 
@@ -10175,7 +10179,8 @@ async function searchTMDB(q,cat,el){
     const div=document.createElement('div');div.className='api-result-item';
     div.innerHTML=poster?`<img class="api-result-poster" src="${poster}" alt="">`:`<div class="api-result-poster-placeholder">🎬</div>`;
     div.innerHTML+=`<div class="api-result-info"><div class="api-result-title">${title}</div><div class="api-result-sub">${date}</div></div>`;
-    div.addEventListener('click',()=>selectApiResult(title,poster,date,'',null,{tmdbId:item.id,tmdbType:type}));el.appendChild(div);
+    // 드라마는 TMDB가 전 시즌을 한 작품으로 주므로, 시즌이 2개 이상이면 시즌을 골라 "제목 시즌 N"으로 따로 등록(시즌마다 텀이 커서 완결을 시즌 단위로 처리하기 위함).
+    div.addEventListener('click',()=>type==='tv'?pickTmdbSeason(item,title,poster,date,el):selectApiResult(title,poster,date,'',null,{tmdbId:item.id,tmdbType:type}));el.appendChild(div);
   });
 }
 async function searchKakaoBook(q,el){
@@ -10276,6 +10281,34 @@ async function fetchAladinPageCountInto(targetInputId,isbnRaw){
     console.error('알라딘 페이지 수 조회 실패',e);
   }
 }
+// 드라마 검색 결과 클릭 → 시즌 목록 조회. 정규 시즌(0=스페셜 제외)이 1개 이하이거나 조회 실패면 기존처럼 작품 단위로 바로 선택.
+// 2개 이상이면 같은 결과창을 시즌 목록으로 바꿔 보여주고, 고른 시즌의 화수·포스터로 "제목 시즌 N"을 등록한다.
+async function pickTmdbSeason(item,title,poster,date,el){
+  const single=()=>selectApiResult(title,poster,date,'',null,{tmdbId:item.id,tmdbType:'tv'});
+  el.innerHTML='<div class="api-loading">시즌 확인 중...</div>';
+  let seasons=[];
+  try{
+    const res=await fetch(`https://api.themoviedb.org/3/tv/${item.id}?api_key=${TMDB_KEY}&language=ko-KR`);
+    if(res.ok){const data=await res.json();seasons=(data.seasons||[]).filter(s=>s.season_number>0);}
+  }catch(e){console.error('TMDB 시즌 조회 실패',e);}
+  if(seasons.length<=1){single();return;}
+  el.innerHTML='';
+  seasons.forEach(s=>{
+    const sTitle=`${title} 시즌 ${s.season_number}`;
+    const sYear=(s.air_date||'').slice(0,4);
+    const sPoster=s.poster_path?`https://image.tmdb.org/t/p/w92${s.poster_path}`:poster;
+    const eps=s.episode_count||0;
+    const div=document.createElement('div');div.className='api-result-item';
+    div.innerHTML=(sPoster?`<img class="api-result-poster" src="${sPoster}" alt="">`:`<div class="api-result-poster-placeholder">🎬</div>`)
+      +`<div class="api-result-info"><div class="api-result-title">${escapeHtml(sTitle)}</div><div class="api-result-sub">${[sYear,eps?eps+'화':'공개 예정'].filter(Boolean).join(' · ')}</div></div>`;
+    div.addEventListener('click',()=>{
+      selectApiResult(sTitle,sPoster,sYear||date,'',null,null);
+      _selectedTotalUnit=eps||null; // selectApiResult가 비워둔 총량을 이 시즌 화수로 채움(공개 예정은 총량 없음)
+      renderCmProgressHint();
+    });
+    el.appendChild(div);
+  });
+}
 // TMDB 상세 엔드포인트로 총 회차(tv)/총 러닝타임분(movie)을 가져옴 — 검색 결과 클릭 직후 1회만 호출.
 // 검색 엔드포인트엔 이 정보가 없어 상세 조회가 별도로 필요함(TMDB 자체 제약, /search가 아닌 /tv 또는 /movie 단건 조회 필요).
 async function fetchTmdbTotalUnit(id,type){
@@ -10346,7 +10379,7 @@ function renderHabitMonthly(){
     const row=document.createElement('div');row.className='hm-row';
     const lbl=document.createElement('span');lbl.className='hm-lbl';
     const hIcon=getHabitIconFor(h);
-    lbl.innerHTML=hIcon?`<i class="ti ${hIcon}" style="font-size:12px;vertical-align:-1px;margin-right:3px;" aria-hidden="true"></i>${h.name}`:h.name;
+    lbl.innerHTML=hIcon?`<i class="ti ${hIcon}" style="font-size:12px;vertical-align:-1px;margin-right:3px;" aria-hidden="true"></i>${escapeHtml(h.name)}`:escapeHtml(h.name);
     row.appendChild(lbl);
     const dots=document.createElement('div');dots.className='hm-dots';
     let checked_cnt=0,activeDayCnt=0;
@@ -10743,7 +10776,7 @@ function _calToggleTodoRows(dk,todos,rowsPrefix,summaryPrefix,label){
     rowsWrap.style.display='none';
     if(summaryEl)summaryEl.innerHTML=`${label} ${todos.length}개 <i class="ti ti-chevron-right ico-inline-11" aria-hidden="true"></i>`;
   }else{
-    rowsWrap.innerHTML=_calSortPendingTodos(todos).map(t=>`<div class="cal-detail-row" style="padding-left:20px;"><span class="cal-detail-text">${t.text}</span></div>`).join('');
+    rowsWrap.innerHTML=_calSortPendingTodos(todos).map(t=>`<div class="cal-detail-row" style="padding-left:20px;"><span class="cal-detail-text">${escapeHtml(t.text)}</span></div>`).join('');
     rowsWrap.style.display='block';
     if(summaryEl)summaryEl.innerHTML=`${label} ${todos.length}개 <i class="ti ti-chevron-down ico-inline-11" aria-hidden="true"></i>`;
   }
@@ -12196,8 +12229,8 @@ function renderRdQuotes(){
   const MAX=2;
   const shown=_rdQuoteShowAll?quotes:quotes.slice(0,MAX);
   let html=shown.map(q=>`<div class="rd-quote-item">
-      <div class="rd-quote-text" data-cid="${q.cid}" onclick="startEditQuoteText('${q.cid}')" style="cursor:pointer;">${q.text}</div>
-      ${q.comment?`<div class="rd-quote-comment" onclick="toggleQuoteCommentEditor('${q.cid}')" style="font-size:var(--dow-label-size);color:var(--pal-mintlime);margin-top:4px;padding:5px 8px;background:rgba(102,160,85,0.14);border-radius:8px;cursor:pointer;">${q.comment}</div>`:''}
+      <div class="rd-quote-text" data-cid="${q.cid}" onclick="startEditQuoteText('${q.cid}')" style="cursor:pointer;">${escapeHtml(q.text)}</div>
+      ${q.comment?`<div class="rd-quote-comment" onclick="toggleQuoteCommentEditor('${q.cid}')" style="font-size:var(--dow-label-size);color:var(--pal-mintlime);margin-top:4px;padding:5px 8px;background:rgba(102,160,85,0.14);border-radius:8px;cursor:pointer;">${escapeHtml(q.comment)}</div>`:''}
       <div id="qc-editor-${q.cid}" class="qc-editor" style="display:none;margin-top:5px;" onclick="event.stopPropagation();">
         <textarea class="qc-comment-textarea" placeholder="이 문장에 대한 감상을 적어보세요">${q.comment||''}</textarea>
         <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px;">
@@ -12343,7 +12376,7 @@ function renderDoneBookQuotes(bookCid){
   const quotes=getQuotes().filter(q=>q.bookCid===bookCid).sort((a,b)=>(b.created||0)-(a.created||0));
   if(!quotes.length){listEl.innerHTML='<div class="rd-quote-empty">아직 모은 문장이 없어요</div>';listEl.style.maxHeight='';listEl.style.overflowY='';return;}
   listEl.innerHTML=quotes.map(q=>`<div class="rd-quote-item">
-      <div class="rd-quote-text" data-cid="${q.cid}" onclick="event.stopPropagation();startEditQuoteText('${q.cid}')" style="cursor:pointer;">${q.text}</div>
+      <div class="rd-quote-text" data-cid="${q.cid}" onclick="event.stopPropagation();startEditQuoteText('${q.cid}')" style="cursor:pointer;">${escapeHtml(q.text)}</div>
       <div id="qc-editor-${q.cid}" class="qc-editor" style="display:none;margin-top:5px;" onclick="event.stopPropagation();">
         <textarea class="qc-comment-textarea" placeholder="이 문장에 대한 감상을 적어보세요">${q.comment||''}</textarea>
         <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px;">
@@ -12381,8 +12414,8 @@ function renderDoneBookComments(bookCid){
   const quotes=getQuotes().filter(q=>q.bookCid===bookCid&&q.comment).sort((a,b)=>(b.created||0)-(a.created||0));
   if(!quotes.length){listEl.innerHTML='<div class="rd-quote-empty">아직 남긴 코멘트가 없어요</div>';listEl.style.maxHeight='';listEl.style.overflowY='';return;}
   listEl.innerHTML=quotes.map(q=>`<div class="rd-comment-item">
-      <div class="rd-quote-text" style="font-size:var(--dow-label-size);color:var(--tm);margin-bottom:4px;">${q.text}</div>
-      <div class="rd-quote-comment" onclick="event.stopPropagation();toggleQuoteCommentEditor('${q.cid}')" style="font-size:var(--dow-label-size);color:var(--tp);padding:6px 8px;background:rgba(var(--divider-rgb),0.14);border-radius:8px;cursor:pointer;">${q.comment}</div>
+      <div class="rd-quote-text" style="font-size:var(--dow-label-size);color:var(--tm);margin-bottom:4px;">${escapeHtml(q.text)}</div>
+      <div class="rd-quote-comment" onclick="event.stopPropagation();toggleQuoteCommentEditor('${q.cid}')" style="font-size:var(--dow-label-size);color:var(--tp);padding:6px 8px;background:rgba(var(--divider-rgb),0.14);border-radius:8px;cursor:pointer;">${escapeHtml(q.comment)}</div>
       <div id="qc-editor-${q.cid}" class="qc-editor" style="display:none;margin-top:5px;" onclick="event.stopPropagation();">
         <textarea class="qc-comment-textarea" placeholder="이 문장에 대한 감상을 적어보세요">${q.comment||''}</textarea>
         <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px;">
