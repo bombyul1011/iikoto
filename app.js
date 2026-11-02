@@ -9073,6 +9073,12 @@ function renderContentTimeline(){
         const segments=groupConsecutiveDays(watchedDays);
         if(!segments.length){
           // 이번 달엔 실제 감상 기록이 아직 없음(예: 이월만 되고 이번달엔 안 본 경우) — 그릴 것 없음, 스킵.
+          // 단, 이번 달에 막 등록해 아직 한 번도 안 본 작품은 시작일 하루짜리로 그려 눌러서 수정/삭제할 수 있게 한다
+          // (안 그리면 잘못 등록해도 타임라인에서 접근할 길이 없음).
+          if(!item._carried&&item.startDate&&item.startDate.slice(0,7)===mk){
+            const d=Math.min(Math.max(1,parseInt(item.startDate.slice(8,10),10)||1),daysInMonth);
+            laid.push({item,startD:d,endD:d,isWatching:true,_seg:true});
+          }
           return;
         }
         segments.forEach(seg=>{
@@ -9323,7 +9329,7 @@ function openContentModal(cat,item=null,mk=null,onSaved=null){
   document.getElementById('cm-del-btn').style.display=item?'block':'none';
   const status=item?.status||'watching';
   setCStatus(status);
-  hideApiResults();
+  hideApiResults(true);
   // 음악은 완료/중단/별점 개념이 없으므로 숨기고, 대신 애플뮤직 재생 버튼을 보여줌
   const isMusic=cat==='music';
   const isBook=cat==='book';
@@ -10107,14 +10113,14 @@ function deleteContent(){
 // ── API SEARCH
 function apiSearchDebounce(q){
   clearTimeout(_apiTimer);
-  if(!q||q.length<1){hideApiResults();return;}
+  if(!q||q.length<1){hideApiResults(true);return;}
   _apiTimer=setTimeout(()=>apiSearch(q),400);
 }
 async function apiSearch(q){
   if(!q)return;
   const cat=_contentCtx.cat||'drama';
   const resultsEl=document.getElementById('api-results');if(!resultsEl)return;
-  resultsEl.style.display='block';resultsEl.innerHTML='<div class="api-loading">검색 중...</div>';
+  resultsEl.dataset.keep='';resultsEl.style.display='block';resultsEl.innerHTML='<div class="api-loading">검색 중...</div>';
   try{
     if(cat==='book')await searchKakaoBook(q,resultsEl);
     else if(cat==='music')await searchITunes(q,resultsEl);
@@ -10210,7 +10216,7 @@ async function searchKakaoBook(q,el){
   }
 }
 function selectApiResult(title,poster,sub1,sub2,musicUrl,tmdbMeta,album){
-  document.getElementById('cm-title').value=title;hideApiResults();
+  document.getElementById('cm-title').value=title;hideApiResults(true);
   _selectedPoster=poster;_selectedAuthor=sub1||'';_selectedMusicUrl=musicUrl||null;
   // album/releaseYear는 음악 검색(searchITunes)에서만 의미 있는 값 — 책(sub2=출판사)·영화(sub2='') 오염 방지
   _selectedAlbum=(_contentCtx.cat==='music')?(album||null):null;
@@ -10285,13 +10291,14 @@ async function fetchAladinPageCountInto(targetInputId,isbnRaw){
 // 2개 이상이면 같은 결과창을 시즌 목록으로 바꿔 보여주고, 고른 시즌의 화수·포스터로 "제목 시즌 N"을 등록한다.
 async function pickTmdbSeason(item,title,poster,date,el){
   const single=()=>selectApiResult(title,poster,date,'',null,{tmdbId:item.id,tmdbType:'tv'});
+  el.dataset.keep='1';el.style.display='block'; // 탭하면 입력창 blur 타이머(200ms)가 결과창을 닫아버리므로 시즌 목록이 뜨는 동안은 유지
   el.innerHTML='<div class="api-loading">시즌 확인 중...</div>';
   let seasons=[];
   try{
     const res=await fetch(`https://api.themoviedb.org/3/tv/${item.id}?api_key=${TMDB_KEY}&language=ko-KR`);
     if(res.ok){const data=await res.json();seasons=(data.seasons||[]).filter(s=>s.season_number>0);}
   }catch(e){console.error('TMDB 시즌 조회 실패',e);}
-  if(seasons.length<=1){single();return;}
+  if(seasons.length<=1){el.dataset.keep='';single();return;}
   el.innerHTML='';
   seasons.forEach(s=>{
     const sTitle=`${title} 시즌 ${s.season_number}`;
@@ -10337,7 +10344,13 @@ function renderCmProgressHint(){
   const preview=document.getElementById('cm-poster-preview');
   if(preview&&preview.style.display==='none')preview.style.display='flex';
 }
-function hideApiResults(){const el=document.getElementById('api-results');if(el)el.style.display='none';}
+// 시즌 목록(pickTmdbSeason)이 떠 있는 동안엔 제목 입력창 blur(결과를 탭하면 발생)로 닫히지 않게 data-keep으로 막고,
+// 시즌을 고르거나 새로 검색할 때만 force로 닫는다.
+function hideApiResults(force){
+  const el=document.getElementById('api-results');if(!el)return;
+  if(el.dataset.keep==='1'&&!force)return;
+  el.dataset.keep='';el.style.display='none';
+}
 
 // ══════════════════════════════════════════════════════════
 // ██ 월간탭 (3/3 — 나머지는 MONTHLY REPORT 부근, API SEARCH 부근) — HABIT MONTHLY/CALENDAR/MONTHLY STAT BAR ██
