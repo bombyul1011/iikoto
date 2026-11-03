@@ -6187,6 +6187,9 @@ function _mfBlockFor(dk,blockCid){
 }
 // 감상 칩(독서/콘텐츠 여러 개 중 고르기) 표기용 — 6자 넘으면 5자+…로 축약.
 function _mfShortTitle(title){
+  // "제목 시즌 N"은 시즌 번호가 잘리면 같은 작품의 다른 시즌과 구분이 안 되므로 제목 쪽만 줄이고 "S N"은 항상 남긴다.
+  const sm=title.match(/^(.*?)\s*시즌\s*(\d+)$/);
+  if(sm&&sm[1])return (sm[1].length>4?sm[1].slice(0,3)+'…':sm[1])+' S'+sm[2];
   return title.length>6?title.slice(0,5)+'…':title;
 }
 // 이번 달(1일~오늘) 날짜별 mflow_YYYY-MM-DD를 읽어 카드별(key) 누적 완료 횟수 집계(슬롯 단위) — 그리드 카드 하단 표시용.
@@ -6430,7 +6433,13 @@ function _mfPanelHtml(dk,slot,c){
     const meta=_mfSubMeta('etc',sub);
     return _mfStackedRowHtml(c,meta.icon,'기타 · '+meta.label,chipsHtml+`<div style="display:flex;gap:6px;margin-top:8px;"><input id="mf-etc-title-inp" class="modal-inp" style="margin-bottom:0;flex:1;" placeholder="${sub==='work'?'예: 재택':'예: 병원'}" value=""><button class="mf-start-btn" style="border-color:rgba(${c.colorRgb},0.6);color:rgb(${c.colorRgb});" onclick="pickMorningFlowEtcTitle('${id}',document.getElementById('mf-etc-title-inp').value.trim())">시작</button></div>`);
   }
-  const label=_mfSlotLabel(slot,true);
+  let label=_mfSlotLabel(slot,true);
+  // 감상(독서/콘텐츠)은 대상이 정해졌으면 종류 뒤에 제목을 붙여 보여줌 — 진행중 항목이 1개라 칩 없이 자동 확정된 경우에도 무엇을 보는지 알 수 있게.
+  // 끝난 작품은 진행중 목록에서 빠지므로 못 찾으면 종류만 표기.
+  if(slot.key==='enjoy'&&slot.targetCid){
+    const tgt=(sub==='read'?_getOngoingReadingWithCid():_getOngoingWatchingWithCid()).find(x=>x.cid===slot.targetCid);
+    if(tgt&&tgt.title)label+=' · '+escapeHtml(_mfShortTitle(tgt.title));
+  }
   const icon=_mfSubMeta(slot.key,sub)?.icon||c.icon;
   // 시각은 저장값이 아니라 연결된 리듬블록(blockCid)에서 그때그때 읽음 — 리듬탭에서 시간을 고치면 바로 반영됨.
   const linkedBlock=_mfBlockFor(dk,slot.blockCid);
