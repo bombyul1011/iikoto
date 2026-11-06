@@ -1,5 +1,5 @@
 // iikoto Service Worker
-const CACHE = 'iikoto-v2.42-timer';
+const CACHE = 'iikoto-v2.43-rhythm';
 const ASSETS = [
   './',
   './index.html'
@@ -31,7 +31,15 @@ self.addEventListener('fetch', e => {
       .then(res => {
         if (res && res.ok) {
           const clone = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone)).catch(() => {});
+          // app.js?v=... 처럼 쿼리만 다른 옛 버전이 캐시에 계속 쌓이지 않도록, 같은 경로의 이전 항목을 지우고 새로 넣는다.
+          caches.open(CACHE).then(async c => {
+            const path = new URL(e.request.url).pathname;
+            const keys = await c.keys();
+            await Promise.all(keys
+              .filter(k => k.url !== e.request.url && new URL(k.url).pathname === path)
+              .map(k => c.delete(k)));
+            await c.put(e.request, clone);
+          }).catch(() => {});
         }
         return res;
       })

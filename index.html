@@ -1501,6 +1501,9 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
 
 /* ── 데일리 리듬 트랙 (블록 모델) ── */
 .rhythm-track-datelabel{font-size:var(--dow-label-size);font-weight:700;color:var(--tp);margin-bottom:14px;display:flex;justify-content:space-between;align-items:baseline;}
+.rhythm-day-title{display:inline-flex;align-items:center;gap:6px;}
+.rhythm-day-nav{background:none;border:0;padding:2px 4px;color:var(--tm);font-size:16px;cursor:pointer;line-height:1;}
+.rhythm-day-nav:disabled{opacity:.25;cursor:default;}
 .rhythm-track-datelabel .w{font-size:var(--dow-label-size);font-weight:400;color:var(--tm);}
 .rhythm-track{position:relative;padding-left:44px;margin-bottom:10px;}
 .rt-gridline{position:absolute;left:44px;right:0;height:1px;background:rgba(var(--divider-rgb),0.18);}
@@ -2788,7 +2791,7 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
   </div>
 </div>
 
-<script src="app.js?v=20261107b"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
+<script src="app.js?v=20261107d"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
 
 </body>
 </html>

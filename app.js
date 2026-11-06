@@ -131,6 +131,23 @@ const EVENT_CATS={
 };
 function getEventCat(key){return EVENT_CATS[key]||EVENT_CATS.etc;}
 function getRhythmBlocks(dk){return S.get(S.key('rblocks',dk))||[];}
+// 리듬 막대의 "종료 시각"을 쓰는 유일한 경로 — 종료 버튼·겹침 자동종료·6시간 안내·취침 자동종료가 모두 여기를 지난다.
+// source==='sleep'(취침시각 기준 자동종료)만 autoClosed를 남겨 취침시각 수정 시 다시 계산되게 하고, 그 외(사용자/겹침/스톱워치)는 확정이라 표시를 지움.
+// 저장·모닝플로우 슬롯 동기화까지 한 번에. 반환: 갱신된 막대 | null(대상 없음).
+function setRhythmBlockEnd(dk,cid,endStr,source){
+  const blocks=getRhythmBlocks(dk),b=blocks.find(function(x){return x&&x.cid===cid;});
+  if(!b)return null;
+  b.end=endStr;
+  if(source==='sleep')b.autoClosed=true;else delete b.autoClosed;
+  saveRhythmBlocks(dk,blocks);
+  syncMorningFlowOnRhythmBlockEnd(dk,cid,endStr);
+  // 자동으로 닫힌(취침/겹침) 콘텐츠 막대가 6시간을 넘으면 잘못 기록됐을 가능성이 크므로 바로 알려 줌 — 리듬탭(과거 날짜 포함)에서 고칠 수 있음.
+  if(source!=='user'&&_isContentBlock(b)){
+    const dur=_rhythmDurationMin(b.start,endStr);
+    if(dur>LONGRUN_MS/60000)showToast((_rhythmBlockDisplayTitle(b.text)||'콘텐츠')+' 기록이 '+Math.floor(dur/60)+'시간 넘게 잡혔어요. 리듬 기록에서 확인해 주세요');
+  }
+  return b;
+}
 function saveRhythmBlocks(dk,v){
   S.set(S.key('rblocks',dk),v);
   S.set(S.key('rblocks_pending',dk),true);
@@ -149,8 +166,7 @@ function autoCloseUnfinishedRhythmBlocks(todayDk,sleepTime){
   [todayDk,yesterdayDk].forEach(dk=>{
     const blocks=getRhythmBlocks(dk);
     if(!blocks.length)return;
-    let changed=false;
-    blocks.forEach(b=>{
+    blocks.slice().forEach(b=>{
       if(b.end&&!b.autoClosed)return; // 사용자가 직접 종료한 블록은 절대 건드리지 않음
       const startMin=dawnTimeToAdjustedMin(b.start);
       if(startMin==null)return;
@@ -160,12 +176,8 @@ function autoCloseUnfinishedRhythmBlocks(todayDk,sleepTime){
       // dk===yesterdayDk인 경우: 전날 시작해 자정을 넘겨 오늘 새벽 취침시각까지 이어진 블록.
       // sleepMin은 항상 새벽보정(1440분 이상)된 값이므로 그 직전 시각을 그대로 종료시각으로 씀.
       const closeMin=(sleepMin-1)%1440;
-      b.end=pad(Math.floor(closeMin/60))+':'+pad(closeMin%60);
-      b.autoClosed=true;
-      changed=true;
-      syncMorningFlowOnRhythmBlockEnd(dk,b.cid,b.end); // 모닝플로우로 시작한 막대면 슬롯도 '진행중'에서 '완료'로
+      setRhythmBlockEnd(dk,b.cid,pad(Math.floor(closeMin/60))+':'+pad(closeMin%60),'sleep');
     });
-    if(changed)saveRhythmBlocks(dk,blocks);
   });
   // 시청/독서 스톱워치를 켠 채 잠들었으면 막대만 닫히고 스톱워치는 계속 '진행중'으로 남으므로, 같이 정리한다.
   try{reconcileStopwatchesWithBlocks();}catch(e){}
@@ -187,6 +199,7 @@ async function syncRhythmBlocksDown(dk){
   if(!rows)return; // 연결 실패 — 로컬 유지
   if(S.get(S.key('rblocks_pending',dk)))return; // 업로드 대기중인 로컬 수정 있으면 덮어쓰지 않음
   S.set(S.key('rblocks',dk),rows.map(rhythmBlockRowToLocal));
+  reconcileAfterRhythmSync();
 }
 // ── initSync 전용 범위 다운로드 — 날짜별로 따로 fetch하면 N일치면 N번 왕복이 그대로 쌓여
 // (특히 LTE/콜드스타트에서) 로딩이 길어짐. date_key=in.(...) 한 번으로 묶어 왕복을 1회로 줄임.
@@ -264,6 +277,11 @@ async function syncMealsDownMany(dks){
 async function syncRhythmBlocksDownMany(dks){
   await _syncManyDown('rhythm_blocks',dks,'rblocks_pending',rhythmBlockRowToLocal,
     (dk,mapped)=>S.set(S.key('rblocks',dk),mapped));
+  reconcileAfterRhythmSync();
+}
+// 다른 기기에서 막대가 종료·수정돼 내려왔을 때, 이 기기에서 돌던 시청·독서 스톱워치와 모닝플로우 상태를 막대(진실의 원천)에 맞춤.
+function reconcileAfterRhythmSync(){
+  try{reconcileStopwatchesWithBlocks();}catch(e){}
 }
 let _rhythmTrackEl=null,_rhythmDk=null,_rhythmFormOpen=false,_rhythmFormCat=null,_rhythmFormStart='',_rhythmFormEnd='',_rhythmFormText='',_rhythmFormCid=null,_rhythmEditIdx=null,_rhythmSubmitting=false;
 // 홈탭 트랙과 주간탭 리듬바 양쪽에서 폼이 열려있을 수 있으므로, 저장/취소/편집 시 둘 다 안전하게 갱신.
@@ -360,6 +378,10 @@ function saveRhythmBlock(){
     blocks.push({cat:cat,start:start,end:end||'',text:text,created:Date.now(),cid:newCid,contentCid:contentCid});
   }
   saveRhythmBlocks(_rhythmDk,blocks);
+  if(!isNew&&end){ // 열려 있던 막대에 폼으로 종료를 채운 경우 — 다른 종료 경로와 같이 모닝플로우·스톱워치 상태를 막대에 맞춤
+    const sb=blocks[_rhythmEditIdx];
+    if(sb&&sb.cid){syncMorningFlowOnRhythmBlockEnd(_rhythmDk,sb.cid,end);reconcileStopwatchesWithBlocks(true);}
+  }
   if(isNew){
     if(cat==='home'){
       if(text==='정리')checkHabitDirect('tidy',_rhythmDk,start); // 살림 중 '정리' 칩 선택했을 때만 습관 연결 — 세탁/주방은 제외
@@ -418,9 +440,7 @@ function _fillRhythmBlockEndAt(dk,idx,force){
   const b=blocks[idx];
   if(!b||(b.end&&!force))return null;
   const n=new Date();
-  b.end=pad(n.getHours())+':'+pad(n.getMinutes());
-  delete b.autoClosed;
-  saveRhythmBlocks(dk,blocks); // saveRhythmBlocks 내부에서 이미 autoSync('rblocks',dk) 호출 — 중복 호출 금지
+  setRhythmBlockEnd(dk,b.cid,pad(n.getHours())+':'+pad(n.getMinutes()),'user'); // 저장·모닝플로우 동기화 포함
   if(b.cat==='exercise'&&b.cid)scheduleExerciseStatAlert(b.cid);
   return {cid:b.cid,cat:b.cat,start:b.start,end:b.end,text:b.text};
 }
@@ -433,14 +453,12 @@ function endRhythmBlockNow(dk,idx){
   if(b.cid&&_swRunning&&_swBlockCid===b.cid){toggleStopwatch();return 'stopwatch';}
   const r=_fillRhythmBlockEndAt(dk,idx);
   if(!r)return null;
-  if(r.cid)syncMorningFlowOnRhythmBlockEnd(dk,r.cid,r.end); // 모닝플로우로 시작한 막대면 pick도 done으로
   refreshRhythmTrack();
   return 'ended';
 }
 function finishRhythmBlock(idx){
   const r=_fillRhythmBlockEndAt(_rhythmDk,idx,true);
   if(!r)return;
-  syncMorningFlowOnRhythmBlockEnd(_rhythmDk,r.cid,r.end); // 모닝플로우로 시작한 블록이면 picks도 done으로 동기화
   refreshRhythmTrack();
   // 종료 시점 메모 제안 — 리듬블록에 입력된 텍스트(콘텐츠 제목 등)가 있으면 그걸 우선 표시,
   // 없으면 기존처럼 카테고리 라벨·지속시간으로 폴백(_buildRhythmMemoTitle 공용 로직).
@@ -677,6 +695,18 @@ function buildMonthlyRhythmBar(dur,dim,dayCount){
   }).join('')+'</div>':'<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:4px 0;">기록된 리듬 항목이 없어요</div>';
   return barHtml+listHtml;
 }
+// 과거 날짜 리듬 열람·수정 — 오늘 기준 7일 전까지 이동할 수 있는지. 서버에서 그날 기록을 받아 한 번 맞춘 뒤 같은 트랙을 그 날짜로 다시 그림.
+const RHYTHM_PAST_DAYS=7;
+function _rhythmOldestDk(){return dateKey(new Date(parseDk(dateKey(getLogicalDate())).getTime()-RHYTHM_PAST_DAYS*86400000));}
+async function openRhythmDay(dk){
+  if(dk>dateKey(getLogicalDate())||dk<_rhythmOldestDk())return;
+  _rhythmFormOpen=false;_resetRhythmForm();
+  try{await Promise.all([syncRhythmBlocksDown(dk),syncSleepDown(dk),syncMealsDown(dk)]);}catch(e){}
+  reconcileAfterRhythmSync();
+  if(!_rhythmTrackEl)return;
+  const old=_rhythmTrackEl,fresh=buildDailyRhythmTrack(dk);
+  if(old.parentNode)old.replaceWith(fresh);
+}
 function buildDailyRhythmTrackFresh(dk){
   // 새로 화면에 들어올 때마다 입력폼은 항상 닫힌 상태로 시작 (열린 채로 남아있던 버그 수정)
   _rhythmFormOpen=false;_resetRhythmForm();
@@ -733,9 +763,12 @@ function buildDailyRhythmTrack(dk){
   _rhythmDk=dk;
   const outer=document.createElement('div');
   const d=new Date(dk+'T00:00:00');
-  const isToday=dk===dateKey(new Date());
+  const todayDk=dateKey(getLogicalDate());
+  const isToday=dk===todayDk;
+  const oldestDk=_rhythmOldestDk();
   const dateRow=document.createElement('div');dateRow.className='rhythm-track-datelabel';
-  dateRow.innerHTML='<span>'+(d.getMonth()+1)+'월 '+d.getDate()+'일 '+_HOME_DAYS[d.getDay()]+'요일</span><span class="w">'+(isToday?'오늘':'')+'</span>';
+  const navBtn=function(delta,icon,off){return '<button type="button" class="rhythm-day-nav" '+(off?'disabled ':'')+'onclick="openRhythmDay(\''+dateKey(new Date(parseDk(dk).getTime()+delta*86400000))+'\')" aria-label="'+(delta<0?'전날':'다음날')+'"><i class="ti '+icon+'" aria-hidden="true"></i></button>';};
+  dateRow.innerHTML='<span class="rhythm-day-title">'+navBtn(-1,'ti-chevron-left',dk<=oldestDk)+(d.getMonth()+1)+'월 '+d.getDate()+'일 '+_HOME_DAYS[d.getDay()]+'요일'+navBtn(1,'ti-chevron-right',isToday)+'</span><span class="w">'+(isToday?'오늘':'')+'</span>';
   outer.appendChild(dateRow);
   const wrap=document.createElement('div');wrap.className='rhythm-track';
   const TOTAL_H=480; // 320→480으로 확대 — 시트 세로 공간을 넉넉히 써서 짧은 블록끼리 겹쳐 보이는 문제 완화
@@ -2841,12 +2874,7 @@ function _autoEndContentBlockForNew(d,b,newBlock,newDk){
     if(d!==newDk||(ns!=null&&cs!=null&&ns>cs))endStr=newBlock.start;
   }
   if(!endStr){const n=new Date();endStr=pad(n.getHours())+':'+pad(n.getMinutes());}
-  const blocks=getRhythmBlocks(d);
-  const i=blocks.findIndex(function(x){return x.cid===b.cid;});
-  if(i<0)return false;
-  blocks[i].end=endStr;delete blocks[i].autoClosed;
-  saveRhythmBlocks(d,blocks);
-  syncMorningFlowOnRhythmBlockEnd(d,b.cid,endStr);
+  if(!setRhythmBlockEnd(d,b.cid,endStr,'overlap'))return false;
   // 시청·독서 스톱워치가 이 막대로 돌고 있었다면 상태도 정리(안내 토스트 포함) — 아니면 막대 이름으로 직접 안내.
   if(!reconcileStopwatchesWithBlocks())showToast((_rhythmBlockDisplayTitle(b.text)||'콘텐츠')+'을(를) '+endStr+'에 종료했어요');
   return true;
@@ -2956,9 +2984,7 @@ function applyLongRunEnd(v){
     return;
   }
   _longRunCtx=null;
-  b.end=v;delete b.autoClosed;
-  saveRhythmBlocks(c.dk,blocks);
-  syncMorningFlowOnRhythmBlockEnd(c.dk,b.cid,v);
+  setRhythmBlockEnd(c.dk,b.cid,v,'user');
   refreshRhythmTrack();
   // 스톱워치가 이 막대로 돌고 있었다면 정리하면서 평소처럼 진행률 입력창을 띄움.
   if(!reconcileStopwatchesWithBlocks(true))showToast(v+'에 종료 처리했어요');
@@ -14185,15 +14211,11 @@ function toggleStopwatch(cid){
 function autoLogReadingRhythm(blockCid,startTs,endTs){
   if(!blockCid||!startTs||!endTs)return;
   const dk=dateKey(getLogicalDate(startTs));
-  const blocks=getRhythmBlocks(dk);
-  const idx=blocks.findIndex(b=>b.cid===blockCid);
-  if(idx<0)return;
   const endD=new Date(endTs);
   let endMin=endD.getHours()*60+endD.getMinutes();
   // 자정을 넘겨 끝난 경우, 같은 논리적 하루(리듬 4시 기준) 안이면 24시를 더해 이어지도록 표시
   if(dateKey(getLogicalDate(endTs))!==dk)endMin+=1440;
-  blocks[idx].end=minToHHMM(endMin%1440);
-  saveRhythmBlocks(dk,blocks); // saveRhythmBlocks 내부에서 이미 autoSync('rblocks',dk) 호출 — 중복 호출 금지
+  setRhythmBlockEnd(dk,blockCid,minToHHMM(endMin%1440),'stopwatch'); // 취침 자동종료 표시(autoClosed)도 여기서 확정되며 지워짐
 }
 function updateStopwatchDisplay(){
   // 경과시간 재계산은 팩토리 onTick 콜백(_swSw 정의부)에서 이미 처리되어 _swSeconds에 미러됨 —
