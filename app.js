@@ -163,9 +163,12 @@ function autoCloseUnfinishedRhythmBlocks(todayDk,sleepTime){
       b.end=pad(Math.floor(closeMin/60))+':'+pad(closeMin%60);
       b.autoClosed=true;
       changed=true;
+      syncMorningFlowOnRhythmBlockEnd(dk,b.cid,b.end); // 모닝플로우로 시작한 막대면 슬롯도 '진행중'에서 '완료'로
     });
     if(changed)saveRhythmBlocks(dk,blocks);
   });
+  // 시청/독서 스톱워치를 켠 채 잠들었으면 막대만 닫히고 스톱워치는 계속 '진행중'으로 남으므로, 같이 정리한다.
+  try{reconcileStopwatchesWithBlocks();}catch(e){}
 }
 // row→local 매핑 공용화(memoRowToLocal 등과 동일 패턴) — syncRhythmBlocksDown/DownMany 양쪽에서 재사용, 중복 정의 제거
 function rhythmBlockRowToLocal(r){return {cat:r.cat,start:r.start_time,end:r.end_time,text:r.text||'',created:r.created,cid:r.client_id||genCid(),autoClosed:!!r.auto_closed,contentCid:r.content_cid||null};}
@@ -2827,18 +2830,138 @@ function showToast(msg){
 const RHYTHM_OVERLAP_SKIP_CATS=['work','appointment'];
 const RHYTHM_OVERLAP_TOAST_MS=8000;
 let _overlapTimer=null,_overlapCtx=null;
+// 콘텐츠(독서·드라마·영화) 막대는 다른 활동과 동시에 둘 수 없다 — 새 막대가 시작되면 묻지 않고 그 시작 시각에 자동 종료한다.
+// (반대로 업무·외출·휴식 등이 진행 중일 때 콘텐츠를 시작하는 경우는 기존처럼 아래 토스트로 묻는다.)
+function _isContentBlock(b){return !!b&&b.cat==='enjoy'&&!!b.contentCid;}
+function _autoEndContentBlockForNew(d,b,newBlock,newDk){
+  let endStr=null;
+  if(newBlock&&newBlock.start){
+    const ns=dawnTimeToAdjustedMin(newBlock.start),cs=dawnTimeToAdjustedMin(b.start);
+    // 어제 막대면 새 막대 시작이 항상 이후, 같은 날이면 새 막대가 콘텐츠 시작보다 늦을 때만 그 시각을 종료로 씀(아니면 지금).
+    if(d!==newDk||(ns!=null&&cs!=null&&ns>cs))endStr=newBlock.start;
+  }
+  if(!endStr){const n=new Date();endStr=pad(n.getHours())+':'+pad(n.getMinutes());}
+  const blocks=getRhythmBlocks(d);
+  const i=blocks.findIndex(function(x){return x.cid===b.cid;});
+  if(i<0)return false;
+  blocks[i].end=endStr;delete blocks[i].autoClosed;
+  saveRhythmBlocks(d,blocks);
+  syncMorningFlowOnRhythmBlockEnd(d,b.cid,endStr);
+  // 시청·독서 스톱워치가 이 막대로 돌고 있었다면 상태도 정리(안내 토스트 포함) — 아니면 막대 이름으로 직접 안내.
+  if(!reconcileStopwatchesWithBlocks())showToast((_rhythmBlockDisplayTitle(b.text)||'콘텐츠')+'을(를) '+endStr+'에 종료했어요');
+  return true;
+}
 function checkRhythmOverlapOnStart(dk,newCid){
   const prevDk=dateKey(new Date(parseDk(dk).getTime()-86400000)); // 자정을 넘겨 이어진 어제 막대까지 확인
+  const newBlock=getRhythmBlocks(dk).find(function(x){return x&&x.cid===newCid;})||null;
   let found=null;
   [prevDk,dk].forEach(function(d){
-    getRhythmBlocks(d).forEach(function(b){
+    getRhythmBlocks(d).slice().forEach(function(b){
       if(!b||b.cid===newCid||b.end)return; // 이미 끝난 막대·방금 만든 막대는 제외
-      if(!RHYTHM_CATS[b.cat]||RHYTHM_OVERLAP_SKIP_CATS.indexOf(b.cat)>=0)return;
+      if(!RHYTHM_CATS[b.cat])return;
+      if(_isContentBlock(b)){_autoEndContentBlockForNew(d,b,newBlock,dk);return;}
+      if(RHYTHM_OVERLAP_SKIP_CATS.indexOf(b.cat)>=0)return;
       found={dk:d,block:b}; // 마지막(가장 최근 날짜) 것을 대표로
     });
   });
   if(!found)return;
   showOverlapToast(found.dk,found.block);
+}
+
+// ── 콘텐츠 막대 6시간 초과 안내 ──
+// 시청·독서를 켜 둔 채 잠들거나 끄는 걸 잊은 경우를 위해, 끝나지 않은 콘텐츠 막대가 6시간을 넘으면 정리 방법을 묻는다.
+// [계속 진행]은 3시간 뒤에 다시 묻고, [종료 시각 정하기]는 시각 휠로 실제 끝낸 시각을 고르며, [지금 종료]는 평소 종료와 같다.
+const LONGRUN_MS=6*3600*1000,LONGRUN_SNOOZE_MS=3*3600*1000;
+let _longRunCtx=null;
+function _rhythmBlockStartTs(dk,b){
+  const m=dawnTimeToAdjustedMin(b.start);
+  if(m==null)return null;
+  return new Date(dk+'T00:00:00').getTime()+m*60000;
+}
+function checkLongRunningContent(){
+  if(_longRunCtx||document.hidden)return;
+  const now=Date.now(),snooze=S.get('longrun_snooze')||{};
+  const base=getLogicalDate();
+  for(let k=0;k<3;k++){ // 오늘·어제·그제
+    const dk=dateKey(new Date(base.getTime()-k*86400000));
+    const blocks=getRhythmBlocks(dk);
+    for(let i=0;i<blocks.length;i++){
+      const b=blocks[i];
+      if(!_isContentBlock(b)||b.end||!b.start)continue;
+      const ts=_rhythmBlockStartTs(dk,b);
+      if(ts==null||now-ts<LONGRUN_MS||(snooze[b.cid]||0)>now)continue;
+      _showLongRunModal(dk,b,Math.floor((now-ts)/3600000));
+      return;
+    }
+  }
+}
+function _showLongRunModal(dk,b,hours){
+  _longRunCtx={dk:dk,cid:b.cid};
+  let ov=document.getElementById('longrun-ov');
+  if(!ov){
+    ov=document.createElement('div');
+    ov.className='modal-ov';ov.id='longrun-ov';
+    ov.innerHTML='<div class="modal" onclick="event.stopPropagation()">'
+      +'<div class="modal-title" id="longrun-title"></div>'
+      +'<div id="longrun-msg" style="font-size:var(--dow-label-size);color:var(--tm);line-height:1.6;margin-bottom:12px;"></div>'
+      +'<div class="modal-actions" style="flex-direction:column;">'
+      +'<button class="mbtn ok" onclick="longRunEndNow()">지금 종료</button>'
+      +'<button class="mbtn cancel" onclick="longRunPickEnd()">종료 시각 정하기</button>'
+      +'<button class="mbtn cancel" onclick="longRunKeep()">계속 진행</button>'
+      +'</div></div>';
+    document.body.appendChild(ov);
+  }
+  const name=_rhythmBlockDisplayTitle(b.text)||RHYTHM_CATS[b.cat].label;
+  document.getElementById('longrun-title').textContent=name+' '+hours+'시간째 진행 중이에요';
+  document.getElementById('longrun-msg').textContent=b.start+'부터 끝나지 않았어요. 켜 둔 채 잠들었다면 실제로 끝낸 시각으로 정리해 주세요.';
+  ov.classList.add('on');
+}
+function _closeLongRun(){
+  const ov=document.getElementById('longrun-ov');if(ov)ov.classList.remove('on');
+}
+function longRunKeep(){
+  if(_longRunCtx){
+    const sn=S.get('longrun_snooze')||{},now=Date.now();
+    Object.keys(sn).forEach(function(k){if(sn[k]<now-2*86400000)delete sn[k];}); // 오래된 항목 정리
+    sn[_longRunCtx.cid]=now+LONGRUN_SNOOZE_MS;
+    S.set('longrun_snooze',sn);
+  }
+  _longRunCtx=null;_closeLongRun();
+}
+function longRunEndNow(){
+  const c=_longRunCtx;_longRunCtx=null;_closeLongRun();
+  if(!c)return;
+  const idx=getRhythmBlocks(c.dk).findIndex(function(x){return x.cid===c.cid;});
+  if(idx>=0)endRhythmBlockNow(c.dk,idx);
+}
+function longRunPickEnd(){
+  if(!_longRunCtx)return;
+  _closeLongRun();
+  const n=new Date();
+  _sleepTarget='longrun-end';
+  document.getElementById('time-inp').value=pad(n.getHours())+':'+pad(n.getMinutes());
+  openModal('time-modal');
+  renderTimeWheel();
+}
+// 시각 휠에서 고른 종료 시각 적용 — 시작보다 이전/같거나 지금보다 이후인 시각은 받지 않고 다시 묻는다.
+function applyLongRunEnd(v){
+  const c=_longRunCtx;
+  if(!c)return;
+  const blocks=getRhythmBlocks(c.dk),i=blocks.findIndex(function(x){return x.cid===c.cid;});
+  if(i<0||blocks[i].end){_longRunCtx=null;return;}
+  const b=blocks[i],dur=_rhythmDurationMin(b.start,v),startTs=_rhythmBlockStartTs(c.dk,b);
+  if(!(dur>0)||startTs==null||startTs+dur*60000>Date.now()+60000){
+    showToast('시작 이후, 지금 이전의 시각을 골라 주세요');
+    setTimeout(function(){longRunPickEnd();},0);
+    return;
+  }
+  _longRunCtx=null;
+  b.end=v;delete b.autoClosed;
+  saveRhythmBlocks(c.dk,blocks);
+  syncMorningFlowOnRhythmBlockEnd(c.dk,b.cid,v);
+  refreshRhythmTrack();
+  // 스톱워치가 이 막대로 돌고 있었다면 정리하면서 평소처럼 진행률 입력창을 띄움.
+  if(!reconcileStopwatchesWithBlocks(true))showToast(v+'에 종료 처리했어요');
 }
 function showOverlapToast(dk,block){
   const t=document.getElementById('rhythm-overlap-toast');
@@ -4204,6 +4327,7 @@ function hasAnyPendingSync(){
 }
 setInterval(()=>{
   if(navigator.onLine&&!window._restoring&&hasAnyPendingSync())syncAll();
+  checkLongRunningContent(); // 켜 둔 채 6시간이 넘은 콘텐츠 막대 안내(2분마다 확인, 이미 안내 중이거나 보류 중이면 무시)
 },120000);
 // 앱을 켜 둔 채 가만히 있어도 애플 캘린더 변경이 들어오도록 5분마다 확인(화면이 보일 때만, 내부에서 5분 간격 제한)
 setInterval(()=>{if(!document.hidden)syncAppleCalendar({silent:true});},300000);
@@ -5258,6 +5382,7 @@ function _applyCompletedTimeOnly(baseMs,hhmm){
 }
 function confirmTime(){
   const v=padTime(document.getElementById('time-inp').value);if(!v)return;
+  if(_sleepTarget==='longrun-end'){closeModal('time-modal');applyLongRunEnd(v);return;}
   if(_sleepTarget==='rblock-start'){_rhythmFormStart=v;closeModal('time-modal');refreshRhythmTrack();return;}
   if(_sleepTarget==='rblock-end'){_rhythmFormEnd=v;closeModal('time-modal');refreshRhythmTrack();return;}
   if(_sleepTarget==='event'){
@@ -9720,6 +9845,9 @@ function createInstantCommitStopwatch(config){
   const onStarted=config.onStarted||function(){};
   const onStop=config.onStop||function(){};
   const onRestored=config.onRestored||function(){};
+  // onExternalEnd(st,info) : 스톱워치가 도는 중에 연결된 리듬막대의 end가 밖에서(취침시각 자동마감·리듬탭 수정 등) 채워진 경우의 정리 콜백.
+  //   info={startTs,cid,blockCid,end,seconds,userInitiated}. 막대의 end는 절대 덮어쓰지 않는다.
+  const onExternalEnd=config.onExternalEnd||function(){};
   const buildTitleText=config.buildTitleText;      // (state)=>string — 리듬블록 text
   const buildPersistPayload=config.buildPersistPayload; // (state)=>obj — localStorage에 저장할 추가 필드
 
@@ -9761,8 +9889,24 @@ function createInstantCommitStopwatch(config){
     onStarted(st);
   }
 
+  // 도는 중인 스톱워치의 막대가 이미 종료돼 있으면(예: 켜 둔 채 잠들어 취침시각 자동마감이 end를 채움) 스톱워치 상태만 조용히 정리.
+  // 막대 end는 그대로 두고, 소요시간도 지금이 아니라 막대의 시작~end 기준으로 계산. 정리했으면 true.
+  function finishIfBlockEnded(userInitiated){
+    if(!st.running||!st.blockCid)return false;
+    const dk=dateKey(getLogicalDate(st.startTs));
+    const b=getRhythmBlocks(dk).find(x=>x.cid===st.blockCid);
+    if(!b||!b.end||!b.start)return false;
+    const info={startTs:st.startTs,cid:st.cid,blockCid:st.blockCid,end:b.end,seconds:_rhythmDurationMin(b.start,b.end)*60,userInitiated:!!userInitiated};
+    if(hasTicker){clearInterval(st.tickInterval);st.tickInterval=null;}
+    if(persistKey)try{localStorage.removeItem(persistKey);}catch(e){}
+    st.running=false;st.startTs=0;st.cid=null;st.blockCid=null;st.seconds=0;
+    onExternalEnd(st,info);
+    return true;
+  }
+
   function stop(){
     if(!st.running)return;
+    if(finishIfBlockEnded(true))return;
     const endTs=Date.now();
     const startTs=st.startTs,cid=st.cid,blockCid=st.blockCid;
     const seconds=Math.max(0,Math.round((endTs-startTs)/1000));
@@ -9806,7 +9950,7 @@ function createInstantCommitStopwatch(config){
     }catch(e){}
   }
 
-  return{state:st,start,stop,toggle,restoreFromStorage,persist};
+  return{state:st,start,stop,toggle,restoreFromStorage,persist,reconcile:(userInitiated)=>finishIfBlockEnded(!!userInitiated)};
 }
 
 // ══════════════════════════════════════════════════════════
@@ -9872,6 +10016,17 @@ const _cswSw=createInstantCommitStopwatch({
     renderCwatchMainCard();
     _refreshEveningContentRow();
     openContentProgressModal(info.cid,minutesWatched,info.seconds); // 시간 문턱 없이 항상 띄움(리듬블록도 항상 생성되므로 일관되게)
+  },
+  onExternalEnd:function(st,info){
+    document.querySelectorAll('.hub-icon-btn').forEach(el=>el.classList.remove('cwatch-active'));
+    _cswSyncMirror(st);
+    if(_chArchiveMk)chExpandMonth(_chArchiveMk);
+    refreshContentHubViews();
+    renderCwatchMainCard();
+    _refreshEveningContentRow();
+    // 사용자가 종료를 직접 눌렀으면 평소처럼 진행률 입력창을, 취침시각 등으로 자동 정리된 경우엔 안내 토스트만.
+    if(info.userInitiated)openContentProgressModal(info.cid,Math.round(info.seconds/60),info.seconds);
+    else showToast('켜 둔 시청을 '+info.end+'에 종료 처리했어요');
   }
 });
 // 시청 시작 확인 단계 — 포스터를 눌러 바로 스톱워치가 시작되면 실수 탭·연타 시 리듬 블록이 중복 생성될 위험이 있어,
@@ -10059,6 +10214,8 @@ function _commitEnjoyRhythmBlock(opts){
 // 실제 로직(즉시커밋, 연타방지 락, 복원)은 createInstantCommitStopwatch 정의부 참조.
 // 함수 이름은 그대로 유지 — 인라인 onclick 등 외부 호출부를 바꾸지 않기 위함.
 function toggleContentStopwatch(cid,knownMk){_cswSw.toggle(cid,knownMk);}
+// 켜 둔 시청·독서 스톱워치의 막대가 이미 닫혀 있으면(취침시각 자동마감, 다른 기기에서 종료 등) 스톱워치 상태를 정리 — 취침시각 저장·앱 복귀·시작 시 호출.
+function reconcileStopwatchesWithBlocks(userInitiated){const a=_cswSw.reconcile(userInitiated),b=_swSw.reconcile(userInitiated);return a||b;}
 function stopContentStopwatch(){_cswSw.stop();}
 // 새로고침·앱 재시작으로 메모리 상태가 초기화돼도 시청중 표시를 이어감(초단위 표시가 없어 setInterval 재개는 불필요)
 _cswSw.restoreFromStorage();
@@ -11938,6 +12095,15 @@ const _swSw=createInstantCommitStopwatch({
     renderRdTop();
     renderRdQuotes(); // 스톱워치 종료로 선택 대상이 바뀌므로(1권이면 그 책, 2권 이상이면 재선택 대기) 문장수집도 함께 갱신
     openProgressModal(info.cid,info.seconds); // 시간 문턱 없이 항상 띄움(리듬블록도 항상 생성되므로 일관되게)
+  },
+  onExternalEnd:function(st,info){
+    document.querySelector('.reading-icon-btn')?.classList.remove('sw-active');
+    _swSyncMirror(st);
+    _refreshEveningContentRow();
+    renderRdTop();
+    renderRdQuotes();
+    if(info.userInitiated)openProgressModal(info.cid,info.seconds);
+    else showToast('켜 둔 독서를 '+info.end+'에 종료 처리했어요');
   },
   onRestored:function(st,saved){
     st.title=saved.title||'';
@@ -14042,6 +14208,7 @@ function updateStopwatchDisplay(){
   if(ringEl)ringEl.setAttribute('stroke-dashoffset',offset);
 }
 document.addEventListener('visibilitychange',function(){
+  if(!document.hidden){reconcileStopwatchesWithBlocks();setTimeout(checkLongRunningContent,1000);} // 다른 기기에서 취침시각/종료가 반영됐을 수 있으므로 복귀할 때마다 확인
   if(!document.hidden&&_swRunning)updateStopwatchDisplay(); // 화면 복귀 즉시 정확한 시간으로 보정 (독서 전용 — 콘텐츠 시청은 초단위 표시가 없어 보정 불필요)
 });
 
@@ -14315,6 +14482,8 @@ async function _openFromNotificationUrl(){
 // localStorage에 저장된 시작시각이 있으면(=종료 처리 없이 앱이 닫힌 경우) 그 시각 기준으로
 // 경과시간을 계산해 스톱워치를 다시 돌아가는 상태로 되살린다.
 _swSw.restoreFromStorage();
+setTimeout(checkLongRunningContent,3000); // 시작 후 동기화가 어느 정도 끝난 뒤 6시간 초과 콘텐츠 막대 확인
+reconcileStopwatchesWithBlocks(); // 복원된 스톱워치의 막대가 이미 닫혀 있으면(잠들기 전 켜 둔 채 취침시각이 등록된 경우 등) 바로 정리
 // 최초 로드 시엔 로컬 캐시만으로 그려지므로(completedAt 등 최신 서버값 반영 전),
 // online/visibilitychange 이벤트를 기다리지 않고 여기서 한 번 동기화를 실행해 최신 상태로 맞춘다.
 if(navigator.onLine){
