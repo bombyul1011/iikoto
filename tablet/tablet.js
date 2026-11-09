@@ -1033,16 +1033,6 @@ async function _runMemoSearch(q){
 const MEAL_KEYS=['breakfast','lunch','snack','dinner'];
 const MEAL_LABELS={breakfast:'아침',lunch:'점심',snack:'간식',dinner:'저녁'};
 
-// 본앱 MORNING_FLOW_CARDS 이식 — 확정 rgb값 대신 팔레트 CSS 변수 참조로 통일(2026-09-04, 본앱이 팔레트 일관성 위해 변경한 방식을 그대로 따름).
-const MFLOW_CARDS=[
-  {key:'rest',label:'휴식',icon:'ti-cup',colorRgb:'var(--pal-mint-rgb)',rhythmCat:'rest'},
-  {key:'exercise',label:'운동',icon:'ti-run',colorRgb:'var(--pal-pink-rgb)',rhythmCat:'exercise'},
-  {key:'enjoy',label:'감상',icon:'ti-stack-2',colorRgb:'var(--pal-lavender-rgb)',rhythmCat:'enjoy'},
-  {key:'desk',label:'책상',icon:'ti-desk',colorRgb:'var(--pal-yellow-rgb)',rhythmCat:'note'},
-  {key:'clean',label:'정리',icon:'ti-sparkles',colorRgb:'var(--pal-lime-rgb)',rhythmCat:'home'},
-  {key:'etc',label:'기타',icon:'ti-dots',colorRgb:'var(--pal-warmgray-rgb)',rhythmCat:null}
-];
-
 // habit_checks를 "날짜+습관명" 조합 기준으로 중복 제거해서 세는 통합 헬퍼.
 // 네트워크 재시도나 동시 클릭 등으로 실수로 중복 삽입되면 length 기준 집계는 100%를 넘는 왜곡된 비율을 만들 수 있어
 // 모든 습관 카운트 계산을 이 고유매칭 방식으로 통일함(2026-08-22, 봄이님 결정).
@@ -1487,7 +1477,7 @@ async function loadWeekTab(){
   const [goalRows,habits,habitChecks,memos,todos,sleepRows,onelineRows,contents,
     lwMemos,lwTodos,lwSleepRows,lwHabitChecks,rblocksFull,sleepReportRows,
     rblocksLast,readingLogRows,
-    rdaThisWeek,rdaLastWeek,weekMflowRows,weekPhotoRows,vacationRanges,lwVacationRanges]=await Promise.all([
+    rdaThisWeek,rdaLastWeek,weekPhotoRows,vacationRanges,lwVacationRanges]=await Promise.all([
     supaFetch(`goal_notes?note_key=eq.wchallenge_${encodeURIComponent(wk)}`),
     supaFetch(`habits?order=sort_order.asc`),
     supaFetch(`habit_checks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
@@ -1520,8 +1510,6 @@ async function loadWeekTab(){
     // 이번 주 독서 활동(탭 전환용) — 이번 주/지난주 각각의 독서 로그(권별 진행량 계산용)
     supaFetch(`content_daily_log?date_key=gte.${startDk}&date_key=lte.${cmpEndDk}&select=date_key,content_cid,unit,amount_read,seconds&order=date_key.asc`),
     supaFetch(`content_daily_log?date_key=gte.${lastStartDk}&date_key=lte.${lastCmpEndDk}&select=date_key,content_cid,unit,amount_read,seconds&order=date_key.asc`),
-    // 이번주 아침 흐름 배너용 — 캘린더 주(월~일) 범위 morning_flow_picks 전체
-    supaFetch(`morning_flow_picks?date_key=gte.${startDk}&date_key=lte.${endDk}`),
     // 이번주 사진 기록 필름스트립용 — 캘린더 주(월~일) 범위 사진메모(photo_url 있는 것만)
     supaFetch(`memos?date_key=gte.${startDk}&date_key=lte.${endDk}&photo_url=not.is.null&order=date_key.asc,memo_time.asc`),
     // 오프 기간(습관율 계산에서 제외용) — 이번주/지난주 각각 별도 조회
@@ -1546,7 +1534,6 @@ async function loadWeekTab(){
     startDk:lastStartDk,endDk:lastCmpEndDk,vacationRanges:lwVacationRanges
   });
   renderWeekRhythmFlow(rblocksThis||[],rblocksLast||[],cmpDayCount);
-  renderWeekMflow(weekMflowRows||[],rblocksFull||[]);
   renderWeekPhotos(weekPhotoRows||[],weekDates);
   renderWeekOneline(onelineRows||[],weekDates);
   renderWeekReading(contents||[],readingBook,readingLogRows||[],startDk,endDk);
@@ -1556,8 +1543,6 @@ async function loadWeekTab(){
 // 반올림·음수/1440초과 정규화까지 포함 — 평균 계산 등 소수분·범위 밖 값이 들어올 수 있는 모든 호출부에서 안전하게 사용(2026-08, 기존엔 연간탭에 _yrMinToHHMM으로 중복 존재했음).
 function _minToHHMM(min){const m=Math.round(((min%1440)+1440)%1440);return pad(Math.floor(m/60))+':'+pad(m%60);}
 
-// 이번 주 모닝루틴 — 오늘 포함 최근 7일 롤링 기준, 항목별 체크 일수를 얇은 막대로 표시(2열 그리드, 본앱 하단 통계그리드와 동일 배치).
-// 달성률 자체보다 "얼마나 루틴화됐는지"를 가볍게 보여주는 용도라 궤도 UI 없이 심플하게.
 // 이번 주 수면 리포트 — 최근 2주 롤링 기준, 목표(SLEEP_GOAL_MIN) 대비/평균컨디션/달성률/규칙성 4지표 풀와이드 카드.
 function renderWeekSleepReport(rows){
   const el=document.getElementById('week-sleep-report');
@@ -1731,52 +1716,6 @@ function renderWeekHabitMatrix(habits,checks,weekDates){
   el.innerHTML=html;
 }
 
-
-// 이번주 아침 흐름 — 6칸 한 줄 그리드. 누적횟수는 running+done 전부, 누적시간은 done만(_mfDurationMin과 동일 방식).
-function _mflowDurationMin(startStr,endStr){
-  if(!startStr||!endStr)return 0;
-  const [sh,sm]=startStr.split(':').map(Number);
-  const [eh,em]=endStr.split(':').map(Number);
-  let startMin=sh*60+sm,endMin=eh*60+em;
-  if(endMin<startMin)endMin+=1440;
-  return endMin-startMin;
-}
-function _mflowDurationLabel(min){
-  if(min<=0)return '0분';
-  const h=Math.floor(min/60),m=min%60;
-  if(h&&m)return `${h}시간 ${m}분`;
-  if(h)return `${h}시간`;
-  return `${m}분`;
-}
-function renderWeekMflow(rows,rblocks){
-  const el=document.getElementById('week-mflow');
-  const stats={};
-  MFLOW_CARDS.forEach(c=>{stats[c.key]={count:0,minutes:0};});
-  const rblocksByCid={};
-  const rblocksByClientId={};
-  (rblocks||[]).forEach(b=>{
-    if(b.cid)rblocksByCid[b.cid]=b;
-    if(b.client_id)rblocksByClientId[b.client_id]=b;
-  });
-  (rows||[]).forEach(row=>{
-    const picks=row.picks||{};
-    Object.entries(picks).forEach(([pickId,p])=>{
-      const key=(p&&p.key)||pickId; // 복수 슬롯 구조(2026-09-20): picks의 키는 슬롯id, 카드는 p.key — 옛 구조는 키가 곧 카드
-      if(!p||!stats[key])return;
-      if(p.status==='running'||p.status==='done')stats[key].count++;
-      if(p.status!=='done')return;
-      // [본앱 2026-09-05 구조변경] 시각은 picks에 직접 없고 blockCid로 rhythm_blocks를 조회해야 함.
-      // 옛 구조(startStr/endStr 직접 저장)는 폴백으로 계속 지원. 자유입력(blockCid 없음)은 시간 취합 제외.
-      const b=(p.blockCid&&(rblocksByCid[p.blockCid]||rblocksByClientId[p.blockCid]))||null;
-      if(b&&b.start_time&&b.end_time)stats[key].minutes+=_mflowDurationMin(b.start_time,b.end_time);
-      else if(p.startStr&&p.endStr)stats[key].minutes+=_mflowDurationMin(p.startStr,p.endStr);
-    });
-  });
-  el.innerHTML=`<div class="wk-mflow-grid">${MFLOW_CARDS.map(c=>{
-    const s=stats[c.key];
-    return `<div class="wk-mflow-cell" style="--wk-mflow-rgb:${c.colorRgb};"><i class="ti ${c.icon}" style="color:rgb(${c.colorRgb});" aria-hidden="true"></i><div class="wk-mflow-cell-label">${c.label}</div><div class="wk-mflow-cell-count">${s.count}</div><div class="wk-mflow-cell-time">${_mflowDurationLabel(s.minutes)}</div></div>`;
-  }).join('')}</div>`;
-}
 
 // 이번주 사진 기록 — 요일(월~일) 7칸 그리드. 하루에 여러 장이면 최신 1장만 대표로, 사진 없는 요일은 빈 칸.
 function renderWeekPhotos(rows,weekDates){
@@ -6113,7 +6052,7 @@ async function loadTimelineTab(){
   // 범위 쿼리 한 번으로 가져온 뒤 JS에서 "오늘을 포함하는 것"만 걸러 dayIndex/totalDays를 계산한다(2026-09-25).
   const lookbackStartDk=dateKey(new Date(new Date(dk+'T00:00:00').getTime()-(MULTIDAY_LOOKBACK_DAYS-1)*86400000));
 
-  const [todos,sleepRows,habits,habitChecks,meals,contents,rblocks,todayManualRows,onelineRows,morningChecks,multidayRows,finalReviewRows]=await Promise.all([
+  const [todos,sleepRows,habits,habitChecks,meals,contents,rblocks,todayManualRows,onelineRows,multidayRows,finalReviewRows]=await Promise.all([
     supaFetch(`todos?date_key=eq.${dk}&order=created.asc`),
     supaFetch(`sleep?date_key=eq.${dk}`),
     supaFetch(`habits?order=sort_order.asc`),
@@ -6123,7 +6062,6 @@ async function loadTimelineTab(){
     supaFetch(`rhythm_blocks?date_key=eq.${dk}&order=start_time.asc`),
     supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wcal_manual_'+dk.slice(0,7))}`),
     supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('oneline:'+dk)}`),
-    supaFetch(`morning_flow_picks?date_key=eq.${dk}`),
     supaFetch(`todos?date_key=gte.${lookbackStartDk}&date_key=lte.${dk}&is_event=eq.true&event_end_date=not.is.null&order=date_key.asc`),
     // 완결 총평(review) — 저장 시각(review_saved_dk)이 완결일(end_date)과 다를 수 있어(예: 완결 며칠 뒤 총평 작성)
     // 위 contents 조회(watching/오늘완결/오늘시작 좁은 조건)로는 놓칠 수 있음. 본앱 getContentMemoItemsForDate와
@@ -6159,17 +6097,11 @@ async function loadTimelineTab(){
   const todayManual=((todayManualRows&&todayManualRows[0]&&todayManualRows[0].lines)||[]).filter(it=>it.dk===dk);
   renderTodayReading(dk,rblocks||[],contents||[],todayManual);
 
-  // 모닝플로우로 등록된 리듬블록의 cid 집합 — picks[key].blockCid가 rhythm_blocks.cid를 가리킴(본앱 2026-09-05 구조)
-  const mflowRow=morningChecks&&morningChecks[0];
-  const mflowCidSet=new Set();
-  if(mflowRow&&mflowRow.picks){
-    Object.values(mflowRow.picks).forEach(p=>{if(p&&p.blockCid)mflowCidSet.add(p.blockCid);});
-  }
 
   // 좌측 상단 — 수면배너 + 습관배너(아이콘만)
   renderTimelineSleepBanner(sleep);
   renderTimelineHabitBanner(dk,habits||[],habitChecks||[]);
-  renderTimelineTrack(dk,todos||[],sleep,mealsRow,rblocks||[],mflowCidSet,undefined,contents||[],habits||[],habitChecks||[]);
+  renderTimelineTrack(dk,todos||[],sleep,mealsRow,rblocks||[],undefined,contents||[],habits||[],habitChecks||[]);
   const compareCardDone=renderTimelineCompareCard(dk,todos||[],sleep,rblocks||[],habits||[],habitChecks||[]);
 
   // 좌우 높이 동기화 — 오른쪽 영역(도넛~감상/습관까지) 실제 렌더 높이를 측정해, 그 값을 트랙 전체 높이(TOTAL_H)로
@@ -6180,7 +6112,7 @@ async function loadTimelineTab(){
   // 아직 최종값이 아니므로 이르게 측정하면 어긋난다.
   Promise.all([rightRenderDone,compareCardDone]).then(()=>{
     if(myGen!==_tlLoadGen)return; // 대기하는 동안 더 최신 날짜 이동이 있었으면 동기화 자체를 시작하지 않음
-    syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,mflowCidSet,contents||[],habits||[],habitChecks||[],myGen);
+    syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,contents||[],habits||[],habitChecks||[],myGen);
   });
 }
 
@@ -6190,7 +6122,7 @@ async function loadTimelineTab(){
 let _isFirstTimelineLoad=true; // 앱 최초 로딩 시에는 사이드바 캘린더/인사배너 등 다른 초기화가 동시에 돌면서
 // 레이아웃이 계속 바뀌는 중이라 rAF 두 번만으로는 최종 높이가 잡히기 전에 측정되는 경우가 있어, 이 경우에만
 // 넉넉한 지연을 둔 추가 재동기화를 한 번 더 건다(재방문 시에는 이미 안정적이라 불필요).
-function syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,mflowCidSet,contents,habits,habitChecks,gen){
+function syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,contents,habits,habitChecks,gen){
   const doSync=()=>{
     if(gen!==_tlLoadGen)return; // 이 동기화가 예약된 뒤 더 최신 날짜 이동이 있었으면 건너뜀(경쟁상태 방지, 2026-09-12)
     const sideEl=document.getElementById('side');
@@ -6221,7 +6153,7 @@ function syncTimelineTrackHeight(dk,todos,sleep,mealsRow,rblocks,mflowCidSet,con
     const bannersEl=document.querySelector('.tl-top-banners');
     const bannersH=(bannersEl?bannersEl.offsetHeight:0)+12; // 배너와 트랙카드 사이 margin-bottom(12px) 포함
     const targetH=Math.max(rightEl.offsetHeight-cardPadding-bannersH,400);
-    renderTimelineTrack(dk,todos||[],sleep,mealsRow,rblocks||[],mflowCidSet,targetH,contents||[],habits||[],habitChecks||[]);
+    renderTimelineTrack(dk,todos||[],sleep,mealsRow,rblocks||[],targetH,contents||[],habits||[],habitChecks||[]);
     // 카드 외곽 높이(max-height)는 컨텐츠 높이(targetH)에 패딩을 더한 값이어야 우측과 정확히 맞음 —
     // 이전에는 패딩을 빼지 않고 rightEl 전체 높이를 그대로 넣어 트랙 카드가 우측보다 패딩만큼 더 커 보였음.
     trackCardEl.style.maxHeight=(targetH+cardPadding)+'px';
@@ -6594,8 +6526,7 @@ function _tlTimeToY(min,TOTAL_H){
 
 // 좌측 리듬트랙 — 리듬 막대(rt-fill 스타일) + 일정(도트+점선) + 시간표/완료투두를 같은 세로축에 정렬해 함께 렌더.
 // 스크롤 없이 전체 24시간을 다 보여주는 고정 높이(TOTAL_H) — 우측 카드 분량과 균형은 추후 조정 예정.
-function renderTimelineTrack(dk,todos,sleep,meals,rblocks,mflowCidSet,totalHOverride,contents,habits,habitChecks){
-  mflowCidSet=mflowCidSet||new Set();
+function renderTimelineTrack(dk,todos,sleep,meals,rblocks,totalHOverride,contents,habits,habitChecks){
   const MEAL_PILL_H=24; // 식사 알약(.tl-meal-pill) 실제 렌더 높이 — 밀어내기(labelTopFix) 계산에 동일하게 사용
   const gridEl=document.getElementById('tl-track-grid');
   const TOTAL_H=totalHOverride||900;
@@ -6649,7 +6580,6 @@ function renderTimelineTrack(dk,todos,sleep,meals,rblocks,mflowCidSet,totalHOver
   // 자정~04시(DAWN_CUTOFF_MIN) 사이는 논리적 하루상 전날의 연장 구간이므로 +1440 보정.
   let nowMin=new Date().getHours()*60+new Date().getMinutes();
   if(nowMin<DAWN_CUTOFF_MIN)nowMin+=1440;
-  const mflowMarkers=[]; // {by} — 모닝플로우 배지는 축 컬럼과 완전히 분리된 별도 세로 레인에 표시
   const renderBlocks=blocksSorted.map((bk,bi)=>{
     const offset=(bk.sortKey!=null)?(bk.sortKey-bk.start):0;
     const by=_tlTimeToY(bk.start+offset,TOTAL_H);
@@ -6720,8 +6650,6 @@ function renderTimelineTrack(dk,todos,sleep,meals,rblocks,mflowCidSet,totalHOver
     const labelHtml=`<span class="tl-fill-label">${iconHtml}${escapeHtml(bk.label)}</span>`;
     const textWrapHtml=`<div class="tl-fill-text"${marginStyle}>${labelHtml}${timeHtml}</div>`;
     axisHtml+=`<div class="tl-fill${isShort?' tl-fill-short':''}${canTwoLine?' tl-fill-two-line':''}${bk.ongoing?' ongoing':''}" style="top:${by}px;height:${bh}px;background-color:${bk.color};z-index:${10+bi};">${textWrapHtml}</div>`;
-    const isMflow=bk.cid&&mflowCidSet.has(bk.cid);
-    if(isMflow)mflowMarkers.push({by});
   });
 
   if(isToday){
@@ -6729,12 +6657,6 @@ function renderTimelineTrack(dk,todos,sleep,meals,rblocks,mflowCidSet,totalHOver
     axisHtml+=`<div class="tl-now-line" style="top:${nowY}px;"></div><div class="tl-now-dot" style="top:${nowY}px;"></div>`;
     if(nowY>maxBottom)maxBottom=nowY;
   }
-
-  // 모닝플로우 배지 전용 레인 — 축 컬럼과 시간표 컬럼 사이(tl-mflow-lane)에 독립적으로 배치되어 막대와 절대 겹치지 않음.
-  let mflowLaneHtml='';
-  mflowMarkers.forEach(m=>{
-    mflowLaneHtml+=`<div class="tl-mflow-badge" style="top:${m.by}px;" title="모닝플로우"><i class="ti ti-sun" aria-hidden="true"></i></div>`;
-  });
 
   // 오른쪽 컬럼 — 일정 + 시간표 + 완료투두 + 조각모드(완료된 조각만)를 시간순으로 통합.
   // 겹치면 러프하게 아래로 밀어냄(식사 리듬처럼 정교한 제자리 배치는 필요 없는 영역이라 단순하게 처리).
@@ -6822,5 +6744,5 @@ function renderTimelineTrack(dk,todos,sleep,meals,rblocks,mflowCidSet,totalHOver
 
   const trackHeight=Math.max(TOTAL_H+14+10,maxBottom+10); // +14는 _tlTimeToY의 07시 이전 압축 여백(PRE_COMPRESS_H)
   gridEl.style.height=trackHeight+'px';
-  gridEl.innerHTML=`<div class="tl-axis-col" style="height:${trackHeight}px;">${sleepFillHtml}${axisHtml}</div><div class="tl-mflow-lane" style="height:${trackHeight}px;">${mflowLaneHtml}</div><div class="tl-todo-col" style="height:${trackHeight}px;">${todoHtml||'<div class="tl-empty" style="padding:12px 0;font-size:var(--fs-sm);">등록된 시간표가 없어요</div>'}</div>`;
+  gridEl.innerHTML=`<div class="tl-axis-col" style="height:${trackHeight}px;">${sleepFillHtml}${axisHtml}</div><div class="tl-todo-col" style="height:${trackHeight}px;">${todoHtml||'<div class="tl-empty" style="padding:12px 0;font-size:var(--fs-sm);">등록된 시간표가 없어요</div>'}</div>`;
 }

@@ -634,6 +634,52 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .photo-archive-thumb-ph.hide{opacity:0;pointer-events:none;}
 .photo-archive-empty{font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:24px 0;}
 
+/* 오전 홈 */
+.mh-chips{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;}
+.mh-chip{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:14px;border:1px solid var(--card-b);background:rgba(255,255,255,0.45);color:var(--ts);font-size:var(--dow-label-size);font-family:inherit;cursor:pointer;}
+.mh-chip i{font-size:14px;}
+.mh-memo-row{display:flex;gap:6px;margin-top:10px;}
+.mh-memo-inp{flex:1;min-width:0;height:38px;border-radius:12px;border:1px solid var(--card-b);background:rgba(255,255,255,0.55);padding:0 12px;font-size:var(--main-text-size);color:var(--tp);font-family:inherit;outline:none;}
+.mh-memo-send{width:38px;height:38px;border-radius:12px;border:none;background:rgba(var(--pal-orange-rgb),0.28);color:var(--pal-orange-text);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.mh-memo-last{display:flex;gap:6px;align-items:flex-start;margin-top:8px;font-size:var(--dow-label-size);color:var(--ts);line-height:1.5;word-break:keep-all;}
+.mh-memo-last i{font-size:13px;margin-top:2px;color:var(--tm);}
+#home-hcard-extra{display:none;}
+.mh-card{border-radius:18px;padding:14px 16px;background:var(--card);border:1px solid var(--card-b);margin-bottom:10px;}
+.mh-dash{border-style:dashed;background:transparent;}
+.mh-ct{display:flex;align-items:center;gap:6px;font-size:var(--dow-label-size);font-weight:500;color:var(--ts);margin-bottom:6px;}
+.mh-tx{font-size:var(--main-text-size);line-height:1.7;color:var(--tp);word-break:keep-all;}
+.mh-dim{color:var(--tm);}
+.mh-note{padding:10px 16px;margin-top:-4px;}
+.mh-wait{text-align:center;padding:22px 16px 16px;}
+.mh-wait-ic{font-size:28px;color:var(--pal-orange-text);margin-bottom:6px;}
+.mh-wait-t{font-size:var(--main-text-size);color:var(--tp);margin-bottom:14px;}
+.mh-main-btn{width:100%;height:42px;border-radius:14px;border:none;background:rgba(var(--pal-orange-rgb),0.30);color:var(--pal-orange-text);font-size:var(--main-text-size);font-weight:500;font-family:inherit;cursor:pointer;}
+.mh-sub-link{margin-top:10px;background:none;border:none;color:var(--tm);font-size:var(--dow-label-size);font-family:inherit;text-decoration:underline;cursor:pointer;}
+.mh-pick{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:16px;background:var(--card);border:1px solid var(--card-b);margin-bottom:8px;cursor:pointer;}
+.mh-pick-ic{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#fff;font-size:19px;}
+.mh-pick-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+.mh-pick-t{font-size:var(--main-text-size);font-weight:500;color:var(--tp);}
+.mh-pick-r{font-size:var(--dow-label-size);color:var(--tm);word-break:keep-all;}
+.mh-pick-go{color:var(--tm);font-size:16px;}
+.mh-meal{display:flex;align-items:center;gap:4px;padding:2px 16px 2px 2px;}
+.mh-check{width:44px;height:44px;background:none;border:none;padding:0;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+.mh-check-c{width:24px;height:24px;border-radius:50%;border:1.5px solid var(--card-b);display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;}
+.mh-check.on .mh-check-c{background:rgba(var(--pal-mint-rgb),0.75);border-color:transparent;}
+.mh-meal-body{flex:1;min-width:0;display:flex;align-items:baseline;justify-content:space-between;gap:8px;}
+.mh-meal-t{font-size:var(--main-text-size);color:var(--tp);}
+.mh-meal-time{font-size:var(--dow-label-size);color:var(--tm);}
+.mh-plan{padding:0;}
+.mh-plan-h{width:100%;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:none;border:none;font-family:inherit;font-size:var(--main-text-size);color:var(--tp);cursor:pointer;}
+.mh-plan-h span{display:flex;align-items:center;gap:6px;}
+.mh-plan-chev{color:var(--tm);transition:transform .2s;}
+.mh-plan.open .mh-plan-chev{transform:rotate(180deg);}
+.mh-plan-b{display:none;padding:0 16px 12px;}
+.mh-plan.open .mh-plan-b{display:block;}
+.mh-plan-i{font-size:var(--main-text-size);line-height:1.7;color:var(--ts);}
+.mps-sub{font-size:var(--dow-label-size);color:var(--tm);margin:-8px 0 12px;}
+.mps-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px;}
+.mh-sel-chip{padding:8px 14px;border-radius:16px;border:1px solid var(--card-b);background:var(--card);color:var(--ts);font-size:var(--main-text-size);font-family:inherit;cursor:pointer;}
+.mh-sel-chip.on{background:rgba(var(--pal-orange-rgb),0.22);border-color:rgba(var(--pal-orange-rgb),0.5);color:var(--tp);}
 .undo-toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%) translateY(16px);background:rgba(60,40,40,.90);color:white;font-size:var(--dow-label-size);padding:9px 18px;border-radius:20px;display:flex;align-items:center;gap:10px;opacity:0;transition:all .25s;z-index:10500;pointer-events:none;backdrop-filter:blur(8px);}
 body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
 .undo-toast.on{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto;}
@@ -1046,70 +1092,13 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
 .rd-progress-today{position:absolute;top:0;height:100%;background:#ff9ec0;transition:left .4s ease,width .4s ease;}
 .rd-progress-bead{position:absolute;top:50%;width:13px;height:13px;border-radius:50%;transform:translate(-50%,-50%);border:1.6px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.25);background:var(--rainbow-bead);background-size:500% 100%;animation:beadRainbow 22s linear infinite;transition:left .4s ease;}
 
-/* ── 오후 홈탭: 통계 카드 (오늘vs어제 진행바 + 웨이브게이지 + 리듬비교) ── */
-/* 굿모닝(모닝 플로우) — 히어로 카드: 태블릿앱 연간탭 .yr-hero 톤 이식(그라디언트 대신 카드 배경색+원형 장식, 배경은 기존 그대로) */
-.mf-hero{position:relative;border-radius:22px;background:var(--card);border:1px solid var(--card-b);padding:20px 18px 18px;margin-bottom:10px;overflow:hidden;}
-.mf-hero:before{content:"";position:absolute;width:140px;height:140px;right:-40px;top:-45px;border-radius:50%;background:rgba(255,190,90,.13);box-shadow:-38px 52px 0 rgba(125,180,210,.08),-64px 18px 0 rgba(220,110,130,.07);}
-.mf-hero-inner{position:relative;z-index:1;}
-.mf-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px;}
-.mf-hero{--mf-solid:#fffaf0;} /* 원 안이 비치지 않도록 채움색 아래에 깔 불투명 바탕 */
-.mf-title{font-size:var(--main-text-size);font-weight:600;color:var(--tp);}
-/* 가로 타임라인 — 노드(원+라벨)가 나란히, 각 노드의 ::before가 앞 노드와 이어지는 선. 노드가 많아지면 가로 스크롤 */
-.mf-tl{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(76px,1fr);overflow-x:auto;padding:4px 0 2px;margin-bottom:14px;scrollbar-width:none;}
-.mf-tl::-webkit-scrollbar{display:none;}
-.mf-node{position:relative;display:flex;flex-direction:column;align-items:center;gap:7px;}
-.mf-node + .mf-node::before{content:"";position:absolute;left:-50%;width:100%;top:16px;height:2px;background:rgba(195,175,168,.45);z-index:0;}
-.mf-node.done::before,.mf-node.running::before,.mf-node.sel::before{background:rgba(var(--mf-rgb),.75);}
-.mf-circle{position:relative;z-index:1;width:34px;height:34px;box-sizing:border-box;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;}
-.mf-circle.wake-on{background:linear-gradient(rgba(145,210,175,.95),rgba(145,210,175,.95)),var(--mf-solid);color:#1f5c3f;}
-.mf-circle.wake-off,.mf-circle.meal-off{background:var(--mf-solid);color:var(--tm);border:2px dashed rgba(163,137,124,.8);}
-.mf-circle.meal-on{background:linear-gradient(rgba(var(--pal-orange-rgb),.9),rgba(var(--pal-orange-rgb),.9)),var(--mf-solid);color:var(--pal-orange-text);}
-.mf-node-label{font-size:var(--main-text-size);color:var(--ts);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;}
-.mf-node.sel .mf-node-label,.mf-node.running .mf-node-label{color:var(--tp);font-weight:600;}
-/* 슬롯 원 — 시작 전(테두리만)/진행중(옅은 색+깜빡임)/완료(꽉 채움), 길게 누르면 삭제 */
-.mf-slot{border:2px solid rgba(var(--mf-rgb),0.9);background:var(--mf-solid);color:rgb(var(--mf-rgb));cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;}
-.mf-slot.running{background:linear-gradient(rgba(var(--mf-rgb),0.30),rgba(var(--mf-rgb),0.30)),var(--mf-solid);animation:mfSlotPulse 1.4s ease-in-out infinite;}
-.mf-slot.done{background:linear-gradient(rgba(var(--mf-rgb),0.85),rgba(var(--mf-rgb),0.85)),var(--mf-solid);border-color:transparent;color:#fff;}
-.mf-slot.sel{box-shadow:0 0 0 3px rgba(var(--mf-rgb),0.30);}
-@keyframes mfSlotPulse{50%{opacity:.5;}}
-/* 펼친 슬롯 패널 — 고른 카테고리 색으로 옅게 물든 띠 */
-.mf-panel{margin-bottom:14px;padding:10px 12px;border-radius:14px;background:rgba(var(--mf-rgb),0.14);border:1px solid rgba(var(--mf-rgb),0.30);}
-.mf-sub-label{font-size:var(--dow-label-size);color:var(--ts);margin-bottom:8px;}
-.mf-slot-del{font-size:var(--dow-label-size);color:var(--tm);text-align:right;margin-top:6px;cursor:pointer;}
-.mf-start-row{display:flex;align-items:center;gap:12px;}
-.mf-start-icon{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.mf-start-row .mf-label{font-size:var(--main-text-size);font-weight:600;color:var(--tp);flex:1;}
-.mf-start-row .mf-status{font-size:var(--xs-label-size);color:var(--tm);margin-top:1px;}
-.mf-start-btn{padding:8px 16px;border-radius:20px;border:1px solid;background:var(--card);font-size:var(--main-text-size);font-weight:700;cursor:pointer;flex-shrink:0;}
-.mf-start-btn.running{color:#fff;border:none;}
-.mf-etc-chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px;}
-.mf-sub-label + .mf-etc-chips{margin-top:0;}
-.mf-etc-chip{padding:7px 13px;border-radius:17px;border:1px solid var(--card-b);background:var(--card);font-size:var(--main-text-size);color:var(--tp);cursor:pointer;}
-/* 6개 카테고리 아이콘 줄 — 누르면 슬롯 추가, 숫자=이번 달 완료 횟수 */
-.mf-picks{display:flex;justify-content:space-between;padding:0 2px;}
-.mf-pick{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;}
-.mf-pick-tile{width:48px;height:48px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:3px;}
-.mf-pick-label{font-size:13px;color:var(--ts);}
-.mf-pick-count{font-size:var(--dow-label-size);color:var(--tm);}
-/* 평소의 나와 비교 카드 */
-.mc-card{border-radius:18px;padding:16px 18px 14px;background:var(--card);border:1px solid var(--card-b);margin-bottom:10px;}
-.mc-title{display:flex;align-items:center;gap:6px;font-size:var(--dow-label-size);font-weight:500;color:var(--ts);margin-bottom:8px;}
-.mc-text{word-break:keep-all;font-size:var(--main-text-size);line-height:1.7;color:var(--tp);}
-.mc-graph{position:relative;height:88px;margin-top:12px;}
-.mc-bar{position:absolute;left:0;right:0;top:32px;height:4px;border-radius:2px;background:rgba(195,175,168,.35);}
-.mc-gap{position:absolute;top:31px;height:6px;border-radius:3px;}
-.mc-dot{position:absolute;top:25px;width:14px;height:14px;box-sizing:border-box;border-radius:50%;transform:translateX(-50%);}
-.mc-lab{position:absolute;font-size:var(--dow-label-size);color:var(--ts);white-space:nowrap;}
-.mc-lab.top{top:0;transform:translateX(-8px);}
-.mc-lab.bot{top:46px;transform:translateX(-4px);font-weight:500;}
-.mc-lab.end{transform:translateX(-100%);padding-right:3px;}
-.mc-axis{position:absolute;top:68px;transform:translateX(-50%);font-size:11px;color:var(--tm);}
 
 /* ── 오후 홈탭: 지금 카드 / 오늘의 흐름(12~19시 비례 타임라인) / 하단 빠른입력 독 ── */
 .afl-now{border-radius:20px;padding:12px 16px 14px;margin-bottom:10px;background:linear-gradient(120deg,rgba(var(--pal-pink-rgb),0.30),rgba(var(--pal-orange-rgb),0.28));border:1px solid rgba(var(--pal-pink-rgb),0.45);}
+@keyframes aflPulse{50%{opacity:.5;}}
 .afl-now-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
 .afl-now-pill{display:inline-flex;align-items:center;gap:7px;padding:4px 10px;border-radius:20px;background:rgba(255,250,240,0.75);color:var(--pal-rose-text);font-size:var(--dow-label-size);font-weight:500;}
-.afl-now-dot{width:7px;height:7px;border-radius:50%;background:#e67e7e;animation:mfSlotPulse 1.4s ease-in-out infinite;}
+.afl-now-dot{width:7px;height:7px;border-radius:50%;background:#e67e7e;animation:aflPulse 1.4s ease-in-out infinite;}
 .afl-now-start{font-size:var(--dow-label-size);color:var(--ts);}
 .afl-now-title{display:flex;align-items:center;gap:6px;font-size:var(--main-text-size);font-weight:400;color:var(--ts);margin-bottom:4px;}
 .afl-now-row{display:flex;align-items:center;justify-content:space-between;gap:12px;}
@@ -1553,14 +1542,6 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
 .rhythm-content-chip.sel{border:1.6px solid var(--sel-color,rgba(190,160,230,0.75));background:var(--sel-bg,rgba(190,160,230,0.14));color:var(--tp);font-weight:600;}
 .rhythm-save-btn{width:100%;background:rgba(255,175,200,0.28);color:var(--pal-pink-text);border:none;border-radius:12px;padding:11px 0;font-size:var(--main-text-size);font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;}
 
-.habit-numbox-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(78px,1fr));gap:8px;margin-bottom:10px;}
-.habit-numbox-card{display:flex;flex-direction:column;align-items:center;background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:14px 8px;}
-.habit-numbox-card.streak{border-color:rgba(var(--pal-orange-rgb),0.45);background:rgba(var(--pal-orange-rgb),0.08);}
-.habit-numbox-name{font-size:var(--dow-label-size);color:var(--tm);margin-bottom:2px;}
-.habit-numbox-num{font-size:18px;font-weight:700;color:var(--tp);font-family:'DM Sans',sans-serif;}
-.habit-streak-wrap{margin-bottom:2px;}
-.habit-motivation-line{font-size:var(--dow-label-size);color:var(--ts);margin-bottom:8px;padding:0 2px;display:flex;align-items:center;gap:5px;}
-.habit-motivation-line .ico-inline-13{color:rgba(var(--pal-orange-rgb),0.85);}
 
 /* ── 주간 가로 리듬바 (블록 모델) ── */
 .wrb-wrap{display:flex;flex-direction:column;gap:13px;padding:2px 0;}
@@ -1667,6 +1648,7 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
         <div id="home-solar-term-line" style="font-size:var(--dow-label-size);margin:-2px 0 6px;display:none;"></div>
         <div class="home-hcard-greeting" id="home-greeting">좋은 아침이에요</div>
         <div class="home-hcard-sub" id="home-greeting-sub"></div>
+        <div id="home-hcard-extra"></div>
       </div>
       <div id="home-body"></div>
     </div>
@@ -1883,6 +1865,22 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
   </div>
 </div>
 
+<!-- 오전 홈 제안 시작 시트 -->
+<div class="overlay" id="morning-pick-sheet" onclick="closeSheet('morning-pick-sheet',event)">
+  <div class="bsheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div style="padding:0 20px 20px;">
+      <div class="modal-title" id="mps-title" style="margin-bottom:14px;"></div>
+      <div class="mps-sub" id="mps-sub"></div>
+      <div class="mps-chips" id="mps-chips"></div>
+      <div class="modal-actions">
+        <button class="mbtn cancel" onclick="closeSheet('morning-pick-sheet')">닫기</button>
+        <button class="mbtn ok" onclick="startMorningPick()">시작</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- 홈 상세보기 공용 시트 -->
 <div class="overlay" id="home-detail-sheet" onclick="closeSheet('home-detail-sheet',event)">
   <div class="bsheet" style="max-height:88vh;overflow-y:auto;" onclick="event.stopPropagation()">
@@ -1904,6 +1902,7 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
 <!-- TODO COPY CONFIRM TOAST -->
 <div class="undo-toast" id="todo-copy-confirm-toast">내일로 복사할까요? <span class="undo-btn" onclick="confirmTodoCopyToast()">네</span></div>
 <div class="undo-toast overlap-toast" id="rhythm-overlap-toast"><div class="ot-msg" id="rhythm-overlap-msg"></div><div class="ot-btns"><span class="undo-btn" onclick="overlapToastEnd()">지금 종료</span><span class="undo-btn ot-keep" onclick="overlapToastKeep()">둘 다 유지</span></div><div class="ot-bar"><i id="rhythm-overlap-bar"></i></div></div>
+<div class="undo-toast" id="wake-home-toast"><span>오늘의 오전 홈이 준비됐어요</span> <span class="undo-btn" onclick="goHomeFromWake()">홈으로</span></div>
 <div class="undo-toast" id="meal-quick-toast"><span id="meal-quick-msg"></span> <span class="undo-btn" onclick="confirmQuickMeal()">체크</span></div>
 <div class="undo-toast" id="music-open-toast">애플뮤직에서 열까요? <span class="undo-btn" onclick="openMusicFromToast()">열기</span></div>
 
@@ -2791,7 +2790,7 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
   </div>
 </div>
 
-<script src="app.js?v=20261109b"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
+<script src="app.js?v=20261109d"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
 
 </body>
 </html>

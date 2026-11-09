@@ -333,13 +333,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .habit-row-icon{font-size:var(--fs-sm);flex-shrink:0;}
 .habit-row.done{color:var(--tp);}
 .habit-check{margin-left:auto;font-size:var(--fs-sm);color:rgba(var(--pal-mint-rgb),1);}
-/* 주간탭 이번주 아침 흐름 — 6칸 한 줄 그리드 */
-.wk-mflow-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;}
-.wk-mflow-cell{text-align:center;padding:6px 2px;border-radius:9px;}
-.wk-mflow-cell i{font-size:var(--fs-lg);}
-.wk-mflow-cell-label{font-size:var(--fs-sm);color:var(--tp);margin-top:3px;}
-.wk-mflow-cell-count{font-size:var(--fs-lg);font-weight:700;color:var(--tp);font-family:'DM Sans',sans-serif;margin-top:2px;}
-.wk-mflow-cell-time{font-size:var(--fs-xs);color:var(--tm);}
 /* 이번주 사진 기록 — 요일(월~일) 7칸 그리드. 사진 없는 요일은 빈 칸으로 자리만 유지. */
 .wk-photo-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;}
 .wk-photo-cell{position:relative;aspect-ratio:1/1;border-radius:9px;overflow:hidden;background:rgba(210,190,175,0.20);cursor:pointer;}
@@ -350,9 +343,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .wk-photo-thumb-ph.hide{opacity:0;pointer-events:none;}
 .wk-photo-cell-dow{position:relative;font-size:var(--fs-xs);font-weight:600;color:var(--tm);padding:2px 0 3px;}
 .wk-photo-cell:not(.wk-photo-cell-empty) .wk-photo-cell-dow{position:absolute;left:4px;bottom:4px;color:#fff;background:rgba(0,0,0,0.35);border-radius:4px;padding:1px 5px;z-index:1;}
-/* 라이트 테마 기본 — 선택 개념이 없는 통계 배너라 본앱 mf-card의 "선택됨(on)" 상태 색을 항상 적용 */
-.wk-mflow-cell{background:rgba(var(--wk-mflow-rgb),0.16);}
-[data-theme="glass"] .wk-mflow-cell{background:transparent;}
+/* 라이트 테마 기본 — 선택 개념이 없는 통계 배너라 "선택됨(on)" 상태 색을 항상 적용 */
 
 /* ── 독서(현재 읽는 책, 식사 카드와 높이 고정 맞춤) ── */
 /* 오늘의 메모 — 레인보우 그라디언트 테두리(기존 감상 카드 스타일 이식). 단일 div 구조라 ::before로 테두리만 그라디언트 처리. */
@@ -482,7 +473,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .tl-axis-col{position:relative;flex:6;min-width:0;padding-left:36px;}
 /* 07시 이후 기상 시 07시~기상시각 구간을 텍스트/시간 없이 웜그레이만 연하게 채움 — 축 왼쪽 눈금열은 침범하지 않도록 좌측 시작을 살짝 안쪽으로 */
 .tl-sleep-fill{position:absolute;left:36px;right:0;background:rgba(var(--pal-warmgray-rgb),0.16);border-radius:6px;z-index:1;pointer-events:none;}
-.tl-mflow-lane{position:relative;width:22px;flex-shrink:0;}
 .tl-todo-col{flex:4;min-width:0;position:relative;padding-left:8px;}
 .tl-gridline{position:absolute;left:36px;right:0;height:1px;background:rgba(var(--divider-rgb),0.18);}
 .tl-hourlabel{position:absolute;left:0;width:30px;text-align:left;font-size:var(--fs-xs);color:var(--tm);transform:translateY(-50%);font-family:'DM Sans',sans-serif;}
@@ -496,9 +486,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .tl-fill-label{position:relative;font-size:var(--fs-sm);font-weight:500;color:var(--tp);display:flex;align-items:center;gap:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1;}
 .tl-fill.tl-fill-two-line .tl-fill-label{width:100%;}
 .tl-fill-icon{flex-shrink:0;font-size:12px;opacity:0.75;}
-/* 모닝플로우 배지 — 리듬축과 완전히 분리된 별도 세로 레인(tl-mflow-lane)에 고정. 막대와 절대 겹치지 않음. */
-.tl-mflow-badge{position:absolute;left:2px;width:18px;height:18px;border-radius:50%;background:transparent;border:1.5px solid rgba(235,130,50,0.7);display:flex;align-items:center;justify-content:center;}
-.tl-mflow-badge i{font-size:11px;color:rgba(235,130,50,0.9);}
 .tl-fill-time{position:relative;flex-shrink:0;font-size:var(--fs-xs);color:var(--tp);font-variant-numeric:tabular-nums;font-family:'DM Sans',sans-serif;margin-left:4px;}
 .tl-fill.tl-fill-two-line .tl-fill-time{margin-left:0;}
 .tl-now-line{position:absolute;left:36px;right:0;height:2px;border-radius:1px;background:linear-gradient(90deg,rgba(235,180,20,0.9),rgba(255,205,110,0.75));z-index:20;}
@@ -1889,7 +1876,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
       </div>
       <div class="card"><div class="card-lbl"><i class="ti ti-moon-stars" style="color:rgba(var(--pal-sky-rgb),1);" aria-hidden="true"></i>수면 리포트</div><div id="week-sleep-report"></div></div>
       <div class="card"><div class="card-lbl"><i class="ti ti-rainbow" style="color:rgba(var(--pal-orange-rgb),1);" aria-hidden="true"></i>리듬 흐름 비교</div><div id="week-rhythm-flow"></div></div>
-      <div class="card"><div class="card-lbl"><i class="ti ti-sun" style="color:rgba(var(--pal-orange-rgb),1);" aria-hidden="true"></i>이번주 아침 흐름</div><div id="week-mflow"></div></div>
       <div class="card"><div class="card-lbl"><i class="ti ti-photo" style="color:rgba(var(--pal-sky-rgb),1);" aria-hidden="true"></i>이번주 사진 기록</div><div id="week-photos"></div></div>
       <div class="grid2" id="week-reading-oneline-row">
         <div class="card">
@@ -2173,6 +2159,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   </div>
 </div>
 
-<script src="tablet.js?v=1793521847"></script>
+<script src="tablet.js?v=1794202317"></script>
 </body>
 </html>
