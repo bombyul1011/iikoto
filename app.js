@@ -9227,7 +9227,7 @@ function openContentModal(cat,item=null,mk=null,onSaved=null){
     }
     else pp.style.display='none';
   }
-  const today=dateKey(currentDate);
+  const today=dateKey(getLogicalDate());
   document.getElementById('cm-start').value=item?(item.startDate||today):today;
   document.getElementById('cm-end').value=item?(item.endDate||''):'';
   document.getElementById('cm-review').value=item?.review||'';
@@ -9356,7 +9356,7 @@ function confirmContent(){
   const title=document.getElementById('cm-title').value.trim();if(!title)return;
   _contentSubmitting=true;
   const startVal=document.getElementById('cm-start').value;
-  const today=dateKey(currentDate);
+  const today=dateKey(getLogicalDate());
   const startDate=startVal||today;
   // 음악은 '듣는 데 며칠씩 걸리는' 개념이 아니라 등록=감상 완료이므로,
   // UI에 상태 선택 버튼이 없는 것과 일관되게 저장 시에도 항상 done으로 고정(진행중 딱지가 남지 않도록).
