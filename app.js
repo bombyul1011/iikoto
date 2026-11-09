@@ -352,6 +352,15 @@ function openRhythmTimeModal(which){
   openModal('time-modal');
   renderTimeWheel();
 }
+// 새 리듬 막대가 만들어진 직후의 습관 연결 — 리듬탭 입력(saveRhythmBlock)과 오전 홈 제안 시작(startMorningPick)이 공용.
+function onRhythmBlockCreated(cat,text,dk,start){
+  if(cat==='home'){
+    if(text==='정리')checkHabitDirect('tidy',dk,start); // 살림 중 '정리' 칩 선택했을 때만 습관 연결 — 세탁/주방은 제외
+  }else{
+    autoCheckHabitFromRhythm(cat,dk,start);
+  }
+  if(cat==='note'&&text==='일기')checkHabitDirect('diary',dk,start);
+}
 function saveRhythmBlock(){
   if(_rhythmSubmitting)return;
   const cat=_rhythmFormCat;if(!cat)return;
@@ -377,14 +386,7 @@ function saveRhythmBlock(){
     const sb=blocks[_rhythmEditIdx];
     if(sb&&sb.cid)reconcileStopwatchesWithBlocks(true);
   }
-  if(isNew){
-    if(cat==='home'){
-      if(text==='정리')checkHabitDirect('tidy',_rhythmDk,start); // 살림 중 '정리' 칩 선택했을 때만 습관 연결 — 세탁/주방은 제외
-    }else{
-      autoCheckHabitFromRhythm(cat,_rhythmDk,start);
-    }
-    if(cat==='note'&&text==='일기')checkHabitDirect('diary',_rhythmDk,start);
-  }
+  if(isNew)onRhythmBlockCreated(cat,text,_rhythmDk,start);
   _rhythmFormOpen=false;_resetRhythmForm();
   refreshRhythmTrack();
   if(isNew&&!end)checkRhythmOverlapOnStart(_rhythmDk,newCid); // 종료 시각 없이 "시작"으로 만든 새 막대만 겹침 확인(과거 구간 수기 입력은 제외)
@@ -2406,10 +2408,14 @@ function refreshHomeIfOpen(){
 // 제안은 앱 안의 규칙(최근 4주 오전 기록·습관 공백) + 하루 한 번 API 추천 1개(ai_cache morning_picks_날짜 캐시).
 // ══════════════════════════════════════════════════════════
 const MORNING_FALLBACK_HOUR=10; // 기상 등록이 없어도 이 시각부터는 오전 홈을 열어 줌
+let _mhPlanOpen=false; // 시간 배분 카드 펼침 상태(재렌더에도 유지)
+let _mpsPick=null,_mpsChoices=[],_mpsSel=0,_mpsPal='orange'; // 제안 시작 시트 상태
 function isMorningStarted(){
   return !!getSleep(dateKey(getLogicalDate())).wake||new Date().getHours()>=MORNING_FALLBACK_HOUR;
 }
-// 기상 시각이 저장된 직후 공통 후처리 — 아침기상 습관 자동체크(목표시각 이내일 때만) → 수면점수 입력 → 홈 갱신.
+// 기상 시각이 저장된 직후 공통 후처리 — 아침기상 습관 자동체크 → 수면점수 입력 → 홈 갱신.
+// "아침기상" 습관은 목표시각이 설정돼 있고 확정한 기상시각이 그 이내일 때만 자동 체크(늦게 일어난 날은 정직하게 체크 안 함).
+// 이미 수기로 체크해 둔 걸 끄지는 않음 — checkHabitDirect의 "이미 켜져있으면 그대로 둠" 원칙.
 function _onWakeSaved(dk,v){
   const goal=getHabitGoal('wake');
   if(goal&&goal.goalTime&&v<=goal.goalTime)checkHabitDirect('wake',dk,v);
@@ -2419,11 +2425,8 @@ function _onWakeSaved(dk,v){
   refreshHomeIfOpen();
 }
 function registerWakeNow(){
-  const n=new Date(),v=pad(n.getHours())+':'+pad(n.getMinutes());
-  const dk=dateKey(getLogicalDate()),d=getSleep(dk);
-  d.wake=v;saveSleepData(dk,d);
-  if(dk===dateKey(currentDate))loadSleep();
-  _onWakeSaved(dk,v);
+  const n=new Date();
+  applySleepTime(dateKey(getLogicalDate()),'wake',pad(n.getHours())+':'+pad(n.getMinutes()));
 }
 function openTimeFromHome(t){
   currentDate=getLogicalDate(); // 시각 모달은 currentDate 기준으로 저장 — 홈에선 항상 오늘로 맞춤
@@ -2464,8 +2467,8 @@ function submitMorningMemo(){
   const inp=document.getElementById('mh-memo-inp');
   const text=inp?inp.value.trim():'';
   if(!text)return;
-  const n=new Date(),dk=dateKey(getLogicalDate()),memos=getMemos(dk);
-  memos.push({text,time:pad(n.getHours())+':'+pad(n.getMinutes()),created:Date.now(),cid:genCid()});
+  const dk=dateKey(getLogicalDate()),memos=getMemos(dk);
+  memos.push(newMemoItem(text));
   saveMemos(dk,memos);
   renderHomeHeaderExtra();
   showToast('메모를 저장했어요');
@@ -2651,37 +2654,36 @@ function getMorningPicks(dk){
 }
 
 // ── 카드 조립
-function _mhCard(inner,extra){const d=document.createElement('div');d.className='mh-card'+(extra?' '+extra:'');d.innerHTML=inner;return d;}
+function _mhEl(html,cls){const d=document.createElement('div');d.className=cls;d.innerHTML=html;return d;}
 function makeMorningHome(){
   const frag=document.createDocumentFragment();
   const dk=dateKey(getLogicalDate());
   if(!isMorningStarted()){
-    const w=_mhCard(`<div class="mh-wait-ic"><i class="ti ti-sun" aria-hidden="true"></i></div>
+    const w=_mhEl(`<div class="mh-wait-ic"><i class="ti ti-sun" aria-hidden="true"></i></div>
       <div class="mh-wait-t">기상을 등록하면 오전 홈이 열려요</div>
       <button class="mh-main-btn" onclick="registerWakeNow()">지금 일어났어요</button>
-      <button class="mh-sub-link" onclick="openTimeFromHome('wake')">다른 시각으로 입력</button>`,'mh-wait');
+      <button class="mh-sub-link" onclick="openTimeFromHome('wake')">다른 시각으로 입력</button>`,'mh-card mh-wait');
     frag.appendChild(w);
     frag.appendChild(makeTodayRhythmBanner());
     return frag;
   }
   loadMorningBrief();
   const ready=_mbrief.dk===dk&&_mbrief.state==='ready'&&_mbrief.data,B=ready?_mbrief.data:null;
-  const mk=(html,cls)=>{const d=document.createElement('div');d.className=cls;d.innerHTML=html;return d;};
   // 브리핑: 컨디션(민트) + 오늘의 한 가지(노랑) 1:1 배너
   if(B&&(B.condition||B.one)){
-    frag.appendChild(mk('아침 브리핑','mh-blabel'));
+    frag.appendChild(_mhEl('아침 브리핑','mh-blabel'));
     const moodPal=B.mood==='좋음'?'mint':B.mood==='보통'?'sky':'lavender';
     let g='';
     if(B.condition)g+=`<div class="mh-tile ${moodPal}"><span class="mh-tile-h">컨디션</span>${B.mood?`<span class="mh-tile-big">${escapeHtml(B.mood)}</span>`:''}<span class="mh-tile-s">${escapeHtml(B.condition)}</span></div>`;
     if(B.one)g+=`<div class="mh-tile yellow"><span class="mh-tile-h"><i class="ti ti-sparkles" style="font-size:18px" aria-hidden="true"></i>오늘의 한 가지</span><span class="mh-tile-t">${escapeHtml(B.one)}</span>${B.one_sub?`<span class="mh-tile-s">${escapeHtml(B.one_sub)}</span>`:''}</div>`;
-    frag.appendChild(mk(g,'mh-grid'+((B.condition&&B.one)?'':' one')));
+    frag.appendChild(_mhEl(g,'mh-grid'+((B.condition&&B.one)?'':' one')));
   }else{
-    frag.appendChild(mk(`<span style="color:var(--ts)"><i class="ti ti-clock" style="font-size:18px" aria-hidden="true"></i></span><div><div style="font-size:var(--main-text-size);font-weight:600">아침 브리핑을 기다리고 있어요</div><div style="font-size:var(--dow-label-size);color:var(--ts);margin-top:2px">오늘 할 일, 오전 추천, 식사를 정리해서 곧 보여드릴게요</div></div>`,'mh-dash'));
+    frag.appendChild(_mhEl(`<span style="color:var(--ts)"><i class="ti ti-clock" style="font-size:18px" aria-hidden="true"></i></span><div><div style="font-size:var(--main-text-size);font-weight:600">아침 브리핑을 기다리고 있어요</div><div style="font-size:var(--dow-label-size);color:var(--ts);margin-top:2px">오늘 할 일, 오전 추천, 식사를 정리해서 곧 보여드릴게요</div></div>`,'mh-dash'));
   }
   // 오전에 하면 좋은 일 — 카드 하나 안에 카테고리 색 행
   const picks=getMorningPicks(dk);
   if(picks.length){
-    const box=mk('<div class="mh-box-h">오전에 하면 좋은 일</div>','mh-box');
+    const box=_mhEl('<div class="mh-box-h">오전에 하면 좋은 일</div>','mh-box');
     picks.forEach((p,i)=>{
       const c=RHYTHM_CATS[p.cat],k=MH_CAT_PAL[p.cat]||'orange';
       const row=document.createElement('div');row.className='mh-pick';
@@ -2695,19 +2697,18 @@ function makeMorningHome(){
   }
   // 오늘 식사(아침) + 브리핑 코멘트
   const meals=getMeals(dk),bt=meals.breakfast_time,menu=(meals.breakfast||'').trim();
-  const mealBox=mk(`<div class="mh-box-h"><span>오늘 식사</span><span style="color:var(--pal-lime-text)"><i class="ti ti-tools-kitchen-2" style="font-size:18px" aria-hidden="true"></i></span></div>
-    <div class="mh-meal-row"><span class="mh-meal-pill">아침</span><span class="mh-meal-menu${menu?'':' dim'}">${menu?escapeHtml(menu):'식사 계획 없음'}</span>${bt?`<span class="mh-meal-time">${escapeHtml(bt)}</span>`:''}<button class="mh-check${bt?' on':''}" aria-label="아침 식사 체크"><span class="mh-check-c">${bt?'<i class="ti ti-check" aria-hidden="true"></i>':''}</span></button></div>
+  // 체크하면 체크박스 자리가 시간 알약으로 바뀜(오늘 탭 식사 배너의 .meal-time-tag와 같은 방식) — 좁은 칸에서 두 개를 같이 두지 않기 위함
+  const mealBox=_mhEl(`<div class="mh-box-h"><span>오늘 식사</span><span style="color:var(--pal-lime-text)"><i class="ti ti-tools-kitchen-2" style="font-size:18px" aria-hidden="true"></i></span></div>
+    <div class="mh-meal-row"><span class="mh-meal-pill">아침</span><span class="mh-meal-menu${menu?'':' dim'}">${menu?escapeHtml(menu):'식사 계획 없음'}</span>${bt?`<span class="mh-time-pill">${tabularTimeHtml(bt)}</span>`:'<button class="mh-check" aria-label="아침 식사 체크"><span class="mh-check-c"></span></button>'}</div>
     ${B&&B.meal?`<div class="mh-meal-note">${escapeHtml(B.meal)}</div>`:''}`,'mh-box');
-  mealBox.querySelector('.mh-check').addEventListener('click',()=>{
-    if(bt){showToast('식사 시간은 오늘 탭에서 고칠 수 있어요');return;}
-    recordMealTime(dk,'breakfast');refreshHomeIfOpen();
-  });
+  const chk=mealBox.querySelector('.mh-check');
+  if(chk)chk.addEventListener('click',()=>{recordMealTime(dk,'breakfast');refreshHomeIfOpen();});
   frag.appendChild(mealBox);
   // 오늘의 시간 배분(접힘) — 점이 달린 세로 타임라인
   if(B&&B.plan.length){
     const nowM=new Date().getHours()*60+new Date().getMinutes();
     const nx=B.plan.find(x=>{const[h,m]=x.t.split(':').map(Number);return h*60+m>nowM;});
-    const pl=mk(`<button class="mh-plan-h"><span class="mh-plan-hl"><span class="mh-box-h" style="display:inline">오늘의 시간 배분</span><span class="mh-plan-sum">${B.plan.length}단계${nx?' · 다음 '+escapeHtml(nx.t)+' '+escapeHtml(nx.title):''}</span></span><i class="ti ti-chevron-down mh-plan-chev" aria-hidden="true"></i></button>
+    const pl=_mhEl(`<button class="mh-plan-h"><span class="mh-plan-hl"><span class="mh-box-h" style="display:inline">오늘의 시간 배분</span><span class="mh-plan-sum">${B.plan.length}단계${nx?' · 다음 '+escapeHtml(nx.t)+' '+escapeHtml(nx.title):''}</span></span><i class="ti ti-chevron-down mh-plan-chev" aria-hidden="true"></i></button>
       <div class="mh-plan-b">${B.plan.map((x,i)=>{const k=MH_CAT_PAL[x.cat]||'orange';return `<div class="mh-tl">${i<B.plan.length-1?'<div class="mh-tl-line"></div>':''}<div class="mh-tl-dot" style="background:rgba(var(--pal-${k}-rgb),1)"></div><div class="mh-tl-r"><span class="mh-tl-t">${escapeHtml(x.t)}</span><span class="mh-tl-n">${escapeHtml(x.title)}</span></div>${x.sub?`<div class="mh-tl-s">${escapeHtml(x.sub)}</div>`:''}</div>`;}).join('')}</div>`,'mh-box mh-plan'+(_mhPlanOpen?' open':''));
     pl.querySelector('.mh-plan-h').addEventListener('click',()=>{_mhPlanOpen=!_mhPlanOpen;pl.classList.toggle('open',_mhPlanOpen);});
     frag.appendChild(pl);
@@ -2715,10 +2716,8 @@ function makeMorningHome(){
   frag.appendChild(makeTodayRhythmBanner());
   return frag;
 }
-let _mhPlanOpen=false;
 
 // ── 제안 시작 시트: 카테고리는 고정, 안에서 세부 칩만 고름. 시작을 누르면 지금 시각으로 리듬에 바로 연동.
-let _mpsPick=null,_mpsChoices=[],_mpsSel=0;
 function openMorningPick(i){
   const p=_mhPicks[i];if(!p)return;
   _mpsPick=p;
@@ -2744,7 +2743,6 @@ function openMorningPick(i){
   _renderMpsChips();
   openSheet('morning-pick-sheet');
 }
-let _mpsPal='orange';
 function _renderMpsChips(){
   const el=document.getElementById('mps-chips');
   if(!_mpsChoices.length){el.innerHTML='<div class="mh-tx mh-dim">바로 시작할 수 있어요</div>';return;}
@@ -2767,8 +2765,7 @@ function startMorningPick(){
     const blocks=getRhythmBlocks(dk);
     blocks.push({cat:p.cat,start,end:'',text,created:Date.now(),cid});
     saveRhythmBlocks(dk,blocks);
-    if(p.cat==='home'){if(text==='정리')checkHabitDirect('tidy',dk,start);}
-    else autoCheckHabitFromRhythm(p.cat,dk,start);
+    onRhythmBlockCreated(p.cat,text,dk,start);
     checkRhythmOverlapOnStart(dk,cid);
   }
   closeSheet('morning-pick-sheet');
@@ -5199,16 +5196,20 @@ function confirmMemoEditTime(){
   closeModal('memo-edit-time-modal');
 }
 // ── 취침/기상 시간 입력 공용 유틸 (지금시각 세팅, 시각 모달) ──
+// 취침/기상 시각 저장의 단일 경로 — 시각 모달(confirmTime)·"지금" 버튼(setNow)·오전 홈 기상 등록(registerWakeNow)이 모두 여기를 지난다.
+// 미완료 리듬블록 자동마감은 "수면 데이터가 실제로 저장되는 날짜(dk, 화면이 보던 날짜)"를 기준으로 스캔해야 함.
+// getLogicalDate()(지금 이 순간의 실제 오늘)를 쓰면, 다음날 이후 화면을 과거 날짜로 옮겨 소급 입력할 때
+// dk와 어긋나 자동마감 대상 범위([오늘,어제] 단 이틀)를 벗어나 버리는 버그가 있었음.
+function applySleepTime(dk,which,v){
+  const d=getSleep(dk);d[which]=v;
+  saveSleepData(dk,d);
+  if(dk===dateKey(currentDate))loadSleep();
+  if(which==='sleep'){autoCloseUnfinishedRhythmBlocks(dk,v);refreshRhythmTrack();}
+  else _onWakeSaved(dk,v);
+}
 function setNow(t){
-  const n=new Date(),v=`${pad(n.getHours())}:${pad(n.getMinutes())}`;
-  const dk=dateKey(currentDate),d=getSleep(dk);
-  if(t==='sleep')d.sleep=v;else d.wake=v;
-  saveSleepData(dk,d);loadSleep();
-  // 미완료 리듬블록 자동마감은 "수면 데이터가 실제로 저장되는 날짜(dk, 화면이 보던 날짜)"를 기준으로 스캔해야 함.
-  // 예전엔 getLogicalDate()(지금 이 순간의 실제 오늘)를 썼는데, 사용자가 다음날 이후에 화면을 과거 날짜로
-  // 옮겨 소급 입력하는 경우 dk와 어긋나서 자동마감 대상 범위([오늘,어제] 단 이틀)를 벗어나 버리는 버그가 있었음.
-  if(t==='sleep'){autoCloseUnfinishedRhythmBlocks(dk,v);refreshRhythmTrack();}
-  else maybePromptSleepScoreAfterWake(dk);
+  const n=new Date();
+  applySleepTime(dateKey(currentDate),t,`${pad(n.getHours())}:${pad(n.getMinutes())}`);
 }
 function openTimeModal(t){
   _sleepTarget=t;
@@ -5620,6 +5621,11 @@ function setupMemoInlineInput(){
     inp.addEventListener('blur',()=>{submitMemoInline();});
   }
 }
+// 지금 시각이 찍힌 새 메모 항목 — 오늘 탭 메모 입력(submitMemoInline)과 오전 홈 한 줄 입력(submitMorningMemo)이 공용.
+function newMemoItem(text){
+  const n=new Date();
+  return {text,time:pad(n.getHours())+':'+pad(n.getMinutes()),created:Date.now(),cid:genCid()};
+}
 function submitMemoInline(){
   if(_memoSubmitting)return;
   const inp=document.getElementById('memo-inline-inp');
@@ -5627,10 +5633,8 @@ function submitMemoInline(){
   const photo=_memoPhotoCtl.photo;
   if(!text&&!photo)return;
   _memoSubmitting=true;
-  const n=new Date();
-  const stamp=`${pad(n.getHours())}:${pad(n.getMinutes())}`;
   const dk=dateKey(currentDate),memos=getMemos(dk);
-  const item={text,time:stamp,created:Date.now(),cid:genCid()};
+  const item=newMemoItem(text);
   if(photo){
     item.photoLocalUrl=photo.localUrl;
     item.photoStatus='pending_upload';
@@ -5728,18 +5732,8 @@ function confirmTime(){
     renderSettingsAlertSection();
     return;
   }
-  const dk=dateKey(currentDate),d=getSleep(dk);
-  if(_sleepTarget==='sleep')d.sleep=v;else d.wake=v;
-  saveSleepData(dk,d);loadSleep();closeModal('time-modal');
-  // 미완료 리듬블록 자동마감은 "수면 데이터가 실제로 저장되는 날짜(dk, 화면이 보던 날짜)"를 기준으로 스캔해야 함.
-  // getLogicalDate()(지금 이 순간의 실제 오늘)를 쓰면, 다음날 이후 화면을 과거 날짜로 옮겨 소급 입력할 때
-  // dk와 어긋나 자동마감 대상 범위([오늘,어제] 단 이틀)를 벗어나 버리는 버그가 있었음.
-  if(_sleepTarget==='sleep'){autoCloseUnfinishedRhythmBlocks(dk,v);refreshRhythmTrack();}
-  // "아침기상" 습관 자동체크 — 목표시각이 설정돼 있고, 이번에 확정한 기상시각이
-  // 그 이내면 자동으로 체크. 목표시각을 늦게 넘겨 일어난 날은 자동체크하지 않되(정직하게 반영),
-  // 이미 다른 방법(수기)으로 체크해둔 걸 자동판단이 강제로 끄지는 않음 — checkHabitDirect의
-  // "이미 켜져있으면 그대로 둠" 원칙과 별개로, 여기선 애초에 목표시각 밖이면 호출 자체를 안 함.
-  if(_sleepTarget==='wake')_onWakeSaved(dk,v);
+  closeModal('time-modal');
+  applySleepTime(dateKey(currentDate),_sleepTarget==='sleep'?'sleep':'wake',v);
 }
 
 // ── TODO

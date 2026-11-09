@@ -676,12 +676,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .mh-pick-r{font-size:var(--dow-label-size);color:var(--ts);margin-top:2px;word-break:keep-all;}
 .mh-meal-row{display:flex;align-items:center;gap:12px;}
 .mh-meal-pill{flex:none;width:44px;text-align:center;font-size:var(--dow-label-size);padding:4px 0;border-radius:999px;background:rgba(var(--pal-lime-rgb),0.6);color:var(--pal-lime-text);}
-.mh-meal-menu{flex:1;min-width:0;font-size:var(--main-text-size);line-height:1.5;color:var(--tp);}
+.mh-meal-menu{flex:1;min-width:0;font-size:var(--main-text-size);line-height:1.5;color:var(--tp);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:keep-all;}
 .mh-meal-menu.dim{color:var(--tm);}
-.mh-meal-time{flex:none;font-size:var(--dow-label-size);color:var(--ts);font-variant-numeric:tabular-nums;}
+.mh-time-pill{flex:none;font-size:var(--dow-label-size);padding:4px 10px;border-radius:999px;background:rgba(var(--pal-lime-rgb),0.35);color:var(--pal-lime-text);font-variant-numeric:tabular-nums;}
 .mh-check{flex:none;width:44px;height:44px;border:0;background:transparent;padding:0;display:grid;place-items:center;cursor:pointer;margin:-10px -6px -10px 0;}
-.mh-check-c{width:24px;height:24px;border-radius:50%;border:1.5px solid rgba(135,165,60,0.7);box-sizing:border-box;display:grid;place-items:center;font-size:14px;color:#fff;}
-.mh-check.on .mh-check-c{background:rgba(var(--pal-lime-rgb),0.95);border-color:transparent;}
+.mh-check-c{width:24px;height:24px;border-radius:50%;border:1.5px solid rgba(135,165,60,0.7);box-sizing:border-box;display:block;}
 .mh-meal-note{font-size:var(--dow-label-size);line-height:1.6;color:var(--tp);padding-top:8px;border-top:1px solid rgba(230,200,140,0.5);word-break:keep-all;}
 .mh-plan{gap:0;}
 .mh-plan-h{width:100%;display:flex;justify-content:space-between;align-items:center;min-height:44px;margin:-10px 0;padding:0;background:none;border:none;font-family:inherit;cursor:pointer;color:var(--ts);}
@@ -2822,7 +2821,7 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
   </div>
 </div>
 
-<script src="app.js?v=20261109f"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
+<script src="app.js?v=20261109g"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
 
 </body>
 </html>
