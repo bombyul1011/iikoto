@@ -2344,7 +2344,7 @@ function updateHomeClock(){
   const hh=h%12||12;
   const keep=document.getElementById('home-weather-icon');
   const weatherTxt=keep?keep.textContent:'';
-  timeEl.innerHTML=ap+' '+hh+':'+String(now.getMinutes()).padStart(2,'0')+' · '+_HOME_DAYS[now.getDay()]+'요일 <span id="home-weather-icon"></span>';
+  timeEl.innerHTML=(getSection()==='morning'?'<i class="ti ti-sun" style="font-size:16px;vertical-align:-3px;margin-right:6px;" aria-hidden="true"></i>':'')+ap+' '+hh+':'+String(now.getMinutes()).padStart(2,'0')+' · '+_HOME_DAYS[now.getDay()]+'요일 <span id="home-weather-icon"></span>';
   const fresh=document.getElementById('home-weather-icon');
   if(fresh)fresh.textContent=weatherTxt||(_homeWeatherCache?' '+_homeWeatherCache.icon+' '+_homeWeatherCache.temp+'°':'');
 }
@@ -2446,20 +2446,18 @@ function goHomeFromWake(){
   goHome();
 }
 
-// ── 헤더 카드 보조 영역: 기상/취침 칩 + 한 줄 메모 입력 + 오늘 마지막 메모
+// ── 헤더 카드 보조 영역: 날짜 줄 오른쪽 아이콘 칩(기상 시각·수면 점수) + 한 줄 입력(메모 저장) + 오늘 메모 박스
 function renderHomeHeaderExtra(){
-  const el=document.getElementById('home-hcard-extra');
-  if(!el)return;
-  if(getSection()!=='morning'){el.innerHTML='';el.style.display='none';return;}
+  const el=document.getElementById('home-hcard-extra'),chips=document.getElementById('home-hcard-chips');
+  if(!el||!chips)return;
+  if(getSection()!=='morning'){el.innerHTML='';el.style.display='none';chips.innerHTML='';return;}
   const dk=dateKey(getLogicalDate()),sl=getSleep(dk);
-  const chip=(icon,text,onclick)=>`<button class="mh-chip" onclick="${onclick}"><i class="ti ${icon}" aria-hidden="true"></i>${text}</button>`;
-  let h='<div class="mh-chips">';
-  h+=sl.wake?chip('ti-sun',`기상 ${escapeHtml(sl.wake)}`,"openTimeFromHome('wake')"):chip('ti-sun','기상 등록','registerWakeNow()');
-  if(sl.sleep)h+=chip('ti-moon',`취침 ${escapeHtml(sl.sleep)}`,"openTimeFromHome('sleep')");
-  h+='</div>';
-  h+='<div class="mh-memo-row"><input type="text" id="mh-memo-inp" class="mh-memo-inp" placeholder="지금 떠오르는 한 줄" maxlength="200" onkeydown="if(event.key===\'Enter\'&&!event.isComposing)submitMorningMemo()"><button class="mh-memo-send" onclick="submitMorningMemo()" aria-label="메모 저장"><i class="ti ti-send" aria-hidden="true"></i></button></div>';
+  chips.innerHTML=`<button class="mh-chip" onclick="${sl.wake?"openTimeFromHome('wake')":'registerWakeNow()'}" aria-label="기상 시각"><i class="ti ti-sunrise" aria-hidden="true"></i>${sl.wake?escapeHtml(sl.wake):'--:--'}</button>`
+    +`<button class="mh-chip mint" onclick="promptSleepScore('${dk}')" aria-label="수면 점수"><i class="ti ti-moon-stars" aria-hidden="true"></i>${sl.score!=null?sl.score:'--'}</button>`;
   const memos=getMemos(dk);
-  if(memos.length){const m=memos[memos.length-1];h+=`<div class="mh-memo-last"><i class="ti ti-pencil" aria-hidden="true"></i><span>${escapeHtml(m.text||'')}</span></div>`;}
+  let h='';
+  if(memos.length)h+=`<div class="mh-memo-box"><i class="ti ti-pencil" aria-hidden="true"></i><span>${escapeHtml(memos[memos.length-1].text||'')}</span></div>`;
+  h+='<div class="mh-memo-row"><input type="text" id="mh-memo-inp" class="mh-memo-inp" placeholder="오늘은 어떤 하루를 보내고 싶으세요?" maxlength="200" onkeydown="if(event.key===\'Enter\'&&!event.isComposing)submitMorningMemo()"><button class="mh-memo-send" onclick="submitMorningMemo()" aria-label="메모 저장"><i class="ti ti-send" aria-hidden="true"></i></button></div>';
   el.innerHTML=h;el.style.display='block';
 }
 function submitMorningMemo(){
@@ -2475,12 +2473,35 @@ function submitMorningMemo(){
 
 // ── 브리핑(JSON) 읽기 — {condition,one,meal,plan[]}
 let _mbrief={dk:null,state:'idle',data:null,at:0};
+const MH_CAT_PAL={exercise:'pink',rest:'mint',note:'yellow',home:'lime',work:'sky',enjoy:'lavender',meal:'mint',appointment:'orange',groom:'rose'};
+function _mhGuessCat(t){
+  if(/운동|바레|헬스|러닝|산책|홈트|스트레칭/.test(t))return 'exercise';
+  if(/정리|청소|세탁|설거지/.test(t))return 'home';
+  if(/독서|책|드라마|영화|일기/.test(t))return 'enjoy';
+  if(/업무|DR|블로그|인스타|카페|촬영/.test(t))return 'work';
+  if(/식사|점심|저녁|아침|간식/.test(t))return 'meal';
+  return '';
+}
+function _mhParsePlanItem(x){
+  if(typeof x==='string'){
+    const m=x.trim().match(/^(\d{1,2}:\d{2})\s+(.+)$/);
+    if(!m)return null;
+    return {t:m[1],title:m[2],sub:'',cat:_mhGuessCat(m[2])};
+  }
+  if(x&&typeof x==='object'&&/^\d{1,2}:\d{2}$/.test(x.t||'')&&typeof x.title==='string'&&x.title.trim()){
+    const title=x.title.trim();
+    return {t:x.t,title,sub:typeof x.sub==='string'?x.sub.trim():'',cat:MH_CAT_PAL[x.cat]||x.cat==='meal'?x.cat:_mhGuessCat(title)};
+  }
+  return null;
+}
+// 브리핑 JSON: {mood,condition,one,one_sub,meal,plan:[{t,title,sub,cat}]} — 문자열 plan("09:30 바레")도 허용
 function _mhParseBrief(raw){
   try{
     const o=typeof raw==='string'?JSON.parse(raw):raw;
     if(!o||typeof o!=='object')return null;
     const s=v=>typeof v==='string'&&v.trim()?v.trim():'';
-    const out={condition:s(o.condition),one:s(o.one),meal:s(o.meal),plan:Array.isArray(o.plan)?o.plan.map(s).filter(Boolean).slice(0,8):[]};
+    const out={mood:s(o.mood).slice(0,10),condition:s(o.condition),one:s(o.one),one_sub:s(o.one_sub),meal:s(o.meal),
+      plan:Array.isArray(o.plan)?o.plan.map(_mhParsePlanItem).filter(Boolean).slice(0,8):[]};
     return (out.condition||out.one||out.meal||out.plan.length)?out:null;
   }catch(e){return null;}
 }
@@ -2488,12 +2509,12 @@ async function loadMorningBrief(){
   const dk=dateKey(getLogicalDate());
   if(_mbrief.dk===dk&&(_mbrief.state==='ready'||_mbrief.state==='loading'))return;
   if(_mbrief.dk===dk&&_mbrief.state==='none'&&Date.now()-_mbrief.at<120000)return; // 아직 없으면 2분 간격으로만 다시 확인
-  const cached=_mhParseBrief(_bcGet('mbrief'));
+  const cached=_mhParseBrief(_bcGet('mbrief2'));
   if(cached){_mbrief={dk,state:'ready',data:cached,at:Date.now()};return;}
   _mbrief={dk,state:'loading',data:null,at:Date.now()};
   let data=null;
   try{const raw=await aiCacheGet('morning_brief_'+dk);if(raw)data=_mhParseBrief(raw);}catch(e){}
-  if(data){_bcSet('mbrief',data);_mbrief={dk,state:'ready',data,at:Date.now()};}
+  if(data){_bcSet('mbrief2',data);_mbrief={dk,state:'ready',data,at:Date.now()};}
   else _mbrief={dk,state:'none',data:null,at:Date.now()};
   if(data)refreshHomeIfOpen();
 }
@@ -2575,7 +2596,8 @@ function computeMorningCandidates(dk){
   }
   out.forEach(c=>{
     const cat=RHYTHM_CATS[c.cat];
-    c.title=cat.label+(c.sub?' · '+c.sub:'');
+    c.title=c.kind==='book'?'독서 · 책 읽기':c.kind==='watch'?'감상 · 이어 보기':cat.label+(c.sub?' · '+c.sub:'');
+    c.icon=c.kind==='book'?'ti-book':cat.icon;
   });
   return out.sort((a,b)=>b.score-a.score);
 }
@@ -2586,7 +2608,7 @@ function _mhValidAiPick(o){
   if(!o||typeof o!=='object')return null;
   const cat=o.cat,sub=typeof o.sub==='string'?o.sub.trim().slice(0,12):'',reason=typeof o.reason==='string'?o.reason.trim().slice(0,40):'';
   if(!RHYTHM_CATS[cat]||cat==='appointment'||!reason)return null;
-  return {cat,sub,reason,score:0,ai:true,title:RHYTHM_CATS[cat].label+(sub?' · '+sub:'')};
+  return {cat,sub,reason,score:0,ai:true,icon:RHYTHM_CATS[cat].icon,title:RHYTHM_CATS[cat].label+(sub?' · '+sub:'')};
 }
 async function loadMorningAiPick(rulePicks){
   const dk=dateKey(getLogicalDate());
@@ -2643,46 +2665,50 @@ function makeMorningHome(){
     return frag;
   }
   loadMorningBrief();
-  // 브리핑
-  if(_mbrief.dk===dk&&_mbrief.state==='ready'&&_mbrief.data){
-    const b=_mbrief.data;
-    frag.appendChild(makeLabel('아침 브리핑'));
-    if(b.condition)frag.appendChild(_mhCard(`<div class="mh-ct"><i class="ti ti-heart" aria-hidden="true"></i>컨디션</div><div class="mh-tx">${escapeHtml(b.condition)}</div>`));
-    if(b.one)frag.appendChild(_mhCard(`<div class="mh-ct"><i class="ti ti-bulb" aria-hidden="true"></i>오늘의 한 가지</div><div class="mh-tx">${escapeHtml(b.one)}</div>`));
+  const ready=_mbrief.dk===dk&&_mbrief.state==='ready'&&_mbrief.data,B=ready?_mbrief.data:null;
+  const mk=(html,cls)=>{const d=document.createElement('div');d.className=cls;d.innerHTML=html;return d;};
+  // 브리핑: 컨디션(민트) + 오늘의 한 가지(노랑) 1:1 배너
+  if(B&&(B.condition||B.one)){
+    frag.appendChild(mk('아침 브리핑','mh-blabel'));
+    const moodPal=B.mood==='좋음'?'mint':B.mood==='보통'?'sky':'lavender';
+    let g='';
+    if(B.condition)g+=`<div class="mh-tile ${moodPal}"><span class="mh-tile-h">컨디션</span>${B.mood?`<span class="mh-tile-big">${escapeHtml(B.mood)}</span>`:''}<span class="mh-tile-s">${escapeHtml(B.condition)}</span></div>`;
+    if(B.one)g+=`<div class="mh-tile yellow"><span class="mh-tile-h"><i class="ti ti-sparkles" style="font-size:18px" aria-hidden="true"></i>오늘의 한 가지</span><span class="mh-tile-t">${escapeHtml(B.one)}</span>${B.one_sub?`<span class="mh-tile-s">${escapeHtml(B.one_sub)}</span>`:''}</div>`;
+    frag.appendChild(mk(g,'mh-grid'+((B.condition&&B.one)?'':' one')));
   }else{
-    frag.appendChild(_mhCard(`<div class="mh-ct"><i class="ti ti-clock" aria-hidden="true"></i>아침 브리핑을 기다리고 있어요</div><div class="mh-tx mh-dim">기상 후 곧 도착해요. 그동안 아래 제안부터 볼 수 있어요.</div>`,'mh-dash'));
+    frag.appendChild(mk(`<span style="color:var(--ts)"><i class="ti ti-clock" style="font-size:18px" aria-hidden="true"></i></span><div><div style="font-size:var(--main-text-size);font-weight:600">아침 브리핑을 기다리고 있어요</div><div style="font-size:var(--dow-label-size);color:var(--ts);margin-top:2px">오늘 할 일, 오전 추천, 식사를 정리해서 곧 보여드릴게요</div></div>`,'mh-dash'));
   }
-  // 오전에 하면 좋은 일
+  // 오전에 하면 좋은 일 — 카드 하나 안에 카테고리 색 행
   const picks=getMorningPicks(dk);
   if(picks.length){
-    frag.appendChild(makeLabel('오전에 하면 좋은 일'));
+    const box=mk('<div class="mh-box-h">오전에 하면 좋은 일</div>','mh-box');
     picks.forEach((p,i)=>{
-      const c=RHYTHM_CATS[p.cat];
+      const c=RHYTHM_CATS[p.cat],k=MH_CAT_PAL[p.cat]||'orange';
       const row=document.createElement('div');row.className='mh-pick';
-      row.innerHTML=`<span class="mh-pick-ic" style="background:${c.color};"><i class="ti ${c.icon}" aria-hidden="true"></i></span>
-        <span class="mh-pick-body"><span class="mh-pick-t">${escapeHtml(p.title)}</span><span class="mh-pick-r">${escapeHtml(p.reason)}</span></span>
-        <i class="ti ti-chevron-right mh-pick-go" aria-hidden="true"></i>`;
+      row.style.background=`rgba(var(--pal-${k}-rgb),0.35)`;
+      row.innerHTML=`<div class="mh-pick-ic" style="color:var(--pal-${k}-text,var(--tp));"><i class="ti ${p.icon||c.icon}" aria-hidden="true"></i></div>
+        <div class="mh-pick-body"><div class="mh-pick-t">${escapeHtml(p.title)}</div><div class="mh-pick-r">${escapeHtml(p.reason)}</div></div><i class="ti ti-chevron-right" style="font-size:18px;color:var(--ts)" aria-hidden="true"></i>`;
       row.addEventListener('click',()=>openMorningPick(i));
-      frag.appendChild(row);
+      box.appendChild(row);
     });
+    frag.appendChild(box);
   }
-  // 아침 식사
+  // 오늘 식사(아침) + 브리핑 코멘트
   const meals=getMeals(dk),bt=meals.breakfast_time,menu=(meals.breakfast||'').trim();
-  frag.appendChild(makeLabel('오늘 식사'));
-  const meal=document.createElement('div');meal.className='mh-card mh-meal';
-  meal.innerHTML=`<button class="mh-check${bt?' on':''}" aria-label="아침 식사 체크"><span class="mh-check-c">${bt?'<i class="ti ti-check" aria-hidden="true"></i>':''}</span></button>
-    <div class="mh-meal-body"><div class="mh-meal-t">아침${menu?' · '+escapeHtml(menu):''}</div>${bt?`<div class="mh-meal-time">${escapeHtml(bt)}</div>`:''}</div>`;
-  meal.querySelector('.mh-check').addEventListener('click',()=>{
+  const mealBox=mk(`<div class="mh-box-h"><span>오늘 식사</span><span style="color:var(--pal-lime-text)"><i class="ti ti-tools-kitchen-2" style="font-size:18px" aria-hidden="true"></i></span></div>
+    <div class="mh-meal-row"><span class="mh-meal-pill">아침</span><span class="mh-meal-menu${menu?'':' dim'}">${menu?escapeHtml(menu):'식사 계획 없음'}</span>${bt?`<span class="mh-meal-time">${escapeHtml(bt)}</span>`:''}<button class="mh-check${bt?' on':''}" aria-label="아침 식사 체크"><span class="mh-check-c">${bt?'<i class="ti ti-check" aria-hidden="true"></i>':''}</span></button></div>
+    ${B&&B.meal?`<div class="mh-meal-note">${escapeHtml(B.meal)}</div>`:''}`,'mh-box');
+  mealBox.querySelector('.mh-check').addEventListener('click',()=>{
     if(bt){showToast('식사 시간은 오늘 탭에서 고칠 수 있어요');return;}
     recordMealTime(dk,'breakfast');refreshHomeIfOpen();
   });
-  frag.appendChild(meal);
-  if(_mbrief.state==='ready'&&_mbrief.data&&_mbrief.data.meal)frag.appendChild(_mhCard(`<div class="mh-tx mh-dim">${escapeHtml(_mbrief.data.meal)}</div>`,'mh-note'));
-  // 오늘의 시간 배분(접힘)
-  if(_mbrief.state==='ready'&&_mbrief.data&&_mbrief.data.plan.length){
-    const pl=document.createElement('div');pl.className='mh-card mh-plan'+(_mhPlanOpen?' open':'');
-    pl.innerHTML=`<button class="mh-plan-h"><span><i class="ti ti-clock" aria-hidden="true"></i>오늘의 시간 배분</span><i class="ti ti-chevron-down mh-plan-chev" aria-hidden="true"></i></button>
-      <div class="mh-plan-b">${_mbrief.data.plan.map(x=>`<div class="mh-plan-i">${escapeHtml(x)}</div>`).join('')}</div>`;
+  frag.appendChild(mealBox);
+  // 오늘의 시간 배분(접힘) — 점이 달린 세로 타임라인
+  if(B&&B.plan.length){
+    const nowM=new Date().getHours()*60+new Date().getMinutes();
+    const nx=B.plan.find(x=>{const[h,m]=x.t.split(':').map(Number);return h*60+m>nowM;});
+    const pl=mk(`<button class="mh-plan-h"><span class="mh-plan-hl"><span class="mh-box-h" style="display:inline">오늘의 시간 배분</span><span class="mh-plan-sum">${B.plan.length}단계${nx?' · 다음 '+escapeHtml(nx.t)+' '+escapeHtml(nx.title):''}</span></span><i class="ti ti-chevron-down mh-plan-chev" aria-hidden="true"></i></button>
+      <div class="mh-plan-b">${B.plan.map((x,i)=>{const k=MH_CAT_PAL[x.cat]||'orange';return `<div class="mh-tl">${i<B.plan.length-1?'<div class="mh-tl-line"></div>':''}<div class="mh-tl-dot" style="background:rgba(var(--pal-${k}-rgb),1)"></div><div class="mh-tl-r"><span class="mh-tl-t">${escapeHtml(x.t)}</span><span class="mh-tl-n">${escapeHtml(x.title)}</span></div>${x.sub?`<div class="mh-tl-s">${escapeHtml(x.sub)}</div>`:''}</div>`;}).join('')}</div>`,'mh-box mh-plan'+(_mhPlanOpen?' open':''));
     pl.querySelector('.mh-plan-h').addEventListener('click',()=>{_mhPlanOpen=!_mhPlanOpen;pl.classList.toggle('open',_mhPlanOpen);});
     frag.appendChild(pl);
   }
@@ -2696,24 +2722,33 @@ let _mpsPick=null,_mpsChoices=[],_mpsSel=0;
 function openMorningPick(i){
   const p=_mhPicks[i];if(!p)return;
   _mpsPick=p;
-  const c=RHYTHM_CATS[p.cat];
+  const c=RHYTHM_CATS[p.cat],k=MH_CAT_PAL[p.cat]||'orange';
+  let lab='세부 선택';
   if(p.cat==='enjoy'){
-    _mpsChoices=_getOngoingReadingWithCid().slice(0,4).map(b=>({label:b.title,cid:b.cid,kind:'book'}))
-      .concat(_getOngoingWatchingWithCid().slice(0,4).map(w=>({label:w.title,cid:w.cid,kind:'watch'})));
+    _mpsChoices=_getOngoingReadingWithCid().slice(0,4).map(b=>({label:'독서 - '+b.title,cid:b.cid,kind:'book'}))
+      .concat(_getOngoingWatchingWithCid().slice(0,4).map(w=>({label:(w.cat==='drama'?'드라마':'영화')+' - '+w.title,cid:w.cid,kind:'watch'})));
+    if(p.kind==='watch')_mpsChoices.sort((a,b)=>(a.kind==='watch'?-1:1)-(b.kind==='watch'?-1:1));
     document.getElementById('mps-sub').textContent='감상 · '+(p.kind==='watch'?'드라마·영화 허브':'독서 허브');
+    lab=p.kind==='watch'?'보는 중인 작품':'읽는 중인 책 (독서 허브)';
   }else{
     _mpsChoices=(RHYTHM_QUICK_CHOICES[p.cat]||[]).map(x=>({label:x.label}));
     document.getElementById('mps-sub').textContent=c.label;
   }
   _mpsSel=Math.max(0,_mpsChoices.findIndex(x=>p.cid?x.cid===p.cid:x.label===p.sub));
   document.getElementById('mps-title').textContent=p.title;
+  document.getElementById('mps-lab').textContent=lab;
+  const ic=document.getElementById('mps-ic');
+  ic.style.background=`rgba(var(--pal-${k}-rgb),0.55)`;ic.style.color=`var(--pal-${k}-text,var(--tp))`;
+  ic.innerHTML=`<i class="ti ${p.icon||c.icon}" aria-hidden="true"></i>`;
+  _mpsPal=k;
   _renderMpsChips();
   openSheet('morning-pick-sheet');
 }
+let _mpsPal='orange';
 function _renderMpsChips(){
   const el=document.getElementById('mps-chips');
   if(!_mpsChoices.length){el.innerHTML='<div class="mh-tx mh-dim">바로 시작할 수 있어요</div>';return;}
-  el.innerHTML=_mpsChoices.map((x,i)=>`<button class="mh-sel-chip${i===_mpsSel?' on':''}" onclick="_mpsSel=${i};_renderMpsChips()">${escapeHtml(x.label)}</button>`).join('');
+  el.innerHTML=_mpsChoices.map((x,i)=>`<button class="mps-chip${i===_mpsSel?' on':''}" style="${i===_mpsSel?`background:rgba(var(--pal-${_mpsPal}-rgb),0.8);color:var(--pal-${_mpsPal}-text,var(--tp));border-color:var(--pal-${_mpsPal}-border,transparent);`:''}" onclick="_mpsSel=${i};_renderMpsChips()">${escapeHtml(x.label)}</button>`).join('');
 }
 function startMorningPick(){
   const p=_mpsPick;if(!p)return;
