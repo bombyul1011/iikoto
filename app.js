@@ -1921,8 +1921,12 @@ function _greetingDefaultText(section,weather){
   const wStr=weather?weather.icon+' '+weather.temp+'° · ':'';
   return {morning:wStr+'오늘 하루도 잘 부탁해요 🌿',afternoon:wStr+'오늘도 잘 해내고 있어요 ✨',night:wStr+'오늘 하루 고생 많았어요 🌙',dawn:'오늘도 하루를 잘 채워내셨어요. 편안한 밤 되세요.'}[section];
 }
+// 인사말 본문 자리 — 새벽엔 같은 문장이 총평(#dw-summary)에도 들어간다
+function _setGreetingText(t){
+  const a=document.getElementById('home-greeting-sub');if(a)a.textContent=t;
+  const b=document.getElementById('dw-summary');if(b)b.textContent=t;
+}
 async function _loadHomeGreeting(section){
-  const subEl=document.getElementById('home-greeting-sub');
   const weatherIconEl=document.getElementById('home-weather-icon');
 
   const key=getClaudeKey();
@@ -1930,7 +1934,7 @@ async function _loadHomeGreeting(section){
   // 캐시된 인사가 있으면 날씨를 기다리지 않고 먼저 보여줌(위치 응답이 늦어도 문구는 즉시 뜸)
   const subSec=_greetingCacheKey(section);
   const cachedGreeting=_greetingFromCache(subSec);
-  if(cachedGreeting&&subEl)subEl.textContent=cachedGreeting.text;
+  if(cachedGreeting)_setGreetingText(cachedGreeting.text);
 
   // 날씨 가져오기(아이콘 + 프롬프트 재료) — 위치 거부 시에도 5분 쿨다운 덕에 오래 붙잡지 않음
   const weather=await fetchWeatherData();
@@ -1939,6 +1943,7 @@ async function _loadHomeGreeting(section){
   if(weatherIconEl&&weather){
     weatherIconEl.textContent=' '+weather.icon+' '+weather.temp+'°';
   }
+  if(weather)_syncDawnMast(weather.icon+' '+weather.temp+'°');
   if(cachedGreeting)return;
 
   // 오늘 데이터 수집 — dawn(새벽)은 "방금 지나간 하루"를 돌아보는 시점이라 getLogicalDate() 기준(어제)으로 조회
@@ -1952,22 +1957,20 @@ async function _loadHomeGreeting(section){
 
   // Claude 키 없으면 서버 캐시 조회 → 있으면 그 문구 표시, 없으면 준비중 안내
   if(!key){
-    if(subEl){
-      const serverCacheKey='greeting_'+dateKey(new Date())+'_'+subSec;
-      const cached=await aiCacheGet(serverCacheKey);
-      if(cached&&_greetingCacheKey(section)===subSec){ // 기다리는 사이 슬롯이 바뀌었으면 옛 문구를 덮어쓰지 않음
-        subEl.textContent=cached;
-        _greetingCache={text:cached,subSection:subSec,fetchedAt:Date.now()};
-        _bcSet(subSec+'_greeting',_greetingCache);
-      }else if(!cached){
-        subEl.textContent='곧 준비될 거예요';
-      }
+    const serverCacheKey='greeting_'+dateKey(new Date())+'_'+subSec;
+    const cached=await aiCacheGet(serverCacheKey);
+    if(cached&&_greetingCacheKey(section)===subSec){ // 기다리는 사이 슬롯이 바뀌었으면 옛 문구를 덮어쓰지 않음
+      _setGreetingText(cached);
+      _greetingCache={text:cached,subSection:subSec,fetchedAt:Date.now()};
+      _bcSet(subSec+'_greeting',_greetingCache);
+    }else if(!cached){
+      _setGreetingText('곧 준비될 거예요');
     }
     return;
   }
   // 최근에 같은 키로 생성이 실패했다면 다시 부르지 않음
   if(_greetingFail.key===subSec&&Date.now()-_greetingFail.at<GREETING_RETRY_MS){
-    if(subEl)subEl.textContent=_greetingDefaultText(section,weather);
+    _setGreetingText(_greetingDefaultText(section,weather));
     return;
   }
 
@@ -2055,59 +2058,19 @@ async function _loadHomeGreeting(section){
       allPendTodos.length?`오늘 못한 일: ${allPendTodos.join(', ')}`:'',
       rhythmSummary,
       pickedMemos.length?`메모: ${pickedMemos.join(' / ')}`:'',
-      sleep.sleep||sleep.wake?`수면: ${sleep.sleep||'?'} 취침 ${sleep.wake||'?'} 기상`:''
+      sleep.sleep||sleep.wake?`수면: ${sleep.sleep||'?'} 취침 ${sleep.wake||'?'} 기상`:'',
+      `오늘의 수치: ${_dawnRecapFacts(dk)}`
     ].filter(Boolean).join('\n');
-    sys=`당신은 따뜻한 생활 코치예요. 방금 지나간 하루의 기록을 보고, "오늘은 이런 결의 하루였다"는 한 줄 총평과 포근한 한마디를 건네요.
-
-**분량 제한 (반드시 지킬 것):**
-- 전체 2-3문장 이내로 짧게.
-
-**절대 원칙 — 사건 나열 금지:**
-- "오전에 X하고 오후에 Y하고 저녁에 Z했다" 같은 시간순 사건 나열 문장을 절대 만들지 말 것.
-- 개별 항목을 순서대로 이어붙이지 말고, 먼저 하루 전체를 관통하는 인상이나 결(분주했다/차분했다/바깥일이 많았다/집중하는 하루였다 등)을 한 문장으로 요약하고, 그 다음에 인상적인 일 1개 정도만 자연스럽게 곁들일 것.
-- 완료한 일들을 나열형으로 다시 읊지 말 것 — "이것저것 챙기며", "바쁘게 움직인" 처럼 뭉뚱그려 표현.
-
+    sys=`당신은 따뜻한 생활 코치예요. 방금 지나간 하루의 기록을 보고 "오늘은 이런 하루였다"는 총평을 써요. 신문 지면의 총평 칼럼처럼 담담하고 따뜻한 톤이에요.
 기타 규칙:
-- 지금은 하루를 마감하는 새벽 시간대예요 — "아직 안 자냐"거나 재촉하는 말은 하지 말고, 담담하고 편안한 톤으로.
-- 내일 할일이나 예고는 언급하지 말 것 — 오직 지나간 하루에 대한 총평만.
-- 확정적이지 않은 내용은 추측하지 말고, 실제 기록에 있는 내용 위주로.
-${GREETING_CONDITION_RULE}
-${GREETING_OUTPUT_RULE}
-- 이모지나 특수기호는 쓰지 않아요.`;
-  } else if(section==='night'){
-    // 저녁은 기존 브리핑처럼 하루 요약+내일 예고가 핵심이라 별도 구성
-    const tom=new Date(now);tom.setDate(now.getDate()+1);
-    const tomTodos=getTodos(dateKey(tom));
-    dataContext=[
-      `오늘은 ${_HOME_DAYS[now.getDay()]}요일이에요.`,
-      weatherDesc,
-      getUserProfileContext(),
-      `(참고용, 출력 금지) 현재 시각: ${now.getHours()}시 · 지금 시점: ${subSecLabel[subSec]}`,
-      todoLine(morningTodos,'오늘 오전'),
-      todoLine(afternoonTodos,'오늘 오후'),
-      todoLine(nightTodos,'오늘 저녁'),
-      todoLine(noneTodos,'오늘 시간지정없음'),
-      tomTodos.length?`내일 할일: ${tomTodos.filter(t=>!t.done&&!t.isEvent).map(t=>t.text).join(', ')}`:'',
-      (()=>{const evs=tomTodos.filter(t=>t.isEvent);return evs.length?`내일 일정: ${evs.map(t=>t.eventTime?`${t.eventTime} ${t.text}`:t.text).join(', ')}`:'';})(),
-      rhythmSummary,
-      _greetingMemoLine(pickedMemos),
-      sleep.sleep||sleep.wake?`수면: ${sleep.sleep||'?'} 취침 ${sleep.wake||'?'} 기상`:''
-    ].filter(Boolean).join('\n');
-    sys=`당신은 날씨와 하루의 결을 살필 줄 아는 따뜻한 하루 비서예요. 오늘 하루를 마무리하는 저녁(${subSecLabel[subSec]}) 시점에 어울리는 브리핑을 작성해요.
-
-**분량 제한 (반드시 지킬 것):**
-- ${subSec==='night_2'?'전투력이 떨어지는 늦은 밤이니 짧게: 전체 3-4문장 이내.':'전체 3-4문장 이내로, 지금보다 두 줄 정도 짧게 압축.'}
-
-기타 규칙:
-- 오늘 완료한 일은 전부 나열하지 말고, 그중 인상적인 1-2가지만 골라 자연스럽게 녹여요. 나머지는 "이것저것", "여러 가지를 챙기며" 처럼 뭉뚱그려 표현해요.
-- ${subSec==='night_2'?'내일에 대한 작은 기대나 응원을 딱 한 문장만, 할일을 나열하지 말고 가볍게. 내일 일정이 있다면 그 사실 정도만 가볍게 언급해도 좋아요(예: "내일은 ~하는 날이네요").':'오늘 하루를 돌아보는 내용이 전체 문장의 중심이 되도록 하고(비중 약 7:3), 내일 할일은 마지막에 짧게 한 문장으로만 덧붙여요 — 항목명은 최대 2-3개까지만 언급하고 그 이상은 나열하지 말 것. 내일 일정이 있다면 할일과 자연스럽게 묶어 언급하되, 일정 시간이 있으면 시간도 함께 녹여요(예: "내일은 14시에 ~일정이 있으니").'}
-${GREETING_WEATHER_SEASON_RULE('날씨/계절/메모 등에서 느껴지는 분위기를 한 줄 정도 자연스럽게 녹여요.')}
-- 리듬 카테고리를 언급할 땐 가장 비중 컸던 것 하나 정도만 은유적으로.
-- 실제 시각과 어긋나는 낮/햇살/노을 묘사 금지 (이미 해가 진 시간).
+${GREETING_WEATHER_SEASON_RULE('날씨/계절/메모 등에서 느껴지는 그 순간의 분위기를 한 줄 정도 자연스럽게 녹여요.')}
+- 3-4문장, 공백 포함 200자 안팎. 수면 점수·기상 시각 차이·가장 오래 한 활동의 시간·식사처럼 기록에 있는 수치를 한두 개 자연스럽게 녹이고, 일정 변경·메모에서 읽히는 그날의 맥락을 한 문장 곁들여요.
+- 오늘 할일은 구체적인 항목명을 언급해도 좋아요. 단, 나열식으로 딱딱하게 늘어놓지 말고 자연스러운 문장 속에 녹여내요.
+- 리듬 카테고리는 가장 비중 컸던 것 위주로만 언급해요.
 - 메모에서 현재 상황(위치, 컨디션)을 자연스럽게 반영해요.
 ${GREETING_CONDITION_RULE}
 ${GREETING_OUTPUT_RULE}
-- 이모지 1-2개`;
+- 이모지는 쓰지 않아요`;
   } else {
     const sectionTodos=section==='morning'?morningTodos:afternoonTodos;
     dataContext=[
@@ -2138,9 +2101,9 @@ ${GREETING_OUTPUT_RULE}
 - 이모지 1-2개`;
   }
 
-  if(subEl)subEl.textContent='잠깐만요...';
+  _setGreetingText('잠깐만요...');
 
-  const maxTok=section==='night'||section==='dawn'?320:280;
+  const maxTok=section==='dawn'?420:section==='night'?320:280;
   const reply=await callClaude(sys,[{role:'user',content:dataContext}],maxTok);
 
   const ok=!!(reply&&!reply.startsWith('__ERR__')&&reply.trim());
@@ -2152,11 +2115,11 @@ ${GREETING_OUTPUT_RULE}
     aiCacheSet('greeting_'+dateKey(new Date())+'_'+subSec,text);
     if(_greetingCacheKey(section)===subSec){
       _greetingCache={text,subSection:subSec,fetchedAt:Date.now()};
-      if(subEl)subEl.textContent=text;
+      _setGreetingText(text);
     }
   }else{
     _greetingFail={key:subSec,at:Date.now()};
-    if(subEl&&_greetingCacheKey(section)===subSec)subEl.textContent=_greetingDefaultText(section,weather);
+    if(_greetingCacheKey(section)===subSec)_setGreetingText(_greetingDefaultText(section,weather));
   }
 }
 function _pickRandom(arr,n){
@@ -2338,12 +2301,22 @@ function _homeGreetingTitle(section,isBday){
   return pool[dateSeedIndex(dateKey(getLogicalDate())+'|'+getHomeTimeSlot(),pool.length)];
 }
 // 상단 시계 줄(오전/오후 시:분 · 요일 · 날씨 배지 자리) — 날씨 배지 span은 loadHomeGreeting이 채우므로 이미 채워진 값은 보존.
+function _homeClockText(){
+  const now=new Date(),h=now.getHours();
+  return (h<12?'오전':'오후')+' '+(h%12||12)+':'+String(now.getMinutes()).padStart(2,'0');
+}
+// 새벽 페이지 마스트헤드의 시각·날씨(#dw-time/#dw-weather) — 상단 시계와 같은 값을 따라간다
+function _syncDawnMast(weatherTxt){
+  const t=document.getElementById('dw-time');if(t)t.textContent=_homeClockText();
+  if(weatherTxt){const w=document.getElementById('dw-weather');if(w)w.textContent=weatherTxt.trim();}
+}
 function updateHomeClock(){
+  _syncDawnMast();
   const timeEl=document.getElementById('home-time');
   if(!timeEl)return;
-  const now=new Date(),h=now.getHours();
-  const ap=h<12?'오전':'오후';
-  const hh=h%12||12;
+  const now=new Date();
+  const ap=now.getHours()<12?'오전':'오후';
+  const hh=now.getHours()%12||12;
   const keep=document.getElementById('home-weather-icon');
   const weatherTxt=keep?keep.textContent:'';
   timeEl.innerHTML=(getSection()==='morning'?'<i class="ti ti-sun" style="font-size:16px;vertical-align:-3px;margin-right:6px;" aria-hidden="true"></i>':'')+ap+' '+hh+':'+String(now.getMinutes()).padStart(2,'0')+' · '+_HOME_DAYS[now.getDay()]+'요일 <span id="home-weather-icon"></span>';
@@ -2359,6 +2332,7 @@ function renderHome(){
   const hcard=document.getElementById('home-header-card');
   if(hcard){
     hcard.className='home-hcard '+(isBday?'birthday':section); // 생일엔 시간대별 배경 대신 생일 배경(index.html .home-hcard.birthday)
+    hcard.style.display=(section==='dawn'&&!isBday)?'none':''; // 새벽엔 인사카드 대신 신문형 페이지(makeDawnPage)가 총평을 맡음
   }
   updateHomeClock();
   const termEl=document.getElementById('home-solar-term-line');
@@ -2460,7 +2434,7 @@ function renderHomeHeaderExtra(){
   const memos=getMemos(dk);
   let h='';
   if(memos.length)h+=`<div class="mh-memo-box"><i class="ti ti-pencil" aria-hidden="true"></i><span>${escapeHtml(memos[memos.length-1].text||'')}</span></div>`;
-  h+='<div class="mh-memo-row"><input type="text" id="mh-memo-inp" class="mh-memo-inp" placeholder="오늘은 어떤 하루를 보내고 싶으세요?" maxlength="200" onkeydown="if(event.key===\'Enter\'&&!event.isComposing)submitMorningMemo()"><button class="mh-memo-send" onclick="submitMorningMemo()" aria-label="메모 저장"><i class="ti ti-send" aria-hidden="true"></i></button></div>';
+  if(!memos.length)h+='<div class="mh-memo-row"><input type="text" id="mh-memo-inp" class="mh-memo-inp" placeholder="오늘은 어떤 하루를 보내고 싶으세요?" maxlength="200" onkeydown="if(event.key===\'Enter\'&&!event.isComposing)submitMorningMemo()"><button class="mh-memo-send" onclick="submitMorningMemo()" aria-label="메모 저장"><i class="ti ti-send" aria-hidden="true"></i></button></div>';
   el.innerHTML=h;el.style.display='block';
 }
 function submitMorningMemo(){
@@ -2609,9 +2583,16 @@ function computeMorningCandidates(dk){
 let _mhAi={dk:null,state:'idle',pick:null};
 function _mhValidAiPick(o){
   if(!o||typeof o!=='object')return null;
+  if(o.todoCid){ // 오늘 할 일 기반 추천 — 아직 안 끝난 그 투두가 있을 때만 유효. 누르면 해당 투두 완료 체크로 연결.
+    const t=getTodos(dateKey(getLogicalDate())).find(x=>x&&x.cid===o.todoCid&&!x.done&&!x.isEvent);
+    const reason=typeof o.reason==='string'?o.reason.trim().slice(0,40):'';
+    if(!t||!reason)return null;
+    const nm=(parseTodoTextParts(t.text).parts[0]||t.text||'').slice(0,20);
+    return {cat:'todo',kind:'todo',todoCid:t.cid,sub:nm,reason,score:0,ai:true,pal:'sky',icon:'ti-checkbox',title:'할 일 · '+nm,raw:{todoCid:t.cid,reason}};
+  }
   const cat=o.cat,sub=typeof o.sub==='string'?o.sub.trim().slice(0,12):'',reason=typeof o.reason==='string'?o.reason.trim().slice(0,40):'';
   if(!RHYTHM_CATS[cat]||cat==='appointment'||!reason)return null;
-  return {cat,sub,reason,score:0,ai:true,icon:RHYTHM_CATS[cat].icon,title:RHYTHM_CATS[cat].label+(sub?' · '+sub:'')};
+  return {cat,sub,reason,score:0,ai:true,icon:RHYTHM_CATS[cat].icon,title:RHYTHM_CATS[cat].label+(sub?' · '+sub:''),raw:{cat,sub,reason}};
 }
 async function loadMorningAiPick(rulePicks){
   const dk=dateKey(getLogicalDate());
@@ -2624,17 +2605,22 @@ async function loadMorningAiPick(rulePicks){
     const raw=await aiCacheGet('morning_picks_'+dk);
     if(raw)pick=_mhValidAiPick(JSON.parse(raw));
     if(!pick&&getClaudeKey()){
-      const todos=getTodos(dk).filter(t=>!t.isEvent&&!t.done).slice(0,8).map(t=>parseTodoTextParts(t.text).parts[0]||t.text);
+      const todoSrc=getTodos(dk).filter(t=>!t.isEvent&&!t.done&&t.cid).slice(0,8);
+      const todos=todoSrc.map((t,i)=>(i+1)+'. '+(parseTodoTextParts(t.text).parts[0]||t.text));
       const events=getTodos(dk).filter(t=>t.isEvent).slice(0,6).map(t=>(t.eventTime||'종일')+' '+(parseTodoTextParts(t.text).parts[0]||t.text));
       const hist=_morningHistory();
-      const ctx=`오늘 할 일: ${todos.join(', ')||'없음'}\n오늘 일정: ${events.join(', ')||'없음'}\n최근 4주 오전 기록 횟수: ${Object.keys(hist.cats).map(k=>(RHYTHM_CATS[k]?RHYTHM_CATS[k].label:k)+' '+hist.cats[k]).join(', ')||'없음'}\n수면 점수: ${getSleepScore(dk)!=null?getSleepScore(dk):'미기록'}\n이미 제안한 것: ${rulePicks.map(p=>p.title).join(', ')||'없음'}`;
-      const sys='너는 생활 리듬 앱의 아침 코치야. 오전(12시 전)에 하면 좋을 활동 1개를 골라 JSON 한 줄로만 답해. 형식: {"cat":"exercise|rest|note|home|work|enjoy","sub":"활동명 10자 이내","reason":"근거 한 줄 25자 이내"}. 이미 제안한 것과 겹치지 말고, 코드블록·설명 없이 JSON만.';
+      const ctx=`오늘 할 일(번호): ${todos.join(' / ')||'없음'}\n오늘 일정: ${events.join(', ')||'없음'}\n최근 4주 오전 기록 횟수: ${Object.keys(hist.cats).map(k=>(RHYTHM_CATS[k]?RHYTHM_CATS[k].label:k)+' '+hist.cats[k]).join(', ')||'없음'}\n수면 점수: ${getSleepScore(dk)!=null?getSleepScore(dk):'미기록'}\n이미 제안한 것: ${rulePicks.map(p=>p.title).join(', ')||'없음'}`;
+      const sys='너는 생활 리듬 앱의 아침 코치야. 오전(12시 전)에 하면 좋을 것 1개를 골라 JSON 한 줄로만 답해. 오늘 할 일 중 오전에 끝내면 좋은 게 있으면 그 번호로 {"todo":번호,"reason":"근거 한 줄 25자 이내"}, 없으면 활동으로 {"cat":"exercise|rest|note|home|enjoy","sub":"활동명 10자 이내","reason":"근거 한 줄 25자 이내"}. 할 일 번호는 목록에 있는 것만 쓰고, 할 일과 무관한 활동을 할 일에 엮지 마. 이미 제안한 것과 겹치지 말고, 코드블록·설명 없이 JSON만.';
       const txt=await callClaude(sys,[{role:'user',content:ctx}],200);
       const m=txt&&txt.match(/\{[\s\S]*\}/);
-      if(m){pick=_mhValidAiPick(JSON.parse(m[0]));if(pick)aiCacheSet('morning_picks_'+dk,JSON.stringify({cat:pick.cat,sub:pick.sub,reason:pick.reason}));}
+      if(m){
+        const o=JSON.parse(m[0]);
+        if(o.todo!=null){const t=todoSrc[Number(o.todo)-1];o.todoCid=t&&t.cid;}
+        pick=_mhValidAiPick(o);if(pick)aiCacheSet('morning_picks_'+dk,JSON.stringify(pick.raw));
+      }
     }
   }catch(e){pick=null;}
-  if(pick)_bcSet('mpick',{cat:pick.cat,sub:pick.sub,reason:pick.reason});
+  if(pick)_bcSet('mpick',pick.raw);
   _mhAi={dk,state:pick?'ready':'none',pick};
   if(pick)refreshHomeIfOpen();
 }
@@ -2644,7 +2630,7 @@ function getMorningPicks(dk){
   const rules=computeMorningCandidates(dk);
   loadMorningAiPick(rules.slice(0,3));
   let picks=rules.slice(0,2);
-  const ai=_mhAi.pick;
+  const ai=_mhAi.pick&&_mhValidAiPick(_mhAi.pick.raw); // 투두가 그 사이 완료됐으면 빠짐
   if(ai&&!picks.some(p=>p.cat===ai.cat&&p.sub===ai.sub))picks.push(ai);
   rules.slice(2).forEach(r=>{if(picks.length<3)picks.push(r);});
   picks=picks.slice(0,3);
@@ -2685,12 +2671,12 @@ function makeMorningHome(){
   if(picks.length){
     const box=_mhEl('<div class="mh-box-h">오전에 하면 좋은 일</div>','mh-box');
     picks.forEach((p,i)=>{
-      const c=RHYTHM_CATS[p.cat],k=MH_CAT_PAL[p.cat]||'orange';
+      const c=RHYTHM_CATS[p.cat]||{icon:p.icon},k=p.pal||MH_CAT_PAL[p.cat]||'orange',isTodo=p.kind==='todo';
       const row=document.createElement('div');row.className='mh-pick';
       row.style.background=`rgba(var(--pal-${k}-rgb),0.35)`;
       row.innerHTML=`<div class="mh-pick-ic" style="color:var(--pal-${k}-text,var(--tp));"><i class="ti ${p.icon||c.icon}" aria-hidden="true"></i></div>
-        <div class="mh-pick-body"><div class="mh-pick-t">${escapeHtml(p.title)}</div><div class="mh-pick-r">${escapeHtml(p.reason)}</div></div><i class="ti ti-chevron-right" style="font-size:18px;color:var(--ts)" aria-hidden="true"></i>`;
-      row.addEventListener('click',()=>openMorningPick(i));
+        <div class="mh-pick-body"><div class="mh-pick-t">${escapeHtml(p.title)}</div><div class="mh-pick-r">${escapeHtml(p.reason)}</div></div>${isTodo?'<span class="mh-pick-chk" aria-label="완료 체크"></span>':'<i class="ti ti-chevron-right" style="font-size:18px;color:var(--ts)" aria-hidden="true"></i>'}`;
+      row.addEventListener('click',()=>isTodo?completeMorningTodoPick(i):openMorningPick(i));
       box.appendChild(row);
     });
     frag.appendChild(box);
@@ -2747,6 +2733,15 @@ function _renderMpsChips(){
   const el=document.getElementById('mps-chips');
   if(!_mpsChoices.length){el.innerHTML='<div class="mh-tx mh-dim">바로 시작할 수 있어요</div>';return;}
   el.innerHTML=_mpsChoices.map((x,i)=>`<button class="mps-chip${i===_mpsSel?' on':''}" style="${i===_mpsSel?`background:rgba(var(--pal-${_mpsPal}-rgb),0.8);color:var(--pal-${_mpsPal}-text,var(--tp));border-color:var(--pal-${_mpsPal}-border,transparent);`:''}" onclick="_mpsSel=${i};_renderMpsChips()">${escapeHtml(x.label)}</button>`).join('');
+}
+// 할 일 기반 추천은 리듬 시작이 아니라 해당 투두 완료 체크로 연결
+function completeMorningTodoPick(i){
+  const p=_mhPicks[i];if(!p||!p.todoCid)return;
+  const dk=dateKey(getLogicalDate()),idx=getTodos(dk).findIndex(t=>t&&t.cid===p.todoCid);
+  if(idx<0)return;
+  toggleTodoAt(dk,idx,p.todoCid);
+  showToast('할 일을 완료했어요');
+  refreshHomeIfOpen();
 }
 function startMorningPick(){
   const p=_mpsPick;if(!p)return;
@@ -7051,82 +7046,24 @@ const DAWN_CLOSING_LINES=[
   '오늘의 페이지는 여기까지예요. 잘 자요.'
 ];
 const DAWN_DOT_COLORS=['var(--pal-orange-border)','var(--pal-pink-border)','var(--pal-mint-border)'];
-// "하루의 모양" 문장 — API 없이 오늘 기록(수면 점수·기상 시각·가장 오래 머문 활동·식사/습관)으로 조립.
-// 같은 날엔 항상 같은 문장이 나오도록 문장 틀 선택은 날짜 시드로 고정.
-function _dwShapeText(dk,durByCat){
-  const pick=(arr,salt)=>arr[dateSeedIndex(dk+'|'+salt,arr.length)];
-  const sl=getSleep(dk)||{};
-  const parts=[];
-  // 1) 하루의 시작 — 수면 점수(없으면 수면 시간) + 평소 대비 기상 시각
+// 새벽 총평(API) 프롬프트에 넣는 그날의 수치 재료 — 수면 점수/기상 시각 차이/식사/습관. 문장은 API가 쓴다.
+function _dawnRecapFacts(dk){
+  const sl=getSleep(dk)||{},out=[];
+  if(sl.score!=null)out.push('수면 점수 '+sl.score+'점');
   const sd=sleepDurMin(sl);
-  let open='';
-  if(sl.score!=null){
-    const sc=sl.score;
-    open=sc>=90?pick([sc+'점으로 푹 잔 하루의 시작이었어요.','푹 자고 개운하게 시작한 하루였어요.'],'a')
-      :sc>=79?pick(['잘 쉬고 시작한 하루였어요.','잠을 든든히 채우고 시작한 하루였어요.'],'a')
-      :sc>=66?pick(['무난하게 시작한 하루였어요.','평소 같은 잠으로 시작한 하루였어요.'],'a')
-      :pick(['잠이 조금 아쉬운 채로 시작한 하루였어요.','조금 피곤하게 시작한 하루였어요.'],'a');
-  }else if(sd!=null){
-    open=fmtDur(sd)+' 자고 시작한 하루였어요.';
-  }
-  if(open&&sl.wake){
+  if(sd!=null)out.push('수면 시간 '+fmtDur(sd));
+  if(sl.wake){
     const w=_dawnTimeToMin(sl.wake),avg=getAvgSleepWindow(7);
     if(w!=null&&avg){
       const diff=w-avg.wakeMin;
-      if(Math.abs(diff)>=20&&Math.abs(diff)<600)open+=' 평소보다 '+fmtDur(Math.abs(diff))+(diff>0?' 늦게':' 일찍')+' 일어났어요.';
+      if(Math.abs(diff)>=20&&Math.abs(diff)<600)out.push('기상 시각이 평소보다 '+fmtDur(Math.abs(diff))+(diff>0?' 늦었음':' 빨랐음'));
     }
   }
-  if(open)parts.push(open);
-  // 2) 가장 오래 머문 활동 — 없으면 완료한 할 일 수
-  const top=Object.keys(durByCat).sort((a,b)=>durByCat[b]-durByCat[a])[0];
-  if(top){
-    const n=RHYTHM_CATS[top].label,d=fmtDur(durByCat[top]);
-    parts.push(pick([n+'에 '+d+'쯤 머문 시간이 가장 길었어요.','하루 중 '+n+' 시간이 '+d+'쯤으로 가장 길었어요.'],'b'));
-  }else{
-    const doneCnt=getTodos(dk).filter(t=>t.done&&!t.isEvent).length;
-    if(doneCnt>0)parts.push('할 일 '+doneCnt+'개를 마무리했어요.');
-  }
-  // 3) 마무리 — 습관을 모두 챙겼으면 그것, 아니면 세 끼, 아니면 일부 습관
-  const habits=getActiveHabits(),ld=new Date(dk+'T00:00:00');
-  const checks=getHabitChecks(weekKey(ld)),dow=(ld.getDay()+6)%7;
-  const hDone=habits.filter(h=>checks[h.id+'-'+dow]).length;
-  const meals=getMeals(dk);
-  const mealCnt=['breakfast','lunch','dinner'].filter(k=>meals[k]||meals[k+'_time']).length;
-  if(habits.length&&hDone===habits.length)parts.push('습관도 모두 챙겼어요.');
-  else if(mealCnt===3)parts.push(pick(['식사도 든든히 챙긴 하루였어요.','아침, 점심, 저녁 모두 챙겨 먹었어요.'],'c'));
-  else if(hDone>0)parts.push('습관은 '+hDone+'개 챙겼어요.');
-  return parts.join(' ');
-}
-// 오늘 활동 분포 — 06~24시 활동(완료한 할 일·습관 체크·시간 있는 일정)을 점으로. 점 중심은 기준선(BASE_Y)에 맞춤.
-function _dwDistHtml(dk){
-  const TRACK_H=36,BASE_Y=14;
-  const g=_paceDotGroups(dk,PACE_DOT_RANGE_START,PACE_DOT_RANGE_END);
-  if(!g)return '';
-  let dots='',i=0;
-  g.groups.forEach(gr=>{
-    const n=gr.items.length;
-    gr.items.forEach((ev,idx)=>{
-      const x=Math.min(100,Math.max(0,gr.centerX+(idx-(n-1)/2)*g.MIN_GAP_PCT));
-      const c=DAWN_DOT_COLORS[i%DAWN_DOT_COLORS.length];
-      dots+=`<div class="dw-dot" style="left:${x}%;top:${BASE_Y}px;background:${c};color:${c};animation-delay:${((i*0.45)%2.6).toFixed(2)}s;" title="${escapeHtml(ev.label)}"></div>`;
-      i++;
-    });
-  });
-  const marks=_paceHourMarksHtml(PACE_DOT_RANGE_START,PACE_DOT_RANGE_END,'dw-hl','dw-hlab');
-  return `<div class="dw-sec"><div class="dw-label"><i class="ti ti-sparkles" aria-hidden="true"></i> 오늘 활동 분포</div>
-    <div class="dw-track" style="height:${TRACK_H}px;"><div class="dw-base" style="top:${BASE_Y}px;"></div>${marks}${dots}</div></div>`;
-}
-// 오늘의 문장 — 수집한 문장 중 날짜 시드로 하루 한 개(같은 날엔 같은 문장). 책갈피 쪽지 모양.
-function _dwQuoteHtml(dk){
-  const quotes=getQuotes().filter(q=>q.text&&q.text.trim());
-  if(!quotes.length)return '';
-  const fixedCid=_dwFix(dk,'quote',()=>quotes[dateSeedIndex(dk,quotes.length)].cid);
-  const q=quotes.find(x=>x.cid===fixedCid)||quotes[dateSeedIndex(dk,quotes.length)];
-  const book=getBooks().find(b=>b.cid===q.bookCid);
-  const src=book?`<div class="dw-quote-src"><i class="ti ti-book" aria-hidden="true"></i>${escapeHtml(book.title)}${book.author?'<span>·</span>'+escapeHtml(book.author):''}</div>`:'';
-  return `<div class="dw-sec"><div class="dw-label dw-label-row"><span><i class="ti ti-quote" aria-hidden="true"></i> 오늘의 문장</span>
-      <span class="dw-share" onclick="shareQuoteCard('${q.cid}')" title="공유 이미지"><i class="ti ti-share-2" aria-hidden="true"></i></span></div>
-    <div class="dw-quote" onclick="openReading()"><span class="dw-quote-ribbon"></span><div class="dw-quote-text">${escapeHtml(q.text)}</div>${src}</div></div>`;
+  const meals=getMeals(dk),mealCnt=['breakfast','lunch','dinner'].filter(k=>meals[k]||meals[k+'_time']).length;
+  out.push('식사 기록 '+mealCnt+'/3끼');
+  const habits=getActiveHabits(),ld=new Date(dk+'T00:00:00'),checks=getHabitChecks(weekKey(ld)),dow=(ld.getDay()+6)%7;
+  if(habits.length)out.push('습관 '+habits.filter(h=>checks[h.id+'-'+dow]).length+'/'+habits.length+'개 체크');
+  return out.join(' · ');
 }
 // 한 번 만든 문구는 그날 안에서 고정(하루의 모양·마무리 문구·오늘의 문장). 홈을 여러 번 열어도 바뀌지 않게 기기 저장소에 보관, 날이 바뀌면 새로 만든다.
 const DW_FIX_KEY='iikoto_dw_fix';
@@ -7149,13 +7086,13 @@ async function _dwSyncServer(dk){
   if(server){
     let sv=null;try{sv=JSON.parse(server);}catch(e){}
     if(sv){
-      try{localStorage.setItem(DW_FIX_KEY,JSON.stringify({dk,shape:sv.shape,closing:sv.closing,quote:sv.quote}));}catch(e){}
+      try{localStorage.setItem(DW_FIX_KEY,JSON.stringify({dk,closing:sv.closing,quote:sv.quote}));}catch(e){}
       const old=document.getElementById('dawn-page');
-      if(old&&(!st||st.dk!==dk||st.shape!==sv.shape||st.closing!==sv.closing||st.quote!==sv.quote))old.replaceWith(makeDawnPage());
+      if(old&&(!st||st.dk!==dk||st.closing!==sv.closing||st.quote!==sv.quote))old.replaceWith(makeDawnPage());
       return;
     }
   }
-  if(st&&st.dk===dk&&(st.shape||st.closing))aiCacheSet(key,JSON.stringify({shape:st.shape||null,closing:st.closing||null,quote:st.quote||null}));
+  if(st&&st.dk===dk&&st.closing)aiCacheSet(key,JSON.stringify({closing:st.closing||null,quote:st.quote||null}));
 }
 function makeDawnPage(){
   const wrap=document.createElement('div');wrap.id='dawn-page';
@@ -7164,12 +7101,13 @@ function makeDawnPage(){
   // 리듬 시간분포(카테고리별 분 합산) — 수면은 제외
   const durByCat={};let totalDur=0;
   rblocks.forEach(b=>{const d=_blockDurMin(b);if(d>0&&RHYTHM_CATS[b.cat]){durByCat[b.cat]=(durByCat[b.cat]||0)+d;totalDur+=d;}});
+  const sumTxt=(_greetingFromCache(_greetingCacheKey('dawn'))||{}).text||'';
   let html=`<div class="dw-mast"><div class="dw-mast-l"><span class="dw-day">${ld.getDate()}</span>
-      <div class="dw-mast-t"><div class="dw-month">${ld.getMonth()+1}월 · ${_HOME_DAYS[ld.getDay()]}요일</div><div class="dw-sub">오늘은 어떤 하루였을까요?</div></div></div>
-      <i class="ti ti-moon dw-moon" aria-hidden="true"></i></div><div class="dw-rule"></div>`;
+      <div class="dw-mast-t"><div class="dw-month">${ld.getMonth()+1}월 · ${_HOME_DAYS[ld.getDay()]}요일</div><div class="dw-sub">${ld.getFullYear()}년 · 오늘의 한 페이지</div></div></div>
+      <div class="dw-mast-r"><span id="dw-time">${_homeClockText()}</span><span id="dw-weather">${_homeWeatherCache?_homeWeatherCache.icon+' '+_homeWeatherCache.temp+'°':''}</span></div></div><div class="dw-rule"></div>`;
+  // 총평 — 인사카드 + 하루의 모양을 합친 자리. 헤드라인은 고정 후보, 본문은 새벽 인사말(API)이 채운다.
+  html+=`<div class="dw-sec dw-sum"><div class="dw-label"><i class="ti ti-sparkles" aria-hidden="true"></i> 오늘의 총평</div><h2 class="dw-head">${escapeHtml(_homeGreetingTitle('dawn',false))}</h2><p class="dw-sum-t" id="dw-summary">${escapeHtml(sumTxt||'잠깐만요...')}</p></div>`;
   html+=_dwDistHtml(dk);
-  const shape=_dwFix(dk,'shape',()=>_dwShapeText(dk,durByCat));
-  if(shape)html+=`<div class="dw-sec"><div class="dw-label">하루의 모양</div><p class="dw-shape">${escapeHtml(shape)}</p></div>`;
   const oneLine=getDailyOneLine(dk).trim();
   if(oneLine)html+=`<div class="dw-sec"><div class="dw-label">하루를 마무리하며</div><p class="dw-oneline">${escapeHtml(oneLine)}</p></div>`;
   if(totalDur>0){
@@ -7204,7 +7142,6 @@ function makeDawnPage(){
   html+=_dwQuoteHtml(dk);
   html+=`<div class="dw-closing">${_dwFix(dk,'closing',()=>DAWN_CLOSING_LINES[Math.floor(Math.random()*DAWN_CLOSING_LINES.length)])}</div>`;
   _dwSyncServer(dk);
-  wrap.appendChild(makeLabel('오늘의 한 페이지'));
   const art=document.createElement('article');art.className='dw-page';art.innerHTML=html;
   wrap.appendChild(art);
   return wrap;
