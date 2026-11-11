@@ -4618,7 +4618,7 @@ function syncOnTabEnter(){
 // ██ 설정 (1/2 — 나머지는 SETTINGS 부근) ██
 // ══════════════════════════════════════════════════════════
 // ── THEME
-const THEME_COLORS={light:'#fdf0e8',glass:'#f7f4ee'};
+const THEME_COLORS={light:'#fdf0e8',glass:'#f7f4ee',jelly:'#fef3ec'};
 function applyThemeColorMeta(theme){
   const m=document.querySelector('meta[name="theme-color"]');
   if(m)m.setAttribute('content',THEME_COLORS[theme]||THEME_COLORS.light);
@@ -7064,6 +7064,37 @@ function _dawnRecapFacts(dk){
   const habits=getActiveHabits(),ld=new Date(dk+'T00:00:00'),checks=getHabitChecks(weekKey(ld)),dow=(ld.getDay()+6)%7;
   if(habits.length)out.push('습관 '+habits.filter(h=>checks[h.id+'-'+dow]).length+'/'+habits.length+'개 체크');
   return out.join(' · ');
+}
+// 오늘 활동 분포 — 06~24시 활동(완료한 할 일·습관 체크·시간 있는 일정)을 점으로. 점 중심은 기준선(BASE_Y)에 맞춤.
+function _dwDistHtml(dk){
+  const TRACK_H=36,BASE_Y=14;
+  const g=_paceDotGroups(dk,PACE_DOT_RANGE_START,PACE_DOT_RANGE_END);
+  if(!g)return '';
+  let dots='',i=0;
+  g.groups.forEach(gr=>{
+    const n=gr.items.length;
+    gr.items.forEach((ev,idx)=>{
+      const x=Math.min(100,Math.max(0,gr.centerX+(idx-(n-1)/2)*g.MIN_GAP_PCT));
+      const c=DAWN_DOT_COLORS[i%DAWN_DOT_COLORS.length];
+      dots+=`<div class="dw-dot" style="left:${x}%;top:${BASE_Y}px;background:${c};color:${c};animation-delay:${((i*0.45)%2.6).toFixed(2)}s;" title="${escapeHtml(ev.label)}"></div>`;
+      i++;
+    });
+  });
+  const marks=_paceHourMarksHtml(PACE_DOT_RANGE_START,PACE_DOT_RANGE_END,'dw-hl','dw-hlab');
+  return `<div class="dw-sec"><div class="dw-label"><i class="ti ti-sparkles" aria-hidden="true"></i> 오늘 활동 분포</div>
+    <div class="dw-track" style="height:${TRACK_H}px;"><div class="dw-base" style="top:${BASE_Y}px;"></div>${marks}${dots}</div></div>`;
+}
+// 오늘의 문장 — 수집한 문장 중 날짜 시드로 하루 한 개(같은 날엔 같은 문장). 책갈피 쪽지 모양.
+function _dwQuoteHtml(dk){
+  const quotes=getQuotes().filter(q=>q.text&&q.text.trim());
+  if(!quotes.length)return '';
+  const fixedCid=_dwFix(dk,'quote',()=>quotes[dateSeedIndex(dk,quotes.length)].cid);
+  const q=quotes.find(x=>x.cid===fixedCid)||quotes[dateSeedIndex(dk,quotes.length)];
+  const book=getBooks().find(b=>b.cid===q.bookCid);
+  const src=book?`<div class="dw-quote-src"><i class="ti ti-book" aria-hidden="true"></i>${escapeHtml(book.title)}${book.author?'<span>·</span>'+escapeHtml(book.author):''}</div>`:'';
+  return `<div class="dw-sec"><div class="dw-label dw-label-row"><span><i class="ti ti-quote" aria-hidden="true"></i> 오늘의 문장</span>
+      <span class="dw-share" onclick="shareQuoteCard('${q.cid}')" title="공유 이미지"><i class="ti ti-share-2" aria-hidden="true"></i></span></div>
+    <div class="dw-quote" onclick="openReading()"><span class="dw-quote-ribbon"></span><div class="dw-quote-text">${escapeHtml(q.text)}</div>${src}</div></div>`;
 }
 // 한 번 만든 문구는 그날 안에서 고정(하루의 모양·마무리 문구·오늘의 문장). 홈을 여러 번 열어도 바뀌지 않게 기기 저장소에 보관, 날이 바뀌면 새로 만든다.
 const DW_FIX_KEY='iikoto_dw_fix';

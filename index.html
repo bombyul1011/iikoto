@@ -1592,11 +1592,76 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
 @font-face{font-family:'Bareonbatang';src:url('./fonts/HakgyoansimBareonbatangR.woff2') format('woff2');font-weight:400;font-display:swap;}
 @font-face{font-family:'Bareonbatang';src:url('./fonts/HakgyoansimBareonbatangB.woff2') format('woff2');font-weight:700;font-display:swap;}
 
+
+/* ══ JELLY THEME (젤리) ══ 글래스(큰 면 = 반투명 유리) + 클레이(눌러서 반응하는 것만 말랑하게: 활성 탭·완료 체크박스·선택 칩·시작 버튼).
+   변수는 :root(라이트) 값을 그대로 물려받고 색·카드·시트만 덮어쓴다. 배경 빛무리는 블러 필터 대신 방사형 그라데이션(저비용). */
+[data-theme="jelly"]{
+  --bg:radial-gradient(circle 300px at 0% 4%,rgba(255,188,168,0.42),transparent 72%),radial-gradient(circle 340px at 100% 22%,rgba(206,188,245,0.42),transparent 72%),radial-gradient(circle 300px at 0% 52%,rgba(255,226,155,0.42),transparent 72%),radial-gradient(circle 320px at 100% 76%,rgba(162,223,202,0.40),transparent 72%),radial-gradient(circle 320px at 0% 98%,rgba(255,188,210,0.38),transparent 72%),linear-gradient(160deg,#fef3ec 0%,#fdf3f7 45%,#f4f1fc 100%);
+  --tp:#573f35;--ts:#7d6256;--tm:#b8a094;
+  --card:rgba(255,255,255,0.42);--card-b:rgba(255,255,255,0.72);
+  --card-p:rgba(255,175,200,0.26);--card-pb:rgba(255,255,255,0.72);
+  --card-m:rgba(160,222,215,0.32);--card-mb:rgba(255,255,255,0.72);
+  --card-y:rgba(255,225,120,0.30);--card-yb:rgba(255,255,255,0.72);
+  --card-s:rgba(200,220,140,0.32);--card-sb:rgba(255,255,255,0.72);
+  --sheet:linear-gradient(160deg,rgba(255,255,255,0.80),rgba(255,243,238,0.66));
+  --modal:linear-gradient(145deg,rgba(255,255,255,0.84),rgba(255,243,238,0.70));
+  --inp:rgba(255,255,255,0.58);--inp-b:rgba(255,255,255,0.85);
+  --sleep-b:rgba(255,255,255,0.46);--sleep-bb:rgba(255,255,255,0.8);
+  --jelly-sheen:linear-gradient(112deg,rgba(255,255,255,0.5) 0%,rgba(255,255,255,0) 36%,rgba(255,255,255,0) 70%,rgba(255,255,255,0.18) 100%);
+  --jelly-edge:0 10px 30px rgba(140,90,100,0.12),inset 0 1.5px 0 rgba(255,255,255,0.95),inset 0 -1px 0 rgba(255,255,255,0.35),inset 1px 0 0 rgba(255,255,255,0.4);
+  --jelly-clay:3px 4px 9px rgba(190,125,115,0.26),-2px -2px 6px rgba(255,255,255,0.95),inset 1px 1px 3px rgba(255,255,255,0.85),inset -2px -3px 5px rgba(190,120,110,0.16);
+}
+[data-theme="jelly"] #splash{background:#fef3ec;}
+/* 큰 면 — 유리 질감(색은 --card-* 변수가 정하고, 광택은 background-image로 얹어 틴트를 지우지 않음) */
+[data-theme="jelly"] .card,[data-theme="jelly"] .sleep-card,[data-theme="jelly"] .habit-week-box,[data-theme="jelly"] .mh-card,[data-theme="jelly"] .mh-box,[data-theme="jelly"] .dw-page,[data-theme="jelly"] .mh-tile,[data-theme="jelly"] .home-hcard:not(.birthday){
+  background-image:var(--jelly-sheen);-webkit-backdrop-filter:blur(14px) saturate(170%);backdrop-filter:blur(14px) saturate(170%);box-shadow:var(--jelly-edge);border-color:rgba(255,255,255,0.7);
+}
+[data-theme="jelly"] .card,[data-theme="jelly"] .sleep-card,[data-theme="jelly"] .mh-card,[data-theme="jelly"] .mh-box,[data-theme="jelly"] .dw-page{border-radius:24px;}
+[data-theme="jelly"] .mh-tile{border-radius:22px;}
+[data-theme="jelly"] .home-hcard:not(.birthday){border-radius:28px;border:1px solid rgba(255,255,255,0.7);}
+[data-theme="jelly"] .home-hcard.morning{background:linear-gradient(135deg,rgba(255,200,160,0.55),rgba(255,235,190,0.35)),var(--jelly-sheen);}
+[data-theme="jelly"] .home-hcard.afternoon{background:linear-gradient(135deg,rgba(255,215,232,0.55),rgba(255,236,205,0.38)),var(--jelly-sheen);}
+[data-theme="jelly"] .home-hcard.night{background:linear-gradient(135deg,rgba(222,212,250,0.58),rgba(255,214,232,0.40)),var(--jelly-sheen);}
+[data-theme="jelly"] .mh-tile.mint{background:linear-gradient(135deg,rgba(150,215,185,0.6),rgba(255,255,255,0.25)),var(--jelly-sheen);border-color:rgba(255,255,255,0.7);}
+[data-theme="jelly"] .mh-tile.yellow{background:linear-gradient(135deg,rgba(255,228,130,0.65),rgba(255,255,255,0.25)),var(--jelly-sheen);border-color:rgba(255,255,255,0.7);}
+[data-theme="jelly"] .mh-tile.sky{background:linear-gradient(135deg,rgba(170,208,228,0.6),rgba(255,255,255,0.25)),var(--jelly-sheen);border-color:rgba(255,255,255,0.7);}
+[data-theme="jelly"] .mh-tile.lavender{background:linear-gradient(135deg,rgba(210,175,225,0.55),rgba(255,255,255,0.25)),var(--jelly-sheen);border-color:rgba(255,255,255,0.7);}
+/* 작은 면 — 연한 유리(칩·추천 행·메모) */
+[data-theme="jelly"] .mh-chip,[data-theme="jelly"] .mh-memo-box,[data-theme="jelly"] .mh-memo-row,[data-theme="jelly"] .date-pill,[data-theme="jelly"] .vtab{-webkit-backdrop-filter:blur(12px) saturate(160%);backdrop-filter:blur(12px) saturate(160%);border:1px solid rgba(255,255,255,0.7);box-shadow:inset 0 1px 0 rgba(255,255,255,0.85),0 4px 14px rgba(140,90,100,0.08);}
+[data-theme="jelly"] .mh-pick{border:1px solid rgba(255,255,255,0.65);border-radius:18px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.85),0 4px 14px rgba(140,90,100,0.08);}
+[data-theme="jelly"] .mh-pick-ic{background:rgba(255,255,255,0.5);border-radius:13px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.85);}
+[data-theme="jelly"] .date-pill{background:rgba(255,255,255,0.5);color:var(--tp);}
+[data-theme="jelly"] .vtab{background:rgba(255,255,255,0.36);color:var(--ts);border-radius:999px;}
+/* 클레이 ① 활성 탭 */
+[data-theme="jelly"] .vtab.on{background:linear-gradient(145deg,#fff6f1,#f8e0d8);border:1px solid rgba(255,255,255,0.6);box-shadow:var(--jelly-clay);animation:none;color:var(--tp);font-weight:600;}
+/* 클레이 ② 체크박스 — 미체크는 유리 윤곽, 체크하면 민트 클레이가 솟음 */
+[data-theme="jelly"] .chk{border:1.5px solid rgba(160,130,120,0.55);background:rgba(255,255,255,0.45);}
+[data-theme="jelly"] .chk.on{background:linear-gradient(145deg,#c8ecd9,#8fd0ae);border-color:rgba(255,255,255,0.7);box-shadow:2px 3px 6px rgba(80,160,120,0.3),-1px -1px 4px rgba(255,255,255,0.95),inset 1px 1px 2px rgba(255,255,255,0.7),inset -1px -2px 3px rgba(60,140,100,0.25);}
+[data-theme="jelly"] .chk.on i{color:#fff!important;}
+/* 클레이 ③④ 시트의 선택 칩·시작 버튼 */
+[data-theme="jelly"] .mps-chip{background:#f8efea;border:1px solid rgba(255,255,255,0.7);box-shadow:inset 2px 3px 6px rgba(190,125,115,0.22),inset -2px -2px 5px rgba(255,255,255,0.9);}
+[data-theme="jelly"] .mps-chip.on{box-shadow:4px 5px 10px rgba(230,110,150,0.3),-2px -2px 6px rgba(255,255,255,0.95),inset 1px 1px 3px rgba(255,255,255,0.8),inset -2px -3px 5px rgba(200,90,130,0.18)!important;font-weight:600;}
+[data-theme="jelly"] .mps-go{background:linear-gradient(145deg,#ffc2d6,#ffb08a);color:var(--tp);border:1px solid rgba(255,255,255,0.6);box-shadow:7px 9px 18px rgba(230,110,130,0.35),-4px -4px 10px rgba(255,255,255,0.95),inset 3px 3px 6px rgba(255,255,255,0.7),inset -4px -5px 9px rgba(210,90,100,0.22);border-radius:999px;}
+[data-theme="jelly"] .mps-close{border-radius:999px;border-color:rgba(255,255,255,0.8);background:rgba(255,255,255,0.4);}
+/* 시트·모달 — 강한 블러 유리 */
+[data-theme="jelly"] .bsheet{border:1px solid rgba(255,255,255,0.75);border-bottom:none;-webkit-backdrop-filter:blur(30px) saturate(190%);backdrop-filter:blur(30px) saturate(190%);box-shadow:0 -10px 40px rgba(140,90,100,0.16),inset 0 1.5px 0 rgba(255,255,255,0.95);}
+[data-theme="jelly"] .modal{border:1px solid rgba(255,255,255,0.75);-webkit-backdrop-filter:blur(30px) saturate(190%);backdrop-filter:blur(30px) saturate(190%);box-shadow:0 16px 50px rgba(140,90,100,0.2),inset 0 1.5px 0 rgba(255,255,255,0.95);}
+/* 오버레이는 어둡게 눌러 회색 막이 끼지 않도록 연하게 */
+[data-theme="jelly"] .overlay,[data-theme="jelly"] .modal-ov{background:rgba(87,63,53,0.16);}
+/* 습관 체크 — 유리 위에서도 윤곽이 보이도록 */
+[data-theme="jelly"] .habit-check-box{border-radius:20px;-webkit-backdrop-filter:blur(14px) saturate(170%);backdrop-filter:blur(14px) saturate(170%);box-shadow:var(--jelly-edge);border-color:rgba(255,255,255,0.7);background-image:var(--jelly-sheen);}
+[data-theme="jelly"] .habit-chk2{border:1.5px dashed rgba(160,130,120,0.45);background:rgba(255,255,255,0.55);}
+[data-theme="jelly"] .habit-chk2.on{border-style:solid;}
+/* 투명도 줄이기 설정이면 블러를 끄고 불투명하게 */
+@media (prefers-reduced-transparency:reduce){
+  [data-theme="jelly"] .card,[data-theme="jelly"] .sleep-card,[data-theme="jelly"] .habit-week-box,[data-theme="jelly"] .mh-card,[data-theme="jelly"] .mh-box,[data-theme="jelly"] .dw-page,[data-theme="jelly"] .mh-tile,[data-theme="jelly"] .home-hcard,[data-theme="jelly"] .bsheet,[data-theme="jelly"] .modal,[data-theme="jelly"] .vtab,[data-theme="jelly"] .date-pill,[data-theme="jelly"] .mh-chip,[data-theme="jelly"] .mh-memo-box,[data-theme="jelly"] .mh-memo-row{-webkit-backdrop-filter:none;backdrop-filter:none;}
+  [data-theme="jelly"]{--card:rgba(255,255,255,0.86);--sheet:#fdf5f1;--modal:#fdf5f1;}
+}
 </style>
 </head>
 <body>
 <div id="bg-fixed"></div>
-<script>(function(){try{var t=localStorage.getItem('theme');if(t){t=JSON.parse(t);document.documentElement.setAttribute('data-theme',t);var c={light:'#fef2e4',glass:'#f7f4ee'}[t];var m=document.querySelector('meta[name="theme-color"]');if(m&&c)m.setAttribute('content',c);}}catch(e){}})();</script>
+<script>(function(){try{var t=localStorage.getItem('theme');if(t){t=JSON.parse(t);document.documentElement.setAttribute('data-theme',t);var c={light:'#fef2e4',glass:'#f7f4ee',jelly:'#fef3ec'}[t];var m=document.querySelector('meta[name="theme-color"]');if(m&&c)m.setAttribute('content',c);}}catch(e){}})();</script>
 <script>(function(){try{var s=localStorage.getItem('textScale');s=s?JSON.parse(s):0;var base={'-1':{main:13,dow:11},'0':{main:14,dow:12},'1':{main:15,dow:13}}[String(s)]||{main:14,dow:12};document.documentElement.style.setProperty('--main-text-size',base.main+'px');document.documentElement.style.setProperty('--dow-label-size',base.dow+'px');}catch(e){}})();</script>
 
 <!-- SPLASH -->
@@ -2623,6 +2688,7 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
         <div class="color-themes">
           <div class="ctheme-btn on" id="ct-light" style="background:linear-gradient(135deg,#fdf0e8,#fde8f0)" onclick="setTheme('light',this)">✓</div>
           <div class="ctheme-btn" id="ct-glass" style="background:linear-gradient(135deg,#f7f4ee,#f3f1ec)" onclick="setTheme('glass',this)">✓</div>
+          <div class="ctheme-btn" id="ct-jelly" style="background:linear-gradient(135deg,#fef3ec,#f4f1fc)" onclick="setTheme('jelly',this)">✓</div>
         </div>
         <div class="settings-item-lbl" style="margin:18px 0 8px;">글자 크기</div>
         <div class="text-scale-ctrl">
@@ -2823,7 +2889,7 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
   </div>
 </div>
 
-<script src="app.js?v=20261110b"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
+<script src="app.js?v=20261111b"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
 
 </body>
 </html>
