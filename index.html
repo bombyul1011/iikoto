@@ -1593,95 +1593,50 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
 @font-face{font-family:'Bareonbatang';src:url('./fonts/HakgyoansimBareonbatangB.woff2') format('woff2');font-weight:700;font-display:swap;}
 
 
-/* ══ JELLY THEME (젤리) ══ 글래스(큰 면 = 반투명 유리) + 클레이(눌러서 반응하는 것만 말랑하게: 활성 탭·완료 체크박스·선택 칩·시작 버튼).
-   변수는 :root(라이트) 값을 그대로 물려받고 색·카드·시트만 덮어쓴다. 배경 빛무리는 블러 필터 대신 방사형 그라데이션(저비용). */
-[data-theme="jelly"]{
-  --bg:radial-gradient(circle 300px at 0% 4%,rgba(255,188,168,0.42),transparent 72%),radial-gradient(circle 340px at 100% 22%,rgba(206,188,245,0.42),transparent 72%),radial-gradient(circle 300px at 0% 52%,rgba(255,226,155,0.42),transparent 72%),radial-gradient(circle 320px at 100% 76%,rgba(162,223,202,0.40),transparent 72%),radial-gradient(circle 320px at 0% 98%,rgba(255,188,210,0.38),transparent 72%),linear-gradient(160deg,#fef3ec 0%,#fdf3f7 45%,#f4f1fc 100%);
-  --tp:#573f35;--ts:#7d6256;--tm:#b8a094;
-  --card:rgba(255,255,255,0.42);--card-b:rgba(255,255,255,0.72);
-  /* 카드 면은 모두 반투명 흰색 — 각자의 색은 아이콘·체크·칩에서만 쓴다 */
-  --card-p:rgba(255,255,255,0.42);--card-pb:rgba(255,255,255,0.72);
-  --card-m:rgba(255,255,255,0.42);--card-mb:rgba(255,255,255,0.72);
-  --card-y:rgba(255,255,255,0.42);--card-yb:rgba(255,255,255,0.72);
-  --card-s:rgba(255,255,255,0.42);--card-sb:rgba(255,255,255,0.72);
-  --sheet:linear-gradient(160deg,rgba(255,255,255,0.80),rgba(255,243,238,0.66));
-  --modal:linear-gradient(145deg,rgba(255,255,255,0.84),rgba(255,243,238,0.70));
-  --inp:rgba(255,255,255,0.58);--inp-b:rgba(255,255,255,0.85);
-  --sleep-b:rgba(255,255,255,0.46);--sleep-bb:rgba(255,255,255,0.8);
-  --jelly-sheen:linear-gradient(112deg,rgba(255,255,255,0.5) 0%,rgba(255,255,255,0) 36%,rgba(255,255,255,0) 70%,rgba(255,255,255,0.18) 100%);
-  --jelly-edge:0 10px 30px rgba(140,90,100,0.12),inset 0 1.5px 0 rgba(255,255,255,0.95),inset 0 -1px 0 rgba(255,255,255,0.35),inset 1px 0 0 rgba(255,255,255,0.4);
-  --jelly-clay:3px 4px 9px rgba(190,125,115,0.26),-2px -2px 6px rgba(255,255,255,0.95),inset 1px 1px 3px rgba(255,255,255,0.85),inset -2px -3px 5px rgba(190,120,110,0.16);
+/* ══ GLASS EFFECT (유리알 + 글라스) ══ 유리알의 색·테두리·구조는 그대로 두고 "유리 효과"만 얹는다:
+   뒤가 비치는 흐림 · 모서리 반사광 · 안쪽 테두리광 · 프로스트 시트. 배경 빛무리는 블러 필터 대신 방사형 그라데이션(저비용).
+   데스크톱 시안(E)의 값을 따른다. 라이트 테마에는 영향 없음([data-theme="glass"] 한정). */
+[data-theme="glass"]{
+  --bg:radial-gradient(circle 280px at 0% 3%,rgba(255,205,180,0.42),transparent 72%),radial-gradient(circle 300px at 100% 20%,rgba(205,195,238,0.38),transparent 72%),radial-gradient(circle 280px at 0% 48%,rgba(250,226,150,0.40),transparent 72%),radial-gradient(circle 300px at 100% 66%,rgba(170,215,196,0.36),transparent 72%),radial-gradient(circle 300px at 4% 88%,rgba(255,200,215,0.34),transparent 72%),radial-gradient(circle 280px at 96% 98%,rgba(190,215,240,0.34),transparent 72%),linear-gradient(165deg,#f7f4ee 0%,#f3f1ec 55%,#f6f3ee 100%);
+  --card:rgba(255,253,248,0.46);
+  --glass-sheen:linear-gradient(115deg,rgba(255,255,255,0.62) 0%,rgba(255,255,255,0) 32%,rgba(255,255,255,0) 72%,rgba(255,255,255,0.20) 100%);
+  --glass-edge:inset 0 1.5px 1px rgba(255,255,255,0.95),inset 0 -8px 14px -10px rgba(120,110,95,0.16),0 8px 22px rgba(150,140,120,0.10);
+  --sheet:linear-gradient(160deg,rgba(252,250,244,0.84),rgba(250,247,240,0.68));
+  --modal:linear-gradient(145deg,rgba(252,250,244,0.84),rgba(250,247,240,0.68));
 }
-[data-theme="jelly"] #splash{background:#fef3ec;}
-/* 큰 면 — 유리 질감(색은 --card-* 변수가 정하고, 광택은 background-image로 얹어 틴트를 지우지 않음) */
-[data-theme="jelly"] .card,[data-theme="jelly"] .sleep-card,[data-theme="jelly"] .habit-week-box,[data-theme="jelly"] .mh-card,[data-theme="jelly"] .mh-box,[data-theme="jelly"] .dw-page,[data-theme="jelly"] .mh-tile,[data-theme="jelly"] .home-hcard:not(.birthday){
-  background-image:var(--jelly-sheen);-webkit-backdrop-filter:blur(14px) saturate(170%);backdrop-filter:blur(14px) saturate(170%);box-shadow:var(--jelly-edge);border-color:rgba(255,255,255,0.7);
-}
-[data-theme="jelly"] .card,[data-theme="jelly"] .sleep-card,[data-theme="jelly"] .mh-card,[data-theme="jelly"] .mh-box,[data-theme="jelly"] .dw-page{border-radius:24px;}
-[data-theme="jelly"] .mh-tile{border-radius:22px;}
-[data-theme="jelly"] .home-hcard:not(.birthday){border-radius:28px;border:1px solid rgba(255,255,255,0.7);}
-[data-theme="jelly"] .home-hcard.morning{background:linear-gradient(135deg,rgba(255,200,160,0.55),rgba(255,235,190,0.35)),var(--jelly-sheen);}
-[data-theme="jelly"] .home-hcard.afternoon{background:linear-gradient(135deg,rgba(255,215,232,0.55),rgba(255,236,205,0.38)),var(--jelly-sheen);}
-[data-theme="jelly"] .home-hcard.night{background:linear-gradient(135deg,rgba(222,212,250,0.58),rgba(255,214,232,0.40)),var(--jelly-sheen);}
-[data-theme="jelly"] .mh-tile.mint{background:linear-gradient(135deg,rgba(150,215,185,0.6),rgba(255,255,255,0.25)),var(--jelly-sheen);border-color:rgba(255,255,255,0.7);}
-[data-theme="jelly"] .mh-tile.yellow{background:linear-gradient(135deg,rgba(255,228,130,0.65),rgba(255,255,255,0.25)),var(--jelly-sheen);border-color:rgba(255,255,255,0.7);}
-[data-theme="jelly"] .mh-tile.sky{background:linear-gradient(135deg,rgba(170,208,228,0.6),rgba(255,255,255,0.25)),var(--jelly-sheen);border-color:rgba(255,255,255,0.7);}
-[data-theme="jelly"] .mh-tile.lavender{background:linear-gradient(135deg,rgba(210,175,225,0.55),rgba(255,255,255,0.25)),var(--jelly-sheen);border-color:rgba(255,255,255,0.7);}
-/* 작은 면 — 연한 유리(칩·추천 행·메모) */
-[data-theme="jelly"] .mh-chip,[data-theme="jelly"] .mh-memo-box,[data-theme="jelly"] .mh-memo-row,[data-theme="jelly"] .date-pill,[data-theme="jelly"] .vtab{-webkit-backdrop-filter:blur(12px) saturate(160%);backdrop-filter:blur(12px) saturate(160%);border:1px solid rgba(255,255,255,0.7);box-shadow:inset 0 1px 0 rgba(255,255,255,0.85),0 4px 14px rgba(140,90,100,0.08);}
-[data-theme="jelly"] .mh-pick{border:1px solid rgba(255,255,255,0.65);border-radius:18px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.85),0 4px 14px rgba(140,90,100,0.08);}
-[data-theme="jelly"] .mh-pick-ic{background:rgba(255,255,255,0.5);border-radius:13px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.85);}
-[data-theme="jelly"] .date-pill{background:rgba(255,255,255,0.5);color:var(--tp);}
-[data-theme="jelly"] .vtab{background:rgba(255,255,255,0.36);color:var(--ts);border-radius:999px;}
-/* 클레이 ① 활성 탭 */
-[data-theme="jelly"] .vtab.on{background:linear-gradient(145deg,#fff6f1,#f8e0d8);border:1px solid rgba(255,255,255,0.6);box-shadow:var(--jelly-clay);animation:none;color:var(--tp);font-weight:600;}
-/* 클레이 ② 체크박스 — 미체크는 유리 윤곽, 체크하면 민트 클레이가 솟음 */
-[data-theme="jelly"] .chk{border:1.5px solid rgba(160,130,120,0.55);background:rgba(255,255,255,0.45);}
-[data-theme="jelly"] .chk.on{background:linear-gradient(145deg,#c8ecd9,#8fd0ae);border-color:rgba(255,255,255,0.7);box-shadow:2px 3px 6px rgba(80,160,120,0.3),-1px -1px 4px rgba(255,255,255,0.95),inset 1px 1px 2px rgba(255,255,255,0.7),inset -1px -2px 3px rgba(60,140,100,0.25);}
-[data-theme="jelly"] .chk.on i{color:#fff!important;}
-/* 클레이 ③④ 시트의 선택 칩·시작 버튼 */
-[data-theme="jelly"] .mps-chip{background:#f8efea;border:1px solid rgba(255,255,255,0.7);box-shadow:inset 2px 3px 6px rgba(190,125,115,0.22),inset -2px -2px 5px rgba(255,255,255,0.9);}
-[data-theme="jelly"] .mps-chip.on{box-shadow:4px 5px 10px rgba(230,110,150,0.3),-2px -2px 6px rgba(255,255,255,0.95),inset 1px 1px 3px rgba(255,255,255,0.8),inset -2px -3px 5px rgba(200,90,130,0.18)!important;font-weight:600;}
-[data-theme="jelly"] .mps-go{background:linear-gradient(145deg,#ffc2d6,#ffb08a);color:var(--tp);border:1px solid rgba(255,255,255,0.6);box-shadow:7px 9px 18px rgba(230,110,130,0.35),-4px -4px 10px rgba(255,255,255,0.95),inset 3px 3px 6px rgba(255,255,255,0.7),inset -4px -5px 9px rgba(210,90,100,0.22);border-radius:999px;}
-[data-theme="jelly"] .mps-close{border-radius:999px;border-color:rgba(255,255,255,0.8);background:rgba(255,255,255,0.4);}
-/* 시트·모달 — 강한 블러 유리 */
-[data-theme="jelly"] .bsheet{border:1px solid rgba(255,255,255,0.75);border-bottom:none;-webkit-backdrop-filter:blur(30px) saturate(190%);backdrop-filter:blur(30px) saturate(190%);box-shadow:0 -10px 40px rgba(140,90,100,0.16),inset 0 1.5px 0 rgba(255,255,255,0.95);}
-[data-theme="jelly"] .modal{border:1px solid rgba(255,255,255,0.75);-webkit-backdrop-filter:blur(30px) saturate(190%);backdrop-filter:blur(30px) saturate(190%);box-shadow:0 16px 50px rgba(140,90,100,0.2),inset 0 1.5px 0 rgba(255,255,255,0.95);}
-/* 오버레이는 어둡게 눌러 회색 막이 끼지 않도록 연하게 */
-[data-theme="jelly"] .overlay,[data-theme="jelly"] .modal-ov{background:rgba(87,63,53,0.16);}
-/* 습관 체크 — 유리 위에서도 윤곽이 보이도록 */
-[data-theme="jelly"] .habit-check-box{border-radius:20px;-webkit-backdrop-filter:blur(14px) saturate(170%);backdrop-filter:blur(14px) saturate(170%);box-shadow:var(--jelly-edge);border-color:rgba(255,255,255,0.7);background-image:var(--jelly-sheen);}
-[data-theme="jelly"] .habit-chk2{border:1.5px dashed rgba(160,130,120,0.45);background:rgba(255,255,255,0.7);box-shadow:2px 3px 6px rgba(190,125,115,0.22),-1.5px -1.5px 4px rgba(255,255,255,0.95),inset 1px 1px 2px rgba(255,255,255,0.9),inset -1.5px -2px 3px rgba(190,120,110,0.14);}
-[data-theme="jelly"] .habit-chk2.on{border-style:solid;}
-/* 주간·월간 목표 카드만 노랑으로 살짝 강조 */
-[data-theme="jelly"] #wchallenge-card,[data-theme="jelly"] #monthly-goal-card{background-image:linear-gradient(rgba(255,225,120,0.16),rgba(255,225,120,0.16)),var(--jelly-sheen);}
-/* ── 월간 달력: 흰 반투명 카드로 감싸고, 오늘은 장미빛 동그라미, 기록 있는 날은 옅은 핑크 ── */
-[data-theme="jelly"] #monthly-cal{background-color:var(--card);background-image:var(--jelly-sheen);border:1px solid rgba(255,255,255,0.72);border-radius:26px;padding:14px 10px 10px;box-shadow:var(--jelly-edge);-webkit-backdrop-filter:blur(14px) saturate(170%);backdrop-filter:blur(14px) saturate(170%);}
-[data-theme="jelly"] #monthly-cal .cal-day.has-record .cal-num{background:rgba(255,175,200,0.30);}
-[data-theme="jelly"] #monthly-cal .cal-day.today .cal-num{background:linear-gradient(145deg,#e8a0aa,#d98693);color:#fff;}
-[data-theme="jelly"] .cal-detail-wrap{background-color:var(--card);background-image:var(--jelly-sheen);border-color:rgba(255,255,255,0.72);border-radius:22px;box-shadow:var(--jelly-edge);}
-/* ── 허브: 시작(재생) 버튼·선택된 탭/칩만 클레이, 나머지 면은 흰 반투명 ── */
-[data-theme="jelly"] .rd-sw-bg{background:linear-gradient(145deg,#ffe3e9,#ffc2d1);box-shadow:var(--jelly-clay);}
-[data-theme="jelly"] .rd-tab.on,[data-theme="jelly"] .ch-month-banner-chip.on,[data-theme="jelly"] .wcal-filter-chip.on,[data-theme="jelly"] .wcal-filter-chip.on[data-cat]{background:linear-gradient(145deg,#fff6f1,#f8e0d8);border:1px solid rgba(255,255,255,0.6);box-shadow:var(--jelly-clay);color:var(--tp);font-weight:600;}
-[data-theme="jelly"] .rd-tab,[data-theme="jelly"] .ch-month-banner-chip,[data-theme="jelly"] .wcal-filter-chip{background:rgba(255,255,255,0.5);border-color:rgba(255,255,255,0.72);}
-[data-theme="jelly"] .wcal-rainbow-wrap{background:none;padding:0;animation:none;}
-[data-theme="jelly"] .wcal-rainbow-inner{background-color:var(--card);background-image:var(--jelly-sheen);border:1px solid rgba(255,255,255,0.72);border-radius:26px;padding:16px 12px 12px;box-shadow:var(--jelly-edge);-webkit-backdrop-filter:blur(14px) saturate(170%);backdrop-filter:blur(14px) saturate(170%);}
-[data-theme="jelly"] .rd-book-item{background-color:var(--card);background-image:var(--jelly-sheen);border-color:rgba(255,255,255,0.72);border-radius:22px;box-shadow:var(--jelly-edge);}
-[data-theme="jelly"] .rd-quote-item{background:rgba(255,255,255,0.5);}
-[data-theme="jelly"] .rd-status-btn.active,[data-theme="jelly"] .m-chip.active{background:linear-gradient(145deg,#fff6f1,#f8e0d8);border:1px solid rgba(255,255,255,0.6);box-shadow:var(--jelly-clay);color:var(--tp);font-weight:600;}
-/* 시트·모달 안의 카드는 이미 블러된 면 위에 놓이므로 중첩 블러를 끈다(스크롤 영역에서 모서리가 사각으로 깨지는 문제 방지) */
-[data-theme="jelly"] .bsheet .card,[data-theme="jelly"] .modal .card{-webkit-backdrop-filter:none;backdrop-filter:none;background-color:rgba(255,255,255,0.55);border-radius:22px;}
-[data-theme="jelly"] #diary-month-list-scroll{padding:2px;margin:-2px;}
+/* 큰 면 — 흐림 + 반사광 + 안쪽 테두리광 (색 테두리는 기존 유리알 값 그대로) */
+[data-theme="glass"] .card,[data-theme="glass"] .sleep-card,[data-theme="glass"] .habit-week-box,[data-theme="glass"] .habit-check-box,[data-theme="glass"] .mh-card,[data-theme="glass"] .mh-box,[data-theme="glass"] .dw-page,[data-theme="glass"] .rd-book-item,[data-theme="glass"] .wcal-rainbow-inner,[data-theme="glass"] .home-hcard:not(.dawn):not(.birthday){-webkit-backdrop-filter:blur(20px) saturate(165%);backdrop-filter:blur(20px) saturate(165%);box-shadow:var(--glass-edge);}
+[data-theme="glass"] .card,[data-theme="glass"] .sleep-card,[data-theme="glass"] .habit-week-box,[data-theme="glass"] .habit-check-box,[data-theme="glass"] .mh-card,[data-theme="glass"] .mh-box,[data-theme="glass"] .dw-page,[data-theme="glass"] .rd-book-item,[data-theme="glass"] .wcal-rainbow-inner{background-image:var(--glass-sheen);}
+[data-theme="glass"] .card,[data-theme="glass"] .sleep-card,[data-theme="glass"] .habit-week-box,[data-theme="glass"] .habit-check-box{border-radius:20px;}
+/* 시안처럼 살짝 색이 도는 카드: 할 일(노랑) · 메모(핑크) · 주간·월간 목표(노랑) */
+[data-theme="glass"] #todo-card,[data-theme="glass"] #wchallenge-card,[data-theme="glass"] #monthly-goal-card{background-image:var(--glass-sheen),linear-gradient(135deg,rgba(255,244,200,0.40),rgba(255,253,248,0));}
+[data-theme="glass"] #memo-card{background-image:var(--glass-sheen),linear-gradient(135deg,rgba(255,232,240,0.46),rgba(255,253,248,0));}
+/* 홈 인사 카드 — 기존 시간대 그라데이션을 시안처럼 조금 더 또렷하게 + 반사광 */
+[data-theme="glass"] .home-hcard.morning{background:var(--glass-sheen),linear-gradient(135deg,rgba(255,236,205,0.55),rgba(255,218,212,0.42));border-color:rgba(255,210,180,0.55);}
+[data-theme="glass"] .home-hcard.afternoon{background:var(--glass-sheen),linear-gradient(135deg,rgba(255,220,235,0.50),rgba(255,235,200,0.40));border-color:rgba(255,200,210,0.52);}
+[data-theme="glass"] .home-hcard.night{background:var(--glass-sheen),linear-gradient(135deg,rgba(225,215,250,0.50),rgba(255,210,230,0.40));border-color:rgba(210,195,240,0.52);}
+/* 허브 메인 카드(무지개 테두리) — 안쪽 면을 반투명하게 */
+[data-theme="glass"] .rd-top-inner{background:linear-gradient(rgba(253,251,245,0.78),rgba(253,251,245,0.78));}
+[data-theme="glass"] .wcal-rainbow-inner{background-color:var(--card);}
+/* 작은 면(상단 날짜·탭·요일 버튼) — 약한 흐림 + 윗면 하이라이트 */
+[data-theme="glass"] .date-pill,[data-theme="glass"] .vtab,[data-theme="glass"] .day-btn,[data-theme="glass"] .mh-chip,[data-theme="glass"] .mh-memo-box,[data-theme="glass"] .mh-memo-row{-webkit-backdrop-filter:blur(12px) saturate(150%);backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,0.9),0 2px 8px rgba(150,140,120,0.08);}
+[data-theme="glass"] .vtab.on{box-shadow:inset 0 1.5px 1px #fff,0 4px 12px rgba(235,180,20,0.12);}
+/* 시트·모달 — 프로스트 유리 */
+[data-theme="glass"] .bsheet{border-radius:28px 28px 0 0;border:1.4px solid rgba(255,255,255,0.85);border-bottom:0;-webkit-backdrop-filter:blur(28px) saturate(170%);backdrop-filter:blur(28px) saturate(170%);box-shadow:inset 0 1.5px 1px #fff,0 -10px 40px rgba(120,110,95,0.14);}
+[data-theme="glass"] .modal{border:1.4px solid rgba(255,255,255,0.85);-webkit-backdrop-filter:blur(28px) saturate(170%);backdrop-filter:blur(28px) saturate(170%);box-shadow:inset 0 1.5px 1px #fff,0 12px 40px rgba(120,110,95,0.18);}
+[data-theme="glass"] .overlay,[data-theme="glass"] .modal-ov{background:rgba(92,86,80,0.06);}
+/* 시트·모달 안의 카드는 이미 블러된 면 위에 놓이므로 중첩 블러를 끈다(스크롤 영역에서 모서리가 깨지고 성능도 떨어짐) */
+[data-theme="glass"] .bsheet .card,[data-theme="glass"] .modal .card{-webkit-backdrop-filter:none;backdrop-filter:none;}
 /* 투명도 줄이기 설정이면 블러를 끄고 불투명하게 */
 @media (prefers-reduced-transparency:reduce){
-  [data-theme="jelly"] .card,[data-theme="jelly"] .sleep-card,[data-theme="jelly"] .habit-week-box,[data-theme="jelly"] .mh-card,[data-theme="jelly"] .mh-box,[data-theme="jelly"] .dw-page,[data-theme="jelly"] .mh-tile,[data-theme="jelly"] .home-hcard,[data-theme="jelly"] .bsheet,[data-theme="jelly"] .modal,[data-theme="jelly"] .vtab,[data-theme="jelly"] .date-pill,[data-theme="jelly"] .mh-chip,[data-theme="jelly"] .mh-memo-box,[data-theme="jelly"] .mh-memo-row,[data-theme="jelly"] #monthly-cal,[data-theme="jelly"] .wcal-rainbow-inner{-webkit-backdrop-filter:none;backdrop-filter:none;}
-  [data-theme="jelly"]{--card:rgba(255,255,255,0.86);--sheet:#fdf5f1;--modal:#fdf5f1;}
+  [data-theme="glass"] .card,[data-theme="glass"] .sleep-card,[data-theme="glass"] .habit-week-box,[data-theme="glass"] .habit-check-box,[data-theme="glass"] .mh-card,[data-theme="glass"] .mh-box,[data-theme="glass"] .dw-page,[data-theme="glass"] .rd-book-item,[data-theme="glass"] .wcal-rainbow-inner,[data-theme="glass"] .home-hcard,[data-theme="glass"] .date-pill,[data-theme="glass"] .vtab,[data-theme="glass"] .day-btn,[data-theme="glass"] .mh-chip,[data-theme="glass"] .mh-memo-box,[data-theme="glass"] .mh-memo-row,[data-theme="glass"] .bsheet,[data-theme="glass"] .modal{-webkit-backdrop-filter:none;backdrop-filter:none;}
+  [data-theme="glass"]{--card:rgba(255,253,248,0.88);--sheet:#f8f5ee;--modal:#f8f5ee;}
 }
 </style>
 </head>
 <body>
 <div id="bg-fixed"></div>
-<script>(function(){try{var t=localStorage.getItem('theme');if(t){t=JSON.parse(t);document.documentElement.setAttribute('data-theme',t);var c={light:'#fef2e4',glass:'#f7f4ee',jelly:'#fef3ec'}[t];var m=document.querySelector('meta[name="theme-color"]');if(m&&c)m.setAttribute('content',c);}}catch(e){}})();</script>
+<script>(function(){try{var t=localStorage.getItem('theme');if(t){t=JSON.parse(t);if(t==='jelly')t='glass';document.documentElement.setAttribute('data-theme',t);var c={light:'#fef2e4',glass:'#f7f4ee'}[t];var m=document.querySelector('meta[name="theme-color"]');if(m&&c)m.setAttribute('content',c);}}catch(e){}})();</script>
 <script>(function(){try{var s=localStorage.getItem('textScale');s=s?JSON.parse(s):0;var base={'-1':{main:13,dow:11},'0':{main:14,dow:12},'1':{main:15,dow:13}}[String(s)]||{main:14,dow:12};document.documentElement.style.setProperty('--main-text-size',base.main+'px');document.documentElement.style.setProperty('--dow-label-size',base.dow+'px');}catch(e){}})();</script>
 
 <!-- SPLASH -->
@@ -2708,7 +2663,6 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
         <div class="color-themes">
           <div class="ctheme-btn on" id="ct-light" style="background:linear-gradient(135deg,#fdf0e8,#fde8f0)" onclick="setTheme('light',this)">✓</div>
           <div class="ctheme-btn" id="ct-glass" style="background:linear-gradient(135deg,#f7f4ee,#f3f1ec)" onclick="setTheme('glass',this)">✓</div>
-          <div class="ctheme-btn" id="ct-jelly" style="background:linear-gradient(135deg,#fef3ec,#f4f1fc)" onclick="setTheme('jelly',this)">✓</div>
         </div>
         <div class="settings-item-lbl" style="margin:18px 0 8px;">글자 크기</div>
         <div class="text-scale-ctrl">
@@ -2909,7 +2863,7 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
   </div>
 </div>
 
-<script src="app.js?v=20261111c"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
+<script src="app.js?v=20261111d"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
 
 </body>
 </html>

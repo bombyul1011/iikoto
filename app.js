@@ -4618,13 +4618,14 @@ function syncOnTabEnter(){
 // ██ 설정 (1/2 — 나머지는 SETTINGS 부근) ██
 // ══════════════════════════════════════════════════════════
 // ── THEME
-const THEME_COLORS={light:'#fdf0e8',glass:'#f7f4ee',jelly:'#fef3ec'};
+const THEME_COLORS={light:'#fdf0e8',glass:'#f7f4ee'};
 function applyThemeColorMeta(theme){
   const m=document.querySelector('meta[name="theme-color"]');
   if(m)m.setAttribute('content',THEME_COLORS[theme]||THEME_COLORS.light);
 }
 (function initTheme(){
   let t=S.get('theme')||'light';
+  if(t==='jelly')t='glass'; // 젤리 테마는 폐지 — 쓰던 기기는 유리알로 이전
   S.set('theme',t);
   document.documentElement.setAttribute('data-theme',t);
   applyThemeColorMeta(t);
