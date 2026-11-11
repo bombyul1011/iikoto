@@ -1599,10 +1599,11 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
   --bg:radial-gradient(circle 300px at 0% 4%,rgba(255,188,168,0.42),transparent 72%),radial-gradient(circle 340px at 100% 22%,rgba(206,188,245,0.42),transparent 72%),radial-gradient(circle 300px at 0% 52%,rgba(255,226,155,0.42),transparent 72%),radial-gradient(circle 320px at 100% 76%,rgba(162,223,202,0.40),transparent 72%),radial-gradient(circle 320px at 0% 98%,rgba(255,188,210,0.38),transparent 72%),linear-gradient(160deg,#fef3ec 0%,#fdf3f7 45%,#f4f1fc 100%);
   --tp:#573f35;--ts:#7d6256;--tm:#b8a094;
   --card:rgba(255,255,255,0.42);--card-b:rgba(255,255,255,0.72);
-  --card-p:rgba(255,175,200,0.26);--card-pb:rgba(255,255,255,0.72);
-  --card-m:rgba(160,222,215,0.32);--card-mb:rgba(255,255,255,0.72);
-  --card-y:rgba(255,225,120,0.30);--card-yb:rgba(255,255,255,0.72);
-  --card-s:rgba(200,220,140,0.32);--card-sb:rgba(255,255,255,0.72);
+  /* 카드 면은 모두 반투명 흰색 — 각자의 색은 아이콘·체크·칩에서만 쓴다 */
+  --card-p:rgba(255,255,255,0.42);--card-pb:rgba(255,255,255,0.72);
+  --card-m:rgba(255,255,255,0.42);--card-mb:rgba(255,255,255,0.72);
+  --card-y:rgba(255,255,255,0.42);--card-yb:rgba(255,255,255,0.72);
+  --card-s:rgba(255,255,255,0.42);--card-sb:rgba(255,255,255,0.72);
   --sheet:linear-gradient(160deg,rgba(255,255,255,0.80),rgba(255,243,238,0.66));
   --modal:linear-gradient(145deg,rgba(255,255,255,0.84),rgba(255,243,238,0.70));
   --inp:rgba(255,255,255,0.58);--inp-b:rgba(255,255,255,0.85);
@@ -1650,11 +1651,30 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
 [data-theme="jelly"] .overlay,[data-theme="jelly"] .modal-ov{background:rgba(87,63,53,0.16);}
 /* 습관 체크 — 유리 위에서도 윤곽이 보이도록 */
 [data-theme="jelly"] .habit-check-box{border-radius:20px;-webkit-backdrop-filter:blur(14px) saturate(170%);backdrop-filter:blur(14px) saturate(170%);box-shadow:var(--jelly-edge);border-color:rgba(255,255,255,0.7);background-image:var(--jelly-sheen);}
-[data-theme="jelly"] .habit-chk2{border:1.5px dashed rgba(160,130,120,0.45);background:rgba(255,255,255,0.55);}
+[data-theme="jelly"] .habit-chk2{border:1.5px dashed rgba(160,130,120,0.45);background:rgba(255,255,255,0.7);box-shadow:2px 3px 6px rgba(190,125,115,0.22),-1.5px -1.5px 4px rgba(255,255,255,0.95),inset 1px 1px 2px rgba(255,255,255,0.9),inset -1.5px -2px 3px rgba(190,120,110,0.14);}
 [data-theme="jelly"] .habit-chk2.on{border-style:solid;}
+/* 주간·월간 목표 카드만 노랑으로 살짝 강조 */
+[data-theme="jelly"] #wchallenge-card,[data-theme="jelly"] #monthly-goal-card{background-image:linear-gradient(rgba(255,225,120,0.16),rgba(255,225,120,0.16)),var(--jelly-sheen);}
+/* ── 월간 달력: 흰 반투명 카드로 감싸고, 오늘은 장미빛 동그라미, 기록 있는 날은 옅은 핑크 ── */
+[data-theme="jelly"] #monthly-cal{background-color:var(--card);background-image:var(--jelly-sheen);border:1px solid rgba(255,255,255,0.72);border-radius:26px;padding:14px 10px 10px;box-shadow:var(--jelly-edge);-webkit-backdrop-filter:blur(14px) saturate(170%);backdrop-filter:blur(14px) saturate(170%);}
+[data-theme="jelly"] #monthly-cal .cal-day.has-record .cal-num{background:rgba(255,175,200,0.30);}
+[data-theme="jelly"] #monthly-cal .cal-day.today .cal-num{background:linear-gradient(145deg,#e8a0aa,#d98693);color:#fff;}
+[data-theme="jelly"] .cal-detail-wrap{background-color:var(--card);background-image:var(--jelly-sheen);border-color:rgba(255,255,255,0.72);border-radius:22px;box-shadow:var(--jelly-edge);}
+/* ── 허브: 시작(재생) 버튼·선택된 탭/칩만 클레이, 나머지 면은 흰 반투명 ── */
+[data-theme="jelly"] .rd-sw-bg{background:linear-gradient(145deg,#ffe3e9,#ffc2d1);box-shadow:var(--jelly-clay);}
+[data-theme="jelly"] .rd-tab.on,[data-theme="jelly"] .ch-month-banner-chip.on,[data-theme="jelly"] .wcal-filter-chip.on,[data-theme="jelly"] .wcal-filter-chip.on[data-cat]{background:linear-gradient(145deg,#fff6f1,#f8e0d8);border:1px solid rgba(255,255,255,0.6);box-shadow:var(--jelly-clay);color:var(--tp);font-weight:600;}
+[data-theme="jelly"] .rd-tab,[data-theme="jelly"] .ch-month-banner-chip,[data-theme="jelly"] .wcal-filter-chip{background:rgba(255,255,255,0.5);border-color:rgba(255,255,255,0.72);}
+[data-theme="jelly"] .wcal-rainbow-wrap{background:none;padding:0;animation:none;}
+[data-theme="jelly"] .wcal-rainbow-inner{background-color:var(--card);background-image:var(--jelly-sheen);border:1px solid rgba(255,255,255,0.72);border-radius:26px;padding:16px 12px 12px;box-shadow:var(--jelly-edge);-webkit-backdrop-filter:blur(14px) saturate(170%);backdrop-filter:blur(14px) saturate(170%);}
+[data-theme="jelly"] .rd-book-item{background-color:var(--card);background-image:var(--jelly-sheen);border-color:rgba(255,255,255,0.72);border-radius:22px;box-shadow:var(--jelly-edge);}
+[data-theme="jelly"] .rd-quote-item{background:rgba(255,255,255,0.5);}
+[data-theme="jelly"] .rd-status-btn.active,[data-theme="jelly"] .m-chip.active{background:linear-gradient(145deg,#fff6f1,#f8e0d8);border:1px solid rgba(255,255,255,0.6);box-shadow:var(--jelly-clay);color:var(--tp);font-weight:600;}
+/* 시트·모달 안의 카드는 이미 블러된 면 위에 놓이므로 중첩 블러를 끈다(스크롤 영역에서 모서리가 사각으로 깨지는 문제 방지) */
+[data-theme="jelly"] .bsheet .card,[data-theme="jelly"] .modal .card{-webkit-backdrop-filter:none;backdrop-filter:none;background-color:rgba(255,255,255,0.55);border-radius:22px;}
+[data-theme="jelly"] #diary-month-list-scroll{padding:2px;margin:-2px;}
 /* 투명도 줄이기 설정이면 블러를 끄고 불투명하게 */
 @media (prefers-reduced-transparency:reduce){
-  [data-theme="jelly"] .card,[data-theme="jelly"] .sleep-card,[data-theme="jelly"] .habit-week-box,[data-theme="jelly"] .mh-card,[data-theme="jelly"] .mh-box,[data-theme="jelly"] .dw-page,[data-theme="jelly"] .mh-tile,[data-theme="jelly"] .home-hcard,[data-theme="jelly"] .bsheet,[data-theme="jelly"] .modal,[data-theme="jelly"] .vtab,[data-theme="jelly"] .date-pill,[data-theme="jelly"] .mh-chip,[data-theme="jelly"] .mh-memo-box,[data-theme="jelly"] .mh-memo-row{-webkit-backdrop-filter:none;backdrop-filter:none;}
+  [data-theme="jelly"] .card,[data-theme="jelly"] .sleep-card,[data-theme="jelly"] .habit-week-box,[data-theme="jelly"] .mh-card,[data-theme="jelly"] .mh-box,[data-theme="jelly"] .dw-page,[data-theme="jelly"] .mh-tile,[data-theme="jelly"] .home-hcard,[data-theme="jelly"] .bsheet,[data-theme="jelly"] .modal,[data-theme="jelly"] .vtab,[data-theme="jelly"] .date-pill,[data-theme="jelly"] .mh-chip,[data-theme="jelly"] .mh-memo-box,[data-theme="jelly"] .mh-memo-row,[data-theme="jelly"] #monthly-cal,[data-theme="jelly"] .wcal-rainbow-inner{-webkit-backdrop-filter:none;backdrop-filter:none;}
   [data-theme="jelly"]{--card:rgba(255,255,255,0.86);--sheet:#fdf5f1;--modal:#fdf5f1;}
 }
 </style>
@@ -2889,7 +2909,7 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
   </div>
 </div>
 
-<script src="app.js?v=20261111b"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
+<script src="app.js?v=20261111c"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
 
 </body>
 </html>
