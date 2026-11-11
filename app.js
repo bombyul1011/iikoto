@@ -2411,7 +2411,7 @@ function openTimeFromHome(t){
   currentDate=getLogicalDate(); // 시각 모달은 currentDate 기준으로 저장 — 홈에선 항상 오늘로 맞춤
   openTimeModal(t);
 }
-// 홈이 아닌 화면에서 기상을 등록했을 때, 점수까지 끝난 뒤 "홈으로" 안내 토스트를 잠깐 띄움.
+// 홈이 아닌 화면에서 기상을 등록했을 때, 점수까지 끝난 뒤 "이동" 안내 토스트를 잠깐 띄움.
 let _wakeHomeTimer=null;
 function _offerHomeAfterWake(dk){
   if(dk!==dateKey(getLogicalDate())||getHomeTimeSlot().indexOf('morning')!==0)return;

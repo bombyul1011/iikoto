@@ -712,10 +712,10 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .mps-go{flex:2;min-height:48px;border-radius:14px;border:0;background:var(--tp);color:#fff;font-size:var(--main-text-size);font-weight:600;font-family:inherit;cursor:pointer;}
 .home-hcard.morning .home-hcard-time{font-size:var(--rt-fill-label-size);color:var(--ts);}
 .home-hcard.morning .home-hcard-sub{color:var(--tp);line-height:1.6;}
-.undo-toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%) translateY(16px);background:rgba(60,40,40,.90);color:white;font-size:var(--dow-label-size);padding:9px 18px;border-radius:20px;display:flex;align-items:center;gap:10px;opacity:0;transition:all .25s;z-index:10500;pointer-events:none;backdrop-filter:blur(8px);}
+.undo-toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%) translateY(16px);background:rgba(60,40,40,.90);color:white;font-size:var(--dow-label-size);padding:9px 18px;border-radius:20px;display:flex;align-items:center;gap:10px;width:max-content;max-width:calc(100vw - 40px);box-sizing:border-box;opacity:0;transition:all .25s;z-index:10500;pointer-events:none;backdrop-filter:blur(8px);}
 body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
 .undo-toast.on{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto;}
-.undo-btn{font-size:var(--dow-label-size);color:rgba(255,200,180,.90);font-weight:500;cursor:pointer;}
+.undo-btn{font-size:var(--dow-label-size);color:rgba(255,200,180,.90);font-weight:500;cursor:pointer;white-space:nowrap;flex-shrink:0;}
 .wk-nav{display:flex;align-items:center;} /* 주간 목표 카드 제목줄 오른쪽: 주 이동 ‹ 라벨 › */
 .wk-arr{width:30px;height:30px;display:flex;align-items:center;justify-content:center;color:var(--ts);font-size:14px;cursor:pointer;}
 .wk-arr.off{opacity:.3;pointer-events:none;}
@@ -1975,7 +1975,7 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
 <!-- TODO COPY CONFIRM TOAST -->
 <div class="undo-toast" id="todo-copy-confirm-toast">내일로 복사할까요? <span class="undo-btn" onclick="confirmTodoCopyToast()">네</span></div>
 <div class="undo-toast overlap-toast" id="rhythm-overlap-toast"><div class="ot-msg" id="rhythm-overlap-msg"></div><div class="ot-btns"><span class="undo-btn" onclick="overlapToastEnd()">지금 종료</span><span class="undo-btn ot-keep" onclick="overlapToastKeep()">둘 다 유지</span></div><div class="ot-bar"><i id="rhythm-overlap-bar"></i></div></div>
-<div class="undo-toast" id="wake-home-toast"><span>오늘의 오전 홈이 준비됐어요</span> <span class="undo-btn" onclick="goHomeFromWake()">홈으로</span></div>
+<div class="undo-toast" id="wake-home-toast"><span>오늘의 오전 홈이 준비됐어요</span> <span class="undo-btn" onclick="goHomeFromWake()">이동</span></div>
 <div class="undo-toast" id="meal-quick-toast"><span id="meal-quick-msg"></span> <span class="undo-btn" onclick="confirmQuickMeal()">체크</span></div>
 <div class="undo-toast" id="music-open-toast">애플뮤직에서 열까요? <span class="undo-btn" onclick="openMusicFromToast()">열기</span></div>
 
@@ -2863,7 +2863,7 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
   </div>
 </div>
 
-<script src="app.js?v=20261112b"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
+<script src="app.js?v=20261112c"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
 
 </body>
 </html>
