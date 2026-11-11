@@ -1180,7 +1180,7 @@ function computeRawStatsForRange(y,mo,lastDay,light){
       const ol=getDailyOneLine(dk);
       if(ol&&ol.trim())onelineTexts.push(`${d}일: ${ol.trim()}`);
     }
-    const dayTodos=getTodos(dk);
+    const dayTodos=getTodos(dk).filter(t=>!t.isEvent); // 일정은 완료 체크가 없어 완료율 분모에서 제외
     totalTodos+=dayTodos.length;doneTodos+=dayTodos.filter(t=>t.done).length;
     const sl=getSleep(dk);
     if(sl.sleep&&sl.wake){const sv=sl.sleep.split(':').map(Number),wv=sl.wake.split(':').map(Number);let m=(wv[0]*60+wv[1])-(sv[0]*60+sv[1]);if(m<0)m+=1440;sleepMin+=m;sleepCnt++;}
@@ -1678,7 +1678,7 @@ async function makeWeeklySummaryCard(){
     const d=new Date(weekStart);d.setDate(weekStart.getDate()+i);
     const dk=dateKey(d);
     const dayName=_HOME_DAYS[d.getDay()]+'요일';
-    const todos=getTodos(dk);
+    const todos=getTodos(dk).filter(t=>!t.isEvent); // 일정은 완료 체크가 없어 완료율·미룬 일 집계에서 제외
     allTodos.push(...todos);
     const memos=getMemos(dk);
     allMemos.push(...memos.map(m=>m.text).filter(Boolean));
@@ -2048,14 +2048,18 @@ async function _loadHomeGreeting(section){
   } else if(section==='dawn'){
     // 새벽은 "방금 지나간 하루"를 담담히 돌아보는 총평 — 시간대별 사건 나열이 아니라
     // 하루 전체를 하나로 뭉뚱그려 "이런 결의 하루였다"는 인상 위주로 전달
-    const allDoneTodos=todos.filter(t=>t.done).map(t=>t.text);
-    const allPendTodos=todos.filter(t=>!t.done).map(t=>t.text);
+    // 일정(isEvent)은 '했다/못했다'가 없는 항목이라 할일 목록에서 제외 — 안 거르면 완료 체크 안 한 일정이 "오늘 못한 일"로 들어감
+    const realTodos=todos.filter(t=>!t.isEvent);
+    const allDoneTodos=realTodos.filter(t=>t.done).map(t=>t.text);
+    const allPendTodos=realTodos.filter(t=>!t.done).map(t=>t.text);
+    const dawnEvents=todos.filter(t=>t.isEvent).slice(0,6).map(t=>(t.eventTime||'종일')+' '+(parseTodoTextParts(t.text).parts[0]||t.text));
     dataContext=[
       `지금은 새벽 시간대라 ${_HOME_DAYS[dataDate.getDay()]}요일 하루를 마감하는 시점이에요. 이 하루는 아직 "오늘"이며 "어제"라고 부르면 안 돼요(자정이 지났어도 새벽 4시 전까지는 이 논리적 하루가 계속 "오늘"이에요).`,
       getUserProfileContext(),
       `(참고용, 출력 금지) 지금은 하루를 마감하는 새벽 시간대예요.`,
       allDoneTodos.length?`오늘 완료한 일: ${allDoneTodos.join(', ')}`:'',
       allPendTodos.length?`오늘 못한 일: ${allPendTodos.join(', ')}`:'',
+      dawnEvents.length?`오늘 있었던 일정(완료 여부 없음, 다녀온 일정으로 다뤄요): ${dawnEvents.join(', ')}`:'',
       rhythmSummary,
       pickedMemos.length?`메모: ${pickedMemos.join(' / ')}`:'',
       sleep.sleep||sleep.wake?`수면: ${sleep.sleep||'?'} 취침 ${sleep.wake||'?'} 기상`:'',
@@ -2066,6 +2070,7 @@ async function _loadHomeGreeting(section){
 ${GREETING_WEATHER_SEASON_RULE('날씨/계절/메모 등에서 느껴지는 그 순간의 분위기를 한 줄 정도 자연스럽게 녹여요.')}
 - 3-4문장, 공백 포함 200자 안팎. 수면 점수·기상 시각 차이·가장 오래 한 활동의 시간·식사처럼 기록에 있는 수치를 한두 개 자연스럽게 녹이고, 일정 변경·메모에서 읽히는 그날의 맥락을 한 문장 곁들여요.
 - 오늘 할일은 구체적인 항목명을 언급해도 좋아요. 단, 나열식으로 딱딱하게 늘어놓지 말고 자연스러운 문장 속에 녹여내요.
+- 이 총평은 지나간 하루를 돌아보는 글이에요. 내일의 일정·계획·할일은 데이터에 없으니 "내일은 ~" 식으로 예고하거나 지어내지 말고, "오늘 못한 일"도 내일로 넘기거나 계획으로 바꿔 말하지 말고 오늘 못 다 한 일로만 담담히 다뤄요. 마무리는 오늘 하루를 갈무리하는 문장으로 끝내요.
 - 리듬 카테고리는 가장 비중 컸던 것 위주로만 언급해요.
 - 메모에서 현재 상황(위치, 컨디션)을 자연스럽게 반영해요.
 ${GREETING_CONDITION_RULE}
