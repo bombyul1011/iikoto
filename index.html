@@ -100,7 +100,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   --graph-track-color:rgba(var(--divider-rgb),0.25);
   --divider-rgb:195,175,168;
   --bg:linear-gradient(165deg,#f7f4ee 0%,#f3f1ec 55%,#f6f3ee 100%);
-  --tp:#5c5650;--ts:#8a8278;--tm:#b8b0a4;
+  --tp:#6e675f;--ts:#968e84;--tm:#b8b0a4;
   --card:rgba(255,253,248,0.50);--card-b:rgba(200,175,140,0.55);
   --empty-bg:rgba(200,175,140,0.16); /* 시간표 도넛 — 리듬 기록 없는 빈 시간 구간 배경 */
   --card-p:var(--card);--card-pb:var(--pal-pink-border);
@@ -1597,7 +1597,7 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
    뒤가 비치는 흐림 · 모서리 반사광 · 안쪽 테두리광 · 프로스트 시트. 배경 빛무리는 블러 필터 대신 방사형 그라데이션(저비용).
    데스크톱 시안(E)의 값을 따른다. 라이트 테마에는 영향 없음([data-theme="glass"] 한정). */
 [data-theme="glass"]{
-  --bg:radial-gradient(circle 280px at 0% 3%,rgba(255,205,180,0.42),transparent 72%),radial-gradient(circle 300px at 100% 20%,rgba(205,195,238,0.38),transparent 72%),radial-gradient(circle 280px at 0% 48%,rgba(250,226,150,0.40),transparent 72%),radial-gradient(circle 300px at 100% 66%,rgba(170,215,196,0.36),transparent 72%),radial-gradient(circle 300px at 4% 88%,rgba(255,200,215,0.34),transparent 72%),radial-gradient(circle 280px at 96% 98%,rgba(190,215,240,0.34),transparent 72%),linear-gradient(165deg,#f7f4ee 0%,#f3f1ec 55%,#f6f3ee 100%);
+  --bg:linear-gradient(180deg,#f7f4ee 0,#f7f4ee 56px,rgba(247,244,238,0) 150px) top/100% 150px no-repeat,radial-gradient(circle 280px at 0% 3%,rgba(255,205,180,0.42),transparent 72%),radial-gradient(circle 300px at 100% 20%,rgba(205,195,238,0.38),transparent 72%),radial-gradient(circle 280px at 0% 48%,rgba(250,226,150,0.40),transparent 72%),radial-gradient(circle 300px at 100% 66%,rgba(170,215,196,0.36),transparent 72%),radial-gradient(circle 300px at 4% 88%,rgba(255,200,215,0.34),transparent 72%),radial-gradient(circle 280px at 96% 98%,rgba(190,215,240,0.34),transparent 72%),linear-gradient(165deg,#f7f4ee 0%,#f3f1ec 55%,#f6f3ee 100%);
   --card:rgba(255,253,248,0.46);
   --glass-sheen:linear-gradient(115deg,rgba(255,255,255,0.62) 0%,rgba(255,255,255,0) 32%,rgba(255,255,255,0) 72%,rgba(255,255,255,0.20) 100%);
   --glass-edge:inset 0 1.5px 1px rgba(255,255,255,0.95),inset 0 -8px 14px -10px rgba(120,110,95,0.16),0 8px 22px rgba(150,140,120,0.10);
@@ -2863,7 +2863,7 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
   </div>
 </div>
 
-<script src="app.js?v=20261111d"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
+<script src="app.js?v=20261111f"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
 
 </body>
 </html>
