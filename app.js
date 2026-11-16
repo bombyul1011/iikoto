@@ -541,7 +541,7 @@ function _exerciseWeekStreak(){
   for(let i=1;i<=4;i++){
     const wkDate=new Date(now);wkDate.setDate(now.getDate()-7*i);
     const wk=weekKey(wkDate);
-    const wkStart=new Date(wk.replace('week:',''));
+    const wkStart=parseDk(wk.replace('week:',''));
     let hasVacationDay=false;
     for(let d=0;d<7;d++){const dd=new Date(wkStart);dd.setDate(wkStart.getDate()+d);if(isVacationDate(dd)){hasVacationDay=true;break;}}
     if(hasVacationDay)break; // 오프가 낀 주에서 연속 종료 — 습관 연속일(getHabitStreak)과 같은 규칙
@@ -1213,7 +1213,7 @@ function computeMonthStats(y,mo,endDay){
   const weeks=Object.keys(weekSet).sort();
   const wcByWeek=weeks.map(wk=>{
     const items=getWChallenge(wk).filter(c=>c.text&&c.text.trim());
-    const wkStart=new Date(wk.replace('week:',''));
+    const wkStart=parseDk(wk.replace('week:',''));
     const wkEnd=new Date(wkStart);wkEnd.setDate(wkStart.getDate()+6);
     const label=`${wkStart.getMonth()+1}.${wkStart.getDate()}–${wkEnd.getMonth()+1}.${wkEnd.getDate()}`;
     const lines=items.map(c=>({text:c.text,pct:Math.round(c.days.filter(Boolean).length/7*100)}));
@@ -2824,7 +2824,10 @@ async function checkAndRecoverPushSubscription(){
   const sub=await getExistingPushSubscription();
   if(!sub)return; // 애초에 구독 안 한 상태면 감지 대상 아님(설정에서 수동으로 켜야 함)
   const rows=await supaFetch(`push_subscriptions?endpoint=eq.${encodeURIComponent(sub.endpoint)}&select=id`);
-  if(rows&&rows.length)return; // 서버에도 정상 존재 — 문제 없음
+  // 조회 자체가 실패(null — 약한 신호, 서버 오류, 접근 거부)한 경우는 "서버에 없음"이 아니므로 아무것도 하지 않음(감사 P2-10 —
+  // 예전엔 조회 실패도 '없음'으로 보고 멀쩡한 구독을 해지·재구독해 알림이 끊길 수 있었음)
+  if(rows===null)return;
+  if(rows.length)return; // 서버에도 정상 존재 — 문제 없음
   // 서버엔 없는데 브라우저만 구독 중인 상태 = 만료/삭제됨. 재구독 시도.
   try{
     const reg=await navigator.serviceWorker.ready;
@@ -3281,7 +3284,7 @@ function overlapToastEnd(){
 function dateKey(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;}
 function monthKey(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;}
 function weekKey(d){const m=new Date(d);m.setDate(d.getDate()-((d.getDay()+6)%7));return `week:${dateKey(m)}`;}
-function getWeekEnd(wkStart){const d=new Date(wkStart);d.setDate(d.getDate()+7);return dateKey(d);}
+function getWeekEnd(wkStart){const d=parseDk(wkStart);d.setDate(d.getDate()+7);return dateKey(d);}
 
 let currentDate=new Date();
 
@@ -3918,11 +3921,14 @@ async function deleteQuoteLocal(cid){
   const res=await supaFetch(`reading_quotes?cid=eq.${cid}`,'DELETE');
   if(res!==null)S.set('quote_delpending_list',(S.get('quote_delpending_list')||[]).filter(c=>c!==cid));
 }
+// 업로드가 성공하고 그사이 문장이 다시 바뀌지 않았을 때만 대기 표시를 끔(감사 P1-1 — 예전엔 실패해도 껐음)
 async function syncQuoteUp(cid){
   const q=getQuotes().find(x=>x.cid===cid);
-  if(!q)return;
-  await supaUpsert('reading_quotes','cid',[{cid:q.cid,book_cid:q.bookCid,text:q.text,created:q.created,comment:q.comment||''}]);
-  S.set('quote_pending_'+cid,false);
+  if(!q)return false;
+  const sent=JSON.stringify(q);
+  const ok=await supaUpsert('reading_quotes','cid',[{cid:q.cid,book_cid:q.bookCid,text:q.text,created:q.created,comment:q.comment||''}]);
+  if(ok&&JSON.stringify(getQuotes().find(x=>x.cid===cid)||null)===sent)S.set('quote_pending_'+cid,false);
+  return !!ok;
 }
 async function syncQuotesDownAll(){
   const rows=await supaFetch('reading_quotes?order=created');
@@ -4224,9 +4230,19 @@ async function syncSleepDown(dk){
   if(!rows.length)return;
   S.set(S.key('sleep',dk),sleepRowToLocal(rows[0]));
 }
+// 성공 여부를 돌려줌 — 호출부는 true일 때만 sleep_pending을 끈다(감사 P1-1).
+// 값을 전부 비운 경우도 서버에 빈 값으로 올림(감사 P3-6 — 예전엔 건너뛰어서 서버의 옛 값이 다시 내려왔음).
 async function syncSleepUp(dk){
-  const d=getSleep(dk);if(!d.sleep&&!d.wake&&d.score==null)return;
-  await supaUpsert('sleep','date_key',[{date_key:dk,sleep_time:d.sleep,wake_time:d.wake,score:d.score!=null?d.score:null}]);
+  const d=getSleep(dk);
+  const ok=await supaUpsert('sleep','date_key',[{date_key:dk,sleep_time:d.sleep||null,wake_time:d.wake||null,score:d.score!=null?d.score:null}]);
+  return !!ok;
+}
+// 업로드 성공 후, 그사이 같은 날짜를 다시 고치지 않았을 때만 대기 표시를 끔(고쳤으면 다음 동기화에서 다시 올라감)
+async function _syncSleepUpAndClear(dk){
+  const sent=JSON.stringify(getSleep(dk));
+  const ok=await syncSleepUp(dk);
+  if(ok&&JSON.stringify(getSleep(dk))===sent)S.set(S.key('sleep_pending',dk),false);
+  return ok;
 }
 async function syncMealsDown(dk){
   const rows=await supaFetch(`meals?date_key=eq.${dk}`);
@@ -4355,14 +4371,14 @@ async function syncHCDown(wk){
   const rows=await supaFetch(`habit_checks?date_key=gte.${ws}&date_key=lt.${we}`);
   if(!rows)return;
   const checks={};const times={};
-  rows.forEach(r=>{const d=new Date(r.date_key);const dow=(d.getDay()+6)%7;const key=`${r.habit_name}-${dow}`;checks[key]=true;if(r.checked_time)times[key]=r.checked_time;});
+  rows.forEach(r=>{const d=parseDk(r.date_key);const dow=(d.getDay()+6)%7;const key=`${r.habit_name}-${dow}`;checks[key]=true;if(r.checked_time)times[key]=r.checked_time;});
   S.set(S.key('hc',wk),checks);
   if(Object.keys(times).length)S.set(S.key('hcTime',wk),times);
 }
 async function syncHCUp(wk){
   const checks=getHabitChecks(wk);const ws=wk.replace('week:','');
   const times=getHabitCheckTimes(wk);
-  const rows=[];const mon=new Date(ws);
+  const rows=[];const mon=parseDk(ws);
   // 키 앞부분은 원래 습관 "이름"이었으나 카탈로그 도입 후 습관 "id"로 바뀜(예: 'exercise-3').
   // 서버 컬럼명(habit_name)은 그대로 두고 담기는 값만 id로 바뀐 것 — 별도 변경 없이 자연히 호환됨.
   Object.keys(checks).filter(k=>checks[k]).forEach(k=>{
@@ -4384,6 +4400,14 @@ async function syncHCUp(wk){
   }
   delKeys.forEach(k=>removeDelPending('hc',wk,k));
   return true;
+}
+// 습관 체크 업로드 후 대기 표시 해제 — 성공했고 그사이 같은 주의 체크·시각이 바뀌지 않았을 때만(감사 P1-1)
+async function _syncHCUpAndClear(wk){
+  const snap=()=>JSON.stringify([getHabitChecks(wk),getHabitCheckTimes(wk),getDelPendingCids('hc',wk)]);
+  const sent=snap();
+  const ok=await syncHCUp(wk);
+  if(ok&&snap()===sent)S.set('hc_pending_'+wk,false);
+  return ok;
 }
 async function syncGoalDown(key){
   const rows=await supaFetch(`goal_notes?note_key=eq.${encodeURIComponent(key)}`);
@@ -4492,14 +4516,13 @@ async function autoSync(type,key){
   if(type==='reading_quote'){await syncQuoteUp(key);}
   else if(type==='todos'){if(await syncTodosUp(key))S.set(S.key('todos_pending',key),false);}
   else if(type==='memos'){if(await syncMemosUp(key))S.set(S.key('memos_pending',key),false);}
-  else if(type==='sleep'){await syncSleepUp(key);S.set(S.key('sleep_pending',key),false);}
+  else if(type==='sleep'){await _syncSleepUpAndClear(key);}
   else if(type==='meals_field'){await syncMealsUp(key);}
   else if(type==='habits')syncHabitsUp();
   else if(type==='recurringItems')syncRecurringItemsUp();
   else if(type==='recurSkip')syncRecurSkipUp(key);
   else if(type==='habitGoals')syncHabitGoalsUp();
-  else if(type==='hc'){await syncHCUp(key);S.set('hc_pending_'+key,false);}
-  else if(type==='hcTime'){await syncHCUp(key);S.set('hc_pending_'+key,false);} // 습관체크 시각도 결국 habit_checks 테이블의 checked_time 컬럼이라 같은 upload 함수(syncHCUp)를 재사용
+  else if(type==='hc')await _syncHCUpAndClear(key);
   else if(type==='goal')syncGoalUp(key);
   else if(type==='wchallenge'){
     const data=S.get(key);
@@ -4540,12 +4563,12 @@ async function syncAll(){
   pushDelPendingAwareUpTask(upTasks,S.key('todos_pending',dk),'todos',dk,()=>syncTodosUp(dk));
   pushDelPendingAwareUpTask(upTasks,S.key('memos_pending',dk),'memos',dk,()=>syncMemosUp(dk));
   if((S.get(S.key('meals_fields_pending',dk))||[]).length)upTasks.push(syncMealsUp(dk));
-  if(S.get(S.key('sleep_pending',dk)))upTasks.push(syncSleepUp(dk).then(ok=>{if(ok!==false)S.set(S.key('sleep_pending',dk),false);}));
+  if(S.get(S.key('sleep_pending',dk)))upTasks.push(_syncSleepUpAndClear(dk));
   pushDelPendingAwareUpTask(upTasks,S.key('contents_pending',mk),'contents',mk,()=>runContentsSyncLocked(mk,()=>syncContentsUp(mk)));
   // wchallenge는 autoSync 내부에서 ok 체크 후 자체적으로 pending을 끄므로 여기선 호출만 한다.
   if(S.get('wchallenge_pending_'+wk))upTasks.push(autoSync('wchallenge','wchallenge_'+wk));
   pushDelPendingAwareUpTask(upTasks,S.key('rblocks_pending',dk),'rblocks',dk,()=>syncRhythmBlocksUp(dk));
-  if(S.get('hc_pending_'+wk))upTasks.push(syncHCUp(wk).then(ok=>{if(ok!==false)S.set('hc_pending_'+wk,false);}));
+  if(S.get('hc_pending_'+wk))upTasks.push(_syncHCUpAndClear(wk));
   if((S.get('recur_future_delpending')||[]).length)upTasks.push(syncRecurFutureDel());
   if(upTasks.length)await Promise.all(upTasks);
   // 이번 주 리듬블록(가로바용) 날짜키
@@ -10400,13 +10423,15 @@ async function syncMonthRange(y,mo){
   });
   if(rbRows){
     const byDate={};
-    rbRows.forEach(r=>{(byDate[r.date_key]=byDate[r.date_key]||[]).push({cat:r.cat,start:r.start_time,end:r.end_time,text:r.text||'',created:r.created,cid:r.client_id||genCid()});});
+    // 공용 매핑(rhythmBlockRowToLocal)을 써야 contentCid·autoClosed가 빠지지 않음(감사 P1-3 — 자체 매핑이 두 필드를 누락해
+    // 월간탭을 연 뒤 리듬을 고치면 그날 감상 블록이 작품 연결 없이 서버로 올라갔음)
+    rbRows.forEach(r=>{(byDate[r.date_key]=byDate[r.date_key]||[]).push(rhythmBlockRowToLocal(r));});
     Object.keys(byDate).forEach(dk=>{if(!S.get(S.key('rblocks_pending',dk)))S.set(S.key('rblocks',dk),byDate[dk]);});
   }
   if(hcRows){
     const byWeek={};const timesByWeek={};
     hcRows.forEach(r=>{
-      const d=new Date(r.date_key);const wk=weekKey(d);const dow=(d.getDay()+6)%7;
+      const d=parseDk(r.date_key);const wk=weekKey(d);const dow=(d.getDay()+6)%7;
       const key=`${r.habit_name}-${dow}`;
       (byWeek[wk]=byWeek[wk]||{})[key]=true;
       if(r.checked_time)(timesByWeek[wk]=timesByWeek[wk]||{})[key]=r.checked_time;
@@ -11788,28 +11813,68 @@ function refreshHabitUIEverywhere(){
   if(document.getElementById('habit-monthly'))renderHabitMonthly();
 }
 function closeSettings(){document.getElementById('settings-ov').classList.remove('on');}
-function downloadFullJSONBackup(){
+// 전체 백업(감사 P0-2, 2026-11-16) — 예전엔 이 기기의 localStorage만 내려받아 최근 30일·열어 본 달뿐이었고,
+// 이이타비 접근키까지 섞여 들어갔음(P2-12). 이제 서버의 기록 표 전체를 표별로 받아 하나의 파일로 저장한다.
+// - 행은 서버 컬럼 이름 그대로(복원 시 변환 불필요), manifest에 표별 행 수와 SHA-256 해시(파일 온전성·복원 검증 기준)
+// - device에는 서버에 없는 값 중 백업할 것만(자기소개·테마·글자 크기). API 키·이이타비 접근키는 넣지 않음
+// - 업로드 대기 중인(아직 서버에 없는) 수정은 포함되지 않음 → 대기 표시가 있으면 먼저 동기화를 시도
+const BACKUP_TABLES={ // 표 이름: 정렬 기준(페이지 나눠 받을 때 순서 고정용 — 기본키)
+  todos:'id',memos:'id',rhythm_blocks:'id',sleep:'id',meals:'id',contents:'id',content_daily_log:'id',
+  habits:'id',habit_checks:'id',goal_notes:'id',reading_quotes:'id',recurring_items:'id',recurring_exceptions:'id',
+  user_settings:'id',calendar_links:'apple_key',calendar_sync_rules:'id',ai_cache:'cache_key',trip_items:'id'
+};
+let _fullBackupRunning=false;
+async function _fetchAllRows(table,order,extraHeaders){
+  const PAGE=1000,rows=[];
+  for(let off=0;;off+=PAGE){
+    const res=await fetch(`${SUPA_URL}/rest/v1/${table}?select=*&order=${order}.asc&limit=${PAGE}&offset=${off}`,
+      {headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,...(extraHeaders||{})}});
+    if(!res.ok)throw new Error(table+' '+res.status);
+    const page=await res.json();
+    rows.push(...page);
+    if(page.length<PAGE)return rows;
+  }
+}
+async function _sha256Hex(str){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function downloadFullJSONBackup(){
+  if(_fullBackupRunning)return;
+  if(!navigator.onLine){showToast('온라인일 때 백업할 수 있어요');return;}
+  _fullBackupRunning=true;
+  showToast('서버 전체 기록을 받는 중이에요…');
   try{
-    // API 키/노션 백업 키 등 민감정보는 백업 파일에 포함하지 않음
-    const EXCLUDE_KEYS=new Set(['claude_api_key']);
-    const data={};
-    for(let i=0;i<localStorage.length;i++){
-      const k=localStorage.key(i);
-      if(!k||EXCLUDE_KEYS.has(k))continue;
-      data[k]=localStorage.getItem(k);
+    try{await syncAll();}catch(e){} // 대기 중인 수정이 있으면 먼저 올려 백업에 포함되게
+    // trip_items는 이이타비 접근키가 있어야 읽힘 — 이 기기에 저장된 키가 있으면 이이타비와 같은 방식(x-client-info의 '|' 뒤)으로
+    // 헤더에만 싣고 파일엔 넣지 않음
+    let tripKey='';
+    try{tripKey=(JSON.parse(localStorage.getItem('iitabi:cfg')||'{}').key)||'';}catch(e){}
+    const tables={},manifest={};
+    for(const [t,order] of Object.entries(BACKUP_TABLES)){
+      if(t==='trip_items'&&!tripKey){manifest[t]={rows:0,skipped:'이 기기에 이이타비 접근키 없음'};continue;}
+      const rows=await _fetchAllRows(t,order,t==='trip_items'?{'x-client-info':'iikoto|'+tripKey}:null);
+      tables[t]=rows;
+      manifest[t]={rows:rows.length,hash:await _sha256Hex(JSON.stringify(rows))};
     }
-    const payload={app:'iikoto',exportedAt:new Date().toISOString(),data};
-    const json=JSON.stringify(payload,null,2);
-    const blob=new Blob([json],{type:'application/json;charset=utf-8'});
+    const payload={
+      format:'iikoto-backup',format_version:1,exported_at:new Date().toISOString(),
+      project_ref:(SUPA_URL.match(/https:\/\/([^.]+)\./)||[])[1]||'',
+      manifest,tables,
+      device:{user_profile:S.get('user_profile')||'',theme:S.get('theme')||'light',textScale:S.get('textScale')||0}
+    };
+    const blob=new Blob([JSON.stringify(payload)],{type:'application/json;charset=utf-8'});
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');
     a.href=url;a.download=`iikoto-backup-${dateKey(new Date())}.json`;
     document.body.appendChild(a);a.click();
-    document.body.removeChild(a);URL.revokeObjectURL(url);
-    showToast('전체 데이터가 저장됐어요 ↓');
+    document.body.removeChild(a);setTimeout(()=>URL.revokeObjectURL(url),1000);
+    const total=Object.values(manifest).reduce((n,m)=>n+m.rows,0);
+    showToast(`전체 기록 ${total.toLocaleString()}행을 저장했어요 ↓`);
   }catch(e){
-    showToast('백업 실패 — 저장 공간을 확인해주세요');
-  }
+    console.warn('전체 백업 실패:',e);
+    showToast('백업 실패 — 연결을 확인하고 다시 시도해주세요');
+  }finally{_fullBackupRunning=false;}
 }
 
 // ══════════════════════════════════════════════════════════
@@ -14287,112 +14352,117 @@ async function initSync(){
   if(!navigator.onLine){_initSyncDone=true;return;}
   syncUserTimezoneIfChanged(); // fire-and-forget — 시간대 안 바뀌었으면 로컬 비교만 하고 끝나 로딩에 영향 없음
   window._restoring=true;
-  var dates=[];
-  for(var i=29;i>=0;i--){var d=new Date();d.setDate(d.getDate()-i);dates.push(dateKey(d));}
-  // 미래 6일치 날짜 추가
-  var futureDates=[];
-  for(var i=1;i<=6;i++){var d=new Date();d.setDate(d.getDate()+i);futureDates.push(dateKey(d));}
-  var uploadedDates={};
-  // pending 있는 날짜는 Up 먼저 — 로컬 데이터 보호
-  for(var i=0;i<dates.length;i++){
-    var dk=dates[i];
-    var didUp=false;
-    // 아래 각 syncXxxUp 호출은 반환값(성공 여부)을 확인해 성공했을 때만 pending을 끄고 uploadedDates에
-    // 표시한다. 예전엔 무조건 껐는데, 업로드가 실패(오프라인 전환 순간 등)해도 pending이 꺼지고
-    // uploadedDates에 찍혀 아래 pastDown 대상에서도 빠져버려, "Up도 실패, Down도 스킵"으로 로컬 변경사항이
-    // 통째로 유실되는 경로가 있었음(기기간 체크 상태가 반복적으로 되돌아가던 문제와 연결).
-    if(S.get(S.key('todos_pending',dk))){
-      if(await syncTodosUp(dk)){S.set(S.key('todos_pending',dk),false);didUp=true;}
+  // 첫 동기화 도중 오류(예: 예상 밖 모양의 데이터로 렌더가 실패)가 나도 잠금이 반드시 풀리게 함(감사 P1-7) —
+  // 예전엔 잠금이 남아 그 세션 내내 다운로드와 2분 재시도가 멈췄음
+  try{
+    var dates=[];
+    for(var i=29;i>=0;i--){var d=new Date();d.setDate(d.getDate()-i);dates.push(dateKey(d));}
+    // 미래 6일치 날짜 추가
+    var futureDates=[];
+    for(var i=1;i<=6;i++){var d=new Date();d.setDate(d.getDate()+i);futureDates.push(dateKey(d));}
+    var uploadedDates={};
+    // pending 있는 날짜는 Up 먼저 — 로컬 데이터 보호
+    for(var i=0;i<dates.length;i++){
+      var dk=dates[i];
+      var didUp=false;
+      // 아래 각 syncXxxUp 호출은 반환값(성공 여부)을 확인해 성공했을 때만 pending을 끄고 uploadedDates에
+      // 표시한다. 예전엔 무조건 껐는데, 업로드가 실패(오프라인 전환 순간 등)해도 pending이 꺼지고
+      // uploadedDates에 찍혀 아래 pastDown 대상에서도 빠져버려, "Up도 실패, Down도 스킵"으로 로컬 변경사항이
+      // 통째로 유실되는 경로가 있었음(기기간 체크 상태가 반복적으로 되돌아가던 문제와 연결).
+      if(S.get(S.key('todos_pending',dk))){
+        if(await syncTodosUp(dk)){S.set(S.key('todos_pending',dk),false);didUp=true;}
+      }
+      if(S.get(S.key('memos_pending',dk))){
+        if(await syncMemosUp(dk)){S.set(S.key('memos_pending',dk),false);didUp=true;}
+      }
+      if((S.get(S.key('meals_fields_pending',dk))||[]).length){
+        await syncMealsUp(dk);
+      }
+      if(S.get(S.key('rblocks_pending',dk))){
+        if(await syncRhythmBlocksUp(dk)){S.set(S.key('rblocks_pending',dk),false);didUp=true;}
+      }
+      if(didUp)uploadedDates[dk]=true;
     }
-    if(S.get(S.key('memos_pending',dk))){
-      if(await syncMemosUp(dk)){S.set(S.key('memos_pending',dk),false);didUp=true;}
+    // 오늘 날짜는 다른 모든 동기화(wchallenge/습관/콘텐츠/하루한줄/월간캘린더 등)보다
+    // 먼저, 확실하게 최신화한다(3번 안정화). 예전엔 이 갱신이 그 부수 작업들 전부가
+    // 끝난 뒤에야 실행돼서, 초기 로딩 시 화면이 "오래된 로컬 캐시"로 먼저 그려진 채 한참(때로는
+    // 수 분) 동안 정확한 값으로 안 바뀌는 지연이 있었다(반복투두 아이콘이 늦게 나타나던 현상의
+    // 체감 시간 대부분이 여기서 비롯됨 — 근본 원인인 필드 누락은 이미 앞서 고쳤지만, 정상 필드라도
+    // 늦게 도착하면 같은 지연 체감이 남는다). uploadedDates에 없으면(방금 Up 안 했으면) 바로 Down.
+    {
+      const todayDk=dateKey(new Date());
+      if(!uploadedDates[todayDk]){
+        await syncTodosDown(todayDk);
+      }
     }
-    if((S.get(S.key('meals_fields_pending',dk))||[]).length){
-      await syncMealsUp(dk);
+    // 미래 날짜 pending Up
+    for(var i=0;i<futureDates.length;i++){
+      var fdk=futureDates[i];
+      if(S.get(S.key('todos_pending',fdk))){
+        if(await syncTodosUp(fdk)){S.set(S.key('todos_pending',fdk),false);uploadedDates[fdk]=true;}
+      }
     }
-    if(S.get(S.key('rblocks_pending',dk))){
-      if(await syncRhythmBlocksUp(dk)){S.set(S.key('rblocks_pending',dk),false);didUp=true;}
+    // wchallenge pending 있으면 Up 먼저
+    var wk=weekKey(new Date());
+    if(S.get('wchallenge_pending_'+wk)){
+      await autoSync('wchallenge','wchallenge_'+wk);
+    } else {
+      // 없으면 Supabase에서 Down
+      await syncWChallengeDown(wk);
     }
-    if(didUp)uploadedDates[dk]=true;
-  }
-  // 오늘 날짜는 다른 모든 동기화(wchallenge/습관/콘텐츠/하루한줄/월간캘린더 등)보다
-  // 먼저, 확실하게 최신화한다(3번 안정화). 예전엔 이 갱신이 그 부수 작업들 전부가
-  // 끝난 뒤에야 실행돼서, 초기 로딩 시 화면이 "오래된 로컬 캐시"로 먼저 그려진 채 한참(때로는
-  // 수 분) 동안 정확한 값으로 안 바뀌는 지연이 있었다(반복투두 아이콘이 늦게 나타나던 현상의
-  // 체감 시간 대부분이 여기서 비롯됨 — 근본 원인인 필드 누락은 이미 앞서 고쳤지만, 정상 필드라도
-  // 늦게 도착하면 같은 지연 체감이 남는다). uploadedDates에 없으면(방금 Up 안 했으면) 바로 Down.
-  {
-    const todayDk=dateKey(new Date());
-    if(!uploadedDates[todayDk]){
-      await syncTodosDown(todayDk);
+    // 습관 / 습관체크 — 항상 동기화 (이전엔 syncAll에만 있어서 PC 사파리 등 새 탭에서 누락되던 버그)
+    await syncHabitsDown();
+    await syncHabitGoalsDown();
+    await syncGoalDown('wishlist:meal');
+    await syncGoalDown('reading_dates');
+    // 책은 contents(cat='book')로 통합됨 — 서재가 여러 달에 걸쳐 있으므로 최근 여러 달치를 다운로드.
+    // pending 업로드는 saveContents가 이미 자체적으로 처리(contents_pending)하므로 별도 루프 불필요.
+    {
+      const nowB=new Date();
+      for(let i=0;i<6;i++){await syncContentsDown(monthKey(new Date(nowB.getFullYear(),nowB.getMonth()-i,1)));}
     }
-  }
-  // 미래 날짜 pending Up
-  for(var i=0;i<futureDates.length;i++){
-    var fdk=futureDates[i];
-    if(S.get(S.key('todos_pending',fdk))){
-      if(await syncTodosUp(fdk)){S.set(S.key('todos_pending',fdk),false);uploadedDates[fdk]=true;}
+    await syncQuotesDownAll();
+    const pendDel=S.get('quote_delpending_list')||[];
+    for(const cid of pendDel){
+      saveQuotesLocal(getQuotes().filter(q=>q.cid!==cid));
+      const res=await supaFetch(`reading_quotes?cid=eq.${cid}`,'DELETE');
+      if(res!==null)S.set('quote_delpending_list',(S.get('quote_delpending_list')||[]).filter(c=>c!==cid));
     }
+    for(const q of getQuotes()){
+      if(S.get('quote_pending_'+q.cid))await syncQuoteUp(q.cid);
+    }
+    await syncHCDown(wk);
+    await syncGoalDown(S.key('mgoal',monthKey(new Date())));
+    await syncMonthRange(new Date().getFullYear(),new Date().getMonth());
+    // 콘텐츠 — 항상 Down 먼저 호출 (내부에서 pending이면 병합 후 자동 Up까지 처리)
+    var mk0=monthKey(new Date());
+    await syncContentsDown(mk0);
+    // 하루한줄 — 이번 주 월~일
+    var mon=new Date();mon.setDate(mon.getDate()-((mon.getDay()+6)%7));
+    for(var i=0;i<7;i++){
+      var od=new Date(mon);od.setDate(mon.getDate()+i);
+      await syncGoalDown(S.key('oneline',dateKey(od)));
+    }
+    // Up 하지 않은 날짜만 Supabase → 로컬 복원 (pending 체크는 각 함수 내부에서 처리)
+    // 날짜별 개별 fetch(N일→N번 왕복) 대신 date_key=in.(...) 범위쿼리로 묶어 왕복 1회로 축소.
+    {
+      const pastDown=dates.filter(dk=>!uploadedDates[dk]);
+      await Promise.all([
+        syncTodosDownMany(pastDown),syncMemosDownMany(pastDown),
+        syncSleepDownMany(pastDown),syncMealsDownMany(pastDown),syncRhythmBlocksDownMany(pastDown)
+      ]);
+    }
+    // 미래 날짜 Down — 동일하게 범위쿼리로 묶음
+    {
+      const futureDown=futureDates.filter(fdk=>!uploadedDates[fdk]);
+      await Promise.all([
+        syncTodosDownMany(futureDown),syncMemosDownMany(futureDown),
+        syncMealsDownMany(futureDown),syncRhythmBlocksDownMany(futureDown)
+      ]);
+    }
+  }finally{
+    window._restoring=false;
   }
-  // wchallenge pending 있으면 Up 먼저
-  var wk=weekKey(new Date());
-  if(S.get('wchallenge_pending_'+wk)){
-    await autoSync('wchallenge','wchallenge_'+wk);
-  } else {
-    // 없으면 Supabase에서 Down
-    await syncWChallengeDown(wk);
-  }
-  // 습관 / 습관체크 — 항상 동기화 (이전엔 syncAll에만 있어서 PC 사파리 등 새 탭에서 누락되던 버그)
-  await syncHabitsDown();
-  await syncHabitGoalsDown();
-  await syncGoalDown('wishlist:meal');
-  await syncGoalDown('reading_dates');
-  // 책은 contents(cat='book')로 통합됨 — 서재가 여러 달에 걸쳐 있으므로 최근 여러 달치를 다운로드.
-  // pending 업로드는 saveContents가 이미 자체적으로 처리(contents_pending)하므로 별도 루프 불필요.
-  {
-    const nowB=new Date();
-    for(let i=0;i<6;i++){await syncContentsDown(monthKey(new Date(nowB.getFullYear(),nowB.getMonth()-i,1)));}
-  }
-  await syncQuotesDownAll();
-  const pendDel=S.get('quote_delpending_list')||[];
-  for(const cid of pendDel){
-    saveQuotesLocal(getQuotes().filter(q=>q.cid!==cid));
-    const res=await supaFetch(`reading_quotes?cid=eq.${cid}`,'DELETE');
-    if(res!==null)S.set('quote_delpending_list',(S.get('quote_delpending_list')||[]).filter(c=>c!==cid));
-  }
-  for(const q of getQuotes()){
-    if(S.get('quote_pending_'+q.cid))await syncQuoteUp(q.cid);
-  }
-  await syncHCDown(wk);
-  await syncGoalDown(S.key('mgoal',monthKey(new Date())));
-  await syncMonthRange(new Date().getFullYear(),new Date().getMonth());
-  // 콘텐츠 — 항상 Down 먼저 호출 (내부에서 pending이면 병합 후 자동 Up까지 처리)
-  var mk0=monthKey(new Date());
-  await syncContentsDown(mk0);
-  // 하루한줄 — 이번 주 월~일
-  var mon=new Date();mon.setDate(mon.getDate()-((mon.getDay()+6)%7));
-  for(var i=0;i<7;i++){
-    var od=new Date(mon);od.setDate(mon.getDate()+i);
-    await syncGoalDown(S.key('oneline',dateKey(od)));
-  }
-  // Up 하지 않은 날짜만 Supabase → 로컬 복원 (pending 체크는 각 함수 내부에서 처리)
-  // 날짜별 개별 fetch(N일→N번 왕복) 대신 date_key=in.(...) 범위쿼리로 묶어 왕복 1회로 축소.
-  {
-    const pastDown=dates.filter(dk=>!uploadedDates[dk]);
-    await Promise.all([
-      syncTodosDownMany(pastDown),syncMemosDownMany(pastDown),
-      syncSleepDownMany(pastDown),syncMealsDownMany(pastDown),syncRhythmBlocksDownMany(pastDown)
-    ]);
-  }
-  // 미래 날짜 Down — 동일하게 범위쿼리로 묶음
-  {
-    const futureDown=futureDates.filter(fdk=>!uploadedDates[fdk]);
-    await Promise.all([
-      syncTodosDownMany(futureDown),syncMemosDownMany(futureDown),
-      syncMealsDownMany(futureDown),syncRhythmBlocksDownMany(futureDown)
-    ]);
-  }
-  window._restoring=false;
   // 예비 투두 동기화
   if(S.get(S.key('todos_pending',RESERVE_DK))){
     if(await syncTodosUp(RESERVE_DK))S.set(S.key('todos_pending',RESERVE_DK),false);

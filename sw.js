@@ -15,7 +15,8 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+      // 같은 출처를 쓰는 이이타비 캐시(iitabi-*)는 건드리지 않고, 이이코토의 옛 캐시만 지움(감사 P2-1)
+      Promise.all(keys.filter(k => k.startsWith('iikoto-') && k !== CACHE).map(k => caches.delete(k)))
     ).then(() => self.clients.claim())
   );
 });
@@ -25,7 +26,11 @@ self.addEventListener('fetch', e => {
   if(e.request.method !== 'GET') return;
   if(e.request.url.includes('workers.dev')) return;
 
-  // 네트워크 우선 — 성공한 응답만 캐시에 갱신하고, 오프라인이면 같은 요청 → 없으면 앱 셸('./') 순으로 폴백.
+  // 네트워크 우선 — 성공한 응답만 캐시에 갱신하고, 실패하면 같은 요청의 캐시로 대신함.
+  // 앱 셸('./') 대체는 페이지 이동 요청에만 적용(감사 P1-10 — 예전엔 app.js 요청에도 HTML을 돌려줘 스플래시에서 멈출 수 있었음).
+  // app.js는 ?v= 버전이 달라도 캐시에 있는 것을 대신 씀(이이타비 sw와 같은 방식).
+  const reqUrl = new URL(e.request.url);
+  const isAppJs = reqUrl.pathname.endsWith('/app.js');
   e.respondWith(
     fetch(e.request)
       .then(res => {
@@ -43,7 +48,11 @@ self.addEventListener('fetch', e => {
         }
         return res;
       })
-      .catch(() => caches.match(e.request).then(hit => hit || caches.match('./')))
+      .catch(() => caches.match(e.request, { ignoreSearch: isAppJs }).then(hit => {
+        if (hit) return hit;
+        if (e.request.mode === 'navigate') return caches.match('./').then(shell => shell || Response.error());
+        return Response.error();
+      }))
   );
 });
 
