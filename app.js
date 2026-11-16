@@ -4245,7 +4245,11 @@ async function syncMealsUp(dk){
   const row={date_key:dk,created:Date.now()};
   pend.forEach(col=>{row[col]=local[col]||null;});
   const ok=await supaUpsert('meals','date_key',[row]);
-  if(ok)S.set(S.key('meals_fields_pending',dk),(S.get(S.key('meals_fields_pending',dk))||[]).filter(c=>!pend.includes(c)));
+  // 업로드 도중 같은 칸을 다시 고쳤으면 그 칸은 대기 표시를 유지 — 보낸 값과 지금 로컬 값이 같은 칸만 해제.
+  if(ok){
+    const now=getMeals(dk);
+    S.set(S.key('meals_fields_pending',dk),(S.get(S.key('meals_fields_pending',dk))||[]).filter(c=>!(pend.includes(c)&&(now[c]||null)===row[c])));
+  }
   if(dk===dateKey(currentDate))renderTodayMeal();
   return !!ok;
 }
@@ -11397,7 +11401,11 @@ function placeWish(el){
   // onblur로만 저장되는 구조라, 배치 직후엔 아직 blur가 안 일어난 상태 — 명시적으로 저장 호출.
   // el.id는 wm-${dk}-${k} 형식(dk 자체에 '-'가 포함되므로 마지막 조각만 k, 나머지가 dk).
   const idParts=el.id.split('-');
-  if(idParts[0]==='wm')saveMealMenu(idParts.slice(1,-1).join('-'),idParts[idParts.length-1]);
+  if(idParts[0]==='wm'){
+    const dk=idParts.slice(1,-1).join('-'),k=idParts[idParts.length-1];
+    _mealDirty[dk+'|'+k]=true; // 화면 값만 바꾼 상태라 입력한 칸으로 표시해야 저장됨
+    saveMealMenu(dk,k);
+  }
   // 특정 날짜 칸에 배치됐으니 위시리스트에서 제거
   if(_wishPlacingIdx!=null){
     const items=getMealWishlist();
@@ -11446,11 +11454,48 @@ function clearMealTime(dk,k){
   patchMealField(dk,k,'time','');
   refreshMealTimeGroup(dk,k,'');
 }
+// 메뉴칸은 원래 blur에서만 저장했는데, iOS에서는 입력칸에 커서를 둔 채 시트를 닫거나 앱을 내리면
+// blur가 일어나지 않아 마지막에 적은 칸이 기기에도 저장되지 않고 사라졌음 → 세 경로를 추가:
+// ① 입력이 멈추고 0.8초 뒤 자동 저장(빈 칸은 시간까지 지우므로 blur/닫기 때만 반영)
+// ② 시트를 닫을 때 ③ 앱이 백그라운드로 갈 때 남은 칸을 한 번에 저장.
+// 저장 대상은 사용자가 실제로 입력한 칸(_mealDirty)만 — 시트가 열린 사이 다른 기기 값이 동기화로 들어와도
+// 손대지 않은 칸의 화면 값이 그 새 값을 덮어쓰지 않게 함.
+const _mealInpTimers={},_mealDirty={};
+function onMealMenuInput(dk,k){
+  const tk=dk+'|'+k;
+  _mealDirty[tk]=true;
+  clearTimeout(_mealInpTimers[tk]);
+  _mealInpTimers[tk]=setTimeout(()=>{
+    delete _mealInpTimers[tk];
+    const el=document.getElementById(`wm-${dk}-${k}`);
+    if(el&&el.value.trim())saveMealMenu(dk,k);
+  },800);
+}
+function flushWeekMealInputs(){
+  Object.keys(_mealDirty).forEach(tk=>{const [dk,k]=tk.split('|');saveMealMenu(dk,k);});
+}
+function closeWeekMealSheet(e){
+  const ov=document.getElementById('week-meal-sheet');
+  if(e&&e.target!==ov)return;
+  flushWeekMealInputs();
+  ov.classList.remove('on');
+}
+document.addEventListener('visibilitychange',()=>{if(document.hidden)flushWeekMealInputs();});
+window.addEventListener('pagehide',flushWeekMealInputs);
 // 메뉴칸(onblur) — 메뉴 필드만 patch. 메뉴가 비면 시간도 같이 지움(리듬 막대 잔존 방지).
 // 시간 필드는 절대 건드리지 않으므로 다른 기기가 등록한 시간이 여기서 사라질 수 없음.
 function saveMealMenu(dk,k){
+  const tk=dk+'|'+k;
+  clearTimeout(_mealInpTimers[tk]);delete _mealInpTimers[tk];
+  if(!_mealDirty[tk])return; // 입력하지 않은 칸은 저장하지 않음(blur만 일어난 경우 포함)
   const el=document.getElementById(`wm-${dk}-${k}`);
-  const val=el?el.value.trim():'';
+  if(!el){delete _mealDirty[tk];return;}
+  delete _mealDirty[tk];
+  const val=el.value.trim();
+  const cur=getMeals(dk);
+  // 입력 중 자동 저장·blur·시트 닫기가 같은 값을 여러 번 부를 수 있어, 바뀐 게 없으면 건너뜀.
+  // (메뉴가 비어 있는데 시간만 남은 경우는 기존대로 아래에서 시간을 지우도록 통과)
+  if(val===(cur[k]||'')&&(val||!cur[k+'_time']))return;
   patchMealField(dk,k,'menu',val);
   if(!val){
     patchMealField(dk,k,'time','');
@@ -11495,6 +11540,7 @@ function openWeekMealSheet(){
   const now=new Date();
   const mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7));
   const body=document.getElementById('week-meal-body');
+  flushWeekMealInputs(); // 혹시 저장 못 하고 남은 입력 칸이 있으면 다시 그리기 전에 저장
   body.innerHTML='';
   const DOW=['월','화','수','목','금','토','일'];
   const CATS=MEAL_KEYS.map(k=>[k,MEAL_LABELS[k]]);
@@ -11515,7 +11561,7 @@ function openWeekMealSheet(){
         const timeBlock=_isTouchDevice()
           ? `<span class="meal-time-inp${tVal?'':' mt-empty'}" id="wm-${dk}-${k}-time" data-value="${tVal}" onclick="openMealTimePicker('${dk}','${k}')">${tVal||'--:--'}</span>${tVal?`<span onclick="clearMealTime('${dk}','${k}')" class="meal-time-clear" title="시간 지우기">✕</span>`:''}`
           : (tVal?`<span class="meal-time-readonly">${tVal}</span>`:'');
-        return `<div class="meal-row"><div class="meal-cat" onpointerdown="mealCatPressStart(this,'${dk}','${k}')" onpointerup="mealCatPressEnd(this)" onpointerleave="mealCatPressEnd(this)" onpointercancel="mealCatPressEnd(this)">${label}</div><input class="meal-inp" style="flex:1 1 0;min-width:0;" id="wm-${dk}-${k}" type="text" placeholder="메뉴 입력" autocomplete="off" value="${(m[k]||'').replace(/"/g,'&quot;')}" onblur="saveMealMenu('${dk}','${k}')"><div class="meal-time-group">${timeBlock}</div></div>`;
+        return `<div class="meal-row"><div class="meal-cat" onpointerdown="mealCatPressStart(this,'${dk}','${k}')" onpointerup="mealCatPressEnd(this)" onpointerleave="mealCatPressEnd(this)" onpointercancel="mealCatPressEnd(this)">${label}</div><input class="meal-inp" style="flex:1 1 0;min-width:0;" id="wm-${dk}-${k}" type="text" placeholder="메뉴 입력" autocomplete="off" value="${(m[k]||'').replace(/"/g,'&quot;')}" oninput="onMealMenuInput('${dk}','${k}')" onblur="saveMealMenu('${dk}','${k}')"><div class="meal-time-group">${timeBlock}</div></div>`;
       }).join('');
     body.appendChild(block);
   }

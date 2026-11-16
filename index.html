@@ -1920,12 +1920,12 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
 
 
 <!-- WEEK MEAL SHEET -->
-<div class="overlay" id="week-meal-sheet" onclick="closeSheet('week-meal-sheet',event)">
+<div class="overlay" id="week-meal-sheet" onclick="closeWeekMealSheet(event)">
   <div class="bsheet" style="max-height:85vh;overflow-y:auto;" onclick="event.stopPropagation()">
     <div class="sheet-handle"></div>
     <div style="padding:0 20px 20px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px;">
-        <div class="goal-section-title" style="margin:0;background:rgba(190,230,205,0.30);color:rgba(85,135,100,0.90);border:1px solid rgba(150,190,165,0.45);box-shadow:none;" onclick="closeSheet('week-meal-sheet')"><i class="ti ti-tools-kitchen-3 ico-13" aria-hidden="true"></i> 주간 식사 계획</div>
+        <div class="goal-section-title" style="margin:0;background:rgba(190,230,205,0.30);color:rgba(85,135,100,0.90);border:1px solid rgba(150,190,165,0.45);box-shadow:none;" onclick="closeWeekMealSheet()"><i class="ti ti-tools-kitchen-3 ico-13" aria-hidden="true"></i> 주간 식사 계획</div>
         <button class="wish-round-btn" onclick="toggleMealWishlist()" title="먹고싶은 메뉴">
           <i class="ti ti-chef-hat" style="font-size:16px;" aria-hidden="true"></i>
         </button>
@@ -2863,7 +2863,7 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
   </div>
 </div>
 
-<script src="app.js?v=20261112c"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
+<script src="app.js?v=20261116a"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
 
 </body>
 </html>
