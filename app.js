@@ -1019,7 +1019,7 @@ async function renderDiaryMonthSheet(){
       const text=getDailyOneLine(dk).trim();
       rowsHtml+=`<div class="diary-row"${isToday?' id="diary-today-row"':''}>
         <div class="diary-date-chip${isHoliday?' holiday':''}${isToday?' today':''}">${pad(d)}</div>
-        <div class="diary-line-text${text?'':' empty'}">${text?text:'···'}</div>
+        <div class="diary-line-text${text?'':' empty'}">${text?escapeHtml(text):'···'}</div>
       </div>`;
     }
     el.innerHTML=`<div style="font-family:'Comfortaa',sans-serif;font-weight:700;font-size:17px;color:var(--tp);margin-bottom:2px;">${mo+1}월의 하루한줄</div>
@@ -1344,7 +1344,7 @@ function _cmrDetailBodyHtml(c,wcalNotes,flat,showHead){
   const isWatchingNow=canWatch&&_cswRunning&&_cswCid===c.cid;
   const watchBtnHtml=canWatch?`<span class="cwatch-btn${isWatchingNow?' active':''}" onclick="event.stopPropagation();toggleContentStopwatch('${c.cid}')"><i class="ti ${isWatchingNow?'ti-player-stop-filled':'ti-player-play-filled'}" aria-hidden="true"></i>${isWatchingNow?'시청중':'시청 시작'}</span>`:'';
   // 재생 — 음악만, musicUrl이 등록돼 있을 때만(그리드 상세에서만). 날짜/별점 등 다른 정보가 없는 자리라 오른쪽 정렬(music-play-btn 클래스, margin-left:auto).
-  const musicPlayBtnHtml=showHead&&c.cat==='music'&&c.musicUrl?`<span class="pl-item-play music-play-btn" style="background:rgba(160,105,180,.18);border:1px solid rgba(160,105,180,.45);" onclick="event.stopPropagation();window.location.href='${c.musicUrl.replace(/'/g,"\\'")}'"><i class="ti ti-player-play-filled" style="color:rgba(160,105,180,1);" aria-hidden="true"></i></span>`:'';
+  const musicPlayBtnHtml=showHead&&c.cat==='music'&&c.musicUrl?`<span class="pl-item-play music-play-btn" style="background:rgba(160,105,180,.18);border:1px solid rgba(160,105,180,.45);" data-url="${safeUrl(c.musicUrl)}" onclick="event.stopPropagation();if(this.dataset.url)window.location.href=this.dataset.url"><i class="ti ti-player-play-filled" style="color:rgba(160,105,180,1);" aria-hidden="true"></i></span>`:'';
   // 음악 메타 — 아티스트명(위) / 앨범명 · 연도(아래) 두 줄로 표기(제목은 위 썸네일 라벨에 이미 있어 중복 생략). 그리드 상세에서만.
   const musicAlbumYearParts=[];
   if(showHead&&c.cat==='music'){
@@ -1417,7 +1417,7 @@ function _cgridRowsHtml(list,cat){
 function _cgridItemHtml(c,cat){
   const meta=CAT_ICON_META[cat];
   const id=c.cid||('t'+(c.created||0));
-  const thumb=c.poster?`<img class="cgrid-thumb" src="${c.poster}" />`:`<div class="cgrid-thumb-fallback" style="background:${meta.color};"><i class="ti ${meta.icon}" aria-hidden="true"></i></div>`;
+  const thumb=c.poster?`<img class="cgrid-thumb" src="${safeUrl(c.poster)}" />`:`<div class="cgrid-thumb-fallback" style="background:${meta.color};"><i class="ti ${meta.icon}" aria-hidden="true"></i></div>`;
   const statusDot=cat!=='music'&&c.status==='watching'?'<span class="cgrid-status-dot">진행중</span>':'';
   const icons=[];
   if(c.stars>0)icons.push('<i class="ti ti-star" aria-hidden="true"></i>');
@@ -1502,7 +1502,7 @@ async function loadMonthlyReportContent(){
   const stats=computeMonthStats(y,mo);
   const goalHtml=stats.goalLines.length?`<div class="mr-card mr-goal-card">
     <div class="mr-sec-title"><i class="ti ti-flag-3 ico-12" aria-hidden="true"></i> 이번 달 목표</div>
-    ${stats.goalLines.map(g=>`<div style="font-size:var(--main-text-size);color:var(--tp);line-height:1.7;padding:2px 0;">${g}</div>`).join('')}
+    ${stats.goalLines.map(g=>`<div style="font-size:var(--main-text-size);color:var(--tp);line-height:1.7;padding:2px 0;">${escapeHtml(g)}</div>`).join('')}
   </div>` : '';
   const statsHtml=`<div class="mr-row2" style="margin-bottom:12px;">
     <div class="mr-stat"><div class="v">${stats.doneTodos}개</div><div class="l">투두 완료</div></div>
@@ -1557,8 +1557,8 @@ async function loadMonthlyReportContent(){
   if(report){
     slot2.innerHTML=`<div class="mr-ai-card">
       <div class="mr-sec-title"><i class="ti ti-sparkles ico-12" aria-hidden="true"></i> 이번 달 한눈에</div>
-      <p style="font-size:var(--main-text-size);color:var(--tp);line-height:1.9;margin-bottom:${report.keywords&&report.keywords.length?'12px':'0'};">${report.comment}</p>
-      ${report.keywords&&report.keywords.length?`<div class="mr-tag-cloud">${report.keywords.map(k=>`<span class="mr-tag">${k}</span>`).join('')}</div>`:''}
+      <p style="font-size:var(--main-text-size);color:var(--tp);line-height:1.9;margin-bottom:${report.keywords&&report.keywords.length?'12px':'0'};">${escapeHtml(report.comment)}</p>
+      ${report.keywords&&report.keywords.length?`<div class="mr-tag-cloud">${report.keywords.map(k=>`<span class="mr-tag">${escapeHtml(k)}</span>`).join('')}</div>`:''}
     </div>`;
   } else {
     slot2.innerHTML=`<div class="mr-ai-card"><div class="mr-sec-title"><i class="ti ti-sparkles ico-12" aria-hidden="true"></i> 이번 달 한눈에</div><div class="mr-ai-empty">${getClaudeKey()?'코멘트를 만들 데이터가 부족해요':'아직 준비 중이에요 (다른 기기에서 먼저 열어보시면 여기서도 볼 수 있어요)'}</div></div>`;
@@ -1606,12 +1606,12 @@ function loadWeeklyReviewFor(dk){
   const content=document.getElementById('weekly-review-content');
   const cacheKey='weekly_summary_'+dk;
   const cached=S.get(cacheKey);
-  if(cached&&!_isWeeklyFallback(cached)){content.innerHTML=cached;return;}
+  if(cached&&!_isWeeklyFallback(cached)){content.innerHTML=sanitizeAiHtml(cached);return;}
   content.innerHTML='<div class="sheet-loading-msg">한 주 요약 작성 중이에요.. 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">약 10-20초 소요돼요</span></div>';
   aiCacheGet(cacheKey).then(function(serverHtml){
     if(serverHtml&&!_isWeeklyFallback(serverHtml)){
       S.set(cacheKey,serverHtml);
-      content.innerHTML=serverHtml;
+      content.innerHTML=sanitizeAiHtml(serverHtml);
       return;
     }
     const isCurrentWeek=dk===_thisWeekSundayDk();
@@ -1628,10 +1628,10 @@ function loadWeeklyReviewFor(dk){
       if(html&&!_isWeeklyFallback(html)){
         S.set(cacheKey,html);
         aiCacheSet(cacheKey,html);
-        content.innerHTML=html;
+        content.innerHTML=sanitizeAiHtml(html);
       }else if(html){
         // AI 요약 실패 — 기록 요약만 보여주되 캐시에 저장하지 않음(다시 열면 다시 시도). 원인(_lastAiError)을 함께 표시.
-        content.innerHTML=html+'<div style="margin-top:14px;font-size:var(--dow-label-size);color:var(--tm);line-height:1.6;">AI 요약을 만들지 못했어요. 다시 열면 다시 시도해요'+(_lastAiError?' ('+escapeHtml(_lastAiError)+')':'')+'</div>';
+        content.innerHTML=sanitizeAiHtml(html)+'<div style="margin-top:14px;font-size:var(--dow-label-size);color:var(--tm);line-height:1.6;">AI 요약을 만들지 못했어요. 다시 열면 다시 시도해요'+(_lastAiError?' ('+escapeHtml(_lastAiError)+')':'')+'</div>';
       }else{
         content.innerHTML='<div class="sheet-loading-msg">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
       }
@@ -1724,8 +1724,8 @@ async function makeWeeklySummaryCard(){
     ${avgSleepStr?`<div>◎ 평균 수면 <b>${avgSleepStr}</b></div>`:''}
     <div>✓ 실행한 투두 <b>${doneTodos}개</b></div>
     <div>✦ 메모 총 <b>${allMemos.length}건</b></div>
-    ${topHabit&&topHabit[1]>0?`<div>→ 가장 많이 한 습관: <b>${topHabit[0]}</b></div>`:''}
-    ${frequentTodo?`<div>◇ 자주 등장한 일: <b>${frequentTodo[0]}(${frequentTodo[1]}회)</b></div>`:''}
+    ${topHabit&&topHabit[1]>0?`<div>→ 가장 많이 한 습관: <b>${escapeHtml(topHabit[0])}</b></div>`:''}
+    ${frequentTodo?`<div>◇ 자주 등장한 일: <b>${escapeHtml(frequentTodo[0])}(${frequentTodo[1]}회)</b></div>`:''}
     ${rhythmChangeText?`<div>◈ 리듬 변화: <b>${rhythmChangeText}</b></div>`:''}
   </div>`;
 
@@ -2977,6 +2977,31 @@ function _todoAlertIconHtml(todoAlertOn,alertTime){
 }
 function escapeHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 function escapeAttr(s){return escapeHtml(s).replace(/"/g,'&quot;');} // HTML 속성값(data-*)용 — 따옴표까지 이스케이프
+// ── 저장된 값을 HTML에 넣을 때 쓰는 도우미(감사 P1-11, 2026-11-16) ──
+// 이미지·링크 주소: http(s)·data:image·blob 주소만 통과시키고 속성용으로 이스케이프(그 외 javascript: 등은 빈 값)
+function safeUrl(u){u=String(u==null?'':u).trim();return /^(https?:|data:image\/|blob:)/i.test(u)?escapeAttr(u):'';}
+// onclick="fn('...')"처럼 속성 안의 자바스크립트 문자열 인자로 넣을 값 — 역슬래시·작은따옴표·줄바꿈을 먼저 막고 속성용으로 이스케이프
+function jsStrAttr(s){return escapeAttr(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r?\n/g,'\\n'));}
+// AI 리포트(서버 캐시 ai_cache·기기 캐시에 HTML로 저장됨)를 그릴 때 — 허용한 태그와 class/style만 남기고 나머지는 글자로 바꿈.
+// 지금 저장된 리포트는 div·b와 style만 쓰고 있어 화면은 그대로임. template 안에서 파싱하므로 정리 과정에서 스크립트가 실행되지 않음.
+const _AI_ALLOWED_TAGS=new Set(['DIV','P','SPAN','B','STRONG','I','EM','BR','UL','OL','LI','SMALL']);
+function sanitizeAiHtml(html){
+  const tpl=document.createElement('template');tpl.innerHTML=String(html==null?'':html);
+  const walk=node=>{
+    Array.from(node.children).forEach(el=>{
+      if(!_AI_ALLOWED_TAGS.has(el.tagName)){el.replaceWith(document.createTextNode(el.textContent));return;}
+      Array.from(el.attributes).forEach(a=>{
+        const n=a.name.toLowerCase();
+        if(n==='class'||n==='aria-hidden'||n.startsWith('data-'))return;
+        if(n==='style'&&!/url\s*\(|expression|javascript:/i.test(a.value))return;
+        el.removeAttribute(a.name);
+      });
+      walk(el);
+    });
+  };
+  walk(tpl.content);
+  return tpl.innerHTML;
+}
 // 자정~새벽(아직 잠들기 전, night_2)에는 "오늘"을 전날 밤 기준으로 보는 논리적 날짜
 // ── 절기(節氣) 정보 — 7~12월 우선 적용, 필요시 이후 확장
 // 날짜는 한국천문연구원 절입시각 기준 (연도별로 1~2일 오차 가능, 매년 갱신 필요)
@@ -6122,12 +6147,12 @@ function renderTodoTextParts(text,strikeParts,todoIdx){
   const inPartMode=_todoPartModeIdx===todoIdx;
   let html='';
   if(hasPrefix){
-    html+=`<span class="todo-prefix" data-role="prefix">${prefix} ></span> `;
+    html+=`<span class="todo-prefix" data-role="prefix">${escapeHtml(prefix)} ></span> `;
   }
   parts.forEach((seg,partIdx)=>{
     const isStruck=strikeParts.includes(partIdx);
     if(partIdx>0)html+=' / ';
-    html+=`<span class="todo-part" data-part-idx="${partIdx}" style="user-select:none;-webkit-user-select:none;-webkit-user-drag:none;${isStruck?'text-decoration:line-through;color:var(--tm);':''}">${seg}</span>`;
+    html+=`<span class="todo-part" data-part-idx="${partIdx}" style="user-select:none;-webkit-user-select:none;-webkit-user-drag:none;${isStruck?'text-decoration:line-through;color:var(--tm);':''}">${escapeHtml(seg)}</span>`;
   });
   if(inPartMode){
     const hasUnstruck=parts.some((_,idx)=>!strikeParts.includes(idx));
@@ -8268,7 +8293,7 @@ function renderMemos(){
       const meta=WCAL_CAT_META[m.cat]||{icon:'ti-tag',color:'var(--tm)'};
       const bub=document.createElement('div');bub.className='memo-bub memo-bub-content';
       const headHtml=isFinal
-        ?(m.poster?`<div class="memo-content-poster"><img src="${m.poster}" alt=""></div><span class="memo-content-title">${escapeHtml(m.title)}</span>`
+        ?(m.poster?`<div class="memo-content-poster"><img src="${safeUrl(m.poster)}" alt=""></div><span class="memo-content-title">${escapeHtml(m.title)}</span>`
                   :`<span class="memo-content-title">${escapeHtml(m.title)}</span>`)
         :`<i class="ti ${meta.icon} memo-content-icon" aria-hidden="true"></i><span class="memo-content-title">${escapeHtml(m.title)}</span>`;
       bub.innerHTML=`<div class="memo-content-head">${headHtml}</div><div class="memo-content-body">${escapeHtml(m.text)}</div>`;
@@ -8308,7 +8333,7 @@ function renderMemos(){
       bub.appendChild(wrap);bub.appendChild(txt);
       bub.addEventListener('click',()=>{_memoSwipeIdx=i;openSheet('memo-sheet');});
     }else{
-      bub.innerHTML=(m.text||'');
+      bub.textContent=(m.text||''); // 글자로만 넣음(감사 P1-11 — 예전엔 HTML로 해석됐음)
       bub.addEventListener('click',()=>{_memoSwipeIdx=i;openSheet('memo-sheet');});
     }
     const time=document.createElement('span');
@@ -8450,7 +8475,7 @@ function openPhotoArchive(){
   }else{
     resEl.innerHTML=results.map((r,i)=>`<div class="photo-archive-thumb" onclick="openPhotoArchiveItem(${i})">
       <div class="photo-archive-thumb-ph"><i class="ti ti-photo" aria-hidden="true"></i></div>
-      <img src="${r.src}" alt="" loading="lazy" onload="this.classList.add('loaded');this.previousElementSibling.classList.add('hide');" onerror="this.previousElementSibling.classList.add('hide');">
+      <img src="${safeUrl(r.src)}" alt="" loading="lazy" onload="this.classList.add('loaded');this.previousElementSibling.classList.add('hide');" onerror="this.previousElementSibling.classList.add('hide');">
     </div>`).join('');
     _photoArchiveResults=results;
   }
@@ -8531,10 +8556,10 @@ async function loadChallengeReviewFor(wk){
   const content=document.getElementById('challenge-review-content');
   const cacheKey='challenge_review_'+wk;
   const cached=S.get(cacheKey);
-  if(cached){content.innerHTML=cached;return;}
+  if(cached){content.innerHTML=sanitizeAiHtml(cached);return;}
   content.innerHTML='<div class="sheet-loading-msg">불러오는 중이에요.. 🌿</div>';
   const serverHtml=await aiCacheGet(cacheKey);
-  if(serverHtml){S.set(cacheKey,serverHtml);content.innerHTML=serverHtml;return;}
+  if(serverHtml){S.set(cacheKey,serverHtml);content.innerHTML=sanitizeAiHtml(serverHtml);return;}
   const isLastWeek=wk===lastWeekKey();
   if(!isLastWeek){
     content.innerHTML='<div class="sheet-loading-msg">이 주는 아직 기록된 요약이 없어요 🌿</div>';
@@ -8549,7 +8574,7 @@ async function loadChallengeReviewFor(wk){
   if(html){
     S.set(cacheKey,html);
     aiCacheSet(cacheKey,html);
-    content.innerHTML=html;
+    content.innerHTML=sanitizeAiHtml(html);
   }
   else content.innerHTML='<div class="sheet-loading-msg">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
 }
@@ -8643,10 +8668,10 @@ async function loadWeeklyMemoReportFor(wk){
   const content=document.getElementById('weekly-memo-report-content');
   const cacheKey='weekly_memo_report_'+wk;
   const cached=S.get(cacheKey);
-  if(cached){content.innerHTML=cached;return;}
+  if(cached){content.innerHTML=sanitizeAiHtml(cached);return;}
   content.innerHTML='<div class="sheet-loading-msg">불러오는 중이에요.. 🌿</div>';
   const serverHtml=await aiCacheGet(cacheKey);
-  if(serverHtml){S.set(cacheKey,serverHtml);content.innerHTML=serverHtml;return;}
+  if(serverHtml){S.set(cacheKey,serverHtml);content.innerHTML=sanitizeAiHtml(serverHtml);return;}
   const isRecentWeek=wk===weekKey((()=>{const d=new Date();d.setDate(d.getDate()-1);return d;})());
   if(!isRecentWeek){
     content.innerHTML='<div class="sheet-loading-msg">이 주는 아직 기록된 요약이 없어요 🌿</div>';
@@ -8661,7 +8686,7 @@ async function loadWeeklyMemoReportFor(wk){
   if(html){
     S.set(cacheKey,html);
     aiCacheSet(cacheKey,html);
-    content.innerHTML=html;
+    content.innerHTML=sanitizeAiHtml(html);
   }
   else content.innerHTML='<div class="sheet-loading-msg">잠시 후 다시 시도해주세요 🌿<br><span style="font-size:var(--dow-label-size);opacity:0.7;">네트워크 상태를 확인해보세요</span></div>';
 }
@@ -9202,7 +9227,7 @@ function openMusicGroupModal(items,mk){
   items.forEach(item=>{
     const row=document.createElement('div');
     row.style.cssText='display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;background:var(--card);border:1px solid var(--card-b);cursor:pointer;';
-    row.innerHTML=`<i class="ti ti-music" style="font-size:14px;color:${getCatBarColor('music')};flex-shrink:0;" aria-hidden="true"></i><span style="font-size:var(--main-text-size);color:var(--tp);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${item.title||''}</span>`;
+    row.innerHTML=`<i class="ti ti-music" style="font-size:14px;color:${getCatBarColor('music')};flex-shrink:0;" aria-hidden="true"></i><span style="font-size:var(--main-text-size);color:var(--tp);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(item.title||'')}</span>`;
     row.addEventListener('click',()=>{closeModal('music-group-modal');openContentModal('music',item,mk);});
     listEl.appendChild(row);
   });
@@ -9824,7 +9849,7 @@ function openWatchPicker(){
   }else{
     listEl.innerHTML=list.filter(c=>c.cid).map(c=>{
       const meta=CAT_ICON_META[c.cat];
-      const posterHtml=c.poster?`<img class="watch-picker-item-poster" src="${c.poster}" alt="">`:`<div class="watch-picker-item-poster-ph" style="background:${meta.color};"><i class="ti ${meta.icon}" aria-hidden="true"></i></div>`;
+      const posterHtml=c.poster?`<img class="watch-picker-item-poster" src="${safeUrl(c.poster)}" alt="">`:`<div class="watch-picker-item-poster-ph" style="background:${meta.color};"><i class="ti ${meta.icon}" aria-hidden="true"></i></div>`;
       return `<div class="watch-picker-item" onclick="closeSheet('watch-picker-sheet');selectPendingWatch('${c.cid}','${c._mk}');">
         ${posterHtml}<div class="watch-picker-item-title">${escapeHtml(c.title||'')}</div>
       </div>`;
@@ -9841,7 +9866,7 @@ function _cswPosterHtml(c,size){
   size=size||52;
   const meta=CAT_ICON_META[c.cat]||CAT_ICON_META.drama;
   return c.poster
-    ?`<img class="rd-top-cover" src="${c.poster}" style="width:${size}px;height:${Math.round(size*76/52)}px;object-fit:cover;">`
+    ?`<img class="rd-top-cover" src="${safeUrl(c.poster)}" style="width:${size}px;height:${Math.round(size*76/52)}px;object-fit:cover;">`
     :`<div class="rd-top-cover" style="width:${size}px;height:${Math.round(size*76/52)}px;background:${meta.color};display:flex;align-items:center;justify-content:center;"><i class="ti ${meta.icon}" style="font-size:22px;color:#fff;" aria-hidden="true"></i></div>`;
 }
 // 진행률 데이터(totalUnit)가 없으면 null — 독서코너 _rdProgressBarHtml과 동일 규칙.
@@ -10100,8 +10125,8 @@ async function searchITunes(q,el){
     const album=item.collectionName||'';
     const poster=item.artworkUrl100||null;
     const div=document.createElement('div');div.className='api-result-item';
-    div.innerHTML=poster?`<img class="api-result-poster" src="${poster}" alt="">`:`<div class="api-result-poster-placeholder">♩</div>`;
-    div.innerHTML+=`<div class="api-result-info"><div class="api-result-title">${title}</div><div class="api-result-sub">${artist}${date?' · '+date:''}</div></div>`;
+    div.innerHTML=poster?`<img class="api-result-poster" src="${safeUrl(poster)}" alt="">`:`<div class="api-result-poster-placeholder">♩</div>`;
+    div.innerHTML+=`<div class="api-result-info"><div class="api-result-title">${escapeHtml(title)}</div><div class="api-result-sub">${escapeHtml(artist)}${date?' · '+escapeHtml(date):''}</div></div>`;
     div.addEventListener('click',()=>selectApiResult(title,poster,artist,date,item.trackViewUrl||null,null,album));el.appendChild(div);
   });
 }
@@ -10116,8 +10141,8 @@ async function searchTMDB(q,cat,el){
     const title=item.title||item.name||'';const date=(item.release_date||item.first_air_date||'').slice(0,4);
     const poster=item.poster_path?`https://image.tmdb.org/t/p/w92${item.poster_path}`:null;
     const div=document.createElement('div');div.className='api-result-item';
-    div.innerHTML=poster?`<img class="api-result-poster" src="${poster}" alt="">`:`<div class="api-result-poster-placeholder">🎬</div>`;
-    div.innerHTML+=`<div class="api-result-info"><div class="api-result-title">${title}</div><div class="api-result-sub">${date}</div></div>`;
+    div.innerHTML=poster?`<img class="api-result-poster" src="${safeUrl(poster)}" alt="">`:`<div class="api-result-poster-placeholder">🎬</div>`;
+    div.innerHTML+=`<div class="api-result-info"><div class="api-result-title">${escapeHtml(title)}</div><div class="api-result-sub">${escapeHtml(date)}</div></div>`;
     // 드라마는 TMDB가 전 시즌을 한 작품으로 주므로, 시즌이 2개 이상이면 시즌을 골라 "제목 시즌 N"으로 따로 등록(시즌마다 텀이 커서 완결을 시즌 단위로 처리하기 위함).
     div.addEventListener('click',()=>type==='tv'?pickTmdbSeason(item,title,poster,date,el):selectApiResult(title,poster,date,'',null,{tmdbId:item.id,tmdbType:type}));el.appendChild(div);
   });
@@ -10139,8 +10164,8 @@ async function searchKakaoBook(q,el){
       const title=item.title||'';const author=(item.authors||[]).join(', ');const poster=item.thumbnail||null;
       const isbn=item.isbn||''; // 카카오 응답: "isbn10 isbn13" 형태 공백구분 — 알라딘 페이지 수 보완 조회용
       const div=document.createElement('div');div.className='api-result-item';
-      div.innerHTML=poster?`<img class="api-result-poster" src="${poster}" alt="">`:`<div class="api-result-poster-placeholder">📚</div>`;
-      div.innerHTML+=`<div class="api-result-info"><div class="api-result-title">${title}</div><div class="api-result-sub">${author}</div></div>`;
+      div.innerHTML=poster?`<img class="api-result-poster" src="${safeUrl(poster)}" alt="">`:`<div class="api-result-poster-placeholder">📚</div>`;
+      div.innerHTML+=`<div class="api-result-info"><div class="api-result-title">${escapeHtml(title)}</div><div class="api-result-sub">${escapeHtml(author)}</div></div>`;
       div.addEventListener('click',()=>{selectApiResult(title,poster,author,item.publisher||'');fetchAladinPageCountInto('cm-total-pages',isbn);});el.appendChild(div);
     });
   }catch(e){
@@ -10239,7 +10264,7 @@ async function pickTmdbSeason(item,title,poster,date,el){
     const sPoster=s.poster_path?`https://image.tmdb.org/t/p/w92${s.poster_path}`:poster;
     const eps=s.episode_count||0;
     const div=document.createElement('div');div.className='api-result-item';
-    div.innerHTML=(sPoster?`<img class="api-result-poster" src="${sPoster}" alt="">`:`<div class="api-result-poster-placeholder">🎬</div>`)
+    div.innerHTML=(sPoster?`<img class="api-result-poster" src="${safeUrl(sPoster)}" alt="">`:`<div class="api-result-poster-placeholder">🎬</div>`)
       +`<div class="api-result-info"><div class="api-result-title">${escapeHtml(sTitle)}</div><div class="api-result-sub">${[sYear,eps?eps+'화':'공개 예정'].filter(Boolean).join(' · ')}</div></div>`;
     div.addEventListener('click',()=>{
       selectApiResult(sTitle,sPoster,sYear||date,'',null,null);
@@ -10368,6 +10393,16 @@ const MONTH_SYNC_TTL=60*1000; // 60초 — 이 시간이 지나면 캐시를 신
 // 무기한 캐시였을 때는, 세션 도중 서버 데이터가 외부(다른 기기, 직접 SQL 등)에서 바뀌어도
 // 이 세션은 그 변경을 전혀 모른 채 "구버전 로컬 스냅샷"을 계속 유지하다가, 그 스냅샷을 그대로
 // 업로드(saveContents 등)해버리면 서버의 새 데이터가 지워진 것처럼 되는 사고로 이어졌음.
+// 월간탭 범위 동기화의 날짜별 반영(감사 P2-5) — 서버에 그날 기록이 0건이면 기기 사본도 비움.
+// 예전엔 서버에 행이 있는 날짜만 덮어써서, 다른 기기에서 지운 메모·리듬이 이 기기에 계속 남았고
+// 그 날짜를 고치면 서버에 되살아났음. 업로드 대기(pending)가 있는 날짜는 지금처럼 건드리지 않음.
+function _monthDays(y,mo){const n=new Date(y,mo+1,0).getDate(),out=[];for(let d=1;d<=n;d++)out.push(`${y}-${pad(mo+1)}-${pad(d)}`);return out;}
+function _applyMonthDay(type,dk,rows){
+  if(S.get(S.key(type+'_pending',dk)))return;
+  if(rows&&rows.length){S.set(S.key(type,dk),rows);return;}
+  const cur=S.get(S.key(type,dk));
+  if(Array.isArray(cur)&&cur.length)S.set(S.key(type,dk),[]); // 기기에만 남은 옛 사본 정리(빈 날짜 키를 새로 만들지는 않음)
+}
 async function syncMonthRange(y,mo){
   if(!navigator.onLine)return false;
   const mk=`${y}-${pad(mo+1)}`;
@@ -10388,7 +10423,7 @@ async function syncMonthRange(y,mo){
   if(mRows){
     const byDate={};
     mRows.forEach(r=>{(byDate[r.date_key]=byDate[r.date_key]||[]).push(memoRowToLocal(r));});
-    Object.keys(byDate).forEach(dk=>{if(!S.get(S.key('memos_pending',dk)))S.set(S.key('memos',dk),byDate[dk]);});
+    _monthDays(y,mo).forEach(dk=>_applyMonthDay('memos',dk,byDate[dk]));
   }
   if(tRows){
     const byDate={};
@@ -10426,7 +10461,7 @@ async function syncMonthRange(y,mo){
     // 공용 매핑(rhythmBlockRowToLocal)을 써야 contentCid·autoClosed가 빠지지 않음(감사 P1-3 — 자체 매핑이 두 필드를 누락해
     // 월간탭을 연 뒤 리듬을 고치면 그날 감상 블록이 작품 연결 없이 서버로 올라갔음)
     rbRows.forEach(r=>{(byDate[r.date_key]=byDate[r.date_key]||[]).push(rhythmBlockRowToLocal(r));});
-    Object.keys(byDate).forEach(dk=>{if(!S.get(S.key('rblocks_pending',dk)))S.set(S.key('rblocks',dk),byDate[dk]);});
+    _monthDays(y,mo).forEach(dk=>_applyMonthDay('rblocks',dk,byDate[dk]));
   }
   if(hcRows){
     const byWeek={};const timesByWeek={};
@@ -10561,7 +10596,7 @@ function renderCalendar(){
         const roundL=isSegStart&&!bar.clipStart?' bar-round-l':'';
         const roundR=isSegEnd&&!bar.clipEnd?' bar-round-r':'';
         const segText=isSegStart?title:''; // 텍스트는 시작 칸에만 표시(중간/끝 칸은 빈 막대로 이어지는 느낌만)
-        barsHtml+=`<div class="cal-event-bar ev-${bar.ev.eventCat||'etc'}${roundL}${roundR}" title="${ec.label}: ${title}" onclick="event.stopPropagation();openEventSheet('${bar.ev._startDk}','${bar.ev.cid}','${title.replace(/'/g,"\\'")}');">${segText}</div>`;
+        barsHtml+=`<div class="cal-event-bar ev-${bar.ev.eventCat||'etc'}${roundL}${roundR}" title="${ec.label}: ${escapeAttr(title)}" onclick="event.stopPropagation();openEventSheet('${bar.ev._startDk}','${jsStrAttr(bar.ev.cid)}','${jsStrAttr(title)}');">${escapeHtml(segText)}</div>`;
       });
       // bar가 이미 차지한 슬롯만큼 하루짜리 배지 노출 개수를 줄임 — bar가 항상 우선(상단)이므로 배지는 남는 자리만 사용
       const usedByBar=barsHere.length;
@@ -10573,9 +10608,9 @@ function renderCalendar(){
         const ec=getEventCat(ev.eventCat);
         const title=parseTodoTextParts(ev.text).parts[0]||ev.text;
         const clickFn=ev.recurRuleCid
-          ?`openRecurringItemSheet('${cdk}','${ev.cid}','${ev.recurRuleCid}','${title.replace(/'/g,"\\'")}')`
-          :`openEventSheet('${cdk}','${ev.cid}','${title.replace(/'/g,"\\'")}')`;
-        badges+=`<div class="cal-event-badge ev-${ev.eventCat||'etc'}" title="${ec.label}: ${title}" onclick="event.stopPropagation();${clickFn};">${title}</div>`;
+          ?`openRecurringItemSheet('${cdk}','${jsStrAttr(ev.cid)}','${jsStrAttr(ev.recurRuleCid)}','${jsStrAttr(title)}')`
+          :`openEventSheet('${cdk}','${jsStrAttr(ev.cid)}','${jsStrAttr(title)}')`;
+        badges+=`<div class="cal-event-badge ev-${ev.eventCat||'etc'}" title="${ec.label}: ${escapeAttr(title)}" onclick="event.stopPropagation();${clickFn};">${escapeHtml(title)}</div>`;
       });
       // "+n개"는 하루짜리 중 안 보인 것만 카운트(bar 자체는 항상 보이므로 미노출分에서 제외)
       const hiddenCount=(evs?evs.length-evsShown.length:0);
@@ -10598,7 +10633,7 @@ function buildDayDetailHtml(dk){
   const allMemos=getMemos(dk);const todos=getTodos(dk);const doneTodos=todos.filter(t=>t.done);const sleep=getSleep(dk);
   const meals=getMeals(dk);
   const oneLine=getDailyOneLine(dk);
-  const headerHtml=oneLine?`<div style="font-size:var(--dow-label-size);color:var(--ts);font-style:italic;margin-bottom:10px;">&#x275D; ${oneLine} &#x275E;</div>`:'';
+  const headerHtml=oneLine?`<div style="font-size:var(--dow-label-size);color:var(--ts);font-style:italic;margin-bottom:10px;">&#x275D; ${escapeHtml(oneLine)} &#x275E;</div>`:'';
   let items='';
   if(sleep.sleep||sleep.wake){
     const sv=sleep.sleep?sleep.sleep.split(':').map(Number):null;
@@ -10635,13 +10670,13 @@ function buildDayDetailHtml(dk){
   if(hiddenCnt>0)items+=`<div class="cal-detail-more" onclick="calShowAll('${dk}')">··· ${hiddenCnt}개 더 보기</div>`;
   if(showMemos.length>0){
     items+=`<div class="cal-memo-rows" id="cal-memo-rows-${dk}">`;
-    showMemos.forEach(m=>{items+=`<div class="cal-detail-row"><span class="cal-detail-time">${m.time||''}</span><span class="cal-detail-text">${m.text||''}</span></div>`;});
+    showMemos.forEach(m=>{items+=`<div class="cal-detail-row"><span class="cal-detail-time">${m.time||''}</span><span class="cal-detail-text">${escapeHtml(m.text||'')}</span></div>`;});
     items+=`</div>`;
   }
   let mealHtml='';
   if(!isFuture){
     MEAL_KEYS.forEach(k=>{
-      if(meals[k])mealHtml+=`<div class="cal-detail-row"><span class="cal-detail-time">${MEAL_LABELS[k]}</span><span class="cal-detail-text" style="flex:1;">${meals[k]}</span>${meals[k+'_time']?`<span style="font-size:var(--dow-label-size);color:var(--tm);flex-shrink:0;">${meals[k+'_time']}</span>`:''}</div>`;
+      if(meals[k])mealHtml+=`<div class="cal-detail-row"><span class="cal-detail-time">${MEAL_LABELS[k]}</span><span class="cal-detail-text" style="flex:1;">${escapeHtml(meals[k])}</span>${meals[k+'_time']?`<span style="font-size:var(--dow-label-size);color:var(--tm);flex-shrink:0;">${meals[k+'_time']}</span>`:''}</div>`;
     });
     if(mealHtml)mealHtml=`<div style="font-size:var(--dow-label-size);font-weight:500;color:rgba(190,130,70,0.85);margin:12px 0 4px;">식사</div>${mealHtml}`;
   }
@@ -10742,7 +10777,7 @@ function calShowAll(dk){
   const moreBtn=rowsWrap.parentElement?rowsWrap.parentElement.querySelector('.cal-detail-more'):null;
     const sorted=[...memos].sort(function(a,b){return toSortKey(a.time)-toSortKey(b.time);});
   const MAX=3;
-  let extra='';sorted.slice(MAX).forEach(function(m){extra+=`<div class="cal-detail-row"><span class="cal-detail-time">${m.time||''}</span><span class="cal-detail-text">${m.text||''}</span></div>`;});
+  let extra='';sorted.slice(MAX).forEach(function(m){extra+=`<div class="cal-detail-row"><span class="cal-detail-time">${m.time||''}</span><span class="cal-detail-text">${escapeHtml(m.text||'')}</span></div>`;});
   rowsWrap.insertAdjacentHTML('beforeend',extra);
   if(moreBtn)moreBtn.remove();
 }
@@ -10923,7 +10958,7 @@ function renderTodayMeal(){
   items.forEach(k=>{
     const t=m[k+'_time'];
     const timeHtml=t?`<span class="meal-time-tag">${tabularTimeHtml(t)}</span>`:`<button class="meal-time-btn" onclick="recordMealTime('${dk}','${k}')" title="식사 시간 기록"><i class="ti ti-check" style="font-size:10px;" aria-hidden="true"></i></button>`;
-    html+=`<div class="cal-detail-row"><span class="cal-detail-time">${MEAL_LABELS[k]}</span><span class="cal-detail-text" style="flex:1;">${m[k]}</span>${timeHtml}</div>`;
+    html+=`<div class="cal-detail-row"><span class="cal-detail-time">${MEAL_LABELS[k]}</span><span class="cal-detail-text" style="flex:1;">${escapeHtml(m[k])}</span>${timeHtml}</div>`;
   });
   el.innerHTML=html||'<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:8px 0;">주간 메뉴판에서 적어보세요</div>';
 }
@@ -10972,7 +11007,7 @@ function renderDailyHabitCheck(){
     const rgbaBorder=getHabitColorBorder(h.color);
     const col=document.createElement('div');col.className='habit-check-col';
     const chkStyle=checked?(isGlass?' style="border-color:'+rgbaText+';"':' style="background:'+rgba+';border-color:'+rgbaBorder+';"'):'';
-    col.innerHTML='<div class="habit-check-name">'+h.name+'</div><div class="habit-chk2'+(checked?' on':'')+'"'+chkStyle+'>'+innerMark+'</div>';
+    col.innerHTML='<div class="habit-check-name">'+escapeHtml(h.name)+'</div><div class="habit-chk2'+(checked?' on':'')+'"'+chkStyle+'>'+innerMark+'</div>';
     col.querySelector('.habit-chk2').addEventListener('click',function(){
       toggleHabitCheckWithTime(wk,h.id,dow,dateKey(currentDate));
       renderDailyHabitCheck();
@@ -11078,7 +11113,7 @@ function buildRhythmFormEl(showOngoingList){
       const ongoingWrap=document.createElement('div');ongoingWrap.className='rhythm-track-ongoing';
       ongoingWrap.innerHTML=ongoingBlocks.map(function(b){
         const cat=RHYTHM_CATS[b.cat];if(!cat)return '';
-        return '<div class="rt-row"><span class="rt-time">'+b.start+'~</span><span class="rt-txt">'+cat.label+(b.text&&b.text.trim()?' — '+b.text.trim():'')+'</span><span class="rt-actions"><span class="rt-finish" onclick="finishRhythmBlock('+b.idx+')"><i class="ti ti-player-stop ico-sz-13" aria-hidden="true"></i></span></span></div>';
+        return '<div class="rt-row"><span class="rt-time">'+b.start+'~</span><span class="rt-txt">'+cat.label+(b.text&&b.text.trim()?' — '+escapeHtml(b.text.trim()):'')+'</span><span class="rt-actions"><span class="rt-finish" onclick="finishRhythmBlock('+b.idx+')"><i class="ti ti-player-stop ico-sz-13" aria-hidden="true"></i></span></span></div>';
       }).join('');
       wrap.appendChild(ongoingWrap);
     }
@@ -11199,7 +11234,7 @@ function renderWeeklyHabitBox(){
       const bg=on?rgbaBg:'none';
       dotsHtml+='<div class="hw-dot-wrap"'+(isVac?' style="opacity:0.4;"':'')+'><div class="hw-dot" style="background:'+bg+';border-color:'+borderColor+';border-width:'+borderWidth+';"></div></div>';
     }
-    html+='<div class="hw-row"><div class="hw-name"><span class="hw-name-dot" style="background:'+rgbaBg+';"></span>'+h.name+'</div><div class="hw-dots">'+dotsHtml+'</div><div class="hw-streak">'+(offCnt>=7?'–':cnt+'/'+(7-offCnt))+'</div></div>';
+    html+='<div class="hw-row"><div class="hw-name"><span class="hw-name-dot" style="background:'+rgbaBg+';"></span>'+escapeHtml(h.name)+'</div><div class="hw-dots">'+dotsHtml+'</div><div class="hw-streak">'+(offCnt>=7?'–':cnt+'/'+(7-offCnt))+'</div></div>';
   });
   el.innerHTML=html;
 }
@@ -11376,7 +11411,7 @@ function renderMealWishlist(){
   const p=document.getElementById('meal-wishlist-panel');
   const items=getMealWishlist();
   p.innerHTML='<div class="wish-add-row"><input id="wish-add-inp" class="meal-inp" type="text" placeholder="먹고싶은 메뉴 추가" autocomplete="off" onkeydown="if(event.isComposing||event.keyCode===229)return;if(event.key===\'Enter\'){event.preventDefault();addMealWish();}"><button class="wish-add-btn" onclick="addMealWish()">+</button></div>'+
-    (items.length?items.map((t,i)=>`<div class="wish-item"><span class="wish-text" onclick="editMealWish(${i},this)">${t}</span><span class="wish-place-btn" onclick="startWishPlacing(${i})">넣기</span><span class="wish-del-btn" onclick="removeMealWish(${i})">✕</span></div>`).join(''):'<div style="font-size:var(--dow-label-size);color:var(--tm);padding:6px 2px;">아직 담아둔 메뉴가 없어요</div>');
+    (items.length?items.map((t,i)=>`<div class="wish-item"><span class="wish-text" onclick="editMealWish(${i},this)">${escapeHtml(t)}</span><span class="wish-place-btn" onclick="startWishPlacing(${i})">넣기</span><span class="wish-del-btn" onclick="removeMealWish(${i})">✕</span></div>`).join(''):'<div style="font-size:var(--dow-label-size);color:var(--tm);padding:6px 2px;">아직 담아둔 메뉴가 없어요</div>');
 }
 function editMealWish(i,spanEl){
   const items=getMealWishlist();
@@ -12164,13 +12199,13 @@ function _rdProgressBarHtml(book){
 }
 // 카드 내용물만(.rd-top-inner 껍데기 제외) — 콘텐츠허브 슬라이드 함수와 동일 규칙, 1개 카드/스와이프 슬라이드 양쪽에서 공용.
 function _rdTopInnerBodyHtml(book,running){
-  const cover=book.poster?`<img class="rd-top-cover" src="${book.poster}" alt="">`:`<div class="rd-top-cover-empty"></div>`;
+  const cover=book.poster?`<img class="rd-top-cover" src="${safeUrl(book.poster)}" alt="">`:`<div class="rd-top-cover-empty"></div>`;
   const progressHtml=_rdProgressBarHtml(book);
   return `<div class="rd-top-main">
         ${cover}
         <div class="rd-top-info">
-          <div class="rd-top-title">${book.title}</div>
-          <div class="rd-top-author">${book.author||''}</div>
+          <div class="rd-top-title">${escapeHtml(book.title)}</div>
+          <div class="rd-top-author">${escapeHtml(book.author||'')}</div>
         </div>
         <div class="rd-top-sw">${swRingSvg(book.cid,running)}</div>
       </div>
@@ -12270,7 +12305,7 @@ function renderRdQuotes(){
       <div class="rd-quote-text" data-cid="${q.cid}" onclick="startEditQuoteText('${q.cid}')" style="cursor:pointer;">${escapeHtml(q.text)}</div>
       ${q.comment?`<div class="rd-quote-comment" onclick="toggleQuoteCommentEditor('${q.cid}')" style="font-size:var(--dow-label-size);color:var(--pal-mintlime);margin-top:4px;padding:5px 8px;background:rgba(102,160,85,0.14);border-radius:8px;cursor:pointer;">${escapeHtml(q.comment)}</div>`:''}
       <div id="qc-editor-${q.cid}" class="qc-editor" style="display:none;margin-top:5px;" onclick="event.stopPropagation();">
-        <textarea class="qc-comment-textarea" placeholder="이 문장에 대한 감상을 적어보세요">${q.comment||''}</textarea>
+        <textarea class="qc-comment-textarea" placeholder="이 문장에 대한 감상을 적어보세요">${escapeHtml(q.comment||'')}</textarea>
         <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px;">
           <span onclick="document.getElementById('qc-editor-${q.cid}').style.display='none';" style="font-size:var(--dow-label-size);color:var(--tm);cursor:pointer;padding:3px 8px;">취소</span>
           <span onclick="commitQuoteComment('${q.cid}')" style="font-size:var(--dow-label-size);color:var(--pal-mintlime);cursor:pointer;padding:3px 8px;font-weight:600;">저장</span>
@@ -12416,7 +12451,7 @@ function renderDoneBookQuotes(bookCid){
   listEl.innerHTML=quotes.map(q=>`<div class="rd-quote-item">
       <div class="rd-quote-text" data-cid="${q.cid}" onclick="event.stopPropagation();startEditQuoteText('${q.cid}')" style="cursor:pointer;">${escapeHtml(q.text)}</div>
       <div id="qc-editor-${q.cid}" class="qc-editor" style="display:none;margin-top:5px;" onclick="event.stopPropagation();">
-        <textarea class="qc-comment-textarea" placeholder="이 문장에 대한 감상을 적어보세요">${q.comment||''}</textarea>
+        <textarea class="qc-comment-textarea" placeholder="이 문장에 대한 감상을 적어보세요">${escapeHtml(q.comment||'')}</textarea>
         <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px;">
           <span onclick="event.stopPropagation();document.getElementById('qc-editor-${q.cid}').style.display='none';" style="font-size:var(--dow-label-size);color:var(--tm);cursor:pointer;padding:3px 8px;">취소</span>
           <span onclick="event.stopPropagation();commitDoneQuoteComment('${q.cid}','${bookCid}')" style="font-size:var(--dow-label-size);color:var(--pal-mintlime);cursor:pointer;padding:3px 8px;font-weight:600;">저장</span>
@@ -12455,7 +12490,7 @@ function renderDoneBookComments(bookCid){
       <div class="rd-quote-text" style="font-size:var(--dow-label-size);color:var(--tm);margin-bottom:4px;">${escapeHtml(q.text)}</div>
       <div class="rd-quote-comment" onclick="event.stopPropagation();toggleQuoteCommentEditor('${q.cid}')" style="font-size:var(--dow-label-size);color:var(--tp);padding:6px 8px;background:rgba(var(--divider-rgb),0.14);border-radius:8px;cursor:pointer;">${escapeHtml(q.comment)}</div>
       <div id="qc-editor-${q.cid}" class="qc-editor" style="display:none;margin-top:5px;" onclick="event.stopPropagation();">
-        <textarea class="qc-comment-textarea" placeholder="이 문장에 대한 감상을 적어보세요">${q.comment||''}</textarea>
+        <textarea class="qc-comment-textarea" placeholder="이 문장에 대한 감상을 적어보세요">${escapeHtml(q.comment||'')}</textarea>
         <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px;">
           <span onclick="event.stopPropagation();document.getElementById('qc-editor-${q.cid}').style.display='none';" style="font-size:var(--dow-label-size);color:var(--tm);cursor:pointer;padding:3px 8px;">취소</span>
           <span onclick="event.stopPropagation();commitDoneQuoteComment('${q.cid}','${bookCid}');renderDoneBookComments('${bookCid}')" style="font-size:var(--dow-label-size);color:var(--pal-mintlime);cursor:pointer;padding:3px 8px;font-weight:600;">저장</span>
@@ -12477,7 +12512,7 @@ function renderRdCovers(){
   const slots=5;
   let html='';
   for(let i=0;i<slots;i++){
-    if(covers[i])html+=`<img class="rd-cover" src="${covers[i].poster}" alt="${covers[i].title}">`;
+    if(covers[i])html+=`<img class="rd-cover" src="${safeUrl(covers[i].poster)}" alt="${escapeAttr(covers[i].title)}">`;
     else html+='<div class="rd-cover rd-cover-empty"></div>';
   }
   el.innerHTML=html;
@@ -12594,10 +12629,10 @@ function renderBookList(){
         </div>`;
     const titleRow=_rdTab==='done'?
       `<div class="rd-book-title" style="display:flex;justify-content:space-between;align-items:center;">
-        <span>${b.title}</span>
+        <span>${escapeHtml(b.title)}</span>
         <span class="rd-del-btn" onclick="event.stopPropagation();removeBook('${b.cid}')" title="삭제"><i class="ti ti-x ico-sz-13" aria-hidden="true"></i></span>
       </div>`:
-      `<div class="rd-book-title">${b.title}</div>`;
+      `<div class="rd-book-title">${escapeHtml(b.title)}</div>`;
     return `<div class="rd-book-item${open?' open':''}" onclick="toggleBookDetail('${b.cid}')">
       ${titleRow}
       <div class="rd-book-meta">${metaStr}</div>
@@ -12858,13 +12893,13 @@ function _wcalFilteredItems(dk){
 }
 function _wcalSwatch(it){
   const m=WCAL_CAT_META[it.cat];
-  if(it.poster)return `<img src="${it.poster}" alt="">`;
+  if(it.poster)return `<img src="${safeUrl(it.poster)}" alt="">`;
   return `<div class="wcal-cat-fallback" style="background:${m.color};"><i class="ti ${m.icon}" aria-hidden="true"></i></div>`;
 }
 // 32x44 고정 크기 포스터(또는 카테고리색 폴백) — 하단 상세 목록과 추가시트 검색 목록에서 공통으로 씀
 function _wcalPosterThumbHtml(cat,poster){
   const m=WCAL_CAT_META[cat];
-  if(poster)return `<img src="${poster}" style="width:32px;height:44px;border-radius:5px;object-fit:cover;flex-shrink:0;" />`;
+  if(poster)return `<img src="${safeUrl(poster)}" style="width:32px;height:44px;border-radius:5px;object-fit:cover;flex-shrink:0;" />`;
   return `<div style="width:32px;height:44px;border-radius:5px;background:var(--card2);flex-shrink:0;display:flex;align-items:center;justify-content:center;"><i class="ti ${m.icon} ico-13" style="color:var(--tm);" aria-hidden="true"></i></div>`;
 }
 // 1개=꽉 채움 / 2개=위아래 반반 / 3개=위 하나 크게+아래 좌우 둘 / 4개=2x2, 5개~=+N — 찌그러뜨리지 않고 각 조각도 object-fit:cover로 중앙 크롭
@@ -14126,7 +14161,7 @@ function renderReserveList(){
     const handleHtml=canReorder?`<div class="todo-drag-handle rm-eligible" style="display:flex;"><i class="ti ti-grip-vertical ico-sz-13" aria-hidden="true"></i></div>`:'';
     el.innerHTML=handleHtml
       +`<button class="item-cat-icon ${cat}" onclick="toggleItemCatDropup(this,${i})" title="카테고리 변경"><i class="ti ${catIcon[cat]} ico-sz-15" aria-hidden="true"></i></button>`
-      +`<span class="reserve-text" data-i="${i}">${t.text}</span>`
+      +`<span class="reserve-text" data-i="${i}">${escapeHtml(t.text)}</span>`
       +`<div class="item-actions">`
       +`<button class="reserve-act-btn" onclick="openReserveMoveModal(${i})" title="날짜 지정"><i class="ti ti-calendar-plus ico-sz-15" aria-hidden="true"></i></button>`
       +`<button class="reserve-del-btn" onclick="deleteReserveTodo(${i})" title="삭제"><i class="ti ti-x ico-sz-14" aria-hidden="true"></i></button>`
