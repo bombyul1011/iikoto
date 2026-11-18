@@ -347,6 +347,13 @@ async function maybeScheduleRhythmReminders(supabase: ReturnType<typeof createCl
 
 Deno.serve(async (_req: Request) => {
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+  // 예약 작업 전용 비밀값 검사(감사 P1-12, 2026-11-18) — pg_cron이 vault('cron_secret')를 x-cron-secret 헤더로 보냄.
+  // 값 대조는 DB 함수 check_cron_secret(service_role만 실행 가능)으로 해서 비밀값이 함수 설정에 따로 남지 않게 함.
+  {
+    const sec = _req.headers.get("x-cron-secret") || "";
+    const { data: okSecret } = sec ? await supabase.rpc("check_cron_secret", { s: sec }) : { data: false };
+    if (okSecret !== true) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 });
+  }
   const nowIso = new Date().toISOString();
 
   const { data: settings } = await supabase.from("user_settings").select("*").eq("id", true).maybeSingle();

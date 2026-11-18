@@ -179,6 +179,14 @@ begin
   return new;
 end $function$;
 
+-- 예약 작업 전용 비밀값 대조(2026-11-18, 감사 P1-12) — service_role만 실행 가능. 서버 함수가 x-cron-secret 헤더 값을 넘겨 확인.
+create or replace function public.check_cron_secret(s text)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select coalesce(s,'') <> '' and exists(select 1 from vault.decrypted_secrets where name='cron_secret' and decrypted_secret = s);
+$$;
+revoke all on function public.check_cron_secret(text) from public, anon, authenticated;
+grant execute on function public.check_cron_secret(text) to service_role;
+
 -- ── 트리거 ──
 CREATE TRIGGER trg_contents_updated_at BEFORE INSERT OR UPDATE ON public.contents FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER trip_items_touch_trg BEFORE UPDATE ON public.trip_items FOR EACH ROW EXECUTE FUNCTION trip_items_touch();

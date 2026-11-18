@@ -2783,6 +2783,18 @@ function startMorningPick(){
 // ── CONSTANTS
 const SUPA_URL='https://vqvpzrxmtpryzhontlxc.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdnB6cnhtdHByeXpob250bHhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTgxMjksImV4cCI6MjA5NjYzNDEyOX0.pbtq1UMPC7ylYM1H2xVa19C1TFlceLmEfEtkz3WK2VI';
+// ── 앱 키(감사 P0-1 3단계, 2026-11-18 — A 방식: 기기마다 한 번 입력하는 비밀값) ──
+// 모든 Supabase 요청에 x-client-info 헤더로 'iikoto|<앱 키>'를 실어 보냄. 서버는 마지막 '|' 조각의 sha256을
+// 등록된 해시와 대조함(잠금 전환 전까지는 검사하지 않음). 이이타비는 'iitabi|<접근키>|<앱 키>'로 보내 앱 키가 항상 마지막 조각.
+// 키 원문은 이 기기 localStorage(iikoto_app_key)에만 있고, 서버에는 해시만 등록함. 백업 파일에도 넣지 않음.
+const APP_KEY_LS='iikoto_app_key';
+function getAppKey(){const k=S.get(APP_KEY_LS);return typeof k==='string'?k.trim():'';}
+function supaHeaders(extra){
+  const h={'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,...(extra||{})};
+  const k=getAppKey();
+  if(k&&!h['x-client-info'])h['x-client-info']='iikoto|'+k;
+  return h;
+}
 // ── Web Push 구독 ──
 // VAPID 공개키(비공개키는 Edge Function 쪽에만 존재, 클라이언트엔 절대 노출 안 함).
 const VAPID_PUBLIC_KEY='BL9_A9IIRXzrxiz28IvKth5NQVRV_uEgVj-Efd3Ca-cUvuDeQZrXrLYx5PFQFpsy2McaMzNmx1-BI98-OzdtLWI';
@@ -3329,7 +3341,7 @@ async function ensureDateSynced(dk){
 }
 async function supaFetch(path,method='GET',body=null){
   try{
-    const opts={method,headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json'}};
+    const opts={method,headers:supaHeaders({'Content-Type':'application/json'})};
     if(body)opts.body=JSON.stringify(body);
     const res=await fetch(SUPA_URL+'/rest/v1/'+path,opts);
     if(!res.ok){console.warn('supa err:',path,await res.text());return null;}
@@ -3340,7 +3352,7 @@ async function supaFetch(path,method='GET',body=null){
 
 async function supaUpsert(path,onConflict,body){
   try{
-    const opts={method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'}};
+    const opts={method:'POST',headers:supaHeaders({'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'})};
     opts.body=JSON.stringify(body);
     const sep=path.includes('?')?'&':'?';
     const res=await fetch(SUPA_URL+'/rest/v1/'+path+sep+'on_conflict='+onConflict,opts);
@@ -11282,7 +11294,7 @@ async function syncAppleCalendar(opts){
     const ctrl=new AbortController();const timer=setTimeout(()=>ctrl.abort(),CAL_SYNC_TIMEOUT_MS);
     let res,j=null;
     try{
-      res=await fetch(SUPA_URL+'/functions/v1/compare-calendars',{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY},signal:ctrl.signal});
+      res=await fetch(SUPA_URL+'/functions/v1/compare-calendars',{method:'POST',headers:supaHeaders(),signal:ctrl.signal});
       j=await res.json().catch(()=>null);
     }finally{clearTimeout(timer);}
     if(!res.ok||!j||j.ok===false){if(!silent)showToast('애플 캘린더를 확인하지 못했어요');return;}
@@ -11672,7 +11684,37 @@ function clearClaudeKey(){
     showToast('삭제됐어요');
   }catch(e){}
 }
+// 설정탭 '앱 키' — 새로 만들기(한 기기에서 한 번), 다른 기기에 붙여 넣어 저장, 키·등록 코드 복사.
+// 등록 코드 = 키의 sha256. 서버에는 이 등록 코드만 넣으면 되고, 기기끼리 같은 키인지는 코드 앞 8자리로 비교.
+async function renderAppKeyStatus(){
+  const st=document.getElementById('app-key-status');if(!st)return;
+  const k=getAppKey();
+  if(!k){st.textContent='이 기기에는 아직 앱 키가 없어요';return;}
+  const code=await _sha256Hex(k);
+  st.textContent=`이 기기에 저장됨 · 등록 코드 ${code.slice(0,8)}…`;
+}
+function _isValidAppKey(k){return /^[0-9a-f]{64}$/.test(k);}
+async function saveAppKey(){
+  const inp=document.getElementById('app-key-inp');if(!inp)return;
+  const val=inp.value.trim().toLowerCase();
+  if(!_isValidAppKey(val)){showToast('64자리 앱 키를 그대로 붙여 넣어주세요');return;}
+  S.set(APP_KEY_LS,val);inp.value='';
+  await renderAppKeyStatus();showToast('앱 키를 저장했어요 ✓');
+}
+async function createAppKey(){
+  if(getAppKey()&&!confirm('이미 이 기기에 앱 키가 있어요. 새로 만들면 다른 기기에도 새 키를 다시 넣어야 해요. 새로 만들까요?'))return;
+  const a=new Uint8Array(32);crypto.getRandomValues(a);
+  S.set(APP_KEY_LS,Array.from(a,b=>b.toString(16).padStart(2,'0')).join(''));
+  await renderAppKeyStatus();showToast('새 앱 키를 만들었어요 — 키와 등록 코드를 복사해 두세요');
+}
+async function copyAppKey(which){
+  const k=getAppKey();if(!k){showToast('이 기기에 앱 키가 없어요');return;}
+  const text=which==='code'?await _sha256Hex(k):k;
+  try{await navigator.clipboard.writeText(text);showToast(which==='code'?'등록 코드를 복사했어요':'앱 키를 복사했어요');}
+  catch(e){showToast('복사하지 못했어요');}
+}
 function openSettings(){
+  renderAppKeyStatus();
   const keyInp=document.getElementById('claude-api-key-inp');
   if(keyInp){const k=S.get('claude_api_key');keyInp.value=k?'sk-ant-••••'+k.slice(-4):'';}
   const profileInp=document.getElementById('user-profile-inp');if(profileInp)profileInp.value=S.get('user_profile')||'';
@@ -11863,7 +11905,7 @@ async function _fetchAllRows(table,order,extraHeaders){
   const PAGE=1000,rows=[];
   for(let off=0;;off+=PAGE){
     const res=await fetch(`${SUPA_URL}/rest/v1/${table}?select=*&order=${order}.asc&limit=${PAGE}&offset=${off}`,
-      {headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,...(extraHeaders||{})}});
+      {headers:supaHeaders(extraHeaders)});
     if(!res.ok)throw new Error(table+' '+res.status);
     const page=await res.json();
     rows.push(...page);
@@ -11888,7 +11930,7 @@ async function downloadFullJSONBackup(){
     const tables={},manifest={};
     for(const [t,order] of Object.entries(BACKUP_TABLES)){
       if(t==='trip_items'&&!tripKey){manifest[t]={rows:0,skipped:'이 기기에 이이타비 접근키 없음'};continue;}
-      const rows=await _fetchAllRows(t,order,t==='trip_items'?{'x-client-info':'iikoto|'+tripKey}:null);
+      const rows=await _fetchAllRows(t,order,t==='trip_items'?{'x-client-info':'iikoto|'+tripKey+(getAppKey()?'|'+getAppKey():'')}:null);
       tables[t]=rows;
       manifest[t]={rows:rows.length,hash:await _sha256Hex(JSON.stringify(rows))};
     }

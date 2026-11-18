@@ -2125,6 +2125,15 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
         </div>
         <div class="api-key-status" id="api-key-status"></div>
       </div>
+      <div class="card">
+        <div class="card-lbl"><i class="ti ti-key" aria-hidden="true"></i>앱 키</div>
+        <div class="api-key-desc">서버 잠금용 키예요. 본앱 설정탭에서 복사한 64자리 키를 붙여 넣어주세요. 이 기기에만 저장돼요.</div>
+        <div class="api-key-row">
+          <input type="password" id="app-key-input" class="api-key-input" placeholder="앱 키 붙여 넣기" autocomplete="off">
+          <div class="fs-btn" onclick="saveAppKeyTablet()"><i class="ti ti-check" aria-hidden="true"></i></div>
+        </div>
+        <div class="api-key-status" id="app-key-status"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -2159,6 +2168,6 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
   </div>
 </div>
 
-<script src="tablet.js?v=1794202317"></script>
+<script src="tablet.js?v=1795489200"></script>
 </body>
 </html>

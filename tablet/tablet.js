@@ -8,9 +8,41 @@
 const SUPA_URL='https://vqvpzrxmtpryzhontlxc.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdnB6cnhtdHByeXpob250bHhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTgxMjksImV4cCI6MjA5NjYzNDEyOX0.pbtq1UMPC7ylYM1H2xVa19C1TFlceLmEfEtkz3WK2VI';
 
+// ── 앱 키(감사 P0-1 3단계) — 본앱과 같은 localStorage 키(iikoto_app_key, JSON 문자열)를 읽어 x-client-info로 실어 보냄.
+// 같은 브라우저에서는 본앱 설정과 공유되고, 홈 화면 앱처럼 저장소가 따로인 경우엔 이 앱 설정탭에서 따로 입력.
+const APP_KEY_LS='iikoto_app_key';
+function getAppKey(){
+  try{const raw=localStorage.getItem(APP_KEY_LS);if(!raw)return '';let v=raw;try{v=JSON.parse(raw);}catch(e){}return typeof v==='string'?v.trim():'';}catch(e){return '';}
+}
+function supaHeaders(extra){
+  const h={'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,...(extra||{})};
+  const k=getAppKey();
+  if(k)h['x-client-info']='iikoto|'+k;
+  return h;
+}
+async function _appKeyCode(k){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(k));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function saveAppKeyTablet(){
+  const input=document.getElementById('app-key-input');
+  const statusEl=document.getElementById('app-key-status');
+  const val=(input.value||'').trim().toLowerCase();
+  if(!/^[0-9a-f]{64}$/.test(val)){statusEl.textContent='본앱에서 만든 64자리 앱 키를 그대로 붙여 넣어주세요';statusEl.classList.remove('saved');return;}
+  localStorage.setItem(APP_KEY_LS,JSON.stringify(val));
+  input.value='';
+  _loadAppKeyStatus();
+}
+async function _loadAppKeyStatus(){
+  const statusEl=document.getElementById('app-key-status');if(!statusEl)return;
+  const k=getAppKey();
+  if(!k){statusEl.textContent='이 기기에는 아직 앱 키가 없어요';statusEl.classList.remove('saved');return;}
+  statusEl.textContent=`저장됨 · 등록 코드 ${(await _appKeyCode(k)).slice(0,8)}…`;
+  statusEl.classList.add('saved');
+}
 async function supaFetch(path){
   try{
-    const res=await fetch(SUPA_URL+'/rest/v1/'+path,{headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}});
+    const res=await fetch(SUPA_URL+'/rest/v1/'+path,{headers:supaHeaders()});
     if(!res.ok)return null;
     return await res.json();
   }catch(e){return null;}
@@ -511,7 +543,7 @@ function switchTab(tab){
   else if(tab==='month'){loadMonthTab();initCgridHeightSync();}
   else if(tab==='reports'){resetReportsView();loadReportsTab();}
   else if(tab==='yearly')loadYearlyTab();
-  else if(tab==='settings')_loadClaudeKeyStatus();
+  else if(tab==='settings'){_loadClaudeKeyStatus();_loadAppKeyStatus();}
 }
 
 // ══════════════════════════════════════════════════════════
@@ -4086,7 +4118,7 @@ async function supaUpsertAiCache(cacheKey,content){
   try{
     await fetch(SUPA_URL+'/rest/v1/ai_cache',{
       method:'POST',
-      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},
+      headers:supaHeaders({'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'}),
       body:JSON.stringify({cache_key:cacheKey,content})
     });
   }catch(e){/* 저장 실패해도 화면엔 이미 표시된 상태라 조용히 무시 */}

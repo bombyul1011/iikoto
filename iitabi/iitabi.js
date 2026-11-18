@@ -131,7 +131,10 @@ function clampDate(d){var t=trip();if(!t)return d;if(d<t.start)return t.start;if
 /* ---------- api ---------- */
 var lastSt=0;   // 마지막 요청의 HTTP 상태(0 = 네트워크 실패) — 큐가 영구 거절(4xx)과 일시 실패를 구분하는 데 쓴다
 function sf(path,method,body,prefer){
-  var h={'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','x-client-info':'iitabi|'+(cfg.key||'')};
+  // 앱 키(감사 P0-1 3단계): 이이코토 본앱이 같은 저장소에 둔 iikoto_app_key가 있으면 마지막 조각으로 덧붙임 —
+  // 서버의 trip_items 정책은 두 번째 조각(접근키)을, 전체 잠금 검사는 마지막 조각(앱 키)을 봄
+  var appKey='';try{var rawK=localStorage.getItem('iikoto_app_key');if(rawK){appKey=rawK;try{appKey=JSON.parse(rawK)}catch(e){}appKey=(typeof appKey==='string'?appKey:'').trim()}}catch(e){}
+  var h={'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','x-client-info':'iitabi|'+(cfg.key||'')+(appKey?'|'+appKey:'')};
   if(prefer)h['Prefer']=prefer;
   return fetch(SUPA_URL+'/rest/v1/'+path,{method:method||'GET',headers:h,body:body?JSON.stringify(body):undefined}).then(function(r){
     lastSt=r.status;

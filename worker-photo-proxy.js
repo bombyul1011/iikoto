@@ -29,7 +29,15 @@ export default {
       if (!key || key.includes('..')) {
         return new Response('bad key', { status: 400, headers: cors });
       }
+      // 2단계 보완(감사 P1-12): 이미지 형식만, 10MB 이하만 받음 — 예전엔 크기·형식 제한이 없었음
+      const ctype = request.headers.get('Content-Type') || '';
+      if (!/^image\/(webp|jpeg|png|heic|heif)$/i.test(ctype)) {
+        return new Response('bad type', { status: 415, headers: cors });
+      }
       const body = await request.arrayBuffer();
+      if (body.byteLength > 10 * 1024 * 1024) {
+        return new Response('too large', { status: 413, headers: cors });
+      }
       await env.PHOTO_BUCKET.put(key, body, {
         httpMetadata: { contentType: request.headers.get('Content-Type') || 'image/webp' }
       });

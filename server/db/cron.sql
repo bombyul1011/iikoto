@@ -1,5 +1,6 @@
 -- iikoto Supabase pg_cron 예약 작업 — 2026-11-16 배포 상태 그대로. 시각은 UTC(한국시간 -9시간).
--- 서버 함수 호출에 쓰는 키는 vault('anon_key_for_cron')에 들어 있음(감사 P1-12: 3단계에서 전용 비밀값으로 교체 예정).
+-- 서버 함수 호출에 쓰는 키는 vault('anon_key_for_cron'), 예약 작업 전용 비밀값은 vault('cron_secret')(2026-11-18 추가 —
+-- send-alerts·materialize-recurring은 x-cron-secret 헤더가 맞아야만 실행됨, 감사 P1-12).
 
 -- 1분마다 알림 생성·발송
 select cron.schedule('send-alerts-every-minute', '* * * * *', $$
@@ -7,7 +8,8 @@ select cron.schedule('send-alerts-every-minute', '* * * * *', $$
     url := 'https://vqvpzrxmtpryzhontlxc.supabase.co/functions/v1/send-alerts',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'anon_key_for_cron')
+      'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'anon_key_for_cron'),
+      'x-cron-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'cron_secret')
     ),
     body := '{}'::jsonb
   );
@@ -24,7 +26,8 @@ select cron.schedule('materialize-recurring-daily', '5 15 * * *', $$
     url := 'https://vqvpzrxmtpryzhontlxc.supabase.co/functions/v1/materialize-recurring',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'anon_key_for_cron')
+      'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'anon_key_for_cron'),
+      'x-cron-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'cron_secret')
     ),
     body := '{}'::jsonb
   );
