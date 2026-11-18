@@ -5,6 +5,9 @@ var VER=(function(){try{return new URL(document.currentScript.src).searchParams.
 var SUPA_URL='https://vqvpzrxmtpryzhontlxc.supabase.co';
 var SUPA_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdnB6cnhtdHByeXpob250bHhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTgxMjksImV4cCI6MjA5NjYzNDEyOX0.pbtq1UMPC7ylYM1H2xVa19C1TFlceLmEfEtkz3WK2VI';
 var LSP='iitabi:';
+/* 앱 키(감사 P0-1 3단계) — 이이코토와 같은 localStorage 키(iikoto_app_key, JSON 문자열). 이이코토 안에서 열면 그대로 공유되고,
+   홈 화면 앱처럼 저장소가 따로면 접근 키 시트에서 한 번 입력. 서버 요청 헤더의 마지막 조각으로 실림(sf 참고) */
+function getAppKey(){try{var r=localStorage.getItem('iikoto_app_key');if(!r)return '';var v=r;try{v=JSON.parse(r)}catch(e){}return (typeof v==='string'?v:'').trim()}catch(e){return ''}}
 function lget(k,d){try{var v=localStorage.getItem(LSP+k);return v==null?d:JSON.parse(v)}catch(e){return d}}
 function lset(k,v){try{localStorage.setItem(LSP+k,JSON.stringify(v))}catch(e){}}
 /* 색 팔레트: [글자, 배경, 진한색, 테두리] — 도시·분류·탭 색의 단일 출처 */
@@ -133,7 +136,7 @@ var lastSt=0;   // 마지막 요청의 HTTP 상태(0 = 네트워크 실패) — 
 function sf(path,method,body,prefer){
   // 앱 키(감사 P0-1 3단계): 이이코토 본앱이 같은 저장소에 둔 iikoto_app_key가 있으면 마지막 조각으로 덧붙임 —
   // 서버의 trip_items 정책은 두 번째 조각(접근키)을, 전체 잠금 검사는 마지막 조각(앱 키)을 봄
-  var appKey='';try{var rawK=localStorage.getItem('iikoto_app_key');if(rawK){appKey=rawK;try{appKey=JSON.parse(rawK)}catch(e){}appKey=(typeof appKey==='string'?appKey:'').trim()}}catch(e){}
+  var appKey=getAppKey();
   var h={'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','x-client-info':'iitabi|'+(cfg.key||'')+(appKey?'|'+appKey:'')};
   if(prefer)h['Prefer']=prefer;
   return fetch(SUPA_URL+'/rest/v1/'+path,{method:method||'GET',headers:h,body:body?JSON.stringify(body):undefined}).then(function(r){
@@ -871,7 +874,7 @@ function sheetHtml(){
   var v=UI.sheet;if(!v)return '';
   var body='';
   if(v==='key'){
-    body='<h1 style="font-size:22px">접근 키</h1><div class="small muted">처음 한 번만 입력하면 이 기기에 저장돼요.</div><input class="fld" id="k_in" type="password" autocomplete="off" placeholder="접근 키" aria-label="접근 키" value="'+ea(cfg.key||'')+'"><div class="row"><button class="btn pri" style="flex:1" data-act="key-save">저장하고 불러오기</button><button class="btn" data-act="sheet-close">닫기</button></div>';
+    body='<h1 style="font-size:22px">접근 키</h1><div class="small muted">처음 한 번만 입력하면 이 기기에 저장돼요.</div><input class="fld" id="k_in" type="password" autocomplete="off" placeholder="접근 키" aria-label="접근 키" value="'+ea(cfg.key||'')+'"><div class="small muted" style="margin-top:10px">앱 키 — 이이코토 설정 → 데이터 → 앱 키에서 [키 복사]로 복사한 64자리'+(getAppKey()?' (이 기기에 저장됨)':'')+'</div><input class="fld" id="ak_in" type="password" autocomplete="off" placeholder="'+(getAppKey()?'저장됨 — 바꿀 때만 입력':'앱 키')+'" aria-label="앱 키"><div class="row"><button class="btn pri" style="flex:1" data-act="key-save">저장하고 불러오기</button><button class="btn" data-act="sheet-close">닫기</button></div>';
   }else if(v==='trips'){
     var cur=cfg.tripId;
     body=shead('내 여행');
@@ -1852,6 +1855,8 @@ var ACT={
   'undo':function(){var uf=UI.undoFn;UI.undoFn=null;document.getElementById('toast').innerHTML='';clearTimeout(UI.toastT);if(uf)uf()},
   'key-save':function(){
     var k=(document.getElementById('k_in').value||'').trim();if(!k){toast('키를 입력해 주세요');return}
+    var ak=((document.getElementById('ak_in')||{}).value||'').trim().toLowerCase();
+    if(ak){if(!/^[0-9a-f]{64}$/.test(ak)){toast('앱 키는 64자리를 그대로 붙여 넣어 주세요');return}try{localStorage.setItem('iikoto_app_key',JSON.stringify(ak))}catch(e){}}
     cfg.key=k;lset('cfg',cfg);UI.sheet=null;UI.keyBad=false;
     loadTrips().then(function(){loadTrip();return pull(true)}).then(function(){render();toast(M?'불러왔어요':'데이터를 찾지 못했어요')});
   },
@@ -2202,7 +2207,7 @@ function boot(){
   restoreDraft();
   syncPayMemos();
   window.addEventListener('pageshow',function(e){if(e.persisted)location.reload()});  // 이이코토 등 다른 페이지에서 뒤로 돌아오면(캐시 복원) 하단바가 내려가 보이는 문제 — 완전히 새로 불러온다(전송 대기 중인 작업은 기기에 저장돼 있어 유지됨)
-  if(!cfg.key){UI.sheet='key';render()}
+  if(!cfg.key||!getAppKey()){UI.sheet='key';render()} // 앱 키가 없는 기기(홈 화면 앱 등)도 한 번 입력하도록
   else{
     loadTrips().then(function(){if(!M)loadTrip();render();return pull(true)});
   }
