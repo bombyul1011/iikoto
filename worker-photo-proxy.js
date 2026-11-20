@@ -19,17 +19,84 @@ async function authorized(request, env) {
   return !!(env.UPLOAD_SECRET && legacy && legacy === env.UPLOAD_SECRET);
 }
 
+// 자동 백업 보관(감사 4단계, 2026-11-20): Supabase 백업 함수(weekly-backup)가 PUT /backup/<파일명>으로 올림.
+// 비밀값 BACKUP_SECRET(헤더 X-Backup-Secret)으로만 접근. R2 안 위치는 backups/ — /photo/ 경로로는 절대 읽을 수 없게 막음.
+// 보관 규칙: 최근 8개는 모두, 그보다 오래된 건 달마다 가장 이른 1개씩 12개월치만 남기고 정리.
+const BACKUP_PREFIX = 'backups/';
+function backupAuthorized(request, env) {
+  const s = request.headers.get('X-Backup-Secret') || '';
+  return !!(env.BACKUP_SECRET && s && s === env.BACKUP_SECRET);
+}
+async function listBackups(env) {
+  const out = [];
+  let cursor;
+  do {
+    const r = await env.PHOTO_BUCKET.list({ prefix: BACKUP_PREFIX, cursor });
+    for (const o of r.objects) out.push({ key: o.key, name: o.key.slice(BACKUP_PREFIX.length), size: o.size, uploaded: o.uploaded });
+    cursor = r.truncated ? r.cursor : undefined;
+  } while (cursor);
+  // 파일명 iikoto-YYYY-MM-DD.json.gz → 이름 역순 = 최신순
+  return out.sort((a, b) => (a.name < b.name ? 1 : -1));
+}
+async function pruneBackups(env) {
+  const all = await listBackups(env);
+  const keep = new Set(all.slice(0, 8).map(b => b.key));
+  const now = new Date();
+  const cutoff = new Date(Date.UTC(now.getUTCFullYear() - 1, now.getUTCMonth(), 1)).toISOString().slice(0, 7);
+  const firstOfMonth = {};
+  for (const b of all.slice(8)) {
+    const m = (b.name.match(/(\d{4}-\d{2})-\d{2}/) || [])[1];
+    if (!m || m < cutoff) continue;
+    if (!firstOfMonth[m] || b.name < firstOfMonth[m].name) firstOfMonth[m] = b;
+  }
+  for (const b of Object.values(firstOfMonth)) keep.add(b.key);
+  const removed = [];
+  for (const b of all) if (!keep.has(b.key)) { await env.PHOTO_BUCKET.delete(b.key); removed.push(b.name); }
+  return { kept: keep.size, removed };
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const cors = {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type,X-Upload-Secret,X-App-Key'
+      'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type,X-Upload-Secret,X-App-Key,X-Backup-Secret'
     };
 
     if (request.method === 'OPTIONS') {
       return new Response(null, { headers: cors });
+    }
+
+    // 자동 백업: PUT /backup/<파일명>(저장 후 보관 규칙대로 정리), GET /backup/(목록), GET /backup/<파일명>(내려받기)
+    if (url.pathname.startsWith('/backup/')) {
+      if (!backupAuthorized(request, env)) {
+        return new Response('unauthorized', { status: 401, headers: cors });
+      }
+      const name = decodeURIComponent(url.pathname.slice('/backup/'.length));
+      if (name && !/^[A-Za-z0-9._-]+$/.test(name)) {
+        return new Response('bad name', { status: 400, headers: cors });
+      }
+      if (request.method === 'PUT' && name) {
+        const body = await request.arrayBuffer();
+        if (body.byteLength > 50 * 1024 * 1024) return new Response('too large', { status: 413, headers: cors });
+        await env.PHOTO_BUCKET.put(BACKUP_PREFIX + name, body, {
+          httpMetadata: { contentType: request.headers.get('Content-Type') || 'application/gzip' }
+        });
+        const pruned = await pruneBackups(env);
+        return new Response(JSON.stringify({ ok: true, name, bytes: body.byteLength, ...pruned }), {
+          headers: { ...cors, 'Content-Type': 'application/json' }
+        });
+      }
+      if (request.method === 'GET' && !name) {
+        return new Response(JSON.stringify(await listBackups(env)), { headers: { ...cors, 'Content-Type': 'application/json' } });
+      }
+      if (request.method === 'GET' && name) {
+        const obj = await env.PHOTO_BUCKET.get(BACKUP_PREFIX + name);
+        if (!obj) return new Response('not found', { status: 404, headers: cors });
+        return new Response(obj.body, { headers: { ...cors, 'Content-Type': obj.httpMetadata?.contentType || 'application/gzip', 'Cache-Control': 'no-store' } });
+      }
+      return new Response('method not allowed', { status: 405, headers: cors });
     }
 
     // 업로드: POST /upload/:key  (body = 이미지 바이너리, Content-Type: image/webp)
@@ -38,7 +105,7 @@ export default {
         return new Response('unauthorized', { status: 401, headers: cors });
       }
       const key = decodeURIComponent(url.pathname.replace('/upload/', ''));
-      if (!key || key.includes('..')) {
+      if (!key || key.includes('..') || key.startsWith(BACKUP_PREFIX)) {
         return new Response('bad key', { status: 400, headers: cors });
       }
       // 2단계 보완(감사 P1-12): 이미지 형식만, 10MB 이하만 받음 — 예전엔 크기·형식 제한이 없었음
@@ -65,7 +132,7 @@ export default {
         return new Response('unauthorized', { status: 401, headers: cors });
       }
       const key = decodeURIComponent(url.pathname.replace('/upload/', ''));
-      if (!key || key.includes('..')) {
+      if (!key || key.includes('..') || key.startsWith(BACKUP_PREFIX)) {
         return new Response('bad key', { status: 400, headers: cors });
       }
       await env.PHOTO_BUCKET.delete(key);
@@ -86,6 +153,7 @@ export default {
       if (cached) return cached;
 
       const key = decodeURIComponent(url.pathname.replace('/photo/', ''));
+      if (key.startsWith(BACKUP_PREFIX)) return new Response('not found', { status: 404, headers: cors });
       const obj = await env.PHOTO_BUCKET.get(key);
       if (!obj) {
         return new Response('not found', { status: 404, headers: cors });

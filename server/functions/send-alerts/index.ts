@@ -9,6 +9,7 @@
 //    [2026-10-01] 수면점수 미등록 알림(sleep_score_missing) 추가 — 09:00 고정, 오늘 sleep 행의 score가 비었을 때만 생성.
 //    [2026-10-01] 생일 축하 — user_settings.birthday('MM-DD', 설정탭에서 입력)가 오늘 날짜와 같으면 아침 브리핑을 생일 버전으로 보냄(2/29생은 평년 2/28).
 //    [2026-10-26] 오늘의 질문 알림(question_alert)은 기능 자체와 함께 폐지.
+//    [2026-11-20] 감사 5-9 — 예약 시각은 5분 여유 창으로 판정, 발송은 '맡음 표시 후 발송'·전부 일시 실패면 30분 안에서 재시도.
 // 2) 조건부 스캔형(리듬 진행중 리마인드) — rhythm_enabled일 때만, 동일하게 timezone 기준으로 경과시간 계산.
 //    1시간/3시간 두 단계로 발송(2026-09-19 추가) — 각 단계는 alerts.source_cid에 구분자를 붙여
 //    별개 row로 관리하되, 실제 리듬블록을 찾아갈 push url의 cid는 alerts.link_cid(원본 client_id)를
@@ -359,16 +360,24 @@ Deno.serve(async (_req: Request) => {
   const { data: settings } = await supabase.from("user_settings").select("*").eq("id", true).maybeSingle();
   const { hhmm, dk, dow, y, m, d, totalMin } = nowInTz(settings?.timezone);
 
+  // 예약 시각 여유 창(감사 5-9): 예전엔 '정확히 그 분'에만 만들어서, 그 1분의 예약 호출이 늦거나 빠지면 그날 알림이 통째로 사라졌음.
+  // 이제 설정 시각부터 5분 안이면 만듦. 같은 날 중복은 각 maybeSchedule*가 source_cid(날짜)로 이미 막음.
+  const due = (t: string | null | undefined) => {
+    if (!t || !/^\d{2}:\d{2}$/.test(t)) return false;
+    const diff = totalMin - (Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5)));
+    return diff >= 0 && diff < 5;
+  };
+  void hhmm;
   if (settings) {
-    if (settings.morning_enabled && settings.morning_briefing_time === hhmm) await maybeScheduleMorningBriefing(supabase, dk, nowIso, settings.birthday);
-    if (settings.sleep_enabled && settings.sleep_alert_time === hhmm) await maybeScheduleSleepAlert(supabase, dk, nowIso);
-    if (settings.sleep_score_enabled && hhmm === "09:00") await maybeScheduleSleepScoreMissing(supabase, dk, nowIso);
-    if (settings.report_enabled && hhmm === "22:00") await maybeScheduleReports(supabase, dk, dow, y, m, d, nowIso);
+    if (settings.morning_enabled && due(settings.morning_briefing_time)) await maybeScheduleMorningBriefing(supabase, dk, nowIso, settings.birthday);
+    if (settings.sleep_enabled && due(settings.sleep_alert_time)) await maybeScheduleSleepAlert(supabase, dk, nowIso);
+    if (settings.sleep_score_enabled && due("09:00")) await maybeScheduleSleepScoreMissing(supabase, dk, nowIso);
+    if (settings.report_enabled && due("22:00")) await maybeScheduleReports(supabase, dk, dow, y, m, d, nowIso);
     if (settings.rhythm_enabled) await maybeScheduleRhythmReminders(supabase, dk, totalMin, nowIso);
   }
 
   const { data: dueAlerts, error: alertsErr } = await supabase
-    .from("alerts").select("id, source_type, source_cid, link_cid, title, body").eq("sent", false).lte("alert_at", nowIso);
+    .from("alerts").select("id, source_type, source_cid, link_cid, title, body, alert_at").eq("sent", false).lte("alert_at", nowIso);
 
   if (alertsErr) {
     console.error("alerts 조회 실패:", alertsErr.message);
@@ -389,7 +398,9 @@ Deno.serve(async (_req: Request) => {
   const staleSubIds: string[] = [];
 
   for (const alert of dueAlerts) {
-    await supabase.from("alerts").update({ sent: true }).eq("id", alert.id);
+    // 발송 전에 '내가 맡음'으로 표시(sent=false인 것만) — 겹쳐 실행된 다른 호출이 같은 알림을 두 번 보내지 않게.
+    const { data: claimed } = await supabase.from("alerts").update({ sent: true }).eq("id", alert.id).eq("sent", false).select("id");
+    if (!claimed || !claimed.length) continue;
 
     // 스누즈 임시 알림은 발송 시점에 할일이 이미 완료됐으면 보내지 않음 — 앱이 완료/삭제 시 예약을 지우지만,
     // 조각 전부 체크 등 다른 경로로 완료된 경우를 대비한 안전장치.
@@ -433,6 +444,18 @@ Deno.serve(async (_req: Request) => {
         )
       ),
     );
+    // 모든 기기로의 발송이 실패했고(만료된 구독 제외) 예정 시각에서 30분이 안 지났으면 다시 '안 보냄'으로 돌려 다음 분에 재시도(감사 5-9 —
+    // 예전엔 발송 전에 sent=true를 찍어서 일시적인 푸시 서버 오류에도 알림이 조용히 사라졌음).
+    const delivered = results.some((r) => r.status === "fulfilled");
+    const transientOnly = results.length > 0 && results.every((r) => {
+      if (r.status === "fulfilled") return false;
+      const m = r.reason instanceof Error ? r.reason.message : String(r.reason);
+      return !(m.includes("410") || m.includes("404"));
+    });
+    if (!delivered && transientOnly && Date.now() - new Date(alert.alert_at).getTime() < 30 * 60 * 1000) {
+      await supabase.from("alerts").update({ sent: false }).eq("id", alert.id);
+      sentCount--;
+    }
     results.forEach((r, i) => {
       if (r.status === "rejected") {
         const sub = (subs || [])[i];

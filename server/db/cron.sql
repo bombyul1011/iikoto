@@ -51,3 +51,26 @@ $$);
 select cron.schedule('note-wake-registered', '* * * * *', $$
   select public.note_wake_registered()
 $$);
+
+-- 매주 일요일 04:00 KST — 서버 전체 자동 백업(R2 backups/, 감사 4단계)
+select cron.schedule('weekly-backup-sun-0400kst', '0 19 * * 6', $$
+  select net.http_post(
+    url := 'https://vqvpzrxmtpryzhontlxc.supabase.co/functions/v1/weekly-backup',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'anon_key_for_cron'),
+      'x-cron-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'cron_secret')
+    ),
+    body := '{}'::jsonb,
+    timeout_milliseconds := 60000
+  );
+$$);
+
+-- 매일 09:17 KST — 8일 넘게 성공한 자동 백업이 없으면 알림(하루 1번, 감사 4-2)
+select cron.schedule('backup-stale-check-daily', '17 0 * * *', $$
+  insert into public.alerts(source_type, source_cid, alert_at, title, body)
+  select 'backup_stale', to_char(now() at time zone 'Asia/Seoul','YYYY-MM-DD'), now(),
+         '자동 백업이 멈췄어요', '8일 넘게 서버 자동 백업이 없어요. 설정탭에서 수동 백업을 한 번 해 주세요.'
+  where not exists (select 1 from public.backup_log where ok and created_at > now() - interval '8 days')
+    and not exists (select 1 from public.alerts where source_type='backup_stale' and source_cid=to_char(now() at time zone 'Asia/Seoul','YYYY-MM-DD'));
+$$);

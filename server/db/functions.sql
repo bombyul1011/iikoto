@@ -214,3 +214,52 @@ revoke all on function public.request_has_app_key() from public, anon, authentic
 -- ── 트리거 ──
 CREATE TRIGGER trg_contents_updated_at BEFORE INSERT OR UPDATE ON public.contents FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER trip_items_touch_trg BEFORE UPDATE ON public.trip_items FOR EACH ROW EXECUTE FUNCTION trip_items_touch();
+
+-- 서버 전체 잠금(2026-11-20, 감사 P0-1 3단계 완료) — PostgREST가 모든 요청 전에 실행. service_role(서버 함수)은 통과,
+-- 그 외에는 x-client-info 마지막 '|' 조각의 앱 키가 맞아야 함. 틀리면 빈 결과가 아니라 401 오류를 돌려줌(로컬 캐시 보호).
+create or replace function public.require_app_key() returns void
+language plpgsql stable security definer set search_path = '' as $$
+declare r text := coalesce(nullif(current_setting('request.jwt.claims', true),'')::json ->> 'role', '');
+begin
+  if r = 'service_role' then return; end if;
+  if not public.request_has_app_key() then
+    raise sqlstate 'PGRST' using
+      message = '{"code":"APPKEY","message":"app key required"}',
+      detail  = '{"status":401,"headers":{}}';
+  end if;
+end $$;
+revoke all on function public.require_app_key() from public;
+grant execute on function public.require_app_key() to anon, authenticated, service_role;
+grant execute on function public.request_has_app_key() to anon, authenticated;
+alter role authenticator set pgrst.db_pre_request = 'public.require_app_key';
+notify pgrst, 'reload config';
+-- 되돌리기(비상시): alter role authenticator reset pgrst.db_pre_request; notify pgrst, 'reload config';
+
+-- 자동 백업(2026-11-20, 감사 4단계) — weekly-backup 함수가 사용. 모두 service_role 전용.
+create table if not exists public.backup_log(
+  id bigserial primary key, created_at timestamptz not null default now(), ok boolean not null,
+  source text not null default 'auto', file text, bytes int, row_total int, manifest jsonb, error text
+);
+alter table public.backup_log enable row level security;
+create policy backup_log_read on public.backup_log for select to anon, authenticated using (true);
+grant select on public.backup_log to anon, authenticated;
+-- 백업 대상 표 목록(public, backup* 제외)과 기본키 — 새 표가 생겨도 자동 포함
+create or replace function public.backup_tables() returns table(t text, pk text)
+language sql stable security definer set search_path = '' as $$
+  select c.relname::text,
+         coalesce((select string_agg(a.attname::text, ',' order by a.attnum)
+                   from pg_index i join pg_attribute a on a.attrelid=i.indrelid and a.attnum = any(i.indkey)
+                   where i.indrelid=c.oid and i.indisprimary), '')
+  from pg_class c join pg_namespace n on n.oid=c.relnamespace
+  where n.nspname='public' and c.relkind='r' and c.relname not like 'backup%'
+  order by 1;
+$$;
+revoke all on function public.backup_tables() from public, anon, authenticated;
+grant execute on function public.backup_tables() to service_role;
+-- 워커 업로드 비밀값(vault backup_secret = 워커 BACKUP_SECRET). 복원 시 새로 만들고 워커에도 같은 값을 넣으면 됨.
+create or replace function public.get_backup_secret() returns text
+language sql stable security definer set search_path = '' as $$
+  select decrypted_secret from vault.decrypted_secrets where name='backup_secret';
+$$;
+revoke all on function public.get_backup_secret() from public, anon, authenticated;
+grant execute on function public.get_backup_secret() to service_role;

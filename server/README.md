@@ -6,7 +6,7 @@
 
 | 위치 | 내용 | 배포처 |
 |---|---|---|
-| `functions/send-alerts/` | 알림 생성·푸시 발송 (v39, 예약 작업 비밀값 검사) | Supabase Edge Function |
+| `functions/send-alerts/` | 알림 생성·푸시 발송 (v40, 예약 작업 비밀값 검사, 5분 여유 창·일시 실패 재시도) | Supabase Edge Function |
 | `functions/materialize-recurring/` | 반복 할일·일정 실체화 (v5, 예약 작업 비밀값 검사) | Supabase Edge Function |
 | `functions/compare-calendars/` | 애플 캘린더 → 이이코토 일정 동기화 (v7, 예약 작업 비밀값 또는 앱 키 검사, `ics.ts` 포함) | Supabase Edge Function |
 | `workers/iikoto-img-proxy.js` | 포스터·표지 이미지 중계 | Cloudflare Worker |
@@ -31,3 +31,14 @@
 
 서버 함수·워커·DB 정책을 바꿔 배포했으면 이 폴더의 해당 파일도 같은 내용으로 고쳐 둡니다.
 기록 데이터 자체의 백업은 여기가 아니라 설정탭의 전체 백업 파일과 서버 안 사본(`backup_YYYYMMDD` 스키마)에 있습니다.
+
+## 서버 전체 잠금 (2026-11-20)
+- 모든 REST 요청은 `public.require_app_key()`(pre-request)를 거침. 앱 키 없으면 401.
+- 서버 함수(service_role)는 통과. 새 기기는 설정 → 앱 키를 먼저 넣어야 기록이 보임.
+- 비상 해제: `alter role authenticator reset pgrst.db_pre_request; notify pgrst, 'reload config';`
+
+## 자동 백업 (2026-11-20, 감사 4단계)
+- `functions/weekly-backup/` — 매주 일요일 04:00 KST(cron `weekly-backup-sun-0400kst`). 모든 표를 `iikoto-backup` v1 형식(앱 수동 백업과 동일)으로 gzip해 R2 `backups/iikoto-YYYY-MM-DD.json.gz`에 저장. 결과는 `backup_log`, 실패 시 alerts(`backup_failed`) 푸시.
+- 보관: 최근 8개 + 그 이전은 달마다 1개씩 12개월(워커가 저장 직후 정리). 1회 약 0.35MB.
+- 내려받기: `GET https://iikoto-photo-proxy.faith-003.workers.dev/backup/<파일명>` + 헤더 `X-Backup-Secret`(vault `backup_secret`, 워커 `BACKUP_SECRET`). 목록은 `/backup/`. `/photo/backups/...`로는 읽을 수 없음.
+- 복원 확인(11/20): 첫 백업 24개 표 3,518행, 내려받아 표별 행 수·해시 전부 일치.

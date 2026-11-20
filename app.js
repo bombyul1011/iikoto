@@ -987,7 +987,7 @@ async function syncOnelineMonthRange(y,mo){
   if(!rows)return false;
   rows.forEach(r=>{
     const dk=r.note_key.replace('oneline:','');
-    if(!S.get(S.key('oneline_pending',dk))&&typeof r.lines==='string')S.set(S.key('oneline',dk),r.lines);
+    if(!S.get(S.key('oneline_pending',dk))&&!isGPending(r.note_key)&&typeof r.lines==='string')S.set(S.key('oneline',dk),r.lines);
   });
   return true;
 }
@@ -2915,7 +2915,7 @@ function getHabitCatalogItem(id){return HABIT_CATALOG.find(c=>c.id===id)||null;}
 // 습관별 "목표" 저장소 — 지금은 아침기상의 목표시각(goalTime, 'HH:MM')만 실사용하지만,
 // 나중에 다른 습관도 목표를 가질 수 있도록(예: 월간 목표 횟수) habitId 기준 범용 구조로 둠.
 function getHabitGoals(){return S.get('habit_goals')||{};}
-function saveHabitGoals(v){S.set('habit_goals',v);autoSync('habitGoals',null);}
+function saveHabitGoals(v){S.set('habit_goals',v);markGPending('habit_goals');autoSync('habitGoals',null);}
 function getHabitGoal(habitId){return getHabitGoals()[habitId]||null;}
 function setHabitGoalTime(habitId,timeStr){
   const goals=getHabitGoals();
@@ -2926,11 +2926,12 @@ function setHabitGoalTime(habitId,timeStr){
 // note_key='habit_goals' 한 행에 {habitId:{goalTime}} 객체 전체를 lines로 통째로 저장.
 async function syncHabitGoalsUp(){
   const goals=getHabitGoals();
-  await supaUpsert('goal_notes','note_key',[{note_key:'habit_goals',lines:goals}]);
+  return await supaUpsert('goal_notes','note_key',[{note_key:'habit_goals',lines:goals}]);
 }
 async function syncHabitGoalsDown(){
+  if(isGPending('habit_goals')){await gpendUpAndClear('habit_goals');return;}
   const rows=await supaFetch('goal_notes?note_key=eq.habit_goals');
-  if(!rows)return;
+  if(!rows||isGPending('habit_goals'))return;
   if(!rows.length){
     const local=getHabitGoals();
     if(Object.keys(local).length)await syncHabitGoalsUp();
@@ -3607,7 +3608,7 @@ function compareTodoOrder(a,b){
 // 각자 판정+저장하던 예전 방식은 여러 기기/여러 sync 경로가 동시에 같은 날짜를 실체화하려 들며 경합이
 // 반복적으로 발생해 폐기했다.
 function getRecurringItems(){return S.get('recurring_items')||[];}
-function saveRecurringItems(v){S.set('recurring_items',v);autoSync('recurringItems',null);}
+function saveRecurringItems(v){S.set('recurring_items',v);markGPending('recurring_items');autoSync('recurringItems',null);}
 // 특정 규칙(ruleCid)이 특정 날짜(dk)에 실체화되지 않도록 막는 예외 — "오늘만 삭제"에서만 씀.
 // 실체화 자체를 스킵하는 용도라, 실체화된 뒤에는 그냥 그 todos 레코드를 지우는 문제일 뿐이라 skip 개념만 남음
 // (구 버전에 있던 edited_text 예외는 폐기 — 실체화된 레코드의 text를 직접 수정하면 되므로 불필요해짐).
@@ -4057,7 +4058,7 @@ function getReadingStreak(){
   return streak;
 }
 function getHabits(){return S.get('habits')||DEFAULT_HABITS;}
-function saveHabits(v){S.set('habits',v);autoSync('habits',null);}
+function saveHabits(v){S.set('habits',v);markGPending('habits');autoSync('habits',null);}
 // _habitPeriods/_isHabitActiveOn 정의는 파일 하단(HABIT MONTHLY 섹션)에 있음 — function 선언 호이스팅으로 순서 무관 동작.
 // 구간(periods)이 비어 있으면 "정보 없음"이지 "꺼짐"이 아니므로 켜짐으로 본다.
 function _isHabitCurrentlyOn(h){
@@ -4173,7 +4174,7 @@ function runContentsSyncLocked(mk,fn){
   return nextChain;
 }
 function getGoal(key){return S.get(key)||[''];}
-function saveGoal(key,lines){S.set(key,lines);autoSync('goal',key);}
+function saveGoal(key,lines){S.set(key,lines);markGPending(key);autoSync('goal',key);}
 
 // ── SUPABASE SYNC
 async function syncTodosDown(dk){
@@ -4307,8 +4308,9 @@ async function syncMealsUp(dk){
   return !!ok;
 }
 async function syncHabitsDown(){
+  if(isGPending('habits')||getDelPendingCids('habits','global').length){await gpendUpAndClear('habits');return;}
   const rows=await supaFetch('habits?order=sort_order');
-  if(!rows)return;
+  if(!rows||isGPending('habits'))return;
   if(rows.length===0&&getHabits().length>0){syncHabitsUp();return;}
   // habit_id(카탈로그 id)/custom도 함께 복원 — 이걸 빠뜨리면 로컬의 id가 사라져
   // 습관과 과거 체크 기록(id 기반 키)의 연결이 끊김.
@@ -4343,8 +4345,9 @@ async function syncHabitsUp(){
 // 구분을 못 해 그 삭제를 무효화시키는 사고를 만들 수 있었음(실제 재현 사례는
 // 없었지만 구조적으로 위험). 서버가 규칙의 유일한 원본이므로 그 값을 그대로 신뢰.
 async function syncRecurringItemsDown(){
+  if(isGPending('recurring_items')||getDelPendingCids('recurring_items','global').length){await gpendUpAndClear('recurring_items');return;}
   const rows=await supaFetch('recurring_items?order=sort_order');
-  if(!rows)return;
+  if(!rows||isGPending('recurring_items'))return;
   S.set('recurring_items',rows.map(r=>({
     cid:r.client_id,text:r.text,isEvent:!!r.is_event,eventTime:r.event_time||null,
     eventCat:r.event_cat||null,timeSection:r.time_section||null,
@@ -4404,9 +4407,11 @@ async function syncRecurSkipDown(dk){
   S.set(S.key('recur_skip',dk),rows.map(r=>r.recur_cid));
 }
 async function syncHCDown(wk){
+  // 업로드 대기 중인 체크가 있으면 서버 값으로 덮지 않음(감사 5-1 — 예전엔 업로드 실패 직후 내려받기가 체크를 되돌릴 수 있었음)
+  if(S.get('hc_pending_'+wk)||getDelPendingCids('hc',wk).length)return;
   const ws=wk.replace('week:','');const we=getWeekEnd(ws);
   const rows=await supaFetch(`habit_checks?date_key=gte.${ws}&date_key=lt.${we}`);
-  if(!rows)return;
+  if(!rows||S.get('hc_pending_'+wk))return;
   const checks={};const times={};
   rows.forEach(r=>{const d=parseDk(r.date_key);const dow=(d.getDay()+6)%7;const key=`${r.habit_name}-${dow}`;checks[key]=true;if(r.checked_time)times[key]=r.checked_time;});
   S.set(S.key('hc',wk),checks);
@@ -4446,9 +4451,51 @@ async function _syncHCUpAndClear(wk){
   if(ok&&snap()===sent)S.set('hc_pending_'+wk,false);
   return ok;
 }
+// ── 공용 '업로드 대기' 도우미(감사 P1-2, 5단계 5-1) ──
+// 예전엔 하루한줄·월간 목표·독서 날짜·먹고 싶은 것·습관 목표 시각·습관 목록·반복 규칙이 저장 직후 한 번만 업로드를
+// 시도하고(오프라인이면 아예 안 함) 실패해도 표시가 남지 않아, 다음 내려받기 때 서버의 옛 값으로 덮여 사라질 수 있었음.
+// 이제 저장할 때 'gpend:<이름>'을 세우고, 업로드가 성공하고 그 사이 값이 바뀌지 않았을 때만 지움.
+// 내려받기는 대기 표시가 있으면 서버 값으로 덮지 않고 먼저 올림. 남은 대기는 retryAllPending(5-2)이 날짜와 상관없이 다시 올림.
+// 이름: goal_notes의 note_key 그대로(oneline:YYYY-MM-DD, mgoal:YYYY-MM, reading_dates, wishlist:meal, habit_goals) + habits, recurring_items.
+const GPEND_PREFIX='gpend:';
+function markGPending(name){S.set(GPEND_PREFIX+name,true);}
+function isGPending(name){return !!S.get(GPEND_PREFIX+name);}
+function _gpendSnap(name){
+  if(name==='habits')return JSON.stringify(getHabits()); // 삭제 대기 목록은 syncHabitsUp이 스스로 비움
+  if(name==='recurring_items')return JSON.stringify(getRecurringItems());
+  if(name==='habit_goals')return JSON.stringify(getHabitGoals());
+  return JSON.stringify(S.get(name));
+}
+function _gpendUpFn(name){
+  if(name==='habits')return syncHabitsUp;
+  if(name==='recurring_items')return syncRecurringItemsUp;
+  if(name==='habit_goals')return syncHabitGoalsUp;
+  return ()=>syncGoalUp(name);
+}
+const _gpendRunning=new Map();
+async function gpendUpAndClear(name){
+  if(!navigator.onLine)return false;
+  if(_gpendRunning.has(name))return _gpendRunning.get(name);
+  const run=(async()=>{
+    const sent=_gpendSnap(name);
+    const ok=await _gpendUpFn(name)();
+    const changed=_gpendSnap(name)!==sent;
+    if(ok&&!changed){try{localStorage.removeItem(GPEND_PREFIX+name);}catch(e){}}
+    return {ok:!!ok,again:!!ok&&changed};
+  })().then(r=>{
+    _gpendRunning.delete(name);
+    // 올리는 사이에 또 입력됐으면(예: 월간 목표를 계속 타이핑) 끝나자마자 최신 값으로 한 번 더 올림 — 성공했을 때만(실패면 재시도 타이머에 맡김)
+    if(r.again)return gpendUpAndClear(name);
+    return r.ok;
+  },e=>{_gpendRunning.delete(name);return false;});
+  _gpendRunning.set(name,run);
+  return run;
+}
 async function syncGoalDown(key){
+  if(isGPending(key)){await gpendUpAndClear(key);return;} // 업로드 대기 중이면 서버 값으로 덮지 않고 먼저 올림
   const rows=await supaFetch(`goal_notes?note_key=eq.${encodeURIComponent(key)}`);
   if(!rows)return;
+  if(isGPending(key))return; // 받는 사이에 새로 입력됨 — 덮지 않음
   if(!rows.length){
     // 로컬에 데이터 있으면 Supabase로 올려줌 (사파리에서 입력 후 PWA 접속 시)
     const local=getGoal(key);
@@ -4458,8 +4505,8 @@ async function syncGoalDown(key){
   S.set(key,rows[0].lines);
 }
 async function syncGoalUp(key){
-  const lines=getGoal(key);
-  await supaUpsert('goal_notes','note_key',[{note_key:key,lines}]);
+  const lines=S.get(key)??getGoal(key);
+  return await supaUpsert('goal_notes','note_key',[{note_key:key,lines}]);
 }
 async function syncWChallengeDown(wk){
   const key='wchallenge_'+wk;
@@ -4555,12 +4602,12 @@ async function autoSync(type,key){
   else if(type==='memos'){if(await syncMemosUp(key))S.set(S.key('memos_pending',key),false);}
   else if(type==='sleep'){await _syncSleepUpAndClear(key);}
   else if(type==='meals_field'){await syncMealsUp(key);}
-  else if(type==='habits')syncHabitsUp();
-  else if(type==='recurringItems')syncRecurringItemsUp();
+  else if(type==='habits')await gpendUpAndClear('habits');
+  else if(type==='recurringItems')await gpendUpAndClear('recurring_items');
   else if(type==='recurSkip')syncRecurSkipUp(key);
-  else if(type==='habitGoals')syncHabitGoalsUp();
+  else if(type==='habitGoals')await gpendUpAndClear('habit_goals');
   else if(type==='hc')await _syncHCUpAndClear(key);
-  else if(type==='goal')syncGoalUp(key);
+  else if(type==='goal')await gpendUpAndClear(key);
   else if(type==='wchallenge'){
     const data=S.get(key);
     if(data){
@@ -4608,6 +4655,8 @@ async function syncAll(){
   if(S.get('hc_pending_'+wk))upTasks.push(_syncHCUpAndClear(wk));
   if((S.get('recur_future_delpending')||[]).length)upTasks.push(syncRecurFutureDel());
   if(upTasks.length)await Promise.all(upTasks);
+  // 현재 날짜 밖에 남은 대기도 날짜와 상관없이 다시 올림(감사 5-2). 방금 시도한 현재 날짜분은 건너뜀.
+  await retryAllPending(new Set(['todos|'+dk,'memos|'+dk,'meals|'+dk,'sleep|'+dk,'contents|'+mk,'rblocks|'+dk,'hc|'+wk,'wchallenge|'+wk]));
   // 이번 주 리듬블록(가로바용) 날짜키
   const weekRblockDks=[];
   for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);weekRblockDks.push(dateKey(d));}
@@ -4649,6 +4698,60 @@ document.addEventListener('visibilitychange',()=>{
   refreshHomeIfOpen(); // 앱으로 돌아온 즉시 로컬 데이터 기준으로 시계·시간대부터 맞춤(오프라인이어도 동작)
   if(navigator.onLine)setTimeout(syncAll,300);
 });
+// ── 남은 업로드 대기 전부 재시도(감사 P1-4, 5단계 5-2) ──
+// 예전엔 syncAll이 '지금 보고 있는 날짜·달·주'의 대기만 다시 올려서, 다른 날짜에서 실패한 수정(예: 어제 오프라인으로 고친 할일,
+// 감상 진행률 로그)은 그 날짜를 다시 열기 전까지 영영 안 올라갔음. 기기에 남은 대기 표시를 전부 훑어 날짜와 상관없이 다시 올림.
+// 한 번에 최대 40건, 순서대로(동시 요청 폭주 방지). skip에 든 것(syncAll이 방금 시도한 현재 날짜분)은 건너뜀.
+function _collectPendingTargets(){
+  const out=[],seen=new Set();
+  const add=(type,key)=>{const id=type+'|'+key;if(!seen.has(id)){seen.add(id);out.push([type,key]);}};
+  let keys=[];
+  try{for(let i=0;i<localStorage.length;i++)keys.push(localStorage.key(i));}catch(e){return out;}
+  const flagRe=/^(todos|memos|rblocks|sleep|cdlog|contents)_pending:(.+)$/;
+  for(const k of keys){
+    if(!k)continue;
+    let m=k.match(flagRe);
+    if(m){if(S.get(k))add(m[1],m[2]);continue;}
+    if((m=k.match(/^meals_fields_pending:(.+)$/))){if((S.get(k)||[]).length)add('meals',m[1]);continue;}
+    if((m=k.match(/^hc_pending_(.+)$/))){if(S.get(k))add('hc',m[1]);continue;}
+    if((m=k.match(/^wchallenge_pending_(.+)$/))){if(S.get(k))add('wchallenge',m[1]);continue;}
+    if((m=k.match(/^quote_pending_(.+)$/))){if(S.get(k))add('quote',m[1]);continue;}
+    if(k.startsWith(GPEND_PREFIX)){if(S.get(k))add('gpend',k.slice(GPEND_PREFIX.length));continue;}
+  }
+  for(const t of ['todos','memos','contents','rblocks','hc'])(S.get(t+'_delpending_list')||[]).forEach(e=>{if(e&&e.dk)add(t,e.dk);});
+  if((S.get('habits_delpending_list')||[]).length)add('gpend','habits');
+  if((S.get('recurring_items_delpending_list')||[]).length)add('gpend','recurring_items');
+  // 45일보다 오래된 날짜·달·주의 대기는 자동 재시도에서 뺌 — 아주 오래 묵은 기기 사본이 그사이 다른 기기에서 고친
+  // 서버 값을 통째로 덮어쓰지 않도록(날짜 단위 전체 업로드라서, 5-3 '바뀐 것만 올리기' 전까지의 안전장치).
+  const cutoff=dateKey(new Date(Date.now()-45*864e5));
+  return out.filter(([t,k])=>{const m=String(k).match(/\d{4}-\d{2}(-\d{2})?/);if(!m)return true;const d=m[1]?m[0]:m[0]+'-31';return d>=cutoff;});
+}
+async function _retryPendingTarget(type,key){
+  if(type==='todos'){if(await syncTodosUp(key))S.set(S.key('todos_pending',key),false);}
+  else if(type==='memos'){if(await syncMemosUp(key))S.set(S.key('memos_pending',key),false);}
+  else if(type==='rblocks'){if(await syncRhythmBlocksUp(key))S.set(S.key('rblocks_pending',key),false);}
+  else if(type==='contents'){if(await runContentsSyncLocked(key,()=>syncContentsUp(key)))S.set(S.key('contents_pending',key),false);}
+  else if(type==='cdlog'){if(await syncContentDailyLogUp(key))S.set(S.key('cdlog_pending',key),false);}
+  else if(type==='sleep')await _syncSleepUpAndClear(key);
+  else if(type==='meals')await syncMealsUp(key);
+  else if(type==='hc')await _syncHCUpAndClear(key);
+  else if(type==='wchallenge')await autoSync('wchallenge','wchallenge_'+key);
+  else if(type==='quote'){if(!getQuotes().some(q=>q.cid===key))S.set('quote_pending_'+key,false);else await syncQuoteUp(key);}
+  else if(type==='gpend')await gpendUpAndClear(key);
+}
+let _retryAllRunning=null;
+async function retryAllPending(skip){
+  if(!navigator.onLine||window._restoring)return;
+  if(_retryAllRunning)return _retryAllRunning;
+  _retryAllRunning=(async()=>{
+    const targets=_collectPendingTargets().filter(([t,k])=>!(skip&&skip.has(t+'|'+k))).slice(0,40);
+    for(const [t,k] of targets){
+      if(!navigator.onLine)break;
+      try{await _retryPendingTarget(t,k);}catch(e){console.warn('대기 재시도 실패',t,k,e);}
+    }
+  })().finally(()=>{_retryAllRunning=null;});
+  return _retryAllRunning;
+}
 // 주기적 pending 재시도 타이머 — online/visibilitychange 이벤트에만 의존하면, 앱을 화면 전환 없이
 // 켜둔 채 두거나(예: 오늘 탭만 계속 보고 있는 경우) 업로드가 실패한 순간 마침 두 이벤트 다 안 걸리면
 // pending이 남은 채로 재시도 기회 자체가 영영 안 옴 — 로컬 수정사항이 서버에 끝내 안 올라가는 근본
@@ -4661,7 +4764,8 @@ function hasAnyPendingSync(){
     S.get(S.key('memos_pending',dk))||getDelPendingCids('memos',dk).length||
     (S.get(S.key('meals_fields_pending',dk))||[]).length||S.get(S.key('sleep_pending',dk))||
     S.get(S.key('contents_pending',mk))||getDelPendingCids('contents',mk).length||S.get('wchallenge_pending_'+wk)||
-    S.get(S.key('rblocks_pending',dk))||getDelPendingCids('rblocks',dk).length||S.get('hc_pending_'+wk));
+    S.get(S.key('rblocks_pending',dk))||getDelPendingCids('rblocks',dk).length||S.get('hc_pending_'+wk)||
+    _collectPendingTargets().length);
 }
 setInterval(()=>{
   if(navigator.onLine&&!window._restoring&&hasAnyPendingSync())syncAll();
@@ -10487,6 +10591,7 @@ async function syncMonthRange(y,mo){
       if(r.checked_time)(timesByWeek[wk]=timesByWeek[wk]||{})[key]=r.checked_time;
     });
     Object.keys(byWeek).forEach(wk=>{
+      if(S.get('hc_pending_'+wk)||getDelPendingCids('hc',wk).length)return; // 업로드 대기 중인 주는 건드리지 않음(감사 5-1 — 방금 해제한 체크가 되살아나지 않게)
       const merged=Object.assign({},getHabitChecks(wk),byWeek[wk]);
       S.set(S.key('hc',wk),merged);
       if(timesByWeek[wk]){
@@ -10914,8 +11019,9 @@ function getDailyOneLine(dk){
 }
 function saveDailyOneLine(dk,text){
   S.set(S.key('oneline',dk),text);
-  // goal_notes 테이블에 동기화 (key: oneline:YYYY-MM-DD)
-  if(navigator.onLine)syncGoalUp(S.key('oneline',dk));
+  // goal_notes 테이블에 동기화 (key: oneline:YYYY-MM-DD) — 업로드 대기 표시 후 시도(실패·오프라인이면 나중에 재시도)
+  markGPending(S.key('oneline',dk));
+  gpendUpAndClear(S.key('oneline',dk));
 }
 function renderDailyOneLineWeek(){
   const el=document.getElementById('daily-oneline-list');if(!el)return;
@@ -11716,8 +11822,21 @@ async function copyAppKey(which){
   try{await navigator.clipboard.writeText(text);showToast(which==='code'?'등록 코드를 복사했어요':'앱 키를 복사했어요');}
   catch(e){showToast('복사하지 못했어요');}
 }
+// 설정탭 '마지막 자동 백업' 표시(감사 4단계) — 서버 weekly-backup이 매주 일요일 04:00에 R2로 백업하고 backup_log에 남김.
+// 성공 기록 중 최신 것을 보여 주고, 최신 시도가 실패였으면 그 사실도 함께 표시. 오프라인·조회 실패면 조용히 비워 둠.
+async function renderAutoBackupStatus(){
+  const el=document.getElementById('auto-backup-status');if(!el)return;
+  const rows=await supaFetch('backup_log?select=created_at,ok,row_total&order=id.desc&limit=10');
+  if(!Array.isArray(rows)){el.textContent='';return;}
+  const okRow=rows.find(r=>r.ok);
+  const fmt=iso=>{const d=new Date(iso);return `${d.getMonth()+1}/${d.getDate()}`;};
+  let t=okRow?`마지막 자동 백업 ${fmt(okRow.created_at)} · ${Number(okRow.row_total||0).toLocaleString()}행 · 매주 일요일 새벽`:'자동 백업 기록이 아직 없어요';
+  if(rows[0]&&!rows[0].ok)t+=` · ⚠ ${fmt(rows[0].created_at)} 백업 실패`;
+  el.textContent=t;
+}
 function openSettings(){
   renderAppKeyStatus();
+  renderAutoBackupStatus();
   const keyInp=document.getElementById('claude-api-key-inp');
   if(keyInp){const k=S.get('claude_api_key');keyInp.value=k?'sk-ant-••••'+k.slice(-4):'';}
   const profileInp=document.getElementById('user-profile-inp');if(profileInp)profileInp.value=S.get('user_profile')||'';
