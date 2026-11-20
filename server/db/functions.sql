@@ -187,6 +187,30 @@ $$;
 revoke all on function public.check_cron_secret(text) from public, anon, authenticated;
 grant execute on function public.check_cron_secret(text) to service_role;
 
+-- 앱 키 대조(2026-11-20, 감사 P0-1 3단계) — service_role만 실행. compare-calendars가 x-client-info 마지막 '|' 조각을 넘겨 확인.
+create or replace function public.check_app_key(k text)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select coalesce(k,'') <> '' and exists(select 1 from vault.decrypted_secrets where name='app_key_hash'
+         and decrypted_secret = encode(extensions.digest(k, 'sha256'), 'hex'));
+$$;
+revoke all on function public.check_app_key(text) from public, anon, authenticated;
+grant execute on function public.check_app_key(text) to service_role;
+
+-- 요청 헤더에 유효한 앱 키가 있는지(최종 잠금용, 아직 미사용). 실행 권한은 public·anon·authenticated에서 회수.
+create or replace function public.request_has_app_key()
+returns boolean language plpgsql stable security definer set search_path = '' as $function$
+declare
+  ci text := coalesce((current_setting('request.headers', true))::json ->> 'x-client-info', '');
+  k text;
+begin
+  if position('|' in ci) = 0 then return false; end if;
+  k := regexp_replace(ci, '^.*\|', '');
+  if k = '' then return false; end if;
+  return exists(select 1 from vault.decrypted_secrets where name = 'app_key_hash'
+                and decrypted_secret = encode(extensions.digest(k, 'sha256'), 'hex'));
+end $function$;
+revoke all on function public.request_has_app_key() from public, anon, authenticated;
+
 -- ── 트리거 ──
 CREATE TRIGGER trg_contents_updated_at BEFORE INSERT OR UPDATE ON public.contents FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER trip_items_touch_trg BEFORE UPDATE ON public.trip_items FOR EACH ROW EXECUTE FUNCTION trip_items_touch();

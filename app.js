@@ -5437,6 +5437,9 @@ async function processMemoPhotoUploadQueue(){
 window.addEventListener('online',processMemoPhotoUploadQueue);
 // 사진 업로드용 Worker 엔드포인트
 const PHOTO_PROXY_BASE='https://iikoto-photo-proxy.faith-003.workers.dev';
+// 사진 워커 인증(감사 P0-1 3단계): 앱 키가 있으면 X-App-Key로 보내고(워커가 sha256을 등록 코드와 대조),
+// 없을 때만 예전 고정 비밀값을 보냄 — 모든 기기 전환이 끝나면 아래 고정값과 워커의 UPLOAD_SECRET을 함께 폐기할 예정.
+function photoAuthHeaders(){const k=getAppKey();return k?{'X-App-Key':k}:{'X-Upload-Secret':PHOTO_UPLOAD_SECRET};}
 const PHOTO_UPLOAD_SECRET='twinkle77*';
 async function _uploadMemoPhotoToR2(blob,dk,cid,ext){
   // 키에 '/'를 넣으면 URL 인코딩(%2F) 처리가 프록시/브라우저 환경별로 갈릴 수 있어
@@ -5447,7 +5450,7 @@ async function _uploadMemoPhotoToR2(blob,dk,cid,ext){
   const key=`${dk.replace(/-/g,'')}_${cid}.${safeExt}`;
   const res=await fetch(`${PHOTO_PROXY_BASE}/upload/${key}`,{
     method:'POST',
-    headers:{'Content-Type':contentType,'X-Upload-Secret':PHOTO_UPLOAD_SECRET},
+    headers:{'Content-Type':contentType,...photoAuthHeaders()},
     body:blob
   });
   if(!res.ok){
@@ -5517,7 +5520,7 @@ async function _deletePhotoFromR2(photoUrl){
   if(!key)return;
   const res=await fetch(`${PHOTO_PROXY_BASE}/upload/${key}`,{
     method:'DELETE',
-    headers:{'X-Upload-Secret':PHOTO_UPLOAD_SECRET}
+    headers:photoAuthHeaders()
   });
   if(!res.ok){
     const detail=await res.text().catch(()=>'');
@@ -10211,7 +10214,7 @@ async function handleQuoteOcrFile(file){
     const base64=await fileToBase64(file);
     const res=await fetch(OCR_PROXY_URL,{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{'Content-Type':'application/json',...(getAppKey()?{'X-App-Key':getAppKey()}:{})}, // OCR 워커는 앱 키가 있어야 처리(감사 P1-12)
       body:JSON.stringify({imageBase64:base64})
     });
     if(!res.ok)throw new Error('OCR 서버 응답 오류');

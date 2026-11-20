@@ -104,6 +104,18 @@ Deno.serve(async (req: Request) => {
   const days = Math.min(90, Math.max(1, parseInt(url.searchParams.get("days") || String(DEFAULT_DAYS), 10) || DEFAULT_DAYS));
   const sb = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
+  // 호출자 확인(감사 P1-12, 2026-11-18): 예약 작업의 x-cron-secret, 또는 앱이 보내는 x-client-info의 마지막 조각(앱 키)이 맞아야 실행.
+  // 예전엔 공개 키만 있으면 누구나 동기화를 돌리고 ?list=1로 일정 목록을 받아 갈 수 있었음.
+  {
+    const sec = req.headers.get("x-cron-secret") || "";
+    const ci = req.headers.get("x-client-info") || "";
+    const appKey = ci.includes("|") ? ci.slice(ci.lastIndexOf("|") + 1) : "";
+    let authed = false;
+    if (sec) { const { data } = await sb.rpc("check_cron_secret", { s: sec }); authed = data === true; }
+    if (!authed && appKey) { const { data } = await sb.rpc("check_app_key", { k: appKey }); authed = data === true; }
+    if (!authed) return json({ ok: false, error: "unauthorized" }, 401);
+  }
+
   const kstNow = new Date(Date.now() + KST_OFFSET);
   const fromMs = Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate());
   const toMs = fromMs + days * DAY + DAY - 1;

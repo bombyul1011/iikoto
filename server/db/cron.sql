@@ -39,7 +39,8 @@ select cron.schedule('compare-calendars-twice-daily', '0 10,23 * * *', $$
     url := 'https://vqvpzrxmtpryzhontlxc.supabase.co/functions/v1/compare-calendars',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'anon_key_for_cron')
+      'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'anon_key_for_cron'),
+      'x-cron-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'cron_secret')
     ),
     body := '{}'::jsonb,
     timeout_milliseconds := 30000

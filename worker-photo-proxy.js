@@ -6,13 +6,26 @@
 // UPLOAD_SECRET 이라는 이름으로 원하는 임의의 긴 문자열을 Secret으로 등록해두세요.
 // (예: openssl rand -hex 24 로 생성한 값 등 — 아무 무작위 긴 문자열이면 충분)
 
+// 앱 키 검사(감사 P0-1 3단계, 2026-11-18): 요청 헤더 X-App-Key의 sha256이 Worker 비밀값 APP_KEY_HASH(=앱 설정의 등록 코드)와 같으면 통과.
+// 전환 기간에만 예전 X-Upload-Secret(UPLOAD_SECRET)도 받아 줌 — 모든 기기가 새 앱으로 바뀐 뒤 그 줄을 지울 예정.
+async function sha256Hex(s) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+async function authorized(request, env) {
+  const appKey = request.headers.get('X-App-Key') || '';
+  if (appKey && env.APP_KEY_HASH && (await sha256Hex(appKey)) === env.APP_KEY_HASH) return true;
+  const legacy = request.headers.get('X-Upload-Secret');
+  return !!(env.UPLOAD_SECRET && legacy && legacy === env.UPLOAD_SECRET);
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const cors = {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type,X-Upload-Secret'
+      'Access-Control-Allow-Headers': 'Content-Type,X-Upload-Secret,X-App-Key'
     };
 
     if (request.method === 'OPTIONS') {
@@ -21,8 +34,7 @@ export default {
 
     // 업로드: POST /upload/:key  (body = 이미지 바이너리, Content-Type: image/webp)
     if (request.method === 'POST' && url.pathname.startsWith('/upload/')) {
-      const secret = request.headers.get('X-Upload-Secret');
-      if (!env.UPLOAD_SECRET || secret !== env.UPLOAD_SECRET) {
+      if (!(await authorized(request, env))) {
         return new Response('unauthorized', { status: 401, headers: cors });
       }
       const key = decodeURIComponent(url.pathname.replace('/upload/', ''));
@@ -49,8 +61,7 @@ export default {
     // 삭제: DELETE /upload/:key — 메모 삭제 시 R2 원본까지 함께 정리하기 위한 엔드포인트.
     // 업로드와 같은 시크릿으로 보호(같은 자격이면 지울 수 있어야 하므로 별도 시크릿 불필요).
     if (request.method === 'DELETE' && url.pathname.startsWith('/upload/')) {
-      const secret = request.headers.get('X-Upload-Secret');
-      if (!env.UPLOAD_SECRET || secret !== env.UPLOAD_SECRET) {
+      if (!(await authorized(request, env))) {
         return new Response('unauthorized', { status: 401, headers: cors });
       }
       const key = decodeURIComponent(url.pathname.replace('/upload/', ''));

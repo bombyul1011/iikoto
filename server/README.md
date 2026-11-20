@@ -8,7 +8,7 @@
 |---|---|---|
 | `functions/send-alerts/` | 알림 생성·푸시 발송 (v39, 예약 작업 비밀값 검사) | Supabase Edge Function |
 | `functions/materialize-recurring/` | 반복 할일·일정 실체화 (v5, 예약 작업 비밀값 검사) | Supabase Edge Function |
-| `functions/compare-calendars/` | 애플 캘린더 → 이이코토 일정 동기화 (v6, `ics.ts` 포함) | Supabase Edge Function |
+| `functions/compare-calendars/` | 애플 캘린더 → 이이코토 일정 동기화 (v7, 예약 작업 비밀값 또는 앱 키 검사, `ics.ts` 포함) | Supabase Edge Function |
 | `workers/iikoto-img-proxy.js` | 포스터·표지 이미지 중계 | Cloudflare Worker |
 | `workers/ocr-prox.js` | 구글 비전 OCR 중계 | Cloudflare Worker |
 | `workers/aladin-book-proxy.js` | 알라딘 책 페이지 수 조회 | Cloudflare Worker |
@@ -23,8 +23,8 @@
 공개 저장소라 비밀값은 넣지 않았습니다. 복원할 때 각 배포처에 다시 등록해야 합니다.
 
 - Supabase 함수 비밀값: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `ICAL_SCHEDULE`, `ICAL_TRAVEL`, `ICAL_WORK`
-- Supabase vault: `anon_key_for_cron`, `briefing_fire_token`, `cron_secret`(예약 작업 전용, 복원 시 `vault.create_secret(encode(gen_random_bytes(32),'hex'),'cron_secret')`로 새로 만들면 됨)
-- Cloudflare 워커 비밀값: `UPLOAD_SECRET`(사진), `GOOGLE_VISION_API_KEY`(OCR), R2 바인딩 `PHOTO_BUCKET`
+- Supabase vault: `anon_key_for_cron`, `briefing_fire_token`, `cron_secret`(예약 작업 전용, 복원 시 `vault.create_secret(encode(gen_random_bytes(32),'hex'),'cron_secret')`로 새로 만들면 됨), `app_key_hash`(앱 키의 sha256 = 앱 설정의 등록 코드)
+- Cloudflare 워커 비밀값: `APP_KEY_HASH`(사진·OCR 둘 다, 앱 키 sha256), `UPLOAD_SECRET`(사진, 전환 기간용 — 추후 삭제), `GOOGLE_VISION_API_KEY`(OCR), R2 바인딩 `PHOTO_BUCKET`
 - 파일 안에서 `<...>`로 가린 값: 알라딘 TTB 키, 이이타비 접근키 해시, 아침 브리핑 예약 실행 주소
 
 ## 갱신 규칙
