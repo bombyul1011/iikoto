@@ -100,14 +100,14 @@ const RHYTHM_CATS={
   groom:{label:'단장',color:'rgba(var(--pal-orange-rgb),0.82)',icon:'ti-mood-spark'},
   work:{label:'업무',color:'rgba(var(--pal-sky-rgb),0.45)',icon:'ti-keyboard'}, // 업무 존재감 살짝 올림(식사 아이콘과 겹쳐도 시인성 확인 완료)
   appointment:{label:'외출',color:'rgba(var(--pal-rose-rgb),0.25)',icon:'ti-bus'}, // 알파만 낮춤(채도는 원색 그대로), 외출도 지속시간이 길어 존재감 조절
-  note:{label:'책상',color:'rgba(var(--pal-yellow-rgb),0.82)',icon:'ti-desk'},
+  note:{label:'작업',color:'rgba(var(--pal-yellow-rgb),0.82)',icon:'ti-palette'},
   enjoy:{label:'감상',color:'rgba(var(--pal-lavender-rgb),0.80)',icon:'ti-stack-2'},
   home:{label:'살림',color:'rgba(var(--pal-lime-rgb),0.82)',icon:'ti-home'}
 };
 const RHYTHM_SLEEP_COLOR='rgba(var(--pal-warmgray-rgb),0.30)'; // 알파만 낮춤(채도는 원색 그대로)
 const RHYTHM_MEAL_COLOR='rgba(var(--pal-green-rgb),0.90)';
-// 리듬 카테고리 분류 설명 — AI 프롬프트에서 시간 사용 데이터를 다룰 때 카테고리 오분류(예: 업무↔책상, 휴식↔감상)를 줄이기 위해 공통으로 붙이는 한 줄 설명.
-const RHYTHM_CAT_GUIDE='(카테고리 참고: 운동=홈트/헬스장/러닝 등, 휴식=낮잠/멍때리기/게임 등 목적 없이 흘려보내는 시간, 단장=기상 후 스트레칭·씻기·스킨케어 등 몸을 준비하는 루틴이나 취침 전 씻고 정돈하는 루틴, 그리고 다음날/다음 일정을 위해 미리 손 써두는 시간(여행 짐 챙기기, 다음날 식사 미리 준비해두기 등)까지 포함 — 지금 당장이 아니라 다가올 시간을 위해 준비하는 행위 전반(휴식과 구분됨), 업무=주로 노트북으로 하는 작업(가끔 외근 포함), 외출=지인과의 약속이나 혼자 가는 카페/산책 등, 책상=일기·공부·앱 정비·노트정리 등 책상에서 하는 작업, 감상=드라마·독서·영화, 정리=청소·빨래 등 집안 정리)';
+// 리듬 카테고리 분류 설명 — AI 프롬프트에서 시간 사용 데이터를 다룰 때 카테고리 오분류(예: 업무↔작업, 휴식↔감상)를 줄이기 위해 공통으로 붙이는 한 줄 설명.
+const RHYTHM_CAT_GUIDE='(카테고리 참고: 운동=홈트/헬스장/러닝 등, 휴식=낮잠/멍때리기/게임 등 목적 없이 흘려보내는 시간, 단장=기상 후 스트레칭·씻기·스킨케어 등 몸을 준비하는 루틴이나 취침 전 씻고 정돈하는 루틴, 그리고 다음날/다음 일정을 위해 미리 손 써두는 시간(여행 짐 챙기기, 다음날 식사 미리 준비해두기 등)까지 포함 — 지금 당장이 아니라 다가올 시간을 위해 준비하는 행위 전반(휴식과 구분됨), 업무=주로 노트북으로 하는 작업(가끔 외근 포함), 외출=지인과의 약속이나 혼자 가는 카페/산책 등, 작업=일기·공부·앱 정비·노트정리·영상 촬영/편집 등 업무 외 개인 작업, 감상=드라마·독서·영화, 정리=청소·빨래 등 집안 정리)';
 // 활동 카테고리 라벨 목록(수면·식사 제외) — 리듬 막대/집계가 "활동"을 가를 때 공통으로 씀.
 function rhythmActivityLabels(){return Object.values(RHYTHM_CATS).map(function(c){return c.label;});}
 function getRhythmColor(key){
@@ -308,7 +308,7 @@ function openRhythmEditForm(idx){
 }
 // 리듬바 감상 입력 폼에서 진행중 드라마/영화 칩을 누르면 한줄메모 인풋에 제목을 채움.
 // 전체 폼을 다시 그리지 않고 인풋 값만 직접 갱신해 다른 입력값(시작/끝 시각 등) 유지.
-// 책상 카테고리에서 '일기'를 선택하면 '일기' 습관이 있을 경우 자동으로 체크(습관 이름이 바뀌었거나 없으면 조용히 무시).
+// 작업 카테고리에서 '일기'를 선택하면 '일기' 습관이 있을 경우 자동으로 체크(습관 이름이 바뀌었거나 없으면 조용히 무시).
 // rgba(r,g,b,a) 형태의 리듬색에서 배경용으로 알파값만 낮춘 옅은 버전을 만듦(color-mix() 미지원 브라우저 대비).
 function _lightenRgba(rgbaStr,newAlpha){
   const m=rgbaStr.match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/);
@@ -2900,7 +2900,7 @@ const HABIT_COLORS=['pink','lavender','yellow','lime','orange','sky','warmgray']
 // 습관 색상을 연동된 리듬 카테고리 색과 통일 — 리듬바(캘린더/타임라인 등 앱 전역)의
 // 색이 곧 그 활동을 대표하는 색이므로, 습관 그리드에서도 같은 색이 나오면 "이 색=이 활동"이라는
 // 인지가 한 번에 이어짐. 매칭 근거: 운동↔리듬exercise(pink), 정리↔리듬home(lime),
-// 케어↔리듬groom/단장(orange), 일기↔리듬note/책상(yellow), 독서↔리듬enjoy/감상(lavender).
+// 케어↔리듬groom/단장(orange), 일기↔리듬note/작업(yellow), 독서↔리듬enjoy/감상(lavender).
 // 아침기상·영양제는 리듬 카테고리와 직접 연동되는 게 없어 리듬 팔레트와 안 겹치는 색(sky/warmgray)을 배정.
 const HABIT_CATALOG=[
   {id:'exercise',   label:'운동',     icon:'ti-run',          color:'pink'},
@@ -6687,7 +6687,8 @@ const RHYTHM_CLEAN_SUB=[
 const RHYTHM_DESK_SUB=[
   {key:'diary',label:'일기'},
   {key:'notes',label:'노트정리'},
-  {key:'work_personal',label:'개인작업'}
+  {key:'work_personal',label:'개인작업'},
+  {key:'content',label:'콘텐츠'}
 ];
 const RHYTHM_WORK_SUB=[
   {key:'remote',label:'재택'},

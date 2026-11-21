@@ -78,7 +78,7 @@ function pickRandom<T>(pool: T[]): T {
 
 const RHYTHM_CAT_LABELS: Record<string, string> = {
   exercise: "운동", rest: "휴식", groom: "단장", work: "업무",
-  appointment: "외출", note: "책상", enjoy: "감상", home: "정리",
+  appointment: "외출", note: "작업", enjoy: "감상", home: "정리",
 };
 
 const RHYTHM_REMIND_BODIES: Record<string, string[]> = {
@@ -144,7 +144,7 @@ const RHYTHM_REMIND_BODIES_3H: Record<string, string[]> = {
     "긴 외출이었어요. 오늘을 한 줄로 남겨보세요.",
   ],
   note: [
-    "3시간째 책상 앞이에요. 지금까지의 흘름을 남겨볼까요?",
+    "3시간째 작업 중이에요. 지금까지의 흘름을 남겨볼까요?",
   ],
   enjoy: [
     "3시간째 감상 중이에요. 지금까지 느낀 걸 남겨볼까요?",

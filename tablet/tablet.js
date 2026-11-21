@@ -344,12 +344,12 @@ const RHYTHM_CATS={
   groom:{label:'단장',color:'rgba(var(--pal-orange-rgb),0.82)',icon:'ti-mood-spark'},
   work:{label:'업무',color:'rgba(var(--pal-sky-rgb),0.45)',icon:'ti-keyboard'},
   appointment:{label:'외출',color:'rgba(var(--pal-rose-rgb),0.25)',icon:'ti-bus'},
-  note:{label:'책상',color:'rgba(var(--pal-yellow-rgb),0.82)',icon:'ti-desk'},
+  note:{label:'작업',color:'rgba(var(--pal-yellow-rgb),0.82)',icon:'ti-palette'},
   enjoy:{label:'감상',color:'rgba(var(--pal-lavender-rgb),0.80)',icon:'ti-stack-2'},
   home:{label:'정리',color:'rgba(var(--pal-lime-rgb),0.82)',icon:'ti-home'}
 };
 // 리듬 카테고리별 의미 가이드 — 월간리포트 리듬 AI 분석 프롬프트에서 라벨만으론 모호한 카테고리를 짧게 설명(2026-08-22, 정의 누락 수정).
-const RHYTHM_CAT_GUIDE=`카테고리 의미: 운동(신체 활동), 휴식(수면 외 쉼), 단장(씻기·꾸미기 등 자기관리), 업무(일), 외출(이동·약속), 책상(독립적인 개인 작업·자기계발), 감상(영화·책 등 콘텐츠 소비), 정리(청소·집안일).`;
+const RHYTHM_CAT_GUIDE=`카테고리 의미: 운동(신체 활동), 휴식(수면 외 쉼), 단장(씻기·꾸미기 등 자기관리), 업무(일), 외출(이동·약속), 작업(일기·공부·영상 촬영/편집 등 독립적인 개인 작업·자기계발), 감상(영화·책 등 콘텐츠 소비), 정리(청소·집안일).`;
 
 // 앱 출시 첫 달(6월, 0-indexed=5) — 월 중순 시작이라 반달치 데이터라 연간탭 통계 비교에서 왜곡 요인.
 // 습관탭 전체통계(_yrHabitOverallStats)와 리듬탭 GROWING/SHRINKING(renderYrRhythmChangeInsights) 양쪽에서
@@ -1226,7 +1226,7 @@ function _rhythmDurByCatWithDays(rblocks,days){
   Object.keys(daysSeen).forEach(k=>{dayCount[k]=daysSeen[k].size;});
   return {d,total,dayCount};
 }
-// 특정 카테고리 하나만의 합산 분(分) — 생활밸런스(업무/책상 비율) 계산처럼 카테고리 하나만 필요할 때.
+// 특정 카테고리 하나만의 합산 분(分) — 생활밸런스(업무/작업 비율) 계산처럼 카테고리 하나만 필요할 때.
 function _rhythmSumCatMin(rblocks,cat,days){
   return _rhythmDurByCat(rblocks,days).d[cat]||0;
 }
@@ -3707,7 +3707,7 @@ function _mrpWaveSvg(rows,weekCount,tailOverridesByKey){
     weekDetails+
     `<div class="mrp-wave-tail">${tailVals}</div>`;
 }
-// 생활밸런스(업무 대비 개인작업) 목표 비율 — 업무 3시간당 개인작업(책상) 2시간이 이상적이라는 기준(2026-08-22 확정).
+// 생활밸런스(업무 대비 개인작업) 목표 비율 — 업무 3시간당 개인작업(작업 카테고리) 2시간이 이상적이라는 기준(2026-08-22 확정).
 const WORK_NOTE_TARGET_RATIO=2/3;
 async function renderMrpTrajectory(mk,sleepRows,habits,habitChecks,rblocks,weeksInMonth,dim,prevData,cacheRow,heroComment,refContext,vacationRanges){
   const el=document.getElementById('mrp-traj');
@@ -3738,7 +3738,7 @@ async function renderMrpTrajectory(mk,sleepRows,habits,habitChecks,rblocks,weeks
       // 분모는 기존 간이식(습관수×7일) 유지 — 여기선 오프 기간의 체크만 분자에서 제외(완전한 정밀 분모 계산은 이 그래프 용도상 과함)
       return Math.round(_uniqueHabitCheckCount(checks,vacationRanges)/(habits.length*7)*100);
     });
-    // 생활밸런스: 그 주 (책상/업무) 실제비율을 목표비율(2/3)로 나눈 달성률(%). 업무기록이 없는 주는 null.
+    // 생활밸런스: 그 주 (작업/업무) 실제비율을 목표비율(2/3)로 나눈 달성률(%). 업무기록이 없는 주는 null.
     const byWeekBalance=weeksInMonth.map(wk=>{
       const days=getWeekDates(new Date(wk+'T00:00:00'));
       const workMin=_rhythmSumCatMin(rblocks,'work',days);
@@ -6274,7 +6274,7 @@ function renderTimelineHabitBanner(dk,habits,checks){
 // ── 감상 옆: 오늘 vs 어제·지난달 비교 카드 — 두 줄로, 서로 다른 지표에서 가장 특징적인 것 2개를 뽑아 보여줌.
 // 본앱 오후홈탭에 곧 추가될 예정인 동일 컨셉의 아카이브 버전(우선순위 규칙은 독립 설계 — _paceWeekInsight와는
 // 비교 기준(최근7일 vs 어제/같은요일)이 달라 그대로 이식하지 않음).
-const TL_COMPARE_CAT_PHRASE={work:'업무',exercise:'운동',home:'정리',rest:'휴식',note:'책상',enjoy:'감상',groom:'단장'};
+const TL_COMPARE_CAT_PHRASE={work:'업무',exercise:'운동',home:'정리',rest:'휴식',note:'작업',enjoy:'감상',groom:'단장'};
 function _tlRhythmCatDurations(rblocks){
   const dur={};
   (rblocks||[]).forEach(b=>{
@@ -6286,7 +6286,7 @@ function _tlRhythmCatDurations(rblocks){
   return dur;
 }
 // 카테고리 안에서 세부 텍스트별 시간을 합산해, 오늘 그 카테고리를 대표하는 텍스트(가장 오래 쓴 것) 1개를 뽑음.
-// "책상 시간이 길어요"보다 "개인작업 시간이 길어요"처럼 실제 활동명으로 안내하기 위한 용도 — 텍스트가 없으면 null(카테고리명 폴백).
+// "작업 시간이 길어요"보다 "개인작업 시간이 길어요"처럼 실제 활동명으로 안내하기 위한 용도 — 텍스트가 없으면 null(카테고리명 폴백).
 function _tlDominantTextInCat(rblocks,cat){
   const dur={};
   (rblocks||[]).forEach(b=>{
