@@ -11633,9 +11633,11 @@ function libMatch(menu){
   const lib=getMenuLib();
   let e=lib.find(x=>x.name===t);
   if(e)return e;
-  for(const part of t.split(',').map(x=>x.trim()).filter(Boolean)){e=lib.find(x=>x.name===part);if(e)return e;}
-  return null;
+  // 쉼표·+ 로 이어 쓴 메뉴는 조각별로 찾음 — 레시피가 있는 항목을 먼저
+  const hits=libTokens(t).map(p=>lib.find(x=>x.name===p)).filter(Boolean);
+  return hits.find(x=>x.recipe)||hits[0]||null;
 }
+function libTokens(menu){return (menu||'').split(/[,+]/).map(x=>x.trim()).filter(Boolean);}
 let _libTab='wish',_libOpen=null,_libPlacing=null,_libShown=[];
 function toggleMealLibrary(){
   const p=document.getElementById('meal-library-panel');
@@ -11747,7 +11749,7 @@ function refreshLibChip(dk,k){
   const e=libMatch(inp&&inp.value);
   const sv=document.getElementById(`wms-${dk}-${k}`);
   if(e&&e.recipe&&ta&&!ta.value.trim()){
-    box.innerHTML=`<span class="lib-chip" onclick="loadLibRecipe('${dk}','${k}')"><i class="ti ti-notebook" aria-hidden="true"></i>보관함 레시피 불러오기</span>`;
+    box.innerHTML=`<span class="lib-chip" onclick="loadLibRecipe('${dk}','${k}')"><i class="ti ti-notebook" aria-hidden="true"></i>${escapeHtml(e.name)} 레시피 불러오기</span>`;
     box.style.display='block';
   }else if(ta&&ta.value.trim()&&inp&&inp.value.trim()){
     // 메모가 있는 메뉴 — 보관은 원할 때만(자동으로 쌓지 않음). 이미 보관된 상태면 채워진 아이콘, 다시 누르면 보관 취소
@@ -11757,16 +11759,45 @@ function refreshLibChip(dk,k){
   }else{box.style.display='none';box.innerHTML='';}
   if(sv)sv.style.display='none';
 }
+function _closeLibPick(){
+  document.querySelectorAll('.lib-pick').forEach(el=>{el.style.display='none';el.innerHTML='';});
+}
+// 저장 아이콘: 이미 보관됨 → 보관 취소 / 메뉴가 여럿이면 이름 칩 한 줄을 띄워 고르게 / 하나면 바로 저장
 function saveRecipeToLib(dk,k){
-  const inp=document.getElementById(`wm-${dk}-${k}`),ta=document.getElementById(`wmm-${dk}-${k}`);
+  const inp=document.getElementById(`wm-${dk}-${k}`),ta=document.getElementById(`wmm-${dk}-${k}`),pick=document.getElementById(`wmp-${dk}-${k}`);
   const menu=((inp&&inp.value)||'').trim(),recipe=((ta&&ta.value)||'').trim();
   if(!menu||!recipe)return;
+  if(pick&&pick.style.display!=='none'){_closeLibPick();return;}
   const e=libMatch(menu);
   if(e){
-    // 이미 보관됨 → 보관 취소: 위시 항목은 레시피만 비우고, 레시피로 만든 항목은 삭제
-    if(e.recipe){if(e.status==='wish')libSet(e.name,{recipe:''});else libRemove(e.name);}
-    else libSet(e.name,{recipe});
-  }else libSet(menu,{status:'made',recipe,use_count:1,last_used:dk});
+    // 보관 취소: 위시 항목은 레시피만 비우고, 레시피로 만든 항목은 삭제
+    if(e.recipe){
+      if(e.status==='wish')libSet(e.name,{recipe:''});else libRemove(e.name);
+      showToast(`${e.name} 보관 취소`);
+    }else{libSet(e.name,{recipe});showToast(`${e.name} 레시피 보관됨`);}
+    refreshLibChip(dk,k);
+    if(document.getElementById('meal-library-panel').style.display!=='none')renderMealLibrary();
+    return;
+  }
+  const toks=libTokens(menu);
+  if(toks.length<=1||!pick){_doSaveLib(dk,k,menu);return;}
+  pick.innerHTML=toks.map((t,i)=>`<span class="lib-pick-chip" onclick="pickLibName('${dk}','${k}',${i})">${escapeHtml(t)}</span>`).join('')+`<span class="lib-pick-chip all" onclick="pickLibName('${dk}','${k}',-1)">세트 전체</span>`;
+  pick.style.display='flex';
+  setTimeout(()=>{const h=ev=>{if(ev.target.closest('.lib-pick-chip')||ev.target.closest('.lib-save-ic'))return;_closeLibPick();document.removeEventListener('mousedown',h,true);document.removeEventListener('touchstart',h,true);};document.addEventListener('mousedown',h,true);document.addEventListener('touchstart',h,true);},0);
+}
+function pickLibName(dk,k,i){
+  const inp=document.getElementById(`wm-${dk}-${k}`);
+  const menu=((inp&&inp.value)||'').trim(),toks=libTokens(menu);
+  const name=i<0?menu:toks[i];
+  _closeLibPick();
+  if(name)_doSaveLib(dk,k,name);
+}
+function _doSaveLib(dk,k,name){
+  const ta=document.getElementById(`wmm-${dk}-${k}`),recipe=((ta&&ta.value)||'').trim();
+  if(!name||!recipe)return;
+  const ex=getMenuLib().find(x=>x.name===name);
+  if(ex)libSet(name,{recipe});else libSet(name,{status:'made',recipe,use_count:1,last_used:dk});
+  showToast(`${name} 레시피 보관됨`);
   refreshLibChip(dk,k);
   if(document.getElementById('meal-library-panel').style.display!=='none')renderMealLibrary();
 }
@@ -12022,7 +12053,7 @@ function openWeekMealSheet(){
           ? `<span class="meal-time-inp${tVal?'':' mt-empty'}" id="wm-${dk}-${k}-time" data-value="${tVal}" onclick="openMealTimePicker('${dk}','${k}')">${tVal||'--:--'}</span>${tVal?`<span onclick="clearMealTime('${dk}','${k}')" class="meal-time-clear" title="시간 지우기">✕</span>`:''}`
           : (tVal?`<span class="meal-time-readonly">${tVal}</span>`:'');
         const shoot=!!m[k+'_shoot'],out=!!m[k+'_out'],memo=m[k+'_memo']||'';
-        return `<div class="meal-row"><div class="meal-cat${shoot?' shoot':''}${out?' out':''}" id="wmc-${dk}-${k}" onclick="openMealFlagPop('${dk}','${k}')">${out?'외식':label}</div><input class="meal-inp" style="flex:1 1 0;min-width:0;" id="wm-${dk}-${k}" type="text" placeholder="메뉴 입력" autocomplete="off" value="${(m[k]||'').replace(/"/g,'&quot;')}" oninput="onMealMenuInput('${dk}','${k}')" onblur="saveMealMenu('${dk}','${k}')"><div class="meal-time-group">${timeBlock}</div></div><div class="meal-lib-chip-row" id="wml-${dk}-${k}" data-dk="${dk}" data-k="${k}" style="display:none;"></div><div class="meal-memo-row" id="wmr-${dk}-${k}" style="display:${memo?'block':'none'};"><textarea class="meal-memo" id="wmm-${dk}-${k}" rows="1" placeholder="메모 (레시피 등)" oninput="onMealMemoInput('${dk}','${k}',this)" onblur="saveMealMemo('${dk}','${k}')">${escapeHtml(memo)}</textarea><i class="ti ti-bookmark lib-save-ic" id="wms-${dk}-${k}" style="display:none;" title="보관함에 저장" onmousedown="event.preventDefault()" onclick="saveRecipeToLib('${dk}','${k}')"></i></div>`;
+        return `<div class="meal-row"><div class="meal-cat${shoot?' shoot':''}${out?' out':''}" id="wmc-${dk}-${k}" onclick="openMealFlagPop('${dk}','${k}')">${out?'외식':label}</div><input class="meal-inp" style="flex:1 1 0;min-width:0;" id="wm-${dk}-${k}" type="text" placeholder="메뉴 입력" autocomplete="off" value="${(m[k]||'').replace(/"/g,'&quot;')}" oninput="onMealMenuInput('${dk}','${k}')" onblur="saveMealMenu('${dk}','${k}')"><div class="meal-time-group">${timeBlock}</div></div><div class="meal-lib-chip-row" id="wml-${dk}-${k}" data-dk="${dk}" data-k="${k}" style="display:none;"></div><div class="meal-memo-row" id="wmr-${dk}-${k}" style="display:${memo?'block':'none'};"><textarea class="meal-memo" id="wmm-${dk}-${k}" rows="1" placeholder="메모 (레시피 등)" oninput="onMealMemoInput('${dk}','${k}',this)" onblur="saveMealMemo('${dk}','${k}')">${escapeHtml(memo)}</textarea><i class="ti ti-bookmark lib-save-ic" id="wms-${dk}-${k}" style="display:none;" title="보관함에 저장" onmousedown="event.preventDefault()" onclick="saveRecipeToLib('${dk}','${k}')"></i><div class="lib-pick" id="wmp-${dk}-${k}" style="display:none;"></div></div>`;
       }).join('');
     body.appendChild(block);
   }

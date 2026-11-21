@@ -340,6 +340,9 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .meal-time-btn{flex-shrink:0;width:20px;height:20px;border-radius:50%;border:1.2px solid rgba(160,190,140,0.55);background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgba(95,140,75,0.75);padding:0;}
 .cal-detail-row .meal-time-btn,.cal-detail-row .meal-time-tag{align-self:center;}
 .cal-detail-row .meal-time-tag{padding-top:0;}
+.lib-pick{flex-wrap:wrap;gap:6px;margin:6px 0 2px;}
+.lib-pick-chip{font-size:var(--dow-label-size);padding:4px 10px;border-radius:999px;border:1px solid var(--pal-mint-border);color:var(--pal-mint-text);background:rgba(var(--pal-mint-rgb),0.22);cursor:pointer;}
+.lib-pick-chip.all{border-style:dashed;background:none;color:var(--ts);}
 .lib-save-ic{position:absolute;left:-26px;top:5px;font-size:16px;color:var(--pal-mint-text);cursor:pointer;opacity:.85;}
 
 .meal-time-btn:active{background:rgba(190,230,205,0.30);}
@@ -2904,7 +2907,7 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
   </div>
 </div>
 
-<script src="app.js?v=20261122g"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
+<script src="app.js?v=20261122h"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
 
 </body>
 </html>
