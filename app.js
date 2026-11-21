@@ -11650,6 +11650,9 @@ function placeWish(el){
 function toggleMealFlag(dk,k,field){
   const on=!getMeals(dk)[k+'_'+field];
   patchMealField(dk,k,field,on);
+  // 촬영과 외식은 동시에 켜지 않음 — 하나를 켜면 다른 하나는 꺼짐
+  const other=field==='shoot'?'out':'shoot';
+  if(on&&getMeals(dk)[k+'_'+other])patchMealField(dk,k,other,false);
   _refreshMealCat(dk,k);
   renderMealShootStat();
 }
@@ -11672,7 +11675,8 @@ function closeMealFlagPop(){
 }
 function _mealFlagOutside(e){
   const pop=document.getElementById('meal-flag-pop');
-  if(pop&&!pop.contains(e.target))closeMealFlagPop();
+  // 라벨(제목) 자체를 누른 경우는 라벨의 onclick이 열고 닫기를 처리하므로 여기선 닫지 않음
+  if(pop&&!pop.contains(e.target)&&!(e.target.closest&&e.target.closest('.meal-cat')))closeMealFlagPop();
 }
 function openMealFlagPop(dk,k){
   const same=document.getElementById('meal-flag-pop');
@@ -11710,11 +11714,13 @@ function onMealMemoInput(dk,k,el){
 function saveMealMemo(dk,k){
   const tk=dk+'|'+k;
   clearTimeout(_mealMemoTimers[tk]);delete _mealMemoTimers[tk];
-  if(!_mealMemoDirty[tk])return;
-  delete _mealMemoDirty[tk];
   const el=document.getElementById(`wmm-${dk}-${k}`);
   if(!el)return;
   const val=el.value.trim();
+  // 비어 있으면 메모 줄을 접음(열기만 하고 안 쓴 경우 포함)
+  if(!val){const row=document.getElementById(`wmr-${dk}-${k}`);if(row)row.style.display='none';}
+  if(!_mealMemoDirty[tk])return;
+  delete _mealMemoDirty[tk];
   if(val===(getMeals(dk)[k+'_memo']||''))return;
   patchMealField(dk,k,'memo',val);
 }
