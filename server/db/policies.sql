@@ -17,6 +17,7 @@ alter table public.habit_checks enable row level security;
 alter table public.habits enable row level security;
 alter table public.meals enable row level security;
 alter table public.meal_entries enable row level security;
+alter table public.menu_library enable row level security;
 alter table public.memos enable row level security;
 alter table public.push_subscriptions enable row level security;
 alter table public.reading_quotes enable row level security;
@@ -48,6 +49,7 @@ create policy "allow_all" on public.habit_checks for all to anon, authenticated 
 create policy "allow_all" on public.habits for all to anon, authenticated using (true) with check (true);
 create policy "allow_all" on public.meals for all to anon, authenticated using (true) with check (true);
 create policy "allow_all" on public.meal_entries for all to anon, authenticated using (true) with check (true);
+create policy "allow_all" on public.menu_library for all to anon, authenticated using (true) with check (true);
 create policy "allow_all" on public.memos for all to anon, authenticated using (true) with check (true);
 create policy "allow_all" on public.reading_quotes for all to anon, authenticated using (true) with check (true);
 create policy "allow_all" on public.rhythm_blocks for all to anon, authenticated using (true) with check (true);

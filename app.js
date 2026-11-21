@@ -4487,7 +4487,7 @@ async function _syncHCUpAndClear(wk){
 // 시도하고(오프라인이면 아예 안 함) 실패해도 표시가 남지 않아, 다음 내려받기 때 서버의 옛 값으로 덮여 사라질 수 있었음.
 // 이제 저장할 때 'gpend:<이름>'을 세우고, 업로드가 성공하고 그 사이 값이 바뀌지 않았을 때만 지움.
 // 내려받기는 대기 표시가 있으면 서버 값으로 덮지 않고 먼저 올림. 남은 대기는 retryAllPending(5-2)이 날짜와 상관없이 다시 올림.
-// 이름: goal_notes의 note_key 그대로(oneline:YYYY-MM-DD, mgoal:YYYY-MM, reading_dates, wishlist:meal, habit_goals) + habits, recurring_items.
+// 이름: goal_notes의 note_key 그대로(oneline:YYYY-MM-DD, mgoal:YYYY-MM, reading_dates, habit_goals) + habits, recurring_items.
 const GPEND_PREFIX='gpend:';
 function markGPending(name){S.set(GPEND_PREFIX+name,true);}
 function isGPending(name){return !!S.get(GPEND_PREFIX+name);}
@@ -4793,7 +4793,7 @@ function hasAnyPendingSync(){
   // 함께 확인 — 이 게이트에서 빠지면 syncAll 자체가 안 불려 아래 syncAll 내부 재시도까지 도달 못 함.
   return !!(S.get(S.key('todos_pending',dk))||getDelPendingCids('todos',dk).length||
     S.get(S.key('memos_pending',dk))||getDelPendingCids('memos',dk).length||
-    (S.get(S.key('meals_fields_pending',dk))||[]).length||S.get(S.key('sleep_pending',dk))||
+    (S.get(S.key('meals_fields_pending',dk))||[]).length||Object.keys(S.get('menu_library_pending')||{}).length||(S.get('menu_library_del')||[]).length||S.get(S.key('sleep_pending',dk))||
     S.get(S.key('contents_pending',mk))||getDelPendingCids('contents',mk).length||S.get('wchallenge_pending_'+wk)||
     S.get(S.key('rblocks_pending',dk))||getDelPendingCids('rblocks',dk).length||S.get('hc_pending_'+wk)||
     _collectPendingTargets().length);
@@ -4940,7 +4940,7 @@ function switchToTab(v,direction){
   document.querySelector('.scroll').scrollTop=0;
   _todoPartModeIdx=-1;
   if(_weeklyRhythmFormOpen){_weeklyRhythmFormOpen=false;_rhythmFormOpen=false;_resetRhythmForm();}
-  if(_wishPlacing)cancelWishPlacing();
+  if(_libPlacing)cancelLibPlacing();
   if(v==='daily')loadDaily();
   else if(v==='weekly')loadWeekly();
   else if(v==='monthly')loadMonthly();
@@ -11558,64 +11558,160 @@ function loadMonthly(){
 // ── MODAL / SHEET HELPERS
 function openModal(id){const el=document.getElementById(id);document.body.appendChild(el);el.classList.add('on');}
 function closeModal(id,e){if(!e||e.target===document.getElementById(id)){document.getElementById(id).classList.remove('on');NumPad.close();}}
-function getMealWishlist(){return getGoal('wishlist:meal').filter(l=>l&&l.trim());}
-function saveMealWishlist(arr){saveGoal('wishlist:meal',arr.length?arr:['']);}
-function toggleMealWishlist(){
-  const p=document.getElementById('meal-wishlist-panel');
-  if(p.style.display==='none'){renderMealWishlist();p.style.display='block';}
+// ── 메뉴 보관함: 먹고 싶음(wish) / 해 먹은 것(made) + 레시피 — 표 menu_library(메뉴 이름 하나가 한 줄)
+// 로컬 모양: [{name,status,recipe,use_count,last_used}]. 서버로는 "바뀐 필드만" 올려(menu_library_pending: 이름→필드 목록)
+// 다른 기기가 고친 다른 필드를 덮어쓰지 않음. 삭제는 menu_library_del 대기열.
+const LIB_FIELDS=['status','recipe','use_count','last_used'];
+function getMenuLib(){return S.get('menu_library')||[];}
+function libFind(name){return getMenuLib().find(e=>e.name===name);}
+// 만들기·고치기는 이 한 곳으로 — 로컬 반영 + 바뀐 필드만 서버 대기열에 표시
+function libSet(name,patch){
+  const lib=getMenuLib();let e=lib.find(x=>x.name===name);
+  const isNew=!e;
+  if(isNew){e={name,status:'wish',recipe:'',use_count:0,last_used:''};lib.push(e);}
+  Object.assign(e,patch);
+  S.set('menu_library',lib);
+  const p=S.get('menu_library_pending')||{};
+  p[name]=[...new Set([...(p[name]||[]),...(isNew?LIB_FIELDS:Object.keys(patch))])];
+  S.set('menu_library_pending',p);
+  syncMenuLibUp();
+}
+function libRemove(name){
+  S.set('menu_library',getMenuLib().filter(e=>e.name!==name));
+  const p=S.get('menu_library_pending')||{};delete p[name];S.set('menu_library_pending',p);
+  S.set('menu_library_del',[...new Set([...(S.get('menu_library_del')||[]),name])]);
+  syncMenuLibUp();
+}
+function _libVal(e,f){return f==='use_count'?(e[f]||0):(e[f]||'');}
+let _libSyncing=false;
+async function syncMenuLibUp(){
+  if(_libSyncing||!navigator.onLine)return;
+  _libSyncing=true;
+  try{
+    for(const n of [...(S.get('menu_library_del')||[])]){
+      const ok=await supaFetch(`menu_library?name=eq.${encodeURIComponent(n)}`,'DELETE');
+      if(ok)S.set('menu_library_del',(S.get('menu_library_del')||[]).filter(x=>x!==n));
+    }
+    const pend=S.get('menu_library_pending')||{};
+    for(const name of Object.keys(pend)){
+      const e=libFind(name);
+      const cur0=S.get('menu_library_pending')||{};
+      if(!e){delete cur0[name];S.set('menu_library_pending',cur0);continue;}
+      const fields=[...pend[name]];
+      const row={name,updated_at:new Date().toISOString()};
+      fields.forEach(f=>{row[f]=f==='use_count'?(e[f]||0):(e[f]||null);});
+      const ok=await supaUpsert('menu_library','name',[row]);
+      if(!ok)continue;
+      // 올리는 사이에 같은 칸을 또 고쳤으면 그 칸의 대기 표시는 유지
+      const cur=S.get('menu_library_pending')||{},now=libFind(name);
+      cur[name]=(cur[name]||[]).filter(f=>!(now&&fields.includes(f)&&_libVal(now,f)===_libVal(e,f)));
+      if(!cur[name].length)delete cur[name];
+      S.set('menu_library_pending',cur);
+    }
+  }finally{_libSyncing=false;}
+}
+async function syncMenuLibDown(){
+  await syncMenuLibUp();
+  const rows=await supaFetch('menu_library?order=updated_at.desc');
+  if(!rows)return;
+  const pend=S.get('menu_library_pending')||{},dels=S.get('menu_library_del')||[],local=getMenuLib(),next=[];
+  rows.forEach(r=>{
+    if(dels.includes(r.name))return;
+    const o={name:r.name,status:r.status,recipe:r.recipe||'',use_count:r.use_count||0,last_used:r.last_used||''};
+    const l=local.find(x=>x.name===r.name);
+    (pend[r.name]||[]).forEach(f=>{if(l)o[f]=l[f];}); // 아직 못 올린 로컬 수정은 서버값으로 덮지 않음
+    next.push(o);
+  });
+  local.forEach(l=>{if(pend[l.name]&&!next.some(n=>n.name===l.name))next.push(l);}); // 아직 못 올린 새 항목
+  S.set('menu_library',next);
+  const panel=document.getElementById('meal-library-panel');
+  if(panel&&panel.style.display!=='none')renderMealLibrary();
+}
+// 메뉴 입력 글자에서 보관함 항목 찾기 — 이름 전체가 같거나, 쉼표로 이어 붙인 조각 중 하나가 같을 때
+function libMatch(menu){
+  const t=(menu||'').trim();if(!t)return null;
+  const lib=getMenuLib();
+  let e=lib.find(x=>x.name===t);
+  if(e)return e;
+  for(const part of t.split(',').map(x=>x.trim()).filter(Boolean)){e=lib.find(x=>x.name===part);if(e)return e;}
+  return null;
+}
+let _libTab='wish',_libOpen=null,_libPlacing=null,_libShown=[];
+function toggleMealLibrary(){
+  const p=document.getElementById('meal-library-panel');
+  if(p.style.display==='none'){renderMealLibrary();p.style.display='block';syncMenuLibDown();}
   else p.style.display='none';
 }
-function renderMealWishlist(){
-  const p=document.getElementById('meal-wishlist-panel');
-  const items=getMealWishlist();
-  p.innerHTML='<div class="wish-add-row"><input id="wish-add-inp" class="meal-inp" type="text" placeholder="먹고싶은 메뉴 추가" autocomplete="off" onkeydown="if(event.isComposing||event.keyCode===229)return;if(event.key===\'Enter\'){event.preventDefault();addMealWish();}"><button class="wish-add-btn" onclick="addMealWish()">+</button></div>'+
-    (items.length?items.map((t,i)=>`<div class="wish-item"><span class="wish-text" onclick="editMealWish(${i},this)">${escapeHtml(t)}</span><span class="wish-place-btn" onclick="startWishPlacing(${i})">넣기</span><span class="wish-del-btn" onclick="removeMealWish(${i})">✕</span></div>`).join(''):'<div style="font-size:var(--dow-label-size);color:var(--tm);padding:6px 2px;">아직 담아둔 메뉴가 없어요</div>');
+function setLibTab(t){_libTab=t;_libOpen=null;renderMealLibrary();}
+function renderMealLibrary(){
+  const p=document.getElementById('meal-library-panel');
+  if(!p)return;
+  const lib=getMenuLib();
+  const wish=lib.filter(e=>e.status==='wish'),made=lib.filter(e=>e.status==='made').sort((a,b)=>(b.last_used||'').localeCompare(a.last_used||''));
+  _libShown=_libTab==='wish'?wish:made;
+  const tab=(k,label,n)=>`<span class="lib-tab${_libTab===k?' on':''}" onclick="setLibTab('${k}')">${label} ${n}</span>`;
+  const add=_libTab==='wish'?'<div class="wish-add-row"><input id="lib-add-inp" class="meal-inp" type="text" placeholder="먹고싶은 메뉴 추가" autocomplete="off" onkeydown="if(event.isComposing||event.keyCode===229)return;if(event.key===\'Enter\'){event.preventDefault();addLibItem();}"><button class="wish-add-btn" onclick="addLibItem()">+</button></div>':'';
+  const md=dk=>{if(!dk)return '';const [,m,d]=dk.split('-');return `${+m}/${+d}`;};
+  const rows=_libShown.map((e,i)=>{
+    const sub=e.status==='made'&&e.last_used?`<div class="lib-sub">마지막 ${md(e.last_used)} · ${e.use_count||0}번</div>`:'';
+    const open=_libOpen===e.name;
+    const detail=open?`<div class="lib-detail"><input class="meal-inp" id="lib-name-inp" type="text" value="${escapeHtml(e.name).replace(/"/g,'&quot;')}" autocomplete="off" onblur="renameLibItem(${i},this)"><textarea class="meal-memo" id="lib-recipe-inp" rows="1" placeholder="레시피" oninput="_autoGrowMemo(this)" onblur="saveLibRecipe(${i},this)">${escapeHtml(e.recipe||'')}</textarea></div>`:'';
+    return `<div class="wish-item"><div style="flex:1;min-width:0;cursor:pointer;" onclick="toggleLibItem(${i})"><div class="wish-text" style="cursor:pointer;">${escapeHtml(e.name)}</div>${sub}</div>${e.recipe?'<i class="ti ti-notebook lib-ic" aria-hidden="true"></i>':''}<span class="wish-place-btn" onclick="startLibPlacing(${i})">넣기</span><span class="wish-del-btn" onclick="deleteLibItem(${i})">✕</span></div>${detail}`;
+  }).join('');
+  const empty=_libTab==='wish'?'먹고 싶은 메뉴를 추가해 보세요.':'메뉴판에 넣거나 레시피를 적으면 여기에 쌓여요.';
+  p.innerHTML=`<div class="lib-tabs">${tab('wish','먹고 싶음',wish.length)}${tab('made','해 먹은 것',made.length)}</div>${add}`+
+    (rows||`<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:8px 0;">${empty}</div>`);
+  const ta=document.getElementById('lib-recipe-inp');if(ta)_autoGrowMemo(ta);
 }
-function editMealWish(i,spanEl){
-  const items=getMealWishlist();
-  const cur=items[i];if(cur==null)return;
-  const inp=document.createElement('input');
-  inp.type='text';inp.className='meal-inp';inp.value=cur;inp.autocomplete='off';
-  inp.style.cssText='flex:1;font-size:var(--main-text-size);';
-  function commit(){
-    const v=inp.value.trim();
-    if(v){items[i]=v;saveMealWishlist(items);}
-    renderMealWishlist();
-  }
-  inp.addEventListener('keydown',e=>{
-    if(e.isComposing||e.keyCode===229)return;
-    if(e.key==='Enter'){e.preventDefault();commit();}
-  });
-  inp.addEventListener('blur',commit);
-  spanEl.replaceWith(inp);
-  inp.focus();inp.select();
+function toggleLibItem(i){
+  const e=_libShown[i];if(!e)return;
+  _libOpen=_libOpen===e.name?null:e.name;
+  renderMealLibrary();
 }
-function addMealWish(){
-  const inp=document.getElementById('wish-add-inp');
+function addLibItem(){
+  const inp=document.getElementById('lib-add-inp');
   const v=inp.value.trim();if(!v)return;
-  const items=getMealWishlist();items.push(v);saveMealWishlist(items);
-  inp.value='';renderMealWishlist();
+  if(!libFind(v))libSet(v,{status:'wish'});
+  inp.value='';renderMealLibrary();
 }
-function removeMealWish(i){
-  const items=getMealWishlist();items.splice(i,1);saveMealWishlist(items);renderMealWishlist();
+function deleteLibItem(i){
+  const e=_libShown[i];if(!e)return;
+  if(e.recipe&&!confirm('레시피까지 함께 지워져요. 삭제할까요?'))return;
+  libRemove(e.name);
+  if(_libOpen===e.name)_libOpen=null;
+  renderMealLibrary();
 }
-let _wishPlacing=null,_wishPlacingIdx=null;
-function startWishPlacing(i){
-  const items=getMealWishlist();
-  _wishPlacing=items[i];if(!_wishPlacing)return;
-  _wishPlacingIdx=i;
-  document.querySelectorAll('#week-meal-body .meal-inp').forEach(el=>el.classList.add('wish-target'));
-  document.getElementById('wish-placing-hint').style.display='block';
+function renameLibItem(i,el){
+  const e=_libShown[i];if(!e)return;
+  const v=el.value.trim();
+  if(!v||v===e.name)return;
+  if(libFind(v)){el.value=e.name;return;} // 같은 이름이 이미 있으면 그대로 둠
+  const copy={...e};
+  libRemove(e.name);
+  libSet(v,{status:copy.status,recipe:copy.recipe,use_count:copy.use_count,last_used:copy.last_used});
+  _libOpen=v;renderMealLibrary();
 }
-function cancelWishPlacing(){
-  _wishPlacing=null;_wishPlacingIdx=null;
-  document.querySelectorAll('#week-meal-body .meal-inp').forEach(el=>el.classList.remove('wish-target'));
-  const hintEl=document.getElementById('wish-placing-hint');
+function saveLibRecipe(i,el){
+  const e=_libShown[i];if(!e)return;
+  const v=el.value.trim();
+  if(v!==(e.recipe||''))libSet(e.name,{recipe:v});
+}
+function startLibPlacing(i){
+  const e=_libShown[i];if(!e)return;
+  _libPlacing=e.name;
+  document.querySelectorAll('#week-meal-body .meal-inp').forEach(el=>el.classList.add('lib-target'));
+  document.getElementById('lib-placing-hint').style.display='block';
+}
+function cancelLibPlacing(){
+  _libPlacing=null;
+  document.querySelectorAll('#week-meal-body .meal-inp').forEach(el=>el.classList.remove('lib-target'));
+  const hintEl=document.getElementById('lib-placing-hint');
   if(hintEl)hintEl.style.display='none';
 }
-function placeWish(el){
-  if(!_wishPlacing)return;
-  el.value=el.value?el.value+', '+_wishPlacing:_wishPlacing;
+function placeLib(el){
+  if(!_libPlacing)return;
+  const name=_libPlacing;
+  el.value=el.value?el.value+', '+name:name;
   // onblur로만 저장되는 구조라, 배치 직후엔 아직 blur가 안 일어난 상태 — 명시적으로 저장 호출.
   // el.id는 wm-${dk}-${k} 형식(dk 자체에 '-'가 포함되므로 마지막 조각만 k, 나머지가 dk).
   const idParts=el.id.split('-');
@@ -11623,29 +11719,74 @@ function placeWish(el){
     const dk=idParts.slice(1,-1).join('-'),k=idParts[idParts.length-1];
     _mealDirty[dk+'|'+k]=true; // 화면 값만 바꾼 상태라 입력한 칸으로 표시해야 저장됨
     saveMealMenu(dk,k);
+    // 칸에 넣은 메뉴는 "해 먹은 것"으로 — 이름·레시피는 남고 횟수와 마지막 날짜가 갱신됨
+    const e=libFind(name);
+    libSet(name,{status:'made',use_count:((e&&e.use_count)||0)+1,last_used:dk});
+    refreshLibChip(dk,k);
   }
-  // 특정 날짜 칸에 배치됐으니 위시리스트에서 제거
-  if(_wishPlacingIdx!=null){
-    const items=getMealWishlist();
-    items.splice(_wishPlacingIdx,1);
-    saveMealWishlist(items);
-    renderMealWishlist();
-  }
-  cancelWishPlacing();
+  cancelLibPlacing();
+  renderMealLibrary();
 }
 (function(){
   const body=document.getElementById('week-meal-body');
   if(!body)return;
   const handler=function(e){
-    if(!_wishPlacing)return;
+    if(!_libPlacing)return;
     const el=e.target.closest('.meal-inp');
     if(!el)return;
     e.preventDefault();
-    placeWish(el);
+    placeLib(el);
   };
   body.addEventListener('mousedown',handler);
   body.addEventListener('touchstart',handler,{passive:false});
 })();
+// 메뉴 이름이 보관함에 있고 레시피가 있으면 메모 줄 위에 [보관함 레시피 불러오기] 칩 — 메모가 비어 있을 때만
+function refreshLibChip(dk,k){
+  const box=document.getElementById(`wml-${dk}-${k}`);if(!box)return;
+  const inp=document.getElementById(`wm-${dk}-${k}`),ta=document.getElementById(`wmm-${dk}-${k}`);
+  const e=libMatch(inp&&inp.value);
+  if(e&&e.recipe&&ta&&!ta.value.trim()){
+    box.innerHTML=`<span class="lib-chip" onclick="loadLibRecipe('${dk}','${k}')"><i class="ti ti-notebook" aria-hidden="true"></i>보관함 레시피 불러오기</span>`;
+    box.style.display='block';
+  }else if(!e&&ta&&ta.value.trim()&&inp&&inp.value.trim()){
+    // 메모는 있는데 보관함에 없는 메뉴 — 원할 때만 보관(자동으로 쌓지 않음)
+    box.innerHTML=`<span class="lib-chip" onclick="saveRecipeToLib('${dk}','${k}')"><i class="ti ti-bookmark" aria-hidden="true"></i>보관함에 저장</span>`;
+    box.style.display='block';
+  }else{box.style.display='none';box.innerHTML='';}
+}
+function saveRecipeToLib(dk,k){
+  const inp=document.getElementById(`wm-${dk}-${k}`),ta=document.getElementById(`wmm-${dk}-${k}`);
+  const menu=((inp&&inp.value)||'').trim(),recipe=((ta&&ta.value)||'').trim();
+  if(!menu||!recipe||libMatch(menu))return;
+  libSet(menu,{status:'made',recipe,use_count:1,last_used:dk});
+  refreshLibChip(dk,k);
+  if(document.getElementById('meal-library-panel').style.display!=='none')renderMealLibrary();
+}
+function loadLibRecipe(dk,k){
+  const inp=document.getElementById(`wm-${dk}-${k}`),ta=document.getElementById(`wmm-${dk}-${k}`),row=document.getElementById(`wmr-${dk}-${k}`);
+  const e=libMatch(inp&&inp.value);
+  if(!e||!e.recipe||!ta)return;
+  ta.value=e.recipe;
+  if(row)row.style.display='block';
+  _autoGrowMemo(ta);
+  _mealMemoDirty[dk+'|'+k]=true;
+  saveMealMemo(dk,k);
+  libSet(e.name,{status:'made',use_count:(e.use_count||0)+1,last_used:dk});
+  refreshLibChip(dk,k);
+  if(document.getElementById('meal-library-panel').style.display!=='none')renderMealLibrary();
+}
+// 메모에 레시피를 적거나 고치면, 보관함에 같은 이름이 이미 있을 때만 그 레시피를 덮어씀(새 항목은 [보관함에 저장]을 눌러야 만들어짐).
+// 메모를 비운 건 그날 기록만 지우고 보관함 레시피는 그대로 둠.
+function syncRecipeToLib(dk,k,val){
+  if(!val)return;
+  const inp=document.getElementById(`wm-${dk}-${k}`);
+  const menu=((inp&&inp.value)||getMeals(dk)[k]||'').trim();
+  if(!menu)return;
+  const e=libMatch(menu);
+  if(e&&(e.recipe||'')!==val)libSet(e.name,{recipe:val});
+  refreshLibChip(dk,k);
+  if(document.getElementById('meal-library-panel').style.display!=='none')renderMealLibrary();
+}
 // 끼니 라벨을 탭하면 작은 선택 칩([촬영][외식][메모])이 뜸 — 표시가 늘어도 칩만 추가하면 됨. 외식이 켜지면 라벨 글자가 "외식"으로 바뀜.
 function toggleMealFlag(dk,k,field){
   const on=!getMeals(dk)[k+'_'+field];
@@ -11706,6 +11847,7 @@ function _autoGrowMemo(el){el.style.height='auto';el.style.height=el.scrollHeigh
 const _mealMemoTimers={},_mealMemoDirty={};
 function onMealMemoInput(dk,k,el){
   _autoGrowMemo(el);
+  refreshLibChip(dk,k);
   const tk=dk+'|'+k;
   _mealMemoDirty[tk]=true;
   clearTimeout(_mealMemoTimers[tk]);
@@ -11723,6 +11865,7 @@ function saveMealMemo(dk,k){
   delete _mealMemoDirty[tk];
   if(val===(getMeals(dk)[k+'_memo']||''))return;
   patchMealField(dk,k,'memo',val);
+  syncRecipeToLib(dk,k,val);
 }
 // 촬영·외식으로 켠 끼니 수 — 이번 주(월~일)·이번 달. 시트에 보이는 14일은 로컬 값, 그 밖의 날은 서버에서 한 번 받아온 값.
 let _flagServer={};
@@ -11771,6 +11914,7 @@ const _mealInpTimers={},_mealDirty={};
 function onMealMenuInput(dk,k){
   const tk=dk+'|'+k;
   _mealDirty[tk]=true;
+  refreshLibChip(dk,k);
   clearTimeout(_mealInpTimers[tk]);
   _mealInpTimers[tk]=setTimeout(()=>{
     delete _mealInpTimers[tk];
@@ -11843,8 +11987,8 @@ function refreshMealTimeGroup(dk,k,tVal){
   }
 }
 function openWeekMealSheet(){
-  cancelWishPlacing();
-  document.getElementById('meal-wishlist-panel').style.display='none';
+  cancelLibPlacing();
+  document.getElementById('meal-library-panel').style.display='none';
   const now=new Date();
   const mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7));
   const body=document.getElementById('week-meal-body');
@@ -11870,12 +12014,13 @@ function openWeekMealSheet(){
           ? `<span class="meal-time-inp${tVal?'':' mt-empty'}" id="wm-${dk}-${k}-time" data-value="${tVal}" onclick="openMealTimePicker('${dk}','${k}')">${tVal||'--:--'}</span>${tVal?`<span onclick="clearMealTime('${dk}','${k}')" class="meal-time-clear" title="시간 지우기">✕</span>`:''}`
           : (tVal?`<span class="meal-time-readonly">${tVal}</span>`:'');
         const shoot=!!m[k+'_shoot'],out=!!m[k+'_out'],memo=m[k+'_memo']||'';
-        return `<div class="meal-row"><div class="meal-cat${shoot?' shoot':''}${out?' out':''}" id="wmc-${dk}-${k}" onclick="openMealFlagPop('${dk}','${k}')">${out?'외식':label}</div><input class="meal-inp" style="flex:1 1 0;min-width:0;" id="wm-${dk}-${k}" type="text" placeholder="메뉴 입력" autocomplete="off" value="${(m[k]||'').replace(/"/g,'&quot;')}" oninput="onMealMenuInput('${dk}','${k}')" onblur="saveMealMenu('${dk}','${k}')"><div class="meal-time-group">${timeBlock}</div></div><div class="meal-memo-row" id="wmr-${dk}-${k}" style="display:${memo?'block':'none'};"><textarea class="meal-memo" id="wmm-${dk}-${k}" rows="1" placeholder="메모 (레시피 등)" oninput="onMealMemoInput('${dk}','${k}',this)" onblur="saveMealMemo('${dk}','${k}')">${escapeHtml(memo)}</textarea></div>`;
+        return `<div class="meal-row"><div class="meal-cat${shoot?' shoot':''}${out?' out':''}" id="wmc-${dk}-${k}" onclick="openMealFlagPop('${dk}','${k}')">${out?'외식':label}</div><input class="meal-inp" style="flex:1 1 0;min-width:0;" id="wm-${dk}-${k}" type="text" placeholder="메뉴 입력" autocomplete="off" value="${(m[k]||'').replace(/"/g,'&quot;')}" oninput="onMealMenuInput('${dk}','${k}')" onblur="saveMealMenu('${dk}','${k}')"><div class="meal-time-group">${timeBlock}</div></div><div class="meal-lib-chip-row" id="wml-${dk}-${k}" data-dk="${dk}" data-k="${k}" style="display:none;"></div><div class="meal-memo-row" id="wmr-${dk}-${k}" style="display:${memo?'block':'none'};"><textarea class="meal-memo" id="wmm-${dk}-${k}" rows="1" placeholder="메모 (레시피 등)" oninput="onMealMemoInput('${dk}','${k}',this)" onblur="saveMealMemo('${dk}','${k}')">${escapeHtml(memo)}</textarea></div>`;
       }).join('');
     body.appendChild(block);
   }
   openSheet('week-meal-sheet');
   body.querySelectorAll('.meal-memo').forEach(_autoGrowMemo);
+  body.querySelectorAll('.meal-lib-chip-row').forEach(el=>refreshLibChip(el.dataset.dk,el.dataset.k));
   loadMealShootStat();
   const todayDk=dateKey(now);
   const tEl=document.getElementById('wm-block-'+todayDk);
@@ -12148,7 +12293,7 @@ function closeSettings(){document.getElementById('settings-ov').classList.remove
 // - device에는 서버에 없는 값 중 백업할 것만(자기소개·테마·글자 크기). API 키·이이타비 접근키는 넣지 않음
 // - 업로드 대기 중인(아직 서버에 없는) 수정은 포함되지 않음 → 대기 표시가 있으면 먼저 동기화를 시도
 const BACKUP_TABLES={ // 표 이름: 정렬 기준(페이지 나눠 받을 때 순서 고정용 — 기본키)
-  todos:'id',memos:'id',rhythm_blocks:'id',sleep:'id',meals:'id',meal_entries:'id',contents:'id',content_daily_log:'id',
+  todos:'id',memos:'id',rhythm_blocks:'id',sleep:'id',meals:'id',meal_entries:'id',menu_library:'id',contents:'id',content_daily_log:'id',
   habits:'id',habit_checks:'id',goal_notes:'id',reading_quotes:'id',recurring_items:'id',recurring_exceptions:'id',
   user_settings:'id',calendar_links:'apple_key',calendar_sync_rules:'id',ai_cache:'cache_key',trip_items:'id'
 };
@@ -14742,7 +14887,7 @@ async function initSync(){
     // 습관 / 습관체크 — 항상 동기화 (이전엔 syncAll에만 있어서 PC 사파리 등 새 탭에서 누락되던 버그)
     await syncHabitsDown();
     await syncHabitGoalsDown();
-    await syncGoalDown('wishlist:meal');
+    await syncMenuLibDown();
     await syncGoalDown('reading_dates');
     // 책은 contents(cat='book')로 통합됨 — 서재가 여러 달에 걸쳐 있으므로 최근 여러 달치를 다운로드.
     // pending 업로드는 saveContents가 이미 자체적으로 처리(contents_pending)하므로 별도 루프 불필요.

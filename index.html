@@ -354,8 +354,16 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .wish-item{display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px dashed rgba(var(--divider-rgb),0.22);}
 .wish-text{flex:1;font-size:var(--main-text-size);color:var(--tp);cursor:pointer;}
 .wish-place-btn{font-size:var(--dow-label-size);color:rgba(85,135,100,0.9);background:rgba(190,230,205,0.28);border-radius:7px;padding:4px 8px;cursor:pointer;flex-shrink:0;white-space:nowrap;}
+.lib-tabs{display:flex;gap:6px;margin:0 0 10px;}
+.lib-tab{font-size:var(--dow-label-size);padding:5px 10px;border-radius:999px;border:1px solid rgba(var(--divider-rgb),0.38);color:var(--ts);cursor:pointer;}
+.lib-tab.on{background:var(--pal-mint-bg);border-color:var(--pal-mint-border);color:var(--pal-mint-text);font-weight:600;}
+.lib-sub{font-size:var(--dow-label-size);color:var(--tm);}
+.lib-ic{font-size:15px;color:var(--pal-mint-text);flex-shrink:0;}
+.lib-detail{margin:2px 0 8px 2px;}
+.lib-chip{display:inline-flex;align-items:center;gap:4px;font-size:var(--dow-label-size);border-radius:999px;padding:4px 10px;background:var(--pal-mint-bg);color:var(--pal-mint-text);border:1px solid var(--pal-mint-border);cursor:pointer;}
+.meal-lib-chip-row{margin:0 0 6px 44px;}
 .wish-del-btn{font-size:var(--dow-label-size);color:var(--tm);cursor:pointer;padding:2px 4px;flex-shrink:0;}
-.meal-inp.wish-target{background:rgba(190,230,205,0.18);border-radius:6px;}
+.meal-inp.lib-target{background:rgba(190,230,205,0.18);border-radius:6px;}
 .month-chips{display:flex;gap:6px;margin-bottom:16px;overflow-x:auto;padding-bottom:2px;}
 .snooze-chip{flex:1;min-width:0;text-align:center;font-size:var(--dow-label-size);color:var(--tp);padding:8px 0;border-radius:12px;background:transparent;border:none;cursor:pointer;font-weight:500;white-space:nowrap;} /* 할일 알림 스누즈 팝업 칩(4개 한 줄) — 키별 팔레트 색(오늘 저녁 칩이 빠져도 색이 밀리지 않게 nth-child 대신 키 클래스) */
 .snooze-chip.snooze-m30{background:var(--pal-pink-bg);color:var(--pal-pink-text);}
@@ -1938,13 +1946,13 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
     <div style="padding:0 20px 20px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px;">
         <div class="goal-section-title" style="margin:0;background:rgba(190,230,205,0.30);color:rgba(85,135,100,0.90);border:1px solid rgba(150,190,165,0.45);box-shadow:none;" onclick="closeWeekMealSheet()"><i class="ti ti-tools-kitchen-3 ico-13" aria-hidden="true"></i> 주간 식사 계획</div>
-        <button class="wish-round-btn" onclick="toggleMealWishlist()" title="먹고싶은 메뉴">
+        <button class="wish-round-btn" onclick="toggleMealLibrary()" title="메뉴 보관함">
           <i class="ti ti-chef-hat" style="font-size:16px;" aria-hidden="true"></i>
         </button>
       </div>
       <div id="meal-shoot-stat" style="font-size:var(--dow-label-size);color:var(--pal-pink-text);margin:-6px 0 12px;"></div>
-      <div id="meal-wishlist-panel" style="display:none;margin-bottom:14px;"></div>
-      <div id="wish-placing-hint" style="display:none;font-size:var(--dow-label-size);color:rgba(100,140,75,0.85);background:rgba(150,215,180,0.14);border-radius:8px;padding:7px 10px;margin-bottom:10px;text-align:center;cursor:pointer;" onclick="cancelWishPlacing()">넣을 칸을 눌러주세요 · 취소하려면 여기를 누르세요</div>
+      <div id="meal-library-panel" style="display:none;margin-bottom:14px;"></div>
+      <div id="lib-placing-hint" style="display:none;font-size:var(--dow-label-size);color:rgba(100,140,75,0.85);background:rgba(150,215,180,0.14);border-radius:8px;padding:7px 10px;margin-bottom:10px;text-align:center;cursor:pointer;" onclick="cancelLibPlacing()">넣을 칸을 눌러주세요 · 취소하려면 여기를 누르세요</div>
       <div id="week-meal-scroll" style="max-height:50vh;overflow-y:auto;">
         <div id="week-meal-body"></div>
       </div>
@@ -2889,7 +2897,7 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
   </div>
 </div>
 
-<script src="app.js?v=20261122b"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
+<script src="app.js?v=20261122c"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
 
 </body>
 </html>
