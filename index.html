@@ -315,6 +315,19 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .meal-time-group{display:flex;align-items:center;gap:1px;flex-shrink:0;min-width:56px;justify-content:flex-end;}
 .meal-time-clear{cursor:pointer;color:var(--tm);font-size:var(--dow-label-size);padding:0 3px 0 0;flex-shrink:0;}
 .meal-cat{width:38px;flex-shrink:0;font-size:var(--dow-label-size);color:var(--tm);margin-right:6px;}
+.meal-cat{cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;text-align:center;border-radius:6px;padding:1px 0;}
+.meal-cat.shoot,#daily-meal-card .cal-detail-time.shoot{color:var(--pal-pink-text);}
+.meal-cat.shoot{background:var(--pal-pink-bg);font-weight:600;}
+.meal-cat.out,#daily-meal-card .cal-detail-time.out{color:var(--pal-sky-text);font-weight:600;}
+.meal-cat.out{background:var(--pal-sky-bg);}
+.meal-cat.shoot.out{background:var(--pal-pink-bg);}
+.meal-flag-pop{position:fixed;z-index:9999;display:flex;gap:6px;padding:6px;border-radius:12px;background:var(--card);border:1px solid rgba(var(--divider-rgb),0.38);box-shadow:0 4px 14px rgba(0,0,0,0.14);}
+.meal-flag-chip{border:1px solid rgba(var(--divider-rgb),0.38);background:none;color:var(--ts);font-family:'DM Sans',sans-serif;font-size:var(--dow-label-size);padding:4px 10px;border-radius:999px;cursor:pointer;}
+.meal-flag-chip.shoot.on{background:var(--pal-pink-bg);color:var(--pal-pink-text);border-color:var(--pal-pink-border);font-weight:600;}
+.meal-flag-chip.out.on{background:var(--pal-sky-bg);color:var(--pal-sky-text);border-color:var(--pal-sky-border);font-weight:600;}
+.meal-memo-row{margin:0 0 6px 44px;}
+.meal-memo{display:block;width:100%;box-sizing:border-box;resize:none;overflow:hidden;background:none;border:none;border-bottom:1px dashed rgba(var(--divider-rgb),0.38);outline:none;font-family:'DM Sans',sans-serif;font-size:var(--dow-label-size);line-height:1.5;color:var(--ts);padding:3px 2px;}
+.meal-memo-line{font-size:var(--dow-label-size);color:var(--ts);line-height:1.5;white-space:pre-wrap;margin-top:1px;}
 .meal-time-inp{width:62px;flex-shrink:0;background:none;border:none;outline:none;font-family:'DM Sans',sans-serif;font-size:var(--main-text-size);color:var(--ts);padding:5px 2px 4px 6px;text-align:right;font-variant-numeric:tabular-nums;cursor:pointer;}
 .cm-star-picker{display:flex;gap:3px;flex:1;}
 .pl-item-play{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
@@ -1930,6 +1943,7 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
           <i class="ti ti-chef-hat" style="font-size:16px;" aria-hidden="true"></i>
         </button>
       </div>
+      <div id="meal-shoot-stat" style="font-size:var(--dow-label-size);color:var(--pal-pink-text);margin:-6px 0 12px;"></div>
       <div id="meal-wishlist-panel" style="display:none;margin-bottom:14px;"></div>
       <div id="wish-placing-hint" style="display:none;font-size:var(--dow-label-size);color:rgba(100,140,75,0.85);background:rgba(150,215,180,0.14);border-radius:8px;padding:7px 10px;margin-bottom:10px;text-align:center;cursor:pointer;" onclick="cancelWishPlacing()">넣을 칸을 눌러주세요 · 취소하려면 여기를 누르세요</div>
       <div id="week-meal-scroll" style="max-height:50vh;overflow-y:auto;">
@@ -2876,7 +2890,7 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
   </div>
 </div>
 
-<script src="app.js?v=20261121a"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
+<script src="app.js?v=20261122a"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
 
 </body>
 </html>

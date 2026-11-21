@@ -1063,6 +1063,13 @@ async function _runMemoSearch(q){
 }
 
 const MEAL_KEYS=['breakfast','lunch','snack','dinner'];
+// meal_entries(끼니당 1행) → 렌더 코드가 쓰는 하루 1객체 모양. 행이 하나도 없으면 null(식사 기록 없음).
+function mealEntriesToRow(rows){
+  if(!rows||!rows.length)return null;
+  const o={};
+  rows.forEach(r=>{if(!MEAL_KEYS.includes(r.slot))return;o[r.slot]=r.menu||'';o[r.slot+'_time']=r.meal_time||'';});
+  return o;
+}
 const MEAL_LABELS={breakfast:'아침',lunch:'점심',snack:'간식',dinner:'저녁'};
 
 // habit_checks를 "날짜+습관명" 조합 기준으로 중복 제거해서 세는 통합 헬퍼.
@@ -6089,7 +6096,7 @@ async function loadTimelineTab(){
     supaFetch(`sleep?date_key=eq.${dk}`),
     supaFetch(`habits?order=sort_order.asc`),
     supaFetch(`habit_checks?date_key=eq.${dk}`),
-    supaFetch(`meals?date_key=eq.${dk}`),
+    supaFetch(`meal_entries?date_key=eq.${dk}`),
     supaFetch(`contents?or=(status.eq.watching,and(status.eq.done,end_date.eq.${dk}),start_date.eq.${dk})&order=created.desc&limit=10`),
     supaFetch(`rhythm_blocks?date_key=eq.${dk}&order=start_time.asc`),
     supaFetch(`goal_notes?note_key=eq.${encodeURIComponent('wcal_manual_'+dk.slice(0,7))}`),
@@ -6112,7 +6119,7 @@ async function loadTimelineTab(){
   if(myGen!==_tlLoadGen)return;
 
   const sleep=sleepRows&&sleepRows[0];
-  const mealsRow=meals&&meals[0];
+  const mealsRow=mealEntriesToRow(meals); // 끼니당 1행(meal_entries) → 예전 하루 1객체 모양(breakfast/breakfast_time…)
 
   // 할일/메모/감상/하루한줄 렌더 — 일정과 타임테이블은 토글 없이 나란히 동시 노출.
   // renderTodayOnelineHl/renderTodayMemos는 async(내부에서 supaFetch로 추가 조회)라 await 없이 그냥 호출하면

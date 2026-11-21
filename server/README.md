@@ -13,7 +13,7 @@
 | `workers/ocr-prox.js` | 구글 비전 OCR 중계 | Cloudflare Worker |
 | `workers/aladin-book-proxy.js` | 알라딘 책 페이지 수 조회 | Cloudflare Worker |
 | `../worker-photo-proxy.js` (저장소 루트) | 사진 올리기·보기·지우기 (R2) | Cloudflare Worker |
-| `db/schema.sql` | 표·제약·인덱스 | Supabase DB |
+| `db/schema.sql` | 표·제약·인덱스 (식사는 `meal_entries` 끼니당 1행, 옛 `meals`는 보관용) | Supabase DB |
 | `db/policies.sql` | 접근 정책(RLS) — 3단계 전환 전 원래 상태 | Supabase DB |
 | `db/functions.sql` | DB 함수·트리거 | Supabase DB |
 | `db/cron.sql` | 예약 작업(pg_cron) | Supabase DB |

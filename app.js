@@ -200,9 +200,9 @@ async function syncRhythmBlocksDown(dk){
 // (특히 LTE/콜드스타트에서) 로딩이 길어짐. date_key=in.(...) 한 번으로 묶어 왕복을 1회로 줄임.
 // 매핑 로직은 각 syncXDown의 기존 rowToLocal/변환 그대로 재사용 — 중복 재구현 안 함.
 // pending 있는 날짜는 덮어쓰지 않는 것도 syncXDown과 동일하게 유지.
-async function _syncManyDown(table,dks,pendingKey,mapFn,setFn){
+async function _syncManyDown(table,dks,pendingKey,mapFn,setFn,orderCol='created'){
   if(!dks.length)return;
-  const rows=await supaFetch(`${table}?date_key=in.(${dks.join(',')})&order=created`);
+  const rows=await supaFetch(`${table}?date_key=in.(${dks.join(',')})&order=${orderCol}`);
   if(!rows)return; // 연결 실패 — 로컬 유지
   const byDk={};
   dks.forEach(dk=>{byDk[dk]=[];});
@@ -264,10 +264,10 @@ async function syncSleepDownMany(dks){
   await _syncManyDown('sleep',dks,'sleep_pending',sleepRowToLocal,(dk,mapped)=>{if(mapped.length)S.set(S.key('sleep',dk),mapped[0]);});
 }
 async function syncMealsDownMany(dks){
-  await _syncManyDown('meals',dks,null,mealRowToLocal,(dk,mapped)=>{
+  await _syncManyDown('meal_entries',dks,null,r=>r,(dk,rows)=>{
     if((S.get(S.key('meals_fields_pending',dk))||[]).length)return; // 업로드 대기중인 필드 있으면 덮어쓰지 않음
-    if(mapped.length)S.set(S.key('meals',dk),mapped[0]);
-  });
+    if(rows.length)S.set(S.key('meals',dk),mealRowsToLocal(rows));
+  },'created_at');
 }
 async function syncRhythmBlocksDownMany(dks){
   await _syncManyDown('rhythm_blocks',dks,'rblocks_pending',rhythmBlockRowToLocal,
@@ -3869,10 +3869,23 @@ function getSleepScoreLevel(score){
 const MEAL_LABELS={breakfast:'아침',lunch:'점심',dinner:'저녁',snack:'간식'};
 const MEAL_KEYS=['breakfast','lunch','snack','dinner'];
 function getMeals(dk){return S.get(S.key('meals',dk))||{};}
-// meals 서버 row(단일 객체) → 로컬 저장 포맷 변환. 서버에서 내려온 3군데 지점이 모두 이 함수를 거침.
-function mealRowToLocal(r){
-  return {breakfast:r.breakfast||'',lunch:r.lunch||'',dinner:r.dinner||'',snack:r.snack||'',breakfast_time:r.breakfast_time||'',lunch_time:r.lunch_time||'',dinner_time:r.dinner_time||'',snack_time:r.snack_time||''};
+// meal_entries 서버 행들(끼니당 1행, 한 날짜분) → 로컬 저장 포맷(하루 한 객체) 변환. 서버에서 내려온 3군데 지점이 모두 이 함수를 거침. 로컬 모양은 예전 그대로라 화면 코드는 건드릴 필요 없음.
+function mealRowsToLocal(rows){
+  const o={};
+  MEAL_KEYS.forEach(k=>{o[k]='';o[k+'_time']='';o[k+'_shoot']=false;o[k+'_memo']='';o[k+'_out']=false;});
+  rows.forEach(r=>{
+    const k=r.slot;if(!MEAL_KEYS.includes(k))return;
+    o[k]=r.menu||'';o[k+'_time']=r.meal_time||'';o[k+'_shoot']=!!r.shoot;o[k+'_memo']=r.memo||'';o[k+'_out']=!!r.eating_out;
+  });
+  return o;
 }
+// 로컬 pending 컬럼 이름(breakfast / breakfast_time / breakfast_shoot / breakfast_memo) ↔ 서버 meal_entries(끼니 한 줄) 컬럼
+const MEAL_FIELD_COL={menu:'menu',time:'meal_time',shoot:'shoot',memo:'memo',out:'eating_out'};
+function _mealColToSlotField(col){
+  const m=col.match(/^(breakfast|lunch|snack|dinner)(?:_(time|shoot|memo|out))?$/);
+  return m?{slot:m[1],field:m[2]||'menu'}:null;
+}
+function _mealLocalToServer(local,col,field){return (field==='shoot'||field==='out')?!!local[col]:(local[col]||null);}
 // 식사 필드 단위 저장 — 메뉴명 또는 시간 중 "실제로 바뀐 필드 하나"만 로컬 갱신 + 서버 patch.
 // 예전엔 그 날 4끼 전체를 객체로 합쳐 통째로 push하는 구조라, 로컬 캐시가 최신이 아닌
 // 상태(예: 다른 기기에서 방금 등록한 시간을 아직 못 받아온 상태)에서 메뉴만 고쳐도
@@ -3881,7 +3894,7 @@ function mealRowToLocal(r){
 // 로컬이 낡아 있어도 서버의 다른 필드를 건드릴 방법 자체가 없음.
 function patchMealField(dk,key,field,value){
   const m=getMeals(dk);
-  const col=field==='time'?key+'_time':key;
+  const col=field==='menu'?key:key+'_'+field; // field: menu | time | shoot | memo
   m[col]=value;
   S.set(S.key('meals',dk),m);
   const pend=S.get(S.key('meals_fields_pending',dk))||[];
@@ -4283,11 +4296,11 @@ async function _syncSleepUpAndClear(dk){
   return ok;
 }
 async function syncMealsDown(dk){
-  const rows=await supaFetch(`meals?date_key=eq.${dk}`);
+  const rows=await supaFetch(`meal_entries?date_key=eq.${dk}`);
   if(!rows)return; // 연결 실패(null) — 로컬 유지
   if((S.get(S.key('meals_fields_pending',dk))||[]).length)return; // 업로드 대기중인 필드 있으면 덮어쓰지 않음
   if(!rows.length)return;
-  S.set(S.key('meals',dk),mealRowToLocal(rows[0]));
+  S.set(S.key('meals',dk),mealRowsToLocal(rows));
 }
 // 필드 단위 patch — pending 큐에 쌓인 컬럼만 골라서 서버로 보냄(나머지 컬럼은 손대지 않음).
 // resolution=merge-duplicates upsert는 body에 없는 컬럼을 기존값 그대로 두므로,
@@ -4296,16 +4309,34 @@ async function syncMealsUp(dk){
   const pend=S.get(S.key('meals_fields_pending',dk))||[];
   if(!pend.length)return true;
   const local=getMeals(dk);
-  const row={date_key:dk,created:Date.now()};
-  pend.forEach(col=>{row[col]=local[col]||null;});
-  const ok=await supaUpsert('meals','date_key',[row]);
-  // 업로드 도중 같은 칸을 다시 고쳤으면 그 칸은 대기 표시를 유지 — 보낸 값과 지금 로컬 값이 같은 칸만 해제.
-  if(ok){
-    const now=getMeals(dk);
-    S.set(S.key('meals_fields_pending',dk),(S.get(S.key('meals_fields_pending',dk))||[]).filter(c=>!(pend.includes(c)&&(now[c]||null)===row[c])));
+  // 끼니(slot)별로 "바뀐 필드만" 담아 요청 하나씩 — 일괄 upsert는 키가 다른 행의 빠진 컬럼을 null로 채워 덮어쓰므로 끼니마다 따로 보냄.
+  // (body에 없는 컬럼은 서버 값 그대로 두므로, 로컬이 낡아 있어도 서버의 다른 필드를 덮어쓸 방법이 없음 — 예전 구조와 같은 원칙)
+  const bySlot={},sent={};
+  const drop=[]; // 해석할 수 없는 옛 대기 표시는 올릴 수 없으니 정리
+  pend.forEach(col=>{
+    const p=_mealColToSlotField(col);
+    if(!p){drop.push(col);return;}
+    const v=_mealLocalToServer(local,col,p.field);
+    sent[col]=v;
+    (bySlot[p.slot]=bySlot[p.slot]||{date_key:dk,slot:p.slot})[MEAL_FIELD_COL[p.field]]=v;
+  });
+  const okCols=[...drop];
+  let allOk=true;
+  for(const slot of Object.keys(bySlot)){
+    const ok=await supaUpsert('meal_entries','date_key,slot',[bySlot[slot]]);
+    if(ok){pend.forEach(col=>{const p=_mealColToSlotField(col);if(p&&p.slot===slot)okCols.push(col);});}
+    else allOk=false;
   }
+  // 업로드 도중 같은 칸을 다시 고쳤으면 그 칸은 대기 표시를 유지 — 보낸 값과 지금 로컬 값이 같은 칸만 해제.
+  const now=getMeals(dk);
+  S.set(S.key('meals_fields_pending',dk),(S.get(S.key('meals_fields_pending',dk))||[]).filter(c=>{
+    if(!okCols.includes(c))return true;
+    if(drop.includes(c))return false;
+    const p=_mealColToSlotField(c);
+    return _mealLocalToServer(now,c,p.field)!==sent[c];
+  }));
   if(dk===dateKey(currentDate))renderTodayMeal();
-  return !!ok;
+  return allOk;
 }
 async function syncHabitsDown(){
   if(isGPending('habits')||getDelPendingCids('habits','global').length){await gpendUpAndClear('habits');return;}
@@ -10536,7 +10567,7 @@ async function syncMonthRange(y,mo){
     supaFetch(`memos?date_key=gte.${start}&date_key=lte.${end}&order=created`),
     supaFetch(`todos?date_key=gte.${start}&date_key=lte.${end}&order=created`),
     supaFetch(`sleep?date_key=gte.${start}&date_key=lte.${end}`),
-    supaFetch(`meals?date_key=gte.${start}&date_key=lte.${end}`),
+    supaFetch(`meal_entries?date_key=gte.${start}&date_key=lte.${end}`),
     supaFetch(`habit_checks?date_key=gte.${start}&date_key=lte.${end}`),
     supaFetch(`rhythm_blocks?date_key=gte.${start}&date_key=lte.${end}&order=created`)
   ]);
@@ -10566,16 +10597,20 @@ async function syncMonthRange(y,mo){
     }
   }
   if(sRows)sRows.forEach(r=>{if(!S.get(S.key('sleep_pending',r.date_key)))S.set(S.key('sleep',r.date_key),sleepRowToLocal(r));});
-  if(mlRows)mlRows.forEach(r=>{
-    const pend=S.get(S.key('meals_fields_pending',r.date_key))||[];
-    const serverRow=mealRowToLocal(r);
-    if(!pend.length){S.set(S.key('meals',r.date_key),serverRow);return;}
-    // pending인 필드(아직 서버로 못 올라간 로컬 수정)만 로컬값 유지, 나머지는 서버값 반영.
-    const local=getMeals(r.date_key);
-    const merged={...serverRow};
-    pend.forEach(col=>{merged[col]=local[col];});
-    S.set(S.key('meals',r.date_key),merged);
-  });
+  if(mlRows){
+    const byDate={};
+    mlRows.forEach(r=>{(byDate[r.date_key]=byDate[r.date_key]||[]).push(r);});
+    Object.keys(byDate).forEach(dk=>{
+      const pend=S.get(S.key('meals_fields_pending',dk))||[];
+      const serverRow=mealRowsToLocal(byDate[dk]);
+      if(!pend.length){S.set(S.key('meals',dk),serverRow);return;}
+      // pending인 필드(아직 서버로 못 올라간 로컬 수정)만 로컬값 유지, 나머지는 서버값 반영.
+      const local=getMeals(dk);
+      const merged={...serverRow};
+      pend.forEach(col=>{merged[col]=local[col];});
+      S.set(S.key('meals',dk),merged);
+    });
+  }
   if(rbRows){
     const byDate={};
     // 공용 매핑(rhythmBlockRowToLocal)을 써야 contentCid·autoClosed가 빠지지 않음(감사 P1-3 — 자체 매핑이 두 필드를 누락해
@@ -11080,7 +11115,8 @@ function renderTodayMeal(){
   items.forEach(k=>{
     const t=m[k+'_time'];
     const timeHtml=t?`<span class="meal-time-tag">${tabularTimeHtml(t)}</span>`:`<button class="meal-time-btn" onclick="recordMealTime('${dk}','${k}')" title="식사 시간 기록"><i class="ti ti-check" style="font-size:10px;" aria-hidden="true"></i></button>`;
-    html+=`<div class="cal-detail-row"><span class="cal-detail-time">${MEAL_LABELS[k]}</span><span class="cal-detail-text" style="flex:1;">${escapeHtml(m[k])}</span>${timeHtml}</div>`;
+    const memoHtml=m[k+'_memo']?`<div class="meal-memo-line">${escapeHtml(m[k+'_memo'])}</div>`:'';
+    html+=`<div class="cal-detail-row"><span class="cal-detail-time${m[k+'_shoot']?' shoot':''}${m[k+'_out']?' out':''}">${m[k+'_out']?'외식':MEAL_LABELS[k]}</span><span class="cal-detail-text" style="flex:1;">${escapeHtml(m[k])}${memoHtml}</span>${timeHtml}</div>`;
   });
   el.innerHTML=html||'<div style="font-size:var(--dow-label-size);color:var(--tm);text-align:center;padding:8px 0;">주간 메뉴판에서 적어보세요</div>';
 }
@@ -11610,24 +11646,107 @@ function placeWish(el){
   body.addEventListener('mousedown',handler);
   body.addEventListener('touchstart',handler,{passive:false});
 })();
-let _mealCatPressTimer=null;
-function mealCatPressStart(el,dk,k){
-  clearTimeout(_mealCatPressTimer);
-  _mealCatPressTimer=setTimeout(()=>{
-    const tEl=document.getElementById(`wm-${dk}-${k}-time`);
-    if(tEl&&tEl.value){
-      tEl.value='';
-      patchMealField(dk,k,'time','');
-      refreshMealTimeGroup(dk,k,'');
-      el.style.transition='opacity .15s';el.style.opacity='0.3';
-      setTimeout(()=>{el.style.opacity='';},220);
-    }
-    _mealCatPressTimer=null;
-  },550);
+// 끼니 라벨을 탭하면 작은 선택 칩([촬영][외식][메모])이 뜸 — 표시가 늘어도 칩만 추가하면 됨. 외식이 켜지면 라벨 글자가 "외식"으로 바뀜.
+function toggleMealFlag(dk,k,field){
+  const on=!getMeals(dk)[k+'_'+field];
+  patchMealField(dk,k,field,on);
+  _refreshMealCat(dk,k);
+  renderMealShootStat();
 }
-function mealCatPressEnd(){
-  clearTimeout(_mealCatPressTimer);
-  _mealCatPressTimer=null;
+function _refreshMealCat(dk,k){
+  const m=getMeals(dk),el=document.getElementById(`wmc-${dk}-${k}`);
+  if(!el)return;
+  el.classList.toggle('shoot',!!m[k+'_shoot']);
+  el.classList.toggle('out',!!m[k+'_out']);
+  el.textContent=m[k+'_out']?'외식':MEAL_LABELS[k];
+  const pop=document.getElementById('meal-flag-pop');
+  if(pop&&pop.dataset.dk===dk&&pop.dataset.k===k){
+    pop.querySelector('[data-f="shoot"]').classList.toggle('on',!!m[k+'_shoot']);
+    pop.querySelector('[data-f="out"]').classList.toggle('on',!!m[k+'_out']);
+  }
+}
+function closeMealFlagPop(){
+  const pop=document.getElementById('meal-flag-pop');
+  if(pop)pop.remove();
+  document.removeEventListener('pointerdown',_mealFlagOutside,true);
+}
+function _mealFlagOutside(e){
+  const pop=document.getElementById('meal-flag-pop');
+  if(pop&&!pop.contains(e.target))closeMealFlagPop();
+}
+function openMealFlagPop(dk,k){
+  const same=document.getElementById('meal-flag-pop');
+  const wasSame=same&&same.dataset.dk===dk&&same.dataset.k===k;
+  closeMealFlagPop();
+  if(wasSame)return;
+  const anchor=document.getElementById(`wmc-${dk}-${k}`);
+  if(!anchor)return;
+  const m=getMeals(dk),r=anchor.getBoundingClientRect();
+  const pop=document.createElement('div');
+  pop.id='meal-flag-pop';pop.className='meal-flag-pop';pop.dataset.dk=dk;pop.dataset.k=k;
+  pop.innerHTML=`<button type="button" data-f="shoot" class="meal-flag-chip shoot${m[k+'_shoot']?' on':''}" onclick="toggleMealFlag('${dk}','${k}','shoot')">촬영</button><button type="button" data-f="out" class="meal-flag-chip out${m[k+'_out']?' on':''}" onclick="toggleMealFlag('${dk}','${k}','out')">외식</button><button type="button" class="meal-flag-chip" onclick="closeMealFlagPop();openMealMemo('${dk}','${k}')">메모</button>`;
+  document.body.appendChild(pop);
+  const w=pop.offsetWidth;
+  pop.style.top=(r.bottom+4)+'px';
+  pop.style.left=Math.max(8,Math.min(r.left,window.innerWidth-w-8))+'px';
+  document.addEventListener('pointerdown',_mealFlagOutside,true);
+}
+function openMealMemo(dk,k){
+  const row=document.getElementById(`wmr-${dk}-${k}`),ta=document.getElementById(`wmm-${dk}-${k}`);
+  if(!row||!ta)return;
+  row.style.display='block';
+  _autoGrowMemo(ta);
+  ta.focus();
+}
+function _autoGrowMemo(el){el.style.height='auto';el.style.height=el.scrollHeight+'px';}
+const _mealMemoTimers={},_mealMemoDirty={};
+function onMealMemoInput(dk,k,el){
+  _autoGrowMemo(el);
+  const tk=dk+'|'+k;
+  _mealMemoDirty[tk]=true;
+  clearTimeout(_mealMemoTimers[tk]);
+  _mealMemoTimers[tk]=setTimeout(()=>saveMealMemo(dk,k),800);
+}
+function saveMealMemo(dk,k){
+  const tk=dk+'|'+k;
+  clearTimeout(_mealMemoTimers[tk]);delete _mealMemoTimers[tk];
+  if(!_mealMemoDirty[tk])return;
+  delete _mealMemoDirty[tk];
+  const el=document.getElementById(`wmm-${dk}-${k}`);
+  if(!el)return;
+  const val=el.value.trim();
+  if(val===(getMeals(dk)[k+'_memo']||''))return;
+  patchMealField(dk,k,'memo',val);
+}
+// 촬영·외식으로 켠 끼니 수 — 이번 주(월~일)·이번 달. 시트에 보이는 14일은 로컬 값, 그 밖의 날은 서버에서 한 번 받아온 값.
+let _flagServer={};
+function _mealFlagCountOf(dk,field,shownFrom,shownTo){
+  if(dk>=shownFrom&&dk<=shownTo){const m=getMeals(dk);return MEAL_KEYS.filter(k=>m[k+'_'+field]).length;}
+  return (_flagServer[dk]&&_flagServer[dk][field])||0;
+}
+function _mealShootRanges(){
+  const now=new Date();
+  const mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7));
+  const sun=new Date(mon);sun.setDate(mon.getDate()+6);
+  const shownTo=new Date(mon);shownTo.setDate(mon.getDate()+13);
+  const mStart=new Date(now.getFullYear(),now.getMonth(),1),mEnd=new Date(now.getFullYear(),now.getMonth()+1,0);
+  return {mon,sun,mStart,mEnd,shownFrom:dateKey(mon),shownTo:dateKey(shownTo)};
+}
+function renderMealShootStat(){
+  const el=document.getElementById('meal-shoot-stat');if(!el)return;
+  const r=_mealShootRanges();
+  const sum=(a,b,f)=>{let n=0;for(const d=new Date(a);d<=b;d.setDate(d.getDate()+1))n+=_mealFlagCountOf(dateKey(d),f,r.shownFrom,r.shownTo);return n;};
+  el.innerHTML=`촬영 · 이번 주 ${sum(r.mon,r.sun,'shoot')}끼 · 이번 달 ${sum(r.mStart,r.mEnd,'shoot')}끼<br>외식 · 이번 주 ${sum(r.mon,r.sun,'out')}끼 · 이번 달 ${sum(r.mStart,r.mEnd,'out')}끼`;
+}
+async function loadMealShootStat(){
+  renderMealShootStat();
+  const r=_mealShootRanges();
+  const a=dateKey(r.mon<r.mStart?r.mon:r.mStart),b=dateKey(r.sun>r.mEnd?r.sun:r.mEnd);
+  const rows=await supaFetch(`meal_entries?select=date_key,shoot,eating_out&or=(shoot.eq.true,eating_out.eq.true)&date_key=gte.${a}&date_key=lte.${b}`);
+  if(!rows)return;
+  _flagServer={};
+  rows.forEach(x=>{const o=_flagServer[x.date_key]=_flagServer[x.date_key]||{shoot:0,out:0};if(x.shoot)o.shoot++;if(x.eating_out)o.out++;});
+  renderMealShootStat();
 }
 // 시간 입력창(type=time) 자체엔 지우기 버튼이 없어 한번 넣은 시간을 못 지우던 문제 — 별도 X 버튼으로 지원.
 function clearMealTime(dk,k){
@@ -11655,6 +11774,7 @@ function onMealMenuInput(dk,k){
 }
 function flushWeekMealInputs(){
   Object.keys(_mealDirty).forEach(tk=>{const [dk,k]=tk.split('|');saveMealMenu(dk,k);});
+  Object.keys(_mealMemoDirty).forEach(tk=>{const [dk,k]=tk.split('|');saveMealMemo(dk,k);});
 }
 function closeWeekMealSheet(e){
   const ov=document.getElementById('week-meal-sheet');
@@ -11743,11 +11863,14 @@ function openWeekMealSheet(){
         const timeBlock=_isTouchDevice()
           ? `<span class="meal-time-inp${tVal?'':' mt-empty'}" id="wm-${dk}-${k}-time" data-value="${tVal}" onclick="openMealTimePicker('${dk}','${k}')">${tVal||'--:--'}</span>${tVal?`<span onclick="clearMealTime('${dk}','${k}')" class="meal-time-clear" title="시간 지우기">✕</span>`:''}`
           : (tVal?`<span class="meal-time-readonly">${tVal}</span>`:'');
-        return `<div class="meal-row"><div class="meal-cat" onpointerdown="mealCatPressStart(this,'${dk}','${k}')" onpointerup="mealCatPressEnd(this)" onpointerleave="mealCatPressEnd(this)" onpointercancel="mealCatPressEnd(this)">${label}</div><input class="meal-inp" style="flex:1 1 0;min-width:0;" id="wm-${dk}-${k}" type="text" placeholder="메뉴 입력" autocomplete="off" value="${(m[k]||'').replace(/"/g,'&quot;')}" oninput="onMealMenuInput('${dk}','${k}')" onblur="saveMealMenu('${dk}','${k}')"><div class="meal-time-group">${timeBlock}</div></div>`;
+        const shoot=!!m[k+'_shoot'],out=!!m[k+'_out'],memo=m[k+'_memo']||'';
+        return `<div class="meal-row"><div class="meal-cat${shoot?' shoot':''}${out?' out':''}" id="wmc-${dk}-${k}" onclick="openMealFlagPop('${dk}','${k}')">${out?'외식':label}</div><input class="meal-inp" style="flex:1 1 0;min-width:0;" id="wm-${dk}-${k}" type="text" placeholder="메뉴 입력" autocomplete="off" value="${(m[k]||'').replace(/"/g,'&quot;')}" oninput="onMealMenuInput('${dk}','${k}')" onblur="saveMealMenu('${dk}','${k}')"><div class="meal-time-group">${timeBlock}</div></div><div class="meal-memo-row" id="wmr-${dk}-${k}" style="display:${memo?'block':'none'};"><textarea class="meal-memo" id="wmm-${dk}-${k}" rows="1" placeholder="메모 (레시피 등)" oninput="onMealMemoInput('${dk}','${k}',this)" onblur="saveMealMemo('${dk}','${k}')">${escapeHtml(memo)}</textarea></div>`;
       }).join('');
     body.appendChild(block);
   }
   openSheet('week-meal-sheet');
+  body.querySelectorAll('.meal-memo').forEach(_autoGrowMemo);
+  loadMealShootStat();
   const todayDk=dateKey(now);
   const tEl=document.getElementById('wm-block-'+todayDk);
   const scroller=document.getElementById('week-meal-scroll');
@@ -12019,7 +12142,7 @@ function closeSettings(){document.getElementById('settings-ov').classList.remove
 // - device에는 서버에 없는 값 중 백업할 것만(자기소개·테마·글자 크기). API 키·이이타비 접근키는 넣지 않음
 // - 업로드 대기 중인(아직 서버에 없는) 수정은 포함되지 않음 → 대기 표시가 있으면 먼저 동기화를 시도
 const BACKUP_TABLES={ // 표 이름: 정렬 기준(페이지 나눠 받을 때 순서 고정용 — 기본키)
-  todos:'id',memos:'id',rhythm_blocks:'id',sleep:'id',meals:'id',contents:'id',content_daily_log:'id',
+  todos:'id',memos:'id',rhythm_blocks:'id',sleep:'id',meals:'id',meal_entries:'id',contents:'id',content_daily_log:'id',
   habits:'id',habit_checks:'id',goal_notes:'id',reading_quotes:'id',recurring_items:'id',recurring_exceptions:'id',
   user_settings:'id',calendar_links:'apple_key',calendar_sync_rules:'id',ai_cache:'cache_key',trip_items:'id'
 };
