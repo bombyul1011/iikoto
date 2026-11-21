@@ -11749,10 +11749,10 @@ function refreshLibChip(dk,k){
   if(e&&e.recipe&&ta&&!ta.value.trim()){
     box.innerHTML=`<span class="lib-chip" onclick="loadLibRecipe('${dk}','${k}')"><i class="ti ti-notebook" aria-hidden="true"></i>보관함 레시피 불러오기</span>`;
     box.style.display='block';
-  }else if(!e&&ta&&ta.value.trim()&&inp&&inp.value.trim()){
-    // 메모는 있는데 보관함에 없는 메뉴 — 원할 때만 보관(자동으로 쌓지 않음)
+  }else if(ta&&ta.value.trim()&&inp&&inp.value.trim()){
+    // 메모가 있는 메뉴 — 보관은 원할 때만(자동으로 쌓지 않음). 이미 보관된 상태면 채워진 아이콘, 다시 누르면 보관 취소
     box.style.display='none';box.innerHTML='';
-    if(sv)sv.style.display='block';
+    if(sv){sv.style.display='block';const on=!!(e&&e.recipe);sv.className='ti '+(on?'ti-bookmark-filled':'ti-bookmark')+' lib-save-ic';sv.title=on?'보관 취소':'보관함에 저장';}
     return;
   }else{box.style.display='none';box.innerHTML='';}
   if(sv)sv.style.display='none';
@@ -11760,8 +11760,13 @@ function refreshLibChip(dk,k){
 function saveRecipeToLib(dk,k){
   const inp=document.getElementById(`wm-${dk}-${k}`),ta=document.getElementById(`wmm-${dk}-${k}`);
   const menu=((inp&&inp.value)||'').trim(),recipe=((ta&&ta.value)||'').trim();
-  if(!menu||!recipe||libMatch(menu))return;
-  libSet(menu,{status:'made',recipe,use_count:1,last_used:dk});
+  if(!menu||!recipe)return;
+  const e=libMatch(menu);
+  if(e){
+    // 이미 보관됨 → 보관 취소: 위시 항목은 레시피만 비우고, 레시피로 만든 항목은 삭제
+    if(e.recipe){if(e.status==='wish')libSet(e.name,{recipe:''});else libRemove(e.name);}
+    else libSet(e.name,{recipe});
+  }else libSet(menu,{status:'made',recipe,use_count:1,last_used:dk});
   refreshLibChip(dk,k);
   if(document.getElementById('meal-library-panel').style.display!=='none')renderMealLibrary();
 }
@@ -11786,7 +11791,7 @@ function syncRecipeToLib(dk,k,val){
   const menu=((inp&&inp.value)||getMeals(dk)[k]||'').trim();
   if(!menu)return;
   const e=libMatch(menu);
-  if(e&&(e.recipe||'')!==val)libSet(e.name,{recipe:val});
+  if(e&&e.recipe&&e.recipe!==val)libSet(e.name,{recipe:val});
   refreshLibChip(dk,k);
   if(document.getElementById('meal-library-panel').style.display!=='none')renderMealLibrary();
 }
