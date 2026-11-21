@@ -324,7 +324,7 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .meal-flag-chip{border:1px solid rgba(var(--divider-rgb),0.38);background:none;color:var(--ts);font-family:'DM Sans',sans-serif;font-size:var(--dow-label-size);padding:4px 10px;border-radius:999px;cursor:pointer;}
 .meal-flag-chip.shoot.on{background:var(--pal-pink-bg);color:var(--pal-pink-text);border-color:var(--pal-pink-border);font-weight:600;}
 .meal-flag-chip.out.on{background:var(--pal-sky-bg);color:var(--pal-sky-text);border-color:var(--pal-sky-border);font-weight:600;}
-.meal-memo-row{margin:0 0 6px 44px;}
+.meal-memo-row{margin:0 0 6px 44px;position:relative;}
 .meal-memo{display:block;width:100%;box-sizing:border-box;resize:none;overflow:hidden;background:none;border:none;border-bottom:1px dashed rgba(var(--divider-rgb),0.38);outline:none;font-family:'DM Sans',sans-serif;font-size:var(--main-text-size);line-height:1.5;color:var(--ts);padding:3px 2px;}
 .meal-memo-line{font-size:var(--main-text-size);color:var(--ts);line-height:1.5;white-space:pre-wrap;margin-top:1px;}
 .meal-time-inp{width:62px;flex-shrink:0;background:none;border:none;outline:none;font-family:'DM Sans',sans-serif;font-size:var(--main-text-size);color:var(--ts);padding:5px 2px 4px 6px;text-align:right;font-variant-numeric:tabular-nums;cursor:pointer;}
@@ -338,6 +338,11 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .meal-time-inp.mt-empty:not(:focus){color:transparent;}
 .meal-time-readonly{font-size:var(--main-text-size);color:var(--ts);font-variant-numeric:tabular-nums;padding:5px 6px 4px 6px;white-space:nowrap;}
 .meal-time-btn{flex-shrink:0;width:20px;height:20px;border-radius:50%;border:1.2px solid rgba(160,190,140,0.55);background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgba(95,140,75,0.75);padding:0;}
+.cal-detail-row .meal-time-btn,.cal-detail-row .meal-time-tag{align-self:center;}
+.cal-detail-row .meal-time-tag{padding-top:0;}
+.lib-save-ic{position:absolute;right:2px;top:5px;font-size:16px;color:var(--pal-mint-text);cursor:pointer;opacity:.85;}
+
+.meal-memo-row .meal-memo{padding-right:24px;}
 .meal-time-btn:active{background:rgba(190,230,205,0.30);}
 .meal-time-tag{font-size:var(--dow-label-size);color:rgba(95,140,75,0.85);font-weight:600;flex-shrink:0;font-variant-numeric:tabular-nums;padding-top:2px;}
 .meal-inp{flex:1;background:none;border:none;border-bottom:1px dashed rgba(var(--divider-rgb),0.38);outline:none;font-family:'DM Sans',sans-serif;font-size:var(--main-text-size);color:var(--tp);padding:5px 2px 4px;}
@@ -354,9 +359,12 @@ body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;-webkit-font-s
 .wish-item{display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px dashed rgba(var(--divider-rgb),0.22);}
 .wish-text{flex:1;font-size:var(--main-text-size);color:var(--tp);cursor:pointer;}
 .wish-place-btn{font-size:var(--dow-label-size);color:rgba(85,135,100,0.9);background:rgba(190,230,205,0.28);border-radius:7px;padding:4px 8px;cursor:pointer;flex-shrink:0;white-space:nowrap;}
-.lib-tabs{display:flex;gap:6px;margin:0 0 10px;}
-.lib-tab{font-size:var(--dow-label-size);padding:5px 10px;border-radius:999px;border:1px solid rgba(var(--divider-rgb),0.38);color:var(--ts);cursor:pointer;}
-.lib-tab.on{background:var(--pal-mint-bg);border-color:var(--pal-mint-border);color:var(--pal-mint-text);font-weight:600;}
+.lib-tabs{display:flex;}
+.lib-tab{flex:1;text-align:center;font-size:var(--main-text-size);padding:9px 0;color:var(--tm);background:rgba(var(--pal-mint-rgb),0.18);border-bottom:1px solid var(--pal-mint-border);cursor:pointer;}
+.lib-tab+.lib-tab{border-left:1px solid var(--pal-mint-border);}
+.lib-tab.on{background:var(--pal-mint-bg);color:var(--pal-mint-text);font-weight:600;border-bottom-color:transparent;}
+.lib-body{padding:8px 12px 10px;}
+#meal-library-panel{background:rgba(255,255,255,0.8);border:1px solid var(--pal-mint-border);border-radius:14px;overflow:hidden;}
 .lib-sub{font-size:var(--dow-label-size);color:var(--tm);}
 .lib-ic{font-size:15px;color:var(--pal-mint-text);flex-shrink:0;}
 .lib-detail{margin:2px 0 8px 2px;}
@@ -1950,7 +1958,7 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
           <i class="ti ti-chef-hat" style="font-size:16px;" aria-hidden="true"></i>
         </button>
       </div>
-      <div id="meal-shoot-stat" style="font-size:var(--dow-label-size);color:var(--pal-pink-text);margin:-6px 0 12px;"></div>
+      <div id="meal-shoot-stat" style="font-size:var(--main-text-size);white-space:nowrap;color:var(--pal-pink-text);margin:-6px 0 12px;"></div>
       <div id="meal-library-panel" style="display:none;margin-bottom:14px;"></div>
       <div id="lib-placing-hint" style="display:none;font-size:var(--dow-label-size);color:rgba(100,140,75,0.85);background:rgba(150,215,180,0.14);border-radius:8px;padding:7px 10px;margin-bottom:10px;text-align:center;cursor:pointer;" onclick="cancelLibPlacing()">넣을 칸을 눌러주세요 · 취소하려면 여기를 누르세요</div>
       <div id="week-meal-scroll" style="max-height:50vh;overflow-y:auto;">
@@ -2897,7 +2905,7 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
   </div>
 </div>
 
-<script src="app.js?v=20261122c"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
+<script src="app.js?v=20261122e"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
 
 </body>
 </html>
