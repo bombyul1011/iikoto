@@ -3568,10 +3568,33 @@ function removeDelPending(type,dk,cid){
 function getDelPendingCids(type,dk){
   return (S.get(type+'_delpending_list')||[]).filter(e=>e.dk===dk).map(e=>e.cid);
 }
+// ── 바뀐 항목만 올리기(감사 P1-13, 5단계 5-3) ──
+// 예전엔 하루(할일·메모·리듬)·한 달(콘텐츠) 묶음 안의 항목을 매번 전부 올려서, 다른 기기에서 그사이 고친 다른 항목을
+// 이 기기의 옛 내용으로 되돌릴 수 있었음. 이제 묶음마다 '마지막으로 서버에 올려 성공한 행'의 지문(cid→해시)을 기억해 두고,
+// 지문이 달라진 항목(실제로 이 기기에서 고친 것)만 올림. 지문이 없으면(처음·기록 유실) 예전처럼 전부 올림 — 지금보다 나빠지지 않음.
+// 받아오기 쪽은 건드리지 않음: 다른 기기의 변경을 받아 로컬이 바뀌면 그 항목은 한 번 더 올라가지만 서버와 같은 내용이라 무해.
+function _rowHash(o){
+  const str=JSON.stringify(o);let h=0x811c9dc5;
+  for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,0x01000193);}
+  return (h>>>0).toString(36)+'.'+str.length.toString(36);
+}
+function _upSnapKey(table,filterQ){return 'upsnap:'+table+':'+filterQ;}
 async function syncListUpSafe(table,filterQ,uniqueCols,localItems,toRow,delCids){
   if(localItems.length){
-    const ok=await supaUpsert(table,uniqueCols,localItems.map(toRow));
-    if(!ok)return false;
+    const snapKey=_upSnapKey(table,filterQ);
+    const snap=S.get(snapKey)||{};
+    const rows=localItems.map(toRow);
+    const hashes=rows.map(_rowHash);
+    const changed=rows.filter((r,i)=>!r.client_id||snap[r.client_id]!==hashes[i]);
+    if(changed.length){
+      const ok=await supaUpsert(table,uniqueCols,changed);
+      if(!ok)return false;
+    }
+    // 성공 — 지금 로컬에 있는 항목 기준으로 지문 갱신(지워진 항목의 지문은 버림)
+    const next={};rows.forEach((r,i)=>{if(r.client_id)next[r.client_id]=hashes[i];});
+    S.set(snapKey,next);
+  }else{
+    try{localStorage.removeItem(_upSnapKey(table,filterQ));}catch(e){}
   }
   if(delCids&&delCids.length){
     const inList=delCids.map(c=>encodeURIComponent(c)).join(',');
@@ -4739,8 +4762,11 @@ function _collectPendingTargets(){
   let keys=[];
   try{for(let i=0;i<localStorage.length;i++)keys.push(localStorage.key(i));}catch(e){return out;}
   const flagRe=/^(todos|memos|rblocks|sleep|cdlog|contents)_pending:(.+)$/;
+  const snapCut=dateKey(new Date(Date.now()-60*864e5));
   for(const k of keys){
     if(!k)continue;
+    // 5-3 지문은 최근 60일 것만 남김(기기 저장공간 보호) — 지문이 없는 옛 날짜를 고치면 예전처럼 그 묶음 전체를 올림
+    if(k.startsWith('upsnap:')){const m=k.match(/(\d{4}-\d{2})(-\d{2})?/);if(m&&(m[2]?m[0]:m[1]+'-31')<snapCut){try{localStorage.removeItem(k);}catch(e){}}continue;}
     let m=k.match(flagRe);
     if(m){if(S.get(k))add(m[1],m[2]);continue;}
     if((m=k.match(/^meals_fields_pending:(.+)$/))){if((S.get(k)||[]).length)add('meals',m[1]);continue;}
