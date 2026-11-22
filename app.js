@@ -179,12 +179,13 @@ function autoCloseUnfinishedRhythmBlocks(todayDk,sleepTime){
 }
 // row→local 매핑 공용화(memoRowToLocal 등과 동일 패턴) — syncRhythmBlocksDown/DownMany 양쪽에서 재사용, 중복 정의 제거
 function rhythmBlockRowToLocal(r){return {cat:r.cat,start:r.start_time,end:r.end_time,text:r.text||'',created:r.created,cid:r.client_id||genCid(),autoClosed:!!r.auto_closed,contentCid:r.content_cid||null};}
+function _rblockRow(dk,b){return {date_key:dk,cat:b.cat,start_time:b.start,end_time:b.end,text:b.text||'',created:b.created||Date.now(),client_id:b.cid,auto_closed:!!b.autoClosed,content_cid:b.contentCid||null};}
 async function syncRhythmBlocksUp(dk){
   const blocks=getRhythmBlocks(dk);
   if(ensureItemCids(blocks))S.set(S.key('rblocks',dk),blocks);
   const delCids=getDelPendingCids('rblocks',dk);
   const ok=await syncListUpSafe('rhythm_blocks',`date_key=eq.${dk}`,'date_key,client_id',blocks,
-    b=>({date_key:dk,cat:b.cat,start_time:b.start,end_time:b.end,text:b.text||'',created:b.created||Date.now(),client_id:b.cid,auto_closed:!!b.autoClosed,content_cid:b.contentCid||null}),
+    b=>_rblockRow(dk,b),
     delCids);
   if(ok)delCids.forEach(cid=>removeDelPending('rblocks',dk,cid));
   return ok;
@@ -193,7 +194,7 @@ async function syncRhythmBlocksDown(dk){
   const rows=await supaFetch('rhythm_blocks?date_key=eq.'+dk+'&order=created');
   if(!rows)return; // 연결 실패 — 로컬 유지
   if(S.get(S.key('rblocks_pending',dk)))return; // 업로드 대기중인 로컬 수정 있으면 덮어쓰지 않음
-  S.set(S.key('rblocks',dk),rows.map(rhythmBlockRowToLocal));
+  S.set(S.key('rblocks',dk),rows.map(rhythmBlockRowToLocal));markSyncedFromServer('rblocks',dk);
   reconcileAfterRhythmSync();
 }
 // ── initSync 전용 범위 다운로드 — 날짜별로 따로 fetch하면 N일치면 N번 왕복이 그대로 쌓여
@@ -248,7 +249,7 @@ async function syncTodosDownMany(dks){
     todoRowToLocal,
     (dk,mapped)=>{
       const deduped=dedupeRecurTodos(mapped);
-      S.set(S.key('todos',dk),deduped);
+      S.set(S.key('todos',dk),deduped);markSyncedFromServer('todos',dk);
       if(deduped.some(t=>t.isEvent&&t.eventEndDate))hasMultidayChange=true;
     });
   // 여러 날짜(최대 30여일)를 한 번에 받아오는 경로 — 다른 기기의 연속일정/오프 변경이 섞여 있을 수 있으므로
@@ -257,7 +258,7 @@ async function syncTodosDownMany(dks){
   renderTodos();
 }
 async function syncMemosDownMany(dks){
-  await _syncManyDown('memos',dks,'memos_pending',memoRowToLocal,(dk,mapped)=>S.set(S.key('memos',dk),mapped));
+  await _syncManyDown('memos',dks,'memos_pending',memoRowToLocal,(dk,mapped)=>{S.set(S.key('memos',dk),mapped);markSyncedFromServer('memos',dk);});
   renderMemos();
 }
 async function syncSleepDownMany(dks){
@@ -271,7 +272,7 @@ async function syncMealsDownMany(dks){
 }
 async function syncRhythmBlocksDownMany(dks){
   await _syncManyDown('rhythm_blocks',dks,'rblocks_pending',rhythmBlockRowToLocal,
-    (dk,mapped)=>S.set(S.key('rblocks',dk),mapped));
+    (dk,mapped)=>{S.set(S.key('rblocks',dk),mapped);markSyncedFromServer('rblocks',dk);});
   reconcileAfterRhythmSync();
 }
 // 다른 기기에서 막대가 종료·수정돼 내려왔을 때, 이 기기에서 돌던 시청·독서 스톱워치 상태를 막대(진실의 원천)에 맞춤.
@@ -3579,6 +3580,20 @@ function _rowHash(o){
   return (h>>>0).toString(36)+'.'+str.length.toString(36);
 }
 function _upSnapKey(table,filterQ){return 'upsnap:'+table+':'+filterQ;}
+// 서버에서 받아 로컬에 반영한 직후, 그 항목들을 '서버와 같은 상태'로 지문에 기록(5-3 보정, 11/22).
+// 이걸 안 하면 다른 기기의 수정을 받은 항목이 '이 기기에서 고친 것'으로 보여, 그 기기가 한 번 더 고친 뒤에
+// 이 기기가 다른 걸 올릴 때 받아 둔 옛 내용으로 되돌려 버림(실기기에서 확인된 문제). onlyCids를 주면 그 항목만 갱신.
+const _UPSNAP_SPEC={todos:['todos','date_key',(k,it)=>_todoRow(k,it)],memos:['memos','date_key',(k,it)=>_memoRow(k,it)],
+  rblocks:['rhythm_blocks','date_key',(k,it)=>_rblockRow(k,it)],contents:['contents','month_key',(k,it)=>_contentRow(k,it)]};
+function markSyncedFromServer(type,key,onlyCids){
+  const spec=_UPSNAP_SPEC[type];if(!spec)return;
+  const [table,col,toRow]=spec;
+  const sk=_upSnapKey(table,`${col}=eq.${key}`);
+  const items=S.get(S.key(type,key))||[];
+  const snap=onlyCids?(S.get(sk)||{}):{};
+  items.forEach(it=>{if(it&&it.cid&&(!onlyCids||onlyCids.has(it.cid))&&it.created!=null)snap[it.cid]=_rowHash(toRow(key,it));});
+  S.set(sk,snap);
+}
 async function syncListUpSafe(table,filterQ,uniqueCols,localItems,toRow,delCids){
   if(localItems.length){
     const snapKey=_upSnapKey(table,filterQ);
@@ -4213,13 +4228,14 @@ function getGoal(key){return S.get(key)||[''];}
 function saveGoal(key,lines){S.set(key,lines);markGPending(key);autoSync('goal',key);}
 
 // ── SUPABASE SYNC
+function _todoRow(dk,t){return {date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,strike_parts:t.strikeParts||[],strike_times:t.strikeTimes||{},completed_at:(t.completedAt!=null?t.completedAt:null),sort_order:(typeof t.sortOrder==='number'?t.sortOrder:null),is_event:!!t.isEvent,event_cat:t.eventCat||null,event_time:t.eventTime||null,event_end_date:t.eventEndDate||null,cat:t.cat||'todo',pinned:!!t.pinned,recur_rule_cid:t.recurRuleCid||null,alert_time:t.alertTime||null,event_alert_on:!!t.eventAlertOn,todo_alert_on:!!t.todoAlertOn,is_vacation:!!t.isVacation};}
 async function syncTodosDown(dk){
   const rows=await supaFetch('todos?date_key=eq.'+dk+'&order=created');
   if(!rows)return; // 연결 실패(null) — 로컬 유지. 빈 배열은 "서버에 진짜 0개"라는 뜻이라 그대로 반영.
   if(S.get(S.key('todos_pending',dk)))return; // 업로드 대기중인 로컬 수정(미루기 등) 있으면 덮어쓰지 않음
   const mapped=rows.map(todoRowToLocal);
   const deduped=dedupeRecurTodos(mapped);
-  S.set(S.key('todos',dk),deduped);
+  S.set(S.key('todos',dk),deduped);markSyncedFromServer('todos',dk);
   // 다른 기기에서 온 변경사항 중 연속일정(오프 여부 포함)이 있으면 isVacationDate 캐시도 함께 무효화 —
   // 로컬 직접 저장/삭제 때만 무효화하던 기존 처리가 sync down 경로를 놓쳐, 다른 기기에서 바꾼 오프 상태가
   // 이 기기에서 캐시된 옛 판정으로 계속 보이는 문제가 있었음.
@@ -4271,16 +4287,17 @@ async function _syncTodosUpInner(dk){
   if(deduped.length!==todos.length)S.set(S.key('todos',dk),deduped);
   const delCids=getDelPendingCids('todos',dk);
   const ok=await syncListUpSafe('todos',`date_key=eq.${dk}`,'date_key,client_id',deduped,
-    t=>({date_key:dk,text:t.text,done:t.done,created:t.created,time_section:t.timeSection||'none',client_id:t.cid,strike_parts:t.strikeParts||[],strike_times:t.strikeTimes||{},completed_at:(t.completedAt!=null?t.completedAt:null),sort_order:(typeof t.sortOrder==='number'?t.sortOrder:null),is_event:!!t.isEvent,event_cat:t.eventCat||null,event_time:t.eventTime||null,event_end_date:t.eventEndDate||null,cat:t.cat||'todo',pinned:!!t.pinned,recur_rule_cid:t.recurRuleCid||null,alert_time:t.alertTime||null,event_alert_on:!!t.eventAlertOn,todo_alert_on:!!t.todoAlertOn,is_vacation:!!t.isVacation}),
+    t=>_todoRow(dk,t),
     delCids);
   if(ok)delCids.forEach(cid=>removeDelPending('todos',dk,cid));
   return ok;
 }
+function _memoRow(dk,m){return {date_key:dk,memo_time:m.time,text:m.text,created:m.created,client_id:m.cid,photo_url:m.photoUrl||null};}
 async function syncMemosDown(dk){
   const rows=await supaFetch('memos?date_key=eq.'+dk+'&order=created');
   if(!rows)return; // 연결 실패(null) — 로컬 유지. 빈 배열은 "서버에 진짜 0개"라는 뜻이라 그대로 반영.
   if(S.get(S.key('memos_pending',dk)))return; // 업로드 대기중인 로컬 수정 있으면 덮어쓰지 않음
-  S.set(S.key('memos',dk),rows.map(memoRowToLocal));
+  S.set(S.key('memos',dk),rows.map(memoRowToLocal));markSyncedFromServer('memos',dk);
   renderMemos();
 }
 async function syncMemosUp(dk){
@@ -4288,7 +4305,7 @@ async function syncMemosUp(dk){
   if(ensureItemCids(memos))S.set(S.key('memos',dk),memos);
   const delCids=getDelPendingCids('memos',dk);
   const ok=await syncListUpSafe('memos',`date_key=eq.${dk}`,'date_key,client_id',memos,
-    m=>({date_key:dk,memo_time:m.time,text:m.text,created:m.created,client_id:m.cid,photo_url:m.photoUrl||null}),
+    m=>_memoRow(dk,m),
     delCids);
   if(ok)delCids.forEach(cid=>removeDelPending('memos',dk,cid));
   // 이 날짜에 아직 R2 업로드가 끝나지 않은 사진(pending_upload)이 있으면, 방금 photo_url=null로
@@ -4607,6 +4624,7 @@ async function syncContentsDownRaw(mk){
   const delCids=new Set(getDelPendingCids('contents',mk));
   const merged=[];
   const seenCids=new Set();
+  const fromServer=new Set(); // 서버 값을 채택한 항목(5-3 지문 갱신 대상)
   rows.forEach(r=>{
     const cid=r.client_id||genCid();
     seenCids.add(cid);
@@ -4619,11 +4637,11 @@ async function syncContentsDownRaw(mk){
       if(matched){l=matched;delete localNoCidByKey[key];}
     }
     const serverItem={cat:r.content_cat,title:r.title,startDate:r.start_date,endDate:r.end_date,status:r.status,review:r.review,stars:r.stars,poster:r.poster||null,author:r.author||'',musicUrl:r.music_url||null,album:r.album||null,releaseYear:r.release_year||null,totalUnit:r.total_unit||null,currentUnit:r.current_unit||null,notes:r.notes||[],reviewSavedDk:r.review_saved_dk||null,reviewSavedTime:r.review_saved_time||null,unitLabel:r.unit_label||null,readSeconds:r.read_seconds||0,watchedDaysCount:r.watched_days_count||null,watchSpanDays:r.watch_span_days||null,watchedSeconds:r.watched_seconds||null,created:r.created,cid,updatedAt:r.updated_at,lastActivityAt:r.last_activity_at||0};
-    if(!l){merged.push(serverItem);return;}
+    if(!l){merged.push(serverItem);fromServer.add(cid);return;}
     // 로컬/서버 둘 다 있으면 updated_at(서버) vs 로컬수정시각 비교, 서버가 더 최신이거나 로컬에 수정시각 기록이 없으면 서버값 채택
     const localTs=l.updatedAt?new Date(l.updatedAt).getTime():0;
     const serverTs=r.updated_at?new Date(r.updated_at).getTime():0;
-    if(serverTs>=localTs)merged.push(serverItem);
+    if(serverTs>=localTs){merged.push(serverItem);fromServer.add(cid);}
     else{l.cid=cid;merged.push(l);} // 로컬값 채택 시에도 서버 cid를 물려받아 다음 매칭이 정상 작동하도록
   });
   // 서버에 없는 로컬 항목: 방금(5분 이내) 생성된 것만 "아직 업로드 안 한 신규"로 보고 보존.
@@ -4636,15 +4654,16 @@ async function syncContentsDownRaw(mk){
   });
   // title+startDate로도 서버와 매칭 안 된 cid-없는 로컬 항목(진짜 신규) — 이제 cid 발급
   Object.values(localNoCidByKey).forEach(it=>{it.cid=genCid();merged.push(it);});
-  S.set(S.key('contents',mk),merged);
+  S.set(S.key('contents',mk),merged);markSyncedFromServer('contents',mk,fromServer);
   if(S.get(S.key('contents_pending',mk)))await syncContentsUp(mk).then(ok=>{if(ok)S.set(S.key('contents_pending',mk),false);});
 }
+function _contentRow(mk,it){return {month_key:mk,content_cat:it.cat,title:it.title,start_date:it.startDate,end_date:it.endDate,status:it.status,review:it.review||'',stars:it.stars||0,poster:it.poster||null,author:it.author||'',music_url:it.musicUrl||null,album:it.album||null,release_year:it.releaseYear||null,total_unit:it.totalUnit||null,current_unit:it.currentUnit||null,notes:it.notes||[],review_saved_dk:it.reviewSavedDk||null,review_saved_time:it.reviewSavedTime||null,unit_label:it.unitLabel||null,read_seconds:it.readSeconds||0,watched_days_count:it.watchedDaysCount||null,watch_span_days:it.watchSpanDays||null,watched_seconds:it.watchedSeconds||null,created:it.created,client_id:it.cid,last_activity_at:it.lastActivityAt||null};}
 async function syncContentsUp(mk){
   const c=getContents(mk);
   if(ensureItemCids(c))S.set(S.key('contents',mk),c);
   const delCids=getDelPendingCids('contents',mk);
   const ok=await syncListUpSafe('contents',`month_key=eq.${mk}`,'month_key,client_id',c,
-    it=>({month_key:mk,content_cat:it.cat,title:it.title,start_date:it.startDate,end_date:it.endDate,status:it.status,review:it.review||'',stars:it.stars||0,poster:it.poster||null,author:it.author||'',music_url:it.musicUrl||null,album:it.album||null,release_year:it.releaseYear||null,total_unit:it.totalUnit||null,current_unit:it.currentUnit||null,notes:it.notes||[],review_saved_dk:it.reviewSavedDk||null,review_saved_time:it.reviewSavedTime||null,unit_label:it.unitLabel||null,read_seconds:it.readSeconds||0,watched_days_count:it.watchedDaysCount||null,watch_span_days:it.watchSpanDays||null,watched_seconds:it.watchedSeconds||null,created:it.created,client_id:it.cid,last_activity_at:it.lastActivityAt||null}),
+    it=>_contentRow(mk,it),
     delCids);
   if(ok)delCids.forEach(cid=>removeDelPending('contents',mk,cid));
   return ok;
@@ -10584,7 +10603,7 @@ const MONTH_SYNC_TTL=60*1000; // 60초 — 이 시간이 지나면 캐시를 신
 function _monthDays(y,mo){const n=new Date(y,mo+1,0).getDate(),out=[];for(let d=1;d<=n;d++)out.push(`${y}-${pad(mo+1)}-${pad(d)}`);return out;}
 function _applyMonthDay(type,dk,rows){
   if(S.get(S.key(type+'_pending',dk)))return;
-  if(rows&&rows.length){S.set(S.key(type,dk),rows);return;}
+  if(rows&&rows.length){S.set(S.key(type,dk),rows);markSyncedFromServer(type,dk);return;}
   const cur=S.get(S.key(type,dk));
   if(Array.isArray(cur)&&cur.length)S.set(S.key(type,dk),[]); // 기기에만 남은 옛 사본 정리(빈 날짜 키를 새로 만들지는 않음)
 }
