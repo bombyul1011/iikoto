@@ -11657,7 +11657,7 @@ function renderMealLibrary(){
   const rows=_libShown.map((e,i)=>{
     const sub=e.status==='made'&&e.last_used?`<div class="lib-sub">마지막 ${md(e.last_used)} · ${e.use_count||0}번</div>`:'';
     const open=_libOpen===e.name;
-    const detail=open?`<div class="lib-detail"><input class="meal-inp" id="lib-name-inp" type="text" value="${escapeHtml(e.name).replace(/"/g,'&quot;')}" autocomplete="off" onblur="renameLibItem(${i},this)"><textarea class="meal-memo" id="lib-recipe-inp" rows="1" placeholder="레시피" oninput="_autoGrowMemo(this)" onblur="saveLibRecipe(${i},this)">${escapeHtml(e.recipe||'')}</textarea></div>`:'';
+    const detail=open?`<div class="lib-detail"><textarea class="meal-memo" id="lib-recipe-inp" rows="1" placeholder="레시피" oninput="_autoGrowMemo(this)" onblur="saveLibRecipe(${i},this)">${escapeHtml(e.recipe||'')}</textarea></div>`:'';
     return `<div class="wish-item"><div style="flex:1;min-width:0;cursor:pointer;" onclick="toggleLibItem(${i})"><div class="wish-text" style="cursor:pointer;">${escapeHtml(e.name)}</div>${sub}</div>${e.recipe?'<i class="ti ti-notebook lib-ic" aria-hidden="true"></i>':''}<span class="wish-place-btn" onclick="startLibPlacing(${i})">넣기</span><span class="wish-del-btn" onclick="deleteLibItem(${i})">✕</span></div>${detail}`;
   }).join('');
   const empty=_libTab==='wish'?'위시 메뉴를 추가해 보세요.':'메모의 [보관함에 저장] 아이콘으로 레시피를 모아 보세요.';
