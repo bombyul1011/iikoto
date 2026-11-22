@@ -4747,11 +4747,18 @@ function _collectPendingTargets(){
     if((m=k.match(/^hc_pending_(.+)$/))){if(S.get(k))add('hc',m[1]);continue;}
     if((m=k.match(/^wchallenge_pending_(.+)$/))){if(S.get(k))add('wchallenge',m[1]);continue;}
     if((m=k.match(/^quote_pending_(.+)$/))){if(S.get(k))add('quote',m[1]);continue;}
-    if(k.startsWith(GPEND_PREFIX)){if(S.get(k))add('gpend',k.slice(GPEND_PREFIX.length));continue;}
+    if(k.startsWith(GPEND_PREFIX)){
+      // 옛 먹고 싶은 것(goal_notes wishlist:meal)은 메뉴 보관함(menu_library)으로 옮겨지고 서버 행도 지워짐(11/21) —
+      // 남은 대기 표시가 그 행을 되살리지 않도록 지우기만 함
+      if(k===GPEND_PREFIX+'wishlist:meal'){try{localStorage.removeItem(k);}catch(e){}continue;}
+      if(S.get(k))add('gpend',k.slice(GPEND_PREFIX.length));continue;
+    }
   }
   for(const t of ['todos','memos','contents','rblocks','hc'])(S.get(t+'_delpending_list')||[]).forEach(e=>{if(e&&e.dk)add(t,e.dk);});
   if((S.get('habits_delpending_list')||[]).length)add('gpend','habits');
   if((S.get('recurring_items_delpending_list')||[]).length)add('gpend','recurring_items');
+  // 메뉴 보관함 — 바뀐 필드·삭제 대기가 남아 있으면 다시 올림(예전엔 앱 시작·보관함 열 때만 재시도)
+  if(Object.keys(S.get('menu_library_pending')||{}).length||(S.get('menu_library_del')||[]).length)add('menulib','all');
   // 45일보다 오래된 날짜·달·주의 대기는 자동 재시도에서 뺌 — 아주 오래 묵은 기기 사본이 그사이 다른 기기에서 고친
   // 서버 값을 통째로 덮어쓰지 않도록(날짜 단위 전체 업로드라서, 5-3 '바뀐 것만 올리기' 전까지의 안전장치).
   const cutoff=dateKey(new Date(Date.now()-45*864e5));
@@ -4769,6 +4776,7 @@ async function _retryPendingTarget(type,key){
   else if(type==='wchallenge')await autoSync('wchallenge','wchallenge_'+key);
   else if(type==='quote'){if(!getQuotes().some(q=>q.cid===key))S.set('quote_pending_'+key,false);else await syncQuoteUp(key);}
   else if(type==='gpend')await gpendUpAndClear(key);
+  else if(type==='menulib')await syncMenuLibUp();
 }
 let _retryAllRunning=null;
 async function retryAllPending(skip){
