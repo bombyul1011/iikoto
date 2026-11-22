@@ -2,21 +2,15 @@
 // R2 바인딩: env.PHOTO_BUCKET (Settings에서 이미 연결 완료)
 // 배포 경로: Cloudflare 대시보드 → iikoto-photo-proxy → Overview → 코드 편집기에 이 내용 붙여넣기 → Deploy
 
-// 최소 인증: 앱만 아는 비밀 헤더값. Worker Settings → Variables and Secrets에서
-// UPLOAD_SECRET 이라는 이름으로 원하는 임의의 긴 문자열을 Secret으로 등록해두세요.
-// (예: openssl rand -hex 24 로 생성한 값 등 — 아무 무작위 긴 문자열이면 충분)
-
 // 앱 키 검사(감사 P0-1 3단계, 2026-11-18): 요청 헤더 X-App-Key의 sha256이 Worker 비밀값 APP_KEY_HASH(=앱 설정의 등록 코드)와 같으면 통과.
-// 전환 기간에만 예전 X-Upload-Secret(UPLOAD_SECRET)도 받아 줌 — 모든 기기가 새 앱으로 바뀐 뒤 그 줄을 지울 예정.
+// 예전 X-Upload-Secret(UPLOAD_SECRET) 방식은 2026-11-22 폐기.
 async function sha256Hex(s) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
   return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 async function authorized(request, env) {
   const appKey = request.headers.get('X-App-Key') || '';
-  if (appKey && env.APP_KEY_HASH && (await sha256Hex(appKey)) === env.APP_KEY_HASH) return true;
-  const legacy = request.headers.get('X-Upload-Secret');
-  return !!(env.UPLOAD_SECRET && legacy && legacy === env.UPLOAD_SECRET);
+  return !!(appKey && env.APP_KEY_HASH && (await sha256Hex(appKey)) === env.APP_KEY_HASH);
 }
 
 // 자동 백업 보관(감사 4단계, 2026-11-20): Supabase 백업 함수(weekly-backup)가 PUT /backup/<파일명>으로 올림.
@@ -61,7 +55,7 @@ export default {
     const cors = {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type,X-Upload-Secret,X-App-Key,X-Backup-Secret'
+      'Access-Control-Allow-Headers': 'Content-Type,X-App-Key,X-Backup-Secret'
     };
 
     if (request.method === 'OPTIONS') {

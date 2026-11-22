@@ -24,7 +24,7 @@
 
 - Supabase 함수 비밀값: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `ICAL_SCHEDULE`, `ICAL_TRAVEL`, `ICAL_WORK`
 - Supabase vault: `anon_key_for_cron`, `briefing_fire_token`, `cron_secret`(예약 작업 전용, 복원 시 `vault.create_secret(encode(gen_random_bytes(32),'hex'),'cron_secret')`로 새로 만들면 됨), `app_key_hash`(앱 키의 sha256 = 앱 설정의 등록 코드)
-- Cloudflare 워커 비밀값: `APP_KEY_HASH`(사진·OCR 둘 다, 앱 키 sha256), `UPLOAD_SECRET`(사진, 전환 기간용 — 추후 삭제), `GOOGLE_VISION_API_KEY`(OCR), R2 바인딩 `PHOTO_BUCKET`
+- Cloudflare 워커 비밀값: `APP_KEY_HASH`(사진·OCR 둘 다, 앱 키 sha256), `GOOGLE_VISION_API_KEY`(OCR), R2 바인딩 `PHOTO_BUCKET`
 - 파일 안에서 `<...>`로 가린 값: 알라딘 TTB 키, 이이타비 접근키 해시, 아침 브리핑 예약 실행 주소
 
 ## 갱신 규칙
@@ -42,3 +42,7 @@
 - 보관: 최근 8개 + 그 이전은 달마다 1개씩 12개월(워커가 저장 직후 정리). 1회 약 0.35MB.
 - 내려받기: `GET https://iikoto-photo-proxy.faith-003.workers.dev/backup/<파일명>` + 헤더 `X-Backup-Secret`(vault `backup_secret`, 워커 `BACKUP_SECRET`). 목록은 `/backup/`. `/photo/backups/...`로는 읽을 수 없음.
 - 복원 확인(11/20): 첫 백업 24개 표 3,518행, 내려받아 표별 행 수·해시 전부 일치.
+
+## 뒷정리 (2026-11-22)
+- 사진 워커의 옛 업로드 비밀값(`UPLOAD_SECRET`, 헤더 `X-Upload-Secret`) 폐기 — 워커 코드·비밀값·app.js 모두에서 삭제. 이제 앱 키만 받음.
+- 0단계 서버 안 사본(`backup_20261116` 스키마) 삭제 — 자동 백업(R2 backups/)이 대신함.

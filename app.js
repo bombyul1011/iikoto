@@ -5582,8 +5582,8 @@ window.addEventListener('online',processMemoPhotoUploadQueue);
 const PHOTO_PROXY_BASE='https://iikoto-photo-proxy.faith-003.workers.dev';
 // 사진 워커 인증(감사 P0-1 3단계): 앱 키가 있으면 X-App-Key로 보내고(워커가 sha256을 등록 코드와 대조),
 // 없을 때만 예전 고정 비밀값을 보냄 — 모든 기기 전환이 끝나면 아래 고정값과 워커의 UPLOAD_SECRET을 함께 폐기할 예정.
-function photoAuthHeaders(){const k=getAppKey();return k?{'X-App-Key':k}:{'X-Upload-Secret':PHOTO_UPLOAD_SECRET};}
-const PHOTO_UPLOAD_SECRET='twinkle77*';
+// 사진 워커 인증은 앱 키(X-App-Key)만 씀 — 예전 소스에 박혀 있던 업로드 비밀값은 11/22 폐기(감사 P1-12)
+function photoAuthHeaders(){const k=getAppKey();return k?{'X-App-Key':k}:{};}
 async function _uploadMemoPhotoToR2(blob,dk,cid,ext){
   // 키에 '/'를 넣으면 URL 인코딩(%2F) 처리가 프록시/브라우저 환경별로 갈릴 수 있어
   // 안전하게 슬래시 없는 평평한 키로 구성 (날짜는 언더스코어로 접두)
