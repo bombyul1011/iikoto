@@ -6,7 +6,7 @@
 
 | 위치 | 내용 | 배포처 |
 |---|---|---|
-| `functions/send-alerts/` | 알림 생성·푸시 발송 (v40, 예약 작업 비밀값 검사, 5분 여유 창·일시 실패 재시도) | Supabase Edge Function |
+| `functions/send-alerts/` | 알림 생성·푸시 발송 (v43, 예약 작업 비밀값 검사, 5분 여유 창·일시 실패 재시도, 할일 존재 확인·자정 넘긴 리듬) | Supabase Edge Function |
 | `functions/materialize-recurring/` | 반복 할일·일정 실체화 (v5, 예약 작업 비밀값 검사) | Supabase Edge Function |
 | `functions/compare-calendars/` | 애플 캘린더 → 이이코토 일정 동기화 (v7, 예약 작업 비밀값 또는 앱 키 검사, `ics.ts` 포함) | Supabase Edge Function |
 | `workers/iikoto-img-proxy.js` | 포스터·표지 이미지 중계 | Cloudflare Worker |
@@ -46,3 +46,8 @@
 ## 뒷정리 (2026-11-22)
 - 사진 워커의 옛 업로드 비밀값(`UPLOAD_SECRET`, 헤더 `X-Upload-Secret`) 폐기 — 워커 코드·비밀값·app.js 모두에서 삭제. 이제 앱 키만 받음.
 - 0단계 서버 안 사본(`backup_20261116` 스키마) 삭제 — 자동 백업(R2 backups/)이 대신함.
+
+## 5단계 마무리 (2026-11-23)
+- send-alerts v43: 할일·스누즈·일정 알림은 발송 직전 todos에 그 cid가 있는지 확인(없거나 완료면 안 보냄), 새벽 6시 전엔 어제 시작한 진행 중 리듬도 리마인드.
+- materialize-recurring v6: '오늘'을 한국 날짜 기준으로 계산(예약이 00:05 KST=전날 15:05 UTC라 하루 밀려 있었음).
+- 주의: send-alerts를 배포할 땐 반드시 이 저장소의 최신 파일 그대로 올릴 것(11/23 다른 세션 수정분이 옛 사본 배포로 한 번 되돌아간 적 있음 — 바로 복구).

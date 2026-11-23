@@ -86,7 +86,9 @@ Deno.serve(async (_req: Request) => {
     return new Response(JSON.stringify({ created: 0 }), { status: 200 });
   }
 
-  const today = new Date();
+  // 한국 날짜 기준(감사 P3-7, 5-9) — 함수는 UTC로 돌고 예약은 00:05 KST(=전날 15:05 UTC)라, 예전엔 '오늘'이
+  // 한국 기준 어제로 잡혀 미리 만드는 범위가 하루 짧았음. 9시간 당긴 시각의 날짜를 쓰면 이 함수 안의 모든 날짜 계산이 KST가 됨.
+  const today = new Date(Date.now() + 9 * 3600 * 1000);
   today.setHours(0, 0, 0, 0);
   const maxPreviewDays = Math.max(RECUR_TODO_PREVIEW_DAYS, RECUR_EVENT_PREVIEW_DAYS);
 

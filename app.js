@@ -301,9 +301,23 @@ function toggleRhythmAddForm(){
   if(!_rhythmFormOpen)_resetRhythmForm();
   refreshRhythmTrack();
 }
+// ── 순번 대신 cid로 대상 확인(감사 P2-3, 5단계 5-5) ──
+// 시트·모달·입력칸이 열려 있는 동안 백그라운드 동기화가 목록을 바꾸면(다른 기기에서 추가·삭제·정렬), 열 때 저장한 순번이
+// 다른 항목을 가리켜 엉뚱한 할일·메모·리듬을 고치거나 지울 수 있었음. 순번을 저장할 때 cid도 같이 기억해 두고,
+// 실행 직전에 그 cid의 현재 순번을 다시 찾음. 이미 사라졌으면 -1(작업 취소, 안내 토스트).
+const _pinnedCids={};
+function pinTarget(slot,list,i){_pinnedCids[slot]=(list&&list[i]&&list[i].cid)||null;}
+function resolveTarget(slot,list,i){
+  const cid=_pinnedCids[slot];
+  if(!cid||!list)return i; // cid 없는 옛 항목은 예전처럼 순번으로
+  if(list[i]&&list[i].cid===cid)return i;
+  const j=list.findIndex(x=>x&&x.cid===cid);
+  if(j<0)showToast('다른 기기에서 바뀐 항목이라 이번 작업은 취소했어요');
+  return j;
+}
 function openRhythmEditForm(idx){
   const b=getRhythmBlocks(_rhythmDk)[idx];if(!b)return;
-  _rhythmEditIdx=idx;_rhythmFormCat=b.cat;_rhythmFormStart=b.start;_rhythmFormEnd=b.end||'';_rhythmFormText=b.text||'';_rhythmFormCid=b.contentCid||null;
+  _rhythmEditIdx=idx;pinTarget('rhythmEdit',getRhythmBlocks(_rhythmDk),idx);_rhythmFormCat=b.cat;_rhythmFormStart=b.start;_rhythmFormEnd=b.end||'';_rhythmFormText=b.text||'';_rhythmFormCid=b.contentCid||null;
   _rhythmFormOpen=true;
   refreshRhythmTrack();
 }
@@ -371,6 +385,7 @@ function saveRhythmBlock(){
   _rhythmSubmitting=true;
   const text=t?t.value.trim():'';
   const blocks=getRhythmBlocks(_rhythmDk);
+  if(_rhythmEditIdx!=null){const j=resolveTarget('rhythmEdit',blocks,_rhythmEditIdx);if(j<0){_rhythmSubmitting=false;return;}_rhythmEditIdx=j;}
   const isNew=_rhythmEditIdx==null;
   let newCid=null;
   // enjoy(감상) 카테고리이고 콘텐츠 칩으로 선택한 경우에만 contentCid를 붙임 — 직접입력/타 카테고리는 undefined 그대로(불필요한 null 남기지 않음)
@@ -3341,11 +3356,19 @@ async function ensureDateSynced(dk){
   await Promise.all([syncTodosDown(dk),syncMemosDown(dk),syncSleepDown(dk),syncMealsDown(dk),syncRhythmBlocksDown(dk)]);
   return true;
 }
+// 요청 시간 제한(감사 P2-8, 5단계 5-10) — 신호가 약할 때 응답 없는 요청을 무한정 기다리면 동기화 잠금이 풀리지 않고
+// 그 뒤 업로드·재시도가 줄줄이 멈췄음. 읽기 15초·쓰기 20초가 지나면 끊고 '실패(null)'로 돌려서 업로드 대기를 남기고 다음에 다시 시도.
+// (쓰기가 실제로는 서버에 닿았는데 응답만 늦은 경우도 재시도가 같은 행을 다시 upsert할 뿐이라 안전)
+function _fetchWithTimeout(url,opts,ms){
+  if(typeof AbortController==='undefined')return fetch(url,opts);
+  const c=new AbortController();const t=setTimeout(()=>c.abort(),ms);
+  return fetch(url,{...opts,signal:c.signal}).finally(()=>clearTimeout(t));
+}
 async function supaFetch(path,method='GET',body=null){
   try{
     const opts={method,headers:supaHeaders({'Content-Type':'application/json'})};
     if(body)opts.body=JSON.stringify(body);
-    const res=await fetch(SUPA_URL+'/rest/v1/'+path,opts);
+    const res=await _fetchWithTimeout(SUPA_URL+'/rest/v1/'+path,opts,method==='GET'?15000:20000);
     if(!res.ok){console.warn('supa err:',path,await res.text());return null;}
     if(method==='DELETE'||res.status===204)return true;
     return await res.json();
@@ -3357,7 +3380,7 @@ async function supaUpsert(path,onConflict,body){
     const opts={method:'POST',headers:supaHeaders({'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'})};
     opts.body=JSON.stringify(body);
     const sep=path.includes('?')?'&':'?';
-    const res=await fetch(SUPA_URL+'/rest/v1/'+path+sep+'on_conflict='+onConflict,opts);
+    const res=await _fetchWithTimeout(SUPA_URL+'/rest/v1/'+path+sep+'on_conflict='+onConflict,opts,20000);
     if(!res.ok){console.warn('supa upsert err:',path,await res.text());return null;}
     return true;
   }catch(e){return null;}
@@ -4648,9 +4671,11 @@ async function syncContentsDownRaw(mk){
   // 그보다 오래된 항목이 서버에 없다는 건 다른 기기에서 이미 삭제됐다는 뜻이므로 로컬에서도 제거.
   const RECENT_MS=5*60*1000;
   const now=Date.now();
+  // 단, 이 달에 업로드 대기가 남아 있으면(감사 P1-5, 5-6) 서버에 없는 로컬 항목도 '아직 못 올린 것'일 수 있어 모두 보존.
+  const monthPending=!!S.get(S.key('contents_pending',mk));
   local.forEach(it=>{
     if(!it.cid||seenCids.has(it.cid)||delCids.has(it.cid))return;
-    if(it.created&&(now-it.created)<RECENT_MS)merged.push(it);
+    if(monthPending||(it.created&&(now-it.created)<RECENT_MS))merged.push(it);
   });
   // title+startDate로도 서버와 매칭 안 된 cid-없는 로컬 항목(진짜 신규) — 이제 cid 발급
   Object.values(localNoCidByKey).forEach(it=>{it.cid=genCid();merged.push(it);});
@@ -5945,8 +5970,8 @@ function confirmTime(){
     return;
   }
   if(_sleepTarget.startsWith('todo-completed:')){
-    const i=parseInt(_sleepTarget.split(':')[1],10);
     const dk=dateKey(currentDate),todos=getTodos(dk);
+    const i=resolveTarget('todoTime',todos,parseInt(_sleepTarget.split(':')[1],10));
     const t=todos[i];
     if(t&&t.done){
       t.completedAt=_applyCompletedTimeOnly(t.completedAt,v);
@@ -5956,8 +5981,8 @@ function confirmTime(){
     return;
   }
   if(_sleepTarget.startsWith('schedule-time:')){
-    const i=parseInt(_sleepTarget.split(':')[1],10);
     const dk=dateKey(currentDate),todos=getTodos(dk);
+    const i=resolveTarget('todoTime',todos,parseInt(_sleepTarget.split(':')[1],10));
     const t=todos[i];
     const m=t&&(t.text||'').match(SCHEDULE_TIME_RE);
     if(t&&m){
@@ -6023,7 +6048,7 @@ function formatCompletedTimeHHMM(ms){
 function openTodoCompletedTimePicker(i){
   const dk=dateKey(currentDate),todos=getTodos(dk);
   const t=todos[i];if(!t||!t.done||!t.completedAt)return;
-  _sleepTarget='todo-completed:'+i;
+  _sleepTarget='todo-completed:'+i;pinTarget('todoTime',todos,i);
   document.getElementById('time-inp').value=formatCompletedTimeHHMM(t.completedAt);
   openModal('time-modal');
   renderTimeWheel();
@@ -6033,7 +6058,7 @@ function openScheduleTimePicker(i){
   const dk=dateKey(currentDate),todos=getTodos(dk);
   const t=todos[i];if(!t||!t.done)return;
   const m=(t.text||'').match(SCHEDULE_TIME_RE);if(!m)return;
-  _sleepTarget='schedule-time:'+i;
+  _sleepTarget='schedule-time:'+i;pinTarget('todoTime',todos,i);
   document.getElementById('time-inp').value=m[1].padStart(2,'0')+':'+m[2];
   openModal('time-modal');
   renderTimeWheel();
@@ -6513,7 +6538,7 @@ function toggleTodoStrikePart(i,partIdx){
 // 조각모드에서 미체크(취소선 없는) 조각 전부를 내일로 복사. 먼저 확인 토스트로 묻고 "네" 눌러야 실행.
 let _pendingPartCopyIdx=-1,_partCopyConfirmTimer=null;
 function copyUnstruckPartsToTomorrow(i){
-  _pendingPartCopyIdx=i;
+  _pendingPartCopyIdx=i;pinTarget('todoCopy',getTodos(dateKey(currentDate)),i);
   const t=document.getElementById('todo-copy-confirm-toast');
   if(!t)return;
   clearTimeout(_partCopyConfirmTimer);
@@ -6523,10 +6548,11 @@ function copyUnstruckPartsToTomorrow(i){
   _partCopyConfirmTimer=setTimeout(()=>{t.classList.remove('on');_pendingPartCopyIdx=-1;},4000);
 }
 function confirmCopyUnstruckParts(){
-  const i=_pendingPartCopyIdx;
+  let i=_pendingPartCopyIdx;
   _pendingPartCopyIdx=-1;
   if(i<0)return;
   const dk=dateKey(currentDate);
+  i=resolveTarget('todoCopy',getTodos(dk),i);if(i<0)return;
   const tom=new Date(currentDate);tom.setDate(tom.getDate()+1);
   const tdk=dateKey(tom);
   const result=relocateTodo(dk,i,tdk,'copy');
@@ -6726,7 +6752,7 @@ function confirmTodoCopyToast(){
 // 구분자(,/) 없는 단일 항목 전체를 내일로 복사 (오늘 항목은 그대로 유지). 스와이프하면 먼저 확인 토스트로 묻고, "네" 눌러야 실제 복사됨.
 let _pendingCopyTodoIdx=-1,_copyConfirmTimer=null;
 function copyWholeTodoToTomorrow(i){
-  _pendingCopyTodoIdx=i;
+  _pendingCopyTodoIdx=i;pinTarget('todoCopy',getTodos(dateKey(currentDate)),i);
   const t=document.getElementById('todo-copy-confirm-toast');
   if(!t)return;
   clearTimeout(_copyConfirmTimer);
@@ -6739,10 +6765,11 @@ function confirmCopyWholeTodo(){
   const t=document.getElementById('todo-copy-confirm-toast');
   if(t)t.classList.remove('on');
   clearTimeout(_copyConfirmTimer);
-  const i=_pendingCopyTodoIdx;
+  let i=_pendingCopyTodoIdx;
   _pendingCopyTodoIdx=-1;
   if(i<0)return;
   const dk=dateKey(currentDate);
+  i=resolveTarget('todoCopy',getTodos(dk),i);if(i<0)return;
   const tom=new Date(currentDate);tom.setDate(tom.getDate()+1);
   const tdk=dateKey(tom);
   const result=relocateTodo(dk,i,tdk,'copy');
@@ -7692,6 +7719,7 @@ function openTodoModal(editIdx=-1){
   document.getElementById('todo-modal-delete').style.display=editIdx>=0?'block':'none'; // 신규 등록 시엔 삭제할 대상이 없으므로 숨김
   const dk=dateKey(currentDate);
   const existing=editIdx>=0?getTodos(dk)[editIdx]:null;
+  pinTarget('todoModal',getTodos(dk),editIdx);
   document.getElementById('todo-modal-inp').value=existing?.text||'';
   _todoAcIndex=null; // 자동완성 후보는 등록창을 열 때마다 새로 만듦(방금 등록한 문장 반영)
   onTodoModalInpInput(); // 수정 진입 시 기존 텍스트가 "DR >"로 시작하면 칩 상태도 즉시 맞춰줌
@@ -8041,7 +8069,8 @@ function deleteTodoFromModal(){
   const editIdx=modal.dataset.editIdx!==''&&modal.dataset.editIdx!=null?parseInt(modal.dataset.editIdx):-1;
   if(editIdx<0)return; // 신규 등록 상태(삭제 대상 없음) 방어
   const dk=dateKey(currentDate),todos=getTodos(dk);
-  const t=todos[editIdx];
+  const ei=resolveTarget('todoModal',todos,editIdx);if(ei<0){closeModal('todo-modal');return;}
+  const t=todos[ei];
   if(t)removeTodoByCid(dk,t.cid);
   closeModal('todo-modal');
   syncCalCacheFromTodos(dk); // 캘린더에서 바로 삭제 시 탭 전환 없이 즉시 반영되도록
@@ -8098,7 +8127,8 @@ async function confirmTodo(){
   const modal=document.getElementById('todo-modal');
   // 반복 설정이 돼 있으면 일반 투두/일정 저장 로직(연속일정, 조각모드 등)을 타지 않고 별도 경로로 분기.
   // 편집(editIdx>=0)인 기존 항목엔 반복 설정을 적용하지 않음 — 신규 등록에서만 지원(범위를 좁혀 복잡도 관리).
-  const editIdx=modal.dataset.editIdx!==''&&modal.dataset.editIdx!=null?parseInt(modal.dataset.editIdx):-1;
+  let editIdx=modal.dataset.editIdx!==''&&modal.dataset.editIdx!=null?parseInt(modal.dataset.editIdx):-1;
+  if(editIdx>=0){editIdx=resolveTarget('todoModal',getTodos(dateKey(currentDate)),editIdx);if(editIdx<0){closeModal('todo-modal');return;}}
   if(editIdx<0&&modal.dataset.recurType){
     confirmRecurringTodo(text);
     return;
@@ -8198,11 +8228,13 @@ function todoDelSwipe(i){
 function openTodoSheet(i){
   _todoSwipeIdx=i;
   const dk=dateKey(currentDate),todos=getTodos(dk);
+  pinTarget('todoSheet',todos,i);
   document.getElementById('todo-sheet-title').textContent=todos[i]?.text||'';
   openSheet('todo-sheet');
 }
-function todoSheetEdit(){_todoSwipeIdx>=0&&(closeSheet('todo-sheet'),openTodoModal(_todoSwipeIdx));}
-function todoSheetDelete(){todoDelSwipe(_todoSwipeIdx);}
+function _todoSheetIdx(){return _todoSwipeIdx<0?-1:resolveTarget('todoSheet',getTodos(dateKey(currentDate)),_todoSwipeIdx);}
+function todoSheetEdit(){const i=_todoSheetIdx();closeSheet('todo-sheet');if(i>=0)openTodoModal(i);}
+function todoSheetDelete(){const i=_todoSheetIdx();if(i>=0)todoDelSwipe(i);else closeSheet('todo-sheet');}
 // 일정 전용 시트 — dk+cid로 대상을 저장해두고, 그 시점 기준으로 실제 배열 인덱스를 다시 찾아 처리(인덱스 stale 방지).
 function openEventSheet(dk,cid,title){
   _eventSheetDk=dk;_eventSheetCid=cid;
@@ -8535,10 +8567,10 @@ function renderMemos(){
       const _ptxt=m.photoStatus==='upload_failed'?`⚠︎ 업로드 실패: ${m.photoErrorMsg||''}`:(m.text||'');
       txt.textContent=_ptxt;
       bub.appendChild(wrap);bub.appendChild(txt);
-      bub.addEventListener('click',()=>{_memoSwipeIdx=i;openSheet('memo-sheet');});
+      bub.addEventListener('click',()=>{_memoSwipeIdx=i;pinTarget('memoSheet',getMemos(dateKey(currentDate)),i);openSheet('memo-sheet');});
     }else{
       bub.textContent=(m.text||''); // 글자로만 넣음(감사 P1-11 — 예전엔 HTML로 해석됐음)
-      bub.addEventListener('click',()=>{_memoSwipeIdx=i;openSheet('memo-sheet');});
+      bub.addEventListener('click',()=>{_memoSwipeIdx=i;pinTarget('memoSheet',getMemos(dateKey(currentDate)),i);openSheet('memo-sheet');});
     }
     const time=document.createElement('span');
     time.className='memo-time';
@@ -8554,7 +8586,7 @@ function memoEditSwipe(i){
   const dk=dateKey(currentDate),m=getMemos(dk)[i];
   document.getElementById('memo-edit-inp').value=m?.text||'';
   document.getElementById('memo-edit-time-inp').value=m?.time||'';
-  document.getElementById('memo-edit-modal').dataset.editIdx=i;
+  document.getElementById('memo-edit-modal').dataset.editIdx=i;pinTarget('memoEdit',getMemos(dk),i);
   // 사진 상태 초기화 — 모달 열 때마다 이전 편집 잔여 상태(취소하고 나간 경우 등)가 남지 않도록
   if(_memoEditPendingPhoto&&_memoEditPendingPhoto.localUrl)URL.revokeObjectURL(_memoEditPendingPhoto.localUrl);
   _memoEditPendingPhoto=null;
@@ -8570,8 +8602,9 @@ function memoDelSwipe(i){
   if(memos[i])addDelPending('memos',dk,memos[i].cid);
   memos.splice(i,1);saveMemos(dk,memos);renderMemos();showUndo();
 }
-function memoSheetEdit(){_memoSwipeIdx>=0&&memoEditSwipe(_memoSwipeIdx);}
-function memoSheetDelete(){_memoSwipeIdx>=0&&memoDelSwipe(_memoSwipeIdx);}
+function _memoSheetIdx(){return _memoSwipeIdx<0?-1:resolveTarget('memoSheet',getMemos(dateKey(currentDate)),_memoSwipeIdx);}
+function memoSheetEdit(){const i=_memoSheetIdx();if(i>=0)memoEditSwipe(i);else closeSheet('memo-sheet');}
+function memoSheetDelete(){const i=_memoSheetIdx();if(i>=0)memoDelSwipe(i);else closeSheet('memo-sheet');}
 function cancelMemoEdit(e){
   if(_memoEditPendingPhoto&&_memoEditPendingPhoto.localUrl)URL.revokeObjectURL(_memoEditPendingPhoto.localUrl);
   _memoEditPendingPhoto=null;_memoEditRemovePhoto=false;_memoEditCurrentPhotoUrl=null;
@@ -8580,7 +8613,8 @@ function cancelMemoEdit(e){
 function confirmMemoEdit(){
   const text=document.getElementById('memo-edit-inp').value.trim();
   const time=padTime(document.getElementById('memo-edit-time-inp').value);
-  const i=parseInt(document.getElementById('memo-edit-modal').dataset.editIdx||'0');
+  let i=parseInt(document.getElementById('memo-edit-modal').dataset.editIdx||'0');
+  if(i>=0){i=resolveTarget('memoEdit',getMemos(dateKey(currentDate)),i);if(i<0){cancelMemoEdit();return;}}
   if(i===-1){ // 홈에서 연 새 메모 — 내용(글 또는 사진)이 있을 때만 저장
     const ndk=document.getElementById('memo-edit-modal').dataset.newDk||dateKey(getLogicalDate());
     const photo=_memoEditPendingPhoto;
@@ -13241,23 +13275,53 @@ function logContentDaily(cid,dk,amountRead,seconds,unit,percentAfter,unitAfter){
   if(idx>=0){
     logs[idx].amountRead=(logs[idx].amountRead||0)+amountRead;
     logs[idx].seconds=(logs[idx].seconds||0)+(seconds||0);
+    logs[idx].dAmt=(logs[idx].dAmt||0)+amountRead;logs[idx].dSec=(logs[idx].dSec||0)+(seconds||0);
     logs[idx].unit=unit;
     logs[idx].percentAfter=percentAfter;
     logs[idx].unitAfter=unitAfter;
   }else{
-    logs.push({cid:cidKey,contentCid:cid,unit:unit,amountRead:amountRead,seconds:seconds||0,percentAfter:percentAfter,unitAfter:unitAfter,created:Date.now()});
+    logs.push({cid:cidKey,contentCid:cid,unit:unit,amountRead:amountRead,seconds:seconds||0,percentAfter:percentAfter,unitAfter:unitAfter,created:Date.now(),dAmt:amountRead,dSec:seconds||0});
   }
   saveContentDailyLog(dk,logs);
 }
+// 진행률 로그 올리기(감사 P2-6, 5단계 5-7) — 같은 날 같은 작품의 로그는 기기가 달라도 cid가 같아서(cdlog_<날짜>_<작품>),
+// 예전엔 각 기기가 자기 기기에서 쌓은 합계로 서버를 덮어써 다른 기기에서 읽은 양·시간이 사라졌음.
+// 이제 기기마다 '아직 안 올린 증가분'(dAmt·dSec)을 따로 들고 있다가, 올릴 때 서버의 현재 값에 더해서 올림.
+// 증가분 필드가 없는 옛 대기 로그는 예전 방식(기기 합계 그대로)으로 올림.
 async function syncContentDailyLogUp(dk){
   const logs=getContentDailyLog(dk);
   if(!logs.length)return true;
-  const ok=await supaUpsert('content_daily_log','client_id',logs.map(l=>({
-    date_key:dk,content_cid:l.contentCid,unit:l.unit,amount_read:l.amountRead||0,
+  const withDelta=logs.filter(l=>l.dAmt!=null||l.dSec!=null);
+  let server={};
+  if(withDelta.length){
+    const inList=withDelta.map(l=>encodeURIComponent(l.cid)).join(',');
+    const rows=await supaFetch(`content_daily_log?client_id=in.(${inList})&select=client_id,amount_read,seconds`);
+    if(!Array.isArray(rows))return false; // 서버 값을 모르면 합칠 수 없으니 다음에 다시
+    rows.forEach(r=>{server[r.client_id]=r;});
+  }
+  const sent=logs.map(l=>{
+    const hasDelta=l.dAmt!=null||l.dSec!=null;
+    const sv=server[l.cid];
+    const amt=hasDelta?((sv?sv.amount_read||0:0)+(l.dAmt||0)):(l.amountRead||0);
+    const sec=hasDelta?((sv?sv.seconds||0:0)+(l.dSec||0)):(l.seconds||0);
+    return {l,amt,sec,dAmt:l.dAmt||0,dSec:l.dSec||0};
+  });
+  const ok=await supaUpsert('content_daily_log','client_id',sent.map(({l,amt,sec})=>({
+    date_key:dk,content_cid:l.contentCid,unit:l.unit,amount_read:amt,
     percent_after:(l.unit==='percent'?l.percentAfter:null),
     unit_after:(l.unit!=='percent'?l.unitAfter:null),
-    seconds:l.seconds||0,created:l.created,client_id:l.cid
+    seconds:sec,created:l.created,client_id:l.cid
   })));
+  if(ok){
+    // 올린 만큼만 증가분에서 빼고(올리는 사이 새로 쌓인 건 남김) 로컬 합계를 서버 값으로 맞춤
+    const cur=getContentDailyLog(dk);
+    sent.forEach(({l,amt,sec,dAmt,dSec})=>{
+      const c=cur.find(x=>x.cid===l.cid);if(!c)return;
+      const restA=(c.dAmt||0)-dAmt,restS=(c.dSec||0)-dSec;
+      c.amountRead=amt+restA;c.seconds=sec+restS;c.dAmt=restA;c.dSec=restS;
+    });
+    S.set(S.key('cdlog',dk),cur);
+  }
   return ok;
 }
 // _rdProgressLabel — 콘텐츠 감상달력(renderWatchCalDetail)의 책 진행률 표시에서도 재사용.
@@ -14724,6 +14788,7 @@ function startEditReserveTodo(i){
   const list=document.getElementById('reserve-list');if(!list)return;
   const span=list.querySelector(`.reserve-text[data-i="${i}"]`);if(!span)return;
   const todos=getReserveTodos();const t=todos[i];if(!t)return;
+  const editCid=t.cid;
   const inp=document.createElement('textarea');
   inp.className='reserve-edit-inp';
   inp.rows=1;
@@ -14737,7 +14802,8 @@ function startEditReserveTodo(i){
     if(committed)return;committed=true;
     const val=inp.value.trim();
     const cur=getReserveTodos();
-    if(cur[i]&&val&&val!==cur[i].text){cur[i].text=val;saveReserveTodos(cur);}
+    const j=editCid?cur.findIndex(x=>x&&x.cid===editCid):i; // 5-5: 입력하는 사이 목록이 바뀌어도 고치던 항목에 저장
+    if(cur[j]&&val&&val!==cur[j].text){cur[j].text=val;saveReserveTodos(cur);}
     renderReserveList();
   };
   inp.addEventListener('blur',commit);
@@ -14782,7 +14848,7 @@ function _joinReserveParts(c,idxs){
   return c.hasPrefix?`${c.prefix} > ${body}`:body;
 }
 function openReserveMoveModal(i){
-  _reserveMoveIdx=i;_reserveSection='none';
+  _reserveMoveIdx=i;_reserveSection='none';pinTarget('reserveMove',getReserveTodos(),i);
   setReserveSection('none');
   const dateInp=document.getElementById('reserve-date-inp');
   if(dateInp)dateInp.value=dateKey(new Date());
@@ -14805,6 +14871,7 @@ function confirmReserveMove(){
   const val=document.getElementById('reserve-date-inp').value;
   if(!val||_reserveMoveIdx<0)return;
   const todos=getReserveTodos();
+  _reserveMoveIdx=resolveTarget('reserveMove',todos,_reserveMoveIdx);if(_reserveMoveIdx<0)return;
   const t=todos[_reserveMoveIdx];if(!t)return;
   const c=_reservePartCtx;
   let movedText=t.text,stayText=null; // stayText: 보관함에 남길 텍스트(조각을 일부만 보낼 때만 있음)

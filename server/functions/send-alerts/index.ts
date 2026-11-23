@@ -10,6 +10,7 @@
 //    [2026-10-01] 생일 축하 — user_settings.birthday('MM-DD', 설정탭에서 입력)가 오늘 날짜와 같으면 아침 브리핑을 생일 버전으로 보냄(2/29생은 평년 2/28).
 //    [2026-10-26] 오늘의 질문 알림(question_alert)은 기능 자체와 함께 폐지.
 //    [2026-11-20] 감사 5-9 — 예약 시각은 5분 여유 창으로 판정, 발송은 '맡음 표시 후 발송'·전부 일시 실패면 30분 안에서 재시도.
+//    [2026-11-23] 감사 5-8·5-9 — 할일·일정 알림은 발송 직전 항목 존재 확인, 새벽 6시 전엔 어제 시작한 진행 중 리듬도 리마인드.
 // 2) 조건부 스캔형(리듬 진행중 리마인드) — rhythm_enabled일 때만, 동일하게 timezone 기준으로 경과시간 계산.
 //    1시간/3시간 두 단계로 발송(2026-09-19 추가) — 각 단계는 alerts.source_cid에 구분자를 붙여
 //    별개 row로 관리하되, 실제 리듬블록을 찾아갈 push url의 cid는 alerts.link_cid(원본 client_id)를
@@ -319,8 +320,15 @@ const RHYTHM_REMIND_STAGES: { elapsedMin: number; suffix: string; stage: "1h" | 
   { elapsedMin: 180, suffix: "_3h", stage: "3h", titleSuffix: "3시간째 진행중이에요" },
 ];
 async function maybeScheduleRhythmReminders(supabase: ReturnType<typeof createClient>, dk: string, nowMin: number, nowIso: string) {
+  // 자정 넘긴 리듬(감사 P2-13, 5-9): 새벽 6시 전에는 어제 날짜에 시작해 아직 진행 중인 블록도 봄(예: 22:30 시작 → 01:30에 3시간 알림).
+  // 경과 시간은 아래에서 음수면 +1440으로 이미 보정됨. 같은 단계 중복은 source_cid로 막힘.
+  const dks = [dk];
+  if (nowMin < 6 * 60) {
+    const [yy, mm, dd] = dk.split("-").map(Number);
+    dks.push(new Date(Date.UTC(yy, mm - 1, dd - 1)).toISOString().slice(0, 10));
+  }
   const { data: ongoing } = await supabase
-    .from("rhythm_blocks").select("client_id,cat,start_time").eq("date_key", dk).or("end_time.is.null,end_time.eq.");
+    .from("rhythm_blocks").select("client_id,cat,start_time").in("date_key", dks).or("end_time.is.null,end_time.eq.");
   if (!ongoing || !ongoing.length) return;
 
   for (const b of ongoing) {
@@ -402,11 +410,12 @@ Deno.serve(async (_req: Request) => {
     const { data: claimed } = await supabase.from("alerts").update({ sent: true }).eq("id", alert.id).eq("sent", false).select("id");
     if (!claimed || !claimed.length) continue;
 
-    // 스누즈 임시 알림은 발송 시점에 할일이 이미 완료됐으면 보내지 않음 — 앱이 완료/삭제 시 예약을 지우지만,
-    // 조각 전부 체크 등 다른 경로로 완료된 경우를 대비한 안전장치.
-    if (alert.source_type === "todo_snooze") {
-      const { data: todoRows } = await supabase.from("todos").select("done").eq("client_id", alert.source_cid).limit(1);
-      if (todoRows && todoRows[0]?.done) continue;
+    // 할일·스누즈·일정 알림은 발송 직전에 그 항목이 아직 있는지 확인(감사 P2-4, 5-8) — 다른 날로 옮기거나 지웠는데
+    // 오프라인 등으로 앱의 예약 삭제가 서버에 못 닿으면, 없는 할일 알림이 옛 시각에 울렸음. 할일·스누즈는 완료됐어도 안 보냄.
+    if (alert.source_type === "todo" || alert.source_type === "todo_snooze" || alert.source_type === "event") {
+      const { data: todoRows, error: todoErr } = await supabase.from("todos").select("done").eq("client_id", alert.source_cid).limit(1);
+      if (!todoErr && (!todoRows || !todoRows.length)) continue;
+      if (alert.source_type !== "event" && todoRows && todoRows[0]?.done) continue;
     }
     sentCount++;
 
