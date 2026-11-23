@@ -6436,6 +6436,16 @@ function attachTodoItemClick(el,idx,cid){
 // mode:'copy' → 원본은 유지하되, 완료조각만 남기고 미완료조각은 제거(스와이프 복사 공용)
 // 조각 없는 단일 항목은 mode에 따라 전체 이동/전체 복사로 동일하게 처리(기존 동작 유지).
 // 남은 완료조각만으로 구성되면 항목 전체를 자동 완료 체크(done=true) 처리.
+// 할일을 다른 날로 옮기거나 복사할 때 알림 설정도 같은 시각으로 따라가게(11/23 봄이님 결정, 감사 P2-4).
+// 예전엔 새 할일에 알림 필드가 빠져 알림이 사라졌고, 원본의 옛 예약만 서버에 남았음(이건 서버에서 발송 전 확인으로 막음).
+function _carryTodoAlert(t){
+  if(!t||t.isEvent||!t.todoAlertOn||!t.alertTime)return {};
+  return {alertTime:t.alertTime,todoAlertOn:true};
+}
+function _scheduleCarriedAlert(nt,targetDk){
+  const basis=alertBasisTimeFor(nt);
+  if(basis)syncAlertFor('todo',nt.cid,targetDk,basis,nt.text);
+}
 function relocateTodo(dk,idx,targetDk,mode){
   const todos=getTodos(dk),todo=todos[idx];
   if(!todo)return{success:false,message:'항목을 찾을 수 없어요'};
@@ -6448,9 +6458,12 @@ function relocateTodo(dk,idx,targetDk,mode){
   if(!hasMultipleParts){
     const targetTodos=getTodos(targetDk);
     if(targetTodos.some(x=>x.text===todo.text))return{success:false,message:'이미 해당 날짜에 있어요'};
-    targetTodos.push({text:todo.text,done:false,created:Date.now(),timeSection:todo.timeSection||'none',cid:genCid(),strikeParts:[],strikeTimes:{},pinned:todo.pinned||false});
+    const nt={text:todo.text,done:false,created:Date.now(),timeSection:todo.timeSection||'none',cid:genCid(),strikeParts:[],strikeTimes:{},pinned:todo.pinned||false,..._carryTodoAlert(todo)};
+    targetTodos.push(nt);
     saveTodos(targetDk,targetTodos);
+    _scheduleCarriedAlert(nt,targetDk);
     if(mode==='move'){
+      clearTodoAlerts(!!todo.isEvent,todo.cid); // 옮긴 원본의 옛 알림 정리(새 할일 쪽에 같은 시각으로 다시 예약됨)
       addDelPending('todos',dk,todo.cid);
       todos.splice(idx,1);
       saveTodos(dk,todos);
@@ -6469,8 +6482,10 @@ function relocateTodo(dk,idx,targetDk,mode){
   const targetTodos=getTodos(targetDk);
   if(!targetTodos.some(x=>x.text===movedText)){
     // 옮겨가는 조각들은 아직 미완료 상태이므로 시각 정보 없이 새로 시작
-    targetTodos.push({text:movedText,done:false,created:Date.now(),timeSection:todo.timeSection||'none',cid:genCid(),strikeParts:[],strikeTimes:{},pinned:todo.pinned||false});
+    const nt={text:movedText,done:false,created:Date.now(),timeSection:todo.timeSection||'none',cid:genCid(),strikeParts:[],strikeTimes:{},pinned:todo.pinned||false,..._carryTodoAlert(todo)};
+    targetTodos.push(nt);
     saveTodos(targetDk,targetTodos);
+    _scheduleCarriedAlert(nt,targetDk);
   }
 
   const remainingIdxs=parts.map((_,i)=>i).filter(i=>strikeSet.has(i));
@@ -8369,11 +8384,13 @@ function confirmTodoToReserve(cat){
   if(_todoSwipeIdx<0)return;
   const dk=dateKey(currentDate);
   const todos=getTodos(dk);
-  const t=todos[_todoSwipeIdx];
+  const ti=resolveTarget('todoSheet',todos,_todoSwipeIdx);if(ti<0)return;
+  const t=todos[ti];
   if(!t)return;
+  clearTodoAlerts(!!t.isEvent,t.cid); // 보관함(날짜 미정)으로 가면 알림도 정리
   // 원본 투두 제거(일정용 필드는 보관함에 남기지 않음 — 보관함은 날짜 미정 항목이라 isEvent 관련 필드 불필요)
   addDelPending('todos',dk,t.cid);
-  todos.splice(_todoSwipeIdx,1);
+  todos.splice(ti,1);
   saveTodos(dk,todos);
   const reserveTodos=getReserveTodos();
   reserveTodos.push({text:t.text,done:false,created:Date.now(),timeSection:'none',cid:genCid(),cat});
@@ -8385,15 +8402,16 @@ function confirmTodoToReserve(cat){
 function todoSheetPostpone(type){
   if(_todoSwipeIdx<0)return;
   const dk=dateKey(currentDate);
+  const si=_todoSheetIdx();if(si<0){closeSheet('todo-sheet');return;}
   if(type==='tomorrow'){
     const tom=new Date(currentDate);tom.setDate(tom.getDate()+1);
     const tdk=dateKey(tom);
-    const result=relocateTodo(dk,_todoSwipeIdx,tdk,'move');
+    const result=relocateTodo(dk,si,tdk,'move');
     showToast(result.message);
     closeSheet('todo-sheet');renderTodos();
   } else {
     closeSheet('todo-sheet');
-    openTodoDatePickerSheet(_todoSwipeIdx);
+    openTodoDatePickerSheet(si);
   }
 }
 // [v2] 범용 커스텀 캘린더 팝업 — 월간탭(.cal-grid/.cal-day)과 동일한 시각 스타일 재사용.
@@ -8468,9 +8486,11 @@ function openContentDatePicker(targetInputId){
 // 투두 날짜변경 전용 래퍼 — 기존 호출부(todoSheetPostpone)와의 연결 유지.
 function openTodoDatePickerSheet(todoIdx){
   const base=new Date(currentDate);base.setDate(base.getDate()+1); // 기본 선택은 내일
+  pinTarget('todoDatePick',getTodos(dateKey(currentDate)),todoIdx);
   openDatePickerModal(dateKey(base),function(selectedDk){
     const dk=dateKey(currentDate);
-    const result=relocateTodo(dk,todoIdx,selectedDk,'move');
+    const ti=resolveTarget('todoDatePick',getTodos(dk),todoIdx);if(ti<0)return;
+    const result=relocateTodo(dk,ti,selectedDk,'move');
     showToast(result.message);
     renderTodos();
   },'날짜 변경','이동');
