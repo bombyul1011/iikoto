@@ -15193,8 +15193,9 @@ setTimeout(checkLongRunningContent,3000); // 시작 후 동기화가 어느 정�
 reconcileStopwatchesWithBlocks(); // 복원된 스톱워치의 막대가 이미 닫혀 있으면(잠들기 전 켜 둔 채 취침시각이 등록된 경우 등) 바로 정리
 // 최초 로드 시엔 로컬 캐시만으로 그려지므로(completedAt 등 최신 서버값 반영 전),
 // online/visibilitychange 이벤트를 기다리지 않고 여기서 한 번 동기화를 실행해 최신 상태로 맞춘다.
+// 시작 동기화는 initSync 한 길로(8단계, 11/26) — 예전엔 여기서 syncAll을 바로 돌리고 0.5초 뒤 initSync가 또 돌아
+// 같은 날짜를 두 번 올리고 받았음. 이제 initSync가 끝난 뒤 syncAll을 한 번만 이어서 부름(initSync 끝부분).
 if(navigator.onLine){
-  syncAll();
   cleanupOldDailyCache(); // fire-and-forget — 실패해도 다음 앱 시작 때 재시도되므로 await로 초기화를 막지 않음
   processPhotoR2DeleteQueue(); // 지난 세션에서 R2 삭제가 실패해 대기열에 남은 사진이 있으면 재시도
 }
@@ -15338,6 +15339,7 @@ async function initSync(){
   _initSyncDone=true;
   refreshHomeIfOpen(); // 첫 동기화가 끝난 시점에 홈이 열려 있으면 받아온 최신 데이터로 다시 그림
   maybeBackfillWeeklyReports(); // 지난주 리포트 보완 생성(월요일 한정) — 동기화로 지난주 데이터가 최신이 된 직후
+  syncAll(); // initSync가 안 다루는 것(하루한줄 주간분·이번 달 콘텐츠·남은 대기 재시도 등)을 이어서 한 번
 }
 setTimeout(initSync, 500);
 setTimeout(checkAndRecoverPushSubscription, 1500);
