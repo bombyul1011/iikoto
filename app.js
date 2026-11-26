@@ -270,6 +270,29 @@ async function syncMealsDownMany(dks){
     if(rows.length)S.set(S.key('meals',dk),mealRowsToLocal(rows));
   },'created_at');
 }
+// ── 옛 날짜 사본 채우기(감사 P2-11, 6단계 6-1) ──
+// 감상 요약·독서 회차·감상달력·사진 모아보기는 기기에 있는 옛 날짜 사본을 훑어 계산해서, 그 날짜를 한 번도 열지 않은
+// 기기(새 기기, 나중에 6-2 정리로 지운 날짜)에선 값이 빠졌음. 계산 전에 비어 있는 날짜만 서버에서 묶어 받아 채움.
+// 한 세션에 같은 날짜는 한 번만 시도. 업로드 대기 중인 날짜는 _syncManyDown이 덮지 않음. 받은 날짜 수를 돌려줌.
+const _filledDays=new Set();
+function _dksBetween(from,to){
+  const out=[];if(!from||!to||from>to)return out;
+  const d=new Date(from+'T00:00:00'),end=new Date(to+'T00:00:00');
+  while(d<=end&&out.length<800){out.push(dateKey(d));d.setDate(d.getDate()+1);}
+  return out;
+}
+async function ensureDaysCached(kind,fromDk,toDk){
+  if(!navigator.onLine)return 0;
+  const lsKey=kind==='memos'?'memos':'rblocks';
+  const missing=_dksBetween(fromDk,toDk).filter(dk=>!_filledDays.has(kind+dk)&&localStorage.getItem(S.key(lsKey,dk))==null);
+  if(!missing.length)return 0;
+  missing.forEach(dk=>_filledDays.add(kind+dk));
+  for(let i=0;i<missing.length;i+=60){
+    const chunk=missing.slice(i,i+60);
+    if(kind==='memos')await syncMemosDownMany(chunk);else await syncRhythmBlocksDownMany(chunk);
+  }
+  return missing.length;
+}
 async function syncRhythmBlocksDownMany(dks){
   await _syncManyDown('rhythm_blocks',dks,'rblocks_pending',rhythmBlockRowToLocal,
     (dk,mapped)=>{S.set(S.key('rblocks',dk),mapped);markSyncedFromServer('rblocks',dk);});
@@ -1113,6 +1136,33 @@ function computeWatchSummary(cat,cid,title,startDate,endDate){
     });
     d.setDate(d.getDate()+1);
   }
+  // 기기에 없는 날짜가 있으면 서버에서 채운 뒤 한 번 더 계산해 저장된 요약을 고침(6-1)
+  ensureDaysCached('rblocks',startDate,spanEnd).then(n=>{
+    if(!n||!cid)return;
+    const again=computeWatchSummaryLocal(cat,cid,title,startDate,endDate);
+    const found=_findContentByCidNearMkInRange(cid,_bookScanMonths());
+    if(!found)return;
+    const it=found.list[found.idx];
+    if(it.watchedDaysCount===again.watchedDaysCount&&it.watchedSeconds===again.watchedSeconds)return;
+    Object.assign(it,again);saveContents(found.mk,found.list);
+  }).catch(()=>{});
+  return{watchedDaysCount:daySet.size,watchSpanDays:spanDays,watchedSeconds:seconds};
+}
+function computeWatchSummaryLocal(cat,cid,title,startDate,endDate){
+  const spanEnd=endDate||startDate;
+  const spanDays=Math.round((new Date(spanEnd+'T00:00:00')-new Date(startDate+'T00:00:00'))/86400000)+1;
+  let seconds=0;const daySet=new Set();
+  _dksBetween(startDate,spanEnd).forEach(dk=>{
+    getRhythmBlocks(dk).forEach(b=>{
+      if(!_isContentWatchBlock(b,cid,title,cat))return;
+      daySet.add(dk);
+      if(b.start&&b.end){
+        const[sh,sm]=b.start.split(':').map(Number),[eh,em]=b.end.split(':').map(Number);
+        let sMin=sh*60+sm,eMin=eh*60+em;if(eMin<=sMin)eMin+=1440;
+        seconds+=(eMin-sMin)*60;
+      }
+    });
+  });
   return{watchedDaysCount:daySet.size,watchSpanDays:spanDays,watchedSeconds:seconds};
 }
 function isFinishedStatus(status){return status==='done'||status==='stopped';}
@@ -8807,6 +8857,23 @@ function openPhotoArchive(){
     });
   }
   results.sort((a,b)=>(b.dk+(b.time||'')).localeCompare(a.dk+(a.time||'')));
+  // 6-1: 기기에 없는 날짜의 사진 메모는 서버에서 받아 합친 뒤 다시 그림(처음 한 번만)
+  if(!openPhotoArchive._serverMerged&&navigator.onLine){
+    supaFetch('memos?photo_url=not.is.null&select=date_key,memo_time,text,photo_url').then(rows=>{
+      if(!Array.isArray(rows))return;
+      const have=new Set(results.map(r=>r.src));
+      const add=rows.filter(r=>r.photo_url&&!have.has(r.photo_url));
+      if(!add.length)return;
+      openPhotoArchive._extra=add.map(r=>({dk:r.date_key,time:r.memo_time||'',text:r.text||'',src:r.photo_url}));
+      openPhotoArchive._serverMerged=true;
+      if(document.getElementById('photo-archive-modal')?.classList.contains('on'))openPhotoArchive();
+    });
+  }
+  if(openPhotoArchive._extra){
+    const have=new Set(results.map(r=>r.src));
+    openPhotoArchive._extra.forEach(r=>{if(!have.has(r.src))results.push(r);});
+    results.sort((a,b)=>(b.dk+(b.time||'')).localeCompare(a.dk+(a.time||'')));
+  }
   if(!results.length){
     resEl.innerHTML='<div class="photo-archive-empty">아직 사진메모가 없어요</div>';
   }else{
@@ -13237,6 +13304,9 @@ function countReadingSessionsForBook(book){
     const blocks=getRhythmBlocks(dk);
     count+=blocks.filter(b=>b.cat==='enjoy'&&b.text===target).length;
   }
+  // 기기에 없는 날짜는 서버에서 채운 뒤 목록을 한 번 다시 그림(6-1)
+  const from=new Date(today);from.setDate(today.getDate()-(maxDays-1));
+  ensureDaysCached('rblocks',dateKey(from),dateKey(today)).then(n=>{if(n&&typeof renderBookList==='function')renderBookList();}).catch(()=>{});
   return count;
 }
 // 남은 예상 회차 계산. 데이터(회차)가 3회 미만이면 아직 추정하기 이르다고 판단해 null 반환.
@@ -13519,6 +13589,7 @@ async function loadAndRenderWatchCal(){
   const prevMk=monthKey(new Date(y,m-1,1));
   _wcalByDate={};
   const push=(dk,item)=>{if(!_wcalByDate[dk])_wcalByDate[dk]=[];_wcalByDate[dk].push(item);};
+  await ensureDaysCached('rblocks',mk+'-01',mk+'-'+String(new Date(y,m+1,0).getDate()).padStart(2,'0')); // 6-1: 그 달 리듬 사본 채우기
 
   // 드라마/영화/독서 — 리듬 블록에서 그 달(+말일 자정 넘어간 전날 몫 보정용으로 prevMk 말일도 포함) 수집
   const daysInMonth=new Date(y,m+1,0).getDate();
