@@ -205,7 +205,27 @@ function weekMonthKey(baseDate){
 }
 const DOW=['일','월','화','수','목','금','토'];
 const DOW_MON_START=['월','화','수','목','금','토','일']; // 월요일 시작 캘린더(사이드바 미니캘린더, 독서달력)용
-function escapeHtml(s){const d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML;}
+// 따옴표도 바꿈(11/26 3차 점검) — title="…" 같은 속성 안에 넣을 때 " 가 들어간 제목이 속성을 깨뜨리지 않게
+function escapeHtml(s){const d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+// AI 리포트 HTML 정리(본앱 sanitizeAiHtml과 같은 규칙, 11/26 3차 점검) — 허용 태그와 class/style만 남기고 나머지는 글자로.
+const _AI_ALLOWED_TAGS=new Set(['DIV','P','SPAN','B','STRONG','I','EM','BR','UL','OL','LI','SMALL']);
+function sanitizeAiHtml(html){
+  const tpl=document.createElement('template');tpl.innerHTML=String(html==null?'':html);
+  const walk=node=>{
+    Array.from(node.children).forEach(el=>{
+      if(!_AI_ALLOWED_TAGS.has(el.tagName)){el.replaceWith(document.createTextNode(el.textContent));return;}
+      Array.from(el.attributes).forEach(a=>{
+        const n=a.name.toLowerCase();
+        if(n==='class'||n==='aria-hidden'||n.startsWith('data-'))return;
+        if(n==='style'&&!/url\s*\(|expression|javascript:/i.test(a.value))return;
+        el.removeAttribute(a.name);
+      });
+      walk(el);
+    });
+  };
+  walk(tpl.content);
+  return tpl.innerHTML;
+}
 
 // sleep_time/wake_time 쌍 배열에서 평균 수면시간(시간 단위, 문자열)을 계산 — 오늘/주간/월간탭 공통
 function avgSleepHoursFromRows(sleepRows){
@@ -1396,7 +1416,7 @@ function advanceTodayReadingSlide(sliderEl){
 }
 
 async function openReportPanel(cacheKey,title){
-  document.getElementById('report-panel-title').innerHTML=`<i class="ti ti-sparkles" aria-hidden="true"></i>${title}`;
+  document.getElementById('report-panel-title').innerHTML=`<i class="ti ti-sparkles" aria-hidden="true"></i>${escapeHtml(title)}`;
   const bodyEl=document.getElementById('report-panel-body');
   bodyEl.innerHTML='<div class="loading-msg">불러오는 중...</div>';
   document.getElementById('report-overlay').classList.add('on');
@@ -1414,10 +1434,10 @@ async function openReportPanel(cacheKey,title){
         ${report.keywords&&report.keywords.length?`<div class="mr-tag-cloud">${report.keywords.map(k=>`<span class="mr-tag">${escapeHtml(k)}</span>`).join('')}</div>`:''}
       </div>`;
     }catch(e){
-      bodyEl.innerHTML=content;
+      bodyEl.innerHTML=sanitizeAiHtml(content);
     }
   }else{
-    bodyEl.innerHTML=`<div class="mr-ai-comment">${content}</div>`;
+    bodyEl.innerHTML=`<div class="mr-ai-comment">${sanitizeAiHtml(content)}</div>`;
   }
 }
 function closeReportPanel(){
@@ -2512,7 +2532,7 @@ async function renderMonthTimetable(y,mo,contentsData){
           label=String(group.length);
           titleAttr=group.map(g=>g.item.title).join(', ');
         }else{
-          label=cat==='music'?(c.item.title||'').slice(0,1):escapeHtml(c.item.title||'');
+          label=escapeHtml(cat==='music'?(c.item.title||'').slice(0,1):(c.item.title||''));
           titleAttr=(c.item._carried?c.item.title+' (전월부터 이어짐)':c.item.title)+(c.item.status==='stopped'?' · 중단':'');
         }
         cellsHtml+=`<div class="tt-block ${cat}${isWatching?' watching':''}${isStopped?' stopped':''}" style="width:${w}px;min-width:${w}px;" title="${escapeHtml(titleAttr||'')}">${label}</div>`;
@@ -3305,13 +3325,13 @@ function renderReportBoxGrid(elId,weeksInMonth,rowsList,type,isYearly){
 function openReportBoxDetail(cacheKey,title,el,createdAt){
   _markReportRead(cacheKey,createdAt||null);
   if(el){el.classList.add('read');const dot=el.querySelector('.report-box-dot');if(dot)dot.remove();}
-  document.getElementById('report-panel-title').innerHTML=`<i class="ti ti-sparkles" aria-hidden="true"></i>${title}`;
+  document.getElementById('report-panel-title').innerHTML=`<i class="ti ti-sparkles" aria-hidden="true"></i>${escapeHtml(title)}`;
   const bodyEl=document.getElementById('report-panel-body');
   bodyEl.innerHTML='<div class="loading-msg">불러오는 중...</div>';
   document.getElementById('report-overlay').classList.add('on');
   supaFetch(`ai_cache?cache_key=eq.${encodeURIComponent(cacheKey)}&select=content`).then(rows=>{
     const content=rows&&rows[0]&&rows[0].content;
-    bodyEl.innerHTML=content?`<div class="mr-ai-comment">${content}</div>`:'<div class="empty-msg">내용을 불러오지 못했어요</div>';
+    bodyEl.innerHTML=content?`<div class="mr-ai-comment">${sanitizeAiHtml(content)}</div>`:'<div class="empty-msg">내용을 불러오지 못했어요</div>';
   });
   _updateSideReportBadge();
 }
@@ -3583,7 +3603,7 @@ async function renderMrpHero(row){
       ${report.keywords&&report.keywords.length?`<div class="mr-tag-cloud">${report.keywords.map(k=>`<span class="mr-tag">${escapeHtml(k)}</span>`).join('')}</div>`:''}`;
   }catch(e){
     await _ensureBareonbatangLoaded();
-    heroEl.innerHTML=`<div class="mrp-hero-comment">${row.content}</div>`;
+    heroEl.innerHTML=`<div class="mrp-hero-comment">${sanitizeAiHtml(row.content)}</div>`;
   }
 }
 

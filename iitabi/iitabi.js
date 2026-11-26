@@ -677,7 +677,7 @@ function bnPlan(e,vd){
   if(!e||e.stay||PLN.indexOf(e.d.plan)<0)return '';
   var sl=evSlot(e),L=planLetters(vd,sl);if(L.length<2)return '';
   var set=!!choiceOf(vd,sl);
-  return '<button class="bnpl" data-act="planjump" data-date="'+ea(vd)+'"><span class="pc pl-'+e.d.plan+'">'+e.d.plan+'</span>'+(set?'플랜 '+e.d.plan+' 진행 중':'플랜 '+e.d.plan+'(기본) · 다른 플랜 고르기')+ic('chevr',14)+'</button>';
+  return '<button class="bnpl" data-act="planjump" data-date="'+ea(vd)+'"><span class="pc pl-'+ea(e.d.plan)+'">'+esc(e.d.plan)+'</span>'+(set?'플랜 '+esc(e.d.plan)+' 진행 중':'플랜 '+esc(e.d.plan)+'(기본) · 다른 플랜 고르기')+ic('chevr',14)+'</button>';
 }
 function screenToday(){
   var t=trip();if(!t)return empty();
