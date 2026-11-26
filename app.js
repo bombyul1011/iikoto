@@ -12406,11 +12406,64 @@ function measureLocalStorage(){
   const oldest=[...dates].sort()[0]||null;
   return {total,top,days:dates.size,oldest};
 }
+// ── 오래된 기기 사본 정리(감사 P1-8, 6단계 6-2) ──
+// 원본은 서버에 있고, 이 기기의 날짜별 사본만 지움. 기본은 꺼짐 — 설정탭에서 정리 범위·용량을 보고 봄이님이 켬(11/26 결정).
+// 대상: 날짜가 붙은 할일·메모·리듬·식사·수면·진행률 로그·하루한줄·캘린더 캐시 사본 중 PRUNE_KEEP_DAYS일보다 오래된 것.
+// 업로드 대기(…_pending, 삭제 대기 목록, gpend:oneline)가 남은 날짜·종류는 절대 지우지 않음. 하루 한 번, 앱 시작 때.
+// 지운 날짜를 다시 열면 온라인일 때 평소처럼 서버에서 받아 보여 줌(오프라인이면 그 날짜만 비어 보임).
+const PRUNE_KEEP_DAYS=120;
+const PRUNE_KINDS={todos:'todos_pending',memos:'memos_pending',rblocks:'rblocks_pending',meals:'meals_fields_pending',
+  sleep:'sleep_pending',cdlog:'cdlog_pending',oneline:null,cal_todos_cache:null};
+function planPruneOldDays(){
+  const cutoff=dateKey(new Date(Date.now()-PRUNE_KEEP_DAYS*864e5));
+  const delKeys={};
+  ['todos','memos','rblocks'].forEach(t=>(S.get(t+'_delpending_list')||[]).forEach(e=>{if(e&&e.dk)delKeys[t+':'+e.dk]=true;}));
+  const keys=[];let bytes=0;const days=new Set();
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i)||'';
+      const m=k.match(/^([a-z_]+):(\d{4}-\d{2}-\d{2})$/);
+      if(!m||!(m[1] in PRUNE_KINDS)||m[2]>=cutoff)continue;
+      const pk=PRUNE_KINDS[m[1]];
+      if(pk){const pv=S.get(S.key(pk,m[2]));if(pv&&(!Array.isArray(pv)||pv.length))continue;}
+      if(m[1]==='oneline'&&(S.get('gpend:oneline:'+m[2])||S.get(S.key('oneline_pending',m[2]))))continue;
+      if(delKeys[m[1]+':'+m[2]])continue;
+      keys.push(k);bytes+=(k.length+(localStorage.getItem(k)||'').length)*2;days.add(m[2]);
+    }
+  }catch(e){}
+  const sorted=[...days].sort();
+  return {cutoff,keys,bytes,days:sorted.length,oldest:sorted[0]||null,newest:sorted[sorted.length-1]||null};
+}
+function runPruneOldDays(force){
+  if(!S.get('prune_enabled'))return 0;
+  const today=dateKey(new Date());
+  if(!force&&S.get('prune_last_day')===today)return 0;
+  const plan=planPruneOldDays();
+  plan.keys.forEach(k=>{try{localStorage.removeItem(k);}catch(e){}});
+  S.set('prune_last_day',today);
+  return plan.keys.length;
+}
+function togglePruneOldDays(){
+  const on=!S.get('prune_enabled');
+  if(on){
+    const p=planPruneOldDays();
+    const msg=p.days?`${PRUNE_KEEP_DAYS}일보다 오래된 ${p.days}일치(${p.oldest.slice(5).replace('-','/')}~${p.newest.slice(5).replace('-','/')}, 약 ${(p.bytes/1048576).toFixed(2)}MB)를 이 기기에서 지울게요. 서버 원본은 그대로예요.`:'지금은 지울 오래된 사본이 없어요. 켜 두면 앞으로 하루 한 번 정리해요.';
+    if(!confirm(msg))return;
+  }
+  S.set('prune_enabled',on);
+  if(on){const n=runPruneOldDays(true);if(n)showToast('오래된 기기 사본을 정리했어요');}
+  renderStorageUsage();
+}
 function renderStorageUsage(){
   const el=document.getElementById('storage-usage-status');if(!el)return;
   const u=measureLocalStorage();
   const mb=b=>(b/1048576).toFixed(b<104858?2:1);
   el.textContent=`기기 저장 ${mb(u.total)}MB / 약 5MB · 날짜 ${u.days}일치${u.oldest?' ('+u.oldest.slice(2).replace(/-/g,'.')+'~)':''} · 큰 항목 ${u.top.map(([g,b])=>g+' '+mb(b)).join(', ')}`;
+  const ps=document.getElementById('prune-status');
+  if(ps){
+    const p=planPruneOldDays();const on=!!S.get('prune_enabled');
+    ps.textContent=(on?'켜짐':'꺼짐')+(p.days?` · 정리 대상 ${p.days}일치(${p.oldest.slice(5).replace('-','/')}~${p.newest.slice(5).replace('-','/')}) ${mb(p.bytes)}MB`:' · 정리 대상 없음');
+  }
 }
 // 설정탭 '마지막 자동 백업' 표시(감사 4단계) — 서버 weekly-backup이 매주 일요일 04:00에 R2로 백업하고 backup_log에 남김.
 // 성공 기록 중 최신 것을 보여 주고, 최신 시도가 실패였으면 그 사실도 함께 표시. 오프라인·조회 실패면 조용히 비워 둠.
@@ -15164,6 +15217,7 @@ if(navigator.onLine){
   cleanupOldDailyCache(); // fire-and-forget — 실패해도 다음 앱 시작 때 재시도되므로 await로 초기화를 막지 않음
   processPhotoR2DeleteQueue(); // 지난 세션에서 R2 삭제가 실패해 대기열에 남은 사진이 있으면 재시도
 }
+runPruneOldDays(); // 6-2: 켜져 있을 때만, 하루 한 번
 restoreMemoPhotoQueue(); // 지난번 앱이 닫혀 못 올린 사진 이어서 올리기(오프라인이면 표시만 복원, online 때 업로드)
 
 // Service Worker 등록 (오프라인 지원)

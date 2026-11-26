@@ -2715,6 +2715,7 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
       <div class="settings-sec-body">
 
         <div class="settings-item" onclick="downloadFullJSONBackup()" style="cursor:pointer;flex-wrap:wrap;"><span class="settings-item-lbl"><i class="ti ti-download ico-inline-15tp" aria-hidden="true"></i>전체 기록 백업 (서버 전체, JSON)</span><i class="ti ti-chevron-right sub-tm-13" aria-hidden="true"></i><span style="flex-basis:100%;font-size:var(--dow-label-size);color:var(--tm);margin-top:4px;" id="auto-backup-status"></span><span style="flex-basis:100%;font-size:var(--dow-label-size);color:var(--tm);margin-top:2px;" id="storage-usage-status"></span></div>
+        <div class="settings-item" onclick="togglePruneOldDays()" style="cursor:pointer;flex-wrap:wrap;"><span class="settings-item-lbl"><i class="ti ti-eraser ico-inline-15tp" aria-hidden="true"></i>오래된 기기 사본 정리 (120일)</span><i class="ti ti-chevron-right sub-tm-13" aria-hidden="true"></i><span style="flex-basis:100%;font-size:var(--dow-label-size);color:var(--tm);margin-top:4px;" id="prune-status"></span></div>
         <div class="settings-item" style="flex-direction:column;align-items:flex-start;gap:8px;padding-bottom:12px;">
           <span class="settings-item-lbl"><i class="ti ti-key ico-inline-15tp" aria-hidden="true"></i>앱 키</span>
           <input type="text" id="app-key-inp" class="modal-inp settings-key-inp"
@@ -2907,7 +2908,7 @@ body:has(#v-home.on .afl-dock) .undo-toast{bottom:100px;}
   </div>
 </div>
 
-<script src="app.js?v=20261126b"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
+<script src="app.js?v=20261126c"></script> <!-- app.js를 수정해 올릴 때마다 v= 뒤 값을 바꿔야 브라우저가 옛 app.js를 재사용하지 않음(index.html과 버전이 어긋나면 새 UI가 옛 스크립트와 짝이 안 맞음) -->
 
 </body>
 </html>
