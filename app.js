@@ -3975,7 +3975,18 @@ const _CONTENT_STATUS_TO_BOOK={watching:'reading',done:'done',stopped:'paused'};
 // todayStart/todayDate(오늘 읽은 양 계산용)는 drama/movie 시청 스톱워치의 시작시각 관리와 동일하게
 // 서버에 남기지 않는 세션성 로컬 값 — 메모리 캐시로만 관리(자정 지나면 자연히 today_date 불일치로 무효화됨).
 let _bookTodayMap={}; // {cid: {todayDate, todayStart}}
-const _BOOK_SCAN_MONTHS=24; // 서재(완독 목록)가 계속 누적되므로 넉넉히 2년치 스캔
+// 서재 스캔 범위(감사 P2-7, 6-4) — 예전엔 24개월 고정이라 2년 넘은 완독 책이 서재에서 빠졌음.
+// 이제 기기에 있는 가장 오래된 콘텐츠 달까지(최소 24개월). getter라 기존 사용처(_bookScanMonths())는 그대로 둠.
+let _bookScanCache=null;
+function _bookScanMonths(){
+  if(_bookScanCache&&Date.now()-_bookScanCache.at<60000)return _bookScanCache.n;
+  let oldest=null;
+  try{for(let i=0;i<localStorage.length;i++){const m=(localStorage.key(i)||'').match(/^contents:(\d{4})-(\d{2})$/);if(m){const v=(+m[1])*12+(+m[2])-1;if(oldest==null||v<oldest)oldest=v;}}}catch(e){}
+  const now=new Date();const cur=now.getFullYear()*12+now.getMonth();
+  const n=Math.max(24,oldest==null?0:cur-oldest+1);
+  _bookScanCache={n,at:Date.now()};
+  return n;
+}
 function _bookContentToShape(c,mk){
   const todaySnap=_bookTodayMap[c.cid];
   const useToday=todaySnap&&todaySnap.todayDate===dateKey(getLogicalDate());
@@ -3995,7 +4006,7 @@ function _bookContentToShape(c,mk){
     linkedContent:true,contentMk:mk,contentTitle:c.title
   };
 }
-// 최근 _BOOK_SCAN_MONTHS개월의 book 카테고리 항목을 모아 book shape 배열로 리턴.
+// 최근 _bookScanMonths()개월의 book 카테고리 항목을 모아 book shape 배열로 리턴.
 // renderReadingHub 등 한 렌더 사이클에서 여러 하위 함수가 반복 호출하므로 짧게 메모이제이션
 // (saveContents/upsertBookLocal 등 contents가 바뀌는 모든 지점에서 _booksCache=null로 무효화됨).
 let _booksCache=null;
@@ -4004,7 +4015,7 @@ function getBooks(){
   const now=new Date();
   const result=[];
   const seen=new Set();
-  for(let i=0;i<_BOOK_SCAN_MONTHS;i++){
+  for(let i=0;i<_bookScanMonths();i++){
     const mk=monthKey(new Date(now.getFullYear(),now.getMonth()-i,1));
     getContents(mk).forEach(c=>{
       if(c.cat!=='book'||!c.cid||seen.has(c.cid))return;
@@ -4063,7 +4074,7 @@ async function syncQuotesDownAll(){
 function upsertBookLocal(book){
   if(book.todayDate)_bookTodayMap[book.cid]={todayDate:book.todayDate,todayStart:book.todayStart||0};
   const now=new Date();
-  const found=_findContentByCidNearMkInRange(book.cid,_BOOK_SCAN_MONTHS);
+  const found=_findContentByCidNearMkInRange(book.cid,_bookScanMonths());
   const targetMk=book.contentMk||(found?found.mk:monthKey(now));
   const list=getContents(targetMk);
   let item=found?found.list[found.idx]:list.find(c=>c.cid===book.cid);
@@ -4106,7 +4117,7 @@ function _findContentByCidNearMkInRange(cid,monthsBack){
   return null;
 }
 function deleteBookLocal(cid){
-  const found=_findContentByCidNearMkInRange(cid,_BOOK_SCAN_MONTHS);
+  const found=_findContentByCidNearMkInRange(cid,_bookScanMonths());
   if(!found)return;
   addDelPending('contents',found.mk,cid);
   found.list.splice(found.idx,1);
@@ -5610,13 +5621,67 @@ function _makePendingPhotoController(previewRowId,thumbClass,clearClass,opts){
 const _memoPhotoCtl=_makePendingPhotoController('memo-photo-preview-row','memo-photo-preview-thumb','memo-photo-preview-clear');
 function handleMemoPhotoSelect(ev){return _memoPhotoCtl.handleSelect(ev);}
 function clearMemoPhotoPreview(){return _memoPhotoCtl.clear();}
-// 업로드 대기열 — 현재는 메모리 배열(새로고침 시 소실). R2 연동 확정 시 IndexedDB로 교체해
-// 앱 재시작/오프라인 지속 상태에서도 대기열이 유지되도록 영속화 예정(오늘은 프론트 뼈대만).
+// 업로드 대기열 — 메모리 배열 + IndexedDB 사본(감사 P1-6, 6단계 6-3, 11/26).
+// 예전엔 메모리에만 있어서, 사진을 올리기 전에 앱이 닫히면 사진 원본이 사라지고 메모가 '업로드 중'에 영영 멈춰
+// 그 날짜의 메모 업로드까지 막혔음. 이제 사진 원본을 IndexedDB(iikoto-photo-queue)에 같이 넣어 두고, 앱을 다시 열면
+// 이어서 올림(restoreMemoPhotoQueue). 원본이 어디에도 없는 '업로드 중' 메모는 '업로드 실패'로 바꿔 메모 글은 올라가게 함.
 const _memoPhotoUploadQueue=[];
+function _photoIdb(){
+  return new Promise((res,rej)=>{
+    if(!window.indexedDB)return rej(new Error('no idb'));
+    const r=indexedDB.open('iikoto-photo-queue',1);
+    r.onupgradeneeded=()=>{r.result.createObjectStore('jobs',{keyPath:'cid'});};
+    r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);
+  });
+}
+async function _idbJobs(mode,fn){
+  try{
+    const db=await _photoIdb();
+    return await new Promise((res,rej)=>{
+      const tx=db.transaction('jobs',mode);const out=fn(tx.objectStore('jobs'));
+      tx.oncomplete=()=>res(out&&out.result!==undefined?out.result:true);tx.onerror=()=>rej(tx.error);
+    });
+  }catch(e){return null;}
+}
+function _idbPutPhotoJob(job){return _idbJobs('readwrite',st=>st.put({cid:job.cid,dk:job.dk,blob:job.blob,ext:job.ext,at:Date.now()}));}
+function _idbDelPhotoJob(cid){return _idbJobs('readwrite',st=>st.delete(cid));}
+function _idbAllPhotoJobs(){return _idbJobs('readonly',st=>st.getAll());}
+async function restoreMemoPhotoQueue(){
+  const jobs=await _idbAllPhotoJobs();
+  const have=new Set(_memoPhotoUploadQueue.map(j=>j.cid));
+  const restored=new Set();
+  for(const j of (Array.isArray(jobs)?jobs:[])){
+    const memos=getMemos(j.dk);const m=memos.find(x=>x.cid===j.cid);
+    if(!m||m.photoUrl){_idbDelPhotoJob(j.cid);continue;} // 메모가 지워졌거나 이미 올라감
+    restored.add(j.cid);
+    if(have.has(j.cid))continue;
+    try{m.photoLocalUrl=URL.createObjectURL(j.blob);}catch(e){}
+    m.photoStatus='pending_upload';delete m.photoErrorMsg;
+    S.set(S.key('memos',j.dk),memos);S.set(S.key('memos_pending',j.dk),true);
+    _memoPhotoUploadQueue.push({dk:j.dk,cid:j.cid,blob:j.blob,ext:j.ext});
+  }
+  // 원본이 없는 '업로드 중' 메모 정리 — 업로드 대기 표시가 남은 날짜만 훑음
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);const mm=k&&k.match(/^memos_pending:(.+)$/);
+      if(!mm||!S.get(k))continue;
+      const dk=mm[1];const memos=getMemos(dk);let changed=false;
+      memos.forEach(m=>{
+        if(m.photoStatus==='pending_upload'&&!m.photoUrl&&!restored.has(m.cid)&&!have.has(m.cid)){
+          m.photoStatus='upload_failed';m.photoErrorMsg='앱이 닫혀 사진이 올라가지 못했어요. 사진을 다시 넣어 주세요';delete m.photoLocalUrl;changed=true;
+        }
+      });
+      if(changed){S.set(S.key('memos',dk),memos);autoSync('memos',dk);}
+    }
+  }catch(e){}
+  if(_memoPhotoUploadQueue.length&&navigator.onLine)processMemoPhotoUploadQueue();
+  if(typeof renderMemos==='function'&&document.getElementById('memo-list'))renderMemos();
+}
 // onDone(선택): 이 job의 업로드가 끝난 직후 호출 — (err, url) 형태. 성공 시 err=null.
 // 폴링 없이 "이 사진의 업로드가 끝났을 때" 후속 작업(예: 교체 전 사진 삭제)을 직접 걸 수 있게 하기 위함.
 function queueMemoPhotoUpload(dk,cid,blob,ext,onDone){
   _memoPhotoUploadQueue.push({dk,cid,blob,ext,onDone});
+  _idbPutPhotoJob({dk,cid,blob,ext});
   // 업로드 완료 전까지 photo_url이 아직 null인 스냅샷으로 syncMemosDown이 로컬을 덮어쓰지 않도록
   // pending 플래그를 계속 세워둠(레이스 컨디션 방지) — 실제 해제는 업로드 성공 후 saveMemos에서.
   S.set(S.key('memos_pending',dk),true);
@@ -5632,6 +5697,7 @@ async function processMemoPhotoUploadQueue(){
       if(m){m.photoUrl=url;m.photoStatus='synced';delete m.photoBlob;delete m.photoLocalUrl;}
       saveMemos(job.dk,memos);
       _memoPhotoUploadQueue.shift();
+      _idbDelPhotoJob(job.cid);
       renderMemos();
       if(job.onDone)job.onDone(null,url);
     }catch(err){
@@ -5754,11 +5820,15 @@ async function processPhotoR2DeleteQueue(){
   const list=S.get(R2_DEL_QUEUE_KEY)||[];
   if(!list.length)return;
   const remaining=[];
+  const holding=_deletedMemo&&_deletedMemo.memo&&_deletedMemo.memo.photoUrl; // 실행취소 대기 중인 사진은 건드리지 않음
   for(const url of list){
+    if(url===holding){remaining.push(url);continue;}
     try{await _deletePhotoFromR2(url);}
     catch(err){console.error('R2 사진 삭제 재시도 실패',err);remaining.push(url);}
   }
-  S.set(R2_DEL_QUEUE_KEY,remaining);
+  // 도는 사이 새로 들어온 삭제 대기는 살려 둠(처리한 것만 빼기)
+  const now=S.get(R2_DEL_QUEUE_KEY)||[];
+  S.set(R2_DEL_QUEUE_KEY,now.filter(u=>!list.includes(u)).concat(remaining));
 }
 window.addEventListener('online',processPhotoR2DeleteQueue);
 // Bareonbatang 로딩을 먼저 기다린 뒤 텍스트를 채워서, 기본 폰트로 잠깐 그려졌다가
@@ -8615,10 +8685,21 @@ function memoEditSwipe(i){
   renderMemoEditPhotoPreview(_memoEditCurrentPhotoUrl);
   openModal('memo-edit-modal');setTimeout(()=>document.getElementById('memo-edit-inp').focus(),100);
 }
+// 삭제한 메모의 사진 정리(감사 P3-10, 6-5) — 예전엔 실행취소 4초 안에 다른 메모를 또 지우면 앞 메모의 사진 정리가
+// 잊혔고, 4초 안에 앱을 닫아도 사진이 R2에 남았음. 이제 지우는 즉시 사진을 삭제 대기열(영구 저장)에 넣고,
+// 실행취소하면 빼며, 앞 메모가 아직 대기 중이면 새 삭제 때 바로 확정 처리함.
+function _finalizeDeletedMemoPhoto(){
+  const purl=_deletedMemo&&_deletedMemo.memo&&_deletedMemo.memo.photoUrl;
+  if(!purl)return;
+  _deletePhotoFromR2(purl).then(()=>_unqueuePhotoR2Delete(purl)).catch(err=>console.error('R2 사진 삭제 실패, 재시도 대기',err));
+}
+function _unqueuePhotoR2Delete(url){const list=(S.get(R2_DEL_QUEUE_KEY)||[]).filter(u=>u!==url);S.set(R2_DEL_QUEUE_KEY,list);}
 function memoDelSwipe(i){
   closeSheet('memo-sheet');
   const dk=dateKey(currentDate),memos=getMemos(dk);
+  if(_deletedMemo){clearTimeout(_undoTimer);_finalizeDeletedMemoPhoto();}
   _deletedMemo={memo:memos[i],idx:i,dk};
+  if(memos[i]&&memos[i].photoUrl)_queuePhotoR2Delete(memos[i].photoUrl);
   if(memos[i])addDelPending('memos',dk,memos[i].cid);
   memos.splice(i,1);saveMemos(dk,memos);renderMemos();showUndo();
 }
@@ -8683,10 +8764,7 @@ function showUndo(){
     t.classList.remove('on');
     // 실행취소 유예시간(4초)이 지나 삭제가 확정된 시점 — 사진이 있던 메모라면 R2 원본도 함께 정리.
     // 실패하면(오프라인/Worker 장애 등) 대기열에 남겨 다음 접속 때 자동 재시도.
-    if(_deletedMemo&&_deletedMemo.memo&&_deletedMemo.memo.photoUrl){
-      const purl=_deletedMemo.memo.photoUrl;
-      _deletePhotoFromR2(purl).catch(err=>{console.error('R2 사진 삭제 실패, 재시도 대기',err);_queuePhotoR2Delete(purl);});
-    }
+    _finalizeDeletedMemoPhoto();
     _deletedMemo=null;
   },4000);
 }
@@ -8694,6 +8772,7 @@ function undoMemo(){
   if(!_deletedMemo)return;
   const memos=getMemos(_deletedMemo.dk);
   if(_deletedMemo.memo)removeDelPending('memos',_deletedMemo.dk,_deletedMemo.memo.cid);
+  if(_deletedMemo.memo&&_deletedMemo.memo.photoUrl)_unqueuePhotoR2Delete(_deletedMemo.memo.photoUrl);
   memos.splice(_deletedMemo.idx,0,_deletedMemo.memo);
   saveMemos(_deletedMemo.dk,memos);_deletedMemo=null;
   document.getElementById('undo-toast').classList.remove('on');renderMemos();
@@ -10274,7 +10353,7 @@ _cswSw.restoreFromStorage();
 // 상태(status/endDate)는 confirmContent가 이미 contents에 저장했으므로 여기서 건드리지 않음 — 독서코너 전용 필드(단위·총량·표지·저자)만 맞춤.
 // (예전엔 여기서 status를 book 용어 'paused'로 덮어써서 contents에 없는 상태값이 저장되고, 중단 책이 '읽는중'으로 보이던 버그가 있었음)
 function syncContentToReadingBook(cid,poster,author,unit,totalPages){
-  const found=_findContentByCidNearMkInRange(cid,_BOOK_SCAN_MONTHS);
+  const found=_findContentByCidNearMkInRange(cid,_bookScanMonths());
   if(!found)return; // 방금 저장한 콘텐츠가 아직 로컬에 없을 리 없지만, 방어적으로 스킵
   const c=found.list[found.idx];
   const finalUnit=unit||'percent';
@@ -12243,6 +12322,29 @@ async function copyAppKey(which){
   try{await navigator.clipboard.writeText(text);showToast(which==='code'?'등록 코드를 복사했어요':'앱 키를 복사했어요');}
   catch(e){showToast('복사하지 못했어요');}
 }
+// 기기 저장 공간 사용량(감사 P1-8, 6-2 1단계) — Safari는 앱마다 localStorage를 약 5MB만 줌.
+// 지금 얼마나 쓰는지, 무엇이 큰지 실제 숫자로 보고 정리 범위를 정하기 위한 표시(정리는 아직 안 함).
+function measureLocalStorage(){
+  const groups={};let total=0,dates=new Set();
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i)||'';const v=localStorage.getItem(k)||'';
+      const bytes=(k.length+v.length)*2; // 브라우저는 UTF-16으로 셈
+      total+=bytes;
+      const g=k.split(/[:_]/)[0]||k;groups[g]=(groups[g]||0)+bytes;
+      const dm=k.match(/:(\d{4}-\d{2}-\d{2})$/);if(dm)dates.add(dm[1]);
+    }
+  }catch(e){}
+  const top=Object.entries(groups).sort((a,b)=>b[1]-a[1]).slice(0,4);
+  const oldest=[...dates].sort()[0]||null;
+  return {total,top,days:dates.size,oldest};
+}
+function renderStorageUsage(){
+  const el=document.getElementById('storage-usage-status');if(!el)return;
+  const u=measureLocalStorage();
+  const mb=b=>(b/1048576).toFixed(b<104858?2:1);
+  el.textContent=`기기 저장 ${mb(u.total)}MB / 약 5MB · 날짜 ${u.days}일치${u.oldest?' ('+u.oldest.slice(2).replace(/-/g,'.')+'~)':''} · 큰 항목 ${u.top.map(([g,b])=>g+' '+mb(b)).join(', ')}`;
+}
 // 설정탭 '마지막 자동 백업' 표시(감사 4단계) — 서버 weekly-backup이 매주 일요일 04:00에 R2로 백업하고 backup_log에 남김.
 // 성공 기록 중 최신 것을 보여 주고, 최신 시도가 실패였으면 그 사실도 함께 표시. 오프라인·조회 실패면 조용히 비워 둠.
 async function renderAutoBackupStatus(){
@@ -12258,6 +12360,7 @@ async function renderAutoBackupStatus(){
 function openSettings(){
   renderAppKeyStatus();
   renderAutoBackupStatus();
+  renderStorageUsage();
   const keyInp=document.getElementById('claude-api-key-inp');
   if(keyInp){const k=S.get('claude_api_key');keyInp.value=k?'sk-ant-••••'+k.slice(-4):'';}
   const profileInp=document.getElementById('user-profile-inp');if(profileInp)profileInp.value=S.get('user_profile')||'';
@@ -12548,7 +12651,7 @@ const _swSw=createInstantCommitStopwatch({
     // st.running=true 및 리듬블록 생성까지 전부 확정된 뒤 호출 — 렌더링/DOM 조작은 여기서만.
     if(_rdPendingCid===st.cid){_rdPendingCid=null;} // pending 카드에서 재생 링으로 시작한 경우 pending 상태 정리
     // 최근 읽은 책 우선노출(독서허브 스와이프 카드) 정렬 기준 — 기존 커밋 시점 로직을 시작 시점으로 이관
-    const foundBook=_findContentByCidNearMkInRange(st.cid,_BOOK_SCAN_MONTHS);
+    const foundBook=_findContentByCidNearMkInRange(st.cid,_bookScanMonths());
     if(foundBook){
       foundBook.list[foundBook.idx].lastActivityAt=Date.now();
       saveContents(foundBook.mk,foundBook.list);
@@ -13120,7 +13223,7 @@ function countReadingSessionsForBook(book){
   const today=new Date();
   let maxDays=365;
   if(book&&typeof book==='object'&&book.cid){
-    const found=_findContentByCidNearMkInRange(book.cid,_BOOK_SCAN_MONTHS);
+    const found=_findContentByCidNearMkInRange(book.cid,_bookScanMonths());
     const item=found?found.list[found.idx]:null;
     if(item&&item.startDate){
       const start=new Date(item.startDate+'T00:00:00');
@@ -13158,7 +13261,7 @@ function estimateRemainingReadingSessions(book,sessionCount){
 // book에 연결된 contents 항목(startDate/endDate)을 찾아 읽는중="며칠째", 다읽음="며칠간" 문구를 만듦.
 // 통합 이후 book은 항상 contents 항목이므로 cid로 직접 찾음.
 function getBookDurationLabel(book){
-  const found=_findContentByCidNearMkInRange(book.cid,_BOOK_SCAN_MONTHS);
+  const found=_findContentByCidNearMkInRange(book.cid,_bookScanMonths());
   const item=found?found.list[found.idx]:null;
   if(!item||!item.startDate)return null;
   const start=new Date(item.startDate+'T00:00:00');
@@ -14990,6 +15093,7 @@ if(navigator.onLine){
   cleanupOldDailyCache(); // fire-and-forget — 실패해도 다음 앱 시작 때 재시도되므로 await로 초기화를 막지 않음
   processPhotoR2DeleteQueue(); // 지난 세션에서 R2 삭제가 실패해 대기열에 남은 사진이 있으면 재시도
 }
+restoreMemoPhotoQueue(); // 지난번 앱이 닫혀 못 올린 사진 이어서 올리기(오프라인이면 표시만 복원, online 때 업로드)
 
 // Service Worker 등록 (오프라인 지원)
 if('serviceWorker' in navigator){
