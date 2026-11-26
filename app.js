@@ -628,12 +628,12 @@ function getDayCategoryDurations(dk){
   const dur={};
   const add=function(label,min){if(min>0)dur[label]=(dur[label]||0)+min;};
   const wakeMin=toMin(sleep.wake),sleepMin=toMin(sleep.sleep);
-  if(wakeMin!=null&&sleepMin!=null&&sleepMin<=wakeMin){add('수면',wakeMin-sleepMin);}
-  else{
-    if(wakeMin!=null)add('수면',wakeMin);
-    // 기상을 아직 안 누른 경우(sleepMin만 있고 wakeMin 없음)는 진행중이라 누계에서 제외
-  }
-  MEAL_KEYS.forEach(function(k){if(meals[k+'_time'])add('식사',60);});
+  // 수면은 '잠든 시각~기상 시각' 전체를 기상한 날에 집계(7단계 P3-9, 11/26 통일). 예전엔 자정 전에 잠든 날만
+  // 자정 이후분(기상 시각)만 세어, 23시에 잔 날과 1시에 잔 날의 기준이 달랐음(자정 전 몫은 어느 날에도 안 잡힘).
+  if(wakeMin!=null&&sleepMin!=null){add('수면',sleepMin<=wakeMin?wakeMin-sleepMin:1440-sleepMin+wakeMin);}
+  else if(wakeMin!=null){add('수면',wakeMin);} // 잠든 시각 기록이 없으면 예전처럼 자정 이후분만
+  // 기상을 아직 안 누른 경우(sleepMin만 있고 wakeMin 없음)는 진행중이라 누계에서 제외
+  MEAL_KEYS.forEach(function(k){if(meals[k+'_time'])add('식사',MEAL_BLOCK_MIN);});
   manual.forEach(function(b){
     if(!b.end)return; // 진행중 블록은 누계에서 제외
     const cat=RHYTHM_CATS[b.cat];if(!cat)return;
@@ -738,7 +738,7 @@ function computeRhythmBlocksRaw(dk){
     const t=meals[k+'_time'];
     if(!t)return;
     const start=toMin(t);
-    blocks.push({start:start,end:Math.min(start+30,1440),color:getRhythmColor('_meal'),label:meals[k]||MEAL_LABELS[k],time:t,icon:true,kind:'meal'});
+    blocks.push({start:start,end:Math.min(start+MEAL_BLOCK_MIN,1440),color:getRhythmColor('_meal'),label:meals[k]||MEAL_LABELS[k],time:t,icon:true,kind:'meal'});
   });
   // 자정 넘어 새로 등록된 블록(예: 00:30 시작)을 그날 이른 새벽 활동과 구분하기 위한 기준시각.
   // 그날 이미 등록된 수기 블록들 중 가장 늦은 시각(끝났으면 end, 진행중이면 start)을 구해두고,
@@ -1026,7 +1026,7 @@ async function syncOnelineMonthRange(y,mo){
   if(!rows)return false;
   rows.forEach(r=>{
     const dk=r.note_key.replace('oneline:','');
-    if(!S.get(S.key('oneline_pending',dk))&&!isGPending(r.note_key)&&typeof r.lines==='string')S.set(S.key('oneline',dk),r.lines);
+    if(!isGPending(r.note_key)&&typeof r.lines==='string')S.set(S.key('oneline',dk),r.lines);
   });
   return true;
 }
@@ -3032,9 +3032,6 @@ function getHabitIconFor(h){
 // 습관은 생성 시 항상 color를 갖도록 보장되므로(카탈로그/커스텀 공통) 유일한
 // 호출부에서 habitColor가 없는 경우는 실제로 발생하지 않음 — 이름 키워드매칭
 // 폴백 분기(구버전 HABIT_ICON_RULES.color)는 죽은 코드였음, 제거하고 팔레트 조회로 단순화.
-function getHabitIconColor(habitColor){
-  return getHabitColorBorder(habitColor);
-}
 
 // ── STORAGE
 const S={
@@ -3519,7 +3516,7 @@ function _findTodoByCid(cid){
     const k=localStorage.key(i);
     if(!k||!k.startsWith('todos:'))continue;
     const dk=k.slice(6);
-    const todo=getTodos.raw(dk).find(x=>x.cid===cid);
+    const todo=getTodos(dk).find(x=>x.cid===cid);
     if(todo)return {dk,todo};
   }
   return null;
@@ -3780,7 +3777,6 @@ function _materializeTodayIfDue(rule,dk){
 // 클라이언트는 그 결과인 todos를 읽기만 한다. 클라이언트가 getTodos(dk)마다 직접 판정+저장하던 방식은 여러 기기·sync 경로의 동시 실체화로 경합이 반복돼
 // (반복 규칙이 풀리거나 recur_rule_cid가 null로 남는 등) 폐기했다. 주체를 서버 하나로 좁혀 경합의 전제가 없으므로 클라이언트엔 반복 판정·락·캐시·업로드 추적이 필요 없다.
 function getTodos(dk){return S.get(S.key('todos',dk))||[];}
-getTodos.raw=getTodos; // 과거엔 실체화 재귀 방지를 위해 별도였음 — 이제 getTodos 자체가 순수 읽기라 완전히 동일.
 
 
 // ── 월간 캘린더 연속일정 bar 좌표 계산 ──
@@ -3900,7 +3896,6 @@ function saveTodosRaw(dk,v){
   S.set(S.key('todos',dk),v);
   autoSync('todos',dk); // pending 플래그 없이 조용히 업로드 시도 — 실패해도 다음 sync down이 정상적으로 서버값을 반영할 수 있음
 }
-saveTodos.raw=saveTodosRaw;
 function getMemos(dk){return S.get(S.key('memos',dk))||[];}
 // memos 서버 row → 로컬 저장 포맷 변환 (down/월간프리페치 공통 사용)
 function memoRowToLocal(r){return {time:r.memo_time,text:r.text,created:r.created,cid:r.client_id||genCid(),photoUrl:r.photo_url||undefined};}
@@ -3979,6 +3974,7 @@ function getSleepScoreLevel(score){
 // 여러 화면에서 각자 다른 문구("아침"/"아침 식사")로 중복 정의되던 것을 통일.
 const MEAL_LABELS={breakfast:'아침',lunch:'점심',dinner:'저녁',snack:'간식'};
 const MEAL_KEYS=['breakfast','lunch','snack','dinner'];
+var MEAL_BLOCK_MIN=30; // 끼니 하나의 길이 — 하루 막대와 리듬 통계가 같은 값을 씀(7단계 P3-9 통일, 예전엔 통계만 60분). var: 위쪽 함수에서 먼저 불려도 안전
 function getMeals(dk){return S.get(S.key('meals',dk))||{};}
 // meal_entries 서버 행들(끼니당 1행, 한 날짜분) → 로컬 저장 포맷(하루 한 객체) 변환. 서버에서 내려온 3군데 지점이 모두 이 함수를 거침. 로컬 모양은 예전 그대로라 화면 코드는 건드릴 필요 없음.
 function mealRowsToLocal(rows){
@@ -4177,14 +4173,14 @@ function deleteBookLocal(cid){
 function markReadingActivityToday(){
   const key='reading_dates';
   const arr=getGoal(key).filter(l=>l&&l.trim());
-  const today=dateKey(new Date());
+  const today=dateKey(getLogicalDate()); // 새벽 4시 기준(7단계 P3-4 통일) — 새벽 1시에 읽어도 전날 독서로 기록
   if(!arr.includes(today)){arr.push(today);saveGoal(key,arr);}
 }
 function getReadingStreak(){
   const arr=getGoal('reading_dates').filter(l=>l&&l.trim()).sort();
   if(!arr.length)return 0;
   let streak=0;
-  let cur=new Date();
+  let cur=getLogicalDate(); // 기록과 같은 새벽 4시 기준
   for(let i=0;i<arr.length+1;i++){
     const dk=dateKey(cur);
     if(arr.includes(dk)){streak++;cur.setDate(cur.getDate()-1);}
@@ -4235,14 +4231,9 @@ function toggleHabitCheckWithTime(wk,habitId,dow,dk){
 }
 function getContents(mk){
   const arr=S.get(S.key('contents',mk))||[];
-  let changed=false;
-  arr.forEach(item=>{
-    if(!item.startDate&&item.startDay){item.startDate=mk+'-'+pad(item.startDay);changed=true;}
-    if(!item.endDate&&item.endDay){item.endDate=mk+'-'+pad(item.endDay);changed=true;}
-    // cid가 없는 항목은 여기서 즉시 발급하지 않음 — syncContentsDown이 서버의
-    // client_id와 title+startDate 기준으로 먼저 매칭할 기회를 준 뒤에도 없으면 그때 발급.
-  });
-  if(changed)S.set(S.key('contents',mk),arr);
+  // (예전 startDay/endDay → startDate/endDate 변환은 7단계에서 제거 — 서버 contents에 day 컬럼이 없고 모든 기기가 이미 변환됨)
+  // cid가 없는 항목은 여기서 즉시 발급하지 않음 — syncContentsDown이 서버의
+  // client_id와 title+startDate 기준으로 먼저 매칭할 기회를 준 뒤에도 없으면 그때 발급.
   return arr;
 }
 // 이번달+지난달 콘텐츠를 합쳐 반환(중복 제거, 각 항목에 _mk=월키 부여) — 월초에 지난달부터 이어지는 진행중 콘텐츠를 놓치지 않기 위한 공용 조회.
@@ -8458,10 +8449,10 @@ async function recurSheetDeleteAll(){
   for(let i=0;i<=scanDays;i++){
     const d=new Date(base);d.setDate(base.getDate()+i);
     const dk=dateKey(d);
-    const todos=getTodos.raw(dk);
+    const todos=getTodos(dk);
     const filtered=todos.filter(t=>t.recurRuleCid!==_recurSheetRuleCid);
     if(filtered.length!==todos.length){
-      saveTodos.raw(dk,filtered);
+      saveTodosRaw(dk,filtered);
       syncCalCacheFromTodos(dk); // 이 날짜의 캘린더 캐시도 같이 갱신 — 안 하면 전체삭제한
       // 반복 일정이 캘린더 탭 재진입 전까지 미리보기 칸에 그대로 남아있는 것처럼 보이는 버그가 있었음.
     }
@@ -9893,7 +9884,7 @@ function openContentProgressModal(cid,watchedNow,secondsWatched){
   _cpgCid=cid;
   _cpgSeconds=secondsWatched||0; // 감상달력 일자별 로그(content_daily_log)에 기록할 이번 세션 시청시간
   const unitLabel=c.cat==='drama'?'화':'분';
-  document.getElementById('cpg-title').textContent=escapeHtml(c.title||'')+' 진행률';
+  document.getElementById('cpg-title').textContent=(c.title||'')+' 진행률';
   document.getElementById('cpg-sub').textContent=c.totalUnit?`전체 ${c.totalUnit}${unitLabel} 중 지금까지 본 ${unitLabel}수를 입력하세요`:`지금까지 본 ${unitLabel}수를 입력하세요 (전체 ${unitLabel}수는 아직 미입력)`;
   const inp=document.getElementById('cpg-inp');
   // 영화는 방금 시청한 분을 자동으로 더해서 미리 채움(수정 가능). 드라마는 시간이 곧 회차가 아니므로 자동 가산하지 않음.
@@ -11936,16 +11927,6 @@ function deleteLibItem(i){
   if(_libOpen===e.name)_libOpen=null;
   renderMealLibrary();
 }
-function renameLibItem(i,el){
-  const e=_libShown[i];if(!e)return;
-  const v=el.value.trim();
-  if(!v||v===e.name)return;
-  if(libFind(v)){el.value=e.name;return;} // 같은 이름이 이미 있으면 그대로 둠
-  const copy={...e};
-  libRemove(e.name);
-  libSet(v,{status:copy.status,recipe:copy.recipe,use_count:copy.use_count,last_used:copy.last_used});
-  _libOpen=v;renderMealLibrary();
-}
 function saveLibRecipe(i,el){
   const e=_libShown[i];if(!e)return;
   const v=el.value.trim();
@@ -12426,7 +12407,7 @@ function planPruneOldDays(){
       if(!m||!(m[1] in PRUNE_KINDS)||m[2]>=cutoff)continue;
       const pk=PRUNE_KINDS[m[1]];
       if(pk){const pv=S.get(S.key(pk,m[2]));if(pv&&(!Array.isArray(pv)||pv.length))continue;}
-      if(m[1]==='oneline'&&(S.get('gpend:oneline:'+m[2])||S.get(S.key('oneline_pending',m[2]))))continue;
+      if(m[1]==='oneline'&&S.get('gpend:oneline:'+m[2]))continue;
       if(delKeys[m[1]+':'+m[2]])continue;
       keys.push(k);bytes+=(k.length+(localStorage.getItem(k)||'').length)*2;days.add(m[2]);
     }
